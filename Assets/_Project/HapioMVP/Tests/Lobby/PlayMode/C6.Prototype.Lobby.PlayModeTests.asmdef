@@ -1,0 +1,25 @@
+{
+  "name": "C6.Prototype.Lobby.PlayModeTests",
+  "rootNamespace": "C6.Prototype.Lobby.Tests",
+  "references": [
+    "C6.Prototype",
+    "C6.Prototype.Networking",
+    "C6.Prototype.Presentation",
+    "Unity.Netcode.Runtime",
+    "Unity.Collections",
+    "UnityEngine.UI",
+    "Unity.InputSystem",
+    "C6.Prototype.Lobby"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ]
+}

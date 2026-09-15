@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "checked_on": "2026-09-15",
+  "source_snapshot": "66b6dc163c3c8f4f2f1c1212f35734a6bb7bd6ae",
+  "target_base": "6bf264732f7cd178f53da49841e103413caea762",
+  "branch": "feature/unity-prototype",
+  "static_checks": {
+    "status": "PASS",
+    "source_runtime_asset_package_settings_tool_files": 639,
+    "byte_identical_files": 638,
+    "editor_layout_path_only_change": 1,
+    "meta_files": 329,
+    "meta_missing_or_duplicate_guids": 0,
+    "build_scenes_matching_path_and_guid": 19,
+    "active_scene_reference_sequence_preserved": true,
+    "package_manifest_and_lock_unchanged": true,
+    "tool_execute_modes_preserved": 11,
+    "files_over_100_mib": 0,
+    "markdown_links_checked": 865,
+    "missing_local_links": 0
+  },
+  "public_scope": {
+    "private_git_history_imported": false,
+    "excluded_evidence_files": 1181,
+    "excluded_history_files": 187,
+    "raw_signing_and_device_artifacts_imported": false,
+    "source_uncommitted_settings_excluded": 3
+  },
+  "runtime_checks": {
+    "unity_import": "NOT_RUN",
+    "compile": "NOT_RUN",
+    "editmode": "NOT_RUN",
+    "playmode": "NOT_RUN",
+    "mac_app": "NOT_RUN",
+    "ios_build_and_sign": "NOT_RUN",
+    "physical_device": "NOT_RUN"
+  },
+  "note": "Static migration checks only. Prior prototype execution results are summarized separately and are not inherited as new runtime checks.",
+  "format_checks": {
+    "git_diff_check_exit": 2,
+    "status": "SOURCE_FORMATTING_WARNINGS",
+    "warnings": 1165,
+    "warnings_traced_to_original_snapshot": 1165,
+    "new_unexplained_warnings": 0,
+    "note": "Preserved Unity serialization whitespace, original Markdown hard breaks and existing end-of-file blank line."
+  }
+}

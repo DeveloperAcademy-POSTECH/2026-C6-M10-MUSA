@@ -1,0 +1,16 @@
+{
+  "name": "C6.Prototype.Networking",
+  "rootNamespace": "C6.Prototype.Networking",
+  "references": [
+    "C6.Prototype",
+    "Unity.Netcode.Runtime",
+    "Unity.Networking.Transport",
+    "Unity.Collections",
+    "UnityEngine.UI",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "autoReferenced": true
+}

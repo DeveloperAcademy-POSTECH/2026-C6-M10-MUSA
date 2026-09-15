@@ -1,0 +1,11 @@
+{
+  "name": "C6.Prototype.GameSyncLifecycle.EditModeTests",
+  "rootNamespace": "C6.Prototype.GameSyncLifecycle.Tests",
+  "references": ["C6.Prototype.Attack", "C6.Prototype.Resources", "C6.Prototype.Orbs", "C6.Prototype.Networking", "Unity.Netcode.Runtime"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}

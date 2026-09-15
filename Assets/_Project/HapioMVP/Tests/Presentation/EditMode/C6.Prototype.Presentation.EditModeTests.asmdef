@@ -1,0 +1,14 @@
+{
+  "name": "C6.Prototype.Presentation.EditModeTests",
+  "rootNamespace": "C6.Prototype.Presentation.Tests",
+  "references": [
+    "C6.Prototype.Presentation",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}

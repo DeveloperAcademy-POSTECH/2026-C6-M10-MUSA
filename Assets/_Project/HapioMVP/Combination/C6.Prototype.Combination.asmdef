@@ -1,0 +1,17 @@
+{
+  "name": "C6.Prototype.Combination",
+  "rootNamespace": "C6.Prototype.Combination",
+  "references": [
+    "C6.Prototype",
+    "C6.Prototype.Orbs",
+    "C6.Prototype.Attack",
+    "C6.Prototype.Resources",
+    "C6.Prototype.Presentation",
+    "C6.Prototype.Networking",
+    "Unity.Netcode.Runtime",
+    "Unity.Collections",
+    "UnityEngine.UI",
+    "Unity.InputSystem"
+  ],
+  "autoReferenced": true
+}

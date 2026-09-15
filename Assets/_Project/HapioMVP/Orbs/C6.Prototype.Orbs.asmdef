@@ -1,0 +1,13 @@
+{
+  "name": "C6.Prototype.Orbs",
+  "rootNamespace": "C6.Prototype.Orbs",
+  "references": [
+    "C6.Prototype",
+    "C6.Prototype.Presentation",
+    "C6.Prototype.Networking",
+    "Unity.Netcode.Runtime",
+    "UnityEngine.UI",
+    "Unity.InputSystem"
+  ],
+  "autoReferenced": true
+}

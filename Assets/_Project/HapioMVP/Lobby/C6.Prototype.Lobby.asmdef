@@ -1,0 +1,14 @@
+{
+  "name": "C6.Prototype.Lobby",
+  "rootNamespace": "C6.Prototype.Lobby",
+  "references": [
+    "C6.Prototype",
+    "C6.Prototype.Networking",
+    "C6.Prototype.Presentation",
+    "Unity.Netcode.Runtime",
+    "Unity.Collections",
+    "UnityEngine.UI",
+    "Unity.InputSystem"
+  ],
+  "autoReferenced": true
+}

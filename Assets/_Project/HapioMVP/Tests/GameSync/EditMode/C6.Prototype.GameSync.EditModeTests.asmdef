@@ -1,0 +1,16 @@
+{
+  "name": "C6.Prototype.GameSync.EditModeTests",
+  "rootNamespace": "C6.Prototype.GameSync.Tests",
+  "references": [
+    "C6.Prototype", "C6.Prototype.GameSync", "C6.Prototype.Attack", "C6.Prototype.Resources",
+    "C6.Prototype.Combination", "C6.Prototype.Battle", "C6.Prototype.Lobby",
+    "C6.Prototype.Presentation", "C6.Prototype.Networking", "C6.Prototype.Orbs",
+    "Unity.Netcode.Runtime", "Unity.Collections"
+  ],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "includePlatforms": ["Editor"]
+}

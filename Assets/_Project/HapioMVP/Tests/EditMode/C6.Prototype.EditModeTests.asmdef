@@ -1,0 +1,10 @@
+{
+    "name": "C6.Prototype.EditModeTests",
+    "rootNamespace": "C6.Prototype.Tests",
+    "references": ["C6.Prototype", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+    "includePlatforms": ["Editor"],
+    "overrideReferences": true,
+    "precompiledReferences": ["nunit.framework.dll"],
+    "autoReferenced": false,
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}
