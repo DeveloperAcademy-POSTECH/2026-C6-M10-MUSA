@@ -59,7 +59,7 @@ namespace C6.Prototype.GameSync
         IEnumerator Run()
         {
             for(int i=0;i<8;i++)yield return null;
-            Require(Host?game.Lobby.CreateRoom("C6 P4 passage",port):game.Lobby.JoinDirect("127.0.0.1",port),"Room request refused");
+            Require(Host?game.Lobby.CreateRoom("C6 P4 passage",port):game.Lobby.JoinDirect(Arg(Environment.GetCommandLineArgs(),"-c6P4Host","127.0.0.1"),port),"Room request refused");
             yield return Wait(()=>game.Lobby.CanReady,15,"Configuration acknowledgement missing");Write("joined-"+index,new Marker());
             yield return Wait(()=>game.Lobby.Snapshot?.ParticipantCount==count,35,"Expected roster missing");
             roster=game.Lobby.Snapshot.OrderedPlayers.Select(p=>p.clientId).ToArray();report.roster=roster;report.localPlayer=game.Lobby.Connection.LocalClientId??ulong.MaxValue;

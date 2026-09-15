@@ -1,0 +1,79 @@
+{
+  "task": "L3",
+  "status": "PASS",
+  "baseCommit": "066f80e2385f484bce40dd6671fb4a402666fa33",
+  "date": "2026-09-15",
+  "unity": "6000.5.7f1",
+  "appBuild": "26",
+  "scope": "Full existing Editor tests and explicit mixed-family Mac P4 fixtures; no mobile or real wireless validation",
+  "tests": {
+    "edit": {
+      "result": "Passed",
+      "total": "1417",
+      "passed": "1417",
+      "failed": "0",
+      "skipped": "0",
+      "inconclusive": "0",
+      "duration": "1.4151022",
+      "xmlSHA256": "772b299375612d01afcc1b0ff20f91e502c74eec7073264cae36f1bfe9506bf4"
+    },
+    "play": {
+      "result": "Passed",
+      "total": "146",
+      "passed": "146",
+      "failed": "0",
+      "skipped": "0",
+      "inconclusive": "0",
+      "duration": "73.2220305",
+      "xmlSHA256": "c9b2ed2bf52dd1328a7259b82f0a269780cdad7402e3584b043ed15c5c1c4746"
+    }
+  },
+  "mac": {
+    "3": {
+      "allPlayerCommonSnapshots": 355,
+      "mismatches": 0,
+      "approvedCrossings": 8,
+      "maximumSpeedIncrease": 0.0,
+      "heldRetained": true,
+      "fullRecipientStopped": true,
+      "sharedVictory": true,
+      "actualHost3DHits": 5,
+      "retryClean": true,
+      "addressFamilies": "IPv6 odd clients / IPv4 even clients; actual Connected log asserted"
+    },
+    "5": {
+      "allPlayerCommonSnapshots": 351,
+      "mismatches": 0,
+      "approvedCrossings": 8,
+      "maximumSpeedIncrease": 0.0,
+      "heldRetained": true,
+      "fullRecipientStopped": true,
+      "sharedVictory": true,
+      "actualHost3DHits": 5,
+      "retryClean": true,
+      "addressFamilies": "IPv6 odd clients / IPv4 even clients; actual Connected log asserted"
+    }
+  },
+  "build": {
+    "task": "L2",
+    "build": "26",
+    "target": "StandaloneOSX",
+    "startedUtc": "2026-09-15T12:34:12.4066340Z",
+    "result": "Succeeded",
+    "exception": "",
+    "outputValidation": "PASS",
+    "device": "NOT_RUN",
+    "gameplay": "NOT_RUN",
+    "errors": 0,
+    "warnings": 15,
+    "seconds": 12.599001999999999
+  },
+  "L4": "NOT_RUN",
+  "limitations": [
+    "Explicit Raw/Combined/capacity fixtures and synthetic pointer; no physical Touch or Bonjour",
+    "Paid stamina generation/direct combination/client-hit reward covered by existing Editor tests, not exercised end-to-end in mixed Mac fixture",
+    "No full real-time 180-second mobile match; no iOS rebuild",
+    "Same Mac loopback; real Wi-Fi/offline LAN/hotspot gameplay are L4"
+  ],
+  "diagnosticSourceSHA256": "381f88107f9014d308189747c4ea088ca2284116bc32755ecced89f89d0871f7"
+}
