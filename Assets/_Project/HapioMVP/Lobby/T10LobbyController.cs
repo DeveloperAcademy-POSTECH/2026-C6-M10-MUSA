@@ -91,14 +91,15 @@ namespace C6.Prototype.Lobby
             LobbyPlayer other = local == null ? null : local.playerNumber == 1 ? snapshot.p2 : snapshot.p1;
             bool multiparty = session.MaximumParticipants > 2;
             var roster = snapshot?.OrderedPlayers ?? Array.Empty<LobbyPlayer>();
-            bool connected = session.Connected;
+            bool transportConnected = session.Connected;
+            bool connected = session.InitialStateReady;
             bool canConnect = connection != null && connection.CanStart;
             bool browsing = session.Discovery != null && session.Discovery.IsBrowsing;
             bool started = snapshot != null && snapshot.phase == LobbyProtocol.Playing && snapshot.start != null;
             bool closed = snapshot != null && snapshot.phase == LobbyProtocol.Closed;
             ulong localId = connection != null && connection.LocalClientId.HasValue ? connection.LocalClientId.Value : ulong.MaxValue;
             bool checkedInitial = local != null && local.initialStateReceived && session.HostConfig != null;
-            string error = !string.IsNullOrWhiteSpace(session.Error) ? FriendlyError(session.Error) : actionError;
+            string error = !string.IsNullOrWhiteSpace(session.Error) ? FriendlyStagedError(session.Error, session.FailureStage) : actionError;
             if (string.IsNullOrWhiteSpace(error) && closed) error = FriendlyError(snapshot.closeReason);
 
             var view = new LobbyUiState
@@ -109,9 +110,12 @@ namespace C6.Prototype.Lobby
                     + "  /  " + (!p.initialStateReceived ? "CHECKING SETTINGS" : p.ready ? "READY" : "NOT READY"))),
                 Browsing = browsing,
                 Phase = started ? "START CONFIRMED" : closed ? "ROOM ENDED" : connected ? "LOBBY"
-                    : connection != null && (connection.State == DirectConnectionState.Connecting || connection.State == DirectConnectionState.StartingHost)
-                        ? "CONNECTING" : browsing ? "SEARCHING" : "OFFLINE",
-                Status = started ? "All players agreed to start. Lobby check complete." : session.Status,
+                    : transportConnected ? "CHECKING ROOM"
+                    : connection != null && (connection.JoinInProgress || connection.State == DirectConnectionState.StartingHost)
+                        ? ConnectionPhase(connection.ConnectionStage) : browsing ? "SEARCHING" : "OFFLINE",
+                Status = started ? "All players agreed to start. Lobby check complete."
+                    : transportConnected && !connected ? snapshot == null ? "Host approved. Receiving room settings…" : "Confirming room settings with the host…"
+                    : session.Status,
                 Error = error,
                 RoomTitle = session.RoomName,
                 LocalPlayer = PlayerName(local?.playerNumber ?? 0),
@@ -123,7 +127,7 @@ namespace C6.Prototype.Lobby
                 RemoteReady = roster.Length > 1 && roster.Where(p => p.clientId != localId).All(p => p.ready),
                 Compatibility = checkedInitial ? roster.Any(p => !p.initialStateReceived)
                     ? "Your settings are confirmed. Waiting for other players." : "Room settings confirmed."
-                    : connected ? "Checking room settings before Ready…" : "Join a room to confirm its settings.",
+                    : transportConnected ? "Checking room settings before Ready…" : "Join a room to confirm its settings.",
                 StartStatus = started ? "START CONFIRMED\nAll players are prepared."
                     : closed ? "This room has ended. Leave and connect again."
                     : session.HasPending ? "Waiting for confirmation…"
@@ -136,9 +140,9 @@ namespace C6.Prototype.Lobby
                 CanRefresh = canConnect && browsing,
                 CanCancelBrowse = browsing,
                 CanJoinDirect = canConnect,
-                CanReady = session.CanReady,
-                CanStart = session.CanStart,
-                CanLeave = connected || (connection != null && (connection.State == DirectConnectionState.Connecting ||
+                CanReady = connected && session.CanReady,
+                CanStart = connected && session.CanStart,
+                CanLeave = transportConnected || (connection != null && (connection.JoinInProgress || connection.State == DirectConnectionState.Connecting ||
                     connection.State == DirectConnectionState.StartingHost))
             };
             hud.SetState(view);
@@ -148,7 +152,7 @@ namespace C6.Prototype.Lobby
         private IReadOnlyList<LobbyRoomRow> RoomRows(bool canConnect)
         {
             if (session.Discovery == null) return Array.Empty<LobbyRoomRow>();
-            // Bonjour can report one room on several interfaces. Keep a single, newest display row per RoomId.
+            // The catalog combines interface-specific routes into one immutable candidate set per room.
             return session.Rooms.Where(room => room != null && !string.IsNullOrEmpty(room.RoomId))
                 .GroupBy(room => room.RoomId, StringComparer.Ordinal)
                 .Select(group => group.OrderByDescending(room => room.LastSeenSeconds)
@@ -161,7 +165,7 @@ namespace C6.Prototype.Lobby
                     {
                         Id = room.RoomId,
                         Title = room.Name,
-                        Address = room.Address + ":" + room.Port,
+                        Address = "Same Wi-Fi or hotspot",
                         Status = string.IsNullOrEmpty(problem) ? room.Participants + " / " + session.MaximumParticipants + " players · Available" : RoomStatus(problem, session.MaximumParticipants),
                         CanJoin = canConnect && string.IsNullOrEmpty(problem)
                     };
@@ -185,6 +189,16 @@ namespace C6.Prototype.Lobby
         }
 
         private static string PlayerName(int number) => number >= 1 && number <= LobbyProtocol.MaximumCapacity ? "P" + number : "—";
+        private static string ConnectionPhase(string stage)
+        {
+            switch (stage)
+            {
+                case "HostApproval": return "HOST CHECK";
+                case "Retrying": return "TRYING NEXT";
+                case "HostStarting": return "OPENING ROOM";
+                default: return "CONNECTING";
+            }
+        }
         private static string RoomStatus(string reason, int capacity)
         {
             switch (reason)
@@ -196,6 +210,31 @@ namespace C6.Prototype.Lobby
                 case "STALE_ROOM": return "No longer available · Refresh";
                 default: return "Unavailable";
             }
+        }
+
+        private static string FriendlyStagedError(string reason, string stage)
+        {
+            // Explicit admission/configuration reasons are more useful than a generic stage.
+            // Keep native permission denial evidence in the existing focused guidance path.
+            switch (reason)
+            {
+                case "ROOM_FULL": case "C6_T02_ROOM_FULL": case "BUILD_MISMATCH": case "PROTOCOL_MISMATCH":
+                case "CONFIG_MISMATCH": case "UNSUPPORTED_HOST_CONFIG": case "STALE_ROOM":
+                case "ROOM_CLOSED": case "HOST_CLOSED_ROOM": case "BATTLE_IN_PROGRESS":
+                case "DUPLICATE_PARTICIPANT": case "APPLICATION_BACKGROUNDED":
+                case "INITIAL_STATE_TIMEOUT": case "INVALID_ADDRESS_OR_PORT": case "INVALID_ADDRESS": case "INVALID_PORT":
+                    return FriendlyError(reason);
+            }
+            if (stage == "DISCOVERY") return FriendlyError(reason);
+            if (stage == "TRANSPORT")
+                return "Could not reach the host. Keep both apps open on the same Wi-Fi or hotspot, then try again.";
+            if (stage == "APPROVAL")
+                return "The host did not approve entry. Refresh the rooms and check that both apps use the same version.";
+            if (stage == "INITIAL_STATE")
+                return "Connected to the host, but room settings were not confirmed. Leave and connect again.";
+            if (stage == "SESSION")
+                return "The room connection was lost. Check the Wi-Fi or hotspot, then connect again.";
+            return FriendlyError(reason);
         }
 
         private static string FriendlyError(string reason)
@@ -226,9 +265,12 @@ namespace C6.Prototype.Lobby
                 case "SEND_FAILED": return "The host did not respond. Check the Wi-Fi and connect again.";
                 case "INVALID_ROOM_NAME": return "Enter a room name of 32 characters or fewer, without line breaks.";
                 case "INVALID_PORT": return "Enter a port number from 1 to 65535.";
-                case "INVALID_ADDRESS_OR_PORT": return "Enter the host IPv4 address and a port from 1 to 65535.";
+                case "INVALID_ADDRESS":
+                case "INVALID_ADDRESS_OR_PORT": return "Enter the host IPv4 or IPv6 address and a port from 1 to 65535.";
                 case "HOST_FAILED": return "The room could not open. Check the Wi-Fi and try again.";
                 case "CONNECTION_BUSY": return "A connection is already in progress. Please wait.";
+                case "CONNECTION_MANAGER_CONFLICT": return "Another session is still open. End it before connecting again.";
+                case "USER_CANCELLED": return "Connection cancelled. Find or create a room when ready.";
                 case "STALE_REVISION": return "The room changed before confirmation. Check its status and try again.";
                 case "STALE_SESSION": return "That room has ended. Connect again.";
                 case "READY_UNCHANGED": return "Your Ready state is already confirmed.";

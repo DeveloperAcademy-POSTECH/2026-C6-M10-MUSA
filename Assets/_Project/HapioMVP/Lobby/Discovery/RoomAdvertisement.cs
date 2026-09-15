@@ -65,8 +65,12 @@ namespace C6.Prototype.Lobby.Discovery
         }
 
         public static bool TryDecode(byte[] bytes, ushort port, out RoomAdvertisement room, out string reason)
+            => TryDecode(bytes, port, out room, out _, out reason);
+
+        public static bool TryDecode(byte[] bytes, ushort port, out RoomAdvertisement room, out ulong sequence, out string reason)
         {
             room = null;
+            sequence = 0;
             reason = null;
             if (bytes == null || bytes.Length == 0 || bytes.Length > MaximumRecordBytes)
             { reason = "Missing or oversized Bonjour TXT record."; return false; }
@@ -96,7 +100,7 @@ namespace C6.Prototype.Lobby.Discovery
                 !values.TryGetValue("u", out string participants) || !values.TryGetValue("q", out string heartbeat) ||
                 !int.TryParse(protocol, NumberStyles.None, CultureInfo.InvariantCulture, out int version) ||
                 !int.TryParse(participants, NumberStyles.None, CultureInfo.InvariantCulture, out int count) ||
-                !ulong.TryParse(heartbeat, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+                !ulong.TryParse(heartbeat, NumberStyles.None, CultureInfo.InvariantCulture, out sequence))
             { reason = "Incomplete Bonjour room metadata."; return false; }
             if (status != "lobby" && status != "playing")
             { reason = "Invalid room status."; return false; }

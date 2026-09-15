@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Linq;
+using System.Reflection;
 using C6.Prototype.Networking;
 using NUnit.Framework;
 using Unity.Netcode;
@@ -90,6 +91,69 @@ namespace C6.Prototype.Lobby.Tests
             Assert.That(safe.yMax, Is.EqualTo(Screen.safeArea.yMax).Within(1f));
             Assert.That(Object.FindObjectsByType<MonoBehaviour>()
                 .Any(item => item != null && (item.GetType().Name == "T09BattleController" || item.GetType().Name == "BattleSession")), Is.False);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator Ipv6DirectEntryKeepsTheAddressAndNumericScopeWithoutTruncation()
+        {
+            Hud.SetDirectExpanded(true);
+            const string address = "fe80:0000:0000:0000:1234:5678:abcd:ef01%12345";
+            Hud.HostAddressInput.text = address;
+            Assert.That(Hud.HostAddress, Is.EqualTo(address));
+            Assert.That(Hud.HostAddressInput, Is.SameAs(Hud.IPv4Input), "Preserve existing scene/test access while supporting IPv6.");
+            Assert.That(Hud.HostAddressInput.characterLimit, Is.GreaterThanOrEqualTo(address.Length));
+            Assert.That(Hud.HostAddressInput.keyboardType, Is.EqualTo(TouchScreenKeyboardType.ASCIICapable));
+            Assert.That(((Text)Hud.HostAddressInput.placeholder).text, Does.Contain("IPv6"));
+            Assert.That(Session.Connection.CanStart, Is.True, "Editing an address must not begin a connection.");
+            Assert.That(Managers(), Is.Empty);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator TransportAloneDoesNotDisplayAReadyWaitingRoomBeforeSnapshotAndAck()
+        {
+            yield return CreateHost();
+            Assert.That(Session.Connected && Session.InitialStateReady, Is.True);
+            var snapshotField = typeof(T10LobbySession).GetField("<Snapshot>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+            var configField = typeof(T10LobbySession).GetField("<HostConfig>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(snapshotField, Is.Not.Null);
+            Assert.That(configField, Is.Not.Null);
+            var snapshot = Session.Snapshot;
+            var hostConfig = Session.HostConfig;
+            try
+            {
+                // Explicit display fixtures over a real transport, applied and restored within
+                // this frame. They do not claim a second device or a delayed network snapshot.
+                snapshotField.SetValue(Session, null);
+                configField.SetValue(Session, null);
+                controller.RefreshView();
+                Assert.That(Session.Connected, Is.True);
+                Assert.That(Session.InitialStateReady, Is.False);
+                Assert.That(Hud.PhaseLabel.text, Is.EqualTo("CHECKING ROOM"));
+                Assert.That(Hud.StatusLabel.text, Does.Contain("Receiving room settings"));
+                Assert.That(Hud.ReadyButton.gameObject.activeInHierarchy, Is.False);
+                Assert.That(Hud.CancelConnectionButton.gameObject.activeInHierarchy, Is.True);
+
+                var unacknowledged = JsonUtility.FromJson<LobbySnapshot>(JsonUtility.ToJson(snapshot));
+                unacknowledged.p1.initialStateReceived = false;
+                snapshotField.SetValue(Session, unacknowledged);
+                configField.SetValue(Session, hostConfig);
+                controller.RefreshView();
+                Assert.That(Session.InitialStateReady || Session.CanReady, Is.False);
+                Assert.That(Hud.PhaseLabel.text, Is.EqualTo("CHECKING ROOM"));
+                Assert.That(Hud.StatusLabel.text, Does.Contain("Confirming room settings"));
+                Assert.That(Hud.ReadyButton.gameObject.activeInHierarchy, Is.False);
+            }
+            finally
+            {
+                snapshotField.SetValue(Session, snapshot);
+                configField.SetValue(Session, hostConfig);
+                controller.RefreshView();
+            }
+            Assert.That(Session.InitialStateReady, Is.True);
+            Assert.That(Hud.PhaseLabel.text, Is.EqualTo("LOBBY"));
+            Assert.That(Hud.ReadyButton.gameObject.activeInHierarchy && Hud.ReadyButton.interactable, Is.True);
             yield return null;
         }
 
