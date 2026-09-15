@@ -1,0 +1,16 @@
+{
+  "name": "C6.Prototype.Networking.EditModeTests",
+  "rootNamespace": "C6.Prototype.Networking.Tests",
+  "references": [
+    "C6.Prototype.Networking",
+    "Unity.Netcode.Runtime",
+    "Unity.Collections"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}

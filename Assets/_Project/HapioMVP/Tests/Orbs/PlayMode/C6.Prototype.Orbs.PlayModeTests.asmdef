@@ -1,0 +1,23 @@
+{
+  "name": "C6.Prototype.Orbs.PlayModeTests",
+  "rootNamespace": "C6.Prototype.Orbs.Tests",
+  "references": [
+    "C6.Prototype.Orbs",
+    "C6.Prototype.Presentation",
+    "C6.Prototype.Networking",
+    "Unity.Netcode.Runtime",
+    "UnityEngine.UI",
+    "Unity.InputSystem"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ]
+}

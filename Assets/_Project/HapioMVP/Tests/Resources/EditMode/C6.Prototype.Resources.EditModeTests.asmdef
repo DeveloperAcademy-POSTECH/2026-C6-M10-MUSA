@@ -1,0 +1,29 @@
+{
+  "name": "C6.Prototype.Resources.EditModeTests",
+  "rootNamespace": "C6.Prototype.Resources.Tests",
+  "references": [
+    "C6.Prototype.Orbs",
+    "C6.Prototype.Presentation",
+    "C6.Prototype.Networking",
+    "Unity.Netcode.Runtime",
+    "UnityEngine.UI",
+    "Unity.InputSystem",
+    "C6.Prototype.Attack",
+    "Unity.Collections",
+    "C6.Prototype.Resources"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
+}

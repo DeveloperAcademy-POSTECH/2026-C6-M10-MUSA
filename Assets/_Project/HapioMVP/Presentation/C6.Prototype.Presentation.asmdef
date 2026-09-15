@@ -1,0 +1,6 @@
+{
+    "name": "C6.Prototype.Presentation",
+    "rootNamespace": "C6.Prototype.Presentation",
+    "references": ["C6.Prototype", "UnityEngine.UI", "Unity.InputSystem"],
+    "autoReferenced": true
+}
