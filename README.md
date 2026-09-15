@@ -27,6 +27,8 @@ Unity·URP·네트워크 패키지 버전은 저장된 설정을 유지합니다
 
 ### 개발 문서
 
+- [계획 — 추가 패키지 없는 핫스팟·Wi-Fi 호환성 개선](docs/LOCAL_NETWORK_COMPATIBILITY_PLAN.md) · L1 핫스팟 데이터 왕복 확인 완료, L2 게임 통합은 미시작
+- [L1 네트워크 진단 코드·검증·빌드 방법](docs/L1_NETWORK_DIAGNOSTICS.md)
 - [보고서 1 — Unity 프로젝트 준비와 기본 게임](docs/UNITY_BEGINNER_DEVELOPMENT_REPORT.md)
 - [보고서 2 — 2D 물리·3D 투척·최대5인 확장](docs/UNITY_BEGINNER_PHYSICS_MULTIPLAYER_REPORT.md)
 - [보고서 3 — 실제 코드 읽기·유지보수·디버깅 실습](docs/UNITY_BEGINNER_CODE_MAINTENANCE_GUIDE.md)
