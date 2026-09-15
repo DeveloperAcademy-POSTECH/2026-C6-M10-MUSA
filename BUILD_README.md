@@ -6,6 +6,8 @@
 
 # Unity에서 iPhone·iPad로 직접 빌드하기
 
+**네트워크 수정 앱26을 재현할 때:** [L2 빌드·실행 절차](docs/L2_CONNECTION_INTEGRATION.md#mac에서-동일-검사를-다시-실행하기)의 `C6.Editor.L2ConnectionBuild.ExportIOS`를 사용한다. 같은 `ContinuousTransferBattle` 씬을 출력하고 Development 빌드에만 `C6_L2_CHECKS` 관찰 도구를 추가한다. 아래 P4 메뉴는 기존 빌드24 출력 절차이므로 앱26 검증본과 구별하며, Xcode 서명·설치 과정은 아래 안내를 그대로 참고한다.
+
 [프로젝트 README](README.md) · [Unity 개발 보고서](docs/UNITY_BEGINNER_DEVELOPMENT_REPORT.md)
 
 **조직 저장소의 Unity 프로젝트를 Mac에서 열어 자신의 iPhone·iPad에 설치하고, 수정한 게임을 다시 반영하는 상세 안내입니다.** Unity를 처음 사용하는 사람도 순서대로 따라갈 수 있도록 클릭 위치, 입력값, 단계별 완료 기준을 함께 적었습니다.

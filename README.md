@@ -27,7 +27,7 @@ Unity·URP·네트워크 패키지 버전은 저장된 설정을 유지합니다
 
 ### 개발 문서
 
-- [계획 — 추가 패키지 없는 핫스팟·Wi-Fi 호환성 개선](docs/LOCAL_NETWORK_COMPATIBILITY_PLAN.md) · L1 핫스팟 데이터 왕복 확인 완료, L2 게임 통합은 미시작
+- [계획 — 추가 패키지 없는 핫스팟·Wi-Fi 호환성 개선](docs/LOCAL_NETWORK_COMPATIBILITY_PLAN.md) · L1~L3 완료, L4 핫스팟 확인 완료·일반 Wi-Fi/오프라인 LAN 미실행
 - [L1 네트워크 진단 코드·검증·빌드 방법](docs/L1_NETWORK_DIAGNOSTICS.md)
 - [보고서 1 — Unity 프로젝트 준비와 기본 게임](docs/UNITY_BEGINNER_DEVELOPMENT_REPORT.md)
 - [보고서 2 — 2D 물리·3D 투척·최대5인 확장](docs/UNITY_BEGINNER_PHYSICS_MULTIPLAYER_REPORT.md)
@@ -36,8 +36,14 @@ Unity·URP·네트워크 패키지 버전은 저장된 설정을 유지합니다
 - [공개 검증 요약과 확인 한계](docs/VALIDATION_SUMMARY.md)
 - [이관 범위·원본 보존·정적 검사](docs/MIGRATION.md)
 
-이번 업로드는 기존 구현의 파일 이관입니다. 이 새 경로에서 Unity 실행·새 빌드·실기기 검사를 완료했다는 뜻은 아닙니다. 원시 기기 로그·서명 자료·과거 Git 이력은 공개하지 않았으며 기존 검증 보고와 이번 이관 검사를 구분합니다.
+최초 빌드24 업로드는 기존 구현의 파일 이관이었으며, 당시 새 경로의 실행 검증과는 구분했습니다. 이후 앱26 네트워크 수정의 실제 검증 범위는 아래에 정리했습니다. 원시 기기 로그·서명 자료·원본 비공개 Git 이력은 공개하지 않았습니다.
 
-### 로컬 네트워크 호환성 개선 L2
+### 로컬 네트워크 호환성 개선 · 앱26
 
-앱26의 IPv4/IPv6 수신, 여러 주소 재시도와 취소, 검색 만료, 최초 상태 확인을 적용했다. 기존 게임 계약과 규칙은 빌드24를 유지한다. iPhone 핫스팟→iPad의 실제 방 입장·최초 상태·양쪽 Ready를 확인했다. 현재 검증 범위와 실행 방법은 [L2 기록](docs/L2_CONNECTION_INTEGRATION.md)을 확인한다. 일반 Wi-Fi·인터넷 없는 LAN·전체 다인 게임 검사는 같은 빌드의 별도 검증이 필요하다.
+`fix/#5-local-network-compatibility`에서 추가 패키지 없이 IPv4/IPv6 수신, 여러 주소 재시도·취소, 검색 만료와 입장 단계 안내를 적용했다. 게임 계약과 규칙은 빌드24를 유지한다. 코드 구조·조정값·앱26 빌드 방법은 [L2 기록](docs/L2_CONNECTION_INTEGRATION.md)을 따른다.
+
+- [L3 회귀 검사](docs/L3_GAME_REGRESSION.md): EditMode 1,417개·PlayMode 146개 통과. Mac의 IPv4/IPv6 혼합 3/5인에서 상태 불일치0, 전달·실제 피격·Victory/Retry 확인. Fixture·합성 포인터를 사용한 독립 앱 검사다.
+- [L4 핫스팟 확인](docs/L4_HOTSPOT_VALIDATION.md): iPhone 핫스팟 Host→iPad의 게임 시작·새 방 재입장은 기기 기록, 전달·조합·투척·결과 화면은 사용자 확인으로 구분한다.
+- 일반 공유기 Wi-Fi·인터넷 없는 LAN은 환경 미확보로 **NOT_RUN**이며 L4 전체는 미완료다. 인터넷 없는 LAN을 허용하는 구조와 실제 해당 환경의 검증 완료는 구분한다.
+
+위 결과는 파일 이관 이후 별도 검증 폴더에서 수행한 네트워크 수정 검증이다. 기존 보고서의 실행 상태를 소급 변경하거나 모든 무선 환경의 성공을 보장하지 않는다.
