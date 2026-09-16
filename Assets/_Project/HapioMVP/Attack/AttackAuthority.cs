@@ -107,6 +107,7 @@ namespace C6.Prototype.Attack
         private uint boundRound;
         private ProjectileLaunchBasis throwBasis;
         private ThrowTuning throwTuning;
+        private ulong[] orderedThrowParticipantIds = Array.Empty<ulong>();
         private int maximumFlyingPerPlayer;
         private float transferDeceleration, transferStopSpeed, maximumTransferSpeed;
         public bool ContinuousTransfersEnabled { get; private set; }
@@ -148,6 +149,23 @@ namespace C6.Prototype.Attack
             if (!ThrowMapping.TryCalculate(UnityEngine.Vector2.one * .5f, sample, basis, tuning, out _, out var error))
                 throw new ArgumentException("Invalid release throw setup: " + error);
             throwBasis = basis; throwTuning = tuning; ReleaseThrowsEnabled = true;
+        }
+        public void ConfigureParticipantThrowFrames(ulong[] orderedParticipantIds)
+        {
+            if (boundRound != 0 || State != AttackBattleState.NotStarted)
+                throw new InvalidOperationException(
+                    "Configure participant throw frames before the first round starts.");
+
+            if (!ReleaseThrowsEnabled)
+                throw new InvalidOperationException(
+                    "Configure release throws before participant throw frames.");
+
+            if (!ParticipantRing.Validate(orderedParticipantIds))
+                throw new ArgumentException(
+                    "Two to five ordered participants are required.",
+                    nameof(orderedParticipantIds));
+
+            orderedThrowParticipantIds = (ulong[])orderedParticipantIds.Clone();
         }
 
         public AttackBattleState State { get; private set; } = AttackBattleState.NotStarted;
@@ -201,12 +219,42 @@ namespace C6.Prototype.Attack
             AttackLaunchResult result;
             BallisticLaunch? calculated = null;
             string throwError = null;
+
             if (request.Kind == OrbActionKind.Launch && ReleaseThrowsEnabled && request.ThrowInput.HasValue)
             {
-                if (ThrowMapping.TryCalculate(request.NormalizedPosition, request.ThrowInput.Value,
-                    throwBasis, throwTuning, out var launch, out var error)) calculated = launch;
-                else throwError = error.ToUpperInvariant().Replace('-', '_');
+                ProjectileLaunchBasis participantBasis = throwBasis;
+
+                if (orderedThrowParticipantIds.Length > 0)
+                {
+                    int participantIndex = Array.IndexOf(
+                        orderedThrowParticipantIds,
+                        authenticatedSender);
+
+                    if (participantIndex < 0)
+                        throwError = "THROW_PARTICIPANT_NOT_FOUND";
+                    else
+                    {
+                        participantBasis = ParticipantLaunchFrame.Calculate(
+                            throwBasis,
+                            participantIndex + 1,
+                            orderedThrowParticipantIds.Length);
+                    }
+                }
+
+                if (throwError == null)
+                {
+                    if (ThrowMapping.TryCalculate(
+                        request.NormalizedPosition,
+                        request.ThrowInput.Value,
+                        participantBasis,
+                        throwTuning,
+                        out var launch,
+                        out var error)) calculated = launch;
+                    else
+                        throwError = error.ToUpperInvariant().Replace('-', '_');
+                }
             }
+
             if (!gameplayEnabled || State != AttackBattleState.Playing) result = Reject("BATTLE_NOT_PLAYING");
             else if (request.Kind != OrbActionKind.Launch) result = Reject("NOT_A_LAUNCH");
             else if (request.TransferMotion.HasValue) result = Reject("UNEXPECTED_TRANSFER_MOTION");

@@ -413,7 +413,21 @@ namespace C6.Prototype.Attack
                 Registry = new HostOrbRegistry(true);
                 Registry.BeginSession(aggregateMode ? approvedSessionId : Guid.NewGuid().ToString("N"), aggregateMode ? approvedRoundId : 1);
                 Authority = new AttackAuthority(Registry, config.MonsterMaxHp, config.BaseDamage);
-                if (releaseThrowsEnabled) Authority.ConfigureReleaseThrows(launchFrame.Basis, CurrentThrowTuning());
+
+                if (releaseThrowsEnabled)
+                {
+                    Authority.ConfigureReleaseThrows(
+                        launchFrame.Basis,
+                        CurrentThrowTuning()
+                    );
+
+                    if (MultiplayerRosterEnabled)
+                    {
+                        Authority.ConfigureParticipantThrowFrames(
+                            approvedRoster
+                        );
+                    }
+                }
                 if (MultiplayerRosterEnabled) Authority.ConfigureFlightCapacity(ParticipantRing.MaximumFlyingPerPlayer);
                 if (continuousTransfersEnabled) Authority.ConfigureContinuousTransfers(config.OrbFloorDeceleration,
                     config.OrbStopSpeed, config.OrbMaxReleaseSpeed * OrbTransferMotion.MaximumReleaseSpeedMultiplier);
