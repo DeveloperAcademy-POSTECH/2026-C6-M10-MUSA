@@ -4,7 +4,8 @@
   "references": [
     "C6.Prototype.Networking",
     "Unity.Netcode.Runtime",
-    "Unity.Collections"
+    "Unity.Collections",
+    "Unity.Networking.Transport"
   ],
   "includePlatforms": [
     "Editor"

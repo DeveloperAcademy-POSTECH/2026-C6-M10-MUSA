@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace C6.Prototype.Lobby.Discovery
@@ -7,8 +8,11 @@ namespace C6.Prototype.Lobby.Discovery
     public sealed class DiscoveredRoom
     {
         private readonly RoomAdvertisement advertisement;
+        private readonly ReadOnlyCollection<string> candidates;
         public string DiscoveryKey { get; }
-        public string Address { get; }
+        public string Address => candidates[0];
+        public IReadOnlyList<string> Candidates => candidates;
+        public IReadOnlyList<string> Addresses => candidates;
         public double LastSeenSeconds { get; }
         public double ExpiresAtSeconds { get; }
         public RoomAdvertisement Advertisement => advertisement.Copy();
@@ -21,14 +25,14 @@ namespace C6.Prototype.Lobby.Discovery
         public int Participants => advertisement.Participants;
         public ushort Port => advertisement.Port;
 
-        internal DiscoveredRoom(string key, RoomAdvertisement room, string address, double now, double expires)
+        internal DiscoveredRoom(string key, RoomAdvertisement room, IEnumerable<string> addresses, double now, double expires)
         {
-            DiscoveryKey = key; advertisement = room.Copy(); Address = address;
+            DiscoveryKey = key; advertisement = room.Copy(); candidates = Array.AsReadOnly(addresses.ToArray());
             LastSeenSeconds = now; ExpiresAtSeconds = expires;
         }
     }
 
-    /// <summary>Pure catalog: interface-specific removal, immutable snapshots, heartbeat expiry and bounded room count.</summary>
+    /// <summary>Per-interface leases, immutable merged candidates and bounded room count.</summary>
     public sealed class DiscoveryRoomCatalog
     {
         public const double DefaultLifetimeSeconds = 12;
@@ -44,29 +48,44 @@ namespace C6.Prototype.Lobby.Discovery
             lifetime = lifetimeSeconds;
         }
 
-        // Multiple interfaces may report one room. Present it once while retaining each removal identity.
-        public IReadOnlyList<DiscoveredRoom> Rooms => entries.Values
-            .GroupBy(x => x.RoomId, StringComparer.Ordinal)
-            .Select(group => group.OrderByDescending(x => x.LastSeenSeconds).ThenBy(x => x.DiscoveryKey, StringComparer.Ordinal).First())
-            .OrderBy(x => x.Name, StringComparer.Ordinal).ThenBy(x => x.RoomId, StringComparer.Ordinal).ToArray();
+        // The latest metadata describes the room, but every compatible interface contributes routes.
+        public IReadOnlyList<DiscoveredRoom> Rooms => entries.Values.GroupBy(x => x.RoomId, StringComparer.Ordinal)
+            .Select(Merge).OrderBy(x => x.Name, StringComparer.Ordinal).ThenBy(x => x.RoomId, StringComparer.Ordinal).ToArray();
 
         public bool Upsert(string key, RoomAdvertisement room, string address, double now)
+            => Upsert(key, room, new[] { address }, now);
+
+        public bool Upsert(string key, RoomAdvertisement room, IEnumerable<string> addresses, double now, double? expiresAt = null)
         {
             if (string.IsNullOrEmpty(key) || key.Length > 1024 || !Finite(now) || now < latestTime ||
-                !RoomAdvertisementCodec.Validate(room, out _) || !RoomAdvertisementCodec.IsUsableIPv4(address)) return false;
-            if (!entries.ContainsKey(key) && entries.Count >= MaximumServices) return false;
+                !RoomAdvertisementCodec.Validate(room, out _) || addresses == null) return false;
+            double expires = expiresAt ?? now + lifetime;
+            if (!Finite(expires) || expires <= now || expires > now + lifetime) return false;
+            string[] selected = DiscoveryAddressCandidates.Select(addresses);
+            if (selected.Length == 0 || (!entries.ContainsKey(key) && entries.Count >= MaximumServices)) return false;
             latestTime = now;
-            entries[key] = new DiscoveredRoom(key, room, address, now, now + lifetime);
+            // An address refresh is not a newer TXT. Keep metadata ordering tied to its lease.
+            double metadataSeenAt = expiresAt.HasValue ? expires - lifetime : now;
+            entries[key] = new DiscoveredRoom(key, room, selected, metadataSeenAt, expires);
             return true;
+        }
+
+        private static DiscoveredRoom Merge(IGrouping<string, DiscoveredRoom> group)
+        {
+            var ordered = group.OrderByDescending(x => x.LastSeenSeconds).ThenBy(x => x.DiscoveryKey, StringComparer.Ordinal).ToArray();
+            DiscoveredRoom latest = ordered[0];
+            // A shared RoomId alone cannot authorize mixing a conflicting port/build/config endpoint.
+            var compatible = ordered.Where(x => x.Port == latest.Port && x.ProtocolVersion == latest.ProtocolVersion &&
+                x.Build == latest.Build && x.ConfigHash == latest.ConfigHash).ToArray();
+            string[] candidates = DiscoveryAddressCandidates.Select(compatible.SelectMany(x => x.Candidates));
+            return new DiscoveredRoom(latest.DiscoveryKey, latest.Advertisement, candidates,
+                latest.LastSeenSeconds, compatible.Max(x => x.ExpiresAtSeconds));
         }
 
         public bool Remove(string key) => key != null && entries.Remove(key);
         public bool Clear()
         {
-            bool changed = entries.Count != 0;
-            entries.Clear();
-            latestTime = double.NegativeInfinity;
-            return changed;
+            bool changed = entries.Count != 0; entries.Clear(); latestTime = double.NegativeInfinity; return changed;
         }
 
         public int Expire(double now)

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -11,7 +10,7 @@ using UnityEngine;
 namespace C6.Prototype.Lobby.Discovery
 {
     /// <summary>
-    /// Real Apple Bonjour registration, browsing, TXT monitoring and interface-specific IPv4 resolution.
+    /// Real Apple Bonjour registration, browsing, TXT monitoring and interface-specific IPv4/IPv6 resolution with bounded recovery.
     /// Own this object on one Unity thread, call Tick every frame, and Dispose on session teardown.
     /// No network callback enters gameplay and no advertised metadata authorizes a participant.
     /// </summary>
@@ -19,7 +18,7 @@ namespace C6.Prototype.Lobby.Discovery
     {
         public const string ServiceType = "_c6hapio._udp";
         public const string LocalDomain = "local.";
-        // DEMO_TUNING_VALUE: metadata heartbeat 3 s, advertised-room expiry 12 s, resolution deadline 8 s.
+        // DEMO_TUNING_VALUE: metadata heartbeat 3 s, advertised-room expiry 12 s, each initial resolution stage deadline 8 s.
         public const double HeartbeatSeconds = 3;
         public const double ResolveTimeoutSeconds = 8;
         private readonly int ownerThread = Thread.CurrentThread.ManagedThreadId;
@@ -30,12 +29,13 @@ namespace C6.Prototype.Lobby.Discovery
         private Operation browse;
         private Operation registration;
         private RoomAdvertisement advertisedRoom;
-        private ulong heartbeat;
+        private readonly DiscoveryHeartbeatSequence heartbeat = new DiscoveryHeartbeatSequence();
         private double now;
         private double nextHeartbeat;
         private bool changed;
         private bool disposed;
         private bool pumping;
+        private int eventVersion;
 
         private static readonly BonjourNative.BrowseReply BrowseCallback = OnBrowse;
         private static readonly BonjourNative.RegisterReply RegisterCallback = OnRegistered;
@@ -100,11 +100,12 @@ namespace C6.Prototype.Lobby.Discovery
             CheckOwner();
             if (!Available()) return false;
             if (!RoomAdvertisementCodec.Validate(room, out string reason)) { Fail(reason); Flush(); return false; }
+            if (!heartbeat.TryAdvance()) { Fail("Bonjour heartbeat exhausted. Restart the app before creating a room."); Flush(); return false; }
             StopAdvertisingInternal();
             LastError = null;
             advertisedRoom = room.Copy();
-            heartbeat = 0;
-            byte[] txt = RoomAdvertisementCodec.Encode(advertisedRoom, heartbeat);
+            // Re-registering the same room must remain newer than a browser's cached TXT.
+            byte[] txt = RoomAdvertisementCodec.Encode(advertisedRoom, heartbeat.Current);
             var operation = NewOperation("register");
             // RoomId is used as the DNS instance label; the user-facing Name is carried in bounded TXT.
             string instance = "C6-" + room.RoomId;
@@ -154,9 +155,9 @@ namespace C6.Prototype.Lobby.Discovery
                 foreach (Operation operation in operations.ToArray())
                 {
                     if (operation.Done) continue;
-                    if (operation.Kind == "resolve" && now - operation.CreatedAt >= ResolveTimeoutSeconds)
+                    if ((operation.Service != null || operation.Kind == "register") && !operation.HasResponse && now >= operation.DeadlineAt)
                     {
-                        FailOperation(operation, "Bonjour resolution timed out. Refresh the room list and check local network permission.");
+                        FailOperation(operation, "Bonjour " + operation.Kind + " timed out. Refresh the room list or try a direct host address.");
                         continue;
                     }
                     int descriptor = BonjourNative.DNSServiceRefSockFD(operation.Reference);
@@ -176,13 +177,26 @@ namespace C6.Prototype.Lobby.Discovery
                         else if ((poll.ReturnedEvents & BonjourNative.PollInput) != 0)
                         {
                             int error = BonjourNative.DNSServiceProcessResult(operation.Reference);
-                            if (error != 0) FailOperation(operation, DescribeError(operation.Kind, error));
+                            if (error != 0) FailOperation(operation, DescribeError(operation.Kind, error), error != -65570);
                         }
                     }
                 }
                 foreach (Service service in services.Values.ToArray())
-                    if (service.Advertisement != null && now - service.LastTxtAt >= DiscoveryRoomCatalog.DefaultLifetimeSeconds)
+                {
+                    if (service.Retry.IsDue(now)) { StartResolve(service); continue; }
+                    int previousAddressCount = service.Addresses.Count;
+                    foreach (string expired in service.Addresses.Where(x => x.Value <= now).Select(x => x.Key).ToArray())
+                        service.Addresses.Remove(expired);
+                    if (service.Addresses.Count == 0)
+                    {
                         changed |= catalog.Remove(service.Key);
+                        if (previousAddressCount > 0 && service.AddressOperation != null)
+                        { service.AddressOperation.HasResponse = false; service.AddressOperation.DeadlineAt = now + ResolveTimeoutSeconds; }
+                    }
+                    else if (previousAddressCount != service.Addresses.Count) Publish(service);
+                    if (service.Query != null && !service.Query.Done && service.Query.HasResponse && service.Lease.HasReceived && !service.Lease.IsFresh(now))
+                        FailOperation(service.Query, "Bonjour room heartbeat expired. Refresh the room list or recreate the host room.");
+                }
                 changed |= catalog.Expire(now) > 0;
                 if (IsAdvertising && now >= nextHeartbeat) SendHeartbeat();
             }
@@ -206,7 +220,9 @@ namespace C6.Prototype.Lobby.Discovery
         private bool SendHeartbeat()
         {
             if (!IsAdvertising || advertisedRoom == null) return false;
-            byte[] txt = RoomAdvertisementCodec.Encode(advertisedRoom, ++heartbeat);
+            if (!heartbeat.TryAdvance())
+            { FailOperation(registration, "Bonjour heartbeat exhausted. Restart the app before creating a room.", false); return false; }
+            byte[] txt = RoomAdvertisementCodec.Encode(advertisedRoom, heartbeat.Current);
             int error = SafeCall(() => BonjourNative.DNSServiceUpdateRecord(registration.Reference, IntPtr.Zero, 0,
                 (ushort)txt.Length, txt, 0));
             nextHeartbeat = now + HeartbeatSeconds;
@@ -217,6 +233,7 @@ namespace C6.Prototype.Lobby.Discovery
 
         private void StopBrowseInternal()
         {
+            eventVersion++;
             if (browse != null) browse.Done = true;
             browse = null;
             foreach (Service service in services.Values) CancelService(service);
@@ -227,6 +244,7 @@ namespace C6.Prototype.Lobby.Discovery
 
         private void StopAdvertisingInternal()
         {
+            eventVersion++;
             if (registration != null) registration.Done = true;
             registration = null;
             advertisedRoom = null;
@@ -237,11 +255,14 @@ namespace C6.Prototype.Lobby.Discovery
 
         private void StartResolve(Service service)
         {
+            service.Retry.StartAttempt();
+            service.Addresses.Clear();
+            LogStage("resolve", "started", service);
             var operation = NewOperation("resolve", service);
             service.Resolve = operation;
             int error = SafeCall(() => BonjourNative.DNSServiceResolve(out operation.Reference, 0, service.InterfaceIndex,
                 service.Name, ServiceType, service.Domain, ResolveCallback, operation.Context));
-            if (!CompleteCreation(operation, error)) RemoveService(service.Key);
+            CompleteCreation(operation, error);
         }
 
         private void StartAddressAndTxt(Service service, string fullName, string hostName)
@@ -249,34 +270,50 @@ namespace C6.Prototype.Lobby.Discovery
             var address = NewOperation("address", service);
             service.AddressOperation = address;
             int error = SafeCall(() => BonjourNative.DNSServiceGetAddrInfo(out address.Reference, 0, service.InterfaceIndex,
-                BonjourNative.IPv4, hostName, AddressCallback, address.Context));
-            if (!CompleteCreation(address, error)) { RemoveService(service.Key); return; }
+                BonjourNative.IPv4 | BonjourNative.IPv6, hostName, AddressCallback, address.Context));
+            if (!CompleteCreation(address, error)) return;
+            LogStage("address", "started", service);
             var query = NewOperation("TXT query", service);
             service.Query = query;
             error = SafeCall(() => BonjourNative.DNSServiceQueryRecord(out query.Reference, 0, service.InterfaceIndex,
                 fullName, BonjourNative.TxtType, BonjourNative.InternetClass, QueryCallback, query.Context));
-            if (!CompleteCreation(query, error)) RemoveService(service.Key);
+            CompleteCreation(query, error);
         }
 
-        private void AcceptTxt(Service service, ushort length, IntPtr bytes)
+        private bool AcceptTxt(Service service, ushort length, IntPtr bytes)
         {
             if (bytes == IntPtr.Zero || length == 0 || length > RoomAdvertisementCodec.MaximumRecordBytes)
-            { changed |= catalog.Remove(service.Key); return; }
+            { changed |= catalog.Remove(service.Key); return false; }
             var record = new byte[length];
             Marshal.Copy(bytes, record, 0, length);
-            if (!RoomAdvertisementCodec.TryDecode(record, service.Port, out RoomAdvertisement room, out _))
-            { service.Advertisement = null; changed |= catalog.Remove(service.Key); return; }
+            if (!RoomAdvertisementCodec.TryDecode(record, service.Port, out RoomAdvertisement room, out ulong sequence, out _))
+            { service.Advertisement = null; changed |= catalog.Remove(service.Key); return false; }
+            // DNS can immediately replay a cached TXT after retry. It must not make a dead host
+            // fresh again. Old TXT replacement callbacks also cannot extend the live lease.
+            bool liveUpdate = service.Lease.HasReceived;
+            // An expired cached record is not the new query's first usable response. Leave
+            // HasResponse false so it can wait its own 8 s deadline for a live heartbeat,
+            // while Publish continues to reject the expired catalog lease.
+            if (!service.Lease.TryRefresh(sequence, now)) return service.Lease.IsFresh(now);
             service.Advertisement = room;
-            service.LastTxtAt = now;
+            if (liveUpdate && service.Addresses.Count > 0) service.Retry.ConfirmLiveHeartbeat();
             Publish(service);
+            return true;
         }
 
         private void Publish(Service service)
         {
             if (service.Advertisement == null || service.Addresses.Count == 0 ||
-                now - service.LastTxtAt >= DiscoveryRoomCatalog.DefaultLifetimeSeconds) return;
-            changed |= catalog.Upsert(service.Key, service.Advertisement, service.Addresses.Min, now);
+                !service.Lease.IsFresh(now)) return;
+            changed |= catalog.Upsert(service.Key, service.Advertisement, service.Addresses.Keys, now,
+                service.Lease.ExpiresAt);
+            if (LastError != null && LastError.StartsWith("Bonjour", StringComparison.Ordinal))
+            { LastError = null; changed = true; }
         }
+
+        private static void LogStage(string stage, string result, Service service)
+            => Debug.Log("C6_NETWORK_DISCOVERY stage=" + stage + " result=" + result +
+                " attempt=" + service.Retry.Attempts + " candidates=" + service.Addresses.Count);
 
         private void RemoveService(string key)
         {
@@ -287,6 +324,11 @@ namespace C6.Prototype.Lobby.Discovery
         private static void CancelService(Service service)
         {
             service.Active = false;
+            StopServiceOperations(service);
+        }
+
+        private static void StopServiceOperations(Service service)
+        {
             if (service.Resolve != null) service.Resolve.Done = true;
             if (service.Query != null) service.Query.Done = true;
             if (service.AddressOperation != null) service.AddressOperation.Done = true;
@@ -302,22 +344,39 @@ namespace C6.Prototype.Lobby.Discovery
         private bool CompleteCreation(Operation operation, int error)
         {
             if (error == 0 && operation.Reference != IntPtr.Zero) return true;
-            FailOperation(operation, DescribeError(operation.Kind, error));
+            FailOperation(operation, DescribeError(operation.Kind, error), error != -65570);
             return false;
         }
 
-        private void FailOperation(Operation operation, string message)
+        private void FailOperation(Operation operation, string message, bool retryAllowed = true)
         {
+            if (operation.Done) return;
             operation.Done = true;
             if (operation == browse) StopBrowseInternal();
             if (operation == registration) StopAdvertisingInternal();
-            if (operation.Service != null) RemoveService(operation.Service.Key);
+            Service service = operation.Service;
+            if (service != null)
+            {
+                StopServiceOperations(service);
+                service.Addresses.Clear();
+                changed |= catalog.Remove(service.Key);
+                LogStage(operation.Kind, "failed", service);
+                if (retryAllowed && service.Retry.Schedule(now))
+                {
+                    LogStage(operation.Kind, "retry_scheduled", service);
+                    return;
+                }
+                // Keep the browse identity until its goodbye or Refresh. Repeated cached PTR
+                // callbacks must not bypass the per-service retry bound.
+                LogStage(operation.Kind, "exhausted", service);
+            }
             Fail(message);
         }
 
         private void Fail(string message)
         {
             LastError = message;
+            Debug.LogWarning("C6_NETWORK_DISCOVERY failure=" + message);
             if (failures.Count < 16) failures.Enqueue(message);
             changed = true;
         }
@@ -340,12 +399,17 @@ namespace C6.Prototype.Lobby.Discovery
         {
             if (pumping) return;
             Cleanup();
+            int version = eventVersion;
             bool notify = changed;
             changed = false;
             string[] errors = failures.ToArray();
             failures.Clear();
             if (notify) Changed?.Invoke();
-            foreach (string error in errors) Failed?.Invoke(error);
+            foreach (string error in errors)
+            {
+                if (disposed || version != eventVersion) break;
+                Failed?.Invoke(error);
+            }
         }
 
         private bool Available()
@@ -415,7 +479,7 @@ namespace C6.Prototype.Lobby.Discovery
             CallbackGuard(context, operation =>
             {
                 var owner = operation.Owner;
-                if (error != 0) { owner.FailOperation(operation, DescribeError("browse", error)); return; }
+                if (error != 0) { owner.FailOperation(operation, DescribeError("browse", error), error != -65570); return; }
                 string name = ReadUtf8(serviceName, 256);
                 string returnedType = ReadUtf8(type, 128);
                 string returnedDomain = ReadUtf8(domain, 256);
@@ -437,7 +501,8 @@ namespace C6.Prototype.Lobby.Discovery
             CallbackGuard(context, operation =>
             {
                 var owner = operation.Owner;
-                if (error != 0) { owner.FailOperation(operation, DescribeError("register", error)); return; }
+                if (error != 0) { owner.FailOperation(operation, DescribeError("register", error), error != -65570); return; }
+                operation.HasResponse = true;
                 owner.AdvertisingConfirmed = (flags & BonjourNative.Add) != 0;
                 owner.RegisteredServiceName = ReadUtf8(serviceName, 256);
                 owner.changed = true;
@@ -451,15 +516,17 @@ namespace C6.Prototype.Lobby.Discovery
             CallbackGuard(context, operation =>
             {
                 var owner = operation.Owner;
-                if (error != 0) { owner.FailOperation(operation, DescribeError("resolve", error)); return; }
+                if (error != 0) { owner.FailOperation(operation, DescribeError("resolve", error), error != -65570); return; }
                 Service service = operation.Service;
                 if (!service.Active) return;
                 string resolvedName = ReadUtf8(fullName);
                 string resolvedHost = ReadUtf8(hostName);
                 if (string.IsNullOrEmpty(resolvedName) || string.IsNullOrEmpty(resolvedHost))
-                { owner.RemoveService(service.Key); return; }
+                { owner.FailOperation(operation, "Bonjour resolution returned invalid service metadata."); return; }
                 service.Port = BonjourNative.NetworkPort(networkPort);
                 owner.AcceptTxt(service, txtLength, txt);
+                LogStage("resolve", "completed", service);
+                operation.HasResponse = true;
                 operation.Done = true;
                 owner.StartAddressAndTxt(service, resolvedName, resolvedHost);
             });
@@ -472,14 +539,14 @@ namespace C6.Prototype.Lobby.Discovery
             CallbackGuard(context, operation =>
             {
                 var owner = operation.Owner;
-                if (error != 0) { owner.FailOperation(operation, DescribeError("TXT query", error)); return; }
+                if (error != 0) { owner.FailOperation(operation, DescribeError("TXT query", error), error != -65570); return; }
                 Service service = operation.Service;
                 if (!service.Active || recordType != BonjourNative.TxtType || recordClass != BonjourNative.InternetClass) return;
                 // TXT updates can emit an old-record removal after a new-record add. Do not erase the
                 // fresh room during replacement; PTR goodbye removes it immediately, otherwise the
                 // last received TXT heartbeat expires after 12 s. Removed TXT never extends that lease.
                 if ((flags & BonjourNative.Add) == 0 || ttl == 0) return;
-                owner.AcceptTxt(service, length, bytes);
+                if (owner.AcceptTxt(service, length, bytes)) operation.HasResponse = true;
             });
         }
 
@@ -490,17 +557,27 @@ namespace C6.Prototype.Lobby.Discovery
             CallbackGuard(context, operation =>
             {
                 var owner = operation.Owner;
-                if (error != 0) { owner.FailOperation(operation, DescribeError("IPv4 resolve", error)); return; }
+                // NoSuchRecord for one family is normal on single-family networks. Keep the
+                // query alive for the other family; its first usable address has the same deadline.
+                if (error == -65554) return;
+                if (error != 0) { owner.FailOperation(operation, DescribeError("address", error), error != -65570); return; }
                 Service service = operation.Service;
-                if (!service.Active || address == IntPtr.Zero) return;
-                // Darwin sockaddr_in: byte length, byte AF_INET (2), ushort port, 4 network-order address bytes.
-                if (Marshal.ReadByte(address, 0) < 8 || Marshal.ReadByte(address, 1) != 2) return;
-                byte[] bytes = new byte[4];
-                Marshal.Copy(IntPtr.Add(address, 4), bytes, 0, 4);
-                string ipv4 = new IPAddress(bytes).ToString();
-                if (!RoomAdvertisementCodec.IsUsableIPv4(ipv4)) return;
-                if ((flags & BonjourNative.Add) != 0 && ttl != 0) service.Addresses.Add(ipv4);
-                else service.Addresses.Remove(ipv4);
+                uint routeInterface = interfaceIndex == 0 ? service.InterfaceIndex : interfaceIndex;
+                if (!service.Active || !L1BonjourAddressCodec.TryDecode(address, routeInterface, out string candidate)) return;
+                if ((flags & BonjourNative.Add) != 0 && ttl != 0)
+                {
+                    if (!service.Addresses.ContainsKey(candidate) && service.Addresses.Count >= DiscoveryAddressCandidates.MaximumRecords)
+                    {
+                        string[] retained = DiscoveryAddressCandidates.SelectRecords(service.Addresses.Keys.Concat(new[] { candidate }));
+                        if (!retained.Contains(candidate)) return;
+                        foreach (string evicted in service.Addresses.Keys.Where(x => !retained.Contains(x)).ToArray()) service.Addresses.Remove(evicted);
+                    }
+                    service.Addresses[candidate] = owner.now + ttl;
+                    operation.HasResponse = true;
+                    LogStage("address", candidate.Contains(":") ? "ipv6_ready" : "ipv4_ready", service);
+                }
+                else if (service.Addresses.Remove(candidate) && service.Addresses.Count == 0)
+                { operation.HasResponse = false; operation.DeadlineAt = owner.now + ResolveTimeoutSeconds; }
                 if (service.Addresses.Count == 0) owner.changed |= owner.catalog.Remove(service.Key);
                 else owner.Publish(service);
             });
@@ -511,14 +588,15 @@ namespace C6.Prototype.Lobby.Discovery
             internal readonly BonjourRoomDiscovery Owner;
             internal readonly string Kind;
             internal readonly Service Service;
-            internal readonly double CreatedAt;
+            internal double DeadlineAt;
             internal GCHandle Handle;
             internal IntPtr Reference;
             internal bool Done;
+            internal bool HasResponse;
             internal IntPtr Context => GCHandle.ToIntPtr(Handle);
             internal Operation(BonjourRoomDiscovery owner, string kind, Service service, double createdAt)
             {
-                Owner = owner; Kind = kind; Service = service; CreatedAt = createdAt;
+                Owner = owner; Kind = kind; Service = service; DeadlineAt = createdAt + ResolveTimeoutSeconds;
                 Handle = GCHandle.Alloc(this);
             }
         }
@@ -529,9 +607,10 @@ namespace C6.Prototype.Lobby.Discovery
             internal uint InterfaceIndex;
             internal ushort Port;
             internal bool Active = true;
-            internal double LastTxtAt;
+            internal readonly DiscoveryHeartbeatLease Lease = new DiscoveryHeartbeatLease();
             internal RoomAdvertisement Advertisement;
-            internal readonly SortedSet<string> Addresses = new SortedSet<string>(StringComparer.Ordinal);
+            internal readonly Dictionary<string, double> Addresses = new Dictionary<string, double>(StringComparer.Ordinal);
+            internal readonly DiscoveryRecoveryState Retry = new DiscoveryRecoveryState();
             internal Operation Resolve, Query, AddressOperation;
         }
     }

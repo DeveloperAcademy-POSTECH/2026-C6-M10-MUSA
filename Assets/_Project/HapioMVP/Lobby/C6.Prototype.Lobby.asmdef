@@ -8,7 +8,8 @@
     "Unity.Netcode.Runtime",
     "Unity.Collections",
     "UnityEngine.UI",
-    "Unity.InputSystem"
+    "Unity.InputSystem",
+    "Unity.Networking.Transport"
   ],
   "autoReferenced": true
 }

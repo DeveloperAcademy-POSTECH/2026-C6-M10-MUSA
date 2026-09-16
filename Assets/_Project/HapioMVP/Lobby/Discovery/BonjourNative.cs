@@ -16,6 +16,7 @@ namespace C6.Prototype.Lobby.Discovery
 #endif
         internal const uint Add = 2;
         internal const uint IPv4 = 1;
+        internal const uint IPv6 = 2;
         internal const ushort TxtType = 16;
         internal const ushort InternetClass = 1;
         internal const short PollInput = 1;

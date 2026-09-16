@@ -1,0 +1,91 @@
+{
+  "task": "L4",
+  "stageComplete": false,
+  "date": "2026-09-15",
+  "applicationBuild": "26",
+  "gameContract": "24",
+  "newBuildPerformed": false,
+  "baseCommit": "e5df3b6e626554075cdf0e84cb91657bea39dbd6",
+  "hotspot": {
+    "status": "PASS",
+    "scope": "iPhone Personal Hotspot provider/Host and iPad client; connection receipts plus user report",
+    "connectionSummary": {
+      "devices": {
+        "iphone": {
+          "appBuild": "26",
+          "gameBuild": "24",
+          "runtimeError": "",
+          "truncated": false,
+          "newEvents": 39,
+          "distinctObservedRooms": 4,
+          "playingObserved": true,
+          "finalState": "Connected",
+          "finalInitialReady": true,
+          "finalParticipants": 2,
+          "clientFamilies": [
+            "DUAL"
+          ],
+          "recordedFailureCodes": [
+            "USER_CANCELLED"
+          ]
+        },
+        "ipad": {
+          "appBuild": "26",
+          "gameBuild": "24",
+          "runtimeError": "",
+          "truncated": false,
+          "newEvents": 36,
+          "distinctObservedRooms": 3,
+          "playingObserved": true,
+          "finalState": "Connected",
+          "finalInitialReady": true,
+          "finalParticipants": 2,
+          "clientFamilies": [
+            "IPv6"
+          ],
+          "recordedFailureCodes": [
+            "CONNECTION_LOST",
+            "USER_CANCELLED"
+          ]
+        }
+      },
+      "finalSameRoom": true,
+      "finalSameSession": true,
+      "finalSameConfig": true,
+      "finalSameRoster": true,
+      "userGameResult": "NOT_CAPTURED_IN_CONNECTION_RECEIPT"
+    },
+    "sameGameStartConfirmed": true,
+    "playingToRoomCloseSecondsApprox": 187.07,
+    "freshRoomAndSessionRejoinConfirmed": true,
+    "userConfirmation": "잘 돼",
+    "userReportedChecks": [
+      "roundtrip transfer",
+      "direct combination and throw to HP80",
+      "180-second end/result stability",
+      "fresh-room rejoin"
+    ],
+    "cableDisconnectedProcedure": "Requested as part of bundled test and user reported normal; not independently recorded by app",
+    "preGameConnectionLost": "Host closed old room; client disconnect followed about0.20s later; not an in-game failure"
+  },
+  "routerWiFi": {
+    "status": "NOT_RUN",
+    "reason": "User confirmed only hotspot available"
+  },
+  "offlineLAN": {
+    "status": "NOT_RUN",
+    "reason": "User confirmed only hotspot available"
+  },
+  "limits": [
+    "Connection receipts do not contain HP, physics-hit, transfer or result snapshots; these are user-reported",
+    "187.07 seconds supports elapsed duration, not direct proof of the timer or result screen",
+    "One successful sample is not a statistical reliability guarantee"
+  ],
+  "protectedHashes": {
+    "Packages/manifest.json": "32d69c3d1d812d38e0805148985c819ce77dcc16098e04449cc42ee92c0b4a4c",
+    "Packages/packages-lock.json": "965cabfaa7018e22920197affe773d8da229944a4577120c4954ebe7d158c5f8",
+    "ProjectSettings/ProjectSettings.asset": "63bf1f2209e5205323480a63b3774af57b67ea3306ea8a02e6bf674b5ba35375",
+    "Assets/_Project/HapioMVP/Config/ScreenLayoutConfig.asset": "2d97da70d4be305dd17c4728362be2cf6dc83c9446947c942024fb0dd61f63a4",
+    "Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity": "2495efe36b15958136cdf7124026772184bb995df8d2366f34d3661133dd4807"
+  }
+}

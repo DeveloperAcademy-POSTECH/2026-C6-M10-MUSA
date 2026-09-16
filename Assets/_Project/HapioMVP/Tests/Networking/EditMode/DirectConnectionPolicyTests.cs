@@ -27,14 +27,13 @@ namespace C6.Prototype.Networking.Tests
         [TestCase("192.168.1.+1")]
         [TestCase("192.168.1. 1")]
         [TestCase("192.168.1.1:7777")]
-        [TestCase("::1")]
         [TestCase("0.0.0.0")]
         [TestCase("0.1.2.3")]
         [TestCase("224.0.0.1")]
         [TestCase("239.255.255.250")]
         [TestCase("240.0.0.1")]
         [TestCase("255.255.255.255")]
-        public void RejectsAmbiguousNonIPv4AndNonUnicastAddresses(string input)
+        public void RejectsMalformedOrNonUnicastAddresses(string input)
         {
             Assert.That(DirectConnectionValidation.TryParseAddress(input, out var address), Is.False);
             Assert.That(address, Is.Null);

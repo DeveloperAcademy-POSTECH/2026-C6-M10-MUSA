@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -23,6 +24,9 @@ namespace C6.Prototype.Networking
         public const int DisconnectTimeoutMilliseconds = 8000;
         public const int ApprovalTimeoutSeconds = 8;
         public const ushort ProtocolVersion = 2;
+        // Preserve the legacy game-response constant above. Connection establishment has a separate
+        // budget covering transport attempts, NGO approval, and a small scheduling allowance.
+        public const float CandidateConnectionTimeoutSeconds = ConnectionTimeoutSeconds + ApprovalTimeoutSeconds + 2f;
 
         private const string Troubleshooting = "Check the host address and port, same Wi-Fi, network isolation, and Local Network access in Settings.";
         private const string RoomFullReason = "C6_T02_ROOM_FULL";
@@ -32,12 +36,28 @@ namespace C6.Prototype.Networking
         private ReadOnlyCollection<ulong> participantView;
         private GameObject managerObject;
         private NetworkManager manager;
-        private UnityTransport transport;
+        private DualStackUnityTransport transport;
         private bool ownsSession;
         private bool destroying;
         private float connectionStartedAt;
         private DirectConnectionState stoppedState;
         private string stoppedMessage;
+        private ConnectionCandidatePlan candidates;
+        private ushort candidatePort;
+        private bool retryCandidate;
+        private bool retryManagerReleased;
+        private int retryBarrierFrame;
+        private uint managerGeneration;
+        private Action transportFailureHandler;
+        private NetworkTransport.TransportEventDelegate transportEventHandler;
+        public string ConnectionStage { get; private set; } = "Idle";
+        public string FailureStage { get; private set; } = string.Empty;
+        public string FailureCode { get; private set; } = string.Empty;
+        public bool JoinInProgress { get; private set; }
+        public int CandidateAttempt => candidates == null ? 0 : candidates.Index + 1;
+        public int CandidateCount => candidates?.Count ?? 0;
+        public uint AttemptId { get; private set; }
+        public string AttemptAddressFamily { get; private set; } = "NONE";
         private ushort selectedProtocol = ProtocolVersion;
         private byte[] connectionPayload = Array.Empty<byte>();
         private Func<ulong, byte[], string> applicationAdmission;
@@ -65,11 +85,11 @@ namespace C6.Prototype.Networking
 
         public DirectConnectionState State { get; private set; } = DirectConnectionState.Idle;
         public string Role { get; private set; } = "None";
-        public string Message { get; private set; } = "Ready. Start a host or enter its IPv4 address to join.";
+        public string Message { get; private set; } = "Ready. Start a host or enter its IPv4 or IPv6 address to join.";
         public ulong? LocalClientId { get; private set; }
         public IReadOnlyList<ulong> ParticipantIds => participantView ??= participants.AsReadOnly();
         public bool CanStart => ownsSession && isActiveAndEnabled
-            && (State == DirectConnectionState.Idle || State == DirectConnectionState.Failed)
+            && !JoinInProgress && (State == DirectConnectionState.Idle || State == DirectConnectionState.Failed)
             && (manager == null || (!manager.IsListening && !manager.ShutdownInProgress));
         // Read-only access for the counter service; this session retains lifecycle ownership.
         public NetworkManager OwnedManager => manager;
@@ -91,52 +111,79 @@ namespace C6.Prototype.Networking
         {
             if (!CanStart) return false;
             if (!DirectConnectionValidation.TryParsePort(portText, out var port))
-                return RejectInput("Enter a port from 1 to 65535.");
+                return RejectInput("Enter a port from 1 to 65535.", "INVALID_PORT");
             if (!EnsureManager()) return false;
+            candidates = null;
             ResetAttempt("Host");
             admission.BeginHostSession();
-            transport.SetConnectionData(true, "127.0.0.1", port, "0.0.0.0");
             SetState(DirectConnectionState.StartingHost, "Starting host...");
             try
             {
+                transport.ConfigureHost(port);
                 if (manager.StartHost()) return true;
+                FailureCode = "HOST_START_FAILED"; FailureStage = "TRANSPORT";
                 BeginStop(DirectConnectionState.Failed, "Could not start host. The port may be in use. " + Troubleshooting);
             }
             catch (Exception exception)
             {
                 LogExceptionType(exception);
+                FailureCode = "HOST_START_FAILED"; FailureStage = "TRANSPORT";
                 BeginStop(DirectConnectionState.Failed, "Could not start host. " + Troubleshooting);
             }
             return false;
         }
 
-        public bool Join(string address, string portText)
+        public bool Join(string address, string portText) => JoinCandidates(new[] { address }, portText);
+
+        public bool JoinCandidates(IEnumerable<string> addresses, string portText)
         {
             if (!CanStart) return false;
-            if (!DirectConnectionValidation.TryParseAddress(address, out var parsedAddress))
-                return RejectInput("Enter a dotted IPv4 unicast address, for example 192.168.1.20.");
-            if (!DirectConnectionValidation.TryParsePort(portText, out var port))
-                return RejectInput("Enter a port from 1 to 65535.");
-            if (!EnsureManager()) return false;
+            if (!DirectConnectionValidation.TryParsePort(portText, out candidatePort))
+                return RejectInput("Enter a port from 1 to 65535.", "INVALID_PORT");
+            if (!ConnectionCandidatePlan.TryCreate(addresses, Time.realtimeSinceStartupAsDouble, out var plan))
+                return RejectInput("Enter a valid IPv4 or IPv6 address; link-local IPv6 also needs its numeric interface scope.", "INVALID_ADDRESS");
+            candidates = plan;
+            JoinInProgress = true;
+            retryCandidate = retryManagerReleased = false;
+            return StartCandidate();
+        }
+
+        private bool StartCandidate()
+        {
+            if (!EnsureManager()) { JoinInProgress = false; Changed?.Invoke(); return false; }
             ResetAttempt("Client");
-            transport.SetConnectionData(true, parsedAddress, port);
-            SetState(DirectConnectionState.Connecting, "Connecting to host...");
+            string address = candidates.Current;
+            AttemptAddressFamily = address.Contains(":") ? "IPv6" : "IPv4";
+            SetState(DirectConnectionState.Connecting, $"Connecting to host... ({CandidateAttempt}/{CandidateCount})");
             try
             {
+                transport.ConfigureClient(address, candidatePort);
                 if (manager.StartClient()) return true;
-                BeginStop(DirectConnectionState.Failed, "Could not start the connection. " + Troubleshooting);
+                AttemptFailed("CONNECT_START_FAILED", "Could not start the connection. " + Troubleshooting);
             }
             catch (Exception exception)
             {
                 LogExceptionType(exception);
-                BeginStop(DirectConnectionState.Failed, "Could not start the connection. " + Troubleshooting);
+                AttemptFailed("CONNECT_START_FAILED", "Could not start the connection. " + Troubleshooting);
             }
-            return false;
+            return JoinInProgress;
         }
 
         public void Stop()
         {
-            if (!ownsSession || State == DirectConnectionState.Stopping) return;
+            if (!ownsSession) return;
+            JoinInProgress = false;
+            retryCandidate = false;
+            FailureCode = "USER_CANCELLED";
+            FailureStage = string.Empty;
+            if (State == DirectConnectionState.Stopping)
+            {
+                // Cancellation includes the shutdown barrier between candidates.
+                stoppedState = DirectConnectionState.Idle;
+                stoppedMessage = "Connection cancelled. Start a host or join manually.";
+                Changed?.Invoke();
+                return;
+            }
             if (State == DirectConnectionState.Idle || State == DirectConnectionState.Failed)
             {
                 CompleteStop(DirectConnectionState.Idle, "Ready. Start a host or join manually.");
@@ -145,8 +192,10 @@ namespace C6.Prototype.Networking
             BeginStop(DirectConnectionState.Idle, "Session ended. Start a host or join manually.");
         }
 
-        private bool RejectInput(string reason)
+        private bool RejectInput(string reason, string code = "CONNECTION_MANAGER_CONFLICT")
         {
+            FailureCode = code;
+            FailureStage = "INPUT";
             SetState(DirectConnectionState.Failed, reason);
             return false;
         }
@@ -157,7 +206,7 @@ namespace C6.Prototype.Networking
             if (FindAnyObjectByType<NetworkManager>() != null)
                 return RejectInput("Another NetworkManager already exists. End that session first.");
             managerObject = new GameObject("T02 Owned NetworkManager");
-            transport = managerObject.AddComponent<UnityTransport>();
+            transport = managerObject.AddComponent<DualStackUnityTransport>();
             manager = managerObject.AddComponent<NetworkManager>();
             manager.NetworkConfig = new NetworkConfig
             {
@@ -174,13 +223,36 @@ namespace C6.Prototype.Networking
             transport.DisconnectTimeoutMS = DisconnectTimeoutMilliseconds;
             manager.ConnectionApprovalCallback = ApproveConnection;
             manager.OnConnectionEvent += OnConnectionEvent;
-            manager.OnTransportFailure += OnTransportFailure;
+            var eventManager = manager;
+            uint generation = ++managerGeneration;
+            transportFailureHandler = () =>
+            {
+                if (generation == managerGeneration && eventManager == manager) OnTransportFailure();
+            };
+            manager.OnTransportFailure += transportFailureHandler;
+            transportEventHandler = (kind, client, payload, receivedAt) =>
+            {
+                if (generation != managerGeneration || eventManager != manager || destroying
+                    || Role != "Client" || State != DirectConnectionState.Connecting) return;
+                if (kind == Unity.Netcode.NetworkEvent.Connect)
+                {
+                    ConnectionStage = "HostApproval";
+                    Message = "Host found. Checking admission...";
+                    Debug.Log($"C6_L2_STAGE attempt={AttemptId} stage=HostApproval elapsed={Time.realtimeSinceStartup-connectionStartedAt:F3}");
+                    Changed?.Invoke();
+                }
+            };
+            transport.OnTransportEvent += transportEventHandler;
             return true;
         }
 
         private void ResetAttempt(string role)
         {
             Role = role;
+            AttemptId++;
+            FailureCode = string.Empty;
+            FailureStage = string.Empty;
+            AttemptAddressFamily = role == "Host" ? "DUAL" : "NONE";
             LastApprovalReason = string.Empty;
             LocalClientId = null;
             participants.Clear();
@@ -191,7 +263,7 @@ namespace C6.Prototype.Networking
         private void ApproveConnection(NetworkManager.ConnectionApprovalRequest request, NetworkManager.ConnectionApprovalResponse response)
         {
             // Reserve immediately: NGO can queue multiple approvals before updating ConnectedClientsIds.
-            bool approved = State != DirectConnectionState.Stopping && admission.TryReserve(request.ClientNetworkId);
+            bool approved = !destroying && Role == "Host" && (State == DirectConnectionState.StartingHost || State == DirectConnectionState.Connected) && admission.TryReserve(request.ClientNetworkId);
             string reason = approved ? string.Empty : RoomFullReason;
             if (approved && applicationAdmission != null)
             {
@@ -208,10 +280,13 @@ namespace C6.Prototype.Networking
 
         private void OnConnectionEvent(NetworkManager source, ConnectionEventData data)
         {
-            if (destroying || source != manager || State == DirectConnectionState.Stopping) return;
+            if (destroying || source != manager || !AcceptConnectionCallbacks) return;
             switch (data.EventType)
             {
                 case ConnectionEvent.ClientConnected:
+                    JoinInProgress = false;
+                    retryCandidate = false;
+                    FailureCode = string.Empty; FailureStage = string.Empty;
                     if (Role == "Host")
                     {
                         LocalClientId = NetworkManager.ServerClientId;
@@ -248,16 +323,23 @@ namespace C6.Prototype.Networking
                             if (MaximumParticipants > 2 && preservePeerDisconnect?.Invoke() == true)
                             { participants.Remove(data.ClientId); Changed?.Invoke(); }
                             else if (wasParticipant)
-                                BeginStop(DirectConnectionState.Failed, "Participant left. Session ended; connect again manually.");
+                            { FailureCode = "PARTICIPANT_LEFT"; FailureStage = "SESSION"; BeginStop(DirectConnectionState.Failed, "Participant left. Session ended; connect again manually."); }
                         }
                     }
                     else
                     {
-                        var reason = source.DisconnectReason;
-                        LastApprovalReason = reason ?? string.Empty;
-                        BeginStop(DirectConnectionState.Failed, reason == RoomFullReason
+                        // NGO 2.13.1 also returns locally generated transport information here.
+                        // Only an actual server denial must stop a pre-admission candidate retry.
+                        LastApprovalReason = GetExplicitApprovalReason(source.DisconnectReason,
+                            transport.DisconnectEvent, transport.DisconnectEventMessage);
+                        bool alreadyConnected = State == DirectConnectionState.Connected;
+                        AttemptFailed(alreadyConnected ? "CONNECTION_LOST" : string.IsNullOrEmpty(LastApprovalReason)
+                            ? "CONNECT_NO_RESPONSE"
+                            : "CONNECTION_REJECTED", LastApprovalReason == RoomFullReason
                             ? "This room is full. Wait for a free seat or choose another room."
-                            : "Disconnected or connection failed. " + Troubleshooting);
+                            : alreadyConnected ? "Connection ended after joining. Connect again to enter a room."
+                            : "The host did not complete admission. " + Troubleshooting,
+                            alreadyConnected ? string.Empty : LastApprovalReason);
                     }
                     break;
                 case ConnectionEvent.PeerDisconnected:
@@ -266,7 +348,7 @@ namespace C6.Prototype.Networking
                         ParticipantDisconnected?.Invoke(data.ClientId);
                         if (MaximumParticipants > 2 && preservePeerDisconnect?.Invoke() == true)
                         { participants.Remove(data.ClientId); Changed?.Invoke(); }
-                        else BeginStop(DirectConnectionState.Failed, "Participant left. Session ended; connect again manually.");
+                        else { FailureCode = "PARTICIPANT_LEFT"; FailureStage = "SESSION"; BeginStop(DirectConnectionState.Failed, "Participant left. Session ended; connect again manually."); }
                     }
                     break;
             }
@@ -279,22 +361,136 @@ namespace C6.Prototype.Networking
             participants.Sort();
         }
 
+        private bool AcceptConnectionCallbacks => State == DirectConnectionState.Connecting
+            || State == DirectConnectionState.StartingHost || State == DirectConnectionState.Connected;
+
+        /// <summary>
+        /// Separates NGO 2.13.1's locally generated disconnect information from server denial text.
+        /// Unknown text remains a denial: do not retry around future or unrecognized admission rules.
+        /// This is classification only; a connected session never retries regardless of its reason.
+        /// </summary>
+        public static string GetExplicitApprovalReason(string reason, NetworkTransport.DisconnectEvents disconnectEvent,
+            string transportMessage)
+        {
+            if (string.IsNullOrEmpty(reason)) return string.Empty;
+            int cursor = 0;
+            // NetworkConnectionManager.GenerateDisconnectInformation builds exactly this header.
+            // Checking both IDs and the current local event/message avoids treating arbitrary
+            // server text that happens to start with "[Disconnect Event]" as a transport timeout.
+            if (!ConsumeNgoDisconnectId(reason, "[Disconnect Event][Client-", ref cursor)
+                || !ConsumeNgoDisconnectId(reason, "[TransportClientId-", ref cursor)) return reason;
+            string tail = reason.Substring(cursor);
+            string eventPrefix = "[" + disconnectEvent + "] ";
+            string message = transportMessage ?? string.Empty;
+            if (tail == eventPrefix + message
+                || tail == eventPrefix + "NetworkConnectionManager was shutdown. " + message) return string.Empty;
+            return reason;
+        }
+
+        private static bool ConsumeNgoDisconnectId(string value, string prefix, ref int cursor)
+        {
+            if (value.IndexOf(prefix, cursor, StringComparison.Ordinal) != cursor) return false;
+            int start = cursor + prefix.Length;
+            int end = value.IndexOf(']', start);
+            if (end <= start || end - start > 20
+                || !ulong.TryParse(value.Substring(start, end - start), NumberStyles.None,
+                    CultureInfo.InvariantCulture, out _)) return false;
+            cursor = end + 1;
+            return true;
+        }
+
         private void OnTransportFailure()
         {
-            if (!destroying && State != DirectConnectionState.Stopping)
-                BeginStop(DirectConnectionState.Failed, "Network transport failed. " + Troubleshooting);
+            if (!destroying && AcceptConnectionCallbacks)
+                AttemptFailed("TRANSPORT_FAILURE", "Network transport failed. " + Troubleshooting);
+        }
+
+        private void AttemptFailed(string code, string message, string approvalReason = "")
+        {
+            if (!AcceptConnectionCallbacks) return;
+            bool canRetry = Role == "Client" && State == DirectConnectionState.Connecting && JoinInProgress
+                && candidates != null && candidates.CanRetry(false, approvalReason, Time.realtimeSinceStartupAsDouble);
+            FailureCode = code;
+            FailureStage = State == DirectConnectionState.Connected ? "SESSION"
+                : !string.IsNullOrEmpty(approvalReason) || ConnectionStage == "HostApproval" ? "APPROVAL" : "TRANSPORT";
+            if (canRetry)
+            {
+                retryCandidate = true;
+                retryManagerReleased = false;
+                BeginStop(DirectConnectionState.Failed, "Address did not connect. Trying another available address...");
+                return;
+            }
+            if (Role == "Client" && State == DirectConnectionState.Connecting && string.IsNullOrEmpty(approvalReason) && candidates != null)
+            {
+                if (candidates.BudgetExpired(Time.realtimeSinceStartupAsDouble)) FailureCode = "CONNECT_BUDGET_EXHAUSTED";
+                else if (candidates.Count > 1) FailureCode = "CONNECT_CANDIDATES_EXHAUSTED";
+            }
+            JoinInProgress = false;
+            retryCandidate = false;
+            BeginStop(DirectConnectionState.Failed, message);
         }
 
         private void Update()
         {
-            if ((State == DirectConnectionState.Connecting || State == DirectConnectionState.StartingHost)
-                && Time.realtimeSinceStartup - connectionStartedAt >= ConnectionTimeoutSeconds)
-                BeginStop(DirectConnectionState.Failed, "Connection timed out. " + Troubleshooting);
+            double now = Time.realtimeSinceStartupAsDouble;
+            if (State == DirectConnectionState.Connecting && JoinInProgress && candidates != null)
+            {
+                if (candidates.BudgetExpired(now))
+                    AttemptFailed("CONNECT_BUDGET_EXHAUSTED", "Connection attempts timed out. " + Troubleshooting);
+                else if (now - connectionStartedAt >= CandidateConnectionTimeoutSeconds)
+                    AttemptFailed("CONNECT_ATTEMPT_TIMEOUT", "Connection timed out. " + Troubleshooting);
+            }
+            else if (State == DirectConnectionState.StartingHost && now - connectionStartedAt >= ConnectionTimeoutSeconds)
+            {
+                FailureCode = "HOST_START_TIMEOUT"; FailureStage = "TRANSPORT";
+                BeginStop(DirectConnectionState.Failed, "Host startup timed out. " + Troubleshooting);
+            }
 
-            // Complete outside NGO callbacks so a new manual start cannot re-enter its shutdown code.
-            if (State == DirectConnectionState.Stopping
-                && (manager == null || (!manager.IsListening && !manager.ShutdownInProgress)))
-                CompleteStop(stoppedState, stoppedMessage);
+            // Never start the next candidate inside an NGO callback, or before its old manager is gone.
+            if (State != DirectConnectionState.Stopping || (manager != null && (manager.IsListening || manager.ShutdownInProgress))) return;
+            if (retryCandidate && JoinInProgress)
+            {
+                if (candidates.BudgetExpired(now))
+                {
+                    FailureCode = "CONNECT_BUDGET_EXHAUSTED";
+                    retryCandidate = JoinInProgress = false;
+                    stoppedState = DirectConnectionState.Failed;
+                    stoppedMessage = "Connection attempts timed out. " + Troubleshooting;
+                    ReleaseManager();
+                    retryManagerReleased = true;
+                    retryBarrierFrame = Time.frameCount;
+                    return;
+                }
+                if (!retryManagerReleased)
+                {
+                    ReleaseManager();
+                    retryManagerReleased = true;
+                    retryBarrierFrame = Time.frameCount;
+                    return;
+                }
+                if (Time.frameCount <= retryBarrierFrame) return;
+                retryCandidate = retryManagerReleased = false;
+                if (!candidates.MoveNext(now))
+                {
+                    JoinInProgress = false;
+                    FailureCode = "CONNECT_CANDIDATES_EXHAUSTED";
+                    CompleteStop(DirectConnectionState.Failed, "No available address connected. " + Troubleshooting);
+                    return;
+                }
+                StartCandidate();
+                return;
+            }
+            // A manually restarted failed/cancelled client also receives a fresh manager. Successful
+            // manual Host cycles retain their existing manager and subscription contract.
+            if (Role == "Client" && !retryManagerReleased)
+            {
+                ReleaseManager();
+                retryManagerReleased = true;
+                retryBarrierFrame = Time.frameCount;
+                return;
+            }
+            if (retryManagerReleased && Time.frameCount <= retryBarrierFrame) return;
+            CompleteStop(stoppedState, stoppedMessage);
         }
 
         private void BeginStop(DirectConnectionState finalState, string reason)
@@ -308,6 +504,7 @@ namespace C6.Prototype.Networking
 
         private void CompleteStop(DirectConnectionState finalState, string reason)
         {
+            JoinInProgress = retryCandidate = retryManagerReleased = false;
             participants.Clear();
             admission.EndSession();
             LocalClientId = null;
@@ -318,7 +515,14 @@ namespace C6.Prototype.Networking
         private void SetState(DirectConnectionState state, string message)
         {
             State = state;
+            ConnectionStage = state == DirectConnectionState.Idle ? "Idle"
+                : state == DirectConnectionState.StartingHost ? "HostStarting"
+                : state == DirectConnectionState.Connecting ? "TransportConnecting"
+                : state == DirectConnectionState.Connected ? "Connected"
+                : state == DirectConnectionState.Stopping ? (retryCandidate && JoinInProgress ? "Retrying" : "Stopping")
+                : "Failed";
             Message = message;
+            Debug.Log($"C6_NET_CONNECTION attempt={AttemptId} candidate={CandidateAttempt}/{CandidateCount} family={AttemptAddressFamily} stage={ConnectionStage} failureStage={FailureStage} code={FailureCode} joining={JoinInProgress} elapsed={Time.realtimeSinceStartup-connectionStartedAt:F3}");
             Debug.Log($"C6_T02_STATE role={Role} status={State} local={LocalClientId?.ToString() ?? "none"} ids=[{string.Join(",", participants)}] reason={Message}");
             Changed?.Invoke();
         }
@@ -359,22 +563,39 @@ namespace C6.Prototype.Networking
 
         private void OnDisable()
         {
-            if (ownsSession && !destroying && manager != null && manager.IsListening)
-                BeginStop(DirectConnectionState.Idle, "Connection screen disabled. Connect again manually.");
+            if (ownsSession && !destroying && (JoinInProgress || (manager != null && manager.IsListening))) Stop();
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused && ownsSession && !destroying && JoinInProgress) Stop();
+        }
+
+        private void ReleaseManager()
+        {
+            managerGeneration++;
+            if (manager != null)
+            {
+                manager.OnConnectionEvent -= OnConnectionEvent;
+                if (transportFailureHandler != null) manager.OnTransportFailure -= transportFailureHandler;
+                manager.ConnectionApprovalCallback = null;
+                if (manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
+            }
+            if (transport != null && transportEventHandler != null) transport.OnTransportEvent -= transportEventHandler;
+            transportFailureHandler = null;
+            transportEventHandler = null;
+            if (managerObject != null) Destroy(managerObject);
+            managerObject = null;
+            manager = null;
+            transport = null;
         }
 
         private void OnDestroy()
         {
             destroying = true;
+            JoinInProgress = retryCandidate = false;
             if (!ownsSession) return;
-            if (manager != null)
-            {
-                manager.OnConnectionEvent -= OnConnectionEvent;
-                manager.OnTransportFailure -= OnTransportFailure;
-                manager.ConnectionApprovalCallback = null;
-                if (!manager.ShutdownInProgress) manager.Shutdown();
-            }
-            if (managerObject != null) Destroy(managerObject);
+            ReleaseManager();
             admission.EndSession();
             Changed = null;
             ParticipantDisconnected = null;

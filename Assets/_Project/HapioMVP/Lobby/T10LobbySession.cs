@@ -52,6 +52,7 @@ namespace C6.Prototype.Lobby
         private double joinedAt, nextSync, pendingAt, ackAt;
         private readonly Dictionary<ulong, double> admittedAt = new Dictionary<ulong, double>();
         private bool intentionalClose, wasConnected;
+        private int bindingGeneration;
         private ushort roomPort=7777;
         private string advertisementKey;
         private double nextAdvertisementRetry;
@@ -59,6 +60,7 @@ namespace C6.Prototype.Lobby
         public LobbyHostConfig HostConfig { get; private set; }
         public LobbyReply LastReply { get; private set; }
         public string Error { get; private set; }="";
+        public string FailureStage { get; private set; }="";
         public string Status { get; private set; }="Create or find a room";
         public string JoinRoute { get; private set; }="NONE";
         public string RoomName=>roomName;
@@ -66,6 +68,9 @@ namespace C6.Prototype.Lobby
         public BonjourRoomDiscovery Discovery=>discovery;
         public IReadOnlyList<DiscoveredRoom> Rooms=>discovery.Rooms;
         public bool Connected=>connection!=null&&connection.State==DirectConnectionState.Connected&&manager!=null&&manager.IsListening&&!manager.ShutdownInProgress;
+        // NGO connection approval precedes the authoritative lobby snapshot and its acknowledgement.
+        // Keep Connected's transport meaning for existing game code, and gate the waiting-room UI separately.
+        public bool InitialStateReady=>Connected&&Snapshot!=null&&HostConfig!=null&&LocalPlayer?.initialStateReceived==true;
         public bool IsHost=>Connected&&manager.IsHost;
         public bool HasPending=>!string.IsNullOrEmpty(pendingId);
         public bool LocalReady=>LocalPlayer?.ready??false;
@@ -78,7 +83,7 @@ namespace C6.Prototype.Lobby
         public event Action<bool> ApplicationPauseChanged;
         public void ReportInterruption(string reason)
         {
-            Error=reason;Status="Room ended / connect again";Changed?.Invoke();
+            Error=reason;FailureStage="SESSION";Status="Room ended / connect again";Changed?.Invoke();
         }
         private static double Now=>Time.realtimeSinceStartupAsDouble;
 
@@ -94,45 +99,52 @@ namespace C6.Prototype.Lobby
         public bool CreateRoom(string name,string port)
         {
             if (!connection.CanStart||config==null) return false;
-            if (!DirectConnectionValidation.TryParsePort(port,out roomPort)) return Fail("INVALID_PORT");
+            if (!DirectConnectionValidation.TryParsePort(port,out roomPort)) return Fail("INVALID_PORT","INPUT");
             name=(name??"").Trim(); if (name.Length==0) name="C6 Room";
-            if (name.Length>32||System.Text.Encoding.UTF8.GetByteCount(name)>80||name.Any(char.IsControl)) return Fail("INVALID_ROOM_NAME");
+            if (name.Length>32||System.Text.Encoding.UTF8.GetByteCount(name)>80||name.Any(char.IsControl)) return Fail("INVALID_ROOM_NAME","INPUT");
             ResetLocal(); roomName=name; expectedRoom=Guid.NewGuid().ToString("N");
             HostConfig=LobbyHostConfig.Capture(config);
             authority=new LobbyAuthority(expectedRoom,Guid.NewGuid().ToString("N"),buildIdentifier,JsonUtility.ToJson(HostConfig),BitConverter.ToUInt32(Guid.NewGuid().ToByteArray(),0),MaximumParticipants,continuousTransfers);
             discovery.StopBrowse(); JoinRoute="HOST";
             if (!connection.ConfigureConnection((ushort)ProtocolVersion,Array.Empty<byte>(),Approve,MaximumParticipants,KeepLobbyOnPeerDisconnect)) return Fail("CONNECTION_BUSY");
-            if (!connection.StartHost(port)) return Fail("HOST_FAILED");
+            if (!connection.StartHost(port)) return Fail(string.IsNullOrEmpty(connection.FailureCode)?"HOST_FAILED":connection.FailureCode,connection.FailureStage);
             Status="Room open / waiting for participants"; Changed?.Invoke(); return true;
         }
         public bool Browse()
         {
             if (!connection.CanStart) return false;
-            Error=""; discovery.StartBrowse(); Status="Finding nearby rooms"; Changed?.Invoke(); return discovery.IsBrowsing;
+            Error="";FailureStage=""; discovery.StartBrowse(); Status=discovery.IsBrowsing?"Finding nearby rooms":"Room search failed"; Changed?.Invoke(); return discovery.IsBrowsing;
         }
-        public void RefreshRooms() { if(connection.CanStart) { Error=""; discovery.Refresh(); Status="Refreshing nearby rooms"; Changed?.Invoke(); } }
-        public void CancelBrowse() { discovery.StopBrowse(); Status="Search stopped"; Changed?.Invoke(); }
+        public void RefreshRooms() { if(connection.CanStart) { Error="";FailureStage=""; discovery.Refresh(); Status="Refreshing nearby rooms"; Changed?.Invoke(); } }
+        public void CancelBrowse() { discovery.StopBrowse(); if(FailureStage=="DISCOVERY"){Error="";FailureStage="";} Status="Search stopped"; Changed?.Invoke(); }
         public bool JoinRoom(string id)
         {
             if (!connection.CanStart) return false;
             var room=Rooms.FirstOrDefault(r=>r.RoomId==id);
-            if(room==null||room.ExpiresAtSeconds<=Now) return Fail("STALE_ROOM");
-            string problem=RoomProblem(room); if(problem.Length>0) return Fail(problem);
+            if(room==null||room.ExpiresAtSeconds<=Now) return Fail("STALE_ROOM","DISCOVERY");
+            string problem=RoomProblem(room); if(problem.Length>0) return Fail(problem,"DISCOVERY");
             roomName=room.Name;
-            return Join(room.Address,room.Port.ToString(),room.RoomId,"BONJOUR");
+            var candidates=room.Candidates!=null&&room.Candidates.Count>0?room.Candidates:new[]{room.Address};
+            return Join(candidates,room.Port.ToString(),room.RoomId,"BONJOUR");
         }
-        public bool JoinDirect(string address,string port)=>Join(address,port,"","DIRECT_IP");
-        public bool JoinForValidation(string address,string port,string build,string roomId="")=>Join(address,port,roomId,"EXPLICIT_VALIDATION",build);
-        private bool Join(string address,string port,string roomId,string route,string build=null)
+        public bool JoinDirect(string address,string port)=>Join(new[]{address},port,"","DIRECT_IP");
+        public bool JoinForValidation(string address,string port,string build,string roomId="")=>Join(new[]{address},port,roomId,"EXPLICIT_VALIDATION",build);
+        public bool JoinCandidatesForValidation(IEnumerable<string> addresses,string port,string build,string roomId="")=>Join(addresses,port,roomId,"EXPLICIT_VALIDATION",build);
+        private bool Join(IEnumerable<string> addresses,string port,string roomId,string route,string build=null)
         {
             if (!connection.CanStart) return false;
-            if (!DirectConnectionValidation.TryParseAddress(address,out _)||!DirectConnectionValidation.TryParsePort(port,out _))return Fail("INVALID_ADDRESS_OR_PORT");
+            var candidates=(addresses??Array.Empty<string>()).ToArray();
+            if (candidates.Length==0||!candidates.Any(address=>DirectConnectionValidation.TryParseAddress(address,out _))
+                ||!DirectConnectionValidation.TryParsePort(port,out _))return Fail("INVALID_ADDRESS_OR_PORT","INPUT");
             build = build ?? buildIdentifier;
             ResetLocal(); expectedRoom=roomId; clientNonce=Guid.NewGuid().ToString("N");
+            // One user JOIN creates one hello. Candidate retries must reuse room/build/nonce,
+            // including after a failed driver has finished shutting down.
             var hello=new LobbyHello{protocol=ProtocolVersion,build=build,roomId=roomId,clientNonce=clientNonce};
             if(!connection.ConfigureConnection((ushort)ProtocolVersion,LobbyWire.Encode(hello),null,MaximumParticipants,KeepLobbyOnPeerDisconnect)) return Fail("CONNECTION_BUSY");
             discovery.StopBrowse(); JoinRoute=route; joinedAt=Now;
-            bool ok=connection.Join(address,port); Status=ok?"Connecting / checking room":"Connection failed";
+            bool ok=connection.JoinCandidates(candidates,port); Status=ok?connection.Message:"Connection failed";
+            if(!ok){Error=string.IsNullOrEmpty(connection.FailureCode)?connection.Message:connection.FailureCode;FailureStage=connection.FailureStage;}
             Debug.Log($"C6_T10A_JOIN route={route} room={roomId} build={build}"); Changed?.Invoke();return ok;
         }
         private string Approve(ulong sender,byte[] payload)
@@ -181,12 +193,26 @@ namespace C6.Prototype.Lobby
             admittedAt.Remove(clientId);
             if (authority.RemoveParticipant(clientId, out _)) Publish();
         }
-        private void OnDiscoveryChanged(){if(!string.IsNullOrEmpty(discovery.LastError))Error=discovery.LastError;Changed?.Invoke();}
+        private void OnDiscoveryChanged()
+        {
+            if(!string.IsNullOrEmpty(discovery.LastError)){Error=discovery.LastError;FailureStage="DISCOVERY";}
+            else if(FailureStage=="DISCOVERY"){Error="";FailureStage="";}
+            Changed?.Invoke();
+        }
         private void OnConnectionChanged()
         {
             Bind();
             if(connection.State==DirectConnectionState.Failed)
-            { Error=string.IsNullOrEmpty(connection.LastApprovalReason)?connection.Message:connection.LastApprovalReason;Status="Connection ended"; }
+            {
+                Error=!string.IsNullOrEmpty(connection.LastApprovalReason)?connection.LastApprovalReason:
+                    !string.IsNullOrEmpty(connection.FailureCode)?connection.FailureCode:connection.Message;
+                FailureStage=connection.FailureStage;
+                Status=FailureStage=="APPROVAL"?"Host did not approve entry":FailureStage=="SESSION"?"Room connection ended":"Connection failed";
+            }
+            else if(connection.JoinInProgress||connection.State==DirectConnectionState.StartingHost)
+            { Error="";FailureStage="";Status=connection.Message; }
+            else if(Connected&&!InitialStateReady)
+            { Error="";FailureStage="";Status=Snapshot==null?"Host approved / receiving room settings":"Confirming room settings with the host"; }
             Changed?.Invoke();
         }
         private void Bind()
@@ -195,14 +221,17 @@ namespace C6.Prototype.Lobby
             bool active=connection.State==DirectConnectionState.Connected&&candidate!=null&&candidate.IsListening&&!candidate.ShutdownInProgress;
             if(!active)
             {
-                if(wasConnected&&connection.State!=DirectConnectionState.Connecting&&connection.State!=DirectConnectionState.StartingHost)
+                if(wasConnected&&!connection.JoinInProgress&&connection.State!=DirectConnectionState.Connecting&&connection.State!=DirectConnectionState.StartingHost)
                 { Unbind(); discovery.StopAdvertising(); Snapshot=null;HostConfig=null;pendingId=null; if(!intentionalClose)Status="Room ended / connect again"; }
                 return;
             }
             if(manager==candidate&&messaging==candidate.CustomMessagingManager)return;
             Unbind(); manager=candidate;messaging=candidate.CustomMessagingManager;wasConnected=true;joinedAt=Now;nextSync=0;
-            messaging.RegisterNamedMessageHandler(SyncMessage,ReceiveSync);messaging.RegisterNamedMessageHandler(StateMessage,ReceiveSnapshot);
-            messaging.RegisterNamedMessageHandler(RequestMessage,ReceiveRequest);messaging.RegisterNamedMessageHandler(ReplyMessage,ReceiveReply);
+            int token=bindingGeneration;
+            messaging.RegisterNamedMessageHandler(SyncMessage,(sender,reader)=>{if(token==bindingGeneration&&manager==candidate)ReceiveSync(sender,reader);});
+            messaging.RegisterNamedMessageHandler(StateMessage,(sender,reader)=>{if(token==bindingGeneration&&manager==candidate)ReceiveSnapshot(sender,reader);});
+            messaging.RegisterNamedMessageHandler(RequestMessage,(sender,reader)=>{if(token==bindingGeneration&&manager==candidate)ReceiveRequest(sender,reader);});
+            messaging.RegisterNamedMessageHandler(ReplyMessage,(sender,reader)=>{if(token==bindingGeneration&&manager==candidate)ReceiveReply(sender,reader);});
             if(manager.IsHost)Publish();
         }
         private void Update()
@@ -280,7 +309,8 @@ namespace C6.Prototype.Lobby
                 && value.phase == LobbyProtocol.Lobby;
             if (rosterChanged && HasPending) { pendingId = null; Error = "ROSTER_CHANGED_READY_AGAIN"; }
             Snapshot=value;HostConfig=hostConfig;expectedRoom=value.roomId;
-            Status=value.phase==LobbyProtocol.Playing?"Start confirmed":rosterChanged?"Players changed / confirm Ready again":value.ParticipantCount>=2?value.ParticipantCount+" players connected":"Waiting for participants";
+            Status=value.phase==LobbyProtocol.Playing?"Start confirmed":!InitialStateReady?"Confirming room settings with the host":
+                rosterChanged?"Players changed / confirm Ready again":value.ParticipantCount>=2?value.ParticipantCount+" players connected":"Waiting for participants";
             string key=value.roomId+":"+value.revision;
             if(key!=lastPublishedState){lastPublishedState=key;Debug.Log($"C6_T10A_STATE local={connection.LocalClientId} room={value.roomId} revision={value.revision} phase={value.phase} participants={value.ParticipantCount} p1Ready={value.p1?.ready} p2Ready={value.p2?.ready} p2Initial={value.p2?.initialStateReceived} canStart={value.canStart} config={value.configFingerprint}");}
             if(started)StartConfirmed?.Invoke(value.start);
@@ -322,16 +352,17 @@ namespace C6.Prototype.Lobby
                 var bytes=new byte[count];reader.ReadBytesSafe(ref bytes,count);return LobbyWire.TryDecode(bytes,out value); }
             catch(Exception){return false;}
         }
-        private bool Fail(string reason){Error=reason;Changed?.Invoke();return false;}
-        private void Abort(string reason){Error=reason;Status="Room ended";if(authority!=null)authority.Close(reason);discovery.StopAdvertising();connection.Stop();Changed?.Invoke();}
-        private void ResetLocal(){discovery.StopAdvertising();advertisementKey=null;nextAdvertisementRetry=0;Unbind();authority=null;Snapshot=null;HostConfig=null;LastReply=null;Error="";sequence=0;pendingId=null;clientNonce="";expectedRoom="";lastPublishedState=null;intentionalClose=false;admittedAt.Clear();}
+        private bool Fail(string reason,string stage=""){Error=reason;FailureStage=stage;Changed?.Invoke();return false;}
+        private void Abort(string reason){Error=reason;FailureStage=!InitialStateReady?"INITIAL_STATE":"SESSION";Status="Room ended";if(authority!=null)authority.Close(reason);discovery.StopAdvertising();connection.Stop();Changed?.Invoke();}
+        private void ResetLocal(){discovery.StopAdvertising();advertisementKey=null;nextAdvertisementRetry=0;Unbind();authority=null;Snapshot=null;HostConfig=null;LastReply=null;Error="";FailureStage="";sequence=0;pendingId=null;clientNonce="";expectedRoom="";lastPublishedState=null;intentionalClose=false;admittedAt.Clear();}
         private void Unbind()
         {
+            bindingGeneration++;
             if(messaging!=null){messaging.UnregisterNamedMessageHandler(SyncMessage);messaging.UnregisterNamedMessageHandler(StateMessage);messaging.UnregisterNamedMessageHandler(RequestMessage);messaging.UnregisterNamedMessageHandler(ReplyMessage);}
             messaging=null;manager=null;wasConnected=false;
         }
-        private void OnDisable(){discovery?.StopBrowse();if(connection!=null&&(connection.State==DirectConnectionState.Connected||connection.State==DirectConnectionState.Connecting||connection.State==DirectConnectionState.StartingHost))Leave();}
-        private void OnApplicationPause(bool paused){ApplicationPauseChanged?.Invoke(paused);if(paused){discovery?.StopBrowse();if(connection!=null&&(connection.State==DirectConnectionState.Connected||connection.State==DirectConnectionState.Connecting||connection.State==DirectConnectionState.StartingHost))Leave();}}
+        private void OnDisable(){discovery?.StopBrowse();if(connection!=null&&(connection.JoinInProgress||connection.State==DirectConnectionState.Connected||connection.State==DirectConnectionState.Connecting||connection.State==DirectConnectionState.StartingHost))Leave();}
+        private void OnApplicationPause(bool paused){ApplicationPauseChanged?.Invoke(paused);if(paused){discovery?.StopBrowse();if(connection!=null&&(connection.JoinInProgress||connection.State==DirectConnectionState.Connected||connection.State==DirectConnectionState.Connecting||connection.State==DirectConnectionState.StartingHost))Leave();}}
         private void OnDestroy(){if(connection!=null){connection.Changed-=OnConnectionChanged;connection.ParticipantDisconnected-=OnParticipantDisconnected;}Unbind();if(discovery!=null){discovery.Changed-=OnDiscoveryChanged;discovery.Dispose();}Changed=null;RequestResolved=null;StartConfirmed=null;ApplicationPauseChanged=null;}
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using C6.Prototype.Networking;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -50,6 +51,7 @@ namespace C6.Prototype.Lobby
         public RectTransform Content => content;
         public InputField RoomNameInput { get; private set; }
         public InputField IPv4Input { get; private set; }
+        public InputField HostAddressInput => IPv4Input;
         public InputField PortInput { get; private set; }
         public string RoomName => RoomNameInput != null ? RoomNameInput.text.Trim() : string.Empty;
         public string HostAddress => IPv4Input != null ? IPv4Input.text.Trim() : string.Empty;
@@ -226,6 +228,8 @@ namespace C6.Prototype.Lobby
             Top(header, 20f, 20f, 8f, 70f);
             var brand = Text("Brand", header, "HAPIO", 28, White, TextAnchor.UpperLeft);
             Top(brand.rectTransform, 0f, 0f, 2f, 33f);
+            var networkBuild = Text("NetworkBuild", header, "NET " + LocalNetworkBuildInfo.Revision + " · APP " + LocalNetworkBuildInfo.ApplicationBuild, 10, Muted, TextAnchor.MiddleRight);
+            Top(networkBuild.rectTransform, 130f, 0f, 3f, 28f);
             var subtitle = Text("Subtitle", header, "PLAY TOGETHER", 11, Teal, TextAnchor.MiddleLeft);
             Top(subtitle.rectTransform, 1f, 115f, 40f, 18f);
             PhaseLabel = Text("Phase", header, "OFFLINE", 11, Gold, TextAnchor.MiddleRight);
@@ -317,12 +321,13 @@ namespace C6.Prototype.Lobby
             DirectToggleButton.onClick.AddListener(() => SetDirectExpanded(!directExpanded));
             directFields = Rect("DirectFields", directPanel);
             Top(directFields, 12f, 12f, 58f, 160f);
-            directHint = Text("DirectHint", directFields, "Can't find a room? Enter the host address.", 12, Muted, TextAnchor.UpperLeft);
+            directHint = Text("DirectHint", directFields, "Enter the host IPv4 or IPv6 address. Keep any %interface suffix.", 12, Muted, TextAnchor.UpperLeft);
             Top(directHint.rectTransform, 0f, 0f, 0f, 32f);
             RectTransform inputs = Rect("AddressFields", directFields);
             Top(inputs, 0f, 0f, 40f, 48f);
-            IPv4Input = Input("HostIPv4", inputs, "Host IPv4", string.Empty);
-            IPv4Input.characterLimit = 15;
+            IPv4Input = Input("HostIPv4", inputs, "Host IPv4 / IPv6", string.Empty);
+            IPv4Input.characterLimit = 64;
+            IPv4Input.keyboardType = TouchScreenKeyboardType.ASCIICapable;
             Fraction((RectTransform)IPv4Input.transform, 0f, .73f);
             PortInput = Input("Port", inputs, "Port", "7777");
             PortInput.characterLimit = 5;

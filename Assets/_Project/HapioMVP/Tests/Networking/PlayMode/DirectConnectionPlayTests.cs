@@ -234,6 +234,63 @@ namespace C6.Prototype.Networking.Tests
             Assert.That(view.ParticipantsLabel.text, Does.Contain("1 / 2"));
         }
 
+        [UnityTest]
+        public IEnumerator CandidateRetryKeepsPayloadAndIgnoresRetiredManagerCallbacks()
+        {
+            // The deliberate dead first endpoint emits this single stock UTP diagnostic.
+            LogAssert.Expect(LogType.Error, "Failed to connect to server.");
+            var payload = new byte[] { 7, 12, 25, 41 };
+            Assert.That(session.ConfigureConnection(DirectConnectionSession.ProtocolVersion, payload), Is.True);
+            Assert.That(session.JoinCandidates(new[] { "::1", "127.0.0.1" }, UnusedPeerPort), Is.True);
+            var retired = session.OwnedManager;
+            var firstAttempt = session.AttemptId;
+            payload[0] = 99;
+            Assert.That(session.ConfigureConnection(DirectConnectionSession.ProtocolVersion, payload), Is.False);
+            yield return WaitFor(() => session.CandidateAttempt == 2 && session.State == DirectConnectionState.Connecting,
+                22f, "First address did not finish shutdown and start its next candidate.");
+            Assert.That(session.AttemptId, Is.EqualTo(firstAttempt + 1));
+            Assert.That(session.OwnedManager, Is.Not.SameAs(retired));
+            Assert.That(session.OwnedManager.NetworkConfig.ConnectionData, Is.EqualTo(new byte[] { 7, 12, 25, 41 }));
+            var method = typeof(DirectConnectionSession).GetMethod("OnConnectionEvent",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(session, new object[] { retired, new ConnectionEventData { EventType = ConnectionEvent.ClientConnected, ClientId = 999 } });
+            Assert.That(session.State, Is.EqualTo(DirectConnectionState.Connecting));
+            Assert.That(session.LocalClientId, Is.Null);
+            Assert.That(session.ParticipantIds, Is.Empty);
+            session.Stop();
+            yield return WaitFor(() => session.State == DirectConnectionState.Idle, 5, "Retry cancellation did not finish.");
+            Assert.That(session.OwnedManager, Is.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator CancelDuringCandidateShutdownPreventsNextAttemptAndAllowsHostRestart()
+        {
+            LogAssert.Expect(LogType.Error, "Failed to connect to server.");
+            bool cancelled = false;
+            Action onChanged = () => {
+                if (!cancelled && session.State == DirectConnectionState.Stopping && session.JoinInProgress)
+                { cancelled = true; session.Stop(); }
+            };
+            session.Changed += onChanged;
+            try
+            {
+                Assert.That(session.JoinCandidates(new[] { "::1", "127.0.0.1" }, UnusedPeerPort), Is.True);
+                var firstAttempt = session.AttemptId;
+                yield return WaitFor(() => cancelled && session.State == DirectConnectionState.Idle,
+                    24, "Cancellation at the shutdown barrier did not return to Idle.");
+                yield return null;
+                Assert.That(session.AttemptId, Is.EqualTo(firstAttempt));
+                Assert.That(session.JoinInProgress, Is.False);
+                Assert.That(session.CanStart, Is.True);
+                Assert.That(session.OwnedManager, Is.Null);
+                Assert.That(session.StartHost(TestPort), Is.True);
+                yield return WaitFor(() => session.State == DirectConnectionState.Connected, 5, "Host restart after cancellation failed.");
+                Assert.That(session.ParticipantIds, Has.Count.EqualTo(1));
+            }
+            finally { session.Changed -= onChanged; }
+        }
+
         private void FindView()
         {
             view = Object.FindAnyObjectByType<DirectConnectionView>();
