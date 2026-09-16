@@ -78,9 +78,32 @@ namespace C6.Prototype.Attack
                 releaseNormalizedPosition.x < 0f || releaseNormalizedPosition.x > 1f ||
                 releaseNormalizedPosition.y < 0f || releaseNormalizedPosition.y > 1f)
             { error = "invalid-release-position"; return false; }
-            if (!LaunchMapping.IsFinite(basis.Origin) || !LaunchMapping.IsFinite(basis.Width) || basis.Width <= 0f ||
-                Vector3.Dot(basis.HorizontalAxis, Vector3.right) < .9999f)
-            { error = "invalid-throw-basis"; return false; }
+
+            //Vector3.right만 허용하는 게 아니라 수평으로 회전된 모든 축을 허용
+            Vector3 forwardAxis = Vector3.Cross(
+                basis.HorizontalAxis,
+                Vector3.up
+            );
+
+            if (!LaunchMapping.IsFinite(basis.Origin)
+                || !LaunchMapping.IsFinite(basis.HorizontalAxis)
+                || !LaunchMapping.IsFinite(basis.Width)
+                || basis.Width <= 0f
+                || basis.HorizontalAxis.sqrMagnitude < 0.9999f
+                || Mathf.Abs(
+                    Vector3.Dot(
+                        basis.HorizontalAxis,
+                        Vector3.up
+                    )
+                ) > 0.0001f
+                || forwardAxis.sqrMagnitude < 0.9999f)
+            {
+                error = "invalid-throw-basis";
+                return false;
+            }
+
+            forwardAxis.Normalize();
+
             if (!LaunchMapping.IsFinite(input.Delta.x) || !LaunchMapping.IsFinite(input.Delta.y) ||
                 !LaunchMapping.IsFinite(input.Duration) || input.Duration <= 0f || input.Duration + .0000001f < tuning.MinDuration ||
                 input.Duration > tuning.SampleWindow + .0000001f)
@@ -100,8 +123,19 @@ namespace C6.Prototype.Attack
             double vz = upwardSpeed * tuning.ForwardGain;
             double worldSpeed = Math.Sqrt(vx * vx + vy * vy + vz * vz);
             double worldScale = Math.Min(1.0, tuning.MaxWorldSpeed / worldSpeed);
-            Vector3 velocity = new Vector3((float)(vx * worldScale), (float)(vy * worldScale), (float)(vz * worldScale));
-            Vector3 position = basis.Origin + Vector3.right * ((releaseNormalizedPosition.x - .5f) * basis.Width);
+
+            Vector3 velocity =
+                basis.HorizontalAxis
+                * (float)(vx * worldScale)
+                + Vector3.up
+                * (float)(vy * worldScale)
+                + forwardAxis
+                * (float)(vz * worldScale);
+
+            Vector3 position = basis.Origin
+                + basis.HorizontalAxis
+                * ((releaseNormalizedPosition.x - .5f) * basis.Width);
+
             if (!LaunchMapping.IsFinite(position) || !LaunchMapping.IsFinite(velocity) ||
                 !LaunchMapping.IsFinite(velocity.magnitude) || velocity.sqrMagnitude <= .000001f)
             { error = "invalid-calculated-launch"; return false; }

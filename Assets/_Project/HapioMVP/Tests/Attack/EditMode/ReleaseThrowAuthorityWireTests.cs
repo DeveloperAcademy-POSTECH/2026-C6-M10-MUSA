@@ -228,6 +228,98 @@ namespace C6.Prototype.Attack.Tests
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }
+        [Test]
+        public void AuthenticatedSenderUsesItsRosterLaunchFrame()
+        {
+            var participantRegistry =
+                new HostOrbRegistry(true);
+
+            participantRegistry.BeginSession(
+                "participant-throw-session",
+                1
+            );
+
+            var participantAuthority =
+                new AttackAuthority(
+                    participantRegistry,
+                    100,
+                    20
+                );
+
+            var baseline = new ProjectileLaunchBasis(
+                new Vector3(0f, 1f, -5f),
+                Vector3.right,
+                8f,
+                new Vector3(0f, 1f, 0f)
+            );
+
+            participantAuthority.ConfigureReleaseThrows(
+                baseline,
+                Tuning
+            );
+
+            participantAuthority.ConfigureParticipantThrowFrames(
+                new[] { 0ul, 7ul }
+            );
+
+            participantAuthority.BeginDevelopmentRound();
+
+            OrbRecord p2Orb =
+                participantRegistry.RegisterDevelopmentOrb(
+                    7,
+                    OrbKind.Combined,
+                    OrbPolarity.None,
+                    Vector2.one * 0.5f
+                );
+
+            var request = new OrbActionRequest(
+                "participant-throw-session",
+                1,
+                "p2-participant-throw",
+                p2Orb.OrbId,
+                null,
+                OrbActionKind.Launch,
+                1,
+                new Vector2(0.5f, 0.8f),
+                Normal
+            );
+
+            AttackLaunchResult result =
+                participantAuthority.RequestLaunch(
+                    7,
+                    request
+                );
+
+            Assert.That(
+                result.Accepted,
+                Is.True,
+                result.Reason
+            );
+
+            Assert.That(
+                result.BallisticLaunch.HasValue,
+                Is.True
+            );
+
+            BallisticLaunch launch =
+                result.BallisticLaunch.Value;
+
+            Assert.That(
+                Vector3.Distance(
+                    launch.Position,
+                    new Vector3(0f, 1f, 5f)
+                ),
+                Is.LessThan(0.0001f)
+            );
+
+            Assert.That(
+                Vector3.Distance(
+                    launch.InitialVelocity,
+                    new Vector3(-1.5f, 4.2f, -12f)
+                ),
+                Is.LessThan(0.0001f)
+            );
+        }
 
         private static string Message(AttackSession session, string name) => (string)typeof(AttackSession)
             .GetProperty(name + "Message", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
@@ -247,5 +339,6 @@ namespace C6.Prototype.Attack.Tests
                 { id = orb.OrbId, owner = 7, position = new Vector3(0, 1, -3), radius = .2f, ballistic = true,
                     velocity = new Vector3(1, 3, 12), gravity = Vector3.down * 9.81f, elapsed = .25f, lifetime = 4 } } };
         }
+
     }
 }
