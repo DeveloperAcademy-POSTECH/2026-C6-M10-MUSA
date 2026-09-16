@@ -99,5 +99,51 @@ namespace C6.Prototype.Attack.Tests
             Assert.Throws<ArgumentException>(() => new BallisticLaunch(Vector3.zero, Vector3.forward, Vector3.down, 1.1f, 4, .1f));
             Assert.Throws<ArgumentException>(() => new BallisticLaunch(Vector3.zero, Vector3.forward, Vector3.down, .5f, float.NaN, .1f));
         }
+        [Test]
+        public void P2ThrowUsesOppositePositionAndDirection()
+        {
+            ProjectileLaunchBasis p2Basis =
+                ParticipantLaunchFrame.Calculate(
+                    Basis(),
+                    2,
+                    2
+                );
+
+            var input = new OrbThrowInput(
+                new Vector2(0.1f, 0.125f),
+                0.1f
+            );
+
+            bool succeeded = ThrowMapping.TryCalculate(
+                new Vector2(0.5f, 1f),
+                input,
+                p2Basis,
+                Tuning(),
+                out BallisticLaunch launch,
+                out string error
+            );
+
+            Assert.That(
+                succeeded,
+                Is.True,
+                error
+            );
+
+            Assert.That(
+                Vector3.Distance(
+                    launch.Position,
+                    new Vector3(0f, 1.08f, 4.5f)
+                ),
+                Is.LessThan(0.0001f)
+            );
+
+            Assert.That(
+                Vector3.Distance(
+                    launch.InitialVelocity,
+                    new Vector3(-6f, 3.5f, -10f)
+                ),
+                Is.LessThan(0.0001f)
+            );
+        }
     }
 }
