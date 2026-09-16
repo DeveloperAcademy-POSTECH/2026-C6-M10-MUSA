@@ -57,6 +57,7 @@ namespace C6.Prototype.GameSync
         private string ControlMessage => continuousTransfers ? "C6.P4.Control.v1" : maximumParticipants == 5 ? "C6.P3.Control.v1" : "C6.T10B.Control.v1";
         private T10LobbySession lobby;
         private T09BattleController controller;
+        private ThrowBattleFraming framing;
         private GameRuntimeConfig runtimeConfig;
         private NetworkManager manager;
         private CustomMessagingManager messaging;
@@ -158,8 +159,14 @@ namespace C6.Prototype.GameSync
         }
         private void Awake()
         {
-            lobby=GetComponent<T10LobbySession>(); controller=GetComponent<T09BattleController>();
-            runtimeConfig=GetComponent<GameRuntimeConfig>();
+            lobby = GetComponent<T10LobbySession>();
+            controller = GetComponent<T09BattleController>();
+            framing = GetComponent<ThrowBattleFraming>();
+            runtimeConfig = GetComponent<GameRuntimeConfig>();
+            if (framing == null)
+            {
+                throw new InvalidOperationException("ThrowBattleFraming component is required.");
+            }
             lobby.Configure(runtimeConfig.Value); ConfigureMaximumParticipants(maximumParticipants); ApplyTransferConfiguration();
             ConfigureContinuousTransfers(continuousTransfers);
             controller.ConfigureApprovedLifecycle(StartPreparedRound,Retry,Leave);
@@ -197,7 +204,12 @@ namespace C6.Prototype.GameSync
                 contract=Copy(value); participants=ordered.Select(Copy).ToArray(); p1=participants[0]; p2=participants[1];
                 if (maximumParticipants == 5) controller.Attack.ConfigureRoster(contract.participantIds);
                 controller.Attack.ConfigureContinuousTransfers(continuousTransfers);
-                controller.ConfigurePlayerNumber(lobby.Snapshot.LocalPlayerNumber(lobby.Connection.OwnedManager.LocalClientId));
+                int localPlayerNumber = lobby.Snapshot.LocalPlayerNumber(
+                    lobby.Connection.OwnedManager.LocalClientId);
+
+                controller.ConfigurePlayerNumber(localPlayerNumber);
+                framing.ConfigureParticipantView(localPlayerNumber, ordered.Length);
+
                 manager=lobby.Connection.OwnedManager; messaging=manager.CustomMessagingManager;
                 messaging.RegisterNamedMessageHandler(StateMessage,ReceiveState);
                 messaging.RegisterNamedMessageHandler(ControlMessage,ReceiveControl);

@@ -16,6 +16,8 @@ namespace C6.Prototype.Battle
         [SerializeField] Quaternion baselineRotation = Quaternion.identity;
         [SerializeField] float baselineFieldOfView;
         [SerializeField] bool hasBaseline;
+        float participantYaw;
+
         readonly Vector3[] corners = new Vector3[4];
         Renderer[] visualRenderers;
         Bounds lastBounds;
@@ -29,6 +31,10 @@ namespace C6.Prototype.Battle
         public float BaselineFieldOfView => baselineFieldOfView;
         public Vector3 BaselinePosition => baselinePosition;
         public Quaternion BaselineRotation => baselineRotation;
+        public float ParticipantYaw => participantYaw;
+
+        public Quaternion ParticipantRotation =>
+            Quaternion.AngleAxis(participantYaw, Vector3.up) * baselineRotation;
 
         public void Configure(SplitScreenLayout source, T09Hud view, BenchmarkMonster target)
         {
@@ -41,6 +47,16 @@ namespace C6.Prototype.Battle
             baselineFieldOfView = source.BattleCamera.fieldOfView;
             hasBaseline = true;
         }
+        public void ConfigureParticipantView(int playerNumber, int participantCount)
+        {
+            participantYaw = ParticipantViewAngle.CalculateYaw(
+                playerNumber,
+                participantCount
+            );
+
+            ApplyFraming();
+        }
+
         void LateUpdate() => ApplyFraming();
         void OnDisable() => RestoreBaseline();
         public void RestoreBaseline()
@@ -58,6 +74,7 @@ namespace C6.Prototype.Battle
             bool previousFit = FitSucceeded;
             FitSucceeded = false;
             var camera = BattleCamera;
+            Quaternion participantRotation = ParticipantRotation;
             if (!hasBaseline || camera == null || camera.orthographic || hud == null || hud.Canvas == null
                 || !hud.Canvas.gameObject.activeInHierarchy || monster == null || monster.Visual == null)
             { FitStatus = "WAITING_FOR_HUD"; return false; }
@@ -69,16 +86,16 @@ namespace C6.Prototype.Battle
                 if (renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy) bounds.Encapsulate(renderer.bounds);
             var viewport = camera.pixelRect;
             if (previousFit && available == EffectiveScreenRect && bounds == lastBounds && viewport == lastViewport
-                && camera.transform.position == lastCameraPosition && camera.transform.rotation == baselineRotation
+                && camera.transform.position == lastCameraPosition && camera.transform.rotation == participantRotation
                 && Mathf.Approximately(camera.fieldOfView, baselineFieldOfView))
             { FitSucceeded = true; return true; }
             var normalized = new Rect((available.xMin - viewport.xMin) / viewport.width,
                 (available.yMin - viewport.yMin) / viewport.height, available.width / viewport.width, available.height / viewport.height);
-            if (!TrySolvePosition(bounds, baselineRotation, baselineFieldOfView, viewport.width / viewport.height,
+            if (!TrySolvePosition(bounds, participantRotation, baselineFieldOfView, viewport.width / viewport.height,
                 normalized, baselinePosition, out var position))
             { FitStatus = "TARGET_FIT_FAILED"; return false; }
             camera.fieldOfView = baselineFieldOfView;
-            camera.transform.SetPositionAndRotation(position, baselineRotation);
+            camera.transform.SetPositionAndRotation(position, participantRotation);
             EffectiveScreenRect = available;
             lastBounds = bounds; lastCameraPosition = position; lastViewport = viewport;
             ProjectedMonsterRect = ProjectBounds(camera, bounds);
@@ -130,8 +147,7 @@ namespace C6.Prototype.Battle
             return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
         }
 
-        // The orientation and FOV stay at the saved camera baseline. Only distance and lateral/vertical
-        // position change. Every world-bounds corner must fit; an average target center alone is insufficient.
+        // Each participant rotates around world Y while keeping the saved pitch and field of view.
         public static bool TrySolvePosition(Bounds bounds, Quaternion rotation, float verticalFov, float aspect,
             Rect allowedViewport, Vector3 baseline, out Vector3 position)
         {
