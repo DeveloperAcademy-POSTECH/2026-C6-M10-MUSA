@@ -1,0 +1,138 @@
+{
+  "height_m": 2.782,
+  "vertices": 2108,
+  "triangles": 4047,
+  "bones": 58,
+  "uv_layers": [
+    "UVMap"
+  ],
+  "clips": [
+    {
+      "name": "Idle",
+      "frames": [
+        1,
+        181
+      ],
+      "fps": 30,
+      "duration_seconds": 6.0,
+      "loop": true,
+      "markers": {}
+    },
+    {
+      "name": "Call_Lure",
+      "frames": [
+        1,
+        196
+      ],
+      "fps": 30,
+      "duration_seconds": 6.5,
+      "loop": false,
+      "markers": {}
+    },
+    {
+      "name": "Move",
+      "frames": [
+        1,
+        97
+      ],
+      "fps": 30,
+      "duration_seconds": 3.2,
+      "loop": true,
+      "markers": {}
+    },
+    {
+      "name": "Ambush",
+      "frames": [
+        1,
+        112
+      ],
+      "fps": 30,
+      "duration_seconds": 3.7,
+      "loop": false,
+      "markers": {}
+    },
+    {
+      "name": "Claw_Attack",
+      "frames": [
+        1,
+        136
+      ],
+      "fps": 30,
+      "duration_seconds": 4.5,
+      "loop": false,
+      "markers": {
+        "Anticipation": 28,
+        "Wind_up": 56,
+        "Held_threat": 68,
+        "Slash_Impact": 74,
+        "Follow_through": 83,
+        "Recovery": 110
+      }
+    },
+    {
+      "name": "Grab",
+      "frames": [
+        1,
+        157
+      ],
+      "fps": 30,
+      "duration_seconds": 5.2,
+      "loop": false,
+      "markers": {}
+    },
+    {
+      "name": "Vanish",
+      "frames": [
+        1,
+        121
+      ],
+      "fps": 30,
+      "duration_seconds": 4.0,
+      "loop": false,
+      "markers": {}
+    },
+    {
+      "name": "Hit",
+      "frames": [
+        1,
+        49
+      ],
+      "fps": 30,
+      "duration_seconds": 1.6,
+      "loop": false,
+      "markers": {}
+    },
+    {
+      "name": "Stunned",
+      "frames": [
+        1,
+        151
+      ],
+      "fps": 30,
+      "duration_seconds": 5.0,
+      "loop": true,
+      "markers": {}
+    },
+    {
+      "name": "Defeated",
+      "frames": [
+        1,
+        136
+      ],
+      "fps": 30,
+      "duration_seconds": 4.5,
+      "loop": false,
+      "markers": {}
+    }
+  ],
+  "max_vertex_influences": 3,
+  "unweighted_vertices": 0,
+  "revision": 1,
+  "changes": [
+    "Torso and legs concealed by overlapping full-length robe",
+    "Wrist sleeves extend to back of hands",
+    "Continuous thicker fingers and claws",
+    "Brighter ivory palette"
+  ],
+  "reference_fidelity": "Interpreted reconstruction; no measured 99% similarity claim"
+}
