@@ -1,0 +1,9 @@
+{
+  "name": "C6.Prototype.PhysicsSandbox.PlayModeTests",
+  "references": ["C6.Prototype.PhysicsSandbox", "C6.Prototype.Orbs", "C6.Prototype.Presentation", "Unity.InputSystem"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}
