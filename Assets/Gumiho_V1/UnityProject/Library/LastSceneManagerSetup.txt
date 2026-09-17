@@ -1,5 +1,0 @@
-sceneSetups:
-- path: Assets/Gumiho/Scenes/Gumiho_Preview.unity
-  isLoaded: 1
-  isActive: 1
-  isSubScene: 0
