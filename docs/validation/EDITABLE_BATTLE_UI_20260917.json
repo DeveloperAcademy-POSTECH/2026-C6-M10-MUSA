@@ -1,0 +1,72 @@
+{
+  "task": "editable-battle-ui",
+  "date": "2026-09-17",
+  "unity": "6000.5.7f1",
+  "base_commit": "8b59ea5862f425bb4392d9c86bc7c894cfe209df",
+  "scene": "Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity",
+  "authoring": "Live Editor API; saved scene; no YAML editing",
+  "editmode": {
+    "status": "PASS",
+    "total": 1438,
+    "passed": 1438,
+    "failed": 0,
+    "skipped": 0,
+    "started_utc": "2026-09-17 02:27:12Z",
+    "duration_seconds": 2.2596385,
+    "xml_sha256": "887bc8af4ba9c34ed1a02874feea2a121bc59a0683448ba3974719423e2c1ba3"
+  },
+  "playmode": {
+    "status": "FAIL",
+    "total": 149,
+    "passed": 144,
+    "failed": 5,
+    "skipped": 0,
+    "started_utc": "2026-09-17 02:28:19Z",
+    "duration_seconds": 77.6501348,
+    "xml_sha256": "04e112ce016d7b2d35efd743d02231ad613d62ba9551c6e8a2af9f1dfe9a62b8"
+  },
+  "new_ui_tests": {
+    "editmode": {
+      "passed": 5,
+      "failed": 0
+    },
+    "playmode": {
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "baseline_failing_subset": {
+    "status": "FAIL",
+    "total": 5,
+    "passed": 0,
+    "failed": 5,
+    "skipped": 0,
+    "started_utc": "2026-09-17 02:32:49Z",
+    "duration_seconds": 1.5382568,
+    "xml_sha256": "3009fdd15988a5778ff8e23f69fb6c570d7d000883b621e5734fb65e91e57533"
+  },
+  "baseline_failure_names_match_current": true,
+  "existing_failure": "ThrowBattleFraming component is required in TwoPlayerBattle and InterruptionBattle legacy scenes",
+  "preservation": {
+    "preexisting_modified_files": 13,
+    "preserved_byte_for_byte": 13,
+    "original_serialized_scene_objects": 171,
+    "removed": 0,
+    "modified_original_objects": 2,
+    "added_serialized_objects": 293
+  },
+  "live_editor_ui_connections": "PASS",
+  "device_build_and_touch": "NOT_RUN",
+  "current_multiplayer_device_validation": "NOT_RUN",
+  "test_fixture": "Current-scene PlayMode tests isolate battle UI with the existing explicit solo Host path; not multiplayer or physical Touch evidence",
+  "tested_source_sha256": {
+    "Assets/_Project/HapioMVP/Battle/T09Hud.cs": "c2779131f9f6c2b02475f883e082572ee8a2158fbfc2811fb6d4754e2f2cd080",
+    "Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity": "b3dd84c2e258b01a1f8b013850f97f25ee85959b8913e897287ab32487e9f1d4",
+    "Assets/_Project/HapioMVP/Editor/EditableBattleUiTools.cs": "82fe268c136d6695df46fdf7c1375ef70541234916546c4f47d32b3210c5fc23",
+    "Assets/_Project/HapioMVP/Tests/Battle/EditMode/EditableBattleUiSceneTests.cs": "a0778187f0d2896e3ab01fbe910a698461a5209d07a111d20e1f1dd4f02e87f4",
+    "Assets/_Project/HapioMVP/Tests/Battle/PlayMode/EditableBattleUiPlayTests.cs": "c926c83f4c1b859b2f4c2ff2607803b8597ba17286eb78faa53666bb7fb7ab1a",
+    "Packages/manifest.json": "32d69c3d1d812d38e0805148985c819ce77dcc16098e04449cc42ee92c0b4a4c",
+    "Packages/packages-lock.json": "965cabfaa7018e22920197affe773d8da229944a4577120c4954ebe7d158c5f8",
+    "ProjectSettings/ProjectVersion.txt": "4b72a68f7b9e250d7f392f9964a8ce91959fa26628a05117ab911edfec912313"
+  }
+}

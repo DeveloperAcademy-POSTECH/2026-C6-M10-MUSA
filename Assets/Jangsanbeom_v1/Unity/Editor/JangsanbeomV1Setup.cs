@@ -77,7 +77,8 @@ public static class JangsanbeomV1Setup
         foreach (var r in go.GetComponentsInChildren<SkinnedMeshRenderer>())
         {
             r.sharedMaterials = r.sharedMaterials.Select(m => materials.ContainsKey(m.name) ? materials[m.name] : materials["Ivory"]).ToArray();
-            r.localBounds = new Bounds(new Vector3(0,1.3f,0), new Vector3(4,4,4));
+            // 9/17(목) 업데이트:  Root 본의 FBX 배율(100)과 상관없이 실제 뼈 위치로 표시 범위를 계산
+            r.updateWhenOffscreen = true;
         }
         string controllerPath = gen + "/Jangsanbeom.controller";
         var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);

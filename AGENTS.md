@@ -49,3 +49,10 @@
 - 현재 작업 브랜치는 `fix/#5-local-network-compatibility`이며 이슈 #5의 핫스팟 수정 PR을 작성한다. 사용자는 브랜치 변경·커밋·GitHub 업로드·PR 작성을 승인했다. main 병합은 이번 요청에 포함하지 않는다.
 - README·BUILD_README·docs/VALIDATION_SUMMARY의 앱26 안내를 최신 진입점으로 사용한다. 과거 L1/L2 문서의 ‘다음 단계’는 작성 시점 기록이다.
 - L1~L3 및 L4 핫스팟 범위의 기존 증거를 인계한다. 일반 Wi-Fi·인터넷 없는 LAN은 NOT_RUN이며 L4 전체 완료를 선언하지 않는다. 이번 정리는 문서 변경이며 빌드·자동 검사·실기기 시험을 다시 실행한 것으로 기록하지 않는다.
+
+## 전투 UI Scene 편집 전환 (2026-09-17)
+
+- 최신 사용자 요청에 따라 현재 `ContinuousTransferBattle`의 전투 UI를 씬에 저장된 Canvas/GameObject로 전환했다. 편집 방법과 코드 연결은 `docs/EDITABLE_BATTLE_UI.md`를 먼저 확인한다.
+- `T09Hud`·`T09BattleController`·`SplitScreenLayout`은 기존 루트에 유지하고, 저장된 UI 참조를 보존한다. 모양은 Canvas 자식에서 편집하며 현재 씬을 런타임 생성 코드로 덮어쓰지 않는다. 과거 시험 씬의 생성 경로는 별도로 남아 있다.
+- 상하 영역·안전 영역 컨테이너와 실제 상태 값은 코드가 관리한다. 버튼 기능은 컨트롤러가 등록하므로 Inspector On Click에 같은 기능을 중복 연결하지 않는다.
+- 새 UI 검사8개와 전체 EditMode1,438개는 통과했다. 전체 PlayMode는144/149이며 기준 커밋에서도 재현된 과거 씬 오류5개가 남아 있다. 상세 범위는 `docs/validation/EDITABLE_BATTLE_UI_20260917.json`을 따른다. 이번 변경의 새 앱 빌드·실기기·다인 실행은 NOT_RUN이다.
