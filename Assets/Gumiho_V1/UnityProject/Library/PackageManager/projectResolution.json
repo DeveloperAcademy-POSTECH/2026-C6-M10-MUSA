@@ -1,0 +1,181 @@
+{
+  "context": {
+    "projectPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Packages",
+    "unityVersion": "6000.6.0f1"
+  },
+  "inputs": [
+    "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Packages/manifest.json",
+    "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Packages/packages-lock.json",
+    "/Applications/Unity/Hub/Editor/6000.6.0f1/Unity.app/Contents/Resources/PackageManager/BuiltInPackages/BuiltInPackagesCombined.sha1"
+  ],
+  "outputs": {
+    "com.unity.render-pipelines.universal@17.6.0": {
+      "name": "com.unity.render-pipelines.universal",
+      "displayName": "Universal Render Pipeline",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.render-pipelines.universal@8457e85b8184",
+      "fingerprint": "8457e85b818408f56ec99d9dbaceac6d05bc3cc1",
+      "version": "17.6.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.modules.animation@1.0.0": {
+      "name": "com.unity.modules.animation",
+      "displayName": "Animation",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.modules.animation",
+      "version": "1.0.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.modules.audio@1.0.0": {
+      "name": "com.unity.modules.audio",
+      "displayName": "Audio",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.modules.audio",
+      "version": "1.0.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.modules.physics@1.0.0": {
+      "name": "com.unity.modules.physics",
+      "displayName": "Physics",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.modules.physics",
+      "version": "1.0.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.modules.ui@1.0.0": {
+      "name": "com.unity.modules.ui",
+      "displayName": "UI",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.modules.ui",
+      "version": "1.0.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.modules.imgui@1.0.0": {
+      "name": "com.unity.modules.imgui",
+      "displayName": "IMGUI",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.modules.imgui",
+      "version": "1.0.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.render-pipelines.core@17.6.0": {
+      "name": "com.unity.render-pipelines.core",
+      "displayName": "Scriptable Render Pipeline Core",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.render-pipelines.core@2d66c71e606e",
+      "fingerprint": "2d66c71e606e5b2e1ba0611419b383fc0a7b7bec",
+      "version": "17.6.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.shadergraph@17.6.0": {
+      "name": "com.unity.shadergraph",
+      "displayName": "Shader Graph",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.shadergraph@ef6135652377",
+      "fingerprint": "ef6135652377abcaf933ede5b23be972ece60dc9",
+      "version": "17.6.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.render-pipelines.universal-config@17.6.0": {
+      "name": "com.unity.render-pipelines.universal-config",
+      "displayName": "Universal Render Pipeline Config",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.render-pipelines.universal-config@561422b74439",
+      "fingerprint": "561422b74439f8598f45a82c4935ca6f1d86f212",
+      "version": "17.6.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.searcher@4.9.5": {
+      "name": "com.unity.searcher",
+      "displayName": "Searcher",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.searcher@a463122f2c00",
+      "fingerprint": "a463122f2c00f83398f41790942a0793431e70ea",
+      "editorCompatibility": "6000.0.0a1",
+      "version": "4.9.5",
+      "source": "registry",
+      "testable": false
+    },
+    "com.unity.graph-authoring@1.0.0": {
+      "name": "com.unity.graph-authoring",
+      "displayName": "Graph Authoring",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.graph-authoring@cfd2588851ee",
+      "fingerprint": "cfd2588851ee248c7989396b0917e843c54c1c6d",
+      "version": "1.0.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.burst@2.0.0": {
+      "name": "com.unity.burst",
+      "displayName": "Burst",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.burst@626e66ab421b",
+      "fingerprint": "626e66ab421bf31cfa602bb20675290e2a514b01",
+      "version": "2.0.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.collections@6.6.0": {
+      "name": "com.unity.collections",
+      "displayName": "Collections",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.collections@10fff0607388",
+      "fingerprint": "10fff0607388aeb98b314cf1183d493c1e67b9ef",
+      "version": "6.6.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.modules.jsonserialize@1.0.0": {
+      "name": "com.unity.modules.jsonserialize",
+      "displayName": "JSONSerialize",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.modules.jsonserialize",
+      "version": "1.0.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.profiling.core@1.0.3": {
+      "name": "com.unity.profiling.core",
+      "displayName": "Unity Profiling Core API",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.profiling.core@8a49f7027d06",
+      "fingerprint": "8a49f7027d0618e2cb86aa9e4ed5fb4392e8121a",
+      "editorCompatibility": "2020.1.0a1",
+      "version": "1.0.3",
+      "source": "registry",
+      "testable": false
+    },
+    "com.unity.nuget.mono-cecil@1.11.6": {
+      "name": "com.unity.nuget.mono-cecil",
+      "displayName": "Mono Cecil",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.nuget.mono-cecil@ecb9724e46ff",
+      "fingerprint": "ecb9724e46fff855c46a4f37f0a3377a3cfffc06",
+      "editorCompatibility": "2019.4.0a1",
+      "version": "1.11.6",
+      "source": "registry",
+      "testable": false
+    },
+    "com.unity.test-framework@1.8.0": {
+      "name": "com.unity.test-framework",
+      "displayName": "Test Framework",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.test-framework@7a3849e09bd0",
+      "fingerprint": "7a3849e09bd0f747cadfc719c0ea32fa9f539b2f",
+      "version": "1.8.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.test-framework.performance@6.6.0": {
+      "name": "com.unity.test-framework.performance",
+      "displayName": "Performance testing API",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.test-framework.performance@0a60b857a52e",
+      "fingerprint": "0a60b857a52e56e6a553af8b152e7ba111ab8234",
+      "version": "6.6.0",
+      "source": "builtin",
+      "testable": false
+    },
+    "com.unity.ext.nunit@2.1.0": {
+      "name": "com.unity.ext.nunit",
+      "displayName": "Custom NUnit",
+      "resolvedPath": "/Users/sunnysideup/.codex/.chatgpt-projects/g-p-6aa667681df88191814010b35390d008/GumihoDelivery_Rebuild/UnityProject/Library/PackageCache/com.unity.ext.nunit@0198eae3b53e",
+      "fingerprint": "0198eae3b53e4b243332e89e4af7bd396715ad55",
+      "version": "2.1.0",
+      "source": "builtin",
+      "testable": false
+    }
+  }
+}
