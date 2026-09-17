@@ -221,6 +221,9 @@ namespace C6.Prototype.Attack
         public AttackRequestReply LastResult { get; private set; }
         public string Status { get; private set; } = "Start a DEV host or join manually.";
         public int ActiveProjectileCount => projectiles.Count;
+        /// <summary>Host presentation only: the live physics body transform of an in-flight orb, or null.</summary>
+        public Transform ProjectileTransform(string orbId) => IsHost && orbId != null && projectiles.TryGetValue(orbId, out var projectile)
+            && projectile != null && !projectile.HasCompleted ? projectile.transform : null;
         public event Action Changed;
         public event Action<AttackRequestReply> RequestResolved;
         public event Action<AttackHitResult> ValidHit;
