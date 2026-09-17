@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2fdd9abd8b5b841e09729046b4394a86, type: 3}
   m_Name: ScreenLayoutConfig
   m_EditorClassIdentifier: C6.Prototype.Presentation::C6.Prototype.Presentation.ScreenLayoutConfig
-  upperFraction: 0.45
+  upperFraction: 0.55
   horizontalSwipeFraction: 0.18
   horizontalDominance: 1.25
   combinationRadiusFraction: 0.08
