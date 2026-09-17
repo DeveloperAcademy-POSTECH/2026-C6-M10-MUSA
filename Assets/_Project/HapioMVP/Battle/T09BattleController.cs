@@ -167,6 +167,7 @@ namespace C6.Prototype.Battle
             battle.Configure(attack, resource, combination, layout.Config);
             battle.Changed += OnBattleChanged;
             OrbView.SetSharedMaterial(spriteMaterial);
+            OrbView.SetArtwork(layout.Config.OrbArt);
             viewRoot = new GameObject("T09 Local Orb Views").transform; viewRoot.SetParent(transform, false);
             proxyRoot = new GameObject("T09 Client Projectile Display Only").transform; proxyRoot.SetParent(transform, false);
             if (orbPhysicsEnabled) EnsureOrbPhysics();
@@ -1060,6 +1061,7 @@ namespace C6.Prototype.Battle
             if (battle != null) battle.Changed -= OnBattleChanged;
             ClearThrowPreview();
             if (projectileMaterial != null) Destroy(projectileMaterial);
+            OrbView.SetArtwork(null);
             Changed = null;
         }
         private sealed class PendingInput

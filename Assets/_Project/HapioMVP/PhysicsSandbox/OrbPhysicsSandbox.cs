@@ -109,6 +109,7 @@ namespace C6.Prototype.PhysicsSandbox
                 if (JsonUtility.ToJson(saved) != savedTuningBaseline) tuning = saved;
             }
             if (orbMaterial != null) OrbView.SetSharedMaterial(orbMaterial);
+            OrbView.SetArtwork(sourceConfig != null ? sourceConfig.OrbArt : null);
             RefreshCameraLayout();
             startingPositions = new Vector3[seeds.Length];
             for (int i = 0; i < 2; i++)
@@ -805,6 +806,7 @@ namespace C6.Prototype.PhysicsSandbox
             if (boards[0] != null) boards[0].EdgeCrossed -= QueueLeftCrossing;
             if (boards[1] != null) boards[1].EdgeCrossed -= QueueRightCrossing;
             crossings.Clear();
+            OrbView.SetArtwork(null);
             IsReady = false;
         }
     }

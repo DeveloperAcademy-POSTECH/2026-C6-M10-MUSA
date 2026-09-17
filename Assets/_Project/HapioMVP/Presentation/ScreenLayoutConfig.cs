@@ -34,12 +34,15 @@ namespace C6.Prototype.Presentation
         [SerializeField, Range(.01f, .2f)] private float orbRadiusScreenFraction = .055f;
         // #4 tuning: multiplies the 5x4 grid radius cap in T09BattleController. 1 = previous behavior.
         [SerializeField, Range(1f, 3f)] private float orbRadiusCapScale = 1f;
+        // #4 art: optional orb sprites. Empty = generated circle artwork (previous behavior).
+        [SerializeField] private OrbArtSet orbArt;
         public float HorizontalSwipeFraction => Valid(horizontalSwipeFraction, .18f, .01f, 1f);
         public float HorizontalDominance => Valid(horizontalDominance, 1.25f, 1f, 5f);
         public float CombinationRadiusFraction => Valid(combinationRadiusFraction, .08f, .01f, .5f);
         public float AttackZoneHeightFraction => Valid(attackZoneHeightFraction, .18f, .01f, .5f);
         public float OrbRadiusScreenFraction => Valid(orbRadiusScreenFraction, .055f, .01f, .2f);
         public float OrbRadiusCapScale => Valid(orbRadiusCapScale, 1f, 1f, 3f);
+        public OrbArtSet OrbArt => orbArt;
         public bool EnableDefense => false;
 
         [Header("P1 · Flat orb board (board widths / seconds)")]
