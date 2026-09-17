@@ -21,6 +21,11 @@ namespace C6.Prototype.Battle
         [SerializeField] private Material spriteMaterial;
         [SerializeField] private AttackLaunchFrame launchFrame;
         [SerializeField] private MonsterHitTarget target;
+
+        [SerializeField] private DamagePopupLayer damagePopups;
+        private int? observedHp;
+        private Vector3? removedProxyPosition;
+
         [SerializeField] private bool orbPhysicsEnabled;
         [SerializeField] private bool releaseThrowsEnabled;
         [SerializeField] private bool continuousTransfersEnabled;
@@ -153,6 +158,7 @@ namespace C6.Prototype.Battle
             attack.ConfigureContinuousTransfers(continuousTransfersEnabled);
             attack.Configure(connection, layout.Config, launchFrame, target, projectileMaterial);
             attack.Changed += OnStateChanged;
+            attack.ValidHitAt += OnHostHitAt;
             // Stop completes asynchronously after the authority has already been released.
             connection.Changed += RefreshHud;
             attack.RequestResolved += OnResolved;
@@ -314,7 +320,7 @@ namespace C6.Prototype.Battle
             {
                 ClearViews(); ClearProxies(); ClearThrowTrails(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear();
                 gestures = new OrbGestureEngine(); gestures.SetInputEnabled(false); sessionKey = null; round = 0; displayedDebugMode = null;
-                RefreshHud(); return;
+                RefreshHud(); observedHp = null; return; 
             }
             if (sessionKey != state.sessionId || round != state.roundId)
             {
@@ -386,7 +392,7 @@ namespace C6.Prototype.Battle
             }
             if (!CanInteract && isActiveAndEnabled) CancelInteractions("Test phase " + state.state);
             gestures.SetInputEnabled(CanInteract);
-            RefreshLocalStates(); UpdateProxies(); UpdateThrowTrails(); RefreshHud();
+            RefreshLocalStates(); UpdateProxies(); ShowObservedDamage(state); UpdateThrowTrails(); RefreshHud();
         }
         /// <summary>All usable lower space is available for free dragging and combination.</summary>
         public Rect OrbGridScreenRect
@@ -840,7 +846,11 @@ namespace C6.Prototype.Battle
         {
             if (attack.IsHost || attack.Snapshot == null) { ClearProxies(); return; }
             var ids = new HashSet<string>(attack.Snapshot.projectiles.Select(p => p.id));
-            foreach (var id in proxies.Keys.ToArray()) if (!ids.Contains(id)) { Destroy(proxies[id]); proxies.Remove(id); }
+            foreach (var id in proxies.Keys.ToArray()) if (!ids.Contains(id))
+            {
+                if (proxies[id] != null) removedProxyPosition = proxies[id].transform.position;
+                Destroy(proxies[id]); proxies.Remove(id);
+            }
             foreach (var wire in attack.Snapshot.projectiles)
             {
                 if (!proxies.TryGetValue(wire.id, out var proxy))
@@ -1062,6 +1072,25 @@ namespace C6.Prototype.Battle
             foreach (var id in throwTrails.Where(pair => pair.Value == null).Select(pair => pair.Key).ToArray()) throwTrails.Remove(id);
         }
         private void ClearThrowTrails() { foreach (var trail in throwTrails.Values) if (trail != null) Destroy(trail.gameObject); throwTrails.Clear(); }
+
+        // Host: exact contact from its own physics. Clients: an HP drop in the snapshot, at the orb view
+        // that disappeared in the same update. Display only; HP and damage stay Host-authoritative.
+        private void OnHostHitAt(AttackHitResult hit, Vector3 position)
+        {
+            if (damagePopups != null) damagePopups.Show(hit.HpBefore - hit.HpAfter, position, layout.BattleCamera);
+        }
+        private void ShowObservedDamage(AttackSnapshot state)
+        {
+            int? previous = observedHp; observedHp = state.hp;
+            Vector3? removed = removedProxyPosition; removedProxyPosition = null;
+            int damage = ObservedDamage(previous, state.hp);
+            if (attack.IsHost || damagePopups == null || damage <= 0) return;
+            var hitbox = target != null ? target.GetComponentInChildren<Collider>() : null;
+            Vector3 at = removed ?? (hitbox != null ? hitbox.bounds.center : Vector3.zero);
+            damagePopups.Show(damage, at, layout.BattleCamera);
+        }
+        public static int ObservedDamage(int? previousHp, int hp) =>
+            previousHp.HasValue && hp < previousHp.Value ? previousHp.Value - hp : 0;
         private void OnApplicationFocus(bool focused) { if (!focused) CancelInteractions("Focus lost"); }
         private void OnApplicationPause(bool paused) { if (paused) CancelInteractions("Paused"); }
         private void OnDisable()
@@ -1081,7 +1110,7 @@ namespace C6.Prototype.Battle
         {
             if (orbPhysics != null) orbPhysics.EdgeCrossed -= OnPhysicsEdgeCrossed;
             if (connection != null) connection.Changed -= RefreshHud;
-            if (attack != null) { attack.Changed -= OnStateChanged; attack.RequestResolved -= OnResolved; }
+            if (attack != null) { attack.Changed -= OnStateChanged; attack.RequestResolved -= OnResolved; attack.ValidHitAt -= OnHostHitAt;}
             if (resource != null) { resource.Changed -= OnResourceChanged; resource.GenerationResolved -= OnGenerationResolved; resource.RecoveryResolved -= OnRecoveryResolved; }
             if (combination != null) { combination.Changed -= OnCombinationChanged; combination.RequestResolved -= OnCombinationResolved; }
             if (battle != null) battle.Changed -= OnBattleChanged;
