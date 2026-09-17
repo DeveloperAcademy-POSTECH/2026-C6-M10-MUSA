@@ -36,6 +36,9 @@ namespace C6.Prototype.Presentation
         [SerializeField, Range(1f, 3f)] private float orbRadiusCapScale = 1f;
         // #4 art: optional orb sprites. Empty = generated circle artwork (previous behavior).
         [SerializeField] private OrbArtSet orbArt;
+        // #4 catch assist: touch pick radius multiplier for a moving orb, scaled by its speed
+        // (0 at rest -> this value at max release speed). 1 = previous behavior. Physics colliders are unchanged.
+        [SerializeField, Range(1f, 2f)] private float orbCatchRadiusScale = 1f;
         public float HorizontalSwipeFraction => Valid(horizontalSwipeFraction, .18f, .01f, 1f);
         public float HorizontalDominance => Valid(horizontalDominance, 1.25f, 1f, 5f);
         public float CombinationRadiusFraction => Valid(combinationRadiusFraction, .08f, .01f, .5f);
@@ -43,6 +46,7 @@ namespace C6.Prototype.Presentation
         public float OrbRadiusScreenFraction => Valid(orbRadiusScreenFraction, .055f, .01f, .2f);
         public float OrbRadiusCapScale => Valid(orbRadiusCapScale, 1f, 1f, 3f);
         public OrbArtSet OrbArt => orbArt;
+        public float OrbCatchRadiusScale => Valid(orbCatchRadiusScale, 1f, 1f, 2f);
         public bool EnableDefense => false;
 
         [Header("P1 · Flat orb board (board widths / seconds)")]
