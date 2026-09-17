@@ -70,7 +70,8 @@ namespace C6.Prototype.Battle
         private readonly HashSet<string> confirmedUnavailable = new HashSet<string>();
         private readonly HashSet<string> touchReceipts = new HashSet<string>();
         private Transform viewRoot, proxyRoot;
-        private Material projectileMaterial;
+        private Material projectileMaterial, trailMaterial;
+        private readonly Dictionary<string, ThrowFlightTrail> throwTrails = new Dictionary<string, ThrowFlightTrail>(StringComparer.Ordinal);
         private string sessionKey;
         private uint round;
         private bool? displayedDebugMode;
@@ -144,6 +145,7 @@ namespace C6.Prototype.Battle
             // Explicit serialized asset reference keeps URP's actual shader in both builds.
             projectileMaterial = new Material(spriteMaterial) { name = "T09 Projectile Teal" };
             projectileMaterial.color = new Color(.25f, .85f, .77f);
+            trailMaterial = new Material(spriteMaterial) { name = "T09 Throw Trail" };
             attack = gameObject.AddComponent<AttackSession>();
             attack.ConfigureInventory(false, 64);
             hud.ParticipantCapacity = maximumParticipants;
@@ -310,7 +312,7 @@ namespace C6.Prototype.Battle
             var state = attack.Snapshot;
             if (state == null || !attack.Connected)
             {
-                ClearViews(); ClearProxies(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear();
+                ClearViews(); ClearProxies(); ClearThrowTrails(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear();
                 gestures = new OrbGestureEngine(); gestures.SetInputEnabled(false); sessionKey = null; round = 0; displayedDebugMode = null;
                 RefreshHud(); return;
             }
@@ -384,7 +386,7 @@ namespace C6.Prototype.Battle
             }
             if (!CanInteract && isActiveAndEnabled) CancelInteractions("Test phase " + state.state);
             gestures.SetInputEnabled(CanInteract);
-            RefreshLocalStates(); UpdateProxies(); RefreshHud();
+            RefreshLocalStates(); UpdateProxies(); UpdateThrowTrails(); RefreshHud();
         }
         /// <summary>All usable lower space is available for free dragging and combination.</summary>
         public Rect OrbGridScreenRect
@@ -514,7 +516,7 @@ namespace C6.Prototype.Battle
                     layout.Config.ThrowSampleWindow, layout.Config.ThrowMinDuration, out var sampledInput);
                 if (sampled && raw.y >= layout.BottomPixelRect.yMax && raw.y <= Screen.height &&
                     ThrowMapping.TryCalculate(OrbGestureEngine.NormalizeClamped(raw, layout.BottomPixelRect), sampledInput,
-                        launchFrame.Basis, CurrentThrowTuning, out _, out _)) releaseInput = sampledInput;
+                        CurrentThrowBasis, CurrentThrowTuning, out _, out _)) releaseInput = sampledInput;
                 ClearThrowPreview();
             }
             var decision = gestures.Up(pointerId, raw, layout.BottomPixelRect, Screen.width, targets, droppedCenter,
@@ -893,6 +895,17 @@ namespace C6.Prototype.Battle
             layout.Config.ThrowForwardGain, layout.Config.ThrowUpGain, layout.Config.ThrowLateralGain,
             layout.Config.ThrowMaxWorldSpeed, layout.Config.ThrowGravity, layout.Config.ThrowBounce,
             layout.Config.ThrowLifetime, layout.Config.ProjectileRadius, layout.Config.ThrowSampleWindow, layout.Config.ThrowMinDuration);
+
+        // The local release check must use the same participant frame the Host applies to this seat.
+        private ProjectileLaunchBasis CurrentThrowBasis
+        {
+            get
+            {
+                int participantCount = attack?.OrderedParticipantIds.Count ?? 0;
+                return approvedPlayerNumber < 1 || participantCount < 2 || approvedPlayerNumber > participantCount
+                    ? launchFrame.Basis : ParticipantLaunchFrame.Calculate(launchFrame.Basis, approvedPlayerNumber, participantCount);
+            }
+        }
         private void RefreshThrowPreview(Vector2 raw)
         {
             if (!ThrowArmed)
@@ -1034,6 +1047,21 @@ namespace C6.Prototype.Battle
             views.Clear(); display.Clear();
         }
         private void ClearProxies() { foreach (var proxy in proxies.Values) if (proxy != null) Destroy(proxy); proxies.Clear(); }
+        // Only the thrower sees the flight trail. It follows the view already on this screen:
+        // the Host's physics body or a client's display proxy. Trails fade and destroy themselves.
+        private void UpdateThrowTrails()
+        {
+            if (!releaseThrowsEnabled || attack.Snapshot == null) return;
+            foreach (var wire in attack.Snapshot.projectiles)
+            {
+                if (wire.owner != attack.LocalPlayerId || throwTrails.ContainsKey(wire.id)) continue;
+                Transform followed = attack.IsHost ? attack.ProjectileTransform(wire.id)
+                    : proxies.TryGetValue(wire.id, out var proxy) && proxy != null ? proxy.transform : null;
+                if (followed != null) throwTrails.Add(wire.id, ThrowFlightTrail.Create(transform, followed, wire, trailMaterial));
+            }
+            foreach (var id in throwTrails.Where(pair => pair.Value == null).Select(pair => pair.Key).ToArray()) throwTrails.Remove(id);
+        }
+        private void ClearThrowTrails() { foreach (var trail in throwTrails.Values) if (trail != null) Destroy(trail.gameObject); throwTrails.Clear(); }
         private void OnApplicationFocus(bool focused) { if (!focused) CancelInteractions("Focus lost"); }
         private void OnApplicationPause(bool paused) { if (paused) CancelInteractions("Paused"); }
         private void OnDisable()
@@ -1059,6 +1087,7 @@ namespace C6.Prototype.Battle
             if (battle != null) battle.Changed -= OnBattleChanged;
             ClearThrowPreview();
             if (projectileMaterial != null) Destroy(projectileMaterial);
+            if (trailMaterial != null) Destroy(trailMaterial);
             Changed = null;
         }
         private sealed class PendingInput
