@@ -1,0 +1,587 @@
+{
+  "vertices": 28480,
+  "triangles": 56392,
+  "revision": "R3: turnaround-driven crouched body, rear-swept ear wedges, narrowed eye mask, compact limbs",
+  "parts": [
+    {
+      "name": "Tail_01",
+      "triangles": 744
+    },
+    {
+      "name": "Tail_02",
+      "triangles": 744
+    },
+    {
+      "name": "Tail_03",
+      "triangles": 744
+    },
+    {
+      "name": "Tail_04",
+      "triangles": 744
+    },
+    {
+      "name": "Tail_05",
+      "triangles": 744
+    },
+    {
+      "name": "Tail_06",
+      "triangles": 744
+    },
+    {
+      "name": "Tail_07",
+      "triangles": 744
+    },
+    {
+      "name": "Tail_08",
+      "triangles": 744
+    },
+    {
+      "name": "Tail_09",
+      "triangles": 744
+    },
+    {
+      "name": "Torso",
+      "triangles": 864
+    },
+    {
+      "name": "Haunch",
+      "triangles": 600
+    },
+    {
+      "name": "Neck",
+      "triangles": 720
+    },
+    {
+      "name": "RuffVolume",
+      "triangles": 1176
+    },
+    {
+      "name": "Face_Refined",
+      "triangles": 1488
+    },
+    {
+      "name": "Nose",
+      "triangles": 480
+    },
+    {
+      "name": "NoseHighlight",
+      "triangles": 48
+    },
+    {
+      "name": "EyeMakeup_L",
+      "triangles": 108
+    },
+    {
+      "name": "EyeSocket_L",
+      "triangles": 108
+    },
+    {
+      "name": "Iris_L",
+      "triangles": 64
+    },
+    {
+      "name": "Pupil_L",
+      "triangles": 64
+    },
+    {
+      "name": "Ear_Sculpted_L",
+      "triangles": 216
+    },
+    {
+      "name": "EarBlackTufts_L",
+      "triangles": 156
+    },
+    {
+      "name": "EyeMakeup_R",
+      "triangles": 108
+    },
+    {
+      "name": "EyeSocket_R",
+      "triangles": 108
+    },
+    {
+      "name": "Iris_R",
+      "triangles": 64
+    },
+    {
+      "name": "Pupil_R",
+      "triangles": 64
+    },
+    {
+      "name": "Ear_Sculpted_R",
+      "triangles": 216
+    },
+    {
+      "name": "EarBlackTufts_R",
+      "triangles": 156
+    },
+    {
+      "name": "ForeheadFlame",
+      "triangles": 84
+    },
+    {
+      "name": "ForeheadSide_L",
+      "triangles": 84
+    },
+    {
+      "name": "ForeheadSide_R",
+      "triangles": 84
+    },
+    {
+      "name": "Mane_L_00",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_01",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_02",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_03",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_04",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_05",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_06",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_07",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_08",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_09",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_10",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_L_11",
+      "triangles": 324
+    },
+    {
+      "name": "DorsalFur_L0",
+      "triangles": 324
+    },
+    {
+      "name": "DorsalFur_L1",
+      "triangles": 324
+    },
+    {
+      "name": "DorsalFur_L2",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_L_00",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_L_01",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_L_02",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_L_03",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_L_04",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_L_05",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_L_06",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_00",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_01",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_02",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_03",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_04",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_05",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_06",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_07",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_08",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_09",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_10",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_R_11",
+      "triangles": 324
+    },
+    {
+      "name": "DorsalFur_R0",
+      "triangles": 324
+    },
+    {
+      "name": "DorsalFur_R1",
+      "triangles": 324
+    },
+    {
+      "name": "DorsalFur_R2",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_R_00",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_R_01",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_R_02",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_R_03",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_R_04",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_R_05",
+      "triangles": 324
+    },
+    {
+      "name": "Mane_Secondary_R_06",
+      "triangles": 324
+    },
+    {
+      "name": "ChestRuff_Center",
+      "triangles": 324
+    },
+    {
+      "name": "ChestRuff_Upper",
+      "triangles": 324
+    },
+    {
+      "name": "TailRootCover",
+      "triangles": 324
+    },
+    {
+      "name": "ForelegUpper_L",
+      "triangles": 576
+    },
+    {
+      "name": "ForelegLower_L",
+      "triangles": 456
+    },
+    {
+      "name": "HindThigh_L",
+      "triangles": 576
+    },
+    {
+      "name": "HindShin_L",
+      "triangles": 336
+    },
+    {
+      "name": "ForePawMass_L",
+      "triangles": 720
+    },
+    {
+      "name": "ForeToe_L0",
+      "triangles": 600
+    },
+    {
+      "name": "ForeClaw_L0",
+      "triangles": 192
+    },
+    {
+      "name": "ForeDigitPad_L0",
+      "triangles": 384
+    },
+    {
+      "name": "ForeToe_L1",
+      "triangles": 600
+    },
+    {
+      "name": "ForeClaw_L1",
+      "triangles": 192
+    },
+    {
+      "name": "ForeDigitPad_L1",
+      "triangles": 384
+    },
+    {
+      "name": "ForeToe_L2",
+      "triangles": 600
+    },
+    {
+      "name": "ForeClaw_L2",
+      "triangles": 192
+    },
+    {
+      "name": "ForeDigitPad_L2",
+      "triangles": 384
+    },
+    {
+      "name": "ForeCentralPad_L",
+      "triangles": 480
+    },
+    {
+      "name": "HindPawMass_L",
+      "triangles": 720
+    },
+    {
+      "name": "HindToe_L0",
+      "triangles": 600
+    },
+    {
+      "name": "HindClaw_L0",
+      "triangles": 192
+    },
+    {
+      "name": "HindDigitPad_L0",
+      "triangles": 384
+    },
+    {
+      "name": "HindToe_L1",
+      "triangles": 600
+    },
+    {
+      "name": "HindClaw_L1",
+      "triangles": 192
+    },
+    {
+      "name": "HindDigitPad_L1",
+      "triangles": 384
+    },
+    {
+      "name": "HindToe_L2",
+      "triangles": 600
+    },
+    {
+      "name": "HindClaw_L2",
+      "triangles": 192
+    },
+    {
+      "name": "HindDigitPad_L2",
+      "triangles": 384
+    },
+    {
+      "name": "HindCentralPad_L",
+      "triangles": 480
+    },
+    {
+      "name": "ForelegUpper_R",
+      "triangles": 576
+    },
+    {
+      "name": "ForelegLower_R",
+      "triangles": 456
+    },
+    {
+      "name": "HindThigh_R",
+      "triangles": 576
+    },
+    {
+      "name": "HindShin_R",
+      "triangles": 336
+    },
+    {
+      "name": "ForePawMass_R",
+      "triangles": 720
+    },
+    {
+      "name": "ForeToe_R0",
+      "triangles": 600
+    },
+    {
+      "name": "ForeClaw_R0",
+      "triangles": 192
+    },
+    {
+      "name": "ForeDigitPad_R0",
+      "triangles": 384
+    },
+    {
+      "name": "ForeToe_R1",
+      "triangles": 600
+    },
+    {
+      "name": "ForeClaw_R1",
+      "triangles": 192
+    },
+    {
+      "name": "ForeDigitPad_R1",
+      "triangles": 384
+    },
+    {
+      "name": "ForeToe_R2",
+      "triangles": 600
+    },
+    {
+      "name": "ForeClaw_R2",
+      "triangles": 192
+    },
+    {
+      "name": "ForeDigitPad_R2",
+      "triangles": 384
+    },
+    {
+      "name": "ForeCentralPad_R",
+      "triangles": 480
+    },
+    {
+      "name": "HindPawMass_R",
+      "triangles": 720
+    },
+    {
+      "name": "HindToe_R0",
+      "triangles": 600
+    },
+    {
+      "name": "HindClaw_R0",
+      "triangles": 192
+    },
+    {
+      "name": "HindDigitPad_R0",
+      "triangles": 384
+    },
+    {
+      "name": "HindToe_R1",
+      "triangles": 600
+    },
+    {
+      "name": "HindClaw_R1",
+      "triangles": 192
+    },
+    {
+      "name": "HindDigitPad_R1",
+      "triangles": 384
+    },
+    {
+      "name": "HindToe_R2",
+      "triangles": 600
+    },
+    {
+      "name": "HindClaw_R2",
+      "triangles": 192
+    },
+    {
+      "name": "HindDigitPad_R2",
+      "triangles": 384
+    },
+    {
+      "name": "HindCentralPad_R",
+      "triangles": 480
+    },
+    {
+      "name": "GoldBell_L",
+      "triangles": 480
+    },
+    {
+      "name": "GoldLoop_L",
+      "triangles": 288
+    },
+    {
+      "name": "TasselKnot_L",
+      "triangles": 216
+    },
+    {
+      "name": "SilkTassel_L",
+      "triangles": 552
+    },
+    {
+      "name": "GoldBell_R",
+      "triangles": 480
+    },
+    {
+      "name": "GoldLoop_R",
+      "triangles": 288
+    },
+    {
+      "name": "TasselKnot_R",
+      "triangles": 216
+    },
+    {
+      "name": "SilkTassel_R",
+      "triangles": 552
+    },
+    {
+      "name": "GoldBell_C",
+      "triangles": 480
+    },
+    {
+      "name": "GoldLoop_C",
+      "triangles": 288
+    },
+    {
+      "name": "TasselKnot_C",
+      "triangles": 216
+    },
+    {
+      "name": "SilkTassel_C",
+      "triangles": 552
+    }
+  ],
+  "bones": 48,
+  "tails": 9,
+  "skinned_meshes": 1,
+  "material_slots": 1,
+  "boundary_edges": 0,
+  "non_manifold_edges": 0,
+  "animation_clips": [
+    "Idle",
+    "Attack_Preview",
+    "Hit_Preview"
+  ],
+  "reference_match": "Unapproved reconstruction. Not original face-by-face topology."
+}
