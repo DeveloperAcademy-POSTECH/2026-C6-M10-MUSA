@@ -26,11 +26,26 @@ namespace C6.Prototype.PhysicsSandbox
         public bool showHelp = true;
         [Tooltip("Matches the current game's lower viewport, safe area and 144-point connected-game footer.")]
         public bool matchGameArea;
+        [Tooltip("ON: 실제 게임 영역 대신 기획 시안처럼 화면의 약 절반을 구슬 영역으로 사용합니다. '실제 게임 조합대 영역'이 켜져 있을 때만 적용됩니다.")]
+        public bool useHalfScreenArea = true;
+        [Tooltip("시안 구슬 영역. 전체 화면 대비 비율이며 아래쪽이 0입니다 (x, y, 너비, 높이).")]
+        public Rect halfScreenArea = new Rect(.028f, .058f, .944f, .487f);
+        [Tooltip("ON: 게임 코드(T09BattleController.RadiusPixels)와 같은 5x4 그리드 기준 반지름 상한을 적용합니다.")]
+        public bool applyGameSizeCap = true;
+        [Tooltip("조합대(구슬 영역) 배경색")]
+        public Color boardColor = new Color(.18f, .32f, .38f, 1f);
+        [Tooltip("조합대 바깥 배경색")]
+        public Color outsideColor = new Color(.03f, .045f, .06f, 1f);
+        public int CombineCount { get; private set; }
+        public string LastCombineResult { get; private set; } = "-";
         [Range(0, 1)] public int visibleBoard;
         public int TouchSamples { get; private set; }
+        /// <summary>마지막으로 레이아웃을 계산한 Game 화면 너비(px). Inspector에서는 Screen.width가 Inspector 창 너비라서 이 값을 쓴다.</summary>
+        public int LayoutScreenWidth => layoutWidth;
         public string LastInput { get; private set; } = "Waiting";
         private int layoutWidth, layoutHeight, layoutBoard = -1;
-        private bool layoutMatched;
+        private bool layoutMatched, layoutHalf;
+        private Rect layoutHalfArea;
         private Rect layoutSafeArea;
         private float layoutFraction;
 
@@ -113,12 +128,13 @@ namespace C6.Prototype.PhysicsSandbox
                 if (seed.previewArtwork != null) seed.previewArtwork.gameObject.SetActive(false);
                 seed.View = seed.GetComponent<OrbView>();
                 if (seed.View == null) seed.View = seed.gameObject.AddComponent<OrbView>();
-                seed.View.Configure("sandbox-" + Guid.NewGuid().ToString("N") + "-" + i, OrbKind.Raw, seed.polarity,
-                    seed.gameObject.layer, ArtworkRadius);
+                seed.View.Configure("sandbox-" + Guid.NewGuid().ToString("N") + "-" + i, seed.kind,
+                    seed.kind == OrbKind.Combined ? OrbPolarity.None : seed.polarity, seed.gameObject.layer, ArtworkRadius);
                 seed.View.SetHeldFeedbackEnabled(true);
                 byId.Add(seed.View.OrbId, seed);
             }
             IsReady = true;
+            HideNonOrbElements();
             ApplyTuning();
             ResetOrbs();
         }
@@ -144,6 +160,7 @@ namespace C6.Prototype.PhysicsSandbox
             rightWorkspace = ValidWorkspace(rightWorkspace, new Rect(1f, -3.5f, 6f, 7f));
             if (!IsReady)
             {
+                ApplyAreaColors();
                 foreach (var seed in seeds)
                 {
                     if (seed == null) continue;
@@ -154,9 +171,10 @@ namespace C6.Prototype.PhysicsSandbox
                 }
                 return;
             }
+            ApplyAreaColors();
             CancelGrab();
             crossings.Clear();
-            foreach (var seed in seeds) if (seed != null && seed.View != null) ApplyViewGeometry(seed);
+            foreach (var seed in AllSeeds) if (seed != null && seed.View != null) ApplyViewGeometry(seed);
             for (int i = 0; i < 2; i++)
             {
                 var workspace = Workspace(i);
@@ -169,6 +187,115 @@ namespace C6.Prototype.PhysicsSandbox
             appliedPortals = portalsEnabled;
             appliedPixelRect = sandboxCamera.pixelRect;
             appliedCameraSize = sandboxCamera.orthographicSize;
+        }
+
+        // ---------- 구슬 추가 / 제거 (Play 중) ----------
+        public const int MaxOrbs = 20;
+        private readonly List<OrbSandboxSeed> addedSeeds = new List<OrbSandboxSeed>();
+        private readonly List<OrbSandboxSeed> hiddenSeeds = new List<OrbSandboxSeed>();
+
+        private IEnumerable<OrbSandboxSeed> AllSeeds
+        {
+            get
+            {
+                foreach (var seed in seeds) yield return seed;
+                foreach (var seed in addedSeeds) yield return seed;
+            }
+        }
+
+        /// <summary>지금 두 조합대에 있는 구슬 수.</summary>
+        public int OrbCount => IsReady ? boards[0].Count + boards[1].Count : 0;
+
+        /// <summary>현재 표시 중인 조합대에 음/양 구슬을 하나 추가한다. 위치는 빈 곳 중 무작위.</summary>
+        public bool AddOrb(OrbPolarity polarity) => AddOrb(OrbKind.Raw, polarity);
+
+        public bool AddOrb(OrbKind kind, OrbPolarity polarity)
+        {
+            if (!IsReady || OrbCount >= MaxOrbs) return false;
+            int board = Mathf.Clamp(visibleBoard, 0, 1);
+            Rect bounds = CenterBounds(board);
+            var position = new Vector3(UnityEngine.Random.Range(bounds.xMin, bounds.xMax),
+                UnityEngine.Random.Range(bounds.yMin, bounds.yMax), 0f);
+            string name = kind == OrbKind.Combined ? "Added COMB Orb " : polarity == OrbPolarity.Yin ? "Added Yin Orb " : "Added Yang Orb ";
+            return CreateOrb(board, kind, kind == OrbKind.Combined ? OrbPolarity.None : polarity, position, name) != null;
+        }
+
+        private OrbSandboxSeed CreateOrb(int board, OrbKind kind, OrbPolarity polarity, Vector3 position, string namePrefix)
+        {
+            OrbSandboxSeed template = null;
+            foreach (var seed in seeds) if (seed != null) { template = seed; break; }
+            var go = new GameObject(namePrefix + (addedSeeds.Count + 1));
+            if (template != null)
+            {
+                go.layer = template.gameObject.layer;
+                go.transform.SetParent(template.transform.parent, false);
+            }
+            var added = go.AddComponent<OrbSandboxSeed>();
+            added.initialBoard = board;
+            added.kind = kind;
+            added.polarity = polarity;
+            added.CurrentBoard = board;
+            go.transform.position = position;
+            added.View = go.AddComponent<OrbView>();
+            added.View.Configure("sandbox-added-" + Guid.NewGuid().ToString("N"), kind, polarity, go.layer, ArtworkRadius);
+            added.View.SetHeldFeedbackEnabled(true);
+            byId.Add(added.View.OrbId, added);
+            addedSeeds.Add(added);
+            ApplyViewGeometry(added);
+            added.View.SetLocalState(LocalOrbState.Idle);
+            boards[board].Register(added.View);
+            boards[board].SetPosition(added.View.OrbId, position, false, Time.unscaledTimeAsDouble);
+            return added;
+        }
+
+        /// <summary>마지막에 추가한 구슬부터 제거. 추가한 구슬이 없으면 씬에 놓인 구슬을 숨긴다(배치 초기화로 복구).</summary>
+        public bool RemoveLastOrb()
+        {
+            if (!IsReady) return false;
+            if (addedSeeds.Count > 0)
+            {
+                var last = addedSeeds[addedSeeds.Count - 1];
+                addedSeeds.RemoveAt(addedSeeds.Count - 1);
+                DetachOrb(last);
+                if (last != null) Destroy(last.gameObject);
+                return true;
+            }
+            for (int i = seeds.Length - 1; i >= 0; i--)
+            {
+                var seed = seeds[i];
+                if (seed == null || seed.View == null || !seed.gameObject.activeSelf) continue;
+                DetachOrb(seed);
+                seed.gameObject.SetActive(false);
+                hiddenSeeds.Add(seed);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Play 중 추가한 구슬을 모두 제거한다.</summary>
+        public void RemoveAddedOrbs()
+        {
+            if (!IsReady) return;
+            DestroyAddedOrbs();
+        }
+
+        private void DestroyAddedOrbs()
+        {
+            foreach (var added in addedSeeds)
+            {
+                if (added == null) continue;
+                DetachOrb(added);
+                Destroy(added.gameObject);
+            }
+            addedSeeds.Clear();
+        }
+
+        private void DetachOrb(OrbSandboxSeed seed)
+        {
+            if (seed == null || seed.View == null) return;
+            if (held == seed) CancelGrab();
+            boards[seed.CurrentBoard].Remove(seed.View.OrbId);
+            seed.View.SetLocalState(LocalOrbState.Idle);
         }
 
         public void ReloadSavedTuning()
@@ -185,10 +312,13 @@ namespace C6.Prototype.PhysicsSandbox
             CancelGrab();
             crossings.Clear();
             boards[0].Clear(); boards[1].Clear();
+            DestroyAddedOrbs();
+            hiddenSeeds.Clear();
             for (int i = 0; i < seeds.Length; i++)
             {
                 var seed = seeds[i];
                 if (seed == null || seed.View == null) continue;
+                if (!seed.gameObject.activeSelf) seed.gameObject.SetActive(true);
                 seed.CurrentBoard = Mathf.Clamp(seed.initialBoard, 0, 1);
                 seed.transform.position = startingPositions[i];
                 ApplyViewGeometry(seed);
@@ -197,6 +327,8 @@ namespace C6.Prototype.PhysicsSandbox
                 boards[seed.CurrentBoard].SetPosition(seed.View.OrbId, startingPositions[i], false, Time.unscaledTimeAsDouble);
             }
             TransferCount = 0;
+            CombineCount = 0;
+            LastCombineResult = "-";
             LastTransferSource = LastTransferDestination = -1;
             LastTransferVelocityBefore = LastTransferVelocityAfter = Vector2.zero;
         }
@@ -266,6 +398,11 @@ namespace C6.Prototype.PhysicsSandbox
 
         private void ReadPointer()
         {
+#if ENABLE_LEGACY_INPUT_MANAGER
+            // Unity Remote 5는 옛 입력(Input.touches)으로만 터치를 보내는 경우가 많다.
+            // Active Input Handling = Both일 때 이 경로로 폰 터치를 받는다.
+            if ((held == null || legacyTouch) && ReadLegacyTouch()) return;
+#endif
             var screen = Touchscreen.current;
             if (held != null && touchPointer)
             {
@@ -306,12 +443,48 @@ namespace C6.Prototype.PhysicsSandbox
             else if (mouse.leftButton.wasPressedThisFrame) { LastInput = "Mouse"; BeginGrab(mousePosition); }
         }
 
+#if ENABLE_LEGACY_INPUT_MANAGER
+        private bool legacyTouch;
+
+        /// <summary>옛 입력 시스템 터치 처리. 터치를 처리했으면 true(마우스 경로는 건너뜀).</summary>
+        private bool ReadLegacyTouch()
+        {
+            int count = UnityEngine.Input.touchCount;
+            if (!legacyTouch)
+            {
+                if (count == 0) return false;
+                for (int i = 0; i < count; i++)
+                {
+                    var began = UnityEngine.Input.GetTouch(i);
+                    if (began.phase != UnityEngine.TouchPhase.Began) continue;
+                    TouchSamples++; LastInput = "Touch / Unity Remote (legacy)";
+                    BeginGrab(began.position);
+                    if (held != null) { legacyTouch = true; activeTouchId = began.fingerId; }
+                    return true;
+                }
+                return true; // 빈 곳을 누르고 있는 중: 마우스 경로로 넘기지 않음
+            }
+            for (int i = 0; i < count; i++)
+            {
+                var touch = UnityEngine.Input.GetTouch(i);
+                if (touch.fingerId != activeTouchId) continue;
+                TouchSamples++; LastInput = "Touch / Unity Remote (legacy)";
+                if (touch.phase == UnityEngine.TouchPhase.Canceled || !ScreenPointAllowed(touch.position)) { CancelGrab(); return true; }
+                MoveGrab(touch.position);
+                if (touch.phase == UnityEngine.TouchPhase.Ended) EndGrab(true);
+                return true;
+            }
+            CancelGrab(); // 손가락이 사라짐
+            return true;
+        }
+#endif
+
         private void BeginGrab(Vector2 screenPosition)
         {
             if (!ScreenPointAllowed(screenPosition) || OverHelp(screenPosition) || !TryWorld(screenPosition, out var world)) return;
             float closest = float.PositiveInfinity;
             OrbSandboxSeed selected = null;
-            foreach (var seed in seeds)
+            foreach (var seed in AllSeeds)
             {
                 if (seed == null || seed.View == null || !seed.View.isActiveAndEnabled) continue;
                 float distance = Vector2.Distance(world, seed.transform.position);
@@ -333,10 +506,103 @@ namespace C6.Prototype.PhysicsSandbox
         private void EndGrab(bool fling)
         {
             if (held == null) return;
-            boards[held.CurrentBoard].Release(held.View.OrbId, Time.unscaledTimeAsDouble, fling);
-            held.View.SetLocalState(LocalOrbState.Idle);
+            var source = held;
+            // 게임과 동일: 정상적으로 놓았을 때 가까운 구슬이 있으면 결합 시도(관성 없음), 없으면 관성 유지.
+            var target = fling ? NearestDropTarget(source) : null;
+            boards[source.CurrentBoard].Release(source.View.OrbId, Time.unscaledTimeAsDouble, fling && target == null);
+            source.View.SetLocalState(LocalOrbState.Idle);
             held = null;
             touchPointer = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            legacyTouch = false;
+#endif
+            if (target != null) TryCombine(source, target);
+        }
+
+        // ---------- 결합 (게임 규칙: 음 + 양 Raw만, 놓은 위치에서 화면 너비의 CombinationRadiusFraction 이내) ----------
+        private float CombinationRadiusFraction => sourceConfig != null ? sourceConfig.CombinationRadiusFraction : .08f;
+
+        private OrbSandboxSeed NearestDropTarget(OrbSandboxSeed source)
+        {
+            Vector2 center = sandboxCamera.WorldToScreenPoint(source.transform.position);
+            float limit = CombinationRadiusFraction * Mathf.Max(1f, Screen.width);
+            OrbSandboxSeed best = null;
+            float bestDistance = float.PositiveInfinity;
+            foreach (var other in AllSeeds)
+            {
+                if (other == null || other == source || other.View == null || !other.gameObject.activeInHierarchy
+                    || other.CurrentBoard != source.CurrentBoard) continue;
+                Vector2 position = sandboxCamera.WorldToScreenPoint(other.transform.position);
+                float distance = Vector2.Distance(position, center);
+                if (distance > limit + .01f || distance >= bestDistance) continue;
+                best = other; bestDistance = distance;
+            }
+            return best;
+        }
+
+        private void TryCombine(OrbSandboxSeed source, OrbSandboxSeed target)
+        {
+            if (source.kind != OrbKind.Raw || target.kind != OrbKind.Raw)
+            { LastCombineResult = "거절: 결합 구슬은 다시 결합할 수 없음"; return; }
+            if (source.polarity == target.polarity)
+            { LastCombineResult = "거절: 같은 극끼리는 결합 불가"; return; }
+            int board = target.CurrentBoard;
+            Vector3 middle = (source.transform.position + target.transform.position) * .5f;
+            middle.z = 0f;
+            RemoveOrb(source);
+            RemoveOrb(target);
+            CreateOrb(board, OrbKind.Combined, OrbPolarity.None, middle, "Combined Orb ");
+            CombineCount++;
+            LastCombineResult = "결합 성공 (음 + 양 → COMB)";
+        }
+
+        private void RemoveOrb(OrbSandboxSeed seed)
+        {
+            if (seed == null) return;
+            DetachOrb(seed);
+            if (addedSeeds.Remove(seed)) Destroy(seed.gameObject);
+            else { seed.gameObject.SetActive(false); hiddenSeeds.Add(seed); }
+        }
+
+        // ---------- Play 화면 정리 / 영역 색 ----------
+        private static readonly string[] NonOrbElements =
+            { "Sandbox heading", "Board A title", "Board B title", "Portal route", "Scene instruction" };
+        private static readonly string[] BoardDecorations =
+            { "Top wall", "Bottom wall", "Left portal edge", "Right portal edge" };
+
+        private void HideNonOrbElements()
+        {
+            showHelp = false;
+            foreach (string name in NonOrbElements)
+            {
+                var child = transform.Find(name);
+                if (child != null) child.gameObject.SetActive(false);
+            }
+            foreach (string boardName in new[] { "Board A - visual boundaries", "Board B - visual boundaries" })
+            {
+                var board = transform.Find(boardName);
+                if (board == null) continue;
+                foreach (string part in BoardDecorations)
+                {
+                    var child = board.Find(part);
+                    if (child != null) child.gameObject.SetActive(false);
+                }
+            }
+        }
+
+        public void ApplyAreaColors()
+        {
+            var background = transform.Find("Background Camera");
+            var backgroundCamera = background != null ? background.GetComponent<Camera>() : null;
+            if (backgroundCamera != null) backgroundCamera.backgroundColor = outsideColor;
+            if (sandboxCamera != null) sandboxCamera.backgroundColor = matchGameArea ? boardColor : outsideColor;
+            foreach (string boardName in new[] { "Board A - visual boundaries", "Board B - visual boundaries" })
+            {
+                var board = transform.Find(boardName);
+                var backdrop = board != null ? board.Find("Backdrop") : null;
+                var renderer = backdrop != null ? backdrop.GetComponent<SpriteRenderer>() : null;
+                if (renderer != null) renderer.color = boardColor;
+            }
         }
 
         private void CancelGrab() => EndGrab(false);
@@ -351,8 +617,30 @@ namespace C6.Prototype.PhysicsSandbox
         }
 
         private Rect Workspace(int index) => index == 0 ? leftWorkspace : rightWorkspace;
-        private float Radius(int index) => Mathf.Min(Workspace(index).width * tuning.orbRadiusScreenFraction,
-            Workspace(index).height * .28f);
+        private float Radius(int index)
+        {
+            Rect space = Workspace(index);
+            float requested = space.width * tuning.orbRadiusScreenFraction;
+            return applyGameSizeCap ? Mathf.Min(requested, GameSizeCap(space)) : Mathf.Min(requested, space.height * .28f);
+        }
+
+        /// <summary>게임 코드와 같은 상한: min(그리드 너비/5*.35, 그리드 높이/4*.28). (게임의 4pt 여백은 무시)</summary>
+        private float GameSizeCap(Rect space)
+        {
+            float scale = tuning != null ? tuning.orbRadiusCapScale : 1f;
+            return Mathf.Min(space.width / 5f * .35f, space.height / 4f * .28f) * scale;
+        }
+
+        /// <summary>Inspector 표시용 크기 정보. 비율은 조합대 너비 기준.</summary>
+        public void GetSizeInfo(out float requestedFraction, out float capFraction, out float usedFraction)
+        {
+            Rect space = Workspace(Mathf.Clamp(visibleBoard, 0, 1));
+            float width = Mathf.Max(.0001f, space.width);
+            float fraction = tuning != null ? tuning.orbRadiusScreenFraction : .055f;
+            requestedFraction = fraction;
+            capFraction = GameSizeCap(space) / width;
+            usedFraction = Radius(Mathf.Clamp(visibleBoard, 0, 1)) / width;
+        }
         private void ApplyViewGeometry(OrbSandboxSeed seed)
         {
             float scale = Radius(seed.CurrentBoard) / ArtworkRadius;
@@ -368,7 +656,7 @@ namespace C6.Prototype.PhysicsSandbox
             float radius = Radius(index);
             float unitsPerPixel = 2f * sandboxCamera.orthographicSize / Mathf.Max(1f, sandboxCamera.pixelRect.height);
             float horizontal = radius;
-            foreach (var seed in seeds)
+            foreach (var seed in AllSeeds)
                 if (seed != null && seed.View != null)
                     horizontal = Mathf.Max(horizontal, seed.View.LabelHalfWidthWorld + 2f * unitsPerPixel);
             float bottom = Mathf.Max(radius * 1.8f, radius * 1.72f + (LabelPixels * .5f + 2f) * unitsPerPixel);
@@ -400,19 +688,37 @@ namespace C6.Prototype.PhysicsSandbox
             return new Rect(safe.xMin, footerTop, safe.width, Mathf.Max(1f, top - footerTop));
         }
 
+        /// <summary>기획 시안(화면 절반 구슬 영역)을 픽셀 영역으로 변환. Safe Area 밖으로는 나가지 않는다.</summary>
+        public static Rect HalfScreenPixels(int width, int height, Rect safe, Rect normalized)
+        {
+            float w = Mathf.Max(1f, width), h = Mathf.Max(1f, height);
+            float xMin = Mathf.Clamp01(normalized.xMin) * w, xMax = Mathf.Clamp01(normalized.xMax) * w;
+            float yMin = Mathf.Clamp01(normalized.yMin) * h, yMax = Mathf.Clamp01(normalized.yMax) * h;
+            xMin = Mathf.Max(xMin, safe.xMin); xMax = Mathf.Min(xMax, safe.xMax);
+            yMin = Mathf.Max(yMin, safe.yMin); yMax = Mathf.Min(yMax, safe.yMax);
+            if (xMax - xMin < 1f) xMax = xMin + 1f;
+            if (yMax - yMin < 1f) yMax = yMin + 1f;
+            return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
+        }
+
         private void RefreshCameraLayout()
         {
             if (sandboxCamera == null || Screen.width < 1 || Screen.height < 1) return;
             float fraction = sourceConfig != null ? sourceConfig.LowerFraction : .45f;
             if (layoutWidth == Screen.width && layoutHeight == Screen.height && layoutMatched == matchGameArea &&
-                layoutBoard == visibleBoard && layoutSafeArea == Screen.safeArea && layoutFraction == fraction) return;
+                layoutBoard == visibleBoard && layoutSafeArea == Screen.safeArea && layoutFraction == fraction &&
+                layoutHalf == useHalfScreenArea && layoutHalfArea == halfScreenArea) return;
             bool geometryChanged = layoutWidth != Screen.width || layoutHeight != Screen.height ||
-                layoutMatched != matchGameArea || layoutSafeArea != Screen.safeArea || layoutFraction != fraction;
+                layoutMatched != matchGameArea || layoutSafeArea != Screen.safeArea || layoutFraction != fraction ||
+                layoutHalf != useHalfScreenArea || layoutHalfArea != halfScreenArea;
             layoutWidth = Screen.width; layoutHeight = Screen.height; layoutMatched = matchGameArea;
             layoutBoard = visibleBoard; layoutSafeArea = Screen.safeArea; layoutFraction = fraction;
+            layoutHalf = useHalfScreenArea; layoutHalfArea = halfScreenArea;
             if (matchGameArea)
             {
-                Rect pixels = GameWorkspacePixels(Screen.width, Screen.height, Screen.safeArea, fraction);
+                Rect pixels = useHalfScreenArea
+                    ? HalfScreenPixels(Screen.width, Screen.height, Screen.safeArea, halfScreenArea)
+                    : GameWorkspacePixels(Screen.width, Screen.height, Screen.safeArea, fraction);
                 float height = Mathf.Max(.3f, pixels.height / Mathf.Max(1f, pixels.width) * 6f);
                 leftWorkspace = new Rect(-7f, -height / 2f, 6f, height);
                 rightWorkspace = new Rect(1f, -height / 2f, 6f, height);
@@ -427,6 +733,7 @@ namespace C6.Prototype.PhysicsSandbox
                 sandboxCamera.orthographicSize = Mathf.Max(5.6f, 8f / Mathf.Max(.1f, sandboxCamera.aspect));
                 sandboxCamera.transform.position = new Vector3(0, 0, -10f);
             }
+            ApplyAreaColors();
             RefreshBoardArtwork("Board A - visual boundaries", leftWorkspace);
             RefreshBoardArtwork("Board B - visual boundaries", rightWorkspace);
             if (IsReady && geometryChanged) { ApplyTuning(); ResetOrbs(); }
@@ -450,9 +757,9 @@ namespace C6.Prototype.PhysicsSandbox
             }
         }
 
-        private Rect HelpRect => new Rect(12f, 12f, Mathf.Min(460f, Mathf.Max(160f, Screen.width - 24f)), 136f);
+        private Rect HelpRect => new Rect(12f, 12f, Mathf.Min(460f, Mathf.Max(160f, Screen.width - 24f)), 166f);
         private bool OverHelp(Vector2 point) => showHelp && HelpRect.Contains(new Vector2(point.x, Screen.height - point.y));
-        private void OnGUI()
+        private void OnGUIRemoved()
         {
             if (!showHelp || !IsReady) return;
             Rect rect = HelpRect;
@@ -464,7 +771,11 @@ namespace C6.Prototype.PhysicsSandbox
             if (GUI.Button(new Rect(rect.x + 12, rect.y + 77, 125, 25), "Reset (R)")) ResetOrbs();
             if (GUI.Button(new Rect(rect.x + 147, rect.y + 77, 125, 25), "Stop (Space)")) StopOrbs();
             GUI.Label(new Rect(rect.x + 12, rect.y + 105, rect.width - 24, 22),
-                (matchGameArea ? "Board " + (visibleBoard == 0 ? "A" : "B") + " / " : "Overview / ") + LastInput);
+                (matchGameArea ? "Board " + (visibleBoard == 0 ? "A" : "B") + " / " : "Overview / ") + LastInput + "  |  Orbs " + OrbCount);
+            float third = (rect.width - 32f) / 3f;
+            if (GUI.Button(new Rect(rect.x + 12, rect.y + 131, third - 4f, 25), "+ Yin")) AddOrb(OrbPolarity.Yin);
+            if (GUI.Button(new Rect(rect.x + 12 + third, rect.y + 131, third - 4f, 25), "+ Yang")) AddOrb(OrbPolarity.Yang);
+            if (GUI.Button(new Rect(rect.x + 12 + third * 2f, rect.y + 131, third - 4f, 25), "- Remove")) RemoveLastOrb();
         }
 
         private void OnApplicationFocus(bool focused)

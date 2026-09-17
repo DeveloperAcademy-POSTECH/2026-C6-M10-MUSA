@@ -856,7 +856,8 @@ namespace C6.Prototype.Battle
         }
         public Vector2 GetViewScreenPosition(string id) => layout.OrbCamera.WorldToScreenPoint(views[id].transform.position);
         private float RadiusPixels => Mathf.Max(1f, Mathf.Min(Screen.width * layout.Config.OrbRadiusScreenFraction,
-            OrbGridScreenRect.width / 5f * .35f, OrbGridScreenRect.height / 4f * .28f));
+            OrbGridScreenRect.width / 5f * .35f * layout.Config.OrbRadiusCapScale,
+            OrbGridScreenRect.height / 4f * .28f * layout.Config.OrbRadiusCapScale));
         private float LabelPixels => Mathf.Max(1f, Mathf.Min(12f * Mathf.Max(.1f, hud.Canvas.scaleFactor), OrbGridScreenRect.height / 4f * .25f));
         private float RadiusWorld => 2f * layout.OrbCamera.orthographicSize * RadiusPixels / Mathf.Max(1f, layout.BottomPixelRect.height);
         private GestureTuning Tuning => new GestureTuning(layout.Config.HorizontalSwipeFraction, layout.Config.HorizontalDominance,

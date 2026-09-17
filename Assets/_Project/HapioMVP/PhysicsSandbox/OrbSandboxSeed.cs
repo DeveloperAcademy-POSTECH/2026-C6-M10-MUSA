@@ -9,6 +9,8 @@ namespace C6.Prototype.PhysicsSandbox
     {
         [Range(0, 1)] public int initialBoard;
         public OrbPolarity polarity;
+        [Tooltip("Raw = 음/양 재료 구슬, Combined = 결합 구슬(COMB)")]
+        public OrbKind kind = OrbKind.Raw;
         public Transform previewArtwork;
         public OrbView View { get; internal set; }
         public int CurrentBoard { get; internal set; }

@@ -5,12 +5,14 @@ using UnityEngine;
 
 namespace C6.Prototype.PhysicsSandbox
 {
-    /// <summary>A working copy of exactly the seven existing shared physics settings.</summary>
+    /// <summary>A working copy of the eight shared orb size/physics settings.</summary>
     [Serializable]
     public sealed class OrbSandboxTuning
     {
-        [Range(.01f, .1f), Tooltip("Radius as a fraction of one player's complete board width.")]
+        [Range(.01f, .2f), Tooltip("Radius as a fraction of one player's complete board width.")]
         public float orbRadiusScreenFraction = .055f;
+        [Range(1f, 3f), Tooltip("Multiplier for the game's 5x4 grid radius cap. 1 = previous game behavior.")]
+        public float orbRadiusCapScale = 1f;
         [Range(0f, 1f)] public float orbRestitution = .65f;
         [Range(0f, 1f)] public float orbContactFriction = .15f;
         [Range(.001f, 20f), Tooltip("Free sliding deceleration, in board widths per second squared.")]
@@ -28,6 +30,7 @@ namespace C6.Prototype.PhysicsSandbox
             return new OrbSandboxTuning
             {
                 orbRadiusScreenFraction = source.OrbRadiusScreenFraction,
+                orbRadiusCapScale = source.OrbRadiusCapScale,
                 orbRestitution = source.OrbRestitution,
                 orbContactFriction = source.OrbContactFriction,
                 orbFloorDeceleration = source.OrbFloorDeceleration,
@@ -39,7 +42,8 @@ namespace C6.Prototype.PhysicsSandbox
 
         public void Sanitize()
         {
-            orbRadiusScreenFraction = Valid(orbRadiusScreenFraction, .055f, .01f, .1f);
+            orbRadiusScreenFraction = Valid(orbRadiusScreenFraction, .055f, .01f, .2f);
+            orbRadiusCapScale = Valid(orbRadiusCapScale, 1f, 1f, 3f);
             orbRestitution = Valid(orbRestitution, .65f, 0f, 1f);
             orbContactFriction = Valid(orbContactFriction, .15f, 0f, 1f);
             orbFloorDeceleration = Valid(orbFloorDeceleration, .6f, .001f, 20f);
@@ -67,7 +71,8 @@ namespace C6.Prototype.PhysicsSandbox
         }
 
         internal bool SameAs(OrbSandboxTuning other) => other != null &&
-            orbRadiusScreenFraction == other.orbRadiusScreenFraction && orbRestitution == other.orbRestitution &&
+            orbRadiusScreenFraction == other.orbRadiusScreenFraction && orbRadiusCapScale == other.orbRadiusCapScale &&
+            orbRestitution == other.orbRestitution &&
             orbContactFriction == other.orbContactFriction && orbFloorDeceleration == other.orbFloorDeceleration &&
             orbStopSpeed == other.orbStopSpeed && orbMaxReleaseSpeed == other.orbMaxReleaseSpeed &&
             orbReleaseSampleWindow == other.orbReleaseSampleWindow;

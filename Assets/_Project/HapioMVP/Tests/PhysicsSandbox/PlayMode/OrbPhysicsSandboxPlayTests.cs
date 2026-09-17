@@ -78,6 +78,7 @@ namespace C6.Prototype.PhysicsSandbox.Tests
         {
             string original = JsonUtility.ToJson(config);
             var identity = seeds[0].View.GetEntityId();
+            sandbox.applyGameSizeCap = false; // 이 테스트는 요청 반지름이 그대로 적용되는지만 확인
             sandbox.tuning.orbRadiusScreenFraction = .08f;
             sandbox.tuning.orbRestitution = .27f;
             sandbox.ApplyTuning();
