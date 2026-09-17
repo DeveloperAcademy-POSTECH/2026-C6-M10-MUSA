@@ -9,6 +9,7 @@ using UnityEngine.UI;
 namespace C6.Prototype.Battle
 {
     /// <summary>Battle UI with explicit Host Start, authoritative clock/team HP, and a frozen result panel.</summary>
+    [ExecuteAlways]
     [DisallowMultipleComponent]
     [RequireComponent(typeof(SplitScreenLayout))]
     public sealed class T09Hud : MonoBehaviour
@@ -20,15 +21,17 @@ namespace C6.Prototype.Battle
         private static readonly Color Gold = new Color(0.86f, 0.73f, 0.47f, 1f);
 
         [SerializeField] private SplitScreenLayout layout;
+        [SerializeField, HideInInspector] private bool useSceneHierarchy;
+        public bool UseSceneHierarchy => useSceneHierarchy;
         private Font font;
-        private RectTransform topZone;
-        private RectTransform bottomZone;
-        private RectTransform topContent;
-        private RectTransform bottomContent;
-        private RectTransform divider;
-        private RectTransform footer;
-        private RectTransform networkFields;
-        private bool networkFieldsVisible = true;
+        [SerializeField] private RectTransform topZone;
+        [SerializeField] private RectTransform bottomZone;
+        [SerializeField] private RectTransform topContent;
+        [SerializeField] private RectTransform bottomContent;
+        [SerializeField] private RectTransform divider;
+        [SerializeField] private RectTransform footer;
+        [SerializeField] private RectTransform networkFields;
+        [SerializeField] private bool networkFieldsVisible = true;
         private readonly Vector3[] footerCorners = new Vector3[4];
         private string networkStatus = "OFFLINE";
         private string actionStatus = "Start a dev host or join";
@@ -41,8 +44,8 @@ namespace C6.Prototype.Battle
         private double lastStaminaMaximum = 100d;
         private bool canEnd;
         private bool canGenerate, canDebugFixture;
-        private RectTransform staminaFill;
-        private Text generateCaption;
+        [SerializeField] private RectTransform staminaFill;
+        [SerializeField] private Text generateCaption;
         private Rect lastSafeArea;
         private Rect lastTop;
         private Rect lastBottom;
@@ -52,39 +55,39 @@ namespace C6.Prototype.Battle
 
         public bool CoordinatedGame { get; set; }
         public int ParticipantCapacity { get; set; } = 2;
-        public Canvas Canvas { get; private set; }
-        public UISafeArea SafeArea { get; private set; }
-        public Button HostButton { get; private set; }
-        public Button JoinButton { get; private set; }
-        public InputField IPv4Input { get; private set; }
-        public InputField PortInput { get; private set; }
+        [field: SerializeField] public Canvas Canvas { get; private set; }
+        [field: SerializeField] public UISafeArea SafeArea { get; private set; }
+        [field: SerializeField] public Button HostButton { get; private set; }
+        [field: SerializeField] public Button JoinButton { get; private set; }
+        [field: SerializeField] public InputField IPv4Input { get; private set; }
+        [field: SerializeField] public InputField PortInput { get; private set; }
         public string HostAddress => IPv4Input != null ? IPv4Input.text : string.Empty;
         public string Port => PortInput != null ? PortInput.text : "7777";
-        public Button StartButton { get; private set; }
-        public Button SoloModeButton { get; private set; }
-        public Button RetryButton { get; private set; }
-        public Button LobbyButton { get; private set; }
-        public Button ResultEndButton { get; private set; }
-        public GameObject ResultOverlay { get; private set; }
-        public Text ResultTitle { get; private set; }
-        public Text ResultSummary { get; private set; }
-        public Text ResultStatus { get; private set; }
-        public Text ClockLabel { get; private set; }
-        public Text TeamHpLabel { get; private set; }
-        public Text PhaseLabel { get; private set; }
-        public Button EndButton { get; private set; }
-        public Text ActionLabel { get; private set; }
-        public Text DetailLabel { get; private set; }
-        public Text HpLabel { get; private set; }
-        public Text ProgressLabel { get; private set; }
-        public Text StaminaLabel { get; private set; }
-        public Text RecoveryLabel { get; private set; }
-        public Text ResourceModeLabel { get; private set; }
-        public Text StorageLabel { get; private set; }
-        public Button GenerateButton { get; private set; }
-        public Button DebugFixtureButton { get; private set; }
-        public Text RoundLabel { get; private set; }
-        public Text ConnectionLabel { get; private set; }
+        [field: SerializeField] public Button StartButton { get; private set; }
+        [field: SerializeField] public Button SoloModeButton { get; private set; }
+        [field: SerializeField] public Button RetryButton { get; private set; }
+        [field: SerializeField] public Button LobbyButton { get; private set; }
+        [field: SerializeField] public Button ResultEndButton { get; private set; }
+        [field: SerializeField] public GameObject ResultOverlay { get; private set; }
+        [field: SerializeField] public Text ResultTitle { get; private set; }
+        [field: SerializeField] public Text ResultSummary { get; private set; }
+        [field: SerializeField] public Text ResultStatus { get; private set; }
+        [field: SerializeField] public Text ClockLabel { get; private set; }
+        [field: SerializeField] public Text TeamHpLabel { get; private set; }
+        [field: SerializeField] public Text PhaseLabel { get; private set; }
+        [field: SerializeField] public Button EndButton { get; private set; }
+        [field: SerializeField] public Text ActionLabel { get; private set; }
+        [field: SerializeField] public Text DetailLabel { get; private set; }
+        [field: SerializeField] public Text HpLabel { get; private set; }
+        [field: SerializeField] public Text ProgressLabel { get; private set; }
+        [field: SerializeField] public Text StaminaLabel { get; private set; }
+        [field: SerializeField] public Text RecoveryLabel { get; private set; }
+        [field: SerializeField] public Text ResourceModeLabel { get; private set; }
+        [field: SerializeField] public Text StorageLabel { get; private set; }
+        [field: SerializeField] public Button GenerateButton { get; private set; }
+        [field: SerializeField] public Button DebugFixtureButton { get; private set; }
+        [field: SerializeField] public Text RoundLabel { get; private set; }
+        [field: SerializeField] public Text ConnectionLabel { get; private set; }
         public SplitScreenLayout Layout => layout;
 
         /// <summary>Visual clamp area only. Gesture tests still use original pointer coordinates.</summary>
@@ -156,7 +159,7 @@ namespace C6.Prototype.Battle
             networkFieldsVisible = visible;
             if (networkFields != null) networkFields.gameObject.SetActive(visible);
             if (SoloModeButton != null) SoloModeButton.gameObject.SetActive(visible);
-            if (footer != null) Bottom(footer, 0f, 0f, 0f, visible ? 224f : 144f);
+            if (!useSceneHierarchy && footer != null) Bottom(footer, 0f, 0f, 0f, visible ? 224f : 144f);
         }
 
         public void SetControls(bool host, bool join, bool start, bool end, bool generate,
@@ -184,12 +187,106 @@ namespace C6.Prototype.Battle
             RefreshRegions();
         }
 
-        private void Awake()
+
+        /// <summary>Checks persistent bindings without recreating or repositioning authored controls.</summary>
+        public bool ValidateSceneHierarchy(out string error)
         {
-            if (layout == null)
-                layout = GetComponent<SplitScreenLayout>();
+            if (layout == null) { error = "layout"; return false; }
+            if (Canvas == null) { error = "Canvas"; return false; }
+            if (SafeArea == null) { error = "SafeArea"; return false; }
+            if (HostButton == null) { error = "HostButton"; return false; }
+            if (JoinButton == null) { error = "JoinButton"; return false; }
+            if (IPv4Input == null) { error = "IPv4Input"; return false; }
+            if (PortInput == null) { error = "PortInput"; return false; }
+            if (StartButton == null) { error = "StartButton"; return false; }
+            if (SoloModeButton == null) { error = "SoloModeButton"; return false; }
+            if (RetryButton == null) { error = "RetryButton"; return false; }
+            if (LobbyButton == null) { error = "LobbyButton"; return false; }
+            if (ResultEndButton == null) { error = "ResultEndButton"; return false; }
+            if (ResultOverlay == null) { error = "ResultOverlay"; return false; }
+            if (ResultTitle == null) { error = "ResultTitle"; return false; }
+            if (ResultSummary == null) { error = "ResultSummary"; return false; }
+            if (ResultStatus == null) { error = "ResultStatus"; return false; }
+            if (ClockLabel == null) { error = "ClockLabel"; return false; }
+            if (TeamHpLabel == null) { error = "TeamHpLabel"; return false; }
+            if (PhaseLabel == null) { error = "PhaseLabel"; return false; }
+            if (EndButton == null) { error = "EndButton"; return false; }
+            if (ActionLabel == null) { error = "ActionLabel"; return false; }
+            if (DetailLabel == null) { error = "DetailLabel"; return false; }
+            if (HpLabel == null) { error = "HpLabel"; return false; }
+            if (ProgressLabel == null) { error = "ProgressLabel"; return false; }
+            if (StaminaLabel == null) { error = "StaminaLabel"; return false; }
+            if (RecoveryLabel == null) { error = "RecoveryLabel"; return false; }
+            if (ResourceModeLabel == null) { error = "ResourceModeLabel"; return false; }
+            if (StorageLabel == null) { error = "StorageLabel"; return false; }
+            if (GenerateButton == null) { error = "GenerateButton"; return false; }
+            if (DebugFixtureButton == null) { error = "DebugFixtureButton"; return false; }
+            if (RoundLabel == null) { error = "RoundLabel"; return false; }
+            if (ConnectionLabel == null) { error = "ConnectionLabel"; return false; }
+            if (topZone == null) { error = "topZone"; return false; }
+            if (bottomZone == null) { error = "bottomZone"; return false; }
+            if (topContent == null) { error = "topContent"; return false; }
+            if (bottomContent == null) { error = "bottomContent"; return false; }
+            if (divider == null) { error = "divider"; return false; }
+            if (footer == null) { error = "footer"; return false; }
+            if (networkFields == null) { error = "networkFields"; return false; }
+            if (staminaFill == null) { error = "staminaFill"; return false; }
+            if (generateCaption == null) { error = "generateCaption"; return false; }
+            if (Canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            { error = "Canvas must use ScreenSpaceOverlay for existing gesture coordinates"; return false; }
+            foreach (var button in new[] { HostButton, JoinButton, StartButton, SoloModeButton,
+                RetryButton, LobbyButton, ResultEndButton, EndButton, GenerateButton, DebugFixtureButton })
+            {
+                if (!button.transform.IsChildOf(Canvas.transform))
+                { error = button.name + " must remain inside the battle Canvas"; return false; }
+            }
+            if (SoloModeButton.GetComponentInChildren<Text>(true) == null)
+            { error = "SoloModeButton requires its caption Text"; return false; }
+            error = string.Empty;
+            return true;
+        }
+
+#if UNITY_EDITOR
+        /// <summary>One-time Editor migration. Existing authored UI is validated and never rebuilt.</summary>
+        public void PrepareSceneHierarchy()
+        {
+            if (Application.isPlaying) throw new InvalidOperationException("Prepare UI outside Play mode.");
+            if (useSceneHierarchy)
+            {
+                if (!ValidateSceneHierarchy(out var error)) throw new InvalidOperationException(error);
+                return;
+            }
+            if (Canvas != null || transform.Find("T09Overlay") != null)
+                throw new InvalidOperationException("Existing UI found; preserve it instead of rebuilding.");
+            if (layout == null) layout = GetComponent<SplitScreenLayout>();
             font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             CreateUI();
+            SetNetworkFieldsVisible(false);
+            RefreshRegions();
+            useSceneHierarchy = true;
+            if (!ValidateSceneHierarchy(out var validationError)) throw new InvalidOperationException(validationError);
+        }
+#endif
+
+        private void Awake()
+        {
+            // Editor mode only previews a saved hierarchy; never construct legacy UI while editing.
+            if (!Application.isPlaying) return;
+            if (layout == null)
+                layout = GetComponent<SplitScreenLayout>();
+            if (useSceneHierarchy)
+            {
+                if (!ValidateSceneHierarchy(out var error))
+                    throw new InvalidOperationException("Editable battle UI has missing/invalid references: " + error);
+                ResultOverlay.SetActive(false);
+                EnsureEventSystem();
+            }
+            else
+            {
+                // Historical diagnostic scenes still construct their original UI.
+                font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                CreateUI();
+            }
             SetStatus(networkStatus, actionStatus, detailStatus);
             SetControls(canHost, canJoin, canStart, canEnd, canGenerate, canDebugFixture, canSolo);
             SetResources(100d, 100d, 20d, 20d / 3d, 0, 20, false, false);
@@ -197,6 +294,7 @@ namespace C6.Prototype.Battle
 
         private void OnEnable()
         {
+            if (!Application.isPlaying && !useSceneHierarchy) return;
             Subscribe();
             RefreshRegions();
         }
@@ -208,6 +306,7 @@ namespace C6.Prototype.Battle
 
         private void LateUpdate()
         {
+            if (!Application.isPlaying && !useSceneHierarchy) return;
             if (layout != null && (lastScreen.x != Screen.width || lastScreen.y != Screen.height ||
                                    lastSafeArea != Screen.safeArea || lastTop != layout.TopPixelRect ||
                                    lastBottom != layout.BottomPixelRect ||
@@ -262,6 +361,11 @@ namespace C6.Prototype.Battle
 
             CreateResultOverlay(canvasRect);
 
+            EnsureEventSystem();
+        }
+
+        private void EnsureEventSystem()
+        {
             if (FindAnyObjectByType<EventSystem>(FindObjectsInactive.Include) == null)
             {
                 var events = new GameObject("T09EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
@@ -434,11 +538,15 @@ namespace C6.Prototype.Battle
             RetryButton.gameObject.SetActive(canHostResultActions);
             LobbyButton.gameObject.SetActive(canHostResultActions);
             RetryButton.interactable = LobbyButton.interactable = canHostResultActions;
-            var closeRect = ResultEndButton.GetComponent<RectTransform>();
-            closeRect.anchorMin = new Vector2(canHostResultActions ? .68f : 0f, 0f);
-            closeRect.anchorMax = Vector2.one;
-            closeRect.offsetMin = new Vector2(canHostResultActions ? 4f : 0f, 0f);
-            closeRect.offsetMax = Vector2.zero;
+            // Scene-authored button positions are owned by the designer, including Client results.
+            if (!useSceneHierarchy)
+            {
+                var closeRect = ResultEndButton.GetComponent<RectTransform>();
+                closeRect.anchorMin = new Vector2(canHostResultActions ? .68f : 0f, 0f);
+                closeRect.anchorMax = Vector2.one;
+                closeRect.offsetMin = new Vector2(canHostResultActions ? 4f : 0f, 0f);
+                closeRect.offsetMax = Vector2.zero;
+            }
         }
 
         private InputField CreateInput(string objectName, RectTransform parent, string placeholder,

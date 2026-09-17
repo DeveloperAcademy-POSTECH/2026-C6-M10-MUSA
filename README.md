@@ -27,6 +27,7 @@ Unity·URP·네트워크 패키지 버전은 저장된 설정을 유지합니다
 
 ### 개발 문서
 
+- [전투 UI — Canvas에서 직접 편집하고 코드 연결 유지하기](docs/EDITABLE_BATTLE_UI.md)
 - [계획 — 추가 패키지 없는 핫스팟·Wi-Fi 호환성 개선](docs/LOCAL_NETWORK_COMPATIBILITY_PLAN.md) · L1~L3 완료, L4 핫스팟 확인 완료·일반 Wi-Fi/오프라인 LAN 미실행
 - [L1 네트워크 진단 코드·검증·빌드 방법](docs/L1_NETWORK_DIAGNOSTICS.md)
 - [보고서 1 — Unity 프로젝트 준비와 기본 게임](docs/UNITY_BEGINNER_DEVELOPMENT_REPORT.md)
