@@ -12,7 +12,7 @@ namespace C6.Prototype.Attack
     public sealed class BenchmarkMonster : MonoBehaviour
     {
         [SerializeField] private ScreenLayoutConfig config;
-        [SerializeField] private BoxCollider hitbox;
+        [SerializeField] private Collider hitbox;
         [SerializeField] private Transform visual;
         [SerializeField] private SplitScreenLayout runtimeLayout;
         private string appliedTargetId;
@@ -21,11 +21,11 @@ namespace C6.Prototype.Attack
 
         public ScreenLayoutConfig Config => runtimeLayout != null ? runtimeLayout.Config : config;
         public ScreenLayoutConfig SavedConfig => config;
-        public BoxCollider Hitbox => hitbox;
+        public Collider Hitbox => hitbox;
         public Transform Visual => visual;
         public MonsterHitTarget Target => GetComponent<MonsterHitTarget>();
 
-        public void Configure(ScreenLayoutConfig sharedConfig, BoxCollider collider, Transform visualRoot)
+        public void Configure(ScreenLayoutConfig sharedConfig, Collider collider, Transform visualRoot)
         {
             if (sharedConfig == null || collider == null || visualRoot == null)
                 throw new ArgumentNullException(nameof(sharedConfig), "The shared Config, hitbox, and visual are required.");
@@ -64,8 +64,25 @@ namespace C6.Prototype.Attack
             hitbox.transform.localPosition = Vector3.zero;
             hitbox.transform.localRotation = Quaternion.identity;
             hitbox.transform.localScale = Vector3.one;
-            hitbox.center = value.MonsterHitboxCenter;
-            hitbox.size = value.MonsterHitboxSize;
+
+            switch (hitbox)
+            {
+                // Vertical capsule: every seat around the monster sees the same hit width.
+                // MonsterHitboxSize.x is the diameter (z is ignored), y is the full height.
+                case CapsuleCollider capsule:
+                    capsule.direction = 1;
+                    capsule.center = value.MonsterHitboxCenter;
+                    capsule.radius = value.MonsterHitboxSize.x * .5f;
+                    capsule.height = Mathf.Max(value.MonsterHitboxSize.y, capsule.radius * 2f);
+                    break;
+                case BoxCollider box:
+                    box.center = value.MonsterHitboxCenter;
+                    box.size = value.MonsterHitboxSize;
+                    break;
+                default:
+                    throw new InvalidOperationException("The monster hitbox must be a BoxCollider or CapsuleCollider.");
+            }
+
             hitbox.isTrigger = false;
             hitbox.enabled = true;
             appliedTargetId = value.MonsterTargetId;
@@ -73,6 +90,27 @@ namespace C6.Prototype.Attack
             appliedCenter = value.MonsterHitboxCenter;
             appliedSize = value.MonsterHitboxSize;
             hasApplied = true;
+        }
+
+        private void OnDrawGizmos()
+        {
+            if (hitbox == null) return;
+            Gizmos.color = new Color(1f, .3f, .2f, .9f);
+            Gizmos.matrix = hitbox.transform.localToWorldMatrix;
+            switch (hitbox)
+            {
+                case CapsuleCollider capsule:
+                    float half = Mathf.Max(0f, capsule.height * .5f - capsule.radius);
+                    Vector3 top = capsule.center + Vector3.up * half, bottom = capsule.center - Vector3.up * half;
+                    Gizmos.DrawWireSphere(top, capsule.radius);
+                    Gizmos.DrawWireSphere(bottom, capsule.radius);
+                    foreach (var side in new[] { Vector3.right, Vector3.left, Vector3.forward, Vector3.back })
+                        Gizmos.DrawLine(top + side * capsule.radius, bottom + side * capsule.radius);
+                    break;
+                case BoxCollider box:
+                    Gizmos.DrawWireCube(box.center, box.size);
+                    break;
+            }
         }
     }
 }
