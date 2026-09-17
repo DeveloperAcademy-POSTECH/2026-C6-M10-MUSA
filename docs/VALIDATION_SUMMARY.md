@@ -1,5 +1,13 @@
 # 공개 검증 요약
 
+## 전투 UI Scene 편집 전환 (2026-09-17)
+
+현재 `ContinuousTransferBattle`의 전투 Canvas를 실제 Editor에서 생성·저장했고, 연결 검사와 세로 화면의 GameObject 편집 항목을 확인했다. [편집 안내와 실행 범위](EDITABLE_BATTLE_UI.md), [검증 요약 JSON](validation/EDITABLE_BATTLE_UI_20260917.json)을 따른다.
+
+별도 검증 복사본에서 **EditMode1,438/1,438 통과, PlayMode144/149 통과**다. 새 UI 검사8개(Edit5·Play3)는 모두 통과했다. PlayMode 실패5개는 변경 전 `8b59ea5`에서도 같은 `ThrowBattleFraming` 누락으로 재현됐으므로 기존 오류로 구분하며 전체 PASS를 선언하지 않는다. UI의 생성 버튼 검사는 명시적 단독 Host 시험이다.
+
+기존 사용자 변경13개는 바이트 단위로 유지했고 기존 씬 오브젝트 삭제0개다. 이번 변경의 새 앱 빌드·실기기 터치·다인 실행은 **NOT_RUN**이며 아래 앱26 기록을 승계하지 않는다.
+
 ## 이관 이후 네트워크 수정 · 앱26 (2026-09-15)
 
 추가 패키지 없는 연결 개선은 [L2 구현·실행 기록](L2_CONNECTION_INTEGRATION.md), [L3 게임·다인 회귀](L3_GAME_REGRESSION.md), [L4 핫스팟 확인](L4_HOTSPOT_VALIDATION.md)에 별도로 기록했다. 소스·설정을 대조한 검증 폴더에서 전체 EditMode 1,417개·PlayMode 146개와 Mac 혼합 3/5인 검사를 수행했으며, iOS 앱26 빌드·서명·두 기기 실행도 확인했다. 동일 검사를 단계별로 중복 합산하지 않는다.
