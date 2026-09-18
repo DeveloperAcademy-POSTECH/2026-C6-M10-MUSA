@@ -1,0 +1,10 @@
+{
+  "name": "C6.Prototype.PhysicsSandbox",
+  "rootNamespace": "C6.Prototype.PhysicsSandbox",
+  "references": [
+    "C6.Prototype.Orbs",
+    "C6.Prototype.Presentation",
+    "Unity.InputSystem"
+  ],
+  "autoReferenced": true
+}

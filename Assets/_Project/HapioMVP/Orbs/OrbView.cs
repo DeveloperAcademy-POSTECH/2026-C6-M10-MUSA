@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using C6.Prototype.Presentation;
 using UnityEngine;
 
 namespace C6.Prototype.Orbs
@@ -20,11 +21,14 @@ namespace C6.Prototype.Orbs
         private static Material spriteMaterial;
         private static bool ownsMaterial;
         private static int liveViews;
+        private static OrbArtSet artwork;
 
         private SpriteRenderer ring;
         private SpriteRenderer core;
         private SpriteRenderer firstDot;
         private SpriteRenderer secondDot;
+        private SpriteRenderer art;
+        private bool labelHidden;
         private TextMesh label;
         private MeshRenderer labelRenderer;
         private CircleAsset circle;
@@ -63,6 +67,9 @@ namespace C6.Prototype.Orbs
             ownsMaterial = false;
         }
 
+        /// <summary>#4: optional sprite artwork for views configured after this call. Null keeps generated circles.</summary>
+        public static void SetArtwork(OrbArtSet set) => artwork = set;
+
         public void Configure(string orbId, OrbKind orbKind, OrbPolarity orbPolarity, int layer, float radiusWorld, string displayLabel = null)
         {
             if (string.IsNullOrWhiteSpace(orbId)) throw new ArgumentException("An orb ID is required.", nameof(orbId));
@@ -94,6 +101,21 @@ namespace C6.Prototype.Orbs
             if (combined)
                 secondDot = Disc("SecondCore", layer, 0.27f,
                     new Vector3(radiusWorld * 0.26f, -radiusWorld * 0.08f, 0f), 43);
+            var artSprite = artwork == null ? null : artwork.SpriteFor(combined, orbPolarity == OrbPolarity.Yin);
+            if (artSprite != null)
+            {
+                // The sprite's full width maps to the collider diameter, so the drawn circle edge is the hit edge.
+                var artObject = new GameObject("Artwork", typeof(SpriteRenderer));
+                artObject.layer = layer;
+                artObject.transform.SetParent(transform, false);
+                float fit = radiusWorld * 2f / Mathf.Max(0.0001f, artSprite.bounds.size.x);
+                artObject.transform.localScale = new Vector3(fit, fit, 1f);
+                art = artObject.GetComponent<SpriteRenderer>();
+                art.sprite = artSprite;
+                art.sharedMaterial = spriteMaterial;
+                art.sortingOrder = 44;
+                labelHidden = artwork.HideLabels;
+            }
 
             var labelObject = new GameObject("OrbLabel", typeof(TextMesh));
             labelObject.layer = layer;
@@ -154,6 +176,8 @@ namespace C6.Prototype.Orbs
             core.transform.SetParent(heldArtwork, false);
             firstDot.transform.SetParent(heldArtwork, false);
             if (secondDot != null) secondDot.transform.SetParent(heldArtwork, false);
+            if (art != null) art.transform.SetParent(heldArtwork, false);
+            ApplyArtwork(localState == LocalOrbState.Pending);
             heldShadow = Disc("HeldShadow", gameObject.layer, 1f, Vector3.zero, 87);
             heldHaloOuter = Disc("HeldHaloOuter", gameObject.layer, 1f, Vector3.zero, 88);
             heldHaloInner = Disc("HeldHaloInner", gameObject.layer, 1f, Vector3.zero, 89);
@@ -181,6 +205,7 @@ namespace C6.Prototype.Orbs
             core.sortingOrder = active ? 91 : 41;
             firstDot.sortingOrder = active ? 92 : 42;
             if (secondDot != null) secondDot.sortingOrder = active ? 93 : 43;
+            if (art != null) art.sortingOrder = active ? 94 : 44;
             labelRenderer.sortingOrder = active ? 95 : 45;
             label.transform.localPosition = active
                 ? new Vector3(idleLabelPosition.x, -circle.Radius * 1.72f, idleLabelPosition.z)
@@ -269,9 +294,21 @@ namespace C6.Prototype.Orbs
             core.color = pending ? Muted : combined ? new Color(0.08f, 0.28f, 0.29f, 1f) : yin ? Dark : Ivory;
             firstDot.color = pending ? new Color(0.57f, 0.62f, 0.58f, 1f) : combined || yin ? Ivory : Dark;
             if (secondDot != null) secondDot.color = pending ? Muted : Dark;
-            label.text = pending ? "LOCKED" : idleLabel;
+            label.text = pending ? "LOCKED" : labelHidden ? string.Empty : idleLabel;
             label.color = pending ? Gold : combined ? Teal : Ivory;
+            ApplyArtwork(pending);
             RefreshHeldVisual();
+        }
+
+        // With artwork, the generated ring/core layers stay allocated (held feedback, tests) but hidden.
+        private void ApplyArtwork(bool pending)
+        {
+            if (art == null) return;
+            art.color = pending ? new Color(0.62f, 0.62f, 0.62f, 1f) : Color.white;
+            ring.enabled = false;
+            core.enabled = false;
+            firstDot.enabled = false;
+            if (secondDot != null) secondDot.enabled = false;
         }
 
         private SpriteRenderer Disc(string objectName, int layer, float scale, Vector3 position, int order)

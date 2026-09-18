@@ -17,7 +17,10 @@ MonoBehaviour:
   horizontalDominance: 1.25
   combinationRadiusFraction: 0.08
   attackZoneHeightFraction: 0.18
-  orbRadiusScreenFraction: 0.055
+  orbRadiusScreenFraction: 0.075
+  orbRadiusCapScale: 2.2
+  orbArt: {fileID: 11400000, guid: 35b73622fc4dd4f32908cc7878777c90, type: 2}
+  orbCatchRadiusScale: 1
   orbRestitution: 0.65
   orbContactFriction: 0.15
   orbFloorDeceleration: 0.6
@@ -28,6 +31,21 @@ MonoBehaviour:
   monsterPosition: {x: 0, y: 0, z: 0}
   monsterHitboxCenter: {x: 0, y: 1.4, z: 0}
   monsterHitboxSize: {x: 1.2, y: 2.6, z: 0.65}
+  throwMinUpSpeed: 0.35
+  throwMaxInputSpeed: 8
+  throwForwardGain: 8
+  throwUpGain: 2.8
+  throwLateralGain: 6
+  throwMaxWorldSpeed: 30
+  throwGravity: 9.81
+  throwBounce: 0.45
+  throwLifetime: 4
+  throwSampleWindow: 0.12
+  throwMinDuration: 0.02
+  battleFramingPaddingFraction: 0.025
+  throwFloorY: 0
+  throwFloorFriction: 0.2
+  throwFloorSize: {x: 18, y: 0.2, z: 18}
   monsterMaxHp: 100
   baseDamage: 20
   projectileSpeed: 12
@@ -47,18 +65,3 @@ MonoBehaviour:
   resourceDebugToolsEnabled: 1
   battleDurationSeconds: 180
   teamHpDecayPerSecond: 1
-  throwMinUpSpeed: .35
-  throwMaxInputSpeed: 8
-  throwForwardGain: 8
-  throwUpGain: 2.8
-  throwLateralGain: 6
-  throwMaxWorldSpeed: 30
-  throwGravity: 9.81
-  throwBounce: .45
-  throwLifetime: 4
-  throwSampleWindow: .12
-  throwMinDuration: .02
-  battleFramingPaddingFraction: .025
-  throwFloorY: 0
-  throwFloorFriction: .2
-  throwFloorSize: {x: 18, y: 0.2, z: 18}
