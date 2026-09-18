@@ -25,6 +25,12 @@ namespace C6.Prototype.Battle
         [SerializeField] private DamagePopupLayer damagePopups;
         private int? observedHp;
         private Vector3? removedProxyPosition;
+        private readonly HashSet<string> ownProxyIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<string> removedOwnIds = new List<string>();
+        // #20: closest pass of each own flight to the monster, for MISS placement and timing.
+        private readonly Dictionary<string, MissWatch> missWatches = new Dictionary<string, MissWatch>(StringComparer.Ordinal);
+        private const float MissPassMargin = .35f; // DEMO_TUNING_VALUE, world units past the closest approach
+        private sealed class MissWatch { public float closest = float.PositiveInfinity; public Vector3 surface; public bool shown; }
 
         [SerializeField] private bool orbPhysicsEnabled;
         [SerializeField] private bool releaseThrowsEnabled;
@@ -159,6 +165,7 @@ namespace C6.Prototype.Battle
             attack.Configure(connection, layout.Config, launchFrame, target, projectileMaterial);
             attack.Changed += OnStateChanged;
             attack.ValidHitAt += OnHostHitAt;
+            attack.ProjectileMissed += OnHostProjectileMissed;
             // Stop completes asynchronously after the authority has already been released.
             connection.Changed += RefreshHud;
             attack.RequestResolved += OnResolved;
@@ -322,7 +329,7 @@ namespace C6.Prototype.Battle
             {
                 ClearViews(); ClearProxies(); ClearThrowTrails(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear();
                 gestures = new OrbGestureEngine(); gestures.SetInputEnabled(false); sessionKey = null; round = 0; displayedDebugMode = null;
-                RefreshHud(); observedHp = null; return; 
+                RefreshHud(); observedHp = null; missWatches.Clear(); return;
             }
             if (sessionKey != state.sessionId || round != state.roundId)
             {
@@ -331,6 +338,7 @@ namespace C6.Prototype.Battle
                 SentTransfers = ReceivedTransfers = 0;
                 hud.SetNetworkFieldsVisible(!attack.Connected); Canvas.ForceUpdateCanvases();
                 sessionKey = state.sessionId; round = state.roundId; displayedDebugMode = null;
+                observedHp = null; missWatches.Clear(); // a new round's vanished orbs are neither hits nor misses
                 action = "Round " + round + " / waiting for Host Start";
                 detail = "Empty start / generate after Host starts the battle";
             }
@@ -832,6 +840,7 @@ namespace C6.Prototype.Battle
         {
             if (releaseThrowsEnabled && gestures.HasActivePointer)
                 throwSampler.Add(gestures.LastRawPosition / Mathf.Max(1f, Screen.width), Time.unscaledTimeAsDouble);
+            WatchOwnFlightsForMiss();
             var held = pendingCombination;
             if (held != null)
             {
@@ -883,6 +892,7 @@ namespace C6.Prototype.Battle
             foreach (var id in proxies.Keys.ToArray()) if (!ids.Contains(id))
             {
                 if (proxies[id] != null) removedProxyPosition = proxies[id].transform.position;
+                if (ownProxyIds.Remove(id)) removedOwnIds.Add(id);
                 Destroy(proxies[id]); proxies.Remove(id);
             }
             foreach (var wire in attack.Snapshot.projectiles)
@@ -893,6 +903,7 @@ namespace C6.Prototype.Battle
                     proxy.transform.SetParent(proxyRoot, false); proxy.layer = LayerMask.NameToLayer("C6Battle");
                     var collider = proxy.GetComponent<Collider>(); collider.enabled = false; Destroy(collider);
                     proxy.GetComponent<Renderer>().sharedMaterial = projectileMaterial; proxies.Add(wire.id, proxy);
+                    if (wire.owner == attack.LocalPlayerId) ownProxyIds.Add(wire.id);
                     if (releaseThrowsEnabled) proxy.AddComponent<BallisticProjectileDisplay>();
                 }
                 var moving = proxy.GetComponent<BallisticProjectileDisplay>();
@@ -1091,7 +1102,7 @@ namespace C6.Prototype.Battle
             foreach (var view in views.Values) { if (view != null) { view.gameObject.SetActive(false); Destroy(view.gameObject); } }
             views.Clear(); display.Clear();
         }
-        private void ClearProxies() { foreach (var proxy in proxies.Values) if (proxy != null) Destroy(proxy); proxies.Clear(); }
+        private void ClearProxies() { foreach (var proxy in proxies.Values) if (proxy != null) Destroy(proxy); proxies.Clear(); ownProxyIds.Clear(); }
         // Only the thrower sees the flight trail. It follows the view already on this screen:
         // the Host's physics body or a client's display proxy. Trails fade and destroy themselves.
         private void UpdateThrowTrails()
@@ -1112,20 +1123,73 @@ namespace C6.Prototype.Battle
         // that disappeared in the same update. Display only; HP and damage stay Host-authoritative.
         private void OnHostHitAt(AttackHitResult hit, Vector3 position)
         {
+            missWatches.Remove(hit.OrbId);
             if (damagePopups != null) damagePopups.Show(hit.HpBefore - hit.HpAfter, position, layout.BattleCamera);
         }
         private void ShowObservedDamage(AttackSnapshot state)
         {
             int? previous = observedHp; observedHp = state.hp;
             Vector3? removed = removedProxyPosition; removedProxyPosition = null;
+            var ownRemoved = removedOwnIds.ToArray(); removedOwnIds.Clear();
+            if (attack.IsHost || damagePopups == null) return;
+            bool missed = ObservedMisses(previous, state.hp, state.state == AttackBattleState.Playing.ToString(), ownRemoved.Length) > 0;
+            // An HP drop cannot be attributed to one orb, so none of the vanished own orbs becomes a MISS.
+            foreach (var id in ownRemoved) { if (missed) ShowMissOnce(id); missWatches.Remove(id); }
             int damage = ObservedDamage(previous, state.hp);
-            if (attack.IsHost || damagePopups == null || damage <= 0) return;
-            var hitbox = target != null ? target.GetComponentInChildren<Collider>() : null;
-            Vector3 at = removed ?? (hitbox != null ? hitbox.bounds.center : Vector3.zero);
-            damagePopups.Show(damage, at, layout.BattleCamera);
+            if (damage > 0) damagePopups.Show(damage, removed ?? MonsterFallbackPoint, layout.BattleCamera);
         }
         public static int ObservedDamage(int? previousHp, int hp) =>
             previousHp.HasValue && hp < previousHp.Value ? previousHp.Value - hp : 0;
+        // #20 Host: only its own orb that expired while the battle can still act. Round end and
+        // target clear cancel flights without an outcome, so they never reach this handler.
+        private void OnHostProjectileMissed(ProjectileOutcome outcome)
+        {
+            if (outcome.AttackerPlayerId == attack.LocalPlayerId && battle != null && battle.CanAct) ShowMissOnce(outcome.OrbId);
+            missWatches.Remove(outcome.OrbId);
+        }
+        // #20 Clients: own orbs vanished in a Playing snapshot without an HP drop. An HP drop in the same
+        // snapshot cannot be attributed to a specific orb, so it never produces a MISS.
+        public static int ObservedMisses(int? previousHp, int hp, bool playing, int removedOwnProjectiles) =>
+            previousHp.HasValue && playing && hp >= previousHp.Value ? removedOwnProjectiles : 0;
+        // #20 A flight has passed the monster once it is clearly farther than its closest approach.
+        public static bool PassedTarget(float closestDistance, float currentDistance, float margin) =>
+            closestDistance > 0f && !float.IsInfinity(closestDistance) && currentDistance >= closestDistance + margin;
+
+        private Collider MonsterHitbox => target != null ? target.GetComponentInChildren<Collider>() : null;
+        private Vector3 MonsterFallbackPoint
+        {
+            get { var hitbox = MonsterHitbox; return hitbox != null ? hitbox.bounds.center : Vector3.zero; }
+        }
+        // Display only, for the local thrower: follows the flight already on this screen (Host physics body
+        // or client proxy). Hit/miss results stay Host-authoritative; a rare bounce-back hit after a MISS
+        // still shows its damage.
+        private void WatchOwnFlightsForMiss()
+        {
+            var hitbox = MonsterHitbox;
+            if (!releaseThrowsEnabled || damagePopups == null || hitbox == null || attack == null || attack.Snapshot == null
+                || battle == null || !battle.CanAct) return;
+            foreach (var wire in attack.Snapshot.projectiles)
+            {
+                if (wire.owner != attack.LocalPlayerId) continue;
+                Transform flight = attack.IsHost ? attack.ProjectileTransform(wire.id)
+                    : proxies.TryGetValue(wire.id, out var proxy) && proxy != null ? proxy.transform : null;
+                if (flight == null) continue;
+                if (!missWatches.TryGetValue(wire.id, out var watch)) missWatches.Add(wire.id, watch = new MissWatch());
+                if (watch.shown) continue;
+                Vector3 surface = hitbox.ClosestPoint(flight.position);
+                float distance = Vector3.Distance(surface, flight.position);
+                if (distance < watch.closest) { watch.closest = distance; watch.surface = surface; }
+                else if (PassedTarget(watch.closest, distance, MissPassMargin)) ShowMissOnce(wire.id);
+            }
+        }
+        private void ShowMissOnce(string orbId)
+        {
+            if (damagePopups == null) return;
+            if (!missWatches.TryGetValue(orbId, out var watch)) missWatches.Add(orbId, watch = new MissWatch());
+            if (watch.shown) return;
+            watch.shown = true;
+            damagePopups.ShowMiss(float.IsInfinity(watch.closest) ? MonsterFallbackPoint : watch.surface, layout.BattleCamera);
+        }
         private void OnApplicationFocus(bool focused) { if (!focused) CancelInteractions("Focus lost"); }
         private void OnApplicationPause(bool paused) { if (paused) CancelInteractions("Paused"); }
         private void OnDisable()
@@ -1145,7 +1209,7 @@ namespace C6.Prototype.Battle
         {
             if (orbPhysics != null) orbPhysics.EdgeCrossed -= OnPhysicsEdgeCrossed;
             if (connection != null) connection.Changed -= RefreshHud;
-            if (attack != null) { attack.Changed -= OnStateChanged; attack.RequestResolved -= OnResolved; attack.ValidHitAt -= OnHostHitAt;}
+            if (attack != null) { attack.Changed -= OnStateChanged; attack.RequestResolved -= OnResolved; attack.ValidHitAt -= OnHostHitAt; attack.ProjectileMissed -= OnHostProjectileMissed; }
             if (resource != null) { resource.Changed -= OnResourceChanged; resource.GenerationResolved -= OnGenerationResolved; resource.RecoveryResolved -= OnRecoveryResolved; }
             if (combination != null) { combination.Changed -= OnCombinationChanged; combination.RequestResolved -= OnCombinationResolved; }
             if (battle != null) battle.Changed -= OnBattleChanged;

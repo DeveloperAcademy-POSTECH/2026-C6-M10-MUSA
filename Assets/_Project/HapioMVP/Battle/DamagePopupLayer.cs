@@ -13,22 +13,31 @@ namespace C6.Prototype.Battle
     public sealed class DamagePopupLayer : MonoBehaviour
     {
         [SerializeField] private Text template;
+        [SerializeField] private Text missTemplate;   // #20: MISS look, edited separately in the scene
         [SerializeField, Min(.05f)] private float duration = .9f;   // DEMO_TUNING_VALUE
         [SerializeField] private float risePixels = 90f;             // Canvas units (390 × 844 reference)
         [SerializeField, Min(1f)] private float popScale = 1.35f;    // starts larger, settles to 1
         private readonly List<Popup> active = new List<Popup>();
 
-        private sealed class Popup { public Text text; public Vector3 world; public Camera camera; public float elapsed; }
+        private sealed class Popup { public Text text; public Color color; public Vector3 world; public Camera camera; public float elapsed; }
 
         public void Show(int damage, Vector3 worldPosition, Camera battleCamera)
         {
-            if (template == null || battleCamera == null || damage <= 0) return;
-            var text = Instantiate(template, template.transform.parent, false);
-            text.name = "Damage " + damage;
-            text.text = damage.ToString();
+            if (damage > 0) Spawn(template, damage.ToString(), "Damage " + damage, worldPosition, battleCamera);
+        }
+
+        public void ShowMiss(Vector3 worldPosition, Camera battleCamera) =>
+            Spawn(missTemplate, "MISS", "Miss", worldPosition, battleCamera);
+
+        private void Spawn(Text source, string label, string objectName, Vector3 worldPosition, Camera battleCamera)
+        {
+            if (source == null || battleCamera == null) return;
+            var text = Instantiate(source, source.transform.parent, false);
+            text.name = objectName;
+            text.text = label;
             text.raycastTarget = false;
             text.gameObject.SetActive(true);
-            var popup = new Popup { text = text, world = worldPosition, camera = battleCamera };
+            var popup = new Popup { text = text, color = source.color, world = worldPosition, camera = battleCamera };
             active.Add(popup);
             Place(popup);
         }
@@ -71,8 +80,7 @@ namespace C6.Prototype.Battle
             if (!visible) return;
             rect.localPosition = local + Vector2.up * offset;
             rect.localScale = Vector3.one * scale;
-            var color = template.color;
-            popup.text.color = new Color(color.r, color.g, color.b, color.a * alpha);
+            popup.text.color = new Color(popup.color.r, popup.color.g, popup.color.b, popup.color.a * alpha);
         }
 
         public void Clear()

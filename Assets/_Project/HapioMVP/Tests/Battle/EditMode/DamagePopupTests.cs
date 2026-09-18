@@ -16,6 +16,25 @@ namespace C6.Prototype.Battle.Tests
         }
 
         [Test]
+        public void OnlyOwnOrbsVanishingWithoutAnHpDropInPlayShowMiss()
+        {
+            Assert.That(T09BattleController.ObservedMisses(300, 300, true, 1), Is.EqualTo(1));
+            Assert.That(T09BattleController.ObservedMisses(300, 280, true, 1), Is.Zero, "HP dropped: cannot be a miss");
+            Assert.That(T09BattleController.ObservedMisses(300, 300, false, 1), Is.Zero, "round ended or target cleared");
+            Assert.That(T09BattleController.ObservedMisses(null, 300, true, 1), Is.Zero, "first snapshot or new round");
+            Assert.That(T09BattleController.ObservedMisses(300, 300, true, 0), Is.Zero, "someone else's orb");
+        }
+
+        [Test]
+        public void MissFiresOnlyAfterTheFlightClearlyMovesAwayFromItsClosestPass()
+        {
+            Assert.That(T09BattleController.PassedTarget(.8f, 1.2f, .35f), Is.True);
+            Assert.That(T09BattleController.PassedTarget(.8f, 1f, .35f), Is.False, "still near the closest pass");
+            Assert.That(T09BattleController.PassedTarget(0f, 2f, .35f), Is.False, "touched the hitbox: the Host decides the hit");
+            Assert.That(T09BattleController.PassedTarget(float.PositiveInfinity, 2f, .35f), Is.False, "no sample yet");
+        }
+
+        [Test]
         public void PopupPopsRisesAndFadesOut()
         {
             DamagePopupLayer.Evaluate(0f, 1f, 90f, 1.35f, out var alpha, out var offset, out var scale);
