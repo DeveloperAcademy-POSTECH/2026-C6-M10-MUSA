@@ -14,5 +14,97 @@ MonoBehaviour:
   m_EditorClassIdentifier: C6.Prototype.Presentation::C6.Prototype.Presentation.OrbArtSet
   yinSprite: {fileID: 21300000, guid: e6aea2a87200f49d38a1b80d28b900da, type: 3}
   yangSprite: {fileID: 21300000, guid: 44c9b5a61209745f1b46253247ea253b, type: 3}
-  combinedSprite: {fileID: 21300000, guid: 86c6aa03b86ea4cf79b44456dd0a53cd, type: 3}
+  combinedSprite: {fileID: 21300000, guid: 3ee020a4ab39a4ba88dd4001124c538e, type: 3}
   hideLabels: 1
+  elements:
+  - element: 1
+    yin: {fileID: 21300000, guid: e6aea2a87200f49d38a1b80d28b900da, type: 3}
+    yang: {fileID: 21300000, guid: 44c9b5a61209745f1b46253247ea253b, type: 3}
+  - element: 2
+    yin: {fileID: 21300000, guid: 18a4e948316c84ebdaa97da57a034a75, type: 3}
+    yang: {fileID: 21300000, guid: 916b02b9edcd347aeb51c65eef08e877, type: 3}
+  - element: 3
+    yin: {fileID: 21300000, guid: 4a862de2ebec549fb92f7f6ed5955840, type: 3}
+    yang: {fileID: 21300000, guid: 3e90e509e0fdd46aea3a0e51a32cf093, type: 3}
+  - element: 4
+    yin: {fileID: 21300000, guid: ab3de3fc634e9445eaf3db787d9fa0ce, type: 3}
+    yang: {fileID: 21300000, guid: 29ce7eac3c10341e7978995a21d38fb5, type: 3}
+  - element: 5
+    yin: {fileID: 21300000, guid: 72af42f8296bb43638c9d57802193acf, type: 3}
+    yang: {fileID: 21300000, guid: bd71113fcca444b5d94afff42515e7bd, type: 3}
+  combined:
+  - yinElement: 1
+    yangElement: 1
+    sprite: {fileID: 21300000, guid: 3ee020a4ab39a4ba88dd4001124c538e, type: 3}
+  - yinElement: 1
+    yangElement: 2
+    sprite: {fileID: 21300000, guid: d20c8afa48b194879b25bbc9d48973ce, type: 3}
+  - yinElement: 1
+    yangElement: 3
+    sprite: {fileID: 21300000, guid: 3ccbce7c674b44880a9761ffb6fd780e, type: 3}
+  - yinElement: 1
+    yangElement: 4
+    sprite: {fileID: 21300000, guid: b75334047489944f887ddde911f91c7c, type: 3}
+  - yinElement: 1
+    yangElement: 5
+    sprite: {fileID: 21300000, guid: 296d31b38d6354f5c81d531c4192ac7a, type: 3}
+  - yinElement: 2
+    yangElement: 1
+    sprite: {fileID: 21300000, guid: 11ffbee7cb28d488ebc2b83408928a01, type: 3}
+  - yinElement: 2
+    yangElement: 2
+    sprite: {fileID: 21300000, guid: 1c026f79a725e4aa889af189e56128fe, type: 3}
+  - yinElement: 2
+    yangElement: 3
+    sprite: {fileID: 21300000, guid: e273ae7f7aa5c47a2993ee2159fe8fa3, type: 3}
+  - yinElement: 2
+    yangElement: 4
+    sprite: {fileID: 21300000, guid: 2214206c13e7140208de86c934de87fd, type: 3}
+  - yinElement: 2
+    yangElement: 5
+    sprite: {fileID: 21300000, guid: 0f17026821db4403080d8394f28d638b, type: 3}
+  - yinElement: 3
+    yangElement: 1
+    sprite: {fileID: 21300000, guid: a1990e4700e3a4c8ea197ded6c9816f7, type: 3}
+  - yinElement: 3
+    yangElement: 2
+    sprite: {fileID: 21300000, guid: ec15c0749d2944521be0df9febb97c60, type: 3}
+  - yinElement: 3
+    yangElement: 3
+    sprite: {fileID: 21300000, guid: 4efe1984025544f1db724a9405f6b6a6, type: 3}
+  - yinElement: 3
+    yangElement: 4
+    sprite: {fileID: 21300000, guid: 7a3d77eba08aa42b58696a44ce73e86c, type: 3}
+  - yinElement: 3
+    yangElement: 5
+    sprite: {fileID: 21300000, guid: c442fd7507f554dcab6b1ed8f975160e, type: 3}
+  - yinElement: 4
+    yangElement: 1
+    sprite: {fileID: 21300000, guid: 9315d487c12e64b0da822de4f9a77cf3, type: 3}
+  - yinElement: 4
+    yangElement: 2
+    sprite: {fileID: 21300000, guid: 12ecd2f9e130e48a7ae1a49bd0f68683, type: 3}
+  - yinElement: 4
+    yangElement: 3
+    sprite: {fileID: 21300000, guid: 96c941a65772a4f648d716fe2d80b9de, type: 3}
+  - yinElement: 4
+    yangElement: 4
+    sprite: {fileID: 21300000, guid: 885cfad4a3f7947f9a2b1d9fb82509a1, type: 3}
+  - yinElement: 4
+    yangElement: 5
+    sprite: {fileID: 21300000, guid: 55911ee91a4354e3d963176ae64b04c0, type: 3}
+  - yinElement: 5
+    yangElement: 1
+    sprite: {fileID: 21300000, guid: 3956dc433b3e94c7cbb156b7b06d261e, type: 3}
+  - yinElement: 5
+    yangElement: 2
+    sprite: {fileID: 21300000, guid: 7a25bb17f0af048b6b0ca867875e8024, type: 3}
+  - yinElement: 5
+    yangElement: 3
+    sprite: {fileID: 21300000, guid: b0285375793604f089f29e80fb4ffdd4, type: 3}
+  - yinElement: 5
+    yangElement: 4
+    sprite: {fileID: 21300000, guid: 93d31eb79cb5c497d93870c64678fadf, type: 3}
+  - yinElement: 5
+    yangElement: 5
+    sprite: {fileID: 21300000, guid: ad87b7844aa2e42d69f9a6efd34a2194, type: 3}

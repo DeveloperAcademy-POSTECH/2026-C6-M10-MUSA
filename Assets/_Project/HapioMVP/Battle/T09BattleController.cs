@@ -176,6 +176,7 @@ namespace C6.Prototype.Battle
             battle.Changed += OnBattleChanged;
             OrbView.SetSharedMaterial(spriteMaterial);
             OrbView.SetArtwork(layout.Config.OrbArt);
+            OrbElements.Configure(layout.Config.TeamElements);
             viewRoot = new GameObject("T09 Local Orb Views").transform; viewRoot.SetParent(transform, false);
             proxyRoot = new GameObject("T09 Client Projectile Display Only").transform; proxyRoot.SetParent(transform, false);
             if (orbPhysicsEnabled) EnsureOrbPhysics();
