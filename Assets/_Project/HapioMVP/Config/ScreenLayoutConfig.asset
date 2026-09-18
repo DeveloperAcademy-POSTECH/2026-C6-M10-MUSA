@@ -17,7 +17,10 @@ MonoBehaviour:
   horizontalDominance: 1.25
   combinationRadiusFraction: 0.08
   attackZoneHeightFraction: 0.18
-  orbRadiusScreenFraction: 0.055
+  orbRadiusScreenFraction: 0.075
+  orbRadiusCapScale: 2.2
+  orbArt: {fileID: 11400000, guid: 35b73622fc4dd4f32908cc7878777c90, type: 2}
+  orbCatchRadiusScale: 1
   orbRestitution: 0.65
   orbContactFriction: 0.15
   orbFloorDeceleration: 0.6

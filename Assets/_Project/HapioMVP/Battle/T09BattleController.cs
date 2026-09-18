@@ -175,6 +175,7 @@ namespace C6.Prototype.Battle
             battle.Configure(attack, resource, combination, layout.Config);
             battle.Changed += OnBattleChanged;
             OrbView.SetSharedMaterial(spriteMaterial);
+            OrbView.SetArtwork(layout.Config.OrbArt);
             viewRoot = new GameObject("T09 Local Orb Views").transform; viewRoot.SetParent(transform, false);
             proxyRoot = new GameObject("T09 Client Projectile Display Only").transform; proxyRoot.SetParent(transform, false);
             if (orbPhysicsEnabled) EnsureOrbPhysics();
@@ -438,7 +439,7 @@ namespace C6.Prototype.Battle
             {
                 Physics2D.SyncTransforms();
                 OrbView view;
-                if (orbPhysicsEnabled) view = FindDisplayedPhysicsOrb(world);
+                if (orbPhysicsEnabled) { view = FindDisplayedPhysicsOrb(world); LogCatchProbe(world, view); }
                 else
                 {
                     var hit = Physics2D.OverlapPoint(world, 1 << LayerMask.NameToLayer("C6Orbs"));
@@ -468,6 +469,38 @@ namespace C6.Prototype.Battle
             }
             RefreshLocalStates(); RefreshHud(); return began;
         }
+        // #4 catch assist: a moving orb is easier to grab. The pick radius grows with speed
+        // (1x at rest, OrbCatchRadiusScale at max release speed). Physics colliders are unchanged.
+        private float CatchRadiusScale(string id)
+        {
+            float extra = layout.Config.OrbCatchRadiusScale - 1f;
+            if (extra <= 0f || orbPhysics == null || physicsTuning.w <= 0f || !orbPhysics.TryGetVelocity(id, out var velocity)) return 1f;
+            return 1f + extra * Mathf.Clamp01(velocity.magnitude / physicsTuning.w);
+        }
+        // #4 diagnostics: on every touch-down, log the nearest orb's distance, pick radius and speed.
+        // HIT/MISS lines show whether fast orbs are missed by position (distance > radius) or by state.
+        private void LogCatchProbe(Vector2 world, OrbView picked)
+        {
+            OrbView nearest = null; float best = float.PositiveInfinity;
+            foreach (var pair in views)
+            {
+                if (pair.Value == null || !pair.Value.isActiveAndEnabled) continue;
+                float d = ((Vector2)pair.Value.transform.position - world).sqrMagnitude;
+                if (d < best) { best = d; nearest = pair.Value; }
+            }
+            if (nearest == null) return;
+            float pixelsPerWorld = layout.BottomPixelRect.height / Mathf.Max(0.0001f, 2f * layout.OrbCamera.orthographicSize);
+            float radius = nearest.Collider.radius * Mathf.Abs(nearest.transform.lossyScale.x);
+            float speed = orbPhysics != null && orbPhysics.TryGetVelocity(nearest.OrbId, out var v) ? v.magnitude : 0f;
+            float maxSpeed = physicsTuning.w;
+            var wire = attack?.Snapshot?.orbs.FirstOrDefault(o => o.id == nearest.OrbId);
+            string blocked = wire == null ? "NO_WIRE" : wire.owner != attack.LocalPlayerId ? "NOT_MINE"
+                : wire.state != (int)OrbAuthorityState.Idle ? "STATE_" + wire.state : IsPending(nearest.OrbId) ? "PENDING"
+                : orbPhysics != null && orbPhysics.TryGetPendingEdge(nearest.OrbId, out _) ? "EDGE_PENDING" : "OK";
+            Debug.Log($"C6_CATCH_{(picked != null ? "HIT" : "MISS")} orb={nearest.OrbId} distPx={Mathf.Sqrt(best) * pixelsPerWorld:F0} " +
+                $"basePx={radius * pixelsPerWorld:F0} pickPx={radius * CatchRadiusScale(nearest.OrbId) * pixelsPerWorld:F0} " +
+                $"speedPx={speed * pixelsPerWorld:F0} speedRatio={(maxSpeed > 0 ? speed / maxSpeed : 0):F2} state={blocked}");
+        }
         private OrbView FindDisplayedPhysicsOrb(Vector2 world)
         {
             // Interpolation renders one physics step behind the body. Picking the future collider
@@ -478,7 +511,7 @@ namespace C6.Prototype.Battle
             {
                 var view = pair.Value;
                 if (!view.isActiveAndEnabled || !view.Collider.enabled || IsPending(pair.Key)) continue;
-                float radius = view.Collider.radius * Mathf.Abs(view.transform.lossyScale.x);
+                float radius = view.Collider.radius * Mathf.Abs(view.transform.lossyScale.x) * CatchRadiusScale(pair.Key);
                 float distance = ((Vector2)view.transform.position - world).sqrMagnitude;
                 if (distance > radius * radius || distance > best) continue;
                 if (distance == best && nearest != null && string.CompareOrdinal(pair.Key, nearest.OrbId) >= 0) continue;
@@ -868,7 +901,8 @@ namespace C6.Prototype.Battle
         }
         public Vector2 GetViewScreenPosition(string id) => layout.OrbCamera.WorldToScreenPoint(views[id].transform.position);
         private float RadiusPixels => Mathf.Max(1f, Mathf.Min(Screen.width * layout.Config.OrbRadiusScreenFraction,
-            OrbGridScreenRect.width / 5f * .35f, OrbGridScreenRect.height / 4f * .28f));
+            OrbGridScreenRect.width / 5f * .35f * layout.Config.OrbRadiusCapScale,
+            OrbGridScreenRect.height / 4f * .28f * layout.Config.OrbRadiusCapScale));
         private float LabelPixels => Mathf.Max(1f, Mathf.Min(12f * Mathf.Max(.1f, hud.Canvas.scaleFactor), OrbGridScreenRect.height / 4f * .25f));
         private float RadiusWorld => 2f * layout.OrbCamera.orthographicSize * RadiusPixels / Mathf.Max(1f, layout.BottomPixelRect.height);
         private GestureTuning Tuning => new GestureTuning(layout.Config.HorizontalSwipeFraction, layout.Config.HorizontalDominance,
@@ -1117,6 +1151,7 @@ namespace C6.Prototype.Battle
             ClearThrowPreview();
             if (projectileMaterial != null) Destroy(projectileMaterial);
             if (trailMaterial != null) Destroy(trailMaterial);
+            OrbView.SetArtwork(null);
             Changed = null;
         }
         private sealed class PendingInput
