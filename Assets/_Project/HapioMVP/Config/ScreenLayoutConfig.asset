@@ -46,7 +46,7 @@ MonoBehaviour:
   throwFloorY: 0
   throwFloorFriction: 0.2
   throwFloorSize: {x: 18, y: 0.2, z: 18}
-  monsterMaxHp: 100
+  monsterMaxHp: 300
   baseDamage: 20
   projectileSpeed: 12
   projectileLifetime: 3
