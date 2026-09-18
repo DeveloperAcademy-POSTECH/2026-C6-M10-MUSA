@@ -68,6 +68,8 @@ namespace C6.Prototype.Presentation
         [SerializeField] private string monsterTargetId = "dev-training-dummy";
         [SerializeField] private Vector3 monsterPosition = Vector3.zero;
         [SerializeField] private Vector3 monsterHitboxCenter = new Vector3(0f, 1.4f, 0f);
+
+        [Tooltip("Box: X·Y·Z size. Capsule: X = diameter, Y = height (Z ignored).")]
         [SerializeField] private Vector3 monsterHitboxSize = new Vector3(1.2f, 2.6f, .65f);
         public string MonsterTargetId => string.IsNullOrWhiteSpace(monsterTargetId) ? "dev-training-dummy" : monsterTargetId;
         public Vector3 MonsterPosition => Finite(monsterPosition) ? monsterPosition : Vector3.zero;

@@ -81,11 +81,14 @@ namespace C6.Prototype.GameSync.Tests
             var config = monster.Config;
             Assert.That(monster.Target.TargetId, Is.EqualTo(config.MonsterTargetId));
             Assert.That(monster.transform.position, Is.EqualTo(config.MonsterPosition));
-            Assert.That(monster.Hitbox.center, Is.EqualTo(config.MonsterHitboxCenter));
-            Assert.That(monster.Hitbox.size, Is.EqualTo(config.MonsterHitboxSize));
+            Assert.That(((BoxCollider)monster.Hitbox).center, Is.EqualTo(config.MonsterHitboxCenter));
+            // The saved P1 box keeps the former target specification. BenchmarkMonster applies the shared Config
+            // size when it runs (RuntimeCopyChangesGeometry... covers that path).
+            Assert.That(((BoxCollider)monster.Hitbox).size, Is.EqualTo(new Vector3(1.2f, 2.6f, .65f)));
             Assert.That(config.MonsterTargetId, Is.EqualTo("dev-training-dummy"));
-            Assert.That(config.MonsterHitboxCenter, Is.EqualTo(new Vector3(0, 1.4f, 0)));
-            Assert.That(config.MonsterHitboxSize, Is.EqualTo(new Vector3(1.2f, 2.6f, .65f)));
+            Assert.That(config.MonsterHitboxCenter, Is.EqualTo(new Vector3(0f, 1.4f, 0f)));
+            // #16: the shared Config is sized for Jangsanbeom's capsule (X = diameter, Y = height).
+            Assert.That(config.MonsterHitboxSize, Is.EqualTo(new Vector3(1.9f, 2.8f, 1.9f)));
         }
 
         [Test] public void RuntimeCopyChangesGeometryWithoutEditingTheSavedConfigOrAddingHp()
@@ -104,8 +107,8 @@ namespace C6.Prototype.GameSync.Tests
                 Assert.That(monster.Config, Is.SameAs(copy));
                 Assert.That(monster.Target.TargetId, Is.EqualTo("p1-test-target"));
                 Assert.That(monster.transform.position, Is.EqualTo(copy.MonsterPosition));
-                Assert.That(monster.Hitbox.center, Is.EqualTo(copy.MonsterHitboxCenter));
-                Assert.That(monster.Hitbox.size, Is.EqualTo(copy.MonsterHitboxSize));
+                Assert.That(((BoxCollider)monster.Hitbox).center, Is.EqualTo(copy.MonsterHitboxCenter));
+                Assert.That(((BoxCollider)monster.Hitbox).size, Is.EqualTo(copy.MonsterHitboxSize));
                 Assert.That(JsonUtility.ToJson(original), Is.EqualTo(before));
                 Assert.That(monster.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
             }
