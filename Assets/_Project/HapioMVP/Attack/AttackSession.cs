@@ -229,6 +229,8 @@ namespace C6.Prototype.Attack
         public event Action<AttackHitResult> ValidHit;
         /// <summary>Host presentation only: the applied hit with the real physics contact position.</summary>
         public event Action<AttackHitResult, Vector3> ValidHitAt;
+        /// <summary>Host presentation only: a launched orb ended by its lifetime without a valid hit.</summary>
+        public event Action<ProjectileOutcome> ProjectileMissed;
 
         public void Configure(DirectConnectionSession session, ScreenLayoutConfig sharedConfig,
             AttackLaunchFrame frame, MonsterHitTarget hitTarget, Material material)
@@ -640,6 +642,11 @@ namespace C6.Prototype.Attack
                     try { ValidHit?.Invoke(appliedHit); }
                     catch (Exception exception) { Debug.LogWarning("C6_T06_HOOK_FAILED type=" + exception.GetType().Name); }
                     try { ValidHitAt?.Invoke(appliedHit, outcome.Position); }
+                    catch (Exception exception) { Debug.LogWarning("C6_T06_HOOK_FAILED type=" + exception.GetType().Name); }
+                }
+                else if (outcome.Kind == ProjectileOutcomeKind.Expired)
+                {
+                    try { ProjectileMissed?.Invoke(outcome); }
                     catch (Exception exception) { Debug.LogWarning("C6_T06_HOOK_FAILED type=" + exception.GetType().Name); }
                 }
             }
