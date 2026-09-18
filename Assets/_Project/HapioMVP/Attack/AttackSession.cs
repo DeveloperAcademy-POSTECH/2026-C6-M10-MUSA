@@ -227,6 +227,8 @@ namespace C6.Prototype.Attack
         public event Action Changed;
         public event Action<AttackRequestReply> RequestResolved;
         public event Action<AttackHitResult> ValidHit;
+        /// <summary>Host presentation only: the applied hit with the real physics contact position.</summary>
+        public event Action<AttackHitResult, Vector3> ValidHitAt;
 
         public void Configure(DirectConnectionSession session, ScreenLayoutConfig sharedConfig,
             AttackLaunchFrame frame, MonsterHitTarget hitTarget, Material material)
@@ -636,6 +638,8 @@ namespace C6.Prototype.Attack
                 if (appliedHit != null)
                 {
                     try { ValidHit?.Invoke(appliedHit); }
+                    catch (Exception exception) { Debug.LogWarning("C6_T06_HOOK_FAILED type=" + exception.GetType().Name); }
+                    try { ValidHitAt?.Invoke(appliedHit, outcome.Position); }
                     catch (Exception exception) { Debug.LogWarning("C6_T06_HOOK_FAILED type=" + exception.GetType().Name); }
                 }
             }

@@ -31,7 +31,7 @@ MonoBehaviour:
   monsterTargetId: dev-training-dummy
   monsterPosition: {x: 0, y: 0, z: 0}
   monsterHitboxCenter: {x: 0, y: 1.4, z: 0}
-  monsterHitboxSize: {x: 1.2, y: 2.6, z: 0.65}
+  monsterHitboxSize: {x: 1.9, y: 2.8, z: 1.9}
   throwMinUpSpeed: 0.35
   throwMaxInputSpeed: 8
   throwForwardGain: 8
