@@ -13,6 +13,7 @@ namespace C6.Prototype.PhysicsSandbox
     public sealed class OrbPhysicsSandbox : MonoBehaviour
     {
         private const float ArtworkRadius = .5f;
+        private int combinedCycle, rawCycle;
         private const float LabelPixels = 12f;
         public ScreenLayoutConfig sourceConfig;
         public Material orbMaterial;
@@ -110,6 +111,7 @@ namespace C6.Prototype.PhysicsSandbox
             }
             if (orbMaterial != null) OrbView.SetSharedMaterial(orbMaterial);
             OrbView.SetArtwork(sourceConfig != null ? sourceConfig.OrbArt : null);
+            OrbElements.Configure(sourceConfig != null ? sourceConfig.TeamElements : OrbElements.AllElements);
             RefreshCameraLayout();
             startingPositions = new Vector3[seeds.Length];
             for (int i = 0; i < 2; i++)
@@ -238,7 +240,7 @@ namespace C6.Prototype.PhysicsSandbox
             added.CurrentBoard = board;
             go.transform.position = position;
             added.View = go.AddComponent<OrbView>();
-            added.View.Configure("sandbox-added-" + Guid.NewGuid().ToString("N"), kind, polarity, go.layer, ArtworkRadius);
+            added.View.Configure(NewSandboxOrbId(kind), kind, polarity, go.layer, ArtworkRadius);
             added.View.SetHeldFeedbackEnabled(true);
             byId.Add(added.View.OrbId, added);
             addedSeeds.Add(added);
@@ -247,6 +249,31 @@ namespace C6.Prototype.PhysicsSandbox
             boards[board].Register(added.View);
             boards[board].SetPosition(added.View.OrbId, position, false, Time.unscaledTimeAsDouble);
             return added;
+        }
+
+        /// <summary>
+        /// 오행 확인용 ID. 결합은 (음, 양) 25조합을, 기본은 5속성을 차례로 돌려 버튼만 눌러도
+        /// 모든 그림을 순서대로 볼 수 있게 한다. 결합 ID는 실제 판과 같은 인코딩을 쓴다.
+        /// </summary>
+        private string NewSandboxOrbId(OrbKind kind)
+        {
+            var all = OrbElements.AllElements;
+            if (all.Length == 0) return "sandbox-added-" + Guid.NewGuid().ToString("N");
+            if (kind == OrbKind.Combined)
+            {
+                var yin = all[(combinedCycle / all.Length) % all.Length];
+                var yang = all[combinedCycle % all.Length];
+                ++combinedCycle;
+                return "sandbox-added-" + OrbElements.NewCombinedId(yin, yang);
+            }
+            var wanted = all[rawCycle % all.Length];
+            ++rawCycle;
+            for (int attempt = 0; attempt < 512; attempt++)
+            {
+                string candidate = "sandbox-added-" + Guid.NewGuid().ToString("N");
+                if (OrbElements.RawElement(candidate) == wanted) return candidate;
+            }
+            return "sandbox-added-" + Guid.NewGuid().ToString("N");
         }
 
         /// <summary>마지막에 추가한 구슬부터 제거. 추가한 구슬이 없으면 씬에 놓인 구슬을 숨긴다(배치 초기화로 복구).</summary>

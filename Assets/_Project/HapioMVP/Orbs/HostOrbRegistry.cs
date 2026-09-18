@@ -195,8 +195,19 @@ namespace C6.Prototype.Orbs
 
             // Prepare every immutable record before touching either material. No failure guard follows
             // the first mutation, and no observer is invoked between the two consumed states and result.
+            // 오행 v1: the combined ID encodes (Yin element, Yang element) so every device can decode it.
+            var yinMaterial = source.Polarity == OrbPolarity.Yin ? source : target;
+            var yangMaterial = source.Polarity == OrbPolarity.Yin ? target : source;
+            var yinElement = OrbElements.RawElement(yinMaterial.OrbId);
+            var yangElement = OrbElements.RawElement(yangMaterial.OrbId);
             string id;
-            do { id = Guid.NewGuid().ToString("N"); } while (orbs.ContainsKey(id));
+            do { id = OrbElements.NewCombinedId(yinElement, yangElement); } while (orbs.ContainsKey(id));
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            UnityEngine.Debug.Log("C6_COMBINE  yin=" + yinElement + " [" + yinMaterial.OrbId + "]"
+                + "  yang=" + yangElement + " [" + yangMaterial.OrbId + "]"
+                + "  -> " + id + "  expects art comb_"
+                + yinElement.ToString().ToLowerInvariant() + "_" + yangElement.ToString().ToLowerInvariant());
+#endif
             sourceConsumed = new OrbRecord(source.OrbId, source.Kind, source.Polarity, source.OwnerPlayerId,
                 OrbAuthorityState.Consumed, request.NormalizedPosition, source.EntrySide, request.SequenceNumber, source.TransferCount, source.LastTransferSequence, source.RightTransferCount, source.TransferMotion);
             targetConsumed = new OrbRecord(target.OrbId, target.Kind, target.Polarity, target.OwnerPlayerId,
