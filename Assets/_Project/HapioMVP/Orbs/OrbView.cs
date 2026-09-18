@@ -47,6 +47,10 @@ namespace C6.Prototype.Orbs
         private Vector3 idleLabelPosition;
 
         public string OrbId { get; private set; }
+        /// <summary>오행 v1: Raw element (Combined uses YinElement/YangElement). None when elements are off.</summary>
+        public OrbElement Element { get; private set; }
+        public OrbElement YinElement { get; private set; }
+        public OrbElement YangElement { get; private set; }
         public CircleCollider2D Collider { get; private set; }
         public SpriteRenderer RingRenderer => ring;
         public LocalOrbState LocalState => localState;
@@ -101,7 +105,27 @@ namespace C6.Prototype.Orbs
             if (combined)
                 secondDot = Disc("SecondCore", layer, 0.27f,
                     new Vector3(radiusWorld * 0.26f, -radiusWorld * 0.08f, 0f), 43);
-            var artSprite = artwork == null ? null : artwork.SpriteFor(combined, orbPolarity == OrbPolarity.Yin);
+            if (combined)
+            {
+                OrbElements.CombinedElements(orbId, out var yinElement, out var yangElement);
+                YinElement = yinElement; YangElement = yangElement; Element = OrbElement.None;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                UnityEngine.Debug.Log("C6_ORBART  COMBINED  id=" + orbId
+                    + "  encoded=" + OrbElements.TryDecodeCombinedId(orbId, out _, out _)
+                    + "  yin=" + yinElement + "  yang=" + yangElement
+                    + "  art=comb_" + yinElement.ToString().ToLowerInvariant()
+                    + "_" + yangElement.ToString().ToLowerInvariant());
+#endif
+            }
+            else
+            {
+                Element = OrbElements.RawElement(orbId);
+                YinElement = orbPolarity == OrbPolarity.Yin ? Element : OrbElement.None;
+                YangElement = orbPolarity == OrbPolarity.Yang ? Element : OrbElement.None;
+            }
+            var artSprite = artwork == null ? null : combined
+                ? artwork.CombinedSpriteFor(YinElement, YangElement)
+                : artwork.RawSprite(Element, orbPolarity == OrbPolarity.Yin);
             if (artSprite != null)
             {
                 // The sprite's full width maps to the collider diameter, so the drawn circle edge is the hit edge.

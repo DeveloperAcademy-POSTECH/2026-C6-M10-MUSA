@@ -39,6 +39,9 @@ namespace C6.Prototype.Presentation
         // #4 catch assist: touch pick radius multiplier for a moving orb, scaled by its speed
         // (0 at rest -> this value at max release speed). 1 = previous behavior. Physics colliders are unchanged.
         [SerializeField, Range(1f, 2f)] private float orbCatchRadiusScale = 1f;
+        // 오행 v1: elements that can appear this round. Empty = no elements (previous behavior).
+        [SerializeField] private OrbElement[] teamElements =
+            { OrbElement.Fire, OrbElement.Water, OrbElement.Wood, OrbElement.Metal, OrbElement.Earth };
         public float HorizontalSwipeFraction => Valid(horizontalSwipeFraction, .18f, .01f, 1f);
         public float HorizontalDominance => Valid(horizontalDominance, 1.25f, 1f, 5f);
         public float CombinationRadiusFraction => Valid(combinationRadiusFraction, .08f, .01f, .5f);
@@ -47,6 +50,7 @@ namespace C6.Prototype.Presentation
         public float OrbRadiusCapScale => Valid(orbRadiusCapScale, 1f, 1f, 3f);
         public OrbArtSet OrbArt => orbArt;
         public float OrbCatchRadiusScale => Valid(orbCatchRadiusScale, 1f, 1f, 2f);
+        public OrbElement[] TeamElements => teamElements ?? new OrbElement[0];
         public bool EnableDefense => false;
 
         [Header("P1 · Flat orb board (board widths / seconds)")]
