@@ -23,7 +23,9 @@ namespace C6.Prototype.Battle
         [SerializeField] private MonsterHitTarget target;
 
         [SerializeField] private DamagePopupLayer damagePopups;
+        [SerializeField] private MonsterAttackWarning attackWarning; // #28: scene Canvas edge glow, target's screen only
         private MonsterMotion monsterMotion;
+        private MonsterAttackPresenter attackPresenter;
         private int? observedHp;
         private Vector3? removedProxyPosition;
         private readonly HashSet<string> ownProxyIds = new HashSet<string>(StringComparer.Ordinal);
@@ -125,6 +127,11 @@ namespace C6.Prototype.Battle
             if (number < 0 || number > maximumParticipants) throw new ArgumentOutOfRangeException(nameof(number));
             approvedPlayerNumber = number;
         }
+        /// <summary>#28: this screen's estimate of the Host clock, which times the monster attack presentation.</summary>
+        public void ConfigureHostClock(Func<double?> hostNow)
+        {
+            if (attackPresenter != null) attackPresenter.ConfigureHostClock(hostNow);
+        }
         public bool OrbPhysicsEnabled => orbPhysicsEnabled;
         public LocalOrbPhysicsBoard OrbPhysics => orbPhysics;
         public void ConfigureOrbPhysics(bool enabled)
@@ -188,6 +195,9 @@ namespace C6.Prototype.Battle
             viewRoot = new GameObject("T09 Local Orb Views").transform; viewRoot.SetParent(transform, false);
             proxyRoot = new GameObject("T09 Client Projectile Display Only").transform; proxyRoot.SetParent(transform, false);
             monsterMotion = MonsterMotion.For(target);
+            attackPresenter = gameObject.AddComponent<MonsterAttackPresenter>();
+            attackPresenter.Configure(battle, attack, monsterMotion, target != null ? target.GetComponent<BenchmarkMonster>() : null,
+                GetComponent<ThrowBattleFraming>(), attackWarning);
             if (orbPhysicsEnabled) EnsureOrbPhysics();
         }
         private void Start()
@@ -1126,7 +1136,8 @@ namespace C6.Prototype.Battle
         private void OnHostHitAt(AttackHitResult hit, Vector3 position)
         {
             missWatches.Remove(hit.OrbId);
-            if (damagePopups != null) if (monsterMotion != null) monsterMotion.PlayHit(); damagePopups.Show(hit.HpBefore - hit.HpAfter, position, layout.BattleCamera);
+            if (monsterMotion != null) monsterMotion.PlayHit();
+            if (damagePopups != null) damagePopups.Show(hit.HpBefore - hit.HpAfter, position, layout.BattleCamera);
         }
         private void ShowObservedDamage(AttackSnapshot state)
         {

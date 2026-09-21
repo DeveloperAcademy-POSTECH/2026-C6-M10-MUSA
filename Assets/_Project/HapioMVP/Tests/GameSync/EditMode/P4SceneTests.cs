@@ -126,6 +126,32 @@ namespace C6.Prototype.GameSync.Tests
             }
             finally { if (prior.IsValid()) EditorSceneManager.ClosePreviewScene(prior); }
         }
+        [Test]
+        public void MonsterAttackWarningIsAnEditableNonBlockingEdgeGlowInTheBattleCanvas()
+        {
+            var controller = Components<T09BattleController>(scene).Single();
+            var warning = Components<MonsterAttackWarning>(scene).Single();
+            using (var serialized = new SerializedObject(controller))
+                Assert.That(serialized.FindProperty("attackWarning").objectReferenceValue, Is.SameAs(warning));
+            Assert.That(warning.transform.parent, Is.SameAs(controller.Hud.Canvas.transform), "#28 warning lives in the battle Canvas");
+            Assert.That(warning.transform.GetSiblingIndex(),
+                Is.LessThan(controller.Hud.Canvas.transform.Find("ConfirmedBattleResult").GetSiblingIndex()), "the result overlay stays on top");
+            using (var serialized = new SerializedObject(warning))
+            {
+                var edges = serialized.FindProperty("edges");
+                Assert.That(edges.arraySize, Is.EqualTo(2));
+                for (int i = 0; i < edges.arraySize; i++)
+                {
+                    var edge = edges.GetArrayElementAtIndex(i).objectReferenceValue;
+                    Assert.That(edge, Is.Not.Null);
+                    using (var graphic = new SerializedObject(edge))
+                    {
+                        Assert.That(graphic.FindProperty("m_RaycastTarget").boolValue, Is.False, "the glow never blocks orb or defense input");
+                        Assert.That(graphic.FindProperty("m_Enabled").boolValue, Is.False, "hidden until the Host attack targets this screen");
+                    }
+                }
+            }
+        }
         private T SingleOnRoot<T>(GameObject root) where T : Component
         {
             var value = Components<T>(scene);

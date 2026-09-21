@@ -96,6 +96,16 @@ namespace C6.Prototype.GameSync
                 return Math.Max(0,Math.Min(s.battle.duration,s.battle.deadline-s.battle.penaltySeconds-s.hostNow-elapsed));
             }
         }
+        /// <summary>#28: this screen's estimate of the Host clock (the Host reads its own), used only for presentation timing.</summary>
+        public double? EstimatedHostNow
+        {
+            get
+            {
+                if(lobby!=null&&lobby.IsHost)return Now;
+                var s=Snapshot; if(s==null||manager==null||!manager.IsListening)return null;
+                return s.hostNow+Math.Max(0,manager.ServerTime.Time-s.serverTime);
+            }
+        }
         private static double Now=>Time.realtimeSinceStartupAsDouble;
         public void ConfigureBuildIdentifier(string value)
         {
@@ -170,6 +180,7 @@ namespace C6.Prototype.GameSync
             lobby.Configure(runtimeConfig.Value); ConfigureMaximumParticipants(maximumParticipants); ApplyTransferConfiguration();
             ConfigureContinuousTransfers(continuousTransfers);
             controller.ConfigureApprovedLifecycle(StartPreparedRound,Retry,Leave);
+            controller.ConfigureHostClock(()=>EstimatedHostNow);
             controller.Hud.CoordinatedGame=true;
             lobby.StartConfirmed+=Attach;
             lobby.Changed+=OnLobbyChanged;
