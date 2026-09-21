@@ -46,6 +46,7 @@
     "com.unity.timeline": "1.8.12",
     "com.unity.transport": "6.5.0",
     "com.unity.ugui": "2.5.0",
-    "com.unity.visualscripting": "1.9.12"
+    "com.unity.visualscripting": "1.9.12",
+    "com.unity.pipeline": "0.7.0-exp.1"
   }
 }

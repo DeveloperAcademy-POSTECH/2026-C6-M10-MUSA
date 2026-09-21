@@ -44,6 +44,10 @@ namespace C6.Prototype.Battle
         private double lastStaminaMaximum = 100d;
         private bool canEnd;
         private bool canGenerate, canDebugFixture;
+        [SerializeField] private bool minimalBattlePresentation;
+        [SerializeField] private RectTransform monsterHpFill;
+        [SerializeField] private RectTransform teamTimeFill;
+        [SerializeField] private Text teamTimeValue;
         [SerializeField] private RectTransform staminaFill;
         [SerializeField] private Text generateCaption;
         private Rect lastSafeArea;
@@ -89,6 +93,11 @@ namespace C6.Prototype.Battle
         [field: SerializeField] public Text RoundLabel { get; private set; }
         [field: SerializeField] public Text ConnectionLabel { get; private set; }
         public SplitScreenLayout Layout => layout;
+        public bool MinimalBattlePresentation => minimalBattlePresentation;
+        public RectTransform MonsterHpFill => monsterHpFill;
+        public RectTransform TeamTimeFill => teamTimeFill;
+        public Text TeamTimeValue => teamTimeValue;
+        public RectTransform StaminaFill => staminaFill;
 
         /// <summary>Visual clamp area only. Gesture tests still use original pointer coordinates.</summary>
         public Rect OrbWorkspaceScreenRect
@@ -121,6 +130,7 @@ namespace C6.Prototype.Battle
             if (HpLabel != null) HpLabel.text = hp + " / " + maxHp;
             if (ProgressLabel != null) ProgressLabel.text = "VALID HITS " + totalHits;
             if (RoundLabel != null) RoundLabel.text = "ROUND " + round + "  /  RESETS " + resets;
+            SetHorizontalFill(monsterHpFill, hp, maxHp);
         }
 
         /// <summary>Continuous Host value. Markers divide the bar visually and do not quantize resources.</summary>
@@ -130,10 +140,9 @@ namespace C6.Prototype.Battle
             double maximum = Finite(max) && max > 0 ? max : 100d;
             lastStaminaMaximum = maximum;
             double confirmed = Finite(value) ? Math.Max(0d, Math.Min(maximum, value)) : 0d;
-            double fraction = confirmed / maximum;
             if (StaminaLabel != null)
                 StaminaLabel.text = Number(confirmed) + " / " + Number(maximum);
-            if (staminaFill != null) staminaFill.anchorMax = new Vector2((float)fraction, 1f);
+            SetHorizontalFill(staminaFill, confirmed, maximum);
             if (RecoveryLabel != null)
             {
                 string recovery = Finite(rate) && rate > 0d && Finite(cost) && cost > 0d
@@ -153,12 +162,37 @@ namespace C6.Prototype.Battle
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
         private static string Number(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
 
+        private static void SetHorizontalFill(RectTransform fill, double value, double maximum)
+        {
+            if (fill == null) return;
+            float fraction = Finite(value) && Finite(maximum) && maximum > 0d
+                ? Mathf.Clamp01((float)(value / maximum)) : 0f;
+            Vector2 anchorMax = fill.anchorMax;
+            anchorMax.x = fraction;
+            fill.anchorMax = anchorMax;
+        }
+
+        /// <summary>Updates the authoritative team time presentation without changing authored layout.</summary>
+        public void SetClockPresentation(double remaining, double teamHp, double duration)
+        {
+            double left = Finite(remaining) ? Math.Max(0d, remaining) : 0d;
+            double team = Finite(teamHp) ? Math.Max(0d, teamHp) : 0d;
+            if (ClockLabel != null)
+                ClockLabel.text = "TIME " + left.ToString("0.0", CultureInfo.InvariantCulture) + "s";
+            if (TeamHpLabel != null)
+                TeamHpLabel.text = "TEAM HP " + team.ToString("0.0", CultureInfo.InvariantCulture);
+            if (teamTimeValue != null)
+                teamTimeValue.text = "TEAM HP " + team.ToString("0.0", CultureInfo.InvariantCulture)
+                    + "  /  TIME " + left.ToString("0.0", CultureInfo.InvariantCulture) + "s";
+            SetHorizontalFill(teamTimeFill, left, duration);
+        }
+
         public void SetNetworkFieldsVisible(bool visible)
         {
-            if (networkFieldsVisible == visible) return;
             networkFieldsVisible = visible;
-            if (networkFields != null) networkFields.gameObject.SetActive(visible);
-            if (SoloModeButton != null) SoloModeButton.gameObject.SetActive(visible);
+            bool showSetupControls = visible && !minimalBattlePresentation;
+            if (networkFields != null) networkFields.gameObject.SetActive(showSetupControls);
+            if (SoloModeButton != null) SoloModeButton.gameObject.SetActive(showSetupControls);
             if (!useSceneHierarchy && footer != null) Bottom(footer, 0f, 0f, 0f, visible ? 224f : 144f);
         }
 
@@ -232,6 +266,12 @@ namespace C6.Prototype.Battle
             if (networkFields == null) { error = "networkFields"; return false; }
             if (staminaFill == null) { error = "staminaFill"; return false; }
             if (generateCaption == null) { error = "generateCaption"; return false; }
+            if (minimalBattlePresentation)
+            {
+                if (monsterHpFill == null) { error = "monsterHpFill"; return false; }
+                if (teamTimeFill == null) { error = "teamTimeFill"; return false; }
+                if (teamTimeValue == null) { error = "teamTimeValue"; return false; }
+            }
             if (Canvas.renderMode != RenderMode.ScreenSpaceOverlay)
             { error = "Canvas must use ScreenSpaceOverlay for existing gesture coordinates"; return false; }
             foreach (var button in new[] { HostButton, JoinButton, StartButton, SoloModeButton,
@@ -294,19 +334,24 @@ namespace C6.Prototype.Battle
 
         private void OnEnable()
         {
-            if (!Application.isPlaying && !useSceneHierarchy) return;
+            // The saved scene is the authoring source. Runtime-only responsive layout must not
+            // rewrite a designer's RectTransforms when the Editor Game view changes size.
+            if (!Application.isPlaying) return;
             Subscribe();
             RefreshRegions();
         }
 
-        private void Start() => RefreshRegions();
+        private void Start()
+        {
+            if (Application.isPlaying) RefreshRegions();
+        }
 
         private void OnDisable() => Unsubscribe();
         private void OnDestroy() => Unsubscribe();
 
         private void LateUpdate()
         {
-            if (!Application.isPlaying && !useSceneHierarchy) return;
+            if (!Application.isPlaying) return;
             if (layout != null && (lastScreen.x != Screen.width || lastScreen.y != Screen.height ||
                                    lastSafeArea != Screen.safeArea || lastTop != layout.TopPixelRect ||
                                    lastBottom != layout.BottomPixelRect ||
@@ -511,8 +556,7 @@ namespace C6.Prototype.Battle
         {
             double left = Finite(remaining) ? Math.Max(0, remaining) : 0;
             double team = Finite(teamHp) ? Math.Max(0, teamHp) : 0;
-            if (ClockLabel != null) ClockLabel.text = "TIME " + left.ToString("0.0", CultureInfo.InvariantCulture) + "s";
-            if (TeamHpLabel != null) TeamHpLabel.text = "TEAM HP " + team.ToString("0.0", CultureInfo.InvariantCulture);
+            SetClockPresentation(left, team, duration);
             string mode = developmentSolo ? "DEV SOLO" : participants + " / " + ParticipantCapacity;
             string shortLabel = shortDuration ? " / SHORT " + Number(duration) + "s" : "";
             if (PhaseLabel != null) PhaseLabel.text = (CoordinatedGame ? "C6 / " : "T09 / ") + (phase ?? "Boot").ToUpperInvariant() + " / " + mode + shortLabel;
