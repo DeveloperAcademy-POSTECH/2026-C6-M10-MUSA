@@ -223,7 +223,7 @@ namespace C6.Prototype.PhysicsSandbox
             return CreateOrb(board, kind, kind == OrbKind.Combined ? OrbPolarity.None : polarity, position, name) != null;
         }
 
-        private OrbSandboxSeed CreateOrb(int board, OrbKind kind, OrbPolarity polarity, Vector3 position, string namePrefix)
+        private OrbSandboxSeed CreateOrb(int board, OrbKind kind, OrbPolarity polarity, Vector3 position, string namePrefix, string explicitId = null)
         {
             OrbSandboxSeed template = null;
             foreach (var seed in seeds) if (seed != null) { template = seed; break; }
@@ -240,7 +240,7 @@ namespace C6.Prototype.PhysicsSandbox
             added.CurrentBoard = board;
             go.transform.position = position;
             added.View = go.AddComponent<OrbView>();
-            added.View.Configure(NewSandboxOrbId(kind), kind, polarity, go.layer, ArtworkRadius);
+            added.View.Configure(explicitId ?? NewSandboxOrbId(kind), kind, polarity, go.layer, ArtworkRadius);
             added.View.SetHeldFeedbackEnabled(true);
             byId.Add(added.View.OrbId, added);
             addedSeeds.Add(added);
@@ -577,11 +577,26 @@ namespace C6.Prototype.PhysicsSandbox
             int board = target.CurrentBoard;
             Vector3 middle = (source.transform.position + target.transform.position) * .5f;
             middle.z = 0f;
+
+            // 실제 판(HostOrbRegistry.TryCompleteReservedCombination)과 같은 규칙으로 결합 ID를 만든다.
+            // RemoveOrb가 View를 없애므로 재료의 속성은 반드시 그 전에 읽는다.
+            var yinSeed = source.polarity == OrbPolarity.Yin ? source : target;
+            var yangSeed = source.polarity == OrbPolarity.Yin ? target : source;
+            var yinElement = OrbElements.RawElement(yinSeed.View.OrbId);
+            var yangElement = OrbElements.RawElement(yangSeed.View.OrbId);
+            string combinedId;
+            do { combinedId = "sandbox-combined-" + OrbElements.NewCombinedId(yinElement, yangElement); }
+            while (byId.ContainsKey(combinedId));
+            UnityEngine.Debug.Log("C6_SANDBOX_COMBINE  yin=" + yinElement + " [" + yinSeed.View.OrbId + "]"
+                + "  yang=" + yangElement + " [" + yangSeed.View.OrbId + "]"
+                + "  -> " + combinedId + "  expects art comb_"
+                + yinElement.ToString().ToLowerInvariant() + "_" + yangElement.ToString().ToLowerInvariant());
+
             RemoveOrb(source);
             RemoveOrb(target);
-            CreateOrb(board, OrbKind.Combined, OrbPolarity.None, middle, "Combined Orb ");
+            CreateOrb(board, OrbKind.Combined, OrbPolarity.None, middle, "Combined Orb ", combinedId);
             CombineCount++;
-            LastCombineResult = "결합 성공 (음 + 양 → COMB)";
+            LastCombineResult = "결합 성공 (음 " + yinElement + " + 양 " + yangElement + ")";
         }
 
         private void RemoveOrb(OrbSandboxSeed seed)
