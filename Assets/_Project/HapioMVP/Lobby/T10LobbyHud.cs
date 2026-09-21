@@ -20,6 +20,8 @@ namespace C6.Prototype.Lobby
         private static readonly Color Gold = new Color(.86f, .73f, .47f, 1f);
         private static readonly Color Alert = new Color(1f, .65f, .53f, 1f);
         private readonly List<Button> roomJoinButtons = new List<Button>();
+        private readonly List<Button> developerControlButtons = new List<Button>();
+        private readonly Dictionary<LobbyDeveloperSetting, Text> developerValueLabels = new Dictionary<LobbyDeveloperSetting, Text>();
         private readonly List<RectTransform> roomRows = new List<RectTransform>();
         private LobbyRoomRow[] displayedRooms = Array.Empty<LobbyRoomRow>();
         private LobbyUiState state = new LobbyUiState();
@@ -27,10 +29,13 @@ namespace C6.Prototype.Lobby
         private RectTransform column, content, statusPanel, createPanel, browsePanel, directPanel, sessionPanel;
         private RectTransform directFields, roomList;
         private Text browseCaption, roomEmptyLabel, directCaption, readyCaption;
+        private RectTransform developerPanel;
+        private Text developerModeCaption;
         private Text roomTitleLabel, roleLabel, localReadyLabel, remoteReadyLabel, relationHint;
         public Text PlayerRosterLabel { get; private set; }
         private Text directHint;
         private bool directExpanded;
+        private readonly LobbyDeveloperSettings developerSettings = new LobbyDeveloperSettings();
         private Vector2Int lastScreen;
         private Rect lastSafeArea;
         private float lastScale;
@@ -57,7 +62,12 @@ namespace C6.Prototype.Lobby
         public string HostAddress => IPv4Input != null ? IPv4Input.text.Trim() : string.Empty;
         public string Port => PortInput != null ? PortInput.text.Trim() : "7777";
         public bool DirectExpanded => directExpanded;
+        public bool DeveloperSettingsReady => developerSettings.Ready;
+        public bool DeveloperModeEnabled => developerSettings.Enabled;
+        public RectTransform DeveloperPanel => developerPanel;
         public Button CreateRoomButton { get; private set; }
+        public Button DeveloperModeButton { get; private set; }
+        public Button ResetDeveloperSettingsButton { get; private set; }
         public Button BrowseButton { get; private set; }
         public Button RefreshButton { get; private set; }
         public Button CancelBrowseButton { get; private set; }
@@ -137,6 +147,9 @@ namespace C6.Prototype.Lobby
             SetButton(StartButton, value.CanStart);
             SetButton(LeaveButton, value.CanLeave);
             SetButton(CancelConnectionButton, value.CanLeave);
+            SetButton(DeveloperModeButton, value.CanCreate && developerSettings.Ready);
+            SetButton(ResetDeveloperSettingsButton, value.CanCreate && developerSettings.Enabled);
+            foreach (Button button in developerControlButtons) SetButton(button, value.CanCreate && developerSettings.Enabled);
             CancelConnectionButton.gameObject.SetActive(!value.Connected && value.CanLeave);
             RoomNameInput.interactable = value.CanCreate;
             IPv4Input.interactable = value.CanJoinDirect;
@@ -206,6 +219,45 @@ namespace C6.Prototype.Lobby
             directFields.gameObject.SetActive(expanded);
             directCaption.text = expanded ? "DIRECT IP  −" : "DIRECT IP  +";
             LayoutSections();
+        }
+
+        public void ConfigureDeveloperDefaults(LobbyHostConfig value)
+        {
+            if (value == null || developerSettings.Ready) return;
+            developerSettings.LoadDefaults(value);
+            RefreshDeveloperUi();
+            SetButton(DeveloperModeButton, state.CanCreate);
+        }
+
+        public void SetDeveloperMode(bool enabled)
+        {
+            if (!developerSettings.Ready) return;
+            developerSettings.SetEnabled(enabled);
+            RefreshDeveloperUi();
+            LayoutSections();
+        }
+
+        public void AdjustDeveloperSetting(LobbyDeveloperSetting setting, int direction)
+        {
+            if (!developerSettings.Enabled) return;
+            developerSettings.Adjust(setting, direction);
+            RefreshDeveloperUi();
+        }
+
+        public LobbyHostConfig BuildRoomConfig() =>
+            developerSettings.Ready ? developerSettings.BuildRoomConfig() : null;
+
+        private void RefreshDeveloperUi()
+        {
+            if (developerModeCaption == null) return;
+            developerModeCaption.text = developerSettings.Enabled ? "DEVELOPER MODE  ·  ON" : "DEVELOPER MODE  ·  OFF";
+            DeveloperModeButton.targetGraphic.color = developerSettings.Enabled
+                ? new Color(.19f, .44f, .43f, 1f) : new Color(.14f, .26f, .29f, 1f);
+            developerPanel.gameObject.SetActive(developerSettings.Enabled);
+            foreach (var pair in developerValueLabels)
+                pair.Value.text = developerSettings.Ready ? developerSettings.DisplayValue(pair.Key) : "—";
+            SetButton(ResetDeveloperSettingsButton, state.CanCreate && developerSettings.Enabled);
+            foreach (Button button in developerControlButtons) SetButton(button, state.CanCreate && developerSettings.Enabled);
         }
 
         private void CreateUi()
@@ -286,9 +338,49 @@ namespace C6.Prototype.Lobby
             RoomNameInput.characterLimit = 32;
             RoomNameInput.keyboardType = TouchScreenKeyboardType.Default;
             Top((RectTransform)RoomNameInput.transform, 12f, 12f, 36f, 48f);
+            DeveloperModeButton = Button("DeveloperMode", createPanel, "DEVELOPER MODE  ·  OFF", false);
+            developerModeCaption = DeveloperModeButton.GetComponentInChildren<Text>();
+            DeveloperModeButton.onClick.AddListener(() => SetDeveloperMode(!developerSettings.Enabled));
+            CreateDeveloperPanel();
             CreateRoomButton = Button("CreateRoom", createPanel, "CREATE ROOM", true);
-            Top((RectTransform)CreateRoomButton.transform, 12f, 12f, 94f, 50f);
             CreateRoomButton.onClick.AddListener(() => CreateRoomRequested?.Invoke());
+        }
+
+        private void CreateDeveloperPanel()
+        {
+            developerPanel = Image("DeveloperSettings", createPanel, new Color(.045f, .10f, .12f, 1f)).rectTransform;
+            var hint = Text("DeveloperHint", developerPanel,
+                "HOST-APPROVED · THIS ROOM ONLY\nSaved project defaults stay unchanged.", 11, Muted, TextAnchor.MiddleCenter);
+            Top(hint.rectTransform, 8f, 8f, 7f, 34f);
+            int index = 0;
+            foreach (LobbyDeveloperSetting setting in LobbyDeveloperSettings.OrderedSettings)
+            {
+                RectTransform row = Rect(setting.ToString(), developerPanel);
+                Top(row, 8f, 8f, 47f + index * 50f, 44f);
+                Text label = Text("Label", row, developerSettings.Label(setting), 11, White, TextAnchor.MiddleLeft);
+                StretchWithMargins(label.rectTransform, 0f, 152f);
+                Button minus = Button("Minus", row, "−", false);
+                RightFixed((RectTransform)minus.transform, 100f, 44f);
+                Text value = Text("Value", row, "—", 12, Teal, TextAnchor.MiddleCenter);
+                RightFixed(value.rectTransform, 48f, 48f);
+                Button plus = Button("Plus", row, "+", false);
+                RightFixed((RectTransform)plus.transform, 0f, 44f);
+                LobbyDeveloperSetting captured = setting;
+                minus.onClick.AddListener(() => AdjustDeveloperSetting(captured, -1));
+                plus.onClick.AddListener(() => AdjustDeveloperSetting(captured, 1));
+                developerControlButtons.Add(minus);
+                developerControlButtons.Add(plus);
+                developerValueLabels.Add(setting, value);
+                index++;
+            }
+            ResetDeveloperSettingsButton = Button("ResetDeveloperSettings", developerPanel, "RESET TO PROJECT DEFAULTS", false);
+            Top((RectTransform)ResetDeveloperSettingsButton.transform, 8f, 8f, 47f + index * 50f + 5f, 44f);
+            ResetDeveloperSettingsButton.onClick.AddListener(() =>
+            {
+                developerSettings.ResetValues();
+                RefreshDeveloperUi();
+            });
+            developerPanel.gameObject.SetActive(false);
         }
 
         private void CreateBrowsePanel()
@@ -383,6 +475,19 @@ namespace C6.Prototype.Lobby
             LeaveButton.onClick.AddListener(() => LeaveRequested?.Invoke());
         }
 
+        private float LayoutCreatePanel()
+        {
+            const float toggleTop = 94f;
+            const float toggleHeight = 44f;
+            const float developerTop = toggleTop + toggleHeight + 10f;
+            float developerHeight = 47f + LobbyDeveloperSettings.OrderedSettings.Count * 50f + 57f;
+            Top((RectTransform)DeveloperModeButton.transform, 12f, 12f, toggleTop, toggleHeight);
+            Top(developerPanel, 12f, 12f, developerTop, developerHeight);
+            float createTop = developerSettings.Enabled ? developerTop + developerHeight + 10f : developerTop;
+            Top((RectTransform)CreateRoomButton.transform, 12f, 12f, createTop, 50f);
+            return createTop + 64f;
+        }
+
         private void LayoutSections()
         {
             if (content == null || statusPanel == null || createPanel == null || browsePanel == null ||
@@ -403,8 +508,9 @@ namespace C6.Prototype.Lobby
             }
             else
             {
-                Top(createPanel, 0f, 0f, y, 158f);
-                y += 178f;
+                float createHeight = LayoutCreatePanel();
+                Top(createPanel, 0f, 0f, y, createHeight);
+                y += createHeight + 20f;
                 float listHeight = displayedRooms.Length == 0 ? 62f : displayedRooms.Length * 110f - 8f;
                 float browseHeight = 94f + listHeight;
                 Top(browsePanel, 0f, 0f, y, browseHeight);
@@ -527,6 +633,22 @@ namespace C6.Prototype.Lobby
             rect.anchorMax = new Vector2(right, 1f);
             rect.offsetMin = new Vector2(left > 0f ? 4f : 0f, 0f);
             rect.offsetMax = new Vector2(right < 1f ? -4f : 0f, 0f);
+        }
+
+        private static void StretchWithMargins(RectTransform rect, float left, float right)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(left, 0f);
+            rect.offsetMax = new Vector2(-right, 0f);
+        }
+
+        private static void RightFixed(RectTransform rect, float right, float width)
+        {
+            rect.anchorMin = new Vector2(1f, 0f);
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(-right - width, 0f);
+            rect.offsetMax = new Vector2(-right, 0f);
         }
     }
 }

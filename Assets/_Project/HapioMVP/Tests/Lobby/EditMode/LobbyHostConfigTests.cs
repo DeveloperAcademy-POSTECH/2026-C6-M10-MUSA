@@ -45,7 +45,7 @@ namespace C6.Prototype.Tests.Lobby
             Assert.That(LobbyHostConfig.TryRead(json, out var parsed), Is.True);
             Assert.That(JsonUtility.ToJson(parsed), Is.EqualTo(json));
             Assert.That(JsonUtility.ToJson(config), Is.EqualTo(before));
-            Assert.That(parsed.schema, Is.EqualTo(2)); Assert.That(parsed.initialOrbs, Is.Zero);
+            Assert.That(parsed.schema, Is.EqualTo(3)); Assert.That(parsed.initialOrbs, Is.Zero);
             Assert.That(parsed.staminaStart, Is.EqualTo(100)); Assert.That(parsed.generateCost, Is.EqualTo(20));
             Assert.That(parsed.recoveryAmount, Is.EqualTo(20)); Assert.That(parsed.recoverySeconds, Is.EqualTo(3));
             Assert.That(parsed.hitRecovery, Is.EqualTo(5)); Assert.That(parsed.duration, Is.EqualTo(180));
@@ -103,6 +103,8 @@ namespace C6.Prototype.Tests.Lobby
         [TestCase("combinationRadius", "0.51")]
         [TestCase("horizontalSwipe", "1.01")]
         [TestCase("horizontalDominance", "0.9")]
+        [TestCase("orbRadiusScreenFraction", "0.21")]
+        [TestCase("orbRadiusCapScale", "0.99")]
         [TestCase("monsterHp", "0")]
         [TestCase("damage", "100001")]
         [TestCase("storageLimit", "21")]

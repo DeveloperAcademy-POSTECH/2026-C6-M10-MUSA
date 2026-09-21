@@ -11,9 +11,10 @@ namespace C6.Prototype.Lobby
     [Serializable]
     public sealed class LobbyHostConfig
     {
-        public int schema = 2;
+        public int schema = 3;
         public int initialOrbs;
         public float upperFraction, combinationRadius, horizontalSwipe, horizontalDominance;
+        public float orbRadiusScreenFraction, orbRadiusCapScale;
         public bool freeWorkspace = true;
         public string attackTrigger = "BattleBoundary";
         public int monsterHp, damage, storageLimit;
@@ -48,6 +49,7 @@ namespace C6.Prototype.Lobby
             if (c == null) throw new ArgumentNullException(nameof(c));
             return new LobbyHostConfig { upperFraction=c.UpperFraction, combinationRadius=c.CombinationRadiusFraction,
                 horizontalSwipe=c.HorizontalSwipeFraction, horizontalDominance=c.HorizontalDominance,
+                orbRadiusScreenFraction=c.OrbRadiusScreenFraction, orbRadiusCapScale=c.OrbRadiusCapScale,
                 monsterHp=c.MonsterMaxHp,monsterHp2=c.MonsterMaxHp2Players, monsterHp3=c.MonsterMaxHp3Players, monsterHp4=c.MonsterMaxHp4Players, monsterHp5=c.MonsterMaxHp5Players, damage=c.BaseDamage, storageLimit=c.OrbStorageLimit,
                 staminaMax=c.StaminaMax, staminaStart=c.StaminaStart, generateCost=c.GenerateCost,
                 recoveryAmount=c.StaminaRecoveryAmount, recoverySeconds=c.StaminaRecoverySeconds,
@@ -71,10 +73,11 @@ namespace C6.Prototype.Lobby
         { 2 => monsterHp2, 3 => monsterHp3, 4 => monsterHp4, 5 => monsterHp5, _ => monsterHp };
         private static bool ValidValues(LobbyHostConfig value)
         {
-            if (value.schema != 2 || value.initialOrbs != 0 || !value.freeWorkspace
+            if (value.schema != 3 || value.initialOrbs != 0 || !value.freeWorkspace
                 || value.attackTrigger != "BattleBoundary" || value.defense) return false;
             return In(value.upperFraction, .01f, .99f) && In(value.combinationRadius, .01f, .5f)
                 && In(value.horizontalSwipe, .01f, 1) && In(value.horizontalDominance, 1, 5)
+                && In(value.orbRadiusScreenFraction, .01f, .2f) && In(value.orbRadiusCapScale, 1f, 3f)
                 && value.monsterHp >= 1 && value.monsterHp <= 100000 && value.damage >= 1 && value.damage <= 100000 && In(value.monsterHp2, 1, 100000) && In(value.monsterHp3, 1, 100000) && In(value.monsterHp4, 1, 100000) && In(value.monsterHp5, 1, 100000)
                 && value.storageLimit >= 1 && value.storageLimit <= 20 && In(value.staminaMax, 1, 100000)
                 && In(value.staminaStart, 0, value.staminaMax) && In(value.generateCost, .001f, value.staminaMax)
@@ -102,6 +105,7 @@ namespace C6.Prototype.Lobby
                 { "schema", Kind.Integer }, { "initialOrbs", Kind.Integer },
                 { "upperFraction", Kind.Number }, { "combinationRadius", Kind.Number },
                 { "horizontalSwipe", Kind.Number }, { "horizontalDominance", Kind.Number },
+                { "orbRadiusScreenFraction", Kind.Number }, { "orbRadiusCapScale", Kind.Number },
                 { "freeWorkspace", Kind.Boolean }, { "attackTrigger", Kind.Text },
                 { "monsterHp", Kind.Integer }, { "monsterHp2", Kind.Integer }, { "monsterHp3", Kind.Integer }, { "monsterHp4", Kind.Integer }, { "monsterHp5", Kind.Integer }, { "damage", Kind.Integer }, { "storageLimit", Kind.Integer },
                 { "staminaMax", Kind.Number }, { "staminaStart", Kind.Number }, { "generateCost", Kind.Number },

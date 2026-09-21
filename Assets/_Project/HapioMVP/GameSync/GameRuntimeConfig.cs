@@ -31,7 +31,7 @@ namespace C6.Prototype.GameSync
         private void OnDestroy() { if (Value != null) Destroy(Value); }
         [Serializable] private sealed class Fields
         {
-            public float upperFraction,horizontalSwipeFraction,horizontalDominance,combinationRadiusFraction;
+            public float upperFraction,horizontalSwipeFraction,horizontalDominance,combinationRadiusFraction,orbRadiusScreenFraction,orbRadiusCapScale;
             public int monsterMaxHp,baseDamage,orbStorageLimit;
             public int monsterMaxHp2Players, monsterMaxHp3Players, monsterMaxHp4Players, monsterMaxHp5Players;
             public float projectileSpeed,projectileLifetime,projectileRadius,attackSnapshotRateHz,launchWidth;
@@ -61,6 +61,7 @@ namespace C6.Prototype.GameSync
             public Fields(LobbyHostConfig c)
             {
                 upperFraction=c.upperFraction; horizontalSwipeFraction=c.horizontalSwipe; horizontalDominance=c.horizontalDominance;
+                orbRadiusScreenFraction=c.orbRadiusScreenFraction; orbRadiusCapScale=c.orbRadiusCapScale;
                 combinationRadiusFraction=c.combinationRadius; monsterMaxHp=c.monsterHp; monsterMaxHp2Players=c.monsterHp2; monsterMaxHp3Players=c.monsterHp3; monsterMaxHp4Players=c.monsterHp4; monsterMaxHp5Players=c.monsterHp5; baseDamage=c.damage; orbStorageLimit=c.storageLimit;
                 projectileSpeed=c.projectileSpeed; projectileLifetime=c.projectileLifetime; projectileRadius=c.projectileRadius;
                 attackSnapshotRateHz=c.snapshotRate; launchWidth=c.launchWidth; launchOrigin=c.launchOrigin; launchAim=c.launchAim;

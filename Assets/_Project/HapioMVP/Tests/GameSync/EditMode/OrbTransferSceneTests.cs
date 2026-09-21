@@ -142,7 +142,7 @@ namespace C6.Prototype.GameSync.Tests
             bool releaseThrow = enabled[0] == throwPath;
             bool fivePlayer = enabled[0] == fivePath;
             bool continuous = enabled[0] == continuousPath;
-            string expectedBuild = continuous ? "24" : fivePlayer ? "23" : releaseThrow ? "22" : physics ? "21" : interruption ? "20" : integrated ? "19" : "16";
+            string expectedBuild = continuous ? "25" : fivePlayer ? "23" : releaseThrow ? "22" : physics ? "21" : interruption ? "20" : integrated ? "19" : "16";
             string expectedDesktop = continuous ? "com.wolfuraark.c6prototype.p4.desktop" : fivePlayer ? "com.wolfuraark.c6prototype.p3.desktop" : releaseThrow ? "com.wolfuraark.c6prototype.p2.desktop" : physics ? "com.wolfuraark.c6prototype.p1.desktop" : interruption ? "com.wolfuraark.c6prototype.t13.desktop" :
                 integrated ? "com.wolfuraark.c6prototype.t12.desktop" : "com.wolfuraark.c6prototype.t11.desktop";
             Assert.That(EditorBuildSettings.scenes.Select(item => item.path), Does.Contain(ScenePath));
