@@ -6,27 +6,42 @@ namespace C6.Prototype.Battle.Tests
     /// <summary>#28 local two-hand defense input. The Host still judges every report.</summary>
     public sealed class MonsterDefenseInputTests
     {
-        private static readonly Rect Upper = new Rect(0, 400, 390, 444);
+        // Screen pixels: the orb area below 400, the battle area above it, the TEAM HP row at its bottom.
+        private static readonly Rect LeftZone = new Rect(0, 400, 195, 70);
+        private static readonly Rect RightZone = new Rect(195, 400, 195, 70);
 
         [Test]
-        public void TouchesCountOnlyByTheUpperHalfWhereTheyBegan()
+        public void TouchesCountOnlyInTheZoneWhereTheyBegan()
         {
-            Assert.That(MonsterDefenseInput.Classify(new Vector2(40, 600), Upper), Is.EqualTo(DefenseZone.Left));
-            Assert.That(MonsterDefenseInput.Classify(new Vector2(350, 600), Upper), Is.EqualTo(DefenseZone.Right));
-            Assert.That(MonsterDefenseInput.Classify(new Vector2(195, 600), Upper), Is.EqualTo(DefenseZone.Right), "the center line belongs to one side");
-            Assert.That(MonsterDefenseInput.Classify(new Vector2(40, 200), Upper), Is.EqualTo(DefenseZone.None), "orb drags and throws begin below");
-            Assert.That(MonsterDefenseInput.Classify(new Vector2(40, 600), Rect.zero), Is.EqualTo(DefenseZone.None), "no battle view yet");
+            Assert.That(MonsterDefenseInput.Classify(new Vector2(40, 430), LeftZone, RightZone), Is.EqualTo(DefenseZone.Left));
+            Assert.That(MonsterDefenseInput.Classify(new Vector2(350, 430), LeftZone, RightZone), Is.EqualTo(DefenseZone.Right));
+            Assert.That(MonsterDefenseInput.Classify(new Vector2(40, 600), LeftZone, RightZone), Is.EqualTo(DefenseZone.None), "touching the monster area");
+            Assert.That(MonsterDefenseInput.Classify(new Vector2(40, 200), LeftZone, RightZone), Is.EqualTo(DefenseZone.None), "orb drags and throws begin below");
+            Assert.That(MonsterDefenseInput.Classify(new Vector2(40, 430), Rect.zero, Rect.zero), Is.EqualTo(DefenseZone.None), "no zones yet");
         }
 
         [Test]
-        public void TwoSecondsOfBothHandsDuringTheWarningReportsOnce()
+        public void ScenesWithoutZonesSplitTheBattleAreaInHalf()
+        {
+            MonsterDefenseInput.SplitHalves(new Rect(0, 400, 390, 444), out var left, out var right);
+            Assert.That(MonsterDefenseInput.Classify(new Vector2(40, 600), left, right), Is.EqualTo(DefenseZone.Left));
+            Assert.That(MonsterDefenseInput.Classify(new Vector2(350, 600), left, right), Is.EqualTo(DefenseZone.Right));
+            Assert.That(MonsterDefenseInput.Classify(new Vector2(195, 600), left, right), Is.EqualTo(DefenseZone.Right), "the shared edge belongs to one side");
+            Assert.That(MonsterDefenseInput.Classify(new Vector2(40, 200), left, right), Is.EqualTo(DefenseZone.None));
+        }
+
+        [Test]
+        public void TwoSecondsOfBothHandsDuringTheWarningReachesTheStanceOnce()
         {
             var hold = new DefenseHoldTracker();
             Assert.That(Step(hold, 1, true, true, 1.0), Is.False);
             Assert.That(hold.Holding, Is.True);
-            Assert.That(Step(hold, 1, true, true, 1.0), Is.True, "reached 2 s");
+            Assert.That(Step(hold, 1, true, true, 1.0), Is.True, "reached 2 s: one report, one haptic");
             Assert.That(hold.Holding, Is.False);
+            Assert.That(hold.Reported, Is.True, "stance stays until the next attack");
             Assert.That(Step(hold, 1, true, true, 1.0), Is.False, "one report per attack");
+            Assert.That(Step(hold, 1, true, false, 1.0), Is.False);
+            Assert.That(hold.Reported, Is.True, "lifting after the stance keeps it");
             Assert.That(Step(hold, 2, true, true, 2.0), Is.True, "the next attack is a new defense");
         }
 
@@ -54,23 +69,31 @@ namespace C6.Prototype.Battle.Tests
         }
 
         [Test]
-        public void HapticCuesMarkTheStartEveryHalfSecondAndCompletion()
+        public void StanceGlowIsSteadyLightGreenAndTheWarningStillPulses()
         {
-            var hold = new DefenseHoldTracker();
-            var cues = new System.Collections.Generic.List<DefenseHoldCue>();
-            for (int frame = 0; frame < 9; frame++) { Step(hold, 1, true, true, .25); cues.Add(hold.Cue); }
-            Assert.That(cues, Is.EqualTo(new[]
+            Assert.That(MonsterAttackWarning.PulseAlpha(.2, 2.5f, .35f), Is.EqualTo(.35f).Within(1e-5), "plain warning pulses");
+            var go = new GameObject("warning", typeof(RectTransform));
+            try
             {
-                DefenseHoldCue.Started, DefenseHoldCue.Progress, DefenseHoldCue.None, DefenseHoldCue.Progress, DefenseHoldCue.None,
-                DefenseHoldCue.Progress, DefenseHoldCue.None, DefenseHoldCue.Completed, DefenseHoldCue.None
-            }), "0.25 start / 0.5 / 1.0 / 1.5 ticks / 2.0 done / then silent");
+                var edge = new GameObject("edge", typeof(RectTransform), typeof(UnityEngine.UI.Image)).GetComponent<UnityEngine.UI.Image>();
+                edge.transform.SetParent(go.transform, false);
+                edge.color = new Color(1f, .08f, .05f, .85f);
+                var warning = go.AddComponent<MonsterAttackWarning>();
+                var serialized = new UnityEditor.SerializedObject(warning);
+                var edges = serialized.FindProperty("edges"); edges.arraySize = 1;
+                edges.GetArrayElementAtIndex(0).objectReferenceValue = edge;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
 
-            Step(hold, 2, true, true, .3);
-            Assert.That(hold.Cue, Is.EqualTo(DefenseHoldCue.Started), "next attack");
-            Step(hold, 2, true, false, .3);
-            Assert.That(hold.Cue, Is.EqualTo(DefenseHoldCue.None), "no tap when a hand lifts");
-            Step(hold, 2, true, true, .3);
-            Assert.That(hold.Cue, Is.EqualTo(DefenseHoldCue.Started), "holding again starts over");
+                warning.Show(.2, WarningLook.Holding);
+                Assert.That(edge.color, Is.EqualTo(new Color(1f, .08f, .05f, .85f)), "holding: steady red");
+                warning.Show(.2, WarningLook.Stance);
+                Assert.That(edge.color.g, Is.GreaterThan(edge.color.r), "stance: green");
+                Assert.That(edge.color.a, Is.EqualTo(.85f).Within(1e-5), "stance: steady");
+                warning.Show(.2, WarningLook.Pulse);
+                Assert.That(edge.color.r, Is.EqualTo(1f), "the next warning is red again");
+                Assert.That(edge.color.a, Is.EqualTo(.85f * .35f).Within(1e-5));
+            }
+            finally { Object.DestroyImmediate(go); }
         }
 
         private static bool Step(DefenseHoldTracker hold, int attack, bool warning, bool bothHeld, double delta) =>

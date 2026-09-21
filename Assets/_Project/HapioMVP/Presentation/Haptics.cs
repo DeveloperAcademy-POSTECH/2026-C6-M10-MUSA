@@ -15,7 +15,6 @@ namespace C6.Prototype.Presentation
     {
 #if UNITY_IOS && !UNITY_EDITOR
         [DllImport("__Internal")] private static extern void C6Haptics_Impact(int style);
-        [DllImport("__Internal")] private static extern void C6Haptics_Success();
 #endif
 
         public static void Impact(HapticImpact strength)
@@ -24,15 +23,6 @@ namespace C6.Prototype.Presentation
             C6Haptics_Impact((int)strength);
 #else
             Debug.Log("C6_HAPTIC impact=" + strength);
-#endif
-        }
-
-        public static void Success()
-        {
-#if UNITY_IOS && !UNITY_EDITOR
-            C6Haptics_Success();
-#else
-            Debug.Log("C6_HAPTIC success");
 #endif
         }
     }

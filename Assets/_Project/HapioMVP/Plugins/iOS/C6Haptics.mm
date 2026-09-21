@@ -3,7 +3,6 @@
 #import <UIKit/UIKit.h>
 
 static UIImpactFeedbackGenerator *c6Impacts[3];
-static UINotificationFeedbackGenerator *c6Notification;
 
 extern "C" void C6Haptics_Impact(int style)
 {
@@ -15,11 +14,4 @@ extern "C" void C6Haptics_Impact(int style)
     }
     [c6Impacts[index] impactOccurred];
     [c6Impacts[index] prepare];
-}
-
-extern "C" void C6Haptics_Success(void)
-{
-    if (c6Notification == nil) c6Notification = [[UINotificationFeedbackGenerator alloc] init];
-    [c6Notification notificationOccurred:UINotificationFeedbackTypeSuccess];
-    [c6Notification prepare];
 }

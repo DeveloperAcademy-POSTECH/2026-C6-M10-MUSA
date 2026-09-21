@@ -127,13 +127,39 @@ namespace C6.Prototype.GameSync.Tests
             finally { if (prior.IsValid()) EditorSceneManager.ClosePreviewScene(prior); }
         }
         [Test]
+        public void DefenseZonesAreInvisibleEdgeAreasAboveTheTeamHpBar()
+        {
+            var controller = Components<T09BattleController>(scene).Single();
+            var upper = controller.Hud.transform.Find("T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent");
+            var teamTime = (RectTransform)upper.Find("TeamTimeBar");
+            var display = (RectTransform)upper.Find("MonsterDisplayArea");
+            RectTransform left, right;
+            using (var serialized = new SerializedObject(controller))
+            {
+                left = (RectTransform)serialized.FindProperty("defenseZoneLeft").objectReferenceValue;
+                right = (RectTransform)serialized.FindProperty("defenseZoneRight").objectReferenceValue;
+            }
+            Assert.That(left, Is.Not.Null); Assert.That(right, Is.Not.Null);
+            foreach (var zone in new[] { left, right })
+            {
+                Assert.That(zone.parent, Is.SameAs(upper), "#28 zones belong to the battle area");
+                Assert.That(zone.GetComponents<Component>().Length, Is.EqualTo(1), "RectTransform only: never drawn and never blocks input");
+                Assert.That(zone.anchorMin.y, Is.GreaterThanOrEqualTo(teamTime.anchorMax.y), "just above the TEAM HP bar, never on it");
+                Assert.That(zone.anchorMax.y, Is.LessThanOrEqualTo(display.anchorMax.y), "beside the lower monster area");
+                Assert.That(zone.anchorMax.y - zone.anchorMin.y, Is.GreaterThan(.1f), "large enough for a thumb");
+            }
+            Assert.That(left.anchorMin.x, Is.EqualTo(0f), "left zone starts at the screen edge");
+            Assert.That(right.anchorMax.x, Is.EqualTo(1f), "right zone ends at the screen edge");
+            Assert.That(left.anchorMax.x, Is.LessThan(.5f)); Assert.That(right.anchorMin.x, Is.GreaterThan(.5f), "the center stays free");
+        }
+        [Test]
         public void SavedConfigCarriesTheAgreedMonsterAttackTiming()
         {
             var config = Components<SplitScreenLayout>(scene).Single().Config;
             Assert.That(config.MonsterAttackFirstDelaySeconds, Is.EqualTo(20f), "#28 first attack 20 s after start");
             Assert.That(config.MonsterAttackIntervalSeconds, Is.EqualTo(15f));
             Assert.That(config.MonsterAttackWarningSeconds, Is.EqualTo(3f));
-            Assert.That(config.DefenseHoldSeconds, Is.EqualTo(2f));
+            Assert.That(config.DefenseHoldSeconds, Is.EqualTo(1.2f), "defense stance after 1.2 s");
             Assert.That(config.DefenseFailPenaltySeconds, Is.EqualTo(20f));
         }
         [Test]

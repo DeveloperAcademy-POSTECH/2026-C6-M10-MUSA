@@ -24,6 +24,7 @@ namespace C6.Prototype.Battle
 
         [SerializeField] private DamagePopupLayer damagePopups;
         [SerializeField] private MonsterAttackWarning attackWarning; // #28: scene Canvas edge glow, target's screen only
+        [SerializeField] private RectTransform defenseZoneLeft, defenseZoneRight; // #28: invisible two-hand defense zones
         private MonsterMotion monsterMotion;
         private MonsterAttackPresenter attackPresenter;
         private MonsterDefenseInput defenseInput;
@@ -203,7 +204,8 @@ namespace C6.Prototype.Battle
             proxyRoot = new GameObject("T09 Client Projectile Display Only").transform; proxyRoot.SetParent(transform, false);
             monsterMotion = MonsterMotion.For(target);
             defenseInput = gameObject.AddComponent<MonsterDefenseInput>();
-            defenseInput.Configure(battle, attack, layout, sequence => battle.HostAcceptDefense(attack.LocalPlayerId, sequence));
+            defenseInput.Configure(battle, attack, layout, defenseZoneLeft, defenseZoneRight,
+                sequence => battle.HostAcceptDefense(attack.LocalPlayerId, sequence));
             attackPresenter = gameObject.AddComponent<MonsterAttackPresenter>();
             attackPresenter.Configure(battle, attack, monsterMotion, target != null ? target.GetComponent<BenchmarkMonster>() : null,
                 GetComponent<ThrowBattleFraming>(), attackWarning, defenseInput);

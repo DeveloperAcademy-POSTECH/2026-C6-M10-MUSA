@@ -9,7 +9,8 @@ namespace C6.Prototype.Battle
     /// <summary>
     /// #28 shows the Host monster attack on every screen: the monster turns to face the target's seat, Claw_Attack
     /// lands its Slash_Impact when the warning ends, then it returns to Idle and faces forward. Only the target sees
-    /// the red edge warning. Display only: target, timing, and result come from the Host battle snapshot.
+    /// the edge warning (light green once it holds the defense stance). Display only: target, timing, and result come
+    /// from the Host battle snapshot.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class MonsterAttackPresenter : MonoBehaviour
@@ -104,7 +105,8 @@ namespace C6.Prototype.Battle
             if (warning != null)
             {
                 if (now.HasValue && attack != null && Warns(state, attack.LocalPlayerId, now.Value))
-                    warning.Show(now.Value - state.attackWarningStartsAt, defense != null && defense.HoldShown);
+                    warning.Show(now.Value - state.attackWarningStartsAt, defense == null ? WarningLook.Pulse
+                        : defense.InStance ? WarningLook.Stance : defense.Holding ? WarningLook.Holding : WarningLook.Pulse);
                 else if (warning.Visible) warning.Hide();
             }
         }

@@ -56,7 +56,7 @@ MonoBehaviour:
   monsterAttackFirstDelaySeconds: 20
   monsterAttackIntervalSeconds: 15
   monsterAttackWarningSeconds: 3
-  defenseHoldSeconds: 2
+  defenseHoldSeconds: 1.2
   defenseFailPenaltySeconds: 20
   projectileSpeed: 12
   projectileLifetime: 3

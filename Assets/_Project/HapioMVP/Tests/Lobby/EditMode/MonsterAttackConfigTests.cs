@@ -16,7 +16,7 @@ namespace C6.Prototype.Lobby.Tests
                 Assert.That(config.MonsterAttackFirstDelaySeconds, Is.EqualTo(20f));
                 Assert.That(config.MonsterAttackIntervalSeconds, Is.EqualTo(15f));
                 Assert.That(config.MonsterAttackWarningSeconds, Is.EqualTo(3f));
-                Assert.That(config.DefenseHoldSeconds, Is.EqualTo(2f));
+                Assert.That(config.DefenseHoldSeconds, Is.EqualTo(1.2f), "defense stance after 1.2 s");
                 Assert.That(config.DefenseFailPenaltySeconds, Is.EqualTo(20f));
             }
             finally { Object.DestroyImmediate(config); }

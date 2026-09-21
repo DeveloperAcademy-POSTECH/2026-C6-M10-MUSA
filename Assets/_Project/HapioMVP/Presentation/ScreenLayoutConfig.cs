@@ -142,13 +142,13 @@ namespace C6.Prototype.Presentation
         [SerializeField] private float monsterAttackFirstDelaySeconds = 20f;
         [SerializeField] private float monsterAttackIntervalSeconds = 15f;
         [SerializeField] private float monsterAttackWarningSeconds = 3f;
-        [SerializeField] private float defenseHoldSeconds = 2f;
+        [SerializeField] private float defenseHoldSeconds = 1.2f; // team playtest: 1.2 s stance (rule book trial was 2 s)
         [SerializeField] private float defenseFailPenaltySeconds = 20f;
         public float MonsterAttackFirstDelaySeconds => Valid(monsterAttackFirstDelaySeconds, 20f, 1f, 600f);
         public float MonsterAttackIntervalSeconds => Valid(monsterAttackIntervalSeconds, 15f, 1f, 600f);
         public float MonsterAttackWarningSeconds => Valid(monsterAttackWarningSeconds, 3f, .5f, 30f);
         /// <summary>A defense must fit inside the warning, so the hold never exceeds it.</summary>
-        public float DefenseHoldSeconds => Mathf.Min(Valid(defenseHoldSeconds, 2f, .1f, 30f), MonsterAttackWarningSeconds);
+        public float DefenseHoldSeconds => Mathf.Min(Valid(defenseHoldSeconds, 1.2f, .1f, 30f), MonsterAttackWarningSeconds);
         public float DefenseFailPenaltySeconds => Valid(defenseFailPenaltySeconds, 20f, 0f, 600f);
         [SerializeField] private float projectileSpeed = 12f;
         [SerializeField] private float projectileLifetime = 3f;

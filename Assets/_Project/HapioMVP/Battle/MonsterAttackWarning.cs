@@ -3,9 +3,13 @@ using UnityEngine.UI;
 
 namespace C6.Prototype.Battle
 {
+    /// <summary>How the edge glow looks: pulsing warning, both hands down, or the defense stance reached.</summary>
+    public enum WarningLook { Pulse, Holding, Stance }
+
     /// <summary>
-    /// #28 red edge glow shown only on the attacked player's screen during the warning. Presentation only:
-    /// the edge Images live in the scene Canvas so their sprite, color, and width stay editable.
+    /// #28 edge glow shown only on the attacked player's screen during the warning: pulsing red, steady red while both
+    /// hands hold, light green once the defense stance is reached. Presentation only: the edge Images live in the scene
+    /// Canvas so their sprite, colors, and width stay editable.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class MonsterAttackWarning : MonoBehaviour
@@ -13,9 +17,11 @@ namespace C6.Prototype.Battle
         [SerializeField] private Graphic[] edges;
         [SerializeField, Min(.1f)] private float pulsesPerSecond = 2.5f;   // DEMO_TUNING_VALUE
         [SerializeField, Range(0f, 1f)] private float minimumAlpha = .35f; // DEMO_TUNING_VALUE: dimmest point of a pulse
+        [SerializeField] private Color stanceColor = new Color(.6f, 1f, .6f, .85f); // DEMO_TUNING_VALUE: light green defense stance
         private Color[] baseColors;
 
         public bool Visible { get; private set; }
+        public WarningLook Look { get; private set; }
 
         private void Awake() { Capture(); Hide(); }
 
@@ -26,20 +32,19 @@ namespace C6.Prototype.Battle
             return Mathf.Lerp(Mathf.Clamp01(minimumAlpha), 1f, (float)wave);
         }
 
-        /// <summary>While both hands hold the defense the glow stops pulsing, so the player can see the hold registered.</summary>
-        public void Show(double elapsedSeconds, bool holding = false)
+        public void Show(double elapsedSeconds, WarningLook look = WarningLook.Pulse)
         {
             if (edges == null) return;
             Capture();
-            float alpha = holding ? 1f : PulseAlpha(elapsedSeconds, pulsesPerSecond, minimumAlpha);
+            float alpha = look == WarningLook.Pulse ? PulseAlpha(elapsedSeconds, pulsesPerSecond, minimumAlpha) : 1f;
             for (int i = 0; i < edges.Length; i++)
             {
                 if (edges[i] == null) continue;
-                var color = baseColors[i];
+                var color = look == WarningLook.Stance ? stanceColor : baseColors[i];
                 edges[i].color = new Color(color.r, color.g, color.b, color.a * alpha);
                 edges[i].enabled = true;
             }
-            Visible = true;
+            Look = look; Visible = true;
         }
 
         public void Hide()

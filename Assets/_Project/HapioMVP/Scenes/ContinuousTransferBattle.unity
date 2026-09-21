@@ -1068,6 +1068,7 @@ MonoBehaviour:
   - {fileID: 1603314766}
   pulsesPerSecond: 2.5
   minimumAlpha: 0.35
+  stanceColor: {r: 0.6, g: 1, b: 0.6, a: 0.85}
 --- !u!1 &251488547
 GameObject:
   m_ObjectHideFlags: 0
@@ -4054,6 +4055,41 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 799665602}
   m_CullTransparentMesh: 1
+--- !u!1 &828501226
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 828501227}
+  m_Layer: 0
+  m_Name: DefenseZoneLeft
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &828501227
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 828501226}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1384393202}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0.14}
+  m_AnchorMax: {x: 0.29, y: 0.36}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &851528175
 GameObject:
   m_ObjectHideFlags: 0
@@ -6831,6 +6867,8 @@ RectTransform:
   - {fileID: 1468588912}
   - {fileID: 1919762666}
   - {fileID: 1920088431}
+  - {fileID: 828501227}
+  - {fileID: 2031368014}
   - {fileID: 1731822511}
   m_Father: {fileID: 1840223988}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -8967,6 +9005,8 @@ MonoBehaviour:
   target: {fileID: 1028071237}
   damagePopups: {fileID: 1672540757}
   attackWarning: {fileID: 212951920}
+  defenseZoneLeft: {fileID: 828501227}
+  defenseZoneRight: {fileID: 2031368014}
   orbPhysicsEnabled: 1
   releaseThrowsEnabled: 1
   continuousTransfersEnabled: 1
@@ -10633,6 +10673,41 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2026446554}
   m_CullTransparentMesh: 1
+--- !u!1 &2031368013
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2031368014}
+  m_Layer: 0
+  m_Name: DefenseZoneRight
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &2031368014
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2031368013}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1384393202}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.71, y: 0.14}
+  m_AnchorMax: {x: 1, y: 0.36}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &2058089176
 GameObject:
   m_ObjectHideFlags: 0
