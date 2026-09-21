@@ -419,7 +419,8 @@ namespace C6.Prototype.Attack
             {
                 Registry = new HostOrbRegistry(true);
                 Registry.BeginSession(aggregateMode ? approvedSessionId : Guid.NewGuid().ToString("N"), aggregateMode ? approvedRoundId : 1);
-                Authority = new AttackAuthority(Registry, config.MonsterMaxHp, config.BaseDamage);
+                // #29: a frozen multiplayer roster picks the per-player HP; legacy 2-player mode keeps MonsterMaxHp.
+                Authority = new AttackAuthority(Registry, config.MonsterMaxHpFor(OrderedParticipantIds.Count), config.BaseDamage);
 
                 if (releaseThrowsEnabled)
                 {
