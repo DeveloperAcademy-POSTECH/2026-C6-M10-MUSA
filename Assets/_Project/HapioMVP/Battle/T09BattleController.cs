@@ -23,6 +23,7 @@ namespace C6.Prototype.Battle
         [SerializeField] private MonsterHitTarget target;
 
         [SerializeField] private DamagePopupLayer damagePopups;
+        private MonsterMotion monsterMotion;
         private int? observedHp;
         private Vector3? removedProxyPosition;
         private readonly HashSet<string> ownProxyIds = new HashSet<string>(StringComparer.Ordinal);
@@ -186,6 +187,7 @@ namespace C6.Prototype.Battle
             OrbElements.Configure(layout.Config.TeamElements);
             viewRoot = new GameObject("T09 Local Orb Views").transform; viewRoot.SetParent(transform, false);
             proxyRoot = new GameObject("T09 Client Projectile Display Only").transform; proxyRoot.SetParent(transform, false);
+            monsterMotion = MonsterMotion.For(target);
             if (orbPhysicsEnabled) EnsureOrbPhysics();
         }
         private void Start()
@@ -1124,7 +1126,7 @@ namespace C6.Prototype.Battle
         private void OnHostHitAt(AttackHitResult hit, Vector3 position)
         {
             missWatches.Remove(hit.OrbId);
-            if (damagePopups != null) damagePopups.Show(hit.HpBefore - hit.HpAfter, position, layout.BattleCamera);
+            if (damagePopups != null) if (monsterMotion != null) monsterMotion.PlayHit(); damagePopups.Show(hit.HpBefore - hit.HpAfter, position, layout.BattleCamera);
         }
         private void ShowObservedDamage(AttackSnapshot state)
         {
@@ -1136,7 +1138,10 @@ namespace C6.Prototype.Battle
             // An HP drop cannot be attributed to one orb, so none of the vanished own orbs becomes a MISS.
             foreach (var id in ownRemoved) { if (missed) ShowMissOnce(id); missWatches.Remove(id); }
             int damage = ObservedDamage(previous, state.hp);
-            if (damage > 0) damagePopups.Show(damage, removed ?? MonsterFallbackPoint, layout.BattleCamera);
+            if (damage > 0){
+                if (monsterMotion != null) monsterMotion.PlayHit();
+                damagePopups.Show(damage, removed ?? MonsterFallbackPoint, layout.BattleCamera);
+            }
         }
         public static int ObservedDamage(int? previousHp, int hp) =>
             previousHp.HasValue && hp < previousHp.Value ? previousHp.Value - hp : 0;
