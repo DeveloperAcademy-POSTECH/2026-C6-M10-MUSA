@@ -117,7 +117,9 @@ namespace C6.Prototype.GameSync
             if (a.orbs.Any(orb => orb.kind == (int)OrbKind.Raw
                 && (orb.state == (int)OrbAuthorityState.Launching || orb.state == (int)OrbAuthorityState.Projectile)))
                 return Reject("RAW_PROJECTILE_STATE", out reason);
-            if (a.maxHp != c.monsterHp || b.monsterMaxHp != c.monsterHp || a.hp != b.observedMonsterHp
+            // #29: multiparty rooms use the Host's per-player HP table for the frozen roster size.
+            int expectedHp = IsMultiparty(expected) ? c.MonsterHpFor(participantIds.Length) : c.monsterHp;
+            if (a.maxHp != expectedHp || b.monsterMaxHp != expectedHp || a.hp != b.observedMonsterHp
                 || r.seed != expected.seed || r.storageLimit != c.storageLimit
                 || !Close(r.maximum, c.staminaMax) || !Close(r.generateCost, c.generateCost)
                 || !Close(r.regenerationRate, c.recoveryAmount / c.recoverySeconds) || !Close(r.hitRecovery, c.hitRecovery)
@@ -132,7 +134,7 @@ namespace C6.Prototype.GameSync
             bool terminal = BattleWire.IsTerminal((BattlePhase)Enum.Parse(typeof(BattlePhase), b.phase));
             if (ready)
             {
-                if (a.orbs.Length != 0 || a.projectiles.Length != 0 || a.hp != c.monsterHp || a.roundHits != 0
+                if (a.orbs.Length != 0 || a.projectiles.Length != 0 || a.hp != expectedHp || a.roundHits != 0
                     || a.state != AttackBattleState.Playing.ToString() || r.playing
                     || !Close(b.remaining, c.duration) || !Close(b.teamHp, c.duration * c.teamHpDecay)
                     || r.players.Any(p => !Close(p.stamina, c.staminaStart) || p.generatedTotal != 0
