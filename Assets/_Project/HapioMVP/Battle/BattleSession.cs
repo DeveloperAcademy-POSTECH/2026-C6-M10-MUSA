@@ -60,6 +60,7 @@ namespace C6.Prototype.Battle
             RefreshBinding();
             if (!aggregateMode || !CanStart) return false;
             if (!Authority.Start(Now)) return false;
+            monsterAttack?.Begin(Authority.StartedAt);
             terminalPublished = false;
             PublishSnapshot("approved-playing");
             attack.PublishInventoryChange("t10b-started");
@@ -78,6 +79,7 @@ namespace C6.Prototype.Battle
         private string resourceTimeSession;
         private uint resourceTimeRound;
         private double lastResourceNow;
+        private HostMonsterAttack monsterAttack; // #28 Host only; recreated with each round
         private static double Now => Time.realtimeSinceStartupAsDouble;
 
         public HostBattleClock Authority { get; private set; }
@@ -116,9 +118,10 @@ namespace C6.Prototype.Battle
                 {
                     if (processingHit && processingSession == context.sessionId && processingRound == context.roundId) value = processingTimestamp;
                     else if (Authority.Phase == BattlePhase.Playing) value = Math.Min(now, Authority.Deadline);
-                    else if (Authority.Phase == BattlePhase.Defeat) value = Authority.Deadline;
+                    // #28: failed defenses end the round before the deadline; exclude that removed time.
+                    else if (Authority.Phase == BattlePhase.Defeat) value = Authority.Deadline - Authority.PenaltySeconds;
                     else if (Authority.Phase == BattlePhase.Victory || Authority.Phase == BattlePhase.NetworkError)
-                        value = Authority.StartedAt + Authority.DurationSeconds - Authority.Remaining;
+                        value = Authority.StartedAt + Authority.DurationSeconds - Authority.Remaining - Authority.PenaltySeconds;
                 }
                 if (resourceTimeSession != context.sessionId || resourceTimeRound != context.roundId)
                 { resourceTimeSession = context.sessionId; resourceTimeRound = context.roundId; lastResourceNow = value; }
@@ -217,9 +220,11 @@ namespace C6.Prototype.Battle
                     {
                         Authority = new HostBattleClock(Duration, config.TeamHpDecayPerSecond, attack.ParticipantCapacity);
                         Authority.BeginLobby(sessionId, roundId, attack.AuthenticatedPlayerIds.Count, developmentSolo, config.MonsterMaxHpFor(attack.OrderedParticipantIds.Count));
+                        monsterAttack = new HostMonsterAttack(config.MonsterAttackFirstDelaySeconds, config.MonsterAttackIntervalSeconds,
+                            config.MonsterAttackWarningSeconds, Guid.NewGuid().GetHashCode());
                         PublishSnapshot("lobby-ready");
                     }
-                    else { Authority = null; Status = "Waiting for the Host battle state."; }
+                    else { Authority = null; monsterAttack = null; Status = "Waiting for the Host battle state."; }
                 }
                 if (manager.IsHost && Authority != null)
                 {
@@ -239,6 +244,7 @@ namespace C6.Prototype.Battle
             if (IsHost)
             {
                 AdvanceClock(processingHit ? processingTimestamp : now);
+                TickMonsterAttack(now);
                 if (now >= nextPublishAt)
                 { nextPublishAt = now + 1d / config.AttackSnapshotRateHz; PublishSnapshot(null); }
             }
@@ -256,6 +262,7 @@ namespace C6.Prototype.Battle
             if (!ResetToLobby("host-start-fresh-round")) return false;
             double now = Now;
             if (!Authority.Start(now)) return false;
+            monsterAttack?.Begin(Authority.StartedAt);
             terminalPublished = false;
             PublishSnapshot("playing");
             // Re-evaluate the shared resource/gesture services after their gate becomes Playing.
@@ -294,6 +301,25 @@ namespace C6.Prototype.Battle
             if (Authority == null || changingRound) return;
             Authority.Advance(now);
             if (Authority.IsTerminal && !terminalPublished) CommitTerminal();
+        }
+        /// <summary>
+        /// #28 Host-only attack progress with the frozen roster (the legacy two-player scene has none, so it never attacks).
+        /// A Hit removes team time; start and result are published at once so every screen sees the same attack.
+        /// </summary>
+        private void TickMonsterAttack(double now)
+        {
+            if (monsterAttack == null || Authority == null || changingRound || processingHit || Authority.Phase != BattlePhase.Playing) return;
+            int started = monsterAttack.Sequence;
+            ulong target = monsterAttack.Target;
+            var result = monsterAttack.Tick(now, attack.OrderedParticipantIds);
+            if (result == MonsterAttackResult.Hit) Authority.ApplyTimePenalty(now, config.DefenseFailPenaltySeconds);
+            if (result != MonsterAttackResult.None)
+                Debug.Log($"C6_MONSTER_ATTACK stage=result round={roundId} attack={monsterAttack.ResolvedSequence} target={target} result={result} penaltySeconds={Authority.PenaltySeconds:R} phase={Authority.Phase}");
+            if (monsterAttack.Sequence != started)
+                Debug.Log($"C6_MONSTER_ATTACK stage=warning round={roundId} attack={monsterAttack.Sequence} target={monsterAttack.Target} warningSeconds={monsterAttack.WarningSeconds:R}");
+            if (result == MonsterAttackResult.None && monsterAttack.Sequence == started) return;
+            if (Authority.IsTerminal && !terminalPublished) CommitTerminal();
+            else PublishSnapshot(null);
         }
         private bool BeforeHostHit(double now)
         {
@@ -342,7 +368,13 @@ namespace C6.Prototype.Battle
                 teamHpDecayPerSecond = Authority.TeamHpDecayPerSecond, penaltySeconds = Authority.PenaltySeconds,
                 observedMonsterHp = Authority.ObservedMonsterHp,
                 monsterMaxHp = config.MonsterMaxHpFor(attack.OrderedParticipantIds.Count), developmentSolo = Authority.DevelopmentSolo,
-                shortDuration = Authority.DurationSeconds < config.BattleDurationSeconds, participants = Authority.Participants
+                shortDuration = Authority.DurationSeconds < config.BattleDurationSeconds, participants = Authority.Participants,
+                attackSequence = monsterAttack?.Sequence ?? 0, attackTarget = monsterAttack?.Target ?? 0UL,
+                attackWarningStartsAt = monsterAttack?.WarningStartsAt ?? 0, attackWarningEndsAt = monsterAttack?.WarningEndsAt ?? 0,
+                // A round that ended mid-warning keeps the attack for the record but no longer warns anyone.
+                attackActive = monsterAttack != null && monsterAttack.Active && Authority.Phase == BattlePhase.Playing,
+                attackResolvedSequence = monsterAttack?.ResolvedSequence ?? 0,
+                attackResult = (int)(monsterAttack?.LastResult ?? MonsterAttackResult.None)
             };
         }
         private void PublishSnapshot(string stage)
@@ -422,7 +454,7 @@ namespace C6.Prototype.Battle
         {
             if (messaging != null)
             { messaging.UnregisterNamedMessageHandler(SnapshotMessage); messaging.UnregisterNamedMessageHandler(SyncMessage); }
-            messaging = null; manager = null; Authority = null; sessionId = localNonce = null; roundId = 0;
+            messaging = null; manager = null; Authority = null; monsterAttack = null; sessionId = localNonce = null; roundId = 0;
             hadSession = false; terminalPublished = false; processingHit = false; nextSyncAt = nextPublishAt = 0;
         }
         private void OnApplicationPause(bool paused)

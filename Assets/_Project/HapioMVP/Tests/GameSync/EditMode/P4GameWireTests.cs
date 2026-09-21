@@ -154,7 +154,40 @@ namespace C6.Prototype.GameSync.Tests
                 Debug.Log($"C6_P4_GAME_WIRE_CAPACITY stored=100 flying=100 motion=200 active=200 identifierCharacters=128 actualBytes={writer.Length} maximumBytes={GameWire.MaximumMultipartyBytes}");
             }
         }
+        [Test]
+        public void MonsterAttackTargetsAFrozenParticipantWithTheHostWarningAndPenalty()
+        {
+            AssertValid(Attacking(3,Seats[2]),3);
+            AssertInvalid(Attacking(3,12345),3);
+            var value=Attacking(3,Seats[1]); value.battle.attackWarningEndsAt+=.5; AssertInvalid(value,3);
+            value=Attacking(3,Seats[1]); value.battle.attackWarningStartsAt-=1; value.battle.attackWarningEndsAt-=1; AssertInvalid(value,3);
+            value=Playing(3); value.battle.penaltySeconds=20; AssertInvalid(value,3);
+            value=Resolved(Attacking(3,Seats[1]),MonsterAttackResult.Hit); value.battle.penaltySeconds=20; AssertValid(value,3);
+            value.battle.penaltySeconds=40; AssertInvalid(value,3);
+        }
+        [Test]
+        public void PublishedAttacksNeverRewindOrChangeAndChangeTheHash()
+        {
+            var before=Attacking(3,Seats[1]);
+            AssertValid(Resolved(Next(before),MonsterAttackResult.Defended),3,before);
+            var after=Next(before); after.battle.attackTarget=Seats[2]; AssertInvalid(after,3,before);
+            Assert.That(GameWire.CanonicalHash(after),Is.Not.EqualTo(GameWire.CanonicalHash(Next(before))));
+            after=Next(before); after.battle.attackSequence=0; after.battle.attackTarget=0; after.battle.attackActive=false;
+            after.battle.attackWarningStartsAt=after.battle.attackWarningEndsAt=0; AssertInvalid(after,3,before);
+            var resolved=Resolved(Next(before),MonsterAttackResult.Defended);
+            after=Next(resolved); after.battle.attackResult=(int)MonsterAttackResult.Hit; AssertInvalid(after,3,resolved);
+        }
 
+        private static GameSnapshot Attacking(int count,ulong target)
+        {
+            var value=Playing(count); var b=value.battle;
+            b.attackSequence=1; b.attackTarget=target; b.attackActive=true; b.attackWarningStartsAt=120; b.attackWarningEndsAt=123;
+            b.remaining=b.teamHp=150; return value;
+        }
+        private static GameSnapshot Resolved(GameSnapshot value,MonsterAttackResult result)
+        {
+            var b=value.battle; b.attackActive=false; b.attackResolvedSequence=b.attackSequence; b.attackResult=(int)result; return value;
+        }
         private static GameSnapshotContext Context(int count)
         {
             var asset=ScriptableObject.CreateInstance<ScreenLayoutConfig>(); LobbyHostConfig config;
