@@ -216,7 +216,7 @@ namespace C6.Prototype.Battle
                     if (manager.IsHost)
                     {
                         Authority = new HostBattleClock(Duration, config.TeamHpDecayPerSecond, attack.ParticipantCapacity);
-                        Authority.BeginLobby(sessionId, roundId, attack.AuthenticatedPlayerIds.Count, developmentSolo, config.MonsterMaxHp);
+                        Authority.BeginLobby(sessionId, roundId, attack.AuthenticatedPlayerIds.Count, developmentSolo, config.MonsterMaxHpFor(attack.OrderedParticipantIds.Count));
                         PublishSnapshot("lobby-ready");
                     }
                     else { Authority = null; Status = "Waiting for the Host battle state."; }
@@ -340,7 +340,7 @@ namespace C6.Prototype.Battle
                 phase = Authority.Phase.ToString(), startedAt = Authority.StartedAt, deadline = Authority.Deadline,
                 remaining = Authority.Remaining, teamHp = Authority.TeamHp, duration = Authority.DurationSeconds,
                 teamHpDecayPerSecond = Authority.TeamHpDecayPerSecond, observedMonsterHp = Authority.ObservedMonsterHp,
-                monsterMaxHp = config.MonsterMaxHp, developmentSolo = Authority.DevelopmentSolo,
+                monsterMaxHp = config.MonsterMaxHpFor(attack.OrderedParticipantIds.Count), developmentSolo = Authority.DevelopmentSolo,
                 shortDuration = Authority.DurationSeconds < config.BattleDurationSeconds, participants = Authority.Participants
             };
         }

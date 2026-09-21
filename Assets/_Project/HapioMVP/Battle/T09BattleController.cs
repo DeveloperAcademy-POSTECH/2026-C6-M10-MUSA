@@ -1082,7 +1082,7 @@ namespace C6.Prototype.Battle
                     && pendingCombination == null && layout.Config.ResourceDebugToolsEnabled && (Application.isEditor || Debug.isDebugBuild),
                 connection.CanStart && (Application.isEditor || Debug.isDebugBuild));
             hud.SetProgress(state?.observedMonsterHp ?? s?.hp ?? layout.Config.MonsterMaxHp,
-                layout.Config.MonsterMaxHp, s?.totalHits ?? 0, state?.roundId ?? s?.roundId ?? 0, s?.resets ?? 0);
+                s != null ? s.maxHp : layout.Config.MonsterMaxHp, s?.totalHits ?? 0, state?.roundId ?? s?.roundId ?? 0, s?.resets ?? 0);
             var resources = resource?.Snapshot;
             var player = resource?.LocalPlayer;
             if (player != null) lastConfirmedStamina = player.stamina;

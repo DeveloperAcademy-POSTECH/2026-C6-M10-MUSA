@@ -33,6 +33,7 @@ namespace C6.Prototype.GameSync
         {
             public float upperFraction,horizontalSwipeFraction,horizontalDominance,combinationRadiusFraction;
             public int monsterMaxHp,baseDamage,orbStorageLimit;
+            public int monsterMaxHp2Players, monsterMaxHp3Players, monsterMaxHp4Players, monsterMaxHp5Players;
             public float projectileSpeed,projectileLifetime,projectileRadius,attackSnapshotRateHz,launchWidth;
             public Vector3 launchOrigin,launchAim;
             public float staminaMax,staminaStart,generateCost,staminaRecoveryAmount,staminaRecoverySeconds,staminaHitRecovery;
@@ -60,7 +61,7 @@ namespace C6.Prototype.GameSync
             public Fields(LobbyHostConfig c)
             {
                 upperFraction=c.upperFraction; horizontalSwipeFraction=c.horizontalSwipe; horizontalDominance=c.horizontalDominance;
-                combinationRadiusFraction=c.combinationRadius; monsterMaxHp=c.monsterHp; baseDamage=c.damage; orbStorageLimit=c.storageLimit;
+                combinationRadiusFraction=c.combinationRadius; monsterMaxHp=c.monsterHp; monsterMaxHp2Players=c.monsterHp2; monsterMaxHp3Players=c.monsterHp3; monsterMaxHp4Players=c.monsterHp4; monsterMaxHp5Players=c.monsterHp5; baseDamage=c.damage; orbStorageLimit=c.storageLimit;
                 projectileSpeed=c.projectileSpeed; projectileLifetime=c.projectileLifetime; projectileRadius=c.projectileRadius;
                 attackSnapshotRateHz=c.snapshotRate; launchWidth=c.launchWidth; launchOrigin=c.launchOrigin; launchAim=c.launchAim;
                 staminaMax=(float)c.staminaMax; staminaStart=(float)c.staminaStart; generateCost=(float)c.generateCost;
