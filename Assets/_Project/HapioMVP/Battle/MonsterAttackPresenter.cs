@@ -56,6 +56,13 @@ namespace C6.Prototype.Battle
             && (state.attackActive || state.attackResolvedSequence == state.attackSequence)
             && hostNow < state.attackWarningEndsAt + MonsterMotion.ClawAttackSeconds - MonsterMotion.ClawImpactSeconds;
 
+        /// <summary>
+        /// A running claw stops when its attack no longer exists: the session ended, a new round began, or the round
+        /// ended before the attack resolved. A resolved attack (Hit or Defended) always finishes its claw.
+        /// </summary>
+        public static bool CancelsClaw(BattleSnapshot state) => state == null || state.attackSequence == 0
+            || !state.attackActive && state.attackResolvedSequence != state.attackSequence;
+
         /// <summary>Only the attacked player's screen warns, and only during the Host warning window.</summary>
         public static bool Warns(BattleSnapshot state, ulong localPlayer, double hostNow) => state != null
             && state.phase == BattlePhase.Playing.ToString() && state.attackActive && state.attackTarget == localPlayer
@@ -83,6 +90,7 @@ namespace C6.Prototype.Battle
                     clawSequence = state.attackSequence; clawRound = state.roundId;
                 }
             }
+            if (motion != null && motion.Attacking && CancelsClaw(state)) motion.StopAttack();
 
             if (visual != null)
             {
@@ -96,7 +104,7 @@ namespace C6.Prototype.Battle
             if (warning != null)
             {
                 if (now.HasValue && attack != null && Warns(state, attack.LocalPlayerId, now.Value))
-                    warning.Show(now.Value - state.attackWarningStartsAt, defense != null && defense.Holding);
+                    warning.Show(now.Value - state.attackWarningStartsAt, defense != null && defense.HoldShown);
                 else if (warning.Visible) warning.Hide();
             }
         }
@@ -104,6 +112,7 @@ namespace C6.Prototype.Battle
         private void OnDisable()
         {
             if (warning != null) warning.Hide();
+            if (motion != null) motion.StopAttack();
             if (visual != null) visual.localRotation = restRotation;
             if (framing != null) framing.HoldFraming = false;
             clawSequence = 0; clawRound = 0;

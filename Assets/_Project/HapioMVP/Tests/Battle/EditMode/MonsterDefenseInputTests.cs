@@ -53,6 +53,26 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(hold.HeldSeconds, Is.EqualTo(1.0).Within(1e-9));
         }
 
+        [Test]
+        public void HapticCuesMarkTheStartEveryHalfSecondAndCompletion()
+        {
+            var hold = new DefenseHoldTracker();
+            var cues = new System.Collections.Generic.List<DefenseHoldCue>();
+            for (int frame = 0; frame < 9; frame++) { Step(hold, 1, true, true, .25); cues.Add(hold.Cue); }
+            Assert.That(cues, Is.EqualTo(new[]
+            {
+                DefenseHoldCue.Started, DefenseHoldCue.Progress, DefenseHoldCue.None, DefenseHoldCue.Progress, DefenseHoldCue.None,
+                DefenseHoldCue.Progress, DefenseHoldCue.None, DefenseHoldCue.Completed, DefenseHoldCue.None
+            }), "0.25 start / 0.5 / 1.0 / 1.5 ticks / 2.0 done / then silent");
+
+            Step(hold, 2, true, true, .3);
+            Assert.That(hold.Cue, Is.EqualTo(DefenseHoldCue.Started), "next attack");
+            Step(hold, 2, true, false, .3);
+            Assert.That(hold.Cue, Is.EqualTo(DefenseHoldCue.None), "no tap when a hand lifts");
+            Step(hold, 2, true, true, .3);
+            Assert.That(hold.Cue, Is.EqualTo(DefenseHoldCue.Started), "holding again starts over");
+        }
+
         private static bool Step(DefenseHoldTracker hold, int attack, bool warning, bool bothHeld, double delta) =>
             hold.Update(1, attack, warning, bothHeld, delta, 2.0);
     }

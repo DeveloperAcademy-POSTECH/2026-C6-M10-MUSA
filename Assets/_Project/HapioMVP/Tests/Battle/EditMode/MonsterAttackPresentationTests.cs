@@ -54,6 +54,19 @@ namespace C6.Prototype.Battle.Tests
         }
 
         [Test]
+        public void TheClawStopsOnlyWhenItsAttackNoLongerExists()
+        {
+            Assert.That(MonsterAttackPresenter.CancelsClaw(Attacking()), Is.False, "attack in progress");
+            var resolved = Attacking(); resolved.attackActive = false; resolved.attackResolvedSequence = 1;
+            resolved.attackResult = (int)MonsterAttackResult.Hit; resolved.phase = BattlePhase.Defeat.ToString();
+            Assert.That(MonsterAttackPresenter.CancelsClaw(resolved), Is.False, "the claw that ended the round still finishes");
+            var cut = Attacking(); cut.attackActive = false; cut.phase = BattlePhase.Victory.ToString();
+            Assert.That(MonsterAttackPresenter.CancelsClaw(cut), Is.True, "the round ended mid-warning");
+            Assert.That(MonsterAttackPresenter.CancelsClaw(new BattleSnapshot { phase = BattlePhase.Ready.ToString(), roundId = 2 }), Is.True, "Retry");
+            Assert.That(MonsterAttackPresenter.CancelsClaw(null), Is.True, "session ended");
+        }
+
+        [Test]
         public void WarningStartsBrightAndPulses()
         {
             Assert.That(MonsterAttackWarning.PulseAlpha(0, 2.5f, .35f), Is.EqualTo(1f).Within(1e-5));

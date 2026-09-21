@@ -178,6 +178,23 @@ namespace C6.Prototype.GameSync.Tests
             after=Next(resolved); after.battle.attackResult=(int)MonsterAttackResult.Hit; AssertInvalid(after,3,resolved);
         }
 
+        [Test]
+        public void RetryAfterAttacksStartsAnEmptyRoundAndCannotCarryTheOldAttack()
+        {
+            var before=Resolved(Attacking(3,Seats[1]),MonsterAttackResult.Hit); before.battle.penaltySeconds=20;
+            AssertValid(before,3);
+            var retry=Ready(3); retry.revision=before.revision+1; retry.hostNow=before.hostNow+1; retry.serverTime=before.serverTime+1;
+            retry.roundId=retry.attack.roundId=retry.resources.roundId=retry.battle.roundId=2;
+            AssertValid(retry,3,before);
+            var carried=Ready(3); carried.revision=retry.revision; carried.hostNow=retry.hostNow; carried.serverTime=retry.serverTime;
+            carried.roundId=carried.attack.roundId=carried.resources.roundId=carried.battle.roundId=2;
+            carried.battle.attackSequence=1; carried.battle.attackTarget=Seats[1];
+            carried.battle.attackWarningStartsAt=120; carried.battle.attackWarningEndsAt=123;
+            AssertInvalid(carried,3,before);
+            carried=Ready(3); carried.revision=retry.revision; carried.hostNow=retry.hostNow; carried.serverTime=retry.serverTime;
+            carried.roundId=carried.attack.roundId=carried.resources.roundId=carried.battle.roundId=2;
+            carried.battle.penaltySeconds=20; AssertInvalid(carried,3,before);
+        }
         private static GameSnapshot Attacking(int count,ulong target)
         {
             var value=Playing(count); var b=value.battle;

@@ -118,6 +118,19 @@ namespace C6.Prototype.Battle.Tests
         }
 
         [Test]
+        public void RetryStartsTheNextRoundWithoutTheLostTime()
+        {
+            var clock = Playing(0);
+            Assert.That(clock.ApplyTimePenalty(10, 20), Is.True);
+            clock.BeginLobby("session-a", 2, 2, false, 100);
+            Assert.That(clock.PenaltySeconds, Is.Zero, "#28 lost time belongs to its round");
+            Assert.That(clock.Remaining, Is.EqualTo(180));
+            Assert.That(clock.Start(500), Is.True);
+            Assert.That(clock.Advance(510), Is.True);
+            Assert.That(clock.Remaining, Is.EqualTo(170));
+        }
+
+        [Test]
         public void PlayingSuspensionCountsElapsedHostTimeOnReturn()
         {
             var clock = Playing(300);

@@ -49,6 +49,14 @@ namespace C6.Prototype.Battle
             attackUntil = Time.unscaledTime + ClawAttackSeconds - offset + .5f; // releases hits even if the clip never reports its end
         }
 
+        /// <summary>#28: a round that ends or restarts mid-attack returns the body to Idle instead of finishing the claw.</summary>
+        public void StopAttack()
+        {
+            if (!Attacking || animator == null || !animator.isActiveAndEnabled) return;
+            animator.CrossFadeInFixedTime(IdleState, ReturnBlendSeconds, 0);
+            oneShotState = 0; attackUntil = 0f;
+        }
+
         private bool PlayOneShot(int state, float offsetSeconds)
         {
             if (animator == null || !animator.isActiveAndEnabled || !animator.HasState(0, state)) return false;

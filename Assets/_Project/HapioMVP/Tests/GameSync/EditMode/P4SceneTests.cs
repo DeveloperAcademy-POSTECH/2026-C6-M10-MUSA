@@ -127,6 +127,16 @@ namespace C6.Prototype.GameSync.Tests
             finally { if (prior.IsValid()) EditorSceneManager.ClosePreviewScene(prior); }
         }
         [Test]
+        public void SavedConfigCarriesTheAgreedMonsterAttackTiming()
+        {
+            var config = Components<SplitScreenLayout>(scene).Single().Config;
+            Assert.That(config.MonsterAttackFirstDelaySeconds, Is.EqualTo(20f), "#28 first attack 20 s after start");
+            Assert.That(config.MonsterAttackIntervalSeconds, Is.EqualTo(15f));
+            Assert.That(config.MonsterAttackWarningSeconds, Is.EqualTo(3f));
+            Assert.That(config.DefenseHoldSeconds, Is.EqualTo(2f));
+            Assert.That(config.DefenseFailPenaltySeconds, Is.EqualTo(20f));
+        }
+        [Test]
         public void MonsterAttackWarningIsAnEditableNonBlockingEdgeGlowInTheBattleCanvas()
         {
             var controller = Components<T09BattleController>(scene).Single();
