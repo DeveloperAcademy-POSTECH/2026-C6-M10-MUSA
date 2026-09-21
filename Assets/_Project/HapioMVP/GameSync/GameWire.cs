@@ -196,6 +196,9 @@ namespace C6.Prototype.GameSync
                 return Reject("PHASE_REGRESSION", out reason);
             if (before.startedAt > 0 && (!Close(before.startedAt, after.startedAt) || !Close(before.deadline, after.deadline)
                 || after.remaining > before.remaining + LogicalTolerance)) return Reject("DEADLINE_REGRESSION", out reason);
+            // #28: failed-defense time only accumulates within a round.
+            if (before.startedAt > 0 && after.penaltySeconds < before.penaltySeconds - LogicalTolerance)
+                return Reject("PENALTY_REGRESSION", out reason);
             bool wasTerminal = Enum.TryParse<BattlePhase>(before.phase, out var phase) && BattleWire.IsTerminal(phase);
             if (wasTerminal && (after.phase != before.phase || !Close(after.remaining, before.remaining)
                 || !Close(after.teamHp, before.teamHp) || after.observedMonsterHp != before.observedMonsterHp
@@ -452,7 +455,7 @@ namespace C6.Prototype.GameSync
                 Text("battle"); Text(value.sessionId); Unsigned(value.roundId);
                 if (includeRevision) Unsigned(value.revision);
                 Text(value.phase); Number(value.startedAt); Number(value.deadline); Number(value.remaining);
-                Number(value.teamHp); Number(value.duration); Number(value.teamHpDecayPerSecond);
+                Number(value.teamHp); Number(value.duration); Number(value.teamHpDecayPerSecond); Number(value.penaltySeconds);
                 Integer(value.observedMonsterHp); Integer(value.monsterMaxHp); Boolean(value.developmentSolo);
                 Boolean(value.shortDuration); Integer(value.participants); Boolean(value.locallyDetectedNetworkError);
             }

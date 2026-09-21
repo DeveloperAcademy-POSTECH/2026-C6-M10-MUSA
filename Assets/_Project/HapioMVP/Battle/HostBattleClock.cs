@@ -28,6 +28,7 @@ namespace C6.Prototype.Battle
         public double StartedAt { get; private set; }
         public double Deadline { get; private set; }
         public double Remaining { get; private set; }
+        public double PenaltySeconds { get; private set; }
         public double TeamHp => Remaining * TeamHpDecayPerSecond;
         public bool IsTerminal => Phase == BattlePhase.Victory || Phase == BattlePhase.Defeat || Phase == BattlePhase.NetworkError;
         public bool CanStart => Phase == BattlePhase.Ready && Participants >= RequiredParticipants && Participants <= MaximumParticipants;
@@ -57,7 +58,7 @@ namespace C6.Prototype.Battle
 
             SessionId = sessionId; RoundId = roundId; Participants = participants; DevelopmentSolo = devSolo;
             MonsterMaxHp = monsterMaxHp; ObservedMonsterHp = monsterMaxHp;
-            StartedAt = Deadline = 0;
+            StartedAt = Deadline = 0; PenaltySeconds = 0;
             Remaining = DurationSeconds;
             hasObservedTime = false; lastObservedTime = 0;
             Phase = participants >= RequiredParticipants ? BattlePhase.Ready : BattlePhase.Lobby;
@@ -78,7 +79,7 @@ namespace C6.Prototype.Battle
             double deadline = now + DurationSeconds;
             if (!Finite(deadline) || deadline <= now) return false;
             AcceptTime(now);
-            StartedAt = now; Deadline = deadline; Remaining = DurationSeconds;
+            StartedAt = now; Deadline = deadline; Remaining = DurationSeconds; PenaltySeconds = 0;
             Phase = BattlePhase.Playing;
             return true;
         }
@@ -113,6 +114,16 @@ namespace C6.Prototype.Battle
             if (hpAfter == 0) Phase = BattlePhase.Victory;
             return true;
         }
+        /// #28: a failed defense removes team time without moving the absolute deadline, so every
+        /// snapshot keeps deadline - startedAt == duration. Reaching zero team time is a Defeat.
+        public bool ApplyTimePenalty(double now, double seconds)
+        {
+            if (!Finite(seconds) || seconds <= 0 || !Advance(now) || Phase != BattlePhase.Playing) return false;
+            PenaltySeconds += seconds;
+            SetRemainingAt(now);
+            if (TeamHp <= 0) { Remaining = 0; Phase = BattlePhase.Defeat; }
+            return true;
+        }
 
         /// <summary>
         /// A connection failure is separate from combat defeat. It freezes the current clock without
@@ -135,7 +146,8 @@ namespace C6.Prototype.Battle
             => Matches(sessionId, roundId) && ObserveAppliedHit(now, hpAfter);
         public bool NetworkError(string sessionId, uint roundId, double now) => Matches(sessionId, roundId) && NetworkError(now);
 
-        private void SetRemainingAt(double now) => Remaining = Math.Min(DurationSeconds, Math.Max(0, Deadline - now));
+        private void SetRemainingAt(double now) => Remaining = Math.Min(DurationSeconds, Math.Max(0, Deadline - now - PenaltySeconds));
+        
         private void AcceptTime(double now) { hasObservedTime = true; lastObservedTime = now; }
         private bool ValidTime(double now) => Finite(now) && now >= 0 && (!hasObservedTime || now >= lastObservedTime);
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);

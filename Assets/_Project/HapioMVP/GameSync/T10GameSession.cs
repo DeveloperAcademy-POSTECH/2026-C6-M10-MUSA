@@ -93,7 +93,7 @@ namespace C6.Prototype.GameSync
                 var s=Snapshot; if(s==null)return 0;
                 if(s.battle.phase!="Playing"||manager==null||!manager.IsListening)return s.battle.remaining;
                 double elapsed=Math.Max(0,manager.ServerTime.Time-s.serverTime);
-                return Math.Max(0,Math.Min(s.battle.duration,s.battle.deadline-s.hostNow-elapsed));
+                return Math.Max(0,Math.Min(s.battle.duration,s.battle.deadline-s.battle.penaltySeconds-s.hostNow-elapsed));
             }
         }
         private static double Now=>Time.realtimeSinceStartupAsDouble;

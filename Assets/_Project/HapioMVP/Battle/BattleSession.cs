@@ -339,7 +339,8 @@ namespace C6.Prototype.Battle
                 nonce = nonce, sessionId = Authority.SessionId, roundId = Authority.RoundId, revision = revision,
                 phase = Authority.Phase.ToString(), startedAt = Authority.StartedAt, deadline = Authority.Deadline,
                 remaining = Authority.Remaining, teamHp = Authority.TeamHp, duration = Authority.DurationSeconds,
-                teamHpDecayPerSecond = Authority.TeamHpDecayPerSecond, observedMonsterHp = Authority.ObservedMonsterHp,
+                teamHpDecayPerSecond = Authority.TeamHpDecayPerSecond, penaltySeconds = Authority.PenaltySeconds,
+                observedMonsterHp = Authority.ObservedMonsterHp,
                 monsterMaxHp = config.MonsterMaxHpFor(attack.OrderedParticipantIds.Count), developmentSolo = Authority.DevelopmentSolo,
                 shortDuration = Authority.DurationSeconds < config.BattleDurationSeconds, participants = Authority.Participants
             };

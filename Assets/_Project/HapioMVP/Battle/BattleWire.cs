@@ -25,6 +25,7 @@ namespace C6.Prototype.Battle
         public double teamHp;
         public double duration;
         public double teamHpDecayPerSecond;
+        public double penaltySeconds; // #28 accumulated failed-defense time, never moves the deadline
         public int observedMonsterHp;
         public int monsterMaxHp;
         public bool developmentSolo;
@@ -85,6 +86,7 @@ namespace C6.Prototype.Battle
                 || !Finite(value.remaining) || value.remaining < 0 || value.remaining > value.duration
                 || !Finite(value.teamHp) || value.teamHp < 0 || value.teamHp > value.duration * value.teamHpDecayPerSecond
                 || Math.Abs(value.teamHp - value.remaining * value.teamHpDecayPerSecond) > 1e-6
+                || !Finite(value.penaltySeconds) || value.penaltySeconds < 0 || value.penaltySeconds > 86400
                 || !Finite(value.startedAt) || !Finite(value.deadline) || value.startedAt < 0 || value.deadline < 0
                 || value.monsterMaxHp < 1 || value.observedMonsterHp < 0 || value.observedMonsterHp > value.monsterMaxHp
                 || value.participants < 1 || value.participants > maximumParticipants || value.locallyDetectedNetworkError) return false;
@@ -92,7 +94,8 @@ namespace C6.Prototype.Battle
             if (started && (value.deadline <= value.startedAt || Math.Abs(value.deadline - value.startedAt - value.duration) > 1e-6)) return false;
             if (phase == BattlePhase.Lobby || phase == BattlePhase.Ready)
             {
-                if (value.startedAt != 0 || value.deadline != 0 || value.remaining != value.duration || value.observedMonsterHp != value.monsterMaxHp) return false;
+                if (value.startedAt != 0 || value.deadline != 0 || value.remaining != value.duration || value.observedMonsterHp != value.monsterMaxHp
+                    || value.penaltySeconds != 0) return false;
                 if (phase == BattlePhase.Ready && value.participants < 2 && !value.developmentSolo) return false;
             }
             if (phase == BattlePhase.Playing && (value.remaining <= 0 || value.observedMonsterHp <= 0)) return false;
