@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Text;
 using C6.Prototype.Attack;
@@ -477,8 +476,8 @@ namespace C6.Prototype.GameSync
             }
             if(Snapshot==null){h.ActionLabel.text="PREPARING";h.DetailLabel.text=Status;return;}
             var s=Snapshot;double remaining=DisplayRemaining;
-            h.ClockLabel.text="TIME "+remaining.ToString("0.0",CultureInfo.InvariantCulture)+"s";
-            h.TeamHpLabel.text="TEAM HP "+(s.battle.phase=="Playing"?remaining*s.battle.teamHpDecayPerSecond:s.battle.teamHp).ToString("0.0",CultureInfo.InvariantCulture);
+            double teamHp=s.battle.phase=="Playing"?remaining*s.battle.teamHpDecayPerSecond:s.battle.teamHp;
+            h.SetClockPresentation(remaining,teamHp,s.battle.duration);
             h.RecoveryLabel.text=maximumParticipants==5
                 ? string.Join(" ", participants.Select(player=>$"P{player.playerNumber}:{s.resources.players.Single(resource=>resource.playerId==player.clientId).stamina:0}"))
                 : string.Join(" / ", participants.Select(player=>$"P{player.playerNumber} {s.resources.players.Single(resource=>resource.playerId==player.clientId).stamina:0}"));

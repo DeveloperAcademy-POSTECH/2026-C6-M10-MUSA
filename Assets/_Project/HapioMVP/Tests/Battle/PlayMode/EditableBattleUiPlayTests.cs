@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Linq;
-using System.Reflection;
 using C6.Prototype.Attack;
 using C6.Prototype.Orbs;
 using NUnit.Framework;
@@ -134,6 +133,8 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(workspace.height, Is.GreaterThan(1f));
 
             hud.SetNetworkFieldsVisible(true);
+            Assert.That(hud.IPv4Input.transform.parent.gameObject.activeSelf, Is.False,
+                "Minimal battle UI keeps connection fields in the lobby rather than the play HUD.");
             hud.SetNetworkFieldsVisible(false);
             Canvas.ForceUpdateCanvases();
             Assert.That(hud.OrbWorkspaceScreenRect, Is.EqualTo(workspace));
@@ -143,9 +144,12 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(hud.StaminaLabel.text, Is.EqualTo("45.5 / 100"));
             Assert.That(hud.StorageLabel.text, Is.EqualTo("ORBS 3 / 20"));
             Assert.That(caption.text, Does.Contain("20"));
-            var fill = (RectTransform)typeof(T09Hud).GetField("staminaFill",
-                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(hud);
-            Assert.That(fill.anchorMax.x, Is.EqualTo(.455f).Within(.00001f));
+            Assert.That(hud.MonsterHpFill.anchorMax.x, Is.EqualTo(.8f).Within(.00001f));
+            Assert.That(hud.StaminaFill.anchorMax.x, Is.EqualTo(.455f).Within(.00001f));
+
+            hud.SetBattle("Playing", 90, 90, 180, 2, false, false, false, 80, 45.5, false);
+            Assert.That(hud.TeamTimeFill.anchorMax.x, Is.EqualTo(.5f).Within(.00001f));
+            Assert.That(hud.TeamTimeValue.text, Is.EqualTo("TEAM HP 90.0  /  TIME 90.0s"));
 
             hud.SetBattle("Victory", 35, 35, 180, 2, false, false, false, 0, 45.5, true);
             Assert.That(hud.ResultOverlay.activeInHierarchy, Is.True);
