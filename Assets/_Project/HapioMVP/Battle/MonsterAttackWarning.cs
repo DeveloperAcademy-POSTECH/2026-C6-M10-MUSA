@@ -26,11 +26,12 @@ namespace C6.Prototype.Battle
             return Mathf.Lerp(Mathf.Clamp01(minimumAlpha), 1f, (float)wave);
         }
 
-        public void Show(double elapsedSeconds)
+        /// <summary>While both hands hold the defense the glow stops pulsing, so the player can see the hold registered.</summary>
+        public void Show(double elapsedSeconds, bool holding = false)
         {
             if (edges == null) return;
             Capture();
-            float alpha = PulseAlpha(elapsedSeconds, pulsesPerSecond, minimumAlpha);
+            float alpha = holding ? 1f : PulseAlpha(elapsedSeconds, pulsesPerSecond, minimumAlpha);
             for (int i = 0; i < edges.Length; i++)
             {
                 if (edges[i] == null) continue;

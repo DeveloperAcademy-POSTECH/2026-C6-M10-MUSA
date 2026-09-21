@@ -26,6 +26,7 @@ namespace C6.Prototype.Battle
         [SerializeField] private MonsterAttackWarning attackWarning; // #28: scene Canvas edge glow, target's screen only
         private MonsterMotion monsterMotion;
         private MonsterAttackPresenter attackPresenter;
+        private MonsterDefenseInput defenseInput;
         private int? observedHp;
         private Vector3? removedProxyPosition;
         private readonly HashSet<string> ownProxyIds = new HashSet<string>(StringComparer.Ordinal);
@@ -131,6 +132,12 @@ namespace C6.Prototype.Battle
         public void ConfigureHostClock(Func<double?> hostNow)
         {
             if (attackPresenter != null) attackPresenter.ConfigureHostClock(hostNow);
+            if (defenseInput != null) defenseInput.ConfigureHostClock(hostNow);
+        }
+        /// <summary>#28: where a completed two-hand hold goes. Without one only a Host can judge its own defense.</summary>
+        public void ConfigureDefenseReport(Action<int> reportDefense)
+        {
+            if (defenseInput != null) defenseInput.ConfigureReport(reportDefense);
         }
         public bool OrbPhysicsEnabled => orbPhysicsEnabled;
         public LocalOrbPhysicsBoard OrbPhysics => orbPhysics;
@@ -144,7 +151,7 @@ namespace C6.Prototype.Battle
         }
         public void ConfigureTransfers(bool enabled) { transfersEnabled = enabled; }
         public void ConfigureReachableEdgeTransferDistance(bool enabled) { reachableEdgeTransferDistance = enabled; }
-        public bool IsDefenseHeld => false;
+        public bool IsDefenseHeld => defenseInput != null && defenseInput.Holding;
         public bool CanInteract => isActiveAndEnabled && attack != null && attack.Connected && attack.Snapshot != null
             && attack.Snapshot.state == "Playing" && resource != null && resource.Connected
             && (!transfersEnabled || !resource.HasPending)
@@ -195,9 +202,11 @@ namespace C6.Prototype.Battle
             viewRoot = new GameObject("T09 Local Orb Views").transform; viewRoot.SetParent(transform, false);
             proxyRoot = new GameObject("T09 Client Projectile Display Only").transform; proxyRoot.SetParent(transform, false);
             monsterMotion = MonsterMotion.For(target);
+            defenseInput = gameObject.AddComponent<MonsterDefenseInput>();
+            defenseInput.Configure(battle, attack, layout, sequence => battle.HostAcceptDefense(attack.LocalPlayerId, sequence));
             attackPresenter = gameObject.AddComponent<MonsterAttackPresenter>();
             attackPresenter.Configure(battle, attack, monsterMotion, target != null ? target.GetComponent<BenchmarkMonster>() : null,
-                GetComponent<ThrowBattleFraming>(), attackWarning);
+                GetComponent<ThrowBattleFraming>(), attackWarning, defenseInput);
             if (orbPhysicsEnabled) EnsureOrbPhysics();
         }
         private void Start()

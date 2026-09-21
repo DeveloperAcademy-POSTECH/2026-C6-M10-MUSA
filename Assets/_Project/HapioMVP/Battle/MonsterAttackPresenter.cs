@@ -21,15 +21,16 @@ namespace C6.Prototype.Battle
         private Transform visual;
         private ThrowBattleFraming framing;
         private MonsterAttackWarning warning;
+        private MonsterDefenseInput defense;
         private Func<double?> hostClock;
         private Quaternion restRotation = Quaternion.identity;
         private int clawSequence;
         private uint clawRound;
 
         public void Configure(BattleSession battleSession, AttackSession attackSession, MonsterMotion monsterMotion,
-            BenchmarkMonster monster, ThrowBattleFraming battleFraming, MonsterAttackWarning attackWarning)
+            BenchmarkMonster monster, ThrowBattleFraming battleFraming, MonsterAttackWarning attackWarning, MonsterDefenseInput defenseInput = null)
         {
-            battle = battleSession; attack = attackSession; motion = monsterMotion; framing = battleFraming; warning = attackWarning;
+            battle = battleSession; attack = attackSession; motion = monsterMotion; framing = battleFraming; warning = attackWarning; defense = defenseInput;
             visual = monster != null ? monster.Visual : null;
             if (visual != null) restRotation = visual.localRotation;
         }
@@ -95,7 +96,7 @@ namespace C6.Prototype.Battle
             if (warning != null)
             {
                 if (now.HasValue && attack != null && Warns(state, attack.LocalPlayerId, now.Value))
-                    warning.Show(now.Value - state.attackWarningStartsAt);
+                    warning.Show(now.Value - state.attackWarningStartsAt, defense != null && defense.Holding);
                 else if (warning.Visible) warning.Hide();
             }
         }

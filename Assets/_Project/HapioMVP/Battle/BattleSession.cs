@@ -321,6 +321,18 @@ namespace C6.Prototype.Battle
             if (Authority.IsTerminal && !terminalPublished) CommitTerminal();
             else PublishSnapshot(null);
         }
+        /// <summary>
+        /// #28 Host judgment of a completed two-hand hold. Only the current target, for the current attack, before the
+        /// warning ends plus the report grace. The published result stays Hit or Defended when the attack resolves.
+        /// </summary>
+        public bool HostAcceptDefense(ulong sender, int sequence)
+        {
+            if (!IsHost || monsterAttack == null || changingRound || Authority.Phase != BattlePhase.Playing) return false;
+            double now = Now;
+            bool accepted = monsterAttack.AcceptDefense(sender, sequence, now);
+            Debug.Log($"C6_MONSTER_DEFENSE round={roundId} attack={sequence} sender={sender} accepted={accepted} target={monsterAttack.Target} current={monsterAttack.Sequence} lateSeconds={now - monsterAttack.WarningEndsAt:F3}");
+            return accepted;
+        }
         private bool BeforeHostHit(double now)
         {
             if (!IsHost || processingHit || Authority == null) return false;

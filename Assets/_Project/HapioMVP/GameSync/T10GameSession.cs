@@ -180,6 +180,7 @@ namespace C6.Prototype.GameSync
             ConfigureContinuousTransfers(continuousTransfers);
             controller.ConfigureApprovedLifecycle(StartPreparedRound,Retry,Leave);
             controller.ConfigureHostClock(()=>EstimatedHostNow);
+            controller.ConfigureDefenseReport(ReportDefense);
             controller.Hud.CoordinatedGame=true;
             lobby.StartConfirmed+=Attach;
             lobby.Changed+=OnLobbyChanged;
@@ -376,6 +377,14 @@ namespace C6.Prototype.GameSync
             SendControl(new GameControl{kind="INITIAL_ACK",nonce=controller.Attack.LocalNonce,roomId=value.roomId,sessionId=value.sessionId,
                 roundId=value.roundId,revision=value.revision,configHash=value.configHash,stateHash=GameWire.CanonicalHash(value)});
         }
+        // #28: a completed two-hand hold. The Host judges its own directly; a Client reports it for the Host to judge.
+        private void ReportDefense(int attackSequence)
+        {
+            if(!attached||Error.Length!=0||contract==null)return;
+            if(lobby.IsHost){controller.Battle.HostAcceptDefense(controller.Attack.LocalPlayerId,attackSequence);return;}
+            SendControl(new GameControl{kind="DEFENSE",nonce=controller.Attack.LocalNonce,roomId=contract.roomId,sessionId=contract.sessionId,
+                roundId=Snapshot?.roundId??contract.roundId,configHash=contract.configFingerprint,attackSequence=attackSequence});
+        }
         private void ReceiveControl(ulong sender,FastBufferReader reader)
         {
             if(!attached||!lobby.IsHost||Error.Length!=0||!GameControl.TryRead(reader,out var c))return;
@@ -383,6 +392,8 @@ namespace C6.Prototype.GameSync
                 ||c.sessionId!=contract.sessionId||c.configHash!=contract.configFingerprint||c.roundId!=preparedRound)
             {RejectedControls++;return;}
             if(c.kind=="QUERY"){ObservePeerResponse(sender);if(Snapshot!=null)SendSnapshot(sender,Snapshot);return;}
+            // #28: a late or wrong-target report is a normal miss, not a protocol violation; the Host logs its judgment.
+            if(c.kind=="DEFENSE"){ObservePeerResponse(sender);controller.Battle.HostAcceptDefense(sender,c.attackSequence);return;}
             if(c.kind!="INITIAL_ACK"||Snapshot?.battle.phase!="Ready"||initialConfirmed
                 ||!initialProofs.TryGetValue(c.revision,out string expected)||c.stateHash!=expected)
             {RejectedControls++;return;}
@@ -507,6 +518,7 @@ namespace C6.Prototype.GameSync
     {
         public string kind,nonce,roomId,sessionId,configHash,stateHash;
         public uint roundId; public ulong revision;
+        public int attackSequence; // #28 DEFENSE only: the attack the sender defended
         internal static FastBufferWriter Write(GameControl c)
         {
             byte[] bytes=Encoding.UTF8.GetBytes(JsonUtility.ToJson(c));
