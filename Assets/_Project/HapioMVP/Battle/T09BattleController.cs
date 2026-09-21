@@ -30,6 +30,9 @@ namespace C6.Prototype.Battle
         // #20: closest pass of each own flight to the monster, for MISS placement and timing.
         private readonly Dictionary<string, MissWatch> missWatches = new Dictionary<string, MissWatch>(StringComparer.Ordinal);
         private const float MissPassMargin = .35f; // DEMO_TUNING_VALUE, world units past the closest approach
+        // #27: raised the moment a MISS is shown, so sound can follow the same rule and frame
+        //      without duplicating it. Presentation only; nothing here reads or changes it.
+        public event Action MissShown;
         private sealed class MissWatch { public float closest = float.PositiveInfinity; public Vector3 surface; public bool shown; }
 
         [SerializeField] private bool orbPhysicsEnabled;
@@ -1189,6 +1192,7 @@ namespace C6.Prototype.Battle
             if (watch.shown) return;
             watch.shown = true;
             damagePopups.ShowMiss(float.IsInfinity(watch.closest) ? MonsterFallbackPoint : watch.surface, layout.BattleCamera);
+            MissShown?.Invoke(); // #27
         }
         private void OnApplicationFocus(bool focused) { if (!focused) CancelInteractions("Focus lost"); }
         private void OnApplicationPause(bool paused) { if (paused) CancelInteractions("Paused"); }

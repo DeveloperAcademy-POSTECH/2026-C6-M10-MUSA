@@ -1013,6 +1013,86 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!1 &227460159
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 227460161}
+  - component: {fileID: 227460160}
+  - component: {fileID: 227460162}
+  m_Layer: 0
+  m_Name: Audio
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &227460160
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227460159}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 29aa1958119fc43369ce2a8041ddd454, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: C6.Prototype.Battle::C6.Prototype.Battle.BattleSound
+  battleMusic: {fileID: 8300000, guid: b39c17bac487947878e0f1af7c92031b, type: 3}
+  musicVolume: 0.2
+  musicOnlyWhilePlaying: 1
+  musicLoopStart: 40.7
+  throwClips:
+  - {fileID: 8300000, guid: 4985a8bd3134c4183ac4708a7187f4c9, type: 3}
+  - {fileID: 8300000, guid: 51ea87b385c5e4a37a3a5ff8cbb140d5, type: 3}
+  - {fileID: 8300000, guid: 72b0d270daca24ccc9d9afbb24700f18, type: 3}
+  - {fileID: 8300000, guid: a7f3a9204e18746dbbbd08eba5b2b984, type: 3}
+  - {fileID: 8300000, guid: 0b512ec0cf7b54ab6b5763e9f796b473, type: 3}
+  throwVolume: 0
+  onlyMyThrows: 1
+  missClips:
+  - {fileID: 8300000, guid: 0e208afda64d44420a10b089b1ec4834, type: 3}
+  missVolume: 1
+  roundStartClip: {fileID: 0}
+  roundStartVolume: 0.8
+--- !u!4 &227460161
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227460159}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.06737, y: 1.12076, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &227460162
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227460159}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2814297703c1640cd888284ca9d6425a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: C6.Prototype.Battle::C6.Prototype.Battle.JangsanbeomSound
+  hitClips:
+  - {fileID: 8300000, guid: 853c5758916ae4c66902d352ec0f7944, type: 3}
+  hitVolume: 1
+  hitPitchJitter: 0.08
+  defeatClip: {fileID: 0}
+  defeatVolume: 1
 --- !u!1 &251488547
 GameObject:
   m_ObjectHideFlags: 0
@@ -3847,7 +3927,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.79, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 2, y: 0}
+  m_AnchoredPosition: {x: 1.999939, y: 0}
   m_SizeDelta: {x: -4, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &851528175
@@ -5446,7 +5526,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.73, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 2.0000076, y: 0}
+  m_AnchoredPosition: {x: 2, y: 0}
   m_SizeDelta: {x: -4, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1031943946
@@ -6555,7 +6635,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 389.9866, y: 0}
+  m_SizeDelta: {x: 478.16696, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1429063270
 GameObject:
@@ -7460,7 +7540,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 389.9866, y: 0}
+  m_SizeDelta: {x: 478.16696, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1667971672
 GameObject:
@@ -10590,3 +10670,4 @@ SceneRoots:
   - {fileID: 273609228}
   - {fileID: 1028071235}
   - {fileID: 100650987}
+  - {fileID: 227460161}
