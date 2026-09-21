@@ -1091,7 +1091,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 853c5758916ae4c66902d352ec0f7944, type: 3}
   hitVolume: 1
   hitPitchJitter: 0.08
-  defeatClip: {fileID: 0}
+  defeatClip: {fileID: 8300000, guid: 9fc293b23a3f2497ea93d875801b99b4, type: 3}
   defeatVolume: 1
 --- !u!1 &251488547
 GameObject:
@@ -6620,7 +6620,7 @@ RectTransform:
   m_GameObject: {fileID: 1384393201}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.8661615, y: 0.8661615, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1815448383}
@@ -6635,7 +6635,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 478.16696, y: 0}
+  m_SizeDelta: {x: 669.62103, y: 33.459618}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1429063270
 GameObject:
@@ -7531,7 +7531,7 @@ RectTransform:
   m_GameObject: {fileID: 1653327028}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.6327478, y: 0.6327478, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 982744440}
@@ -7540,7 +7540,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 478.16696, y: 0}
+  m_SizeDelta: {x: 916.6369, y: 102.830605}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1667971672
 GameObject:

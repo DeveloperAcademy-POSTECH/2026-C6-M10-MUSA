@@ -44,7 +44,7 @@
 | 파일명 | 원본 이름 | 출처 | 제작자 | 라이선스 | 표기 필요 | 수정 | 추가일 |
 |---|---|---|---|---|---|---|---|
 | sfx_jangsanbeom_hit_01.wav | Cartoon Punch Cassette E | https://freesound.org/people/modusmogulus/sounds/785935/ | modusmogulus | CC0 | 불필요 | 이름만 변경 | 2026-09-21 |
-| sfx_jangsanbeom_defeat_01.wav | | | | | | | |
+| sfx_jangsanbeom_defeat_01.wav | A_Character_Yell11 | https://freesound.org/people/Potapooo/sounds/714610/ | Potapooo | CC0 | 불필요 | 앞 0.15초 무음 제거, 피크 -11.3dB → -1.0dB 정규화, 24bit/48k → 16bit/44.1k | 2026-09-21 |
 
 ---
 
