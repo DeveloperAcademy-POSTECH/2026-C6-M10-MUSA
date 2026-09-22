@@ -228,10 +228,36 @@ namespace C6.Prototype.Resources
         private static bool IsStored(OrbRecord orb) => orb.AuthorityState == OrbAuthorityState.Idle
             || orb.AuthorityState == OrbAuthorityState.Launching;
 
+        // #34: the same polarity may repeat at most this many times in a row.
+        private const uint PolarityStreakLimit = 3;
+
+        /// <summary>
+        /// The drawn polarity with the streak rule applied: after PolarityStreakLimit equal results
+        /// the next one is forced to the opposite. Whether an index was corrected depends on the
+        /// CORRECTED value before it, so the series is replayed from 0 rather than read one step
+        /// back. No state is kept, so Host, client and a rejoining device all compute the same value.
+        /// The draw itself (RawPolarityFor) is unchanged, and so is the long-run 50/50 split.
+        /// </summary>
+        private static OrbPolarity PolarityFor(uint seed, ulong playerId, uint successfulIndex)
+        {
+            var previous = OrbPolarity.None;
+            var current = OrbPolarity.None;
+            uint run = 0;
+            for (uint index = 0; ; index++)
+            {
+                current = RawPolarityFor(seed, playerId, index);
+                if (run >= PolarityStreakLimit && current == previous)
+                    current = current == OrbPolarity.Yin ? OrbPolarity.Yang : OrbPolarity.Yin;
+                if (current == previous) run++;
+                else { previous = current; run = 1; }
+                if (index == successfulIndex) return current;
+            }
+        }
+
         // SplitMix64 counter mapping: each successful local generation advances its own counter.
         // One output bit selects Yin/Yang with equal bit partition; failures and the other player's
         // command ordering cannot change this player's sequence. This is not cryptographic randomness.
-        private static OrbPolarity PolarityFor(uint seed, ulong playerId, uint successfulIndex)
+        private static OrbPolarity RawPolarityFor(uint seed, ulong playerId, uint successfulIndex)
         {
             unchecked
             {
