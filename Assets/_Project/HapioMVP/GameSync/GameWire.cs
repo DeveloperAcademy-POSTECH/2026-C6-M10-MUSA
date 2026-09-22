@@ -128,6 +128,13 @@ namespace C6.Prototype.GameSync
                     (!Close(p.gravity.y, -c.throwGravity) || !Close(p.lifetime, c.throwLifetime)))
                 || b.developmentSolo || b.shortDuration || r.debugTestMode)
                 return Reject("CONFIG_OR_COMPONENT_VALUE_MISMATCH", out reason);
+            // #28: only frozen multiparty rosters are attacked; the target is a participant, every warning lasts the
+            // Host config, the first one waits for the first delay, and team time falls only by failed defenses.
+            if (b.attackSequence > 0 && (!IsMultiparty(expected) || !participantIds.Contains(b.attackTarget)
+                    || !Close(b.attackWarningEndsAt - b.attackWarningStartsAt, c.monsterAttackWarning)
+                    || b.attackWarningStartsAt + LogicalTolerance < b.startedAt + c.monsterAttackFirstDelay)
+                || b.penaltySeconds > b.attackResolvedSequence * (double)c.defenseFailPenalty + LogicalTolerance)
+                return Reject("MONSTER_ATTACK_MISMATCH", out reason);
 
             bool ready = b.phase == BattlePhase.Ready.ToString() || b.phase == BattlePhase.Lobby.ToString();
             bool playing = b.phase == BattlePhase.Playing.ToString();
@@ -196,6 +203,17 @@ namespace C6.Prototype.GameSync
                 return Reject("PHASE_REGRESSION", out reason);
             if (before.startedAt > 0 && (!Close(before.startedAt, after.startedAt) || !Close(before.deadline, after.deadline)
                 || after.remaining > before.remaining + LogicalTolerance)) return Reject("DEADLINE_REGRESSION", out reason);
+            // #28: failed-defense time only accumulates within a round.
+            if (before.startedAt > 0 && after.penaltySeconds < before.penaltySeconds - LogicalTolerance)
+                return Reject("PENALTY_REGRESSION", out reason);
+            // #28: attacks only move forward; a published attack keeps its target, window, and result.
+            if (after.attackSequence < before.attackSequence || after.attackResolvedSequence < before.attackResolvedSequence
+                || before.attackSequence > 0 && after.attackSequence == before.attackSequence
+                    && (after.attackTarget != before.attackTarget || !Close(after.attackWarningStartsAt, before.attackWarningStartsAt)
+                        || !Close(after.attackWarningEndsAt, before.attackWarningEndsAt) || after.attackActive && !before.attackActive)
+                || before.attackResolvedSequence > 0 && after.attackResolvedSequence == before.attackResolvedSequence
+                    && after.attackResult != before.attackResult)
+                return Reject("MONSTER_ATTACK_REGRESSION", out reason);
             bool wasTerminal = Enum.TryParse<BattlePhase>(before.phase, out var phase) && BattleWire.IsTerminal(phase);
             if (wasTerminal && (after.phase != before.phase || !Close(after.remaining, before.remaining)
                 || !Close(after.teamHp, before.teamHp) || after.observedMonsterHp != before.observedMonsterHp
@@ -452,9 +470,11 @@ namespace C6.Prototype.GameSync
                 Text("battle"); Text(value.sessionId); Unsigned(value.roundId);
                 if (includeRevision) Unsigned(value.revision);
                 Text(value.phase); Number(value.startedAt); Number(value.deadline); Number(value.remaining);
-                Number(value.teamHp); Number(value.duration); Number(value.teamHpDecayPerSecond);
+                Number(value.teamHp); Number(value.duration); Number(value.teamHpDecayPerSecond); Number(value.penaltySeconds);
                 Integer(value.observedMonsterHp); Integer(value.monsterMaxHp); Boolean(value.developmentSolo);
                 Boolean(value.shortDuration); Integer(value.participants); Boolean(value.locallyDetectedNetworkError);
+                Integer(value.attackSequence); Unsigned(value.attackTarget); Number(value.attackWarningStartsAt);
+                Number(value.attackWarningEndsAt); Boolean(value.attackActive); Integer(value.attackResolvedSequence); Integer(value.attackResult);
             }
             public override string ToString() => content.ToString();
         }
