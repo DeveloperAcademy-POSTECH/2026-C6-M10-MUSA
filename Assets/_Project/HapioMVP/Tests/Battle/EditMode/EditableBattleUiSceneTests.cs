@@ -121,6 +121,22 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(hud.Canvas.GetComponentsInChildren<Graphic>(true)
                 .Any(graphic => graphic.name.IndexOf("Defense", StringComparison.OrdinalIgnoreCase) >= 0), Is.False,
                 "The blue defense regions in the reference are explanatory and must not render.");
+            var boundary = hud.Canvas.GetComponentsInChildren<OrbWorkspaceBoundaryView>(true).Single();
+            Assert.That(boundary.Hud, Is.SameAs(hud));
+            Assert.That(boundary.Frame, Is.SameAs(boundary.transform));
+            Assert.That(boundary.transform.parent, Is.SameAs(hud.Canvas.transform));
+            Assert.That(boundary.transform.GetSiblingIndex(), Is.Zero,
+                "The decorative guide belongs behind the saved HUD controls.");
+            Assert.That(boundary.GetComponentsInChildren<Graphic>(true), Has.Length.EqualTo(9));
+            Assert.That(boundary.GetComponentsInChildren<Graphic>(true).All(graphic => !graphic.raycastTarget),
+                Is.True, "The guide must never intercept orb drags or the Generate button.");
+            var tint = (RectTransform)boundary.transform.Find("OrbAreaTint");
+            Assert.That(tint, Is.Not.Null);
+            Assert.That(tint.GetSiblingIndex(), Is.Zero,
+                "The transparent area layer must stay behind the border details.");
+            Assert.That(tint.anchorMin, Is.EqualTo(Vector2.zero));
+            Assert.That(tint.anchorMax, Is.EqualTo(Vector2.one));
+            Assert.That(tint.GetComponent<Image>().color.a, Is.GreaterThan(0f).And.LessThan(0.5f));
 
             foreach (var button in Buttons(hud))
                 Assert.That(button.onClick.GetPersistentEventCount(), Is.Zero,

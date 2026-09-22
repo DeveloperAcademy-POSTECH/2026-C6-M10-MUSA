@@ -2,6 +2,8 @@
 
 > 2026-09-22 그래픽 적용 이후의 정면 배경·투명 HUD 에셋·현재 위치는 [정면 전투 화면 그래픽 적용](FIGMA_FRONT_ARTWORK.md)을 먼저 본다. 아래의 초기 Hierarchy와 2026-09-17 실행 수치는 그래픽 적용 전 기록이다.
 
+> #40 구슬 영역 표시: 현재 씬의 `T09Overlay/OrbWorkspaceBoundary`에서 `OrbAreaTint`의 Image Color/Alpha로 반투명 영역을, `UpperEdge*`·`LowerEdge*`·`*Opening`의 Image와 RectTransform으로 경계 스타일을 조정한다. 이 장식은 모두 Raycast Target이 꺼져 있으며 위치·크기는 실행 중 `T09Hud.OrbWorkspaceScreenRect`를 따라간다. 구현·검증 범위는 [구슬 영역 경계선 기록](ORB_AREA_BORDERLINE_PLAN.md)을 본다.
+
 작성일: 2026-09-17 · Unity 6000.5.7f1 · 대상: `ContinuousTransferBattle.unity`
 
 현재 전투 화면은 **Scene에 저장된 Canvas와 자식 GameObject를 선택해서 수정하는 구조**다. 글자 위치·크기·패널 색상·버튼 배치를 바꾸기 위해 `T09Hud.cs`의 생성 코드를 고칠 필요가 없다. 게임 상태를 표시하고 버튼 입력을 처리하는 기존 코드 연결은 유지한다.

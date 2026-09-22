@@ -178,6 +178,40 @@ namespace C6.Prototype.Battle.Tests
         }
 
         [UnityTest]
+        public IEnumerator OrbWorkspaceGuideFollowsTheLiveFooterWithoutTakingInput()
+        {
+            UseExplicitLocalUiFixture();
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            var boundary = hud.Canvas.GetComponentInChildren<OrbWorkspaceBoundaryView>(true);
+            Assert.That(boundary, Is.Not.Null);
+            Assert.That(boundary.GetComponentsInChildren<Graphic>(true).All(graphic => !graphic.raycastTarget),
+                Is.True);
+            AssertBoundaryMatchesWorkspace(boundary, hud.OrbWorkspaceScreenRect);
+
+            var footer = (RectTransform)hud.Canvas.transform.Find(
+                "SafeArea/LowerSafeViewport/LowerHudContent/ResourceControls");
+            var previousBottom = hud.OrbWorkspaceScreenRect.yMin;
+            footer.sizeDelta += new Vector2(0f, 20f);
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+            Assert.That(hud.OrbWorkspaceScreenRect.yMin, Is.GreaterThan(previousBottom + 1f));
+            AssertBoundaryMatchesWorkspace(boundary, hud.OrbWorkspaceScreenRect);
+        }
+
+        private static void AssertBoundaryMatchesWorkspace(OrbWorkspaceBoundaryView boundary, Rect workspace)
+        {
+            var corners = new Vector3[4];
+            boundary.Frame.GetWorldCorners(corners);
+            Vector2 lower = RectTransformUtility.WorldToScreenPoint(null, corners[0]);
+            Vector2 upper = RectTransformUtility.WorldToScreenPoint(null, corners[2]);
+            Assert.That(lower.x, Is.EqualTo(workspace.xMin).Within(1f));
+            Assert.That(lower.y, Is.EqualTo(workspace.yMin).Within(1f));
+            Assert.That(upper.x, Is.EqualTo(workspace.xMax).Within(1f));
+            Assert.That(upper.y, Is.EqualTo(workspace.yMax).Within(1f));
+        }
+
+        [UnityTest]
         public IEnumerator OneRuntimeGenerateClickCreatesOnePaidRawOrbInsideTheVisibleWorkspace()
         {
             UseExplicitLocalUiFixture();
