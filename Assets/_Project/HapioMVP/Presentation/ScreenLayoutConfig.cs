@@ -7,7 +7,9 @@ namespace C6.Prototype.Presentation
     public sealed class ScreenLayoutConfig : ScriptableObject
     {
         public const float DefaultUpperFraction = 0.55f;
-        public const float MinimalBattleFooterHeight = 188f;
+        // The TeamTimeBar sits on the battle/workspace seam, outside the controls footer.
+        // Keep this exclusion height in sync with ResourceControls in the saved battle scene.
+        public const float MinimalBattleFooterHeight = 152f;
         // DEMO_ASSUMPTION: both cameras retain a nonzero viewport, even after an invalid edit.
         public const float MinimumFraction = 0.01f;
         public const float MaximumFraction = 0.99f;

@@ -703,7 +703,7 @@ namespace C6.Prototype.PhysicsSandbox
         private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
         /// <summary>The same connected-game HUD calculation used by T09Hud: safe lower viewport,
-        /// CanvasScaler 390x844 with .5 match and the current minimal battle footer.</summary>
+        /// CanvasScaler 390x844 with .5 match and the controls-only footer below the orb plate.</summary>
         public static Rect GameWorkspacePixels(int width, int height, Rect safe, float lowerFraction)
         {
             float scale = Mathf.Sqrt(Mathf.Max(1f, width) / 390f * Mathf.Max(1f, height) / 844f);

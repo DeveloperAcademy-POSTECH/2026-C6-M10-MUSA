@@ -131,8 +131,13 @@ namespace C6.Prototype.GameSync.Tests
         {
             var controller = Components<T09BattleController>(scene).Single();
             var upper = controller.Hud.transform.Find("T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent");
-            var teamTime = (RectTransform)upper.Find("TeamTimeBar");
+            var divider = controller.Hud.transform.Find("T09Overlay/ViewportDivider");
+            var teamTime = (RectTransform)divider.Find("TeamTimeBar");
             var display = (RectTransform)upper.Find("MonsterDisplayArea");
+            Assert.That(teamTime, Is.Not.Null, "The team time bar now marks the battle/orb divider.");
+            var corners = new Vector3[4];
+            teamTime.GetWorldCorners(corners);
+            float teamBarTop = corners[1].y;
             RectTransform left, right;
             using (var serialized = new SerializedObject(controller))
             {
@@ -144,7 +149,9 @@ namespace C6.Prototype.GameSync.Tests
             {
                 Assert.That(zone.parent, Is.SameAs(upper), "#28 zones belong to the battle area");
                 Assert.That(zone.GetComponents<Component>().Length, Is.EqualTo(1), "RectTransform only: never drawn and never blocks input");
-                Assert.That(zone.anchorMin.y, Is.GreaterThanOrEqualTo(teamTime.anchorMax.y), "just above the TEAM HP bar, never on it");
+                zone.GetWorldCorners(corners);
+                Assert.That(corners[0].y, Is.GreaterThanOrEqualTo(teamBarTop),
+                    "defense input stays above the team bar across their different parents");
                 Assert.That(zone.anchorMax.y, Is.LessThanOrEqualTo(display.anchorMax.y), "beside the lower monster area");
                 Assert.That(zone.anchorMax.y - zone.anchorMin.y, Is.GreaterThan(.1f), "large enough for a thumb");
             }

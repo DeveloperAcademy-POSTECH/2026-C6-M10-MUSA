@@ -88,17 +88,21 @@ namespace C6.Prototype.Battle.Tests
             var battleStats = (RectTransform)upperContent.Find("BattleStats");
             var hpPanel = (RectTransform)battleStats.Find("MonsterHpPanel");
             var monsterArea = framing.MonsterDisplayArea;
-            var footer = (RectTransform)hud.transform.Find(
-                "T09Overlay/SafeArea/LowerSafeViewport/LowerHudContent/ResourceControls");
-            var teamTime = (RectTransform)footer.Find("TeamTimeBar");
+            var lowerContent = (RectTransform)hud.transform.Find(
+                "T09Overlay/SafeArea/LowerSafeViewport/LowerHudContent");
+            var footer = (RectTransform)lowerContent.Find("ResourceControls");
+            var divider = (RectTransform)hud.Canvas.transform.Find("ViewportDivider");
+            var teamTime = (RectTransform)divider.Find("TeamTimeBar");
             var staminaPanel = (RectTransform)footer.Find("PersonalStaminaPanel");
             var resourceButtons = (RectTransform)footer.Find("ResourceButtons");
+            Assert.That(teamTime, Is.Not.Null,
+                "The team time bar belongs to the camera divider, outside the clipped viewports.");
+            Assert.That(footer.Find("TeamTimeBar"), Is.Null);
             Assert.That(staminaPanel, Is.Not.Null,
                 "The five-section stamina view belongs at the bottom of the orb area.");
             Assert.That(battleStats.Find("PersonalStaminaPanel"), Is.Null);
             Assert.That(hpPanel.anchorMin.x, Is.EqualTo(0f).Within(.0001f));
             Assert.That(hpPanel.anchorMax.x, Is.EqualTo(1f).Within(.0001f));
-            Assert.That(teamTime.anchoredPosition.y, Is.LessThan(staminaPanel.anchoredPosition.y));
             Assert.That(staminaPanel.anchoredPosition.y, Is.LessThan(resourceButtons.anchoredPosition.y));
             Assert.That(monsterArea.anchorMax.y, Is.LessThan(battleStats.anchorMin.y));
             Assert.That(footer.sizeDelta.y,
@@ -130,13 +134,23 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(boundary.GetComponentsInChildren<Graphic>(true), Has.Length.EqualTo(9));
             Assert.That(boundary.GetComponentsInChildren<Graphic>(true).All(graphic => !graphic.raycastTarget),
                 Is.True, "The guide must never intercept orb drags or the Generate button.");
+            Assert.That(boundary.GetComponentsInChildren<Graphic>(true).All(graphic => !graphic.enabled),
+                Is.True, "The former translucent guide must stay hidden behind the wooden plate.");
             var tint = (RectTransform)boundary.transform.Find("OrbAreaTint");
             Assert.That(tint, Is.Not.Null);
             Assert.That(tint.GetSiblingIndex(), Is.Zero,
-                "The transparent area layer must stay behind the border details.");
+                "The retired area layer retains its saved ordering without drawing.");
             Assert.That(tint.anchorMin, Is.EqualTo(Vector2.zero));
             Assert.That(tint.anchorMax, Is.EqualTo(Vector2.one));
-            Assert.That(tint.GetComponent<Image>().color.a, Is.GreaterThan(0f).And.LessThan(0.5f));
+            var plate = hud.Layout.OrbCamera.transform.Find("OrbWoodenPlate");
+            Assert.That(plate, Is.Not.Null, "The 2D plate belongs under the orb camera.");
+            var plateView = plate.GetComponent<OrbWoodenPlateView>();
+            Assert.That(plateView, Is.Not.Null);
+            Assert.That(plateView.Hud, Is.SameAs(hud));
+            Assert.That(plateView.PlateRenderer, Is.SameAs(plate.GetComponent<SpriteRenderer>()));
+            Assert.That(plateView.PlateRenderer.sprite, Is.Not.Null);
+            Assert.That(plate.GetComponent<Collider2D>(), Is.Null,
+                "The board is visual only; orb collisions still use their existing bounds.");
 
             foreach (var button in Buttons(hud))
                 Assert.That(button.onClick.GetPersistentEventCount(), Is.Zero,

@@ -1,5 +1,7 @@
 # 구슬 조작 영역 경계선 계획 (#40)
 
+> 후속 사용자 선택으로 반투명 레이어/청록 선은 저장 씬에서 표시를 끄고 평면 고목 엿판으로 교체했다. 이 문서의 아래 구현·검증 기록은 **이전 경계 시안의 당시 결과**이며, 현재 화면 구성은 [고목 엿판 조합 영역 UI](WORN_YEOT_BOARD_UI.md)를 본다.
+
 기준 브랜치: `feat/#40-orb-area-borderline` · 대상 씬: `Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity`
 
 ## 목적과 현재 상태

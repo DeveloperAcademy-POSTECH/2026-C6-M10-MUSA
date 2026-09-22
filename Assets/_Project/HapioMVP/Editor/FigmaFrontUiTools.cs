@@ -34,6 +34,10 @@ namespace C6.Editor
             string error = string.Empty;
             if (hud == null || !hud.UseSceneHierarchy || !hud.ValidateSceneHierarchy(out error))
                 throw new InvalidOperationException("The saved battle HUD is missing or invalid: " + error);
+            if (hud.Layout != null && hud.Layout.OrbCamera != null &&
+                hud.Layout.OrbCamera.transform.Find("OrbWoodenPlate") != null)
+                throw new InvalidOperationException(
+                    "The wooden board layout is scene-authored. Reapplying the old Figma preset would reset its control positions.");
 
             Texture2D background = ImportTexture("FrontBackdrop.png", false);
             Texture2D hudAtlas = ImportTexture("HudAtlasTransparent.png", true);
