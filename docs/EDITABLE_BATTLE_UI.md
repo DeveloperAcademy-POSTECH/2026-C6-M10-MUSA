@@ -2,6 +2,8 @@
 
 > 2026-09-22 그래픽 적용 이후의 정면 배경·투명 HUD 에셋·현재 위치는 [정면 전투 화면 그래픽 적용](FIGMA_FRONT_ARTWORK.md)을 먼저 본다. 아래의 초기 Hierarchy와 2026-09-17 실행 수치는 그래픽 적용 전 기록이다.
 
+> #40 현재 배치: 구슬 영역은 [고목 엿판 UI 적용](WORN_YEOT_BOARD_UI.md)처럼 `T04 Orb Camera/OrbWoodenPlate`의 독립 Sprite로 표시한다. 이전 `T09Overlay/OrbWorkspaceBoundary` 반투명 레이어와 청록 경계 Graphic은 오브젝트를 보존한 채 표시만 껐다. 원래 구현 기록은 [구슬 영역 경계선 기록](ORB_AREA_BORDERLINE_PLAN.md)을 본다.
+
 작성일: 2026-09-17 · Unity 6000.5.7f1 · 대상: `ContinuousTransferBattle.unity`
 
 현재 전투 화면은 **Scene에 저장된 Canvas와 자식 GameObject를 선택해서 수정하는 구조**다. 글자 위치·크기·패널 색상·버튼 배치를 바꾸기 위해 `T09Hud.cs`의 생성 코드를 고칠 필요가 없다. 게임 상태를 표시하고 버튼 입력을 처리하는 기존 코드 연결은 유지한다.
@@ -87,7 +89,7 @@ P4ContinuousTransferBattle
 
 ### 예시 C — 스태미나 패널 꾸미기
 
-`BattleStats → PersonalStaminaPanel`의 `Image` 색과 `Rect Transform`을 바꾼다. 자식 `StaminaValue`는 숫자, `ContinuousStaminaTrack`은 게이지 배경이다. 그 안의 `ConfirmedStaminaFill`은 실제 회복량에 따라 길이가 변하는 채움 부분이다.
+현재 저장 씬에서는 `LowerHudContent → ResourceControls → PersonalStaminaPanel`을 선택한다. 자식 `StaminaValue`는 숫자, `ContinuousStaminaTrack`은 게이지 배경이다. 그 안의 `ConfirmedStaminaFill`은 실제 회복량에 따라 길이가 변하는 채움 부분이다.
 
 채움 부분의 색은 편집할 수 있지만, 가로 Anchor의 최대값은 실행 중 자원 비율로 갱신된다. 게이지 전체 크기를 바꾸려면 부모 `ContinuousStaminaTrack`을 수정한다. `TwentyMarker1`~`TwentyMarker4`는 20 단위의 시각적 구분선이다.
 
@@ -116,7 +118,7 @@ Play가 정지된 상태에서 `T09Overlay → ConfirmedBattleResult`를 선택�
 
 안전 영역과 상하 컨테이너는 해상도가 달라져도 UI가 화면 밖으로 밀리지 않도록 관리한다. 그 컨테이너 자체의 위치를 바꾸면 화면 크기 갱신 때 다시 맞춰질 수 있다. 일반적인 화면 재배치는 그 **안의 패널·글자·버튼**을 옮겨서 진행한다.
 
-하단 `ResourceControls`의 현재 기본 높이는 144다. 높이거나 위로 올리면 구슬이 움직이는 빈 영역이 줄어든다. 이 경계는 실제 구슬 배치·크기 계산에도 사용하므로 큰 변경 후에는 굴림·좌우 전달·투척 조작을 함께 확인한다.
+하단 `ResourceControls`의 현재 기본 높이는 152다. 높이거나 위로 올리면 구슬이 움직이는 영역이 줄어든다. 이 경계는 실제 구슬 배치·크기 계산과 목판 표시에도 사용하므로 큰 변경 후에는 굴림·좌우 전달·투척 조작을 함께 확인한다.
 
 상단 `BattleClock`, `TeamHp`, `PersonalStorage`와 하단 쪽 `ResourceMode`, `ResourceProgress`의 화면 좌표는 `ThrowBattleFraming`이 몬스터를 배치할 빈 공간을 계산할 때 사용한다. 이 글자를 몬스터 쪽으로 옮기면 카메라가 몬스터를 보여 주는 크기·위치도 달라질 수 있다. 몬스터 영역을 완전히 새로 설계할 때는 이 연결도 함께 조정한다.
 

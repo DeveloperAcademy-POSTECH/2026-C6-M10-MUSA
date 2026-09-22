@@ -178,6 +178,63 @@ namespace C6.Prototype.Battle.Tests
         }
 
         [UnityTest]
+        public IEnumerator OrbWorkspaceGuideFollowsTheLiveFooterWithoutTakingInput()
+        {
+            UseExplicitLocalUiFixture();
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            var boundary = hud.Canvas.GetComponentInChildren<OrbWorkspaceBoundaryView>(true);
+            var plate = Object.FindAnyObjectByType<OrbWoodenPlateView>(FindObjectsInactive.Include);
+            Assert.That(boundary, Is.Not.Null);
+            Assert.That(plate, Is.Not.Null);
+            Assert.That(plate.Hud, Is.SameAs(hud));
+            Assert.That(plate.PlateRenderer.sprite, Is.Not.Null);
+            Assert.That(plate.gameObject.layer, Is.EqualTo(LayerMask.NameToLayer("C6Orbs")));
+            Assert.That(hud.Layout.OrbCamera.cullingMask & (1 << plate.gameObject.layer), Is.Not.Zero);
+            Assert.That(plate.PlateRenderer.sortingOrder, Is.LessThan(40));
+            Assert.That(plate.GetComponent<Collider2D>(), Is.Null);
+            Assert.That(boundary.GetComponentsInChildren<Graphic>(true).All(graphic => !graphic.raycastTarget),
+                Is.True);
+            AssertBoundaryMatchesWorkspace(boundary, hud.OrbWorkspaceScreenRect);
+            AssertPlateMatchesWorkspace(plate, hud.OrbWorkspaceScreenRect);
+
+            var footer = (RectTransform)hud.Canvas.transform.Find(
+                "SafeArea/LowerSafeViewport/LowerHudContent/ResourceControls");
+            var previousBottom = hud.OrbWorkspaceScreenRect.yMin;
+            footer.sizeDelta += new Vector2(0f, 20f);
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+            Assert.That(hud.OrbWorkspaceScreenRect.yMin, Is.GreaterThan(previousBottom + 1f));
+            AssertBoundaryMatchesWorkspace(boundary, hud.OrbWorkspaceScreenRect);
+            AssertPlateMatchesWorkspace(plate, hud.OrbWorkspaceScreenRect);
+        }
+
+        private void AssertPlateMatchesWorkspace(OrbWoodenPlateView plate, Rect workspace)
+        {
+            plate.Refresh();
+            Bounds bounds = plate.PlateRenderer.bounds;
+            Camera camera = hud.Layout.OrbCamera;
+            Vector3 lower = camera.WorldToScreenPoint(bounds.min);
+            Vector3 upper = camera.WorldToScreenPoint(bounds.max);
+            Assert.That(lower.x, Is.EqualTo(workspace.xMin).Within(1f));
+            Assert.That(lower.y, Is.EqualTo(workspace.yMin).Within(1f));
+            Assert.That(upper.x, Is.EqualTo(workspace.xMax).Within(1f));
+            Assert.That(upper.y, Is.EqualTo(workspace.yMax).Within(1f));
+        }
+
+        private static void AssertBoundaryMatchesWorkspace(OrbWorkspaceBoundaryView boundary, Rect workspace)
+        {
+            var corners = new Vector3[4];
+            boundary.Frame.GetWorldCorners(corners);
+            Vector2 lower = RectTransformUtility.WorldToScreenPoint(null, corners[0]);
+            Vector2 upper = RectTransformUtility.WorldToScreenPoint(null, corners[2]);
+            Assert.That(lower.x, Is.EqualTo(workspace.xMin).Within(1f));
+            Assert.That(lower.y, Is.EqualTo(workspace.yMin).Within(1f));
+            Assert.That(upper.x, Is.EqualTo(workspace.xMax).Within(1f));
+            Assert.That(upper.y, Is.EqualTo(workspace.yMax).Within(1f));
+        }
+
+        [UnityTest]
         public IEnumerator OneRuntimeGenerateClickCreatesOnePaidRawOrbInsideTheVisibleWorkspace()
         {
             UseExplicitLocalUiFixture();
@@ -206,6 +263,10 @@ namespace C6.Prototype.Battle.Tests
                 "A single click must not be wired to generation twice.");
             Assert.That(controller.Views, Has.Count.EqualTo(1));
             var view = controller.Views.Values.Single();
+            var plate = Object.FindAnyObjectByType<OrbWoodenPlateView>(FindObjectsInactive.Include);
+            Assert.That(plate, Is.Not.Null);
+            Assert.That(view.RingRenderer.sortingOrder, Is.GreaterThan(plate.PlateRenderer.sortingOrder),
+                "The wooden plate must render behind an idle orb.");
             Canvas.ForceUpdateCanvases();
             Physics2D.SyncTransforms();
             var workspace = hud.OrbWorkspaceScreenRect;

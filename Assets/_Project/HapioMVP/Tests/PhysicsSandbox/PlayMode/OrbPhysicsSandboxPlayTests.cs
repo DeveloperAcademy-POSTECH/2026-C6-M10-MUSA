@@ -74,6 +74,17 @@ namespace C6.Prototype.PhysicsSandbox.Tests
         }
 
         [Test]
+        public void ConnectedGameWorkspaceLeavesOnlyTheControlsFooterBelowTheBoard()
+        {
+            var pixels = OrbPhysicsSandbox.GameWorkspacePixels(
+                390, 844, new Rect(0f, 0f, 390f, 844f), .45f);
+            Assert.That(pixels.yMin, Is.EqualTo(ScreenLayoutConfig.MinimalBattleFooterHeight).Within(.001f));
+            Assert.That(pixels.yMax, Is.EqualTo(844f * .45f).Within(.001f));
+            Assert.That(pixels.height, Is.GreaterThan(220f),
+                "The physical preview must include the space recovered by moving the team bar to the divider.");
+        }
+
+        [Test]
         public void LiveTuningResizesExistingCollidersAndMaterialWithoutChangingSavedConfig()
         {
             string original = JsonUtility.ToJson(config);
