@@ -69,10 +69,14 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(upperViewport.anchorMax, Is.EqualTo(Vector2.one));
             Assert.That(lowerViewport.anchorMin, Is.EqualTo(Vector2.zero));
             Assert.That(lowerViewport.anchorMax, Is.EqualTo(new Vector2(1f, .45f)));
-            Assert.That(hud.transform.Find(
-                "T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent").localScale, Is.EqualTo(Vector3.one));
-            Assert.That(hud.transform.Find(
-                "T09Overlay/SafeArea/LowerSafeViewport/LowerHudContent").localScale, Is.EqualTo(Vector3.one));
+            foreach (var content in new[] {
+                hud.transform.Find("T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent"),
+                hud.transform.Find("T09Overlay/SafeArea/LowerSafeViewport/LowerHudContent") })
+            {
+                Assert.That(content.localScale.x, Is.GreaterThan(0f).And.LessThanOrEqualTo(1f));
+                Assert.That(content.localScale.y, Is.EqualTo(content.localScale.x).Within(.0001f));
+                Assert.That(content.localScale.z, Is.EqualTo(1f));
+            }
             Assert.That(hud.transform.Find(
                 "T09Overlay/SafeArea/LowerSafeViewport/LowerHudContent/ResourceControls").gameObject.activeSelf,
                 Is.True, "The footer RectTransform still defines the orb workspace.");
@@ -83,10 +87,10 @@ namespace C6.Prototype.Battle.Tests
                 "T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent");
             var battleStats = (RectTransform)upperContent.Find("BattleStats");
             var hpPanel = (RectTransform)battleStats.Find("MonsterHpPanel");
-            var teamTime = (RectTransform)upperContent.Find("TeamTimeBar");
             var monsterArea = framing.MonsterDisplayArea;
             var footer = (RectTransform)hud.transform.Find(
                 "T09Overlay/SafeArea/LowerSafeViewport/LowerHudContent/ResourceControls");
+            var teamTime = (RectTransform)footer.Find("TeamTimeBar");
             var staminaPanel = (RectTransform)footer.Find("PersonalStaminaPanel");
             var resourceButtons = (RectTransform)footer.Find("ResourceButtons");
             Assert.That(staminaPanel, Is.Not.Null,
@@ -94,18 +98,26 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(battleStats.Find("PersonalStaminaPanel"), Is.Null);
             Assert.That(hpPanel.anchorMin.x, Is.EqualTo(0f).Within(.0001f));
             Assert.That(hpPanel.anchorMax.x, Is.EqualTo(1f).Within(.0001f));
-            Assert.That(teamTime.anchorMax.y, Is.LessThan(monsterArea.anchorMin.y));
+            Assert.That(teamTime.anchoredPosition.y, Is.LessThan(staminaPanel.anchoredPosition.y));
+            Assert.That(staminaPanel.anchoredPosition.y, Is.LessThan(resourceButtons.anchoredPosition.y));
             Assert.That(monsterArea.anchorMax.y, Is.LessThan(battleStats.anchorMin.y));
             Assert.That(footer.sizeDelta.y,
                 Is.EqualTo(ScreenLayoutConfig.MinimalBattleFooterHeight).Within(.0001f));
             Assert.That(resourceButtons.anchoredPosition.y, Is.GreaterThanOrEqualTo(staminaPanel.sizeDelta.y));
             Assert.That(hud.GenerateButton.transform.parent, Is.SameAs(resourceButtons));
             Assert.That(hud.GenerateButton.GetComponent<RectTransform>().anchorMin.x,
-                Is.EqualTo(.32f).Within(.0001f));
+                Is.EqualTo(0f).Within(.0001f));
+            Assert.That(hud.GenerateButton.targetGraphic.raycastTarget, Is.True,
+                "The Figma artwork must remain a clickable button.");
             var staminaTrack = (RectTransform)staminaPanel.Find("ContinuousStaminaTrack");
             Assert.That(staminaTrack, Is.Not.Null);
             Assert.That(Enumerable.Range(1, 4)
                 .All(index => staminaTrack.Find("TwentyMarker" + index) != null), Is.True);
+            Assert.That(Enumerable.Range(1, 5)
+                .All(index => staminaTrack.Find("FigmaStaminaGem" + index + "/FillClip/Artwork/FigmaAtlasArt")
+                    ?.GetComponent<RawImage>() != null), Is.True);
+            Assert.That(hud.Layout.BattleCamera.GetComponentInChildren<FigmaViewportBackdrop>(), Is.Not.Null);
+            Assert.That(hud.Layout.OrbCamera.GetComponentInChildren<FigmaViewportBackdrop>(), Is.Not.Null);
             Assert.That(hud.Canvas.GetComponentsInChildren<Graphic>(true)
                 .Any(graphic => graphic.name.IndexOf("Defense", StringComparison.OrdinalIgnoreCase) >= 0), Is.False,
                 "The blue defense regions in the reference are explanatory and must not render.");
