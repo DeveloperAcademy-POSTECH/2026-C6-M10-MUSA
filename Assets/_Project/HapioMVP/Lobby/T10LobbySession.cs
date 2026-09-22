@@ -39,6 +39,7 @@ namespace C6.Prototype.Lobby
             maximumParticipants = maximum;
         }
         [SerializeField] private ScreenLayoutConfig config;
+        private LobbyHostConfig roomDefaults;
         [SerializeField] private string buildIdentifier = LobbyBuildInfo.Build;
         public string BuildIdentifier => buildIdentifier;
         public void ConfigureBuild(string value) { if (connection != null && !connection.CanStart) throw new InvalidOperationException("End room before configuring build."); if (string.IsNullOrWhiteSpace(value) || value.Length > 32) throw new ArgumentException("Invalid build."); buildIdentifier = value; }
@@ -87,23 +88,39 @@ namespace C6.Prototype.Lobby
         }
         private static double Now=>Time.realtimeSinceStartupAsDouble;
 
-        public void Configure(ScreenLayoutConfig value) { if (Connected) throw new InvalidOperationException("End room before configuring."); config=value; }
+        public void Configure(ScreenLayoutConfig value)
+        {
+            if (connection != null && !connection.CanStart) throw new InvalidOperationException("End room before configuring.");
+            config=value;
+            roomDefaults=value==null?null:LobbyHostConfig.Capture(value);
+        }
+        public LobbyHostConfig CaptureRoomDefaults()
+        {
+            LobbyHostConfig source=roomDefaults??(config==null?null:LobbyHostConfig.Capture(config));
+            if(source==null)return null;
+            return LobbyHostConfig.TryRead(JsonUtility.ToJson(source),out LobbyHostConfig copy)?copy:null;
+        }
         private void Awake()
         {
             connection=GetComponent<DirectConnectionSession>(); discovery=new BonjourRoomDiscovery();
+            if(config!=null)roomDefaults=LobbyHostConfig.Capture(config);
             discovery.Changed+=OnDiscoveryChanged;
             connection.Changed+=OnConnectionChanged;
             connection.ParticipantDisconnected+=OnParticipantDisconnected;
         }
         private void Start()=>Debug.Log($"C6_T10A_READY build={buildIdentifier} protocol={ProtocolVersion} device={SystemInfo.deviceModel} os={SystemInfo.operatingSystem} screen={Screen.width}x{Screen.height}");
-        public bool CreateRoom(string name,string port)
+        public bool CreateRoom(string name,string port)=>CreateRoom(name,port,null);
+        public bool CreateRoom(string name,string port,LobbyHostConfig requestedConfig)
         {
             if (!connection.CanStart||config==null) return false;
             if (!DirectConnectionValidation.TryParsePort(port,out roomPort)) return Fail("INVALID_PORT","INPUT");
             name=(name??"").Trim(); if (name.Length==0) name="C6 Room";
             if (name.Length>32||System.Text.Encoding.UTF8.GetByteCount(name)>80||name.Any(char.IsControl)) return Fail("INVALID_ROOM_NAME","INPUT");
             ResetLocal(); roomName=name; expectedRoom=Guid.NewGuid().ToString("N");
-            HostConfig=LobbyHostConfig.Capture(config);
+            LobbyHostConfig selected=requestedConfig??CaptureRoomDefaults();
+            if(selected==null||!LobbyHostConfig.TryRead(JsonUtility.ToJson(selected),out LobbyHostConfig approved))
+                return Fail("UNSUPPORTED_HOST_CONFIG","INPUT");
+            HostConfig=approved;
             authority=new LobbyAuthority(expectedRoom,Guid.NewGuid().ToString("N"),buildIdentifier,JsonUtility.ToJson(HostConfig),BitConverter.ToUInt32(Guid.NewGuid().ToByteArray(),0),MaximumParticipants,continuousTransfers);
             discovery.StopBrowse(); JoinRoute="HOST";
             if (!connection.ConfigureConnection((ushort)ProtocolVersion,Array.Empty<byte>(),Approve,MaximumParticipants,KeepLobbyOnPeerDisconnect)) return Fail("CONNECTION_BUSY");

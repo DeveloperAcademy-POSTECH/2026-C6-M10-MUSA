@@ -73,7 +73,7 @@ namespace C6.Prototype.GameSync
                     Require(DirectConnectionValidation.TryParsePort(port, out _), "Invalid automation port");
                     markerTag = scenario + "-" + receipt.runId.Substring(0, 8);
                     receipt.mode = "EXPLICIT_MAC_AUTOMATION"; receipt.role = role; receipt.scenario = scenario;
-                    Require(game.BuildIdentifier == "24", "P4 game contract changed");
+                    Require(game.BuildIdentifier == "25", "P4 game contract changed");
                     Application.runInBackground = true; Application.targetFrameRate = 60;
                 }
                 catch (Exception exception) { error = exception.Message; }

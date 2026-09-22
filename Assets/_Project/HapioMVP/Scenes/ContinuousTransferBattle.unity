@@ -8996,7 +8996,7 @@ MonoBehaviour:
   transfersEnabled: 1
   continuousTransfers: 1
   reachableEdgeTransferDistance: 1
-  buildIdentifierOverride: 24
+  buildIdentifierOverride: 25
   interruptionHandlingEnabled: 1
   maximumParticipants: 5
 --- !u!114 &1815373577
@@ -9040,7 +9040,7 @@ MonoBehaviour:
   maximumParticipants: 5
   continuousTransfers: 1
   config: {fileID: 11400000, guid: f233199333baa4272a0ccca0e377b831, type: 2}
-  buildIdentifier: 24
+  buildIdentifier: 25
 --- !u!114 &1815373580
 MonoBehaviour:
   m_ObjectHideFlags: 0

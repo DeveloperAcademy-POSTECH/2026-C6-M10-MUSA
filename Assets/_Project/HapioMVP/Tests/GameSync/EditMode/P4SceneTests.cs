@@ -50,8 +50,8 @@ namespace C6.Prototype.GameSync.Tests
             Assert.That(lobby.MaximumParticipants, Is.EqualTo(5));
             Assert.That(lobby.ProtocolVersion, Is.EqualTo(24));
             Assert.That(controller.MaximumParticipants, Is.EqualTo(5));
-            Assert.That(game.BuildIdentifier, Is.EqualTo("24"));
-            Assert.That(lobby.BuildIdentifier, Is.EqualTo("24"));
+            Assert.That(game.BuildIdentifier, Is.EqualTo("25"));
+            Assert.That(lobby.BuildIdentifier, Is.EqualTo("25"));
             Assert.That(game.TransfersEnabled && game.ReachableEdgeTransferDistance && game.InterruptionHandlingEnabled, Is.True);
             Assert.That(controller.OrbPhysicsEnabled && controller.ReleaseThrowsEnabled, Is.True);
             Assert.That(game.ContinuousTransfersEnabled && lobby.ContinuousTransfersEnabled && controller.ContinuousTransfersEnabled, Is.True);

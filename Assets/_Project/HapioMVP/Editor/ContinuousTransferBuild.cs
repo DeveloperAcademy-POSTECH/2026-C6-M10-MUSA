@@ -23,7 +23,7 @@ namespace C6.Editor
 {
     public static class ContinuousTransferBuild
     {
-        public const string BuildNumber = "24";
+        public const string BuildNumber = "25";
         public const string SourceScenePath = FivePlayerBattleBuild.ScenePath;
         public const string ScenePath="Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity";
         public const string MonsterPrefabPath="Assets/_Project/HapioMVP/Prefabs/BenchmarkMonster.prefab";
@@ -177,7 +177,7 @@ namespace C6.Editor
                 RequireOnRoot<T10LobbyController>(roots, root);
                 if (!game.ContinuousTransfersEnabled || !lobby.ContinuousTransfersEnabled || !root.GetComponent<T09BattleController>().ContinuousTransfersEnabled
                     || lobby.ProtocolVersion != LobbyProtocol.ContinuousTransferVersion || game.MaximumParticipants != 5 || lobby.MaximumParticipants != 5 || root.GetComponent<T09BattleController>().MaximumParticipants != 5 || !game.InterruptionHandlingEnabled || !game.TransfersEnabled || !game.ReachableEdgeTransferDistance || game.BuildIdentifier != BuildNumber || lobby.BuildIdentifier != BuildNumber)
-                    throw new InvalidOperationException("The existing scene is not the expected build24 release throw mode; it was preserved.");
+                    throw new InvalidOperationException("The existing scene is not the expected build25 developer-settings mode; it was preserved.");
                 if (layout.BattleCamera == null || layout.OrbCamera == null || layout.BattleCamera == layout.OrbCamera)
                     throw new InvalidOperationException("P4 requires its two distinct remapped cameras.");
                 if (!RequireOnRoot<T09BattleController>(roots, root).OrbPhysicsEnabled

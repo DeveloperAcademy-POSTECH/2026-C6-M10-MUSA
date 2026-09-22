@@ -327,6 +327,66 @@ namespace C6.Prototype.Lobby.Tests
         }
 
         [UnityTest]
+        public IEnumerator DeveloperModeBuildsOneRoomConfigAndLeavesProjectDefaultsUntouched()
+        {
+            Assert.That(Hud.DeveloperSettingsReady, Is.True);
+            Assert.That(Hud.DeveloperModeEnabled, Is.False);
+            Assert.That(Hud.DeveloperPanel.gameObject.activeSelf, Is.False);
+            Assert.That(Hud.DeveloperModeButton.interactable, Is.True);
+            LobbyHostConfig defaults = Session.CaptureRoomDefaults();
+            string defaultsJson = JsonUtility.ToJson(defaults);
+            float collapsedHeight = Hud.Content.rect.height;
+
+            Hud.DeveloperModeButton.onClick.Invoke();
+            yield return null;
+            var column = (RectTransform)Hud.Canvas.transform.Find("SafeArea/CenteredColumn");
+            column.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 320f);
+            Canvas.ForceUpdateCanvases();
+            Assert.That(Hud.DeveloperModeEnabled, Is.True);
+            Assert.That(Hud.DeveloperPanel.gameObject.activeInHierarchy, Is.True);
+            Assert.That(Hud.Content.rect.height, Is.GreaterThan(collapsedHeight));
+            Assert.That(Hud.Scroll.vertical, Is.True);
+
+            Button[] developerButtons = Hud.DeveloperPanel.GetComponentsInChildren<Button>(false);
+            Assert.That(developerButtons,
+                Has.Length.EqualTo(LobbyDeveloperSettings.OrderedSettings.Count * 2 + 1));
+            foreach (Button button in developerButtons)
+            {
+                Rect rect = ((RectTransform)button.transform).rect;
+                Assert.That(rect.height, Is.GreaterThanOrEqualTo(44f), button.name + " height");
+                Assert.That(rect.width, Is.GreaterThanOrEqualTo(44f), button.name + " width");
+            }
+            for (int a = 0; a < developerButtons.Length; a++)
+                for (int b = a + 1; b < developerButtons.Length; b++)
+                    Assert.That(ScreenRect((RectTransform)developerButtons[a].transform)
+                        .Overlaps(ScreenRect((RectTransform)developerButtons[b].transform)),
+                        Is.False, developerButtons[a].name + " overlaps " + developerButtons[b].name);
+            Assert.That(ScreenRect(Hud.DeveloperPanel)
+                .Overlaps(ScreenRect((RectTransform)Hud.CreateRoomButton.transform)),
+                Is.False, "Developer settings must not overlap CREATE ROOM.");
+
+            Hud.AdjustDeveloperSetting(LobbyDeveloperSetting.MonsterHp2, -1);
+            Hud.AdjustDeveloperSetting(LobbyDeveloperSetting.OrbStorageLimit, -1);
+            Hud.AdjustDeveloperSetting(LobbyDeveloperSetting.OrbSizePercent, 1);
+            LobbyHostConfig draft = Hud.BuildRoomConfig();
+            Assert.That(draft.monsterHp2, Is.EqualTo(Mathf.Max(1, defaults.monsterHp2 - 100)));
+            Assert.That(draft.storageLimit, Is.EqualTo(Mathf.Max(1, defaults.storageLimit - 1)));
+            Assert.That(draft.orbRadiusScreenFraction,
+                Is.EqualTo(Mathf.Clamp(defaults.orbRadiusScreenFraction * 1.1f, .01f, .2f)).Within(.0001f));
+            Assert.That(draft.orbRadiusCapScale,
+                Is.EqualTo(Mathf.Clamp(defaults.orbRadiusCapScale * 1.1f, 1f, 3f)).Within(.0001f));
+
+            Hud.RoomNameInput.text = "Developer Room";
+            Hud.PortInput.text = HostPort;
+            Hud.CreateRoomButton.onClick.Invoke();
+            yield return WaitFor(() => Session.IsHost && Session.HostConfig != null, 5,
+                "Developer room did not create a Host.");
+            Assert.That(JsonUtility.ToJson(Session.HostConfig), Is.EqualTo(JsonUtility.ToJson(draft)));
+            Assert.That(JsonUtility.ToJson(Session.CaptureRoomDefaults()), Is.EqualTo(defaultsJson));
+            Assert.That(Hud.DeveloperPanel.gameObject.activeInHierarchy, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator ControllerDisableDetachesActionsAndReenableDoesNotDuplicateSubscriptions()
         {
             controller.enabled = false;

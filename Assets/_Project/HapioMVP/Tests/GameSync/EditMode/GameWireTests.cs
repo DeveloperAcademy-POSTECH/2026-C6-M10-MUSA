@@ -362,7 +362,10 @@ namespace C6.Prototype.GameSync.Tests
             try
             {
                 JsonUtility.FromJsonOverwrite("{\"upperFraction\":0.61,\"horizontalSwipeFraction\":0.25,"
-                    + "\"horizontalDominance\":1.5,\"combinationRadiusFraction\":0.12,\"monsterMaxHp\":240,\"baseDamage\":30,"
+                    + "\"horizontalDominance\":1.5,\"combinationRadiusFraction\":0.12,"
+                    + "\"orbRadiusScreenFraction\":0.11,\"orbRadiusCapScale\":1.7,\"monsterMaxHp\":240,\"baseDamage\":30,"
+                    + "\"monsterAttackFirstDelaySeconds\":28,\"monsterAttackIntervalSeconds\":18,"
+                    + "\"monsterAttackWarningSeconds\":4,\"defenseHoldSeconds\":1.6,\"defenseFailPenaltySeconds\":12,"
                     + "\"orbStorageLimit\":18,\"projectileSpeed\":14,\"projectileLifetime\":4,\"projectileRadius\":0.25,"
                     + "\"attackSnapshotRateHz\":15,\"launchWidth\":4.5,\"launchOrigin\":{\"x\":1,\"y\":2,\"z\":-6},"
                     + "\"launchAim\":{\"x\":0.5,\"y\":1.5,\"z\":0.25},\"staminaMax\":120,\"staminaStart\":110,"

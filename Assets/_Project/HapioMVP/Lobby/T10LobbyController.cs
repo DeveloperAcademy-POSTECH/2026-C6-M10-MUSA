@@ -84,6 +84,8 @@ namespace C6.Prototype.Lobby
         public void RefreshView()
         {
             if (session == null || hud == null || hud.Canvas == null) return;
+            if (!hud.DeveloperSettingsReady)
+                hud.ConfigureDeveloperDefaults(session.CaptureRoomDefaults());
             DirectConnectionSession connection = session.Connection;
             LobbySnapshot snapshot = session.Snapshot;
             LobbyPlayer local = connection != null && connection.LocalClientId.HasValue
@@ -172,7 +174,8 @@ namespace C6.Prototype.Lobby
                 }).ToArray();
         }
 
-        private void CreateRoom() => Execute(() => session.CreateRoom(hud.RoomName, hud.Port), "The room could not open. Please try again.");
+        private void CreateRoom() => Execute(() => session.CreateRoom(hud.RoomName, hud.Port, hud.BuildRoomConfig()),
+            "The room could not open. Please review the room settings and try again.");
         private void Browse() => Execute(session.Browse, "Room search could not start. Try Refresh or Direct IP.");
         private void JoinRoom(string roomId) => Execute(() => session.JoinRoom(roomId), "This room is no longer available. Refresh the list.");
         private void JoinDirect() => Execute(() => session.JoinDirect(hud.HostAddress, hud.Port), "Check the host address and port, then try again.");

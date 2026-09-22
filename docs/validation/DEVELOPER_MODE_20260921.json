@@ -1,0 +1,58 @@
+{
+  "task": "session-create-developer-mode",
+  "date": "2026-09-21",
+  "branch": "feat/#30-developer-mode",
+  "base_commit": "4077c330",
+  "unity": "6000.5.7f1",
+  "game_build_identifier": "25",
+  "host_config_schema": 3,
+  "implemented": [
+    "session creation developer-mode toggle and scrollable controls",
+    "room-only draft; saved ScreenLayoutConfig remains unchanged",
+    "host-approved participant-specific monster HP, damage, orb limit, orb size, duration, generation and recovery tuning",
+    "orb size fields copied into GameRuntimeConfig for gameplay",
+    "320 logical-width controls keep 44-pixel minimum button size and do not overlap"
+  ],
+  "compile": {
+    "status": "PASS",
+    "errors": 0
+  },
+  "editmode": {
+    "status": "PASS",
+    "total": 1477,
+    "passed": 1477,
+    "failed": 0,
+    "skipped": 0,
+    "duration_seconds": 31.2,
+    "developer_settings_subset": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "host_config_subset": {
+      "total": 166,
+      "passed": 166,
+      "failed": 0
+    },
+    "runtime_orb_size_mapping_subset": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "playmode_lobby": {
+    "status": "PASS",
+    "total": 15,
+    "passed": 15,
+    "failed": 0,
+    "skipped": 0,
+    "duration_seconds": 3.38,
+    "evidence_scope": "real local NGO Host plus UI and room-config behavior; not a remote Client or physical-device result"
+  },
+  "remote_client_receives_schema3_and_runtime_values": "NOT_RUN",
+  "multiplayer_process_probe": "NOT_RUN",
+  "ios_xcode_build_sign_install": "NOT_RUN",
+  "physical_device_touch_and_safe_area": "NOT_RUN",
+  "manual_visual_review": "NOT_RUN",
+  "note": "Source and automated tests do not count as iPhone/iPad or remote multiplayer validation."
+}
