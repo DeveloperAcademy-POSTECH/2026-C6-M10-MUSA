@@ -209,6 +209,46 @@ namespace C6.Prototype.Battle.Tests
             AssertPlateMatchesWorkspace(plate, hud.OrbWorkspaceScreenRect);
         }
 
+        [UnityTest]
+        public IEnumerator DefenseGuidesFollowTheSavedInputZonesAndWarningStates()
+        {
+            UseExplicitLocalUiFixture();
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            var warning = hud.Canvas.GetComponentInChildren<MonsterAttackWarning>(true);
+            var upper = hud.Canvas.transform.Find("SafeArea/UpperSafeViewport/UpperHudContent");
+            Assert.That(warning, Is.Not.Null);
+            foreach (var side in new[] { "Left", "Right" })
+            {
+                var zone = (RectTransform)upper.Find("DefenseZone" + side);
+                var marker = zone.GetComponentInChildren<DefenseTouchMarker>(true);
+                Assert.That(marker, Is.Not.Null);
+                Assert.That(marker.Outline.enabled || marker.HoldProgress.enabled || marker.HandIcon.enabled,
+                    Is.False, "non-targeted screens keep the guides hidden");
+                var corners = new Vector3[4];
+                zone.GetWorldCorners(corners);
+                Vector2 center = RectTransformUtility.WorldToScreenPoint(null, marker.transform.position);
+                Assert.That(new Rect(corners[0].x, corners[0].y,
+                    corners[2].x - corners[0].x, corners[2].y - corners[0].y).Contains(center), Is.True,
+                    "the visible target center stays inside the real touch zone");
+                Assert.That(marker.GetComponentsInChildren<Graphic>(true).All(graphic => !graphic.raycastTarget),
+                    Is.True);
+            }
+
+            warning.Show(0d, WarningLook.Pulse);
+            Assert.That(upper.GetComponentsInChildren<DefenseTouchMarker>(true)
+                .All(marker => marker.Outline.enabled && marker.HandIcon.enabled && !marker.HoldProgress.enabled), Is.True);
+            warning.Show(0d, WarningLook.Holding, .5f);
+            Assert.That(upper.GetComponentsInChildren<DefenseTouchMarker>(true)
+                .All(marker => marker.HoldProgress.enabled && Mathf.Abs(marker.HoldProgress.fillAmount - .5f) < .0001f), Is.True);
+            warning.Show(0d, WarningLook.Stance, 1f);
+            Assert.That(upper.GetComponentsInChildren<DefenseTouchMarker>(true)
+                .All(marker => marker.Outline.color.g > marker.Outline.color.r), Is.True);
+            warning.Hide();
+            Assert.That(upper.GetComponentsInChildren<DefenseTouchMarker>(true)
+                .All(marker => !marker.Outline.enabled && !marker.HoldProgress.enabled && !marker.HandIcon.enabled), Is.True);
+        }
+
         private void AssertPlateMatchesWorkspace(OrbWoodenPlateView plate, Rect workspace)
         {
             plate.Refresh();

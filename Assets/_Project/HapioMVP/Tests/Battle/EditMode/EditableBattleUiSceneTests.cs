@@ -122,9 +122,18 @@ namespace C6.Prototype.Battle.Tests
                     ?.GetComponent<RawImage>() != null), Is.True);
             Assert.That(hud.Layout.BattleCamera.GetComponentInChildren<FigmaViewportBackdrop>(), Is.Not.Null);
             Assert.That(hud.Layout.OrbCamera.GetComponentInChildren<FigmaViewportBackdrop>(), Is.Not.Null);
-            Assert.That(hud.Canvas.GetComponentsInChildren<Graphic>(true)
-                .Any(graphic => graphic.name.IndexOf("Defense", StringComparison.OrdinalIgnoreCase) >= 0), Is.False,
-                "The blue defense regions in the reference are explanatory and must not render.");
+            var defenseMarkers = hud.Canvas.GetComponentsInChildren<DefenseTouchMarker>(true);
+            Assert.That(defenseMarkers, Has.Length.EqualTo(2), "Only the two real defense zones get visual guides.");
+            foreach (var marker in defenseMarkers)
+            {
+                Assert.That(marker.transform.parent.name, Does.StartWith("DefenseZone"));
+                Assert.That(marker.Outline, Is.Not.Null);
+                Assert.That(marker.HoldProgress, Is.Not.Null);
+                Assert.That(marker.HandIcon, Is.Not.Null);
+                Assert.That(marker.GetComponentsInChildren<Graphic>(true)
+                    .All(graphic => !graphic.enabled && !graphic.raycastTarget), Is.True,
+                    "Defense guides start hidden and never take touches from the input zones.");
+            }
             var boundary = hud.Canvas.GetComponentsInChildren<OrbWorkspaceBoundaryView>(true).Single();
             Assert.That(boundary.Hud, Is.SameAs(hud));
             Assert.That(boundary.Frame, Is.SameAs(boundary.transform));

@@ -96,6 +96,65 @@ namespace C6.Prototype.Battle.Tests
             finally { Object.DestroyImmediate(go); }
         }
 
+        [Test]
+        public void DefenseGuideShowsTheHandAndHoldArcOnlyDuringAWarning()
+        {
+            var go = new GameObject("warning", typeof(RectTransform));
+            try
+            {
+                var edge = new GameObject("edge", typeof(RectTransform), typeof(UnityEngine.UI.Image))
+                    .GetComponent<UnityEngine.UI.Image>();
+                edge.transform.SetParent(go.transform, false);
+                var marker = new GameObject("marker", typeof(RectTransform), typeof(DefenseTouchMarker))
+                    .GetComponent<DefenseTouchMarker>();
+                marker.transform.SetParent(go.transform, false);
+                var outline = AddVisual(marker.transform, "outline");
+                var progress = AddVisual(marker.transform, "progress");
+                var hand = AddVisual(marker.transform, "hand");
+                progress.type = UnityEngine.UI.Image.Type.Filled;
+                progress.fillMethod = UnityEngine.UI.Image.FillMethod.Radial360;
+                using (var values = new UnityEditor.SerializedObject(marker))
+                {
+                    values.FindProperty("outline").objectReferenceValue = outline;
+                    values.FindProperty("holdProgress").objectReferenceValue = progress;
+                    values.FindProperty("handIcon").objectReferenceValue = hand;
+                    values.ApplyModifiedPropertiesWithoutUndo();
+                }
+                var warning = go.AddComponent<MonsterAttackWarning>();
+                using (var values = new UnityEditor.SerializedObject(warning))
+                {
+                    var edges = values.FindProperty("edges"); edges.arraySize = 1;
+                    edges.GetArrayElementAtIndex(0).objectReferenceValue = edge;
+                    var markers = values.FindProperty("defenseMarkers"); markers.arraySize = 1;
+                    markers.GetArrayElementAtIndex(0).objectReferenceValue = marker;
+                    values.ApplyModifiedPropertiesWithoutUndo();
+                }
+
+                warning.Show(.2, WarningLook.Pulse);
+                Assert.That(outline.enabled && hand.enabled, Is.True);
+                Assert.That(progress.enabled, Is.False);
+                warning.Show(.2, WarningLook.Holding, .5f);
+                Assert.That(progress.enabled, Is.True);
+                Assert.That(progress.fillAmount, Is.EqualTo(.5f).Within(1e-5));
+                warning.Show(.2, WarningLook.Stance, 1f);
+                Assert.That(outline.color.g, Is.GreaterThan(outline.color.r), "the existing stance cue stays green");
+                Assert.That(progress.fillAmount, Is.EqualTo(1f));
+                warning.Hide();
+                Assert.That(outline.enabled || progress.enabled || hand.enabled, Is.False);
+                Assert.That(outline.raycastTarget || progress.raycastTarget || hand.raycastTarget, Is.False);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        private static UnityEngine.UI.Image AddVisual(Transform parent, string name)
+        {
+            var image = new GameObject(name, typeof(RectTransform), typeof(UnityEngine.UI.Image))
+                .GetComponent<UnityEngine.UI.Image>();
+            image.transform.SetParent(parent, false);
+            image.raycastTarget = false;
+            return image;
+        }
+
         private static bool Step(DefenseHoldTracker hold, int attack, bool warning, bool bothHeld, double delta) =>
             hold.Update(1, attack, warning, bothHeld, delta, 2.0);
     }
