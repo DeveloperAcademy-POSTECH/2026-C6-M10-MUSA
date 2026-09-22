@@ -86,6 +86,8 @@ namespace C6.Prototype.GameSync.Tests
             var value = Playing(2); var context = Context(2); context.participantIds = null;
             Assert.That(GameWire.Validate(value, context, null, out _), Is.False);
             value.players = null;
+            // #29: the older two-seat scene keeps the single legacy HP, not the multiparty table.
+            value.attack.hp = value.attack.maxHp = value.battle.observedMonsterHp = value.battle.monsterMaxHp = context.config.monsterHp;
             Assert.That(GameWire.Validate(value, context, null, out string reason), Is.True, reason);
             Assert.That(GameWire.Validate(value, Context(2), null, out _), Is.False);
         }
@@ -262,14 +264,15 @@ namespace C6.Prototype.GameSync.Tests
         }
         private static GameSnapshot Ready(int count)
         {
-            var c=Context(count); var players=Seats.Take(count).Select((id,index)=>new LobbyPlayer{clientId=id,playerNumber=index+1,connected=true,ready=true,initialStateReceived=true}).ToArray();
+            var c=Context(count); int hp=c.config.MonsterHpFor(count); // #29 per-player HP table
+            var players=Seats.Take(count).Select((id,index)=>new LobbyPlayer{clientId=id,playerNumber=index+1,connected=true,ready=true,initialStateReceived=true}).ToArray();
             return new GameSnapshot{roomId=Room,sessionId=Session,nonce=Nonce,roundId=1,revision=1,seed=c.seed,configHash=c.configHash,
                 hostNow=100,serverTime=200,p1=players[0],p2=players[1],players=players,
-                attack=new AttackSnapshot{nonce=Nonce,sessionId=Session,roundId=1,revision=1,hp=100,maxHp=100,state="Playing"},
+                attack=new AttackSnapshot{nonce=Nonce,sessionId=Session,roundId=1,revision=1,hp=hp,maxHp=hp,state="Playing"},
                 resources=new ResourceSnapshot{nonce=Nonce,sessionId=Session,roundId=1,revision=1,seed=c.seed,maximum=100,generateCost=20,
                     regenerationRate=20d/3d,hitRecovery=5,storageLimit=20,players=Seats.Take(count).Select(id=>new ResourcePlayerWire{playerId=id,stamina=100}).ToArray()},
                 battle=new BattleSnapshot{nonce=Nonce,sessionId=Session,roundId=1,revision=1,phase="Ready",remaining=180,teamHp=180,duration=180,
-                    teamHpDecayPerSecond=1,observedMonsterHp=100,monsterMaxHp=100,participants=count}};
+                    teamHpDecayPerSecond=1,observedMonsterHp=hp,monsterMaxHp=hp,participants=count}};
         }
         private static GameSnapshot Playing(int count,ulong? owner=null)
         {

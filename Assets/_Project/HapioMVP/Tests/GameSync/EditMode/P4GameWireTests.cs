@@ -154,7 +154,57 @@ namespace C6.Prototype.GameSync.Tests
                 Debug.Log($"C6_P4_GAME_WIRE_CAPACITY stored=100 flying=100 motion=200 active=200 identifierCharacters=128 actualBytes={writer.Length} maximumBytes={GameWire.MaximumMultipartyBytes}");
             }
         }
+        [Test]
+        public void MonsterAttackTargetsAFrozenParticipantWithTheHostWarningAndPenalty()
+        {
+            AssertValid(Attacking(3,Seats[2]),3);
+            AssertInvalid(Attacking(3,12345),3);
+            var value=Attacking(3,Seats[1]); value.battle.attackWarningEndsAt+=.5; AssertInvalid(value,3);
+            value=Attacking(3,Seats[1]); value.battle.attackWarningStartsAt-=1; value.battle.attackWarningEndsAt-=1; AssertInvalid(value,3);
+            value=Playing(3); value.battle.penaltySeconds=20; AssertInvalid(value,3);
+            value=Resolved(Attacking(3,Seats[1]),MonsterAttackResult.Hit); value.battle.penaltySeconds=20; AssertValid(value,3);
+            value.battle.penaltySeconds=40; AssertInvalid(value,3);
+        }
+        [Test]
+        public void PublishedAttacksNeverRewindOrChangeAndChangeTheHash()
+        {
+            var before=Attacking(3,Seats[1]);
+            AssertValid(Resolved(Next(before),MonsterAttackResult.Defended),3,before);
+            var after=Next(before); after.battle.attackTarget=Seats[2]; AssertInvalid(after,3,before);
+            Assert.That(GameWire.CanonicalHash(after),Is.Not.EqualTo(GameWire.CanonicalHash(Next(before))));
+            after=Next(before); after.battle.attackSequence=0; after.battle.attackTarget=0; after.battle.attackActive=false;
+            after.battle.attackWarningStartsAt=after.battle.attackWarningEndsAt=0; AssertInvalid(after,3,before);
+            var resolved=Resolved(Next(before),MonsterAttackResult.Defended);
+            after=Next(resolved); after.battle.attackResult=(int)MonsterAttackResult.Hit; AssertInvalid(after,3,resolved);
+        }
 
+        [Test]
+        public void RetryAfterAttacksStartsAnEmptyRoundAndCannotCarryTheOldAttack()
+        {
+            var before=Resolved(Attacking(3,Seats[1]),MonsterAttackResult.Hit); before.battle.penaltySeconds=20;
+            AssertValid(before,3);
+            var retry=Ready(3); retry.revision=before.revision+1; retry.hostNow=before.hostNow+1; retry.serverTime=before.serverTime+1;
+            retry.roundId=retry.attack.roundId=retry.resources.roundId=retry.battle.roundId=2;
+            AssertValid(retry,3,before);
+            var carried=Ready(3); carried.revision=retry.revision; carried.hostNow=retry.hostNow; carried.serverTime=retry.serverTime;
+            carried.roundId=carried.attack.roundId=carried.resources.roundId=carried.battle.roundId=2;
+            carried.battle.attackSequence=1; carried.battle.attackTarget=Seats[1];
+            carried.battle.attackWarningStartsAt=120; carried.battle.attackWarningEndsAt=123;
+            AssertInvalid(carried,3,before);
+            carried=Ready(3); carried.revision=retry.revision; carried.hostNow=retry.hostNow; carried.serverTime=retry.serverTime;
+            carried.roundId=carried.attack.roundId=carried.resources.roundId=carried.battle.roundId=2;
+            carried.battle.penaltySeconds=20; AssertInvalid(carried,3,before);
+        }
+        private static GameSnapshot Attacking(int count,ulong target)
+        {
+            var value=Playing(count); var b=value.battle;
+            b.attackSequence=1; b.attackTarget=target; b.attackActive=true; b.attackWarningStartsAt=120; b.attackWarningEndsAt=123;
+            b.remaining=b.teamHp=150; return value;
+        }
+        private static GameSnapshot Resolved(GameSnapshot value,MonsterAttackResult result)
+        {
+            var b=value.battle; b.attackActive=false; b.attackResolvedSequence=b.attackSequence; b.attackResult=(int)result; return value;
+        }
         private static GameSnapshotContext Context(int count)
         {
             var asset=ScriptableObject.CreateInstance<ScreenLayoutConfig>(); LobbyHostConfig config;
@@ -164,14 +214,15 @@ namespace C6.Prototype.GameSync.Tests
         }
         private static GameSnapshot Ready(int count)
         {
-            var c=Context(count); var players=Seats.Take(count).Select((id,index)=>new LobbyPlayer{clientId=id,playerNumber=index+1,connected=true,ready=true,initialStateReceived=true}).ToArray();
+            var c=Context(count); int hp=c.config.MonsterHpFor(count); // #29 per-player HP table
+            var players=Seats.Take(count).Select((id,index)=>new LobbyPlayer{clientId=id,playerNumber=index+1,connected=true,ready=true,initialStateReceived=true}).ToArray();
             return new GameSnapshot{roomId=Room,sessionId=Session,nonce=Nonce,roundId=1,revision=1,seed=c.seed,configHash=c.configHash,
                 hostNow=100,serverTime=200,continuousTransfers=true,p1=players[0],p2=players[1],players=players,
-                attack=new AttackSnapshot{nonce=Nonce,sessionId=Session,roundId=1,revision=1,hp=100,maxHp=100,state="Playing"},
+                attack=new AttackSnapshot{nonce=Nonce,sessionId=Session,roundId=1,revision=1,hp=hp,maxHp=hp,state="Playing"},
                 resources=new ResourceSnapshot{nonce=Nonce,sessionId=Session,roundId=1,revision=1,seed=c.seed,maximum=100,generateCost=20,
                     regenerationRate=20d/3d,hitRecovery=5,storageLimit=20,players=Seats.Take(count).Select(id=>new ResourcePlayerWire{playerId=id,stamina=100}).ToArray()},
                 battle=new BattleSnapshot{nonce=Nonce,sessionId=Session,roundId=1,revision=1,phase="Ready",remaining=180,teamHp=180,duration=180,
-                    teamHpDecayPerSecond=1,observedMonsterHp=100,monsterMaxHp=100,participants=count}};
+                    teamHpDecayPerSecond=1,observedMonsterHp=hp,monsterMaxHp=hp,participants=count}};
         }
         private static GameSnapshot Playing(int count,ulong? owner=null)
         {

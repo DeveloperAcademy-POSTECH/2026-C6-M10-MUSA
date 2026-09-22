@@ -7,6 +7,7 @@ namespace C6.Prototype.Presentation
     public sealed class ScreenLayoutConfig : ScriptableObject
     {
         public const float DefaultUpperFraction = 0.55f;
+        public const float MinimalBattleFooterHeight = 80f;
         // DEMO_ASSUMPTION: both cameras retain a nonzero viewport, even after an invalid edit.
         public const float MinimumFraction = 0.01f;
         public const float MaximumFraction = 0.99f;
@@ -118,6 +119,37 @@ namespace C6.Prototype.Presentation
         // T06 values extend the same configuration asset; no second gameplay config.
         [SerializeField] private int monsterMaxHp = 100;
         [SerializeField] private int baseDamage = 20;
+
+        [Header("#29 · Monster HP by participants (frozen multiplayer roster)")]
+        [SerializeField] private int monsterMaxHp2Players = 800;
+        [SerializeField] private int monsterMaxHp3Players = 1000;
+        [SerializeField] private int monsterMaxHp4Players = 1200;
+        [SerializeField] private int monsterMaxHp5Players = 1400;
+        public int MonsterMaxHp2Players => Mathf.Clamp(monsterMaxHp2Players, 1, 100000);
+        public int MonsterMaxHp3Players => Mathf.Clamp(monsterMaxHp3Players, 1, 100000);
+        public int MonsterMaxHp4Players => Mathf.Clamp(monsterMaxHp4Players, 1, 100000);
+        public int MonsterMaxHp5Players => Mathf.Clamp(monsterMaxHp5Players, 1, 100000);
+        /// <summary>2~5 players use the table. Legacy 2-player scenes without a frozen roster pass 0 and keep MonsterMaxHp.</summary>
+        public int MonsterMaxHpFor(int participants) => participants switch
+        {
+            2 => MonsterMaxHp2Players,
+            3 => MonsterMaxHp3Players,
+            4 => MonsterMaxHp4Players,
+            5 => MonsterMaxHp5Players,
+            _ => MonsterMaxHp
+        };
+        [Header("#28 · Monster attack and defense (seconds)")]
+        [SerializeField] private float monsterAttackFirstDelaySeconds = 20f;
+        [SerializeField] private float monsterAttackIntervalSeconds = 15f;
+        [SerializeField] private float monsterAttackWarningSeconds = 3f;
+        [SerializeField] private float defenseHoldSeconds = 1.2f; // team playtest: 1.2 s stance (rule book trial was 2 s)
+        [SerializeField] private float defenseFailPenaltySeconds = 20f;
+        public float MonsterAttackFirstDelaySeconds => Valid(monsterAttackFirstDelaySeconds, 20f, 1f, 600f);
+        public float MonsterAttackIntervalSeconds => Valid(monsterAttackIntervalSeconds, 15f, 1f, 600f);
+        public float MonsterAttackWarningSeconds => Valid(monsterAttackWarningSeconds, 3f, .5f, 30f);
+        /// <summary>A defense must fit inside the warning, so the hold never exceeds it.</summary>
+        public float DefenseHoldSeconds => Mathf.Min(Valid(defenseHoldSeconds, 1.2f, .1f, 30f), MonsterAttackWarningSeconds);
+        public float DefenseFailPenaltySeconds => Valid(defenseFailPenaltySeconds, 20f, 0f, 600f);
         [SerializeField] private float projectileSpeed = 12f;
         [SerializeField] private float projectileLifetime = 3f;
         // DEMO_ASSUMPTION: T06 attack-view updates only, not the full T10 state system.

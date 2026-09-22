@@ -12,6 +12,7 @@ namespace C6.Prototype.Battle
         [SerializeField] SplitScreenLayout layout;
         [SerializeField] T09Hud hud;
         [SerializeField] BenchmarkMonster monster;
+        [SerializeField] RectTransform monsterDisplayArea;
         [SerializeField] Vector3 baselinePosition;
         [SerializeField] Quaternion baselineRotation = Quaternion.identity;
         [SerializeField] float baselineFieldOfView;
@@ -32,6 +33,9 @@ namespace C6.Prototype.Battle
         public Vector3 BaselinePosition => baselinePosition;
         public Quaternion BaselineRotation => baselineRotation;
         public float ParticipantYaw => participantYaw;
+        public RectTransform MonsterDisplayArea => monsterDisplayArea;
+        /// <summary>#28: while true, the last solved camera stays put unless the view or HUD area changes.</summary>
+        public bool HoldFraming { get; set; }
 
         public Quaternion ParticipantRotation =>
             Quaternion.AngleAxis(participantYaw, Vector3.up) * baselineRotation;
@@ -85,6 +89,10 @@ namespace C6.Prototype.Battle
             foreach (var renderer in visualRenderers)
                 if (renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy) bounds.Encapsulate(renderer.bounds);
             var viewport = camera.pixelRect;
+            if (HoldFraming && previousFit && available == EffectiveScreenRect && viewport == lastViewport
+                && camera.transform.position == lastCameraPosition && camera.transform.rotation == participantRotation
+                && Mathf.Approximately(camera.fieldOfView, baselineFieldOfView))
+            { FitSucceeded = true; return true; }
             if (previousFit && available == EffectiveScreenRect && bounds == lastBounds && viewport == lastViewport
                 && camera.transform.position == lastCameraPosition && camera.transform.rotation == participantRotation
                 && Mathf.Approximately(camera.fieldOfView, baselineFieldOfView))
@@ -110,14 +118,23 @@ namespace C6.Prototype.Battle
         {
             area = Rect.MinMaxRect(Mathf.Max(viewport.xMin, safe.xMin), Mathf.Max(viewport.yMin, safe.yMin),
                 Mathf.Min(viewport.xMax, safe.xMax), Mathf.Min(viewport.yMax, safe.yMax));
-            if (hud.TeamHpLabel == null || hud.ClockLabel == null || hud.StorageLabel == null
-                || hud.ResourceModeLabel == null || hud.RoundLabel == null) return false;
-            float top = Mathf.Min(ScreenRect(hud.TeamHpLabel.rectTransform).yMin,
-                ScreenRect(hud.ClockLabel.rectTransform).yMin, ScreenRect(hud.StorageLabel.rectTransform).yMin);
-            float bottom = Mathf.Max(ScreenRect(hud.ResourceModeLabel.rectTransform).yMax,
-                ScreenRect(hud.RoundLabel.rectTransform).yMax);
-            area.yMin = Mathf.Max(area.yMin, bottom);
-            area.yMax = Mathf.Min(area.yMax, top);
+            if (monsterDisplayArea != null)
+            {
+                Rect display = ScreenRect(monsterDisplayArea);
+                area = Rect.MinMaxRect(Mathf.Max(area.xMin, display.xMin), Mathf.Max(area.yMin, display.yMin),
+                    Mathf.Min(area.xMax, display.xMax), Mathf.Min(area.yMax, display.yMax));
+            }
+            else
+            {
+                if (hud.TeamHpLabel == null || hud.ClockLabel == null || hud.StorageLabel == null
+                    || hud.ResourceModeLabel == null || hud.RoundLabel == null) return false;
+                float top = Mathf.Min(ScreenRect(hud.TeamHpLabel.rectTransform).yMin,
+                    ScreenRect(hud.ClockLabel.rectTransform).yMin, ScreenRect(hud.StorageLabel.rectTransform).yMin);
+                float bottom = Mathf.Max(ScreenRect(hud.ResourceModeLabel.rectTransform).yMax,
+                    ScreenRect(hud.RoundLabel.rectTransform).yMax);
+                area.yMin = Mathf.Max(area.yMin, bottom);
+                area.yMax = Mathf.Min(area.yMax, top);
+            }
             if (area.width <= 1f || area.height <= 1f) return false;
             float padding = Mathf.Min(area.width, area.height) * layout.Config.BattleFramingPaddingFraction;
             area = Rect.MinMaxRect(area.xMin + padding, area.yMin + padding, area.xMax - padding, area.yMax - padding);

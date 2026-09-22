@@ -47,6 +47,68 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(hud.Canvas.GetComponent<CanvasScaler>(), Is.Not.Null);
             Assert.That(hud.Canvas.GetComponent<GraphicRaycaster>(), Is.Not.Null);
             Assert.That(hud.ResultOverlay.activeSelf, Is.False);
+            Assert.That(hud.MinimalBattlePresentation, Is.True);
+            var framing = Components<ThrowBattleFraming>(preview).Single();
+            Assert.That(hud.MonsterHpFill, Is.Not.Null);
+            Assert.That(hud.TeamTimeFill, Is.Not.Null);
+            Assert.That(hud.TeamTimeValue, Is.Not.Null);
+            Assert.That(hud.StaminaFill, Is.Not.Null);
+            Assert.That(framing.MonsterDisplayArea, Is.Not.Null);
+            Assert.That(framing.MonsterDisplayArea.GetComponent<Graphic>(), Is.Null,
+                "MonsterDisplayArea defines framing only and must remain invisible.");
+            Assert.That(framing.MonsterDisplayArea.GetComponent<Selectable>(), Is.Null,
+                "MonsterDisplayArea must never intercept input.");
+            Assert.That(hud.GenerateButton.gameObject.activeSelf, Is.True);
+            Assert.That(hud.transform.Find("T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent/Header").gameObject.activeSelf,
+                Is.False);
+            var upperViewport = (RectTransform)hud.transform.Find("T09Overlay/SafeArea/UpperSafeViewport");
+            var lowerViewport = (RectTransform)hud.transform.Find("T09Overlay/SafeArea/LowerSafeViewport");
+            Assert.That(upperViewport.gameObject.activeSelf, Is.True);
+            Assert.That(lowerViewport.gameObject.activeSelf, Is.True);
+            Assert.That(upperViewport.anchorMin, Is.EqualTo(new Vector2(0f, .45f)));
+            Assert.That(upperViewport.anchorMax, Is.EqualTo(Vector2.one));
+            Assert.That(lowerViewport.anchorMin, Is.EqualTo(Vector2.zero));
+            Assert.That(lowerViewport.anchorMax, Is.EqualTo(new Vector2(1f, .45f)));
+            Assert.That(hud.transform.Find(
+                "T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent").localScale, Is.EqualTo(Vector3.one));
+            Assert.That(hud.transform.Find(
+                "T09Overlay/SafeArea/LowerSafeViewport/LowerHudContent").localScale, Is.EqualTo(Vector3.one));
+            Assert.That(hud.transform.Find(
+                "T09Overlay/SafeArea/LowerSafeViewport/LowerHudContent/ResourceControls").gameObject.activeSelf,
+                Is.True, "The footer RectTransform still defines the orb workspace.");
+            Assert.That(hud.StaminaLabel.gameObject.activeSelf, Is.False);
+            Assert.That(hud.RecoveryLabel.gameObject.activeSelf, Is.False);
+
+            var upperContent = (RectTransform)hud.transform.Find(
+                "T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent");
+            var battleStats = (RectTransform)upperContent.Find("BattleStats");
+            var hpPanel = (RectTransform)battleStats.Find("MonsterHpPanel");
+            var teamTime = (RectTransform)upperContent.Find("TeamTimeBar");
+            var monsterArea = framing.MonsterDisplayArea;
+            var footer = (RectTransform)hud.transform.Find(
+                "T09Overlay/SafeArea/LowerSafeViewport/LowerHudContent/ResourceControls");
+            var staminaPanel = (RectTransform)footer.Find("PersonalStaminaPanel");
+            var resourceButtons = (RectTransform)footer.Find("ResourceButtons");
+            Assert.That(staminaPanel, Is.Not.Null,
+                "The five-section stamina view belongs at the bottom of the orb area.");
+            Assert.That(battleStats.Find("PersonalStaminaPanel"), Is.Null);
+            Assert.That(hpPanel.anchorMin.x, Is.EqualTo(0f).Within(.0001f));
+            Assert.That(hpPanel.anchorMax.x, Is.EqualTo(1f).Within(.0001f));
+            Assert.That(teamTime.anchorMax.y, Is.LessThan(monsterArea.anchorMin.y));
+            Assert.That(monsterArea.anchorMax.y, Is.LessThan(battleStats.anchorMin.y));
+            Assert.That(footer.sizeDelta.y,
+                Is.EqualTo(ScreenLayoutConfig.MinimalBattleFooterHeight).Within(.0001f));
+            Assert.That(resourceButtons.anchoredPosition.y, Is.GreaterThanOrEqualTo(staminaPanel.sizeDelta.y));
+            Assert.That(hud.GenerateButton.transform.parent, Is.SameAs(resourceButtons));
+            Assert.That(hud.GenerateButton.GetComponent<RectTransform>().anchorMin.x,
+                Is.EqualTo(.32f).Within(.0001f));
+            var staminaTrack = (RectTransform)staminaPanel.Find("ContinuousStaminaTrack");
+            Assert.That(staminaTrack, Is.Not.Null);
+            Assert.That(Enumerable.Range(1, 4)
+                .All(index => staminaTrack.Find("TwentyMarker" + index) != null), Is.True);
+            Assert.That(hud.Canvas.GetComponentsInChildren<Graphic>(true)
+                .Any(graphic => graphic.name.IndexOf("Defense", StringComparison.OrdinalIgnoreCase) >= 0), Is.False,
+                "The blue defense regions in the reference are explanatory and must not render.");
 
             foreach (var button in Buttons(hud))
                 Assert.That(button.onClick.GetPersistentEventCount(), Is.Zero,

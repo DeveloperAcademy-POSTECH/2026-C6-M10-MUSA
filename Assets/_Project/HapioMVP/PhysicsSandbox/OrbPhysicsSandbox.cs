@@ -25,7 +25,7 @@ namespace C6.Prototype.PhysicsSandbox
         public Rect leftWorkspace = new Rect(-7f, -3.5f, 6f, 7f);
         public Rect rightWorkspace = new Rect(1f, -3.5f, 6f, 7f);
         public bool showHelp = true;
-        [Tooltip("Matches the current game's lower viewport, safe area and 144-point connected-game footer.")]
+        [Tooltip("Matches the current game's lower viewport, safe area and minimal battle footer.")]
         public bool matchGameArea;
         [Tooltip("ON: 실제 게임 영역 대신 기획 시안처럼 화면의 약 절반을 구슬 영역으로 사용합니다. '실제 게임 조합대 영역'이 켜져 있을 때만 적용됩니다.")]
         public bool useHalfScreenArea = true;
@@ -703,7 +703,7 @@ namespace C6.Prototype.PhysicsSandbox
         private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
         /// <summary>The same connected-game HUD calculation used by T09Hud: safe lower viewport,
-        /// CanvasScaler 390x844 with .5 match, FitContent minimum height 280, footer height 144.</summary>
+        /// CanvasScaler 390x844 with .5 match and the current minimal battle footer.</summary>
         public static Rect GameWorkspacePixels(int width, int height, Rect safe, float lowerFraction)
         {
             float scale = Mathf.Sqrt(Mathf.Max(1f, width) / 390f * Mathf.Max(1f, height) / 844f);
@@ -712,7 +712,7 @@ namespace C6.Prototype.PhysicsSandbox
             float regionHeight = Mathf.Max(1f, top - bottom);
             float fit = Mathf.Max(.01f, Mathf.Min(1f, Mathf.Min(safe.width / scale, 580f) / 320f,
                 regionHeight / scale / 280f));
-            float footerTop = Mathf.Min(top, bottom + 144f * scale * fit);
+            float footerTop = Mathf.Min(top, bottom + ScreenLayoutConfig.MinimalBattleFooterHeight * scale * fit);
             return new Rect(safe.xMin, footerTop, safe.width, Mathf.Max(1f, top - footerTop));
         }
 
