@@ -106,7 +106,8 @@ namespace C6.Prototype.Battle
             {
                 if (now.HasValue && attack != null && Warns(state, attack.LocalPlayerId, now.Value))
                     warning.Show(now.Value - state.attackWarningStartsAt, defense == null ? WarningLook.Pulse
-                        : defense.InStance ? WarningLook.Stance : defense.Holding ? WarningLook.Holding : WarningLook.Pulse);
+                        : defense.InStance ? WarningLook.Stance : defense.Holding ? WarningLook.Holding : WarningLook.Pulse,
+                        defense != null ? defense.HoldProgress : 0f);
                 else if (warning.Visible) warning.Hide();
             }
         }

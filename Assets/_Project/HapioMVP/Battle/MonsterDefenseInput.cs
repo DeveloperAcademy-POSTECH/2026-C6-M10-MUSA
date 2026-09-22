@@ -33,6 +33,9 @@ namespace C6.Prototype.Battle
 
         /// <summary>Both hands are down during this screen's warning and the stance is not reached yet.</summary>
         public bool Holding => tracker.Holding;
+        /// <summary>Local two-hand hold progress for the warning UI; the Host still judges defense.</summary>
+        public float HoldProgress => layout == null || layout.Config.DefenseHoldSeconds <= 0f ? 0f :
+            Mathf.Clamp01((float)(tracker.HeldSeconds / layout.Config.DefenseHoldSeconds));
         /// <summary>The hold completed for the current attack: this screen is in the defense stance until the warning ends.</summary>
         public bool InStance => tracker.Reported;
 

@@ -15,6 +15,7 @@ namespace C6.Prototype.Battle
     public sealed class MonsterAttackWarning : MonoBehaviour
     {
         [SerializeField] private Graphic[] edges;
+        [SerializeField] private DefenseTouchMarker[] defenseMarkers;
         [SerializeField, Min(.1f)] private float pulsesPerSecond = 2.5f;   // DEMO_TUNING_VALUE
         [SerializeField, Range(0f, 1f)] private float minimumAlpha = .35f; // DEMO_TUNING_VALUE: dimmest point of a pulse
         [SerializeField] private Color stanceColor = new Color(.6f, 1f, .6f, .85f); // DEMO_TUNING_VALUE: light green defense stance
@@ -32,7 +33,7 @@ namespace C6.Prototype.Battle
             return Mathf.Lerp(Mathf.Clamp01(minimumAlpha), 1f, (float)wave);
         }
 
-        public void Show(double elapsedSeconds, WarningLook look = WarningLook.Pulse)
+        public void Show(double elapsedSeconds, WarningLook look = WarningLook.Pulse, float holdProgress = 0f)
         {
             if (edges == null) return;
             Capture();
@@ -44,12 +45,15 @@ namespace C6.Prototype.Battle
                 edges[i].color = new Color(color.r, color.g, color.b, color.a * alpha);
                 edges[i].enabled = true;
             }
+            if (defenseMarkers != null)
+                foreach (var marker in defenseMarkers) if (marker != null) marker.Show(look, alpha, holdProgress);
             Look = look; Visible = true;
         }
 
         public void Hide()
         {
             if (edges != null) foreach (var edge in edges) if (edge != null) edge.enabled = false;
+            if (defenseMarkers != null) foreach (var marker in defenseMarkers) if (marker != null) marker.Hide();
             Visible = false;
         }
 

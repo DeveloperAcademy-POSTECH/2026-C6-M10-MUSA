@@ -127,7 +127,7 @@ namespace C6.Prototype.GameSync.Tests
             finally { if (prior.IsValid()) EditorSceneManager.ClosePreviewScene(prior); }
         }
         [Test]
-        public void DefenseZonesAreInvisibleEdgeAreasAboveTheTeamHpBar()
+        public void DefenseInputZonesStayUnchangedAndVisualGuidesStayAboveTheTeamHpBar()
         {
             var controller = Components<T09BattleController>(scene).Single();
             var upper = controller.Hud.transform.Find("T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent");
@@ -149,6 +149,11 @@ namespace C6.Prototype.GameSync.Tests
             {
                 Assert.That(zone.parent, Is.SameAs(upper), "#28 zones belong to the battle area");
                 Assert.That(zone.GetComponents<Component>().Length, Is.EqualTo(1), "RectTransform only: never drawn and never blocks input");
+                var marker = zone.GetComponentInChildren<DefenseTouchMarker>(true);
+                Assert.That(marker, Is.Not.Null, "the zone center shows where to hold during a targeted warning");
+                Assert.That(marker.GetComponent<RectTransform>().anchoredPosition, Is.EqualTo(Vector2.zero));
+                Assert.That(marker.HoldProgress.type, Is.EqualTo(UnityEngine.UI.Image.Type.Filled));
+                Assert.That(marker.HoldProgress.fillMethod, Is.EqualTo(UnityEngine.UI.Image.FillMethod.Radial360));
                 zone.GetWorldCorners(corners);
                 Assert.That(corners[0].y, Is.GreaterThanOrEqualTo(teamBarTop),
                     "defense input stays above the team bar across their different parents");
@@ -193,6 +198,14 @@ namespace C6.Prototype.GameSync.Tests
                         Assert.That(graphic.FindProperty("m_Enabled").boolValue, Is.False, "hidden until the Host attack targets this screen");
                     }
                 }
+                var markers = serialized.FindProperty("defenseMarkers");
+                Assert.That(markers.arraySize, Is.EqualTo(2));
+                Assert.That(markers.GetArrayElementAtIndex(0).objectReferenceValue,
+                    Is.SameAs(controller.Hud.transform.Find("T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent/DefenseZoneLeft")
+                        .GetComponentInChildren<DefenseTouchMarker>(true)));
+                Assert.That(markers.GetArrayElementAtIndex(1).objectReferenceValue,
+                    Is.SameAs(controller.Hud.transform.Find("T09Overlay/SafeArea/UpperSafeViewport/UpperHudContent/DefenseZoneRight")
+                        .GetComponentInChildren<DefenseTouchMarker>(true)));
             }
         }
         private T SingleOnRoot<T>(GameObject root) where T : Component
