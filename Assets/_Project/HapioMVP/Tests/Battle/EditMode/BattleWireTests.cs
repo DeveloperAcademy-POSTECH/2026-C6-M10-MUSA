@@ -145,6 +145,42 @@ namespace C6.Prototype.Battle.Tests
             Assert.Throws<ArgumentException>(() =>
             { using (var ignored = BattleWire.Write(new BattleSyncPacket { nonce = new string('x', BattleWire.MaximumBytes) })) { } });
         }
+
+        [Test]
+        public void MonsterAttackExistsOnlyAfterStartAndWarnsOnlyWhilePlaying()
+        {
+            Assert.That(BattleWire.ValidSnapshot(Attacking()), Is.True);
+            var resolved = Attacking(); resolved.attackActive = false; resolved.attackResolvedSequence = 1;
+            resolved.attackResult = (int)MonsterAttackResult.Hit;
+            Assert.That(BattleWire.ValidSnapshot(resolved), Is.True);
+            var ended = Attacking(); ended.attackActive = false; ended.phase = BattlePhase.Defeat.ToString(); ended.remaining = ended.teamHp = 0;
+            Assert.That(BattleWire.ValidSnapshot(ended), Is.True, "a round that ended mid-warning keeps the unresolved attack");
+
+            Action<BattleSnapshot>[] mutations =
+            {
+                value => value.attackSequence = -1,
+                value => { value.attackResolvedSequence = 1; value.attackResult = (int)MonsterAttackResult.Hit; }, // live but resolved
+                value => value.attackActive = false,                                   // Playing attack without a result
+                value => { value.attackActive = false; value.attackResolvedSequence = 1; value.attackResult = 9; },
+                value => { value.attackActive = false; value.attackResolvedSequence = 1; }, // resolved without a result
+                value => value.attackResult = (int)MonsterAttackResult.Hit,            // result before resolution
+                value => value.attackWarningEndsAt = value.attackWarningStartsAt,
+                value => value.attackWarningStartsAt = value.startedAt - 1,
+                value => value.attackWarningEndsAt = double.NaN,
+                value => { value.phase = BattlePhase.Victory.ToString(); value.observedMonsterHp = 0; }, // warning after the end
+                value => value.attackSequence = 0,                                     // attack fields without an attack
+            };
+            foreach (var mutate in mutations)
+            { var value = Attacking(); mutate(value); Assert.That(BattleWire.ValidSnapshot(value), Is.False); }
+
+            var lobby = Lobby(); lobby.attackSequence = 1; lobby.attackWarningStartsAt = 30; lobby.attackWarningEndsAt = 33;
+            Assert.That(BattleWire.ValidSnapshot(lobby), Is.False, "no attack before Start");
+        }
+        private static BattleSnapshot Attacking()
+        {
+            var value = Playing(); value.attackSequence = 1; value.attackTarget = 1; value.attackActive = true;
+            value.attackWarningStartsAt = 30; value.attackWarningEndsAt = 33; return value;
+        }
         private static bool Accept(BattleSnapshot previous, BattleSnapshot next) => BattleWire.AcceptsSnapshot(previous, next,
             previous.nonce, previous.sessionId, previous.roundId);
         private static BattleSnapshot Playing(string nonce = null) => new BattleSnapshot

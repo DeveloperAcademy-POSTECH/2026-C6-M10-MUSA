@@ -40,7 +40,7 @@ namespace C6.Prototype.GameSync
                 Require(count>=2&&count<=5&&index>=0&&index<count,"Bad participant index");
                 Directory.CreateDirectory(output); ownsOutput=true; shared=Directory.GetParent(output).FullName;
                 game=GetComponent<T10GameSession>(); controller=game.Controller;
-                Require(game.BuildIdentifier=="24"&&game.ContinuousTransfersEnabled&&controller.ContinuousTransfersEnabled&&controller.OrbPhysicsEnabled,"Build24 passage wiring required");
+                Require(game.BuildIdentifier=="25"&&game.ContinuousTransfersEnabled&&controller.ContinuousTransfersEnabled&&controller.OrbPhysicsEnabled,"Build25 developer-settings wiring required");
                 Application.runInBackground=true; Application.targetFrameRate=60; Application.logMessageReceived+=Observe; active=true;
             } catch(Exception e){error=e.ToString();}
             var stack=new Stack<IEnumerator>(); stack.Push(Run());
