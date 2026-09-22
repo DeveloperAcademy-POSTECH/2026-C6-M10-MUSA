@@ -146,6 +146,12 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(caption.text, Does.Contain("20"));
             Assert.That(hud.MonsterHpFill.anchorMax.x, Is.EqualTo(.8f).Within(.00001f));
             Assert.That(hud.StaminaFill.anchorMax.x, Is.EqualTo(.455f).Within(.00001f));
+            var staminaTrack = hud.StaminaFill.parent;
+            var gems = Enumerable.Range(1, 5)
+                .Select(index => (RectTransform)staminaTrack.Find("FigmaStaminaGem" + index + "/FillClip"))
+                .ToArray();
+            Assert.That(gems.Select(gem => gem.anchorMax.x),
+                Is.EqualTo(new[] { 1f, 1f, .275f, 0f, 0f }).Within(.00001f));
 
             hud.SetBattle("Playing", 90, 90, 180, 2, false, false, false, 80, 45.5, false);
             Assert.That(hud.TeamTimeFill.anchorMax.x, Is.EqualTo(.5f).Within(.00001f));
