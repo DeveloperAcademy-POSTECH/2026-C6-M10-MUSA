@@ -49,6 +49,7 @@ namespace C6.Prototype.Battle
         [SerializeField] private RectTransform teamTimeFill;
         [SerializeField] private Text teamTimeValue;
         [SerializeField] private RectTransform staminaFill;
+        [SerializeField] private RectTransform[] staminaSegments;
         [SerializeField] private Text generateCaption;
         private Rect lastSafeArea;
         private Rect lastTop;
@@ -143,6 +144,13 @@ namespace C6.Prototype.Battle
             if (StaminaLabel != null)
                 StaminaLabel.text = Number(confirmed) + " / " + Number(maximum);
             SetHorizontalFill(staminaFill, confirmed, maximum);
+            if (staminaSegments != null)
+            {
+                float sections = (float)(confirmed / maximum * staminaSegments.Length);
+                for (int i = 0; i < staminaSegments.Length; i++)
+                    if (staminaSegments[i] != null)
+                        SetHorizontalFill(staminaSegments[i], Mathf.Clamp01(sections - i), 1d);
+            }
             if (RecoveryLabel != null)
             {
                 string recovery = Finite(rate) && rate > 0d && Finite(cost) && cost > 0d
