@@ -91,6 +91,46 @@ namespace C6.Prototype.Battle.Tests
         }
 
         [Test]
+        public void FailedDefensePenaltyShortensTeamTimeWithoutMovingTheDeadline()
+        {
+            var clock = Playing(1000);
+            Assert.That(clock.ApplyTimePenalty(1010, 20), Is.True);
+            Assert.That(clock.Deadline, Is.EqualTo(1180), "the absolute deadline never moves");
+            Assert.That(clock.PenaltySeconds, Is.EqualTo(20));
+            Assert.That(clock.Remaining, Is.EqualTo(150));
+            Assert.That(clock.Advance(1100), Is.True);
+            Assert.That(clock.Remaining, Is.EqualTo(60));
+            Assert.That(clock.Advance(1160), Is.True);
+            Assert.That(clock.Phase, Is.EqualTo(BattlePhase.Defeat), "time runs out 20 seconds earlier");
+        }
+
+        [Test]
+        public void PenaltyReachingZeroIsADefeatAndOnlyAppliesWhilePlaying()
+        {
+            var clock = Playing(0);
+            Assert.That(clock.ApplyTimePenalty(170, 20), Is.True);
+            Assert.That(clock.Phase, Is.EqualTo(BattlePhase.Defeat));
+            Assert.That(clock.Remaining, Is.Zero);
+            Assert.That(clock.ApplyTimePenalty(171, 20), Is.False, "no penalty after the result");
+            Assert.That(NewLobby(2, false).ApplyTimePenalty(0, 20), Is.False, "no penalty before the battle starts");
+            Assert.That(Playing(0).ApplyTimePenalty(10, 0), Is.False);
+            Assert.That(Playing(0).ApplyTimePenalty(10, double.NaN), Is.False);
+        }
+
+        [Test]
+        public void RetryStartsTheNextRoundWithoutTheLostTime()
+        {
+            var clock = Playing(0);
+            Assert.That(clock.ApplyTimePenalty(10, 20), Is.True);
+            clock.BeginLobby("session-a", 2, 2, false, 100);
+            Assert.That(clock.PenaltySeconds, Is.Zero, "#28 lost time belongs to its round");
+            Assert.That(clock.Remaining, Is.EqualTo(180));
+            Assert.That(clock.Start(500), Is.True);
+            Assert.That(clock.Advance(510), Is.True);
+            Assert.That(clock.Remaining, Is.EqualTo(170));
+        }
+
+        [Test]
         public void PlayingSuspensionCountsElapsedHostTimeOnReturn()
         {
             var clock = Playing(300);

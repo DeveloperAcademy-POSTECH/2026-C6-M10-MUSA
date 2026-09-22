@@ -53,6 +53,11 @@ MonoBehaviour:
   monsterMaxHp3Players: 1000
   monsterMaxHp4Players: 1200
   monsterMaxHp5Players: 1400
+  monsterAttackFirstDelaySeconds: 20
+  monsterAttackIntervalSeconds: 15
+  monsterAttackWarningSeconds: 3
+  defenseHoldSeconds: 1.2
+  defenseFailPenaltySeconds: 20
   projectileSpeed: 12
   projectileLifetime: 3
   attackSnapshotRateHz: 20

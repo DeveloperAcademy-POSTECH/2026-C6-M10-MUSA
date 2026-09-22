@@ -34,6 +34,8 @@ namespace C6.Prototype.Battle
         public Quaternion BaselineRotation => baselineRotation;
         public float ParticipantYaw => participantYaw;
         public RectTransform MonsterDisplayArea => monsterDisplayArea;
+        /// <summary>#28: while true, the last solved camera stays put unless the view or HUD area changes.</summary>
+        public bool HoldFraming { get; set; }
 
         public Quaternion ParticipantRotation =>
             Quaternion.AngleAxis(participantYaw, Vector3.up) * baselineRotation;
@@ -87,6 +89,10 @@ namespace C6.Prototype.Battle
             foreach (var renderer in visualRenderers)
                 if (renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy) bounds.Encapsulate(renderer.bounds);
             var viewport = camera.pixelRect;
+            if (HoldFraming && previousFit && available == EffectiveScreenRect && viewport == lastViewport
+                && camera.transform.position == lastCameraPosition && camera.transform.rotation == participantRotation
+                && Mathf.Approximately(camera.fieldOfView, baselineFieldOfView))
+            { FitSucceeded = true; return true; }
             if (previousFit && available == EffectiveScreenRect && bounds == lastBounds && viewport == lastViewport
                 && camera.transform.position == lastCameraPosition && camera.transform.rotation == participantRotation
                 && Mathf.Approximately(camera.fieldOfView, baselineFieldOfView))

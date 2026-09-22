@@ -25,11 +25,20 @@ namespace C6.Prototype.Battle
         public double teamHp;
         public double duration;
         public double teamHpDecayPerSecond;
+        public double penaltySeconds; // #28 accumulated failed-defense time, never moves the deadline
         public int observedMonsterHp;
         public int monsterMaxHp;
         public bool developmentSolo;
         public bool shortDuration;
         public int participants;
+        // #28 Host monster attack. Sequence 0 means no attack yet this round. Warning times use the Host clock like deadline.
+        public int attackSequence;
+        public ulong attackTarget;
+        public double attackWarningStartsAt;
+        public double attackWarningEndsAt;
+        public bool attackActive;
+        public int attackResolvedSequence;
+        public int attackResult; // MonsterAttackResult of attackResolvedSequence
         // A client may report its lost connection without inventing a victory/defeat or ticking HP.
         public bool locallyDetectedNetworkError;
     }
@@ -85,6 +94,7 @@ namespace C6.Prototype.Battle
                 || !Finite(value.remaining) || value.remaining < 0 || value.remaining > value.duration
                 || !Finite(value.teamHp) || value.teamHp < 0 || value.teamHp > value.duration * value.teamHpDecayPerSecond
                 || Math.Abs(value.teamHp - value.remaining * value.teamHpDecayPerSecond) > 1e-6
+                || !Finite(value.penaltySeconds) || value.penaltySeconds < 0 || value.penaltySeconds > 86400
                 || !Finite(value.startedAt) || !Finite(value.deadline) || value.startedAt < 0 || value.deadline < 0
                 || value.monsterMaxHp < 1 || value.observedMonsterHp < 0 || value.observedMonsterHp > value.monsterMaxHp
                 || value.participants < 1 || value.participants > maximumParticipants || value.locallyDetectedNetworkError) return false;
@@ -92,13 +102,30 @@ namespace C6.Prototype.Battle
             if (started && (value.deadline <= value.startedAt || Math.Abs(value.deadline - value.startedAt - value.duration) > 1e-6)) return false;
             if (phase == BattlePhase.Lobby || phase == BattlePhase.Ready)
             {
-                if (value.startedAt != 0 || value.deadline != 0 || value.remaining != value.duration || value.observedMonsterHp != value.monsterMaxHp) return false;
+                if (value.startedAt != 0 || value.deadline != 0 || value.remaining != value.duration || value.observedMonsterHp != value.monsterMaxHp
+                    || value.penaltySeconds != 0) return false;
                 if (phase == BattlePhase.Ready && value.participants < 2 && !value.developmentSolo) return false;
             }
             if (phase == BattlePhase.Playing && (value.remaining <= 0 || value.observedMonsterHp <= 0)) return false;
             if (phase == BattlePhase.Victory && (value.remaining <= 0 || value.observedMonsterHp != 0)) return false;
             if (phase == BattlePhase.Defeat && value.remaining != 0) return false;
-            return true;
+            return ValidMonsterAttack(value, phase);
+        }
+
+        /// <summary>#28: attacks exist only after Start, a live warning only while Playing, and results never skip ahead.</summary>
+        private static bool ValidMonsterAttack(BattleSnapshot value, BattlePhase phase)
+        {
+            int sequence = value.attackSequence, resolved = value.attackResolvedSequence;
+            if (sequence < 0 || resolved < 0 || resolved > sequence || sequence - resolved > 1
+                || !Enum.IsDefined(typeof(MonsterAttackResult), value.attackResult)
+                || (resolved == 0) != (value.attackResult == (int)MonsterAttackResult.None)
+                || !Finite(value.attackWarningStartsAt) || !Finite(value.attackWarningEndsAt)) return false;
+            if (sequence == 0)
+                return !value.attackActive && value.attackTarget == 0 && value.attackWarningStartsAt == 0 && value.attackWarningEndsAt == 0;
+            if (phase == BattlePhase.Lobby || phase == BattlePhase.Ready
+                || value.attackWarningStartsAt < value.startedAt || value.attackWarningEndsAt <= value.attackWarningStartsAt) return false;
+            if (value.attackActive) return phase == BattlePhase.Playing && resolved == sequence - 1;
+            return phase != BattlePhase.Playing || resolved == sequence;
         }
 
         internal static bool AcceptsSnapshot(BattleSnapshot current, BattleSnapshot incoming,

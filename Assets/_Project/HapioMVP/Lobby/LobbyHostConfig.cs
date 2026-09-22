@@ -20,7 +20,7 @@ namespace C6.Prototype.Lobby
         public int monsterHp, damage, storageLimit;
 
         public int monsterHp2, monsterHp3, monsterHp4, monsterHp5;
-
+        public float monsterAttackFirstDelay, monsterAttackInterval, monsterAttackWarning, defenseHold, defenseFailPenalty;
         public double staminaMax, staminaStart, generateCost, recoveryAmount, recoverySeconds, hitRecovery, duration, teamHpDecay;
         public float projectileSpeed, projectileLifetime, projectileRadius, snapshotRate, launchWidth;
         public Vector3 launchOrigin, launchAim;
@@ -50,7 +50,11 @@ namespace C6.Prototype.Lobby
             return new LobbyHostConfig { upperFraction=c.UpperFraction, combinationRadius=c.CombinationRadiusFraction,
                 horizontalSwipe=c.HorizontalSwipeFraction, horizontalDominance=c.HorizontalDominance,
                 orbRadiusScreenFraction=c.OrbRadiusScreenFraction, orbRadiusCapScale=c.OrbRadiusCapScale,
-                monsterHp=c.MonsterMaxHp,monsterHp2=c.MonsterMaxHp2Players, monsterHp3=c.MonsterMaxHp3Players, monsterHp4=c.MonsterMaxHp4Players, monsterHp5=c.MonsterMaxHp5Players, damage=c.BaseDamage, storageLimit=c.OrbStorageLimit,
+                monsterHp=c.MonsterMaxHp, monsterHp2=c.MonsterMaxHp2Players, monsterHp3=c.MonsterMaxHp3Players,
+                monsterHp4=c.MonsterMaxHp4Players, monsterHp5=c.MonsterMaxHp5Players,
+                monsterAttackFirstDelay=c.MonsterAttackFirstDelaySeconds, monsterAttackInterval=c.MonsterAttackIntervalSeconds,
+                monsterAttackWarning=c.MonsterAttackWarningSeconds, defenseHold=c.DefenseHoldSeconds,
+                defenseFailPenalty=c.DefenseFailPenaltySeconds, damage=c.BaseDamage, storageLimit=c.OrbStorageLimit,
                 staminaMax=c.StaminaMax, staminaStart=c.StaminaStart, generateCost=c.GenerateCost,
                 recoveryAmount=c.StaminaRecoveryAmount, recoverySeconds=c.StaminaRecoverySeconds,
                 hitRecovery=c.StaminaHitRecovery, duration=c.BattleDurationSeconds, teamHpDecay=c.TeamHpDecayPerSecond,
@@ -78,7 +82,12 @@ namespace C6.Prototype.Lobby
             return In(value.upperFraction, .01f, .99f) && In(value.combinationRadius, .01f, .5f)
                 && In(value.horizontalSwipe, .01f, 1) && In(value.horizontalDominance, 1, 5)
                 && In(value.orbRadiusScreenFraction, .01f, .2f) && In(value.orbRadiusCapScale, 1f, 3f)
-                && value.monsterHp >= 1 && value.monsterHp <= 100000 && value.damage >= 1 && value.damage <= 100000 && In(value.monsterHp2, 1, 100000) && In(value.monsterHp3, 1, 100000) && In(value.monsterHp4, 1, 100000) && In(value.monsterHp5, 1, 100000)
+                && value.monsterHp >= 1 && value.monsterHp <= 100000 && value.damage >= 1 && value.damage <= 100000
+                && In(value.monsterHp2, 1, 100000) && In(value.monsterHp3, 1, 100000)
+                && In(value.monsterHp4, 1, 100000) && In(value.monsterHp5, 1, 100000)
+                && In(value.monsterAttackFirstDelay, 1, 600) && In(value.monsterAttackInterval, 1, 600)
+                && In(value.monsterAttackWarning, .5f, 30)
+                && In(value.defenseHold, .1f, value.monsterAttackWarning) && In(value.defenseFailPenalty, 0, 600)
                 && value.storageLimit >= 1 && value.storageLimit <= 20 && In(value.staminaMax, 1, 100000)
                 && In(value.staminaStart, 0, value.staminaMax) && In(value.generateCost, .001f, value.staminaMax)
                 && In(value.recoveryAmount, 0, value.staminaMax) && In(value.recoverySeconds, .01f, 3600)
@@ -107,7 +116,7 @@ namespace C6.Prototype.Lobby
                 { "horizontalSwipe", Kind.Number }, { "horizontalDominance", Kind.Number },
                 { "orbRadiusScreenFraction", Kind.Number }, { "orbRadiusCapScale", Kind.Number },
                 { "freeWorkspace", Kind.Boolean }, { "attackTrigger", Kind.Text },
-                { "monsterHp", Kind.Integer }, { "monsterHp2", Kind.Integer }, { "monsterHp3", Kind.Integer }, { "monsterHp4", Kind.Integer }, { "monsterHp5", Kind.Integer }, { "damage", Kind.Integer }, { "storageLimit", Kind.Integer },
+                { "monsterHp", Kind.Integer }, { "monsterHp2", Kind.Integer }, { "monsterHp3", Kind.Integer }, { "monsterHp4", Kind.Integer }, { "monsterHp5", Kind.Integer }, { "monsterAttackFirstDelay", Kind.Number }, { "monsterAttackInterval", Kind.Number }, { "monsterAttackWarning", Kind.Number }, { "defenseHold", Kind.Number }, { "defenseFailPenalty", Kind.Number }, { "damage", Kind.Integer }, { "storageLimit", Kind.Integer },
                 { "staminaMax", Kind.Number }, { "staminaStart", Kind.Number }, { "generateCost", Kind.Number },
                 { "recoveryAmount", Kind.Number }, { "recoverySeconds", Kind.Number }, { "hitRecovery", Kind.Number },
                 { "duration", Kind.Number }, { "teamHpDecay", Kind.Number }, { "projectileSpeed", Kind.Number },

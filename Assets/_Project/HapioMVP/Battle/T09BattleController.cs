@@ -23,6 +23,11 @@ namespace C6.Prototype.Battle
         [SerializeField] private MonsterHitTarget target;
 
         [SerializeField] private DamagePopupLayer damagePopups;
+        [SerializeField] private MonsterAttackWarning attackWarning; // #28: scene Canvas edge glow, target's screen only
+        [SerializeField] private RectTransform defenseZoneLeft, defenseZoneRight; // #28: invisible two-hand defense zones
+        private MonsterMotion monsterMotion;
+        private MonsterAttackPresenter attackPresenter;
+        private MonsterDefenseInput defenseInput;
         private int? observedHp;
         private Vector3? removedProxyPosition;
         private readonly HashSet<string> ownProxyIds = new HashSet<string>(StringComparer.Ordinal);
@@ -124,6 +129,17 @@ namespace C6.Prototype.Battle
             if (number < 0 || number > maximumParticipants) throw new ArgumentOutOfRangeException(nameof(number));
             approvedPlayerNumber = number;
         }
+        /// <summary>#28: this screen's estimate of the Host clock, which times the monster attack presentation.</summary>
+        public void ConfigureHostClock(Func<double?> hostNow)
+        {
+            if (attackPresenter != null) attackPresenter.ConfigureHostClock(hostNow);
+            if (defenseInput != null) defenseInput.ConfigureHostClock(hostNow);
+        }
+        /// <summary>#28: where a completed two-hand hold goes. Without one only a Host can judge its own defense.</summary>
+        public void ConfigureDefenseReport(Action<int> reportDefense)
+        {
+            if (defenseInput != null) defenseInput.ConfigureReport(reportDefense);
+        }
         public bool OrbPhysicsEnabled => orbPhysicsEnabled;
         public LocalOrbPhysicsBoard OrbPhysics => orbPhysics;
         public void ConfigureOrbPhysics(bool enabled)
@@ -136,7 +152,7 @@ namespace C6.Prototype.Battle
         }
         public void ConfigureTransfers(bool enabled) { transfersEnabled = enabled; }
         public void ConfigureReachableEdgeTransferDistance(bool enabled) { reachableEdgeTransferDistance = enabled; }
-        public bool IsDefenseHeld => false;
+        public bool IsDefenseHeld => defenseInput != null && defenseInput.Holding;
         public bool CanInteract => isActiveAndEnabled && attack != null && attack.Connected && attack.Snapshot != null
             && attack.Snapshot.state == "Playing" && resource != null && resource.Connected
             && (!transfersEnabled || !resource.HasPending)
@@ -186,6 +202,13 @@ namespace C6.Prototype.Battle
             OrbElements.Configure(layout.Config.TeamElements);
             viewRoot = new GameObject("T09 Local Orb Views").transform; viewRoot.SetParent(transform, false);
             proxyRoot = new GameObject("T09 Client Projectile Display Only").transform; proxyRoot.SetParent(transform, false);
+            monsterMotion = MonsterMotion.For(target);
+            defenseInput = gameObject.AddComponent<MonsterDefenseInput>();
+            defenseInput.Configure(battle, attack, layout, defenseZoneLeft, defenseZoneRight,
+                sequence => battle.HostAcceptDefense(attack.LocalPlayerId, sequence));
+            attackPresenter = gameObject.AddComponent<MonsterAttackPresenter>();
+            attackPresenter.Configure(battle, attack, monsterMotion, target != null ? target.GetComponent<BenchmarkMonster>() : null,
+                GetComponent<ThrowBattleFraming>(), attackWarning, defenseInput);
             if (orbPhysicsEnabled) EnsureOrbPhysics();
         }
         private void Start()
@@ -1124,6 +1147,7 @@ namespace C6.Prototype.Battle
         private void OnHostHitAt(AttackHitResult hit, Vector3 position)
         {
             missWatches.Remove(hit.OrbId);
+            if (monsterMotion != null) monsterMotion.PlayHit();
             if (damagePopups != null) damagePopups.Show(hit.HpBefore - hit.HpAfter, position, layout.BattleCamera);
         }
         private void ShowObservedDamage(AttackSnapshot state)
@@ -1136,7 +1160,10 @@ namespace C6.Prototype.Battle
             // An HP drop cannot be attributed to one orb, so none of the vanished own orbs becomes a MISS.
             foreach (var id in ownRemoved) { if (missed) ShowMissOnce(id); missWatches.Remove(id); }
             int damage = ObservedDamage(previous, state.hp);
-            if (damage > 0) damagePopups.Show(damage, removed ?? MonsterFallbackPoint, layout.BattleCamera);
+            if (damage > 0){
+                if (monsterMotion != null) monsterMotion.PlayHit();
+                damagePopups.Show(damage, removed ?? MonsterFallbackPoint, layout.BattleCamera);
+            }
         }
         public static int ObservedDamage(int? previousHp, int hp) =>
             previousHp.HasValue && hp < previousHp.Value ? previousHp.Value - hp : 0;
