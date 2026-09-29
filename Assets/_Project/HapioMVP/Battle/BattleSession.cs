@@ -1,6 +1,7 @@
 using System;
 using C6.Prototype.Attack;
 using C6.Prototype.Combination;
+using C6.Prototype.Orbs;
 using C6.Prototype.Presentation;
 using C6.Prototype.Resources;
 using Unity.Netcode;
@@ -61,6 +62,7 @@ namespace C6.Prototype.Battle
             if (!aggregateMode || !CanStart) return false;
             if (!Authority.Start(Now)) return false;
             monsterAttack?.Begin(Authority.StartedAt);
+            monsterInterference?.Begin(Authority.StartedAt);
             terminalPublished = false;
             PublishSnapshot("approved-playing");
             attack.PublishInventoryChange("t10b-started");
@@ -80,6 +82,7 @@ namespace C6.Prototype.Battle
         private uint resourceTimeRound;
         private double lastResourceNow;
         private HostMonsterAttack monsterAttack; // #28 Host only; recreated with each round
+        private HostMonsterInterference monsterInterference; // #53 Host only; recreated with each round
         private static double Now => Time.realtimeSinceStartupAsDouble;
 
         public HostBattleClock Authority { get; private set; }
@@ -138,7 +141,7 @@ namespace C6.Prototype.Battle
             attack = attackSession; resources = resourceSession; combinations = combinationSession; config = sharedConfig;
             if (attack == null || resources == null || combinations == null || config == null)
                 throw new ArgumentNullException("T09 requires the existing attack, resource, combination, and shared configuration.");
-            attack.ConfigureBattleHooks(() => CanAct, BeforeHostHit, AfterRewardedHit);
+            attack.ConfigureBattleHooks(() => CanAct, BeforeHostHit, AfterRewardedHit, HostTransferInterferenceRejection);
             resources.ConfigureGameplayGate(() => CanAct, () => ResourceGameplayNow);
             combinations.ConfigureGameplayGate(() => CanAct);
             if (isActiveAndEnabled) Subscribe();
@@ -222,9 +225,13 @@ namespace C6.Prototype.Battle
                         Authority.BeginLobby(sessionId, roundId, attack.AuthenticatedPlayerIds.Count, developmentSolo, config.MonsterMaxHpFor(attack.OrderedParticipantIds.Count));
                         monsterAttack = new HostMonsterAttack(config.MonsterAttackFirstDelaySeconds, config.MonsterAttackIntervalSeconds,
                             config.MonsterAttackWarningSeconds, Guid.NewGuid().GetHashCode());
+                        monsterInterference = new HostMonsterInterference(
+                            HostMonsterInterference.DefaultIntervalSeconds,
+                            HostMonsterInterference.DefaultDurationSeconds,
+                            Guid.NewGuid().GetHashCode());
                         PublishSnapshot("lobby-ready");
                     }
-                    else { Authority = null; monsterAttack = null; Status = "Waiting for the Host battle state."; }
+                    else { Authority = null; monsterAttack = null; monsterInterference = null; Status = "Waiting for the Host battle state."; }
                 }
                 if (manager.IsHost && Authority != null)
                 {
@@ -245,6 +252,7 @@ namespace C6.Prototype.Battle
             {
                 AdvanceClock(processingHit ? processingTimestamp : now);
                 TickMonsterAttack(now);
+                TickMonsterInterference(now);
                 if (now >= nextPublishAt)
                 { nextPublishAt = now + 1d / config.AttackSnapshotRateHz; PublishSnapshot(null); }
             }
@@ -263,6 +271,7 @@ namespace C6.Prototype.Battle
             double now = Now;
             if (!Authority.Start(now)) return false;
             monsterAttack?.Begin(Authority.StartedAt);
+            monsterInterference?.Begin(Authority.StartedAt);
             terminalPublished = false;
             PublishSnapshot("playing");
             // Re-evaluate the shared resource/gesture services after their gate becomes Playing.
@@ -321,6 +330,51 @@ namespace C6.Prototype.Battle
             if (Authority.IsTerminal && !terminalPublished) CommitTerminal();
             else PublishSnapshot(null);
         }
+        /// <summary>#53 Host-only 30-second random interference schedule.</summary>
+        private void TickMonsterInterference(double now)
+        {
+            if (monsterInterference == null || Authority == null || changingRound || processingHit
+                || Authority.Phase != BattlePhase.Playing) return;
+
+            int previousSequence = monsterInterference.Sequence;
+            bool wasActive = monsterInterference.Active;
+            if (!monsterInterference.Tick(now, attack.OrderedParticipantIds)) return;
+
+            if (monsterInterference.Active && monsterInterference.Sequence != previousSequence)
+            {
+                Debug.Log(
+                    $"C6_MONSTER_INTERFERENCE stage=start round={roundId} sequence={monsterInterference.Sequence} " +
+                    $"tag={monsterInterference.Tag} hasTarget={monsterInterference.HasTarget} target={monsterInterference.Target} " +
+                    $"direction={monsterInterference.Direction} durationSeconds={monsterInterference.DurationSeconds:R}");
+            }
+            else if (wasActive)
+            {
+                Debug.Log($"C6_MONSTER_INTERFERENCE stage=end round={roundId} sequence={monsterInterference.Sequence}");
+            }
+
+            PublishSnapshot(null);
+        }
+
+        private string HostTransferInterferenceRejection(ulong sender, OrbActionKind kind)
+        {
+            if (!IsHost || monsterInterference == null || Authority == null || Authority.Phase != BattlePhase.Playing)
+                return null;
+
+            double now = Now;
+            AdvanceClock(now);
+            TickMonsterInterference(now);
+            if (Authority.Phase != BattlePhase.Playing)
+                return null;
+
+            MonsterTransferDirection direction = kind == OrbActionKind.TransferLeft
+                ? MonsterTransferDirection.Left
+                : kind == OrbActionKind.TransferRight
+                    ? MonsterTransferDirection.Right
+                    : MonsterTransferDirection.None;
+            return monsterInterference.BlocksTransfer(sender, direction)
+                ? HostMonsterInterference.TransferBlockedReason
+                : null;
+        }
         /// <summary>
         /// #28 Host judgment of a completed two-hand hold. Only the current target, for the current attack, before the
         /// warning ends plus the report grace. The published result stays Hit or Defended when the attack resolves.
@@ -372,6 +426,9 @@ namespace C6.Prototype.Battle
 
         private BattleSnapshot BuildSnapshot(string nonce)
         {
+            bool interferenceLive = monsterInterference != null
+                && monsterInterference.Active
+                && Authority.Phase == BattlePhase.Playing;
             return new BattleSnapshot
             {
                 nonce = nonce, sessionId = Authority.SessionId, roundId = Authority.RoundId, revision = revision,
@@ -386,7 +443,15 @@ namespace C6.Prototype.Battle
                 // A round that ended mid-warning keeps the attack for the record but no longer warns anyone.
                 attackActive = monsterAttack != null && monsterAttack.Active && Authority.Phase == BattlePhase.Playing,
                 attackResolvedSequence = monsterAttack?.ResolvedSequence ?? 0,
-                attackResult = (int)(monsterAttack?.LastResult ?? MonsterAttackResult.None)
+                attackResult = (int)(monsterAttack?.LastResult ?? MonsterAttackResult.None),
+                interferenceSequence = monsterInterference?.Sequence ?? 0,
+                interferenceKind = interferenceLive ? (int)monsterInterference.Kind : (int)MonsterInterferenceKind.None,
+                interferenceDirection = interferenceLive ? (int)monsterInterference.Direction : (int)MonsterTransferDirection.None,
+                interferenceActive = interferenceLive,
+                interferenceHasTarget = interferenceLive && monsterInterference.HasTarget,
+                interferenceTarget = interferenceLive && monsterInterference.HasTarget ? monsterInterference.Target : 0UL,
+                interferenceStartsAt = interferenceLive ? monsterInterference.StartsAt : 0,
+                interferenceEndsAt = interferenceLive ? monsterInterference.EndsAt : 0
             };
         }
         private void PublishSnapshot(string stage)
@@ -466,7 +531,8 @@ namespace C6.Prototype.Battle
         {
             if (messaging != null)
             { messaging.UnregisterNamedMessageHandler(SnapshotMessage); messaging.UnregisterNamedMessageHandler(SyncMessage); }
-            messaging = null; manager = null; Authority = null; monsterAttack = null; sessionId = localNonce = null; roundId = 0;
+            messaging = null; manager = null; Authority = null; monsterAttack = null; monsterInterference = null;
+            sessionId = localNonce = null; roundId = 0;
             hadSession = false; terminalPublished = false; processingHit = false; nextSyncAt = nextPublishAt = 0;
         }
         private void OnApplicationPause(bool paused)
