@@ -188,6 +188,7 @@ namespace C6.Prototype.Orbs
                 || source.Kind != OrbKind.Raw || target.Kind != OrbKind.Raw
                 || !IsValidKindAndPolarity(source.Kind, source.Polarity) || !IsValidKindAndPolarity(target.Kind, target.Polarity)
                 || source.Polarity == target.Polarity
+                || !OrbElements.SameElement(source.OrbId, target.OrbId)
                 || source.AuthorityState != OrbAuthorityState.Idle || target.AuthorityState != OrbAuthorityState.Idle
                 || reservation.ReservedOrbIds.Count != 2
                 || !pending.TryGetValue(source.OrbId, out var sourceHeld) || !ReferenceEquals(sourceHeld, reservation)
@@ -195,18 +196,16 @@ namespace C6.Prototype.Orbs
 
             // Prepare every immutable record before touching either material. No failure guard follows
             // the first mutation, and no observer is invoked between the two consumed states and result.
-            // 오행 v1: the combined ID encodes (Yin element, Yang element) so every device can decode it.
-            var yinMaterial = source.Polarity == OrbPolarity.Yin ? source : target;
-            var yangMaterial = source.Polarity == OrbPolarity.Yin ? target : source;
-            var yinElement = OrbElements.RawElement(yinMaterial.OrbId);
-            var yangElement = OrbElements.RawElement(yangMaterial.OrbId);
+            // 오행 v2: both materials share one element (checked above), and the combined ID carries it
+            // so every device shows the same comb_{element}_{element} artwork.
+            var element = OrbElements.RawElement(source.OrbId);
             string id;
-            do { id = OrbElements.NewCombinedId(yinElement, yangElement); } while (orbs.ContainsKey(id));
+            do { id = OrbElements.NewCombinedId(element); } while (orbs.ContainsKey(id));
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            UnityEngine.Debug.Log("C6_COMBINE  yin=" + yinElement + " [" + yinMaterial.OrbId + "]"
-                + "  yang=" + yangElement + " [" + yangMaterial.OrbId + "]"
-                + "  -> " + id + "  expects art comb_"
-                + yinElement.ToString().ToLowerInvariant() + "_" + yangElement.ToString().ToLowerInvariant());
+            string artName = element.ToString().ToLowerInvariant();
+            UnityEngine.Debug.Log("C6_COMBINE  element=" + element
+                + "  source=[" + source.OrbId + "]  target=[" + target.OrbId + "]"
+                + "  -> " + id + "  expects art comb_" + artName + "_" + artName);
 #endif
             sourceConsumed = new OrbRecord(source.OrbId, source.Kind, source.Polarity, source.OwnerPlayerId,
                 OrbAuthorityState.Consumed, request.NormalizedPosition, source.EntrySide, request.SequenceNumber, source.TransferCount, source.LastTransferSequence, source.RightTransferCount, source.TransferMotion);
@@ -310,6 +309,8 @@ namespace C6.Prototype.Orbs
                 if (source.Kind != OrbKind.Raw || target.Kind != OrbKind.Raw
                     || !IsValidKindAndPolarity(target.Kind, target.Polarity)
                     || source.Polarity == target.Polarity) return Reject("INVALID_COMBINATION");
+                // 오행 v2: 같은 속성의 음 + 양만 결합 (예: 불 음 + 불 양). 다른 속성끼리는 거절.
+                if (!OrbElements.SameElement(source.OrbId, target.OrbId)) return Reject("ELEMENT_MISMATCH");
                 if (target.AuthorityState != OrbAuthorityState.Idle) return Reject("OTHER_ORB_NOT_IDLE");
                 if (pending.ContainsKey(target.OrbId)) return Reject("OTHER_ORB_PENDING");
                 if (request.SequenceNumber <= lastSequences[target.OrbId]) return Reject("OTHER_STALE_SEQUENCE");

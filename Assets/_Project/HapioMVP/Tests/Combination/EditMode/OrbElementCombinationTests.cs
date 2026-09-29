@@ -8,9 +8,9 @@ using UnityEngine;
 namespace C6.Prototype.Combination.Tests
 {
     /// <summary>
-    /// 오행 v1. A combined orb's ID must carry (Yin material element, Yang material element) so that
-    /// every device shows the same artwork without any wire change. These tests run the real Host
-    /// combination path, not the sandbox, so they are the only cheap proof that pairing is correct.
+    /// 오행 v2. Only a Yin and a Yang of the SAME element combine (예: 불 음 + 불 양). The combined
+    /// orb's ID carries that element in both slots so every device shows the same artwork without
+    /// any wire change. These tests run the real Host combination path, not the sandbox.
     /// </summary>
     public sealed class OrbElementCombinationTests
     {
@@ -24,37 +24,58 @@ namespace C6.Prototype.Combination.Tests
             Fresh();
         }
 
+        // Back to the default (elements off) so other fixtures are not affected by this one.
         [TearDown]
-        public void TearDown() => OrbElements.Configure(OrbElements.AllElements);
+        public void TearDown() => OrbElements.Configure(null);
 
-        /// <summary>The material that is Yin decides the first slot, whichever side the request named first.</summary>
-        [TestCase(OrbPolarity.Yin, OrbPolarity.Yang)]
-        [TestCase(OrbPolarity.Yang, OrbPolarity.Yin)]
-        public void CombinedIdCarriesMaterialElementsRegardlessOfRequestOrder(OrbPolarity first, OrbPolarity second)
+        /// <summary>A same-element Yin + Yang combines, and the combined ID carries that element twice.</summary>
+        [Test]
+        public void SameElementYinAndYangCombineIntoThatElement(
+            [ValueSource(nameof(Elements))] OrbElement element,
+            [Values(OrbPolarity.Yin, OrbPolarity.Yang)] OrbPolarity first)
         {
-            var pairsSeen = new HashSet<string>();
-            for (int attempt = 0; attempt < 60; attempt++)
+            var second = first == OrbPolarity.Yin ? OrbPolarity.Yang : OrbPolarity.Yin;
+            var source = AddWithElement(first, element);
+            var target = AddWithElement(second, element);
+            var result = authority.Combine(7, Request(source, target, "same-" + element + "-" + first));
+            Assert.That(result.Accepted, Is.True, result.Reason);
+
+            OrbElements.CombinedElements(result.Combined.OrbId, out var yin, out var yang);
+            Assert.That(yin, Is.EqualTo(element), "id=" + result.Combined.OrbId);
+            Assert.That(yang, Is.EqualTo(element), "id=" + result.Combined.OrbId);
+            Assert.That(Guid.TryParseExact(result.Combined.OrbId, "N", out _), Is.True,
+                "The encoded ID must stay a valid Guid \"N\" string: " + result.Combined.OrbId);
+        }
+
+        /// <summary>A Yin and a Yang of different elements are rejected and both stay usable.</summary>
+        [Test]
+        public void DifferentElementsAreRejected()
+        {
+            var source = AddWithElement(OrbPolarity.Yin, OrbElement.Fire);
+            var target = AddWithElement(OrbPolarity.Yang, OrbElement.Water);
+            var result = authority.Combine(7, Request(source, target, "mismatch"));
+            Assert.That(result.Accepted, Is.False);
+            Assert.That(result.Reason, Is.EqualTo("ELEMENT_MISMATCH"));
+
+            Assert.That(registry.TryGet(source.OrbId, out var sourceAfter), Is.True);
+            Assert.That(registry.TryGet(target.OrbId, out var targetAfter), Is.True);
+            Assert.That(sourceAfter.AuthorityState, Is.EqualTo(OrbAuthorityState.Idle));
+            Assert.That(targetAfter.AuthorityState, Is.EqualTo(OrbAuthorityState.Idle));
+            Assert.That(registry.IsPending(source.OrbId), Is.False);
+            Assert.That(registry.IsPending(target.OrbId), Is.False);
+        }
+
+        /// <summary>A Combined without an encoded pair (DEV fixture) still shows one same-element artwork.</summary>
+        [Test]
+        public void UnencodedCombinedIdFallsBackToOneElement()
+        {
+            for (int attempt = 0; attempt < 50; attempt++)
             {
-                Fresh();
-                var source = Add(first); var target = Add(second);
-                var result = authority.Combine(7, Request(source, target, "combine-" + attempt));
-                Assert.That(result.Accepted, Is.True, result.Reason);
-
-                var yinMaterial = source.Polarity == OrbPolarity.Yin ? source : target;
-                var yangMaterial = source.Polarity == OrbPolarity.Yin ? target : source;
-                var expectedYin = OrbElements.RawElement(yinMaterial.OrbId);
-                var expectedYang = OrbElements.RawElement(yangMaterial.OrbId);
-
-                OrbElements.CombinedElements(result.Combined.OrbId, out var yin, out var yang);
-                Assert.That(yin, Is.EqualTo(expectedYin),
-                    "Yin slot must come from the Yin material. id=" + result.Combined.OrbId);
-                Assert.That(yang, Is.EqualTo(expectedYang),
-                    "Yang slot must come from the Yang material. id=" + result.Combined.OrbId);
-                Assert.That(Guid.TryParseExact(result.Combined.OrbId, "N", out _), Is.True,
-                    "The encoded ID must stay a valid Guid \"N\" string: " + result.Combined.OrbId);
-                pairsSeen.Add(expectedYin + "_" + expectedYang);
+                string id = "dev-fixture-" + attempt;
+                OrbElements.CombinedElements(id, out var yin, out var yang);
+                Assert.That(yin, Is.Not.EqualTo(OrbElement.None), id);
+                Assert.That(yang, Is.EqualTo(yin), id);
             }
-            Assert.That(pairsSeen.Count, Is.GreaterThan(5), "Materials should not collapse onto a single element pair.");
         }
 
         /// <summary>All 25 pairs survive the ID encoding, and every ID stays hex.</summary>
@@ -93,6 +114,20 @@ namespace C6.Prototype.Combination.Tests
 
         private OrbRecord Add(OrbPolarity polarity)
             => registry.RegisterDevelopmentOrb(7, OrbKind.Raw, polarity, new Vector2(.1f, .125f));
+
+        private static IEnumerable<OrbElement> Elements() => OrbElements.AllElements;
+
+        /// <summary>IDs are random, so keep registering until one hashes to the wanted element.</summary>
+        private OrbRecord AddWithElement(OrbPolarity polarity, OrbElement element)
+        {
+            for (int attempt = 0; attempt < 500; attempt++)
+            {
+                var orb = Add(polarity);
+                if (OrbElements.RawElement(orb.OrbId) == element) return orb;
+            }
+            Assert.Fail("Could not create a " + element + " " + polarity + " orb.");
+            return null;
+        }
 
         private static CombinationRequest Request(OrbRecord source, OrbRecord target, string id)
             => new CombinationRequest("session-a", 1, id, source.OrbId, target.OrbId, 1,

@@ -252,8 +252,8 @@ namespace C6.Prototype.PhysicsSandbox
         }
 
         /// <summary>
-        /// 오행 확인용 ID. 결합은 (음, 양) 25조합을, 기본은 5속성을 차례로 돌려 버튼만 눌러도
-        /// 모든 그림을 순서대로 볼 수 있게 한다. 결합 ID는 실제 판과 같은 인코딩을 쓴다.
+        /// 오행 확인용 ID. 결합은 같은 속성 5종(불+불, 물+물 …)을, 기본은 5속성을 차례로 돌려
+        /// 버튼만 눌러도 모든 그림을 순서대로 볼 수 있게 한다. 결합 ID는 실제 판과 같은 인코딩을 쓴다.
         /// </summary>
         private string NewSandboxOrbId(OrbKind kind)
         {
@@ -261,10 +261,9 @@ namespace C6.Prototype.PhysicsSandbox
             if (all.Length == 0) return "sandbox-added-" + Guid.NewGuid().ToString("N");
             if (kind == OrbKind.Combined)
             {
-                var yin = all[(combinedCycle / all.Length) % all.Length];
-                var yang = all[combinedCycle % all.Length];
+                var element = all[combinedCycle % all.Length];
                 ++combinedCycle;
-                return "sandbox-added-" + OrbElements.NewCombinedId(yin, yang);
+                return "sandbox-added-" + OrbElements.NewCombinedId(element);
             }
             var wanted = all[rawCycle % all.Length];
             ++rawCycle;
@@ -547,7 +546,7 @@ namespace C6.Prototype.PhysicsSandbox
             if (target != null) TryCombine(source, target);
         }
 
-        // ---------- 결합 (게임 규칙: 음 + 양 Raw만, 놓은 위치에서 화면 너비의 CombinationRadiusFraction 이내) ----------
+        // ---------- 결합 (게임 규칙: 같은 속성의 음 + 양 Raw만, 놓은 위치에서 화면 너비의 CombinationRadiusFraction 이내) ----------
         private float CombinationRadiusFraction => sourceConfig != null ? sourceConfig.CombinationRadiusFraction : .08f;
 
         private OrbSandboxSeed NearestDropTarget(OrbSandboxSeed source)
@@ -574,29 +573,31 @@ namespace C6.Prototype.PhysicsSandbox
             { LastCombineResult = "거절: 결합 구슬은 다시 결합할 수 없음"; return; }
             if (source.polarity == target.polarity)
             { LastCombineResult = "거절: 같은 극끼리는 결합 불가"; return; }
+            // 오행 v2: 실제 판(HostOrbRegistry)과 같은 규칙. 다른 속성끼리는 결합하지 않는다.
+            var sourceElement = OrbElements.RawElement(source.View.OrbId);
+            var targetElement = OrbElements.RawElement(target.View.OrbId);
+            if (sourceElement != targetElement)
+            { LastCombineResult = "거절: 다른 속성끼리는 결합 불가 (" + sourceElement + " / " + targetElement + ")"; return; }
             int board = target.CurrentBoard;
             Vector3 middle = (source.transform.position + target.transform.position) * .5f;
             middle.z = 0f;
 
             // 실제 판(HostOrbRegistry.TryCompleteReservedCombination)과 같은 규칙으로 결합 ID를 만든다.
-            // RemoveOrb가 View를 없애므로 재료의 속성은 반드시 그 전에 읽는다.
-            var yinSeed = source.polarity == OrbPolarity.Yin ? source : target;
-            var yangSeed = source.polarity == OrbPolarity.Yin ? target : source;
-            var yinElement = OrbElements.RawElement(yinSeed.View.OrbId);
-            var yangElement = OrbElements.RawElement(yangSeed.View.OrbId);
+            // RemoveOrb가 View를 없애므로 재료의 속성은 반드시 그 전에 읽는다(위에서 읽음).
+            var element = sourceElement;
             string combinedId;
-            do { combinedId = "sandbox-combined-" + OrbElements.NewCombinedId(yinElement, yangElement); }
+            do { combinedId = "sandbox-combined-" + OrbElements.NewCombinedId(element); }
             while (byId.ContainsKey(combinedId));
-            UnityEngine.Debug.Log("C6_SANDBOX_COMBINE  yin=" + yinElement + " [" + yinSeed.View.OrbId + "]"
-                + "  yang=" + yangElement + " [" + yangSeed.View.OrbId + "]"
-                + "  -> " + combinedId + "  expects art comb_"
-                + yinElement.ToString().ToLowerInvariant() + "_" + yangElement.ToString().ToLowerInvariant());
+            string artName = element.ToString().ToLowerInvariant();
+            UnityEngine.Debug.Log("C6_SANDBOX_COMBINE  element=" + element
+                + "  source=[" + source.View.OrbId + "]  target=[" + target.View.OrbId + "]"
+                + "  -> " + combinedId + "  expects art comb_" + artName + "_" + artName);
 
             RemoveOrb(source);
             RemoveOrb(target);
             CreateOrb(board, OrbKind.Combined, OrbPolarity.None, middle, "Combined Orb ", combinedId);
             CombineCount++;
-            LastCombineResult = "결합 성공 (음 " + yinElement + " + 양 " + yangElement + ")";
+            LastCombineResult = "결합 성공 (" + element + " 음 + 양)";
         }
 
         private void RemoveOrb(OrbSandboxSeed seed)
