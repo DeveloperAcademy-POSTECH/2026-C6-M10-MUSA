@@ -184,6 +184,42 @@ namespace C6.Prototype.Battle.Tests
         }
 
         [Test]
+        public void MonsterInterferenceOverlayIsSavedAndDoesNotInterceptInput()
+        {
+            var controller = Components<T09BattleController>(preview).Single();
+            var overlays = hud.Canvas.GetComponentsInChildren<MonsterInterferenceOverlay>(true);
+            Assert.That(overlays, Has.Length.EqualTo(1));
+            var overlay = overlays[0];
+            Assert.That(overlay.transform.parent, Is.SameAs(hud.Canvas.transform));
+            Assert.That(overlay.transform.GetSiblingIndex(),
+                Is.LessThan(hud.ResultOverlay.transform.GetSiblingIndex()),
+                "The confirmed result overlay remains above transient interference presentation.");
+
+            using (var serializedController = new SerializedObject(controller))
+            using (var serializedOverlay = new SerializedObject(overlay))
+            {
+                Assert.That(
+                    serializedController.FindProperty("interferenceOverlay").objectReferenceValue,
+                    Is.SameAs(overlay));
+                var left = serializedOverlay.FindProperty("leftEdge").objectReferenceValue as Graphic;
+                var right = serializedOverlay.FindProperty("rightEdge").objectReferenceValue as Graphic;
+                var message = serializedOverlay.FindProperty("message").objectReferenceValue as Text;
+                Assert.That(left, Is.Not.Null);
+                Assert.That(right, Is.Not.Null);
+                Assert.That(message, Is.Not.Null);
+                Assert.That(left.enabled, Is.False);
+                Assert.That(right.enabled, Is.False);
+                Assert.That(message.enabled, Is.False);
+                Assert.That(new[] { left, right, message }.All(item => !item.raycastTarget), Is.True);
+                Assert.That(left.color.r, Is.GreaterThan(left.color.g).And.GreaterThan(left.color.b));
+                Assert.That(right.color.r, Is.GreaterThan(right.color.g).And.GreaterThan(right.color.b));
+                Assert.That(message.text, Is.EqualTo(MonsterInterferenceOverlay.DefaultMessage));
+                Assert.That(message.alignment, Is.EqualTo(TextAnchor.MiddleCenter));
+                Assert.That(message.GetComponent<Outline>(), Is.Not.Null);
+            }
+        }
+
+        [Test]
         public void RepeatedPreparationPreservesEditedControlsAndTheirIdentities()
         {
             Assert.That(hud.UseSceneHierarchy, Is.True);

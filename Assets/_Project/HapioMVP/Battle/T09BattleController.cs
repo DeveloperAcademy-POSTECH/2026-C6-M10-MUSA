@@ -25,9 +25,11 @@ namespace C6.Prototype.Battle
         [SerializeField] private DamagePopupLayer damagePopups;
         [SerializeField] private MonsterAttackWarning attackWarning; // #28: scene Canvas edge glow, target's screen only
         [SerializeField] private RectTransform defenseZoneLeft, defenseZoneRight; // #28: invisible two-hand defense zones
+        [SerializeField] private MonsterInterferenceOverlay interferenceOverlay;
         private MonsterMotion monsterMotion;
         private MonsterAttackPresenter attackPresenter;
         private MonsterDefenseInput defenseInput;
+        private Func<double?> presentationHostClock;
         private int? observedHp;
         private Vector3? removedProxyPosition;
         private readonly HashSet<string> ownProxyIds = new HashSet<string>(StringComparer.Ordinal);
@@ -135,6 +137,7 @@ namespace C6.Prototype.Battle
         /// <summary>#28: this screen's estimate of the Host clock, which times the monster attack presentation.</summary>
         public void ConfigureHostClock(Func<double?> hostNow)
         {
+            presentationHostClock = hostNow;
             if (attackPresenter != null) attackPresenter.ConfigureHostClock(hostNow);
             if (defenseInput != null) defenseInput.ConfigureHostClock(hostNow);
         }
@@ -866,6 +869,7 @@ namespace C6.Prototype.Battle
         }
         private void Update()
         {
+            RefreshInterferencePresentation();
             if (releaseThrowsEnabled && gestures.HasActivePointer)
                 throwSampler.Add(gestures.LastRawPosition / Mathf.Max(1f, Screen.width), Time.unscaledTimeAsDouble);
             WatchOwnFlightsForMiss();
@@ -1100,6 +1104,7 @@ namespace C6.Prototype.Battle
             bool connected = battle != null && battle.Connected;
             bool canStart = battle != null && battle.CanStart;
             hud.SetNetworkFieldsVisible(!attack.Connected);
+            RefreshInterferencePresentation();
             hud.SetStatus(attack.Connected ? ((attack.IsHost ? "HOST / P" : "CLIENT / P") + (approvedPlayerNumber > 0 ? approvedPlayerNumber : attack.IsHost ? 1 : 2)) : connection.State.ToString().ToUpperInvariant(), action,
                 connection.State == DirectConnectionState.Failed ? connection.Message : detail);
             hud.SetControls(connection.CanStart, connection.CanStart, canStart, !connection.CanStart,
@@ -1123,6 +1128,44 @@ namespace C6.Prototype.Battle
                 connection.CanStart, state?.observedMonsterHp ?? s?.hp ?? layout.Config.MonsterMaxHp,
                 lastConfirmedStamina, host && connected);
             Changed?.Invoke();
+        }
+        private void RefreshInterferencePresentation()
+        {
+            if (interferenceOverlay == null) return;
+            var state = battle?.Snapshot;
+            MonsterTransferDirection blockedDirection = RestrictedInterferenceDirection(
+                state, attack != null ? attack.LocalPlayerId : 0);
+            if (blockedDirection == MonsterTransferDirection.None || hud == null || layout == null)
+            {
+                interferenceOverlay.Hide();
+                return;
+            }
+
+            double? hostNow = presentationHostClock != null ? presentationHostClock()
+                : battle != null && battle.IsHost ? Time.realtimeSinceStartupAsDouble : (double?)null;
+            interferenceOverlay.Present(blockedDirection, hud.OrbWorkspaceScreenRect,
+                layout.TopPixelRect, hostNow, state.interferenceEndsAt);
+        }
+
+        public static MonsterTransferDirection RestrictedInterferenceDirection(BattleSnapshot state, ulong localPlayer)
+        {
+            if (state == null || !state.interferenceActive || state.phase != BattlePhase.Playing.ToString())
+                return MonsterTransferDirection.None;
+            if (state.interferenceKind == (int)MonsterInterferenceKind.SinglePlayerDirectionBlock)
+            {
+                return state.interferenceHasTarget && state.interferenceTarget == localPlayer
+                    ? (MonsterTransferDirection)state.interferenceDirection
+                    : MonsterTransferDirection.None;
+            }
+            if (state.interferenceKind == (int)MonsterInterferenceKind.AllPlayersDirectionRestriction)
+            {
+                return state.interferenceDirection == (int)MonsterTransferDirection.Left
+                    ? MonsterTransferDirection.Right
+                    : state.interferenceDirection == (int)MonsterTransferDirection.Right
+                        ? MonsterTransferDirection.Left
+                        : MonsterTransferDirection.None;
+            }
+            return MonsterTransferDirection.None;
         }
         private void ClearViews()
         {
@@ -1227,6 +1270,7 @@ namespace C6.Prototype.Battle
         private void OnApplicationPause(bool paused) { if (paused) CancelInteractions("Paused"); }
         private void OnDisable()
         {
+            if (interferenceOverlay != null) interferenceOverlay.Hide();
             string id = gestures.ActiveOrb?.OrbId;
             if (id != null) LogPointerCancellation(gestures.ActivePointerId.Value, id, "COMPONENT_DISABLED");
             gestures.SetInputEnabled(false);
