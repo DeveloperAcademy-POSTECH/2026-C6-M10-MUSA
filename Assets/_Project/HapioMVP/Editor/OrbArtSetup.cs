@@ -46,11 +46,12 @@ namespace C6.Editor
             }
             var yin = Load("fire_yin");
             var yang = Load("fire_yang");
-            var combined = Load("fire_comb") ?? Load("comb_fire_fire");
+            // fire_comb.png는 #22에서 삭제됐고, 결합 그림은 Combined 폴더 안에 있다.
+            var combined = Load("fire_comb") ?? Load("Combined/comb_fire_fire");
             if (yin == null || yang == null || combined == null)
             {
                 EditorUtility.DisplayDialog("Orb Art",
-                    "Sprites not found in " + PlaceholderFolder + ".\nNeeded: fire_yin, fire_yang, fire_comb (imported as Sprite).", "OK");
+                    "Sprites not found in " + PlaceholderFolder + ".\nNeeded: fire_yin, fire_yang, Combined/comb_fire_fire (imported as Sprite).", "OK");
                 return;
             }
             var set = AssetDatabase.LoadAssetAtPath<OrbArtSet>(ArtSetPath);

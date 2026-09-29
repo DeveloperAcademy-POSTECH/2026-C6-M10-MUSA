@@ -12,13 +12,17 @@ namespace C6.Prototype.Orbs
     ///   ('0'..'4' = Fire, Water, Wood, Metal, Earth). Decoding therefore never depends on the
     ///   team list, its order, or any hash agreement between devices, and the ID stays a valid
     ///   Guid "N" string. Older hash-encoded IDs still decode through the legacy fallback.
+    /// 오행 v2: 같은 속성의 음 + 양만 결합한다(예: 불 음 + 불 양). 다른 속성끼리는 결합 불가.
+    /// 결합 ID는 여전히 두 칸을 쓰지만 두 칸이 항상 같은 속성이다.
+    /// 속성은 씬이 Configure를 호출해야 켜진다. 호출 전(기본값)에는 모든 구슬이 None이라
+    /// 속성 규칙이 적용되지 않는다. 옛 T05/T08 씬과 EditMode 테스트가 여기에 해당한다.
     /// </summary>
     public static class OrbElements
     {
         public static readonly OrbElement[] AllElements =
             { OrbElement.Fire, OrbElement.Water, OrbElement.Wood, OrbElement.Metal, OrbElement.Earth };
-        private static OrbElement[] team = AllElements;
-        private const uint RawSalt = 0x1F3A5C7Bu, CombinedYinSalt = 0x51E2D3C4u, CombinedYangSalt = 0x9C8B7A69u;
+        private static OrbElement[] team = Array.Empty<OrbElement>();
+        private const uint RawSalt = 0x1F3A5C7Bu, CombinedSalt = 0x51E2D3C4u;
 
         // Combined IDs carry the pair in their last two characters. '0' maps to FirstCode and the
         // codes stay inside the hex alphabet so the ID remains parseable as a Guid.
@@ -41,13 +45,24 @@ namespace C6.Prototype.Orbs
 
         public static OrbElement RawElement(string orbId) => Pick(orbId, RawSalt);
 
-        /// <summary>The pair carried by a combined orb ID. Falls back to the legacy hash pair.</summary>
+        /// <summary>오행 v2: 두 Raw 구슬의 속성이 같을 때만 결합할 수 있다. 속성이 꺼져 있으면 둘 다 None이라 항상 true.</summary>
+        public static bool SameElement(string firstOrbId, string secondOrbId)
+            => RawElement(firstOrbId) == RawElement(secondOrbId);
+
+        /// <summary>
+        /// The pair carried by a combined orb ID. An ID without an encoded pair (DEV fixtures,
+        /// debug Combined) picks one element by hash and uses it for both slots, so it always
+        /// shows one of the five same-element artworks.
+        /// </summary>
         public static void CombinedElements(string orbId, out OrbElement yin, out OrbElement yang)
         {
             if (TryDecodeCombinedId(orbId, out yin, out yang)) return;
-            yin = Pick(orbId, CombinedYinSalt);
-            yang = Pick(orbId, CombinedYangSalt);
+            yin = Pick(orbId, CombinedSalt);
+            yang = yin;
         }
+
+        /// <summary>Host only: a fresh combined ID for a same-element pair (예: 불 + 불).</summary>
+        public static string NewCombinedId(OrbElement element) => NewCombinedId(element, element);
 
         /// <summary>Host only: a fresh 32-hex ID whose last two characters carry the given pair.</summary>
         public static string NewCombinedId(OrbElement yin, OrbElement yang)

@@ -718,7 +718,9 @@ namespace C6.Prototype.Battle
             else
             {
                 action = "COMBINATION REJECTED / " + reply.reason;
-                detail = "Use two different Raw orbs: one Yin and one Yang";
+                detail = reply.reason == "ELEMENT_MISMATCH"
+                    ? "Same element only: Yin + Yang of one element"
+                    : "Use two different Raw orbs: one Yin and one Yang";
                 Debug.Log($"C6_T09_COMBINE_UI accepted=false request={reply.requestId} reason={reply.reason} round={round}");
             }
             ReconcileConfirmedOrb(reply.currentSource);
