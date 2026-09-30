@@ -190,6 +190,14 @@ namespace C6.Prototype.Presentation
         public int OrbStorageLimit => Mathf.Clamp(orbStorageLimit, 1, 20);
         public bool ResourceDebugToolsEnabled => resourceDebugToolsEnabled;
 
+        [Header("#51 · Combined orb expiry (seconds)")]
+        [Tooltip("A combined orb not thrown within this many seconds disappears on every screen.")]
+        [SerializeField] private float combinedOrbLifetimeSeconds = 8f;
+        [Tooltip("The combined orb blinks during this many final seconds before it disappears.")]
+        [SerializeField] private float combinedOrbWarningSeconds = 2f;
+        public float CombinedOrbLifetimeSeconds => Valid(combinedOrbLifetimeSeconds, 8f, 1f, 600f);
+        public float CombinedOrbWarningSeconds => Mathf.Min(Valid(combinedOrbWarningSeconds, 2f, 0f, 600f), CombinedOrbLifetimeSeconds);
+
         // T09 DEMO_TUNING_VALUE: one shared Host-clock battle, not monster attack damage.
         [SerializeField] private float battleDurationSeconds = 180f;
         [SerializeField] private float teamHpDecayPerSecond = 1f;

@@ -7,6 +7,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace C6.Editor
 {
@@ -81,6 +82,130 @@ namespace C6.Editor
                 Debug.Log("C6_EDITABLE_UI_CONNECTIONS_VALID: serialized references and existing controller links are present.");
             }
             finally { if (opened) EditorSceneManager.CloseScene(scene, true); }
+        }
+
+        [MenuItem("C6/UI/Prepare Monster Interference UI")]
+        public static void PrepareMonsterInterferenceUi()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Stop Play mode before preparing monster interference UI.");
+
+            Scene scene = SceneManager.GetSceneByPath(ScenePath);
+            bool opened = !scene.IsValid() || !scene.isLoaded;
+            if (!opened && scene.isDirty)
+                throw new InvalidOperationException(
+                    "The battle scene has unsaved changes. Save it before preparing monster interference UI; no changes were discarded.");
+            if (opened) scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+
+            var hud = FindHud(scene);
+            Validate(hud);
+            var controller = hud.GetComponent<T09BattleController>();
+            var canvas = hud.Canvas.transform;
+            var existing = canvas.GetComponentInChildren<MonsterInterferenceOverlay>(true);
+            var overlay = existing != null
+                ? existing
+                : CreateInterferenceOverlay(canvas, hud.ActionLabel != null ? hud.ActionLabel.font : null);
+
+            var serializedOverlay = new SerializedObject(overlay);
+            var left = overlay.transform.Find("BlockedLeftEdge")?.GetComponent<Graphic>();
+            var right = overlay.transform.Find("BlockedRightEdge")?.GetComponent<Graphic>();
+            var message = overlay.transform.Find("InterferenceMessage")?.GetComponent<Text>();
+            serializedOverlay.FindProperty("leftEdge").objectReferenceValue = left;
+            serializedOverlay.FindProperty("rightEdge").objectReferenceValue = right;
+            serializedOverlay.FindProperty("message").objectReferenceValue = message;
+            serializedOverlay.ApplyModifiedPropertiesWithoutUndo();
+
+            var serializedController = new SerializedObject(controller);
+            serializedController.FindProperty("interferenceOverlay").objectReferenceValue = overlay;
+            serializedController.ApplyModifiedPropertiesWithoutUndo();
+
+            if (hud.ResultOverlay != null && hud.ResultOverlay.transform.parent == canvas)
+                overlay.transform.SetSiblingIndex(hud.ResultOverlay.transform.GetSiblingIndex());
+            else
+                overlay.transform.SetAsLastSibling();
+
+            EditorUtility.SetDirty(overlay);
+            EditorUtility.SetDirty(controller);
+            EditorSceneManager.MarkSceneDirty(scene);
+            if (!EditorSceneManager.SaveScene(scene))
+                throw new IOException("Could not save monster interference UI to the battle scene.");
+
+            Selection.activeGameObject = overlay.gameObject;
+            EditorGUIUtility.PingObject(overlay.gameObject);
+            Debug.Log("C6_MONSTER_INTERFERENCE_UI_READY: red board-edge block and centered monster message are connected.");
+        }
+
+        static MonsterInterferenceOverlay CreateInterferenceOverlay(Transform canvas, Font font)
+        {
+            var rootObject = new GameObject("MonsterInterferenceOverlay", typeof(RectTransform),
+                typeof(MonsterInterferenceOverlay));
+            Undo.RegisterCreatedObjectUndo(rootObject, "Create monster interference UI");
+            var root = (RectTransform)rootObject.transform;
+            root.SetParent(canvas, false);
+            root.anchorMin = Vector2.zero;
+            root.anchorMax = Vector2.one;
+            root.offsetMin = Vector2.zero;
+            root.offsetMax = Vector2.zero;
+
+            Image sourceLeft = null;
+            Image sourceRight = null;
+            var attackWarning = canvas.GetComponentInChildren<MonsterAttackWarning>(true);
+            if (attackWarning != null)
+            {
+                sourceLeft = attackWarning.GetComponentsInChildren<Image>(true)
+                    .FirstOrDefault(item => item.name == "LeftEdge");
+                sourceRight = attackWarning.GetComponentsInChildren<Image>(true)
+                    .FirstOrDefault(item => item.name == "RightEdge");
+            }
+
+            CreateInterferenceEdge("BlockedLeftEdge", root, sourceLeft);
+            CreateInterferenceEdge("BlockedRightEdge", root, sourceRight);
+
+            var messageObject = new GameObject("InterferenceMessage", typeof(RectTransform),
+                typeof(CanvasRenderer), typeof(Text), typeof(Outline));
+            Undo.RegisterCreatedObjectUndo(messageObject, "Create monster interference message");
+            var messageRect = (RectTransform)messageObject.transform;
+            messageRect.SetParent(root, false);
+            var message = messageObject.GetComponent<Text>();
+            message.font = font;
+            message.text = MonsterInterferenceOverlay.DefaultMessage;
+            message.fontSize = 20;
+            message.fontStyle = FontStyle.Bold;
+            message.alignment = TextAnchor.MiddleCenter;
+            message.color = new Color(1f, .80f, .39f, 1f);
+            message.horizontalOverflow = HorizontalWrapMode.Wrap;
+            message.verticalOverflow = VerticalWrapMode.Overflow;
+            message.resizeTextForBestFit = true;
+            message.resizeTextMinSize = 14;
+            message.resizeTextMaxSize = 22;
+            message.raycastTarget = false;
+            message.enabled = false;
+            var outline = messageObject.GetComponent<Outline>();
+            outline.effectColor = new Color(.15f, .06f, .01f, .9f);
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
+            outline.useGraphicAlpha = true;
+            return rootObject.GetComponent<MonsterInterferenceOverlay>();
+        }
+
+        static Image CreateInterferenceEdge(string name, Transform parent, Image source)
+        {
+            var edgeObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            Undo.RegisterCreatedObjectUndo(edgeObject, "Create monster interference edge");
+            edgeObject.transform.SetParent(parent, false);
+            var image = edgeObject.GetComponent<Image>();
+            if (source != null)
+            {
+                image.sprite = source.sprite;
+                image.type = source.type;
+                image.preserveAspect = source.preserveAspect;
+                image.pixelsPerUnitMultiplier = source.pixelsPerUnitMultiplier;
+                edgeObject.transform.localScale = source.transform.localScale;
+            }
+            image.color = new Color(1f, .08f, .05f, .88f);
+            image.raycastTarget = false;
+            image.maskable = false;
+            image.enabled = false;
+            return image;
         }
 
         static T09Hud FindHud(Scene scene)

@@ -25,9 +25,11 @@ namespace C6.Prototype.Battle
         [SerializeField] private DamagePopupLayer damagePopups;
         [SerializeField] private MonsterAttackWarning attackWarning; // #28: scene Canvas edge glow, target's screen only
         [SerializeField] private RectTransform defenseZoneLeft, defenseZoneRight; // #28: invisible two-hand defense zones
+        [SerializeField] private MonsterInterferenceOverlay interferenceOverlay;
         private MonsterMotion monsterMotion;
         private MonsterAttackPresenter attackPresenter;
         private MonsterDefenseInput defenseInput;
+        private Func<double?> presentationHostClock;
         private int? observedHp;
         private Vector3? removedProxyPosition;
         private readonly HashSet<string> ownProxyIds = new HashSet<string>(StringComparer.Ordinal);
@@ -87,6 +89,9 @@ namespace C6.Prototype.Battle
         private bool reachableEdgeTransferDistance;
         private readonly Dictionary<string, PendingInput> pending = new Dictionary<string, PendingInput>();
         private readonly HashSet<string> confirmedUnavailable = new HashSet<string>();
+        // #51: local time each Combined orb first appeared in a Host snapshot (any owner, so a
+        // received orb keeps its timer). Drives the blink only; the Host alone removes orbs.
+        private readonly Dictionary<string, float> combinedSeenAt = new Dictionary<string, float>(StringComparer.Ordinal);
         private readonly HashSet<string> touchReceipts = new HashSet<string>();
         private Transform viewRoot, proxyRoot;
         private Material projectileMaterial, trailMaterial;
@@ -150,6 +155,7 @@ namespace C6.Prototype.Battle
         /// <summary>#28: this screen's estimate of the Host clock, which times the monster attack presentation.</summary>
         public void ConfigureHostClock(Func<double?> hostNow)
         {
+            presentationHostClock = hostNow;
             if (attackPresenter != null) attackPresenter.ConfigureHostClock(hostNow);
             if (defenseInput != null) defenseInput.ConfigureHostClock(hostNow);
         }
@@ -370,14 +376,14 @@ namespace C6.Prototype.Battle
             var state = attack.Snapshot;
             if (state == null || !attack.Connected)
             {
-                ClearViews(); ClearProxies(); ClearThrowTrails(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear();
+                ClearViews(); ClearProxies(); ClearThrowTrails(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); combinedSeenAt.Clear();
                 gestures = new OrbGestureEngine(); gestures.SetInputEnabled(false); sessionKey = null; round = 0; displayedDebugMode = null;
                 hud.HideElementWarning(); RefreshHud(); observedHp = null; missWatches.Clear(); return;
             }
             if (sessionKey != state.sessionId || round != state.roundId)
             {
                 hud.HideElementWarning(); CancelInteractions("Confirmed session/round changed");
-                ClearViews(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); gestures = new OrbGestureEngine();
+                ClearViews(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); combinedSeenAt.Clear(); gestures = new OrbGestureEngine();
                 SentTransfers = ReceivedTransfers = 0;
                 hud.SetNetworkFieldsVisible(!attack.Connected); Canvas.ForceUpdateCanvases();
                 sessionKey = state.sessionId; round = state.roundId; displayedDebugMode = null;
@@ -391,8 +397,26 @@ namespace C6.Prototype.Battle
                 if (!ids.Contains(id))
                 {
                     // A confirmed Launching/Projectile/Consumed record, never a local timeout, removes the view.
+                    // #51: a held orb can expire mid-drag; end that drag before its view goes away.
+                    if (gestures.ActiveOrb?.OrbId == id) { LogPointerCancellation(gestures.ActivePointerId.Value, id, "ORB_REMOVED"); gestures.CancelAllPointers(); }
+                    bool expired = combinedSeenAt.TryGetValue(id, out float seenAt)
+                        && Time.unscaledTime - seenAt >= layout.Config.CombinedOrbLifetimeSeconds - 1f
+                        && !state.orbs.Any(o => o.id == id && o.state != (int)OrbAuthorityState.Consumed);
                     RemoveView(id);
+                    if (expired)
+                    {
+                        action = "ORB EXPIRED";
+                        detail = "Throw a combined orb within " + layout.Config.CombinedOrbLifetimeSeconds.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " seconds";
+                        Debug.Log($"C6_T09_COMBINED_EXPIRED orb={id} round={round}");
+                    }
                 }
+            // #51: remember when each Combined orb first appeared; forget ones no longer Idle.
+            var idleCombined = new HashSet<string>(state.orbs.Where(o => o.kind == (int)OrbKind.Combined
+                && o.state == (int)OrbAuthorityState.Idle).Select(o => o.id), StringComparer.Ordinal);
+            foreach (string id in idleCombined)
+                if (!combinedSeenAt.ContainsKey(id)) combinedSeenAt.Add(id, Time.unscaledTime);
+            foreach (string id in combinedSeenAt.Keys.ToArray())
+                if (!idleCombined.Contains(id)) combinedSeenAt.Remove(id);
             foreach (var orb in available)
             {
                 bool arrived = transfersEnabled && orb.transferCount > 0 &&
@@ -905,8 +929,10 @@ namespace C6.Prototype.Battle
         }
         private void Update()
         {
+            RefreshInterferencePresentation();
             if (releaseThrowsEnabled && gestures.HasActivePointer)
                 throwSampler.Add(gestures.LastRawPosition / Mathf.Max(1f, Screen.width), Time.unscaledTimeAsDouble);
+            UpdateExpiryWarnings();
             WatchOwnFlightsForMiss();
             var held = pendingCombination;
             if (held != null)
@@ -933,6 +959,18 @@ namespace C6.Prototype.Battle
                 }
             }
         }
+        /// <summary>#51: combined orbs blink during their final seconds before the Host removes them.</summary>
+        private void UpdateExpiryWarnings()
+        {
+            if (layout == null || layout.Config == null || views.Count == 0) return;
+            float lifetime = layout.Config.CombinedOrbLifetimeSeconds;
+            float warningFrom = lifetime - layout.Config.CombinedOrbWarningSeconds;
+            bool playing = battle != null && battle.CanAct;
+            foreach (var pair in views)
+                pair.Value.SetExpiryWarning(playing && combinedSeenAt.TryGetValue(pair.Key, out float seenAt)
+                    && Time.unscaledTime - seenAt >= warningFrom);
+        }
+
         private void LateUpdate()
         {
             if (hud == null || hud.Canvas == null) return;
@@ -1140,6 +1178,7 @@ namespace C6.Prototype.Battle
             bool connected = battle != null && battle.Connected;
             bool canStart = battle != null && battle.CanStart;
             hud.SetNetworkFieldsVisible(!attack.Connected);
+            RefreshInterferencePresentation();
             hud.SetStatus(attack.Connected ? ((attack.IsHost ? "HOST / P" : "CLIENT / P") + (approvedPlayerNumber > 0 ? approvedPlayerNumber : attack.IsHost ? 1 : 2)) : connection.State.ToString().ToUpperInvariant(), action,
                 connection.State == DirectConnectionState.Failed ? connection.Message : detail);
             hud.SetControls(connection.CanStart, connection.CanStart, canStart, !connection.CanStart,
@@ -1163,6 +1202,44 @@ namespace C6.Prototype.Battle
                 connection.CanStart, state?.observedMonsterHp ?? s?.hp ?? layout.Config.MonsterMaxHp,
                 lastConfirmedStamina, host && connected);
             Changed?.Invoke();
+        }
+        private void RefreshInterferencePresentation()
+        {
+            if (interferenceOverlay == null) return;
+            var state = battle?.Snapshot;
+            MonsterTransferDirection blockedDirection = RestrictedInterferenceDirection(
+                state, attack != null ? attack.LocalPlayerId : 0);
+            if (blockedDirection == MonsterTransferDirection.None || hud == null || layout == null)
+            {
+                interferenceOverlay.Hide();
+                return;
+            }
+
+            double? hostNow = presentationHostClock != null ? presentationHostClock()
+                : battle != null && battle.IsHost ? Time.realtimeSinceStartupAsDouble : (double?)null;
+            interferenceOverlay.Present(blockedDirection, hud.OrbWorkspaceScreenRect,
+                layout.TopPixelRect, hostNow, state.interferenceEndsAt);
+        }
+
+        public static MonsterTransferDirection RestrictedInterferenceDirection(BattleSnapshot state, ulong localPlayer)
+        {
+            if (state == null || !state.interferenceActive || state.phase != BattlePhase.Playing.ToString())
+                return MonsterTransferDirection.None;
+            if (state.interferenceKind == (int)MonsterInterferenceKind.SinglePlayerDirectionBlock)
+            {
+                return state.interferenceHasTarget && state.interferenceTarget == localPlayer
+                    ? (MonsterTransferDirection)state.interferenceDirection
+                    : MonsterTransferDirection.None;
+            }
+            if (state.interferenceKind == (int)MonsterInterferenceKind.AllPlayersDirectionRestriction)
+            {
+                return state.interferenceDirection == (int)MonsterTransferDirection.Left
+                    ? MonsterTransferDirection.Right
+                    : state.interferenceDirection == (int)MonsterTransferDirection.Right
+                        ? MonsterTransferDirection.Left
+                        : MonsterTransferDirection.None;
+            }
+            return MonsterTransferDirection.None;
         }
         private void ClearViews()
         {
@@ -1267,6 +1344,7 @@ namespace C6.Prototype.Battle
         private void OnApplicationPause(bool paused) { if (paused) CancelInteractions("Paused"); }
         private void OnDisable()
         {
+            if (interferenceOverlay != null) interferenceOverlay.Hide();
             string id = gestures.ActiveOrb?.OrbId;
             if (id != null) LogPointerCancellation(gestures.ActivePointerId.Value, id, "COMPONENT_DISABLED");
             gestures.SetInputEnabled(false);

@@ -339,7 +339,7 @@ namespace C6.Prototype.Attack
 
         public AttackLaunchResult RequestTransfer(ulong authenticatedSender, OrbActionRequest request,
             ulong receiver, bool receiverConnected, int storageLimit, float edgeInset, bool gameplayEnabled = true,
-            double motionServerTime = 0d)
+            double motionServerTime = 0d, string hostRejectionReason = null)
         {
             if (request == null) return Reject("MISSING_REQUEST");
             string contextError = ContextError(request.SessionId, request.RoundId);
@@ -355,6 +355,7 @@ namespace C6.Prototype.Attack
             else if (request.ThrowInput.HasValue) result = Reject("UNEXPECTED_THROW_INPUT");
             else if (!HostOrbRegistry.TransferTuningValid(storageLimit, edgeInset)) result = Reject("INVALID_TRANSFER_TUNING");
             else if (motionError != null) result = Reject(motionError);
+            else if (!string.IsNullOrEmpty(hostRejectionReason)) result = Reject(hostRejectionReason);
             else if (!receiverConnected || receiver == authenticatedSender) result = Reject("RECEIVER_NOT_CONNECTED");
             else if (registry.TryGet(request.OrbId, out var before) && before.TransferCount == ulong.MaxValue)
                 result = Reject("TRANSFER_COUNT_EXHAUSTED");

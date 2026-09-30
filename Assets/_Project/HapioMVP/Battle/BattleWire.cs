@@ -39,6 +39,15 @@ namespace C6.Prototype.Battle
         public bool attackActive;
         public int attackResolvedSequence;
         public int attackResult; // MonsterAttackResult of attackResolvedSequence
+        // #53 Host monster interference. A live effect is synchronized so every screen shows the same rule.
+        public int interferenceSequence;
+        public int interferenceKind; // MonsterInterferenceKind
+        public int interferenceDirection; // MonsterTransferDirection
+        public bool interferenceActive;
+        public bool interferenceHasTarget;
+        public ulong interferenceTarget;
+        public double interferenceStartsAt;
+        public double interferenceEndsAt;
         // A client may report its lost connection without inventing a victory/defeat or ticking HP.
         public bool locallyDetectedNetworkError;
     }
@@ -109,7 +118,7 @@ namespace C6.Prototype.Battle
             if (phase == BattlePhase.Playing && (value.remaining <= 0 || value.observedMonsterHp <= 0)) return false;
             if (phase == BattlePhase.Victory && (value.remaining <= 0 || value.observedMonsterHp != 0)) return false;
             if (phase == BattlePhase.Defeat && value.remaining != 0) return false;
-            return ValidMonsterAttack(value, phase);
+            return ValidMonsterAttack(value, phase) && ValidMonsterInterference(value, phase);
         }
 
         /// <summary>#28: attacks exist only after Start, a live warning only while Playing, and results never skip ahead.</summary>
@@ -126,6 +135,40 @@ namespace C6.Prototype.Battle
                 || value.attackWarningStartsAt < value.startedAt || value.attackWarningEndsAt <= value.attackWarningStartsAt) return false;
             if (value.attackActive) return phase == BattlePhase.Playing && resolved == sequence - 1;
             return phase != BattlePhase.Playing || resolved == sequence;
+        }
+
+        /// <summary>#53: only a live Playing snapshot carries the current effect details.</summary>
+        private static bool ValidMonsterInterference(BattleSnapshot value, BattlePhase phase)
+        {
+            int sequence = value.interferenceSequence;
+            var kind = (MonsterInterferenceKind)value.interferenceKind;
+            var direction = (MonsterTransferDirection)value.interferenceDirection;
+            if (sequence < 0 || !Enum.IsDefined(typeof(MonsterInterferenceKind), kind)
+                || !Enum.IsDefined(typeof(MonsterTransferDirection), direction)
+                || !Finite(value.interferenceStartsAt) || !Finite(value.interferenceEndsAt)) return false;
+
+            if (sequence == 0)
+            {
+                return !value.interferenceActive && !value.interferenceHasTarget
+                    && kind == MonsterInterferenceKind.None && direction == MonsterTransferDirection.None
+                    && value.interferenceTarget == 0 && value.interferenceStartsAt == 0 && value.interferenceEndsAt == 0;
+            }
+
+            if (!value.interferenceActive)
+            {
+                return kind == MonsterInterferenceKind.None && direction == MonsterTransferDirection.None
+                    && !value.interferenceHasTarget && value.interferenceTarget == 0
+                    && value.interferenceStartsAt == 0 && value.interferenceEndsAt == 0;
+            }
+
+            if (phase != BattlePhase.Playing || kind == MonsterInterferenceKind.None
+                || direction == MonsterTransferDirection.None
+                || value.interferenceStartsAt < value.startedAt
+                || value.interferenceEndsAt <= value.interferenceStartsAt) return false;
+            if (kind == MonsterInterferenceKind.SinglePlayerDirectionBlock)
+                return value.interferenceHasTarget;
+            return kind == MonsterInterferenceKind.AllPlayersDirectionRestriction
+                && !value.interferenceHasTarget && value.interferenceTarget == 0;
         }
 
         internal static bool AcceptsSnapshot(BattleSnapshot current, BattleSnapshot incoming,

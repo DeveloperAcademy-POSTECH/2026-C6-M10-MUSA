@@ -45,6 +45,7 @@ namespace C6.Prototype.Orbs
         private SpriteRenderer heldHaloInner;
         private SpriteRenderer heldShadow;
         private Vector3 idleLabelPosition;
+        private bool expiryWarning;
 
         public string OrbId { get; private set; }
         /// <summary>오행 v1: Raw element (Combined uses YinElement/YangElement). None when elements are off.</summary>
@@ -213,6 +214,34 @@ namespace C6.Prototype.Orbs
         private void LateUpdate()
         {
             if (heldArtwork != null && HeldFeedbackActive) RefreshHeldVisual();
+            if (expiryWarning) ApplyExpiryBlink();
+        }
+
+        /// <summary>#51: blink before a combined orb expires. Presentation only; the Host decides removal.</summary>
+        public void SetExpiryWarning(bool value)
+        {
+            if (expiryWarning == value) return;
+            expiryWarning = value;
+            if (initialized && !value) SetLocalState(localState);
+        }
+
+        private void ApplyExpiryBlink()
+        {
+            if (!initialized) return;
+            float alpha = Mathf.Repeat(Time.unscaledTime * 6f, 1f) < 0.5f ? 0.3f : 1f;
+            if (art != null) SetAlpha(art, alpha);
+            else
+            {
+                SetAlpha(ring, alpha); SetAlpha(core, alpha); SetAlpha(firstDot, alpha);
+                if (secondDot != null) SetAlpha(secondDot, alpha);
+            }
+        }
+
+        private static void SetAlpha(SpriteRenderer renderer, float alpha)
+        {
+            var color = renderer.color;
+            color.a = alpha;
+            renderer.color = color;
         }
 
         private void RefreshHeldVisual()
