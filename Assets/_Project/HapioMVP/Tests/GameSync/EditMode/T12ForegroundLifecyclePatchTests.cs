@@ -11,7 +11,7 @@ namespace C6.Prototype.GameSync.Tests
     public sealed class T12ForegroundLifecyclePatchTests
     {
         private const string FixturePath = "Assets/_Project/HapioMVP/Tests/GameSync/EditMode/Fixtures/T12Unity6000_5_7f1Lifecycle.json";
-        private const string ScenePath = "Assets/_Project/HapioMVP/Scenes/IntegratedDeviceBattle.unity";
+        private const string ScenePath = "Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity";
         private const string Marker = "C6_T12_FOREGROUND_LIFECYCLE_V1";
         private const string Guard = "if (C6T12IsActualBackground()) return;";
         private Type patchType;
@@ -34,14 +34,15 @@ namespace C6.Prototype.GameSync.Tests
         }
 
         [Test]
-        public void AppliesOnlyToAnIosExportContainingExactlyTheIntegratedScene()
+        public void AppliesOnlyToAnIosExportContainingExactlyTheCurrentBattleScene()
         {
             Assert.That(Applies(BuildTarget.iOS, new[] { ScenePath }), Is.True);
             Assert.That(Applies(BuildTarget.StandaloneOSX, new[] { ScenePath }), Is.False);
             Assert.That(Applies(BuildTarget.iOS, null), Is.False);
             Assert.That(Applies(BuildTarget.iOS, Array.Empty<string>()), Is.False);
             Assert.That(Applies(BuildTarget.iOS, new[] { (string)null }), Is.False);
-            foreach (string previous in new[] { "OrbTransferBattle", "TwoPlayerBattle", "BattleLoop" })
+            foreach (string previous in new[] { "OrbTransferBattle", "TwoPlayerBattle", "BattleLoop",
+                "IntegratedDeviceBattle", "InterruptionBattle", "PhysicsBattle", "ThrowBattle", "FivePlayerBattle" })
             {
                 string path = "Assets/_Project/HapioMVP/Scenes/" + previous + ".unity";
                 Assert.That(Applies(BuildTarget.iOS, new[] { path }), Is.False, previous);
@@ -51,17 +52,11 @@ namespace C6.Prototype.GameSync.Tests
         }
 
         [Test]
-        [TestCase("InterruptionBattle")]
-        [TestCase("PhysicsBattle")]
-        public void LaterSceneRetainsTheReviewedPatchWithoutEnablingMixedOrUnrelatedExports(string sceneName)
+        public void SimilarOrMixedScenePathsDoNotReceiveTheLifecyclePatch()
         {
-            string interruption = "Assets/_Project/HapioMVP/Scenes/" + sceneName + ".unity";
-            Assert.That(Applies(BuildTarget.iOS, new[] { interruption }), Is.True);
-            Assert.That(Applies(BuildTarget.StandaloneOSX, new[] { interruption }), Is.False);
-            Assert.That(Applies(BuildTarget.iOS, new[] { interruption, ScenePath }), Is.False);
-            Assert.That(Applies(BuildTarget.iOS, new[] { interruption, interruption }), Is.False);
-            Assert.That(Applies(BuildTarget.iOS, new[] { interruption + ".backup" }), Is.False);
-            Assert.That(Applies(BuildTarget.iOS, new[] { "Assets/Other/InterruptionBattle.unity" }), Is.False);
+            Assert.That(Applies(BuildTarget.iOS, new[] { ScenePath + ".backup" }), Is.False);
+            Assert.That(Applies(BuildTarget.iOS, new[] { "Assets/Other/ContinuousTransferBattle.unity" }), Is.False);
+            Assert.That(Applies(BuildTarget.iOS, new[] { ScenePath, "Assets/Other/Unrelated.unity" }), Is.False);
         }
 
         [Test]
