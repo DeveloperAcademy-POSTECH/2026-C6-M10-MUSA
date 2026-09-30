@@ -28,7 +28,7 @@ MonoBehaviour:
   orbFloorDeceleration: 2
   orbStopSpeed: 0.065
   orbMaxReleaseSpeed: 3
-  orbReleaseSampleWindow: 0.06
+  orbReleaseSampleWindow: 0.3
   monsterTargetId: dev-training-dummy
   monsterPosition: {x: 0, y: 0, z: 0}
   monsterHitboxCenter: {x: 0, y: 1.4, z: 0}
