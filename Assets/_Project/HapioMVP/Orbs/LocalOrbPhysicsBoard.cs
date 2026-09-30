@@ -312,8 +312,13 @@ namespace C6.Prototype.Orbs
                 Vector2 velocity = entry.Body.linearVelocity;
                 if (!Finite(velocity)) velocity = Vector2.zero;
                 Vector2 position = entry.Body.position;
-                bool crossLeft = position.x <= CenterBounds.xMin && velocity.x < 0;
-                bool crossRight = position.x >= CenterBounds.xMax && velocity.x > 0;
+                // PhysX can leave a tiny signed horizontal residual at a resting edge.
+                // Ignore that noise, but preserve a real diagonal/glancing crossing even
+                // when its horizontal component is below the total-speed stop threshold.
+                float horizontalNoiseFloor = tuning.StopSpeed * .01f;
+                bool moving = velocity.sqrMagnitude > tuning.StopSpeed * tuning.StopSpeed;
+                bool crossLeft = moving && position.x <= CenterBounds.xMin && velocity.x < -horizontalNoiseFloor;
+                bool crossRight = moving && position.x >= CenterBounds.xMax && velocity.x > horizontalNoiseFloor;
                 if (horizontalPassage && (crossLeft || crossRight))
                 {
                     // This velocity belongs to the completed physics step. Do not charge a

@@ -1084,7 +1084,10 @@ namespace C6.Prototype.Battle
             view.transform.localScale = Vector3.one * RadiusWorld / Mathf.Max(.0001f, view.Collider.radius);
             view.SetLabelPixelHeight(layout.OrbCamera, LabelPixels);
             Rect space = hud.OrbWorkspaceScreenRect;
-            float x = Mathf.Max(RadiusPixels, view.GetLabelHalfWidthPixels(layout.OrbCamera) + 2f);
+            // Continuous passage needs the orb's center to reach the visible side edge.
+            // The legacy board still keeps the full sprite/caption inside its workspace.
+            float x = continuousTransfersEnabled && orbPhysicsEnabled ? 0f :
+                Mathf.Max(RadiusPixels, view.GetLabelHalfWidthPixels(layout.OrbCamera) + 2f);
             point.x = Mathf.Clamp(point.x, space.xMin + x, Mathf.Max(space.xMin + x, space.xMax - x));
             // Reserve the held caption's full height even while idle so a grab cannot jump.
             float bottomPadding = Mathf.Max(RadiusPixels * 1.8f, RadiusPixels * 1.72f + LabelPixels * .5f + 2f);
@@ -1094,7 +1097,11 @@ namespace C6.Prototype.Battle
                 point.x = Mathf.Clamp(point.x, physicsScreenBounds.xMin, physicsScreenBounds.xMax);
                 point.y = Mathf.Clamp(point.y, physicsScreenBounds.yMin, physicsScreenBounds.yMax);
             }
-            if (layout.TryScreenToOrbPlane(point, out var world))
+            Vector3 world;
+            bool projected = continuousTransfersEnabled && orbPhysicsEnabled
+                ? layout.TryScreenToOrbPlaneUnclamped(point, out world)
+                : layout.TryScreenToOrbPlane(point, out world);
+            if (projected)
             {
                 view.transform.position = world;
                 if (orbPhysicsEnabled && orbPhysics != null)
@@ -1163,18 +1170,23 @@ namespace C6.Prototype.Battle
             if (!orbPhysicsEnabled || hud == null || hud.Canvas == null || layout.OrbCamera == null) return;
             EnsureOrbPhysics();
             Rect space = hud.OrbWorkspaceScreenRect;
-            float xPadding = RadiusPixels;
+            float xPadding = continuousTransfersEnabled ? 0f : RadiusPixels;
             foreach (var view in views.Values)
             {
                 view.transform.localScale = Vector3.one * RadiusWorld / Mathf.Max(.0001f, view.Collider.radius);
                 view.SetLabelPixelHeight(layout.OrbCamera, LabelPixels);
-                xPadding = Mathf.Max(xPadding, view.GetLabelHalfWidthPixels(layout.OrbCamera) + 2f);
+                if (!continuousTransfersEnabled)
+                    xPadding = Mathf.Max(xPadding, view.GetLabelHalfWidthPixels(layout.OrbCamera) + 2f);
             }
             float bottom = Mathf.Max(RadiusPixels * 1.8f, RadiusPixels * 1.72f + LabelPixels * .5f + 2f);
             var min = new Vector2(space.xMin + xPadding, space.yMin + bottom);
             var max = new Vector2(Mathf.Max(min.x + .001f, space.xMax - xPadding),
                 Mathf.Max(min.y + .001f, space.yMax - RadiusPixels));
-            if (!layout.TryScreenToOrbPlane(min, out var a) || !layout.TryScreenToOrbPlane(max, out var b)) return;
+            Vector3 a = default, b = default;
+            bool projected = continuousTransfersEnabled
+                ? layout.TryScreenToOrbPlaneUnclamped(min, out a) && layout.TryScreenToOrbPlaneUnclamped(max, out b)
+                : layout.TryScreenToOrbPlane(min, out a) && layout.TryScreenToOrbPlane(max, out b);
+            if (!projected) return;
             var bounds = Rect.MinMaxRect(a.x, a.y, b.x, b.y);
             // Both axes use the same world-units-per-pixel scale; tall screens never turn circles into ellipses.
             float boardWidth = space.width * 2f * layout.OrbCamera.orthographicSize / Mathf.Max(1f, layout.BottomPixelRect.height);

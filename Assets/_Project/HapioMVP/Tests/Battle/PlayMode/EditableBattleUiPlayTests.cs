@@ -210,6 +210,22 @@ namespace C6.Prototype.Battle.Tests
         }
 
         [UnityTest]
+        public IEnumerator ContinuousOrbCenterCanReachBothVisibleSideEdges()
+        {
+            UseExplicitLocalUiFixture();
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            var board = controller.GetComponent<LocalOrbPhysicsBoard>();
+            Assert.That(board, Is.Not.Null);
+            var workspace = hud.OrbWorkspaceScreenRect;
+            var camera = controller.Layout.OrbCamera;
+            float left = camera.WorldToScreenPoint(new Vector3(board.CenterBounds.xMin, board.CenterBounds.center.y)).x;
+            float right = camera.WorldToScreenPoint(new Vector3(board.CenterBounds.xMax, board.CenterBounds.center.y)).x;
+            Assert.That(left, Is.EqualTo(workspace.xMin).Within(.5f));
+            Assert.That(right, Is.EqualTo(workspace.xMax).Within(.5f));
+        }
+
+        [UnityTest]
         public IEnumerator DefenseGuidesFollowTheSavedInputZonesAndWarningStates()
         {
             UseExplicitLocalUiFixture();
@@ -321,6 +337,14 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(framing.ApplyFraming(), Is.True, framing.FitStatus);
             Assert.That(framing.ProjectedMonsterRect.yMin, Is.GreaterThanOrEqualTo(framing.EffectiveScreenRect.yMin - .5f));
             Assert.That(framing.ProjectedMonsterRect.yMax, Is.LessThanOrEqualTo(framing.EffectiveScreenRect.yMax + .5f));
+
+            const int edgePointer = 6501;
+            Assert.That(controller.BeginPointer(edgePointer, point, false), Is.True);
+            controller.MovePointer(edgePointer, new Vector2(workspace.xMin, point.y));
+            Assert.That(controller.GetViewScreenPosition(view.OrbId).x, Is.EqualTo(workspace.xMin).Within(.5f));
+            controller.MovePointer(edgePointer, new Vector2(workspace.xMax, point.y));
+            Assert.That(controller.GetViewScreenPosition(view.OrbId).x, Is.EqualTo(workspace.xMax).Within(.5f));
+            controller.CancelPointer(edgePointer);
         }
 
         private void UseExplicitLocalUiFixture()
