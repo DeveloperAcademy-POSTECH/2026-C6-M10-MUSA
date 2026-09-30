@@ -77,6 +77,47 @@ namespace C6.Prototype.Lobby.Tests
         }
 
         [Test]
+        public void OrbPhysicsBounceAndExpirySettingsReachTheRoomConfig()
+        {
+            settings.SetEnabled(true);
+            settings.SetValue(LobbyDeveloperSetting.OrbRestitution, .5);
+            settings.SetValue(LobbyDeveloperSetting.OrbContactFriction, .2);
+            settings.SetValue(LobbyDeveloperSetting.OrbFloorDeceleration, 3);
+            settings.SetValue(LobbyDeveloperSetting.OrbMaxReleaseSpeed, 4);
+            settings.SetValue(LobbyDeveloperSetting.OrbStopSpeed, .05);
+            settings.SetValue(LobbyDeveloperSetting.OrbReleaseSampleWindow, .1);
+            settings.SetValue(LobbyDeveloperSetting.RejectedCombinationBounce, 1.5);
+            settings.SetValue(LobbyDeveloperSetting.CombinedOrbLifetime, 10);
+            settings.SetValue(LobbyDeveloperSetting.CombinedOrbWarning, 3);
+
+            LobbyHostConfig room = settings.BuildRoomConfig();
+
+            Assert.That(room.orbRestitution, Is.EqualTo(.5f).Within(.0001f));
+            Assert.That(room.orbContactFriction, Is.EqualTo(.2f).Within(.0001f));
+            Assert.That(room.orbFloorDeceleration, Is.EqualTo(3f).Within(.0001f));
+            Assert.That(room.orbMaxReleaseSpeed, Is.EqualTo(4f).Within(.0001f));
+            Assert.That(room.orbStopSpeed, Is.EqualTo(.05f).Within(.0001f));
+            Assert.That(room.orbReleaseSampleWindow, Is.EqualTo(.1f).Within(.0001f));
+            Assert.That(room.rejectedCombinationBounceSpeed, Is.EqualTo(1.5f).Within(.0001f));
+            Assert.That(room.combinedOrbLifetimeSeconds, Is.EqualTo(10f).Within(.0001f));
+            Assert.That(room.combinedOrbWarningSeconds, Is.EqualTo(3f).Within(.0001f));
+            Assert.That(LobbyHostConfig.TryRead(JsonUtility.ToJson(room), out _), Is.True);
+        }
+
+        [Test]
+        public void ExpiryBlinkNeverOutlastsTheLifetime()
+        {
+            settings.SetEnabled(true);
+            settings.SetValue(LobbyDeveloperSetting.CombinedOrbLifetime, 10);
+            settings.SetValue(LobbyDeveloperSetting.CombinedOrbWarning, 5);
+            settings.SetValue(LobbyDeveloperSetting.CombinedOrbLifetime, 3);
+            Assert.That(settings.Value(LobbyDeveloperSetting.CombinedOrbWarning), Is.EqualTo(3));
+            settings.Adjust(LobbyDeveloperSetting.CombinedOrbWarning, 1);
+            Assert.That(settings.Value(LobbyDeveloperSetting.CombinedOrbWarning), Is.EqualTo(3));
+            Assert.That(LobbyHostConfig.TryRead(JsonUtility.ToJson(settings.BuildRoomConfig()), out _), Is.True);
+        }
+
+        [Test]
         public void AdjustmentsClampAtTheSupportedHostRangesAndResetToDefaults()
         {
             settings.SetValue(LobbyDeveloperSetting.OrbStorageLimit, 999);

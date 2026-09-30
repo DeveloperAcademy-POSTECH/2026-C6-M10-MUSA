@@ -17,7 +17,17 @@ namespace C6.Prototype.Lobby
         GenerateCost,
         RecoveryAmount,
         RecoverySeconds,
-        HitRecovery
+        HitRecovery,
+        // #41 orb physics, #52 failed-combination bounce, #51 combined-orb expiry
+        OrbRestitution,
+        OrbContactFriction,
+        OrbFloorDeceleration,
+        OrbStopSpeed,
+        OrbMaxReleaseSpeed,
+        OrbReleaseSampleWindow,
+        RejectedCombinationBounce,
+        CombinedOrbLifetime,
+        CombinedOrbWarning
     }
 
     /// <summary>
@@ -40,7 +50,16 @@ namespace C6.Prototype.Lobby
                 LobbyDeveloperSetting.GenerateCost,
                 LobbyDeveloperSetting.RecoveryAmount,
                 LobbyDeveloperSetting.RecoverySeconds,
-                LobbyDeveloperSetting.HitRecovery
+                LobbyDeveloperSetting.HitRecovery,
+                LobbyDeveloperSetting.OrbRestitution,
+                LobbyDeveloperSetting.OrbContactFriction,
+                LobbyDeveloperSetting.OrbFloorDeceleration,
+                LobbyDeveloperSetting.OrbStopSpeed,
+                LobbyDeveloperSetting.OrbMaxReleaseSpeed,
+                LobbyDeveloperSetting.OrbReleaseSampleWindow,
+                LobbyDeveloperSetting.RejectedCombinationBounce,
+                LobbyDeveloperSetting.CombinedOrbLifetime,
+                LobbyDeveloperSetting.CombinedOrbWarning
             };
 
         private readonly Dictionary<LobbyDeveloperSetting, double> values =
@@ -77,6 +96,15 @@ namespace C6.Prototype.Lobby
             values[LobbyDeveloperSetting.RecoveryAmount] = defaults.recoveryAmount;
             values[LobbyDeveloperSetting.RecoverySeconds] = defaults.recoverySeconds;
             values[LobbyDeveloperSetting.HitRecovery] = defaults.hitRecovery;
+            values[LobbyDeveloperSetting.OrbRestitution] = defaults.orbRestitution;
+            values[LobbyDeveloperSetting.OrbContactFriction] = defaults.orbContactFriction;
+            values[LobbyDeveloperSetting.OrbFloorDeceleration] = defaults.orbFloorDeceleration;
+            values[LobbyDeveloperSetting.OrbStopSpeed] = defaults.orbStopSpeed;
+            values[LobbyDeveloperSetting.OrbMaxReleaseSpeed] = defaults.orbMaxReleaseSpeed;
+            values[LobbyDeveloperSetting.OrbReleaseSampleWindow] = defaults.orbReleaseSampleWindow;
+            values[LobbyDeveloperSetting.RejectedCombinationBounce] = defaults.rejectedCombinationBounceSpeed;
+            values[LobbyDeveloperSetting.CombinedOrbLifetime] = defaults.combinedOrbLifetimeSeconds;
+            values[LobbyDeveloperSetting.CombinedOrbWarning] = defaults.combinedOrbWarningSeconds;
         }
 
         public double Value(LobbyDeveloperSetting setting) =>
@@ -94,7 +122,13 @@ namespace C6.Prototype.Lobby
             double maximum = Maximum(setting);
             double clamped = Math.Max(Minimum(setting), Math.Min(maximum, value));
             if (IsInteger(setting)) clamped = Math.Round(clamped, MidpointRounding.AwayFromZero);
+            else if (IsOrbSetting(setting)) clamped = Math.Round(clamped, 4); // no 0.30000000000000004 from repeated steps
             values[setting] = clamped;
+            // Keep dependent limits valid: stop speed <= max release speed, blink <= lifetime.
+            if (setting == LobbyDeveloperSetting.OrbMaxReleaseSpeed && Value(LobbyDeveloperSetting.OrbStopSpeed) > clamped)
+                values[LobbyDeveloperSetting.OrbStopSpeed] = clamped;
+            if (setting == LobbyDeveloperSetting.CombinedOrbLifetime && Value(LobbyDeveloperSetting.CombinedOrbWarning) > clamped)
+                values[LobbyDeveloperSetting.CombinedOrbWarning] = clamped;
         }
 
         public string Label(LobbyDeveloperSetting setting)
@@ -113,6 +147,15 @@ namespace C6.Prototype.Lobby
                 case LobbyDeveloperSetting.RecoveryAmount: return "RECOVERY AMOUNT";
                 case LobbyDeveloperSetting.RecoverySeconds: return "RECOVERY INTERVAL";
                 case LobbyDeveloperSetting.HitRecovery: return "HIT RECOVERY";
+                case LobbyDeveloperSetting.OrbRestitution: return "ORB BOUNCINESS";
+                case LobbyDeveloperSetting.OrbContactFriction: return "ORB CONTACT FRICTION";
+                case LobbyDeveloperSetting.OrbFloorDeceleration: return "ORB FLOOR SLOWDOWN";
+                case LobbyDeveloperSetting.OrbStopSpeed: return "ORB STOP SPEED";
+                case LobbyDeveloperSetting.OrbMaxReleaseSpeed: return "ORB MAX RELEASE SPEED";
+                case LobbyDeveloperSetting.OrbReleaseSampleWindow: return "RELEASE SAMPLE TIME";
+                case LobbyDeveloperSetting.RejectedCombinationBounce: return "FAILED COMBINE BOUNCE";
+                case LobbyDeveloperSetting.CombinedOrbLifetime: return "COMBINED ORB LIFETIME";
+                case LobbyDeveloperSetting.CombinedOrbWarning: return "EXPIRY BLINK TIME";
                 default: throw new ArgumentOutOfRangeException(nameof(setting));
             }
         }
@@ -125,6 +168,10 @@ namespace C6.Prototype.Lobby
                 case LobbyDeveloperSetting.OrbSizePercent: return value.ToString("0") + "%";
                 case LobbyDeveloperSetting.BattleDuration: return value.ToString("0") + "s";
                 case LobbyDeveloperSetting.RecoverySeconds: return value.ToString("0.0") + "s";
+                case LobbyDeveloperSetting.OrbReleaseSampleWindow: return value.ToString("0.00") + "s";
+                case LobbyDeveloperSetting.CombinedOrbLifetime: return value.ToString("0") + "s";
+                case LobbyDeveloperSetting.CombinedOrbWarning: return value.ToString("0.0") + "s";
+                case LobbyDeveloperSetting.OrbStopSpeed: return value.ToString("0.000");
                 default: return value.ToString(IsInteger(setting) ? "0" : "0.##");
             }
         }
@@ -148,6 +195,15 @@ namespace C6.Prototype.Lobby
             result.recoveryAmount = Value(LobbyDeveloperSetting.RecoveryAmount);
             result.recoverySeconds = Value(LobbyDeveloperSetting.RecoverySeconds);
             result.hitRecovery = Value(LobbyDeveloperSetting.HitRecovery);
+            result.orbRestitution = (float)Value(LobbyDeveloperSetting.OrbRestitution);
+            result.orbContactFriction = (float)Value(LobbyDeveloperSetting.OrbContactFriction);
+            result.orbFloorDeceleration = (float)Value(LobbyDeveloperSetting.OrbFloorDeceleration);
+            result.orbMaxReleaseSpeed = (float)Value(LobbyDeveloperSetting.OrbMaxReleaseSpeed);
+            result.orbStopSpeed = Math.Min((float)Value(LobbyDeveloperSetting.OrbStopSpeed), Math.Min(1f, result.orbMaxReleaseSpeed));
+            result.orbReleaseSampleWindow = (float)Value(LobbyDeveloperSetting.OrbReleaseSampleWindow);
+            result.rejectedCombinationBounceSpeed = (float)Value(LobbyDeveloperSetting.RejectedCombinationBounce);
+            result.combinedOrbLifetimeSeconds = (float)Value(LobbyDeveloperSetting.CombinedOrbLifetime);
+            result.combinedOrbWarningSeconds = Math.Min((float)Value(LobbyDeveloperSetting.CombinedOrbWarning), result.combinedOrbLifetimeSeconds);
 
             string json = JsonUtility.ToJson(result);
             if (!LobbyHostConfig.TryRead(json, out LobbyHostConfig approved))
@@ -169,6 +225,15 @@ namespace C6.Prototype.Lobby
                 case LobbyDeveloperSetting.GenerateCost:
                 case LobbyDeveloperSetting.RecoveryAmount:
                 case LobbyDeveloperSetting.HitRecovery: return defaults.staminaMax;
+                case LobbyDeveloperSetting.OrbRestitution:
+                case LobbyDeveloperSetting.OrbContactFriction: return 1;
+                case LobbyDeveloperSetting.OrbFloorDeceleration:
+                case LobbyDeveloperSetting.OrbMaxReleaseSpeed:
+                case LobbyDeveloperSetting.RejectedCombinationBounce: return 10;
+                case LobbyDeveloperSetting.OrbStopSpeed: return Math.Min(.5, Value(LobbyDeveloperSetting.OrbMaxReleaseSpeed));
+                case LobbyDeveloperSetting.OrbReleaseSampleWindow: return .5;
+                case LobbyDeveloperSetting.CombinedOrbLifetime: return 60;
+                case LobbyDeveloperSetting.CombinedOrbWarning: return Value(LobbyDeveloperSetting.CombinedOrbLifetime);
                 default: return 100000;
             }
         }
@@ -182,6 +247,14 @@ namespace C6.Prototype.Lobby
                 case LobbyDeveloperSetting.RecoveryAmount:
                 case LobbyDeveloperSetting.HitRecovery: return 0;
                 case LobbyDeveloperSetting.RecoverySeconds: return .5;
+                case LobbyDeveloperSetting.OrbRestitution:
+                case LobbyDeveloperSetting.OrbContactFriction:
+                case LobbyDeveloperSetting.RejectedCombinationBounce:
+                case LobbyDeveloperSetting.CombinedOrbWarning: return 0;
+                case LobbyDeveloperSetting.OrbFloorDeceleration: return .1;
+                case LobbyDeveloperSetting.OrbStopSpeed: return .005;
+                case LobbyDeveloperSetting.OrbMaxReleaseSpeed: return .5;
+                case LobbyDeveloperSetting.OrbReleaseSampleWindow: return .02;
                 default: return 1;
             }
         }
@@ -199,6 +272,15 @@ namespace C6.Prototype.Lobby
                 case LobbyDeveloperSetting.BattleDuration: return 30;
                 case LobbyDeveloperSetting.RecoverySeconds: return .5;
                 case LobbyDeveloperSetting.HitRecovery: return 1;
+                case LobbyDeveloperSetting.OrbRestitution:
+                case LobbyDeveloperSetting.OrbContactFriction: return .05;
+                case LobbyDeveloperSetting.OrbFloorDeceleration:
+                case LobbyDeveloperSetting.OrbMaxReleaseSpeed:
+                case LobbyDeveloperSetting.RejectedCombinationBounce: return .25;
+                case LobbyDeveloperSetting.OrbStopSpeed: return .005;
+                case LobbyDeveloperSetting.OrbReleaseSampleWindow: return .02;
+                case LobbyDeveloperSetting.CombinedOrbLifetime: return 1;
+                case LobbyDeveloperSetting.CombinedOrbWarning: return .5;
                 default: return 5;
             }
         }
@@ -218,6 +300,8 @@ namespace C6.Prototype.Lobby
                 default: return false;
             }
         }
+
+        private static bool IsOrbSetting(LobbyDeveloperSetting setting) => setting >= LobbyDeveloperSetting.OrbRestitution;
 
         private static LobbyHostConfig Clone(LobbyHostConfig value)
         {
