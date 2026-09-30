@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace C6.Prototype.PhysicsSandbox
 {
-    /// <summary>A working copy of the eight shared orb size/physics settings.</summary>
+    /// <summary>A working copy of the shared orb size/physics settings, plus #51 expiry and #52 bounce.</summary>
     [Serializable]
     public sealed class OrbSandboxTuning
     {
@@ -23,6 +23,12 @@ namespace C6.Prototype.PhysicsSandbox
         public float orbMaxReleaseSpeed = 2f;
         [Range(.02f, .5f), Tooltip("Seconds of recent drag positions used to calculate release velocity.")]
         public float orbReleaseSampleWindow = .12f;
+        [Range(0f, 10f), Tooltip("#52: speed both orbs are pushed apart after a failed combination, in board widths per second.")]
+        public float rejectedCombinationBounceSpeed = .5f;
+        [Range(1f, 600f), Tooltip("#51: a combined orb not thrown within this many seconds disappears.")]
+        public float combinedOrbLifetimeSeconds = 8f;
+        [Range(0f, 600f), Tooltip("#51: the combined orb blinks during this many final seconds.")]
+        public float combinedOrbWarningSeconds = 2f;
 
         public static OrbSandboxTuning Capture(ScreenLayoutConfig source)
         {
@@ -36,7 +42,10 @@ namespace C6.Prototype.PhysicsSandbox
                 orbFloorDeceleration = source.OrbFloorDeceleration,
                 orbStopSpeed = source.OrbStopSpeed,
                 orbMaxReleaseSpeed = source.OrbMaxReleaseSpeed,
-                orbReleaseSampleWindow = source.OrbReleaseSampleWindow
+                orbReleaseSampleWindow = source.OrbReleaseSampleWindow,
+                rejectedCombinationBounceSpeed = source.RejectedCombinationBounceSpeed,
+                combinedOrbLifetimeSeconds = source.CombinedOrbLifetimeSeconds,
+                combinedOrbWarningSeconds = source.CombinedOrbWarningSeconds
             };
         }
 
@@ -50,6 +59,9 @@ namespace C6.Prototype.PhysicsSandbox
             orbMaxReleaseSpeed = Valid(orbMaxReleaseSpeed, 2f, .01f, 10f);
             orbStopSpeed = Valid(orbStopSpeed, .015f, .001f, Mathf.Min(1f, orbMaxReleaseSpeed));
             orbReleaseSampleWindow = Valid(orbReleaseSampleWindow, .12f, .02f, .5f);
+            rejectedCombinationBounceSpeed = Valid(rejectedCombinationBounceSpeed, .5f, 0f, 10f);
+            combinedOrbLifetimeSeconds = Valid(combinedOrbLifetimeSeconds, 8f, 1f, 600f);
+            combinedOrbWarningSeconds = Valid(combinedOrbWarningSeconds, 2f, 0f, combinedOrbLifetimeSeconds);
         }
 
         /// <summary>Explicit save operation only. No other ScreenLayoutConfig field is serialized here.</summary>

@@ -402,8 +402,9 @@ namespace C6.Prototype.PhysicsSandbox
         /// </summary>
         private void TickCombinedExpiry()
         {
-            float lifetime = sourceConfig != null ? sourceConfig.CombinedOrbLifetimeSeconds : 8f;
-            float warning = sourceConfig != null ? sourceConfig.CombinedOrbWarningSeconds : 2f;
+            // 'Orb Physics Tuning' 작업값을 바로 쓴다. 저장하면 ScreenLayoutConfig(게임)에도 반영된다.
+            float lifetime = tuning != null ? Mathf.Clamp(tuning.combinedOrbLifetimeSeconds, 1f, 600f) : 8f;
+            float warning = tuning != null ? Mathf.Clamp(tuning.combinedOrbWarningSeconds, 0f, lifetime) : 2f;
             float now = Time.unscaledTime;
             List<OrbSandboxSeed> expired = null;
             foreach (var seed in AllSeeds)
@@ -615,7 +616,7 @@ namespace C6.Prototype.PhysicsSandbox
         private void TryCombine(OrbSandboxSeed source, OrbSandboxSeed target)
         {
             if (source.kind != OrbKind.Raw || target.kind != OrbKind.Raw)
-            { LastCombineResult = "거절: 결합 구슬은 다시 결합할 수 없음"; return; }
+            { LastCombineResult = "거절: 결합 구슬은 다시 결합할 수 없음"; BounceApart(source, target); return; }
             if (source.polarity == target.polarity)
             { LastCombineResult = "거절: 같은 극끼리는 결합 불가"; BounceApart(source, target); return; }
             // 오행 v2: 실제 판(HostOrbRegistry)과 같은 규칙. 다른 속성끼리는 결합하지 않는다.
@@ -652,7 +653,7 @@ namespace C6.Prototype.PhysicsSandbox
             Vector2 away = (Vector2)(source.transform.position - target.transform.position);
             if (away.sqrMagnitude < 1e-8f) away = Vector2.right;
             away.Normalize();
-            float speed = sourceConfig != null ? sourceConfig.RejectedCombinationBounceSpeed : .5f;
+            float speed = tuning != null ? Mathf.Clamp(tuning.rejectedCombinationBounceSpeed, 0f, 10f) : .5f;
             var board = boards[source.CurrentBoard];
             board.Push(source.View.OrbId, away * speed);
             board.Push(target.View.OrbId, -away * speed);

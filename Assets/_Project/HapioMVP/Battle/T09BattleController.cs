@@ -655,10 +655,11 @@ namespace C6.Prototype.Battle
             RefreshLocalStates(); RefreshHud();
         }
 
-        /// <summary>#52: why two Raw orbs can never combine, or null when they can (or either is not Raw).</summary>
+        /// <summary>#52: why two orbs can never combine, or null when they can. A combined orb never combines again.</summary>
         private static string FailedCombinationReason(OrbRecord source, OrbRecord target)
         {
-            if (source == null || target == null || source.Kind != OrbKind.Raw || target.Kind != OrbKind.Raw) return null;
+            if (source == null || target == null) return null;
+            if (source.Kind != OrbKind.Raw || target.Kind != OrbKind.Raw) return "COMBINED_ORB";
             if (source.Polarity == target.Polarity) return "SAME_POLARITY";
             if (!OrbElements.SameElement(source.OrbId, target.OrbId)) return "ELEMENT_MISMATCH";
             return null;
