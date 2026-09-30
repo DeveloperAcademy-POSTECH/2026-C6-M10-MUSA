@@ -30,6 +30,8 @@ namespace C6.Prototype.Battle
         private MonsterAttackPresenter attackPresenter;
         private MonsterDefenseInput defenseInput;
         private Func<double?> presentationHostClock;
+        private int interferenceMotionSequence;
+        private uint interferenceMotionRound;
         private int? observedHp;
         private Vector3? removedProxyPosition;
         private readonly HashSet<string> ownProxyIds = new HashSet<string>(StringComparer.Ordinal);
@@ -1239,8 +1241,12 @@ namespace C6.Prototype.Battle
         }
         private void RefreshInterferencePresentation()
         {
-            if (interferenceOverlay == null) return;
             var state = battle?.Snapshot;
+            double? hostNow = presentationHostClock != null ? presentationHostClock()
+                : battle != null && battle.IsHost ? Time.realtimeSinceStartupAsDouble : (double?)null;
+            RefreshInterferenceMotion(state, hostNow);
+
+            if (interferenceOverlay == null) return;
             MonsterTransferDirection blockedDirection = RestrictedInterferenceDirection(
                 state, attack != null ? attack.LocalPlayerId : 0);
             if (blockedDirection == MonsterTransferDirection.None || hud == null || layout == null)
@@ -1249,10 +1255,47 @@ namespace C6.Prototype.Battle
                 return;
             }
 
-            double? hostNow = presentationHostClock != null ? presentationHostClock()
-                : battle != null && battle.IsHost ? Time.realtimeSinceStartupAsDouble : (double?)null;
             interferenceOverlay.Present(blockedDirection, hud.OrbWorkspaceScreenRect,
                 layout.TopPixelRect, hostNow, state.interferenceEndsAt);
+        }
+
+        private void RefreshInterferenceMotion(BattleSnapshot state, double? hostNow)
+        {
+            bool live = state != null && state.interferenceActive
+                && state.phase == BattlePhase.Playing.ToString();
+            if (!live)
+            {
+                if (monsterMotion != null && monsterMotion.Grabbing) monsterMotion.StopGrab();
+                return;
+            }
+            if (state.interferenceSequence == interferenceMotionSequence
+                && state.roundId == interferenceMotionRound) return;
+            if (!hostNow.HasValue) return;
+
+            float? offset = InterferenceMotionOffset(state, hostNow.Value);
+            if (!offset.HasValue)
+            {
+                if (!double.IsNaN(hostNow.Value) && !double.IsInfinity(hostNow.Value)
+                    && hostNow.Value >= state.interferenceStartsAt + MonsterMotion.GrabSeconds)
+                {
+                    interferenceMotionSequence = state.interferenceSequence;
+                    interferenceMotionRound = state.roundId;
+                }
+                return;
+            }
+            if (monsterMotion != null && monsterMotion.PlayGrab(offset.Value))
+            {
+                interferenceMotionSequence = state.interferenceSequence;
+                interferenceMotionRound = state.roundId;
+            }
+        }
+
+        public static float? InterferenceMotionOffset(BattleSnapshot state, double hostNow)
+        {
+            if (state == null || !state.interferenceActive || state.phase != BattlePhase.Playing.ToString()
+                || double.IsNaN(hostNow) || double.IsInfinity(hostNow)) return null;
+            double elapsed = hostNow - state.interferenceStartsAt;
+            return elapsed >= 0d && elapsed < MonsterMotion.GrabSeconds ? (float)elapsed : (float?)null;
         }
 
         public static MonsterTransferDirection RestrictedInterferenceDirection(BattleSnapshot state, ulong localPlayer)
@@ -1379,6 +1422,7 @@ namespace C6.Prototype.Battle
         private void OnDisable()
         {
             if (interferenceOverlay != null) interferenceOverlay.Hide();
+            if (monsterMotion != null) monsterMotion.StopGrab();
             string id = gestures.ActiveOrb?.OrbId;
             if (id != null) LogPointerCancellation(gestures.ActivePointerId.Value, id, "COMPONENT_DISABLED");
             gestures.SetInputEnabled(false);

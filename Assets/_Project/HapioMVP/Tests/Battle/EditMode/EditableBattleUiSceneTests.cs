@@ -214,9 +214,22 @@ namespace C6.Prototype.Battle.Tests
                 Assert.That(left.color.r, Is.GreaterThan(left.color.g).And.GreaterThan(left.color.b));
                 Assert.That(right.color.r, Is.GreaterThan(right.color.g).And.GreaterThan(right.color.b));
                 Assert.That(message.text, Is.EqualTo(MonsterInterferenceOverlay.DefaultMessage));
-                Assert.That(message.alignment, Is.EqualTo(TextAnchor.MiddleCenter));
+                Assert.That(message.alignment, Is.EqualTo(TextAnchor.LowerCenter),
+                    "The saved lower-centered label sits over the lower half of the monster display.");
                 Assert.That(message.GetComponent<Outline>(), Is.Not.Null);
             }
+        }
+
+        [Test]
+        public void SavedJangsanbeomControllerContainsTheInterferenceGrabClip()
+        {
+            var animator = Components<Animator>(preview).Single(item =>
+                item.runtimeAnimatorController != null
+                && item.runtimeAnimatorController.animationClips.Any(clip => clip.name == "Grab"));
+            Assert.That(animator, Is.Not.Null);
+            Assert.That(animator.runtimeAnimatorController, Is.Not.Null);
+            Assert.That(animator.runtimeAnimatorController.animationClips.Any(clip => clip.name == "Grab"), Is.True,
+                "The synchronized interference motion requires the generated Jangsanbeom Grab state.");
         }
 
         [Test]

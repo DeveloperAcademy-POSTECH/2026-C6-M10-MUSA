@@ -90,6 +90,27 @@ namespace C6.Prototype.Battle.Tests
                 Is.EqualTo("요괴의 방해로 구슬을 자유롭게 전달하기 어려워졌다..."));
         }
 
+        [Test]
+        public void GrabMotionUsesHostSynchronizedInterferenceTime()
+        {
+            var snapshot = PlayingSnapshot(
+                MonsterInterferenceKind.AllPlayersDirectionRestriction,
+                MonsterTransferDirection.Left);
+            snapshot.interferenceStartsAt = 30d;
+            snapshot.interferenceEndsAt = 38d;
+
+            Assert.That(MonsterMotion.GrabSeconds, Is.EqualTo(5.2f).Within(.0001f));
+            Assert.That(T09BattleController.InterferenceMotionOffset(snapshot, 29.9d), Is.Null);
+            Assert.That(T09BattleController.InterferenceMotionOffset(snapshot, 30d), Is.EqualTo(0f));
+            Assert.That(T09BattleController.InterferenceMotionOffset(snapshot, 32.5d), Is.EqualTo(2.5f));
+            Assert.That(T09BattleController.InterferenceMotionOffset(snapshot, 35.2d), Is.Null,
+                "A late observer must not replay a Grab that has already completed.");
+
+            snapshot.phase = BattlePhase.Defeat.ToString();
+            snapshot.interferenceActive = false;
+            Assert.That(T09BattleController.InterferenceMotionOffset(snapshot, 31d), Is.Null);
+        }
+
         private static BattleSnapshot PlayingSnapshot(
             MonsterInterferenceKind kind,
             MonsterTransferDirection direction)
