@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using C6.Prototype.Lobby.Discovery;
 using C6.Prototype.Networking;
+using C6.Prototype.Presentation;
 using UnityEngine;
 
 namespace C6.Prototype.Lobby
@@ -58,6 +59,8 @@ namespace C6.Prototype.Lobby
             subscribedHud.RoomJoinRequested += JoinRoom;
             subscribedHud.JoinDirectRequested += JoinDirect;
             subscribedHud.ReadyToggleRequested += ToggleReady;
+            subscribedHud.ElementSelectionRequested += SelectElement;
+            subscribedHud.ClearElementRequested += ClearElement;
             subscribedHud.StartRequested += StartMatch;
             subscribedHud.LeaveRequested += Leave;
         }
@@ -74,6 +77,8 @@ namespace C6.Prototype.Lobby
                 subscribedHud.RoomJoinRequested -= JoinRoom;
                 subscribedHud.JoinDirectRequested -= JoinDirect;
                 subscribedHud.ReadyToggleRequested -= ToggleReady;
+                subscribedHud.ElementSelectionRequested -= SelectElement;
+                subscribedHud.ClearElementRequested -= ClearElement;
                 subscribedHud.StartRequested -= StartMatch;
                 subscribedHud.LeaveRequested -= Leave;
             }
@@ -108,7 +113,20 @@ namespace C6.Prototype.Lobby
             {
                 Connected = connected,
                 Multiparty = multiparty,
+                ElementSelectionEnabled = session.ElementSelectionEnabled,
+                SelectedElement = local?.selectedElement ?? OrbElement.None,
+                SelectionPending = session.HasPending,
+                CanClearElement = session.CanSelectElement && local?.selectedElement != OrbElement.None,
+                ElementOptions = LobbyProtocol.Elements.Select(element =>
+                {
+                    var owner = roster.FirstOrDefault(p => p.selectedElement == element);
+                    return new LobbyElementOption { Element = element, Selected = owner?.clientId == localId,
+                        OccupiedBy = owner == null ? string.Empty : PlayerName(owner.playerNumber),
+                        CanSelect = session.CanSelectElement && (owner == null || owner.clientId == localId) };
+                }).ToArray(),
                 PlayerRoster = string.Join("\n", roster.Select(p => "P" + p.playerNumber + (p.clientId == localId ? "  (YOU)" : "")
+                    + (session.ElementSelectionEnabled ? " / " + LobbyProtocol.ElementName(p.selectedElement)
+                        + " / " + SeatLabel(snapshot, p.clientId) : string.Empty)
                     + "  /  " + (!p.initialStateReceived ? "CHECKING SETTINGS" : p.ready ? "READY" : "NOT READY"))),
                 Browsing = browsing,
                 Phase = started ? "START CONFIRMED" : closed ? "ROOM ENDED" : connected ? "LOBBY"
@@ -120,7 +138,8 @@ namespace C6.Prototype.Lobby
                     : session.Status,
                 Error = error,
                 RoomTitle = session.RoomName,
-                LocalPlayer = PlayerName(local?.playerNumber ?? 0),
+                LocalPlayer = PlayerName(local?.playerNumber ?? 0) + (session.ElementSelectionEnabled && local != null
+                    ? " / " + LobbyProtocol.ElementName(local.selectedElement) + " / " + SeatLabel(snapshot, localId) : string.Empty),
                 Role = connected ? session.IsHost ? "HOST" : "CLIENT" : "OFFLINE",
                 LeftPlayer = PlayerName(snapshot?.LeftPlayerNumber(localId) ?? 0),
                 RightPlayer = PlayerName(snapshot?.RightPlayerNumber(localId) ?? 0),
@@ -134,6 +153,8 @@ namespace C6.Prototype.Lobby
                     : closed ? "This room has ended. Leave and connect again."
                     : session.HasPending ? "Waiting for confirmation…"
                     : !checkedInitial ? "Ready unlocks after room settings are confirmed."
+                    : session.ElementSelectionEnabled && !LobbyProtocol.ValidElement(local?.selectedElement ?? OrbElement.None)
+                        ? "Select an available element before Ready. Each player must choose a different element."
                     : (snapshot?.ParticipantCount ?? 0) < 2 ? "Waiting for at least one other player."
                     : snapshot.canStart ? session.IsHost ? "All ready. You can start." : "All ready. Waiting for the host."
                     : "All connected players must be ready to start.",
@@ -180,6 +201,8 @@ namespace C6.Prototype.Lobby
         private void JoinRoom(string roomId) => Execute(() => session.JoinRoom(roomId), "This room is no longer available. Refresh the list.");
         private void JoinDirect() => Execute(() => session.JoinDirect(hud.HostAddress, hud.Port), "Check the host address and port, then try again.");
         private void ToggleReady() => Execute(session.ToggleReady, "Ready is not available yet. Wait for room settings to be confirmed.");
+        private void SelectElement(OrbElement element) => Execute(() => session.SelectElement(element), "Wait for confirmation, then choose an available element.");
+        private void ClearElement() => Execute(session.ClearElement, "Choose an element first. Wait for the host before changing it.");
         private void StartMatch() => Execute(session.StartMatch, "Only the host can start after all connected players are ready.");
         private void RefreshRooms() { actionError = string.Empty; session.RefreshRooms(); RefreshView(); }
         private void CancelBrowse() { actionError = string.Empty; session.CancelBrowse(); RefreshView(); }
@@ -192,6 +215,11 @@ namespace C6.Prototype.Lobby
         }
 
         private static string PlayerName(int number) => number >= 1 && number <= LobbyProtocol.MaximumCapacity ? "P" + number : "—";
+        private static string SeatLabel(LobbySnapshot snapshot, ulong clientId)
+        {
+            int seat = snapshot?.LocalSeatNumber(clientId) ?? 0;
+            return seat > 0 ? "SEAT " + seat : "SEAT AT START";
+        }
         private static string ConnectionPhase(string stage)
         {
             switch (stage)
@@ -260,6 +288,10 @@ namespace C6.Prototype.Lobby
                 case "HOST_ONLY": return "Only the host can start the room.";
                 case "BOTH_READY_REQUIRED": return "Both players must be ready before the host can start.";
                 case "ALL_READY_REQUIRED": return "All connected players must confirm Ready before the host starts.";
+                case "ELEMENT_SELECTION_REQUIRED": return "Select an available element before tapping Ready.";
+                case "INVALID_ELEMENT": return "Choose Fire, Water, Wood, Metal, or Earth.";
+                case "ELEMENT_ALREADY_SELECTED": return "Another player selected that element. Your current choice stays unchanged; choose an available element.";
+                case "SELECTION_CHANGED_READY_AGAIN": return "Element selections changed. Check the choices and confirm Ready again.";
                 case "ROSTER_CHANGED_READY_AGAIN": return "Players changed. Confirm Ready again before starting.";
                 case "DUPLICATE_PARTICIPANT": return "This player is already in the room. Leave before joining again.";
                 case "INITIAL_STATE_REQUIRED": return "Wait for room settings to finish checking, then tap Ready.";

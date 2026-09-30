@@ -1,0 +1,44 @@
+{
+  "date": "2026-09-30",
+  "branch": "feat/#56-lobby-element-selection",
+  "featureCommit": "7511ef52",
+  "mergedMainCommit": "40d01b69",
+  "unity": "6000.5.7f1",
+  "resolutions": [
+    "T09BattleController keeps both the element warning reset and the Combined expiry tracking reset on round changes",
+    "ContinuousTransferBattle scene keeps #56's manually adjusted backdrop and wooden plate transforms plus its WarningPanel and main's MonsterInterferenceOverlay, edges and message",
+    "BattleSession Host Update ticks monster interference on schedule alongside monster attacks and Combined expiry",
+    "Unity Editor API set the saved interference message alignment to MiddleCenter, matching its UI test and centered-message behavior"
+  ],
+  "validation": [
+    {
+      "step": "Scene static merge structure",
+      "status": "PASS",
+      "detail": "757 unique serialized object IDs; no duplicate or conflict markers; WarningPanel, BlockedRightEdge and MonsterInterferenceOverlay each present once; #56 manual transforms retained"
+    },
+    {
+      "step": "Full EditMode",
+      "status": "PASS",
+      "method": "Unity Test Runner XML: 1695 executed, 1695 passed, 0 failed, 0 skipped",
+      "evidence": "/private/tmp/c6-56-merge-editmode-20260930-b.xml"
+    },
+    {
+      "step": "Full PlayMode",
+      "status": "FAIL",
+      "method": "Unity Test Runner XML: 164 executed, 128 passed, 36 failed, 0 skipped",
+      "evidence": "/private/tmp/c6-56-merge-playmode-20260930.xml",
+      "detail": "Compared with ELEMENT_SELECTION_20260929.json: no new failing test names; one formerly failing OrbInputPlayTests case passed in this run. The full suite is not PASS."
+    },
+    {
+      "step": "Lobby PlayMode subset within full run",
+      "status": "PASS",
+      "detail": "T10LobbyPlayTests: 18 executed, 18 passed"
+    },
+    {
+      "step": "Post-merge Mac and iOS app builds and device play",
+      "status": "NOT_RUN",
+      "detail": "Earlier #56 app/device evidence predates this main merge and is not reused"
+    }
+  ],
+  "privacy": "Raw test logs remain local; no device ID or signing identity is recorded here."
+}

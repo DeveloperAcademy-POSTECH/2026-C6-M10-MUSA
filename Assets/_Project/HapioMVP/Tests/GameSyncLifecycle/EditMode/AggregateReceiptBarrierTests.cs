@@ -126,7 +126,10 @@ namespace C6.Prototype.GameSyncLifecycle.Tests
         {
             resources.SetAggregateMode(true);
             Set(resources, "attack", attack);
-            Set(attack, "<Snapshot>k__BackingField", Inventory(inventoryRevision, OrbAuthorityState.Idle));
+            var generatedInventory = Inventory(inventoryRevision, OrbAuthorityState.Idle);
+            generatedInventory.orbs[0].kind = (int)OrbKind.Raw;
+            generatedInventory.orbs[0].polarity = (int)OrbPolarity.Yin;
+            Set(attack, "<Snapshot>k__BackingField", generatedInventory);
             Set(resources, "<Snapshot>k__BackingField", new ResourceSnapshot
             {
                 nonce = nonce, sessionId = Session, roundId = 1, revision = resourceRevision,
@@ -134,8 +137,11 @@ namespace C6.Prototype.GameSyncLifecycle.Tests
             });
             var reply = new ResourceRequestReply
             {
+                nonce = nonce, sessionId = Session, roundId = 1,
                 accepted = true, known = true, sequence = 1, operation = (int)ResourceRequestKind.Generate,
-                inventoryRevision = 2, resourceRevision = 2, confirmedOrb = Wire(OrbAuthorityState.Idle)
+                inventoryRevision = 2, resourceRevision = 2,
+                confirmedOrb = new OrbWire { id = Orb, owner = 0, kind = (int)OrbKind.Raw,
+                    polarity = (int)OrbPolarity.Yin, state = (int)OrbAuthorityState.Idle, pos = new Vector2(.5f, .5f) }
             };
             Assert.That((bool)Invoke(resources, "AcceptedAggregateReceiptConfirmed", reply), Is.EqualTo(expected));
         }

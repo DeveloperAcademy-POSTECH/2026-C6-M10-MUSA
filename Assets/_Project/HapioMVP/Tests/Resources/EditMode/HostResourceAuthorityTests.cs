@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using C6.Prototype.Attack;
 using C6.Prototype.Orbs;
+using C6.Prototype.Presentation;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -466,6 +467,169 @@ namespace C6.Prototype.Resources.Tests
             Assert.Throws<ArgumentOutOfRangeException>(() => new ResourceTuning(100, 100, 20, Rate, 5, 0));
             Assert.Throws<ArgumentOutOfRangeException>(() => new HostResourceAuthority(registry, default, 1));
             Assert.Throws<ArgumentNullException>(() => new HostResourceAuthority(null, new ResourceTuning(100, 100, 20, Rate, 5, 20), 1));
+        }
+
+        [TestCase(OrbElement.Fire)]
+        [TestCase(OrbElement.Water)]
+        [TestCase(OrbElement.Wood)]
+        [TestCase(OrbElement.Metal)]
+        [TestCase(OrbElement.Earth)]
+        public void ASingleApprovedElementKeepsPolarityCostAndDuplicateRules(OrbElement element)
+        {
+            var selected = SelectedResources(new Dictionary<ulong, OrbElement> { { 0, element } }, out var target);
+            for (ulong sequence = 1; sequence <= 5; sequence++)
+            {
+                var request = Request(sequence);
+                var result = selected.Generate(0, request, 0);
+                var legacy = authority.Generate(0, request, 0);
+                Assert.That(result.Accepted, Is.True, result.Reason);
+                Assert.That(result.Orb.RawElement, Is.EqualTo(element));
+                Assert.That(OrbElements.RawElement(result.Orb), Is.EqualTo(element));
+                Assert.That(result.Orb.Polarity, Is.EqualTo(legacy.Orb.Polarity), "Choice must not change the seeded polarity stream.");
+                Assert.That(result.StaminaBefore - result.StaminaAfter, Is.EqualTo(20));
+                var replay = selected.Generate(0, request, 0);
+                Assert.That(replay.IsDuplicate, Is.True);
+                Assert.That(replay.Orb.OrbId, Is.EqualTo(result.Orb.OrbId));
+                Assert.That(replay.Orb.RawElement, Is.EqualTo(element));
+            }
+            Assert.That(target.Snapshot().Count, Is.EqualTo(5));
+            Assert.That(selected.GetPlayer(0).GeneratedTotal, Is.EqualTo(5));
+            Assert.That(selected.GetPlayer(0).Stamina, Is.Zero);
+            Assert.That(selected.GetPlayer(1).Stamina, Is.EqualTo(100));
+        }
+
+        [Test]
+        public void BothPlayersDrawFromAllActiveSelectionsRegardlessOfMapOrderOrRequester()
+        {
+            var selected = SelectedResources(new Dictionary<ulong, OrbElement>
+                { { 0, OrbElement.Fire }, { 1, OrbElement.Wood }, { 77, OrbElement.Earth } }, out var target);
+            var reordered = SelectedResources(new Dictionary<ulong, OrbElement>
+                { { 77, OrbElement.Earth }, { 1, OrbElement.Wood }, { 0, OrbElement.Fire } }, out _);
+            var seenByFire = new HashSet<OrbElement>();
+            var seenByWood = new HashSet<OrbElement>();
+            for (ulong sequence = 1; sequence <= 5; sequence++)
+            {
+                foreach (ulong playerId in new ulong[] { 0, 1 })
+                {
+                    var request = Request(sequence, $"player-{playerId}-{sequence}");
+                    var result = selected.Generate(playerId, request, 0);
+                    var samePool = reordered.Generate(playerId, request, 0);
+                    var legacy = authority.Generate(playerId, request, 0);
+                    Assert.That(result.Accepted, Is.True, result.Reason);
+                    Assert.That(result.Orb.RawElement, Is.EqualTo(OrbElement.Fire).Or.EqualTo(OrbElement.Wood));
+                    Assert.That(result.Orb.RawElement, Is.EqualTo(samePool.Orb.RawElement), "Map insertion order cannot change a draw.");
+                    Assert.That(result.Orb.Polarity, Is.EqualTo(legacy.Orb.Polarity), "Element draw cannot alter Yin/Yang.");
+                    Assert.That(result.StaminaBefore - result.StaminaAfter, Is.EqualTo(20));
+                    Assert.That(selected.Generate(playerId, request, 0).Orb.OrbId, Is.EqualTo(result.Orb.OrbId),
+                        "A replay returns the original orb without another draw or charge.");
+                    (playerId == 0 ? seenByFire : seenByWood).Add(result.Orb.RawElement);
+                }
+            }
+            Assert.That(seenByFire, Does.Contain(OrbElement.Wood), "Fire's owner can receive Wood Raw.");
+            Assert.That(seenByWood, Does.Contain(OrbElement.Fire), "Wood's owner can receive Fire Raw.");
+            Assert.That(target.Snapshot().Count, Is.EqualTo(10));
+            Assert.That(selected.GetPlayer(0).Stamina, Is.Zero);
+            Assert.That(selected.GetPlayer(1).Stamina, Is.Zero);
+        }
+
+        [Test]
+        public void RetryDrawsFromTheSameApprovedPoolWithANewRoundSequence()
+        {
+            var selected = SelectedResources(new Dictionary<ulong, OrbElement>
+                { { 0, OrbElement.Fire }, { 1, OrbElement.Wood } }, out var target);
+            var firstRound = new List<OrbElement>();
+            for (ulong sequence = 1; sequence <= 5; sequence++)
+            {
+                var result = selected.Generate(0,
+                    new GenerateRequest("resource-session", 1, "round-1-" + sequence, sequence), 0);
+                Assert.That(result.Accepted, Is.True, result.Reason);
+                Assert.That(result.Orb.RawElement, Is.EqualTo(OrbElement.Fire).Or.EqualTo(OrbElement.Wood));
+                firstRound.Add(result.Orb.RawElement);
+            }
+
+            selected.EndRound(0);
+            target.ResetRound(2);
+            selected.BeginRound(new ulong[] { 0, 1 }, 0);
+            var secondRound = new List<OrbElement>();
+            for (ulong sequence = 1; sequence <= 5; sequence++)
+            {
+                var result = selected.Generate(0,
+                    new GenerateRequest("resource-session", 2, "round-2-" + sequence, sequence), 0);
+                Assert.That(result.Accepted, Is.True, result.Reason);
+                Assert.That(result.Orb.RawElement, Is.EqualTo(OrbElement.Fire).Or.EqualTo(OrbElement.Wood));
+                secondRound.Add(result.Orb.RawElement);
+            }
+
+            Assert.That(secondRound.SequenceEqual(firstRound), Is.False,
+                "Retry must use its new round ID instead of replaying the first round's element stream.");
+        }
+
+        [Test]
+        public void ApprovedElementMapIsCopiedAndCannotChangeWhileRoundIsAlive()
+        {
+            var map = new Dictionary<ulong, OrbElement> { { 0, OrbElement.Fire }, { 1, OrbElement.Water } };
+            var selected = SelectedResources(map, out var target);
+            var unchanged = SelectedResources(new Dictionary<ulong, OrbElement>(map), out _);
+            map[0] = OrbElement.Earth;
+            Assert.Throws<InvalidOperationException>(() => selected.ConfigureSelectedElements(map));
+            for (ulong sequence = 1; sequence <= 4; sequence++)
+                Assert.That(selected.Generate(0, Request(sequence), 0).Orb.RawElement,
+                    Is.EqualTo(unchanged.Generate(0, Request(sequence), 0).Orb.RawElement));
+            selected.EndRound(0);
+            target.ResetRound(2);
+            selected.ConfigureSelectedElements(map);
+            selected.BeginRound(new ulong[] { 0, 1 }, 0);
+            var nextDraws = new HashSet<OrbElement>();
+            for (ulong sequence = 1; sequence <= 4; sequence++)
+            {
+                var next = selected.Generate(0, new GenerateRequest("resource-session", 2, "retry-" + sequence, sequence), 0);
+                nextDraws.Add(next.Orb.RawElement);
+            }
+            Assert.That(nextDraws, Does.Contain(OrbElement.Earth));
+            Assert.That(nextDraws.Contains(OrbElement.Fire), Is.False);
+            Assert.That(selected.GetPlayer(0).GeneratedTotal, Is.EqualTo(4));
+        }
+
+        [TestCase(OrbElement.None)]
+        [TestCase((OrbElement)99)]
+        public void InvalidSelectionRejectsWithoutInventoryCostOrSuccessfulPolarityIndex(OrbElement element)
+        {
+            var selected = SelectedResources(new Dictionary<ulong, OrbElement> { { 0, element } }, out var target);
+            var request = Request(1);
+            var result = selected.Generate(0, request, 0);
+            Assert.That(result.Accepted, Is.False);
+            Assert.That(result.Reason, Is.EqualTo("ELEMENT_SELECTION_REQUIRED"));
+            Assert.That(result.Orb, Is.Null);
+            Assert.That(target.Snapshot(), Is.Empty);
+            Assert.That(selected.GetPlayer(0).Stamina, Is.EqualTo(100));
+            Assert.That(selected.GetPlayer(0).GeneratedTotal, Is.Zero);
+            Assert.That(selected.GetPlayer(0).LastSequence, Is.EqualTo(1), "Rejected requests remain retired.");
+            Assert.That(selected.Generate(0, request, 0).IsDuplicate, Is.True);
+            Assert.That(selected.Query(0, "resource-session", 1, request.RequestId).Receipt.Accepted, Is.False);
+        }
+
+        [Test]
+        public void MissingChoiceAndMissingEntireMapCannotFallBackToLegacyInNormalRegistry()
+        {
+            foreach (var map in new IReadOnlyDictionary<ulong, OrbElement>[] { null, new Dictionary<ulong, OrbElement> { { 1, OrbElement.Water } } })
+            {
+                var selected = SelectedResources(map, out var target);
+                Assert.That(selected.Generate(0, Request(1), 0).Reason, Is.EqualTo("ELEMENT_SELECTION_REQUIRED"));
+                Assert.That(target.Snapshot(), Is.Empty);
+                Assert.That(selected.GetPlayer(0).Stamina, Is.EqualTo(100));
+                Assert.That(selected.GetPlayer(0).GeneratedTotal, Is.Zero);
+            }
+        }
+
+        private HostResourceAuthority SelectedResources(IReadOnlyDictionary<ulong, OrbElement> map, out HostOrbRegistry target)
+        {
+            target = new HostOrbRegistry(false);
+            target.BeginSession("resource-session", 1);
+            target.ConfigureExplicitRawElements();
+            var selected = Make(target);
+            selected.ConfigureSelectedElements(map);
+            selected.BeginRound(new ulong[] { 0, 1 }, 0);
+            return selected;
         }
 
         private HostResourceAuthority Make(HostOrbRegistry target)

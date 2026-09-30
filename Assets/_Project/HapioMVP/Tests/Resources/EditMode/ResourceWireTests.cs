@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text;
 using C6.Prototype.Attack;
 using C6.Prototype.Orbs;
+using C6.Prototype.Presentation;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Netcode;
@@ -72,7 +73,7 @@ namespace C6.Prototype.Resources.Tests
                 Assert.That(ResourceWire.ValidRequest(received), Is.True);
                 Assert.That(received.sequence, Is.EqualTo(ulong.MaxValue));
                 Assert.That(received.operation, Is.EqualTo((int)ResourceRequestKind.Generate));
-                string[] forbidden = { "sender", "owner", "playerId", "polarity", "cost", "stamina", "position" };
+                string[] forbidden = { "sender", "owner", "playerId", "polarity", "cost", "stamina", "position", "element", "rawElement" };
                 Assert.That(typeof(ResourceRequestPacket).GetFields().Any(field => forbidden.Contains(field.Name)), Is.False);
             }
             request.sequence = 0;
@@ -121,11 +122,11 @@ namespace C6.Prototype.Resources.Tests
         public void ChangedProtocolLengthMalformedUtf8AndOversizeAreRejected()
         {
             byte[] body = Encoding.UTF8.GetBytes("{\"sessionId\":\"session\"}");
-            AssertRejected(Frame(body, 2, body.Length));
-            AssertRejected(Frame(body, 1, body.Length + 1));
-            AssertRejected(Frame(body, 1, body.Length - 1));
-            AssertRejected(Frame(new byte[] { 0xff }, 1, 1));
-            AssertRejected(Frame(new byte[ResourceWire.MaximumBytes], 1, ResourceWire.MaximumBytes));
+            AssertRejected(Frame(body, 1, body.Length));
+            AssertRejected(Frame(body, 2, body.Length + 1));
+            AssertRejected(Frame(body, 2, body.Length - 1));
+            AssertRejected(Frame(new byte[] { 0xff }, 2, 1));
+            AssertRejected(Frame(new byte[ResourceWire.MaximumBytes], 2, ResourceWire.MaximumBytes));
             Assert.Throws<ArgumentException>(() =>
             {
                 using (var ignored = ResourceWire.Write(new ResourceSyncPacket { nonce = new string('x', ResourceWire.MaximumBytes) })) { }
@@ -144,6 +145,54 @@ namespace C6.Prototype.Resources.Tests
             snapshot.roundId = 1;
             snapshot.revision = 0;
             Assert.That(ResourceWire.ValidSnapshot(snapshot), Is.False);
+        }
+
+        [Test]
+        public void StrictRawReceiptRequiresExplicitElementAndPreservesItThroughNetworkAndRecordRoundTrip()
+        {
+            var reply = Reply();
+            Assert.That(ResourceWire.ValidReply(reply, 100), Is.True, "The old element-less fixture remains a separate legacy contract.");
+            Assert.That(ResourceWire.ValidReply(reply, 100, true), Is.False);
+            reply.confirmedOrb.rawElement = OrbElement.Water;
+            Assert.That(ResourceWire.ValidReply(reply, 100, true), Is.True);
+            using (var writer = ResourceWire.Write(reply))
+            using (var reader = new FastBufferReader(writer, Allocator.Temp))
+            {
+                Assert.That(ResourceWire.TryRead<ResourceRequestReply>(reader, out var received), Is.True);
+                Assert.That(ResourceWire.ValidReply(received, 100, true), Is.True);
+                Assert.That(received.confirmedOrb.rawElement, Is.EqualTo(OrbElement.Water));
+                var record = received.confirmedOrb.ToRecord();
+                Assert.That(record.RawElement, Is.EqualTo(OrbElement.Water));
+                Assert.That(OrbWire.FromRecord(record).rawElement, Is.EqualTo(OrbElement.Water));
+            }
+            reply.confirmedOrb.rawElement = (OrbElement)99;
+            Assert.That(ResourceWire.ValidReply(reply, 100), Is.False);
+            reply.confirmedOrb.kind = (int)OrbKind.Combined;
+            reply.confirmedOrb.polarity = (int)OrbPolarity.None;
+            reply.confirmedOrb.rawElement = OrbElement.Water;
+            Assert.That(ResourceWire.ValidReply(reply, 100), Is.False, "Combined must have only the element encoded in its ID.");
+        }
+
+        [Test]
+        public void GenerationReceiptWaitsForItsInventoryAndRejectsSameIdElementMutation()
+        {
+            var reply = Reply(); reply.inventoryRevision = 10; reply.confirmedOrb.rawElement = OrbElement.Water;
+            var current = OrbWire.FromRecord(reply.confirmedOrb.ToRecord());
+            var inventory = new AttackSnapshot { nonce = reply.nonce, sessionId = reply.sessionId, roundId = reply.roundId,
+                revision = 9, orbs = new[] { current } };
+            Assert.That(ResourceWire.InventoryElementConfirmed(reply, inventory), Is.False);
+            inventory.revision = 10;
+            Assert.That(ResourceWire.InventoryElementConfirmed(reply, inventory), Is.True);
+            current.rawElement = OrbElement.Fire;
+            Assert.That(ResourceWire.InventoryElementConfirmed(reply, inventory), Is.False);
+            current.rawElement = OrbElement.Water;
+            current.owner = 99; current.sequence = 30; current.transferCount = 3;
+            Assert.That(ResourceWire.InventoryElementConfirmed(reply, inventory), Is.True,
+                "The element checkpoint must not replace the session's separate owner/state progression checks.");
+            inventory.orbs = Array.Empty<OrbWire>(); inventory.revision++;
+            Assert.That(ResourceWire.InventoryElementConfirmed(reply, inventory), Is.True, "Consumed records may be pruned from a newer inventory.");
+            inventory.sessionId = "another-session";
+            Assert.That(ResourceWire.InventoryElementConfirmed(reply, inventory), Is.False);
         }
 
         private static ResourceSnapshot Snapshot() => new ResourceSnapshot

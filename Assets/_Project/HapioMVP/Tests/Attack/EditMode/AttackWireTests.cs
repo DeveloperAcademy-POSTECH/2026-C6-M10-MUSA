@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Text;
 using C6.Prototype.Orbs;
+using C6.Prototype.Presentation;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Netcode;
@@ -11,6 +12,35 @@ namespace C6.Prototype.Attack.Tests
 {
     public sealed class AttackWireTests
     {
+        [TestCase(OrbElement.Fire)]
+        [TestCase(OrbElement.Water)]
+        [TestCase(OrbElement.Wood)]
+        [TestCase(OrbElement.Metal)]
+        [TestCase(OrbElement.Earth)]
+        public void ExplicitRawElementRoundTripsAndRejectsMissingInvalidOrCombinedElement(OrbElement element)
+        {
+            var original = Snapshot();
+            var record = new OrbRecord("explicit-raw", OrbKind.Raw, OrbPolarity.Yin, 41,
+                OrbAuthorityState.Idle, new Vector2(.2f, .6f), EntrySide.None, 0, rawElement: element);
+            original.orbs = new[] { OrbWire.FromRecord(record) };
+            using (var writer = AttackWire.Write(original))
+            using (var reader = new FastBufferReader(writer, Allocator.Temp))
+            {
+                Assert.That(AttackWire.TryRead<AttackSnapshot>(reader, out var received), Is.True);
+                Assert.That(AttackWire.ValidSnapshot(received, 12, true), Is.True);
+                Assert.That(received.orbs[0].ToRecord().RawElement, Is.EqualTo(element));
+                received.orbs[0].rawElement = OrbElement.None;
+                Assert.That(AttackWire.ValidSnapshot(received, 12, true), Is.False, "Normal selection contract requires a Raw element.");
+                Assert.That(AttackWire.ValidSnapshot(received), Is.True, "Preserved fixtures retain the explicit legacy mode.");
+                received.orbs[0].rawElement = (OrbElement)99;
+                Assert.That(AttackWire.ValidSnapshot(received), Is.False);
+                received.orbs[0].rawElement = element;
+                received.orbs[0].kind = (int)OrbKind.Combined;
+                received.orbs[0].polarity = (int)OrbPolarity.None;
+                Assert.That(AttackWire.ValidSnapshot(received), Is.False, "Combined carries its pair in the ID, not the Raw field.");
+            }
+        }
+
         [Test]
         public void FullTwoParticipantStateRoundTripsWithoutLosingIdentityOrPrecision()
         {
@@ -43,10 +73,10 @@ namespace C6.Prototype.Attack.Tests
         public void WrongVersionTruncatedLengthAndTrailingBytesAreRejectedBeforeJsonParsing()
         {
             var body = Encoding.UTF8.GetBytes("{\"nonce\":\"x\"}");
-            AssertRejected(Frame(body, 2, body.Length));
-            AssertRejected(Frame(body, 1, body.Length + 1));
-            AssertRejected(Frame(body, 1, body.Length - 1));
-            AssertRejected(new byte[] { 1, 0, 0, 0, 0 });
+            AssertRejected(Frame(body, 1, body.Length));
+            AssertRejected(Frame(body, AttackWire.Version, body.Length + 1));
+            AssertRejected(Frame(body, AttackWire.Version, body.Length - 1));
+            AssertRejected(new byte[] { AttackWire.Version, 0, 0, 0, 0 });
         }
 
         [Test]
@@ -56,15 +86,15 @@ namespace C6.Prototype.Attack.Tests
             {
                 using (var ignored = AttackWire.Write(new AttackHello { nonce = new string('a', AttackWire.MaximumBytes) })) { }
             });
-            AssertRejected(Frame(new byte[AttackWire.MaximumBytes], 1, AttackWire.MaximumBytes));
+            AssertRejected(Frame(new byte[AttackWire.MaximumBytes], AttackWire.Version, AttackWire.MaximumBytes));
         }
 
         [Test]
         public void InvalidUtf8AndMalformedJsonCannotCreatePackets()
         {
-            AssertRejected(Frame(new byte[] { 0xff }, 1, 1));
+            AssertRejected(Frame(new byte[] { 0xff }, AttackWire.Version, 1));
             var malformed = Encoding.UTF8.GetBytes("{broken");
-            AssertRejected(Frame(malformed, 1, malformed.Length));
+            AssertRejected(Frame(malformed, AttackWire.Version, malformed.Length));
         }
 
         [Test]
@@ -253,7 +283,7 @@ namespace C6.Prototype.Attack.Tests
             {
                 using (var ignored = AttackWire.Write(new AttackHello { nonce = new string('x', AttackWire.MaximumInventoryBytes) }, AttackWire.MaximumInventoryBytes)) { }
             });
-            byte[] frame = Frame(new byte[AttackWire.MaximumInventoryBytes], 1, AttackWire.MaximumInventoryBytes);
+            byte[] frame = Frame(new byte[AttackWire.MaximumInventoryBytes], AttackWire.Version, AttackWire.MaximumInventoryBytes);
             using (var reader = new FastBufferReader(frame, Allocator.Temp))
                 Assert.That(AttackWire.TryRead<AttackHello>(reader, out _, AttackWire.MaximumInventoryBytes), Is.False);
         }

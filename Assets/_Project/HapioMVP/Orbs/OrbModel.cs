@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using C6.Prototype.Presentation;
 using UnityEngine;
 
 namespace C6.Prototype.Orbs
@@ -17,6 +18,8 @@ namespace C6.Prototype.Orbs
         public string OrbId { get; }
         public OrbKind Kind { get; }
         public OrbPolarity Polarity { get; }
+        /// <summary>Host-selected Raw element. None is reserved for legacy fixtures; Combined uses its encoded ID.</summary>
+        public OrbElement RawElement { get; }
         // Kind capabilities are independent of availability; authority state and pending still gate actions.
         public bool CanAttack => Kind == OrbKind.Combined;
         public bool CanCombine => Kind == OrbKind.Raw;
@@ -33,11 +36,12 @@ namespace C6.Prototype.Orbs
         public OrbRecord(string orbId, OrbKind kind, OrbPolarity polarity, ulong ownerPlayerId,
             OrbAuthorityState authorityState, Vector2 normalizedPosition, EntrySide entrySide,
             ulong sequenceNumber, ulong transferCount = 0, ulong lastTransferSequence = 0, ulong rightTransferCount = 0,
-            OrbTransferMotion? transferMotion = null)
+            OrbTransferMotion? transferMotion = null, OrbElement rawElement = OrbElement.None)
         {
             OrbId = orbId;
             Kind = kind;
             Polarity = polarity;
+            RawElement = rawElement;
             OwnerPlayerId = ownerPlayerId;
             AuthorityState = authorityState;
             NormalizedPosition = normalizedPosition;

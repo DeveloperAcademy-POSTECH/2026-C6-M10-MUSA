@@ -27,6 +27,7 @@ namespace C6.Prototype.Battle
         private Quaternion restRotation = Quaternion.identity;
         private int clawSequence;
         private uint clawRound;
+        private ulong[] roundSeatOrder;
 
         public void Configure(BattleSession battleSession, AttackSession attackSession, MonsterMotion monsterMotion,
             BenchmarkMonster monster, ThrowBattleFraming battleFraming, MonsterAttackWarning attackWarning, MonsterDefenseInput defenseInput = null)
@@ -39,16 +40,25 @@ namespace C6.Prototype.Battle
         /// <summary>Host time estimate for this screen. Without one only the Host, whose clock the snapshot uses, can present.</summary>
         public void ConfigureHostClock(Func<double?> clock) => hostClock = clock;
 
+        public void ConfigureRoundSeats(IReadOnlyList<ulong> seats)
+        {
+            if (!C6.Prototype.Networking.ParticipantRing.ValidateSeatOrder(seats,
+                attack != null && attack.MultiplayerRosterEnabled ? attack.OrderedParticipantIds : seats))
+                throw new ArgumentException("Round seats must match the approved participants.", nameof(seats));
+            roundSeatOrder = new ulong[seats.Count];
+            for (int i = 0; i < seats.Count; i++) roundSeatOrder[i] = seats[i];
+        }
+
         /// <summary>Claw_Attack starts early enough for Slash_Impact to land when the warning ends (or at once for a short warning).</summary>
         public static double ClawStartsAt(double warningStartsAt, double warningEndsAt, double impactSeconds) =>
             Math.Max(warningStartsAt, warningEndsAt - impactSeconds);
 
-        /// <summary>The seat yaw of the target in the frozen roster, the same angle its camera uses; null if unknown.</summary>
+        /// <summary>The target's actual round seat yaw, the same angle its camera and throw frame use.</summary>
         public static float? TargetYaw(IReadOnlyList<ulong> roster, ulong target)
         {
             if (roster == null || roster.Count < 2 || roster.Count > 5) return null;
             for (int i = 0; i < roster.Count; i++)
-                if (roster[i] == target) return ParticipantViewAngle.CalculateYaw(i + 1, roster.Count);
+                if (roster[i] == target) return ParticipantViewAngle.CalculateSeatYaw(i + 1, roster.Count);
             return null;
         }
 
@@ -80,7 +90,7 @@ namespace C6.Prototype.Battle
             var state = battle != null ? battle.Snapshot : null;
             double? now = HostNow();
             bool presents = now.HasValue && attack != null && Presents(state, now.Value);
-            float? yaw = presents ? TargetYaw(attack.OrderedParticipantIds, state.attackTarget) : null;
+            float? yaw = presents ? TargetYaw(roundSeatOrder != null ? roundSeatOrder : attack.RoundSeatOrder, state.attackTarget) : null;
 
             if (presents && (state.attackSequence != clawSequence || state.roundId != clawRound) && motion != null)
             {

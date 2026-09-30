@@ -75,13 +75,15 @@ namespace C6.Prototype.Orbs
         /// <summary>#4: optional sprite artwork for views configured after this call. Null keeps generated circles.</summary>
         public static void SetArtwork(OrbArtSet set) => artwork = set;
 
-        public void Configure(string orbId, OrbKind orbKind, OrbPolarity orbPolarity, int layer, float radiusWorld, string displayLabel = null)
+        public void Configure(string orbId, OrbKind orbKind, OrbPolarity orbPolarity, int layer, float radiusWorld, string displayLabel = null, OrbElement rawElement = OrbElement.None)
         {
             if (string.IsNullOrWhiteSpace(orbId)) throw new ArgumentException("An orb ID is required.", nameof(orbId));
             if (layer < 0 || layer > 31) throw new ArgumentOutOfRangeException(nameof(layer));
             if (float.IsNaN(radiusWorld) || float.IsInfinity(radiusWorld) || radiusWorld <= 0f)
                 throw new ArgumentOutOfRangeException(nameof(radiusWorld));
             if (initialized) throw new InvalidOperationException("An OrbView is configured once for one ID.");
+            if (!OrbElements.ValidElementData(orbKind, rawElement))
+                throw new ArgumentException("Invalid Raw element field for this orb kind.", nameof(rawElement));
 
             EnsureMaterial();
             circle = AcquireCircle(radiusWorld);
@@ -120,7 +122,7 @@ namespace C6.Prototype.Orbs
             }
             else
             {
-                Element = OrbElements.RawElement(orbId);
+                Element = rawElement == OrbElement.None ? OrbElements.RawElement(orbId) : rawElement;
                 YinElement = orbPolarity == OrbPolarity.Yin ? Element : OrbElement.None;
                 YangElement = orbPolarity == OrbPolarity.Yang ? Element : OrbElement.None;
             }

@@ -16,7 +16,8 @@ namespace C6.Prototype.Attack
             int participantCount
         )
         {
-            float yaw = ParticipantViewAngle.CalculateYaw(
+            // The caller supplies the one-based seat of this round, not its stable P identifier.
+            float yaw = ParticipantViewAngle.CalculateSeatYaw(
                 playerNumber,
                 participantCount
             );

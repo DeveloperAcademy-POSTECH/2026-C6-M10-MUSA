@@ -16,19 +16,29 @@ namespace C6.Prototype.Lobby
     [DisallowMultipleComponent, RequireComponent(typeof(DirectConnectionSession))]
     public sealed class T10LobbySession : MonoBehaviour
     {
-        private string SyncMessage => continuousTransfers ? "C6.P4.Lobby.Sync.v1" : MaximumParticipants > 2 ? "C6.P3.Lobby.Sync.v1" : "C6.T10A.Sync.v1";
-        private string StateMessage => continuousTransfers ? "C6.P4.Lobby.State.v1" : MaximumParticipants > 2 ? "C6.P3.Lobby.State.v1" : "C6.T10A.State.v1";
-        private string RequestMessage => continuousTransfers ? "C6.P4.Lobby.Request.v1" : MaximumParticipants > 2 ? "C6.P3.Lobby.Request.v1" : "C6.T10A.Request.v1";
-        private string ReplyMessage => continuousTransfers ? "C6.P4.Lobby.Reply.v1" : MaximumParticipants > 2 ? "C6.P3.Lobby.Reply.v1" : "C6.T10A.Reply.v1";
+        private string SyncMessage => elementSelection ? "C6.E56.Lobby.Sync.v1" : continuousTransfers ? "C6.P4.Lobby.Sync.v1" : MaximumParticipants > 2 ? "C6.P3.Lobby.Sync.v1" : "C6.T10A.Sync.v1";
+        private string StateMessage => elementSelection ? "C6.E56.Lobby.State.v1" : continuousTransfers ? "C6.P4.Lobby.State.v1" : MaximumParticipants > 2 ? "C6.P3.Lobby.State.v1" : "C6.T10A.State.v1";
+        private string RequestMessage => elementSelection ? "C6.E56.Lobby.Request.v1" : continuousTransfers ? "C6.P4.Lobby.Request.v1" : MaximumParticipants > 2 ? "C6.P3.Lobby.Request.v1" : "C6.T10A.Request.v1";
+        private string ReplyMessage => elementSelection ? "C6.E56.Lobby.Reply.v1" : continuousTransfers ? "C6.P4.Lobby.Reply.v1" : MaximumParticipants > 2 ? "C6.P3.Lobby.Reply.v1" : "C6.T10A.Reply.v1";
         [SerializeField] private int maximumParticipants = LobbyProtocol.Capacity;
         public int MaximumParticipants => maximumParticipants;
         [SerializeField] private bool continuousTransfers;
         public bool ContinuousTransfersEnabled => continuousTransfers;
-        public int ProtocolVersion => LobbyProtocol.For(MaximumParticipants, continuousTransfers);
+        [SerializeField] private bool elementSelection;
+        public bool ElementSelectionEnabled => elementSelection;
+        public int ProtocolVersion => LobbyProtocol.For(MaximumParticipants, continuousTransfers, elementSelection);
+        public void ConfigureElementSelection(bool enabled)
+        {
+            if (connection != null && !connection.CanStart) throw new InvalidOperationException("End room before configuring element selection.");
+            if (enabled && (!continuousTransfers || MaximumParticipants != LobbyProtocol.MaximumCapacity))
+                throw new InvalidOperationException("Element selection requires continuous transfers and multiparty capacity.");
+            elementSelection = enabled;
+        }
         public void ConfigureContinuousTransfers(bool enabled)
         {
             if (connection != null && !connection.CanStart) throw new InvalidOperationException("End room before configuring transfer mode.");
             if (enabled && MaximumParticipants != LobbyProtocol.MaximumCapacity) throw new InvalidOperationException("Continuous transfers require multiparty capacity.");
+            if (!enabled && elementSelection) throw new InvalidOperationException("Disable element selection before disabling continuous transfers.");
             continuousTransfers = enabled;
         }
         public void ConfigureCapacity(int maximum = LobbyProtocol.Capacity)
@@ -76,7 +86,9 @@ namespace C6.Prototype.Lobby
         public bool HasPending=>!string.IsNullOrEmpty(pendingId);
         public bool LocalReady=>LocalPlayer?.ready??false;
         public LobbyPlayer LocalPlayer=>Snapshot?.Find(connection.LocalClientId??ulong.MaxValue);
-        public bool CanReady=>Connected&&Snapshot?.phase==LobbyProtocol.Lobby&&LocalPlayer!=null&&LocalPlayer.initialStateReceived&&!HasPending;
+        public bool CanSelectElement=>Connected&&elementSelection&&Snapshot?.phase==LobbyProtocol.Lobby&&LocalPlayer?.initialStateReceived==true&&!HasPending;
+        public bool CanReady=>Connected&&Snapshot?.phase==LobbyProtocol.Lobby&&LocalPlayer!=null&&LocalPlayer.initialStateReceived&&!HasPending
+            &&(!elementSelection||LobbyProtocol.ValidElement(LocalPlayer.selectedElement));
         public bool CanStart=>IsHost&&Snapshot?.canStart==true&&!HasPending;
         public event Action Changed;
         public event Action<LobbyReply> RequestResolved;
@@ -121,7 +133,7 @@ namespace C6.Prototype.Lobby
             if(selected==null||!LobbyHostConfig.TryRead(JsonUtility.ToJson(selected),out LobbyHostConfig approved))
                 return Fail("UNSUPPORTED_HOST_CONFIG","INPUT");
             HostConfig=approved;
-            authority=new LobbyAuthority(expectedRoom,Guid.NewGuid().ToString("N"),buildIdentifier,JsonUtility.ToJson(HostConfig),BitConverter.ToUInt32(Guid.NewGuid().ToByteArray(),0),MaximumParticipants,continuousTransfers);
+            authority=new LobbyAuthority(expectedRoom,Guid.NewGuid().ToString("N"),buildIdentifier,JsonUtility.ToJson(HostConfig),BitConverter.ToUInt32(Guid.NewGuid().ToByteArray(),0),MaximumParticipants,continuousTransfers,elementSelection);
             discovery.StopBrowse(); JoinRoute="HOST";
             if (!connection.ConfigureConnection((ushort)ProtocolVersion,Array.Empty<byte>(),Approve,MaximumParticipants,KeepLobbyOnPeerDisconnect)) return Fail("CONNECTION_BUSY");
             if (!connection.StartHost(port)) return Fail(string.IsNullOrEmpty(connection.FailureCode)?"HOST_FAILED":connection.FailureCode,connection.FailureStage);
@@ -183,15 +195,30 @@ namespace C6.Prototype.Lobby
             return string.Empty;
         }
         public bool ToggleReady()=>CanReady&&Submit(LobbyProtocol.SetReady,!LocalReady);
+        public bool SelectElement(OrbElement element)
+        {
+            if (!CanSelectElement || !LobbyProtocol.ValidElement(element)) return false;
+            if (Snapshot.OrderedPlayers.Any(p => p.clientId != LocalPlayer.clientId && p.selectedElement == element))
+                return Fail("ELEMENT_ALREADY_SELECTED");
+            return Submit(LobbyProtocol.SelectElement, false, element);
+        }
+        public bool ClearElement()=>CanSelectElement&&LocalPlayer.selectedElement!=OrbElement.None&&Submit(LobbyProtocol.ClearElement,false);
+        public bool ReturnToLobby(uint completedRound)
+        {
+            if (!IsHost || !elementSelection || HasPending || authority == null || !authority.ReturnToLobby(completedRound)) return false;
+            Error="";FailureStage="";LastReply=null;
+            Publish(); UpdateAdvertisement();
+            return true;
+        }
         public bool StartMatch()=>CanStart&&Submit(LobbyProtocol.Start,false);
         // Development tests use the same untrusted request path to verify Host rejection.
         public bool RequestStartForValidation()=>Connected&&Submit(LobbyProtocol.Start,false);
-        private bool Submit(string kind,bool ready)
+        private bool Submit(string kind,bool ready,OrbElement selectedElement=OrbElement.None)
         {
             if(!Connected||Snapshot==null||HasPending)return false;
             var request=new LobbyRequest{protocol=ProtocolVersion,roomId=Snapshot.roomId,sessionId=Snapshot.sessionId,
                 requestId=Guid.NewGuid().ToString("N"),sequence=++sequence,revision=Snapshot.revision,kind=kind,
-                ready=ready,configFingerprint=Snapshot.configFingerprint};
+                ready=ready,selectedElement=selectedElement,selectionRevision=Snapshot.selectionRevision,configFingerprint=Snapshot.configFingerprint};
             pendingId=request.requestId;pendingAt=Now;pendingRevision=request.revision;
             if(IsHost) ProcessRequest(NetworkManager.ServerClientId,request);
             else if(!Send(RequestMessage,NetworkManager.ServerClientId,request)){pendingId=null;return Fail("SEND_FAILED");}
@@ -324,10 +351,11 @@ namespace C6.Prototype.Lobby
             bool started=Snapshot?.phase!=LobbyProtocol.Playing&&value.phase==LobbyProtocol.Playing;
             bool rosterChanged = MaximumParticipants > 2 && Snapshot != null && !LobbyWire.SameRoster(Snapshot, value)
                 && value.phase == LobbyProtocol.Lobby;
+            bool selectionChanged = elementSelection && Snapshot != null && Snapshot.selectionRevision != value.selectionRevision;
             if (rosterChanged && HasPending) { pendingId = null; Error = "ROSTER_CHANGED_READY_AGAIN"; }
             Snapshot=value;HostConfig=hostConfig;expectedRoom=value.roomId;
             Status=value.phase==LobbyProtocol.Playing?"Start confirmed":!InitialStateReady?"Confirming room settings with the host":
-                rosterChanged?"Players changed / confirm Ready again":value.ParticipantCount>=2?value.ParticipantCount+" players connected":"Waiting for participants";
+                rosterChanged?"Players changed / confirm Ready again":selectionChanged?"Element selections changed / confirm Ready again":value.ParticipantCount>=2?value.ParticipantCount+" players connected":"Waiting for participants";
             string key=value.roomId+":"+value.revision;
             if(key!=lastPublishedState){lastPublishedState=key;Debug.Log($"C6_T10A_STATE local={connection.LocalClientId} room={value.roomId} revision={value.revision} phase={value.phase} participants={value.ParticipantCount} p1Ready={value.p1?.ready} p2Ready={value.p2?.ready} p2Initial={value.p2?.initialStateReceived} canStart={value.canStart} config={value.configFingerprint}");}
             if(started)StartConfirmed?.Invoke(value.start);

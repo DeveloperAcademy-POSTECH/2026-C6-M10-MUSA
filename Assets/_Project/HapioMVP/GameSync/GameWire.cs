@@ -9,6 +9,7 @@ using C6.Prototype.Battle;
 using C6.Prototype.Lobby;
 using C6.Prototype.Orbs;
 using C6.Prototype.Resources;
+using C6.Prototype.Presentation;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -22,6 +23,7 @@ namespace C6.Prototype.GameSync
         public const byte Version = 11;
         public const byte MultipartyVersion = 23;
         public const byte ContinuousTransferVersion = 24;
+        public const byte ElementSelectionVersion = 56;
         public const int MaximumMultipartyBytes = 327680;
         public const int MaximumMultipartyOrbs = 200;
         public const double LogicalTolerance = 0.000001d;
@@ -37,7 +39,7 @@ namespace C6.Prototype.GameSync
             if (bytes.Length == 0 || bytes.Length > maximumBytes - 5)
                 throw new ArgumentException("Game snapshot exceeds its bounded envelope.");
             var writer = new FastBufferWriter(bytes.Length + 5, Allocator.Temp);
-            writer.WriteValueSafe(value.continuousTransfers ? ContinuousTransferVersion : IsMultiparty(value) ? MultipartyVersion : Version); writer.WriteValueSafe(bytes.Length); writer.WriteBytesSafe(bytes);
+            writer.WriteValueSafe(value.elementSelection ? ElementSelectionVersion : value.continuousTransfers ? ContinuousTransferVersion : IsMultiparty(value) ? MultipartyVersion : Version); writer.WriteValueSafe(bytes.Length); writer.WriteBytesSafe(bytes);
             return writer;
         }
 
@@ -49,12 +51,13 @@ namespace C6.Prototype.GameSync
             try
             {
                 reader.ReadValueSafe(out byte version); reader.ReadValueSafe(out int length);
-                if ((version != Version && version != MultipartyVersion && version != ContinuousTransferVersion) || length < 1 || length != reader.Length - reader.Position
+                if ((version != Version && version != MultipartyVersion && version != ContinuousTransferVersion && version != ElementSelectionVersion) || length < 1 || length != reader.Length - reader.Position
                     || remaining > (version == Version ? MaximumBytes : MaximumMultipartyBytes)) return false;
                 var bytes = new byte[length]; reader.ReadBytesSafe(ref bytes, length);
                 value = JsonUtility.FromJson<GameSnapshot>(Utf8.GetString(bytes));
                 return value != null && IsMultiparty(value) == (version != Version)
-                    && value.continuousTransfers == (version == ContinuousTransferVersion);
+                    && value.elementSelection == (version == ElementSelectionVersion)
+                    && (version == ElementSelectionVersion || value.continuousTransfers == (version == ContinuousTransferVersion));
             }
             catch (Exception exception) when (exception is ArgumentException || exception is InvalidOperationException)
             { return false; }
@@ -78,6 +81,7 @@ namespace C6.Prototype.GameSync
                 || incoming.nonce != expected.nonce || incoming.roundId < expected.minimumRoundId
                 || incoming.roundId == 0 || incoming.revision == 0)
                 return Reject("SNAPSHOT_CONTEXT", out reason);
+            if (incoming.elementSelection != expected.elementSelection) return Reject("ELEMENT_SELECTION_MODE_MISMATCH", out reason);
             if (incoming.continuousTransfers != expected.continuousTransfers) return Reject("TRANSFER_MODE_MISMATCH", out reason);
             if (incoming.configHash != expected.configHash || incoming.seed != expected.seed)
                 return Reject("CONFIG_OR_SEED_MISMATCH", out reason);
@@ -85,6 +89,7 @@ namespace C6.Prototype.GameSync
                 return Reject("INVALID_CLOCK_SAMPLE", out reason);
             if (!ValidPlayers(incoming, expected))
                 return Reject("PLAYER_CONTRACT", out reason);
+            if (!ValidElementsAndSeats(incoming, expected, previous, out reason)) return false;
             int capacity = IsMultiparty(expected) ? 5 : 2;
             if (!AttackWire.ValidSnapshot(incoming.attack, IsMultiparty(expected) ? MaximumMultipartyOrbs : 64)
                 || !ResourceWire.ValidSnapshot(incoming.resources, capacity)
@@ -166,7 +171,7 @@ namespace C6.Prototype.GameSync
                     return Reject("INVALID_PREVIOUS_SNAPSHOT", out reason);
                 if (previous.roomId != incoming.roomId || previous.sessionId != incoming.sessionId
                     || previous.configHash != incoming.configHash || previous.seed != incoming.seed
-                    || previous.continuousTransfers != incoming.continuousTransfers)
+                    || previous.continuousTransfers != incoming.continuousTransfers || previous.elementSelection != incoming.elementSelection)
                     return Reject("PREVIOUS_CONTEXT_MISMATCH", out reason);
                 if (incoming.roundId < previous.roundId) return Reject("OLD_ROUND", out reason);
                 if (incoming.hostNow + LogicalTolerance < previous.hostNow || incoming.serverTime + LogicalTolerance < previous.serverTime)
@@ -224,9 +229,10 @@ namespace C6.Prototype.GameSync
             foreach (var orb in incoming.attack.orbs)
             {
                 if (!older.TryGetValue(orb.id, out var prior)) continue;
-                if (orb.kind != prior.kind || orb.polarity != prior.polarity || orb.state < prior.state || orb.sequence < prior.sequence)
+                if (orb.kind != prior.kind || orb.polarity != prior.polarity || orb.rawElement != prior.rawElement
+                    || orb.state < prior.state || orb.sequence < prior.sequence)
                     return Reject("ORB_IDENTITY_OR_STATE_REGRESSION", out reason);
-                if (!ValidTransferProgression(prior, orb, expected, out reason)) return false;
+                if (!ValidTransferProgression(prior, orb, expected, incoming.roundSeatOrder, out reason)) return false;
             }
             foreach (var player in incoming.resources.players)
             {
@@ -288,7 +294,7 @@ namespace C6.Prototype.GameSync
             && Close(left.transferServerTime, right.transferServerTime);
 
         private static bool ValidTransferProgression(OrbWire previous, OrbWire incoming,
-            GameSnapshotContext expected, out string reason)
+            GameSnapshotContext expected, ulong[] roundSeats, out string reason)
         {
             reason = string.Empty;
             if (!expected.allowTransfers)
@@ -320,7 +326,7 @@ namespace C6.Prototype.GameSync
                 if (incoming.entrySide == (int)EntrySide.Left && right == 0
                     || incoming.entrySide == (int)EntrySide.Right && left == 0)
                     return Reject("LAST_TRANSFER_DIRECTION_MISMATCH", out reason);
-                var roster = expected.participantIds;
+                var roster = expected.elementSelection ? roundSeats : expected.participantIds;
                 int index = Array.IndexOf(roster, previous.owner);
                 if (index < 0) return Reject("INVALID_PREVIOUS_ORB_OWNER", out reason);
                 // Modulo each unsigned count before subtraction: valid ulong counters cannot overflow.
@@ -355,7 +361,7 @@ namespace C6.Prototype.GameSync
             // does not establish a fixed point. Encode the already declared 1e-6 logical precision
             // directly, without changing live values or reducing ID/integer/revision precision.
             var canonical = new LogicalEncoder();
-            canonical.Text(snapshot.continuousTransfers ? "C6-GAME-LOGICAL-1E-6-P4" : IsMultiparty(snapshot) ? "C6-GAME-LOGICAL-1E-6-P3" : "C6-GAME-LOGICAL-1E-6-V2");
+            canonical.Text(snapshot.elementSelection ? "C6-GAME-LOGICAL-1E-6-CE56" : snapshot.continuousTransfers ? "C6-GAME-LOGICAL-1E-6-P4" : IsMultiparty(snapshot) ? "C6-GAME-LOGICAL-1E-6-P3" : "C6-GAME-LOGICAL-1E-6-V2");
             canonical.Text(snapshot.roomId); canonical.Text(snapshot.sessionId);
             canonical.Unsigned(snapshot.roundId); canonical.Unsigned(snapshot.revision);
             canonical.Text(snapshot.configHash); canonical.Unsigned(snapshot.seed);
@@ -365,6 +371,12 @@ namespace C6.Prototype.GameSync
                 foreach (var player in snapshot.players) canonical.Player(player);
             }
             else { canonical.Player(snapshot.p1); canonical.Player(snapshot.p2); }
+            if (snapshot.elementSelection)
+            {
+                canonical.Boolean(snapshot.continuousTransfers);
+                canonical.Integer(snapshot.roundSeatOrder?.Length ?? 0);
+                foreach (var seat in snapshot.roundSeatOrder ?? Array.Empty<ulong>()) canonical.Unsigned(seat);
+            }
             canonical.Boolean(snapshot.initialStateConfirmed);
             canonical.Number(snapshot.hostNow); canonical.Number(snapshot.serverTime);
             canonical.Attack(snapshot.attack, true); canonical.Resources(snapshot.resources, true);
@@ -422,6 +434,7 @@ namespace C6.Prototype.GameSync
                 if (player == null) throw new ArgumentException("A canonical snapshot requires both players.");
                 Text("player"); Unsigned(player.clientId); Integer(player.playerNumber);
                 Boolean(player.connected); Boolean(player.initialStateReceived); Boolean(player.ready);
+                if (player.selectedElement != OrbElement.None) { Text("selected-element"); Integer((int)player.selectedElement); }
             }
             internal void Attack(AttackSnapshot value, bool includeRevision)
             {
@@ -433,6 +446,7 @@ namespace C6.Prototype.GameSync
                 foreach (var orb in value.orbs.OrderBy(orb => orb.id, StringComparer.Ordinal))
                 {
                     Text(orb.id); Unsigned(orb.owner); Integer(orb.kind); Integer(orb.polarity); Integer(orb.state);
+                    if (orb.rawElement != OrbElement.None) { Text("raw-element"); Integer((int)orb.rawElement); }
                     Number(orb.pos.x); Number(orb.pos.y); Unsigned(orb.sequence);
                     Unsigned(orb.transferCount); Unsigned(orb.rightTransferCount); Unsigned(orb.lastTransferSequence); Integer(orb.entrySide);
                     // Keep historical logical hashes unchanged when the optional motion is absent.
@@ -483,6 +497,8 @@ namespace C6.Prototype.GameSync
             && LobbyWire.ValidId(expected.roomId) && LobbyWire.ValidId(expected.sessionId)
             && AttackWire.ValidNonce(expected.nonce) && LobbyWire.ValidFingerprint(expected.configHash)
             && ValidExpectedPlayers(expected) && expected.minimumRoundId > 0
+            && (!expected.elementSelection || ValidSelectedElements(expected.selectedElements, ExpectedPlayers(expected).Length)
+                && RoundSeatLayout.Valid(expected.initialSeatOrder, ExpectedPlayers(expected)))
             && (!expected.allowTransfers || Finite(expected.transferEdgeInset) && expected.transferEdgeInset > 0f && expected.transferEdgeInset < .5f)
             && expected.config != null && LobbyHostConfig.TryRead(JsonUtility.ToJson(expected.config), out _)
             && (!IsMultiparty(expected) || expected.config.storageLimit <= 20)
@@ -515,7 +531,49 @@ namespace C6.Prototype.GameSync
         }
         private static bool SamePlayer(LobbyPlayer a, LobbyPlayer b) => a != null && b != null
             && a.clientId == b.clientId && a.playerNumber == b.playerNumber && a.connected == b.connected
-            && a.ready == b.ready && a.initialStateReceived == b.initialStateReceived;
+            && a.ready == b.ready && a.initialStateReceived == b.initialStateReceived && a.selectedElement == b.selectedElement;
+        private static bool ValidSelectedElements(OrbElement[] elements, int count)
+            => elements != null && elements.Length == count && elements.All(ValidElement)
+                && elements.Distinct().Count() == count;
+        private static bool ValidElement(OrbElement element) => element >= OrbElement.Fire && element <= OrbElement.Earth;
+        private static bool ValidElementsAndSeats(GameSnapshot incoming, GameSnapshotContext expected,
+            GameSnapshot previous, out string reason)
+        {
+            reason = string.Empty;
+            if (!expected.elementSelection) return (incoming.roundSeatOrder == null || incoming.roundSeatOrder.Length == 0)
+                || Reject("UNAPPROVED_SEATS", out reason);
+            var ids = ExpectedPlayers(expected);
+            if (!RoundSeatLayout.Valid(incoming.roundSeatOrder, ids)) return Reject("ROUND_SEATS", out reason);
+            if (previous == null && incoming.roundId == expected.minimumRoundId
+                && !incoming.roundSeatOrder.SequenceEqual(expected.initialSeatOrder)) return Reject("INITIAL_SEATS", out reason);
+            if (previous != null && incoming.roundId == previous.roundId
+                && (previous.roundSeatOrder == null || !incoming.roundSeatOrder.SequenceEqual(previous.roundSeatOrder)))
+                return Reject("FROZEN_ROUND_SEATS", out reason);
+            var players = incoming.OrderedPlayers;
+            for (int i = 0; i < ids.Length; i++)
+                if (players[i].selectedElement != expected.selectedElements[i]) return Reject("FROZEN_SELECTED_ELEMENT", out reason);
+            if (incoming.attack?.orbs == null) return Reject("MISSING_ORBS", out reason);
+            foreach (var orb in incoming.attack.orbs)
+            {
+                if (orb == null) return Reject("MISSING_ORB", out reason);
+                if (orb.kind == (int)OrbKind.Raw)
+                {
+                    if (!ValidElement(orb.rawElement)) return Reject("RAW_ELEMENT_REQUIRED", out reason);
+                    // A received Raw may differ from its new owner's choice. Its own element stays immutable.
+                }
+                else if (orb.kind == (int)OrbKind.Combined)
+                {
+                    if (orb.rawElement != OrbElement.None || !OrbElements.TryDecodeCombinedId(orb.id, out var yin, out var yang)
+                        || !ValidElement(yin) || yin != yang) return Reject("COMBINED_ELEMENT", out reason);
+                    if (orb.state == (int)OrbAuthorityState.Launching || orb.state == (int)OrbAuthorityState.Projectile)
+                    {
+                        int ownerIndex = Array.IndexOf(ids, orb.owner);
+                        if (ownerIndex < 0 || yin != expected.selectedElements[ownerIndex]) return Reject("LAUNCH_ELEMENT_PERMISSION", out reason);
+                    }
+                }
+            }
+            return true;
+        }
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
         private static bool Close(double left, double right) => Finite(left) && Finite(right) && Math.Abs(left - right) <= LogicalTolerance;
         private static bool Reject(string value, out string reason) { reason = value; return false; }

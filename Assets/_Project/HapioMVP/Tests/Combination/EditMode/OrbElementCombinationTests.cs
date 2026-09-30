@@ -94,7 +94,7 @@ namespace C6.Prototype.Combination.Tests
                     }
         }
 
-        /// <summary>A prefixed sandbox ID decodes the same way, since only the last two characters matter.</summary>
+        /// <summary>Known sandbox prefixes remain presentation-only; the normal authority decoder rejects them.</summary>
         [Test]
         public void PrefixedIdsDecodeToTheSamePair()
         {
@@ -102,6 +102,70 @@ namespace C6.Prototype.Combination.Tests
             OrbElements.CombinedElements(id, out var yin, out var yang);
             Assert.That(yin, Is.EqualTo(OrbElement.Metal));
             Assert.That(yang, Is.EqualTo(OrbElement.Fire));
+            Assert.That(OrbElements.TryDecodeCombinedId(id, out _, out _), Is.False);
+        }
+
+        [TestCase(OrbElement.Fire, OrbPolarity.Yin)]
+        [TestCase(OrbElement.Fire, OrbPolarity.Yang)]
+        [TestCase(OrbElement.Water, OrbPolarity.Yin)]
+        [TestCase(OrbElement.Water, OrbPolarity.Yang)]
+        [TestCase(OrbElement.Wood, OrbPolarity.Yin)]
+        [TestCase(OrbElement.Wood, OrbPolarity.Yang)]
+        [TestCase(OrbElement.Metal, OrbPolarity.Yin)]
+        [TestCase(OrbElement.Metal, OrbPolarity.Yang)]
+        [TestCase(OrbElement.Earth, OrbPolarity.Yin)]
+        [TestCase(OrbElement.Earth, OrbPolarity.Yang)]
+        public void ExplicitRawElementsCombineWithGlobalHashDisabledAndPreserveConsumedMaterials(OrbElement element, OrbPolarity polarity)
+        {
+            OrbElements.Configure(null);
+            registry.ConfigureExplicitRawElements();
+            var source = registry.RegisterGeneratedRaw("session-a", 1, 7, polarity, new Vector2(.25f, .3f), element);
+            var opposite = polarity == OrbPolarity.Yin ? OrbPolarity.Yang : OrbPolarity.Yin;
+            var target = registry.RegisterGeneratedRaw("session-a", 1, 7, opposite, new Vector2(.3f, .3f), element);
+            var result = authority.Combine(7, Request(source, target, "explicit-pair"));
+            Assert.That(result.Accepted, Is.True, result.Reason);
+            Assert.That(registry.TryGet(source.OrbId, out var consumedSource), Is.True);
+            Assert.That(registry.TryGet(target.OrbId, out var consumedTarget), Is.True);
+            Assert.That(consumedSource.AuthorityState, Is.EqualTo(OrbAuthorityState.Consumed));
+            Assert.That(consumedTarget.AuthorityState, Is.EqualTo(OrbAuthorityState.Consumed));
+            Assert.That(consumedSource.RawElement, Is.EqualTo(element));
+            Assert.That(consumedTarget.RawElement, Is.EqualTo(element));
+            Assert.That(result.Combined.RawElement, Is.EqualTo(OrbElement.None));
+            Assert.That(OrbElements.TryDecodeCombinedId(result.Combined.OrbId, out var yin, out var yang), Is.True);
+            Assert.That(yin, Is.EqualTo(element));
+            Assert.That(yang, Is.EqualTo(element));
+        }
+
+        [Test]
+        public void ExplicitMismatchIsRejectedEvenWhenBothIdsHashToSameLegacyElement()
+        {
+            OrbElements.Configure(new[] { OrbElement.Fire });
+            registry.ConfigureExplicitRawElements();
+            var source = registry.RegisterGeneratedRaw("session-a", 1, 7, OrbPolarity.Yin, Vector2.one * .5f, OrbElement.Fire);
+            var target = registry.RegisterGeneratedRaw("session-a", 1, 7, OrbPolarity.Yang, Vector2.one * .5f, OrbElement.Water);
+            Assert.That(OrbElements.SameElement(source.OrbId, target.OrbId), Is.True, "This demonstrates why ID-only comparison is insufficient.");
+            var result = authority.Combine(7, Request(source, target, "explicit-mismatch"));
+            Assert.That(result.Accepted, Is.False);
+            Assert.That(result.Reason, Is.EqualTo("ELEMENT_MISMATCH"));
+            Assert.That(registry.IsPending(source.OrbId), Is.False);
+            Assert.That(registry.IsPending(target.OrbId), Is.False);
+            Assert.That(registry.Snapshot().Count, Is.EqualTo(2));
+            Assert.That(source.AuthorityState, Is.EqualTo(OrbAuthorityState.Idle));
+            Assert.That(target.AuthorityState, Is.EqualTo(OrbAuthorityState.Idle));
+        }
+
+        [TestCase("dev-fixture-10")]
+        [TestCase("10")]
+        [TestCase("not-a-guid-22")]
+        [TestCase("00000000000000000000000000000g11")]
+        public void NonGuidSuffixNeverCountsAsNormalEncodedCombined(string id)
+        {
+            Assert.That(OrbElements.TryDecodeCombinedId(id, out var yin, out var yang), Is.False);
+            Assert.That(yin, Is.EqualTo(OrbElement.None));
+            Assert.That(yang, Is.EqualTo(OrbElement.None));
+            OrbElements.CombinedElements(id, out yin, out yang);
+            Assert.That(OrbElements.IsValidRawElement(yin), Is.True);
+            Assert.That(yang, Is.EqualTo(yin), "Unencoded development identity uses a single legacy element.");
         }
 
         private void Fresh()

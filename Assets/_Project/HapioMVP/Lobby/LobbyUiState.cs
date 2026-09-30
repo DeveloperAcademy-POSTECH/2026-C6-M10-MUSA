@@ -1,4 +1,5 @@
 using System;
+using C6.Prototype.Presentation;
 
 namespace C6.Prototype.Lobby
 {
@@ -11,6 +12,15 @@ namespace C6.Prototype.Lobby
         public string Address = string.Empty;
         public string Status = string.Empty;
         public bool CanJoin;
+    }
+
+    [Serializable]
+    public sealed class LobbyElementOption
+    {
+        public OrbElement Element;
+        public string OccupiedBy = string.Empty;
+        public bool Selected;
+        public bool CanSelect;
     }
 
     /// <summary>Passive presentation values. None of these fields authorize a network operation.</summary>
@@ -29,6 +39,11 @@ namespace C6.Prototype.Lobby
         public string Compatibility = "Waiting for connection";
         public string StartStatus = string.Empty;
         public bool Multiparty;
+        public bool ElementSelectionEnabled;
+        public OrbElement SelectedElement;
+        public bool SelectionPending;
+        public bool CanClearElement;
+        public LobbyElementOption[] ElementOptions = Array.Empty<LobbyElementOption>();
         public string PlayerRoster = string.Empty;
         public bool Connected;
         public bool Browsing;

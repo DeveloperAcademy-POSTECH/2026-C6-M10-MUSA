@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using C6.Prototype.Attack;
 using C6.Prototype.Orbs;
 using C6.Prototype.Networking;
+using C6.Prototype.Presentation;
 using UnityEngine;
 
 namespace C6.Prototype.Resources
@@ -36,6 +37,20 @@ namespace C6.Prototype.Resources
         private readonly HashSet<string> rewardedHits = new HashSet<string>(StringComparer.Ordinal);
         private double lastHostTime;
         private bool started;
+        private Dictionary<ulong, OrbElement> selectedElements;
+
+        /// <summary>Host-approved round choices. Null is an explicit legacy contract, never a normal fallback.</summary>
+        public void ConfigureSelectedElements(IReadOnlyDictionary<ulong, OrbElement> selections)
+        {
+            var copy = selections == null ? null : new Dictionary<ulong, OrbElement>(selections);
+            bool same = selectedElements == null ? copy == null : copy != null && selectedElements.Count == copy.Count;
+            if (same && selectedElements != null)
+                foreach (var item in selectedElements)
+                    if (!copy.TryGetValue(item.Key, out var value) || value != item.Value) { same = false; break; }
+            if (started && !IsEnded && !same)
+                throw new InvalidOperationException("Freeze resource choices before BeginRound; change them only for a later round.");
+            selectedElements = copy;
+        }
         public int MaximumParticipants { get; }
 
         public ResourceTuning Tuning { get; }
@@ -133,18 +148,26 @@ namespace C6.Prototype.Resources
                 // First-seen valid sequence IDs are retired even on rejection. Failed generation has no
                 // resource/RNG mutation, but an older reordered command must not become payable later.
                 player.LastSequence = request.SequenceNumber;
+                bool selected = selectedElements != null && selectedElements.TryGetValue(authenticatedSender, out var ownElement)
+                    && OrbElements.IsValidRawElement(ownElement);
                 double eligibilityEpsilon = Math.Max(1, Tuning.GenerateCost) * 0.0000001;
-                if (player.Stamina + eligibilityEpsilon < Tuning.GenerateCost) result = Reject("INSUFFICIENT_STAMINA", player.Stamina);
+                if ((selectedElements != null || registry.RequiresExplicitRawElements) && !selected)
+                    result = Reject("ELEMENT_SELECTION_REQUIRED", player.Stamina);
+                else if (player.Stamina + eligibilityEpsilon < Tuning.GenerateCost) result = Reject("INSUFFICIENT_STAMINA", player.Stamina);
                 else if (CountStoredOrbs(authenticatedSender) >= Tuning.StorageLimit)
                     result = Reject("STORAGE_FULL", player.Stamina);
                 else if (player.Generated == int.MaxValue) result = Reject("GENERATION_LIMIT", player.Stamina);
                 else
                 {
                     var polarity = PolarityFor(Seed, player.Id, (uint)player.Generated);
+                    // Each paid Raw draws from the current round's Host-approved, active choices.
+                    // The sorted pool and separate stream make map insertion order and polarity independent.
+                    var element = selected ? ElementFor(Seed, RoundId, player.Id, (uint)player.Generated, SelectedElementPool())
+                        : OrbElement.None;
                     var position = FindSpawnPosition(player.Id);
                     double before = player.Stamina;
                     // Registry insertion is validated before cost and successful-generation counter change.
-                    var orb = registry.RegisterGeneratedRaw(SessionId, RoundId, player.Id, polarity, position);
+                    var orb = registry.RegisterGeneratedRaw(SessionId, RoundId, player.Id, polarity, position, element);
                     player.Stamina = Math.Max(0, player.Stamina - Tuning.GenerateCost);
                     player.Generated++;
                     result = new GenerateResult(true, false, "GENERATED_ONE_RAW", orb, before, player.Stamina);
@@ -267,6 +290,35 @@ namespace C6.Prototype.Resources
                 value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
                 value ^= value >> 31;
                 return (value & 1UL) == 0 ? OrbPolarity.Yin : OrbPolarity.Yang;
+            }
+        }
+
+        private List<OrbElement> SelectedElementPool()
+        {
+            var pool = new List<OrbElement>();
+            if (selectedElements == null) return pool;
+            foreach (var id in players.Keys)
+                if (selectedElements.TryGetValue(id, out var element)
+                    && OrbElements.IsValidRawElement(element) && !pool.Contains(element)) pool.Add(element);
+            pool.Sort();
+            return pool;
+        }
+
+        // A separate deterministic SplitMix64 stream selects from the Host-approved pool.
+        // Failed and replayed requests do not advance Generated, so they cannot alter later draws.
+        private static OrbElement ElementFor(uint seed, uint roundId, ulong playerId, uint successfulIndex,
+            IReadOnlyList<OrbElement> pool)
+        {
+            unchecked
+            {
+                // Retry keeps the same approved choices but starts a new draw sequence.
+                ulong value = ((ulong)seed << 32) ^ playerId ^ (roundId * 0xD6E8FEB86659FD93UL)
+                    ^ 0xE7037ED1A0B428DBUL;
+                value += 0x9E3779B97F4A7C15UL * (successfulIndex + 1UL);
+                value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
+                value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
+                value ^= value >> 31;
+                return pool[(int)(value % (ulong)pool.Count)];
             }
         }
 

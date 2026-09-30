@@ -1,4 +1,5 @@
 using System;
+using C6.Prototype.Presentation;
 
 namespace C6.Prototype.Lobby
 {
@@ -8,11 +9,13 @@ namespace C6.Prototype.Lobby
         public const int Capacity = 2;
         public const int MultipartyVersion = 23;
         public const int ContinuousTransferVersion = 24;
+        public const int ElementSelectionVersion = 56;
         public const int MaximumCapacity = 5;
-        public static bool IsMultiparty(int protocol) => protocol == MultipartyVersion || protocol == ContinuousTransferVersion;
+        public static bool IsElementSelection(int protocol) => protocol == ElementSelectionVersion;
+        public static bool IsMultiparty(int protocol) => protocol == MultipartyVersion || protocol == ContinuousTransferVersion || IsElementSelection(protocol);
         public static bool IsSupported(int protocol) => protocol == Version || IsMultiparty(protocol);
-        public static int For(int maximumParticipants, bool continuousTransfers = false)
-            => continuousTransfers ? ContinuousTransferVersion : maximumParticipants == MaximumCapacity ? MultipartyVersion : Version;
+        public static int For(int maximumParticipants, bool continuousTransfers = false, bool elementSelection = false)
+            => elementSelection ? ElementSelectionVersion : continuousTransfers ? ContinuousTransferVersion : maximumParticipants == MaximumCapacity ? MultipartyVersion : Version;
         public const ulong HostClientId = 0;
         public const string Lobby = "Lobby";
         public const string Playing = "Playing";
@@ -21,6 +24,11 @@ namespace C6.Prototype.Lobby
         public const string SetReady = "SetReady";
         public const string Start = "Start";
         public const string Leave = "Leave";
+        public const string SelectElement = "SelectElement";
+        public const string ClearElement = "ClearElement";
+        public static bool ValidElement(OrbElement element) => element >= OrbElement.Fire && element <= OrbElement.Earth;
+        public static readonly OrbElement[] Elements = { OrbElement.Fire, OrbElement.Water, OrbElement.Wood, OrbElement.Metal, OrbElement.Earth };
+        public static string ElementName(OrbElement element) => ValidElement(element) ? element.ToString().ToUpperInvariant() : "NOT SELECTED";
     }
 
     [Serializable]
@@ -42,8 +50,11 @@ namespace C6.Prototype.Lobby
         public string requestId;
         public ulong sequence;
         public ulong revision;
+        // Ready applies only to the Host-approved element selection barrier it observed.
+        public ulong selectionRevision;
         public string kind;
         public bool ready;
+        public OrbElement selectedElement;
         public string configFingerprint;
     }
 
@@ -55,6 +66,7 @@ namespace C6.Prototype.Lobby
         public bool connected;
         public bool initialStateReceived;
         public bool ready;
+        public OrbElement selectedElement;
     }
 
     [Serializable]
@@ -69,6 +81,10 @@ namespace C6.Prototype.Lobby
         // P3 freezes admission order for the entire battle; legacy contracts leave this empty.
         public ulong[] participantIds = Array.Empty<ulong>();
         public bool continuousTransfers;
+        public bool elementSelection;
+        // These choices align with participantIds (identity order), not the shuffled seats.
+        public OrbElement[] selectedElements = Array.Empty<OrbElement>();
+        public ulong[] roundSeatOrder = Array.Empty<ulong>();
     }
 
     [Serializable]
@@ -79,6 +95,7 @@ namespace C6.Prototype.Lobby
         public string roomId;
         public string sessionId;
         public ulong revision;
+        public ulong selectionRevision;
         public string phase;
         public uint seed;
         public uint roundId;
@@ -115,10 +132,24 @@ namespace C6.Prototype.Lobby
         public LobbyPlayer Find(ulong clientId)
         { foreach (var player in OrderedPlayers) if (player != null && player.clientId == clientId) return player; return null; }
         public int LocalPlayerNumber(ulong clientId) => Find(clientId)?.playerNumber ?? 0;
+        public int LocalSeatNumber(ulong clientId)
+        {
+            if (!LobbyProtocol.IsElementSelection(protocol)) return LocalPlayerNumber(clientId);
+            if (start?.roundSeatOrder == null) return 0;
+            int index = Array.IndexOf(start.roundSeatOrder, clientId);
+            return index < 0 ? 0 : index + 1;
+        }
         public int LeftPlayerNumber(ulong clientId) => NeighbourPlayerNumber(clientId, -1);
         public int RightPlayerNumber(ulong clientId) => NeighbourPlayerNumber(clientId, 1);
         private int NeighbourPlayerNumber(ulong clientId, int direction)
         {
+            if (LobbyProtocol.IsElementSelection(protocol))
+            {
+                var seats = start?.roundSeatOrder;
+                if (seats == null || seats.Length < 2) return 0;
+                int index = Array.IndexOf(seats, clientId);
+                return index < 0 ? 0 : Find(seats[(index + direction + seats.Length) % seats.Length])?.playerNumber ?? 0;
+            }
             var roster = OrderedPlayers;
             if (roster.Length < 2) return 0;
             for (int i = 0; i < roster.Length; i++)
@@ -132,10 +163,10 @@ namespace C6.Prototype.Lobby
     public static class LobbyCompatibility
     {
         // Run before reserving NGO capacity. No reservation is consumed by rejected payloads.
-        public static string Check(LobbyHello hello, string hostBuild, string roomId, string phase, int participantCount, int maximumParticipants = LobbyProtocol.Capacity, bool continuousTransfers = false)
+        public static string Check(LobbyHello hello, string hostBuild, string roomId, string phase, int participantCount, int maximumParticipants = LobbyProtocol.Capacity, bool continuousTransfers = false, bool elementSelection = false)
         {
             if (!LobbyWire.ValidHello(hello)) return "INVALID_HELLO";
-            if (hello.protocol != LobbyProtocol.For(maximumParticipants, continuousTransfers)) return "PROTOCOL_MISMATCH";
+            if (hello.protocol != LobbyProtocol.For(maximumParticipants, continuousTransfers, elementSelection)) return "PROTOCOL_MISMATCH";
             if (!string.Equals(hello.build, hostBuild, StringComparison.Ordinal)) return "BUILD_MISMATCH";
             if (!string.IsNullOrEmpty(hello.roomId) && hello.roomId != roomId) return "STALE_ROOM";
             if (phase == LobbyProtocol.Playing) return "BATTLE_IN_PROGRESS";
