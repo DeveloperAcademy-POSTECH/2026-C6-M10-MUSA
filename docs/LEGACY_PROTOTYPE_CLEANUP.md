@@ -42,11 +42,13 @@
 | 삭제 에셋 참조·`.meta` | PASS | 삭제 에셋 GUID 130개에 대해 남은 Unity YAML/설정 참조 0건, `.meta` 누락·고아 0건 정적 점검. Build Settings에는 현행 Scene 1개. |
 | 저장된 Scene·Prefab 연결 | PASS | Unity Editor에서 `ContinuousTransferBuild.ValidateSavedScene()` 성공, 누락 컴포넌트·필수 참조 검사 통과. |
 | Unity 컴파일 | PASS | Unity 6000.5.7f1 Editor 재컴파일 완료, `failed=false`, 오류 0건. |
-| EditMode | PASS | 2026-09-30 전체 1,636개 실행, 1,636 PASS, 0 FAIL. |
-| PlayMode | PASS | 2026-09-30 전체 82개 실행, 82 PASS, 0 FAIL. 결과 원본은 작업 호스트의 `/private/tmp/c6-cleanup-playmode-20260930.json`에 임시 보관. |
+| EditMode | PASS | 최신 `main` 변경을 합친 최종 브랜치에서 2026-09-30 전체 1,638개 실행, 1,638 PASS, 0 FAIL. 결과 원본은 작업 호스트의 `/private/tmp/c6-cleanup-final-editmode-20260930.json`에 임시 보관. |
+| PlayMode | PASS | 2026-09-30 전체 82개 실행, 82 PASS, 0 FAIL. 결과 원본은 작업 호스트의 `/private/tmp/c6-cleanup-final-playmode-20260930.json`에 임시 보관. |
 | macOS/iOS 출력 | NOT_RUN | 이 정리 브랜치에서 새 앱/Xcode 프로젝트를 출력하지 않음. |
 | 실기기 설치·조작 | NOT_RUN | 이 정리 브랜치에서 새 빌드를 기기에 설치·실행하지 않음. |
 
-정리 전 `main`의 같은 날 PlayMode 기준은 **164개 중 125 PASS, 39 FAIL**이었다. 기존 실패의 다수는 옛 Scene을 여는 테스트였다. 정리 후 테스트 수가 달라졌으므로 두 숫자의 차이를 기능 오류 39건 수정으로 계산하지 않는다. 옮긴 현행 Scene 검사 중 로비 18개, 직접 연결 6개, 전투 흐름 2개는 각각 별도 실행에서도 통과했고 최종 전체 82개 실행에도 포함됐다.
+정리 시작 시점 `main`(74134ff7)의 같은 날 PlayMode 기준은 **164개 중 125 PASS, 39 FAIL**이었다. 기존 실패의 다수는 옛 Scene을 여는 테스트였다. 정리 후 테스트 수가 달라졌으므로 두 숫자의 차이를 기능 오류 39건 수정으로 계산하지 않는다. 옮긴 현행 Scene 검사 중 로비 18개, 직접 연결 6개, 전투 흐름 2개는 각각 별도 실행에서도 통과했고 최종 전체 82개 실행에도 포함됐다.
+
+작업 중 최신 `main`의 몬스터 방해 효과 변경(6b799ed4)을 병합했다. 새 검사 하나가 저장된 UI와 다른 텍스트 정렬값을 고정으로 요구해, 방해 효과 참조·입력 차단 검사는 유지하고 정렬값 단정만 제거했다. Scene의 기존 UI 배치는 변경하지 않았다.
 
 과거 [P4 검증](P4_VALIDATION.md), [#56 로비 선택 검증](LOBBY_ELEMENT_SELECTION_IMPLEMENTATION.md), [공개 검증 요약](VALIDATION_SUMMARY.md)은 각 기록의 당시 코드·환경을 설명한다. 해당 기록을 현재 브랜치의 새 빌드·기기 결과로 승계하지 않는다.
