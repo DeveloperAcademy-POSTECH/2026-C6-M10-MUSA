@@ -678,7 +678,7 @@ namespace C6.Prototype.Battle
             if (source == null || target == null) return null;
             if (source.Kind != OrbKind.Raw || target.Kind != OrbKind.Raw) return "COMBINED_ORB";
             if (source.Polarity == target.Polarity) return "SAME_POLARITY";
-            if (!OrbElements.SameElement(source.OrbId, target.OrbId)) return "ELEMENT_MISMATCH";
+            if (!OrbElements.SameElement(source, target)) return "ELEMENT_MISMATCH";
             return null;
         }
 

@@ -24,64 +24,22 @@ namespace C6.Editor
     public static class ContinuousTransferBuild
     {
         public const string BuildNumber = "25";
-        public const string SourceScenePath = FivePlayerBattleBuild.ScenePath;
         public const string ScenePath="Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity";
         public const string MonsterPrefabPath="Assets/_Project/HapioMVP/Prefabs/BenchmarkMonster.prefab";
         public const string LegacyVisualName="T04 Training Dummy - Visual Only";
         public const string ConfigPath="Assets/_Project/HapioMVP/Config/ScreenLayoutConfig.asset";
         public const string LocalNetworkPurpose="같은 Wi-Fi에서 C6 방을 찾고 최대 다섯 기기를 연결해 함께 플레이합니다.";
-        [MenuItem("C6/Next Phase/P4/Connect Explicit Mac Validation Probe")]
-        public static void EnsureProbeForValidation()
-        {
-            if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Stop Play mode first.");
-            ValidateSavedScene(false);
-            var original = SceneManager.GetActiveScene();
-            var target = SceneManager.GetSceneByPath(ScenePath);
-            bool opened = !target.IsValid() || !target.isLoaded;
-            if (!opened && target.isDirty) throw new InvalidOperationException("Save the user's dirty P4 scene before connecting its probe.");
-            if (opened && Application.isBatchMode)
-                for (int i = 0; i < SceneManager.sceneCount; i++)
-                    if (SceneManager.GetSceneAt(i).isDirty)
-                        throw new InvalidOperationException("Preserving a dirty scene; use a clean verification process.");
-            try
-            {
-                if (opened) target = EditorSceneManager.OpenScene(ScenePath,
-                    Application.isBatchMode ? OpenSceneMode.Single : OpenSceneMode.Additive);
-                var games = Components<T10GameSession>(target);
-                if (games.Length != 1) throw new InvalidOperationException("One P4 game root is required.");
-                var probes = Components<P4ContinuousTransferProbe>(target);
-                if (probes.Length > 1 || probes.Length == 1 && probes[0].gameObject != games[0].gameObject)
-                    throw new InvalidOperationException("Existing validation wiring is ambiguous; preserving it.");
-                if (probes.Length == 0)
-                {
-                    games[0].gameObject.AddComponent<P4ContinuousTransferProbe>();
-                    VerifySceneReferences(target);
-                    if (!EditorSceneManager.SaveScene(target)) throw new InvalidOperationException("Could not save the explicit P4 probe connection.");
-                }
-                Debug.Log("C6_P4_PROBE_CONNECTED scene=" + ScenePath + " mode=explicit-development-standalone-arguments-only");
-            }
-            finally
-            {
-                if (opened && !Application.isBatchMode && target.IsValid() && target.isLoaded)
-                    EditorSceneManager.CloseScene(target, true);
-                if (original.IsValid() && original.isLoaded) SceneManager.SetActiveScene(original);
-            }
-        }
         [MenuItem("C6/Next Phase/P4/Prepare Continuous Transfer Battle")]
         public static void Prepare()
         {
             if(EditorApplication.isPlayingOrWillChangePlaymode)throw new InvalidOperationException("Stop Play mode first.");
             var config=AssetDatabase.LoadAssetAtPath<ScreenLayoutConfig>(ConfigPath);
             if(config==null)throw new InvalidOperationException("Existing shared Config is required.");
-            bool create=AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath)==null;
-            if(create&&(File.Exists(ScenePath)||File.Exists(ScenePath+".meta")))throw new InvalidOperationException("Occupied scene path; preserving it.");
-            if(create&&!Application.isBatchMode)
-                for(int i=0;i<SceneManager.sceneCount;i++)if(string.IsNullOrEmpty(SceneManager.GetSceneAt(i).path))
-                    throw new InvalidOperationException("Save the untitled scene or use a verification copy.");
+            if(AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath)==null)
+                throw new InvalidOperationException("The saved ContinuousTransferBattle scene is required; Prepare does not recreate it from a legacy scene.");
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(MonsterPrefabPath);
             if (prefab == null) throw new InvalidOperationException("Prepare the existing P1 monster prefab first; P4 does not replace it.");
             ValidateMonster(prefab);
-            if(create) CreateDerivedScene();
             ValidateSavedScene();
             PlayerSettings.productName="C6 Prototype";PlayerSettings.bundleVersion="0.1.0";
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Standalone,"com.wolfuraark.c6prototype.p4.desktop");
@@ -97,51 +55,25 @@ namespace C6.Editor
                 EditorBuildSettings.scenes.Where(s=>s.path!=ScenePath).Select(s=>new EditorBuildSettingsScene(s.path,false))).ToArray();
             Debug.Log("C6_P4_PREPARED scene="+ScenePath+" config="+ConfigPath+" build="+BuildNumber);
         }
-        static void CreateDerivedScene()
+        public static void ValidateMonster(GameObject root)
         {
-            // CopyAsset is Unity's asset copy API: it creates a new scene GUID while preserving local
-            // file IDs, prefab links and all intra-scene references. Never open or modify the source.
-            FivePlayerBattleBuild.ValidateSavedScene();
-            var source = EditorSceneManager.OpenPreviewScene(SourceScenePath);
-            try
-            {
-                var game = Components<T10GameSession>(source).Single();
-                var controller = Components<T09BattleController>(source).Single();
-                if (game.BuildIdentifier != FivePlayerBattleBuild.BuildNumber || game.ContinuousTransfersEnabled
-                    || controller.ContinuousTransfersEnabled || Components<T10LobbySession>(source).Single().ContinuousTransfersEnabled)
-                    throw new InvalidOperationException("P4 must derive from the preserved build23 manual transfer scene.");
-            }
-            finally { if (source.IsValid()) EditorSceneManager.ClosePreviewScene(source); }
-            if (!AssetDatabase.CopyAsset(SourceScenePath, ScenePath))
-                throw new InvalidOperationException("Unity could not copy the saved P3 scene to its unoccupied P4 path.");
-            Scene original = SceneManager.GetActiveScene();
-            Scene target = default;
-            try
-            {
-                target = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
-                var game = Components<T10GameSession>(target).Single();
-                var lobby = Components<T10LobbySession>(target).Single();
-                var controller = Components<T09BattleController>(target).Single();
-                game.gameObject.name = "P4ContinuousTransferBattle";
-                lobby.ConfigureBuild(BuildNumber); lobby.ConfigureCapacity(5); lobby.ConfigureContinuousTransfers(true);
-                game.ConfigureMaximumParticipants(5); game.ConfigureTransfers(true);
-                game.ConfigureContinuousTransfers(true); game.ConfigureBuildIdentifier(BuildNumber);
-                controller.ConfigureMaximumParticipants(5); controller.ConfigureContinuousTransfers(true);
-                foreach (var oldProbe in Components<P3MultiplayerProbe>(target)) UnityEngine.Object.DestroyImmediate(oldProbe);
-                if (Components<P4ContinuousTransferProbe>(target).Length != 0)
-                    throw new InvalidOperationException("Source unexpectedly contains a P4 probe; preserving the copied scene for inspection.");
-                game.gameObject.AddComponent<P4ContinuousTransferProbe>();
-                VerifySceneReferences(target);
-                if (!EditorSceneManager.SaveScene(target)) throw new InvalidOperationException("Could not save the separate P4 scene.");
-            }
-            finally
-            {
-                if (target.IsValid() && target.isLoaded) EditorSceneManager.CloseScene(target, true);
-                if (original.IsValid() && original.isLoaded) SceneManager.SetActiveScene(original);
-            }
+            var monster = root.GetComponent<BenchmarkMonster>();
+            var target = root.GetComponent<MonsterHitTarget>();
+            var colliders = root.GetComponentsInChildren<Collider>(true);
+            if (monster == null || target == null || monster.SavedConfig != AssetDatabase.LoadAssetAtPath<ScreenLayoutConfig>(ConfigPath)
+                || monster.Hitbox == null || monster.Visual == null || monster.Hitbox.transform.parent != root.transform
+                || monster.Visual.parent != root.transform || monster.Hitbox.gameObject.name != "Hitbox"
+                || monster.Visual.name != "Visual" || colliders.Length != 1 || colliders[0] != monster.Hitbox
+                || monster.Hitbox.isTrigger || root.GetComponentsInChildren<Rigidbody>(true).Length != 0
+                || root.GetComponentsInChildren<MonsterHitTarget>(true).Length != 1)
+                throw new InvalidOperationException("Benchmark monster requires one shared Config, one static non-trigger child hitbox, and one root target identity.");
+            if (root.GetComponentsInChildren<Renderer>(true).Length == 0
+                || monster.Visual.GetComponentsInChildren<Collider>(true).Length != 0)
+                throw new InvalidOperationException("Benchmark monster visual geometry must be visible and independent of hit detection.");
+            int battleLayer = LayerMask.NameToLayer("C6Battle");
+            if (battleLayer < 0 || root.layer != battleLayer || monster.Hitbox.gameObject.layer != battleLayer)
+                throw new InvalidOperationException("The monster and its hitbox must retain the C6Battle layer.");
         }
-
-        public static void ValidateMonster(GameObject root) => FivePlayerBattleBuild.ValidateMonster(root);
 
         static T[] Components<T>(Scene scene) where T : Component => scene.GetRootGameObjects()
             .SelectMany(root => root.GetComponentsInChildren<T>(true)).ToArray();
@@ -154,8 +86,7 @@ namespace C6.Editor
             return found[0];
         }
 
-        public static void ValidateSavedScene() => ValidateSavedScene(true);
-        static void ValidateSavedScene(bool requireProbe)
+        public static void ValidateSavedScene()
         {
             var scene = EditorSceneManager.OpenPreviewScene(ScenePath);
             try
@@ -184,9 +115,9 @@ namespace C6.Editor
                     || !RequireOnRoot<T09BattleController>(roots, root).ReleaseThrowsEnabled)
                     throw new InvalidOperationException("The P4 scene must explicitly enable local orb physics and release throws.");
                 RequireOnRoot<ThrowBattleFraming>(roots, root);
-                if (requireProbe) RequireOnRoot<P4ContinuousTransferProbe>(roots, root);
-                if (Components<P3MultiplayerProbe>(scene).Length != 0 || Components<P2ThrowProbe>(scene).Length != 0)
-                    throw new InvalidOperationException("P4 must replace only the copied scene validation probe.");
+                if (Components<MonoBehaviour>(scene).Any(component => component != null &&
+                    (component.GetType().Name == "P3MultiplayerProbe" || component.GetType().Name == "P2ThrowProbe")))
+                    throw new InvalidOperationException("The current battle scene must not contain a legacy validation probe.");
                 var floors = Components<ThrowBattleFloor>(scene);
                 if (floors.Length != 1 || floors[0].GetComponent<BoxCollider>() == null
                     || floors[0].GetComponent<BoxCollider>().isTrigger || floors[0].GetComponent<MonsterHitTarget>() != null)
@@ -234,6 +165,7 @@ namespace C6.Editor
         static void ApplyPlist(string path)
         {
             var plist=new PlistDocument();plist.ReadFromFile(path);
+            // Current game builds declare Local Network access here for both direct-IP and Bonjour joins.
             plist.root.SetString("NSLocalNetworkUsageDescription",LocalNetworkPurpose);
             PlistElementArray list;
             if(plist.root.values.TryGetValue("NSBonjourServices",out var existing))list=existing.AsArray();

@@ -2,17 +2,17 @@
 
 > **코드를 직접 이해하고 수정하려면:** [보고서 3 — 상세 코드 유지보수 안내서](docs/UNITY_BEGINNER_CODE_MAINTENANCE_GUIDE.md)에서 실제 호출 흐름, 코드 예시, Console·중단점·테스트 사용법을 먼저 확인할 수 있습니다.
 
-> **초보자 개발 보고서 후속편:** [빌드21~24의 2D 물리·3D 투척·최대 5인·연속 이동 구조와 수정 방법](docs/UNITY_BEGINNER_PHYSICS_MULTIPLAYER_REPORT.md)을 정리했습니다. 최신 씬의 빌드는 [P4 실행 안내](docs/P4_RUNBOOK.md)를 따르고, 아래 상세 안내는 Unity·Xcode 조작과 서명 절차를 참고하세요.
+> **현재 실행 경로:** 이 안내는 저장된 `ContinuousTransferBattle.unity`와 `ContinuousTransferBuild` 메뉴를 기준으로 합니다. [현재 씬 실행 안내](docs/P4_RUNBOOK.md)와 [정리 범위](docs/LEGACY_PROTOTYPE_CLEANUP.md)를 함께 확인하세요. 이전 단계의 개발 보고서와 검증 문서는 역사 기록입니다.
 
 # Unity에서 iPhone·iPad로 직접 빌드하기
 
-**네트워크 수정 앱26을 재현할 때:** [L2 빌드·실행 절차](docs/L2_CONNECTION_INTEGRATION.md#mac에서-동일-검사를-다시-실행하기)의 `C6.Editor.L2ConnectionBuild.ExportIOS`를 사용한다. 같은 `ContinuousTransferBattle` 씬을 출력하고 Development 빌드에만 `C6_L2_CHECKS` 관찰 도구를 추가한다. 아래 P4 메뉴는 기존 빌드24 출력 절차이므로 앱26 검증본과 구별하며, Xcode 서명·설치 과정은 아래 안내를 그대로 참고한다.
+과거 앱26 네트워크 진단 빌드를 재현할 때만 [L2 기록](docs/L2_CONNECTION_INTEGRATION.md)을 참고합니다. 일반적인 현재 게임 출력에는 아래 `ContinuousTransferBuild` 메뉴를 사용합니다. 과거 앱26 결과를 이번 소스의 실행 결과로 승계하지 않습니다.
 
 [프로젝트 README](README.md) · [Unity 개발 보고서](docs/UNITY_BEGINNER_DEVELOPMENT_REPORT.md)
 
 **조직 저장소의 Unity 프로젝트를 Mac에서 열어 자신의 iPhone·iPad에 설치하고, 수정한 게임을 다시 반영하는 상세 안내입니다.** Unity를 처음 사용하는 사람도 순서대로 따라갈 수 있도록 클릭 위치, 입력값, 단계별 완료 기준을 함께 적었습니다.
 
-문서 갱신: **2026-09-15 공개 이관본**. 아래 순서는 최신 **빌드24 `ContinuousTransferBattle`**을 기준으로 합니다. 이전 상세 안내의 Unity·Xcode 조작 절차를 유지하고 씬·메뉴·출력 경로와 조작 설명을 현재 구현에 맞췄습니다. 이관 중 게임 코드 변경이나 새 빌드·설치·실기기 시험을 실행한 것은 아닙니다. 과거 검증 범위는 [공개 검증 요약](docs/VALIDATION_SUMMARY.md)에서 확인합니다.
+문서 갱신: **2026-09-30**. 아래 순서는 현재 `ContinuousTransferBattle` 씬과 `ContinuousTransferBuild`의 iOS 빌드 번호 **25**를 기준으로 합니다. 문서를 고쳤다는 사실은 새 빌드·서명·실기기 시험의 PASS가 아닙니다. 과거 검증 범위는 [공개 검증 요약](docs/VALIDATION_SUMMARY.md)에서 확인합니다.
 
 ## 먼저 알아둘 전체 순서
 
@@ -98,7 +98,7 @@ Add modules가 없으면 Hub를 통해 설치한 Editor인지 확인합니다. �
 
 ### GitHub에서 새로 내려받는 경우
 
-[조직 저장소](https://github.com/DeveloperAcademy-POSTECH/2026-C6-M10-MUSA)에서 Unity 이관 내용이 있는 브랜치를 내려받습니다. PR 병합 전에는 `feature/unity-prototype`을 선택하고, 병합 후에는 `main`에서 받을 수 있습니다. 선택한 브랜치에 `Assets`, `Packages`, `ProjectSettings`가 있는지 확인합니다. 새 위치에 둘 때도 `Assets`·`Packages`·`ProjectSettings`가 함께 있는 폴더를 Hub에 추가합니다. 기존 프로젝트 폴더 위에 다운로드한 파일을 통째로 덮어쓰지 않습니다.
+[조직 저장소](https://github.com/DeveloperAcademy-POSTECH/2026-C6-M10-MUSA)에서 사용할 브랜치를 내려받습니다. 작업 중인 PR을 확인한다면 해당 브랜치, 병합된 기능을 확인한다면 최신 `main`을 선택합니다. 선택한 브랜치에 `Assets`, `Packages`, `ProjectSettings`가 있는지 확인합니다. 새 위치에 둘 때도 이 세 폴더가 함께 있는 루트를 Hub에 추가합니다. 기존 프로젝트 폴더 위에 다운로드한 파일을 통째로 덮어쓰지 않습니다.
 
 GitHub에는 생성된 `.app`이나 Xcode 출력 폴더가 포함되어 있지 않습니다. 내려받은 소스에서 [5단계](#export)의 Unity 출력을 수행해 만들어야 합니다.
 
@@ -109,13 +109,13 @@ GitHub에는 생성된 `.app`이나 Xcode 출력 폴더가 포함되어 있지 �
 
    `Assets → _Project → HapioMVP → Scenes → ContinuousTransferBattle.unity`
 
-3. `ContinuousTransferBattle.unity`를 더블 클릭합니다. 이것이 현재 빌드24 씬입니다. `InterruptionBattle` 등 이전 단계 씬도 학습·비교용으로 보존되어 있으므로 이름을 확인합니다.
+3. `ContinuousTransferBattle.unity`를 더블 클릭합니다. 현재 게임의 저장된 실행 씬은 이 파일입니다. 이전 단계의 실험 씬 이름으로 게임을 시작하지 않습니다.
 4. **Window → General → Console**을 열어 빨간 컴파일 오류가 없는지 확인합니다. 오류가 있으면 첫 오류의 메시지와 파일 위치를 먼저 확인합니다.
 5. Play 중이면 상단 Play 버튼을 눌러 종료합니다. 수정한 씬은 **File → Save**로 저장합니다.
 
 **완료 기준:** 현재 씬을 열 수 있고, 컴파일이 끝났으며, Play가 꺼져 있어야 합니다. 전용 빌더는 저장된 씬을 사용하므로 수정한 내용을 먼저 저장합니다.
 
-이 씬의 UI와 구슬 일부는 실행 중 코드로 생성됩니다. Play 전에 Hierarchy에 모든 버튼과 구슬이 보이지 않아도 정상입니다. Inspector에서 수정할 값과 코드 위치는 [개발 보고서](docs/UNITY_BEGINNER_DEVELOPMENT_REPORT.md)에 정리했습니다.
+전투 UI의 Canvas와 편집할 주요 버튼·바는 씬에 저장되어 있습니다. 게임 중 생기는 구슬처럼 런타임 객체는 Play 전 Hierarchy에 보이지 않을 수 있습니다. 화면 요소를 조정할 때는 [편집 가능한 전투 UI 안내](docs/EDITABLE_BATTLE_UI.md)의 Scene 참조와 런타임 데이터 연결을 함께 확인합니다.
 
 <a id="device"></a>
 ## 3. iPhone·iPad 연결과 개발자 모드
@@ -163,7 +163,7 @@ GitHub에는 생성된 `.app`이나 Xcode 출력 폴더가 포함되어 있지 �
 |---|---|---|
 | Product Name | `C6 Prototype` | 앱 이름 |
 | Bundle Identifier | 기본값은 `com.wolfuraark.c6prototype`. 자신의 Team에서 사용할 수 없으면 고유 앱 ID 지정 | 앱을 식별하는 ID |
-| Version / Build | `0.1.0` / `24` | P4 전용 빌더가 설정하는 버전 표기 |
+| Version / Build | `0.1.0` / `25` | `ContinuousTransferBuild.Prepare()`가 설정하는 버전 표기 |
 | Target Device | iPhone and iPad | 두 종류의 기기에 설치 |
 | Orientation | Portrait | 세로 화면 |
 | SDK | Device SDK | 실제 기기용 출력 |
@@ -335,11 +335,11 @@ Xcode 상단에는 **무엇을 실행할지 고르는 Scheme**과 **어디에서
 3. iPad에서 **FIND ROOMS**를 누르고 발견한 방의 **JOIN**을 선택합니다.
 4. 로컬 네트워크 알림이 나오면 허용합니다. 허용 후 필요하면 탐색·참가를 다시 누릅니다.
 5. 양쪽에 같은 방과 **P1·P2**가 보이는지 확인합니다.
-6. 양쪽에서 **I'M READY**를 누릅니다.
-7. iPhone Host에서 **HOST START**를 누릅니다.
-8. PLAYING·시작 구슬 **0개**·스태미나 **100**·몬스터 HP **100**·**180초**에서 진행하는지 확인합니다.
-9. **GENERATE / 20**으로 Raw를 만듭니다. Yin과 Yang을 겹쳐 손을 놓으면 Combined가 됩니다. 음양은 무작위이므로 두 번 생성했다고 반드시 반대 음양이 나오지는 않습니다.
-10. Combined를 상단 전투 영역으로 올린 뒤 **위로 움직이면서 손을 놓으면** 방향·세기에 따라 투척됩니다. 상단으로 들어갔다는 이유만으로 자동 발사되지 않습니다.
+6. 각자 로비에서 **화·수·목·금·토 중 서로 다른 속성**을 하나 선택합니다. 처음에는 미선택이고, 선택 전에는 Ready를 할 수 없습니다. 선택을 바꾸거나 해제하면 전원의 Ready가 풀립니다.
+7. 양쪽에서 **I'M READY**를 누른 뒤 Host에서 **HOST START**를 누릅니다.
+8. PLAYING·시작 구슬 **0개**·스태미나 **100**·기본 시간 **180초**를 확인합니다. 기본 몬스터 HP는 두 명일 때 **800**이며, 참가 인원이나 Host 개발자 설정에 따라 달라질 수 있습니다. P번호는 식별자이고 실제 자리와 LEFT·RIGHT 이웃은 매 판 추첨 결과를 확인합니다.
+9. **GENERATE / 20**으로 Raw를 만듭니다. 원소는 현재 방에서 선택된 속성 중 하나가 추첨되므로 자신의 속성만 나오지 않습니다. **같은 원소**의 Yin과 Yang을 직접 겹쳐 손을 놓으면 Combined가 됩니다.
+10. **자신이 선택한 원소의 Combined**를 상단 전투 영역으로 올린 뒤 위로 움직이며 손을 놓으면 방향·세기에 따라 투척됩니다. 다른 원소는 경고 후 원래 위치에 남고 피해가 발생하지 않습니다.
 11. 하단 구슬을 좌우로 밀면서 놓으면 관성으로 움직입니다. 놓은 구슬이 좌우 경계에 닿으면 이웃 화면의 반대편으로 자동 전달되고, 남은 속도가 마찰로 줄어 멈출 때까지 이동합니다. 매 경계에서 다시 잡을 필요는 없습니다.
 
 세 명 이상은 최대 다섯 명까지 같은 절차로 참가합니다. 모두 같은 빌드·Config를 사용하고, 각자의 LEFT·RIGHT 이웃을 확인한 뒤 전원이 Ready합니다. 자세한 조작은 [P4 실행 안내](docs/P4_RUNBOOK.md)를 참고합니다.
@@ -372,7 +372,7 @@ Xcode 상단에는 **무엇을 실행할지 고르는 Scheme**과 **어디에서
 
 **옛 Xcode 프로젝트에서 Run만 누르면 새 Unity 변경이 들어가지 않습니다.** 수정 후에도 예전 화면이 보이면 이번 Export 경로를 열었는지부터 확인합니다.
 
-빌드 번호는 자동 증가하지 않습니다. 현재 전용 빌더의 Prepare가 버전 `0.1.0`·빌드 `24`와 앱 ID를 다시 설정합니다. Inspector의 빌드 번호만 바꿔도 다음 출력에서 돌아갈 수 있으므로, 지금은 **변경 커밋·출력 폴더·실행 날짜**도 함께 기록해 수정본을 구분합니다.
+빌드 번호는 자동 증가하지 않습니다. 현재 전용 빌더의 Prepare가 버전 `0.1.0`·빌드 `25`와 앱 ID를 다시 설정합니다. Inspector의 빌드 번호만 바꿔도 다음 출력에서 돌아갈 수 있으므로, 지금은 **변경 커밋·출력 폴더·실행 날짜**도 함께 기록해 수정본을 구분합니다.
 
 <a id="troubleshooting"></a>
 ## 10. 오류가 날 때 확인할 순서
@@ -414,7 +414,7 @@ Mac에서 별도 앱으로 실행하고 싶을 때의 경로입니다.
 
 Mac 출력도 기존 결과가 있으면 중단합니다. 새 출력 경로 절차를 사용할 때는 Unity 실행 명령에서 `-buildTarget iOS` 부분을 빼고 Editor를 연 뒤, 위 순서대로 Build Profiles에서 macOS를 활성화합니다. 이후 iOS를 출력할 때는 다시 iOS를 활성화합니다. 이 메뉴는 로컬 개발 앱을 만들며 공증·App Store 배포를 수행하지 않습니다.
 
-혼자 기본 전투를 배우려면 Unity에서 이전 `BattleLoop.unity`를 열어 Play → DEV SOLO ON → HOST → HOST START를 사용할 수 있습니다. DEV SOLO는 Editor·개발 빌드용입니다. 이는 T09 학습 장면이므로 최신 2D 물리·다인 로비·연속 전달까지 포함한 P4 검증을 대신하지 않습니다.
+Editor에서 현재 화면을 확인할 때도 `ContinuousTransferBattle.unity`를 엽니다. 실제 전투 시작과 협동 조작을 확인하려면 현재 빌드의 참가자 두 명 이상을 같은 방에 연결해 속성을 선택하고 전원 Ready를 완료합니다.
 
 <a id="records"></a>
 ## 12. 이번 결과 기록과 참고 자료

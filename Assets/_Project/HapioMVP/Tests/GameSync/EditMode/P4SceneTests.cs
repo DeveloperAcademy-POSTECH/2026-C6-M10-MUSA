@@ -7,6 +7,7 @@ using C6.Prototype.Orbs;
 using C6.Prototype.Presentation;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -17,7 +18,6 @@ namespace C6.Prototype.GameSync.Tests
     public sealed class P4SceneTests
     {
         private const string ScenePath = "Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity";
-        private const string PreviousPath = "Assets/_Project/HapioMVP/Scenes/FivePlayerBattle.unity";
         private const string ConfigPath = "Assets/_Project/HapioMVP/Config/ScreenLayoutConfig.asset";
         private const string MonsterPath = "Assets/_Project/HapioMVP/Prefabs/BenchmarkMonster.prefab";
         private Scene scene;
@@ -64,11 +64,9 @@ namespace C6.Prototype.GameSync.Tests
             Assert.That(layout.Config.StaminaStart, Is.EqualTo(100));
             Assert.That(layout.Config.GenerateCost, Is.EqualTo(20));
             Assert.That(layout.Config.StaminaHitRecovery, Is.EqualTo(5));
-            Assert.That(Components<P4ContinuousTransferProbe>(scene).Single().gameObject, Is.SameAs(root));
-            Assert.That(Components<P3MultiplayerProbe>(scene), Is.Empty);
         }
         [Test]
-        public void CopiedP4CamerasMonsterFloorAndEverySceneReferenceAreLocal()
+        public void SavedCurrentCamerasMonsterFloorAndEverySceneReferenceAreLocal()
         {
             var layout = Components<SplitScreenLayout>(scene).Single();
             var cameras = Components<Camera>(scene);
@@ -83,6 +81,7 @@ namespace C6.Prototype.GameSync.Tests
                 Is.SameAs(AssetDatabase.LoadAssetAtPath<GameObject>(MonsterPath)));
             Assert.That(monster.SavedConfig, Is.SameAs(layout.Config));
             Assert.That(monster.Hitbox.isTrigger, Is.False);
+            Assert.That(monster.Hitbox.transform.parent, Is.SameAs(monster.transform));
             Assert.That(monster.Visual.GetComponentsInChildren<Collider>(true), Is.Empty);
             var floor = Components<ThrowBattleFloor>(scene).Single();
             Assert.That(floor.GetComponent<BoxCollider>(), Is.Not.Null);
@@ -107,29 +106,33 @@ namespace C6.Prototype.GameSync.Tests
             }
         }
         [Test]
-        public void PreviousP3SceneKeepsItsManualTransfersAndFivePlayerIdentity()
+        public void SavedControllerInputAndLobbyReferencesPointToCurrentSceneComponents()
         {
-            var prior = EditorSceneManager.OpenPreviewScene(PreviousPath);
-            try
-            {
-                var game = Components<T10GameSession>(prior).Single();
-                var lobby = Components<T10LobbySession>(prior).Single();
-                var controller = Components<T09BattleController>(prior).Single();
-                Assert.That(game.BuildIdentifier, Is.EqualTo("23"));
-                Assert.That(lobby.BuildIdentifier, Is.EqualTo("23"));
-                Assert.That(game.MaximumParticipants, Is.EqualTo(5));
-                Assert.That(lobby.MaximumParticipants, Is.EqualTo(5));
-                Assert.That(lobby.ProtocolVersion, Is.EqualTo(23));
-                Assert.That(controller.MaximumParticipants, Is.EqualTo(5));
-                Assert.That(controller.OrbPhysicsEnabled && controller.ReleaseThrowsEnabled, Is.True);
-                Assert.That(game.ContinuousTransfersEnabled || lobby.ContinuousTransfersEnabled || controller.ContinuousTransfersEnabled, Is.False);
-                Assert.That(Components<P3MultiplayerProbe>(prior), Has.Length.EqualTo(1));
-                Assert.That(Components<P4ContinuousTransferProbe>(prior), Is.Empty);
-                Assert.That(AssetDatabase.AssetPathToGUID(ScenePath), Is.Not.EqualTo(AssetDatabase.AssetPathToGUID(PreviousPath)));
-                Assert.That(Components<SplitScreenLayout>(prior).Single().Config,
-                    Is.SameAs(Components<SplitScreenLayout>(scene).Single().Config));
-            }
-            finally { if (prior.IsValid()) EditorSceneManager.ClosePreviewScene(prior); }
+            var layout = Components<SplitScreenLayout>(scene).Single();
+            var controller = Components<T09BattleController>(scene).Single();
+            var connection = Components<DirectConnectionSession>(scene).Single();
+            var hud = Components<T09Hud>(scene).Single();
+            AssertReference(controller, "layout", layout);
+            AssertReference(controller, "connection", connection);
+            AssertReference(controller, "hud", hud);
+            AssertReference(controller, "launchFrame", Components<AttackLaunchFrame>(scene).Single());
+            AssertReference(controller, "target", Components<MonsterHitTarget>(scene).Single());
+            AssertReference(Components<OrbPointerInput>(scene).Single(), "controller", controller);
+            var lobbyController = Components<T10LobbyController>(scene).Single();
+            AssertReference(lobbyController, "session", Components<T10LobbySession>(scene).Single());
+            AssertReference(lobbyController, "hud", Components<T10LobbyHud>(scene).Single());
+        }
+        [Test]
+        public void BuildSettingsSelectOnlyTheCurrentPortraitScene()
+        {
+            var enabled = EditorBuildSettings.scenes.Where(item => item.enabled).Select(item => item.path).ToArray();
+            Assert.That(enabled, Is.EqualTo(new[] { ScenePath }));
+            Assert.That(PlayerSettings.iOS.buildNumber, Is.EqualTo("25"));
+            Assert.That(PlayerSettings.defaultInterfaceOrientation, Is.EqualTo(UIOrientation.Portrait));
+            Assert.That(PlayerSettings.iOS.targetDevice, Is.EqualTo(iOSTargetDevice.iPhoneAndiPad));
+            Assert.That(PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.iOS), Is.EqualTo("com.wolfuraark.c6prototype"));
+            Assert.That(PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Standalone),
+                Is.EqualTo("com.wolfuraark.c6prototype.p4.desktop"));
         }
         [Test]
         public void DefenseInputZonesStayUnchangedAndVisualGuidesStayAboveTheTeamHpBar()
@@ -222,5 +225,14 @@ namespace C6.Prototype.GameSync.Tests
         }
         private static T[] Components<T>(Scene value) where T : Component => value.GetRootGameObjects()
             .SelectMany(root => root.GetComponentsInChildren<T>(true)).ToArray();
+        private static void AssertReference(UnityEngine.Object owner, string field, UnityEngine.Object expected)
+        {
+            using (var serialized = new SerializedObject(owner))
+            {
+                var property = serialized.FindProperty(field);
+                Assert.That(property, Is.Not.Null, field);
+                Assert.That(property.objectReferenceValue, Is.SameAs(expected), owner.name + "." + field);
+            }
+        }
     }
 }

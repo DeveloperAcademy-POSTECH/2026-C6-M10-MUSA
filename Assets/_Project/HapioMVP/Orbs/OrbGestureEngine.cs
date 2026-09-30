@@ -350,7 +350,7 @@ namespace C6.Prototype.Orbs
                     StringComparer.Ordinal.Equals(other.OrbId, ActiveOrb.OrbId) ||
                     !AreOpposite(ActiveOrb.Polarity, other.Polarity) ||
                     // 오행 v2: only one element's Yin + Yang combine. Off (no elements) = always the same.
-                    !OrbElements.SameElement(ActiveOrb.OrbId, other.OrbId)) continue;
+                    !OrbElements.SameElement(ActiveOrb, other)) continue;
                 float squared = (candidate.ScreenPosition - rawPosition).sqrMagnitude;
                 float normalizedDistance = Mathf.Sqrt(squared) / screenWidth;
                 if (normalizedDistance > tuning.DropDistanceFraction &&

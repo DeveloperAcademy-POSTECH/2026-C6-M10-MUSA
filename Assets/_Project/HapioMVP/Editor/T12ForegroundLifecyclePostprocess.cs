@@ -17,9 +17,6 @@ namespace C6.Editor
     public sealed class T12ForegroundLifecyclePostprocess : IPreprocessBuildWithReport, IProcessSceneWithReport, IPostprocessBuildWithReport
     {
         public const string SupportedUnityVersion = "6000.5.7f1";
-        public const string IntegratedScene = "Assets/_Project/HapioMVP/Scenes/IntegratedDeviceBattle.unity";
-        public const string InterruptionScene = "Assets/_Project/HapioMVP/Scenes/InterruptionBattle.unity";
-        public const string PhysicsScene = "Assets/_Project/HapioMVP/Scenes/PhysicsBattle.unity";
         public const string Marker = "C6_T12_FOREGROUND_LIFECYCLE_V1";
         private static readonly Dictionary<string, HashSet<string>> BuildScenes = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         public int callbackOrder => 950;
@@ -71,7 +68,7 @@ namespace C6.Editor
         }
         public static bool Applies(BuildTarget target, string[] actualScenes) => target == BuildTarget.iOS && actualScenes != null
             && actualScenes.Length == 1 && IsSupportedScene(actualScenes[0]);
-        private static bool IsSupportedScene(string scene) => scene == IntegratedScene || scene == InterruptionScene || scene == PhysicsScene || scene == ThrowBattleBuild.ScenePath || scene == FivePlayerBattleBuild.ScenePath || scene == ContinuousTransferBuild.ScenePath;
+        private static bool IsSupportedScene(string scene) => scene == ContinuousTransferBuild.ScenePath;
         public static PatchedSources PatchSources(string unityVersion, string controller, string rendering)
         {
             if (unityVersion != SupportedUnityVersion) throw new InvalidOperationException("Unsupported Unity source version; do not patch an unknown installation.");
@@ -117,7 +114,7 @@ namespace C6.Editor
         private static Change[] ControllerChanges() => new[]
         {
             new Change("Controller-0", @"@implementation UnityAppController
-", @"// C6_T12_FOREGROUND_LIFECYCLE_V1: this export contains only IntegratedDeviceBattle.
+", @"// C6_T12_FOREGROUND_LIFECYCLE_V1: this export contains only the current battle scene.
 // The current Unity scene callback is authoritative even before UIApplication commits its state.
 static bool c6T12ActualBackground = false;
 extern ""C"" bool C6T12IsActualBackground(void)

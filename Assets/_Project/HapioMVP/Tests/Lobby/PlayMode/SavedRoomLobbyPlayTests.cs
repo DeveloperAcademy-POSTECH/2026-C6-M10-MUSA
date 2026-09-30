@@ -15,10 +15,10 @@ using Object = UnityEngine.Object;
 
 namespace C6.Prototype.Lobby.Tests
 {
-    /// <summary>Saved lobby scene and one real NGO Host. UI-only rows are explicit fixtures, never two-device discovery evidence.</summary>
+    /// <summary>Current saved game scene and one real NGO lobby Host. UI-only rows are explicit fixtures, never two-device discovery evidence.</summary>
     public sealed class SavedRoomLobbyPlayTests
     {
-        private const string ScenePath = "Assets/_Project/HapioMVP/Scenes/RoomLobby.unity";
+        private const string ScenePath = "Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity";
         private const string HostPort = "25241";
         private const string EmptyLoopbackPort = "25242";
         private T10LobbyController controller;
@@ -43,6 +43,8 @@ namespace C6.Prototype.Lobby.Tests
             Assert.That(Session.HostConfig, Is.Null);
             Assert.That(Session.Discovery.IsBrowsing || Session.Discovery.IsAdvertising, Is.False);
             Assert.That(Managers(), Is.Empty);
+            Assert.That(Session.MaximumParticipants, Is.EqualTo(5));
+            Assert.That(Session.ElementSelectionEnabled, Is.True);
             Canvas.ForceUpdateCanvases();
         }
 
@@ -57,7 +59,7 @@ namespace C6.Prototype.Lobby.Tests
                 Scene loaded = SceneManager.GetSceneByPath(ScenePath);
                 if (loaded.isLoaded)
                 {
-                    Scene cleanup = SceneManager.CreateScene("Room Lobby Test Cleanup");
+                    Scene cleanup = SceneManager.CreateScene("Current Lobby Test Cleanup");
                     SceneManager.SetActiveScene(cleanup);
                     yield return SceneManager.UnloadSceneAsync(loaded);
                 }
@@ -91,7 +93,9 @@ namespace C6.Prototype.Lobby.Tests
             Assert.That(safe.xMax, Is.EqualTo(Screen.safeArea.xMax).Within(1f));
             Assert.That(safe.yMax, Is.EqualTo(Screen.safeArea.yMax).Within(1f));
             Assert.That(Object.FindObjectsByType<MonoBehaviour>()
-                .Any(item => item != null && (item.GetType().Name == "T09BattleController" || item.GetType().Name == "BattleSession")), Is.False);
+                .Any(item => item != null && item.GetType().Name == "T09BattleController"), Is.True,
+                "The current lobby belongs to the same saved scene as combat.");
+            Assert.That(Hud.SelectionStatusLabel.text, Does.Contain("NOT SELECTED"));
             yield return null;
         }
 
@@ -137,11 +141,17 @@ namespace C6.Prototype.Lobby.Tests
                 Assert.That(Hud.CancelConnectionButton.gameObject.activeInHierarchy, Is.True);
 
                 var unacknowledged = JsonUtility.FromJson<LobbySnapshot>(JsonUtility.ToJson(snapshot));
+                // The current five-player protocol reads its canonical players[] roster.
+                // p1 is a wire-validated compatibility mirror, so the display fixture must
+                // represent the same missing acknowledgement in both copies.
                 unacknowledged.p1.initialStateReceived = false;
+                unacknowledged.players[0].initialStateReceived = false;
+                Assert.That(unacknowledged.Find(Session.Connection.LocalClientId.Value).initialStateReceived, Is.False);
                 snapshotField.SetValue(Session, unacknowledged);
                 configField.SetValue(Session, hostConfig);
                 controller.RefreshView();
-                Assert.That(Session.InitialStateReady || Session.CanReady, Is.False);
+                Assert.That(Session.InitialStateReady, Is.False);
+                Assert.That(Session.CanReady, Is.False);
                 Assert.That(Hud.PhaseLabel.text, Is.EqualTo("CHECKING ROOM"));
                 Assert.That(Hud.StatusLabel.text, Does.Contain("Confirming room settings"));
                 Assert.That(Hud.ReadyButton.gameObject.activeInHierarchy, Is.False);
@@ -154,16 +164,18 @@ namespace C6.Prototype.Lobby.Tests
             }
             Assert.That(Session.InitialStateReady, Is.True);
             Assert.That(Hud.PhaseLabel.text, Is.EqualTo("LOBBY"));
-            Assert.That(Hud.ReadyButton.gameObject.activeInHierarchy && Hud.ReadyButton.interactable, Is.True);
+            Assert.That(Hud.ElementButtons.Values.All(button => button.interactable), Is.True);
+            Assert.That(Hud.ReadyButton.interactable, Is.False,
+                "An acknowledged room still requires an element choice before Ready.");
             yield return null;
         }
 
         [UnityTest]
-        public IEnumerator P3OptInHostShowsFiveSeatRosterAndStillCannotStartAlone()
+        public IEnumerator CurrentElementLobbyHostShowsFiveSeatRosterAndStillCannotStartAlone()
         {
-            Session.ConfigureCapacity(5); Session.ConfigureBuild("23");
             yield return CreateHost();
-            Assert.That(Session.ProtocolVersion, Is.EqualTo(23));
+            Assert.That(Session.ProtocolVersion, Is.EqualTo(LobbyProtocol.ElementSelectionVersion));
+            Assert.That(Session.ContinuousTransfersEnabled && Session.ElementSelectionEnabled, Is.True);
             Assert.That(Session.Connection.MaximumParticipants, Is.EqualTo(5));
             Assert.That(Session.Snapshot.Capacity, Is.EqualTo(5));
             Assert.That(Session.Snapshot.OrderedPlayers, Has.Length.EqualTo(1));
@@ -294,23 +306,27 @@ namespace C6.Prototype.Lobby.Tests
             Assert.That(Session.LocalPlayer.playerNumber, Is.EqualTo(1));
             Assert.That(Session.HostConfig, Is.Not.Null);
             Assert.That(LobbyWire.ValidSnapshot(Session.Snapshot), Is.True);
-            Assert.That(Session.CanReady, Is.True);
+            Assert.That(Session.CanReady, Is.False,
+                "The current five-element lobby starts without an approved selection.");
             Assert.That(Session.CanStart || Session.StartMatch(), Is.False);
             Assert.That(Hud.LocalPlayerLabel.text, Does.Contain("P1"));
             Assert.That(Hud.LeftPlayerLabel.text, Does.Contain("—"));
             Assert.That(Hud.RightPlayerLabel.text, Does.Contain("—"));
-            Assert.That(Hud.ParticipantsLabel.text, Does.Contain("1 / 2"));
-            Assert.That(Hud.ReadyButton.interactable, Is.True);
+            Assert.That(Hud.ParticipantsLabel.text, Does.Contain("1 / 5"));
+            Assert.That(Hud.ReadyButton.interactable, Is.False);
+            Assert.That(Hud.ElementButtons.Count, Is.EqualTo(5));
             Assert.That(Hud.StartButton.interactable, Is.False);
             Assert.That(Session.Snapshot.roundId, Is.Zero);
             Assert.That(Session.Snapshot.start, Is.Null);
-            Debug.Log("C6_T10A_PLAYMODE actualNgoHost=true participants=1 initialConfigConfirmed=true hostP1=true startBlocked=true physicalDevice=false discoveryVerification=false");
+            Debug.Log("C6_LOBBY_CURRENT_SCENE actualNgoHost=true participants=1 capacity=5 selected=None readyBlocked=true startBlocked=true physicalDevice=false discoveryVerification=false");
         }
 
         [UnityTest]
         public IEnumerator ReadyAndUnreadyAreHostConfirmedWithoutStartingARound()
         {
             yield return CreateHost();
+            Assert.That(Session.SelectElement(OrbElement.Fire), Is.True);
+            Assert.That(Session.LocalPlayer.selectedElement, Is.EqualTo(OrbElement.Fire));
             ulong initial = Session.Snapshot.revision;
             Hud.ReadyButton.onClick.Invoke();
             yield return WaitFor(() => Session.LocalReady && !Session.HasPending, 2, "Ready was not confirmed.");
@@ -329,6 +345,7 @@ namespace C6.Prototype.Lobby.Tests
         public IEnumerator RejectedStartAtTheSameRevisionReleasesPendingAndAllowsTheNextAction()
         {
             yield return CreateHost();
+            Assert.That(Session.SelectElement(OrbElement.Fire), Is.True);
             Assert.That(Session.ToggleReady(), Is.True);
             yield return WaitFor(() => Session.LocalReady && !Session.HasPending, 2, "Host Ready did not finish.");
             ulong revision = Session.Snapshot.revision;
@@ -338,20 +355,21 @@ namespace C6.Prototype.Lobby.Tests
             yield return WaitFor(() => Session.LastReply != null && Session.LastReply.requestId != previousRequest && !Session.HasPending,
                 2, "A same-revision rejection did not resolve its request receipt and left Ready locked.");
             Assert.That(Session.LastReply.accepted, Is.False);
-            Assert.That(Session.LastReply.reason, Is.EqualTo("BOTH_READY_REQUIRED"));
+            Assert.That(Session.LastReply.reason, Is.EqualTo("ALL_READY_REQUIRED"));
             Assert.That(Session.Snapshot.revision, Is.EqualTo(revision));
             Assert.That(Session.Snapshot.phase, Is.EqualTo(LobbyProtocol.Lobby));
             Assert.That(Hud.ErrorLabel.gameObject.activeSelf, Is.True);
-            Assert.That(Hud.ErrorLabel.text, Does.Contain("Both players"));
+            Assert.That(Hud.ErrorLabel.text, Does.Contain("All connected players"));
             Assert.That(Session.ToggleReady(), Is.True);
             yield return WaitFor(() => !Session.LocalReady && !Session.HasPending, 2, "A resolved rejection left later actions blocked.");
-            Debug.Log("C6_T10A_PLAYMODE validationRequest=Start participants=1 reason=BOTH_READY_REQUIRED sameRevisionReceiptResolved=true nextReadyActionConfirmed=true physicalDevice=false");
+            Debug.Log("C6_LOBBY_CURRENT_SCENE validationRequest=Start participants=1 reason=ALL_READY_REQUIRED sameRevisionReceiptResolved=true nextReadyActionConfirmed=true physicalDevice=false");
         }
 
         [UnityTest]
         public IEnumerator LeaveAndCreateAgainUseNewIdentityAndClearReadyAndStartState()
         {
             yield return CreateHost();
+            Assert.That(Session.SelectElement(OrbElement.Fire), Is.True);
             Assert.That(Session.ToggleReady(), Is.True);
             yield return WaitFor(() => Session.LocalReady && !Session.HasPending, 2, "Ready did not finish before Leave.");
             string oldRoom = Session.Snapshot.roomId;
@@ -366,6 +384,8 @@ namespace C6.Prototype.Lobby.Tests
             Assert.That(Session.Snapshot.roomId, Is.Not.EqualTo(oldRoom));
             Assert.That(Session.Snapshot.sessionId, Is.Not.EqualTo(oldSession));
             Assert.That(Session.LocalReady || Session.CanStart || Session.HasPending, Is.False);
+            Assert.That(Session.LocalPlayer.selectedElement, Is.EqualTo(OrbElement.None));
+            Assert.That(Session.CanReady, Is.False);
             Assert.That(Session.Snapshot.p2, Is.Null);
             Assert.That(Session.Snapshot.roundId, Is.Zero);
             Assert.That(Session.Snapshot.start, Is.Null);
@@ -379,8 +399,8 @@ namespace C6.Prototype.Lobby.Tests
             controller.enabled = false;
             Hud.SetRooms(new[]
             {
-                new LobbyRoomRow { Id = "display-available", Title = "Nearby friend", Address = "192.168.1.2:7777", Status = "1 / 2 players · Available", CanJoin = true },
-                new LobbyRoomRow { Id = "display-full", Title = "A full room", Address = "192.168.1.3:7777", Status = "2 / 2 players · Room full", CanJoin = false },
+                new LobbyRoomRow { Id = "display-available", Title = "Nearby friend", Address = "192.168.1.2:7777", Status = "1 / 5 players · Available", CanJoin = true },
+                new LobbyRoomRow { Id = "display-full", Title = "A full room", Address = "192.168.1.3:7777", Status = "5 / 5 players · Room full", CanJoin = false },
                 new LobbyRoomRow { Id = "display-version", Title = "An older room", Address = "192.168.1.4:7777", Status = "Different app version", CanJoin = false }
             });
             Hud.SetDirectExpanded(true);
@@ -485,6 +505,7 @@ namespace C6.Prototype.Lobby.Tests
             yield return null;
             Hud.CreateRoomButton.onClick.Invoke();
             yield return WaitFor(() => Session.IsHost && Session.Snapshot != null, 5, "Reenabled UI did not create a Host.");
+            Assert.That(Session.SelectElement(OrbElement.Fire), Is.True);
             ulong revision = Session.Snapshot.revision;
             Hud.ReadyButton.onClick.Invoke();
             yield return WaitFor(() => !Session.HasPending, 2, "Ready receipt remained pending.");
@@ -543,6 +564,7 @@ namespace C6.Prototype.Lobby.Tests
         {
             yield return CreateHost();
             string oldRoom = Session.Snapshot.roomId;
+            Assert.That(Session.SelectElement(OrbElement.Fire), Is.True);
             Assert.That(Session.ToggleReady(), Is.True);
             yield return WaitFor(() => Session.LocalReady && !Session.HasPending, 2, "Ready did not finish before the simulated pause.");
             Session.SendMessage("OnApplicationPause", true, SendMessageOptions.RequireReceiver);

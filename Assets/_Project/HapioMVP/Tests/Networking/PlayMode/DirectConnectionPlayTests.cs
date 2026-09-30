@@ -1,120 +1,89 @@
 using System;
 using System.Collections;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
-using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
 namespace C6.Prototype.Networking.Tests
 {
+    /// <summary>
+    /// Transport lifecycle checks in the current saved game scene. The room UI and its
+    /// approval/initial-state path are covered by SavedRoomLobbyPlayTests instead.
+    /// One Editor process owns one DirectConnectionSession, so an unanswered loopback
+    /// join is not evidence of a second connected device.
+    /// </summary>
     public sealed class DirectConnectionPlayTests
     {
-        private const string ScenePath = "Assets/_Project/HapioMVP/Scenes/DirectConnectionSmoke.unity";
-        private const string TestPort = "24992";
-        private const string UnusedPeerPort = "24993";
-        private DirectConnectionView view;
+        private const string ScenePath = "Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity";
+        private const string HostPort = "24992";
+        private const string UnusedLoopbackPort = "24993";
         private DirectConnectionSession session;
+        private bool previousRunInBackground;
 
         [UnitySetUp]
-        public IEnumerator LoadSavedConnectionScene()
+        public IEnumerator LoadCurrentGameSceneWithTransportIsolated()
         {
+            previousRunInBackground = Application.runInBackground;
+            Application.runInBackground = true;
             yield return LoadScene();
             yield return null;
-            FindView();
-            Canvas.ForceUpdateCanvases();
+            yield return null;
+            IsolateTransport();
             Assert.That(session.State, Is.EqualTo(DirectConnectionState.Idle));
             Assert.That(session.CanStart, Is.True);
+            Assert.That(Managers(), Is.Empty, "Opening the current scene must not start NGO implicitly.");
         }
 
         [UnityTearDown]
-        public IEnumerator StopAndUnloadConnectionScene()
+        public IEnumerator StopAndUnloadCurrentGameScene()
         {
-            foreach (var existing in Object.FindObjectsByType<DirectConnectionSession>())
-                existing.Stop();
-            yield return WaitFor(
-                () => Object.FindObjectsByType<NetworkManager>()
-                    .All(manager => !manager.IsListening && !manager.ShutdownInProgress),
-                5f, "Network shutdown did not finish during cleanup.");
-
-            var loaded = SceneManager.GetSceneByPath(ScenePath);
-            if (loaded.isLoaded)
+            try
             {
-                var empty = SceneManager.CreateScene("T02 Test Cleanup");
-                SceneManager.SetActiveScene(empty);
-                yield return SceneManager.UnloadSceneAsync(loaded);
+                if (session != null) session.Stop();
+                yield return WaitFor(() => Managers().All(manager => !manager.IsListening && !manager.ShutdownInProgress),
+                    5f, "Network shutdown did not finish during cleanup.");
+
+                var loaded = SceneManager.GetSceneByPath(ScenePath);
+                if (loaded.isLoaded)
+                {
+                    var empty = SceneManager.CreateScene("Current Connection Test Cleanup");
+                    SceneManager.SetActiveScene(empty);
+                    yield return SceneManager.UnloadSceneAsync(loaded);
+                }
+                yield return null;
+                yield return null;
+                Assert.That(Object.FindObjectsByType<DirectConnectionSession>(), Is.Empty);
+                Assert.That(Managers(), Is.Empty, "The saved scene must remove its owned NetworkManager.");
             }
-            yield return null;
-            yield return null;
-            Assert.That(Object.FindObjectsByType<NetworkManager>(), Is.Empty,
-                "The T02 scene must remove its owned NetworkManager.");
+            finally { Application.runInBackground = previousRunInBackground; }
         }
 
         [UnityTest]
-        public IEnumerator SavedSceneHasOneInputLoopAndReachableConnectionControls()
+        public IEnumerator InvalidDirectAddressDoesNotAllocateTransportAndHostCanStartAfterward()
         {
-            AssertSingleView();
-            Assert.That(Object.FindObjectsByType<NetworkManager>(), Is.Empty,
-                "Opening the screen must not start a network session.");
-            Assert.That(view.BuildLabel.text, Does.Contain("C6-T02"));
-            Assert.That(view.SafeArea.GetComponent<UISafeArea>(), Is.Not.Null);
-            Assert.That(view.Scroll.vertical, Is.True);
-            Assert.That(view.Scroll.horizontal, Is.False);
-            Assert.That(view.PortInput.text, Is.EqualTo(DirectConnectionSession.DefaultPort.ToString()));
-            Assert.That(view.AddressInput.keyboardType,
-                Is.EqualTo(TouchScreenKeyboardType.NumbersAndPunctuation));
-            Assert.That(view.HostButton.interactable && view.JoinButton.interactable, Is.True);
-            Assert.That(view.StopButton.interactable, Is.False);
-            Assert.That(view.ParticipantsLabel.text, Does.Contain("0 / 2"));
-
-            var pointer = new PointerEventData(EventSystem.current)
-            {
-                button = PointerEventData.InputButton.Left,
-                position = RectTransformUtility.WorldToScreenPoint(null,
-                    view.JoinButton.transform.position)
-            };
-            var hits = new System.Collections.Generic.List<RaycastResult>();
-            EventSystem.current.RaycastAll(pointer, hits);
-            Assert.That(hits, Is.Not.Empty);
-            Assert.That(hits[0].gameObject, Is.SameAs(view.JoinButton.gameObject),
-                "The scroll viewport and decorative text must not intercept the Join button.");
-            yield return null;
-        }
-
-        [UnityTest]
-        public IEnumerator InvalidAddressShowsFailureAndAllowsManualHostRetry()
-        {
-            view.AddressInput.text = "not-an-address";
-            view.PortInput.text = TestPort;
-            Click(view.JoinButton);
-            yield return null;
-
+            Assert.That(session.Join("not-an-address", HostPort), Is.False);
             Assert.That(session.State, Is.EqualTo(DirectConnectionState.Failed));
-            Assert.That(view.StateLabel.text, Does.Contain("Failed"));
-            Assert.That(view.MessageLabel.text, Does.Contain("IPv4"));
-            Assert.That(view.GuidanceLabel.text, Does.Contain("Wi-Fi"));
-            Assert.That(view.GuidanceLabel.text, Does.Contain("router"));
-            Assert.That(view.GuidanceLabel.text, Does.Contain("permission"));
-            Assert.That(session.CanStart && view.HostButton.interactable && view.JoinButton.interactable,
-                Is.True);
-            Assert.That(Object.FindObjectsByType<NetworkManager>(), Is.Empty,
-                "Invalid input must be rejected before opening a transport.");
+            Assert.That(session.FailureStage, Is.EqualTo("INPUT"));
+            Assert.That(session.FailureCode, Is.EqualTo("INVALID_ADDRESS"));
+            Assert.That(Managers(), Is.Empty, "Invalid input must fail before creating NGO transport.");
+            Assert.That(session.CanStart, Is.True);
 
-            Click(view.HostButton);
+            Assert.That(session.StartHost(HostPort), Is.True);
             yield return WaitFor(() => session.State == DirectConnectionState.Connected,
-                5f, "The valid manual retry did not start a host.");
-            Assert.That(view.StateLabel.text, Does.Contain("Connected"));
-            Assert.That(view.RoleLabel.text, Does.Contain("Host"));
+                5f, "A valid host retry did not connect.");
+            Assert.That(session.Role, Is.EqualTo("Host"));
+            Assert.That(session.LocalClientId, Is.EqualTo(NetworkManager.ServerClientId));
             Assert.That(session.ParticipantIds, Is.EquivalentTo(new[] { NetworkManager.ServerClientId }));
+            Assert.That(Managers(), Has.Length.EqualTo(1));
         }
 
         [UnityTest]
-        public IEnumerator ConnectingBlocksDuplicateInputAndCancelReturnsToIdle()
+        public IEnumerator UnansweredLoopbackJoinRejectsDuplicateStartAndCanBeCancelled()
         {
             int connectingNotifications = 0;
             Action changed = () =>
@@ -125,39 +94,29 @@ namespace C6.Prototype.Networking.Tests
             session.Changed += changed;
             try
             {
-                view.AddressInput.text = "127.0.0.1";
-                view.PortInput.text = UnusedPeerPort;
-                Click(view.JoinButton);
+                Assert.That(session.Join("127.0.0.1", UnusedLoopbackPort), Is.True);
                 Assert.That(session.State, Is.EqualTo(DirectConnectionState.Connecting));
-                Assert.That(view.HostButton.interactable || view.JoinButton.interactable, Is.False);
-                Assert.That(view.AddressInput.interactable || view.PortInput.interactable, Is.False);
-                Assert.That(view.StopButton.interactable, Is.True);
-                Assert.That(view.StopButtonLabel.text, Is.EqualTo("Cancel"));
-
-                Click(view.JoinButton);
-                Click(view.HostButton);
-                Assert.That(session.Join("127.0.0.1", UnusedPeerPort), Is.False,
-                    "The session must also reject a repeated start independently of the UI.");
-                yield return null;
+                Assert.That(session.JoinInProgress, Is.True);
+                Assert.That(session.CanStart, Is.False);
+                Assert.That(session.Join("127.0.0.1", UnusedLoopbackPort), Is.False);
+                Assert.That(session.StartHost(HostPort), Is.False);
                 Assert.That(connectingNotifications, Is.EqualTo(1));
-                Assert.That(Object.FindObjectsByType<NetworkManager>(), Has.Length.EqualTo(1));
+                Assert.That(Managers(), Has.Length.EqualTo(1));
 
-                Click(view.StopButton);
+                session.Stop();
                 yield return WaitFor(() => session.State == DirectConnectionState.Idle,
-                    5f, "Cancel did not finish shutting down the pending connection.");
-                Assert.That(session.CanStart && view.JoinButton.interactable, Is.True);
+                    5f, "Cancelling an unanswered loopback join did not return to Idle.");
+                Assert.That(session.CanStart, Is.True);
+                Assert.That(session.JoinInProgress, Is.False);
                 Assert.That(session.LocalClientId, Is.Null);
                 Assert.That(session.ParticipantIds, Is.Empty);
-                Assert.That(view.RoleLabel.text, Does.Contain("None"));
+                Assert.That(Managers().All(manager => !manager.IsListening && !manager.ShutdownInProgress), Is.True);
             }
-            finally
-            {
-                session.Changed -= changed;
-            }
+            finally { session.Changed -= changed; }
         }
 
         [UnityTest]
-        public IEnumerator TwoHostCyclesReuseOneManagerAndProduceOneConnectedNotificationEach()
+        public IEnumerator TwoHostCyclesReuseOneManagerAndPublishOneConnectionEach()
         {
             int connectedNotifications = 0;
             Action changed = () =>
@@ -171,77 +130,61 @@ namespace C6.Prototype.Networking.Tests
             {
                 for (int cycle = 0; cycle < 2; cycle++)
                 {
-                    // Re-enabling the view must restore its UI subscription cleanly.
-                    view.enabled = false;
-                    view.enabled = true;
-                    view.PortInput.text = TestPort;
-                    Click(view.HostButton);
+                    Assert.That(session.StartHost(HostPort), Is.True);
                     yield return WaitFor(() => session.State == DirectConnectionState.Connected,
                         5f, $"Host cycle {cycle + 1} failed to connect.");
-
-                    var managers = Object.FindObjectsByType<NetworkManager>();
+                    var managers = Managers();
                     Assert.That(managers, Has.Length.EqualTo(1));
                     if (firstManager == null) firstManager = managers[0];
                     else Assert.That(managers[0], Is.SameAs(firstManager));
-                    Assert.That(connectedNotifications, Is.EqualTo(cycle + 1),
-                        "Repeated subscriptions or callbacks must not duplicate a host connection notification.");
+                    Assert.That(connectedNotifications, Is.EqualTo(cycle + 1));
                     Assert.That(session.LocalClientId, Is.EqualTo(NetworkManager.ServerClientId));
-                    Assert.That(view.ParticipantsLabel.text, Does.Contain("1 / 2"));
-                    Assert.That(view.RoleLabel.text, Does.Contain("Host"));
-                    Assert.That(view.HostButton.interactable || view.JoinButton.interactable, Is.False);
+                    Assert.That(session.ParticipantIds, Has.Count.EqualTo(1));
 
-                    Click(view.StopButton);
+                    session.Stop();
                     yield return WaitFor(() => session.State == DirectConnectionState.Idle,
                         5f, $"Host cycle {cycle + 1} did not stop.");
                     Assert.That(firstManager.IsListening || firstManager.ShutdownInProgress, Is.False);
                     Assert.That(session.CanStart, Is.True);
-                    Assert.That(view.ParticipantsLabel.text, Does.Contain("0 / 2"));
-                    Assert.That(view.RoleLabel.text, Does.Contain("None"));
-                    AssertSingleView();
+                    Assert.That(session.ParticipantIds, Is.Empty);
                 }
             }
-            finally
-            {
-                session.Changed -= changed;
-            }
+            finally { session.Changed -= changed; }
         }
 
         [UnityTest]
-        public IEnumerator ReloadRemovesOwnedManagerAndAllowsAFreshSession()
+        public IEnumerator ReloadDestroysOwnedManagerAndAllowsAFreshHost()
         {
-            view.PortInput.text = TestPort;
-            Click(view.HostButton);
+            Assert.That(session.StartHost(HostPort), Is.True);
             yield return WaitFor(() => session.State == DirectConnectionState.Connected,
-                5f, "The host did not start before the reload check.");
-            var oldManager = Object.FindAnyObjectByType<NetworkManager>();
+                5f, "The first host did not connect before reload.");
+            var oldManager = session.OwnedManager;
             var oldSession = session;
 
             yield return LoadScene();
             yield return WaitFor(() => oldManager == null && oldSession == null,
                 5f, "Reload retained the previous session or its owned NetworkManager.");
             yield return null;
-            FindView();
-            AssertSingleView();
+            IsolateTransport();
             Assert.That(session.State, Is.EqualTo(DirectConnectionState.Idle));
             Assert.That(session.CanStart, Is.True);
-            Assert.That(Object.FindObjectsByType<NetworkManager>(), Is.Empty);
+            Assert.That(Managers(), Is.Empty);
 
-            view.PortInput.text = TestPort;
-            Click(view.HostButton);
+            Assert.That(session.StartHost(HostPort), Is.True);
             yield return WaitFor(() => session.State == DirectConnectionState.Connected,
-                5f, "The reloaded screen could not start a fresh host.");
-            Assert.That(Object.FindObjectsByType<NetworkManager>(), Has.Length.EqualTo(1));
-            Assert.That(view.ParticipantsLabel.text, Does.Contain("1 / 2"));
+                5f, "The reloaded current scene could not start a fresh host.");
+            Assert.That(Managers(), Has.Length.EqualTo(1));
+            Assert.That(session.ParticipantIds, Is.EquivalentTo(new[] { NetworkManager.ServerClientId }));
         }
 
         [UnityTest]
         public IEnumerator CandidateRetryKeepsPayloadAndIgnoresRetiredManagerCallbacks()
         {
-            // The deliberate dead first endpoint emits this single stock UTP diagnostic.
+            // The deliberately unused first endpoint emits this stock UTP diagnostic.
             LogAssert.Expect(LogType.Error, "Failed to connect to server.");
             var payload = new byte[] { 7, 12, 25, 41 };
             Assert.That(session.ConfigureConnection(DirectConnectionSession.ProtocolVersion, payload), Is.True);
-            Assert.That(session.JoinCandidates(new[] { "::1", "127.0.0.1" }, UnusedPeerPort), Is.True);
+            Assert.That(session.JoinCandidates(new[] { "::1", "127.0.0.1" }, UnusedLoopbackPort), Is.True);
             var retired = session.OwnedManager;
             var firstAttempt = session.AttemptId;
             payload[0] = 99;
@@ -252,14 +195,19 @@ namespace C6.Prototype.Networking.Tests
             Assert.That(session.OwnedManager, Is.Not.SameAs(retired));
             Assert.That(session.OwnedManager.NetworkConfig.ConnectionData, Is.EqualTo(new byte[] { 7, 12, 25, 41 }));
             var method = typeof(DirectConnectionSession).GetMethod("OnConnectionEvent",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.That(method, Is.Not.Null);
-            method.Invoke(session, new object[] { retired, new ConnectionEventData { EventType = ConnectionEvent.ClientConnected, ClientId = 999 } });
+            method.Invoke(session, new object[]
+            {
+                retired,
+                new ConnectionEventData { EventType = ConnectionEvent.ClientConnected, ClientId = 999 }
+            });
             Assert.That(session.State, Is.EqualTo(DirectConnectionState.Connecting));
             Assert.That(session.LocalClientId, Is.Null);
             Assert.That(session.ParticipantIds, Is.Empty);
             session.Stop();
-            yield return WaitFor(() => session.State == DirectConnectionState.Idle, 5, "Retry cancellation did not finish.");
+            yield return WaitFor(() => session.State == DirectConnectionState.Idle,
+                5f, "Retry cancellation did not finish.");
             Assert.That(session.OwnedManager, Is.Null);
         }
 
@@ -268,56 +216,49 @@ namespace C6.Prototype.Networking.Tests
         {
             LogAssert.Expect(LogType.Error, "Failed to connect to server.");
             bool cancelled = false;
-            Action onChanged = () => {
+            Action onChanged = () =>
+            {
                 if (!cancelled && session.State == DirectConnectionState.Stopping && session.JoinInProgress)
-                { cancelled = true; session.Stop(); }
+                {
+                    cancelled = true;
+                    session.Stop();
+                }
             };
             session.Changed += onChanged;
             try
             {
-                Assert.That(session.JoinCandidates(new[] { "::1", "127.0.0.1" }, UnusedPeerPort), Is.True);
+                Assert.That(session.JoinCandidates(new[] { "::1", "127.0.0.1" }, UnusedLoopbackPort), Is.True);
                 var firstAttempt = session.AttemptId;
                 yield return WaitFor(() => cancelled && session.State == DirectConnectionState.Idle,
-                    24, "Cancellation at the shutdown barrier did not return to Idle.");
+                    24f, "Cancellation at the shutdown barrier did not return to Idle.");
                 yield return null;
                 Assert.That(session.AttemptId, Is.EqualTo(firstAttempt));
                 Assert.That(session.JoinInProgress, Is.False);
                 Assert.That(session.CanStart, Is.True);
                 Assert.That(session.OwnedManager, Is.Null);
-                Assert.That(session.StartHost(TestPort), Is.True);
-                yield return WaitFor(() => session.State == DirectConnectionState.Connected, 5, "Host restart after cancellation failed.");
+                Assert.That(session.StartHost(HostPort), Is.True);
+                yield return WaitFor(() => session.State == DirectConnectionState.Connected,
+                    5f, "Host restart after cancellation failed.");
                 Assert.That(session.ParticipantIds, Has.Count.EqualTo(1));
             }
             finally { session.Changed -= onChanged; }
         }
 
-        private void FindView()
+        private void IsolateTransport()
         {
-            view = Object.FindAnyObjectByType<DirectConnectionView>();
             session = Object.FindAnyObjectByType<DirectConnectionSession>();
-            Assert.That(view, Is.Not.Null, "The saved scene must contain the T02 view.");
-            Assert.That(session, Is.Not.Null, "The saved scene must contain the T02 session.");
-            Assert.That(view.Session, Is.SameAs(session));
-        }
-
-        private void AssertSingleView()
-        {
-            Assert.That(Object.FindObjectsByType<DirectConnectionView>(), Has.Length.EqualTo(1));
+            Assert.That(session, Is.Not.Null, "The current saved game scene needs one DirectConnectionSession.");
             Assert.That(Object.FindObjectsByType<DirectConnectionSession>(), Has.Length.EqualTo(1));
-            Assert.That(Object.FindObjectsByType<Canvas>(), Has.Length.EqualTo(1));
-            Assert.That(Object.FindObjectsByType<EventSystem>(), Has.Length.EqualTo(1));
-            Assert.That(Object.FindObjectsByType<InputSystemUIInputModule>(), Has.Length.EqualTo(1));
-            Assert.That(EventSystem.current.currentInputModule, Is.TypeOf<InputSystemUIInputModule>());
+            // The same root also owns the live lobby. Stop only its Update loop while
+            // exercising the transport directly; its full UI path has separate tests.
+            var lobby = session.GetComponents<MonoBehaviour>()
+                .SingleOrDefault(component => component != null &&
+                    component.GetType().FullName == "C6.Prototype.Lobby.T10LobbySession");
+            Assert.That(lobby, Is.Not.Null, "The tested transport must belong to the current lobby scene.");
+            lobby.enabled = false;
         }
 
-        private static void Click(Button button)
-        {
-            var pointer = new PointerEventData(EventSystem.current)
-            {
-                button = PointerEventData.InputButton.Left
-            };
-            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerClickHandler);
-        }
+        private static NetworkManager[] Managers() => Object.FindObjectsByType<NetworkManager>();
 
         private static AsyncOperation LoadScene()
         {
