@@ -1,6 +1,6 @@
 # #56 로비 속성 선택·랜덤 자리·속성별 공격 구현 기록
 
-작성일: 2026-09-29, 후속 수정일: 2026-09-30. 브랜치: `feat/#56-lobby-element-selection`. 기준 HEAD: `991339eeeedf18e2baa1fb859f857a1c8859ba2a` **위의 미커밋 작업 파일**. 최초 사용자 승인: r02의 8개 규칙 + 선택 해제 버튼. 2026-09-30 후속 지시가 Raw 생성 규칙을 변경했다. 계획: [LOBBY_ELEMENT_SELECTION_PLAN.md](LOBBY_ELEMENT_SELECTION_PLAN.md).
+작성일: 2026-09-29, 후속 수정일: 2026-09-30. 브랜치: `feat/#56-lobby-element-selection`. 최초 구현 당시의 기준 HEAD는 `991339eeeedf18e2baa1fb859f857a1c8859ba2a`였고, 그때는 미커밋 작업이었다. 이후 기능 커밋 `7511ef52`와 `main` 병합 커밋 `f914a25b`까지 반영했다. 최초 사용자 승인: r02의 8개 규칙 + 선택 해제 버튼. 2026-09-30 후속 지시가 Raw 생성 규칙을 변경했다. 계획: [LOBBY_ELEMENT_SELECTION_PLAN.md](LOBBY_ELEMENT_SELECTION_PLAN.md). 병합 후 검증 결과는 [별도 기록](validation/ELEMENT_SELECTION_MAIN_MERGE_20260930.json)을 따른다.
 
 ## 현재 사용 흐름
 
@@ -106,3 +106,7 @@ Unity에서 Main Scene을 열어 Play한다. 두 개 이상 같은 새 앱을 �
 2026-09-29: 사용자 승인한 8개 규칙과 선택 해제 구현. **당시 Raw는 자기 선택 속성만 생성했다.** 선택/자리 데이터를 통신 계약에 추가, 동일 속성 조합 유지, 현재 소유자의 공격 자격과 로컬 경고/복원, 같은 방 로비 복귀·새 roundId 재시작 연결. 게임 규칙 변경과 검증 도구 fixture를 위에서 구분했다.
 
 2026-09-30: 사용자 후속 지시로 Raw를 활성 참가자들의 승인 선택 집합에서 추첨하도록 수정. 실기기에서 발견한 새 방 재입장 오류의 과거 승인 상태 정리 경로를 추가. 두 수정은 최초 2026-09-29 자동 검사 결과 및 수정 전 iOS 결과와 구분한다.
+
+## 2026-09-30 main 병합 후 검증
+
+`main`의 요괴 방해 UI와 #56의 속성 경고·수동 Scene 배치를 함께 유지했다. 병합 후 Unity EditMode는 **1,695/1,695 PASS**, 전체 PlayMode는 **128/164 PASS·36 FAIL**이다. 병합 전 실패 목록과 비교하면 새로 실패한 테스트 이름은 없지만 전체 PlayMode를 PASS로 취급하지 않는다. 그 실행에 포함된 로비 PlayMode는 **18/18 PASS**다. 병합 후 Mac/iOS 앱 빌드와 실기기 플레이는 **NOT_RUN**이며, 앞 절의 iPhone 검증을 병합 후 결과로 승계하지 않는다. 수치와 실행 근거는 [병합 검증 기록](validation/ELEMENT_SELECTION_MAIN_MERGE_20260930.json)에 있다.
