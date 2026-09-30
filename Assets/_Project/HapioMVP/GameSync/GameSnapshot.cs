@@ -3,6 +3,7 @@ using C6.Prototype.Attack;
 using C6.Prototype.Resources;
 using C6.Prototype.Battle;
 using C6.Prototype.Lobby;
+using C6.Prototype.Presentation;
 
 namespace C6.Prototype.GameSync
 {
@@ -22,6 +23,8 @@ namespace C6.Prototype.GameSync
         public LobbyPlayer[] players;
         // P4 is a trusted scene capability, negotiated independently from P3.
         public bool continuousTransfers;
+        public bool elementSelection;
+        public ulong[] roundSeatOrder = Array.Empty<ulong>();
         public LobbyPlayer[] OrderedPlayers => players != null && players.Length > 0 ? players : new[] { p1, p2 };
         public bool initialStateConfirmed;
         public double hostNow;
@@ -49,6 +52,9 @@ namespace C6.Prototype.GameSync
         // Trusted scene capability. A packet cannot enable transfer support on an older scene.
         public bool allowTransfers;
         public bool continuousTransfers;
+        public bool elementSelection;
+        public OrbElement[] selectedElements;
+        public ulong[] initialSeatOrder;
         public float transferMaximumSpeed;
         public float transferEdgeInset;
     }

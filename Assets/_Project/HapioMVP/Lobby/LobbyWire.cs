@@ -2,6 +2,7 @@ using System;
 using System.Security.Cryptography;
 using System.Text;
 using System.Linq;
+using C6.Prototype.Presentation;
 using UnityEngine;
 
 namespace C6.Prototype.Lobby
@@ -79,7 +80,8 @@ namespace C6.Prototype.Lobby
             && ValidId(request.roomId) && ValidId(request.sessionId) && ValidId(request.requestId)
             && request.sequence > 0 && request.revision > 0
             && (request.kind == LobbyProtocol.AckInitial || request.kind == LobbyProtocol.SetReady
-                || request.kind == LobbyProtocol.Start || request.kind == LobbyProtocol.Leave)
+                || request.kind == LobbyProtocol.Start || request.kind == LobbyProtocol.Leave
+                || request.kind == LobbyProtocol.SelectElement || request.kind == LobbyProtocol.ClearElement)
             && (request.kind == LobbyProtocol.Leave || ValidFingerprint(request.configFingerprint));
 
         public static bool ValidSnapshot(LobbySnapshot value)
@@ -98,8 +100,9 @@ namespace C6.Prototype.Lobby
                 || (value.p2 != null && (value.p2.clientId == LobbyProtocol.HostClientId || value.p2.playerNumber != 2
                     || !value.p2.connected || (value.p2.ready && !value.p2.initialStateReceived)))
                 || value.closeReason == null || value.closeReason.Length > 128) return false;
-            if (!ValidRoster(value)) return false;
-            bool bothReady = value.ParticipantCount >= 2 && value.OrderedPlayers.All(p => p.ready && p.initialStateReceived);
+            if (!ValidRoster(value) || !ValidSelections(value)) return false;
+            bool bothReady = value.ParticipantCount >= 2 && value.OrderedPlayers.All(p => p.ready && p.initialStateReceived
+                && (!LobbyProtocol.IsElementSelection(value.protocol) || LobbyProtocol.ValidElement(p.selectedElement)));
             if (value.canStart != (value.phase == LobbyProtocol.Lobby && bothReady)) return false;
             if (value.phase == LobbyProtocol.Lobby)
                 return value.roundId == 0 && value.start == null && value.closeReason.Length == 0;
@@ -111,14 +114,38 @@ namespace C6.Prototype.Lobby
             return false;
         }
 
-        private static bool ValidStart(LobbySnapshot value) => value.roundId == 1 && value.start != null
+        private static bool ValidStart(LobbySnapshot value) => (LobbyProtocol.IsElementSelection(value.protocol) ? value.roundId > 0 : value.roundId == 1) && value.start != null
             && value.start.roomId == value.roomId && value.start.sessionId == value.sessionId
             && value.start.roundId == value.roundId && value.start.seed == value.seed
             && value.start.configFingerprint == value.configFingerprint && value.start.hostConfigJson == value.hostConfigJson
-            && value.start.continuousTransfers == (value.protocol == LobbyProtocol.ContinuousTransferVersion)
+            && value.start.continuousTransfers == (value.protocol == LobbyProtocol.ContinuousTransferVersion || LobbyProtocol.IsElementSelection(value.protocol))
+            && value.start.elementSelection == LobbyProtocol.IsElementSelection(value.protocol)
             && (LobbyProtocol.IsMultiparty(value.protocol)
                 ? value.start.participantIds != null && value.start.participantIds.SequenceEqual(value.OrderedPlayers.Select(p => p.clientId))
-                : value.start.participantIds == null || value.start.participantIds.Length == 0);
+                : value.start.participantIds == null || value.start.participantIds.Length == 0)
+            && (LobbyProtocol.IsElementSelection(value.protocol)
+                ? value.start.selectedElements != null && value.start.selectedElements.SequenceEqual(value.OrderedPlayers.Select(p => p.selectedElement))
+                    && value.start.selectedElements.All(LobbyProtocol.ValidElement)
+                    && value.start.roundSeatOrder != null && value.start.roundSeatOrder.Length == value.start.participantIds.Length
+                    && value.start.roundSeatOrder.Distinct().Count() == value.start.participantIds.Length
+                    && value.start.roundSeatOrder.All(value.start.participantIds.Contains)
+                : (value.start.selectedElements == null || value.start.selectedElements.Length == 0)
+                    && (value.start.roundSeatOrder == null || value.start.roundSeatOrder.Length == 0));
+
+        private static bool ValidSelections(LobbySnapshot value)
+        {
+            var players = value.OrderedPlayers;
+            if (!LobbyProtocol.IsElementSelection(value.protocol))
+                return value.selectionRevision == 0 && players.All(p => p.selectedElement == OrbElement.None);
+            if (value.selectionRevision == 0 || value.selectionRevision > value.revision) return false;
+            var occupied = new System.Collections.Generic.HashSet<OrbElement>();
+            foreach (var player in players)
+            {
+                if (player.selectedElement == OrbElement.None) { if (player.ready) return false; }
+                else if (!LobbyProtocol.ValidElement(player.selectedElement) || !occupied.Add(player.selectedElement)) return false;
+            }
+            return true;
+        }
 
         private static bool ValidRoster(LobbySnapshot value)
         {
@@ -140,6 +167,37 @@ namespace C6.Prototype.Lobby
             && left.OrderedPlayers.Select(p => p.clientId).SequenceEqual(right.OrderedPlayers.Select(p => p.clientId));
         private static bool SamePlayers(LobbySnapshot left, LobbySnapshot right) => SameRoster(left, right)
             && left.OrderedPlayers.Zip(right.OrderedPlayers, SamePlayer).All(same => same);
+        public static bool SameSelections(LobbySnapshot left, LobbySnapshot right) => SameRoster(left, right)
+            && left.OrderedPlayers.Zip(right.OrderedPlayers, (a, b) => a.selectedElement == b.selectedElement).All(same => same);
+        private static bool SameStart(LobbyStartContract left, LobbyStartContract right)
+        {
+            if (left == null) return right == null;
+            return right != null && left.roomId == right.roomId && left.sessionId == right.sessionId && left.roundId == right.roundId
+                && left.seed == right.seed && left.configFingerprint == right.configFingerprint && left.hostConfigJson == right.hostConfigJson
+                && left.continuousTransfers == right.continuousTransfers && left.elementSelection == right.elementSelection
+                && (left.participantIds ?? Array.Empty<ulong>()).SequenceEqual(right.participantIds ?? Array.Empty<ulong>())
+                && (left.selectedElements ?? Array.Empty<OrbElement>()).SequenceEqual(right.selectedElements ?? Array.Empty<OrbElement>())
+                && (left.roundSeatOrder ?? Array.Empty<ulong>()).SequenceEqual(right.roundSeatOrder ?? Array.Empty<ulong>());
+        }
+
+        private static bool ValidSelectionTransition(LobbySnapshot current, LobbySnapshot incoming)
+        {
+            if (!LobbyProtocol.IsElementSelection(current.protocol)) return true;
+            if (incoming.selectionRevision < current.selectionRevision) return false;
+            if (current.phase == LobbyProtocol.Playing)
+            {
+                if (!SameSelections(current, incoming)) return false;
+                if (incoming.phase == LobbyProtocol.Lobby)
+                    return incoming.selectionRevision > current.selectionRevision && incoming.OrderedPlayers.All(p => !p.ready);
+                return incoming.selectionRevision == current.selectionRevision && SameStart(current.start, incoming.start);
+            }
+            if (incoming.selectionRevision == current.selectionRevision && !SameSelections(current, incoming)) return false;
+            // At the exact selection mutation revision every Ready flag must be reset. Later snapshots
+            // can legitimately include fresh Ready confirmations that followed that mutation.
+            if (incoming.selectionRevision > current.selectionRevision && incoming.selectionRevision == incoming.revision
+                && incoming.OrderedPlayers.Any(p => p.ready)) return false;
+            return true;
+        }
         private static bool ValidRosterTransition(LobbySnapshot current, LobbySnapshot incoming)
         {
             if (current.protocol != incoming.protocol) return false;
@@ -185,19 +243,23 @@ namespace C6.Prototype.Lobby
                 return AcceptsSnapshot(current, receipt, expectedBuild, expectedNonce, expectedRoomId);
             if (receipt.revision == current.revision)
                 return receipt.phase == current.phase && receipt.roundId == current.roundId
+                    && receipt.selectionRevision == current.selectionRevision && SameStart(receipt.start, current.start)
                     && receipt.canStart == current.canStart && receipt.closeReason == current.closeReason
                     && SamePlayers(receipt, current);
             // A historical receipt may resolve an intent, but may not claim impossible future state.
-            if (receipt.roundId > current.roundId
+            if (receipt.roundId > current.roundId || receipt.selectionRevision > current.selectionRevision
                 || receipt.phase == LobbyProtocol.Closed
                 || (receipt.phase == LobbyProtocol.Playing && current.phase == LobbyProtocol.Lobby)
+                || (receipt.phase == LobbyProtocol.Playing && current.phase == LobbyProtocol.Playing
+                    && receipt.roundId == current.roundId && !SameStart(receipt.start, current.start))
                 || !ValidRosterTransition(receipt, current)) return false;
             return true;
         }
 
         private static bool SamePlayer(LobbyPlayer left, LobbyPlayer right) => left == null ? right == null
             : right != null && left.clientId == right.clientId && left.playerNumber == right.playerNumber
-                && left.connected == right.connected && left.initialStateReceived == right.initialStateReceived && left.ready == right.ready;
+                && left.connected == right.connected && left.initialStateReceived == right.initialStateReceived && left.ready == right.ready
+                && left.selectedElement == right.selectedElement;
 
         public static bool AcceptsSnapshot(LobbySnapshot current, LobbySnapshot incoming, string expectedBuild,
             string expectedNonce, string expectedRoomId = "")
@@ -208,9 +270,10 @@ namespace C6.Prototype.Lobby
             if (incoming.roomId != current.roomId || incoming.sessionId != current.sessionId || incoming.revision <= current.revision
                 || incoming.build != current.build || incoming.seed != current.seed || incoming.hostConfigJson != current.hostConfigJson
                 || incoming.configFingerprint != current.configFingerprint || current.phase == LobbyProtocol.Closed
-                || !ValidRosterTransition(current, incoming)) return false;
-            if (current.phase == LobbyProtocol.Playing && incoming.phase != LobbyProtocol.Playing && incoming.phase != LobbyProtocol.Closed) return false;
-            if (current.roundId > incoming.roundId) return false;
+                || !ValidRosterTransition(current, incoming) || !ValidSelectionTransition(current, incoming)) return false;
+            bool returningToLobby = LobbyProtocol.IsElementSelection(current.protocol) && current.phase == LobbyProtocol.Playing && incoming.phase == LobbyProtocol.Lobby;
+            if (current.phase == LobbyProtocol.Playing && incoming.phase != LobbyProtocol.Playing && incoming.phase != LobbyProtocol.Closed && !returningToLobby) return false;
+            if (current.roundId > incoming.roundId && !returningToLobby) return false;
             return true;
         }
     }

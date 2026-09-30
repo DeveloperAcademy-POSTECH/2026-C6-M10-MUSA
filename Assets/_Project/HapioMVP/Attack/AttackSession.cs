@@ -13,11 +13,11 @@ namespace C6.Prototype.Attack
     [DisallowMultipleComponent, RequireComponent(typeof(DirectConnectionSession))]
     public sealed class AttackSession : MonoBehaviour
     {
-        private string HelloMessage => continuousTransfersEnabled ? "C6.CE24.Hello.v1" : releaseThrowsEnabled ? "C6.P2.Hello.v1" : "C6.T06.Hello.v1";
-        private string RequestMessage => continuousTransfersEnabled ? "C6.CE24.Transfer.v1" : releaseThrowsEnabled ? "C6.P2.Launch.v1" : "C6.T06.Launch.v1";
-        private string QueryMessage => continuousTransfersEnabled ? "C6.CE24.Query.v1" : releaseThrowsEnabled ? "C6.P2.Query.v1" : "C6.T06.Query.v1";
-        private string ReplyMessage => continuousTransfersEnabled ? "C6.CE24.Reply.v1" : releaseThrowsEnabled ? "C6.P2.Reply.v1" : "C6.T06.Reply.v1";
-        private string SnapshotMessage => continuousTransfersEnabled ? "C6.CE24.Snapshot.v1" : releaseThrowsEnabled ? "C6.P2.Snapshot.v1" : "C6.T06.Snapshot.v1";
+        private string HelloMessage => RequiresExplicitRawElements ? "C6.CE56.Hello.v1" : continuousTransfersEnabled ? "C6.CE24.Hello.v1" : releaseThrowsEnabled ? "C6.P2.Hello.v1" : "C6.T06.Hello.v1";
+        private string RequestMessage => RequiresExplicitRawElements ? "C6.CE56.Transfer.v1" : continuousTransfersEnabled ? "C6.CE24.Transfer.v1" : releaseThrowsEnabled ? "C6.P2.Launch.v1" : "C6.T06.Launch.v1";
+        private string QueryMessage => RequiresExplicitRawElements ? "C6.CE56.Query.v1" : continuousTransfersEnabled ? "C6.CE24.Query.v1" : releaseThrowsEnabled ? "C6.P2.Query.v1" : "C6.T06.Query.v1";
+        private string ReplyMessage => RequiresExplicitRawElements ? "C6.CE56.Reply.v1" : continuousTransfersEnabled ? "C6.CE24.Reply.v1" : releaseThrowsEnabled ? "C6.P2.Reply.v1" : "C6.T06.Reply.v1";
+        private string SnapshotMessage => RequiresExplicitRawElements ? "C6.CE56.Snapshot.v1" : continuousTransfersEnabled ? "C6.CE24.Snapshot.v1" : releaseThrowsEnabled ? "C6.P2.Snapshot.v1" : "C6.T06.Snapshot.v1";
         private const int MaximumRequestsPerRoundPerParticipant = 256;
         private readonly Dictionary<ulong, string> participantNonces = new Dictionary<ulong, string>();
         private readonly HashSet<ulong> fixtureOwners = new HashSet<ulong>();
@@ -60,9 +60,54 @@ namespace C6.Prototype.Attack
             continuousTransfersEnabled = enabled;
         }
         private ulong[] approvedRoster;
+        private ulong[] roundSeatOrder;
+        private Dictionary<ulong, OrbElement> selectedElements;
         public bool MultiplayerRosterEnabled => approvedRoster != null;
+        public bool RequiresExplicitRawElements => selectedElements != null;
         public int ParticipantCapacity => MultiplayerRosterEnabled ? ParticipantRing.MaximumPlayers : 2;
         public IReadOnlyList<ulong> OrderedParticipantIds => approvedRoster == null ? Array.Empty<ulong>() : Array.AsReadOnly(approvedRoster);
+        public IReadOnlyList<ulong> RoundSeatOrder => roundSeatOrder != null ? Array.AsReadOnly(roundSeatOrder) : OrderedParticipantIds;
+        public bool TryGetSelectedElement(ulong player, out OrbElement element)
+        {
+            element = OrbElement.None;
+            return selectedElements != null && selectedElements.TryGetValue(player, out element);
+        }
+        public void ConfigureSelectedElements(IReadOnlyDictionary<ulong, OrbElement> choices)
+        {
+            if (choices == null || choices.Count < 2 || choices.Count > ParticipantRing.MaximumPlayers)
+                throw new ArgumentException("Two to five approved element selections are required.", nameof(choices));
+            var copy = new Dictionary<ulong, OrbElement>();
+            var occupied = new HashSet<OrbElement>();
+            foreach (var choice in choices)
+            {
+                if (!OrbElements.IsValidRawElement(choice.Value) || !occupied.Add(choice.Value))
+                    throw new ArgumentException("Selections must be valid and unique.", nameof(choices));
+                copy.Add(choice.Key, choice.Value);
+            }
+            if (approvedRoster != null && !new HashSet<ulong>(copy.Keys).SetEquals(approvedRoster))
+                throw new ArgumentException("Every approved participant must have one selection.", nameof(choices));
+            // A retry can confirm the same immutable selection map, but may not replace it.
+            if (selectedElements != null && selectedElements.Count == copy.Count
+                && selectedElements.All(value => copy.TryGetValue(value.Key, out var choice) && choice == value.Value)) return;
+            if (explicitDevelopmentRequested || manager != null)
+                throw new InvalidOperationException("Change element selections after returning to the room lobby.");
+            selectedElements = copy;
+        }
+        public void ConfigureRoundSeats(IReadOnlyList<ulong> seats)
+        {
+            if (!MultiplayerRosterEnabled || !ParticipantRing.ValidateSeatOrder(seats, approvedRoster))
+                throw new ArgumentException("Round seats must match the approved roster.", nameof(seats));
+            if (roundSeatOrder != null && roundSeatOrder.SequenceEqual(seats)) return;
+            if (Connected && (canAct == null || canAct()))
+                throw new InvalidOperationException("Round seats are frozen during combat.");
+            if (Connected && Snapshot.state == AttackBattleState.Playing.ToString()
+                && (Snapshot.orbs.Length != 0 || Snapshot.projectiles.Length != 0))
+                throw new InvalidOperationException("Prepare empty round state before changing seats.");
+            var copy = new ulong[seats.Count];
+            for (int i = 0; i < seats.Count; i++) copy[i] = seats[i];
+            if (Authority != null && releaseThrowsEnabled) Authority.ConfigureRoundSeats(copy);
+            roundSeatOrder = copy;
+        }
         public void ConfigureRoster(ulong[] ids)
         {
             if (explicitDevelopmentRequested || manager != null) throw new InvalidOperationException("Configure the frozen roster before gameplay attaches.");
@@ -70,7 +115,10 @@ namespace C6.Prototype.Attack
                 throw new ArgumentException("A Host-first ordered roster of two to five unique participants is required.", nameof(ids));
             if (config != null && config.OrbStorageLimit > ParticipantRing.MaximumStoredPerPlayer)
                 throw new InvalidOperationException("Multiplayer storage cannot exceed the bounded per-player protocol capacity.");
+            if (selectedElements != null && !new HashSet<ulong>(selectedElements.Keys).SetEquals(ids))
+                throw new ArgumentException("Roster and approved element selections must match.", nameof(ids));
             approvedRoster = (ulong[])ids.Clone();
+            roundSeatOrder = (ulong[])ids.Clone();
             useT06Fixtures = false;
             maximumSnapshotOrbs = ParticipantRing.MaximumLiveOrbs;
             maximumSnapshotBytes = AttackWire.MaximumMultiplayerInventoryBytes;
@@ -111,10 +159,32 @@ namespace C6.Prototype.Attack
             RefreshBinding();
             return CanProcess;
         }
+        /// <summary>Detach approved gameplay while preserving the room's connected LAN transport.</summary>
+        public bool EndApprovedConnection()
+        {
+            if (!aggregateMode || !explicitDevelopmentRequested || !AttackWire.ValidId(approvedSessionId)
+                || IsHost && (canAct?.Invoke() ?? false)) return false;
+            // A client calls this only after the lobby service accepts its Host's room transition.
+            intentionalEnd = true;
+            explicitDevelopmentRequested = false;
+            ResetBinding(AttackBattleState.Ended, false);
+            Snapshot = null;
+            ClearApprovedRoomState();
+            Status = "Returned to the connected room lobby.";
+            Changed?.Invoke();
+            return true;
+        }
+        private void ClearApprovedRoomState()
+        {
+            approvedSessionId = null; approvedRoundId = 0;
+            approvedRoster = roundSeatOrder = null;
+            selectedElements = null;
+            localNonce = null;
+        }
         public bool ApplyAggregateSnapshot(AttackSnapshot incoming, bool notify = false)
         {
             if (!aggregateMode || !CanProcess || manager.IsHost || incoming == null || incoming.nonce != localNonce
-                || !AttackWire.ValidSnapshot(incoming, maximumSnapshotOrbs) || !ValidMotionMode(incoming) || incoming.sessionId != approvedSessionId
+                || !AttackWire.ValidSnapshot(incoming, maximumSnapshotOrbs, RequiresExplicitRawElements) || !ValidMotionMode(incoming) || incoming.sessionId != approvedSessionId
                 || incoming.roundId < approvedRoundId) return false;
             if (Snapshot != null)
             {
@@ -151,6 +221,11 @@ namespace C6.Prototype.Attack
             if (reply.pending || Snapshot == null || reply.inventoryRevision == 0
                 || Snapshot.revision < reply.inventoryRevision) return false;
             var orb = Snapshot.orbs.FirstOrDefault(value => value.id == reply.orbId);
+            // Owner, motion and authority state may legitimately advance before a late receipt.
+            // Kind, polarity and the explicit Raw element may never change for the same ID.
+            if (orb != null && reply.confirmedOrb != null
+                && (orb.kind != reply.confirmedOrb.kind || orb.polarity != reply.confirmedOrb.polarity
+                    || orb.rawElement != reply.confirmedOrb.rawElement)) return false;
             // Active records omit Consumed; a later authoritative inventory plus its accepted
             // receipt confirms removal without inventing another orb or reusing a local Idle view.
             OrbActionRequest request = null;
@@ -318,7 +393,11 @@ namespace C6.Prototype.Attack
             }
             explicitDevelopmentRequested = false;
             if (connection != null) connection.Stop();
-            ResetBinding(AttackBattleState.Ended, true);
+            // A full room exit must not carry the prior room's player IDs or choices into
+            // the next room. NGO can assign a different client ID after reconnection.
+            ResetBinding(AttackBattleState.Ended, false);
+            ClearApprovedRoomState();
+            Changed?.Invoke();
         }
 
         public void FailUnconfirmedRequest() => FailNetwork("Host confirmation did not arrive; the unresolved request was not replayed.");
@@ -418,9 +497,11 @@ namespace C6.Prototype.Attack
             if (manager.IsHost)
             {
                 Registry = new HostOrbRegistry(true);
+                if (RequiresExplicitRawElements) Registry.ConfigureExplicitRawElements();
                 Registry.BeginSession(aggregateMode ? approvedSessionId : Guid.NewGuid().ToString("N"), aggregateMode ? approvedRoundId : 1);
                 // #29: a frozen multiplayer roster picks the per-player HP; legacy 2-player mode keeps MonsterMaxHp.
                 Authority = new AttackAuthority(Registry, config.MonsterMaxHpFor(OrderedParticipantIds.Count), config.BaseDamage);
+                if (RequiresExplicitRawElements) Authority.ConfigureSelectedElements(selectedElements);
 
                 if (releaseThrowsEnabled)
                 {
@@ -432,7 +513,7 @@ namespace C6.Prototype.Attack
                     if (MultiplayerRosterEnabled)
                     {
                         Authority.ConfigureParticipantThrowFrames(
-                            approvedRoster
+                            roundSeatOrder ?? approvedRoster
                         );
                     }
                 }
@@ -528,7 +609,7 @@ namespace C6.Prototype.Attack
                 ulong receiver = sender;
                 bool readyPeer;
                 if (approvedRoster != null)
-                    readyPeer = ParticipantRing.TryNeighbour(approvedRoster, sender, request.Kind == OrbActionKind.TransferRight, out receiver)
+                    readyPeer = ParticipantRing.TryNeighbour(roundSeatOrder ?? approvedRoster, sender, request.Kind == OrbActionKind.TransferRight, out receiver)
                         && AuthenticatedPlayerIds.Contains(sender) && AuthenticatedPlayerIds.Contains(receiver) && IsParticipant(receiver);
                 else
                 {
@@ -687,7 +768,7 @@ namespace C6.Prototype.Attack
                 || reply.roundId != Snapshot.roundId || !AttackWire.ValidId(reply.requestId)
                 || !submitted.TryGetValue(reply.requestId, out var request) || reply.orbId != request.OrbId
                 || request.SessionId != reply.sessionId || request.RoundId != reply.roundId
-                || reply.confirmedOrb != null && (!AttackWire.ValidOrb(reply.confirmedOrb) || !ValidOrbMotionMode(reply.confirmedOrb)
+                || reply.confirmedOrb != null && (!AttackWire.ValidOrb(reply.confirmedOrb, RequiresExplicitRawElements) || !ValidOrbMotionMode(reply.confirmedOrb)
                     || reply.confirmedOrb.id != request.OrbId || reply.confirmedOrb.owner != LocalPlayerId
                         && !(transfersEnabled && reply.known && HostOrbRegistry.IsTransfer(request.Kind) && IsParticipant(reply.confirmedOrb.owner))))
             { Drop("REPLY_CONTEXT"); return; }
@@ -755,7 +836,7 @@ namespace C6.Prototype.Attack
         {
             if (aggregateMode || !CanProcess || manager.IsHost || sender != NetworkManager.ServerClientId
                 || !AttackWire.TryRead<AttackSnapshot>(reader, out var incoming, maximumSnapshotBytes) || incoming.nonce != localNonce
-                || !AttackWire.ValidSnapshot(incoming, maximumSnapshotOrbs) || !ValidMotionMode(incoming)) return;
+                || !AttackWire.ValidSnapshot(incoming, maximumSnapshotOrbs, RequiresExplicitRawElements) || !ValidMotionMode(incoming)) return;
             if (Snapshot != null && (incoming.sessionId != Snapshot.sessionId || incoming.roundId < Snapshot.roundId
                 || incoming.revision <= Snapshot.revision || incoming.totalHits < Snapshot.totalHits || incoming.resets < Snapshot.resets)) return;
             bool changedRound = Snapshot == null || incoming.roundId != Snapshot.roundId;

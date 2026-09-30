@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text;
 using C6.Prototype.Attack;
 using C6.Prototype.Orbs;
+using C6.Prototype.Presentation;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Netcode;
@@ -180,12 +181,12 @@ namespace C6.Prototype.Combination.Tests
         public void ProtocolVersionLengthTruncationMalformedUtf8AndOversizeAreRejected()
         {
             byte[] body = Encoding.UTF8.GetBytes("{\"sessionId\":\"session\"}");
-            AssertRejected(Frame(body, 2, body.Length));
-            AssertRejected(Frame(body, 1, body.Length + 1));
-            AssertRejected(Frame(body, 1, body.Length - 1));
+            AssertRejected(Frame(body, 1, body.Length));
+            AssertRejected(Frame(body, 2, body.Length + 1));
+            AssertRejected(Frame(body, 2, body.Length - 1));
             AssertRejected(new byte[] { 1, 0, 0 });
-            AssertRejected(Frame(new byte[] { 0xff }, 1, 1));
-            AssertRejected(Frame(new byte[CombinationWire.MaximumBytes], 1, CombinationWire.MaximumBytes));
+            AssertRejected(Frame(new byte[] { 0xff }, 2, 1));
+            AssertRejected(Frame(new byte[CombinationWire.MaximumBytes], 2, CombinationWire.MaximumBytes));
             Assert.Throws<ArgumentException>(() =>
             {
                 using (var ignored = CombinationWire.Write(new CombinationPacket { nonce = new string('x', CombinationWire.MaximumBytes) })) { }
@@ -228,6 +229,57 @@ namespace C6.Prototype.Combination.Tests
             reply.accepted = true; reply.inventoryRevision = 0;
             Assert.That(CombinationWire.InventoryConfirmed(reply, snapshot), Is.False);
             Assert.That(CombinationWire.ValidReply(reply), Is.False);
+        }
+
+        [Test]
+        public void StrictCombinationReceiptRequiresExplicitSameElementAndMatchingEncodedCombined()
+        {
+            var reply = Approved(Packet());
+            Assert.That(CombinationWire.ValidReply(reply), Is.True);
+            Assert.That(CombinationWire.ValidReply(reply, true), Is.False);
+            reply.currentSource.rawElement = reply.currentTarget.rawElement = OrbElement.Wood;
+            string id = OrbElements.NewCombinedId(OrbElement.Wood);
+            reply.originalCombined.id = reply.currentCombined.id = id;
+            Assert.That(CombinationWire.ValidReply(reply, true), Is.True);
+            using (var writer = CombinationWire.Write(reply))
+            using (var reader = new FastBufferReader(writer, Allocator.Temp))
+            {
+                Assert.That(CombinationWire.TryRead<CombinationReply>(reader, out var received), Is.True);
+                Assert.That(CombinationWire.ValidReply(received, true), Is.True);
+                Assert.That(received.currentSource.rawElement, Is.EqualTo(OrbElement.Wood));
+            }
+            reply.currentTarget.rawElement = OrbElement.Fire;
+            Assert.That(CombinationWire.ValidReply(reply, true), Is.False);
+            reply.currentTarget.rawElement = OrbElement.Wood;
+            reply.originalCombined.id = reply.currentCombined.id = OrbElements.NewCombinedId(OrbElement.Fire);
+            Assert.That(CombinationWire.ValidReply(reply, true), Is.False);
+            reply.currentSource.rawElement = (OrbElement)99;
+            Assert.That(CombinationWire.ValidReply(reply), Is.False);
+        }
+
+        [Test]
+        public void StrictCombinationInventoryCheckpointRejectsPresentElementMutationButAllowsConsumedAbsenceAndTransfer()
+        {
+            var reply = Approved(Packet());
+            reply.currentSource.rawElement = reply.currentTarget.rawElement = OrbElement.Wood;
+            reply.originalCombined.id = reply.currentCombined.id = OrbElements.NewCombinedId(OrbElement.Wood);
+            var source = OrbWire.FromRecord(reply.currentSource.ToRecord());
+            var combined = OrbWire.FromRecord(reply.currentCombined.ToRecord());
+            var snapshot = new AttackSnapshot { nonce = reply.nonce, sessionId = reply.sessionId, roundId = reply.roundId,
+                revision = reply.inventoryRevision, orbs = new[] { source, combined } };
+            Assert.That(CombinationWire.InventoryConfirmed(reply, snapshot, true), Is.True);
+            source.rawElement = OrbElement.Fire;
+            Assert.That(CombinationWire.InventoryConfirmed(reply, snapshot, true), Is.False);
+            source.rawElement = OrbElement.Wood;
+            combined.owner = 88; combined.sequence = 14; combined.transferCount = 2;
+            snapshot.orbs = new[] { combined }; snapshot.revision++;
+            Assert.That(CombinationWire.InventoryConfirmed(reply, snapshot, true), Is.True,
+                "Consumed materials are absent and a delivered Combined keeps the encoded element.");
+            combined.rawElement = OrbElement.Earth;
+            Assert.That(CombinationWire.InventoryConfirmed(reply, snapshot, true), Is.False);
+            combined.rawElement = OrbElement.None;
+            snapshot.orbs = Array.Empty<OrbWire>();
+            Assert.That(CombinationWire.InventoryConfirmed(reply, snapshot, true), Is.True, "The result may already be consumed too.");
         }
 
         private static CombinationPacket Packet() => new CombinationPacket

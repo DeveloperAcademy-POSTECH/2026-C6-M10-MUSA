@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using C6.Prototype.Orbs;
 using C6.Prototype.Networking;
+using C6.Prototype.Presentation;
 
 namespace C6.Prototype.Attack
 {
@@ -108,6 +109,48 @@ namespace C6.Prototype.Attack
         private ProjectileLaunchBasis throwBasis;
         private ThrowTuning throwTuning;
         private ulong[] orderedThrowParticipantIds = Array.Empty<ulong>();
+        private Dictionary<ulong, OrbElement> selectedElements;
+
+        /// <summary>Normal room attack eligibility. The authenticated current owner is the only identity checked.</summary>
+        public void ConfigureSelectedElements(IReadOnlyDictionary<ulong, OrbElement> choices)
+        {
+            RequirePreparedConfiguration();
+            if (choices == null || choices.Count < 1 || choices.Count > ParticipantRing.MaximumPlayers)
+                throw new ArgumentException("One to five approved element selections are required.", nameof(choices));
+            var copy = new Dictionary<ulong, OrbElement>();
+            var occupied = new HashSet<OrbElement>();
+            foreach (var choice in choices)
+            {
+                if (!OrbElements.IsValidRawElement(choice.Value) || !occupied.Add(choice.Value))
+                    throw new ArgumentException("Selections must be valid and unique.", nameof(choices));
+                copy.Add(choice.Key, choice.Value);
+            }
+            selectedElements = copy;
+        }
+
+        /// <summary>Install a new round's seat order while its empty Ready state is being prepared.</summary>
+        public void ConfigureRoundSeats(IReadOnlyList<ulong> seats)
+        {
+            RequirePreparedConfiguration();
+            if (!ReleaseThrowsEnabled)
+                throw new InvalidOperationException("Configure release throws before round seats.");
+            if (!ParticipantRing.ValidateSeatOrder(seats, orderedThrowParticipantIds.Length > 0 ? orderedThrowParticipantIds : seats))
+                throw new ArgumentException("Round seats must contain every approved participant exactly once.", nameof(seats));
+            var copy = new ulong[seats.Count];
+            for (int i = 0; i < seats.Count; i++) copy[i] = seats[i];
+            orderedThrowParticipantIds = copy;
+        }
+
+        private void RequirePreparedConfiguration()
+        {
+            if (State == AttackBattleState.NotStarted || State == AttackBattleState.Ended
+                || State == AttackBattleState.NetworkError || State == AttackBattleState.TargetCleared) return;
+            // The aggregate session separately requires the battle Ready gate. The attack service
+            // enters its physics Playing state during Ready, before any gameplay request is allowed.
+            if (State == AttackBattleState.Playing && receipts.Count == 0 && launched.Count == 0
+                && processedHits.Count == 0 && registry.Snapshot().Count == 0) return;
+            throw new InvalidOperationException("Round configuration is frozen after gameplay begins.");
+        }
         private int maximumFlyingPerPlayer;
         private float transferDeceleration, transferStopSpeed, maximumTransferSpeed;
         public bool ContinuousTransfersEnabled { get; private set; }
@@ -219,6 +262,7 @@ namespace C6.Prototype.Attack
             AttackLaunchResult result;
             BallisticLaunch? calculated = null;
             string throwError = null;
+            string selectedElementError = SelectedElementError(authenticatedSender, request);
 
             if (request.Kind == OrbActionKind.Launch && ReleaseThrowsEnabled && request.ThrowInput.HasValue)
             {
@@ -260,6 +304,7 @@ namespace C6.Prototype.Attack
             else if (request.TransferMotion.HasValue) result = Reject("UNEXPECTED_TRANSFER_MOTION");
             else if (ReleaseThrowsEnabled && !request.ThrowInput.HasValue) result = Reject("THROW_INPUT_REQUIRED");
             else if (!ReleaseThrowsEnabled && request.ThrowInput.HasValue) result = Reject("THROW_MODE_DISABLED");
+            else if (selectedElementError != null) result = Reject(selectedElementError);
             else if (throwError != null) result = Reject(throwError);
             else if (FlightCapacityReached(authenticatedSender)) result = Reject("FLIGHT_CAPACITY_FULL");
             else
@@ -277,6 +322,19 @@ namespace C6.Prototype.Attack
             }
             receipts.Add(request.RequestId, new Receipt(authenticatedSender, request, result));
             return result;
+        }
+
+        private string SelectedElementError(ulong authenticatedSender, OrbActionRequest request)
+        {
+            if (selectedElements == null || request.Kind != OrbActionKind.Launch) return null;
+            if (!registry.TryGet(request.OrbId, out var orb)) return "ORB_NOT_FOUND";
+            if (orb.OwnerPlayerId != authenticatedSender) return "OWNER_MISMATCH";
+            // Raw keeps the existing registry rejection and can never become a projectile.
+            if (orb.Kind != OrbKind.Combined) return null;
+            if (!selectedElements.TryGetValue(authenticatedSender, out var selected)
+                || !OrbElements.TryDecodeCombinedId(orb.OrbId, out var yin, out var yang)
+                || yin != selected || yang != selected) return "SELECTED_ELEMENT_MISMATCH";
+            return null;
         }
 
         public AttackLaunchResult RequestTransfer(ulong authenticatedSender, OrbActionRequest request,

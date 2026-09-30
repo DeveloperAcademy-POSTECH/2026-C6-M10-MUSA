@@ -13,9 +13,9 @@ namespace C6.Prototype.Combination
     [DisallowMultipleComponent]
     public sealed class CombinationSession : MonoBehaviour
     {
-        private const string RequestMessage = "C6.T08.Combine.v1";
-        private const string QueryMessage = "C6.T08.Query.v1";
-        private const string ReplyMessage = "C6.T08.Reply.v1";
+        private const string RequestMessage = "C6.T08.Combine.v2";
+        private const string QueryMessage = "C6.T08.Query.v2";
+        private const string ReplyMessage = "C6.T08.Reply.v2";
         private sealed class SubmittedRequest
         {
             public ulong Sender;
@@ -60,7 +60,7 @@ namespace C6.Prototype.Combination
         public CombinationReply LastResult { get; private set; }
         public bool HasPending => pending != null;
         public bool AwaitingInventoryConfirmation => pending != null && LastResult != null && LastResult.known
-            && LastResult.accepted && !CombinationWire.InventoryConfirmed(LastResult, attack?.Snapshot);
+            && LastResult.accepted && !CombinationWire.InventoryConfirmed(LastResult, attack?.Snapshot, attack?.RequiresExplicitRawElements ?? false);
         public bool Connected => isActiveAndEnabled && attack != null && attack.Connected && resources != null && resources.Connected
             && sessionId == attack.Snapshot.sessionId && roundId == attack.Snapshot.roundId;
         public bool IsHost => Connected && manager != null && manager.IsHost && Authority != null;
@@ -102,9 +102,9 @@ namespace C6.Prototype.Combination
         private void ConfirmPendingInventory()
         {
             if (refreshing || confirmingInventory || !Connected || pending == null || LastResult == null
-                || !CombinationWire.MatchesReply(pending, LastResult, attack.LocalPlayerId)
+                || !CombinationWire.MatchesReply(pending, LastResult, attack.LocalPlayerId, attack.RequiresExplicitRawElements)
                 || LastResult.sourcePending || LastResult.targetPending
-                || !CombinationWire.InventoryConfirmed(LastResult, attack.Snapshot)) return;
+                || !CombinationWire.InventoryConfirmed(LastResult, attack.Snapshot, attack.RequiresExplicitRawElements)) return;
             confirmingInventory = true;
             try { DeliverReply(LastResult); }
             finally { confirmingInventory = false; }
@@ -294,10 +294,10 @@ namespace C6.Prototype.Combination
 
         private void DeliverReply(CombinationReply reply)
         {
-            if (!Connected || !CombinationWire.MatchesReply(pending, reply, attack.LocalPlayerId)) return;
+            if (!Connected || !CombinationWire.MatchesReply(pending, reply, attack.LocalPlayerId, attack.RequiresExplicitRawElements)) return;
             if (LastResult != null && LastResult.requestId == reply.requestId && reply.inventoryRevision < LastResult.inventoryRevision) return;
             LastResult = reply;
-            bool inventoryConfirmed = !reply.accepted || CombinationWire.InventoryConfirmed(reply, attack.Snapshot);
+            bool inventoryConfirmed = !reply.accepted || CombinationWire.InventoryConfirmed(reply, attack.Snapshot, attack.RequiresExplicitRawElements);
             bool conclusive = reply.known && !reply.sourcePending && !reply.targetPending && inventoryConfirmed;
             if (conclusive) pending = null;
             Status = conclusive ? reply.accepted ? "Host confirmed Yin + Yang: one new Combined orb." : "Host rejected: " + reply.reason

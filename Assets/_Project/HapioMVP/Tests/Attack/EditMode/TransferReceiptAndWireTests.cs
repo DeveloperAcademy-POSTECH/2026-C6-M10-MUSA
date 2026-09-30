@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using C6.Prototype.Networking;
 using C6.Prototype.Orbs;
+using C6.Prototype.Presentation;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -87,6 +88,58 @@ namespace C6.Prototype.Attack.Tests
             Assert.That(session.LastResult.confirmedOrb, Is.SameAs(current)); Assert.That(current.owner, Is.EqualTo(1));
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void RawReceiptWithAChangedElementCannotResolveAgainstTheSameInventoryIdentity(bool accepted)
+        {
+            session.ConfigureSelectedElements(new Dictionary<ulong, OrbElement>
+                { { 0, OrbElement.Fire }, { 1, OrbElement.Water } });
+            var returned = RawWire(0, 2, 2, 2, EntrySide.Left, OrbElement.Fire);
+            Set(session, "<Snapshot>k__BackingField", Snapshot(3, returned));
+            var tampered = Reply(); tampered.accepted = accepted;
+            tampered.confirmedOrb = RawWire(1, 1, 1, 1, EntrySide.Right, OrbElement.Water);
+            Assert.That(AttackWire.ValidOrb(tampered.confirmedOrb, true), Is.True,
+                "The changed element is schema-valid, so rejection must compare the same-ID aggregate.");
+            Deliver(tampered);
+            session.NotifyAggregateChanged();
+            Assert.That(resolved, Is.Zero);
+            Assert.That(session.LastResult, Is.Null);
+            Assert.That(session.Snapshot.orbs[0], Is.SameAs(returned));
+            Assert.That(returned.rawElement, Is.EqualTo(OrbElement.Fire));
+            Assert.That(returned.owner, Is.Zero, "A late receipt cannot reverse a legitimate return transfer.");
+
+            var corrected = Reply(); corrected.accepted = accepted;
+            corrected.confirmedOrb = RawWire(1, 1, 1, 1, EntrySide.Right, OrbElement.Fire);
+            Deliver(corrected);
+            Assert.That(resolved, Is.EqualTo(1));
+            Assert.That(session.LastResult.confirmedOrb.rawElement, Is.EqualTo(OrbElement.Fire));
+            if (!accepted) Assert.That(session.LastResult.confirmedOrb, Is.SameAs(returned));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void MatchingRawReceiptAllowsAdvancedOwnershipAndAuthoritativePrunedAbsence(bool pruned)
+        {
+            session.ConfigureSelectedElements(new Dictionary<ulong, OrbElement>
+                { { 0, OrbElement.Fire }, { 1, OrbElement.Water } });
+            Set(session, "<Snapshot>k__BackingField", Snapshot(1, RawWire(0, 0, 0, 0, EntrySide.None, OrbElement.Fire)));
+            var reply = Reply(); reply.confirmedOrb = RawWire(1, 1, 1, 1, EntrySide.Right, OrbElement.Fire);
+            Deliver(reply); Assert.That(resolved, Is.Zero, "The inventory revision still gates a valid receipt.");
+            var returned = RawWire(0, 2, 2, 2, EntrySide.Left, OrbElement.Fire);
+            Set(session, "<Snapshot>k__BackingField", pruned ? Snapshot(4) : Snapshot(3, returned));
+            session.NotifyAggregateChanged();
+            Assert.That(resolved, Is.EqualTo(1));
+            Assert.That(session.LastResult.accepted, Is.True);
+            Assert.That(session.ActiveProjectileCount, Is.Zero);
+            if (pruned) Assert.That(session.Snapshot.orbs, Is.Empty, "Consumed Raw is never restored by a receipt.");
+            else
+            {
+                Assert.That(session.Snapshot.orbs[0], Is.SameAs(returned));
+                Assert.That(returned.owner, Is.Zero);
+                Assert.That(returned.rawElement, Is.EqualTo(OrbElement.Fire));
+            }
+        }
+
         [Test]
         public void TransferMetadataSurvivesRecordAndJsonRoundTrips()
         {
@@ -124,6 +177,12 @@ namespace C6.Prototype.Attack.Tests
         { id = OrbId, owner = owner, sequence = sequence, transferCount = count, lastTransferSequence = lastTransfer,
             entrySide = (int)side, kind = (int)OrbKind.Combined, polarity = (int)OrbPolarity.None,
             state = (int)OrbAuthorityState.Idle, pos = new Vector2(.2f, .6f) };
+        private static OrbWire RawWire(ulong owner, ulong sequence, ulong count, ulong lastTransfer, EntrySide side, OrbElement element)
+        {
+            var value = Wire(owner, sequence, count, lastTransfer, side);
+            value.kind = (int)OrbKind.Raw; value.polarity = (int)OrbPolarity.Yin; value.rawElement = element;
+            return value;
+        }
         private static object Get(object target, string name) => target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(target);
         private static void Set(object target, string name, object value) => target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(target, value);
     }

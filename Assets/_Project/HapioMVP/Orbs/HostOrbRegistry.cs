@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using C6.Prototype.Presentation;
 using UnityEngine;
 
 namespace C6.Prototype.Orbs
@@ -29,6 +30,16 @@ namespace C6.Prototype.Orbs
         private readonly Dictionary<string, Receipt> receipts = new Dictionary<string, Receipt>(StringComparer.Ordinal);
 
         public bool DevelopmentTestMode { get; }
+        public bool RequiresExplicitRawElements { get; private set; }
+
+        /// <summary>Select the normal lobby contract only while the inventory is empty; retain it across Retry.</summary>
+        public void ConfigureExplicitRawElements(bool enabled = true)
+        {
+            if (RequiresExplicitRawElements == enabled) return;
+            if (orbs.Count != 0 || pending.Count != 0)
+                throw new InvalidOperationException("Select the Raw element contract before adding round inventory.");
+            RequiresExplicitRawElements = enabled;
+        }
         public bool HasSession => !string.IsNullOrEmpty(SessionId);
         public string SessionId { get; private set; } = string.Empty;
         public uint RoundId { get; private set; }
@@ -61,17 +72,20 @@ namespace C6.Prototype.Orbs
             ClearRound();
             SessionId = string.Empty;
             RoundId = 0;
+            RequiresExplicitRawElements = false;
         }
 
-        public OrbRecord RegisterDevelopmentOrb(ulong owner, OrbKind kind, OrbPolarity polarity, Vector2 position)
+        public OrbRecord RegisterDevelopmentOrb(ulong owner, OrbKind kind, OrbPolarity polarity, Vector2 position, OrbElement rawElement = OrbElement.None)
         {
             RequireSession();
             if (!DevelopmentTestMode) throw new InvalidOperationException("Development fixtures require explicit test mode.");
             if (!IsValidKindAndPolarity(kind, polarity)) throw new ArgumentException("Raw requires Yin or Yang; Combined requires None.");
             if (!IsNormalized(position)) throw new ArgumentOutOfRangeException(nameof(position), "Position must be finite and within [0, 1].");
+            if (!OrbElements.ValidElementData(kind, rawElement, RequiresExplicitRawElements))
+                throw new ArgumentException("Raw requires its explicit element in the selected contract; Combined uses None.", nameof(rawElement));
             string id;
             do { id = Guid.NewGuid().ToString("N"); } while (orbs.ContainsKey(id));
-            var orb = new OrbRecord(id, kind, polarity, owner, OrbAuthorityState.Idle, position, EntrySide.None, 0);
+            var orb = new OrbRecord(id, kind, polarity, owner, OrbAuthorityState.Idle, position, EntrySide.None, 0, rawElement: rawElement);
             orbs.Add(id, orb);
             lastSequences.Add(id, 0);
             return orb;
@@ -82,7 +96,7 @@ namespace C6.Prototype.Orbs
         /// No development fixture flag or client-provided identity is used on this path.
         /// </summary>
         public OrbRecord RegisterGeneratedRaw(string sessionId, uint roundId, ulong owner,
-            OrbPolarity polarity, Vector2 position)
+            OrbPolarity polarity, Vector2 position, OrbElement rawElement = OrbElement.None)
         {
             RequireSession();
             if (!string.Equals(SessionId, sessionId, StringComparison.Ordinal) || RoundId != roundId)
@@ -90,10 +104,12 @@ namespace C6.Prototype.Orbs
             if (polarity != OrbPolarity.Yin && polarity != OrbPolarity.Yang)
                 throw new ArgumentException("Generated Raw requires Yin or Yang.", nameof(polarity));
             if (!IsNormalized(position)) throw new ArgumentOutOfRangeException(nameof(position));
+            if (!OrbElements.ValidElementData(OrbKind.Raw, rawElement, RequiresExplicitRawElements))
+                throw new ArgumentException("Generated Raw requires a valid Host-selected element.", nameof(rawElement));
             string id;
             do { id = Guid.NewGuid().ToString("N"); } while (orbs.ContainsKey(id));
             var orb = new OrbRecord(id, OrbKind.Raw, polarity, owner, OrbAuthorityState.Idle,
-                position, EntrySide.None, 0);
+                position, EntrySide.None, 0, rawElement: rawElement);
             orbs.Add(id, orb);
             lastSequences.Add(id, 0);
             return orb;
@@ -163,7 +179,7 @@ namespace C6.Prototype.Orbs
                 || !ReferenceEquals(held, reservation)) return false;
 
             launching = new OrbRecord(orb.OrbId, orb.Kind, orb.Polarity, orb.OwnerPlayerId,
-                OrbAuthorityState.Launching, request.NormalizedPosition, orb.EntrySide, request.SequenceNumber, orb.TransferCount, orb.LastTransferSequence, orb.RightTransferCount, orb.TransferMotion);
+                OrbAuthorityState.Launching, request.NormalizedPosition, orb.EntrySide, request.SequenceNumber, orb.TransferCount, orb.LastTransferSequence, orb.RightTransferCount, orb.TransferMotion, orb.RawElement);
             orbs[orb.OrbId] = launching;
             pending.Remove(orb.OrbId);
             return true;
@@ -188,7 +204,9 @@ namespace C6.Prototype.Orbs
                 || source.Kind != OrbKind.Raw || target.Kind != OrbKind.Raw
                 || !IsValidKindAndPolarity(source.Kind, source.Polarity) || !IsValidKindAndPolarity(target.Kind, target.Polarity)
                 || source.Polarity == target.Polarity
-                || !OrbElements.SameElement(source.OrbId, target.OrbId)
+                || !OrbElements.ValidElementData(source.Kind, source.RawElement, RequiresExplicitRawElements)
+                || !OrbElements.ValidElementData(target.Kind, target.RawElement, RequiresExplicitRawElements)
+                || !OrbElements.SameElement(source, target)
                 || source.AuthorityState != OrbAuthorityState.Idle || target.AuthorityState != OrbAuthorityState.Idle
                 || reservation.ReservedOrbIds.Count != 2
                 || !pending.TryGetValue(source.OrbId, out var sourceHeld) || !ReferenceEquals(sourceHeld, reservation)
@@ -198,7 +216,7 @@ namespace C6.Prototype.Orbs
             // the first mutation, and no observer is invoked between the two consumed states and result.
             // 오행 v2: both materials share one element (checked above), and the combined ID carries it
             // so every device shows the same comb_{element}_{element} artwork.
-            var element = OrbElements.RawElement(source.OrbId);
+            var element = OrbElements.RawElement(source);
             string id;
             do { id = OrbElements.NewCombinedId(element); } while (orbs.ContainsKey(id));
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -208,9 +226,9 @@ namespace C6.Prototype.Orbs
                 + "  -> " + id + "  expects art comb_" + artName + "_" + artName);
 #endif
             sourceConsumed = new OrbRecord(source.OrbId, source.Kind, source.Polarity, source.OwnerPlayerId,
-                OrbAuthorityState.Consumed, request.NormalizedPosition, source.EntrySide, request.SequenceNumber, source.TransferCount, source.LastTransferSequence, source.RightTransferCount, source.TransferMotion);
+                OrbAuthorityState.Consumed, request.NormalizedPosition, source.EntrySide, request.SequenceNumber, source.TransferCount, source.LastTransferSequence, source.RightTransferCount, source.TransferMotion, source.RawElement);
             targetConsumed = new OrbRecord(target.OrbId, target.Kind, target.Polarity, target.OwnerPlayerId,
-                OrbAuthorityState.Consumed, targetPosition, target.EntrySide, request.SequenceNumber, target.TransferCount, target.LastTransferSequence, target.RightTransferCount, target.TransferMotion);
+                OrbAuthorityState.Consumed, targetPosition, target.EntrySide, request.SequenceNumber, target.TransferCount, target.LastTransferSequence, target.RightTransferCount, target.TransferMotion, target.RawElement);
             combined = new OrbRecord(id, OrbKind.Combined, OrbPolarity.None, reservation.SenderPlayerId,
                 OrbAuthorityState.Idle, (request.NormalizedPosition + targetPosition) * .5f, EntrySide.None, 0);
             orbs.Add(id, combined); lastSequences.Add(id, 0);
@@ -232,14 +250,16 @@ namespace C6.Prototype.Orbs
                 || approvedMotion.HasValue && !OrbTransferMotion.IsValid(approvedMotion.Value, float.MaxValue)
                 || receiver == reservation.SenderPlayerId || !TryGet(request.OrbId, out var orb)
                 || orb.OwnerPlayerId != reservation.SenderPlayerId || orb.AuthorityState != OrbAuthorityState.Idle
-                || !IsValidKindAndPolarity(orb.Kind, orb.Polarity) || orb.TransferCount == ulong.MaxValue || orb.RightTransferCount > orb.TransferCount
+                || !IsValidKindAndPolarity(orb.Kind, orb.Polarity)
+                || !OrbElements.ValidElementData(orb.Kind, orb.RawElement, RequiresExplicitRawElements)
+                || orb.TransferCount == ulong.MaxValue || orb.RightTransferCount > orb.TransferCount
                 || reservation.ReservedOrbIds.Count != 1 || !pending.TryGetValue(orb.OrbId, out var held)
                 || !ReferenceEquals(held, reservation) || CountStoredOrbs(receiver) >= storageLimit) return false;
             var entry = request.Kind == OrbActionKind.TransferLeft ? EntrySide.Right : EntrySide.Left;
             var position = new Vector2(entry == EntrySide.Left ? edgeInset : 1f - edgeInset, request.NormalizedPosition.y);
             transferred = new OrbRecord(orb.OrbId, orb.Kind, orb.Polarity, receiver, OrbAuthorityState.Idle,
                 position, entry, request.SequenceNumber, orb.TransferCount + 1, request.SequenceNumber,
-                orb.RightTransferCount + (request.Kind == OrbActionKind.TransferRight ? 1UL : 0UL), approvedMotion);
+                orb.RightTransferCount + (request.Kind == OrbActionKind.TransferRight ? 1UL : 0UL), approvedMotion, orb.RawElement);
             orbs[orb.OrbId] = transferred;
             pending.Remove(orb.OrbId);
             return true;
@@ -278,7 +298,7 @@ namespace C6.Prototype.Orbs
                 || orb.Kind != OrbKind.Combined || orb.Polarity != OrbPolarity.None
                 || orb.AuthorityState != expectedState) return false;
             advanced = new OrbRecord(orb.OrbId, orb.Kind, orb.Polarity, orb.OwnerPlayerId,
-                nextState, orb.NormalizedPosition, orb.EntrySide, orb.SequenceNumber, orb.TransferCount, orb.LastTransferSequence, orb.RightTransferCount, orb.TransferMotion);
+                nextState, orb.NormalizedPosition, orb.EntrySide, orb.SequenceNumber, orb.TransferCount, orb.LastTransferSequence, orb.RightTransferCount, orb.TransferMotion, orb.RawElement);
             orbs[orb.OrbId] = advanced;
             return true;
         }
@@ -290,7 +310,8 @@ namespace C6.Prototype.Orbs
             if (!IsNormalized(request.NormalizedPosition)) return Reject("INVALID_POSITION");
             if (!TryGet(request.OrbId, out var source)) return Reject("ORB_NOT_FOUND");
             if (source.OwnerPlayerId != sender) return Reject("OWNER_MISMATCH");
-            if (!IsValidKindAndPolarity(source.Kind, source.Polarity)) return Reject("INVALID_ORB");
+            if (!IsValidKindAndPolarity(source.Kind, source.Polarity)
+                || !OrbElements.ValidElementData(source.Kind, source.RawElement, RequiresExplicitRawElements)) return Reject("INVALID_ORB");
             if (source.AuthorityState != OrbAuthorityState.Idle) return Reject("ORB_NOT_IDLE");
             if (pending.ContainsKey(source.OrbId)) return Reject("ORB_PENDING");
             if (request.SequenceNumber <= lastSequences[source.OrbId]) return Reject("STALE_SEQUENCE");
@@ -308,9 +329,10 @@ namespace C6.Prototype.Orbs
                 if (target.OwnerPlayerId != sender) return Reject("OTHER_OWNER_MISMATCH");
                 if (source.Kind != OrbKind.Raw || target.Kind != OrbKind.Raw
                     || !IsValidKindAndPolarity(target.Kind, target.Polarity)
+                    || !OrbElements.ValidElementData(target.Kind, target.RawElement, RequiresExplicitRawElements)
                     || source.Polarity == target.Polarity) return Reject("INVALID_COMBINATION");
                 // 오행 v2: 같은 속성의 음 + 양만 결합 (예: 불 음 + 불 양). 다른 속성끼리는 거절.
-                if (!OrbElements.SameElement(source.OrbId, target.OrbId)) return Reject("ELEMENT_MISMATCH");
+                if (!OrbElements.SameElement(source, target)) return Reject("ELEMENT_MISMATCH");
                 if (target.AuthorityState != OrbAuthorityState.Idle) return Reject("OTHER_ORB_NOT_IDLE");
                 if (pending.ContainsKey(target.OrbId)) return Reject("OTHER_ORB_PENDING");
                 if (request.SequenceNumber <= lastSequences[target.OrbId]) return Reject("OTHER_STALE_SEQUENCE");

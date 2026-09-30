@@ -287,6 +287,17 @@ namespace C6.Prototype.Battle
             return true;
         }
 
+        /// <summary>End only the approved game binding; the joined room transport stays alive.</summary>
+        public void EndApprovedConnection()
+        {
+            intentionalEnd = true; hadSession = false; processingHit = false;
+            if (attack != null && !attack.EndApprovedConnection())
+                throw new InvalidOperationException("Approved gameplay could not detach from its room.");
+            ResetNetworkBinding(); Snapshot = null;
+            Status = "Choose elements in the joined room lobby.";
+            Changed?.Invoke();
+        }
+
         public void EndSession()
         {
             intentionalEnd = true; hadSession = false; processingHit = false;

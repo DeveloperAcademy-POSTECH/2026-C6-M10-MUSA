@@ -119,6 +119,21 @@ namespace C6.Prototype.Battle
         public int ReceivedTransfers { get; private set; }
         [SerializeField] private int maximumParticipants = 2;
         private int approvedPlayerNumber;
+        private int approvedSeatNumber;
+        private OrbElement selectedElement;
+        public OrbElement SelectedElement => selectedElement;
+        public int ApprovedSeatNumber => approvedSeatNumber;
+        public void ConfigureSelectedElement(OrbElement element)
+        {
+            if (element < OrbElement.None || element > OrbElement.Earth) throw new ArgumentOutOfRangeException(nameof(element));
+            selectedElement = element;
+            if (hud != null) hud.HideElementWarning();
+        }
+        public void ConfigureSeatNumber(int seat)
+        {
+            if (seat < 0 || seat > maximumParticipants) throw new ArgumentOutOfRangeException(nameof(seat));
+            approvedSeatNumber = seat;
+        }
         public int MaximumParticipants => maximumParticipants;
         public void ConfigureMaximumParticipants(int maximum)
         {
@@ -160,7 +175,7 @@ namespace C6.Prototype.Battle
             && attack.Snapshot.state == "Playing" && resource != null && resource.Connected
             && (!transfersEnabled || !resource.HasPending)
             && resource.Snapshot.playing && combination != null && combination.Connected && pendingCombination == null
-            && battle != null && battle.CanAct;
+            && battle != null && battle.CanAct && (hud == null || !hud.ElementWarningVisible);
         public event Action Changed;
 
         public void Configure(SplitScreenLayout split, DirectConnectionSession session, T09Hud overlay,
@@ -222,6 +237,8 @@ namespace C6.Prototype.Battle
             hud.SoloModeButton.onClick.AddListener(ToggleDevelopmentSolo);
             hud.RetryButton.onClick.AddListener(RetryBattle);
             hud.LobbyButton.onClick.AddListener(ReturnToLobby);
+            if (hud.ReadyStartButton != null) hud.ReadyStartButton.onClick.AddListener(StartBattle);
+            if (hud.ReadyLobbyButton != null) hud.ReadyLobbyButton.onClick.AddListener(ReturnToLobby);
             hud.ResultEndButton.onClick.AddListener(EndDevelopmentTest);
             hud.EndButton.onClick.AddListener(EndDevelopmentTest);
             hud.GenerateButton.onClick.AddListener(GenerateOrb);
@@ -258,9 +275,9 @@ namespace C6.Prototype.Battle
         { if (connection.CanStart) ConfigureDevelopmentSolo(!developmentSolo); }
         public void StartBattle() => RequestHostStart();
         private Func<bool> approvedStart;
-        private Action approvedRetry, approvedEnd;
-        public void ConfigureApprovedLifecycle(Func<bool> start, Action retry, Action end)
-        { approvedStart = start; approvedRetry = retry; approvedEnd = end; }
+        private Action approvedRetry, approvedEnd, approvedLobby;
+        public void ConfigureApprovedLifecycle(Func<bool> start, Action retry, Action end, Action roomLobby = null)
+        { approvedStart = start; approvedRetry = retry; approvedEnd = end; approvedLobby = roomLobby; }
         public bool RequestHostStart()
         {
             if (!isActiveAndEnabled || battle == null || !battle.CanStart) return false;
@@ -276,7 +293,7 @@ namespace C6.Prototype.Battle
         public void ReturnToLobby()
         {
             if (!isActiveAndEnabled || battle == null || !battle.IsHost) return;
-            ClearLocalInput("Host Lobby"); if (approvedRetry != null) approvedRetry(); else battle.ReturnLobby();
+            ClearLocalInput("Host Lobby"); if (approvedLobby != null) approvedLobby(); else if (approvedRetry != null) approvedRetry(); else battle.ReturnLobby();
         }
         public void EndDevelopmentTest()
         {
@@ -355,11 +372,11 @@ namespace C6.Prototype.Battle
             {
                 ClearViews(); ClearProxies(); ClearThrowTrails(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear();
                 gestures = new OrbGestureEngine(); gestures.SetInputEnabled(false); sessionKey = null; round = 0; displayedDebugMode = null;
-                RefreshHud(); observedHp = null; missWatches.Clear(); return;
+                hud.HideElementWarning(); RefreshHud(); observedHp = null; missWatches.Clear(); return;
             }
             if (sessionKey != state.sessionId || round != state.roundId)
             {
-                CancelInteractions("Confirmed session/round changed");
+                hud.HideElementWarning(); CancelInteractions("Confirmed session/round changed");
                 ClearViews(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); gestures = new OrbGestureEngine();
                 SentTransfers = ReceivedTransfers = 0;
                 hud.SetNetworkFieldsVisible(!attack.Connected); Canvas.ForceUpdateCanvases();
@@ -384,7 +401,7 @@ namespace C6.Prototype.Battle
                 {
                     var view = new GameObject("T09 Orb " + orb.id).AddComponent<OrbView>(); view.transform.SetParent(viewRoot, false);
                     view.Configure(orb.id, (OrbKind)orb.kind, (OrbPolarity)orb.polarity, LayerMask.NameToLayer("C6Orbs"), RadiusWorld,
-                        orb.kind == (int)OrbKind.Combined ? "COMB" : orb.polarity == (int)OrbPolarity.Yin ? "YIN" : "YANG");
+                        orb.kind == (int)OrbKind.Combined ? "COMB" : orb.polarity == (int)OrbPolarity.Yin ? "YIN" : "YANG", rawElement: orb.rawElement);
                     view.SetHeldFeedbackEnabled(true);
                     views.Add(orb.id, view);
                     PositionView(orb.id, ConfirmedToScreen(orb));
@@ -754,6 +771,13 @@ namespace C6.Prototype.Battle
             Debug.Log($"C6_T09_DECISION kind={decision.Kind} sourceInput={sourceInput} origin={origin} pointer={pointerId} orb={decision.OrbId} rawX={decision.RawPosition.x:F2} rawY={decision.RawPosition.y:F2} screenWidth={Screen.width} gridWidth={OrbGridScreenRect.width:F2} swipeThreshold={Screen.width * layout.Config.HorizontalSwipeFraction:F2} round={round}");
             if (decision.Kind == OrbActionKind.Combine)
             { SubmitCombination(decision.OrbId, decision.OtherOrbId, fromTouch); return; }
+            if (decision.Kind == OrbActionKind.Launch && selectedElement != OrbElement.None
+                && (!OrbElements.TryDecodeCombinedId(decision.OrbId, out var yin, out var yang)
+                    || yin != selectedElement || yang != selectedElement))
+            {
+                RejectElementLaunch(decision.OrbId, dragStart);
+                return;
+            }
             ulong old = LastSequence(decision.OrbId);
             if (old == ulong.MaxValue) { gestures.ResolvePending(decision.OrbId); attack.FailUnconfirmedRequest(); return; }
             ulong seq = old + 1;
@@ -765,7 +789,7 @@ namespace C6.Prototype.Battle
                 : decision.NormalizedPosition;
             var request = new OrbActionRequest(sessionKey, round, Guid.NewGuid().ToString("N"), decision.OrbId, decision.OtherOrbId,
                 decision.Kind, seq, position, throwInput);
-            pending[request.RequestId] = new PendingInput { request = request, touch = fromTouch, sentAt = Time.unscaledTime };
+            pending[request.RequestId] = new PendingInput { request = request, touch = fromTouch, sentAt = Time.unscaledTime, returnPosition = dragStart };
             RefreshLocalStates();
             action = transfer ? "PASSING " + (decision.Kind == OrbActionKind.TransferLeft ? "LEFT" : "RIGHT") + " / waiting for Host"
                 : "Waiting for Host / " + decision.Kind;
@@ -827,11 +851,26 @@ namespace C6.Prototype.Battle
             action = (reply.accepted ? transfer ? "PASS CONFIRMED" : "LAUNCH APPROVED" : transfer ? "PASS REJECTED" : "REJECTED") + " / " + reply.reason;
             detail = reply.accepted ? transfer ? "Same orb / ownership confirmed by Host" : "Same ID / 2D removed / actual Host physics"
                 : "Host confirmed current state; no duplicate spawn";
-            if (!reply.accepted && inputRequest.request.TransferMotion.HasValue)
+            if (!reply.accepted && reply.reason == "SELECTED_ELEMENT_MISMATCH")
+                RejectElementLaunch(reply.orbId, inputRequest.returnPosition);
+            else if (!reply.accepted && inputRequest.request.TransferMotion.HasValue)
                 orbPhysics.ResolveRejectedEdge(reply.orbId);
             else if (!reply.accepted && reply.confirmedOrb != null && !reply.pending && views.ContainsKey(reply.orbId))
                 PositionView(reply.orbId, ConfirmedToScreen(reply.confirmedOrb));
             RefreshLocalStates(); RefreshHud();
+        }
+        private void RejectElementLaunch(string id, Vector2 returnPosition)
+        {
+            gestures.ResolvePending(id);
+            throwSampler.Clear(); ClearThrowPreview();
+            PositionView(id, returnPosition);
+            if (orbPhysicsEnabled && orbPhysics != null) orbPhysics.Release(id, Time.unscaledTimeAsDouble, false);
+            OrbElements.CombinedElements(id, out var element, out _);
+            action = "ELEMENT MISMATCH";
+            detail = "Only your selected element can attack; orb returned without consumption";
+            hud.ShowElementWarning("Your element: " + selectedElement + "\nOnly " + selectedElement
+                + " Combined orbs can attack.\nOrb element: " + element);
+            Debug.Log("C6_ELEMENT_LAUNCH_REJECT local=" + attack.LocalPlayerId + " orb=" + id + " selected=" + selectedElement);
         }
         private bool IsPending(string id) => pending.Values.Any(p => p.request.OrbId == id)
             || pendingCombination != null && (pendingCombination.request.SourceOrbId == id || pendingCombination.request.TargetOrbId == id);
@@ -987,7 +1026,7 @@ namespace C6.Prototype.Battle
             {
                 int participantCount = attack?.OrderedParticipantIds.Count ?? 0;
                 return approvedPlayerNumber < 1 || participantCount < 2 || approvedPlayerNumber > participantCount
-                    ? launchFrame.Basis : ParticipantLaunchFrame.Calculate(launchFrame.Basis, approvedPlayerNumber, participantCount);
+                    ? launchFrame.Basis : ParticipantLaunchFrame.Calculate(launchFrame.Basis, approvedSeatNumber > 0 ? approvedSeatNumber : approvedPlayerNumber, participantCount);
             }
         }
         private void RefreshThrowPreview(Vector2 raw)
@@ -1066,6 +1105,7 @@ namespace C6.Prototype.Battle
             uint battleRound = battle?.Snapshot?.roundId ?? 0;
             if (phase != displayedBattlePhase || battleRound != displayedBattleRound)
             {
+                hud.HideElementWarning();
                 ClearLocalInput("Battle phase / round changed");
                 displayedBattlePhase = phase; displayedBattleRound = battleRound;
                 action = phase == "Playing" ? "GENERATE / COMBINE / ATTACK" : phase.ToUpperInvariant();
@@ -1253,7 +1293,7 @@ namespace C6.Prototype.Battle
             Changed = null;
         }
         private sealed class PendingInput
-        { public OrbActionRequest request; public bool touch, queried; public float sentAt; }
+        { public OrbActionRequest request; public bool touch, queried; public float sentAt; public Vector2 returnPosition; }
         private sealed class PendingCombination
         { public CombinationRequest request; public bool touch, queried; public float sentAt; }
     }

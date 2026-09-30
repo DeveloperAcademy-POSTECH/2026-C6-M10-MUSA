@@ -5,7 +5,7 @@
     "C6.Prototype", "C6.Prototype.GameSync", "C6.Prototype.Attack", "C6.Prototype.Resources",
     "C6.Prototype.Combination", "C6.Prototype.Battle", "C6.Prototype.Lobby",
     "C6.Prototype.Presentation", "C6.Prototype.Networking", "C6.Prototype.Orbs",
-    "Unity.Netcode.Runtime", "Unity.Collections"
+    "Unity.Netcode.Runtime", "Unity.Collections", "UnityEngine.UI"
   ],
   "optionalUnityReferences": ["TestAssemblies"],
   "overrideReferences": true,

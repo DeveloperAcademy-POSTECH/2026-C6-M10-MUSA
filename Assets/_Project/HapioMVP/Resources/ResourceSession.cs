@@ -13,11 +13,11 @@ namespace C6.Prototype.Resources
     [DisallowMultipleComponent]
     public sealed class ResourceSession : MonoBehaviour
     {
-        private const string RequestMessage = "C6.T07.Generate.v1";
-        private const string QueryMessage = "C6.T07.Query.v1";
-        private const string ReplyMessage = "C6.T07.Reply.v1";
-        private const string SnapshotMessage = "C6.T07.Resources.v1";
-        private const string SyncMessage = "C6.T07.Sync.v1";
+        private const string RequestMessage = "C6.T07.Generate.v2";
+        private const string QueryMessage = "C6.T07.Query.v2";
+        private const string ReplyMessage = "C6.T07.Reply.v2";
+        private const string SnapshotMessage = "C6.T07.Resources.v2";
+        private const string SyncMessage = "C6.T07.Sync.v2";
         private const int MaximumRequestsPerParticipant = 256;
 
         private sealed class Receipt
@@ -39,6 +39,22 @@ namespace C6.Prototype.Resources
         private ScreenLayoutConfig config;
         private bool aggregateMode;
         private uint? approvedSeed;
+        private Dictionary<ulong, OrbElement> selectedElements;
+        public void ConfigureSelectedElements(IReadOnlyDictionary<ulong, OrbElement> selections)
+        {
+            var copy = selections == null ? null : new Dictionary<ulong, OrbElement>(selections);
+            bool same = selectedElements == null ? copy == null : copy != null && selectedElements.Count == copy.Count;
+            if (same && selectedElements != null)
+                foreach (var item in selectedElements)
+                    if (!copy.TryGetValue(item.Key, out var value) || value != item.Value) { same = false; break; }
+            if (!same && Authority != null && !Authority.IsEnded && GameplayAllowed)
+                throw new InvalidOperationException("Apply new resource selections while preparing the next round, not during combat.");
+            // RefreshBinding applies this frozen copy to each new round authority, including Retry.
+            selectedElements = copy;
+        }
+        private OrbElement FixtureElement(ulong owner) => selectedElements != null
+            && selectedElements.TryGetValue(owner, out var element) && OrbElements.IsValidRawElement(element)
+                ? element : OrbElement.None;
         private bool confirmingAggregateReceipt;
         public void ConfigureApprovedSeed(uint value)
         {
@@ -84,7 +100,8 @@ namespace C6.Prototype.Resources
                 || Snapshot.revision < reply.resourceRevision || inventory.revision < reply.inventoryRevision
                 || reply.operation == (int)ResourceRequestKind.Generate && player.lastSequence < reply.sequence) return false;
             var confirmed = inventory.orbs.FirstOrDefault(value => value.id == reply.confirmedOrb.id);
-            return confirmed == null || confirmed.owner == attack.LocalPlayerId;
+            return (confirmed == null || confirmed.owner == attack.LocalPlayerId)
+                && ResourceWire.InventoryElementConfirmed(reply, inventory);
         }
         private void ConfirmAggregateReceipt()
         {
@@ -245,6 +262,7 @@ namespace C6.Prototype.Resources
                         var tuning = new ResourceTuning(config.StaminaMax, config.StaminaStart, config.GenerateCost,
                             config.StaminaRecoveryPerSecond, config.StaminaHitRecovery, config.OrbStorageLimit);
                         Authority = new HostResourceAuthority(attack.Registry, tuning, seed, attack.ParticipantCapacity);
+                        Authority.ConfigureSelectedElements(selectedElements);
                         Authority.BeginRound(attack.AuthenticatedPlayerIds, Now);
                         Status = "NORMAL: empty inventory, full stamina; Host generates one Raw orb per 20.";
                         Debug.Log($"C6_T07_ROUND session={sessionId} round={roundId} seed={seed} mode=NORMAL initialOrbs=0 stamina={config.StaminaStart}");
@@ -380,7 +398,7 @@ namespace C6.Prototype.Resources
             foreach (var owner in owners)
             {
                 for (int index = 0; index < 5; index++)
-                    attack.Registry.RegisterDevelopmentOrb(owner, OrbKind.Raw, index % 2 == 0 ? OrbPolarity.Yin : OrbPolarity.Yang, positions[owner][index]);
+                    attack.Registry.RegisterDevelopmentOrb(owner, OrbKind.Raw, index % 2 == 0 ? OrbPolarity.Yin : OrbPolarity.Yang, positions[owner][index], FixtureElement(owner));
                 debugFixtureOwners.Add(owner);
                 Debug.Log($"C6_T09_MIXED_RAW session={sessionId} round={roundId} owner={owner} raw=5 cost=0 mode=DEBUG_TEST_MODE clockReset=false combinedSupplied=0");
             }
@@ -402,7 +420,7 @@ namespace C6.Prototype.Resources
             {
                 var chosen = mixedDebugFixture ? (index % 2 == 0 ? OrbPolarity.Yin : OrbPolarity.Yang) : polarity;
                 var position = mixedDebugFixture ? new Vector2(.1f + .2f * (index / 2), index % 2 == 0 ? .125f : .375f) : FindDebugSpawnPosition(owner);
-                attack.Registry.RegisterDevelopmentOrb(owner, OrbKind.Raw, chosen, position);
+                attack.Registry.RegisterDevelopmentOrb(owner, OrbKind.Raw, chosen, position, FixtureElement(owner));
             }
             debugFixtureOwners.Add(owner);
             Debug.Log($"C6_T07_DEBUG_FIXTURE session={sessionId} round={roundId} owner={owner} raw=5 polarity={(mixedDebugFixture ? "MixedYinYang" : polarity.ToString())} cost=0 mode=DEBUG_TEST_MODE");
@@ -534,7 +552,7 @@ namespace C6.Prototype.Resources
 
         private void DeliverReply(ResourceRequestReply reply)
         {
-            if (!Connected || pending == null || !ResourceWire.ValidReply(reply, Snapshot.maximum)
+            if (!Connected || pending == null || !ResourceWire.ValidReply(reply, Snapshot.maximum, attack.RequiresExplicitRawElements)
                 || reply.nonce != pending.nonce || reply.sessionId != pending.sessionId || reply.roundId != pending.roundId
                 || reply.requestId != pending.requestId || reply.sequence != pending.sequence || reply.operation != pending.operation
                 || reply.confirmedOrb != null && reply.confirmedOrb.owner != attack.LocalPlayerId) return;

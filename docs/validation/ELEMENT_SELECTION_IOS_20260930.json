@@ -1,0 +1,123 @@
+{
+  "date": "2026-09-30",
+  "branch": "feat/#56-lobby-element-selection",
+  "baseHead": "991339eeeedf18e2baa1fb859f857a1c8859ba2a",
+  "sourceState": "uncommitted #56 working tree; same source as 2026-09-29 validation",
+  "unity": "6000.5.7f1",
+  "protocol": 56,
+  "appBuild": "25",
+  "device": {
+    "model": "iPhone 17",
+    "ios": "26.6.2",
+    "connection": "iPhone wired to Mac; iPhone and Mac joined one local-network room via Bonjour"
+  },
+  "results": [
+    {
+      "step": "Unity iOS Xcode project export",
+      "status": "PASS",
+      "evidence": "/private/tmp/c6-56-ios-export-20260930-a.log",
+      "detail": "C6_P4_BUILD_COMPLETE target=iOS; fresh output directory"
+    },
+    {
+      "step": "Xcode Debug iphoneos build and personal Team signing",
+      "status": "PASS",
+      "evidence": "/private/tmp/c6-56-xcodebuild-20260930-a.log",
+      "detail": "BUILD SUCCEEDED; signed app verified on disk and satisfies designated requirement"
+    },
+    {
+      "step": "iPhone installation",
+      "status": "PASS",
+      "evidence": "/private/tmp/c6-56-install-20260930-a.json",
+      "detail": "devicectl reported app installed for com.wolfuraark.c6prototype"
+    },
+    {
+      "step": "iPhone app launch",
+      "status": "PASS",
+      "evidence": "/private/tmp/c6-56-iphone-console-20260930-a.log",
+      "detail": "devicectl foreground launch and C6_T10A_READY protocol=56; C6_T10B_READY"
+    },
+    {
+      "step": "Mac normal app Host Fire selection and Ready",
+      "status": "PASS",
+      "evidence": "local macOS Player.log; source screenshot observed in this session",
+      "detail": "Host P1 Fire approved at lobby revision 2; SetReady approved at revision 3; one participant only"
+    },
+    {
+      "step": "iPhone and Mac local-network room join",
+      "status": "PASS",
+      "method": "real iPhone 17 plus Mac normal app, Bonjour discovery and Join",
+      "evidence": "private iPhone console and Mac Player.log",
+      "detail": "Host accepted second participant and initial ACK; both showed the same lobby"
+    },
+    {
+      "step": "Lobby element choice, duplicate occupancy and clear",
+      "status": "PASS",
+      "method": "user touch on iPhone plus Mac screen and host log",
+      "evidence": "host SelectElement/ClearElement accepted at lobby revisions 6, 8, 10, 11; user visual confirmation",
+      "detail": "P1 Fire occupied on iPhone; P2 Water changed to Wood; Clear returned None and disabled Ready; Wood could be selected again"
+    },
+    {
+      "step": "Selection change and clear reset all Ready",
+      "status": "PASS",
+      "method": "host and client state plus user visual confirmation",
+      "evidence": "host lobby revision 7 had P2 Ready; revision 8 after change and revision 10 after clear had P1/P2 Not Ready",
+      "detail": "Host-approved selection state, no optimistic state claimed"
+    },
+    {
+      "step": "Two-participant start and initial seat mapping",
+      "status": "PASS",
+      "method": "real iPhone plus Mac normal gameplay",
+      "evidence": "host lobby revision 13 canStart true, C6_T10B_START round 1; Mac screen P1 Fire Seat 2; user confirmed iPhone P2 Wood Seat 1",
+      "detail": "Host/P1 was not fixed to first seat in this round; 3-5-device neighbor order is not inferred"
+    },
+    {
+      "step": "Selected-element Raw generation and stamina display",
+      "status": "PASS",
+      "method": "Mac mouse and iPhone touch",
+      "evidence": "Mac C6_T07_REPLY Generate accepted and Fire Raw image; user confirmed iPhone Wood Raw and stamina depletion/recovery",
+      "detail": "One generation observed on each device in normal two-device game"
+    },
+    {
+      "step": "Actual two-device transfer, combination and valid hit",
+      "status": "PASS",
+      "method": "real touch/mouse and host authority log",
+      "evidence": "C6_T08_COMBINE approvals and C6_T11_RECEIVED; round 1 HP changed from 800 to 540 through approved attacks",
+      "detail": "Recorded only for actions observed in normal round, not as a full 5-player proof"
+    },
+    {
+      "step": "Retry initial state and next round",
+      "status": "PASS",
+      "method": "Mac UI plus host/client ACK",
+      "evidence": "C6_T09_STATE retry-ready round 2 remaining 180 monsterHp 800; client initial ACK; C6_T10B_START round 2",
+      "detail": "Selected elements remained usable in the next round; first two-person seat order happened to repeat, which is permitted"
+    },
+    {
+      "step": "Other-element Combined attack rejection on both owners",
+      "status": "PASS",
+      "method": "real two-device touch/mouse; user visual confirmation plus host/client logs",
+      "evidence": "Mac C6_ELEMENT_LAUNCH_REJECT selected=Fire, iPhone C6_ELEMENT_LAUNCH_REJECT selected=Wood",
+      "detail": "Warning shown, orb returned and remained, HP 800 unchanged, time continued; no approved attack for rejected orb IDs"
+    },
+    {
+      "step": "Fresh-room element reset",
+      "status": "PASS",
+      "detail": "Both participants showed Not Selected and Ready disabled before any new choice. The reused client process received a higher transport participant ID; its display/role implications are under separate review.",
+      "method": "both apps left the previous room; Mac created a distinct room; iPhone joined it",
+      "evidence": "host log shows Closed old room and a different room ID at revision 1; iPhone C6_T10A_JOIN for that room; user visual confirmation"
+    },
+    {
+      "step": "Fresh-room combat start after leave and rejoin",
+      "status": "FAIL",
+      "method": "same Mac/iPhone process, leave prior room, create distinct room, both select and Ready, Host Start",
+      "evidence": "Mac Player.log: new room revision 8 Start accepted, followed by C6_T10B_NETWORK_ERROR GAME_ATTACH_FAILED; iPhone join and Ready in private console",
+      "detail": "The fresh-room client transport ID advanced from 1 to 2. AttackSession retained the previous room's element/roster state and rejected the new roster with “Roster and approved element selections must match.” Regression fix and new build are pending; this failure remains historical evidence."
+    },
+    {
+      "step": "3-5 physical device neighbor/camera order",
+      "status": "NOT_RUN",
+      "detail": "Only one iPhone and Mac were available; prior synthetic Mac 3/5 process runs are separate evidence"
+    }
+  ],
+  "relatedPriorValidation": "ELEMENT_SELECTION_20260929.json",
+  "privacy": "Device identifier, certificate fingerprint, raw logs and screenshots remain local and are not committed."
+}

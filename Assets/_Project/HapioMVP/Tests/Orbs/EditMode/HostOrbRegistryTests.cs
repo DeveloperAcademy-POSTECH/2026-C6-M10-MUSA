@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using C6.Prototype.Presentation;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -296,6 +297,61 @@ namespace C6.Prototype.Orbs.Tests
             Assert.Throws<InvalidOperationException>(() => registry.ResetRound(2));
             registry.BeginSession("session-b", 1);
             AssertRejected(registry.Reserve(0, oldRequest), "SESSION_MISMATCH");
+        }
+
+        [Test]
+        public void ExplicitElementContractRejectsMissingAndInvalidRawAndSurvivesRetryOnly()
+        {
+            registry.ConfigureExplicitRawElements();
+            Assert.Throws<ArgumentException>(() => registry.RegisterGeneratedRaw("session-a", 1, 0, OrbPolarity.Yin, Vector2.one * .5f));
+            Assert.Throws<ArgumentException>(() => registry.RegisterGeneratedRaw("session-a", 1, 0, OrbPolarity.Yin, Vector2.one * .5f, (OrbElement)99));
+            Assert.Throws<ArgumentException>(() => registry.RegisterDevelopmentOrb(0, OrbKind.Raw, OrbPolarity.Yin, Vector2.one * .5f));
+            Assert.That(registry.Snapshot(), Is.Empty);
+            registry.ResetRound(2);
+            Assert.That(registry.RequiresExplicitRawElements, Is.True);
+            var generated = registry.RegisterGeneratedRaw("session-a", 2, 0, OrbPolarity.Yin, Vector2.one * .5f, OrbElement.Wood);
+            Assert.That(generated.RawElement, Is.EqualTo(OrbElement.Wood));
+            Assert.Throws<InvalidOperationException>(() => registry.ConfigureExplicitRawElements(false));
+            registry.ClearSession();
+            Assert.That(registry.RequiresExplicitRawElements, Is.False);
+        }
+
+        [Test]
+        public void RawTransferKeepsExplicitElementIdPolarityAndMotionAcrossDifferentOwners()
+        {
+            registry.ConfigureExplicitRawElements();
+            var original = registry.RegisterGeneratedRaw("session-a", 1, 0, OrbPolarity.Yin, new Vector2(.5f, .4f), OrbElement.Metal);
+            var motion = new OrbTransferMotion(new Vector2(2f, .25f), 10d);
+            var request = new OrbActionRequest("session-a", 1, "explicit-transfer", original.OrbId, null,
+                OrbActionKind.TransferRight, 1, new Vector2(1f, .4f), transferMotion: motion);
+            var reserved = registry.Reserve(0, request);
+            Assert.That(reserved.Accepted, Is.True, reserved.Reason);
+            Assert.That(registry.TryCompleteReservedTransfer(reserved.Reservation, 9, 20, .03f, out var received, motion), Is.True);
+            Assert.That(received.OrbId, Is.EqualTo(original.OrbId));
+            Assert.That(received.RawElement, Is.EqualTo(OrbElement.Metal));
+            Assert.That(received.OwnerPlayerId, Is.EqualTo(9));
+            Assert.That(received.Polarity, Is.EqualTo(OrbPolarity.Yin));
+            Assert.That(received.AuthorityState, Is.EqualTo(OrbAuthorityState.Idle));
+            Assert.That(received.EntrySide, Is.EqualTo(EntrySide.Left));
+            Assert.That(received.TransferMotion.Value, Is.EqualTo(motion));
+            Assert.That(original.OwnerPlayerId, Is.Zero, "The immutable source record stays unchanged.");
+            Assert.That(registry.IsPending(original.OrbId), Is.False);
+        }
+
+        [Test]
+        public void ExplicitElementOverridesLegacyHashAndMalformedDataNeverBecomesAValidPair()
+        {
+            var explicitRaw = new OrbRecord("legacy-id", OrbKind.Raw, OrbPolarity.Yin, 0,
+                OrbAuthorityState.Idle, Vector2.one * .5f, EntrySide.None, 0, rawElement: OrbElement.Earth);
+            Assert.That(OrbElements.RawElement(explicitRaw), Is.EqualTo(OrbElement.Earth));
+            Assert.That(OrbElements.ValidElementData(OrbKind.Raw, OrbElement.None), Is.True);
+            Assert.That(OrbElements.ValidElementData(OrbKind.Raw, OrbElement.None, true), Is.False);
+            Assert.That(OrbElements.ValidElementData(OrbKind.Raw, (OrbElement)99), Is.False);
+            Assert.That(OrbElements.ValidElementData(OrbKind.Combined, OrbElement.Earth), Is.False);
+            Assert.That(OrbElements.ValidElementData((OrbKind)99, OrbElement.None), Is.False);
+            var invalidRaw = new OrbRecord("invalid", OrbKind.Raw, OrbPolarity.Yang, 0,
+                OrbAuthorityState.Idle, Vector2.one * .5f, EntrySide.None, 0, rawElement: (OrbElement)99);
+            Assert.That(OrbElements.SameElement(invalidRaw, invalidRaw), Is.False);
         }
 
         private OrbRecord Add(OrbKind kind = OrbKind.Combined, OrbPolarity polarity = OrbPolarity.None, ulong owner = 0)

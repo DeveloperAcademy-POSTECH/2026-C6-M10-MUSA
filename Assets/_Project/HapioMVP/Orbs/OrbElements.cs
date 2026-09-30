@@ -5,17 +5,17 @@ using C6.Prototype.Presentation;
 namespace C6.Prototype.Orbs
 {
     /// <summary>
-    /// Element rule (오행 v1). An orb's element comes from its Host-issued ID, so every device
-    /// agrees without any wire or snapshot change.
-    /// - Raw: one element picked from the team list by hashing the ID.
+    /// Element identity. Normal lobby-selected Raw orbs carry an explicit Host-approved element.
+    /// Legacy scenes and fixtures without that field may still derive it from the Host-issued ID.
+    /// - Raw: explicit element first; ID hash is used only by the separate legacy path.
     /// - Combined: the Host writes the pair into the LAST TWO characters of the 32-hex ID
     ///   ('0'..'4' = Fire, Water, Wood, Metal, Earth). Decoding therefore never depends on the
     ///   team list, its order, or any hash agreement between devices, and the ID stays a valid
     ///   Guid "N" string. Older hash-encoded IDs still decode through the legacy fallback.
     /// 오행 v2: 같은 속성의 음 + 양만 결합한다(예: 불 음 + 불 양). 다른 속성끼리는 결합 불가.
     /// 결합 ID는 여전히 두 칸을 쓰지만 두 칸이 항상 같은 속성이다.
-    /// 속성은 씬이 Configure를 호출해야 켜진다. 호출 전(기본값)에는 모든 구슬이 None이라
-    /// 속성 규칙이 적용되지 않는다. 옛 T05/T08 씬과 EditMode 테스트가 여기에 해당한다.
+    /// Configure는 legacy ID hash의 공통 목록만 설정한다. 명시 Raw 원소는 목록이 비어도 유지된다.
+    /// 원소 없는 옛 T05/T08 씬과 fixture에서는 ID hash가 None으로 해석되는 기존 경로를 유지한다.
     /// </summary>
     public static class OrbElements
     {
@@ -45,6 +45,26 @@ namespace C6.Prototype.Orbs
 
         public static OrbElement RawElement(string orbId) => Pick(orbId, RawSalt);
 
+        public static bool IsValidRawElement(OrbElement element) => element >= OrbElement.Fire && element <= OrbElement.Earth;
+
+        /// <summary>Combined has no duplicate Raw field. Missing Raw is valid only in legacy contracts.</summary>
+        public static bool ValidElementData(OrbKind kind, OrbElement rawElement, bool requireExplicitRaw = false)
+            => kind == OrbKind.Combined ? rawElement == OrbElement.None
+                : kind == OrbKind.Raw && (IsValidRawElement(rawElement) || !requireExplicitRaw && rawElement == OrbElement.None);
+
+        /// <summary>The received owner and the global team list never override an explicit Raw element.</summary>
+        public static OrbElement RawElement(OrbRecord orb)
+        {
+            if (orb == null || orb.Kind != OrbKind.Raw) return OrbElement.None;
+            if (IsValidRawElement(orb.RawElement)) return orb.RawElement;
+            return orb.RawElement == OrbElement.None ? RawElement(orb.OrbId) : OrbElement.None;
+        }
+
+        public static bool SameElement(OrbRecord first, OrbRecord second)
+            => first != null && second != null && first.Kind == OrbKind.Raw && second.Kind == OrbKind.Raw
+                && ValidElementData(first.Kind, first.RawElement) && ValidElementData(second.Kind, second.RawElement)
+                && RawElement(first) == RawElement(second);
+
         /// <summary>오행 v2: 두 Raw 구슬의 속성이 같을 때만 결합할 수 있다. 속성이 꺼져 있으면 둘 다 None이라 항상 true.</summary>
         public static bool SameElement(string firstOrbId, string secondOrbId)
             => RawElement(firstOrbId) == RawElement(secondOrbId);
@@ -57,6 +77,13 @@ namespace C6.Prototype.Orbs
         public static void CombinedElements(string orbId, out OrbElement yin, out OrbElement yang)
         {
             if (TryDecodeCombinedId(orbId, out yin, out yang)) return;
+            // Explicit sandbox identities are presentation-only. Never accept their prefix in a normal Host request.
+            const string addedPrefix = "sandbox-added-", combinedPrefix = "sandbox-combined-";
+            string sandboxId = orbId != null && orbId.StartsWith(addedPrefix, StringComparison.Ordinal)
+                ? orbId.Substring(addedPrefix.Length)
+                : orbId != null && orbId.StartsWith(combinedPrefix, StringComparison.Ordinal)
+                    ? orbId.Substring(combinedPrefix.Length) : null;
+            if (sandboxId != null && TryDecodeCombinedId(sandboxId, out yin, out yang)) return;
             yin = Pick(orbId, CombinedSalt);
             yang = yin;
         }
@@ -76,7 +103,7 @@ namespace C6.Prototype.Orbs
         public static bool TryDecodeCombinedId(string orbId, out OrbElement yin, out OrbElement yang)
         {
             yin = OrbElement.None; yang = OrbElement.None;
-            if (string.IsNullOrEmpty(orbId) || orbId.Length < CodeLength) return false;
+            if (string.IsNullOrEmpty(orbId) || orbId.Length != 32 || !Guid.TryParseExact(orbId, "N", out _)) return false;
             if (TryCode(orbId[orbId.Length - 2], out yin) && TryCode(orbId[orbId.Length - 1], out yang)) return true;
             yin = OrbElement.None; yang = OrbElement.None;
             return false;
