@@ -16,7 +16,7 @@ using Object = UnityEngine.Object;
 namespace C6.Prototype.Lobby.Tests
 {
     /// <summary>Saved lobby scene and one real NGO Host. UI-only rows are explicit fixtures, never two-device discovery evidence.</summary>
-    public sealed class T10LobbyPlayTests
+    public sealed class SavedRoomLobbyPlayTests
     {
         private const string ScenePath = "Assets/_Project/HapioMVP/Scenes/RoomLobby.unity";
         private const string HostPort = "25241";
@@ -57,7 +57,7 @@ namespace C6.Prototype.Lobby.Tests
                 Scene loaded = SceneManager.GetSceneByPath(ScenePath);
                 if (loaded.isLoaded)
                 {
-                    Scene cleanup = SceneManager.CreateScene("T10 Lobby Test Cleanup");
+                    Scene cleanup = SceneManager.CreateScene("Room Lobby Test Cleanup");
                     SceneManager.SetActiveScene(cleanup);
                     yield return SceneManager.UnloadSceneAsync(loaded);
                 }
