@@ -245,6 +245,7 @@ namespace C6.Prototype.Battle
             {
                 AdvanceClock(processingHit ? processingTimestamp : now);
                 TickMonsterAttack(now);
+                TickCombinedOrbExpiry(now);
                 if (now >= nextPublishAt)
                 { nextPublishAt = now + 1d / config.AttackSnapshotRateHz; PublishSnapshot(null); }
             }
@@ -302,6 +303,21 @@ namespace C6.Prototype.Battle
             Authority.Advance(now);
             if (Authority.IsTerminal && !terminalPublished) CommitTerminal();
         }
+        /// <summary>
+        /// #51 Host only: a Combined orb not thrown within the configured seconds disappears on every screen.
+        /// Only while the battle is Playing, so a paused, ended or resetting round never removes orbs.
+        /// </summary>
+        private void TickCombinedOrbExpiry(double now)
+        {
+            if (changingRound || processingHit || Authority == null || Authority.Phase != BattlePhase.Playing
+                || attack == null || attack.Registry == null) return;
+            var expired = attack.Registry.ExpireIdleCombined(now, config.CombinedOrbLifetimeSeconds);
+            if (expired.Count == 0) return;
+            foreach (var orb in expired)
+                Debug.Log($"C6_COMBINED_EXPIRED orb={orb.OrbId} owner={orb.OwnerPlayerId} lifetime={config.CombinedOrbLifetimeSeconds}");
+            attack.PublishInventoryChange("combined-expired");
+        }
+
         /// <summary>
         /// #28 Host-only attack progress with the frozen roster (the legacy two-player scene has none, so it never attacks).
         /// A Hit removes team time; start and result are published at once so every screen sees the same attack.

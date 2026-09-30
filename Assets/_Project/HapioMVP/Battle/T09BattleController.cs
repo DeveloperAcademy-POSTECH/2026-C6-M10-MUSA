@@ -87,6 +87,9 @@ namespace C6.Prototype.Battle
         private bool reachableEdgeTransferDistance;
         private readonly Dictionary<string, PendingInput> pending = new Dictionary<string, PendingInput>();
         private readonly HashSet<string> confirmedUnavailable = new HashSet<string>();
+        // #51: local time each Combined orb first appeared in a Host snapshot (any owner, so a
+        // received orb keeps its timer). Drives the blink only; the Host alone removes orbs.
+        private readonly Dictionary<string, float> combinedSeenAt = new Dictionary<string, float>(StringComparer.Ordinal);
         private readonly HashSet<string> touchReceipts = new HashSet<string>();
         private Transform viewRoot, proxyRoot;
         private Material projectileMaterial, trailMaterial;
@@ -353,14 +356,14 @@ namespace C6.Prototype.Battle
             var state = attack.Snapshot;
             if (state == null || !attack.Connected)
             {
-                ClearViews(); ClearProxies(); ClearThrowTrails(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear();
+                ClearViews(); ClearProxies(); ClearThrowTrails(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); combinedSeenAt.Clear();
                 gestures = new OrbGestureEngine(); gestures.SetInputEnabled(false); sessionKey = null; round = 0; displayedDebugMode = null;
                 RefreshHud(); observedHp = null; missWatches.Clear(); return;
             }
             if (sessionKey != state.sessionId || round != state.roundId)
             {
                 CancelInteractions("Confirmed session/round changed");
-                ClearViews(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); gestures = new OrbGestureEngine();
+                ClearViews(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); combinedSeenAt.Clear(); gestures = new OrbGestureEngine();
                 SentTransfers = ReceivedTransfers = 0;
                 hud.SetNetworkFieldsVisible(!attack.Connected); Canvas.ForceUpdateCanvases();
                 sessionKey = state.sessionId; round = state.roundId; displayedDebugMode = null;
@@ -374,8 +377,26 @@ namespace C6.Prototype.Battle
                 if (!ids.Contains(id))
                 {
                     // A confirmed Launching/Projectile/Consumed record, never a local timeout, removes the view.
+                    // #51: a held orb can expire mid-drag; end that drag before its view goes away.
+                    if (gestures.ActiveOrb?.OrbId == id) { LogPointerCancellation(gestures.ActivePointerId.Value, id, "ORB_REMOVED"); gestures.CancelAllPointers(); }
+                    bool expired = combinedSeenAt.TryGetValue(id, out float seenAt)
+                        && Time.unscaledTime - seenAt >= layout.Config.CombinedOrbLifetimeSeconds - 1f
+                        && !state.orbs.Any(o => o.id == id && o.state != (int)OrbAuthorityState.Consumed);
                     RemoveView(id);
+                    if (expired)
+                    {
+                        action = "ORB EXPIRED";
+                        detail = "Throw a combined orb within " + layout.Config.CombinedOrbLifetimeSeconds.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " seconds";
+                        Debug.Log($"C6_T09_COMBINED_EXPIRED orb={id} round={round}");
+                    }
                 }
+            // #51: remember when each Combined orb first appeared; forget ones no longer Idle.
+            var idleCombined = new HashSet<string>(state.orbs.Where(o => o.kind == (int)OrbKind.Combined
+                && o.state == (int)OrbAuthorityState.Idle).Select(o => o.id), StringComparer.Ordinal);
+            foreach (string id in idleCombined)
+                if (!combinedSeenAt.ContainsKey(id)) combinedSeenAt.Add(id, Time.unscaledTime);
+            foreach (string id in combinedSeenAt.Keys.ToArray())
+                if (!idleCombined.Contains(id)) combinedSeenAt.Remove(id);
             foreach (var orb in available)
             {
                 bool arrived = transfersEnabled && orb.transferCount > 0 &&
@@ -868,6 +889,7 @@ namespace C6.Prototype.Battle
         {
             if (releaseThrowsEnabled && gestures.HasActivePointer)
                 throwSampler.Add(gestures.LastRawPosition / Mathf.Max(1f, Screen.width), Time.unscaledTimeAsDouble);
+            UpdateExpiryWarnings();
             WatchOwnFlightsForMiss();
             var held = pendingCombination;
             if (held != null)
@@ -894,6 +916,18 @@ namespace C6.Prototype.Battle
                 }
             }
         }
+        /// <summary>#51: combined orbs blink during their final seconds before the Host removes them.</summary>
+        private void UpdateExpiryWarnings()
+        {
+            if (layout == null || layout.Config == null || views.Count == 0) return;
+            float lifetime = layout.Config.CombinedOrbLifetimeSeconds;
+            float warningFrom = lifetime - layout.Config.CombinedOrbWarningSeconds;
+            bool playing = battle != null && battle.CanAct;
+            foreach (var pair in views)
+                pair.Value.SetExpiryWarning(playing && combinedSeenAt.TryGetValue(pair.Key, out float seenAt)
+                    && Time.unscaledTime - seenAt >= warningFrom);
+        }
+
         private void LateUpdate()
         {
             if (hud == null || hud.Canvas == null) return;
