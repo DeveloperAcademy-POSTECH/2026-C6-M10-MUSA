@@ -93,7 +93,7 @@ namespace C6.Editor
                     if (GUILayout.Button("마지막 구슬 제거")) sandbox.RemoveLastOrb();
                     if (GUILayout.Button("추가한 구슬 모두 제거")) sandbox.RemoveAddedOrbs();
                 }
-                EditorGUILayout.HelpBox("결합: 음 구슬을 양 구슬 위(화면 너비 8% 이내)에 놓으면 두 구슬 사이에 COMB가 생깁니다. 같은 극·COMB끼리는 결합되지 않고, 가까이 놓으면 관성 없이 멈춥니다(게임과 동일).", MessageType.None);
+                EditorGUILayout.HelpBox("결합: 음 구슬을 양 구슬 위(화면 너비 8% 이내)에 놓으면 두 구슬 사이에 COMB가 생깁니다. 같은 속성의 음+양만 결합됩니다. 같은 극, 다른 속성, COMB가 끼면 결합에 실패하고 두 구슬이 서로 반대 방향으로 튕깁니다(게임과 동일, 세기는 위 '결합 실패 튕김 속도'). COMB는 '결합 구슬 소멸 시간' 안에 던지지 않으면 깜빡이다 사라집니다.", MessageType.None);
                 EditorGUILayout.HelpBox("추가한 구슬은 지금 보고 있는 조합대에 생깁니다. '배치 초기화'를 누르면 추가한 구슬은 사라지고 처음 배치로 돌아갑니다.", MessageType.None);
             }
             using (new EditorGUI.DisabledScope(sandbox.sourceConfig == null))
