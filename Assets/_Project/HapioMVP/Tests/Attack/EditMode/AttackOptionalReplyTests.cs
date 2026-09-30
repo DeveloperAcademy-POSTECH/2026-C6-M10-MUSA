@@ -72,7 +72,7 @@ namespace C6.Prototype.Attack.Tests
             }
             else raw = raw.Replace(field, "\"confirmedOrbEntries\":" + (mutation == "null" ? "null" : mutation == "object" ? "[{}]" : "[{},{}]"));
             var body = Encoding.UTF8.GetBytes(raw);
-            var frame = new byte[body.Length + 5]; frame[0] = 1;
+            var frame = new byte[body.Length + 5]; frame[0] = AttackWire.Version;
             Array.Copy(BitConverter.GetBytes(body.Length), 0, frame, 1, 4); Array.Copy(body, 0, frame, 5, body.Length);
             using (var reader = new FastBufferReader(frame, Allocator.Temp))
                 Assert.That(AttackWire.TryRead<AttackRequestReply>(reader, out _), Is.False, raw);
@@ -91,7 +91,7 @@ namespace C6.Prototype.Attack.Tests
             string raw = JsonUtility.ToJson(Reply());
             string duplicate = escaped ? "\"confirmed\\u004frbEntries\":[]," : "\"confirmedOrbEntries\":[],";
             raw = raw.Insert(1, duplicate);
-            byte[] body = Encoding.UTF8.GetBytes(raw), frame = new byte[body.Length + 5]; frame[0] = 1;
+            byte[] body = Encoding.UTF8.GetBytes(raw), frame = new byte[body.Length + 5]; frame[0] = AttackWire.Version;
             Array.Copy(BitConverter.GetBytes(body.Length), 0, frame, 1, 4); Array.Copy(body, 0, frame, 5, body.Length);
             using (var reader = new FastBufferReader(frame, Allocator.Temp))
                 Assert.That(AttackWire.TryRead<AttackRequestReply>(reader, out _), Is.False, raw);

@@ -99,7 +99,7 @@ namespace C6.Prototype.Combination.Tests
 
         private static byte[] Frame(string raw)
         {
-            byte[] body = Encoding.UTF8.GetBytes(raw), frame = new byte[body.Length + 5]; frame[0] = 1;
+            byte[] body = Encoding.UTF8.GetBytes(raw), frame = new byte[body.Length + 5]; frame[0] = 2;
             Array.Copy(BitConverter.GetBytes(body.Length), 0, frame, 1, 4); Array.Copy(body, 0, frame, 5, body.Length);
             return frame;
         }

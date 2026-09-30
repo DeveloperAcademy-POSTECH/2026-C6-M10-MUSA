@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using C6.Prototype.Orbs;
 using C6.Prototype.Networking;
+using C6.Prototype.Presentation;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -155,6 +156,7 @@ namespace C6.Prototype.Attack
         public ulong owner;
         public int kind;
         public int polarity;
+        public OrbElement rawElement;
         public int state;
         public Vector2 pos;
         public ulong sequence;
@@ -165,11 +167,12 @@ namespace C6.Prototype.Attack
         public double transferServerTime;
         public OrbRecord ToRecord() => new OrbRecord(id, (OrbKind)kind, (OrbPolarity)polarity,
             owner, (OrbAuthorityState)state, pos, (EntrySide)entrySide, sequence, transferCount, lastTransferSequence, rightTransferCount,
-            hasTransferMotion ? new OrbTransferMotion(new Vector2(transferVelocityX, transferVelocityY), transferServerTime) : (OrbTransferMotion?)null);
+            hasTransferMotion ? new OrbTransferMotion(new Vector2(transferVelocityX, transferVelocityY), transferServerTime) : (OrbTransferMotion?)null,
+            rawElement);
         public static OrbWire FromRecord(OrbRecord orb) => orb == null ? null : new OrbWire
         {
             id = orb.OrbId, owner = orb.OwnerPlayerId, kind = (int)orb.Kind,
-            polarity = (int)orb.Polarity, state = (int)orb.AuthorityState,
+            polarity = (int)orb.Polarity, rawElement = orb.RawElement, state = (int)orb.AuthorityState,
             pos = orb.NormalizedPosition, sequence = orb.SequenceNumber, transferCount = orb.TransferCount,
             lastTransferSequence = orb.LastTransferSequence, rightTransferCount = orb.RightTransferCount, entrySide = (int)orb.EntrySide,
             hasTransferMotion = orb.TransferMotion.HasValue, transferVelocityX = orb.TransferMotion?.Velocity.x ?? 0f,
@@ -273,7 +276,7 @@ namespace C6.Prototype.Attack
     // T06-only bounded DTO transport. Named handlers authenticate sender before parsing packet data.
     internal static class AttackWire
     {
-        private const byte Version = 1;
+        internal const byte Version = 2;
         internal const int MaximumBytes = 16384;
         // P2 carries actual velocity/gravity/time for up to 64 projectiles as well as their
         // 64 inventory records. Keep requests/replies at 16 KiB; only configured inventory
@@ -331,9 +334,10 @@ namespace C6.Prototype.Attack
         internal static bool Normalized(Vector2 value) => Finite(value.x) && Finite(value.y)
             && value.x >= 0f && value.x <= 1f && value.y >= 0f && value.y <= 1f;
 
-        internal static bool ValidOrb(OrbWire orb) => orb != null && ValidId(orb.id)
+        internal static bool ValidOrb(OrbWire orb, bool requireExplicitRaw = false) => orb != null && ValidId(orb.id)
             && Enum.IsDefined(typeof(OrbKind), orb.kind) && Enum.IsDefined(typeof(OrbPolarity), orb.polarity)
             && Enum.IsDefined(typeof(OrbAuthorityState), orb.state) && Enum.IsDefined(typeof(EntrySide), orb.entrySide) && Normalized(orb.pos)
+            && OrbElements.ValidElementData((OrbKind)orb.kind, orb.rawElement, requireExplicitRaw)
             && orb.rightTransferCount <= orb.transferCount
             && ValidTransferMotion(orb)
             && (orb.transferCount == 0 ? orb.lastTransferSequence == 0 && orb.entrySide == (int)EntrySide.None
@@ -354,8 +358,8 @@ namespace C6.Prototype.Attack
                     : orb.entrySide == (int)EntrySide.Right && orb.transferVelocityX <= 0f);
         }
 
-        internal static bool ValidOptionalOrb(OrbWire[] entries) => entries != null && entries.Length <= 1
-            && (entries.Length == 0 || ValidOrb(entries[0]));
+        internal static bool ValidOptionalOrb(OrbWire[] entries, bool requireExplicitRaw = false) => entries != null && entries.Length <= 1
+            && (entries.Length == 0 || ValidOrb(entries[0], requireExplicitRaw));
 
         internal static bool ValidProjectileMotion(ProjectileWire projectile)
         {
@@ -373,7 +377,7 @@ namespace C6.Prototype.Attack
                 && projectile.elapsed >= 0f && projectile.elapsed <= projectile.lifetime + .1f;
         }
 
-        internal static bool ValidSnapshot(AttackSnapshot snapshot, int maximumOrbs = 12)
+        internal static bool ValidSnapshot(AttackSnapshot snapshot, int maximumOrbs = 12, bool requireExplicitRaw = false)
         {
             if (maximumOrbs < 1 || (maximumOrbs > 64 && maximumOrbs != ParticipantRing.MaximumLiveOrbs) || snapshot == null || !ValidNonce(snapshot.nonce) || !ValidId(snapshot.sessionId)
                 || snapshot.roundId == 0 || snapshot.revision == 0 || snapshot.maxHp < 1 || snapshot.hp < 0
@@ -386,7 +390,7 @@ namespace C6.Prototype.Attack
             var orbById = new System.Collections.Generic.Dictionary<string, OrbWire>(StringComparer.Ordinal);
             foreach (var orb in snapshot.orbs)
             {
-                if (!ValidOrb(orb) || !ids.Add(orb.id)) return false;
+                if (!ValidOrb(orb, requireExplicitRaw) || !ids.Add(orb.id)) return false;
                 orbById.Add(orb.id, orb);
             }
             ids.Clear();

@@ -7,6 +7,7 @@ using C6.Prototype.Battle;
 using C6.Prototype.Lobby;
 using C6.Prototype.Networking;
 using C6.Prototype.Resources;
+using C6.Prototype.Presentation;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -17,6 +18,18 @@ namespace C6.Prototype.GameSync
     public sealed class T10GameSession : MonoBehaviour
     {
         public const string Build = "15";
+        [SerializeField] private bool elementSelectionEnabled;
+        public bool ElementSelectionEnabled => elementSelectionEnabled;
+        private ulong[] roundSeats = Array.Empty<ulong>();
+        public IReadOnlyList<ulong> RoundSeatOrder => Array.AsReadOnly(roundSeats);
+        public void ConfigureElementSelection(bool enabled)
+        {
+            if (attached || lobby != null && lobby.Connection != null && !lobby.Connection.CanStart)
+                throw new InvalidOperationException("Choose lobby element rules before opening a room.");
+            if (enabled && maximumParticipants != 5) throw new InvalidOperationException("Element selection uses the five-player room contract.");
+            elementSelectionEnabled = enabled;
+            if (lobby != null) lobby.ConfigureElementSelection(enabled);
+        }
         [SerializeField] private bool transfersEnabled;
         [SerializeField] private bool continuousTransfers;
         public bool ContinuousTransfersEnabled => continuousTransfers;
@@ -52,8 +65,8 @@ namespace C6.Prototype.GameSync
         public string BuildIdentifier => string.IsNullOrEmpty(buildIdentifierOverride) ? (transfersEnabled ? "16" : Build)
             : ValidBuildIdentifier(buildIdentifierOverride) ? buildIdentifierOverride
             : throw new InvalidOperationException("The saved build identifier must be a positive number of at most 32 digits.");
-        private string StateMessage => continuousTransfers ? "C6.P4.State.v1" : maximumParticipants == 5 ? "C6.P3.State.v1" : "C6.T10B.State.v1";
-        private string ControlMessage => continuousTransfers ? "C6.P4.Control.v1" : maximumParticipants == 5 ? "C6.P3.Control.v1" : "C6.T10B.Control.v1";
+        private string StateMessage => elementSelectionEnabled ? "C6.CE56.State.v1" : continuousTransfers ? "C6.P4.State.v1" : maximumParticipants == 5 ? "C6.P3.State.v1" : "C6.T10B.State.v1";
+        private string ControlMessage => elementSelectionEnabled ? "C6.CE56.Control.v1" : continuousTransfers ? "C6.P4.Control.v1" : maximumParticipants == 5 ? "C6.P3.Control.v1" : "C6.T10B.Control.v1";
         private T10LobbySession lobby;
         private T09BattleController controller;
         private ThrowBattleFraming framing;
@@ -178,7 +191,8 @@ namespace C6.Prototype.GameSync
             }
             lobby.Configure(runtimeConfig.Value); ConfigureMaximumParticipants(maximumParticipants); ApplyTransferConfiguration();
             ConfigureContinuousTransfers(continuousTransfers);
-            controller.ConfigureApprovedLifecycle(StartPreparedRound,Retry,Leave);
+            ConfigureElementSelection(elementSelectionEnabled);
+            controller.ConfigureApprovedLifecycle(StartPreparedRound,Retry,Leave,ReturnToRoomLobby);
             controller.ConfigureHostClock(()=>EstimatedHostNow);
             controller.ConfigureDefenseReport(ReportDefense);
             controller.Hud.CoordinatedGame=true;
@@ -197,8 +211,8 @@ namespace C6.Prototype.GameSync
             try
             {
                 if(lobby.Snapshot?.p2==null || value.roomId!=lobby.Snapshot.roomId || value.sessionId!=lobby.Snapshot.sessionId
-                    || value.roundId!=1 || value.configFingerprint!=lobby.Snapshot.configFingerprint
-                    || value.continuousTransfers!=continuousTransfers)
+                    || value.roundId==0 || !elementSelectionEnabled && value.roundId!=1 || value.configFingerprint!=lobby.Snapshot.configFingerprint
+                    || value.continuousTransfers!=continuousTransfers || value.elementSelection!=elementSelectionEnabled)
                     throw new InvalidOperationException("START_CONTRACT_MISMATCH");
                 var ordered = lobby.Snapshot.OrderedPlayers;
                 if (ordered == null || ordered.Length < 2 || ordered.Length > maximumParticipants
@@ -208,6 +222,12 @@ namespace C6.Prototype.GameSync
                 if (maximumParticipants == 5 && (value.participantIds == null
                     || !value.participantIds.SequenceEqual(ordered.Select(player => player.clientId))))
                     throw new InvalidOperationException("START_FROZEN_ROSTER_MISMATCH");
+                if (elementSelectionEnabled && (value.selectedElements == null || value.selectedElements.Length != ordered.Length
+                    || !value.selectedElements.SequenceEqual(ordered.Select(player => player.selectedElement))
+                    || value.selectedElements.Any(element => element < OrbElement.Fire || element > OrbElement.Earth)
+                    || value.selectedElements.Distinct().Count() != ordered.Length
+                    || !RoundSeatLayout.Valid(value.roundSeatOrder, value.participantIds)))
+                    throw new InvalidOperationException("START_ELEMENT_OR_SEAT_MISMATCH");
                 runtimeConfig.Apply(lobby.HostConfig);
                 // Apply the approved Host capacity after Config adoption, before any registry binds.
                 controller.Attack.ConfigureTransfers(transfersEnabled, runtimeConfig.Value.OrbStorageLimit,
@@ -215,11 +235,19 @@ namespace C6.Prototype.GameSync
                 contract=Copy(value); participants=ordered.Select(Copy).ToArray(); p1=participants[0]; p2=participants[1];
                 if (maximumParticipants == 5) controller.Attack.ConfigureRoster(contract.participantIds);
                 controller.Attack.ConfigureContinuousTransfers(continuousTransfers);
+                roundSeats = elementSelectionEnabled ? (ulong[])contract.roundSeatOrder.Clone() : ordered.Select(player => player.clientId).ToArray();
+                if (elementSelectionEnabled)
+                {
+                    var selections = participants.ToDictionary(player => player.clientId, player => player.selectedElement);
+                    controller.Attack.ConfigureSelectedElements(selections);
+                    controller.Resource.ConfigureSelectedElements(selections);
+                    controller.Attack.ConfigureRoundSeats(roundSeats);
+                }
                 int localPlayerNumber = lobby.Snapshot.LocalPlayerNumber(
                     lobby.Connection.OwnedManager.LocalClientId);
 
                 controller.ConfigurePlayerNumber(localPlayerNumber);
-                framing.ConfigureParticipantView(localPlayerNumber, ordered.Length);
+                ApplyLocalSeat();
 
                 manager=lobby.Connection.OwnedManager; messaging=manager.CustomMessagingManager;
                 messaging.RegisterNamedMessageHandler(StateMessage,ReceiveState);
@@ -228,7 +256,7 @@ namespace C6.Prototype.GameSync
                 controller.Resource.SetAggregateMode(true);
                 controller.Battle.SetAggregateMode(true);
                 controller.Resource.ConfigureApprovedSeed(contract.seed);
-                attached=true; attachedAt=initialWaitAt=lastGoodPublish=Now; preparedRound=1; autoStart=lobby.IsHost;
+                attached=true; attachedAt=initialWaitAt=lastGoodPublish=Now; preparedRound=contract.roundId; autoStart=lobby.IsHost;
                 initialConfirmed=false; revision=0; Snapshot=null; Error="";
                 peerResponses.Configure(lobby.IsHost ? participants.Skip(1).Select(player => player.clientId)
                     : new[] { NetworkManager.ServerClientId });
@@ -238,13 +266,48 @@ namespace C6.Prototype.GameSync
                     throw new InvalidOperationException("APPROVED_GAME_BIND_FAILED");
                 Status="Checking all initial game states";
                 SetGameVisible(true); Changed?.Invoke();
-                Debug.Log($"C6_T10B_ATTACHED role={(lobby.IsHost?"HOST":"CLIENT")} session={contract.sessionId} round=1 seed={contract.seed} config={contract.configFingerprint}");
+                Debug.Log($"C6_T10B_ATTACHED role={(lobby.IsHost?"HOST":"CLIENT")} session={contract.sessionId} round={contract.roundId} seed={contract.seed} config={contract.configFingerprint}");
             }
             catch(Exception e){Fail("GAME_ATTACH_FAILED / "+e.Message);}
         }
         private void OnLobbyChanged()
         {
+            if (attached && elementSelectionEnabled && lobby.Snapshot?.phase == LobbyProtocol.Lobby && !ending)
+            { DetachToRoomLobby(); return; }
             if(attached&&!lobby.Connected&&!ending)Fail("PARTICIPANT_DISCONNECTED");
+        }
+        private void ApplyLocalSeat()
+        {
+            ulong local = lobby.Connection.OwnedManager.LocalClientId;
+            int seat = Array.IndexOf(roundSeats, local) + 1;
+            if (seat < 1) throw new InvalidOperationException("LOCAL_SEAT_MISSING");
+            controller.ConfigureSeatNumber(seat);
+            framing.ConfigureParticipantView(seat, participants.Length);
+            if (elementSelectionEnabled)
+                controller.ConfigureSelectedElement(participants.Single(player => player.clientId == local).selectedElement);
+            controller.Hud.SetPlayerIdentity(elementSelectionEnabled,
+                "P" + participants.Single(player => player.clientId == local).playerNumber + " / "
+                + participants.Single(player => player.clientId == local).selectedElement + " / Seat " + seat);
+        }
+        public void ReturnToRoomLobby()
+        {
+            if (!attached || !elementSelectionEnabled || !lobby.IsHost || Error.Length != 0
+                || controller.Battle.Phase == BattlePhase.Playing) return;
+            lobby.ReturnToLobby(preparedRound);
+        }
+        private void DetachToRoomLobby()
+        {
+            ending = true; attached = false;
+            controller.CancelInteractions("RETURN_TO_ROOM_LOBBY");
+            Unbind(); peerResponses.Clear(); initialProofs.Clear();
+            controller.Battle.EndApprovedConnection();
+            Snapshot = null; contract = null; participants = Array.Empty<LobbyPlayer>();
+            p1 = p2 = null; roundSeats = Array.Empty<ulong>(); initialConfirmed = autoStart = false;
+            controller.ConfigureSelectedElement(OrbElement.None);
+            controller.Hud.SetPlayerIdentity(false, "");
+            controller.Hud.SetRoomPreparationControls(false, false);
+            Error = ""; Status = "Choose elements and confirm Ready in this room";
+            ending = false; SetGameVisible(false); Changed?.Invoke();
         }
         private void HandleApplicationPause(bool paused)
         {
@@ -316,10 +379,11 @@ namespace C6.Prototype.GameSync
             if(a.roundId!=r.roundId||a.roundId!=b.roundId)return;
             var candidate=new GameSnapshot{nonce=controller.Attack.LocalNonce,roomId=contract.roomId,sessionId=contract.sessionId,
                 roundId=a.roundId,revision=revision+1,configHash=contract.configFingerprint,seed=contract.seed,continuousTransfers=continuousTransfers,
+                elementSelection=elementSelectionEnabled, roundSeatOrder=elementSelectionEnabled?(ulong[])roundSeats.Clone():Array.Empty<ulong>(),
                 p1=Copy(p1),p2=Copy(p2),players=maximumParticipants==5?participants.Select(Copy).ToArray():null,initialStateConfirmed=initialConfirmed,hostNow=Now,serverTime=manager.ServerTime.Time,
                 attack=Copy(a),resources=Copy(r),battle=Copy(b)};
             SetNonce(candidate,controller.Attack.LocalNonce);
-            string signature=JsonUtility.ToJson(candidate.attack)+JsonUtility.ToJson(candidate.resources)+JsonUtility.ToJson(candidate.battle)+initialConfirmed;
+            string signature=(elementSelectionEnabled?JsonUtility.ToJson(candidate.players)+string.Join(",",roundSeats):"")+JsonUtility.ToJson(candidate.attack)+JsonUtility.ToJson(candidate.resources)+JsonUtility.ToJson(candidate.battle)+initialConfirmed;
             if(candidate.battle.phase!="Playing"&&Snapshot!=null&&frozenSignature==signature){lastGoodPublish=Now;return;}
             if(!GameWire.Validate(candidate,Context(candidate.nonce),Snapshot,out string reason))
             {
@@ -342,6 +406,7 @@ namespace C6.Prototype.GameSync
         private GameSnapshotContext Context(string nonce)=>new GameSnapshotContext{roomId=contract.roomId,sessionId=contract.sessionId,
             configHash=contract.configFingerprint,config=lobby.HostConfig,seed=contract.seed,p1=p1.clientId,p2=p2.clientId,participantIds=maximumParticipants==5?contract.participantIds:null,nonce=nonce,
             allowTransfers=transfersEnabled,continuousTransfers=continuousTransfers,
+            elementSelection=elementSelectionEnabled, selectedElements=contract.selectedElements, initialSeatOrder=contract.roundSeatOrder,minimumRoundId=contract.roundId,
             transferMaximumSpeed=runtimeConfig.Value.OrbMaxReleaseSpeed*C6.Prototype.Orbs.OrbTransferMotion.MaximumReleaseSpeedMultiplier,transferEdgeInset=runtimeConfig.Value.OrbRadiusScreenFraction};
         private void ReceiveState(ulong sender,FastBufferReader reader)
         {
@@ -356,7 +421,12 @@ namespace C6.Prototype.GameSync
             if(!controller.Battle.ApplyAggregateSnapshot(Copy(incoming.battle),false)){Fail("BATTLE_APPLY_FAILED");return;}
             bool newRound=Snapshot==null||Snapshot.roundId!=incoming.roundId;
             Snapshot=incoming; initialConfirmed=incoming.initialStateConfirmed;
-            if(newRound){initialWaitAt=Now;peerResponses.Reset();}
+            if(newRound)
+            {
+                initialWaitAt=Now;peerResponses.Reset();preparedRound=incoming.roundId;
+                if (elementSelectionEnabled)
+                { roundSeats=(ulong[])incoming.roundSeatOrder.Clone();controller.Attack.ConfigureRoundSeats(roundSeats);ApplyLocalSeat(); }
+            }
             ObservePeerResponse(sender);
             controller.Attack.NotifyAggregateChanged(); controller.Resource.NotifyAggregateChanged();
             controller.Combination.NotifyAggregateChanged(); controller.Battle.NotifyAggregateChanged();
@@ -414,7 +484,13 @@ namespace C6.Prototype.GameSync
         {
             if(!attached||!lobby.IsHost||Error.Length!=0||controller.Battle.Phase==BattlePhase.Playing)return;
             autoStart=false;initialConfirmed=false;initialWaitAt=Now;initialProofs.Clear();peerResponses.Reset();
-            controller.Battle.RetryHost(); preparedRound=controller.Attack.Snapshot.roundId;
+            if (!controller.Battle.RetryHost()) return;
+            preparedRound=controller.Attack.Snapshot.roundId;
+            if (elementSelectionEnabled)
+            {
+                roundSeats=RoundSeatLayout.Shuffle(contract.participantIds,new System.Random(Guid.NewGuid().GetHashCode()));
+                controller.Attack.ConfigureRoundSeats(roundSeats);ApplyLocalSeat();
+            }
             frozenSignature=null;nextPublish=0;Status="Checking empty next round";
         }
         public void Leave()
@@ -488,7 +564,11 @@ namespace C6.Prototype.GameSync
             h.SetNetworkFieldsVisible(false);h.HostButton.gameObject.SetActive(false);h.JoinButton.gameObject.SetActive(false);
             h.SoloModeButton.gameObject.SetActive(false);h.DebugFixtureButton.gameObject.SetActive(false);
             h.StartButton.interactable=CanStart;h.EndButton.interactable=true;
-            h.LobbyButton.gameObject.SetActive(false);
+            bool canReturn = elementSelectionEnabled && lobby.IsHost && Error.Length==0 && Snapshot!=null
+                && Snapshot.battle.phase!="Playing";
+            h.LobbyButton.gameObject.SetActive(canReturn && h.ResultOverlay.activeSelf);
+            h.LobbyButton.interactable=canReturn;
+            h.SetRoomPreparationControls(canReturn && Snapshot.battle.phase=="Ready", CanStart);
             if(Error.Length!=0)
             {
                 h.GenerateButton.interactable=false;h.StartButton.interactable=false;h.ActionLabel.text="NETWORK ERROR";

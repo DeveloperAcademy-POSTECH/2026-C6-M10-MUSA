@@ -252,6 +252,7 @@ namespace C6.Prototype.Battle
             {
                 AdvanceClock(processingHit ? processingTimestamp : now);
                 TickMonsterAttack(now);
+                TickMonsterInterference(now);
                 TickCombinedOrbExpiry(now);
                 if (now >= nextPublishAt)
                 { nextPublishAt = now + 1d / config.AttackSnapshotRateHz; PublishSnapshot(null); }
@@ -294,6 +295,17 @@ namespace C6.Prototype.Battle
             Status = "Fresh empty inventory and full Stamina; Host Start is required.";
             PublishSnapshot(stage);
             return true;
+        }
+
+        /// <summary>End only the approved game binding; the joined room transport stays alive.</summary>
+        public void EndApprovedConnection()
+        {
+            intentionalEnd = true; hadSession = false; processingHit = false;
+            if (attack != null && !attack.EndApprovedConnection())
+                throw new InvalidOperationException("Approved gameplay could not detach from its room.");
+            ResetNetworkBinding(); Snapshot = null;
+            Status = "Choose elements in the joined room lobby.";
+            Changed?.Invoke();
         }
 
         public void EndSession()

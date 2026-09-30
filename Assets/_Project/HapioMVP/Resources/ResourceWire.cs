@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using C6.Prototype.Attack;
 using C6.Prototype.Orbs;
@@ -94,7 +95,7 @@ namespace C6.Prototype.Resources
 
     internal static class ResourceWire
     {
-        private const byte Version = 1;
+        private const byte Version = 2;
         internal const int MaximumBytes = 8192;
         private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
 
@@ -150,24 +151,35 @@ namespace C6.Prototype.Resources
             && ValidContext(packet.nonce, packet.sessionId, packet.roundId) && ValidId(packet.requestId)
             && packet.sequence > 0 && Enum.IsDefined(typeof(ResourceRequestKind), packet.operation);
 
-        internal static bool ValidOrb(OrbWire orb) => orb != null && ValidId(orb.id)
+        internal static bool ValidOrb(OrbWire orb, bool requireExplicitRaw = false) => orb != null && ValidId(orb.id)
             && Enum.IsDefined(typeof(OrbKind), orb.kind) && Enum.IsDefined(typeof(OrbPolarity), orb.polarity)
             && Enum.IsDefined(typeof(OrbAuthorityState), orb.state)
+            && OrbElements.ValidElementData((OrbKind)orb.kind, orb.rawElement, requireExplicitRaw)
             && Finite(orb.pos.x) && Finite(orb.pos.y) && orb.pos.x >= 0 && orb.pos.x <= 1 && orb.pos.y >= 0 && orb.pos.y <= 1
             && (orb.kind == (int)OrbKind.Combined ? orb.polarity == (int)OrbPolarity.None : orb.polarity != (int)OrbPolarity.None);
 
-        internal static bool ValidOptionalOrb(OrbWire[] entries) => entries != null && entries.Length <= 1
-            && (entries.Length == 0 || ValidOrb(entries[0]));
+        internal static bool ValidOptionalOrb(OrbWire[] entries, bool requireExplicitRaw = false) => entries != null && entries.Length <= 1
+            && (entries.Length == 0 || ValidOrb(entries[0], requireExplicitRaw));
 
-        internal static bool ValidReply(ResourceRequestReply reply, double maximum) => reply != null
-            && ValidOptionalOrb(reply.confirmedOrbEntries)
+        internal static bool ValidReply(ResourceRequestReply reply, double maximum, bool requireExplicitRaw = false) => reply != null
+            && ValidOptionalOrb(reply.confirmedOrbEntries, requireExplicitRaw)
             && ValidContext(reply.nonce, reply.sessionId, reply.roundId) && ValidId(reply.requestId)
             && reply.sequence > 0 && Enum.IsDefined(typeof(ResourceRequestKind), reply.operation)
             && reply.reason != null && reply.reason.Length <= 128
             && Finite(maximum) && maximum > 0 && Finite(reply.staminaBefore) && Finite(reply.staminaAfter)
             && reply.staminaBefore >= 0 && reply.staminaAfter >= 0 && reply.staminaBefore <= maximum && reply.staminaAfter <= maximum
-            && (!reply.accepted || reply.known && ValidOrb(reply.confirmedOrb))
-            && (reply.confirmedOrb == null || ValidOrb(reply.confirmedOrb));
+            && (!reply.accepted || reply.known && ValidOrb(reply.confirmedOrb, requireExplicitRaw))
+            && (reply.confirmedOrb == null || ValidOrb(reply.confirmedOrb, requireExplicitRaw));
+
+        /// <summary>A newer inventory may omit Consumed records. Any present same ID must keep its Raw element.</summary>
+        internal static bool InventoryElementConfirmed(ResourceRequestReply reply, AttackSnapshot inventory)
+        {
+            if (reply == null || !reply.known || !reply.accepted || reply.confirmedOrb == null || reply.inventoryRevision == 0
+                || inventory == null || inventory.orbs == null || inventory.revision < reply.inventoryRevision
+                || inventory.nonce != reply.nonce || inventory.sessionId != reply.sessionId || inventory.roundId != reply.roundId) return false;
+            var confirmed = inventory.orbs.FirstOrDefault(value => value != null && value.id == reply.confirmedOrb.id);
+            return confirmed == null || confirmed.rawElement == reply.confirmedOrb.rawElement;
+        }
 
         internal static bool ValidSnapshot(ResourceSnapshot snapshot, int maximumParticipants = 2)
         {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using C6.Prototype.Networking;
+using C6.Prototype.Presentation;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -23,6 +24,8 @@ namespace C6.Prototype.Lobby
         private readonly List<Button> developerControlButtons = new List<Button>();
         private readonly Dictionary<LobbyDeveloperSetting, Text> developerValueLabels = new Dictionary<LobbyDeveloperSetting, Text>();
         private readonly List<RectTransform> roomRows = new List<RectTransform>();
+        private readonly Dictionary<OrbElement, Button> elementButtons = new Dictionary<OrbElement, Button>();
+        private RectTransform elementPanel;
         private LobbyRoomRow[] displayedRooms = Array.Empty<LobbyRoomRow>();
         private LobbyUiState state = new LobbyUiState();
         private Font font;
@@ -49,6 +52,8 @@ namespace C6.Prototype.Lobby
         public event Action StartRequested;
         public event Action JoinDirectRequested;
         public event Action<string> RoomJoinRequested;
+        public event Action<OrbElement> ElementSelectionRequested;
+        public event Action ClearElementRequested;
 
         public Canvas Canvas { get; private set; }
         public UISafeArea SafeArea { get; private set; }
@@ -74,6 +79,9 @@ namespace C6.Prototype.Lobby
         public Button DirectToggleButton { get; private set; }
         public Button JoinDirectButton { get; private set; }
         public Button ReadyButton { get; private set; }
+        public Button ClearElementButton { get; private set; }
+        public Text SelectionStatusLabel { get; private set; }
+        public IReadOnlyDictionary<OrbElement, Button> ElementButtons => elementButtons;
         public Button StartButton { get; private set; }
         public Button LeaveButton { get; private set; }
         public Button CancelConnectionButton { get; private set; }
@@ -128,9 +136,23 @@ namespace C6.Prototype.Lobby
             PlayerRosterLabel.text = Clean(value.PlayerRoster);
             PlayerRosterLabel.gameObject.SetActive(value.Multiparty);
             localReadyLabel.transform.parent.gameObject.SetActive(!value.Multiparty);
-            relationHint.text = value.Multiparty ? "Seats follow join order. Left and right form a circle."
+            relationHint.text = value.ElementSelectionEnabled ? "Seats are drawn at start and each Retry. P numbers keep their identity."
+                : value.Multiparty ? "Seats follow join order. Left and right form a circle."
                 : "With two players, your friend is on both sides.";
-            float rosterOffset = value.Multiparty ? 56f : 0f;
+            float rosterOffset = value.ElementSelectionEnabled ? 310f : value.Multiparty ? 56f : 0f;
+            elementPanel.gameObject.SetActive(value.ElementSelectionEnabled);
+            Top(PlayerRosterLabel.rectTransform, 14f, 14f, value.ElementSelectionEnabled ? 510f : 291f, value.ElementSelectionEnabled ? 130f : 92f);
+            SelectionStatusLabel.text = value.SelectionPending ? "HOST CONFIRMATION PENDING…\nApproved choice: " + LobbyProtocol.ElementName(value.SelectedElement)
+                : "YOUR ELEMENT: " + LobbyProtocol.ElementName(value.SelectedElement);
+            SetButton(ClearElementButton, value.CanClearElement && !value.SelectionPending);
+            foreach (var entry in elementButtons)
+            {
+                LobbyElementOption option = Array.Find(value.ElementOptions ?? Array.Empty<LobbyElementOption>(), item => item != null && item.Element == entry.Key);
+                entry.Value.interactable = option?.CanSelect == true && !value.SelectionPending;
+                entry.Value.GetComponentInChildren<Text>().text = LobbyProtocol.ElementName(entry.Key)
+                    + (option?.Selected == true ? "\nSELECTED" : !string.IsNullOrEmpty(option?.OccupiedBy) ? "\n" + option.OccupiedBy : string.Empty);
+                entry.Value.GetComponent<Image>().color = option?.Selected == true ? new Color(.19f,.44f,.43f,1f) : new Color(.14f,.26f,.29f,1f);
+            }
             Top((RectTransform)ReadyButton.transform, 12f, 12f, 341f + rosterOffset, 52f);
             Top((RectTransform)StartButton.transform, 12f, 12f, 404f + rosterOffset, 52f);
             Top(StartStatusLabel.rectTransform, 14f, 14f, 466f + rosterOffset, 54f);
@@ -461,6 +483,7 @@ namespace C6.Prototype.Lobby
             PlayerRosterLabel = Text("PlayerRoster", sessionPanel, string.Empty, 13, White, TextAnchor.UpperLeft);
             Top(PlayerRosterLabel.rectTransform, 14f, 14f, 291f, 92f);
             PlayerRosterLabel.gameObject.SetActive(false);
+            CreateElementPanel();
             ReadyButton = Button("Ready", sessionPanel, "I'M READY", true);
             Top((RectTransform)ReadyButton.transform, 12f, 12f, 341f, 52f);
             readyCaption = ReadyButton.GetComponentInChildren<Text>();
@@ -473,6 +496,34 @@ namespace C6.Prototype.Lobby
             LeaveButton = Button("Leave", sessionPanel, "LEAVE ROOM", false);
             Top((RectTransform)LeaveButton.transform, 12f, 12f, 530f, 50f);
             LeaveButton.onClick.AddListener(() => LeaveRequested?.Invoke());
+        }
+
+        private void CreateElementPanel()
+        {
+            elementPanel = Image("ElementSelection", sessionPanel, new Color(.045f,.10f,.12f,1f)).rectTransform;
+            Top(elementPanel, 12f, 12f, 291f, 206f);
+            Text hint = Text("ElementHint", elementPanel, "CHOOSE YOUR ELEMENT · ONE PLAYER PER ELEMENT", 11, Gold, TextAnchor.MiddleCenter);
+            Top(hint.rectTransform, 8f, 8f, 6f, 28f);
+            SelectionStatusLabel = Text("ApprovedSelection", elementPanel, "YOUR ELEMENT: NOT SELECTED", 12, Teal, TextAnchor.MiddleCenter);
+            Top(SelectionStatusLabel.rectTransform, 8f, 8f, 38f, 35f);
+            RectTransform firstRow = Rect("ElementRow1", elementPanel);
+            Top(firstRow, 8f, 8f, 80f, 46f);
+            RectTransform secondRow = Rect("ElementRow2", elementPanel);
+            Top(secondRow, 8f, 8f, 134f, 46f);
+            for (int index = 0; index < LobbyProtocol.Elements.Length; index++)
+            {
+                OrbElement element = LobbyProtocol.Elements[index];
+                RectTransform parent = index < 3 ? firstRow : secondRow;
+                int column = index < 3 ? index : index - 3;
+                Button button = Button(element.ToString(), parent, LobbyProtocol.ElementName(element), false);
+                Fraction((RectTransform)button.transform, column / 3f, (column + 1f) / 3f);
+                button.onClick.AddListener(() => ElementSelectionRequested?.Invoke(element));
+                elementButtons.Add(element, button);
+            }
+            ClearElementButton = Button("ClearElement", secondRow, "CLEAR\nSELECTION", false);
+            Fraction((RectTransform)ClearElementButton.transform, 2f/3f, 1f);
+            ClearElementButton.onClick.AddListener(() => ClearElementRequested?.Invoke());
+            elementPanel.gameObject.SetActive(false);
         }
 
         private float LayoutCreatePanel()
@@ -503,8 +554,9 @@ namespace C6.Prototype.Lobby
             y += statusHeight + 8f;
             if (state.Connected)
             {
-                Top(sessionPanel, 0f, 0f, y, state.Multiparty ? 650f : 594f);
-                y += (state.Multiparty ? 650f : 594f) + 16f;
+                float sessionHeight = state.ElementSelectionEnabled ? 904f : state.Multiparty ? 650f : 594f;
+                Top(sessionPanel, 0f, 0f, y, sessionHeight);
+                y += sessionHeight + 16f;
             }
             else
             {

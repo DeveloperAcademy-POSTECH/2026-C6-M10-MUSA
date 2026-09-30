@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Linq;
 using C6.Prototype.Attack;
 using C6.Prototype.Orbs;
 using Unity.Collections;
@@ -88,7 +89,7 @@ namespace C6.Prototype.Combination
     // T08 uses its own small bounded envelope over the existing authenticated NGO connection.
     internal static class CombinationWire
     {
-        private const byte Version = 1;
+        private const byte Version = 2;
         internal const int MaximumBytes = 8192;
         private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
 
@@ -152,28 +153,33 @@ namespace C6.Prototype.Combination
             && left.requestId == right.requestId && left.sourceOrbId == right.sourceOrbId && left.targetOrbId == right.targetOrbId
             && left.sequence == right.sequence && Exact(left.sourcePosition, right.sourcePosition) && Exact(left.targetPosition, right.targetPosition);
 
-        internal static bool ValidOrb(OrbWire orb) => orb != null && ValidId(orb.id)
+        internal static bool ValidOrb(OrbWire orb, bool requireExplicitRaw = false) => orb != null && ValidId(orb.id)
             && Enum.IsDefined(typeof(OrbKind), orb.kind) && Enum.IsDefined(typeof(OrbPolarity), orb.polarity)
             && Enum.IsDefined(typeof(OrbAuthorityState), orb.state) && Normalized(orb.pos)
+            && OrbElements.ValidElementData((OrbKind)orb.kind, orb.rawElement, requireExplicitRaw)
             && (orb.kind == (int)OrbKind.Combined ? orb.polarity == (int)OrbPolarity.None : orb.polarity != (int)OrbPolarity.None);
 
-        internal static bool ValidOptionalOrb(OrbWire[] entries) => entries != null && entries.Length <= 1
-            && (entries.Length == 0 || ValidOrb(entries[0]));
+        internal static bool ValidOptionalOrb(OrbWire[] entries, bool requireExplicitRaw = false) => entries != null && entries.Length <= 1
+            && (entries.Length == 0 || ValidOrb(entries[0], requireExplicitRaw));
 
-        internal static bool ValidReply(CombinationReply reply)
+        internal static bool ValidReply(CombinationReply reply, bool requireExplicitRaw = false)
         {
-            if (reply == null || !ValidOptionalOrb(reply.originalCombinedEntries) || !ValidOptionalOrb(reply.currentSourceEntries)
-                || !ValidOptionalOrb(reply.currentTargetEntries) || !ValidOptionalOrb(reply.currentCombinedEntries)
+            if (reply == null || !ValidOptionalOrb(reply.originalCombinedEntries, requireExplicitRaw) || !ValidOptionalOrb(reply.currentSourceEntries, requireExplicitRaw)
+                || !ValidOptionalOrb(reply.currentTargetEntries, requireExplicitRaw) || !ValidOptionalOrb(reply.currentCombinedEntries, requireExplicitRaw)
                 || !ValidContext(reply.nonce, reply.sessionId, reply.roundId) || !ValidId(reply.requestId)
                 || !ValidId(reply.sourceOrbId) || !ValidId(reply.targetOrbId) || reply.sequence == 0 || reply.inventoryRevision == 0
                 || !Normalized(reply.sourcePosition) || !Normalized(reply.targetPosition)
                 || reply.reason == null || reply.reason.Length > 128 || reply.accepted && !reply.known)
                 return false;
-            if (reply.currentSource != null && (!ValidOrb(reply.currentSource) || reply.currentSource.id != reply.sourceOrbId)
-                || reply.currentTarget != null && (!ValidOrb(reply.currentTarget) || reply.currentTarget.id != reply.targetOrbId)
-                || reply.originalCombined != null && !ValidOrb(reply.originalCombined)
-                || reply.currentCombined != null && !ValidOrb(reply.currentCombined)) return false;
+            if (reply.currentSource != null && (!ValidOrb(reply.currentSource, requireExplicitRaw) || reply.currentSource.id != reply.sourceOrbId)
+                || reply.currentTarget != null && (!ValidOrb(reply.currentTarget, requireExplicitRaw) || reply.currentTarget.id != reply.targetOrbId)
+                || reply.originalCombined != null && !ValidOrb(reply.originalCombined, requireExplicitRaw)
+                || reply.currentCombined != null && !ValidOrb(reply.currentCombined, requireExplicitRaw)) return false;
             if (!reply.accepted) return reply.originalCombined == null && reply.currentCombined == null;
+            if (requireExplicitRaw && (reply.currentSource == null || reply.currentTarget == null || reply.originalCombined == null
+                || reply.currentSource.rawElement != reply.currentTarget.rawElement
+                || !OrbElements.TryDecodeCombinedId(reply.originalCombined.id, out var yin, out var yang)
+                || yin != reply.currentSource.rawElement || yang != reply.currentSource.rawElement)) return false;
             return !reply.sourcePending && !reply.targetPending && reply.sourceOrbId != reply.targetOrbId && reply.currentSource != null && reply.currentTarget != null
                 && reply.originalCombined != null && reply.currentCombined != null
                 && reply.currentSource.kind == (int)OrbKind.Raw && reply.currentTarget.kind == (int)OrbKind.Raw
@@ -190,14 +196,26 @@ namespace C6.Prototype.Combination
 
         // Snapshot payloads remain owned/validated by AttackSession. A receipt cannot advance its
         // revision or substitute a partial inventory: the actual snapshot must catch up first.
-        internal static bool InventoryConfirmed(CombinationReply reply, AttackSnapshot snapshot) => reply != null
-            && reply.known && reply.accepted && reply.inventoryRevision > 0 && snapshot != null
-            && snapshot.nonce == reply.nonce && snapshot.sessionId == reply.sessionId && snapshot.roundId == reply.roundId
-            && snapshot.revision >= reply.inventoryRevision;
-
-        internal static bool MatchesReply(CombinationPacket pending, CombinationReply reply, ulong owner)
+        internal static bool InventoryConfirmed(CombinationReply reply, AttackSnapshot snapshot, bool requireExplicitRaw = false)
         {
-            if (pending == null || !ValidReply(reply) || reply.nonce != pending.nonce || reply.sessionId != pending.sessionId
+            if (reply == null || !reply.known || !reply.accepted || reply.inventoryRevision == 0 || snapshot == null
+                || snapshot.nonce != reply.nonce || snapshot.sessionId != reply.sessionId || snapshot.roundId != reply.roundId
+                || snapshot.revision < reply.inventoryRevision) return false;
+            if (!requireExplicitRaw) return true;
+            if (!ValidReply(reply, true) || snapshot.orbs == null) return false;
+            // Materials/result may already be consumed and omitted, or the Combined may have a new owner.
+            // Preserve those legal progressions; compare only the immutable element for any present same ID.
+            foreach (var receiptOrb in new[] { reply.currentSource, reply.currentTarget, reply.originalCombined })
+            {
+                var confirmed = snapshot.orbs.FirstOrDefault(value => value != null && value.id == receiptOrb.id);
+                if (confirmed != null && confirmed.rawElement != receiptOrb.rawElement) return false;
+            }
+            return true;
+        }
+
+        internal static bool MatchesReply(CombinationPacket pending, CombinationReply reply, ulong owner, bool requireExplicitRaw = false)
+        {
+            if (pending == null || !ValidReply(reply, requireExplicitRaw) || reply.nonce != pending.nonce || reply.sessionId != pending.sessionId
                 || reply.roundId != pending.roundId || reply.requestId != pending.requestId || reply.sourceOrbId != pending.sourceOrbId
                 || reply.targetOrbId != pending.targetOrbId || reply.sequence != pending.sequence
                 || !Exact(reply.sourcePosition, pending.sourcePosition) || !Exact(reply.targetPosition, pending.targetPosition)) return false;

@@ -48,7 +48,12 @@ namespace C6.Prototype.GameSync.Tests
             SingleOnRoot<ThrowBattleFraming>(root);
             Assert.That(game.MaximumParticipants, Is.EqualTo(5));
             Assert.That(lobby.MaximumParticipants, Is.EqualTo(5));
-            Assert.That(lobby.ProtocolVersion, Is.EqualTo(24));
+            Assert.That(game.ElementSelectionEnabled, Is.True);
+            Assert.That(controller.Hud.ElementWarningOverlay, Is.Not.Null);
+            Assert.That(controller.Hud.ReadyStartButton, Is.Not.Null);
+            Assert.That(controller.Hud.ReadyLobbyButton, Is.Not.Null);
+            Assert.That(controller.Hud.PlayerIdentityText, Is.Not.Null);
+            Assert.That(lobby.ProtocolVersion, Is.EqualTo(LobbyProtocol.ElementSelectionVersion));
             Assert.That(controller.MaximumParticipants, Is.EqualTo(5));
             Assert.That(game.BuildIdentifier, Is.EqualTo("25"));
             Assert.That(lobby.BuildIdentifier, Is.EqualTo("25"));

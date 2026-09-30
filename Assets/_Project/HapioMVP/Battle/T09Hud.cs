@@ -23,6 +23,28 @@ namespace C6.Prototype.Battle
         [SerializeField] private SplitScreenLayout layout;
         [SerializeField, HideInInspector] private bool useSceneHierarchy;
         public bool UseSceneHierarchy => useSceneHierarchy;
+        [SerializeField] private GameObject elementWarningOverlay;
+        [SerializeField] private Text elementWarningText;
+        [SerializeField] private Button elementWarningConfirm;
+        [SerializeField] private Text playerIdentityText;
+        public bool ElementWarningVisible => elementWarningOverlay != null && elementWarningOverlay.activeSelf;
+        public GameObject ElementWarningOverlay => elementWarningOverlay;
+        public Text ElementWarningText => elementWarningText;
+        public Button ElementWarningConfirm => elementWarningConfirm;
+        public Text PlayerIdentityText => playerIdentityText;
+        [SerializeField] private GameObject readyRoomControls;
+        [SerializeField] private Button readyStartButton;
+        [SerializeField] private Button readyLobbyButton;
+        public Button ReadyStartButton => readyStartButton;
+        public Button ReadyLobbyButton => readyLobbyButton;
+        public GameObject ReadyRoomControls => readyRoomControls;
+        public void SetRoomPreparationControls(bool visible, bool canStart)
+        {
+            if (readyRoomControls == null) return;
+            readyRoomControls.SetActive(visible);
+            readyStartButton.interactable = canStart;
+            readyLobbyButton.interactable = visible;
+        }
         private Font font;
         [SerializeField] private RectTransform topZone;
         [SerializeField] private RectTransform bottomZone;
@@ -316,6 +338,76 @@ namespace C6.Prototype.Battle
         }
 #endif
 
+        /// <summary>Add only this feature's panel/label; preserve every existing Canvas child and reference.</summary>
+        public void PrepareElementSelectionUI()
+        {
+            if (Canvas == null) throw new InvalidOperationException("Prepare the existing battle Canvas first.");
+            if (font == null) font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            var canvasRect = Canvas.GetComponent<RectTransform>();
+            if (elementWarningOverlay == null)
+            {
+                if (canvasRect.Find("ElementAttackWarning") != null)
+                    throw new InvalidOperationException("Unbound element warning already exists; preserve and inspect it.");
+                var overlay = Image("ElementAttackWarning", canvasRect, new Color(0f, 0f, 0f, .68f));
+                overlay.raycastTarget = true;
+                overlay.rectTransform.anchorMin = Vector2.zero; overlay.rectTransform.anchorMax = Vector2.one;
+                overlay.rectTransform.offsetMin = overlay.rectTransform.offsetMax = Vector2.zero;
+                var panel = Image("WarningPanel", overlay.rectTransform, new Color(.07f, .12f, .15f, 1f)).rectTransform;
+                panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(.5f, .5f);
+                panel.sizeDelta = new Vector2(320f, 190f);
+                elementWarningText = Text("WarningMessage", panel, "Only your selected element can attack.", 16, White, TextAnchor.MiddleCenter);
+                elementWarningText.rectTransform.anchorMin = new Vector2(0f, .32f);
+                elementWarningText.rectTransform.anchorMax = new Vector2(1f, 1f);
+                elementWarningText.rectTransform.offsetMin = new Vector2(14f, 5f);
+                elementWarningText.rectTransform.offsetMax = new Vector2(-14f, -10f);
+                var row = Rect("ConfirmRow", panel);
+                row.anchorMin = new Vector2(.2f, .07f); row.anchorMax = new Vector2(.8f, .27f);
+                row.offsetMin = row.offsetMax = Vector2.zero;
+                elementWarningConfirm = CreateButton("Confirm", row, "OK", 0f, 1f);
+                elementWarningOverlay = overlay.gameObject;
+                elementWarningOverlay.SetActive(false);
+                if (Application.isPlaying) elementWarningConfirm.onClick.AddListener(HideElementWarning);
+            }
+            if (readyRoomControls == null)
+            {
+                var row = Image("ReadyRoomControls", canvasRect, Ink).rectTransform;
+                row.anchorMin = new Vector2(.2f, .42f); row.anchorMax = new Vector2(.8f, .47f);
+                row.offsetMin = row.offsetMax = Vector2.zero;
+                readyStartButton = CreateButton("ReadyHostStart", row, "START", 0f, .5f);
+                readyLobbyButton = CreateButton("ReadyRoomLobby", row, "ROOM LOBBY", .5f, 1f);
+                readyRoomControls = row.gameObject; readyRoomControls.SetActive(false);
+            }
+            if (playerIdentityText == null)
+            {
+                var parent = SafeArea != null ? SafeArea.GetComponent<RectTransform>() : canvasRect;
+                if (parent.Find("PlayerElementSeat") != null)
+                    throw new InvalidOperationException("Unbound identity label already exists; preserve and inspect it.");
+                playerIdentityText = Text("PlayerElementSeat", parent, "", 12, White, TextAnchor.MiddleLeft);
+                playerIdentityText.rectTransform.anchorMin = new Vector2(.025f, .900f);
+                playerIdentityText.rectTransform.anchorMax = new Vector2(.8f, .925f);
+                playerIdentityText.rectTransform.offsetMin = playerIdentityText.rectTransform.offsetMax = Vector2.zero;
+                var shadow = playerIdentityText.gameObject.AddComponent<UnityEngine.UI.Shadow>();
+                shadow.effectColor = new Color(0f, 0f, 0f, .9f); shadow.effectDistance = new Vector2(1f, -1f);
+                playerIdentityText.gameObject.SetActive(false);
+            }
+        }
+        public void SetPlayerIdentity(bool visible, string value)
+        {
+            if (visible && playerIdentityText == null) PrepareElementSelectionUI();
+            if (playerIdentityText == null) return;
+            playerIdentityText.text = value ?? "";
+            playerIdentityText.gameObject.SetActive(visible);
+        }
+        public void ShowElementWarning(string message)
+        {
+            if (elementWarningOverlay == null) PrepareElementSelectionUI();
+            elementWarningText.text = message;
+            elementWarningOverlay.transform.SetAsLastSibling();
+            elementWarningOverlay.SetActive(true);
+        }
+        public void HideElementWarning()
+        { if (elementWarningOverlay != null) elementWarningOverlay.SetActive(false); }
+
         private void Awake()
         {
             // Editor mode only previews a saved hierarchy; never construct legacy UI while editing.
@@ -335,6 +427,8 @@ namespace C6.Prototype.Battle
                 font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 CreateUI();
             }
+            HideElementWarning();
+            if (elementWarningConfirm != null) elementWarningConfirm.onClick.AddListener(HideElementWarning);
             SetStatus(networkStatus, actionStatus, detailStatus);
             SetControls(canHost, canJoin, canStart, canEnd, canGenerate, canDebugFixture, canSolo);
             SetResources(100d, 100d, 20d, 20d / 3d, 0, 20, false, false);

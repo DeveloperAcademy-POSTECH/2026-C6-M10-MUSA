@@ -5,6 +5,10 @@ namespace C6.Prototype.Presentation
     public static class ParticipantViewAngle
     {
         public static float CalculateYaw(int playerNumber, int participantCount)
+            => CalculateSeatYaw(playerNumber, participantCount);
+
+        /// <summary>The one-based actual round seat, never the player's admission P number.</summary>
+        public static float CalculateSeatYaw(int seatNumber, int participantCount)
         {
             if (participantCount < 2 || participantCount > 5)
             {
@@ -15,17 +19,17 @@ namespace C6.Prototype.Presentation
                 );
             }
 
-            if (playerNumber < 1 || playerNumber > participantCount)
+            if (seatNumber < 1 || seatNumber > participantCount)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(playerNumber),
-                    playerNumber,
-                    "플레이어 번호는 1부터 참가 인원수 사이여야 합니다."
+                    nameof(seatNumber),
+                    seatNumber,
+                    "실제 자리는 1부터 참가 인원수 사이여야 합니다."
                 );
             }
 
             float angleStep = 360f / participantCount;
-            float playerYaw = (playerNumber - 1) * angleStep;
+            float playerYaw = (seatNumber - 1) * angleStep;
 
             return playerYaw;
         }

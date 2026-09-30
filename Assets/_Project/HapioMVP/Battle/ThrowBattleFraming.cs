@@ -52,9 +52,13 @@ namespace C6.Prototype.Battle
             hasBaseline = true;
         }
         public void ConfigureParticipantView(int playerNumber, int participantCount)
+            => ConfigureSeatView(playerNumber, participantCount);
+
+        /// <summary>Rotate the local camera by the approved one-based round seat.</summary>
+        public void ConfigureSeatView(int seatNumber, int participantCount)
         {
-            participantYaw = ParticipantViewAngle.CalculateYaw(
-                playerNumber,
+            participantYaw = ParticipantViewAngle.CalculateSeatYaw(
+                seatNumber,
                 participantCount
             );
 

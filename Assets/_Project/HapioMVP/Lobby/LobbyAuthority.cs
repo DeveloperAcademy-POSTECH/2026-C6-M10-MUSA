@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using C6.Prototype.Presentation;
 
 namespace C6.Prototype.Lobby
 {
@@ -13,6 +14,7 @@ namespace C6.Prototype.Lobby
             internal ulong Id;
             internal bool InitialStateReceived;
             internal bool Ready;
+            internal OrbElement SelectedElement;
             internal string Nonce;
             internal ulong LastSequence;
             internal ulong AdmissionRevision;
@@ -23,6 +25,8 @@ namespace C6.Prototype.Lobby
         private readonly string hostConfigJson;
         private LobbyStartContract start;
         private ulong rosterRevision = 1;
+        private uint completedRound;
+        private readonly Random seatRandom = new Random(BitConverter.ToInt32(Guid.NewGuid().ToByteArray(), 0));
         public string RoomId { get; }
         public string SessionId { get; }
         public string Build { get; }
@@ -34,12 +38,16 @@ namespace C6.Prototype.Lobby
         public uint RoundId => start?.roundId ?? 0;
         public int MaximumParticipants { get; }
         public bool ContinuousTransfersEnabled { get; }
-        public int ProtocolVersion => LobbyProtocol.For(MaximumParticipants, ContinuousTransfersEnabled);
+        public bool ElementSelectionEnabled { get; }
+        public ulong SelectionRevision { get; private set; }
+        public int ProtocolVersion => LobbyProtocol.For(MaximumParticipants, ContinuousTransfersEnabled, ElementSelectionEnabled);
         public int ParticipantCount => peers.Count + 1;
         public bool CanStart => Phase == LobbyProtocol.Lobby && peers.Count > 0 && host.Ready && host.InitialStateReceived
-            && peers.All(p => p.Ready && p.InitialStateReceived);
+            && peers.All(p => p.Ready && p.InitialStateReceived)
+            && (!ElementSelectionEnabled || LobbyProtocol.ValidElement(host.SelectedElement)
+                && peers.All(p => LobbyProtocol.ValidElement(p.SelectedElement)));
 
-        public LobbyAuthority(string roomId, string sessionId, string build, string hostConfigJson, uint seed, int maximumParticipants = LobbyProtocol.Capacity, bool continuousTransfers = false)
+        public LobbyAuthority(string roomId, string sessionId, string build, string hostConfigJson, uint seed, int maximumParticipants = LobbyProtocol.Capacity, bool continuousTransfers = false, bool elementSelection = false)
         {
             if (!LobbyWire.ValidId(roomId) || !LobbyWire.ValidId(sessionId) || !LobbyWire.ValidBuild(build)
                 || !LobbyWire.ValidConfigJson(hostConfigJson)) throw new ArgumentException("Invalid bounded lobby identity or host configuration.");
@@ -47,7 +55,10 @@ namespace C6.Prototype.Lobby
                 throw new ArgumentOutOfRangeException(nameof(maximumParticipants));
             if (continuousTransfers && maximumParticipants != LobbyProtocol.MaximumCapacity)
                 throw new ArgumentException("Continuous transfers require the multiparty contract.");
-            MaximumParticipants = maximumParticipants; ContinuousTransfersEnabled = continuousTransfers;
+            if (elementSelection && (!continuousTransfers || maximumParticipants != LobbyProtocol.MaximumCapacity))
+                throw new ArgumentException("Element selection requires the continuous-transfer multiparty contract.");
+            MaximumParticipants = maximumParticipants; ContinuousTransfersEnabled = continuousTransfers; ElementSelectionEnabled = elementSelection;
+            SelectionRevision = elementSelection ? 1ul : 0ul;
             RoomId = roomId; SessionId = sessionId; Build = build; this.hostConfigJson = hostConfigJson; Seed = seed;
             ConfigFingerprint = LobbyWire.Fingerprint(hostConfigJson);
             host = new Participant { Id = LobbyProtocol.HostClientId, InitialStateReceived = true, Nonce = string.Empty, AdmissionRevision = 1 };
@@ -56,12 +67,12 @@ namespace C6.Prototype.Lobby
         public bool TryAdmit(ulong clientId, LobbyHello hello, out string reason)
         {
             if (clientId == LobbyProtocol.HostClientId) { reason = "HOST_ID_RESERVED"; return false; }
-            reason = LobbyCompatibility.Check(hello, Build, RoomId, Phase, ParticipantCount, MaximumParticipants, ContinuousTransfersEnabled);
+            reason = LobbyCompatibility.Check(hello, Build, RoomId, Phase, ParticipantCount, MaximumParticipants, ContinuousTransfersEnabled, ElementSelectionEnabled);
             if (reason.Length != 0) return false;
             if (peers.Any(p => p.Id == clientId || (MaximumParticipants > 2 && p.Nonce == hello.clientNonce)))
                 { reason = "DUPLICATE_PARTICIPANT"; return false; }
             peers.Add(new Participant { Id = clientId, Nonce = hello.clientNonce, AdmissionRevision = Revision + 1 });
-            if (MaximumParticipants > 2) { ResetReady(); rosterRevision = Revision + 1; }
+            if (MaximumParticipants > 2) { ResetReady(); rosterRevision = Revision + 1; if (ElementSelectionEnabled) SelectionRevision = Revision + 1; }
             Revision++;
             return true;
         }
@@ -90,6 +101,8 @@ namespace C6.Prototype.Lobby
             {
                 if (request.kind == LobbyProtocol.SetReady) revisionAccepted = request.revision >= rosterRevision;
                 else if (request.kind == LobbyProtocol.AckInitial) revisionAccepted = request.revision >= participant.AdmissionRevision;
+                else if (ElementSelectionEnabled && (request.kind == LobbyProtocol.SelectElement || request.kind == LobbyProtocol.ClearElement))
+                    revisionAccepted = request.revision >= rosterRevision;
             }
             if (!revisionAccepted) return Reject("STALE_REVISION", out reason);
             if (request.kind == LobbyProtocol.Leave)
@@ -106,17 +119,39 @@ namespace C6.Prototype.Lobby
             {
                 if (!participant.InitialStateReceived) return Reject("INITIAL_STATE_REQUIRED", out reason);
                 if (request.configFingerprint != ConfigFingerprint) return Reject("CONFIG_MISMATCH", out reason);
+                if (ElementSelectionEnabled && request.selectionRevision != SelectionRevision) return Reject("SELECTION_CHANGED_READY_AGAIN", out reason);
+                if (ElementSelectionEnabled && !LobbyProtocol.ValidElement(participant.SelectedElement)) return Reject("ELEMENT_SELECTION_REQUIRED", out reason);
                 if (participant.Ready == request.ready) return Reject("READY_UNCHANGED", out reason);
                 participant.Ready = request.ready;
+            }
+            else if (request.kind == LobbyProtocol.SelectElement || request.kind == LobbyProtocol.ClearElement)
+            {
+                if (!ElementSelectionEnabled) return Reject("UNKNOWN_REQUEST", out reason);
+                if (!participant.InitialStateReceived) return Reject("INITIAL_STATE_REQUIRED", out reason);
+                if (request.configFingerprint != ConfigFingerprint) return Reject("CONFIG_MISMATCH", out reason);
+                OrbElement selected = request.kind == LobbyProtocol.ClearElement ? OrbElement.None : request.selectedElement;
+                if (request.kind == LobbyProtocol.SelectElement && !LobbyProtocol.ValidElement(selected)) return Reject("INVALID_ELEMENT", out reason);
+                if (participant.SelectedElement == selected) { reason = string.Empty; return true; }
+                // Check occupancy before releasing the old choice: a rejected change preserves Ready and ownership.
+                if (selected != OrbElement.None && (host.Id != sender && host.SelectedElement == selected
+                    || peers.Any(p => p.Id != sender && p.SelectedElement == selected))) return Reject("ELEMENT_ALREADY_SELECTED", out reason);
+                participant.SelectedElement = selected;
+                ResetReady();
+                SelectionRevision = Revision + 1;
             }
             else if (request.kind == LobbyProtocol.Start)
             {
                 if (sender != LobbyProtocol.HostClientId) return Reject("HOST_ONLY", out reason);
                 if (!CanStart) return Reject(MaximumParticipants > 2 ? "ALL_READY_REQUIRED" : "BOTH_READY_REQUIRED", out reason);
                 if (request.configFingerprint != ConfigFingerprint) return Reject("CONFIG_MISMATCH", out reason);
-                start = new LobbyStartContract { roomId = RoomId, sessionId = SessionId, roundId = 1,
+                if (completedRound == uint.MaxValue) return Reject("ROUND_LIMIT", out reason);
+                var participants = new[] { host }.Concat(peers).ToArray();
+                var participantIds = MaximumParticipants > 2 ? participants.Select(p => p.Id).ToArray() : Array.Empty<ulong>();
+                start = new LobbyStartContract { roomId = RoomId, sessionId = SessionId, roundId = completedRound + 1,
                     seed = Seed, configFingerprint = ConfigFingerprint, hostConfigJson = hostConfigJson, continuousTransfers = ContinuousTransfersEnabled,
-                    participantIds = MaximumParticipants > 2 ? new[] { host.Id }.Concat(peers.Select(p => p.Id)).ToArray() : Array.Empty<ulong>() };
+                    participantIds = participantIds, elementSelection = ElementSelectionEnabled,
+                    selectedElements = ElementSelectionEnabled ? participants.Select(p => p.SelectedElement).ToArray() : Array.Empty<OrbElement>(),
+                    roundSeatOrder = ElementSelectionEnabled ? ShuffleSeats(participantIds, seatRandom) : Array.Empty<ulong>() };
                 Phase = LobbyProtocol.Playing;
             }
             else return Reject("UNKNOWN_REQUEST", out reason);
@@ -134,6 +169,28 @@ namespace C6.Prototype.Lobby
             Revision++;
         }
 
+        /// <summary>Host integration calls this only after a completed result / Retry preparation.</summary>
+        public bool ReturnToLobby(uint finishedRound)
+        {
+            if (!ElementSelectionEnabled || Phase != LobbyProtocol.Playing || start == null
+                || finishedRound < start.roundId || finishedRound == uint.MaxValue) return false;
+            completedRound = finishedRound;
+            start = null;
+            Phase = LobbyProtocol.Lobby;
+            ResetReady();
+            Revision++; rosterRevision = Revision; SelectionRevision = Revision;
+            return true;
+        }
+
+        public static ulong[] ShuffleSeats(ulong[] participantIds, Random random)
+        {
+            if (participantIds == null || random == null) throw new ArgumentNullException(participantIds == null ? nameof(participantIds) : nameof(random));
+            var seats = (ulong[])participantIds.Clone();
+            for (int i = seats.Length - 1; i > 0; i--)
+            { int other = random.Next(i + 1); (seats[i], seats[other]) = (seats[other], seats[i]); }
+            return seats;
+        }
+
         // Only the P3 lobby can shrink. Playing/legacy disconnections keep the original room-end policy.
         public bool RemoveParticipant(ulong clientId, out string reason)
         {
@@ -142,7 +199,7 @@ namespace C6.Prototype.Lobby
             if (peer == null) return Reject("NOT_A_PARTICIPANT", out reason);
             if (MaximumParticipants <= 2 || Phase != LobbyProtocol.Lobby)
             { Close("PARTICIPANT_LEFT"); reason = string.Empty; return true; }
-            peers.Remove(peer); ResetReady(); Revision++; rosterRevision = Revision; reason = string.Empty; return true;
+            peers.Remove(peer); ResetReady(); Revision++; rosterRevision = Revision; if (ElementSelectionEnabled) SelectionRevision = Revision; reason = string.Empty; return true;
         }
         private void ResetReady() { host.Ready = false; foreach (var peer in peers) peer.Ready = false; }
         public LobbySnapshot Snapshot(string recipientNonce = "")
@@ -151,18 +208,19 @@ namespace C6.Prototype.Lobby
             return new LobbySnapshot
             {
                 protocol = ProtocolVersion, build = Build, roomId = RoomId, sessionId = SessionId,
-                revision = Revision, phase = Phase, seed = Seed, roundId = RoundId,
+                revision = Revision, selectionRevision = SelectionRevision, phase = Phase, seed = Seed, roundId = RoundId,
                 hostConfigJson = hostConfigJson, configFingerprint = ConfigFingerprint, recipientNonce = recipientNonce,
                 p1 = roster[0], p2 = roster.Length > 1 ? roster[1] : null,
                 players = MaximumParticipants > 2 ? roster : Array.Empty<LobbyPlayer>(), canStart = CanStart,
                 closeReason = CloseReason, start = start == null ? null : new LobbyStartContract
                 { roomId = start.roomId, sessionId = start.sessionId, roundId = start.roundId, seed = start.seed,
                     configFingerprint = start.configFingerprint, hostConfigJson = start.hostConfigJson, continuousTransfers = start.continuousTransfers,
-                    participantIds = (ulong[])start.participantIds.Clone() }
+                    participantIds = (ulong[])start.participantIds.Clone(), elementSelection = start.elementSelection,
+                    selectedElements = (OrbElement[])start.selectedElements.Clone(), roundSeatOrder = (ulong[])start.roundSeatOrder.Clone() }
             };
         }
         private static LobbyPlayer CopyPlayer(Participant source, int number) => new LobbyPlayer
-        { clientId = source.Id, playerNumber = number, connected = true, initialStateReceived = source.InitialStateReceived, ready = source.Ready };
+        { clientId = source.Id, playerNumber = number, connected = true, initialStateReceived = source.InitialStateReceived, ready = source.Ready, selectedElement = source.SelectedElement };
         private static bool Reject(string value, out string reason) { reason = value; return false; }
     }
 }

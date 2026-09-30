@@ -3,6 +3,7 @@ using System.Collections;
 using System.Linq;
 using System.Reflection;
 using C6.Prototype.Networking;
+using C6.Prototype.Presentation;
 using NUnit.Framework;
 using Unity.Netcode;
 using UnityEngine;
@@ -171,6 +172,90 @@ namespace C6.Prototype.Lobby.Tests
             Assert.That(Hud.PlayerRosterLabel.text, Does.Contain("P1  (YOU)"));
             Assert.That(Session.StartMatch(), Is.False);
             Assert.Throws<InvalidOperationException>(() => Session.ConfigureCapacity(2));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator ElementSelectionAndClearButtonsReflectOnlyHostApprovedChoice()
+        {
+            Session.ConfigureCapacity(5);
+            Session.ConfigureContinuousTransfers(true);
+            Session.ConfigureElementSelection(true);
+            Session.ConfigureBuild("56");
+            yield return CreateHost();
+            Assert.That(Session.ProtocolVersion, Is.EqualTo(56));
+            Assert.That(Session.LocalPlayer.selectedElement, Is.EqualTo(OrbElement.None));
+            Assert.That(Session.CanReady || Hud.ReadyButton.interactable, Is.False);
+            Assert.That(Hud.ElementButtons.Count, Is.EqualTo(5));
+            Assert.That(Hud.ElementButtons.Values.All(button=>button.gameObject.activeInHierarchy&&button.interactable), Is.True);
+            Assert.That(Hud.SelectionStatusLabel.text, Does.Contain("NOT SELECTED"));
+            Assert.That(Hud.ClearElementButton.interactable, Is.False);
+            Hud.ElementButtons[OrbElement.Fire].onClick.Invoke();
+            Assert.That(Session.LastReply.accepted, Is.True);
+            Assert.That(Session.LocalPlayer.selectedElement, Is.EqualTo(OrbElement.Fire));
+            Assert.That(Hud.SelectionStatusLabel.text, Does.Contain("FIRE"));
+            Assert.That(Hud.ElementButtons[OrbElement.Fire].GetComponentInChildren<Text>().text, Does.Contain("SELECTED"));
+            Assert.That(Session.CanReady&&Hud.ReadyButton.interactable, Is.True);
+            Hud.ReadyButton.onClick.Invoke();
+            Assert.That(Session.LocalReady, Is.True);
+            Hud.ClearElementButton.onClick.Invoke();
+            Assert.That(Session.LocalPlayer.selectedElement, Is.EqualTo(OrbElement.None));
+            Assert.That(Session.LocalReady||Session.CanReady||Hud.ReadyButton.interactable, Is.False);
+            Assert.That(Hud.SelectionStatusLabel.text, Does.Contain("NOT SELECTED"));
+            Assert.That(Session.Snapshot.start, Is.Null, "A real single NGO Host is not multiplayer start evidence.");
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PendingChoiceFixtureBlocksButtonsAndSessionSubmissionWithoutOptimisticChange()
+        {
+            Session.ConfigureCapacity(5); Session.ConfigureContinuousTransfers(true); Session.ConfigureElementSelection(true);
+            yield return CreateHost();
+            Assert.That(Session.SelectElement(OrbElement.Water), Is.True);
+            var pending = typeof(T10LobbySession).GetField("pendingId",BindingFlags.Instance|BindingFlags.NonPublic);
+            var sequence = typeof(T10LobbySession).GetField("sequence",BindingFlags.Instance|BindingFlags.NonPublic);
+            ulong before = (ulong)sequence.GetValue(Session);
+            try
+            {
+                // Explicit Pending UI/session fixture over a real NGO Host. This does not claim
+                // network latency or a second physical device.
+                pending.SetValue(Session,"pending-fixture"); controller.RefreshView();
+                Assert.That(Hud.ElementButtons.Values.All(button=>!button.interactable), Is.True);
+                Assert.That(Hud.ClearElementButton.interactable||Hud.ReadyButton.interactable, Is.False);
+                Assert.That(Hud.SelectionStatusLabel.text, Does.Contain("PENDING"));
+                Assert.That(Hud.SelectionStatusLabel.text, Does.Contain("WATER"));
+                Assert.That(Session.SelectElement(OrbElement.Fire)||Session.ClearElement()||Session.ToggleReady(), Is.False);
+                Hud.ElementButtons[OrbElement.Fire].onClick.Invoke();
+                Assert.That((ulong)sequence.GetValue(Session), Is.EqualTo(before));
+                Assert.That(Session.LocalPlayer.selectedElement, Is.EqualTo(OrbElement.Water));
+                Assert.That(Session.HasPending, Is.True);
+            }
+            finally { pending.SetValue(Session,null); controller.RefreshView(); }
+            Assert.That(Hud.ElementButtons[OrbElement.Fire].interactable, Is.True);
+            Assert.That(Hud.ReadyButton.interactable, Is.True);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator FiveElementRowsFitAboveReadyAndShowOccupancyAndSeatIdentity()
+        {
+            var column=(RectTransform)Hud.Canvas.transform.Find("SafeArea/CenteredColumn");
+            column.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,320f);
+            column.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical,700f);
+            Hud.SetState(new LobbyUiState{Connected=true,Multiparty=true,ElementSelectionEnabled=true,Participants="5 / 5",
+                SelectedElement=OrbElement.Wood,LocalPlayer="P3 / WOOD / SEAT 1",LeftPlayer="P5",RightPlayer="P1",
+                PlayerRoster="P1 / FIRE / SEAT 2 / READY\nP2 / WATER / SEAT 5 / READY\nP3 / WOOD / SEAT 1 / READY\nP4 / METAL / SEAT 4 / READY\nP5 / EARTH / SEAT 3 / READY",
+                ElementOptions=LobbyProtocol.Elements.Select(element=>new LobbyElementOption{Element=element,
+                    OccupiedBy=element==OrbElement.Fire?"P1":"",Selected=element==OrbElement.Wood,CanSelect=element!=OrbElement.Fire}).ToArray()});
+            Canvas.ForceUpdateCanvases();
+            Assert.That(Hud.ElementButtons[OrbElement.Fire].interactable, Is.False);
+            Assert.That(Hud.ElementButtons[OrbElement.Fire].GetComponentInChildren<Text>().text, Does.Contain("P1"));
+            Assert.That(Hud.LocalPlayerLabel.text, Does.Contain("P3 / WOOD / SEAT 1"));
+            Assert.That(Hud.PlayerRosterLabel.preferredHeight, Is.LessThanOrEqualTo(Hud.PlayerRosterLabel.rectTransform.rect.height));
+            Rect roster=ScreenRect(Hud.PlayerRosterLabel.rectTransform), ready=ScreenRect((RectTransform)Hud.ReadyButton.transform);
+            Assert.That(roster.yMin, Is.GreaterThan(ready.yMax));
+            Assert.That(Hud.Scroll.vertical, Is.True);
+            Assert.That(Hud.Content.rect.height, Is.GreaterThan(Hud.Scroll.viewport.rect.height));
             yield return null;
         }
 

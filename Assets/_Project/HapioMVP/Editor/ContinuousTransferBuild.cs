@@ -176,7 +176,7 @@ namespace C6.Editor
                 RequireOnRoot<T10LobbyHud>(roots, root);
                 RequireOnRoot<T10LobbyController>(roots, root);
                 if (!game.ContinuousTransfersEnabled || !lobby.ContinuousTransfersEnabled || !root.GetComponent<T09BattleController>().ContinuousTransfersEnabled
-                    || lobby.ProtocolVersion != LobbyProtocol.ContinuousTransferVersion || game.MaximumParticipants != 5 || lobby.MaximumParticipants != 5 || root.GetComponent<T09BattleController>().MaximumParticipants != 5 || !game.InterruptionHandlingEnabled || !game.TransfersEnabled || !game.ReachableEdgeTransferDistance || game.BuildIdentifier != BuildNumber || lobby.BuildIdentifier != BuildNumber)
+                    || lobby.ProtocolVersion != (game.ElementSelectionEnabled ? LobbyProtocol.ElementSelectionVersion : LobbyProtocol.ContinuousTransferVersion) || game.MaximumParticipants != 5 || lobby.MaximumParticipants != 5 || root.GetComponent<T09BattleController>().MaximumParticipants != 5 || !game.InterruptionHandlingEnabled || !game.TransfersEnabled || !game.ReachableEdgeTransferDistance || game.BuildIdentifier != BuildNumber || lobby.BuildIdentifier != BuildNumber)
                     throw new InvalidOperationException("The existing scene is not the expected build25 developer-settings mode; it was preserved.");
                 if (layout.BattleCamera == null || layout.OrbCamera == null || layout.BattleCamera == layout.OrbCamera)
                     throw new InvalidOperationException("P4 requires its two distinct remapped cameras.");
@@ -241,7 +241,7 @@ namespace C6.Editor
             if(!list.values.Any(v=>v.AsString()==BonjourRoomDiscovery.ServiceType))list.AddString(BonjourRoomDiscovery.ServiceType);
             plist.WriteToFile(path);
         }
-        static void ApplyMacDeclarations(string appPath)
+        public static void ApplyMacDeclarations(string appPath)
         {
             ApplyPlist(Path.Combine(appPath,"Contents/Info.plist"));
             // This local development player has no distribution identity. Re-sign its modified plist ad hoc.

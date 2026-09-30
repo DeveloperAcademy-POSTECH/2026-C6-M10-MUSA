@@ -1,0 +1,370 @@
+{
+  "date": "2026-09-29",
+  "branch": "feat/#56-lobby-element-selection",
+  "baseHead": "991339eeeedf18e2baa1fb859f857a1c8859ba2a",
+  "sourceState": "uncommitted #56 implementation working tree; not a new commit",
+  "projectCsFingerprint": "fbcdecfed3be009a34988eadf0e46a30bd7622b033b0496bdc70b0b64464d96b",
+  "projectCsFiles": 269,
+  "unity": "6000.5.7f1",
+  "normalLobbyGameProtocol": 56,
+  "gameBuildIdentifier": "25",
+  "appDisplay": "26",
+  "compileAndSavedScene": {
+    "status": "PASS",
+    "scene": "Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity",
+    "editorApiOnly": true,
+    "localEvidence": "/private/tmp/c6-56-prepare-ui-final.log"
+  },
+  "editMode": {
+    "status": "PASS",
+    "total": 1661,
+    "passed": 1661,
+    "failed": 0,
+    "skipped": 0,
+    "inconclusive": 0,
+    "startUtc": "2026-09-29 14:12:56Z",
+    "endUtc": "2026-09-29 14:12:58Z",
+    "xmlSha256": "25ccaa2691483646e7fa92ef27eb0ff096b121695e77343c42e0412086db9730",
+    "localEvidence": "/private/tmp/c6-56-edit-complete.xml",
+    "failedTests": []
+  },
+  "playMode": {
+    "status": "FAIL",
+    "total": 164,
+    "passed": 127,
+    "failed": 37,
+    "skipped": 0,
+    "inconclusive": 0,
+    "startUtc": "2026-09-29 13:54:39Z",
+    "endUtc": "2026-09-29 13:55:52Z",
+    "xmlSha256": "811eae784e5361d5341ecb230f0b7facf0ac375416fb183d4a7d50162aba9814",
+    "localEvidence": "/private/tmp/c6-56-play.xml",
+    "failedTests": [
+      "C6.Prototype.Attack.Tests.AttackInputIntegrationPlayTests.FiveRealHitsClearTargetAndExplicitResetRestoresFreshRoundWhileKeepingSessionTotals",
+      "C6.Prototype.Attack.Tests.AttackInputIntegrationPlayTests.QueuedEnhancedTouchRecordsItsSourceAndCancellationCannotCreateAnExtraHit",
+      "C6.Prototype.Attack.Tests.AttackInputIntegrationPlayTests.RawVerticalDragAndCancelledCombinedCannotLaunchOrLoseTheirViews",
+      "C6.Prototype.Attack.Tests.AttackInputIntegrationPlayTests.SavedSceneRequiresExplicitHostAndRegistersFiveCombinedPlusOneRaw",
+      "C6.Prototype.Attack.Tests.AttackInputIntegrationPlayTests.ZoneEntryRemovesTwoDimensionalViewAndHitsWithTheSameLogicalIdOnce",
+      "C6.Prototype.Battle.Tests.BattleAdjacentDropPlayTests.AdjacentCenterDropsAcrossEveryColumnPairInBothDirectionsCombineOnlyOnRelease",
+      "C6.Prototype.Battle.Tests.BattleAdjacentDropPlayTests.FullWorkspaceHorizontalRawDragCombinesAtTheFarTargetOnlyOnRelease",
+      "C6.Prototype.Battle.Tests.BattleAdjacentDropPlayTests.NearOuterColliderEdgeGrabsReachAdjacentTargetCentersWithoutTransfer",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.ConfirmedDefeatClearsUnresolvedMaterialRequestsAndAllowsResultRetry",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.DisablingControllerWithPendingMaterialsCannotOrphanConfirmationHandling",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.ExplicitSoloRequiresHostStartAndRetryReturnsToFreshReadyBeforePaidGenerate",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.FiveActualCombinationHitsRewardBeforeVictoryAndRetryRejectsOldRequests",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.FormerAttackBandIsNowCombinationWorkspaceAndBoundaryLaunchRemainsAuthoritative",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.RealTwoSecondExpiryCancelsInFlightCombinedBeforeLateHitOrRecovery",
+      "C6.Prototype.Battle.Tests.OrbPhysicsBattlePlayTests.HeldOverlapWaitsForNormalReleaseThenConsumesOnlyTheTwoMaterials",
+      "C6.Prototype.Battle.Tests.OrbPhysicsBattlePlayTests.NormalControllerReleaseCarriesRecentDragMotionAndASecondGrabCancelsIt",
+      "C6.Prototype.Battle.Tests.OrbPhysicsBattlePlayTests.ReleasedCollisionAndWallContactCannotCreateGameplayRequests",
+      "C6.Prototype.Battle.Tests.OrbPhysicsBattlePlayTests.SamePolarityReleaseIsRejectedAndLeavesTwoSeparatedDynamicBodies",
+      "C6.Prototype.Battle.Tests.OrbPhysicsBattlePlayTests.UnconfirmedMaterialReservationFreezesBothBodiesUntilSessionCleanup",
+      "C6.Prototype.Battle.Tests.ReleaseThrowBattlePlayTests.CancellationAndRawUpperReleasePreserveTheirOrbs",
+      "C6.Prototype.Battle.Tests.ReleaseThrowBattlePlayTests.ExtraPointerCannotStealClearOrReleaseTheOwnersThrow",
+      "C6.Prototype.Battle.Tests.ReleaseThrowBattlePlayTests.HoldingInBattleDoesNotReserveConsumeOrSpawnAndStationaryReleaseKeepsOrb",
+      "C6.Prototype.Battle.Tests.ReleaseThrowBattlePlayTests.MovingReleaseLaunchesExactlyOnceAndActualHostPhysicsHits",
+      "C6.Prototype.Battle.Tests.ReleaseThrowBattlePlayTests.ReturnToLowerDisarmsThenAnOrdinaryReleaseCoastsWithoutAttack",
+      "C6.Prototype.Combination.Tests.CombinationIntegrationPlayTests.ActualDropResultLaunchesWithSameNewIdAndRealHitRecoversFiveOnce",
+      "C6.Prototype.Combination.Tests.CombinationIntegrationPlayTests.ExistingTargetReservationKeepsBothLocalMaterialsLockedUntilNormalReset",
+      "C6.Prototype.Combination.Tests.CombinationIntegrationPlayTests.NearbySamePolarityDropReachesHostAndPreservesBothRawAndPaidResources",
+      "C6.Prototype.Combination.Tests.CombinationIntegrationPlayTests.OppositeRawBothDropDirectionsWaitForUpAndDuplicateCreatesNoSecondCombined",
+      "C6.Prototype.Combination.Tests.CombinationIntegrationPlayTests.RawEnteringAttackZoneCannotLaunchOrGrantRecovery",
+      "C6.Prototype.GameSyncLifecycle.Tests.ApprovedGameScenePlayTests.InitialLobbyHasNoImplicitHostOrGameplayAndRuntimeConfigIsIsolated",
+      "C6.Prototype.GameSyncLifecycle.Tests.ApprovedGameScenePlayTests.OnePlayerRoomCannotBypassTheLobbyOrStartPreparedGameplay",
+      "C6.Prototype.GameSyncLifecycle.Tests.InterruptionScenePlayTests.FocusLossAndUnpairedResumeDoNotEndAnOpenRoom",
+      "C6.Prototype.GameSyncLifecycle.Tests.InterruptionScenePlayTests.IdlePauseAndResumeDoNotInventAClosedRoomOrStartNetworking",
+      "C6.Prototype.GameSyncLifecycle.Tests.InterruptionScenePlayTests.SimulatedBackgroundEndsTheRoomAndResumeWaitsForAManualNewHost",
+      "C6.Prototype.Orbs.Tests.OrbInputPlayTests.ContactOnlyWaitsForDropAndAnEarlierHorizontalRequestWinsOverLaterDrop",
+      "C6.Prototype.Resources.Tests.ResourceIntegrationPlayTests.ExplicitDebugFixtureDoesNotReplacePaidGenerationAndRealHitRewardsExactlyFive",
+      "C6.Prototype.Resources.Tests.ResourceIntegrationPlayTests.KillingHitStillRewardsFiveThenRecoveryStopsAndOldHitCannotRewardNewRound"
+    ]
+  },
+  "baselinePlayMode": {
+    "status": "FAIL",
+    "total": 161,
+    "passed": 124,
+    "failed": 37,
+    "skipped": 0,
+    "inconclusive": 0,
+    "startUtc": "2026-09-29 14:06:18Z",
+    "endUtc": "2026-09-29 14:07:39Z",
+    "xmlSha256": "ed94e0878bc685cd637a2983565b6a74c90ab57259008ae23ff1d51fc64f6384",
+    "localEvidence": "/private/tmp/c6-56-baseline-play-verified.xml",
+    "failedTests": [
+      "C6.Prototype.Attack.Tests.AttackInputIntegrationPlayTests.FiveRealHitsClearTargetAndExplicitResetRestoresFreshRoundWhileKeepingSessionTotals",
+      "C6.Prototype.Attack.Tests.AttackInputIntegrationPlayTests.QueuedEnhancedTouchRecordsItsSourceAndCancellationCannotCreateAnExtraHit",
+      "C6.Prototype.Attack.Tests.AttackInputIntegrationPlayTests.RawVerticalDragAndCancelledCombinedCannotLaunchOrLoseTheirViews",
+      "C6.Prototype.Attack.Tests.AttackInputIntegrationPlayTests.SavedSceneRequiresExplicitHostAndRegistersFiveCombinedPlusOneRaw",
+      "C6.Prototype.Attack.Tests.AttackInputIntegrationPlayTests.ZoneEntryRemovesTwoDimensionalViewAndHitsWithTheSameLogicalIdOnce",
+      "C6.Prototype.Battle.Tests.BattleAdjacentDropPlayTests.AdjacentCenterDropsAcrossEveryColumnPairInBothDirectionsCombineOnlyOnRelease",
+      "C6.Prototype.Battle.Tests.BattleAdjacentDropPlayTests.FullWorkspaceHorizontalRawDragCombinesAtTheFarTargetOnlyOnRelease",
+      "C6.Prototype.Battle.Tests.BattleAdjacentDropPlayTests.NearOuterColliderEdgeGrabsReachAdjacentTargetCentersWithoutTransfer",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.ConfirmedDefeatClearsUnresolvedMaterialRequestsAndAllowsResultRetry",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.DisablingControllerWithPendingMaterialsCannotOrphanConfirmationHandling",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.ExplicitSoloRequiresHostStartAndRetryReturnsToFreshReadyBeforePaidGenerate",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.FiveActualCombinationHitsRewardBeforeVictoryAndRetryRejectsOldRequests",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.FormerAttackBandIsNowCombinationWorkspaceAndBoundaryLaunchRemainsAuthoritative",
+      "C6.Prototype.Battle.Tests.BattleLoopIntegrationPlayTests.RealTwoSecondExpiryCancelsInFlightCombinedBeforeLateHitOrRecovery",
+      "C6.Prototype.Battle.Tests.OrbPhysicsBattlePlayTests.HeldOverlapWaitsForNormalReleaseThenConsumesOnlyTheTwoMaterials",
+      "C6.Prototype.Battle.Tests.OrbPhysicsBattlePlayTests.NormalControllerReleaseCarriesRecentDragMotionAndASecondGrabCancelsIt",
+      "C6.Prototype.Battle.Tests.OrbPhysicsBattlePlayTests.ReleasedCollisionAndWallContactCannotCreateGameplayRequests",
+      "C6.Prototype.Battle.Tests.OrbPhysicsBattlePlayTests.SamePolarityReleaseIsRejectedAndLeavesTwoSeparatedDynamicBodies",
+      "C6.Prototype.Battle.Tests.OrbPhysicsBattlePlayTests.UnconfirmedMaterialReservationFreezesBothBodiesUntilSessionCleanup",
+      "C6.Prototype.Battle.Tests.ReleaseThrowBattlePlayTests.CancellationAndRawUpperReleasePreserveTheirOrbs",
+      "C6.Prototype.Battle.Tests.ReleaseThrowBattlePlayTests.ExtraPointerCannotStealClearOrReleaseTheOwnersThrow",
+      "C6.Prototype.Battle.Tests.ReleaseThrowBattlePlayTests.HoldingInBattleDoesNotReserveConsumeOrSpawnAndStationaryReleaseKeepsOrb",
+      "C6.Prototype.Battle.Tests.ReleaseThrowBattlePlayTests.MovingReleaseLaunchesExactlyOnceAndActualHostPhysicsHits",
+      "C6.Prototype.Battle.Tests.ReleaseThrowBattlePlayTests.ReturnToLowerDisarmsThenAnOrdinaryReleaseCoastsWithoutAttack",
+      "C6.Prototype.Combination.Tests.CombinationIntegrationPlayTests.ActualDropResultLaunchesWithSameNewIdAndRealHitRecoversFiveOnce",
+      "C6.Prototype.Combination.Tests.CombinationIntegrationPlayTests.ExistingTargetReservationKeepsBothLocalMaterialsLockedUntilNormalReset",
+      "C6.Prototype.Combination.Tests.CombinationIntegrationPlayTests.NearbySamePolarityDropReachesHostAndPreservesBothRawAndPaidResources",
+      "C6.Prototype.Combination.Tests.CombinationIntegrationPlayTests.OppositeRawBothDropDirectionsWaitForUpAndDuplicateCreatesNoSecondCombined",
+      "C6.Prototype.Combination.Tests.CombinationIntegrationPlayTests.RawEnteringAttackZoneCannotLaunchOrGrantRecovery",
+      "C6.Prototype.GameSyncLifecycle.Tests.ApprovedGameScenePlayTests.InitialLobbyHasNoImplicitHostOrGameplayAndRuntimeConfigIsIsolated",
+      "C6.Prototype.GameSyncLifecycle.Tests.ApprovedGameScenePlayTests.OnePlayerRoomCannotBypassTheLobbyOrStartPreparedGameplay",
+      "C6.Prototype.GameSyncLifecycle.Tests.InterruptionScenePlayTests.FocusLossAndUnpairedResumeDoNotEndAnOpenRoom",
+      "C6.Prototype.GameSyncLifecycle.Tests.InterruptionScenePlayTests.IdlePauseAndResumeDoNotInventAClosedRoomOrStartNetworking",
+      "C6.Prototype.GameSyncLifecycle.Tests.InterruptionScenePlayTests.SimulatedBackgroundEndsTheRoomAndResumeWaitsForAManualNewHost",
+      "C6.Prototype.Orbs.Tests.OrbInputPlayTests.ContactOnlyWaitsForDropAndAnEarlierHorizontalRequestWinsOverLaterDrop",
+      "C6.Prototype.Resources.Tests.ResourceIntegrationPlayTests.ExplicitDebugFixtureDoesNotReplacePaidGenerationAndRealHitRewardsExactlyFive",
+      "C6.Prototype.Resources.Tests.ResourceIntegrationPlayTests.KillingHitStillRewardsFiveThenRecoveryStopsAndOldHitCannotRewardNewRound"
+    ]
+  },
+  "playComparison": {
+    "baselineCommit": "991339eeeedf18e2baa1fb859f857a1c8859ba2a",
+    "sameFailedTestNames": true,
+    "newFailedTests": [],
+    "fixedFailedTests": [],
+    "newLobbyPlayTests": [
+      {
+        "name": "C6.Prototype.Lobby.Tests.T10LobbyPlayTests.ElementSelectionAndClearButtonsReflectOnlyHostApprovedChoice",
+        "result": "Passed"
+      },
+      {
+        "name": "C6.Prototype.Lobby.Tests.T10LobbyPlayTests.FiveElementRowsFitAboveReadyAndShowOccupancyAndSeatIdentity",
+        "result": "Passed"
+      },
+      {
+        "name": "C6.Prototype.Lobby.Tests.T10LobbyPlayTests.PendingChoiceFixtureBlocksButtonsAndSessionSubmissionWithoutOptimisticChange",
+        "result": "Passed"
+      }
+    ],
+    "note": "Two existing randomized fixture tests stopped at a different assertion; matching failed names is not a universal gameplay guarantee."
+  },
+  "macBuild": {
+    "unity": "6000.5.7f1",
+    "result": "Succeeded",
+    "errors": 0,
+    "warnings": 14,
+    "seconds": 13.534489,
+    "status": "PASS",
+    "localEvidence": "/private/tmp/c6-56-mac-build-final.log"
+  },
+  "macMultiplayer": [
+    {
+      "status": "PASS",
+      "participants": 3,
+      "environment": "independent macOS Development processes; direct IPv4 loopback",
+      "physicalTouch": false,
+      "fixture": {
+        "durationSeconds": 15,
+        "monsterHp": 20,
+        "firstThreatDelaySeconds": 60,
+        "savedConfigChanged": false
+      },
+      "startedUtc": "2026-09-29T14:12:43.9372000Z",
+      "finishedUtc": "2026-09-29T14:13:01.2867650Z",
+      "buildGuid": "89866c78ee6b487f9c767a69573ddd74",
+      "assertionCounts": [
+        33,
+        26,
+        28
+      ],
+      "sharedRounds": [
+        {
+          "stage": "first-ready",
+          "round": 1,
+          "seats": [
+            0,
+            2,
+            1
+          ],
+          "selectedElements": [
+            1,
+            2,
+            3
+          ],
+          "hash": "fdaa8f7e6ef5232ac2a272232e09740eb72dd14b364a38ca27ba7a00c56b8db7"
+        },
+        {
+          "stage": "retry-ready",
+          "round": 2,
+          "seats": [
+            0,
+            1,
+            2
+          ],
+          "selectedElements": [
+            1,
+            2,
+            3
+          ],
+          "hash": "e68689cb091cf8c9601b74ad324b3cff4f44bf8a71e03911bf3a8893faab78e9"
+        },
+        {
+          "stage": "second-ready",
+          "round": 3,
+          "seats": [
+            2,
+            1,
+            0
+          ],
+          "selectedElements": [
+            2,
+            1,
+            3
+          ],
+          "hash": "eb0d15e0c4cd138161700421510b2e3acf6e84d3452d56c38f4d0494cd45a10c"
+        }
+      ],
+      "sameRoundHashAndSeatsBeforeAck": true,
+      "allExitCodes": 0,
+      "acceptedHitRecoveries": 0,
+      "expectedDiagnosticShutdown": [
+        "",
+        "",
+        ""
+      ],
+      "resultSha256": [
+        "f18fbce711314ca81492a14aefec538c7017ffb85e54b4df80d8661adfffc229",
+        "f2d06ad2366128044f76ba0929f0284a15421baa8a35c6809149dce7d25c6172",
+        "e1e0a3b9573cb48e7011a6c87070faa78b42cadd9511c00898479194e16cc2fa"
+      ],
+      "localEvidence": "/private/tmp/c6-56-native3-final"
+    },
+    {
+      "status": "PASS",
+      "participants": 5,
+      "environment": "independent macOS Development processes; direct IPv4 loopback",
+      "physicalTouch": false,
+      "fixture": {
+        "durationSeconds": 15,
+        "monsterHp": 20,
+        "firstThreatDelaySeconds": 60,
+        "savedConfigChanged": false
+      },
+      "startedUtc": "2026-09-29T14:13:45.2585000Z",
+      "finishedUtc": "2026-09-29T14:14:02.8114510Z",
+      "buildGuid": "89866c78ee6b487f9c767a69573ddd74",
+      "assertionCounts": [
+        33,
+        26,
+        24,
+        24,
+        28
+      ],
+      "sharedRounds": [
+        {
+          "stage": "first-ready",
+          "round": 1,
+          "seats": [
+            1,
+            3,
+            0,
+            4,
+            2
+          ],
+          "selectedElements": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "hash": "45cfdcd14b96c891c905925f5bbae5b796997b51fe492002bbbc5087ba0b4f57"
+        },
+        {
+          "stage": "retry-ready",
+          "round": 2,
+          "seats": [
+            0,
+            4,
+            3,
+            2,
+            1
+          ],
+          "selectedElements": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "hash": "274a1d977c6ff317e02cb99bca02dedbfef5caf498e70ab1bc42d50d5b5913bb"
+        },
+        {
+          "stage": "second-ready",
+          "round": 3,
+          "seats": [
+            0,
+            2,
+            1,
+            4,
+            3
+          ],
+          "selectedElements": [
+            2,
+            1,
+            3,
+            4,
+            5
+          ],
+          "hash": "2b162daf28bf897478fdd5143e9df9498f9103caef7c4aaa838f57061c9a08e6"
+        }
+      ],
+      "sameRoundHashAndSeatsBeforeAck": true,
+      "allExitCodes": 0,
+      "acceptedHitRecoveries": 0,
+      "expectedDiagnosticShutdown": [
+        "PARTICIPANT_DISCONNECTED",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "resultSha256": [
+        "1e51893b6af7d380e14bc33e9ba38e2f10d0250e7a94cbd771c52dfa73c85b59",
+        "d48b33734d77ab5c8e2e3612936f779dd7990aa75e865955c36dc951e7e105fd",
+        "2e21e16800dc27c1874114c1214ae367bbffd00e551899f42f0ef0316fedb87e",
+        "fa0935eeebaa1fc700884db2443ecb4668da48fb10f086e67bbb2608d6fd3b33",
+        "9553230ab4f4e7f37983a5a19995fac067e0d57cee31967ba0eb1edd9f328bd2"
+      ],
+      "localEvidence": "/private/tmp/c6-56-native5-final"
+    }
+  ],
+  "initialDiagnosticRuns": [
+    {
+      "evidence": "/private/tmp/c6-56-native3-a",
+      "status": "FAIL",
+      "cause": "diagnostic admission/barrier marker name collision; corrected"
+    },
+    {
+      "evidence": "/private/tmp/c6-56-native3-b",
+      "status": "FAIL",
+      "cause": "diagnostic Host aggregate snapshot assertion before LateUpdate; corrected by waiting"
+    },
+    {
+      "evidence": "/private/tmp/c6-56-native3-c",
+      "status": "FAIL",
+      "cause": "all feature assertions passed, Host diagnostic cleanup raced with successful peer leave; corrected only after all complete markers"
+    }
+  ],
+  "notRun": [
+    "iOS export/build/sign/install/physical Touch",
+    "actual iPhone/iPad camera/frame/asset validation",
+    "new normal 180-second round",
+    "hotspot/general Wi-Fi/offline LAN #56 validation",
+    "new valid physical 3D hit in multiplayer probe"
+  ],
+  "privacy": "Raw XML/logs/screenshots and nonce-bearing reports remain local; this file is a summary."
+}
