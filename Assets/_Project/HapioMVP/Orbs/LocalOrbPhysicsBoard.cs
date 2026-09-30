@@ -230,6 +230,23 @@ namespace C6.Prototype.Orbs
                 if (!paused && !entry.Locked) entry.Body.position = FindFreePosition(entry, Clamp(entry.Body.position));
             }
         }
+        /// <summary>
+        /// #52: sets a resting, unlocked orb moving (a rejected combination pushes both orbs apart).
+        /// Velocity is in board widths per second, like transfers, and never exceeds the release cap.
+        /// </summary>
+        public bool Push(string id, Vector2 normalizedVelocity)
+        {
+            if (!configured || !TryEntry(id, out var entry) || entry.Held || entry.Locked || entry.EdgePending
+                || paused || !isActiveAndEnabled || !Finite(normalizedVelocity)) return false;
+            float width = boardWorldWidth > 0 ? boardWorldWidth : CenterBounds.width;
+            Vector2 velocity = Vector2.ClampMagnitude(normalizedVelocity * width, tuning.MaxReleaseSpeed);
+            if (!Finite(velocity)) return false;
+            SetMode(entry);
+            entry.Body.linearVelocity = velocity;
+            if (velocity.sqrMagnitude > 0) entry.Body.WakeUp();
+            return true;
+        }
+
         public bool TryGetVelocity(string id, out Vector2 velocity)
         {
             velocity = Vector2.zero;

@@ -617,12 +617,12 @@ namespace C6.Prototype.PhysicsSandbox
             if (source.kind != OrbKind.Raw || target.kind != OrbKind.Raw)
             { LastCombineResult = "거절: 결합 구슬은 다시 결합할 수 없음"; return; }
             if (source.polarity == target.polarity)
-            { LastCombineResult = "거절: 같은 극끼리는 결합 불가"; return; }
+            { LastCombineResult = "거절: 같은 극끼리는 결합 불가"; BounceApart(source, target); return; }
             // 오행 v2: 실제 판(HostOrbRegistry)과 같은 규칙. 다른 속성끼리는 결합하지 않는다.
             var sourceElement = OrbElements.RawElement(source.View.OrbId);
             var targetElement = OrbElements.RawElement(target.View.OrbId);
             if (sourceElement != targetElement)
-            { LastCombineResult = "거절: 다른 속성끼리는 결합 불가 (" + sourceElement + " / " + targetElement + ")"; return; }
+            { LastCombineResult = "거절: 다른 속성끼리는 결합 불가 (" + sourceElement + " / " + targetElement + ")"; BounceApart(source, target); return; }
             int board = target.CurrentBoard;
             Vector3 middle = (source.transform.position + target.transform.position) * .5f;
             middle.z = 0f;
@@ -643,6 +643,19 @@ namespace C6.Prototype.PhysicsSandbox
             CreateOrb(board, OrbKind.Combined, OrbPolarity.None, middle, "Combined Orb ", combinedId);
             CombineCount++;
             LastCombineResult = "결합 성공 (" + element + " 음 + 양)";
+        }
+
+        /// <summary>#52 게임과 같은 규칙: 결합에 실패한 두 구슬(같은 극, 다른 속성)은 서로 반대 방향으로 튕겨 나간다.</summary>
+        private void BounceApart(OrbSandboxSeed source, OrbSandboxSeed target)
+        {
+            if (source == null || target == null || source.CurrentBoard != target.CurrentBoard) return;
+            Vector2 away = (Vector2)(source.transform.position - target.transform.position);
+            if (away.sqrMagnitude < 1e-8f) away = Vector2.right;
+            away.Normalize();
+            float speed = sourceConfig != null ? sourceConfig.RejectedCombinationBounceSpeed : .5f;
+            var board = boards[source.CurrentBoard];
+            board.Push(source.View.OrbId, away * speed);
+            board.Push(target.View.OrbId, -away * speed);
         }
 
         private void RemoveOrb(OrbSandboxSeed seed)

@@ -56,6 +56,11 @@ namespace C6.Prototype.Presentation
         public OrbElement[] TeamElements => teamElements ?? new OrbElement[0];
         public bool EnableDefense => false;
 
+        [Header("#52 · Failed combination bounce (board widths / second)")]
+        [Tooltip("Same polarity (Yin+Yin, Yang+Yang) or different elements: both orbs are pushed apart at this speed.")]
+        [SerializeField] private float rejectedCombinationBounceSpeed = .5f;
+        public float RejectedCombinationBounceSpeed => Valid(rejectedCombinationBounceSpeed, .5f, 0f, 10f);
+
         [Header("P1 · Flat orb board (board widths / seconds)")]
         [SerializeField, Range(0f, 1f)] private float orbRestitution = .65f;
         [SerializeField, Range(0f, 1f)] private float orbContactFriction = .15f;
