@@ -314,6 +314,41 @@ namespace C6.Prototype.Orbs
             return true;
         }
 
+        /// <summary>
+        /// An edge-held orb cannot travel farther than the visual clamp. The current physics
+        /// scene may use the finger's unclamped motion for release velocity only after an
+        /// intentional outward gesture. This does not approve a transfer or change ownership.
+        /// </summary>
+        public static bool IntentionalContinuousEdgeRelease(Rect centerBounds, Vector2 pointerStart,
+            Vector2 pointerEnd, Vector2 orbCenter, float orbRadiusPixels, float dominanceRatio)
+        {
+            if (!IsFinite(pointerStart) || !IsFinite(pointerEnd) || !IsFinite(orbCenter) ||
+                !IsFinite(centerBounds.xMin) || !IsFinite(centerBounds.xMax) ||
+                !IsFinite(centerBounds.yMin) || !IsFinite(centerBounds.yMax) ||
+                centerBounds.width <= 0f || centerBounds.height <= 0f ||
+                !IsFinite(orbRadiusPixels) || orbRadiusPixels <= 0f ||
+                !IsFinite(dominanceRatio) || dominanceRatio <= 0f) return false;
+            Vector2 delta = pointerEnd - pointerStart;
+            if (!IsFinite(delta)) return false;
+            float minimumTravel = Mathf.Max(8f, orbRadiusPixels * .25f);
+            if (Mathf.Abs(delta.x) < minimumTravel ||
+                Mathf.Abs(delta.x) < Mathf.Abs(delta.y) * dominanceRatio) return false;
+            float edgeTolerance = Mathf.Max(1f, orbRadiusPixels * .05f);
+            if (orbCenter.y < centerBounds.yMin - edgeTolerance ||
+                orbCenter.y > centerBounds.yMax + edgeTolerance) return false;
+            return delta.x < 0f && Mathf.Abs(orbCenter.x - centerBounds.xMin) <= edgeTolerance ||
+                delta.x > 0f && Mathf.Abs(orbCenter.x - centerBounds.xMax) <= edgeTolerance;
+        }
+
+        /// <summary>The last horizontal screen pixel is a valid board release in continuous mode.</summary>
+        public static bool ContainsContinuousBoardRelease(Rect board, Vector2 point)
+        {
+            return IsFinite(point) && IsFinite(board.xMin) && IsFinite(board.xMax) &&
+                IsFinite(board.yMin) && IsFinite(board.yMax) && board.width > 0f && board.height > 0f &&
+                point.x >= board.xMin && point.x <= board.xMax &&
+                point.y >= board.yMin && point.y < board.yMax;
+        }
+
         public static Rect AttackZone(Rect lowerRect, float heightFraction)
         {
             return new Rect(lowerRect.xMin, lowerRect.yMax - lowerRect.height * heightFraction,

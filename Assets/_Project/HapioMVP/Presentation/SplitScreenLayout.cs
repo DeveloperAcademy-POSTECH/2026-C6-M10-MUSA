@@ -79,13 +79,28 @@ namespace C6.Prototype.Presentation
         public bool TryScreenToOrbPlane(Vector2 screenPoint, out Vector3 worldPoint)
         {
             worldPoint = default;
-            if (!ContainsBottomScreenPoint(screenPoint)) return false;
+            return ContainsBottomScreenPoint(screenPoint) && TryScreenToOrbPlaneUnclamped(screenPoint, out worldPoint);
+        }
 
-            // The saved T04 lower view uses the world XY plane (z = 0); this does not handle gestures.
+        /// <summary>
+        /// Projects a finite pointer target onto the orb plane even when a grab offset puts it
+        /// outside the camera rect. Only drag sampling should use this; hit tests and ordinary
+        /// pointer input must keep the guarded TryScreenToOrbPlane path.
+        /// </summary>
+        public bool TryScreenToOrbPlaneUnclamped(Vector2 screenPoint, out Vector3 worldPoint)
+        {
+            worldPoint = default;
+            if (orbCamera == null || !IsFinite(screenPoint.x) || !IsFinite(screenPoint.y) ||
+                orbCamera.pixelRect.width <= 0f || orbCamera.pixelRect.height <= 0f) return false;
+
+            // The lower view uses the world XY plane (z = 0). Camera rays extrapolate past its
+            // pixel rect, allowing a bounded physical gesture target beyond a visible side edge.
             var ray = orbCamera.ScreenPointToRay(screenPoint);
             var plane = new Plane(Vector3.forward, Vector3.zero);
-            if (!plane.Raycast(ray, out float distance)) return false;
-            worldPoint = ray.GetPoint(distance);
+            if (!plane.Raycast(ray, out float distance) || !IsFinite(distance)) return false;
+            Vector3 projected = ray.GetPoint(distance);
+            if (!IsFinite(projected.x) || !IsFinite(projected.y) || !IsFinite(projected.z)) return false;
+            worldPoint = projected;
             return true;
         }
 

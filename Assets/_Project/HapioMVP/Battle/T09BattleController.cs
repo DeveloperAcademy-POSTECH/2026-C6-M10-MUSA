@@ -622,7 +622,9 @@ namespace C6.Prototype.Battle
             Vector2 droppedCenter = id != null && views.ContainsKey(id) ? GetViewScreenPosition(id) : raw;
             // Choose the nearest displayed target before filtering polarity. A same-Yin drop must
             // not unexpectedly select a slightly farther Yang and become a successful combination.
-            bool validDrop = FinitePoint(raw) && FinitePoint(droppedCenter) && layout.BottomPixelRect.Contains(raw);
+            bool validDrop = FinitePoint(droppedCenter) && (continuousTransfersEnabled
+                ? OrbGestureEngine.ContainsContinuousBoardRelease(layout.BottomPixelRect, raw)
+                : FinitePoint(raw) && layout.BottomPixelRect.Contains(raw));
             OrbDropTarget? nearest = source == null || !validDrop ? null : NearestDropTarget(source.OrbId, droppedCenter);
             IReadOnlyList<OrbDropTarget> targets = nearest.HasValue
                 ? new[] { nearest.Value } : Array.Empty<OrbDropTarget>();
@@ -669,7 +671,17 @@ namespace C6.Prototype.Battle
             // Only a normal, action-free release on the board can carry local momentum.
             // A synchronous Host rejection is still an action, not a second physical throw.
             if (orbPhysicsEnabled && id != null)
-                orbPhysics.Release(id, Time.unscaledTimeAsDouble, validDrop && !hadQualifiedAction && !submittedAction);
+            {
+                bool freeRelease = validDrop && !hadQualifiedAction && !submittedAction;
+                // A held orb is visually clamped at a side edge. In continuous mode, an
+                // intentional outward swipe may use the unclamped finger path for inertia;
+                // the physical edge still sends the normal Host-authorized transfer request.
+                bool edgeMomentum = freeRelease && continuousTransfersEnabled &&
+                    physicsScreenBounds.width > 0f &&
+                    OrbGestureEngine.IntentionalContinuousEdgeRelease(physicsScreenBounds,
+                        dragPointerStart, raw, droppedCenter, RadiusPixels, layout.Config.HorizontalDominance);
+                orbPhysics.Release(id, Time.unscaledTimeAsDouble, freeRelease, edgeMomentum);
+            }
             if (bounceTarget != null) BounceApart(id, bounceTarget);
             RefreshLocalStates(); RefreshHud();
         }
@@ -906,7 +918,7 @@ namespace C6.Prototype.Battle
                 // A delayed receipt can follow a return transfer. Reconcile with the latest
                 // aggregate; never tombstone an orb merely because it once left this player.
                 OnStateChanged();
-                Debug.Log($"C6_T11_TRANSFER_UI accepted={reply.accepted} request={reply.requestId} orb={reply.orbId} direction={inputRequest.request.Kind} reason={reply.reason} round={round}");
+                Debug.Log($"C6_T11_TRANSFER_UI accepted={reply.accepted} request={reply.requestId} orb={reply.orbId} direction={inputRequest.request.Kind} reason={reply.reason} waitSeconds={Time.unscaledTime - inputRequest.sentAt:F3} round={round}");
             }
             action = (reply.accepted ? transfer ? "PASS CONFIRMED" : "LAUNCH APPROVED" : transfer ? "PASS REJECTED" : "REJECTED") + " / " + reply.reason;
             detail = reply.accepted ? transfer ? "Same orb / ownership confirmed by Host" : "Same ID / 2D removed / actual Host physics"
@@ -1067,6 +1079,8 @@ namespace C6.Prototype.Battle
         private void PositionView(string id, Vector2 point, bool directDragSample = false)
         {
             if (!views.TryGetValue(id, out var view) || float.IsNaN(point.x) || float.IsNaN(point.y) || float.IsInfinity(point.x) || float.IsInfinity(point.y)) return;
+            Vector2? gestureWorld = directDragSample && continuousTransfersEnabled && orbPhysicsEnabled &&
+                layout.TryScreenToOrbPlaneUnclamped(point, out var unclampedWorld) ? (Vector2)unclampedWorld : (Vector2?)null;
             view.transform.localScale = Vector3.one * RadiusWorld / Mathf.Max(.0001f, view.Collider.radius);
             view.SetLabelPixelHeight(layout.OrbCamera, LabelPixels);
             Rect space = hud.OrbWorkspaceScreenRect;
@@ -1084,7 +1098,7 @@ namespace C6.Prototype.Battle
             {
                 view.transform.position = world;
                 if (orbPhysicsEnabled && orbPhysics != null)
-                    orbPhysics.SetPosition(id, world, directDragSample, Time.unscaledTimeAsDouble);
+                    orbPhysics.SetPosition(id, world, directDragSample, Time.unscaledTimeAsDouble, gestureWorld);
                 display[id] = OrbGestureEngine.NormalizeClamped(point, layout.BottomPixelRect);
             }
         }
@@ -1125,7 +1139,9 @@ namespace C6.Prototype.Battle
             foreach (var pair in views)
             {
                 bool locked = IsPending(pair.Key);
-                pair.Value.SetLocalState(locked ? LocalOrbState.Pending :
+                bool transferPending = locked && pending.Values.Any(item => item.request.OrbId == pair.Key &&
+                    (item.request.Kind == OrbActionKind.TransferLeft || item.request.Kind == OrbActionKind.TransferRight));
+                pair.Value.SetLocalState(locked ? transferPending ? LocalOrbState.TransferPending : LocalOrbState.Pending :
                     gestures.ActiveOrb?.OrbId == pair.Key ? LocalOrbState.Dragging : LocalOrbState.Idle);
                 if (orbPhysicsEnabled) orbPhysics.SetLocked(pair.Key, locked);
             }

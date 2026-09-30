@@ -166,6 +166,86 @@ namespace C6.Prototype.Orbs.Tests
             Assert.That(Velocity(moving), Is.EqualTo(Vector2.zero));
         }
 
+        [TestCase(1)]
+        [TestCase(-1)]
+        public void OptedInOutwardEdgeDragRestoresBoundedVelocityAndRejectedOrbCanBeGrabbed(int direction)
+        {
+            board.ConfigureHorizontalPassage(true, Bounds.width + Radius * 2f);
+            float edge = direction > 0 ? Bounds.xMax : Bounds.xMin;
+            var view = View("edge-drag", new Vector2(edge, 0));
+            var body = view.GetComponent<Rigidbody2D>();
+            int observations = 0;
+            OrbEdgeCrossing crossing = default;
+            board.EdgeCrossed += value => { observations++; crossing = value; };
+
+            Assert.That(board.Grab(view.OrbId, 10), Is.True);
+            // The body and visual are clamped even if the finger travels far outside the board.
+            board.SetPosition(view.OrbId, new Vector2(edge, 0), true, 10.1,
+                new Vector2(edge + direction * 100f, 0));
+            Assert.That(body.position.x, Is.EqualTo(edge));
+            Assert.That(view.transform.position.x, Is.EqualTo(edge));
+            Assert.That(board.Release(view.OrbId, 10.1, true, true), Is.True);
+            // Only one orb radius of pointer overrun is sampled: .2 world units / .1 seconds.
+            Assert.That(Velocity(view).x, Is.EqualTo(direction * 2f).Within(.0001f));
+            Simulate(1);
+            Assert.That(observations, Is.EqualTo(1));
+            Assert.That(crossing.ToRight, Is.EqualTo(direction > 0));
+            Assert.That(board.TryGetPendingEdge(view.OrbId, out _), Is.True);
+
+            Assert.That(board.ResolveRejectedEdge(view.OrbId), Is.True);
+            Assert.That(Velocity(view), Is.EqualTo(Vector2.zero));
+            Assert.That(body.position.x, Is.EqualTo(edge));
+            Assert.That(board.Grab(view.OrbId, 11), Is.True,
+                "A rejected transfer must leave its original orb available for a new drag.");
+            Assert.That(board.Release(view.OrbId, 11, false), Is.True);
+            Simulate(5);
+            Assert.That(observations, Is.EqualTo(1), "A rejected edge must not retry by itself.");
+        }
+
+        [Test]
+        public void EdgePointerOverrunDoesNotTransferWithoutOptInOrDeliberateRecentTravel()
+        {
+            board.ConfigureHorizontalPassage(true, Bounds.width + Radius * 2f);
+            var view = View("edge-intent", new Vector2(Bounds.xMax, 0));
+            int observations = 0;
+            board.EdgeCrossed += _ => observations++;
+
+            Assert.That(board.Grab(view.OrbId, 10), Is.True);
+            board.SetPosition(view.OrbId, new Vector2(Bounds.xMax, 0), true, 10.1,
+                new Vector2(Bounds.xMax + Radius, 0));
+            Assert.That(board.Release(view.OrbId, 10.1, true), Is.True,
+                "The default release must preserve the original clamped sample behavior.");
+            Assert.That(Velocity(view), Is.EqualTo(Vector2.zero));
+            Simulate(5);
+            Assert.That(observations, Is.Zero);
+
+            Assert.That(board.Grab(view.OrbId, 12), Is.True);
+            board.SetPosition(view.OrbId, new Vector2(Bounds.xMax, 0), true, 12.1,
+                new Vector2(Bounds.xMax + Radius * .05f, 0));
+            Assert.That(board.Release(view.OrbId, 12.1, true, true), Is.True);
+            Assert.That(Velocity(view), Is.EqualTo(Vector2.zero), "Sub-threshold pointer jitter is not a push.");
+            Simulate(5);
+            Assert.That(observations, Is.Zero);
+
+            Assert.That(board.Grab(view.OrbId, 14), Is.True);
+            board.SetPosition(view.OrbId, new Vector2(Bounds.xMax, 0), true, 14.05,
+                new Vector2(Bounds.xMax + Radius, 0));
+            Assert.That(board.Release(view.OrbId, 15, true, true), Is.True);
+            Assert.That(Velocity(view), Is.EqualTo(Vector2.zero), "A stationary hold expires the motion sample.");
+            Simulate(5);
+            Assert.That(observations, Is.Zero);
+
+            Assert.That(board.Grab(view.OrbId, 16), Is.True);
+            board.SetPosition(view.OrbId, new Vector2(Bounds.xMax, 0), true, 16.05,
+                new Vector2(Bounds.xMax + Radius, 0));
+            board.SetPosition(view.OrbId, new Vector2(Bounds.xMax, 0), true, 16.08,
+                new Vector2(Bounds.xMax + Radius * .6f, 0));
+            Assert.That(board.Release(view.OrbId, 16.08, true, true), Is.True);
+            Assert.That(Velocity(view), Is.EqualTo(Vector2.zero), "An inward reversal cancels the earlier outward drag.");
+            Simulate(5);
+            Assert.That(observations, Is.Zero);
+        }
+
         [Test]
         public void StationaryHoldDoesNotReuseAnOldFastMovement()
         {
