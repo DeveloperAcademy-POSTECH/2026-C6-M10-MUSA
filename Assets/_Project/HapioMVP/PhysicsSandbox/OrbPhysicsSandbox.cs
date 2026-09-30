@@ -38,6 +38,11 @@ namespace C6.Prototype.PhysicsSandbox
         [Tooltip("조합대 바깥 배경색")]
         public Color outsideColor = new Color(.03f, .045f, .06f, 1f);
         public int CombineCount { get; private set; }
+        [Tooltip("ON: 게임과 같이 결합 구슬을 일정 시간 안에 던지지 않으면 사라집니다 (#51). 시간은 ScreenLayoutConfig 값을 씁니다.")]
+        public bool combinedOrbExpiry = true;
+        /// <summary>#51: 시간 초과로 사라진 결합 구슬 수.</summary>
+        public int ExpiredCount { get; private set; }
+        private readonly Dictionary<OrbSandboxSeed, float> combinedBornAt = new Dictionary<OrbSandboxSeed, float>();
         public string LastCombineResult { get; private set; } = "-";
         [Range(0, 1)] public int visibleBoard;
         public int TouchSamples { get; private set; }
@@ -319,6 +324,7 @@ namespace C6.Prototype.PhysicsSandbox
 
         private void DetachOrb(OrbSandboxSeed seed)
         {
+            if (seed != null) combinedBornAt.Remove(seed);
             if (seed == null || seed.View == null) return;
             if (held == seed) CancelGrab();
             boards[seed.CurrentBoard].Remove(seed.View.OrbId);
@@ -355,6 +361,8 @@ namespace C6.Prototype.PhysicsSandbox
             }
             TransferCount = 0;
             CombineCount = 0;
+            ExpiredCount = 0;
+            combinedBornAt.Clear();
             LastCombineResult = "-";
             LastTransferSource = LastTransferDestination = -1;
             LastTransferVelocityBefore = LastTransferVelocityAfter = Vector2.zero;
@@ -385,6 +393,43 @@ namespace C6.Prototype.PhysicsSandbox
             if (keyboard != null && keyboard.rKey.wasPressedThisFrame) ResetOrbs();
             if (keyboard != null && keyboard.spaceKey.wasPressedThisFrame) StopOrbs();
             ReadPointer();
+            TickCombinedExpiry();
+        }
+
+        /// <summary>
+        /// #51 게임과 같은 규칙: 결합 구슬은 처음 나타난 뒤 CombinedOrbLifetimeSeconds 안에 던지지 않으면 사라지고,
+        /// 마지막 CombinedOrbWarningSeconds 동안 깜빡인다. 들고 있던 구슬이 사라지면 잡기도 함께 끝난다.
+        /// </summary>
+        private void TickCombinedExpiry()
+        {
+            float lifetime = sourceConfig != null ? sourceConfig.CombinedOrbLifetimeSeconds : 8f;
+            float warning = sourceConfig != null ? sourceConfig.CombinedOrbWarningSeconds : 2f;
+            float now = Time.unscaledTime;
+            List<OrbSandboxSeed> expired = null;
+            foreach (var seed in AllSeeds)
+            {
+                if (seed == null) continue;
+                if (seed.View == null || seed.kind != OrbKind.Combined || !seed.gameObject.activeInHierarchy)
+                { combinedBornAt.Remove(seed); continue; }
+                if (!combinedOrbExpiry) { combinedBornAt.Remove(seed); seed.View.SetExpiryWarning(false); continue; }
+                if (!combinedBornAt.TryGetValue(seed, out float bornAt)) { bornAt = now; combinedBornAt.Add(seed, now); }
+                float age = now - bornAt;
+                if (age >= lifetime)
+                {
+                    if (expired == null) expired = new List<OrbSandboxSeed>();
+                    expired.Add(seed);
+                }
+                else seed.View.SetExpiryWarning(age >= lifetime - warning);
+            }
+            if (expired == null) return;
+            foreach (var seed in expired)
+            {
+                seed.View.SetExpiryWarning(false);
+                UnityEngine.Debug.Log("C6_SANDBOX_COMBINED_EXPIRED  orb=" + seed.View.OrbId + "  lifetime=" + lifetime);
+                RemoveOrb(seed);
+                ExpiredCount++;
+            }
+            LastCombineResult = "결합 구슬 소멸 (" + lifetime + "초 안에 던지지 않음)";
         }
 
         private void QueueLeftCrossing(OrbEdgeCrossing crossing) => QueueCrossing(0, crossing);

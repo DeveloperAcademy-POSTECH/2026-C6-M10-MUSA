@@ -27,6 +27,9 @@ namespace C6.Prototype.Orbs
         private readonly Dictionary<string, OrbReservation> pending = new Dictionary<string, OrbReservation>(StringComparer.Ordinal);
         private readonly Dictionary<string, ulong> lastSequences = new Dictionary<string, ulong>(StringComparer.Ordinal);
         private readonly Dictionary<string, Receipt> receipts = new Dictionary<string, Receipt>(StringComparer.Ordinal);
+        // #51: Host clock time each Combined orb was first seen. Keyed by ID, so a transfer
+        // (a new record with the same ID) keeps the original timer instead of restarting it.
+        private readonly Dictionary<string, double> combinedBornAt = new Dictionary<string, double>(StringComparer.Ordinal);
 
         public bool DevelopmentTestMode { get; }
         public bool HasSession => !string.IsNullOrEmpty(SessionId);
@@ -254,6 +257,38 @@ namespace C6.Prototype.Orbs
                 || !pending.TryGetValue(reservation.Request.OrbId, out var held) || !ReferenceEquals(held, reservation)) return false;
             return pending.Remove(reservation.Request.OrbId);
         }
+        /// <summary>
+        /// #51 Host only: a Combined orb still Idle <paramref name="lifetimeSeconds"/> after it first appeared
+        /// becomes Consumed, so the next snapshot removes it from every screen. An orb locked by a pending
+        /// launch or transfer waits for that result. Returns the orbs that expired on this call.
+        /// </summary>
+        public IReadOnlyList<OrbRecord> ExpireIdleCombined(double now, double lifetimeSeconds)
+        {
+            if (!HasSession || double.IsNaN(now) || double.IsInfinity(now)
+                || double.IsNaN(lifetimeSeconds) || double.IsInfinity(lifetimeSeconds) || lifetimeSeconds <= 0d)
+                return Array.Empty<OrbRecord>();
+            List<OrbRecord> expired = null;
+            foreach (var orb in new List<OrbRecord>(orbs.Values))
+            {
+                if (orb.Kind != OrbKind.Combined || orb.AuthorityState == OrbAuthorityState.Consumed) continue;
+                if (!combinedBornAt.TryGetValue(orb.OrbId, out double bornAt))
+                {
+                    combinedBornAt.Add(orb.OrbId, now);
+                    continue;
+                }
+                if (orb.AuthorityState != OrbAuthorityState.Idle || pending.ContainsKey(orb.OrbId)
+                    || now - bornAt < lifetimeSeconds) continue;
+                var consumed = new OrbRecord(orb.OrbId, orb.Kind, orb.Polarity, orb.OwnerPlayerId,
+                    OrbAuthorityState.Consumed, orb.NormalizedPosition, orb.EntrySide, orb.SequenceNumber,
+                    orb.TransferCount, orb.LastTransferSequence, orb.RightTransferCount, orb.TransferMotion);
+                orbs[orb.OrbId] = consumed;
+                combinedBornAt.Remove(orb.OrbId);
+                if (expired == null) expired = new List<OrbRecord>();
+                expired.Add(consumed);
+            }
+            return expired != null ? (IReadOnlyList<OrbRecord>)expired : Array.Empty<OrbRecord>();
+        }
+
         public int CountStoredOrbs(ulong owner)
         {
             int count = 0;
@@ -337,6 +372,7 @@ namespace C6.Prototype.Orbs
             pending.Clear();
             lastSequences.Clear();
             receipts.Clear();
+            combinedBornAt.Clear();
         }
 
         private void RequireSession()
