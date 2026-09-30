@@ -170,13 +170,14 @@ namespace C6.Prototype.Attack
         private Func<bool> canAct;
         private Func<double, bool> beforeHostHit;
         private Action<double, AttackHitResult> afterRewardedHit;
+        private Func<ulong, OrbActionKind, string> beforeHostTransfer;
 
         // Optional T09 hooks. The preserved T06-T08 scenes configure none and keep their original behavior.
         public void ConfigureBattleHooks(Func<bool> gameplayGate, Func<double, bool> beforeHit,
-            Action<double, AttackHitResult> afterHit)
+            Action<double, AttackHitResult> afterHit, Func<ulong, OrbActionKind, string> transferGate = null)
         {
             if (Connected) throw new InvalidOperationException("Configure battle hooks before starting a connection.");
-            canAct = gameplayGate; beforeHostHit = beforeHit; afterRewardedHit = afterHit;
+            canAct = gameplayGate; beforeHostHit = beforeHit; afterRewardedHit = afterHit; beforeHostTransfer = transferGate;
         }
 
         public void EndGameplayRound()
@@ -536,8 +537,9 @@ namespace C6.Prototype.Attack
                     readyPeer = AuthenticatedPlayerIds.Contains(sender) && peers.Length == 1 && IsParticipant(peers[0]);
                     if (readyPeer) receiver = peers[0];
                 }
+                string hostRejectionReason = beforeHostTransfer?.Invoke(sender, request.Kind);
                 result = Authority.RequestTransfer(sender, request, receiver, readyPeer,
-                    transferStorageLimit, transferEdgeInset, canAct?.Invoke() ?? true, MotionServerTime);
+                    transferStorageLimit, transferEdgeInset, canAct?.Invoke() ?? true, MotionServerTime, hostRejectionReason);
                 Debug.Log($"C6_T11_TRANSFER session={Registry.SessionId} round={Registry.RoundId} sender={sender} request={request.RequestId} orb={request.OrbId} direction={request.Kind} accepted={result.Accepted} duplicate={result.IsDuplicate} reason={result.Reason} receiver={result.Orb?.OwnerPlayerId} transferCount={result.Orb?.TransferCount}");
             }
             else result = Authority.RequestLaunch(sender, request, canAct?.Invoke() ?? true);

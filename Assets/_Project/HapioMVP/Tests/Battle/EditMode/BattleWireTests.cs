@@ -4,6 +4,7 @@ using System.Text;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Netcode;
+using UnityEngine;
 
 namespace C6.Prototype.Battle.Tests
 {
@@ -175,6 +176,60 @@ namespace C6.Prototype.Battle.Tests
 
             var lobby = Lobby(); lobby.attackSequence = 1; lobby.attackWarningStartsAt = 30; lobby.attackWarningEndsAt = 33;
             Assert.That(BattleWire.ValidSnapshot(lobby), Is.False, "no attack before Start");
+        }
+
+        [Test]
+        public void MonsterInterferenceCarriesSingleTargetAndGlobalDirectionPolicies()
+        {
+            var single = Playing();
+            single.interferenceSequence = 1;
+            single.interferenceKind = (int)MonsterInterferenceKind.SinglePlayerDirectionBlock;
+            single.interferenceDirection = (int)MonsterTransferDirection.Left;
+            single.interferenceActive = true;
+            single.interferenceHasTarget = true;
+            single.interferenceTarget = 0;
+            single.interferenceStartsAt = 30;
+            single.interferenceEndsAt = 38;
+            Assert.That(BattleWire.ValidSnapshot(single), Is.True);
+
+            var global = Playing(single.nonce);
+            global.interferenceSequence = 2;
+            global.interferenceKind = (int)MonsterInterferenceKind.AllPlayersDirectionRestriction;
+            global.interferenceDirection = (int)MonsterTransferDirection.Right;
+            global.interferenceActive = true;
+            global.interferenceStartsAt = 60;
+            global.interferenceEndsAt = 68;
+            Assert.That(BattleWire.ValidSnapshot(global), Is.True);
+
+            Action<BattleSnapshot>[] mutations =
+            {
+                value => value.interferenceSequence = -1,
+                value => value.interferenceKind = 99,
+                value => value.interferenceDirection = 99,
+                value => { value.interferenceSequence = 0; value.interferenceActive = true; },
+                value => { value.interferenceActive = true; value.interferenceHasTarget = false; },
+                value => { value.interferenceKind = (int)MonsterInterferenceKind.AllPlayersDirectionRestriction; value.interferenceHasTarget = true; },
+                value => { value.interferenceKind = (int)MonsterInterferenceKind.AllPlayersDirectionRestriction; value.interferenceTarget = 7; },
+                value => value.interferenceStartsAt = value.startedAt - 1,
+                value => value.interferenceEndsAt = value.interferenceStartsAt,
+                value => value.interferenceEndsAt = double.NaN,
+                value => { value.phase = BattlePhase.Defeat.ToString(); value.remaining = value.teamHp = 0; },
+            };
+            foreach (var mutate in mutations)
+            {
+                var value = JsonUtility.FromJson<BattleSnapshot>(JsonUtility.ToJson(single));
+                mutate(value);
+                Assert.That(BattleWire.ValidSnapshot(value), Is.False);
+            }
+
+            var afterEnd = single;
+            afterEnd.interferenceActive = false;
+            afterEnd.interferenceKind = (int)MonsterInterferenceKind.None;
+            afterEnd.interferenceDirection = (int)MonsterTransferDirection.None;
+            afterEnd.interferenceHasTarget = false;
+            afterEnd.interferenceTarget = 0;
+            afterEnd.interferenceStartsAt = afterEnd.interferenceEndsAt = 0;
+            Assert.That(BattleWire.ValidSnapshot(afterEnd), Is.True);
         }
         private static BattleSnapshot Attacking()
         {

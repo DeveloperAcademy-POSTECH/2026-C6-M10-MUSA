@@ -145,6 +145,24 @@ namespace C6.Prototype.Attack.Tests
             Assert.That(Send(Request("new-push", sequence: 2)).Accepted, Is.True);
         }
 
+        [Test]
+        public void HostPolicyRejectionIsReceiptedAndNeverMovesOwnership()
+        {
+            const string reason = "MONSTER_INTERFERENCE_DIRECTION_BLOCKED";
+            var request = Request("interference-blocked");
+            var rejected = authority.RequestTransfer(0, request, 17, true, 20, Inset, true, 10.5d, reason);
+
+            Assert.That(rejected.Accepted, Is.False);
+            Assert.That(rejected.Reason, Is.EqualTo(reason));
+            AssertSourceUnchanged();
+
+            var repeated = authority.RequestTransfer(0, request, 17, true, 20, Inset, true, 12d);
+            Assert.That(repeated.Accepted, Is.False);
+            Assert.That(repeated.IsDuplicate, Is.True);
+            Assert.That(repeated.Reason, Is.EqualTo(reason));
+            AssertSourceUnchanged();
+        }
+
         [TestCase(2)] [TestCase(3)] [TestCase(5)]
         public void RepeatedRingHandoffsKeepOneOrbAndDecayUntilNaturalStop(int players)
         {
