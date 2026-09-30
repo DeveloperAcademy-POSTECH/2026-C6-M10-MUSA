@@ -13,9 +13,12 @@ namespace C6.Prototype.Battle
         private static readonly int IdleState = Animator.StringToHash("Base Layer.Idle");
         private static readonly int HitState = Animator.StringToHash("Base Layer.Hit");
         private static readonly int AttackState = Animator.StringToHash("Base Layer.Claw_Attack");
+        private static readonly int GrabState = Animator.StringToHash("Base Layer.Grab");
         /// <summary>Claw_Attack is 136 frames at 30 fps (asset_manifest.json); Slash_Impact is its frame 74.</summary>
         public const float ClawAttackSeconds = 135f / 30f;
         public const float ClawImpactSeconds = 73f / 30f;
+        /// <summary>Grab is frames 1..157 at 30 fps and presents a monster interference without changing gameplay.</summary>
+        public const float GrabSeconds = 156f / 30f;
         private const float BlendSeconds = .08f;        // DEMO_TUNING_VALUE: fade into a one-shot
         private const float ReturnBlendSeconds = .2f;   // DEMO_TUNING_VALUE: fade back to Idle
         private Animator animator;
@@ -24,6 +27,7 @@ namespace C6.Prototype.Battle
 
         /// <summary>#28: the attack owns the body until it ends; a hit reaction must not cut the claw short.</summary>
         public bool Attacking => oneShotState == AttackState && Time.unscaledTime < attackUntil;
+        public bool Grabbing => oneShotState == GrabState;
 
         /// <summary>Finds the model Animator under the monster root and attaches this driver once.</summary>
         public static MonsterMotion For(Component monster)
@@ -49,12 +53,29 @@ namespace C6.Prototype.Battle
             attackUntil = Time.unscaledTime + ClawAttackSeconds - offset + .5f; // releases hits even if the clip never reports its end
         }
 
+        /// <summary>
+        /// Plays the interference Grab from Host-synchronized elapsed time. Claw_Attack keeps priority so the visual
+        /// attack is never cut short; the caller may retry while the interference remains active.
+        /// </summary>
+        public bool PlayGrab(float elapsedSeconds)
+        {
+            if (Attacking || elapsedSeconds < 0f || elapsedSeconds >= GrabSeconds) return false;
+            return PlayOneShot(GrabState, elapsedSeconds);
+        }
+
         /// <summary>#28: a round that ends or restarts mid-attack returns the body to Idle instead of finishing the claw.</summary>
         public void StopAttack()
         {
             if (!Attacking || animator == null || !animator.isActiveAndEnabled) return;
             animator.CrossFadeInFixedTime(IdleState, ReturnBlendSeconds, 0);
             oneShotState = 0; attackUntil = 0f;
+        }
+
+        public void StopGrab()
+        {
+            if (!Grabbing || animator == null || !animator.isActiveAndEnabled) return;
+            animator.CrossFadeInFixedTime(IdleState, ReturnBlendSeconds, 0);
+            oneShotState = 0;
         }
 
         private bool PlayOneShot(int state, float offsetSeconds)
