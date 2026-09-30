@@ -737,12 +737,15 @@ MonoBehaviour:
   tuning:
     orbRadiusScreenFraction: 0.055
     orbRadiusCapScale: 3
-    orbRestitution: 0.65
+    orbRestitution: 0.8
     orbContactFriction: 0
     orbFloorDeceleration: 2
-    orbStopSpeed: 0.015
-    orbMaxReleaseSpeed: 2
-    orbReleaseSampleWindow: 0.12
+    orbStopSpeed: 0.065
+    orbMaxReleaseSpeed: 3
+    orbReleaseSampleWindow: 0.06
+    rejectedCombinationBounceSpeed: 2
+    combinedOrbLifetimeSeconds: 8
+    combinedOrbWarningSeconds: 2
   savedTuningBaseline: '{"orbRadiusScreenFraction":0.054999999701976779,"orbRestitution":0.6499999761581421,"orbContactFriction":0.0,"orbFloorDeceleration":0.6000000238418579,"orbStopSpeed":0.014999999664723874,"orbMaxReleaseSpeed":2.0,"orbReleaseSampleWindow":0.11999999731779099}'
   portalsEnabled: 0
   leftWorkspace:
@@ -769,6 +772,7 @@ MonoBehaviour:
   applyGameSizeCap: 1
   boardColor: {r: 0.18, g: 0.32, b: 0.38, a: 1}
   outsideColor: {r: 0.03, g: 0.045, b: 0.06, a: 1}
+  combinedOrbExpiry: 1
   visibleBoard: 0
 --- !u!4 &644699088
 Transform:
