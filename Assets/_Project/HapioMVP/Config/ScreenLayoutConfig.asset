@@ -22,12 +22,13 @@ MonoBehaviour:
   orbArt: {fileID: 11400000, guid: 35b73622fc4dd4f32908cc7878777c90, type: 2}
   orbCatchRadiusScale: 1
   teamElements: 0100000002000000030000000400000005000000
-  orbRestitution: 0.65
+  rejectedCombinationBounceSpeed: 2
+  orbRestitution: 0.8
   orbContactFriction: 0
   orbFloorDeceleration: 2
-  orbStopSpeed: 0.015
-  orbMaxReleaseSpeed: 2
-  orbReleaseSampleWindow: 0.12
+  orbStopSpeed: 0.065
+  orbMaxReleaseSpeed: 3
+  orbReleaseSampleWindow: 0.06
   monsterTargetId: dev-training-dummy
   monsterPosition: {x: 0, y: 0, z: 0}
   monsterHitboxCenter: {x: 0, y: 1.4, z: 0}
@@ -73,5 +74,7 @@ MonoBehaviour:
   staminaHitRecovery: 5
   orbStorageLimit: 20
   resourceDebugToolsEnabled: 1
+  combinedOrbLifetimeSeconds: 8
+  combinedOrbWarningSeconds: 2
   battleDurationSeconds: 180
   teamHpDecayPerSecond: 1

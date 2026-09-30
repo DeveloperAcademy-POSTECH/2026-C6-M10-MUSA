@@ -32,6 +32,8 @@ namespace C6.Prototype.GameSync
         [Serializable] private sealed class Fields
         {
             public float upperFraction,horizontalSwipeFraction,horizontalDominance,combinationRadiusFraction,orbRadiusScreenFraction,orbRadiusCapScale;
+            public float orbRestitution,orbContactFriction,orbFloorDeceleration,orbStopSpeed,orbMaxReleaseSpeed,orbReleaseSampleWindow;
+            public float rejectedCombinationBounceSpeed,combinedOrbLifetimeSeconds,combinedOrbWarningSeconds;
             public int monsterMaxHp,baseDamage,orbStorageLimit;
             public int monsterMaxHp2Players, monsterMaxHp3Players, monsterMaxHp4Players, monsterMaxHp5Players;
             public float monsterAttackFirstDelaySeconds, monsterAttackIntervalSeconds, monsterAttackWarningSeconds, defenseHoldSeconds, defenseFailPenaltySeconds;
@@ -63,6 +65,11 @@ namespace C6.Prototype.GameSync
             {
                 upperFraction=c.upperFraction; horizontalSwipeFraction=c.horizontalSwipe; horizontalDominance=c.horizontalDominance;
                 orbRadiusScreenFraction=c.orbRadiusScreenFraction; orbRadiusCapScale=c.orbRadiusCapScale;
+                orbRestitution=c.orbRestitution; orbContactFriction=c.orbContactFriction;
+                orbFloorDeceleration=c.orbFloorDeceleration; orbStopSpeed=c.orbStopSpeed;
+                orbMaxReleaseSpeed=c.orbMaxReleaseSpeed; orbReleaseSampleWindow=c.orbReleaseSampleWindow;
+                rejectedCombinationBounceSpeed=c.rejectedCombinationBounceSpeed;
+                combinedOrbLifetimeSeconds=c.combinedOrbLifetimeSeconds; combinedOrbWarningSeconds=c.combinedOrbWarningSeconds;
                 combinationRadiusFraction=c.combinationRadius;
                 monsterMaxHp=c.monsterHp; monsterMaxHp2Players=c.monsterHp2; monsterMaxHp3Players=c.monsterHp3;
                 monsterMaxHp4Players=c.monsterHp4; monsterMaxHp5Players=c.monsterHp5;

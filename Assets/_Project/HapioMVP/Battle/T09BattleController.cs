@@ -639,7 +639,17 @@ namespace C6.Prototype.Battle
             if (source != null)
                 Debug.Log($"C6_T12_POINTER_END source={(touch ? "TOUCH" : pointerId == OrbPointerInput.MousePointerId ? "MOUSE" : "DEBUG")} pointer={pointerId} orb={source.OrbId} kind={source.Kind} startX={dragPointerStart.x:F3} startY={dragPointerStart.y:F3} rawX={raw.x:F3} rawY={raw.y:F3} deltaX={raw.x - dragPointerStart.x:F3} deltaY={raw.y - dragPointerStart.y:F3} heldSeconds={Time.unscaledTime - dragStartedAt:F3} reason={gestures.LastReleaseReason} requiredTravel={gestures.LastTransferRequiredTravel:F3} dropTarget={nearest?.Orb.OrbId ?? "none"} decision={decision?.Kind.ToString() ?? "none"} round={round}");
             bool submittedAction = decision.HasValue || !hadQualifiedAction && validDrop && source != null && nearest.HasValue;
+            // #52: a Raw pair that can never combine (same polarity or different element) bounces apart
+            // locally instead of asking the Host, which would reject it without changing anything.
+            string bounceTarget = !decision.HasValue && !hadQualifiedAction && validDrop && source != null && nearest.HasValue
+                && FailedCombinationReason(source, nearest.Value.Orb) != null ? nearest.Value.Orb.OrbId : null;
             if (decision.HasValue) SubmitDecision(decision.Value, touch, pointerId, "UP", releaseInput);
+            else if (bounceTarget != null)
+            {
+                action = "BOUNCE / " + FailedCombinationReason(source, nearest.Value.Orb);
+                detail = "Combine a Yin and a Yang of the same element";
+                Debug.Log($"C6_T09_COMBINE_BOUNCE source={source.OrbId} target={bounceTarget} reason={FailedCombinationReason(source, nearest.Value.Orb)} round={round}");
+            }
             else if (!hadQualifiedAction && validDrop && source != null && nearest.HasValue)
                 SubmitCombination(source.OrbId, nearest.Value.Orb.OrbId, touch);
             else if (!hadQualifiedAction && source != null && source.Kind == OrbKind.Raw
@@ -658,7 +668,31 @@ namespace C6.Prototype.Battle
             // A synchronous Host rejection is still an action, not a second physical throw.
             if (orbPhysicsEnabled && id != null)
                 orbPhysics.Release(id, Time.unscaledTimeAsDouble, validDrop && !hadQualifiedAction && !submittedAction);
+            if (bounceTarget != null) BounceApart(id, bounceTarget);
             RefreshLocalStates(); RefreshHud();
+        }
+
+        /// <summary>#52: why two orbs can never combine, or null when they can. A combined orb never combines again.</summary>
+        private static string FailedCombinationReason(OrbRecord source, OrbRecord target)
+        {
+            if (source == null || target == null) return null;
+            if (source.Kind != OrbKind.Raw || target.Kind != OrbKind.Raw) return "COMBINED_ORB";
+            if (source.Polarity == target.Polarity) return "SAME_POLARITY";
+            if (!OrbElements.SameElement(source.OrbId, target.OrbId)) return "ELEMENT_MISMATCH";
+            return null;
+        }
+
+        /// <summary>#52: push both orbs away from each other along the line between their centres.</summary>
+        private void BounceApart(string sourceId, string targetId)
+        {
+            if (!orbPhysicsEnabled || orbPhysics == null || sourceId == null
+                || !views.TryGetValue(sourceId, out var source) || !views.TryGetValue(targetId, out var target)) return;
+            Vector2 away = (Vector2)(source.transform.position - target.transform.position);
+            if (away.sqrMagnitude < 1e-8f) away = Vector2.right;
+            away.Normalize();
+            float speed = layout.Config.RejectedCombinationBounceSpeed;
+            orbPhysics.Push(sourceId, away * speed);
+            orbPhysics.Push(targetId, -away * speed);
         }
 
         private static bool FinitePoint(Vector2 point) => !float.IsNaN(point.x) && !float.IsInfinity(point.x)

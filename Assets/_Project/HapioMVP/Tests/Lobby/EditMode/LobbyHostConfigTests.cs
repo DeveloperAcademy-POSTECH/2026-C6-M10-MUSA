@@ -45,7 +45,7 @@ namespace C6.Prototype.Tests.Lobby
             Assert.That(LobbyHostConfig.TryRead(json, out var parsed), Is.True);
             Assert.That(JsonUtility.ToJson(parsed), Is.EqualTo(json));
             Assert.That(JsonUtility.ToJson(config), Is.EqualTo(before));
-            Assert.That(parsed.schema, Is.EqualTo(3)); Assert.That(parsed.initialOrbs, Is.Zero);
+            Assert.That(parsed.schema, Is.EqualTo(4)); Assert.That(parsed.initialOrbs, Is.Zero);
             Assert.That(parsed.staminaStart, Is.EqualTo(100)); Assert.That(parsed.generateCost, Is.EqualTo(20));
             Assert.That(parsed.recoveryAmount, Is.EqualTo(20)); Assert.That(parsed.recoverySeconds, Is.EqualTo(3));
             Assert.That(parsed.hitRecovery, Is.EqualTo(5)); Assert.That(parsed.duration, Is.EqualTo(180));
@@ -95,6 +95,16 @@ namespace C6.Prototype.Tests.Lobby
         public void IntegerFieldsCannotBeTruncatedOrOverflowed(string token)
         { Reject(Replace(json, "schema", token)); }
         [TestCase("schema", "1")]
+        [TestCase("schema", "3")]
+        [TestCase("orbRestitution", "1.1")]
+        [TestCase("orbContactFriction", "-0.1")]
+        [TestCase("orbFloorDeceleration", "0")]
+        [TestCase("orbMaxReleaseSpeed", "11")]
+        [TestCase("orbStopSpeed", "5")]
+        [TestCase("orbReleaseSampleWindow", "0.6")]
+        [TestCase("rejectedCombinationBounceSpeed", "-1")]
+        [TestCase("combinedOrbLifetimeSeconds", "0")]
+        [TestCase("combinedOrbWarningSeconds", "700")]
         [TestCase("initialOrbs", "1")]
         [TestCase("freeWorkspace", "false")]
         [TestCase("attackTrigger", "\"AttackBand\"")]

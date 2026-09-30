@@ -348,7 +348,9 @@ namespace C6.Prototype.Orbs
                     other.Kind != OrbKind.Raw || other.AuthorityState != OrbAuthorityState.Idle ||
                     other.OwnerPlayerId != ActiveOrb.OwnerPlayerId ||
                     StringComparer.Ordinal.Equals(other.OrbId, ActiveOrb.OrbId) ||
-                    !AreOpposite(ActiveOrb.Polarity, other.Polarity)) continue;
+                    !AreOpposite(ActiveOrb.Polarity, other.Polarity) ||
+                    // 오행 v2: only one element's Yin + Yang combine. Off (no elements) = always the same.
+                    !OrbElements.SameElement(ActiveOrb.OrbId, other.OrbId)) continue;
                 float squared = (candidate.ScreenPosition - rawPosition).sqrMagnitude;
                 float normalizedDistance = Mathf.Sqrt(squared) / screenWidth;
                 if (normalizedDistance > tuning.DropDistanceFraction &&

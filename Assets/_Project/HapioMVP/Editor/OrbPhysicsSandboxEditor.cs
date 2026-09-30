@@ -12,7 +12,8 @@ namespace C6.Editor
         static readonly string[] TuningFields =
         {
             "orbRadiusScreenFraction", "orbRadiusCapScale", "orbRestitution", "orbContactFriction", "orbFloorDeceleration",
-            "orbStopSpeed", "orbMaxReleaseSpeed", "orbReleaseSampleWindow"
+            "orbStopSpeed", "orbMaxReleaseSpeed", "orbReleaseSampleWindow",
+            "rejectedCombinationBounceSpeed", "combinedOrbLifetimeSeconds", "combinedOrbWarningSeconds"
         };
 
         bool referencesExpanded;
@@ -36,6 +37,9 @@ namespace C6.Editor
             DrawTuning(tuning, "orbStopSpeed", "완전 정지 기준 속도", "이 속도보다 느려지면 정지합니다. 단위는 조합대 너비/초입니다.");
             DrawTuning(tuning, "orbMaxReleaseSpeed", "놓을 때 최대 속도", "드래그 후 놓을 때 허용하는 최대 속도입니다. 단위는 조합대 너비/초입니다. 예: 2는 1초에 화면 너비 2배입니다.");
             DrawTuning(tuning, "orbReleaseSampleWindow", "놓기 속도 측정 구간 (초)", "놓기 직전 움직임을 평균 내는 시간입니다. 짧으면 마지막 손동작에 민감하고 길면 부드러워집니다.");
+            DrawTuning(tuning, "rejectedCombinationBounceSpeed", "결합 실패 튕김 속도", "#52: 같은 극, 다른 속성, 결합 구슬끼리처럼 결합에 실패하면 두 구슬이 이 속도로 서로 반대 방향으로 튕깁니다. 단위는 조합대 너비/초이며 0이면 튕기지 않습니다.");
+            DrawTuning(tuning, "combinedOrbLifetimeSeconds", "결합 구슬 소멸 시간 (초)", "#51: 결합 구슬을 이 시간 안에 던지지 않으면 사라집니다.");
+            DrawTuning(tuning, "combinedOrbWarningSeconds", "소멸 전 깜빡임 시간 (초)", "#51: 사라지기 전 마지막 몇 초 동안 깜빡일지 정합니다. 소멸 시간보다 길 수 없습니다.");
             DrawSizeInfo(sandbox);
 
             EditorGUILayout.Space();
@@ -89,7 +93,7 @@ namespace C6.Editor
                     if (GUILayout.Button("마지막 구슬 제거")) sandbox.RemoveLastOrb();
                     if (GUILayout.Button("추가한 구슬 모두 제거")) sandbox.RemoveAddedOrbs();
                 }
-                EditorGUILayout.HelpBox("결합: 음 구슬을 양 구슬 위(화면 너비 8% 이내)에 놓으면 두 구슬 사이에 COMB가 생깁니다. 같은 극·COMB끼리는 결합되지 않고, 가까이 놓으면 관성 없이 멈춥니다(게임과 동일).", MessageType.None);
+                EditorGUILayout.HelpBox("결합: 음 구슬을 양 구슬 위(화면 너비 8% 이내)에 놓으면 두 구슬 사이에 COMB가 생깁니다. 같은 속성의 음+양만 결합됩니다. 같은 극, 다른 속성, COMB가 끼면 결합에 실패하고 두 구슬이 서로 반대 방향으로 튕깁니다(게임과 동일, 세기는 위 '결합 실패 튕김 속도'). COMB는 '결합 구슬 소멸 시간' 안에 던지지 않으면 깜빡이다 사라집니다.", MessageType.None);
                 EditorGUILayout.HelpBox("추가한 구슬은 지금 보고 있는 조합대에 생깁니다. '배치 초기화'를 누르면 추가한 구슬은 사라지고 처음 배치로 돌아갑니다.", MessageType.None);
             }
             using (new EditorGUI.DisabledScope(sandbox.sourceConfig == null))
@@ -106,11 +110,11 @@ namespace C6.Editor
                     if (GUILayout.Button("튜닝값 저장"))
                     {
                         SaveTuning(sandbox);
-                        ShowNotification("8개 크기·물리 설정을 저장했습니다.");
+                        ShowNotification("11개 크기·물리·튕김·소멸 설정을 저장했습니다.");
                     }
                 }
             }
-            EditorGUILayout.HelpBox("'튜닝값 저장'은 공용 ScreenLayoutConfig의 위 8개 항목만 저장합니다. 저장한 값은 실제 게임을 다음에 시작할 때 사용됩니다. Play 중 변경한 값은 이 버튼을 누르지 않으면 되돌아갑니다.", MessageType.None);
+            EditorGUILayout.HelpBox("'튜닝값 저장'은 공용 ScreenLayoutConfig의 위 11개 항목만 저장합니다. 저장한 값은 실제 게임을 다음에 시작할 때 사용됩니다. Play 중 변경한 값은 이 버튼을 누르지 않으면 되돌아갑니다.", MessageType.None);
             EditorGUILayout.HelpBox("이 씬은 같은 물리 코드로 두 조합대 사이 이동과 음·양 결합을 로컬에서 시험합니다. 몬스터 공격은 제외하며, 기기 간 네트워크와 휴대폰 터치 감각은 별도 확인이 필요합니다.", MessageType.None);
 
             if (Application.isPlaying)
