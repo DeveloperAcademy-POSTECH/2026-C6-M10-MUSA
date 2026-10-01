@@ -195,10 +195,11 @@ namespace C6.Prototype.Presentation
         public int OrbStorageLimit => Mathf.Clamp(orbStorageLimit, 1, 20);
         public bool ResourceDebugToolsEnabled => resourceDebugToolsEnabled;
 
-        [Header("#51 · Combined orb expiry (seconds)")]
-        [Tooltip("A combined orb not thrown within this many seconds disappears on every screen.")]
+        // the names keep "combined" so saved assets and lobby developer settings stay compatible.
+        [Header("#51/#71 · Orb expiry (seconds from creation)")]
+        [Tooltip("Any orb (Yin, Yang or combined) not used within this many seconds after it was created disappears on every screen. Combining gives the new combined orb a fresh lifetime.")]
         [SerializeField] private float combinedOrbLifetimeSeconds = 8f;
-        [Tooltip("The combined orb blinks during this many final seconds before it disappears.")]
+        [Tooltip("An orb blinks during this many final seconds before it disappears.")]
         [SerializeField] private float combinedOrbWarningSeconds = 2f;
         public float CombinedOrbLifetimeSeconds => Valid(combinedOrbLifetimeSeconds, 8f, 1f, 600f);
         public float CombinedOrbWarningSeconds => Mathf.Min(Valid(combinedOrbWarningSeconds, 2f, 0f, 600f), CombinedOrbLifetimeSeconds);
