@@ -217,11 +217,13 @@ namespace C6.Editor
             DateTime started = DateTime.UtcNow;
             try
             {
-                report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                var buildOptions = new BuildPlayerOptions
                 {
                     scenes = new[] { ScenePath }, locationPathName = path,
                     target = target, options = BuildOptions.Development
-                });
+                };
+                using (T12ForegroundLifecyclePostprocess.RegisterExplicitBuild(buildOptions))
+                    report = BuildPipeline.BuildPlayer(buildOptions);
                 receipt.result = report.summary.result.ToString();
                 receipt.errors = report.summary.totalErrors;
                 receipt.warnings = report.summary.totalWarnings;
