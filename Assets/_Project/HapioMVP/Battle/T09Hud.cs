@@ -19,6 +19,8 @@ namespace C6.Prototype.Battle
         private static readonly Color Muted = new Color(0.58f, 0.70f, 0.72f, 1f);
         private static readonly Color Teal = new Color(0.39f, 0.80f, 0.74f, 1f);
         private static readonly Color Gold = new Color(0.86f, 0.73f, 0.47f, 1f);
+        private static readonly Color FeverYellow = new Color(1f, .76f, .05f, 1f);
+        public const string FeverMessageText = "피버타임!";
 
         [SerializeField] private SplitScreenLayout layout;
         [SerializeField, HideInInspector] private bool useSceneHierarchy;
@@ -68,6 +70,10 @@ namespace C6.Prototype.Battle
         private bool canGenerate, canDebugFixture;
         [SerializeField] private bool minimalBattlePresentation;
         [SerializeField] private RectTransform monsterHpFill;
+        [SerializeField] private RectTransform feverGaugeFill;
+        [SerializeField] private Text feverGaugeLabel;
+        [SerializeField] private GameObject feverEdgeOverlay;
+        [SerializeField] private UnityEngine.UI.Text feverMessage;
         [SerializeField] private RectTransform teamTimeFill;
         [SerializeField] private Text teamTimeValue;
         [SerializeField] private RectTransform staminaFill;
@@ -79,6 +85,7 @@ namespace C6.Prototype.Battle
         private Vector2Int lastScreen;
         private float lastCanvasScale;
         private SplitScreenLayout subscribedLayout;
+        private UnityEngine.UI.Image[] feverEdgeGraphics;
 
         public bool CoordinatedGame { get; set; }
         public int ParticipantCapacity { get; set; } = 2;
@@ -118,6 +125,10 @@ namespace C6.Prototype.Battle
         public SplitScreenLayout Layout => layout;
         public bool MinimalBattlePresentation => minimalBattlePresentation;
         public RectTransform MonsterHpFill => monsterHpFill;
+        public RectTransform FeverGaugeFill => feverGaugeFill;
+        public Text FeverGaugeLabel => feverGaugeLabel;
+        public GameObject FeverEdgeOverlay => feverEdgeOverlay;
+        public UnityEngine.UI.Text FeverMessage => feverMessage;
         public RectTransform TeamTimeFill => teamTimeFill;
         public Text TeamTimeValue => teamTimeValue;
         public RectTransform StaminaFill => staminaFill;
@@ -182,12 +193,106 @@ namespace C6.Prototype.Battle
             if (StorageLabel != null) StorageLabel.text = "ORBS " + stored + " / " + cap;
             if (ResourceModeLabel != null)
             {
-                ResourceModeLabel.text = isDebugMode ? "DEBUG_TEST_MODE / FIXTURE" : "NORMAL / EMPTY START";
-                ResourceModeLabel.color = isDebugMode ? Gold : Muted;
+                bool feverMode = Finite(cost) && cost == 0d;
+                ResourceModeLabel.text = isDebugMode ? "DEBUG_TEST_MODE / FIXTURE"
+                    : feverMode ? "FEVER / FREE ATTACK ORBS" : "NORMAL / EMPTY START";
+                ResourceModeLabel.color = isDebugMode || feverMode ? Gold : Muted;
             }
             if (generateCaption != null)
                 generateCaption.text = pending ? "WAITING FOR HOST" : "GENERATE  /  " + Number(cost);
         }
+
+        public void SetFever(int gaugePercent, bool active)
+        {
+            SetFever(gaugePercent, active, null, 0d, 0d, default);
+        }
+
+        public void SetFever(int gaugePercent, bool active, double? hostNow,
+            double startsAt, double endsAt, Rect monsterScreenRect)
+        {
+            int gauge = Mathf.Clamp(gaugePercent, 0, HostFeverState.MaximumGaugePercent);
+            float fraction = FeverDisplayFraction(gauge, active, hostNow, startsAt, endsAt);
+            bool presentationActive = active && fraction > 0f;
+            SetHorizontalFill(feverGaugeFill, fraction, 1d);
+            if (feverGaugeLabel != null)
+            {
+                int displayPercent = active
+                    ? Mathf.CeilToInt(fraction * HostFeverState.MaximumGaugePercent)
+                    : gauge;
+                feverGaugeLabel.text = presentationActive
+                    ? "FEVER TIME  " + displayPercent + "%"
+                    : "FEVER  " + displayPercent + "%";
+            }
+            if (feverMessage != null)
+            {
+                feverMessage.text = FeverMessageText;
+                feverMessage.enabled = presentationActive;
+                if (presentationActive) PlaceFeverMessage(monsterScreenRect);
+            }
+            if (feverEdgeOverlay != null)
+            {
+                if (feverEdgeOverlay.activeSelf != presentationActive)
+                    feverEdgeOverlay.SetActive(presentationActive);
+                if (presentationActive)
+                {
+                    feverEdgeOverlay.transform.SetAsLastSibling();
+                    RefreshFeverPulse(hostNow ?? Time.unscaledTimeAsDouble);
+                }
+            }
+        }
+
+        public static float FeverDisplayFraction(int gaugePercent, bool active, double? hostNow,
+            double startsAt, double endsAt)
+        {
+            if (!active)
+                return Mathf.Clamp01(gaugePercent / (float)HostFeverState.MaximumGaugePercent);
+            if (!hostNow.HasValue || !Finite(hostNow.Value) || !Finite(startsAt) || !Finite(endsAt)
+                || endsAt <= startsAt)
+                return 1f;
+            return Mathf.Clamp01((float)((endsAt - hostNow.Value) / (endsAt - startsAt)));
+        }
+
+        public static float FeverPulse01(double time)
+        {
+            if (!Finite(time)) return 0f;
+            return .5f + .5f * Mathf.Sin((float)time * Mathf.PI * 4f);
+        }
+
+        private void RefreshFeverPulse(double time)
+        {
+            if (feverEdgeOverlay == null) return;
+            float pulse = FeverPulse01(time);
+            Color color = Color.Lerp(FeverYellow, Color.white, pulse * .42f);
+            color.a = Mathf.Lerp(.28f, .96f, pulse);
+            if (feverEdgeGraphics == null || feverEdgeGraphics.Length == 0)
+                feverEdgeGraphics = feverEdgeOverlay.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+            foreach (var edge in feverEdgeGraphics)
+                edge.color = color;
+        }
+
+        private void PlaceFeverMessage(Rect screenRect)
+        {
+            if (feverMessage == null || feverEdgeOverlay == null || Canvas == null
+                || !Valid(screenRect)) return;
+            var root = feverEdgeOverlay.transform as RectTransform;
+            if (root == null) return;
+            Camera camera = Canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : Canvas.worldCamera;
+            bool gotMin = RectTransformUtility.ScreenPointToLocalPointInRectangle(root,
+                new Vector2(screenRect.xMin, screenRect.yMin), camera, out var min);
+            bool gotMax = RectTransformUtility.ScreenPointToLocalPointInRectangle(root,
+                new Vector2(screenRect.xMax, screenRect.yMax), camera, out var max);
+            if (!gotMin || !gotMax) return;
+            var rect = feverMessage.rectTransform;
+            rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
+            rect.pivot = new Vector2(.5f, .5f);
+            rect.anchoredPosition = (min + max) * .5f;
+            rect.sizeDelta = new Vector2(Mathf.Max(1f, max.x - min.x - 48f), 68f);
+        }
+
+        private static bool Valid(Rect rect) => Finite(rect.xMin) && Finite(rect.yMin)
+            && Finite(rect.xMax) && Finite(rect.yMax) && rect.width > 0f && rect.height > 0f;
+
+        private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
         private static string Number(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
@@ -299,6 +404,10 @@ namespace C6.Prototype.Battle
             if (minimalBattlePresentation)
             {
                 if (monsterHpFill == null) { error = "monsterHpFill"; return false; }
+                if (feverGaugeFill == null) { error = "feverGaugeFill"; return false; }
+                if (feverGaugeLabel == null) { error = "feverGaugeLabel"; return false; }
+                if (feverEdgeOverlay == null) { error = "feverEdgeOverlay"; return false; }
+                if (feverMessage == null) { error = "feverMessage"; return false; }
                 if (teamTimeFill == null) { error = "teamTimeFill"; return false; }
                 if (teamTimeValue == null) { error = "teamTimeValue"; return false; }
             }
@@ -432,6 +541,7 @@ namespace C6.Prototype.Battle
             SetStatus(networkStatus, actionStatus, detailStatus);
             SetControls(canHost, canJoin, canStart, canEnd, canGenerate, canDebugFixture, canSolo);
             SetResources(100d, 100d, 20d, 20d / 3d, 0, 20, false, false);
+            SetFever(0, false);
         }
 
         private void OnEnable()

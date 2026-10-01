@@ -228,6 +228,64 @@ namespace C6.Prototype.GameSync.Tests
         }
 
         [Test]
+        public void CoalescedSnapshotsMayCarrySeveralFeverChargesAtOnceButNeverRegress()
+        {
+            var before = Playing(); before.battle.feverGaugePercent = 20;
+            var after = Next(before); after.battle.feverGaugePercent = 80;
+            Assert.That(GameWire.Validate(after, Context(), before, out string reason), Is.True, reason);
+
+            var regressed = Next(after); regressed.battle.feverGaugePercent = 60;
+            AssertInvalid(regressed, after);
+        }
+
+        [Test]
+        public void FeverStartCanAtomicallyConvertExistingRawIdentity()
+        {
+            var before = Playing(); before.battle.feverGaugePercent = 80;
+            before.attack.orbs = new[] { Raw("converted", 0) };
+            before.resources.players[0].storedOrbs = 1;
+
+            var after = Next(before);
+            after.battle.feverGaugePercent = 100;
+            after.battle.feverSequence = 1;
+            after.battle.feverActive = true;
+            after.battle.feverStartsAt = after.hostNow;
+            after.battle.feverEndsAt = after.hostNow + HostFeverState.DefaultDurationSeconds;
+            after.resources.feverActive = true;
+            after.resources.generateCost = 0;
+            after.attack.orbs[0].kind = (int)OrbKind.FeverAttack;
+            after.attack.orbs[0].polarity = (int)OrbPolarity.None;
+            after.attack.orbs[0].rawElement = OrbElement.None;
+
+            Assert.That(GameWire.Validate(after, Context(), before, out string reason), Is.True, reason);
+        }
+
+        [Test]
+        public void ReceiverMayMissWholeFeverWindowAndStillObserveItsLaunchedOrb()
+        {
+            var before = Playing(); before.battle.feverGaugePercent = 80;
+            before.attack.orbs = new[] { Raw("launched-fever", 0) };
+            before.resources.players[0].storedOrbs = 1;
+
+            var after = Next(before);
+            after.hostNow += HostFeverState.DefaultDurationSeconds;
+            after.serverTime += HostFeverState.DefaultDurationSeconds;
+            after.battle.feverGaugePercent = 0;
+            after.battle.feverSequence = 1;
+            after.attack.orbs[0].kind = (int)OrbKind.FeverAttack;
+            after.attack.orbs[0].polarity = (int)OrbPolarity.None;
+            after.attack.orbs[0].rawElement = OrbElement.None;
+            after.attack.orbs[0].state = (int)OrbAuthorityState.Projectile;
+            after.resources.players[0].storedOrbs = 0;
+            after.attack.projectiles = new[] { new ProjectileWire
+            {
+                id = "launched-fever", owner = 0, position = Vector3.forward, radius = .2f
+            } };
+
+            Assert.That(GameWire.Validate(after, Context(), before, out string reason), Is.True, reason);
+        }
+
+        [Test]
         public void WireRoundTripPreservesFractionalResourcesAndUnsignedRevisions()
         {
             var original = Playing(); original.revision = ulong.MaxValue;

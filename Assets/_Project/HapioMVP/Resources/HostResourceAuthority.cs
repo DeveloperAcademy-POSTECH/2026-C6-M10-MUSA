@@ -59,6 +59,7 @@ namespace C6.Prototype.Resources
         public uint RoundId { get; private set; }
         public bool IsPlaying { get; private set; }
         public bool IsEnded { get; private set; }
+        public bool FeverActive { get; private set; }
 
         public HostResourceAuthority(HostOrbRegistry registry, ResourceTuning tuning, uint seed, int maximumParticipants = 2)
         {
@@ -90,6 +91,16 @@ namespace C6.Prototype.Resources
             foreach (var id in ids) players.Add(id, new Player(id, Tuning.Start));
             SessionId = registry.SessionId; RoundId = registry.RoundId;
             lastHostTime = hostNow; started = true; IsPlaying = true; IsEnded = false;
+            FeverActive = false;
+        }
+
+        /// <summary>The battle Host owns this flag. Clients cannot request a free generation mode.</summary>
+        public bool SetFeverActive(bool active)
+        {
+            RequireCurrentRound();
+            if (IsEnded || FeverActive == active) return false;
+            FeverActive = active;
+            return true;
         }
 
         public bool AddParticipant(ulong playerId, double hostNow)
@@ -151,26 +162,36 @@ namespace C6.Prototype.Resources
                 bool selected = selectedElements != null && selectedElements.TryGetValue(authenticatedSender, out var ownElement)
                     && OrbElements.IsValidRawElement(ownElement);
                 double eligibilityEpsilon = Math.Max(1, Tuning.GenerateCost) * 0.0000001;
-                if ((selectedElements != null || registry.RequiresExplicitRawElements) && !selected)
+                if (!FeverActive && (selectedElements != null || registry.RequiresExplicitRawElements) && !selected)
                     result = Reject("ELEMENT_SELECTION_REQUIRED", player.Stamina);
-                else if (player.Stamina + eligibilityEpsilon < Tuning.GenerateCost) result = Reject("INSUFFICIENT_STAMINA", player.Stamina);
+                else if (!FeverActive && player.Stamina + eligibilityEpsilon < Tuning.GenerateCost) result = Reject("INSUFFICIENT_STAMINA", player.Stamina);
                 else if (CountStoredOrbs(authenticatedSender) >= Tuning.StorageLimit)
                     result = Reject("STORAGE_FULL", player.Stamina);
                 else if (player.Generated == int.MaxValue) result = Reject("GENERATION_LIMIT", player.Stamina);
                 else
                 {
-                    var polarity = PolarityFor(Seed, player.Id, (uint)player.Generated);
-                    // Each paid Raw draws from the current round's Host-approved, active choices.
-                    // The sorted pool and separate stream make map insertion order and polarity independent.
-                    var element = selected ? ElementFor(Seed, RoundId, player.Id, (uint)player.Generated, SelectedElementPool())
-                        : OrbElement.None;
                     var position = FindSpawnPosition(player.Id);
                     double before = player.Stamina;
-                    // Registry insertion is validated before cost and successful-generation counter change.
-                    var orb = registry.RegisterGeneratedRaw(SessionId, RoundId, player.Id, polarity, position, element);
-                    player.Stamina = Math.Max(0, player.Stamina - Tuning.GenerateCost);
+                    OrbRecord orb;
+                    string reason;
+                    if (FeverActive)
+                    {
+                        orb = registry.RegisterGeneratedFeverAttack(SessionId, RoundId, player.Id, position);
+                        reason = "GENERATED_ONE_FEVER_ATTACK";
+                    }
+                    else
+                    {
+                        var polarity = PolarityFor(Seed, player.Id, (uint)player.Generated);
+                        // Each paid Raw draws from the current round's Host-approved, active choices.
+                        // The sorted pool and separate stream make map insertion order and polarity independent.
+                        var element = selected ? ElementFor(Seed, RoundId, player.Id, (uint)player.Generated, SelectedElementPool())
+                            : OrbElement.None;
+                        orb = registry.RegisterGeneratedRaw(SessionId, RoundId, player.Id, polarity, position, element);
+                        player.Stamina = Math.Max(0, player.Stamina - Tuning.GenerateCost);
+                        reason = "GENERATED_ONE_RAW";
+                    }
                     player.Generated++;
-                    result = new GenerateResult(true, false, "GENERATED_ONE_RAW", orb, before, player.Stamina);
+                    result = new GenerateResult(true, false, reason, orb, before, player.Stamina);
                 }
             }
             receipts.Add(request.RequestId, new Receipt(authenticatedSender, request, result));
@@ -200,7 +221,7 @@ namespace C6.Prototype.Resources
             Advance(hostNow, IsPlaying);
             if (IsEnded) return RecoveryRejected("ROUND_ENDED");
             if (string.IsNullOrEmpty(hit.OrbId) || !registry.TryGet(hit.OrbId, out var orb)
-                || orb.Kind != OrbKind.Combined || orb.AuthorityState != OrbAuthorityState.Consumed
+                || !orb.CanAttack || orb.AuthorityState != OrbAuthorityState.Consumed
                 || orb.OwnerPlayerId != hit.AttackerPlayerId || hit.Damage <= 0
                 || hit.HpBefore <= hit.HpAfter || hit.HpBefore - hit.HpAfter != hit.Damage)
                 return RecoveryRejected("INVALID_HIT_RECORD");

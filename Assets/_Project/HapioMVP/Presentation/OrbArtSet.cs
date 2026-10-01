@@ -32,6 +32,8 @@ namespace C6.Prototype.Presentation
         [SerializeField] private Sprite yinSprite;
         [SerializeField] private Sprite yangSprite;
         [SerializeField] private Sprite combinedSprite;
+        [Tooltip("Optional FeverAttack artwork. Empty uses the current Combined artwork until a dedicated asset is ready.")]
+        [SerializeField] private Sprite feverAttackSprite;
         [Tooltip("Hide the YIN / YANG / COMB caption under orbs that use artwork. LOCKED is still shown.")]
         [SerializeField] private bool hideLabels = true;
 
@@ -42,6 +44,7 @@ namespace C6.Prototype.Presentation
         public Sprite YinSprite => yinSprite;
         public Sprite YangSprite => yangSprite;
         public Sprite CombinedSprite => combinedSprite;
+        public Sprite FeverAttackSprite => feverAttackSprite != null ? feverAttackSprite : combinedSprite;
         public bool HideLabels => hideLabels;
 
         public Sprite SpriteFor(bool isCombined, bool yin) => isCombined ? combinedSprite : yin ? yinSprite : yangSprite;

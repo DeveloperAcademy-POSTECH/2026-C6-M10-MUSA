@@ -119,6 +119,28 @@ namespace C6.Prototype.Resources.Tests
         }
 
         [Test]
+        public void FeverSnapshotRequiresAndPreservesZeroGenerationCost()
+        {
+            var snapshot = Snapshot();
+            snapshot.feverActive = true;
+            snapshot.generateCost = 0;
+            Assert.That(ResourceWire.ValidSnapshot(snapshot), Is.True);
+            using (var writer = ResourceWire.Write(snapshot))
+            using (var reader = new FastBufferReader(writer, Allocator.Temp))
+            {
+                Assert.That(ResourceWire.TryRead<ResourceSnapshot>(reader, out var received), Is.True);
+                Assert.That(received.feverActive, Is.True);
+                Assert.That(received.generateCost, Is.Zero);
+            }
+
+            snapshot.generateCost = 20;
+            Assert.That(ResourceWire.ValidSnapshot(snapshot), Is.False);
+            snapshot.feverActive = false;
+            snapshot.generateCost = 0;
+            Assert.That(ResourceWire.ValidSnapshot(snapshot), Is.False);
+        }
+
+        [Test]
         public void ChangedProtocolLengthMalformedUtf8AndOversizeAreRejected()
         {
             byte[] body = Encoding.UTF8.GetBytes("{\"sessionId\":\"session\"}");

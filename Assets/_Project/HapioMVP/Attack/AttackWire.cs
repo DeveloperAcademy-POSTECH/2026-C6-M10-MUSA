@@ -359,7 +359,7 @@ namespace C6.Prototype.Attack
             && (orb.transferCount == 0 ? orb.lastTransferSequence == 0 && orb.entrySide == (int)EntrySide.None
                 : orb.lastTransferSequence >= orb.transferCount && orb.lastTransferSequence <= orb.sequence
                     && (orb.entrySide == (int)EntrySide.Left || orb.entrySide == (int)EntrySide.Right))
-            && (orb.kind == (int)OrbKind.Combined ? orb.polarity == (int)OrbPolarity.None : orb.polarity != (int)OrbPolarity.None);
+            && ((OrbKind)orb.kind == OrbKind.Raw ? orb.polarity != (int)OrbPolarity.None : orb.polarity == (int)OrbPolarity.None);
 
         internal static bool ValidTransferMotion(OrbWire orb)
         {
@@ -415,7 +415,7 @@ namespace C6.Prototype.Attack
                     || !Finite(projectile.position) || !Finite(projectile.radius) || projectile.radius <= 0f
                     || !ValidProjectileMotion(projectile)
                     || !orbById.TryGetValue(projectile.id, out var orb) || orb.owner != projectile.owner
-                    || orb.kind != (int)OrbKind.Combined || orb.state != (int)OrbAuthorityState.Projectile)
+                    || !orb.ToRecord().CanAttack || orb.state != (int)OrbAuthorityState.Projectile)
                     return false;
             return true;
         }

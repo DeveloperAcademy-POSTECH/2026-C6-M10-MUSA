@@ -48,6 +48,12 @@ namespace C6.Prototype.Battle
         public ulong interferenceTarget;
         public double interferenceStartsAt;
         public double interferenceEndsAt;
+        // #63 Host-owned team fever state. Gauge is 0..100 in exact hit-charge increments.
+        public int feverGaugePercent;
+        public int feverSequence;
+        public bool feverActive;
+        public double feverStartsAt;
+        public double feverEndsAt;
         // A client may report its lost connection without inventing a victory/defeat or ticking HP.
         public bool locallyDetectedNetworkError;
     }
@@ -118,7 +124,8 @@ namespace C6.Prototype.Battle
             if (phase == BattlePhase.Playing && (value.remaining <= 0 || value.observedMonsterHp <= 0)) return false;
             if (phase == BattlePhase.Victory && (value.remaining <= 0 || value.observedMonsterHp != 0)) return false;
             if (phase == BattlePhase.Defeat && value.remaining != 0) return false;
-            return ValidMonsterAttack(value, phase) && ValidMonsterInterference(value, phase);
+            return ValidMonsterAttack(value, phase) && ValidMonsterInterference(value, phase)
+                && ValidFever(value, phase);
         }
 
         /// <summary>#28: attacks exist only after Start, a live warning only while Playing, and results never skip ahead.</summary>
@@ -171,6 +178,26 @@ namespace C6.Prototype.Battle
                 && !value.interferenceHasTarget && value.interferenceTarget == 0;
         }
 
+        private static bool ValidFever(BattleSnapshot value, BattlePhase phase)
+        {
+            if (value.feverGaugePercent < 0 || value.feverGaugePercent > HostFeverState.MaximumGaugePercent
+                || value.feverGaugePercent % HostFeverState.DefaultChargePerHit != 0
+                || value.feverSequence < 0 || !Finite(value.feverStartsAt) || !Finite(value.feverEndsAt)) return false;
+
+            if (phase == BattlePhase.Lobby || phase == BattlePhase.Ready)
+                return value.feverGaugePercent == 0 && value.feverSequence == 0 && !value.feverActive
+                    && value.feverStartsAt == 0 && value.feverEndsAt == 0;
+
+            if (value.feverActive)
+                return phase == BattlePhase.Playing && value.feverSequence > 0
+                    && value.feverGaugePercent == HostFeverState.MaximumGaugePercent
+                    && value.feverStartsAt >= value.startedAt
+                    && Math.Abs(value.feverEndsAt - value.feverStartsAt - HostFeverState.DefaultDurationSeconds) <= 1e-6;
+
+            return value.feverGaugePercent < HostFeverState.MaximumGaugePercent
+                && value.feverStartsAt == 0 && value.feverEndsAt == 0;
+        }
+
         internal static bool AcceptsSnapshot(BattleSnapshot current, BattleSnapshot incoming,
             string expectedNonce, string expectedSession, uint expectedRound, int maximumParticipants = 2)
         {
@@ -180,7 +207,9 @@ namespace C6.Prototype.Battle
             if (Enum.TryParse<BattlePhase>(current.phase, out var previous) && IsTerminal(previous)
                 && (incoming.phase != current.phase || incoming.remaining != current.remaining || incoming.teamHp != current.teamHp
                     || incoming.observedMonsterHp != current.observedMonsterHp || incoming.deadline != current.deadline
-                    || incoming.startedAt != current.startedAt || incoming.duration != current.duration)) return false;
+                    || incoming.startedAt != current.startedAt || incoming.duration != current.duration
+                    || incoming.feverGaugePercent != current.feverGaugePercent
+                    || incoming.feverSequence != current.feverSequence || incoming.feverActive != current.feverActive)) return false;
             return true;
         }
     }
