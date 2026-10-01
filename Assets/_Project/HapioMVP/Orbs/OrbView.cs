@@ -55,6 +55,7 @@ namespace C6.Prototype.Orbs
         public CircleCollider2D Collider { get; private set; }
         public SpriteRenderer RingRenderer => ring;
         public LocalOrbState LocalState => localState;
+        public OrbKind Kind => kind;
         public bool HeldFeedbackActive => initialized && heldFeedbackEnabled && isActiveAndEnabled &&
             localState == LocalOrbState.Dragging;
         public float HeldScale => heldArtwork == null ? 1f : heldArtwork.localScale.x;
@@ -102,22 +103,29 @@ namespace C6.Prototype.Orbs
             Collider.isTrigger = true;
 
             core = Disc("Core", layer, 0.82f, Vector3.zero, 41);
+            bool attackOrb = kind == OrbKind.Combined || kind == OrbKind.FeverAttack;
             bool combined = kind == OrbKind.Combined;
-            firstDot = Disc("FirstCore", layer, combined ? 0.27f : 0.19f,
-                new Vector3(combined ? -radiusWorld * 0.26f : 0f, radiusWorld * 0.08f, 0f), 42);
-            if (combined)
+            firstDot = Disc("FirstCore", layer, attackOrb ? 0.27f : 0.19f,
+                new Vector3(attackOrb ? -radiusWorld * 0.26f : 0f, radiusWorld * 0.08f, 0f), 42);
+            if (attackOrb)
                 secondDot = Disc("SecondCore", layer, 0.27f,
                     new Vector3(radiusWorld * 0.26f, -radiusWorld * 0.08f, 0f), 43);
-            if (combined)
+            if (attackOrb)
             {
-                OrbElements.CombinedElements(orbId, out var yinElement, out var yangElement);
-                YinElement = yinElement; YangElement = yangElement; Element = OrbElement.None;
+                if (combined)
+                {
+                    OrbElements.CombinedElements(orbId, out var yinElement, out var yangElement);
+                    YinElement = yinElement; YangElement = yangElement;
+                }
+                else YinElement = YangElement = OrbElement.None;
+                Element = OrbElement.None;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                UnityEngine.Debug.Log("C6_ORBART  COMBINED  id=" + orbId
-                    + "  encoded=" + OrbElements.TryDecodeCombinedId(orbId, out _, out _)
-                    + "  yin=" + yinElement + "  yang=" + yangElement
-                    + "  art=comb_" + yinElement.ToString().ToLowerInvariant()
-                    + "_" + yangElement.ToString().ToLowerInvariant());
+                if (combined)
+                    UnityEngine.Debug.Log("C6_ORBART  COMBINED  id=" + orbId
+                        + "  encoded=" + OrbElements.TryDecodeCombinedId(orbId, out _, out _)
+                        + "  yin=" + YinElement + "  yang=" + YangElement
+                        + "  art=comb_" + YinElement.ToString().ToLowerInvariant()
+                        + "_" + YangElement.ToString().ToLowerInvariant());
 #endif
             }
             else
@@ -126,8 +134,9 @@ namespace C6.Prototype.Orbs
                 YinElement = orbPolarity == OrbPolarity.Yin ? Element : OrbElement.None;
                 YangElement = orbPolarity == OrbPolarity.Yang ? Element : OrbElement.None;
             }
-            var artSprite = artwork == null ? null : combined
-                ? artwork.CombinedSpriteFor(YinElement, YangElement)
+            var artSprite = artwork == null ? null
+                : kind == OrbKind.FeverAttack ? artwork.FeverAttackSprite
+                : combined ? artwork.CombinedSpriteFor(YinElement, YangElement)
                 : artwork.RawSprite(Element, orbPolarity == OrbPolarity.Yin);
             if (artSprite != null)
             {
@@ -153,7 +162,7 @@ namespace C6.Prototype.Orbs
             label.fontSize = 64;
             // TextMesh multiplies font glyph units by characterSize / 10. Font size is
             // atlas detail, so account for actual capital height instead of multiplying it twice.
-            label.font.RequestCharactersInTexture("YIN YANG COMBINED LOCKED", label.fontSize);
+            label.font.RequestCharactersInTexture("YIN YANG COMBINED FEVER LOCKED", label.fontSize);
             if (label.font.GetCharacterInfo('M', out var capital, label.fontSize))
                 labelGlyphHeight = Mathf.Max(1f, capital.maxY - capital.minY);
             SetLabelLocalHeight(radiusWorld * 0.56f);
@@ -163,7 +172,9 @@ namespace C6.Prototype.Orbs
             labelRenderer = label.GetComponent<MeshRenderer>();
             labelRenderer.sharedMaterial = label.font.material;
             labelRenderer.sortingOrder = 45;
-            idleLabel = string.IsNullOrEmpty(displayLabel) ? (combined ? "COMBINED" : polarity == OrbPolarity.Yin ? "YIN" : "YANG") : displayLabel;
+            idleLabel = string.IsNullOrEmpty(displayLabel)
+                ? kind == OrbKind.FeverAttack ? "FEVER" : combined ? "COMBINED" : polarity == OrbPolarity.Yin ? "YIN" : "YANG"
+                : displayLabel;
             label.font.RequestCharactersInTexture(idleLabel + " LOCKED", label.fontSize);
             // Cache both states now, before any renderer bounds exist. Reserving an action
             // cannot make a wider LOCKED caption suddenly spill past the viewport edge.
@@ -171,6 +182,63 @@ namespace C6.Prototype.Orbs
             idleLabelPosition = label.transform.localPosition;
             SetLocalState(LocalOrbState.Idle);
             if (heldFeedbackEnabled) EnsureHeldArtwork();
+        }
+
+        /// <summary>
+        /// Fever preserves the authoritative orb ID and the owner-local Rigidbody. Update only the
+        /// presentation in place so a rolling Raw does not teleport or lose velocity at fever start.
+        /// </summary>
+        public bool ConvertRawToFeverAttack()
+        {
+            if (!initialized || kind != OrbKind.Raw) return kind == OrbKind.FeverAttack;
+            kind = OrbKind.FeverAttack;
+            polarity = OrbPolarity.None;
+            Element = YinElement = YangElement = OrbElement.None;
+
+            float radius = circle.Radius;
+            firstDot.transform.localScale = new Vector3(.27f, .27f, 1f);
+            firstDot.transform.localPosition = new Vector3(-radius * .26f, radius * .08f, 0f);
+            if (secondDot == null)
+            {
+                secondDot = Disc("SecondCore", gameObject.layer, .27f,
+                    new Vector3(radius * .26f, -radius * .08f, 0f), 43);
+                if (heldArtwork != null) secondDot.transform.SetParent(heldArtwork, false);
+            }
+
+            var feverSprite = artwork != null ? artwork.FeverAttackSprite : null;
+            if (feverSprite != null)
+            {
+                if (art == null)
+                {
+                    var artObject = new GameObject("Artwork", typeof(SpriteRenderer));
+                    artObject.layer = gameObject.layer;
+                    artObject.transform.SetParent(heldArtwork != null ? heldArtwork : transform, false);
+                    art = artObject.GetComponent<SpriteRenderer>();
+                    art.sharedMaterial = spriteMaterial;
+                }
+                float fit = radius * 2f / Mathf.Max(.0001f, feverSprite.bounds.size.x);
+                art.transform.localScale = new Vector3(fit, fit, 1f);
+                art.sprite = feverSprite;
+                art.sortingOrder = localState == LocalOrbState.Dragging ? 94 : 44;
+                labelHidden = artwork.HideLabels;
+            }
+            else
+            {
+                if (art != null)
+                {
+                    var oldArt = art.gameObject;
+                    art = null;
+                    ReleaseObject(oldArt);
+                }
+                labelHidden = false;
+                ring.enabled = core.enabled = firstDot.enabled = secondDot.enabled = true;
+            }
+
+            idleLabel = "FEVER";
+            label.font.RequestCharactersInTexture(idleLabel + " LOCKED", label.fontSize);
+            maximumLabelHalfWidthGlyphs = Mathf.Max(MeasureLabelHalfWidth(idleLabel), MeasureLabelHalfWidth("LOCKED"));
+            SetLocalState(localState);
+            return true;
         }
 
         /// <summary>
@@ -266,7 +334,7 @@ namespace C6.Prototype.Orbs
                 ? new Vector3(idleLabelPosition.x, -circle.Radius * 1.72f, idleLabelPosition.z)
                 : idleLabelPosition;
             if (!active) return;
-            Color glow = kind == OrbKind.Combined ? Teal : polarity == OrbPolarity.Yin ? Ivory : Gold;
+            Color glow = kind != OrbKind.Raw ? Teal : polarity == OrbPolarity.Yin ? Ivory : Gold;
             heldHaloOuter.transform.localScale = Vector3.one * (1.58f + wave * 0.055f);
             heldHaloOuter.color = new Color(glow.r, glow.g, glow.b, 0.10f + wave * 0.025f);
             heldHaloInner.transform.localScale = Vector3.one * (1.40f + wave * 0.035f);
@@ -344,7 +412,7 @@ namespace C6.Prototype.Orbs
             if (!initialized) return;
             bool transferPending = state == LocalOrbState.TransferPending;
             bool pending = state == LocalOrbState.Pending || transferPending;
-            bool combined = kind == OrbKind.Combined;
+            bool combined = kind != OrbKind.Raw;
             bool yin = polarity == OrbPolarity.Yin;
             ring.color = pending ? Gold : state == LocalOrbState.Dragging ? Color.white : combined ? Teal : yin ? Ivory : Gold;
             core.color = pending ? Muted : combined ? new Color(0.08f, 0.28f, 0.29f, 1f) : yin ? Dark : Ivory;

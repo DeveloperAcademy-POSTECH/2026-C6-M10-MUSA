@@ -317,6 +317,14 @@ namespace C6.Prototype.Resources
         public bool RequestGenerate() => BeginRequest(ResourceRequestKind.Generate);
         public bool RequestDebugCombined() => CanRequestDebugCombined && BeginRequest(ResourceRequestKind.DebugCombined);
 
+        /// <summary>Called only by the authoritative battle service when the shared fever window changes.</summary>
+        public bool HostSetFeverActive(bool active)
+        {
+            if (!IsHost || Authority == null || !Authority.SetFeverActive(active)) return false;
+            PublishSnapshot(active ? "fever-start" : "fever-end");
+            return true;
+        }
+
         private bool BeginRequest(ResourceRequestKind kind)
         {
             if (!Playing || pending != null || nextSequence == ulong.MaxValue) return false;
@@ -609,8 +617,10 @@ namespace C6.Prototype.Resources
             Snapshot = new ResourceSnapshot
             {
                 nonce = attack.NonceForPlayer(manager.LocalClientId), sessionId = sessionId, roundId = roundId, revision = ++revision,
-                seed = seed, playing = Authority.IsPlaying, debugTestMode = debugTestMode, debugToolsEnabled = DebugAvailable,
-                maximum = config.StaminaMax, generateCost = config.GenerateCost, regenerationRate = config.StaminaRecoveryPerSecond,
+                seed = seed, playing = Authority.IsPlaying, feverActive = Authority.FeverActive,
+                debugTestMode = debugTestMode, debugToolsEnabled = DebugAvailable,
+                maximum = config.StaminaMax, generateCost = Authority.FeverActive ? 0 : config.GenerateCost,
+                regenerationRate = config.StaminaRecoveryPerSecond,
                 hitRecovery = config.StaminaHitRecovery, storageLimit = config.OrbStorageLimit,
                 players = Authority.Snapshot().Select(player => new ResourcePlayerWire
                 { playerId = player.PlayerId, stamina = player.Stamina, generatedTotal = player.GeneratedTotal,
@@ -627,7 +637,7 @@ namespace C6.Prototype.Resources
         {
             if (aggregateMode || Snapshot == null || !ResourceWire.ValidNonce(nonce)) return;
             var copy = new ResourceSnapshot { nonce = nonce, sessionId = Snapshot.sessionId, roundId = Snapshot.roundId,
-                revision = Snapshot.revision, seed = Snapshot.seed, playing = Snapshot.playing,
+                revision = Snapshot.revision, seed = Snapshot.seed, playing = Snapshot.playing, feverActive = Snapshot.feverActive,
                 debugTestMode = Snapshot.debugTestMode, debugToolsEnabled = Snapshot.debugToolsEnabled,
                 maximum = Snapshot.maximum, generateCost = Snapshot.generateCost, regenerationRate = Snapshot.regenerationRate,
                 hitRecovery = Snapshot.hitRecovery, storageLimit = Snapshot.storageLimit, players = Snapshot.players };

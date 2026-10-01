@@ -59,6 +59,36 @@ namespace C6.Prototype.Resources.Tests
         }
 
         [Test]
+        public void FeverGenerationCreatesFreeAttackOrbsThenReturnsToPaidRaw()
+        {
+            Assert.That(authority.SetFeverActive(true), Is.True);
+            var fever = authority.Generate(0, Request(1), 0);
+            Assert.That(fever.Accepted, Is.True);
+            Assert.That(fever.Orb.Kind, Is.EqualTo(OrbKind.FeverAttack));
+            Assert.That(fever.Orb.CanAttack, Is.True);
+            Assert.That(fever.StaminaBefore, Is.EqualTo(100));
+            Assert.That(fever.StaminaAfter, Is.EqualTo(100));
+
+            Assert.That(authority.SetFeverActive(false), Is.True);
+            var normal = authority.Generate(0, Request(2), 0);
+            Assert.That(normal.Accepted, Is.True);
+            Assert.That(normal.Orb.Kind, Is.EqualTo(OrbKind.Raw));
+            Assert.That(normal.StaminaAfter, Is.EqualTo(80));
+        }
+
+        [Test]
+        public void FeverGenerationStillHonorsTwentyOrbStorageLimit()
+        {
+            authority.SetFeverActive(true);
+            for (ulong sequence = 1; sequence <= 20; sequence++)
+                Assert.That(authority.Generate(0, Request(sequence), 0).Accepted, Is.True);
+            var rejected = authority.Generate(0, Request(21), 0);
+            Assert.That(rejected.Accepted, Is.False);
+            Assert.That(rejected.Reason, Is.EqualTo("STORAGE_FULL"));
+            Assert.That(authority.GetPlayer(0).Stamina, Is.EqualTo(100));
+        }
+
+        [Test]
         public void GeneratedPositionsAreDistinctAndNormalizedAtFullStorageCapacity()
         {
             var positions = new HashSet<Vector2>();

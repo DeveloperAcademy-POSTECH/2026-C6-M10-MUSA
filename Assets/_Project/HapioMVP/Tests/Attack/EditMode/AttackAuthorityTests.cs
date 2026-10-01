@@ -73,6 +73,22 @@ namespace C6.Prototype.Attack.Tests
             Assert.That(authority.MonsterHp, Is.EqualTo(100));
         }
 
+        [Test]
+        public void FeverAttackLaunchesAndDealsTheConfiguredTwentyDamage()
+        {
+            authority.BeginDevelopmentRound();
+            var orb = registry.RegisterGeneratedFeverAttack("attack-session", 1, 7, Vector2.one * .5f);
+            var launch = authority.RequestLaunch(7, Request(orb));
+            Assert.That(launch.Accepted, Is.True);
+            Assert.That(launch.SpawnRequired, Is.True);
+            Assert.That(authority.MarkProjectileSpawned("attack-session", 1, orb.OrbId), Is.True);
+
+            var hit = Hit(orb);
+            Assert.That(hit.Applied, Is.True);
+            Assert.That(hit.Damage, Is.EqualTo(20));
+            Assert.That(authority.MonsterHp, Is.EqualTo(80));
+        }
+
         [TestCase("sender", "OWNER_MISMATCH")]
         [TestCase("session", "SESSION_MISMATCH")]
         [TestCase("old-round", "ROUND_MISMATCH")]

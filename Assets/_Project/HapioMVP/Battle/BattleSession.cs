@@ -83,6 +83,7 @@ namespace C6.Prototype.Battle
         private double lastResourceNow;
         private HostMonsterAttack monsterAttack; // #28 Host only; recreated with each round
         private HostMonsterInterference monsterInterference; // #53 Host only; recreated with each round
+        private HostFeverState fever; // #63 Host-only shared gauge and window
         private static double Now => Time.realtimeSinceStartupAsDouble;
 
         public HostBattleClock Authority { get; private set; }
@@ -229,9 +230,11 @@ namespace C6.Prototype.Battle
                             HostMonsterInterference.DefaultIntervalSeconds,
                             HostMonsterInterference.DefaultDurationSeconds,
                             Guid.NewGuid().GetHashCode());
+                        fever = new HostFeverState();
+                        fever.BeginRound();
                         PublishSnapshot("lobby-ready");
                     }
-                    else { Authority = null; monsterAttack = null; monsterInterference = null; Status = "Waiting for the Host battle state."; }
+                    else { Authority = null; monsterAttack = null; monsterInterference = null; fever = null; Status = "Waiting for the Host battle state."; }
                 }
                 if (manager.IsHost && Authority != null)
                 {
@@ -251,9 +254,10 @@ namespace C6.Prototype.Battle
             if (IsHost)
             {
                 AdvanceClock(processingHit ? processingTimestamp : now);
+                TickFever(now);
                 TickMonsterAttack(now);
                 TickMonsterInterference(now);
-                TickCombinedOrbExpiry(now);
+                TickOrbExpiry(now);
                 if (now >= nextPublishAt)
                 { nextPublishAt = now + 1d / config.AttackSnapshotRateHz; PublishSnapshot(null); }
             }
@@ -324,18 +328,19 @@ namespace C6.Prototype.Battle
             if (Authority.IsTerminal && !terminalPublished) CommitTerminal();
         }
         /// <summary>
-        /// #51 Host only: a Combined orb not thrown within the configured seconds disappears on every screen.
-        /// Only while the battle is Playing, so a paused, ended or resetting round never removes orbs.
+        /// #51/#71 Host only: an orb (Raw or Combined) not used within the configured seconds after it was
+        /// created disappears on every screen. Only while the battle is Playing, so a paused, ended or
+        /// resetting round never removes orbs.
         /// </summary>
-        private void TickCombinedOrbExpiry(double now)
+        private void TickOrbExpiry(double now)
         {
             if (changingRound || processingHit || Authority == null || Authority.Phase != BattlePhase.Playing
                 || attack == null || attack.Registry == null) return;
-            var expired = attack.Registry.ExpireIdleCombined(now, config.CombinedOrbLifetimeSeconds);
+            var expired = attack.Registry.ExpireIdleOrbs(now, config.CombinedOrbLifetimeSeconds);
             if (expired.Count == 0) return;
             foreach (var orb in expired)
-                Debug.Log($"C6_COMBINED_EXPIRED orb={orb.OrbId} owner={orb.OwnerPlayerId} lifetime={config.CombinedOrbLifetimeSeconds}");
-            attack.PublishInventoryChange("combined-expired");
+                Debug.Log($"C6_ORB_EXPIRED orb={orb.OrbId} kind={orb.Kind} owner={orb.OwnerPlayerId} lifetime={config.CombinedOrbLifetimeSeconds}");
+            attack.PublishInventoryChange("orb-expired");
         }
 
         /// <summary>
@@ -344,7 +349,8 @@ namespace C6.Prototype.Battle
         /// </summary>
         private void TickMonsterAttack(double now)
         {
-            if (monsterAttack == null || Authority == null || changingRound || processingHit || Authority.Phase != BattlePhase.Playing) return;
+            if (monsterAttack == null || Authority == null || changingRound || processingHit
+                || Authority.Phase != BattlePhase.Playing || fever?.Active == true) return;
             int started = monsterAttack.Sequence;
             ulong target = monsterAttack.Target;
             var result = monsterAttack.Tick(now, attack.OrderedParticipantIds);
@@ -361,7 +367,7 @@ namespace C6.Prototype.Battle
         private void TickMonsterInterference(double now)
         {
             if (monsterInterference == null || Authority == null || changingRound || processingHit
-                || Authority.Phase != BattlePhase.Playing) return;
+                || Authority.Phase != BattlePhase.Playing || fever?.Active == true) return;
 
             int previousSequence = monsterInterference.Sequence;
             bool wasActive = monsterInterference.Active;
@@ -417,6 +423,7 @@ namespace C6.Prototype.Battle
         private bool BeforeHostHit(double now)
         {
             if (!IsHost || processingHit || Authority == null) return false;
+            TickFever(now);
             bool allowed = Authority.CanApplyHit(sessionId, roundId, now);
             if (!allowed)
             { if (Authority.IsTerminal && !terminalPublished) CommitTerminal(); return false; }
@@ -430,19 +437,58 @@ namespace C6.Prototype.Battle
             {
                 if (Authority == null || !Authority.Matches(processingSession, processingRound)) return;
                 if (hit != null && hit.Applied && hit.SessionId == processingSession && hit.RoundId == processingRound)
+                {
                     Authority.ObserveAppliedHit(processingSession, processingRound, processingTimestamp, hit.HpAfter);
+                    if (!Authority.IsTerminal && fever != null
+                        && fever.RecordValidHit(hit.OrbId, processingTimestamp) == FeverUpdateResult.Started)
+                        StartFever();
+                }
                 else Authority.Advance(processingSession, processingRound, processingTimestamp);
                 if (Authority.IsTerminal && !terminalPublished) CommitTerminal();
                 else PublishSnapshot(hit != null && hit.Applied ? "hit-after-recovery" : null);
             }
             finally { processingHit = false; }
         }
+
+        private void StartFever()
+        {
+            if (!IsHost || fever == null || !fever.Active || attack?.Registry == null) return;
+            bool attackCancelled = monsterAttack?.SuspendForFever() ?? false;
+            bool interferenceCleared = monsterInterference?.SuspendForFever() ?? false;
+            var converted = attack.Registry.ConvertIdleRawToFeverAttack();
+            resources?.HostSetFeverActive(true);
+            if (converted.Count > 0) attack.PublishInventoryChange("fever-convert-raw");
+            Debug.Log($"C6_FEVER stage=start round={roundId} sequence={fever.Sequence} gauge={fever.GaugePercent} durationSeconds={fever.DurationSeconds:R} converted={converted.Count} attackCancelled={attackCancelled} interferenceCleared={interferenceCleared}");
+        }
+
+        private void TickFever(double now)
+        {
+            if (!IsHost || fever == null || Authority == null || changingRound
+                || Authority.Phase != BattlePhase.Playing || fever.Tick(now) != FeverUpdateResult.Ended) return;
+            resources?.HostSetFeverActive(false);
+            var removed = attack?.Registry?.ConsumeIdleFeverAttack() ?? Array.Empty<OrbRecord>();
+            if (removed.Count > 0) attack.PublishInventoryChange("fever-remove-idle");
+            monsterAttack?.ResumeAfterFever(now);
+            monsterInterference?.ResumeAfterFever(now);
+            Debug.Log($"C6_FEVER stage=end round={roundId} sequence={fever.Sequence} removed={removed.Count} gauge={fever.GaugePercent}");
+            PublishSnapshot("fever-ended");
+        }
+
+        private void ResetFeverForRoundEnd()
+        {
+            if (fever == null) return;
+            if (fever.Active) resources?.HostSetFeverActive(false);
+            attack?.Registry?.ConsumeIdleFeverAttack();
+            fever.EndRound();
+        }
+
         private void CommitTerminal()
         {
             if (Authority == null || !Authority.IsTerminal || terminalPublished || endingGameplay) return;
             terminalPublished = true; endingGameplay = true;
             try
             {
+                ResetFeverForRoundEnd();
                 resources.ClearPendingForConfirmedRoundEnd(sessionId, roundId);
                 combinations.ClearPendingForConfirmedRoundEnd(sessionId, roundId);
                 PublishSnapshot("result-after-resource-recovery");
@@ -478,7 +524,12 @@ namespace C6.Prototype.Battle
                 interferenceHasTarget = interferenceLive && monsterInterference.HasTarget,
                 interferenceTarget = interferenceLive && monsterInterference.HasTarget ? monsterInterference.Target : 0UL,
                 interferenceStartsAt = interferenceLive ? monsterInterference.StartsAt : 0,
-                interferenceEndsAt = interferenceLive ? monsterInterference.EndsAt : 0
+                interferenceEndsAt = interferenceLive ? monsterInterference.EndsAt : 0,
+                feverGaugePercent = fever?.GaugePercent ?? 0,
+                feverSequence = fever?.Sequence ?? 0,
+                feverActive = fever?.Active == true && Authority.Phase == BattlePhase.Playing,
+                feverStartsAt = fever?.Active == true && Authority.Phase == BattlePhase.Playing ? fever.StartsAt : 0,
+                feverEndsAt = fever?.Active == true && Authority.Phase == BattlePhase.Playing ? fever.EndsAt : 0
             };
         }
         private void PublishSnapshot(string stage)
@@ -558,7 +609,7 @@ namespace C6.Prototype.Battle
         {
             if (messaging != null)
             { messaging.UnregisterNamedMessageHandler(SnapshotMessage); messaging.UnregisterNamedMessageHandler(SyncMessage); }
-            messaging = null; manager = null; Authority = null; monsterAttack = null; monsterInterference = null;
+            messaging = null; manager = null; Authority = null; monsterAttack = null; monsterInterference = null; fever = null;
             sessionId = localNonce = null; roundId = 0;
             hadSession = false; terminalPublished = false; processingHit = false; nextSyncAt = nextPublishAt = 0;
         }

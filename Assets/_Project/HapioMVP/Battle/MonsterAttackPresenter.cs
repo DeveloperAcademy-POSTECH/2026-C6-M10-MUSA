@@ -64,7 +64,8 @@ namespace C6.Prototype.Battle
 
         /// <summary>An attack is shown until its claw recovers, unless the round ended before it resolved.</summary>
         public static bool Presents(BattleSnapshot state, double hostNow) => state != null && state.attackSequence > 0
-            && (state.attackActive || state.attackResolvedSequence == state.attackSequence)
+            && (state.attackActive || state.attackResolvedSequence == state.attackSequence
+                && state.attackResult != (int)MonsterAttackResult.Cancelled)
             && hostNow < state.attackWarningEndsAt + MonsterMotion.ClawAttackSeconds - MonsterMotion.ClawImpactSeconds;
 
         /// <summary>
@@ -72,7 +73,8 @@ namespace C6.Prototype.Battle
         /// ended before the attack resolved. A resolved attack (Hit or Defended) always finishes its claw.
         /// </summary>
         public static bool CancelsClaw(BattleSnapshot state) => state == null || state.attackSequence == 0
-            || !state.attackActive && state.attackResolvedSequence != state.attackSequence;
+            || !state.attackActive && (state.attackResolvedSequence != state.attackSequence
+                || state.attackResult == (int)MonsterAttackResult.Cancelled);
 
         /// <summary>Only the attacked player's screen warns, and only during the Host warning window.</summary>
         public static bool Warns(BattleSnapshot state, ulong localPlayer, double hostNow) => state != null

@@ -141,6 +141,23 @@ namespace C6.Prototype.Battle
             return false;
         }
 
+        /// <summary>Fever immediately clears the live transfer restriction.</summary>
+        public bool SuspendForFever()
+        {
+            if (!Active) return false;
+            ClearActiveEffect();
+            return true;
+        }
+
+        /// <summary>After fever, wait one full interval instead of replaying missed effects.</summary>
+        public void ResumeAfterFever(double now)
+        {
+            if (double.IsNaN(now) || double.IsInfinity(now) || now < 0)
+                throw new ArgumentOutOfRangeException(nameof(now));
+            ClearActiveEffect();
+            nextInterferenceAt = now + IntervalSeconds;
+        }
+
         private void StartRandomEffect(double now, IReadOnlyList<ulong> participants)
         {
             Sequence++;

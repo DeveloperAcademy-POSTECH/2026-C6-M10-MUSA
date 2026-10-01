@@ -95,6 +95,24 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(attack.Sequence, Is.Zero);
         }
 
+        [Test]
+        public void FeverCancelsWarningAndResumeUsesFreshFirstDelay()
+        {
+            var attack = Started(0);
+            attack.Tick(20, Roster);
+            Assert.That(attack.SuspendForFever(), Is.True);
+            Assert.That(attack.Active, Is.False);
+            Assert.That(attack.ResolvedSequence, Is.EqualTo(1));
+            Assert.That(attack.LastResult, Is.EqualTo(MonsterAttackResult.Cancelled));
+
+            attack.ResumeAfterFever(30);
+            Assert.That(attack.Tick(49.9, Roster), Is.EqualTo(MonsterAttackResult.None));
+            Assert.That(attack.Sequence, Is.EqualTo(1));
+            attack.Tick(50, Roster);
+            Assert.That(attack.Sequence, Is.EqualTo(2));
+            Assert.That(attack.Active, Is.True);
+        }
+
         [TestCase(0, 15, 3)]
         [TestCase(20, 0, 3)]
         [TestCase(20, 15, double.NaN)]

@@ -36,6 +36,7 @@ namespace C6.Prototype.Resources
         public ulong revision;
         public uint seed;
         public bool playing;
+        public bool feverActive;
         public bool debugTestMode;
         public bool debugToolsEnabled;
         public double maximum;
@@ -156,7 +157,7 @@ namespace C6.Prototype.Resources
             && Enum.IsDefined(typeof(OrbAuthorityState), orb.state)
             && OrbElements.ValidElementData((OrbKind)orb.kind, orb.rawElement, requireExplicitRaw)
             && Finite(orb.pos.x) && Finite(orb.pos.y) && orb.pos.x >= 0 && orb.pos.x <= 1 && orb.pos.y >= 0 && orb.pos.y <= 1
-            && (orb.kind == (int)OrbKind.Combined ? orb.polarity == (int)OrbPolarity.None : orb.polarity != (int)OrbPolarity.None);
+            && ((OrbKind)orb.kind == OrbKind.Raw ? orb.polarity != (int)OrbPolarity.None : orb.polarity == (int)OrbPolarity.None);
 
         internal static bool ValidOptionalOrb(OrbWire[] entries, bool requireExplicitRaw = false) => entries != null && entries.Length <= 1
             && (entries.Length == 0 || ValidOrb(entries[0], requireExplicitRaw));
@@ -186,7 +187,8 @@ namespace C6.Prototype.Resources
             if (maximumParticipants < 2 || maximumParticipants > ParticipantRing.MaximumPlayers
                 || snapshot == null || !ValidContext(snapshot.nonce, snapshot.sessionId, snapshot.roundId)
                 || snapshot.revision == 0 || !Finite(snapshot.maximum) || snapshot.maximum <= 0 || snapshot.maximum > 100000
-                || !Finite(snapshot.generateCost) || snapshot.generateCost <= 0 || snapshot.generateCost > snapshot.maximum
+                || !Finite(snapshot.generateCost) || snapshot.generateCost < 0 || snapshot.generateCost > snapshot.maximum
+                || snapshot.feverActive != (snapshot.generateCost == 0)
                 || !Finite(snapshot.regenerationRate) || snapshot.regenerationRate < 0 || snapshot.regenerationRate > 100000
                 || !Finite(snapshot.hitRecovery) || snapshot.hitRecovery < 0 || snapshot.hitRecovery > snapshot.maximum
                 || snapshot.storageLimit < 1 || snapshot.storageLimit > 1000

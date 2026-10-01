@@ -28,9 +28,13 @@ namespace C6.Prototype.Orbs
         private readonly Dictionary<string, OrbReservation> pending = new Dictionary<string, OrbReservation>(StringComparer.Ordinal);
         private readonly Dictionary<string, ulong> lastSequences = new Dictionary<string, ulong>(StringComparer.Ordinal);
         private readonly Dictionary<string, Receipt> receipts = new Dictionary<string, Receipt>(StringComparer.Ordinal);
-        // #51: Host clock time each Combined orb was first seen. Keyed by ID, so a transfer
+        // #51/#71: Host clock time each orb was first seen (its creation). Keyed by ID, so a transfer
         // (a new record with the same ID) keeps the original timer instead of restarting it.
-        private readonly Dictionary<string, double> combinedBornAt = new Dictionary<string, double>(StringComparer.Ordinal);
+        // A Combined orb is a new orb, so combining starts a fresh lifetime.
+        private readonly Dictionary<string, double> orbBornAt = new Dictionary<string, double>(StringComparer.Ordinal);
+
+        /// <summary>the lifetime last used by <see cref="ExpireIdleOrbs"/>. Zero until the battle ticks.</summary>
+        public double OrbLifetimeSeconds { get; private set; }
 
         public bool DevelopmentTestMode { get; }
         public bool RequiresExplicitRawElements { get; private set; }
@@ -82,10 +86,10 @@ namespace C6.Prototype.Orbs
         {
             RequireSession();
             if (!DevelopmentTestMode) throw new InvalidOperationException("Development fixtures require explicit test mode.");
-            if (!IsValidKindAndPolarity(kind, polarity)) throw new ArgumentException("Raw requires Yin or Yang; Combined requires None.");
+            if (!IsValidKindAndPolarity(kind, polarity)) throw new ArgumentException("Raw requires Yin or Yang; attack orbs require None.");
             if (!IsNormalized(position)) throw new ArgumentOutOfRangeException(nameof(position), "Position must be finite and within [0, 1].");
             if (!OrbElements.ValidElementData(kind, rawElement, RequiresExplicitRawElements))
-                throw new ArgumentException("Raw requires its explicit element in the selected contract; Combined uses None.", nameof(rawElement));
+                throw new ArgumentException("Raw requires its explicit element in the selected contract; attack orbs use None.", nameof(rawElement));
             string id;
             do { id = Guid.NewGuid().ToString("N"); } while (orbs.ContainsKey(id));
             var orb = new OrbRecord(id, kind, polarity, owner, OrbAuthorityState.Idle, position, EntrySide.None, 0, rawElement: rawElement);
@@ -116,6 +120,66 @@ namespace C6.Prototype.Orbs
             orbs.Add(id, orb);
             lastSequences.Add(id, 0);
             return orb;
+        }
+
+        /// <summary>Host-approved zero-cost generation while the shared fever window is active.</summary>
+        public OrbRecord RegisterGeneratedFeverAttack(string sessionId, uint roundId, ulong owner, Vector2 position)
+        {
+            RequireSession();
+            if (!string.Equals(SessionId, sessionId, StringComparison.Ordinal) || RoundId != roundId)
+                throw new InvalidOperationException("Generated FeverAttack must belong to the active Host round.");
+            if (!IsNormalized(position)) throw new ArgumentOutOfRangeException(nameof(position));
+            string id;
+            do { id = Guid.NewGuid().ToString("N"); } while (orbs.ContainsKey(id));
+            var orb = new OrbRecord(id, OrbKind.FeverAttack, OrbPolarity.None, owner,
+                OrbAuthorityState.Idle, position, EntrySide.None, 0);
+            orbs.Add(id, orb);
+            lastSequences.Add(id, 0);
+            return orb;
+        }
+
+        /// <summary>
+        /// Fever starts atomically on the Host. Every still stored Raw keeps its identity, owner,
+        /// position and transfer motion, but becomes an immediately throwable FeverAttack.
+        /// Any in-flight Raw reservation is retired rather than being allowed to complete as Raw.
+        /// </summary>
+        public IReadOnlyList<OrbRecord> ConvertIdleRawToFeverAttack()
+        {
+            if (!HasSession) return Array.Empty<OrbRecord>();
+            List<OrbRecord> converted = null;
+            foreach (var orb in new List<OrbRecord>(orbs.Values))
+            {
+                if (orb.Kind != OrbKind.Raw || orb.AuthorityState != OrbAuthorityState.Idle) continue;
+                pending.Remove(orb.OrbId);
+                var fever = new OrbRecord(orb.OrbId, OrbKind.FeverAttack, OrbPolarity.None,
+                    orb.OwnerPlayerId, orb.AuthorityState, orb.NormalizedPosition, orb.EntrySide,
+                    orb.SequenceNumber, orb.TransferCount, orb.LastTransferSequence,
+                    orb.RightTransferCount, orb.TransferMotion);
+                orbs[orb.OrbId] = fever;
+                if (converted == null) converted = new List<OrbRecord>();
+                converted.Add(fever);
+            }
+            return converted != null ? (IReadOnlyList<OrbRecord>)converted : Array.Empty<OrbRecord>();
+        }
+
+        /// <summary>Fever end removes only unthrown FeverAttack orbs. Launching/projectile orbs still resolve.</summary>
+        public IReadOnlyList<OrbRecord> ConsumeIdleFeverAttack()
+        {
+            if (!HasSession) return Array.Empty<OrbRecord>();
+            List<OrbRecord> consumed = null;
+            foreach (var orb in new List<OrbRecord>(orbs.Values))
+            {
+                if (orb.Kind != OrbKind.FeverAttack || orb.AuthorityState != OrbAuthorityState.Idle) continue;
+                pending.Remove(orb.OrbId);
+                var removed = new OrbRecord(orb.OrbId, orb.Kind, orb.Polarity, orb.OwnerPlayerId,
+                    OrbAuthorityState.Consumed, orb.NormalizedPosition, orb.EntrySide,
+                    orb.SequenceNumber, orb.TransferCount, orb.LastTransferSequence,
+                    orb.RightTransferCount, orb.TransferMotion, orb.RawElement);
+                orbs[orb.OrbId] = removed;
+                if (consumed == null) consumed = new List<OrbRecord>();
+                consumed.Add(removed);
+            }
+            return consumed != null ? (IReadOnlyList<OrbRecord>)consumed : Array.Empty<OrbRecord>();
         }
 
         public IReadOnlyList<OrbRecord> Snapshot()
@@ -175,7 +239,7 @@ namespace C6.Prototype.Orbs
                 || !string.Equals(SessionId, request.SessionId, StringComparison.Ordinal)
                 || RoundId != request.RoundId
                 || !TryGet(request.OrbId, out var orb)
-                || orb.Kind != OrbKind.Combined || orb.Polarity != OrbPolarity.None
+                || !orb.CanAttack || orb.Polarity != OrbPolarity.None
                 || orb.AuthorityState != OrbAuthorityState.Idle
                 || orb.OwnerPlayerId != reservation.SenderPlayerId
                 || !pending.TryGetValue(orb.OrbId, out var held)
@@ -235,6 +299,9 @@ namespace C6.Prototype.Orbs
             combined = new OrbRecord(id, OrbKind.Combined, OrbPolarity.None, reservation.SenderPlayerId,
                 OrbAuthorityState.Idle, (request.NormalizedPosition + targetPosition) * .5f, EntrySide.None, 0);
             orbs.Add(id, combined); lastSequences.Add(id, 0);
+            // The materials' timers end here. The combined orb is a new orb and starts its own full lifetime
+            // the first time the Host sees it (its creation snapshot or the next expiry tick).
+            orbBornAt.Remove(source.OrbId); orbBornAt.Remove(target.OrbId);
             orbs[source.OrbId] = sourceConsumed; orbs[target.OrbId] = targetConsumed;
             pending.Remove(source.OrbId); pending.Remove(target.OrbId);
             return true;
@@ -278,35 +345,52 @@ namespace C6.Prototype.Orbs
             return pending.Remove(reservation.Request.OrbId);
         }
         /// <summary>
-        /// #51 Host only: a Combined orb still Idle <paramref name="lifetimeSeconds"/> after it first appeared
-        /// becomes Consumed, so the next snapshot removes it from every screen. An orb locked by a pending
-        /// launch or transfer waits for that result. Returns the orbs that expired on this call.
+        /// #51/#71 Host only: any orb (Raw or Combined) still Idle <paramref name="lifetimeSeconds"/> after it was
+        /// created becomes Consumed, so the next snapshot removes it from every screen. A Combined orb counts
+        /// from its own creation (combining gives a fresh lifetime). An orb locked by a pending combination, launch or transfer
+        /// waits for that result. Returns the orbs that expired on this call.
         /// </summary>
-        public IReadOnlyList<OrbRecord> ExpireIdleCombined(double now, double lifetimeSeconds)
+        public IReadOnlyList<OrbRecord> ExpireIdleOrbs(double now, double lifetimeSeconds)
         {
             if (!HasSession || double.IsNaN(now) || double.IsInfinity(now)
                 || double.IsNaN(lifetimeSeconds) || double.IsInfinity(lifetimeSeconds) || lifetimeSeconds <= 0d)
                 return Array.Empty<OrbRecord>();
+            OrbLifetimeSeconds = lifetimeSeconds;
             List<OrbRecord> expired = null;
             foreach (var orb in new List<OrbRecord>(orbs.Values))
             {
-                if (orb.Kind != OrbKind.Combined || orb.AuthorityState == OrbAuthorityState.Consumed) continue;
-                if (!combinedBornAt.TryGetValue(orb.OrbId, out double bornAt))
+                if (orb.AuthorityState == OrbAuthorityState.Consumed) { orbBornAt.Remove(orb.OrbId); continue; }
+                if (!orbBornAt.TryGetValue(orb.OrbId, out double bornAt))
                 {
-                    combinedBornAt.Add(orb.OrbId, now);
+                    orbBornAt.Add(orb.OrbId, now);
                     continue;
                 }
                 if (orb.AuthorityState != OrbAuthorityState.Idle || pending.ContainsKey(orb.OrbId)
                     || now - bornAt < lifetimeSeconds) continue;
                 var consumed = new OrbRecord(orb.OrbId, orb.Kind, orb.Polarity, orb.OwnerPlayerId,
                     OrbAuthorityState.Consumed, orb.NormalizedPosition, orb.EntrySide, orb.SequenceNumber,
-                    orb.TransferCount, orb.LastTransferSequence, orb.RightTransferCount, orb.TransferMotion);
+                    orb.TransferCount, orb.LastTransferSequence, orb.RightTransferCount, orb.TransferMotion, orb.RawElement);
                 orbs[orb.OrbId] = consumed;
-                combinedBornAt.Remove(orb.OrbId);
+                orbBornAt.Remove(orb.OrbId);
                 if (expired == null) expired = new List<OrbRecord>();
                 expired.Add(consumed);
             }
             return expired != null ? (IReadOnlyList<OrbRecord>)expired : Array.Empty<OrbRecord>();
+        }
+
+        /// <summary>
+        /// Host only: seconds left before an Idle orb expires, for the snapshot that lets clients blink it.
+        /// The first call for a new orb starts its timer (snapshots are published as soon as an orb is created).
+        /// False while no lifetime is known yet or for a Consumed / unknown orb.
+        /// </summary>
+        public bool TryGetRemainingLifetime(string orbId, double now, out double remainingSeconds)
+        {
+            remainingSeconds = 0d;
+            if (OrbLifetimeSeconds <= 0d || orbId == null || double.IsNaN(now) || double.IsInfinity(now)
+                || !orbs.TryGetValue(orbId, out var orb) || orb.AuthorityState == OrbAuthorityState.Consumed) return false;
+            if (!orbBornAt.TryGetValue(orbId, out double bornAt)) { bornAt = now; orbBornAt.Add(orbId, now); }
+            remainingSeconds = Math.Max(0d, bornAt + OrbLifetimeSeconds - now);
+            return true;
         }
 
         public int CountStoredOrbs(ulong owner)
@@ -330,7 +414,7 @@ namespace C6.Prototype.Orbs
                 || (expectedState == OrbAuthorityState.Projectile && nextState == OrbAuthorityState.Consumed);
             if (!validStep || !HasSession || !string.Equals(SessionId, sessionId, StringComparison.Ordinal)
                 || RoundId != roundId || !TryGet(orbId, out var orb)
-                || orb.Kind != OrbKind.Combined || orb.Polarity != OrbPolarity.None
+                || !orb.CanAttack || orb.Polarity != OrbPolarity.None
                 || orb.AuthorityState != expectedState) return false;
             advanced = new OrbRecord(orb.OrbId, orb.Kind, orb.Polarity, orb.OwnerPlayerId,
                 nextState, orb.NormalizedPosition, orb.EntrySide, orb.SequenceNumber, orb.TransferCount, orb.LastTransferSequence, orb.RightTransferCount, orb.TransferMotion, orb.RawElement);
@@ -354,7 +438,7 @@ namespace C6.Prototype.Orbs
             OrbRecord target = null;
             if (request.Kind == OrbActionKind.Launch)
             {
-                if (source.Kind != OrbKind.Combined) return Reject("RAW_CANNOT_LAUNCH");
+                if (!source.CanAttack) return Reject("RAW_CANNOT_LAUNCH");
                 if (!string.IsNullOrEmpty(request.OtherOrbId)) return Reject("UNEXPECTED_SECOND_ORB");
             }
             else if (request.Kind == OrbActionKind.Combine)
@@ -394,7 +478,7 @@ namespace C6.Prototype.Orbs
             pending.Clear();
             lastSequences.Clear();
             receipts.Clear();
-            combinedBornAt.Clear();
+            orbBornAt.Clear();
         }
 
         private void RequireSession()
@@ -411,7 +495,7 @@ namespace C6.Prototype.Orbs
         private static bool IsValidKindAndPolarity(OrbKind kind, OrbPolarity polarity)
         {
             return (kind == OrbKind.Raw && (polarity == OrbPolarity.Yin || polarity == OrbPolarity.Yang))
-                || (kind == OrbKind.Combined && polarity == OrbPolarity.None);
+                || ((kind == OrbKind.Combined || kind == OrbKind.FeverAttack) && polarity == OrbPolarity.None);
         }
 
         private static bool IsNormalized(Vector2 position)

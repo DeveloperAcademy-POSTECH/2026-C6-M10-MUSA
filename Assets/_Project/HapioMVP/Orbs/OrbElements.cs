@@ -47,9 +47,9 @@ namespace C6.Prototype.Orbs
 
         public static bool IsValidRawElement(OrbElement element) => element >= OrbElement.Fire && element <= OrbElement.Earth;
 
-        /// <summary>Combined has no duplicate Raw field. Missing Raw is valid only in legacy contracts.</summary>
+        /// <summary>Attack orbs have no duplicate Raw field. Missing Raw is valid only in legacy contracts.</summary>
         public static bool ValidElementData(OrbKind kind, OrbElement rawElement, bool requireExplicitRaw = false)
-            => kind == OrbKind.Combined ? rawElement == OrbElement.None
+            => kind == OrbKind.Combined || kind == OrbKind.FeverAttack ? rawElement == OrbElement.None
                 : kind == OrbKind.Raw && (IsValidRawElement(rawElement) || !requireExplicitRaw && rawElement == OrbElement.None);
 
         /// <summary>The received owner and the global team list never override an explicit Raw element.</summary>

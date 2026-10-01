@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace C6.Prototype.Orbs
 {
-    public enum OrbKind { Raw, Combined }
+    public enum OrbKind { Raw, Combined, FeverAttack }
     public enum OrbPolarity { Yin, Yang, None }
     public enum OrbAuthorityState { Idle, Launching, Projectile, Consumed }
     public enum LocalOrbState { Idle, Dragging, Pending, TransferPending }
@@ -21,7 +21,7 @@ namespace C6.Prototype.Orbs
         /// <summary>Host-selected Raw element. None is reserved for legacy fixtures; Combined uses its encoded ID.</summary>
         public OrbElement RawElement { get; }
         // Kind capabilities are independent of availability; authority state and pending still gate actions.
-        public bool CanAttack => Kind == OrbKind.Combined;
+        public bool CanAttack => Kind == OrbKind.Combined || Kind == OrbKind.FeverAttack;
         public bool CanCombine => Kind == OrbKind.Raw;
         public ulong OwnerPlayerId { get; }
         public OrbAuthorityState AuthorityState { get; }

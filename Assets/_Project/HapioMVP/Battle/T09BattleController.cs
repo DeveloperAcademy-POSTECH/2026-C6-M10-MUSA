@@ -57,7 +57,7 @@ namespace C6.Prototype.Battle
         private readonly ThrowGestureSampler throwSampler = new ThrowGestureSampler();
         private ThrowHeldPreview throwPreview;
         public bool ReleaseThrowsEnabled => releaseThrowsEnabled;
-        public bool ThrowArmed => releaseThrowsEnabled && gestures.ActiveOrb?.Kind == OrbKind.Combined &&
+        public bool ThrowArmed => releaseThrowsEnabled && gestures.ActiveOrb?.CanAttack == true &&
             gestures.LastRawPosition.y >= layout.BottomPixelRect.yMax;
         public void ConfigureReleaseThrows(bool enabled)
         {
@@ -91,9 +91,9 @@ namespace C6.Prototype.Battle
         private bool reachableEdgeTransferDistance;
         private readonly Dictionary<string, PendingInput> pending = new Dictionary<string, PendingInput>();
         private readonly HashSet<string> confirmedUnavailable = new HashSet<string>();
-        // #51: local time each Combined orb first appeared in a Host snapshot (any owner, so a
-        // received orb keeps its timer). Drives the blink only; the Host alone removes orbs.
-        private readonly Dictionary<string, float> combinedSeenAt = new Dictionary<string, float>(StringComparer.Ordinal);
+        // #51/#71: Host server time at which each Idle orb (Raw or Combined) expires, from the snapshot.
+        // Drives the blink and the expiry message only; the Host alone removes orbs.
+        private readonly Dictionary<string, double> orbExpiresAt = new Dictionary<string, double>(StringComparer.Ordinal);
         private readonly HashSet<string> touchReceipts = new HashSet<string>();
         private Transform viewRoot, proxyRoot;
         private Material projectileMaterial, trailMaterial;
@@ -378,14 +378,14 @@ namespace C6.Prototype.Battle
             var state = attack.Snapshot;
             if (state == null || !attack.Connected)
             {
-                ClearViews(); ClearProxies(); ClearThrowTrails(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); combinedSeenAt.Clear();
+                ClearViews(); ClearProxies(); ClearThrowTrails(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); orbExpiresAt.Clear();
                 gestures = new OrbGestureEngine(); gestures.SetInputEnabled(false); sessionKey = null; round = 0; displayedDebugMode = null;
                 hud.HideElementWarning(); RefreshHud(); observedHp = null; missWatches.Clear(); return;
             }
             if (sessionKey != state.sessionId || round != state.roundId)
             {
                 hud.HideElementWarning(); CancelInteractions("Confirmed session/round changed");
-                ClearViews(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); combinedSeenAt.Clear(); gestures = new OrbGestureEngine();
+                ClearViews(); pending.Clear(); pendingCombination = null; sequences.Clear(); displayedTransfers.Clear(); confirmedUnavailable.Clear(); orbExpiresAt.Clear(); gestures = new OrbGestureEngine();
                 SentTransfers = ReceivedTransfers = 0;
                 hud.SetNetworkFieldsVisible(!attack.Connected); Canvas.ForceUpdateCanvases();
                 sessionKey = state.sessionId; round = state.roundId; displayedDebugMode = null;
@@ -401,33 +401,41 @@ namespace C6.Prototype.Battle
                     // A confirmed Launching/Projectile/Consumed record, never a local timeout, removes the view.
                     // #51: a held orb can expire mid-drag; end that drag before its view goes away.
                     if (gestures.ActiveOrb?.OrbId == id) { LogPointerCancellation(gestures.ActivePointerId.Value, id, "ORB_REMOVED"); gestures.CancelAllPointers(); }
-                    bool expired = combinedSeenAt.TryGetValue(id, out float seenAt)
-                        && Time.unscaledTime - seenAt >= layout.Config.CombinedOrbLifetimeSeconds - 1f
+                    bool expired = orbExpiresAt.TryGetValue(id, out double expiresAt)
+                        && SecondsUntil(expiresAt) <= .5d
                         && !state.orbs.Any(o => o.id == id && o.state != (int)OrbAuthorityState.Consumed);
                     RemoveView(id);
                     if (expired)
                     {
                         action = "ORB EXPIRED";
-                        detail = "Throw a combined orb within " + layout.Config.CombinedOrbLifetimeSeconds.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " seconds";
-                        Debug.Log($"C6_T09_COMBINED_EXPIRED orb={id} round={round}");
+                        detail = "Use an orb within " + layout.Config.CombinedOrbLifetimeSeconds.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " seconds after it appears";
+                        Debug.Log($"C6_T09_ORB_EXPIRED orb={id} round={round}");
                     }
                 }
-            // #51: remember when each Combined orb first appeared; forget ones no longer Idle.
-            var idleCombined = new HashSet<string>(state.orbs.Where(o => o.kind == (int)OrbKind.Combined
-                && o.state == (int)OrbAuthorityState.Idle).Select(o => o.id), StringComparer.Ordinal);
-            foreach (string id in idleCombined)
-                if (!combinedSeenAt.ContainsKey(id)) combinedSeenAt.Add(id, Time.unscaledTime);
-            foreach (string id in combinedSeenAt.Keys.ToArray())
-                if (!idleCombined.Contains(id)) combinedSeenAt.Remove(id);
+            // #51/#71: remember when each Idle orb expires; forget ones no longer Idle.
+            var idleTimed = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var orb in state.orbs)
+                if (orb.state == (int)OrbAuthorityState.Idle && orb.hasExpiry)
+                { orbExpiresAt[orb.id] = orb.expiresAtServerTime; idleTimed.Add(orb.id); }
+            foreach (string id in orbExpiresAt.Keys.ToArray())
+                if (!idleTimed.Contains(id)) orbExpiresAt.Remove(id);
             foreach (var orb in available)
             {
                 bool arrived = transfersEnabled && orb.transferCount > 0 &&
                     (!displayedTransfers.TryGetValue(orb.id, out var lastTransfer) || orb.transferCount > lastTransfer);
+                if (views.TryGetValue(orb.id, out var existingView)
+                    && existingView.Kind == OrbKind.Raw && orb.kind == (int)OrbKind.FeverAttack)
+                {
+                    if (gestures.ActiveOrb?.OrbId == orb.id)
+                        CancelInteractions("Fever converted the held Raw orb");
+                    existingView.ConvertRawToFeverAttack();
+                }
                 if (!views.ContainsKey(orb.id))
                 {
                     var view = new GameObject("T09 Orb " + orb.id).AddComponent<OrbView>(); view.transform.SetParent(viewRoot, false);
                     view.Configure(orb.id, (OrbKind)orb.kind, (OrbPolarity)orb.polarity, LayerMask.NameToLayer("C6Orbs"), RadiusWorld,
-                        orb.kind == (int)OrbKind.Combined ? "COMB" : orb.polarity == (int)OrbPolarity.Yin ? "YIN" : "YANG", rawElement: orb.rawElement);
+                        orb.kind == (int)OrbKind.FeverAttack ? "FEVER" : orb.kind == (int)OrbKind.Combined ? "COMB"
+                            : orb.polarity == (int)OrbPolarity.Yin ? "YIN" : "YANG", rawElement: orb.rawElement);
                     view.SetHeldFeedbackEnabled(true);
                     views.Add(orb.id, view);
                     PositionView(orb.id, ConfirmedToScreen(orb));
@@ -541,7 +549,7 @@ namespace C6.Prototype.Battle
                 dragIsTouch = input != null && input.IsActiveTouchPointer(pointerId);
                 if (dragIsTouch) TouchBegins++;
                 action = "Dragging " + record.Kind;
-                detail = releaseThrowsEnabled && record.Kind == OrbKind.Combined ? "Swipe into battle and release to throw" : continuousTransfersEnabled ? "Drag Yin onto Yang / push sideways to roll across screens" : transfersEnabled ? "Drop on Yin + Yang / release at a side edge to pass"
+                detail = releaseThrowsEnabled && record.CanAttack ? "Swipe into battle and release to throw" : continuousTransfersEnabled ? "Drag Yin onto Yang / push sideways to roll across screens" : transfersEnabled ? "Drop on Yin + Yang / release at a side edge to pass"
                     : record.Kind == OrbKind.Raw ? "Drop onto the opposite Yin / Yang" : "Drag across the upper battle boundary to attack";
                 Debug.Log($"C6_T09_POINTER_BEGIN source={(dragIsTouch ? "TOUCH" : pointerId == OrbPointerInput.MousePointerId ? "MOUSE" : "DEBUG")} pointer={pointerId} orb={record.OrbId} kind={record.Kind} rawX={raw.x:F3} rawY={raw.y:F3} centerX={dragStart.x:F3} centerY={dragStart.y:F3} screenWidth={Screen.width} round={round}");
             }
@@ -665,7 +673,7 @@ namespace C6.Prototype.Battle
             if (releaseThrowsEnabled && source != null && !submittedAction && !validDrop)
             {
                 PositionView(id, dragStart);
-                if (source.Kind == OrbKind.Combined)
+                if (source.CanAttack)
                 { action = "THROW CANCELLED"; detail = "Swipe upward and release while moving"; }
             }
             // Only a normal, action-free release on the board can carry local momentum.
@@ -843,7 +851,9 @@ namespace C6.Prototype.Battle
             Debug.Log($"C6_T09_DECISION kind={decision.Kind} sourceInput={sourceInput} origin={origin} pointer={pointerId} orb={decision.OrbId} rawX={decision.RawPosition.x:F2} rawY={decision.RawPosition.y:F2} screenWidth={Screen.width} gridWidth={OrbGridScreenRect.width:F2} swipeThreshold={Screen.width * layout.Config.HorizontalSwipeFraction:F2} round={round}");
             if (decision.Kind == OrbActionKind.Combine)
             { SubmitCombination(decision.OrbId, decision.OtherOrbId, fromTouch); return; }
-            if (decision.Kind == OrbActionKind.Launch && selectedElement != OrbElement.None
+            bool feverAttack = attack.Snapshot?.orbs.Any(orb => orb.id == decision.OrbId
+                && orb.kind == (int)OrbKind.FeverAttack) == true;
+            if (decision.Kind == OrbActionKind.Launch && !feverAttack && selectedElement != OrbElement.None
                 && (!OrbElements.TryDecodeCombinedId(decision.OrbId, out var yin, out var yang)
                     || yin != selectedElement || yang != selectedElement))
             {
@@ -978,6 +988,7 @@ namespace C6.Prototype.Battle
         private void Update()
         {
             RefreshInterferencePresentation();
+            RefreshFeverPresentation();
             if (releaseThrowsEnabled && gestures.HasActivePointer)
                 throwSampler.Add(gestures.LastRawPosition / Mathf.Max(1f, Screen.width), Time.unscaledTimeAsDouble);
             UpdateExpiryWarnings();
@@ -1007,16 +1018,22 @@ namespace C6.Prototype.Battle
                 }
             }
         }
-        /// <summary>#51: combined orbs blink during their final seconds before the Host removes them.</summary>
+        /// <summary>#51/#71: every orb blinks during its final seconds before the Host removes it.</summary>
         private void UpdateExpiryWarnings()
         {
             if (layout == null || layout.Config == null || views.Count == 0) return;
-            float lifetime = layout.Config.CombinedOrbLifetimeSeconds;
-            float warningFrom = lifetime - layout.Config.CombinedOrbWarningSeconds;
+            double warning = layout.Config.CombinedOrbWarningSeconds;
             bool playing = battle != null && battle.CanAct;
             foreach (var pair in views)
-                pair.Value.SetExpiryWarning(playing && combinedSeenAt.TryGetValue(pair.Key, out float seenAt)
-                    && Time.unscaledTime - seenAt >= warningFrom);
+                pair.Value.SetExpiryWarning(playing && warning > 0d && orbExpiresAt.TryGetValue(pair.Key, out double expiresAt)
+                    && SecondsUntil(expiresAt) <= warning);
+        }
+
+        /// <summary>seconds from now (shared network time) until a Host server time.</summary>
+        private double SecondsUntil(double serverTime)
+        {
+            double now = attack != null ? attack.MotionServerTime : 0d;
+            return now > 0d ? serverTime - now : double.PositiveInfinity;
         }
 
         private void LateUpdate()
@@ -1252,6 +1269,7 @@ namespace C6.Prototype.Battle
                 connection.CanStart && (Application.isEditor || Debug.isDebugBuild));
             hud.SetProgress(state?.observedMonsterHp ?? s?.hp ?? layout.Config.MonsterMaxHp,
                 s != null ? s.maxHp : layout.Config.MonsterMaxHp, s?.totalHits ?? 0, state?.roundId ?? s?.roundId ?? 0, s?.resets ?? 0);
+            RefreshFeverPresentation();
             var resources = resource?.Snapshot;
             var player = resource?.LocalPlayer;
             if (player != null) lastConfirmedStamina = player.stamina;
@@ -1270,8 +1288,7 @@ namespace C6.Prototype.Battle
         private void RefreshInterferencePresentation()
         {
             var state = battle?.Snapshot;
-            double? hostNow = presentationHostClock != null ? presentationHostClock()
-                : battle != null && battle.IsHost ? Time.realtimeSinceStartupAsDouble : (double?)null;
+            double? hostNow = PresentationHostNow();
             RefreshInterferenceMotion(state, hostNow);
 
             if (interferenceOverlay == null) return;
@@ -1286,6 +1303,19 @@ namespace C6.Prototype.Battle
             interferenceOverlay.Present(blockedDirection, hud.OrbWorkspaceScreenRect,
                 layout.TopPixelRect, hostNow, state.interferenceEndsAt);
         }
+
+        private void RefreshFeverPresentation()
+        {
+            if (hud == null || layout == null) return;
+            var state = battle?.Snapshot;
+            hud.SetFever(state?.feverGaugePercent ?? 0, state?.feverActive == true,
+                PresentationHostNow(), state?.feverStartsAt ?? 0d, state?.feverEndsAt ?? 0d,
+                layout.TopPixelRect);
+        }
+
+        private double? PresentationHostNow() => presentationHostClock != null
+            ? presentationHostClock()
+            : battle != null && battle.IsHost ? Time.realtimeSinceStartupAsDouble : (double?)null;
 
         private void RefreshInterferenceMotion(BattleSnapshot state, double? hostNow)
         {

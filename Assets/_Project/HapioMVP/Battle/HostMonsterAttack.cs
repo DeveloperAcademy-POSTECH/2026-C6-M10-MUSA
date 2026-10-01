@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace C6.Prototype.Battle
 {
-    public enum MonsterAttackResult { None, Defended, Hit }
+    public enum MonsterAttackResult { None, Defended, Hit, Cancelled }
 
     /// <summary>
     /// #28 Host-only schedule for the monster's single-target attack. Pure logic: the battle session feeds
@@ -73,6 +73,24 @@ namespace C6.Prototype.Battle
             if (!Active || sequence != Sequence || sender != Target || now > WarningEndsAt + ReportGraceSeconds) return false;
             Defended = true;
             return true;
+        }
+
+        /// <summary>Fever cancels the current warning and retires it without damage.</summary>
+        public bool SuspendForFever()
+        {
+            if (!Active) return false;
+            Active = Defended = false;
+            ResolvedSequence = Sequence;
+            LastResult = MonsterAttackResult.Cancelled;
+            return true;
+        }
+
+        /// <summary>After fever, schedule a fresh first attack rather than catching up missed intervals.</summary>
+        public void ResumeAfterFever(double now)
+        {
+            if (!Positive(now) && now != 0) throw new ArgumentOutOfRangeException(nameof(now));
+            Active = Defended = false;
+            nextAttackAt = now + FirstDelaySeconds;
         }
 
         private static bool Positive(double value) => !double.IsNaN(value) && !double.IsInfinity(value) && value > 0;

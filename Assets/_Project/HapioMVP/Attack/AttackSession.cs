@@ -793,6 +793,17 @@ namespace C6.Prototype.Attack
             Changed?.Invoke();
         }
 
+        /// <summary>
+        /// converts the Registry's Host-clock timer to NetworkManager server time, which every phone
+        /// shares, so a stored or re-sent snapshot still points at the same moment. Null while no timer runs.
+        /// </summary>
+        private double? ExpiryServerTime(OrbRecord orb)
+        {
+            if (orb == null || orb.AuthorityState != OrbAuthorityState.Idle || MotionServerTime <= 0d
+                || !Registry.TryGetRemainingLifetime(orb.OrbId, Time.realtimeSinceStartupAsDouble, out double remaining)) return null;
+            return MotionServerTime + remaining;
+        }
+
         private void PublishHostSnapshot(string stage)
         {
             if (!IsHost || Registry == null) return;
@@ -803,7 +814,7 @@ namespace C6.Prototype.Attack
                 hp = Authority.MonsterHp, maxHp = Authority.MonsterMaxHp, totalHits = totalHits,
                 roundHits = Authority.ValidHitCount, resets = resets, state = Authority.State.ToString(),
                 orbs = Registry.Snapshot().Where(orb => useT06Fixtures || orb.AuthorityState != OrbAuthorityState.Consumed)
-                    .Select(OrbWire.FromRecord).ToArray(),
+                    .Select(orb => OrbWire.FromRecord(orb, ExpiryServerTime(orb))).ToArray(),
                 projectiles = projectiles.Values.Where(value => value != null && !value.HasCompleted)
                     .OrderBy(value => value.OrbId, StringComparer.Ordinal).Select(value => new ProjectileWire
                     {

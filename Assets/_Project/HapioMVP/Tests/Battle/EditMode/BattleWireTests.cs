@@ -231,6 +231,28 @@ namespace C6.Prototype.Battle.Tests
             afterEnd.interferenceStartsAt = afterEnd.interferenceEndsAt = 0;
             Assert.That(BattleWire.ValidSnapshot(afterEnd), Is.True);
         }
+
+        [Test]
+        public void FeverSnapshotCarriesTeamGaugeAndExactTenSecondWindow()
+        {
+            var charged = Playing(); charged.feverGaugePercent = 80;
+            Assert.That(BattleWire.ValidSnapshot(charged), Is.True);
+
+            var active = Playing(charged.nonce);
+            active.feverGaugePercent = 100; active.feverSequence = 1; active.feverActive = true;
+            active.feverStartsAt = 25; active.feverEndsAt = 35;
+            Assert.That(BattleWire.ValidSnapshot(active), Is.True);
+
+            active.feverEndsAt = 34.9;
+            Assert.That(BattleWire.ValidSnapshot(active), Is.False);
+            active.feverEndsAt = 35; active.feverGaugePercent = 80;
+            Assert.That(BattleWire.ValidSnapshot(active), Is.False);
+
+            var ended = Playing(charged.nonce); ended.feverSequence = 1;
+            Assert.That(BattleWire.ValidSnapshot(ended), Is.True);
+            ended.feverGaugePercent = 10;
+            Assert.That(BattleWire.ValidSnapshot(ended), Is.False);
+        }
         private static BattleSnapshot Attacking()
         {
             var value = Playing(); value.attackSequence = 1; value.attackTarget = 1; value.attackActive = true;
