@@ -12,6 +12,8 @@ using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("C6.Prototype.GameSync.EditModeTests")]
+
 namespace C6.Prototype.GameSync
 {
     [DefaultExecutionOrder(300), DisallowMultipleComponent]
@@ -202,6 +204,7 @@ namespace C6.Prototype.GameSync
         }
         private void Start()
         {
+            controller.Hud.ClearNeighbours();
             SetGameVisible(false);
             Debug.Log("C6_T10B_READY build="+BuildIdentifier+" transfers="+transfersEnabled+" initialOrbs=0 stamina=100 cost=20 recovery=20/3 hitRecovery=5");
         }
@@ -281,13 +284,34 @@ namespace C6.Prototype.GameSync
             ulong local = lobby.Connection.OwnedManager.LocalClientId;
             int seat = Array.IndexOf(roundSeats, local) + 1;
             if (seat < 1) throw new InvalidOperationException("LOCAL_SEAT_MISSING");
+            var localPlayer = participants.SingleOrDefault(player => player.clientId == local);
+            if (localPlayer == null) throw new InvalidOperationException("LOCAL_PLAYER_MISSING");
             controller.ConfigureSeatNumber(seat);
             framing.ConfigureParticipantView(seat, participants.Length);
             if (elementSelectionEnabled)
-                controller.ConfigureSelectedElement(participants.Single(player => player.clientId == local).selectedElement);
+                controller.ConfigureSelectedElement(localPlayer.selectedElement);
             controller.Hud.SetPlayerIdentity(elementSelectionEnabled,
-                "P" + participants.Single(player => player.clientId == local).playerNumber + " / "
-                + participants.Single(player => player.clientId == local).selectedElement + " / Seat " + seat);
+                "P" + localPlayer.playerNumber + " / " + localPlayer.selectedElement + " / Seat " + seat);
+            if (elementSelectionEnabled && TryResolveNeighbours(participants, roundSeats, local,
+                    out var left, out var right))
+                controller.Hud.SetNeighbours(left.playerNumber, left.selectedElement,
+                    right.playerNumber, right.selectedElement);
+            else
+                controller.Hud.ClearNeighbours();
+        }
+
+        internal static bool TryResolveNeighbours(IReadOnlyList<LobbyPlayer> roster, ulong[] seats,
+            ulong localId, out LobbyPlayer left, out LobbyPlayer right)
+        {
+            left = right = null;
+            if (roster == null || seats == null || roster.Any(player => player == null)
+                || !RoundSeatLayout.Valid(seats, roster.Select(player => player.clientId).ToArray())
+                || !ParticipantRing.TryNeighbour(seats, localId, false, out ulong leftId)
+                || !ParticipantRing.TryNeighbour(seats, localId, true, out ulong rightId))
+                return false;
+            left = roster.FirstOrDefault(player => player.clientId == leftId);
+            right = roster.FirstOrDefault(player => player.clientId == rightId);
+            return left != null && right != null;
         }
         public void ReturnToRoomLobby()
         {
@@ -305,6 +329,7 @@ namespace C6.Prototype.GameSync
             p1 = p2 = null; roundSeats = Array.Empty<ulong>(); initialConfirmed = autoStart = false;
             controller.ConfigureSelectedElement(OrbElement.None);
             controller.Hud.SetPlayerIdentity(false, "");
+            controller.Hud.ClearNeighbours();
             controller.Hud.SetRoomPreparationControls(false, false);
             Error = ""; Status = "Choose elements and confirm Ready in this room";
             ending = false; SetGameVisible(false); Changed?.Invoke();
@@ -517,11 +542,13 @@ namespace C6.Prototype.GameSync
             if(ending)return;ending=true;
             controller.CancelInteractions("SESSION_ENDED"); peerResponses.Clear(); developmentHoldPeerResponses=false;
             Unbind();lobby.Leave();controller.Battle.EndSession(); attached=false;Snapshot=null;contract=null;
+            controller.Hud.ClearNeighbours();
             initialConfirmed=false;participants=Array.Empty<LobbyPlayer>();initialProofs.Clear();Error="";Status="Create or join a room";ending=false;SetGameVisible(false);Changed?.Invoke();
         }
         private void Fail(string reason)
         {
             if(Error.Length!=0)return;Error=reason;
+            controller.Hud.ClearNeighbours();
             Status=interruptionHandlingEnabled?InterruptionMessage(reason):"NETWORK ERROR / "+reason;
             Debug.Log("C6_T10B_NETWORK_ERROR reason="+reason);
             ending=true; peerResponses.Reset();

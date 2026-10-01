@@ -76,6 +76,10 @@ namespace C6.Prototype.Battle
         [SerializeField] private UnityEngine.UI.Text feverMessage;
         [SerializeField] private RectTransform teamTimeFill;
         [SerializeField] private Text teamTimeValue;
+        [SerializeField] private Image leftNeighbourIcon;
+        [SerializeField] private Text leftNeighbourLabel;
+        [SerializeField] private Image rightNeighbourIcon;
+        [SerializeField] private Text rightNeighbourLabel;
         [SerializeField] private RectTransform staminaFill;
         [SerializeField] private RectTransform[] staminaSegments;
         [SerializeField] private Text generateCaption;
@@ -131,6 +135,10 @@ namespace C6.Prototype.Battle
         public UnityEngine.UI.Text FeverMessage => feverMessage;
         public RectTransform TeamTimeFill => teamTimeFill;
         public Text TeamTimeValue => teamTimeValue;
+        public Image LeftNeighbourIcon => leftNeighbourIcon;
+        public Text LeftNeighbourLabel => leftNeighbourLabel;
+        public Image RightNeighbourIcon => rightNeighbourIcon;
+        public Text RightNeighbourLabel => rightNeighbourLabel;
         public RectTransform StaminaFill => staminaFill;
 
         /// <summary>Visual clamp area only. Gesture tests still use original pointer coordinates.</summary>
@@ -316,10 +324,41 @@ namespace C6.Prototype.Battle
                 ClockLabel.text = "TIME " + left.ToString("0.0", CultureInfo.InvariantCulture) + "s";
             if (TeamHpLabel != null)
                 TeamHpLabel.text = "TEAM HP " + team.ToString("0.0", CultureInfo.InvariantCulture);
+            // The authoritative remaining time is rounded up for a player-facing countdown:
+            // a positive fraction still shows at least 00:01, and exactly zero shows 00:00.
             if (teamTimeValue != null)
-                teamTimeValue.text = "TEAM HP " + team.ToString("0.0", CultureInfo.InvariantCulture)
-                    + "  /  TIME " + left.ToString("0.0", CultureInfo.InvariantCulture) + "s";
+            {
+                long seconds = (long)Math.Min(Math.Ceiling(left), int.MaxValue);
+                teamTimeValue.text = (seconds / 60).ToString("00", CultureInfo.InvariantCulture)
+                    + ":" + (seconds % 60).ToString("00", CultureInfo.InvariantCulture);
+            }
             SetHorizontalFill(teamTimeFill, left, duration);
+        }
+
+        /// <summary>Shows the players adjacent to this round's confirmed seat, not P-number order.</summary>
+        public void SetNeighbours(int leftPlayer, OrbElement leftElement, int rightPlayer, OrbElement rightElement)
+        {
+            var art = layout != null && layout.Config != null ? layout.Config.OrbArt : null;
+            SetNeighbour(leftNeighbourIcon, leftNeighbourLabel, art, leftPlayer, leftElement, "L");
+            SetNeighbour(rightNeighbourIcon, rightNeighbourLabel, art, rightPlayer, rightElement, "R");
+        }
+
+        public void ClearNeighbours()
+        {
+            SetNeighbour(leftNeighbourIcon, leftNeighbourLabel, null, 0, OrbElement.None, "L");
+            SetNeighbour(rightNeighbourIcon, rightNeighbourLabel, null, 0, OrbElement.None, "R");
+        }
+
+        private static void SetNeighbour(Image icon, Text label, OrbArtSet art, int player,
+            OrbElement element, string side)
+        {
+            if (icon == null || label == null) return;
+            var sprite = art != null && player > 0 && element != OrbElement.None
+                ? art.RawSprite(element, false) : null;
+            icon.sprite = sprite;
+            label.text = sprite != null ? side + " / P" + player : string.Empty;
+            icon.gameObject.SetActive(sprite != null);
+            label.gameObject.SetActive(sprite != null);
         }
 
         public void SetNetworkFieldsVisible(bool visible)
@@ -410,6 +449,9 @@ namespace C6.Prototype.Battle
                 if (feverMessage == null) { error = "feverMessage"; return false; }
                 if (teamTimeFill == null) { error = "teamTimeFill"; return false; }
                 if (teamTimeValue == null) { error = "teamTimeValue"; return false; }
+                if (leftNeighbourIcon == null || leftNeighbourLabel == null ||
+                    rightNeighbourIcon == null || rightNeighbourLabel == null)
+                { error = "neighbour UI"; return false; }
             }
             if (Canvas.renderMode != RenderMode.ScreenSpaceOverlay)
             { error = "Canvas must use ScreenSpaceOverlay for existing gesture coordinates"; return false; }
@@ -537,6 +579,7 @@ namespace C6.Prototype.Battle
                 CreateUI();
             }
             HideElementWarning();
+            ClearNeighbours();
             if (elementWarningConfirm != null) elementWarningConfirm.onClick.AddListener(HideElementWarning);
             SetStatus(networkStatus, actionStatus, detailStatus);
             SetControls(canHost, canJoin, canStart, canEnd, canGenerate, canDebugFixture, canSolo);
