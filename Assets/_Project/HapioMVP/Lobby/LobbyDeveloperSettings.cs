@@ -154,7 +154,7 @@ namespace C6.Prototype.Lobby
                 case LobbyDeveloperSetting.OrbMaxReleaseSpeed: return "ORB MAX RELEASE SPEED";
                 case LobbyDeveloperSetting.OrbReleaseSampleWindow: return "RELEASE SAMPLE TIME";
                 case LobbyDeveloperSetting.RejectedCombinationBounce: return "FAILED COMBINE BOUNCE";
-                case LobbyDeveloperSetting.CombinedOrbLifetime: return "COMBINED ORB LIFETIME";
+                case LobbyDeveloperSetting.CombinedOrbLifetime: return "ORB LIFETIME";
                 case LobbyDeveloperSetting.CombinedOrbWarning: return "EXPIRY BLINK TIME";
                 default: throw new ArgumentOutOfRangeException(nameof(setting));
             }

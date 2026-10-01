@@ -253,7 +253,7 @@ namespace C6.Prototype.Battle
                 AdvanceClock(processingHit ? processingTimestamp : now);
                 TickMonsterAttack(now);
                 TickMonsterInterference(now);
-                TickCombinedOrbExpiry(now);
+                TickOrbExpiry(now);
                 if (now >= nextPublishAt)
                 { nextPublishAt = now + 1d / config.AttackSnapshotRateHz; PublishSnapshot(null); }
             }
@@ -324,18 +324,19 @@ namespace C6.Prototype.Battle
             if (Authority.IsTerminal && !terminalPublished) CommitTerminal();
         }
         /// <summary>
-        /// #51 Host only: a Combined orb not thrown within the configured seconds disappears on every screen.
-        /// Only while the battle is Playing, so a paused, ended or resetting round never removes orbs.
+        /// #51/#71 Host only: an orb (Raw or Combined) not used within the configured seconds after it was
+        /// created disappears on every screen. Only while the battle is Playing, so a paused, ended or
+        /// resetting round never removes orbs.
         /// </summary>
-        private void TickCombinedOrbExpiry(double now)
+        private void TickOrbExpiry(double now)
         {
             if (changingRound || processingHit || Authority == null || Authority.Phase != BattlePhase.Playing
                 || attack == null || attack.Registry == null) return;
-            var expired = attack.Registry.ExpireIdleCombined(now, config.CombinedOrbLifetimeSeconds);
+            var expired = attack.Registry.ExpireIdleOrbs(now, config.CombinedOrbLifetimeSeconds);
             if (expired.Count == 0) return;
             foreach (var orb in expired)
-                Debug.Log($"C6_COMBINED_EXPIRED orb={orb.OrbId} owner={orb.OwnerPlayerId} lifetime={config.CombinedOrbLifetimeSeconds}");
-            attack.PublishInventoryChange("combined-expired");
+                Debug.Log($"C6_ORB_EXPIRED orb={orb.OrbId} kind={orb.Kind} owner={orb.OwnerPlayerId} lifetime={config.CombinedOrbLifetimeSeconds}");
+            attack.PublishInventoryChange("orb-expired");
         }
 
         /// <summary>

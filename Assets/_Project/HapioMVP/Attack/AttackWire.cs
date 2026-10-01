@@ -165,6 +165,10 @@ namespace C6.Prototype.Attack
         public bool hasTransferMotion;
         public float transferVelocityX, transferVelocityY;
         public double transferServerTime;
+        // Host network time (NetworkManager.ServerTime) when this orb expires. Presentation only:
+        // clients blink the orb near this time; the Host alone removes it.
+        public bool hasExpiry;
+        public double expiresAtServerTime;
         public OrbRecord ToRecord() => new OrbRecord(id, (OrbKind)kind, (OrbPolarity)polarity,
             owner, (OrbAuthorityState)state, pos, (EntrySide)entrySide, sequence, transferCount, lastTransferSequence, rightTransferCount,
             hasTransferMotion ? new OrbTransferMotion(new Vector2(transferVelocityX, transferVelocityY), transferServerTime) : (OrbTransferMotion?)null,
@@ -178,6 +182,16 @@ namespace C6.Prototype.Attack
             hasTransferMotion = orb.TransferMotion.HasValue, transferVelocityX = orb.TransferMotion?.Velocity.x ?? 0f,
             transferVelocityY = orb.TransferMotion?.Velocity.y ?? 0f, transferServerTime = orb.TransferMotion?.ServerTime ?? 0d
         };
+
+        /// <summary>the same wire record carrying the Host's expiry time for clients to blink it.</summary>
+        public static OrbWire FromRecord(OrbRecord orb, double? expiresAtServerTime)
+        {
+            var wire = FromRecord(orb);
+            if (wire != null && expiresAtServerTime.HasValue && !double.IsNaN(expiresAtServerTime.Value)
+                && !double.IsInfinity(expiresAtServerTime.Value) && expiresAtServerTime.Value >= 0d)
+            { wire.hasExpiry = true; wire.expiresAtServerTime = expiresAtServerTime.Value; }
+            return wire;
+        }
     }
 
     [Serializable]
@@ -340,6 +354,8 @@ namespace C6.Prototype.Attack
             && OrbElements.ValidElementData((OrbKind)orb.kind, orb.rawElement, requireExplicitRaw)
             && orb.rightTransferCount <= orb.transferCount
             && ValidTransferMotion(orb)
+            && (orb.hasExpiry ? !double.IsNaN(orb.expiresAtServerTime) && !double.IsInfinity(orb.expiresAtServerTime) && orb.expiresAtServerTime >= 0d
+                : orb.expiresAtServerTime == 0d)
             && (orb.transferCount == 0 ? orb.lastTransferSequence == 0 && orb.entrySide == (int)EntrySide.None
                 : orb.lastTransferSequence >= orb.transferCount && orb.lastTransferSequence <= orb.sequence
                     && (orb.entrySide == (int)EntrySide.Left || orb.entrySide == (int)EntrySide.Right))
