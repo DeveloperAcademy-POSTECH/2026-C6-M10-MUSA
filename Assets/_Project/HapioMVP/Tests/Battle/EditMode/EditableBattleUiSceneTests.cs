@@ -51,6 +51,14 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(hud.MonsterHpFill, Is.Not.Null);
             Assert.That(hud.TeamTimeFill, Is.Not.Null);
             Assert.That(hud.TeamTimeValue, Is.Not.Null);
+            Assert.That(hud.TeamTimeValue.gameObject.activeSelf, Is.True);
+            Assert.That(hud.TeamTimeValue.raycastTarget, Is.False);
+            Assert.That(hud.TeamTimeValue.fontSize, Is.GreaterThanOrEqualTo(18));
+            Assert.That(hud.TeamTimeValue.GetComponent<Outline>(), Is.Not.Null);
+            Assert.That(hud.LeftNeighbourIcon, Is.Not.Null);
+            Assert.That(hud.LeftNeighbourLabel, Is.Not.Null);
+            Assert.That(hud.RightNeighbourIcon, Is.Not.Null);
+            Assert.That(hud.RightNeighbourLabel, Is.Not.Null);
             Assert.That(hud.StaminaFill, Is.Not.Null);
             Assert.That(framing.MonsterDisplayArea, Is.Not.Null);
             Assert.That(framing.MonsterDisplayArea.GetComponent<Graphic>(), Is.Null,
@@ -96,6 +104,20 @@ namespace C6.Prototype.Battle.Tests
             var resourceButtons = (RectTransform)footer.Find("ResourceButtons");
             Assert.That(teamTime, Is.Not.Null,
                 "The team time bar belongs to the camera divider, outside the clipped viewports.");
+            Assert.That(hud.TeamTimeValue.transform.parent, Is.SameAs(teamTime));
+            foreach (var icon in new[] { hud.LeftNeighbourIcon, hud.RightNeighbourIcon })
+            {
+                Assert.That(icon.transform.parent, Is.SameAs(teamTime));
+                Assert.That(icon.gameObject.activeSelf, Is.False, "A room has no neighbours before seat approval.");
+                Assert.That(icon.preserveAspect, Is.True);
+                Assert.That(icon.raycastTarget, Is.False);
+            }
+            foreach (var label in new[] { hud.LeftNeighbourLabel, hud.RightNeighbourLabel })
+            {
+                Assert.That(label.transform.parent, Is.SameAs(label == hud.LeftNeighbourLabel
+                    ? hud.LeftNeighbourIcon.transform : hud.RightNeighbourIcon.transform));
+                Assert.That(label.raycastTarget, Is.False);
+            }
             Assert.That(footer.Find("TeamTimeBar"), Is.Null);
             Assert.That(staminaPanel, Is.Not.Null,
                 "The five-section stamina view belongs at the bottom of the orb area.");

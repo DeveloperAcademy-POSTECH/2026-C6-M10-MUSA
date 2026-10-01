@@ -3,6 +3,7 @@ using System.Collections;
 using System.Linq;
 using C6.Prototype.Attack;
 using C6.Prototype.Orbs;
+using C6.Prototype.Presentation;
 using NUnit.Framework;
 using Unity.Netcode;
 using UnityEngine;
@@ -155,7 +156,26 @@ namespace C6.Prototype.Battle.Tests
 
             hud.SetBattle("Playing", 90, 90, 180, 2, false, false, false, 80, 45.5, false);
             Assert.That(hud.TeamTimeFill.anchorMax.x, Is.EqualTo(.5f).Within(.00001f));
-            Assert.That(hud.TeamTimeValue.text, Is.EqualTo("TEAM HP 90.0  /  TIME 90.0s"));
+            Assert.That(hud.TeamTimeValue.text, Is.EqualTo("01:30"));
+            Assert.That(hud.TeamTimeValue.gameObject.activeInHierarchy, Is.True);
+            hud.SetClockPresentation(.2d, .2d, 180d);
+            Assert.That(hud.TeamTimeValue.text, Is.EqualTo("00:01"));
+            hud.SetClockPresentation(0d, 0d, 180d);
+            Assert.That(hud.TeamTimeValue.text, Is.EqualTo("00:00"));
+            hud.SetClockPresentation(180d, 180d, 180d);
+            Assert.That(hud.TeamTimeValue.text, Is.EqualTo("03:00"));
+
+            var art = hud.Layout.Config.OrbArt;
+            hud.SetNeighbours(2, OrbElement.Water, 3, OrbElement.Wood);
+            Assert.That(hud.LeftNeighbourIcon.sprite, Is.SameAs(art.RawSprite(OrbElement.Water, false)));
+            Assert.That(hud.RightNeighbourIcon.sprite, Is.SameAs(art.RawSprite(OrbElement.Wood, false)));
+            Assert.That(hud.LeftNeighbourLabel.text, Is.EqualTo("L / P2"));
+            Assert.That(hud.RightNeighbourLabel.text, Is.EqualTo("R / P3"));
+            Assert.That(hud.LeftNeighbourIcon.gameObject.activeInHierarchy, Is.True);
+            Assert.That(hud.RightNeighbourIcon.gameObject.activeInHierarchy, Is.True);
+            hud.ClearNeighbours();
+            Assert.That(hud.LeftNeighbourIcon.gameObject.activeSelf, Is.False);
+            Assert.That(hud.RightNeighbourIcon.gameObject.activeSelf, Is.False);
 
             hud.SetBattle("Victory", 35, 35, 180, 2, false, false, false, 0, 45.5, true);
             Assert.That(hud.ResultOverlay.activeInHierarchy, Is.True);
