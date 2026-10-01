@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using C6.Prototype.Presentation;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -174,6 +175,63 @@ namespace C6.Prototype.Orbs.Tests
             var decision = engine.Up(1, new Vector2(530f, 260f), Lower, 1000f, targets);
             Assert.That(decision?.Kind, Is.EqualTo(OrbActionKind.Combine));
             Assert.That(decision?.OtherOrbId, Is.EqualTo("other"));
+        }
+
+        [Test]
+        public void DropUsesExplicitRawElementInsteadOfLegacyIdHash()
+        {
+            OrbElements.Configure(new[] { OrbElement.Fire, OrbElement.Water });
+            try
+            {
+                const string sourceId = "explicit-source";
+                string targetId = null;
+                for (int index = 0; index < 100; index++)
+                {
+                    string candidate = "explicit-target-" + index;
+                    if (OrbElements.RawElement(candidate) == OrbElements.RawElement(sourceId)) continue;
+                    targetId = candidate;
+                    break;
+                }
+
+                Assert.That(targetId, Is.Not.Null, "Fixture needs two IDs with different legacy hash elements.");
+                var source = Raw(sourceId, OrbPolarity.Yin, rawElement: OrbElement.Fire);
+                var target = Raw(targetId, OrbPolarity.Yang, rawElement: OrbElement.Fire);
+                Assert.That(OrbElements.SameElement(sourceId, targetId), Is.False,
+                    "The regression requires the obsolete ID-only comparison to disagree.");
+
+                Assert.That(Begin(source), Is.True);
+                var decision = engine.Up(1, new Vector2(530f, 260f), Lower, 1000f,
+                    new[] { new OrbDropTarget(target, new Vector2(530f, 260f)) });
+
+                Assert.That(decision?.Kind, Is.EqualTo(OrbActionKind.Combine));
+                Assert.That(decision?.OtherOrbId, Is.EqualTo(targetId));
+            }
+            finally
+            {
+                OrbElements.Configure(null);
+            }
+        }
+
+        [Test]
+        public void DropRejectsExplicitElementMismatchEvenWhenLegacyIdsMatch()
+        {
+            OrbElements.Configure(new[] { OrbElement.Fire });
+            try
+            {
+                var source = Raw("explicit-source", OrbPolarity.Yin, rawElement: OrbElement.Fire);
+                var target = Raw("explicit-target", OrbPolarity.Yang, rawElement: OrbElement.Water);
+                Assert.That(OrbElements.SameElement(source.OrbId, target.OrbId), Is.True,
+                    "A one-element legacy team makes every ID-only comparison match.");
+
+                Assert.That(Begin(source), Is.True);
+                Assert.That(engine.Up(1, new Vector2(530f, 260f), Lower, 1000f,
+                    new[] { new OrbDropTarget(target, new Vector2(530f, 260f)) }), Is.Null);
+                Assert.That(engine.HasPending, Is.False);
+            }
+            finally
+            {
+                OrbElements.Configure(null);
+            }
         }
 
         [Test]
@@ -366,8 +424,10 @@ namespace C6.Prototype.Orbs.Tests
         }
 
         static OrbRecord Raw(string id = "source", OrbPolarity polarity = OrbPolarity.Yin,
-            ulong owner = 1, OrbAuthorityState state = OrbAuthorityState.Idle) =>
-            new OrbRecord(id, OrbKind.Raw, polarity, owner, state, new Vector2(.5f, .5f), EntrySide.None, 0);
+            ulong owner = 1, OrbAuthorityState state = OrbAuthorityState.Idle,
+            OrbElement rawElement = OrbElement.None) =>
+            new OrbRecord(id, OrbKind.Raw, polarity, owner, state, new Vector2(.5f, .5f), EntrySide.None, 0,
+                rawElement: rawElement);
 
         static OrbRecord Combined(string id = "source") =>
             new OrbRecord(id, OrbKind.Combined, OrbPolarity.None, 1, OrbAuthorityState.Idle,

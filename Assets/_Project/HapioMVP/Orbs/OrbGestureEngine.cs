@@ -349,8 +349,11 @@ namespace C6.Prototype.Orbs
                     other.OwnerPlayerId != ActiveOrb.OwnerPlayerId ||
                     StringComparer.Ordinal.Equals(other.OrbId, ActiveOrb.OrbId) ||
                     !AreOpposite(ActiveOrb.Polarity, other.Polarity) ||
-                    // 오행 v2: only one element's Yin + Yang combine. Off (no elements) = always the same.
-                    !OrbElements.SameElement(ActiveOrb.OrbId, other.OrbId)) continue;
+                    // Normal sessions carry the Host-approved element on each Raw record. Comparing
+                    // only the random IDs would re-derive a legacy hash element and can reject two
+                    // visually matching orbs. The record overload preserves that explicit data while
+                    // still falling back to the legacy ID path for older fixtures.
+                    !OrbElements.SameElement(ActiveOrb, other)) continue;
                 float squared = (candidate.ScreenPosition - rawPosition).sqrMagnitude;
                 float normalizedDistance = Mathf.Sqrt(squared) / screenWidth;
                 if (normalizedDistance > tuning.DropDistanceFraction &&
