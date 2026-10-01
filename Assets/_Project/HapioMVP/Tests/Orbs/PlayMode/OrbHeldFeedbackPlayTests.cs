@@ -88,6 +88,7 @@ namespace C6.Prototype.Orbs.Tests
 
         [TestCase(LocalOrbState.Idle)]
         [TestCase(LocalOrbState.Pending)]
+        [TestCase(LocalOrbState.TransferPending)]
         public void ReleasingOrReservingTheOrbImmediatelyRestoresItsSize(LocalOrbState endState)
         {
             var view = CreateView("restore-" + endState);
@@ -99,8 +100,34 @@ namespace C6.Prototype.Orbs.Tests
             view.SetLocalState(endState);
             AssertRestored(view);
             Assert.That(label.transform.localPosition, Is.EqualTo(initialLabelPosition));
-            Assert.That(label.text, Is.EqualTo(endState == LocalOrbState.Pending ? "LOCKED" : "YIN"));
+            string expectedLabel = endState == LocalOrbState.Pending ? "LOCKED" :
+                endState == LocalOrbState.TransferPending ? string.Empty : "YIN";
+            Assert.That(label.text, Is.EqualTo(expectedLabel));
             Assert.That(view.RingRenderer.sortingOrder, Is.EqualTo(40));
+        }
+
+        [Test]
+        public void TransferWaitingMutesTheOrbWithoutLockCaptionAndRestoresIdleWhenCleared()
+        {
+            var view = CreateView("transfer-reset");
+            view.SetHeldFeedbackEnabled(true);
+            var label = view.GetComponentInChildren<TextMesh>();
+            var core = view.transform.Find("HeldArtwork/Core").GetComponent<SpriteRenderer>();
+            Color idleCoreColor = core.color;
+
+            view.SetLocalState(LocalOrbState.Dragging);
+            view.SetLocalState(LocalOrbState.TransferPending);
+            Assert.That(view.LocalState, Is.EqualTo(LocalOrbState.TransferPending));
+            AssertRestored(view);
+            Assert.That(label.text, Is.Empty);
+            Assert.That(core.color, Is.Not.EqualTo(idleCoreColor), "Passing must remain visibly distinct from an idle orb.");
+
+            // Controller outcomes decide whether this view is removed or restored; this checks the restore path.
+            view.SetLocalState(LocalOrbState.Idle);
+            Assert.That(view.LocalState, Is.EqualTo(LocalOrbState.Idle));
+            Assert.That(label.text, Is.EqualTo("YIN"));
+            Assert.That(core.color, Is.EqualTo(idleCoreColor));
+            AssertRestored(view);
         }
 
         [Test]

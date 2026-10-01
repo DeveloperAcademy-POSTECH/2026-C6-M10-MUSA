@@ -76,7 +76,7 @@ namespace C6.Prototype.GameSync
         private LobbyStartContract contract;
         private LobbyPlayer p1,p2;
         private LobbyPlayer[] participants = Array.Empty<LobbyPlayer>();
-        private double attachedAt,nextPublish,nextSync,initialWaitAt,lastGoodPublish;
+        private double attachedAt,nextPublish,nextTransferPublish,nextSync,initialWaitAt,lastGoodPublish;
         private bool attached,initialConfirmed,autoStart,ending;
         private uint preparedRound;
         private ulong revision;
@@ -353,11 +353,16 @@ namespace C6.Prototype.GameSync
                 var a=controller.Attack.Snapshot;
                 if(a!=null && a.roundId!=preparedRound)
                 { preparedRound=a.roundId; initialConfirmed=false; initialWaitAt=Now; initialProofs.Clear(); frozenSignature=null; peerResponses.Reset(); }
-                if(Now>=nextPublish)
+                double now=Now;
+                double publishPeriod=1.0/runtimeConfig.Value.AttackSnapshotRateHz;
+                if(now>=nextPublish || initialConfirmed && TransferPublishDue(Snapshot,a,now,nextTransferPublish))
                 {
-                    nextPublish=Now+1.0/runtimeConfig.Value.AttackSnapshotRateHz;
+                    // A transfer may arrive just after the regular tick. Publish its authoritative
+                    // owner/motion earlier, but bound all attempts to at most twice the configured rate.
+                    nextPublish=now+publishPeriod;
+                    nextTransferPublish=now+publishPeriod*.5d;
                     try { Publish(); } catch (Exception e) { Fail("SNAPSHOT_CAPTURE_FAILED / "+e.Message); }
-                    if (initialConfirmed && Now-lastGoodPublish>2) Fail("CONSISTENT_STATE_TIMEOUT");
+                    if (initialConfirmed && now-lastGoodPublish>2) Fail("CONSISTENT_STATE_TIMEOUT");
                 }
                 if(autoStart&&CanStart){autoStart=false;StartPreparedRound();}
             }
@@ -370,6 +375,20 @@ namespace C6.Prototype.GameSync
             }
             if(!initialConfirmed&&Now-initialWaitAt>12)Fail("INITIAL_STATE_CONFIRMATION_TIMEOUT");
             UpdateHud();
+        }
+        // Only an unpublished Host-approved handoff deserves an early aggregate publish.
+        // Revisions alone include pose updates and rejected requests, which must not raise the send rate.
+        private static bool TransferPublishDue(GameSnapshot published, AttackSnapshot latest, double now, double earliest)
+        {
+            if (published?.attack?.orbs == null || latest?.orbs == null || latest.roundId != published.roundId
+                || latest.revision <= published.attack.revision || now < earliest) return false;
+            foreach (var orb in latest.orbs)
+            {
+                if (orb == null || orb.transferCount == 0) continue;
+                var previous = Array.Find(published.attack.orbs, item => item != null && item.id == orb.id);
+                if (previous == null || orb.transferCount > previous.transferCount) return true;
+            }
+            return false;
         }
         private void Publish()
         {

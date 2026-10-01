@@ -13175,7 +13175,6 @@ GameObject:
   - component: {fileID: 1815373577}
   - component: {fileID: 1815373576}
   - component: {fileID: 1815373575}
-  - component: {fileID: 1815373587}
   m_Layer: 0
   m_Name: P4ContinuousTransferBattle
   m_TagString: Untagged
@@ -13450,18 +13449,6 @@ Transform:
   - {fileID: 1371361687}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1815373587
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1815373572}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e4b07b2edd0b4f1ea2ea2c2f91996652, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: C6.Prototype.GameSync::C6.Prototype.GameSync.P4ContinuousTransferProbe
 --- !u!1 &1815448382
 GameObject:
   m_ObjectHideFlags: 0

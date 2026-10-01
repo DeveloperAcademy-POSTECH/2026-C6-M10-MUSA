@@ -17,6 +17,8 @@ namespace C6.Prototype.Combination.Tests
         [SetUp]
         public void SetUp()
         {
+            // These legacy combinations are element-neutral regardless of test-run order.
+            OrbElements.Configure(null);
             registry = new HostOrbRegistry(true);
             registry.BeginSession("session-a", 1);
             resources = new HostResourceAuthority(registry, new ResourceTuning(100, 100, 20, 20d / 3d, 5, 20), 731);

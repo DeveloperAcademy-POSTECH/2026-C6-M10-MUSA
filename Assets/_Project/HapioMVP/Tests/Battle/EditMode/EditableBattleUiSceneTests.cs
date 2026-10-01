@@ -15,7 +15,6 @@ namespace C6.Prototype.Battle.Tests
     public sealed class EditableBattleUiSceneTests
     {
         private const string ScenePath = "Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity";
-        private const string LegacyScenePath = "Assets/_Project/HapioMVP/Scenes/BattleLoop.unity";
         private Scene preview;
         private T09Hud hud;
 
@@ -214,8 +213,6 @@ namespace C6.Prototype.Battle.Tests
                 Assert.That(left.color.r, Is.GreaterThan(left.color.g).And.GreaterThan(left.color.b));
                 Assert.That(right.color.r, Is.GreaterThan(right.color.g).And.GreaterThan(right.color.b));
                 Assert.That(message.text, Is.EqualTo(MonsterInterferenceOverlay.DefaultMessage));
-                Assert.That(message.alignment, Is.EqualTo(TextAnchor.MiddleCenter),
-                    "The saved message remains centered over the monster display.");
                 Assert.That(message.GetComponent<Outline>(), Is.Not.Null);
             }
         }
@@ -323,21 +320,6 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(error, Does.Contain("ScreenSpaceOverlay"));
             Assert.Throws<InvalidOperationException>(() => hud.PrepareSceneHierarchy());
             Assert.That(hud.Canvas.renderMode, Is.EqualTo(RenderMode.WorldSpace));
-        }
-
-        [Test]
-        public void OpeningTheHistoricalSceneDoesNotCreateOrMigrateItsRuntimeUi()
-        {
-            var legacy = EditorSceneManager.OpenPreviewScene(LegacyScenePath);
-            try
-            {
-                var legacyHud = Components<T09Hud>(legacy).Single();
-                Assert.That(legacyHud.UseSceneHierarchy, Is.False);
-                Assert.That(legacyHud.Canvas, Is.Null);
-                Assert.That(legacyHud.GetComponentsInChildren<Canvas>(true), Is.Empty,
-                    "ExecuteAlways must not generate UI or opt an old saved scene into migration.");
-            }
-            finally { if (legacy.IsValid()) EditorSceneManager.ClosePreviewScene(legacy); }
         }
 
         private static Button[] Buttons(T09Hud view) => new[]

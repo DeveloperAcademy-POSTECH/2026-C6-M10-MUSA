@@ -58,7 +58,7 @@ Mac5인 첫 판의 자리 순서(플레이어 식별자 기준)는 **P2→P4→P
 자동 검사 항목은 다음 파일에 있다.
 
 - `Tests/Lobby/EditMode/LobbyElementSelectionTests`: 고유 점유·경합·거절 보존·선택 해제·이전 Ready 차단·전투 고정·새 방/로비 복귀.
-- `Tests/Lobby/PlayMode/T10LobbyPlayTests`: 실제 NGO Host에서 선택/해제 버튼 연결, 명시 Pending fixture, 좁은 화면의 선택 UI 배치. 단독 Host 시험을 다인 접속으로 해석하지 않는다.
+- `Tests/Lobby/PlayMode/SavedRoomLobbyPlayTests`: 실제 NGO Host에서 선택/해제 버튼 연결, 명시 Pending fixture, 좁은 화면의 선택 UI 배치. 단독 Host 시험을 다인 접속으로 해석하지 않는다.
 - `Tests/Attack/EditMode/SelectedElementAttackTests`, `RoundSeatOrderTests`: 일치5/불일치20 공격 자격, 현재 소유자, 예약 보존, Host 포함 자리·투척 프레임.
 - `Tests/GameSync/EditMode/ElementSelectionGameWireTests`: 선택/자리/hash·새 판 허용·판 도중 변조 거절·타 속성 Raw 전달. `P4SceneTests`는 저장된 새 UI 참조까지 검사.
 - 기존 Orbs/Resources/Combination/Wire/영수증 시험: Raw 원소 보존·생성 비용/거절·동일 원소 조합·변조 거절. 2026-09-30 추가한 `HostResourceAuthorityTests`의 승인 선택 집합·활성 참가자 필터·맵 순서 독립·실패 후 추첨 불변 사례와 `RoundSeatOrderTests`의 새 방 재입장 사례는 **소스 추가**이며, 재실행 결과를 이 문장만으로 PASS 처리하지 않는다.

@@ -20,6 +20,9 @@ namespace C6.Prototype.Attack.Tests
         [SetUp]
         public void SetUp()
         {
+            // This legacy fixture has no selected team. PlayMode scenes can leave the
+            // process-wide element configuration active when the Editor runs suites in sequence.
+            OrbElements.Configure(null);
             registry = new HostOrbRegistry(true); registry.BeginSession(Session, 1);
             authority = new AttackAuthority(registry, 100, 20);
             authority.ConfigureContinuousTransfers(.6f, .015f, 32f); authority.BeginDevelopmentRound();

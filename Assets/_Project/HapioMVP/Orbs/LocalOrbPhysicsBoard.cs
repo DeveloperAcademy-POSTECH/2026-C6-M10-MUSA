@@ -65,8 +65,10 @@ namespace C6.Prototype.Orbs
         private readonly struct Sample
         {
             public readonly Vector2 Position;
+            public readonly Vector2 GesturePosition;
             public readonly double Time;
-            public Sample(Vector2 position, double time) { Position = position; Time = time; }
+            public Sample(Vector2 position, Vector2 gesturePosition, double time)
+            { Position = position; GesturePosition = gesturePosition; Time = time; }
         }
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly List<string> scratchIds = new List<string>();
@@ -174,10 +176,14 @@ namespace C6.Prototype.Orbs
         {
             if (!TryEntry(id, out var entry) || paused || !isActiveAndEnabled || entry.Locked || entry.Held || entry.EdgePending || !Finite(now)) return false;
             entry.Held = true; entry.Samples.Clear();
-            AddSample(entry, entry.Body.position, now); SetMode(entry); Stop(entry);
+            AddSample(entry, entry.Body.position, entry.Body.position, now); SetMode(entry); Stop(entry);
             return true;
         }
-        public void SetPosition(string id, Vector2 world, bool sample, double now)
+        /// <summary>
+        /// The optional gesture position is the unclamped pointer target. The orb still stays
+        /// inside the board; only a deliberate edge release may use this bounded input for inertia.
+        /// </summary>
+        public void SetPosition(string id, Vector2 world, bool sample, double now, Vector2? gestureWorld = null)
         {
             if (!TryEntry(id, out var entry) || !Finite(world)) return;
             Vector2 next = Clamp(world);
@@ -185,7 +191,9 @@ namespace C6.Prototype.Orbs
             {
                 if (!entry.Held || entry.Locked || entry.EdgePending || paused || !Finite(now)) return;
                 if (entry.Samples.Count > 0 && now < entry.Samples[entry.Samples.Count - 1].Time) return;
-                AddSample(entry, next, now);
+                Vector2 gesture = gestureWorld.HasValue && Finite(gestureWorld.Value)
+                    ? ClampGesture(gestureWorld.Value) : next;
+                AddSample(entry, next, gesture, now);
             }
             else
             {
@@ -197,12 +205,12 @@ namespace C6.Prototype.Orbs
             // Rigidbody position is authoritative. Keep immediate rendering/hit queries in this frame aligned.
             entry.View.transform.position = new Vector3(next.x, next.y, entry.View.transform.position.z);
         }
-        public bool Release(string id, double now, bool applyInertia)
+        public bool Release(string id, double now, bool applyInertia, bool allowEdgeOutwardMomentum = false)
         {
             if (!TryEntry(id, out var entry) || !entry.Held) return false;
             Vector2 velocity = Vector2.zero;
             if (applyInertia && !entry.Locked && !paused && isActiveAndEnabled && Finite(now))
-                velocity = ReleaseVelocity(entry, now);
+                velocity = ReleaseVelocity(entry, now, allowEdgeOutwardMomentum);
             entry.Held = false; entry.Samples.Clear(); SetMode(entry); Stop(entry);
             if (!entry.Locked && !paused && isActiveAndEnabled)
             {
@@ -304,8 +312,13 @@ namespace C6.Prototype.Orbs
                 Vector2 velocity = entry.Body.linearVelocity;
                 if (!Finite(velocity)) velocity = Vector2.zero;
                 Vector2 position = entry.Body.position;
-                bool crossLeft = position.x <= CenterBounds.xMin && velocity.x < 0;
-                bool crossRight = position.x >= CenterBounds.xMax && velocity.x > 0;
+                // PhysX can leave a tiny signed horizontal residual at a resting edge.
+                // Ignore that noise, but preserve a real diagonal/glancing crossing even
+                // when its horizontal component is below the total-speed stop threshold.
+                float horizontalNoiseFloor = tuning.StopSpeed * .01f;
+                bool moving = velocity.sqrMagnitude > tuning.StopSpeed * tuning.StopSpeed;
+                bool crossLeft = moving && position.x <= CenterBounds.xMin && velocity.x < -horizontalNoiseFloor;
+                bool crossRight = moving && position.x >= CenterBounds.xMax && velocity.x > horizontalNoiseFloor;
                 if (horizontalPassage && (crossLeft || crossRight))
                 {
                     // This velocity belongs to the completed physics step. Do not charge a
@@ -357,11 +370,13 @@ namespace C6.Prototype.Orbs
             if (!OrbPhysicsTuning.Valid(maximum) || maximum <= .000001f) throw new InvalidOperationException("An orb needs finite, nonzero world scale.");
             entry.Collider.radius = radius / maximum;
         }
-        private Vector2 ReleaseVelocity(Entry entry, double now)
+        private Vector2 ReleaseVelocity(Entry entry, double now, bool allowEdgeOutwardMomentum)
         {
             if (entry.Samples.Count == 0 || now < entry.Samples[entry.Samples.Count - 1].Time) return Vector2.zero;
-            // Adding the stationary final point makes a long hold discard earlier movement.
-            AddSample(entry, entry.Body.position, now);
+            // A stationary final point discards old movement on a long hold. Preserve the last
+            // pointer target separately: the body may have stopped at the visible side edge.
+            Vector2 lastGesture = entry.Samples[entry.Samples.Count - 1].GesturePosition;
+            AddSample(entry, entry.Body.position, lastGesture, now);
             if (entry.Samples.Count < 2) return Vector2.zero;
             Sample first = entry.Samples[0], last = entry.Samples[entry.Samples.Count - 1];
             double elapsed = last.Time - first.Time;
@@ -369,13 +384,45 @@ namespace C6.Prototype.Orbs
             Vector2 velocity = (last.Position - first.Position) / (float)elapsed;
             if (!Finite(velocity)) return Vector2.zero;
             velocity = Vector2.ClampMagnitude(velocity, tuning.MaxReleaseSpeed);
-            return velocity.magnitude <= tuning.StopSpeed ? Vector2.zero : velocity;
+            if (velocity.magnitude <= tuning.StopSpeed) velocity = Vector2.zero;
+            if (!allowEdgeOutwardMomentum || !horizontalPassage) return velocity;
+
+            // An ordinary release keeps the old sampled-physics behavior. Only recent pointer
+            // travel beyond a side edge may restore outward momentum lost to visual clamping.
+            float minimumTravel = Mathf.Max(radius * .15f, tuning.StopSpeed * tuning.SampleWindow);
+            Vector2 gestureTravel = last.GesturePosition - first.GesturePosition;
+            bool right = entry.Body.position.x >= CenterBounds.xMax - .0001f
+                && last.GesturePosition.x >= CenterBounds.xMax + minimumTravel
+                && gestureTravel.x >= minimumTravel;
+            bool left = entry.Body.position.x <= CenterBounds.xMin + .0001f
+                && last.GesturePosition.x <= CenterBounds.xMin - minimumTravel
+                && gestureTravel.x <= -minimumTravel;
+            if (!right && !left) return velocity;
+            if (!LastGestureMovementIsOutward(entry.Samples, right, minimumTravel * .25f)) return velocity;
+            Vector2 gestureVelocity = gestureTravel / (float)elapsed;
+            if (!Finite(gestureVelocity)) return velocity;
+            gestureVelocity = Vector2.ClampMagnitude(gestureVelocity, tuning.MaxReleaseSpeed);
+            if (right && gestureVelocity.x <= tuning.StopSpeed || left && gestureVelocity.x >= -tuning.StopSpeed)
+                return velocity;
+            return Mathf.Abs(gestureVelocity.x) > Mathf.Abs(velocity.x) ? gestureVelocity : velocity;
         }
-        private void AddSample(Entry entry, Vector2 position, double now)
+        private static bool LastGestureMovementIsOutward(List<Sample> samples, bool right, float threshold)
+        {
+            // A recent reversal cancels an earlier outward drag; a stationary release sample
+            // does not erase its last actual movement.
+            for (int index = samples.Count - 1; index > 0; index--)
+            {
+                float delta = samples[index].GesturePosition.x - samples[index - 1].GesturePosition.x;
+                if (Mathf.Abs(delta) < threshold) continue;
+                return right ? delta > 0 : delta < 0;
+            }
+            return false;
+        }
+        private void AddSample(Entry entry, Vector2 position, Vector2 gesturePosition, double now)
         {
             if (entry.Samples.Count > 0 && entry.Samples[entry.Samples.Count - 1].Time == now)
-                entry.Samples[entry.Samples.Count - 1] = new Sample(position, now);
-            else entry.Samples.Add(new Sample(position, now));
+                entry.Samples[entry.Samples.Count - 1] = new Sample(position, gesturePosition, now);
+            else entry.Samples.Add(new Sample(position, gesturePosition, now));
             double cutoff = now - tuning.SampleWindow;
             while (entry.Samples.Count > 1 && entry.Samples[0].Time < cutoff) entry.Samples.RemoveAt(0);
             // Bound unusual high-frequency callers without allowing unbounded allocation.
@@ -440,6 +487,9 @@ namespace C6.Prototype.Orbs
         { entry = null; return configured && id != null && entries.TryGetValue(id, out entry) && entry.View != null && entry.Body != null && entry.Collider != null; }
         private void CopyIds() { scratchIds.Clear(); scratchIds.AddRange(entries.Keys); scratchIds.Sort(StringComparer.Ordinal); }
         private Vector2 Clamp(Vector2 value) => new Vector2(Mathf.Clamp(value.x, CenterBounds.xMin, CenterBounds.xMax), Mathf.Clamp(value.y, CenterBounds.yMin, CenterBounds.yMax));
+        private Vector2 ClampGesture(Vector2 value) => new Vector2(
+            Mathf.Clamp(value.x, CenterBounds.xMin - radius, CenterBounds.xMax + radius),
+            Mathf.Clamp(value.y, CenterBounds.yMin, CenterBounds.yMax));
         private void RequireConfigured() { if (!configured) throw new InvalidOperationException("Configure the local board before registering a view."); }
         private static bool Finite(Vector2 value) => OrbPhysicsTuning.Valid(value.x) && OrbPhysicsTuning.Valid(value.y);
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value) && value >= 0;

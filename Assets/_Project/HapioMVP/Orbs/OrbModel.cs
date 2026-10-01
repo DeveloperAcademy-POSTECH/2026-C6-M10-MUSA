@@ -8,7 +8,7 @@ namespace C6.Prototype.Orbs
     public enum OrbKind { Raw, Combined, FeverAttack }
     public enum OrbPolarity { Yin, Yang, None }
     public enum OrbAuthorityState { Idle, Launching, Projectile, Consumed }
-    public enum LocalOrbState { Idle, Dragging, Pending }
+    public enum LocalOrbState { Idle, Dragging, Pending, TransferPending }
     public enum EntrySide { None, Left, Right }
     public enum OrbActionKind { Launch, TransferLeft, TransferRight, Combine }
 

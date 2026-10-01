@@ -34,7 +34,7 @@ P2의 최종 1,192개 테스트 이름을 모두 보존했고 P3에서 **119개�
 | `P3GameWireTests` | 44 |
 | `P3SceneTests` | 3 |
 | `ParticipantGameBarrierTests` | 8 |
-| `T10LobbyPlayTests` | 2 |
+| `T10LobbyPlayTests` (당시 이름, 현재 `SavedRoomLobbyPlayTests`) | 2 |
 | `MultiplayerResourceTests` | 7 |
 | `P3LobbyTests` | 30 |
 | **합계** | **119** |
