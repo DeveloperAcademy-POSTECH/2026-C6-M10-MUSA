@@ -149,6 +149,60 @@ namespace C6.Prototype.Orbs.Tests
             Assert.That(Velocity(board, view.OrbId), Is.EqualTo(Vector2.zero));
         }
 
+        [TestCase(-1)]
+        [TestCase(1)]
+        public void SubThresholdResidualAtEdgeDoesNotManufactureATransfer(int direction)
+        {
+            var view = View(board, "residual", new Vector2(direction > 0 ? Bounds.xMax : Bounds.xMin, 0));
+            var body = view.GetComponent<Rigidbody2D>();
+            body.linearVelocity = Vector2.right * direction * .000001f;
+            int observations = 0;
+            board.EdgeCrossed += _ => observations++;
+
+            Simulate(3);
+
+            Assert.That(observations, Is.Zero);
+            Assert.That(board.TryGetPendingEdge(view.OrbId, out _), Is.False);
+            Assert.That(Velocity(board, view.OrbId), Is.EqualTo(Vector2.zero));
+        }
+
+        [TestCase(-1)]
+        [TestCase(1)]
+        public void GlancingOutwardMotionStillTransfersWithItsVerticalMomentum(int direction)
+        {
+            var view = View(board, "glancing", new Vector2(direction > 0 ? Bounds.xMax : Bounds.xMin, 0));
+            var body = view.GetComponent<Rigidbody2D>();
+            // Horizontal speed is below StopSpeed (.05), but the orb is moving overall.
+            body.linearVelocity = new Vector2(direction * .04f, 2f);
+            int observations = 0;
+            OrbEdgeCrossing crossing = default;
+            board.EdgeCrossed += edge => { observations++; crossing = edge; };
+
+            Simulate(1);
+
+            Assert.That(observations, Is.EqualTo(1));
+            Assert.That(crossing.ToRight, Is.EqualTo(direction > 0));
+            Assert.That(crossing.VelocityBoardWidthsPerSecond.x, Is.EqualTo(direction * .008f).Within(.000001f));
+            Assert.That(crossing.VelocityBoardWidthsPerSecond.y, Is.EqualTo(.4f).Within(.000001f));
+        }
+
+        [TestCase(-1)]
+        [TestCase(1)]
+        public void VerticalMotionWithOnlyHorizontalPhysicsNoiseDoesNotTransfer(int direction)
+        {
+            var view = View(board, "vertical-noise", new Vector2(direction > 0 ? Bounds.xMax : Bounds.xMin, 0));
+            var body = view.GetComponent<Rigidbody2D>();
+            body.linearVelocity = new Vector2(direction * .000001f, 2f);
+            int observations = 0;
+            board.EdgeCrossed += _ => observations++;
+
+            Simulate(3);
+
+            Assert.That(observations, Is.Zero);
+            Assert.That(board.TryGetPendingEdge(view.OrbId, out _), Is.False);
+            Assert.That(Velocity(board, view.OrbId).y, Is.GreaterThan(0f));
+        }
+
         [TestCase(true)]
         [TestCase(false)]
         public void ReceiverPreservesHeightAndWidthNormalizedVelocityAcrossDifferentBoardSizes(bool fromLeft)

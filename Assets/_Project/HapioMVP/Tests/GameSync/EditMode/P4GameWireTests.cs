@@ -96,6 +96,30 @@ namespace C6.Prototype.GameSync.Tests
             var expected=Context(3); expected.continuousTransfers=false;
             Assert.That(GameWire.Validate(value,expected,null,out _),Is.False);
         }
+        [Test]
+        public void ApprovedTransferCanPublishBetweenNormalTicksButCannotBurstBeforeTheRateLimit()
+        {
+            var published = Playing(3, 0);
+            var approved = Transfer(published, 3, 1, 0, true);
+            Assert.That(TransferPublishDue(published, approved.attack, 100.024d, 100.025d), Is.False);
+            Assert.That(TransferPublishDue(published, approved.attack, 100.025d, 100.025d), Is.True);
+            Assert.That(TransferPublishDue(approved, approved.attack, 100.030d, 100.025d), Is.False,
+                "An already published handoff must not trigger another priority send.");
+            var returned = Transfer(approved, 3, 0, 1, false);
+            Assert.That(TransferPublishDue(published, returned.attack, 100.050d, 100.025d), Is.True,
+                "Skipped intermediate snapshots still contain an unpublished approved handoff.");
+        }
+        [Test]
+        public void PoseUpdatesAndUnchangedOwnershipCannotRaiseTheAggregateSendRate()
+        {
+            var published = Playing(3, 0);
+            var poseOnly = Next(published);
+            Assert.That(TransferPublishDue(published, poseOnly.attack, 100.025d, 100.025d), Is.False);
+            var approved = Transfer(published, 3, 1, 0, true);
+            approved.attack.roundId++;
+            Assert.That(TransferPublishDue(published, approved.attack, 100.025d, 100.025d), Is.False,
+                "A different round never promotes a stale transfer.");
+        }
         [TestCase(true)] [TestCase(false)]
         public void DelayedArrivalMayStopWithoutChangingItsApprovedEntry(bool right)
         {
@@ -194,6 +218,13 @@ namespace C6.Prototype.GameSync.Tests
             carried=Ready(3); carried.revision=retry.revision; carried.hostNow=retry.hostNow; carried.serverTime=retry.serverTime;
             carried.roundId=carried.attack.roundId=carried.resources.roundId=carried.battle.roundId=2;
             carried.battle.penaltySeconds=20; AssertInvalid(carried,3,before);
+        }
+        private static bool TransferPublishDue(GameSnapshot published, AttackSnapshot latest, double now, double earliest)
+        {
+            var method = typeof(T10GameSession).GetMethod("TransferPublishDue",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Assert.That(method, Is.Not.Null);
+            return (bool)method.Invoke(null, new object[] { published, latest, now, earliest });
         }
         private static GameSnapshot Attacking(int count,ulong target)
         {

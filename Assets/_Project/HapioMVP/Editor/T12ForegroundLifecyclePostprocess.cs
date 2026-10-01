@@ -19,10 +19,40 @@ namespace C6.Editor
         public const string SupportedUnityVersion = "6000.5.7f1";
         public const string Marker = "C6_T12_FOREGROUND_LIFECYCLE_V1";
         private static readonly Dictionary<string, HashSet<string>> BuildScenes = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, string[]> ExplicitBuildScenes = new Dictionary<string, string[]>(StringComparer.Ordinal);
         public int callbackOrder => 950;
         // The requested target/output is stable from preprocess through scene processing and
         // postprocess; a report's generated player GUID may be finalized later in the build.
-        private static string BuildKey(BuildReport report) => report.summary.platform + "\n" + report.summary.outputPath;
+        private static string BuildKey(BuildTarget target, string output) => target + "\n" + Path.GetFullPath(output);
+        private static string BuildKey(BuildReport report) => BuildKey(report.summary.platform, report.summary.outputPath);
+
+        // BuildPlayerOptions is the builder's explicit scene list for this exact target and output.
+        // An incremental build can reuse scene data without invoking IProcessSceneWithReport.
+        public static IDisposable RegisterExplicitBuild(BuildPlayerOptions options)
+        {
+            string key = BuildKey(options.target, options.locationPathName);
+            if (ExplicitBuildScenes.ContainsKey(key)) throw new InvalidOperationException("A T12 scene declaration is already registered for this build.");
+            ExplicitBuildScenes.Add(key, options.scenes == null ? null : (string[])options.scenes.Clone());
+            return new ExplicitBuildRegistration(key);
+        }
+
+        private sealed class ExplicitBuildRegistration : IDisposable
+        {
+            private readonly string key;
+            public ExplicitBuildRegistration(string key) { this.key = key; }
+            public void Dispose() { ExplicitBuildScenes.Remove(key); }
+        }
+
+        public static string[] ResolveActualScenes(string[] explicitlyBuilt, string[] processed)
+        {
+            if (explicitlyBuilt == null) return processed;
+            if (processed != null && processed.Length > 0 &&
+                (processed.Length != explicitlyBuilt.Length ||
+                 !new HashSet<string>(processed, StringComparer.Ordinal).SetEquals(explicitlyBuilt)))
+                throw new BuildFailedException("T12 scene callbacks disagree with the explicit BuildPlayer scene list.");
+            return explicitlyBuilt;
+        }
+
         public void OnPreprocessBuild(BuildReport report)
         { if (report != null) BuildScenes[BuildKey(report)] = new HashSet<string>(StringComparer.Ordinal); }
         public void OnProcessScene(Scene scene, BuildReport report)
@@ -37,11 +67,13 @@ namespace C6.Editor
             if (report == null) return;
             string key = BuildKey(report);
             BuildScenes.TryGetValue(key, out var scenes); BuildScenes.Remove(key);
+            ExplicitBuildScenes.TryGetValue(key, out var explicitlyBuilt); ExplicitBuildScenes.Remove(key);
             if (report.summary.platform != BuildTarget.iOS) return;
-            if (!Applies(report.summary.platform, scenes?.ToArray()))
+            string[] actualScenes = ResolveActualScenes(explicitlyBuilt, scenes?.ToArray());
+            if (!Applies(report.summary.platform, actualScenes))
             {
                 if (EditorBuildSettings.scenes.Any(s => s.enabled && IsSupportedScene(s.path))
-                    && (scenes == null || scenes.Count == 0))
+                    && (actualScenes == null || actualScenes.Length == 0))
                     throw new BuildFailedException("T12 lifecycle patch cannot prove which scenes this export contains.");
                 return;
             }
@@ -61,7 +93,7 @@ namespace C6.Editor
                 throw new BuildFailedException("T12 lifecycle source write verification failed.");
             File.WriteAllText(Path.Combine(evidence, "patch-receipt.json"), JsonUtility.ToJson(new PatchReceipt
             {
-                unityVersion = Application.unityVersion, scene = scenes.Single(), appliedUtc = DateTime.UtcNow.ToString("O"),
+                unityVersion = Application.unityVersion, scene = actualScenes.Single(), appliedUtc = DateTime.UtcNow.ToString("O"),
                 controllerBefore = Hash(beforeController), controllerAfter = Hash(patch.controller), renderingBefore = Hash(beforeRendering), renderingAfter = Hash(patch.rendering)
             }, true), new UTF8Encoding(false));
             Debug.Log("C6_T12_IOS_LIFECYCLE_PATCH_APPLIED unity=" + Application.unityVersion + " foregroundInactive=continue actualBackground=existingPause deviceValidation=NOT_RUN output=" + output);

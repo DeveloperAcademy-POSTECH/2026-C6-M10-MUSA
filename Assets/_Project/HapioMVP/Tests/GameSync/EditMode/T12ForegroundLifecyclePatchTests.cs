@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.ExceptionServices;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEngine;
 
 namespace C6.Prototype.GameSync.Tests
@@ -57,6 +58,23 @@ namespace C6.Prototype.GameSync.Tests
             Assert.That(Applies(BuildTarget.iOS, new[] { ScenePath + ".backup" }), Is.False);
             Assert.That(Applies(BuildTarget.iOS, new[] { "Assets/Other/ContinuousTransferBattle.unity" }), Is.False);
             Assert.That(Applies(BuildTarget.iOS, new[] { ScenePath, "Assets/Other/Unrelated.unity" }), Is.False);
+        }
+
+        [Test]
+        public void ExplicitBuildSceneProvesIncrementalExportAndRejectsConflictingCallbacks()
+        {
+            var requested = new[] { ScenePath };
+            Assert.That((string[])Invoke("ResolveActualScenes", requested, null), Is.EqualTo(requested));
+            Assert.That((string[])Invoke("ResolveActualScenes", requested, Array.Empty<string>()), Is.EqualTo(requested));
+            Assert.That((string[])Invoke("ResolveActualScenes", requested, requested), Is.EqualTo(requested));
+            Assert.That((string[])Invoke("ResolveActualScenes", null, requested), Is.EqualTo(requested));
+            Assert.That((string[])Invoke("ResolveActualScenes", null, Array.Empty<string>()), Is.Empty);
+            Assert.Throws<BuildFailedException>(() => Invoke("ResolveActualScenes", requested,
+                new[] { "Assets/Other/Unrelated.unity" }));
+            Assert.Throws<BuildFailedException>(() => Invoke("ResolveActualScenes", requested,
+                new[] { ScenePath, "Assets/Other/Unrelated.unity" }));
+            Assert.That(Applies(BuildTarget.iOS, (string[])Invoke("ResolveActualScenes",
+                new[] { ScenePath, "Assets/Other/Unrelated.unity" }, Array.Empty<string>())), Is.False);
         }
 
         [Test]

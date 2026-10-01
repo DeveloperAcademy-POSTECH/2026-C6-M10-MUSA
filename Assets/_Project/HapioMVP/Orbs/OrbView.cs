@@ -204,7 +204,7 @@ namespace C6.Prototype.Orbs
             firstDot.transform.SetParent(heldArtwork, false);
             if (secondDot != null) secondDot.transform.SetParent(heldArtwork, false);
             if (art != null) art.transform.SetParent(heldArtwork, false);
-            ApplyArtwork(localState == LocalOrbState.Pending);
+            ApplyArtwork(localState == LocalOrbState.Pending || localState == LocalOrbState.TransferPending);
             heldShadow = Disc("HeldShadow", gameObject.layer, 1f, Vector3.zero, 87);
             heldHaloOuter = Disc("HeldHaloOuter", gameObject.layer, 1f, Vector3.zero, 88);
             heldHaloInner = Disc("HeldHaloInner", gameObject.layer, 1f, Vector3.zero, 89);
@@ -342,14 +342,15 @@ namespace C6.Prototype.Orbs
         {
             localState = state;
             if (!initialized) return;
-            bool pending = state == LocalOrbState.Pending;
+            bool transferPending = state == LocalOrbState.TransferPending;
+            bool pending = state == LocalOrbState.Pending || transferPending;
             bool combined = kind == OrbKind.Combined;
             bool yin = polarity == OrbPolarity.Yin;
             ring.color = pending ? Gold : state == LocalOrbState.Dragging ? Color.white : combined ? Teal : yin ? Ivory : Gold;
             core.color = pending ? Muted : combined ? new Color(0.08f, 0.28f, 0.29f, 1f) : yin ? Dark : Ivory;
             firstDot.color = pending ? new Color(0.57f, 0.62f, 0.58f, 1f) : combined || yin ? Ivory : Dark;
             if (secondDot != null) secondDot.color = pending ? Muted : Dark;
-            label.text = pending ? "LOCKED" : labelHidden ? string.Empty : idleLabel;
+            label.text = transferPending ? string.Empty : pending ? "LOCKED" : labelHidden ? string.Empty : idleLabel;
             label.color = pending ? Gold : combined ? Teal : Ivory;
             ApplyArtwork(pending);
             RefreshHeldVisual();

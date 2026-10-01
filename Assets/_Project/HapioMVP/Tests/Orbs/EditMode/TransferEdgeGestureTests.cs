@@ -62,4 +62,50 @@ namespace C6.Prototype.Orbs.Tests
             Assert.That(result?.Kind,Is.EqualTo(OrbActionKind.TransferLeft)); Assert.That(result?.NormalizedPosition.y,Is.EqualTo(.5f));
         }
     }
+
+    public sealed class ContinuousEdgeReleaseIntentTests
+    {
+        private static readonly Rect CenterBounds = Rect.MinMaxRect(60f, 60f, 940f, 540f);
+
+        [Test]
+        public void ExactRightScreenEdgeStillCountsAsAContinuousBoardRelease()
+        {
+            var board = Rect.MinMaxRect(0f, 0f, 1000f, 600f);
+            Assert.That(OrbGestureEngine.ContainsContinuousBoardRelease(board, new Vector2(1000f, 300f)), Is.True);
+            Assert.That(OrbGestureEngine.ContainsContinuousBoardRelease(board, new Vector2(1000.1f, 300f)), Is.False);
+            Assert.That(OrbGestureEngine.ContainsContinuousBoardRelease(board, new Vector2(1000f, 600f)), Is.False,
+                "The upper edge belongs to the battle viewport, not the rolling board.");
+        }
+
+        [Test]
+        public void OutwardReleaseFromEitherRestingEdgeQualifiesWithoutMovingTheOrbCenter()
+        {
+            Assert.That(OrbGestureEngine.IntentionalContinuousEdgeRelease(CenterBounds,
+                new Vector2(70f, 300f), new Vector2(35f, 301f), new Vector2(60f, 300f), 60f, 1.25f), Is.True);
+            Assert.That(OrbGestureEngine.IntentionalContinuousEdgeRelease(CenterBounds,
+                new Vector2(930f, 300f), new Vector2(965f, 301f), new Vector2(940f, 300f), 60f, 1.25f), Is.True);
+        }
+
+        [Test]
+        public void TapJitterWrongDirectionAndDiagonalReleaseDoNotQualify()
+        {
+            Assert.That(OrbGestureEngine.IntentionalContinuousEdgeRelease(CenterBounds,
+                new Vector2(70f, 300f), new Vector2(64f, 300f), new Vector2(60f, 300f), 60f, 1.25f), Is.False);
+            Assert.That(OrbGestureEngine.IntentionalContinuousEdgeRelease(CenterBounds,
+                new Vector2(70f, 300f), new Vector2(100f, 300f), new Vector2(60f, 300f), 60f, 1.25f), Is.False);
+            Assert.That(OrbGestureEngine.IntentionalContinuousEdgeRelease(CenterBounds,
+                new Vector2(70f, 300f), new Vector2(35f, 260f), new Vector2(60f, 300f), 60f, 1.25f), Is.False);
+        }
+
+        [Test]
+        public void InteriorOrbOrInvalidGeometryCannotOptIntoUnclampedReleaseMotion()
+        {
+            Assert.That(OrbGestureEngine.IntentionalContinuousEdgeRelease(CenterBounds,
+                new Vector2(500f, 300f), new Vector2(450f, 300f), new Vector2(500f, 300f), 60f, 1.25f), Is.False);
+            Assert.That(OrbGestureEngine.IntentionalContinuousEdgeRelease(new Rect(0f, 0f, 0f, 600f),
+                new Vector2(70f, 300f), new Vector2(35f, 300f), new Vector2(60f, 300f), 60f, 1.25f), Is.False);
+            Assert.That(OrbGestureEngine.IntentionalContinuousEdgeRelease(CenterBounds,
+                new Vector2(float.NaN, 300f), new Vector2(35f, 300f), new Vector2(60f, 300f), 60f, 1.25f), Is.False);
+        }
+    }
 }
