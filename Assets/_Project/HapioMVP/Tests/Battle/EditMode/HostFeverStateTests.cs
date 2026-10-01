@@ -66,5 +66,23 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(fever.Sequence, Is.Zero);
             Assert.That(fever.GaugePercent, Is.EqualTo(20));
         }
+
+        [Test]
+        public void ActiveFeverPresentationCountsDownFromFullToEmpty()
+        {
+            Assert.That(T09Hud.FeverDisplayFraction(80, false, null, 0d, 0d), Is.EqualTo(.8f));
+            Assert.That(T09Hud.FeverDisplayFraction(100, true, 10d, 10d, 20d), Is.EqualTo(1f));
+            Assert.That(T09Hud.FeverDisplayFraction(100, true, 15d, 10d, 20d), Is.EqualTo(.5f));
+            Assert.That(T09Hud.FeverDisplayFraction(100, true, 19d, 10d, 20d), Is.EqualTo(.1f).Within(.0001f));
+            Assert.That(T09Hud.FeverDisplayFraction(100, true, 20d, 10d, 20d), Is.Zero);
+        }
+
+        [Test]
+        public void FeverPulseAlternatesBetweenDimAndBrightWithoutLeavingValidRange()
+        {
+            Assert.That(T09Hud.FeverPulse01(.125d), Is.EqualTo(1f).Within(.0001f));
+            Assert.That(T09Hud.FeverPulse01(.375d), Is.EqualTo(0f).Within(.0001f));
+            Assert.That(T09Hud.FeverPulse01(double.NaN), Is.Zero);
+        }
     }
 }

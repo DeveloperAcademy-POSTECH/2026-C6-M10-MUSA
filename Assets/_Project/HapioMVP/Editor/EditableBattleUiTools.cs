@@ -201,18 +201,48 @@ namespace C6.Editor
                 edgeRoot.gameObject.SetActive(false);
             }
 
+            var feverMessage = edgeRoot.Find("FeverMessage")?.GetComponent<Text>();
+            if (feverMessage == null)
+            {
+                var messageObject = new GameObject("FeverMessage", typeof(RectTransform),
+                    typeof(CanvasRenderer), typeof(Text), typeof(Outline));
+                Undo.RegisterCreatedObjectUndo(messageObject, "Create fever message");
+                messageObject.transform.SetParent(edgeRoot, false);
+                feverMessage = messageObject.GetComponent<Text>();
+            }
+            feverMessage.font = hud.ActionLabel != null
+                ? hud.ActionLabel.font
+                : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            feverMessage.text = T09Hud.FeverMessageText;
+            feverMessage.fontSize = 20;
+            feverMessage.fontStyle = FontStyle.Bold;
+            feverMessage.alignment = TextAnchor.MiddleCenter;
+            feverMessage.color = new Color(1f, .80f, .39f, 1f);
+            feverMessage.horizontalOverflow = HorizontalWrapMode.Wrap;
+            feverMessage.verticalOverflow = VerticalWrapMode.Overflow;
+            feverMessage.resizeTextForBestFit = true;
+            feverMessage.resizeTextMinSize = 14;
+            feverMessage.resizeTextMaxSize = 22;
+            feverMessage.raycastTarget = false;
+            feverMessage.enabled = false;
+            var feverOutline = feverMessage.GetComponent<Outline>();
+            feverOutline.effectColor = new Color(.15f, .06f, .01f, .9f);
+            feverOutline.effectDistance = new Vector2(1.5f, -1.5f);
+            feverOutline.useGraphicAlpha = true;
+
             var serializedHud = new SerializedObject(hud);
             serializedHud.FindProperty("feverGaugeFill").objectReferenceValue = fill;
             serializedHud.FindProperty("feverGaugeLabel").objectReferenceValue = label;
             serializedHud.FindProperty("feverEdgeOverlay").objectReferenceValue = edgeRoot.gameObject;
+            serializedHud.FindProperty("feverMessage").objectReferenceValue = feverMessage;
             serializedHud.ApplyModifiedPropertiesWithoutUndo();
             if (hud.ResultOverlay != null) edgeRoot.SetSiblingIndex(hud.ResultOverlay.transform.GetSiblingIndex());
-            EditorUtility.SetDirty(hud); EditorUtility.SetDirty(label);
+            EditorUtility.SetDirty(hud); EditorUtility.SetDirty(label); EditorUtility.SetDirty(feverMessage);
             EditorSceneManager.MarkSceneDirty(scene);
             if (!hud.ValidateSceneHierarchy(out var error)) throw new InvalidOperationException(error);
             if (!EditorSceneManager.SaveScene(scene)) throw new IOException("Could not save fever UI to the battle scene.");
             Selection.activeGameObject = gaugeRoot.gameObject;
-            Debug.Log("C6_FEVER_UI_READY gauge=team-shared edge=yellow raycast=false");
+            Debug.Log("C6_FEVER_UI_READY gauge=team-shared edge=yellow-pulse message=centered raycast=false");
         }
 
         static Image CreateUiImage(string name, Transform parent, Color color)

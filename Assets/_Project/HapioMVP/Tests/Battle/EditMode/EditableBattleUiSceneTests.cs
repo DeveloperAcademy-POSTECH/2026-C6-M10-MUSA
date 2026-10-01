@@ -226,6 +226,7 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(hud.FeverGaugeFill, Is.Not.Null);
             Assert.That(hud.FeverGaugeLabel, Is.Not.Null);
             Assert.That(hud.FeverEdgeOverlay, Is.Not.Null);
+            Assert.That(hud.FeverMessage, Is.Not.Null);
             Assert.That(hud.FeverGaugeFill.parent.name, Is.EqualTo("TeamFeverGauge"));
             Assert.That(hud.FeverGaugeFill.parent.parent.name, Is.EqualTo("MonsterHpPanel"));
             Assert.That(hud.FeverGaugeLabel.transform.parent, Is.SameAs(hud.FeverGaugeFill.parent));
@@ -239,6 +240,12 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(images, Has.Length.EqualTo(4));
             Assert.That(images.All(image => !image.raycastTarget), Is.True);
             Assert.That(images.All(image => image.color.r > image.color.b && image.color.g > image.color.b), Is.True);
+            Assert.That(hud.FeverMessage.transform.parent, Is.SameAs(edge.transform));
+            Assert.That(hud.FeverMessage.text, Is.EqualTo(T09Hud.FeverMessageText));
+            Assert.That(hud.FeverMessage.alignment, Is.EqualTo(TextAnchor.MiddleCenter));
+            Assert.That(hud.FeverMessage.raycastTarget, Is.False);
+            Assert.That(hud.FeverMessage.enabled, Is.False);
+            Assert.That(hud.FeverMessage.GetComponent<Outline>(), Is.Not.Null);
         }
 
         [Test]

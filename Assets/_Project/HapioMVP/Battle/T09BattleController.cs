@@ -976,6 +976,7 @@ namespace C6.Prototype.Battle
         private void Update()
         {
             RefreshInterferencePresentation();
+            RefreshFeverPresentation();
             if (releaseThrowsEnabled && gestures.HasActivePointer)
                 throwSampler.Add(gestures.LastRawPosition / Mathf.Max(1f, Screen.width), Time.unscaledTimeAsDouble);
             UpdateExpiryWarnings();
@@ -1234,7 +1235,7 @@ namespace C6.Prototype.Battle
                 connection.CanStart && (Application.isEditor || Debug.isDebugBuild));
             hud.SetProgress(state?.observedMonsterHp ?? s?.hp ?? layout.Config.MonsterMaxHp,
                 s != null ? s.maxHp : layout.Config.MonsterMaxHp, s?.totalHits ?? 0, state?.roundId ?? s?.roundId ?? 0, s?.resets ?? 0);
-            hud.SetFever(state?.feverGaugePercent ?? 0, state?.feverActive == true);
+            RefreshFeverPresentation();
             var resources = resource?.Snapshot;
             var player = resource?.LocalPlayer;
             if (player != null) lastConfirmedStamina = player.stamina;
@@ -1253,8 +1254,7 @@ namespace C6.Prototype.Battle
         private void RefreshInterferencePresentation()
         {
             var state = battle?.Snapshot;
-            double? hostNow = presentationHostClock != null ? presentationHostClock()
-                : battle != null && battle.IsHost ? Time.realtimeSinceStartupAsDouble : (double?)null;
+            double? hostNow = PresentationHostNow();
             RefreshInterferenceMotion(state, hostNow);
 
             if (interferenceOverlay == null) return;
@@ -1269,6 +1269,19 @@ namespace C6.Prototype.Battle
             interferenceOverlay.Present(blockedDirection, hud.OrbWorkspaceScreenRect,
                 layout.TopPixelRect, hostNow, state.interferenceEndsAt);
         }
+
+        private void RefreshFeverPresentation()
+        {
+            if (hud == null || layout == null) return;
+            var state = battle?.Snapshot;
+            hud.SetFever(state?.feverGaugePercent ?? 0, state?.feverActive == true,
+                PresentationHostNow(), state?.feverStartsAt ?? 0d, state?.feverEndsAt ?? 0d,
+                layout.TopPixelRect);
+        }
+
+        private double? PresentationHostNow() => presentationHostClock != null
+            ? presentationHostClock()
+            : battle != null && battle.IsHost ? Time.realtimeSinceStartupAsDouble : (double?)null;
 
         private void RefreshInterferenceMotion(BattleSnapshot state, double? hostNow)
         {
