@@ -222,6 +222,22 @@ namespace C6.Prototype.Battle.Tests
             Assert.That(interference.Sequence, Is.Zero);
         }
 
+        [Test]
+        public void FeverClearsEffectAndResumeWaitsAFullFreshInterval()
+        {
+            var interference = Started(0);
+            interference.Tick(30, Roster);
+            Assert.That(interference.SuspendForFever(), Is.True);
+            Assert.That(interference.Active, Is.False);
+            Assert.That(interference.Kind, Is.EqualTo(MonsterInterferenceKind.None));
+
+            interference.ResumeAfterFever(40);
+            Assert.That(interference.Tick(69.9, Roster), Is.False);
+            Assert.That(interference.Sequence, Is.EqualTo(1));
+            Assert.That(interference.Tick(70, Roster), Is.True);
+            Assert.That(interference.Sequence, Is.EqualTo(2));
+        }
+
         [TestCase(0, 8)]
         [TestCase(30, 0)]
         [TestCase(30, 31)]

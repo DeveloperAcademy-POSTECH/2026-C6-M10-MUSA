@@ -126,7 +126,8 @@ namespace C6.Prototype.GameSync
             int expectedHp = IsMultiparty(expected) ? c.MonsterHpFor(participantIds.Length) : c.monsterHp;
             if (a.maxHp != expectedHp || b.monsterMaxHp != expectedHp || a.hp != b.observedMonsterHp
                 || r.seed != expected.seed || r.storageLimit != c.storageLimit
-                || !Close(r.maximum, c.staminaMax) || !Close(r.generateCost, c.generateCost)
+                || r.feverActive != b.feverActive
+                || !Close(r.maximum, c.staminaMax) || !Close(r.generateCost, b.feverActive ? 0 : c.generateCost)
                 || !Close(r.regenerationRate, c.recoveryAmount / c.recoverySeconds) || !Close(r.hitRecovery, c.hitRecovery)
                 || !Close(b.duration, c.duration) || !Close(b.teamHpDecayPerSecond, c.teamHpDecay)
                 || a.projectiles.Any(p => !Close(p.radius, c.projectileRadius) || p.ballistic &&
@@ -211,6 +212,8 @@ namespace C6.Prototype.GameSync
             // #28: failed-defense time only accumulates within a round.
             if (before.startedAt > 0 && after.penaltySeconds < before.penaltySeconds - LogicalTolerance)
                 return Reject("PENALTY_REGRESSION", out reason);
+            if (!ValidFeverProgression(before, after))
+                return Reject("FEVER_REGRESSION", out reason);
             // #28: attacks only move forward; a published attack keeps its target, window, and result.
             if (after.attackSequence < before.attackSequence || after.attackResolvedSequence < before.attackResolvedSequence
                 || before.attackSequence > 0 && after.attackSequence == before.attackSequence
@@ -229,7 +232,11 @@ namespace C6.Prototype.GameSync
             foreach (var orb in incoming.attack.orbs)
             {
                 if (!older.TryGetValue(orb.id, out var prior)) continue;
-                if (orb.kind != prior.kind || orb.polarity != prior.polarity || orb.rawElement != prior.rawElement
+                bool feverConversion = prior.kind == (int)OrbKind.Raw && orb.kind == (int)OrbKind.FeverAttack
+                    && (after.feverActive || after.feverSequence > before.feverSequence)
+                    && orb.polarity == (int)OrbPolarity.None && orb.rawElement == OrbElement.None;
+                if ((!feverConversion
+                        && (orb.kind != prior.kind || orb.polarity != prior.polarity || orb.rawElement != prior.rawElement))
                     || orb.state < prior.state || orb.sequence < prior.sequence)
                     return Reject("ORB_IDENTITY_OR_STATE_REGRESSION", out reason);
                 if (!ValidTransferProgression(prior, orb, expected, incoming.roundSeatOrder, out reason)) return false;
@@ -341,7 +348,8 @@ namespace C6.Prototype.GameSync
 
         private static bool SameResources(ResourceSnapshot left, ResourceSnapshot right)
         {
-            if (left.playing != right.playing || left.players.Length != right.players.Length) return false;
+            if (left.playing != right.playing || left.feverActive != right.feverActive
+                || !Close(left.generateCost, right.generateCost) || left.players.Length != right.players.Length) return false;
             foreach (var player in left.players)
             {
                 var other = right.players.FirstOrDefault(p => p.playerId == player.playerId);
@@ -349,6 +357,28 @@ namespace C6.Prototype.GameSync
                     || player.lastSequence != other.lastSequence || player.storedOrbs != other.storedOrbs) return false;
             }
             return true;
+        }
+
+        private static bool ValidFeverProgression(BattleSnapshot before, BattleSnapshot after)
+        {
+            if (after.feverSequence < before.feverSequence) return false;
+            if (Enum.TryParse<BattlePhase>(after.phase, out var phase) && BattleWire.IsTerminal(phase))
+                return !after.feverActive && after.feverGaugePercent == 0;
+
+            // Reliable snapshots are ordered but may be coalesced. A receiver can therefore see
+            // several 20% hits at once, or miss a complete ten-second window while suspended.
+            if (before.feverActive && after.feverActive && after.feverSequence == before.feverSequence)
+                return Close(after.feverStartsAt, before.feverStartsAt)
+                    && Close(after.feverEndsAt, before.feverEndsAt);
+            if (after.feverActive)
+                return after.feverSequence > before.feverSequence;
+            if (after.feverSequence > before.feverSequence)
+                return true;
+            if (before.feverActive)
+                return true;
+
+            return after.feverGaugePercent >= before.feverGaugePercent
+                && (after.feverGaugePercent - before.feverGaugePercent) % HostFeverState.DefaultChargePerHit == 0;
         }
 
         /// <summary>Stable comparison at the same aggregate revision. Recipient nonces are transport context.</summary>
@@ -471,6 +501,7 @@ namespace C6.Prototype.GameSync
                 Text("resources"); Text(value.sessionId); Unsigned(value.roundId);
                 if (includeRevision) Unsigned(value.revision);
                 Unsigned(value.seed); Boolean(value.playing); Boolean(value.debugTestMode); Boolean(value.debugToolsEnabled);
+                if (value.feverActive) { Text("fever-active"); Boolean(true); }
                 Number(value.maximum); Number(value.generateCost); Number(value.regenerationRate); Number(value.hitRecovery);
                 Integer(value.storageLimit); Integer(value.players.Length);
                 foreach (var player in value.players.OrderBy(player => player.playerId))
@@ -489,6 +520,12 @@ namespace C6.Prototype.GameSync
                 Boolean(value.shortDuration); Integer(value.participants); Boolean(value.locallyDetectedNetworkError);
                 Integer(value.attackSequence); Unsigned(value.attackTarget); Number(value.attackWarningStartsAt);
                 Number(value.attackWarningEndsAt); Boolean(value.attackActive); Integer(value.attackResolvedSequence); Integer(value.attackResult);
+                if (value.feverGaugePercent != 0 || value.feverSequence != 0 || value.feverActive
+                    || value.feverStartsAt != 0 || value.feverEndsAt != 0)
+                {
+                    Text("fever"); Integer(value.feverGaugePercent); Integer(value.feverSequence); Boolean(value.feverActive);
+                    Number(value.feverStartsAt); Number(value.feverEndsAt);
+                }
             }
             public override string ToString() => content.ToString();
         }

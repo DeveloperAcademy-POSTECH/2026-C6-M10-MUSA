@@ -68,6 +68,9 @@ namespace C6.Prototype.Battle
         private bool canGenerate, canDebugFixture;
         [SerializeField] private bool minimalBattlePresentation;
         [SerializeField] private RectTransform monsterHpFill;
+        [SerializeField] private RectTransform feverGaugeFill;
+        [SerializeField] private Text feverGaugeLabel;
+        [SerializeField] private GameObject feverEdgeOverlay;
         [SerializeField] private RectTransform teamTimeFill;
         [SerializeField] private Text teamTimeValue;
         [SerializeField] private RectTransform staminaFill;
@@ -118,6 +121,9 @@ namespace C6.Prototype.Battle
         public SplitScreenLayout Layout => layout;
         public bool MinimalBattlePresentation => minimalBattlePresentation;
         public RectTransform MonsterHpFill => monsterHpFill;
+        public RectTransform FeverGaugeFill => feverGaugeFill;
+        public Text FeverGaugeLabel => feverGaugeLabel;
+        public GameObject FeverEdgeOverlay => feverEdgeOverlay;
         public RectTransform TeamTimeFill => teamTimeFill;
         public Text TeamTimeValue => teamTimeValue;
         public RectTransform StaminaFill => staminaFill;
@@ -182,11 +188,26 @@ namespace C6.Prototype.Battle
             if (StorageLabel != null) StorageLabel.text = "ORBS " + stored + " / " + cap;
             if (ResourceModeLabel != null)
             {
-                ResourceModeLabel.text = isDebugMode ? "DEBUG_TEST_MODE / FIXTURE" : "NORMAL / EMPTY START";
-                ResourceModeLabel.color = isDebugMode ? Gold : Muted;
+                bool feverMode = Finite(cost) && cost == 0d;
+                ResourceModeLabel.text = isDebugMode ? "DEBUG_TEST_MODE / FIXTURE"
+                    : feverMode ? "FEVER / FREE ATTACK ORBS" : "NORMAL / EMPTY START";
+                ResourceModeLabel.color = isDebugMode || feverMode ? Gold : Muted;
             }
             if (generateCaption != null)
                 generateCaption.text = pending ? "WAITING FOR HOST" : "GENERATE  /  " + Number(cost);
+        }
+
+        public void SetFever(int gaugePercent, bool active)
+        {
+            int gauge = Mathf.Clamp(gaugePercent, 0, HostFeverState.MaximumGaugePercent);
+            SetHorizontalFill(feverGaugeFill, gauge, HostFeverState.MaximumGaugePercent);
+            if (feverGaugeLabel != null)
+                feverGaugeLabel.text = active ? "FEVER TIME  " + gauge + "%" : "FEVER  " + gauge + "%";
+            if (feverEdgeOverlay != null && feverEdgeOverlay.activeSelf != active)
+            {
+                feverEdgeOverlay.SetActive(active);
+                if (active) feverEdgeOverlay.transform.SetAsLastSibling();
+            }
         }
 
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
@@ -299,6 +320,9 @@ namespace C6.Prototype.Battle
             if (minimalBattlePresentation)
             {
                 if (monsterHpFill == null) { error = "monsterHpFill"; return false; }
+                if (feverGaugeFill == null) { error = "feverGaugeFill"; return false; }
+                if (feverGaugeLabel == null) { error = "feverGaugeLabel"; return false; }
+                if (feverEdgeOverlay == null) { error = "feverEdgeOverlay"; return false; }
                 if (teamTimeFill == null) { error = "teamTimeFill"; return false; }
                 if (teamTimeValue == null) { error = "teamTimeValue"; return false; }
             }
@@ -432,6 +456,7 @@ namespace C6.Prototype.Battle
             SetStatus(networkStatus, actionStatus, detailStatus);
             SetControls(canHost, canJoin, canStart, canEnd, canGenerate, canDebugFixture, canSolo);
             SetResources(100d, 100d, 20d, 20d / 3d, 0, 20, false, false);
+            SetFever(0, false);
         }
 
         private void OnEnable()

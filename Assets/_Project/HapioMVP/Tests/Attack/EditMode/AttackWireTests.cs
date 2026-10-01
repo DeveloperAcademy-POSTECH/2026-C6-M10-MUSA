@@ -160,6 +160,27 @@ namespace C6.Prototype.Attack.Tests
         }
 
         [Test]
+        public void FeverAttackUsesAttackPolarityAndMayOwnAProjectile()
+        {
+            var snapshot = Snapshot();
+            var fever = Orb("fever");
+            fever.kind = (int)OrbKind.FeverAttack;
+            fever.state = (int)OrbAuthorityState.Projectile;
+            snapshot.orbs = new[] { fever };
+            snapshot.projectiles = new[]
+            {
+                new ProjectileWire { id = fever.id, owner = fever.owner, position = Vector3.forward, radius = .2f }
+            };
+            Assert.That(AttackWire.ValidSnapshot(snapshot), Is.True);
+
+            fever.polarity = (int)OrbPolarity.Yin;
+            Assert.That(AttackWire.ValidSnapshot(snapshot), Is.False);
+            fever.polarity = (int)OrbPolarity.None;
+            fever.rawElement = OrbElement.Fire;
+            Assert.That(AttackWire.ValidSnapshot(snapshot), Is.False);
+        }
+
+        [Test]
         public void RequestRoundTripPreservesActionContextAndHasNoClaimedSenderField()
         {
             var original = new OrbActionRequest(Guid.NewGuid().ToString("N"), 17, "request", "orb", null,

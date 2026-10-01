@@ -82,10 +82,10 @@ namespace C6.Prototype.Orbs
         {
             RequireSession();
             if (!DevelopmentTestMode) throw new InvalidOperationException("Development fixtures require explicit test mode.");
-            if (!IsValidKindAndPolarity(kind, polarity)) throw new ArgumentException("Raw requires Yin or Yang; Combined requires None.");
+            if (!IsValidKindAndPolarity(kind, polarity)) throw new ArgumentException("Raw requires Yin or Yang; attack orbs require None.");
             if (!IsNormalized(position)) throw new ArgumentOutOfRangeException(nameof(position), "Position must be finite and within [0, 1].");
             if (!OrbElements.ValidElementData(kind, rawElement, RequiresExplicitRawElements))
-                throw new ArgumentException("Raw requires its explicit element in the selected contract; Combined uses None.", nameof(rawElement));
+                throw new ArgumentException("Raw requires its explicit element in the selected contract; attack orbs use None.", nameof(rawElement));
             string id;
             do { id = Guid.NewGuid().ToString("N"); } while (orbs.ContainsKey(id));
             var orb = new OrbRecord(id, kind, polarity, owner, OrbAuthorityState.Idle, position, EntrySide.None, 0, rawElement: rawElement);
@@ -116,6 +116,66 @@ namespace C6.Prototype.Orbs
             orbs.Add(id, orb);
             lastSequences.Add(id, 0);
             return orb;
+        }
+
+        /// <summary>Host-approved zero-cost generation while the shared fever window is active.</summary>
+        public OrbRecord RegisterGeneratedFeverAttack(string sessionId, uint roundId, ulong owner, Vector2 position)
+        {
+            RequireSession();
+            if (!string.Equals(SessionId, sessionId, StringComparison.Ordinal) || RoundId != roundId)
+                throw new InvalidOperationException("Generated FeverAttack must belong to the active Host round.");
+            if (!IsNormalized(position)) throw new ArgumentOutOfRangeException(nameof(position));
+            string id;
+            do { id = Guid.NewGuid().ToString("N"); } while (orbs.ContainsKey(id));
+            var orb = new OrbRecord(id, OrbKind.FeverAttack, OrbPolarity.None, owner,
+                OrbAuthorityState.Idle, position, EntrySide.None, 0);
+            orbs.Add(id, orb);
+            lastSequences.Add(id, 0);
+            return orb;
+        }
+
+        /// <summary>
+        /// Fever starts atomically on the Host. Every still stored Raw keeps its identity, owner,
+        /// position and transfer motion, but becomes an immediately throwable FeverAttack.
+        /// Any in-flight Raw reservation is retired rather than being allowed to complete as Raw.
+        /// </summary>
+        public IReadOnlyList<OrbRecord> ConvertIdleRawToFeverAttack()
+        {
+            if (!HasSession) return Array.Empty<OrbRecord>();
+            List<OrbRecord> converted = null;
+            foreach (var orb in new List<OrbRecord>(orbs.Values))
+            {
+                if (orb.Kind != OrbKind.Raw || orb.AuthorityState != OrbAuthorityState.Idle) continue;
+                pending.Remove(orb.OrbId);
+                var fever = new OrbRecord(orb.OrbId, OrbKind.FeverAttack, OrbPolarity.None,
+                    orb.OwnerPlayerId, orb.AuthorityState, orb.NormalizedPosition, orb.EntrySide,
+                    orb.SequenceNumber, orb.TransferCount, orb.LastTransferSequence,
+                    orb.RightTransferCount, orb.TransferMotion);
+                orbs[orb.OrbId] = fever;
+                if (converted == null) converted = new List<OrbRecord>();
+                converted.Add(fever);
+            }
+            return converted != null ? (IReadOnlyList<OrbRecord>)converted : Array.Empty<OrbRecord>();
+        }
+
+        /// <summary>Fever end removes only unthrown FeverAttack orbs. Launching/projectile orbs still resolve.</summary>
+        public IReadOnlyList<OrbRecord> ConsumeIdleFeverAttack()
+        {
+            if (!HasSession) return Array.Empty<OrbRecord>();
+            List<OrbRecord> consumed = null;
+            foreach (var orb in new List<OrbRecord>(orbs.Values))
+            {
+                if (orb.Kind != OrbKind.FeverAttack || orb.AuthorityState != OrbAuthorityState.Idle) continue;
+                pending.Remove(orb.OrbId);
+                var removed = new OrbRecord(orb.OrbId, orb.Kind, orb.Polarity, orb.OwnerPlayerId,
+                    OrbAuthorityState.Consumed, orb.NormalizedPosition, orb.EntrySide,
+                    orb.SequenceNumber, orb.TransferCount, orb.LastTransferSequence,
+                    orb.RightTransferCount, orb.TransferMotion, orb.RawElement);
+                orbs[orb.OrbId] = removed;
+                if (consumed == null) consumed = new List<OrbRecord>();
+                consumed.Add(removed);
+            }
+            return consumed != null ? (IReadOnlyList<OrbRecord>)consumed : Array.Empty<OrbRecord>();
         }
 
         public IReadOnlyList<OrbRecord> Snapshot()
@@ -175,7 +235,7 @@ namespace C6.Prototype.Orbs
                 || !string.Equals(SessionId, request.SessionId, StringComparison.Ordinal)
                 || RoundId != request.RoundId
                 || !TryGet(request.OrbId, out var orb)
-                || orb.Kind != OrbKind.Combined || orb.Polarity != OrbPolarity.None
+                || !orb.CanAttack || orb.Polarity != OrbPolarity.None
                 || orb.AuthorityState != OrbAuthorityState.Idle
                 || orb.OwnerPlayerId != reservation.SenderPlayerId
                 || !pending.TryGetValue(orb.OrbId, out var held)
@@ -330,7 +390,7 @@ namespace C6.Prototype.Orbs
                 || (expectedState == OrbAuthorityState.Projectile && nextState == OrbAuthorityState.Consumed);
             if (!validStep || !HasSession || !string.Equals(SessionId, sessionId, StringComparison.Ordinal)
                 || RoundId != roundId || !TryGet(orbId, out var orb)
-                || orb.Kind != OrbKind.Combined || orb.Polarity != OrbPolarity.None
+                || !orb.CanAttack || orb.Polarity != OrbPolarity.None
                 || orb.AuthorityState != expectedState) return false;
             advanced = new OrbRecord(orb.OrbId, orb.Kind, orb.Polarity, orb.OwnerPlayerId,
                 nextState, orb.NormalizedPosition, orb.EntrySide, orb.SequenceNumber, orb.TransferCount, orb.LastTransferSequence, orb.RightTransferCount, orb.TransferMotion, orb.RawElement);
@@ -354,7 +414,7 @@ namespace C6.Prototype.Orbs
             OrbRecord target = null;
             if (request.Kind == OrbActionKind.Launch)
             {
-                if (source.Kind != OrbKind.Combined) return Reject("RAW_CANNOT_LAUNCH");
+                if (!source.CanAttack) return Reject("RAW_CANNOT_LAUNCH");
                 if (!string.IsNullOrEmpty(request.OtherOrbId)) return Reject("UNEXPECTED_SECOND_ORB");
             }
             else if (request.Kind == OrbActionKind.Combine)
@@ -411,7 +471,7 @@ namespace C6.Prototype.Orbs
         private static bool IsValidKindAndPolarity(OrbKind kind, OrbPolarity polarity)
         {
             return (kind == OrbKind.Raw && (polarity == OrbPolarity.Yin || polarity == OrbPolarity.Yang))
-                || (kind == OrbKind.Combined && polarity == OrbPolarity.None);
+                || ((kind == OrbKind.Combined || kind == OrbKind.FeverAttack) && polarity == OrbPolarity.None);
         }
 
         private static bool IsNormalized(Vector2 position)

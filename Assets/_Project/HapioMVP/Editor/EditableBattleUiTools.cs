@@ -135,6 +135,104 @@ namespace C6.Editor
             Debug.Log("C6_MONSTER_INTERFERENCE_UI_READY: red board-edge block and centered monster message are connected.");
         }
 
+        [MenuItem("C6/UI/Prepare Fever UI")]
+        public static void PrepareFeverUi()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Stop Play mode before preparing fever UI.");
+            Scene scene = SceneManager.GetSceneByPath(ScenePath);
+            bool opened = !scene.IsValid() || !scene.isLoaded;
+            if (!opened && scene.isDirty)
+                throw new InvalidOperationException("Save existing scene changes before preparing fever UI.");
+            if (opened) scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+
+            var hud = FindHud(scene);
+            var canvas = hud.Canvas.GetComponent<RectTransform>();
+            var hpPanel = hud.Canvas.GetComponentsInChildren<RectTransform>(true)
+                .Single(item => item.name == "MonsterHpPanel");
+            var gaugeRoot = hpPanel.Find("TeamFeverGauge") as RectTransform;
+            if (gaugeRoot == null)
+            {
+                gaugeRoot = CreateUiImage("TeamFeverGauge", hpPanel, new Color(.13f, .10f, .04f, .94f)).rectTransform;
+                gaugeRoot.anchorMin = new Vector2(0f, 0f); gaugeRoot.anchorMax = new Vector2(1f, 0f);
+                gaugeRoot.offsetMin = new Vector2(13f, 4f); gaugeRoot.offsetMax = new Vector2(-10f, 13f);
+            }
+            var fill = gaugeRoot.Find("FeverFill") as RectTransform;
+            if (fill == null)
+            {
+                fill = CreateUiImage("FeverFill", gaugeRoot, new Color(1f, .76f, .08f, 1f)).rectTransform;
+                fill.anchorMin = Vector2.zero; fill.anchorMax = new Vector2(0f, 1f);
+                fill.offsetMin = fill.offsetMax = Vector2.zero;
+            }
+            var label = gaugeRoot.Find("FeverLabel")?.GetComponent<Text>();
+            if (label == null)
+            {
+                var labelObject = new GameObject("FeverLabel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+                Undo.RegisterCreatedObjectUndo(labelObject, "Create fever gauge label");
+                labelObject.transform.SetParent(gaugeRoot, false);
+                label = labelObject.GetComponent<Text>();
+                label.font = hud.ActionLabel != null ? hud.ActionLabel.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                label.fontSize = 7; label.fontStyle = FontStyle.Bold; label.alignment = TextAnchor.MiddleCenter;
+                label.color = new Color(1f, .94f, .62f, 1f); label.raycastTarget = false;
+                var rect = label.rectTransform; rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+                rect.offsetMin = rect.offsetMax = Vector2.zero;
+            }
+
+            if (hud.ProgressLabel != null)
+            {
+                Undo.RecordObject(hud.ProgressLabel.rectTransform, "Move valid hit label above fever gauge");
+                var rect = hud.ProgressLabel.rectTransform;
+                rect.anchorMin = new Vector2(0f, 0f); rect.anchorMax = new Vector2(1f, 0f);
+                rect.offsetMin = new Vector2(13f, 15f); rect.offsetMax = new Vector2(-10f, 27f);
+            }
+
+            var edgeRoot = canvas.Find("FeverEdgeOverlay") as RectTransform;
+            if (edgeRoot == null)
+            {
+                var edgeObject = new GameObject("FeverEdgeOverlay", typeof(RectTransform));
+                Undo.RegisterCreatedObjectUndo(edgeObject, "Create fever edge overlay");
+                edgeRoot = (RectTransform)edgeObject.transform; edgeRoot.SetParent(canvas, false);
+                edgeRoot.anchorMin = Vector2.zero; edgeRoot.anchorMax = Vector2.one;
+                edgeRoot.offsetMin = edgeRoot.offsetMax = Vector2.zero;
+                CreateFeverEdge("Top", edgeRoot, new Vector2(0f, 1f), Vector2.one, new Vector2(0f, -10f), Vector2.zero);
+                CreateFeverEdge("Bottom", edgeRoot, Vector2.zero, new Vector2(1f, 0f), Vector2.zero, new Vector2(0f, 10f));
+                CreateFeverEdge("Left", edgeRoot, Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(10f, 0f));
+                CreateFeverEdge("Right", edgeRoot, new Vector2(1f, 0f), Vector2.one, new Vector2(-10f, 0f), Vector2.zero);
+                edgeRoot.gameObject.SetActive(false);
+            }
+
+            var serializedHud = new SerializedObject(hud);
+            serializedHud.FindProperty("feverGaugeFill").objectReferenceValue = fill;
+            serializedHud.FindProperty("feverGaugeLabel").objectReferenceValue = label;
+            serializedHud.FindProperty("feverEdgeOverlay").objectReferenceValue = edgeRoot.gameObject;
+            serializedHud.ApplyModifiedPropertiesWithoutUndo();
+            if (hud.ResultOverlay != null) edgeRoot.SetSiblingIndex(hud.ResultOverlay.transform.GetSiblingIndex());
+            EditorUtility.SetDirty(hud); EditorUtility.SetDirty(label);
+            EditorSceneManager.MarkSceneDirty(scene);
+            if (!hud.ValidateSceneHierarchy(out var error)) throw new InvalidOperationException(error);
+            if (!EditorSceneManager.SaveScene(scene)) throw new IOException("Could not save fever UI to the battle scene.");
+            Selection.activeGameObject = gaugeRoot.gameObject;
+            Debug.Log("C6_FEVER_UI_READY gauge=team-shared edge=yellow raycast=false");
+        }
+
+        static Image CreateUiImage(string name, Transform parent, Color color)
+        {
+            var gameObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            Undo.RegisterCreatedObjectUndo(gameObject, "Create " + name);
+            gameObject.transform.SetParent(parent, false);
+            var image = gameObject.GetComponent<Image>(); image.color = color; image.raycastTarget = false;
+            return image;
+        }
+
+        static void CreateFeverEdge(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax,
+            Vector2 offsetMin, Vector2 offsetMax)
+        {
+            var image = CreateUiImage(name, parent, new Color(1f, .76f, .05f, .78f));
+            image.maskable = false;
+            image.rectTransform.anchorMin = anchorMin; image.rectTransform.anchorMax = anchorMax;
+            image.rectTransform.offsetMin = offsetMin; image.rectTransform.offsetMax = offsetMax;
+        }
+
         static MonsterInterferenceOverlay CreateInterferenceOverlay(Transform canvas, Font font)
         {
             var rootObject = new GameObject("MonsterInterferenceOverlay", typeof(RectTransform),

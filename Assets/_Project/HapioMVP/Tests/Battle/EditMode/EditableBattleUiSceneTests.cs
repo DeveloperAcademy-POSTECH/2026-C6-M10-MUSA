@@ -214,10 +214,31 @@ namespace C6.Prototype.Battle.Tests
                 Assert.That(left.color.r, Is.GreaterThan(left.color.g).And.GreaterThan(left.color.b));
                 Assert.That(right.color.r, Is.GreaterThan(right.color.g).And.GreaterThan(right.color.b));
                 Assert.That(message.text, Is.EqualTo(MonsterInterferenceOverlay.DefaultMessage));
-                Assert.That(message.alignment, Is.EqualTo(TextAnchor.LowerCenter),
-                    "The saved lower-centered label sits over the lower half of the monster display.");
+                Assert.That(message.alignment, Is.EqualTo(TextAnchor.MiddleCenter),
+                    "The saved message remains centered over the monster display.");
                 Assert.That(message.GetComponent<Outline>(), Is.Not.Null);
             }
+        }
+
+        [Test]
+        public void FeverGaugeAndNonBlockingYellowEdgeAreSavedInTheScene()
+        {
+            Assert.That(hud.FeverGaugeFill, Is.Not.Null);
+            Assert.That(hud.FeverGaugeLabel, Is.Not.Null);
+            Assert.That(hud.FeverEdgeOverlay, Is.Not.Null);
+            Assert.That(hud.FeverGaugeFill.parent.name, Is.EqualTo("TeamFeverGauge"));
+            Assert.That(hud.FeverGaugeFill.parent.parent.name, Is.EqualTo("MonsterHpPanel"));
+            Assert.That(hud.FeverGaugeLabel.transform.parent, Is.SameAs(hud.FeverGaugeFill.parent));
+            Assert.That(hud.FeverGaugeLabel.raycastTarget, Is.False);
+
+            var edge = hud.FeverEdgeOverlay;
+            Assert.That(edge.transform.parent, Is.SameAs(hud.Canvas.transform));
+            Assert.That(edge.transform.GetSiblingIndex(), Is.LessThan(hud.ResultOverlay.transform.GetSiblingIndex()));
+            Assert.That(edge.activeSelf, Is.False);
+            var images = edge.GetComponentsInChildren<Image>(true);
+            Assert.That(images, Has.Length.EqualTo(4));
+            Assert.That(images.All(image => !image.raycastTarget), Is.True);
+            Assert.That(images.All(image => image.color.r > image.color.b && image.color.g > image.color.b), Is.True);
         }
 
         [Test]

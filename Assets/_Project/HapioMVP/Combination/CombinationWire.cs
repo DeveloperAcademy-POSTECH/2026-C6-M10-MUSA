@@ -157,7 +157,7 @@ namespace C6.Prototype.Combination
             && Enum.IsDefined(typeof(OrbKind), orb.kind) && Enum.IsDefined(typeof(OrbPolarity), orb.polarity)
             && Enum.IsDefined(typeof(OrbAuthorityState), orb.state) && Normalized(orb.pos)
             && OrbElements.ValidElementData((OrbKind)orb.kind, orb.rawElement, requireExplicitRaw)
-            && (orb.kind == (int)OrbKind.Combined ? orb.polarity == (int)OrbPolarity.None : orb.polarity != (int)OrbPolarity.None);
+            && ((OrbKind)orb.kind == OrbKind.Raw ? orb.polarity != (int)OrbPolarity.None : orb.polarity == (int)OrbPolarity.None);
 
         internal static bool ValidOptionalOrb(OrbWire[] entries, bool requireExplicitRaw = false) => entries != null && entries.Length <= 1
             && (entries.Length == 0 || ValidOrb(entries[0], requireExplicitRaw));

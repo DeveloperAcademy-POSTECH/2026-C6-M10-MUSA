@@ -151,7 +151,7 @@ namespace C6.Prototype.Orbs
                 : !ContainsClosed(zone, previous) && SegmentIntersectsClosedRect(previous, rawPosition, zone);
             // Launch wins if the same raw sample also qualifies as a horizontal swipe. The
             // segment test catches exact-edge contact and fast jumps past the battle boundary.
-            if (!tuning.LaunchOnRelease && ActiveOrb.Kind == OrbKind.Combined && enteredLaunchRegion)
+            if (!tuning.LaunchOnRelease && ActiveOrb.CanAttack && enteredLaunchRegion)
                 return Reserve(OrbActionKind.Launch, null, rawPosition, lowerRect);
 
             Vector2 delta = rawPosition - startRawPosition;
@@ -183,7 +183,7 @@ namespace C6.Prototype.Orbs
 
             OrbGestureDecision? decision = Move(pointerId, rawPosition, lowerRect, screenWidth);
             if (!HasPending && InputEnabled && tuning.LaunchOnRelease && allowReleaseLaunch &&
-                ActiveOrb.Kind == OrbKind.Combined && IsFinite(rawPosition) && IsValidGeometry(lowerRect, screenWidth) &&
+                ActiveOrb.CanAttack && IsFinite(rawPosition) && IsValidGeometry(lowerRect, screenWidth) &&
                 rawPosition.y >= lowerRect.yMax && rawPosition.x >= lowerRect.xMin && rawPosition.x <= lowerRect.xMax)
                 decision = Reserve(OrbActionKind.Launch, null, rawPosition, lowerRect);
             if (decision.HasValue)
