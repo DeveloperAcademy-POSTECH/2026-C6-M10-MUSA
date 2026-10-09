@@ -1,0 +1,20 @@
+{
+  "name": "C6Lab.Runtime",
+  "rootNamespace": "C6Lab",
+  "references": [
+    "Unity.Netcode.Runtime",
+    "Unity.InputSystem",
+    "UnityEngine.UI",
+    "Unity.Collections",
+    "Unity.Networking.Transport"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

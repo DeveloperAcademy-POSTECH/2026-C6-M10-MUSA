@@ -6,7 +6,7 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/_Project/HapioMVP/Scenes/ContinuousTransferBattle.unity
-    guid: 759b16287f8c84e14a79d5e8c33f5834
+    path: Assets/Lab/Scenes/Lab.unity
+    guid: 84e038ee921ed49a68782dd5b35431b1
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

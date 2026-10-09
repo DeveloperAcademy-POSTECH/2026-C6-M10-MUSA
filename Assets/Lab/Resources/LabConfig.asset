@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66613ecff04f44e418d4cb25ffe69fd6, type: 3}
+  m_Name: LabConfig
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabConfig
+  monsterMaxHp: 1000
+  damage: 20
+  battleDurationSeconds: 180
+  staminaMax: 100
+  staminaStart: 100
+  generateCost: 20
+  staminaRecoveryAmount: 20
+  staminaRecoverySeconds: 3
+  hitRecovery: 5
+  orbStorageLimit: 20
+  orbLifetimeSeconds: 8
+  orbRestitution: 0.8
+  orbFloorDeceleration: 2
+  orbStopSpeed: 0.065
+  orbMaxReleaseSpeed: 3
+  orbRadius: 0.32
+  boardHeight: 5
+  spawnRiseDistance: 0.65
+  spawnRiseDuration: 0.25
+  cameraRadius: 8
+  cameraHeightOffset: 0.65
+  throwOriginRadius: 4
+  throwOriginHeightOffset: -0.5
+  throwOriginLateralRange: 1
+  throwSwipeMinSpeed: 0.8
+  throwSwipeMinDistance: 0.12
+  throwSwipeUpDominance: 0.65
+  throwMaxSwipeSpeed: 6
+  throwMinUpSpeed: 2
+  throwLateralGain: 2.5
+  throwUpGain: 2.1
+  throwForwardGain: 4.5
+  throwMaxWorldSpeed: 18
+  throwGravity: 9.81
+  throwLifetime: 4
+  throwRadius: 0.165
+  throwPowerExponent: 1
+  throwLoftOffsetDegrees: 0
+  throwAirDamping: 0
