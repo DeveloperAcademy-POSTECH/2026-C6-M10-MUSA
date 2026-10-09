@@ -1,0 +1,21 @@
+{
+  "name": "C6Lab.EditModeTests",
+  "rootNamespace": "C6Lab.Tests",
+  "references": [
+    "C6Lab.Runtime"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
+}
