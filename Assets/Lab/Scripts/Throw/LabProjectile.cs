@@ -81,8 +81,8 @@ namespace C6Lab
                 replacementVisual.transform.localRotation = Quaternion.identity;
                 LabVisualSafety.RemovePhysics(replacementVisual);
             }
-            MeshRenderer defaultRenderer = visualMount.Find("Default Sphere")?.GetComponent<MeshRenderer>();
-            if (defaultRenderer != null) defaultRenderer.enabled = prefab == null;
+            Transform defaultSphere = visualMount.Find("Default Sphere");
+            if (defaultSphere != null) defaultSphere.gameObject.SetActive(prefab == null);
         }
 
         /// <summary>Creates the default Unity sphere presentation with an independent root collider.</summary>
@@ -275,23 +275,10 @@ namespace C6Lab
                 visualMount = mount.transform;
                 visualMount.SetParent(transform, false);
             }
-            Transform visual = visualMount.Find("Default Sphere");
-            if (visual == null)
-            {
-                GameObject sphereVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphereVisual.name = "Default Sphere";
-                sphereVisual.transform.SetParent(visualMount, false);
-                SphereCollider redundantCollider = sphereVisual.GetComponent<SphereCollider>();
-                if (redundantCollider != null)
-                {
-                    redundantCollider.enabled = false;
-                    LabVisualSafety.DestroyVisualObject(redundantCollider);
-                }
-                visual = sphereVisual.transform;
-            }
-            visual.localPosition = Vector3.zero;
-            visual.localRotation = Quaternion.identity;
-            visual.localScale = Vector3.one * (2f * radius);
+            // The board and the projectile share one replaceable 3D sphere presentation.
+            // Physics stays on each object's root, with its own gameplay radius.
+            LabOrbVisualFactory.EnsureSphere(visualMount, "Default Sphere", radius,
+                LabOrbKind.Combined);
         }
     }
 }

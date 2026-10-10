@@ -1,6 +1,6 @@
 # C6 Physics Lab 개발자 모드 조정값 명세
 
-> 기준: 2026-10-10, Unity 6000.6.5f1, PR #76 병합 커밋 `854cdd9c`의 코드·Scene·설정 에셋. 아래 기본값은 C# 필드 초기값이 아니라 현재 직렬화된 `Assets/Lab/Resources/LabConfig.asset`의 값이다. 이 문서는 해당 병합본의 설정을 기준으로 하며, 이후 값이 바뀌면 문서를 함께 갱신해야 한다.
+> 기본값 기준: 2026-10-10, Unity 6000.6.5f1, PR #76 병합 커밋 `854cdd9c`의 설정 에셋. 아래 기본값은 C# 필드 초기값이 아니라 직렬화된 `Assets/Lab/Resources/LabConfig.asset`의 값이다. 구슬 물리 설명은 현재 3D 조합판 전환 코드에 맞췄으며, 이 전환의 실행 검증 결과를 뜻하지 않는다. 이후 값이 바뀌면 문서를 함께 갱신해야 한다.
 
 이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 숫자 39개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
 
@@ -19,7 +19,7 @@
 ## 2. 단위와 공통 판정
 
 - **월드 단위(m)**: 이 프로젝트의 Unity 월드 거리. `m/s`와 `m/s²`는 그 거리 기준 속도·가속도를 설명하기 위한 표기다.
-- **보드 폭**: 현재 2D 구슬판의 가로 너비를 1로 본 단위. 손가락 입력 속도, 2D 구슬 방출·감속·정지 값은 보드 폭을 기준으로 정규화된다. 따라서 2D 값과 3D 투사체의 `m/s` 값을 직접 비교하면 안 된다.
+- **보드 폭**: 3D 구슬이 XY 평면에서 움직이는 조합판의 가로 너비를 1로 본 단위. 손가락 입력 속도, 조합판 구슬의 방출·감속·정지 값은 보드 폭을 기준으로 정규화된다. 따라서 이 값과 비행 투사체의 월드 단위/초를 직접 비교하면 안 된다.
 - **높일 때의 효과**는 다른 수치와 손동작이 같다는 조건에서의 경향이다. 충돌, 속도 상한, 발사각 제한 때문에 항상 같은 크기로 나타나지는 않는다.
 - 표의 **범위**는 DEV 입력칸의 범위다. Inspector의 `[Min]`·`[Range]`와 런타임 속성의 방어적 보정은 별도이며, 패널 적용 시에는 표의 범위와 값 간 관계를 먼저 검사한다.
 
@@ -49,18 +49,18 @@
 
 근거: `LabConfig.StaminaRecoveryPerSecond`, `LabModel.TryGenerate`, `TryTransfer`, `ConfirmHit`, `TryAdvance`.
 
-## 5. 구슬 수명·2D 판·생성 연출
+## 5. 구슬 수명·3D 조합판·생성 연출
 
 | DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
 | --- | ---: | --- | --- |
 | Orb Lifetime (seconds) | 8 | 0.1–86,400 / 초 | 보관 중인 Raw·Combined의 수명. Raw는 생성 시점, Combined는 조합 시점부터 센다. 이웃에게 전달해도 수명은 초기화되지 않는다. 이미 발사돼 비행 중인 구슬은 이 만료 대상이 아니다. |
-| Orb Bounce | 0.8 | 0–1 / 2D 접촉 탄성 | 구슬·상하 벽의 `PhysicsMaterial2D.bounciness`. 높이면 접촉 후 더 잘 튀는 경향이 있다. 충돌 결과는 상대 물체와 물리 설정에도 영향을 받는다. |
-| Orb Floor Deceleration | 2 | 0–100,000 / 보드 폭/초² | 손을 놓은 뒤 움직이는 2D 구슬의 속력에서 매 물리 스텝 감산한다. 높이면 더 빨리 멈춘다. Unity의 `Rigidbody2D.linearDamping`을 조정하는 값은 아니다. |
+| Orb Bounce | 0.8 | 0–1 / 3D 접촉 탄성 | 구슬·상하 벽의 `PhysicsMaterial.bounciness`. 높이면 접촉 후 더 잘 튀는 경향이 있다. 충돌 결과는 상대 물체와 물리 설정에도 영향을 받는다. |
+| Orb Floor Deceleration | 2 | 0–100,000 / 보드 폭/초² | 손을 놓은 뒤 XY 평면에서 움직이는 3D 구슬의 속력에서 매 물리 스텝 감산한다. 높이면 더 빨리 멈춘다. Unity의 `Rigidbody.linearDamping`이나 접촉 재질의 마찰을 조정하는 값은 아니다. |
 | Orb Stop Speed | 0.065 | 0–100,000 / 보드 폭/초 | 구슬 속력이 이 값 이하이면 0으로 만든다. 높이면 낮은 속도의 구슬이 일찍 멈춘다. `Orb Maximum Release Speed` 이하여야 한다. |
-| Orb Maximum Release Speed | 3 | 0.001–100,000 / 보드 폭/초 | 잡은 2D 구슬을 놓을 때 부여할 최대 굴림 속력. 높이면 더 세게 밀 수 있다. Host가 받는 이동 샘플의 안전 상한도 이 값의 16배로 계산된다. 3D 투척 속도 상한과 별개다. |
-| Orb Radius | 0.32 | 0.001–100 / 2D 월드 단위 | 2D `CircleCollider2D`와 기본 원형 표시 크기. 잡기·직접 겹침 조합 거리, 판 가장자리 여백에도 쓰인다. 크기를 키우면 아래의 판 높이 조건을 다시 맞춰야 한다. |
-| Orb Board Height | 5 | 0.1–1,000 / 2D 월드 단위 | 구슬 전용 직교 카메라의 세로 표시 높이. 가로 길이는 화면 비율에 따라 달라지고 판의 물리 경계도 함께 다시 계산된다. |
-| Spawn Rise Distance | 0.65 | 0–1,000 / 2D 월드 단위 | 새 Raw의 **Visual 자식**이 본체 위치 아래에서 시작하는 거리. 물리 본체·구슬 ID·Host 위치를 이동시키지 않는다. 0이면 상승 연출이 생략된다. |
+| Orb Maximum Release Speed | 3 | 0.001–100,000 / 보드 폭/초 | 잡은 조합판 구슬을 놓을 때 부여할 최대 평면 이동 속력. 높이면 더 세게 밀 수 있다. Host가 받는 이동 샘플의 안전 상한도 이 값의 16배로 계산된다. 3D 투척 속도 상한과 별개다. |
+| Orb Radius | 0.32 | 0.001–100 / 월드 단위 | 조합판 구슬 루트의 3D `SphereCollider` 반경과 기본 구체 표시 반경. 잡기·직접 겹침 조합 거리, 판 가장자리 여백에도 쓰인다. 크기를 키우면 아래의 판 높이 조건을 다시 맞춰야 한다. |
+| Orb Board Height | 5 | 0.1–1,000 / 월드 단위 | 구슬 전용 직교 카메라의 세로 표시 높이. 가로 길이는 화면 비율에 따라 달라지고 판의 물리 경계도 함께 다시 계산된다. |
+| Spawn Rise Distance | 0.65 | 0–1,000 / 월드 단위 | 새 Raw의 **Visual 자식**이 본체 위치 아래에서 시작하는 거리. 3D 물리 루트·구슬 ID·Host 위치를 이동시키지 않는다. 0이면 상승 연출이 생략된다. |
 | Spawn Rise Duration (seconds) | 0.25 | 0–86,400 / 초 | Visual이 본체 위치까지 올라오는 시간. 연출 중 입력·물리 이동은 잠시 잠긴다. 0이면 연출이 즉시 끝난다. |
 
 판 높이와 반경은 별도 기하 검사를 통과해야 한다. `BoardHeight/2 > OrbRadius + 0.05`와 `(BoardHeight/2) × 구슬 카메라 aspect > OrbRadius + 0.05`를 모두 만족해야 **APPLY**가 진행된다. 판의 화면 비율이 바뀌면 같은 값도 통과 여부가 달라질 수 있다.
@@ -77,13 +77,13 @@
 | Camera Height Offset | 0.65 | −1,000–1,000 / 월드 단위 | 요괴 중심에 대한 카메라 높이 차이. 카메라는 계속 요괴 중심을 바라본다. |
 | Throw Origin Radius | 4 | 0.001–1,000 / 월드 단위 | 요괴 중심에서 공의 기본 발사점까지의 수평 거리. 높이면 날아가야 하는 거리가 늘어난다. |
 | Throw Origin Height Offset | −0.5 | −1,000–1,000 / 월드 단위 | 요괴 중심에 대한 공의 초기 높이. 궤적과 바닥·요괴 접촉 위치에 영향을 준다. |
-| Throw Origin Lateral Range | 1 | 0–1,000 / 월드 단위 | 손을 놓은 2D 판의 가로 위치를 0–1로 환산해 3D 발사점을 좌우 `±Range`만큼 옮긴다. 0이면 중앙에서만 출발한다. 측면에서 놓아도 자동으로 요괴를 향해 조준하지 않는다. |
+| Throw Origin Lateral Range | 1 | 0–1,000 / 월드 단위 | 손을 놓은 조합판의 가로 위치를 0–1로 환산해 3D 발사점을 좌우 `±Range`만큼 옮긴다. 0이면 중앙에서만 출발한다. 측면에서 놓아도 자동으로 요괴를 향해 조준하지 않는다. |
 
 근거: `LabSeatCamera.LateUpdate`, `LabThrowMath.SeatPosition`·`LaunchPosition`.
 
 ## 7. 스와이프 판정·3D 투척
 
-입력은 손을 놓기 직전 **0.12초**의 2D 위치 샘플에서 계산한다. 손을 놓은 지점이 좌우 전달 경계이고 바깥 방향으로 움직이면 이웃 **전달 판정이 먼저**이며, 투척은 그다음이다. Combined 구슬만 투척할 수 있다. 아래 표의 `vₓ`·`vᵧ`는 각각 보드 폭/초 단위의 가로·위쪽 입력 속도다.
+입력은 손을 놓기 직전 **0.12초**의 조합판 XY 위치 샘플에서 계산한다. 구슬 자체는 3D 물리 루트를 갖지만 이 단계의 손동작은 평면 좌표다. 손을 놓은 지점이 좌우 전달 경계이고 바깥 방향으로 움직이면 이웃 **전달 판정이 먼저**이며, 투척은 그다음이다. Combined 구슬만 투척할 수 있다. 아래 표의 `vₓ`·`vᵧ`는 각각 보드 폭/초 단위의 가로·위쪽 입력 속도다.
 
 | DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
 | --- | ---: | --- | --- |
@@ -125,7 +125,7 @@
 | 관찰·목표 | 먼저 비교할 값 | 함께 확인할 것 |
 | --- | --- | --- |
 | 공이 너무 곧장 가서 하강이 안 보임 | Upward Gain ↑, Forward Gain ↓를 각각 시험 | peak·비행 시간·실제 HIT; 카메라가 정면이면 깊이감이 약할 수 있음 |
-| 약한 손동작도 투척으로 처리됨 | Minimum Swipe Speed 또는 Minimum Swipe Distance ↑ | 2D 굴림과 투척의 경계, 최근 0.12초 입력 |
+| 약한 손동작도 투척으로 처리됨 | Minimum Swipe Speed 또는 Minimum Swipe Distance ↑ | 조합판 평면 이동과 투척의 경계, 최근 0.12초 입력 |
 | 강하게 던져도 거리 차이가 작음 | Maximum World Speed 상한 여부, Power Exponent | `C6_LAB_THROW`의 실제 launch 속도 |
 | 구슬이 금방 사라져 조합하기 어려움 | Orb Lifetime ↑ | Raw/Combined의 각각 생성 시각, 전달 후 수명 |
 | 구슬이 너무 오래 굴러다님 | Orb Floor Deceleration ↑ 또는 Orb Stop Speed ↑ | 충돌·전달 속도까지 영향을 받는지 |
@@ -137,7 +137,7 @@
 
 정확히 3명인 일반 방의 인원 조건, 좌석의 입장 순서, 네트워크 주소·포트, 음양 생성 알고리즘, 조합·전달의 승인 규칙, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport는 이 39개 입력칸에 없다. 필요하면 별도 코드·Scene 변경이 필요하다. DEV 솔로에는 이웃이 없어 화면 간 전달을 시험할 수 없다.
 
-이 문서 작성에서는 PR #76 병합본의 코드·Scene·설정 에셋과 `docs/VALIDATION.md`의 기존 증거를 **읽어 확인**했다. 문서 작성 때문에 새 Unity 실행·빌드·실기기 테스트를 수행하지 않았다. 원본 실험실 기록의 EditMode **12/12**, PlayMode **20/20**, Mac Development 앱 화면 확인과 이관 브랜치의 EditMode **12/12**, PlayMode **20/20**, Mac 앱 빌드는 `docs/VALIDATION.md`에 구분돼 있다. Mac 실제 포인터 조합·투척 감각 및 이번 변경의 iOS 터치 투척은 그 기록에서 **NOT_RUN**이다. 이 문서를 추가한 브랜치에서 새로 실행한 결과로 해석하지 않는다.
+기존 PR #76 기준 문서는 해당 코드·Scene·설정 에셋과 당시 `docs/VALIDATION.md`의 증거를 **읽어 확인**해 작성됐다. 그 기록의 EditMode **12/12**, PlayMode **20/20** 및 Mac Development 앱 빌드는 이번 3D 조합판 전환의 통과 증거가 아니다. 이 전환의 Unity 컴파일·EditMode·PlayMode, Mac·iOS 빌드, 실제 조작은 새 실행 기록으로 구분해야 한다. 문서의 물리 용어를 갱신한 것만으로 실행 결과를 PASS로 보지 않는다.
 
 ## 10. 코드·Scene 연결 지도
 
@@ -146,7 +146,7 @@
 - 저장된 DEV 버튼·39개 입력칸 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
 - 패널 열기·DEFAULTS·APPLY·SOLO 종료: `Assets/Lab/Scripts/UI/LabDeveloperMode.cs`.
 - Host 전투 수치·스태미나·생성·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
-- 2D 구슬 물리·손동작: `Assets/Lab/Scripts/Orb/LabOrbBoard.cs`와 `LabOrbView.cs`.
+- 3D 조합판 구슬 물리·XY 손동작·공통 구체 외형: `Assets/Lab/Scripts/Orb/LabOrbBoard.cs`와 `LabOrbView.cs`.
 - 발사 위치·초기 속도: `Assets/Lab/Scripts/Throw/LabThrowMath.cs`.
 - 공의 중력·저항·충돌·수명: `Assets/Lab/Scripts/Throw/LabProjectile.cs`.
 - Host의 발사·피격 확정·결과 로그: `Assets/Lab/Scripts/Session/LabNetwork.cs`.

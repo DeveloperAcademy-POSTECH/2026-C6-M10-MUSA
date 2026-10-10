@@ -10,7 +10,7 @@ Editor 또는 Development Build에서 **DEV**를 열면 HP·시간·스태미나
 | --- | --- | --- |
 | 전투 | 요괴 HP 1,000 · 피해 20 · 시간 180초 | 라운드 체력·제한 시간·명중 피해 |
 | 스태미나·생성 | 시작 100 · 생성 비용 20 · 회복량 20/3초 | 생성 가능 횟수와 **연속 회복 속도** |
-| 2D 구슬 | 수명 8초 · 탄성 0.8 · 감속 2 | 보관 시간과 구슬판의 굴림·반발 |
+| 3D 조합판 구슬 | 수명 8초 · 탄성 0.8 · 감속 2 | 보관 시간과 평면 위 3D 구체의 이동·반발 |
 | 카메라·발사점 | 카메라 거리 8 · 발사 거리 4 | 보이는 시점과 3D 투척 시작 위치 |
 | 투척 | 상승 배율 2.1 · 전진 배율 4.5 · 중력 9.81 | 손동작 판정과 공의 초기 속도·비행 궤적 |
 
@@ -29,7 +29,7 @@ Unity Editor에서 Play를 누르거나 **Development Build**로 만든 앱을 �
 
 값을 다시 조정하려면 **DEV → 값 변경 → APPLY + RESTART SOLO**를 누릅니다. 새 값으로 새 판을 시작하며 구슬·HP·시간·스태미나가 초기화됩니다. 예를 들어 느긋하게 조합을 시험하려면 `Battle Duration (seconds) = 600`, `Orb Lifetime (seconds) = 60`, `Orb Generation Cost = 1`로 입력합니다. **DEFAULTS**는 저장된 `LabConfig.asset` 값을 입력칸에 불러오고, **END SOLO**는 로비로 돌아갑니다. 이 패널의 변경은 실행 중인 앱의 솔로 세션에만 적용되며 설정 에셋과 일반 3인 세션에는 저장·전파되지 않습니다. 오류가 있는 값은 적용하지 않고 패널에 이유를 표시합니다. 일반 빌드에서는 DEV 버튼이 숨겨집니다.
 
-전투 중 각 플레이어는 원통 요괴를 둘러싼 자기 자리의 시점에서 봅니다. **GENERATE**는 아래에서 솟아오르는 Yin 또는 Yang Raw 구슬 한 개를 만듭니다. 구슬은 손가락이나 마우스로 밀면 관성으로 굴러가다가 감속하고, 상하에서 반발합니다. 좌우 끝으로 나가면 이웃 화면으로 속도와 높이를 이어 전달합니다. **Yin을 Yang에, 또는 Yang을 Yin에 직접 드래그하여 놓았을 때만** Combined가 생깁니다. 자연 충돌은 조합하지 않습니다.
+전투 중 각 플레이어는 원통 요괴를 둘러싼 자기 자리의 시점에서 봅니다. **GENERATE**는 아래에서 솟아오르는 Yin 또는 Yang Raw 구슬 한 개를 만듭니다. 조합판의 구슬은 3D 구체이며 `Rigidbody`·`SphereCollider`의 PhysX 충돌을 사용합니다. 위치와 속도의 Z축은 고정해 기존 XY 평면에서만 움직입니다. 손가락이나 마우스로 밀면 관성으로 이동하다 감속하고, 상하에서 반발합니다. 좌우 끝으로 나가면 이웃 화면으로 속도와 높이를 이어 전달합니다. **Yin을 Yang에, 또는 Yang을 Yin에 직접 드래그하여 놓았을 때만** Combined가 생깁니다. 자연 충돌은 조합하지 않습니다.
 
 Combined를 잡고 **구슬 판 안에서 위쪽으로 빠르게 움직이며 손을 놓으면** 그 자리에서 3D 투척합니다. 손을 놓는 가로 위치와 움직임의 방향·세기가 발사 위치와 속도에 반영되므로, 중앙으로 던지면 원통을 맞힐 수 있고 옆으로 치우치면 빗나갑니다. 느리게 옮기면 투척되지 않고 판 위에 남으며, 좌우 끝으로 빠져나가면 기존 이웃 전달이 우선합니다. 보이는 Unity Cylinder가 실제 피격체이며 Host에서 충돌을 확인한 명중만 HP를 줄입니다. 새 조작의 속도·생성 상승 거리·카메라 거리 등은 `LabConfig.asset`에서 조정합니다.
 
@@ -59,12 +59,14 @@ iOS Xcode 프로젝트는 Unity 메뉴 **C6 Lab → Export iOS Xcode Project**�
 | `Assets/Lab/Resources/LabConfig.asset` | HP·시간·스태미나·구슬 수명·물리·투척 설정 |
 | `Assets/Lab/Scripts/Session/` | 직접 IP 3인 연결과 Host 승인·상태 전파 |
 | `Assets/Lab/Scripts/Core/` | 세션·구슬·자원·승패 데이터와 규칙 |
-| `Assets/Lab/Scripts/Orb/` | 소유자 화면의 Rigidbody2D 물리와 구슬 표시 |
+| `Assets/Lab/Scripts/Orb/` | 소유자 화면의 XY 평면에 고정된 3D Rigidbody·SphereCollider 물리와 구슬 표시 |
 | `Assets/Lab/Scripts/Throw/` | 자리별 발사 위치·속도, Rigidbody 투사체, Cylinder 피격체와 바닥 빗나감 |
 | `Assets/Lab/Scripts/UI/` | 자리별 카메라, 저장된 UI 참조에 게임 값 반영과 버튼 연결 |
 | `Assets/Lab/Tests/` | 옮긴 기능에 필요한 EditMode·PlayMode 검사 |
 
-`LabOrbView`는 충돌·ID를 담는 물리 루트와 교체 가능한 `Visual` 자식을 분리합니다. 요괴도 Cylinder의 피격 MeshCollider와 나중에 바꿀 수 있는 시각 Mount를 분리합니다. 현재 표현은 Unity에서 생성한 도형과 색만 사용하며 외부 그래픽 에셋은 사용하지 않습니다.
+`LabOrbView`는 구슬 ID·3D 물리 루트와 교체 가능한 `Visual` 자식을 분리합니다. 조합판 구슬과 날아가는 투사체는 같은 `LabOrbVisualFactory`의 Unity 구체 표현을 사용하지만, 조합판의 평면 물리와 투사체의 3D 비행은 각자의 물리 루트에서 처리합니다. 시각 자식은 조합판의 소유권·충돌 판정을 바꾸지 않고 교체할 수 있습니다. 요괴도 Cylinder의 피격 MeshCollider와 나중에 바꿀 수 있는 시각 Mount를 분리합니다. 현재 표현은 Unity에서 생성한 도형과 색만 사용하며 외부 그래픽 에셋은 사용하지 않습니다.
+
+화면 간 이동 데이터는 여전히 **구슬 ID·소유자·정규화한 XY 위치와 XY 속도**입니다. Host가 승인한 좌우 전달에서 이 값을 이어 주고, 조합판 내부의 3D 물리 컴포넌트 자체는 네트워크로 전송하지 않습니다. 물리 방식이 다른 구버전과 섞이지 않도록 실험실 접속 프로토콜 버전을 올렸습니다.
 
 ## 현재 기준 수치
 
@@ -72,6 +74,6 @@ iOS Xcode 프로젝트는 Unity 메뉴 **C6 Lab → Export iOS Xcode Project**�
 
 ## 검증 상태
 
-원본 실험실에 이어 이관된 브랜치에서도 Unity 6000.6.5f1 EditMode **12/12**, PlayMode **20/20**과 Mac Development 앱 빌드를 확인했습니다. 원본의 과거 기록과 이관 경로의 새 검사 범위는 [검증 범위](docs/VALIDATION.md)에서 구분합니다. 이관 경로의 Mac 3앱 실행, iOS 네이티브 빌드·실기기 설치와 실제 손/마우스 드래그 조합·투척은 아직 **NOT_RUN**입니다.
+3D 구슬 전환 후 Unity 6000.6.5f1에서 **EditMode 12/12, PlayMode 23/23**, Mac Development 앱 빌드와 iOS Xcode 프로젝트 생성이 통과했습니다. Mac 화면에서는 개발자 솔로 Raw 구슬의 3D 표시를 확인했습니다. 새 버전 세 실행본 연결과 iOS 앱의 네이티브 빌드·실기기 조작은 아직 실행하지 않았습니다. 각각의 환경과 근거는 [검증 기록](docs/VALIDATION.md)에 구분해 남겼습니다.
 
 세부 범위와 합격 조건은 [docs/LAB_SCOPE.md](docs/LAB_SCOPE.md)를 참조합니다.

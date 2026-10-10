@@ -249,6 +249,7 @@ namespace C6Lab.Editor
             orbCamera.orthographicSize = config.BoardHeight * .5f;
             orbCamera.nearClipPlane = .1f;
             orbCamera.farClipPlane = 12f;
+            LabOrb3DSceneUpgrade.Configure(boardObject, orbCamera, battleCamera);
 
             var sceneRoot = new GameObject("LabSceneController", typeof(LabSceneController));
             var sceneController = sceneRoot.GetComponent<LabSceneController>();

@@ -5,7 +5,7 @@ using UnityEngine.TestTools;
 
 namespace C6Lab.Tests
 {
-    /// <summary>Real Rigidbody2D/CircleCollider2D integration, not a mocked movement calculator.</summary>
+    /// <summary>Real 3D Rigidbody/SphereCollider integration, not a mocked movement calculator.</summary>
     public sealed class LabOrbPhysicsTests
     {
         private const float Width = 8f;
@@ -37,6 +37,58 @@ namespace C6Lab.Tests
             if (root != null) Object.Destroy(root);
             if (config != null) Object.Destroy(config);
             yield return null;
+        }
+
+        [Test]
+        public void BoardOrbUsesA3DSphereAndAnIndependentReplaceableMeshVisual()
+        {
+            var orb = board.UpsertOrb("sphere", LabOrbKind.Yin, new Vector2(.5f, .5f));
+
+            Assert.That(orb.Body, Is.SameAs(orb.GetComponent<Rigidbody>()));
+            Assert.That(orb.HitSphere, Is.SameAs(orb.GetComponent<SphereCollider>()));
+            Assert.That(orb.GetComponent<Rigidbody2D>(), Is.Null);
+            Assert.That(orb.GetComponent<CircleCollider2D>(), Is.Null);
+            Assert.That(orb.HitSphere.radius, Is.EqualTo(config.OrbRadius).Within(.001f));
+            Assert.That(orb.HitSphere.isTrigger, Is.False);
+            Assert.That(orb.Body.useGravity, Is.False);
+            Assert.That(orb.Body.constraints & RigidbodyConstraints.FreezePositionZ,
+                Is.EqualTo(RigidbodyConstraints.FreezePositionZ),
+                "3D physics must stay on the existing XY interaction plane.");
+            Assert.That(orb.Visual, Is.Not.Null);
+            Assert.That(orb.Visual, Is.Not.SameAs(orb.transform),
+                "The visual must be replaceable without changing the physics root.");
+            var mesh = orb.Visual.GetComponentInChildren<MeshFilter>(true);
+            Assert.That(mesh, Is.Not.Null);
+            Assert.That(mesh.sharedMesh, Is.Not.Null);
+            Assert.That(orb.Visual.GetComponentInChildren<MeshRenderer>(true), Is.Not.Null);
+            Assert.That(orb.Visual.GetComponentInChildren<SpriteRenderer>(true), Is.Null);
+            Assert.That(orb.Visual.GetComponentInChildren<Collider>(true), Is.Null,
+                "A replacement visual must not add a second gameplay hitbox.");
+        }
+
+        [UnityTest]
+        public IEnumerator ReplacingOrbArtCannotIntroduce2DPhysics()
+        {
+            var orb = board.UpsertOrb("replaceable", LabOrbKind.Yang, new Vector2(.5f, .5f));
+            var artPrefab = new GameObject("Art with legacy 2D physics");
+            var artChild = new GameObject("Physics child");
+            artChild.transform.SetParent(artPrefab.transform, false);
+            artChild.AddComponent<CircleCollider2D>();
+            artChild.AddComponent<Rigidbody2D>();
+
+            orb.SetVisualPrefab(artPrefab);
+            Object.Destroy(artPrefab);
+            Collider2D artCollider = orb.Visual.GetComponentInChildren<Collider2D>(true);
+            Rigidbody2D artBody = orb.Visual.GetComponentInChildren<Rigidbody2D>(true);
+            if (artCollider != null) Assert.That(artCollider.enabled, Is.False);
+            if (artBody != null) Assert.That(artBody.simulated, Is.False);
+
+            yield return null; // Destroy(Component) finishes at the end of the frame.
+            Assert.That(orb.Visual.GetComponentInChildren<Collider2D>(true), Is.Null);
+            Assert.That(orb.Visual.GetComponentInChildren<Rigidbody2D>(true), Is.Null);
+            Assert.That(orb.HitSphere.enabled, Is.True, "Replacing art must leave gameplay collision intact.");
+            orb.SetVisualPrefab(null);
+            Assert.That(orb.Visual.Find("Default Sphere").gameObject.activeSelf, Is.True);
         }
 
         [UnityTest]
@@ -93,9 +145,9 @@ namespace C6Lab.Tests
             Assert.That(saved.ToRight, Is.True);
             Assert.That(saved.Height01, Is.GreaterThan(.5f));
             Assert.That(saved.VelocityInBoardWidthsPerSecond.x, Is.GreaterThan(0f));
-            Assert.That(orb.Body.bodyType, Is.EqualTo(RigidbodyType2D.Kinematic));
+            Assert.That(orb.Body.isKinematic, Is.True);
             Assert.That(board.RejectEdge("out"), Is.True);
-            Assert.That(orb.Body.bodyType, Is.EqualTo(RigidbodyType2D.Dynamic));
+            Assert.That(orb.Body.isKinematic, Is.False);
             Assert.That(board.TryGetMotion("out", out _, out var speed), Is.True);
             Assert.That(speed, Is.EqualTo(Vector2.zero));
         }
@@ -151,19 +203,19 @@ namespace C6Lab.Tests
             int combines = 0;
             board.CombineRequested += (first, second, center) => combines++;
             for (int i = 0; i < 30; i++) yield return new WaitForFixedUpdate();
-            Assert.That(combines, Is.Zero, "A Rigidbody2D collision must not combine materials.");
+            Assert.That(combines, Is.Zero, "A 3D sphere collision must not combine materials.");
 
-            Vector2 from = yin.Body.position;
-            Vector2 to = yang.Body.position;
+            Vector2 from = BoardPoint(yin);
+            Vector2 to = BoardPoint(yang);
             Assert.That(board.TryBeginDragAtWorld(from, 1d), Is.True);
             Assert.That(board.DragToWorld(to, 1.1d), Is.True);
             Assert.That(board.EndDragAtWorld(to, 1.12d), Is.True);
             Assert.That(combines, Is.EqualTo(1));
-            Assert.That(yin.Body.bodyType, Is.EqualTo(RigidbodyType2D.Kinematic));
-            Assert.That(yang.Body.bodyType, Is.EqualTo(RigidbodyType2D.Kinematic));
+            Assert.That(yin.Body.isKinematic, Is.True);
+            Assert.That(yang.Body.isKinematic, Is.True);
             Assert.That(board.RejectEdge("yin"), Is.True);
-            Assert.That(yin.Body.bodyType, Is.EqualTo(RigidbodyType2D.Dynamic));
-            Assert.That(yang.Body.bodyType, Is.EqualTo(RigidbodyType2D.Dynamic));
+            Assert.That(yin.Body.isKinematic, Is.False);
+            Assert.That(yang.Body.isKinematic, Is.False);
         }
 
         [Test]
@@ -204,27 +256,55 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator OutwardCombinedFlickTransfersBeforeThrowing()
+        {
+            board.UpsertOrb("edge-combined", LabOrbKind.Combined, new Vector2(.9f, .3f));
+            int throws = 0;
+            int crossings = 0;
+            board.ThrowRequested += _ => throws++;
+            board.EdgeCrossed += crossing =>
+            {
+                Assert.That(crossing.OrbId, Is.EqualTo("edge-combined"));
+                Assert.That(crossing.ToRight, Is.True);
+                crossings++;
+            };
+
+            Assert.That(board.TryBeginDragAtWorld(new Vector2(3.2f, -.8f), 1d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(4.5f, 1.1f), 1.04d), Is.True);
+            for (int i = 0; i < 8 && crossings == 0; i++) yield return new WaitForFixedUpdate();
+
+            Assert.That(throws, Is.Zero, "An outward side exit takes precedence over a Combined throw.");
+            Assert.That(crossings, Is.EqualTo(1));
+        }
+
+        [UnityTest]
         public IEnumerator NewGeneratedRawRisesOnceBeforeBecomingMovable()
         {
             LabOrbView orb = board.UpsertOrb("generated", LabOrbKind.Yin,
                 new Vector2(.5f, .5f), playSpawnRise: true);
             Assert.That(orb.IsSpawning, Is.True);
-            Assert.That(orb.Body.bodyType, Is.EqualTo(RigidbodyType2D.Kinematic));
-            Assert.That(orb.HitCircle.enabled, Is.False);
-            Assert.That(board.TryBeginDragAtWorld(orb.Body.position, 1d), Is.False);
+            Assert.That(orb.Body.isKinematic, Is.True);
+            Assert.That(orb.HitSphere.enabled, Is.False);
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(orb), 1d), Is.False);
             Assert.That(orb.Visual.localPosition.y, Is.LessThan(0f));
 
             yield return new WaitForSeconds(config.SpawnRiseDuration + .08f);
             Assert.That(orb.IsSpawning, Is.False);
             Assert.That(orb.Visual.localPosition.y, Is.EqualTo(0f).Within(.001f));
-            Assert.That(orb.HitCircle.enabled, Is.True);
-            Assert.That(orb.Body.bodyType, Is.EqualTo(RigidbodyType2D.Dynamic));
+            Assert.That(orb.HitSphere.enabled, Is.True);
+            Assert.That(orb.Body.isKinematic, Is.False);
             board.UpsertOrb("generated", LabOrbKind.Yin, new Vector2(.5f, .5f), playSpawnRise: true);
             Assert.That(orb.IsSpawning, Is.False, "Repeated snapshots must not replay the rise.");
             Assert.That(board.RemoveOrb("generated"), Is.True);
             LabOrbView returned = board.UpsertOrb("generated", LabOrbKind.Yin,
                 new Vector2(.5f, .5f), playSpawnRise: true);
             Assert.That(returned.IsSpawning, Is.False, "Returning with the same ID must not replay the rise.");
+        }
+
+        private static Vector2 BoardPoint(LabOrbView orb)
+        {
+            Vector3 position = orb.Body.position;
+            return new Vector2(position.x, position.y);
         }
     }
 }
