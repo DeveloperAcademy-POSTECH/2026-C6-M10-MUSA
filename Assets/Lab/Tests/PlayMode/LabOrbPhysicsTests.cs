@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -64,6 +65,73 @@ namespace C6Lab.Tests
             Assert.That(orb.Visual.GetComponentInChildren<SpriteRenderer>(true), Is.Null);
             Assert.That(orb.Visual.GetComponentInChildren<Collider>(true), Is.Null,
                 "A replacement visual must not add a second gameplay hitbox.");
+        }
+
+        [UnityTest]
+        public IEnumerator SharedAppearanceKeepsBoardAndProjectileArtSeparateFromPhysics()
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Assert.That(shader, Is.Not.Null);
+            var yinMaterial = new Material(shader);
+            var yangMaterial = new Material(shader);
+            var combinedMaterial = new Material(shader);
+            var shadowMaterial = new Material(shader);
+            string colorProperty = yinMaterial.HasProperty("_BaseColor") ? "_BaseColor" : "_Color";
+            yinMaterial.SetColor(colorProperty, Color.blue);
+            yangMaterial.SetColor(colorProperty, Color.red);
+            combinedMaterial.SetColor(colorProperty, Color.green);
+            var art = new GameObject("Shared orb art");
+            var artSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            artSphere.name = "Sphere";
+            artSphere.transform.SetParent(art.transform, false);
+            var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            SetSerializedField(appearance, "visualPrefab", art);
+            SetSerializedField(appearance, "yinMaterial", yinMaterial);
+            SetSerializedField(appearance, "yangMaterial", yangMaterial);
+            SetSerializedField(appearance, "combinedMaterial", combinedMaterial);
+            SetSerializedField(appearance, "shadowMaterial", shadowMaterial);
+            SetSerializedField(config, "orbAppearance", appearance);
+
+            LabProjectile projectile = null;
+            try
+            {
+                board.Configure(config, inputCamera, Bounds);
+                LabOrbView yin = board.UpsertOrb("styled-yin", LabOrbKind.Yin, new Vector2(.3f, .5f));
+                LabOrbView yang = board.UpsertOrb("styled-yang", LabOrbKind.Yang, new Vector2(.7f, .5f));
+                projectile = LabProjectile.Create(new Vector3(0f, 1f, 3f), config);
+                yield return null; // Visual-only collider removal completes at frame end.
+
+                Assert.That(ArtSurface(yin.Visual).sharedMaterial, Is.SameAs(yinMaterial));
+                Assert.That(ArtSurface(yang.Visual).sharedMaterial, Is.SameAs(yangMaterial));
+                Assert.That(ArtSurface(projectile.VisualMount).sharedMaterial, Is.SameAs(combinedMaterial));
+                Assert.That(ArtColor(yin.Visual, colorProperty), Is.EqualTo(Color.blue));
+                Assert.That(ArtColor(yang.Visual, colorProperty), Is.EqualTo(Color.red));
+                Assert.That(ArtColor(projectile.VisualMount, colorProperty), Is.EqualTo(Color.green));
+                Assert.That(yin.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
+                Assert.That(yin.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
+                Assert.That(projectile.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
+                Assert.That(projectile.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
+                Assert.That(yin.HitSphere, Is.SameAs(yin.GetComponent<SphereCollider>()));
+                Assert.That(projectile.GetComponent<SphereCollider>(), Is.Not.Null);
+
+                Transform contactShadow = yin.transform.Find("Contact Shadow");
+                Assert.That(contactShadow, Is.Not.Null);
+                Assert.That(contactShadow.parent, Is.SameAs(yin.transform),
+                    "The contact shadow must remain still while the visual mount rolls.");
+                Assert.That(contactShadow.GetComponent<MeshRenderer>().sharedMaterial,
+                    Is.SameAs(shadowMaterial));
+                Assert.That(contactShadow.GetComponent<Collider>(), Is.Null);
+            }
+            finally
+            {
+                if (projectile != null) Object.Destroy(projectile.gameObject);
+                Object.Destroy(appearance);
+                Object.Destroy(art);
+                Object.Destroy(yinMaterial);
+                Object.Destroy(yangMaterial);
+                Object.Destroy(combinedMaterial);
+                Object.Destroy(shadowMaterial);
+            }
         }
 
         [UnityTest]
@@ -305,6 +373,28 @@ namespace C6Lab.Tests
         {
             Vector3 position = orb.Body.position;
             return new Vector2(position.x, position.y);
+        }
+
+        private static MeshRenderer ArtSurface(Transform mount)
+        {
+            Transform sphere = mount.Find("Replacement Visual/Sphere");
+            Assert.That(sphere, Is.Not.Null, "The configured visual prefab must be active.");
+            return sphere.GetComponent<MeshRenderer>();
+        }
+
+        private static Color ArtColor(Transform mount, string property)
+        {
+            var block = new MaterialPropertyBlock();
+            ArtSurface(mount).GetPropertyBlock(block);
+            Assert.That(block.isEmpty, Is.False, "Per-orb color must be sent to the renderer.");
+            return block.GetColor(property);
+        }
+
+        private static void SetSerializedField(Object target, string name, Object value)
+        {
+            FieldInfo field = target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, name + " should be Inspector-editable.");
+            field.SetValue(target, value);
         }
     }
 }

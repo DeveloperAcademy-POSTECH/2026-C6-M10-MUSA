@@ -312,12 +312,13 @@ namespace C6Lab.Editor
             var hud = canvasObject.GetComponent<LabHud>();
             hud.network = network;
 
-            // The bottom tint is a UI shape, not a texture asset. It does not intercept orb gestures.
+            // Keep the legacy UI shape for designer layouts, but let the lit board art show through.
             RectTransform boardTint = CreateRect("BoardAreaTint", canvasObject.transform,
                 new Vector2(0f, 0f), new Vector2(1f, .46f), Vector2.zero, Vector2.zero);
             var boardImage = boardTint.gameObject.AddComponent<UnityEngine.UI.Image>();
             boardImage.color = new Color(.08f, .14f, .17f, .26f);
             boardImage.raycastTarget = false;
+            boardImage.enabled = false;
 
             RectTransform header = CreateRect("BattleHeader", canvasObject.transform,
                 new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(12f, -118f), new Vector2(-12f, -46f));

@@ -113,6 +113,7 @@ namespace C6Lab
             foreach (var entry in entries.Values)
             {
                 entry.View.Configure(entry.View.OrbId, entry.View.Kind, config.OrbRadius);
+                entry.View.ConfigureAppearance(config.OrbAppearance);
                 SetLayerRecursively(entry.View.transform, gameObject.layer);
                 entry.View.HitSphere.sharedMaterial = contactMaterial;
                 entry.View.Body.position = OnPlane(Clamp(XY(entry.View.Body.position)));
@@ -151,6 +152,7 @@ namespace C6Lab
             gameObject.transform.position = OnPlane(ToWorld(normalizedPosition));
             var view = gameObject.AddComponent<LabOrbView>();
             view.Configure(id, kind, config.OrbRadius);
+            view.ConfigureAppearance(config.OrbAppearance);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             var body = view.Body;

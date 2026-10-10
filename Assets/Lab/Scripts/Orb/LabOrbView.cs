@@ -16,6 +16,9 @@ namespace C6Lab
         [SerializeField] private bool tintDefaultByKind = true;
 
         private GameObject replacementVisual;
+        private GameObject contactShadow;
+        private GameObject replacementPrefab;
+        private LabOrbAppearance appearance;
         private string orbId;
         private LabOrbKind kind;
         private float visualRadius = .32f;
@@ -28,6 +31,18 @@ namespace C6Lab
         public bool IsSpawning { get; private set; }
         public Rigidbody Body { get; private set; }
         public SphereCollider HitSphere { get; private set; }
+
+        /// <summary>Sets shared Inspector-editable art without changing this orb's physics.</summary>
+        public void ConfigureAppearance(LabOrbAppearance value)
+        {
+            if (appearance == value)
+            {
+                UpdateVisual();
+                return;
+            }
+            appearance = value;
+            SetVisualPrefabInternal(appearance != null ? appearance.VisualPrefab : null);
+        }
 
         private void Awake()
         {
@@ -75,13 +90,28 @@ namespace C6Lab
         /// </summary>
         public void SetVisualPrefab(GameObject prefab)
         {
+            SetVisualPrefabInternal(prefab);
+        }
+
+        private void SetVisualPrefabInternal(GameObject prefab)
+        {
             EnsureVisual();
+            // Unity treats a destroyed prefab reference as null. Clearing the art must
+            // still remove its live clone even when that source prefab was destroyed.
+            if ((prefab == null && replacementVisual == null)
+                || (prefab != null && replacementVisual != null && replacementPrefab == prefab))
+            {
+                UpdateVisual();
+                return;
+            }
             if (replacementVisual != null)
             {
                 replacementVisual.SetActive(false);
                 LabVisualSafety.DestroyVisualObject(replacementVisual);
                 replacementVisual = null;
             }
+
+            replacementPrefab = prefab;
 
             if (prefab != null)
             {
@@ -185,16 +215,19 @@ namespace C6Lab
                 visual = existing;
             }
             visual.gameObject.layer = gameObject.layer;
-            LabOrbVisualFactory.EnsureSphere(visual, "Default Sphere", visualRadius, kind);
+            LabOrbVisualFactory.EnsureSphere(visual, "Default Sphere", visualRadius, kind,
+                appearance != null ? appearance.MaterialFor(kind) : null);
         }
 
         private void UpdateVisual()
         {
             MeshRenderer defaultRenderer = LabOrbVisualFactory.EnsureSphere(
-                visual, "Default Sphere", visualRadius, kind);
+                visual, "Default Sphere", visualRadius, kind,
+                appearance != null ? appearance.MaterialFor(kind) : null);
             if (defaultRenderer != null)
             {
-                if (!tintDefaultByKind) defaultRenderer.SetPropertyBlock(null);
+                if (appearance == null && !tintDefaultByKind)
+                    defaultRenderer.SetPropertyBlock(null);
             }
             Transform defaultSphere = visual.Find("Default Sphere");
             if (defaultSphere != null) defaultSphere.gameObject.SetActive(replacementVisual == null);
@@ -202,7 +235,47 @@ namespace C6Lab
             {
                 replacementVisual.transform.localScale = Vector3.one * (2f * visualRadius);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, visual.gameObject.layer);
+                if (appearance != null && replacementPrefab == appearance.VisualPrefab)
+                    appearance.ApplyKindMaterial(replacementVisual, kind);
             }
+            UpdateContactShadow();
+        }
+
+        private void UpdateContactShadow()
+        {
+            if (appearance == null || appearance.ShadowMaterial == null)
+            {
+                if (contactShadow != null)
+                {
+                    contactShadow.SetActive(false);
+                    LabVisualSafety.DestroyVisualObject(contactShadow);
+                    contactShadow = null;
+                }
+                return;
+            }
+            if (contactShadow == null)
+            {
+                contactShadow = new GameObject("Contact Shadow");
+                contactShadow.transform.SetParent(transform, false);
+                contactShadow.AddComponent<MeshFilter>().sharedMesh = LabOrbVisualFactory.GetShadowQuad();
+                var renderer = contactShadow.AddComponent<MeshRenderer>();
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
+            contactShadow.layer = gameObject.layer;
+            contactShadow.transform.localPosition = new Vector3(appearance.ShadowOffset.x,
+                appearance.ShadowOffset.y, appearance.ShadowDepth);
+            contactShadow.transform.localRotation = Quaternion.identity;
+            Vector2 scale = appearance.ShadowScale;
+            contactShadow.transform.localScale = new Vector3(
+                Mathf.Max(0f, scale.x) * 2f * visualRadius,
+                Mathf.Max(0f, scale.y) * 2f * visualRadius, 1f);
+            MeshRenderer surface = contactShadow.GetComponent<MeshRenderer>();
+            surface.sharedMaterial = appearance.ShadowMaterial;
+            var properties = new MaterialPropertyBlock();
+            properties.SetColor("_BaseColor", appearance.ShadowColor);
+            properties.SetColor("_Color", appearance.ShadowColor);
+            surface.SetPropertyBlock(properties);
         }
     }
 
@@ -211,13 +284,34 @@ namespace C6Lab
     {
         private static Material sphereMaterial;
         private static Mesh sphereMesh;
+        private static Mesh shadowQuad;
+
+        /// <summary>A unit UV quad facing the front-on board camera, with no collider.</summary>
+        public static Mesh GetShadowQuad()
+        {
+            if (shadowQuad != null) return shadowQuad;
+            shadowQuad = new Mesh { name = "Lab contact-shadow quad", hideFlags = HideFlags.DontSave };
+            shadowQuad.vertices = new[]
+            {
+                new Vector3(-.5f, -.5f, 0f), new Vector3(.5f, -.5f, 0f),
+                new Vector3(.5f, .5f, 0f), new Vector3(-.5f, .5f, 0f)
+            };
+            shadowQuad.uv = new[]
+            {
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(1f, 1f), new Vector2(0f, 1f)
+            };
+            shadowQuad.triangles = new[] { 0, 2, 1, 0, 3, 2 }; // Normal faces camera at -Z.
+            shadowQuad.RecalculateNormals();
+            return shadowQuad;
+        }
 
         /// <summary>
         /// Adds or updates an art-only Unity sphere mesh under mount. It has no collider:
         /// the corresponding orb or projectile root owns the sole physics representation.
         /// </summary>
         public static MeshRenderer EnsureSphere(Transform mount, string childName,
-            float radius, LabOrbKind kind)
+            float radius, LabOrbKind kind, Material appearanceMaterial = null)
         {
             if (mount == null) throw new ArgumentNullException(nameof(mount));
             Transform child = mount.Find(childName);
@@ -239,9 +333,14 @@ namespace C6Lab
             MeshRenderer renderer = child.GetComponent<MeshRenderer>();
             if (renderer != null)
             {
-                Material material = GetSphereMaterial();
-                if (material != null) renderer.sharedMaterial = material;
-                ApplyKindColor(renderer, kind);
+                if (appearanceMaterial != null)
+                    ApplyAppearanceMaterial(renderer, appearanceMaterial);
+                else
+                {
+                    Material material = GetSphereMaterial();
+                    if (material != null) renderer.sharedMaterial = material;
+                    ApplyKindColor(renderer, kind);
+                }
             }
             EnsureRollMarker(child, material: GetSphereMaterial());
             return renderer;
@@ -309,6 +408,23 @@ namespace C6Lab
             renderer.GetPropertyBlock(properties);
             properties.SetColor("_BaseColor", color); // URP Lit
             properties.SetColor("_Color", color);     // Standard shader fallback
+            renderer.SetPropertyBlock(properties);
+        }
+
+        /// <summary>
+        /// Keep the Inspector material as the color source while binding its current color
+        /// explicitly per renderer. This avoids platform/renderer variants displaying a
+        /// previous orb's material color on other instances.
+        /// </summary>
+        public static void ApplyAppearanceMaterial(Renderer renderer, Material material)
+        {
+            if (renderer == null || material == null) return;
+            renderer.sharedMaterial = material;
+            Color color = material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor")
+                : material.HasProperty("_Color") ? material.GetColor("_Color") : Color.white;
+            var properties = new MaterialPropertyBlock();
+            properties.SetColor("_BaseColor", color);
+            properties.SetColor("_Color", color);
             renderer.SetPropertyBlock(properties);
         }
 

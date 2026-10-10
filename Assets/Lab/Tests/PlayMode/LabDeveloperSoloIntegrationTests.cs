@@ -64,6 +64,14 @@ namespace C6Lab.Tests
             Assert.That(network, Is.Not.Null, "The saved Lab Scene needs a LabNetwork.");
             Assert.That(board, Is.Not.Null, "The saved Lab Scene needs an orb board.");
             Assert.That(developerUi, Is.Not.Null, "The saved Lab Scene needs Developer Mode controls.");
+            LabOrbAppearance appearance = network.config.OrbAppearance;
+            Assert.That(appearance, Is.Not.Null,
+                "The saved config must point to the shared Inspector-editable orb appearance.");
+            Assert.That(appearance.VisualPrefab, Is.Not.Null);
+            Assert.That(appearance.YinMaterial, Is.Not.Null);
+            Assert.That(appearance.YangMaterial, Is.Not.Null);
+            Assert.That(appearance.CombinedMaterial, Is.Not.Null);
+            Assert.That(appearance.ShadowMaterial, Is.Not.Null);
             Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count),
                 "New throw tuning rows must be usable in the saved Scene's DEV panel.");
             Assert.That(network.board, Is.SameAs(board), "The Host must receive this board's gesture events.");
@@ -77,6 +85,8 @@ namespace C6Lab.Tests
             Assert.That((boardCamera.cullingMask & (1 << board.gameObject.layer)) != 0, Is.True);
             Assert.That((battleCamera.cullingMask & (1 << board.gameObject.layer)) == 0, Is.True,
                 "The new 3D board spheres must not appear in the battle camera.");
+            Assert.That(boardCamera.depth, Is.GreaterThan(battleCamera.depth),
+                "The board camera must render after the battle camera on mobile devices.");
 
             // Keep the test independent of an ordinary app using the default port 7777.
             network.port = 17777;

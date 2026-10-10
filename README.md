@@ -21,6 +21,7 @@ DEV 값은 **APPLY + START/RESTART SOLO**로 새 1인 라운드를 시작할 때
 - Unity Hub에서 이 저장소 루트를 프로젝트로 추가하고 **Unity 6000.6.5f1**로 엽니다. 버전 기준은 `ProjectSettings/ProjectVersion.txt`입니다.
 - 실험 Scene은 `Assets/Lab/Scenes/Lab.unity`입니다. Scene에 저장된 Canvas와 GameObject는 Hierarchy/Inspector에서 직접 조정합니다.
 - 게임 수치는 `Assets/Lab/Resources/LabConfig.asset`의 **단일 설정 원본**에서 조정합니다. 속성을 바꿨다면 새 세션에서 확인합니다.
+- 구슬의 **보이는 형태**는 `Assets/Lab/Art/Orbs/`의 에셋에서 조정합니다. 게임 수치와 시각 에셋은 분리되어 있습니다.
 - 화면에서 한 실행본은 **HOST**, 나머지 두 실행본은 Host IP와 포트 `7777`을 입력해 **JOIN**합니다. 세 명이 연결되면 Host가 **START**를 누릅니다. 같은 Mac의 세 실행본이라면 Host IP는 `127.0.0.1`입니다. 다른 기기라면 Host가 연결된 로컬 네트워크의 IP를 입력합니다.
 
 ### 한 대로 조합·투척 실험하기
@@ -64,7 +65,14 @@ iOS Xcode 프로젝트는 Unity 메뉴 **C6 Lab → Export iOS Xcode Project**�
 | `Assets/Lab/Scripts/UI/` | 자리별 카메라, 저장된 UI 참조에 게임 값 반영과 버튼 연결 |
 | `Assets/Lab/Tests/` | 옮긴 기능에 필요한 EditMode·PlayMode 검사 |
 
-`LabOrbView`는 구슬 ID·3D 물리 루트와 교체 가능한 `Visual` 자식을 분리합니다. 조합판 구슬과 날아가는 투사체는 같은 `LabOrbVisualFactory`의 Unity 구체 표현을 사용하지만, 조합판의 평면 물리와 투사체의 3D 비행은 각자의 물리 루트에서 처리합니다. 시각 자식은 조합판의 소유권·충돌 판정을 바꾸지 않고 교체할 수 있습니다. 요괴도 Cylinder의 피격 MeshCollider와 나중에 바꿀 수 있는 시각 Mount를 분리합니다. 현재 표현은 Unity에서 생성한 도형과 색만 사용하며 외부 그래픽 에셋은 사용하지 않습니다.
+`LabOrbView`는 구슬 ID·3D 물리 루트와 교체 가능한 `Visual` 자식을 분리합니다. 조합판 구슬과 날아가는 투사체는 같은 `OrbVisual.prefab`과 Yin·Yang·Combined 머티리얼을 사용하지만, 조합판의 평면 물리와 투사체의 3D 비행은 각자의 물리 루트에서 처리합니다. 보드 구슬의 접촉 그림자도 물리 충돌체와 분리되어 있습니다. 요괴는 Cylinder의 피격 MeshCollider와 나중에 바꿀 수 있는 시각 Mount를 분리합니다. 현재 표현은 Unity에서 만든 도형과 재질만 사용하며 외부 그래픽 에셋은 사용하지 않습니다.
+
+### 조합판 구슬의 외형 바꾸기
+
+1. `Assets/Lab/Resources/LabConfig.asset`의 **Orb Appearance**가 `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`을 가리키는지 확인합니다. 이 에셋에서 공통 Visual Prefab, 종류별 Material, 접촉 그림자의 색·크기·위치를 교체할 수 있습니다.
+2. `Assets/Lab/Art/Orbs/OrbYin.mat`, `OrbYang.mat`, `OrbCombined.mat`에서 각 구슬의 색·광택을 조정합니다. `OrbVisual.prefab`에서는 구체 메시와 회전 표시를 직접 조정합니다. 외형 Prefab에 Collider나 Rigidbody를 추가하지 마세요. 충돌과 구슬 ID는 런타임 루트가 담당합니다.
+3. `Assets/Lab/Scenes/Lab.unity`의 **OrbBoard → OrbBoardPlate / OrbBoardLight**에서 판 색과 빛을 조정합니다. `LabCanvas/BoardAreaTint`는 기존 배치를 보존하되 Image가 꺼져 있어 3D 조명을 가리지 않습니다. 판 크기는 `Board Height`와 화면 비율에 맞춰 실행 시 갱신됩니다.
+4. Play 또는 Development Build의 DEV 솔로에서 Yin·Yang을 생성하고 직접 조합·투척해 보세요. Material 색을 변경한 뒤에는 새 라운드를 시작해야 이미 표시된 구슬에도 새 색이 적용됩니다. 외형 변경은 구슬의 반지름·소유권·전달·피격 판정을 바꾸지 않습니다.
 
 화면 간 이동 데이터는 여전히 **구슬 ID·소유자·정규화한 XY 위치와 XY 속도**입니다. Host가 승인한 좌우 전달에서 이 값을 이어 주고, 조합판 내부의 3D 물리 컴포넌트 자체는 네트워크로 전송하지 않습니다. 물리 방식이 다른 구버전과 섞이지 않도록 실험실 접속 프로토콜 버전을 올렸습니다.
 
@@ -74,6 +82,6 @@ iOS Xcode 프로젝트는 Unity 메뉴 **C6 Lab → Export iOS Xcode Project**�
 
 ## 검증 상태
 
-3D 구슬 전환 후 Unity 6000.6.5f1에서 **EditMode 12/12, PlayMode 23/23**, Mac Development 앱 빌드와 iOS Xcode 프로젝트 생성이 통과했습니다. Mac 화면에서는 개발자 솔로 Raw 구슬의 3D 표시를 확인했습니다. 새 버전 세 실행본 연결과 iOS 앱의 네이티브 빌드·실기기 조작은 아직 실행하지 않았습니다. 각각의 환경과 근거는 [검증 기록](docs/VALIDATION.md)에 구분해 남겼습니다.
+3D 구슬 외형 에셋 연결 후 Unity 6000.6.5f1에서 **EditMode 12/12, PlayMode 24/24**, Mac Development 앱 빌드, iOS Xcode 프로젝트와 서명 앱 빌드가 통과했습니다. Mac 화면에서는 Yin·Yang 구체와 판 배경을, iPhone 17에서는 판 배경과 Yin·Yang·Combined의 입체 표시를 확인했습니다. 실기기 투척 외형과 세 실행본 연결은 별도 검증 항목입니다. 각각의 환경과 근거는 [검증 기록](docs/VALIDATION.md)에 구분해 남겼습니다.
 
 세부 범위와 합격 조건은 [docs/LAB_SCOPE.md](docs/LAB_SCOPE.md)를 참조합니다.
