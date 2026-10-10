@@ -102,6 +102,9 @@ namespace C6Lab
         [SerializeField, Min(0f)] private float spawnRiseDistance = .65f;
         [SerializeField, Min(0f)] private float spawnRiseDuration = .25f;
 
+        [Header("Replaceable orb presentation")]
+        [SerializeField] private LabOrbAppearance orbAppearance;
+
         [Header("Battle view and throw origin")]
         [SerializeField, Min(.001f)] private float cameraRadius = 8f;
         [SerializeField] private float cameraHeightOffset = .65f;
@@ -146,6 +149,7 @@ namespace C6Lab
         public float BoardHeight => Positive(boardHeight, 5f);
         public float SpawnRiseDistance => Mathf.Max(0f, Finite(spawnRiseDistance, .65f));
         public float SpawnRiseDuration => Mathf.Max(0f, Finite(spawnRiseDuration, .25f));
+        public LabOrbAppearance OrbAppearance => orbAppearance;
         public float CameraRadius => Positive(cameraRadius, 8f);
         public float CameraHeightOffset => Finite(cameraHeightOffset, .65f);
         public float ThrowOriginRadius => Positive(throwOriginRadius, 4f);

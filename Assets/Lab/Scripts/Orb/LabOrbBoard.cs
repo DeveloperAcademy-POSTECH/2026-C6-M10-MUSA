@@ -76,7 +76,7 @@ namespace C6Lab
         private LabConfig config;
         private Camera inputCamera;
         private Rect bounds;
-        private PhysicsMaterial2D contactMaterial;
+        private PhysicsMaterial contactMaterial;
         private GameObject wallRoot;
         private string heldId;
         private bool heldByTouch;
@@ -104,16 +104,20 @@ namespace C6Lab
             bounds = worldCenterBounds;
             configured = true;
             if (contactMaterial == null)
-                contactMaterial = new PhysicsMaterial2D("Lab orb contact") { hideFlags = HideFlags.DontSave };
+                contactMaterial = new PhysicsMaterial("Lab orb contact") { hideFlags = HideFlags.DontSave };
             contactMaterial.bounciness = config.OrbRestitution;
-            contactMaterial.friction = ContactFriction;
+            contactMaterial.dynamicFriction = ContactFriction;
+            contactMaterial.staticFriction = ContactFriction;
+            contactMaterial.bounceCombine = PhysicsMaterialCombine.Maximum;
             BuildHorizontalWalls();
             foreach (var entry in entries.Values)
             {
                 entry.View.Configure(entry.View.OrbId, entry.View.Kind, config.OrbRadius);
-                entry.View.HitCircle.sharedMaterial = contactMaterial;
-                entry.View.Body.position = Clamp(entry.View.Body.position);
-                entry.View.Body.linearVelocity = Vector2.zero;
+                entry.View.ConfigureAppearance(config.OrbAppearance);
+                SetLayerRecursively(entry.View.transform, gameObject.layer);
+                entry.View.HitSphere.sharedMaterial = contactMaterial;
+                entry.View.Body.position = OnPlane(Clamp(XY(entry.View.Body.position)));
+                StopMotion(entry.View.Body);
                 entry.EdgePending = false;
                 SetBodyMode(entry);
             }
@@ -133,47 +137,53 @@ namespace C6Lab
             if (entries.TryGetValue(id, out var existing))
             {
                 existing.LocalOwner = localOwner;
-                if (existing.View.Kind != kind) existing.View.Configure(id, kind, config.OrbRadius);
+                if (existing.View.Kind != kind)
+                {
+                    existing.View.Configure(id, kind, config.OrbRadius);
+                    SetLayerRecursively(existing.View.transform, this.gameObject.layer);
+                }
                 SetBodyMode(existing);
                 return existing.View;
             }
 
             var gameObject = new GameObject("Orb " + id);
+            gameObject.layer = this.gameObject.layer;
             gameObject.transform.SetParent(transform, false);
-            gameObject.transform.position = ToWorld(normalizedPosition);
+            gameObject.transform.position = OnPlane(ToWorld(normalizedPosition));
             var view = gameObject.AddComponent<LabOrbView>();
             view.Configure(id, kind, config.OrbRadius);
-            view.HitCircle.sharedMaterial = contactMaterial;
+            view.ConfigureAppearance(config.OrbAppearance);
+            SetLayerRecursively(gameObject.transform, gameObject.layer);
+            view.HitSphere.sharedMaterial = contactMaterial;
             var body = view.Body;
-            body.gravityScale = 0f;
+            body.useGravity = false;
             body.linearDamping = 0f;
             body.angularDamping = 0f;
-            body.constraints = RigidbodyConstraints2D.FreezeRotation;
-            body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-            body.interpolation = RigidbodyInterpolation2D.Interpolate;
+            body.constraints = RigidbodyConstraints.FreezePositionZ | RigidbodyConstraints.FreezeRotation;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            body.interpolation = RigidbodyInterpolation.Interpolate;
             body.mass = 1f;
-            body.position = Clamp(ToWorld(normalizedPosition));
+            body.position = OnPlane(Clamp(ToWorld(normalizedPosition)));
             var entry = new Entry { View = view, LocalOwner = localOwner };
             entries.Add(id, entry);
             if (playSpawnRise && risenIds.Add(id))
             {
                 entry.SpawnLocked = true;
-                view.HitCircle.enabled = false;
+                view.HitSphere.enabled = false;
                 SetBodyMode(entry);
                 view.PlaySpawnRise(config.SpawnRiseDistance, config.SpawnRiseDuration, () =>
                 {
                     if (!entries.TryGetValue(id, out var current) || !ReferenceEquals(current, entry)
                         || current.View == null) return;
                     current.SpawnLocked = false;
-                    current.View.HitCircle.enabled = true;
+                    current.View.HitSphere.enabled = true;
                     SetBodyMode(current);
                 });
             }
             else SetBodyMode(entry);
-            body.linearVelocity = localOwner && !entry.SpawnLocked
-                ? Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
-                    config.OrbMaxReleaseSpeed * bounds.width)
-                : Vector2.zero;
+            if (!body.isKinematic)
+                body.linearVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
+                    config.OrbMaxReleaseSpeed * bounds.width));
             return view;
         }
 
@@ -213,7 +223,7 @@ namespace C6Lab
             if (id == null || !entries.TryGetValue(id, out var entry)) return false;
             if (locked && heldId == id) CancelDrag();
             entry.Locked = locked;
-            if (locked) entry.View.Body.linearVelocity = Vector2.zero;
+            if (locked) StopMotion(entry.View.Body);
             SetBodyMode(entry);
             return true;
         }
@@ -229,14 +239,14 @@ namespace C6Lab
             {
                 partner.PendingPartnerId = null;
                 partner.Locked = false;
-                partner.View.Body.linearVelocity = Vector2.zero;
+                StopMotion(partner.View.Body);
                 SetBodyMode(partner);
             }
             entry.PendingPartnerId = null;
             entry.EdgePending = false;
             entry.Locked = false;
-            entry.View.Body.linearVelocity = Vector2.zero;
-            entry.View.Body.position = Clamp(entry.View.Body.position);
+            StopMotion(entry.View.Body);
+            entry.View.Body.position = OnPlane(Clamp(XY(entry.View.Body.position)));
             SetBodyMode(entry);
             return true;
         }
@@ -246,8 +256,8 @@ namespace C6Lab
         {
             normalizedPosition = velocityInBoardWidthsPerSecond = default;
             if (!configured || id == null || !entries.TryGetValue(id, out var entry)) return false;
-            normalizedPosition = ToNormalized(entry.View.Body.position);
-            velocityInBoardWidthsPerSecond = entry.View.Body.linearVelocity / bounds.width;
+            normalizedPosition = ToNormalized(XY(entry.View.Body.position));
+            velocityInBoardWidthsPerSecond = XY(entry.View.Body.linearVelocity) / bounds.width;
             return true;
         }
 
@@ -259,7 +269,7 @@ namespace C6Lab
             foreach (var entry in entries.Values)
             {
                 if (!entry.LocalOwner || entry.Locked || entry.SpawnLocked || entry.EdgePending || entry.Held) continue;
-                float distance = (entry.View.Body.position - worldPoint).sqrMagnitude;
+                float distance = (XY(entry.View.Body.position) - worldPoint).sqrMagnitude;
                 if (distance > best) continue;
                 best = distance;
                 nearest = entry;
@@ -267,7 +277,7 @@ namespace C6Lab
             if (nearest == null) return false;
             heldId = nearest.View.OrbId;
             nearest.Held = true;
-            nearest.View.Body.linearVelocity = Vector2.zero;
+            StopMotion(nearest.View.Body);
             SetBodyMode(nearest);
             samples.Clear();
             AddSample(worldPoint, now);
@@ -278,7 +288,7 @@ namespace C6Lab
         {
             if (heldId == null || !entries.TryGetValue(heldId, out var entry) || !Finite(worldPoint) || !Finite(now))
                 return false;
-            entry.View.Body.position = Clamp(worldPoint);
+            entry.View.Body.position = OnPlane(Clamp(worldPoint));
             AddSample(worldPoint, now);
             return true;
         }
@@ -293,7 +303,7 @@ namespace C6Lab
             heldId = null;
             samples.Clear();
             entry.Held = false;
-            entry.View.HitCircle.isTrigger = false;
+            entry.View.HitSphere.isTrigger = false;
 
             // Side exits keep their existing screen-to-screen handoff even on a diagonal flick.
             bool outwardSide = (worldPoint.x <= bounds.xMin && inputVelocity.x < 0f)
@@ -302,7 +312,7 @@ namespace C6Lab
                 && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
             {
                 entry.Locked = true;
-                entry.View.Body.linearVelocity = Vector2.zero;
+                StopMotion(entry.View.Body);
                 SetBodyMode(entry);
                 float releaseX01 = Mathf.InverseLerp(bounds.xMin, bounds.xMax, worldPoint.x);
                 ThrowRequested?.Invoke(new LabOrbThrowGesture(id, inputVelocity, releaseX01, swipeDistance));
@@ -318,11 +328,11 @@ namespace C6Lab
                     target.Locked = true;
                     entry.PendingPartnerId = target.View.OrbId;
                     target.PendingPartnerId = id;
-                    entry.View.Body.linearVelocity = Vector2.zero;
-                    target.View.Body.linearVelocity = Vector2.zero;
+                    StopMotion(entry.View.Body);
+                    StopMotion(target.View.Body);
                     SetBodyMode(entry);
                     SetBodyMode(target);
-                    Vector2 middle = ToNormalized((entry.View.Body.position + target.View.Body.position) * .5f);
+                    Vector2 middle = ToNormalized((XY(entry.View.Body.position) + XY(target.View.Body.position)) * .5f);
                     CombineRequested?.Invoke(id, target.View.OrbId, middle);
                     return true;
                 }
@@ -330,8 +340,8 @@ namespace C6Lab
 
             SetBodyMode(entry);
             Vector2 worldVelocity = inputVelocity * bounds.width;
-            entry.View.Body.linearVelocity = Vector2.ClampMagnitude(worldVelocity,
-                config.OrbMaxReleaseSpeed * bounds.width);
+            entry.View.Body.linearVelocity = OnPlane(Vector2.ClampMagnitude(worldVelocity,
+                config.OrbMaxReleaseSpeed * bounds.width));
             return true;
         }
 
@@ -340,8 +350,8 @@ namespace C6Lab
             if (heldId != null && entries.TryGetValue(heldId, out var entry))
             {
                 entry.Held = false;
-                entry.View.HitCircle.isTrigger = false;
-                entry.View.Body.linearVelocity = Vector2.zero;
+                entry.View.HitSphere.isTrigger = false;
+                StopMotion(entry.View.Body);
                 SetBodyMode(entry);
             }
             heldId = null;
@@ -399,16 +409,16 @@ namespace C6Lab
             {
                 if (entry.View == null || !entry.LocalOwner || entry.Locked || entry.SpawnLocked || entry.Held || entry.EdgePending) continue;
                 var body = entry.View.Body;
-                Vector2 velocity = body.linearVelocity;
+                Vector2 velocity = XY(body.linearVelocity);
                 float speed = velocity.magnitude;
-                // Config motion is expressed in board widths, while Rigidbody2D uses world units.
+                // Config motion is expressed in board widths, while Rigidbody uses world units.
                 // Convert at this boundary so different camera/board sizes retain the same feel.
                 if (speed <= config.OrbStopSpeed * bounds.width) velocity = Vector2.zero;
                 else velocity = velocity.normalized * Mathf.Max(0f,
                     speed - config.OrbFloorDeceleration * bounds.width * Time.fixedDeltaTime);
-                body.linearVelocity = velocity;
+                body.linearVelocity = OnPlane(velocity);
                 if (velocity.x == 0f) continue;
-                Vector2 position = body.position;
+                Vector2 position = XY(body.position);
                 bool left = position.x <= bounds.xMin && velocity.x < 0f;
                 bool right = position.x >= bounds.xMax && velocity.x > 0f;
                 if (!left && !right) continue;
@@ -416,8 +426,8 @@ namespace C6Lab
                     Mathf.InverseLerp(bounds.yMin, bounds.yMax, position.y), velocity / bounds.width);
                 entry.EdgePending = true;
                 entry.PendingEdge = crossing;
-                body.position = Clamp(position);
-                body.linearVelocity = Vector2.zero;
+                body.position = OnPlane(Clamp(position));
+                StopMotion(body);
                 SetBodyMode(entry);
                 EdgeCrossed?.Invoke(crossing);
             }
@@ -432,7 +442,7 @@ namespace C6Lab
                 if (candidate == dragged || candidate.View.Kind == LabOrbKind.Combined
                     || candidate.View.Kind == dragged.View.Kind || !candidate.LocalOwner
                     || candidate.Locked || candidate.SpawnLocked || candidate.EdgePending || candidate.Held) continue;
-                float distance = (candidate.View.Body.position - dragged.View.Body.position).sqrMagnitude;
+                float distance = (XY(candidate.View.Body.position) - XY(dragged.View.Body.position)).sqrMagnitude;
                 if (distance <= best) { best = distance; nearest = candidate; }
             }
             return nearest;
@@ -445,9 +455,12 @@ namespace C6Lab
                 wallRoot = new GameObject("Physics walls - top and bottom");
                 wallRoot.transform.SetParent(transform, false);
             }
+            wallRoot.layer = gameObject.layer;
             while (wallRoot.transform.childCount > 0)
             {
                 var old = wallRoot.transform.GetChild(0);
+                var collider = old.GetComponent<Collider>();
+                if (collider != null) collider.enabled = false;
                 old.SetParent(null);
                 Destroy(old.gameObject);
             }
@@ -458,10 +471,12 @@ namespace C6Lab
         private void CreateWall(string label, float worldY)
         {
             var wall = new GameObject(label);
+            wall.layer = gameObject.layer;
             wall.transform.SetParent(wallRoot.transform, false);
             wall.transform.position = new Vector3(bounds.center.x, worldY, 0f);
-            var collider = wall.AddComponent<BoxCollider2D>();
-            collider.size = new Vector2(bounds.width + config.OrbRadius * 4f, WallThickness);
+            var collider = wall.AddComponent<BoxCollider>();
+            collider.size = new Vector3(bounds.width + config.OrbRadius * 4f,
+                WallThickness, config.OrbRadius * 2f + WallThickness);
             collider.sharedMaterial = contactMaterial;
         }
 
@@ -469,10 +484,15 @@ namespace C6Lab
         {
             var body = entry.View.Body;
             bool movable = entry.LocalOwner && !entry.Held && !entry.Locked && !entry.SpawnLocked && !entry.EdgePending;
-            RigidbodyType2D desired = movable ? RigidbodyType2D.Dynamic : RigidbodyType2D.Kinematic;
-            if (body.bodyType != desired) body.bodyType = desired;
-            body.simulated = true;
-            entry.View.HitCircle.isTrigger = entry.Held;
+            bool desiredKinematic = !movable;
+            if (body.isKinematic != desiredKinematic)
+            {
+                StopMotion(body);
+                body.isKinematic = desiredKinematic;
+                if (movable) body.linearVelocity = Vector3.zero;
+            }
+            body.detectCollisions = true;
+            entry.View.HitSphere.isTrigger = entry.Held;
         }
 
         private static void Retire(Entry entry)
@@ -480,9 +500,9 @@ namespace C6Lab
             if (entry.View == null) return;
             // Destroy is deferred in Play Mode. Remove its collider immediately so a
             // transfer/retry snapshot cannot collide with a visually removed orb.
-            entry.View.Body.linearVelocity = Vector2.zero;
-            entry.View.Body.simulated = false;
-            entry.View.HitCircle.enabled = false;
+            StopMotion(entry.View.Body);
+            entry.View.Body.detectCollisions = false;
+            entry.View.HitSphere.enabled = false;
             Destroy(entry.View.gameObject);
         }
 
@@ -542,6 +562,18 @@ namespace C6Lab
         private Vector2 Clamp(Vector2 world) => new Vector2(
             Mathf.Clamp(world.x, bounds.xMin, bounds.xMax),
             Mathf.Clamp(world.y, bounds.yMin, bounds.yMax));
+        private static Vector2 XY(Vector3 value) => new Vector2(value.x, value.y);
+        private static Vector3 OnPlane(Vector2 value) => new Vector3(value.x, value.y, 0f);
+        private static void StopMotion(Rigidbody body)
+        {
+            if (!body.isKinematic) body.linearVelocity = Vector3.zero;
+        }
+        private static void SetLayerRecursively(Transform root, int layer)
+        {
+            root.gameObject.layer = layer;
+            for (int i = 0; i < root.childCount; i++)
+                SetLayerRecursively(root.GetChild(i), layer);
+        }
         private void RequireConfigured()
         {
             if (!configured) throw new InvalidOperationException("Configure the board before adding orbs.");

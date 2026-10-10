@@ -36,6 +36,8 @@ namespace C6Lab
     {
         [SerializeField] private Transform visualMount;
         private GameObject replacementVisual;
+        private GameObject replacementPrefab;
+        private LabOrbAppearance appearance;
         private Rigidbody body;
         private SphereCollider sphere;
         private LabConfig config;
@@ -57,6 +59,18 @@ namespace C6Lab
         public bool IsResolved => resolved;
         public Transform VisualMount => visualMount;
 
+        /// <summary>Sets shared presentation; this projectile's root collider is unchanged.</summary>
+        public void ConfigureAppearance(LabOrbAppearance value)
+        {
+            if (appearance == value)
+            {
+                EnsureDefaultVisual(config != null ? config.ThrowRadius : .165f);
+                return;
+            }
+            appearance = value;
+            SetVisualPrefabInternal(appearance != null ? appearance.VisualPrefab : null);
+        }
+
         /// <summary>Registers the battle floor. A floor contact ends this shot as a miss.</summary>
         public void SetMissSurface(Collider floor)
         {
@@ -66,23 +80,39 @@ namespace C6Lab
         /// <summary>Replaces the default sphere's presentation; the root SphereCollider stays put.</summary>
         public void SetVisualPrefab(GameObject prefab)
         {
+            SetVisualPrefabInternal(prefab);
+        }
+
+        private void SetVisualPrefabInternal(GameObject prefab)
+        {
             float radius = config != null ? config.ThrowRadius : 0.165f;
             EnsureDefaultVisual(radius);
+            // A destroyed source prefab compares equal to null in Unity. Do not skip
+            // removing an instantiated visual when callers clear that source.
+            if ((prefab == null && replacementVisual == null)
+                || (prefab != null && replacementVisual != null && replacementPrefab == prefab))
+                return;
             if (replacementVisual != null)
             {
                 replacementVisual.SetActive(false);
                 LabVisualSafety.DestroyVisualObject(replacementVisual);
                 replacementVisual = null;
             }
+            replacementPrefab = prefab;
             if (prefab != null)
             {
                 replacementVisual = Instantiate(prefab, visualMount);
+                replacementVisual.name = "Replacement Visual";
                 replacementVisual.transform.localPosition = Vector3.zero;
                 replacementVisual.transform.localRotation = Quaternion.identity;
+                replacementVisual.transform.localScale = Vector3.one * (2f * radius);
                 LabVisualSafety.RemovePhysics(replacementVisual);
+                LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, gameObject.layer);
+                if (appearance != null && prefab == appearance.VisualPrefab)
+                    appearance.ApplyKindMaterial(replacementVisual, LabOrbKind.Combined);
             }
-            MeshRenderer defaultRenderer = visualMount.Find("Default Sphere")?.GetComponent<MeshRenderer>();
-            if (defaultRenderer != null) defaultRenderer.enabled = prefab == null;
+            Transform defaultSphere = visualMount.Find("Default Sphere");
+            if (defaultSphere != null) defaultSphere.gameObject.SetActive(prefab == null);
         }
 
         /// <summary>Creates the default Unity sphere presentation with an independent root collider.</summary>
@@ -95,6 +125,8 @@ namespace C6Lab
             root.AddComponent<Rigidbody>();
             root.AddComponent<SphereCollider>();
             LabProjectile projectile = root.AddComponent<LabProjectile>();
+            projectile.config = config;
+            projectile.ConfigureAppearance(config.OrbAppearance);
             projectile.EnsureDefaultVisual(config.ThrowRadius);
             return projectile;
         }
@@ -139,6 +171,7 @@ namespace C6Lab
         private void Prepare(Vector3 velocity, LabConfig tuning, bool visualOnly)
         {
             config = tuning;
+            ConfigureAppearance(tuning.OrbAppearance);
             if (body == null) body = GetComponent<Rigidbody>();
             if (sphere == null) sphere = GetComponent<SphereCollider>();
             if (body == null || sphere == null)
@@ -275,23 +308,20 @@ namespace C6Lab
                 visualMount = mount.transform;
                 visualMount.SetParent(transform, false);
             }
-            Transform visual = visualMount.Find("Default Sphere");
-            if (visual == null)
+            // The board and the projectile share one replaceable 3D sphere presentation.
+            // Physics stays on each object's root, with its own gameplay radius.
+            LabOrbVisualFactory.EnsureSphere(visualMount, "Default Sphere", radius,
+                LabOrbKind.Combined,
+                appearance != null ? appearance.MaterialFor(LabOrbKind.Combined) : null);
+            Transform defaultSphere = visualMount.Find("Default Sphere");
+            if (defaultSphere != null) defaultSphere.gameObject.SetActive(replacementVisual == null);
+            if (replacementVisual != null)
             {
-                GameObject sphereVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphereVisual.name = "Default Sphere";
-                sphereVisual.transform.SetParent(visualMount, false);
-                SphereCollider redundantCollider = sphereVisual.GetComponent<SphereCollider>();
-                if (redundantCollider != null)
-                {
-                    redundantCollider.enabled = false;
-                    LabVisualSafety.DestroyVisualObject(redundantCollider);
-                }
-                visual = sphereVisual.transform;
+                replacementVisual.transform.localScale = Vector3.one * (2f * radius);
+                LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, gameObject.layer);
+                if (appearance != null && replacementPrefab == appearance.VisualPrefab)
+                    appearance.ApplyKindMaterial(replacementVisual, LabOrbKind.Combined);
             }
-            visual.localPosition = Vector3.zero;
-            visual.localRotation = Quaternion.identity;
-            visual.localScale = Vector3.one * (2f * radius);
         }
     }
 }

@@ -64,11 +64,29 @@ namespace C6Lab.Tests
             Assert.That(network, Is.Not.Null, "The saved Lab Scene needs a LabNetwork.");
             Assert.That(board, Is.Not.Null, "The saved Lab Scene needs an orb board.");
             Assert.That(developerUi, Is.Not.Null, "The saved Lab Scene needs Developer Mode controls.");
+            LabOrbAppearance appearance = network.config.OrbAppearance;
+            Assert.That(appearance, Is.Not.Null,
+                "The saved config must point to the shared Inspector-editable orb appearance.");
+            Assert.That(appearance.VisualPrefab, Is.Not.Null);
+            Assert.That(appearance.YinMaterial, Is.Not.Null);
+            Assert.That(appearance.YangMaterial, Is.Not.Null);
+            Assert.That(appearance.CombinedMaterial, Is.Not.Null);
+            Assert.That(appearance.ShadowMaterial, Is.Not.Null);
             Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count),
                 "New throw tuning rows must be usable in the saved Scene's DEV panel.");
             Assert.That(network.board, Is.SameAs(board), "The Host must receive this board's gesture events.");
             Assert.That(network.target != null && network.target.Hitbox != null, Is.True);
             Assert.That(network.battleFloor, Is.Not.Null);
+            Camera boardCamera = UnityEngine.Object.FindFirstObjectByType<LabSceneController>()?.orbCamera;
+            Camera battleCamera = UnityEngine.Object.FindFirstObjectByType<LabSeatCamera>()?.battleCamera;
+            Assert.That(boardCamera, Is.Not.Null);
+            Assert.That(battleCamera, Is.Not.Null);
+            Assert.That(board.gameObject.layer, Is.EqualTo(LayerMask.NameToLayer("LabOrbBoard")));
+            Assert.That((boardCamera.cullingMask & (1 << board.gameObject.layer)) != 0, Is.True);
+            Assert.That((battleCamera.cullingMask & (1 << board.gameObject.layer)) == 0, Is.True,
+                "The new 3D board spheres must not appear in the battle camera.");
+            Assert.That(boardCamera.depth, Is.GreaterThan(battleCamera.depth),
+                "The board camera must render after the battle camera on mobile devices.");
 
             // Keep the test independent of an ordinary app using the default port 7777.
             network.port = 17777;
@@ -95,6 +113,11 @@ namespace C6Lab.Tests
                 }
                 Assert.That(yin, Is.Not.Null);
                 Assert.That(yang, Is.Not.Null);
+                LabOrbView yinView = board.GetComponentInChildren<LabOrbView>();
+                Assert.That(yinView, Is.Not.Null);
+                Assert.That(yinView.GetComponent<Rigidbody>(), Is.Not.Null);
+                Assert.That(yinView.GetComponent<SphereCollider>(), Is.Not.Null);
+                Assert.That(yinView.Visual.GetComponentInChildren<MeshRenderer>(), Is.Not.Null);
 
                 // Generated orbs rise before accepting a drag. Then use the same public
                 // board gesture methods that the pointer path calls, not TryCombine.
@@ -112,6 +135,11 @@ namespace C6Lab.Tests
                 Assert.That(combined, Is.Not.Null, "Direct Yin/Yang overlap should reach the Host through CombineRequested.");
                 Assert.That(network.Snapshot.orbs.Any(o => o.id == yin.id || o.id == yang.id), Is.False);
                 Assert.That(board.TryGetMotion(combined.id, out Vector2 combined01, out _), Is.True);
+                LabOrbView combinedView = board.GetComponentsInChildren<LabOrbView>()
+                    .Single(view => view.OrbId == combined.id);
+                Assert.That(combinedView.HitSphere, Is.Not.Null);
+                Assert.That(combinedView.Visual.GetComponentInChildren<MeshRenderer>(), Is.Not.Null,
+                    "The attackable Combined orb must use the same 3D sphere presentation as Raw orbs.");
 
                 // A centred upward release produces the same seat-zero arc as manual Solo play.
                 // Keep the orb held while moving it into position, pause, then flick up.
@@ -124,6 +152,11 @@ namespace C6Lab.Tests
                 Assert.That(board.EndDragAtWorld(release, 3.04d), Is.True);
                 Assert.That(network.Snapshot.orbs.Any(o => o.id == combined.id && o.inFlight), Is.True,
                     "ThrowRequested must cause a Host-approved launch.");
+                LabProjectile projectile = UnityEngine.Object.FindFirstObjectByType<LabProjectile>();
+                Assert.That(projectile, Is.Not.Null);
+                Assert.That(projectile.GetComponent<SphereCollider>(), Is.Not.Null);
+                Assert.That(projectile.VisualMount.GetComponentInChildren<MeshRenderer>(), Is.Not.Null,
+                    "The thrown orb must retain the 3D sphere presentation.");
 
                 for (int step = 0; step < 150 && network.Snapshot.hp == initialHp; step++)
                     yield return new WaitForFixedUpdate();

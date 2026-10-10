@@ -119,6 +119,16 @@ namespace C6Lab
                 body.isKinematic = true;
                 DestroyVisualObject(body);
             }
+            foreach (Collider2D collider in visual.GetComponentsInChildren<Collider2D>(true))
+            {
+                collider.enabled = false;
+                DestroyVisualObject(collider);
+            }
+            foreach (Rigidbody2D body in visual.GetComponentsInChildren<Rigidbody2D>(true))
+            {
+                body.simulated = false;
+                DestroyVisualObject(body);
+            }
         }
 
         public static void DestroyVisualObject(UnityEngine.Object item)

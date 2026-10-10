@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e4e729969904e4aa9a7ec888cf226f7, type: 3}
+  m_Name: LabOrbAppearance
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabOrbAppearance
+  visualPrefab: {fileID: 2372661788850678693, guid: e69e9814a5a24447b9620fb3c315da5b, type: 3}
+  yinMaterial: {fileID: 2100000, guid: fb4269035a9fe4034afbf9586ee1dba5, type: 2}
+  yangMaterial: {fileID: 2100000, guid: c818ee0402e624a1db7e61540f23d686, type: 2}
+  combinedMaterial: {fileID: 2100000, guid: d6edcd1c20c3d4436bb1f8b76067a468, type: 2}
+  shadowMaterial: {fileID: 2100000, guid: 1284cbabd166044c2b2a0fc78c6959bc, type: 2}
+  shadowColor: {r: 0, g: 0, b: 0, a: 0.22}
+  shadowScale: {x: 1.4, y: 0.8}
+  shadowOffset: {x: 0.06, y: -0.08}
+  shadowDepth: 0.4
