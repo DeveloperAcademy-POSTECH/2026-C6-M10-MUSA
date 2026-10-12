@@ -1,8 +1,6 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem.UI;
 
 namespace C6Lab
 {
@@ -28,13 +26,9 @@ namespace C6Lab
         public Text staminaText;
         public Text orbsText;
         public Text seatText;
-        public Image monsterHpFill;
-        public Image playerHpFill;
-        public Image staminaFill;
 
         private void Awake()
         {
-            EnsureUiInputModule();
             if (hostButton != null) hostButton.onClick.AddListener(Host);
             if (joinButton != null) joinButton.onClick.AddListener(Join);
             if (findHostButton != null) findHostButton.onClick.AddListener(FindHost);
@@ -76,18 +70,12 @@ namespace C6Lab
                 Set(staminaText, "STAMINA —");
                 Set(orbsText, "ORBS —");
                 Set(seatText, connected ? "PLAYER " + network.LocalPlayerId : "NO SESSION");
-                SetFill(monsterHpFill, 0f);
-                SetFill(playerHpFill, connected ? 1f : 0f);
-                SetFill(staminaFill, 0f);
                 return;
             }
             Set(hpText, "YOKAI HP " + snapshot.hp + " / " + network.config.MonsterMaxHp);
             Set(timeText, "TIME " + Mathf.CeilToInt((float)snapshot.remaining));
-            SetFill(monsterHpFill, network.config == null ? 0f : (float)snapshot.hp / network.config.MonsterMaxHp);
-            SetFill(playerHpFill, 1f);
             LabPlayerState local = Array.Find(snapshot.players ?? Array.Empty<LabPlayerState>(), p => p.id == network.LocalPlayerId);
             Set(staminaText, local == null ? "STAMINA —" : "STAMINA " + Mathf.FloorToInt(local.stamina) + " / " + network.config.StaminaMax);
-            SetFill(staminaFill, local == null || network.config == null ? 0f : local.stamina / network.config.StaminaMax);
             int count = 0;
             foreach (var orb in snapshot.orbs ?? Array.Empty<LabOrbState>()) if (orb.owner == network.LocalPlayerId && !orb.inFlight) count++;
             Set(orbsText, "ORBS " + count + " / " + network.config.OrbStorageLimit);
@@ -124,23 +112,6 @@ namespace C6Lab
             return true;
         }
 
-        private static void EnsureUiInputModule()
-        {
-            EventSystem eventSystem = FindAnyObjectByType<EventSystem>();
-            if (eventSystem == null)
-            {
-                var eventSystemObject = new GameObject("EventSystem", typeof(EventSystem));
-                eventSystem = eventSystemObject.GetComponent<EventSystem>();
-            }
-
-            foreach (InputSystemUIInputModule module in eventSystem.GetComponents<InputSystemUIInputModule>())
-                module.enabled = false;
-
-            StandaloneInputModule standalone = eventSystem.GetComponent<StandaloneInputModule>();
-            if (standalone == null) standalone = eventSystem.gameObject.AddComponent<StandaloneInputModule>();
-            standalone.enabled = true;
-        }
-
         private static void SetVisible(GameObject target, bool visible)
         {
             if (target != null && target.activeSelf != visible) target.SetActive(visible);
@@ -149,11 +120,6 @@ namespace C6Lab
         private static void Set(Text target, string value)
         {
             if (target != null && target.text != value) target.text = value;
-        }
-
-        private static void SetFill(Image target, float value)
-        {
-            if (target != null) target.fillAmount = Mathf.Clamp01(value);
         }
     }
 }
