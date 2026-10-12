@@ -90,15 +90,22 @@ namespace C6Lab.Tests
             SetSerializedField(appearance, "yangMaterial", yangMaterial);
             SetSerializedField(appearance, "combinedMaterial", combinedMaterial);
             SetSerializedField(appearance, "shadowMaterial", shadowMaterial);
+            // Pure colors stay identical through linear/gamma conversion, like the materials above.
+            SetSerializedColor(appearance, "waterColor", Color.cyan);
+            SetSerializedColor(appearance, "fireColor", new Color(1f, 1f, 0f));
             SetSerializedField(config, "orbAppearance", appearance);
 
             LabProjectile projectile = null;
+            LabProjectile fireShot = null;
             try
             {
                 board.Configure(config, inputCamera, Bounds);
                 LabOrbView yin = board.UpsertOrb("styled-yin", LabOrbKind.Yin, new Vector2(.3f, .5f));
                 LabOrbView yang = board.UpsertOrb("styled-yang", LabOrbKind.Yang, new Vector2(.7f, .5f));
                 projectile = LabProjectile.Create(new Vector3(0f, 1f, 3f), config);
+                LabOrbView water = board.UpsertOrb("styled-water", LabOrbKind.Combined, new Vector2(.5f, .5f),
+                    element: LabOrbElement.Water);
+                fireShot = LabProjectile.Create(new Vector3(1f, 1f, 3f), config, null, LabOrbElement.Fire);
                 yield return null; // Visual-only collider removal completes at frame end.
 
                 Assert.That(ArtSurface(yin.Visual).sharedMaterial, Is.SameAs(yinMaterial));
@@ -107,6 +114,11 @@ namespace C6Lab.Tests
                 Assert.That(ArtColor(yin.Visual, colorProperty), Is.EqualTo(Color.blue));
                 Assert.That(ArtColor(yang.Visual, colorProperty), Is.EqualTo(Color.red));
                 Assert.That(ArtColor(projectile.VisualMount, colorProperty), Is.EqualTo(Color.green));
+                Assert.That(ArtSurface(water.Visual).sharedMaterial, Is.SameAs(combinedMaterial));
+                Assert.That(ArtColor(water.Visual, colorProperty), Is.EqualTo(Color.cyan),
+                    "A Combined orb shows its element tint over the combined material.");
+                Assert.That(ArtColor(fireShot.VisualMount, colorProperty), Is.EqualTo(new Color(1f, 1f, 0f)),
+                    "A thrown orb keeps its element tint in flight.");
                 Assert.That(yin.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
                 Assert.That(yin.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
                 Assert.That(projectile.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
@@ -125,6 +137,7 @@ namespace C6Lab.Tests
             finally
             {
                 if (projectile != null) Object.Destroy(projectile.gameObject);
+                if (fireShot != null) Object.Destroy(fireShot.gameObject);
                 Object.Destroy(appearance);
                 Object.Destroy(art);
                 Object.Destroy(yinMaterial);
@@ -407,6 +420,13 @@ namespace C6Lab.Tests
             ArtSurface(mount).GetPropertyBlock(block);
             Assert.That(block.isEmpty, Is.False, "Per-orb color must be sent to the renderer.");
             return block.GetColor(property);
+        }
+
+        private static void SetSerializedColor(Object target, string name, Color value)
+        {
+            FieldInfo field = target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, name + " should be Inspector-editable.");
+            field.SetValue(target, value);
         }
 
         private static void SetSerializedField(Object target, string name, Object value)

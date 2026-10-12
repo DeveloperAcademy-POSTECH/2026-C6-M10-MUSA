@@ -16,12 +16,14 @@ namespace C6Lab
         public const int DefaultParticipants = 3;
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
+        private const uint ElementDrawSalt = 0x5A17E1E5u;
         private readonly Dictionary<ulong, LabPlayerState> players = new Dictionary<ulong, LabPlayerState>();
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
         private readonly HashSet<string> requests = new HashSet<string>(StringComparer.Ordinal);
         private readonly ulong[] seats = new ulong[MaximumParticipants];
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
+        private readonly Dictionary<ulong, uint> combinedCounts = new Dictionary<ulong, uint>();
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -69,11 +71,12 @@ namespace C6Lab
             activeSeatCount = ids.Length;
             Array.Clear(seats, 0, seats.Length);
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
-            players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear();
+            players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear(); combinedCounts.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState { id = ids[i], seat = i, stamina = rules.StaminaStart });
                 generatedCounts.Add(ids[i], 0u);
+                combinedCounts.Add(ids[i], 0u);
             }
             seed = SeedFor(id, round);
             hp = rules.MonsterMaxHp;
@@ -128,9 +131,12 @@ namespace C6Lab
                 return Reject("POLARITY_MISMATCH", out reason);
 
             orbs.Remove(firstId); orbs.Remove(secondId);
+            uint combined = combinedCounts[sender];
+            combinedCounts[sender] = combined + 1;
             orb = new LabOrbState
             {
-                id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, origin = LabOrbOrigin.Combined, originOwner = sender,
+                id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = ElementFor(seed, sender, combined),
+                origin = LabOrbOrigin.Combined, originOwner = sender,
                 x = (first.x + second.x) * .5f, y = (first.y + second.y) * .5f,
                 vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
             };
@@ -328,6 +334,10 @@ namespace C6Lab
             }
             return LabOrbKind.Yin;
         }
+
+        // A separate salted stream keeps element draws independent of generation draws.
+        private static LabOrbElement ElementFor(uint seed, ulong playerId, uint index) =>
+            (LabOrbElement)(1 + (int)(DrawFor(seed ^ ElementDrawSalt, playerId, index) % 5UL));
 
         private static ulong DrawFor(uint seed, ulong playerId, uint index)
         {

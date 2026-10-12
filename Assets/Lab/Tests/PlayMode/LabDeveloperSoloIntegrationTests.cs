@@ -195,6 +195,7 @@ namespace C6Lab.Tests
 
                 LabOrbState combined = network.Snapshot.orbs.SingleOrDefault(o => o.kind == LabOrbKind.Combined);
                 Assert.That(combined, Is.Not.Null, "Direct Yin/Yang overlap should reach the Host through CombineRequested.");
+                Assert.That(combined.element, Is.Not.EqualTo(LabOrbElement.None), "Every Combined orb has a five-element attribute.");
                 Assert.That(network.Snapshot.orbs.Any(o => o.id == yin.id || o.id == yang.id), Is.False);
                 Assert.That(board.TryGetMotion(combined.id, out Vector2 combined01, out _), Is.True);
                 LabOrbView combinedView = board.GetComponentsInChildren<LabOrbView>()

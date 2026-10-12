@@ -381,6 +381,47 @@ namespace C6Lab.Tests
             finally { UnityEngine.Object.DestroyImmediate(mixed); }
         }
 
+        [Test]
+        public void CombiningDrawsEveryElementEvenlyAndOtherOrbsHaveNone()
+        {
+            var rawOnly = ConfigWith(.001f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                float[] values = rawOnly.CaptureDeveloperValues();
+                values[9] = 100f; // stored orb limit
+                Assert.That(rawOnly.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("element-test", new ulong[] { 10, 20, 30 }, 0d, rawOnly);
+                var counts = new Dictionary<LabOrbElement, int>();
+                foreach (ulong player in new ulong[] { 10, 20, 30 })
+                {
+                    var yins = new List<LabOrbState>();
+                    var yangs = new List<LabOrbState>();
+                    for (int i = 0; i < 100; i++)
+                    {
+                        Assert.That(room.TryGenerate(player, "raw-" + player + "-" + i, 0d, out var raw, out _), Is.True);
+                        Assert.That(raw.element, Is.EqualTo(LabOrbElement.None));
+                        (raw.kind == LabOrbKind.Yin ? yins : yangs).Add(raw);
+                    }
+                    for (int i = 0; i < Math.Min(yins.Count, yangs.Count); i++)
+                    {
+                        Assert.That(room.TryCombine(player, yins[i].id, yangs[i].id, "combine-" + player + "-" + i, 0d,
+                            out var combined, out var reason), Is.True, reason);
+                        Assert.That(combined.element, Is.Not.EqualTo(LabOrbElement.None));
+                        Assert.That(room.Snapshot(0d).orbs.Single(orb => orb.id == combined.id).element,
+                            Is.EqualTo(combined.element), "Clients receive the element through the snapshot.");
+                        counts[combined.element] = counts.TryGetValue(combined.element, out int count) ? count + 1 : 1;
+                    }
+                }
+
+                // 140 combines for this seed: about 28 per element at an even 20 percent.
+                Assert.That(counts.Keys, Is.EquivalentTo(new[]
+                    { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth }));
+                foreach (var pair in counts) Assert.That(pair.Value, Is.InRange(14, 42), pair.Key.ToString());
+            }
+            finally { UnityEngine.Object.DestroyImmediate(rawOnly); }
+        }
+
         /// <summary>A default config with one generation cost and chances in GeneratedKinds order.</summary>
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {

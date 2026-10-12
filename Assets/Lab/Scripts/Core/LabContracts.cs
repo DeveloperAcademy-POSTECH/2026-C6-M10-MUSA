@@ -6,6 +6,8 @@ namespace C6Lab
     // Items are appended so the serialized numbers of existing kinds stay unchanged.
     public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb }
     public enum LabOrbOrigin { Unknown, Generated, Combined }
+    /// <summary>Five-element attribute of a Combined orb (화·수·목·금·토). Other kinds keep None.</summary>
+    public enum LabOrbElement { None, Fire, Water, Wood, Metal, Earth }
 
     public static class LabOrbKindRules
     {
@@ -20,6 +22,7 @@ namespace C6Lab
         public string id;
         public ulong owner;
         public LabOrbKind kind;
+        public LabOrbElement element;
         public LabOrbOrigin origin;
         public ulong originOwner;
         public float x, y, vx, vy;

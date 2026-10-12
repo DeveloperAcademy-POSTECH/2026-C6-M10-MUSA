@@ -38,6 +38,7 @@ namespace C6Lab
         private GameObject replacementVisual;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
+        private LabOrbElement element;
         private Rigidbody body;
         private SphereCollider sphere;
         private LabConfig config;
@@ -109,14 +110,15 @@ namespace C6Lab
                 LabVisualSafety.RemovePhysics(replacementVisual);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, gameObject.layer);
                 if (appearance != null && prefab == appearance.VisualPrefab)
-                    appearance.ApplyKindMaterial(replacementVisual, LabOrbKind.Combined);
+                    appearance.ApplyKindMaterial(replacementVisual, LabOrbKind.Combined, element);
             }
             Transform defaultSphere = visualMount.Find("Default Sphere");
             if (defaultSphere != null) defaultSphere.gameObject.SetActive(prefab == null);
         }
 
         /// <summary>Creates the default Unity sphere presentation with an independent root collider.</summary>
-        public static LabProjectile Create(Vector3 position, LabConfig config, Transform parent = null)
+        public static LabProjectile Create(Vector3 position, LabConfig config, Transform parent = null,
+            LabOrbElement element = LabOrbElement.None)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
             GameObject root = new GameObject("Throw Projectile");
@@ -126,6 +128,7 @@ namespace C6Lab
             root.AddComponent<SphereCollider>();
             LabProjectile projectile = root.AddComponent<LabProjectile>();
             projectile.config = config;
+            projectile.element = element;
             projectile.ConfigureAppearance(config.OrbAppearance);
             projectile.EnsureDefaultVisual(config.ThrowRadius);
             return projectile;
@@ -312,7 +315,8 @@ namespace C6Lab
             // Physics stays on each object's root, with its own gameplay radius.
             LabOrbVisualFactory.EnsureSphere(visualMount, "Default Sphere", radius,
                 LabOrbKind.Combined,
-                appearance != null ? appearance.MaterialFor(LabOrbKind.Combined) : null);
+                appearance != null ? appearance.MaterialFor(LabOrbKind.Combined) : null,
+                appearance != null ? appearance.ColorOverrideFor(LabOrbKind.Combined, element) : null, element);
             Transform defaultSphere = visualMount.Find("Default Sphere");
             if (defaultSphere != null) defaultSphere.gameObject.SetActive(replacementVisual == null);
             if (replacementVisual != null)
@@ -320,7 +324,7 @@ namespace C6Lab
                 replacementVisual.transform.localScale = Vector3.one * (2f * radius);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, gameObject.layer);
                 if (appearance != null && replacementPrefab == appearance.VisualPrefab)
-                    appearance.ApplyKindMaterial(replacementVisual, LabOrbKind.Combined);
+                    appearance.ApplyKindMaterial(replacementVisual, LabOrbKind.Combined, element);
             }
         }
     }

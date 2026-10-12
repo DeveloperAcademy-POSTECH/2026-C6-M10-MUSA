@@ -21,12 +21,14 @@ namespace C6Lab
         private LabOrbAppearance appearance;
         private string orbId;
         private LabOrbKind kind;
+        private LabOrbElement element;
         private float visualRadius = .32f;
         private Coroutine spawnRiseRoutine;
         private Action spawnRiseCompleted;
 
         public string OrbId => orbId;
         public LabOrbKind Kind => kind;
+        public LabOrbElement Element => element;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
         public Rigidbody Body { get; private set; }
@@ -65,7 +67,8 @@ namespace C6Lab
             visual.Rotate(axis, degrees, Space.World);
         }
 
-        public void Configure(string id, LabOrbKind orbKind, float radius)
+        public void Configure(string id, LabOrbKind orbKind, float radius,
+            LabOrbElement orbElement = LabOrbElement.None)
         {
             if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("An orb ID is required.", nameof(id));
             if (radius <= 0f || float.IsNaN(radius) || float.IsInfinity(radius))
@@ -75,6 +78,7 @@ namespace C6Lab
             if (HitSphere == null) HitSphere = GetComponent<SphereCollider>();
             orbId = id;
             kind = orbKind;
+            element = orbElement;
             visualRadius = radius;
             HitSphere.radius = radius;
             HitSphere.center = Vector3.zero;
@@ -217,7 +221,7 @@ namespace C6Lab
             visual.gameObject.layer = gameObject.layer;
             LabOrbVisualFactory.EnsureSphere(visual, "Default Sphere", visualRadius, kind,
                 appearance != null ? appearance.MaterialFor(kind) : null,
-                appearance != null ? appearance.ColorOverrideFor(kind) : null);
+                appearance != null ? appearance.ColorOverrideFor(kind, element) : null, element);
         }
 
         private void UpdateVisual()
@@ -225,7 +229,7 @@ namespace C6Lab
             MeshRenderer defaultRenderer = LabOrbVisualFactory.EnsureSphere(
                 visual, "Default Sphere", visualRadius, kind,
                 appearance != null ? appearance.MaterialFor(kind) : null,
-                appearance != null ? appearance.ColorOverrideFor(kind) : null);
+                appearance != null ? appearance.ColorOverrideFor(kind, element) : null, element);
             if (defaultRenderer != null)
             {
                 if (appearance == null && !tintDefaultByKind)
@@ -238,7 +242,7 @@ namespace C6Lab
                 replacementVisual.transform.localScale = Vector3.one * (2f * visualRadius);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, visual.gameObject.layer);
                 if (appearance != null && replacementPrefab == appearance.VisualPrefab)
-                    appearance.ApplyKindMaterial(replacementVisual, kind);
+                    appearance.ApplyKindMaterial(replacementVisual, kind, element);
             }
             UpdateContactShadow();
         }
@@ -313,7 +317,8 @@ namespace C6Lab
         /// the corresponding orb or projectile root owns the sole physics representation.
         /// </summary>
         public static MeshRenderer EnsureSphere(Transform mount, string childName,
-            float radius, LabOrbKind kind, Material appearanceMaterial = null, Color? appearanceColor = null)
+            float radius, LabOrbKind kind, Material appearanceMaterial = null, Color? appearanceColor = null,
+            LabOrbElement element = LabOrbElement.None)
         {
             if (mount == null) throw new ArgumentNullException(nameof(mount));
             Transform child = mount.Find(childName);
@@ -341,7 +346,7 @@ namespace C6Lab
                 {
                     Material material = GetSphereMaterial();
                     if (material != null) renderer.sharedMaterial = material;
-                    ApplyKindColor(renderer, kind);
+                    ApplyKindColor(renderer, kind, element);
                 }
             }
             EnsureRollMarker(child, material: GetSphereMaterial());
@@ -397,15 +402,11 @@ namespace C6Lab
             }
         }
 
-        public static void ApplyKindColor(Renderer renderer, LabOrbKind kind)
+        public static void ApplyKindColor(Renderer renderer, LabOrbKind kind,
+            LabOrbElement element = LabOrbElement.None)
         {
             if (renderer == null) return;
-            Color color = kind switch
-            {
-                LabOrbKind.Yin => new Color(.17f, .46f, .94f),
-                LabOrbKind.Yang => new Color(.96f, .38f, .17f),
-                _ => new Color(.53f, .34f, .84f)
-            };
+            Color color = LabOrbPalette.For(kind, element);
             var properties = new MaterialPropertyBlock();
             renderer.GetPropertyBlock(properties);
             properties.SetColor("_BaseColor", color); // URP Lit

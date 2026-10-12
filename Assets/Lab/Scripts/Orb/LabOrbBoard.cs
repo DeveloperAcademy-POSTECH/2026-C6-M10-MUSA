@@ -129,7 +129,7 @@ namespace C6Lab
         /// </summary>
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
-            bool playSpawnRise = false)
+            bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None)
         {
             RequireConfigured();
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
@@ -137,9 +137,9 @@ namespace C6Lab
             if (entries.TryGetValue(id, out var existing))
             {
                 existing.LocalOwner = localOwner;
-                if (existing.View.Kind != kind)
+                if (existing.View.Kind != kind || existing.View.Element != element)
                 {
-                    existing.View.Configure(id, kind, config.OrbRadius);
+                    existing.View.Configure(id, kind, config.OrbRadius, element);
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
                 SetBodyMode(existing);
@@ -151,7 +151,7 @@ namespace C6Lab
             gameObject.transform.SetParent(transform, false);
             gameObject.transform.position = OnPlane(ToWorld(normalizedPosition));
             var view = gameObject.AddComponent<LabOrbView>();
-            view.Configure(id, kind, config.OrbRadius);
+            view.Configure(id, kind, config.OrbRadius, element);
             view.ConfigureAppearance(config.OrbAppearance);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
