@@ -410,16 +410,16 @@ namespace C6Lab
             }
         }
 
-        /// <summary>임시 속성 색 (오방색 기준). 에셋이 들어오면 Inspector의 속성 머티리얼이 우선한다.</summary>
+        /// <summary>임시 속성 색. 에셋이 들어오면 Inspector의 속성 머티리얼이 우선한다.</summary>
         public static Color TemporaryElementColor(LabOrbElement element)
         {
             return element switch
             {
-                LabOrbElement.Fire => new Color(.89f, .20f, .16f),  // 화 · 적
-                LabOrbElement.Water => new Color(.12f, .14f, .22f), // 수 · 흑
-                LabOrbElement.Wood => new Color(.10f, .55f, .50f),  // 목 · 청
-                LabOrbElement.Metal => new Color(.93f, .93f, .90f), // 금 · 백
-                LabOrbElement.Earth => new Color(.95f, .76f, .18f), // 토 · 황
+                LabOrbElement.Fire => new Color(.88f, .16f, .14f),  // 화 · 빨강
+                LabOrbElement.Water => new Color(.13f, .42f, .90f), // 수 · 파랑
+                LabOrbElement.Wood => new Color(.20f, .66f, .25f),  // 목 · 초록
+                LabOrbElement.Metal => new Color(.96f, .80f, .15f), // 금 · 노랑
+                LabOrbElement.Earth => new Color(.52f, .33f, .16f), // 토 · 갈색
                 _ => new Color(.53f, .34f, .84f)
             };
         }
@@ -440,8 +440,8 @@ namespace C6Lab
             if (renderer == null) return;
             Color color = kind switch
             {
-                LabOrbKind.Yin => new Color(.17f, .46f, .94f),
-                LabOrbKind.Yang => new Color(.96f, .38f, .17f),
+                LabOrbKind.Yin => new Color(.08f, .08f, .09f),  // 음 · 검정
+                LabOrbKind.Yang => new Color(.95f, .95f, .93f), // 양 · 흰색
                 _ => new Color(.53f, .34f, .84f)
             };
             var properties = new MaterialPropertyBlock();
