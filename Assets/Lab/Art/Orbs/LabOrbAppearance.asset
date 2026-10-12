@@ -16,6 +16,16 @@ MonoBehaviour:
   yinMaterial: {fileID: 2100000, guid: fb4269035a9fe4034afbf9586ee1dba5, type: 2}
   yangMaterial: {fileID: 2100000, guid: c818ee0402e624a1db7e61540f23d686, type: 2}
   combinedMaterial: {fileID: 2100000, guid: d6edcd1c20c3d4436bb1f8b76067a468, type: 2}
+  fireColor: {r: 0.9, g: 0.17, b: 0.14, a: 1}
+  waterColor: {r: 0.13, g: 0.42, b: 0.95, a: 1}
+  woodColor: {r: 0.2, g: 0.7, b: 0.28, a: 1}
+  metalColor: {r: 0.8, g: 0.66, b: 0.46, a: 1}
+  earthColor: {r: 0.4, g: 0.25, b: 0.12, a: 1}
+  itemColor: {r: 0.53, g: 0.34, b: 0.84, a: 1}
+  relayIcon: {fileID: 2800000, guid: f894f106135c2425191dda917c414f1d, type: 3}
+  secretBoxIcon: {fileID: 2800000, guid: 9db8a74d0e7504e73828d0a2b7846275, type: 3}
+  potionIcon: {fileID: 2800000, guid: d10f9e33aeb5d4549ac370bcca69ebb9, type: 3}
+  bombIcon: {fileID: 2800000, guid: dc7601458a62e4966907a6847ddfc966, type: 3}
   shadowMaterial: {fileID: 2100000, guid: 1284cbabd166044c2b2a0fc78c6959bc, type: 2}
   shadowColor: {r: 0, g: 0, b: 0, a: 0.22}
   shadowScale: {x: 1.4, y: 0.8}
