@@ -134,6 +134,31 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void CombinedOrbsReceiveEveryElementFromTheHost()
+        {
+            var seen = new System.Collections.Generic.HashSet<LabOrbElement>();
+            for (int session = 0; session < 40; session++)
+            {
+                var room = new LabModel();
+                room.Begin("element-" + session, new ulong[] { 10, 20 }, 0d, config);
+                LabOrbState yin = null, yang = null;
+                for (int i = 0; i < 5 && (yin == null || yang == null); i++)
+                {
+                    Assert.That(room.TryGenerate(10, "g" + i, 0d, out var raw, out _), Is.True);
+                    if (raw.kind == LabOrbKind.Yin && yin == null) yin = raw;
+                    if (raw.kind == LabOrbKind.Yang && yang == null) yang = raw;
+                }
+                Assert.That(room.TryCombine(10, yin.id, yang.id, "c", 0d, out var combined, out _), Is.True);
+                Assert.That(combined.element, Is.Not.EqualTo(LabOrbElement.None));
+                // JSON is the network format; the element must survive it.
+                var copy = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(room.Snapshot(0d)));
+                Assert.That(copy.orbs.Single(orb => orb.id == combined.id).element, Is.EqualTo(combined.element));
+                seen.Add(combined.element);
+            }
+            Assert.That(seen.Count, Is.EqualTo(5), "All five elements should appear across sessions.");
+        }
+
+        [Test]
         public void DeveloperSoloRetryResetsOnlyItsOwnPlayerAndKeepsMultiplayerMinimum()
         {
             var solo = new LabModel();
@@ -184,6 +209,11 @@ namespace C6Lab.Tests
             Assert.That(combined.kind, Is.EqualTo(LabOrbKind.Combined));
             Assert.That(combined.origin, Is.EqualTo(LabOrbOrigin.Combined));
             Assert.That(combined.createdAt, Is.EqualTo(1d));
+            Assert.That(yin.element, Is.EqualTo(LabOrbElement.None));
+            Assert.That(yang.element, Is.EqualTo(LabOrbElement.None));
+            Assert.That(combined.element, Is.Not.EqualTo(LabOrbElement.None));
+            Assert.That(model.Snapshot(1d).orbs.Single(orb => orb.id == combined.id).element,
+                Is.EqualTo(combined.element));
             Assert.That(model.Snapshot(1d).orbs.Any(orb => orb.id == yin.id || orb.id == yang.id), Is.False);
             Assert.That(model.TryCombine(10, yin.id, yang.id, "valid", 1d, out _, out var duplicateReason), Is.False);
             Assert.That(duplicateReason, Is.EqualTo("DUPLICATE_REQUEST"));

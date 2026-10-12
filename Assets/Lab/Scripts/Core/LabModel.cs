@@ -26,6 +26,7 @@ namespace C6Lab
         private string sessionId;
         private uint round;
         private uint seed;
+        private uint combinedCount;
         private ulong revision;
         private int hp;
         private double lastTime;
@@ -76,6 +77,7 @@ namespace C6Lab
                 generatedCounts.Add(ids[i], 0u);
             }
             seed = SeedFor(id, round);
+            combinedCount = 0;
             hp = rules.MonsterMaxHp;
             revision = 0;
             lastTime = now;
@@ -128,9 +130,11 @@ namespace C6Lab
                 return Reject("POLARITY_MISMATCH", out reason);
 
             orbs.Remove(firstId); orbs.Remove(secondId);
+            var element = ElementFor(seed, combinedCount++);
             orb = new LabOrbState
             {
-                id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, origin = LabOrbOrigin.Combined, originOwner = sender,
+                id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = element,
+                origin = LabOrbOrigin.Combined, originOwner = sender,
                 x = (first.x + second.x) * .5f, y = (first.y + second.y) * .5f,
                 vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
             };
@@ -316,6 +320,24 @@ namespace C6Lab
 
         // Counter-based Host draw: one player's accepted generation cannot change another's
         // polarity sequence. After three equal results the next Raw flips polarity.
+        /// <summary>
+        /// 결합 구슬의 오행 속성을 정한다. 다섯 속성이 같은 확률로 나온다.
+        /// Host만 호출하므로 모든 기기가 스냅샷으로 같은 결과를 받는다.
+        /// 규칙을 바꿀 때는 이 함수만 고치면 된다.
+        /// </summary>
+        private static LabOrbElement ElementFor(uint seed, uint combinedIndex)
+        {
+            unchecked
+            {
+                ulong value = ((ulong)seed << 32) ^ 0xE1E3E7A5UL;
+                value += 0x9E3779B97F4A7C15UL * (combinedIndex + 1UL);
+                value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
+                value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
+                value ^= value >> 31;
+                return (LabOrbElement)(1 + (int)(value % 5UL));
+            }
+        }
+
         private static LabOrbKind PolarityFor(uint seed, ulong playerId, uint successfulIndex)
         {
             var previous = LabOrbKind.Combined;
