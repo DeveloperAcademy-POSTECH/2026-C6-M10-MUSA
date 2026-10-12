@@ -6,14 +6,18 @@ namespace C6Lab
     // Items are appended so the serialized numbers of existing kinds stay unchanged.
     public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb }
     public enum LabOrbOrigin { Unknown, Generated, Combined }
-    /// <summary>Five-element attribute of a Combined orb (화·수·목·금·토). Other kinds keep None.</summary>
-    public enum LabOrbElement { None, Fire, Water, Wood, Metal, Earth }
 
     public static class LabOrbKindRules
     {
         public static bool IsRaw(this LabOrbKind kind) => kind == LabOrbKind.Yin || kind == LabOrbKind.Yang;
         public static bool IsItem(this LabOrbKind kind) => kind >= LabOrbKind.Relay && kind <= LabOrbKind.Bomb;
     }
+
+    /// <summary>
+    /// 오행 속성. 음/양 구슬은 None이고, 결합 구슬만 Host가 다섯 속성 중 하나를 정한다.
+    /// 값의 순서는 네트워크 스냅샷에 정수로 저장되므로 바꾸지 않는다.
+    /// </summary>
+    public enum LabOrbElement { None, Fire, Water, Wood, Metal, Earth }
 
     /// <summary>One Host-approved orb. Positions and velocities are normalized to the board.</summary>
     [Serializable]

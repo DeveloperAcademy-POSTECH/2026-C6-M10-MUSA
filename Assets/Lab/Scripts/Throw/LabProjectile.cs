@@ -315,8 +315,9 @@ namespace C6Lab
             // Physics stays on each object's root, with its own gameplay radius.
             LabOrbVisualFactory.EnsureSphere(visualMount, "Default Sphere", radius,
                 LabOrbKind.Combined,
-                appearance != null ? appearance.MaterialFor(LabOrbKind.Combined) : null,
-                appearance != null ? appearance.ColorOverrideFor(LabOrbKind.Combined, element) : null, element);
+                appearance != null ? appearance.MaterialFor(LabOrbKind.Combined, element) : null,
+                appearance == null || appearance.NeedsTemporaryElementColor(LabOrbKind.Combined, element)
+                    ? element : LabOrbElement.None);
             Transform defaultSphere = visualMount.Find("Default Sphere");
             if (defaultSphere != null) defaultSphere.gameObject.SetActive(replacementVisual == null);
             if (replacementVisual != null)

@@ -31,7 +31,7 @@ namespace C6Lab
         public string OrbId => orbId;
         public LabOrbKind Kind => kind;
         public LabOrbElement Element => element;
-        /// <summary>Host-approved swipes still needed before this item can be used.</summary>
+        /// <summary>Host-approved handoffs still needed before this item can be used.</summary>
         public int LockSwipes => lockSwipes;
         public LabOrbItemMarker ItemMarker => itemMarker;
         public Transform Visual => visual;
@@ -83,7 +83,7 @@ namespace C6Lab
             if (HitSphere == null) HitSphere = GetComponent<SphereCollider>();
             orbId = id;
             kind = orbKind;
-            element = orbElement;
+            element = orbKind == LabOrbKind.Combined ? orbElement : LabOrbElement.None;
             visualRadius = radius;
             HitSphere.radius = radius;
             HitSphere.center = Vector3.zero;
@@ -231,16 +231,22 @@ namespace C6Lab
             }
             visual.gameObject.layer = gameObject.layer;
             LabOrbVisualFactory.EnsureSphere(visual, "Default Sphere", visualRadius, kind,
-                appearance != null ? appearance.MaterialFor(kind) : null,
-                appearance != null ? appearance.ColorOverrideFor(kind, element) : null, element);
+                appearance != null ? appearance.MaterialFor(kind, element) : null, TemporaryColorElement());
+        }
+
+        /// <summary>속성 머티리얼이 비어 있을 때만 임시 색을 칠할 속성을 돌려준다.</summary>
+        private LabOrbElement TemporaryColorElement()
+        {
+            if (kind != LabOrbKind.Combined || element == LabOrbElement.None) return LabOrbElement.None;
+            return appearance == null || appearance.NeedsTemporaryElementColor(kind, element)
+                ? element : LabOrbElement.None;
         }
 
         private void UpdateVisual()
         {
             MeshRenderer defaultRenderer = LabOrbVisualFactory.EnsureSphere(
                 visual, "Default Sphere", visualRadius, kind,
-                appearance != null ? appearance.MaterialFor(kind) : null,
-                appearance != null ? appearance.ColorOverrideFor(kind, element) : null, element);
+                appearance != null ? appearance.MaterialFor(kind, element) : null, TemporaryColorElement());
             if (defaultRenderer != null)
             {
                 if (appearance == null && !tintDefaultByKind)
@@ -345,8 +351,8 @@ namespace C6Lab
         /// the corresponding orb or projectile root owns the sole physics representation.
         /// </summary>
         public static MeshRenderer EnsureSphere(Transform mount, string childName,
-            float radius, LabOrbKind kind, Material appearanceMaterial = null, Color? appearanceColor = null,
-            LabOrbElement element = LabOrbElement.None)
+            float radius, LabOrbKind kind, Material appearanceMaterial = null,
+            LabOrbElement temporaryElementColor = LabOrbElement.None)
         {
             if (mount == null) throw new ArgumentNullException(nameof(mount));
             Transform child = mount.Find(childName);
@@ -369,13 +375,15 @@ namespace C6Lab
             if (renderer != null)
             {
                 if (appearanceMaterial != null)
-                    ApplyAppearanceMaterial(renderer, appearanceMaterial, appearanceColor);
+                    ApplyAppearanceMaterial(renderer, appearanceMaterial);
                 else
                 {
                     Material material = GetSphereMaterial();
                     if (material != null) renderer.sharedMaterial = material;
-                    ApplyKindColor(renderer, kind, element);
+                    ApplyKindColor(renderer, kind);
                 }
+                // 속성 에셋이 들어오기 전까지 결합 구슬은 임시 오방색으로 구분한다.
+                if (kind == LabOrbKind.Combined) ApplyElementColor(renderer, temporaryElementColor);
             }
             EnsureRollMarker(child, material: GetSphereMaterial());
             return renderer;
@@ -430,11 +438,40 @@ namespace C6Lab
             }
         }
 
-        public static void ApplyKindColor(Renderer renderer, LabOrbKind kind,
-            LabOrbElement element = LabOrbElement.None)
+        /// <summary>임시 속성 색. 에셋이 들어오면 Inspector의 속성 머티리얼이 우선한다.</summary>
+        public static Color TemporaryElementColor(LabOrbElement element)
+        {
+            return element switch
+            {
+                LabOrbElement.Fire => new Color(.88f, .16f, .14f),  // 화 · 빨강
+                LabOrbElement.Water => new Color(.13f, .42f, .90f), // 수 · 파랑
+                LabOrbElement.Wood => new Color(.20f, .66f, .25f),  // 목 · 초록
+                LabOrbElement.Metal => new Color(.96f, .80f, .15f), // 금 · 노랑
+                LabOrbElement.Earth => new Color(.52f, .33f, .16f), // 토 · 갈색
+                _ => new Color(.53f, .34f, .84f)
+            };
+        }
+
+        public static void ApplyElementColor(Renderer renderer, LabOrbElement element)
+        {
+            if (renderer == null || element == LabOrbElement.None) return;
+            Color color = TemporaryElementColor(element);
+            var properties = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(properties);
+            properties.SetColor("_BaseColor", color); // URP Lit
+            properties.SetColor("_Color", color);     // Standard shader fallback
+            renderer.SetPropertyBlock(properties);
+        }
+
+        public static void ApplyKindColor(Renderer renderer, LabOrbKind kind)
         {
             if (renderer == null) return;
-            Color color = LabOrbPalette.For(kind, element);
+            Color color = kind switch
+            {
+                LabOrbKind.Yin => new Color(.08f, .08f, .09f),  // 음 · 검정
+                LabOrbKind.Yang => new Color(.95f, .95f, .93f), // 양 · 흰색
+                _ => new Color(.53f, .34f, .84f)
+            };
             var properties = new MaterialPropertyBlock();
             renderer.GetPropertyBlock(properties);
             properties.SetColor("_BaseColor", color); // URP Lit
@@ -447,12 +484,12 @@ namespace C6Lab
         /// explicitly per renderer. This avoids platform/renderer variants displaying a
         /// previous orb's material color on other instances.
         /// </summary>
-        public static void ApplyAppearanceMaterial(Renderer renderer, Material material, Color? colorOverride = null)
+        public static void ApplyAppearanceMaterial(Renderer renderer, Material material)
         {
             if (renderer == null || material == null) return;
             renderer.sharedMaterial = material;
-            Color color = colorOverride ?? (material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor")
-                : material.HasProperty("_Color") ? material.GetColor("_Color") : Color.white);
+            Color color = material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor")
+                : material.HasProperty("_Color") ? material.GetColor("_Color") : Color.white;
             var properties = new MaterialPropertyBlock();
             properties.SetColor("_BaseColor", color);
             properties.SetColor("_Color", color);

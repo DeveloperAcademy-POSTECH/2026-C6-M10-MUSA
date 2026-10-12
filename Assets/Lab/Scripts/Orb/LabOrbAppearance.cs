@@ -3,45 +3,6 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
-    /// Default orb colors. Yin/Yang/Combined surfaces take their color from the appearance
-    /// materials; these defaults cover element and item tints, and the fallback sphere
-    /// used when no appearance asset is assigned.
-    /// </summary>
-    public static class LabOrbPalette
-    {
-        public static readonly Color Yin = new Color(.1f, .1f, .12f);
-        public static readonly Color Yang = new Color(.96f, .96f, .94f);
-        public static readonly Color Fire = new Color(.9f, .17f, .14f);
-        public static readonly Color Water = new Color(.13f, .42f, .95f);
-        public static readonly Color Wood = new Color(.2f, .7f, .28f);
-        public static readonly Color Metal = new Color(.8f, .66f, .46f);
-        public static readonly Color Earth = new Color(.4f, .25f, .12f);
-        public static readonly Color Combined = new Color(.55f, .29f, .81f);
-        public static readonly Color Item = new Color(.53f, .34f, .84f);
-
-        public static Color For(LabOrbKind kind, LabOrbElement element)
-        {
-            if (kind.IsItem()) return Item;
-            return kind switch
-            {
-                LabOrbKind.Yin => Yin,
-                LabOrbKind.Yang => Yang,
-                _ => ElementOrNull(element) ?? Combined
-            };
-        }
-
-        public static Color? ElementOrNull(LabOrbElement element) => element switch
-        {
-            LabOrbElement.Fire => Fire,
-            LabOrbElement.Water => Water,
-            LabOrbElement.Wood => Wood,
-            LabOrbElement.Metal => Metal,
-            LabOrbElement.Earth => Earth,
-            _ => (Color?)null
-        };
-    }
-
-    /// <summary>
     /// Inspector-editable orb presentation shared by board orbs and thrown projectiles.
     /// The optional prefab contains art only, authored at unit diameter. Physics, orb ID,
     /// ownership and gameplay radius always remain on each runtime object's root.
@@ -53,14 +14,13 @@ namespace C6Lab
         [SerializeField] private Material yinMaterial;
         [SerializeField] private Material yangMaterial;
         [SerializeField] private Material combinedMaterial;
-        [Header("Combined element tints (drawn over the combined material)")]
-        [SerializeField] private Color fireColor = LabOrbPalette.Fire;
-        [SerializeField] private Color waterColor = LabOrbPalette.Water;
-        [SerializeField] private Color woodColor = LabOrbPalette.Wood;
-        [SerializeField] private Color metalColor = LabOrbPalette.Metal;
-        [SerializeField] private Color earthColor = LabOrbPalette.Earth;
-        [Header("Item orbs (icon drawn on a disc facing the board camera)")]
-        [SerializeField] private Color itemColor = LabOrbPalette.Item;
+        [Header("Combined orb by element (empty = combined material tinted with a temporary color)")]
+        [SerializeField] private Material fireMaterial;
+        [SerializeField] private Material waterMaterial;
+        [SerializeField] private Material woodMaterial;
+        [SerializeField] private Material metalMaterial;
+        [SerializeField] private Material earthMaterial;
+        [Header("Item icons (drawn on a disc facing the board camera)")]
         [SerializeField] private Texture2D relayIcon;
         [SerializeField] private Texture2D secretBoxIcon;
         [SerializeField] private Texture2D potionIcon;
@@ -82,13 +42,31 @@ namespace C6Lab
         public Vector2 ShadowOffset => shadowOffset;
         public float ShadowDepth => shadowDepth;
 
-        public Material MaterialFor(LabOrbKind kind)
+        public Material MaterialFor(LabOrbKind kind, LabOrbElement element = LabOrbElement.None)
         {
+            if (kind == LabOrbKind.Combined)
+            {
+                Material elementMaterial = ElementMaterialFor(element);
+                if (elementMaterial != null) return elementMaterial;
+            }
             return kind switch
             {
                 LabOrbKind.Yin => yinMaterial,
                 LabOrbKind.Yang => yangMaterial,
                 _ => combinedMaterial
+            };
+        }
+
+        public Material ElementMaterialFor(LabOrbElement element)
+        {
+            return element switch
+            {
+                LabOrbElement.Fire => fireMaterial,
+                LabOrbElement.Water => waterMaterial,
+                LabOrbElement.Wood => woodMaterial,
+                LabOrbElement.Metal => metalMaterial,
+                LabOrbElement.Earth => earthMaterial,
+                _ => null
             };
         }
 
@@ -101,20 +79,11 @@ namespace C6Lab
             _ => null
         };
 
-        /// <summary>A color drawn over the kind's material, or null to keep the material's own color.</summary>
-        public Color? ColorOverrideFor(LabOrbKind kind, LabOrbElement element = LabOrbElement.None)
+        /// <summary>속성 에셋이 아직 없는 결합 구슬은 임시 색으로 구분한다.</summary>
+        public bool NeedsTemporaryElementColor(LabOrbKind kind, LabOrbElement element)
         {
-            if (kind.IsItem()) return itemColor;
-            if (kind != LabOrbKind.Combined) return null;
-            return element switch
-            {
-                LabOrbElement.Fire => fireColor,
-                LabOrbElement.Water => waterColor,
-                LabOrbElement.Wood => woodColor,
-                LabOrbElement.Metal => metalColor,
-                LabOrbElement.Earth => earthColor,
-                _ => (Color?)null
-            };
+            return kind == LabOrbKind.Combined && element != LabOrbElement.None
+                && ElementMaterialFor(element) == null;
         }
 
         /// <summary>
@@ -123,16 +92,19 @@ namespace C6Lab
         /// A future art prefab can nest its renderer differently: the first renderer is
         /// used when a direct child named Sphere is absent.
         /// </summary>
-        public void ApplyKindMaterial(GameObject artRoot, LabOrbKind kind, LabOrbElement element = LabOrbElement.None)
+        public void ApplyKindMaterial(GameObject artRoot, LabOrbKind kind,
+            LabOrbElement element = LabOrbElement.None)
         {
             if (artRoot == null) return;
-            Material material = MaterialFor(kind);
+            Material material = MaterialFor(kind, element);
             if (material == null) return;
             Transform sphere = artRoot.transform.Find("Sphere");
             Renderer surface = sphere != null ? sphere.GetComponent<Renderer>() : null;
             if (surface == null) surface = artRoot.GetComponentInChildren<Renderer>(true);
             if (surface == null) return;
-            LabOrbVisualFactory.ApplyAppearanceMaterial(surface, material, ColorOverrideFor(kind, element));
+            LabOrbVisualFactory.ApplyAppearanceMaterial(surface, material);
+            if (NeedsTemporaryElementColor(kind, element))
+                LabOrbVisualFactory.ApplyElementColor(surface, element);
         }
     }
 }

@@ -16,7 +16,6 @@ namespace C6Lab
         public const int DefaultParticipants = 3;
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
-        private const uint ElementDrawSalt = 0x5A17E1E5u;
         private const uint LockDrawSalt = 0x10C4ED00u;
         private readonly Dictionary<ulong, LabPlayerState> players = new Dictionary<ulong, LabPlayerState>();
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
@@ -24,11 +23,11 @@ namespace C6Lab
         private readonly ulong[] seats = new ulong[MaximumParticipants];
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
-        private readonly Dictionary<ulong, uint> combinedCounts = new Dictionary<ulong, uint>();
         private Rules rules;
         private string sessionId;
         private uint round;
         private uint seed;
+        private uint combinedCount;
         private ulong revision;
         private int hp;
         private double lastTime;
@@ -72,14 +71,14 @@ namespace C6Lab
             activeSeatCount = ids.Length;
             Array.Clear(seats, 0, seats.Length);
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
-            players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear(); combinedCounts.Clear();
+            players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState { id = ids[i], seat = i, stamina = rules.StaminaStart });
                 generatedCounts.Add(ids[i], 0u);
-                combinedCounts.Add(ids[i], 0u);
             }
             seed = SeedFor(id, round);
+            combinedCount = 0;
             hp = rules.MonsterMaxHp;
             revision = 0;
             lastTime = now;
@@ -134,11 +133,10 @@ namespace C6Lab
                 return Reject("POLARITY_MISMATCH", out reason);
 
             orbs.Remove(firstId); orbs.Remove(secondId);
-            uint combined = combinedCounts[sender];
-            combinedCounts[sender] = combined + 1;
+            var element = ElementFor(seed, combinedCount++);
             orb = new LabOrbState
             {
-                id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = ElementFor(seed, sender, combined),
+                id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = element,
                 origin = LabOrbOrigin.Combined, originOwner = sender,
                 x = (first.x + second.x) * .5f, y = (first.y + second.y) * .5f,
                 vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
@@ -327,6 +325,24 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// 결합 구슬의 오행 속성을 정한다. 다섯 속성이 같은 확률로 나온다.
+        /// Host만 호출하므로 모든 기기가 스냅샷으로 같은 결과를 받는다.
+        /// 규칙을 바꿀 때는 이 함수만 고치면 된다.
+        /// </summary>
+        private static LabOrbElement ElementFor(uint seed, uint combinedIndex)
+        {
+            unchecked
+            {
+                ulong value = ((ulong)seed << 32) ^ 0xE1E3E7A5UL;
+                value += 0x9E3779B97F4A7C15UL * (combinedIndex + 1UL);
+                value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
+                value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
+                value ^= value >> 31;
+                return (LabOrbElement)(1 + (int)(value % 5UL));
+            }
+        }
+
         // Counter-based Host draw: one player's accepted generation cannot change another's
         // sequence. Each draw is independent, so results follow the configured percentages.
         private static LabOrbKind GeneratedKindFor(uint seed, ulong playerId, uint index, int[] chances)
@@ -347,10 +363,6 @@ namespace C6Lab
             int span = rules.ItemUnlockSwipesMax - rules.ItemUnlockSwipesMin + 1;
             return rules.ItemUnlockSwipesMin + (int)(DrawFor(seed ^ LockDrawSalt, playerId, index) % (ulong)span);
         }
-
-        // A separate salted stream keeps element draws independent of generation draws.
-        private static LabOrbElement ElementFor(uint seed, ulong playerId, uint index) =>
-            (LabOrbElement)(1 + (int)(DrawFor(seed ^ ElementDrawSalt, playerId, index) % 5UL));
 
         private static ulong DrawFor(uint seed, ulong playerId, uint index)
         {
