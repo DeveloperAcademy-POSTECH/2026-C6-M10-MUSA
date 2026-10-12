@@ -359,11 +359,12 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void DoubleTapOnAnUnlockedPotionRequestsUseButLockedOrSlowTapsDoNot()
+        public void DoubleTapOnAnUnlockedPotionOrBoxRequestsUseButLockedOrSlowTapsDoNot()
         {
             var potion = board.UpsertOrb("potion", LabOrbKind.Potion, new Vector2(.3f, .5f), lockSwipes: 0);
             var locked = board.UpsertOrb("locked", LabOrbKind.Potion, new Vector2(.7f, .5f), lockSwipes: 2);
             var slow = board.UpsertOrb("slow", LabOrbKind.Potion, new Vector2(.5f, .85f), lockSwipes: 0);
+            var box = board.UpsertOrb("box", LabOrbKind.SecretBox, new Vector2(.5f, .2f), lockSwipes: 0);
             var uses = new System.Collections.Generic.List<string>();
             board.UseRequested += id => uses.Add(id);
 
@@ -385,6 +386,11 @@ namespace C6Lab.Tests
             Assert.That(BoardPoint(potion), Is.EqualTo(potionPoint), "A double tap uses the item in place.");
             Assert.That(board.TryBeginDragAtWorld(potionPoint, 5d), Is.False,
                 "The item waits for the Host result instead of being dragged again.");
+
+            Vector2 boxPoint = BoardPoint(box);
+            Tap(boxPoint, 6d);
+            Tap(boxPoint, 6.2d);
+            Assert.That(uses, Is.EqualTo(new[] { "potion", "box" }));
         }
 
         private void Tap(Vector2 point, double at)

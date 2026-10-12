@@ -651,6 +651,51 @@ namespace C6Lab.Tests
             finally { UnityEngine.Object.DestroyImmediate(potions); }
         }
 
+        [Test]
+        public void SecretBoxOpensIntoTwoThrowableElementOrbsOnlyWhenThereIsRoom()
+        {
+            var boxes = ConfigWith(1f, 0, 0, 0, 100, 0, 0);
+            try
+            {
+                float[] values = boxes.CaptureDeveloperValues();
+                values[9] = 3f;  // stored orb limit
+                values[46] = 0f; // unlock swipes min
+                values[47] = 0f; // unlock swipes max
+                Assert.That(boxes.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("box-open", new ulong[] { 10, 20, 30 }, 0d, boxes);
+                Assert.That(room.TryGenerate(10, "box", 0d, out var box, out _), Is.True);
+                Assert.That(box.kind, Is.EqualTo(LabOrbKind.SecretBox));
+
+                Assert.That(room.TryUseItem(10, box.id, "open", .5d, out _, out var openReason), Is.True);
+                Assert.That(openReason, Is.EqualTo("ITEM_USED"));
+                var opened = room.Snapshot(.5d).orbs.Where(orb => orb.owner == 10).OrderBy(orb => orb.x).ToArray();
+                Assert.That(opened.Length, Is.EqualTo(2), "The box is replaced by exactly two orbs.");
+                Assert.That(opened.Any(orb => orb.id == box.id), Is.False);
+                foreach (var orb in opened)
+                {
+                    Assert.That(orb.kind, Is.EqualTo(LabOrbKind.Combined));
+                    Assert.That(orb.element, Is.Not.EqualTo(LabOrbElement.None));
+                    Assert.That(orb.createdAt, Is.EqualTo(.5d), "Opened orbs start a fresh orb lifetime.");
+                    Assert.That(orb.y, Is.EqualTo(box.y));
+                }
+                Assert.That(opened[0].x, Is.EqualTo(box.x - .05f).Within(.0001f));
+                Assert.That(opened[1].x, Is.EqualTo(box.x + .05f).Within(.0001f));
+                Assert.That(room.TryLaunch(10, opened[0].id, "throw", .6d, out _, out var launchReason), Is.True, launchReason);
+
+                for (int i = 0; i < 3; i++)
+                    Assert.That(room.TryGenerate(20, "full-" + i, .7d, out _, out _), Is.True);
+                var fullBox = room.Snapshot(.7d).orbs.First(orb => orb.owner == 20);
+                Assert.That(room.TryUseItem(20, fullBox.id, "no-room", .8d, out _, out var fullReason), Is.False);
+                Assert.That(fullReason, Is.EqualTo("STORAGE_FULL"));
+                Assert.That(room.Snapshot(.8d).orbs.Any(orb => orb.id == fullBox.id), Is.True, "A box without room is kept.");
+
+                Assert.That(room.Snapshot(8.4d).orbs.Select(orb => orb.id), Does.Contain(opened[1].id));
+                Assert.That(room.Snapshot(8.5d).orbs.Select(orb => orb.id), Does.Not.Contain(opened[1].id));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(boxes); }
+        }
+
         /// <summary>A default config with one generation cost and chances in GeneratedKinds order.</summary>
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {

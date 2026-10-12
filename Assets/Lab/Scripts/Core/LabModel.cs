@@ -16,6 +16,7 @@ namespace C6Lab
         public const int DefaultParticipants = 3;
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
+        private const float SecretBoxSpread = .05f;
         private const uint LockDrawSalt = 0x10C4ED00u;
         private readonly Dictionary<ulong, LabPlayerState> players = new Dictionary<ulong, LabPlayerState>();
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
@@ -240,9 +241,10 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// Double-tap use of the owner's unlocked item. A potion heals its user's personal HP up to
-        /// the maximum; at full HP it is refused and kept so it can still be passed to a neighbor.
-        /// A player already at 0 HP cannot be revived by a potion.
+        /// Double-tap use of the owner's unlocked item. A secret box opens into two throwable element
+        /// orbs beside it, which needs one more free storage slot. A potion heals its user's personal
+        /// HP up to the maximum; at full HP it is refused and kept so it can still be passed to a
+        /// neighbor. A player already at 0 HP cannot be revived by a potion.
         /// </summary>
         public bool TryUseItem(ulong sender, string id, string requestId, double now,
             out LabOrbState orb, out string reason)
@@ -253,6 +255,25 @@ namespace C6Lab
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (!current.kind.IsDoubleTapUsable()) return Reject("NOT_USABLE", out reason);
             if (current.lockSwipes > 0) return Reject("ITEM_LOCKED", out reason);
+            if (current.kind == LabOrbKind.SecretBox)
+            {
+                if (CountStored(sender) + 1 > rules.OrbStorageLimit) return Reject("STORAGE_FULL", out reason);
+                orbs.Remove(current.id);
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    var opened = new LabOrbState
+                    {
+                        id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = ElementFor(seed, combinedCount++),
+                        origin = LabOrbOrigin.Combined, originOwner = sender,
+                        x = Mathf.Clamp01(current.x + side * SecretBoxSpread), y = current.y,
+                        vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
+                    };
+                    orbs.Add(opened.id, opened);
+                }
+                reason = "ITEM_USED";
+                orb = current.Copy();
+                return true;
+            }
             var player = players[sender];
             if (player.personalHp <= 0) return Reject("PLAYER_DOWN", out reason);
             if (player.personalHp >= rules.PlayerMaxHp) return Reject("HP_FULL", out reason);
