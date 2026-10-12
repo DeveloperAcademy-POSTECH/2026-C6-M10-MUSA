@@ -20,6 +20,11 @@ namespace C6Lab
         [SerializeField] private Material woodMaterial;
         [SerializeField] private Material metalMaterial;
         [SerializeField] private Material earthMaterial;
+        [Header("Item icons (drawn on a disc facing the board camera)")]
+        [SerializeField] private Texture2D relayIcon;
+        [SerializeField] private Texture2D secretBoxIcon;
+        [SerializeField] private Texture2D potionIcon;
+        [SerializeField] private Texture2D bombIcon;
         [Header("Board contact shadow (presentation only)")]
         [SerializeField] private Material shadowMaterial;
         [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, .22f);
@@ -64,6 +69,15 @@ namespace C6Lab
                 _ => null
             };
         }
+
+        public Texture2D IconFor(LabOrbKind kind) => kind switch
+        {
+            LabOrbKind.Relay => relayIcon,
+            LabOrbKind.SecretBox => secretBoxIcon,
+            LabOrbKind.Potion => potionIcon,
+            LabOrbKind.Bomb => bombIcon,
+            _ => null
+        };
 
         /// <summary>속성 에셋이 아직 없는 결합 구슬은 임시 색으로 구분한다.</summary>
         public bool NeedsTemporaryElementColor(LabOrbKind kind, LabOrbElement element)

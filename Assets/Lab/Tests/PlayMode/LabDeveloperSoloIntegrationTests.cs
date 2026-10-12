@@ -14,6 +14,93 @@ namespace C6Lab.Tests
     public sealed class LabDeveloperSoloIntegrationTests
     {
         [UnityTest]
+        public IEnumerator SavedLobbyCanChooseTwoToFivePlayersBeforeHosting()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+
+            GameObject[] roots = SceneManager.GetActiveScene().GetRootGameObjects();
+            LabHud hud = roots.SelectMany(root => root.GetComponentsInChildren<LabHud>(true))
+                .FirstOrDefault();
+            LabDeveloperMode developerUi = roots.SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true))
+                .FirstOrDefault();
+            LabNetwork network = hud == null ? null : hud.network;
+            Assert.That(network, Is.Not.Null);
+            Assert.That(hud, Is.Not.Null);
+            Assert.That(developerUi, Is.Not.Null);
+            Assert.That(hud.network, Is.SameAs(network));
+            Assert.That(developerUi.network, Is.SameAs(network),
+                "The ordinary lobby and DEV panel must edit the same room-size value.");
+            Assert.That(hud.hostButton, Is.Not.Null);
+            Assert.That(hud.decreasePlayersButton, Is.Not.Null);
+            Assert.That(hud.increasePlayersButton, Is.Not.Null);
+            Assert.That(hud.peersText, Is.Not.Null);
+            Assert.That(hud.roomNameText, Is.Not.Null);
+            Assert.That(hud.roomListPanel, Is.Not.Null);
+            Assert.That(hud.refreshRoomsButton, Is.Not.Null);
+            Assert.That(hud.cancelRoomSearchButton, Is.Not.Null);
+            Assert.That(hud.roomListContent, Is.Not.Null);
+            Assert.That(hud.roomListRowTemplate, Is.Not.Null);
+            Assert.That(hud.roomSearchStatusText, Is.Not.Null);
+            Assert.That(hud.roomListContent.IsChildOf(hud.roomListPanel.transform), Is.True,
+                "Search results must appear inside the saved room-list panel.");
+            Assert.That(hud.roomListRowTemplate.transform.IsChildOf(hud.roomListContent), Is.True);
+            Assert.That(hud.roomListRowTemplate.GetComponentInChildren<UnityEngine.UI.Text>(true), Is.Not.Null,
+                "A discovered room needs a readable button label.");
+            Assert.That(hud.roomListContent.GetComponent<UnityEngine.UI.VerticalLayoutGroup>().childControlHeight,
+                Is.True, "Room rows must use their preferred height instead of collapsing to zero.");
+            Assert.That(hud.roomListRowTemplate.GetComponent<UnityEngine.UI.LayoutElement>().preferredHeight,
+                Is.GreaterThan(0f));
+            RectTransform title = hud.roomListPanel.transform.Find("RoomListTitle") as RectTransform;
+            Assert.That(title, Is.Not.Null);
+            Assert.That(title.anchorMin.y, Is.EqualTo(1f),
+                "The room heading must stay above the scrolling rows, including on tall screens.");
+            Assert.That(hud.roomSearchStatusText.rectTransform.anchorMin.y, Is.EqualTo(1f),
+                "The room-search hint must remain visible above the scrolling rows.");
+            Assert.That(hud.roomListPanel.activeSelf, Is.False,
+                "The room browser must not cover the lobby before searching.");
+            Assert.That(hud.roomListRowTemplate.gameObject.activeSelf, Is.False,
+                "The template is not an actual discovered room.");
+
+            Assert.That(network.TargetParticipantCount, Is.EqualTo(3));
+            hud.decreasePlayersButton.onClick.Invoke();
+            Assert.That(network.TargetParticipantCount, Is.EqualTo(2));
+            yield return null;
+            Assert.That(hud.decreasePlayersButton.interactable, Is.False);
+            Assert.That(hud.peersText.text, Does.Contain("ROOM PLAYERS 2 / 5"));
+
+            developerUi.Open();
+            Assert.That(developerUi.targetParticipantsSlider.value, Is.EqualTo(2f));
+            developerUi.targetParticipantsSlider.value = 5f;
+            Assert.That(network.TargetParticipantCount, Is.EqualTo(5));
+            developerUi.Close();
+            yield return null;
+            Assert.That(hud.increasePlayersButton.interactable, Is.False);
+            hud.decreasePlayersButton.onClick.Invoke();
+            Assert.That(network.TargetParticipantCount, Is.EqualTo(4));
+
+            // Use the saved ordinary HOST button, not the DEV room-creation shortcut.
+            hud.port.text = "17780";
+            try
+            {
+                hud.hostButton.onClick.Invoke();
+                Assert.That(network.IsHost, Is.True, network.Notice);
+                Assert.That(network.TargetParticipantCount, Is.EqualTo(4));
+                yield return null;
+                Assert.That(hud.decreasePlayersButton.gameObject.activeSelf, Is.False);
+                Assert.That(hud.increasePlayersButton.gameObject.activeSelf, Is.False);
+                Assert.That(hud.roomNameText.gameObject.activeSelf, Is.True);
+                Assert.That(hud.roomNameText.text, Is.Not.Empty,
+                    "The Host must see the registered room name or an explicit registration status.");
+                Assert.That(developerUi.targetParticipantsSlider.interactable, Is.False);
+            }
+            finally
+            {
+                if (network.IsConnected) network.Stop();
+            }
+        }
+
+        [UnityTest]
         public IEnumerator SavedDeveloperPanelCreatesAndRetunesTwoPlayerHostLobby()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
@@ -68,8 +155,8 @@ namespace C6Lab.Tests
             LabDeveloperMode developerUi = UnityEngine.Object.FindFirstObjectByType<LabDeveloperMode>();
             Assert.That(network, Is.Not.Null);
             Assert.That(developerUi, Is.Not.Null);
-            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(39));
-            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(39));
+            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
+            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(developerUi.applyHostButton, Is.Not.Null);
             Assert.That(developerUi.targetParticipantsSlider.value, Is.EqualTo(3f));
             network.port = 17778;
@@ -141,6 +228,17 @@ namespace C6Lab.Tests
             Assert.That(boardCamera.depth, Is.GreaterThan(battleCamera.depth),
                 "The board camera must render after the battle camera on mobile devices.");
 
+            // Each solo round has a random session seed and draws are independent, so use
+            // Yin/Yang-only chances and a cheap cost: up to 20 draws find both polarities.
+            LabConfig savedConfig = network.config;
+            LabConfig rawOnly = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = rawOnly.CaptureDeveloperValues();
+            tuning[5] = 1f;
+            tuning[39] = 50f; tuning[40] = 50f;
+            tuning[41] = 0f; tuning[42] = 0f; tuning[43] = 0f; tuning[44] = 0f;
+            Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
+            network.config = rawOnly;
+
             // Keep the test independent of an ordinary app using the default port 7777.
             network.port = 17777;
             try
@@ -152,11 +250,9 @@ namespace C6Lab.Tests
                 Assert.That(network.Snapshot.players.Length, Is.EqualTo(1));
                 int initialHp = network.Snapshot.hp;
 
-                // The Host's deterministic polarity rule gives both Yin and Yang within
-                // four accepted generations, regardless of its session seed.
                 LabOrbState yin = null;
                 LabOrbState yang = null;
-                for (int i = 0; i < 4 && (yin == null || yang == null); i++)
+                for (int i = 0; i < 20 && (yin == null || yang == null); i++)
                 {
                     int before = network.Snapshot.orbs.Length;
                     network.Generate();
@@ -186,6 +282,7 @@ namespace C6Lab.Tests
 
                 LabOrbState combined = network.Snapshot.orbs.SingleOrDefault(o => o.kind == LabOrbKind.Combined);
                 Assert.That(combined, Is.Not.Null, "Direct Yin/Yang overlap should reach the Host through CombineRequested.");
+                Assert.That(combined.element, Is.Not.EqualTo(LabOrbElement.None), "Every Combined orb has a five-element attribute.");
                 Assert.That(network.Snapshot.orbs.Any(o => o.id == yin.id || o.id == yang.id), Is.False);
                 Assert.That(board.TryGetMotion(combined.id, out Vector2 combined01, out _), Is.True);
                 LabOrbView combinedView = board.GetComponentsInChildren<LabOrbView>()
@@ -227,6 +324,8 @@ namespace C6Lab.Tests
             finally
             {
                 network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(rawOnly);
             }
         }
 

@@ -41,6 +41,7 @@ namespace C6Lab
         public float wz;
         public string reason;
         public ulong owner;
+        public int element;
         public int targetParticipants;
         public int configRevision;
         public string configFingerprint;
@@ -59,9 +60,9 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // 3D board physics changes motion semantics even though snapshots remain planar.
-        // Reject old clients rather than mixing two simulations in a single room.
-        private const ushort LabProtocolVersion = 5604;
+        // Item orb kinds and generation-chance settings are new snapshot/settings data.
+        // Reject old clients rather than mixing two rule sets in a single room.
+        private const ushort LabProtocolVersion = 5605;
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/4");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
@@ -101,6 +102,8 @@ namespace C6Lab
         private LabConfig sessionConfig;
         private LabBonjourDiscovery discovery;
         private string advertisedName;
+        private IReadOnlyList<LabDiscoveredRoom> discoveredRooms = Array.Empty<LabDiscoveredRoom>();
+        private bool roomSearchActive;
         private int targetParticipantCount = 3;
         private int configRevision;
         private string configFingerprint;
@@ -109,10 +112,8 @@ namespace C6Lab
         private double joinAttemptAt;
         private bool joinInProgress;
         private bool joinRetryPending;
-        private bool discoveryJoinPending;
         private bool discoveryJoinActive;
-        private string discoveryServiceName;
-        private double discoveryFirstTargetAt;
+        private string discoveryRoomKey;
         private bool clientConfigReady;
         private long snapshotSequence;
         private long incomingSequence;
@@ -127,6 +128,13 @@ namespace C6Lab
         public string LastShotReport { get; private set; } = string.Empty;
         public int ParticipantCount => order.Count;
         public int TargetParticipantCount => targetParticipantCount;
+        public bool IsSearchingRooms => roomSearchActive && discovery != null && discovery.IsBrowsing;
+        public IReadOnlyList<LabDiscoveredRoom> DiscoveredRooms => discoveredRooms;
+        // Bonjour may rename a duplicate service. Show only its confirmed registered name.
+        public string HostRoomName => IsHost && discovery != null && discovery.AdvertisingConfirmed
+            ? discovery.RegisteredServiceName ?? string.Empty : string.Empty;
+        public bool HostRoomNamePending => IsHost && discovery != null && discovery.IsAdvertising
+            && !discovery.AdvertisingConfirmed;
         public bool SessionConfigReady => IsHost
             ? order.Count > 0 && order.All(id => configAcknowledgements.Contains(id))
             : clientConfigReady;
@@ -134,8 +142,9 @@ namespace C6Lab
         public bool IsDeveloperSolo => developerSolo;
         public bool DeveloperBuildAvailable => Application.isEditor || Debug.isDebugBuild;
         public bool IsConnected => manager != null && manager.IsListening && (manager.IsHost || manager.IsConnectedClient);
-        public bool CanChooseConnection => !IsConnected && !joinInProgress && !joinRetryPending
-            && !discoveryJoinPending && (manager == null || (!manager.IsListening && !manager.ShutdownInProgress));
+        private bool CanBeginConnection => !IsConnected && !joinInProgress && !joinRetryPending
+            && (manager == null || (!manager.IsListening && !manager.ShutdownInProgress));
+        public bool CanChooseConnection => CanBeginConnection && !roomSearchActive;
         public ulong LocalPlayerId => IsConnected ? manager.LocalClientId : ulong.MaxValue;
         public LabSnapshot Snapshot => latest;
         public bool CanStartBattle => IsHost && !developerSolo && order.Count == targetParticipantCount
@@ -178,7 +187,7 @@ namespace C6Lab
         /// <summary>The Host chooses 2–5 network participants before creating the room.</summary>
         public bool SetTargetParticipantCount(int count)
         {
-            if (IsConnected || count < 2 || count > 5) return false;
+            if (!CanChooseConnection || count < 2 || count > 5) return false;
             targetParticipantCount = count;
             Changed?.Invoke();
             return true;
@@ -187,7 +196,7 @@ namespace C6Lab
         /// <summary>Install a validated, session-only copy before Host. Never edit the saved asset.</summary>
         public bool ConfigureHostSession(LabConfig candidate, int targetParticipants)
         {
-            if (IsConnected || targetParticipants < 2 || targetParticipants > 5)
+            if (!CanChooseConnection || targetParticipants < 2 || targetParticipants > 5)
             {
                 SetNotice("Choose 2–5 players before creating a room.");
                 return false;
@@ -270,6 +279,7 @@ namespace C6Lab
         public void Host()
         {
             if (!CanChooseConnection || manager == null || transport == null || config == null) return;
+            DisposeDiscovery();
             ResetLocal();
             configRevision = 1;
             configFingerprint = LabSessionSettings.Fingerprint(config.CaptureDeveloperValues(), targetParticipantCount,
@@ -301,8 +311,8 @@ namespace C6Lab
             if (!CanChooseConnection || manager == null || transport == null || config == null) return;
             if (string.IsNullOrWhiteSpace(address)) { SetStatus("Enter the Host IP address."); return; }
             DisposeDiscovery();
-            discoveryJoinPending = false;
             discoveryJoinActive = false;
+            discoveryRoomKey = null;
             hostAddress = address.Trim();
             var addresses = new List<string>();
             try
@@ -314,29 +324,60 @@ namespace C6Lab
             BeginJoinCandidates(addresses);
         }
 
-        /// <summary>Browse local Bonjour rooms, then try IPv6 and IPv4 routes with a direct-IP fallback.</summary>
-        public void FindAndJoinRoom()
+        /// <summary>Browse without joining. A player must explicitly select a visible room.</summary>
+        public bool StartRoomSearch()
         {
-            if (!CanChooseConnection) return;
+            if (!CanBeginConnection || manager == null || transport == null || config == null) return false;
             DisposeDiscovery();
             if (!LabBonjourDiscovery.IsSupported)
             {
                 SetStatus("Room discovery is available on macOS and iOS. Use direct IP here.");
-                return;
+                return false;
             }
             discovery = new LabBonjourDiscovery();
             discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
+            discovery.Changed += OnDiscoveryChanged;
+            roomSearchActive = true;
             if (!discovery.StartBrowse())
             {
-                SetStatus(discovery.LastError ?? "Room search could not start. Use direct IP.");
+                string error = discovery.LastError ?? "Room search could not start. Use direct IP.";
                 DisposeDiscovery();
-                return;
+                SetStatus(error);
+                return false;
             }
-            discoveryJoinPending = true;
             discoveryJoinActive = false;
-            discoveryServiceName = null;
-            discoveryFirstTargetAt = 0;
+            discoveryRoomKey = null;
             SetStatus("Searching local rooms; keep the Host app open...");
+            return true;
+        }
+
+        public void CancelRoomSearch()
+        {
+            if (!roomSearchActive) return;
+            DisposeDiscovery();
+            SetStatus("Room search canceled. Choose HOST or JOIN.");
+        }
+
+        /// <summary>Use only the selected room's current IPv4/IPv6 routes.</summary>
+        public bool JoinDiscoveredRoom(string roomKey)
+        {
+            if (!IsSearchingRooms || !CanBeginConnection) return false;
+            LabDiscoveredRoom room = discoveredRooms.FirstOrDefault(item =>
+                string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase));
+            LabBonjourTarget[] targets = LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey);
+            if (room == null || targets.Length == 0)
+            {
+                discoveredRooms = LabRoomCatalog.GroupTargets(discovery.Targets);
+                SetStatus("That room is no longer available. Refresh and choose another room.");
+                return false;
+            }
+            port = room.Port;
+            roomSearchActive = false;
+            discoveredRooms = Array.Empty<LabDiscoveredRoom>();
+            discoveryJoinActive = true;
+            discoveryRoomKey = room.Key;
+            BeginJoinCandidates(targets.Select(item => item.Address));
+            return joinInProgress;
         }
 
         private void BeginJoinCandidates(IEnumerable<string> addresses)
@@ -420,9 +461,8 @@ namespace C6Lab
             stopping = true;
             joinInProgress = false;
             joinRetryPending = false;
-            discoveryJoinPending = false;
             discoveryJoinActive = false;
-            discoveryServiceName = null;
+            discoveryRoomKey = null;
             DisposeDiscovery();
             UnregisterHandler();
             if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
@@ -518,30 +558,22 @@ namespace C6Lab
             double now = Time.realtimeSinceStartupAsDouble;
             foreach (ulong stale in pendingApprovals.Where(item => now - item.Value > 15d)
                          .Select(item => item.Key).ToArray()) pendingApprovals.Remove(stale);
-            if (discovery != null)
+            LabBonjourDiscovery activeDiscovery = discovery;
+            if (activeDiscovery != null)
             {
-                discovery.Tick(now);
-                if (discoveryJoinPending && discovery.Targets.Count > 0)
+                activeDiscovery.Tick(now);
+                if (discovery == activeDiscovery && roomSearchActive && !activeDiscovery.IsBrowsing)
                 {
-                    if (discoveryFirstTargetAt == 0) discoveryFirstTargetAt = now;
-                    if (now - discoveryFirstTargetAt >= .75d)
-                    {
-                        var first = discovery.Targets[0];
-                        var candidates = discovery.Targets
-                            .Where(item => item.ServiceName == first.ServiceName && item.Port == first.Port)
-                            .Select(item => item.Address).ToArray();
-                        port = first.Port;
-                        discoveryJoinPending = false;
-                        discoveryJoinActive = true;
-                        discoveryServiceName = first.ServiceName;
-                        BeginJoinCandidates(candidates);
-                    }
+                    string error = activeDiscovery.LastError ?? "Room search ended. Use direct IP or search again.";
+                    DisposeDiscovery();
+                    SetStatus(error);
                 }
-                if (discoveryJoinActive)
+                if (discovery == activeDiscovery && discoveryJoinActive)
                 {
-                    foreach (LabBonjourTarget target in discovery.Targets)
+                    foreach (LabBonjourTarget target in activeDiscovery.Targets)
                     {
-                        if (target.ServiceName != discoveryServiceName || target.Port != port) continue;
+                        if (!string.Equals(LabRoomCatalog.Key(target.ServiceName, target.Port),
+                                discoveryRoomKey, StringComparison.OrdinalIgnoreCase)) continue;
                         if (LabConnectionCandidates.AppendDiscovered(joinCandidates, target.Address, port))
                             Debug.Log("C6_LAB_DISCOVERY_ROUTE_ADDED family=" + LabBonjourAddressCodec.Family(target.Address));
                     }
@@ -855,11 +887,11 @@ namespace C6Lab
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
             Vector3 launchPosition = LabThrowMath.LaunchPosition(seat, seatCount, targetCenter, releaseX01, config);
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
-            var projectile = LabProjectile.Create(launchPosition, config, projectileRoot);
+            var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element);
             projectile.name = "Projectile " + orb.id;
             projectile.SetMissSurface(battleFloor);
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
-            var notice = new LabNetworkPacket { type = "projectile", firstId = orb.id, owner = orb.owner, x = launchPosition.x, y = launchPosition.y, z = launchPosition.z, wx = velocity.x, wy = velocity.y, wz = velocity.z };
+            var notice = new LabNetworkPacket { type = "projectile", firstId = orb.id, owner = orb.owner, element = (int)orb.element, x = launchPosition.x, y = launchPosition.y, z = launchPosition.z, wx = velocity.x, wy = velocity.y, wz = velocity.z };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
             Debug.Log("C6_LAB_THROW orb=" + orb.id + " seat=" + seat
                 + " swipe=" + releaseVelocity + " launch=" + velocity
@@ -907,7 +939,7 @@ namespace C6Lab
                 bool showRise = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
                     && orb.kind != LabOrbKind.Combined;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
-                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element);
+                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element, orb.lockSwipes);
             }
             foreach (string id in visibleOrbIds) if (!current.Contains(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
@@ -1003,7 +1035,9 @@ namespace C6Lab
                     {
                         Vector3 position = new Vector3(packet.x, packet.y, packet.z);
                         Vector3 velocity = new Vector3(packet.wx, packet.wy, packet.wz);
-                        LabProjectile visual = LabProjectile.Create(position, config, projectileRoot);
+                        LabOrbElement element = packet.element >= (int)LabOrbElement.None && packet.element <= (int)LabOrbElement.Earth
+                            ? (LabOrbElement)packet.element : LabOrbElement.None;
+                        LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element);
                         visual.SetMissSurface(battleFloor);
                         visual.LaunchVisual(velocity, config, target);
                     }
@@ -1175,6 +1209,7 @@ namespace C6Lab
             if (!LabBonjourDiscovery.IsSupported) return;
             discovery = new LabBonjourDiscovery();
             discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
+            discovery.Changed += OnDiscoveryChanged;
             advertisedName = "C6Lab-" + Guid.NewGuid().ToString("N").Substring(0, 8);
             bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
             bool ipv6 = transport is LabDualStackTransport second && second.HasIpv6Listener;
@@ -1188,10 +1223,27 @@ namespace C6Lab
 
         private void DisposeDiscovery()
         {
-            if (discovery == null) return;
-            discovery.Dispose();
-            discovery = null;
+            if (discovery != null)
+            {
+                discovery.Changed -= OnDiscoveryChanged;
+                discovery.Dispose();
+                discovery = null;
+            }
+            roomSearchActive = false;
+            discoveredRooms = Array.Empty<LabDiscoveredRoom>();
+            discoveryRoomKey = null;
             advertisedName = null;
+            Changed?.Invoke();
+        }
+
+        private void OnDiscoveryChanged()
+        {
+            if (roomSearchActive && discovery != null)
+            {
+                discoveredRooms = LabRoomCatalog.GroupTargets(discovery.Targets);
+                Debug.Log("C6_LAB_ROOM_LIST count=" + discoveredRooms.Count);
+            }
+            Changed?.Invoke();
         }
 
         private void ClearProjectiles()
