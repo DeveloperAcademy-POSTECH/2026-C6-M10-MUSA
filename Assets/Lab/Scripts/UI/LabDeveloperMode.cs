@@ -90,7 +90,12 @@ namespace C6Lab
                 targetParticipantsSlider.minValue = 2f;
                 targetParticipantsSlider.maxValue = 5f;
                 targetParticipantsSlider.wholeNumbers = true;
-                targetParticipantsSlider.onValueChanged.AddListener(_ => RefreshTargetLabel());
+                targetParticipantsSlider.onValueChanged.AddListener(value =>
+                {
+                    if (network != null && network.CanChooseConnection)
+                        network.SetTargetParticipantCount(Mathf.RoundToInt(value));
+                    RefreshTargetLabel();
+                });
                 targetParticipantsSlider.SetValueWithoutNotify(network.TargetParticipantCount);
             }
             Fill(runtimeConfig);
@@ -103,11 +108,11 @@ namespace C6Lab
             if (soloTuningActive && !network.IsDeveloperSolo)
                 RestoreSourceConfig();
 
-            bool canOpen = !network.IsConnected || network.IsDeveloperSolo || HostLobby;
+            bool canOpen = network.CanChooseConnection || network.IsDeveloperSolo || HostLobby;
             if (toggleButton != null) toggleButton.interactable = canOpen;
             if (endSoloButton != null) endSoloButton.interactable = network.IsDeveloperSolo;
-            if (applyHostButton != null) applyHostButton.interactable = !network.IsConnected || HostLobby;
-            if (targetParticipantsSlider != null) targetParticipantsSlider.interactable = !network.IsConnected;
+            if (applyHostButton != null) applyHostButton.interactable = network.CanChooseConnection || HostLobby;
+            if (targetParticipantsSlider != null) targetParticipantsSlider.interactable = network.CanChooseConnection;
             string soloTitle = network.IsDeveloperSolo ? "RESTART SOLO" : "START SOLO";
             if (applyStartLabel != null && applyStartLabel.text != soloTitle) applyStartLabel.text = soloTitle;
             string hostTitle = HostLobby ? "APPLY TO ROOM" : "CREATE ROOM";
@@ -116,7 +121,8 @@ namespace C6Lab
 
         public void Open()
         {
-            if (!available || network == null || (network.IsConnected && !network.IsDeveloperSolo && !HostLobby)) return;
+            if (!available || network == null ||
+                (!network.CanChooseConnection && !network.IsDeveloperSolo && !HostLobby)) return;
             Fill(network.IsConnected && network.config != null ? network.config : runtimeConfig);
             if (targetParticipantsSlider != null)
                 targetParticipantsSlider.SetValueWithoutNotify(network.TargetParticipantCount);
@@ -186,6 +192,11 @@ namespace C6Lab
         {
             if (!available || network == null || runtimeConfig == null) return;
             bool lobby = HostLobby;
+            if (!lobby && !network.CanChooseConnection)
+            {
+                SetFeedback("Cancel room search before creating a room.");
+                return;
+            }
             if (network.IsConnected && !lobby)
             {
                 SetFeedback("Shared settings are editable only by the Host before battle starts.");
@@ -205,7 +216,7 @@ namespace C6Lab
                 return;
             }
 
-            int targetCount = targetParticipantsSlider == null ? 3 : Mathf.RoundToInt(targetParticipantsSlider.value);
+            int targetCount = network.TargetParticipantCount;
             if (!network.ConfigureHostSession(runtimeConfig, targetCount))
             {
                 SetFeedback("Room settings or player count were not accepted.");

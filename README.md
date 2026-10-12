@@ -22,9 +22,9 @@ DEV 값은 **START/RESTART SOLO**로 1인 라운드에, **CREATE ROOM**으로 �
 - 실험 Scene은 `Assets/Lab/Scenes/Lab.unity`입니다. Scene에 저장된 Canvas와 GameObject는 Hierarchy/Inspector에서 직접 조정합니다.
 - 게임 수치는 `Assets/Lab/Resources/LabConfig.asset`의 **단일 설정 원본**에서 조정합니다. 속성을 바꿨다면 새 세션에서 확인합니다.
 - 구슬의 **보이는 형태**는 `Assets/Lab/Art/Orbs/`의 에셋에서 조정합니다. 게임 수치와 시각 에셋은 분리되어 있습니다.
-- 공유 방은 Host를 포함해 **2~5명**, 기본값은 **3명**입니다. Host는 **DEV → ROOM PLAYERS·값 조정 → CREATE ROOM**으로 인원과 수치를 정합니다. 기본 수치로 시작할 때는 일반 **HOST**를 사용합니다. 참가자는 **FIND HOST**로 방을 찾아 자동 입장하거나 Host 주소와 포트 `7777`을 입력해 **JOIN**합니다. 설정이 모든 참가자에게 확인되고 목표 인원이 모이면 Host의 **START**가 활성화됩니다. 같은 Mac에서 직접 IP로 접속한다면 주소는 `127.0.0.1`입니다.
+- 공유 방은 Host를 포함해 **2~5명**, 기본값은 **3명**입니다. Host는 일반 로비의 **ROOM PLAYERS** 옆 `−`·`+`로 인원을 정한 뒤 **HOST**로 방을 만듭니다. DEV의 **ROOM PLAYERS**도 같은 인원 설정을 사용하며, 개발자 수치를 함께 조정할 때는 **DEV → CREATE ROOM**으로 방을 만듭니다. 방을 만든 후에는 인원수를 바꿀 수 없습니다. Host 로비에는 네트워크에 실제 등록된 방 이름이 표시됩니다. 참가자는 **FIND ROOMS**로 방 목록을 열고 원하는 이름을 눌러 입장하거나, Host 주소와 포트 `7777`을 입력해 **JOIN**합니다. 설정이 모든 참가자에게 확인되고 목표 인원이 모이면 Host의 **START**가 활성화됩니다. 같은 Mac에서 직접 IP로 접속한다면 주소는 `127.0.0.1`입니다.
 
-핫스팟에서 시험할 때는 iPhone에서 개인용 핫스팟을 켜고 그 iPhone에서 방을 만듭니다. 참가 기기를 해당 핫스팟에 연결한 뒤 **FIND HOST**를 먼저 사용합니다. 검색이 되지 않으면 참가 기기에서 Host의 실제 IP 주소와 포트로 **JOIN**할 수 있습니다. 두 앱의 로컬 네트워크 접근 권한을 허용하고, 자동 검색 실패와 직접 IP 접속 실패는 구분해 기록합니다. 기존 프로토타입의 핫스팟 성공 기록은 이 Lab 버전의 검증 결과가 아니므로 [검증 기록](docs/VALIDATION.md)에서 새 실행 결과를 확인하세요.
+핫스팟에서 시험할 때는 iPhone에서 개인용 핫스팟을 켜고 그 iPhone에서 방을 만듭니다. 참가 기기를 해당 핫스팟에 연결한 뒤 **FIND ROOMS**에서 Host 화면의 방 이름과 같은 항목을 눌러 입장합니다. 목록에는 방마다 한 행만 나타나며, 선택한 방의 IPv4·IPv6 주소는 접속 경로로 함께 시도합니다. 목록의 **REFRESH**는 다시 검색하고 **CANCEL**은 검색을 닫습니다. 검색이 되지 않으면 참가 기기에서 Host의 실제 IP 주소와 포트로 **JOIN**할 수 있습니다. 두 앱의 로컬 네트워크 접근 권한을 허용하고, 방 검색 실패와 직접 IP 접속 실패는 구분해 기록합니다. 기존 프로토타입의 핫스팟 성공 기록은 이 Lab 버전의 검증 결과가 아니므로 [검증 기록](docs/VALIDATION.md)에서 새 실행 결과를 확인하세요.
 
 ### 한 대로 조합·투척 실험하기
 
@@ -34,7 +34,7 @@ Unity Editor에서 Play를 누르거나 **Development Build**로 만든 앱을 �
 
 ### 공유 방의 값 바꾸기
 
-Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤, 39개 값을 숫자 입력 또는 슬라이더로 조정합니다. 숫자 입력은 정확한 값을 지정할 때 사용하며 두 조작은 서로 같은 값을 보여줍니다. **CREATE ROOM**을 누르면 그 값으로 방을 만들고, 참가자가 **FIND HOST** 또는 직접 IP **JOIN**으로 들어오면 Host 설정을 받습니다. Host 로비에서 전투 시작 전에 다시 DEV를 열어 값을 바꿀 수 있으며, 이때 버튼은 **APPLY TO ROOM**입니다. 변경된 설정에 대해 참가자의 확인이 끝나야 **START**할 수 있습니다. 인원수는 방을 만들기 전에 선택하며, 전투 중에는 설정을 바꾸지 않습니다. 설정은 실행 중인 세션의 복사본에만 적용되고 `LabConfig.asset`에는 저장되지 않습니다.
+Host에서 **DEV**를 열고 39개 값을 숫자 입력 또는 슬라이더로 조정합니다. 숫자 입력은 정확한 값을 지정할 때 사용하며 두 조작은 서로 같은 값을 보여줍니다. DEV의 **ROOM PLAYERS**는 일반 로비의 인원 선택과 같은 값을 표시·변경합니다. **CREATE ROOM**을 누르면 선택한 인원과 조정값으로 방을 만들고, 참가자가 **FIND ROOMS**의 방 목록 또는 직접 IP **JOIN**으로 들어오면 Host 설정을 받습니다. Host 로비에서 전투 시작 전에 다시 DEV를 열어 값을 바꿀 수 있으며, 이때 버튼은 **APPLY TO ROOM**입니다. 변경된 설정에 대해 참가자의 확인이 끝나야 **START**할 수 있습니다. 인원수는 방을 만들기 전에 선택하며, 전투 중에는 설정을 바꾸지 않습니다. 설정은 실행 중인 세션의 복사본에만 적용되고 `LabConfig.asset`에는 저장되지 않습니다.
 
 전투 중 각 플레이어는 원통 요괴를 둘러싼 자기 자리의 시점에서 봅니다. **GENERATE**는 아래에서 솟아오르는 Yin 또는 Yang Raw 구슬 한 개를 만듭니다. 조합판의 구슬은 3D 구체이며 `Rigidbody`·`SphereCollider`의 PhysX 충돌을 사용합니다. 위치와 속도의 Z축은 고정해 기존 XY 평면에서만 움직입니다. 손가락이나 마우스로 밀면 관성으로 이동하다 감속하고, 상하에서 반발합니다. 좌우 끝으로 나가면 이웃 화면으로 속도와 높이를 이어 전달합니다. **Yin을 Yang에, 또는 Yang을 Yin에 직접 드래그하여 놓았을 때만** Combined가 생깁니다. 자연 충돌은 조합하지 않습니다.
 
@@ -61,7 +61,7 @@ open -n -a "$APP" --args --lab-join 127.0.0.1 --lab-port 7777
 open -n -a "$APP" --args --lab-join 127.0.0.1 --lab-port 7777
 ```
 
-위 명령은 기본 목표 인원 **3명**의 예입니다. Host 화면에 `3 / 3`이 보이고 설정 확인이 끝나 **START**가 활성화되면 누릅니다. 2명 실험은 Host가 먼저 DEV에서 **ROOM PLAYERS = 2**를 설정해 방을 만들고 Client 실행본을 하나만 띄웁니다. 자동 검증에서만 Host 인자에 `--lab-auto-start --lab-auto-generate --lab-auto-transfer`를 추가합니다. 한 프로젝트 폴더를 Editor 여러 개에서 동시에 열 필요는 없습니다. 독립 실행 앱으로 네트워크 경로를 확인합니다.
+위 명령은 기본 목표 인원 **3명**의 예입니다. Host 화면에 `3 / 3`이 보이고 설정 확인이 끝나 **START**가 활성화되면 누릅니다. **2명 실험**에는 `--lab-host` 없이 앱을 두 번 연 뒤 Host 일반 로비의 **ROOM PLAYERS**를 **2**로 바꾸고 **HOST**를 누릅니다. 다른 실행본에서는 **FIND ROOMS**의 방 이름을 눌러 입장하거나 직접 IP로 **JOIN**합니다. DEV 패널에서도 같은 인원값을 선택할 수 있습니다. 자동 검증에서만 Host 인자에 `--lab-auto-start --lab-auto-generate --lab-auto-transfer`를 추가합니다. 한 프로젝트 폴더를 Editor 여러 개에서 동시에 열 필요는 없습니다. 독립 실행 앱으로 네트워크 경로를 확인합니다.
 
 iOS Xcode 프로젝트는 Unity 메뉴 **C6 Lab → Export iOS Xcode Project**에서 만듭니다. Console에 표시된 `.../iOS` 출력 폴더에서 `Unity-iPhone.xcodeproj`를 열고, Xcode에서 개발 Team을 선택해 기기에 설치한 뒤 로컬 네트워크 권한을 허용합니다. **Unity의 iOS 출력 폴더에는 Xcode 프로젝트가 있고, Xcode가 빌드한 설치용 앱은 별도의 DerivedData에 저장됩니다.** Xcode GUI에서 Run하면 보통 사용자 Library 아래 DerivedData를 사용합니다.
 
@@ -81,7 +81,7 @@ DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" xcodebuild \
 | --- | --- |
 | `Assets/Lab/Scenes/Lab.unity` | 저장된 전투 화면·Canvas·카메라·컴포넌트 참조 |
 | `Assets/Lab/Resources/LabConfig.asset` | HP·시간·스태미나·구슬 수명·물리·투척 설정 |
-| `Assets/Lab/Scripts/Session/` | 방 자동 검색·직접 IP 2~5인 연결, Host 설정 승인·상태 전파 |
+| `Assets/Lab/Scripts/Session/` | 방 이름 등록·목록 검색·선택 입장·직접 IP 2~5인 연결, Host 설정 승인·상태 전파 |
 | `Assets/Lab/Scripts/Core/` | 세션·구슬·자원·승패 데이터와 규칙 |
 | `Assets/Lab/Scripts/Orb/` | 소유자 화면의 XY 평면에 고정된 3D Rigidbody·SphereCollider 물리와 구슬 표시 |
 | `Assets/Lab/Scripts/Throw/` | 자리별 발사 위치·속도, Rigidbody 투사체, Cylinder 피격체와 바닥 빗나감 |

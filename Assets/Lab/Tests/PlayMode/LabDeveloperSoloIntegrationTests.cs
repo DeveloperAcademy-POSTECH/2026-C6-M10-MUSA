@@ -14,6 +14,93 @@ namespace C6Lab.Tests
     public sealed class LabDeveloperSoloIntegrationTests
     {
         [UnityTest]
+        public IEnumerator SavedLobbyCanChooseTwoToFivePlayersBeforeHosting()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+
+            GameObject[] roots = SceneManager.GetActiveScene().GetRootGameObjects();
+            LabHud hud = roots.SelectMany(root => root.GetComponentsInChildren<LabHud>(true))
+                .FirstOrDefault();
+            LabDeveloperMode developerUi = roots.SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true))
+                .FirstOrDefault();
+            LabNetwork network = hud == null ? null : hud.network;
+            Assert.That(network, Is.Not.Null);
+            Assert.That(hud, Is.Not.Null);
+            Assert.That(developerUi, Is.Not.Null);
+            Assert.That(hud.network, Is.SameAs(network));
+            Assert.That(developerUi.network, Is.SameAs(network),
+                "The ordinary lobby and DEV panel must edit the same room-size value.");
+            Assert.That(hud.hostButton, Is.Not.Null);
+            Assert.That(hud.decreasePlayersButton, Is.Not.Null);
+            Assert.That(hud.increasePlayersButton, Is.Not.Null);
+            Assert.That(hud.peersText, Is.Not.Null);
+            Assert.That(hud.roomNameText, Is.Not.Null);
+            Assert.That(hud.roomListPanel, Is.Not.Null);
+            Assert.That(hud.refreshRoomsButton, Is.Not.Null);
+            Assert.That(hud.cancelRoomSearchButton, Is.Not.Null);
+            Assert.That(hud.roomListContent, Is.Not.Null);
+            Assert.That(hud.roomListRowTemplate, Is.Not.Null);
+            Assert.That(hud.roomSearchStatusText, Is.Not.Null);
+            Assert.That(hud.roomListContent.IsChildOf(hud.roomListPanel.transform), Is.True,
+                "Search results must appear inside the saved room-list panel.");
+            Assert.That(hud.roomListRowTemplate.transform.IsChildOf(hud.roomListContent), Is.True);
+            Assert.That(hud.roomListRowTemplate.GetComponentInChildren<UnityEngine.UI.Text>(true), Is.Not.Null,
+                "A discovered room needs a readable button label.");
+            Assert.That(hud.roomListContent.GetComponent<UnityEngine.UI.VerticalLayoutGroup>().childControlHeight,
+                Is.True, "Room rows must use their preferred height instead of collapsing to zero.");
+            Assert.That(hud.roomListRowTemplate.GetComponent<UnityEngine.UI.LayoutElement>().preferredHeight,
+                Is.GreaterThan(0f));
+            RectTransform title = hud.roomListPanel.transform.Find("RoomListTitle") as RectTransform;
+            Assert.That(title, Is.Not.Null);
+            Assert.That(title.anchorMin.y, Is.EqualTo(1f),
+                "The room heading must stay above the scrolling rows, including on tall screens.");
+            Assert.That(hud.roomSearchStatusText.rectTransform.anchorMin.y, Is.EqualTo(1f),
+                "The room-search hint must remain visible above the scrolling rows.");
+            Assert.That(hud.roomListPanel.activeSelf, Is.False,
+                "The room browser must not cover the lobby before searching.");
+            Assert.That(hud.roomListRowTemplate.gameObject.activeSelf, Is.False,
+                "The template is not an actual discovered room.");
+
+            Assert.That(network.TargetParticipantCount, Is.EqualTo(3));
+            hud.decreasePlayersButton.onClick.Invoke();
+            Assert.That(network.TargetParticipantCount, Is.EqualTo(2));
+            yield return null;
+            Assert.That(hud.decreasePlayersButton.interactable, Is.False);
+            Assert.That(hud.peersText.text, Does.Contain("ROOM PLAYERS 2 / 5"));
+
+            developerUi.Open();
+            Assert.That(developerUi.targetParticipantsSlider.value, Is.EqualTo(2f));
+            developerUi.targetParticipantsSlider.value = 5f;
+            Assert.That(network.TargetParticipantCount, Is.EqualTo(5));
+            developerUi.Close();
+            yield return null;
+            Assert.That(hud.increasePlayersButton.interactable, Is.False);
+            hud.decreasePlayersButton.onClick.Invoke();
+            Assert.That(network.TargetParticipantCount, Is.EqualTo(4));
+
+            // Use the saved ordinary HOST button, not the DEV room-creation shortcut.
+            hud.port.text = "17780";
+            try
+            {
+                hud.hostButton.onClick.Invoke();
+                Assert.That(network.IsHost, Is.True, network.Notice);
+                Assert.That(network.TargetParticipantCount, Is.EqualTo(4));
+                yield return null;
+                Assert.That(hud.decreasePlayersButton.gameObject.activeSelf, Is.False);
+                Assert.That(hud.increasePlayersButton.gameObject.activeSelf, Is.False);
+                Assert.That(hud.roomNameText.gameObject.activeSelf, Is.True);
+                Assert.That(hud.roomNameText.text, Is.Not.Empty,
+                    "The Host must see the registered room name or an explicit registration status.");
+                Assert.That(developerUi.targetParticipantsSlider.interactable, Is.False);
+            }
+            finally
+            {
+                if (network.IsConnected) network.Stop();
+            }
+        }
+
+        [UnityTest]
         public IEnumerator SavedDeveloperPanelCreatesAndRetunesTwoPlayerHostLobby()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
