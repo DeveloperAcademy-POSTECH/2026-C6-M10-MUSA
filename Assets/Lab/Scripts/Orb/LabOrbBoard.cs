@@ -138,7 +138,7 @@ namespace C6Lab
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
             bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
-            int relayStage = 0)
+            int relayStage = 0, float fuseSeconds = -1f)
         {
             RequireConfigured();
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
@@ -151,8 +151,9 @@ namespace C6Lab
                     existing.View.Configure(id, kind, config.OrbRadius, element);
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
-                if (existing.View.LockSwipes != lockSwipes || existing.View.RelayStage != relayStage)
-                    existing.View.SetItemState(lockSwipes, relayStage);
+                if (existing.View.LockSwipes != lockSwipes || existing.View.RelayStage != relayStage
+                    || existing.View.FuseSeconds != fuseSeconds)
+                    existing.View.SetItemState(lockSwipes, relayStage, fuseSeconds);
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -164,7 +165,7 @@ namespace C6Lab
             var view = gameObject.AddComponent<LabOrbView>();
             view.Configure(id, kind, config.OrbRadius, element);
             view.ConfigureAppearance(config.OrbAppearance);
-            view.SetItemState(lockSwipes, relayStage);
+            view.SetItemState(lockSwipes, relayStage, fuseSeconds);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);

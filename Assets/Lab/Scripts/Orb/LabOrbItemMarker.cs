@@ -4,8 +4,9 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
-    /// Item presentation on the orb root: an icon on a disc and a badge (remaining unlock handoffs,
-    /// or a relay orb's x1/x2/MAX stage), all facing the front-on board camera. It follows the Visual mount's
+    /// Item presentation on the orb root: an icon on a disc, a badge (remaining unlock handoffs,
+    /// or a relay orb's x1/x2/MAX stage) and a bomb's fuse seconds above the orb, all facing the
+    /// front-on board camera. It follows the Visual mount's
     /// rise animation but not its rolling rotation, and owns no collider.
     /// </summary>
     [DisallowMultipleComponent]
@@ -14,6 +15,7 @@ namespace C6Lab
         private const int BadgeFontSize = 64;
         private static readonly Color DiscColor = new Color(.97f, .97f, .97f);
         private static readonly Color BadgeColor = new Color(.12f, .12f, .14f, .95f);
+        private static readonly Color FuseColor = new Color(.95f, .2f, .15f);
         private static readonly Dictionary<Texture2D, Sprite> iconSprites = new Dictionary<Texture2D, Sprite>();
         private static Sprite discSprite;
         private static Sprite squareSprite;
@@ -22,12 +24,15 @@ namespace C6Lab
         private SpriteRenderer icon;
         private SpriteRenderer badge;
         private TextMesh badgeCount;
+        private TextMesh fuse;
         private Transform follow;
         private float radius;
 
         public bool IconVisible => icon != null && icon.gameObject.activeSelf;
         public bool BadgeVisible => badge != null && badge.gameObject.activeSelf;
         public string BadgeText => badgeCount != null ? badgeCount.text : string.Empty;
+        public bool FuseVisible => fuse != null && fuse.gameObject.activeSelf;
+        public string FuseText => fuse != null ? fuse.text : string.Empty;
 
         public static LabOrbItemMarker Create(Transform orbRoot)
         {
@@ -37,8 +42,8 @@ namespace C6Lab
             return marker.AddComponent<LabOrbItemMarker>();
         }
 
-        /// <summary>Shows the icon (when assigned) and the badge text; null or empty hides the badge.</summary>
-        public void Show(Texture2D iconTexture, string badgeText, float orbRadius, Transform followMount)
+        /// <summary>Shows the icon (when assigned), badge and fuse; null or empty text hides that part.</summary>
+        public void Show(Texture2D iconTexture, string badgeText, string fuseText, float orbRadius, Transform followMount)
         {
             EnsureParts();
             radius = orbRadius;
@@ -68,6 +73,14 @@ namespace C6Lab
                 badgeCount.transform.localPosition = new Vector3(.62f * radius, -.62f * radius, -.02f);
                 badgeCount.characterSize = .5f * radius / (BadgeFontSize * .1f);
             }
+            if (fuse != null)
+            {
+                bool burning = !string.IsNullOrEmpty(fuseText);
+                fuse.gameObject.SetActive(burning);
+                fuse.text = burning ? fuseText : string.Empty;
+                fuse.transform.localPosition = new Vector3(0f, 1.3f * radius, -.02f);
+                fuse.characterSize = .7f * radius / (BadgeFontSize * .1f);
+            }
         }
 
         private void LateUpdate() => FollowMount();
@@ -86,18 +99,25 @@ namespace C6Lab
             badge = CreateSprite("Lock Badge", Square(), BadgeColor, 2);
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (font == null) return;
-            var count = new GameObject("Lock Count");
-            count.layer = gameObject.layer;
-            count.transform.SetParent(transform, false);
-            badgeCount = count.AddComponent<TextMesh>();
-            badgeCount.font = font;
-            badgeCount.fontSize = BadgeFontSize;
-            badgeCount.anchor = TextAnchor.MiddleCenter;
-            badgeCount.alignment = TextAlignment.Center;
-            badgeCount.color = Color.white;
-            var renderer = count.GetComponent<MeshRenderer>();
+            badgeCount = CreateText("Lock Count", font, Color.white);
+            fuse = CreateText("Fuse Seconds", font, FuseColor);
+        }
+
+        private TextMesh CreateText(string label, Font font, Color color)
+        {
+            var part = new GameObject(label);
+            part.layer = gameObject.layer;
+            part.transform.SetParent(transform, false);
+            var text = part.AddComponent<TextMesh>();
+            text.font = font;
+            text.fontSize = BadgeFontSize;
+            text.anchor = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignment.Center;
+            text.color = color;
+            var renderer = part.GetComponent<MeshRenderer>();
             renderer.sharedMaterial = font.material;
             renderer.sortingOrder = 3;
+            return text;
         }
 
         private SpriteRenderer CreateSprite(string label, Sprite sprite, Color color, int order)

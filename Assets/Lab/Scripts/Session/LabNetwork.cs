@@ -98,9 +98,10 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // Relay stages and item effect settings are new snapshot/settings data; reject older clients
-        // rather than mixing rooms with different item rules.
-        private const ushort LabProtocolVersion = 5609;
+        // Relay stages, bomb explosions and item effect settings are new snapshot/settings data;
+        // reject older clients rather than mixing rooms with different item rules.
+        private const ushort LabProtocolVersion = 5610;
+        private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/5");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
@@ -815,6 +816,7 @@ namespace C6Lab
             if (!IsHost || model == null) return;
             double now = Time.realtimeSinceStartupAsDouble;
             latest = model.Snapshot(now);
+            AnnounceBombExplosions();
             // Large experimental states are deliberately updated less often instead of queuing
             // many reliable fragments per peer until the network becomes unusable.
             nextSnapshotAt = now + ((latest.orbs?.Length ?? 0) > 100 ? .5d : .1d);
@@ -845,6 +847,16 @@ namespace C6Lab
             }
             if (immediate) Debug.Log("C6_LAB_STATE phase=" + latest.phase + " hp=" + latest.hp + " remaining=" + latest.remaining.ToString("F1"));
             Changed?.Invoke();
+        }
+
+        private void AnnounceBombExplosions()
+        {
+            foreach (ulong owner in model.DrainBombExplosions())
+            {
+                Debug.Log("C6_LAB_BOMB_EXPLODED owner=" + owner);
+                if (owner == LocalPlayerId) SetNotice(BombExplodedNotice);
+                else Send(owner, new LabNetworkPacket { type = "notice", sessionId = sessionId, reason = BombExplodedNotice });
+            }
         }
 
         private void AbortOversizedSnapshot(string reason)
@@ -994,8 +1006,11 @@ namespace C6Lab
                 current.Add(orb.id);
                 bool showRise = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
                     && orb.kind != LabOrbKind.Combined;
+                // Every screen derives a bomb's fuse from the shared Host clock in the snapshot.
+                float fuse = orb.kind == LabOrbKind.Bomb && config != null
+                    ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
-                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element, orb.lockSwipes, orb.relayStage);
+                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element, orb.lockSwipes, orb.relayStage, fuse);
             }
             foreach (string id in visibleOrbIds) if (!current.Contains(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
@@ -1087,6 +1102,9 @@ namespace C6Lab
                     break;
                 case "reject":
                     RejectLocally(packet.firstId, packet.reason);
+                    break;
+                case "notice":
+                    if (packet.sessionId == sessionId) SetNotice(packet.reason);
                     break;
                 case "targetImpact":
                     if (target != null && impactReceipts.TryAccept(packet.sessionId, packet.round,

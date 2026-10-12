@@ -86,7 +86,8 @@ namespace C6Lab
             new LabDeveloperField("Contact Combine (0 off, 1 on)", 0f, 1f, true),
             new LabDeveloperField("Potion Heal (HP)", 0f, 300f, true),
             new LabDeveloperField("Relay x2 Damage Multiplier", 1f, 20f),
-            new LabDeveloperField("Relay MAX Damage Multiplier", 1f, 20f)
+            new LabDeveloperField("Relay MAX Damage Multiplier", 1f, 20f),
+            new LabDeveloperField("Bomb Damage Multiplier", 1f, 20f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -126,6 +127,7 @@ namespace C6Lab
         [SerializeField, Range(0, 300)] private int potionHeal = 10;
         [SerializeField, Range(1f, 20f)] private float relayDoubleMultiplier = 2f;
         [SerializeField, Range(1f, 20f)] private float relayMaxMultiplier = 4f;
+        [SerializeField, Range(1f, 20f)] private float bombMultiplier = 3f;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -212,6 +214,7 @@ namespace C6Lab
         public int PotionHeal => Mathf.Clamp(potionHeal, 0, 300);
         public float RelayDoubleMultiplier => Mathf.Clamp(Finite(relayDoubleMultiplier, 2f), 1f, 20f);
         public float RelayMaxMultiplier => Mathf.Clamp(Finite(relayMaxMultiplier, 4f), 1f, 20f);
+        public float BombMultiplier => Mathf.Clamp(Finite(bombMultiplier, 3f), 1f, 20f);
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
         public float OrbStopSpeed => Mathf.Clamp(Finite(orbStopSpeed, .065f), 0f, OrbMaxReleaseSpeed);
@@ -269,7 +272,7 @@ namespace C6Lab
                 ItemLifetimeSeconds, ItemUnlockSwipesMin, ItemUnlockSwipesMax,
                 PlayerMaxHp,
                 CombineSpeed, DropCombineEnabled ? 1f : 0f, ContactCombineEnabled ? 1f : 0f,
-                PotionHeal, RelayDoubleMultiplier, RelayMaxMultiplier
+                PotionHeal, RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier
             };
         }
 
@@ -364,6 +367,7 @@ namespace C6Lab
             potionHeal = (int)values[52];
             relayDoubleMultiplier = values[53];
             relayMaxMultiplier = values[54];
+            bombMultiplier = values[55];
             error = string.Empty;
             return true;
         }

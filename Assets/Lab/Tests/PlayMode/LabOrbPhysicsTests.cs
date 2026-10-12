@@ -419,6 +419,31 @@ namespace C6Lab.Tests
             Assert.That(thrown, Is.EqualTo("relay"));
         }
 
+        [Test]
+        public void BombShowsItsFuseAboveTheOrbAndCanBeThrownOnlyOnceUnlocked()
+        {
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), lockSwipes: 1, fuseSeconds: 11.2f);
+            Assert.That(bomb.ItemMarker.FuseVisible, Is.True);
+            Assert.That(bomb.ItemMarker.FuseText, Is.EqualTo("12"), "Remaining seconds round up.");
+            Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("1"), "The lock badge stays beside the fuse.");
+            var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.3f, .7f), lockSwipes: 0, relayStage: 1);
+            Assert.That(relay.ItemMarker.FuseVisible, Is.False, "Only bombs burn a fuse.");
+
+            int throws = 0;
+            board.ThrowRequested += gesture => throws++;
+            Assert.That(board.TryBeginDragAtWorld(new Vector2(.8f, -.8f), 1d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(.8f, .9f), 1.1d), Is.True);
+            Assert.That(throws, Is.Zero, "A locked bomb cannot be thrown.");
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), lockSwipes: 0, fuseSeconds: 3.4f);
+            Assert.That(bomb.ItemMarker.FuseText, Is.EqualTo("4"));
+            Assert.That(bomb.ItemMarker.BadgeVisible, Is.False);
+            Vector2 from = BoardPoint(bomb);
+            Assert.That(board.TryBeginDragAtWorld(from, 2d), Is.True);
+            Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1f), 2.1d), Is.True);
+            Assert.That(throws, Is.EqualTo(1), "An unlocked bomb is thrown with an upward flick.");
+        }
+
         private void Tap(Vector2 point, double at)
         {
             Assert.That(board.TryBeginDragAtWorld(point, at), Is.True);

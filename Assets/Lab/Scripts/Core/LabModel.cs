@@ -25,6 +25,7 @@ namespace C6Lab
         private readonly ulong[] seats = new ulong[MaximumParticipants];
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
+        private readonly List<ulong> bombExplosions = new List<ulong>();
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -73,7 +74,7 @@ namespace C6Lab
             activeSeatCount = ids.Length;
             Array.Clear(seats, 0, seats.Length);
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
-            players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear();
+            players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState
@@ -292,6 +293,14 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>Players whose boards were cleared by an unthrown bomb since the last call.</summary>
+        public ulong[] DrainBombExplosions()
+        {
+            ulong[] owners = bombExplosions.ToArray();
+            bombExplosions.Clear();
+            return owners;
+        }
+
         /// <summary>Remove an expired or missed projectile without damage or a hit reward.</summary>
         public bool ConfirmMiss(string id, double now)
         {
@@ -360,8 +369,15 @@ namespace C6Lab
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond));
-                foreach (string id in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
-                    .Select(orb => orb.id).ToArray()) orbs.Remove(id);
+                foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
+                    .ToArray())
+                {
+                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb) continue;
+                    // An unthrown bomb takes every orb still on its current holder's board.
+                    foreach (string id in orbs.Values.Where(orb => orb.owner == expired.owner && !orb.inFlight)
+                        .Select(orb => orb.id).ToArray()) orbs.Remove(id);
+                    bombExplosions.Add(expired.owner);
+                }
                 remaining = Math.Max(0d, deadline - now);
                 if (now >= deadline) phase = LabPhase.Defeat;
             }
@@ -371,6 +387,7 @@ namespace C6Lab
 
         private int DamageFor(LabOrbState orb)
         {
+            if (orb.kind == LabOrbKind.Bomb) return Math.Max(1, (int)Math.Round(rules.Damage * rules.BombMultiplier));
             if (orb.kind != LabOrbKind.Relay) return rules.Damage;
             float multiplier = orb.relayStage >= RelayMaxStage ? rules.RelayMaxMultiplier
                 : orb.relayStage == 2 ? rules.RelayDoubleMultiplier : 1f;
@@ -470,7 +487,7 @@ namespace C6Lab
         private sealed class Rules
         {
             public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
-            public readonly float RelayDoubleMultiplier, RelayMaxMultiplier;
+            public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
             public readonly int[] GenerationChances;
@@ -487,6 +504,7 @@ namespace C6Lab
                 PotionHeal = config.PotionHeal;
                 RelayDoubleMultiplier = config.RelayDoubleMultiplier;
                 RelayMaxMultiplier = config.RelayMaxMultiplier;
+                BombMultiplier = config.BombMultiplier;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
                 BattleDurationSeconds = config.BattleDurationSeconds;

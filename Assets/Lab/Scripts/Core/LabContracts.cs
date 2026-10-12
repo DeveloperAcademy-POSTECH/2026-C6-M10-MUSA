@@ -15,7 +15,7 @@ namespace C6Lab
         public static bool IsDoubleTapUsable(this LabOrbKind kind) => kind == LabOrbKind.Potion || kind == LabOrbKind.SecretBox;
         /// <summary>Orbs that an upward flick may throw at the target.</summary>
         public static bool CanThrow(this LabOrbKind kind, int lockSwipes) =>
-            kind == LabOrbKind.Combined || (kind == LabOrbKind.Relay && lockSwipes == 0);
+            kind == LabOrbKind.Combined || ((kind == LabOrbKind.Relay || kind == LabOrbKind.Bomb) && lockSwipes == 0);
     }
 
     /// <summary>

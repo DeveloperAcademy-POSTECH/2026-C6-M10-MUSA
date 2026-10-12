@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(55));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(56));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -39,6 +39,8 @@ namespace C6Lab.Tests
             Assert.That(new[] { values[53], values[54] }, Is.EqualTo(new[] { 2f, 4f }), "Relay x2 and MAX multipliers.");
             values[53] = 1.5f;
             values[54] = 3f;
+            Assert.That(values[55], Is.EqualTo(3f), "Bomb damage multiplier.");
+            values[55] = 2.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -55,6 +57,7 @@ namespace C6Lab.Tests
             Assert.That(config.PotionHeal, Is.EqualTo(25));
             Assert.That(config.RelayDoubleMultiplier, Is.EqualTo(1.5f));
             Assert.That(config.RelayMaxMultiplier, Is.EqualTo(3f));
+            Assert.That(config.BombMultiplier, Is.EqualTo(2.5f));
         }
 
         [Test]

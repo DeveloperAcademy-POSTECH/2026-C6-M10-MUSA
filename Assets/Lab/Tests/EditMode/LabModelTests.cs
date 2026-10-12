@@ -744,6 +744,65 @@ namespace C6Lab.Tests
             finally { UnityEngine.Object.DestroyImmediate(relays); }
         }
 
+        [Test]
+        public void UnthrownBombClearsItsCurrentHoldersBoardAtTheFuse()
+        {
+            var mixed = ConfigWith(1f, 50, 0, 0, 0, 0, 50);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("bomb-holder", new ulong[] { 10, 20, 30 }, 0d, mixed);
+                LabOrbState bomb = null;
+                for (int i = 0; i < 10 && bomb == null; i++)
+                {
+                    Assert.That(room.TryGenerate(10, "draw-" + i, 0d, out var orb, out _), Is.True);
+                    if (orb.kind == LabOrbKind.Bomb) bomb = orb;
+                }
+                Assert.That(bomb, Is.Not.Null);
+                Assert.That(PassRight(room, bomb.id, 10, 1d).owner, Is.EqualTo(20ul), "The bomb moves to the next holder.");
+
+                Assert.That(room.TryGenerate(10, "keep", 10d, out var kept, out _), Is.True);
+                for (int i = 0; i < 2; i++)
+                    Assert.That(room.TryGenerate(20, "lost-" + i, 10d, out _, out _), Is.True);
+                Assert.That(room.Snapshot(14.9d).orbs.Count(orb => orb.owner == 20), Is.EqualTo(3));
+                Assert.That(room.DrainBombExplosions(), Is.Empty);
+
+                var after = room.Snapshot(15d);
+                Assert.That(after.orbs.Any(orb => orb.owner == 20), Is.False,
+                    "Every orb on the holder's board is lost, including the bomb.");
+                Assert.That(after.orbs.Select(orb => orb.id), Does.Contain(kept.id), "Other boards are untouched.");
+                Assert.That(room.DrainBombExplosions(), Is.EqualTo(new[] { 20ul }));
+                Assert.That(room.DrainBombExplosions(), Is.Empty, "Each explosion is reported once.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mixed); }
+        }
+
+        [Test]
+        public void UnlockedBombHitsForTripleDamageAndAMissNeverExplodes()
+        {
+            var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
+            try
+            {
+                float[] values = bombs.CaptureDeveloperValues();
+                values[46] = 0f; // unlock swipes min
+                values[47] = 0f; // unlock swipes max
+                Assert.That(bombs.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("bomb-throw", new ulong[] { 10, 20, 30 }, 0d, bombs);
+
+                Assert.That(room.TryGenerate(10, "hit", 0d, out var hitBomb, out _), Is.True);
+                Assert.That(ThrowAndHit(room, hitBomb.id, 10, .1d), Is.EqualTo(60));
+                Assert.That(room.Hp, Is.EqualTo(940));
+
+                Assert.That(room.TryGenerate(10, "miss", .2d, out var missBomb, out _), Is.True);
+                Assert.That(room.TryLaunch(10, missBomb.id, "throw-miss", .3d, out _, out _), Is.True);
+                Assert.That(room.ConfirmMiss(missBomb.id, .4d), Is.True);
+                Assert.That(room.Snapshot(20d).orbs, Is.Empty);
+                Assert.That(room.DrainBombExplosions(), Is.Empty, "A thrown bomb never explodes on a board.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(bombs); }
+        }
+
         private static LabOrbState PassRight(LabModel room, string id, ulong holder, double at)
         {
             Assert.That(room.TryUpdateMotion(holder, id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
