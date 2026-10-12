@@ -79,7 +79,8 @@ namespace C6Lab
             new LabDeveloperField("Bomb Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Item Lifetime (seconds)", .1f, 86400f),
             new LabDeveloperField("Item Unlock Swipes Min", 0f, 20f, true),
-            new LabDeveloperField("Item Unlock Swipes Max", 0f, 20f, true)
+            new LabDeveloperField("Item Unlock Swipes Max", 0f, 20f, true),
+            new LabDeveloperField("Player Max HP", 1f, 300f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -93,6 +94,7 @@ namespace C6Lab
         [SerializeField, Min(1)] private int monsterMaxHp = 1000;
         [SerializeField, Min(1)] private int damage = 20;
         [SerializeField, Min(1f)] private float battleDurationSeconds = 180f;
+        [SerializeField, Range(1, 300)] private int playerMaxHp = 300;
 
         [Header("Stamina and generation")]
         [SerializeField, Min(1f)] private float staminaMax = 100f;
@@ -159,6 +161,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 5f)] private float throwAirDamping;
 
         public int MonsterMaxHp => Mathf.Max(1, monsterMaxHp);
+        public int PlayerMaxHp => Mathf.Clamp(playerMaxHp, 1, 300);
         public int Damage => Mathf.Max(1, damage);
         public float BattleDurationSeconds => Positive(battleDurationSeconds, 180f);
         public float StaminaMax => Positive(staminaMax, 100f);
@@ -240,7 +243,8 @@ namespace C6Lab
                 ThrowMaxWorldSpeed, ThrowGravity, ThrowLifetime, ThrowRadius,
                 ThrowPowerExponent, ThrowLoftOffsetDegrees, ThrowAirDamping,
                 chances[0], chances[1], chances[2], chances[3], chances[4], chances[5],
-                ItemLifetimeSeconds, ItemUnlockSwipesMin, ItemUnlockSwipesMax
+                ItemLifetimeSeconds, ItemUnlockSwipesMin, ItemUnlockSwipesMax,
+                PlayerMaxHp
             };
         }
 
@@ -328,6 +332,7 @@ namespace C6Lab
             itemLifetimeSeconds = values[45];
             itemUnlockSwipesMin = (int)values[46];
             itemUnlockSwipesMax = (int)values[47];
+            playerMaxHp = (int)values[48];
             error = string.Empty;
             return true;
         }

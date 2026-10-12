@@ -33,6 +33,7 @@ namespace C6Lab
         public Text noticeText;
         public Text peersText;
         public Text hpText;
+        public Text playerHpText;
         public Text timeText;
         public Text staminaText;
         public Text orbsText;
@@ -109,6 +110,7 @@ namespace C6Lab
             if (snapshot == null)
             {
                 Set(hpText, "YOKAI HP —");
+                Set(playerHpText, "PLAYER HP —");
                 Set(timeText, "TIME —");
                 Set(staminaText, "STAMINA —");
                 Set(orbsText, "ORBS —");
@@ -118,6 +120,9 @@ namespace C6Lab
             Set(hpText, "YOKAI HP " + snapshot.hp + " / " + network.config.MonsterMaxHp);
             Set(timeText, "TIME " + Mathf.CeilToInt((float)snapshot.remaining));
             LabPlayerState local = Array.Find(snapshot.players ?? Array.Empty<LabPlayerState>(), p => p.id == network.LocalPlayerId);
+            Set(playerHpText, local == null || network.config == null
+                ? "PLAYER HP —"
+                : "PLAYER HP " + local.personalHp + " / " + network.config.PlayerMaxHp);
             Set(staminaText, local == null ? "STAMINA —" : "STAMINA " + Mathf.FloorToInt(local.stamina) + " / " + network.config.StaminaMax);
             int count = 0;
             foreach (var orb in snapshot.orbs ?? Array.Empty<LabOrbState>()) if (orb.owner == network.LocalPlayerId && !orb.inFlight) count++;
