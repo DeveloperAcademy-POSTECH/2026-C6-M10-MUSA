@@ -42,13 +42,13 @@ MonoBehaviour:
   throwSwipeUpDominance: 0.65
   throwMaxSwipeSpeed: 6
   throwMinUpSpeed: 2
-  throwLateralGain: 2.5
+  throwLateralGain: 4.5
   throwUpGain: 2.1
-  throwForwardGain: 4.5
-  throwMaxWorldSpeed: 18
-  throwGravity: 9.81
+  throwForwardGain: 2.5
+  throwMaxWorldSpeed: 12.5
+  throwGravity: 15
   throwLifetime: 4
   throwRadius: 0.165
-  throwPowerExponent: 1
+  throwPowerExponent: 1.2
   throwLoftOffsetDegrees: 0
   throwAirDamping: 0
