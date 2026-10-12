@@ -17,11 +17,13 @@ namespace C6Lab
 
         private GameObject replacementVisual;
         private GameObject contactShadow;
+        private LabOrbItemMarker itemMarker;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
         private string orbId;
         private LabOrbKind kind;
         private LabOrbElement element;
+        private int lockSwipes;
         private float visualRadius = .32f;
         private Coroutine spawnRiseRoutine;
         private Action spawnRiseCompleted;
@@ -29,6 +31,9 @@ namespace C6Lab
         public string OrbId => orbId;
         public LabOrbKind Kind => kind;
         public LabOrbElement Element => element;
+        /// <summary>Host-approved handoffs still needed before this item can be used.</summary>
+        public int LockSwipes => lockSwipes;
+        public LabOrbItemMarker ItemMarker => itemMarker;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
         public Rigidbody Body { get; private set; }
@@ -97,6 +102,12 @@ namespace C6Lab
             HitSphere.center = Vector3.zero;
             EnsureVisual();
             UpdateVisual();
+        }
+
+        public void SetLockSwipes(int value)
+        {
+            lockSwipes = Mathf.Max(0, value);
+            UpdateItemMarker();
         }
 
         /// <summary>
@@ -264,6 +275,23 @@ namespace C6Lab
                     appearance.ApplyKindMaterial(replacementVisual, kind, element);
             }
             UpdateContactShadow();
+            UpdateItemMarker();
+        }
+
+        private void UpdateItemMarker()
+        {
+            if (!kind.IsItem())
+            {
+                if (itemMarker != null)
+                {
+                    itemMarker.gameObject.SetActive(false);
+                    LabVisualSafety.DestroyVisualObject(itemMarker.gameObject);
+                    itemMarker = null;
+                }
+                return;
+            }
+            if (itemMarker == null) itemMarker = LabOrbItemMarker.Create(transform);
+            itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, lockSwipes, visualRadius, visual);
         }
 
         private void UpdateContactShadow()

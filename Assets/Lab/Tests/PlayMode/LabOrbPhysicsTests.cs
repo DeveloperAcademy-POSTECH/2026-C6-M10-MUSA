@@ -90,15 +90,30 @@ namespace C6Lab.Tests
             SetSerializedField(appearance, "yangMaterial", yangMaterial);
             SetSerializedField(appearance, "combinedMaterial", combinedMaterial);
             SetSerializedField(appearance, "shadowMaterial", shadowMaterial);
+            // Element materials win over temporary colors. Pure colors stay identical through
+            // linear/gamma conversion, like the materials above.
+            var waterMaterial = new Material(shader);
+            var fireMaterial = new Material(shader);
+            waterMaterial.SetColor(colorProperty, Color.cyan);
+            fireMaterial.SetColor(colorProperty, new Color(1f, 1f, 0f));
+            SetSerializedField(appearance, "waterMaterial", waterMaterial);
+            SetSerializedField(appearance, "fireMaterial", fireMaterial);
+            var bombIcon = new Texture2D(8, 8);
+            SetSerializedField(appearance, "bombIcon", bombIcon);
             SetSerializedField(config, "orbAppearance", appearance);
 
             LabProjectile projectile = null;
+            LabProjectile fireShot = null;
             try
             {
                 board.Configure(config, inputCamera, Bounds);
                 LabOrbView yin = board.UpsertOrb("styled-yin", LabOrbKind.Yin, new Vector2(.3f, .5f));
                 LabOrbView yang = board.UpsertOrb("styled-yang", LabOrbKind.Yang, new Vector2(.7f, .5f));
                 projectile = LabProjectile.Create(new Vector3(0f, 1f, 3f), config);
+                LabOrbView water = board.UpsertOrb("styled-water", LabOrbKind.Combined, new Vector2(.5f, .5f),
+                    element: LabOrbElement.Water);
+                fireShot = LabProjectile.Create(new Vector3(1f, 1f, 3f), config, null, LabOrbElement.Fire);
+                LabOrbView bomb = board.UpsertOrb("styled-bomb", LabOrbKind.Bomb, new Vector2(.5f, .2f), lockSwipes: 2);
                 yield return null; // Visual-only collider removal completes at frame end.
 
                 Assert.That(ArtSurface(yin.Visual).sharedMaterial, Is.SameAs(yinMaterial));
@@ -107,6 +122,18 @@ namespace C6Lab.Tests
                 Assert.That(ArtColor(yin.Visual, colorProperty), Is.EqualTo(Color.blue));
                 Assert.That(ArtColor(yang.Visual, colorProperty), Is.EqualTo(Color.red));
                 Assert.That(ArtColor(projectile.VisualMount, colorProperty), Is.EqualTo(Color.green));
+                Assert.That(ArtSurface(water.Visual).sharedMaterial, Is.SameAs(waterMaterial));
+                Assert.That(ArtColor(water.Visual, colorProperty), Is.EqualTo(Color.cyan),
+                    "A Combined orb uses its element material.");
+                Assert.That(ArtSurface(fireShot.VisualMount).sharedMaterial, Is.SameAs(fireMaterial));
+                Assert.That(ArtColor(fireShot.VisualMount, colorProperty), Is.EqualTo(new Color(1f, 1f, 0f)),
+                    "A thrown orb keeps its element color in flight.");
+                Assert.That(bomb.ItemMarker, Is.Not.Null);
+                Assert.That(bomb.ItemMarker.IconVisible, Is.True, "An assigned item icon is drawn on the orb.");
+                Assert.That(bomb.ItemMarker.transform.parent, Is.SameAs(bomb.transform),
+                    "The icon sits on the orb root so it does not roll with the art.");
+                Assert.That(bomb.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
+                Assert.That(yin.ItemMarker, Is.Null, "Only items carry an icon marker.");
                 Assert.That(yin.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
                 Assert.That(yin.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
                 Assert.That(projectile.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
@@ -125,6 +152,10 @@ namespace C6Lab.Tests
             finally
             {
                 if (projectile != null) Object.Destroy(projectile.gameObject);
+                if (fireShot != null) Object.Destroy(fireShot.gameObject);
+                Object.Destroy(bombIcon);
+                Object.Destroy(waterMaterial);
+                Object.Destroy(fireMaterial);
                 Object.Destroy(appearance);
                 Object.Destroy(art);
                 Object.Destroy(yinMaterial);
@@ -284,6 +315,47 @@ namespace C6Lab.Tests
             Assert.That(board.RejectEdge("yin"), Is.True);
             Assert.That(yin.Body.isKinematic, Is.False);
             Assert.That(yang.Body.isKinematic, Is.False);
+        }
+
+        [Test]
+        public void DroppingRawOnAnItemOrAnItemOnRawNeverRequestsCombine()
+        {
+            var yin = board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.3f, .3f));
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.7f, .3f));
+            var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.3f, .7f));
+            var yang = board.UpsertOrb("yang", LabOrbKind.Yang, new Vector2(.7f, .7f));
+            int combines = 0;
+            board.CombineRequested += (first, second, center) => combines++;
+
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(yin), 1d), Is.True);
+            Assert.That(board.DragToWorld(BoardPoint(bomb), 1.1d), Is.True);
+            Assert.That(board.EndDragAtWorld(BoardPoint(bomb), 1.12d), Is.True);
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(relay), 2d), Is.True);
+            Assert.That(board.DragToWorld(BoardPoint(yang), 2.1d), Is.True);
+            Assert.That(board.EndDragAtWorld(BoardPoint(yang), 2.12d), Is.True);
+            Assert.That(combines, Is.Zero, "Only a Yin/Yang pair may request a combination.");
+        }
+
+        [Test]
+        public void LockedItemMovesLikeAnyOrbAndItsBadgeFollowsTheHostCount()
+        {
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 3);
+            Assert.That(bomb.LockSwipes, Is.EqualTo(3));
+            Assert.That(bomb.ItemMarker.BadgeVisible, Is.True);
+            Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("3"));
+            Assert.That(bomb.Body.isKinematic, Is.False, "Locked items must still roll to a neighbor's screen.");
+
+            Vector2 start = BoardPoint(bomb);
+            Vector2 moved = start + new Vector2(1.5f, 0f);
+            Assert.That(board.TryBeginDragAtWorld(start, 1d), Is.True);
+            Assert.That(board.DragToWorld(moved, 1.5d), Is.True);
+            Assert.That(board.EndDragAtWorld(moved, 2d), Is.True);
+            Assert.That(BoardPoint(bomb), Is.EqualTo(moved));
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2);
+            Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("2"), "The badge follows the Host count after a handoff.");
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 0);
+            Assert.That(bomb.ItemMarker.BadgeVisible, Is.False);
         }
 
         [Test]

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -13,7 +14,9 @@ namespace C6Lab.Tests
         [SetUp]
         public void SetUp()
         {
-            config = ScriptableObject.CreateInstance<LabConfig>();
+            // Rule tests below need Yin/Yang only; item chances have their own tests.
+            // Cost 10 leaves stamina to keep drawing until both polarities appear.
+            config = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
             model = new LabModel();
             model.Begin("lab-test", new ulong[] { 10, 20, 30 }, 0d, config);
         }
@@ -31,10 +34,13 @@ namespace C6Lab.Tests
             Assert.That(snapshot.players.Select(player => player.id), Is.EqualTo(new ulong[] { 10, 20, 30 }));
             Assert.That(snapshot.players.Select(player => player.seat), Is.EqualTo(new[] { 0, 1, 2 }));
             Assert.That(snapshot.players.All(player => player.stamina == 100f), Is.True);
+            Assert.That(snapshot.players.All(player => player.personalHp == 300), Is.True);
             Assert.That(snapshot.orbs, Is.Empty);
 
             snapshot.players[0].stamina = 0f;
+            snapshot.players[0].personalHp = 0;
             Assert.That(model.Snapshot(0d).players[0].stamina, Is.EqualTo(100f));
+            Assert.That(model.Snapshot(0d).players[0].personalHp, Is.EqualTo(300));
             Assert.Throws<ArgumentException>(() => new LabModel().Begin("bad", new ulong[] { 1 }, 0d, config));
             Assert.Throws<ArgumentException>(() => new LabModel().Begin("bad", new ulong[] { 1, 1, 2 }, 0d, config));
             Assert.Throws<ArgumentException>(() => new LabModel().Begin("bad", new ulong[] { 1, 2, 3, 4, 5, 6 }, 0d, config));
@@ -46,12 +52,17 @@ namespace C6Lab.Tests
         [TestCase(5)]
         public void NetworkRoomAcceptsDistinctPlayersUpToFiveInSeatOrder(int count)
         {
+            float[] values = config.CaptureDeveloperValues();
+            values[48] = 120f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             ulong[] ids = Enumerable.Range(1, count).Select(index => (ulong)index).ToArray();
             var room = new LabModel();
             room.Begin("room-" + count, ids, 0d, config);
             LabSnapshot snapshot = room.Snapshot(0d);
             Assert.That(snapshot.players.Select(player => player.id), Is.EqualTo(ids));
             Assert.That(snapshot.players.Select(player => player.seat), Is.EqualTo(Enumerable.Range(0, count)));
+            Assert.That(snapshot.players.Select(player => player.personalHp),
+                Is.EqualTo(Enumerable.Repeat(120, count)));
         }
 
         [Test]
@@ -104,16 +115,17 @@ namespace C6Lab.Tests
             Assert.That(start.players.Length, Is.EqualTo(1));
             Assert.That(start.players[0].id, Is.EqualTo(42ul));
             Assert.That(start.players[0].seat, Is.EqualTo(0));
+            Assert.That(start.players[0].personalHp, Is.EqualTo(300));
             Assert.That(start.hp, Is.EqualTo(1000));
 
             LabOrbState yin = null, yang = null;
-            for (int i = 0; i < 4 && (yin == null || yang == null); i++)
+            for (int i = 0; i < 10 && (yin == null || yang == null); i++)
             {
                 Assert.That(solo.TryGenerate(42ul, "solo-generate-" + i, 0d, out var raw, out _), Is.True);
                 Assert.That(raw.y, Is.GreaterThanOrEqualTo(.43f),
                     "Generated orbs must be above the bottom HUD's covered part of the board.");
                 if (raw.kind == LabOrbKind.Yin) yin = raw;
-                else yang = raw;
+                else if (raw.kind == LabOrbKind.Yang) yang = raw;
             }
             Assert.That(yin, Is.Not.Null);
             Assert.That(yang, Is.Not.Null);
@@ -142,7 +154,8 @@ namespace C6Lab.Tests
                 var room = new LabModel();
                 room.Begin("element-" + session, new ulong[] { 10, 20 }, 0d, config);
                 LabOrbState yin = null, yang = null;
-                for (int i = 0; i < 5 && (yin == null || yang == null); i++)
+                // Draws are independent now, so allow more than five tries to see both polarities.
+                for (int i = 0; i < 10 && (yin == null || yang == null); i++)
                 {
                     Assert.That(room.TryGenerate(10, "g" + i, 0d, out var raw, out _), Is.True);
                     if (raw.kind == LabOrbKind.Yin && yin == null) yin = raw;
@@ -171,6 +184,7 @@ namespace C6Lab.Tests
             Assert.That(retry.players.Select(player => player.id), Is.EqualTo(new ulong[] { 7ul }));
             Assert.That(retry.orbs, Is.Empty);
             Assert.That(retry.players[0].stamina, Is.EqualTo(100f));
+            Assert.That(retry.players[0].personalHp, Is.EqualTo(300));
             Assert.Throws<ArgumentException>(() => new LabModel().Begin("not-multiplayer", new[] { 7ul }, 0d, config));
         }
 
@@ -183,7 +197,8 @@ namespace C6Lab.Tests
             Assert.That(first.originOwner, Is.EqualTo(10ul));
             Assert.That(model.TryGenerate(10, "one", 0d, out _, out var reason), Is.False);
             Assert.That(reason, Is.EqualTo("DUPLICATE_REQUEST"));
-            Assert.That(model.Snapshot(0d).players.Single(player => player.id == 10).stamina, Is.EqualTo(80f));
+            Assert.That(model.Snapshot(0d).players.Single(player => player.id == 10).stamina,
+                Is.EqualTo(100f - config.GenerateCost));
             Assert.That(model.Snapshot(0d).orbs.Length, Is.EqualTo(1));
 
             model.Tick(3d);
@@ -194,9 +209,13 @@ namespace C6Lab.Tests
         [Test]
         public void OnlyOwnersOppositeRawMayCombineAndCombinationStartsFreshLifetime()
         {
-            var raw = new LabOrbState[4];
-            for (int i = 0; i < raw.Length; i++)
-                Assert.That(model.TryGenerate(10, "generate-" + i, 0d, out raw[i], out _), Is.True);
+            // Three draws containing both polarities always include a same-polarity pair.
+            var raw = new List<LabOrbState>();
+            for (int i = 0; i < 10 && (raw.Count < 3 || raw.Select(orb => orb.kind).Distinct().Count() < 2); i++)
+            {
+                Assert.That(model.TryGenerate(10, "generate-" + i, 0d, out var generated, out _), Is.True);
+                raw.Add(generated);
+            }
             var yin = raw.First(orb => orb.kind == LabOrbKind.Yin);
             var yang = raw.First(orb => orb.kind == LabOrbKind.Yang);
             var samePair = raw.GroupBy(orb => orb.kind).First(group => group.Count() >= 2).Take(2).ToArray();
@@ -310,7 +329,64 @@ namespace C6Lab.Tests
             Assert.That(retry.hp, Is.EqualTo(1000));
             Assert.That(retry.remaining, Is.EqualTo(180d));
             Assert.That(retry.players.All(player => player.stamina == 100f), Is.True);
+            Assert.That(retry.players.All(player => player.personalHp == 300), Is.True);
             Assert.That(retry.orbs, Is.Empty);
+        }
+
+        [Test]
+        public void HostDamageIsPerPlayerAndOnlyTheLastZeroEndsTheRound()
+        {
+            Assert.That(model.TryApplyPlayerDamage(999, 1, .1d), Is.False, "Unknown players cannot lose HP.");
+            Assert.That(model.TryApplyPlayerDamage(10, 0, .1d), Is.False);
+            Assert.That(model.TryApplyPlayerDamage(10, -1, .1d), Is.False);
+            Assert.That(model.TryApplyPlayerDamage(10, 100, .1d), Is.True);
+            var damaged = model.Snapshot(.1d);
+            Assert.That(damaged.players.Select(player => player.personalHp), Is.EqualTo(new[] { 200, 300, 300 }));
+            Assert.That(damaged.hp, Is.EqualTo(1000), "Player damage must not change monster HP.");
+            Assert.That(damaged.phase, Is.EqualTo(LabPhase.Playing));
+
+            Assert.That(model.TryApplyPlayerDamage(10, 999, .2d), Is.True);
+            Assert.That(model.TryApplyPlayerDamage(10, 1, .2d), Is.False, "Already-zero HP cannot be damaged again.");
+            Assert.That(model.TryApplyPlayerDamage(20, 300, .3d), Is.True);
+            Assert.That(model.Snapshot(.3d).phase, Is.EqualTo(LabPhase.Playing));
+            Assert.That(model.TryApplyPlayerDamage(30, 300, .4d), Is.True);
+            var lost = model.Snapshot(.4d);
+            Assert.That(lost.players.All(player => player.personalHp == 0), Is.True);
+            Assert.That(lost.phase, Is.EqualTo(LabPhase.Defeat));
+            Assert.That(lost.hp, Is.EqualTo(1000));
+            Assert.That(model.TryApplyPlayerDamage(30, 1, .5d), Is.False, "A finished round cannot change HP.");
+            Assert.That(model.TryGenerate(20, "after-party-defeat", .5d, out _, out _), Is.False);
+        }
+
+        [Test]
+        public void PlayerHpUsesTheRoomSettingAndResetsForSoloRetry()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[48] = 120f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var solo = new LabModel();
+            solo.BeginSolo("solo-hp", 42, 0d, config);
+            Assert.That(solo.Snapshot(0d).players.Single().personalHp, Is.EqualTo(120));
+            Assert.That(solo.TryApplyPlayerDamage(42, 119, .1d), Is.True);
+            Assert.That(solo.Snapshot(.1d).players.Single().personalHp, Is.EqualTo(1));
+            Assert.That(solo.TryApplyPlayerDamage(42, 1, .2d), Is.True);
+            Assert.That(solo.Snapshot(.2d).phase, Is.EqualTo(LabPhase.Defeat));
+            solo.BeginSolo("solo-hp", 42, .3d, config);
+            var retry = solo.Snapshot(.3d);
+            Assert.That(retry.round, Is.EqualTo(2u));
+            Assert.That(retry.phase, Is.EqualTo(LabPhase.Playing));
+            Assert.That(retry.players.Single().personalHp, Is.EqualTo(120));
+        }
+
+        [Test]
+        public void PlayerDamageRejectsBackwardAndExpiredHostTime()
+        {
+            Assert.That(model.TryApplyPlayerDamage(10, 10, 10d), Is.True);
+            Assert.That(model.TryApplyPlayerDamage(10, 10, 9d), Is.False);
+            Assert.That(model.Snapshot(10d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(290));
+            Assert.That(model.TryApplyPlayerDamage(10, 10, 180d), Is.False);
+            Assert.That(model.Snapshot(180d).phase, Is.EqualTo(LabPhase.Defeat));
+            Assert.That(model.Snapshot(180d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(290));
         }
 
         [Test]
@@ -327,15 +403,215 @@ namespace C6Lab.Tests
             Assert.That(after.revision, Is.EqualTo(before.revision));
         }
 
+        [Test]
+        public void GenerationFollowsDefaultChancesAndIncludesEveryItem()
+        {
+            var chances = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                float[] values = chances.CaptureDeveloperValues();
+                values[5] = .001f; // generation cost
+                values[9] = 100f;  // stored orb limit
+                Assert.That(chances.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("chance-test", new ulong[] { 10, 20, 30 }, 0d, chances);
+                var counts = new Dictionary<LabOrbKind, int>();
+                var lockCounts = new HashSet<int>();
+                foreach (ulong player in new ulong[] { 10, 20, 30 })
+                    for (int i = 0; i < 100; i++)
+                    {
+                        Assert.That(room.TryGenerate(player, "draw-" + player + "-" + i, 0d, out var orb, out var reason),
+                            Is.True, reason);
+                        counts[orb.kind] = counts.TryGetValue(orb.kind, out int count) ? count + 1 : 1;
+                        if (orb.kind.IsItem()) lockCounts.Add(orb.lockSwipes);
+                        else Assert.That(orb.lockSwipes, Is.Zero, "Only items are locked.");
+                    }
+
+                // 300 draws at 40/40/5/5/5/5 percent: expected 120 each polarity and 15 each item.
+                Assert.That(counts.Keys, Is.EquivalentTo(LabConfig.GeneratedKinds));
+                Assert.That(counts[LabOrbKind.Yin], Is.InRange(90, 150));
+                Assert.That(counts[LabOrbKind.Yang], Is.InRange(90, 150));
+                foreach (LabOrbKind item in new[] { LabOrbKind.Relay, LabOrbKind.SecretBox, LabOrbKind.Potion, LabOrbKind.Bomb })
+                    Assert.That(counts[item], Is.InRange(5, 30), item.ToString());
+                Assert.That(lockCounts, Is.EquivalentTo(new[] { 2, 3, 4 }), "Items need 2 to 4 unlock swipes by default.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(chances); }
+        }
+
+        [Test]
+        public void HundredPercentChanceAlwaysCreatesThatKind()
+        {
+            var bombsOnly = ConfigWith(10f, 0, 0, 0, 0, 0, 100);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("bombs-only", new ulong[] { 10, 20, 30 }, 0d, bombsOnly);
+                for (int i = 0; i < 5; i++)
+                {
+                    Assert.That(room.TryGenerate(10, "bomb-" + i, 0d, out var orb, out _), Is.True);
+                    Assert.That(orb.kind, Is.EqualTo(LabOrbKind.Bomb));
+                    Assert.That(orb.origin, Is.EqualTo(LabOrbOrigin.Generated));
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(bombsOnly); }
+        }
+
+        [Test]
+        public void ItemsCannotCombineWithRawOrBeThrownYet()
+        {
+            var mixed = ConfigWith(10f, 50, 0, 0, 0, 0, 50);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("yin-and-bombs", new ulong[] { 10, 20, 30 }, 0d, mixed);
+                LabOrbState yin = null, bomb = null;
+                for (int i = 0; i < 10 && (yin == null || bomb == null); i++)
+                {
+                    Assert.That(room.TryGenerate(10, "mixed-" + i, 0d, out var orb, out _), Is.True);
+                    if (orb.kind == LabOrbKind.Yin) yin = orb;
+                    else if (orb.kind == LabOrbKind.Bomb) bomb = orb;
+                }
+                Assert.That(yin, Is.Not.Null);
+                Assert.That(bomb, Is.Not.Null);
+
+                Assert.That(room.TryCombine(10, yin.id, bomb.id, "yin-bomb", .1d, out _, out var combineReason), Is.False);
+                Assert.That(combineReason, Is.EqualTo("POLARITY_MISMATCH"));
+                Assert.That(room.TryLaunch(10, bomb.id, "bomb-throw", .1d, out _, out var launchReason), Is.False);
+                Assert.That(launchReason, Is.EqualTo("RAW_CANNOT_ATTACK"));
+                Assert.That(room.Snapshot(.1d).orbs.Select(orb => orb.id), Does.Contain(yin.id).And.Contain(bomb.id));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mixed); }
+        }
+
+        [Test]
+        public void EachHandoffToANeighborRemovesOneLockAndSoloCannotUnlock()
+        {
+            var bombsOnly = ConfigWith(10f, 0, 0, 0, 0, 0, 100);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("unlock-test", new ulong[] { 10, 20, 30 }, 0d, bombsOnly);
+                Assert.That(room.TryGenerate(10, "bomb", 0d, out var bomb, out _), Is.True);
+                int locks = bomb.lockSwipes;
+                Assert.That(locks, Is.InRange(2, 4));
+
+                // Pass the bomb rightward around the ring; one extra pass shows the count stops at zero.
+                ulong[] ring = { 10, 20, 30 };
+                for (int pass = 1; pass <= locks + 1; pass++)
+                {
+                    ulong holder = ring[(pass - 1) % ring.Length];
+                    double at = pass * .1d;
+                    Assert.That(room.TryUpdateMotion(holder, bomb.id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
+                    Assert.That(room.TryTransfer(holder, bomb.id, true, .5f, Vector2.right, "pass-" + pass, at,
+                        out var passed, out var reason), Is.True, reason);
+                    Assert.That(passed.owner, Is.EqualTo(ring[pass % ring.Length]));
+                    Assert.That(passed.lockSwipes, Is.EqualTo(Math.Max(0, locks - pass)));
+                    Assert.That(room.Snapshot(at).orbs.Single(orb => orb.id == bomb.id).lockSwipes,
+                        Is.EqualTo(passed.lockSwipes), "Every screen sees the remaining count.");
+                }
+
+                var solo = new LabModel();
+                solo.BeginSolo("unlock-solo", 7ul, 0d, bombsOnly);
+                Assert.That(solo.TryGenerate(7ul, "solo-bomb", 0d, out var soloBomb, out _), Is.True);
+                Assert.That(solo.TryUpdateMotion(7ul, soloBomb.id, new Vector2(.99f, .5f), Vector2.right, .1d), Is.True);
+                Assert.That(solo.TryTransfer(7ul, soloBomb.id, true, .5f, Vector2.right, "solo-pass", .1d,
+                    out _, out var soloReason), Is.False);
+                Assert.That(soloReason, Is.EqualTo("NO_NEIGHBOR"));
+                Assert.That(solo.Snapshot(.1d).orbs.Single().lockSwipes, Is.EqualTo(soloBomb.lockSwipes),
+                    "Solo play has no neighbor, so items stay locked.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(bombsOnly); }
+        }
+
+        [Test]
+        public void ItemsLastTheItemLifetimeWhileRawOrbsKeepTheOrbLifetime()
+        {
+            var mixed = ConfigWith(10f, 50, 0, 0, 0, 0, 50);
+            try
+            {
+                Assert.That(mixed.ItemLifetimeSeconds, Is.EqualTo(15f));
+                var room = new LabModel();
+                room.Begin("lifetime-test", new ulong[] { 10, 20, 30 }, 0d, mixed);
+                LabOrbState yin = null, bomb = null;
+                for (int i = 0; i < 10 && (yin == null || bomb == null); i++)
+                {
+                    Assert.That(room.TryGenerate(10, "life-" + i, 0d, out var orb, out _), Is.True);
+                    if (orb.kind == LabOrbKind.Yin) yin = orb;
+                    else if (orb.kind == LabOrbKind.Bomb) bomb = orb;
+                }
+                Assert.That(yin, Is.Not.Null);
+                Assert.That(bomb, Is.Not.Null);
+
+                var atEight = room.Snapshot(8d).orbs.Select(orb => orb.id).ToArray();
+                Assert.That(atEight, Does.Not.Contain(yin.id));
+                Assert.That(atEight, Does.Contain(bomb.id), "Items outlive the 8-second orb lifetime.");
+                Assert.That(room.Snapshot(14.9d).orbs.Select(orb => orb.id), Does.Contain(bomb.id));
+                Assert.That(room.Snapshot(15d).orbs.Select(orb => orb.id), Does.Not.Contain(bomb.id));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mixed); }
+        }
+
+        [Test]
+        public void CombiningDrawsEveryElementEvenlyAndOtherOrbsHaveNone()
+        {
+            var rawOnly = ConfigWith(.001f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                float[] values = rawOnly.CaptureDeveloperValues();
+                values[9] = 100f; // stored orb limit
+                Assert.That(rawOnly.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("element-test", new ulong[] { 10, 20, 30 }, 0d, rawOnly);
+                var counts = new Dictionary<LabOrbElement, int>();
+                foreach (ulong player in new ulong[] { 10, 20, 30 })
+                {
+                    var yins = new List<LabOrbState>();
+                    var yangs = new List<LabOrbState>();
+                    for (int i = 0; i < 100; i++)
+                    {
+                        Assert.That(room.TryGenerate(player, "raw-" + player + "-" + i, 0d, out var raw, out _), Is.True);
+                        Assert.That(raw.element, Is.EqualTo(LabOrbElement.None));
+                        (raw.kind == LabOrbKind.Yin ? yins : yangs).Add(raw);
+                    }
+                    for (int i = 0; i < Math.Min(yins.Count, yangs.Count); i++)
+                    {
+                        Assert.That(room.TryCombine(player, yins[i].id, yangs[i].id, "combine-" + player + "-" + i, 0d,
+                            out var combined, out var reason), Is.True, reason);
+                        Assert.That(combined.element, Is.Not.EqualTo(LabOrbElement.None));
+                        Assert.That(room.Snapshot(0d).orbs.Single(orb => orb.id == combined.id).element,
+                            Is.EqualTo(combined.element), "Clients receive the element through the snapshot.");
+                        counts[combined.element] = counts.TryGetValue(combined.element, out int count) ? count + 1 : 1;
+                    }
+                }
+
+                // 140 combines for this seed: about 28 per element at an even 20 percent.
+                Assert.That(counts.Keys, Is.EquivalentTo(new[]
+                    { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth }));
+                foreach (var pair in counts) Assert.That(pair.Value, Is.InRange(14, 42), pair.Key.ToString());
+            }
+            finally { UnityEngine.Object.DestroyImmediate(rawOnly); }
+        }
+
+        /// <summary>A default config with one generation cost and chances in GeneratedKinds order.</summary>
+        private static LabConfig ConfigWith(float generateCost, params int[] chances)
+        {
+            var created = ScriptableObject.CreateInstance<LabConfig>();
+            float[] values = created.CaptureDeveloperValues();
+            values[5] = generateCost;
+            for (int i = 0; i < chances.Length; i++) values[39 + i] = chances[i];
+            Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            return created;
+        }
+
         private (LabOrbState yin, LabOrbState yang) GeneratePair(ulong owner, double at = 0d)
         {
             LabOrbState yin = null, yang = null;
-            for (int i = 0; i < 4 && (yin == null || yang == null); i++)
+            for (int i = 0; i < 10 && (yin == null || yang == null); i++)
             {
                 Assert.That(model.TryGenerate(owner, "pair-" + owner + "-" + at + "-" + i, at,
                     out var orb, out _), Is.True);
                 if (orb.kind == LabOrbKind.Yin) yin = orb;
-                else yang = orb;
+                else if (orb.kind == LabOrbKind.Yang) yang = orb;
             }
             Assert.That(yin, Is.Not.Null);
             Assert.That(yang, Is.Not.Null);

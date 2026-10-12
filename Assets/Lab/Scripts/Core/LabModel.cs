@@ -16,6 +16,7 @@ namespace C6Lab
         public const int DefaultParticipants = 3;
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
+        private const uint LockDrawSalt = 0x10C4ED00u;
         private readonly Dictionary<ulong, LabPlayerState> players = new Dictionary<ulong, LabPlayerState>();
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
         private readonly HashSet<string> requests = new HashSet<string>(StringComparer.Ordinal);
@@ -73,7 +74,10 @@ namespace C6Lab
             players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
-                players.Add(ids[i], new LabPlayerState { id = ids[i], seat = i, stamina = rules.StaminaStart });
+                players.Add(ids[i], new LabPlayerState
+                {
+                    id = ids[i], seat = i, stamina = rules.StaminaStart, personalHp = rules.PlayerMaxHp
+                });
                 generatedCounts.Add(ids[i], 0u);
             }
             seed = SeedFor(id, round);
@@ -102,12 +106,14 @@ namespace C6Lab
             uint generated = generatedCounts[sender];
             if (generated == uint.MaxValue) return Reject("GENERATION_LIMIT", out reason);
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
-            var kind = PolarityFor(seed, sender, generated);
+            var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
+            int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
             generatedCounts[sender] = generated + 1;
             Vector2 position = SpawnPosition(sender);
             orb = new LabOrbState
             {
-                id = NewOrbId(), owner = sender, kind = kind, origin = LabOrbOrigin.Generated, originOwner = sender,
+                id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes,
+                origin = LabOrbOrigin.Generated, originOwner = sender,
                 x = position.x, y = position.y,
                 vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
             };
@@ -126,7 +132,7 @@ namespace C6Lab
                 !orbs.TryGetValue(firstId, out var first) || !orbs.TryGetValue(secondId, out var second))
                 return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(first, sender) || !UsableBy(second, sender)) return Reject("NOT_OWNED_IDLE", out reason);
-            if (first.kind == LabOrbKind.Combined || second.kind == LabOrbKind.Combined || first.kind == second.kind)
+            if (!first.kind.IsRaw() || !second.kind.IsRaw() || first.kind == second.kind)
                 return Reject("POLARITY_MISMATCH", out reason);
 
             orbs.Remove(firstId); orbs.Remove(secondId);
@@ -147,6 +153,7 @@ namespace C6Lab
         /// <summary>
         /// A right edge enters the next seat from its left; a left edge enters the previous seat
         /// from its right. The same ID, creation time, and velocity survive the handoff.
+        /// Each handoff of a locked item removes one lock, so items unlock only by teamwork.
         /// </summary>
         public bool TryTransfer(ulong sender, string id, bool right, float height01,
             Vector2 normalizedVelocity, string requestId, double now, out LabOrbState orb, out string reason)
@@ -170,6 +177,7 @@ namespace C6Lab
             current.y = height01;
             current.vx = normalizedVelocity.x;
             current.vy = normalizedVelocity.y;
+            if (current.lockSwipes > 0) current.lockSwipes--;
             current.revision = ++revision;
             reason = "TRANSFERRED";
             orb = current.Copy();
@@ -202,6 +210,20 @@ namespace C6Lab
             if (players.TryGetValue(orb.owner, out var attacker))
                 attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
             if (hp == 0) phase = LabPhase.Victory;
+            return true;
+        }
+
+        /// <summary>
+        /// Host-only entry point for a future player-damage event. No gameplay action invokes it yet.
+        /// One player reaching zero does not stop the round; all players reaching zero ends in Defeat.
+        /// </summary>
+        public bool TryApplyPlayerDamage(ulong playerId, int amount, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || amount <= 0 ||
+                !players.TryGetValue(playerId, out var player) || player.personalHp <= 0) return false;
+
+            player.personalHp = Math.Max(0, player.personalHp - amount);
+            if (players.Values.All(current => current.personalHp == 0)) phase = LabPhase.Defeat;
             return true;
         }
 
@@ -273,7 +295,7 @@ namespace C6Lab
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond));
-                foreach (string id in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= rules.OrbLifetimeSeconds)
+                foreach (string id in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .Select(orb => orb.id).ToArray()) orbs.Remove(id);
                 remaining = Math.Max(0d, deadline - now);
                 if (now >= deadline) phase = LabPhase.Defeat;
@@ -282,6 +304,8 @@ namespace C6Lab
             return true;
         }
 
+        private float LifetimeOf(LabOrbState orb) =>
+            orb.kind.IsItem() ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
         private Vector2 SpawnPosition(ulong owner)
         {
@@ -318,8 +342,6 @@ namespace C6Lab
             }
         }
 
-        // Counter-based Host draw: one player's accepted generation cannot change another's
-        // polarity sequence. After three equal results the next Raw flips polarity.
         /// <summary>
         /// 결합 구슬의 오행 속성을 정한다. 다섯 속성이 같은 확률로 나온다.
         /// Host만 호출하므로 모든 기기가 스냅샷으로 같은 결과를 받는다.
@@ -338,23 +360,28 @@ namespace C6Lab
             }
         }
 
-        private static LabOrbKind PolarityFor(uint seed, ulong playerId, uint successfulIndex)
+        // Counter-based Host draw: one player's accepted generation cannot change another's
+        // sequence. Each draw is independent, so results follow the configured percentages.
+        private static LabOrbKind GeneratedKindFor(uint seed, ulong playerId, uint index, int[] chances)
         {
-            var previous = LabOrbKind.Combined;
-            var current = LabOrbKind.Combined;
-            uint run = 0;
-            for (uint index = 0; ; index++)
+            int total = 0;
+            foreach (int chance in chances) total += chance;
+            int roll = (int)(DrawFor(seed, playerId, index) % (ulong)total);
+            for (int i = 0; i < chances.Length; i++)
             {
-                current = RawPolarityFor(seed, playerId, index);
-                if (run >= 3 && current == previous)
-                    current = current == LabOrbKind.Yin ? LabOrbKind.Yang : LabOrbKind.Yin;
-                if (current == previous) run++;
-                else { previous = current; run = 1; }
-                if (index == successfulIndex) return current;
+                roll -= chances[i];
+                if (roll < 0) return LabConfig.GeneratedKinds[i];
             }
+            return LabOrbKind.Yin;
         }
 
-        private static LabOrbKind RawPolarityFor(uint seed, ulong playerId, uint index)
+        private int LockSwipesFor(uint seed, ulong playerId, uint index)
+        {
+            int span = rules.ItemUnlockSwipesMax - rules.ItemUnlockSwipesMin + 1;
+            return rules.ItemUnlockSwipesMin + (int)(DrawFor(seed ^ LockDrawSalt, playerId, index) % (ulong)span);
+        }
+
+        private static ulong DrawFor(uint seed, ulong playerId, uint index)
         {
             unchecked
             {
@@ -363,19 +390,26 @@ namespace C6Lab
                 value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
                 value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
                 value ^= value >> 31;
-                return (value & 1UL) == 0 ? LabOrbKind.Yin : LabOrbKind.Yang;
+                return value;
             }
         }
 
         private sealed class Rules
         {
-            public readonly int MonsterMaxHp, Damage, OrbStorageLimit;
+            public readonly int MonsterMaxHp, PlayerMaxHp, Damage, OrbStorageLimit;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
-                StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed;
+                StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
+            public readonly int[] GenerationChances;
+            public readonly int ItemUnlockSwipesMin, ItemUnlockSwipesMax;
 
             public Rules(LabConfig config)
             {
+                GenerationChances = config.GenerationChances();
+                ItemLifetimeSeconds = config.ItemLifetimeSeconds;
+                ItemUnlockSwipesMin = config.ItemUnlockSwipesMin;
+                ItemUnlockSwipesMax = config.ItemUnlockSwipesMax;
                 MonsterMaxHp = config.MonsterMaxHp;
+                PlayerMaxHp = config.PlayerMaxHp;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
                 BattleDurationSeconds = config.BattleDurationSeconds;

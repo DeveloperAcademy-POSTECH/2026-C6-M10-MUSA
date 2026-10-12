@@ -129,7 +129,7 @@ namespace C6Lab
         /// </summary>
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
-            bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None)
+            bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0)
         {
             RequireConfigured();
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
@@ -142,6 +142,7 @@ namespace C6Lab
                     existing.View.Configure(id, kind, config.OrbRadius, element);
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
+                if (existing.View.LockSwipes != lockSwipes) existing.View.SetLockSwipes(lockSwipes);
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -153,6 +154,7 @@ namespace C6Lab
             var view = gameObject.AddComponent<LabOrbView>();
             view.Configure(id, kind, config.OrbRadius, element);
             view.ConfigureAppearance(config.OrbAppearance);
+            view.SetLockSwipes(lockSwipes);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
@@ -320,7 +322,7 @@ namespace C6Lab
                 return true;
             }
 
-            if (config.DropCombineEnabled && entry.View.Kind != LabOrbKind.Combined)
+            if (config.DropCombineEnabled && entry.View.Kind.IsRaw())
             {
                 Entry target = FindOppositeOverlap(entry);
                 if (target != null)
@@ -465,7 +467,7 @@ namespace C6Lab
         /// <summary>닿으면 결합에 쓸 수 있는 구슬인지 확인한다.</summary>
         private static bool CanContactCombine(Entry entry)
         {
-            return entry.View.Kind != LabOrbKind.Combined
+            return entry.View.Kind.IsRaw()
                 && entry.LocalOwner
                 && !entry.Held
                 && !entry.Locked
@@ -481,7 +483,7 @@ namespace C6Lab
             float best = Mathf.Pow(config.OrbRadius * 2f, 2f);
             foreach (var candidate in entries.Values)
             {
-                if (candidate == dragged || candidate.View.Kind == LabOrbKind.Combined
+                if (candidate == dragged || !candidate.View.Kind.IsRaw()
                     || candidate.View.Kind == dragged.View.Kind || !candidate.LocalOwner
                     || candidate.Locked || candidate.SpawnLocked || candidate.EdgePending || candidate.Held) continue;
                 float distance = (XY(candidate.View.Body.position) - XY(dragged.View.Body.position)).sqrMagnitude;

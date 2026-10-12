@@ -1,20 +1,20 @@
 # C6 Physics Lab 개발자 모드 조정값 명세
 
-> 기본 수치 기준: 2026-10-10, Unity 6000.6.5f1, PR #76 병합 커밋 `854cdd9c`의 설정 에셋. 아래 기본값은 C# 필드 초기값이 아니라 직렬화된 `Assets/Lab/Resources/LabConfig.asset`의 값이다. 개발자 UI·공유 방 절차는 이후 변경된 현재 코드 기준이다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
+> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 원래 39개 수치는 PR #76의 설정 에셋을 기준으로 기록했으며, 이후 생성 확률·아이템 9개와 개인 HP 1개를 더했다. 직렬화된 값이 없으면 C# 필드 초기값이 쓰인다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
 
-이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 숫자 39개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
+이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 숫자 49개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
 
 ## 1. 패널의 적용 방식
 
 1. `Assets/Lab/Scenes/Lab.unity`를 Unity Editor에서 실행하거나 **Development Build**를 실행한다. 일반 배포 빌드에서는 DEV 버튼이 숨겨진다. 참가자는 일반 빌드여도 Host가 확정한 세션 설정을 수신한다.
-2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 참가자와 전투 진행 중에는 설정 변경을 열지 않는다. 숫자 입력칸 39개와 대응하는 슬라이더가 서로 값을 반영한다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
-3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 39개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
-4. 혼자 시험할 때는 **START SOLO**를 누른다. 이미 솔로 전투 중이면 **RESTART SOLO**가 표시된다. 새 라운드가 시작되므로 HP·시간·스태미나·구슬이 초기화된다. 진행 중인 네트워크 라운드에 값을 즉시 적용하는 동작은 없다.
+2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 참가자와 전투 진행 중에는 설정 변경을 열지 않는다. 숫자 입력칸 49개와 대응하는 슬라이더가 서로 값을 반영한다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
+3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 49개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
+4. 혼자 시험할 때는 **START SOLO**를 누른다. 이미 솔로 전투 중이면 **RESTART SOLO**가 표시된다. 새 라운드가 시작되므로 요괴/개인 HP·시간·스태미나·구슬이 초기화된다. 진행 중인 네트워크 라운드에 값을 즉시 적용하는 동작은 없다.
 5. **DEFAULTS**는 저장된 `LabConfig.asset`의 숫자를 입력칸과 슬라이더에 불러올 뿐이다. 공유 방이나 솔로에 적용하려면 해당 시작·적용 버튼을 눌러야 한다. **END SOLO**는 솔로를 끝내고 원본 설정으로 복귀한다. 런타임 복사본은 앱이 실행 중인 동안만 유지되며 원본 에셋에는 저장되지 않는다.
 
 패널을 열어도 이미 진행 중인 Host 전투 시간은 멈추지 않는다. 마지막 `SHOT HIT/MISS` 보고는 솔로를 끝내거나 연결을 끊으면 지워질 수 있으므로 먼저 기록한다. 공유 방에서는 Host의 설정 지문과 확인 응답을 기준으로 시작을 판정한다. 이 절은 코드상 경로 설명이며 실제 기기 동기화 결과는 검증 기록과 구분한다.
 
-입력은 **39개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
+입력은 **49개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
 
 ## 2. 단위와 공통 판정
 
@@ -30,8 +30,11 @@
 | Monster Max HP | 1000 | 정수 1–1,000,000 / HP | 새 라운드의 요괴 최대·초기 체력. 높이면 같은 피해량에서 더 많은 명중이 필요하다. 진행 중인 HP를 직접 고치는 값은 아니다. |
 | Damage per Hit | 20 | 정수 1–1,000,000 / HP | Host가 3D 투사체의 실제 요괴 피격을 확정할 때마다 차감할 체력. 빗나감에는 적용되지 않는다. HP는 0 아래로 내려가지 않는다. |
 | Battle Duration (seconds) | 180 | 1–86,400 / 초 | Host가 라운드 시작 시 계산하는 제한 시간. 시간이 끝나면 패배한다. 패널을 열어도 시간은 흐른다. |
+| Player Max HP | 300 | 정수 1–300 / 개인 HP | 각 플레이어의 새 라운드 최대·초기 체력. DEV 필드 배열에서는 **49번째(인덱스 48)**로 추가되어 앞선 48개 설정 순서를 보존한다. 한 사람의 개인 HP가 0이어도 전투를 계속하며 전원 0이면 패배한다. 진행 중인 개인 HP를 직접 바꾸는 슬라이더가 아니다. |
 
-근거: `LabModel.BeginWithSeats`, `ConfirmHit`, `TryAdvance`.
+개인 HP는 Host의 플레이어별 상태와 스냅샷에 보관되며 화면에는 내 값만 표시한다. 현재 요괴 공격이나 아이템 피해 이벤트는 이 값을 깎지 않는다. Host 모델의 `TryApplyPlayerDamage`는 향후 이벤트용 상태 변경 경로로, 양수 피해·유효한 플레이어·진행 중인 판에서만 적용하고 0에서 멈춘다. 실제 플레이에서 전원 0 패배를 시험하려면 별도 피해 이벤트 구현이 필요하다.
+
+근거: `LabModel.BeginWithSeats`, `TryApplyPlayerDamage`, `ConfirmHit`, `TryAdvance`, `LabHud`.
 
 ## 4. 스태미나·구슬 생성
 
@@ -39,13 +42,13 @@
 | --- | ---: | --- | --- |
 | Maximum Stamina | 100 | 1–1,000,000 / 스태미나 | 개인 스태미나 상한. 시작량·생성 비용·회복량·명중 보상은 이 값 이하여야 한다. |
 | Starting Stamina | 100 | 0–1,000,000 / 스태미나 | 새 라운드에서 각 플레이어가 갖는 양. 높이면 처음 만들 수 있는 구슬 수가 늘 수 있다. |
-| Orb Generation Cost | 20 | 0.001–1,000,000 / 스태미나/개 | `GENERATE` 요청이 Host에서 승인될 때 Raw 한 개당 소비. 현재 보유량이 비용 미만이면 생성이 거절된다. |
+| Orb Generation Cost | 20 | 0.001–1,000,000 / 스태미나/개 | `GENERATE` 요청이 Host에서 승인될 때 구슬(음·양·아이템) 한 개당 소비. 현재 보유량이 비용 미만이면 생성이 거절된다. |
 | Stamina Recovery Amount | 20 | 0–1,000,000 / 스태미나 | 아래 간격과 함께 자동 회복 **속도**를 정한다. 0이면 시간에 따른 회복이 없다. |
 | Stamina Recovery Interval (seconds) | 3 | 0.001–86,400 / 초 | 회복 속도 = `Recovery Amount ÷ Recovery Interval`. 현재 값은 **초당 약 6.67씩 연속 회복**한다. “3초마다 한 번에 20”으로 처리하지 않는다. |
 | Stamina Reward per Hit | 5 | 0–1,000,000 / 스태미나 | Host가 실제 명중을 확정했을 때 그 투사체의 공격자에게만 즉시 더한다. 최대 스태미나를 넘지 않는다. 빗나감은 보상이 없다. |
 | Stored Orb Limit | 20 | 정수 1–100 / 구슬 개수 | 각 플레이어가 보관하는 비행 전 구슬의 수량 상한. 생성자뿐 아니라 전달받는 사람의 남은 자리도 검사한다. |
 
-예시: 기본값에서 구슬 한 개를 만들면 100→80이 된다. 다른 행동이 없다면 3초 동안 `20/3 × 3 = 20`이 연속으로 회복돼 다시 100이 된다. 실제 회복은 Host 시간 경과를 처리할 때 갱신된다. Raw는 Host가 Yin 또는 Yang으로 정하며 이 패널에는 음양 확률 입력칸이 없다.
+예시: 기본값에서 구슬 한 개를 만들면 100→80이 된다. 다른 행동이 없다면 3초 동안 `20/3 × 3 = 20`이 연속으로 회복돼 다시 100이 된다. 실제 회복은 Host 시간 경과를 처리할 때 갱신된다. 생성되는 종류는 아래 **8절의 생성 확률**을 따른다.
 
 근거: `LabConfig.StaminaRecoveryPerSecond`, `LabModel.TryGenerate`, `TryTransfer`, `ConfirmHit`, `TryAdvance`.
 
@@ -53,7 +56,7 @@
 
 | DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
 | --- | ---: | --- | --- |
-| Orb Lifetime (seconds) | 8 | 0.1–86,400 / 초 | 보관 중인 Raw·Combined의 수명. Raw는 생성 시점, Combined는 조합 시점부터 센다. 이웃에게 전달해도 수명은 초기화되지 않는다. 이미 발사돼 비행 중인 구슬은 이 만료 대상이 아니다. |
+| Orb Lifetime (seconds) | 8 | 0.1–86,400 / 초 | 보관 중인 Raw·Combined의 수명(아이템은 8절의 `Item Lifetime`). Raw는 생성 시점, Combined는 조합 시점부터 센다. 이웃에게 전달해도 수명은 초기화되지 않는다. 이미 발사돼 비행 중인 구슬은 이 만료 대상이 아니다. |
 | Orb Bounce | 0.8 | 0–1 / 3D 접촉 탄성 | 구슬·상하 벽의 `PhysicsMaterial.bounciness`. 높이면 접촉 후 더 잘 튀는 경향이 있다. 충돌 결과는 상대 물체와 물리 설정에도 영향을 받는다. |
 | Orb Floor Deceleration | 2 | 0–100,000 / 보드 폭/초² | 손을 놓은 뒤 XY 평면에서 움직이는 3D 구슬의 속력에서 매 물리 스텝 감산한다. 높이면 더 빨리 멈춘다. Unity의 `Rigidbody.linearDamping`이나 접촉 재질의 마찰을 조정하는 값은 아니다. |
 | Orb Stop Speed | 0.065 | 0–100,000 / 보드 폭/초 | 구슬 속력이 이 값 이하이면 0으로 만든다. 높이면 낮은 속도의 구슬이 일찍 멈춘다. `Orb Maximum Release Speed` 이하여야 한다. |
@@ -114,11 +117,31 @@
 
 근거: `LabOrbBoard.ReleaseVelocity`·`EndDragAtWorld`, `LabThrowMath.IsThrowGesture`·`LaunchVelocity`, `LabProjectile.Prepare`·`FixedUpdate`·`Resolve`, `LabNetwork.SpawnHostProjectile`·`OnProjectileResolved`.
 
-## 8. 입력 제약과 조정 실험 예시
+## 8. 생성 확률·아이템
 
-**값 간 관계:** `Starting Stamina`, `Orb Generation Cost`, `Stamina Recovery Amount`, `Stamina Reward per Hit`은 모두 `Maximum Stamina` 이하여야 한다. `Orb Stop Speed ≤ Orb Maximum Release Speed`, `Throw Minimum Swipe Speed ≤ Throw Maximum Swipe Speed`, `Throw Minimum Upward Speed ≤ Throw Maximum World Speed`도 필수다. 관계 위반 시 전체 입력이 거절된다.
+GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 생성은 독립 추첨이며 같은 극성이 이어져도 보정하지 않는다. 결합 구슬의 오행 속성(화·수·목·금·토)은 결합 순간 같은 확률로 정해지며 이 패널로 조정하지 않는다.
 
-**기준 실험:** DEFAULTS를 불러와 APPLY로 솔로를 시작한다. 비교 시간을 확보하려면 전투 시간·구슬 수명을 늘리고 생성 비용을 낮추되, 변경값을 함께 기록한다. Yin과 Yang을 직접 겹쳐 Combined를 만든 후 판 중앙에서 위로 던진다. `SHOT HIT/MISS | 비행 시간 | peak +최고 상승 | range 수평 이동`와 HP 변화를 적는다. 같은 손동작을 여러 번 반복하고 **한 번에 한 값**만 바꿔 APPLY + RESTART SOLO로 비교한다. Console/Player 로그에는 `C6_LAB_THROW`(입력·발사 속도)와 `C6_LAB_PROJECTILE`(충돌·비행 지표)가 남는다.
+| DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
+| --- | ---: | --- | --- |
+| Yin Chance (%) | 40 | 정수 0–100 / % | 생성 결과가 음(Yin)일 확률. |
+| Yang Chance (%) | 40 | 정수 0–100 / % | 생성 결과가 양(Yang)일 확률. |
+| Relay Orb Chance (%) | 5 | 정수 0–100 / % | 릴레이 구슬 아이템 확률. |
+| Secret Box Chance (%) | 5 | 정수 0–100 / % | 시크릿 상자 아이템 확률. |
+| Potion Chance (%) | 5 | 정수 0–100 / % | 회복물약 아이템 확률. |
+| Bomb Chance (%) | 5 | 정수 0–100 / % | 폭탄 아이템 확률. 6개 확률의 합은 반드시 100이어야 한다. |
+| Item Lifetime (seconds) | 15 | 0.1–86,400 / 초 | 보관 중인 아이템의 수명. 생성 시점부터 세며 이웃에게 전달해도 초기화되지 않는다. |
+| Item Unlock Swipes Min | 2 | 정수 0–20 / 회 | 아이템이 생성될 때 정해지는 잠금 횟수의 하한. 잠금은 **이웃 화면으로 넘길 때마다** 1씩 준다. |
+| Item Unlock Swipes Max | 4 | 정수 0–20 / 회 | 잠금 횟수의 상한. Min ≤ Max여야 한다. Min·Max를 모두 0으로 두면 아이템이 처음부터 해금된 상태로 생긴다. |
+
+아이템은 음·양과 조합되지 않고 아직 던질 수 없다. 효과와 더블 탭 사용은 별도 이슈에서 다룬다. 1인 솔로에는 이웃이 없어 잠긴 아이템이 해금되지 않는다.
+
+근거: `LabConfig.GenerationChances`, `LabModel.TryGenerate`·`TryCombine`·`TryTransfer`·`TryAdvance`, `LabOrbItemMarker.Show`.
+
+## 9. 입력 제약과 조정 실험 예시
+
+**값 간 관계:** `Starting Stamina`, `Orb Generation Cost`, `Stamina Recovery Amount`, `Stamina Reward per Hit`은 모두 `Maximum Stamina` 이하여야 한다. `Orb Stop Speed ≤ Orb Maximum Release Speed`, `Throw Minimum Swipe Speed ≤ Throw Maximum Swipe Speed`, `Throw Minimum Upward Speed ≤ Throw Maximum World Speed`, 생성 확률 6개의 합 = 100, `Item Unlock Swipes Min ≤ Item Unlock Swipes Max`도 필수다. 관계 위반 시 전체 입력이 거절된다.
+
+**기준 실험:** DEFAULTS를 불러와 APPLY로 솔로를 시작한다. 비교 시간을 확보하려면 전투 시간·구슬 수명을 늘리고 생성 비용을 낮추되, 변경값을 함께 기록한다. Yin과 Yang을 직접 겹쳐 Combined를 만든 후 판 중앙에서 위로 던진다. 투척 비교에서 아이템이 섞이지 않게 하려면 `Yin Chance`·`Yang Chance`를 50으로, 아이템 확률을 0으로 둔다. `SHOT HIT/MISS | 비행 시간 | peak +최고 상승 | range 수평 이동`와 HP 변화를 적는다. 같은 손동작을 여러 번 반복하고 **한 번에 한 값**만 바꿔 APPLY + RESTART SOLO로 비교한다. Console/Player 로그에는 `C6_LAB_THROW`(입력·발사 속도)와 `C6_LAB_PROJECTILE`(충돌·비행 지표)가 남는다.
 
 **예시 질문별 첫 조정 대상**
 
@@ -130,22 +153,25 @@
 | 구슬이 금방 사라져 조합하기 어려움 | Orb Lifetime ↑ | Raw/Combined의 각각 생성 시각, 전달 후 수명 |
 | 구슬이 너무 오래 굴러다님 | Orb Floor Deceleration ↑ 또는 Orb Stop Speed ↑ | 충돌·전달 속도까지 영향을 받는지 |
 | 측면에서 던진 공이 잘 빗나감 | Origin Lateral Range 또는 Lateral Gain 비교 | 자동 조준 기능은 현재 없음; 판정 반경 변경은 난이도도 바꿈 |
+| 아이템이 너무 자주/드물게 나옴 | 아이템 4종 확률과 Yin/Yang 확률을 함께 조정 | 합 100 유지, 보유 한도에 아이템도 포함됨 |
+| 아이템이 해금되기 전에 사라짐 | Item Lifetime ↑ 또는 Item Unlock Swipes Max ↓ | 세 명이 실제로 넘기는 데 걸리는 시간 |
 
 이 표의 화살표는 **시험 방향**이지 검증된 추천값이 아니다. 잘못된 투척을 자동 보정하거나 요괴를 추적하는 기능은 현재 없다.
 
-## 9. 이 패널로 조정할 수 없는 것·검증 범위
+## 10. 이 패널로 조정할 수 없는 것·검증 범위
 
-방의 **목표 인원**은 39개 수치 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 음양 생성 알고리즘, 조합·전달의 승인 규칙, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport는 39개 입력칸으로 조정하지 않는다. DEV 솔로에는 이웃이 없어 화면 간 전달을 시험할 수 없다.
+방의 **목표 인원**은 49개 수치 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport는 49개 입력칸으로 조정하지 않는다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
 
 기존 PR #76 기준 문서는 해당 코드·Scene·설정 에셋과 당시 `docs/VALIDATION.md`의 증거를 **읽어 확인**해 작성됐다. 그 기록의 EditMode **12/12**, PlayMode **20/20** 및 Mac Development 앱 빌드는 이번 3D 조합판 전환의 통과 증거가 아니다. 이 전환의 Unity 컴파일·EditMode·PlayMode, Mac·iOS 빌드, 실제 조작은 새 실행 기록으로 구분해야 한다. 문서의 물리 용어를 갱신한 것만으로 실행 결과를 PASS로 보지 않는다.
 
-## 10. 코드·Scene 연결 지도
+## 11. 코드·Scene 연결 지도
 
 - 설정 필드·범위·일괄 검사: `Assets/Lab/Scripts/Core/LabConfig.cs` — `DeveloperFields`, `CaptureDeveloperValues`, `TryApplyDeveloperValues`.
 - 저장 기본값: `Assets/Lab/Resources/LabConfig.asset`.
-- 저장된 DEV 버튼·39개 입력칸·슬라이더·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
+- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 49개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
 - 패널 열기·DEFAULTS·SOLO/Host 설정 적용·슬라이더 변환: `Assets/Lab/Scripts/UI/LabDeveloperMode.cs`.
-- Host 전투 수치·스태미나·생성·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
+- Host 전투 수치·개인 HP·전원 0 패배·스태미나·생성 확률·속성·아이템 잠금·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
+- 아이템 아이콘·잠금 배지: `Assets/Lab/Scripts/Orb/LabOrbItemMarker.cs`, 아이콘·속성 재질 지정: `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`.
 - 3D 조합판 구슬 물리·XY 손동작·공통 구체 외형: `Assets/Lab/Scripts/Orb/LabOrbBoard.cs`와 `LabOrbView.cs`.
 - 발사 위치·초기 속도: `Assets/Lab/Scripts/Throw/LabThrowMath.cs`.
 - 공의 중력·저항·충돌·수명: `Assets/Lab/Scripts/Throw/LabProjectile.cs`.

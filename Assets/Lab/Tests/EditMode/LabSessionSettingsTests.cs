@@ -22,14 +22,19 @@ namespace C6Lab.Tests
             try
             {
                 float[] values = config.CaptureDeveloperValues();
-                string original = LabSessionSettings.Fingerprint(values, 3, 5604);
-                Assert.That(LabSessionSettings.Fingerprint(values, 3, 5604), Is.EqualTo(original));
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5604), Is.Not.EqualTo(original));
+                string original = LabSessionSettings.Fingerprint(values, 3, 5606);
+                Assert.That(LabSessionSettings.Fingerprint(values, 3, 5606), Is.EqualTo(original));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5606), Is.Not.EqualTo(original));
                 Assert.That(LabSessionSettings.Fingerprint(values, 3, 5605), Is.Not.EqualTo(original));
+                float defaultThrowDamping = values[38];
                 values[38] += .1f;
-                Assert.That(LabSessionSettings.Fingerprint(values, 3, 5604), Is.Not.EqualTo(original));
+                Assert.That(LabSessionSettings.Fingerprint(values, 3, 5606), Is.Not.EqualTo(original));
+                values[38] = defaultThrowDamping;
+                values[48] = 120f;
+                Assert.That(LabSessionSettings.Fingerprint(values, 3, 5606), Is.Not.EqualTo(original),
+                    "Player HP setting must be part of the shared room fingerprint.");
                 values[38] = float.NaN;
-                Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(values, 3, 5604));
+                Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(values, 3, 5606));
             }
             finally { UnityEngine.Object.DestroyImmediate(config); }
         }
@@ -45,9 +50,9 @@ namespace C6Lab.Tests
                 {
                     string serialized = JsonUtility.ToJson(new JsonSettings { values = values });
                     float[] restored = JsonUtility.FromJson<JsonSettings>(serialized).values;
-                    Assert.That(restored.Length, Is.EqualTo(42));
-                    Assert.That(LabSessionSettings.Fingerprint(restored, 5, 5604),
-                        Is.EqualTo(LabSessionSettings.Fingerprint(values, 5, 5604)));
+                    Assert.That(restored.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
+                    Assert.That(LabSessionSettings.Fingerprint(restored, 5, 5606),
+                        Is.EqualTo(LabSessionSettings.Fingerprint(values, 5, 5606)));
                 }
             }
             finally { UnityEngine.Object.DestroyImmediate(config); }
@@ -72,6 +77,7 @@ namespace C6Lab.Tests
             values[28] = 100000f;
             values[32] = 100000f;
             values[38] = 5f;
+            values[48] = 1f;
             return values;
         }
 
@@ -106,12 +112,47 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void BonjourAddressesFormOneSelectableRowPerRoomAndOnlySelectedRoutesJoin()
+        {
+            var targets = new[]
+            {
+                new LabBonjourTarget("192.0.2.10", 7777, 1, "C6Lab-alpha"),
+                new LabBonjourTarget("2001:db8::10", 7777, 1, "C6Lab-alpha"),
+                new LabBonjourTarget("fe80::10%4", 7777, 4, "C6Lab-alpha"),
+                new LabBonjourTarget("192.0.2.20", 7777, 1, "C6Lab-beta"),
+                new LabBonjourTarget("192.0.2.30", 7778, 1, "C6Lab-alpha")
+            };
+            var rooms = LabRoomCatalog.GroupTargets(targets);
+            Assert.That(rooms.Count, Is.EqualTo(3));
+            var selected = rooms.Single(room => room.Name == "C6Lab-alpha" && room.Port == 7777);
+            var routes = LabRoomCatalog.RoutesForRoom(targets, selected.Key);
+            Assert.That(routes.Select(route => route.Address), Is.EquivalentTo(new[]
+                { "192.0.2.10", "2001:db8::10", "fe80::10%4" }));
+            Assert.That(LabConnectionCandidates.Initial(routes.Select(route => route.Address), selected.Port)[0],
+                Is.EqualTo("2001:db8::10"));
+        }
+
+        [Test]
+        public void StaleOrUnusableBonjourRoomCannotSupplyJoinRoutes()
+        {
+            var first = new LabBonjourTarget("192.0.2.10", 7777, 1, "C6Lab-first");
+            var second = new LabBonjourTarget("192.0.2.20", 7777, 1, "C6Lab-second");
+            string staleKey = LabRoomCatalog.GroupTargets(new[] { first, second })
+                .Single(room => room.Name == "C6Lab-first").Key;
+            Assert.That(LabRoomCatalog.RoutesForRoom(new[] { second }, staleKey), Is.Empty);
+            Assert.That(LabRoomCatalog.GroupTargets(new[]
+                { new LabBonjourTarget("fe80::10", 7777, 1, "C6Lab-unusable"), second }).Count,
+                Is.EqualTo(1));
+        }
+
+        [Test]
         public void FivePlayersWithOneHundredOrbsEachRoundTripsWithoutTruncation()
         {
             var players = new LabPlayerState[5];
             var orbs = new LabOrbState[500];
             for (int i = 0; i < players.Length; i++)
-                players[i] = new LabPlayerState { id = (ulong)(i + 1), seat = i, stamina = 100f };
+                players[i] = new LabPlayerState { id = (ulong)(i + 1), seat = i, stamina = 100f,
+                    personalHp = 300 - i * 50 };
             for (int i = 0; i < orbs.Length; i++)
                 orbs[i] = new LabOrbState { id = Guid.NewGuid().ToString("N"), owner = (ulong)(i / 100 + 1),
                     kind = LabOrbKind.Combined, origin = LabOrbOrigin.Combined,
@@ -132,6 +173,8 @@ namespace C6Lab.Tests
             }
             LabSnapshot restored = JsonUtility.FromJson<LabSnapshot>(string.Concat(chunks));
             Assert.That(restored.players.Length, Is.EqualTo(5));
+            Assert.That(restored.players.Select(player => player.personalHp),
+                Is.EqualTo(new[] { 300, 250, 200, 150, 100 }));
             Assert.That(restored.orbs.Length, Is.EqualTo(500));
             Assert.That(restored.orbs[499].id, Is.EqualTo(orbs[499].id));
             Assert.That(restored.orbs[499].owner, Is.EqualTo(5ul));

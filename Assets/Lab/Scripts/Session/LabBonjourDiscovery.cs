@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -16,8 +17,47 @@ namespace C6Lab
         public uint InterfaceIndex { get; }
         public string ServiceName { get; }
         public string Key => ServiceName + "|" + InterfaceIndex + "|" + Address + "|" + Port;
-        internal LabBonjourTarget(string address, ushort port, uint interfaceIndex, string serviceName)
+        public LabBonjourTarget(string address, ushort port, uint interfaceIndex, string serviceName)
         { Address = address; Port = port; InterfaceIndex = interfaceIndex; ServiceName = serviceName; }
+    }
+
+    /// <summary>One visible room, possibly reachable through several network interfaces and IP families.</summary>
+    public sealed class LabDiscoveredRoom
+    {
+        public string Key { get; }
+        public string Name { get; }
+        public ushort Port { get; }
+
+        internal LabDiscoveredRoom(string name, ushort port)
+        { Name = name; Port = port; Key = LabRoomCatalog.Key(name, port); }
+    }
+
+    /// <summary>Keep the room picker independent of the number of Bonjour A/AAAA records.</summary>
+    public static class LabRoomCatalog
+    {
+        public static string Key(string name, ushort port) => port.ToString(CultureInfo.InvariantCulture) + ":" + name;
+
+        public static IReadOnlyList<LabDiscoveredRoom> GroupTargets(IEnumerable<LabBonjourTarget> targets)
+        {
+            if (targets == null) return Array.Empty<LabDiscoveredRoom>();
+            return targets.Where(Usable).GroupBy(target => Key(target.ServiceName, target.Port),
+                    StringComparer.OrdinalIgnoreCase)
+                .Select(group => new LabDiscoveredRoom(group.First().ServiceName, group.First().Port))
+                .OrderBy(room => room.Name, StringComparer.OrdinalIgnoreCase).ThenBy(room => room.Port)
+                .ToArray();
+        }
+
+        public static LabBonjourTarget[] RoutesForRoom(IEnumerable<LabBonjourTarget> targets, string roomKey)
+        {
+            if (targets == null || string.IsNullOrEmpty(roomKey)) return Array.Empty<LabBonjourTarget>();
+            return targets.Where(target => Usable(target)
+                    && string.Equals(Key(target.ServiceName, target.Port), roomKey, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        }
+
+        private static bool Usable(LabBonjourTarget target) => target != null
+            && !string.IsNullOrWhiteSpace(target.ServiceName) && target.Port != 0
+            && LabDualStackEndpoint.TryParse(target.Address, target.Port, out _, out _);
     }
 
     /// <summary>
@@ -28,7 +68,7 @@ namespace C6Lab
     public sealed class LabBonjourDiscovery : IDisposable
     {
         public const string ServiceType = "_c6lab._udp";
-        public const string Protocol = "C6-LAB-5604";
+        public const string Protocol = "C6-LAB-5606";
         public const int MaximumServices = 32;
         public const int MaximumAddressesPerService = 32;
         public const double ResolveTimeoutSeconds = 8;
