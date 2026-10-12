@@ -59,9 +59,9 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // 3D board physics changes motion semantics even though snapshots remain planar.
-        // Reject old clients rather than mixing two simulations in a single room.
-        private const ushort LabProtocolVersion = 5604;
+        // Item orb kinds and generation-chance settings are new snapshot/settings data.
+        // Reject old clients rather than mixing two rule sets in a single room.
+        private const ushort LabProtocolVersion = 5605;
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/4");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;

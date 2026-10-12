@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -13,7 +14,9 @@ namespace C6Lab.Tests
         [SetUp]
         public void SetUp()
         {
-            config = ScriptableObject.CreateInstance<LabConfig>();
+            // Rule tests below need Yin/Yang only; item chances have their own tests.
+            // Cost 10 leaves stamina to keep drawing until both polarities appear.
+            config = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
             model = new LabModel();
             model.Begin("lab-test", new ulong[] { 10, 20, 30 }, 0d, config);
         }
@@ -107,13 +110,13 @@ namespace C6Lab.Tests
             Assert.That(start.hp, Is.EqualTo(1000));
 
             LabOrbState yin = null, yang = null;
-            for (int i = 0; i < 4 && (yin == null || yang == null); i++)
+            for (int i = 0; i < 10 && (yin == null || yang == null); i++)
             {
                 Assert.That(solo.TryGenerate(42ul, "solo-generate-" + i, 0d, out var raw, out _), Is.True);
                 Assert.That(raw.y, Is.GreaterThanOrEqualTo(.43f),
                     "Generated orbs must be above the bottom HUD's covered part of the board.");
                 if (raw.kind == LabOrbKind.Yin) yin = raw;
-                else yang = raw;
+                else if (raw.kind == LabOrbKind.Yang) yang = raw;
             }
             Assert.That(yin, Is.Not.Null);
             Assert.That(yang, Is.Not.Null);
@@ -158,7 +161,8 @@ namespace C6Lab.Tests
             Assert.That(first.originOwner, Is.EqualTo(10ul));
             Assert.That(model.TryGenerate(10, "one", 0d, out _, out var reason), Is.False);
             Assert.That(reason, Is.EqualTo("DUPLICATE_REQUEST"));
-            Assert.That(model.Snapshot(0d).players.Single(player => player.id == 10).stamina, Is.EqualTo(80f));
+            Assert.That(model.Snapshot(0d).players.Single(player => player.id == 10).stamina,
+                Is.EqualTo(100f - config.GenerateCost));
             Assert.That(model.Snapshot(0d).orbs.Length, Is.EqualTo(1));
 
             model.Tick(3d);
@@ -169,9 +173,13 @@ namespace C6Lab.Tests
         [Test]
         public void OnlyOwnersOppositeRawMayCombineAndCombinationStartsFreshLifetime()
         {
-            var raw = new LabOrbState[4];
-            for (int i = 0; i < raw.Length; i++)
-                Assert.That(model.TryGenerate(10, "generate-" + i, 0d, out raw[i], out _), Is.True);
+            // Three draws containing both polarities always include a same-polarity pair.
+            var raw = new List<LabOrbState>();
+            for (int i = 0; i < 10 && (raw.Count < 3 || raw.Select(orb => orb.kind).Distinct().Count() < 2); i++)
+            {
+                Assert.That(model.TryGenerate(10, "generate-" + i, 0d, out var generated, out _), Is.True);
+                raw.Add(generated);
+            }
             var yin = raw.First(orb => orb.kind == LabOrbKind.Yin);
             var yang = raw.First(orb => orb.kind == LabOrbKind.Yang);
             var samePair = raw.GroupBy(orb => orb.kind).First(group => group.Count() >= 2).Take(2).ToArray();
@@ -297,15 +305,102 @@ namespace C6Lab.Tests
             Assert.That(after.revision, Is.EqualTo(before.revision));
         }
 
+        [Test]
+        public void GenerationFollowsDefaultChancesAndIncludesEveryItem()
+        {
+            var chances = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                float[] values = chances.CaptureDeveloperValues();
+                values[5] = .001f; // generation cost
+                values[9] = 100f;  // stored orb limit
+                Assert.That(chances.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("chance-test", new ulong[] { 10, 20, 30 }, 0d, chances);
+                var counts = new Dictionary<LabOrbKind, int>();
+                foreach (ulong player in new ulong[] { 10, 20, 30 })
+                    for (int i = 0; i < 100; i++)
+                    {
+                        Assert.That(room.TryGenerate(player, "draw-" + player + "-" + i, 0d, out var orb, out var reason),
+                            Is.True, reason);
+                        counts[orb.kind] = counts.TryGetValue(orb.kind, out int count) ? count + 1 : 1;
+                    }
+
+                // 300 draws at 40/40/5/5/5/5 percent: expected 120 each polarity and 15 each item.
+                Assert.That(counts.Keys, Is.EquivalentTo(LabConfig.GeneratedKinds));
+                Assert.That(counts[LabOrbKind.Yin], Is.InRange(90, 150));
+                Assert.That(counts[LabOrbKind.Yang], Is.InRange(90, 150));
+                foreach (LabOrbKind item in new[] { LabOrbKind.Relay, LabOrbKind.SecretBox, LabOrbKind.Potion, LabOrbKind.Bomb })
+                    Assert.That(counts[item], Is.InRange(5, 30), item.ToString());
+            }
+            finally { UnityEngine.Object.DestroyImmediate(chances); }
+        }
+
+        [Test]
+        public void HundredPercentChanceAlwaysCreatesThatKind()
+        {
+            var bombsOnly = ConfigWith(10f, 0, 0, 0, 0, 0, 100);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("bombs-only", new ulong[] { 10, 20, 30 }, 0d, bombsOnly);
+                for (int i = 0; i < 5; i++)
+                {
+                    Assert.That(room.TryGenerate(10, "bomb-" + i, 0d, out var orb, out _), Is.True);
+                    Assert.That(orb.kind, Is.EqualTo(LabOrbKind.Bomb));
+                    Assert.That(orb.origin, Is.EqualTo(LabOrbOrigin.Generated));
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(bombsOnly); }
+        }
+
+        [Test]
+        public void ItemsCannotCombineWithRawOrBeThrownYet()
+        {
+            var mixed = ConfigWith(10f, 50, 0, 0, 0, 0, 50);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("yin-and-bombs", new ulong[] { 10, 20, 30 }, 0d, mixed);
+                LabOrbState yin = null, bomb = null;
+                for (int i = 0; i < 10 && (yin == null || bomb == null); i++)
+                {
+                    Assert.That(room.TryGenerate(10, "mixed-" + i, 0d, out var orb, out _), Is.True);
+                    if (orb.kind == LabOrbKind.Yin) yin = orb;
+                    else if (orb.kind == LabOrbKind.Bomb) bomb = orb;
+                }
+                Assert.That(yin, Is.Not.Null);
+                Assert.That(bomb, Is.Not.Null);
+
+                Assert.That(room.TryCombine(10, yin.id, bomb.id, "yin-bomb", .1d, out _, out var combineReason), Is.False);
+                Assert.That(combineReason, Is.EqualTo("POLARITY_MISMATCH"));
+                Assert.That(room.TryLaunch(10, bomb.id, "bomb-throw", .1d, out _, out var launchReason), Is.False);
+                Assert.That(launchReason, Is.EqualTo("RAW_CANNOT_ATTACK"));
+                Assert.That(room.Snapshot(.1d).orbs.Select(orb => orb.id), Does.Contain(yin.id).And.Contain(bomb.id));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mixed); }
+        }
+
+        /// <summary>A default config with one generation cost and chances in GeneratedKinds order.</summary>
+        private static LabConfig ConfigWith(float generateCost, params int[] chances)
+        {
+            var created = ScriptableObject.CreateInstance<LabConfig>();
+            float[] values = created.CaptureDeveloperValues();
+            values[5] = generateCost;
+            for (int i = 0; i < chances.Length; i++) values[39 + i] = chances[i];
+            Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            return created;
+        }
+
         private (LabOrbState yin, LabOrbState yang) GeneratePair(ulong owner, double at = 0d)
         {
             LabOrbState yin = null, yang = null;
-            for (int i = 0; i < 4 && (yin == null || yang == null); i++)
+            for (int i = 0; i < 10 && (yin == null || yang == null); i++)
             {
                 Assert.That(model.TryGenerate(owner, "pair-" + owner + "-" + at + "-" + i, at,
                     out var orb, out _), Is.True);
                 if (orb.kind == LabOrbKind.Yin) yin = orb;
-                else yang = orb;
+                else if (orb.kind == LabOrbKind.Yang) yang = orb;
             }
             Assert.That(yin, Is.Not.Null);
             Assert.That(yang, Is.Not.Null);

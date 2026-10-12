@@ -68,8 +68,8 @@ namespace C6Lab.Tests
             LabDeveloperMode developerUi = UnityEngine.Object.FindFirstObjectByType<LabDeveloperMode>();
             Assert.That(network, Is.Not.Null);
             Assert.That(developerUi, Is.Not.Null);
-            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(39));
-            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(39));
+            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
+            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(developerUi.applyHostButton, Is.Not.Null);
             Assert.That(developerUi.targetParticipantsSlider.value, Is.EqualTo(3f));
             network.port = 17778;
@@ -141,6 +141,17 @@ namespace C6Lab.Tests
             Assert.That(boardCamera.depth, Is.GreaterThan(battleCamera.depth),
                 "The board camera must render after the battle camera on mobile devices.");
 
+            // Each solo round has a random session seed and draws are independent, so use
+            // Yin/Yang-only chances and a cheap cost: up to 20 draws find both polarities.
+            LabConfig savedConfig = network.config;
+            LabConfig rawOnly = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = rawOnly.CaptureDeveloperValues();
+            tuning[5] = 1f;
+            tuning[39] = 50f; tuning[40] = 50f;
+            tuning[41] = 0f; tuning[42] = 0f; tuning[43] = 0f; tuning[44] = 0f;
+            Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
+            network.config = rawOnly;
+
             // Keep the test independent of an ordinary app using the default port 7777.
             network.port = 17777;
             try
@@ -152,11 +163,9 @@ namespace C6Lab.Tests
                 Assert.That(network.Snapshot.players.Length, Is.EqualTo(1));
                 int initialHp = network.Snapshot.hp;
 
-                // The Host's deterministic polarity rule gives both Yin and Yang within
-                // four accepted generations, regardless of its session seed.
                 LabOrbState yin = null;
                 LabOrbState yang = null;
-                for (int i = 0; i < 4 && (yin == null || yang == null); i++)
+                for (int i = 0; i < 20 && (yin == null || yang == null); i++)
                 {
                     int before = network.Snapshot.orbs.Length;
                     network.Generate();
@@ -222,6 +231,8 @@ namespace C6Lab.Tests
             finally
             {
                 network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(rawOnly);
             }
         }
 

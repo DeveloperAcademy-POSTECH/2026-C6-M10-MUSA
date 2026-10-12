@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(39));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(45));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -30,6 +30,9 @@ namespace C6Lab.Tests
             values[36] = 1.6f; // nonlinear throw power
             values[37] = 8f; // higher launch angle
             values[38] = .45f; // flight damping
+            values[39] = 50f; // Yin chance
+            values[40] = 25f; // Yang chance
+            values[44] = 10f; // Bomb chance; Relay/Box/Potion stay 5 each
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -41,6 +44,26 @@ namespace C6Lab.Tests
             Assert.That(config.ThrowPowerExponent, Is.EqualTo(1.6f));
             Assert.That(config.ThrowLoftOffsetDegrees, Is.EqualTo(8f));
             Assert.That(config.ThrowAirDamping, Is.EqualTo(.45f));
+            Assert.That(config.GenerationChances(), Is.EqualTo(new[] { 50, 25, 5, 5, 5, 10 }));
+        }
+
+        [Test]
+        public void GenerationChancesStartFromIssueDefaultsAndMustTotalOneHundred()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            Assert.That(new[] { values[39], values[40], values[41], values[42], values[43], values[44] },
+                Is.EqualTo(new[] { 40f, 40f, 5f, 5f, 5f, 5f }));
+
+            values[0] = 240f;
+            values[39] = 41f; // total 101
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False);
+            Assert.That(error, Does.Contain("100"));
+            Assert.That(config.MonsterMaxHp, Is.EqualTo(1000), "A rejected form must not partially apply.");
+            Assert.That(config.GenerationChances(), Is.EqualTo(new[] { 40, 40, 5, 5, 5, 5 }));
+
+            values[39] = 39.5f;
+            values[40] = 40.5f;
+            Assert.That(config.TryApplyDeveloperValues(values, out _), Is.False, "Chances are whole percents.");
         }
 
         [Test]

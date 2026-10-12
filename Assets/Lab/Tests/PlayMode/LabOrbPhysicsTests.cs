@@ -287,6 +287,25 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void DroppingRawOnAnItemOrAnItemOnRawNeverRequestsCombine()
+        {
+            var yin = board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.3f, .3f));
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.7f, .3f));
+            var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.3f, .7f));
+            var yang = board.UpsertOrb("yang", LabOrbKind.Yang, new Vector2(.7f, .7f));
+            int combines = 0;
+            board.CombineRequested += (first, second, center) => combines++;
+
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(yin), 1d), Is.True);
+            Assert.That(board.DragToWorld(BoardPoint(bomb), 1.1d), Is.True);
+            Assert.That(board.EndDragAtWorld(BoardPoint(bomb), 1.12d), Is.True);
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(relay), 2d), Is.True);
+            Assert.That(board.DragToWorld(BoardPoint(yang), 2.1d), Is.True);
+            Assert.That(board.EndDragAtWorld(BoardPoint(yang), 2.12d), Is.True);
+            Assert.That(combines, Is.Zero, "Only a Yin/Yang pair may request a combination.");
+        }
+
+        [Test]
         public void OnlyCombinedFlickReleasedInsideTheBoardRequestsThrow()
         {
             board.UpsertOrb("raw", LabOrbKind.Yin, new Vector2(.4f, .3f));

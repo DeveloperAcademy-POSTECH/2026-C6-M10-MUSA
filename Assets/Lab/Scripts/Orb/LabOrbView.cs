@@ -216,14 +216,16 @@ namespace C6Lab
             }
             visual.gameObject.layer = gameObject.layer;
             LabOrbVisualFactory.EnsureSphere(visual, "Default Sphere", visualRadius, kind,
-                appearance != null ? appearance.MaterialFor(kind) : null);
+                appearance != null ? appearance.MaterialFor(kind) : null,
+                appearance != null ? appearance.ColorOverrideFor(kind) : null);
         }
 
         private void UpdateVisual()
         {
             MeshRenderer defaultRenderer = LabOrbVisualFactory.EnsureSphere(
                 visual, "Default Sphere", visualRadius, kind,
-                appearance != null ? appearance.MaterialFor(kind) : null);
+                appearance != null ? appearance.MaterialFor(kind) : null,
+                appearance != null ? appearance.ColorOverrideFor(kind) : null);
             if (defaultRenderer != null)
             {
                 if (appearance == null && !tintDefaultByKind)
@@ -311,7 +313,7 @@ namespace C6Lab
         /// the corresponding orb or projectile root owns the sole physics representation.
         /// </summary>
         public static MeshRenderer EnsureSphere(Transform mount, string childName,
-            float radius, LabOrbKind kind, Material appearanceMaterial = null)
+            float radius, LabOrbKind kind, Material appearanceMaterial = null, Color? appearanceColor = null)
         {
             if (mount == null) throw new ArgumentNullException(nameof(mount));
             Transform child = mount.Find(childName);
@@ -334,7 +336,7 @@ namespace C6Lab
             if (renderer != null)
             {
                 if (appearanceMaterial != null)
-                    ApplyAppearanceMaterial(renderer, appearanceMaterial);
+                    ApplyAppearanceMaterial(renderer, appearanceMaterial, appearanceColor);
                 else
                 {
                     Material material = GetSphereMaterial();
@@ -416,12 +418,12 @@ namespace C6Lab
         /// explicitly per renderer. This avoids platform/renderer variants displaying a
         /// previous orb's material color on other instances.
         /// </summary>
-        public static void ApplyAppearanceMaterial(Renderer renderer, Material material)
+        public static void ApplyAppearanceMaterial(Renderer renderer, Material material, Color? colorOverride = null)
         {
             if (renderer == null || material == null) return;
             renderer.sharedMaterial = material;
-            Color color = material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor")
-                : material.HasProperty("_Color") ? material.GetColor("_Color") : Color.white;
+            Color color = colorOverride ?? (material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor")
+                : material.HasProperty("_Color") ? material.GetColor("_Color") : Color.white);
             var properties = new MaterialPropertyBlock();
             properties.SetColor("_BaseColor", color);
             properties.SetColor("_Color", color);

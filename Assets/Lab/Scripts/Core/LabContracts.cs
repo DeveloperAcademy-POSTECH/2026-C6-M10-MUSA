@@ -3,8 +3,15 @@ using System;
 namespace C6Lab
 {
     public enum LabPhase { Idle, Playing, Victory, Defeat }
-    public enum LabOrbKind { Yin, Yang, Combined }
+    // Items are appended so the serialized numbers of existing kinds stay unchanged.
+    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb }
     public enum LabOrbOrigin { Unknown, Generated, Combined }
+
+    public static class LabOrbKindRules
+    {
+        public static bool IsRaw(this LabOrbKind kind) => kind == LabOrbKind.Yin || kind == LabOrbKind.Yang;
+        public static bool IsItem(this LabOrbKind kind) => kind >= LabOrbKind.Relay && kind <= LabOrbKind.Bomb;
+    }
 
     /// <summary>One Host-approved orb. Positions and velocities are normalized to the board.</summary>
     [Serializable]

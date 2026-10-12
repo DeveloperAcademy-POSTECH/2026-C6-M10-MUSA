@@ -100,7 +100,7 @@ namespace C6Lab
             uint generated = generatedCounts[sender];
             if (generated == uint.MaxValue) return Reject("GENERATION_LIMIT", out reason);
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
-            var kind = PolarityFor(seed, sender, generated);
+            var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
             generatedCounts[sender] = generated + 1;
             Vector2 position = SpawnPosition(sender);
             orb = new LabOrbState
@@ -124,7 +124,7 @@ namespace C6Lab
                 !orbs.TryGetValue(firstId, out var first) || !orbs.TryGetValue(secondId, out var second))
                 return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(first, sender) || !UsableBy(second, sender)) return Reject("NOT_OWNED_IDLE", out reason);
-            if (first.kind == LabOrbKind.Combined || second.kind == LabOrbKind.Combined || first.kind == second.kind)
+            if (!first.kind.IsRaw() || !second.kind.IsRaw() || first.kind == second.kind)
                 return Reject("POLARITY_MISMATCH", out reason);
 
             orbs.Remove(firstId); orbs.Remove(secondId);
@@ -315,24 +315,21 @@ namespace C6Lab
         }
 
         // Counter-based Host draw: one player's accepted generation cannot change another's
-        // polarity sequence. After three equal results the next Raw flips polarity.
-        private static LabOrbKind PolarityFor(uint seed, ulong playerId, uint successfulIndex)
+        // sequence. Each draw is independent, so results follow the configured percentages.
+        private static LabOrbKind GeneratedKindFor(uint seed, ulong playerId, uint index, int[] chances)
         {
-            var previous = LabOrbKind.Combined;
-            var current = LabOrbKind.Combined;
-            uint run = 0;
-            for (uint index = 0; ; index++)
+            int total = 0;
+            foreach (int chance in chances) total += chance;
+            int roll = (int)(DrawFor(seed, playerId, index) % (ulong)total);
+            for (int i = 0; i < chances.Length; i++)
             {
-                current = RawPolarityFor(seed, playerId, index);
-                if (run >= 3 && current == previous)
-                    current = current == LabOrbKind.Yin ? LabOrbKind.Yang : LabOrbKind.Yin;
-                if (current == previous) run++;
-                else { previous = current; run = 1; }
-                if (index == successfulIndex) return current;
+                roll -= chances[i];
+                if (roll < 0) return LabConfig.GeneratedKinds[i];
             }
+            return LabOrbKind.Yin;
         }
 
-        private static LabOrbKind RawPolarityFor(uint seed, ulong playerId, uint index)
+        private static ulong DrawFor(uint seed, ulong playerId, uint index)
         {
             unchecked
             {
@@ -341,7 +338,7 @@ namespace C6Lab
                 value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
                 value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
                 value ^= value >> 31;
-                return (value & 1UL) == 0 ? LabOrbKind.Yin : LabOrbKind.Yang;
+                return value;
             }
         }
 
@@ -350,9 +347,11 @@ namespace C6Lab
             public readonly int MonsterMaxHp, Damage, OrbStorageLimit;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed;
+            public readonly int[] GenerationChances;
 
             public Rules(LabConfig config)
             {
+                GenerationChances = config.GenerationChances();
                 MonsterMaxHp = config.MonsterMaxHp;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;

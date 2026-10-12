@@ -14,6 +14,8 @@ namespace C6Lab
         [SerializeField] private Material yinMaterial;
         [SerializeField] private Material yangMaterial;
         [SerializeField] private Material combinedMaterial;
+        [Header("Item orbs (temporary tint until item icons)")]
+        [SerializeField] private Color itemColor = new Color(.53f, .34f, .84f);
         [Header("Board contact shadow (presentation only)")]
         [SerializeField] private Material shadowMaterial;
         [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, .22f);
@@ -41,6 +43,9 @@ namespace C6Lab
             };
         }
 
+        /// <summary>A color drawn over the kind's material, or null to keep the material's own color.</summary>
+        public Color? ColorOverrideFor(LabOrbKind kind) => kind.IsItem() ? itemColor : (Color?)null;
+
         /// <summary>
         /// Applies the kind's material only to the primary sphere. A separate roll marker
         /// keeps its own neutral material and stays readable while the orb rotates.
@@ -56,7 +61,7 @@ namespace C6Lab
             Renderer surface = sphere != null ? sphere.GetComponent<Renderer>() : null;
             if (surface == null) surface = artRoot.GetComponentInChildren<Renderer>(true);
             if (surface == null) return;
-            LabOrbVisualFactory.ApplyAppearanceMaterial(surface, material);
+            LabOrbVisualFactory.ApplyAppearanceMaterial(surface, material, ColorOverrideFor(kind));
         }
     }
 }

@@ -319,7 +319,7 @@ namespace C6Lab
                 return true;
             }
 
-            if (entry.View.Kind != LabOrbKind.Combined)
+            if (entry.View.Kind.IsRaw())
             {
                 Entry target = FindOppositeOverlap(entry);
                 if (target != null)
@@ -439,7 +439,7 @@ namespace C6Lab
             float best = Mathf.Pow(config.OrbRadius * 2f, 2f);
             foreach (var candidate in entries.Values)
             {
-                if (candidate == dragged || candidate.View.Kind == LabOrbKind.Combined
+                if (candidate == dragged || !candidate.View.Kind.IsRaw()
                     || candidate.View.Kind == dragged.View.Kind || !candidate.LocalOwner
                     || candidate.Locked || candidate.SpawnLocked || candidate.EdgePending || candidate.Held) continue;
                 float distance = (XY(candidate.View.Body.position) - XY(dragged.View.Body.position)).sqrMagnitude;
