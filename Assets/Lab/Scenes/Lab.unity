@@ -29704,6 +29704,7 @@ GameObject:
   - component: {fileID: 1255900040}
   - component: {fileID: 1255900039}
   - component: {fileID: 1255900044}
+  - component: {fileID: 2009600012}
   m_Layer: 0
   m_Name: LabCanvas
   m_TagString: Untagged
@@ -29752,6 +29753,25 @@ MonoBehaviour:
   staminaText: {fileID: 221936450}
   orbsText: {fileID: 171567771}
   seatText: {fileID: 701431257}
+--- !u!114 &2009600012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1255900038}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4f43295a10d4a0cb88da279f9f4690e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabImpactFeedback
+  battleCamera: {fileID: 427558553}
+  lifetime: 0.65
+  initialRingDiameter: 18
+  finalRingDiameter: 105
+  ringThickness: 4
+  numberRise: 46
+  numberFontSize: 28
 --- !u!114 &1255900040
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -30031,6 +30051,7 @@ MonoBehaviour:
   config: {fileID: 11400000, guid: ef9760abcf89544bba04c678ed9324a4, type: 2}
   board: {fileID: 523518297}
   target: {fileID: 821114679}
+  impactFeedback: {fileID: 2009600012}
   battleFloor: {fileID: 561349816}
   projectileRoot: {fileID: 1026313651}
   manager: {fileID: 1262056754}

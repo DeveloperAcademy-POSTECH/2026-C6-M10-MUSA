@@ -258,12 +258,50 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator FlightTrailUsesElementColorAndExpiresAfterTheProjectile()
+        {
+            LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
+            GameObject projectileRoot = new GameObject("Test Projectile Root");
+            LabTarget target = LabTarget.CreateCylinder(null, new Vector3(0f, 1f, 0f), .8f, 2f);
+            LabProjectile projectile = LabProjectile.Create(new Vector3(0f, 1f, 3f),
+                config, projectileRoot.transform, LabOrbElement.Water);
+            TrailRenderer trail = projectile.FlightTrail;
+            Assert.IsNotNull(trail);
+            Assert.IsFalse(trail.emitting);
+            Assert.IsNotNull(trail.sharedMaterial, "The flight path needs a renderable material.");
+            Assert.AreSame(projectile.transform, trail.transform.parent);
+            Assert.IsNull(trail.GetComponent<Collider>(), "The trail must not affect hit detection.");
+            Assert.That(trail.startColor.r, Is.EqualTo(.13f).Within(.001f));
+            Assert.That(trail.startColor.g, Is.EqualTo(.42f).Within(.001f));
+            Assert.That(trail.startColor.b, Is.EqualTo(.90f).Within(.001f));
+
+            int reports = 0;
+            Assert.IsTrue(projectile.Launch("trail-water", 1UL, new Vector3(0f, 0f, -9f),
+                config, target, _ => reports++));
+            Assert.IsTrue(trail.emitting);
+            for (int step = 0; step < 120 && reports == 0; step++)
+                yield return new WaitForFixedUpdate();
+            Assert.AreEqual(1, reports);
+            Assert.IsNotNull(trail, "The fading trail should outlive the resolved projectile.");
+            Assert.IsFalse(trail.emitting);
+            Assert.AreSame(projectileRoot.transform, trail.transform.parent);
+            yield return new WaitForSeconds(trail.time + .1f);
+            Assert.IsTrue(trail == null, "The trail must release itself after fading.");
+
+            Object.Destroy(target.gameObject);
+            Object.Destroy(projectileRoot);
+            Object.Destroy(config);
+        }
+
+        [UnityTest]
         public IEnumerator ClientVisualCannotReportAuthoritativeDamage()
         {
             LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
             LabTarget target = LabTarget.CreateCylinder(null, new Vector3(0f, 1f, 0f), .8f, 2f);
             LabProjectile projectile = LabProjectile.Create(new Vector3(0f, 1f, 3f), config);
             Assert.IsTrue(projectile.LaunchVisual(new Vector3(0f, 0f, -9f), config, target));
+            Assert.IsNotNull(projectile.FlightTrail);
+            Assert.IsTrue(projectile.FlightTrail.emitting);
             yield return new WaitForSeconds(.5f);
             Assert.IsTrue(projectile == null || !projectile.IsResolved);
             Object.Destroy(target.gameObject);

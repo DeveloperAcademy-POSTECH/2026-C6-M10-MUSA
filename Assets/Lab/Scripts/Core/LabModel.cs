@@ -202,11 +202,23 @@ namespace C6Lab
 
         /// <summary>Call only after the Host projectile actually collides with the cylinder target.</summary>
         public bool ConfirmHit(string id, double now)
+            => ConfirmHit(id, now, out _, out _);
+
+        /// <summary>
+        /// Confirm one Host collision and return the consumed orb's element and the HP actually
+        /// removed. The latter can be less than configured damage for a finishing hit.
+        /// </summary>
+        public bool ConfirmHit(string id, double now, out LabOrbElement element, out int actualDamage)
         {
+            element = LabOrbElement.None;
+            actualDamage = 0;
             if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !orbs.TryGetValue(id ?? string.Empty, out var orb)
                 || !orb.inFlight) return false;
+            element = orb.element;
             orbs.Remove(id);
+            int previousHp = hp;
             hp = Math.Max(0, hp - rules.Damage);
+            actualDamage = previousHp - hp;
             if (players.TryGetValue(orb.owner, out var attacker))
                 attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
             if (hp == 0) phase = LabPhase.Victory;

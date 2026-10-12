@@ -29,6 +29,8 @@ namespace C6Lab
         public long requestId;
         public string firstId;
         public string secondId;
+        public uint round;
+        public int damage;
         public bool right;
         public float x;
         public float y;
@@ -54,16 +56,52 @@ namespace C6Lab
     }
 
     /// <summary>
+    /// Client-side gate for authoritative impact presentation. A shot can display once in the
+    /// current Host round; stale, malformed, and repeated messages never replay the effect.
+    /// </summary>
+    public sealed class LabImpactReceiptGate
+    {
+        private readonly HashSet<string> seenProjectileIds = new HashSet<string>(StringComparer.Ordinal);
+        private string activeSession;
+        private uint activeRound;
+
+        public void SetActive(string session, uint round)
+        {
+            if (activeSession == session && activeRound == round) return;
+            activeSession = session;
+            activeRound = round;
+            seenProjectileIds.Clear();
+        }
+
+        public void Reset() => SetActive(null, 0);
+
+        public bool TryAccept(string session, uint round, string projectileId, LabOrbElement element,
+            int damage, Vector3 targetLocalPoint, Vector3 impactVelocity)
+        {
+            if (string.IsNullOrEmpty(activeSession) || activeRound == 0 || session != activeSession
+                || round != activeRound || string.IsNullOrEmpty(projectileId)
+                || element < LabOrbElement.Fire || element > LabOrbElement.Earth || damage <= 0
+                || !Finite(targetLocalPoint) || !Finite(impactVelocity)) return false;
+            return seenProjectileIds.Add(projectileId);
+        }
+
+        private static bool Finite(Vector3 value) =>
+            !float.IsNaN(value.x) && !float.IsInfinity(value.x)
+            && !float.IsNaN(value.y) && !float.IsInfinity(value.y)
+            && !float.IsNaN(value.z) && !float.IsInfinity(value.z);
+    }
+
+    /// <summary>
     /// Local Host/Join experiment. The host alone owns LabModel and session tuning.
     /// Only owner motion is simulated locally; requests and damage are accepted by the host.
     /// </summary>
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // Player HP is serialized in snapshots and the developer settings payload.
-        // Reject old clients rather than mixing two rule sets in a single room.
-        private const ushort LabProtocolVersion = 5606;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/4");
+        // Impact packets now carry the confirmed damage, element, target-local hit point, and round.
+        // Reject older clients instead of silently omitting hit feedback in a mixed-version room.
+        private const ushort LabProtocolVersion = 5607;
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/5");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -71,6 +109,7 @@ namespace C6Lab
         public LabConfig config;
         public LabOrbBoard board;
         public LabTarget target;
+        public LabImpactFeedback impactFeedback;
         public Collider battleFloor;
         public Transform projectileRoot;
         public NetworkManager manager;
@@ -82,6 +121,7 @@ namespace C6Lab
         private readonly HashSet<ulong> configAcknowledgements = new HashSet<ulong>();
         private readonly Dictionary<ulong, double> pendingApprovals = new Dictionary<ulong, double>();
         private readonly HashSet<string> visibleOrbIds = new HashSet<string>();
+        private readonly LabImpactReceiptGate impactReceipts = new LabImpactReceiptGate();
         private readonly List<string> joinCandidates = new List<string>();
         private LabModel model;
         private double nextSnapshotAt;
@@ -155,6 +195,7 @@ namespace C6Lab
             sourceConfig = config;
             if (manager == null) manager = GetComponent<NetworkManager>();
             if (transport == null) transport = GetComponent<UnityTransport>();
+            if (impactFeedback == null) impactFeedback = FindFirstObjectByType<LabImpactFeedback>();
             if (board != null)
             {
                 board.EdgeCrossed += OnEdgeCrossed;
@@ -480,9 +521,11 @@ namespace C6Lab
                 return;
             }
             sessionId = Guid.NewGuid().ToString("N");
+            impactFeedback?.Clear();
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             model.Begin(sessionId, order.ToArray(), Time.realtimeSinceStartupAsDouble, config);
+            impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
             PublishSnapshot(true);
             SetStatus("PLAYING: " + order.Count + " / " + targetParticipantCount);
@@ -530,9 +573,11 @@ namespace C6Lab
         {
             LastShotReport = string.Empty;
             sessionId = Guid.NewGuid().ToString("N");
+            impactFeedback?.Clear();
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             model.BeginSolo(sessionId, LocalPlayerId, Time.realtimeSinceStartupAsDouble, config);
+            impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
             PublishSnapshot(true);
             SetStatus("DEVELOPER SOLO: 1 / 1");
@@ -906,10 +951,17 @@ namespace C6Lab
             double now = Time.realtimeSinceStartupAsDouble;
             if (result.Hit)
             {
-                if (model.ConfirmHit(result.ProjectileId, now) && target != null)
+                if (model.ConfirmHit(result.ProjectileId, now, out var element, out int actualDamage)
+                    && target != null)
                 {
+                    Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
+                    Vector3 targetLocalPoint = hitbox.InverseTransformPoint(result.HitPoint);
                     target.GetComponent<LabHangingTarget>()?.Kick(result.ImpactVelocity);
+                    impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage);
                     var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
+                        round = model.Round, firstId = result.ProjectileId,
+                        element = (int)element, damage = actualDamage,
+                        x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z };
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
@@ -1005,6 +1057,8 @@ namespace C6Lab
                         || packet.seats == null || packet.seats.Length > packet.targetParticipants) return;
                     order.Clear();
                     latest = null;
+                    impactReceipts.Reset();
+                    impactFeedback?.Clear();
                     visibleOrbIds.Clear();
                     if (board != null) board.Clear();
                     order.AddRange(packet.seats);
@@ -1025,9 +1079,15 @@ namespace C6Lab
                     RejectLocally(packet.firstId, packet.reason);
                     break;
                 case "targetImpact":
-                    if (packet.sessionId == sessionId && target != null && Finite(packet.wx)
-                        && Finite(packet.wy) && Finite(packet.wz))
+                    if (target != null && impactReceipts.TryAccept(packet.sessionId, packet.round,
+                        packet.firstId, (LabOrbElement)packet.element, packet.damage,
+                        new Vector3(packet.x, packet.y, packet.z),
+                        new Vector3(packet.wx, packet.wy, packet.wz)))
+                    {
                         target.GetComponent<LabHangingTarget>()?.Kick(new Vector3(packet.wx, packet.wy, packet.wz));
+                        impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
+                            (LabOrbElement)packet.element, packet.damage);
+                    }
                     break;
                 case "projectile":
                     if (target != null && config != null && Finite(packet.x) && Finite(packet.y)
@@ -1118,9 +1178,14 @@ namespace C6Lab
                 || snapshot.players == null || snapshot.players.Length != targetParticipantCount) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
             bool logTransition = latest == null || latest.sessionId != snapshot.sessionId || latest.phase != snapshot.phase;
-            if (sessionId != snapshot.sessionId) target?.GetComponent<LabHangingTarget>()?.ResetSwing();
+            if (sessionId != snapshot.sessionId || latest == null || latest.round != snapshot.round)
+            {
+                target?.GetComponent<LabHangingTarget>()?.ResetSwing();
+                impactFeedback?.Clear();
+            }
             sessionId = snapshot.sessionId;
             latest = snapshot;
+            impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
             SyncBoard();
             if (logTransition && latest.phase == LabPhase.Playing) SetNotice(string.Empty);
             SetStatus(latest.phase + ": " + targetParticipantCount + " / " + targetParticipantCount);
@@ -1185,6 +1250,8 @@ namespace C6Lab
             configAcknowledgements.Clear();
             pendingApprovals.Clear();
             visibleOrbIds.Clear();
+            impactReceipts.Reset();
+            impactFeedback?.Clear();
             model = null;
             developerSolo = false;
             latest = null;

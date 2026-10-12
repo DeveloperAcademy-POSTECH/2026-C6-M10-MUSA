@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace C6Lab
 {
@@ -36,7 +37,13 @@ namespace C6Lab
     [RequireComponent(typeof(Rigidbody), typeof(SphereCollider))]
     public sealed class LabProjectile : MonoBehaviour
     {
+        private const float DefaultTrailSeconds = .28f;
+        private const float DefaultTrailWidthScale = .75f;
+        private const float DefaultTrailMinVertexDistance = .035f;
+        private static Material sharedTrailMaterial;
+
         [SerializeField] private Transform visualMount;
+        [SerializeField] private TrailRenderer flightTrail;
         private GameObject replacementVisual;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
@@ -62,6 +69,7 @@ namespace C6Lab
         public ulong OwnerPlayerId => ownerPlayerId;
         public bool IsResolved => resolved;
         public Transform VisualMount => visualMount;
+        public TrailRenderer FlightTrail => flightTrail;
 
         /// <summary>Sets shared presentation; this projectile's root collider is unchanged.</summary>
         public void ConfigureAppearance(LabOrbAppearance value)
@@ -134,6 +142,7 @@ namespace C6Lab
             projectile.element = element;
             projectile.ConfigureAppearance(config.OrbAppearance);
             projectile.EnsureDefaultVisual(config.ThrowRadius);
+            projectile.EnsureFlightTrail(config.ThrowRadius);
             return projectile;
         }
 
@@ -200,6 +209,12 @@ namespace C6Lab
             launchedAt = Time.time;
             launched = true;
             EnsureDefaultVisual(tuning.ThrowRadius);
+            EnsureFlightTrail(tuning.ThrowRadius);
+            if (flightTrail != null)
+            {
+                flightTrail.Clear();
+                flightTrail.emitting = true;
+            }
         }
 
         private void FixedUpdate()
@@ -219,7 +234,7 @@ namespace C6Lab
         {
             if (!launched || resolved || Time.time - launchedAt < config.ThrowLifetime) return;
             if (authoritative) Resolve(false, transform.position);
-            else Destroy(gameObject);
+            else FinishVisual();
         }
 
         private void OnCollisionEnter(Collision collision)
@@ -243,11 +258,7 @@ namespace C6Lab
         {
             if (!launched || authoritative || resolved) return;
             if ((target != null && other == target.Hitbox) || other == missSurface)
-            {
-                resolved = true;
-            Vector3 impactVelocity = incomingVelocity;
-                Destroy(gameObject);
-            }
+                FinishVisual();
         }
 
         // A swept sphere supplements Continuous Speculative for fast shots through thin mesh triangles.
@@ -277,12 +288,15 @@ namespace C6Lab
             }
             if (!found) return;
             if (authoritative) Resolve(hitTarget, nearest.point);
-            else
-            {
-                resolved = true;
-            Vector3 impactVelocity = incomingVelocity;
-                Destroy(gameObject);
-            }
+            else FinishVisual();
+        }
+
+        private void FinishVisual()
+        {
+            if (resolved) return;
+            resolved = true;
+            LeaveFadingTrail();
+            Destroy(gameObject);
         }
 
         private void Resolve(bool hit, Vector3 point)
@@ -301,6 +315,9 @@ namespace C6Lab
             LabProjectileResult result = new LabProjectileResult(projectileId, ownerPlayerId,
                 hit, point, Mathf.Max(0f, Time.time - launchedAt),
                 Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, endXZ), impactVelocity);
+            // Keep the last visible part of the flight briefly. If the callback ends the
+            // round, ClearProjectiles also destroys this detached child of projectileRoot.
+            LeaveFadingTrail();
             try
             {
                 onResolved?.Invoke(result);
@@ -309,6 +326,81 @@ namespace C6Lab
             {
                 Destroy(gameObject);
             }
+        }
+
+        private void EnsureFlightTrail(float radius)
+        {
+            if (flightTrail == null)
+            {
+                GameObject trailObject = new GameObject("Flight Trail");
+                trailObject.transform.SetParent(transform, false);
+                flightTrail = trailObject.AddComponent<TrailRenderer>();
+                flightTrail.emitting = false;
+            }
+
+            flightTrail.gameObject.layer = gameObject.layer;
+            flightTrail.transform.localPosition = Vector3.zero;
+            flightTrail.transform.localRotation = Quaternion.identity;
+            flightTrail.time = appearance != null ? appearance.ThrowTrailSeconds : DefaultTrailSeconds;
+            flightTrail.widthMultiplier = radius * (appearance != null
+                ? appearance.ThrowTrailWidthScale : DefaultTrailWidthScale);
+            flightTrail.widthCurve = AnimationCurve.Linear(0f, 1f, 1f, 0f);
+            flightTrail.minVertexDistance = appearance != null
+                ? appearance.ThrowTrailMinVertexDistance : DefaultTrailMinVertexDistance;
+            flightTrail.numCornerVertices = 2;
+            flightTrail.numCapVertices = 2;
+            flightTrail.alignment = LineAlignment.View;
+            flightTrail.textureMode = LineTextureMode.Stretch;
+            flightTrail.shadowCastingMode = ShadowCastingMode.Off;
+            flightTrail.receiveShadows = false;
+            flightTrail.sharedMaterial = appearance != null && appearance.ThrowTrailMaterial != null
+                ? appearance.ThrowTrailMaterial : GetTrailMaterial();
+            Color color = LabOrbVisualFactory.TemporaryElementColor(element);
+            color.a = .82f;
+            flightTrail.startColor = color;
+            color.a = 0f;
+            flightTrail.endColor = color;
+        }
+
+        private void LeaveFadingTrail()
+        {
+            if (flightTrail == null) return;
+            TrailRenderer fadingTrail = flightTrail;
+            flightTrail = null;
+            fadingTrail.emitting = false;
+            fadingTrail.transform.SetParent(transform.parent, true);
+            Destroy(fadingTrail.gameObject, fadingTrail.time);
+        }
+
+        private static Material GetTrailMaterial()
+        {
+            if (sharedTrailMaterial != null) return sharedTrailMaterial;
+            Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+            if (shader == null) shader = Shader.Find("Particles/Standard Unlit");
+            if (shader == null) shader = Shader.Find("Sprites/Default");
+            if (shader == null) return null;
+            sharedTrailMaterial = new Material(shader)
+            {
+                name = "Lab shared flight trail",
+                hideFlags = HideFlags.DontSave,
+                renderQueue = (int)RenderQueue.Transparent
+            };
+            if (sharedTrailMaterial.HasProperty("_Surface"))
+                sharedTrailMaterial.SetFloat("_Surface", 1f);
+            if (sharedTrailMaterial.HasProperty("_Blend"))
+                sharedTrailMaterial.SetFloat("_Blend", 0f);
+            if (sharedTrailMaterial.HasProperty("_SrcBlend"))
+                sharedTrailMaterial.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            if (sharedTrailMaterial.HasProperty("_DstBlend"))
+                sharedTrailMaterial.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            if (sharedTrailMaterial.HasProperty("_ZWrite"))
+                sharedTrailMaterial.SetFloat("_ZWrite", 0f);
+            if (sharedTrailMaterial.HasProperty("_BaseColor"))
+                sharedTrailMaterial.SetColor("_BaseColor", Color.white);
+            if (sharedTrailMaterial.HasProperty("_Color"))
+                sharedTrailMaterial.SetColor("_Color", Color.white);
+            sharedTrailMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            return sharedTrailMaterial;
         }
 
         private void EnsureDefaultVisual(float radius)
