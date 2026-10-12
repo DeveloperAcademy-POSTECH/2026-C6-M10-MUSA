@@ -440,6 +440,7 @@ namespace C6Lab
                 return;
             }
             sessionId = Guid.NewGuid().ToString("N");
+            target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             model.Begin(sessionId, order.ToArray(), Time.realtimeSinceStartupAsDouble, config);
             SetNotice(string.Empty);
@@ -489,6 +490,7 @@ namespace C6Lab
         {
             LastShotReport = string.Empty;
             sessionId = Guid.NewGuid().ToString("N");
+            target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             model.BeginSolo(sessionId, LocalPlayerId, Time.realtimeSinceStartupAsDouble, config);
             SetNotice(string.Empty);
@@ -870,7 +872,16 @@ namespace C6Lab
         {
             if (!IsHost || model == null) return;
             double now = Time.realtimeSinceStartupAsDouble;
-            if (result.Hit) model.ConfirmHit(result.ProjectileId, now);
+            if (result.Hit)
+            {
+                if (model.ConfirmHit(result.ProjectileId, now) && target != null)
+                {
+                    target.GetComponent<LabHangingTarget>()?.Kick(result.ImpactVelocity);
+                    var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
+                        wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z };
+                    foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
+                }
+            }
             else model.ConfirmMiss(result.ProjectileId, now);
             LastShotReport = string.Format(CultureInfo.InvariantCulture,
                 "SHOT {0} | {1:F2}s | peak +{2:F2}m | range {3:F2}m",
@@ -981,6 +992,11 @@ namespace C6Lab
                 case "reject":
                     RejectLocally(packet.firstId, packet.reason);
                     break;
+                case "targetImpact":
+                    if (packet.sessionId == sessionId && target != null && Finite(packet.wx)
+                        && Finite(packet.wy) && Finite(packet.wz))
+                        target.GetComponent<LabHangingTarget>()?.Kick(new Vector3(packet.wx, packet.wy, packet.wz));
+                    break;
                 case "projectile":
                     if (target != null && config != null && Finite(packet.x) && Finite(packet.y)
                         && Finite(packet.z) && Finite(packet.wx) && Finite(packet.wy) && Finite(packet.wz))
@@ -1068,6 +1084,7 @@ namespace C6Lab
                 || snapshot.players == null || snapshot.players.Length != targetParticipantCount) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
             bool logTransition = latest == null || latest.sessionId != snapshot.sessionId || latest.phase != snapshot.phase;
+            if (sessionId != snapshot.sessionId) target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             sessionId = snapshot.sessionId;
             latest = snapshot;
             SyncBoard();

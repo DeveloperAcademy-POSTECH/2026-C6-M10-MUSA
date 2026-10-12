@@ -65,7 +65,7 @@ namespace C6Lab
                 Vector3 center = target.transform.position;
                 battleCamera.transform.position = LabThrowMath.SeatPosition(
                     player.seat, seatCount, center, config.CameraRadius, config.CameraHeightOffset);
-                battleCamera.transform.LookAt(center);
+                battleCamera.transform.LookAt(center + (target.GetComponent<LabHangingTarget>() != null ? Vector3.up * 2f : Vector3.zero));
                 activeSeat = player.seat;
                 activeSeatCount = seatCount;
                 Debug.Log("C6_LAB_CAMERA seat=" + activeSeat + " position=" +
