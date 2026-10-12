@@ -34,6 +34,9 @@ namespace C6Lab
         public Rigidbody Body { get; private set; }
         public SphereCollider HitSphere { get; private set; }
 
+        /// <summary>다른 구슬과 부딪혔을 때 알린다. (상대 구슬, 서로 다가간 속도 - 월드 단위)</summary>
+        public event Action<LabOrbView, float> HitOrb;
+
         /// <summary>Sets shared Inspector-editable art without changing this orb's physics.</summary>
         public void ConfigureAppearance(LabOrbAppearance value)
         {
@@ -65,6 +68,16 @@ namespace C6Lab
             Vector3 axis = Vector3.Cross(Vector3.forward, velocity.normalized);
             float degrees = velocity.magnitude / visualRadius * Mathf.Rad2Deg * Time.deltaTime;
             visual.Rotate(axis, degrees, Space.World);
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            // 벽이 아니라 다른 구슬과 부딪혔을 때만 알린다.
+            LabOrbView other = collision.rigidbody != null
+                ? collision.rigidbody.GetComponent<LabOrbView>()
+                : null;
+            if (other == null) return;
+            HitOrb?.Invoke(other, collision.relativeVelocity.magnitude);
         }
 
         public void Configure(string id, LabOrbKind orbKind, float radius,
