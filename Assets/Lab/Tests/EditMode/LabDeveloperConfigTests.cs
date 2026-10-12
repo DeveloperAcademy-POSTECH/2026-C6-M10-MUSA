@@ -64,5 +64,23 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(values, out _), Is.False);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
         }
+
+        [Test]
+        public void EverySliderPreservesDefaultAndBothAllowedEndpoints()
+        {
+            float[] defaults = config.CaptureDeveloperValues();
+            for (int i = 0; i < defaults.Length; i++)
+            {
+                LabDeveloperField field = LabConfig.DeveloperFields[i];
+                foreach (float candidate in new[] { field.Min, defaults[i], field.Max })
+                {
+                    float position = LabDeveloperSliderScale.Normalize(field, defaults[i], candidate);
+                    float restored = LabDeveloperSliderScale.Denormalize(field, defaults[i], position);
+                    float tolerance = Mathf.Max(.01f, Mathf.Abs(candidate) * .0001f);
+                    Assert.That(position, Is.InRange(0f, 1f), field.Label);
+                    Assert.That(restored, Is.EqualTo(candidate).Within(tolerance), field.Label);
+                }
+            }
+        }
     }
 }

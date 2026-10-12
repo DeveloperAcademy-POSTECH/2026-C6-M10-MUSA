@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Text;
 using Unity.Collections;
 using Unity.Netcode;
@@ -11,9 +12,16 @@ using UnityEngine;
 namespace C6Lab
 {
     [Serializable]
+    internal sealed class LabMotionSample
+    {
+        public string id;
+        public float x, y, vx, vy;
+    }
+
+    [Serializable]
     internal sealed class LabNetworkPacket
     {
-        public int protocol = 1;
+        public int protocol = 2;
         public string type;
         public string sessionId;
         public ulong[] seats;
@@ -33,20 +41,31 @@ namespace C6Lab
         public float wz;
         public string reason;
         public ulong owner;
+        public int targetParticipants;
+        public int configRevision;
+        public string configFingerprint;
+        public float[] tuning;
+        public long snapshotSequence;
+        public int chunkIndex;
+        public int chunkCount;
+        public string chunkData;
+        public LabMotionSample[] motionSamples;
     }
 
     /// <summary>
-    /// A deliberately small, direct-IP, three-peer experiment. The host alone owns LabModel.
+    /// Local Host/Join experiment. The host alone owns LabModel and session tuning.
     /// Only owner motion is simulated locally; requests and damage are accepted by the host.
     /// </summary>
     public sealed class LabNetwork : MonoBehaviour
     {
-        private const string MessageName = "C6Lab.Packet.1";
+        private const string MessageName = "C6Lab.Packet.2";
         // 3D board physics changes motion semantics even though snapshots remain planar.
         // Reject old clients rather than mixing two simulations in a single room.
-        private const ushort LabProtocolVersion = 5603;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/3");
+        private const ushort LabProtocolVersion = 5604;
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/4");
         private const int MaximumPacketBytes = 32768;
+        private const double JoinAttemptSeconds = 12d;
+        private const double JoinBudgetSeconds = 60d;
         private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
         public LabConfig config;
         public LabOrbBoard board;
@@ -58,8 +77,11 @@ namespace C6Lab
         public ushort port = 7777;
         public string hostAddress = "127.0.0.1";
 
-        private readonly List<ulong> order = new List<ulong>(3);
+        private readonly List<ulong> order = new List<ulong>(5);
+        private readonly HashSet<ulong> configAcknowledgements = new HashSet<ulong>();
+        private readonly Dictionary<ulong, double> pendingApprovals = new Dictionary<ulong, double>();
         private readonly HashSet<string> visibleOrbIds = new HashSet<string>();
+        private readonly List<string> joinCandidates = new List<string>();
         private LabModel model;
         private double nextSnapshotAt;
         private double nextMotionAt;
@@ -75,22 +97,53 @@ namespace C6Lab
         private bool stopAfterDisconnect;
         private string sessionId;
         private LabSnapshot latest;
+        private LabConfig sourceConfig;
+        private LabConfig sessionConfig;
+        private LabBonjourDiscovery discovery;
+        private string advertisedName;
+        private int targetParticipantCount = 3;
+        private int configRevision;
+        private string configFingerprint;
+        private int joinCandidateIndex;
+        private double joinStartedAt;
+        private double joinAttemptAt;
+        private bool joinInProgress;
+        private bool joinRetryPending;
+        private bool discoveryJoinPending;
+        private bool discoveryJoinActive;
+        private string discoveryServiceName;
+        private double discoveryFirstTargetAt;
+        private bool clientConfigReady;
+        private long snapshotSequence;
+        private long incomingSequence;
+        private int incomingChunkCount;
+        private string[] incomingChunks;
+        private int incomingChunkReceived;
 
         public event Action Changed;
+        public event Action<LabConfig> ConfigApplied;
         public string Status { get; private set; } = "Choose HOST or JOIN.";
         public string Notice { get; private set; } = string.Empty;
         public string LastShotReport { get; private set; } = string.Empty;
         public int ParticipantCount => order.Count;
+        public int TargetParticipantCount => targetParticipantCount;
+        public bool SessionConfigReady => IsHost
+            ? order.Count > 0 && order.All(id => configAcknowledgements.Contains(id))
+            : clientConfigReady;
         public bool IsHost => manager != null && manager.IsHost;
         public bool IsDeveloperSolo => developerSolo;
         public bool DeveloperBuildAvailable => Application.isEditor || Debug.isDebugBuild;
         public bool IsConnected => manager != null && manager.IsListening && (manager.IsHost || manager.IsConnectedClient);
+        public bool CanChooseConnection => !IsConnected && !joinInProgress && !joinRetryPending
+            && !discoveryJoinPending && (manager == null || (!manager.IsListening && !manager.ShutdownInProgress));
         public ulong LocalPlayerId => IsConnected ? manager.LocalClientId : ulong.MaxValue;
         public LabSnapshot Snapshot => latest;
-        public bool CanStartBattle => IsHost && order.Count == 3 && (latest == null || latest.phase != LabPhase.Playing);
+        public bool CanStartBattle => IsHost && !developerSolo && order.Count == targetParticipantCount
+            && SessionConfigReady && (latest == null || latest.phase != LabPhase.Playing);
 
         private void Awake()
         {
+            sourceConfig = config;
             if (manager == null) manager = GetComponent<NetworkManager>();
             if (transport == null) transport = GetComponent<UnityTransport>();
             if (board != null)
@@ -122,59 +175,276 @@ namespace C6Lab
             else if (Array.IndexOf(args, "--lab-join") >= 0) Join(hostAddress);
         }
 
+        /// <summary>The Host chooses 2–5 network participants before creating the room.</summary>
+        public bool SetTargetParticipantCount(int count)
+        {
+            if (IsConnected || count < 2 || count > 5) return false;
+            targetParticipantCount = count;
+            Changed?.Invoke();
+            return true;
+        }
+
+        /// <summary>Install a validated, session-only copy before Host. Never edit the saved asset.</summary>
+        public bool ConfigureHostSession(LabConfig candidate, int targetParticipants)
+        {
+            if (IsConnected || targetParticipants < 2 || targetParticipants > 5)
+            {
+                SetNotice("Choose 2–5 players before creating a room.");
+                return false;
+            }
+            if (!TryInstallSessionConfig(candidate, out string error))
+            {
+                SetNotice(error);
+                return false;
+            }
+            targetParticipantCount = targetParticipants;
+            SetNotice("Room settings prepared for " + targetParticipants + " players.");
+            return true;
+        }
+
+        /// <summary>Host lobby edits invalidate every old ACK and send a new revision.</summary>
+        public bool ApplyHostLobbyConfig(LabConfig candidate)
+        {
+            if (!IsHost || developerSolo || model != null)
+            {
+                SetNotice("Settings can change only in the Host lobby.");
+                return false;
+            }
+            if (!TryInstallSessionConfig(candidate, out string error))
+            {
+                SetNotice(error);
+                return false;
+            }
+            configRevision++;
+            configFingerprint = LabSessionSettings.Fingerprint(config.CaptureDeveloperValues(), targetParticipantCount,
+                LabProtocolVersion);
+            configAcknowledgements.Clear();
+            configAcknowledgements.Add(LocalPlayerId);
+            BroadcastLobby();
+            foreach (ulong id in order) if (id != LocalPlayerId) SendSessionConfig(id);
+            SetNotice("Settings updated; waiting for all players to confirm.");
+            return true;
+        }
+
+        private bool TryInstallSessionConfig(LabConfig candidate, out string error)
+        {
+            error = "A valid session config is required.";
+            if (candidate == null) return false;
+            return TryInstallValues(candidate.CaptureDeveloperValues(), out error);
+        }
+
+        private bool TryInstallValues(float[] values, out string error)
+        {
+            error = "A valid session config is required.";
+            if (sourceConfig == null) return false;
+            LabConfig replacement = Instantiate(sourceConfig);
+            replacement.name = sourceConfig.name + " (Session Runtime)";
+            replacement.hideFlags = HideFlags.DontSave;
+            if (!replacement.TryApplyDeveloperValues(values, out error))
+            {
+                Destroy(replacement);
+                return false;
+            }
+            if (sessionConfig != null) Destroy(sessionConfig);
+            sessionConfig = replacement;
+            config = replacement;
+            ConfigApplied?.Invoke(config);
+            error = string.Empty;
+            return true;
+        }
+
+        private void RestoreSourceConfig()
+        {
+            if (sourceConfig != null && config != sourceConfig)
+            {
+                config = sourceConfig;
+                ConfigApplied?.Invoke(config);
+            }
+            if (sessionConfig != null)
+            {
+                Destroy(sessionConfig);
+                sessionConfig = null;
+            }
+        }
+
         public void Host()
         {
-            if (IsConnected || manager == null || transport == null || config == null) return;
+            if (!CanChooseConnection || manager == null || transport == null || config == null) return;
             ResetLocal();
+            configRevision = 1;
+            configFingerprint = LabSessionSettings.Fingerprint(config.CaptureDeveloperValues(), targetParticipantCount,
+                LabProtocolVersion);
             ConfigureManager();
-            transport.SetConnectionData("127.0.0.1", port, "0.0.0.0");
-            if (!manager.StartHost()) { SetStatus("Host failed: check port and network."); return; }
+            try
+            {
+                if (transport is LabDualStackTransport dual) dual.ConfigureHost(port);
+                else transport.SetConnectionData("127.0.0.1", port, "0.0.0.0");
+            }
+            catch (Exception e) { SetStatus("Host endpoint failed: " + e.Message); return; }
+            if (!manager.StartHost())
+            {
+                string code = transport is LabDualStackTransport failed ? failed.LastFailureCode : string.Empty;
+                SetStatus("Host failed: " + (string.IsNullOrEmpty(code) ? "check port and network" : code) + ".");
+                return;
+            }
             RegisterHandler();
             if (!order.Contains(manager.LocalClientId)) order.Add(manager.LocalClientId);
-            SetStatus("HOST listening on port " + port + "; waiting for 2 peers.");
+            configAcknowledgements.Add(manager.LocalClientId);
+            StartAdvertising();
+            SetStatus("HOST listening on port " + port + "; waiting for " + (targetParticipantCount - 1) + " peers.");
             Debug.Log("C6_LAB_HOST port=" + port + " protocol=" + LabProtocolVersion);
             BroadcastLobby();
         }
 
         public void Join(string address)
         {
-            if (IsConnected || manager == null || transport == null || config == null) return;
+            if (!CanChooseConnection || manager == null || transport == null || config == null) return;
             if (string.IsNullOrWhiteSpace(address)) { SetStatus("Enter the Host IP address."); return; }
+            DisposeDiscovery();
+            discoveryJoinPending = false;
+            discoveryJoinActive = false;
             hostAddress = address.Trim();
+            var addresses = new List<string>();
+            try
+            {
+                if (IPAddress.TryParse(hostAddress, out var literal)) addresses.Add(literal.ToString());
+                else addresses.AddRange(Dns.GetHostAddresses(hostAddress).Select(ip => ip.ToString()));
+            }
+            catch (Exception e) { SetStatus("Host address lookup failed: " + e.GetType().Name); return; }
+            BeginJoinCandidates(addresses);
+        }
+
+        /// <summary>Browse local Bonjour rooms, then try IPv6 and IPv4 routes with a direct-IP fallback.</summary>
+        public void FindAndJoinRoom()
+        {
+            if (!CanChooseConnection) return;
+            DisposeDiscovery();
+            if (!LabBonjourDiscovery.IsSupported)
+            {
+                SetStatus("Room discovery is available on macOS and iOS. Use direct IP here.");
+                return;
+            }
+            discovery = new LabBonjourDiscovery();
+            discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
+            if (!discovery.StartBrowse())
+            {
+                SetStatus(discovery.LastError ?? "Room search could not start. Use direct IP.");
+                DisposeDiscovery();
+                return;
+            }
+            discoveryJoinPending = true;
+            discoveryJoinActive = false;
+            discoveryServiceName = null;
+            discoveryFirstTargetAt = 0;
+            SetStatus("Searching local rooms; keep the Host app open...");
+        }
+
+        private void BeginJoinCandidates(IEnumerable<string> addresses)
+        {
             ResetLocal();
+            joinCandidates.Clear();
+            joinCandidates.AddRange(LabConnectionCandidates.Initial(addresses, port));
+            if (joinCandidates.Count == 0) { SetStatus("No usable numeric IPv4/IPv6 address. Use direct IP."); return; }
+            joinCandidateIndex = 0;
+            joinStartedAt = Time.realtimeSinceStartupAsDouble;
+            joinInProgress = true;
+            StartJoinAttempt();
+        }
+
+        private void StartJoinAttempt()
+        {
+            if (!joinInProgress || joinCandidateIndex >= joinCandidates.Count || manager == null || transport == null) return;
+            string address = joinCandidates[joinCandidateIndex];
             ConfigureManager();
-            try { transport.SetConnectionData(hostAddress, port); }
-            catch (Exception e) { SetStatus("Invalid Host address: " + e.GetType().Name); return; }
-            if (!manager.StartClient()) { SetStatus("Connection could not start."); return; }
+            try
+            {
+                if (transport is LabDualStackTransport dual) dual.ConfigureClient(address, port);
+                else transport.SetConnectionData(address, port);
+                if (!manager.StartClient()) throw new InvalidOperationException("Client start failed.");
+            }
+            catch (Exception e)
+            {
+                string code = transport is LabDualStackTransport failed ? failed.LastFailureCode : string.Empty;
+                SetStatus("Cannot connect via " + address + ": "
+                    + (string.IsNullOrEmpty(code) ? e.GetType().Name : code));
+                AdvanceJoinCandidate();
+                return;
+            }
             RegisterHandler();
-            SetStatus("Connecting to " + hostAddress + ":" + port + "...");
-            Debug.Log("C6_LAB_JOIN address=" + hostAddress + " port=" + port);
+            joinAttemptAt = Time.realtimeSinceStartupAsDouble;
+            SetStatus("Connecting to " + address + ":" + port + " (" + (joinCandidateIndex + 1)
+                + "/" + joinCandidates.Count + ")...");
+            Debug.Log("C6_LAB_JOIN address=" + address + " port=" + port);
+        }
+
+        private void AdvanceJoinCandidate()
+        {
+            if (!joinInProgress || joinRetryPending) return;
+            string rejection = manager == null ? string.Empty : manager.DisconnectReason;
+            if (!string.IsNullOrEmpty(rejection))
+            {
+                joinInProgress = false;
+                discoveryJoinActive = false;
+                DisposeDiscovery();
+                UnregisterHandler();
+                if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
+                SetStatus("Join rejected: " + rejection);
+                return;
+            }
+            if (++joinCandidateIndex >= joinCandidates.Count
+                || Time.realtimeSinceStartupAsDouble - joinStartedAt > JoinBudgetSeconds)
+            {
+                if (discoveryJoinActive && Time.realtimeSinceStartupAsDouble - joinStartedAt <= JoinBudgetSeconds)
+                {
+                    joinRetryPending = true;
+                    UnregisterHandler();
+                    if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
+                    SetStatus("Waiting for another local route to the discovered Host...");
+                    return;
+                }
+                joinInProgress = false;
+                DisposeDiscovery();
+                UnregisterHandler();
+                if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
+                SetStatus("Connection failed on all local routes. Check Host, port, and network.");
+                return;
+            }
+            joinRetryPending = true;
+            UnregisterHandler();
+            if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
         }
 
         public void Stop()
         {
             if (stopping) return;
             stopping = true;
-            if (handlerRegistered && manager != null && manager.CustomMessagingManager != null)
-            {
-                manager.CustomMessagingManager.UnregisterNamedMessageHandler(MessageName);
-                handlerRegistered = false;
-            }
+            joinInProgress = false;
+            joinRetryPending = false;
+            discoveryJoinPending = false;
+            discoveryJoinActive = false;
+            discoveryServiceName = null;
+            DisposeDiscovery();
+            UnregisterHandler();
             if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
             ResetLocal();
+            RestoreSourceConfig();
             SetStatus("Disconnected. Choose HOST or JOIN.");
             stopping = false;
         }
 
         public void StartBattle()
         {
-            if (!CanStartBattle) { SetNotice("Exactly 3 connected players are required."); return; }
+            if (!CanStartBattle)
+            {
+                SetNotice("Wait for " + targetParticipantCount + " players and matching settings confirmations.");
+                return;
+            }
             sessionId = Guid.NewGuid().ToString("N");
             model = new LabModel();
             model.Begin(sessionId, order.ToArray(), Time.realtimeSinceStartupAsDouble, config);
             SetNotice(string.Empty);
             PublishSnapshot(true);
-            SetStatus("PLAYING: 3 / 3");
+            SetStatus("PLAYING: " + order.Count + " / " + targetParticipantCount);
             Debug.Log("C6_LAB_START session=" + sessionId + " seats=" + string.Join(",", order));
         }
 
@@ -194,6 +464,7 @@ namespace C6Lab
             Host();
             if (!IsHost || order.Count != 1) return false;
             developerSolo = true;
+            DisposeDiscovery();
             BeginDeveloperSoloRound();
             return true;
         }
@@ -234,8 +505,63 @@ namespace C6Lab
 
         private void Update()
         {
-            if (stopAfterDisconnect) { stopAfterDisconnect = false; Stop(); return; }
+            if (stopAfterDisconnect)
+            {
+                stopAfterDisconnect = false;
+                string explanation = Status;
+                Stop();
+                SetStatus(explanation);
+                return;
+            }
             double now = Time.realtimeSinceStartupAsDouble;
+            foreach (ulong stale in pendingApprovals.Where(item => now - item.Value > 15d)
+                         .Select(item => item.Key).ToArray()) pendingApprovals.Remove(stale);
+            if (discovery != null)
+            {
+                discovery.Tick(now);
+                if (discoveryJoinPending && discovery.Targets.Count > 0)
+                {
+                    if (discoveryFirstTargetAt == 0) discoveryFirstTargetAt = now;
+                    if (now - discoveryFirstTargetAt >= .75d)
+                    {
+                        var first = discovery.Targets[0];
+                        var candidates = discovery.Targets
+                            .Where(item => item.ServiceName == first.ServiceName && item.Port == first.Port)
+                            .Select(item => item.Address).ToArray();
+                        port = first.Port;
+                        discoveryJoinPending = false;
+                        discoveryJoinActive = true;
+                        discoveryServiceName = first.ServiceName;
+                        BeginJoinCandidates(candidates);
+                    }
+                }
+                if (discoveryJoinActive)
+                {
+                    foreach (LabBonjourTarget target in discovery.Targets)
+                    {
+                        if (target.ServiceName != discoveryServiceName || target.Port != port) continue;
+                        if (LabConnectionCandidates.AppendDiscovered(joinCandidates, target.Address, port))
+                            Debug.Log("C6_LAB_DISCOVERY_ROUTE_ADDED family=" + LabBonjourAddressCodec.Family(target.Address));
+                    }
+                }
+            }
+            if (joinRetryPending && manager != null && !manager.IsListening && !manager.ShutdownInProgress)
+            {
+                if (joinCandidateIndex < joinCandidates.Count)
+                {
+                    joinRetryPending = false;
+                    StartJoinAttempt();
+                }
+                else if (now - joinStartedAt > JoinBudgetSeconds)
+                {
+                    joinInProgress = false;
+                    joinRetryPending = false;
+                    DisposeDiscovery();
+                    SetStatus("No reachable route found. Use direct IP or check the Host network.");
+                }
+            }
+            if (joinInProgress && !joinRetryPending && joinAttemptAt > 0
+                && now - joinAttemptAt >= JoinAttemptSeconds) AdvanceJoinCandidate();
             if (IsHost && model != null)
             {
                 model.Tick(now);
@@ -267,12 +593,15 @@ namespace C6Lab
             if (IsConnected && board != null && latest != null && latest.phase == LabPhase.Playing && now >= nextMotionAt)
             {
                 nextMotionAt = now + 0.1;
+                var samples = new List<LabMotionSample>();
                 foreach (var orb in latest.orbs ?? Array.Empty<LabOrbState>())
                 {
                     if (orb.owner != LocalPlayerId || orb.inFlight) continue;
                     if (board.TryGetMotion(orb.id, out var position, out var velocity))
-                        Request(new LabNetworkPacket { type = "motion", firstId = orb.id, x = position.x, y = position.y, vx = velocity.x, vy = velocity.y });
+                        samples.Add(new LabMotionSample { id = orb.id, x = position.x, y = position.y,
+                            vx = velocity.x, vy = velocity.y });
                 }
+                if (samples.Count > 0) Request(new LabNetworkPacket { type = "motion_batch", motionSamples = samples.ToArray() });
             }
         }
 
@@ -293,8 +622,11 @@ namespace C6Lab
 
         private void Approve(NetworkManager.ConnectionApprovalRequest request, NetworkManager.ConnectionApprovalResponse response)
         {
-            bool allowed = manager.IsHost && order.Count < 3 && model == null
+            bool alreadyPending = pendingApprovals.ContainsKey(request.ClientNetworkId);
+            bool allowed = manager.IsHost && order.Count + pendingApprovals.Count - (alreadyPending ? 1 : 0)
+                    < targetParticipantCount && model == null
                 && request.Payload != null && request.Payload.SequenceEqual(LabConnectionToken);
+            if (allowed) pendingApprovals[request.ClientNetworkId] = Time.realtimeSinceStartupAsDouble;
             response.Approved = allowed;
             response.CreatePlayerObject = false;
             response.Pending = false;
@@ -308,20 +640,38 @@ namespace C6Lab
             handlerRegistered = true;
         }
 
+        private void UnregisterHandler()
+        {
+            if (handlerRegistered && manager != null && manager.CustomMessagingManager != null)
+                manager.CustomMessagingManager.UnregisterNamedMessageHandler(MessageName);
+            handlerRegistered = false;
+        }
+
         private void OnConnected(ulong id)
         {
             if (stopping || manager == null) return;
             RegisterHandler();
             if (manager.IsHost)
             {
-                if (!order.Contains(id) && order.Count < 3) order.Add(id);
+                pendingApprovals.Remove(id);
+                if (!order.Contains(id) && order.Count < targetParticipantCount) order.Add(id);
+                else if (!order.Contains(id))
+                {
+                    manager.DisconnectClient(id);
+                    return;
+                }
                 Debug.Log("C6_LAB_PEER_JOIN id=" + id + " participants=" + order.Count);
                 BroadcastLobby();
-                if (autoStart && order.Count == 3) StartBattle();
+                if (id != LocalPlayerId) SendSessionConfig(id);
+                if (autoStart && CanStartBattle) StartBattle();
             }
             else if (id == manager.LocalClientId)
             {
-                SetStatus("Connected; waiting for 3 players.");
+                joinInProgress = false;
+                joinRetryPending = false;
+                discoveryJoinActive = false;
+                DisposeDiscovery();
+                SetStatus("Connected; waiting for Host settings.");
                 Debug.Log("C6_LAB_CONNECTED local=" + id);
             }
         }
@@ -329,6 +679,7 @@ namespace C6Lab
         private void OnDisconnected(ulong id)
         {
             if (stopping) return;
+            pendingApprovals.Remove(id);
             if (manager != null && manager.IsHost)
             {
                 if (!order.Remove(id))
@@ -338,11 +689,13 @@ namespace C6Lab
                 }
                 Debug.LogWarning("C6_LAB_PEER_LEFT id=" + id);
                 if (model != null) { model = null; latest = null; if (board != null) board.Clear(); }
+                configAcknowledgements.Remove(id);
                 BroadcastLobby();
-                SetStatus("A player left. Connect exactly 3 before starting.");
+                SetStatus("A player left. Connect " + targetParticipantCount + " before starting.");
             }
             else
             {
+                if (joinInProgress) { AdvanceJoinCandidate(); return; }
                 stopAfterDisconnect = true;
                 string reason = manager == null ? string.Empty : manager.DisconnectReason;
                 SetStatus(string.IsNullOrEmpty(reason) ? "Connection ended. Rejoin the Host." : "Join failed: " + reason);
@@ -352,6 +705,7 @@ namespace C6Lab
 
         private void OnTransportFailure()
         {
+            if (joinInProgress) { AdvanceJoinCandidate(); return; }
             SetStatus("Network transport failed. Check IP, port, and same network.");
             Debug.LogWarning("C6_LAB_TRANSPORT_FAILURE");
         }
@@ -359,10 +713,21 @@ namespace C6Lab
         private void BroadcastLobby()
         {
             if (!IsHost) return;
-            var packet = new LabNetworkPacket { type = "lobby", seats = order.ToArray() };
+            var packet = new LabNetworkPacket { type = "lobby", seats = order.ToArray(),
+                targetParticipants = targetParticipantCount, configRevision = configRevision,
+                configFingerprint = configFingerprint };
             foreach (ulong id in order) if (id != manager.LocalClientId) Send(id, packet);
-            SetStatus("LOBBY: " + order.Count + " / 3");
+            SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
+                + " · settings " + configAcknowledgements.Count + "/" + order.Count);
             Changed?.Invoke();
+        }
+
+        private void SendSessionConfig(ulong id)
+        {
+            if (!IsHost || config == null || id == LocalPlayerId) return;
+            Send(id, new LabNetworkPacket { type = "config", targetParticipants = targetParticipantCount,
+                configRevision = configRevision, configFingerprint = configFingerprint,
+                tuning = config.CaptureDeveloperValues() });
         }
 
         private void PublishSnapshot(bool immediate)
@@ -370,12 +735,43 @@ namespace C6Lab
             if (!IsHost || model == null) return;
             double now = Time.realtimeSinceStartupAsDouble;
             latest = model.Snapshot(now);
-            nextSnapshotAt = now + 0.1;
+            // Large experimental states are deliberately updated less often instead of queuing
+            // many reliable fragments per peer until the network becomes unusable.
+            nextSnapshotAt = now + ((latest.orbs?.Length ?? 0) > 100 ? .5d : .1d);
             SyncBoard();
-            var packet = new LabNetworkPacket { type = "snapshot", sessionId = sessionId, snapshot = latest };
-            foreach (ulong id in order) if (id != manager.LocalClientId) Send(id, packet);
+            string[] pieces;
+            try { pieces = LabSessionSettings.ChunkSnapshot(latest); }
+            catch (ArgumentException e)
+            {
+                AbortOversizedSnapshot(e.Message);
+                return;
+            }
+            long sequence = ++snapshotSequence;
+            foreach (ulong id in order)
+            {
+                if (id == manager.LocalClientId) continue;
+                for (int i = 0; i < pieces.Length; i++)
+                {
+                    bool sent = Send(id, new LabNetworkPacket { type = "snapshot_chunk", sessionId = sessionId,
+                        configRevision = configRevision, configFingerprint = configFingerprint,
+                        snapshotSequence = sequence, chunkIndex = i, chunkCount = pieces.Length,
+                        chunkData = pieces[i] });
+                    if (!sent)
+                    {
+                        AbortOversizedSnapshot("Could not send the complete battle state to all players.");
+                        return;
+                    }
+                }
+            }
             if (immediate) Debug.Log("C6_LAB_STATE phase=" + latest.phase + " hp=" + latest.hp + " remaining=" + latest.remaining.ToString("F1"));
             Changed?.Invoke();
+        }
+
+        private void AbortOversizedSnapshot(string reason)
+        {
+            Debug.LogError("C6_LAB_SNAPSHOT_ABORT " + reason);
+            Stop();
+            SetStatus("Room ended: state exceeded the safe network size.");
         }
 
         private void Request(LabNetworkPacket packet)
@@ -426,6 +822,16 @@ namespace C6Lab
                         accepted = model.TryUpdateMotion(sender, packet.firstId, new Vector2(packet.x, packet.y), new Vector2(packet.vx, packet.vy), now);
                     // Frequent or late motion samples are best-effort; never unlock an orb from them.
                     return;
+                case "motion_batch":
+                    if (packet.motionSamples == null || packet.motionSamples.Length > 100) return;
+                    foreach (LabMotionSample motion in packet.motionSamples)
+                    {
+                        if (motion == null || !Finite(motion.x) || !Finite(motion.y)
+                            || !Finite(motion.vx) || !Finite(motion.vy)) continue;
+                        model.TryUpdateMotion(sender, motion.id, new Vector2(motion.x, motion.y),
+                            new Vector2(motion.vx, motion.vy), now);
+                    }
+                    return;
             }
             if (accepted)
             {
@@ -441,10 +847,11 @@ namespace C6Lab
         {
             if (orb == null || target == null || config == null) return;
             int seat = latest != null && latest.players != null ? Array.Find(latest.players, p => p.id == orb.owner)?.seat ?? order.IndexOf(orb.owner) : order.IndexOf(orb.owner);
+            int seatCount = latest?.players?.Length ?? order.Count;
             Vector3 targetCenter = target.transform.position;
-            Vector3 seatAnchor = LabThrowMath.SeatPosition(seat, 3, targetCenter,
+            Vector3 seatAnchor = LabThrowMath.SeatPosition(seat, seatCount, targetCenter,
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
-            Vector3 launchPosition = LabThrowMath.LaunchPosition(seat, 3, targetCenter, releaseX01, config);
+            Vector3 launchPosition = LabThrowMath.LaunchPosition(seat, seatCount, targetCenter, releaseX01, config);
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
             var projectile = LabProjectile.Create(launchPosition, config, projectileRoot);
             projectile.name = "Projectile " + orb.id;
@@ -533,6 +940,17 @@ namespace C6Lab
             if (IsHost)
             {
                 if (sender == LocalPlayerId || !order.Contains(sender)) return;
+                if (packet.type == "config_ack")
+                {
+                    if (packet.configRevision == configRevision
+                        && packet.configFingerprint == configFingerprint)
+                    {
+                        configAcknowledgements.Add(sender);
+                        BroadcastLobby();
+                        if (autoStart && CanStartBattle) StartBattle();
+                    }
+                    return;
+                }
                 HandleRequest(sender, packet);
                 return;
             }
@@ -540,24 +958,25 @@ namespace C6Lab
             switch (packet.type)
             {
                 case "lobby":
+                    if (packet.targetParticipants < 2 || packet.targetParticipants > 5
+                        || packet.seats == null || packet.seats.Length > packet.targetParticipants) return;
                     order.Clear();
                     latest = null;
                     visibleOrbIds.Clear();
                     if (board != null) board.Clear();
-                    if (packet.seats != null) order.AddRange(packet.seats);
-                    SetStatus("LOBBY: " + order.Count + " / 3");
+                    order.AddRange(packet.seats);
+                    targetParticipantCount = packet.targetParticipants;
+                    if (packet.configRevision != configRevision || packet.configFingerprint != configFingerprint)
+                        clientConfigReady = false;
+                    SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
+                        + (clientConfigReady ? " · settings confirmed" : " · waiting for settings"));
                     Debug.Log("C6_LAB_LOBBY participants=" + order.Count + " seats=" + string.Join(",", order));
                     break;
-                case "snapshot":
-                    if (packet.snapshot == null || packet.snapshot.players == null || packet.snapshot.players.Length != 3) return;
-                    if (latest != null && latest.sessionId == packet.snapshot.sessionId && latest.round > packet.snapshot.round) return;
-                    bool logTransition = latest == null || latest.sessionId != packet.snapshot.sessionId || latest.phase != packet.snapshot.phase;
-                    sessionId = packet.snapshot.sessionId;
-                    latest = packet.snapshot;
-                    SyncBoard();
-                    if (logTransition && latest.phase == LabPhase.Playing) SetNotice(string.Empty);
-                    SetStatus(latest.phase + ": 3 / 3");
-                    if (logTransition) Debug.Log("C6_LAB_SNAPSHOT phase=" + latest.phase + " hp=" + latest.hp + " remaining=" + latest.remaining.ToString("F1") + " orbs=" + (latest.orbs?.Length ?? 0));
+                case "config":
+                    ReceiveSessionConfig(packet);
+                    break;
+                case "snapshot_chunk":
+                    ReceiveSnapshotChunk(packet);
                     break;
                 case "reject":
                     RejectLocally(packet.firstId, packet.reason);
@@ -574,6 +993,88 @@ namespace C6Lab
                     }
                     break;
             }
+        }
+
+        private void ReceiveSessionConfig(LabNetworkPacket packet)
+        {
+            if (packet.configRevision < 1 || packet.targetParticipants < 2 || packet.targetParticipants > 5
+                || packet.tuning == null || packet.tuning.Length != LabConfig.DeveloperFields.Count) return;
+            string expected;
+            try { expected = LabSessionSettings.Fingerprint(packet.tuning, packet.targetParticipants, LabProtocolVersion); }
+            catch (ArgumentException) { return; }
+            if (expected != packet.configFingerprint)
+            {
+                SetStatus("Host settings failed integrity check. Rejoin the room.");
+                return;
+            }
+            if (clientConfigReady && packet.configRevision == configRevision
+                && packet.configFingerprint == configFingerprint)
+            {
+                Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "config_ack",
+                    configRevision = configRevision, configFingerprint = configFingerprint });
+                return;
+            }
+            if (packet.configRevision < configRevision) return;
+            if (!TryInstallValues(packet.tuning, out string error))
+            {
+                SetStatus("Host settings rejected: " + error);
+                return;
+            }
+            targetParticipantCount = packet.targetParticipants;
+            configRevision = packet.configRevision;
+            configFingerprint = packet.configFingerprint;
+            clientConfigReady = true;
+            Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "config_ack",
+                configRevision = configRevision, configFingerprint = configFingerprint });
+            SetStatus("Settings confirmed; waiting for " + targetParticipantCount + " players.");
+            Debug.Log("C6_LAB_CONFIG_READY revision=" + configRevision + " fingerprint=" + configFingerprint);
+        }
+
+        private void ReceiveSnapshotChunk(LabNetworkPacket packet)
+        {
+            if (!clientConfigReady || packet.configRevision != configRevision
+                || packet.configFingerprint != configFingerprint
+                || string.IsNullOrEmpty(packet.sessionId) || packet.snapshotSequence < 1
+                || packet.chunkCount < 1 || packet.chunkCount > 256
+                || packet.chunkIndex < 0 || packet.chunkIndex >= packet.chunkCount
+                || string.IsNullOrEmpty(packet.chunkData)
+                || packet.chunkData.Length > LabSessionSettings.SnapshotChunkCharacters) return;
+            if (packet.snapshotSequence < incomingSequence) return;
+            if (packet.snapshotSequence > incomingSequence)
+            {
+                incomingSequence = packet.snapshotSequence;
+                incomingChunkCount = packet.chunkCount;
+                incomingChunks = new string[packet.chunkCount];
+                incomingChunkReceived = 0;
+            }
+            if (packet.chunkCount != incomingChunkCount || incomingChunks == null) return;
+            if (incomingChunks[packet.chunkIndex] == null)
+            {
+                incomingChunks[packet.chunkIndex] = packet.chunkData;
+                incomingChunkReceived++;
+            }
+            else if (incomingChunks[packet.chunkIndex] != packet.chunkData) return;
+            if (incomingChunkReceived != incomingChunkCount) return;
+            string json = string.Concat(incomingChunks);
+            incomingChunks = null;
+            incomingChunkReceived = 0;
+            if (json.Length > LabSessionSettings.MaximumSnapshotCharacters) return;
+            try { if (Utf8.GetByteCount(json) > LabSessionSettings.MaximumSnapshotBytes) return; }
+            catch (Exception) { return; }
+            LabSnapshot snapshot;
+            try { snapshot = JsonUtility.FromJson<LabSnapshot>(json); }
+            catch (Exception) { return; }
+            if (snapshot == null || snapshot.sessionId != packet.sessionId
+                || snapshot.players == null || snapshot.players.Length != targetParticipantCount) return;
+            if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
+            bool logTransition = latest == null || latest.sessionId != snapshot.sessionId || latest.phase != snapshot.phase;
+            sessionId = snapshot.sessionId;
+            latest = snapshot;
+            SyncBoard();
+            if (logTransition && latest.phase == LabPhase.Playing) SetNotice(string.Empty);
+            SetStatus(latest.phase + ": " + targetParticipantCount + " / " + targetParticipantCount);
+            if (logTransition) Debug.Log("C6_LAB_SNAPSHOT phase=" + latest.phase + " hp=" + latest.hp
+                + " remaining=" + latest.remaining.ToString("F1") + " orbs=" + (latest.orbs?.Length ?? 0));
         }
 
         private void RejectLocally(string orbId, string reason)
@@ -615,11 +1116,11 @@ namespace C6Lab
             {
                 reader.ReadValueSafe(out int version);
                 reader.ReadValueSafe(out int count);
-                if (version != 1 || count < 2 || count != reader.Length - reader.Position) return false;
+                if (version != 2 || count < 2 || count != reader.Length - reader.Position) return false;
                 var bytes = new byte[count];
                 reader.ReadBytesSafe(ref bytes, count);
                 packet = JsonUtility.FromJson<LabNetworkPacket>(Utf8.GetString(bytes));
-                return packet != null && packet.protocol == 1 && !string.IsNullOrEmpty(packet.type);
+                return packet != null && packet.protocol == 2 && !string.IsNullOrEmpty(packet.type);
             }
             catch (Exception) { return false; }
         }
@@ -630,15 +1131,50 @@ namespace C6Lab
         {
             ClearProjectiles();
             order.Clear();
+            configAcknowledgements.Clear();
+            pendingApprovals.Clear();
             visibleOrbIds.Clear();
             model = null;
             developerSolo = false;
             latest = null;
             sessionId = null;
+            configRevision = 0;
+            configFingerprint = null;
+            clientConfigReady = false;
+            snapshotSequence = 0;
+            incomingSequence = 0;
+            incomingChunks = null;
+            incomingChunkCount = 0;
+            incomingChunkReceived = 0;
             LastShotReport = string.Empty;
             requestSequence = 0;
             if (board != null) board.Clear();
             Changed?.Invoke();
+        }
+
+        private void StartAdvertising()
+        {
+            DisposeDiscovery();
+            if (!LabBonjourDiscovery.IsSupported) return;
+            discovery = new LabBonjourDiscovery();
+            discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
+            advertisedName = "C6Lab-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
+            bool ipv6 = transport is LabDualStackTransport second && second.HasIpv6Listener;
+            if (!discovery.StartAdvertise(advertisedName, port, ipv4, ipv6))
+            {
+                Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);
+                DisposeDiscovery();
+            }
+            else Debug.Log("C6_LAB_LISTEN_FAMILIES ipv4=" + ipv4 + " ipv6=" + ipv6);
+        }
+
+        private void DisposeDiscovery()
+        {
+            if (discovery == null) return;
+            discovery.Dispose();
+            discovery = null;
+            advertisedName = null;
         }
 
         private void ClearProjectiles()

@@ -14,6 +14,51 @@ namespace C6Lab.Tests
     public sealed class LabDeveloperSoloIntegrationTests
     {
         [UnityTest]
+        public IEnumerator SavedDeveloperPanelCreatesAndRetunesTwoPlayerHostLobby()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+            LabNetwork network = UnityEngine.Object.FindFirstObjectByType<LabNetwork>();
+            LabDeveloperMode developerUi = UnityEngine.Object.FindFirstObjectByType<LabDeveloperMode>();
+            LabSceneController sceneController = UnityEngine.Object.FindFirstObjectByType<LabSceneController>();
+            LabSeatCamera seatCamera = UnityEngine.Object.FindFirstObjectByType<LabSeatCamera>();
+            Assert.That(network, Is.Not.Null);
+            Assert.That(developerUi, Is.Not.Null);
+            Assert.That(developerUi.applyHostButton, Is.Not.Null);
+            Assert.That(developerUi.targetParticipantsSlider, Is.Not.Null);
+            network.port = 17779;
+            try
+            {
+                developerUi.Open();
+                developerUi.targetParticipantsSlider.value = 2f;
+                developerUi.valueInputs[0].text = "350";
+                developerUi.ApplyAndHost();
+                Assert.That(network.IsHost, Is.True, developerUi.feedbackText.text);
+                Assert.That(network.TargetParticipantCount, Is.EqualTo(2));
+                Assert.That(network.config.MonsterMaxHp, Is.EqualTo(350));
+                Assert.That(sceneController.config, Is.SameAs(network.config));
+                Assert.That(seatCamera.config, Is.SameAs(network.config));
+
+                yield return null;
+                developerUi.Open();
+                Assert.That(developerUi.targetParticipantsSlider.interactable, Is.False);
+                developerUi.valueInputs[0].text = "400";
+                developerUi.ApplyAndHost();
+                Assert.That(network.IsHost, Is.True);
+                Assert.That(network.config.MonsterMaxHp, Is.EqualTo(400));
+                Assert.That(sceneController.config, Is.SameAs(network.config));
+                Assert.That(seatCamera.config, Is.SameAs(network.config));
+            }
+            finally
+            {
+                if (network.IsConnected) network.Stop();
+            }
+            Assert.That(network.config, Is.SameAs(developerUi.sourceConfig));
+            Assert.That(sceneController.config, Is.SameAs(developerUi.sourceConfig));
+            Assert.That(seatCamera.config, Is.SameAs(developerUi.sourceConfig));
+        }
+
+        [UnityTest]
         public IEnumerator SavedDeveloperPanelCanApplyAndRestartStraightThrowTuning()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
@@ -24,11 +69,19 @@ namespace C6Lab.Tests
             Assert.That(network, Is.Not.Null);
             Assert.That(developerUi, Is.Not.Null);
             Assert.That(developerUi.valueInputs.Length, Is.EqualTo(39));
+            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(39));
+            Assert.That(developerUi.applyHostButton, Is.Not.Null);
+            Assert.That(developerUi.targetParticipantsSlider.value, Is.EqualTo(3f));
             network.port = 17778;
             try
             {
                 developerUi.Open();
+                developerUi.valueSliders[36].value = .75f;
+                Assert.That(developerUi.valueInputs[36].text, Is.EqualTo("2.3125"));
                 developerUi.valueInputs[36].text = "1.6";
+                Assert.That(developerUi.valueSliders[36].value,
+                    Is.EqualTo(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[36], 1f, 1.6f))
+                        .Within(.0001f));
                 developerUi.valueInputs[37].text = "12";
                 developerUi.valueInputs[38].text = "0.6";
                 developerUi.ApplyAndStart();

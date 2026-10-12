@@ -13,6 +13,7 @@ namespace C6Lab
         public InputField port;
         public Button hostButton;
         public Button joinButton;
+        public Button findHostButton;
         public Button startButton;
         public Button generateButton;
         public Text generateLabel;
@@ -30,6 +31,7 @@ namespace C6Lab
         {
             if (hostButton != null) hostButton.onClick.AddListener(Host);
             if (joinButton != null) joinButton.onClick.AddListener(Join);
+            if (findHostButton != null) findHostButton.onClick.AddListener(FindHost);
             if (startButton != null) startButton.onClick.AddListener(() => network?.StartBattle());
             if (generateButton != null) generateButton.onClick.AddListener(() => network?.Generate());
             if (leaveButton != null) leaveButton.onClick.AddListener(() => network?.Stop());
@@ -49,17 +51,18 @@ namespace C6Lab
             SetVisible(sessionControls, !playing);
             SetVisible(statusText == null ? null : statusText.gameObject, !playing);
             bool connected = network.IsConnected;
-            if (hostButton != null) hostButton.interactable = !connected;
-            if (joinButton != null) joinButton.interactable = !connected;
+            if (hostButton != null) hostButton.interactable = network.CanChooseConnection;
+            if (joinButton != null) joinButton.interactable = network.CanChooseConnection;
+            if (findHostButton != null) findHostButton.interactable = network.CanChooseConnection;
             if (startButton != null) startButton.interactable = network.CanStartBattle;
             if (generateButton != null) generateButton.interactable = connected && snapshot != null && snapshot.phase == LabPhase.Playing;
             if (network.config != null) Set(generateLabel, "GENERATE / " + network.config.GenerateCost.ToString("0.#"));
-            if (leaveButton != null) leaveButton.interactable = connected;
+            if (leaveButton != null) leaveButton.interactable = connected || !network.CanChooseConnection;
             Set(statusText, network.Status);
             Set(noticeText, network.Notice);
             Set(peersText, network.IsDeveloperSolo
                 ? "DEVELOPER SOLO 1 / 1"
-                : "PLAYERS " + network.ParticipantCount + " / 3");
+                : "PLAYERS " + network.ParticipantCount + " / " + network.TargetParticipantCount);
             if (snapshot == null)
             {
                 Set(hpText, "YOKAI HP —");
@@ -90,6 +93,12 @@ namespace C6Lab
         {
             if (network == null || !TryPort()) return;
             network.Join(hostAddress == null ? network.hostAddress : hostAddress.text);
+        }
+
+        private void FindHost()
+        {
+            if (network == null || !TryPort()) return;
+            network.FindAndJoinRoom();
         }
 
         private bool TryPort()
