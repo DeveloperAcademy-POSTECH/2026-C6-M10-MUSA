@@ -393,6 +393,32 @@ namespace C6Lab.Tests
             Assert.That(uses, Is.EqualTo(new[] { "potion", "box" }));
         }
 
+        [Test]
+        public void UnlockedRelayShowsItsStageAndCanBeThrownButALockedRelayCannot()
+        {
+            var lockedRelay = board.UpsertOrb("locked-relay", LabOrbKind.Relay, new Vector2(.4f, .3f), lockSwipes: 2);
+            var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.6f, .3f), lockSwipes: 0, relayStage: 1);
+            Assert.That(lockedRelay.ItemMarker.BadgeText, Is.EqualTo("2"));
+            Assert.That(relay.ItemMarker.BadgeText, Is.EqualTo("×1"), "The badge turns into the relay stage on unlock.");
+            board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.6f, .3f), lockSwipes: 0, relayStage: 2);
+            Assert.That(relay.ItemMarker.BadgeText, Is.EqualTo("×2"));
+            board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.6f, .3f), lockSwipes: 0, relayStage: 3);
+            Assert.That(relay.ItemMarker.BadgeText, Is.EqualTo("MAX"));
+            Assert.That(relay.ItemMarker.BadgeVisible, Is.True);
+
+            int throws = 0;
+            string thrown = null;
+            board.ThrowRequested += gesture => { throws++; thrown = gesture.OrbId; };
+            Assert.That(board.TryBeginDragAtWorld(new Vector2(-.8f, -.8f), 1d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(-.8f, .9f), 1.1d), Is.True);
+            Assert.That(throws, Is.Zero, "A locked relay stays on the board.");
+
+            Assert.That(board.TryBeginDragAtWorld(new Vector2(.8f, -.8f), 2d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(.8f, .9f), 2.1d), Is.True);
+            Assert.That(throws, Is.EqualTo(1));
+            Assert.That(thrown, Is.EqualTo("relay"));
+        }
+
         private void Tap(Vector2 point, double at)
         {
             Assert.That(board.TryBeginDragAtWorld(point, at), Is.True);

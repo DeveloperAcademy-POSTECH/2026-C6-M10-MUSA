@@ -98,9 +98,9 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // Item use requests and the potion-heal setting are new; reject older clients rather than
-        // mixing rooms where double-tapping an item does nothing.
-        private const ushort LabProtocolVersion = 5608;
+        // Relay stages and item effect settings are new snapshot/settings data; reject older clients
+        // rather than mixing rooms with different item rules.
+        private const ushort LabProtocolVersion = 5609;
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/5");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
@@ -995,7 +995,7 @@ namespace C6Lab
                 bool showRise = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
                     && orb.kind != LabOrbKind.Combined;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
-                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element, orb.lockSwipes);
+                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element, orb.lockSwipes, orb.relayStage);
             }
             foreach (string id in visibleOrbIds) if (!current.Contains(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();

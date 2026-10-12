@@ -13,6 +13,9 @@ namespace C6Lab
         public static bool IsItem(this LabOrbKind kind) => kind >= LabOrbKind.Relay && kind <= LabOrbKind.Bomb;
         /// <summary>Items used in place by a double tap once unlocked.</summary>
         public static bool IsDoubleTapUsable(this LabOrbKind kind) => kind == LabOrbKind.Potion || kind == LabOrbKind.SecretBox;
+        /// <summary>Orbs that an upward flick may throw at the target.</summary>
+        public static bool CanThrow(this LabOrbKind kind, int lockSwipes) =>
+            kind == LabOrbKind.Combined || (kind == LabOrbKind.Relay && lockSwipes == 0);
     }
 
     /// <summary>
@@ -31,6 +34,8 @@ namespace C6Lab
         public LabOrbElement element;
         /// <summary>Handoffs to a neighbor's screen still needed before an item can be used; 0 means unlocked.</summary>
         public int lockSwipes;
+        /// <summary>Unlocked relay orb stage: 1 = x1, 2 = x2, 3 = MAX. 0 for every other orb.</summary>
+        public int relayStage;
         public LabOrbOrigin origin;
         public ulong originOwner;
         public float x, y, vx, vy;

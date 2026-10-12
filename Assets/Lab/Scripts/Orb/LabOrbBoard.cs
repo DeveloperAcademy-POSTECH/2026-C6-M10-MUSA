@@ -137,7 +137,8 @@ namespace C6Lab
         /// </summary>
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
-            bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0)
+            bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
+            int relayStage = 0)
         {
             RequireConfigured();
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
@@ -150,7 +151,8 @@ namespace C6Lab
                     existing.View.Configure(id, kind, config.OrbRadius, element);
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
-                if (existing.View.LockSwipes != lockSwipes) existing.View.SetLockSwipes(lockSwipes);
+                if (existing.View.LockSwipes != lockSwipes || existing.View.RelayStage != relayStage)
+                    existing.View.SetItemState(lockSwipes, relayStage);
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -162,7 +164,7 @@ namespace C6Lab
             var view = gameObject.AddComponent<LabOrbView>();
             view.Configure(id, kind, config.OrbRadius, element);
             view.ConfigureAppearance(config.OrbAppearance);
-            view.SetLockSwipes(lockSwipes);
+            view.SetItemState(lockSwipes, relayStage);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
@@ -339,7 +341,7 @@ namespace C6Lab
             // Side exits keep their existing screen-to-screen handoff even on a diagonal flick.
             bool outwardSide = (worldPoint.x <= bounds.xMin && inputVelocity.x < 0f)
                 || (worldPoint.x >= bounds.xMax && inputVelocity.x > 0f);
-            if (entry.View.Kind == LabOrbKind.Combined && !outwardSide
+            if (entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
                 && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
             {
                 entry.Locked = true;

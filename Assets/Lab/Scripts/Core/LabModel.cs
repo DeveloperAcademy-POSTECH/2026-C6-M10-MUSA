@@ -17,6 +17,7 @@ namespace C6Lab
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
         private const float SecretBoxSpread = .05f;
+        private const int RelayMaxStage = 3;
         private const uint LockDrawSalt = 0x10C4ED00u;
         private readonly Dictionary<ulong, LabPlayerState> players = new Dictionary<ulong, LabPlayerState>();
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
@@ -109,11 +110,12 @@ namespace C6Lab
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
             var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
             int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
+            int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
             Vector2 position = SpawnPosition(sender);
             orb = new LabOrbState
             {
-                id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes,
+                id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes, relayStage = relayStage,
                 origin = LabOrbOrigin.Generated, originOwner = sender,
                 x = position.x, y = position.y,
                 vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
@@ -154,7 +156,8 @@ namespace C6Lab
         /// <summary>
         /// A right edge enters the next seat from its left; a left edge enters the previous seat
         /// from its right. The same ID, creation time, and velocity survive the handoff.
-        /// Each handoff of a locked item removes one lock, so items unlock only by teamwork.
+        /// Each handoff of a locked item removes one lock, so items unlock only by teamwork. A relay
+        /// orb becomes x1 when it unlocks, then each further handoff raises it to x2 and MAX.
         /// </summary>
         public bool TryTransfer(ulong sender, string id, bool right, float height01,
             Vector2 normalizedVelocity, string requestId, double now, out LabOrbState orb, out string reason)
@@ -178,7 +181,12 @@ namespace C6Lab
             current.y = height01;
             current.vx = normalizedVelocity.x;
             current.vy = normalizedVelocity.y;
-            if (current.lockSwipes > 0) current.lockSwipes--;
+            if (current.lockSwipes > 0)
+            {
+                current.lockSwipes--;
+                if (current.lockSwipes == 0 && current.kind == LabOrbKind.Relay) current.relayStage = 1;
+            }
+            else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
             current.revision = ++revision;
             reason = "TRANSFERRED";
             orb = current.Copy();
@@ -192,7 +200,7 @@ namespace C6Lab
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
-            if (current.kind != LabOrbKind.Combined) return Reject("RAW_CANNOT_ATTACK", out reason);
+            if (!current.kind.CanThrow(current.lockSwipes)) return Reject("RAW_CANNOT_ATTACK", out reason);
             current.inFlight = true;
             current.vx = current.vy = 0f;
             current.revision = ++revision;
@@ -218,7 +226,7 @@ namespace C6Lab
             element = orb.element;
             orbs.Remove(id);
             int previousHp = hp;
-            hp = Math.Max(0, hp - rules.Damage);
+            hp = Math.Max(0, hp - DamageFor(orb));
             actualDamage = previousHp - hp;
             if (players.TryGetValue(orb.owner, out var attacker))
                 attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
@@ -361,6 +369,14 @@ namespace C6Lab
             return true;
         }
 
+        private int DamageFor(LabOrbState orb)
+        {
+            if (orb.kind != LabOrbKind.Relay) return rules.Damage;
+            float multiplier = orb.relayStage >= RelayMaxStage ? rules.RelayMaxMultiplier
+                : orb.relayStage == 2 ? rules.RelayDoubleMultiplier : 1f;
+            return Math.Max(1, (int)Math.Round(rules.Damage * multiplier));
+        }
+
         private float LifetimeOf(LabOrbState orb) =>
             orb.kind.IsItem() ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
@@ -454,6 +470,7 @@ namespace C6Lab
         private sealed class Rules
         {
             public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
+            public readonly float RelayDoubleMultiplier, RelayMaxMultiplier;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
             public readonly int[] GenerationChances;
@@ -468,6 +485,8 @@ namespace C6Lab
                 MonsterMaxHp = config.MonsterMaxHp;
                 PlayerMaxHp = config.PlayerMaxHp;
                 PotionHeal = config.PotionHeal;
+                RelayDoubleMultiplier = config.RelayDoubleMultiplier;
+                RelayMaxMultiplier = config.RelayMaxMultiplier;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
                 BattleDurationSeconds = config.BattleDurationSeconds;

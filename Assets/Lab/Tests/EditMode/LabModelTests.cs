@@ -696,6 +696,69 @@ namespace C6Lab.Tests
             finally { UnityEngine.Object.DestroyImmediate(boxes); }
         }
 
+        [Test]
+        public void RelayBecomesX1OnUnlockThenX2AndMaxOnHandoffsAndHitsHarder()
+        {
+            var relays = ConfigWith(10f, 0, 0, 100, 0, 0, 0);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("relay-stages", new ulong[] { 10, 20, 30 }, 0d, relays);
+                Assert.That(room.TryGenerate(10, "relay", 0d, out var relay, out _), Is.True);
+                int locks = relay.lockSwipes;
+                Assert.That(locks, Is.InRange(2, 4));
+                Assert.That(relay.relayStage, Is.Zero);
+                Assert.That(room.TryLaunch(10, relay.id, "locked-throw", 0d, out _, out var lockedReason), Is.False);
+                Assert.That(lockedReason, Is.EqualTo("RAW_CANNOT_ATTACK"), "A locked relay is not an attack orb yet.");
+
+                // The unlocking handoff makes it x1, the next two make x2 and MAX, and MAX stays.
+                ulong[] ring = { 10, 20, 30 };
+                for (int pass = 1; pass <= locks + 3; pass++)
+                {
+                    var passed = PassRight(room, relay.id, ring[(pass - 1) % ring.Length], pass * .1d);
+                    int expected = pass < locks ? 0 : Math.Min(3, pass - locks + 1);
+                    Assert.That(passed.relayStage, Is.EqualTo(expected), "after handoff " + pass);
+                }
+
+                float[] values = relays.CaptureDeveloperValues();
+                values[46] = 0f; // unlock swipes min
+                values[47] = 0f; // unlock swipes max
+                Assert.That(relays.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var hits = new LabModel();
+                hits.Begin("relay-hits", new ulong[] { 10, 20, 30 }, 0d, relays);
+
+                Assert.That(hits.TryGenerate(10, "x1", 0d, out var x1, out _), Is.True);
+                Assert.That(x1.relayStage, Is.EqualTo(1), "An already unlocked relay starts at x1.");
+                Assert.That(ThrowAndHit(hits, x1.id, 10, .1d), Is.EqualTo(20));
+
+                Assert.That(hits.TryGenerate(10, "x2", .2d, out var x2, out _), Is.True);
+                Assert.That(PassRight(hits, x2.id, 10, .3d).relayStage, Is.EqualTo(2));
+                Assert.That(ThrowAndHit(hits, x2.id, 20, .4d), Is.EqualTo(40));
+
+                Assert.That(hits.TryGenerate(10, "max", .5d, out var max, out _), Is.True);
+                PassRight(hits, max.id, 10, .6d);
+                Assert.That(PassRight(hits, max.id, 20, .7d).relayStage, Is.EqualTo(3));
+                Assert.That(ThrowAndHit(hits, max.id, 30, .8d), Is.EqualTo(80));
+                Assert.That(hits.Hp, Is.EqualTo(1000 - 20 - 40 - 80));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(relays); }
+        }
+
+        private static LabOrbState PassRight(LabModel room, string id, ulong holder, double at)
+        {
+            Assert.That(room.TryUpdateMotion(holder, id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
+            Assert.That(room.TryTransfer(holder, id, true, .5f, Vector2.right, "pass-" + id + "-" + at, at,
+                out var passed, out var reason), Is.True, reason);
+            return passed;
+        }
+
+        private static int ThrowAndHit(LabModel room, string id, ulong thrower, double at)
+        {
+            Assert.That(room.TryLaunch(thrower, id, "throw-" + id, at, out _, out var reason), Is.True, reason);
+            Assert.That(room.ConfirmHit(id, at, out _, out int damage), Is.True);
+            return damage;
+        }
+
         /// <summary>A default config with one generation cost and chances in GeneratedKinds order.</summary>
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {

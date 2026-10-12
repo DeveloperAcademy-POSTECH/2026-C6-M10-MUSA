@@ -24,6 +24,7 @@ namespace C6Lab
         private LabOrbKind kind;
         private LabOrbElement element;
         private int lockSwipes;
+        private int relayStage;
         private float visualRadius = .32f;
         private Coroutine spawnRiseRoutine;
         private Action spawnRiseCompleted;
@@ -33,6 +34,7 @@ namespace C6Lab
         public LabOrbElement Element => element;
         /// <summary>Host-approved handoffs still needed before this item can be used.</summary>
         public int LockSwipes => lockSwipes;
+        public int RelayStage => relayStage;
         public LabOrbItemMarker ItemMarker => itemMarker;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
@@ -104,9 +106,13 @@ namespace C6Lab
             UpdateVisual();
         }
 
-        public void SetLockSwipes(int value)
+        public void SetLockSwipes(int value) => SetItemState(value, relayStage);
+
+        /// <summary>Host-approved lock count and relay stage; both only change the item badge.</summary>
+        public void SetItemState(int lockCount, int stage)
         {
-            lockSwipes = Mathf.Max(0, value);
+            lockSwipes = Mathf.Max(0, lockCount);
+            relayStage = Mathf.Max(0, stage);
             UpdateItemMarker();
         }
 
@@ -291,7 +297,14 @@ namespace C6Lab
                 return;
             }
             if (itemMarker == null) itemMarker = LabOrbItemMarker.Create(transform);
-            itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, lockSwipes, visualRadius, visual);
+            itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), visualRadius, visual);
+        }
+
+        private string BadgeText()
+        {
+            if (lockSwipes > 0) return lockSwipes.ToString();
+            if (kind != LabOrbKind.Relay || relayStage <= 0) return null;
+            return relayStage >= 3 ? "MAX" : relayStage == 2 ? "×2" : "×1";
         }
 
         private void UpdateContactShadow()

@@ -4,8 +4,8 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
-    /// Item presentation on the orb root: an icon on a disc and a lock badge with the swipes
-    /// still needed, all facing the front-on board camera. It follows the Visual mount's
+    /// Item presentation on the orb root: an icon on a disc and a badge (remaining unlock handoffs,
+    /// or a relay orb's x1/x2/MAX stage), all facing the front-on board camera. It follows the Visual mount's
     /// rise animation but not its rolling rotation, and owns no collider.
     /// </summary>
     [DisallowMultipleComponent]
@@ -25,7 +25,6 @@ namespace C6Lab
         private Transform follow;
         private float radius;
 
-        public int ShownLockSwipes { get; private set; }
         public bool IconVisible => icon != null && icon.gameObject.activeSelf;
         public bool BadgeVisible => badge != null && badge.gameObject.activeSelf;
         public string BadgeText => badgeCount != null ? badgeCount.text : string.Empty;
@@ -38,8 +37,8 @@ namespace C6Lab
             return marker.AddComponent<LabOrbItemMarker>();
         }
 
-        /// <summary>Shows the icon (when assigned) and a badge while lockSwipes is above zero.</summary>
-        public void Show(Texture2D iconTexture, int lockSwipes, float orbRadius, Transform followMount)
+        /// <summary>Shows the icon (when assigned) and the badge text; null or empty hides the badge.</summary>
+        public void Show(Texture2D iconTexture, string badgeText, float orbRadius, Transform followMount)
         {
             EnsureParts();
             radius = orbRadius;
@@ -56,15 +55,16 @@ namespace C6Lab
                 icon.transform.localScale = Vector3.one * (1.15f * radius);
             }
 
-            ShownLockSwipes = Mathf.Max(0, lockSwipes);
-            bool locked = ShownLockSwipes > 0;
-            badge.gameObject.SetActive(locked);
+            bool visible = !string.IsNullOrEmpty(badgeText);
+            badge.gameObject.SetActive(visible);
             badge.transform.localPosition = new Vector3(.62f * radius, -.62f * radius, -.01f);
-            badge.transform.localScale = Vector3.one * (.62f * radius);
+            // Widen the square for longer labels such as "x2" or "MAX".
+            float width = Mathf.Max(1f, .55f * (visible ? badgeText.Length : 1));
+            badge.transform.localScale = new Vector3(.62f * radius * width, .62f * radius, 1f);
             if (badgeCount != null)
             {
-                badgeCount.gameObject.SetActive(locked);
-                badgeCount.text = ShownLockSwipes.ToString();
+                badgeCount.gameObject.SetActive(visible);
+                badgeCount.text = visible ? badgeText : string.Empty;
                 badgeCount.transform.localPosition = new Vector3(.62f * radius, -.62f * radius, -.02f);
                 badgeCount.characterSize = .5f * radius / (BadgeFontSize * .1f);
             }
