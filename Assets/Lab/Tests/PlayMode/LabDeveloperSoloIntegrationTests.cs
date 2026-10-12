@@ -225,6 +225,11 @@ namespace C6Lab.Tests
                     yield return new WaitForFixedUpdate();
                 Assert.That(network.Snapshot.hp, Is.EqualTo(initialHp - network.config.Damage),
                     "Only an actual cylinder collision should lower Host HP.");
+                var hanging = network.target.GetComponent<LabHangingTarget>();
+                Assert.That(hanging, Is.Not.Null, "The saved scene must expose Pinata tuning.");
+                for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();
+                Assert.That(hanging.SwingAngles.magnitude, Is.GreaterThan(.1f),
+                    "A Host-confirmed hit should make the actual target swing.");
                 Assert.That(network.LastShotReport, Does.StartWith("SHOT HIT"));
                 Assert.That(network.Notice, Is.EqualTo(network.LastShotReport));
                 Assert.That(network.Snapshot.orbs.Any(o => o.id == combined.id), Is.False);
