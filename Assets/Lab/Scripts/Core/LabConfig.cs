@@ -80,7 +80,10 @@ namespace C6Lab
             new LabDeveloperField("Item Lifetime (seconds)", .1f, 86400f),
             new LabDeveloperField("Item Unlock Swipes Min", 0f, 20f, true),
             new LabDeveloperField("Item Unlock Swipes Max", 0f, 20f, true),
-            new LabDeveloperField("Player Max HP", 1f, 300f, true)
+            new LabDeveloperField("Player Max HP", 1f, 300f, true),
+            new LabDeveloperField("Combine Speed", 0f, 10f),
+            new LabDeveloperField("Drop Combine (0 off, 1 on)", 0f, 1f, true),
+            new LabDeveloperField("Contact Combine (0 off, 1 on)", 0f, 1f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -128,6 +131,12 @@ namespace C6Lab
         [SerializeField, Min(.001f)] private float orbMaxReleaseSpeed = 3f;
         [SerializeField, Min(.001f)] private float orbRadius = .32f;
         [SerializeField, Min(.1f)] private float boardHeight = 5f;
+
+        [Header("Orb combine")]
+        [Tooltip("두 구슬이 서로 다가간 속도 (보드 너비/초)가 이 값 이상이면 결합. 0 = 스쳐도 결합")]
+        [SerializeField, Range(0f, 10f)] private float combineSpeed = 0f;
+        [SerializeField] private bool dropCombineEnabled = true;
+        [SerializeField] private bool contactCombineEnabled = true;
 
         [Header("Spawn presentation")]
         [SerializeField, Min(0f)] private float spawnRiseDistance = .65f;
@@ -200,6 +209,11 @@ namespace C6Lab
         public float OrbMaxReleaseSpeed => Positive(orbMaxReleaseSpeed, 3f);
         public float OrbRadius => Positive(orbRadius, .32f);
         public float BoardHeight => Positive(boardHeight, 5f);
+
+        public float CombineSpeed => Mathf.Clamp(Finite(combineSpeed, 0f), 0f, 10f);
+        public bool DropCombineEnabled => dropCombineEnabled;
+        public bool ContactCombineEnabled => contactCombineEnabled;
+
         public float SpawnRiseDistance => Mathf.Max(0f, Finite(spawnRiseDistance, .65f));
         public float SpawnRiseDuration => Mathf.Max(0f, Finite(spawnRiseDuration, .25f));
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -244,7 +258,8 @@ namespace C6Lab
                 ThrowPowerExponent, ThrowLoftOffsetDegrees, ThrowAirDamping,
                 chances[0], chances[1], chances[2], chances[3], chances[4], chances[5],
                 ItemLifetimeSeconds, ItemUnlockSwipesMin, ItemUnlockSwipesMax,
-                PlayerMaxHp
+                PlayerMaxHp,
+                CombineSpeed, DropCombineEnabled ? 1f : 0f, ContactCombineEnabled ? 1f : 0f
             };
         }
 
@@ -333,6 +348,9 @@ namespace C6Lab
             itemUnlockSwipesMin = (int)values[46];
             itemUnlockSwipesMax = (int)values[47];
             playerMaxHp = (int)values[48];
+            combineSpeed = values[49];
+            dropCombineEnabled = values[50] >= .5f;
+            contactCombineEnabled = values[51] >= .5f;
             error = string.Empty;
             return true;
         }

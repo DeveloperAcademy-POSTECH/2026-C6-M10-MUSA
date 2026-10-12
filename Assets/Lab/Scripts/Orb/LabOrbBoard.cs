@@ -157,6 +157,7 @@ namespace C6Lab
             view.SetLockSwipes(lockSwipes);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
+            view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
             var body = view.Body;
             body.useGravity = false;
             body.linearDamping = 0f;
@@ -321,21 +322,12 @@ namespace C6Lab
                 return true;
             }
 
-            if (entry.View.Kind.IsRaw())
+            if (config.DropCombineEnabled && entry.View.Kind.IsRaw())
             {
                 Entry target = FindOppositeOverlap(entry);
                 if (target != null)
                 {
-                    entry.Locked = true;
-                    target.Locked = true;
-                    entry.PendingPartnerId = target.View.OrbId;
-                    target.PendingPartnerId = id;
-                    StopMotion(entry.View.Body);
-                    StopMotion(target.View.Body);
-                    SetBodyMode(entry);
-                    SetBodyMode(target);
-                    Vector2 middle = ToNormalized((XY(entry.View.Body.position) + XY(target.View.Body.position)) * .5f);
-                    CombineRequested?.Invoke(id, target.View.OrbId, middle);
+                    RequestCombine(entry, target);
                     return true;
                 }
             }
@@ -434,6 +426,56 @@ namespace C6Lab
                 EdgeCrossed?.Invoke(crossing);
             }
         }
+
+        /// <summary>
+        /// 두 구슬을 그 자리에 멈추고 방장에게 결합을 요청한다.
+        /// 놓아서 결합과 닿으면 결합이 함께 쓴다.
+        /// </summary>
+        private void RequestCombine(Entry first, Entry second)
+        {
+            first.Locked = true;
+            second.Locked = true;
+            first.PendingPartnerId = second.View.OrbId;
+            second.PendingPartnerId = first.View.OrbId;
+            StopMotion(first.View.Body);
+            StopMotion(second.View.Body);
+            SetBodyMode(first);
+            SetBodyMode(second);
+            Vector2 middle = ToNormalized((XY(first.View.Body.position) + XY(second.View.Body.position)) * .5f);
+            CombineRequested?.Invoke(first.View.OrbId, second.View.OrbId, middle);
+        }
+
+        /// <summary>
+        /// 구슬끼리 부딪혔을 때, 음+양이고 충분히 빠르게 부딪혔으면 결합을 요청
+        /// 두 구슬 모두 신호를 보내지먼, 첫 요청에서 짝 표시가 붙어 두 번째 신호는 건너뛴다.
+        /// </summary>
+        private void OnOrbHit(LabOrbView self, LabOrbView other, float worldSpeed)
+        {
+            if (!configured || !interactionEnabled || !config.ContactCombineEnabled) return;
+            if (!entries.TryGetValue(self.OrbId, out var first)
+                || !entries.TryGetValue(other.OrbId, out var second)) return;
+            if (!CanContactCombine(first) || !CanContactCombine(second)) return;
+            if (first.View.Kind == second.View.Kind) return;
+
+            // 물리 속도는 월드 단위라, 다른 튜닝 값처럼 보드 너비 단위로 바꿔서 비교한다.
+            float speed = worldSpeed / bounds.width;
+            if (speed < config.CombineSpeed) return;
+
+            RequestCombine(first, second);
+        }
+
+        /// <summary>닿으면 결합에 쓸 수 있는 구슬인지 확인한다.</summary>
+        private static bool CanContactCombine(Entry entry)
+        {
+            return entry.View.Kind.IsRaw()
+                && entry.LocalOwner
+                && !entry.Held
+                && !entry.Locked
+                && !entry.SpawnLocked
+                && !entry.EdgePending
+                && entry.PendingPartnerId == null;
+        }
+
 
         private Entry FindOppositeOverlap(Entry dragged)
         {
