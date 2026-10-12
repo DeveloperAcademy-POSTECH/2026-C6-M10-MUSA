@@ -26,8 +26,8 @@ namespace C6Lab.Tests
             Assert.That(hud.playerHpText, Is.Not.Null, "The saved Canvas must bind its player HP text to LabHud.");
             Assert.That(hud.playerHpText.transform.parent.name, Is.EqualTo("BattleHeader"));
             Assert.That(developerUi, Is.Not.Null);
-            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(52));
-            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(52));
+            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
+            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(hud.playerHpText.text, Is.EqualTo("PLAYER HP —"));
 
             LabNetwork network = hud.network;

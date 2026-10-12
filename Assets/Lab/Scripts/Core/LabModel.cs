@@ -239,6 +239,30 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>
+        /// Double-tap use of the owner's unlocked item. A potion heals its user's personal HP up to
+        /// the maximum; at full HP it is refused and kept so it can still be passed to a neighbor.
+        /// A player already at 0 HP cannot be revived by a potion.
+        /// </summary>
+        public bool TryUseItem(ulong sender, string id, string requestId, double now,
+            out LabOrbState orb, out string reason)
+        {
+            orb = null;
+            if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
+            if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            if (!current.kind.IsDoubleTapUsable()) return Reject("NOT_USABLE", out reason);
+            if (current.lockSwipes > 0) return Reject("ITEM_LOCKED", out reason);
+            var player = players[sender];
+            if (player.personalHp <= 0) return Reject("PLAYER_DOWN", out reason);
+            if (player.personalHp >= rules.PlayerMaxHp) return Reject("HP_FULL", out reason);
+            player.personalHp = Math.Min(rules.PlayerMaxHp, player.personalHp + rules.PotionHeal);
+            orbs.Remove(current.id);
+            reason = "ITEM_USED";
+            orb = current.Copy();
+            return true;
+        }
+
         /// <summary>Remove an expired or missed projectile without damage or a hit reward.</summary>
         public bool ConfirmMiss(string id, double now)
         {
@@ -408,7 +432,7 @@ namespace C6Lab
 
         private sealed class Rules
         {
-            public readonly int MonsterMaxHp, PlayerMaxHp, Damage, OrbStorageLimit;
+            public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
             public readonly int[] GenerationChances;
@@ -422,6 +446,7 @@ namespace C6Lab
                 ItemUnlockSwipesMax = config.ItemUnlockSwipesMax;
                 MonsterMaxHp = config.MonsterMaxHp;
                 PlayerMaxHp = config.PlayerMaxHp;
+                PotionHeal = config.PotionHeal;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
                 BattleDurationSeconds = config.BattleDurationSeconds;

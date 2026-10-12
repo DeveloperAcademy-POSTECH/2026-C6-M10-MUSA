@@ -83,7 +83,8 @@ namespace C6Lab
             new LabDeveloperField("Player Max HP", 1f, 300f, true),
             new LabDeveloperField("Combine Speed", 0f, 10f),
             new LabDeveloperField("Drop Combine (0 off, 1 on)", 0f, 1f, true),
-            new LabDeveloperField("Contact Combine (0 off, 1 on)", 0f, 1f, true)
+            new LabDeveloperField("Contact Combine (0 off, 1 on)", 0f, 1f, true),
+            new LabDeveloperField("Potion Heal (HP)", 0f, 300f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -120,6 +121,7 @@ namespace C6Lab
         [SerializeField, Min(.1f)] private float itemLifetimeSeconds = 15f;
         [SerializeField, Range(0, 20)] private int itemUnlockSwipesMin = 2;
         [SerializeField, Range(0, 20)] private int itemUnlockSwipesMax = 4;
+        [SerializeField, Range(0, 300)] private int potionHeal = 10;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -203,6 +205,7 @@ namespace C6Lab
         public float ItemLifetimeSeconds => Positive(itemLifetimeSeconds, 15f);
         public int ItemUnlockSwipesMin => Mathf.Clamp(Mathf.Min(itemUnlockSwipesMin, itemUnlockSwipesMax), 0, 20);
         public int ItemUnlockSwipesMax => Mathf.Clamp(Mathf.Max(itemUnlockSwipesMin, itemUnlockSwipesMax), 0, 20);
+        public int PotionHeal => Mathf.Clamp(potionHeal, 0, 300);
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
         public float OrbStopSpeed => Mathf.Clamp(Finite(orbStopSpeed, .065f), 0f, OrbMaxReleaseSpeed);
@@ -259,7 +262,8 @@ namespace C6Lab
                 chances[0], chances[1], chances[2], chances[3], chances[4], chances[5],
                 ItemLifetimeSeconds, ItemUnlockSwipesMin, ItemUnlockSwipesMax,
                 PlayerMaxHp,
-                CombineSpeed, DropCombineEnabled ? 1f : 0f, ContactCombineEnabled ? 1f : 0f
+                CombineSpeed, DropCombineEnabled ? 1f : 0f, ContactCombineEnabled ? 1f : 0f,
+                PotionHeal
             };
         }
 
@@ -351,6 +355,7 @@ namespace C6Lab
             combineSpeed = values[49];
             dropCombineEnabled = values[50] >= .5f;
             contactCombineEnabled = values[51] >= .5f;
+            potionHeal = (int)values[52];
             error = string.Empty;
             return true;
         }

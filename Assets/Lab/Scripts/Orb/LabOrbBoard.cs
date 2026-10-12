@@ -69,6 +69,8 @@ namespace C6Lab
         private const float ContactFriction = .15f;
         private const float WallThickness = .5f;
         private const double ReleaseSampleWindow = .12d;
+        private const double TapMaxSeconds = .3d;
+        private const double DoubleTapWindow = .35d;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly HashSet<string> risenIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<PointerSample> samples = new List<PointerSample>();
@@ -79,6 +81,10 @@ namespace C6Lab
         private PhysicsMaterial contactMaterial;
         private GameObject wallRoot;
         private string heldId;
+        private Vector2 pressPoint;
+        private double pressTime;
+        private string lastTapId;
+        private double lastTapTime;
         private bool heldByTouch;
         private bool interactionEnabled = true;
         private bool uiInputBlocked;
@@ -92,6 +98,8 @@ namespace C6Lab
         public event Action<string, string, Vector2> CombineRequested;
         /// <summary>The velocity is input displacement divided by board width and seconds.</summary>
         public event Action<LabOrbThrowGesture> ThrowRequested;
+        /// <summary>A double tap on an unlocked usable item. The Host applies or rejects its effect.</summary>
+        public event Action<string> UseRequested;
 
         public void Configure(LabConfig tuning, Camera camera, Rect worldCenterBounds)
         {
@@ -284,6 +292,8 @@ namespace C6Lab
             SetBodyMode(nearest);
             samples.Clear();
             AddSample(worldPoint, now);
+            pressPoint = worldPoint;
+            pressTime = now;
             return true;
         }
 
@@ -307,6 +317,24 @@ namespace C6Lab
             samples.Clear();
             entry.Held = false;
             entry.View.HitSphere.isTrigger = false;
+
+            // A tap is short and nearly still. Two taps on the same unlocked item use it in place.
+            bool tapped = now - pressTime <= TapMaxSeconds && (worldPoint - pressPoint).magnitude <= config.OrbRadius * .5f;
+            if (tapped && entry.View.Kind.IsDoubleTapUsable() && entry.View.LockSwipes == 0)
+            {
+                if (lastTapId == id && now - lastTapTime <= DoubleTapWindow)
+                {
+                    lastTapId = null;
+                    entry.Locked = true;
+                    StopMotion(entry.View.Body);
+                    SetBodyMode(entry);
+                    UseRequested?.Invoke(id);
+                    return true;
+                }
+                lastTapId = id;
+                lastTapTime = now;
+            }
+            else lastTapId = null;
 
             // Side exits keep their existing screen-to-screen handoff even on a diagonal flick.
             bool outwardSide = (worldPoint.x <= bounds.xMin && inputVelocity.x < 0f)

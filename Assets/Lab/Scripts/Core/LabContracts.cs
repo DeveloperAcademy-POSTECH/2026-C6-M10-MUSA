@@ -11,6 +11,8 @@ namespace C6Lab
     {
         public static bool IsRaw(this LabOrbKind kind) => kind == LabOrbKind.Yin || kind == LabOrbKind.Yang;
         public static bool IsItem(this LabOrbKind kind) => kind >= LabOrbKind.Relay && kind <= LabOrbKind.Bomb;
+        /// <summary>Items used in place by a double tap once unlocked.</summary>
+        public static bool IsDoubleTapUsable(this LabOrbKind kind) => kind == LabOrbKind.Potion;
     }
 
     /// <summary>

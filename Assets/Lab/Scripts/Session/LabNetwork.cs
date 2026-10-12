@@ -98,9 +98,9 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // Impact packets now carry the confirmed damage, element, target-local hit point, and round.
-        // Reject older clients instead of silently omitting hit feedback in a mixed-version room.
-        private const ushort LabProtocolVersion = 5607;
+        // Item use requests and the potion-heal setting are new; reject older clients rather than
+        // mixing rooms where double-tapping an item does nothing.
+        private const ushort LabProtocolVersion = 5608;
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/5");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
@@ -201,6 +201,7 @@ namespace C6Lab
                 board.EdgeCrossed += OnEdgeCrossed;
                 board.CombineRequested += OnCombineRequested;
                 board.ThrowRequested += OnThrowRequested;
+                board.UseRequested += OnUseRequested;
             }
             if (manager != null)
             {
@@ -874,6 +875,9 @@ namespace C6Lab
                 case "generate":
                     accepted = model.TryGenerate(sender, uniqueRequestId, now, out result, out reason);
                     break;
+                case "use":
+                    accepted = model.TryUseItem(sender, packet.firstId, uniqueRequestId, now, out result, out reason);
+                    break;
                 case "combine":
                     accepted = model.TryCombine(sender, packet.firstId, packet.secondId, uniqueRequestId, now, out result, out reason);
                     break;
@@ -1018,6 +1022,12 @@ namespace C6Lab
         {
             if (latest == null || latest.phase != LabPhase.Playing) return;
             Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y });
+        }
+
+        private void OnUseRequested(string orbId)
+        {
+            if (latest == null || latest.phase != LabPhase.Playing) return;
+            Request(new LabNetworkPacket { type = "use", requestId = ++requestSequence, firstId = orbId });
         }
 
         private void OnThrowRequested(LabOrbThrowGesture gesture)
@@ -1334,6 +1344,7 @@ namespace C6Lab
                 board.EdgeCrossed -= OnEdgeCrossed;
                 board.CombineRequested -= OnCombineRequested;
                 board.ThrowRequested -= OnThrowRequested;
+                board.UseRequested -= OnUseRequested;
             }
             if (manager != null)
             {

@@ -592,6 +592,65 @@ namespace C6Lab.Tests
             finally { UnityEngine.Object.DestroyImmediate(rawOnly); }
         }
 
+        [Test]
+        public void PotionHealsOnlyItsUnlockedOwnerUpToMaxHpAndIsKeptWhenFull()
+        {
+            var potions = ConfigWith(10f, 0, 0, 0, 0, 100, 0);
+            try
+            {
+                var locked = new LabModel();
+                locked.Begin("potion-locked", new ulong[] { 10, 20, 30 }, 0d, potions);
+                Assert.That(locked.TryGenerate(10, "locked", 0d, out var lockedPotion, out _), Is.True);
+                Assert.That(lockedPotion.lockSwipes, Is.GreaterThan(0));
+                Assert.That(locked.TryUseItem(10, lockedPotion.id, "use-locked", 0d, out _, out var lockedReason), Is.False);
+                Assert.That(lockedReason, Is.EqualTo("ITEM_LOCKED"));
+
+                float[] values = potions.CaptureDeveloperValues();
+                values[46] = 0f; // unlock swipes min
+                values[47] = 0f; // unlock swipes max
+                Assert.That(potions.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("potion-open", new ulong[] { 10, 20, 30 }, 0d, potions);
+                Assert.That(room.TryGenerate(10, "first", 0d, out var potion, out _), Is.True);
+                Assert.That(potion.kind, Is.EqualTo(LabOrbKind.Potion));
+                Assert.That(potion.lockSwipes, Is.Zero);
+
+                Assert.That(room.TryUseItem(10, potion.id, "full", .1d, out _, out var fullReason), Is.False);
+                Assert.That(fullReason, Is.EqualTo("HP_FULL"));
+                Assert.That(room.Snapshot(.1d).orbs.Any(orb => orb.id == potion.id), Is.True, "A refused potion is kept.");
+
+                Assert.That(room.TryApplyPlayerDamage(10, 25, .2d), Is.True);
+                Assert.That(room.TryUseItem(20, potion.id, "foreign", .3d, out _, out var foreignReason), Is.False);
+                Assert.That(foreignReason, Is.EqualTo("NOT_OWNED_IDLE"));
+                Assert.That(room.TryUseItem(10, potion.id, "heal", .3d, out _, out var healReason), Is.True);
+                Assert.That(healReason, Is.EqualTo("ITEM_USED"));
+                var healed = room.Snapshot(.3d);
+                Assert.That(healed.players.Single(player => player.id == 10).personalHp, Is.EqualTo(285));
+                Assert.That(healed.players.Single(player => player.id == 20).personalHp, Is.EqualTo(300));
+                Assert.That(healed.orbs.Any(orb => orb.id == potion.id), Is.False, "A used potion is consumed.");
+
+                Assert.That(room.TryGenerate(10, "second", .4d, out var second, out _), Is.True);
+                Assert.That(room.TryUseItem(10, second.id, "cap", .5d, out _, out _), Is.True);
+                Assert.That(room.Snapshot(.5d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(295));
+                Assert.That(room.TryGenerate(10, "third", .6d, out var third, out _), Is.True);
+                Assert.That(room.TryUseItem(10, third.id, "capped", .7d, out _, out _), Is.True);
+                Assert.That(room.Snapshot(.7d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(300),
+                    "Healing never exceeds Player Max HP.");
+
+                Assert.That(room.TryApplyPlayerDamage(20, 300, .8d), Is.True);
+                Assert.That(room.Snapshot(.8d).phase, Is.EqualTo(LabPhase.Playing), "Others are still standing.");
+                Assert.That(room.TryGenerate(20, "downed", .8d, out var downedPotion, out _), Is.True);
+                Assert.That(room.TryUseItem(20, downedPotion.id, "revive", .9d, out _, out var downReason), Is.False);
+                Assert.That(downReason, Is.EqualTo("PLAYER_DOWN"), "A potion cannot revive a player at 0 HP.");
+                Assert.That(room.Snapshot(.9d).players.Single(player => player.id == 20).personalHp, Is.Zero);
+
+                Assert.That(model.TryGenerate(10, "raw", 0d, out var raw, out _), Is.True);
+                Assert.That(model.TryUseItem(10, raw.id, "raw-use", 0d, out _, out var rawReason), Is.False);
+                Assert.That(rawReason, Is.EqualTo("NOT_USABLE"));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(potions); }
+        }
+
         /// <summary>A default config with one generation cost and chances in GeneratedKinds order.</summary>
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {
