@@ -34,10 +34,13 @@ namespace C6Lab.Tests
             Assert.That(snapshot.players.Select(player => player.id), Is.EqualTo(new ulong[] { 10, 20, 30 }));
             Assert.That(snapshot.players.Select(player => player.seat), Is.EqualTo(new[] { 0, 1, 2 }));
             Assert.That(snapshot.players.All(player => player.stamina == 100f), Is.True);
+            Assert.That(snapshot.players.All(player => player.personalHp == 300), Is.True);
             Assert.That(snapshot.orbs, Is.Empty);
 
             snapshot.players[0].stamina = 0f;
+            snapshot.players[0].personalHp = 0;
             Assert.That(model.Snapshot(0d).players[0].stamina, Is.EqualTo(100f));
+            Assert.That(model.Snapshot(0d).players[0].personalHp, Is.EqualTo(300));
             Assert.Throws<ArgumentException>(() => new LabModel().Begin("bad", new ulong[] { 1 }, 0d, config));
             Assert.Throws<ArgumentException>(() => new LabModel().Begin("bad", new ulong[] { 1, 1, 2 }, 0d, config));
             Assert.Throws<ArgumentException>(() => new LabModel().Begin("bad", new ulong[] { 1, 2, 3, 4, 5, 6 }, 0d, config));
@@ -49,12 +52,17 @@ namespace C6Lab.Tests
         [TestCase(5)]
         public void NetworkRoomAcceptsDistinctPlayersUpToFiveInSeatOrder(int count)
         {
+            float[] values = config.CaptureDeveloperValues();
+            values[48] = 120f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             ulong[] ids = Enumerable.Range(1, count).Select(index => (ulong)index).ToArray();
             var room = new LabModel();
             room.Begin("room-" + count, ids, 0d, config);
             LabSnapshot snapshot = room.Snapshot(0d);
             Assert.That(snapshot.players.Select(player => player.id), Is.EqualTo(ids));
             Assert.That(snapshot.players.Select(player => player.seat), Is.EqualTo(Enumerable.Range(0, count)));
+            Assert.That(snapshot.players.Select(player => player.personalHp),
+                Is.EqualTo(Enumerable.Repeat(120, count)));
         }
 
         [Test]
@@ -107,6 +115,7 @@ namespace C6Lab.Tests
             Assert.That(start.players.Length, Is.EqualTo(1));
             Assert.That(start.players[0].id, Is.EqualTo(42ul));
             Assert.That(start.players[0].seat, Is.EqualTo(0));
+            Assert.That(start.players[0].personalHp, Is.EqualTo(300));
             Assert.That(start.hp, Is.EqualTo(1000));
 
             LabOrbState yin = null, yang = null;
@@ -175,6 +184,7 @@ namespace C6Lab.Tests
             Assert.That(retry.players.Select(player => player.id), Is.EqualTo(new ulong[] { 7ul }));
             Assert.That(retry.orbs, Is.Empty);
             Assert.That(retry.players[0].stamina, Is.EqualTo(100f));
+            Assert.That(retry.players[0].personalHp, Is.EqualTo(300));
             Assert.Throws<ArgumentException>(() => new LabModel().Begin("not-multiplayer", new[] { 7ul }, 0d, config));
         }
 
@@ -319,7 +329,64 @@ namespace C6Lab.Tests
             Assert.That(retry.hp, Is.EqualTo(1000));
             Assert.That(retry.remaining, Is.EqualTo(180d));
             Assert.That(retry.players.All(player => player.stamina == 100f), Is.True);
+            Assert.That(retry.players.All(player => player.personalHp == 300), Is.True);
             Assert.That(retry.orbs, Is.Empty);
+        }
+
+        [Test]
+        public void HostDamageIsPerPlayerAndOnlyTheLastZeroEndsTheRound()
+        {
+            Assert.That(model.TryApplyPlayerDamage(999, 1, .1d), Is.False, "Unknown players cannot lose HP.");
+            Assert.That(model.TryApplyPlayerDamage(10, 0, .1d), Is.False);
+            Assert.That(model.TryApplyPlayerDamage(10, -1, .1d), Is.False);
+            Assert.That(model.TryApplyPlayerDamage(10, 100, .1d), Is.True);
+            var damaged = model.Snapshot(.1d);
+            Assert.That(damaged.players.Select(player => player.personalHp), Is.EqualTo(new[] { 200, 300, 300 }));
+            Assert.That(damaged.hp, Is.EqualTo(1000), "Player damage must not change monster HP.");
+            Assert.That(damaged.phase, Is.EqualTo(LabPhase.Playing));
+
+            Assert.That(model.TryApplyPlayerDamage(10, 999, .2d), Is.True);
+            Assert.That(model.TryApplyPlayerDamage(10, 1, .2d), Is.False, "Already-zero HP cannot be damaged again.");
+            Assert.That(model.TryApplyPlayerDamage(20, 300, .3d), Is.True);
+            Assert.That(model.Snapshot(.3d).phase, Is.EqualTo(LabPhase.Playing));
+            Assert.That(model.TryApplyPlayerDamage(30, 300, .4d), Is.True);
+            var lost = model.Snapshot(.4d);
+            Assert.That(lost.players.All(player => player.personalHp == 0), Is.True);
+            Assert.That(lost.phase, Is.EqualTo(LabPhase.Defeat));
+            Assert.That(lost.hp, Is.EqualTo(1000));
+            Assert.That(model.TryApplyPlayerDamage(30, 1, .5d), Is.False, "A finished round cannot change HP.");
+            Assert.That(model.TryGenerate(20, "after-party-defeat", .5d, out _, out _), Is.False);
+        }
+
+        [Test]
+        public void PlayerHpUsesTheRoomSettingAndResetsForSoloRetry()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[48] = 120f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var solo = new LabModel();
+            solo.BeginSolo("solo-hp", 42, 0d, config);
+            Assert.That(solo.Snapshot(0d).players.Single().personalHp, Is.EqualTo(120));
+            Assert.That(solo.TryApplyPlayerDamage(42, 119, .1d), Is.True);
+            Assert.That(solo.Snapshot(.1d).players.Single().personalHp, Is.EqualTo(1));
+            Assert.That(solo.TryApplyPlayerDamage(42, 1, .2d), Is.True);
+            Assert.That(solo.Snapshot(.2d).phase, Is.EqualTo(LabPhase.Defeat));
+            solo.BeginSolo("solo-hp", 42, .3d, config);
+            var retry = solo.Snapshot(.3d);
+            Assert.That(retry.round, Is.EqualTo(2u));
+            Assert.That(retry.phase, Is.EqualTo(LabPhase.Playing));
+            Assert.That(retry.players.Single().personalHp, Is.EqualTo(120));
+        }
+
+        [Test]
+        public void PlayerDamageRejectsBackwardAndExpiredHostTime()
+        {
+            Assert.That(model.TryApplyPlayerDamage(10, 10, 10d), Is.True);
+            Assert.That(model.TryApplyPlayerDamage(10, 10, 9d), Is.False);
+            Assert.That(model.Snapshot(10d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(290));
+            Assert.That(model.TryApplyPlayerDamage(10, 10, 180d), Is.False);
+            Assert.That(model.Snapshot(180d).phase, Is.EqualTo(LabPhase.Defeat));
+            Assert.That(model.Snapshot(180d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(290));
         }
 
         [Test]

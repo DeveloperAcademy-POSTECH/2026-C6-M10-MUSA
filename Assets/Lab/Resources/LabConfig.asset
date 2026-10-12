@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: LabConfig
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabConfig
   monsterMaxHp: 1000
+  playerMaxHp: 300
   damage: 20
   battleDurationSeconds: 180
   staminaMax: 100

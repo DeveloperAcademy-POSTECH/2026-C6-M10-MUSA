@@ -14,6 +14,54 @@ namespace C6Lab.Tests
     public sealed class LabDeveloperSoloIntegrationTests
     {
         [UnityTest]
+        public IEnumerator SavedHudAndDeveloperSliderShowLocalPlayerHpAcrossSoloRestart()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+
+            LabHud hud = UnityEngine.Object.FindFirstObjectByType<LabHud>();
+            LabDeveloperMode developerUi = UnityEngine.Object.FindFirstObjectByType<LabDeveloperMode>();
+            Assert.That(hud, Is.Not.Null);
+            Assert.That(hud.network, Is.Not.Null);
+            Assert.That(hud.playerHpText, Is.Not.Null, "The saved Canvas must bind its player HP text to LabHud.");
+            Assert.That(hud.playerHpText.transform.parent.name, Is.EqualTo("BattleHeader"));
+            Assert.That(developerUi, Is.Not.Null);
+            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(49));
+            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(49));
+            Assert.That(hud.playerHpText.text, Is.EqualTo("PLAYER HP —"));
+
+            LabNetwork network = hud.network;
+            network.port = 17776;
+            try
+            {
+                developerUi.Open();
+                developerUi.valueInputs[48].text = "125";
+                Assert.That(developerUi.valueSliders[48].value,
+                    Is.EqualTo(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[48], 300f, 125f))
+                        .Within(.0001f));
+                developerUi.ApplyAndStart();
+                Assert.That(network.IsDeveloperSolo, Is.True, developerUi.feedbackText.text);
+                yield return null;
+                Assert.That(network.Snapshot.players.Single().personalHp, Is.EqualTo(125));
+                Assert.That(hud.playerHpText.text, Is.EqualTo("PLAYER HP 125 / 125"));
+
+                developerUi.Open();
+                developerUi.valueInputs[48].text = "80";
+                developerUi.ApplyAndStart();
+                yield return null;
+                Assert.That(network.Snapshot.round, Is.EqualTo(2u));
+                Assert.That(network.Snapshot.players.Single().personalHp, Is.EqualTo(80));
+                Assert.That(hud.playerHpText.text, Is.EqualTo("PLAYER HP 80 / 80"));
+            }
+            finally
+            {
+                if (network.IsConnected) network.Stop();
+            }
+            yield return null;
+            Assert.That(hud.playerHpText.text, Is.EqualTo("PLAYER HP —"));
+        }
+
+        [UnityTest]
         public IEnumerator SavedLobbyCanChooseTwoToFivePlayersBeforeHosting()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);

@@ -74,7 +74,10 @@ namespace C6Lab
             players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
-                players.Add(ids[i], new LabPlayerState { id = ids[i], seat = i, stamina = rules.StaminaStart });
+                players.Add(ids[i], new LabPlayerState
+                {
+                    id = ids[i], seat = i, stamina = rules.StaminaStart, personalHp = rules.PlayerMaxHp
+                });
                 generatedCounts.Add(ids[i], 0u);
             }
             seed = SeedFor(id, round);
@@ -207,6 +210,20 @@ namespace C6Lab
             if (players.TryGetValue(orb.owner, out var attacker))
                 attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
             if (hp == 0) phase = LabPhase.Victory;
+            return true;
+        }
+
+        /// <summary>
+        /// Host-only entry point for a future player-damage event. No gameplay action invokes it yet.
+        /// One player reaching zero does not stop the round; all players reaching zero ends in Defeat.
+        /// </summary>
+        public bool TryApplyPlayerDamage(ulong playerId, int amount, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || amount <= 0 ||
+                !players.TryGetValue(playerId, out var player) || player.personalHp <= 0) return false;
+
+            player.personalHp = Math.Max(0, player.personalHp - amount);
+            if (players.Values.All(current => current.personalHp == 0)) phase = LabPhase.Defeat;
             return true;
         }
 
@@ -379,7 +396,7 @@ namespace C6Lab
 
         private sealed class Rules
         {
-            public readonly int MonsterMaxHp, Damage, OrbStorageLimit;
+            public readonly int MonsterMaxHp, PlayerMaxHp, Damage, OrbStorageLimit;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
             public readonly int[] GenerationChances;
@@ -392,6 +409,7 @@ namespace C6Lab
                 ItemUnlockSwipesMin = config.ItemUnlockSwipesMin;
                 ItemUnlockSwipesMax = config.ItemUnlockSwipesMax;
                 MonsterMaxHp = config.MonsterMaxHp;
+                PlayerMaxHp = config.PlayerMaxHp;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
                 BattleDurationSeconds = config.BattleDurationSeconds;

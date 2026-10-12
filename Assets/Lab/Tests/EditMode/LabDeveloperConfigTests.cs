@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(48));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(49));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -33,6 +33,7 @@ namespace C6Lab.Tests
             values[39] = 50f; // Yin chance
             values[40] = 25f; // Yang chance
             values[44] = 10f; // Bomb chance; Relay/Box/Potion stay 5 each
+            values[48] = 120f; // new player HP setting remains last, preserving earlier indices
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -45,6 +46,32 @@ namespace C6Lab.Tests
             Assert.That(config.ThrowLoftOffsetDegrees, Is.EqualTo(8f));
             Assert.That(config.ThrowAirDamping, Is.EqualTo(.45f));
             Assert.That(config.GenerationChances(), Is.EqualTo(new[] { 50, 25, 5, 5, 5, 10 }));
+            Assert.That(config.PlayerMaxHp, Is.EqualTo(120));
+        }
+
+        [Test]
+        public void PlayerHpSliderUsesOneToThreeHundredWithoutPartiallyApplyingInvalidForms()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            Assert.That(values[48], Is.EqualTo(300f));
+            Assert.That(LabConfig.DeveloperFields[48].Min, Is.EqualTo(1f));
+            Assert.That(LabConfig.DeveloperFields[48].Max, Is.EqualTo(300f));
+
+            values[48] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.PlayerMaxHp, Is.EqualTo(1));
+            values[48] = 300f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.True, error);
+            Assert.That(config.PlayerMaxHp, Is.EqualTo(300));
+
+            values[0] = 240f;
+            foreach (float bad in new[] { 0f, 301f, 1.5f, float.NaN })
+            {
+                values[48] = bad;
+                Assert.That(config.TryApplyDeveloperValues(values, out _), Is.False);
+                Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
+                Assert.That(config.PlayerMaxHp, Is.EqualTo(300));
+            }
         }
 
         [Test]

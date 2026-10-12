@@ -44,6 +44,7 @@ namespace C6Lab
     {
         public ulong id;
         public float stamina;
+        public int personalHp;
         public int seat;
 
         public LabPlayerState Copy() => (LabPlayerState)MemberwiseClone();
