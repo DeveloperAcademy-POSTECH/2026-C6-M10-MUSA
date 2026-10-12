@@ -106,6 +106,40 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void BonjourAddressesFormOneSelectableRowPerRoomAndOnlySelectedRoutesJoin()
+        {
+            var targets = new[]
+            {
+                new LabBonjourTarget("192.0.2.10", 7777, 1, "C6Lab-alpha"),
+                new LabBonjourTarget("2001:db8::10", 7777, 1, "C6Lab-alpha"),
+                new LabBonjourTarget("fe80::10%4", 7777, 4, "C6Lab-alpha"),
+                new LabBonjourTarget("192.0.2.20", 7777, 1, "C6Lab-beta"),
+                new LabBonjourTarget("192.0.2.30", 7778, 1, "C6Lab-alpha")
+            };
+            var rooms = LabRoomCatalog.GroupTargets(targets);
+            Assert.That(rooms.Count, Is.EqualTo(3));
+            var selected = rooms.Single(room => room.Name == "C6Lab-alpha" && room.Port == 7777);
+            var routes = LabRoomCatalog.RoutesForRoom(targets, selected.Key);
+            Assert.That(routes.Select(route => route.Address), Is.EquivalentTo(new[]
+                { "192.0.2.10", "2001:db8::10", "fe80::10%4" }));
+            Assert.That(LabConnectionCandidates.Initial(routes.Select(route => route.Address), selected.Port)[0],
+                Is.EqualTo("2001:db8::10"));
+        }
+
+        [Test]
+        public void StaleOrUnusableBonjourRoomCannotSupplyJoinRoutes()
+        {
+            var first = new LabBonjourTarget("192.0.2.10", 7777, 1, "C6Lab-first");
+            var second = new LabBonjourTarget("192.0.2.20", 7777, 1, "C6Lab-second");
+            string staleKey = LabRoomCatalog.GroupTargets(new[] { first, second })
+                .Single(room => room.Name == "C6Lab-first").Key;
+            Assert.That(LabRoomCatalog.RoutesForRoom(new[] { second }, staleKey), Is.Empty);
+            Assert.That(LabRoomCatalog.GroupTargets(new[]
+                { new LabBonjourTarget("fe80::10", 7777, 1, "C6Lab-unusable"), second }).Count,
+                Is.EqualTo(1));
+        }
+
+        [Test]
         public void FivePlayersWithOneHundredOrbsEachRoundTripsWithoutTruncation()
         {
             var players = new LabPlayerState[5];
