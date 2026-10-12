@@ -9,16 +9,18 @@
 | 연결 | 같은 로컬 네트워크에서 Host 1명과 Client 2명, **정확히 3명**일 때 시작. Host IP 직접 입력, 기본 포트 `7777`. 실험실 버전끼리만 접속. 자리는 입장 순서이며 세 자리의 좌우 이웃이 고리로 연결된다. |
 | 생성·자원 | 시작 구슬 0개. Yin/Yang 중 Raw 한 개를 만들 때 개인 스태미나 20 소모. 100에서 시작하고 3초당 20 회복. 유효 명중의 실제 공격자에게만 5 회복. 보유 한도 20개. |
 | 조합 | Raw Yin과 Raw Yang을 **직접 드래그로 겹친 뒤 놓았을 때** Combined 한 개를 만든다. 같은 극성 및 물리 충돌만으로는 결합하지 않는다. 두 Raw ID는 사라지고 Combined에 새 ID가 생긴다. |
-| 2D 물리·전달 | 소유자 화면에서 Rigidbody2D/CircleCollider2D로 굴림·충돌·마찰 감속을 계산한다. 상하에서는 반발하며 좌우에서는 튕기지 않고 Host가 소유권 이전을 승인한 뒤 이웃 화면으로 높이·속도·구슬 ID를 이어 준다. 중복 전달은 승인하지 않는다. |
+| 3D 조합판 물리·전달 | 소유자 화면에서 `Rigidbody`·`SphereCollider`의 3D PhysX 충돌을 쓰되 Z 위치·속도를 고정해 XY 평면에서 이동·감속한다. 상하 `BoxCollider`에서는 반발하며 좌우에서는 튕기지 않고 Host가 소유권 이전을 승인한 뒤 이웃 화면으로 높이·속도·구슬 ID를 이어 준다. 중복 전달은 승인하지 않는다. |
 | 투척·피격 | Combined를 위쪽으로 움직이며 손을 놓는 입력으로 방향·세기를 구한다. Host의 3D Rigidbody 투사체가 **눈에 보이는 Unity Cylinder의 MeshCollider**에 실제로 맞아야 피해 20을 적용한다. 빗나감은 피해나 명중 보상을 만들지 않는다. |
 | 전투 결과 | 3인 요괴 HP 1,000, 제한 180초. HP 0은 승리, 시간이 끝나면 패배. 시간은 Host의 절대 시간으로 진행한다. |
 | 수명 | Raw와 Combined는 각각 생성 후 8초에 만료된다. Combined는 조합 순간부터 다시 센다. 수명과 경고 시간은 설정에서 바꿀 수 있다. |
 
 ## 수정 지점과 교체 경계
 
-`Assets/Lab/Resources/LabConfig.asset`이 수치 설정 원본이다. 여기서 HP, 피해, 시간, 스태미나, 구슬 수명, 2D 반발·감속, 투척 파라미터를 바꾼다. 코드는 설정을 읽어 판정하고 UI는 확정된 값을 표시한다. Host 확정 스냅샷만 공유 HP·시간·구슬 상태의 기준이다.
+`Assets/Lab/Resources/LabConfig.asset`이 수치 설정 원본이다. 여기서 HP, 피해, 시간, 스태미나, 구슬 수명, 조합판 구슬의 3D 접촉 탄성·평면 감속, 투척 파라미터를 바꾼다. 코드는 설정을 읽어 판정하고 UI는 확정된 값을 표시한다. Host 확정 스냅샷만 공유 HP·시간·구슬 상태의 기준이다.
 
-`Assets/Lab/Scenes/Lab.unity`의 Canvas, RectTransform, 카메라와 컴포넌트 참조는 Hierarchy/Inspector에서 배치한다. `LabHud`는 저장된 UI에 값을 연결하며 UI의 위치를 코드로 다시 만들지 않는다. 2D 구슬은 ID/Collider/Rigidbody2D를 가진 루트와 별도 `Visual` 자식으로 나뉜다. Cylinder 요괴도 피격 Collider와 교체용 시각 Mount를 나눈다. 향후 그림 에셋이 완성되면 **시각 자식만 바꾸고 판정·소유권·물리 루트는 유지**한다.
+`Assets/Lab/Scenes/Lab.unity`의 Canvas, RectTransform, 카메라와 컴포넌트 참조는 Hierarchy/Inspector에서 배치한다. `LabHud`는 저장된 UI에 값을 연결하며 UI의 위치를 코드로 다시 만들지 않는다. 조합판 구슬은 ID·`SphereCollider`·`Rigidbody`를 가진 루트와 별도 `Visual` 자식으로 나뉜다. 조합판 구슬과 투사체는 공통 Unity 3D 구체 표현을 사용하지만, 조합판에서는 XY 평면 물리, 투척 뒤에는 3D 비행을 각자의 루트에서 처리한다. Cylinder 요괴도 피격 Collider와 교체용 시각 Mount를 나눈다. 향후 그림 에셋이 완성되면 **시각 자식만 바꾸고 판정·소유권·물리 루트는 유지**한다.
+
+네트워크의 구슬 상태는 물리 컴포넌트가 아니라 기존의 ID·소유자·정규화한 XY 위치/속도·수명이다. 소유자가 자기 화면에서 물리를 계산하고, 좌우 전달은 Host 승인 뒤 동일 ID와 평면 운동량을 다음 소유자에게 넘긴다. 3D 전환 빌드와 이전 2D 물리 빌드의 혼합 접속은 실험실 프로토콜 버전으로 차단한다.
 
 새 코드는 `Core`, `Session`, `Orb`, `Throw`, `UI`로 책임을 나눈다. 과거 `T01`·`T09` 같은 단계별 클래스나 Scene을 새 프로젝트에 쌓지 않는다. 단계 이력은 로컬 Git 커밋으로 추적한다.
 
@@ -28,7 +30,7 @@
 - 기존 그래픽·Figma UI·요괴 모델·사운드·시각 효과의 이식
 - 요괴의 공격 패턴, 방어 입력, 전달 방해, 피버
 - 방 자동 발견·Bonjour, Photon·Relay·인터넷 매치메이킹
-- 구 프로젝트의 전체 테스트와 개발자 조정 UI, 4~5인 접속
+- 구 프로젝트의 전체 테스트와 4~5인 접속
 
 이는 새 실험실의 **의도적인 제외 범위**다. 과거 프로젝트의 지원 여부와 동일하다는 뜻은 아니다.
 
@@ -42,9 +44,9 @@
 | V-02 | 3명만 시작, 4번째 입장 거절, Host 승인 상태 일치 | Core EditMode 및 세 실행본 | [검증 기록](VALIDATION.md) |
 | V-03 | 생성 비용·회복·명중 보상, 180초·HP 1,000·피해 20 | Core EditMode / PlayMode | [검증 기록](VALIDATION.md) |
 | V-04 | Yin+Yang 직접 놓기에서만 조합, 같은 극성·자연 충돌은 미조합 | Orb PlayMode | [검증 기록](VALIDATION.md) |
-| V-05 | 2D 굴림·점진 감속·구슬 충돌·상하 반발 | 실제 Physics2D PlayMode | [검증 기록](VALIDATION.md) |
+| V-05 | 조합판의 3D 구체·충돌체, XY 평면 제한, 감속·구슬 충돌·상하 반발 | 실제 Physics3D PlayMode와 화면 관찰 | [검증 기록](VALIDATION.md) |
 | V-06 | 좌우 전달 시 동일 ID·높이·속도 유지, 반복 이동 뒤 감속 정지 | Host+Client 둘 이상 / 최종 3개 실행본 | [검증 기록](VALIDATION.md) |
-| V-07 | Combined 손떼기 3D 투척과 Cylinder 실제 충돌 명중, 빗나감 무피해 | 실제 Physics3D PlayMode 및 세 실행본 | [검증 기록](VALIDATION.md) |
+| V-07 | Combined 손떼기 뒤 평면 구슬에서 3D 투사체로 전환, Cylinder 실제 충돌 명중과 빗나감 무피해 | 실제 Physics3D PlayMode 및 세 실행본 | [검증 기록](VALIDATION.md) |
 | V-08 | Raw·Combined 8초 만료, 새 Combined 수명, 만료 후 모든 화면 제거 | Core EditMode 및 세 실행본 | [검증 기록](VALIDATION.md) |
 | V-09 | macOS 앱 세 실행본을 직접 IP `127.0.0.1:7777`로 연결해 HP·시간·구슬 동기화 | macOS 빌드·실행 | [검증 기록](VALIDATION.md) |
 | V-10 | iOS 기기 3대의 같은 LAN 연결과 터치 조작 | iOS 빌드·설치·실기기 | [검증 기록](VALIDATION.md) |

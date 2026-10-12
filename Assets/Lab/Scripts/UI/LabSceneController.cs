@@ -19,6 +19,11 @@ namespace C6Lab
             float halfHeight = orbCamera.orthographicSize;
             float halfWidth = halfHeight * orbCamera.aspect;
             float margin = config.OrbRadius + 0.05f;
+            // The plate follows the visible board when the Inspector or DEV tuning
+            // changes its height. It is render-only; the physics plane stays at z=0.
+            Transform plate = board.transform.Find("OrbBoardPlate");
+            if (plate != null)
+                plate.localScale = new Vector3(halfWidth * 2f, halfHeight * 2f, 1f);
             board.Configure(config, orbCamera, new Rect(-halfWidth + margin, -halfHeight + margin, (halfWidth - margin) * 2f, (halfHeight - margin) * 2f));
         }
     }

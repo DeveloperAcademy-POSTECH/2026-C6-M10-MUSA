@@ -12,7 +12,7 @@
 
 기존 `Throw Forward Gain`, `Throw Upward Gain`, `Throw Lateral Gain`은 손동작의 전진·상향·좌우 속도 배율이다. `Throw Gravity`는 아래 방향 가속도, `Throw Maximum World Speed`는 최종 초기 속도 상한이다. 상한에 자주 걸리면 Power Exponent나 Gain을 높여도 차이가 작다. `Throw Minimum Upward Speed`는 약한 던지기의 상승 속도 하한이다. `Throw Lifetime (seconds)` 전에 명중·바닥 접촉이 없으면 빗나감으로 종료한다.
 
-구슬 판에서 손을 놓기 전 **0.12초**의 이동 방향·속도를 입력으로 사용한다. 좌우 끝의 이웃 전달 판정이 우선이며, 판 내부에서 Combined를 위로 튕겨 놓아야 투척한다. 발사 위치는 놓은 가로 위치를 따른다. Host만 실제 Collider 명중과 HP 감소를 확정하며, 클라이언트 투사체는 표시용이다. 회전·커브볼은 이 실험에 포함하지 않는다.
+조합판 구슬은 3D 구체·`Rigidbody`·`SphereCollider`를 사용하지만 Z 이동을 막아 XY 평면에서만 움직인다. 손을 놓기 전 **0.12초**의 평면 이동 방향·속도를 투척 입력으로 사용한다. 좌우 끝의 이웃 전달 판정이 우선이며, 판 내부에서 Combined를 위로 튕겨 놓아야 별도의 3D 투사체가 발사된다. 발사 위치는 놓은 가로 위치를 따른다. 두 구슬 표현은 같은 Unity 구체 형태를 사용하되 조합판 물리와 비행 물리는 별도 루트에서 처리한다. Host만 실제 Collider 명중과 HP 감소를 확정하며, 클라이언트 투사체는 표시용이다. 회전·커브볼은 이 실험에 포함하지 않는다.
 
 ## 비교 시험 순서
 
@@ -24,4 +24,4 @@
 
 실제 손가락 투척의 조작감과 궤적은 iPhone Development Build에서 별도 확인해야 한다. Mac 마우스 자동 드래그와 PlayMode의 직접 메서드 호출은 실기기 터치 검증을 대신하지 않는다. 다인 연결에서 사용하는 값은 각 앱의 `LabConfig.asset`에 들어 있으므로, 서로 다른 설정으로 빌드하면 클라이언트 표시 궤적과 Host 판정 궤적이 달라질 수 있다.
 
-관련 코드: `LabOrbBoard`(손동작), `LabThrowMath`(2D→3D 발사), `LabProjectile`(중력·저항·충돌), `LabNetwork`(Host 확정·시험 결과), `LabDeveloperMode`(솔로 값 적용).
+관련 코드: `LabOrbBoard`(XY 손동작·3D 조합판 물리), `LabOrbView`·`LabOrbVisualFactory`(공통 구체 표현), `LabThrowMath`(XY 입력→3D 발사), `LabProjectile`(중력·저항·충돌), `LabNetwork`(Host 확정·시험 결과), `LabDeveloperMode`(솔로 값 적용).

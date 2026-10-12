@@ -42,8 +42,10 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.1";
-        private const ushort LabProtocolVersion = 5602;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/2");
+        // 3D board physics changes motion semantics even though snapshots remain planar.
+        // Reject old clients rather than mixing two simulations in a single room.
+        private const ushort LabProtocolVersion = 5603;
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/3");
         private const int MaximumPacketBytes = 32768;
         private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
         public LabConfig config;

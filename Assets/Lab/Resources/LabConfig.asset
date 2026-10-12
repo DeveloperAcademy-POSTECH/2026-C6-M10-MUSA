@@ -31,6 +31,7 @@ MonoBehaviour:
   boardHeight: 5
   spawnRiseDistance: 0.65
   spawnRiseDuration: 0.25
+  orbAppearance: {fileID: 11400000, guid: 9fd06f927557d47e2ac8b342a6979ed0, type: 2}
   cameraRadius: 8
   cameraHeightOffset: 0.65
   throwOriginRadius: 4
