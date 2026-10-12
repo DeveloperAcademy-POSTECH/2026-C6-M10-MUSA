@@ -8,6 +8,7 @@ namespace C6Lab
         public readonly string ProjectileId;
         public readonly ulong OwnerPlayerId;
         public readonly bool Hit;
+        public readonly Vector3 ImpactVelocity;
         public readonly Vector3 HitPoint;
         public readonly float FlightSeconds;
         public readonly float PeakRise;
@@ -15,11 +16,12 @@ namespace C6Lab
         public string Id => ProjectileId;
 
         public LabProjectileResult(string projectileId, ulong ownerPlayerId, bool hit,
-            Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance)
+            Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance, Vector3 impactVelocity = default)
         {
             ProjectileId = projectileId;
             OwnerPlayerId = ownerPlayerId;
             Hit = hit;
+            ImpactVelocity = impactVelocity;
             HitPoint = hitPoint;
             FlightSeconds = flightSeconds;
             PeakRise = peakRise;
@@ -47,6 +49,7 @@ namespace C6Lab
         private string projectileId;
         private ulong ownerPlayerId;
         private Vector3 lastPosition;
+        private Vector3 incomingVelocity;
         private Vector3 launchPosition;
         private float peakHeight;
         private float launchedAt;
@@ -186,6 +189,7 @@ namespace C6Lab
             body.linearDamping = tuning.ThrowAirDamping;
             body.angularDamping = 0f;
             body.linearVelocity = Vector3.ClampMagnitude(velocity, tuning.ThrowMaxWorldSpeed);
+            incomingVelocity = body.linearVelocity;
             body.WakeUp();
             lastPosition = body.position;
             launchPosition = body.position;
@@ -203,6 +207,7 @@ namespace C6Lab
                 SweepForResolutionSurface();
             if (resolved) return;
 
+            incomingVelocity = body.linearVelocity;
             body.AddForce(Vector3.down * config.ThrowGravity, ForceMode.Acceleration);
             lastPosition = body.position;
         }
@@ -237,6 +242,7 @@ namespace C6Lab
             if ((target != null && other == target.Hitbox) || other == missSurface)
             {
                 resolved = true;
+            Vector3 impactVelocity = incomingVelocity;
                 Destroy(gameObject);
             }
         }
@@ -271,6 +277,7 @@ namespace C6Lab
             else
             {
                 resolved = true;
+            Vector3 impactVelocity = incomingVelocity;
                 Destroy(gameObject);
             }
         }
@@ -279,6 +286,7 @@ namespace C6Lab
         {
             if (resolved) return;
             resolved = true;
+            Vector3 impactVelocity = incomingVelocity;
             if (body != null)
             {
                 body.linearVelocity = Vector3.zero;
@@ -289,7 +297,7 @@ namespace C6Lab
             Vector2 endXZ = new Vector2(point.x, point.z);
             LabProjectileResult result = new LabProjectileResult(projectileId, ownerPlayerId,
                 hit, point, Mathf.Max(0f, Time.time - launchedAt),
-                Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, endXZ));
+                Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, endXZ), impactVelocity);
             try
             {
                 onResolved?.Invoke(result);
