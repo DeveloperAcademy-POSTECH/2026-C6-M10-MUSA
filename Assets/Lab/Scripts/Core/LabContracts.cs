@@ -3,8 +3,15 @@ using System;
 namespace C6Lab
 {
     public enum LabPhase { Idle, Playing, Victory, Defeat }
-    public enum LabOrbKind { Yin, Yang, Combined }
+    // Items are appended so the serialized numbers of existing kinds stay unchanged.
+    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb }
     public enum LabOrbOrigin { Unknown, Generated, Combined }
+
+    public static class LabOrbKindRules
+    {
+        public static bool IsRaw(this LabOrbKind kind) => kind == LabOrbKind.Yin || kind == LabOrbKind.Yang;
+        public static bool IsItem(this LabOrbKind kind) => kind >= LabOrbKind.Relay && kind <= LabOrbKind.Bomb;
+    }
 
     /// <summary>
     /// 오행 속성. 음/양 구슬은 None이고, 결합 구슬만 Host가 다섯 속성 중 하나를 정한다.
@@ -20,6 +27,8 @@ namespace C6Lab
         public ulong owner;
         public LabOrbKind kind;
         public LabOrbElement element;
+        /// <summary>Handoffs to a neighbor's screen still needed before an item can be used; 0 means unlocked.</summary>
+        public int lockSwipes;
         public LabOrbOrigin origin;
         public ulong originOwner;
         public float x, y, vx, vy;

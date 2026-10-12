@@ -45,7 +45,7 @@ namespace C6Lab.Tests
                 {
                     string serialized = JsonUtility.ToJson(new JsonSettings { values = values });
                     float[] restored = JsonUtility.FromJson<JsonSettings>(serialized).values;
-                    Assert.That(restored.Length, Is.EqualTo(39));
+                    Assert.That(restored.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
                     Assert.That(LabSessionSettings.Fingerprint(restored, 5, 5604),
                         Is.EqualTo(LabSessionSettings.Fingerprint(values, 5, 5604)));
                 }

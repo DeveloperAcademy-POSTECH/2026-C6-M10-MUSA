@@ -9,7 +9,18 @@ namespace C6Lab
         public LabOrbBoard board;
         public Camera orbCamera;
 
-        private void Awake() => ReconfigureBoard();
+        private void Awake()
+        {
+            foreach (var network in FindObjectsByType<LabNetwork>(FindObjectsSortMode.None))
+            {
+                if (network.board != board || network.target == null
+                    || network.target.GetComponent<LabHangingTarget>() == null) continue;
+                if (network.battleFloor != null)
+                    network.battleFloor.transform.position += Vector3.down * .7f;
+                break;
+            }
+            ReconfigureBoard();
+        }
 
         /// <summary>Refresh the board only before a round; configuring clears current motion.</summary>
         public void ReconfigureBoard()

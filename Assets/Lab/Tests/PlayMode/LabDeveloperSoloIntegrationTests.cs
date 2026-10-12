@@ -155,8 +155,8 @@ namespace C6Lab.Tests
             LabDeveloperMode developerUi = UnityEngine.Object.FindFirstObjectByType<LabDeveloperMode>();
             Assert.That(network, Is.Not.Null);
             Assert.That(developerUi, Is.Not.Null);
-            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(39));
-            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(39));
+            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
+            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(developerUi.applyHostButton, Is.Not.Null);
             Assert.That(developerUi.targetParticipantsSlider.value, Is.EqualTo(3f));
             network.port = 17778;
@@ -228,6 +228,17 @@ namespace C6Lab.Tests
             Assert.That(boardCamera.depth, Is.GreaterThan(battleCamera.depth),
                 "The board camera must render after the battle camera on mobile devices.");
 
+            // Each solo round has a random session seed and draws are independent, so use
+            // Yin/Yang-only chances and a cheap cost: up to 20 draws find both polarities.
+            LabConfig savedConfig = network.config;
+            LabConfig rawOnly = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = rawOnly.CaptureDeveloperValues();
+            tuning[5] = 1f;
+            tuning[39] = 50f; tuning[40] = 50f;
+            tuning[41] = 0f; tuning[42] = 0f; tuning[43] = 0f; tuning[44] = 0f;
+            Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
+            network.config = rawOnly;
+
             // Keep the test independent of an ordinary app using the default port 7777.
             network.port = 17777;
             try
@@ -239,11 +250,9 @@ namespace C6Lab.Tests
                 Assert.That(network.Snapshot.players.Length, Is.EqualTo(1));
                 int initialHp = network.Snapshot.hp;
 
-                // The Host's deterministic polarity rule gives both Yin and Yang within
-                // four accepted generations, regardless of its session seed.
                 LabOrbState yin = null;
                 LabOrbState yang = null;
-                for (int i = 0; i < 4 && (yin == null || yang == null); i++)
+                for (int i = 0; i < 20 && (yin == null || yang == null); i++)
                 {
                     int before = network.Snapshot.orbs.Length;
                     network.Generate();
@@ -273,6 +282,7 @@ namespace C6Lab.Tests
 
                 LabOrbState combined = network.Snapshot.orbs.SingleOrDefault(o => o.kind == LabOrbKind.Combined);
                 Assert.That(combined, Is.Not.Null, "Direct Yin/Yang overlap should reach the Host through CombineRequested.");
+                Assert.That(combined.element, Is.Not.EqualTo(LabOrbElement.None), "Every Combined orb has a five-element attribute.");
                 Assert.That(network.Snapshot.orbs.Any(o => o.id == yin.id || o.id == yang.id), Is.False);
                 Assert.That(board.TryGetMotion(combined.id, out Vector2 combined01, out _), Is.True);
                 LabOrbView combinedView = board.GetComponentsInChildren<LabOrbView>()
@@ -302,6 +312,11 @@ namespace C6Lab.Tests
                     yield return new WaitForFixedUpdate();
                 Assert.That(network.Snapshot.hp, Is.EqualTo(initialHp - network.config.Damage),
                     "Only an actual cylinder collision should lower Host HP.");
+                var hanging = network.target.GetComponent<LabHangingTarget>();
+                Assert.That(hanging, Is.Not.Null, "The saved scene must expose Pinata tuning.");
+                for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();
+                Assert.That(hanging.SwingAngles.magnitude, Is.GreaterThan(.1f),
+                    "A Host-confirmed hit should make the actual target swing.");
                 Assert.That(network.LastShotReport, Does.StartWith("SHOT HIT"));
                 Assert.That(network.Notice, Is.EqualTo(network.LastShotReport));
                 Assert.That(network.Snapshot.orbs.Any(o => o.id == combined.id), Is.False);
@@ -309,6 +324,8 @@ namespace C6Lab.Tests
             finally
             {
                 network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(rawOnly);
             }
         }
 

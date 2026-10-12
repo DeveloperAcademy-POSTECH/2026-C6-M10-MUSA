@@ -18883,8 +18883,9 @@ GameObject:
   m_Component:
   - component: {fileID: 821114678}
   - component: {fileID: 821114679}
+  - component: {fileID: 1973402101}
   m_Layer: 0
-  m_Name: Cylinder Target
+  m_Name: Pinata Target
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -45539,6 +45540,27 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1964778639}
   m_CullTransparentMesh: 1
+--- !u!114 &1973402101
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 821114677}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed8f1af7604a4fe0a86c1880bb383cc0, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabHangingTarget
+  impactStrength: 20
+  swingDamping: 0
+  maximumAngle: 55
+  returnStrength: 44
+  ropeLength: 1.5
+  bounceStrength: 0.18
+  bounceReturnStrength: 45
+  bounceDamping: 1.5
+  maximumExtension: 0.5
 --- !u!1 &1974429206
 GameObject:
   m_ObjectHideFlags: 0

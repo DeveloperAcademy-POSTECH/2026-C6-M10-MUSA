@@ -41,6 +41,7 @@ namespace C6Lab
         public float wz;
         public string reason;
         public ulong owner;
+        public int element;
         public int targetParticipants;
         public int configRevision;
         public string configFingerprint;
@@ -59,9 +60,9 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // 3D board physics changes motion semantics even though snapshots remain planar.
-        // Reject old clients rather than mixing two simulations in a single room.
-        private const ushort LabProtocolVersion = 5604;
+        // Item orb kinds and generation-chance settings are new snapshot/settings data.
+        // Reject old clients rather than mixing two rule sets in a single room.
+        private const ushort LabProtocolVersion = 5605;
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/4");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
@@ -479,6 +480,7 @@ namespace C6Lab
                 return;
             }
             sessionId = Guid.NewGuid().ToString("N");
+            target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             model.Begin(sessionId, order.ToArray(), Time.realtimeSinceStartupAsDouble, config);
             SetNotice(string.Empty);
@@ -528,6 +530,7 @@ namespace C6Lab
         {
             LastShotReport = string.Empty;
             sessionId = Guid.NewGuid().ToString("N");
+            target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             model.BeginSolo(sessionId, LocalPlayerId, Time.realtimeSinceStartupAsDouble, config);
             SetNotice(string.Empty);
@@ -884,11 +887,11 @@ namespace C6Lab
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
             Vector3 launchPosition = LabThrowMath.LaunchPosition(seat, seatCount, targetCenter, releaseX01, config);
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
-            var projectile = LabProjectile.Create(launchPosition, config, projectileRoot);
+            var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element);
             projectile.name = "Projectile " + orb.id;
             projectile.SetMissSurface(battleFloor);
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
-            var notice = new LabNetworkPacket { type = "projectile", firstId = orb.id, owner = orb.owner, x = launchPosition.x, y = launchPosition.y, z = launchPosition.z, wx = velocity.x, wy = velocity.y, wz = velocity.z };
+            var notice = new LabNetworkPacket { type = "projectile", firstId = orb.id, owner = orb.owner, element = (int)orb.element, x = launchPosition.x, y = launchPosition.y, z = launchPosition.z, wx = velocity.x, wy = velocity.y, wz = velocity.z };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
             Debug.Log("C6_LAB_THROW orb=" + orb.id + " seat=" + seat
                 + " swipe=" + releaseVelocity + " launch=" + velocity
@@ -901,7 +904,16 @@ namespace C6Lab
         {
             if (!IsHost || model == null) return;
             double now = Time.realtimeSinceStartupAsDouble;
-            if (result.Hit) model.ConfirmHit(result.ProjectileId, now);
+            if (result.Hit)
+            {
+                if (model.ConfirmHit(result.ProjectileId, now) && target != null)
+                {
+                    target.GetComponent<LabHangingTarget>()?.Kick(result.ImpactVelocity);
+                    var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
+                        wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z };
+                    foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
+                }
+            }
             else model.ConfirmMiss(result.ProjectileId, now);
             LastShotReport = string.Format(CultureInfo.InvariantCulture,
                 "SHOT {0} | {1:F2}s | peak +{2:F2}m | range {3:F2}m",
@@ -927,7 +939,7 @@ namespace C6Lab
                 bool showRise = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
                     && orb.kind != LabOrbKind.Combined;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
-                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element);
+                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element, orb.lockSwipes);
             }
             foreach (string id in visibleOrbIds) if (!current.Contains(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
@@ -1012,13 +1024,20 @@ namespace C6Lab
                 case "reject":
                     RejectLocally(packet.firstId, packet.reason);
                     break;
+                case "targetImpact":
+                    if (packet.sessionId == sessionId && target != null && Finite(packet.wx)
+                        && Finite(packet.wy) && Finite(packet.wz))
+                        target.GetComponent<LabHangingTarget>()?.Kick(new Vector3(packet.wx, packet.wy, packet.wz));
+                    break;
                 case "projectile":
                     if (target != null && config != null && Finite(packet.x) && Finite(packet.y)
                         && Finite(packet.z) && Finite(packet.wx) && Finite(packet.wy) && Finite(packet.wz))
                     {
                         Vector3 position = new Vector3(packet.x, packet.y, packet.z);
                         Vector3 velocity = new Vector3(packet.wx, packet.wy, packet.wz);
-                        LabProjectile visual = LabProjectile.Create(position, config, projectileRoot);
+                        LabOrbElement element = packet.element >= (int)LabOrbElement.None && packet.element <= (int)LabOrbElement.Earth
+                            ? (LabOrbElement)packet.element : LabOrbElement.None;
+                        LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element);
                         visual.SetMissSurface(battleFloor);
                         visual.LaunchVisual(velocity, config, target);
                     }
@@ -1099,6 +1118,7 @@ namespace C6Lab
                 || snapshot.players == null || snapshot.players.Length != targetParticipantCount) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
             bool logTransition = latest == null || latest.sessionId != snapshot.sessionId || latest.phase != snapshot.phase;
+            if (sessionId != snapshot.sessionId) target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             sessionId = snapshot.sessionId;
             latest = snapshot;
             SyncBoard();

@@ -8,6 +8,7 @@ namespace C6Lab
         public readonly string ProjectileId;
         public readonly ulong OwnerPlayerId;
         public readonly bool Hit;
+        public readonly Vector3 ImpactVelocity;
         public readonly Vector3 HitPoint;
         public readonly float FlightSeconds;
         public readonly float PeakRise;
@@ -15,11 +16,12 @@ namespace C6Lab
         public string Id => ProjectileId;
 
         public LabProjectileResult(string projectileId, ulong ownerPlayerId, bool hit,
-            Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance)
+            Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance, Vector3 impactVelocity = default)
         {
             ProjectileId = projectileId;
             OwnerPlayerId = ownerPlayerId;
             Hit = hit;
+            ImpactVelocity = impactVelocity;
             HitPoint = hitPoint;
             FlightSeconds = flightSeconds;
             PeakRise = peakRise;
@@ -38,6 +40,7 @@ namespace C6Lab
         private GameObject replacementVisual;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
+        private LabOrbElement element;
         private Rigidbody body;
         private SphereCollider sphere;
         private LabConfig config;
@@ -47,6 +50,7 @@ namespace C6Lab
         private string projectileId;
         private ulong ownerPlayerId;
         private Vector3 lastPosition;
+        private Vector3 incomingVelocity;
         private Vector3 launchPosition;
         private float peakHeight;
         private float launchedAt;
@@ -109,14 +113,15 @@ namespace C6Lab
                 LabVisualSafety.RemovePhysics(replacementVisual);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, gameObject.layer);
                 if (appearance != null && prefab == appearance.VisualPrefab)
-                    appearance.ApplyKindMaterial(replacementVisual, LabOrbKind.Combined);
+                    appearance.ApplyKindMaterial(replacementVisual, LabOrbKind.Combined, element);
             }
             Transform defaultSphere = visualMount.Find("Default Sphere");
             if (defaultSphere != null) defaultSphere.gameObject.SetActive(prefab == null);
         }
 
         /// <summary>Creates the default Unity sphere presentation with an independent root collider.</summary>
-        public static LabProjectile Create(Vector3 position, LabConfig config, Transform parent = null)
+        public static LabProjectile Create(Vector3 position, LabConfig config, Transform parent = null,
+            LabOrbElement element = LabOrbElement.None)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
             GameObject root = new GameObject("Throw Projectile");
@@ -126,6 +131,7 @@ namespace C6Lab
             root.AddComponent<SphereCollider>();
             LabProjectile projectile = root.AddComponent<LabProjectile>();
             projectile.config = config;
+            projectile.element = element;
             projectile.ConfigureAppearance(config.OrbAppearance);
             projectile.EnsureDefaultVisual(config.ThrowRadius);
             return projectile;
@@ -186,6 +192,7 @@ namespace C6Lab
             body.linearDamping = tuning.ThrowAirDamping;
             body.angularDamping = 0f;
             body.linearVelocity = Vector3.ClampMagnitude(velocity, tuning.ThrowMaxWorldSpeed);
+            incomingVelocity = body.linearVelocity;
             body.WakeUp();
             lastPosition = body.position;
             launchPosition = body.position;
@@ -203,6 +210,7 @@ namespace C6Lab
                 SweepForResolutionSurface();
             if (resolved) return;
 
+            incomingVelocity = body.linearVelocity;
             body.AddForce(Vector3.down * config.ThrowGravity, ForceMode.Acceleration);
             lastPosition = body.position;
         }
@@ -237,6 +245,7 @@ namespace C6Lab
             if ((target != null && other == target.Hitbox) || other == missSurface)
             {
                 resolved = true;
+            Vector3 impactVelocity = incomingVelocity;
                 Destroy(gameObject);
             }
         }
@@ -271,6 +280,7 @@ namespace C6Lab
             else
             {
                 resolved = true;
+            Vector3 impactVelocity = incomingVelocity;
                 Destroy(gameObject);
             }
         }
@@ -279,6 +289,7 @@ namespace C6Lab
         {
             if (resolved) return;
             resolved = true;
+            Vector3 impactVelocity = incomingVelocity;
             if (body != null)
             {
                 body.linearVelocity = Vector3.zero;
@@ -289,7 +300,7 @@ namespace C6Lab
             Vector2 endXZ = new Vector2(point.x, point.z);
             LabProjectileResult result = new LabProjectileResult(projectileId, ownerPlayerId,
                 hit, point, Mathf.Max(0f, Time.time - launchedAt),
-                Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, endXZ));
+                Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, endXZ), impactVelocity);
             try
             {
                 onResolved?.Invoke(result);
@@ -312,7 +323,9 @@ namespace C6Lab
             // Physics stays on each object's root, with its own gameplay radius.
             LabOrbVisualFactory.EnsureSphere(visualMount, "Default Sphere", radius,
                 LabOrbKind.Combined,
-                appearance != null ? appearance.MaterialFor(LabOrbKind.Combined) : null);
+                appearance != null ? appearance.MaterialFor(LabOrbKind.Combined, element) : null,
+                appearance == null || appearance.NeedsTemporaryElementColor(LabOrbKind.Combined, element)
+                    ? element : LabOrbElement.None);
             Transform defaultSphere = visualMount.Find("Default Sphere");
             if (defaultSphere != null) defaultSphere.gameObject.SetActive(replacementVisual == null);
             if (replacementVisual != null)
@@ -320,7 +333,7 @@ namespace C6Lab
                 replacementVisual.transform.localScale = Vector3.one * (2f * radius);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, gameObject.layer);
                 if (appearance != null && replacementPrefab == appearance.VisualPrefab)
-                    appearance.ApplyKindMaterial(replacementVisual, LabOrbKind.Combined);
+                    appearance.ApplyKindMaterial(replacementVisual, LabOrbKind.Combined, element);
             }
         }
     }
