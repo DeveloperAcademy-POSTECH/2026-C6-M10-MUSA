@@ -155,6 +155,7 @@ namespace C6Lab
             view.ConfigureAppearance(config.OrbAppearance);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
+            view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
             var body = view.Body;
             body.useGravity = false;
             body.linearDamping = 0f;
@@ -440,6 +441,37 @@ namespace C6Lab
             SetBodyMode(second);
             Vector2 middle = ToNormalized((XY(first.View.Body.position) + XY(second.View.Body.position)) * .5f);
             CombineRequested?.Invoke(first.View.OrbId, second.View.OrbId, middle);
+        }
+
+        /// <summary>
+        /// 구슬끼리 부딪혔을 때, 음+양이고 충분히 빠르게 부딪혔으면 결합을 요청
+        /// 두 구슬 모두 신호를 보내지먼, 첫 요청에서 짝 표시가 붙어 두 번째 신호는 건너뛴다.
+        /// </summary>
+        private void OnOrbHit(LabOrbView self, LabOrbView other, float worldSpeed)
+        {
+            if (!configured || !interactionEnabled || !config.ContactCombineEnabled) return;
+            if (!entries.TryGetValue(self.OrbId, out var first)
+                || !entries.TryGetValue(other.OrbId, out var second)) return;
+            if (!CanContactCombine(first) || !CanContactCombine(second)) return;
+            if (first.View.Kind == second.View.Kind) return;
+
+            // 물리 속도는 월드 단위라, 다른 튜닝 값처럼 보드 너비 단위로 바꿔서 비교한다.
+            float speed = worldSpeed / bounds.width;
+            if (speed < config.CombineSpeed) return;
+
+            RequestCombine(first, second);
+        }
+
+        /// <summary>닿으면 결합에 쓸 수 있는 구슬인지 확인한다.</summary>
+        private static bool CanContactCombine(Entry entry)
+        {
+            return entry.View.Kind != LabOrbKind.Combined
+                && entry.LocalOwner
+                && !entry.Held
+                && !entry.Locked
+                && !entry.SpawnLocked
+                && !entry.EdgePending
+                && entry.PendingPartnerId == null;
         }
 
 
