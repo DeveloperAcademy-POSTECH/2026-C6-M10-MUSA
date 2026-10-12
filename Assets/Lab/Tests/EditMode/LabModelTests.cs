@@ -22,7 +22,7 @@ namespace C6Lab.Tests
         public void TearDown() => UnityEngine.Object.DestroyImmediate(config);
 
         [Test]
-        public void DefaultsAndExactlyThreeSeatsAreVisibleInAnIndependentSnapshot()
+        public void DefaultsAndThreeSeatRoomAreVisibleInAnIndependentSnapshot()
         {
             var snapshot = model.Snapshot(0d);
             Assert.That(snapshot.phase, Is.EqualTo(LabPhase.Playing));
@@ -35,8 +35,64 @@ namespace C6Lab.Tests
 
             snapshot.players[0].stamina = 0f;
             Assert.That(model.Snapshot(0d).players[0].stamina, Is.EqualTo(100f));
-            Assert.Throws<ArgumentException>(() => new LabModel().Begin("bad", new ulong[] { 1, 2 }, 0d, config));
+            Assert.Throws<ArgumentException>(() => new LabModel().Begin("bad", new ulong[] { 1 }, 0d, config));
             Assert.Throws<ArgumentException>(() => new LabModel().Begin("bad", new ulong[] { 1, 1, 2 }, 0d, config));
+            Assert.Throws<ArgumentException>(() => new LabModel().Begin("bad", new ulong[] { 1, 2, 3, 4, 5, 6 }, 0d, config));
+        }
+
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void NetworkRoomAcceptsDistinctPlayersUpToFiveInSeatOrder(int count)
+        {
+            ulong[] ids = Enumerable.Range(1, count).Select(index => (ulong)index).ToArray();
+            var room = new LabModel();
+            room.Begin("room-" + count, ids, 0d, config);
+            LabSnapshot snapshot = room.Snapshot(0d);
+            Assert.That(snapshot.players.Select(player => player.id), Is.EqualTo(ids));
+            Assert.That(snapshot.players.Select(player => player.seat), Is.EqualTo(Enumerable.Range(0, count)));
+        }
+
+        [Test]
+        public void TwoPlayerRoomTransfersToTheSameNeighborFromEitherEdge()
+        {
+            var room = new LabModel();
+            room.Begin("two-player", new ulong[] { 10, 20 }, 0d, config);
+            Assert.That(room.TryGenerate(10, "left-orb", 0d, out var left, out _), Is.True);
+            Assert.That(room.TryGenerate(10, "right-orb", 0d, out var right, out _), Is.True);
+            Assert.That(room.TryUpdateMotion(10, left.id, new Vector2(.01f, .3f), Vector2.left, .1d), Is.True);
+            Assert.That(room.TryUpdateMotion(10, right.id, new Vector2(.99f, .7f), Vector2.right, .1d), Is.True);
+            Assert.That(room.TryTransfer(10, left.id, false, .3f, Vector2.left, "to-left", .1d,
+                out var receivedLeft, out _), Is.True);
+            Assert.That(room.TryTransfer(10, right.id, true, .7f, Vector2.right, "to-right", .1d,
+                out var receivedRight, out _), Is.True);
+            Assert.That(receivedLeft.owner, Is.EqualTo(20ul));
+            Assert.That(receivedLeft.x, Is.EqualTo(1f));
+            Assert.That(receivedRight.owner, Is.EqualTo(20ul));
+            Assert.That(receivedRight.x, Is.EqualTo(0f));
+        }
+
+        [TestCase(2)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void LastAndFirstSeatsRemainNeighborsInEverySupportedRing(int count)
+        {
+            ulong[] ids = Enumerable.Range(1, count).Select(index => (ulong)index).ToArray();
+            var room = new LabModel();
+            room.Begin("ring-" + count, ids, 0d, config);
+            ulong last = ids[count - 1];
+            Assert.That(room.TryGenerate(last, "ring-orb", 0d, out var orb, out _), Is.True);
+            Assert.That(room.TryUpdateMotion(last, orb.id, new Vector2(.99f, .4f), Vector2.right, .1d), Is.True);
+            Assert.That(room.TryTransfer(last, orb.id, true, .4f, Vector2.right, "wrap-right", .1d,
+                out var atFirst, out _), Is.True);
+            Assert.That(atFirst.owner, Is.EqualTo(ids[0]));
+            Assert.That(atFirst.id, Is.EqualTo(orb.id));
+            Assert.That(room.TryUpdateMotion(ids[0], orb.id, new Vector2(.01f, .4f), Vector2.left, .2d), Is.True);
+            Assert.That(room.TryTransfer(ids[0], orb.id, false, .4f, Vector2.left, "wrap-left", .2d,
+                out var atLast, out _), Is.True);
+            Assert.That(atLast.owner, Is.EqualTo(last));
+            Assert.That(atLast.id, Is.EqualTo(orb.id));
         }
 
         [Test]
@@ -78,7 +134,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void DeveloperSoloRetryResetsOnlyItsOwnPlayerAndKeepsThreeSeatBeginStrict()
+        public void DeveloperSoloRetryResetsOnlyItsOwnPlayerAndKeepsMultiplayerMinimum()
         {
             var solo = new LabModel();
             solo.BeginSolo("solo-retry", 7ul, 0d, config);
@@ -90,7 +146,7 @@ namespace C6Lab.Tests
             Assert.That(retry.players.Select(player => player.id), Is.EqualTo(new ulong[] { 7ul }));
             Assert.That(retry.orbs, Is.Empty);
             Assert.That(retry.players[0].stamina, Is.EqualTo(100f));
-            Assert.Throws<ArgumentException>(() => new LabModel().Begin("not-three", new[] { 7ul }, 0d, config));
+            Assert.Throws<ArgumentException>(() => new LabModel().Begin("not-multiplayer", new[] { 7ul }, 0d, config));
         }
 
         [Test]

@@ -11,13 +11,15 @@ namespace C6Lab
     /// </summary>
     public sealed class LabModel
     {
-        public const int ParticipantCount = 3;
+        public const int MinimumParticipants = 2;
+        public const int MaximumParticipants = 5;
+        public const int DefaultParticipants = 3;
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
         private readonly Dictionary<ulong, LabPlayerState> players = new Dictionary<ulong, LabPlayerState>();
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
         private readonly HashSet<string> requests = new HashSet<string>(StringComparer.Ordinal);
-        private readonly ulong[] seats = new ulong[ParticipantCount];
+        private readonly ulong[] seats = new ulong[MaximumParticipants];
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private Rules rules;
@@ -38,8 +40,9 @@ namespace C6Lab
 
         public void Begin(string id, ulong[] ids, double now, LabConfig config)
         {
-            if (ids == null || ids.Length != ParticipantCount || ids.Distinct().Count() != ParticipantCount)
-                throw new ArgumentException("Exactly three distinct player IDs are required.", nameof(ids));
+            if (ids == null || ids.Length < MinimumParticipants || ids.Length > MaximumParticipants
+                || ids.Distinct().Count() != ids.Length)
+                throw new ArgumentException("Two to five distinct player IDs are required.", nameof(ids));
             BeginWithSeats(id, ids, now, config);
         }
 

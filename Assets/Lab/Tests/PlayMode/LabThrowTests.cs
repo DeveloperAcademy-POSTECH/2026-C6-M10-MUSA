@@ -60,6 +60,35 @@ namespace C6Lab.Tests
             finally { Object.DestroyImmediate(config); }
         }
 
+        [TestCase(2)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void OtherRoomSizesKeepCameraAndThrowAlignedWithTheirOwnSeatCount(int seatCount)
+        {
+            LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                Vector3 center = new Vector3(0f, 1.35f, 0f);
+                for (int seat = 0; seat < seatCount; seat++)
+                {
+                    Vector3 camera = LabThrowMath.SeatPosition(seat, seatCount, center,
+                        config.CameraRadius, config.CameraHeightOffset);
+                    Vector3 anchor = LabThrowMath.SeatPosition(seat, seatCount, center,
+                        config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
+                    Vector3 shot = LabThrowMath.LaunchPosition(seat, seatCount, center, .5f, config);
+                    Assert.That(Vector3.Dot(camera - center, anchor - center), Is.GreaterThan(0f));
+                    Assert.That(Vector3.Distance(shot, anchor), Is.LessThan(.001f));
+                    Vector3 next = LabThrowMath.SeatPosition((seat + 1) % seatCount, seatCount,
+                        center, config.CameraRadius, config.CameraHeightOffset);
+                    Assert.That(Vector3.Angle(
+                        Vector3.ProjectOnPlane(camera - center, Vector3.up),
+                        Vector3.ProjectOnPlane(next - center, Vector3.up)),
+                        Is.EqualTo(360f / seatCount).Within(.01f));
+                }
+            }
+            finally { Object.DestroyImmediate(config); }
+        }
+
         [Test]
         public void PowerAndLoftControlsChangeTheStraightLaunchIndependently()
         {

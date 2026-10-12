@@ -28,4 +28,4 @@
 
 새로 작성한 Markdown의 `git diff --check`는 통과했다. 전체 diff에는 Unity가 원본 Scene·`.meta`·ProjectSettings에 직렬화한 빈 값의 후행 공백 경고가 있다. 해당 Unity 파일은 원본과 바이트 단위로 일치하도록 보존했으며, 이관 경로에서 EditMode·PlayMode와 Mac 빌드를 다시 통과했다.
 
-현재 기본 게임은 정확히 3인 직접 IP 연결이다. Development 빌드의 솔로 모드에서 조합과 투척 수치를 시험할 수 있다. 이전 버전의 2~5인·오행·방어 UI 등은 새 버전에 있다고 주장하지 않는다.
+이관 당시 기본 게임은 정확히 3인 직접 IP 연결이었다. Development 빌드의 솔로 모드에서 조합과 투척 수치를 시험할 수 있었다. 이후 기능 변경의 현재 범위는 `README.md`와 `docs/LAB_SCOPE.md`를 따른다. 이관 문서의 과거 검증 결과를 이후 변경의 증거로 승계하지 않는다.

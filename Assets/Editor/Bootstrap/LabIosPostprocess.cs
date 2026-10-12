@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace C6Lab.Editor
 {
-    /// <summary>Direct local-IP gameplay requests iOS Local Network permission; Bonjour is unused.</summary>
+    /// <summary>Local Host/Join and Bonjour room discovery need iOS Local Network permission.</summary>
     public static class LabIosPostprocess
     {
         [PostProcessBuild(100)]
@@ -17,7 +17,9 @@ namespace C6Lab.Editor
             var document = new PlistDocument();
             document.ReadFromFile(path);
             document.root.SetString("NSLocalNetworkUsageDescription",
-                "같은 로컬 네트워크에서 C6 Physics Lab의 세 기기를 직접 연결합니다.");
+                "같은 로컬 네트워크나 개인용 핫스팟에서 C6 Physics Lab 방을 찾고 기기를 연결합니다.");
+            PlistElementArray services = document.root.CreateArray("NSBonjourServices");
+            services.AddString("_c6lab._udp");
             document.WriteToFile(path);
             Debug.Log("C6_LAB_IOS_LOCAL_NETWORK_PURPOSE_OK");
         }

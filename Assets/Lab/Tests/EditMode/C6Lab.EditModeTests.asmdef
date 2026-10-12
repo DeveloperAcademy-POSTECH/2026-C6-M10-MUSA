@@ -2,7 +2,8 @@
   "name": "C6Lab.EditModeTests",
   "rootNamespace": "C6Lab.Tests",
   "references": [
-    "C6Lab.Runtime"
+    "C6Lab.Runtime",
+    "Unity.Networking.Transport"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"
