@@ -93,6 +93,8 @@ namespace C6Lab.Tests
             // Pure colors stay identical through linear/gamma conversion, like the materials above.
             SetSerializedColor(appearance, "waterColor", Color.cyan);
             SetSerializedColor(appearance, "fireColor", new Color(1f, 1f, 0f));
+            var bombIcon = new Texture2D(8, 8);
+            SetSerializedField(appearance, "bombIcon", bombIcon);
             SetSerializedField(config, "orbAppearance", appearance);
 
             LabProjectile projectile = null;
@@ -106,6 +108,7 @@ namespace C6Lab.Tests
                 LabOrbView water = board.UpsertOrb("styled-water", LabOrbKind.Combined, new Vector2(.5f, .5f),
                     element: LabOrbElement.Water);
                 fireShot = LabProjectile.Create(new Vector3(1f, 1f, 3f), config, null, LabOrbElement.Fire);
+                LabOrbView bomb = board.UpsertOrb("styled-bomb", LabOrbKind.Bomb, new Vector2(.5f, .2f), lockSwipes: 2);
                 yield return null; // Visual-only collider removal completes at frame end.
 
                 Assert.That(ArtSurface(yin.Visual).sharedMaterial, Is.SameAs(yinMaterial));
@@ -119,6 +122,12 @@ namespace C6Lab.Tests
                     "A Combined orb shows its element tint over the combined material.");
                 Assert.That(ArtColor(fireShot.VisualMount, colorProperty), Is.EqualTo(new Color(1f, 1f, 0f)),
                     "A thrown orb keeps its element tint in flight.");
+                Assert.That(bomb.ItemMarker, Is.Not.Null);
+                Assert.That(bomb.ItemMarker.IconVisible, Is.True, "An assigned item icon is drawn on the orb.");
+                Assert.That(bomb.ItemMarker.transform.parent, Is.SameAs(bomb.transform),
+                    "The icon sits on the orb root so it does not roll with the art.");
+                Assert.That(bomb.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
+                Assert.That(yin.ItemMarker, Is.Null, "Only items carry an icon marker.");
                 Assert.That(yin.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
                 Assert.That(yin.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
                 Assert.That(projectile.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
@@ -138,6 +147,7 @@ namespace C6Lab.Tests
             {
                 if (projectile != null) Object.Destroy(projectile.gameObject);
                 if (fireShot != null) Object.Destroy(fireShot.gameObject);
+                Object.Destroy(bombIcon);
                 Object.Destroy(appearance);
                 Object.Destroy(art);
                 Object.Destroy(yinMaterial);
@@ -316,6 +326,28 @@ namespace C6Lab.Tests
             Assert.That(board.DragToWorld(BoardPoint(yang), 2.1d), Is.True);
             Assert.That(board.EndDragAtWorld(BoardPoint(yang), 2.12d), Is.True);
             Assert.That(combines, Is.Zero, "Only a Yin/Yang pair may request a combination.");
+        }
+
+        [Test]
+        public void LockedItemMovesLikeAnyOrbAndItsBadgeFollowsTheHostCount()
+        {
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 3);
+            Assert.That(bomb.LockSwipes, Is.EqualTo(3));
+            Assert.That(bomb.ItemMarker.BadgeVisible, Is.True);
+            Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("3"));
+            Assert.That(bomb.Body.isKinematic, Is.False, "Locked items must still roll to a neighbor's screen.");
+
+            Vector2 start = BoardPoint(bomb);
+            Vector2 moved = start + new Vector2(1.5f, 0f);
+            Assert.That(board.TryBeginDragAtWorld(start, 1d), Is.True);
+            Assert.That(board.DragToWorld(moved, 1.5d), Is.True);
+            Assert.That(board.EndDragAtWorld(moved, 2d), Is.True);
+            Assert.That(BoardPoint(bomb), Is.EqualTo(moved));
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2);
+            Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("2"), "The badge follows the Host count after a handoff.");
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 0);
+            Assert.That(bomb.ItemMarker.BadgeVisible, Is.False);
         }
 
         [Test]

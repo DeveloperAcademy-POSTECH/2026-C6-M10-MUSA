@@ -76,7 +76,10 @@ namespace C6Lab
             new LabDeveloperField("Relay Orb Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Secret Box Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Potion Chance (%)", 0f, 100f, true),
-            new LabDeveloperField("Bomb Chance (%)", 0f, 100f, true)
+            new LabDeveloperField("Bomb Chance (%)", 0f, 100f, true),
+            new LabDeveloperField("Item Lifetime (seconds)", .1f, 86400f),
+            new LabDeveloperField("Item Unlock Swipes Min", 0f, 20f, true),
+            new LabDeveloperField("Item Unlock Swipes Max", 0f, 20f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -107,6 +110,11 @@ namespace C6Lab
         [SerializeField, Range(0, 100)] private int secretBoxChance = 5;
         [SerializeField, Range(0, 100)] private int potionChance = 5;
         [SerializeField, Range(0, 100)] private int bombChance = 5;
+
+        [Header("Item orbs")]
+        [SerializeField, Min(.1f)] private float itemLifetimeSeconds = 15f;
+        [SerializeField, Range(0, 20)] private int itemUnlockSwipesMin = 2;
+        [SerializeField, Range(0, 20)] private int itemUnlockSwipesMax = 4;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -180,6 +188,9 @@ namespace C6Lab
         }
 
         public float OrbLifetimeSeconds => Positive(orbLifetimeSeconds, 8f);
+        public float ItemLifetimeSeconds => Positive(itemLifetimeSeconds, 15f);
+        public int ItemUnlockSwipesMin => Mathf.Clamp(Mathf.Min(itemUnlockSwipesMin, itemUnlockSwipesMax), 0, 20);
+        public int ItemUnlockSwipesMax => Mathf.Clamp(Mathf.Max(itemUnlockSwipesMin, itemUnlockSwipesMax), 0, 20);
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
         public float OrbStopSpeed => Mathf.Clamp(Finite(orbStopSpeed, .065f), 0f, OrbMaxReleaseSpeed);
@@ -228,7 +239,8 @@ namespace C6Lab
                 ThrowMinUpSpeed, ThrowLateralGain, ThrowUpGain, ThrowForwardGain,
                 ThrowMaxWorldSpeed, ThrowGravity, ThrowLifetime, ThrowRadius,
                 ThrowPowerExponent, ThrowLoftOffsetDegrees, ThrowAirDamping,
-                chances[0], chances[1], chances[2], chances[3], chances[4], chances[5]
+                chances[0], chances[1], chances[2], chances[3], chances[4], chances[5],
+                ItemLifetimeSeconds, ItemUnlockSwipesMin, ItemUnlockSwipesMax
             };
         }
 
@@ -266,6 +278,7 @@ namespace C6Lab
             if (values[28] > values[32]) { error = "Throw Minimum Upward Speed cannot exceed Throw Maximum World Speed."; return false; }
             float chanceTotal = values[39] + values[40] + values[41] + values[42] + values[43] + values[44];
             if (chanceTotal != 100f) { error = "Generation chances must add up to 100 (now " + chanceTotal + ")."; return false; }
+            if (values[46] > values[47]) { error = "Item Unlock Swipes Min cannot exceed Item Unlock Swipes Max."; return false; }
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
@@ -312,6 +325,9 @@ namespace C6Lab
             secretBoxChance = (int)values[42];
             potionChance = (int)values[43];
             bombChance = (int)values[44];
+            itemLifetimeSeconds = values[45];
+            itemUnlockSwipesMin = (int)values[46];
+            itemUnlockSwipesMax = (int)values[47];
             error = string.Empty;
             return true;
         }

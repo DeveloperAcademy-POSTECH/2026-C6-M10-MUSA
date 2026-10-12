@@ -59,8 +59,12 @@ namespace C6Lab
         [SerializeField] private Color woodColor = LabOrbPalette.Wood;
         [SerializeField] private Color metalColor = LabOrbPalette.Metal;
         [SerializeField] private Color earthColor = LabOrbPalette.Earth;
-        [Header("Item orbs (temporary tint until item icons)")]
+        [Header("Item orbs (icon drawn on a disc facing the board camera)")]
         [SerializeField] private Color itemColor = LabOrbPalette.Item;
+        [SerializeField] private Texture2D relayIcon;
+        [SerializeField] private Texture2D secretBoxIcon;
+        [SerializeField] private Texture2D potionIcon;
+        [SerializeField] private Texture2D bombIcon;
         [Header("Board contact shadow (presentation only)")]
         [SerializeField] private Material shadowMaterial;
         [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, .22f);
@@ -87,6 +91,15 @@ namespace C6Lab
                 _ => combinedMaterial
             };
         }
+
+        public Texture2D IconFor(LabOrbKind kind) => kind switch
+        {
+            LabOrbKind.Relay => relayIcon,
+            LabOrbKind.SecretBox => secretBoxIcon,
+            LabOrbKind.Potion => potionIcon,
+            LabOrbKind.Bomb => bombIcon,
+            _ => null
+        };
 
         /// <summary>A color drawn over the kind's material, or null to keep the material's own color.</summary>
         public Color? ColorOverrideFor(LabOrbKind kind, LabOrbElement element = LabOrbElement.None)

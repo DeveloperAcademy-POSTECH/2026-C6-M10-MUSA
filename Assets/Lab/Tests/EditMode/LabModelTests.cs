@@ -318,12 +318,15 @@ namespace C6Lab.Tests
                 var room = new LabModel();
                 room.Begin("chance-test", new ulong[] { 10, 20, 30 }, 0d, chances);
                 var counts = new Dictionary<LabOrbKind, int>();
+                var lockCounts = new HashSet<int>();
                 foreach (ulong player in new ulong[] { 10, 20, 30 })
                     for (int i = 0; i < 100; i++)
                     {
                         Assert.That(room.TryGenerate(player, "draw-" + player + "-" + i, 0d, out var orb, out var reason),
                             Is.True, reason);
                         counts[orb.kind] = counts.TryGetValue(orb.kind, out int count) ? count + 1 : 1;
+                        if (orb.kind.IsItem()) lockCounts.Add(orb.lockSwipes);
+                        else Assert.That(orb.lockSwipes, Is.Zero, "Only items are locked.");
                     }
 
                 // 300 draws at 40/40/5/5/5/5 percent: expected 120 each polarity and 15 each item.
@@ -332,6 +335,7 @@ namespace C6Lab.Tests
                 Assert.That(counts[LabOrbKind.Yang], Is.InRange(90, 150));
                 foreach (LabOrbKind item in new[] { LabOrbKind.Relay, LabOrbKind.SecretBox, LabOrbKind.Potion, LabOrbKind.Bomb })
                     Assert.That(counts[item], Is.InRange(5, 30), item.ToString());
+                Assert.That(lockCounts, Is.EquivalentTo(new[] { 2, 3, 4 }), "Items need 2 to 4 unlock swipes by default.");
             }
             finally { UnityEngine.Object.DestroyImmediate(chances); }
         }
@@ -377,6 +381,74 @@ namespace C6Lab.Tests
                 Assert.That(room.TryLaunch(10, bomb.id, "bomb-throw", .1d, out _, out var launchReason), Is.False);
                 Assert.That(launchReason, Is.EqualTo("RAW_CANNOT_ATTACK"));
                 Assert.That(room.Snapshot(.1d).orbs.Select(orb => orb.id), Does.Contain(yin.id).And.Contain(bomb.id));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mixed); }
+        }
+
+        [Test]
+        public void EachHandoffToANeighborRemovesOneLockAndSoloCannotUnlock()
+        {
+            var bombsOnly = ConfigWith(10f, 0, 0, 0, 0, 0, 100);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("unlock-test", new ulong[] { 10, 20, 30 }, 0d, bombsOnly);
+                Assert.That(room.TryGenerate(10, "bomb", 0d, out var bomb, out _), Is.True);
+                int locks = bomb.lockSwipes;
+                Assert.That(locks, Is.InRange(2, 4));
+
+                // Pass the bomb rightward around the ring; one extra pass shows the count stops at zero.
+                ulong[] ring = { 10, 20, 30 };
+                for (int pass = 1; pass <= locks + 1; pass++)
+                {
+                    ulong holder = ring[(pass - 1) % ring.Length];
+                    double at = pass * .1d;
+                    Assert.That(room.TryUpdateMotion(holder, bomb.id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
+                    Assert.That(room.TryTransfer(holder, bomb.id, true, .5f, Vector2.right, "pass-" + pass, at,
+                        out var passed, out var reason), Is.True, reason);
+                    Assert.That(passed.owner, Is.EqualTo(ring[pass % ring.Length]));
+                    Assert.That(passed.lockSwipes, Is.EqualTo(Math.Max(0, locks - pass)));
+                    Assert.That(room.Snapshot(at).orbs.Single(orb => orb.id == bomb.id).lockSwipes,
+                        Is.EqualTo(passed.lockSwipes), "Every screen sees the remaining count.");
+                }
+
+                var solo = new LabModel();
+                solo.BeginSolo("unlock-solo", 7ul, 0d, bombsOnly);
+                Assert.That(solo.TryGenerate(7ul, "solo-bomb", 0d, out var soloBomb, out _), Is.True);
+                Assert.That(solo.TryUpdateMotion(7ul, soloBomb.id, new Vector2(.99f, .5f), Vector2.right, .1d), Is.True);
+                Assert.That(solo.TryTransfer(7ul, soloBomb.id, true, .5f, Vector2.right, "solo-pass", .1d,
+                    out _, out var soloReason), Is.False);
+                Assert.That(soloReason, Is.EqualTo("NO_NEIGHBOR"));
+                Assert.That(solo.Snapshot(.1d).orbs.Single().lockSwipes, Is.EqualTo(soloBomb.lockSwipes),
+                    "Solo play has no neighbor, so items stay locked.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(bombsOnly); }
+        }
+
+        [Test]
+        public void ItemsLastTheItemLifetimeWhileRawOrbsKeepTheOrbLifetime()
+        {
+            var mixed = ConfigWith(10f, 50, 0, 0, 0, 0, 50);
+            try
+            {
+                Assert.That(mixed.ItemLifetimeSeconds, Is.EqualTo(15f));
+                var room = new LabModel();
+                room.Begin("lifetime-test", new ulong[] { 10, 20, 30 }, 0d, mixed);
+                LabOrbState yin = null, bomb = null;
+                for (int i = 0; i < 10 && (yin == null || bomb == null); i++)
+                {
+                    Assert.That(room.TryGenerate(10, "life-" + i, 0d, out var orb, out _), Is.True);
+                    if (orb.kind == LabOrbKind.Yin) yin = orb;
+                    else if (orb.kind == LabOrbKind.Bomb) bomb = orb;
+                }
+                Assert.That(yin, Is.Not.Null);
+                Assert.That(bomb, Is.Not.Null);
+
+                var atEight = room.Snapshot(8d).orbs.Select(orb => orb.id).ToArray();
+                Assert.That(atEight, Does.Not.Contain(yin.id));
+                Assert.That(atEight, Does.Contain(bomb.id), "Items outlive the 8-second orb lifetime.");
+                Assert.That(room.Snapshot(14.9d).orbs.Select(orb => orb.id), Does.Contain(bomb.id));
+                Assert.That(room.Snapshot(15d).orbs.Select(orb => orb.id), Does.Not.Contain(bomb.id));
             }
             finally { UnityEngine.Object.DestroyImmediate(mixed); }
         }

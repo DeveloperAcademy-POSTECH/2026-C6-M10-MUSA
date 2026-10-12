@@ -17,6 +17,7 @@ namespace C6Lab
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
         private const uint ElementDrawSalt = 0x5A17E1E5u;
+        private const uint LockDrawSalt = 0x10C4ED00u;
         private readonly Dictionary<ulong, LabPlayerState> players = new Dictionary<ulong, LabPlayerState>();
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
         private readonly HashSet<string> requests = new HashSet<string>(StringComparer.Ordinal);
@@ -104,11 +105,13 @@ namespace C6Lab
             if (generated == uint.MaxValue) return Reject("GENERATION_LIMIT", out reason);
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
             var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
+            int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
             generatedCounts[sender] = generated + 1;
             Vector2 position = SpawnPosition(sender);
             orb = new LabOrbState
             {
-                id = NewOrbId(), owner = sender, kind = kind, origin = LabOrbOrigin.Generated, originOwner = sender,
+                id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes,
+                origin = LabOrbOrigin.Generated, originOwner = sender,
                 x = position.x, y = position.y,
                 vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
             };
@@ -149,6 +152,7 @@ namespace C6Lab
         /// <summary>
         /// A right edge enters the next seat from its left; a left edge enters the previous seat
         /// from its right. The same ID, creation time, and velocity survive the handoff.
+        /// Each handoff of a locked item removes one lock, so items unlock only by teamwork.
         /// </summary>
         public bool TryTransfer(ulong sender, string id, bool right, float height01,
             Vector2 normalizedVelocity, string requestId, double now, out LabOrbState orb, out string reason)
@@ -172,6 +176,7 @@ namespace C6Lab
             current.y = height01;
             current.vx = normalizedVelocity.x;
             current.vy = normalizedVelocity.y;
+            if (current.lockSwipes > 0) current.lockSwipes--;
             current.revision = ++revision;
             reason = "TRANSFERRED";
             orb = current.Copy();
@@ -275,7 +280,7 @@ namespace C6Lab
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond));
-                foreach (string id in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= rules.OrbLifetimeSeconds)
+                foreach (string id in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .Select(orb => orb.id).ToArray()) orbs.Remove(id);
                 remaining = Math.Max(0d, deadline - now);
                 if (now >= deadline) phase = LabPhase.Defeat;
@@ -284,6 +289,8 @@ namespace C6Lab
             return true;
         }
 
+        private float LifetimeOf(LabOrbState orb) =>
+            orb.kind.IsItem() ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
         private Vector2 SpawnPosition(ulong owner)
         {
@@ -335,6 +342,12 @@ namespace C6Lab
             return LabOrbKind.Yin;
         }
 
+        private int LockSwipesFor(uint seed, ulong playerId, uint index)
+        {
+            int span = rules.ItemUnlockSwipesMax - rules.ItemUnlockSwipesMin + 1;
+            return rules.ItemUnlockSwipesMin + (int)(DrawFor(seed ^ LockDrawSalt, playerId, index) % (ulong)span);
+        }
+
         // A separate salted stream keeps element draws independent of generation draws.
         private static LabOrbElement ElementFor(uint seed, ulong playerId, uint index) =>
             (LabOrbElement)(1 + (int)(DrawFor(seed ^ ElementDrawSalt, playerId, index) % 5UL));
@@ -356,12 +369,16 @@ namespace C6Lab
         {
             public readonly int MonsterMaxHp, Damage, OrbStorageLimit;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
-                StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed;
+                StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
             public readonly int[] GenerationChances;
+            public readonly int ItemUnlockSwipesMin, ItemUnlockSwipesMax;
 
             public Rules(LabConfig config)
             {
                 GenerationChances = config.GenerationChances();
+                ItemLifetimeSeconds = config.ItemLifetimeSeconds;
+                ItemUnlockSwipesMin = config.ItemUnlockSwipesMin;
+                ItemUnlockSwipesMax = config.ItemUnlockSwipesMax;
                 MonsterMaxHp = config.MonsterMaxHp;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;

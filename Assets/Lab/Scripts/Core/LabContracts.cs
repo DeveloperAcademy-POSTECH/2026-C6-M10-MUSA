@@ -23,6 +23,8 @@ namespace C6Lab
         public ulong owner;
         public LabOrbKind kind;
         public LabOrbElement element;
+        /// <summary>Handoffs to a neighbor's screen still needed before an item can be used; 0 means unlocked.</summary>
+        public int lockSwipes;
         public LabOrbOrigin origin;
         public ulong originOwner;
         public float x, y, vx, vy;

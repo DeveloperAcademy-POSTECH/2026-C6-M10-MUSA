@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(45));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(48));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -86,6 +86,26 @@ namespace C6Lab.Tests
             values[0] = 240.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out _), Is.False);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
+        }
+
+        [Test]
+        public void ItemSettingsDefaultToFifteenSecondsAndTwoToFourSwipes()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            Assert.That(new[] { values[45], values[46], values[47] }, Is.EqualTo(new[] { 15f, 2f, 4f }));
+
+            values[45] = 30f;
+            values[46] = 0f;
+            values[47] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.ItemLifetimeSeconds, Is.EqualTo(30f));
+            Assert.That(config.ItemUnlockSwipesMin, Is.EqualTo(0));
+            Assert.That(config.ItemUnlockSwipesMax, Is.EqualTo(1));
+
+            values[46] = 3f; // min above max
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
+            Assert.That(error, Does.Contain("Item Unlock Swipes Min"));
+            Assert.That(config.ItemUnlockSwipesMax, Is.EqualTo(1), "A rejected form must not partially apply.");
         }
 
         [Test]
