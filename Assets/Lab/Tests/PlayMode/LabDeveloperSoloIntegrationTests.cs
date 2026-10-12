@@ -260,6 +260,11 @@ namespace C6Lab.Tests
             Assert.That(appearance.YangMaterial, Is.Not.Null);
             Assert.That(appearance.CombinedMaterial, Is.Not.Null);
             Assert.That(appearance.ShadowMaterial, Is.Not.Null);
+            Assert.That(appearance.ThrowTrailMaterial, Is.Not.Null,
+                "The saved orb appearance must provide the flight trail material.");
+            Assert.That(network.impactFeedback, Is.Not.Null,
+                "The saved LabCanvas must be connected to the Host-approved impact feedback.");
+            Assert.That(network.impactFeedback.GetComponent<Canvas>(), Is.Not.Null);
             Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count),
                 "New throw tuning rows must be usable in the saved Scene's DEV panel.");
             Assert.That(network.board, Is.SameAs(board), "The Host must receive this board's gesture events.");
@@ -355,11 +360,24 @@ namespace C6Lab.Tests
                 Assert.That(projectile.GetComponent<SphereCollider>(), Is.Not.Null);
                 Assert.That(projectile.VisualMount.GetComponentInChildren<MeshRenderer>(), Is.Not.Null,
                     "The thrown orb must retain the 3D sphere presentation.");
+                Assert.That(projectile.FlightTrail, Is.Not.Null);
+                Assert.That(projectile.FlightTrail.emitting, Is.True);
+                Assert.That(projectile.FlightTrail.sharedMaterial, Is.SameAs(appearance.ThrowTrailMaterial));
+                Color expectedDamageColor = projectile.FlightTrail.startColor;
 
                 for (int step = 0; step < 150 && network.Snapshot.hp == initialHp; step++)
                     yield return new WaitForFixedUpdate();
                 Assert.That(network.Snapshot.hp, Is.EqualTo(initialHp - network.config.Damage),
                     "Only an actual cylinder collision should lower Host HP.");
+                Transform impactLayer = network.impactFeedback.transform.Find("Impact Feedback");
+                Assert.That(impactLayer, Is.Not.Null,
+                    "A Host-confirmed cylinder hit must place feedback on the saved Canvas.");
+                var damageLabel = impactLayer.GetComponentInChildren<UnityEngine.UI.Text>();
+                Assert.That(damageLabel, Is.Not.Null);
+                Assert.That(damageLabel.text, Is.EqualTo("-" + network.config.Damage));
+                Assert.That(damageLabel.color.r, Is.EqualTo(expectedDamageColor.r).Within(.001f));
+                Assert.That(damageLabel.color.g, Is.EqualTo(expectedDamageColor.g).Within(.001f));
+                Assert.That(damageLabel.color.b, Is.EqualTo(expectedDamageColor.b).Within(.001f));
                 var hanging = network.target.GetComponent<LabHangingTarget>();
                 Assert.That(hanging, Is.Not.Null, "The saved scene must expose Pinata tuning.");
                 for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();

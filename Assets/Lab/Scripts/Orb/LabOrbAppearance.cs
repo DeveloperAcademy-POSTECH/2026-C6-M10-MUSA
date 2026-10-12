@@ -31,6 +31,11 @@ namespace C6Lab
         [SerializeField] private Vector2 shadowScale = new Vector2(1.4f, .8f);
         [SerializeField] private Vector2 shadowOffset = new Vector2(.06f, -.08f);
         [SerializeField] private float shadowDepth = .4f;
+        [Header("Thrown orb trail (presentation only)")]
+        [SerializeField] private float throwTrailSeconds = .28f;
+        [SerializeField] private float throwTrailWidthScale = .75f;
+        [SerializeField] private float throwTrailMinVertexDistance = .035f;
+        [SerializeField] private Material throwTrailMaterial;
 
         public GameObject VisualPrefab => visualPrefab;
         public Material YinMaterial => yinMaterial;
@@ -41,6 +46,11 @@ namespace C6Lab
         public Vector2 ShadowScale => shadowScale;
         public Vector2 ShadowOffset => shadowOffset;
         public float ShadowDepth => shadowDepth;
+        public float ThrowTrailSeconds => throwTrailSeconds > 0f ? throwTrailSeconds : .28f;
+        public float ThrowTrailWidthScale => throwTrailWidthScale > 0f ? throwTrailWidthScale : .75f;
+        public float ThrowTrailMinVertexDistance => throwTrailMinVertexDistance > 0f
+            ? throwTrailMinVertexDistance : .035f;
+        public Material ThrowTrailMaterial => throwTrailMaterial;
 
         public Material MaterialFor(LabOrbKind kind, LabOrbElement element = LabOrbElement.None)
         {

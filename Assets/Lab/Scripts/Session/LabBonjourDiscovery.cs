@@ -68,7 +68,7 @@ namespace C6Lab
     public sealed class LabBonjourDiscovery : IDisposable
     {
         public const string ServiceType = "_c6lab._udp";
-        public const string Protocol = "C6-LAB-5606";
+        public const string Protocol = "C6-LAB-5607";
         public const int MaximumServices = 32;
         public const int MaximumAddressesPerService = 32;
         public const double ResolveTimeoutSeconds = 8;

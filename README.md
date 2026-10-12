@@ -43,6 +43,8 @@ Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤
 
 Combined를 잡고 **구슬 판 안에서 위쪽으로 빠르게 움직이며 손을 놓으면** 그 자리에서 3D 투척합니다. 손을 놓는 가로 위치와 움직임의 방향·세기가 발사 위치와 속도에 반영되므로, 중앙으로 던지면 원통을 맞힐 수 있고 옆으로 치우치면 빗나갑니다. 느리게 옮기면 투척되지 않고 판 위에 남으며, 좌우 끝으로 빠져나가면 기존 이웃 전달이 우선합니다. 보이는 Unity Cylinder가 실제 피격체이며 Host에서 충돌을 확인한 명중만 HP를 줄입니다. 새 조작의 속도·생성 상승 거리·카메라 거리 등은 `LabConfig.asset`에서 조정합니다.
 
+손을 놓아 투척한 Combined에는 속성 색의 짧은 비행 잔상이 남습니다. **Host가 실제 명중과 HP 감소를 확정한 경우에만** 요괴의 맞은 지점에서 원형 표시가 커졌다 사라지고, 근처에 속성 색의 `-실제 감소 HP` 숫자가 뜹니다. 마지막 명중으로 남은 HP가 설정 피해보다 적다면 숫자도 실제 감소량만 보여 줍니다. 빗나감에는 피해 숫자·피격 원형이 나오지 않습니다. 숫자와 원형은 저장 Scene의 `LabCanvas / LabImpactFeedback` 컴포넌트에서, 잔상 길이·폭·머티리얼은 `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`에서 조정합니다. 모두 시각 효과이며 투사체의 물리·판정을 바꾸지 않습니다.
+
 직선 투척의 세기 반응·발사각·공기 저항은 **DEV**의 `Throw Power Exponent`, `Throw Loft Offset (degrees)`, `Throw Air Damping`으로 한 판씩 비교할 수 있습니다. 명중·빗나감 뒤 화면에 비행 시간·최고 상승·수평 이동 거리가 나타납니다. 값의 의미와 반복 시험 순서는 [직선 투척 물리 실험 가이드](docs/THROW_TUNING_GUIDE.md)를 참조하세요.
 
 ## 개인 HP 확인
@@ -94,7 +96,7 @@ DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" xcodebuild \
 | `Assets/Lab/Scripts/Session/` | 방 이름 등록·목록 검색·선택 입장·직접 IP 2~5인 연결, Host 설정 승인·상태 전파 |
 | `Assets/Lab/Scripts/Core/` | 세션·구슬·자원·승패 데이터와 규칙 |
 | `Assets/Lab/Scripts/Orb/` | 소유자 화면의 XY 평면에 고정된 3D Rigidbody·SphereCollider 물리와 구슬 표시 |
-| `Assets/Lab/Scripts/Throw/` | 자리별 발사 위치·속도, Rigidbody 투사체, Cylinder 피격체와 바닥 빗나감 |
+| `Assets/Lab/Scripts/Throw/` | 자리별 발사 위치·속도, Rigidbody 투사체·비행 잔상, Cylinder 피격체와 바닥 빗나감 |
 | `Assets/Lab/Scripts/UI/` | 자리별 카메라, 저장된 UI 참조에 게임 값 반영과 버튼 연결 |
 | `Assets/Lab/Tests/` | 옮긴 기능에 필요한 EditMode·PlayMode 검사 |
 
@@ -107,7 +109,7 @@ DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" xcodebuild \
 3. `Assets/Lab/Scenes/Lab.unity`의 **OrbBoard → OrbBoardPlate / OrbBoardLight**에서 판 색과 빛을 조정합니다. `LabCanvas/BoardAreaTint`는 기존 배치를 보존하되 Image가 꺼져 있어 3D 조명을 가리지 않습니다. 판 크기는 `Board Height`와 화면 비율에 맞춰 실행 시 갱신됩니다.
 4. Play 또는 Development Build의 DEV 솔로에서 Yin·Yang을 생성하고 직접 조합·투척해 보세요. Material 색을 변경한 뒤에는 새 라운드를 시작해야 이미 표시된 구슬에도 새 색이 적용됩니다. 외형 변경은 구슬의 반지름·소유권·전달·피격 판정을 바꾸지 않습니다.
 
-화면 간 이동 데이터는 여전히 **구슬 ID·소유자·정규화한 XY 위치와 XY 속도**입니다. Host가 승인한 좌우 전달에서 이 값을 이어 주고, 조합판 내부의 3D 물리 컴포넌트 자체는 네트워크로 전송하지 않습니다. 플레이어별 HP가 공유 스냅샷에 추가되어 접속 프로토콜은 `5606`입니다. 다른 버전의 앱과 같은 방에 접속할 수 없습니다.
+화면 간 이동 데이터는 여전히 **구슬 ID·소유자·정규화한 XY 위치와 XY 속도**입니다. Host가 승인한 좌우 전달에서 이 값을 이어 주고, 조합판 내부의 3D 물리 컴포넌트 자체는 네트워크로 전송하지 않습니다. 확정 피격 신호에는 구슬 ID·라운드·속성·실제 피해량·요괴 기준 충돌 위치를 담습니다. 접속 프로토콜은 `5607`이며 다른 버전의 앱과 같은 방에 접속할 수 없습니다.
 
 ## 현재 기준 수치
 
