@@ -70,7 +70,10 @@ namespace C6Lab
             new LabDeveloperField("Throw Radius", .001f, 100f),
             new LabDeveloperField("Throw Power Exponent", .25f, 3f),
             new LabDeveloperField("Throw Loft Offset (degrees)", -30f, 30f),
-            new LabDeveloperField("Throw Air Damping", 0f, 5f)
+            new LabDeveloperField("Throw Air Damping", 0f, 5f),
+            new LabDeveloperField("Combine Speed", 0f, 10f),
+            new LabDeveloperField("Drop Combine (0 off, 1 on)", 0f, 1f, true),
+            new LabDeveloperField("Contact Combine (0 off, 1 on)", 0f, 1f, true)
         });
 
         [Header("Battle")]
@@ -97,6 +100,12 @@ namespace C6Lab
         [SerializeField, Min(.001f)] private float orbMaxReleaseSpeed = 3f;
         [SerializeField, Min(.001f)] private float orbRadius = .32f;
         [SerializeField, Min(.1f)] private float boardHeight = 5f;
+
+        [Header("Orb combine")]
+        [Tooltip("두 구슬이 서로 다가간 속도 (보드 너비/초)가 이 값 이상이면 결합. 0 = 스쳐도 결합")]
+        [SerializeField, Range(0f, 10f)] private float combineSpeed = 0f;
+        [SerializeField] private bool dropCombineEnabled = true;
+        [SerializeField] private bool contactCombineEnabled = true;
 
         [Header("Spawn presentation")]
         [SerializeField, Min(0f)] private float spawnRiseDistance = .65f;
@@ -147,6 +156,11 @@ namespace C6Lab
         public float OrbMaxReleaseSpeed => Positive(orbMaxReleaseSpeed, 3f);
         public float OrbRadius => Positive(orbRadius, .32f);
         public float BoardHeight => Positive(boardHeight, 5f);
+
+        public float CombineSpeed => Mathf.Clamp(Finite(combineSpeed, 0f), 0f, 10f);
+        public bool DropCombineEnabled => dropCombineEnabled;
+        public bool ContactCombineEnabled => contactCombineEnabled;
+
         public float SpawnRiseDistance => Mathf.Max(0f, Finite(spawnRiseDistance, .65f));
         public float SpawnRiseDuration => Mathf.Max(0f, Finite(spawnRiseDuration, .25f));
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -185,7 +199,8 @@ namespace C6Lab
             ThrowSwipeMinDistance, ThrowSwipeUpDominance, ThrowMaxSwipeSpeed,
             ThrowMinUpSpeed, ThrowLateralGain, ThrowUpGain, ThrowForwardGain,
             ThrowMaxWorldSpeed, ThrowGravity, ThrowLifetime, ThrowRadius,
-            ThrowPowerExponent, ThrowLoftOffsetDegrees, ThrowAirDamping
+            ThrowPowerExponent, ThrowLoftOffsetDegrees, ThrowAirDamping,
+            CombineSpeed, DropCombineEnabled ? 1f : 0f, ContactCombineEnabled ? 1f : 0f
         };
 
         /// <summary>Validates the complete form before modifying any gameplay value.</summary>
@@ -260,6 +275,10 @@ namespace C6Lab
             throwPowerExponent = values[36];
             throwLoftOffsetDegrees = values[37];
             throwAirDamping = values[38];
+            combineSpeed = values[39];
+            dropCombineEnabled = values[40] >= .5f;
+            contactCombineEnabled = values[41] >= .5f;
+
             error = string.Empty;
             return true;
         }

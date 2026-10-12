@@ -68,8 +68,8 @@ namespace C6Lab.Tests
             LabDeveloperMode developerUi = UnityEngine.Object.FindFirstObjectByType<LabDeveloperMode>();
             Assert.That(network, Is.Not.Null);
             Assert.That(developerUi, Is.Not.Null);
-            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(39));
-            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(39));
+            Assert.That(developerUi.valueInputs.Length, Is.EqualTo(42));
+            Assert.That(developerUi.valueSliders.Length, Is.EqualTo(42));
             Assert.That(developerUi.applyHostButton, Is.Not.Null);
             Assert.That(developerUi.targetParticipantsSlider.value, Is.EqualTo(3f));
             network.port = 17778;

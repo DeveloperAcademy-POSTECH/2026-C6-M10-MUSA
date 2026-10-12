@@ -319,21 +319,12 @@ namespace C6Lab
                 return true;
             }
 
-            if (entry.View.Kind != LabOrbKind.Combined)
+            if (config.DropCombineEnabled && entry.View.Kind != LabOrbKind.Combined)
             {
                 Entry target = FindOppositeOverlap(entry);
                 if (target != null)
                 {
-                    entry.Locked = true;
-                    target.Locked = true;
-                    entry.PendingPartnerId = target.View.OrbId;
-                    target.PendingPartnerId = id;
-                    StopMotion(entry.View.Body);
-                    StopMotion(target.View.Body);
-                    SetBodyMode(entry);
-                    SetBodyMode(target);
-                    Vector2 middle = ToNormalized((XY(entry.View.Body.position) + XY(target.View.Body.position)) * .5f);
-                    CombineRequested?.Invoke(id, target.View.OrbId, middle);
+                    RequestCombine(entry, target);
                     return true;
                 }
             }
@@ -432,6 +423,25 @@ namespace C6Lab
                 EdgeCrossed?.Invoke(crossing);
             }
         }
+
+        /// <summary>
+        /// 두 구슬을 그 자리에 멈추고 방장에게 결합을 요청한다.
+        /// 놓아서 결합과 닿으면 결합이 함께 쓴다.
+        /// </summary>
+        private void RequestCombine(Entry first, Entry second)
+        {
+            first.Locked = true;
+            second.Locked = true;
+            first.PendingPartnerId = second.View.OrbId;
+            second.PendingPartnerId = first.View.OrbId;
+            StopMotion(first.View.Body);
+            StopMotion(second.View.Body);
+            SetBodyMode(first);
+            SetBodyMode(second);
+            Vector2 middle = ToNormalized((XY(first.View.Body.position) + XY(second.View.Body.position)) * .5f);
+            CombineRequested?.Invoke(first.View.OrbId, second.View.OrbId, middle);
+        }
+
 
         private Entry FindOppositeOverlap(Entry dragged)
         {
