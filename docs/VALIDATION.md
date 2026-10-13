@@ -174,3 +174,14 @@ PlayMode의 합격은 실제 카메라 화면의 프레임별 시각 품질이�
 | `FlightTrailUsesElementColorAndExpiresAfterTheProjectile` | 궤적 색이 8비트로 저장되어 0.90 대신 0.90196이 되어 허용 오차 0.001을 넘는다. |
 | `SavedSceneSoloCanGenerateCombineAndHitTheCylinder` | #95의 저장 투척 수치 변경 뒤 검사의 고정 손동작이 원통에 미치지 못한다. |
 
+## 투척 기본값·카메라 바라보는 높이 — 2026-10-13, 이슈 #100
+
+기준은 Unity **6000.6.5f1**, `fix/#100-throw-pinata-defaults` 브랜치다. 저장 기본값 `Throw Gravity`를 15에서 30으로 바꾸고, 전투 카메라가 바라보는 높이를 DEV 57번째 값 `Camera Look Height Offset`(기본 2, 기존 동작과 같음)으로 분리했다. 솔로 명중 PlayMode 검사는 저장 투척 기본값과 분리하도록 검사 안에서 투척 수치를 고정했다.
+
+| 항목 | 상태 | 이번 변경의 근거·범위 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode 소스를 컴파일했다. 오류 0. |
+| EditMode·PlayMode | NOT_RUN | 이 브랜치의 실행 결과는 아직 기록하지 않았다. 솔로 명중 검사가 다시 통과하는지 확인이 필요하다. |
+| DEV 솔로: 중력 30 체감·명중, 카메라 바라보는 높이 조정 | NOT_RUN | 사용자가 DEV로 고른 값을 저장 기본값에 반영했으며, 반영 후 화면 확인 기록은 아직 없다. |
+| Mac 3개 실행본·iOS 실기기 | NOT_RUN | 이번 변경에서는 실행하지 않았다. |
+
