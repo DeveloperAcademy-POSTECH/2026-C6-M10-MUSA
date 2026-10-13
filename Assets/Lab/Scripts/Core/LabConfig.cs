@@ -87,7 +87,8 @@ namespace C6Lab
             new LabDeveloperField("Potion Heal (HP)", 0f, 300f, true),
             new LabDeveloperField("Relay x2 Damage Multiplier", 1f, 20f),
             new LabDeveloperField("Relay MAX Damage Multiplier", 1f, 20f),
-            new LabDeveloperField("Bomb Damage Multiplier", 1f, 20f)
+            new LabDeveloperField("Bomb Damage Multiplier", 1f, 20f),
+            new LabDeveloperField("Camera Look Height Offset", -10f, 10f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -156,6 +157,7 @@ namespace C6Lab
         [Header("Battle view and throw origin")]
         [SerializeField, Min(.001f)] private float cameraRadius = 8f;
         [SerializeField] private float cameraHeightOffset = .65f;
+        [SerializeField, Range(-10f, 10f)] private float cameraLookHeightOffset = 2f;
         [SerializeField, Min(.001f)] private float throwOriginRadius = 4f;
         [SerializeField] private float throwOriginHeightOffset = -.5f;
         [SerializeField, Min(0f)] private float throwOriginLateralRange = 1f;
@@ -231,6 +233,7 @@ namespace C6Lab
         public LabOrbAppearance OrbAppearance => orbAppearance;
         public float CameraRadius => Positive(cameraRadius, 8f);
         public float CameraHeightOffset => Finite(cameraHeightOffset, .65f);
+        public float CameraLookHeightOffset => Mathf.Clamp(Finite(cameraLookHeightOffset, 2f), -10f, 10f);
         public float ThrowOriginRadius => Positive(throwOriginRadius, 4f);
         public float ThrowOriginHeightOffset => Finite(throwOriginHeightOffset, -.5f);
         public float ThrowOriginLateralRange => Mathf.Max(0f, Finite(throwOriginLateralRange, 1f));
@@ -272,7 +275,8 @@ namespace C6Lab
                 ItemLifetimeSeconds, ItemUnlockSwipesMin, ItemUnlockSwipesMax,
                 PlayerMaxHp,
                 CombineSpeed, DropCombineEnabled ? 1f : 0f, ContactCombineEnabled ? 1f : 0f,
-                PotionHeal, RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier
+                PotionHeal, RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier,
+                CameraLookHeightOffset
             };
         }
 
@@ -368,6 +372,7 @@ namespace C6Lab
             relayDoubleMultiplier = values[53];
             relayMaxMultiplier = values[54];
             bombMultiplier = values[55];
+            cameraLookHeightOffset = values[56];
             error = string.Empty;
             return true;
         }

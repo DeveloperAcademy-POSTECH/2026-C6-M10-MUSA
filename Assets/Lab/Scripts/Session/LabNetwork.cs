@@ -98,9 +98,9 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // Relay stages, bomb explosions and item effect settings are new snapshot/settings data;
-        // reject older clients rather than mixing rooms with different item rules.
-        private const ushort LabProtocolVersion = 5610;
+        // Relay stages, bomb explosions, item effects and the camera look height are new
+        // snapshot/settings data; reject older clients rather than mixing room rules.
+        private const ushort LabProtocolVersion = 5611;
         private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/5");
         private const int MaximumPacketBytes = 32768;
