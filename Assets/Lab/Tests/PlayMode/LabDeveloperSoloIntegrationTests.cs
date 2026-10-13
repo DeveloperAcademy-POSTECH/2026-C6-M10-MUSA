@@ -405,9 +405,11 @@ namespace C6Lab.Tests
                 var damageLabel = impactLayer.GetComponentInChildren<UnityEngine.UI.Text>();
                 Assert.That(damageLabel, Is.Not.Null);
                 Assert.That(damageLabel.text, Is.EqualTo("-" + network.config.Damage));
-                Assert.That(damageLabel.color.r, Is.EqualTo(expectedDamageColor.r).Within(.001f));
-                Assert.That(damageLabel.color.g, Is.EqualTo(expectedDamageColor.g).Within(.001f));
-                Assert.That(damageLabel.color.b, Is.EqualTo(expectedDamageColor.b).Within(.001f));
+                // The trail reads back 8-bit channels, so compare the label at the same precision.
+                Color damageColor = (Color32)damageLabel.color;
+                Assert.That(damageColor.r, Is.EqualTo(expectedDamageColor.r).Within(.001f));
+                Assert.That(damageColor.g, Is.EqualTo(expectedDamageColor.g).Within(.001f));
+                Assert.That(damageColor.b, Is.EqualTo(expectedDamageColor.b).Within(.001f));
                 var hanging = network.target.GetComponent<LabHangingTarget>();
                 Assert.That(hanging, Is.Not.Null, "The saved scene must expose Pinata tuning.");
                 for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();

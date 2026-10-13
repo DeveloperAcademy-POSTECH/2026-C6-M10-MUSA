@@ -158,7 +158,8 @@ namespace C6Lab
         /// A right edge enters the next seat from its left; a left edge enters the previous seat
         /// from its right. The same ID, creation time, and velocity survive the handoff.
         /// Each handoff of a locked item removes one lock, so items unlock only by teamwork. A relay
-        /// orb becomes x1 when it unlocks, then each further handoff raises it to x2 and MAX.
+        /// orb becomes x1 when it unlocks, then each further handoff raises it to x2 and MAX. An
+        /// unlocked bomb becomes an ordinary attack orb: its fuse is cut and a fresh orb lifetime starts.
         /// </summary>
         public bool TryTransfer(ulong sender, string id, bool right, float height01,
             Vector2 normalizedVelocity, string requestId, double now, out LabOrbState orb, out string reason)
@@ -186,6 +187,7 @@ namespace C6Lab
             {
                 current.lockSwipes--;
                 if (current.lockSwipes == 0 && current.kind == LabOrbKind.Relay) current.relayStage = 1;
+                if (current.lockSwipes == 0 && current.kind == LabOrbKind.Bomb) current.createdAt = now;
             }
             else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
             current.revision = ++revision;
@@ -372,8 +374,8 @@ namespace C6Lab
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
                 {
-                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb) continue;
-                    // An unthrown bomb takes every orb still on its current holder's board.
+                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0) continue;
+                    // A bomb still locked at its fuse takes every orb on its current holder's board.
                     foreach (string id in orbs.Values.Where(orb => orb.owner == expired.owner && !orb.inFlight)
                         .Select(orb => orb.id).ToArray()) orbs.Remove(id);
                     bombExplosions.Add(expired.owner);
@@ -394,8 +396,10 @@ namespace C6Lab
             return Math.Max(1, (int)Math.Round(rules.Damage * multiplier));
         }
 
+        // An unlocked bomb is an ordinary attack orb and keeps the orb lifetime, not the fuse.
         private float LifetimeOf(LabOrbState orb) =>
-            orb.kind.IsItem() ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
+            orb.kind.IsItem() && !(orb.kind == LabOrbKind.Bomb && orb.lockSwipes == 0)
+                ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
         private Vector2 SpawnPosition(ulong owner)
         {

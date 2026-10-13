@@ -141,7 +141,7 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 | Relay MAX Damage Multiplier | 4 | 1–20 / 배 | 릴레이 구슬이 해금 후 두 번 넘겨져 `MAX` 단계일 때의 배율. 이후 더 넘겨도 오르지 않는다. |
 | Bomb Damage Multiplier | 3 | 1–20 / 배 | 해금된 폭탄을 던져 명중했을 때 `Damage per Hit`에 곱하는 값. 빗나가면 피해도 폭발도 없다. |
 
-아이템은 음·양과 조합되지 않는다. 해금된 **회복물약·시크릿 상자**는 같은 구슬을 0.35초 안에 두 번 탭해 그 자리에서 사용한다(한 번의 탭은 0.3초 이내, 이동 거리 구슬 반지름의 절반 이하). 시크릿 상자는 양옆에 속성 구슬 2개를 만들고 새 `Orb Lifetime`을 주며 보관 칸 하나가 더 필요하다. 해금된 **릴레이 구슬·폭탄**은 Combined처럼 위로 그어 던진다. 폭탄의 타이머는 `Item Lifetime`이며, 던지지 않은 채 끝나면 그 순간 보유자의 판 위 구슬이 모두 사라진다. 피해 배율의 결과는 반올림한 정수이며 최소 1이다. 1인 솔로에는 이웃이 없어 잠긴 아이템이 해금되지 않으므로, 효과를 혼자 시험하려면 `Item Unlock Swipes Min`·`Max`를 0으로 둔다.
+아이템은 음·양과 조합되지 않는다. 해금된 **회복물약·시크릿 상자**는 같은 구슬을 0.35초 안에 두 번 탭해 그 자리에서 사용한다(한 번의 탭은 0.3초 이내, 이동 거리 구슬 반지름의 절반 이하). 시크릿 상자는 양옆에 속성 구슬 2개를 만들고 새 `Orb Lifetime`을 주며 보관 칸 하나가 더 필요하다. 해금된 **릴레이 구슬·폭탄**은 Combined처럼 위로 그어 던진다. 잠긴 폭탄의 타이머는 `Item Lifetime`이며, 잠긴 채 끝나면 그 순간 보유자의 판 위 구슬이 모두 사라진다. 해금되는 순간 타이머가 꺼지고 일반 공격 구슬처럼 해금 시점부터 `Orb Lifetime`이 새로 시작되며, 끝나면 폭발 없이 사라진다. 피해 배율의 결과는 반올림한 정수이며 최소 1이다. 1인 솔로에는 이웃이 없어 잠긴 아이템이 해금되지 않으므로, 효과를 혼자 시험하려면 `Item Unlock Swipes Min`·`Max`를 0으로 둔다.
 
 근거: `LabConfig.GenerationChances`, `LabModel.TryGenerate`·`TryCombine`·`TryTransfer`·`TryUseItem`·`TryAdvance`·`ConfirmHit`, `LabOrbBoard.EndDragAtWorld`, `LabOrbItemMarker.Show`, `LabNetwork.SyncBoard`.
 
@@ -163,7 +163,7 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 | 측면에서 던진 공이 잘 빗나감 | Origin Lateral Range 또는 Lateral Gain 비교 | 자동 조준 기능은 현재 없음; 판정 반경 변경은 난이도도 바꿈 |
 | 아이템이 너무 자주/드물게 나옴 | 아이템 4종 확률과 Yin/Yang 확률을 함께 조정 | 합 100 유지, 보유 한도에 아이템도 포함됨 |
 | 아이템이 해금되기 전에 사라짐 | Item Lifetime ↑ 또는 Item Unlock Swipes Max ↓ | 세 명이 실제로 넘기는 데 걸리는 시간 |
-| 폭탄을 해금하고 던질 시간이 부족함 | Item Lifetime ↑ 또는 Item Unlock Swipes Max ↓ | 폭탄 타이머도 Item Lifetime을 쓰므로 다른 아이템 수명도 함께 바뀜 |
+| 폭탄을 해금할 시간이 부족함 | Item Lifetime ↑ 또는 Item Unlock Swipes Max ↓ | 잠긴 폭탄 타이머도 Item Lifetime을 쓰므로 다른 아이템 수명도 함께 바뀜. 해금 후 던질 시간은 Orb Lifetime |
 | 릴레이 MAX가 너무 약하거나 강함 | Relay MAX Damage Multiplier | 요괴 HP와 MAX까지 넘기는 데 걸리는 시간 |
 
 이 표의 화살표는 **시험 방향**이지 검증된 추천값이 아니다. 잘못된 투척을 자동 보정하거나 요괴를 추적하는 기능은 현재 없다.
