@@ -21,6 +21,22 @@ namespace C6Lab
         }
     }
 
+    ///<summary>
+    /// DEV 패널에서 보이는 묶음. 항목 번호 (DeveloperFields 순서)는 바꾸지 않고, 
+    /// 화면에 보이는 위치만 묶음별로 모은다. 
+    /// </summary>
+    public readonly struct LabDeveloperCategory
+    {
+        public readonly string Title;
+        public readonly int[] FieldIndices;
+
+        public LabDeveloperCategory(string title, params int[] fieldIndices)
+        {
+            Title = title;
+            FieldIndices = fieldIndices;
+        }
+    }
+
     /// <summary>
     /// The lab's single Inspector-editable gameplay tuning asset. Its values are copied into a
     /// running host session; visual prefabs may be replaced without changing these rules.
@@ -97,6 +113,23 @@ namespace C6Lab
             LabOrbKind.Yin, LabOrbKind.Yang, LabOrbKind.Relay,
             LabOrbKind.SecretBox, LabOrbKind.Potion, LabOrbKind.Bomb
         });
+
+        // 화면 표시용 묶음. 새 DEV 항목을 추가하면 여기 한 곳에 번호를 넣는다.
+        public static IReadOnlyList<LabDeveloperCategory> DeveloperCategories { get; } = Array.AsReadOnly(new[]
+        {
+            new LabDeveloperCategory("Battle", 0, 1, 2, 48),
+            new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
+            new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55),
+            new LabDeveloperCategory("Orb lifetime", 10),
+            new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16),
+            new LabDeveloperCategory("Orb combine", 49, 50, 51),
+            new LabDeveloperCategory("Spawn presentation", 17, 18),
+            new LabDeveloperCategory("Camera and throw origin", 19, 20, 21, 22, 23, 56),
+            new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
+            new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38)
+        });
+
 
         [Header("Battle")]
         [SerializeField, Min(1)] private int monsterMaxHp = 1000;

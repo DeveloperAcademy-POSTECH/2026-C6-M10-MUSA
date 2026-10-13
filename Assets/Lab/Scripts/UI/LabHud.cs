@@ -40,6 +40,11 @@ namespace C6Lab
         public Text seatText;
         [Header("Saved battle UI")]
         public GameObject battleUi;
+        [Header("Battle-only camera background")]
+        public Camera battleCamera;
+        public Camera orbCamera;
+        public Color battleBackgroundColor = new Color(.32f, .42f, .49f, 1f);
+        public Color orbBackgroundColor = new Color(.18f, .24f, .29f, 1f);
         public UnityEngine.UI.Image yokaiHpFill;
         public UnityEngine.UI.Image playerHpFill;
         public UnityEngine.UI.Image[] staminaCells;
@@ -63,6 +68,10 @@ namespace C6Lab
 
         private readonly List<Button> roomRows = new List<Button>();
         private string renderedRoomList = string.Empty;
+        private Camera capturedBattleCamera;
+        private Camera capturedOrbCamera;
+        private Color lobbyBattleBackgroundColor;
+        private Color lobbyOrbBackgroundColor;
 
         private void Awake()
         {
@@ -101,6 +110,7 @@ namespace C6Lab
             bool terminal = snapshot != null && (snapshot.phase == LabPhase.Victory || snapshot.phase == LabPhase.Defeat);
             bool battleVisible = snapshot != null && snapshot.phase != LabPhase.Idle;
             bool paused = playing && network.IsBattlePaused;
+            UpdateBattleBackground(battleVisible);
             SetVisible(battleUi, battleVisible);
             SetVisible(pauseMenu, paused);
             if (paused) BringPauseLayersForward();
@@ -213,6 +223,34 @@ namespace C6Lab
             GetNeighborLabels(snapshot, network.LocalPlayerId, out string left, out string right);
             Set(leftNeighborText, left);
             Set(rightNeighborText, right);
+        }
+
+        private void OnDisable()
+        {
+            if (capturedBattleCamera != null) capturedBattleCamera.backgroundColor = lobbyBattleBackgroundColor;
+            if (capturedOrbCamera != null) capturedOrbCamera.backgroundColor = lobbyOrbBackgroundColor;
+        }
+
+        private void UpdateBattleBackground(bool battleVisible)
+        {
+            ApplyCameraBackground(battleCamera, battleBackgroundColor, battleVisible,
+                ref capturedBattleCamera, ref lobbyBattleBackgroundColor);
+            ApplyCameraBackground(orbCamera, orbBackgroundColor, battleVisible,
+                ref capturedOrbCamera, ref lobbyOrbBackgroundColor);
+        }
+
+        private static void ApplyCameraBackground(Camera camera, Color battleColor, bool battleVisible,
+            ref Camera capturedCamera, ref Color lobbyColor)
+        {
+            if (capturedCamera != camera)
+            {
+                if (capturedCamera != null) capturedCamera.backgroundColor = lobbyColor;
+                capturedCamera = camera;
+                if (camera != null) lobbyColor = camera.backgroundColor;
+            }
+            if (camera == null) return;
+            Color color = battleVisible ? battleColor : lobbyColor;
+            if (camera.backgroundColor != color) camera.backgroundColor = color;
         }
 
         private void OpenDeveloperSettings()

@@ -73,6 +73,7 @@ namespace C6Lab
                 if (toggleButton != null) toggleButton.gameObject.SetActive(false);
                 return;
             }
+            BuildCategoryLayout();
 
             if (toggleButton != null) toggleButton.onClick.AddListener(Open);
             if (closeButton != null) closeButton.onClick.AddListener(Close);
@@ -315,6 +316,69 @@ namespace C6Lab
             seatCamera.config = sourceConfig;
             sceneController.ReconfigureBoard();
             seatCamera.RefreshPose();
+        }
+
+        /// <summary>
+        /// 설정 줄을 카테고리별로 모으고, 카테고리마다 접기/펼치기 제목 줄을 붙인다.
+        /// 줄의 위치만 바꾸므로 값 번호(valueInputs 순서)와 APPLY 동작은 그대로다.
+        /// </summary>
+        private void BuildCategoryLayout()
+        {
+            GameObject template = valueInputs[0].transform.parent.gameObject;
+            Transform content = template.transform.parent;
+            Text labelStyle = template.transform.Find("SettingLabel").GetComponent<Text>();
+            int sibling = 1; // 0번 자리는 인원수 줄(TargetParticipantsRow)이 그대로 쓴다.
+
+            foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
+            {
+                // 제목 줄은 글자 + 버튼만 가진 한 겹짜리 오브젝트로 새로 만든다.
+                // 설정 줄들과 같은 위계(Content 바로 아래)에 놓인다.
+                GameObject header = new GameObject("Category " + category.Title,
+                    typeof(RectTransform), typeof(Text), typeof(Button), typeof(LayoutElement));
+                header.layer = content.gameObject.layer;
+                header.transform.SetParent(content, false);
+
+                Text title = header.GetComponent<Text>();
+                title.font = labelStyle.font;
+                title.fontSize = labelStyle.fontSize;
+                title.color = labelStyle.color;
+                title.fontStyle = FontStyle.Bold;
+                title.alignment = TextAnchor.MiddleCenter;
+                title.raycastTarget = true;
+
+                LayoutElement titleLayout = header.GetComponent<LayoutElement>();
+                titleLayout.preferredHeight = 30f;
+                titleLayout.flexibleWidth = 1f;
+                header.transform.SetSiblingIndex(sibling++);
+
+                // 이 카테고리의 설정 줄들을 제목 바로 아래로 옮긴다.
+                GameObject[] rows = new GameObject[category.FieldIndices.Length];
+                for (int i = 0; i < rows.Length; i++)
+                {
+                    rows[i] = valueInputs[category.FieldIndices[i]].transform.parent.gameObject;
+                    rows[i].transform.SetSiblingIndex(sibling++);
+                }
+
+                // 처음에는 모두 접힌 상태로 시작한다. 제목을 누르면 접고 펼친다.
+                // 숨긴 줄의 값도 APPLY 때 그대로 읽힌다.
+                string name = category.Title;
+                bool expanded = false;
+                SetCategoryExpanded(title, name, rows, expanded);
+                Button toggle = header.GetComponent<Button>();
+                toggle.targetGraphic = title;
+                toggle.onClick.AddListener(() =>
+                {
+                    expanded = !expanded;
+                    SetCategoryExpanded(title, name, rows, expanded);
+                });
+            }
+        }
+
+        /// <summary>펼침 상태에 맞춰 제목의 세모(▶ 접힘 / ▼ 펼침)와 항목 줄 표시를 바꾼다.</summary>
+        private static void SetCategoryExpanded(Text title, string name, GameObject[] rows, bool expanded)
+        {
+            title.text = (expanded ? "\u25BC  " : "\u25B6  ") + name;
+            foreach (GameObject row in rows) row.SetActive(expanded);
         }
 
         /// <summary>Extend older saved panels without deleting existing Inspector-edited rows.</summary>

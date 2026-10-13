@@ -75,5 +75,6 @@
 | V-22 | 저장 Scene의 Figma 전투 UI 일곱 요소와 좌우 P표시, 분:초·요괴 HP·자기 HP 초기값/DEV 최대값·스태미나 다섯 칸의 갱신, 2인·솔로 구분 | 저장 Scene 참조·PlayMode·화면 관찰 | [검증 기록](VALIDATION.md) |
 | V-23 | 참가자 요청을 Host가 승인한 공동 일시정지·Host 재개, 시간/수명/물리 정지와 입력 차단, 중복·이전 요청 거절 | EditMode·PlayMode·Host/Client 실제 실행 | [검증 기록](VALIDATION.md) |
 | V-24 | Host의 모두 로비로 실행 시 연결·방 유지와 전원 동시 복귀, Host DEV 설정 갱신 후 전원 확인·새 판 자동 시작 | EditMode·PlayMode·Host/Client 실제 실행 | [검증 기록](VALIDATION.md) |
+| V-25 | 전투·일시정지·결과 화면의 상단·하단 단색 배경은 밝게 표시하고, 같은 방 로비 복귀 시 원래 카메라색 복원; 조합대·캐릭터·HUD 색과 참조 유지 | 저장 Scene 연결·PlayMode·Game View 화면 관찰 | [검증 기록](VALIDATION.md) |
 
 검증에 필요한 자료는 이 새 코드와 관련 검사에 한정한다. 과거 프로토타입의 통과 기록은 새 Unity 버전 또는 새 코드의 통과 증거로 승계하지 않는다.
