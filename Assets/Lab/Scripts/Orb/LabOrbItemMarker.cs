@@ -4,9 +4,11 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
-    /// Item presentation on the orb root: an icon on a disc, a badge (remaining unlock handoffs,
-    /// or a relay orb's x1/x2/MAX stage) and a bomb's fuse seconds above the orb, all facing the
-    /// front-on board camera. It follows the Visual mount's
+    /// Item presentation on the orb root: an icon on a disc, a padlock over the dimmed icon while
+    /// the item is locked, a badge (remaining unlock handoffs, or a relay orb's x1/x2/MAX stage)
+    /// and a bomb's fuse seconds above the orb, all facing the front-on board camera. On unlock
+    /// the padlock rises and fades while the icon sharpens, then a gold ring shrinks onto the orb
+    /// and the orb glows once. It follows the Visual mount's
     /// rise animation but not its rolling rotation, and owns no collider.
     /// </summary>
     [DisallowMultipleComponent]
@@ -19,16 +21,31 @@ namespace C6Lab
         private static readonly Dictionary<Texture2D, Sprite> iconSprites = new Dictionary<Texture2D, Sprite>();
         private static Sprite discSprite;
         private static Sprite squareSprite;
+        private static Sprite ringSprite;
+        private static Sprite glowSprite;
+        private static LabOrbAppearance defaultLook;
 
         private SpriteRenderer disc;
         private SpriteRenderer icon;
+        private SpriteRenderer padlock;
+        private SpriteRenderer ring;
+        private SpriteRenderer glow;
         private SpriteRenderer badge;
         private TextMesh badgeCount;
         private TextMesh fuse;
         private Transform follow;
         private float radius;
+        private float unlockElapsed = -1f;
+        private float unlockFromAlpha;
+        private LabOrbAppearance unlockLook;
 
         public bool IconVisible => icon != null && icon.gameObject.activeSelf;
+        public float IconAlpha => icon != null ? icon.color.a : 0f;
+        public bool LockVisible => padlock != null && padlock.gameObject.activeSelf;
+        public bool UnlockPlaying => unlockElapsed >= 0f;
+        public bool RingVisible => ring != null && ring.gameObject.activeSelf;
+        public float RingDiameter => ring != null ? ring.transform.localScale.x : 0f;
+        public bool GlowVisible => glow != null && glow.gameObject.activeSelf;
         public bool BadgeVisible => badge != null && badge.gameObject.activeSelf;
         public string BadgeText => badgeCount != null ? badgeCount.text : string.Empty;
         public bool FuseVisible => fuse != null && fuse.gameObject.activeSelf;
@@ -83,7 +100,111 @@ namespace C6Lab
             }
         }
 
-        private void LateUpdate() => FollowMount();
+        /// <summary>
+        /// Covers the icon with the appearance's padlock and dims it while locked. Without a
+        /// padlock image only the dimming and the count badge mark the lock. Call after Show.
+        /// </summary>
+        public void SetLocked(bool locked, LabOrbAppearance look)
+        {
+            EnsureParts();
+            // The unlock effect owns the padlock and icon until it ends.
+            if (!locked && UnlockPlaying) return;
+            StopUnlock();
+            look = LookOrDefault(look);
+            Texture2D lockTexture = look.LockIcon;
+            bool covered = locked && lockTexture != null;
+            padlock.gameObject.SetActive(covered);
+            if (covered)
+            {
+                padlock.sprite = SpriteFor(lockTexture);
+                // The sprite is one unit wide; size its longer side in orb radii.
+                float aspect = (float)lockTexture.height / lockTexture.width;
+                padlock.transform.localScale = Vector3.one * (look.LockIconSize * radius / Mathf.Max(1f, aspect));
+                padlock.transform.localPosition = new Vector3(0f, 0f, -.005f);
+            }
+            icon.color = new Color(1f, 1f, 1f, locked ? look.LockedIconAlpha : 1f);
+        }
+
+        /// <summary>
+        /// Starts from the locked look, then lifts and fades the padlock while the icon sharpens,
+        /// lands a shrinking ring on the orb and glows once. Call after Show.
+        /// </summary>
+        public void PlayUnlock(LabOrbAppearance look)
+        {
+            SetLocked(true, look);
+            unlockLook = LookOrDefault(look);
+            unlockFromAlpha = icon.color.a;
+            unlockElapsed = 0f;
+            AnimateUnlock();
+        }
+
+        private void LateUpdate()
+        {
+            FollowMount();
+            if (!UnlockPlaying) return;
+            unlockElapsed += Time.deltaTime;
+            AnimateUnlock();
+        }
+
+        private void AnimateUnlock()
+        {
+            LabOrbAppearance look = unlockLook != null ? unlockLook : LookOrDefault(null);
+            float elapsed = unlockElapsed;
+
+            // The padlock rises and fades while the icon sharpens.
+            float lift = Mathf.Clamp01(elapsed / look.UnlockLockSeconds);
+            float rise = 1f - (1f - lift) * (1f - lift);
+            padlock.transform.localPosition = new Vector3(0f, look.UnlockLockRise * radius * rise, -.005f);
+            padlock.color = new Color(1f, 1f, 1f, 1f - lift);
+            icon.color = new Color(1f, 1f, 1f, Mathf.Lerp(unlockFromAlpha, 1f, lift));
+            if (lift >= 1f) padlock.gameObject.SetActive(false);
+
+            // A gold ring shrinks onto the orb, slowing as it lands; the orb then glows once
+            // while the ring fades away.
+            float shrink = (elapsed - look.UnlockRingDelay) / look.UnlockRingSeconds;
+            float flash = (elapsed - look.UnlockRingDelay - look.UnlockRingSeconds) / look.UnlockGlowSeconds;
+            ring.gameObject.SetActive(shrink >= 0f && flash < 1f);
+            if (ring.gameObject.activeSelf)
+            {
+                float t = Mathf.Clamp01(shrink);
+                float landing = 1f - (1f - t) * (1f - t) * (1f - t);
+                ring.transform.localScale = Vector3.one * (2f * radius * Mathf.Lerp(look.UnlockRingStartScale, 1f, landing));
+                Color color = look.UnlockRingColor;
+                color.a *= Mathf.Clamp01(t * 5f) * (1f - Mathf.Clamp01(flash));
+                ring.color = color;
+            }
+            glow.gameObject.SetActive(flash >= 0f && flash < 1f);
+            if (glow.gameObject.activeSelf)
+            {
+                glow.transform.localScale = Vector3.one * (2.6f * radius);
+                Color color = look.UnlockGlowColor;
+                color.a *= Mathf.Sin(Mathf.PI * flash);
+                glow.color = color;
+            }
+
+            if (elapsed >= look.UnlockEffectSeconds) StopUnlock();
+        }
+
+        private void StopUnlock()
+        {
+            unlockElapsed = -1f;
+            unlockLook = null;
+            padlock.color = Color.white;
+            ring.gameObject.SetActive(false);
+            glow.gameObject.SetActive(false);
+        }
+
+        /// <summary>The assigned appearance, or one holding the default lock and unlock look.</summary>
+        private static LabOrbAppearance LookOrDefault(LabOrbAppearance look)
+        {
+            if (look != null) return look;
+            if (defaultLook == null)
+            {
+                defaultLook = ScriptableObject.CreateInstance<LabOrbAppearance>();
+                defaultLook.hideFlags = HideFlags.DontSave;
+            }
+            return defaultLook;
+        }
 
         private void FollowMount()
         {
@@ -94,9 +215,17 @@ namespace C6Lab
         private void EnsureParts()
         {
             if (disc != null) return;
+            // The glow sits behind the disc so it lights the orb's rim, not the icon.
+            glow = CreateSprite("Unlock Glow", Glow(), Color.white, -1);
+            glow.gameObject.SetActive(false);
             disc = CreateSprite("Icon Disc", Disc(), DiscColor, 0);
+            ring = CreateSprite("Unlock Ring", Ring(), Color.white, 0);
+            ring.transform.localPosition = new Vector3(0f, 0f, -.003f);
+            ring.gameObject.SetActive(false);
             icon = CreateSprite("Icon", null, Color.white, 1);
-            badge = CreateSprite("Lock Badge", Square(), BadgeColor, 2);
+            padlock = CreateSprite("Padlock", null, Color.white, 2);
+            padlock.gameObject.SetActive(false);
+            badge = CreateSprite("Lock Badge", Square(), BadgeColor, 3);
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (font == null) return;
             badgeCount = CreateText("Lock Count", font, Color.white);
@@ -116,7 +245,7 @@ namespace C6Lab
             text.color = color;
             var renderer = part.GetComponent<MeshRenderer>();
             renderer.sharedMaterial = font.material;
-            renderer.sortingOrder = 3;
+            renderer.sortingOrder = 4;
             return text;
         }
 
@@ -159,6 +288,46 @@ namespace C6Lab
                 }
             discSprite = CreateGeneratedSprite("Lab item disc", size, pixels);
             return discSprite;
+        }
+
+        /// <summary>A thin ring whose outer edge is the sprite edge, so scale 1 sits on the orb outline.</summary>
+        private static Sprite Ring()
+        {
+            if (ringSprite != null) return ringSprite;
+            const int size = 128;
+            const float thickness = 7f;
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x + .5f - size * .5f;
+                    float dy = y + .5f - size * .5f;
+                    float distance = Mathf.Sqrt(dx * dx + dy * dy);
+                    float alpha = Mathf.Clamp01(size * .5f - distance)
+                        * Mathf.Clamp01(distance - (size * .5f - thickness));
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
+                }
+            ringSprite = CreateGeneratedSprite("Lab unlock ring", size, pixels);
+            return ringSprite;
+        }
+
+        /// <summary>A soft disc: solid to 70% of its radius, then fading to the edge.</summary>
+        private static Sprite Glow()
+        {
+            if (glowSprite != null) return glowSprite;
+            const int size = 64;
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x + .5f - size * .5f;
+                    float dy = y + .5f - size * .5f;
+                    float distance = Mathf.Sqrt(dx * dx + dy * dy) / (size * .5f);
+                    float alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.7f, 1f, distance));
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
+                }
+            glowSprite = CreateGeneratedSprite("Lab unlock glow", size, pixels);
+            return glowSprite;
         }
 
         private static Sprite Square()

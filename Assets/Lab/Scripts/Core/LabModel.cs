@@ -183,9 +183,11 @@ namespace C6Lab
             current.y = height01;
             current.vx = normalizedVelocity.x;
             current.vy = normalizedVelocity.y;
+            current.unlockedAt = -1d;
             if (current.lockSwipes > 0)
             {
                 current.lockSwipes--;
+                if (current.lockSwipes == 0) current.unlockedAt = now;
                 if (current.lockSwipes == 0 && current.kind == LabOrbKind.Relay) current.relayStage = 1;
                 if (current.lockSwipes == 0 && current.kind == LabOrbKind.Bomb) current.createdAt = now;
             }

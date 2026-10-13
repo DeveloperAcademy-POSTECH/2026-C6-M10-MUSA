@@ -100,6 +100,8 @@ namespace C6Lab.Tests
             SetSerializedField(appearance, "fireMaterial", fireMaterial);
             var bombIcon = new Texture2D(8, 8);
             SetSerializedField(appearance, "bombIcon", bombIcon);
+            var lockIcon = new Texture2D(8, 8);
+            SetSerializedField(appearance, "lockIcon", lockIcon);
             SetSerializedField(config, "orbAppearance", appearance);
 
             LabProjectile projectile = null;
@@ -132,6 +134,12 @@ namespace C6Lab.Tests
                 Assert.That(bomb.ItemMarker.IconVisible, Is.True, "An assigned item icon is drawn on the orb.");
                 Assert.That(bomb.ItemMarker.transform.parent, Is.SameAs(bomb.transform),
                     "The icon sits on the orb root so it does not roll with the art.");
+                Assert.That(bomb.ItemMarker.LockVisible, Is.True, "A locked item shows a padlock over its icon.");
+                Assert.That(bomb.ItemMarker.IconAlpha, Is.EqualTo(appearance.LockedIconAlpha).Within(.001f),
+                    "The icon under the padlock is dimmed.");
+                board.UpsertOrb("styled-bomb", LabOrbKind.Bomb, new Vector2(.5f, .2f), lockSwipes: 0);
+                Assert.That(bomb.ItemMarker.LockVisible, Is.False);
+                Assert.That(bomb.ItemMarker.IconAlpha, Is.EqualTo(1f), "An unlocked item's icon is sharp again.");
                 Assert.That(bomb.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
                 Assert.That(yin.ItemMarker, Is.Null, "Only items carry an icon marker.");
                 Assert.That(yin.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
@@ -154,6 +162,7 @@ namespace C6Lab.Tests
                 if (projectile != null) Object.Destroy(projectile.gameObject);
                 if (fireShot != null) Object.Destroy(fireShot.gameObject);
                 Object.Destroy(bombIcon);
+                Object.Destroy(lockIcon);
                 Object.Destroy(waterMaterial);
                 Object.Destroy(fireMaterial);
                 Object.Destroy(appearance);
@@ -380,6 +389,70 @@ namespace C6Lab.Tests
             Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("2"), "The badge follows the Host count after a handoff.");
             board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 0);
             Assert.That(bomb.ItemMarker.BadgeVisible, Is.False);
+        }
+
+        [Test]
+        public void JustUnlockedItemPlaysTheUnlockEffectOnceAndAnOpenItemDoesNot()
+        {
+            var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.4f, .3f), lockSwipes: 0, relayStage: 1,
+                justUnlocked: true);
+            Assert.That(relay.UnlockEffectPlays, Is.EqualTo(1), "An item arriving just unlocked plays the effect.");
+            board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.4f, .3f), lockSwipes: 0, relayStage: 1,
+                justUnlocked: true);
+            Assert.That(relay.UnlockEffectPlays, Is.EqualTo(1), "Repeated snapshots of the same unlock do not replay it.");
+
+            var open = board.UpsertOrb("open", LabOrbKind.Potion, new Vector2(.6f, .3f), lockSwipes: 0);
+            Assert.That(open.UnlockEffectPlays, Is.Zero, "An item created unlocked, or seen late, shows already open.");
+        }
+
+        [UnityTest]
+        public IEnumerator UnlockLiftsThePadlockThenLandsAShrinkingRingWithOneGlow()
+        {
+            var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            var relayIcon = new Texture2D(8, 8);
+            var lockIcon = new Texture2D(8, 8);
+            SetSerializedField(appearance, "relayIcon", relayIcon);
+            SetSerializedField(appearance, "lockIcon", lockIcon);
+            SetSerializedField(config, "orbAppearance", appearance);
+            try
+            {
+                board.Configure(config, inputCamera, Bounds);
+                var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.5f, .5f), lockSwipes: 0,
+                    relayStage: 1, justUnlocked: true);
+                LabOrbItemMarker marker = relay.ItemMarker;
+                Assert.That(marker.UnlockPlaying, Is.True);
+                Assert.That(marker.LockVisible, Is.True, "A just-unlocked item starts with the padlock on its icon.");
+                Assert.That(marker.IconAlpha, Is.EqualTo(appearance.LockedIconAlpha).Within(.001f));
+                Assert.That(marker.RingVisible, Is.False, "The ring follows a moment after the padlock starts.");
+
+                relay.SetItemState(0, 2);
+                Assert.That(marker.LockVisible, Is.True, "A snapshot update mid-effect does not cut it short.");
+
+                yield return new WaitForSeconds(appearance.UnlockRingDelay + appearance.UnlockRingSeconds * .5f);
+                float orbDiameter = 2f * config.OrbRadius;
+                Assert.That(marker.RingVisible, Is.True, "A ring shrinks onto the orb.");
+                Assert.That(marker.RingDiameter, Is.InRange(orbDiameter, orbDiameter * appearance.UnlockRingStartScale));
+
+                bool glowed = false;
+                float giveUp = Time.time + 2f;
+                while (marker.UnlockPlaying && Time.time < giveUp)
+                {
+                    glowed |= marker.GlowVisible;
+                    yield return null;
+                }
+                Assert.That(glowed, Is.True, "The orb glows once as the ring lands.");
+                Assert.That(marker.UnlockPlaying, Is.False);
+                Assert.That(marker.LockVisible, Is.False, "The padlock is gone once it has risen and faded.");
+                Assert.That(marker.RingVisible, Is.False);
+                Assert.That(marker.GlowVisible, Is.False);
+                Assert.That(marker.IconAlpha, Is.EqualTo(1f), "The icon is sharp once the effect ends.");
+            }
+            finally
+            {
+                Object.Destroy(relayIcon);
+                Object.Destroy(lockIcon);
+                Object.Destroy(appearance);
+            }
         }
 
         [Test]

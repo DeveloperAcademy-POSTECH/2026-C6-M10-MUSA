@@ -74,6 +74,7 @@ namespace C6Lab
         private const double DoubleTapWindow = .35d;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly HashSet<string> risenIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<PointerSample> samples = new List<PointerSample>();
         private readonly List<Entry> updateEntries = new List<Entry>();
         private LabConfig config;
@@ -135,11 +136,12 @@ namespace C6Lab
         /// <summary>
         /// Add a newly approved orb, or update its kind/owner. Existing local physics is never
         /// reset by a repeated snapshot. Positions are 0..1; velocity is board widths/second.
+        /// justUnlocked plays the unlock effect once per orb, however many snapshots repeat it.
         /// </summary>
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
             bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
-            int relayStage = 0, float fuseSeconds = -1f)
+            int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false)
         {
             RequireConfigured();
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
@@ -155,6 +157,7 @@ namespace C6Lab
                 if (existing.View.LockSwipes != lockSwipes || existing.View.RelayStage != relayStage
                     || existing.View.FuseSeconds != fuseSeconds)
                     existing.View.SetItemState(lockSwipes, relayStage, fuseSeconds);
+                if (justUnlocked && unlockEffectIds.Add(id)) existing.View.PlayUnlockEffect();
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -167,6 +170,7 @@ namespace C6Lab
             view.Configure(id, kind, config.OrbRadius, element);
             view.ConfigureAppearance(config.OrbAppearance);
             view.SetItemState(lockSwipes, relayStage, fuseSeconds);
+            if (justUnlocked && unlockEffectIds.Add(id)) view.PlayUnlockEffect();
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
@@ -218,6 +222,7 @@ namespace C6Lab
                 Retire(entry);
             entries.Clear();
             risenIds.Clear();
+            unlockEffectIds.Clear();
         }
 
         public void SetInteractionEnabled(bool enabled)

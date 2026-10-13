@@ -38,6 +38,8 @@ namespace C6Lab
         public int RelayStage => relayStage;
         /// <summary>A bomb's remaining seconds before it explodes; negative when not shown.</summary>
         public float FuseSeconds => fuseSeconds;
+        /// <summary>How many times this item has started its unlock presentation.</summary>
+        public int UnlockEffectPlays { get; private set; }
         public LabOrbItemMarker ItemMarker => itemMarker;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
@@ -118,6 +120,13 @@ namespace C6Lab
             relayStage = Mathf.Max(0, stage);
             fuseSeconds = fuse;
             UpdateItemMarker();
+        }
+
+        /// <summary>Starts the unlock presentation for an item a handoff just unlocked on this screen.</summary>
+        public void PlayUnlockEffect()
+        {
+            UnlockEffectPlays++;
+            if (itemMarker != null) itemMarker.PlayUnlock(appearance);
         }
 
         /// <summary>
@@ -305,6 +314,7 @@ namespace C6Lab
                 ? Mathf.CeilToInt(fuseSeconds).ToString() : null;
             itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), fuseText,
                 visualRadius, visual);
+            itemMarker.SetLocked(lockSwipes > 0, appearance);
         }
 
         private string BadgeText()

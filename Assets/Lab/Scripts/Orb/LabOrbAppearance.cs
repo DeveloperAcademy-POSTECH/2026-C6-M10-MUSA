@@ -25,6 +25,28 @@ namespace C6Lab
         [SerializeField] private Texture2D secretBoxIcon;
         [SerializeField] private Texture2D potionIcon;
         [SerializeField] private Texture2D bombIcon;
+        [Header("Locked item (presentation only)")]
+        [SerializeField] private Texture2D lockIcon;
+        [Tooltip("Longer side of the padlock image, in orb radii.")]
+        [SerializeField, Min(.1f)] private float lockIconSize = 1.2f;
+        [Tooltip("Item icon opacity while the padlock covers it.")]
+        [SerializeField, Range(0f, 1f)] private float lockedIconAlpha = .4f;
+        [Header("Unlock effect (presentation only)")]
+        [Tooltip("Seconds for the padlock to rise and fade while the icon sharpens.")]
+        [SerializeField, Min(.01f)] private float unlockLockSeconds = .3f;
+        [Tooltip("How far the padlock rises while it fades, in orb radii.")]
+        [SerializeField, Min(0f)] private float unlockLockRise = .8f;
+        [Tooltip("Ring diameter when it appears, in orb diameters.")]
+        [SerializeField, Min(1f)] private float unlockRingStartScale = 1.5f;
+        [Tooltip("Seconds after the unlock before the ring appears.")]
+        [SerializeField, Min(0f)] private float unlockRingDelay = .1f;
+        [Tooltip("Seconds for the ring to shrink onto the orb, slowing as it lands.")]
+        [SerializeField, Min(.01f)] private float unlockRingSeconds = .4f;
+        [Tooltip("Seconds of the single glow as the ring lands.")]
+        [SerializeField, Min(.01f)] private float unlockGlowSeconds = .1f;
+        [SerializeField] private Color unlockRingColor = new Color(1f, .8f, .25f, 1f);
+        [Tooltip("Glow tint; its alpha is the peak strength.")]
+        [SerializeField] private Color unlockGlowColor = new Color(1f, .95f, .7f, .85f);
         [Header("Board contact shadow (presentation only)")]
         [SerializeField] private Material shadowMaterial;
         [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, .22f);
@@ -41,6 +63,20 @@ namespace C6Lab
         public Material YinMaterial => yinMaterial;
         public Material YangMaterial => yangMaterial;
         public Material CombinedMaterial => combinedMaterial;
+        public Texture2D LockIcon => lockIcon;
+        public float LockIconSize => lockIconSize > 0f ? lockIconSize : 1.2f;
+        public float LockedIconAlpha => Mathf.Clamp01(lockedIconAlpha);
+        public float UnlockLockSeconds => unlockLockSeconds > 0f ? unlockLockSeconds : .3f;
+        public float UnlockLockRise => Mathf.Max(0f, unlockLockRise);
+        public float UnlockRingStartScale => Mathf.Max(1f, unlockRingStartScale);
+        public float UnlockRingDelay => Mathf.Max(0f, unlockRingDelay);
+        public float UnlockRingSeconds => unlockRingSeconds > 0f ? unlockRingSeconds : .4f;
+        public float UnlockGlowSeconds => unlockGlowSeconds > 0f ? unlockGlowSeconds : .1f;
+        public Color UnlockRingColor => unlockRingColor;
+        public Color UnlockGlowColor => unlockGlowColor;
+        /// <summary>The whole unlock presentation: the padlock lift, or the ring landing and its glow.</summary>
+        public float UnlockEffectSeconds =>
+            Mathf.Max(UnlockLockSeconds, UnlockRingDelay + UnlockRingSeconds + UnlockGlowSeconds);
         public Material ShadowMaterial => shadowMaterial;
         public Color ShadowColor => shadowColor;
         public Vector2 ShadowScale => shadowScale;
