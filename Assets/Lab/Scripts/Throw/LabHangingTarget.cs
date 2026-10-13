@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace C6Lab
 {
-    /// <summary>A damped pendulum. The real hitbox and visible body share the moving pivot.</summary>
+    /// <summary>A damped pendulum with a freely turning body. The hitbox and art share both pivots.</summary>
     [DisallowMultipleComponent]
     public sealed class LabHangingTarget : MonoBehaviour
     {
@@ -37,12 +37,19 @@ namespace C6Lab
         public float SwingDamping => Safe(swingDamping, 1.15f, 0f, 20f);
         public float MaximumAngle => Safe(maximumAngle, 24f, 1f, 75f);
         public float ReturnStrength => Safe(returnStrength, 13f, 0f, 100f);
-        private Transform pivot, hangingBody, visualMount, rope, ceilingBeam, ceilingPlate;
+        // Configured from the session's LabConfig copy; these are only safe standalone defaults.
+        private float spinStrength = 80f, spinDamping = 1.2f, maximumSpinSpeed = 720f;
+        private Transform pivot, twistPivot, hangingBody, visualMount, rope, ceilingBeam, ceilingPlate;
         private float verticalOffset, verticalVelocity;
         private Vector2 angle, velocity;
+        private float yawAngleDegrees, yawSpeedDegreesPerSecond;
         private Material bodyMaterial, ropeMaterial;
+        private Color bodyBaseColor;
         private float flash;
         public Vector2 SwingAngles => angle;
+        // Deliberately unwrapped: a value greater than 360 confirms a complete revolution.
+        public float YawAngleDegrees => yawAngleDegrees;
+        public float YawSpeedDegreesPerSecond => yawSpeedDegreesPerSecond;
 
         private void Awake()
         {
@@ -57,11 +64,21 @@ namespace C6Lab
             Transform body = target.Hitbox.transform;
             hangingBody = body;
             visualMount = target.VisualMount;
-            body.SetParent(pivot, true);
+            twistPivot = new GameObject("Body Twist Pivot").transform;
+            twistPivot.SetParent(pivot, false);
+            body.SetParent(twistPivot, true);
             // A shorter body leaves an unmistakable rope above it and air below it.
             body.localScale = new Vector3(body.localScale.x, .9f, body.localScale.z);
-            target.VisualMount.SetParent(pivot, true);
-            bodyMaterial = MakeMaterial(new Color(.85f, .28f, .09f), .32f);
+            target.VisualMount.SetParent(twistPivot, true);
+            // The saved Scene may supply a diagnostic texture. Own a runtime clone so flash
+            // never edits the asset or replaces the visible cylinder with a flat color.
+            var sourceMaterial = body.GetComponent<Renderer>().sharedMaterial;
+            bodyMaterial = sourceMaterial != null && sourceMaterial.shader != null &&
+                sourceMaterial.shader.name.StartsWith("Universal Render Pipeline/")
+                ? new Material(sourceMaterial)
+                : MakeMaterial(new Color(.85f, .28f, .09f), .32f);
+            bodyBaseColor = bodyMaterial.HasProperty("_BaseColor")
+                ? bodyMaterial.GetColor("_BaseColor") : Color.white;
             body.GetComponent<Renderer>().sharedMaterial = bodyMaterial;
             ropeMaterial = MakeMaterial(new Color(.64f, .52f, .32f), .1f);
             rope = Primitive("Rope", PrimitiveType.Cylinder, pivot,
@@ -71,6 +88,69 @@ namespace C6Lab
             ceilingPlate = Primitive("Ceiling Plate", PrimitiveType.Cube, transform,
                 new Vector3(0, 2.01f, 0), new Vector3(6f, .12f, 3f), ropeMaterial);
             ApplyRopeLength();
+        }
+
+        /// <summary>Apply the session tuning without mutating the source LabConfig asset.</summary>
+        public void ConfigureSpin(float strength, float damping, float maxSpeed)
+        {
+            spinStrength = Safe(strength, 80f, 0f, 200f);
+            spinDamping = Safe(damping, 1.2f, 0f, 10f);
+            maximumSpinSpeed = Safe(maxSpeed, 720f, 30f, 1440f);
+            yawSpeedDegreesPerSecond = Mathf.Clamp(yawSpeedDegreesPerSecond,
+                -maximumSpinSpeed, maximumSpinSpeed);
+        }
+
+        /// <summary>Host-authoritative hit: return the signed yaw impulse for the impact packet.</summary>
+        public float ApplyHostImpact(Vector3 hitPointWorld, Vector3 impactVelocity)
+        {
+            if (pivot == null || !FiniteVector(hitPointWorld) || !FiniteVector(impactVelocity))
+                return 0f;
+            Kick(impactVelocity);
+            // Swing tilts the local spin axis. Project the lever arm onto its plane
+            // before measuring signed torque about that axis.
+            Vector3 axis = twistPivot.up;
+            Vector3 lever = Vector3.ProjectOnPlane(hitPointWorld - hangingBody.position, axis);
+            float impulse = Vector3.Dot(axis,
+                Vector3.Cross(lever, impactVelocity)) * spinStrength;
+            impulse = Mathf.Clamp(impulse, -maximumSpinSpeed, maximumSpinSpeed);
+            ApplyYawImpulse(impulse);
+            return impulse;
+        }
+
+        /// <summary>Replay an already approved host hit without recomputing a local hit point.</summary>
+        public void ApplyRemoteImpact(Vector3 impactVelocity, float signedYawImpulse)
+        {
+            if (pivot == null || !FiniteVector(impactVelocity) || !Finite(signedYawImpulse)) return;
+            Kick(impactVelocity);
+            ApplyYawImpulse(signedYawImpulse);
+        }
+
+        /// <summary>Reconcile unwrapped yaw from the latest host snapshot.</summary>
+        public void ReconcileYaw(float angleDegrees, float speedDegreesPerSecond)
+        {
+            if (twistPivot == null || !Finite(angleDegrees) || !Finite(speedDegreesPerSecond)) return;
+            float difference = angleDegrees - yawAngleDegrees;
+            // Snapshot angles describe the Host at send time. During a fast spin, ordinary
+            // transit delay makes them older than the locally integrated pose. Avoid pulling
+            // the body backward every 100 ms for an error explainable by <=200 ms of travel.
+            float transitTolerance = Mathf.Max(2f,
+                Mathf.Max(Mathf.Abs(speedDegreesPerSecond),
+                    Mathf.Abs(yawSpeedDegreesPerSecond)) * .2f);
+            if (Mathf.Abs(difference) <= transitTolerance) return;
+            // A large divergence is normally a missed impact or round transition.
+            yawAngleDegrees = Mathf.Abs(difference) > 90f
+                ? angleDegrees : Mathf.Lerp(yawAngleDegrees, angleDegrees, .35f);
+            yawSpeedDegreesPerSecond = Mathf.Abs(difference) > 90f
+                ? Mathf.Clamp(speedDegreesPerSecond, -maximumSpinSpeed, maximumSpinSpeed)
+                : Mathf.Lerp(yawSpeedDegreesPerSecond,
+                    Mathf.Clamp(speedDegreesPerSecond, -maximumSpinSpeed, maximumSpinSpeed), .35f);
+            ApplyYawRotation();
+        }
+
+        private void ApplyYawImpulse(float impulse)
+        {
+            yawSpeedDegreesPerSecond = Mathf.Clamp(yawSpeedDegreesPerSecond + impulse,
+                -maximumSpinSpeed, maximumSpinSpeed);
         }
 
         public void Kick(Vector3 incomingVelocity)
@@ -89,8 +169,10 @@ namespace C6Lab
         {
             angle = velocity = Vector2.zero;
             verticalOffset = verticalVelocity = 0f;
+            yawAngleDegrees = yawSpeedDegreesPerSecond = 0f;
             flash = 0;
             if (pivot != null) pivot.localRotation = Quaternion.identity;
+            ApplyYawRotation();
             ApplyRopeLength();
         }
 
@@ -107,6 +189,10 @@ namespace C6Lab
                 if (Vector2.Dot(velocity, angle) > 0) velocity *= -.25f;
             }
             pivot.localRotation = Quaternion.Euler(angle.x, 0, angle.y);
+            yawSpeedDegreesPerSecond *= Mathf.Exp(-spinDamping * dt);
+            if (Mathf.Abs(yawSpeedDegreesPerSecond) < .01f) yawSpeedDegreesPerSecond = 0f;
+            yawAngleDegrees += yawSpeedDegreesPerSecond * dt;
+            ApplyYawRotation();
             if (MaximumExtension == 0f) verticalOffset = verticalVelocity = 0f;
             else
             {
@@ -119,9 +205,14 @@ namespace C6Lab
         private void Update()
         {
             flash = Mathf.Max(0, flash - Time.deltaTime);
-            if (bodyMaterial != null)
-                bodyMaterial.SetColor("_BaseColor", Color.Lerp(new Color(.85f, .28f, .09f),
+            if (bodyMaterial != null && bodyMaterial.HasProperty("_BaseColor"))
+                bodyMaterial.SetColor("_BaseColor", Color.Lerp(bodyBaseColor,
                     new Color(1f, .85f, .45f), flash / .16f));
+        }
+
+        private void ApplyYawRotation()
+        {
+            if (twistPivot != null) twistPivot.localRotation = Quaternion.Euler(0f, yawAngleDegrees, 0f);
         }
 
         private void ApplyRopeLength()
@@ -142,8 +233,9 @@ namespace C6Lab
             float halfBodyHeight = hangingBody.localScale.y; // Unity's cylinder is two units tall.
             float pivotHeight = length + halfBodyHeight;
             pivot.localPosition = Vector3.up * pivotHeight;
-            hangingBody.localPosition = Vector3.down * (pivotHeight + verticalOffset);
-            visualMount.localPosition = hangingBody.localPosition;
+            twistPivot.localPosition = Vector3.down * (pivotHeight + verticalOffset);
+            hangingBody.localPosition = Vector3.zero;
+            visualMount.localPosition = Vector3.zero;
             float stretchedLength = length + verticalOffset;
             rope.localPosition = Vector3.down * (stretchedLength * .5f);
             rope.localScale = new Vector3(.055f, stretchedLength * .5f, .055f);
@@ -175,6 +267,8 @@ namespace C6Lab
         }
 
         private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
+        private static bool FiniteVector(Vector3 value)
+            => Finite(value.x) && Finite(value.y) && Finite(value.z);
         private static float Safe(float value, float fallback, float min, float max)
             => Mathf.Clamp(Finite(value) ? value : fallback, min, max);
 

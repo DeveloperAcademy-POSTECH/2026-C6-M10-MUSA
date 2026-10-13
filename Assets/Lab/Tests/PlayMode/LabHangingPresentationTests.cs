@@ -139,6 +139,150 @@ namespace C6Lab.Tests
             Object.Destroy(target.gameObject);
         }
 
+        [UnityTest]
+        public IEnumerator SideHitsSpinInOppositeDirectionsWhileCentreHitDoesNot()
+        {
+            var target = LabTarget.CreateCylinder(null, Vector3.zero, .6f, 2.7f);
+            var hanging = target.gameObject.AddComponent<LabHangingTarget>();
+            hanging.ConfigureSpin(80f, 1.2f, 720f);
+            Vector3 centre = target.Hitbox.transform.position;
+            Vector3 incoming = Vector3.forward * 12.5f;
+            Assert.That(hanging.ApplyHostImpact(centre, incoming), Is.EqualTo(0f).Within(.001f));
+            Assert.That(hanging.YawSpeedDegreesPerSecond, Is.EqualTo(0f).Within(.001f));
+
+            float rightImpulse = hanging.ApplyHostImpact(centre + Vector3.right * .6f, incoming);
+            Assert.That(rightImpulse, Is.LessThan(-100f));
+            Assert.That(hanging.YawSpeedDegreesPerSecond, Is.EqualTo(rightImpulse).Within(.001f));
+            hanging.ResetSwing();
+            float leftImpulse = hanging.ApplyHostImpact(centre - Vector3.right * .6f, incoming);
+            Assert.That(leftImpulse, Is.EqualTo(-rightImpulse).Within(.001f));
+            Assert.That(hanging.YawSpeedDegreesPerSecond, Is.EqualTo(leftImpulse).Within(.001f));
+            Assert.That(target.Hitbox.attachedRigidbody.isKinematic, Is.True);
+            Assert.That(target.Hitbox.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(target.Hitbox.sharedMesh));
+            Object.Destroy(target.gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator SideHitUsesTheTiltedLocalSpinAxis()
+        {
+            var target = LabTarget.CreateCylinder(null, Vector3.zero, .6f, 2.7f);
+            var hanging = target.gameObject.AddComponent<LabHangingTarget>();
+            hanging.ConfigureSpin(80f, 1.2f, 720f);
+            Transform swing = target.transform.Find("Suspension Pivot");
+            Transform twist = swing.Find("Body Twist Pivot");
+            swing.localRotation = Quaternion.Euler(35f, 0f, 0f);
+            Vector3 hit = target.Hitbox.transform.position + twist.right * .6f;
+            Vector3 incoming = Vector3.forward * 12.5f;
+            Vector3 lever = Vector3.ProjectOnPlane(hit - target.Hitbox.transform.position, twist.up);
+            float expected = Vector3.Dot(twist.up, Vector3.Cross(lever, incoming)) * 80f;
+            Assert.That(hanging.ApplyHostImpact(hit, incoming), Is.EqualTo(expected).Within(.01f));
+            Assert.That(Mathf.Abs(expected), Is.LessThan(600f),
+                "The swing-tilted axis must alter the torque compared with world Y.");
+            Object.Destroy(target.gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator TangentialHitMakesFullTurnThenDampsAndResetRestoresHitboxAndArt()
+        {
+            var target = LabTarget.CreateCylinder(null, Vector3.zero, .6f, 2.7f);
+            var hanging = target.gameObject.AddComponent<LabHangingTarget>();
+            hanging.ConfigureSpin(80f, 1.2f, 720f);
+            Vector3 centre = target.Hitbox.transform.position;
+            Vector3 incoming = Vector3.forward * 12.5f;
+            float impulse = hanging.ApplyHostImpact(centre + Vector3.right * .6f, incoming);
+            Assert.That(Mathf.Abs(impulse), Is.EqualTo(600f).Within(.01f));
+            float initialSpeed = Mathf.Abs(hanging.YawSpeedDegreesPerSecond);
+            for (int i = 0; i < 150; i++) yield return new WaitForFixedUpdate();
+            Assert.That(Mathf.Abs(hanging.YawAngleDegrees), Is.GreaterThan(360f));
+            Assert.That(Mathf.Abs(hanging.YawSpeedDegreesPerSecond), Is.LessThan(initialSpeed * .1f));
+            Transform twist = target.transform.Find("Suspension Pivot/Body Twist Pivot");
+            Assert.That(target.Hitbox.transform.parent, Is.SameAs(twist));
+            Assert.That(target.VisualMount.parent, Is.SameAs(twist));
+            Assert.That(target.transform.Find("Suspension Pivot/Rope").parent,
+                Is.SameAs(twist.parent), "The rope must not rotate with the body.");
+
+            hanging.ResetSwing();
+            Assert.That(hanging.YawAngleDegrees, Is.EqualTo(0f));
+            Assert.That(hanging.YawSpeedDegreesPerSecond, Is.EqualTo(0f));
+            Assert.That(twist.localRotation, Is.EqualTo(Quaternion.identity));
+            Assert.That(Vector3.Distance(target.Hitbox.transform.position, centre), Is.LessThan(.001f));
+            Object.Destroy(target.gameObject);
+        }
+
+        [UnityTest]
+        public IEnumerator RepeatedImpactsRespectSpeedLimitAndRemoteSnapshotConverges()
+        {
+            var host = LabTarget.CreateCylinder(null, new Vector3(-4, 0, 0), .6f, 2.7f);
+            var client = LabTarget.CreateCylinder(null, new Vector3(4, 0, 0), .6f, 2.7f);
+            var hostHanging = host.gameObject.AddComponent<LabHangingTarget>();
+            var clientHanging = client.gameObject.AddComponent<LabHangingTarget>();
+            hostHanging.ConfigureSpin(200f, .8f, 450f);
+            clientHanging.ConfigureSpin(200f, .8f, 450f);
+            Vector3 velocity = Vector3.forward * 20f;
+            for (int i = 0; i < 6; i++)
+            {
+                float impulse = hostHanging.ApplyHostImpact(
+                    host.Hitbox.transform.position + Vector3.right * .6f, velocity);
+                clientHanging.ApplyRemoteImpact(velocity, impulse);
+            }
+            Assert.That(Mathf.Abs(hostHanging.YawSpeedDegreesPerSecond), Is.EqualTo(450f).Within(.001f));
+            Assert.That(clientHanging.YawSpeedDegreesPerSecond,
+                Is.EqualTo(hostHanging.YawSpeedDegreesPerSecond).Within(.001f));
+            for (int i = 0; i < 40; i++) yield return new WaitForFixedUpdate();
+            float expectedAngle = hostHanging.YawAngleDegrees;
+            float expectedSpeed = hostHanging.YawSpeedDegreesPerSecond;
+            clientHanging.ResetSwing(); // Simulate a lost impact before the next host snapshot.
+            clientHanging.ReconcileYaw(expectedAngle, expectedSpeed);
+            Assert.That(clientHanging.YawAngleDegrees, Is.EqualTo(expectedAngle).Within(.001f),
+                "A large divergence must be corrected by the host snapshot.");
+            Assert.That(clientHanging.YawSpeedDegreesPerSecond,
+                Is.EqualTo(expectedSpeed).Within(.001f));
+            Object.Destroy(host.gameObject);
+            Object.Destroy(client.gameObject);
+        }
+
+        [UnityTest]
+        public IEnumerator DelayedHostSnapshotDoesNotPullAHealthyFastSpinBackward()
+        {
+            var target = LabTarget.CreateCylinder(null, Vector3.zero, .6f, 2.7f);
+            var hanging = target.gameObject.AddComponent<LabHangingTarget>();
+            hanging.ConfigureSpin(200f, 1.2f, 720f);
+            hanging.ApplyHostImpact(target.Hitbox.transform.position + Vector3.right * .6f,
+                Vector3.forward * 12.5f);
+            for (int i = 0; i < 10; i++) yield return new WaitForFixedUpdate();
+            float angleBefore = hanging.YawAngleDegrees;
+            float speedBefore = hanging.YawSpeedDegreesPerSecond;
+            hanging.ReconcileYaw(angleBefore - speedBefore * .1f, speedBefore * 1.1f);
+            Assert.That(hanging.YawAngleDegrees, Is.EqualTo(angleBefore).Within(.001f));
+            Assert.That(hanging.YawSpeedDegreesPerSecond, Is.EqualTo(speedBefore).Within(.001f));
+            Object.Destroy(target.gameObject);
+        }
+
+        [UnityTest]
+        public IEnumerator RuntimeHitFlashPreservesSceneAssignedTexture()
+        {
+            var target = LabTarget.CreateCylinder(null, Vector3.zero, .6f, 2.7f);
+            var texture = new Texture2D(2, 2);
+            var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            material.SetTexture("_BaseMap", texture);
+            target.Hitbox.GetComponent<Renderer>().sharedMaterial = material;
+            var hanging = target.gameObject.AddComponent<LabHangingTarget>();
+            var runtimeMaterial = target.Hitbox.GetComponent<Renderer>().sharedMaterial;
+            Assert.That(runtimeMaterial, Is.Not.SameAs(material),
+                "Impact flashes must not edit the saved material asset.");
+            Assert.That(runtimeMaterial.GetTexture("_BaseMap"), Is.SameAs(texture));
+            hanging.ApplyHostImpact(target.Hitbox.transform.position + Vector3.right * .6f,
+                Vector3.forward * 12.5f);
+            yield return null;
+            Assert.That(runtimeMaterial.GetTexture("_BaseMap"), Is.SameAs(texture));
+            Object.Destroy(target.gameObject);
+            Object.Destroy(material);
+            Object.Destroy(texture);
+        }
+
         private static void Set(LabHangingTarget hanging, string name, float value)
         {
             typeof(LabHangingTarget).GetField(name,

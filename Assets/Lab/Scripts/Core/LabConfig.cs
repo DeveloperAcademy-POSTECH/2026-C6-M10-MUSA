@@ -104,7 +104,10 @@ namespace C6Lab
             new LabDeveloperField("Relay x2 Damage Multiplier", 1f, 20f),
             new LabDeveloperField("Relay MAX Damage Multiplier", 1f, 20f),
             new LabDeveloperField("Bomb Damage Multiplier", 1f, 20f),
-            new LabDeveloperField("Camera Look Height Offset", -10f, 10f)
+            new LabDeveloperField("Camera Look Height Offset", -10f, 10f),
+            new LabDeveloperField("Target Spin Strength", 0f, 200f),
+            new LabDeveloperField("Target Spin Damping", 0f, 10f),
+            new LabDeveloperField("Target Spin Maximum Speed (deg/s)", 30f, 1440f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -127,7 +130,8 @@ namespace C6Lab
             new LabDeveloperCategory("Spawn presentation", 17, 18),
             new LabDeveloperCategory("Camera and throw origin", 19, 20, 21, 22, 23, 56),
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
-            new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38)
+            new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
+            new LabDeveloperCategory("Target spin", 57, 58, 59)
         });
 
 
@@ -136,6 +140,11 @@ namespace C6Lab
         [SerializeField, Min(1)] private int damage = 20;
         [SerializeField, Min(1f)] private float battleDurationSeconds = 180f;
         [SerializeField, Range(1, 300)] private int playerMaxHp = 300;
+
+        [Header("Target spin")]
+        [SerializeField, Range(0f, 200f)] private float targetSpinStrength = 80f;
+        [SerializeField, Range(0f, 10f)] private float targetSpinDamping = 1.2f;
+        [SerializeField, Range(30f, 1440f)] private float targetSpinMaximumSpeed = 720f;
 
         [Header("Stamina and generation")]
         [SerializeField, Min(1f)] private float staminaMax = 100f;
@@ -216,6 +225,9 @@ namespace C6Lab
         public int PlayerMaxHp => Mathf.Clamp(playerMaxHp, 1, 300);
         public int Damage => Mathf.Max(1, damage);
         public float BattleDurationSeconds => Positive(battleDurationSeconds, 180f);
+        public float TargetSpinStrength => Mathf.Clamp(Finite(targetSpinStrength, 80f), 0f, 200f);
+        public float TargetSpinDamping => Mathf.Clamp(Finite(targetSpinDamping, 1.2f), 0f, 10f);
+        public float TargetSpinMaximumSpeed => Mathf.Clamp(Finite(targetSpinMaximumSpeed, 720f), 30f, 1440f);
         public float StaminaMax => Positive(staminaMax, 100f);
         public float StaminaStart => Mathf.Clamp(Finite(staminaStart, 100f), 0f, StaminaMax);
         public float GenerateCost => Mathf.Clamp(Positive(generateCost, 20f), .001f, StaminaMax);
@@ -309,7 +321,8 @@ namespace C6Lab
                 PlayerMaxHp,
                 CombineSpeed, DropCombineEnabled ? 1f : 0f, ContactCombineEnabled ? 1f : 0f,
                 PotionHeal, RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier,
-                CameraLookHeightOffset
+                CameraLookHeightOffset, TargetSpinStrength, TargetSpinDamping,
+                TargetSpinMaximumSpeed
             };
         }
 
@@ -406,6 +419,9 @@ namespace C6Lab
             relayMaxMultiplier = values[54];
             bombMultiplier = values[55];
             cameraLookHeightOffset = values[56];
+            targetSpinStrength = values[57];
+            targetSpinDamping = values[58];
+            targetSpinMaximumSpeed = values[59];
             error = string.Empty;
             return true;
         }

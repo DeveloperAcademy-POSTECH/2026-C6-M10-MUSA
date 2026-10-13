@@ -64,7 +64,7 @@ namespace C6Lab.Tests
                 contact, velocity), Is.False);
             Assert.That(gate.TryAccept("session-a", 2u, "", LabOrbElement.Fire, 20,
                 contact, velocity), Is.False);
-            Assert.That(gate.TryAccept("session-a", 2u, "shot-1", LabOrbElement.None, 20,
+            Assert.That(gate.TryAccept("session-a", 2u, "shot-1", (LabOrbElement)(-1), 20,
                 contact, velocity), Is.False);
             Assert.That(gate.TryAccept("session-a", 2u, "shot-1", LabOrbElement.Fire, 0,
                 contact, velocity), Is.False);
@@ -72,11 +72,18 @@ namespace C6Lab.Tests
                 new Vector3(float.NaN, 0, 0), velocity), Is.False);
             Assert.That(gate.TryAccept("session-a", 2u, "shot-1", LabOrbElement.Fire, 20,
                 contact, new Vector3(float.PositiveInfinity, 0, 0)), Is.False);
+            Assert.That(gate.TryAccept("session-a", 2u, "shot-1", LabOrbElement.Fire, 20,
+                contact, velocity, float.NaN), Is.False);
+            Assert.That(gate.TryAccept("session-a", 2u, "shot-1", LabOrbElement.Fire, 20,
+                contact, velocity, 1440.1f), Is.False);
 
             Assert.That(gate.TryAccept("session-a", 2u, "shot-1", LabOrbElement.Fire, 20,
-                contact, velocity), Is.True);
+                contact, velocity, -180f), Is.True);
             Assert.That(gate.TryAccept("session-a", 2u, "shot-1", LabOrbElement.Fire, 20,
                 contact, velocity), Is.False);
+            Assert.That(gate.TryAccept("session-a", 2u, "shot-item", LabOrbElement.None, 60,
+                contact, velocity, 125f), Is.True,
+                "A confirmed relay/bomb hit must animate and spin on clients too.");
             gate.SetActive("session-a", 3u);
             Assert.That(gate.TryAccept("session-a", 2u, "shot-2", LabOrbElement.Fire, 20,
                 contact, velocity), Is.False);
