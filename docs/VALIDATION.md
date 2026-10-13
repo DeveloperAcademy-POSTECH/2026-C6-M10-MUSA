@@ -268,3 +268,20 @@ PlayMode의 합격은 실제 카메라 화면의 프레임별 시각 품질이�
 | iOS 실기기 | NOT_RUN | 실기기 화면에서 자물쇠·원의 선명도와 크기 확인이 필요하다. |
 
 추가·변경한 검사: `LabModelTests.OnlyTheUnlockingHandoffStampsTheUnlockTimeAndTheNextHandoffClearsIt`, `LabSessionSettingsTests`의 스냅샷 왕복(해금 시각 포함), `LabOrbPhysicsTests`의 자물쇠·흐림 확인, `JustUnlockedItemPlaysTheUnlockEffectOnceAndAnOpenItemDoesNot`, `UnlockLiftsThePadlockThenLandsAShrinkingRingWithOneGlow`.
+
+## 구미호 3D 표시 교체 — 2026-10-13, 이슈 #128
+
+기준은 Unity **6000.6.5f1**, `feat/#128-gumiho-target-visual` 브랜치다. `Assets/Lab/Scenes/Lab.unity`의 한 전투 Scene에서 구미호 표시 프리팹을 사용하고, 기존 Cylinder의 MeshCollider·명중 보상·Host 판정·회전 동기화는 유지하는 변경이다. 이 절은 #115 회전 검사의 실행 상태를 승계하지 않는다. 검증 시나리오는 [V-07·V-26·V-28](LAB_SCOPE.md)이다.
+
+| 항목 | 상태 | 이 브랜치의 확인 근거 또는 남은 작업 |
+| --- | --- | --- |
+| 저장 Scene·프리팹 참조 | PASS (Editor·PlayMode) | Unity에서 FBX·`Gumiho_Mat` 텍스처를 불러와 저장 Scene의 `Visual Mount` 프리팹 인스턴스를 확인했다. 업그레이드 메뉴를 재실행해도 같은 Scene/프리팹 연결을 유지했다. Editor 로그 `C6_GUMIHO_VISUAL_SAVED` 2회와 아래 구미호 PlayMode XML을 근거로 한다. |
+| 숨긴 원통·피격체 분리 | PASS (PlayMode) | `SavedBattleSceneDisplaysGumihoWithoutReplacingTheHitbox`: 저장 Scene의 원통 MeshRenderer만 비활성, MeshCollider·MeshFilter 유지, 표시 프리팹의 별도 Collider/Rigidbody 없음. |
+| 피격 강조·공동 운동 | PASS (직접 충격 PlayMode) | `SavedGumihoFlashesOnImpactWithoutChangingTheSourceTexture`에서 텍스처·공유 재질 보존과 표면 색 강조/복원을 확인했다. `SavedBattleSceneDisplaysGumihoWithoutReplacingTheHitbox`에서 표시물과 피격체의 같은 피벗 회전을 확인했다. 실제 투척·HP 숫자·확대 원형을 함께 보는 통합 화면 검사는 아래 Host/Client 항목에 남긴다. |
+| Unity 컴파일 | PASS (Editor) | Unity 6000.6.5f1에서 수정 스크립트를 임포트하고 아래 PlayMode를 실행했다. 해당 실행 로그에 `error CS`는 없었다. |
+| EditMode | NOT_RUN | 이 변경 전용 EditMode 검사는 실행하지 않았다. |
+| PlayMode | PASS (선별 14/14) | 구미호 전용 2/2, 기존 흔들림·회전 회귀 12/12, 실패·스킵 각 0. Unity Test Runner XML: `/private/tmp/c6-issue128-gumiho-playmode.xml`, `/private/tmp/c6-issue128-hanging-playmode.xml`. 전체 PlayMode 55건을 실행한 결과는 아니다. |
+| Mac Host/Client | NOT_RUN | 같은 명중 뒤 두 화면에 구미호의 피격 강조·회전 방향·HP 감소가 일치하는지 확인한다. 빗나감에서 피해와 명중 연출이 없어야 한다. |
+| iOS Xcode 출력·앱 빌드·실기기 성능 | NOT_RUN | 원본 FBX는 약 42.8만 삼각형·15MB, 텍스처는 1254×1254다. iPhone의 실제 프레임률·메모리·발열은 측정 전이며 모바일 경량화/LOD 여부는 이 결과로 판단한다. Xcode 생성, 서명 앱 빌드, 설치·화면·성능은 별도 기록한다. |
+
+Editor의 390×844 Game View에서 텍스처가 입혀진 구미호의 표시 자체는 관찰했다. 화면상 모델이 작아 보여 실제 기기에서 크기·가독성·실루엣과 Collider의 일치감을 다시 확인해야 한다. 구미호 메시 약 42.8만 삼각형의 iPhone 성능도 미측정이다. 선택 PlayMode 실행 중 Netcode 패키지의 `OnApplicationQuit` 싱글턴 경고가 1회 출력됐지만 테스트 실패는 없었다. 저장 Scene 종료 시 발생했던 `LabTarget` 파괴 참조 오류는 `LabNetwork.OnDestroy`가 대상 참조를 먼저 비우도록 바꾼 뒤 재실행 로그에서 재현되지 않았다.

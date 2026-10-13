@@ -3,8 +3,8 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
-    /// The visible Unity Cylinder mesh is also the exact static hitbox mesh. A later art prefab
-    /// may be mounted separately without changing this collider or any combat rule.
+    /// The Unity Cylinder mesh remains the exact static hitbox. Its renderer can be hidden
+    /// while presentation art is mounted separately, without changing any combat rule.
     /// </summary>
     public sealed class LabTarget : MonoBehaviour
     {

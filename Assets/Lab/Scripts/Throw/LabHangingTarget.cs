@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace C6Lab
@@ -6,6 +7,20 @@ namespace C6Lab
     [DisallowMultipleComponent]
     public sealed class LabHangingTarget : MonoBehaviour
     {
+        private const float FlashDuration = .16f;
+        private static readonly Color HitFlashColor = new Color(1f, .85f, .45f);
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int LegacyColorId = Shader.PropertyToID("_Color");
+
+        private sealed class FlashSurface
+        {
+            public Renderer Renderer;
+            public int MaterialIndex;
+            public int ColorProperty;
+            public Color BaseColor;
+            public MaterialPropertyBlock Properties;
+        }
+
         [SerializeField, Min(0f), Tooltip("Higher values produce a stronger swing from the same impact. Range: 0–20.")]
         private float impactStrength = 2.4f;
         [SerializeField, Min(0f), Tooltip("How quickly swing momentum fades. Zero keeps oscillating. Range: 0–20.")]
@@ -46,6 +61,7 @@ namespace C6Lab
         private Material bodyMaterial, ropeMaterial;
         private Color bodyBaseColor;
         private float flash;
+        private readonly List<FlashSurface> visualFlashSurfaces = new List<FlashSurface>();
         public Vector2 SwingAngles => angle;
         // Deliberately unwrapped: a value greater than 360 confirms a complete revolution.
         public float YawAngleDegrees => yawAngleDegrees;
@@ -80,6 +96,7 @@ namespace C6Lab
             bodyBaseColor = bodyMaterial.HasProperty("_BaseColor")
                 ? bodyMaterial.GetColor("_BaseColor") : Color.white;
             body.GetComponent<Renderer>().sharedMaterial = bodyMaterial;
+            RefreshFlashRenderers();
             ropeMaterial = MakeMaterial(new Color(.64f, .52f, .32f), .1f);
             rope = Primitive("Rope", PrimitiveType.Cylinder, pivot,
                 new Vector3(0, -.425f, 0), new Vector3(.055f, .425f, .055f), ropeMaterial);
@@ -159,10 +176,14 @@ namespace C6Lab
             ApplyRopeLength();
             Vector3 local = transform.InverseTransformDirection(incomingVelocity);
             if (!Finite(local.x) || !Finite(local.y) || !Finite(local.z)) return;
+            // A replacement visual may have been mounted after Awake. Refresh only when hit,
+            // not every frame, so newly added mesh renderers receive the same feedback.
+            RefreshFlashRenderers();
             velocity += Vector2.ClampMagnitude(new Vector2(-local.z, local.x) * ImpactStrength, 55f);
             velocity = Vector2.ClampMagnitude(velocity, 85f);
             verticalVelocity = Mathf.Clamp(verticalVelocity + Mathf.Min(local.magnitude, 30f) * BounceStrength, -8f, 8f);
-            flash = .16f;
+            flash = FlashDuration;
+            ApplyFlash(1f);
         }
 
         public void ResetSwing()
@@ -171,6 +192,7 @@ namespace C6Lab
             verticalOffset = verticalVelocity = 0f;
             yawAngleDegrees = yawSpeedDegreesPerSecond = 0f;
             flash = 0;
+            ApplyFlash(0f);
             if (pivot != null) pivot.localRotation = Quaternion.identity;
             ApplyYawRotation();
             ApplyRopeLength();
@@ -204,10 +226,60 @@ namespace C6Lab
 
         private void Update()
         {
+            float previousFlash = flash;
             flash = Mathf.Max(0, flash - Time.deltaTime);
-            if (bodyMaterial != null && bodyMaterial.HasProperty("_BaseColor"))
-                bodyMaterial.SetColor("_BaseColor", Color.Lerp(bodyBaseColor,
-                    new Color(1f, .85f, .45f), flash / .16f));
+            if (flash > 0f || previousFlash > 0f) ApplyFlash(flash / FlashDuration);
+        }
+
+        /// <summary>Rebuild the visible art's flash bindings after changing its prefab.</summary>
+        public void RefreshFlashRenderers()
+        {
+            ApplyVisualFlash(0f);
+            visualFlashSurfaces.Clear();
+            if (visualMount == null) return;
+
+            foreach (Renderer renderer in visualMount.GetComponentsInChildren<Renderer>(true))
+            {
+                Material[] materials = renderer.sharedMaterials;
+                for (int index = 0; index < materials.Length; index++)
+                {
+                    Material material = materials[index];
+                    if (material == null) continue;
+                    bool hasBaseColor = material.HasProperty(BaseColorId);
+                    if (!hasBaseColor && !material.HasProperty(LegacyColorId)) continue;
+                    int colorProperty = hasBaseColor ? BaseColorId : LegacyColorId;
+                    visualFlashSurfaces.Add(new FlashSurface
+                    {
+                        Renderer = renderer,
+                        MaterialIndex = index,
+                        ColorProperty = colorProperty,
+                        BaseColor = material.GetColor(colorProperty),
+                        Properties = new MaterialPropertyBlock()
+                    });
+                }
+            }
+            ApplyVisualFlash(flash / FlashDuration);
+        }
+
+        private void ApplyFlash(float strength)
+        {
+            if (bodyMaterial != null && bodyMaterial.HasProperty(BaseColorId))
+                bodyMaterial.SetColor(BaseColorId,
+                    Color.Lerp(bodyBaseColor, HitFlashColor, strength));
+            ApplyVisualFlash(strength);
+        }
+
+        private void ApplyVisualFlash(float strength)
+        {
+            foreach (FlashSurface surface in visualFlashSurfaces)
+            {
+                if (surface.Renderer == null) continue;
+                // Preserve the renderer's other per-material overrides and texture bindings.
+                surface.Renderer.GetPropertyBlock(surface.Properties, surface.MaterialIndex);
+                surface.Properties.SetColor(surface.ColorProperty,
+                    Color.Lerp(surface.BaseColor, HitFlashColor, strength));
+                surface.Renderer.SetPropertyBlock(surface.Properties, surface.MaterialIndex);
+            }
         }
 
         private void ApplyYawRotation()
@@ -287,6 +359,7 @@ namespace C6Lab
 
         private void OnDestroy()
         {
+            ApplyVisualFlash(0f);
             if (bodyMaterial != null) Destroy(bodyMaterial);
             if (ropeMaterial != null) Destroy(ropeMaterial);
         }

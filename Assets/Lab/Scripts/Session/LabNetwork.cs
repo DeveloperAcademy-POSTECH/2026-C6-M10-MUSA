@@ -1644,6 +1644,9 @@ namespace C6Lab
                 manager.OnClientDisconnectCallback -= OnDisconnected;
                 manager.OnTransportFailure -= OnTransportFailure;
             }
+            // Scene teardown may have destroyed the target before the network component.
+            // Voluntary Stop() still resets its swing while the target is alive.
+            target = null;
             Stop();
         }
     }
