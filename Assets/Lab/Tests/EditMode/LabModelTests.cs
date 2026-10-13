@@ -778,6 +778,47 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void UnlockedBombIsDefusedAndLivesAFreshOrbLifetimeLikeAnAttackOrb()
+        {
+            var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("bomb-defuse", new ulong[] { 10, 20, 30 }, 0d, bombs);
+                Assert.That(room.TryGenerate(10, "bomb", 0d, out var bomb, out _), Is.True);
+                int locks = bomb.lockSwipes;
+                ulong[] ring = { 10, 20, 30 };
+                LabOrbState unlocked = null;
+                for (int pass = 1; pass <= locks; pass++)
+                    unlocked = PassRight(room, bomb.id, ring[(pass - 1) % ring.Length], pass);
+                Assert.That(unlocked.lockSwipes, Is.Zero);
+                Assert.That(unlocked.createdAt, Is.EqualTo((double)locks), "Unlocking starts a fresh lifetime.");
+
+                ulong holder = unlocked.owner;
+                Assert.That(room.TryGenerate(holder, "bystander", locks + 1d, out var bystander, out _), Is.True);
+                Assert.That(room.Snapshot(locks + 7.9d).orbs.Select(orb => orb.id), Does.Contain(bomb.id));
+                var after = room.Snapshot(locks + 8d);
+                Assert.That(after.orbs.Select(orb => orb.id), Does.Not.Contain(bomb.id),
+                    "An unlocked bomb keeps the 8-second orb lifetime, not the 15-second fuse.");
+                Assert.That(after.orbs.Select(orb => orb.id), Does.Contain(bystander.id),
+                    "A defused bomb leaves the holder's board untouched.");
+                Assert.That(room.DrainBombExplosions(), Is.Empty);
+
+                float[] values = bombs.CaptureDeveloperValues();
+                values[46] = 0f; // unlock swipes min
+                values[47] = 0f; // unlock swipes max
+                Assert.That(bombs.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var open = new LabModel();
+                open.Begin("bomb-open", new ulong[] { 10, 20, 30 }, 0d, bombs);
+                Assert.That(open.TryGenerate(10, "open", 0d, out var openBomb, out _), Is.True);
+                Assert.That(open.Snapshot(7.9d).orbs.Select(orb => orb.id), Does.Contain(openBomb.id));
+                Assert.That(open.Snapshot(8d).orbs, Is.Empty, "A bomb created unlocked follows the same rule.");
+                Assert.That(open.DrainBombExplosions(), Is.Empty);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(bombs); }
+        }
+
+        [Test]
         public void UnlockedBombHitsForTripleDamageAndAMissNeverExplodes()
         {
             var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
