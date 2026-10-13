@@ -306,6 +306,19 @@ namespace C6Lab.Tests
             tuning[5] = 1f;
             tuning[39] = 50f; tuning[40] = 50f;
             tuning[41] = 0f; tuning[42] = 0f; tuning[43] = 0f; tuning[44] = 0f;
+            // This checks the generate-combine-throw-hit path, not throw feel. Pin a throw that
+            // reaches the target so tuning the saved defaults cannot break the path check.
+            tuning[21] = 4f;    // throw origin radius
+            tuning[22] = -.5f;  // throw origin height offset
+            tuning[28] = 2f;    // minimum upward speed
+            tuning[29] = 2.5f;  // lateral gain
+            tuning[30] = 2.1f;  // upward gain
+            tuning[31] = 4.5f;  // forward gain
+            tuning[32] = 18f;   // maximum world speed
+            tuning[33] = 9.81f; // gravity
+            tuning[36] = 1f;    // power exponent
+            tuning[37] = 0f;    // loft offset
+            tuning[38] = 0f;    // air damping
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
             network.config = rawOnly;
 

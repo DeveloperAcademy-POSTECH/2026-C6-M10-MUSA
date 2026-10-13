@@ -137,10 +137,11 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // Paused battle snapshots and room-wide control require the same protocol on every peer.
-        private const ushort LabProtocolVersion = 5611;
+        // The camera tuning and shared pause state change room settings/snapshots;
+        // reject older clients rather than mixing different battle rules.
+        private const ushort LabProtocolVersion = 5612;
         private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/6");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/7");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
