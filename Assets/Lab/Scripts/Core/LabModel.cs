@@ -129,6 +129,14 @@ namespace C6Lab
 
         public bool TryCombine(ulong sender, string firstId, string secondId, string requestId,
             double now, out LabOrbState orb, out string reason)
+            => TryCombine(sender, firstId, secondId, requestId, now, Vector2.zero, out orb, out reason);
+
+        /// <summary>
+        /// 결합 구슬이 결합 직전 두 구슬의 움직임을 이어받는다. 속도는 요청한 기기가 계산해
+        /// 보내며(보드 폭/초), Host는 유한한 값인지 확인하고 최대 이동 속도 안으로 제한한다.
+        /// </summary>
+        public bool TryCombine(ulong sender, string firstId, string secondId, string requestId,
+            double now, Vector2 normalizedVelocity, out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
@@ -141,12 +149,15 @@ namespace C6Lab
 
             orbs.Remove(firstId); orbs.Remove(secondId);
             var element = ElementFor(seed, combinedCount++);
+            Vector2 velocity = Finite(normalizedVelocity)
+                ? Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed)
+                : Vector2.zero;
             orb = new LabOrbState
             {
                 id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = element,
                 origin = LabOrbOrigin.Combined, originOwner = sender,
                 x = (first.x + second.x) * .5f, y = (first.y + second.y) * .5f,
-                vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
+                vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false
             };
             orbs.Add(orb.id, orb);
             reason = "COMBINED";

@@ -1125,7 +1125,9 @@ namespace C6Lab
                     accepted = model.TryUseItem(sender, packet.firstId, uniqueRequestId, now, out result, out reason);
                     break;
                 case "combine":
-                    accepted = model.TryCombine(sender, packet.firstId, packet.secondId, uniqueRequestId, now, out result, out reason);
+                    // 요청한 기기가 보낸 결합 직전 속도(보드 폭/초). Model이 유효성 검사와 상한 제한을 한다.
+                    accepted = model.TryCombine(sender, packet.firstId, packet.secondId, uniqueRequestId, now,
+                        new Vector2(packet.vx, packet.vy), out result, out reason);
                     break;
                 case "transfer":
                     accepted = model.TryTransfer(sender, packet.firstId, packet.right, packet.y, new Vector2(packet.vx, packet.vy), uniqueRequestId, now, out result, out reason);
@@ -1274,10 +1276,10 @@ namespace C6Lab
             Request(new LabNetworkPacket { type = "transfer", requestId = ++requestSequence, firstId = edge.OrbId, right = edge.ToRight, y = edge.Height01, vx = edge.VelocityInBoardWidthsPerSecond.x, vy = edge.VelocityInBoardWidthsPerSecond.y });
         }
 
-        private void OnCombineRequested(string firstId, string secondId, Vector2 center)
+        private void OnCombineRequested(string firstId, string secondId, Vector2 center, Vector2 velocity)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y });
+            Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y, vx = velocity.x, vy = velocity.y });
         }
 
         private void OnUseRequested(string orbId)

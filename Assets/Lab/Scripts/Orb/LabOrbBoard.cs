@@ -97,7 +97,10 @@ namespace C6Lab
         public Rect CenterBounds => bounds;
         public bool InteractionEnabled => interactionEnabled;
         public event Action<LabOrbEdgeCrossing> EdgeCrossed;
-        public event Action<string, string, Vector2> CombineRequested;
+        /// <summary>
+        /// 결합 요청. (첫 구슬, 두 번째 구슬, 결합 위치 0..1, 결합 구슬이 이어받을 속도 보드 폭/초)
+        /// </summary>
+        public event Action<string, string, Vector2, Vector2> CombineRequested;
         /// <summary>The velocity is input displacement divided by board width and seconds.</summary>
         public event Action<LabOrbThrowGesture> ThrowRequested;
         /// <summary>A double tap on an unlocked usable item. The Host applies or rejects its effect.</summary>
@@ -488,13 +491,22 @@ namespace C6Lab
             second.Locked = true;
             first.PendingPartnerId = second.View.OrbId;
             second.PendingPartnerId = first.View.OrbId;
+            // 멈추기 전에 두 구슬의 속도를 기록한다. 잡고 있던 구슬은 속도가 0이다.
+            Vector2 velocity = CombinedVelocity(XY(first.View.Body.linearVelocity),
+                XY(second.View.Body.linearVelocity)) / bounds.width;
             StopMotion(first.View.Body);
             StopMotion(second.View.Body);
             SetBodyMode(first);
             SetBodyMode(second);
             Vector2 middle = ToNormalized((XY(first.View.Body.position) + XY(second.View.Body.position)) * .5f);
-            CombineRequested?.Invoke(first.View.OrbId, second.View.OrbId, middle);
+            CombineRequested?.Invoke(first.View.OrbId, second.View.OrbId, middle, velocity);
         }
+
+        /// <summary>
+        /// 결합 구슬이 이어받을 속도. 같은 무게의 두 구슬이 붙는 것처럼 두 속도의 평균을 쓴다.
+        /// 규칙을 바꿀 때는 이 함수만 고친다.
+        /// </summary>
+        private static Vector2 CombinedVelocity(Vector2 first, Vector2 second) => (first + second) * .5f;
 
         /// <summary>
         /// 구슬끼리 부딪혔을 때, 음+양이고 충분히 빠르게 부딪혔으면 결합을 요청

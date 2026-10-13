@@ -207,6 +207,41 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void CombinedOrbKeepsRequestedVelocityWithinMotionLimit()
+        {
+            LabOrbState yin = null, yang = null;
+            for (int i = 0; i < 10 && (yin == null || yang == null); i++)
+            {
+                Assert.That(model.TryGenerate(10, "keep-" + i, 0d, out var raw, out _), Is.True);
+                if (raw.kind == LabOrbKind.Yin && yin == null) yin = raw;
+                if (raw.kind == LabOrbKind.Yang && yang == null) yang = raw;
+            }
+            Assert.That(yin, Is.Not.Null);
+            Assert.That(yang, Is.Not.Null);
+
+            var requested = new Vector2(.6f, -.4f);
+            Assert.That(model.TryCombine(10, yin.id, yang.id, "keep", 1d, requested, out var combined, out _), Is.True);
+            Assert.That(combined.vx, Is.EqualTo(requested.x).Within(.0001f));
+            Assert.That(combined.vy, Is.EqualTo(requested.y).Within(.0001f));
+            var stored = model.Snapshot(1d).orbs.Single(orb => orb.id == combined.id);
+            Assert.That(new Vector2(stored.vx, stored.vy), Is.EqualTo(requested));
+
+            // Huge requested speeds are limited. Player 20 has its own full stamina.
+            LabOrbState a = null, b = null;
+            for (int i = 0; i < 10 && (a == null || b == null); i++)
+            {
+                Assert.That(model.TryGenerate(20, "unsafe-" + i, 1d, out var raw, out _), Is.True);
+                if (raw.kind == LabOrbKind.Yin && a == null) a = raw;
+                if (raw.kind == LabOrbKind.Yang && b == null) b = raw;
+            }
+            Assert.That(a, Is.Not.Null);
+            Assert.That(b, Is.Not.Null);
+            Assert.That(model.TryCombine(20, a.id, b.id, "huge", 1d, new Vector2(1e6f, 0f), out var fast, out _), Is.True);
+            Assert.That(new Vector2(fast.vx, fast.vy).magnitude, Is.LessThan(1e6f));
+            Assert.That(float.IsNaN(fast.vx) || float.IsInfinity(fast.vx), Is.False);
+        }
+
+        [Test]
         public void OnlyOwnersOppositeRawMayCombineAndCombinationStartsFreshLifetime()
         {
             // Three draws containing both polarities always include a same-polarity pair.
