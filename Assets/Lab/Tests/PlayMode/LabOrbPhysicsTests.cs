@@ -302,7 +302,7 @@ namespace C6Lab.Tests
             var yang = board.UpsertOrb("yang", LabOrbKind.Yang, new Vector2(.65f, .5f),
                 new Vector2(-.9f, 0f));
             int combines = 0;
-            board.CombineRequested += (first, second, center) => combines++;
+            board.CombineRequested += (first, second, center, velocity) => combines++;
             for (int i = 0; i < 30; i++) yield return new WaitForFixedUpdate();
             Assert.That(combines, Is.Zero, "Contact must not request a combination when disabled.");
 
@@ -331,7 +331,7 @@ namespace C6Lab.Tests
             var yang = board.UpsertOrb("yang", LabOrbKind.Yang, new Vector2(.65f, .5f),
                 new Vector2(-.9f, 0f));
             int combines = 0;
-            board.CombineRequested += (first, second, center) => combines++;
+            board.CombineRequested += (first, second, center, velocity) => combines++;
 
             for (int i = 0; i < 30; i++) yield return new WaitForFixedUpdate();
             Assert.That(combines, Is.EqualTo(1), "One physical contact should request one combination.");
@@ -339,6 +339,29 @@ namespace C6Lab.Tests
             Assert.That(yang.Body.isKinematic, Is.True);
             for (int i = 0; i < 10; i++) yield return new WaitForFixedUpdate();
             Assert.That(combines, Is.EqualTo(1), "Pending partners must not request a duplicate.");
+        }
+
+        [UnityTest]
+        public IEnumerator ContactCombineCarriesTheAverageVelocityOfBothOrbs()
+        {
+            SetSerializedField(config, "contactCombineEnabled", true);
+            SetSerializedField(config, "dropCombineEnabled", false);
+            // A moving Yin hits a resting Yang. Equal masses keep the average velocity.
+            board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.3f, .5f), new Vector2(1.2f, 0f));
+            board.UpsertOrb("yang", LabOrbKind.Yang, new Vector2(.6f, .5f));
+            int combines = 0;
+            Vector2 carried = Vector2.zero;
+            board.CombineRequested += (first, second, center, velocity) =>
+            {
+                combines++;
+                carried = velocity;
+            };
+
+            for (int i = 0; i < 40 && combines == 0; i++) yield return new WaitForFixedUpdate();
+            Assert.That(combines, Is.EqualTo(1));
+            Assert.That(carried.x, Is.GreaterThan(.1f), "The combined orb should keep moving the way Yin was rolling.");
+            Assert.That(carried.x, Is.LessThan(1.2f), "Two orbs share one momentum, so it cannot be faster than Yin.");
+            Assert.That(Mathf.Abs(carried.y), Is.LessThan(.2f));
         }
 
         [Test]
@@ -349,7 +372,7 @@ namespace C6Lab.Tests
             var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.3f, .7f));
             var yang = board.UpsertOrb("yang", LabOrbKind.Yang, new Vector2(.7f, .7f));
             int combines = 0;
-            board.CombineRequested += (first, second, center) => combines++;
+            board.CombineRequested += (first, second, center, velocity) => combines++;
 
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(yin), 1d), Is.True);
             Assert.That(board.DragToWorld(BoardPoint(bomb), 1.1d), Is.True);

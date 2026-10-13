@@ -1248,10 +1248,10 @@ namespace C6Lab
             Request(new LabNetworkPacket { type = "transfer", requestId = ++requestSequence, firstId = edge.OrbId, right = edge.ToRight, y = edge.Height01, vx = edge.VelocityInBoardWidthsPerSecond.x, vy = edge.VelocityInBoardWidthsPerSecond.y });
         }
 
-        private void OnCombineRequested(string firstId, string secondId, Vector2 center)
+        private void OnCombineRequested(string firstId, string secondId, Vector2 center, Vector2 velocity)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y });
+            Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y, vx = velocity.x, vy = velocity.y });
         }
 
         private void OnUseRequested(string orbId)
