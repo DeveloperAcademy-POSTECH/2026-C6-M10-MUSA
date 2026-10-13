@@ -1102,7 +1102,9 @@ namespace C6Lab
                     accepted = model.TryUseItem(sender, packet.firstId, uniqueRequestId, now, out result, out reason);
                     break;
                 case "combine":
-                    accepted = model.TryCombine(sender, packet.firstId, packet.secondId, uniqueRequestId, now, out result, out reason);
+                    // 요청한 기기가 보낸 결합 직전 속도(보드 폭/초). Model이 유효성 검사와 상한 제한을 한다.
+                    accepted = model.TryCombine(sender, packet.firstId, packet.secondId, uniqueRequestId, now,
+                        new Vector2(packet.vx, packet.vy), out result, out reason);
                     break;
                 case "transfer":
                     accepted = model.TryTransfer(sender, packet.firstId, packet.right, packet.y, new Vector2(packet.vx, packet.vy), uniqueRequestId, now, out result, out reason);
