@@ -40,10 +40,21 @@ namespace C6Lab
         public ulong originOwner;
         public float x, y, vx, vy;
         public double createdAt;
+        /// <summary>
+        /// Host time of the handoff that unlocked this item, so the receiving screen can play the
+        /// unlock effect; -1 when no handoff unlocked it or it has been handed on since.
+        /// </summary>
+        public double unlockedAt = -1d;
         public ulong revision;
         public bool inFlight;
 
+        /// <summary>An unlock older than this, for example seen after a reconnect, shows the item already open.</summary>
+        public const double UnlockEffectWindowSeconds = 1d;
+
         public LabOrbState Copy() => (LabOrbState)MemberwiseClone();
+
+        public bool JustUnlocked(double serverTime) =>
+            unlockedAt >= 0d && serverTime - unlockedAt <= UnlockEffectWindowSeconds;
     }
 
     [Serializable]

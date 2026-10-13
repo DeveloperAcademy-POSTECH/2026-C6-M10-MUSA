@@ -392,6 +392,20 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void JustUnlockedItemPlaysTheUnlockEffectOnceAndAnOpenItemDoesNot()
+        {
+            var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.4f, .3f), lockSwipes: 0, relayStage: 1,
+                justUnlocked: true);
+            Assert.That(relay.UnlockEffectPlays, Is.EqualTo(1), "An item arriving just unlocked plays the effect.");
+            board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.4f, .3f), lockSwipes: 0, relayStage: 1,
+                justUnlocked: true);
+            Assert.That(relay.UnlockEffectPlays, Is.EqualTo(1), "Repeated snapshots of the same unlock do not replay it.");
+
+            var open = board.UpsertOrb("open", LabOrbKind.Potion, new Vector2(.6f, .3f), lockSwipes: 0);
+            Assert.That(open.UnlockEffectPlays, Is.Zero, "An item created unlocked, or seen late, shows already open.");
+        }
+
+        [Test]
         public void DoubleTapOnAnUnlockedPotionOrBoxRequestsUseButLockedOrSlowTapsDoNot()
         {
             var potion = board.UpsertOrb("potion", LabOrbKind.Potion, new Vector2(.3f, .5f), lockSwipes: 0);

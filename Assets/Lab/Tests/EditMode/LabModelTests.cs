@@ -778,6 +778,39 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void OnlyTheUnlockingHandoffStampsTheUnlockTimeAndTheNextHandoffClearsIt()
+        {
+            var relays = ConfigWith(10f, 0, 0, 100, 0, 0, 0);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("unlock-time", new ulong[] { 10, 20, 30 }, 0d, relays);
+                Assert.That(room.TryGenerate(10, "relay", 0d, out var relay, out _), Is.True);
+                Assert.That(relay.unlockedAt, Is.EqualTo(-1d), "A new item has not been unlocked by a handoff.");
+                int locks = relay.lockSwipes;
+                ulong[] ring = { 10, 20, 30 };
+                LabOrbState passed = null;
+                for (int pass = 1; pass <= locks; pass++)
+                {
+                    passed = PassRight(room, relay.id, ring[(pass - 1) % ring.Length], pass);
+                    if (pass < locks)
+                        Assert.That(passed.unlockedAt, Is.EqualTo(-1d), "A handoff that leaves it locked is not an unlock.");
+                }
+                Assert.That(passed.unlockedAt, Is.EqualTo((double)locks));
+
+                var seen = room.Snapshot(locks + .5d).orbs.Single(orb => orb.id == relay.id);
+                Assert.That(seen.JustUnlocked(locks + .5d), Is.True, "The receiving screen plays the unlock effect.");
+                Assert.That(seen.JustUnlocked(locks + LabOrbState.UnlockEffectWindowSeconds + .1d), Is.False,
+                    "A screen that sees the unlock late shows the item already open.");
+
+                passed = PassRight(room, relay.id, passed.owner, locks + .6d);
+                Assert.That(passed.unlockedAt, Is.EqualTo(-1d), "The next holder receives it already open.");
+                Assert.That(passed.JustUnlocked(locks + .6d), Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(relays); }
+        }
+
+        [Test]
         public void UnlockedBombIsDefusedAndLivesAFreshOrbLifetimeLikeAnAttackOrb()
         {
             var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
