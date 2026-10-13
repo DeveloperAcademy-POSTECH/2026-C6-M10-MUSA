@@ -318,7 +318,7 @@ namespace C6Lab
             seatCamera.RefreshPose();
         }
 
-                /// <summary>
+        /// <summary>
         /// 설정 줄을 카테고리별로 모으고, 카테고리마다 접기/펼치기 제목 줄을 붙인다.
         /// 줄의 위치만 바꾸므로 값 번호(valueInputs 순서)와 APPLY 동작은 그대로다.
         /// </summary>
@@ -326,25 +326,29 @@ namespace C6Lab
         {
             GameObject template = valueInputs[0].transform.parent.gameObject;
             Transform content = template.transform.parent;
+            Text labelStyle = template.transform.Find("SettingLabel").GetComponent<Text>();
             int sibling = 1; // 0번 자리는 인원수 줄(TargetParticipantsRow)이 그대로 쓴다.
 
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
             {
-                // 설정 줄을 복제해 글자만 남긴 제목 줄로 만든다.
-                GameObject header = Instantiate(template, content);
-                header.name = "Category " + category.Title;
-                header.transform.Find("SettingValue").gameObject.SetActive(false);
-                header.transform.Find("SettingSlider").gameObject.SetActive(false);
-                Text title = header.transform.Find("SettingLabel").GetComponent<Text>();
+                // 제목 줄은 글자 + 버튼만 가진 한 겹짜리 오브젝트로 새로 만든다.
+                // 설정 줄들과 같은 위계(Content 바로 아래)에 놓인다.
+                GameObject header = new GameObject("Category " + category.Title,
+                    typeof(RectTransform), typeof(Text), typeof(Button), typeof(LayoutElement));
+                header.layer = content.gameObject.layer;
+                header.transform.SetParent(content, false);
+
+                Text title = header.GetComponent<Text>();
+                title.font = labelStyle.font;
+                title.fontSize = labelStyle.fontSize;
+                title.color = labelStyle.color;
                 title.fontStyle = FontStyle.Bold;
                 title.alignment = TextAnchor.MiddleCenter;
                 title.raycastTarget = true;
-                LayoutElement titleLayout = title.GetComponent<LayoutElement>();
-                if (titleLayout != null)
-                {
-                    titleLayout.preferredWidth = -1f;
-                    titleLayout.flexibleWidth = 1f;
-                }
+
+                LayoutElement titleLayout = header.GetComponent<LayoutElement>();
+                titleLayout.preferredHeight = 30f;
+                titleLayout.flexibleWidth = 1f;
                 header.transform.SetSiblingIndex(sibling++);
 
                 // 이 카테고리의 설정 줄들을 제목 바로 아래로 옮긴다.
@@ -359,7 +363,8 @@ namespace C6Lab
                 string name = category.Title;
                 bool expanded = true;
                 title.text = "- " + name;
-                Button toggle = title.gameObject.AddComponent<Button>();
+                Button toggle = header.GetComponent<Button>();
+                toggle.targetGraphic = title;
                 toggle.onClick.AddListener(() =>
                 {
                     expanded = !expanded;
