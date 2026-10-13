@@ -406,7 +406,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator UnlockLiftsAndFadesThePadlockWhileTheIconSharpens()
+        public IEnumerator UnlockLiftsThePadlockThenLandsAShrinkingRingWithOneGlow()
         {
             var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
             var relayIcon = new Texture2D(8, 8);
@@ -423,14 +423,29 @@ namespace C6Lab.Tests
                 Assert.That(marker.UnlockPlaying, Is.True);
                 Assert.That(marker.LockVisible, Is.True, "A just-unlocked item starts with the padlock on its icon.");
                 Assert.That(marker.IconAlpha, Is.EqualTo(appearance.LockedIconAlpha).Within(.001f));
+                Assert.That(marker.RingVisible, Is.False, "The ring follows a moment after the padlock starts.");
 
                 relay.SetItemState(0, 2);
                 Assert.That(marker.LockVisible, Is.True, "A snapshot update mid-effect does not cut it short.");
 
-                yield return new WaitForSeconds(appearance.UnlockLockSeconds + .2f);
+                yield return new WaitForSeconds(appearance.UnlockRingDelay + appearance.UnlockRingSeconds * .5f);
+                float orbDiameter = 2f * config.OrbRadius;
+                Assert.That(marker.RingVisible, Is.True, "A ring shrinks onto the orb.");
+                Assert.That(marker.RingDiameter, Is.InRange(orbDiameter, orbDiameter * appearance.UnlockRingStartScale));
+
+                bool glowed = false;
+                float giveUp = Time.time + 2f;
+                while (marker.UnlockPlaying && Time.time < giveUp)
+                {
+                    glowed |= marker.GlowVisible;
+                    yield return null;
+                }
+                Assert.That(glowed, Is.True, "The orb glows once as the ring lands.");
                 Assert.That(marker.UnlockPlaying, Is.False);
                 Assert.That(marker.LockVisible, Is.False, "The padlock is gone once it has risen and faded.");
-                Assert.That(marker.IconAlpha, Is.EqualTo(1f), "The icon is sharp once the padlock is gone.");
+                Assert.That(marker.RingVisible, Is.False);
+                Assert.That(marker.GlowVisible, Is.False);
+                Assert.That(marker.IconAlpha, Is.EqualTo(1f), "The icon is sharp once the effect ends.");
             }
             finally
             {
