@@ -92,17 +92,56 @@ namespace C6Lab
     }
 
     /// <summary>
+    /// Maps unscaled transport time to a Host-owned battle time. Connection timeouts and room
+    /// discovery still use real time; only gameplay expiry, recovery and damage use this clock.
+    /// </summary>
+    public sealed class LabBattleClock
+    {
+        private double pausedAt;
+        private double pausedDuration;
+        public bool IsPaused { get; private set; }
+
+        public double Now(double realTime) =>
+            (IsPaused ? pausedAt : realTime) - pausedDuration;
+
+        public bool Pause(double realTime)
+        {
+            if (IsPaused || !Valid(realTime)) return false;
+            pausedAt = realTime;
+            IsPaused = true;
+            return true;
+        }
+
+        public bool Resume(double realTime)
+        {
+            if (!IsPaused || !Valid(realTime) || realTime < pausedAt) return false;
+            pausedDuration += realTime - pausedAt;
+            IsPaused = false;
+            return true;
+        }
+
+        public void Reset()
+        {
+            pausedAt = 0d;
+            pausedDuration = 0d;
+            IsPaused = false;
+        }
+
+        private static bool Valid(double value) => !double.IsNaN(value) && !double.IsInfinity(value) && value >= 0d;
+    }
+
+    /// <summary>
     /// Local Host/Join experiment. The host alone owns LabModel and session tuning.
     /// Only owner motion is simulated locally; requests and damage are accepted by the host.
     /// </summary>
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // Relay stages, bomb explosions, item effects and the camera look height are new
-        // snapshot/settings data; reject older clients rather than mixing room rules.
-        private const ushort LabProtocolVersion = 5611;
+        // The camera tuning and shared pause state change room settings/snapshots;
+        // reject older clients rather than mixing different battle rules.
+        private const ushort LabProtocolVersion = 5612;
         private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/5");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/7");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -120,9 +159,11 @@ namespace C6Lab
 
         private readonly List<ulong> order = new List<ulong>(5);
         private readonly HashSet<ulong> configAcknowledgements = new HashSet<ulong>();
+        private readonly Dictionary<ulong, long> pauseRequestIds = new Dictionary<ulong, long>();
         private readonly Dictionary<ulong, double> pendingApprovals = new Dictionary<ulong, double>();
         private readonly HashSet<string> visibleOrbIds = new HashSet<string>();
         private readonly LabImpactReceiptGate impactReceipts = new LabImpactReceiptGate();
+        private readonly LabBattleClock battleClock = new LabBattleClock();
         private readonly List<string> joinCandidates = new List<string>();
         private LabModel model;
         private double nextSnapshotAt;
@@ -137,6 +178,12 @@ namespace C6Lab
         private string autoTransferredSession;
         private bool stopping;
         private bool stopAfterDisconnect;
+        private bool pendingDeveloperRestart;
+        private bool pauseRequestPending;
+        private double pauseRequestSentAt;
+        private bool locallyPaused;
+        private float timeScaleBeforePause = 1f;
+        private long lobbySnapshotSequenceFloor;
         private string sessionId;
         private LabSnapshot latest;
         private LabConfig sourceConfig;
@@ -190,6 +237,15 @@ namespace C6Lab
         public LabSnapshot Snapshot => latest;
         public bool CanStartBattle => IsHost && !developerSolo && order.Count == targetParticipantCount
             && SessionConfigReady && (latest == null || latest.phase != LabPhase.Playing);
+        public bool IsBattlePaused => latest != null && latest.phase == LabPhase.Playing && latest.paused;
+        public bool CanPauseBattle => IsConnected && latest != null && latest.phase == LabPhase.Playing
+            && !latest.paused && !pauseRequestPending
+            && (IsHost ? model != null && !battleClock.IsPaused : clientConfigReady);
+        public bool CanResumeBattle => IsHost && model != null && model.Phase == LabPhase.Playing
+            && battleClock.IsPaused;
+        public bool CanReturnAllToLobby => IsHost && !developerSolo && model != null;
+        public bool CanRestartSharedBattle => DeveloperBuildAvailable && CanReturnAllToLobby
+            && model.Phase == LabPhase.Playing && battleClock.IsPaused;
 
         private void Awake()
         {
@@ -267,6 +323,14 @@ namespace C6Lab
                 SetNotice(error);
                 return false;
             }
+            pendingDeveloperRestart = false;
+            PublishHostConfigRevision();
+            SetNotice("Settings updated; waiting for all players to confirm.");
+            return true;
+        }
+
+        private void PublishHostConfigRevision()
+        {
             configRevision++;
             configFingerprint = LabSessionSettings.Fingerprint(config.CaptureDeveloperValues(), targetParticipantCount,
                 LabProtocolVersion);
@@ -274,8 +338,6 @@ namespace C6Lab
             configAcknowledgements.Add(LocalPlayerId);
             BroadcastLobby();
             foreach (ulong id in order) if (id != LocalPlayerId) SendSessionConfig(id);
-            SetNotice("Settings updated; waiting for all players to confirm.");
-            return true;
         }
 
         private bool TryInstallSessionConfig(LabConfig candidate, out string error)
@@ -522,6 +584,12 @@ namespace C6Lab
                 SetNotice("Wait for " + targetParticipantCount + " players and matching settings confirmations.");
                 return;
             }
+            pendingDeveloperRestart = false;
+            pauseRequestIds.Clear();
+            pauseRequestPending = false;
+            battleClock.Reset();
+            ApplyLocalPause(false);
+            ClearProjectiles();
             sessionId = Guid.NewGuid().ToString("N");
             impactFeedback?.Clear();
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
@@ -564,6 +632,8 @@ namespace C6Lab
                 return false;
             }
             ClearProjectiles();
+            battleClock.Reset();
+            ApplyLocalPause(false);
             if (board != null) board.Clear();
             visibleOrbIds.Clear();
             latest = null;
@@ -574,6 +644,8 @@ namespace C6Lab
         private void BeginDeveloperSoloRound()
         {
             LastShotReport = string.Empty;
+            battleClock.Reset();
+            ApplyLocalPause(false);
             sessionId = Guid.NewGuid().ToString("N");
             impactFeedback?.Clear();
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
@@ -588,8 +660,124 @@ namespace C6Lab
 
         public void Generate()
         {
-            if (!IsConnected || latest == null || latest.phase != LabPhase.Playing) return;
+            if (!IsConnected || latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
             Request(new LabNetworkPacket { type = "generate", requestId = ++requestSequence });
+        }
+
+        /// <summary>Any current participant may ask the Host to pause this shared round.</summary>
+        public bool PauseBattle()
+        {
+            if (!CanPauseBattle) return false;
+            if (IsHost) return PauseAsHost();
+            bool sent = Send(NetworkManager.ServerClientId, new LabNetworkPacket
+            {
+                type = "pause", sessionId = sessionId, requestId = ++requestSequence
+            });
+            if (sent)
+            {
+                pauseRequestPending = true;
+                pauseRequestSentAt = Time.realtimeSinceStartupAsDouble;
+            }
+            return sent;
+        }
+
+        private bool PauseAsHost()
+        {
+            if (!IsHost || model == null || model.Phase != LabPhase.Playing || battleClock.IsPaused)
+                return false;
+            double realTime = Time.realtimeSinceStartupAsDouble;
+            model.Tick(battleClock.Now(realTime));
+            if (model.Phase != LabPhase.Playing)
+            {
+                PublishSnapshot(true);
+                return false;
+            }
+            if (!battleClock.Pause(realTime)) return false;
+            PublishSnapshot(true);
+            Debug.Log("C6_LAB_PAUSED session=" + sessionId);
+            return true;
+        }
+
+        /// <summary>Only the Host resumes; the same battle time and physical motion continue.</summary>
+        public bool ResumeBattle()
+        {
+            if (!CanResumeBattle) return false;
+            if (!battleClock.Resume(Time.realtimeSinceStartupAsDouble)) return false;
+            PublishSnapshot(true);
+            Debug.Log("C6_LAB_RESUMED session=" + sessionId);
+            return true;
+        }
+
+        /// <summary>Keep the transport, participants, advertised room and approved settings.</summary>
+        public bool ReturnAllToLobby()
+        {
+            if (!CanReturnAllToLobby) return false;
+            EndBattleToLobby();
+            BroadcastLobby();
+            SetNotice("All players returned to the same room lobby.");
+            Debug.Log("C6_LAB_RETURN_TO_LOBBY participants=" + order.Count);
+            return true;
+        }
+
+        /// <summary>Validate Host DEV settings, then start a fresh shared round after every ACK.</summary>
+        public bool RestartBattleWithDeveloperConfig(LabConfig candidate)
+        {
+            if (!CanRestartSharedBattle)
+            {
+                SetNotice("Pause a Host battle before restarting with DEV settings.");
+                return false;
+            }
+            if (!TryInstallSessionConfig(candidate, out string error))
+            {
+                SetNotice(error);
+                return false;
+            }
+            EndBattleToLobby();
+            pendingDeveloperRestart = true;
+            PublishHostConfigRevision();
+            SetNotice("New settings sent; restarting after all players confirm.");
+            TryStartPendingDeveloperRestart();
+            return true;
+        }
+
+        private void TryStartPendingDeveloperRestart()
+        {
+            if (pendingDeveloperRestart && CanStartBattle) StartBattle();
+        }
+
+        private void EndBattleToLobby()
+        {
+            pendingDeveloperRestart = false;
+            pauseRequestIds.Clear();
+            pauseRequestPending = false;
+            ClearProjectiles();
+            board?.Clear();
+            visibleOrbIds.Clear();
+            impactReceipts.Reset();
+            impactFeedback?.Clear();
+            target?.GetComponent<LabHangingTarget>()?.ResetSwing();
+            model = null;
+            latest = null;
+            sessionId = null;
+            battleClock.Reset();
+            ApplyLocalPause(false);
+            LastShotReport = string.Empty;
+        }
+
+        private void ApplyLocalPause(bool pause)
+        {
+            if (locallyPaused == pause) return;
+            if (pause)
+            {
+                timeScaleBeforePause = Time.timeScale;
+                Time.timeScale = 0f;
+                locallyPaused = true;
+            }
+            else
+            {
+                Time.timeScale = timeScaleBeforePause;
+                locallyPaused = false;
+            }
         }
 
         private void Update()
@@ -603,6 +791,8 @@ namespace C6Lab
                 return;
             }
             double now = Time.realtimeSinceStartupAsDouble;
+            if (pauseRequestPending && now - pauseRequestSentAt >= 5d)
+                pauseRequestPending = false;
             foreach (ulong stale in pendingApprovals.Where(item => now - item.Value > 15d)
                          .Select(item => item.Key).ToArray()) pendingApprovals.Remove(stale);
             LabBonjourDiscovery activeDiscovery = discovery;
@@ -645,11 +835,11 @@ namespace C6Lab
                 && now - joinAttemptAt >= JoinAttemptSeconds) AdvanceJoinCandidate();
             if (IsHost && model != null)
             {
-                model.Tick(now);
+                model.Tick(battleClock.Now(now));
                 if (now >= nextSnapshotAt) PublishSnapshot(false);
             }
             // Command-line smoke mode is intentionally separate from ordinary UI play.
-            if (IsConnected && latest != null && latest.phase == LabPhase.Playing)
+            if (IsConnected && latest != null && latest.phase == LabPhase.Playing && !latest.paused)
             {
                 if (autoGenerate && autoGeneratedSession != latest.sessionId)
                 {
@@ -671,7 +861,8 @@ namespace C6Lab
                     }
                 }
             }
-            if (IsConnected && board != null && latest != null && latest.phase == LabPhase.Playing && now >= nextMotionAt)
+            if (IsConnected && board != null && latest != null && latest.phase == LabPhase.Playing
+                && !latest.paused && now >= nextMotionAt)
             {
                 nextMotionAt = now + 0.1;
                 var samples = new List<LabMotionSample>();
@@ -769,7 +960,8 @@ namespace C6Lab
                     return;
                 }
                 Debug.LogWarning("C6_LAB_PEER_LEFT id=" + id);
-                if (model != null) { model = null; latest = null; if (board != null) board.Clear(); }
+                if (model != null) EndBattleToLobby();
+                pendingDeveloperRestart = false;
                 configAcknowledgements.Remove(id);
                 BroadcastLobby();
                 SetStatus("A player left. Connect " + targetParticipantCount + " before starting.");
@@ -796,7 +988,7 @@ namespace C6Lab
             if (!IsHost) return;
             var packet = new LabNetworkPacket { type = "lobby", seats = order.ToArray(),
                 targetParticipants = targetParticipantCount, configRevision = configRevision,
-                configFingerprint = configFingerprint };
+                configFingerprint = configFingerprint, snapshotSequence = snapshotSequence };
             foreach (ulong id in order) if (id != manager.LocalClientId) Send(id, packet);
             SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
                 + " · settings " + configAcknowledgements.Count + "/" + order.Count);
@@ -815,11 +1007,13 @@ namespace C6Lab
         {
             if (!IsHost || model == null) return;
             double now = Time.realtimeSinceStartupAsDouble;
-            latest = model.Snapshot(now);
+            latest = model.Snapshot(battleClock.Now(now));
+            latest.paused = battleClock.IsPaused && latest.phase == LabPhase.Playing;
             AnnounceBombExplosions();
             // Large experimental states are deliberately updated less often instead of queuing
             // many reliable fragments per peer until the network becomes unusable.
             nextSnapshotAt = now + ((latest.orbs?.Length ?? 0) > 100 ? .5d : .1d);
+            ApplyLocalPause(latest.paused);
             SyncBoard();
             string[] pieces;
             try { pieces = LabSessionSettings.ChunkSnapshot(latest); }
@@ -876,10 +1070,27 @@ namespace C6Lab
         private void HandleRequest(ulong sender, LabNetworkPacket packet)
         {
             if (!IsHost || model == null || packet == null || !order.Contains(sender)) return;
-            double now = Time.realtimeSinceStartupAsDouble;
+            double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
             bool accepted = false;
             string reason = "Rejected";
             if (packet.sessionId != sessionId) return;
+            if (packet.type == "pause")
+            {
+                if (packet.requestId < 1
+                    || (pauseRequestIds.TryGetValue(sender, out long previous) && packet.requestId <= previous))
+                    return;
+                pauseRequestIds[sender] = packet.requestId;
+                PauseAsHost();
+                return;
+            }
+            if (battleClock.IsPaused)
+            {
+                if (packet.type == "motion" || packet.type == "motion_batch") return;
+                if (sender == LocalPlayerId) RejectLocally(packet.firstId, "BATTLE_PAUSED");
+                else Send(sender, new LabNetworkPacket { type = "reject", sessionId = sessionId,
+                    firstId = packet.firstId, reason = "BATTLE_PAUSED" });
+                return;
+            }
             LabOrbState result = null;
             string uniqueRequestId = sender + ":" + packet.requestId;
             switch (packet.type)
@@ -935,7 +1146,8 @@ namespace C6Lab
                 PublishSnapshot(true);
             }
             else if (sender == LocalPlayerId) RejectLocally(packet.firstId, reason);
-            else Send(sender, new LabNetworkPacket { type = "reject", firstId = packet.firstId, reason = reason });
+            else Send(sender, new LabNetworkPacket { type = "reject", sessionId = sessionId,
+                firstId = packet.firstId, reason = reason });
         }
 
         private void SpawnHostProjectile(LabOrbState orb, Vector2 releaseVelocity, float releaseX01)
@@ -952,7 +1164,10 @@ namespace C6Lab
             projectile.name = "Projectile " + orb.id;
             projectile.SetMissSurface(battleFloor);
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
-            var notice = new LabNetworkPacket { type = "projectile", firstId = orb.id, owner = orb.owner, element = (int)orb.element, x = launchPosition.x, y = launchPosition.y, z = launchPosition.z, wx = velocity.x, wy = velocity.y, wz = velocity.z };
+            var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
+                firstId = orb.id, owner = orb.owner, element = (int)orb.element,
+                x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
+                wx = velocity.x, wy = velocity.y, wz = velocity.z };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
             Debug.Log("C6_LAB_THROW orb=" + orb.id + " seat=" + seat
                 + " swipe=" + releaseVelocity + " launch=" + velocity
@@ -964,7 +1179,7 @@ namespace C6Lab
         private void OnProjectileResolved(LabProjectileResult result)
         {
             if (!IsHost || model == null) return;
-            double now = Time.realtimeSinceStartupAsDouble;
+            double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
             if (result.Hit)
             {
                 if (model.ConfirmHit(result.ProjectileId, now, out var element, out int actualDamage)
@@ -1015,12 +1230,12 @@ namespace C6Lab
             foreach (string id in visibleOrbIds) if (!current.Contains(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
             foreach (string id in current) visibleOrbIds.Add(id);
-            board.SetInteractionEnabled(latest.phase == LabPhase.Playing);
+            board.SetInteractionEnabled(latest.phase == LabPhase.Playing && !latest.paused);
         }
 
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)
         {
-            if (latest == null || latest.phase != LabPhase.Playing) return;
+            if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
             if (developerSolo)
             {
                 // The single player has no neighbor. Restore the stopped edge orb immediately.
@@ -1035,19 +1250,19 @@ namespace C6Lab
 
         private void OnCombineRequested(string firstId, string secondId, Vector2 center)
         {
-            if (latest == null || latest.phase != LabPhase.Playing) return;
+            if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
             Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y });
         }
 
         private void OnUseRequested(string orbId)
         {
-            if (latest == null || latest.phase != LabPhase.Playing) return;
+            if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
             Request(new LabNetworkPacket { type = "use", requestId = ++requestSequence, firstId = orbId });
         }
 
         private void OnThrowRequested(LabOrbThrowGesture gesture)
         {
-            if (latest == null || latest.phase != LabPhase.Playing) return;
+            if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
             board.SetOrbLocked(gesture.OrbId, true);
             Request(new LabNetworkPacket { type = "launch", requestId = ++requestSequence,
                 firstId = gesture.OrbId, x = gesture.ReleaseX01,
@@ -1062,12 +1277,13 @@ namespace C6Lab
                 if (sender == LocalPlayerId || !order.Contains(sender)) return;
                 if (packet.type == "config_ack")
                 {
-                    if (packet.configRevision == configRevision
+                    if (model == null && packet.configRevision == configRevision
                         && packet.configFingerprint == configFingerprint)
                     {
                         configAcknowledgements.Add(sender);
                         BroadcastLobby();
                         if (autoStart && CanStartBattle) StartBattle();
+                        else TryStartPendingDeveloperRestart();
                     }
                     return;
                 }
@@ -1079,13 +1295,25 @@ namespace C6Lab
             {
                 case "lobby":
                     if (packet.targetParticipants < 2 || packet.targetParticipants > 5
-                        || packet.seats == null || packet.seats.Length > packet.targetParticipants) return;
+                        || packet.seats == null || packet.seats.Length > packet.targetParticipants
+                        || packet.snapshotSequence < incomingSequence
+                        || packet.snapshotSequence < lobbySnapshotSequenceFloor) return;
+                    lobbySnapshotSequenceFloor = packet.snapshotSequence;
+                    incomingSequence = Math.Max(incomingSequence, packet.snapshotSequence);
+                    incomingChunks = null;
+                    incomingChunkCount = 0;
+                    incomingChunkReceived = 0;
                     order.Clear();
                     latest = null;
+                    sessionId = null;
+                    pauseRequestPending = false;
                     impactReceipts.Reset();
                     impactFeedback?.Clear();
+                    ClearProjectiles();
+                    target?.GetComponent<LabHangingTarget>()?.ResetSwing();
                     visibleOrbIds.Clear();
                     if (board != null) board.Clear();
+                    ApplyLocalPause(false);
                     order.AddRange(packet.seats);
                     targetParticipantCount = packet.targetParticipants;
                     if (packet.configRevision != configRevision || packet.configFingerprint != configFingerprint)
@@ -1101,7 +1329,7 @@ namespace C6Lab
                     ReceiveSnapshotChunk(packet);
                     break;
                 case "reject":
-                    RejectLocally(packet.firstId, packet.reason);
+                    if (packet.sessionId == sessionId) RejectLocally(packet.firstId, packet.reason);
                     break;
                 case "notice":
                     if (packet.sessionId == sessionId) SetNotice(packet.reason);
@@ -1118,7 +1346,8 @@ namespace C6Lab
                     }
                     break;
                 case "projectile":
-                    if (target != null && config != null && Finite(packet.x) && Finite(packet.y)
+                    if (latest != null && packet.sessionId == sessionId
+                        && target != null && config != null && Finite(packet.x) && Finite(packet.y)
                         && Finite(packet.z) && Finite(packet.wx) && Finite(packet.wy) && Finite(packet.wz))
                     {
                         Vector3 position = new Vector3(packet.x, packet.y, packet.z);
@@ -1173,6 +1402,7 @@ namespace C6Lab
             if (!clientConfigReady || packet.configRevision != configRevision
                 || packet.configFingerprint != configFingerprint
                 || string.IsNullOrEmpty(packet.sessionId) || packet.snapshotSequence < 1
+                || packet.snapshotSequence <= lobbySnapshotSequenceFloor
                 || packet.chunkCount < 1 || packet.chunkCount > 256
                 || packet.chunkIndex < 0 || packet.chunkIndex >= packet.chunkCount
                 || string.IsNullOrEmpty(packet.chunkData)
@@ -1205,7 +1435,8 @@ namespace C6Lab
             if (snapshot == null || snapshot.sessionId != packet.sessionId
                 || snapshot.players == null || snapshot.players.Length != targetParticipantCount) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
-            bool logTransition = latest == null || latest.sessionId != snapshot.sessionId || latest.phase != snapshot.phase;
+            bool logTransition = latest == null || latest.sessionId != snapshot.sessionId
+                || latest.phase != snapshot.phase || latest.paused != snapshot.paused;
             if (sessionId != snapshot.sessionId || latest == null || latest.round != snapshot.round)
             {
                 target?.GetComponent<LabHangingTarget>()?.ResetSwing();
@@ -1213,10 +1444,13 @@ namespace C6Lab
             }
             sessionId = snapshot.sessionId;
             latest = snapshot;
+            if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
+            ApplyLocalPause(snapshot.phase == LabPhase.Playing && snapshot.paused);
             SyncBoard();
             if (logTransition && latest.phase == LabPhase.Playing) SetNotice(string.Empty);
-            SetStatus(latest.phase + ": " + targetParticipantCount + " / " + targetParticipantCount);
+            SetStatus((latest.paused ? "PAUSED" : latest.phase.ToString())
+                + ": " + targetParticipantCount + " / " + targetParticipantCount);
             if (logTransition) Debug.Log("C6_LAB_SNAPSHOT phase=" + latest.phase + " hp=" + latest.hp
                 + " remaining=" + latest.remaining.ToString("F1") + " orbs=" + (latest.orbs?.Length ?? 0));
         }
@@ -1273,6 +1507,11 @@ namespace C6Lab
 
         private void ResetLocal()
         {
+            ApplyLocalPause(false);
+            battleClock.Reset();
+            pendingDeveloperRestart = false;
+            pauseRequestIds.Clear();
+            pauseRequestPending = false;
             ClearProjectiles();
             order.Clear();
             configAcknowledgements.Clear();
@@ -1292,6 +1531,7 @@ namespace C6Lab
             incomingChunks = null;
             incomingChunkCount = 0;
             incomingChunkReceived = 0;
+            lobbySnapshotSequenceFloor = 0;
             LastShotReport = string.Empty;
             requestSequence = 0;
             if (board != null) board.Clear();

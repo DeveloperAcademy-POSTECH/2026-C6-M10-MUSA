@@ -55,7 +55,7 @@ namespace C6Lab
                 Anchor = hitbox,
                 AnchorLocalPoint = targetLocalPoint,
                 Color = color,
-                StartedAt = Time.unscaledTime
+                StartedAt = Time.time
             };
             hit.Root = NewRect("Hit Feedback", effectLayer);
             hit.Root.anchorMin = hit.Root.anchorMax = new Vector2(.5f, .5f);
@@ -157,7 +157,7 @@ namespace C6Lab
             for (int i = activeHits.Count - 1; i >= 0; i--)
             {
                 ActiveHit hit = activeHits[i];
-                float progress = (Time.unscaledTime - hit.StartedAt) / Mathf.Max(.05f, lifetime);
+                float progress = (Time.time - hit.StartedAt) / Mathf.Max(.05f, lifetime);
                 if (progress >= 1f || hit.Anchor == null || hit.Root == null)
                 {
                     if (hit.Root != null) Destroy(hit.Root.gameObject);

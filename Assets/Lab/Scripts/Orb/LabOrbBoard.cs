@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 namespace C6Lab
@@ -412,6 +413,7 @@ namespace C6Lab
 
             var primary = Touchscreen.current?.primaryTouch;
             if (primary != null && primary.press.wasPressedThisFrame
+                && !PointerStartedOverUi(primary.position.ReadValue())
                 && TryScreenToWorld(primary.position.ReadValue(), out var touchPoint)
                 && TryBeginDragAtWorld(touchPoint, now))
             {
@@ -420,9 +422,22 @@ namespace C6Lab
             }
             var pointer = Mouse.current;
             if (pointer != null && pointer.leftButton.wasPressedThisFrame
+                && !PointerStartedOverUi(pointer.position.ReadValue())
                 && TryScreenToWorld(pointer.position.ReadValue(), out var mousePoint)
                 && TryBeginDragAtWorld(mousePoint, now))
                 heldByTouch = false;
+        }
+
+        private static bool PointerStartedOverUi(Vector2 screenPosition)
+        {
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem == null) return false;
+            var pointer = new PointerEventData(eventSystem) { position = screenPosition };
+            var hits = new List<RaycastResult>();
+            eventSystem.RaycastAll(pointer, hits);
+            for (int i = 0; i < hits.Count; i++)
+                if (hits[i].module is UnityEngine.UI.GraphicRaycaster) return true;
+            return false;
         }
 
         private void FixedUpdate()
