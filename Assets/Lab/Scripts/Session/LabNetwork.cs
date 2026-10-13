@@ -98,9 +98,10 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // Impact packets now carry the confirmed damage, element, target-local hit point, and round.
-        // Reject older clients instead of silently omitting hit feedback in a mixed-version room.
-        private const ushort LabProtocolVersion = 5607;
+        // Relay stages, bomb explosions and item effect settings are new snapshot/settings data;
+        // reject older clients rather than mixing rooms with different item rules.
+        private const ushort LabProtocolVersion = 5610;
+        private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/5");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
@@ -201,6 +202,7 @@ namespace C6Lab
                 board.EdgeCrossed += OnEdgeCrossed;
                 board.CombineRequested += OnCombineRequested;
                 board.ThrowRequested += OnThrowRequested;
+                board.UseRequested += OnUseRequested;
             }
             if (manager != null)
             {
@@ -814,6 +816,7 @@ namespace C6Lab
             if (!IsHost || model == null) return;
             double now = Time.realtimeSinceStartupAsDouble;
             latest = model.Snapshot(now);
+            AnnounceBombExplosions();
             // Large experimental states are deliberately updated less often instead of queuing
             // many reliable fragments per peer until the network becomes unusable.
             nextSnapshotAt = now + ((latest.orbs?.Length ?? 0) > 100 ? .5d : .1d);
@@ -846,6 +849,16 @@ namespace C6Lab
             Changed?.Invoke();
         }
 
+        private void AnnounceBombExplosions()
+        {
+            foreach (ulong owner in model.DrainBombExplosions())
+            {
+                Debug.Log("C6_LAB_BOMB_EXPLODED owner=" + owner);
+                if (owner == LocalPlayerId) SetNotice(BombExplodedNotice);
+                else Send(owner, new LabNetworkPacket { type = "notice", sessionId = sessionId, reason = BombExplodedNotice });
+            }
+        }
+
         private void AbortOversizedSnapshot(string reason)
         {
             Debug.LogError("C6_LAB_SNAPSHOT_ABORT " + reason);
@@ -873,6 +886,9 @@ namespace C6Lab
             {
                 case "generate":
                     accepted = model.TryGenerate(sender, uniqueRequestId, now, out result, out reason);
+                    break;
+                case "use":
+                    accepted = model.TryUseItem(sender, packet.firstId, uniqueRequestId, now, out result, out reason);
                     break;
                 case "combine":
                     accepted = model.TryCombine(sender, packet.firstId, packet.secondId, uniqueRequestId, now, out result, out reason);
@@ -990,8 +1006,11 @@ namespace C6Lab
                 current.Add(orb.id);
                 bool showRise = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
                     && orb.kind != LabOrbKind.Combined;
+                // Every screen derives a bomb's fuse from the shared Host clock in the snapshot.
+                float fuse = orb.kind == LabOrbKind.Bomb && config != null
+                    ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
-                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element, orb.lockSwipes);
+                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element, orb.lockSwipes, orb.relayStage, fuse);
             }
             foreach (string id in visibleOrbIds) if (!current.Contains(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
@@ -1018,6 +1037,12 @@ namespace C6Lab
         {
             if (latest == null || latest.phase != LabPhase.Playing) return;
             Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y });
+        }
+
+        private void OnUseRequested(string orbId)
+        {
+            if (latest == null || latest.phase != LabPhase.Playing) return;
+            Request(new LabNetworkPacket { type = "use", requestId = ++requestSequence, firstId = orbId });
         }
 
         private void OnThrowRequested(LabOrbThrowGesture gesture)
@@ -1077,6 +1102,9 @@ namespace C6Lab
                     break;
                 case "reject":
                     RejectLocally(packet.firstId, packet.reason);
+                    break;
+                case "notice":
+                    if (packet.sessionId == sessionId) SetNotice(packet.reason);
                     break;
                 case "targetImpact":
                     if (target != null && impactReceipts.TryAccept(packet.sessionId, packet.round,
@@ -1334,6 +1362,7 @@ namespace C6Lab
                 board.EdgeCrossed -= OnEdgeCrossed;
                 board.CombineRequested -= OnCombineRequested;
                 board.ThrowRequested -= OnThrowRequested;
+                board.UseRequested -= OnUseRequested;
             }
             if (manager != null)
             {

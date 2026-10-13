@@ -592,6 +592,232 @@ namespace C6Lab.Tests
             finally { UnityEngine.Object.DestroyImmediate(rawOnly); }
         }
 
+        [Test]
+        public void PotionHealsOnlyItsUnlockedOwnerUpToMaxHpAndIsKeptWhenFull()
+        {
+            var potions = ConfigWith(10f, 0, 0, 0, 0, 100, 0);
+            try
+            {
+                var locked = new LabModel();
+                locked.Begin("potion-locked", new ulong[] { 10, 20, 30 }, 0d, potions);
+                Assert.That(locked.TryGenerate(10, "locked", 0d, out var lockedPotion, out _), Is.True);
+                Assert.That(lockedPotion.lockSwipes, Is.GreaterThan(0));
+                Assert.That(locked.TryUseItem(10, lockedPotion.id, "use-locked", 0d, out _, out var lockedReason), Is.False);
+                Assert.That(lockedReason, Is.EqualTo("ITEM_LOCKED"));
+
+                float[] values = potions.CaptureDeveloperValues();
+                values[46] = 0f; // unlock swipes min
+                values[47] = 0f; // unlock swipes max
+                Assert.That(potions.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("potion-open", new ulong[] { 10, 20, 30 }, 0d, potions);
+                Assert.That(room.TryGenerate(10, "first", 0d, out var potion, out _), Is.True);
+                Assert.That(potion.kind, Is.EqualTo(LabOrbKind.Potion));
+                Assert.That(potion.lockSwipes, Is.Zero);
+
+                Assert.That(room.TryUseItem(10, potion.id, "full", .1d, out _, out var fullReason), Is.False);
+                Assert.That(fullReason, Is.EqualTo("HP_FULL"));
+                Assert.That(room.Snapshot(.1d).orbs.Any(orb => orb.id == potion.id), Is.True, "A refused potion is kept.");
+
+                Assert.That(room.TryApplyPlayerDamage(10, 25, .2d), Is.True);
+                Assert.That(room.TryUseItem(20, potion.id, "foreign", .3d, out _, out var foreignReason), Is.False);
+                Assert.That(foreignReason, Is.EqualTo("NOT_OWNED_IDLE"));
+                Assert.That(room.TryUseItem(10, potion.id, "heal", .3d, out _, out var healReason), Is.True);
+                Assert.That(healReason, Is.EqualTo("ITEM_USED"));
+                var healed = room.Snapshot(.3d);
+                Assert.That(healed.players.Single(player => player.id == 10).personalHp, Is.EqualTo(285));
+                Assert.That(healed.players.Single(player => player.id == 20).personalHp, Is.EqualTo(300));
+                Assert.That(healed.orbs.Any(orb => orb.id == potion.id), Is.False, "A used potion is consumed.");
+
+                Assert.That(room.TryGenerate(10, "second", .4d, out var second, out _), Is.True);
+                Assert.That(room.TryUseItem(10, second.id, "cap", .5d, out _, out _), Is.True);
+                Assert.That(room.Snapshot(.5d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(295));
+                Assert.That(room.TryGenerate(10, "third", .6d, out var third, out _), Is.True);
+                Assert.That(room.TryUseItem(10, third.id, "capped", .7d, out _, out _), Is.True);
+                Assert.That(room.Snapshot(.7d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(300),
+                    "Healing never exceeds Player Max HP.");
+
+                Assert.That(room.TryApplyPlayerDamage(20, 300, .8d), Is.True);
+                Assert.That(room.Snapshot(.8d).phase, Is.EqualTo(LabPhase.Playing), "Others are still standing.");
+                Assert.That(room.TryGenerate(20, "downed", .8d, out var downedPotion, out _), Is.True);
+                Assert.That(room.TryUseItem(20, downedPotion.id, "revive", .9d, out _, out var downReason), Is.False);
+                Assert.That(downReason, Is.EqualTo("PLAYER_DOWN"), "A potion cannot revive a player at 0 HP.");
+                Assert.That(room.Snapshot(.9d).players.Single(player => player.id == 20).personalHp, Is.Zero);
+
+                Assert.That(model.TryGenerate(10, "raw", 0d, out var raw, out _), Is.True);
+                Assert.That(model.TryUseItem(10, raw.id, "raw-use", 0d, out _, out var rawReason), Is.False);
+                Assert.That(rawReason, Is.EqualTo("NOT_USABLE"));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(potions); }
+        }
+
+        [Test]
+        public void SecretBoxOpensIntoTwoThrowableElementOrbsOnlyWhenThereIsRoom()
+        {
+            var boxes = ConfigWith(1f, 0, 0, 0, 100, 0, 0);
+            try
+            {
+                float[] values = boxes.CaptureDeveloperValues();
+                values[9] = 3f;  // stored orb limit
+                values[46] = 0f; // unlock swipes min
+                values[47] = 0f; // unlock swipes max
+                Assert.That(boxes.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("box-open", new ulong[] { 10, 20, 30 }, 0d, boxes);
+                Assert.That(room.TryGenerate(10, "box", 0d, out var box, out _), Is.True);
+                Assert.That(box.kind, Is.EqualTo(LabOrbKind.SecretBox));
+
+                Assert.That(room.TryUseItem(10, box.id, "open", .5d, out _, out var openReason), Is.True);
+                Assert.That(openReason, Is.EqualTo("ITEM_USED"));
+                var opened = room.Snapshot(.5d).orbs.Where(orb => orb.owner == 10).OrderBy(orb => orb.x).ToArray();
+                Assert.That(opened.Length, Is.EqualTo(2), "The box is replaced by exactly two orbs.");
+                Assert.That(opened.Any(orb => orb.id == box.id), Is.False);
+                foreach (var orb in opened)
+                {
+                    Assert.That(orb.kind, Is.EqualTo(LabOrbKind.Combined));
+                    Assert.That(orb.element, Is.Not.EqualTo(LabOrbElement.None));
+                    Assert.That(orb.createdAt, Is.EqualTo(.5d), "Opened orbs start a fresh orb lifetime.");
+                    Assert.That(orb.y, Is.EqualTo(box.y));
+                }
+                Assert.That(opened[0].x, Is.EqualTo(box.x - .05f).Within(.0001f));
+                Assert.That(opened[1].x, Is.EqualTo(box.x + .05f).Within(.0001f));
+                Assert.That(room.TryLaunch(10, opened[0].id, "throw", .6d, out _, out var launchReason), Is.True, launchReason);
+
+                for (int i = 0; i < 3; i++)
+                    Assert.That(room.TryGenerate(20, "full-" + i, .7d, out _, out _), Is.True);
+                var fullBox = room.Snapshot(.7d).orbs.First(orb => orb.owner == 20);
+                Assert.That(room.TryUseItem(20, fullBox.id, "no-room", .8d, out _, out var fullReason), Is.False);
+                Assert.That(fullReason, Is.EqualTo("STORAGE_FULL"));
+                Assert.That(room.Snapshot(.8d).orbs.Any(orb => orb.id == fullBox.id), Is.True, "A box without room is kept.");
+
+                Assert.That(room.Snapshot(8.4d).orbs.Select(orb => orb.id), Does.Contain(opened[1].id));
+                Assert.That(room.Snapshot(8.5d).orbs.Select(orb => orb.id), Does.Not.Contain(opened[1].id));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(boxes); }
+        }
+
+        [Test]
+        public void RelayBecomesX1OnUnlockThenX2AndMaxOnHandoffsAndHitsHarder()
+        {
+            var relays = ConfigWith(10f, 0, 0, 100, 0, 0, 0);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("relay-stages", new ulong[] { 10, 20, 30 }, 0d, relays);
+                Assert.That(room.TryGenerate(10, "relay", 0d, out var relay, out _), Is.True);
+                int locks = relay.lockSwipes;
+                Assert.That(locks, Is.InRange(2, 4));
+                Assert.That(relay.relayStage, Is.Zero);
+                Assert.That(room.TryLaunch(10, relay.id, "locked-throw", 0d, out _, out var lockedReason), Is.False);
+                Assert.That(lockedReason, Is.EqualTo("RAW_CANNOT_ATTACK"), "A locked relay is not an attack orb yet.");
+
+                // The unlocking handoff makes it x1, the next two make x2 and MAX, and MAX stays.
+                ulong[] ring = { 10, 20, 30 };
+                for (int pass = 1; pass <= locks + 3; pass++)
+                {
+                    var passed = PassRight(room, relay.id, ring[(pass - 1) % ring.Length], pass * .1d);
+                    int expected = pass < locks ? 0 : Math.Min(3, pass - locks + 1);
+                    Assert.That(passed.relayStage, Is.EqualTo(expected), "after handoff " + pass);
+                }
+
+                float[] values = relays.CaptureDeveloperValues();
+                values[46] = 0f; // unlock swipes min
+                values[47] = 0f; // unlock swipes max
+                Assert.That(relays.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var hits = new LabModel();
+                hits.Begin("relay-hits", new ulong[] { 10, 20, 30 }, 0d, relays);
+
+                Assert.That(hits.TryGenerate(10, "x1", 0d, out var x1, out _), Is.True);
+                Assert.That(x1.relayStage, Is.EqualTo(1), "An already unlocked relay starts at x1.");
+                Assert.That(ThrowAndHit(hits, x1.id, 10, .1d), Is.EqualTo(20));
+
+                Assert.That(hits.TryGenerate(10, "x2", .2d, out var x2, out _), Is.True);
+                Assert.That(PassRight(hits, x2.id, 10, .3d).relayStage, Is.EqualTo(2));
+                Assert.That(ThrowAndHit(hits, x2.id, 20, .4d), Is.EqualTo(40));
+
+                Assert.That(hits.TryGenerate(10, "max", .5d, out var max, out _), Is.True);
+                PassRight(hits, max.id, 10, .6d);
+                Assert.That(PassRight(hits, max.id, 20, .7d).relayStage, Is.EqualTo(3));
+                Assert.That(ThrowAndHit(hits, max.id, 30, .8d), Is.EqualTo(80));
+                Assert.That(hits.Hp, Is.EqualTo(1000 - 20 - 40 - 80));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(relays); }
+        }
+
+        [Test]
+        public void UnthrownBombClearsItsCurrentHoldersBoardAtTheFuse()
+        {
+            var mixed = ConfigWith(1f, 50, 0, 0, 0, 0, 50);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("bomb-holder", new ulong[] { 10, 20, 30 }, 0d, mixed);
+                LabOrbState bomb = null;
+                for (int i = 0; i < 10 && bomb == null; i++)
+                {
+                    Assert.That(room.TryGenerate(10, "draw-" + i, 0d, out var orb, out _), Is.True);
+                    if (orb.kind == LabOrbKind.Bomb) bomb = orb;
+                }
+                Assert.That(bomb, Is.Not.Null);
+                Assert.That(PassRight(room, bomb.id, 10, 1d).owner, Is.EqualTo(20ul), "The bomb moves to the next holder.");
+
+                Assert.That(room.TryGenerate(10, "keep", 10d, out var kept, out _), Is.True);
+                for (int i = 0; i < 2; i++)
+                    Assert.That(room.TryGenerate(20, "lost-" + i, 10d, out _, out _), Is.True);
+                Assert.That(room.Snapshot(14.9d).orbs.Count(orb => orb.owner == 20), Is.EqualTo(3));
+                Assert.That(room.DrainBombExplosions(), Is.Empty);
+
+                var after = room.Snapshot(15d);
+                Assert.That(after.orbs.Any(orb => orb.owner == 20), Is.False,
+                    "Every orb on the holder's board is lost, including the bomb.");
+                Assert.That(after.orbs.Select(orb => orb.id), Does.Contain(kept.id), "Other boards are untouched.");
+                Assert.That(room.DrainBombExplosions(), Is.EqualTo(new[] { 20ul }));
+                Assert.That(room.DrainBombExplosions(), Is.Empty, "Each explosion is reported once.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mixed); }
+        }
+
+        [Test]
+        public void UnlockedBombHitsForTripleDamageAndAMissNeverExplodes()
+        {
+            var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
+            try
+            {
+                float[] values = bombs.CaptureDeveloperValues();
+                values[46] = 0f; // unlock swipes min
+                values[47] = 0f; // unlock swipes max
+                Assert.That(bombs.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("bomb-throw", new ulong[] { 10, 20, 30 }, 0d, bombs);
+
+                Assert.That(room.TryGenerate(10, "hit", 0d, out var hitBomb, out _), Is.True);
+                Assert.That(ThrowAndHit(room, hitBomb.id, 10, .1d), Is.EqualTo(60));
+                Assert.That(room.Hp, Is.EqualTo(940));
+
+                Assert.That(room.TryGenerate(10, "miss", .2d, out var missBomb, out _), Is.True);
+                Assert.That(room.TryLaunch(10, missBomb.id, "throw-miss", .3d, out _, out _), Is.True);
+                Assert.That(room.ConfirmMiss(missBomb.id, .4d), Is.True);
+                Assert.That(room.Snapshot(20d).orbs, Is.Empty);
+                Assert.That(room.DrainBombExplosions(), Is.Empty, "A thrown bomb never explodes on a board.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(bombs); }
+        }
+
+        private static LabOrbState PassRight(LabModel room, string id, ulong holder, double at)
+        {
+            Assert.That(room.TryUpdateMotion(holder, id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
+            Assert.That(room.TryTransfer(holder, id, true, .5f, Vector2.right, "pass-" + id + "-" + at, at,
+                out var passed, out var reason), Is.True, reason);
+            return passed;
+        }
+
+        private static int ThrowAndHit(LabModel room, string id, ulong thrower, double at)
+        {
+            Assert.That(room.TryLaunch(thrower, id, "throw-" + id, at, out _, out var reason), Is.True, reason);
+            Assert.That(room.ConfirmHit(id, at, out _, out int damage), Is.True);
+            return damage;
+        }
+
         /// <summary>A default config with one generation cost and chances in GeneratedKinds order.</summary>
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {

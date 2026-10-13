@@ -69,6 +69,8 @@ namespace C6Lab
         private const float ContactFriction = .15f;
         private const float WallThickness = .5f;
         private const double ReleaseSampleWindow = .12d;
+        private const double TapMaxSeconds = .3d;
+        private const double DoubleTapWindow = .35d;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly HashSet<string> risenIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<PointerSample> samples = new List<PointerSample>();
@@ -79,6 +81,10 @@ namespace C6Lab
         private PhysicsMaterial contactMaterial;
         private GameObject wallRoot;
         private string heldId;
+        private Vector2 pressPoint;
+        private double pressTime;
+        private string lastTapId;
+        private double lastTapTime;
         private bool heldByTouch;
         private bool interactionEnabled = true;
         private bool uiInputBlocked;
@@ -92,6 +98,8 @@ namespace C6Lab
         public event Action<string, string, Vector2> CombineRequested;
         /// <summary>The velocity is input displacement divided by board width and seconds.</summary>
         public event Action<LabOrbThrowGesture> ThrowRequested;
+        /// <summary>A double tap on an unlocked usable item. The Host applies or rejects its effect.</summary>
+        public event Action<string> UseRequested;
 
         public void Configure(LabConfig tuning, Camera camera, Rect worldCenterBounds)
         {
@@ -129,7 +137,8 @@ namespace C6Lab
         /// </summary>
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
-            bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0)
+            bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
+            int relayStage = 0, float fuseSeconds = -1f)
         {
             RequireConfigured();
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
@@ -142,7 +151,9 @@ namespace C6Lab
                     existing.View.Configure(id, kind, config.OrbRadius, element);
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
-                if (existing.View.LockSwipes != lockSwipes) existing.View.SetLockSwipes(lockSwipes);
+                if (existing.View.LockSwipes != lockSwipes || existing.View.RelayStage != relayStage
+                    || existing.View.FuseSeconds != fuseSeconds)
+                    existing.View.SetItemState(lockSwipes, relayStage, fuseSeconds);
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -154,7 +165,7 @@ namespace C6Lab
             var view = gameObject.AddComponent<LabOrbView>();
             view.Configure(id, kind, config.OrbRadius, element);
             view.ConfigureAppearance(config.OrbAppearance);
-            view.SetLockSwipes(lockSwipes);
+            view.SetItemState(lockSwipes, relayStage, fuseSeconds);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
@@ -284,6 +295,8 @@ namespace C6Lab
             SetBodyMode(nearest);
             samples.Clear();
             AddSample(worldPoint, now);
+            pressPoint = worldPoint;
+            pressTime = now;
             return true;
         }
 
@@ -308,10 +321,28 @@ namespace C6Lab
             entry.Held = false;
             entry.View.HitSphere.isTrigger = false;
 
+            // A tap is short and nearly still. Two taps on the same unlocked item use it in place.
+            bool tapped = now - pressTime <= TapMaxSeconds && (worldPoint - pressPoint).magnitude <= config.OrbRadius * .5f;
+            if (tapped && entry.View.Kind.IsDoubleTapUsable() && entry.View.LockSwipes == 0)
+            {
+                if (lastTapId == id && now - lastTapTime <= DoubleTapWindow)
+                {
+                    lastTapId = null;
+                    entry.Locked = true;
+                    StopMotion(entry.View.Body);
+                    SetBodyMode(entry);
+                    UseRequested?.Invoke(id);
+                    return true;
+                }
+                lastTapId = id;
+                lastTapTime = now;
+            }
+            else lastTapId = null;
+
             // Side exits keep their existing screen-to-screen handoff even on a diagonal flick.
             bool outwardSide = (worldPoint.x <= bounds.xMin && inputVelocity.x < 0f)
                 || (worldPoint.x >= bounds.xMax && inputVelocity.x > 0f);
-            if (entry.View.Kind == LabOrbKind.Combined && !outwardSide
+            if (entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
                 && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
             {
                 entry.Locked = true;

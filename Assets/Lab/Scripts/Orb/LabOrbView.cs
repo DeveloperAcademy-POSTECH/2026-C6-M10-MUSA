@@ -24,6 +24,8 @@ namespace C6Lab
         private LabOrbKind kind;
         private LabOrbElement element;
         private int lockSwipes;
+        private int relayStage;
+        private float fuseSeconds = -1f;
         private float visualRadius = .32f;
         private Coroutine spawnRiseRoutine;
         private Action spawnRiseCompleted;
@@ -33,6 +35,9 @@ namespace C6Lab
         public LabOrbElement Element => element;
         /// <summary>Host-approved handoffs still needed before this item can be used.</summary>
         public int LockSwipes => lockSwipes;
+        public int RelayStage => relayStage;
+        /// <summary>A bomb's remaining seconds before it explodes; negative when not shown.</summary>
+        public float FuseSeconds => fuseSeconds;
         public LabOrbItemMarker ItemMarker => itemMarker;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
@@ -104,9 +109,14 @@ namespace C6Lab
             UpdateVisual();
         }
 
-        public void SetLockSwipes(int value)
+        public void SetLockSwipes(int value) => SetItemState(value, relayStage, fuseSeconds);
+
+        /// <summary>Host-approved lock count, relay stage and bomb fuse; they only change item labels.</summary>
+        public void SetItemState(int lockCount, int stage, float fuse = -1f)
         {
-            lockSwipes = Mathf.Max(0, value);
+            lockSwipes = Mathf.Max(0, lockCount);
+            relayStage = Mathf.Max(0, stage);
+            fuseSeconds = fuse;
             UpdateItemMarker();
         }
 
@@ -291,7 +301,17 @@ namespace C6Lab
                 return;
             }
             if (itemMarker == null) itemMarker = LabOrbItemMarker.Create(transform);
-            itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, lockSwipes, visualRadius, visual);
+            string fuseText = kind == LabOrbKind.Bomb && fuseSeconds >= 0f
+                ? Mathf.CeilToInt(fuseSeconds).ToString() : null;
+            itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), fuseText,
+                visualRadius, visual);
+        }
+
+        private string BadgeText()
+        {
+            if (lockSwipes > 0) return lockSwipes.ToString();
+            if (kind != LabOrbKind.Relay || relayStage <= 0) return null;
+            return relayStage >= 3 ? "MAX" : relayStage == 2 ? "×2" : "×1";
         }
 
         private void UpdateContactShadow()

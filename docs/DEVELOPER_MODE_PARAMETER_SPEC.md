@@ -2,19 +2,19 @@
 
 > 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 원래 39개 수치는 PR #76의 설정 에셋을 기준으로 기록했으며, 이후 생성 확률·아이템 9개와 개인 HP 1개를 더했다. 직렬화된 값이 없으면 C# 필드 초기값이 쓰인다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
 
-이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 숫자 52개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
+이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 숫자 56개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
 
 ## 1. 패널의 적용 방식
 
 1. `Assets/Lab/Scenes/Lab.unity`를 Unity Editor에서 실행하거나 **Development Build**를 실행한다. 일반 배포 빌드에서는 DEV 버튼이 숨겨진다. 참가자는 일반 빌드여도 Host가 확정한 세션 설정을 수신한다.
-2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 참가자와 전투 진행 중에는 설정 변경을 열지 않는다. 숫자 입력칸 52개와 대응하는 슬라이더가 서로 값을 반영한다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
-3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 52개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
+2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 참가자와 전투 진행 중에는 설정 변경을 열지 않는다. 숫자 입력칸 56개와 대응하는 슬라이더가 서로 값을 반영한다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
+3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 56개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
 4. 혼자 시험할 때는 **START SOLO**를 누른다. 이미 솔로 전투 중이면 **RESTART SOLO**가 표시된다. 새 라운드가 시작되므로 요괴/개인 HP·시간·스태미나·구슬이 초기화된다. 진행 중인 네트워크 라운드에 값을 즉시 적용하는 동작은 없다.
 5. **DEFAULTS**는 저장된 `LabConfig.asset`의 숫자를 입력칸과 슬라이더에 불러올 뿐이다. 공유 방이나 솔로에 적용하려면 해당 시작·적용 버튼을 눌러야 한다. **END SOLO**는 솔로를 끝내고 원본 설정으로 복귀한다. 런타임 복사본은 앱이 실행 중인 동안만 유지되며 원본 에셋에는 저장되지 않는다.
 
 패널을 열어도 이미 진행 중인 Host 전투 시간은 멈추지 않는다. 마지막 `SHOT HIT/MISS` 보고는 솔로를 끝내거나 연결을 끊으면 지워질 수 있으므로 먼저 기록한다. 공유 방에서는 Host의 설정 지문과 확인 응답을 기준으로 시작을 판정한다. 이 절은 코드상 경로 설명이며 실제 기기 동기화 결과는 검증 기록과 구분한다.
 
-입력은 **52개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
+입력은 **56개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
 
 ## 2. 단위와 공통 판정
 
@@ -135,10 +135,14 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 | Item Lifetime (seconds) | 15 | 0.1–86,400 / 초 | 보관 중인 아이템의 수명. 생성 시점부터 세며 이웃에게 전달해도 초기화되지 않는다. |
 | Item Unlock Swipes Min | 2 | 정수 0–20 / 회 | 아이템이 생성될 때 정해지는 잠금 횟수의 하한. 잠금은 **이웃 화면으로 넘길 때마다** 1씩 준다. |
 | Item Unlock Swipes Max | 4 | 정수 0–20 / 회 | 잠금 횟수의 상한. Min ≤ Max여야 한다. Min·Max를 모두 0으로 두면 아이템이 처음부터 해금된 상태로 생긴다. |
+| Potion Heal (HP) | 10 | 정수 0–300 / 개인 HP | 해금된 회복물약을 더블 탭했을 때 사용자의 개인 HP에 더하는 양. `Player Max HP`를 넘지 않는다. HP가 가득 차 있거나 0이면 사용이 거절되고 물약은 남는다. |
+| Relay x2 Damage Multiplier | 2 | 1–20 / 배 | 릴레이 구슬이 해금 후 한 번 더 넘겨져 `×2` 단계일 때 `Damage per Hit`에 곱하는 값. 해금 직후 `×1` 단계는 항상 1배다. |
+| Relay MAX Damage Multiplier | 4 | 1–20 / 배 | 릴레이 구슬이 해금 후 두 번 넘겨져 `MAX` 단계일 때의 배율. 이후 더 넘겨도 오르지 않는다. |
+| Bomb Damage Multiplier | 3 | 1–20 / 배 | 해금된 폭탄을 던져 명중했을 때 `Damage per Hit`에 곱하는 값. 빗나가면 피해도 폭발도 없다. |
 
-아이템은 음·양과 조합되지 않고 아직 던질 수 없다. 효과와 더블 탭 사용은 별도 이슈에서 다룬다. 1인 솔로에는 이웃이 없어 잠긴 아이템이 해금되지 않는다.
+아이템은 음·양과 조합되지 않는다. 해금된 **회복물약·시크릿 상자**는 같은 구슬을 0.35초 안에 두 번 탭해 그 자리에서 사용한다(한 번의 탭은 0.3초 이내, 이동 거리 구슬 반지름의 절반 이하). 시크릿 상자는 양옆에 속성 구슬 2개를 만들고 새 `Orb Lifetime`을 주며 보관 칸 하나가 더 필요하다. 해금된 **릴레이 구슬·폭탄**은 Combined처럼 위로 그어 던진다. 폭탄의 타이머는 `Item Lifetime`이며, 던지지 않은 채 끝나면 그 순간 보유자의 판 위 구슬이 모두 사라진다. 피해 배율의 결과는 반올림한 정수이며 최소 1이다. 1인 솔로에는 이웃이 없어 잠긴 아이템이 해금되지 않으므로, 효과를 혼자 시험하려면 `Item Unlock Swipes Min`·`Max`를 0으로 둔다.
 
-근거: `LabConfig.GenerationChances`, `LabModel.TryGenerate`·`TryCombine`·`TryTransfer`·`TryAdvance`, `LabOrbItemMarker.Show`.
+근거: `LabConfig.GenerationChances`, `LabModel.TryGenerate`·`TryCombine`·`TryTransfer`·`TryUseItem`·`TryAdvance`·`ConfirmHit`, `LabOrbBoard.EndDragAtWorld`, `LabOrbItemMarker.Show`, `LabNetwork.SyncBoard`.
 
 ## 9. 입력 제약과 조정 실험 예시
 
@@ -158,12 +162,14 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 | 측면에서 던진 공이 잘 빗나감 | Origin Lateral Range 또는 Lateral Gain 비교 | 자동 조준 기능은 현재 없음; 판정 반경 변경은 난이도도 바꿈 |
 | 아이템이 너무 자주/드물게 나옴 | 아이템 4종 확률과 Yin/Yang 확률을 함께 조정 | 합 100 유지, 보유 한도에 아이템도 포함됨 |
 | 아이템이 해금되기 전에 사라짐 | Item Lifetime ↑ 또는 Item Unlock Swipes Max ↓ | 세 명이 실제로 넘기는 데 걸리는 시간 |
+| 폭탄을 해금하고 던질 시간이 부족함 | Item Lifetime ↑ 또는 Item Unlock Swipes Max ↓ | 폭탄 타이머도 Item Lifetime을 쓰므로 다른 아이템 수명도 함께 바뀜 |
+| 릴레이 MAX가 너무 약하거나 강함 | Relay MAX Damage Multiplier | 요괴 HP와 MAX까지 넘기는 데 걸리는 시간 |
 
 이 표의 화살표는 **시험 방향**이지 검증된 추천값이 아니다. 잘못된 투척을 자동 보정하거나 요괴를 추적하는 기능은 현재 없다.
 
 ## 10. 이 패널로 조정할 수 없는 것·검증 범위
 
-방의 **목표 인원**은 52개 수치 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport는 52개 입력칸으로 조정하지 않는다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
+방의 **목표 인원**은 56개 수치 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport는 56개 입력칸으로 조정하지 않는다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
 
 기존 PR #76 기준 문서는 해당 코드·Scene·설정 에셋과 당시 `docs/VALIDATION.md`의 증거를 **읽어 확인**해 작성됐다. 그 기록의 EditMode **12/12**, PlayMode **20/20** 및 Mac Development 앱 빌드는 이번 3D 조합판 전환의 통과 증거가 아니다. 이 전환의 Unity 컴파일·EditMode·PlayMode, Mac·iOS 빌드, 실제 조작은 새 실행 기록으로 구분해야 한다. 문서의 물리 용어를 갱신한 것만으로 실행 결과를 PASS로 보지 않는다.
 
@@ -171,10 +177,11 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 
 - 설정 필드·범위·일괄 검사: `Assets/Lab/Scripts/Core/LabConfig.cs` — `DeveloperFields`, `CaptureDeveloperValues`, `TryApplyDeveloperValues`.
 - 저장 기본값: `Assets/Lab/Resources/LabConfig.asset`.
-- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 52개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
+- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 56개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
 - 패널 열기·DEFAULTS·SOLO/Host 설정 적용·슬라이더 변환: `Assets/Lab/Scripts/UI/LabDeveloperMode.cs`.
 - Host 전투 수치·개인 HP·전원 0 패배·스태미나·생성 확률·속성·아이템 잠금·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
-- 아이템 아이콘·잠금 배지: `Assets/Lab/Scripts/Orb/LabOrbItemMarker.cs`, 아이콘·속성 재질 지정: `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`.
+- 아이템 더블 탭 사용·효과(물약·상자), 릴레이 단계, 폭탄 폭발·피해 배율: `Assets/Lab/Scripts/Core/LabModel.cs`(`TryUseItem`·`TryTransfer`·`TryAdvance`·`ConfirmHit`)와 `LabOrbBoard.EndDragAtWorld`.
+- 아이템 아이콘·잠금/단계 배지·폭탄 남은 초: `Assets/Lab/Scripts/Orb/LabOrbItemMarker.cs`, 아이콘·속성 재질 지정: `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`.
 - 3D 조합판 구슬 물리·XY 손동작·공통 구체 외형: `Assets/Lab/Scripts/Orb/LabOrbBoard.cs`와 `LabOrbView.cs`.
 - 발사 위치·초기 속도: `Assets/Lab/Scripts/Throw/LabThrowMath.cs`.
 - 공의 중력·저항·충돌·수명: `Assets/Lab/Scripts/Throw/LabProjectile.cs`.

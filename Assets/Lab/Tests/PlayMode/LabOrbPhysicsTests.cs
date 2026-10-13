@@ -359,6 +359,98 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void DoubleTapOnAnUnlockedPotionOrBoxRequestsUseButLockedOrSlowTapsDoNot()
+        {
+            var potion = board.UpsertOrb("potion", LabOrbKind.Potion, new Vector2(.3f, .5f), lockSwipes: 0);
+            var locked = board.UpsertOrb("locked", LabOrbKind.Potion, new Vector2(.7f, .5f), lockSwipes: 2);
+            var slow = board.UpsertOrb("slow", LabOrbKind.Potion, new Vector2(.5f, .85f), lockSwipes: 0);
+            var box = board.UpsertOrb("box", LabOrbKind.SecretBox, new Vector2(.5f, .2f), lockSwipes: 0);
+            var uses = new System.Collections.Generic.List<string>();
+            board.UseRequested += id => uses.Add(id);
+
+            Vector2 lockedPoint = BoardPoint(locked);
+            Tap(lockedPoint, 1d);
+            Tap(lockedPoint, 1.2d);
+            Assert.That(uses, Is.Empty, "A locked item cannot be used.");
+
+            Vector2 slowPoint = BoardPoint(slow);
+            Tap(slowPoint, 2d);
+            Tap(slowPoint, 3d);
+            Assert.That(uses, Is.Empty, "Taps further apart than the double-tap window do not use an item.");
+
+            Vector2 potionPoint = BoardPoint(potion);
+            Tap(potionPoint, 4d);
+            Assert.That(uses, Is.Empty);
+            Tap(potionPoint, 4.2d);
+            Assert.That(uses, Is.EqualTo(new[] { "potion" }));
+            Assert.That(BoardPoint(potion), Is.EqualTo(potionPoint), "A double tap uses the item in place.");
+            Assert.That(board.TryBeginDragAtWorld(potionPoint, 5d), Is.False,
+                "The item waits for the Host result instead of being dragged again.");
+
+            Vector2 boxPoint = BoardPoint(box);
+            Tap(boxPoint, 6d);
+            Tap(boxPoint, 6.2d);
+            Assert.That(uses, Is.EqualTo(new[] { "potion", "box" }));
+        }
+
+        [Test]
+        public void UnlockedRelayShowsItsStageAndCanBeThrownButALockedRelayCannot()
+        {
+            var lockedRelay = board.UpsertOrb("locked-relay", LabOrbKind.Relay, new Vector2(.4f, .3f), lockSwipes: 2);
+            var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.6f, .3f), lockSwipes: 0, relayStage: 1);
+            Assert.That(lockedRelay.ItemMarker.BadgeText, Is.EqualTo("2"));
+            Assert.That(relay.ItemMarker.BadgeText, Is.EqualTo("×1"), "The badge turns into the relay stage on unlock.");
+            board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.6f, .3f), lockSwipes: 0, relayStage: 2);
+            Assert.That(relay.ItemMarker.BadgeText, Is.EqualTo("×2"));
+            board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.6f, .3f), lockSwipes: 0, relayStage: 3);
+            Assert.That(relay.ItemMarker.BadgeText, Is.EqualTo("MAX"));
+            Assert.That(relay.ItemMarker.BadgeVisible, Is.True);
+
+            int throws = 0;
+            string thrown = null;
+            board.ThrowRequested += gesture => { throws++; thrown = gesture.OrbId; };
+            Assert.That(board.TryBeginDragAtWorld(new Vector2(-.8f, -.8f), 1d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(-.8f, .9f), 1.1d), Is.True);
+            Assert.That(throws, Is.Zero, "A locked relay stays on the board.");
+
+            Assert.That(board.TryBeginDragAtWorld(new Vector2(.8f, -.8f), 2d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(.8f, .9f), 2.1d), Is.True);
+            Assert.That(throws, Is.EqualTo(1));
+            Assert.That(thrown, Is.EqualTo("relay"));
+        }
+
+        [Test]
+        public void BombShowsItsFuseAboveTheOrbAndCanBeThrownOnlyOnceUnlocked()
+        {
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), lockSwipes: 1, fuseSeconds: 11.2f);
+            Assert.That(bomb.ItemMarker.FuseVisible, Is.True);
+            Assert.That(bomb.ItemMarker.FuseText, Is.EqualTo("12"), "Remaining seconds round up.");
+            Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("1"), "The lock badge stays beside the fuse.");
+            var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.3f, .7f), lockSwipes: 0, relayStage: 1);
+            Assert.That(relay.ItemMarker.FuseVisible, Is.False, "Only bombs burn a fuse.");
+
+            int throws = 0;
+            board.ThrowRequested += gesture => throws++;
+            Assert.That(board.TryBeginDragAtWorld(new Vector2(.8f, -.8f), 1d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(.8f, .9f), 1.1d), Is.True);
+            Assert.That(throws, Is.Zero, "A locked bomb cannot be thrown.");
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), lockSwipes: 0, fuseSeconds: 3.4f);
+            Assert.That(bomb.ItemMarker.FuseText, Is.EqualTo("4"));
+            Assert.That(bomb.ItemMarker.BadgeVisible, Is.False);
+            Vector2 from = BoardPoint(bomb);
+            Assert.That(board.TryBeginDragAtWorld(from, 2d), Is.True);
+            Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1f), 2.1d), Is.True);
+            Assert.That(throws, Is.EqualTo(1), "An unlocked bomb is thrown with an upward flick.");
+        }
+
+        private void Tap(Vector2 point, double at)
+        {
+            Assert.That(board.TryBeginDragAtWorld(point, at), Is.True);
+            Assert.That(board.EndDragAtWorld(point, at + .05d), Is.True);
+        }
+
+        [Test]
         public void OnlyCombinedFlickReleasedInsideTheBoardRequestsThrow()
         {
             board.UpsertOrb("raw", LabOrbKind.Yin, new Vector2(.4f, .3f));

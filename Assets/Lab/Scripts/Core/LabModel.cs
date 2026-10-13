@@ -16,6 +16,8 @@ namespace C6Lab
         public const int DefaultParticipants = 3;
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
+        private const float SecretBoxSpread = .05f;
+        private const int RelayMaxStage = 3;
         private const uint LockDrawSalt = 0x10C4ED00u;
         private readonly Dictionary<ulong, LabPlayerState> players = new Dictionary<ulong, LabPlayerState>();
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
@@ -23,6 +25,7 @@ namespace C6Lab
         private readonly ulong[] seats = new ulong[MaximumParticipants];
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
+        private readonly List<ulong> bombExplosions = new List<ulong>();
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -71,7 +74,7 @@ namespace C6Lab
             activeSeatCount = ids.Length;
             Array.Clear(seats, 0, seats.Length);
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
-            players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear();
+            players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState
@@ -108,11 +111,12 @@ namespace C6Lab
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
             var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
             int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
+            int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
             Vector2 position = SpawnPosition(sender);
             orb = new LabOrbState
             {
-                id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes,
+                id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes, relayStage = relayStage,
                 origin = LabOrbOrigin.Generated, originOwner = sender,
                 x = position.x, y = position.y,
                 vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
@@ -153,7 +157,8 @@ namespace C6Lab
         /// <summary>
         /// A right edge enters the next seat from its left; a left edge enters the previous seat
         /// from its right. The same ID, creation time, and velocity survive the handoff.
-        /// Each handoff of a locked item removes one lock, so items unlock only by teamwork.
+        /// Each handoff of a locked item removes one lock, so items unlock only by teamwork. A relay
+        /// orb becomes x1 when it unlocks, then each further handoff raises it to x2 and MAX.
         /// </summary>
         public bool TryTransfer(ulong sender, string id, bool right, float height01,
             Vector2 normalizedVelocity, string requestId, double now, out LabOrbState orb, out string reason)
@@ -177,7 +182,12 @@ namespace C6Lab
             current.y = height01;
             current.vx = normalizedVelocity.x;
             current.vy = normalizedVelocity.y;
-            if (current.lockSwipes > 0) current.lockSwipes--;
+            if (current.lockSwipes > 0)
+            {
+                current.lockSwipes--;
+                if (current.lockSwipes == 0 && current.kind == LabOrbKind.Relay) current.relayStage = 1;
+            }
+            else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
             current.revision = ++revision;
             reason = "TRANSFERRED";
             orb = current.Copy();
@@ -191,7 +201,7 @@ namespace C6Lab
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
-            if (current.kind != LabOrbKind.Combined) return Reject("RAW_CANNOT_ATTACK", out reason);
+            if (!current.kind.CanThrow(current.lockSwipes)) return Reject("RAW_CANNOT_ATTACK", out reason);
             current.inFlight = true;
             current.vx = current.vy = 0f;
             current.revision = ++revision;
@@ -217,7 +227,7 @@ namespace C6Lab
             element = orb.element;
             orbs.Remove(id);
             int previousHp = hp;
-            hp = Math.Max(0, hp - rules.Damage);
+            hp = Math.Max(0, hp - DamageFor(orb));
             actualDamage = previousHp - hp;
             if (players.TryGetValue(orb.owner, out var attacker))
                 attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
@@ -237,6 +247,58 @@ namespace C6Lab
             player.personalHp = Math.Max(0, player.personalHp - amount);
             if (players.Values.All(current => current.personalHp == 0)) phase = LabPhase.Defeat;
             return true;
+        }
+
+        /// <summary>
+        /// Double-tap use of the owner's unlocked item. A secret box opens into two throwable element
+        /// orbs beside it, which needs one more free storage slot. A potion heals its user's personal
+        /// HP up to the maximum; at full HP it is refused and kept so it can still be passed to a
+        /// neighbor. A player already at 0 HP cannot be revived by a potion.
+        /// </summary>
+        public bool TryUseItem(ulong sender, string id, string requestId, double now,
+            out LabOrbState orb, out string reason)
+        {
+            orb = null;
+            if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
+            if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            if (!current.kind.IsDoubleTapUsable()) return Reject("NOT_USABLE", out reason);
+            if (current.lockSwipes > 0) return Reject("ITEM_LOCKED", out reason);
+            if (current.kind == LabOrbKind.SecretBox)
+            {
+                if (CountStored(sender) + 1 > rules.OrbStorageLimit) return Reject("STORAGE_FULL", out reason);
+                orbs.Remove(current.id);
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    var opened = new LabOrbState
+                    {
+                        id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = ElementFor(seed, combinedCount++),
+                        origin = LabOrbOrigin.Combined, originOwner = sender,
+                        x = Mathf.Clamp01(current.x + side * SecretBoxSpread), y = current.y,
+                        vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
+                    };
+                    orbs.Add(opened.id, opened);
+                }
+                reason = "ITEM_USED";
+                orb = current.Copy();
+                return true;
+            }
+            var player = players[sender];
+            if (player.personalHp <= 0) return Reject("PLAYER_DOWN", out reason);
+            if (player.personalHp >= rules.PlayerMaxHp) return Reject("HP_FULL", out reason);
+            player.personalHp = Math.Min(rules.PlayerMaxHp, player.personalHp + rules.PotionHeal);
+            orbs.Remove(current.id);
+            reason = "ITEM_USED";
+            orb = current.Copy();
+            return true;
+        }
+
+        /// <summary>Players whose boards were cleared by an unthrown bomb since the last call.</summary>
+        public ulong[] DrainBombExplosions()
+        {
+            ulong[] owners = bombExplosions.ToArray();
+            bombExplosions.Clear();
+            return owners;
         }
 
         /// <summary>Remove an expired or missed projectile without damage or a hit reward.</summary>
@@ -307,13 +369,29 @@ namespace C6Lab
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond));
-                foreach (string id in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
-                    .Select(orb => orb.id).ToArray()) orbs.Remove(id);
+                foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
+                    .ToArray())
+                {
+                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb) continue;
+                    // An unthrown bomb takes every orb still on its current holder's board.
+                    foreach (string id in orbs.Values.Where(orb => orb.owner == expired.owner && !orb.inFlight)
+                        .Select(orb => orb.id).ToArray()) orbs.Remove(id);
+                    bombExplosions.Add(expired.owner);
+                }
                 remaining = Math.Max(0d, deadline - now);
                 if (now >= deadline) phase = LabPhase.Defeat;
             }
             lastTime = now;
             return true;
+        }
+
+        private int DamageFor(LabOrbState orb)
+        {
+            if (orb.kind == LabOrbKind.Bomb) return Math.Max(1, (int)Math.Round(rules.Damage * rules.BombMultiplier));
+            if (orb.kind != LabOrbKind.Relay) return rules.Damage;
+            float multiplier = orb.relayStage >= RelayMaxStage ? rules.RelayMaxMultiplier
+                : orb.relayStage == 2 ? rules.RelayDoubleMultiplier : 1f;
+            return Math.Max(1, (int)Math.Round(rules.Damage * multiplier));
         }
 
         private float LifetimeOf(LabOrbState orb) =>
@@ -408,7 +486,8 @@ namespace C6Lab
 
         private sealed class Rules
         {
-            public readonly int MonsterMaxHp, PlayerMaxHp, Damage, OrbStorageLimit;
+            public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
+            public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
             public readonly int[] GenerationChances;
@@ -422,6 +501,10 @@ namespace C6Lab
                 ItemUnlockSwipesMax = config.ItemUnlockSwipesMax;
                 MonsterMaxHp = config.MonsterMaxHp;
                 PlayerMaxHp = config.PlayerMaxHp;
+                PotionHeal = config.PotionHeal;
+                RelayDoubleMultiplier = config.RelayDoubleMultiplier;
+                RelayMaxMultiplier = config.RelayMaxMultiplier;
+                BombMultiplier = config.BombMultiplier;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
                 BattleDurationSeconds = config.BattleDurationSeconds;
