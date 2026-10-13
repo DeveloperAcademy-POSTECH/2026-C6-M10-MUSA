@@ -126,6 +126,7 @@ namespace C6Lab
         public void PlayUnlockEffect()
         {
             UnlockEffectPlays++;
+            if (itemMarker != null) itemMarker.PlayUnlock(appearance);
         }
 
         /// <summary>

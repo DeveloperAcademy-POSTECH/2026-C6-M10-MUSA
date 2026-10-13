@@ -405,6 +405,41 @@ namespace C6Lab.Tests
             Assert.That(open.UnlockEffectPlays, Is.Zero, "An item created unlocked, or seen late, shows already open.");
         }
 
+        [UnityTest]
+        public IEnumerator UnlockLiftsAndFadesThePadlockWhileTheIconSharpens()
+        {
+            var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            var relayIcon = new Texture2D(8, 8);
+            var lockIcon = new Texture2D(8, 8);
+            SetSerializedField(appearance, "relayIcon", relayIcon);
+            SetSerializedField(appearance, "lockIcon", lockIcon);
+            SetSerializedField(config, "orbAppearance", appearance);
+            try
+            {
+                board.Configure(config, inputCamera, Bounds);
+                var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.5f, .5f), lockSwipes: 0,
+                    relayStage: 1, justUnlocked: true);
+                LabOrbItemMarker marker = relay.ItemMarker;
+                Assert.That(marker.UnlockPlaying, Is.True);
+                Assert.That(marker.LockVisible, Is.True, "A just-unlocked item starts with the padlock on its icon.");
+                Assert.That(marker.IconAlpha, Is.EqualTo(appearance.LockedIconAlpha).Within(.001f));
+
+                relay.SetItemState(0, 2);
+                Assert.That(marker.LockVisible, Is.True, "A snapshot update mid-effect does not cut it short.");
+
+                yield return new WaitForSeconds(appearance.UnlockLockSeconds + .2f);
+                Assert.That(marker.UnlockPlaying, Is.False);
+                Assert.That(marker.LockVisible, Is.False, "The padlock is gone once it has risen and faded.");
+                Assert.That(marker.IconAlpha, Is.EqualTo(1f), "The icon is sharp once the padlock is gone.");
+            }
+            finally
+            {
+                Object.Destroy(relayIcon);
+                Object.Destroy(lockIcon);
+                Object.Destroy(appearance);
+            }
+        }
+
         [Test]
         public void DoubleTapOnAnUnlockedPotionOrBoxRequestsUseButLockedOrSlowTapsDoNot()
         {

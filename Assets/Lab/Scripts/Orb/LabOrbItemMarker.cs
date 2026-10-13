@@ -6,7 +6,8 @@ namespace C6Lab
     /// <summary>
     /// Item presentation on the orb root: an icon on a disc, a padlock over the dimmed icon while
     /// the item is locked, a badge (remaining unlock handoffs, or a relay orb's x1/x2/MAX stage)
-    /// and a bomb's fuse seconds above the orb, all facing the front-on board camera. It follows the Visual mount's
+    /// and a bomb's fuse seconds above the orb, all facing the front-on board camera. On unlock
+    /// the padlock rises and fades while the icon sharpens. It follows the Visual mount's
     /// rise animation but not its rolling rotation, and owns no collider.
     /// </summary>
     [DisallowMultipleComponent]
@@ -28,10 +29,15 @@ namespace C6Lab
         private TextMesh fuse;
         private Transform follow;
         private float radius;
+        private float unlockElapsed = -1f;
+        private float unlockSeconds;
+        private float unlockRise;
+        private float unlockFromAlpha;
 
         public bool IconVisible => icon != null && icon.gameObject.activeSelf;
         public float IconAlpha => icon != null ? icon.color.a : 0f;
         public bool LockVisible => padlock != null && padlock.gameObject.activeSelf;
+        public bool UnlockPlaying => unlockElapsed >= 0f;
         public bool BadgeVisible => badge != null && badge.gameObject.activeSelf;
         public string BadgeText => badgeCount != null ? badgeCount.text : string.Empty;
         public bool FuseVisible => fuse != null && fuse.gameObject.activeSelf;
@@ -93,6 +99,10 @@ namespace C6Lab
         public void SetLocked(bool locked, LabOrbAppearance look)
         {
             EnsureParts();
+            // The unlock effect owns the padlock and icon until it ends.
+            if (!locked && UnlockPlaying) return;
+            unlockElapsed = -1f;
+            padlock.color = Color.white;
             Texture2D lockTexture = look != null ? look.LockIcon : null;
             bool covered = locked && lockTexture != null;
             padlock.gameObject.SetActive(covered);
@@ -108,7 +118,40 @@ namespace C6Lab
             icon.color = new Color(1f, 1f, 1f, alpha);
         }
 
-        private void LateUpdate() => FollowMount();
+        /// <summary>
+        /// Starts from the locked look, then lifts and fades the padlock while the icon sharpens.
+        /// Call after Show.
+        /// </summary>
+        public void PlayUnlock(LabOrbAppearance look)
+        {
+            SetLocked(true, look);
+            unlockFromAlpha = icon.color.a;
+            unlockSeconds = look != null ? look.UnlockLockSeconds : .3f;
+            unlockRise = (look != null ? look.UnlockLockRise : .8f) * radius;
+            unlockElapsed = 0f;
+            AnimateUnlock();
+        }
+
+        private void LateUpdate()
+        {
+            FollowMount();
+            if (!UnlockPlaying) return;
+            unlockElapsed += Time.deltaTime;
+            AnimateUnlock();
+        }
+
+        private void AnimateUnlock()
+        {
+            float t = Mathf.Clamp01(unlockElapsed / unlockSeconds);
+            float eased = 1f - (1f - t) * (1f - t);
+            padlock.transform.localPosition = new Vector3(0f, unlockRise * eased, -.005f);
+            padlock.color = new Color(1f, 1f, 1f, 1f - t);
+            icon.color = new Color(1f, 1f, 1f, Mathf.Lerp(unlockFromAlpha, 1f, t));
+            if (t < 1f) return;
+            unlockElapsed = -1f;
+            padlock.gameObject.SetActive(false);
+            padlock.color = Color.white;
+        }
 
         private void FollowMount()
         {
