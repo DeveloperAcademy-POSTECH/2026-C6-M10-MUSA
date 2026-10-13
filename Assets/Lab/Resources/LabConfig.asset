@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: LabConfig
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabConfig
   monsterMaxHp: 1000
-  playerMaxHp: 300
   damage: 20
   battleDurationSeconds: 180
+  playerMaxHp: 300
   staminaMax: 100
   staminaStart: 100
   generateCost: 20
@@ -23,6 +23,19 @@ MonoBehaviour:
   staminaRecoverySeconds: 3
   hitRecovery: 5
   orbStorageLimit: 20
+  yinChance: 40
+  yangChance: 40
+  relayChance: 5
+  secretBoxChance: 5
+  potionChance: 5
+  bombChance: 5
+  itemLifetimeSeconds: 15
+  itemUnlockSwipesMin: 2
+  itemUnlockSwipesMax: 4
+  potionHeal: 10
+  relayDoubleMultiplier: 2
+  relayMaxMultiplier: 4
+  bombMultiplier: 3
   orbLifetimeSeconds: 8
   orbRestitution: 0.8
   orbFloorDeceleration: 2
@@ -30,11 +43,15 @@ MonoBehaviour:
   orbMaxReleaseSpeed: 3
   orbRadius: 0.32
   boardHeight: 5
+  combineSpeed: 0
+  dropCombineEnabled: 1
+  contactCombineEnabled: 1
   spawnRiseDistance: 0.65
   spawnRiseDuration: 0.25
   orbAppearance: {fileID: 11400000, guid: 9fd06f927557d47e2ac8b342a6979ed0, type: 2}
   cameraRadius: 8
   cameraHeightOffset: 0.65
+  cameraLookHeightOffset: 2
   throwOriginRadius: 4
   throwOriginHeightOffset: -0.5
   throwOriginLateralRange: 1
@@ -47,7 +64,7 @@ MonoBehaviour:
   throwUpGain: 2.1
   throwForwardGain: 2.5
   throwMaxWorldSpeed: 12.5
-  throwGravity: 15
+  throwGravity: 30
   throwLifetime: 4
   throwRadius: 0.165
   throwPowerExponent: 1.2
