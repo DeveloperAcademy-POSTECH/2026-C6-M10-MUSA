@@ -772,7 +772,9 @@ namespace C6Lab
             visibleOrbIds.Clear();
             impactReceipts.Reset();
             impactFeedback?.Clear();
-            target?.GetComponent<LabHangingTarget>()?.ResetSwing();
+            // Unity's destroyed components compare equal to null even though C# ?. still
+            // invokes GetComponent on the stale managed wrapper during scene teardown.
+            if (target != null) target.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = null;
             latest = null;
             sessionId = null;
@@ -1214,7 +1216,8 @@ namespace C6Lab
                     Vector3 targetLocalPoint = hitbox.InverseTransformPoint(result.HitPoint);
                     float signedYawImpulse = target.GetComponent<LabHangingTarget>()
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
-                    impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage);
+                    impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
+                        result.ImpactVelocity);
                     var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
                         round = model.Round, firstId = result.ProjectileId,
                         element = (int)element, damage = actualDamage,
@@ -1371,7 +1374,8 @@ namespace C6Lab
                         target.GetComponent<LabHangingTarget>()?.ApplyRemoteImpact(
                             new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse);
                         impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
-                            (LabOrbElement)packet.element, packet.damage);
+                            (LabOrbElement)packet.element, packet.damage,
+                            new Vector3(packet.wx, packet.wy, packet.wz));
                     }
                     break;
                 case "projectile":
@@ -1552,7 +1556,7 @@ namespace C6Lab
             visibleOrbIds.Clear();
             impactReceipts.Reset();
             impactFeedback?.Clear();
-            target?.GetComponent<LabHangingTarget>()?.ResetSwing();
+            if (target != null) target.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = null;
             developerSolo = false;
             latest = null;
