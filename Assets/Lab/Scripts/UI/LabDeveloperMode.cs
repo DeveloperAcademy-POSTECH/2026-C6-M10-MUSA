@@ -359,19 +359,26 @@ namespace C6Lab
                     rows[i].transform.SetSiblingIndex(sibling++);
                 }
 
-                // 제목을 누르면 접고 펼친다. 숨긴 줄의 값도 APPLY 때 그대로 읽힌다.
+                // 처음에는 모두 접힌 상태로 시작한다. 제목을 누르면 접고 펼친다.
+                // 숨긴 줄의 값도 APPLY 때 그대로 읽힌다.
                 string name = category.Title;
-                bool expanded = true;
-                title.text = "- " + name;
+                bool expanded = false;
+                SetCategoryExpanded(title, name, rows, expanded);
                 Button toggle = header.GetComponent<Button>();
                 toggle.targetGraphic = title;
                 toggle.onClick.AddListener(() =>
                 {
                     expanded = !expanded;
-                    title.text = (expanded ? "- " : "+ ") + name;
-                    foreach (GameObject row in rows) row.SetActive(expanded);
+                    SetCategoryExpanded(title, name, rows, expanded);
                 });
             }
+        }
+
+        /// <summary>펼침 상태에 맞춰 제목의 세모(▶ 접힘 / ▼ 펼침)와 항목 줄 표시를 바꾼다.</summary>
+        private static void SetCategoryExpanded(Text title, string name, GameObject[] rows, bool expanded)
+        {
+            title.text = (expanded ? "\u25BC  " : "\u25B6  ") + name;
+            foreach (GameObject row in rows) row.SetActive(expanded);
         }
 
         /// <summary>Extend older saved panels without deleting existing Inspector-edited rows.</summary>
