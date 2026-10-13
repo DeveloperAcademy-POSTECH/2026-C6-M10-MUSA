@@ -166,5 +166,28 @@ namespace C6Lab.Tests
                 }
             }
         }
+            [Test]
+        public void EveryDeveloperFieldBelongsToExactlyOneCategory()
+        {
+            int fieldCount = LabConfig.DeveloperFields.Count;
+            int[] seen = new int[fieldCount];
+
+            foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
+            {
+                Assert.That(category.Title, Is.Not.Empty);
+                Assert.That(category.FieldIndices, Is.Not.Empty, category.Title + " has no fields.");
+                foreach (int index in category.FieldIndices)
+                {
+                    Assert.That(index, Is.InRange(0, fieldCount - 1),
+                        category.Title + " points to a field that does not exist: " + index);
+                    seen[index]++;
+                }
+            }
+
+            for (int i = 0; i < fieldCount; i++)
+                Assert.That(seen[i], Is.EqualTo(1),
+                    LabConfig.DeveloperFields[i].Label + " (" + i + ") must be in exactly one category.");
+        }
+
     }
 }
