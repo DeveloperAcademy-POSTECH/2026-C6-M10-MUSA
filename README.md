@@ -4,7 +4,7 @@
 
 ## 개발자 설정 빠른 참고
 
-Editor 또는 Development Build에서 **DEV**를 열면 요괴·개인 HP·시간·스태미나·생성 확률·아이템·구슬 물리·카메라·투척 관련 숫자 **57개**를 숫자 입력과 슬라이더로 조정할 수 있습니다. 이 값은 솔로 라운드 또는 Host가 만드는 공유 방에 적용합니다. [개발자 모드 조정값 상세 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)에 모든 값의 현재 기본값, 입력 범위, 단위, 실제 효과, 값 사이의 제약과 코드 연결을 정리했습니다. 투척값을 비교하는 순서는 [투척 물리 실험 가이드](docs/THROW_TUNING_GUIDE.md)를 보세요.
+Editor 또는 Development Build에서 **DEV**를 열면 요괴·개인 HP·시간·스태미나·생성 확률·아이템·구슬 물리·카메라·투척·피격 회전 관련 숫자 **60개**를 숫자 입력과 슬라이더로 조정할 수 있습니다. 이 값은 솔로 라운드 또는 Host가 만드는 공유 방에 적용합니다. [개발자 모드 조정값 상세 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)에 모든 값의 현재 기본값, 입력 범위, 단위, 실제 효과, 값 사이의 제약과 코드 연결을 정리했습니다. 투척값을 비교하는 순서는 [투척 물리 실험 가이드](docs/THROW_TUNING_GUIDE.md)를 보세요.
 
 | 조정 영역 | 기본값 예시 | 무엇이 바뀌나 |
 | --- | --- | --- |
@@ -15,6 +15,7 @@ Editor 또는 Development Build에서 **DEV**를 열면 요괴·개인 HP·시�
 | 3D 조합판 구슬 | 수명 8초 · 탄성 0.8 · 감속 2 | 보관 시간과 평면 위 3D 구체의 이동·반발 |
 | 카메라·발사점 | 카메라 거리 8 · 발사 거리 4 | 보이는 시점과 3D 투척 시작 위치 |
 | 투척 | 상승 배율 2.1 · 전진 배율 2.5 · 중력 30 | 손동작 판정과 공의 초기 속도·비행 궤적 |
+| 요괴 피격 회전 | 강도 80 · 감쇠 1.2 · 최대 720°/초 | 피격 위치에 따른 Y축 회전량·정지 속도 |
 
 DEV 값은 **START/RESTART SOLO**로 1인 라운드에, **CREATE ROOM**으로 새 공유 방에 적용됩니다. Host는 전투 시작 전 **APPLY TO ROOM**으로 공유 설정을 다시 보낼 수 있습니다. 저장된 설정 에셋은 바꾸지 않습니다.
 
@@ -30,13 +31,13 @@ DEV 값은 **START/RESTART SOLO**로 1인 라운드에, **CREATE ROOM**으로 �
 
 ### 한 대로 조합·투척 실험하기
 
-Unity Editor에서 Play를 누르거나 **Development Build**로 만든 앱을 실행합니다. 화면 오른쪽의 **DEV**를 누르면 57개 수치의 숫자 입력과 슬라이더가 있는 패널이 열립니다. `Monster Max HP`, `Orb Generation Cost`, `Orb Lifetime (seconds)`, `Throw ...` 등 필요한 값을 조정하고 **START SOLO**를 누르세요. 한 명의 Host 세션이 즉시 시작되며, **GENERATE**로 Yin/Yang을 만든 뒤 서로 다른 두 구슬을 직접 겹쳐 Combined를 만들고 위쪽으로 빠르게 스와이프해 원통에 던질 수 있습니다. GENERATE에서는 아이템도 섞여 나옵니다. 좌우 끝 전달은 이웃이 없으므로 발생하지 않고, 같은 이유로 **잠긴 아이템도 솔로에서는 풀리지 않습니다.** 풀린 아이템을 혼자 보려면 `Item Unlock Swipes Min`·`Max`를 0으로, 아이템 없이 투척만 비교하려면 `Yin Chance`·`Yang Chance`를 50, 아이템 확률을 0으로 둡니다.
+Unity Editor에서 Play를 누르거나 **Development Build**로 만든 앱을 실행합니다. 화면 오른쪽의 **DEV**를 누르면 60개 수치의 숫자 입력과 슬라이더가 있는 패널이 열립니다. `Monster Max HP`, `Orb Generation Cost`, `Orb Lifetime (seconds)`, `Throw ...` 등 필요한 값을 조정하고 **START SOLO**를 누르세요. 한 명의 Host 세션이 즉시 시작되며, **GENERATE**로 Yin/Yang을 만든 뒤 서로 다른 두 구슬을 직접 겹쳐 Combined를 만들고 위쪽으로 빠르게 스와이프해 원통에 던질 수 있습니다. GENERATE에서는 아이템도 섞여 나옵니다. 좌우 끝 전달은 이웃이 없으므로 발생하지 않고, 같은 이유로 **잠긴 아이템도 솔로에서는 풀리지 않습니다.** 풀린 아이템을 혼자 보려면 `Item Unlock Swipes Min`·`Max`를 0으로, 아이템 없이 투척만 비교하려면 `Yin Chance`·`Yang Chance`를 50, 아이템 확률을 0으로 둡니다.
 
 값을 다시 조정하려면 **DEV → 값 변경 → RESTART SOLO**를 누릅니다. 새 값으로 새 판을 시작하며 구슬·요괴/개인 HP·시간·스태미나가 초기화됩니다. 예를 들어 느긋하게 조합을 시험하려면 `Battle Duration (seconds) = 600`, `Orb Lifetime (seconds) = 60`, `Orb Generation Cost = 1`로 입력합니다. **DEFAULTS**는 저장된 `LabConfig.asset` 값을 입력칸에 불러오고, **END SOLO**는 로비로 돌아갑니다. 오류가 있는 값은 적용하지 않고 패널에 이유를 표시합니다. 일반 빌드에서는 DEV 버튼이 숨겨집니다.
 
 ### 공유 방의 값 바꾸기
 
-Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤, 57개 값을 숫자 입력 또는 슬라이더로 조정합니다. 숫자 입력은 정확한 값을 지정할 때 사용하며 두 조작은 서로 같은 값을 보여줍니다. DEV의 **ROOM PLAYERS**는 일반 로비의 인원 선택과 같은 값을 표시·변경합니다. **CREATE ROOM**을 누르면 선택한 인원과 조정값으로 방을 만들고, 참가자가 **FIND ROOMS**의 방 목록에서 이름을 선택하거나 직접 IP **JOIN**으로 들어오면 Host 설정을 받습니다. Host 로비에서 전투 시작 전에 다시 DEV를 열어 값을 바꿀 수 있으며, 이때 버튼은 **APPLY TO ROOM**입니다. 변경된 설정에 대해 참가자의 확인이 끝나야 **START**할 수 있습니다. 인원수는 방을 만들기 전에 선택합니다. Editor·Development Build의 Host는 전투를 일시정지한 뒤 **DEV → APPLY & RESTART**로 새 설정을 참가자에게 보내고 확인을 받아 새 판을 시작할 수 있습니다. 진행 중인 판의 설정은 바꾸지 않고, 설정은 실행 중인 세션의 복사본에만 적용되며 `LabConfig.asset`에는 저장되지 않습니다.
+Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤, 60개 값을 숫자 입력 또는 슬라이더로 조정합니다. 숫자 입력은 정확한 값을 지정할 때 사용하며 두 조작은 서로 같은 값을 보여줍니다. DEV의 **ROOM PLAYERS**는 일반 로비의 인원 선택과 같은 값을 표시·변경합니다. **CREATE ROOM**을 누르면 선택한 인원과 조정값으로 방을 만들고, 참가자가 **FIND ROOMS**의 방 목록에서 이름을 선택하거나 직접 IP **JOIN**으로 들어오면 Host 설정을 받습니다. Host 로비에서 전투 시작 전에 다시 DEV를 열어 값을 바꿀 수 있으며, 이때 버튼은 **APPLY TO ROOM**입니다. 변경된 설정에 대해 참가자의 확인이 끝나야 **START**할 수 있습니다. 인원수는 방을 만들기 전에 선택합니다. Editor·Development Build의 Host는 전투를 일시정지한 뒤 **DEV → APPLY & RESTART**로 새 설정을 참가자에게 보내고 확인을 받아 새 판을 시작할 수 있습니다. 진행 중인 판의 설정은 바꾸지 않고, 설정은 실행 중인 세션의 복사본에만 적용되며 `LabConfig.asset`에는 저장되지 않습니다.
 
 ## 전투 UI와 일시정지
 
@@ -129,7 +130,9 @@ DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" xcodebuild \
 3. `Assets/Lab/Scenes/Lab.unity`의 **OrbBoard → OrbBoardPlate / OrbBoardLight**에서 판 색과 빛을 조정합니다. `LabCanvas/BoardAreaTint`는 기존 배치를 보존하되 Image가 꺼져 있어 3D 조명을 가리지 않습니다. 판 크기는 `Board Height`와 화면 비율에 맞춰 실행 시 갱신됩니다.
 4. Play 또는 Development Build의 DEV 솔로에서 Yin·Yang을 생성하고 직접 조합·투척해 보세요. Material 색을 변경한 뒤에는 새 라운드를 시작해야 이미 표시된 구슬에도 새 색이 적용됩니다. 외형 변경은 구슬의 반지름·소유권·전달·피격 판정을 바꾸지 않습니다.
 
-화면 간 이동 데이터는 여전히 **구슬 ID·소유자·정규화한 XY 위치와 XY 속도**입니다. Host가 승인한 좌우 전달에서 이 값을 이어 주고, 조합판 내부의 3D 물리 컴포넌트 자체는 네트워크로 전송하지 않습니다. 확정 피격 신호에는 구슬 ID·라운드·속성·실제 피해량·요괴 기준 충돌 위치를 담습니다. 아이템 사용 요청·릴레이 단계·폭발 알림과 일시정지 상태도 공유합니다. 합쳐진 접속 프로토콜은 `5612`이며 다른 버전의 앱과 같은 방에 접속할 수 없습니다.
+화면 간 이동 데이터는 여전히 **구슬 ID·소유자·정규화한 XY 위치와 XY 속도**입니다. Host가 승인한 좌우 전달에서 이 값을 이어 주고, 조합판 내부의 3D 물리 컴포넌트 자체는 네트워크로 전송하지 않습니다. 확정 피격 신호에는 구슬 ID·라운드·속성·실제 피해량·요괴 기준 충돌 위치와 Host가 계산한 회전 충격량을 담습니다. 회전 각도·속도는 Host 스냅샷으로 보정합니다. 아이템 사용 요청·릴레이 단계·폭발 알림과 일시정지 상태도 공유합니다. 합쳐진 접속 프로토콜은 `5613`이며 다른 버전의 앱과 같은 방에 접속할 수 없습니다.
+
+요괴의 현재 Cylinder에는 [회전 확인용 그레디언트](Assets/Lab/Art/Targets/TargetSpinGradient.png)가 적용되어 있습니다. 밝은 화살표가 왼쪽/오른쪽으로 움직이는지 관찰하면 빗맞힘 회전 방향을 구분할 수 있습니다. 몸체와 실제 피격 MeshCollider는 함께 회전하고, 로프와 천장 받침은 기존 매달림 연출에 남습니다. 회전 강도·감쇠·최대 속도는 DEV의 **Target spin** 항목에서 새 판에 적용합니다.
 
 ## 현재 기준 수치
 

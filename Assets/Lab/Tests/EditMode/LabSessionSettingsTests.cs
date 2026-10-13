@@ -33,6 +33,10 @@ namespace C6Lab.Tests
                 values[48] = 120f;
                 Assert.That(LabSessionSettings.Fingerprint(values, 3, 5606), Is.Not.EqualTo(original),
                     "Player HP setting must be part of the shared room fingerprint.");
+                values[48] = config.PlayerMaxHp;
+                values[57] = 90f;
+                Assert.That(LabSessionSettings.Fingerprint(values, 3, 5606), Is.Not.EqualTo(original),
+                    "Target spin tuning must be part of the shared room fingerprint.");
                 values[38] = float.NaN;
                 Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(values, 3, 5606));
             }
@@ -78,6 +82,9 @@ namespace C6Lab.Tests
             values[32] = 100000f;
             values[38] = 5f;
             values[48] = 1f;
+            values[57] = 200f;
+            values[58] = 10f;
+            values[59] = 1440f;
             return values;
         }
 
@@ -161,6 +168,7 @@ namespace C6Lab.Tests
                     revision = (ulong)(i + 1) };
             var snapshot = new LabSnapshot { sessionId = Guid.NewGuid().ToString("N"),
                 round = 1, phase = LabPhase.Playing, hp = 100000, remaining = 180d,
+                targetYawDegrees = 475.25f, targetYawSpeedDegreesPerSecond = -320.5f,
                 players = players, orbs = orbs };
             string[] chunks = LabSessionSettings.ChunkSnapshot(snapshot);
             Assert.That(chunks.Length, Is.GreaterThan(1));
@@ -178,6 +186,8 @@ namespace C6Lab.Tests
             Assert.That(restored.orbs.Length, Is.EqualTo(500));
             Assert.That(restored.orbs[499].id, Is.EqualTo(orbs[499].id));
             Assert.That(restored.orbs[499].owner, Is.EqualTo(5ul));
+            Assert.That(restored.targetYawDegrees, Is.EqualTo(475.25f));
+            Assert.That(restored.targetYawSpeedDegreesPerSecond, Is.EqualTo(-320.5f));
         }
     }
 }

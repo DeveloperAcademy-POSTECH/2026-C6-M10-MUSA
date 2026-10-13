@@ -67,6 +67,8 @@ namespace C6Lab
         public bool paused;
         public double serverTime, remaining;
         public int hp;
+        /// <summary>Host-owned presentation pose, synchronized separately from HP and collision.</summary>
+        public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();
         public LabOrbState[] orbs = Array.Empty<LabOrbState>();
     }

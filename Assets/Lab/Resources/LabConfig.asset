@@ -16,6 +16,9 @@ MonoBehaviour:
   damage: 20
   battleDurationSeconds: 180
   playerMaxHp: 300
+  targetSpinStrength: 80
+  targetSpinDamping: 1.2
+  targetSpinMaximumSpeed: 720
   staminaMax: 100
   staminaStart: 100
   generateCost: 20

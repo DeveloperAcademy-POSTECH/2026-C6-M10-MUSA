@@ -41,6 +41,7 @@ namespace C6Lab
         public float wx;
         public float wy;
         public float wz;
+        public float spinImpulse;
         public string reason;
         public ulong owner;
         public int element;
@@ -76,12 +77,16 @@ namespace C6Lab
         public void Reset() => SetActive(null, 0);
 
         public bool TryAccept(string session, uint round, string projectileId, LabOrbElement element,
-            int damage, Vector3 targetLocalPoint, Vector3 impactVelocity)
+            int damage, Vector3 targetLocalPoint, Vector3 impactVelocity, float signedYawImpulse = 0f)
         {
             if (string.IsNullOrEmpty(activeSession) || activeRound == 0 || session != activeSession
                 || round != activeRound || string.IsNullOrEmpty(projectileId)
-                || element < LabOrbElement.Fire || element > LabOrbElement.Earth || damage <= 0
-                || !Finite(targetLocalPoint) || !Finite(impactVelocity)) return false;
+                // Relay and bomb projectiles legitimately carry None; the Host already
+                // confirmed their damage before sending this presentation event.
+                || element < LabOrbElement.None || element > LabOrbElement.Earth || damage <= 0
+                || !Finite(targetLocalPoint) || !Finite(impactVelocity)
+                || float.IsNaN(signedYawImpulse) || float.IsInfinity(signedYawImpulse)
+                || Mathf.Abs(signedYawImpulse) > 1440f) return false;
             return seenProjectileIds.Add(projectileId);
         }
 
@@ -137,9 +142,9 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // The camera tuning and shared pause state change room settings/snapshots;
+        // Target yaw state and spin tuning change room settings/snapshots;
         // reject older clients rather than mixing different battle rules.
-        private const ushort LabProtocolVersion = 5612;
+        private const ushort LabProtocolVersion = 5613;
         private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/7");
         private const int MaximumPacketBytes = 32768;
@@ -270,6 +275,7 @@ namespace C6Lab
 
         private void Start()
         {
+            ConfigureTargetSpin();
             var args = Environment.GetCommandLineArgs();
             for (int i = 0; i < args.Length; i++)
             {
@@ -362,6 +368,7 @@ namespace C6Lab
             if (sessionConfig != null) Destroy(sessionConfig);
             sessionConfig = replacement;
             config = replacement;
+            ConfigureTargetSpin();
             ConfigApplied?.Invoke(config);
             error = string.Empty;
             return true;
@@ -372,6 +379,7 @@ namespace C6Lab
             if (sourceConfig != null && config != sourceConfig)
             {
                 config = sourceConfig;
+                ConfigureTargetSpin();
                 ConfigApplied?.Invoke(config);
             }
             if (sessionConfig != null)
@@ -379,6 +387,13 @@ namespace C6Lab
                 Destroy(sessionConfig);
                 sessionConfig = null;
             }
+        }
+
+        private void ConfigureTargetSpin()
+        {
+            if (config == null || target == null) return;
+            target.GetComponent<LabHangingTarget>()?.ConfigureSpin(
+                config.TargetSpinStrength, config.TargetSpinDamping, config.TargetSpinMaximumSpeed);
         }
 
         public void Host()
@@ -592,6 +607,7 @@ namespace C6Lab
             ClearProjectiles();
             sessionId = Guid.NewGuid().ToString("N");
             impactFeedback?.Clear();
+            ConfigureTargetSpin();
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             model.Begin(sessionId, order.ToArray(), Time.realtimeSinceStartupAsDouble, config);
@@ -648,6 +664,7 @@ namespace C6Lab
             ApplyLocalPause(false);
             sessionId = Guid.NewGuid().ToString("N");
             impactFeedback?.Clear();
+            ConfigureTargetSpin();
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             model.BeginSolo(sessionId, LocalPlayerId, Time.realtimeSinceStartupAsDouble, config);
@@ -1008,6 +1025,12 @@ namespace C6Lab
             if (!IsHost || model == null) return;
             double now = Time.realtimeSinceStartupAsDouble;
             latest = model.Snapshot(battleClock.Now(now));
+            LabHangingTarget hanging = target == null ? null : target.GetComponent<LabHangingTarget>();
+            if (hanging != null)
+            {
+                latest.targetYawDegrees = hanging.YawAngleDegrees;
+                latest.targetYawSpeedDegreesPerSecond = hanging.YawSpeedDegreesPerSecond;
+            }
             latest.paused = battleClock.IsPaused && latest.phase == LabPhase.Playing;
             AnnounceBombExplosions();
             // Large experimental states are deliberately updated less often instead of queuing
@@ -1187,13 +1210,15 @@ namespace C6Lab
                 {
                     Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
                     Vector3 targetLocalPoint = hitbox.InverseTransformPoint(result.HitPoint);
-                    target.GetComponent<LabHangingTarget>()?.Kick(result.ImpactVelocity);
+                    float signedYawImpulse = target.GetComponent<LabHangingTarget>()
+                        ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
                     impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage);
                     var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
                         round = model.Round, firstId = result.ProjectileId,
                         element = (int)element, damage = actualDamage,
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
-                        wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z };
+                        wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
+                        spinImpulse = signedYawImpulse };
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
             }
@@ -1338,9 +1363,10 @@ namespace C6Lab
                     if (target != null && impactReceipts.TryAccept(packet.sessionId, packet.round,
                         packet.firstId, (LabOrbElement)packet.element, packet.damage,
                         new Vector3(packet.x, packet.y, packet.z),
-                        new Vector3(packet.wx, packet.wy, packet.wz)))
+                        new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse))
                     {
-                        target.GetComponent<LabHangingTarget>()?.Kick(new Vector3(packet.wx, packet.wy, packet.wz));
+                        target.GetComponent<LabHangingTarget>()?.ApplyRemoteImpact(
+                            new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse);
                         impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
                             (LabOrbElement)packet.element, packet.damage);
                     }
@@ -1447,6 +1473,10 @@ namespace C6Lab
             if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
             ApplyLocalPause(snapshot.phase == LabPhase.Playing && snapshot.paused);
+            if (target != null && Finite(snapshot.targetYawDegrees)
+                && Finite(snapshot.targetYawSpeedDegreesPerSecond))
+                target.GetComponent<LabHangingTarget>()?.ReconcileYaw(
+                    snapshot.targetYawDegrees, snapshot.targetYawSpeedDegreesPerSecond);
             SyncBoard();
             if (logTransition && latest.phase == LabPhase.Playing) SetNotice(string.Empty);
             SetStatus((latest.paused ? "PAUSED" : latest.phase.ToString())
@@ -1519,6 +1549,7 @@ namespace C6Lab
             visibleOrbIds.Clear();
             impactReceipts.Reset();
             impactFeedback?.Clear();
+            target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = null;
             developerSolo = false;
             latest = null;
