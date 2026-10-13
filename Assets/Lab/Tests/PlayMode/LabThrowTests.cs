@@ -271,9 +271,11 @@ namespace C6Lab.Tests
             Assert.IsNotNull(trail.sharedMaterial, "The flight path needs a renderable material.");
             Assert.AreSame(projectile.transform, trail.transform.parent);
             Assert.IsNull(trail.GetComponent<Collider>(), "The trail must not affect hit detection.");
-            Assert.That(trail.startColor.r, Is.EqualTo(.13f).Within(.001f));
-            Assert.That(trail.startColor.g, Is.EqualTo(.42f).Within(.001f));
-            Assert.That(trail.startColor.b, Is.EqualTo(.90f).Within(.001f));
+            // TrailRenderer stores the gradient color with 8-bit channels on readback.
+            Color expectedTrailColor = (Color32)new Color(.13f, .42f, .90f);
+            Assert.That(trail.startColor.r, Is.EqualTo(expectedTrailColor.r).Within(.001f));
+            Assert.That(trail.startColor.g, Is.EqualTo(expectedTrailColor.g).Within(.001f));
+            Assert.That(trail.startColor.b, Is.EqualTo(expectedTrailColor.b).Within(.001f));
 
             int reports = 0;
             Assert.IsTrue(projectile.Launch("trail-water", 1UL, new Vector3(0f, 0f, -9f),

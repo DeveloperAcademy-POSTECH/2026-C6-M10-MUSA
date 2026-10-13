@@ -32232,6 +32232,10 @@ MonoBehaviour:
   orbsText: {fileID: 171567771}
   seatText: {fileID: 701431257}
   battleUi: {fileID: 1286443198}
+  battleCamera: {fileID: 427558553}
+  orbCamera: {fileID: 760621525}
+  battleBackgroundColor: {r: 0.32, g: 0.42, b: 0.49, a: 1}
+  orbBackgroundColor: {r: 0.18, g: 0.24, b: 0.29, a: 1}
   yokaiHpFill: {fileID: 1620563520}
   playerHpFill: {fileID: 2079071263}
   staminaCells:

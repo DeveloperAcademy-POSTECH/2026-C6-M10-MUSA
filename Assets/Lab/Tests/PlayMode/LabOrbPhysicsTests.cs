@@ -293,8 +293,10 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator PhysicalContactAloneNeverCombinesButDirectYinYangDropDoes()
+        public IEnumerator DisabledContactCombineLeavesDirectYinYangDropAvailable()
         {
+            SetSerializedField(config, "contactCombineEnabled", false);
+            Assert.That(config.ContactCombineEnabled, Is.False);
             var yin = board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.35f, .5f),
                 new Vector2(.9f, 0f));
             var yang = board.UpsertOrb("yang", LabOrbKind.Yang, new Vector2(.65f, .5f),
@@ -302,7 +304,7 @@ namespace C6Lab.Tests
             int combines = 0;
             board.CombineRequested += (first, second, center) => combines++;
             for (int i = 0; i < 30; i++) yield return new WaitForFixedUpdate();
-            Assert.That(combines, Is.Zero, "A 3D sphere collision must not combine materials.");
+            Assert.That(combines, Is.Zero, "Contact must not request a combination when disabled.");
 
             Vector2 from = BoardPoint(yin);
             Vector2 to = BoardPoint(yang);
@@ -315,6 +317,28 @@ namespace C6Lab.Tests
             Assert.That(board.RejectEdge("yin"), Is.True);
             Assert.That(yin.Body.isKinematic, Is.False);
             Assert.That(yang.Body.isKinematic, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator EnabledContactCombineRequestsOneYinYangCombination()
+        {
+            SetSerializedField(config, "contactCombineEnabled", true);
+            SetSerializedField(config, "dropCombineEnabled", false);
+            Assert.That(config.ContactCombineEnabled, Is.True);
+            Assert.That(config.DropCombineEnabled, Is.False);
+            var yin = board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.35f, .5f),
+                new Vector2(.9f, 0f));
+            var yang = board.UpsertOrb("yang", LabOrbKind.Yang, new Vector2(.65f, .5f),
+                new Vector2(-.9f, 0f));
+            int combines = 0;
+            board.CombineRequested += (first, second, center) => combines++;
+
+            for (int i = 0; i < 30; i++) yield return new WaitForFixedUpdate();
+            Assert.That(combines, Is.EqualTo(1), "One physical contact should request one combination.");
+            Assert.That(yin.Body.isKinematic, Is.True);
+            Assert.That(yang.Body.isKinematic, Is.True);
+            for (int i = 0; i < 10; i++) yield return new WaitForFixedUpdate();
+            Assert.That(combines, Is.EqualTo(1), "Pending partners must not request a duplicate.");
         }
 
         [Test]
@@ -554,7 +578,7 @@ namespace C6Lab.Tests
             return block.GetColor(property);
         }
 
-        private static void SetSerializedField(Object target, string name, Object value)
+        private static void SetSerializedField(Object target, string name, object value)
         {
             FieldInfo field = target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(field, Is.Not.Null, name + " should be Inspector-editable.");

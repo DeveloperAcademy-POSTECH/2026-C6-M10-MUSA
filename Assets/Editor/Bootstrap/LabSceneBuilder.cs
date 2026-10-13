@@ -311,6 +311,8 @@ namespace C6Lab.Editor
             scaler.matchWidthOrHeight = .5f;
             var hud = canvasObject.GetComponent<LabHud>();
             hud.network = network;
+            hud.battleCamera = seatCamera.battleCamera;
+            hud.orbCamera = sceneController.orbCamera;
 
             // Keep the legacy UI shape for designer layouts, but let the lit board art show through.
             RectTransform boardTint = CreateRect("BoardAreaTint", canvasObject.transform,
