@@ -100,6 +100,8 @@ namespace C6Lab.Tests
             SetSerializedField(appearance, "fireMaterial", fireMaterial);
             var bombIcon = new Texture2D(8, 8);
             SetSerializedField(appearance, "bombIcon", bombIcon);
+            var lockIcon = new Texture2D(8, 8);
+            SetSerializedField(appearance, "lockIcon", lockIcon);
             SetSerializedField(config, "orbAppearance", appearance);
 
             LabProjectile projectile = null;
@@ -132,6 +134,12 @@ namespace C6Lab.Tests
                 Assert.That(bomb.ItemMarker.IconVisible, Is.True, "An assigned item icon is drawn on the orb.");
                 Assert.That(bomb.ItemMarker.transform.parent, Is.SameAs(bomb.transform),
                     "The icon sits on the orb root so it does not roll with the art.");
+                Assert.That(bomb.ItemMarker.LockVisible, Is.True, "A locked item shows a padlock over its icon.");
+                Assert.That(bomb.ItemMarker.IconAlpha, Is.EqualTo(appearance.LockedIconAlpha).Within(.001f),
+                    "The icon under the padlock is dimmed.");
+                board.UpsertOrb("styled-bomb", LabOrbKind.Bomb, new Vector2(.5f, .2f), lockSwipes: 0);
+                Assert.That(bomb.ItemMarker.LockVisible, Is.False);
+                Assert.That(bomb.ItemMarker.IconAlpha, Is.EqualTo(1f), "An unlocked item's icon is sharp again.");
                 Assert.That(bomb.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
                 Assert.That(yin.ItemMarker, Is.Null, "Only items carry an icon marker.");
                 Assert.That(yin.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
@@ -154,6 +162,7 @@ namespace C6Lab.Tests
                 if (projectile != null) Object.Destroy(projectile.gameObject);
                 if (fireShot != null) Object.Destroy(fireShot.gameObject);
                 Object.Destroy(bombIcon);
+                Object.Destroy(lockIcon);
                 Object.Destroy(waterMaterial);
                 Object.Destroy(fireMaterial);
                 Object.Destroy(appearance);

@@ -4,9 +4,9 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
-    /// Item presentation on the orb root: an icon on a disc, a badge (remaining unlock handoffs,
-    /// or a relay orb's x1/x2/MAX stage) and a bomb's fuse seconds above the orb, all facing the
-    /// front-on board camera. It follows the Visual mount's
+    /// Item presentation on the orb root: an icon on a disc, a padlock over the dimmed icon while
+    /// the item is locked, a badge (remaining unlock handoffs, or a relay orb's x1/x2/MAX stage)
+    /// and a bomb's fuse seconds above the orb, all facing the front-on board camera. It follows the Visual mount's
     /// rise animation but not its rolling rotation, and owns no collider.
     /// </summary>
     [DisallowMultipleComponent]
@@ -22,6 +22,7 @@ namespace C6Lab
 
         private SpriteRenderer disc;
         private SpriteRenderer icon;
+        private SpriteRenderer padlock;
         private SpriteRenderer badge;
         private TextMesh badgeCount;
         private TextMesh fuse;
@@ -29,6 +30,8 @@ namespace C6Lab
         private float radius;
 
         public bool IconVisible => icon != null && icon.gameObject.activeSelf;
+        public float IconAlpha => icon != null ? icon.color.a : 0f;
+        public bool LockVisible => padlock != null && padlock.gameObject.activeSelf;
         public bool BadgeVisible => badge != null && badge.gameObject.activeSelf;
         public string BadgeText => badgeCount != null ? badgeCount.text : string.Empty;
         public bool FuseVisible => fuse != null && fuse.gameObject.activeSelf;
@@ -83,6 +86,28 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// Covers the icon with the appearance's padlock and dims it while locked. Without a
+        /// padlock image only the dimming and the count badge mark the lock. Call after Show.
+        /// </summary>
+        public void SetLocked(bool locked, LabOrbAppearance look)
+        {
+            EnsureParts();
+            Texture2D lockTexture = look != null ? look.LockIcon : null;
+            bool covered = locked && lockTexture != null;
+            padlock.gameObject.SetActive(covered);
+            if (covered)
+            {
+                padlock.sprite = SpriteFor(lockTexture);
+                // The sprite is one unit wide; size its longer side in orb radii.
+                float aspect = (float)lockTexture.height / lockTexture.width;
+                padlock.transform.localScale = Vector3.one * (look.LockIconSize * radius / Mathf.Max(1f, aspect));
+                padlock.transform.localPosition = new Vector3(0f, 0f, -.005f);
+            }
+            float alpha = locked ? (look != null ? look.LockedIconAlpha : .4f) : 1f;
+            icon.color = new Color(1f, 1f, 1f, alpha);
+        }
+
         private void LateUpdate() => FollowMount();
 
         private void FollowMount()
@@ -96,7 +121,9 @@ namespace C6Lab
             if (disc != null) return;
             disc = CreateSprite("Icon Disc", Disc(), DiscColor, 0);
             icon = CreateSprite("Icon", null, Color.white, 1);
-            badge = CreateSprite("Lock Badge", Square(), BadgeColor, 2);
+            padlock = CreateSprite("Padlock", null, Color.white, 2);
+            padlock.gameObject.SetActive(false);
+            badge = CreateSprite("Lock Badge", Square(), BadgeColor, 3);
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (font == null) return;
             badgeCount = CreateText("Lock Count", font, Color.white);
@@ -116,7 +143,7 @@ namespace C6Lab
             text.color = color;
             var renderer = part.GetComponent<MeshRenderer>();
             renderer.sharedMaterial = font.material;
-            renderer.sortingOrder = 3;
+            renderer.sortingOrder = 4;
             return text;
         }
 

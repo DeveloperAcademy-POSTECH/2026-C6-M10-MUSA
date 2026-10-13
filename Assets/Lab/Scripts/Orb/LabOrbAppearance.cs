@@ -25,6 +25,12 @@ namespace C6Lab
         [SerializeField] private Texture2D secretBoxIcon;
         [SerializeField] private Texture2D potionIcon;
         [SerializeField] private Texture2D bombIcon;
+        [Header("Locked item (presentation only)")]
+        [SerializeField] private Texture2D lockIcon;
+        [Tooltip("Longer side of the padlock image, in orb radii.")]
+        [SerializeField, Min(.1f)] private float lockIconSize = 1.2f;
+        [Tooltip("Item icon opacity while the padlock covers it.")]
+        [SerializeField, Range(0f, 1f)] private float lockedIconAlpha = .4f;
         [Header("Board contact shadow (presentation only)")]
         [SerializeField] private Material shadowMaterial;
         [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, .22f);
@@ -41,6 +47,9 @@ namespace C6Lab
         public Material YinMaterial => yinMaterial;
         public Material YangMaterial => yangMaterial;
         public Material CombinedMaterial => combinedMaterial;
+        public Texture2D LockIcon => lockIcon;
+        public float LockIconSize => lockIconSize > 0f ? lockIconSize : 1.2f;
+        public float LockedIconAlpha => Mathf.Clamp01(lockedIconAlpha);
         public Material ShadowMaterial => shadowMaterial;
         public Color ShadowColor => shadowColor;
         public Vector2 ShadowScale => shadowScale;

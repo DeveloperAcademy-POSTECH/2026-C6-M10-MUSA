@@ -305,6 +305,7 @@ namespace C6Lab
                 ? Mathf.CeilToInt(fuseSeconds).ToString() : null;
             itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), fuseText,
                 visualRadius, visual);
+            itemMarker.SetLocked(lockSwipes > 0, appearance);
         }
 
         private string BadgeText()
