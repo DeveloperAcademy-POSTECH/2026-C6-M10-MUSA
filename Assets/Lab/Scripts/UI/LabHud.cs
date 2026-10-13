@@ -38,6 +38,28 @@ namespace C6Lab
         public Text staminaText;
         public Text orbsText;
         public Text seatText;
+        [Header("Saved battle UI")]
+        public GameObject battleUi;
+        public UnityEngine.UI.Image yokaiHpFill;
+        public UnityEngine.UI.Image playerHpFill;
+        public UnityEngine.UI.Image[] staminaCells;
+        public GameObject leftNeighborBadge;
+        public GameObject rightNeighborBadge;
+        public Text leftNeighborText;
+        public Text rightNeighborText;
+        public Button pauseButton;
+        public GameObject pauseMenu;
+        public Button resumeButton;
+        public Button returnLobbyButton;
+        public Button developerSettingsButton;
+        public Text pauseStatusText;
+        public LabDeveloperMode developerMode;
+        [Header("Saved battle result controls")]
+        public GameObject resultControls;
+        public Text resultStatusText;
+        public Button resultRestartButton;
+        public Button resultReturnLobbyButton;
+        public Button resultLeaveButton;
 
         private readonly List<Button> roomRows = new List<Button>();
         private string renderedRoomList = string.Empty;
@@ -54,6 +76,13 @@ namespace C6Lab
             if (startButton != null) startButton.onClick.AddListener(() => network?.StartBattle());
             if (generateButton != null) generateButton.onClick.AddListener(() => network?.Generate());
             if (leaveButton != null) leaveButton.onClick.AddListener(() => network?.Stop());
+            if (pauseButton != null) pauseButton.onClick.AddListener(() => network?.PauseBattle());
+            if (resumeButton != null) resumeButton.onClick.AddListener(() => network?.ResumeBattle());
+            if (returnLobbyButton != null) returnLobbyButton.onClick.AddListener(() => network?.ReturnAllToLobby());
+            if (developerSettingsButton != null) developerSettingsButton.onClick.AddListener(OpenDeveloperSettings);
+            if (resultRestartButton != null) resultRestartButton.onClick.AddListener(RestartFromResult);
+            if (resultReturnLobbyButton != null) resultReturnLobbyButton.onClick.AddListener(() => network?.ReturnAllToLobby());
+            if (resultLeaveButton != null) resultLeaveButton.onClick.AddListener(() => network?.Stop());
         }
 
         private void Start()
@@ -69,11 +98,25 @@ namespace C6Lab
             if (network == null) return;
             var snapshot = network.Snapshot;
             bool playing = snapshot != null && snapshot.phase == LabPhase.Playing;
-            SetVisible(sessionControls, !playing);
-            SetVisible(statusText == null ? null : statusText.gameObject, !playing);
+            bool terminal = snapshot != null && (snapshot.phase == LabPhase.Victory || snapshot.phase == LabPhase.Defeat);
+            bool battleVisible = snapshot != null && snapshot.phase != LabPhase.Idle;
+            bool paused = playing && network.IsBattlePaused;
+            SetVisible(battleUi, battleVisible);
+            SetVisible(pauseMenu, paused);
+            if (paused) BringPauseLayersForward();
+            bool hasNeighbors = battleVisible && (snapshot.players?.Length ?? 0) > 1;
+            SetVisible(leftNeighborBadge, hasNeighbors);
+            SetVisible(rightNeighborBadge, hasNeighbors);
+            SetVisible(generateButton == null ? null : generateButton.gameObject, playing);
+            SetVisible(pauseButton == null ? null : pauseButton.gameObject, playing);
+            SetVisible(sessionControls, !battleVisible);
+            SetVisible(statusText == null ? null : statusText.gameObject, !battleVisible);
+            SetVisible(resultControls, terminal);
+            if (terminal)
+                Set(resultStatusText, snapshot.phase == LabPhase.Victory ? "VICTORY" : "DEFEAT");
             bool connected = network.IsConnected;
             bool searching = network.IsSearchingRooms;
-            bool hostLobby = connected && network.IsHost && !playing;
+            bool hostLobby = connected && network.IsHost && snapshot == null;
             SetVisible(roomListPanel, searching && !connected);
             SetVisible(decreasePlayersButton == null ? null : decreasePlayersButton.gameObject, !connected && !searching);
             SetVisible(increasePlayersButton == null ? null : increasePlayersButton.gameObject, !connected && !searching);
@@ -97,8 +140,37 @@ namespace C6Lab
             if (joinButton != null) joinButton.interactable = network.CanChooseConnection;
             if (findHostButton != null) findHostButton.interactable = network.CanChooseConnection;
             if (startButton != null) startButton.interactable = network.CanStartBattle;
-            if (generateButton != null) generateButton.interactable = connected && snapshot != null && snapshot.phase == LabPhase.Playing;
-            if (network.config != null) Set(generateLabel, "GENERATE / " + network.config.GenerateCost.ToString("0.#"));
+            if (generateButton != null) generateButton.interactable = connected && playing && !paused;
+            if (pauseButton != null) pauseButton.interactable = network.CanPauseBattle;
+            if (resumeButton != null) resumeButton.interactable = network.CanResumeBattle;
+            if (returnLobbyButton != null) returnLobbyButton.interactable = network.CanReturnAllToLobby;
+            SetVisible(returnLobbyButton == null ? null : returnLobbyButton.gameObject, network.IsHost);
+            SetVisible(developerSettingsButton == null ? null : developerSettingsButton.gameObject,
+                network.IsHost && network.DeveloperBuildAvailable);
+            if (developerSettingsButton != null)
+                developerSettingsButton.interactable = network.DeveloperBuildAvailable
+                    && network.IsBattlePaused && network.IsHost
+                    && (network.CanRestartSharedBattle || network.IsDeveloperSolo);
+            if (resultRestartButton != null)
+            {
+                SetVisible(resultRestartButton.gameObject, terminal && network.IsHost);
+                resultRestartButton.interactable = terminal && network.IsHost
+                    && (network.IsDeveloperSolo || network.CanStartBattle);
+            }
+            if (resultReturnLobbyButton != null)
+            {
+                SetVisible(resultReturnLobbyButton.gameObject, terminal && network.IsHost && !network.IsDeveloperSolo);
+                resultReturnLobbyButton.interactable = terminal && network.CanReturnAllToLobby;
+            }
+            if (resultLeaveButton != null)
+            {
+                SetVisible(resultLeaveButton.gameObject, terminal && (!network.IsHost || network.IsDeveloperSolo));
+                resultLeaveButton.interactable = terminal && connected;
+            }
+            if (terminal && !network.IsHost)
+                Set(resultStatusText, (snapshot.phase == LabPhase.Victory ? "VICTORY" : "DEFEAT") + " · WAITING FOR HOST");
+            Set(pauseStatusText, network.IsHost ? "PAUSED" : "PAUSED · HOST CONTROLS");
+            if (network.config != null) Set(generateLabel, "CREATE / " + network.config.GenerateCost.ToString("0.#"));
             if (leaveButton != null) leaveButton.interactable = connected || !network.CanChooseConnection;
             Set(statusText, network.Status);
             Set(noticeText, network.Notice);
@@ -109,26 +181,106 @@ namespace C6Lab
                     : "ROOM PLAYERS " + network.TargetParticipantCount + " / 5");
             if (snapshot == null)
             {
-                Set(hpText, "YOKAI HP —");
-                Set(playerHpText, "PLAYER HP —");
-                Set(timeText, "TIME —");
+                Set(hpText, "—");
+                Set(playerHpText, "—");
+                Set(timeText, "--:--");
                 Set(staminaText, "STAMINA —");
                 Set(orbsText, "ORBS —");
                 Set(seatText, connected ? "PLAYER " + network.LocalPlayerId : "NO SESSION");
+                Set(leftNeighborText, "P—");
+                Set(rightNeighborText, "P—");
+                SetFill(yokaiHpFill, 0f);
+                SetFill(playerHpFill, 0f);
+                SetStaminaCells(0f);
                 return;
             }
-            Set(hpText, "YOKAI HP " + snapshot.hp + " / " + network.config.MonsterMaxHp);
-            Set(timeText, "TIME " + Mathf.CeilToInt((float)snapshot.remaining));
+            Set(hpText, snapshot.hp + " / " + network.config.MonsterMaxHp);
+            int remainingSeconds = Mathf.Max(0, Mathf.CeilToInt((float)snapshot.remaining));
+            Set(timeText, (remainingSeconds / 60).ToString("00") + ":" + (remainingSeconds % 60).ToString("00"));
             LabPlayerState local = Array.Find(snapshot.players ?? Array.Empty<LabPlayerState>(), p => p.id == network.LocalPlayerId);
             Set(playerHpText, local == null || network.config == null
-                ? "PLAYER HP —"
-                : "PLAYER HP " + local.personalHp + " / " + network.config.PlayerMaxHp);
+                ? "—"
+                : local.personalHp + " / " + network.config.PlayerMaxHp);
             Set(staminaText, local == null ? "STAMINA —" : "STAMINA " + Mathf.FloorToInt(local.stamina) + " / " + network.config.StaminaMax);
             int count = 0;
             foreach (var orb in snapshot.orbs ?? Array.Empty<LabOrbState>()) if (orb.owner == network.LocalPlayerId && !orb.inFlight) count++;
             Set(orbsText, "ORBS " + count + " / " + network.config.OrbStorageLimit);
             Set(seatText, local == null ? "PLAYER —" : "PLAYER " + local.id + " · SEAT "
                 + (local.seat + 1) + (network.IsDeveloperSolo ? " · SOLO" : string.Empty));
+            SetFill(yokaiHpFill, Fraction(snapshot.hp, network.config.MonsterMaxHp));
+            SetFill(playerHpFill, local == null ? 0f : Fraction(local.personalHp, network.config.PlayerMaxHp));
+            SetStaminaCells(local == null ? 0f : Fraction(local.stamina, network.config.StaminaMax));
+            GetNeighborLabels(snapshot, network.LocalPlayerId, out string left, out string right);
+            Set(leftNeighborText, left);
+            Set(rightNeighborText, right);
+        }
+
+        private void OpenDeveloperSettings()
+        {
+            if (network == null || !network.DeveloperBuildAvailable || !network.IsHost
+                || !network.IsBattlePaused || (!network.CanRestartSharedBattle && !network.IsDeveloperSolo)) return;
+            if (developerMode == null) developerMode = GetComponent<LabDeveloperMode>();
+            developerMode?.Open();
+            if (developerMode != null && developerMode.panel != null)
+                developerMode.panel.transform.SetAsLastSibling();
+        }
+
+        private void RestartFromResult()
+        {
+            if (network == null || !network.IsHost) return;
+            if (network.IsDeveloperSolo) network.RestartDeveloperSolo();
+            else if (network.CanStartBattle) network.StartBattle();
+        }
+
+        private void BringPauseLayersForward()
+        {
+            if (pauseMenu == null) return;
+            Transform overlay = pauseMenu.transform;
+            Transform devPanel = developerMode != null && developerMode.panel != null
+                && developerMode.panel.activeInHierarchy ? developerMode.panel.transform : null;
+            if (devPanel != null && devPanel.parent == overlay.parent)
+            {
+                int last = overlay.parent.childCount - 1;
+                if (overlay.GetSiblingIndex() != last - 1 || devPanel.GetSiblingIndex() != last)
+                {
+                    overlay.SetAsLastSibling();
+                    devPanel.SetAsLastSibling();
+                }
+            }
+            else if (overlay.GetSiblingIndex() != overlay.parent.childCount - 1)
+            {
+                overlay.SetAsLastSibling();
+            }
+        }
+
+        /// <summary>Lab seats are room-order P numbers even when Netcode IDs increase after reconnecting.</summary>
+        public static void GetNeighborLabels(LabSnapshot snapshot, ulong localId, out string left, out string right)
+        {
+            left = right = "P—";
+            LabPlayerState[] players = snapshot?.players;
+            if (players == null || players.Length < 2) return;
+            LabPlayerState local = Array.Find(players, player => player != null && player.id == localId);
+            if (local == null) return;
+            int count = players.Length;
+            LabPlayerState leftPlayer = Array.Find(players, player => player != null && player.seat == (local.seat + count - 1) % count);
+            LabPlayerState rightPlayer = Array.Find(players, player => player != null && player.seat == (local.seat + 1) % count);
+            if (leftPlayer != null) left = "P" + (leftPlayer.seat + 1);
+            if (rightPlayer != null) right = "P" + (rightPlayer.seat + 1);
+        }
+
+        private void SetStaminaCells(float fraction)
+        {
+            if (staminaCells == null) return;
+            for (int i = 0; i < staminaCells.Length; i++)
+                SetFill(staminaCells[i], Mathf.Clamp01(fraction * staminaCells.Length - i));
+        }
+
+        private static float Fraction(float value, float maximum) =>
+            maximum > 0f ? Mathf.Clamp01(value / maximum) : 0f;
+
+        private static void SetFill(UnityEngine.UI.Image target, float value)
+        {
+            if (target != null && !Mathf.Approximately(target.fillAmount, value)) target.fillAmount = value;
         }
 
         private void Host()

@@ -38,6 +38,7 @@ namespace C6Lab
 
         private bool HostLobby => network != null && network.IsHost && !network.IsDeveloperSolo
             && network.Snapshot == null;
+        private bool HostPausedBattle => network != null && network.CanRestartSharedBattle;
 
         private void Awake()
         {
@@ -108,27 +109,35 @@ namespace C6Lab
             if (soloTuningActive && !network.IsDeveloperSolo)
                 RestoreSourceConfig();
 
-            bool canOpen = network.CanChooseConnection || network.IsDeveloperSolo || HostLobby;
+            // The legacy toggle belongs to the room setup screen; battle settings
+            // are opened from the shared pause menu instead.
+            bool showToggle = network.Snapshot == null;
+            if (toggleButton != null && toggleButton.gameObject.activeSelf != showToggle)
+                toggleButton.gameObject.SetActive(showToggle);
+            bool canOpen = network.CanChooseConnection || network.IsDeveloperSolo || HostLobby || HostPausedBattle;
             if (toggleButton != null) toggleButton.interactable = canOpen;
             if (endSoloButton != null) endSoloButton.interactable = network.IsDeveloperSolo;
-            if (applyHostButton != null) applyHostButton.interactable = network.CanChooseConnection || HostLobby;
+            if (applyHostButton != null) applyHostButton.interactable = network.CanChooseConnection || HostLobby || HostPausedBattle;
             if (targetParticipantsSlider != null) targetParticipantsSlider.interactable = network.CanChooseConnection;
             string soloTitle = network.IsDeveloperSolo ? "RESTART SOLO" : "START SOLO";
             if (applyStartLabel != null && applyStartLabel.text != soloTitle) applyStartLabel.text = soloTitle;
-            string hostTitle = HostLobby ? "APPLY TO ROOM" : "CREATE ROOM";
+            string hostTitle = HostPausedBattle ? "APPLY & RESTART"
+                : HostLobby ? "APPLY TO ROOM" : "CREATE ROOM";
             if (applyHostLabel != null && applyHostLabel.text != hostTitle) applyHostLabel.text = hostTitle;
         }
 
         public void Open()
         {
             if (!available || network == null ||
-                (!network.CanChooseConnection && !network.IsDeveloperSolo && !HostLobby)) return;
+                (!network.CanChooseConnection && !network.IsDeveloperSolo && !HostLobby && !HostPausedBattle)) return;
             Fill(network.IsConnected && network.config != null ? network.config : runtimeConfig);
             if (targetParticipantsSlider != null)
                 targetParticipantsSlider.SetValueWithoutNotify(network.TargetParticipantCount);
             RefreshTargetLabel();
             SetFeedback(string.IsNullOrEmpty(network.LastShotReport)
-                ? "Solo restarts a round. CREATE ROOM shares these values with every player."
+                ? HostPausedBattle
+                    ? "Apply settings to restart the whole room after every player confirms."
+                    : "Solo restarts a round. CREATE ROOM shares these values with every player."
                 : network.LastShotReport);
             if (panel != null) panel.SetActive(true);
             if (sceneController != null && sceneController.board != null)
@@ -192,17 +201,30 @@ namespace C6Lab
         {
             if (!available || network == null || runtimeConfig == null) return;
             bool lobby = HostLobby;
-            if (!lobby && !network.CanChooseConnection)
+            bool restart = HostPausedBattle;
+            if (!lobby && !restart && !network.CanChooseConnection)
             {
                 SetFeedback("Cancel room search before creating a room.");
                 return;
             }
-            if (network.IsConnected && !lobby)
+            if (network.IsConnected && !lobby && !restart)
             {
                 SetFeedback("Shared settings are editable only by the Host before battle starts.");
                 return;
             }
             if (!TryReadAndApplyForm()) return;
+
+            if (restart)
+            {
+                if (!network.RestartBattleWithDeveloperConfig(runtimeConfig))
+                {
+                    SetFeedback("Room restart was not accepted. Check the Host status.");
+                    return;
+                }
+                SetFeedback("Settings sent; the room will restart after every player confirms.");
+                Close();
+                return;
+            }
 
             if (lobby)
             {

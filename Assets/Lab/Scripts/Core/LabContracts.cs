@@ -63,6 +63,8 @@ namespace C6Lab
         public string sessionId;
         public uint round;
         public LabPhase phase;
+        /// <summary>Host-approved full-session pause; the battle phase remains Playing.</summary>
+        public bool paused;
         public double serverTime, remaining;
         public int hp;
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();

@@ -19,16 +19,31 @@ namespace C6Lab.Tests
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
 
-            LabHud hud = UnityEngine.Object.FindFirstObjectByType<LabHud>();
-            LabDeveloperMode developerUi = UnityEngine.Object.FindFirstObjectByType<LabDeveloperMode>();
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabHud hud = developerUi.GetComponent<LabHud>();
             Assert.That(hud, Is.Not.Null);
             Assert.That(hud.network, Is.Not.Null);
             Assert.That(hud.playerHpText, Is.Not.Null, "The saved Canvas must bind its player HP text to LabHud.");
-            Assert.That(hud.playerHpText.transform.parent.name, Is.EqualTo("BattleHeader"));
+            Assert.That(hud.battleUi, Is.Not.Null, "The Figma battle UI must be saved in the Scene.");
+            Assert.That(hud.yokaiHpFill, Is.Not.Null);
+            Assert.That(hud.playerHpText.transform.parent.name, Is.EqualTo("FigmaPlayerHpBar"));
+            Assert.That(hud.playerHpFill, Is.Not.Null,
+                "The saved Figma HP bar must bind to the player's live health value.");
+            Assert.That(hud.timeText.transform.parent.name, Is.EqualTo("FigmaTimeFrame"));
+            Assert.That(hud.generateButton.transform.parent, Is.SameAs(hud.battleUi.transform));
+            Assert.That(hud.staminaCells.Length, Is.EqualTo(5));
+            Assert.That(hud.leftNeighborText, Is.Not.Null);
+            Assert.That(hud.rightNeighborText, Is.Not.Null);
+            Assert.That(hud.pauseButton, Is.Not.Null);
+            Assert.That(hud.pauseMenu, Is.Not.Null);
+            Assert.That(hud.resultControls, Is.Not.Null);
+            Assert.That(hud.resultRestartButton, Is.Not.Null);
+            Assert.That(hud.resultReturnLobbyButton, Is.Not.Null);
+            Assert.That(hud.resultLeaveButton, Is.Not.Null);
             Assert.That(developerUi, Is.Not.Null);
             Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(developerUi.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
-            Assert.That(hud.playerHpText.text, Is.EqualTo("PLAYER HP —"));
+            Assert.That(hud.playerHpText.text, Is.EqualTo("—"));
 
             LabNetwork network = hud.network;
             network.port = 17776;
@@ -43,22 +58,26 @@ namespace C6Lab.Tests
                 Assert.That(network.IsDeveloperSolo, Is.True, developerUi.feedbackText.text);
                 yield return null;
                 Assert.That(network.Snapshot.players.Single().personalHp, Is.EqualTo(125));
-                Assert.That(hud.playerHpText.text, Is.EqualTo("PLAYER HP 125 / 125"));
+                Assert.That(hud.playerHpText.text, Is.EqualTo("125 / 125"));
+                Assert.That(hud.playerHpFill.fillAmount, Is.EqualTo(1f).Within(.001f));
+                string firstSession = network.Snapshot.sessionId;
 
                 developerUi.Open();
                 developerUi.valueInputs[48].text = "80";
                 developerUi.ApplyAndStart();
                 yield return null;
-                Assert.That(network.Snapshot.round, Is.EqualTo(2u));
+                Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(firstSession),
+                    "DEV Solo restart creates a fresh battle session.");
+                Assert.That(network.Snapshot.round, Is.EqualTo(1u));
                 Assert.That(network.Snapshot.players.Single().personalHp, Is.EqualTo(80));
-                Assert.That(hud.playerHpText.text, Is.EqualTo("PLAYER HP 80 / 80"));
+                Assert.That(hud.playerHpText.text, Is.EqualTo("80 / 80"));
             }
             finally
             {
                 if (network.IsConnected) network.Stop();
             }
             yield return null;
-            Assert.That(hud.playerHpText.text, Is.EqualTo("PLAYER HP —"));
+            Assert.That(hud.playerHpText.text, Is.EqualTo("—"));
         }
 
         [UnityTest]
@@ -153,12 +172,12 @@ namespace C6Lab.Tests
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
-            LabNetwork network = UnityEngine.Object.FindFirstObjectByType<LabNetwork>();
-            LabDeveloperMode developerUi = UnityEngine.Object.FindFirstObjectByType<LabDeveloperMode>();
-            LabSceneController sceneController = UnityEngine.Object.FindFirstObjectByType<LabSceneController>();
-            LabSeatCamera seatCamera = UnityEngine.Object.FindFirstObjectByType<LabSeatCamera>();
-            Assert.That(network, Is.Not.Null);
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabSceneController sceneController = developerUi.sceneController;
+            LabSeatCamera seatCamera = developerUi.seatCamera;
             Assert.That(developerUi, Is.Not.Null);
+            Assert.That(network, Is.Not.Null);
             Assert.That(developerUi.applyHostButton, Is.Not.Null);
             Assert.That(developerUi.targetParticipantsSlider, Is.Not.Null);
             network.port = 17779;
@@ -198,9 +217,8 @@ namespace C6Lab.Tests
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
-            LabNetwork network = UnityEngine.Object.FindObjectsByType<LabNetwork>(FindObjectsSortMode.None)
-                .FirstOrDefault(candidate => candidate.board != null && candidate.target != null);
-            LabDeveloperMode developerUi = UnityEngine.Object.FindFirstObjectByType<LabDeveloperMode>();
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
             Assert.That(network, Is.Not.Null);
             Assert.That(developerUi, Is.Not.Null);
             Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
@@ -245,10 +263,9 @@ namespace C6Lab.Tests
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null; // Let Awake/Start bind the saved Scene references.
 
-            LabNetwork network = UnityEngine.Object.FindObjectsByType<LabNetwork>(FindObjectsSortMode.None)
-                .FirstOrDefault(candidate => candidate.board != null && candidate.target != null);
-            LabOrbBoard board = UnityEngine.Object.FindFirstObjectByType<LabOrbBoard>();
-            LabDeveloperMode developerUi = UnityEngine.Object.FindFirstObjectByType<LabDeveloperMode>();
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabOrbBoard board = network == null ? null : network.board;
             Assert.That(network, Is.Not.Null, "The saved Lab Scene needs a LabNetwork.");
             Assert.That(board, Is.Not.Null, "The saved Lab Scene needs an orb board.");
             Assert.That(developerUi, Is.Not.Null, "The saved Lab Scene needs Developer Mode controls.");
@@ -270,8 +287,8 @@ namespace C6Lab.Tests
             Assert.That(network.board, Is.SameAs(board), "The Host must receive this board's gesture events.");
             Assert.That(network.target != null && network.target.Hitbox != null, Is.True);
             Assert.That(network.battleFloor, Is.Not.Null);
-            Camera boardCamera = UnityEngine.Object.FindFirstObjectByType<LabSceneController>()?.orbCamera;
-            Camera battleCamera = UnityEngine.Object.FindFirstObjectByType<LabSeatCamera>()?.battleCamera;
+            Camera boardCamera = developerUi.sceneController?.orbCamera;
+            Camera battleCamera = developerUi.seatCamera?.battleCamera;
             Assert.That(boardCamera, Is.Not.Null);
             Assert.That(battleCamera, Is.Not.Null);
             Assert.That(board.gameObject.layer, Is.EqualTo(LayerMask.NameToLayer("LabOrbBoard")));
@@ -394,6 +411,11 @@ namespace C6Lab.Tests
                 UnityEngine.Object.Destroy(rawOnly);
             }
         }
+
+        private static LabDeveloperMode SavedDeveloperUi() =>
+            SceneManager.GetActiveScene().GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true))
+                .Single();
 
         private static Vector2 ToWorld(Rect bounds, Vector2 position01) => new Vector2(
             Mathf.Lerp(bounds.xMin, bounds.xMax, position01.x),
