@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(57));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(60));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -33,7 +33,7 @@ namespace C6Lab.Tests
             values[39] = 50f; // Yin chance
             values[40] = 25f; // Yang chance
             values[44] = 10f; // Bomb chance; Relay/Box/Potion stay 5 each
-            values[48] = 120f; // new player HP setting remains last, preserving earlier indices
+            values[48] = 120f; // existing player HP index remains stable as spin fields are appended
             Assert.That(values[52], Is.EqualTo(10f), "Potion heal defaults to 10 HP.");
             values[52] = 25f; // potion heal
             Assert.That(new[] { values[53], values[54] }, Is.EqualTo(new[] { 2f, 4f }), "Relay x2 and MAX multipliers.");
@@ -43,6 +43,11 @@ namespace C6Lab.Tests
             values[55] = 2.5f;
             Assert.That(values[56], Is.EqualTo(2f), "The camera looks 2 units above the target centre by default.");
             values[56] = -1.5f;
+            Assert.That(new[] { values[57], values[58], values[59] },
+                Is.EqualTo(new[] { 80f, 1.2f, 720f }));
+            values[57] = 120f;
+            values[58] = .8f;
+            values[59] = 900f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -61,6 +66,9 @@ namespace C6Lab.Tests
             Assert.That(config.RelayMaxMultiplier, Is.EqualTo(3f));
             Assert.That(config.BombMultiplier, Is.EqualTo(2.5f));
             Assert.That(config.CameraLookHeightOffset, Is.EqualTo(-1.5f));
+            Assert.That(config.TargetSpinStrength, Is.EqualTo(120f));
+            Assert.That(config.TargetSpinDamping, Is.EqualTo(.8f));
+            Assert.That(config.TargetSpinMaximumSpeed, Is.EqualTo(900f));
         }
 
         [Test]
@@ -86,6 +94,27 @@ namespace C6Lab.Tests
                 Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
                 Assert.That(config.PlayerMaxHp, Is.EqualTo(300));
             }
+        }
+
+        [Test]
+        public void InvalidSpinTuningDoesNotPartiallyApplyTheDeveloperForm()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[0] = 240f;
+            values[57] = 201f;
+            Assert.That(config.TryApplyDeveloperValues(values, out _), Is.False);
+            Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
+            Assert.That(config.TargetSpinStrength, Is.EqualTo(80f));
+
+            values[57] = 100f;
+            values[58] = float.NaN;
+            Assert.That(config.TryApplyDeveloperValues(values, out _), Is.False);
+            Assert.That(config.TargetSpinStrength, Is.EqualTo(80f));
+
+            values[58] = 2f;
+            values[59] = 20f;
+            Assert.That(config.TryApplyDeveloperValues(values, out _), Is.False);
+            Assert.That(config.TargetSpinMaximumSpeed, Is.EqualTo(720f));
         }
 
         [Test]
