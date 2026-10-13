@@ -196,7 +196,7 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 - 패널 열기·DEFAULTS·SOLO/Host 설정 적용·슬라이더 변환: `Assets/Lab/Scripts/UI/LabDeveloperMode.cs`.
 - Host 전투 수치·개인 HP·전원 0 패배·스태미나·생성 확률·속성·아이템 잠금·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
 - 아이템 더블 탭 사용·효과(물약·상자), 릴레이 단계, 폭탄 폭발·피해 배율: `Assets/Lab/Scripts/Core/LabModel.cs`(`TryUseItem`·`TryTransfer`·`TryAdvance`·`ConfirmHit`)와 `LabOrbBoard.EndDragAtWorld`.
-- 아이템 아이콘·잠금/단계 배지·폭탄 남은 초: `Assets/Lab/Scripts/Orb/LabOrbItemMarker.cs`, 아이콘·속성 재질 지정: `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`.
+- 아이템 아이콘·자물쇠·잠금/단계 배지·폭탄 남은 초·해금 연출: `Assets/Lab/Scripts/Orb/LabOrbItemMarker.cs`, 아이콘·자물쇠·속성 재질과 잠금·해금 연출 값: `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`. 해금 연출 값은 DEV 패널이 아닌 Inspector에서 조정한다.
 - 3D 조합판 구슬 물리·XY 손동작·공통 구체 외형: `Assets/Lab/Scripts/Orb/LabOrbBoard.cs`와 `LabOrbView.cs`.
 - 발사 위치·초기 속도: `Assets/Lab/Scripts/Throw/LabThrowMath.cs`.
 - 공의 중력·저항·충돌·수명: `Assets/Lab/Scripts/Throw/LabProjectile.cs`.
