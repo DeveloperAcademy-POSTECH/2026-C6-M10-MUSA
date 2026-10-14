@@ -8,7 +8,7 @@ namespace C6Lab
     {
         // At exponent 1 the mapping is identical to the previous linear launch model.
         private const float PowerReferenceSwipeSpeed = 1.5f;
-        /// <summary>Seat zero is at +Z; the other seats advance clockwise from that player's view.</summary>
+        /// <summary>Seat zero is at +Z; increasing P numbers advance to that player's screen-right.</summary>
         public static Vector3 SeatPosition(int seatIndex, int seatCount, Vector3 arenaCenter,
             float ringRadius, float heightOffset)
         {
@@ -16,7 +16,9 @@ namespace C6Lab
             if (seatIndex < 0 || seatIndex >= seatCount)
                 throw new ArgumentOutOfRangeException(nameof(seatIndex));
 
-            float angle = 2f * Mathf.PI * seatIndex / seatCount;
+            // At +Z the camera faces -Z, so its screen-right is world -X. A negative
+            // angle keeps the room's P+1 transfer direction aligned with that side.
+            float angle = -2f * Mathf.PI * seatIndex / seatCount;
             float radius = Mathf.Max(0f, ringRadius);
             return arenaCenter + new Vector3(Mathf.Sin(angle) * radius,
                 heightOffset, Mathf.Cos(angle) * radius);
