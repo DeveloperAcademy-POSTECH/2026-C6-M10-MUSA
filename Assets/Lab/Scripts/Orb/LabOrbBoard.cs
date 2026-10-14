@@ -103,6 +103,8 @@ namespace C6Lab
         public event Action<string, string, Vector2, Vector2> CombineRequested;
         /// <summary>The velocity is input displacement divided by board width and seconds.</summary>
         public event Action<LabOrbThrowGesture> ThrowRequested;
+        /// <summary>내가 생성한 구슬이 떠오르기 시작할 때 한 번 알린다. (구슬 ID)</summary>
+        public event Action<string> SpawnRiseStarted;
         /// <summary>A double tap on an unlocked usable item. The Host applies or rejects its effect.</summary>
         public event Action<string> UseRequested;
 
@@ -190,6 +192,7 @@ namespace C6Lab
             entries.Add(id, entry);
             if (playSpawnRise && risenIds.Add(id))
             {
+                SpawnRiseStarted?.Invoke(id);
                 entry.SpawnLocked = true;
                 view.HitSphere.enabled = false;
                 SetBodyMode(entry);
