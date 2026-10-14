@@ -26,8 +26,6 @@ namespace C6Lab
         public Button roomListRowTemplate;
         public Text roomSearchStatusText;
         public Button startButton;
-        public Button generateButton;
-        public Text generateLabel;
         public Button leaveButton;
         public Text statusText;
         public Text noticeText;
@@ -83,7 +81,6 @@ namespace C6Lab
             if (refreshRoomsButton != null) refreshRoomsButton.onClick.AddListener(RefreshRooms);
             if (cancelRoomSearchButton != null) cancelRoomSearchButton.onClick.AddListener(() => network?.CancelRoomSearch());
             if (startButton != null) startButton.onClick.AddListener(() => network?.StartBattle());
-            if (generateButton != null) generateButton.onClick.AddListener(() => network?.Generate());
             if (leaveButton != null) leaveButton.onClick.AddListener(() => network?.Stop());
             if (pauseButton != null) pauseButton.onClick.AddListener(() => network?.PauseBattle());
             if (resumeButton != null) resumeButton.onClick.AddListener(() => network?.ResumeBattle());
@@ -117,7 +114,6 @@ namespace C6Lab
             bool hasNeighbors = battleVisible && (snapshot.players?.Length ?? 0) > 1;
             SetVisible(leftNeighborBadge, hasNeighbors);
             SetVisible(rightNeighborBadge, hasNeighbors);
-            SetVisible(generateButton == null ? null : generateButton.gameObject, playing);
             SetVisible(pauseButton == null ? null : pauseButton.gameObject, playing);
             SetVisible(sessionControls, !battleVisible);
             SetVisible(statusText == null ? null : statusText.gameObject, !battleVisible);
@@ -150,7 +146,6 @@ namespace C6Lab
             if (joinButton != null) joinButton.interactable = network.CanChooseConnection;
             if (findHostButton != null) findHostButton.interactable = network.CanChooseConnection;
             if (startButton != null) startButton.interactable = network.CanStartBattle;
-            if (generateButton != null) generateButton.interactable = connected && playing && !paused && network.HasLocalDrum;
             if (pauseButton != null) pauseButton.interactable = network.CanPauseBattle;
             if (resumeButton != null) resumeButton.interactable = network.CanResumeBattle;
             if (returnLobbyButton != null) returnLobbyButton.interactable = network.CanReturnAllToLobby;
@@ -180,7 +175,6 @@ namespace C6Lab
             if (terminal && !network.IsHost)
                 Set(resultStatusText, (snapshot.phase == LabPhase.Victory ? "VICTORY" : "DEFEAT") + " · WAITING FOR HOST");
             Set(pauseStatusText, network.IsHost ? "PAUSED" : "PAUSED · HOST CONTROLS");
-            if (network.config != null) Set(generateLabel, "CREATE / " + network.config.GenerateCost.ToString("0.#"));
             if (leaveButton != null) leaveButton.interactable = connected || !network.CanChooseConnection;
             Set(statusText, network.Status);
             Set(noticeText, network.Notice);

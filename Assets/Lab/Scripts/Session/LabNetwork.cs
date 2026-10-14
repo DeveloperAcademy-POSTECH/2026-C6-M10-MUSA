@@ -266,6 +266,7 @@ namespace C6Lab
                 board.CombineRequested += OnCombineRequested;
                 board.ThrowRequested += OnThrowRequested;
                 board.UseRequested += OnUseRequested;
+                board.DrumTapped += Generate;
             }
             if (manager != null)
             {
@@ -1672,6 +1673,7 @@ namespace C6Lab
                 board.CombineRequested -= OnCombineRequested;
                 board.ThrowRequested -= OnThrowRequested;
                 board.UseRequested -= OnUseRequested;
+                board.DrumTapped -= Generate;
             }
             if (manager != null)
             {

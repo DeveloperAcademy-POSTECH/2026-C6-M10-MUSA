@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(64));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(65));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -55,6 +55,8 @@ namespace C6Lab.Tests
             values[62] = 1.4f;
             Assert.That(values[63], Is.EqualTo(1f), "One drum per game by default.");
             values[63] = 3f;
+            Assert.That(values[64], Is.EqualTo(.6f), "The drum keeps the old generate button's size.");
+            values[64] = .8f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -80,6 +82,7 @@ namespace C6Lab.Tests
             Assert.That(config.SpawnMinSpeed, Is.EqualTo(.8f));
             Assert.That(config.SpawnMaxSpeed, Is.EqualTo(1.4f));
             Assert.That(config.DrumCount, Is.EqualTo(3));
+            Assert.That(config.DrumRadius, Is.EqualTo(.8f));
         }
 
         [Test]

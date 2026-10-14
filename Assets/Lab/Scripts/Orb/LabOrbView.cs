@@ -18,6 +18,7 @@ namespace C6Lab
         private GameObject replacementVisual;
         private GameObject contactShadow;
         private LabOrbItemMarker itemMarker;
+        private SpriteRenderer drumArt;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
         private string orbId;
@@ -41,6 +42,8 @@ namespace C6Lab
         /// <summary>How many times this item has started its unlock presentation.</summary>
         public int UnlockEffectPlays { get; private set; }
         public LabOrbItemMarker ItemMarker => itemMarker;
+        /// <summary>A drum shows its flat art instead of the sphere once the appearance provides it.</summary>
+        public bool DrumArtVisible => drumArt != null && drumArt.gameObject.activeSelf;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
         public Rigidbody Body { get; private set; }
@@ -70,7 +73,8 @@ namespace C6Lab
 
         private void Update()
         {
-            if (Body == null || visual == null || visualRadius <= 0f) return;
+            // The drum's flat art must keep facing the camera instead of rolling like a ball.
+            if (Body == null || visual == null || visualRadius <= 0f || kind.IsDrum()) return;
             Vector3 velocity = Body.linearVelocity;
             velocity.z = 0f;
             if (velocity.sqrMagnitude < .0001f) return;
@@ -284,17 +288,42 @@ namespace C6Lab
                 if (appearance == null && !tintDefaultByKind)
                     defaultRenderer.SetPropertyBlock(null);
             }
+            Sprite drumSprite = kind.IsDrum() && appearance != null ? appearance.DrumSprite : null;
             Transform defaultSphere = visual.Find("Default Sphere");
-            if (defaultSphere != null) defaultSphere.gameObject.SetActive(replacementVisual == null);
+            if (defaultSphere != null) defaultSphere.gameObject.SetActive(drumSprite == null && replacementVisual == null);
             if (replacementVisual != null)
             {
+                replacementVisual.SetActive(drumSprite == null);
                 replacementVisual.transform.localScale = Vector3.one * (2f * visualRadius);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, visual.gameObject.layer);
                 if (appearance != null && replacementPrefab == appearance.VisualPrefab)
                     appearance.ApplyKindMaterial(replacementVisual, kind, element);
             }
+            UpdateDrumArt(drumSprite);
             UpdateContactShadow();
             UpdateItemMarker();
+        }
+
+        private void UpdateDrumArt(Sprite sprite)
+        {
+            if (sprite == null)
+            {
+                if (drumArt != null) drumArt.gameObject.SetActive(false);
+                return;
+            }
+            if (drumArt == null)
+            {
+                var art = new GameObject("Drum Art");
+                art.transform.SetParent(visual, false);
+                drumArt = art.AddComponent<SpriteRenderer>();
+            }
+            drumArt.gameObject.layer = visual.gameObject.layer;
+            drumArt.gameObject.SetActive(true);
+            drumArt.sprite = sprite;
+            // Face the front-on board camera just in front of the collision sphere, at its diameter.
+            drumArt.transform.localPosition = new Vector3(0f, 0f, -1.02f * visualRadius);
+            drumArt.transform.localRotation = Quaternion.identity;
+            drumArt.transform.localScale = Vector3.one * (2f * visualRadius / Mathf.Max(.0001f, sprite.bounds.size.x));
         }
 
         private void UpdateItemMarker()

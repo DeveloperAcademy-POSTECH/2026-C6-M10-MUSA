@@ -102,6 +102,9 @@ namespace C6Lab.Tests
             SetSerializedField(appearance, "bombIcon", bombIcon);
             var lockIcon = new Texture2D(8, 8);
             SetSerializedField(appearance, "lockIcon", lockIcon);
+            var drumTexture = new Texture2D(8, 8);
+            var drumSprite = Sprite.Create(drumTexture, new Rect(0f, 0f, 8f, 8f), new Vector2(.5f, .5f), 8f);
+            SetSerializedField(appearance, "drumSprite", drumSprite);
             SetSerializedField(config, "orbAppearance", appearance);
 
             LabProjectile projectile = null;
@@ -142,6 +145,11 @@ namespace C6Lab.Tests
                 Assert.That(bomb.ItemMarker.IconAlpha, Is.EqualTo(1f), "An unlocked item's icon is sharp again.");
                 Assert.That(bomb.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
                 Assert.That(yin.ItemMarker, Is.Null, "Only items carry an icon marker.");
+                LabOrbView drum = board.UpsertOrb("styled-drum", LabOrbKind.Drum, new Vector2(.8f, .8f));
+                Assert.That(drum.DrumArtVisible, Is.True, "The drum shows its flat art from the appearance.");
+                Assert.That(drum.Visual.GetComponentInChildren<MeshRenderer>(), Is.Null, "The drum art replaces the ball.");
+                Assert.That(drum.Visual.GetComponentInChildren<SpriteRenderer>().bounds.size.x,
+                    Is.EqualTo(2f * config.DrumRadius).Within(.01f), "The art matches the drum's collision size.");
                 Assert.That(yin.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
                 Assert.That(yin.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
                 Assert.That(projectile.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
@@ -163,6 +171,8 @@ namespace C6Lab.Tests
                 if (fireShot != null) Object.Destroy(fireShot.gameObject);
                 Object.Destroy(bombIcon);
                 Object.Destroy(lockIcon);
+                Object.Destroy(drumSprite);
+                Object.Destroy(drumTexture);
                 Object.Destroy(waterMaterial);
                 Object.Destroy(fireMaterial);
                 Object.Destroy(appearance);
@@ -476,6 +486,35 @@ namespace C6Lab.Tests
                 Object.Destroy(lockIcon);
                 Object.Destroy(appearance);
             }
+        }
+
+        [Test]
+        public void TappingADrumGeneratesWithoutStoppingItAndAFlickMovesItButNeverThrows()
+        {
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.5f, .5f));
+            Assert.That(drum.HitSphere.radius, Is.EqualTo(config.DrumRadius).Within(.0001f), "A drum uses its own, larger size.");
+            var taps = new System.Collections.Generic.List<string>();
+            int throws = 0;
+            board.DrumTapped += id => taps.Add(id);
+            board.ThrowRequested += gesture => throws++;
+
+            drum.Body.linearVelocity = new Vector3(.4f, 0f, 0f);
+            Vector2 center = BoardPoint(drum);
+            // A touch on the drum's body away from its centre still grabs it.
+            Vector2 rim = center + new Vector2(config.DrumRadius * .9f, 0f);
+            Tap(rim, 1d);
+            Tap(rim, 1.1d);
+            Tap(rim, 1.2d);
+            Assert.That(taps, Is.EqualTo(new[] { "drum", "drum", "drum" }), "Every tap generates, so rapid taps burst.");
+            Assert.That(drum.Body.linearVelocity.x, Is.EqualTo(.4f).Within(.0001f), "A tap does not stop the drum.");
+            Assert.That(Vector2.Distance(BoardPoint(drum), center), Is.LessThan(.0001f),
+                "Tapping the rim does not jump the drum's centre under the finger.");
+
+            Assert.That(board.TryBeginDragAtWorld(center, 2d), Is.True);
+            Assert.That(board.EndDragAtWorld(center + new Vector2(0f, 1.5f), 2.1d), Is.True);
+            Assert.That(throws, Is.Zero, "A drum is never thrown.");
+            Assert.That(taps.Count, Is.EqualTo(3), "A flick is not a tap.");
+            Assert.That(drum.Body.linearVelocity.y, Is.GreaterThan(0f), "The flick sends the drum up the board.");
         }
 
         [Test]

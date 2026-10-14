@@ -25,6 +25,8 @@ namespace C6Lab
         [SerializeField] private Texture2D secretBoxIcon;
         [SerializeField] private Texture2D potionIcon;
         [SerializeField] private Texture2D bombIcon;
+        [Header("Generate drum (drawn facing the board camera)")]
+        [SerializeField] private Sprite drumSprite;
         [Header("Locked item (presentation only)")]
         [SerializeField] private Texture2D lockIcon;
         [Tooltip("Longer side of the padlock image, in orb radii.")]
@@ -63,6 +65,7 @@ namespace C6Lab
         public Material YinMaterial => yinMaterial;
         public Material YangMaterial => yangMaterial;
         public Material CombinedMaterial => combinedMaterial;
+        public Sprite DrumSprite => drumSprite;
         public Texture2D LockIcon => lockIcon;
         public float LockIconSize => lockIconSize > 0f ? lockIconSize : 1.2f;
         public float LockedIconAlpha => Mathf.Clamp01(lockedIconAlpha);

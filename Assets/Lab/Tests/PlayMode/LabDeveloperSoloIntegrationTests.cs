@@ -30,7 +30,9 @@ namespace C6Lab.Tests
             Assert.That(hud.playerHpFill, Is.Not.Null,
                 "The saved Figma HP bar must bind to the player's live health value.");
             Assert.That(hud.timeText.transform.parent.name, Is.EqualTo("FigmaTimeFrame"));
-            Assert.That(hud.generateButton.transform.parent, Is.SameAs(hud.battleUi.transform));
+            Transform oldGenerateButton = hud.battleUi.transform.Find("FigmaGenerateButton");
+            Assert.That(oldGenerateButton == null || !oldGenerateButton.gameObject.activeSelf, Is.True,
+                "The drum on the board replaces the bottom generate button, which stays hidden.");
             Assert.That(hud.staminaCells.Length, Is.EqualTo(5));
             Assert.That(hud.leftNeighborText, Is.Not.Null);
             Assert.That(hud.rightNeighborText, Is.Not.Null);
@@ -279,6 +281,8 @@ namespace C6Lab.Tests
             Assert.That(appearance.ShadowMaterial, Is.Not.Null);
             Assert.That(appearance.ThrowTrailMaterial, Is.Not.Null,
                 "The saved orb appearance must provide the flight trail material.");
+            Assert.That(appearance.DrumSprite, Is.Not.Null,
+                "The saved orb appearance must provide the generate drum art.");
             Assert.That(network.impactFeedback, Is.Not.Null,
                 "The saved LabCanvas must be connected to the Host-approved impact feedback.");
             Assert.That(network.impactFeedback.GetComponent<Canvas>(), Is.Not.Null);
@@ -341,19 +345,29 @@ namespace C6Lab.Tests
                 Assert.That(network.Snapshot.players.Length, Is.EqualTo(1));
                 int initialHp = network.Snapshot.hp;
 
+                LabOrbState drum = network.Snapshot.drums.Single();
+                Assert.That(drum.owner, Is.EqualTo(network.LocalPlayerId), "The solo player holds the drum.");
+                LabOrbView drumView = board.GetComponentsInChildren<LabOrbView>().Single(view => view.OrbId == drum.id);
+                Assert.That(drumView.DrumArtVisible, Is.True);
+                Assert.That(drumView.HitSphere.radius, Is.EqualTo(network.config.DrumRadius).Within(.0001f));
+
+                // Tap the drum on the board, the same gesture a player uses.
                 LabOrbState yin = null;
                 LabOrbState yang = null;
                 for (int i = 0; i < 20 && (yin == null || yang == null); i++)
                 {
                     int before = network.Snapshot.orbs.Length;
-                    network.Generate();
+                    Assert.That(board.TryGetMotion(drum.id, out Vector2 drum01, out _), Is.True);
+                    Vector2 drumWorld = ToWorld(board.CenterBounds, drum01);
+                    Assert.That(board.TryBeginDragAtWorld(drumWorld, 10d + i), Is.True);
+                    Assert.That(board.EndDragAtWorld(drumWorld, 10.05d + i), Is.True);
                     Assert.That(network.Snapshot.orbs.Length, Is.EqualTo(before + 1));
                     yin = network.Snapshot.orbs.FirstOrDefault(o => o.kind == LabOrbKind.Yin);
                     yang = network.Snapshot.orbs.FirstOrDefault(o => o.kind == LabOrbKind.Yang);
                 }
                 Assert.That(yin, Is.Not.Null);
                 Assert.That(yang, Is.Not.Null);
-                LabOrbView yinView = board.GetComponentInChildren<LabOrbView>();
+                LabOrbView yinView = board.GetComponentsInChildren<LabOrbView>().Single(view => view.OrbId == yin.id);
                 Assert.That(yinView, Is.Not.Null);
                 Assert.That(yinView.GetComponent<Rigidbody>(), Is.Not.Null);
                 Assert.That(yinView.GetComponent<SphereCollider>(), Is.Not.Null);

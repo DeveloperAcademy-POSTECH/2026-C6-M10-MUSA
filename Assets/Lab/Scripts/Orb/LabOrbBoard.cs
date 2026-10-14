@@ -58,6 +58,8 @@ namespace C6Lab
             public bool EdgePending;
             public string PendingPartnerId;
             public LabOrbEdgeCrossing PendingEdge;
+            public Vector2 PressVelocity;
+            public Vector2 GrabOffset;
         }
 
         private readonly struct PointerSample
@@ -107,6 +109,8 @@ namespace C6Lab
         public event Action<string> SpawnRiseStarted;
         /// <summary>A double tap on an unlocked usable item. The Host applies or rejects its effect.</summary>
         public event Action<string> UseRequested;
+        /// <summary>A tap on a drum asks the Host to generate an orb from it. (drum ID)</summary>
+        public event Action<string> DrumTapped;
 
         public void Configure(LabConfig tuning, Camera camera, Rect worldCenterBounds)
         {
@@ -127,7 +131,7 @@ namespace C6Lab
             BuildHorizontalWalls();
             foreach (var entry in entries.Values)
             {
-                entry.View.Configure(entry.View.OrbId, entry.View.Kind, config.OrbRadius, entry.View.Element);
+                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind), entry.View.Element);
                 entry.View.ConfigureAppearance(config.OrbAppearance);
                 SetLayerRecursively(entry.View.transform, gameObject.layer);
                 entry.View.HitSphere.sharedMaterial = contactMaterial;
@@ -156,7 +160,7 @@ namespace C6Lab
                 existing.LocalOwner = localOwner;
                 if (existing.View.Kind != kind || existing.View.Element != element)
                 {
-                    existing.View.Configure(id, kind, config.OrbRadius, element);
+                    existing.View.Configure(id, kind, RadiusFor(kind), element);
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
                 if (existing.View.LockSwipes != lockSwipes || existing.View.RelayStage != relayStage
@@ -174,7 +178,7 @@ namespace C6Lab
             gameObject.transform.SetParent(transform, false);
             gameObject.transform.position = OnPlane(start);
             var view = gameObject.AddComponent<LabOrbView>();
-            view.Configure(id, kind, config.OrbRadius, element);
+            view.Configure(id, kind, RadiusFor(kind), element);
             view.ConfigureAppearance(config.OrbAppearance);
             view.SetItemState(lockSwipes, relayStage, fuseSeconds);
             if (justUnlocked && unlockEffectIds.Add(id)) view.PlayUnlockEffect();
@@ -189,7 +193,7 @@ namespace C6Lab
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.mass = 1f;
-            body.position = OnPlane(Clamp(start));
+            body.position = OnPlane(Clamp(start, RadiusFor(kind)));
             var entry = new Entry { View = view, LocalOwner = localOwner };
             entries.Add(id, entry);
             Vector3 startVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
@@ -313,18 +317,23 @@ namespace C6Lab
         {
             if (!configured || !interactionEnabled || heldId != null || !Finite(worldPoint) || !Finite(now)) return false;
             Entry nearest = null;
-            float best = Mathf.Pow(config.OrbRadius * 1.25f, 2f);
+            // Compare touches relative to each body's reach so the larger drum is as easy to grab.
+            float best = 1f;
             foreach (var entry in entries.Values)
             {
                 if (!entry.LocalOwner || entry.Locked || entry.SpawnLocked || entry.EdgePending || entry.Held) continue;
-                float distance = (XY(entry.View.Body.position) - worldPoint).sqrMagnitude;
-                if (distance > best) continue;
-                best = distance;
+                float reach = entry.View.HitSphere.radius * 1.25f;
+                float closeness = (XY(entry.View.Body.position) - worldPoint).sqrMagnitude / (reach * reach);
+                if (closeness > best) continue;
+                best = closeness;
                 nearest = entry;
             }
             if (nearest == null) return false;
             heldId = nearest.View.OrbId;
             nearest.Held = true;
+            nearest.PressVelocity = XY(nearest.View.Body.linearVelocity);
+            // A drum is large: keep the grabbed point under the finger instead of jumping its centre there.
+            nearest.GrabOffset = nearest.View.Kind.IsDrum() ? XY(nearest.View.Body.position) - worldPoint : Vector2.zero;
             StopMotion(nearest.View.Body);
             SetBodyMode(nearest);
             samples.Clear();
@@ -338,7 +347,7 @@ namespace C6Lab
         {
             if (heldId == null || !entries.TryGetValue(heldId, out var entry) || !Finite(worldPoint) || !Finite(now))
                 return false;
-            entry.View.Body.position = OnPlane(Clamp(worldPoint));
+            entry.View.Body.position = OnPlane(Clamp(worldPoint + entry.GrabOffset, entry.View.HitSphere.radius));
             AddSample(worldPoint, now);
             return true;
         }
@@ -357,6 +366,16 @@ namespace C6Lab
 
             // A tap is short and nearly still. Two taps on the same unlocked item use it in place.
             bool tapped = now - pressTime <= TapMaxSeconds && (worldPoint - pressPoint).magnitude <= config.OrbRadius * .5f;
+            if (tapped && entry.View.Kind.IsDrum())
+            {
+                // Every tap generates, so rapid taps fire in a burst. The drum keeps drifting the way
+                // it was going; only a drag or a flick moves it.
+                lastTapId = null;
+                SetBodyMode(entry);
+                entry.View.Body.linearVelocity = OnPlane(entry.PressVelocity);
+                DrumTapped?.Invoke(id);
+                return true;
+            }
             if (tapped && entry.View.Kind.IsDoubleTapUsable() && entry.View.LockSwipes == 0)
             {
                 if (lastTapId == id && now - lastTapTime <= DoubleTapWindow)
@@ -694,6 +713,19 @@ namespace C6Lab
         private Vector2 Clamp(Vector2 world) => new Vector2(
             Mathf.Clamp(world.x, bounds.xMin, bounds.xMax),
             Mathf.Clamp(world.y, bounds.yMin, bounds.yMax));
+
+        /// <summary>
+        /// Keeps a body larger than an orb clear of the top and bottom walls. Side edges stay at the
+        /// orb limits, where a drum hands off to a neighbour just like an orb.
+        /// </summary>
+        private Vector2 Clamp(Vector2 world, float radius)
+        {
+            float inset = Mathf.Clamp(radius - config.OrbRadius, 0f, bounds.height * .5f);
+            return new Vector2(Mathf.Clamp(world.x, bounds.xMin, bounds.xMax),
+                Mathf.Clamp(world.y, bounds.yMin + inset, bounds.yMax - inset));
+        }
+
+        private float RadiusFor(LabOrbKind kind) => kind.IsDrum() ? config.DrumRadius : config.OrbRadius;
         private static Vector2 XY(Vector3 value) => new Vector2(value.x, value.y);
         private static Vector3 OnPlane(Vector2 value) => new Vector3(value.x, value.y, 0f);
         private static void StopMotion(Rigidbody body)
