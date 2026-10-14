@@ -14,6 +14,8 @@ namespace C6Lab
         [Range(0f, 1f)] public float bgmVolume = .5f;
         [Tooltip("구슬 생성 장구 소리 기본 크기. 일시정지 메뉴 SFX 슬라이더 값이 여기에 곱해진다.")]
         [Range(0f, 1f)] public float generateSoundVolume = .8f;
+        [Tooltip("내가 던진 구슬이 요괴에 맞았을 때 소리 기본 크기. 던진 사람 기기에서만 난다.")]
+        [Range(0f, 1f)] public float hitSoundVolume = .9f;
 
         private void Awake()
         {
@@ -47,6 +49,14 @@ namespace C6Lab
                 battleBgm.Bind(boardNetwork);
             }
             if (battleBgm != null) battleBgm.volume = bgmVolume;
+            // 던진 구슬의 결과 소리(맞음)도 같은 방식으로 붙인다.
+            LabThrowSound throwSound = GetComponent<LabThrowSound>();
+            if (boardNetwork != null && throwSound == null)
+            {
+                throwSound = gameObject.AddComponent<LabThrowSound>();
+                throwSound.Bind(boardNetwork);
+            }
+            if (throwSound != null) throwSound.hitVolume = hitSoundVolume;
             // 일시정지 메뉴에 BGM·효과음 크기 슬라이더를 붙인다. 값은 기기마다 따로 저장된다.
             LabHud hud = FindFirstObjectByType<LabHud>();
             if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)
@@ -61,6 +71,7 @@ namespace C6Lab
             if (!Application.isPlaying) return;
             if (TryGetComponent(out LabBattleBgm bgm)) bgm.volume = bgmVolume;
             if (TryGetComponent(out LabGenerateSound sound)) sound.volume = generateSoundVolume;
+            if (TryGetComponent(out LabThrowSound throwSound)) throwSound.hitVolume = hitSoundVolume;
         }
 #endif
 

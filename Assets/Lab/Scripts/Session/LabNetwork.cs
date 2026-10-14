@@ -216,6 +216,8 @@ namespace C6Lab
 
         public event Action Changed;
         public event Action<LabConfig> ConfigApplied;
+        /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (실제 피해량)</summary>
+        public event Action<int> LocalThrowHit;
         public string Status { get; private set; } = "Choose HOST or JOIN.";
         public string Notice { get; private set; } = string.Empty;
         public string LastShotReport { get; private set; } = string.Empty;
@@ -1218,8 +1220,9 @@ namespace C6Lab
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
                     impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
                         result.ImpactVelocity);
+                    if (result.OwnerPlayerId == LocalPlayerId) LocalThrowHit?.Invoke(actualDamage);
                     var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
-                        round = model.Round, firstId = result.ProjectileId,
+                        round = model.Round, firstId = result.ProjectileId, owner = result.OwnerPlayerId,
                         element = (int)element, damage = actualDamage,
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
@@ -1376,6 +1379,8 @@ namespace C6Lab
                         impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
                             (LabOrbElement)packet.element, packet.damage,
                             new Vector3(packet.wx, packet.wy, packet.wz));
+                        // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
+                        if (packet.owner == LocalPlayerId) LocalThrowHit?.Invoke(packet.damage);
                     }
                     break;
                 case "projectile":
