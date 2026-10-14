@@ -17,6 +17,18 @@ namespace C6Lab
         [Tooltip("내가 던진 구슬이 요괴에 맞았을 때 소리 기본 크기. 던진 사람 기기에서만 난다.")]
         [Range(0f, 1f)] public float hitSoundVolume = .9f;
 
+        [Header("Haptics (요괴 타격 시 던진 사람 아이폰 진동)")]
+        [Tooltip("끄면 타격 진동이 나지 않는다.")]
+        public bool hitHapticsEnabled = true;
+        [Tooltip("기본 피해(Damage per Hit) 이하로 맞았을 때 진동 종류")]
+        public LabHapticStyle normalHitHapticStyle = LabHapticStyle.Light;
+        [Tooltip("기본 피해일 때 진동 세기 (0 = 끔)")]
+        [Range(0f, 1f)] public float normalHitHapticIntensity = .6f;
+        [Tooltip("기본보다 큰 피해(아이템)로 맞았을 때 진동 종류")]
+        public LabHapticStyle strongHitHapticStyle = LabHapticStyle.Heavy;
+        [Tooltip("큰 피해일 때 진동 세기 (0 = 끔)")]
+        [Range(0f, 1f)] public float strongHitHapticIntensity = 1f;
+
         private void Awake()
         {
             LabNetwork boardNetwork = null;
@@ -57,6 +69,14 @@ namespace C6Lab
                 throwSound.Bind(boardNetwork);
             }
             if (throwSound != null) throwSound.hitVolume = hitSoundVolume;
+            // 타격 햅틱도 같은 신호(내 공이 맞음)를 받아 던진 사람 기기에서만 진동한다.
+            LabHitHaptics hitHaptics = GetComponent<LabHitHaptics>();
+            if (boardNetwork != null && hitHaptics == null)
+            {
+                hitHaptics = gameObject.AddComponent<LabHitHaptics>();
+                hitHaptics.Bind(boardNetwork);
+            }
+            ApplyHaptics(hitHaptics);
             // 일시정지 메뉴에 BGM·효과음 크기 슬라이더를 붙인다. 값은 기기마다 따로 저장된다.
             LabHud hud = FindFirstObjectByType<LabHud>();
             if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)
@@ -72,8 +92,19 @@ namespace C6Lab
             if (TryGetComponent(out LabBattleBgm bgm)) bgm.volume = bgmVolume;
             if (TryGetComponent(out LabGenerateSound sound)) sound.volume = generateSoundVolume;
             if (TryGetComponent(out LabThrowSound throwSound)) throwSound.hitVolume = hitSoundVolume;
+            if (TryGetComponent(out LabHitHaptics haptics)) ApplyHaptics(haptics);
         }
 #endif
+
+        private void ApplyHaptics(LabHitHaptics haptics)
+        {
+            if (haptics == null) return;
+            haptics.hapticsEnabled = hitHapticsEnabled;
+            haptics.normalStyle = normalHitHapticStyle;
+            haptics.normalIntensity = normalHitHapticIntensity;
+            haptics.strongStyle = strongHitHapticStyle;
+            haptics.strongIntensity = strongHitHapticIntensity;
+        }
 
         /// <summary>Refresh the board only before a round; configuring clears current motion.</summary>
         public void ReconfigureBoard()
