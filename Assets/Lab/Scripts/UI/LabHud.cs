@@ -49,6 +49,7 @@ namespace C6Lab
         public Color orbBackgroundColor = new Color(.18f, .24f, .29f, 1f);
         public UnityEngine.UI.Image yokaiHpFill;
         public UnityEngine.UI.Image playerHpFill;
+        public UnityEngine.UI.Image staminaFill;
         public UnityEngine.UI.Image[] staminaCells;
         public GameObject leftNeighborBadge;
         public GameObject rightNeighborBadge;
@@ -356,6 +357,7 @@ namespace C6Lab
 
         private void SetStaminaCells(float fraction)
         {
+            SetFill(staminaFill, fraction);
             if (staminaCells == null) return;
             for (int i = 0; i < staminaCells.Length; i++)
                 SetFill(staminaCells[i], fraction * staminaCells.Length >= i + 1 ? 1f : 0f);

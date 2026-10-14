@@ -20,12 +20,14 @@ namespace C6Lab.Editor
         [MenuItem("C6 Lab/Apply Bottom HUD Design")]
         public static void Apply()
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Stop Play Mode before applying the bottom HUD.");
+            BuildFill("StaminaBar", "StaminaContinuousFill", new Color32(255, 255, 255, 255));
+            BuildFill("PlayerHpBar", "PlayerHpContinuousFill", new Color32(255, 255, 255, 255));
             string[] required =
             {
-                "BottomHudBackground", "StaminaBar", "StaminaFill1", "StaminaFill2", "StaminaFill3",
-                "StaminaFill4", "StaminaFill5", "StaminaFillColor1", "StaminaFillColor2",
-                "StaminaFillColor3", "StaminaFillColor4", "StaminaFillColor5", "PlayerHpBar",
-                "PlayerHpFill", "PlayerHpFillColor", "GenerateButton"
+                "BottomHudBackground", "StaminaBar", "StaminaContinuousFill",
+                "PlayerHpBar", "PlayerHpContinuousFill"
             };
             foreach (string name in required)
             {
@@ -47,48 +49,76 @@ namespace C6Lab.Editor
 
             RectTransform background = EnsureRect(battle, "BottomHudBackground");
             background.gameObject.SetActive(true);
-            PlaceGuide(background, 0f, 747f, 402f, 127f);
+            PlaceGuide(background, 0f, 797f, 403.511f, 77.29f);
             SetImage(background, Sprite("BottomHudBackground"), false);
             background.SetAsLastSibling();
+
+            // Cover the paper showing through the PNG's translucent bottom edge.
+            RectTransform bottomEdge = EnsureRect(background, "BottomEdgeBacking");
+            bottomEdge.gameObject.SetActive(true);
+            bottomEdge.anchorMin = Vector2.zero;
+            bottomEdge.anchorMax = new Vector2(1f, 0f);
+            bottomEdge.pivot = new Vector2(.5f, 0f);
+            bottomEdge.offsetMin = Vector2.zero;
+            bottomEdge.offsetMax = new Vector2(0f, 3f);
+            Image edgeImage = SetImage(bottomEdge, null, false);
+            var backgroundTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            try
+            {
+                ImageConversion.LoadImage(backgroundTexture, File.ReadAllBytes(ArtPath + "BottomHudBackground.png"));
+                Color edgeColor = backgroundTexture.GetPixel(backgroundTexture.width / 2, backgroundTexture.height / 3);
+                edgeColor.a = 1f;
+                edgeImage.color = edgeColor;
+            }
+            finally { UnityEngine.Object.DestroyImmediate(backgroundTexture); }
 
             RectTransform stamina = EnsureRect(battle, "FigmaStaminaBar");
             stamina.gameObject.SetActive(true);
             ClearChildrenExcept(stamina);
-            PlaceGuide(stamina, 6f, 766f, 159.737f, 99f);
+            PlaceGuide(stamina, 4f, 809f, 193.952f, 60.251f);
             RemoveImage(stamina);
             stamina.SetAsLastSibling();
 
             RectTransform staminaFrame = EnsureRect(stamina, "StaminaFrame");
-            staminaFrame.gameObject.SetActive(true);
-            PlaceLocal(staminaFrame, 0f, 0f, 159.737f, 99f);
+            staminaFrame.gameObject.SetActive(false);
+            Stretch(staminaFrame);
             SetImage(staminaFrame, Sprite("StaminaBar"), false);
             staminaFrame.SetAsFirstSibling();
 
-            hud.staminaCells = new Image[5];
-            AddStaminaCell(stamina, hud, 0, "StaminaFillColor1");
-            AddStaminaCell(stamina, hud, 1, "StaminaFillColor2");
-            AddStaminaCell(stamina, hud, 2, "StaminaFillColor3");
-            AddStaminaCell(stamina, hud, 3, "StaminaFillColor4");
-            AddStaminaCell(stamina, hud, 4, "StaminaFillColor5");
+            hud.staminaCells = Array.Empty<Image>();
+            RectTransform staminaFill = EnsureRect(stamina, "StaminaContinuousFill");
+            Stretch(staminaFill);
+            LabShapeFillImage staminaImage = staminaFill.gameObject.AddComponent<LabShapeFillImage>();
+            staminaImage.sprite = Sprite("StaminaContinuousFill");
+            staminaImage.filledColor = new Color32(0x46, 0x78, 0xB1, 255);
+            staminaImage.raycastTarget = false;
+            staminaImage.type = Image.Type.Filled;
+            staminaImage.fillMethod = Image.FillMethod.Horizontal;
+            staminaImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+            staminaImage.fillAmount = 1f;
+            hud.staminaFill = staminaImage;
 
             RectTransform playerHp = EnsureRect(battle, "FigmaPlayerHpBar");
             playerHp.gameObject.SetActive(true);
             ClearChildrenExcept(playerHp, hud.playerHpText == null ? null : hud.playerHpText.transform);
-            PlaceGuide(playerHp, 231f, 768f, 163f, 96f);
+            PlaceGuide(playerHp, 202f, 810f, 194f, 59f);
             RemoveImage(playerHp);
             playerHp.SetAsLastSibling();
 
             RectTransform hpFrame = EnsureRect(playerHp, "PlayerHpFrame");
-            hpFrame.gameObject.SetActive(true);
-            PlaceLocal(hpFrame, 0f, 0f, 163f, 96f);
+            hpFrame.gameObject.SetActive(false);
+            Stretch(hpFrame);
             SetImage(hpFrame, Sprite("PlayerHpBar"), false);
             hpFrame.SetAsFirstSibling();
 
             RectTransform hpFill = EnsureRect(playerHp, "PlayerHpFill");
             hpFill.gameObject.SetActive(true);
-            PlaceLocal(hpFill, 0f, 0f, 163f, 96f);
+            Stretch(hpFill);
             RemoveMask(hpFill);
-            Image hpImage = SetImage(hpFill, Sprite("PlayerHpFillColor"), false);
+            LabShapeFillImage hpImage = hpFill.gameObject.AddComponent<LabShapeFillImage>();
+            hpImage.sprite = Sprite("PlayerHpContinuousFill");
+            hpImage.filledColor = new Color32(0xCB, 0x4B, 0x45, 255);
+            hpImage.raycastTarget = false;
             hpImage.type = Image.Type.Filled;
             hpImage.fillMethod = Image.FillMethod.Horizontal;
             hpImage.fillOrigin = (int)Image.OriginHorizontal.Right;
@@ -103,7 +133,8 @@ namespace C6Lab.Editor
                 hud.playerHpText.gameObject.SetActive(false);
             }
             if (hud.staminaText != null) hud.staminaText.gameObject.SetActive(false);
-            // GenerateButton.png is still prepared above: the drum on the board draws it.
+            Transform oldButton = battle.Find("FigmaGenerateButton");
+            if (oldButton != null) oldButton.gameObject.SetActive(false);
 
             background.SetAsFirstSibling();
             playerHp.SetSiblingIndex(background.GetSiblingIndex() + 1);
@@ -117,20 +148,24 @@ namespace C6Lab.Editor
             Debug.Log("C6_LAB_BOTTOM_HUD_DESIGN_APPLIED scene=" + ScenePath);
         }
 
-        private static void AddStaminaCell(RectTransform parent, LabHud hud, int index, string spriteName)
+        private static void BuildFill(string sourceName, string outputName, Color32 color)
         {
-            RectTransform cell = EnsureRect(parent, "StaminaCell" + (index + 1));
-            cell.gameObject.SetActive(true);
-            PlaceLocal(cell, 0f, 0f, 159.737f, 99f);
-            RemoveMask(cell);
-            Image image = SetImage(cell, Sprite(spriteName), false);
-            image.type = Image.Type.Filled;
-            image.fillMethod = Image.FillMethod.Horizontal;
-            image.fillOrigin = (int)Image.OriginHorizontal.Left;
-            image.fillAmount = 1f;
-            image.preserveAspect = false;
-            hud.staminaCells[index] = image;
-            cell.SetAsLastSibling();
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            try
+            {
+                if (!ImageConversion.LoadImage(texture, File.ReadAllBytes(ArtPath + sourceName + ".png")))
+                    throw new IOException("Cannot decode " + sourceName);
+                Color32[] pixels = texture.GetPixels32();
+                // The original alpha defines both the curved edge and the gaps between cells.
+                for (int i = 0; i < pixels.Length; i++)
+                    pixels[i] = new Color32(color.r, color.g, color.b, pixels[i].a);
+                texture.SetPixels32(pixels);
+                texture.Apply();
+                string path = ArtPath + outputName + ".png";
+                File.WriteAllBytes(path, texture.EncodeToPNG());
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(texture); }
         }
 
         private static void PrepareSprite(string path)
