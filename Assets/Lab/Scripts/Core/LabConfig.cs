@@ -112,7 +112,10 @@ namespace C6Lab
             new LabDeveloperField("Spawn Minimum Speed (board widths/s)", 0f, 10f),
             new LabDeveloperField("Spawn Maximum Speed (board widths/s)", 0f, 10f),
             new LabDeveloperField("Drum Count", 1f, 5f, true),
-            new LabDeveloperField("Drum Radius", .1f, 1.5f)
+            new LabDeveloperField("Drum Radius", .1f, 1.5f),
+            new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
+            new LabDeveloperField("Drum Drift Turning (per second)", 0f, 2f),
+            new LabDeveloperField("Drum Spin Strength", 0f, 3f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -137,7 +140,7 @@ namespace C6Lab
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Drum", 63, 64)
+            new LabDeveloperCategory("Drum", 63, 64, 65, 66, 67)
         });
 
 
@@ -212,6 +215,12 @@ namespace C6Lab
         [SerializeField, Range(1, 5)] private int drumCount = 1;
         [Tooltip("북의 충돌·표시 반지름 (월드 단위). 기본은 예전 화면 아래 생성 버튼 크기.")]
         [SerializeField, Range(.1f, 1.5f)] private float drumRadius = .6f;
+        [Tooltip("가만히 둔 북이 저절로 떠도는 최고 속도 (보드 너비/초). 0이면 떠돌지 않는다.")]
+        [SerializeField, Range(0f, 1f)] private float drumDriftSpeed = .1f;
+        [Tooltip("떠도는 방향이 바뀌는 빠르기. 클수록 자주 방향을 튼다.")]
+        [SerializeField, Range(0f, 2f)] private float drumDriftTurning = .25f;
+        [Tooltip("떠돌며 돌 때와 부딪혀 돌 때의 회전 세기. 0이면 돌지 않는다.")]
+        [SerializeField, Range(0f, 3f)] private float drumSpinStrength = 1f;
 
         [Header("Replaceable orb presentation")]
         [SerializeField] private LabOrbAppearance orbAppearance;
@@ -300,6 +309,9 @@ namespace C6Lab
         public float SpawnMaxSpeed => Mathf.Clamp(Finite(spawnMaxSpeed, 1.8f), SpawnMinSpeed, 10f);
         public int DrumCount => Mathf.Clamp(drumCount, 1, 5);
         public float DrumRadius => Mathf.Clamp(Finite(drumRadius, .6f), .1f, 1.5f);
+        public float DrumDriftSpeed => Mathf.Clamp(Finite(drumDriftSpeed, .1f), 0f, 1f);
+        public float DrumDriftTurning => Mathf.Clamp(Finite(drumDriftTurning, .25f), 0f, 2f);
+        public float DrumSpinStrength => Mathf.Clamp(Finite(drumSpinStrength, 1f), 0f, 3f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
         public float CameraRadius => Positive(cameraRadius, 8f);
         public float CameraHeightOffset => Finite(cameraHeightOffset, .65f);
@@ -348,7 +360,8 @@ namespace C6Lab
                 PotionHeal, RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier,
                 CameraLookHeightOffset, TargetSpinStrength, TargetSpinDamping,
                 TargetSpinMaximumSpeed,
-                SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, DrumCount, DrumRadius
+                SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, DrumCount, DrumRadius,
+                DrumDriftSpeed, DrumDriftTurning, DrumSpinStrength
             };
         }
 
@@ -454,6 +467,9 @@ namespace C6Lab
             spawnMaxSpeed = values[62];
             drumCount = (int)values[63];
             drumRadius = values[64];
+            drumDriftSpeed = values[65];
+            drumDriftTurning = values[66];
+            drumSpinStrength = values[67];
             error = string.Empty;
             return true;
         }

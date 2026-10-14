@@ -59,6 +59,9 @@ namespace C6Lab
             public LabOrbEdgeCrossing PendingEdge;
             public Vector2 PressVelocity;
             public Vector2 GrabOffset;
+            public float DriftSeed;
+            public float DriftHeading;
+            public bool HasDriftHeading;
         }
 
         private readonly struct PointerSample
@@ -73,6 +76,14 @@ namespace C6Lab
         private const double ReleaseSampleWindow = .12d;
         private const double TapMaxSeconds = .3d;
         private const double DoubleTapWindow = .35d;
+        // Drum drift: how fast its velocity eases toward the drift path (board widths/s²), how near
+        // a side edge or wall (board widths) it starts easing away, how much faster than its drift
+        // an outward push must be to pass it to a neighbour, and how its art turns as the path curves.
+        private const float DrumDriftAcceleration = .3f;
+        private const float DrumEdgeMargin = .15f;
+        private const float DrumPassSpeedFactor = 1.5f;
+        private const float DrumDriftSpinGain = .3f;
+        private const float DrumDriftMaxSpin = 90f;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly HashSet<string> spawnedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
@@ -195,7 +206,7 @@ namespace C6Lab
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.mass = 1f;
             body.position = OnPlane(start);
-            var entry = new Entry { View = view, LocalOwner = localOwner };
+            var entry = new Entry { View = view, LocalOwner = localOwner, DriftSeed = DriftSeedFor(id) };
             entries.Add(id, entry);
             SetBodyMode(entry);
             if (!body.isKinematic)
@@ -507,21 +518,36 @@ namespace C6Lab
             updateEntries.AddRange(entries.Values);
             foreach (var entry in updateEntries)
             {
-                if (entry.View == null || !entry.LocalOwner || entry.Locked || entry.Held || entry.EdgePending) continue;
+                if (entry.View == null) continue;
+                bool drum = entry.View.Kind.IsDrum();
+                if (!entry.LocalOwner || entry.Locked || entry.Held || entry.EdgePending)
+                {
+                    if (drum) entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
+                    continue;
+                }
                 var body = entry.View.Body;
                 Vector2 velocity = XY(body.linearVelocity);
+                Vector2 position = XY(body.position);
                 float speed = velocity.magnitude;
                 // Config motion is expressed in board widths, while Rigidbody uses world units.
                 // Convert at this boundary so different camera/board sizes retain the same feel.
-                if (speed <= config.OrbStopSpeed * bounds.width) velocity = Vector2.zero;
+                if (drum) velocity = Drift(entry, velocity, position);
+                else if (speed <= config.OrbStopSpeed * bounds.width) velocity = Vector2.zero;
                 else velocity = velocity.normalized * Mathf.Max(0f,
                     speed - config.OrbFloorDeceleration * bounds.width * Time.fixedDeltaTime);
                 body.linearVelocity = OnPlane(velocity);
                 if (velocity.x == 0f) continue;
-                Vector2 position = XY(body.position);
                 bool left = position.x <= bounds.xMin && velocity.x < 0f;
                 bool right = position.x >= bounds.xMax && velocity.x > 0f;
                 if (!left && !right) continue;
+                if (drum && Mathf.Abs(velocity.x) < DrumPassSpeedFactor * config.DrumDriftSpeed * bounds.width)
+                {
+                    // A drum never drifts onto a neighbour's screen by itself; only a push or a swipe
+                    // passes it. A gentle drift that reaches the edge turns back instead.
+                    body.position = OnPlane(Clamp(position));
+                    body.linearVelocity = OnPlane(new Vector2(-velocity.x, velocity.y));
+                    continue;
+                }
                 var crossing = new LabOrbEdgeCrossing(entry.View.OrbId, right,
                     Mathf.InverseLerp(bounds.yMin, bounds.yMax, position.y), velocity / bounds.width);
                 entry.EdgePending = true;
@@ -531,6 +557,57 @@ namespace C6Lab
                 SetBodyMode(entry);
                 EdgeCrossed?.Invoke(crossing);
             }
+        }
+
+        /// <summary>
+        /// A drum left alone drifts on its own along a smooth noise path in any direction, easing away
+        /// from the side edges and the top and bottom walls. A push or a flick first slides and slows
+        /// like an orb; the drift takes over again once it is gentle. Its art turns as the path curves.
+        /// </summary>
+        private Vector2 Drift(Entry entry, Vector2 velocity, Vector2 position)
+        {
+            float driftSpeed = config.DrumDriftSpeed * bounds.width;
+            float step = Time.fixedDeltaTime;
+            float speed = velocity.magnitude;
+            if (speed > driftSpeed * 1.05f + .0001f)
+            {
+                entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
+                entry.HasDriftHeading = false;
+                return velocity.normalized * Mathf.Max(driftSpeed,
+                    speed - config.OrbFloorDeceleration * bounds.width * step);
+            }
+
+            float time = Time.time * config.DrumDriftTurning;
+            float heading = Mathf.PerlinNoise(entry.DriftSeed, time) * 4f * Mathf.PI;
+            float pace = Mathf.Lerp(.5f, 1f, Mathf.PerlinNoise(entry.DriftSeed + 31.7f, time * .7f));
+            Vector2 desired = new Vector2(Mathf.Cos(heading), Mathf.Sin(heading)) * pace;
+            float inset = Mathf.Clamp(entry.View.HitSphere.radius - config.OrbRadius, 0f, bounds.height * .5f);
+            float margin = bounds.width * DrumEdgeMargin;
+            desired.x += EaseAway(position.x - bounds.xMin, margin) - EaseAway(bounds.xMax - position.x, margin);
+            desired.y += EaseAway(position.y - (bounds.yMin + inset), margin)
+                - EaseAway(bounds.yMax - inset - position.y, margin);
+            desired = Vector2.ClampMagnitude(desired, 1f) * driftSpeed;
+
+            float turn = entry.HasDriftHeading
+                ? Mathf.DeltaAngle(entry.DriftHeading * Mathf.Rad2Deg, heading * Mathf.Rad2Deg) / step : 0f;
+            entry.DriftHeading = heading;
+            entry.HasDriftHeading = true;
+            entry.View.DriveDrumSpin(driftSpeed > 0f
+                ? Mathf.Clamp(turn * DrumDriftSpinGain, -DrumDriftMaxSpin, DrumDriftMaxSpin) : 0f,
+                config.DrumSpinStrength);
+            return Vector2.MoveTowards(velocity, desired, DrumDriftAcceleration * bounds.width * step);
+        }
+
+        /// <summary>How strongly to steer away from a boundary this far off: 0 beyond the margin, 2 at it.</summary>
+        private static float EaseAway(float distance, float margin) =>
+            margin <= 0f ? 0f : 2f * Mathf.Clamp01(1f - distance / margin);
+
+        /// <summary>A stable per-drum offset into the drift noise, so drums on one board wander apart.</summary>
+        private static float DriftSeedFor(string id)
+        {
+            int hash = 17;
+            unchecked { foreach (char character in id) hash = hash * 31 + character; }
+            return (hash & 0xFFFF) * .01f;
         }
 
         /// <summary>

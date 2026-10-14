@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(65));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(68));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -61,6 +61,11 @@ namespace C6Lab.Tests
             values[63] = 3f;
             Assert.That(values[64], Is.EqualTo(.6f), "The drum keeps the old generate button's size.");
             values[64] = .8f;
+            Assert.That(new[] { values[65], values[66], values[67] }, Is.EqualTo(new[] { .1f, .25f, 1f }),
+                "The drum drifts slowly, turns gently and spins at full strength by default.");
+            values[65] = .2f;
+            values[66] = .5f;
+            values[67] = 2f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -89,6 +94,9 @@ namespace C6Lab.Tests
             Assert.That(config.SpawnMaxSpeed, Is.EqualTo(1.4f));
             Assert.That(config.DrumCount, Is.EqualTo(3));
             Assert.That(config.DrumRadius, Is.EqualTo(.8f));
+            Assert.That(config.DrumDriftSpeed, Is.EqualTo(.2f));
+            Assert.That(config.DrumDriftTurning, Is.EqualTo(.5f));
+            Assert.That(config.DrumSpinStrength, Is.EqualTo(2f));
         }
 
         [Test]

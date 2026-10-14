@@ -603,6 +603,72 @@ namespace C6Lab.Tests
             Assert.That(throws, Is.EqualTo(1), "An unlocked bomb is thrown with an upward flick.");
         }
 
+        [UnityTest]
+        public IEnumerator ALoneDrumDriftsGentlyOnItsOwnWithinTheBoardAndTurns()
+        {
+            SetDrumDrift(.4f, 1f); // a quicker drift so a short test sees it wander
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.5f, .5f));
+            int crossings = 0;
+            board.EdgeCrossed += crossing => crossings++;
+            Vector2 last = BoardPoint(drum);
+            float path = 0f, topSpeed = 0f;
+            // A bounce off a side edge may leave the centre a physics step past the limit.
+            var board01 = new Rect(Bounds.xMin - .2f, Bounds.yMin - .2f, Bounds.width + .4f, Bounds.height + .4f);
+            for (int step = 0; step < 125; step++) // about 2.5 seconds of physics
+            {
+                yield return new WaitForFixedUpdate();
+                Vector2 now = BoardPoint(drum);
+                path += Vector2.Distance(now, last);
+                last = now;
+                topSpeed = Mathf.Max(topSpeed, drum.Body.linearVelocity.magnitude);
+                Assert.That(board01.Contains(now), Is.True, "It stays on its own board.");
+            }
+            Assert.That(path, Is.GreaterThan(.5f), "Left alone, the drum moves on its own.");
+            Assert.That(topSpeed, Is.LessThanOrEqualTo(config.DrumDriftSpeed * Width * 1.06f), "It drifts gently.");
+            Assert.That(crossings, Is.Zero, "It never wanders onto a neighbour's screen by itself.");
+            Assert.That(Quaternion.Angle(drum.Visual.localRotation, Quaternion.identity), Is.GreaterThan(1f),
+                "Its art turns as the drift path curves.");
+            Assert.That(Vector3.Angle(drum.Visual.forward, Vector3.forward), Is.LessThan(.01f),
+                "It turns about the view axis and never rolls over.");
+        }
+
+        [UnityTest]
+        public IEnumerator ADriftingDrumTurnsBackAtASideEdgeButASwipePassesIt()
+        {
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(1f, .5f));
+            int crossings = 0;
+            board.EdgeCrossed += crossing => crossings++;
+            drum.Body.linearVelocity = new Vector3(config.DrumDriftSpeed * Width, 0f, 0f); // drifting outward
+            for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossings, Is.Zero, "A gentle drift never carries the drum onto a neighbour's screen.");
+            Assert.That(drum.Body.linearVelocity.x, Is.LessThan(0f), "It turns back from the edge.");
+
+            drum.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f); // a swipe to the right
+            for (int step = 0; step < 3; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossings, Is.EqualTo(1), "A swipe passes it to the neighbour.");
+        }
+
+        [UnityTest]
+        public IEnumerator AGlancingHitSpinsTheDrumTheWayTheContactSlides()
+        {
+            SetDrumDrift(0f, config.DrumDriftTurning); // no drift spin, so only the hit can turn it
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.5f, .5f));
+            // An orb skims leftward over the drum's upper rim (board centre is world 0,0).
+            float above = (config.DrumRadius + config.OrbRadius) * .8f;
+            board.UpsertOrb("skim", LabOrbKind.Yin, new Vector2(.75f, .5f + above / Bounds.height), new Vector2(-2f, 0f));
+            for (int step = 0; step < 15; step++) yield return new WaitForFixedUpdate();
+            Assert.That(drum.DrumSpin, Is.GreaterThan(30f),
+                "Dragged leftward across its top, the drum turns anticlockwise like a real one.");
+        }
+
+        private void SetDrumDrift(float speed, float turning)
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[65] = speed;
+            values[66] = turning;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+        }
+
         private void Tap(Vector2 point, double at)
         {
             Assert.That(board.TryBeginDragAtWorld(point, at), Is.True);
@@ -715,6 +781,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator ABurstOfOrbsFromOneDrumFliesApartWithoutJammingOrShovingIt()
         {
+            SetDrumDrift(0f, config.DrumDriftTurning); // hold the drum still so only a shove could move it
             var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.5f, .5f));
             Vector2 center = BoardPoint(drum);
             var orbs = new System.Collections.Generic.List<LabOrbView>();

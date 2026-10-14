@@ -12,6 +12,12 @@ namespace C6Lab
     [RequireComponent(typeof(Rigidbody), typeof(SphereCollider))]
     public sealed class LabOrbView : MonoBehaviour
     {
+        // A drum's spin eases toward its drift spin at this rate (per second); a glancing hit adds
+        // this share of the contact's sliding speed, up to the maximum (degrees per second).
+        private const float DrumSpinEase = 1.5f;
+        private const float DrumHitSpin = .35f;
+        private const float DrumMaxSpin = 540f;
+
         [SerializeField] private Transform visual;
         [SerializeField] private bool tintDefaultByKind = true;
 
@@ -27,6 +33,9 @@ namespace C6Lab
         private int lockSwipes;
         private int relayStage;
         private float fuseSeconds = -1f;
+        private float spinVelocity;
+        private float spinTarget;
+        private float spinStrength;
         private float visualRadius = .32f;
         private Coroutine spawnRoutine;
         private Action spawnCompleted;
@@ -42,6 +51,8 @@ namespace C6Lab
         /// <summary>How many times this item has started its unlock presentation.</summary>
         public int UnlockEffectPlays { get; private set; }
         public LabOrbItemMarker ItemMarker => itemMarker;
+        /// <summary>The drum art's spin about the view axis, in degrees per second.</summary>
+        public float DrumSpin => spinVelocity;
         /// <summary>A drum shows its flat art instead of the sphere once the appearance provides it.</summary>
         public bool DrumArtVisible => drumArt != null && drumArt.gameObject.activeSelf;
         public Transform Visual => visual;
@@ -73,8 +84,14 @@ namespace C6Lab
 
         private void Update()
         {
-            // The drum's flat art must keep facing the camera instead of rolling like a ball.
-            if (Body == null || visual == null || visualRadius <= 0f || kind.IsDrum()) return;
+            if (Body == null || visual == null || visualRadius <= 0f) return;
+            if (kind.IsDrum())
+            {
+                // The flat art keeps facing the camera and turns about the view axis instead of rolling.
+                spinVelocity = Mathf.Lerp(spinVelocity, spinTarget, 1f - Mathf.Exp(-DrumSpinEase * Time.deltaTime));
+                visual.Rotate(0f, 0f, spinVelocity * Time.deltaTime, Space.Self);
+                return;
+            }
             Vector3 velocity = Body.linearVelocity;
             velocity.z = 0f;
             if (velocity.sqrMagnitude < .0001f) return;
@@ -86,14 +103,38 @@ namespace C6Lab
             visual.Rotate(axis, degrees, Space.World);
         }
 
+        /// <summary>The board sets the drum's drift spin each physics step; strength scales every spin.</summary>
+        public void DriveDrumSpin(float driftDegreesPerSecond, float strength)
+        {
+            spinStrength = Mathf.Max(0f, strength);
+            spinTarget = driftDegreesPerSecond * spinStrength;
+        }
+
         private void OnCollisionEnter(Collision collision)
         {
+            if (kind.IsDrum()) AddHitSpin(collision);
             // 벽이 아니라 다른 구슬과 부딪혔을 때만 알린다.
             LabOrbView other = collision.rigidbody != null
                 ? collision.rigidbody.GetComponent<LabOrbView>()
                 : null;
             if (other == null) return;
             HitOrb?.Invoke(other, collision.relativeVelocity.magnitude);
+        }
+
+        /// <summary>
+        /// A glancing hit drags the drum's rim the way the contact slides, like friction on a real
+        /// drum: an orb passing over its top to the left turns it anticlockwise. A head-on hit or a
+        /// wall it meets square does not spin it.
+        /// </summary>
+        private void AddHitSpin(Collision collision)
+        {
+            if (spinStrength <= 0f || collision.contactCount == 0 || Body == null) return;
+            Vector3 rim = collision.GetContact(0).point - transform.position;
+            Vector3 otherVelocity = collision.rigidbody != null ? collision.rigidbody.linearVelocity : Vector3.zero;
+            Vector3 slide = otherVelocity - Body.linearVelocity;
+            float turn = (rim.x * slide.y - rim.y * slide.x) / (visualRadius * visualRadius);
+            spinVelocity = Mathf.Clamp(spinVelocity + turn * Mathf.Rad2Deg * DrumHitSpin * spinStrength,
+                -DrumMaxSpin, DrumMaxSpin);
         }
 
         public void Configure(string id, LabOrbKind orbKind, float radius,
