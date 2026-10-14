@@ -23,8 +23,8 @@ MonoBehaviour:
   staminaStart: 100
   generateCost: 20
   staminaRecoveryAmount: 20
-  staminaRecoverySeconds: 3
-  hitRecovery: 5
+  staminaRecoverySeconds: 1.7
+  hitRecovery: 10
   orbStorageLimit: 20
   yinChance: 40
   yangChance: 40
@@ -49,9 +49,9 @@ MonoBehaviour:
   combineSpeed: 0
   dropCombineEnabled: 1
   contactCombineEnabled: 1
-  spawnRiseDistance: 0.65
-  spawnRiseDuration: 0.25
-  spawnFanAngle: 55
+  spawnPopStartScale: 0.3
+  spawnPopDuration: 0.15
+  spawnFanAngle: 180
   spawnMinSpeed: 1
   spawnMaxSpeed: 1.8
   spawnOriginHeight: 0.2
