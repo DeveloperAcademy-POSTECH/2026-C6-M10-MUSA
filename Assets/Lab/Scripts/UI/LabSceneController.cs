@@ -11,8 +11,10 @@ namespace C6Lab
 
         private void Awake()
         {
+            LabNetwork boardNetwork = null;
             foreach (var network in FindObjectsByType<LabNetwork>(FindObjectsSortMode.None))
             {
+                if (network.board == board) boardNetwork = network;
                 if (network.board != board || network.target == null
                     || network.target.GetComponent<LabHangingTarget>() == null) continue;
                 if (network.battleFloor != null)
@@ -26,6 +28,9 @@ namespace C6Lab
             // 구슬 생성 효과음은 장면 수정 없이 보드 옆에 붙여 둔다.
             if (board != null && GetComponent<LabGenerateSound>() == null)
                 gameObject.AddComponent<LabGenerateSound>().Bind(board);
+            // 전투 BGM도 같은 방식으로 붙이고, 전투 상태를 읽을 네트워크를 연결한다.
+            if (boardNetwork != null && GetComponent<LabBattleBgm>() == null)
+                gameObject.AddComponent<LabBattleBgm>().Bind(boardNetwork);
             ReconfigureBoard();
         }
 
