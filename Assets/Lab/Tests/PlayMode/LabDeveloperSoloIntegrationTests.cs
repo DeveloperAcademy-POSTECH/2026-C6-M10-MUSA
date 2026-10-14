@@ -30,7 +30,9 @@ namespace C6Lab.Tests
             Assert.That(hud.playerHpFill, Is.Not.Null,
                 "The saved Figma HP bar must bind to the player's live health value.");
             Assert.That(hud.timeText.transform.parent.name, Is.EqualTo("FigmaTimeFrame"));
-            Assert.That(hud.generateButton.transform.parent, Is.SameAs(hud.battleUi.transform));
+            Transform oldGenerateButton = hud.battleUi.transform.Find("FigmaGenerateButton");
+            Assert.That(oldGenerateButton == null || !oldGenerateButton.gameObject.activeSelf, Is.True,
+                "The drum on the board replaces the bottom generate button, which stays hidden.");
             Assert.That(hud.staminaCells.Length, Is.EqualTo(5));
             Assert.That(hud.leftNeighborText, Is.Not.Null);
             Assert.That(hud.rightNeighborText, Is.Not.Null);
@@ -313,6 +315,8 @@ namespace C6Lab.Tests
             Assert.That(appearance.ShadowMaterial, Is.Not.Null);
             Assert.That(appearance.ThrowTrailMaterial, Is.Not.Null,
                 "The saved orb appearance must provide the flight trail material.");
+            Assert.That(appearance.DrumSprite, Is.Not.Null,
+                "The saved orb appearance must provide the generate drum art.");
             Assert.That(network.impactFeedback, Is.Not.Null,
                 "The saved LabCanvas must be connected to the Host-approved impact feedback.");
             Assert.That(network.impactFeedback.GetComponent<Canvas>(), Is.Not.Null);
@@ -353,11 +357,16 @@ namespace C6Lab.Tests
             tuning[36] = 1f;    // power exponent
             tuning[37] = 0f;    // loft offset
             tuning[38] = 0f;    // air damping
-            // All orbs now launch from the GENERATE button. Turn off contact combining so orbs
+            // Orbs scatter from the drum in every direction. Turn off contact combining so orbs
             // that bump while scattering cannot merge before the test drags Yin onto Yang.
             tuning[51] = 0f;
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
             network.config = rawOnly;
+            // The board reads contact combining from its own config, so it needs the same tuning.
+            LabSceneController sceneController = developerUi.sceneController;
+            LabConfig savedBoardConfig = sceneController.config;
+            sceneController.config = rawOnly;
+            sceneController.ReconfigureBoard();
 
             // Keep the test independent of an ordinary app using the default port 7777.
             network.port = 17777;
@@ -370,28 +379,38 @@ namespace C6Lab.Tests
                 Assert.That(network.Snapshot.players.Length, Is.EqualTo(1));
                 int initialHp = network.Snapshot.hp;
 
+                LabOrbState drum = network.Snapshot.drums.Single();
+                Assert.That(drum.owner, Is.EqualTo(network.LocalPlayerId), "The solo player holds the drum.");
+                LabOrbView drumView = board.GetComponentsInChildren<LabOrbView>().Single(view => view.OrbId == drum.id);
+                Assert.That(drumView.DrumArtVisible, Is.True);
+                Assert.That(drumView.HitSphere.radius, Is.EqualTo(network.config.DrumRadius).Within(.0001f));
+
+                // Tap the drum on the board, the same gesture a player uses.
                 LabOrbState yin = null;
                 LabOrbState yang = null;
                 for (int i = 0; i < 20 && (yin == null || yang == null); i++)
                 {
                     int before = network.Snapshot.orbs.Length;
-                    network.Generate();
+                    Assert.That(board.TryGetMotion(drum.id, out Vector2 drum01, out _), Is.True);
+                    Vector2 drumWorld = ToWorld(board.CenterBounds, drum01);
+                    Assert.That(board.TryBeginDragAtWorld(drumWorld, 10d + i), Is.True);
+                    Assert.That(board.EndDragAtWorld(drumWorld, 10.05d + i), Is.True);
                     Assert.That(network.Snapshot.orbs.Length, Is.EqualTo(before + 1));
                     yin = network.Snapshot.orbs.FirstOrDefault(o => o.kind == LabOrbKind.Yin);
                     yang = network.Snapshot.orbs.FirstOrDefault(o => o.kind == LabOrbKind.Yang);
                 }
                 Assert.That(yin, Is.Not.Null);
                 Assert.That(yang, Is.Not.Null);
-                LabOrbView yinView = board.GetComponentInChildren<LabOrbView>();
+                LabOrbView yinView = board.GetComponentsInChildren<LabOrbView>().Single(view => view.OrbId == yin.id);
                 Assert.That(yinView, Is.Not.Null);
                 Assert.That(yinView.GetComponent<Rigidbody>(), Is.Not.Null);
                 Assert.That(yinView.GetComponent<SphereCollider>(), Is.Not.Null);
                 Assert.That(yinView.Visual.GetComponentInChildren<MeshRenderer>(), Is.Not.Null);
 
-                // Generated orbs rise, then launch from the button and slide to a stop before
+                // Generated orbs pop out of the drum, fly off at once and slide to a stop before
                 // the drag. Use the same public board gesture methods the pointer path calls.
                 float slideSeconds = network.config.SpawnMaxSpeed / Mathf.Max(.01f, network.config.OrbFloorDeceleration);
-                yield return new WaitForSeconds(network.config.SpawnRiseDuration + slideSeconds + .3f);
+                yield return new WaitForSeconds(network.config.SpawnPopDuration + slideSeconds + .3f);
                 Assert.That(board.TryGetMotion(yin.id, out Vector2 yin01, out _), Is.True);
                 Assert.That(board.TryGetMotion(yang.id, out Vector2 yang01, out _), Is.True);
                 Rect bounds = board.CenterBounds;
@@ -461,6 +480,8 @@ namespace C6Lab.Tests
             {
                 network.Stop();
                 network.config = savedConfig;
+                sceneController.config = savedBoardConfig;
+                sceneController.ReconfigureBoard();
                 UnityEngine.Object.Destroy(rawOnly);
             }
         }

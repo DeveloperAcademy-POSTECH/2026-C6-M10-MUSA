@@ -21,10 +21,14 @@ namespace C6Lab
         private const uint LockDrawSalt = 0x10C4ED00u;
         private const uint SpawnAngleSalt = 0x5A4E0A11u;
         private const uint SpawnSpeedSalt = 0x5A4E05EDu;
-        // 옆 가장자리(이웃에게 넘어가는 선)까지 0.5 중 이만큼만 미끄러지게 한다.
-        private const float SpawnSideTravelLimit = .42f;
+        private const uint DrumSeatSalt = 0xD2D2D2D2u;
+        // 갓 생성된 구슬은 옆 가장자리(이웃에게 넘어가는 선)에서 이만큼 안쪽까지만 미끄러진다.
+        private const float SpawnEdgeMargin = .08f;
+        // 한 판에 북이 여러 개 놓일 때 가운데부터 좌우로 벌려 놓는다.
+        private static readonly float[] DrumStartX = { .5f, .3f, .7f, .15f, .85f };
         private readonly Dictionary<ulong, LabPlayerState> players = new Dictionary<ulong, LabPlayerState>();
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
+        private readonly Dictionary<string, LabOrbState> drums = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
         private readonly HashSet<string> requests = new HashSet<string>(StringComparer.Ordinal);
         private readonly ulong[] seats = new ulong[MaximumParticipants];
         private int activeSeatCount;
@@ -79,7 +83,7 @@ namespace C6Lab
             activeSeatCount = ids.Length;
             Array.Clear(seats, 0, seats.Length);
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
-            players.Clear(); orbs.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
+            players.Clear(); orbs.Clear(); drums.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState
@@ -92,6 +96,7 @@ namespace C6Lab
             combinedCount = 0;
             hp = rules.MonsterMaxHp;
             revision = 0;
+            PlaceDrums(now);
             lastTime = now;
             deadline = nextDeadline;
             remaining = rules.BattleDurationSeconds;
@@ -104,10 +109,26 @@ namespace C6Lab
             if (!TryAdvance(now, out string reason)) throw new ArgumentOutOfRangeException(nameof(now), reason);
         }
 
+        /// <summary>Generate from the sender's first drum at its last Host-known position.</summary>
         public bool TryGenerate(ulong sender, string requestId, double now, out LabOrbState orb, out string reason)
+            => TryGenerate(sender, null, null, requestId, now, out orb, out reason);
+
+        /// <summary>
+        /// A player can generate only from a drum on their own board. The orb starts at the drum's
+        /// position, which the owner's screen reports with the tap because only it simulates the drum.
+        /// </summary>
+        public bool TryGenerate(ulong sender, string drumId, Vector2? drumPosition, string requestId, double now,
+            out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            // Without a tapped drum, use the sender's earliest placed one (drums are never removed).
+            LabOrbState drum = drumId == null
+                ? drums.Values.FirstOrDefault(candidate => candidate.owner == sender)
+                : drums.TryGetValue(drumId, out var tapped) && tapped.owner == sender ? tapped : null;
+            if (drum == null) return Reject("NO_DRUM", out reason);
+            Vector2 position = drumPosition ?? new Vector2(drum.x, drum.y);
+            if (!Unit(position.x) || !Unit(position.y)) return Reject("INVALID_MOTION", out reason);
             var player = players[sender];
             if (CountStored(sender) >= rules.OrbStorageLimit) return Reject("STORAGE_FULL", out reason);
             if (player.stamina + .00001f < rules.GenerateCost) return Reject("INSUFFICIENT_STAMINA", out reason);
@@ -118,8 +139,7 @@ namespace C6Lab
             int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
-            Vector2 position = SpawnOrigin();
-            Vector2 launch = SpawnVelocityFor(seed, sender, generated);
+            Vector2 launch = SpawnVelocityFor(seed, sender, generated, position.x);
             orb = new LabOrbState
             {
                 id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes, relayStage = relayStage,
@@ -183,7 +203,7 @@ namespace C6Lab
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
-            if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
+            if (!TryFindMovable(id, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (activeSeatCount == 1) return Reject("NO_NEIGHBOR", out reason);
             if (!Unit(height01) || !Finite(normalizedVelocity) ||
@@ -194,7 +214,9 @@ namespace C6Lab
                 return Reject("NOT_OUTWARD_EDGE", out reason);
             int receiverSeat = (players[sender].seat + (right ? 1 : activeSeatCount - 1)) % activeSeatCount;
             ulong receiver = seats[receiverSeat];
-            if (CountStored(receiver) >= rules.OrbStorageLimit) return Reject("RECEIVER_FULL", out reason);
+            // A drum is not a stored orb, so a full board still receives it.
+            if (!current.kind.IsDrum() && CountStored(receiver) >= rules.OrbStorageLimit)
+                return Reject("RECEIVER_FULL", out reason);
             current.owner = receiver;
             current.x = right ? 0f : 1f;
             current.y = height01;
@@ -333,7 +355,7 @@ namespace C6Lab
         public bool TryUpdateMotion(ulong sender, string id, Vector2 normalizedPosition,
             Vector2 normalizedVelocity, double now)
         {
-            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !orbs.TryGetValue(id ?? string.Empty, out var orb)
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !TryFindMovable(id, out var orb)
                 || !UsableBy(orb, sender) || !Unit(normalizedPosition.x) || !Unit(normalizedPosition.y)
                 || !Finite(normalizedVelocity) ||
                 normalizedVelocity.sqrMagnitude > rules.MaximumMotionSpeed * rules.MaximumMotionSpeed) return false;
@@ -360,7 +382,8 @@ namespace C6Lab
                 remaining = remaining,
                 hp = hp,
                 players = players.Values.OrderBy(player => player.seat).Select(player => player.Copy()).ToArray(),
-                orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray()
+                orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
+                drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray()
             };
         }
 
@@ -420,27 +443,54 @@ namespace C6Lab
             orb.kind.IsItem() && !(orb.kind == LabOrbKind.Bomb && orb.lockSwipes == 0)
                 ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
-        /// <summary>모든 생성 구슬은 화면 아래 가운데 생성 버튼 한 점에서 나온다.</summary>
-        private Vector2 SpawnOrigin() => new Vector2(.5f, rules.SpawnOriginHeight);
+
+        /// <summary>Orbs and drums both move between screens; look the ID up in either list.</summary>
+        private bool TryFindMovable(string id, out LabOrbState found) =>
+            orbs.TryGetValue(id ?? string.Empty, out found) || drums.TryGetValue(id ?? string.Empty, out found);
 
         /// <summary>
-        /// 생성 버튼에서 튀어나가는 속도 (보드 너비/초). 방향은 위쪽 기준 좌우 부채꼴 안,
+        /// 판마다 북을 받을 사람을 무작위로 정한다. 북이 인원 이하이면 서로 다른 사람이 받고,
+        /// 더 많으면 모두 하나씩 받은 뒤 남는 북도 무작위로 나눈다. Host만 뽑으므로 모든 기기가
+        /// 스냅샷으로 같은 결과를 받는다. 북은 받은 사람 판의 가운데에서 시작한다.
+        /// </summary>
+        private void PlaceDrums(double now)
+        {
+            int[] shuffled = Enumerable.Range(0, activeSeatCount)
+                .OrderBy(seat => DrawFor(seed ^ DrumSeatSalt, (ulong)seat, 0u)).ToArray();
+            var perBoard = new int[activeSeatCount];
+            for (int i = 0; i < rules.DrumCount; i++)
+            {
+                int seat = i < activeSeatCount ? shuffled[i]
+                    : (int)(DrawFor(seed ^ DrumSeatSalt, ulong.MaxValue, (uint)i) % (ulong)activeSeatCount);
+                var drum = new LabOrbState
+                {
+                    id = NewOrbId(), owner = seats[seat], kind = LabOrbKind.Drum,
+                    x = DrumStartX[perBoard[seat]++], y = .5f, createdAt = now, revision = ++revision
+                };
+                drums.Add(drum.id, drum);
+            }
+        }
+
+        /// <summary>
+        /// 북에서 튀어나가는 속도 (보드 너비/초). 방향은 위쪽 기준 좌우 각도 안(180°면 모든 방향),
         /// 속도는 최소~최대 사이에서 Host가 뽑는다. 종류 뽑기와 같은 seed 방식이라
         /// 한 사람의 생성이 다른 사람의 결과를 바꾸지 않고, 모든 기기가 스냅샷으로 같은 값을 받는다.
-        /// 옆으로 너무 멀리 미끄러져 이웃에게 넘어가지 않도록, 바닥 감속으로 계산한
-        /// 옆 이동 거리가 한도를 넘으면 그만큼만 속도를 줄인다.
+        /// 북이 옆 가장자리 가까이 있어도 나오자마자 이웃에게 넘어가지 않도록, 바닥 감속으로
+        /// 계산한 옆 이동 거리가 그쪽 가장자리까지 남은 거리를 넘으면 그만큼만 속도를 줄인다.
         /// </summary>
-        private Vector2 SpawnVelocityFor(uint drawSeed, ulong playerId, uint index)
+        private Vector2 SpawnVelocityFor(uint drawSeed, ulong playerId, uint index, float originX)
         {
             float angle = Mathf.Lerp(-rules.SpawnFanAngle, rules.SpawnFanAngle,
                 Unit01(DrawFor(drawSeed ^ SpawnAngleSalt, playerId, index))) * Mathf.Deg2Rad;
             float speed = Mathf.Lerp(rules.SpawnMinSpeed, rules.SpawnMaxSpeed,
                 Unit01(DrawFor(drawSeed ^ SpawnSpeedSalt, playerId, index)));
-            float side = Mathf.Abs(Mathf.Sin(angle));
+            float sin = Mathf.Sin(angle);
+            float side = Mathf.Abs(sin);
             if (rules.FloorDeceleration > 0f && side > .0001f)
             {
+                float room = sin > 0f ? 1f - SpawnEdgeMargin - originX : originX - SpawnEdgeMargin;
                 // 멈출 때까지 옆으로 가는 거리 = 속도² × sin / (2 × 감속)
-                float safeSpeed = Mathf.Sqrt(2f * rules.FloorDeceleration * SpawnSideTravelLimit / side);
+                float safeSpeed = Mathf.Sqrt(2f * rules.FloorDeceleration * Mathf.Max(0f, room) / side);
                 speed = Mathf.Min(speed, safeSpeed);
             }
             speed = Mathf.Min(speed, rules.MaximumMotionSpeed);
@@ -451,7 +501,7 @@ namespace C6Lab
         private string NewOrbId()
         {
             string id;
-            do id = Guid.NewGuid().ToString("N"); while (orbs.ContainsKey(id));
+            do id = Guid.NewGuid().ToString("N"); while (orbs.ContainsKey(id) || drums.ContainsKey(id));
             return id;
         }
         private static bool UsableBy(LabOrbState orb, ulong sender) => orb.owner == sender && !orb.inFlight;
@@ -528,9 +578,9 @@ namespace C6Lab
             public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
-            public readonly float SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, SpawnOriginHeight, FloorDeceleration;
+            public readonly float SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, FloorDeceleration;
             public readonly int[] GenerationChances;
-            public readonly int ItemUnlockSwipesMin, ItemUnlockSwipesMax;
+            public readonly int ItemUnlockSwipesMin, ItemUnlockSwipesMax, DrumCount;
 
             public Rules(LabConfig config)
             {
@@ -557,8 +607,8 @@ namespace C6Lab
                 SpawnFanAngle = config.SpawnFanAngle;
                 SpawnMinSpeed = config.SpawnMinSpeed;
                 SpawnMaxSpeed = config.SpawnMaxSpeed;
-                SpawnOriginHeight = config.SpawnOriginHeight;
                 FloorDeceleration = config.OrbFloorDeceleration;
+                DrumCount = config.DrumCount;
             }
         }
     }

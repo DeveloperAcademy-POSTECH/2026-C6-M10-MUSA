@@ -3,14 +3,19 @@ using System;
 namespace C6Lab
 {
     public enum LabPhase { Idle, Playing, Victory, Defeat }
-    // Items are appended so the serialized numbers of existing kinds stay unchanged.
-    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb }
+    // Items and the drum are appended so the serialized numbers of existing kinds stay unchanged.
+    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum }
     public enum LabOrbOrigin { Unknown, Generated, Combined }
 
     public static class LabOrbKindRules
     {
         public static bool IsRaw(this LabOrbKind kind) => kind == LabOrbKind.Yin || kind == LabOrbKind.Yang;
         public static bool IsItem(this LabOrbKind kind) => kind >= LabOrbKind.Relay && kind <= LabOrbKind.Bomb;
+        /// <summary>
+        /// The generate drum moves and passes between screens like an orb, but it is kept in its
+        /// own snapshot list so orb rules (lifetime, storage, combining, throwing, bombs) never apply.
+        /// </summary>
+        public static bool IsDrum(this LabOrbKind kind) => kind == LabOrbKind.Drum;
         /// <summary>Items used in place by a double tap once unlocked.</summary>
         public static bool IsDoubleTapUsable(this LabOrbKind kind) => kind == LabOrbKind.Potion || kind == LabOrbKind.SecretBox;
         /// <summary>Orbs that an upward flick may throw at the target.</summary>
@@ -82,5 +87,7 @@ namespace C6Lab
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();
         public LabOrbState[] orbs = Array.Empty<LabOrbState>();
+        /// <summary>Generate drums. Only a player whose board holds one can create orbs.</summary>
+        public LabOrbState[] drums = Array.Empty<LabOrbState>();
     }
 }

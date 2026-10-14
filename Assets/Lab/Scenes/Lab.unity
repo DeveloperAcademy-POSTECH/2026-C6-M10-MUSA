@@ -6325,7 +6325,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &269849410
 RectTransform:
   m_ObjectHideFlags: 0
@@ -6391,7 +6391,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 269849409}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
@@ -31709,8 +31709,6 @@ MonoBehaviour:
   roomListRowTemplate: {fileID: 811172831}
   roomSearchStatusText: {fileID: 1025708875}
   startButton: {fileID: 1249483475}
-  generateButton: {fileID: 269849413}
-  generateLabel: {fileID: 2077647243}
   leaveButton: {fileID: 2132890244}
   statusText: {fileID: 880727438}
   noticeText: {fileID: 996986835}

@@ -65,8 +65,8 @@ namespace C6Lab
             new LabDeveloperField("Orb Maximum Release Speed", .001f, 100000f),
             new LabDeveloperField("Orb Radius", .001f, 100f),
             new LabDeveloperField("Orb Board Height", .1f, 1000f),
-            new LabDeveloperField("Spawn Rise Distance", 0f, 1000f),
-            new LabDeveloperField("Spawn Rise Duration (seconds)", 0f, 86400f),
+            new LabDeveloperField("Spawn Pop Start Size (0-1 of the orb)", 0f, 1f),
+            new LabDeveloperField("Spawn Pop Duration (seconds)", 0f, 2f),
             new LabDeveloperField("Camera Radius", .001f, 1000f),
             new LabDeveloperField("Camera Height Offset", -1000f, 1000f),
             new LabDeveloperField("Throw Origin Radius", .001f, 1000f),
@@ -108,7 +108,7 @@ namespace C6Lab
             new LabDeveloperField("Target Spin Strength", 0f, 200f),
             new LabDeveloperField("Target Spin Damping", 0f, 10f),
             new LabDeveloperField("Target Spin Maximum Speed (deg/s)", 30f, 1440f),
-            new LabDeveloperField("Spawn Fan Angle (deg, each side)", 0f, 89f),
+            new LabDeveloperField("Spawn Fan Angle (deg each side, 180 = all directions)", 0f, 180f),
             new LabDeveloperField("Spawn Minimum Speed (board widths/s)", 0f, 10f),
             new LabDeveloperField("Spawn Maximum Speed (board widths/s)", 0f, 10f),
             new LabDeveloperField("BGM Volume", 0f, 1f),
@@ -121,7 +121,12 @@ namespace C6Lab
             new LabDeveloperField("Hit Haptic Style (0-4)", 0f, 4f, true),
             new LabDeveloperField("Hit Haptic Intensity", 0f, 1f),
             new LabDeveloperField("Item Hit Haptic Style (0-4)", 0f, 4f, true),
-            new LabDeveloperField("Item Hit Haptic Intensity", 0f, 1f)
+            new LabDeveloperField("Item Hit Haptic Intensity", 0f, 1f),
+            new LabDeveloperField("Drum Count", 1f, 5f, true),
+            new LabDeveloperField("Drum Radius", .1f, 1.5f),
+            new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
+            new LabDeveloperField("Drum Drift Turning (per second)", 0f, 2f),
+            new LabDeveloperField("Drum Spin Strength", 0f, 3f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -146,7 +151,8 @@ namespace C6Lab
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73)
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73),
+            new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78)
         });
 
 
@@ -205,16 +211,28 @@ namespace C6Lab
         [SerializeField] private bool contactCombineEnabled = true;
 
         [Header("Spawn presentation")]
-        [SerializeField, Min(0f)] private float spawnRiseDistance = .65f;
-        [SerializeField, Min(0f)] private float spawnRiseDuration = .25f;
-        [Tooltip("생성 버튼에서 구슬이 튀어나가는 부채꼴 각도. 위쪽 기준 좌우 각각 이 각도까지 (도)")]
-        [SerializeField, Range(0f, 89f)] private float spawnFanAngle = 55f;
+        [Tooltip("북에서 나올 때 구슬의 처음 크기 (구슬 크기 대비 0~1)")]
+        [SerializeField, Range(0f, 1f)] private float spawnPopStartScale = .3f;
+        [Tooltip("구슬이 북에서 톡 튀어나와 제 크기가 되는 시간 (초). 이 동안은 다른 것과 부딪히지 않고 날아간다.")]
+        [SerializeField, Range(0f, 2f)] private float spawnPopDuration = .15f;
+        [Tooltip("북에서 구슬이 튀어나가는 각도. 위쪽 기준 좌우 각각 이 각도까지 (도). 180이면 모든 방향")]
+        [SerializeField, Range(0f, 180f)] private float spawnFanAngle = 180f;
         [Tooltip("튀어나가는 최소 속도 (보드 너비/초)")]
         [SerializeField, Range(0f, 10f)] private float spawnMinSpeed = 1f;
         [Tooltip("튀어나가는 최대 속도 (보드 너비/초)")]
         [SerializeField, Range(0f, 10f)] private float spawnMaxSpeed = 1.8f;
-        [Tooltip("구슬이 나오는 높이 (보드 아래 0 ~ 위 1). 생성 버튼 윗부분에 맞춘다. Inspector 전용")]
-        [SerializeField, Range(0f, 1f)] private float spawnOriginHeight = .2f;
+
+        [Header("Drum")]
+        [Tooltip("한 판에 놓이는 생성 북 개수. 판 시작 때 받을 사람을 무작위로 정한다.")]
+        [SerializeField, Range(1, 5)] private int drumCount = 1;
+        [Tooltip("북의 충돌·표시 반지름 (월드 단위). 기본은 예전 화면 아래 생성 버튼 크기.")]
+        [SerializeField, Range(.1f, 1.5f)] private float drumRadius = .6f;
+        [Tooltip("가만히 둔 북이 저절로 떠도는 최고 속도 (보드 너비/초). 0이면 떠돌지 않는다.")]
+        [SerializeField, Range(0f, 1f)] private float drumDriftSpeed = .1f;
+        [Tooltip("떠도는 방향이 바뀌는 빠르기. 클수록 자주 방향을 튼다.")]
+        [SerializeField, Range(0f, 2f)] private float drumDriftTurning = .25f;
+        [Tooltip("떠돌며 돌 때와 부딪혀 돌 때의 회전 세기. 0이면 돌지 않는다.")]
+        [SerializeField, Range(0f, 3f)] private float drumSpinStrength = 1f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -322,12 +340,16 @@ namespace C6Lab
         public bool DropCombineEnabled => dropCombineEnabled;
         public bool ContactCombineEnabled => contactCombineEnabled;
 
-        public float SpawnRiseDistance => Mathf.Max(0f, Finite(spawnRiseDistance, .65f));
-        public float SpawnRiseDuration => Mathf.Max(0f, Finite(spawnRiseDuration, .25f));
-        public float SpawnFanAngle => Mathf.Clamp(Finite(spawnFanAngle, 55f), 0f, 89f);
+        public float SpawnPopStartScale => Mathf.Clamp01(Finite(spawnPopStartScale, .3f));
+        public float SpawnPopDuration => Mathf.Clamp(Finite(spawnPopDuration, .15f), 0f, 2f);
+        public float SpawnFanAngle => Mathf.Clamp(Finite(spawnFanAngle, 180f), 0f, 180f);
         public float SpawnMinSpeed => Mathf.Clamp(Finite(spawnMinSpeed, 1f), 0f, 10f);
         public float SpawnMaxSpeed => Mathf.Clamp(Finite(spawnMaxSpeed, 1.8f), SpawnMinSpeed, 10f);
-        public float SpawnOriginHeight => Mathf.Clamp01(Finite(spawnOriginHeight, .2f));
+        public int DrumCount => Mathf.Clamp(drumCount, 1, 5);
+        public float DrumRadius => Mathf.Clamp(Finite(drumRadius, .6f), .1f, 1.5f);
+        public float DrumDriftSpeed => Mathf.Clamp(Finite(drumDriftSpeed, .1f), 0f, 1f);
+        public float DrumDriftTurning => Mathf.Clamp(Finite(drumDriftTurning, .25f), 0f, 2f);
+        public float DrumSpinStrength => Mathf.Clamp(Finite(drumSpinStrength, 1f), 0f, 3f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
         public float BgmVolume => Mathf.Clamp01(Finite(bgmVolume, .2f));
         public float GenerateSoundVolume => Mathf.Clamp01(Finite(generateSoundVolume, 1f));
@@ -373,8 +395,8 @@ namespace C6Lab
                 StaminaMax, StaminaStart, GenerateCost, StaminaRecoveryAmount,
                 StaminaRecoverySeconds, HitRecovery, (float)OrbStorageLimit,
                 OrbLifetimeSeconds, OrbRestitution, OrbFloorDeceleration, OrbStopSpeed,
-                OrbMaxReleaseSpeed, OrbRadius, BoardHeight, SpawnRiseDistance,
-                SpawnRiseDuration, CameraRadius, CameraHeightOffset, ThrowOriginRadius,
+                OrbMaxReleaseSpeed, OrbRadius, BoardHeight, SpawnPopStartScale,
+                SpawnPopDuration, CameraRadius, CameraHeightOffset, ThrowOriginRadius,
                 ThrowOriginHeightOffset, ThrowOriginLateralRange, ThrowSwipeMinSpeed,
                 ThrowSwipeMinDistance, ThrowSwipeUpDominance, ThrowMaxSwipeSpeed,
                 ThrowMinUpSpeed, ThrowLateralGain, ThrowUpGain, ThrowForwardGain,
@@ -392,7 +414,8 @@ namespace C6Lab
                 HapticsEnabled ? 1f : 0f,
                 (float)GenerateHapticStyle, GenerateHapticIntensity,
                 (float)HitHapticStyle, HitHapticIntensity,
-                (float)ItemHitHapticStyle, ItemHitHapticIntensity
+                (float)ItemHitHapticStyle, ItemHitHapticIntensity,
+                DrumCount, DrumRadius, DrumDriftSpeed, DrumDriftTurning, DrumSpinStrength
             };
         }
 
@@ -450,8 +473,8 @@ namespace C6Lab
             orbMaxReleaseSpeed = values[14];
             orbRadius = values[15];
             boardHeight = values[16];
-            spawnRiseDistance = values[17];
-            spawnRiseDuration = values[18];
+            spawnPopStartScale = values[17];
+            spawnPopDuration = values[18];
             cameraRadius = values[19];
             cameraHeightOffset = values[20];
             throwOriginRadius = values[21];
@@ -507,6 +530,11 @@ namespace C6Lab
             hitHapticIntensity = values[71];
             itemHitHapticStyle = (LabHapticStyle)(int)values[72];
             itemHitHapticIntensity = values[73];
+            drumCount = (int)values[74];
+            drumRadius = values[75];
+            drumDriftSpeed = values[76];
+            drumDriftTurning = values[77];
+            drumSpinStrength = values[78];
             error = string.Empty;
             return true;
         }

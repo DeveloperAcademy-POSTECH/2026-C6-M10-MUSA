@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(74));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(79));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -25,6 +25,10 @@ namespace C6Lab.Tests
             values[5] = 5f;   // generation cost
             values[10] = 45f; // orb lifetime
             values[15] = .45f; // orb radius
+            Assert.That(new[] { values[17], values[18] }, Is.EqualTo(new[] { .3f, .15f }),
+                "Orbs pop out of the drum from 30% size over 0.15 seconds.");
+            values[17] = .5f; // spawn pop start size
+            values[18] = .2f; // spawn pop duration
             values[29] = 3.25f; // lateral throw gain
             values[35] = .2f; // projectile radius
             values[36] = 1.6f; // nonlinear throw power
@@ -49,7 +53,7 @@ namespace C6Lab.Tests
             values[58] = .8f;
             values[59] = 900f;
             Assert.That(new[] { values[60], values[61], values[62] },
-                Is.EqualTo(new[] { 55f, 1f, 1.8f }), "Spawn fan angle, minimum and maximum launch speed.");
+                Is.EqualTo(new[] { 180f, 1f, 1.8f }), "Orbs leave the drum in every direction by default.");
             values[60] = 40f;
             values[61] = .8f;
             values[62] = 1.4f;
@@ -63,12 +67,23 @@ namespace C6Lab.Tests
             values[68] = 1f; // Medium
             values[72] = 4f; // Rigid
             values[73] = .7f;
+            Assert.That(values[74], Is.EqualTo(1f), "One drum per game by default.");
+            values[74] = 3f;
+            Assert.That(values[75], Is.EqualTo(.6f), "The drum keeps the old generate button's size.");
+            values[75] = .8f;
+            Assert.That(new[] { values[76], values[77], values[78] }, Is.EqualTo(new[] { .1f, .25f, 1f }),
+                "The drum drifts slowly, turns gently and spins at full strength by default.");
+            values[76] = .2f;
+            values[77] = .5f;
+            values[78] = 2f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
             Assert.That(config.GenerateCost, Is.EqualTo(5f));
             Assert.That(config.OrbLifetimeSeconds, Is.EqualTo(45f));
             Assert.That(config.OrbRadius, Is.EqualTo(.45f));
+            Assert.That(config.SpawnPopStartScale, Is.EqualTo(.5f));
+            Assert.That(config.SpawnPopDuration, Is.EqualTo(.2f));
             Assert.That(config.ThrowLateralGain, Is.EqualTo(3.25f));
             Assert.That(config.ThrowRadius, Is.EqualTo(.2f));
             Assert.That(config.ThrowPowerExponent, Is.EqualTo(1.6f));
@@ -93,6 +108,24 @@ namespace C6Lab.Tests
             Assert.That(config.GenerateHapticStyle, Is.EqualTo(LabHapticStyle.Medium));
             Assert.That(config.ItemHitHapticStyle, Is.EqualTo(LabHapticStyle.Rigid));
             Assert.That(config.ItemHitHapticIntensity, Is.EqualTo(.7f));
+            Assert.That(config.DrumCount, Is.EqualTo(3));
+            Assert.That(config.DrumRadius, Is.EqualTo(.8f));
+            Assert.That(config.DrumDriftSpeed, Is.EqualTo(.2f));
+            Assert.That(config.DrumDriftTurning, Is.EqualTo(.5f));
+            Assert.That(config.DrumSpinStrength, Is.EqualTo(2f));
+        }
+
+        [Test]
+        public void DrumCountIsAWholeNumberFromOneToFive()
+        {
+            foreach (float invalid in new[] { 0f, 6f, 2.5f })
+            {
+                float[] values = config.CaptureDeveloperValues();
+                values[74] = invalid;
+                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False, invalid.ToString());
+                Assert.That(error, Does.Contain("Drum Count"));
+            }
+            Assert.That(config.DrumCount, Is.EqualTo(1));
         }
 
         [Test]

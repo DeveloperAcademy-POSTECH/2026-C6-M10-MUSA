@@ -169,7 +169,8 @@ namespace C6Lab.Tests
             var snapshot = new LabSnapshot { sessionId = Guid.NewGuid().ToString("N"),
                 round = 1, phase = LabPhase.Playing, hp = 100000, remaining = 180d,
                 targetYawDegrees = 475.25f, targetYawSpeedDegreesPerSecond = -320.5f,
-                players = players, orbs = orbs };
+                players = players, orbs = orbs,
+                drums = new[] { new LabOrbState { id = "drum", owner = 3ul, kind = LabOrbKind.Drum, x = .5f, y = .5f } } };
             string[] chunks = LabSessionSettings.ChunkSnapshot(snapshot);
             Assert.That(chunks.Length, Is.GreaterThan(1));
             foreach (string chunk in chunks)
@@ -188,6 +189,8 @@ namespace C6Lab.Tests
             Assert.That(restored.orbs[499].owner, Is.EqualTo(5ul));
             Assert.That(restored.orbs[499].unlockedAt, Is.EqualTo(12340.5d), "The unlock time reaches every screen.");
             Assert.That(restored.orbs[0].unlockedAt, Is.EqualTo(-1d));
+            Assert.That(restored.drums.Single().kind, Is.EqualTo(LabOrbKind.Drum), "Drums reach every screen.");
+            Assert.That(restored.drums.Single().owner, Is.EqualTo(3ul));
             Assert.That(restored.targetYawDegrees, Is.EqualTo(475.25f));
             Assert.That(restored.targetYawSpeedDegreesPerSecond, Is.EqualTo(-320.5f));
         }

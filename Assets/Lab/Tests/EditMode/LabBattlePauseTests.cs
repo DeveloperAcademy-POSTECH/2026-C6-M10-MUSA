@@ -16,6 +16,7 @@ namespace C6Lab.Tests
                 values[39] = 50f;
                 values[40] = 50f;
                 for (int i = 41; i <= 44; i++) values[i] = 0f;
+                values[74] = 2f; // both players hold a drum
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
 
                 var clock = new LabBattleClock();

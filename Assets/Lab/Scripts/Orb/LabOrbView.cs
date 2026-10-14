@@ -12,12 +12,19 @@ namespace C6Lab
     [RequireComponent(typeof(Rigidbody), typeof(SphereCollider))]
     public sealed class LabOrbView : MonoBehaviour
     {
+        // A drum's spin eases toward its drift spin at this rate (per second); a glancing hit adds
+        // this share of the contact's sliding speed, up to the maximum (degrees per second).
+        private const float DrumSpinEase = 1.5f;
+        private const float DrumHitSpin = .35f;
+        private const float DrumMaxSpin = 540f;
+
         [SerializeField] private Transform visual;
         [SerializeField] private bool tintDefaultByKind = true;
 
         private GameObject replacementVisual;
         private GameObject contactShadow;
         private LabOrbItemMarker itemMarker;
+        private SpriteRenderer drumArt;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
         private string orbId;
@@ -26,9 +33,12 @@ namespace C6Lab
         private int lockSwipes;
         private int relayStage;
         private float fuseSeconds = -1f;
+        private float spinVelocity;
+        private float spinTarget;
+        private float spinStrength;
         private float visualRadius = .32f;
-        private Coroutine spawnRiseRoutine;
-        private Action spawnRiseCompleted;
+        private Coroutine spawnRoutine;
+        private Action spawnCompleted;
 
         public string OrbId => orbId;
         public LabOrbKind Kind => kind;
@@ -41,6 +51,10 @@ namespace C6Lab
         /// <summary>How many times this item has started its unlock presentation.</summary>
         public int UnlockEffectPlays { get; private set; }
         public LabOrbItemMarker ItemMarker => itemMarker;
+        /// <summary>The drum art's spin about the view axis, in degrees per second.</summary>
+        public float DrumSpin => spinVelocity;
+        /// <summary>A drum shows its flat art instead of the sphere once the appearance provides it.</summary>
+        public bool DrumArtVisible => drumArt != null && drumArt.gameObject.activeSelf;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
         public Rigidbody Body { get; private set; }
@@ -71,6 +85,13 @@ namespace C6Lab
         private void Update()
         {
             if (Body == null || visual == null || visualRadius <= 0f) return;
+            if (kind.IsDrum())
+            {
+                // The flat art keeps facing the camera and turns about the view axis instead of rolling.
+                spinVelocity = Mathf.Lerp(spinVelocity, spinTarget, 1f - Mathf.Exp(-DrumSpinEase * Time.deltaTime));
+                visual.Rotate(0f, 0f, spinVelocity * Time.deltaTime, Space.Self);
+                return;
+            }
             Vector3 velocity = Body.linearVelocity;
             velocity.z = 0f;
             if (velocity.sqrMagnitude < .0001f) return;
@@ -82,14 +103,38 @@ namespace C6Lab
             visual.Rotate(axis, degrees, Space.World);
         }
 
+        /// <summary>The board sets the drum's drift spin each physics step; strength scales every spin.</summary>
+        public void DriveDrumSpin(float driftDegreesPerSecond, float strength)
+        {
+            spinStrength = Mathf.Max(0f, strength);
+            spinTarget = driftDegreesPerSecond * spinStrength;
+        }
+
         private void OnCollisionEnter(Collision collision)
         {
+            if (kind.IsDrum()) AddHitSpin(collision);
             // 벽이 아니라 다른 구슬과 부딪혔을 때만 알린다.
             LabOrbView other = collision.rigidbody != null
                 ? collision.rigidbody.GetComponent<LabOrbView>()
                 : null;
             if (other == null) return;
             HitOrb?.Invoke(other, collision.relativeVelocity.magnitude);
+        }
+
+        /// <summary>
+        /// A glancing hit drags the drum's rim the way the contact slides, like friction on a real
+        /// drum: an orb passing over its top to the left turns it anticlockwise. A head-on hit or a
+        /// wall it meets square does not spin it.
+        /// </summary>
+        private void AddHitSpin(Collision collision)
+        {
+            if (spinStrength <= 0f || collision.contactCount == 0 || Body == null) return;
+            Vector3 rim = collision.GetContact(0).point - transform.position;
+            Vector3 otherVelocity = collision.rigidbody != null ? collision.rigidbody.linearVelocity : Vector3.zero;
+            Vector3 slide = otherVelocity - Body.linearVelocity;
+            float turn = (rim.x * slide.y - rim.y * slide.x) / (visualRadius * visualRadius);
+            spinVelocity = Mathf.Clamp(spinVelocity + turn * Mathf.Rad2Deg * DrumHitSpin * spinStrength,
+                -DrumMaxSpin, DrumMaxSpin);
         }
 
         public void Configure(string id, LabOrbKind orbKind, float radius,
@@ -173,79 +218,95 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// Animates only the replaceable Visual child. The orb root, its Rigidbody and
-        /// its collider remain at the host-approved position throughout this effect.
-        /// Repeated calls during the same rise share its completion instead of replaying it.
+        /// Pops the replaceable Visual child out of the drum: it starts at fromOffset (root-local,
+        /// usually the drum's centre) at startScale and eases onto the root at full size while the
+        /// root already flies on its launch. Physics, the orb ID and the collider size never change.
+        /// Repeated calls during the same pop share its completion instead of replaying it.
         /// Completion also runs if the view is disabled or destroyed, so callers can
-        /// release any temporary input/physics lock.
+        /// release any temporary collision lock.
         /// </summary>
-        public void PlaySpawnRise(float distance, float duration, Action onComplete = null)
+        public void PlaySpawnPop(Vector3 fromOffset, float startScale, float duration, Action onComplete = null)
         {
-            if (float.IsNaN(distance) || float.IsInfinity(distance) || distance < 0f)
-                throw new ArgumentOutOfRangeException(nameof(distance));
+            if (float.IsNaN(fromOffset.x) || float.IsNaN(fromOffset.y) || float.IsNaN(fromOffset.z)
+                || float.IsInfinity(fromOffset.x) || float.IsInfinity(fromOffset.y) || float.IsInfinity(fromOffset.z))
+                throw new ArgumentOutOfRangeException(nameof(fromOffset));
+            if (float.IsNaN(startScale) || float.IsInfinity(startScale) || startScale < 0f)
+                throw new ArgumentOutOfRangeException(nameof(startScale));
             if (float.IsNaN(duration) || float.IsInfinity(duration) || duration < 0f)
                 throw new ArgumentOutOfRangeException(nameof(duration));
 
             if (IsSpawning)
             {
-                spawnRiseCompleted += onComplete;
+                spawnCompleted += onComplete;
                 return;
             }
 
             EnsureVisual();
-            if (visual == null || !isActiveAndEnabled || distance == 0f || duration == 0f)
+            if (visual == null || !isActiveAndEnabled || duration == 0f)
             {
-                if (visual != null) visual.localPosition = Vector3.zero;
+                ResetVisualPose();
                 onComplete?.Invoke();
                 return;
             }
 
             IsSpawning = true;
-            spawnRiseCompleted = onComplete;
-            visual.localPosition = new Vector3(0f, -distance, 0f);
-            spawnRiseRoutine = StartCoroutine(RiseVisual(duration));
+            spawnCompleted = onComplete;
+            visual.localPosition = fromOffset;
+            visual.localScale = Vector3.one * startScale;
+            spawnRoutine = StartCoroutine(PopVisual(fromOffset, startScale, duration));
         }
 
-        private IEnumerator RiseVisual(float duration)
+        private IEnumerator PopVisual(Vector3 from, float startScale, float duration)
         {
             float elapsed = 0f;
-            Vector3 from = visual.localPosition;
             while (elapsed < duration)
             {
+                // Wait first, so the first rendered frame shows the orb small inside the drum.
+                yield return null;
                 elapsed += Time.deltaTime;
                 float remaining = 1f - Mathf.Clamp01(elapsed / duration);
                 float eased = 1f - remaining * remaining * remaining;
-                if (visual != null) visual.localPosition = Vector3.LerpUnclamped(from, Vector3.zero, eased);
-                yield return null;
+                if (visual != null)
+                {
+                    visual.localPosition = Vector3.LerpUnclamped(from, Vector3.zero, eased);
+                    visual.localScale = Vector3.one * Mathf.LerpUnclamped(startScale, 1f, eased);
+                }
             }
 
-            spawnRiseRoutine = null;
-            CompleteSpawnRise();
+            spawnRoutine = null;
+            CompleteSpawn();
         }
 
         private void OnDisable()
         {
-            CompleteSpawnRise();
+            CompleteSpawn();
         }
 
         private void OnDestroy()
         {
-            CompleteSpawnRise();
+            CompleteSpawn();
         }
 
-        private void CompleteSpawnRise()
+        private void CompleteSpawn()
         {
             if (!IsSpawning) return;
             IsSpawning = false;
-            if (spawnRiseRoutine != null)
+            if (spawnRoutine != null)
             {
-                StopCoroutine(spawnRiseRoutine);
-                spawnRiseRoutine = null;
+                StopCoroutine(spawnRoutine);
+                spawnRoutine = null;
             }
-            if (visual != null) visual.localPosition = Vector3.zero;
-            Action completed = spawnRiseCompleted;
-            spawnRiseCompleted = null;
+            ResetVisualPose();
+            Action completed = spawnCompleted;
+            spawnCompleted = null;
             completed?.Invoke();
+        }
+
+        private void ResetVisualPose()
+        {
+            if (visual == null) return;
+            visual.localPosition = Vector3.zero;
+            visual.localScale = Vector3.one;
         }
 
         private void EnsureVisual()
@@ -284,17 +345,42 @@ namespace C6Lab
                 if (appearance == null && !tintDefaultByKind)
                     defaultRenderer.SetPropertyBlock(null);
             }
+            Sprite drumSprite = kind.IsDrum() && appearance != null ? appearance.DrumSprite : null;
             Transform defaultSphere = visual.Find("Default Sphere");
-            if (defaultSphere != null) defaultSphere.gameObject.SetActive(replacementVisual == null);
+            if (defaultSphere != null) defaultSphere.gameObject.SetActive(drumSprite == null && replacementVisual == null);
             if (replacementVisual != null)
             {
+                replacementVisual.SetActive(drumSprite == null);
                 replacementVisual.transform.localScale = Vector3.one * (2f * visualRadius);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, visual.gameObject.layer);
                 if (appearance != null && replacementPrefab == appearance.VisualPrefab)
                     appearance.ApplyKindMaterial(replacementVisual, kind, element);
             }
+            UpdateDrumArt(drumSprite);
             UpdateContactShadow();
             UpdateItemMarker();
+        }
+
+        private void UpdateDrumArt(Sprite sprite)
+        {
+            if (sprite == null)
+            {
+                if (drumArt != null) drumArt.gameObject.SetActive(false);
+                return;
+            }
+            if (drumArt == null)
+            {
+                var art = new GameObject("Drum Art");
+                art.transform.SetParent(visual, false);
+                drumArt = art.AddComponent<SpriteRenderer>();
+            }
+            drumArt.gameObject.layer = visual.gameObject.layer;
+            drumArt.gameObject.SetActive(true);
+            drumArt.sprite = sprite;
+            // Face the front-on board camera just in front of the collision sphere, at its diameter.
+            drumArt.transform.localPosition = new Vector3(0f, 0f, -1.02f * visualRadius);
+            drumArt.transform.localRotation = Quaternion.identity;
+            drumArt.transform.localScale = Vector3.one * (2f * visualRadius / Mathf.Max(.0001f, sprite.bounds.size.x));
         }
 
         private void UpdateItemMarker()

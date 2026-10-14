@@ -40,7 +40,6 @@ namespace C6Lab.Editor
             if (canvas == null) throw new InvalidOperationException("LabCanvas is missing.");
             LabHud hud = canvas.GetComponent<LabHud>();
             if (hud == null) throw new InvalidOperationException("LabCanvas is missing LabHud.");
-            if (hud.generateButton == null) throw new InvalidOperationException("LabHud.generateButton is missing.");
 
             RectTransform battle = EnsureRect(canvas.transform, "FigmaBattleUi");
             Stretch(battle);
@@ -104,23 +103,11 @@ namespace C6Lab.Editor
                 hud.playerHpText.gameObject.SetActive(false);
             }
             if (hud.staminaText != null) hud.staminaText.gameObject.SetActive(false);
-            if (hud.generateLabel != null) hud.generateLabel.gameObject.SetActive(false);
-
-            RectTransform generate = hud.generateButton.GetComponent<RectTransform>();
-            generate.gameObject.SetActive(true);
-            generate.SetParent(battle, false);
-            generate.name = "FigmaGenerateButton";
-            ClearChildrenExcept(generate, hud.generateLabel == null ? null : hud.generateLabel.transform);
-            PlaceGuide(generate, 152f, 776f, 98f, 98f);
-            Image generateImage = SetImage(generate, Sprite("GenerateButton"), true);
-            generateImage.preserveAspect = false;
-            hud.generateButton.targetGraphic = generateImage;
-            generate.SetAsLastSibling();
+            // GenerateButton.png is still prepared above: the drum on the board draws it.
 
             background.SetAsFirstSibling();
             playerHp.SetSiblingIndex(background.GetSiblingIndex() + 1);
             stamina.SetSiblingIndex(playerHp.GetSiblingIndex() + 1);
-            generate.SetAsLastSibling();
 
             EditorUtility.SetDirty(hud);
             EditorSceneManager.MarkSceneDirty(scene);

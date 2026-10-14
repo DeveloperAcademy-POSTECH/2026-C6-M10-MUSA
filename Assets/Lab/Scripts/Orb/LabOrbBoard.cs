@@ -53,11 +53,15 @@ namespace C6Lab
             public LabOrbView View;
             public bool LocalOwner;
             public bool Locked;
-            public bool SpawnLocked;
             public bool Held;
             public bool EdgePending;
             public string PendingPartnerId;
             public LabOrbEdgeCrossing PendingEdge;
+            public Vector2 PressVelocity;
+            public Vector2 GrabOffset;
+            public float DriftSeed;
+            public float DriftHeading;
+            public bool HasDriftHeading;
         }
 
         private readonly struct PointerSample
@@ -72,8 +76,16 @@ namespace C6Lab
         private const double ReleaseSampleWindow = .12d;
         private const double TapMaxSeconds = .3d;
         private const double DoubleTapWindow = .35d;
+        // Drum drift: how fast its velocity eases toward the drift path (board widths/s²), how near
+        // a side edge or wall (board widths) it starts easing away, how much faster than its drift
+        // an outward push must be to pass it to a neighbour, and how its art turns as the path curves.
+        private const float DrumDriftAcceleration = .3f;
+        private const float DrumEdgeMargin = .15f;
+        private const float DrumPassSpeedFactor = 1.5f;
+        private const float DrumDriftSpinGain = .3f;
+        private const float DrumDriftMaxSpin = 90f;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
-        private readonly HashSet<string> risenIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> spawnedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<PointerSample> samples = new List<PointerSample>();
         private readonly List<Entry> updateEntries = new List<Entry>();
@@ -103,10 +115,12 @@ namespace C6Lab
         public event Action<string, string, Vector2, Vector2> CombineRequested;
         /// <summary>The velocity is input displacement divided by board width and seconds.</summary>
         public event Action<LabOrbThrowGesture> ThrowRequested;
-        /// <summary>내가 생성한 구슬이 떠오르기 시작할 때 한 번 알린다. (구슬 ID)</summary>
-        public event Action<string> SpawnRiseStarted;
+        /// <summary>내가 생성한 구슬이 북에서 튀어나오기 시작할 때 한 번 알린다. (구슬 ID)</summary>
+        public event Action<string> SpawnStarted;
         /// <summary>A double tap on an unlocked usable item. The Host applies or rejects its effect.</summary>
         public event Action<string> UseRequested;
+        /// <summary>A tap on a drum asks the Host to generate an orb from it. (drum ID)</summary>
+        public event Action<string> DrumTapped;
 
         public void Configure(LabConfig tuning, Camera camera, Rect worldCenterBounds)
         {
@@ -127,7 +141,7 @@ namespace C6Lab
             BuildHorizontalWalls();
             foreach (var entry in entries.Values)
             {
-                entry.View.Configure(entry.View.OrbId, entry.View.Kind, config.OrbRadius, entry.View.Element);
+                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind), entry.View.Element);
                 entry.View.ConfigureAppearance(config.OrbAppearance);
                 SetLayerRecursively(entry.View.transform, gameObject.layer);
                 entry.View.HitSphere.sharedMaterial = contactMaterial;
@@ -145,7 +159,7 @@ namespace C6Lab
         /// </summary>
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
-            bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
+            bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false)
         {
             RequireConfigured();
@@ -156,7 +170,7 @@ namespace C6Lab
                 existing.LocalOwner = localOwner;
                 if (existing.View.Kind != kind || existing.View.Element != element)
                 {
-                    existing.View.Configure(id, kind, config.OrbRadius, element);
+                    existing.View.Configure(id, kind, RadiusFor(kind), element);
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
                 if (existing.View.LockSwipes != lockSwipes || existing.View.RelayStage != relayStage
@@ -167,12 +181,16 @@ namespace C6Lab
                 return existing.View;
             }
 
+            Vector2 start = ToWorld(normalizedPosition);
+            Vector2 popFrom = start;
+            if (playSpawn) start = OutsideDrums(start, velocityInBoardWidthsPerSecond, out popFrom);
+            start = Clamp(start, RadiusFor(kind));
             var gameObject = new GameObject("Orb " + id);
             gameObject.layer = this.gameObject.layer;
             gameObject.transform.SetParent(transform, false);
-            gameObject.transform.position = OnPlane(ToWorld(normalizedPosition));
+            gameObject.transform.position = OnPlane(start);
             var view = gameObject.AddComponent<LabOrbView>();
-            view.Configure(id, kind, config.OrbRadius, element);
+            view.Configure(id, kind, RadiusFor(kind), element);
             view.ConfigureAppearance(config.OrbAppearance);
             view.SetItemState(lockSwipes, relayStage, fuseSeconds);
             if (justUnlocked && unlockEffectIds.Add(id)) view.PlayUnlockEffect();
@@ -187,31 +205,56 @@ namespace C6Lab
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.mass = 1f;
-            body.position = OnPlane(Clamp(ToWorld(normalizedPosition)));
-            var entry = new Entry { View = view, LocalOwner = localOwner };
+            body.position = OnPlane(start);
+            var entry = new Entry { View = view, LocalOwner = localOwner, DriftSeed = DriftSeedFor(id) };
             entries.Add(id, entry);
-            Vector3 startVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
-                config.OrbMaxReleaseSpeed * bounds.width));
-            if (playSpawnRise && risenIds.Add(id))
+            SetBodyMode(entry);
+            if (!body.isKinematic)
+                body.linearVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
+                    config.OrbMaxReleaseSpeed * bounds.width));
+            if (playSpawn && spawnedIds.Add(id))
             {
-                SpawnRiseStarted?.Invoke(id);
-                entry.SpawnLocked = true;
-                view.HitSphere.enabled = false;
-                SetBodyMode(entry);
-                view.PlaySpawnRise(config.SpawnRiseDistance, config.SpawnRiseDuration, () =>
+                SpawnStarted?.Invoke(id);
+                // The orb flies on its launch at once, so a burst never waits. For the short pop it
+                // passes through other orbs and drums (walls still stop it), so orbs leaving together
+                // cannot jam on each other or shove the drum.
+                var passedThrough = new List<Collider>();
+                foreach (var other in entries.Values)
                 {
-                    if (!entries.TryGetValue(id, out var current) || !ReferenceEquals(current, entry)
-                        || current.View == null) return;
-                    current.SpawnLocked = false;
-                    current.View.HitSphere.enabled = true;
-                    SetBodyMode(current);
-                    // 떠오르는 동안은 물리가 꺼져 있으므로, 다 떠오른 순간 생성 버튼에서 튀어나가는 속도를 준다.
-                    if (!current.View.Body.isKinematic) current.View.Body.linearVelocity = startVelocity;
-                });
+                    if (other == entry || other.View == null) continue;
+                    Physics.IgnoreCollision(view.HitSphere, other.View.HitSphere, true);
+                    passedThrough.Add(other.View.HitSphere);
+                }
+                view.PlaySpawnPop(gameObject.transform.InverseTransformVector(OnPlane(popFrom - start)),
+                    config.SpawnPopStartScale, config.SpawnPopDuration, () =>
+                    {
+                        if (view == null || view.HitSphere == null) return;
+                        foreach (Collider other in passedThrough)
+                            if (other != null) Physics.IgnoreCollision(view.HitSphere, other, false);
+                    });
             }
-            else SetBodyMode(entry);
-            if (!body.isKinematic) body.linearVelocity = startVelocity;
             return view;
+        }
+
+        /// <summary>
+        /// A generated orb starts at its drum's centre on the Host. Begin its body just outside that
+        /// drum, along its launch direction, so the two never start overlapped and burst apart;
+        /// drumCenter is where its art pops out from.
+        /// </summary>
+        private Vector2 OutsideDrums(Vector2 start, Vector2 launch, out Vector2 drumCenter)
+        {
+            Vector2 direction = launch.sqrMagnitude > 1e-8f ? launch.normalized : Vector2.up;
+            foreach (var entry in entries.Values)
+            {
+                if (entry.View == null || !entry.View.Kind.IsDrum()) continue;
+                Vector2 center = XY(entry.View.Body.position);
+                float clearance = entry.View.HitSphere.radius + config.OrbRadius;
+                if ((start - center).sqrMagnitude >= clearance * clearance) continue;
+                drumCenter = center;
+                return center + direction * clearance;
+            }
+            drumCenter = start;
+            return start;
         }
 
         public bool RemoveOrb(string id)
@@ -229,7 +272,7 @@ namespace C6Lab
             foreach (var entry in entries.Values)
                 Retire(entry);
             entries.Clear();
-            risenIds.Clear();
+            spawnedIds.Clear();
             unlockEffectIds.Clear();
         }
 
@@ -293,18 +336,23 @@ namespace C6Lab
         {
             if (!configured || !interactionEnabled || heldId != null || !Finite(worldPoint) || !Finite(now)) return false;
             Entry nearest = null;
-            float best = Mathf.Pow(config.OrbRadius * 1.25f, 2f);
+            // Compare touches relative to each body's reach so the larger drum is as easy to grab.
+            float best = 1f;
             foreach (var entry in entries.Values)
             {
-                if (!entry.LocalOwner || entry.Locked || entry.SpawnLocked || entry.EdgePending || entry.Held) continue;
-                float distance = (XY(entry.View.Body.position) - worldPoint).sqrMagnitude;
-                if (distance > best) continue;
-                best = distance;
+                if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held) continue;
+                float reach = entry.View.HitSphere.radius * 1.25f;
+                float closeness = (XY(entry.View.Body.position) - worldPoint).sqrMagnitude / (reach * reach);
+                if (closeness > best) continue;
+                best = closeness;
                 nearest = entry;
             }
             if (nearest == null) return false;
             heldId = nearest.View.OrbId;
             nearest.Held = true;
+            nearest.PressVelocity = XY(nearest.View.Body.linearVelocity);
+            // A drum is large: keep the grabbed point under the finger instead of jumping its centre there.
+            nearest.GrabOffset = nearest.View.Kind.IsDrum() ? XY(nearest.View.Body.position) - worldPoint : Vector2.zero;
             StopMotion(nearest.View.Body);
             SetBodyMode(nearest);
             samples.Clear();
@@ -318,7 +366,7 @@ namespace C6Lab
         {
             if (heldId == null || !entries.TryGetValue(heldId, out var entry) || !Finite(worldPoint) || !Finite(now))
                 return false;
-            entry.View.Body.position = OnPlane(Clamp(worldPoint));
+            entry.View.Body.position = OnPlane(Clamp(worldPoint + entry.GrabOffset, entry.View.HitSphere.radius));
             AddSample(worldPoint, now);
             return true;
         }
@@ -337,6 +385,16 @@ namespace C6Lab
 
             // A tap is short and nearly still. Two taps on the same unlocked item use it in place.
             bool tapped = now - pressTime <= TapMaxSeconds && (worldPoint - pressPoint).magnitude <= config.OrbRadius * .5f;
+            if (tapped && entry.View.Kind.IsDrum())
+            {
+                // Every tap generates, so rapid taps fire in a burst. The drum keeps drifting the way
+                // it was going; only a drag or a flick moves it.
+                lastTapId = null;
+                SetBodyMode(entry);
+                entry.View.Body.linearVelocity = OnPlane(entry.PressVelocity);
+                DrumTapped?.Invoke(id);
+                return true;
+            }
             if (tapped && entry.View.Kind.IsDoubleTapUsable() && entry.View.LockSwipes == 0)
             {
                 if (lastTapId == id && now - lastTapTime <= DoubleTapWindow)
@@ -460,21 +518,36 @@ namespace C6Lab
             updateEntries.AddRange(entries.Values);
             foreach (var entry in updateEntries)
             {
-                if (entry.View == null || !entry.LocalOwner || entry.Locked || entry.SpawnLocked || entry.Held || entry.EdgePending) continue;
+                if (entry.View == null) continue;
+                bool drum = entry.View.Kind.IsDrum();
+                if (!entry.LocalOwner || entry.Locked || entry.Held || entry.EdgePending)
+                {
+                    if (drum) entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
+                    continue;
+                }
                 var body = entry.View.Body;
                 Vector2 velocity = XY(body.linearVelocity);
+                Vector2 position = XY(body.position);
                 float speed = velocity.magnitude;
                 // Config motion is expressed in board widths, while Rigidbody uses world units.
                 // Convert at this boundary so different camera/board sizes retain the same feel.
-                if (speed <= config.OrbStopSpeed * bounds.width) velocity = Vector2.zero;
+                if (drum) velocity = Drift(entry, velocity, position);
+                else if (speed <= config.OrbStopSpeed * bounds.width) velocity = Vector2.zero;
                 else velocity = velocity.normalized * Mathf.Max(0f,
                     speed - config.OrbFloorDeceleration * bounds.width * Time.fixedDeltaTime);
                 body.linearVelocity = OnPlane(velocity);
                 if (velocity.x == 0f) continue;
-                Vector2 position = XY(body.position);
                 bool left = position.x <= bounds.xMin && velocity.x < 0f;
                 bool right = position.x >= bounds.xMax && velocity.x > 0f;
                 if (!left && !right) continue;
+                if (drum && Mathf.Abs(velocity.x) < DrumPassSpeedFactor * config.DrumDriftSpeed * bounds.width)
+                {
+                    // A drum never drifts onto a neighbour's screen by itself; only a push or a swipe
+                    // passes it. A gentle drift that reaches the edge turns back instead.
+                    body.position = OnPlane(Clamp(position));
+                    body.linearVelocity = OnPlane(new Vector2(-velocity.x, velocity.y));
+                    continue;
+                }
                 var crossing = new LabOrbEdgeCrossing(entry.View.OrbId, right,
                     Mathf.InverseLerp(bounds.yMin, bounds.yMax, position.y), velocity / bounds.width);
                 entry.EdgePending = true;
@@ -484,6 +557,57 @@ namespace C6Lab
                 SetBodyMode(entry);
                 EdgeCrossed?.Invoke(crossing);
             }
+        }
+
+        /// <summary>
+        /// A drum left alone drifts on its own along a smooth noise path in any direction, easing away
+        /// from the side edges and the top and bottom walls. A push or a flick first slides and slows
+        /// like an orb; the drift takes over again once it is gentle. Its art turns as the path curves.
+        /// </summary>
+        private Vector2 Drift(Entry entry, Vector2 velocity, Vector2 position)
+        {
+            float driftSpeed = config.DrumDriftSpeed * bounds.width;
+            float step = Time.fixedDeltaTime;
+            float speed = velocity.magnitude;
+            if (speed > driftSpeed * 1.05f + .0001f)
+            {
+                entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
+                entry.HasDriftHeading = false;
+                return velocity.normalized * Mathf.Max(driftSpeed,
+                    speed - config.OrbFloorDeceleration * bounds.width * step);
+            }
+
+            float time = Time.time * config.DrumDriftTurning;
+            float heading = Mathf.PerlinNoise(entry.DriftSeed, time) * 4f * Mathf.PI;
+            float pace = Mathf.Lerp(.5f, 1f, Mathf.PerlinNoise(entry.DriftSeed + 31.7f, time * .7f));
+            Vector2 desired = new Vector2(Mathf.Cos(heading), Mathf.Sin(heading)) * pace;
+            float inset = Mathf.Clamp(entry.View.HitSphere.radius - config.OrbRadius, 0f, bounds.height * .5f);
+            float margin = bounds.width * DrumEdgeMargin;
+            desired.x += EaseAway(position.x - bounds.xMin, margin) - EaseAway(bounds.xMax - position.x, margin);
+            desired.y += EaseAway(position.y - (bounds.yMin + inset), margin)
+                - EaseAway(bounds.yMax - inset - position.y, margin);
+            desired = Vector2.ClampMagnitude(desired, 1f) * driftSpeed;
+
+            float turn = entry.HasDriftHeading
+                ? Mathf.DeltaAngle(entry.DriftHeading * Mathf.Rad2Deg, heading * Mathf.Rad2Deg) / step : 0f;
+            entry.DriftHeading = heading;
+            entry.HasDriftHeading = true;
+            entry.View.DriveDrumSpin(driftSpeed > 0f
+                ? Mathf.Clamp(turn * DrumDriftSpinGain, -DrumDriftMaxSpin, DrumDriftMaxSpin) : 0f,
+                config.DrumSpinStrength);
+            return Vector2.MoveTowards(velocity, desired, DrumDriftAcceleration * bounds.width * step);
+        }
+
+        /// <summary>How strongly to steer away from a boundary this far off: 0 beyond the margin, 2 at it.</summary>
+        private static float EaseAway(float distance, float margin) =>
+            margin <= 0f ? 0f : 2f * Mathf.Clamp01(1f - distance / margin);
+
+        /// <summary>A stable per-drum offset into the drift noise, so drums on one board wander apart.</summary>
+        private static float DriftSeedFor(string id)
+        {
+            int hash = 17;
+            unchecked { foreach (char character in id) hash = hash * 31 + character; }
+            return (hash & 0xFFFF) * .01f;
         }
 
         /// <summary>
@@ -539,7 +663,6 @@ namespace C6Lab
                 && entry.LocalOwner
                 && !entry.Held
                 && !entry.Locked
-                && !entry.SpawnLocked
                 && !entry.EdgePending
                 && entry.PendingPartnerId == null;
         }
@@ -553,7 +676,7 @@ namespace C6Lab
             {
                 if (candidate == dragged || !candidate.View.Kind.IsRaw()
                     || candidate.View.Kind == dragged.View.Kind || !candidate.LocalOwner
-                    || candidate.Locked || candidate.SpawnLocked || candidate.EdgePending || candidate.Held) continue;
+                    || candidate.Locked || candidate.EdgePending || candidate.Held) continue;
                 float distance = (XY(candidate.View.Body.position) - XY(dragged.View.Body.position)).sqrMagnitude;
                 if (distance <= best) { best = distance; nearest = candidate; }
             }
@@ -595,7 +718,7 @@ namespace C6Lab
         private void SetBodyMode(Entry entry)
         {
             var body = entry.View.Body;
-            bool movable = entry.LocalOwner && !entry.Held && !entry.Locked && !entry.SpawnLocked && !entry.EdgePending;
+            bool movable = entry.LocalOwner && !entry.Held && !entry.Locked && !entry.EdgePending;
             bool desiredKinematic = !movable;
             if (body.isKinematic != desiredKinematic)
             {
@@ -674,6 +797,19 @@ namespace C6Lab
         private Vector2 Clamp(Vector2 world) => new Vector2(
             Mathf.Clamp(world.x, bounds.xMin, bounds.xMax),
             Mathf.Clamp(world.y, bounds.yMin, bounds.yMax));
+
+        /// <summary>
+        /// Keeps a body larger than an orb clear of the top and bottom walls. Side edges stay at the
+        /// orb limits, where a drum hands off to a neighbour just like an orb.
+        /// </summary>
+        private Vector2 Clamp(Vector2 world, float radius)
+        {
+            float inset = Mathf.Clamp(radius - config.OrbRadius, 0f, bounds.height * .5f);
+            return new Vector2(Mathf.Clamp(world.x, bounds.xMin, bounds.xMax),
+                Mathf.Clamp(world.y, bounds.yMin + inset, bounds.yMax - inset));
+        }
+
+        private float RadiusFor(LabOrbKind kind) => kind.IsDrum() ? config.DrumRadius : config.OrbRadius;
         private static Vector2 XY(Vector3 value) => new Vector2(value.x, value.y);
         private static Vector3 OnPlane(Vector2 value) => new Vector3(value.x, value.y, 0f);
         private static void StopMotion(Rigidbody body)

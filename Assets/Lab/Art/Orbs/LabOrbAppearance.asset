@@ -25,9 +25,18 @@ MonoBehaviour:
   secretBoxIcon: {fileID: 2800000, guid: 9db8a74d0e7504e73828d0a2b7846275, type: 3}
   potionIcon: {fileID: 2800000, guid: d10f9e33aeb5d4549ac370bcca69ebb9, type: 3}
   bombIcon: {fileID: 2800000, guid: dc7601458a62e4966907a6847ddfc966, type: 3}
+  drumSprite: {fileID: 21300000, guid: 2732675626f72427387ada5d986dfa0f, type: 3}
   lockIcon: {fileID: 2800000, guid: 34345e2fb63124286a9d172adfb68664, type: 3}
   lockIconSize: 0.7
   lockedIconAlpha: 0.4
+  unlockLockSeconds: 0.3
+  unlockLockRise: 0.8
+  unlockRingStartScale: 1.5
+  unlockRingDelay: 0.1
+  unlockRingSeconds: 0.4
+  unlockGlowSeconds: 0.1
+  unlockRingColor: {r: 1, g: 0.8, b: 0.25, a: 1}
+  unlockGlowColor: {r: 1, g: 0.95, b: 0.7, a: 0.85}
   shadowMaterial: {fileID: 2100000, guid: 1284cbabd166044c2b2a0fc78c6959bc, type: 2}
   shadowColor: {r: 0, g: 0, b: 0, a: 0.22}
   shadowScale: {x: 1.4, y: 0.8}

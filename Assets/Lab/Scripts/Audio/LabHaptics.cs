@@ -30,13 +30,13 @@ namespace C6Lab
             network = targetNetwork;
             board = targetBoard;
             if (network != null) network.LocalThrowHit += OnLocalThrowHit;
-            if (board != null) board.SpawnRiseStarted += OnSpawnRiseStarted;
+            if (board != null) board.SpawnStarted += OnSpawnStarted;
         }
 
         private LabConfig Config => network != null ? network.config : null;
 
         private void OnLocalThrowHit(int damage) => PlayForHit(damage, Config);
-        private void OnSpawnRiseStarted(string orbId) => PlayForGenerate(Config);
+        private void OnSpawnStarted(string orbId) => PlayForGenerate(Config);
 
         /// <summary>기본 피해(Damage per Hit)보다 크면 아이템 타격 진동, 아니면 타격 진동.</summary>
         public bool PlayForHit(int damage, LabConfig config)
@@ -73,7 +73,7 @@ namespace C6Lab
         private void Unbind()
         {
             if (network != null) network.LocalThrowHit -= OnLocalThrowHit;
-            if (board != null) board.SpawnRiseStarted -= OnSpawnRiseStarted;
+            if (board != null) board.SpawnStarted -= OnSpawnStarted;
         }
 
         private void OnDestroy() => Unbind();
