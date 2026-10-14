@@ -53,7 +53,6 @@ namespace C6Lab
             public LabOrbView View;
             public bool LocalOwner;
             public bool Locked;
-            public bool SpawnLocked;
             public bool Held;
             public bool EdgePending;
             public string PendingPartnerId;
@@ -75,7 +74,7 @@ namespace C6Lab
         private const double TapMaxSeconds = .3d;
         private const double DoubleTapWindow = .35d;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
-        private readonly HashSet<string> risenIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> spawnedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<PointerSample> samples = new List<PointerSample>();
         private readonly List<Entry> updateEntries = new List<Entry>();
@@ -105,8 +104,8 @@ namespace C6Lab
         public event Action<string, string, Vector2, Vector2> CombineRequested;
         /// <summary>The velocity is input displacement divided by board width and seconds.</summary>
         public event Action<LabOrbThrowGesture> ThrowRequested;
-        /// <summary>내가 생성한 구슬이 떠오르기 시작할 때 한 번 알린다. (구슬 ID)</summary>
-        public event Action<string> SpawnRiseStarted;
+        /// <summary>내가 생성한 구슬이 북에서 튀어나오기 시작할 때 한 번 알린다. (구슬 ID)</summary>
+        public event Action<string> SpawnStarted;
         /// <summary>A double tap on an unlocked usable item. The Host applies or rejects its effect.</summary>
         public event Action<string> UseRequested;
         /// <summary>A tap on a drum asks the Host to generate an orb from it. (drum ID)</summary>
@@ -149,7 +148,7 @@ namespace C6Lab
         /// </summary>
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
-            bool playSpawnRise = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
+            bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false)
         {
             RequireConfigured();
@@ -172,7 +171,9 @@ namespace C6Lab
             }
 
             Vector2 start = ToWorld(normalizedPosition);
-            if (playSpawnRise) start = OutsideDrums(start, velocityInBoardWidthsPerSecond);
+            Vector2 popFrom = start;
+            if (playSpawn) start = OutsideDrums(start, velocityInBoardWidthsPerSecond, out popFrom);
+            start = Clamp(start, RadiusFor(kind));
             var gameObject = new GameObject("Orb " + id);
             gameObject.layer = this.gameObject.layer;
             gameObject.transform.SetParent(transform, false);
@@ -193,38 +194,43 @@ namespace C6Lab
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.mass = 1f;
-            body.position = OnPlane(Clamp(start, RadiusFor(kind)));
+            body.position = OnPlane(start);
             var entry = new Entry { View = view, LocalOwner = localOwner };
             entries.Add(id, entry);
-            Vector3 startVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
-                config.OrbMaxReleaseSpeed * bounds.width));
-            if (playSpawnRise && risenIds.Add(id))
+            SetBodyMode(entry);
+            if (!body.isKinematic)
+                body.linearVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
+                    config.OrbMaxReleaseSpeed * bounds.width));
+            if (playSpawn && spawnedIds.Add(id))
             {
-                SpawnRiseStarted?.Invoke(id);
-                entry.SpawnLocked = true;
-                view.HitSphere.enabled = false;
-                SetBodyMode(entry);
-                view.PlaySpawnRise(config.SpawnRiseDistance, config.SpawnRiseDuration, () =>
+                SpawnStarted?.Invoke(id);
+                // The orb flies on its launch at once, so a burst never waits. For the short pop it
+                // passes through other orbs and drums (walls still stop it), so orbs leaving together
+                // cannot jam on each other or shove the drum.
+                var passedThrough = new List<Collider>();
+                foreach (var other in entries.Values)
                 {
-                    if (!entries.TryGetValue(id, out var current) || !ReferenceEquals(current, entry)
-                        || current.View == null) return;
-                    current.SpawnLocked = false;
-                    current.View.HitSphere.enabled = true;
-                    SetBodyMode(current);
-                    // 떠오르는 동안은 물리가 꺼져 있으므로, 다 떠오른 순간 생성 버튼에서 튀어나가는 속도를 준다.
-                    if (!current.View.Body.isKinematic) current.View.Body.linearVelocity = startVelocity;
-                });
+                    if (other == entry || other.View == null) continue;
+                    Physics.IgnoreCollision(view.HitSphere, other.View.HitSphere, true);
+                    passedThrough.Add(other.View.HitSphere);
+                }
+                view.PlaySpawnPop(gameObject.transform.InverseTransformVector(OnPlane(popFrom - start)),
+                    config.SpawnPopStartScale, config.SpawnPopDuration, () =>
+                    {
+                        if (view == null || view.HitSphere == null) return;
+                        foreach (Collider other in passedThrough)
+                            if (other != null) Physics.IgnoreCollision(view.HitSphere, other, false);
+                    });
             }
-            else SetBodyMode(entry);
-            if (!body.isKinematic) body.linearVelocity = startVelocity;
             return view;
         }
 
         /// <summary>
-        /// A generated orb starts at its drum's centre on the Host. Begin it just outside that drum,
-        /// along its launch direction, so the two bodies never start overlapped and burst apart.
+        /// A generated orb starts at its drum's centre on the Host. Begin its body just outside that
+        /// drum, along its launch direction, so the two never start overlapped and burst apart;
+        /// drumCenter is where its art pops out from.
         /// </summary>
-        private Vector2 OutsideDrums(Vector2 start, Vector2 launch)
+        private Vector2 OutsideDrums(Vector2 start, Vector2 launch, out Vector2 drumCenter)
         {
             Vector2 direction = launch.sqrMagnitude > 1e-8f ? launch.normalized : Vector2.up;
             foreach (var entry in entries.Values)
@@ -233,8 +239,10 @@ namespace C6Lab
                 Vector2 center = XY(entry.View.Body.position);
                 float clearance = entry.View.HitSphere.radius + config.OrbRadius;
                 if ((start - center).sqrMagnitude >= clearance * clearance) continue;
-                return Clamp(center + direction * clearance);
+                drumCenter = center;
+                return center + direction * clearance;
             }
+            drumCenter = start;
             return start;
         }
 
@@ -253,7 +261,7 @@ namespace C6Lab
             foreach (var entry in entries.Values)
                 Retire(entry);
             entries.Clear();
-            risenIds.Clear();
+            spawnedIds.Clear();
             unlockEffectIds.Clear();
         }
 
@@ -321,7 +329,7 @@ namespace C6Lab
             float best = 1f;
             foreach (var entry in entries.Values)
             {
-                if (!entry.LocalOwner || entry.Locked || entry.SpawnLocked || entry.EdgePending || entry.Held) continue;
+                if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held) continue;
                 float reach = entry.View.HitSphere.radius * 1.25f;
                 float closeness = (XY(entry.View.Body.position) - worldPoint).sqrMagnitude / (reach * reach);
                 if (closeness > best) continue;
@@ -499,7 +507,7 @@ namespace C6Lab
             updateEntries.AddRange(entries.Values);
             foreach (var entry in updateEntries)
             {
-                if (entry.View == null || !entry.LocalOwner || entry.Locked || entry.SpawnLocked || entry.Held || entry.EdgePending) continue;
+                if (entry.View == null || !entry.LocalOwner || entry.Locked || entry.Held || entry.EdgePending) continue;
                 var body = entry.View.Body;
                 Vector2 velocity = XY(body.linearVelocity);
                 float speed = velocity.magnitude;
@@ -578,7 +586,6 @@ namespace C6Lab
                 && entry.LocalOwner
                 && !entry.Held
                 && !entry.Locked
-                && !entry.SpawnLocked
                 && !entry.EdgePending
                 && entry.PendingPartnerId == null;
         }
@@ -592,7 +599,7 @@ namespace C6Lab
             {
                 if (candidate == dragged || !candidate.View.Kind.IsRaw()
                     || candidate.View.Kind == dragged.View.Kind || !candidate.LocalOwner
-                    || candidate.Locked || candidate.SpawnLocked || candidate.EdgePending || candidate.Held) continue;
+                    || candidate.Locked || candidate.EdgePending || candidate.Held) continue;
                 float distance = (XY(candidate.View.Body.position) - XY(dragged.View.Body.position)).sqrMagnitude;
                 if (distance <= best) { best = distance; nearest = candidate; }
             }
@@ -634,7 +641,7 @@ namespace C6Lab
         private void SetBodyMode(Entry entry)
         {
             var body = entry.View.Body;
-            bool movable = entry.LocalOwner && !entry.Held && !entry.Locked && !entry.SpawnLocked && !entry.EdgePending;
+            bool movable = entry.LocalOwner && !entry.Held && !entry.Locked && !entry.EdgePending;
             bool desiredKinematic = !movable;
             if (body.isKinematic != desiredKinematic)
             {

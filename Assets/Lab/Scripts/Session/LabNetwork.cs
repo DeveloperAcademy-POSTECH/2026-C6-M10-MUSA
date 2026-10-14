@@ -1275,13 +1275,13 @@ namespace C6Lab
             {
                 if (orb.owner != LocalPlayerId || orb.inFlight) continue;
                 current.Add(orb.id);
-                bool showRise = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
+                bool showSpawn = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
                     && orb.kind != LabOrbKind.Combined;
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
-                    new Vector2(orb.vx, orb.vy), true, showRise, orb.element, orb.lockSwipes, orb.relayStage, fuse,
+                    new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
                     orb.JustUnlocked(latest.serverTime));
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())

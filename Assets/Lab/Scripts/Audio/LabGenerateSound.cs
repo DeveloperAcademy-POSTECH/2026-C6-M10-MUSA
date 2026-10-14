@@ -23,9 +23,9 @@ namespace C6Lab
 
         public void Bind(LabOrbBoard target)
         {
-            if (board != null) board.SpawnRiseStarted -= OnSpawnRiseStarted;
+            if (board != null) board.SpawnStarted -= OnSpawnStarted;
             board = target;
-            if (board != null) board.SpawnRiseStarted += OnSpawnRiseStarted;
+            if (board != null) board.SpawnStarted += OnSpawnStarted;
         }
 
         private void Awake()
@@ -36,7 +36,7 @@ namespace C6Lab
             source.spatialBlend = 0f; // 화면 UI 소리라 위치와 상관없이 같은 크기로 들린다.
         }
 
-        private void OnSpawnRiseStarted(string orbId) => PlayRandom();
+        private void OnSpawnStarted(string orbId) => PlayRandom();
 
         public void PlayRandom()
         {
@@ -50,7 +50,7 @@ namespace C6Lab
 
         private void OnDestroy()
         {
-            if (board != null) board.SpawnRiseStarted -= OnSpawnRiseStarted;
+            if (board != null) board.SpawnStarted -= OnSpawnStarted;
         }
     }
 }

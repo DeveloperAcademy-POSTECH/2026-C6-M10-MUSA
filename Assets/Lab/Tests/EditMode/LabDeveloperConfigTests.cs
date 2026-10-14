@@ -25,6 +25,10 @@ namespace C6Lab.Tests
             values[5] = 5f;   // generation cost
             values[10] = 45f; // orb lifetime
             values[15] = .45f; // orb radius
+            Assert.That(new[] { values[17], values[18] }, Is.EqualTo(new[] { .3f, .15f }),
+                "Orbs pop out of the drum from 30% size over 0.15 seconds.");
+            values[17] = .5f; // spawn pop start size
+            values[18] = .2f; // spawn pop duration
             values[29] = 3.25f; // lateral throw gain
             values[35] = .2f; // projectile radius
             values[36] = 1.6f; // nonlinear throw power
@@ -63,6 +67,8 @@ namespace C6Lab.Tests
             Assert.That(config.GenerateCost, Is.EqualTo(5f));
             Assert.That(config.OrbLifetimeSeconds, Is.EqualTo(45f));
             Assert.That(config.OrbRadius, Is.EqualTo(.45f));
+            Assert.That(config.SpawnPopStartScale, Is.EqualTo(.5f));
+            Assert.That(config.SpawnPopDuration, Is.EqualTo(.2f));
             Assert.That(config.ThrowLateralGain, Is.EqualTo(3.25f));
             Assert.That(config.ThrowRadius, Is.EqualTo(.2f));
             Assert.That(config.ThrowPowerExponent, Is.EqualTo(1.6f));

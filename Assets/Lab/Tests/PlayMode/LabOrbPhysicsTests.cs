@@ -669,49 +669,67 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator NewGeneratedRawRisesOnceBeforeBecomingMovable()
+        public IEnumerator NewGeneratedOrbPopsOutOfItsDrumOnceAndFliesAtOnce()
         {
-            LabOrbView orb = board.UpsertOrb("generated", LabOrbKind.Yin,
-                new Vector2(.5f, .5f), playSpawnRise: true);
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.5f, .5f));
+            Vector2 drumCenter = BoardPoint(drum);
+            Vector2 launch = new Vector2(-.3f, .9f); // board widths per second, up and to the left
+            // The Host starts a generated orb at its drum's centre.
+            LabOrbView orb = board.UpsertOrb("generated", LabOrbKind.Yin, new Vector2(.5f, .5f), launch, playSpawn: true);
+            Vector2 start = BoardPoint(orb);
+            Assert.That(Vector2.Distance(start, drumCenter), Is.EqualTo(config.DrumRadius + config.OrbRadius).Within(.001f),
+                "The orb's body starts just outside the drum.");
+            Assert.That(Vector2.Dot((start - drumCenter).normalized, launch.normalized), Is.GreaterThan(.999f),
+                "It starts on the side it flies toward.");
             Assert.That(orb.IsSpawning, Is.True);
-            Assert.That(orb.Body.isKinematic, Is.True);
-            Assert.That(orb.HitSphere.enabled, Is.False);
-            Assert.That(board.TryBeginDragAtWorld(BoardPoint(orb), 1d), Is.False);
-            Assert.That(orb.Visual.localPosition.y, Is.LessThan(0f));
+            Assert.That(orb.Body.isKinematic, Is.False, "The orb flies at once instead of waiting.");
+            Assert.That(orb.HitSphere.enabled, Is.True, "Walls still stop it while it pops out.");
+            Assert.That(Physics.GetIgnoreCollision(orb.HitSphere, drum.HitSphere), Is.True,
+                "It passes through the drum and other orbs while it pops out.");
+            Vector3 art = orb.Visual.position;
+            Assert.That(Vector2.Distance(new Vector2(art.x, art.y), drumCenter), Is.LessThan(.001f),
+                "Its art starts inside the drum.");
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(config.SpawnPopStartScale).Within(.001f));
 
-            yield return new WaitForSeconds(config.SpawnRiseDuration + .08f);
+            yield return new WaitForFixedUpdate();
+            yield return new WaitForFixedUpdate();
+            Vector2 moved = BoardPoint(orb) - start;
+            Assert.That(moved.x, Is.LessThan(0f), "The launch applies from the first physics step.");
+            Assert.That(moved.y, Is.GreaterThan(0f));
+
+            yield return new WaitForSeconds(config.SpawnPopDuration + .08f);
             Assert.That(orb.IsSpawning, Is.False);
-            Assert.That(orb.Visual.localPosition.y, Is.EqualTo(0f).Within(.001f));
-            Assert.That(orb.HitSphere.enabled, Is.True);
-            Assert.That(orb.Body.isKinematic, Is.False);
-            board.UpsertOrb("generated", LabOrbKind.Yin, new Vector2(.5f, .5f), playSpawnRise: true);
-            Assert.That(orb.IsSpawning, Is.False, "Repeated snapshots must not replay the rise.");
+            Assert.That(orb.Visual.localPosition.magnitude, Is.LessThan(.001f));
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(1f).Within(.001f));
+            Assert.That(Physics.GetIgnoreCollision(orb.HitSphere, drum.HitSphere), Is.False,
+                "It collides normally once out.");
+
+            board.UpsertOrb("generated", LabOrbKind.Yin, new Vector2(.5f, .5f), playSpawn: true);
+            Assert.That(orb.IsSpawning, Is.False, "Repeated snapshots must not replay the pop.");
             Assert.That(board.RemoveOrb("generated"), Is.True);
             LabOrbView returned = board.UpsertOrb("generated", LabOrbKind.Yin,
-                new Vector2(.5f, .5f), playSpawnRise: true);
-            Assert.That(returned.IsSpawning, Is.False, "Returning with the same ID must not replay the rise.");
+                new Vector2(.5f, .5f), playSpawn: true);
+            Assert.That(returned.IsSpawning, Is.False, "Returning with the same ID must not replay the pop.");
         }
 
         [UnityTest]
-        public IEnumerator GeneratedOrbKeepsItsLaunchUntilTheRiseEndsThenMoves()
+        public IEnumerator ABurstOfOrbsFromOneDrumFliesApartWithoutJammingOrShovingIt()
         {
-            Vector2 launch = new Vector2(-.3f, .9f); // board widths per second, up and to the left
-            LabOrbView orb = board.UpsertOrb("launched", LabOrbKind.Yin,
-                new Vector2(.5f, .2f), launch, playSpawnRise: true);
-            Vector3 start = orb.Body.position;
-            Assert.That(orb.Body.isKinematic, Is.True, "Physics is off while the orb rises out of the button.");
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.5f, .5f));
+            Vector2 center = BoardPoint(drum);
+            var orbs = new System.Collections.Generic.List<LabOrbView>();
+            for (int i = 0; i < 6; i++) // six rapid taps in one frame, each in its own direction
+            {
+                float angle = i * 60f * Mathf.Deg2Rad;
+                Vector2 launch = new Vector2(Mathf.Sin(angle), Mathf.Cos(angle)) * .8f;
+                orbs.Add(board.UpsertOrb("burst-" + i, LabOrbKind.Yin, new Vector2(.5f, .5f), launch, playSpawn: true));
+            }
 
-            yield return new WaitForSeconds(config.SpawnRiseDuration * .5f);
-            Assert.That(orb.Body.position.x, Is.EqualTo(start.x).Within(.0001f), "No motion during the rise.");
-            Assert.That(orb.Body.position.y, Is.EqualTo(start.y).Within(.0001f));
-
-            yield return new WaitForSeconds(config.SpawnRiseDuration * .5f + .05f);
-            Assert.That(orb.IsSpawning, Is.False);
-            yield return new WaitForFixedUpdate();
-            yield return new WaitForFixedUpdate();
-            Vector3 moved = orb.Body.position - start;
-            Assert.That(moved.x, Is.LessThan(0f), "The launch velocity is applied once the rise ends.");
-            Assert.That(moved.y, Is.GreaterThan(0f));
+            yield return new WaitForSeconds(config.SpawnPopDuration + .1f);
+            foreach (var orb in orbs)
+                Assert.That(Vector2.Distance(BoardPoint(orb), center),
+                    Is.GreaterThan(config.DrumRadius + config.OrbRadius + .05f), orb.OrbId + " keeps flying out.");
+            Assert.That(Vector2.Distance(BoardPoint(drum), center), Is.LessThan(.05f), "Popping orbs do not shove the drum.");
         }
 
         private static Vector2 BoardPoint(LabOrbView orb)

@@ -373,10 +373,10 @@ namespace C6Lab.Tests
                 Assert.That(yinView.GetComponent<SphereCollider>(), Is.Not.Null);
                 Assert.That(yinView.Visual.GetComponentInChildren<MeshRenderer>(), Is.Not.Null);
 
-                // Generated orbs rise, then launch from the drum and slide to a stop before
+                // Generated orbs pop out of the drum, fly off at once and slide to a stop before
                 // the drag. Use the same public board gesture methods the pointer path calls.
                 float slideSeconds = network.config.SpawnMaxSpeed / Mathf.Max(.01f, network.config.OrbFloorDeceleration);
-                yield return new WaitForSeconds(network.config.SpawnRiseDuration + slideSeconds + .3f);
+                yield return new WaitForSeconds(network.config.SpawnPopDuration + slideSeconds + .3f);
                 Assert.That(board.TryGetMotion(yin.id, out Vector2 yin01, out _), Is.True);
                 Assert.That(board.TryGetMotion(yang.id, out Vector2 yang01, out _), Is.True);
                 Rect bounds = board.CenterBounds;

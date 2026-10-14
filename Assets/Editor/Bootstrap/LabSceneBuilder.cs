@@ -163,8 +163,8 @@ namespace C6Lab.Editor
             if (Mathf.Abs(lateral.floatValue - 6f) > .0001f ||
                 Mathf.Abs(forward.floatValue - 8f) > .0001f)
                 throw new InvalidOperationException("Throw tuning differs from the legacy values. Edit LabConfig in the Inspector instead.");
-            SetFloat(serialized, "spawnRiseDistance", .65f);
-            SetFloat(serialized, "spawnRiseDuration", .25f);
+            SetFloat(serialized, "spawnPopStartScale", .3f);
+            SetFloat(serialized, "spawnPopDuration", .15f);
             SetFloat(serialized, "cameraRadius", 8f);
             SetFloat(serialized, "cameraHeightOffset", .65f);
             SetFloat(serialized, "throwOriginRadius", 4f);

@@ -28,8 +28,8 @@ namespace C6Lab
         private int relayStage;
         private float fuseSeconds = -1f;
         private float visualRadius = .32f;
-        private Coroutine spawnRiseRoutine;
-        private Action spawnRiseCompleted;
+        private Coroutine spawnRoutine;
+        private Action spawnCompleted;
 
         public string OrbId => orbId;
         public LabOrbKind Kind => kind;
@@ -177,79 +177,95 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// Animates only the replaceable Visual child. The orb root, its Rigidbody and
-        /// its collider remain at the host-approved position throughout this effect.
-        /// Repeated calls during the same rise share its completion instead of replaying it.
+        /// Pops the replaceable Visual child out of the drum: it starts at fromOffset (root-local,
+        /// usually the drum's centre) at startScale and eases onto the root at full size while the
+        /// root already flies on its launch. Physics, the orb ID and the collider size never change.
+        /// Repeated calls during the same pop share its completion instead of replaying it.
         /// Completion also runs if the view is disabled or destroyed, so callers can
-        /// release any temporary input/physics lock.
+        /// release any temporary collision lock.
         /// </summary>
-        public void PlaySpawnRise(float distance, float duration, Action onComplete = null)
+        public void PlaySpawnPop(Vector3 fromOffset, float startScale, float duration, Action onComplete = null)
         {
-            if (float.IsNaN(distance) || float.IsInfinity(distance) || distance < 0f)
-                throw new ArgumentOutOfRangeException(nameof(distance));
+            if (float.IsNaN(fromOffset.x) || float.IsNaN(fromOffset.y) || float.IsNaN(fromOffset.z)
+                || float.IsInfinity(fromOffset.x) || float.IsInfinity(fromOffset.y) || float.IsInfinity(fromOffset.z))
+                throw new ArgumentOutOfRangeException(nameof(fromOffset));
+            if (float.IsNaN(startScale) || float.IsInfinity(startScale) || startScale < 0f)
+                throw new ArgumentOutOfRangeException(nameof(startScale));
             if (float.IsNaN(duration) || float.IsInfinity(duration) || duration < 0f)
                 throw new ArgumentOutOfRangeException(nameof(duration));
 
             if (IsSpawning)
             {
-                spawnRiseCompleted += onComplete;
+                spawnCompleted += onComplete;
                 return;
             }
 
             EnsureVisual();
-            if (visual == null || !isActiveAndEnabled || distance == 0f || duration == 0f)
+            if (visual == null || !isActiveAndEnabled || duration == 0f)
             {
-                if (visual != null) visual.localPosition = Vector3.zero;
+                ResetVisualPose();
                 onComplete?.Invoke();
                 return;
             }
 
             IsSpawning = true;
-            spawnRiseCompleted = onComplete;
-            visual.localPosition = new Vector3(0f, -distance, 0f);
-            spawnRiseRoutine = StartCoroutine(RiseVisual(duration));
+            spawnCompleted = onComplete;
+            visual.localPosition = fromOffset;
+            visual.localScale = Vector3.one * startScale;
+            spawnRoutine = StartCoroutine(PopVisual(fromOffset, startScale, duration));
         }
 
-        private IEnumerator RiseVisual(float duration)
+        private IEnumerator PopVisual(Vector3 from, float startScale, float duration)
         {
             float elapsed = 0f;
-            Vector3 from = visual.localPosition;
             while (elapsed < duration)
             {
+                // Wait first, so the first rendered frame shows the orb small inside the drum.
+                yield return null;
                 elapsed += Time.deltaTime;
                 float remaining = 1f - Mathf.Clamp01(elapsed / duration);
                 float eased = 1f - remaining * remaining * remaining;
-                if (visual != null) visual.localPosition = Vector3.LerpUnclamped(from, Vector3.zero, eased);
-                yield return null;
+                if (visual != null)
+                {
+                    visual.localPosition = Vector3.LerpUnclamped(from, Vector3.zero, eased);
+                    visual.localScale = Vector3.one * Mathf.LerpUnclamped(startScale, 1f, eased);
+                }
             }
 
-            spawnRiseRoutine = null;
-            CompleteSpawnRise();
+            spawnRoutine = null;
+            CompleteSpawn();
         }
 
         private void OnDisable()
         {
-            CompleteSpawnRise();
+            CompleteSpawn();
         }
 
         private void OnDestroy()
         {
-            CompleteSpawnRise();
+            CompleteSpawn();
         }
 
-        private void CompleteSpawnRise()
+        private void CompleteSpawn()
         {
             if (!IsSpawning) return;
             IsSpawning = false;
-            if (spawnRiseRoutine != null)
+            if (spawnRoutine != null)
             {
-                StopCoroutine(spawnRiseRoutine);
-                spawnRiseRoutine = null;
+                StopCoroutine(spawnRoutine);
+                spawnRoutine = null;
             }
-            if (visual != null) visual.localPosition = Vector3.zero;
-            Action completed = spawnRiseCompleted;
-            spawnRiseCompleted = null;
+            ResetVisualPose();
+            Action completed = spawnCompleted;
+            spawnCompleted = null;
             completed?.Invoke();
+        }
+
+        private void ResetVisualPose()
+        {
+            if (visual == null) return;
+            visual.localPosition = Vector3.zero;
+            visual.localScale = Vector3.one;
         }
 
         private void EnsureVisual()

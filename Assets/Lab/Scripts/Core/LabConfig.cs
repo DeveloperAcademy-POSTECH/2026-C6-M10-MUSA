@@ -65,8 +65,8 @@ namespace C6Lab
             new LabDeveloperField("Orb Maximum Release Speed", .001f, 100000f),
             new LabDeveloperField("Orb Radius", .001f, 100f),
             new LabDeveloperField("Orb Board Height", .1f, 1000f),
-            new LabDeveloperField("Spawn Rise Distance", 0f, 1000f),
-            new LabDeveloperField("Spawn Rise Duration (seconds)", 0f, 86400f),
+            new LabDeveloperField("Spawn Pop Start Size (0-1 of the orb)", 0f, 1f),
+            new LabDeveloperField("Spawn Pop Duration (seconds)", 0f, 2f),
             new LabDeveloperField("Camera Radius", .001f, 1000f),
             new LabDeveloperField("Camera Height Offset", -1000f, 1000f),
             new LabDeveloperField("Throw Origin Radius", .001f, 1000f),
@@ -196,8 +196,10 @@ namespace C6Lab
         [SerializeField] private bool contactCombineEnabled = true;
 
         [Header("Spawn presentation")]
-        [SerializeField, Min(0f)] private float spawnRiseDistance = .65f;
-        [SerializeField, Min(0f)] private float spawnRiseDuration = .25f;
+        [Tooltip("북에서 나올 때 구슬의 처음 크기 (구슬 크기 대비 0~1)")]
+        [SerializeField, Range(0f, 1f)] private float spawnPopStartScale = .3f;
+        [Tooltip("구슬이 북에서 톡 튀어나와 제 크기가 되는 시간 (초). 이 동안은 다른 것과 부딪히지 않고 날아간다.")]
+        [SerializeField, Range(0f, 2f)] private float spawnPopDuration = .15f;
         [Tooltip("북에서 구슬이 튀어나가는 각도. 위쪽 기준 좌우 각각 이 각도까지 (도). 180이면 모든 방향")]
         [SerializeField, Range(0f, 180f)] private float spawnFanAngle = 180f;
         [Tooltip("튀어나가는 최소 속도 (보드 너비/초)")]
@@ -291,8 +293,8 @@ namespace C6Lab
         public bool DropCombineEnabled => dropCombineEnabled;
         public bool ContactCombineEnabled => contactCombineEnabled;
 
-        public float SpawnRiseDistance => Mathf.Max(0f, Finite(spawnRiseDistance, .65f));
-        public float SpawnRiseDuration => Mathf.Max(0f, Finite(spawnRiseDuration, .25f));
+        public float SpawnPopStartScale => Mathf.Clamp01(Finite(spawnPopStartScale, .3f));
+        public float SpawnPopDuration => Mathf.Clamp(Finite(spawnPopDuration, .15f), 0f, 2f);
         public float SpawnFanAngle => Mathf.Clamp(Finite(spawnFanAngle, 180f), 0f, 180f);
         public float SpawnMinSpeed => Mathf.Clamp(Finite(spawnMinSpeed, 1f), 0f, 10f);
         public float SpawnMaxSpeed => Mathf.Clamp(Finite(spawnMaxSpeed, 1.8f), SpawnMinSpeed, 10f);
@@ -332,8 +334,8 @@ namespace C6Lab
                 StaminaMax, StaminaStart, GenerateCost, StaminaRecoveryAmount,
                 StaminaRecoverySeconds, HitRecovery, (float)OrbStorageLimit,
                 OrbLifetimeSeconds, OrbRestitution, OrbFloorDeceleration, OrbStopSpeed,
-                OrbMaxReleaseSpeed, OrbRadius, BoardHeight, SpawnRiseDistance,
-                SpawnRiseDuration, CameraRadius, CameraHeightOffset, ThrowOriginRadius,
+                OrbMaxReleaseSpeed, OrbRadius, BoardHeight, SpawnPopStartScale,
+                SpawnPopDuration, CameraRadius, CameraHeightOffset, ThrowOriginRadius,
                 ThrowOriginHeightOffset, ThrowOriginLateralRange, ThrowSwipeMinSpeed,
                 ThrowSwipeMinDistance, ThrowSwipeUpDominance, ThrowMaxSwipeSpeed,
                 ThrowMinUpSpeed, ThrowLateralGain, ThrowUpGain, ThrowForwardGain,
@@ -404,8 +406,8 @@ namespace C6Lab
             orbMaxReleaseSpeed = values[14];
             orbRadius = values[15];
             boardHeight = values[16];
-            spawnRiseDistance = values[17];
-            spawnRiseDuration = values[18];
+            spawnPopStartScale = values[17];
+            spawnPopDuration = values[18];
             cameraRadius = values[19];
             cameraHeightOffset = values[20];
             throwOriginRadius = values[21];
