@@ -51,6 +51,7 @@ namespace C6Lab
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool terminal = snapshot != null && (snapshot.phase == LabPhase.Victory || snapshot.phase == LabPhase.Defeat);
+            terminal = terminal && !LabGourdFinish.DelayVictory(network, snapshot);
             if (!terminal)
             {
                 if (panel != null && panel.gameObject.activeSelf) panel.gameObject.SetActive(false);
