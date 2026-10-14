@@ -19,6 +19,10 @@ namespace C6Lab
         private const float SecretBoxSpread = .05f;
         private const int RelayMaxStage = 3;
         private const uint LockDrawSalt = 0x10C4ED00u;
+        private const uint SpawnAngleSalt = 0x5A4E0A11u;
+        private const uint SpawnSpeedSalt = 0x5A4E05EDu;
+        // 옆 가장자리(이웃에게 넘어가는 선)까지 0.5 중 이만큼만 미끄러지게 한다.
+        private const float SpawnSideTravelLimit = .42f;
         private readonly Dictionary<ulong, LabPlayerState> players = new Dictionary<ulong, LabPlayerState>();
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
         private readonly HashSet<string> requests = new HashSet<string>(StringComparer.Ordinal);
@@ -113,13 +117,14 @@ namespace C6Lab
             int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
-            Vector2 position = SpawnPosition(sender);
+            Vector2 position = SpawnOrigin();
+            Vector2 launch = SpawnVelocityFor(seed, sender, generated);
             orb = new LabOrbState
             {
                 id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes, relayStage = relayStage,
                 origin = LabOrbOrigin.Generated, originOwner = sender,
                 x = position.x, y = position.y,
-                vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
+                vx = launch.x, vy = launch.y, createdAt = now, revision = ++revision, inFlight = false
             };
             orbs.Add(orb.id, orb);
             reason = "GENERATED";
@@ -414,19 +419,34 @@ namespace C6Lab
             orb.kind.IsItem() && !(orb.kind == LabOrbKind.Bomb && orb.lockSwipes == 0)
                 ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
-        private Vector2 SpawnPosition(ulong owner)
+        /// <summary>모든 생성 구슬은 화면 아래 가운데 생성 버튼 한 점에서 나온다.</summary>
+        private Vector2 SpawnOrigin() => new Vector2(.5f, rules.SpawnOriginHeight);
+
+        /// <summary>
+        /// 생성 버튼에서 튀어나가는 속도 (보드 너비/초). 방향은 위쪽 기준 좌우 부채꼴 안,
+        /// 속도는 최소~최대 사이에서 Host가 뽑는다. 종류 뽑기와 같은 seed 방식이라
+        /// 한 사람의 생성이 다른 사람의 결과를 바꾸지 않고, 모든 기기가 스냅샷으로 같은 값을 받는다.
+        /// 옆으로 너무 멀리 미끄러져 이웃에게 넘어가지 않도록, 바닥 감속으로 계산한
+        /// 옆 이동 거리가 한도를 넘으면 그만큼만 속도를 줄인다.
+        /// </summary>
+        private Vector2 SpawnVelocityFor(uint drawSeed, ulong playerId, uint index)
         {
-            // Keep the lowest row above the bottom HUD so generated orbs can be grabbed.
-            // The rise animation still begins below the row, as if the orb emerges from underneath.
-            for (int index = 0; index < 20; index++)
+            float angle = Mathf.Lerp(-rules.SpawnFanAngle, rules.SpawnFanAngle,
+                Unit01(DrawFor(drawSeed ^ SpawnAngleSalt, playerId, index))) * Mathf.Deg2Rad;
+            float speed = Mathf.Lerp(rules.SpawnMinSpeed, rules.SpawnMaxSpeed,
+                Unit01(DrawFor(drawSeed ^ SpawnSpeedSalt, playerId, index)));
+            float side = Mathf.Abs(Mathf.Sin(angle));
+            if (rules.FloorDeceleration > 0f && side > .0001f)
             {
-                var point = new Vector2(.16f + (index % 5) * .17f, .43f + (index / 5) * .17f);
-                bool clear = !orbs.Values.Any(orb => orb.owner == owner && !orb.inFlight &&
-                    Mathf.Abs(orb.x - point.x) < .14f && Mathf.Abs(orb.y - point.y) < .16f);
-                if (clear) return point;
+                // 멈출 때까지 옆으로 가는 거리 = 속도² × sin / (2 × 감속)
+                float safeSpeed = Mathf.Sqrt(2f * rules.FloorDeceleration * SpawnSideTravelLimit / side);
+                speed = Mathf.Min(speed, safeSpeed);
             }
-            return new Vector2(.5f, .5f);
+            speed = Mathf.Min(speed, rules.MaximumMotionSpeed);
+            return new Vector2(Mathf.Sin(angle), Mathf.Cos(angle)) * speed;
         }
+
+        private static float Unit01(ulong draw) => (float)((draw >> 11) * (1.0 / (1UL << 53)));
         private string NewOrbId()
         {
             string id;
@@ -507,6 +527,7 @@ namespace C6Lab
             public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
+            public readonly float SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, SpawnOriginHeight, FloorDeceleration;
             public readonly int[] GenerationChances;
             public readonly int ItemUnlockSwipesMin, ItemUnlockSwipesMax;
 
@@ -532,6 +553,11 @@ namespace C6Lab
                 HitRecovery = config.HitRecovery;
                 OrbLifetimeSeconds = config.OrbLifetimeSeconds;
                 MaximumMotionSpeed = config.OrbMaxReleaseSpeed * 16f;
+                SpawnFanAngle = config.SpawnFanAngle;
+                SpawnMinSpeed = config.SpawnMinSpeed;
+                SpawnMaxSpeed = config.SpawnMaxSpeed;
+                SpawnOriginHeight = config.SpawnOriginHeight;
+                FloorDeceleration = config.OrbFloorDeceleration;
             }
         }
     }

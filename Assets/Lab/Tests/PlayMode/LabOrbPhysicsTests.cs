@@ -653,6 +653,28 @@ namespace C6Lab.Tests
             Assert.That(returned.IsSpawning, Is.False, "Returning with the same ID must not replay the rise.");
         }
 
+        [UnityTest]
+        public IEnumerator GeneratedOrbKeepsItsLaunchUntilTheRiseEndsThenMoves()
+        {
+            Vector2 launch = new Vector2(-.3f, .9f); // board widths per second, up and to the left
+            LabOrbView orb = board.UpsertOrb("launched", LabOrbKind.Yin,
+                new Vector2(.5f, .2f), launch, playSpawnRise: true);
+            Vector3 start = orb.Body.position;
+            Assert.That(orb.Body.isKinematic, Is.True, "Physics is off while the orb rises out of the button.");
+
+            yield return new WaitForSeconds(config.SpawnRiseDuration * .5f);
+            Assert.That(orb.Body.position.x, Is.EqualTo(start.x).Within(.0001f), "No motion during the rise.");
+            Assert.That(orb.Body.position.y, Is.EqualTo(start.y).Within(.0001f));
+
+            yield return new WaitForSeconds(config.SpawnRiseDuration * .5f + .05f);
+            Assert.That(orb.IsSpawning, Is.False);
+            yield return new WaitForFixedUpdate();
+            yield return new WaitForFixedUpdate();
+            Vector3 moved = orb.Body.position - start;
+            Assert.That(moved.x, Is.LessThan(0f), "The launch velocity is applied once the rise ends.");
+            Assert.That(moved.y, Is.GreaterThan(0f));
+        }
+
         private static Vector2 BoardPoint(LabOrbView orb)
         {
             Vector3 position = orb.Body.position;

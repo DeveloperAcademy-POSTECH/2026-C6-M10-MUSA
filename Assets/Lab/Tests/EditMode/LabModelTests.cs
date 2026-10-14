@@ -122,8 +122,9 @@ namespace C6Lab.Tests
             for (int i = 0; i < 10 && (yin == null || yang == null); i++)
             {
                 Assert.That(solo.TryGenerate(42ul, "solo-generate-" + i, 0d, out var raw, out _), Is.True);
-                Assert.That(raw.y, Is.GreaterThanOrEqualTo(.43f),
-                    "Generated orbs must be above the bottom HUD's covered part of the board.");
+                Assert.That(new Vector2(raw.x, raw.y), Is.EqualTo(new Vector2(.5f, config.SpawnOriginHeight)),
+                    "Generated orbs come out of the GENERATE button at the bottom centre.");
+                Assert.That(raw.vy, Is.GreaterThan(0f), "Generated orbs launch upward, away from the bottom HUD.");
                 if (raw.kind == LabOrbKind.Yin) yin = raw;
                 else if (raw.kind == LabOrbKind.Yang) yang = raw;
             }
@@ -422,6 +423,66 @@ namespace C6Lab.Tests
             Assert.That(model.TryApplyPlayerDamage(10, 10, 180d), Is.False);
             Assert.That(model.Snapshot(180d).phase, Is.EqualTo(LabPhase.Defeat));
             Assert.That(model.Snapshot(180d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(290));
+        }
+
+        [Test]
+        public void GeneratedOrbsLaunchFromTheButtonInsideTheFanWithHostDrawnSpeed()
+        {
+            float fan = config.SpawnFanAngle;
+            float min = config.SpawnMinSpeed;
+            var directions = new List<float>();
+            var speeds = new List<float>();
+            for (int i = 0; i < 9; i++) // cost 10 of 100 stamina: nine draws fit without recovery
+            {
+                Assert.That(model.TryGenerate(10, "fan-" + i, 0d, out var orb, out var reason), Is.True, reason);
+                Assert.That(orb.x, Is.EqualTo(.5f));
+                Assert.That(orb.y, Is.EqualTo(config.SpawnOriginHeight));
+                var velocity = new Vector2(orb.vx, orb.vy);
+                float angle = Mathf.Atan2(velocity.x, velocity.y) * Mathf.Rad2Deg;
+                Assert.That(Mathf.Abs(angle), Is.LessThanOrEqualTo(fan + .01f), "Direction stays inside the fan.");
+                Assert.That(velocity.magnitude, Is.LessThanOrEqualTo(config.SpawnMaxSpeed + .0001f));
+                float sideTravel = velocity.sqrMagnitude * Mathf.Abs(Mathf.Sin(angle * Mathf.Deg2Rad))
+                    / (2f * config.OrbFloorDeceleration);
+                Assert.That(sideTravel, Is.LessThanOrEqualTo(.42f + .0001f),
+                    "A launch never slides far enough to cross into a neighbour's board.");
+                // Speeds below the minimum only come from the side-travel limit at wide angles.
+                if (Mathf.Abs(angle) < 20f) Assert.That(velocity.magnitude, Is.GreaterThanOrEqualTo(min - .0001f));
+                directions.Add(angle);
+                speeds.Add(velocity.magnitude);
+            }
+            Assert.That(directions.Distinct().Count(), Is.EqualTo(directions.Count), "Each launch takes its own direction.");
+            Assert.That(directions.Any(angle => angle < 0f) && directions.Any(angle => angle > 0f), Is.True,
+                "Launches spread to both sides of straight up.");
+            Assert.That(speeds.Distinct().Count(), Is.GreaterThan(1), "Launch speed varies between min and max.");
+        }
+
+        [Test]
+        public void SpawnLaunchIsTheSameForTheSameRoomAndDrawIndex()
+        {
+            var again = new LabModel();
+            again.Begin("lab-test", new ulong[] { 10, 20, 30 }, 0d, config);
+            Assert.That(model.TryGenerate(10, "a", 0d, out var first, out _), Is.True);
+            Assert.That(again.TryGenerate(10, "b", 0d, out var repeat, out _), Is.True);
+            Assert.That(new Vector2(repeat.vx, repeat.vy), Is.EqualTo(new Vector2(first.vx, first.vy)),
+                "The Host draw depends only on the room seed, player and draw index.");
+            Assert.That(model.TryGenerate(20, "c", 0d, out var other, out _), Is.True);
+            Assert.That(new Vector2(other.vx, other.vy), Is.Not.EqualTo(new Vector2(first.vx, first.vy)),
+                "Another player's first orb has its own launch.");
+        }
+
+        [Test]
+        public void ZeroFanLaunchesStraightUp()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[60] = 0f;
+            values[61] = 1.2f;
+            values[62] = 1.2f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var straight = new LabModel();
+            straight.Begin("straight", new ulong[] { 10, 20 }, 0d, config);
+            Assert.That(straight.TryGenerate(10, "up", 0d, out var orb, out _), Is.True);
+            Assert.That(orb.vx, Is.EqualTo(0f).Within(.0001f));
+            Assert.That(orb.vy, Is.EqualTo(1.2f).Within(.0001f));
         }
 
         [Test]

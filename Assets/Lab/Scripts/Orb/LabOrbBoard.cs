@@ -190,6 +190,8 @@ namespace C6Lab
             body.position = OnPlane(Clamp(ToWorld(normalizedPosition)));
             var entry = new Entry { View = view, LocalOwner = localOwner };
             entries.Add(id, entry);
+            Vector3 startVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
+                config.OrbMaxReleaseSpeed * bounds.width));
             if (playSpawnRise && risenIds.Add(id))
             {
                 SpawnRiseStarted?.Invoke(id);
@@ -203,12 +205,12 @@ namespace C6Lab
                     current.SpawnLocked = false;
                     current.View.HitSphere.enabled = true;
                     SetBodyMode(current);
+                    // 떠오르는 동안은 물리가 꺼져 있으므로, 다 떠오른 순간 생성 버튼에서 튀어나가는 속도를 준다.
+                    if (!current.View.Body.isKinematic) current.View.Body.linearVelocity = startVelocity;
                 });
             }
             else SetBodyMode(entry);
-            if (!body.isKinematic)
-                body.linearVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
-                    config.OrbMaxReleaseSpeed * bounds.width));
+            if (!body.isKinematic) body.linearVelocity = startVelocity;
             return view;
         }
 

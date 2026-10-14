@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(60));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(63));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -48,6 +48,11 @@ namespace C6Lab.Tests
             values[57] = 120f;
             values[58] = .8f;
             values[59] = 900f;
+            Assert.That(new[] { values[60], values[61], values[62] },
+                Is.EqualTo(new[] { 55f, 1f, 1.8f }), "Spawn fan angle, minimum and maximum launch speed.");
+            values[60] = 40f;
+            values[61] = .8f;
+            values[62] = 1.4f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -69,6 +74,20 @@ namespace C6Lab.Tests
             Assert.That(config.TargetSpinStrength, Is.EqualTo(120f));
             Assert.That(config.TargetSpinDamping, Is.EqualTo(.8f));
             Assert.That(config.TargetSpinMaximumSpeed, Is.EqualTo(900f));
+            Assert.That(config.SpawnFanAngle, Is.EqualTo(40f));
+            Assert.That(config.SpawnMinSpeed, Is.EqualTo(.8f));
+            Assert.That(config.SpawnMaxSpeed, Is.EqualTo(1.4f));
+        }
+
+        [Test]
+        public void SpawnMinimumSpeedCannotExceedMaximum()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[61] = 2f;
+            values[62] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False);
+            Assert.That(error, Does.Contain("Spawn Minimum Speed"));
+            Assert.That(config.SpawnMinSpeed, Is.EqualTo(1f));
         }
 
         [Test]

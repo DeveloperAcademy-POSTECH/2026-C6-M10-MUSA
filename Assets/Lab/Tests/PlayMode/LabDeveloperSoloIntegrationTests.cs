@@ -319,6 +319,9 @@ namespace C6Lab.Tests
             tuning[36] = 1f;    // power exponent
             tuning[37] = 0f;    // loft offset
             tuning[38] = 0f;    // air damping
+            // All orbs now launch from the GENERATE button. Turn off contact combining so orbs
+            // that bump while scattering cannot merge before the test drags Yin onto Yang.
+            tuning[51] = 0f;
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
             network.config = rawOnly;
 
@@ -351,9 +354,10 @@ namespace C6Lab.Tests
                 Assert.That(yinView.GetComponent<SphereCollider>(), Is.Not.Null);
                 Assert.That(yinView.Visual.GetComponentInChildren<MeshRenderer>(), Is.Not.Null);
 
-                // Generated orbs rise before accepting a drag. Then use the same public
-                // board gesture methods that the pointer path calls, not TryCombine.
-                yield return new WaitForSeconds(network.config.SpawnRiseDuration + .1f);
+                // Generated orbs rise, then launch from the button and slide to a stop before
+                // the drag. Use the same public board gesture methods the pointer path calls.
+                float slideSeconds = network.config.SpawnMaxSpeed / Mathf.Max(.01f, network.config.OrbFloorDeceleration);
+                yield return new WaitForSeconds(network.config.SpawnRiseDuration + slideSeconds + .3f);
                 Assert.That(board.TryGetMotion(yin.id, out Vector2 yin01, out _), Is.True);
                 Assert.That(board.TryGetMotion(yang.id, out Vector2 yang01, out _), Is.True);
                 Rect bounds = board.CenterBounds;
