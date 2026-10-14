@@ -55,6 +55,17 @@ MonoBehaviour:
   spawnMinSpeed: 1
   spawnMaxSpeed: 1.8
   spawnOriginHeight: 0.2
+  bgmVolume: 0.2
+  generateSoundVolume: 1
+  hitSoundVolume: 0.9
+  missSoundVolume: 0.7
+  hapticsEnabled: 1
+  generateHapticStyle: 1
+  generateHapticIntensity: 0.4
+  hitHapticStyle: 2
+  hitHapticIntensity: 0.6
+  itemHitHapticStyle: 2
+  itemHitHapticIntensity: 1
   orbAppearance: {fileID: 11400000, guid: 9fd06f927557d47e2ac8b342a6979ed0, type: 2}
   cameraRadius: 8
   cameraHeightOffset: 0.65
