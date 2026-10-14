@@ -118,6 +118,20 @@ namespace C6Lab.Tests
                 Is.True, "Room rows must use their preferred height instead of collapsing to zero.");
             Assert.That(hud.roomListRowTemplate.GetComponent<UnityEngine.UI.LayoutElement>().preferredHeight,
                 Is.GreaterThan(0f));
+            Assert.That(hud.playerSlotPanel, Is.Not.Null,
+                "The saved lobby Canvas needs an editable P-slot panel.");
+            Assert.That(hud.playerSlotButtons, Is.Not.Null);
+            Assert.That(hud.playerSlotButtons.Length, Is.EqualTo(LabModel.MaximumParticipants));
+            Assert.That(hud.playerSlotStatusText, Is.Not.Null);
+            Assert.That(hud.playerSlotPanel.transform.parent, Is.EqualTo(hud.transform),
+                "Slot controls should remain saved scene objects on LabCanvas.");
+            foreach (UnityEngine.UI.Button button in hud.playerSlotButtons)
+            {
+                Assert.That(button, Is.Not.Null);
+                Assert.That(button.GetComponentInChildren<UnityEngine.UI.Text>(true), Is.Not.Null);
+            }
+            Assert.That(hud.playerSlotPanel.activeSelf, Is.False,
+                "The slot chooser should appear only after joining a room.");
             RectTransform title = hud.roomListPanel.transform.Find("RoomListTitle") as RectTransform;
             Assert.That(title, Is.Not.Null);
             Assert.That(title.anchorMin.y, Is.EqualTo(1f),
@@ -160,6 +174,26 @@ namespace C6Lab.Tests
                 Assert.That(hud.roomNameText.text, Is.Not.Empty,
                     "The Host must see the registered room name or an explicit registration status.");
                 Assert.That(developerUi.targetParticipantsSlider.interactable, Is.False);
+                Assert.That(network.LocalSlotNumber, Is.EqualTo(0));
+                Assert.That(network.CanStartBattle, Is.False,
+                    "The Host must claim a P number before starting the room.");
+                Assert.That(hud.playerSlotPanel.activeSelf, Is.True);
+                Assert.That(hud.playerSlotButtons.Count(button => button.gameObject.activeSelf), Is.EqualTo(4));
+                Assert.That(hud.playerSlotButtons[4].gameObject.activeSelf, Is.False,
+                    "A four-player room must not offer P5.");
+
+                // The Host can choose any available P number, then clear it by tapping the same button.
+                hud.playerSlotButtons[2].onClick.Invoke();
+                yield return null;
+                Assert.That(network.LocalSlotNumber, Is.EqualTo(3));
+                Assert.That(hud.seatText.text, Does.Contain("P3"));
+                Assert.That(hud.playerSlotButtons[2].interactable, Is.True);
+                Assert.That(hud.playerSlotButtons[2].GetComponentInChildren<UnityEngine.UI.Text>().text,
+                    Does.Contain("YOU/CLEAR"));
+                hud.playerSlotButtons[2].onClick.Invoke();
+                yield return null;
+                Assert.That(network.LocalSlotNumber, Is.Zero);
+                Assert.That(network.CanStartBattle, Is.False);
             }
             finally
             {

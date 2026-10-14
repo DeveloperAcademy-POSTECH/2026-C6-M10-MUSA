@@ -38,6 +38,10 @@ namespace C6Lab
         public Text staminaText;
         public Text orbsText;
         public Text seatText;
+        [Header("Saved lobby player slots")]
+        public GameObject playerSlotPanel;
+        public Button[] playerSlotButtons;
+        public Text playerSlotStatusText;
         [Header("Saved battle UI")]
         public GameObject battleUi;
         [Header("Battle-only camera background")]
@@ -67,6 +71,7 @@ namespace C6Lab
         public Button resultLeaveButton;
 
         private readonly List<Button> roomRows = new List<Button>();
+        private readonly Text[] playerSlotButtonLabels = new Text[LabModel.MaximumParticipants];
         private string renderedRoomList = string.Empty;
         private Camera capturedBattleCamera;
         private Camera capturedOrbCamera;
@@ -82,6 +87,21 @@ namespace C6Lab
             if (increasePlayersButton != null) increasePlayersButton.onClick.AddListener(() => ChangePlayerCount(1));
             if (refreshRoomsButton != null) refreshRoomsButton.onClick.AddListener(RefreshRooms);
             if (cancelRoomSearchButton != null) cancelRoomSearchButton.onClick.AddListener(() => network?.CancelRoomSearch());
+            if (playerSlotButtons != null)
+            {
+                for (int i = 0; i < playerSlotButtons.Length && i < LabModel.MaximumParticipants; i++)
+                {
+                    Button button = playerSlotButtons[i];
+                    if (button == null) continue;
+                    int slotNumber = i + 1;
+                    playerSlotButtonLabels[i] = button.GetComponentInChildren<Text>(true);
+                    button.onClick.AddListener(() =>
+                    {
+                        if (network != null)
+                            network.RequestPlayerSlot(network.LocalSlotNumber == slotNumber ? 0 : slotNumber);
+                    });
+                }
+            }
             if (startButton != null) startButton.onClick.AddListener(() => network?.StartBattle());
             if (generateButton != null) generateButton.onClick.AddListener(() => network?.Generate());
             if (leaveButton != null) leaveButton.onClick.AddListener(() => network?.Stop());
@@ -127,6 +147,9 @@ namespace C6Lab
             bool connected = network.IsConnected;
             bool searching = network.IsSearchingRooms;
             bool hostLobby = connected && network.IsHost && snapshot == null;
+            bool playerSlotLobby = connected && snapshot == null && !network.IsDeveloperSolo;
+            SetVisible(playerSlotPanel, playerSlotLobby);
+            RefreshPlayerSlots(playerSlotLobby);
             SetVisible(roomListPanel, searching && !connected);
             SetVisible(decreasePlayersButton == null ? null : decreasePlayersButton.gameObject, !connected && !searching);
             SetVisible(increasePlayersButton == null ? null : increasePlayersButton.gameObject, !connected && !searching);
@@ -196,7 +219,10 @@ namespace C6Lab
                 Set(timeText, "--:--");
                 Set(staminaText, "STAMINA —");
                 Set(orbsText, "ORBS —");
-                Set(seatText, connected ? "PLAYER " + network.LocalPlayerId : "NO SESSION");
+                Set(seatText, connected
+                    ? network.IsDeveloperSolo ? "DEVELOPER SOLO" : network.LocalSlotNumber > 0
+                        ? "P" + network.LocalSlotNumber : "P— · CHOOSE SLOT"
+                    : "NO SESSION");
                 Set(leftNeighborText, "P—");
                 Set(rightNeighborText, "P—");
                 SetFill(yokaiHpFill, 0f);
@@ -215,8 +241,8 @@ namespace C6Lab
             int count = 0;
             foreach (var orb in snapshot.orbs ?? Array.Empty<LabOrbState>()) if (orb.owner == network.LocalPlayerId && !orb.inFlight) count++;
             Set(orbsText, "ORBS " + count + " / " + network.config.OrbStorageLimit);
-            Set(seatText, local == null ? "PLAYER —" : "PLAYER " + local.id + " · SEAT "
-                + (local.seat + 1) + (network.IsDeveloperSolo ? " · SOLO" : string.Empty));
+            Set(seatText, local == null ? "P—" : "P" + (local.seat + 1)
+                + (network.IsDeveloperSolo ? " · SOLO" : string.Empty));
             SetFill(yokaiHpFill, Fraction(snapshot.hp, network.config.MonsterMaxHp));
             SetFill(playerHpFill, local == null ? 0f : Fraction(local.personalHp, network.config.PlayerMaxHp));
             SetStaminaCells(local == null ? 0f : Fraction(local.stamina, network.config.StaminaMax));
@@ -291,7 +317,7 @@ namespace C6Lab
             }
         }
 
-        /// <summary>Lab seats are room-order P numbers even when Netcode IDs increase after reconnecting.</summary>
+        /// <summary>Host-approved P numbers determine seats, independent of Netcode IDs.</summary>
         public static void GetNeighborLabels(LabSnapshot snapshot, ulong localId, out string left, out string right)
         {
             left = right = "P—";
@@ -304,6 +330,34 @@ namespace C6Lab
             LabPlayerState rightPlayer = Array.Find(players, player => player != null && player.seat == (local.seat + 1) % count);
             if (leftPlayer != null) left = "P" + (leftPlayer.seat + 1);
             if (rightPlayer != null) right = "P" + (rightPlayer.seat + 1);
+        }
+
+        private void RefreshPlayerSlots(bool visible)
+        {
+            if (playerSlotButtons == null) return;
+            int target = network.TargetParticipantCount;
+            int selected = network.LocalSlotNumber;
+            bool pending = network.SlotSelectionPending;
+            if (visible)
+                Set(playerSlotStatusText, pending ? "WAITING FOR HOST APPROVAL…"
+                    : selected > 0 ? "YOUR POSITION: P" + selected
+                    : "CHOOSE AN OPEN P NUMBER BEFORE START");
+
+            for (int i = 0; i < playerSlotButtons.Length && i < LabModel.MaximumParticipants; i++)
+            {
+                Button button = playerSlotButtons[i];
+                if (button == null) continue;
+                int slot = i + 1;
+                bool inRoom = visible && slot <= target;
+                SetVisible(button.gameObject, inRoom);
+                if (!inRoom) continue;
+
+                ulong owner = network.GetSlotOwner(slot);
+                bool own = owner != ulong.MaxValue && owner == network.LocalPlayerId;
+                bool occupied = owner != ulong.MaxValue;
+                button.interactable = network.CanSelectPlayerSlot && !pending && (!occupied || own);
+                Set(playerSlotButtonLabels[i], "P" + slot + "\n" + (own ? "YOU/CLEAR" : occupied ? "TAKEN" : "OPEN"));
+            }
         }
 
         private void SetStaminaCells(float fraction)
