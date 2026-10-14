@@ -310,7 +310,7 @@ namespace C6Lab
         {
             if (staminaCells == null) return;
             for (int i = 0; i < staminaCells.Length; i++)
-                SetFill(staminaCells[i], Mathf.Clamp01(fraction * staminaCells.Length - i));
+                SetFill(staminaCells[i], fraction * staminaCells.Length >= i + 1 ? 1f : 0f);
         }
 
         private static float Fraction(float value, float maximum) =>
