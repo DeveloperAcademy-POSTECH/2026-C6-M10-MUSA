@@ -64,7 +64,7 @@ Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤
 
 Combined를 잡고 **구슬 판 안에서 위쪽으로 빠르게 움직이며 손을 놓으면** 그 자리에서 3D 투척합니다. 손을 놓는 가로 위치와 움직임의 방향·세기가 발사 위치와 속도에 반영되므로, 중앙으로 던지면 원통을 맞힐 수 있고 옆으로 치우치면 빗나갑니다. 느리게 옮기면 투척되지 않고 판 위에 남으며, 좌우 끝으로 빠져나가면 기존 이웃 전달이 우선합니다. 보이는 Unity Cylinder가 실제 피격체이며 Host에서 충돌을 확인한 명중만 HP를 줄입니다. 새 조작의 속도·생성 상승 거리·카메라 거리 등은 `LabConfig.asset`에서 조정합니다.
 
-손을 놓아 투척한 Combined에는 속성 색의 짧은 비행 잔상이 남습니다. **Host가 실제 명중과 HP 감소를 확정한 경우에만** 요괴의 맞은 지점에서 원형 표시가 커졌다 사라지고, 근처에 속성 색의 `-실제 감소 HP` 숫자가 뜹니다. 마지막 명중으로 남은 HP가 설정 피해보다 적다면 숫자도 실제 감소량만 보여 줍니다. 빗나감에는 피해 숫자·피격 원형이 나오지 않습니다. 숫자와 원형은 저장 Scene의 `LabCanvas / LabImpactFeedback` 컴포넌트에서, 잔상 길이·폭·머티리얼은 `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`에서 조정합니다. 모두 시각 효과이며 투사체의 물리·판정을 바꾸지 않습니다.
+손을 놓아 투척한 Combined에는 속성 색의 짧은 비행 잔상이 남습니다. **Host가 실제 명중과 HP 감소를 확정한 경우에만** 요괴의 맞은 지점에서 속성 색의 코어·스파크·확대 충격파가 나타나고, 근처에 `-실제 감소 HP` 숫자가 뜹니다. 마지막 명중으로 남은 HP가 설정 피해보다 적다면 숫자도 실제 감소량만 보여 줍니다. 빗나감에는 피해 숫자·피격 입자가 나오지 않습니다. 숫자는 저장 Scene의 `LabCanvas / LabImpactFeedback`에서, 피격 입자는 `Impact Particle VFX`와 `Assets/Lab/Art/Effects/ImpactParticleBurst.prefab`에서 표시 크기·수명을 조정합니다. 투척 잔상 길이·폭·머티리얼은 `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`에서 조정합니다. 모두 시각 효과이며 투사체의 물리·판정을 바꾸지 않습니다.
 
 직선 투척의 세기 반응·발사각·공기 저항은 **DEV**의 `Throw Power Exponent`, `Throw Loft Offset (degrees)`, `Throw Air Damping`으로 한 판씩 비교할 수 있습니다. 명중·빗나감 뒤 화면에 비행 시간·최고 상승·수평 이동 거리가 나타납니다. 값의 의미와 반복 시험 순서는 [직선 투척 물리 실험 가이드](docs/THROW_TUNING_GUIDE.md)를 참조하세요.
 
