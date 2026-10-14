@@ -108,9 +108,10 @@ namespace C6Lab
             new LabDeveloperField("Target Spin Strength", 0f, 200f),
             new LabDeveloperField("Target Spin Damping", 0f, 10f),
             new LabDeveloperField("Target Spin Maximum Speed (deg/s)", 30f, 1440f),
-            new LabDeveloperField("Spawn Fan Angle (deg, each side)", 0f, 89f),
+            new LabDeveloperField("Spawn Fan Angle (deg each side, 180 = all directions)", 0f, 180f),
             new LabDeveloperField("Spawn Minimum Speed (board widths/s)", 0f, 10f),
-            new LabDeveloperField("Spawn Maximum Speed (board widths/s)", 0f, 10f)
+            new LabDeveloperField("Spawn Maximum Speed (board widths/s)", 0f, 10f),
+            new LabDeveloperField("Drum Count", 1f, 5f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -134,7 +135,8 @@ namespace C6Lab
             new LabDeveloperCategory("Camera and throw origin", 19, 20, 21, 22, 23, 56),
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
-            new LabDeveloperCategory("Target spin", 57, 58, 59)
+            new LabDeveloperCategory("Target spin", 57, 58, 59),
+            new LabDeveloperCategory("Drum", 63)
         });
 
 
@@ -195,14 +197,16 @@ namespace C6Lab
         [Header("Spawn presentation")]
         [SerializeField, Min(0f)] private float spawnRiseDistance = .65f;
         [SerializeField, Min(0f)] private float spawnRiseDuration = .25f;
-        [Tooltip("생성 버튼에서 구슬이 튀어나가는 부채꼴 각도. 위쪽 기준 좌우 각각 이 각도까지 (도)")]
-        [SerializeField, Range(0f, 89f)] private float spawnFanAngle = 55f;
+        [Tooltip("북에서 구슬이 튀어나가는 각도. 위쪽 기준 좌우 각각 이 각도까지 (도). 180이면 모든 방향")]
+        [SerializeField, Range(0f, 180f)] private float spawnFanAngle = 180f;
         [Tooltip("튀어나가는 최소 속도 (보드 너비/초)")]
         [SerializeField, Range(0f, 10f)] private float spawnMinSpeed = 1f;
         [Tooltip("튀어나가는 최대 속도 (보드 너비/초)")]
         [SerializeField, Range(0f, 10f)] private float spawnMaxSpeed = 1.8f;
-        [Tooltip("구슬이 나오는 높이 (보드 아래 0 ~ 위 1). 생성 버튼 윗부분에 맞춘다. Inspector 전용")]
-        [SerializeField, Range(0f, 1f)] private float spawnOriginHeight = .2f;
+
+        [Header("Drum")]
+        [Tooltip("한 판에 놓이는 생성 북 개수. 판 시작 때 받을 사람을 무작위로 정한다.")]
+        [SerializeField, Range(1, 5)] private int drumCount = 1;
 
         [Header("Replaceable orb presentation")]
         [SerializeField] private LabOrbAppearance orbAppearance;
@@ -286,10 +290,10 @@ namespace C6Lab
 
         public float SpawnRiseDistance => Mathf.Max(0f, Finite(spawnRiseDistance, .65f));
         public float SpawnRiseDuration => Mathf.Max(0f, Finite(spawnRiseDuration, .25f));
-        public float SpawnFanAngle => Mathf.Clamp(Finite(spawnFanAngle, 55f), 0f, 89f);
+        public float SpawnFanAngle => Mathf.Clamp(Finite(spawnFanAngle, 180f), 0f, 180f);
         public float SpawnMinSpeed => Mathf.Clamp(Finite(spawnMinSpeed, 1f), 0f, 10f);
         public float SpawnMaxSpeed => Mathf.Clamp(Finite(spawnMaxSpeed, 1.8f), SpawnMinSpeed, 10f);
-        public float SpawnOriginHeight => Mathf.Clamp01(Finite(spawnOriginHeight, .2f));
+        public int DrumCount => Mathf.Clamp(drumCount, 1, 5);
         public LabOrbAppearance OrbAppearance => orbAppearance;
         public float CameraRadius => Positive(cameraRadius, 8f);
         public float CameraHeightOffset => Finite(cameraHeightOffset, .65f);
@@ -338,7 +342,7 @@ namespace C6Lab
                 PotionHeal, RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier,
                 CameraLookHeightOffset, TargetSpinStrength, TargetSpinDamping,
                 TargetSpinMaximumSpeed,
-                SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed
+                SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, DrumCount
             };
         }
 
@@ -442,6 +446,7 @@ namespace C6Lab
             spawnFanAngle = values[60];
             spawnMinSpeed = values[61];
             spawnMaxSpeed = values[62];
+            drumCount = (int)values[63];
             error = string.Empty;
             return true;
         }

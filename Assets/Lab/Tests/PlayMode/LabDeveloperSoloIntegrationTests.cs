@@ -319,11 +319,16 @@ namespace C6Lab.Tests
             tuning[36] = 1f;    // power exponent
             tuning[37] = 0f;    // loft offset
             tuning[38] = 0f;    // air damping
-            // All orbs now launch from the GENERATE button. Turn off contact combining so orbs
+            // Orbs scatter from the drum in every direction. Turn off contact combining so orbs
             // that bump while scattering cannot merge before the test drags Yin onto Yang.
             tuning[51] = 0f;
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
             network.config = rawOnly;
+            // The board reads contact combining from its own config, so it needs the same tuning.
+            LabSceneController sceneController = developerUi.sceneController;
+            LabConfig savedBoardConfig = sceneController.config;
+            sceneController.config = rawOnly;
+            sceneController.ReconfigureBoard();
 
             // Keep the test independent of an ordinary app using the default port 7777.
             network.port = 17777;
@@ -354,7 +359,7 @@ namespace C6Lab.Tests
                 Assert.That(yinView.GetComponent<SphereCollider>(), Is.Not.Null);
                 Assert.That(yinView.Visual.GetComponentInChildren<MeshRenderer>(), Is.Not.Null);
 
-                // Generated orbs rise, then launch from the button and slide to a stop before
+                // Generated orbs rise, then launch from the drum and slide to a stop before
                 // the drag. Use the same public board gesture methods the pointer path calls.
                 float slideSeconds = network.config.SpawnMaxSpeed / Mathf.Max(.01f, network.config.OrbFloorDeceleration);
                 yield return new WaitForSeconds(network.config.SpawnRiseDuration + slideSeconds + .3f);
@@ -427,6 +432,8 @@ namespace C6Lab.Tests
             {
                 network.Stop();
                 network.config = savedConfig;
+                sceneController.config = savedBoardConfig;
+                sceneController.ReconfigureBoard();
                 UnityEngine.Object.Destroy(rawOnly);
             }
         }

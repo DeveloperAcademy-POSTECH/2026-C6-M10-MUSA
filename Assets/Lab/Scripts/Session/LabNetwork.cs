@@ -142,9 +142,9 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.2";
-        // The item unlock time joins the orb snapshot;
+        // Generate drums join the snapshot and the generate request names one;
         // reject older clients rather than mixing different battle rules.
-        private const ushort LabProtocolVersion = 5614;
+        private const ushort LabProtocolVersion = 5615;
         private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/7");
         private const int MaximumPacketBytes = 32768;
@@ -233,6 +233,8 @@ namespace C6Lab
             : clientConfigReady;
         public bool IsHost => manager != null && manager.IsHost;
         public bool IsDeveloperSolo => developerSolo;
+        /// <summary>Only a player with a drum on their board can generate orbs.</summary>
+        public bool HasLocalDrum => LocalDrum() != null;
         public bool DeveloperBuildAvailable => Application.isEditor || Debug.isDebugBuild;
         public bool IsConnected => manager != null && manager.IsListening && (manager.IsHost || manager.IsConnectedClient);
         private bool CanBeginConnection => !IsConnected && !joinInProgress && !joinRetryPending
@@ -675,11 +677,30 @@ namespace C6Lab
             Debug.Log("C6_LAB_SOLO_START session=" + sessionId + " player=" + LocalPlayerId);
         }
 
+        /// <summary>Generate from the first drum on this player's board.</summary>
         public void Generate()
         {
-            if (!IsConnected || latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            Request(new LabNetworkPacket { type = "generate", requestId = ++requestSequence });
+            LabOrbState drum = LocalDrum();
+            if (drum != null) Generate(drum.id);
         }
+
+        /// <summary>Ask the Host to generate from this drum at the position this screen shows now.</summary>
+        public void Generate(string drumId)
+        {
+            if (!IsConnected || latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
+            LabOrbState drum = Array.Find(latest.drums ?? Array.Empty<LabOrbState>(),
+                candidate => candidate.id == drumId && candidate.owner == LocalPlayerId);
+            if (drum == null) return;
+            Vector2 position = board != null && board.TryGetMotion(drum.id, out var local, out _)
+                ? local : new Vector2(drum.x, drum.y);
+            // The drum travels in secondId: a refused request restores its firstId orb, and a
+            // refused generate (no stamina, full board) must never stop the drum.
+            Request(new LabNetworkPacket { type = "generate", requestId = ++requestSequence, secondId = drum.id,
+                x = Mathf.Clamp01(position.x), y = Mathf.Clamp01(position.y) });
+        }
+
+        private LabOrbState LocalDrum() => latest == null ? null
+            : Array.Find(latest.drums ?? Array.Empty<LabOrbState>(), drum => drum.owner == LocalPlayerId);
 
         /// <summary>Any current participant may ask the Host to pause this shared round.</summary>
         public bool PauseBattle()
@@ -885,7 +906,8 @@ namespace C6Lab
             {
                 nextMotionAt = now + 0.1;
                 var samples = new List<LabMotionSample>();
-                foreach (var orb in latest.orbs ?? Array.Empty<LabOrbState>())
+                foreach (var orb in (latest.orbs ?? Array.Empty<LabOrbState>())
+                    .Concat(latest.drums ?? Array.Empty<LabOrbState>()))
                 {
                     if (orb.owner != LocalPlayerId || orb.inFlight) continue;
                     if (board.TryGetMotion(orb.id, out var position, out var velocity))
@@ -1121,7 +1143,10 @@ namespace C6Lab
             switch (packet.type)
             {
                 case "generate":
-                    accepted = model.TryGenerate(sender, uniqueRequestId, now, out result, out reason);
+                    accepted = string.IsNullOrEmpty(packet.secondId)
+                        ? model.TryGenerate(sender, uniqueRequestId, now, out result, out reason)
+                        : model.TryGenerate(sender, packet.secondId, new Vector2(packet.x, packet.y),
+                            uniqueRequestId, now, out result, out reason);
                     break;
                 case "use":
                     accepted = model.TryUseItem(sender, packet.firstId, uniqueRequestId, now, out result, out reason);
@@ -1257,6 +1282,12 @@ namespace C6Lab
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
                     new Vector2(orb.vx, orb.vy), true, showRise, orb.element, orb.lockSwipes, orb.relayStage, fuse,
                     orb.JustUnlocked(latest.serverTime));
+            }
+            foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
+            {
+                if (drum.owner != LocalPlayerId) continue;
+                current.Add(drum.id);
+                board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy));
             }
             foreach (string id in visibleOrbIds) if (!current.Contains(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();

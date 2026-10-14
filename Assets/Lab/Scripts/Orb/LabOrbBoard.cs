@@ -167,10 +167,12 @@ namespace C6Lab
                 return existing.View;
             }
 
+            Vector2 start = ToWorld(normalizedPosition);
+            if (playSpawnRise) start = OutsideDrums(start, velocityInBoardWidthsPerSecond);
             var gameObject = new GameObject("Orb " + id);
             gameObject.layer = this.gameObject.layer;
             gameObject.transform.SetParent(transform, false);
-            gameObject.transform.position = OnPlane(ToWorld(normalizedPosition));
+            gameObject.transform.position = OnPlane(start);
             var view = gameObject.AddComponent<LabOrbView>();
             view.Configure(id, kind, config.OrbRadius, element);
             view.ConfigureAppearance(config.OrbAppearance);
@@ -187,7 +189,7 @@ namespace C6Lab
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.mass = 1f;
-            body.position = OnPlane(Clamp(ToWorld(normalizedPosition)));
+            body.position = OnPlane(Clamp(start));
             var entry = new Entry { View = view, LocalOwner = localOwner };
             entries.Add(id, entry);
             Vector3 startVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
@@ -212,6 +214,24 @@ namespace C6Lab
             else SetBodyMode(entry);
             if (!body.isKinematic) body.linearVelocity = startVelocity;
             return view;
+        }
+
+        /// <summary>
+        /// A generated orb starts at its drum's centre on the Host. Begin it just outside that drum,
+        /// along its launch direction, so the two bodies never start overlapped and burst apart.
+        /// </summary>
+        private Vector2 OutsideDrums(Vector2 start, Vector2 launch)
+        {
+            Vector2 direction = launch.sqrMagnitude > 1e-8f ? launch.normalized : Vector2.up;
+            foreach (var entry in entries.Values)
+            {
+                if (entry.View == null || !entry.View.Kind.IsDrum()) continue;
+                Vector2 center = XY(entry.View.Body.position);
+                float clearance = entry.View.HitSphere.radius + config.OrbRadius;
+                if ((start - center).sqrMagnitude >= clearance * clearance) continue;
+                return Clamp(center + direction * clearance);
+            }
+            return start;
         }
 
         public bool RemoveOrb(string id)

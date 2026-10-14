@@ -150,7 +150,7 @@ namespace C6Lab
             if (joinButton != null) joinButton.interactable = network.CanChooseConnection;
             if (findHostButton != null) findHostButton.interactable = network.CanChooseConnection;
             if (startButton != null) startButton.interactable = network.CanStartBattle;
-            if (generateButton != null) generateButton.interactable = connected && playing && !paused;
+            if (generateButton != null) generateButton.interactable = connected && playing && !paused && network.HasLocalDrum;
             if (pauseButton != null) pauseButton.interactable = network.CanPauseBattle;
             if (resumeButton != null) resumeButton.interactable = network.CanResumeBattle;
             if (returnLobbyButton != null) returnLobbyButton.interactable = network.CanReturnAllToLobby;

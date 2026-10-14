@@ -117,14 +117,17 @@ namespace C6Lab.Tests
             Assert.That(start.players[0].seat, Is.EqualTo(0));
             Assert.That(start.players[0].personalHp, Is.EqualTo(300));
             Assert.That(start.hp, Is.EqualTo(1000));
+            Assert.That(start.drums.Length, Is.EqualTo(config.DrumCount));
+            Assert.That(start.drums.All(drum => drum.owner == 42ul), Is.True, "A solo player holds every drum.");
+            Assert.That(start.drums.Select(drum => drum.x).Distinct().Count(), Is.EqualTo(start.drums.Length),
+                "Drums sharing a board start apart.");
 
             LabOrbState yin = null, yang = null;
             for (int i = 0; i < 10 && (yin == null || yang == null); i++)
             {
                 Assert.That(solo.TryGenerate(42ul, "solo-generate-" + i, 0d, out var raw, out _), Is.True);
-                Assert.That(new Vector2(raw.x, raw.y), Is.EqualTo(new Vector2(.5f, config.SpawnOriginHeight)),
-                    "Generated orbs come out of the GENERATE button at the bottom centre.");
-                Assert.That(raw.vy, Is.GreaterThan(0f), "Generated orbs launch upward, away from the bottom HUD.");
+                Assert.That(new Vector2(raw.x, raw.y), Is.EqualTo(new Vector2(.5f, .5f)),
+                    "Generated orbs come out of the first drum, which starts in the middle of the board.");
                 if (raw.kind == LabOrbKind.Yin) yin = raw;
                 else if (raw.kind == LabOrbKind.Yang) yang = raw;
             }
@@ -426,34 +429,155 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GeneratedOrbsLaunchFromTheButtonInsideTheFanWithHostDrawnSpeed()
+        public void GeneratedOrbsLeaveTheDrumInEveryDirectionWithoutCrossingASideEdge()
         {
-            float fan = config.SpawnFanAngle;
-            float min = config.SpawnMinSpeed;
-            var directions = new List<float>();
-            var speeds = new List<float>();
-            for (int i = 0; i < 9; i++) // cost 10 of 100 stamina: nine draws fit without recovery
+            var spray = ConfigWith(.001f, 50, 50, 0, 0, 0, 0);
+            try
             {
-                Assert.That(model.TryGenerate(10, "fan-" + i, 0d, out var orb, out var reason), Is.True, reason);
-                Assert.That(orb.x, Is.EqualTo(.5f));
-                Assert.That(orb.y, Is.EqualTo(config.SpawnOriginHeight));
-                var velocity = new Vector2(orb.vx, orb.vy);
-                float angle = Mathf.Atan2(velocity.x, velocity.y) * Mathf.Rad2Deg;
-                Assert.That(Mathf.Abs(angle), Is.LessThanOrEqualTo(fan + .01f), "Direction stays inside the fan.");
-                Assert.That(velocity.magnitude, Is.LessThanOrEqualTo(config.SpawnMaxSpeed + .0001f));
-                float sideTravel = velocity.sqrMagnitude * Mathf.Abs(Mathf.Sin(angle * Mathf.Deg2Rad))
-                    / (2f * config.OrbFloorDeceleration);
-                Assert.That(sideTravel, Is.LessThanOrEqualTo(.42f + .0001f),
-                    "A launch never slides far enough to cross into a neighbour's board.");
-                // Speeds below the minimum only come from the side-travel limit at wide angles.
-                if (Mathf.Abs(angle) < 20f) Assert.That(velocity.magnitude, Is.GreaterThanOrEqualTo(min - .0001f));
-                directions.Add(angle);
-                speeds.Add(velocity.magnitude);
+                float[] values = spray.CaptureDeveloperValues();
+                values[9] = 100f; // stored orb limit
+                Assert.That(spray.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("spray", new ulong[] { 10, 20, 30 }, 0d, spray);
+                LabOrbState drum = room.Snapshot(0d).drums.First(candidate => candidate.owner == 10);
+                float deceleration = spray.OrbFloorDeceleration;
+
+                // The owner's screen reports where its drum is now; the Host starts the orb there.
+                var reported = new Vector2(.35f, .6f);
+                var velocities = new List<Vector2>();
+                for (int i = 0; i < 40; i++)
+                {
+                    Assert.That(room.TryGenerate(10, drum.id, reported, "spray-" + i, 0d, out var orb, out var reason),
+                        Is.True, reason);
+                    Assert.That(new Vector2(orb.x, orb.y), Is.EqualTo(reported), "The orb starts where the drum is.");
+                    var velocity = new Vector2(orb.vx, orb.vy);
+                    Assert.That(velocity.magnitude, Is.LessThanOrEqualTo(spray.SpawnMaxSpeed + .0001f));
+                    float room01 = velocity.x > 0f ? 1f - .08f - reported.x : reported.x - .08f;
+                    float sideTravel = velocity.magnitude * Mathf.Abs(velocity.x) / (2f * deceleration);
+                    Assert.That(sideTravel, Is.LessThanOrEqualTo(room01 + .0001f),
+                        "A launch stops before the side edge it heads for.");
+                    velocities.Add(velocity);
+                }
+                Assert.That(velocities.Any(v => v.y > 0f) && velocities.Any(v => v.y < 0f), Is.True, "Orbs fly up and down.");
+                Assert.That(velocities.Any(v => v.x > 0f) && velocities.Any(v => v.x < 0f), Is.True, "Orbs fly left and right.");
+                Assert.That(velocities.Select(v => v.magnitude).Distinct().Count(), Is.GreaterThan(1),
+                    "Launch speed varies between min and max.");
+
+                var byTheEdge = new Vector2(.95f, .5f);
+                for (int i = 0; i < 20; i++)
+                {
+                    Assert.That(room.TryGenerate(10, drum.id, byTheEdge, "edge-" + i, 0d, out var orb, out var reason),
+                        Is.True, reason);
+                    Assert.That(orb.vx, Is.LessThanOrEqualTo(0f), "A drum by the right edge never sends an orb across it.");
+                }
+
+                Assert.That(room.TryGenerate(20, drum.id, reported, "not-mine", 0d, out _, out var refused), Is.False);
+                Assert.That(refused, Is.EqualTo("NO_DRUM"), "Only the drum's holder can tap it.");
+                Assert.That(room.TryGenerate(10, drum.id, new Vector2(1.2f, .5f), "off-board", 0d, out _, out refused),
+                    Is.False);
+                Assert.That(refused, Is.EqualTo("INVALID_MOTION"));
+                Assert.That(room.TryGenerate(10, drum.id, new Vector2(float.NaN, .5f), "not-finite", 0d, out _, out refused),
+                    Is.False);
+                Assert.That(refused, Is.EqualTo("INVALID_MOTION"));
             }
-            Assert.That(directions.Distinct().Count(), Is.EqualTo(directions.Count), "Each launch takes its own direction.");
-            Assert.That(directions.Any(angle => angle < 0f) && directions.Any(angle => angle > 0f), Is.True,
-                "Launches spread to both sides of straight up.");
-            Assert.That(speeds.Distinct().Count(), Is.GreaterThan(1), "Launch speed varies between min and max.");
+            finally { UnityEngine.Object.DestroyImmediate(spray); }
+        }
+
+        [Test]
+        public void OneDrumGoesToARandomPlayerAndOnlyItsHolderCanGenerate()
+        {
+            var single = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                float[] values = single.CaptureDeveloperValues();
+                values[63] = 1f; // drum count
+                Assert.That(single.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var holders = new HashSet<ulong>();
+                for (int session = 0; session < 12; session++)
+                {
+                    var room = new LabModel();
+                    room.Begin("drum-" + session, new ulong[] { 10, 20, 30 }, 0d, single);
+                    LabOrbState drum = room.Snapshot(0d).drums.Single();
+                    Assert.That(drum.kind, Is.EqualTo(LabOrbKind.Drum));
+                    Assert.That(new Vector2(drum.x, drum.y), Is.EqualTo(new Vector2(.5f, .5f)),
+                        "The drum starts in the middle of its holder's board.");
+                    holders.Add(drum.owner);
+                    foreach (ulong player in new ulong[] { 10, 20, 30 })
+                    {
+                        bool generated = room.TryGenerate(player, "g-" + player, 0d, out _, out var reason);
+                        Assert.That(generated, Is.EqualTo(player == drum.owner), reason);
+                        if (!generated) Assert.That(reason, Is.EqualTo("NO_DRUM"));
+                    }
+                }
+                Assert.That(holders.Count, Is.GreaterThan(1), "The Host draws the holder anew for each round.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(single); }
+        }
+
+        [TestCase(2, 3)]
+        [TestCase(3, 3)]
+        [TestCase(5, 3)]
+        [TestCase(4, 2)]
+        public void DrumsGoToDifferentPlayersBeforeAnyoneGetsASecond(int drumCount, int playerCount)
+        {
+            var drums = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                float[] values = drums.CaptureDeveloperValues();
+                values[63] = drumCount;
+                Assert.That(drums.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                ulong[] ids = Enumerable.Range(1, playerCount).Select(index => (ulong)index).ToArray();
+                var room = new LabModel();
+                room.Begin("drums-" + drumCount + "-" + playerCount, ids, 0d, drums);
+                LabOrbState[] placed = room.Snapshot(0d).drums;
+                Assert.That(placed.Length, Is.EqualTo(drumCount));
+                int[] perPlayer = ids.Select(id => placed.Count(drum => drum.owner == id)).ToArray();
+                if (drumCount <= playerCount) Assert.That(perPlayer.Max(), Is.EqualTo(1), "Each drum has its own holder.");
+                else Assert.That(perPlayer.Min(), Is.GreaterThanOrEqualTo(1), "Everyone holds a drum first.");
+                foreach (ulong id in ids)
+                {
+                    float[] xs = placed.Where(drum => drum.owner == id).Select(drum => drum.x).ToArray();
+                    Assert.That(xs.Distinct().Count(), Is.EqualTo(xs.Length), "Drums sharing a board start apart.");
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(drums); }
+        }
+
+        [Test]
+        public void DrumPassesToANeighborButIsNeverStoredThrownExpiredOrBlownUp()
+        {
+            var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
+            try
+            {
+                float[] values = bombs.CaptureDeveloperValues();
+                values[9] = 1f;  // stored orb limit: one orb fills a board
+                values[63] = 3f; // every player holds one drum
+                Assert.That(bombs.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("drum-rules", new ulong[] { 10, 20, 30 }, 0d, bombs);
+                LabOrbState drum = room.Snapshot(0d).drums.Single(candidate => candidate.owner == 10);
+
+                Assert.That(room.TryGenerate(20, "fill", 0d, out var bomb, out var reason), Is.True, reason);
+                Assert.That(bomb.lockSwipes, Is.GreaterThan(0));
+                Assert.That(room.TryGenerate(20, "over", 0d, out _, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("STORAGE_FULL"), "Player 20's board is full of orbs.");
+                Assert.That(room.TryGenerate(10, "beside-drum", 0d, out _, out reason), Is.True,
+                    "A drum does not take a storage slot. " + reason);
+                Assert.That(room.TryLaunch(10, drum.id, "throw-drum", 0d, out _, out _), Is.False, "A drum is never thrown.");
+                Assert.That(room.TryUseItem(10, drum.id, "use-drum", 0d, out _, out _), Is.False);
+
+                Assert.That(PassRight(room, drum.id, 10, .1d).owner, Is.EqualTo(20ul), "A full board still receives the drum.");
+                Assert.That(room.TryGenerate(10, "no-drum", .2d, out _, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("NO_DRUM"), "Passing the drum away stops its old holder generating.");
+
+                LabSnapshot afterFuse = room.Snapshot(bombs.ItemLifetimeSeconds + 1d);
+                Assert.That(room.DrainBombExplosions(), Does.Contain(20ul));
+                Assert.That(afterFuse.orbs.Any(orb => orb.owner == 20ul), Is.False);
+                Assert.That(afterFuse.drums.Count(candidate => candidate.owner == 20ul), Is.EqualTo(2),
+                    "A bomb never takes a drum.");
+                Assert.That(room.Snapshot(170d).drums.Length, Is.EqualTo(3), "Drums never expire.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(bombs); }
         }
 
         [Test]
@@ -508,6 +632,7 @@ namespace C6Lab.Tests
                 float[] values = chances.CaptureDeveloperValues();
                 values[5] = .001f; // generation cost
                 values[9] = 100f;  // stored orb limit
+                values[63] = 3f;   // every player holds a drum
                 Assert.That(chances.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var room = new LabModel();
                 room.Begin("chance-test", new ulong[] { 10, 20, 30 }, 0d, chances);
@@ -988,12 +1113,16 @@ namespace C6Lab.Tests
             return damage;
         }
 
-        /// <summary>A default config with one generation cost and chances in GeneratedKinds order.</summary>
+        /// <summary>
+        /// A default config with one generation cost and chances in GeneratedKinds order. Five drums
+        /// let every player in any room generate; drum placement has its own tests.
+        /// </summary>
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {
             var created = ScriptableObject.CreateInstance<LabConfig>();
             float[] values = created.CaptureDeveloperValues();
             values[5] = generateCost;
+            values[63] = LabModel.MaximumParticipants;
             for (int i = 0; i < chances.Length; i++) values[39 + i] = chances[i];
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
