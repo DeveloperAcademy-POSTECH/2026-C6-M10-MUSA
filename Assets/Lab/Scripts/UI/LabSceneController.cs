@@ -16,6 +16,8 @@ namespace C6Lab
         [Range(0f, 1f)] public float generateSoundVolume = .8f;
         [Tooltip("내가 던진 구슬이 요괴에 맞았을 때 소리 기본 크기. 던진 사람 기기에서만 난다.")]
         [Range(0f, 1f)] public float hitSoundVolume = .9f;
+        [Tooltip("내가 던진 구슬이 요괴를 빗나갔을 때 소리 기본 크기. 던진 사람 기기에서만 난다.")]
+        [Range(0f, 1f)] public float missSoundVolume = .7f;
 
         [Header("Haptics (요괴 타격 시 던진 사람 아이폰 진동)")]
         [Tooltip("끄면 타격 진동이 나지 않는다.")]
@@ -61,14 +63,18 @@ namespace C6Lab
                 battleBgm.Bind(boardNetwork);
             }
             if (battleBgm != null) battleBgm.volume = bgmVolume;
-            // 던진 구슬의 결과 소리(맞음)도 같은 방식으로 붙인다.
+            // 던진 구슬의 결과 소리(맞음·빗나감)도 같은 방식으로 붙인다.
             LabThrowSound throwSound = GetComponent<LabThrowSound>();
             if (boardNetwork != null && throwSound == null)
             {
                 throwSound = gameObject.AddComponent<LabThrowSound>();
                 throwSound.Bind(boardNetwork);
             }
-            if (throwSound != null) throwSound.hitVolume = hitSoundVolume;
+            if (throwSound != null)
+            {
+                throwSound.hitVolume = hitSoundVolume;
+                throwSound.missVolume = missSoundVolume;
+            }
             // 타격 햅틱도 같은 신호(내 공이 맞음)를 받아 던진 사람 기기에서만 진동한다.
             LabHitHaptics hitHaptics = GetComponent<LabHitHaptics>();
             if (boardNetwork != null && hitHaptics == null)
@@ -91,7 +97,11 @@ namespace C6Lab
             if (!Application.isPlaying) return;
             if (TryGetComponent(out LabBattleBgm bgm)) bgm.volume = bgmVolume;
             if (TryGetComponent(out LabGenerateSound sound)) sound.volume = generateSoundVolume;
-            if (TryGetComponent(out LabThrowSound throwSound)) throwSound.hitVolume = hitSoundVolume;
+            if (TryGetComponent(out LabThrowSound throwSound))
+            {
+                throwSound.hitVolume = hitSoundVolume;
+                throwSound.missVolume = missSoundVolume;
+            }
             if (TryGetComponent(out LabHitHaptics haptics)) ApplyHaptics(haptics);
         }
 #endif

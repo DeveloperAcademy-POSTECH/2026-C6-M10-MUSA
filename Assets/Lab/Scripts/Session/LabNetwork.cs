@@ -218,6 +218,9 @@ namespace C6Lab
         public event Action<LabConfig> ConfigApplied;
         /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (실제 피해량)</summary>
         public event Action<int> LocalThrowHit;
+        /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
+        public event Action LocalThrowMissed;
+        private string lastMissNoticeId;
         public string Status { get; private set; } = "Choose HOST or JOIN.";
         public string Notice { get; private set; } = string.Empty;
         public string LastShotReport { get; private set; } = string.Empty;
@@ -1230,7 +1233,14 @@ namespace C6Lab
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
             }
-            else model.ConfirmMiss(result.ProjectileId, now);
+            else if (model.ConfirmMiss(result.ProjectileId, now))
+            {
+                // 빗나감은 던진 사람에게만 알린다. 같은 구슬은 Host가 한 번만 확정한다.
+                if (result.OwnerPlayerId == LocalPlayerId) LocalThrowMissed?.Invoke();
+                else if (order.Contains(result.OwnerPlayerId))
+                    Send(result.OwnerPlayerId, new LabNetworkPacket { type = "targetMiss", sessionId = sessionId,
+                        round = model.Round, firstId = result.ProjectileId, owner = result.OwnerPlayerId });
+            }
             LastShotReport = string.Format(CultureInfo.InvariantCulture,
                 "SHOT {0} | {1:F2}s | peak +{2:F2}m | range {3:F2}m",
                 result.Hit ? "HIT" : "MISS", result.FlightSeconds,
@@ -1381,6 +1391,14 @@ namespace C6Lab
                             new Vector3(packet.wx, packet.wy, packet.wz));
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
                         if (packet.owner == LocalPlayerId) LocalThrowHit?.Invoke(packet.damage);
+                    }
+                    break;
+                case "targetMiss":
+                    if (packet.sessionId == sessionId && packet.owner == LocalPlayerId
+                        && packet.firstId != lastMissNoticeId)
+                    {
+                        lastMissNoticeId = packet.firstId;
+                        LocalThrowMissed?.Invoke();
                     }
                     break;
                 case "projectile":
