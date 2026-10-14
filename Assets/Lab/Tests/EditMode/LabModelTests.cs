@@ -355,7 +355,8 @@ namespace C6Lab.Tests
             Assert.That(model.ConfirmHit(combined.id, 1d), Is.True);
             var after = model.Snapshot(1d);
             Assert.That(after.hp, Is.EqualTo(980));
-            Assert.That(after.players.Single(player => player.id == 10).stamina, Is.EqualTo(before + 5f).Within(.001f));
+            Assert.That(after.players.Single(player => player.id == 10).stamina,
+                Is.EqualTo(Mathf.Min(config.StaminaMax, before + config.HitRecovery)).Within(.001f));
             Assert.That(after.players.Single(player => player.id == 20).stamina, Is.EqualTo(100f));
             Assert.That(after.orbs.Length, Is.EqualTo(orbCountBefore - 1));
             Assert.That(after.orbs.Any(orb => orb.id == combined.id), Is.False);

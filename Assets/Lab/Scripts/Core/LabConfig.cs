@@ -172,8 +172,8 @@ namespace C6Lab
         [SerializeField, Min(0f)] private float staminaStart = 100f;
         [SerializeField, Min(.001f)] private float generateCost = 20f;
         [SerializeField, Min(0f)] private float staminaRecoveryAmount = 20f;
-        [SerializeField, Min(.001f)] private float staminaRecoverySeconds = 3f;
-        [SerializeField, Min(0f)] private float hitRecovery = 5f;
+        [SerializeField, Min(.001f)] private float staminaRecoverySeconds = 1.7f;
+        [SerializeField, Min(0f)] private float hitRecovery = 10f;
         [SerializeField, Range(1, 100)] private int orbStorageLimit = 20;
 
         [Header("Generation chances (percent, total 100)")]
@@ -299,9 +299,9 @@ namespace C6Lab
         public float StaminaStart => Mathf.Clamp(Finite(staminaStart, 100f), 0f, StaminaMax);
         public float GenerateCost => Mathf.Clamp(Positive(generateCost, 20f), .001f, StaminaMax);
         public float StaminaRecoveryAmount => Mathf.Clamp(Finite(staminaRecoveryAmount, 20f), 0f, StaminaMax);
-        public float StaminaRecoverySeconds => Positive(staminaRecoverySeconds, 3f);
+        public float StaminaRecoverySeconds => Positive(staminaRecoverySeconds, 1.7f);
         public float StaminaRecoveryPerSecond => StaminaRecoveryAmount / StaminaRecoverySeconds;
-        public float HitRecovery => Mathf.Clamp(Finite(hitRecovery, 5f), 0f, StaminaMax);
+        public float HitRecovery => Mathf.Clamp(Finite(hitRecovery, 10f), 0f, StaminaMax);
         public int OrbStorageLimit => Mathf.Clamp(orbStorageLimit, 1, 100);
 
         /// <summary>

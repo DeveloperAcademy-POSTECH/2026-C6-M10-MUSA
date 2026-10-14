@@ -23,8 +23,8 @@ MonoBehaviour:
   staminaStart: 100
   generateCost: 20
   staminaRecoveryAmount: 20
-  staminaRecoverySeconds: 3
-  hitRecovery: 5
+  staminaRecoverySeconds: 1.7
+  hitRecovery: 10
   orbStorageLimit: 20
   yinChance: 40
   yangChance: 40

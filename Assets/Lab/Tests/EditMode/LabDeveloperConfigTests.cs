@@ -116,6 +116,19 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void SavedConfigKeepsTheDrumSpreadAndStaminaTuning()
+        {
+            // An Inspector save from an older branch once wrote its stale 55° fan into the asset.
+            var saved = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(saved, Is.Not.Null);
+            Assert.That(saved.SpawnFanAngle, Is.EqualTo(180f), "Orbs leave the drum in every direction.");
+            Assert.That(saved.StaminaRecoveryAmount, Is.EqualTo(20f));
+            Assert.That(saved.StaminaRecoverySeconds, Is.EqualTo(1.7f),
+                "A drained bar refills in about one lap of the drum around three players.");
+            Assert.That(saved.HitRecovery, Is.EqualTo(10f), "A hit returns half an orb.");
+        }
+
+        [Test]
         public void DrumCountIsAWholeNumberFromOneToFive()
         {
             foreach (float invalid in new[] { 0f, 6f, 2.5f })
