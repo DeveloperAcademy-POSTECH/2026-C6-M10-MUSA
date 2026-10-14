@@ -107,7 +107,10 @@ namespace C6Lab
             new LabDeveloperField("Camera Look Height Offset", -10f, 10f),
             new LabDeveloperField("Target Spin Strength", 0f, 200f),
             new LabDeveloperField("Target Spin Damping", 0f, 10f),
-            new LabDeveloperField("Target Spin Maximum Speed (deg/s)", 30f, 1440f)
+            new LabDeveloperField("Target Spin Maximum Speed (deg/s)", 30f, 1440f),
+            new LabDeveloperField("Spawn Fan Angle (deg, each side)", 0f, 89f),
+            new LabDeveloperField("Spawn Minimum Speed (board widths/s)", 0f, 10f),
+            new LabDeveloperField("Spawn Maximum Speed (board widths/s)", 0f, 10f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -127,7 +130,7 @@ namespace C6Lab
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
-            new LabDeveloperCategory("Spawn presentation", 17, 18),
+            new LabDeveloperCategory("Spawn presentation", 17, 18, 60, 61, 62),
             new LabDeveloperCategory("Camera and throw origin", 19, 20, 21, 22, 23, 56),
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
@@ -192,6 +195,14 @@ namespace C6Lab
         [Header("Spawn presentation")]
         [SerializeField, Min(0f)] private float spawnRiseDistance = .65f;
         [SerializeField, Min(0f)] private float spawnRiseDuration = .25f;
+        [Tooltip("생성 버튼에서 구슬이 튀어나가는 부채꼴 각도. 위쪽 기준 좌우 각각 이 각도까지 (도)")]
+        [SerializeField, Range(0f, 89f)] private float spawnFanAngle = 55f;
+        [Tooltip("튀어나가는 최소 속도 (보드 너비/초)")]
+        [SerializeField, Range(0f, 10f)] private float spawnMinSpeed = 1f;
+        [Tooltip("튀어나가는 최대 속도 (보드 너비/초)")]
+        [SerializeField, Range(0f, 10f)] private float spawnMaxSpeed = 1.8f;
+        [Tooltip("구슬이 나오는 높이 (보드 아래 0 ~ 위 1). 생성 버튼 윗부분에 맞춘다. Inspector 전용")]
+        [SerializeField, Range(0f, 1f)] private float spawnOriginHeight = .2f;
 
         [Header("Replaceable orb presentation")]
         [SerializeField] private LabOrbAppearance orbAppearance;
@@ -275,6 +286,10 @@ namespace C6Lab
 
         public float SpawnRiseDistance => Mathf.Max(0f, Finite(spawnRiseDistance, .65f));
         public float SpawnRiseDuration => Mathf.Max(0f, Finite(spawnRiseDuration, .25f));
+        public float SpawnFanAngle => Mathf.Clamp(Finite(spawnFanAngle, 55f), 0f, 89f);
+        public float SpawnMinSpeed => Mathf.Clamp(Finite(spawnMinSpeed, 1f), 0f, 10f);
+        public float SpawnMaxSpeed => Mathf.Clamp(Finite(spawnMaxSpeed, 1.8f), SpawnMinSpeed, 10f);
+        public float SpawnOriginHeight => Mathf.Clamp01(Finite(spawnOriginHeight, .2f));
         public LabOrbAppearance OrbAppearance => orbAppearance;
         public float CameraRadius => Positive(cameraRadius, 8f);
         public float CameraHeightOffset => Finite(cameraHeightOffset, .65f);
@@ -322,7 +337,8 @@ namespace C6Lab
                 CombineSpeed, DropCombineEnabled ? 1f : 0f, ContactCombineEnabled ? 1f : 0f,
                 PotionHeal, RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier,
                 CameraLookHeightOffset, TargetSpinStrength, TargetSpinDamping,
-                TargetSpinMaximumSpeed
+                TargetSpinMaximumSpeed,
+                SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed
             };
         }
 
@@ -361,6 +377,7 @@ namespace C6Lab
             float chanceTotal = values[39] + values[40] + values[41] + values[42] + values[43] + values[44];
             if (chanceTotal != 100f) { error = "Generation chances must add up to 100 (now " + chanceTotal + ")."; return false; }
             if (values[46] > values[47]) { error = "Item Unlock Swipes Min cannot exceed Item Unlock Swipes Max."; return false; }
+            if (values[61] > values[62]) { error = "Spawn Minimum Speed cannot exceed Spawn Maximum Speed."; return false; }
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
@@ -422,6 +439,9 @@ namespace C6Lab
             targetSpinStrength = values[57];
             targetSpinDamping = values[58];
             targetSpinMaximumSpeed = values[59];
+            spawnFanAngle = values[60];
+            spawnMinSpeed = values[61];
+            spawnMaxSpeed = values[62];
             error = string.Empty;
             return true;
         }
