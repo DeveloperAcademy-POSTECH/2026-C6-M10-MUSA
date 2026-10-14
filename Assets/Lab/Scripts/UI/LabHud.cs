@@ -126,6 +126,7 @@ namespace C6Lab
             var snapshot = network.Snapshot;
             bool playing = snapshot != null && snapshot.phase == LabPhase.Playing;
             bool terminal = snapshot != null && (snapshot.phase == LabPhase.Victory || snapshot.phase == LabPhase.Defeat);
+            terminal = terminal && !LabGourdFinish.DelayVictory(network, snapshot);
             bool battleVisible = snapshot != null && snapshot.phase != LabPhase.Idle;
             bool paused = playing && network.IsBattlePaused;
             UpdateBattleBackground(battleVisible);
