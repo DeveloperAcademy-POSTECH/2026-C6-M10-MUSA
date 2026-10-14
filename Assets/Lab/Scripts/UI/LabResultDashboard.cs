@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>
-    /// 승리/패배 결과 화면 위에 이번 라운드 기록과 MVP 칭호를 보여주는 임시 대시보드.
+    /// 승리/패배 결과 화면 위에 이번 라운드 기록 표(생성·결합·아이템 사용·넘겨준 구슬·칭호)를 보여주는 대시보드.
     /// 장면 수정 없이 코드로 만들고, 기존 결과 카드(VICTORY/DEFEAT·버튼) 바로 위에 놓는다.
     /// 값은 Host가 보낸 스냅샷의 플레이어 기록(LabPlayerState)을 그대로 쓰므로 모든 기기가 같다.
     /// 디자인이 정해지면 이 화면만 바꾸고, 계산은 LabResultStats를 그대로 쓴다.
@@ -14,19 +14,22 @@ namespace C6Lab
     [DisallowMultipleComponent]
     public sealed class LabResultDashboard : MonoBehaviour
     {
-        public float width = 340f;
+        public float width = 362f;
         public float gapAboveResult = 12f;
-        public float rowHeight = 24f;
+        public float headerHeight = 28f;
+        public float rowHeight = 32f;
         public int fontSize = 14;
 
         // 결과 카드와 같은 색
         public Color borderColor = new Color(.867f, .733f, .565f, .98f);
         public Color innerColor = new Color(.973f, .914f, .804f, 1f);
+        public Color headerColor = new Color(.925f, .855f, .725f, 1f);
+        public Color myRowColor = new Color(.945f, .878f, .757f, 1f);
+        public Color lineColor = new Color(.867f, .733f, .565f, .7f);
         public Color textColor = new Color(.169f, .137f, .153f, 1f);
-        public Color accentColor = new Color(.565f, .337f, .247f, 1f);
 
-        private static readonly string[] Headers = { "", "GEN", "COMBINE", "ITEMS", "PASS" };
-        private static readonly float[] Columns = { 46f, 52f, 66f, 112f, 54f };
+        private static readonly string[] Headers = { "플레이어", "생성", "결합", "아이템 사용", "넘겨준 구슬", "칭호" };
+        private static readonly float[] Columns = { 48f, 38f, 38f, 66f, 72f, 84f }; // 합 346 + 왼쪽 여백 6 = 안쪽 폭 352
 
         private LabNetwork network;
         private GameObject resultControls;
@@ -60,7 +63,7 @@ namespace C6Lab
             Show(snapshot.players, snapshot.phase == LabPhase.Victory);
         }
 
-        /// <summary>기록 표와 MVP를 다시 그린다. (테스트에서도 직접 부를 수 있다)</summary>
+        /// <summary>기록 표를 다시 그린다. (테스트에서도 직접 부를 수 있다)</summary>
         public void Show(LabPlayerState[] players, bool victory)
         {
             EnsurePanel();
@@ -69,51 +72,39 @@ namespace C6Lab
 
             var rows = (players ?? new LabPlayerState[0]).Where(p => p != null).OrderBy(p => p.seat).ToArray();
             ulong local = network != null ? network.LocalPlayerId : ulong.MaxValue;
-            float y = 10f;
+            IReadOnlyList<LabResultAward> awards = LabResultStats.Awards(rows);
 
-            AddText(victory ? "TEAM RECORD · VICTORY" : "TEAM RECORD · DEFEAT", 12f, y, width - 24f, 22f,
-                fontSize + 2, FontStyle.Bold, TextAnchor.MiddleLeft, textColor);
-            y += 26f;
-            AddRow(Headers, y, FontStyle.Bold, accentColor);
-            y += rowHeight;
+            float inner = width - 10f;
+            float y = 0f;
+            // 머리줄
+            AddBox(0f, y, inner, headerHeight, headerColor);
+            AddCells(Headers, y, headerHeight, FontStyle.Normal, null, fontSize - 2);
+            y += headerHeight;
             foreach (var p in rows)
             {
-                bool me = p.id == local;
-                AddRow(new[]
+                AddBox(0f, y, inner, 1f, lineColor);
+                if (p.id == local) AddBox(0f, y + 1f, inner, rowHeight - 1f, myRowColor);
+                string[] cells =
                 {
-                    LabResultStats.PlayerName(p) + (me ? "*" : ""),
+                    LabResultStats.PlayerName(p),
                     p.generatedTotal.ToString(),
                     p.combinedTotal.ToString(),
-                    ItemCell(p),
-                    p.passedTotal.ToString()
-                }, y, me ? FontStyle.Bold : FontStyle.Normal, textColor);
+                    p.ItemsUsed.ToString(),
+                    p.passedTotal.ToString(),
+                    TitlesOf(p, awards)
+                };
+                // 각 항목 1등 숫자는 굵게 (칭호와 같은 기준)
+                bool[] bold =
+                {
+                    false,
+                    IsWinner(p, awards, LabResultTitle.MostGenerated),
+                    IsWinner(p, awards, LabResultTitle.MostCombined),
+                    IsWinner(p, awards, LabResultTitle.MostItems),
+                    IsWinner(p, awards, LabResultTitle.MostPassed),
+                    false
+                };
+                AddCells(cells, y, rowHeight, FontStyle.Normal, bold, fontSize);
                 y += rowHeight;
-            }
-
-            y += 6f;
-            AddText("MVP", 12f, y, width - 24f, 20f, fontSize, FontStyle.Bold, TextAnchor.MiddleLeft, accentColor);
-            y += 22f;
-            IReadOnlyList<LabResultAward> awards = LabResultStats.Awards(rows);
-            if (awards.Count == 0)
-            {
-                AddText("No records this round.", 12f, y, width - 24f, 20f, fontSize, FontStyle.Normal,
-                    TextAnchor.MiddleLeft, textColor);
-                y += 20f;
-            }
-            foreach (var award in awards)
-            {
-                string names = string.Join(", ", award.Winners.Select(LabResultStats.PlayerName));
-                AddText(LabResultStats.Label(award.Title), 12f, y, 170f, 20f, fontSize, FontStyle.Normal,
-                    TextAnchor.MiddleLeft, textColor);
-                AddText(names + " · " + award.Value, 182f, y, width - 194f, 20f, fontSize, FontStyle.Bold,
-                    TextAnchor.MiddleRight, textColor);
-                y += 20f;
-            }
-            if (rows.Any(p => p.id == local))
-            {
-                AddText("* me", 12f, y + 2f, width - 24f, 16f, fontSize - 3, FontStyle.Italic,
-                    TextAnchor.MiddleLeft, accentColor);
-                y += 18f;
             }
 
             panel.sizeDelta = new Vector2(width, y + 10f);
@@ -121,16 +112,13 @@ namespace C6Lab
             panel.SetAsLastSibling();
         }
 
-        /// <summary>아이템 칸: 합계와 0이 아닌 종류 (R 릴레이 · B 비밀상자 · P 포션 · X 폭탄)</summary>
-        private static string ItemCell(LabPlayerState p)
-        {
-            var parts = new List<string>();
-            if (p.relayUsed > 0) parts.Add("R" + p.relayUsed);
-            if (p.secretBoxUsed > 0) parts.Add("B" + p.secretBoxUsed);
-            if (p.potionUsed > 0) parts.Add("P" + p.potionUsed);
-            if (p.bombUsed > 0) parts.Add("X" + p.bombUsed);
-            return parts.Count == 0 ? p.ItemsUsed.ToString() : p.ItemsUsed + "  " + string.Join(" ", parts);
-        }
+        private static bool IsWinner(LabPlayerState p, IReadOnlyList<LabResultAward> awards, LabResultTitle title) =>
+            awards.Any(a => a.Title == title && a.Winners.Any(w => w.id == p.id));
+
+        /// <summary>이 플레이어가 받은 칭호들 (예: "결합왕 · 패스왕"). 없으면 빈칸.</summary>
+        private static string TitlesOf(LabPlayerState p, IReadOnlyList<LabResultAward> awards) =>
+            string.Join(" · ", awards.Where(a => a.Winners.Any(w => w.id == p.id))
+                .Select(a => LabResultStats.Label(a.Title)));
 
         private void EnsurePanel()
         {
@@ -164,24 +152,42 @@ namespace C6Lab
             textsRect.SetParent(panel, false);
             textsRect.anchorMin = Vector2.zero;
             textsRect.anchorMax = Vector2.one;
-            textsRect.offsetMin = textsRect.offsetMax = Vector2.zero;
+            textsRect.offsetMin = new Vector2(5f, 5f);
+            textsRect.offsetMax = new Vector2(-5f, -5f);
             content = textsRect;
             panel.gameObject.SetActive(false);
         }
 
-        private void AddRow(string[] cells, float y, FontStyle style, Color color)
+        private void AddCells(string[] cells, float y, float h, FontStyle style, bool[] bold, int size)
         {
-            float x = 12f;
+            float x = 6f;
             for (int i = 0; i < cells.Length && i < Columns.Length; i++)
             {
-                AddText(cells[i], x, y, Columns[i], rowHeight, fontSize, style,
-                    i == 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, color);
+                bool strong = bold != null && i < bold.Length && bold[i];
+                bool last = i == Columns.Length - 1;
+                // 칭호 칸은 조금 작게, 길면 두 줄로 접는다.
+                AddText(cells[i], x, y, Columns[i] - 2f, h, last ? size - 1 : size,
+                    strong ? FontStyle.Bold : style, TextAnchor.MiddleLeft, textColor, last);
                 x += Columns[i];
             }
         }
 
+        private void AddBox(float x, float y, float w, float h, Color color)
+        {
+            var go = new GameObject("Box", typeof(RectTransform), typeof(Image));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(content, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(x, -y);
+            rect.sizeDelta = new Vector2(w, h);
+            var image = go.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+        }
+
         private void AddText(string value, float x, float y, float w, float h, int size, FontStyle style,
-            TextAnchor anchor, Color color)
+            TextAnchor anchor, Color color, bool wrap = false)
         {
             var go = new GameObject("Cell", typeof(RectTransform), typeof(Text));
             var rect = (RectTransform)go.transform;
@@ -197,7 +203,9 @@ namespace C6Lab
             text.color = color;
             text.alignment = anchor;
             text.raycastTarget = false;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            // 칭호 칸은 길면 두 줄로 접는다.
+            text.horizontalOverflow = wrap ? HorizontalWrapMode.Wrap : HorizontalWrapMode.Overflow;
+            text.lineSpacing = .9f;
             text.text = value;
         }
     }

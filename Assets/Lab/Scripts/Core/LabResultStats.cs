@@ -62,10 +62,10 @@ namespace C6Lab
         {
             switch (title)
             {
-                case LabResultTitle.MostGenerated: return "MOST GENERATED";
-                case LabResultTitle.MostCombined: return "MOST COMBINED";
-                case LabResultTitle.MostItems: return "MOST ITEMS";
-                case LabResultTitle.MostPassed: return "MOST PASSES";
+                case LabResultTitle.MostGenerated: return "생성왕";
+                case LabResultTitle.MostCombined: return "결합왕";
+                case LabResultTitle.MostItems: return "아이템왕";
+                case LabResultTitle.MostPassed: return "패스왕";
                 default: return title.ToString();
             }
         }
