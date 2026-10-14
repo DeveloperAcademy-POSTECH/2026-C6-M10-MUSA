@@ -109,7 +109,7 @@ DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" xcodebuild \
 
 ## 오디오 출처
 
-게임에 쓰인 소리 파일의 출처와 이용 조건은 [오디오 출처](docs/AUDIO_CREDITS.md)에 정리한다. 전투 BGM(꽹과리)과 장구 효과음은 국립국악원 국악 디지털 음원을 출처 표시 조건으로 사용한다.
+게임에 쓰인 소리 파일의 출처와 이용 조건은 [오디오 출처](docs/AUDIO_CREDITS.md)에 정리한다. 전투 BGM(꽹과리)과 장구 효과음은 국립국악원 국악 디지털 음원을 출처 표시 조건으로 사용한다. 요괴 타격음과 빗나감 소리는 freesound.org의 CC0 소리를 사용한다.
 
 ## 프로젝트 구성
 

@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(63));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(74));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -53,6 +53,16 @@ namespace C6Lab.Tests
             values[60] = 40f;
             values[61] = .8f;
             values[62] = 1.4f;
+            Assert.That(new[] { values[63], values[64], values[65], values[66] },
+                Is.EqualTo(new[] { .2f, 1f, .9f, .7f }), "BGM, generate, hit and miss volumes.");
+            Assert.That(new[] { values[67], values[68], values[69], values[70], values[71], values[72], values[73] },
+                Is.EqualTo(new[] { 1f, 0f, .4f, 0f, .6f, 2f, 1f }), "Haptics on; generate/hit/item-hit style and intensity.");
+            values[63] = .5f;
+            values[64] = .8f;
+            values[67] = 0f;
+            values[68] = 1f; // Medium
+            values[72] = 4f; // Rigid
+            values[73] = .7f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -77,6 +87,12 @@ namespace C6Lab.Tests
             Assert.That(config.SpawnFanAngle, Is.EqualTo(40f));
             Assert.That(config.SpawnMinSpeed, Is.EqualTo(.8f));
             Assert.That(config.SpawnMaxSpeed, Is.EqualTo(1.4f));
+            Assert.That(config.BgmVolume, Is.EqualTo(.5f));
+            Assert.That(config.GenerateSoundVolume, Is.EqualTo(.8f));
+            Assert.That(config.HapticsEnabled, Is.False);
+            Assert.That(config.GenerateHapticStyle, Is.EqualTo(LabHapticStyle.Medium));
+            Assert.That(config.ItemHitHapticStyle, Is.EqualTo(LabHapticStyle.Rigid));
+            Assert.That(config.ItemHitHapticIntensity, Is.EqualTo(.7f));
         }
 
         [Test]

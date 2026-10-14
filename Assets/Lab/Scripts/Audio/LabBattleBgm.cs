@@ -15,7 +15,8 @@ namespace C6Lab
     {
         public const string ClipFolder = "Audio/BGM";
 
-        [Range(0f, 1f)] public float volume = .5f;
+        [Tooltip("LabConfig를 읽을 수 없을 때만 쓰는 기본 크기. 평소에는 LabConfig의 BGM Volume을 쓴다.")]
+        [Range(0f, 1f)] public float volume = .2f;
         [Min(0f)] public float fadeOutSeconds = 1.5f;
 
         private AudioSource source;
@@ -25,8 +26,9 @@ namespace C6Lab
 
         public bool IsPlaying => source != null && source.isPlaying;
 
-        // 기본 크기 × 이 기기의 BGM 설정
-        private float TargetVolume => volume * LabAudioSettings.BgmVolume;
+        // 기본 크기(LabConfig: Inspector·DEV) × 이 기기의 BGM 설정(일시정지 메뉴)
+        private float BaseVolume => network != null && network.config != null ? network.config.BgmVolume : volume;
+        private float TargetVolume => BaseVolume * LabAudioSettings.BgmVolume;
 
         public void Bind(LabNetwork target) => network = target;
 

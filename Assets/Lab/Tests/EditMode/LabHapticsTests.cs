@@ -1,0 +1,64 @@
+using NUnit.Framework;
+using UnityEngine;
+
+namespace C6Lab.Tests
+{
+    public sealed class LabHapticsTests
+    {
+        private GameObject host;
+        private LabHaptics haptics;
+        private LabConfig config;
+
+        [SetUp]
+        public void SetUp()
+        {
+            host = new GameObject("haptics");
+            haptics = host.AddComponent<LabHaptics>();
+            config = ScriptableObject.CreateInstance<LabConfig>();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            Object.DestroyImmediate(host);
+            Object.DestroyImmediate(config);
+        }
+
+        [Test]
+        public void BaseDamageUsesHitHapticAndBiggerItemDamageUsesItemHaptic()
+        {
+            Assert.That(config.Damage, Is.EqualTo(20));
+            Assert.That(haptics.PlayForHit(20, config), Is.True);
+            Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.Hit), "A normal 20-damage hit is the weak haptic.");
+            Assert.That(haptics.PlayForHit(60, config), Is.True);
+            Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.ItemHit), "Item damage above the base is strong.");
+            Assert.That(haptics.PlayForHit(10, config), Is.True);
+            Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.Hit));
+            Assert.That(haptics.PlayCount, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void GenerateUsesItsOwnHaptic()
+        {
+            Assert.That(haptics.PlayForGenerate(config), Is.True);
+            Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.Generate));
+        }
+
+        [Test]
+        public void TurningHapticsOffOrZeroIntensityPlaysNothing()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[67] = 0f; // haptics off
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(haptics.PlayForHit(60, config), Is.False);
+            Assert.That(haptics.PlayForGenerate(config), Is.False);
+
+            values[67] = 1f;
+            values[69] = 0f; // generate intensity 0
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.True, error);
+            Assert.That(haptics.PlayForGenerate(config), Is.False);
+            Assert.That(haptics.PlayForHit(20, config), Is.True);
+            Assert.That(haptics.PlayCount, Is.EqualTo(1));
+        }
+    }
+}
