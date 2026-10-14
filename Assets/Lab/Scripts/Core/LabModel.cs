@@ -139,6 +139,7 @@ namespace C6Lab
             int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
+            player.generatedTotal++;
             Vector2 launch = SpawnVelocityFor(seed, sender, generated, position.x);
             orb = new LabOrbState
             {
@@ -186,6 +187,7 @@ namespace C6Lab
                 vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false
             };
             orbs.Add(orb.id, orb);
+            players[sender].combinedTotal++;
             reason = "COMBINED";
             orb = orb.Copy();
             return true;
@@ -232,6 +234,7 @@ namespace C6Lab
             }
             else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
             current.revision = ++revision;
+            if (!current.kind.IsDrum()) players[sender].passedTotal++;
             reason = "TRANSFERRED";
             orb = current.Copy();
             return true;
@@ -248,6 +251,9 @@ namespace C6Lab
             current.inFlight = true;
             current.vx = current.vy = 0f;
             current.revision = ++revision;
+            // 릴레이·폭탄은 던지는 것이 곧 아이템 사용이다.
+            if (current.kind == LabOrbKind.Relay) players[sender].relayUsed++;
+            else if (current.kind == LabOrbKind.Bomb) players[sender].bombUsed++;
             reason = "LAUNCHED";
             orb = current.Copy();
             return true;
@@ -322,6 +328,7 @@ namespace C6Lab
                     };
                     orbs.Add(opened.id, opened);
                 }
+                players[sender].secretBoxUsed++;
                 reason = "ITEM_USED";
                 orb = current.Copy();
                 return true;
@@ -330,6 +337,7 @@ namespace C6Lab
             if (player.personalHp <= 0) return Reject("PLAYER_DOWN", out reason);
             if (player.personalHp >= rules.PlayerMaxHp) return Reject("HP_FULL", out reason);
             player.personalHp = Math.Min(rules.PlayerMaxHp, player.personalHp + rules.PotionHeal);
+            player.potionUsed++;
             orbs.Remove(current.id);
             reason = "ITEM_USED";
             orb = current.Copy();
