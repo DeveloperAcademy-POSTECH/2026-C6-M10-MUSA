@@ -20635,6 +20635,55 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 847169181}
   m_CullTransparentMesh: 1
+--- !u!1 &852642363
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 852642365}
+  - component: {fileID: 852642364}
+  m_Layer: 0
+  m_Name: Impact Particle VFX
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &852642364
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 852642363}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a67145a13ec43db9644a8089102eb78, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabImpactParticleVfx
+  effectPrefab: {fileID: 3359854786279691528, guid: 78504441afced49308d2d46b93859f92, type: 3}
+  battleCamera: {fileID: 427558553}
+  prewarmCount: 8
+  maxPoolSize: 8
+  surfaceOffset: 0.04
+--- !u!4 &852642365
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 852642363}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &856204129
 GameObject:
   m_ObjectHideFlags: 0
@@ -49909,10 +49958,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabImpactFeedback
   battleCamera: {fileID: 427558553}
+  particleVfx: {fileID: 852642364}
   lifetime: 0.65
-  initialRingDiameter: 18
-  finalRingDiameter: 105
-  ringThickness: 4
   numberRise: 46
   numberFontSize: 28
 --- !u!1 &2009637133
@@ -54330,3 +54377,4 @@ SceneRoots:
   - {fileID: 1262056755}
   - {fileID: 1255900043}
   - {fileID: 1290961900}
+  - {fileID: 852642365}
