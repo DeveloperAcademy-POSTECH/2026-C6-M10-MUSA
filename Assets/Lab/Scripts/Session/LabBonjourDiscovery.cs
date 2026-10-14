@@ -68,12 +68,13 @@ namespace C6Lab
     public sealed class LabBonjourDiscovery : IDisposable
     {
         public const string ServiceType = "_c6lab._udp";
-        public const string Protocol = "C6-LAB-5614";
+        public static readonly string Protocol = "C6-LAB-" +
+            LabNetwork.LabProtocolVersion.ToString(CultureInfo.InvariantCulture);
         public const int MaximumServices = 32;
         public const int MaximumAddressesPerService = 32;
         public const double ResolveTimeoutSeconds = 8;
         private const string Domain = "local.";
-        private const string TxtPrefix = "p=" + Protocol + ";f=";
+        private static readonly string TxtPrefix = "p=" + Protocol + ";f=";
         private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
         private static readonly LabBonjourNative.RegisterReply RegisterCallback = Registered;
         private static readonly LabBonjourNative.BrowseReply BrowseCallback = Browsed;

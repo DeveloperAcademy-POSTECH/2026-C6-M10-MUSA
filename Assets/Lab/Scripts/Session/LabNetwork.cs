@@ -148,7 +148,7 @@ namespace C6Lab
     {
         private const string MessageName = "C6Lab.Packet.3";
         // P-slot assignments now join lobby packets; older clients cannot share this room.
-        private const ushort LabProtocolVersion = 5615;
+        internal const ushort LabProtocolVersion = 5615;
         private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
         private const int MaximumPacketBytes = 32768;
