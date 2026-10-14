@@ -47463,6 +47463,15 @@ MonoBehaviour:
   config: {fileID: 11400000, guid: ef9760abcf89544bba04c678ed9324a4, type: 2}
   board: {fileID: 523518297}
   orbCamera: {fileID: 760621525}
+  bgmVolume: 0.2
+  generateSoundVolume: 1
+  hitSoundVolume: 0.9
+  missSoundVolume: 0.7
+  hitHapticsEnabled: 1
+  normalHitHapticStyle: 0
+  normalHitHapticIntensity: 0.6
+  strongHitHapticStyle: 2
+  strongHitHapticIntensity: 1
 --- !u!4 &1925757924
 Transform:
   m_ObjectHideFlags: 0
