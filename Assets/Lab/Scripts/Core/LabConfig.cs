@@ -111,6 +111,17 @@ namespace C6Lab
             new LabDeveloperField("Spawn Fan Angle (deg each side, 180 = all directions)", 0f, 180f),
             new LabDeveloperField("Spawn Minimum Speed (board widths/s)", 0f, 10f),
             new LabDeveloperField("Spawn Maximum Speed (board widths/s)", 0f, 10f),
+            new LabDeveloperField("BGM Volume", 0f, 1f),
+            new LabDeveloperField("Generate Sound Volume", 0f, 1f),
+            new LabDeveloperField("Hit Sound Volume", 0f, 1f),
+            new LabDeveloperField("Miss Sound Volume", 0f, 1f),
+            new LabDeveloperField("Haptics (0 off, 1 on)", 0f, 1f, true),
+            new LabDeveloperField("Generate Haptic Style (0 Light 1 Medium 2 Heavy 3 Soft 4 Rigid)", 0f, 4f, true),
+            new LabDeveloperField("Generate Haptic Intensity", 0f, 1f),
+            new LabDeveloperField("Hit Haptic Style (0-4)", 0f, 4f, true),
+            new LabDeveloperField("Hit Haptic Intensity", 0f, 1f),
+            new LabDeveloperField("Item Hit Haptic Style (0-4)", 0f, 4f, true),
+            new LabDeveloperField("Item Hit Haptic Intensity", 0f, 1f),
             new LabDeveloperField("Drum Count", 1f, 5f, true),
             new LabDeveloperField("Drum Radius", .1f, 1.5f),
             new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
@@ -140,7 +151,8 @@ namespace C6Lab
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Drum", 63, 64, 65, 66, 67)
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73),
+            new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78)
         });
 
 
@@ -221,6 +233,32 @@ namespace C6Lab
         [SerializeField, Range(0f, 2f)] private float drumDriftTurning = .25f;
         [Tooltip("떠돌며 돌 때와 부딪혀 돌 때의 회전 세기. 0이면 돌지 않는다.")]
         [SerializeField, Range(0f, 3f)] private float drumSpinStrength = 1f;
+
+        [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
+        [Tooltip("전투 BGM 기본 크기")]
+        [SerializeField, Range(0f, 1f)] private float bgmVolume = .2f;
+        [Tooltip("구슬 생성 장구 소리 기본 크기")]
+        [SerializeField, Range(0f, 1f)] private float generateSoundVolume = 1f;
+        [Tooltip("내가 던진 구슬이 요괴에 맞았을 때 소리 기본 크기 (던진 사람 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float hitSoundVolume = .9f;
+        [Tooltip("내가 던진 구슬이 빗나갔을 때 소리 기본 크기 (던진 사람 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float missSoundVolume = .7f;
+
+        [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
+        [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
+        [SerializeField] private bool hapticsEnabled = true;
+        [Tooltip("내 구슬이 생성되어 떠오를 때 진동 종류")]
+        [SerializeField] private LabHapticStyle generateHapticStyle = LabHapticStyle.Light;
+        [Tooltip("생성 진동 세기 (0 = 끔)")]
+        [SerializeField, Range(0f, 1f)] private float generateHapticIntensity = .4f;
+        [Tooltip("기본 피해(Damage per Hit) 이하로 맞았을 때 진동 종류")]
+        [SerializeField] private LabHapticStyle hitHapticStyle = LabHapticStyle.Light;
+        [Tooltip("기본 피해일 때 진동 세기 (0 = 끔)")]
+        [SerializeField, Range(0f, 1f)] private float hitHapticIntensity = .6f;
+        [Tooltip("기본보다 큰 피해(아이템)로 맞았을 때 진동 종류")]
+        [SerializeField] private LabHapticStyle itemHitHapticStyle = LabHapticStyle.Heavy;
+        [Tooltip("큰 피해일 때 진동 세기 (0 = 끔)")]
+        [SerializeField, Range(0f, 1f)] private float itemHitHapticIntensity = 1f;
 
         [Header("Replaceable orb presentation")]
         [SerializeField] private LabOrbAppearance orbAppearance;
@@ -313,6 +351,17 @@ namespace C6Lab
         public float DrumDriftTurning => Mathf.Clamp(Finite(drumDriftTurning, .25f), 0f, 2f);
         public float DrumSpinStrength => Mathf.Clamp(Finite(drumSpinStrength, 1f), 0f, 3f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
+        public float BgmVolume => Mathf.Clamp01(Finite(bgmVolume, .2f));
+        public float GenerateSoundVolume => Mathf.Clamp01(Finite(generateSoundVolume, 1f));
+        public float HitSoundVolume => Mathf.Clamp01(Finite(hitSoundVolume, .9f));
+        public float MissSoundVolume => Mathf.Clamp01(Finite(missSoundVolume, .7f));
+        public bool HapticsEnabled => hapticsEnabled;
+        public LabHapticStyle GenerateHapticStyle => ValidStyle(generateHapticStyle);
+        public float GenerateHapticIntensity => Mathf.Clamp01(Finite(generateHapticIntensity, .4f));
+        public LabHapticStyle HitHapticStyle => ValidStyle(hitHapticStyle);
+        public float HitHapticIntensity => Mathf.Clamp01(Finite(hitHapticIntensity, .6f));
+        public LabHapticStyle ItemHitHapticStyle => ValidStyle(itemHitHapticStyle);
+        public float ItemHitHapticIntensity => Mathf.Clamp01(Finite(itemHitHapticIntensity, 1f));
         public float CameraRadius => Positive(cameraRadius, 8f);
         public float CameraHeightOffset => Finite(cameraHeightOffset, .65f);
         public float CameraLookHeightOffset => Mathf.Clamp(Finite(cameraLookHeightOffset, 2f), -10f, 10f);
@@ -360,8 +409,13 @@ namespace C6Lab
                 PotionHeal, RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier,
                 CameraLookHeightOffset, TargetSpinStrength, TargetSpinDamping,
                 TargetSpinMaximumSpeed,
-                SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, DrumCount, DrumRadius,
-                DrumDriftSpeed, DrumDriftTurning, DrumSpinStrength
+                SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed,
+                BgmVolume, GenerateSoundVolume, HitSoundVolume, MissSoundVolume,
+                HapticsEnabled ? 1f : 0f,
+                (float)GenerateHapticStyle, GenerateHapticIntensity,
+                (float)HitHapticStyle, HitHapticIntensity,
+                (float)ItemHitHapticStyle, ItemHitHapticIntensity,
+                DrumCount, DrumRadius, DrumDriftSpeed, DrumDriftTurning, DrumSpinStrength
             };
         }
 
@@ -465,17 +519,30 @@ namespace C6Lab
             spawnFanAngle = values[60];
             spawnMinSpeed = values[61];
             spawnMaxSpeed = values[62];
-            drumCount = (int)values[63];
-            drumRadius = values[64];
-            drumDriftSpeed = values[65];
-            drumDriftTurning = values[66];
-            drumSpinStrength = values[67];
+            bgmVolume = values[63];
+            generateSoundVolume = values[64];
+            hitSoundVolume = values[65];
+            missSoundVolume = values[66];
+            hapticsEnabled = values[67] >= .5f;
+            generateHapticStyle = (LabHapticStyle)(int)values[68];
+            generateHapticIntensity = values[69];
+            hitHapticStyle = (LabHapticStyle)(int)values[70];
+            hitHapticIntensity = values[71];
+            itemHitHapticStyle = (LabHapticStyle)(int)values[72];
+            itemHitHapticIntensity = values[73];
+            drumCount = (int)values[74];
+            drumRadius = values[75];
+            drumDriftSpeed = values[76];
+            drumDriftTurning = values[77];
+            drumSpinStrength = values[78];
             error = string.Empty;
             return true;
         }
 
         private static float Finite(float value, float fallback) =>
             float.IsNaN(value) || float.IsInfinity(value) ? fallback : value;
+        private static LabHapticStyle ValidStyle(LabHapticStyle style) =>
+            style >= LabHapticStyle.Light && style <= LabHapticStyle.Rigid ? style : LabHapticStyle.Light;
         private static float Positive(float value, float fallback) => Mathf.Max(.001f, Finite(value, fallback));
     }
 }

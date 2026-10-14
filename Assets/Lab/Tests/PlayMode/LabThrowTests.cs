@@ -61,6 +61,7 @@ namespace C6Lab.Tests
         }
 
         [TestCase(2)]
+        [TestCase(3)]
         [TestCase(4)]
         [TestCase(5)]
         public void OtherRoomSizesKeepCameraAndThrowAlignedWithTheirOwnSeatCount(int seatCount)
@@ -84,6 +85,12 @@ namespace C6Lab.Tests
                         Vector3.ProjectOnPlane(camera - center, Vector3.up),
                         Vector3.ProjectOnPlane(next - center, Vector3.up)),
                         Is.EqualTo(360f / seatCount).Within(.01f));
+                    if (seatCount > 2)
+                    {
+                        Vector3 screenRight = Quaternion.LookRotation(center - camera) * Vector3.right;
+                        Assert.That(Vector3.Dot(next - camera, screenRight), Is.GreaterThan(0f),
+                            "P+1 must be on the player's visible right, where a rightward orb is transferred.");
+                    }
                 }
             }
             finally { Object.DestroyImmediate(config); }

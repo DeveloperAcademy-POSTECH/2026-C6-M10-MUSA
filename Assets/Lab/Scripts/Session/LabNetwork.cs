@@ -21,10 +21,15 @@ namespace C6Lab
     [Serializable]
     internal sealed class LabNetworkPacket
     {
-        public int protocol = 2;
+        public int protocol = 3;
         public string type;
         public string sessionId;
+        // Connected Netcode client IDs, independent of their chosen P numbers.
         public ulong[] seats;
+        public LabPlayerSlotAssignment[] slotAssignments;
+        public int slotNumber;
+        public bool accepted;
+        public long lobbyRevision;
         public LabSnapshot snapshot;
         public long requestId;
         public string firstId;
@@ -141,12 +146,12 @@ namespace C6Lab
     /// </summary>
     public sealed class LabNetwork : MonoBehaviour
     {
-        private const string MessageName = "C6Lab.Packet.2";
-        // Generate drums join the snapshot and the generate request names one;
-        // reject older clients rather than mixing different battle rules.
-        private const ushort LabProtocolVersion = 5615;
+        private const string MessageName = "C6Lab.Packet.3";
+        // P-slot assignments join lobby packets, and generate drums join the snapshot with the
+        // generate request naming one; older clients cannot share this room.
+        internal const ushort LabProtocolVersion = 5616;
         private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/7");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -163,6 +168,7 @@ namespace C6Lab
         public string hostAddress = "127.0.0.1";
 
         private readonly List<ulong> order = new List<ulong>(5);
+        private readonly Dictionary<ulong, long> slotRequestIds = new Dictionary<ulong, long>();
         private readonly HashSet<ulong> configAcknowledgements = new HashSet<ulong>();
         private readonly Dictionary<ulong, long> pauseRequestIds = new Dictionary<ulong, long>();
         private readonly Dictionary<ulong, double> pendingApprovals = new Dictionary<ulong, double>();
@@ -171,6 +177,7 @@ namespace C6Lab
         private readonly LabBattleClock battleClock = new LabBattleClock();
         private readonly List<string> joinCandidates = new List<string>();
         private LabModel model;
+        private LabPlayerSlots playerSlots;
         private double nextSnapshotAt;
         private double nextMotionAt;
         private long requestSequence;
@@ -186,9 +193,15 @@ namespace C6Lab
         private bool pendingDeveloperRestart;
         private bool pauseRequestPending;
         private double pauseRequestSentAt;
+        private bool slotSelectionPending;
+        private long pendingSlotRequestId;
+        private int pendingSlotNumber;
+        private double slotRequestSentAt;
         private bool locallyPaused;
         private float timeScaleBeforePause = 1f;
         private long lobbySnapshotSequenceFloor;
+        private long lobbyRevision;
+        private long receivedLobbyRevision;
         private string sessionId;
         private LabSnapshot latest;
         private LabConfig sourceConfig;
@@ -216,11 +229,21 @@ namespace C6Lab
 
         public event Action Changed;
         public event Action<LabConfig> ConfigApplied;
+        /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (실제 피해량)</summary>
+        public event Action<int> LocalThrowHit;
+        /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
+        public event Action LocalThrowMissed;
+        private string lastMissNoticeId;
         public string Status { get; private set; } = "Choose HOST or JOIN.";
         public string Notice { get; private set; } = string.Empty;
         public string LastShotReport { get; private set; } = string.Empty;
         public int ParticipantCount => order.Count;
         public int TargetParticipantCount => targetParticipantCount;
+        public int LocalSlotNumber => IsConnected && playerSlots != null ? playerSlots.GetSlot(LocalPlayerId) : 0;
+        public bool SlotSelectionPending => slotSelectionPending;
+        public bool CanSelectPlayerSlot => IsConnected && playerSlots != null && !developerSolo
+            && model == null && latest == null && !slotSelectionPending;
+        public ulong GetSlotOwner(int slotNumber) => playerSlots?.GetOwner(slotNumber) ?? ulong.MaxValue;
         public bool IsSearchingRooms => roomSearchActive && discovery != null && discovery.IsBrowsing;
         public IReadOnlyList<LabDiscoveredRoom> DiscoveredRooms => discoveredRooms;
         // Bonjour may rename a duplicate service. Show only its confirmed registered name.
@@ -243,7 +266,8 @@ namespace C6Lab
         public ulong LocalPlayerId => IsConnected ? manager.LocalClientId : ulong.MaxValue;
         public LabSnapshot Snapshot => latest;
         public bool CanStartBattle => IsHost && !developerSolo && order.Count == targetParticipantCount
-            && SessionConfigReady && (latest == null || latest.phase != LabPhase.Playing);
+            && playerSlots != null && playerSlots.IsComplete(order) && SessionConfigReady
+            && (latest == null || latest.phase != LabPhase.Playing);
         public bool IsBattlePaused => latest != null && latest.phase == LabPhase.Playing && latest.paused;
         public bool CanPauseBattle => IsConnected && latest != null && latest.phase == LabPhase.Playing
             && !latest.paused && !pauseRequestPending
@@ -317,6 +341,57 @@ namespace C6Lab
             targetParticipantCount = targetParticipants;
             SetNotice("Room settings prepared for " + targetParticipants + " players.");
             return true;
+        }
+
+        /// <summary>
+        /// Select P1..PN in a connected room lobby, or 0 to clear the choice. The Host alone
+        /// accepts a claim; the requesting client waits for its result and the new lobby state.
+        /// </summary>
+        public bool RequestPlayerSlot(int slotNumber)
+        {
+            if (!CanSelectPlayerSlot || slotNumber < 0 || slotNumber > targetParticipantCount)
+            {
+                SetNotice("Choose an available P number in the room lobby.");
+                return false;
+            }
+            if (IsHost) return TrySelectSlot(LocalPlayerId, slotNumber);
+            long id = ++requestSequence;
+            if (!Send(NetworkManager.ServerClientId, new LabNetworkPacket
+                { type = "slot_select", requestId = id, slotNumber = slotNumber }))
+            {
+                SetNotice("Could not send the P number selection. Try again.");
+                return false;
+            }
+            slotSelectionPending = true;
+            pendingSlotRequestId = id;
+            pendingSlotNumber = slotNumber;
+            slotRequestSentAt = Time.realtimeSinceStartupAsDouble;
+            Changed?.Invoke();
+            return true;
+        }
+
+        private bool TrySelectSlot(ulong playerId, int slotNumber)
+        {
+            if (!IsHost || developerSolo || model != null || !order.Contains(playerId)
+                || playerSlots == null || !playerSlots.TrySelect(playerId, slotNumber, out string reason))
+            {
+                SetNotice("That P number is unavailable. Choose another.");
+                return false;
+            }
+            SetNotice(string.Empty);
+            BroadcastLobby();
+            Debug.Log("C6_LAB_SLOT player=" + playerId + " p=" + slotNumber + " result=" + reason);
+            if (autoStart && CanStartBattle) StartBattle();
+            else TryStartPendingDeveloperRestart();
+            return true;
+        }
+
+        private int FirstAvailableSlot()
+        {
+            if (playerSlots == null) return 0;
+            for (int slot = 1; slot <= targetParticipantCount; slot++)
+                if (playerSlots.GetOwner(slot) == ulong.MaxValue) return slot;
+            return 0;
         }
 
         /// <summary>Host lobby edits invalidate every old ACK and send a new revision.</summary>
@@ -404,6 +479,7 @@ namespace C6Lab
             if (!CanChooseConnection || manager == null || transport == null || config == null) return;
             DisposeDiscovery();
             ResetLocal();
+            playerSlots = new LabPlayerSlots(targetParticipantCount);
             configRevision = 1;
             configFingerprint = LabSessionSettings.Fingerprint(config.CaptureDeveloperValues(), targetParticipantCount,
                 LabProtocolVersion);
@@ -422,6 +498,8 @@ namespace C6Lab
             }
             RegisterHandler();
             if (!order.Contains(manager.LocalClientId)) order.Add(manager.LocalClientId);
+            if (autoStart && playerSlots.GetSlot(manager.LocalClientId) == 0)
+                playerSlots.TrySelect(manager.LocalClientId, FirstAvailableSlot(), out _);
             configAcknowledgements.Add(manager.LocalClientId);
             StartAdvertising();
             SetStatus("HOST listening on port " + port + "; waiting for " + (targetParticipantCount - 1) + " peers.");
@@ -599,7 +677,7 @@ namespace C6Lab
         {
             if (!CanStartBattle)
             {
-                SetNotice("Wait for " + targetParticipantCount + " players and matching settings confirmations.");
+                SetNotice("Wait for " + targetParticipantCount + " selected P numbers and matching settings confirmations.");
                 return;
             }
             pendingDeveloperRestart = false;
@@ -613,12 +691,13 @@ namespace C6Lab
             ConfigureTargetSpin();
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
-            model.Begin(sessionId, order.ToArray(), Time.realtimeSinceStartupAsDouble, config);
+            ulong[] playersInPOrder = playerSlots.PlayersInSlotOrder();
+            model.Begin(sessionId, playersInPOrder, Time.realtimeSinceStartupAsDouble, config);
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
             PublishSnapshot(true);
             SetStatus("PLAYING: " + order.Count + " / " + targetParticipantCount);
-            Debug.Log("C6_LAB_START session=" + sessionId + " seats=" + string.Join(",", order));
+            Debug.Log("C6_LAB_START session=" + sessionId + " seats=" + string.Join(",", playersInPOrder));
         }
 
         /// <summary>Start a one-player Host session only in the Editor or a Development Build.</summary>
@@ -834,6 +913,12 @@ namespace C6Lab
             double now = Time.realtimeSinceStartupAsDouble;
             if (pauseRequestPending && now - pauseRequestSentAt >= 5d)
                 pauseRequestPending = false;
+            if (slotSelectionPending && now - slotRequestSentAt >= 5d)
+            {
+                slotSelectionPending = false;
+                pendingSlotRequestId = 0;
+                SetNotice("P number selection timed out. Try again.");
+            }
             foreach (ulong stale in pendingApprovals.Where(item => now - item.Value > 15d)
                          .Select(item => item.Key).ToArray()) pendingApprovals.Remove(stale);
             LabBonjourDiscovery activeDiscovery = discovery;
@@ -974,6 +1059,8 @@ namespace C6Lab
                     manager.DisconnectClient(id);
                     return;
                 }
+                if (autoStart && playerSlots != null && playerSlots.GetSlot(id) == 0)
+                    playerSlots.TrySelect(id, FirstAvailableSlot(), out _);
                 Debug.Log("C6_LAB_PEER_JOIN id=" + id + " participants=" + order.Count);
                 BroadcastLobby();
                 if (id != LocalPlayerId) SendSessionConfig(id);
@@ -1001,6 +1088,8 @@ namespace C6Lab
                     Debug.Log("C6_LAB_JOIN_REJECTED id=" + id);
                     return;
                 }
+                playerSlots?.Release(id);
+                slotRequestIds.Remove(id);
                 Debug.LogWarning("C6_LAB_PEER_LEFT id=" + id);
                 if (model != null) EndBattleToLobby();
                 pendingDeveloperRestart = false;
@@ -1029,12 +1118,46 @@ namespace C6Lab
         {
             if (!IsHost) return;
             var packet = new LabNetworkPacket { type = "lobby", seats = order.ToArray(),
+                slotAssignments = playerSlots?.Snapshot() ?? Array.Empty<LabPlayerSlotAssignment>(),
                 targetParticipants = targetParticipantCount, configRevision = configRevision,
-                configFingerprint = configFingerprint, snapshotSequence = snapshotSequence };
+                configFingerprint = configFingerprint, snapshotSequence = snapshotSequence,
+                lobbyRevision = ++lobbyRevision };
             foreach (ulong id in order) if (id != manager.LocalClientId) Send(id, packet);
             SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
+                + " · P " + (playerSlots?.SelectedCount ?? 0) + "/" + targetParticipantCount
                 + " · settings " + configAcknowledgements.Count + "/" + order.Count);
             Changed?.Invoke();
+        }
+
+        private void HandleSlotSelectionRequest(ulong sender, LabNetworkPacket packet)
+        {
+            bool accepted = false;
+            bool changed = false;
+            string reason;
+            if (developerSolo || model != null || playerSlots == null)
+                reason = "SLOT_SELECTION_CLOSED";
+            else if (packet.requestId <= 0)
+                reason = "INVALID_SLOT_REQUEST";
+            else if (slotRequestIds.TryGetValue(sender, out long previous) && packet.requestId <= previous)
+            {
+                accepted = packet.requestId == previous && playerSlots != null
+                    && playerSlots.GetSlot(sender) == packet.slotNumber;
+                reason = accepted ? "SLOT_UNCHANGED" : "STALE_SLOT_REQUEST";
+            }
+            else
+            {
+                slotRequestIds[sender] = packet.requestId;
+                int previousSlot = playerSlots.GetSlot(sender);
+                accepted = playerSlots.TrySelect(sender, packet.slotNumber, out reason);
+                changed = accepted && previousSlot != packet.slotNumber;
+            }
+            Send(sender, new LabNetworkPacket { type = "slot_result", requestId = packet.requestId,
+                slotNumber = packet.slotNumber, accepted = accepted, reason = reason });
+            if (!changed) return;
+            BroadcastLobby();
+            Debug.Log("C6_LAB_SLOT player=" + sender + " p=" + packet.slotNumber + " result=" + reason);
+            if (autoStart && CanStartBattle) StartBattle();
+            else TryStartPendingDeveloperRestart();
         }
 
         private void SendSessionConfig(ulong id)
@@ -1206,8 +1329,11 @@ namespace C6Lab
         private void SpawnHostProjectile(LabOrbState orb, Vector2 releaseVelocity, float releaseX01)
         {
             if (orb == null || target == null || config == null) return;
-            int seat = latest != null && latest.players != null ? Array.Find(latest.players, p => p.id == orb.owner)?.seat ?? order.IndexOf(orb.owner) : order.IndexOf(orb.owner);
-            int seatCount = latest?.players?.Length ?? order.Count;
+            int selectedSeat = (playerSlots?.GetSlot(orb.owner) ?? 0) - 1;
+            int seat = latest != null && latest.players != null
+                ? Array.Find(latest.players, p => p.id == orb.owner)?.seat ?? selectedSeat : selectedSeat;
+            int seatCount = latest?.players?.Length ?? targetParticipantCount;
+            if (seat < 0 || seat >= seatCount) return;
             Vector3 targetCenter = target.transform.position;
             Vector3 seatAnchor = LabThrowMath.SeatPosition(seat, seatCount, targetCenter,
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
@@ -1244,8 +1370,9 @@ namespace C6Lab
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
                     impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
                         result.ImpactVelocity);
+                    if (result.OwnerPlayerId == LocalPlayerId) LocalThrowHit?.Invoke(actualDamage);
                     var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
-                        round = model.Round, firstId = result.ProjectileId,
+                        round = model.Round, firstId = result.ProjectileId, owner = result.OwnerPlayerId,
                         element = (int)element, damage = actualDamage,
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
@@ -1253,7 +1380,14 @@ namespace C6Lab
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
             }
-            else model.ConfirmMiss(result.ProjectileId, now);
+            else if (model.ConfirmMiss(result.ProjectileId, now))
+            {
+                // 빗나감은 던진 사람에게만 알린다. 같은 구슬은 Host가 한 번만 확정한다.
+                if (result.OwnerPlayerId == LocalPlayerId) LocalThrowMissed?.Invoke();
+                else if (order.Contains(result.OwnerPlayerId))
+                    Send(result.OwnerPlayerId, new LabNetworkPacket { type = "targetMiss", sessionId = sessionId,
+                        round = model.Round, firstId = result.ProjectileId, owner = result.OwnerPlayerId });
+            }
             LastShotReport = string.Format(CultureInfo.InvariantCulture,
                 "SHOT {0} | {1:F2}s | peak +{2:F2}m | range {3:F2}m",
                 result.Hit ? "HIT" : "MISS", result.FlightSeconds,
@@ -1338,6 +1472,11 @@ namespace C6Lab
             if (IsHost)
             {
                 if (sender == LocalPlayerId || !order.Contains(sender)) return;
+                if (packet.type == "slot_select")
+                {
+                    HandleSlotSelectionRequest(sender, packet);
+                    return;
+                }
                 if (packet.type == "config_ack")
                 {
                     if (model == null && packet.configRevision == configRevision
@@ -1357,10 +1496,16 @@ namespace C6Lab
             switch (packet.type)
             {
                 case "lobby":
+                {
                     if (packet.targetParticipants < 2 || packet.targetParticipants > 5
                         || packet.seats == null || packet.seats.Length > packet.targetParticipants
+                        || packet.seats.Distinct().Count() != packet.seats.Length
+                        || packet.slotAssignments == null || packet.lobbyRevision <= receivedLobbyRevision
                         || packet.snapshotSequence < incomingSequence
                         || packet.snapshotSequence < lobbySnapshotSequenceFloor) return;
+                    var newSlots = new LabPlayerSlots(packet.targetParticipants);
+                    if (!newSlots.TryReplace(packet.slotAssignments, packet.seats)) return;
+                    receivedLobbyRevision = packet.lobbyRevision;
                     lobbySnapshotSequenceFloor = packet.snapshotSequence;
                     incomingSequence = Math.Max(incomingSequence, packet.snapshotSequence);
                     incomingChunks = null;
@@ -1378,12 +1523,26 @@ namespace C6Lab
                     if (board != null) board.Clear();
                     ApplyLocalPause(false);
                     order.AddRange(packet.seats);
+                    playerSlots = newSlots;
                     targetParticipantCount = packet.targetParticipants;
                     if (packet.configRevision != configRevision || packet.configFingerprint != configFingerprint)
                         clientConfigReady = false;
                     SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
+                        + " · P " + playerSlots.SelectedCount + "/" + targetParticipantCount
                         + (clientConfigReady ? " · settings confirmed" : " · waiting for settings"));
-                    Debug.Log("C6_LAB_LOBBY participants=" + order.Count + " seats=" + string.Join(",", order));
+                    Debug.Log("C6_LAB_LOBBY participants=" + order.Count + " slots="
+                        + string.Join(",", playerSlots.Snapshot().Select(item => "P" + item.slotNumber + ":" + item.playerId)));
+                    break;
+                }
+                case "slot_result":
+                    if (!slotSelectionPending || packet.requestId != pendingSlotRequestId
+                        || packet.slotNumber != pendingSlotNumber) return;
+                    slotSelectionPending = false;
+                    pendingSlotRequestId = 0;
+                    if (!packet.accepted)
+                        SetNotice(packet.reason == "SLOT_TAKEN" ? "That P number is already selected."
+                            : "P number selection was rejected: " + packet.reason);
+                    else SetNotice(string.Empty);
                     break;
                 case "config":
                     ReceiveSessionConfig(packet);
@@ -1408,6 +1567,16 @@ namespace C6Lab
                         impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
                             (LabOrbElement)packet.element, packet.damage,
                             new Vector3(packet.wx, packet.wy, packet.wz));
+                        // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
+                        if (packet.owner == LocalPlayerId) LocalThrowHit?.Invoke(packet.damage);
+                    }
+                    break;
+                case "targetMiss":
+                    if (packet.sessionId == sessionId && packet.owner == LocalPlayerId
+                        && packet.firstId != lastMissNoticeId)
+                    {
+                        lastMissNoticeId = packet.firstId;
+                        LocalThrowMissed?.Invoke();
                     }
                     break;
                 case "projectile":
@@ -1563,11 +1732,11 @@ namespace C6Lab
             {
                 reader.ReadValueSafe(out int version);
                 reader.ReadValueSafe(out int count);
-                if (version != 2 || count < 2 || count != reader.Length - reader.Position) return false;
+                if (version != 3 || count < 2 || count != reader.Length - reader.Position) return false;
                 var bytes = new byte[count];
                 reader.ReadBytesSafe(ref bytes, count);
                 packet = JsonUtility.FromJson<LabNetworkPacket>(Utf8.GetString(bytes));
-                return packet != null && packet.protocol == 2 && !string.IsNullOrEmpty(packet.type);
+                return packet != null && packet.protocol == 3 && !string.IsNullOrEmpty(packet.type);
             }
             catch (Exception) { return false; }
         }
@@ -1580,9 +1749,15 @@ namespace C6Lab
             battleClock.Reset();
             pendingDeveloperRestart = false;
             pauseRequestIds.Clear();
+            slotRequestIds.Clear();
             pauseRequestPending = false;
+            slotSelectionPending = false;
+            pendingSlotRequestId = 0;
+            pendingSlotNumber = 0;
+            slotRequestSentAt = 0d;
             ClearProjectiles();
             order.Clear();
+            playerSlots = null;
             configAcknowledgements.Clear();
             pendingApprovals.Clear();
             visibleOrbIds.Clear();
@@ -1602,6 +1777,8 @@ namespace C6Lab
             incomingChunkCount = 0;
             incomingChunkReceived = 0;
             lobbySnapshotSequenceFloor = 0;
+            lobbyRevision = 0;
+            receivedLobbyRevision = 0;
             LastShotReport = string.Empty;
             requestSequence = 0;
             if (board != null) board.Clear();

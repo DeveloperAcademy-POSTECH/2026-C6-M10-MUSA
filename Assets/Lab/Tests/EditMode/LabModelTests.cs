@@ -84,6 +84,37 @@ namespace C6Lab.Tests
             Assert.That(receivedRight.x, Is.EqualTo(0f));
         }
 
+        [Test]
+        public void ChosenPOrderRatherThanConnectionOrderControlsBothTransferDirections()
+        {
+            var slots = new LabPlayerSlots(3);
+            Assert.That(slots.TrySelect(10ul, 3, out _), Is.True); // Host chooses P3.
+            Assert.That(slots.TrySelect(20ul, 1, out _), Is.True);
+            Assert.That(slots.TrySelect(30ul, 2, out _), Is.True);
+            var room = new LabModel();
+            room.Begin("chosen-p-order", slots.PlayersInSlotOrder(), 0d, config);
+            Assert.That(room.Snapshot(0d).players.Select(player => player.id),
+                Is.EqualTo(new ulong[] { 20ul, 30ul, 10ul }));
+
+            Assert.That(room.TryGenerate(10ul, "right", 0d, out var right, out _), Is.True);
+            Assert.That(room.TryGenerate(10ul, "left", 0d, out var left, out _), Is.True);
+            Assert.That(room.TryUpdateMotion(10ul, right.id, new Vector2(.99f, .5f), Vector2.right, .1d), Is.True);
+            Assert.That(room.TryUpdateMotion(10ul, left.id, new Vector2(.01f, .5f), Vector2.left, .1d), Is.True);
+            Assert.That(room.TryTransfer(10ul, right.id, true, .5f, Vector2.right, "p3-right", .1d,
+                out var atP1, out _), Is.True);
+            Assert.That(room.TryTransfer(10ul, left.id, false, .5f, Vector2.left, "p3-left", .1d,
+                out var atP2, out _), Is.True);
+            Assert.That(atP1.owner, Is.EqualTo(20ul));
+            Assert.That(atP2.owner, Is.EqualTo(30ul));
+
+            room.Tick(181d);
+            room.Begin("chosen-p-order", slots.PlayersInSlotOrder(), 182d, config);
+            LabSnapshot retry = room.Snapshot(182d);
+            Assert.That(retry.round, Is.EqualTo(2u));
+            Assert.That(retry.players.Select(player => player.id),
+                Is.EqualTo(new ulong[] { 20ul, 30ul, 10ul }));
+        }
+
         [TestCase(2)]
         [TestCase(4)]
         [TestCase(5)]
@@ -490,7 +521,7 @@ namespace C6Lab.Tests
             try
             {
                 float[] values = single.CaptureDeveloperValues();
-                values[63] = 1f; // drum count
+                values[74] = 1f; // drum count
                 Assert.That(single.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var holders = new HashSet<ulong>();
                 for (int session = 0; session < 12; session++)
@@ -524,7 +555,7 @@ namespace C6Lab.Tests
             try
             {
                 float[] values = drums.CaptureDeveloperValues();
-                values[63] = drumCount;
+                values[74] = drumCount;
                 Assert.That(drums.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 ulong[] ids = Enumerable.Range(1, playerCount).Select(index => (ulong)index).ToArray();
                 var room = new LabModel();
@@ -551,7 +582,7 @@ namespace C6Lab.Tests
             {
                 float[] values = bombs.CaptureDeveloperValues();
                 values[9] = 1f;  // stored orb limit: one orb fills a board
-                values[63] = 3f; // every player holds one drum
+                values[74] = 3f; // every player holds one drum
                 Assert.That(bombs.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var room = new LabModel();
                 room.Begin("drum-rules", new ulong[] { 10, 20, 30 }, 0d, bombs);
@@ -632,7 +663,7 @@ namespace C6Lab.Tests
                 float[] values = chances.CaptureDeveloperValues();
                 values[5] = .001f; // generation cost
                 values[9] = 100f;  // stored orb limit
-                values[63] = 3f;   // every player holds a drum
+                values[74] = 3f;   // every player holds a drum
                 Assert.That(chances.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var room = new LabModel();
                 room.Begin("chance-test", new ulong[] { 10, 20, 30 }, 0d, chances);
@@ -1122,7 +1153,7 @@ namespace C6Lab.Tests
             var created = ScriptableObject.CreateInstance<LabConfig>();
             float[] values = created.CaptureDeveloperValues();
             values[5] = generateCost;
-            values[63] = LabModel.MaximumParticipants;
+            values[74] = LabModel.MaximumParticipants;
             for (int i = 0; i < chances.Length; i++) values[39 + i] = chances[i];
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;

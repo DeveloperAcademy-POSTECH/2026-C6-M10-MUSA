@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(68));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(79));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -57,15 +57,25 @@ namespace C6Lab.Tests
             values[60] = 40f;
             values[61] = .8f;
             values[62] = 1.4f;
-            Assert.That(values[63], Is.EqualTo(1f), "One drum per game by default.");
-            values[63] = 3f;
-            Assert.That(values[64], Is.EqualTo(.6f), "The drum keeps the old generate button's size.");
+            Assert.That(new[] { values[63], values[64], values[65], values[66] },
+                Is.EqualTo(new[] { .2f, 1f, .9f, .7f }), "BGM, generate, hit and miss volumes.");
+            Assert.That(new[] { values[67], values[68], values[69], values[70], values[71], values[72], values[73] },
+                Is.EqualTo(new[] { 1f, 0f, .4f, 0f, .6f, 2f, 1f }), "Haptics on; generate/hit/item-hit style and intensity.");
+            values[63] = .5f;
             values[64] = .8f;
-            Assert.That(new[] { values[65], values[66], values[67] }, Is.EqualTo(new[] { .1f, .25f, 1f }),
+            values[67] = 0f;
+            values[68] = 1f; // Medium
+            values[72] = 4f; // Rigid
+            values[73] = .7f;
+            Assert.That(values[74], Is.EqualTo(1f), "One drum per game by default.");
+            values[74] = 3f;
+            Assert.That(values[75], Is.EqualTo(.6f), "The drum keeps the old generate button's size.");
+            values[75] = .8f;
+            Assert.That(new[] { values[76], values[77], values[78] }, Is.EqualTo(new[] { .1f, .25f, 1f }),
                 "The drum drifts slowly, turns gently and spins at full strength by default.");
-            values[65] = .2f;
-            values[66] = .5f;
-            values[67] = 2f;
+            values[76] = .2f;
+            values[77] = .5f;
+            values[78] = 2f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -92,6 +102,12 @@ namespace C6Lab.Tests
             Assert.That(config.SpawnFanAngle, Is.EqualTo(40f));
             Assert.That(config.SpawnMinSpeed, Is.EqualTo(.8f));
             Assert.That(config.SpawnMaxSpeed, Is.EqualTo(1.4f));
+            Assert.That(config.BgmVolume, Is.EqualTo(.5f));
+            Assert.That(config.GenerateSoundVolume, Is.EqualTo(.8f));
+            Assert.That(config.HapticsEnabled, Is.False);
+            Assert.That(config.GenerateHapticStyle, Is.EqualTo(LabHapticStyle.Medium));
+            Assert.That(config.ItemHitHapticStyle, Is.EqualTo(LabHapticStyle.Rigid));
+            Assert.That(config.ItemHitHapticIntensity, Is.EqualTo(.7f));
             Assert.That(config.DrumCount, Is.EqualTo(3));
             Assert.That(config.DrumRadius, Is.EqualTo(.8f));
             Assert.That(config.DrumDriftSpeed, Is.EqualTo(.2f));
@@ -105,7 +121,7 @@ namespace C6Lab.Tests
             foreach (float invalid in new[] { 0f, 6f, 2.5f })
             {
                 float[] values = config.CaptureDeveloperValues();
-                values[63] = invalid;
+                values[74] = invalid;
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False, invalid.ToString());
                 Assert.That(error, Does.Contain("Drum Count"));
             }

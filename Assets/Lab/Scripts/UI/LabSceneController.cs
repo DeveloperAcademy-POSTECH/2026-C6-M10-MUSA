@@ -9,11 +9,7 @@ namespace C6Lab
         public LabOrbBoard board;
         public Camera orbCamera;
 
-        [Header("Audio (기본 크기)")]
-        [Tooltip("전투 BGM 기본 크기. 각 기기의 일시정지 메뉴 BGM 슬라이더 값이 여기에 곱해진다.")]
-        [Range(0f, 1f)] public float bgmVolume = .5f;
-        [Tooltip("구슬 생성 장구 소리 기본 크기. 일시정지 메뉴 SFX 슬라이더 값이 여기에 곱해진다.")]
-        [Range(0f, 1f)] public float generateSoundVolume = .8f;
+        // 소리 크기와 햅틱 설정은 LabConfig(Inspector: Resources/LabConfig, DEV: Sound and haptics)에 있다.
 
         private void Awake()
         {
@@ -31,38 +27,30 @@ namespace C6Lab
             // 게임 소리는 모두 화면 기준(2D)이라 위치와 상관없이 하나만 있으면 된다.
             if (FindFirstObjectByType<AudioListener>() == null)
                 gameObject.AddComponent<AudioListener>();
-            // 구슬 생성 효과음은 장면 수정 없이 보드 옆에 붙여 둔다.
+            // 소리·햅틱은 장면 수정 없이 여기에 붙인다. 크기·햅틱 설정은 모두 boardNetwork.config(LabConfig)에서 읽는다.
+            // 구슬 생성 효과음 (내 구슬이 떠오를 때)
             LabGenerateSound generateSound = GetComponent<LabGenerateSound>();
             if (board != null && generateSound == null)
             {
                 generateSound = gameObject.AddComponent<LabGenerateSound>();
                 generateSound.Bind(board);
             }
-            if (generateSound != null) generateSound.volume = generateSoundVolume;
-            // 전투 BGM도 같은 방식으로 붙이고, 전투 상태를 읽을 네트워크를 연결한다.
-            LabBattleBgm battleBgm = GetComponent<LabBattleBgm>();
-            if (boardNetwork != null && battleBgm == null)
-            {
-                battleBgm = gameObject.AddComponent<LabBattleBgm>();
-                battleBgm.Bind(boardNetwork);
-            }
-            if (battleBgm != null) battleBgm.volume = bgmVolume;
+            if (generateSound != null) generateSound.BindConfig(boardNetwork);
+            // 전투 BGM (전투 상태를 읽을 네트워크 연결)
+            if (boardNetwork != null && GetComponent<LabBattleBgm>() == null)
+                gameObject.AddComponent<LabBattleBgm>().Bind(boardNetwork);
+            // 던진 구슬의 결과 소리 (맞음·빗나감, 던진 사람 기기만)
+            if (boardNetwork != null && GetComponent<LabThrowSound>() == null)
+                gameObject.AddComponent<LabThrowSound>().Bind(boardNetwork);
+            // 햅틱 (내 구슬 생성, 내가 던진 구슬 타격)
+            if (boardNetwork != null && GetComponent<LabHaptics>() == null)
+                gameObject.AddComponent<LabHaptics>().Bind(boardNetwork, board);
             // 일시정지 메뉴에 BGM·효과음 크기 슬라이더를 붙인다. 값은 기기마다 따로 저장된다.
             LabHud hud = FindFirstObjectByType<LabHud>();
             if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)
                 gameObject.AddComponent<LabAudioSettingsPanel>().Bind(hud.pauseMenu, generateSound);
             ReconfigureBoard();
         }
-
-#if UNITY_EDITOR
-        // Play 중 Inspector에서 값을 바꾸면 바로 들리도록 반영한다.
-        private void OnValidate()
-        {
-            if (!Application.isPlaying) return;
-            if (TryGetComponent(out LabBattleBgm bgm)) bgm.volume = bgmVolume;
-            if (TryGetComponent(out LabGenerateSound sound)) sound.volume = generateSoundVolume;
-        }
-#endif
 
         /// <summary>Refresh the board only before a round; configuring clears current motion.</summary>
         public void ReconfigureBoard()

@@ -664,8 +664,8 @@ namespace C6Lab.Tests
         private void SetDrumDrift(float speed, float turning)
         {
             float[] values = config.CaptureDeveloperValues();
-            values[65] = speed;
-            values[66] = turning;
+            values[76] = speed;
+            values[77] = turning;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
         }
 

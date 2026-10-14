@@ -51,6 +51,7 @@ namespace C6Lab
         public LabPhase Phase => phase;
         public int Hp => hp;
 
+        /// <summary>ids must be the Host-approved player IDs in P1..PN order.</summary>
         public void Begin(string id, ulong[] ids, double now, LabConfig config)
         {
             if (ids == null || ids.Length < MinimumParticipants || ids.Length > MaximumParticipants
