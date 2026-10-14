@@ -25,6 +25,9 @@ namespace C6Lab
 
         public bool IsPlaying => source != null && source.isPlaying;
 
+        // 기본 크기 × 이 기기의 BGM 설정
+        private float TargetVolume => volume * LabAudioSettings.BgmVolume;
+
         public void Bind(LabNetwork target) => network = target;
 
         private void Awake()
@@ -34,7 +37,7 @@ namespace C6Lab
             source.playOnAwake = false;
             source.loop = true;
             source.spatialBlend = 0f;
-            source.volume = volume;
+            source.volume = TargetVolume;
             if (clips.Length > 0) source.clip = clips[0];
         }
 
@@ -52,13 +55,15 @@ namespace C6Lab
 
             if (snapshot.phase == LabPhase.Playing)
             {
+                // 설정에서 크기를 바꾸면 바로 반영된다.
+                source.volume = TargetVolume;
                 string round = snapshot.sessionId + ":" + snapshot.round;
                 if (round != playingRound)
                 {
                     // 새 라운드는 처음부터
                     playingRound = round;
                     fading = false;
-                    source.volume = volume;
+                    source.volume = TargetVolume;
                     source.Stop();
                     source.time = 0f;
                     if (!snapshot.paused) source.Play();
@@ -70,7 +75,7 @@ namespace C6Lab
                 }
                 else if (!source.isPlaying)
                 {
-                    source.volume = volume;
+                    source.volume = TargetVolume;
                     source.UnPause();
                     if (!source.isPlaying) source.Play();
                 }
@@ -81,7 +86,7 @@ namespace C6Lab
             if (source.isPlaying)
             {
                 fading = true;
-                float step = fadeOutSeconds <= 0f ? 1f : volume * Time.unscaledDeltaTime / fadeOutSeconds;
+                float step = fadeOutSeconds <= 0f ? 1f : TargetVolume * Time.unscaledDeltaTime / fadeOutSeconds;
                 source.volume = Mathf.Max(0f, source.volume - step);
                 if (source.volume <= 0f) StopNow();
             }
@@ -91,7 +96,7 @@ namespace C6Lab
         {
             if (source.isPlaying || fading) source.Stop();
             fading = false;
-            source.volume = volume;
+            source.volume = TargetVolume;
             if (network == null || network.Snapshot == null) playingRound = null;
         }
     }

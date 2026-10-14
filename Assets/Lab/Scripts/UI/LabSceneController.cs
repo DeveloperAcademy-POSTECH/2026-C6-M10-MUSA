@@ -26,11 +26,19 @@ namespace C6Lab
             if (FindFirstObjectByType<AudioListener>() == null)
                 gameObject.AddComponent<AudioListener>();
             // 구슬 생성 효과음은 장면 수정 없이 보드 옆에 붙여 둔다.
-            if (board != null && GetComponent<LabGenerateSound>() == null)
-                gameObject.AddComponent<LabGenerateSound>().Bind(board);
+            LabGenerateSound generateSound = GetComponent<LabGenerateSound>();
+            if (board != null && generateSound == null)
+            {
+                generateSound = gameObject.AddComponent<LabGenerateSound>();
+                generateSound.Bind(board);
+            }
             // 전투 BGM도 같은 방식으로 붙이고, 전투 상태를 읽을 네트워크를 연결한다.
             if (boardNetwork != null && GetComponent<LabBattleBgm>() == null)
                 gameObject.AddComponent<LabBattleBgm>().Bind(boardNetwork);
+            // 일시정지 메뉴에 BGM·효과음 크기 슬라이더를 붙인다. 값은 기기마다 따로 저장된다.
+            LabHud hud = FindFirstObjectByType<LabHud>();
+            if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)
+                gameObject.AddComponent<LabAudioSettingsPanel>().Bind(hud.pauseMenu, generateSound);
             ReconfigureBoard();
         }
 
