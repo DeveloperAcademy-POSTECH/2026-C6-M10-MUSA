@@ -49,6 +49,11 @@ namespace C6Lab
             LabHud hud = FindFirstObjectByType<LabHud>();
             if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)
                 gameObject.AddComponent<LabAudioSettingsPanel>().Bind(hud.pauseMenu, generateSound);
+            // 승리/패배 결과 화면 위에 이번 라운드 기록·MVP 대시보드를 붙인다.
+            if (hud != null && hud.resultControls != null && boardNetwork != null
+                && GetComponent<LabResultDashboard>() == null)
+                gameObject.AddComponent<LabResultDashboard>().Bind(boardNetwork, hud.resultControls,
+                    hud.resultStatusText != null ? hud.resultStatusText.font : null);
             ReconfigureBoard();
         }
 

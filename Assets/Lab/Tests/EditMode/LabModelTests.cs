@@ -1148,6 +1148,90 @@ namespace C6Lab.Tests
         /// A default config with one generation cost and chances in GeneratedKinds order. Five drums
         /// let every player in any room generate; drum placement has its own tests.
         /// </summary>
+        [Test]
+        public void RoundRecordsCountOnlySuccessfulGenerateCombineAndPass()
+        {
+            var (yin, yang) = GeneratePair(10);
+            LabPlayerState Me(double at) => model.Snapshot(at).players.Single(p => p.id == 10);
+            int generated = model.Snapshot(0d).orbs.Count(orb => orb.owner == 10);
+            Assert.That(Me(0d).generatedTotal, Is.EqualTo(generated));
+
+            Assert.That(model.TryCombine(10, yin.id, yin.id, "bad-combine", 0d, out _, out _), Is.False);
+            Assert.That(Me(0d).combinedTotal, Is.Zero, "A rejected combine is not counted.");
+            Assert.That(model.TryCombine(10, yin.id, yang.id, "combine", .1d, out var combined, out _), Is.True);
+            Assert.That(Me(.1d).combinedTotal, Is.EqualTo(1));
+
+            Assert.That(model.TryUpdateMotion(10, combined.id, new Vector2(.99f, .5f), Vector2.right, .2d), Is.True);
+            Assert.That(model.TryTransfer(10, combined.id, true, .5f, Vector2.right, "pass", .2d, out _, out var reason),
+                Is.True, reason);
+            Assert.That(Me(.2d).passedTotal, Is.EqualTo(1));
+            Assert.That(model.Snapshot(.2d).players.Where(p => p.id != 10).All(p => p.passedTotal == 0), Is.True);
+
+            // A new round starts every record from zero.
+            model.Tick(500d);
+            Assert.That(model.Phase, Is.Not.EqualTo(LabPhase.Playing));
+            model.Begin("lab-test", new ulong[] { 10, 20, 30 }, 500d, config);
+            var fresh = model.Snapshot(500d).players.Single(p => p.id == 10);
+            Assert.That(new[] { fresh.generatedTotal, fresh.combinedTotal, fresh.passedTotal, fresh.ItemsUsed },
+                Is.EqualTo(new[] { 0, 0, 0, 0 }));
+        }
+
+        [Test]
+        public void ItemsCountWhenUsedOrThrownButNotWhenRefused()
+        {
+            // GeneratedKinds order: Yin, Yang, Relay, SecretBox, Potion, Bomb
+            void Check(int[] chances, Func<LabModel, string, bool> use, Func<LabPlayerState, int> counter, int expected)
+            {
+                var items = ConfigWith(1f, chances);
+                try
+                {
+                    float[] values = items.CaptureDeveloperValues();
+                    values[46] = 0f; // unlock swipes min
+                    values[47] = 0f; // unlock swipes max
+                    Assert.That(items.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                    var room = new LabModel();
+                    room.Begin("items", new ulong[] { 10, 20 }, 0d, items);
+                    Assert.That(room.TryGenerate(10, "item", 0d, out var item, out _), Is.True);
+                    use(room, item.id);
+                    var me = room.Snapshot(.5d).players.Single(p => p.id == 10);
+                    Assert.That(counter(me), Is.EqualTo(expected));
+                    Assert.That(me.ItemsUsed, Is.EqualTo(expected));
+                }
+                finally { UnityEngine.Object.DestroyImmediate(items); }
+            }
+
+            Check(new[] { 0, 0, 100, 0, 0, 0 }, (room, id) => room.TryLaunch(10, id, "relay", .5d, out _, out _),
+                p => p.relayUsed, 1);
+            Check(new[] { 0, 0, 0, 100, 0, 0 }, (room, id) => room.TryUseItem(10, id, "box", .5d, out _, out _),
+                p => p.secretBoxUsed, 1);
+            Check(new[] { 0, 0, 0, 0, 0, 100 }, (room, id) => room.TryLaunch(10, id, "bomb", .5d, out _, out _),
+                p => p.bombUsed, 1);
+            // A potion at full HP is refused and kept, so it is not counted.
+            Check(new[] { 0, 0, 0, 0, 100, 0 }, (room, id) => room.TryUseItem(10, id, "potion", .5d, out _, out _),
+                p => p.potionUsed, 0);
+        }
+
+        [Test]
+        public void MvpAwardsShareTiesAndSkipEmptyCategories()
+        {
+            var players = new[]
+            {
+                new LabPlayerState { id = 10, seat = 0, generatedTotal = 5, relayUsed = 1 },
+                new LabPlayerState { id = 20, seat = 1, generatedTotal = 5, passedTotal = 3 },
+                new LabPlayerState { id = 30, seat = 2, generatedTotal = 2, potionUsed = 1, bombUsed = 1 }
+            };
+            var awards = LabResultStats.Awards(players);
+            Assert.That(awards.Select(a => a.Title), Is.EqualTo(new[]
+                { LabResultTitle.MostGenerated, LabResultTitle.MostItems, LabResultTitle.MostPassed }),
+                "Nobody combined, so there is no combine award.");
+            Assert.That(awards[0].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }));
+            Assert.That(awards[0].Value, Is.EqualTo(5));
+            Assert.That(awards[1].Winners.Single().id, Is.EqualTo(30ul));
+            Assert.That(awards[1].Value, Is.EqualTo(2));
+            Assert.That(awards[2].Winners.Single().id, Is.EqualTo(20ul));
+            Assert.That(LabResultStats.Awards(new LabPlayerState[0]), Is.Empty);
+        }
+
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {
             var created = ScriptableObject.CreateInstance<LabConfig>();

@@ -70,6 +70,18 @@ namespace C6Lab
         public int personalHp;
         public int seat;
 
+        // 결과 대시보드용 이번 라운드 기록. Host가 성공한 행동만 센다.
+        /// <summary>구슬 생성 성공 수</summary>
+        public int generatedTotal;
+        /// <summary>결합 성공 수 (내가 만든 결합 구슬)</summary>
+        public int combinedTotal;
+        /// <summary>이웃에게 넘겨준 구슬 수 (북 제외)</summary>
+        public int passedTotal;
+        /// <summary>아이템 사용 수: 릴레이·폭탄은 던졌을 때, 비밀상자·포션은 더블탭 사용했을 때</summary>
+        public int relayUsed, secretBoxUsed, potionUsed, bombUsed;
+
+        public int ItemsUsed => relayUsed + secretBoxUsed + potionUsed + bombUsed;
+
         public LabPlayerState Copy() => (LabPlayerState)MemberwiseClone();
     }
 
