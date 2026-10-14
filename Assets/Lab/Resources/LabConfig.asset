@@ -49,12 +49,27 @@ MonoBehaviour:
   combineSpeed: 0
   dropCombineEnabled: 1
   contactCombineEnabled: 1
-  spawnRiseDistance: 0.65
-  spawnRiseDuration: 0.25
-  spawnFanAngle: 55
+  spawnPopStartScale: 0.3
+  spawnPopDuration: 0.15
+  spawnFanAngle: 180
   spawnMinSpeed: 1
   spawnMaxSpeed: 1.8
-  spawnOriginHeight: 0.2
+  drumCount: 1
+  drumRadius: 0.6
+  drumDriftSpeed: 0.1
+  drumDriftTurning: 0.25
+  drumSpinStrength: 1
+  bgmVolume: 0.2
+  generateSoundVolume: 1
+  hitSoundVolume: 0.9
+  missSoundVolume: 0.7
+  hapticsEnabled: 1
+  generateHapticStyle: 0
+  generateHapticIntensity: 0.4
+  hitHapticStyle: 0
+  hitHapticIntensity: 0.6
+  itemHitHapticStyle: 2
+  itemHitHapticIntensity: 1
   orbAppearance: {fileID: 11400000, guid: 9fd06f927557d47e2ac8b342a6979ed0, type: 2}
   cameraRadius: 8
   cameraHeightOffset: 0.65
