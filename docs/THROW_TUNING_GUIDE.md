@@ -18,7 +18,7 @@
 
 1. `Lab.unity`를 Play하거나 Mac Development 앱을 실행한다. **DEV**에서 `Battle Duration (seconds) = 600`, `Orb Lifetime (seconds) = 60`, `Orb Generation Cost = 1`로 두면 조합 시간이 넉넉하다. 생성에 아이템이 섞이지 않도록 `Yin Chance = 50`, `Yang Chance = 50`, 아이템 확률 4개는 0으로 둔다.
 2. 기준 조건을 `Throw Power Exponent = 1`, `Throw Loft Offset (degrees) = 0`, `Throw Air Damping = 0`으로 둔다. **START SOLO**를 누른다.
-3. **GENERATE**로 Yin과 Yang을 만든 뒤 직접 겹쳐 Combined를 만든다. 구슬 판 중앙에서 위쪽으로 던진다. 발사 높이와 손동작을 가능한 한 비슷하게 유지한다.
+3. 조합판 위 **북**을 탭해 Yin과 Yang을 만든 뒤 직접 겹쳐 Combined를 만든다. 구슬 판 중앙에서 위쪽으로 던진다. 발사 높이와 손동작을 가능한 한 비슷하게 유지한다.
 4. 명중·빗나감 때 화면의 `SHOT HIT/MISS | 비행 시간 | 최고 상승 | 수평 이동 거리`와 HP를 기록한다. Console/Player 로그의 `C6_LAB_THROW`에는 입력 속도·3D 발사 속도·설정값, `C6_LAB_PROJECTILE`에는 충돌 결과·지표·접촉점이 남는다.
 5. **DEV → 값 하나만 변경 → RESTART SOLO**로 비교한다. 예를 들어 먼저 Power Exponent `1 → 1.4`, 다음에는 기준으로 돌리고 Loft Offset `0 → 10`, 마지막으로 Air Damping `0 → 0.3`을 각각 시험한다. 한 조건당 여러 번 던져 손동작 차이와 설정 효과를 구분한다.
 
