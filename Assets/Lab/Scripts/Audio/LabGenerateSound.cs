@@ -12,14 +12,21 @@ namespace C6Lab
     {
         public const string ClipFolder = "Audio/Generate";
 
-        [Range(0f, 1f)] public float volume = .8f;
+        [Tooltip("LabConfig를 읽을 수 없을 때만 쓰는 기본 크기. 평소에는 LabConfig의 Generate Sound Volume을 쓴다.")]
+        [Range(0f, 1f)] public float volume = 1f;
 
         private AudioClip[] clips;
         private AudioSource source;
         private LabOrbBoard board;
+        private LabNetwork network;
         private int lastIndex = -1;
 
         public int ClipCount => clips == null ? 0 : clips.Length;
+
+        /// <summary>크기 설정(LabConfig)을 읽을 네트워크를 연결한다.</summary>
+        public void BindConfig(LabNetwork target) => network = target;
+
+        private float BaseVolume => network != null && network.config != null ? network.config.GenerateSoundVolume : volume;
 
         public void Bind(LabOrbBoard target)
         {
@@ -45,7 +52,7 @@ namespace C6Lab
             if (clips.Length > 1 && index == lastIndex)
                 index = (index + 1 + Random.Range(0, clips.Length - 1)) % clips.Length;
             lastIndex = index;
-            source.PlayOneShot(clips[index], volume * LabAudioSettings.SfxVolume);
+            source.PlayOneShot(clips[index], BaseVolume * LabAudioSettings.SfxVolume);
         }
 
         private void OnDestroy()

@@ -14,8 +14,13 @@ namespace C6Lab
         public const string HitFolder = "Audio/Hit";
         public const string MissFolder = "Audio/Miss";
 
+        // LabConfig를 읽을 수 없을 때만 쓰는 기본 크기. 평소에는 LabConfig의 Hit/Miss Sound Volume을 쓴다.
         [Range(0f, 1f)] public float hitVolume = .9f;
         [Range(0f, 1f)] public float missVolume = .7f;
+
+        private LabConfig Config => network != null ? network.config : null;
+        private float HitBase => Config != null ? Config.HitSoundVolume : hitVolume;
+        private float MissBase => Config != null ? Config.MissSoundVolume : missVolume;
 
         private AudioClip[] hitClips;
         private AudioClip[] missClips;
@@ -53,8 +58,8 @@ namespace C6Lab
 
         private void OnLocalThrowHit(int damage) => PlayHit();
 
-        public void PlayHit() => PlayRandom(hitClips, ref lastHitIndex, hitVolume);
-        public void PlayMiss() => PlayRandom(missClips, ref lastMissIndex, missVolume);
+        public void PlayHit() => PlayRandom(hitClips, ref lastHitIndex, HitBase);
+        public void PlayMiss() => PlayRandom(missClips, ref lastMissIndex, MissBase);
 
         private void PlayRandom(AudioClip[] clips, ref int lastIndex, float volume)
         {
