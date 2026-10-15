@@ -106,6 +106,18 @@ namespace C6Lab
             };
         }
 
+        /// <summary>Shared element tint for proposals and effects using the orb palette.</summary>
+        public static Color DefaultElementColor(LabOrbElement element)
+            => LabOrbVisualFactory.TemporaryElementColor(element);
+
+        public Color ElementColorFor(LabOrbElement element)
+        {
+            Material material = ElementMaterialFor(element);
+            if (material != null && material.HasProperty("_BaseColor")) return material.GetColor("_BaseColor");
+            if (material != null && material.HasProperty("_Color")) return material.GetColor("_Color");
+            return DefaultElementColor(element);
+        }
+
         public Material ElementMaterialFor(LabOrbElement element)
         {
             return element switch

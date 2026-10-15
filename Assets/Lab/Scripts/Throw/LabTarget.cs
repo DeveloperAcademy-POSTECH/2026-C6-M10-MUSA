@@ -13,6 +13,10 @@ namespace C6Lab
         [SerializeField] private Transform visualMount;
         private GameObject replacementVisual;
 
+        public event System.Action<Vector3, LabOrbElement> ApprovedHit;
+        public void NotifyApprovedHit(Vector3 localPoint, LabOrbElement element)
+            => ApprovedHit?.Invoke(localPoint, element);
+
         public MeshCollider Hitbox => hitbox;
         public Transform VisualMount => visualMount;
 

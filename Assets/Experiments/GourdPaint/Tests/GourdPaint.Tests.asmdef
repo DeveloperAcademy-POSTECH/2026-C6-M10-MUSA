@@ -1,0 +1,12 @@
+{
+  "name": "MUSA.GourdPaint.Tests",
+  "references": [
+    "MUSA.GourdPaint",
+    "C6Lab.Runtime"
+  ],
+  "includePlatforms": [],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}
