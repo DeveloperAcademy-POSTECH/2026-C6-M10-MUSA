@@ -8,6 +8,15 @@ namespace C6Lab
         public LabConfig config;
         public LabOrbBoard board;
         public Camera orbCamera;
+        [Header("Saved combination area (Canvas screen coordinates)")]
+        public RectTransform orbInteractionArea;
+        public RectTransform lowerHudBoundary;
+        [Min(0f)] public float lowerHudGap = 4f;
+
+        private readonly Vector3[] areaCorners = new Vector3[4];
+        private bool boardConfigured;
+        private Rect appliedScreenArea;
+        private string lastAreaError;
 
         // 소리 크기와 햅틱 설정은 LabConfig(Inspector: Resources/LabConfig, DEV: Sound and haptics)에 있다.
 
@@ -62,15 +71,99 @@ namespace C6Lab
         {
             if (config == null || board == null || orbCamera == null) return;
             orbCamera.orthographicSize = config.BoardHeight * .5f;
+            Canvas.ForceUpdateCanvases();
+            if (!TryBoardBounds(config.BoardHeight, config.OrbRadius, config.DrumRadius,
+                out Rect screenArea, out Rect centreBounds, out string error))
+            {
+                ReportAreaError(error);
+                return;
+            }
+            FitPlateToCamera();
+            board.Configure(config, orbCamera, centreBounds);
+            board.SetInputScreenRect(screenArea);
+            appliedScreenArea = screenArea;
+            boardConfigured = true;
+            lastAreaError = null;
+        }
+
+        // Layout changes resize the physical region without resetting moving or pending orbs.
+        // A held gesture finishes using its old region, then the next LateUpdate applies the resize.
+        private void LateUpdate()
+        {
+            if (!boardConfigured || config == null || board == null || orbCamera == null) return;
+            if (!TryBoardBounds(config.BoardHeight, config.OrbRadius, config.DrumRadius,
+                out Rect screenArea, out Rect centreBounds, out string error))
+            {
+                ReportAreaError(error);
+                return;
+            }
+            if (Approximately(centreBounds, board.CenterBounds) && Approximately(screenArea, appliedScreenArea))
+                return;
+            if (!board.TryResizeBounds(centreBounds)) return;
+            board.SetInputScreenRect(screenArea);
+            appliedScreenArea = screenArea;
+            FitPlateToCamera();
+            lastAreaError = null;
+        }
+
+        public bool ValidateBoardTuning(float boardHeight, float orbRadius, float drumRadius, out string error)
+        {
+            Canvas.ForceUpdateCanvases();
+            return TryBoardBounds(boardHeight, orbRadius, drumRadius, out _, out _, out error);
+        }
+
+        private bool TryBoardBounds(float boardHeight, float orbRadius, float drumRadius,
+            out Rect screenArea, out Rect centreBounds, out string error)
+        {
+            screenArea = default;
+            centreBounds = default;
+            error = "The orb camera is not connected in the saved Scene.";
+            if (orbCamera == null) return false;
+            screenArea = orbCamera.pixelRect;
+            // Small test fixtures and legacy scene generators can still use the complete viewport.
+            // The saved Lab Scene explicitly supplies the editable area and HUD references.
+            if (orbInteractionArea != null)
+            {
+                Canvas canvas = orbInteractionArea.GetComponentInParent<Canvas>(true);
+                if (canvas == null) { error = "The orb interaction area must belong to a Canvas."; return false; }
+                Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+                screenArea = LabOrbAreaGeometry.ScreenRect(orbInteractionArea, uiCamera, areaCorners);
+                if (lowerHudBoundary != null)
+                {
+                    Rect hud = LabOrbAreaGeometry.ScreenRect(lowerHudBoundary, uiCamera, areaCorners);
+                    if (hud.xMin < screenArea.xMax && hud.xMax > screenArea.xMin)
+                        screenArea.yMin = Mathf.Max(screenArea.yMin,
+                            hud.yMax + Mathf.Max(0f, lowerHudGap) * canvas.scaleFactor);
+                }
+            }
+            Rect viewport = orbCamera.pixelRect;
+            screenArea = Rect.MinMaxRect(Mathf.Max(screenArea.xMin, viewport.xMin),
+                Mathf.Max(screenArea.yMin, viewport.yMin), Mathf.Min(screenArea.xMax, viewport.xMax),
+                Mathf.Min(screenArea.yMax, viewport.yMax));
+            return LabOrbAreaGeometry.TryCenterBounds(orbCamera, screenArea, boardHeight,
+                orbRadius, drumRadius, out centreBounds, out error);
+        }
+
+        private void FitPlateToCamera()
+        {
             float halfHeight = orbCamera.orthographicSize;
             float halfWidth = halfHeight * orbCamera.aspect;
-            float margin = config.OrbRadius + 0.05f;
             // The plate follows the visible board when the Inspector or DEV tuning
             // changes its height. It is render-only; the physics plane stays at z=0.
             Transform plate = board.transform.Find("OrbBoardPlate");
             if (plate != null)
                 plate.localScale = new Vector3(halfWidth * 2f, halfHeight * 2f, 1f);
-            board.Configure(config, orbCamera, new Rect(-halfWidth + margin, -halfHeight + margin, (halfWidth - margin) * 2f, (halfHeight - margin) * 2f));
         }
+
+        private void ReportAreaError(string error)
+        {
+            if (lastAreaError == error) return;
+            lastAreaError = error;
+            Debug.LogWarning("C6_LAB_AREA_INVALID " + error, this);
+        }
+
+        private static bool Approximately(Rect a, Rect b) =>
+            Mathf.Abs(a.xMin - b.xMin) < .0001f && Mathf.Abs(a.xMax - b.xMax) < .0001f
+            && Mathf.Abs(a.yMin - b.yMin) < .0001f && Mathf.Abs(a.yMax - b.yMax) < .0001f;
     }
 }

@@ -272,11 +272,9 @@ namespace C6Lab
                 SetFeedback("The orb camera is not connected in the saved Scene.");
                 return false;
             }
-            float halfHeight = values[16] * .5f;
-            float margin = values[15] + .05f;
-            if (halfHeight <= margin || halfHeight * sceneController.orbCamera.aspect <= margin)
+            if (!sceneController.ValidateBoardTuning(values[16], values[15], values[75], out string areaError))
             {
-                SetFeedback("Orb Board Height is too small for the selected Orb Radius.");
+                SetFeedback(areaError);
                 return false;
             }
 

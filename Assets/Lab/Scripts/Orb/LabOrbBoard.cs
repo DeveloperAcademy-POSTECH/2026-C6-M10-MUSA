@@ -92,6 +92,8 @@ namespace C6Lab
         private LabConfig config;
         private Camera inputCamera;
         private Rect bounds;
+        private Rect inputScreenRect;
+        private bool hasInputScreenRect;
         private PhysicsMaterial contactMaterial;
         private GameObject wallRoot;
         private string heldId;
@@ -151,6 +153,69 @@ namespace C6Lab
                 SetBodyMode(entry);
             }
         }
+
+        /// <summary>
+        /// Change only the board geometry, keeping identities and Host-request state intact.
+        /// Positions and motion retain their normalized board units. A larger body's vertical
+        /// clearance may clamp its position; a held gesture defers the entire resize instead.
+        /// </summary>
+        public bool TryResizeBounds(Rect worldCenterBounds)
+        {
+            if (!configured || heldId != null || worldCenterBounds.width <= 0f || worldCenterBounds.height <= 0f
+                || !Finite(worldCenterBounds.min) || !Finite(worldCenterBounds.max)) return false;
+            float widthScale = worldCenterBounds.width / bounds.width;
+            if (!Finite(widthScale) || widthScale <= 0f) return false;
+            float additionalRadius = Mathf.Max(0f, config.DrumRadius - config.OrbRadius);
+            foreach (var entry in entries.Values)
+            {
+                if (entry.View == null) continue;
+                additionalRadius = Mathf.Max(additionalRadius, entry.View.HitSphere.radius - config.OrbRadius);
+                if (!entry.View.Body.isKinematic && !Finite(XY(entry.View.Body.linearVelocity) * widthScale)) return false;
+            }
+            if (worldCenterBounds.height < additionalRadius * 2f) return false;
+            if (worldCenterBounds == bounds) return true;
+
+            Rect previous = bounds;
+            bounds = worldCenterBounds;
+            foreach (var entry in entries.Values)
+            {
+                if (entry.View == null) continue;
+                Rigidbody body = entry.View.Body;
+                Vector2 point = XY(body.position);
+                Vector2 normalized = new Vector2(
+                    Mathf.Clamp01((point.x - previous.xMin) / previous.width),
+                    Mathf.Clamp01((point.y - previous.yMin) / previous.height));
+                Vector3 velocity = body.linearVelocity;
+                bool sleeping = !body.isKinematic && body.IsSleeping();
+                body.position = OnPlane(Clamp(ToWorld(normalized), entry.View.HitSphere.radius));
+                // Kinematic bodies already hold a zero velocity. Do not reset their pending
+                // transfer/throw/combine state or change collision mode while remapping them.
+                if (!body.isKinematic)
+                {
+                    body.linearVelocity = OnPlane(XY(velocity) * widthScale);
+                    if (sleeping) body.Sleep();
+                }
+            }
+            BuildHorizontalWalls();
+            return true;
+        }
+
+        /// <summary>
+        /// Limit only where a new pointer gesture may begin. A gesture already holding an orb
+        /// continues outside this rectangle so it can still pass an edge or release a throw.
+        /// </summary>
+        public void SetInputScreenRect(Rect screenRect)
+        {
+            if (screenRect.width <= 0f || screenRect.height <= 0f
+                || !Finite(screenRect.min) || !Finite(screenRect.max))
+                throw new ArgumentException("A finite positive input screen rectangle is required.", nameof(screenRect));
+            inputScreenRect = screenRect;
+            hasInputScreenRect = true;
+        }
+
+        private bool CanStartPointerAtScreen(Vector2 screenPoint) => !hasInputScreenRect
+            || (screenPoint.x >= inputScreenRect.xMin && screenPoint.x <= inputScreenRect.xMax
+                && screenPoint.y >= inputScreenRect.yMin && screenPoint.y <= inputScreenRect.yMax);
 
         /// <summary>
         /// Add a newly approved orb, or update its kind/owner. Existing local physics is never
@@ -484,6 +549,7 @@ namespace C6Lab
 
             var primary = Touchscreen.current?.primaryTouch;
             if (primary != null && primary.press.wasPressedThisFrame
+                && CanStartPointerAtScreen(primary.position.ReadValue())
                 && !PointerStartedOverUi(primary.position.ReadValue())
                 && TryScreenToWorld(primary.position.ReadValue(), out var touchPoint)
                 && TryBeginDragAtWorld(touchPoint, now))
@@ -493,6 +559,7 @@ namespace C6Lab
             }
             var pointer = Mouse.current;
             if (pointer != null && pointer.leftButton.wasPressedThisFrame
+                && CanStartPointerAtScreen(pointer.position.ReadValue())
                 && !PointerStartedOverUi(pointer.position.ReadValue())
                 && TryScreenToWorld(pointer.position.ReadValue(), out var mousePoint)
                 && TryBeginDragAtWorld(mousePoint, now))
