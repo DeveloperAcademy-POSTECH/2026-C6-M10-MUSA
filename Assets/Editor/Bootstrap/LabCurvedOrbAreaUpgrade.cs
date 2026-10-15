@@ -13,6 +13,7 @@ namespace C6Lab.Editor
     {
         private const string ScenePath = "Assets/Lab/Scenes/Lab.unity";
         private const string TexturePath = "Assets/Lab/Art/UI/BoardPlate.png";
+        private const string HudTexturePath = "Assets/Lab/Art/BottomHud/BottomHudBackground.png";
         private const int SampleCount = 65;
         private const float AlphaThreshold = .5f;
 
@@ -38,11 +39,20 @@ namespace C6Lab.Editor
             Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(TexturePath);
             if (source == null || plate.GetComponent<Renderer>().sharedMaterial.mainTexture != source)
                 throw new InvalidOperationException("The saved OrbBoardPlate must display the existing BoardPlate.png.");
+            UnityEngine.UI.Image hudImage = lowerHud.GetComponent<UnityEngine.UI.Image>();
+            Texture2D hudSource = AssetDatabase.LoadAssetAtPath<Texture2D>(HudTexturePath);
+            if (hudSource == null || hudImage == null || hudImage.sprite == null
+                || hudImage.sprite.texture != hudSource || hudImage.type != UnityEngine.UI.Image.Type.Simple
+                || hudImage.preserveAspect)
+                throw new InvalidOperationException("BottomHudBackground must keep its existing full-rect Simple sprite mapping.");
             LabOrbAreaProfile profile = plate.GetComponent<LabOrbAreaProfile>();
             bool bake = profile == null || profile.SourceTexture != source
                 || profile.LowerBoundary.Count < 2 || profile.UpperBoundary.Count < 2;
             Vector2[] lower = null, upper = null;
             if (bake) Bake(source, out lower, out upper);
+            bool bakeHud = profile == null || profile.LowerOccluderTexture != hudSource
+                || profile.LowerOccluderBoundary.Count < 2;
+            Vector2[] hudTop = bakeHud ? BakeOpaqueTop(hudSource) : null;
 
             const string label = "Fit Curved Orb Area";
             Undo.IncrementCurrentGroup();
@@ -53,20 +63,25 @@ namespace C6Lab.Editor
             // Re-fitting layout preserves later Scene-handle/Inspector edits. The source is
             // sampled only when this Scene has no profile yet or a different texture is assigned.
             if (bake) profile.SetBakedBoundary(source, AlphaThreshold, lower, upper);
+            if (bakeHud) profile.SetBakedOccluder(hudSource, AlphaThreshold, hudTop);
             controller.curvedAreaProfile = profile;
             controller.requireCurvedAreaProfile = true;
             controller.orbInteractionArea = area;
             controller.lowerHudBoundary = lowerHud;
-            area.anchorMin = new Vector2(0f, Mathf.Max(area.anchorMin.y, lowerHud.anchorMax.y));
-            area.anchorMax = new Vector2(1f, controller.orbCamera.rect.yMax);
+            controller.lowerHudGap = 0f;
+            area.anchorMin = controller.orbCamera.rect.min;
+            area.anchorMax = controller.orbCamera.rect.max;
             area.offsetMin = Vector2.zero;
             area.offsetMax = Vector2.zero;
             area.pivot = new Vector2(.5f, .5f);
             area.localScale = Vector3.one;
             area.localRotation = Quaternion.identity;
             controller.orbCamera.orthographicSize = controller.config.BoardHeight * .5f;
+            // Restore the exact saved #154 art transform. Runtime fits its width to the
+            // camera aspect just as #154 did; neither path moves the paper above the HUD.
+            plate.localPosition = new Vector3(0f, 0f, .55f);
+            plate.localScale = new Vector3(10f, 5f, 1f);
             Canvas.ForceUpdateCanvases();
-            if (!controller.FitPaperPlate(out string error)) throw new InvalidOperationException(error);
             ValidateBindings(controller, source);
             EditorUtility.SetDirty(controller);
             EditorUtility.SetDirty(area);
@@ -77,7 +92,7 @@ namespace C6Lab.Editor
             if (!EditorSceneManager.SaveScene(scene))
                 throw new InvalidOperationException("Unity could not save the curved paper area.");
             Undo.CollapseUndoOperations(group);
-            Debug.Log("C6_LAB_CURVED_AREA_SAVED: paper alpha contours, editable Scene handles and actual physics layout are connected; HUD positions and camera viewport are unchanged.");
+            Debug.Log("C6_LAB_CURVED_AREA_SAVED: #154 paper transform restored; physics follows the paper silhouette and actual lower-HUD opaque contour without moving artwork.");
         }
 
         [MenuItem("C6 Lab/Validate Curved Orb Area")]
@@ -85,7 +100,7 @@ namespace C6Lab.Editor
         {
             LabSceneController controller = RequireSingle<LabSceneController>(RequireScene());
             ValidateBindings(controller, AssetDatabase.LoadAssetAtPath<Texture2D>(TexturePath));
-            Debug.Log("C6_LAB_CURVED_AREA_VALID: saved paper curves, material, controller, HUD gap and visual Quad agree.");
+            Debug.Log("C6_LAB_CURVED_AREA_VALID: #154 saved paper transform, paper/HUD curve sources and controller references agree.");
         }
 
         private static void Bake(Texture2D source, out Vector2[] lower, out Vector2[] upper)
@@ -123,6 +138,30 @@ namespace C6Lab.Editor
             finally { UnityEngine.Object.DestroyImmediate(decoded); }
         }
 
+        private static Vector2[] BakeOpaqueTop(Texture2D source)
+        {
+            var decoded = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            try
+            {
+                if (!decoded.LoadImage(File.ReadAllBytes(AssetDatabase.GetAssetPath(source)), false))
+                    throw new InvalidOperationException("Unity could not decode the lower HUD PNG.");
+                Color32[] pixels = decoded.GetPixels32();
+                var points = new Vector2[SampleCount];
+                int alpha = Mathf.RoundToInt(AlphaThreshold * 255f);
+                for (int sample = 0; sample < SampleCount; sample++)
+                {
+                    float u = sample / (float)(SampleCount - 1);
+                    int x = Mathf.RoundToInt(u * (decoded.width - 1));
+                    int top = decoded.height - 1;
+                    while (top >= 0 && pixels[top * decoded.width + x].a < alpha) top--;
+                    if (top < 0) throw new InvalidOperationException("The lower HUD PNG has no opaque surface at sample " + sample + ".");
+                    points[sample] = new Vector2(u, (top + 1) / (float)decoded.height);
+                }
+                return points;
+            }
+            finally { UnityEngine.Object.DestroyImmediate(decoded); }
+        }
+
         private static void ValidateBindings(LabSceneController controller, Texture2D source)
         {
             LabOrbAreaProfile profile = controller.curvedAreaProfile;
@@ -133,20 +172,24 @@ namespace C6Lab.Editor
             if (controller.orbInteractionArea == null || controller.lowerHudBoundary == null
                 || controller.orbInteractionArea.GetComponent<UnityEngine.UI.Graphic>() != null
                 || controller.orbInteractionArea.GetComponent<CanvasRenderer>() != null)
-                throw new InvalidOperationException("The invisible plate layout guide and existing lower HUD must be connected.");
+                throw new InvalidOperationException("The invisible plate reference and existing lower HUD must be connected.");
             RequireVisualPlate(profile.transform);
+            UnityEngine.UI.Image hud = controller.lowerHudBoundary.GetComponent<UnityEngine.UI.Image>();
+            if (hud == null || hud.sprite == null || hud.sprite.texture != profile.LowerOccluderTexture
+                || profile.LowerOccluderTexture != AssetDatabase.LoadAssetAtPath<Texture2D>(HudTexturePath)
+                || profile.LowerOccluderBoundary.Count < 2 || controller.lowerHudGap != 0f)
+                throw new InvalidOperationException("The lower HUD's actual opaque contour must be baked without a rectangular gap.");
             if (!controller.ValidateBoardTuning(controller.config.BoardHeight,
                 controller.config.OrbRadius, controller.config.DrumRadius, out string error))
                 throw new InvalidOperationException(error);
-            Canvas canvas = controller.orbInteractionArea.GetComponentInParent<Canvas>(true);
-            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            var corners = new Vector3[4];
-            Rect hud = LabOrbAreaGeometry.ScreenRect(controller.lowerHudBoundary, uiCamera, corners);
-            Vector3 paperBottom = controller.orbCamera.WorldToScreenPoint(profile.transform.TransformPoint(new Vector3(0f, -.5f, 0f)));
-            Vector3 paperTop = controller.orbCamera.WorldToScreenPoint(profile.transform.TransformPoint(new Vector3(0f, .5f, 0f)));
-            if (paperBottom.y < hud.yMax + controller.lowerHudGap * canvas.scaleFactor - .25f
-                || Mathf.Abs(paperTop.y - controller.orbCamera.pixelRect.yMax) > .25f)
-                throw new InvalidOperationException("The paper Quad must fit above the lower HUD, with its original top at the orb-camera boundary.");
+            if (Vector3.Distance(profile.transform.localPosition, new Vector3(0f, 0f, .55f)) > .0001f
+                || Vector3.Distance(profile.transform.localScale, new Vector3(10f, 5f, 1f)) > .0001f)
+                throw new InvalidOperationException("The saved paper Quad must retain #154's local position (0,0,.55) and scale (10,5,1). Runtime alone fits the camera aspect.");
+            if ((controller.orbInteractionArea.anchorMin - controller.orbCamera.rect.min).sqrMagnitude > .000001f
+                || (controller.orbInteractionArea.anchorMax - controller.orbCamera.rect.max).sqrMagnitude > .000001f
+                || controller.orbInteractionArea.offsetMin.sqrMagnitude > .000001f
+                || controller.orbInteractionArea.offsetMax.sqrMagnitude > .000001f)
+                throw new InvalidOperationException("The invisible reference must cover the complete orb camera viewport.");
         }
 
         private static void RequireVisualPlate(Transform plate)

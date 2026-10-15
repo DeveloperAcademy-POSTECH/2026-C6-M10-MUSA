@@ -8,10 +8,11 @@ namespace C6Lab
         public LabConfig config;
         public LabOrbBoard board;
         public Camera orbCamera;
-        [Header("Saved combination area (Canvas screen coordinates)")]
+        [Header("Nonvisual combination-area reference (paper keeps the camera viewport)")]
         public RectTransform orbInteractionArea;
         public RectTransform lowerHudBoundary;
-        [Min(0f)] public float lowerHudGap = 4f;
+        [Tooltip("Legacy rectangular fixtures only; the saved curved Lab follows the actual HUD alpha with no extra gap.")]
+        [Min(0f)] public float lowerHudGap = 0f;
         [Header("Paper silhouette (baked from the visible plate)")]
         public LabOrbAreaProfile curvedAreaProfile;
         public bool requireCurvedAreaProfile;
@@ -81,7 +82,7 @@ namespace C6Lab
                 ReportAreaError(error);
                 return;
             }
-            FitPlate(plateRect);
+            FitPlateToCamera();
             board.ConfigureArea(config, orbCamera, shape);
             board.SetInputScreenRect(screenArea);
             appliedScreenArea = screenArea;
@@ -105,7 +106,7 @@ namespace C6Lab
             if (!board.TryResizeArea(shape)) return;
             board.SetInputScreenRect(screenArea);
             appliedScreenArea = screenArea;
-            FitPlate(plateRect);
+            FitPlateToCamera();
             lastAreaError = null;
         }
 
@@ -115,14 +116,14 @@ namespace C6Lab
             return TryBoardArea(boardHeight, orbRadius, drumRadius, out _, out _, out _, out error);
         }
 
-        /// <summary>Editor layout helper: moves the existing paper Quad without creating physics objects.</summary>
+        /// <summary>Fits the existing Quad exactly as #154 did; never moves it to make room for HUD artwork.</summary>
         public bool FitPaperPlate(out string error)
         {
             if (config == null) { error = "The Lab Config is missing."; return false; }
             Canvas.ForceUpdateCanvases();
             if (!TryBoardArea(config.BoardHeight, config.OrbRadius, config.DrumRadius,
                 out _, out Rect plateRect, out _, out error)) return false;
-            FitPlate(plateRect);
+            FitPlateToCamera();
             return true;
         }
 
@@ -145,8 +146,37 @@ namespace C6Lab
                 return false;
             }
             screenArea = orbCamera.pixelRect;
-            // Legacy test fixtures keep their full rectangular viewport. The saved Lab explicitly
-            // requires the paper profile and uses this RectTransform only as the Quad's layout box.
+            if (curvedAreaProfile != null)
+            {
+                // The paper remains the full lower-camera Quad. Only the physics shape is
+                // intersected with the already-rendered lower HUD's actual opaque contour.
+                if (orbInteractionArea == null || lowerHudBoundary == null)
+                {
+                    error = "The saved curved area requires its nonvisual guide and lower HUD references.";
+                    return false;
+                }
+                Canvas canvas = lowerHudBoundary.GetComponentInParent<Canvas>(true);
+                UnityEngine.UI.Image hudImage = lowerHudBoundary.GetComponent<UnityEngine.UI.Image>();
+                if (canvas == null || hudImage == null || hudImage.sprite == null
+                    || hudImage.sprite.texture != curvedAreaProfile.LowerOccluderTexture
+                    || hudImage.type != UnityEngine.UI.Image.Type.Simple || hudImage.preserveAspect)
+                {
+                    error = "The lower HUD must use its baked, non-aspect-preserving Simple Image sprite.";
+                    return false;
+                }
+                Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+                Rect hudScreen = LabOrbAreaGeometry.ScreenRect(lowerHudBoundary, uiCamera, areaCorners);
+                if (!TryPaperWorldRect(boardHeight, out plateRect)
+                    || !TryWorldRect(hudScreen, boardHeight, out Rect hudWorld))
+                {
+                    error = "The paper and lower HUD require valid orthographic screen-to-world rectangles.";
+                    return false;
+                }
+                return curvedAreaProfile.TryBuildShape(plateRect, hudWorld, orbRadius, drumRadius,
+                    out shape, out error);
+            }
+            // Legacy test fixtures keep their previous rectangle semantics. The saved Lab
+            // requires the curve profile above and can never silently enter this fallback.
             if (orbInteractionArea != null)
             {
                 Canvas canvas = orbInteractionArea.GetComponentInParent<Canvas>(true);
@@ -161,22 +191,15 @@ namespace C6Lab
                             hud.yMax + Mathf.Max(0f, lowerHudGap) * canvas.scaleFactor);
                 }
             }
-            else if (curvedAreaProfile != null)
-            {
-                error = "The saved curved paper area requires its Canvas layout guide.";
-                return false;
-            }
             Rect viewport = orbCamera.pixelRect;
             screenArea = Rect.MinMaxRect(Mathf.Max(screenArea.xMin, viewport.xMin),
                 Mathf.Max(screenArea.yMin, viewport.yMin), Mathf.Min(screenArea.xMax, viewport.xMax),
                 Mathf.Min(screenArea.yMax, viewport.yMax));
             if (!TryWorldRect(screenArea, boardHeight, out plateRect))
             {
-                error = "The paper layout must have a positive size inside the orthographic orb camera.";
+                error = "The legacy paper layout must have a positive size inside the orthographic orb camera.";
                 return false;
             }
-            if (curvedAreaProfile != null)
-                return curvedAreaProfile.TryBuildShape(plateRect, orbRadius, drumRadius, out shape, out error);
             if (!LabOrbAreaGeometry.TryCenterBounds(orbCamera, screenArea, boardHeight,
                 orbRadius, drumRadius, out Rect centreBounds, out error)) return false;
             shape = LabOrbAreaShape.FromCenterBounds(centreBounds, orbRadius);
@@ -200,6 +223,21 @@ namespace C6Lab
             return LabOrbAreaGeometry.Valid(rect);
         }
 
+        private bool TryPaperWorldRect(float boardHeight, out Rect rect)
+        {
+            rect = default;
+            if (board == null || !orbCamera.orthographic || boardHeight <= 0f) return false;
+            float halfHeight = boardHeight * .5f;
+            float halfWidth = halfHeight * orbCamera.aspect;
+            // Use the same Quad transform as #154. Camera.pixelRect can contain fractional
+            // pixels while screen projection uses integer pixel dimensions; projecting that
+            // outer rectangle back would slightly stretch physics away from the drawn paper.
+            Vector3 lower = board.transform.TransformPoint(new Vector3(-halfWidth, -halfHeight, 0f));
+            Vector3 upper = board.transform.TransformPoint(new Vector3(halfWidth, halfHeight, 0f));
+            rect = Rect.MinMaxRect(lower.x, lower.y, upper.x, upper.y);
+            return LabOrbAreaGeometry.Valid(rect);
+        }
+
         private bool Project(Plane plane, Vector2 screen, out Vector2 world)
         {
             world = default;
@@ -211,18 +249,17 @@ namespace C6Lab
                 && !float.IsNaN(world.y) && !float.IsInfinity(world.y);
         }
 
-        private void FitPlate(Rect plateRect)
+        private void FitPlateToCamera()
         {
             Transform plate = curvedAreaProfile != null ? curvedAreaProfile.transform
                 : board.transform.Find("OrbBoardPlate");
             if (plate == null) return;
-            // Quad and the physics profile share exactly the same UV-to-world mapping.
-            // Only its Y position/height change for the lower HUD; X extent and camera stay fixed.
-            Vector3 position = plate.position;
-            plate.position = new Vector3(plateRect.center.x, plateRect.center.y, position.z);
-            Vector3 parentScale = plate.parent != null ? plate.parent.lossyScale : Vector3.one;
-            plate.localScale = new Vector3(plateRect.width / Mathf.Abs(parentScale.x),
-                plateRect.height / Mathf.Abs(parentScale.y), plate.localScale.z);
+            float halfHeight = orbCamera.orthographicSize;
+            float halfWidth = halfHeight * orbCamera.aspect;
+            // #154 composition: full lower-camera Quad at the board origin, beneath the HUD.
+            // A curved physics boundary must follow that composition, never resize the artwork.
+            plate.localPosition = new Vector3(0f, 0f, plate.localPosition.z);
+            plate.localScale = new Vector3(halfWidth * 2f, halfHeight * 2f, 1f);
         }
 
         private void ReportAreaError(string error)
