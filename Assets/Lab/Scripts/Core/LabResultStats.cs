@@ -4,8 +4,8 @@ using System.Linq;
 
 namespace C6Lab
 {
-    /// <summary>결과 대시보드의 MVP 칭호 종류.</summary>
-    public enum LabResultTitle { MostGenerated, MostCombined, MostItems, MostPassed }
+    /// <summary>결과 대시보드의 MVP 칭호 종류. (생성은 누구나 하는 일이라 비교하지 않는다)</summary>
+    public enum LabResultTitle { MostCombined, MostItems, MostPassed }
 
     /// <summary>한 칭호의 결과. 동점이면 Winners에 여러 명이 들어간다.</summary>
     public readonly struct LabResultAward
@@ -32,7 +32,6 @@ namespace C6Lab
             if (player == null) return 0;
             switch (title)
             {
-                case LabResultTitle.MostGenerated: return player.generatedTotal;
                 case LabResultTitle.MostCombined: return player.combinedTotal;
                 case LabResultTitle.MostItems: return player.ItemsUsed;
                 case LabResultTitle.MostPassed: return player.passedTotal;
@@ -62,7 +61,6 @@ namespace C6Lab
         {
             switch (title)
             {
-                case LabResultTitle.MostGenerated: return "생성왕";
                 case LabResultTitle.MostCombined: return "결합왕";
                 case LabResultTitle.MostItems: return "아이템왕";
                 case LabResultTitle.MostPassed: return "패스왕";

@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>
-    /// 승리/패배 결과 화면 위에 이번 라운드 기록 표(생성·타격·딜·결합·아이템·전달·칭호)를 보여주는 대시보드.
+    /// 승리/패배 결과 화면 위에 이번 라운드 기록 표(타격·딜·결합·아이템·구슬 전달·칭호)를 보여주는 대시보드.
     /// 장면 수정 없이 코드로 만들고, 기존 결과 카드(VICTORY/DEFEAT·버튼) 바로 위에 놓는다.
     /// 값은 Host가 보낸 스냅샷의 플레이어 기록(LabPlayerState)을 그대로 쓰므로 모든 기기가 같다.
     /// 디자인이 정해지면 이 화면만 바꾸고, 계산은 LabResultStats를 그대로 쓴다.
@@ -28,8 +28,8 @@ namespace C6Lab
         public Color lineColor = new Color(.867f, .733f, .565f, .7f);
         public Color textColor = new Color(.169f, .137f, .153f, 1f);
 
-        private static readonly string[] Headers = { "플레이어", "생성", "타격", "딜", "결합", "아이템", "전달", "칭호" };
-        private static readonly float[] Columns = { 44f, 34f, 34f, 40f, 34f, 44f, 44f, 72f }; // 합 346 + 왼쪽 여백 6 = 안쪽 폭 352
+        private static readonly string[] Headers = { "플레이어", "타격", "딜", "결합", "아이템", "구슬 전달", "칭호" };
+        private static readonly float[] Columns = { 46f, 38f, 44f, 38f, 48f, 58f, 74f }; // 합 346 + 왼쪽 여백 6 = 안쪽 폭 352
 
         /// <summary>요괴를 쓰러뜨린 마지막 한 방을 친 사람 표시 (승리했을 때만)</summary>
         public const string LastHitLabel = "막타";
@@ -91,7 +91,6 @@ namespace C6Lab
                 string[] cells =
                 {
                     LabResultStats.PlayerName(p),
-                    p.generatedTotal.ToString(),
                     p.hitTotal.ToString(),
                     p.damageTotal.ToString(),
                     p.combinedTotal.ToString(),
@@ -103,7 +102,6 @@ namespace C6Lab
                 bool[] bold =
                 {
                     false,
-                    IsWinner(p, awards, LabResultTitle.MostGenerated),
                     false,
                     false,
                     IsWinner(p, awards, LabResultTitle.MostCombined),

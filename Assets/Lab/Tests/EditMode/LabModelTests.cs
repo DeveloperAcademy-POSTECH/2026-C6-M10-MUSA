@@ -1217,19 +1217,18 @@ namespace C6Lab.Tests
         {
             var players = new[]
             {
-                new LabPlayerState { id = 10, seat = 0, generatedTotal = 5, relayUsed = 1 },
+                new LabPlayerState { id = 10, seat = 0, generatedTotal = 9, relayUsed = 1, passedTotal = 3 },
                 new LabPlayerState { id = 20, seat = 1, generatedTotal = 5, passedTotal = 3 },
                 new LabPlayerState { id = 30, seat = 2, generatedTotal = 2, potionUsed = 1, bombUsed = 1 }
             };
             var awards = LabResultStats.Awards(players);
             Assert.That(awards.Select(a => a.Title), Is.EqualTo(new[]
-                { LabResultTitle.MostGenerated, LabResultTitle.MostItems, LabResultTitle.MostPassed }),
-                "Nobody combined, so there is no combine award.");
-            Assert.That(awards[0].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }));
-            Assert.That(awards[0].Value, Is.EqualTo(5));
-            Assert.That(awards[1].Winners.Single().id, Is.EqualTo(30ul));
-            Assert.That(awards[1].Value, Is.EqualTo(2));
-            Assert.That(awards[2].Winners.Single().id, Is.EqualTo(20ul));
+                { LabResultTitle.MostItems, LabResultTitle.MostPassed }),
+                "Nobody combined, so there is no combine award, and generating is not compared.");
+            Assert.That(awards[0].Winners.Single().id, Is.EqualTo(30ul));
+            Assert.That(awards[0].Value, Is.EqualTo(2));
+            Assert.That(awards[1].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }));
+            Assert.That(awards[1].Value, Is.EqualTo(3));
             Assert.That(LabResultStats.Awards(new LabPlayerState[0]), Is.Empty);
         }
 
