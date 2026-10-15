@@ -6,6 +6,24 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
+    /// A locked bomb that reached its fuse: the board it blasts and where, in 0..1 board units,
+    /// its holder last reported it.
+    /// </summary>
+    public readonly struct LabBombBlast
+    {
+        public readonly ulong Owner;
+        public readonly string BombId;
+        public readonly Vector2 Position;
+
+        public LabBombBlast(ulong owner, string bombId, Vector2 position)
+        {
+            Owner = owner;
+            BombId = bombId;
+            Position = position;
+        }
+    }
+
+    /// <summary>
     /// Plain Host-only battle state. Transport authenticates sender IDs before calling this class;
     /// clients render copies from Snapshot and never decide ownership, damage, or expiry.
     /// </summary>
@@ -33,7 +51,7 @@ namespace C6Lab
         private readonly ulong[] seats = new ulong[MaximumParticipants];
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
-        private readonly List<ulong> bombExplosions = new List<ulong>();
+        private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -344,12 +362,12 @@ namespace C6Lab
             return true;
         }
 
-        /// <summary>Players whose boards were cleared by an unthrown bomb since the last call.</summary>
-        public ulong[] DrainBombExplosions()
+        /// <summary>Locked bombs that blasted at their fuse since the last call, each reported once.</summary>
+        public LabBombBlast[] DrainBombExplosions()
         {
-            ulong[] owners = bombExplosions.ToArray();
+            LabBombBlast[] blasts = bombExplosions.ToArray();
             bombExplosions.Clear();
-            return owners;
+            return blasts;
         }
 
         /// <summary>Remove an expired or missed projectile without damage or a hit reward.</summary>
@@ -425,10 +443,9 @@ namespace C6Lab
                     .ToArray())
                 {
                     if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0) continue;
-                    // A bomb still locked at its fuse takes every orb on its current holder's board.
-                    foreach (string id in orbs.Values.Where(orb => orb.owner == expired.owner && !orb.inFlight)
-                        .Select(orb => orb.id).ToArray()) orbs.Remove(id);
-                    bombExplosions.Add(expired.owner);
+                    // A bomb still locked at its fuse blasts on its current holder's board. No orb is
+                    // lost: the holder's screen pushes the ones around it away from where it last was.
+                    bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
                 }
                 remaining = Math.Max(0d, deadline - now);
                 if (now >= deadline) phase = LabPhase.Defeat;

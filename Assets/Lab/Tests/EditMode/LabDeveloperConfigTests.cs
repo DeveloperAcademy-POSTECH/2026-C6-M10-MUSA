@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(79));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(81));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -76,6 +76,10 @@ namespace C6Lab.Tests
             values[76] = .2f;
             values[77] = .5f;
             values[78] = 2f;
+            Assert.That(new[] { values[79], values[80] }, Is.EqualTo(new[] { .4f, 3f }),
+                "A bomb blast reaches 40% of the board width and pushes hardest right beside it.");
+            values[79] = .6f;
+            values[80] = 4.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -113,6 +117,8 @@ namespace C6Lab.Tests
             Assert.That(config.DrumDriftSpeed, Is.EqualTo(.2f));
             Assert.That(config.DrumDriftTurning, Is.EqualTo(.5f));
             Assert.That(config.DrumSpinStrength, Is.EqualTo(2f));
+            Assert.That(config.BombBlastRadius, Is.EqualTo(.6f));
+            Assert.That(config.BombBlastStrength, Is.EqualTo(4.5f));
         }
 
         [Test]

@@ -126,7 +126,9 @@ namespace C6Lab
             new LabDeveloperField("Drum Radius", .1f, 1.5f),
             new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
             new LabDeveloperField("Drum Drift Turning (per second)", 0f, 2f),
-            new LabDeveloperField("Drum Spin Strength", 0f, 3f)
+            new LabDeveloperField("Drum Spin Strength", 0f, 3f),
+            new LabDeveloperField("Bomb Blast Radius (board widths)", 0f, 2f),
+            new LabDeveloperField("Bomb Blast Strength (board widths/s)", 0f, 10f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -142,7 +144,7 @@ namespace C6Lab
             new LabDeveloperCategory("Battle", 0, 1, 2, 48),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
             new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44),
-            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 79, 80),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
@@ -192,6 +194,10 @@ namespace C6Lab
         [SerializeField, Range(1f, 20f)] private float relayDoubleMultiplier = 2f;
         [SerializeField, Range(1f, 20f)] private float relayMaxMultiplier = 4f;
         [SerializeField, Range(1f, 20f)] private float bombMultiplier = 3f;
+        [Tooltip("잠긴 폭탄이 터질 때 구슬을 밀어내는 범위 (보드 너비 대비). 0이면 밀지 않는다.")]
+        [SerializeField, Range(0f, 2f)] private float bombBlastRadius = .4f;
+        [Tooltip("폭탄 바로 옆 구슬이 밀려나는 속도 (보드 너비/초). 범위 끝으로 갈수록 약해진다.")]
+        [SerializeField, Range(0f, 10f)] private float bombBlastStrength = 3f;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -329,6 +335,8 @@ namespace C6Lab
         public float RelayDoubleMultiplier => Mathf.Clamp(Finite(relayDoubleMultiplier, 2f), 1f, 20f);
         public float RelayMaxMultiplier => Mathf.Clamp(Finite(relayMaxMultiplier, 4f), 1f, 20f);
         public float BombMultiplier => Mathf.Clamp(Finite(bombMultiplier, 3f), 1f, 20f);
+        public float BombBlastRadius => Mathf.Clamp(Finite(bombBlastRadius, .4f), 0f, 2f);
+        public float BombBlastStrength => Mathf.Clamp(Finite(bombBlastStrength, 3f), 0f, 10f);
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
         public float OrbStopSpeed => Mathf.Clamp(Finite(orbStopSpeed, .065f), 0f, OrbMaxReleaseSpeed);
@@ -415,7 +423,8 @@ namespace C6Lab
                 (float)GenerateHapticStyle, GenerateHapticIntensity,
                 (float)HitHapticStyle, HitHapticIntensity,
                 (float)ItemHitHapticStyle, ItemHitHapticIntensity,
-                DrumCount, DrumRadius, DrumDriftSpeed, DrumDriftTurning, DrumSpinStrength
+                DrumCount, DrumRadius, DrumDriftSpeed, DrumDriftTurning, DrumSpinStrength,
+                BombBlastRadius, BombBlastStrength
             };
         }
 
@@ -535,6 +544,8 @@ namespace C6Lab
             drumDriftSpeed = values[76];
             drumDriftTurning = values[77];
             drumSpinStrength = values[78];
+            bombBlastRadius = values[79];
+            bombBlastStrength = values[80];
             error = string.Empty;
             return true;
         }
