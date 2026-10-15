@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>
-    /// 승리/패배 결과 화면 위에 이번 라운드 기록 표(생성·결합·아이템 사용·넘겨준 구슬·칭호)를 보여주는 대시보드.
+    /// 승리/패배 결과 화면 위에 이번 라운드 기록 표(생성·타격·딜·결합·아이템·전달·칭호)를 보여주는 대시보드.
     /// 장면 수정 없이 코드로 만들고, 기존 결과 카드(VICTORY/DEFEAT·버튼) 바로 위에 놓는다.
     /// 값은 Host가 보낸 스냅샷의 플레이어 기록(LabPlayerState)을 그대로 쓰므로 모든 기기가 같다.
     /// 디자인이 정해지면 이 화면만 바꾸고, 계산은 LabResultStats를 그대로 쓴다.
@@ -28,8 +28,11 @@ namespace C6Lab
         public Color lineColor = new Color(.867f, .733f, .565f, .7f);
         public Color textColor = new Color(.169f, .137f, .153f, 1f);
 
-        private static readonly string[] Headers = { "플레이어", "생성", "결합", "아이템 사용", "넘겨준 구슬", "칭호" };
-        private static readonly float[] Columns = { 48f, 38f, 38f, 66f, 72f, 84f }; // 합 346 + 왼쪽 여백 6 = 안쪽 폭 352
+        private static readonly string[] Headers = { "플레이어", "생성", "타격", "딜", "결합", "아이템", "전달", "칭호" };
+        private static readonly float[] Columns = { 44f, 34f, 34f, 40f, 34f, 44f, 44f, 72f }; // 합 346 + 왼쪽 여백 6 = 안쪽 폭 352
+
+        /// <summary>요괴를 쓰러뜨린 마지막 한 방을 친 사람 표시 (승리했을 때만)</summary>
+        public const string LastHitLabel = "막타";
 
         private LabNetwork network;
         private GameObject resultControls;
@@ -89,16 +92,20 @@ namespace C6Lab
                 {
                     LabResultStats.PlayerName(p),
                     p.generatedTotal.ToString(),
+                    p.hitTotal.ToString(),
+                    p.damageTotal.ToString(),
                     p.combinedTotal.ToString(),
                     p.ItemsUsed.ToString(),
                     p.passedTotal.ToString(),
-                    TitlesOf(p, awards)
+                    TitlesOf(p, awards, victory)
                 };
                 // 각 항목 1등 숫자는 굵게 (칭호와 같은 기준)
                 bool[] bold =
                 {
                     false,
                     IsWinner(p, awards, LabResultTitle.MostGenerated),
+                    false,
+                    false,
                     IsWinner(p, awards, LabResultTitle.MostCombined),
                     IsWinner(p, awards, LabResultTitle.MostItems),
                     IsWinner(p, awards, LabResultTitle.MostPassed),
@@ -116,10 +123,14 @@ namespace C6Lab
         private static bool IsWinner(LabPlayerState p, IReadOnlyList<LabResultAward> awards, LabResultTitle title) =>
             awards.Any(a => a.Title == title && a.Winners.Any(w => w.id == p.id));
 
-        /// <summary>이 플레이어가 받은 칭호들 (예: "결합왕 · 패스왕"). 없으면 빈칸.</summary>
-        private static string TitlesOf(LabPlayerState p, IReadOnlyList<LabResultAward> awards) =>
-            string.Join(" · ", awards.Where(a => a.Winners.Any(w => w.id == p.id))
-                .Select(a => LabResultStats.Label(a.Title)));
+        /// <summary>이 플레이어가 받은 칭호들 (예: "결합왕 · 패스왕"). 승리했고 막타를 쳤으면 "막타"도 붙인다. 없으면 빈칸.</summary>
+        private static string TitlesOf(LabPlayerState p, IReadOnlyList<LabResultAward> awards, bool victory)
+        {
+            var labels = awards.Where(a => a.Winners.Any(w => w.id == p.id))
+                .Select(a => LabResultStats.Label(a.Title)).ToList();
+            if (victory && p.lastHit) labels.Add(LastHitLabel);
+            return string.Join(" · ", labels);
+        }
 
         private void EnsurePanel()
         {

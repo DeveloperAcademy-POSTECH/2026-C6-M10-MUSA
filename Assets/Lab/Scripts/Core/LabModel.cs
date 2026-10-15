@@ -279,7 +279,13 @@ namespace C6Lab
             hp = Math.Max(0, hp - DamageFor(orb));
             actualDamage = previousHp - hp;
             if (players.TryGetValue(orb.owner, out var attacker))
+            {
                 attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
+                // 결과 대시보드 기록: 타격 횟수·딜, 요괴를 쓰러뜨린 한 방이면 막타
+                attacker.hitTotal++;
+                attacker.damageTotal += actualDamage;
+                if (hp == 0) attacker.lastHit = true;
+            }
             if (hp == 0) phase = LabPhase.Victory;
             return true;
         }

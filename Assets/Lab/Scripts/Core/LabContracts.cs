@@ -80,6 +80,13 @@ namespace C6Lab
         /// <summary>아이템 사용 수: 릴레이·폭탄은 던졌을 때, 비밀상자·포션은 더블탭 사용했을 때</summary>
         public int relayUsed, secretBoxUsed, potionUsed, bombUsed;
 
+        /// <summary>요괴에 맞힌 횟수 (Host가 타격을 확정한 것만)</summary>
+        public int hitTotal;
+        /// <summary>요괴에게 준 총 피해 (남은 HP보다 큰 피해는 남은 만큼만)</summary>
+        public int damageTotal;
+        /// <summary>요괴 HP를 0으로 만든 마지막 한 방(막타)을 쳤는지. 승리했을 때만 한 명이 true.</summary>
+        public bool lastHit;
+
         public int ItemsUsed => relayUsed + secretBoxUsed + potionUsed + bombUsed;
 
         public LabPlayerState Copy() => (LabPlayerState)MemberwiseClone();

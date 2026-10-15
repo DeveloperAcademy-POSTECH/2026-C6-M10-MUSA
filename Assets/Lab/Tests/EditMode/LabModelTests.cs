@@ -1233,6 +1233,57 @@ namespace C6Lab.Tests
             Assert.That(LabResultStats.Awards(new LabPlayerState[0]), Is.Empty);
         }
 
+        [Test]
+        public void HitsAndDamageAreRecordedAndOnlyTheKillingBlowIsTheLastHit()
+        {
+            var shortFight = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                float[] values = shortFight.CaptureDeveloperValues();
+                values[0] = 30f; // Monster Max HP
+                values[1] = 20f; // Damage per Hit
+                Assert.That(shortFight.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                model.Begin("hit-records", new ulong[] { 10, 20, 30 }, 0d, shortFight);
+
+                var first = GeneratePair(10);
+                Assert.That(model.TryCombine(10, first.yin.id, first.yang.id, "c1", 0d, out var a, out _), Is.True);
+                Assert.That(ThrowAndHit(model, a.id, 10, .1d), Is.EqualTo(20));
+                var afterFirst = model.Snapshot(.1d).players.Single(p => p.id == 10);
+                Assert.That(afterFirst.hitTotal, Is.EqualTo(1));
+                Assert.That(afterFirst.damageTotal, Is.EqualTo(20));
+                Assert.That(afterFirst.lastHit, Is.False);
+
+                var second = GeneratePair(20, .2d);
+                Assert.That(model.TryCombine(20, second.yin.id, second.yang.id, "c2", .2d, out var b, out _), Is.True);
+                ThrowAndHit(model, b.id, 20, .3d);
+                var done = model.Snapshot(.3d);
+                Assert.That(done.phase, Is.EqualTo(LabPhase.Victory));
+                var killer = done.players.Single(p => p.id == 20);
+                Assert.That(killer.hitTotal, Is.EqualTo(1));
+                Assert.That(killer.damageTotal, Is.EqualTo(10), "Only the HP that was left counts as damage.");
+                Assert.That(done.players.Where(p => p.lastHit).Select(p => p.id), Is.EqualTo(new ulong[] { 20 }));
+                Assert.That(done.players.Single(p => p.id == 30).hitTotal, Is.EqualTo(0));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(shortFight); }
+        }
+
+        [Test]
+        public void DefeatHasNoLastHitAndANewRoundClearsHitRecords()
+        {
+            var pair = GeneratePair(10);
+            Assert.That(model.TryCombine(10, pair.yin.id, pair.yang.id, "c", 0d, out var combined, out _), Is.True);
+            ThrowAndHit(model, combined.id, 10, .1d);
+            model.Tick(180d);
+            var lost = model.Snapshot(180d);
+            Assert.That(lost.phase, Is.EqualTo(LabPhase.Defeat));
+            Assert.That(lost.players.Single(p => p.id == 10).hitTotal, Is.EqualTo(1));
+            Assert.That(lost.players.Any(p => p.lastHit), Is.False);
+
+            model.Begin("lab-test", new ulong[] { 10, 20, 30 }, 181d, config);
+            var retry = model.Snapshot(181d);
+            Assert.That(retry.players.All(p => p.hitTotal == 0 && p.damageTotal == 0 && !p.lastHit), Is.True);
+        }
+
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {
             var created = ScriptableObject.CreateInstance<LabConfig>();
