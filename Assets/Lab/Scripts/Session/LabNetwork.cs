@@ -1238,6 +1238,7 @@ namespace C6Lab
         private void OnBombBlast(string bombId, Vector2 position)
         {
             SetNotice(BombBlastNotice);
+            if (board != null) board.Blast(bombId, position);
             BombBlasted?.Invoke(bombId, position);
         }
 

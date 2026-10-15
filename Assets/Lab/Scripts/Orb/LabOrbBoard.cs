@@ -347,6 +347,43 @@ namespace C6Lab
             return start;
         }
 
+        /// <summary>
+        /// A locked bomb blasted on this board. The bomb leaves at once, and every orb and drum whose
+        /// centre is within the blast radius is flung straight away from it, hardest right beside it
+        /// and fading to nothing at the edge. Nothing is removed; an orb flung past a side edge goes
+        /// to the neighbour through the usual Host-approved handoff. An orb held under a finger is
+        /// knocked out of the hand too. Orbs already waiting on a Host answer stay put. The blast
+        /// centre is where this screen shows the bomb, or the Host's last position for it if it is
+        /// gone. Returns how many bodies were pushed.
+        /// </summary>
+        public int Blast(string bombId, Vector2 normalizedPosition)
+        {
+            if (!configured || !Finite(normalizedPosition)) return 0;
+            Vector2 center = bombId != null && entries.TryGetValue(bombId, out var bomb) && bomb.View != null
+                ? XY(bomb.View.Body.position) : ToWorld(normalizedPosition, config.OrbRadius);
+            if (bombId != null) RemoveOrb(bombId);
+            float reach = config.BombBlastRadius * bounds.width;
+            float strength = config.BombBlastStrength * bounds.width;
+            if (reach <= 0f || strength <= 0f) return 0;
+
+            int pushed = 0;
+            updateEntries.Clear();
+            updateEntries.AddRange(entries.Values);
+            foreach (var entry in updateEntries)
+            {
+                if (entry.View == null || !entry.LocalOwner || entry.Locked || entry.EdgePending) continue;
+                Vector2 away = XY(entry.View.Body.position) - center;
+                float distance = away.magnitude;
+                if (distance > reach) continue;
+                if (entry.Held) CancelDrag();
+                Vector2 direction = distance > 1e-5f ? away / distance : Vector2.up;
+                Vector2 velocity = XY(entry.View.Body.linearVelocity) + direction * strength * (1f - distance / reach);
+                entry.View.Body.linearVelocity = OnPlane(velocity);
+                pushed++;
+            }
+            return pushed;
+        }
+
         public bool RemoveOrb(string id)
         {
             if (id == null || !entries.TryGetValue(id, out var entry)) return false;

@@ -661,6 +661,48 @@ namespace C6Lab.Tests
                 "Dragged leftward across its top, the drum turns anticlockwise like a real one.");
         }
 
+        [Test]
+        public void ABlastFlingsNearbyOrbsDrumsAndTheHeldOrbAwayWithoutRemovingAny()
+        {
+            // Board centre is world (0,0); positions below are given in 0..1 board units.
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2);
+            var near = board.UpsertOrb("near", LabOrbKind.Yin, new Vector2(.625f, .5f));   // world (1, 0)
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.3125f, .5f)); // world (-1.5, 0)
+            var held = board.UpsertOrb("held", LabOrbKind.Yang, new Vector2(.5f, .8f));    // world (0, 1.2)
+            var far = board.UpsertOrb("far", LabOrbKind.Yin, new Vector2(.95f, .95f));     // beyond the reach
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(held), 1d), Is.True);
+
+            int pushed = board.Blast("bomb", new Vector2(.5f, .5f));
+            float reach = config.BombBlastRadius * Width;
+            float strength = config.BombBlastStrength * Width;
+            Assert.That(pushed, Is.EqualTo(3));
+            Assert.That(board.TryGetMotion("bomb", out _, out _), Is.False, "The bomb itself is gone.");
+            Assert.That(board.Count, Is.EqualTo(4), "The blast removes no other orb.");
+            Assert.That(near.Body.linearVelocity.x, Is.EqualTo(strength * (1f - 1f / reach)).Within(.01f),
+                "An orb is flung straight away from the bomb, harder the closer it was.");
+            Assert.That(near.Body.linearVelocity.y, Is.EqualTo(0f).Within(.001f));
+            Assert.That(drum.Body.linearVelocity.x, Is.LessThan(0f), "The drum is flung too.");
+            Assert.That(held.Body.isKinematic, Is.False, "A held orb is knocked out of the hand.");
+            Assert.That(held.Body.linearVelocity.y, Is.GreaterThan(0f));
+            Assert.That(far.Body.linearVelocity.magnitude, Is.EqualTo(0f), "Beyond the blast radius nothing moves.");
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(far), 2d), Is.True, "No gesture is left stuck after the blast.");
+        }
+
+        [UnityTest]
+        public IEnumerator AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour()
+        {
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.75f, .5f), lockSwipes: 2); // world (2, 0)
+            board.UpsertOrb("orb", LabOrbKind.Yin, new Vector2(.875f, .5f));                // world (3, 0)
+            board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.875f, .75f));             // world (3, 1)
+            var crossed = new System.Collections.Generic.List<string>();
+            board.EdgeCrossed += crossing => { if (crossing.ToRight) crossed.Add(crossing.OrbId); };
+
+            Assert.That(board.Blast("bomb", new Vector2(.75f, .5f)), Is.EqualTo(2));
+            for (int step = 0; step < 15 && crossed.Count < 2; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed, Is.EquivalentTo(new[] { "orb", "drum" }),
+                "Flung past the right edge, both go to the neighbour through the usual handoff.");
+        }
+
         private void SetDrumDrift(float speed, float turning)
         {
             float[] values = config.CaptureDeveloperValues();
