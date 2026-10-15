@@ -82,7 +82,7 @@
 | Drum Drift Turning (per second) | 0.25 | 0–2 / 초⁻¹ | 떠도는 방향이 바뀌는 빠르기(부드러운 노이즈의 진행 속도). 높이면 자주 방향을 틀고, 0이면 같은 방향을 유지한다. 벽·옆 가장자리 0.15 보드 폭 안에서는 방향과 상관없이 멀어지는 쪽으로 튼다. **78번째(인덱스 77)**. |
 | Drum Spin Strength | 1 | 0–3 / 배 | 북 그림 회전의 세기. 떠도는 길이 휘는 쪽으로 도는 회전(최대 초당 90° × 세기)과, 구슬·벽이 스치며 접점이 미끄러지는 방향으로 도는 회전(최대 초당 540°)에 모두 곱한다. 회전은 그림만 바꾸고 충돌·위치에는 영향이 없다. 0이면 돌지 않는다. **79번째(인덱스 78)**. |
 
-판 높이와 반경은 별도 기하 검사를 통과해야 한다. `BoardHeight/2 > OrbRadius + 0.05`와 `(BoardHeight/2) × 구슬 카메라 aspect > OrbRadius + 0.05`를 모두 만족해야 **APPLY**가 진행된다. 판의 화면 비율이 바뀌면 같은 값도 통과 여부가 달라질 수 있다.
+판 높이와 반경은 별도 기하 검사를 통과해야 한다. `OrbInteractionArea`와 하단 HUD 경계를 화면 좌표에서 XY 물리 평면으로 바꾼 실제 영역의 가로·세로가 각각 `2 × (max(OrbRadius, DrumRadius) + 0.05)`보다 커야 **APPLY**가 진행된다. 후보 `BoardHeight`로 계산만 하며 검증 중 카메라 배율은 바꾸지 않는다. 판의 화면 비율이나 Canvas 영역이 바뀌면 같은 값도 통과 여부가 달라질 수 있다. 근거는 `LabSceneController.ValidateBoardTuning`과 `LabOrbAreaGeometry.TryCenterBounds`다.
 
 근거: `LabModel.TryAdvance`·`TryCombine`, `LabOrbBoard.Configure`·`EndDragAtWorld`·`FixedUpdate`·`BuildHorizontalWalls`, `LabOrbView.PlaySpawnRise`, `LabSceneController.ReconfigureBoard`.
 
