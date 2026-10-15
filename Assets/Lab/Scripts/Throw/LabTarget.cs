@@ -13,6 +13,11 @@ namespace C6Lab
         [SerializeField] private Transform visualMount;
         private GameObject replacementVisual;
 
+        /// <summary>Local presentation event, emitted only after the existing Host approval gates.</summary>
+        public event System.Action<Vector3, LabOrbElement> ApprovedHit;
+        public void NotifyApprovedHit(Vector3 localPoint, LabOrbElement element)
+            => ApprovedHit?.Invoke(localPoint, element);
+
         public MeshCollider Hitbox => hitbox;
         public Transform VisualMount => visualMount;
         /// <summary>The instance owned by SetVisualPrefab, independent of other mount children.</summary>

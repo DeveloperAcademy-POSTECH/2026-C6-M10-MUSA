@@ -24,6 +24,19 @@ namespace C6Lab
 
         // 소리 크기와 햅틱 설정은 LabConfig(Inspector: Resources/LabConfig, DEV: Sound and haptics)에 있다.
 
+        private LabNetwork gourdNetwork;
+        private LabGourdPaint gourdPaint;
+
+        private void OnGourdConfigApplied(LabConfig _)
+        {
+            if (gourdPaint != null) gourdPaint.ApplyMode();
+        }
+
+        private void OnDestroy()
+        {
+            if (gourdNetwork != null) gourdNetwork.ConfigApplied -= OnGourdConfigApplied;
+        }
+
         private void Awake()
         {
             LabNetwork boardNetwork = null;
@@ -58,6 +71,11 @@ namespace C6Lab
             // 햅틱 (내 구슬 생성, 내가 던진 구슬 타격)
             if (boardNetwork != null && GetComponent<LabHaptics>() == null)
                 gameObject.AddComponent<LabHaptics>().Bind(boardNetwork, board);
+            // Resolve the main target before crack/paint Start. Shared config and Solo restarts
+            // reuse the same accepted-config boundary, so editing an unapplied DEV value is inert.
+            gourdNetwork = boardNetwork;
+            gourdPaint = LabGourdPaint.Attach(boardNetwork);
+            if (gourdNetwork != null) gourdNetwork.ConfigApplied += OnGourdConfigApplied;
             // 일시정지 메뉴에 BGM·효과음 크기 슬라이더를 붙인다. 값은 기기마다 따로 저장된다.
             LabHud hud = FindFirstObjectByType<LabHud>();
             if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)
