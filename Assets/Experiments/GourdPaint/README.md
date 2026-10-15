@@ -12,6 +12,14 @@
 
 실험 장면: `Assets/Experiments/GourdPaint/GourdPaintPrototype.unity`. 메뉴는 기본 빌드 시작 장면을 바꾸지 않는다. 원본 `Lab.unity`는 보존한다.
 
+### 메뉴 (C6 Lab → Gourd Paint Experiment)
+
+- **Open Scene**: 실험 장면을 연다. 없으면 만든다.
+- **Rebuild Scene From Latest Lab**: main의 `Lab.unity`가 바뀌었을 때, 최신 Lab을 복사해 실험 장면을 다시 만든다.
+- **Export iOS Xcode Project**: 실험 장면만 넣은 아이폰 빌드를 `Builds/GourdPaint/<시간>/iOS`에 만든다.
+
+Build Settings의 장면 목록(`EditorBuildSettings.asset`)과 기본 빌드 메뉴(C6 Lab → Export iOS Xcode Project, 항상 `Lab.unity`)는 바꾸지 않는다.
+
 ## 이번 검증 — 2026-10-15
 
 Unity 6000.6.5f1에서 컴파일·실험 Scene 생성·셰이더 렌더 확인. 기존 전투 PlayMode 60/60 통과, 별도로 추가한 페인트 PlayMode 검사 1/1 통과, EditMode 88/88 통과. 승인 타격 이벤트 연결, 회전 후 로컬 자국 좌표 유지, 초기화, 잘못된 좌표 거부, 128개 한도 확인. 테스트에서 만든 다섯 색 캡처를 직접 확인했다. 사용자 손 입력, 실제 다중 기기 동기, iOS 성능은 미검증이며 시연 전에 직접 확인이 필요하다.

@@ -5,11 +5,8 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
+  - enabled: 1
     path: Assets/Lab/Scenes/Lab.unity
     guid: 84e038ee921ed49a68782dd5b35431b1
-  - enabled: 1
-    path: Assets/Experiments/GourdPaint/GourdPaintPrototype.unity
-    guid: 883c65da93c36433890796d64bbce66e
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
