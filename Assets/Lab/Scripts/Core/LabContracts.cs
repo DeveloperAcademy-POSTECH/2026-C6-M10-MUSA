@@ -88,7 +88,7 @@ namespace C6Lab
         public int damageTotal;
         /// <summary>요괴 HP를 0으로 만든 마지막 한 방(막타)을 쳤는지. 승리했을 때만 한 명이 true.</summary>
         public bool lastHit;
-        /// <summary>북을 하나 이상 가지고 있던 시간(초). 북을 여러 개 가져도 한 번만 센다.</summary>
+        /// <summary>북 점유 시간(초): 북을 하나 이상 점유한 시간. 여러 개여도 한 번만 센다. 북 점유율 = 이 값 / playedSeconds</summary>
         public double drumSeconds;
 
         public int ItemsUsed => relayUsed + secretBoxUsed + potionUsed + bombUsed;

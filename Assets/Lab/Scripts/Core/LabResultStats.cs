@@ -7,7 +7,7 @@ namespace C6Lab
     /// <summary>
     /// 결과 대시보드의 칭호 종류 (화면에 붙는 순서).
     /// 딜왕: 요괴에게 준 피해 최다 · 구슬 패스왕: 구슬 전달 최다 · 북 패스왕: 북 전달 최다 ·
-    /// 막타: 요괴를 쓰러뜨린 한 방(승리 시에만) · 북 독점: 북을 가지고 있던 시간 최다
+    /// 막타: 요괴를 쓰러뜨린 한 방(승리 시에만) · 북 독점: 북 점유율 최고 (점유 시간으로 비교)
     /// </summary>
     public enum LabResultTitle { MostDamage, MostPassed, MostDrumPassed, LastHit, MostDrum }
 
@@ -78,14 +78,14 @@ namespace C6Lab
             }
         }
 
-        /// <summary>플레이 시간 중 북을 가지고 있던 비율(0~100, 반올림). 플레이 시간이 0이면 0.</summary>
+        /// <summary>북 점유율: 플레이 시간 중 북을 점유한 비율(0~100, 반올림). 플레이 시간이 0이면 0.</summary>
         public static int DrumSharePercent(LabPlayerState player, double playedSeconds)
         {
             if (player == null || playedSeconds <= 0d || player.drumSeconds <= 0d) return 0;
             return (int)Math.Round(Math.Min(1d, player.drumSeconds / playedSeconds) * 100d, MidpointRounding.AwayFromZero);
         }
 
-        /// <summary>북 점유 글자 (예: "12초 · 40%")</summary>
+        /// <summary>북 점유 글자: 점유 시간 · 북 점유율 (예: "12초 · 40%")</summary>
         public static string DrumText(LabPlayerState player, double playedSeconds) =>
             player == null ? "" : (int)Math.Round(player.drumSeconds, MidpointRounding.AwayFromZero) + "초 · "
                 + DrumSharePercent(player, playedSeconds) + "%";

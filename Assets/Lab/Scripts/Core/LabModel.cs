@@ -433,7 +433,7 @@ namespace C6Lab
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond));
-                    // 결과 대시보드 기록: 이 사이에 북을 가지고 있던 사람의 점유 시간
+                    // 결과 대시보드 기록: 이 사이에 북을 점유한 사람의 점유 시간 (북 점유율 계산용)
                     // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)
                     foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())
                         if (players.TryGetValue(holder, out var drummer)) drummer.drumSeconds += elapsed;
