@@ -17,7 +17,8 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(83));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(84));
+            Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -76,14 +77,16 @@ namespace C6Lab.Tests
             values[76] = .2f;
             values[77] = .5f;
             values[78] = 2f;
-            Assert.That(new[] { values[79], values[80] }, Is.EqualTo(new[] { .4f, 9f }),
+            values[79] = 1f; // gourd mode: crack
+            Assert.That(new[] { values[80], values[81] }, Is.EqualTo(new[] { .4f, 9f }),
                 "A bomb blast reaches 40% of the board width and pushes hardest right beside it.");
-            values[79] = .6f;
-            values[80] = 12f;
-            Assert.That(new[] { values[81], values[82] }, Is.EqualTo(new[] { 2f, 1f }), "A blast plays a full Heavy haptic.");
-            values[81] = 4f; // Rigid
-            values[82] = .5f;
+            values[80] = .6f;
+            values[81] = 12f;
+            Assert.That(new[] { values[82], values[83] }, Is.EqualTo(new[] { 2f, 1f }), "A blast plays a full Heavy haptic.");
+            values[82] = 4f; // Rigid
+            values[83] = .5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
             Assert.That(config.GenerateCost, Is.EqualTo(5f));
@@ -308,6 +311,111 @@ namespace C6Lab.Tests
             for (int i = 0; i < fieldCount; i++)
                 Assert.That(seen[i], Is.EqualTo(1),
                     LabConfig.DeveloperFields[i].Label + " (" + i + ") must be in exactly one category.");
+        }
+
+
+        [System.Serializable]
+        private sealed class SharedModeSettings
+        {
+            public float[] values;
+        }
+
+        [Test]
+        public void GourdModeAppendsAtIndex79AndRoundTripsWithoutChangingExistingValues()
+        {
+            Assert.That(LabConfig.DeveloperFields.Count, Is.GreaterThan(79),
+                "Later fields append after Gourd Mode; the total is checked by the form test.");
+            Assert.That(LabConfig.DeveloperFields[78].Label, Is.EqualTo("Drum Spin Strength"));
+            LabDeveloperField field = LabConfig.DeveloperFields[79];
+            Assert.That(field.Label, Is.EqualTo("Gourd Mode (0 paint, 1 crack)"));
+            Assert.That(field.Min, Is.Zero);
+            Assert.That(field.Max, Is.EqualTo(1f));
+            Assert.That(field.WholeNumber, Is.True);
+            Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
+            float[] values = config.CaptureDeveloperValues();
+            var originalPrefix = new float[79];
+            System.Array.Copy(values, originalPrefix, 79);
+            foreach (float mode in new[] { 1f, 0f, 1f })
+            {
+                values[79] = mode;
+                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                Assert.That(config.GourdMode, Is.EqualTo(mode == 0f ? LabGourdMode.Paint : LabGourdMode.Crack));
+                float[] captured = config.CaptureDeveloperValues();
+                Assert.That(captured[79], Is.EqualTo(mode));
+                var currentPrefix = new float[79];
+                System.Array.Copy(captured, currentPrefix, 79);
+                Assert.That(currentPrefix, Is.EqualTo(originalPrefix),
+                    "Appending the mode cannot shift or modify the previous 79 tuning values.");
+            }
+        }
+
+        [Test]
+        public void InvalidGourdModeCannotPartiallyApplyAnotherSetting()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[79] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            values[0] = 240f;
+            foreach (float invalid in new[] { -1f, 2f, .5f, float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+            {
+                values[79] = invalid;
+                Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, invalid.ToString());
+                Assert.That(error, Does.Contain("Gourd Mode"));
+                Assert.That(config.MonsterMaxHp, Is.EqualTo(1000), "The whole form is rejected atomically.");
+                Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(79)]
+        [TestCase(81)]
+        public void ObsoleteOrOversizedModeSchemaIsRejectedBeforeApplyingSettings(int length)
+        {
+            float[] invalid = new float[length];
+            float[] current = config.CaptureDeveloperValues();
+            System.Array.Copy(current, invalid, Mathf.Min(length, current.Length));
+            if (length > 0) invalid[0] = 240f;
+            Assert.That(config.TryApplyDeveloperValues(invalid, out string error), Is.False);
+            Assert.That(error, Does.Contain("incomplete"));
+            Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
+            Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
+            Assert.Throws<System.ArgumentException>(() => LabSessionSettings.Fingerprint(invalid, 3, 1));
+        }
+
+        [Test]
+        public void SharedGourdModeChangesFingerprintAndSurvivesJsonAndConfigRoundTrip()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            // The fingerprint function accepts a protocol value independently of the current
+            // wire version; connection compatibility itself is tested by the networking layer.
+            const ushort protocol = 1;
+            string paintFingerprint = LabSessionSettings.Fingerprint(values, 3, protocol);
+            values[79] = 1f;
+            string crackFingerprint = LabSessionSettings.Fingerprint(values, 3, protocol);
+            Assert.That(crackFingerprint, Is.Not.EqualTo(paintFingerprint),
+                "Clients must acknowledge the selected mode as part of the shared settings.");
+            string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
+            float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
+            Assert.That(received.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
+            Assert.That(LabSessionSettings.Fingerprint(received, 3, protocol), Is.EqualTo(crackFingerprint));
+            var clientConfig = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                Assert.That(clientConfig.TryApplyDeveloperValues(received, out string error), Is.True, error);
+                Assert.That(clientConfig.GourdMode, Is.EqualTo(LabGourdMode.Crack));
+                Assert.That(clientConfig.CaptureDeveloperValues(), Is.EqualTo(values));
+                values[79] = 0f;
+                Assert.That(LabSessionSettings.Fingerprint(values, 3, protocol), Is.EqualTo(paintFingerprint));
+            }
+            finally { Object.DestroyImmediate(clientConfig); }
+        }
+
+        [Test]
+        public void UnknownInspectorGourdEnumFallsBackToPaintForSharedSettings()
+        {
+            JsonUtility.FromJsonOverwrite("{\"gourdMode\":999}", config);
+            Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
+            Assert.That(config.CaptureDeveloperValues()[79], Is.Zero);
         }
 
     }

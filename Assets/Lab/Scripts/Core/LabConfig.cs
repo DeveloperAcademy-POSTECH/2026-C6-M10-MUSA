@@ -127,6 +127,7 @@ namespace C6Lab
             new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
             new LabDeveloperField("Drum Drift Turning (per second)", 0f, 2f),
             new LabDeveloperField("Drum Spin Strength", 0f, 3f),
+            new LabDeveloperField("Gourd Mode (0 paint, 1 crack)", 0f, 1f, true),
             new LabDeveloperField("Bomb Blast Radius (board widths)", 0f, 2f),
             new LabDeveloperField("Bomb Blast Strength (board widths/s)", 0f, 20f),
             new LabDeveloperField("Bomb Haptic Style (0-4)", 0f, 4f, true),
@@ -146,7 +147,7 @@ namespace C6Lab
             new LabDeveloperCategory("Battle", 0, 1, 2, 48),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
             new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44),
-            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 79, 80),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
@@ -155,8 +156,9 @@ namespace C6Lab
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 81, 82),
-            new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78)
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83),
+            new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78),
+            new LabDeveloperCategory("Gourd", 79)
         });
 
 
@@ -241,6 +243,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 2f)] private float drumDriftTurning = .25f;
         [Tooltip("떠돌며 돌 때와 부딪혀 돌 때의 회전 세기. 0이면 돌지 않는다.")]
         [SerializeField, Range(0f, 3f)] private float drumSpinStrength = 1f;
+
+        [Header("Gourd (요괴 박)")]
+        [Tooltip("Paint: 흰 박에 구슬 속성 색을 칠한다 (#153). Crack: 박 모델에 금이 가고 처치 연출이 나온다 (#163).")]
+        [SerializeField] private LabGourdMode gourdMode = LabGourdMode.Paint;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -364,6 +370,7 @@ namespace C6Lab
         public float DrumDriftSpeed => Mathf.Clamp(Finite(drumDriftSpeed, .1f), 0f, 1f);
         public float DrumDriftTurning => Mathf.Clamp(Finite(drumDriftTurning, .25f), 0f, 2f);
         public float DrumSpinStrength => Mathf.Clamp(Finite(drumSpinStrength, 1f), 0f, 3f);
+        public LabGourdMode GourdMode => gourdMode == LabGourdMode.Crack ? LabGourdMode.Crack : LabGourdMode.Paint;
         public LabOrbAppearance OrbAppearance => orbAppearance;
         public float BgmVolume => Mathf.Clamp01(Finite(bgmVolume, .2f));
         public float GenerateSoundVolume => Mathf.Clamp01(Finite(generateSoundVolume, 1f));
@@ -432,6 +439,7 @@ namespace C6Lab
                 (float)HitHapticStyle, HitHapticIntensity,
                 (float)ItemHitHapticStyle, ItemHitHapticIntensity,
                 DrumCount, DrumRadius, DrumDriftSpeed, DrumDriftTurning, DrumSpinStrength,
+                (float)GourdMode,
                 BombBlastRadius, BombBlastStrength,
                 (float)BombHapticStyle, BombHapticIntensity
             };
@@ -553,10 +561,11 @@ namespace C6Lab
             drumDriftSpeed = values[76];
             drumDriftTurning = values[77];
             drumSpinStrength = values[78];
-            bombBlastRadius = values[79];
-            bombBlastStrength = values[80];
-            bombHapticStyle = (LabHapticStyle)(int)values[81];
-            bombHapticIntensity = values[82];
+            gourdMode = values[79] >= .5f ? LabGourdMode.Crack : LabGourdMode.Paint;
+            bombBlastRadius = values[80];
+            bombBlastStrength = values[81];
+            bombHapticStyle = (LabHapticStyle)(int)values[82];
+            bombHapticIntensity = values[83];
             error = string.Empty;
             return true;
         }

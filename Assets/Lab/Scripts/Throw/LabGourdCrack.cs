@@ -12,6 +12,7 @@ namespace C6Lab
         Renderer[] shells;
         MaterialPropertyBlock properties;
         bool initialized;
+        bool started;
         public GameObject VisualInstance { get; private set; }
         public string InitializationError { get; private set; }
         public bool IsReady => initialized && isActiveAndEnabled && network != null && target != null
@@ -24,20 +25,42 @@ namespace C6Lab
         public int Stage { get; private set; }
         void Start()
         {
+            started = true;
+            Initialize();
+        }
+        void OnEnable()
+        {
+            if (started) Initialize();
+        }
+        /// <summary>Re-enter crack mode without duplicating its mounted visual.</summary>
+        public bool Initialize()
+        {
+            if (IsReady) return true;
+            ReleasePresentation();
+            if (!isActiveAndEnabled)
+            {
+                InitializationError = "The crack presentation is disabled.";
+                return false;
+            }
             if (network == null || target == null || network.target != target
                 || target.Hitbox == null || target.VisualMount == null
                 || gourdPrefab == null || crackMaterial == null
                 || !crackMaterial.HasProperty("_CrackStage"))
             {
                 InitializationError = "The gourd network, target, prefab, or crack material is not ready.";
-                return;
+                return false;
+            }
+            if (target.MountedVisual != null)
+            {
+                InitializationError = "The target already owns another mounted visual.";
+                return false;
             }
             target.SetVisualPrefab(gourdPrefab);
             VisualInstance = target.MountedVisual;
             if (VisualInstance == null)
             {
                 FailInitialization("The target did not mount a gourd instance.");
-                return;
+                return false;
             }
             Transform visual = VisualInstance.transform;
             foreach (var animator in visual.GetComponentsInChildren<Animator>(true)) animator.enabled = false;
@@ -57,7 +80,7 @@ namespace C6Lab
             if (shells.Length == 0)
             {
                 FailInitialization("The mounted gourd has no Shell renderer for the crack material.");
-                return;
+                return false;
             }
             Bounds bounds = shells[0].bounds;
             foreach (var r in shells) bounds.Encapsulate(r.bounds);
@@ -65,7 +88,7 @@ namespace C6Lab
             if (float.IsNaN(size) || float.IsInfinity(size) || size <= Mathf.Epsilon)
             {
                 FailInitialization("The mounted gourd shell has no usable bounds.");
-                return;
+                return false;
             }
             visual.localScale *= 1.8f / size;
             bounds = shells[0].bounds;
@@ -78,12 +101,20 @@ namespace C6Lab
             initialized = true;
             InitializationError = null;
             SetStage(0);
+            return true;
         }
         void FailInitialization(string reason)
         {
+            ReleasePresentation();
             InitializationError = reason;
-            // A malformed visual must not hide the original target or block victory forever.
-            if (target != null && target.MountedVisual == VisualInstance) target.SetVisualPrefab(null);
+        }
+        /// <summary>Release only this component's visual before another mode mounts its own.</summary>
+        public void ReleasePresentation()
+        {
+            GetComponent<LabGourdFinish>()?.ResetPresentation();
+            SetStage(0);
+            if (target != null && VisualInstance != null && target.MountedVisual == VisualInstance)
+                target.SetVisualPrefab(null);
             VisualInstance = null;
             shells = null;
             initialized = false;
@@ -114,10 +145,7 @@ namespace C6Lab
                 r.SetPropertyBlock(properties);
             }
         }
-        void OnDisable()
-        {
-            GetComponent<LabGourdFinish>()?.ResetPresentation();
-            SetStage(0);
-        }
+        void OnDisable() => ReleasePresentation();
+        void OnDestroy() => ReleasePresentation();
     }
 }

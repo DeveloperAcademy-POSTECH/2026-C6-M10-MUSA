@@ -32,10 +32,10 @@ namespace C6Lab.Tests
             Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.Bomb));
 
             float[] values = config.CaptureDeveloperValues();
-            values[82] = 0f; // bomb haptic intensity
+            values[83] = 0f; // bomb haptic intensity
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(haptics.PlayForBomb(config), Is.False, "Zero intensity plays nothing.");
-            values[82] = 1f;
+            values[83] = 1f;
             values[67] = 0f; // haptics off
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.True, error);
             Assert.That(haptics.PlayForBomb(config), Is.False, "Turning haptics off silences the blast too.");
