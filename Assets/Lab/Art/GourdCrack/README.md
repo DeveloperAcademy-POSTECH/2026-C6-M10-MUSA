@@ -1,6 +1,6 @@
 # 박 명중 크랙 프로토타입 (#150)
 
-Unity 6000.6.5f1에서 **C6 Lab → Open Gourd Crack Prototype**을 선택하고 Play를 누른다. DEV의 START SOLO로 라운드를 시작한 뒤 Yin/Yang을 조합해 Combined를 위로 스와이프하여 던진다. 현재 팀 버전의 투척·명중 판정과 HP를 사용한다.
+Unity 6000.6.5f1에서 **C6 Lab → Open Gourd Crack Prototype**을 선택하고 Play를 누른다. DEV의 `Gourd Mode (0 paint, 1 crack)`를 **1**로 선택하고 START SOLO로 라운드를 시작한 뒤 Yin/Yang을 조합해 Combined를 위로 스와이프하여 던진다. 현재 팀 버전의 투척·명중 판정과 HP를 사용한다.
 
 실험 장면은 `Assets/Lab/Scenes/LabGourdCrack.unity`다. 원본 Lab 장면을 복사하여 박 표현만 추가했다. 이 메뉴는 빌드 시작 Scene을 바꾸지 않으므로 실기기에서 시험하려면 이 장면을 포함하는 빌드 구성을 별도로 지정해야 한다.
 
@@ -27,10 +27,18 @@ HP 0의 승리 스냅샷이 도착하면 약 0.2초 움찔한 뒤, 박이 고정
 
 Unity 6000.6.5f1에서 실험 Scene에 마무리 컴포넌트를 연결하고, 갈라진 상태를 렌더 캡처하여 확인했다. 전체 PlayMode 66/66 통과 후, 반복 스냅샷 재생 방지·승리 지연 해제·패배 즉시 표시·로비 복귀 초기화 검사를 추가한 관련 검사 6/6 재통과. EditMode 88/88 통과. 실제 다중 기기에서의 연출 동기와 iOS 성능은 미검증. 원본 Lab 장면에는 마무리 컴포넌트를 추가하지 않았으며, 해당 컴포넌트가 있는 실험 장면에서만 결과 표시가 지연된다.
 
-## 기본 Lab 연결 — 이슈 #163
+## 기본 Lab 연결 — 이슈 #163 당시 기록
 
-현재 기본 실행·빌드 Scene인 `Assets/Lab/Scenes/Lab.unity`에도 박 외형·크랙·마무리 컴포넌트를 연결한다. 위 #150의 별도 실험 Scene 설명과 검증 기록은 당시 범위로 보존한다. 최신 UI와 곡선 조합 영역을 유지하기 위해 실험 Scene 전체를 복사하지 않는다.
+당시 기본 실행·빌드 Scene인 `Assets/Lab/Scenes/Lab.unity`에도 박 외형·크랙·마무리 컴포넌트를 연결했다. 위 #150의 별도 실험 Scene 설명과 검증 기록은 당시 범위로 보존한다. 최신 UI와 곡선 조합 영역을 유지하기 위해 실험 Scene 전체를 복사하지 않는다.
 
 `C6 Lab → Apply Gourd To Main Scene`은 현재 열린 기본 Lab의 Target에 기존 프리팹/재질 참조만 연결하며, `Validate Main Gourd References`로 연결을 확인한다. 박은 Play 시작 시 생성된다. Collider·매달림·회전·피해는 기존 경로를 사용한다. 준비 실패나 비활성 연출이 승리 결과를 무한히 지연하지 않도록 처리하며, 마지막 명중은 실제 장착된 박 인스턴스를 사용한다.
 
 이 변경의 실제 실행 결과와 미실행 항목은 `docs/VALIDATION.md`의 #163 기록을 참조한다. #150의 과거 실행 결과를 #163 기본 Scene 통합의 검증 결과로 승계하지 않는다.
+
+## 기본 전투의 모드 선택 — #166 / PR #168 통합
+
+기본값 **Paint(0)**는 흰 박·색칠과 즉시 결과를 사용한다. 기존 크랙을 확인하려면 `LabConfig` Inspector의 **Gourd Mode = Crack** 또는 DEV의 **`Gourd Mode (0 paint, 1 crack) = 1`**을 선택한 뒤 솔로 시작/재시작·Host 방 생성/로비 적용·일시정지한 Host의 적용/재시작을 실행한다. Client는 Host 설정을 따르며, 일반 결과 Retry는 모드를 유지한다. Inspector 수정만으로 진행 중인 전투가 즉시 전환되지는 않는다.
+
+현재 `LabSceneController`의 초기 연결과 `LabNetwork.ConfigApplied`를 통해 `LabGourdPaint.Attach`·`ApplyMode`가 실행 중 표현을 선택한다. Scene을 크랙/페인트 전용으로 덮어쓰지 않는다. **Crack(1)**에서 기존 HP 단계·약 1.2초 승리 마무리가 활성화되며, Paint와 동시에 표현하지 않는다. 원통 Collider·매달림·회전·Host 피해 규칙은 공통이다. 패배는 모드와 관계없이 지연하지 않는다. 보존된 `LabGourdCrack.unity` 실험 Scene도 현재 기본 설정이 Paint이므로 크랙 재현 시 DEV 값을 1로 적용한다.
+
+위 #150·#163 기록과 Scene 직렬화 방식이었던 이전 로컬 #166의 검사는 당시 버전에 한정한다. 새 모드의 설정/런타임 연결은 `docs/VALIDATION.md`의 별도 통합 검증을 확인하며 과거 PASS를 승계하지 않는다. 페인트 표시 규칙과 연결은 `Assets/Lab/Art/GourdPaint/README.md`를 참조한다.

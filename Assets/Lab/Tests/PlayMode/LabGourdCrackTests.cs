@@ -27,52 +27,16 @@ namespace C6Lab.Tests
 
   #if UNITY_EDITOR
   [UnityTest]
-  public IEnumerator MainSceneHostProjectilesDriveCracksFinishAndResultRestart()
+  public IEnumerator MainSceneCrackModeHostProjectilesDriveCracksFinishAndResultRestart()
   {
    yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
    yield return null;
-
-   var c = Object.FindFirstObjectByType<LabGourdCrack>();
-   Assert.That(c, Is.Not.Null, "The ordinary build Scene must mount the gourd, not only the optional prototype Scene.");
    var hud = Object.FindFirstObjectByType<LabHud>();
    Assert.That(hud, Is.Not.Null);
    LabNetwork network = hud.network;
    Assert.That(network, Is.Not.Null);
-   Assert.That(c.network, Is.SameAs(network));
-   Assert.That(c.target, Is.SameAs(network.target));
-   Assert.That(c.gourdPrefab, Is.SameAs(UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
-    "Assets/Lab/Art/Target2/Prefabs/Target2_Intact.prefab")));
-   Assert.That(c.crackMaterial, Is.SameAs(UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(
-    "Assets/Lab/Art/GourdCrack/GourdCrack.mat")));
-   Assert.That(c.IsReady, Is.True, c.InitializationError);
-   Assert.That(c.InitializationError, Is.Null.Or.Empty);
-   Assert.That(c.VisualInstance, Is.SameAs(network.target.MountedVisual));
-   Assert.That(c.VisualInstance.activeSelf, Is.True);
-   Assert.That(c.VisualInstance.transform.parent, Is.SameAs(network.target.VisualMount));
-   Assert.That(c.crackMaterial.shader.isSupported, Is.True);
-   var shells = c.VisualInstance.GetComponentsInChildren<Renderer>(true)
-    .Where(renderer => renderer.sharedMaterials.Contains(c.crackMaterial)).ToArray();
-   Assert.That(shells, Is.Not.Empty);
-   Assert.That(shells.Any(renderer => renderer.enabled && renderer.gameObject.activeInHierarchy), Is.True);
-   Assert.That(network.target.Hitbox.enabled, Is.True);
-   Assert.That(network.target.Hitbox.GetComponent<MeshRenderer>().enabled, Is.False,
-    "Only the diagnostic cylinder rendering is replaced; its hitbox must stay enabled.");
-   Assert.That(c.VisualInstance.GetComponentsInChildren<Collider>(true), Is.Empty);
-   Assert.That(c.VisualInstance.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
-   Assert.That(c.VisualInstance.GetComponentsInChildren<Animator>(true).All(animator => !animator.enabled), Is.True);
-
-   var finish = c.GetComponent<LabGourdFinish>();
-   Assert.That(finish, Is.Not.Null);
-   Assert.That(finish.enabled, Is.True);
-   var prospectiveVictory = new LabSnapshot { sessionId = "disabled-check", round = 1, phase = LabPhase.Victory, hp = 0 };
-   finish.enabled = false;
-   Assert.That(LabGourdFinish.DelayVictory(network, prospectiveVictory), Is.False,
-    "A disabled presentation cannot hold the ordinary victory UI indefinitely.");
-   finish.enabled = true;
-   c.enabled = false;
-   Assert.That(LabGourdFinish.DelayVictory(network, prospectiveVictory), Is.False);
-   c.enabled = true;
-
+   var c = network.target.GetComponent<LabGourdCrack>();
+   Assert.That(c, Is.Not.Null, "The ordinary Scene retains the crack component and its Inspector references.");
    var controller = Object.FindFirstObjectByType<LabSceneController>();
    Assert.That(controller, Is.Not.Null);
    LabConfig savedConfig = network.config;
@@ -81,6 +45,7 @@ namespace C6Lab.Tests
    // Fixed DEV fixture: generating unlocked Relay orbs avoids random Yin/Yang draws. The
    // saved Host, board gesture, projectile collision and result UI paths remain in use.
    float[] tuning = fixture.CaptureDeveloperValues();
+   SetTuning(tuning, "Gourd Mode (0 paint, 1 crack)", 1f);
    SetTuning(tuning, "Monster Max HP", 60f);
    SetTuning(tuning, "Damage per Hit", 20f);
    SetTuning(tuning, "Battle Duration (seconds)", 30f);
@@ -122,6 +87,39 @@ namespace C6Lab.Tests
    {
     Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
     yield return null;
+    Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
+    Assert.That(c.network, Is.SameAs(network));
+    Assert.That(c.target, Is.SameAs(network.target));
+    Assert.That(c.gourdPrefab, Is.SameAs(UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+     "Assets/Lab/Art/Target2/Prefabs/Target2_Intact.prefab")));
+    Assert.That(c.crackMaterial, Is.SameAs(UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(
+     "Assets/Lab/Art/GourdCrack/GourdCrack.mat")));
+    Assert.That(c.IsReady, Is.True, c.InitializationError);
+    Assert.That(c.InitializationError, Is.Null.Or.Empty);
+    Assert.That(c.VisualInstance, Is.SameAs(network.target.MountedVisual));
+    Assert.That(c.VisualInstance.activeSelf, Is.True);
+    Assert.That(c.VisualInstance.transform.parent, Is.SameAs(network.target.VisualMount));
+    Assert.That(c.crackMaterial.shader.isSupported, Is.True);
+    var shells = c.VisualInstance.GetComponentsInChildren<Renderer>(true)
+     .Where(renderer => renderer.sharedMaterials.Contains(c.crackMaterial)).ToArray();
+    Assert.That(shells, Is.Not.Empty);
+    Assert.That(shells.Any(renderer => renderer.enabled && renderer.gameObject.activeInHierarchy), Is.True);
+    Assert.That(network.target.Hitbox.enabled, Is.True);
+    Assert.That(network.target.Hitbox.GetComponent<MeshRenderer>().enabled, Is.False,
+     "Only the diagnostic cylinder rendering is replaced; its hitbox must stay enabled.");
+    Assert.That(c.VisualInstance.GetComponentsInChildren<Collider>(true), Is.Empty);
+    Assert.That(c.VisualInstance.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
+    Assert.That(c.VisualInstance.GetComponentsInChildren<Animator>(true).All(animator => !animator.enabled), Is.True);
+
+    var finish = c.GetComponent<LabGourdFinish>();
+    Assert.That(finish, Is.Not.Null);
+    Assert.That(finish.enabled, Is.True);
+    var prospectiveVictory = new LabSnapshot { sessionId = "disabled-check", round = 1, phase = LabPhase.Victory, hp = 0 };
+    finish.enabled = false;
+    Assert.That(LabGourdFinish.DelayVictory(network, prospectiveVictory), Is.False,
+     "A disabled presentation cannot hold the ordinary victory UI indefinitely.");
+    finish.enabled = true;
+
     Assert.That(network.IsHost, Is.True);
     Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
     Assert.That(network.Snapshot.hp, Is.EqualTo(60));
@@ -214,8 +212,9 @@ namespace C6Lab.Tests
 
     network.Stop();
     yield return null;
-    Assert.That(c.Stage, Is.Zero);
-    Assert.That(c.VisualInstance.activeSelf, Is.True);
+    Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
+    Assert.That(network.target.GetComponent<LabGourdPaint>().IsReady, Is.True);
+    Assert.That(c.enabled, Is.False);
     Assert.That(hud.sessionControls.activeInHierarchy, Is.True);
    }
    finally
@@ -263,7 +262,7 @@ namespace C6Lab.Tests
 
   static void CaptureMainBattle(Camera camera, string fileName)
   {
-   const string directory = "Library/Issue163Captures";
+   const string directory = "Library/Issue166ModeCaptures/Crack";
    Directory.CreateDirectory(directory);
    var texture = new RenderTexture(540, 960, 24);
    var image = new Texture2D(540, 960, TextureFormat.RGB24, false);
@@ -312,45 +311,62 @@ namespace C6Lab.Tests
   }
 
   [UnityTest]
-  public IEnumerator SavedSceneMountsGourdAndResetsCracks()
+  public IEnumerator MainSceneConfigSelectedCrackPresentationUsesStagesAndOneBoundedFinish()
   {
-   yield return UnityEditor.SceneManagement.EditorSceneManager.LoadSceneAsyncInPlayMode("Assets/Lab/Scenes/LabGourdCrack.unity", new LoadSceneParameters(LoadSceneMode.Single));
+   yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
    yield return null;
-   var c=Object.FindFirstObjectByType<LabGourdCrack>();Assert.That(c,Is.Not.Null);
-   var renderers=c.target.VisualMount.GetComponentsInChildren<Renderer>();
-   Assert.That(renderers.Any(r=>r.sharedMaterials.Contains(c.crackMaterial)),Is.True,"Imported shell must receive crack shader");
-   Assert.That(c.target.Hitbox.enabled,Is.True);
-   Assert.That(c.target.VisualMount.GetComponentsInChildren<Collider>().Length,Is.Zero);
-   var camera=Object.FindObjectsByType<Camera>(FindObjectsSortMode.None).First(v=>v.name=="BattleCamera");
-   Directory.CreateDirectory("Library/GourdCrackCaptures");
-   for(int stage=0;stage<=3;stage++)
+   var network = Object.FindFirstObjectByType<LabHud>().network;
+   var fixture = Object.Instantiate(network.config);
+   float[] values = fixture.CaptureDeveloperValues();
+   SetTuning(values, "Gourd Mode (0 paint, 1 crack)", 1f);
+   Assert.That(fixture.TryApplyDeveloperValues(values, out string error), Is.True, error);
+   try
    {
-    c.SetStage(stage);Assert.That(c.Stage,Is.EqualTo(stage));
-    var rt=new RenderTexture(540,960,24);var image=new Texture2D(540,960,TextureFormat.RGB24,false);var old=RenderTexture.active;
-    try{camera.targetTexture=rt;camera.Render();RenderTexture.active=rt;image.ReadPixels(new Rect(0,0,540,960),0,0);image.Apply();File.WriteAllBytes("Library/GourdCrackCaptures/stage-"+stage+".png",image.EncodeToPNG());}
-    finally{camera.targetTexture=null;RenderTexture.active=old;rt.Release();Object.Destroy(rt);Object.Destroy(image);}
+    Assert.That(network.ConfigureHostSession(fixture, 2), Is.True, network.Notice);
+    yield return null;
+    var c = network.target.GetComponent<LabGourdCrack>();
+    var paint = network.target.GetComponent<LabGourdPaint>();
+    Assert.That(c.IsReady, Is.True, c.InitializationError);
+    Assert.That(paint.enabled, Is.False);
+    Assert.That(c.target.Hitbox.enabled, Is.True);
+    Assert.That(c.VisualInstance.GetComponentsInChildren<Collider>(true), Is.Empty);
+    var renderers = c.VisualInstance.GetComponentsInChildren<Renderer>();
+    Assert.That(renderers.Any(r => r.sharedMaterials.Contains(c.crackMaterial)), Is.True);
+    var camera = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None).Single(v => v.name == "BattleCamera");
+    for (int stage = 0; stage <= 3; stage++)
+    {
+     c.SetStage(stage);
+     Assert.That(c.Stage, Is.EqualTo(stage));
+     CaptureMainBattle(camera, "preview-stage-" + stage + ".png");
+    }
+    var finish = c.GetComponent<LabGourdFinish>();
+    var victory = new LabSnapshot { sessionId = "finish-fixture", round = 1, phase = LabPhase.Victory, hp = 0 };
+    Assert.That(LabGourdFinish.DelayVictory(network, victory), Is.True);
+    finish.ObserveSnapshot(victory, .6f);
+    Assert.That(finish.IsFinishing, Is.True);
+    Assert.That(finish.Complete, Is.False);
+    Assert.That(c.target.VisualMount.Find("Gourd Left Half").gameObject.activeSelf, Is.True);
+    Assert.That(c.target.VisualMount.Find("Gourd Right Half").gameObject.activeSelf, Is.True);
+    Assert.That(c.target.VisualMount.Find("Small Yokai Spirit").gameObject.activeSelf, Is.True);
+    finish.Advance(1f);
+    Assert.That(finish.Complete, Is.True);
+    Assert.That(LabGourdFinish.DelayVictory(network, victory), Is.False);
+    int childCount = c.target.VisualMount.childCount;
+    finish.ObserveSnapshot(victory, 0f);
+    Assert.That(c.target.VisualMount.childCount, Is.EqualTo(childCount), "Repeated snapshot fixture cannot duplicate finish objects.");
+    Assert.That(LabGourdFinish.DelayVictory(network, new LabSnapshot { phase = LabPhase.Defeat }), Is.False);
+    CaptureMainBattle(camera, "preview-finish.png");
+    finish.ObserveSnapshot(null, 0f);
+    Assert.That(finish.IsFinishing, Is.False);
+    Assert.That(c.VisualInstance.activeSelf, Is.True);
+    yield return null;
+    Assert.That(c.Stage, Is.Zero, "A lobby without a snapshot resets damage presentation.");
    }
-   var finish = c.GetComponent<LabGourdFinish>();
-   Assert.That(finish, Is.Not.Null);
-   var victory = new LabSnapshot { sessionId="finish-test", round=1, phase=LabPhase.Victory, hp=0 };
-   Assert.That(LabGourdFinish.DelayVictory(c.network,victory),Is.True);
-   finish.ObserveSnapshot(victory,.6f);
-   Assert.That(finish.IsFinishing, Is.True);
-   Assert.That(finish.Complete, Is.False);
-   Assert.That(c.target.VisualMount.Find("Gourd Left Half").gameObject.activeSelf, Is.True);
-   Assert.That(c.target.VisualMount.Find("Gourd Right Half").gameObject.activeSelf, Is.True);
-   Assert.That(c.target.VisualMount.Find("Small Yokai Spirit").gameObject.activeSelf, Is.True);
-   finish.Advance(1f); Assert.That(finish.Complete, Is.True);
-   Assert.That(LabGourdFinish.DelayVictory(c.network,victory),Is.False);
-   int childCount = c.target.VisualMount.childCount;
-   finish.ObserveSnapshot(victory,0);Assert.That(c.target.VisualMount.childCount,Is.EqualTo(childCount),"Repeated snapshots cannot duplicate the finish");
-   Assert.That(LabGourdFinish.DelayVictory(c.network,new LabSnapshot{phase=LabPhase.Defeat}),Is.False);
-   var preview = new RenderTexture(540,960,24); var png = new Texture2D(540,960,TextureFormat.RGB24,false); var previous = RenderTexture.active;
-   try { camera.targetTexture=preview; camera.Render();RenderTexture.active=preview;png.ReadPixels(new Rect(0,0,540,960),0,0);png.Apply();File.WriteAllBytes("Library/GourdCrackCaptures/finish.png",png.EncodeToPNG()); }
-   finally { camera.targetTexture=null;RenderTexture.active=previous;preview.Release();Object.Destroy(preview);Object.Destroy(png); }
-   finish.ObserveSnapshot(null,0);Assert.That(finish.IsFinishing, Is.False);
-   Assert.That(c.VisualInstance.activeSelf,Is.True);
-   yield return null;Assert.That(c.Stage,Is.Zero,"No active session must reset damage");
+   finally
+   {
+    network.Stop();
+    Object.Destroy(fixture);
+   }
   }
   #endif
  }

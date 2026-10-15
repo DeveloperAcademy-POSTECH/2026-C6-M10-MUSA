@@ -148,8 +148,9 @@ namespace C6Lab
     {
         private const string MessageName = "C6Lab.Packet.3";
         // P-slot assignments join lobby packets, and generate drums join the snapshot with the
-        // generate request naming one; older clients cannot share this room.
-        internal const ushort LabProtocolVersion = 5616;
+        // generate request naming one. Version 5617 also appends Gourd Mode to the
+        // shared config (80 values); older clients cannot share this room.
+        internal const ushort LabProtocolVersion = 5617;
         private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
         private const int MaximumPacketBytes = 32768;
@@ -747,6 +748,9 @@ namespace C6Lab
 
         private void BeginDeveloperSoloRound()
         {
+            // DEV Solo installs its runtime copy directly; notify the same presentation
+            // subscribers that receive accepted Host room settings before the next round.
+            ConfigApplied?.Invoke(config);
             LastShotReport = string.Empty;
             battleClock.Reset();
             ApplyLocalPause(false);
@@ -1374,6 +1378,7 @@ namespace C6Lab
                     Vector3 targetLocalPoint = hitbox.InverseTransformPoint(result.HitPoint);
                     float signedYawImpulse = target.GetComponent<LabHangingTarget>()
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
+                    target.NotifyApprovedHit(targetLocalPoint, element);
                     impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
                         result.ImpactVelocity);
                     if (result.OwnerPlayerId == LocalPlayerId) LocalThrowHit?.Invoke(actualDamage);
@@ -1570,6 +1575,7 @@ namespace C6Lab
                     {
                         target.GetComponent<LabHangingTarget>()?.ApplyRemoteImpact(
                             new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse);
+                        target.NotifyApprovedHit(new Vector3(packet.x, packet.y, packet.z), (LabOrbElement)packet.element);
                         impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
                             (LabOrbElement)packet.element, packet.damage,
                             new Vector3(packet.wx, packet.wy, packet.wz));
