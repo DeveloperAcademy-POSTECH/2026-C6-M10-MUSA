@@ -24,9 +24,14 @@ namespace C6Lab
         public Color borderColor = new Color(.867f, .733f, .565f, .98f);
         public Color innerColor = new Color(.973f, .914f, .804f, 1f);
         public Color headerColor = new Color(.925f, .855f, .725f, 1f);
-        public Color myRowColor = new Color(.945f, .878f, .757f, 1f);
+        /// <summary>내 줄 배경 (버튼과 같은 갈색). 글자는 myRowTextColor.</summary>
+        public Color myRowColor = new Color(.565f, .337f, .247f, 1f);
+        public Color myRowTextColor = Color.white;
         public Color lineColor = new Color(.867f, .733f, .565f, .7f);
         public Color textColor = new Color(.169f, .137f, .153f, 1f);
+
+        /// <summary>내 줄의 이름 옆에 붙는 표시 (예: "P2 나")</summary>
+        public const string MeLabel = "나";
 
         private static readonly string[] Headers = { "플레이어", "타격", "딜", "결합", "아이템", "구슬\n전달", "북 점유", "칭호" };
         private static readonly float[] Columns = { 44f, 32f, 38f, 32f, 40f, 40f, 52f, 68f }; // 합 346 + 왼쪽 여백 6 = 안쪽 폭 352
@@ -79,15 +84,16 @@ namespace C6Lab
             float y = 0f;
             // 머리줄
             AddBox(0f, y, inner, headerHeight, headerColor);
-            AddCells(Headers, y, headerHeight, FontStyle.Normal, null, fontSize - 2);
+            AddCells(Headers, y, headerHeight, FontStyle.Normal, null, fontSize - 2, textColor);
             y += headerHeight;
             foreach (var p in rows)
             {
                 AddBox(0f, y, inner, 1f, lineColor);
-                if (p.id == local) AddBox(0f, y + 1f, inner, rowHeight - 1f, myRowColor);
+                bool mine = p.id == local;
+                if (mine) AddBox(0f, y + 1f, inner, rowHeight - 1f, myRowColor);
                 string[] cells =
                 {
-                    LabResultStats.PlayerName(p),
+                    mine ? LabResultStats.PlayerName(p) + " " + MeLabel : LabResultStats.PlayerName(p),
                     p.hitTotal.ToString(),
                     p.damageTotal.ToString(),
                     p.combinedTotal.ToString(),
@@ -108,7 +114,7 @@ namespace C6Lab
                     IsWinner(p, awards, LabResultTitle.MostDrum),
                     false
                 };
-                AddCells(cells, y, rowHeight, FontStyle.Normal, bold, fontSize);
+                AddCells(cells, y, rowHeight, FontStyle.Normal, bold, fontSize, mine ? myRowTextColor : textColor);
                 y += rowHeight;
             }
 
@@ -163,7 +169,7 @@ namespace C6Lab
             panel.gameObject.SetActive(false);
         }
 
-        private void AddCells(string[] cells, float y, float h, FontStyle style, bool[] bold, int size)
+        private void AddCells(string[] cells, float y, float h, FontStyle style, bool[] bold, int size, Color color)
         {
             float x = 6f;
             for (int i = 0; i < cells.Length && i < Columns.Length; i++)
@@ -174,7 +180,7 @@ namespace C6Lab
                 bool twoLines = cells[i] != null && cells[i].IndexOf('\n') >= 0;
                 int cellSize = last ? size - 1 : twoLines && size >= fontSize ? size - 2 : size;
                 AddText(cells[i], x, y, Columns[i] - 2f, h, cellSize,
-                    strong ? FontStyle.Bold : style, TextAnchor.MiddleLeft, textColor, last);
+                    strong ? FontStyle.Bold : style, TextAnchor.MiddleLeft, color, last);
                 x += Columns[i];
             }
         }
