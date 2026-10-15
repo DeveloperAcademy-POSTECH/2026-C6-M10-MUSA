@@ -24,6 +24,20 @@ namespace C6Lab
 
         // 소리 크기와 햅틱 설정은 LabConfig(Inspector: Resources/LabConfig, DEV: Sound and haptics)에 있다.
 
+        private LabNetwork gourdNetwork;
+        private LabGourdPaint gourdPaint;
+        private bool gourdUsesPaint;
+
+        private void Update()
+        {
+            // DEV에서 박 모드를 바꾸면 적용(Apply) 순간 바로 페인트 ↔ 크랙을 바꾼다.
+            if (gourdPaint == null) return;
+            bool usePaint = LabGourdPaint.UsePaint(gourdNetwork);
+            if (usePaint == gourdUsesPaint) return;
+            gourdUsesPaint = usePaint;
+            gourdPaint.ApplyMode(true);
+        }
+
         private void Awake()
         {
             LabNetwork boardNetwork = null;
@@ -58,9 +72,11 @@ namespace C6Lab
             // 햅틱 (내 구슬 생성, 내가 던진 구슬 타격)
             if (boardNetwork != null && GetComponent<LabHaptics>() == null)
                 gameObject.AddComponent<LabHaptics>().Bind(boardNetwork, board);
-            // 박 페인트 (#153): 요괴 자리에 흰 박을 붙이고 승인된 타격마다 속성 색을 칠한다.
-            // 다른 컴포넌트의 Start보다 먼저 붙여야 크랙 박(#163)이 박 모델을 다시 붙이지 않는다.
-            if (LabGourdPaint.EnabledInMainScene) LabGourdPaint.Attach(boardNetwork);
+            // 요괴 박 모드 (LabConfig → Gourd): Paint면 흰 박에 속성 색을 칠하고(#153), Crack이면 크랙 박(#163).
+            // 다른 컴포넌트의 Start보다 먼저 적용해야 페인트 모드에서 크랙 박이 박 모델을 붙이지 않는다.
+            gourdNetwork = boardNetwork;
+            gourdPaint = LabGourdPaint.Attach(boardNetwork);
+            gourdUsesPaint = LabGourdPaint.UsePaint(boardNetwork);
             // 일시정지 메뉴에 BGM·효과음 크기 슬라이더를 붙인다. 값은 기기마다 따로 저장된다.
             LabHud hud = FindFirstObjectByType<LabHud>();
             if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)

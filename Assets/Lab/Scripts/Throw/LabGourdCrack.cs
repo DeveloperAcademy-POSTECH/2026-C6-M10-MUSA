@@ -22,7 +22,12 @@ namespace C6Lab
             && System.Array.TrueForAll(shells, renderer => renderer != null);
         void Awake() => properties = new MaterialPropertyBlock();
         public int Stage { get; private set; }
-        void Start()
+        void Start() => Initialize();
+
+        /// <summary>
+        /// 박 모델을 붙이고 크랙 재질을 연결한다. 박 모드를 페인트에서 크랙으로 되돌릴 때 다시 부를 수 있다.
+        /// </summary>
+        public void Initialize()
         {
             if (network == null || target == null || network.target != target
                 || target.Hitbox == null || target.VisualMount == null

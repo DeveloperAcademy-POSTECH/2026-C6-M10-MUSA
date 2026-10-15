@@ -2,19 +2,28 @@ using UnityEngine;
 
 namespace C6Lab
 {
+    /// <summary>요괴 박 모드. Inspector(LabConfig → Gourd)와 DEV("Gourd")에서 고른다.</summary>
+    public enum LabGourdMode { Paint = 0, Crack = 1 }
+
     /// <summary>
     /// 박 페인트 (#153). 요괴 자리에 흰 박을 붙이고, Host가 승인한 타격 위치에 구슬 속성 색을 칠한다.
     /// Fire=빨강, Water=파랑, Wood=초록, Metal=노랑, Earth=갈색. 속성이 없는 타격은 칠하지 않는다.
-    /// 본 게임에서는 LabSceneController가 시작할 때 붙이며, 같은 박에 박 모델을 다시 붙이는
-    /// 크랙·마무리 연출(#163, LabGourdCrack·LabGourdFinish)은 꺼 둔다.
+    /// 본 게임에서는 LabSceneController가 시작할 때 붙인다. 박 모드(LabConfig.GourdMode)가
+    /// Paint면 크랙·마무리 연출(#163, LabGourdCrack·LabGourdFinish)을 끄고 흰 박을, Crack이면
+    /// 페인트를 끄고 원래 크랙 박을 쓴다. DEV에서 모드를 바꾸면 적용 순간 바로 바뀐다.
     /// 피해·승패·네트워크 패킷은 바꾸지 않는 화면 연출이다.
     /// </summary>
     public sealed class LabGourdPaint : MonoBehaviour
     {
         /// <summary>
-        /// 본 게임 장면에서 페인트 박을 쓸지. 크랙 박을 시험하는 테스트만 false로 바꾼다.
+        /// false면 박 모드 설정과 상관없이 크랙 박을 쓴다. 크랙 박을 시험하는 테스트만 바꾼다.
         /// </summary>
         public static bool EnabledInMainScene = true;
+
+        /// <summary>지금 설정으로 페인트를 써야 하는지.</summary>
+        public static bool UsePaint(LabNetwork network) =>
+            EnabledInMainScene && (network == null || network.config == null
+                || network.config.GourdMode == LabGourdMode.Paint);
 
         public const string ResourceFolder = "GourdPaint/";
         public const int Capacity = 128;
@@ -30,19 +39,26 @@ namespace C6Lab
         private MaterialPropertyBlock block;
         private Renderer shell;
         private string roundKey;
+        private bool started;
+        private GameObject mountedVisual;
 
         public int PaintCount { get; private set; }
         public Transform Shell => shell != null ? shell.transform : null;
 
         /// <summary>
-        /// 게임 시작 시 코드로 붙일 때 부른다. 재질·흰 박은 Resources/GourdPaint에서 읽는다.
-        /// 모든 Start보다 먼저 불려야 크랙 박이 붙지 않는다 (LabSceneController.Awake에서 호출).
+        /// 게임 시작 시 코드로 붙이고 지금 박 모드를 적용한다. 재질·흰 박은 Resources/GourdPaint에서 읽는다.
+        /// 모든 Start보다 먼저 불려야 페인트 모드에서 크랙 박이 붙지 않는다 (LabSceneController.Awake에서 호출).
+        /// 이후 DEV 등으로 박 모드가 바뀌면 LabSceneController가 ApplyMode(true)를 다시 부른다.
         /// </summary>
         public static LabGourdPaint Attach(LabNetwork network)
         {
             if (network == null || network.target == null) return null;
             var existing = network.target.GetComponent<LabGourdPaint>();
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                existing.ApplyMode(false);
+                return existing;
+            }
             var material = Resources.Load<Material>(ResourceFolder + "WhiteGourd");
             var prefab = Resources.Load<GameObject>(ResourceFolder + "WhiteGourd");
             if (material == null || prefab == null)
@@ -55,36 +71,62 @@ namespace C6Lab
             paint.network = network;
             paint.paintMaterial = material;
             paint.visualPrefab = prefab;
-            paint.DisableCrackPresentation();
+            paint.ApplyMode(false);
             return paint;
         }
 
-        private void Awake()
-        {
-            block = new MaterialPropertyBlock();
-            DisableCrackPresentation();
-        }
+        private void Awake() => block = new MaterialPropertyBlock();
 
-        /// <summary>크랙 박은 늦게 실행되며 같은 표적에 자기 박 모델을 다시 붙이므로, 시작 전에 끈다.</summary>
-        private void DisableCrackPresentation()
+        /// <summary>
+        /// 박 모드 적용. Paint: 크랙·마무리 연출을 끄고 흰 박을 붙인다. Crack: 흰 박을 떼고 크랙 박을 켠다.
+        /// running이 true면 이미 시작한 장면이라, 크랙 박을 다시 붙이도록 Initialize를 직접 부른다.
+        /// </summary>
+        public void ApplyMode(bool running)
         {
             if (target == null) return;
+            bool paint = UsePaint(network);
             foreach (var crack in FindObjectsByType<LabGourdCrack>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 if (crack.target != target) continue;
                 var finish = crack.GetComponent<LabGourdFinish>();
-                if (finish != null) finish.enabled = false;
-                crack.enabled = false;
+                if (paint)
+                {
+                    if (finish != null) finish.enabled = false;
+                    crack.enabled = false;
+                }
+                else
+                {
+                    enabled = false; // 흰 박을 먼저 뗀다 (OnDisable)
+                    crack.enabled = true;
+                    if (finish != null) finish.enabled = true;
+                    if (running && !crack.IsReady) crack.Initialize();
+                }
             }
+            if (paint) enabled = true; // 처음이면 Start, 다시 켜지면 OnEnable에서 흰 박을 붙인다
+            else enabled = false;
         }
 
         private void Start()
         {
-            if (target == null || visualPrefab == null || paintMaterial == null) return;
+            started = true;
+            Mount();
+        }
+
+        private void OnEnable()
+        {
+            if (started) Mount();
+        }
+
+        private void OnDisable() => Unmount();
+
+        /// <summary>흰 박을 표적에 붙이고 승인된 타격을 받기 시작한다.</summary>
+        private void Mount()
+        {
+            if (target == null || visualPrefab == null || paintMaterial == null || shell != null) return;
             if (block == null) block = new MaterialPropertyBlock();
             target.SetVisualPrefab(visualPrefab);
-            Transform root = target.MountedVisual != null ? target.MountedVisual.transform : null;
-            Transform white = root != null ? root.Find("White Gourd") : null;
+            mountedVisual = target.MountedVisual;
+            Transform white = mountedVisual != null ? mountedVisual.transform.Find("White Gourd") : null;
             shell = white != null ? white.GetComponent<Renderer>() : null;
             if (shell == null)
             {
@@ -94,6 +136,19 @@ namespace C6Lab
             shell.sharedMaterial = paintMaterial;
             target.ApprovedHit += OnHit;
             ClearPaint();
+        }
+
+        /// <summary>흰 박을 떼고 타격 받기를 멈춘다. 다른 연출이 이미 박을 바꿨다면 그대로 둔다.</summary>
+        private void Unmount()
+        {
+            if (target != null)
+            {
+                target.ApprovedHit -= OnHit;
+                if (mountedVisual != null && target.MountedVisual == mountedVisual) target.SetVisualPrefab(null);
+            }
+            mountedVisual = null;
+            shell = null;
+            PaintCount = 0;
         }
 
         private void Update()

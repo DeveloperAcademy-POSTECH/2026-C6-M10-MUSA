@@ -19,6 +19,38 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator SwitchingGourdModeSwapsPaintAndCrackWhileRunning()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+            var paint = Object.FindFirstObjectByType<LabGourdPaint>();
+            Assert.That(paint, Is.Not.Null);
+            LabGourdCrack crack = null;
+            foreach (var candidate in Object.FindObjectsByType<LabGourdCrack>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (candidate.target == paint.target) crack = candidate;
+            Assert.That(crack, Is.Not.Null, "The crack gourd stays in the main Scene, only switched off.");
+            Assert.That(paint.enabled && paint.Shell != null && !crack.enabled, Is.True, "Paint is the default mode.");
+
+            try
+            {
+                LabGourdPaint.EnabledInMainScene = false; // same path as choosing Crack in LabConfig / DEV
+                paint.ApplyMode(true);
+                yield return null;
+                Assert.That(paint.enabled, Is.False);
+                Assert.That(paint.Shell, Is.Null, "The white gourd is removed.");
+                Assert.That(crack.enabled && crack.IsReady, Is.True, "The crack gourd is mounted again.");
+            }
+            finally { LabGourdPaint.EnabledInMainScene = true; }
+
+            paint.ApplyMode(true);
+            yield return null;
+            Assert.That(paint.enabled && paint.Shell != null, Is.True, "Back to paint mode.");
+            Assert.That(crack.enabled, Is.False);
+            Assert.That(paint.Shell.IsChildOf(paint.target.MountedVisual.transform), Is.True);
+        }
+
+        [UnityTest]
         public IEnumerator MainSceneUsesWhitePaintGourdAndApprovedHitsPaintTheSurface()
         {
             Assert.That(LabGourdPaint.EnabledInMainScene, Is.True);

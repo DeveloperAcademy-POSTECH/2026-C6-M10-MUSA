@@ -17,7 +17,8 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(79));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(80));
+            Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -76,7 +77,9 @@ namespace C6Lab.Tests
             values[76] = .2f;
             values[77] = .5f;
             values[78] = 2f;
+            values[79] = 1f; // gourd mode: crack
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
             Assert.That(config.GenerateCost, Is.EqualTo(5f));

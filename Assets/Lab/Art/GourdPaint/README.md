@@ -17,12 +17,18 @@
 | `Assets/Lab/Resources/GourdPaint/` | 흰 박 프리팹 `WhiteGourd`, 페인트 재질 `WhiteGourd`, 꼭지 재질 `Stem` |
 | `Assets/Lab/Scripts/UI/LabSceneController.cs` | 게임 시작 시 `LabGourdPaint.Attach`로 붙인다 (장면 파일 수정 없음) |
 
-## 크랙 박(#163)과의 관계
+## 박 모드: 페인트 / 크랙
 
-`Lab.unity`에는 #163의 박 모델·크랙·마무리 연출(`LabGourdCrack`, `LabGourdFinish`)이 남아 있지만, 같은 표적에 박 모델을 붙이므로 **페인트를 쓰는 동안 시작 전에 꺼 둔다.** 그래서 금과 처치 마무리 연출은 나오지 않는다.
-크랙 박으로 되돌리려면 `LabGourdPaint.EnabledInMainScene = false` (크랙 테스트가 이 방법을 쓴다). 실제 박 모델 위에 페인트와 금을 함께 보이려면 두 셰이더를 합치는 작업이 필요하다.
+| 어디서 | 방법 |
+| --- | --- |
+| Inspector | `Assets/Lab/Resources/LabConfig` → **Gourd → Gourd Mode** (Paint / Crack) |
+| DEV 패널 | **Gourd** 묶음 → `Gourd Mode (0 paint, 1 crack)` → Apply 하면 바로 바뀜 |
+
+- **Paint (기본):** 흰 박에 색칠. 같은 표적에 박 모델을 붙이는 #163 크랙·마무리 연출(`LabGourdCrack`, `LabGourdFinish`)은 꺼 둔다.
+- **Crack:** 페인트를 떼고 #163 박 모델·금·처치 마무리 연출을 쓴다. 크랙 코드·재질·`Lab.unity`의 연결은 그대로 남아 있다.
+- 실제 박 모델 위에 페인트와 금을 함께 보이려면 두 셰이더를 합치는 작업이 필요하다.
 
 ## 확인
 
-- PlayMode `LabGourdPaintTests`: 본 장면에 흰 박이 붙고 크랙이 꺼지는지, 승인 타격 칠하기·속성 없는 타격 무시·회전 후 좌표 유지·잘못된 좌표 거부·128개 한도
+- PlayMode `LabGourdPaintTests`: 본 장면에 흰 박이 붙고 크랙이 꺼지는지, 실행 중 모드 전환(페인트 ↔ 크랙), 승인 타격 칠하기·속성 없는 타격 무시·회전 후 좌표 유지·잘못된 좌표 거부·128개 한도
 - 사용자 손 입력, 실제 다중 기기 표시, iOS 성능은 기기에서 직접 확인
