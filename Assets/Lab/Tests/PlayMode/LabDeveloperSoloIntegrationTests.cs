@@ -33,7 +33,11 @@ namespace C6Lab.Tests
             Transform oldGenerateButton = hud.battleUi.transform.Find("FigmaGenerateButton");
             Assert.That(oldGenerateButton == null || !oldGenerateButton.gameObject.activeSelf, Is.True,
                 "The drum on the board replaces the bottom generate button, which stays hidden.");
-            Assert.That(hud.staminaCells.Length, Is.EqualTo(5));
+            Assert.That(hud.staminaFill, Is.Not.Null);
+            Assert.That(hud.staminaCells, Is.Empty);
+            Assert.That(hud.staminaFill.type, Is.EqualTo(UnityEngine.UI.Image.Type.Filled));
+            Assert.That(hud.staminaFill.fillOrigin, Is.EqualTo((int)UnityEngine.UI.Image.OriginHorizontal.Left));
+            Assert.That(hud.playerHpFill.fillOrigin, Is.EqualTo((int)UnityEngine.UI.Image.OriginHorizontal.Right));
             Assert.That(hud.leftNeighborText, Is.Not.Null);
             Assert.That(hud.rightNeighborText, Is.Not.Null);
             Assert.That(hud.pauseButton, Is.Not.Null);
@@ -62,6 +66,12 @@ namespace C6Lab.Tests
                 Assert.That(network.Snapshot.players.Single().personalHp, Is.EqualTo(125));
                 Assert.That(hud.playerHpText.text, Is.EqualTo("125 / 125"));
                 Assert.That(hud.playerHpFill.fillAmount, Is.EqualTo(1f).Within(.001f));
+                Assert.That(hud.localPlayerCircle.sprite, Is.SameAs(hud.playerCircleSprites[0]));
+                Assert.That(hud.localPlayerCircle.enabled, Is.True);
+                Assert.That(hud.leftNeighborBadge.activeSelf, Is.False);
+                Assert.That(hud.rightNeighborBadge.activeSelf, Is.False);
+                Assert.That(hud.staminaFill.fillAmount,
+                    Is.EqualTo(network.Snapshot.players.Single().stamina / network.config.StaminaMax).Within(.001f));
                 string firstSession = network.Snapshot.sessionId;
 
                 developerUi.Open();
@@ -176,25 +186,18 @@ namespace C6Lab.Tests
                 Assert.That(hud.roomNameText.text, Is.Not.Empty,
                     "The Host must see the registered room name or an explicit registration status.");
                 Assert.That(developerUi.targetParticipantsSlider.interactable, Is.False);
-                Assert.That(network.LocalSlotNumber, Is.EqualTo(0));
+                Assert.That(network.LocalSlotNumber, Is.EqualTo(1));
                 Assert.That(network.CanStartBattle, Is.False,
-                    "The Host must claim a P number before starting the room.");
-                Assert.That(hud.playerSlotPanel.activeSelf, Is.True);
-                Assert.That(hud.playerSlotButtons.Count(button => button.gameObject.activeSelf), Is.EqualTo(4));
-                Assert.That(hud.playerSlotButtons[4].gameObject.activeSelf, Is.False,
-                    "A four-player room must not offer P5.");
+                    "The room still needs its remaining participants.");
+                Assert.That(hud.playerSlotPanel.activeSelf, Is.False);
+                Assert.That(network.CanSelectPlayerSlot, Is.False);
 
-                // The Host can choose any available P number, then clear it by tapping the same button.
+                // Legacy controls cannot override the host's first-arrival P1 number.
                 hud.playerSlotButtons[2].onClick.Invoke();
                 yield return null;
-                Assert.That(network.LocalSlotNumber, Is.EqualTo(3));
-                Assert.That(hud.seatText.text, Does.Contain("P3"));
-                Assert.That(hud.playerSlotButtons[2].interactable, Is.True);
-                Assert.That(hud.playerSlotButtons[2].GetComponentInChildren<UnityEngine.UI.Text>().text,
-                    Does.Contain("YOU/CLEAR"));
-                hud.playerSlotButtons[2].onClick.Invoke();
-                yield return null;
-                Assert.That(network.LocalSlotNumber, Is.Zero);
+                Assert.That(network.LocalSlotNumber, Is.EqualTo(1));
+                Assert.That(hud.seatText.text, Does.Contain("P1"));
+                Assert.That(network.RequestPlayerSlot(0), Is.False);
                 Assert.That(network.CanStartBattle, Is.False);
             }
             finally

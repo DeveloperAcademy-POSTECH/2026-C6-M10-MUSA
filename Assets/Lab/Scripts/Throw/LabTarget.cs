@@ -19,6 +19,8 @@ namespace C6Lab
 
         public MeshCollider Hitbox => hitbox;
         public Transform VisualMount => visualMount;
+        /// <summary>The instance owned by SetVisualPrefab, independent of other mount children.</summary>
+        public GameObject MountedVisual => replacementVisual;
 
         public static LabTarget CreateCylinder(Transform parent, Vector3 center,
             float radius, float height)

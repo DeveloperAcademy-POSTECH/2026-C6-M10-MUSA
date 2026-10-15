@@ -92,6 +92,10 @@ namespace C6Lab
         private LabConfig config;
         private Camera inputCamera;
         private Rect bounds;
+        private LabOrbAreaShape areaShape;
+        private readonly List<Mesh> areaWallMeshes = new List<Mesh>();
+        private Rect inputScreenRect;
+        private bool hasInputScreenRect;
         private PhysicsMaterial contactMaterial;
         private GameObject wallRoot;
         private string heldId;
@@ -107,6 +111,7 @@ namespace C6Lab
         public int Count => entries.Count;
         /// <summary>World-space limits for orb centres; the visual extends by OrbRadius.</summary>
         public Rect CenterBounds => bounds;
+        public LabOrbAreaShape AreaShape => areaShape;
         public bool InteractionEnabled => interactionEnabled;
         public event Action<LabOrbEdgeCrossing> EdgeCrossed;
         /// <summary>
@@ -127,10 +132,19 @@ namespace C6Lab
             if (tuning == null || camera == null || worldCenterBounds.width <= 0f || worldCenterBounds.height <= 0f
                 || !Finite(worldCenterBounds.min) || !Finite(worldCenterBounds.max))
                 throw new ArgumentException("Config, camera, and finite positive board centre bounds are required.");
+            ConfigureArea(tuning, camera, LabOrbAreaShape.FromCenterBounds(worldCenterBounds, tuning.OrbRadius));
+        }
+
+        public void ConfigureArea(LabConfig tuning, Camera camera, LabOrbAreaShape shape)
+        {
+            if (tuning == null || camera == null || shape == null
+                || (shape.IsCurved && !shape.CanFitRadius(Mathf.Max(tuning.OrbRadius, tuning.DrumRadius))))
+                throw new ArgumentException("Config, camera, and an area large enough for orbs and drums are required.");
             CancelDrag();
             config = tuning;
             inputCamera = camera;
-            bounds = worldCenterBounds;
+            areaShape = shape;
+            bounds = shape.CenterBounds;
             configured = true;
             if (contactMaterial == null)
                 contactMaterial = new PhysicsMaterial("Lab orb contact") { hideFlags = HideFlags.DontSave };
@@ -145,11 +159,87 @@ namespace C6Lab
                 entry.View.ConfigureAppearance(config.OrbAppearance);
                 SetLayerRecursively(entry.View.transform, gameObject.layer);
                 entry.View.HitSphere.sharedMaterial = contactMaterial;
-                entry.View.Body.position = OnPlane(Clamp(XY(entry.View.Body.position)));
+                entry.View.Body.position = OnPlane(Clamp(XY(entry.View.Body.position), entry.View.HitSphere.radius));
                 StopMotion(entry.View.Body);
                 entry.EdgePending = false;
                 SetBodyMode(entry);
             }
+        }
+
+        /// <summary>
+        /// Change only the board geometry, keeping identities and Host-request state intact.
+        /// Positions and motion retain their normalized board units. A larger body's vertical
+        /// clearance may clamp its position; a held gesture defers the entire resize instead.
+        /// </summary>
+        public bool TryResizeBounds(Rect worldCenterBounds)
+        {
+            if (!configured || heldId != null || worldCenterBounds.width <= 0f || worldCenterBounds.height <= 0f
+                || !Finite(worldCenterBounds.min) || !Finite(worldCenterBounds.max)) return false;
+            return TryResizeArea(LabOrbAreaShape.FromCenterBounds(worldCenterBounds, config.OrbRadius));
+        }
+
+        public bool TryResizeArea(LabOrbAreaShape shape)
+        {
+            if (!configured || heldId != null || shape == null) return false;
+            Rect worldCenterBounds = shape.CenterBounds;
+            float widthScale = worldCenterBounds.width / bounds.width;
+            if (!Finite(widthScale) || widthScale <= 0f) return false;
+            float additionalRadius = Mathf.Max(0f, config.DrumRadius - config.OrbRadius);
+            foreach (var entry in entries.Values)
+            {
+                if (entry.View == null) continue;
+                additionalRadius = Mathf.Max(additionalRadius, entry.View.HitSphere.radius - config.OrbRadius);
+                if (!shape.CanFitRadius(entry.View.HitSphere.radius)) return false;
+                if (!entry.View.Body.isKinematic && !Finite(XY(entry.View.Body.linearVelocity) * widthScale)) return false;
+            }
+            if (worldCenterBounds.height < additionalRadius * 2f) return false;
+            if (!shape.CanFitRadius(Mathf.Max(config.DrumRadius, config.OrbRadius))) return false;
+            if (areaShape.ApproximatelyEquals(shape)) return true;
+
+            LabOrbAreaShape previous = areaShape;
+            areaShape = shape;
+            bounds = worldCenterBounds;
+            foreach (var entry in entries.Values)
+            {
+                if (entry.View == null) continue;
+                Rigidbody body = entry.View.Body;
+                Vector2 point = XY(body.position);
+                float radius = entry.View.HitSphere.radius;
+                Vector2 normalized = NormalizeForBody(previous, point, radius);
+                Vector3 velocity = body.linearVelocity;
+                bool sleeping = !body.isKinematic && body.IsSleeping();
+                body.position = OnPlane(ToWorld(normalized, radius));
+                // Kinematic bodies already hold a zero velocity. Do not reset their pending
+                // transfer/throw/combine state or change collision mode while remapping them.
+                if (!body.isKinematic)
+                {
+                    body.linearVelocity = OnPlane(XY(velocity) * widthScale);
+                    if (sleeping) body.Sleep();
+                }
+            }
+            BuildHorizontalWalls();
+            return true;
+        }
+
+        /// <summary>
+        /// Limit only where a new pointer gesture may begin. A gesture already holding an orb
+        /// continues outside this rectangle so it can still pass an edge or release a throw.
+        /// </summary>
+        public void SetInputScreenRect(Rect screenRect)
+        {
+            if (screenRect.width <= 0f || screenRect.height <= 0f
+                || !Finite(screenRect.min) || !Finite(screenRect.max))
+                throw new ArgumentException("A finite positive input screen rectangle is required.", nameof(screenRect));
+            inputScreenRect = screenRect;
+            hasInputScreenRect = true;
+        }
+
+        private bool CanStartPointerAtScreen(Vector2 screenPoint)
+        {
+            if (hasInputScreenRect && (screenPoint.x < inputScreenRect.xMin || screenPoint.x > inputScreenRect.xMax
+                || screenPoint.y < inputScreenRect.yMin || screenPoint.y > inputScreenRect.yMax)) return false;
+            return areaShape == null || !areaShape.IsCurved
+                || (TryScreenToWorld(screenPoint, out Vector2 point) && areaShape.Contains(point, 0f));
         }
 
         /// <summary>
@@ -181,7 +271,7 @@ namespace C6Lab
                 return existing.View;
             }
 
-            Vector2 start = ToWorld(normalizedPosition);
+            Vector2 start = ToWorld(normalizedPosition, RadiusFor(kind));
             Vector2 popFrom = start;
             if (playSpawn) start = OutsideDrums(start, velocityInBoardWidthsPerSecond, out popFrom);
             start = Clamp(start, RadiusFor(kind));
@@ -317,7 +407,7 @@ namespace C6Lab
             entry.EdgePending = false;
             entry.Locked = false;
             StopMotion(entry.View.Body);
-            entry.View.Body.position = OnPlane(Clamp(XY(entry.View.Body.position)));
+            entry.View.Body.position = OnPlane(Clamp(XY(entry.View.Body.position), entry.View.HitSphere.radius));
             SetBodyMode(entry);
             return true;
         }
@@ -327,7 +417,7 @@ namespace C6Lab
         {
             normalizedPosition = velocityInBoardWidthsPerSecond = default;
             if (!configured || id == null || !entries.TryGetValue(id, out var entry)) return false;
-            normalizedPosition = ToNormalized(XY(entry.View.Body.position));
+            normalizedPosition = NormalizeForBody(areaShape, XY(entry.View.Body.position), entry.View.HitSphere.radius);
             velocityInBoardWidthsPerSecond = XY(entry.View.Body.linearVelocity) / bounds.width;
             return true;
         }
@@ -335,6 +425,7 @@ namespace C6Lab
         public bool TryBeginDragAtWorld(Vector2 worldPoint, double now)
         {
             if (!configured || !interactionEnabled || heldId != null || !Finite(worldPoint) || !Finite(now)) return false;
+            if (areaShape.IsCurved && !areaShape.Contains(worldPoint, 0f)) return false;
             Entry nearest = null;
             // Compare touches relative to each body's reach so the larger drum is as easy to grab.
             float best = 1f;
@@ -484,6 +575,7 @@ namespace C6Lab
 
             var primary = Touchscreen.current?.primaryTouch;
             if (primary != null && primary.press.wasPressedThisFrame
+                && CanStartPointerAtScreen(primary.position.ReadValue())
                 && !PointerStartedOverUi(primary.position.ReadValue())
                 && TryScreenToWorld(primary.position.ReadValue(), out var touchPoint)
                 && TryBeginDragAtWorld(touchPoint, now))
@@ -493,6 +585,7 @@ namespace C6Lab
             }
             var pointer = Mouse.current;
             if (pointer != null && pointer.leftButton.wasPressedThisFrame
+                && CanStartPointerAtScreen(pointer.position.ReadValue())
                 && !PointerStartedOverUi(pointer.position.ReadValue())
                 && TryScreenToWorld(pointer.position.ReadValue(), out var mousePoint)
                 && TryBeginDragAtWorld(mousePoint, now))
@@ -544,15 +637,15 @@ namespace C6Lab
                 {
                     // A drum never drifts onto a neighbour's screen by itself; only a push or a swipe
                     // passes it. A gentle drift that reaches the edge turns back instead.
-                    body.position = OnPlane(Clamp(position));
+                    body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
                     body.linearVelocity = OnPlane(new Vector2(-velocity.x, velocity.y));
                     continue;
                 }
                 var crossing = new LabOrbEdgeCrossing(entry.View.OrbId, right,
-                    Mathf.InverseLerp(bounds.yMin, bounds.yMax, position.y), velocity / bounds.width);
+                    NormalizeForBody(areaShape, position, entry.View.HitSphere.radius).y, velocity / bounds.width);
                 entry.EdgePending = true;
                 entry.PendingEdge = crossing;
-                body.position = OnPlane(Clamp(position));
+                body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
                 StopMotion(body);
                 SetBodyMode(entry);
                 EdgeCrossed?.Invoke(crossing);
@@ -584,8 +677,13 @@ namespace C6Lab
             float inset = Mathf.Clamp(entry.View.HitSphere.radius - config.OrbRadius, 0f, bounds.height * .5f);
             float margin = bounds.width * DrumEdgeMargin;
             desired.x += EaseAway(position.x - bounds.xMin, margin) - EaseAway(bounds.xMax - position.x, margin);
-            desired.y += EaseAway(position.y - (bounds.yMin + inset), margin)
-                - EaseAway(bounds.yMax - inset - position.y, margin);
+            if (areaShape.IsCurved)
+            {
+                desired += CurveRepulsion(areaShape.LowerBoundary, position, entry.View.HitSphere.radius, margin, false);
+                desired += CurveRepulsion(areaShape.UpperBoundary, position, entry.View.HitSphere.radius, margin, true);
+            }
+            else desired.y += EaseAway(position.y - (bounds.yMin + inset), margin)
+                    - EaseAway(bounds.yMax - inset - position.y, margin);
             desired = Vector2.ClampMagnitude(desired, 1f) * driftSpeed;
 
             float turn = entry.HasDriftHeading
@@ -601,6 +699,25 @@ namespace C6Lab
         /// <summary>How strongly to steer away from a boundary this far off: 0 beyond the margin, 2 at it.</summary>
         private static float EaseAway(float distance, float margin) =>
             margin <= 0f ? 0f : 2f * Mathf.Clamp01(1f - distance / margin);
+
+        private static Vector2 CurveRepulsion(IReadOnlyList<Vector2> curve, Vector2 position,
+            float radius, float margin, bool upper)
+        {
+            float closest = float.PositiveInfinity;
+            Vector2 steering = Vector2.zero;
+            for (int i = 1; i < curve.Count; i++)
+            {
+                Vector2 segment = curve[i] - curve[i - 1];
+                float t = Mathf.Clamp01(Vector2.Dot(position - curve[i - 1], segment) / segment.sqrMagnitude);
+                Vector2 delta = position - (curve[i - 1] + segment * t);
+                if (delta.sqrMagnitude >= closest) continue;
+                closest = delta.sqrMagnitude;
+                Vector2 inward = (upper ? new Vector2(segment.y, -segment.x)
+                    : new Vector2(-segment.y, segment.x)).normalized;
+                steering = inward * EaseAway(Vector2.Dot(delta, inward) - radius, margin);
+            }
+            return steering;
+        }
 
         /// <summary>A stable per-drum offset into the drift noise, so drums on one board wander apart.</summary>
         private static float DriftSeedFor(string id)
@@ -699,8 +816,57 @@ namespace C6Lab
                 old.SetParent(null);
                 Destroy(old.gameObject);
             }
+            foreach (Mesh mesh in areaWallMeshes) if (mesh != null) Destroy(mesh);
+            areaWallMeshes.Clear();
+            if (areaShape.IsCurved)
+            {
+                CreateCurvedWall("Top curve", areaShape.UpperBoundary, true);
+                CreateCurvedWall("Bottom curve", areaShape.LowerBoundary, false);
+                return;
+            }
             CreateWall("Top", bounds.yMax + config.OrbRadius + WallThickness * .5f);
             CreateWall("Bottom", bounds.yMin - config.OrbRadius - WallThickness * .5f);
+        }
+
+        // Only the two paper rims are solid. No face spans a side portal.
+        private void CreateCurvedWall(string label, IReadOnlyList<Vector2> curve, bool upper)
+        {
+            var vertices = new List<Vector3>();
+            var triangles = new List<int>();
+            float depth = Mathf.Max(config.OrbRadius, config.DrumRadius) + WallThickness;
+            float outside = upper ? WallThickness : -WallThickness;
+            void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 outward)
+            {
+                int first = vertices.Count;
+                vertices.Add(a); vertices.Add(b); vertices.Add(c); vertices.Add(d);
+                bool forward = Vector3.Dot(Vector3.Cross(b - a, c - a), outward) > 0f;
+                triangles.Add(first); triangles.Add(first + (forward ? 1 : 2)); triangles.Add(first + (forward ? 2 : 1));
+                triangles.Add(first); triangles.Add(first + (forward ? 2 : 3)); triangles.Add(first + (forward ? 3 : 2));
+            }
+            for (int i = 1; i < curve.Count; i++)
+            {
+                Vector2 a = curve[i - 1], b = curve[i];
+                Vector3 af = new Vector3(a.x, a.y, -depth), ab = new Vector3(a.x, a.y, depth);
+                Vector3 bf = new Vector3(b.x, b.y, -depth), bb = new Vector3(b.x, b.y, depth);
+                Vector3 offset = Vector3.up * outside;
+                Quad(af, bf, bb, ab, upper ? Vector3.down : Vector3.up);
+                Quad(af + offset, ab + offset, bb + offset, bf + offset, upper ? Vector3.up : Vector3.down);
+                Quad(af, af + offset, bf + offset, bf, Vector3.back);
+                Quad(ab, bb, bb + offset, ab + offset, Vector3.forward);
+                if (i == 1) Quad(af, ab, ab + offset, af + offset, Vector3.left);
+                if (i == curve.Count - 1) Quad(bf, bf + offset, bb + offset, bb, Vector3.right);
+            }
+            var mesh = new Mesh { name = label + " collision", hideFlags = HideFlags.DontSave };
+            mesh.SetVertices(vertices); mesh.SetTriangles(triangles, 0); mesh.RecalculateBounds();
+            areaWallMeshes.Add(mesh);
+            var wall = new GameObject(label);
+            wall.layer = gameObject.layer;
+            wall.transform.SetParent(wallRoot.transform, false);
+            // Samples are world coordinates even if the board is moved in the scene.
+            wall.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            var collider = wall.AddComponent<MeshCollider>();
+            collider.sharedMesh = mesh;
+            collider.sharedMaterial = contactMaterial;
         }
 
         private void CreateWall(string label, float worldY)
@@ -788,15 +954,12 @@ namespace C6Lab
             return Finite(worldPoint);
         }
 
-        private Vector2 ToWorld(Vector2 normalized) => new Vector2(
-            Mathf.Lerp(bounds.xMin, bounds.xMax, Mathf.Clamp01(normalized.x)),
-            Mathf.Lerp(bounds.yMin, bounds.yMax, Mathf.Clamp01(normalized.y)));
-        private Vector2 ToNormalized(Vector2 world) => new Vector2(
-            Mathf.Clamp01((world.x - bounds.xMin) / bounds.width),
-            Mathf.Clamp01((world.y - bounds.yMin) / bounds.height));
-        private Vector2 Clamp(Vector2 world) => new Vector2(
-            Mathf.Clamp(world.x, bounds.xMin, bounds.xMax),
-            Mathf.Clamp(world.y, bounds.yMin, bounds.yMax));
+        private Vector2 ToWorld(Vector2 normalized, float radius) => areaShape.Clamp(
+            areaShape.ToWorld(normalized, areaShape.IsCurved ? radius : config.OrbRadius), radius);
+        private Vector2 NormalizeForBody(LabOrbAreaShape shape, Vector2 point, float radius) =>
+            shape.ToNormalized(point, shape.IsCurved ? radius : config.OrbRadius);
+        private Vector2 ToNormalized(Vector2 world) => areaShape.ToNormalized(world, config.OrbRadius);
+        private Vector2 Clamp(Vector2 world) => areaShape.Clamp(world, config.OrbRadius);
 
         /// <summary>
         /// Keeps a body larger than an orb clear of the top and bottom walls. Side edges stay at the
@@ -804,9 +967,7 @@ namespace C6Lab
         /// </summary>
         private Vector2 Clamp(Vector2 world, float radius)
         {
-            float inset = Mathf.Clamp(radius - config.OrbRadius, 0f, bounds.height * .5f);
-            return new Vector2(Mathf.Clamp(world.x, bounds.xMin, bounds.xMax),
-                Mathf.Clamp(world.y, bounds.yMin + inset, bounds.yMax - inset));
+            return areaShape.Clamp(world, radius);
         }
 
         private float RadiusFor(LabOrbKind kind) => kind.IsDrum() ? config.DrumRadius : config.OrbRadius;
@@ -834,6 +995,7 @@ namespace C6Lab
         private void OnDestroy()
         {
             if (contactMaterial != null) Destroy(contactMaterial);
+            foreach (Mesh mesh in areaWallMeshes) if (mesh != null) Destroy(mesh);
         }
     }
 }

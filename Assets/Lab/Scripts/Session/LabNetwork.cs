@@ -241,8 +241,7 @@ namespace C6Lab
         public int TargetParticipantCount => targetParticipantCount;
         public int LocalSlotNumber => IsConnected && playerSlots != null ? playerSlots.GetSlot(LocalPlayerId) : 0;
         public bool SlotSelectionPending => slotSelectionPending;
-        public bool CanSelectPlayerSlot => IsConnected && playerSlots != null && !developerSolo
-            && model == null && latest == null && !slotSelectionPending;
+        public bool CanSelectPlayerSlot => false;
         public ulong GetSlotOwner(int slotNumber) => playerSlots?.GetOwner(slotNumber) ?? ulong.MaxValue;
         public bool IsSearchingRooms => roomSearchActive && discovery != null && discovery.IsBrowsing;
         public IReadOnlyList<LabDiscoveredRoom> DiscoveredRooms => discoveredRooms;
@@ -386,6 +385,14 @@ namespace C6Lab
             return true;
         }
 
+        private void SyncArrivalSlots()
+        {
+            // The host's connection list preserves arrival order, not numeric client IDs.
+            playerSlots = new LabPlayerSlots(targetParticipantCount);
+            for (int i = 0; i < order.Count; i++)
+                playerSlots.TrySelect(order[i], i + 1, out _);
+        }
+
         private int FirstAvailableSlot()
         {
             if (playerSlots == null) return 0;
@@ -498,8 +505,7 @@ namespace C6Lab
             }
             RegisterHandler();
             if (!order.Contains(manager.LocalClientId)) order.Add(manager.LocalClientId);
-            if (autoStart && playerSlots.GetSlot(manager.LocalClientId) == 0)
-                playerSlots.TrySelect(manager.LocalClientId, FirstAvailableSlot(), out _);
+            SyncArrivalSlots();
             configAcknowledgements.Add(manager.LocalClientId);
             StartAdvertising();
             SetStatus("HOST listening on port " + port + "; waiting for " + (targetParticipantCount - 1) + " peers.");
@@ -1059,8 +1065,7 @@ namespace C6Lab
                     manager.DisconnectClient(id);
                     return;
                 }
-                if (autoStart && playerSlots != null && playerSlots.GetSlot(id) == 0)
-                    playerSlots.TrySelect(id, FirstAvailableSlot(), out _);
+                SyncArrivalSlots();
                 Debug.Log("C6_LAB_PEER_JOIN id=" + id + " participants=" + order.Count);
                 BroadcastLobby();
                 if (id != LocalPlayerId) SendSessionConfig(id);
@@ -1092,6 +1097,7 @@ namespace C6Lab
                 slotRequestIds.Remove(id);
                 Debug.LogWarning("C6_LAB_PEER_LEFT id=" + id);
                 if (model != null) EndBattleToLobby();
+                SyncArrivalSlots();
                 pendingDeveloperRestart = false;
                 configAcknowledgements.Remove(id);
                 BroadcastLobby();
@@ -1134,7 +1140,7 @@ namespace C6Lab
             bool accepted = false;
             bool changed = false;
             string reason;
-            if (developerSolo || model != null || playerSlots == null)
+            if (!CanSelectPlayerSlot || developerSolo || model != null || playerSlots == null)
                 reason = "SLOT_SELECTION_CLOSED";
             else if (packet.requestId <= 0)
                 reason = "INVALID_SLOT_REQUEST";
