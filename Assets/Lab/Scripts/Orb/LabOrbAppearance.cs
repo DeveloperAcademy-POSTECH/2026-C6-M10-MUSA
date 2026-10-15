@@ -49,6 +49,14 @@ namespace C6Lab
         [SerializeField] private Color unlockRingColor = new Color(1f, .8f, .25f, 1f);
         [Tooltip("Glow tint; its alpha is the peak strength.")]
         [SerializeField] private Color unlockGlowColor = new Color(1f, .95f, .7f, .85f);
+        [Header("Bomb fuse warning (presentation only)")]
+        [Tooltip("A locked bomb starts flashing red when this many seconds are left on its fuse.")]
+        [SerializeField, Min(0f)] private float bombWarningSeconds = 3f;
+        [Tooltip("Flashes per second when the warning starts.")]
+        [SerializeField, Min(.1f)] private float bombWarningSlowHz = 2f;
+        [Tooltip("Flashes per second just before it blasts.")]
+        [SerializeField, Min(.1f)] private float bombWarningFastHz = 8f;
+        [SerializeField] private Color bombWarningColor = new Color(1f, .12f, .08f, 1f);
         [Header("Board contact shadow (presentation only)")]
         [SerializeField] private Material shadowMaterial;
         [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, .22f);
@@ -77,6 +85,10 @@ namespace C6Lab
         public float UnlockGlowSeconds => unlockGlowSeconds > 0f ? unlockGlowSeconds : .1f;
         public Color UnlockRingColor => unlockRingColor;
         public Color UnlockGlowColor => unlockGlowColor;
+        public float BombWarningSeconds => Mathf.Max(0f, bombWarningSeconds);
+        public float BombWarningSlowHz => Mathf.Max(.1f, bombWarningSlowHz);
+        public float BombWarningFastHz => Mathf.Max(BombWarningSlowHz, bombWarningFastHz);
+        public Color BombWarningColor => bombWarningColor;
         /// <summary>The whole unlock presentation: the padlock lift, or the ring landing and its glow.</summary>
         public float UnlockEffectSeconds =>
             Mathf.Max(UnlockLockSeconds, UnlockRingDelay + UnlockRingSeconds + UnlockGlowSeconds);

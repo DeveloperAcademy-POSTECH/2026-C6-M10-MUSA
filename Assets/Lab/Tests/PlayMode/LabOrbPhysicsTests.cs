@@ -720,6 +720,35 @@ namespace C6Lab.Tests
             Assert.That(board.GetComponentInChildren<LabBombBlastEffect>() == null, Is.True, "The burst clears itself.");
         }
 
+        [UnityTest]
+        public IEnumerator ALockedBombFlashesRedInItsLastSecondsFasterAsItRunsOut()
+        {
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 5f);
+            var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.2f, .5f), lockSwipes: 0, relayStage: 1);
+            yield return null;
+            Assert.That(bomb.ItemMarker.WarningHz, Is.Zero, "With more than three seconds left it does not warn yet.");
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 2.8f);
+            float early = bomb.ItemMarker.WarningHz;
+            Assert.That(early, Is.GreaterThan(0f), "In its last three seconds the bomb starts flashing.");
+            float brightest = 0f;
+            float until = Time.time + .6f;
+            while (Time.time < until)
+            {
+                yield return null;
+                brightest = Mathf.Max(brightest, bomb.ItemMarker.WarningLevel);
+            }
+            Assert.That(brightest, Is.GreaterThan(.5f), "It flashes red.");
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: .3f);
+            Assert.That(bomb.ItemMarker.WarningHz, Is.GreaterThan(early), "It flashes faster as the fuse runs out.");
+            Assert.That(relay.ItemMarker.WarningHz, Is.Zero, "Only a bomb's fuse warns.");
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 0, fuseSeconds: -1f);
+            Assert.That(bomb.ItemMarker.WarningHz, Is.Zero);
+            Assert.That(bomb.ItemMarker.WarningLevel, Is.Zero, "An unlocked bomb has no fuse and stops warning.");
+        }
+
         private void SetDrumDrift(float speed, float turning)
         {
             float[] values = config.CaptureDeveloperValues();

@@ -401,6 +401,7 @@ namespace C6Lab
             itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), fuseText,
                 visualRadius, visual);
             itemMarker.SetLocked(lockSwipes > 0, appearance);
+            itemMarker.SetFuse(kind == LabOrbKind.Bomb ? fuseSeconds : -1f, appearance);
         }
 
         private string BadgeText()
