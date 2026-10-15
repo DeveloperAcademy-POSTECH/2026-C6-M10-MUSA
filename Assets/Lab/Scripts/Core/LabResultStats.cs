@@ -83,10 +83,35 @@ namespace C6Lab
             return (int)Math.Round(Math.Min(1d, player.drumSeconds / playedSeconds) * 100d, MidpointRounding.AwayFromZero);
         }
 
-        /// <summary>북 점유 칸 글자: "12초" 아래 줄에 "40%"</summary>
+        /// <summary>북 점유 글자 (예: "12초 · 40%")</summary>
         public static string DrumText(LabPlayerState player, double playedSeconds) =>
-            player == null ? "" : (int)Math.Round(player.drumSeconds, MidpointRounding.AwayFromZero) + "초\n"
+            player == null ? "" : (int)Math.Round(player.drumSeconds, MidpointRounding.AwayFromZero) + "초 · "
                 + DrumSharePercent(player, playedSeconds) + "%";
+
+        /// <summary>내 이름 옆에 붙는 표시 (예: "P2 나")</summary>
+        public const string MeLabel = "나";
+
+        /// <summary>칭호를 받은 사람들 (예: "P1 나, P3"). 동점이면 좌석 순서로 모두 적는다.</summary>
+        public static string WinnerNames(LabResultAward award, ulong localId) =>
+            award.Winners == null ? "" : string.Join(", ", award.Winners.Select(p =>
+                p.id == localId ? PlayerName(p) + " " + MeLabel : PlayerName(p)));
+
+        /// <summary>
+        /// 칭호 줄의 기록 칸. 딜왕 "40 (2회 타격)" (동점이면 "60 (2·3회 타격)", 이름 순서와 같음) ·
+        /// 패스왕 "5회" · 북 독점 "12초 · 40%" · 막타는 빈칸.
+        /// </summary>
+        public static string Record(LabResultAward award, double playedSeconds)
+        {
+            if (award.Winners == null || award.Winners.Length == 0) return "";
+            switch (award.Title)
+            {
+                case LabResultTitle.MostDamage:
+                    return award.Value + " (" + string.Join("·", award.Winners.Select(p => p.hitTotal)) + "회 타격)";
+                case LabResultTitle.MostPassed: return award.Value + "회";
+                case LabResultTitle.MostDrum: return DrumText(award.Winners[0], playedSeconds);
+                default: return "";
+            }
+        }
 
         /// <summary>좌석 번호로 만든 플레이어 이름 (P1~P5). 화면의 이웃 표시와 같은 규칙.</summary>
         public static string PlayerName(LabPlayerState player) => player == null ? "P—" : "P" + (player.seat + 1);

@@ -1235,6 +1235,19 @@ namespace C6Lab.Tests
             Assert.That(won[3].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }),
                 "40.2s and 39.8s both show as 40s, so the drum title is shared.");
 
+            // 칭호 줄 글자: 누구 · 기록 (20번이 이 기기의 나)
+            players[0].hitTotal = 2;
+            players[1].hitTotal = 3;
+            Assert.That(LabResultStats.WinnerNames(won[0], 20ul), Is.EqualTo("P1, P2 나"));
+            Assert.That(LabResultStats.Record(won[0], 100d), Is.EqualTo("60 (2·3회 타격)"));
+            Assert.That(LabResultStats.Record(won[1], 100d), Is.EqualTo("3회"));
+            Assert.That(LabResultStats.Record(won[2], 100d), Is.Empty);
+            Assert.That(LabResultStats.Record(won[3], 100d), Is.EqualTo("40초 · 40%"));
+            var solo = new LabResultAward(LabResultTitle.MostDamage, 40,
+                new[] { new LabPlayerState { id = 30, seat = 2, damageTotal = 40, hitTotal = 2 } });
+            Assert.That(LabResultStats.Record(solo, 100d), Is.EqualTo("40 (2회 타격)"));
+            Assert.That(LabResultStats.WinnerNames(solo, 20ul), Is.EqualTo("P3"));
+
             players[1].lastHit = false;
             players[0].damageTotal = players[1].damageTotal = 0;
             players[0].passedTotal = players[1].passedTotal = 0;
@@ -1327,7 +1340,7 @@ namespace C6Lab.Tests
                 Assert.That(mid.players.Where(p => p.id != first && p.id != second).Single().drumSeconds, Is.EqualTo(0d));
                 Assert.That(LabResultStats.DrumSharePercent(a, mid.playedSeconds), Is.EqualTo(25));
                 Assert.That(LabResultStats.DrumSharePercent(b, mid.playedSeconds), Is.EqualTo(75));
-                Assert.That(LabResultStats.DrumText(b, mid.playedSeconds), Is.EqualTo("30초\n75%"));
+                Assert.That(LabResultStats.DrumText(b, mid.playedSeconds), Is.EqualTo("30초 · 75%"));
 
                 var ended = model.Snapshot(200d);
                 Assert.That(ended.phase, Is.EqualTo(LabPhase.Defeat));

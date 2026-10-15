@@ -6,7 +6,8 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>
-    /// 승리/패배 결과 화면 위에 이번 라운드 기록 표(타격·딜·결합·아이템·구슬 전달·북 점유·칭호)를 보여주는 대시보드.
+    /// 승리/패배 결과 화면에 이번 라운드 칭호(딜왕·패스왕·막타·북 독점)를 칭호별로 한 줄씩 보여주는 대시보드.
+    /// 줄마다 칭호 · 받은 사람(동점이면 모두) · 기록. 기록이 0인 칭호는 줄을 만들지 않는다.
     /// 장면 수정 없이 코드로 만들고, 기존 결과 카드(VICTORY/DEFEAT·버튼) 바로 위에 놓는다.
     /// 값은 Host가 보낸 스냅샷의 플레이어 기록(LabPlayerState)을 그대로 쓰므로 모든 기기가 같다.
     /// 디자인이 정해지면 이 화면만 바꾸고, 계산은 LabResultStats를 그대로 쓴다.
@@ -14,10 +15,10 @@ namespace C6Lab
     [DisallowMultipleComponent]
     public sealed class LabResultDashboard : MonoBehaviour
     {
-        public float width = 362f;
+        public float width = 284f;
         public float gapAboveResult = 12f;
-        public float headerHeight = 34f;
-        public float rowHeight = 32f;
+        public float headerHeight = 26f;
+        public float rowHeight = 30f;
         public int fontSize = 14;
 
         // 결과 카드와 같은 색
@@ -30,11 +31,11 @@ namespace C6Lab
         public Color lineColor = new Color(.867f, .733f, .565f, .7f);
         public Color textColor = new Color(.169f, .137f, .153f, 1f);
 
-        /// <summary>내 줄의 이름 옆에 붙는 표시 (예: "P2 나")</summary>
-        public const string MeLabel = "나";
+        /// <summary>받은 칭호가 하나도 없을 때 한 줄</summary>
+        public const string NoRecordLabel = "기록 없음";
 
-        private static readonly string[] Headers = { "플레이어", "타격", "딜", "결합", "아이템", "구슬\n전달", "북 점유", "칭호" };
-        private static readonly float[] Columns = { 44f, 32f, 38f, 32f, 40f, 40f, 52f, 68f }; // 합 346 + 왼쪽 여백 6 = 안쪽 폭 352
+        private static readonly string[] Headers = { "칭호", "누구", "기록" };
+        private static readonly float[] Columns = { 62f, 84f, 122f }; // 합 268 + 왼쪽 여백 6 = 안쪽 폭 274
 
         private LabNetwork network;
         private GameObject resultControls;
@@ -69,7 +70,7 @@ namespace C6Lab
             Show(snapshot.players, snapshot.phase == LabPhase.Victory, snapshot.playedSeconds);
         }
 
-        /// <summary>기록 표를 다시 그린다. (테스트에서도 직접 부를 수 있다)</summary>
+        /// <summary>칭호별 목록을 다시 그린다. (테스트에서도 직접 부를 수 있다)</summary>
         public void Show(LabPlayerState[] players, bool victory, double playedSeconds = 0d)
         {
             EnsurePanel();
@@ -86,34 +87,26 @@ namespace C6Lab
             AddBox(0f, y, inner, headerHeight, headerColor);
             AddCells(Headers, y, headerHeight, FontStyle.Normal, null, fontSize - 2, textColor);
             y += headerHeight;
-            foreach (var p in rows)
+            if (awards.Count == 0)
             {
                 AddBox(0f, y, inner, 1f, lineColor);
-                bool mine = p.id == local;
+                AddText(NoRecordLabel, 6f, y, inner - 12f, rowHeight, fontSize, FontStyle.Normal,
+                    TextAnchor.MiddleCenter, textColor);
+                y += rowHeight;
+            }
+            // 칭호마다 한 줄: 칭호 · 누구 · 기록. 내가 받은 칭호 줄은 갈색 배경 + 흰 글자.
+            foreach (var award in awards)
+            {
+                AddBox(0f, y, inner, 1f, lineColor);
+                bool mine = award.Winners.Any(w => w.id == local);
                 if (mine) AddBox(0f, y + 1f, inner, rowHeight - 1f, myRowColor);
                 string[] cells =
                 {
-                    mine ? LabResultStats.PlayerName(p) + " " + MeLabel : LabResultStats.PlayerName(p),
-                    p.hitTotal.ToString(),
-                    p.damageTotal.ToString(),
-                    p.combinedTotal.ToString(),
-                    p.ItemsUsed.ToString(),
-                    p.passedTotal.ToString(),
-                    LabResultStats.DrumText(p, playedSeconds),
-                    TitlesOf(p, awards)
+                    LabResultStats.Label(award.Title),
+                    LabResultStats.WinnerNames(award, local),
+                    LabResultStats.Record(award, playedSeconds)
                 };
-                // 각 항목 1등 숫자는 굵게 (칭호와 같은 기준)
-                bool[] bold =
-                {
-                    false,
-                    false,
-                    IsWinner(p, awards, LabResultTitle.MostDamage),
-                    false,
-                    false,
-                    IsWinner(p, awards, LabResultTitle.MostPassed),
-                    IsWinner(p, awards, LabResultTitle.MostDrum),
-                    false
-                };
+                bool[] bold = { true, false, false };
                 AddCells(cells, y, rowHeight, FontStyle.Normal, bold, fontSize, mine ? myRowTextColor : textColor);
                 y += rowHeight;
             }
@@ -122,14 +115,6 @@ namespace C6Lab
             panel.gameObject.SetActive(true);
             panel.SetAsLastSibling();
         }
-
-        private static bool IsWinner(LabPlayerState p, IReadOnlyList<LabResultAward> awards, LabResultTitle title) =>
-            awards.Any(a => a.Title == title && a.Winners.Any(w => w.id == p.id));
-
-        /// <summary>이 플레이어가 받은 칭호들 (예: "딜왕 · 막타"). 없으면 빈칸.</summary>
-        private static string TitlesOf(LabPlayerState p, IReadOnlyList<LabResultAward> awards) =>
-            string.Join(" · ", awards.Where(a => a.Winners.Any(w => w.id == p.id))
-                .Select(a => LabResultStats.Label(a.Title)));
 
         private void EnsurePanel()
         {
@@ -175,12 +160,9 @@ namespace C6Lab
             for (int i = 0; i < cells.Length && i < Columns.Length; i++)
             {
                 bool strong = bold != null && i < bold.Length && bold[i];
-                bool last = i == Columns.Length - 1;
-                // 칭호 칸은 조금 작게, 길면 두 줄로 접는다. 두 줄짜리 기록 칸(북 점유)도 조금 작게.
-                bool twoLines = cells[i] != null && cells[i].IndexOf('\n') >= 0;
-                int cellSize = last ? size - 1 : twoLines && size >= fontSize ? size - 2 : size;
-                AddText(cells[i], x, y, Columns[i] - 2f, h, cellSize,
-                    strong ? FontStyle.Bold : style, TextAnchor.MiddleLeft, color, last);
+                // 누구·기록 칸은 길면(동점 여러 명 등) 두 줄로 접는다.
+                AddText(cells[i], x, y, Columns[i] - 2f, h, size,
+                    strong ? FontStyle.Bold : style, TextAnchor.MiddleLeft, color, i > 0);
                 x += Columns[i];
             }
         }
