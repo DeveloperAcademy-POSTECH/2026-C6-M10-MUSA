@@ -16,16 +16,20 @@ namespace C6Lab
         public bool Complete => running && elapsed >= Duration;
         public bool IsFinishing => running;
         void Awake() => crack = GetComponent<LabGourdCrack>();
+        bool CanPresent => isActiveAndEnabled && crack != null && crack.IsReady;
         public static bool DelayVictory(LabNetwork network, LabSnapshot snapshot)
         {
             if (snapshot == null || snapshot.phase != LabPhase.Victory || network == null || network.target == null) return false;
             var finish = network.target.GetComponent<LabGourdFinish>();
-            return finish != null && (!finish.Complete || finish.key != RoundKey(snapshot));
+            // An absent, disabled, or invalid presentation must never hold the result UI open.
+            // A failed/cancelled attempt retains its round key and is not started again.
+            return finish != null && finish.CanPresent && finish.crack.network == network
+                && (finish.key != RoundKey(snapshot) || (finish.running && !finish.Complete));
         }
         static string RoundKey(LabSnapshot s) => s.sessionId + ":" + s.round;
         void Update()
         {
-            var s = crack.network != null ? crack.network.Snapshot : null;
+            var s = crack != null && crack.network != null ? crack.network.Snapshot : null;
             ObserveSnapshot(s, Time.unscaledDeltaTime);
         }
         public void ObserveSnapshot(LabSnapshot s, float delta)
@@ -34,12 +38,15 @@ namespace C6Lab
             { if (running) ResetPresentation(); key = null; return; }
             string next = RoundKey(s);
             if (next != key) { ResetPresentation(); key = next; BeginPresentation(); }
+            if (!CanPresent) { ResetPresentation(); return; }
             if (running) Advance(delta);
         }
         public void BeginPresentation()
         {
-            if (running || crack.target == null || crack.target.VisualMount.childCount == 0) return;
-            intact = crack.target.VisualMount.GetChild(0).gameObject;
+            if (running || !CanPresent) return;
+            var shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) return;
+            intact = crack.VisualInstance;
             restPosition = intact.transform.localPosition;
             left = Half(intact, -1); right = Half(intact, 1);
             left.SetActive(false); right.SetActive(false);
@@ -49,7 +56,7 @@ namespace C6Lab
             spirit.transform.position = crack.target.Hitbox.bounds.center;
             spirit.transform.localScale = Vector3.one * .34f;
             LabVisualSafety.RemovePhysics(spirit);
-            spiritMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            spiritMaterial = new Material(shader);
             spiritMaterial.SetColor("_BaseColor", new Color(1f,.64f,.2f));
             spirit.GetComponent<Renderer>().sharedMaterial = spiritMaterial;
             var core = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -82,6 +89,13 @@ namespace C6Lab
         public void Advance(float delta)
         {
             if (!running) return;
+            if (!CanPresent || intact == null || intact != crack.VisualInstance
+                || left == null || right == null || spirit == null)
+            {
+                ResetPresentation();
+                return;
+            }
+            if (float.IsNaN(delta)) delta = 0f;
             elapsed = Mathf.Min(Duration, elapsed + Mathf.Max(0, delta));
             if (elapsed < .2f)
             {
@@ -111,8 +125,9 @@ namespace C6Lab
             }
             foreach(var item in new[]{left,right,spirit}) if(item != null){item.SetActive(false);Destroy(item);}
             if(spiritMaterial != null) Destroy(spiritMaterial);
-            left=right=spirit=null;running=false;elapsed=0;
+            intact=left=right=spirit=null;spiritMaterial=null;running=false;elapsed=0;
         }
-        void OnDestroy() { if(spiritMaterial != null) Destroy(spiritMaterial); }
+        void OnDisable() => ResetPresentation();
+        void OnDestroy() => ResetPresentation();
     }
 }
