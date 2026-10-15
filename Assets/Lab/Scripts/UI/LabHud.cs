@@ -55,6 +55,10 @@ namespace C6Lab
         public GameObject rightNeighborBadge;
         public Text leftNeighborText;
         public Text rightNeighborText;
+        public Image localPlayerCircle;
+        public Image leftPlayerCircle;
+        public Image rightPlayerCircle;
+        public Sprite[] playerCircleSprites;
         public Button pauseButton;
         public GameObject pauseMenu;
         public Button resumeButton;
@@ -146,8 +150,8 @@ namespace C6Lab
             bool searching = network.IsSearchingRooms;
             bool hostLobby = connected && network.IsHost && snapshot == null;
             bool playerSlotLobby = connected && snapshot == null && !network.IsDeveloperSolo;
-            SetVisible(playerSlotPanel, playerSlotLobby);
-            RefreshPlayerSlots(playerSlotLobby);
+            SetVisible(playerSlotPanel, false);
+            RefreshPlayerSlots(false);
             SetVisible(roomListPanel, searching && !connected);
             SetVisible(decreasePlayersButton == null ? null : decreasePlayersButton.gameObject, !connected && !searching);
             SetVisible(increasePlayersButton == null ? null : increasePlayersButton.gameObject, !connected && !searching);
@@ -245,6 +249,24 @@ namespace C6Lab
             GetNeighborLabels(snapshot, network.LocalPlayerId, out string left, out string right);
             Set(leftNeighborText, left);
             Set(rightNeighborText, right);
+            SetPlayerCircle(localPlayerCircle, local == null ? 0 : local.seat + 1);
+            SetPlayerCircle(leftPlayerCircle, ParsePlayerNumber(left));
+            SetPlayerCircle(rightPlayerCircle, ParsePlayerNumber(right));
+        }
+
+        private static int ParsePlayerNumber(string label)
+        {
+            return label != null && label.Length > 1 && int.TryParse(label.Substring(1), out int number)
+                ? number : 0;
+        }
+
+        private void SetPlayerCircle(Image image, int number)
+        {
+            if (image == null) return;
+            Sprite art = playerCircleSprites != null && number > 0 && number <= playerCircleSprites.Length
+                ? playerCircleSprites[number - 1] : null;
+            image.enabled = art != null;
+            if (image.sprite != art) image.sprite = art;
         }
 
         private void OnDisable()
