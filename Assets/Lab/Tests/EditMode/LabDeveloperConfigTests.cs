@@ -58,12 +58,14 @@ namespace C6Lab.Tests
             values[60] = 40f;
             values[61] = .8f;
             values[62] = 1.4f;
-            Assert.That(new[] { values[63], values[64], values[65], values[66] },
-                Is.EqualTo(new[] { .2f, 1f, .9f, .7f }), "BGM, generate, hit and miss volumes.");
+            Assert.That(new[] { values[63], values[64], values[65], values[66], values[84] },
+                Is.EqualTo(new[] { 50f, 50f, 50f, 50f, 50f }), "DEV volumes start at 50, which keeps the Inspector volumes.");
+            Assert.That(new[] { config.BgmVolume, config.GenerateSoundVolume, config.HitSoundVolume, config.MissSoundVolume },
+                Is.EqualTo(new[] { .2f, 1f, .9f, .7f }).Within(1e-5f), "At 50 the Inspector BGM, generate, hit and miss volumes are used as they are.");
             Assert.That(new[] { values[67], values[68], values[69], values[70], values[71], values[72], values[73] },
-                Is.EqualTo(new[] { 1f, 0f, .4f, 0f, .6f, 2f, 1f }), "Haptics on; generate/hit/item-hit style and intensity.");
-            values[63] = .5f;
-            values[64] = .8f;
+                Is.EqualTo(new[] { 1f, 1f, 1f, 2f, 1f, 2f, 1f }), "Haptics on; generate Medium, hit and item-hit Heavy, all at full strength.");
+            values[63] = 100f; // BGM twice the Inspector volume
+            values[64] = 25f;  // generate half the Inspector volume
             values[67] = 0f;
             values[68] = 1f; // Medium
             values[72] = 4f; // Rigid
@@ -85,14 +87,14 @@ namespace C6Lab.Tests
             Assert.That(new[] { values[82], values[83] }, Is.EqualTo(new[] { 2f, 1f }), "A blast plays a full Heavy haptic.");
             values[82] = 4f; // Rigid
             values[83] = .5f;
-            Assert.That(new[] { values[84], values[85], values[86] }, Is.EqualTo(new[] { .8f, 0f, .3f }),
-                "Combining plays its sound at 80% and a weak Light haptic by default.");
-            values[84] = .4f;
+            Assert.That(new[] { values[85], values[86] }, Is.EqualTo(new[] { 0f, 1f }),
+                "Combining plays a Light haptic at full strength by default.");
+            values[84] = 0f; // combine sound off
             values[85] = 3f; // Soft
             values[86] = .1f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
-            Assert.That(config.CombineSoundVolume, Is.EqualTo(.4f));
+            Assert.That(config.CombineSoundVolume, Is.EqualTo(0f));
             Assert.That(config.CombineHapticStyle, Is.EqualTo(LabHapticStyle.Soft));
             Assert.That(config.CombineHapticIntensity, Is.EqualTo(.1f));
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
@@ -120,8 +122,9 @@ namespace C6Lab.Tests
             Assert.That(config.SpawnFanAngle, Is.EqualTo(40f));
             Assert.That(config.SpawnMinSpeed, Is.EqualTo(.8f));
             Assert.That(config.SpawnMaxSpeed, Is.EqualTo(1.4f));
-            Assert.That(config.BgmVolume, Is.EqualTo(.5f));
-            Assert.That(config.GenerateSoundVolume, Is.EqualTo(.8f));
+            Assert.That(config.BgmVolume, Is.EqualTo(.4f).Within(1e-5f), "100 doubles the Inspector BGM volume (0.2).");
+            Assert.That(config.GenerateSoundVolume, Is.EqualTo(.5f).Within(1e-5f), "25 halves the Inspector generate volume (1).");
+            Assert.That(config.HitSoundVolume, Is.EqualTo(.9f).Within(1e-5f), "50 keeps the Inspector hit volume.");
             Assert.That(config.HapticsEnabled, Is.False);
             Assert.That(config.GenerateHapticStyle, Is.EqualTo(LabHapticStyle.Medium));
             Assert.That(config.ItemHitHapticStyle, Is.EqualTo(LabHapticStyle.Rigid));

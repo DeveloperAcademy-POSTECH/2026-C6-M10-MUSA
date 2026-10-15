@@ -194,11 +194,17 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 
 | 순서 | 항목 | 기본값 | 입력 범위 | 효과 |
 | --- | --- | --- | --- | --- |
-| 85 (인덱스 84) | `Combine Sound Volume` | 0.8 | 0~1 | 내가 요청한 결합을 Host가 승인했을 때 결합한 사람 기기에서 나는 소리의 기본 크기. 실제 크기 = 이 값 × 일시정지 메뉴 효과음 슬라이더. 소리 파일은 `Assets/Lab/Resources/Audio/Combine`의 파일 중 하나를 무작위로(연속 같은 소리 없이) 재생하며, 파일이 없으면 소리가 나지 않는다. |
+| 85 (인덱스 84) | `Combine Sound Volume (50 = Inspector)` | 50 | 0~100 | 내가 요청한 결합을 Host가 승인했을 때 결합한 사람 기기에서 나는 소리의 크기. 아래 "DEV 소리 크기" 규칙을 따른다(Inspector 기본 0.8). 소리 파일은 `Assets/Lab/Resources/Audio/Combine`의 파일 중 하나를 무작위로(연속 같은 소리 없이) 재생하며, 파일이 없으면 소리가 나지 않는다. |
 | 86 (인덱스 85) | `Combine Haptic Style (0-4)` | 0 = Light | 0~4 정수 | 결합 진동 종류. 0 Light, 1 Medium, 2 Heavy, 3 Soft, 4 Rigid. |
-| 87 (인덱스 86) | `Combine Haptic Intensity` | 0.3 | 0~1 | 결합 진동 세기. 0이면 진동하지 않는다. `Haptics (0 off, 1 on)`이 0이면 함께 꺼진다. |
+| 87 (인덱스 86) | `Combine Haptic Intensity` | 1 | 0~1 | 결합 진동 세기. 0이면 진동하지 않는다. `Haptics (0 off, 1 on)`이 0이면 함께 꺼진다. |
 
-결합이 거절되면 소리·진동이 나지 않는다. Host는 승인 즉시, Client는 Host가 보내는 `combined` 알림을 받았을 때 재생한다. 아이폰 빌드에서만 실제로 진동한다. 같은 #172에서 타격 진동 세기(`Hit Haptic Intensity`, 72번째) 기본값을 0.6에서 0.9로 올렸다.
+결합이 거절되면 소리·진동이 나지 않는다. Host는 승인 즉시, Client는 Host가 보내는 `combined` 알림을 받았을 때 재생한다. 아이폰 빌드에서만 실제로 진동한다.
+
+### DEV 소리 크기 — 64~67번째, 85번째 설정
+
+BGM·생성·타격·빗나감·결합 소리 크기 5개(인덱스 63~66, 84)는 DEV에서 **0~100**으로 입력하며 기본값은 **50**이다. 50은 Inspector(`Resources/LabConfig`)에 적힌 크기를 그대로 쓴다는 뜻이고, 실제 크기 = Inspector 값 × (DEV 값 ÷ 50)이다. 100은 Inspector 값의 2배, 25는 절반, 0은 소리 없음. DEV 값은 Inspector에 보이지 않으며 원본 에셋을 바꾸지 않는다. 기기별 일시정지 메뉴의 BGM/효과음 슬라이더가 여기에 한 번 더 곱해진다.
+
+#172 아이폰 확인 뒤 진동 기본값을 정리했다: 생성 Medium·1, 타격 Heavy·1, 아이템 타격 Heavy·1, 폭탄 Heavy·1, 결합 Light·1. 세기 차이는 진동 종류(Light < Medium < Heavy)로 낸다.
 
 ## 9. 입력 제약과 조정 실험 예시
 

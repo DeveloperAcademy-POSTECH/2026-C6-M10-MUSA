@@ -56,11 +56,11 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void CombineUsesAWeakLightHapticUnlessSilent()
+        public void CombineUsesALightHapticUnlessSilent()
         {
-            Assert.That(config.CombineHapticStyle, Is.EqualTo(LabHapticStyle.Light));
-            Assert.That(config.CombineHapticIntensity, Is.LessThan(config.HitHapticIntensity),
-                "Combining is weaker than hitting the yokai.");
+            Assert.That(config.CombineHapticStyle, Is.EqualTo(LabHapticStyle.Light),
+                "Combining uses the lightest style; hitting the yokai is Heavy.");
+            Assert.That(config.HitHapticStyle, Is.EqualTo(LabHapticStyle.Heavy));
             Assert.That(haptics.PlayForCombine(config), Is.True);
             Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.Combine));
 

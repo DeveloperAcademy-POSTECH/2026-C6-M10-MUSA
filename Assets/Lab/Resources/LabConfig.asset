@@ -68,15 +68,15 @@ MonoBehaviour:
   combineSoundVolume: 0.8
   hapticsEnabled: 1
   generateHapticStyle: 1
-  generateHapticIntensity: 0.4
+  generateHapticIntensity: 1
   hitHapticStyle: 2
-  hitHapticIntensity: 0.9
+  hitHapticIntensity: 1
   itemHitHapticStyle: 2
   itemHitHapticIntensity: 1
   bombHapticStyle: 2
   bombHapticIntensity: 1
   combineHapticStyle: 0
-  combineHapticIntensity: 0.3
+  combineHapticIntensity: 1
   orbAppearance: {fileID: 11400000, guid: 9fd06f927557d47e2ac8b342a6979ed0, type: 2}
   cameraRadius: 8
   cameraHeightOffset: 0.65
