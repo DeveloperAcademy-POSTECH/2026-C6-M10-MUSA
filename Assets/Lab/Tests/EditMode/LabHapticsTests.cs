@@ -56,6 +56,22 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void CombineUsesAWeakLightHapticUnlessSilent()
+        {
+            Assert.That(config.CombineHapticStyle, Is.EqualTo(LabHapticStyle.Light));
+            Assert.That(config.CombineHapticIntensity, Is.LessThan(config.HitHapticIntensity),
+                "Combining is weaker than hitting the yokai.");
+            Assert.That(haptics.PlayForCombine(config), Is.True);
+            Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.Combine));
+
+            float[] values = config.CaptureDeveloperValues();
+            values[86] = 0f; // combine haptic intensity
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(haptics.PlayForCombine(config), Is.False, "Zero intensity plays nothing.");
+            Assert.That(haptics.PlayCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void GenerateUsesItsOwnHaptic()
         {
             Assert.That(haptics.PlayForGenerate(config), Is.True);

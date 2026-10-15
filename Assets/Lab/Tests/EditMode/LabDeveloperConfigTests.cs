@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(84));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(87));
             Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
@@ -85,8 +85,16 @@ namespace C6Lab.Tests
             Assert.That(new[] { values[82], values[83] }, Is.EqualTo(new[] { 2f, 1f }), "A blast plays a full Heavy haptic.");
             values[82] = 4f; // Rigid
             values[83] = .5f;
+            Assert.That(new[] { values[84], values[85], values[86] }, Is.EqualTo(new[] { .8f, 0f, .3f }),
+                "Combining plays its sound at 80% and a weak Light haptic by default.");
+            values[84] = .4f;
+            values[85] = 3f; // Soft
+            values[86] = .1f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
+            Assert.That(config.CombineSoundVolume, Is.EqualTo(.4f));
+            Assert.That(config.CombineHapticStyle, Is.EqualTo(LabHapticStyle.Soft));
+            Assert.That(config.CombineHapticIntensity, Is.EqualTo(.1f));
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
             Assert.That(config.GenerateCost, Is.EqualTo(5f));
