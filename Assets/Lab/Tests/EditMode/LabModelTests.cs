@@ -1221,18 +1221,22 @@ namespace C6Lab.Tests
                     damageTotal = 60, passedTotal = 3, drumSeconds = 40.2d },
                 new LabPlayerState { id = 20, seat = 1, generatedTotal = 5, damageTotal = 60, passedTotal = 3,
                     drumSeconds = 39.8d, lastHit = true },
-                new LabPlayerState { id = 30, seat = 2, generatedTotal = 2, potionUsed = 1, drumSeconds = 12d }
+                new LabPlayerState { id = 30, seat = 2, generatedTotal = 2, potionUsed = 1, drumSeconds = 12d,
+                    drumPassedTotal = 2 }
             };
             var won = LabResultStats.Awards(players, true);
             Assert.That(won.Select(a => a.Title), Is.EqualTo(new[]
-                { LabResultTitle.MostDamage, LabResultTitle.MostPassed, LabResultTitle.LastHit, LabResultTitle.MostDrum }),
+                { LabResultTitle.MostDamage, LabResultTitle.MostPassed, LabResultTitle.MostDrumPassed,
+                    LabResultTitle.LastHit, LabResultTitle.MostDrum }),
                 "Generating, combining and items are records only; they give no title.");
-            Assert.That(won.Select(a => LabResultStats.Label(a.Title)), Is.EqualTo(new[] { "딜왕", "패스왕", "막타", "북 독점" }));
+            Assert.That(won.Select(a => LabResultStats.Label(a.Title)),
+                Is.EqualTo(new[] { "딜왕", "구슬 패스왕", "북 패스왕", "막타", "북 독점" }));
             Assert.That(won[0].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }), "Ties share the title.");
             Assert.That(won[0].Value, Is.EqualTo(60));
             Assert.That(won[1].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }));
-            Assert.That(won[2].Winners.Single().id, Is.EqualTo(20ul));
-            Assert.That(won[3].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }),
+            Assert.That(won[2].Winners.Single().id, Is.EqualTo(30ul));
+            Assert.That(won[3].Winners.Single().id, Is.EqualTo(20ul));
+            Assert.That(won[4].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }),
                 "40.2s and 39.8s both show as 40s, so the drum title is shared.");
 
             // 칭호 줄 글자: 누구 · 기록 (20번이 이 기기의 나)
@@ -1241,8 +1245,9 @@ namespace C6Lab.Tests
             Assert.That(LabResultStats.WinnerNames(won[0], 20ul), Is.EqualTo("P1, P2 나"));
             Assert.That(LabResultStats.Record(won[0], 100d), Is.EqualTo("60 (2·3회 타격)"));
             Assert.That(LabResultStats.Record(won[1], 100d), Is.EqualTo("3회"));
-            Assert.That(LabResultStats.Record(won[2], 100d), Is.Empty);
-            Assert.That(LabResultStats.Record(won[3], 100d), Is.EqualTo("40초 · 40%"));
+            Assert.That(LabResultStats.Record(won[2], 100d), Is.EqualTo("2회"));
+            Assert.That(LabResultStats.Record(won[3], 100d), Is.Empty);
+            Assert.That(LabResultStats.Record(won[4], 100d), Is.EqualTo("40초 · 40%"));
             var solo = new LabResultAward(LabResultTitle.MostDamage, 40,
                 new[] { new LabPlayerState { id = 30, seat = 2, damageTotal = 40, hitTotal = 2 } });
             Assert.That(LabResultStats.Record(solo, 100d), Is.EqualTo("40 (2회 타격)"));
@@ -1251,6 +1256,7 @@ namespace C6Lab.Tests
             players[1].lastHit = false;
             players[0].damageTotal = players[1].damageTotal = 0;
             players[0].passedTotal = players[1].passedTotal = 0;
+            players[2].drumPassedTotal = 0;
             Assert.That(LabResultStats.Awards(players, true).Select(a => a.Title),
                 Is.EqualTo(new[] { LabResultTitle.MostDrum }), "Empty categories give no title.");
 
@@ -1330,6 +1336,9 @@ namespace C6Lab.Tests
                     out var passed, out var reason), Is.True, reason);
                 ulong second = passed.owner;
                 Assert.That(second, Is.Not.EqualTo(first));
+                var afterPass = model.Snapshot(10d).players.Single(p => p.id == first);
+                Assert.That(afterPass.drumPassedTotal, Is.EqualTo(1), "Passing a drum counts as a drum pass.");
+                Assert.That(afterPass.passedTotal, Is.EqualTo(0), "A drum is not counted as an orb pass.");
 
                 var mid = model.Snapshot(40d);
                 Assert.That(mid.playedSeconds, Is.EqualTo(40d).Within(1e-6));

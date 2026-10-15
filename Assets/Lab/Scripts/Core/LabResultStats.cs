@@ -6,10 +6,10 @@ namespace C6Lab
 {
     /// <summary>
     /// 결과 대시보드의 칭호 종류 (화면에 붙는 순서).
-    /// 딜왕: 요괴에게 준 피해 최다 · 패스왕: 구슬 전달 최다 · 막타: 요괴를 쓰러뜨린 한 방(승리 시에만) ·
-    /// 북 독점: 북을 가지고 있던 시간 최다
+    /// 딜왕: 요괴에게 준 피해 최다 · 구슬 패스왕: 구슬 전달 최다 · 북 패스왕: 북 전달 최다 ·
+    /// 막타: 요괴를 쓰러뜨린 한 방(승리 시에만) · 북 독점: 북을 가지고 있던 시간 최다
     /// </summary>
-    public enum LabResultTitle { MostDamage, MostPassed, LastHit, MostDrum }
+    public enum LabResultTitle { MostDamage, MostPassed, MostDrumPassed, LastHit, MostDrum }
 
     /// <summary>한 칭호의 결과. 동점이면 Winners에 여러 명이 들어간다.</summary>
     public readonly struct LabResultAward
@@ -38,6 +38,7 @@ namespace C6Lab
             {
                 case LabResultTitle.MostDamage: return player.damageTotal;
                 case LabResultTitle.MostPassed: return player.passedTotal;
+                case LabResultTitle.MostDrumPassed: return player.drumPassedTotal;
                 case LabResultTitle.LastHit: return player.lastHit ? 1 : 0;
                 // 화면에 보이는 정수 초로 비교해서, 같은 초로 보이면 공동 칭호
                 case LabResultTitle.MostDrum: return (int)Math.Round(player.drumSeconds, MidpointRounding.AwayFromZero);
@@ -69,7 +70,8 @@ namespace C6Lab
             switch (title)
             {
                 case LabResultTitle.MostDamage: return "딜왕";
-                case LabResultTitle.MostPassed: return "패스왕";
+                case LabResultTitle.MostPassed: return "구슬 패스왕";
+                case LabResultTitle.MostDrumPassed: return "북 패스왕";
                 case LabResultTitle.LastHit: return "막타";
                 case LabResultTitle.MostDrum: return "북 독점";
                 default: return title.ToString();
@@ -98,7 +100,7 @@ namespace C6Lab
 
         /// <summary>
         /// 칭호 줄의 기록 칸. 딜왕 "40 (2회 타격)" (동점이면 "60 (2·3회 타격)", 이름 순서와 같음) ·
-        /// 패스왕 "5회" · 북 독점 "12초 · 40%" · 막타는 빈칸.
+        /// 구슬 패스왕·북 패스왕 "5회" · 북 독점 "12초 · 40%" · 막타는 빈칸.
         /// </summary>
         public static string Record(LabResultAward award, double playedSeconds)
         {
@@ -107,7 +109,8 @@ namespace C6Lab
             {
                 case LabResultTitle.MostDamage:
                     return award.Value + " (" + string.Join("·", award.Winners.Select(p => p.hitTotal)) + "회 타격)";
-                case LabResultTitle.MostPassed: return award.Value + "회";
+                case LabResultTitle.MostPassed:
+                case LabResultTitle.MostDrumPassed: return award.Value + "회";
                 case LabResultTitle.MostDrum: return DrumText(award.Winners[0], playedSeconds);
                 default: return "";
             }

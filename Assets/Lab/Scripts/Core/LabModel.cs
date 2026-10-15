@@ -236,7 +236,8 @@ namespace C6Lab
             }
             else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
             current.revision = ++revision;
-            if (!current.kind.IsDrum()) players[sender].passedTotal++;
+            if (current.kind.IsDrum()) players[sender].drumPassedTotal++;
+            else players[sender].passedTotal++;
             reason = "TRANSFERRED";
             orb = current.Copy();
             return true;

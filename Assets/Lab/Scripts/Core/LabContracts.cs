@@ -77,6 +77,8 @@ namespace C6Lab
         public int combinedTotal;
         /// <summary>이웃에게 넘겨준 구슬 수 (북 제외)</summary>
         public int passedTotal;
+        /// <summary>이웃에게 넘겨준 북 수</summary>
+        public int drumPassedTotal;
         /// <summary>아이템 사용 수: 릴레이·폭탄은 던졌을 때, 비밀상자·포션은 더블탭 사용했을 때</summary>
         public int relayUsed, secretBoxUsed, potionUsed, bombUsed;
 
