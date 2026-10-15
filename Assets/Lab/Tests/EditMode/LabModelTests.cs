@@ -1217,19 +1217,34 @@ namespace C6Lab.Tests
         {
             var players = new[]
             {
-                new LabPlayerState { id = 10, seat = 0, generatedTotal = 9, relayUsed = 1, passedTotal = 3 },
-                new LabPlayerState { id = 20, seat = 1, generatedTotal = 5, passedTotal = 3 },
-                new LabPlayerState { id = 30, seat = 2, generatedTotal = 2, potionUsed = 1, bombUsed = 1 }
+                new LabPlayerState { id = 10, seat = 0, generatedTotal = 9, combinedTotal = 7, relayUsed = 4,
+                    damageTotal = 60, passedTotal = 3, drumSeconds = 40.2d },
+                new LabPlayerState { id = 20, seat = 1, generatedTotal = 5, damageTotal = 60, passedTotal = 3,
+                    drumSeconds = 39.8d, lastHit = true },
+                new LabPlayerState { id = 30, seat = 2, generatedTotal = 2, potionUsed = 1, drumSeconds = 12d }
             };
-            var awards = LabResultStats.Awards(players);
-            Assert.That(awards.Select(a => a.Title), Is.EqualTo(new[]
-                { LabResultTitle.MostItems, LabResultTitle.MostPassed }),
-                "Nobody combined, so there is no combine award, and generating is not compared.");
-            Assert.That(awards[0].Winners.Single().id, Is.EqualTo(30ul));
-            Assert.That(awards[0].Value, Is.EqualTo(2));
-            Assert.That(awards[1].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }));
-            Assert.That(awards[1].Value, Is.EqualTo(3));
-            Assert.That(LabResultStats.Awards(new LabPlayerState[0]), Is.Empty);
+            var won = LabResultStats.Awards(players, true);
+            Assert.That(won.Select(a => a.Title), Is.EqualTo(new[]
+                { LabResultTitle.MostDamage, LabResultTitle.MostPassed, LabResultTitle.LastHit, LabResultTitle.MostDrum }),
+                "Generating, combining and items are records only; they give no title.");
+            Assert.That(won.Select(a => LabResultStats.Label(a.Title)), Is.EqualTo(new[] { "딜왕", "패스왕", "막타", "북 독점" }));
+            Assert.That(won[0].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }), "Ties share the title.");
+            Assert.That(won[0].Value, Is.EqualTo(60));
+            Assert.That(won[1].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }));
+            Assert.That(won[2].Winners.Single().id, Is.EqualTo(20ul));
+            Assert.That(won[3].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }),
+                "40.2s and 39.8s both show as 40s, so the drum title is shared.");
+
+            players[1].lastHit = false;
+            players[0].damageTotal = players[1].damageTotal = 0;
+            players[0].passedTotal = players[1].passedTotal = 0;
+            Assert.That(LabResultStats.Awards(players, true).Select(a => a.Title),
+                Is.EqualTo(new[] { LabResultTitle.MostDrum }), "Empty categories give no title.");
+
+            players[1].lastHit = true;
+            Assert.That(LabResultStats.Awards(players, false).Any(a => a.Title == LabResultTitle.LastHit), Is.False,
+                "The last hit title is only for a victory.");
+            Assert.That(LabResultStats.Awards(new LabPlayerState[0], true), Is.Empty);
         }
 
         [Test]

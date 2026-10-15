@@ -31,9 +31,6 @@ namespace C6Lab
         private static readonly string[] Headers = { "플레이어", "타격", "딜", "결합", "아이템", "구슬\n전달", "북 점유", "칭호" };
         private static readonly float[] Columns = { 44f, 32f, 38f, 32f, 40f, 40f, 52f, 68f }; // 합 346 + 왼쪽 여백 6 = 안쪽 폭 352
 
-        /// <summary>요괴를 쓰러뜨린 마지막 한 방을 친 사람 표시 (승리했을 때만)</summary>
-        public const string LastHitLabel = "막타";
-
         private LabNetwork network;
         private GameObject resultControls;
         private RectTransform panel;
@@ -76,7 +73,7 @@ namespace C6Lab
 
             var rows = (players ?? new LabPlayerState[0]).Where(p => p != null).OrderBy(p => p.seat).ToArray();
             ulong local = network != null ? network.LocalPlayerId : ulong.MaxValue;
-            IReadOnlyList<LabResultAward> awards = LabResultStats.Awards(rows);
+            IReadOnlyList<LabResultAward> awards = LabResultStats.Awards(rows, victory);
 
             float inner = width - 10f;
             float y = 0f;
@@ -97,18 +94,18 @@ namespace C6Lab
                     p.ItemsUsed.ToString(),
                     p.passedTotal.ToString(),
                     LabResultStats.DrumText(p, playedSeconds),
-                    TitlesOf(p, awards, victory)
+                    TitlesOf(p, awards)
                 };
                 // 각 항목 1등 숫자는 굵게 (칭호와 같은 기준)
                 bool[] bold =
                 {
                     false,
                     false,
+                    IsWinner(p, awards, LabResultTitle.MostDamage),
                     false,
-                    IsWinner(p, awards, LabResultTitle.MostCombined),
-                    IsWinner(p, awards, LabResultTitle.MostItems),
+                    false,
                     IsWinner(p, awards, LabResultTitle.MostPassed),
-                    false,
+                    IsWinner(p, awards, LabResultTitle.MostDrum),
                     false
                 };
                 AddCells(cells, y, rowHeight, FontStyle.Normal, bold, fontSize);
@@ -123,14 +120,10 @@ namespace C6Lab
         private static bool IsWinner(LabPlayerState p, IReadOnlyList<LabResultAward> awards, LabResultTitle title) =>
             awards.Any(a => a.Title == title && a.Winners.Any(w => w.id == p.id));
 
-        /// <summary>이 플레이어가 받은 칭호들 (예: "결합왕 · 패스왕"). 승리했고 막타를 쳤으면 "막타"도 붙인다. 없으면 빈칸.</summary>
-        private static string TitlesOf(LabPlayerState p, IReadOnlyList<LabResultAward> awards, bool victory)
-        {
-            var labels = awards.Where(a => a.Winners.Any(w => w.id == p.id))
-                .Select(a => LabResultStats.Label(a.Title)).ToList();
-            if (victory && p.lastHit) labels.Add(LastHitLabel);
-            return string.Join(" · ", labels);
-        }
+        /// <summary>이 플레이어가 받은 칭호들 (예: "딜왕 · 막타"). 없으면 빈칸.</summary>
+        private static string TitlesOf(LabPlayerState p, IReadOnlyList<LabResultAward> awards) =>
+            string.Join(" · ", awards.Where(a => a.Winners.Any(w => w.id == p.id))
+                .Select(a => LabResultStats.Label(a.Title)));
 
         private void EnsurePanel()
         {
