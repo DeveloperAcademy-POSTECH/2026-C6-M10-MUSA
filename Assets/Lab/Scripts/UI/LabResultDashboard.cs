@@ -9,7 +9,7 @@ namespace C6Lab
     /// 승리/패배 결과 화면에 이번 라운드 칭호(딜왕·패스왕·막타·북 독점)를 칭호별로 한 줄씩 보여주는 대시보드.
     /// 줄마다 칭호 · 받은 사람(동점이면 모두) · 기록. 기록이 0인 칭호는 줄을 만들지 않는다.
     /// 장면 수정 없이 코드로 만들고, 결과 카드(VICTORY/DEFEAT·버튼 전체) 바로 밑에 놓는다.
-    /// 목록이 아래 HUD에 가리지 않도록 결과 카드를 목록 높이만큼 위로 올리고, 결과 화면이 끝나면 되돌린다.
+    /// 결과 카드는 화면 위에서 1/3 지점으로 올려 목록이 아래 HUD에 가리지 않게 하고, 결과 화면이 끝나면 되돌린다.
     /// 값은 Host가 보낸 스냅샷의 플레이어 기록(LabPlayerState)을 그대로 쓰므로 모든 기기가 같다.
     /// 디자인이 정해지면 이 화면만 바꾸고, 계산은 LabResultStats를 그대로 쓴다.
     /// </summary>
@@ -21,10 +21,8 @@ namespace C6Lab
         public float gapBelowResult = 12f;
         public float headerHeight = 24f;
         public float rowHeight = 27f;
-        /// <summary>
-        /// 결과 카드를 위로 올리는 정도 (목록 높이 + 간격 기준). 1이면 목록 아랫변이 원래 카드 아랫변 자리에 온다.
-        /// </summary>
-        [Range(0f, 1f)] public float liftResult = 1f;
+        /// <summary>결과 카드 윗변 위치: 화면 위에서부터의 비율 (1/3이면 위에서 1/3 지점). 목록은 그 밑에 붙는다.</summary>
+        [Range(0f, 1f)] public float resultTopFromTop = 1f / 3f;
         public int fontSize = 14;
 
         // 결과 카드와 같은 색
@@ -49,9 +47,9 @@ namespace C6Lab
         private RectTransform content;
         private Font font;
         private string shownKey;
-        // 카드를 올리기 전 위치 (결과 화면이 끝나면 되돌린다)
-        private bool lifted;
-        private Vector2 cardOffsetMin, cardOffsetMax;
+        // 카드를 옮기기 전 위치 (결과 화면이 끝나면 되돌린다)
+        private bool moved;
+        private Vector2 cardAnchorMin, cardAnchorMax, cardOffsetMin, cardOffsetMax;
 
         public bool IsShowing => panel != null && panel.gameObject.activeSelf;
 
@@ -124,32 +122,43 @@ namespace C6Lab
             panel.sizeDelta = new Vector2(width, y + 10f);
             panel.gameObject.SetActive(true);
             panel.SetAsLastSibling();
-            LiftCard(panel.sizeDelta.y + gapBelowResult);
+            PlaceCard();
         }
 
         private void OnDisable() => RestoreCard();
 
-        /// <summary>결과 카드를 올리고, 목록을 카드 바로 밑에 다시 붙인다.</summary>
-        private void LiftCard(float below)
+        /// <summary>
+        /// 결과 카드 윗변을 화면 위에서 resultTopFromTop 지점(기본 1/3)에 놓고, 목록을 카드 바로 밑에 다시 붙인다.
+        /// 카드 크기·가로 위치는 그대로다.
+        /// </summary>
+        private void PlaceCard()
         {
             RestoreCard();
             var card = resultControls != null ? resultControls.transform as RectTransform : null;
             if (card == null || panel == null) return;
+            cardAnchorMin = card.anchorMin;
+            cardAnchorMax = card.anchorMax;
             cardOffsetMin = card.offsetMin;
             cardOffsetMax = card.offsetMax;
-            var lift = new Vector2(0f, below * Mathf.Clamp01(liftResult));
-            card.offsetMin = cardOffsetMin + lift;
-            card.offsetMax = cardOffsetMax + lift;
-            lifted = true;
-            panel.anchoredPosition = new Vector2(0f, card.offsetMin.y - gapBelowResult);
+            float height = card.rect.height;
+            float top = 1f - Mathf.Clamp01(resultTopFromTop);
+            card.anchorMin = new Vector2(cardAnchorMin.x, top);
+            card.anchorMax = new Vector2(cardAnchorMax.x, top);
+            card.offsetMin = new Vector2(cardOffsetMin.x, -height);
+            card.offsetMax = new Vector2(cardOffsetMax.x, 0f);
+            moved = true;
+            panel.anchorMin = panel.anchorMax = new Vector2(.5f, top);
+            panel.anchoredPosition = new Vector2(0f, -height - gapBelowResult);
         }
 
         private void RestoreCard()
         {
-            if (!lifted) return;
-            lifted = false;
+            if (!moved) return;
+            moved = false;
             var card = resultControls != null ? resultControls.transform as RectTransform : null;
             if (card == null) return;
+            card.anchorMin = cardAnchorMin;
+            card.anchorMax = cardAnchorMax;
             card.offsetMin = cardOffsetMin;
             card.offsetMax = cardOffsetMax;
         }
