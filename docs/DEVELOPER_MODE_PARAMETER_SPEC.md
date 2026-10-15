@@ -1,20 +1,20 @@
 # C6 Physics Lab 개발자 모드 조정값 명세
 
-> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 원래 39개 수치는 PR #76의 설정 에셋을 기준으로 기록했으며, 이후 생성 확률·아이템 9개와 개인 HP 1개를 더했고, 아이템 효과·결합·카메라·요괴 회전·생성 연출·소리·햅틱·생성 북 값을 차례로 더해 현재 박 표현 모드·폭탄 충격파까지 84개다. 64~74번째(인덱스 63~73) 소리 음량·햅틱 11개(#142)는 이 문서에 아직 따로 설명하지 않았다. 81~84번째(인덱스 80~83)는 #167의 폭탄 충격파·폭발 진동 값이다. 직렬화된 값이 없으면 C# 필드 초기값이 쓰인다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
+> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 원래 39개 수치는 PR #76의 설정 에셋을 기준으로 기록했으며, 이후 생성 확률·아이템 9개와 개인 HP 1개를 더했고, 아이템 효과·결합·카메라·요괴 회전·생성 연출·소리·햅틱·생성 북 값을 차례로 더해 현재 박 표현 모드·폭탄 충격파·결합 소리/햅틱까지 87개다. 64~74번째(인덱스 63~73) 소리 음량·햅틱 11개(#142)는 이 문서에 아직 따로 설명하지 않았다. 81~84번째(인덱스 80~83)는 #167의 폭탄 충격파·폭발 진동 값이고, 85~87번째(인덱스 84~86)는 #172의 결합 소리 크기·결합 진동 종류·세기다. 직렬화된 값이 없으면 C# 필드 초기값이 쓰인다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
 
-이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 조정값 84개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
+이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 조정값 87개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
 
 ## 1. 패널의 적용 방식
 
 1. `Assets/Lab/Scenes/Lab.unity`를 Unity Editor에서 실행하거나 **Development Build**를 실행한다. 일반 배포 빌드에서는 DEV 버튼이 숨겨진다. 참가자는 일반 빌드여도 Host가 확정한 세션 설정을 수신한다.
-2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 숫자 입력칸 84개와 대응하는 슬라이더가 서로 값을 반영한다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
-3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 84개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
+2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 숫자 입력칸 87개와 대응하는 슬라이더가 서로 값을 반영한다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
+3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 87개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
 4. 혼자 시험할 때는 **START SOLO**를 누른다. 이미 솔로 전투 중이면 **RESTART SOLO**가 표시된다. 새 라운드가 시작되므로 요괴/개인 HP·시간·스태미나·구슬이 초기화된다. 진행 중인 네트워크 라운드에 값을 즉시 적용하는 동작은 없다.
 5. **DEFAULTS**는 저장된 `LabConfig.asset`의 숫자를 입력칸과 슬라이더에 불러올 뿐이다. 공유 방이나 솔로에 적용하려면 해당 시작·적용 버튼을 눌러야 한다. **END SOLO**는 솔로를 끝내고 원본 설정으로 복귀한다. 런타임 복사본은 앱이 실행 중인 동안만 유지되며 원본 에셋에는 저장되지 않는다.
 
 패널 열기 자체는 시간을 멈추지 않는다. 공유 전투에서 설정을 바꾸려면 먼저 공동 일시정지를 승인받아야 하며, 이때 시간은 그 일시정지 상태를 따른다. 마지막 `SHOT HIT/MISS` 보고는 솔로를 끝내거나 연결을 끊으면 지워질 수 있으므로 먼저 기록한다. 공유 방에서는 Host의 설정 지문과 확인 응답을 기준으로 시작을 판정한다. 이 절은 코드상 경로 설명이며 실제 기기 동기화 결과는 검증 기록과 구분한다.
 
-입력은 **84개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
+입력은 **87개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
 
 ## 2. 단위와 공통 판정
 
@@ -48,7 +48,7 @@ Inspector 원본은 `LabConfig`의 **Gourd Mode**(`LabGourdMode.Paint` / `Crack`
 
 Paint는 승인된 속성 명중을 한 판 최대 128개까지 표면에 칠하고 무속성·빗나감을 칠하지 않는다. 새 판·Retry·로비·방 이탈에서 자국을 지운다. Crack은 기존 HP 단계와 약 1.2초 승리 마무리를 유지한다. Paint 결과와 두 모드의 패배 결과는 지연하지 않는다. 모드 전환은 같은 원통 Collider·매달림·회전 루트를 사용한다.
 
-박 모드는 80번째 설정으로 #166에서 프로토콜 `5617`과 함께 추가됐고, #167의 폭탄 값 4개를 더한 84개 설정을 공유하는 현재 프로토콜은 `5618`이다. 이전 형식 앱과 호환되지 않는다. 실제 Host/Client 모드 일치 검증은 `docs/VALIDATION.md`의 이번 통합 기록을 확인한다. 직렬화된 Paint 참조로 검사했던 #166의 이전 PASS를 이 경로에 승계하지 않는다.
+박 모드는 80번째 설정으로 #166에서 프로토콜 `5617`과 함께 추가됐고, #167의 폭탄 값 4개로 84개(프로토콜 `5618`), #172의 결합 소리·햅틱 3개를 더한 87개 설정과 결합 승인 알림을 공유하는 현재 프로토콜은 `5619`이다. 이전 형식 앱과 호환되지 않는다. 실제 Host/Client 모드 일치 검증은 `docs/VALIDATION.md`의 이번 통합 기록을 확인한다. 직렬화된 Paint 참조로 검사했던 #166의 이전 PASS를 이 경로에 승계하지 않는다.
 
 근거: `LabConfig.GourdMode`·`DeveloperFields`·`CaptureDeveloperValues`·`TryApplyDeveloperValues`, `LabSceneController.Awake`, `LabNetwork.ConfigApplied`, `LabGourdPaint.Attach`·`ApplyMode`, `LabGourdCrack`, `LabGourdFinish`.
 
@@ -190,6 +190,16 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 
 근거: `LabConfig.GenerationChances`, `LabModel.TryGenerate`·`TryCombine`·`TryTransfer`·`TryUseItem`·`TryAdvance`·`ConfirmHit`, `LabOrbBoard.EndDragAtWorld`, `LabOrbItemMarker.Show`, `LabNetwork.SyncBoard`.
 
+### 결합 소리·햅틱 — 85~87번째 설정
+
+| 순서 | 항목 | 기본값 | 입력 범위 | 효과 |
+| --- | --- | --- | --- | --- |
+| 85 (인덱스 84) | `Combine Sound Volume` | 0.8 | 0~1 | 내가 요청한 결합을 Host가 승인했을 때 결합한 사람 기기에서 나는 소리의 기본 크기. 실제 크기 = 이 값 × 일시정지 메뉴 효과음 슬라이더. 소리 파일은 `Assets/Lab/Resources/Audio/Combine`의 파일 중 하나를 무작위로(연속 같은 소리 없이) 재생하며, 파일이 없으면 소리가 나지 않는다. |
+| 86 (인덱스 85) | `Combine Haptic Style (0-4)` | 0 = Light | 0~4 정수 | 결합 진동 종류. 0 Light, 1 Medium, 2 Heavy, 3 Soft, 4 Rigid. |
+| 87 (인덱스 86) | `Combine Haptic Intensity` | 0.3 | 0~1 | 결합 진동 세기. 0이면 진동하지 않는다. `Haptics (0 off, 1 on)`이 0이면 함께 꺼진다. |
+
+결합이 거절되면 소리·진동이 나지 않는다. Host는 승인 즉시, Client는 Host가 보내는 `combined` 알림을 받았을 때 재생한다. 아이폰 빌드에서만 실제로 진동한다. 같은 #172에서 타격 진동 세기(`Hit Haptic Intensity`, 72번째) 기본값을 0.6에서 0.9로 올렸다.
+
 ## 9. 입력 제약과 조정 실험 예시
 
 **값 간 관계:** `Starting Stamina`, `Orb Generation Cost`, `Stamina Recovery Amount`, `Stamina Reward per Hit`은 모두 `Maximum Stamina` 이하여야 한다. `Orb Stop Speed ≤ Orb Maximum Release Speed`, `Throw Minimum Swipe Speed ≤ Throw Maximum Swipe Speed`, `Throw Minimum Upward Speed ≤ Throw Maximum World Speed`, 생성 확률 6개의 합 = 100, `Item Unlock Swipes Min ≤ Item Unlock Swipes Max`도 필수다. 관계 위반 시 전체 입력이 거절된다.
@@ -216,7 +226,7 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 
 ## 10. 이 패널로 조정할 수 없는 것·검증 범위
 
-방의 **목표 인원**은 84개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport는 84개 입력칸으로 조정하지 않는다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
+방의 **목표 인원**은 87개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport는 87개 입력칸으로 조정하지 않는다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
 
 기존 PR #76 기준 문서는 해당 코드·Scene·설정 에셋과 당시 `docs/VALIDATION.md`의 증거를 **읽어 확인**해 작성됐다. 그 기록의 EditMode **12/12**, PlayMode **20/20** 및 Mac Development 앱 빌드는 이번 3D 조합판 전환의 통과 증거가 아니다. 이 전환의 Unity 컴파일·EditMode·PlayMode, Mac·iOS 빌드, 실제 조작은 새 실행 기록으로 구분해야 한다. 문서의 물리 용어를 갱신한 것만으로 실행 결과를 PASS로 보지 않는다.
 
@@ -224,7 +234,7 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 
 - 설정 필드·범위·일괄 검사: `Assets/Lab/Scripts/Core/LabConfig.cs` — `DeveloperFields`, `CaptureDeveloperValues`, `TryApplyDeveloperValues`.
 - 저장 기본값: `Assets/Lab/Resources/LabConfig.asset`.
-- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 84개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
+- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 87개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
 - 패널 열기·DEFAULTS·SOLO/Host 설정 적용·슬라이더 변환: `Assets/Lab/Scripts/UI/LabDeveloperMode.cs`.
 - Host 전투 수치·개인 HP·전원 0 패배·스태미나·생성 확률·속성·아이템 잠금·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
 - 아이템 더블 탭 사용·효과(물약·상자), 릴레이 단계, 폭탄 폭발·피해 배율: `Assets/Lab/Scripts/Core/LabModel.cs`(`TryUseItem`·`TryTransfer`·`TryAdvance`·`ConfirmHit`)와 `LabOrbBoard.EndDragAtWorld`.
