@@ -68,6 +68,18 @@ namespace C6Lab
             }
         }
 
+        /// <summary>플레이 시간 중 북을 가지고 있던 비율(0~100, 반올림). 플레이 시간이 0이면 0.</summary>
+        public static int DrumSharePercent(LabPlayerState player, double playedSeconds)
+        {
+            if (player == null || playedSeconds <= 0d || player.drumSeconds <= 0d) return 0;
+            return (int)Math.Round(Math.Min(1d, player.drumSeconds / playedSeconds) * 100d, MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>북 점유 칸 글자: "12초" 아래 줄에 "40%"</summary>
+        public static string DrumText(LabPlayerState player, double playedSeconds) =>
+            player == null ? "" : (int)Math.Round(player.drumSeconds, MidpointRounding.AwayFromZero) + "초\n"
+                + DrumSharePercent(player, playedSeconds) + "%";
+
         /// <summary>좌석 번호로 만든 플레이어 이름 (P1~P5). 화면의 이웃 표시와 같은 규칙.</summary>
         public static string PlayerName(LabPlayerState player) => player == null ? "P—" : "P" + (player.seat + 1);
     }

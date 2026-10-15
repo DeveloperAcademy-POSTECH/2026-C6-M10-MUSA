@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>
-    /// 승리/패배 결과 화면 위에 이번 라운드 기록 표(타격·딜·결합·아이템·구슬 전달·칭호)를 보여주는 대시보드.
+    /// 승리/패배 결과 화면 위에 이번 라운드 기록 표(타격·딜·결합·아이템·구슬 전달·북 점유·칭호)를 보여주는 대시보드.
     /// 장면 수정 없이 코드로 만들고, 기존 결과 카드(VICTORY/DEFEAT·버튼) 바로 위에 놓는다.
     /// 값은 Host가 보낸 스냅샷의 플레이어 기록(LabPlayerState)을 그대로 쓰므로 모든 기기가 같다.
     /// 디자인이 정해지면 이 화면만 바꾸고, 계산은 LabResultStats를 그대로 쓴다.
@@ -16,7 +16,7 @@ namespace C6Lab
     {
         public float width = 362f;
         public float gapAboveResult = 12f;
-        public float headerHeight = 28f;
+        public float headerHeight = 34f;
         public float rowHeight = 32f;
         public int fontSize = 14;
 
@@ -28,8 +28,8 @@ namespace C6Lab
         public Color lineColor = new Color(.867f, .733f, .565f, .7f);
         public Color textColor = new Color(.169f, .137f, .153f, 1f);
 
-        private static readonly string[] Headers = { "플레이어", "타격", "딜", "결합", "아이템", "구슬 전달", "칭호" };
-        private static readonly float[] Columns = { 46f, 38f, 44f, 38f, 48f, 58f, 74f }; // 합 346 + 왼쪽 여백 6 = 안쪽 폭 352
+        private static readonly string[] Headers = { "플레이어", "타격", "딜", "결합", "아이템", "구슬\n전달", "북 점유", "칭호" };
+        private static readonly float[] Columns = { 44f, 32f, 38f, 32f, 40f, 40f, 52f, 68f }; // 합 346 + 왼쪽 여백 6 = 안쪽 폭 352
 
         /// <summary>요괴를 쓰러뜨린 마지막 한 방을 친 사람 표시 (승리했을 때만)</summary>
         public const string LastHitLabel = "막타";
@@ -64,11 +64,11 @@ namespace C6Lab
             string key = snapshot.sessionId + ":" + snapshot.round + ":" + snapshot.phase;
             if (key == shownKey && panel != null && panel.gameObject.activeSelf) return;
             shownKey = key;
-            Show(snapshot.players, snapshot.phase == LabPhase.Victory);
+            Show(snapshot.players, snapshot.phase == LabPhase.Victory, snapshot.playedSeconds);
         }
 
         /// <summary>기록 표를 다시 그린다. (테스트에서도 직접 부를 수 있다)</summary>
-        public void Show(LabPlayerState[] players, bool victory)
+        public void Show(LabPlayerState[] players, bool victory, double playedSeconds = 0d)
         {
             EnsurePanel();
             if (panel == null) return;
@@ -96,6 +96,7 @@ namespace C6Lab
                     p.combinedTotal.ToString(),
                     p.ItemsUsed.ToString(),
                     p.passedTotal.ToString(),
+                    LabResultStats.DrumText(p, playedSeconds),
                     TitlesOf(p, awards, victory)
                 };
                 // 각 항목 1등 숫자는 굵게 (칭호와 같은 기준)
@@ -107,6 +108,7 @@ namespace C6Lab
                     IsWinner(p, awards, LabResultTitle.MostCombined),
                     IsWinner(p, awards, LabResultTitle.MostItems),
                     IsWinner(p, awards, LabResultTitle.MostPassed),
+                    false,
                     false
                 };
                 AddCells(cells, y, rowHeight, FontStyle.Normal, bold, fontSize);
@@ -175,8 +177,10 @@ namespace C6Lab
             {
                 bool strong = bold != null && i < bold.Length && bold[i];
                 bool last = i == Columns.Length - 1;
-                // 칭호 칸은 조금 작게, 길면 두 줄로 접는다.
-                AddText(cells[i], x, y, Columns[i] - 2f, h, last ? size - 1 : size,
+                // 칭호 칸은 조금 작게, 길면 두 줄로 접는다. 두 줄짜리 기록 칸(북 점유)도 조금 작게.
+                bool twoLines = cells[i] != null && cells[i].IndexOf('\n') >= 0;
+                int cellSize = last ? size - 1 : twoLines && size >= fontSize ? size - 2 : size;
+                AddText(cells[i], x, y, Columns[i] - 2f, h, cellSize,
                     strong ? FontStyle.Bold : style, TextAnchor.MiddleLeft, textColor, last);
                 x += Columns[i];
             }
@@ -215,6 +219,7 @@ namespace C6Lab
             text.raycastTarget = false;
             // 칭호 칸은 길면 두 줄로 접는다.
             text.horizontalOverflow = wrap ? HorizontalWrapMode.Wrap : HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
             text.lineSpacing = .9f;
             text.text = value;
         }

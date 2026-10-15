@@ -44,6 +44,7 @@ namespace C6Lab
         private double lastTime;
         private double deadline;
         private double remaining;
+        private double played;
         private LabPhase phase = LabPhase.Idle;
 
         public string SessionId => sessionId;
@@ -100,6 +101,7 @@ namespace C6Lab
             lastTime = now;
             deadline = nextDeadline;
             remaining = rules.BattleDurationSeconds;
+            played = 0d;
             phase = LabPhase.Playing;
         }
 
@@ -394,6 +396,7 @@ namespace C6Lab
                 phase = phase,
                 serverTime = now,
                 remaining = remaining,
+                playedSeconds = played,
                 hp = hp,
                 players = players.Values.OrderBy(player => player.seat).Select(player => player.Copy()).ToArray(),
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
@@ -424,9 +427,16 @@ namespace C6Lab
                 double effectiveNow = Math.Min(now, deadline);
                 double elapsed = effectiveNow - lastTime;
                 if (elapsed > 0d)
+                {
+                    played += elapsed;
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond));
+                    // 결과 대시보드 기록: 이 사이에 북을 가지고 있던 사람의 점유 시간
+                    // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)
+                    foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())
+                        if (players.TryGetValue(holder, out var drummer)) drummer.drumSeconds += elapsed;
+                }
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
                 {

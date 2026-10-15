@@ -1283,6 +1283,46 @@ namespace C6Lab.Tests
             Assert.That(retry.players.All(p => p.hitTotal == 0 && p.damageTotal == 0 && !p.lastHit), Is.True);
         }
 
+        [Test]
+        public void DrumHoldTimeFollowsTheDrumAndStopsWhenTheRoundEnds()
+        {
+            var single = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                float[] values = single.CaptureDeveloperValues();
+                values[74] = 1f; // drum count
+                Assert.That(single.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                model.Begin("drum-time", new ulong[] { 10, 20, 30 }, 0d, single);
+                LabOrbState drum = model.Snapshot(0d).drums.Single();
+                ulong first = drum.owner;
+
+                model.Tick(10d);
+                Assert.That(model.TryUpdateMotion(first, drum.id, new Vector2(.99f, .5f), Vector2.right, 10d), Is.True);
+                Assert.That(model.TryTransfer(first, drum.id, true, .5f, Vector2.right, "drum-pass", 10d,
+                    out var passed, out var reason), Is.True, reason);
+                ulong second = passed.owner;
+                Assert.That(second, Is.Not.EqualTo(first));
+
+                var mid = model.Snapshot(40d);
+                Assert.That(mid.playedSeconds, Is.EqualTo(40d).Within(1e-6));
+                var a = mid.players.Single(p => p.id == first);
+                var b = mid.players.Single(p => p.id == second);
+                Assert.That(a.drumSeconds, Is.EqualTo(10d).Within(1e-6));
+                Assert.That(b.drumSeconds, Is.EqualTo(30d).Within(1e-6));
+                Assert.That(mid.players.Where(p => p.id != first && p.id != second).Single().drumSeconds, Is.EqualTo(0d));
+                Assert.That(LabResultStats.DrumSharePercent(a, mid.playedSeconds), Is.EqualTo(25));
+                Assert.That(LabResultStats.DrumSharePercent(b, mid.playedSeconds), Is.EqualTo(75));
+                Assert.That(LabResultStats.DrumText(b, mid.playedSeconds), Is.EqualTo("30초\n75%"));
+
+                var ended = model.Snapshot(200d);
+                Assert.That(ended.phase, Is.EqualTo(LabPhase.Defeat));
+                Assert.That(ended.playedSeconds, Is.EqualTo(180d).Within(1e-6), "Time after the round ends is not counted.");
+                Assert.That(ended.players.Single(p => p.id == second).drumSeconds, Is.EqualTo(170d).Within(1e-6));
+                Assert.That(LabResultStats.DrumSharePercent(new LabPlayerState { drumSeconds = 5d }, 0d), Is.EqualTo(0));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(single); }
+        }
+
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {
             var created = ScriptableObject.CreateInstance<LabConfig>();
