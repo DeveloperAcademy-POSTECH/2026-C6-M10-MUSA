@@ -127,7 +127,11 @@ namespace C6Lab
             new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
             new LabDeveloperField("Drum Drift Turning (per second)", 0f, 2f),
             new LabDeveloperField("Drum Spin Strength", 0f, 3f),
-            new LabDeveloperField("Gourd Mode (0 paint, 1 crack)", 0f, 1f, true)
+            new LabDeveloperField("Gourd Mode (0 paint, 1 crack)", 0f, 1f, true),
+            new LabDeveloperField("Bomb Blast Radius (board widths)", 0f, 2f),
+            new LabDeveloperField("Bomb Blast Strength (board widths/s)", 0f, 20f),
+            new LabDeveloperField("Bomb Haptic Style (0-4)", 0f, 4f, true),
+            new LabDeveloperField("Bomb Haptic Intensity", 0f, 1f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -143,7 +147,7 @@ namespace C6Lab
             new LabDeveloperCategory("Battle", 0, 1, 2, 48),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
             new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44),
-            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
@@ -152,7 +156,7 @@ namespace C6Lab
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73),
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78),
             new LabDeveloperCategory("Gourd", 79)
         });
@@ -194,6 +198,10 @@ namespace C6Lab
         [SerializeField, Range(1f, 20f)] private float relayDoubleMultiplier = 2f;
         [SerializeField, Range(1f, 20f)] private float relayMaxMultiplier = 4f;
         [SerializeField, Range(1f, 20f)] private float bombMultiplier = 3f;
+        [Tooltip("잠긴 폭탄이 터질 때 구슬을 밀어내는 범위 (보드 너비 대비). 0이면 밀지 않는다.")]
+        [SerializeField, Range(0f, 2f)] private float bombBlastRadius = .4f;
+        [Tooltip("폭탄 바로 옆 구슬이 밀려나는 속도 (보드 너비/초). 범위 끝으로 갈수록 약해진다.")]
+        [SerializeField, Range(0f, 20f)] private float bombBlastStrength = 9f;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -265,6 +273,10 @@ namespace C6Lab
         [SerializeField] private LabHapticStyle itemHitHapticStyle = LabHapticStyle.Heavy;
         [Tooltip("큰 피해일 때 진동 세기 (0 = 끔)")]
         [SerializeField, Range(0f, 1f)] private float itemHitHapticIntensity = 1f;
+        [Tooltip("내 판에서 잠긴 폭탄이 터질 때 진동 종류")]
+        [SerializeField] private LabHapticStyle bombHapticStyle = LabHapticStyle.Heavy;
+        [Tooltip("폭탄 폭발 진동 세기 (0이면 진동 없음)")]
+        [SerializeField, Range(0f, 1f)] private float bombHapticIntensity = 1f;
 
         [Header("Replaceable orb presentation")]
         [SerializeField] private LabOrbAppearance orbAppearance;
@@ -335,6 +347,8 @@ namespace C6Lab
         public float RelayDoubleMultiplier => Mathf.Clamp(Finite(relayDoubleMultiplier, 2f), 1f, 20f);
         public float RelayMaxMultiplier => Mathf.Clamp(Finite(relayMaxMultiplier, 4f), 1f, 20f);
         public float BombMultiplier => Mathf.Clamp(Finite(bombMultiplier, 3f), 1f, 20f);
+        public float BombBlastRadius => Mathf.Clamp(Finite(bombBlastRadius, .4f), 0f, 2f);
+        public float BombBlastStrength => Mathf.Clamp(Finite(bombBlastStrength, 9f), 0f, 20f);
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
         public float OrbStopSpeed => Mathf.Clamp(Finite(orbStopSpeed, .065f), 0f, OrbMaxReleaseSpeed);
@@ -369,6 +383,8 @@ namespace C6Lab
         public float HitHapticIntensity => Mathf.Clamp01(Finite(hitHapticIntensity, .6f));
         public LabHapticStyle ItemHitHapticStyle => ValidStyle(itemHitHapticStyle);
         public float ItemHitHapticIntensity => Mathf.Clamp01(Finite(itemHitHapticIntensity, 1f));
+        public LabHapticStyle BombHapticStyle => ValidStyle(bombHapticStyle);
+        public float BombHapticIntensity => Mathf.Clamp01(Finite(bombHapticIntensity, 1f));
         public float CameraRadius => Positive(cameraRadius, 8f);
         public float CameraHeightOffset => Finite(cameraHeightOffset, .65f);
         public float CameraLookHeightOffset => Mathf.Clamp(Finite(cameraLookHeightOffset, 2f), -10f, 10f);
@@ -423,7 +439,9 @@ namespace C6Lab
                 (float)HitHapticStyle, HitHapticIntensity,
                 (float)ItemHitHapticStyle, ItemHitHapticIntensity,
                 DrumCount, DrumRadius, DrumDriftSpeed, DrumDriftTurning, DrumSpinStrength,
-                (float)GourdMode
+                (float)GourdMode,
+                BombBlastRadius, BombBlastStrength,
+                (float)BombHapticStyle, BombHapticIntensity
             };
         }
 
@@ -544,6 +562,10 @@ namespace C6Lab
             drumDriftTurning = values[77];
             drumSpinStrength = values[78];
             gourdMode = values[79] >= .5f ? LabGourdMode.Crack : LabGourdMode.Paint;
+            bombBlastRadius = values[80];
+            bombBlastStrength = values[81];
+            bombHapticStyle = (LabHapticStyle)(int)values[82];
+            bombHapticIntensity = values[83];
             error = string.Empty;
             return true;
         }

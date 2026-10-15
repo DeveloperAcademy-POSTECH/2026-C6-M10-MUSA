@@ -661,6 +661,94 @@ namespace C6Lab.Tests
                 "Dragged leftward across its top, the drum turns anticlockwise like a real one.");
         }
 
+        [Test]
+        public void ABlastFlingsNearbyOrbsDrumsAndTheHeldOrbAwayWithoutRemovingAny()
+        {
+            // Board centre is world (0,0); positions below are given in 0..1 board units.
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2);
+            var near = board.UpsertOrb("near", LabOrbKind.Yin, new Vector2(.625f, .5f));   // world (1, 0)
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.3125f, .5f)); // world (-1.5, 0)
+            var held = board.UpsertOrb("held", LabOrbKind.Yang, new Vector2(.5f, .8f));    // world (0, 1.2)
+            var far = board.UpsertOrb("far", LabOrbKind.Yin, new Vector2(.95f, .95f));     // beyond the reach
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(held), 1d), Is.True);
+
+            int pushed = board.Blast("bomb", new Vector2(.5f, .5f));
+            float reach = config.BombBlastRadius * Width;
+            float strength = config.BombBlastStrength * Width;
+            Assert.That(pushed, Is.EqualTo(3));
+            Assert.That(board.TryGetMotion("bomb", out _, out _), Is.False, "The bomb itself is gone.");
+            Assert.That(board.Count, Is.EqualTo(4), "The blast removes no other orb.");
+            Assert.That(near.Body.linearVelocity.x, Is.EqualTo(strength * (1f - 1f / reach)).Within(.01f),
+                "An orb is flung straight away from the bomb, harder the closer it was.");
+            Assert.That(near.Body.linearVelocity.y, Is.EqualTo(0f).Within(.001f));
+            Assert.That(drum.Body.linearVelocity.x, Is.LessThan(0f), "The drum is flung too.");
+            Assert.That(held.Body.isKinematic, Is.False, "A held orb is knocked out of the hand.");
+            Assert.That(held.Body.linearVelocity.y, Is.GreaterThan(0f));
+            Assert.That(far.Body.linearVelocity.magnitude, Is.EqualTo(0f), "Beyond the blast radius nothing moves.");
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(far), 2d), Is.True, "No gesture is left stuck after the blast.");
+        }
+
+        [UnityTest]
+        public IEnumerator AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour()
+        {
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.75f, .5f), lockSwipes: 2); // world (2, 0)
+            board.UpsertOrb("orb", LabOrbKind.Yin, new Vector2(.875f, .5f));                // world (3, 0)
+            board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.875f, .75f));             // world (3, 1)
+            var crossed = new System.Collections.Generic.List<string>();
+            board.EdgeCrossed += crossing => { if (crossing.ToRight) crossed.Add(crossing.OrbId); };
+
+            Assert.That(board.Blast("bomb", new Vector2(.75f, .5f)), Is.EqualTo(2));
+            for (int step = 0; step < 15 && crossed.Count < 2; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed, Is.EquivalentTo(new[] { "orb", "drum" }),
+                "Flung past the right edge, both go to the neighbour through the usual handoff.");
+        }
+
+        [UnityTest]
+        public IEnumerator ABlastShowsACartoonBurstWithBombThatClearsItself()
+        {
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2);
+            board.Blast("bomb", new Vector2(.5f, .5f));
+            var effect = board.GetComponentInChildren<LabBombBlastEffect>();
+            Assert.That(effect, Is.Not.Null, "A blast draws a burst where the bomb was.");
+            Assert.That(effect.Label, Is.EqualTo("BOMB!"));
+            Assert.That(effect.gameObject.layer, Is.EqualTo(board.gameObject.layer), "It shows on the board camera only.");
+            Assert.That(effect.GetComponentsInChildren<Collider>(), Is.Empty, "The burst never touches physics.");
+            Vector3 at = effect.transform.position;
+            Assert.That(new Vector2(at.x, at.y), Is.EqualTo(Vector2.zero), "It bursts at the bomb (board centre).");
+
+            yield return new WaitForSeconds(LabBombBlastEffect.Seconds + .2f);
+            Assert.That(board.GetComponentInChildren<LabBombBlastEffect>() == null, Is.True, "The burst clears itself.");
+        }
+
+        [UnityTest]
+        public IEnumerator ALockedBombFlashesRedInItsLastSecondsFasterAsItRunsOut()
+        {
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 5f);
+            var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.2f, .5f), lockSwipes: 0, relayStage: 1);
+            yield return null;
+            Assert.That(bomb.ItemMarker.WarningHz, Is.Zero, "With more than three seconds left it does not warn yet.");
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 2.8f);
+            float early = bomb.ItemMarker.WarningHz;
+            Assert.That(early, Is.GreaterThan(0f), "In its last three seconds the bomb starts flashing.");
+            float brightest = 0f;
+            float until = Time.time + .6f;
+            while (Time.time < until)
+            {
+                yield return null;
+                brightest = Mathf.Max(brightest, bomb.ItemMarker.WarningLevel);
+            }
+            Assert.That(brightest, Is.GreaterThan(.5f), "It flashes red.");
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: .3f);
+            Assert.That(bomb.ItemMarker.WarningHz, Is.GreaterThan(early), "It flashes faster as the fuse runs out.");
+            Assert.That(relay.ItemMarker.WarningHz, Is.Zero, "Only a bomb's fuse warns.");
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 0, fuseSeconds: -1f);
+            Assert.That(bomb.ItemMarker.WarningHz, Is.Zero);
+            Assert.That(bomb.ItemMarker.WarningLevel, Is.Zero, "An unlocked bomb has no fuse and stops warning.");
+        }
+
         private void SetDrumDrift(float speed, float turning)
         {
             float[] values = config.CaptureDeveloperValues();

@@ -25,6 +25,24 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ABombBlastPlaysAHeavyHapticUnlessHapticsAreOffOrSilent()
+        {
+            Assert.That(config.BombHapticStyle, Is.EqualTo(LabHapticStyle.Heavy));
+            Assert.That(haptics.PlayForBomb(config), Is.True);
+            Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.Bomb));
+
+            float[] values = config.CaptureDeveloperValues();
+            values[83] = 0f; // bomb haptic intensity
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(haptics.PlayForBomb(config), Is.False, "Zero intensity plays nothing.");
+            values[83] = 1f;
+            values[67] = 0f; // haptics off
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.True, error);
+            Assert.That(haptics.PlayForBomb(config), Is.False, "Turning haptics off silences the blast too.");
+            Assert.That(haptics.PlayCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void BaseDamageUsesHitHapticAndBiggerItemDamageUsesItemHaptic()
         {
             Assert.That(config.Damage, Is.EqualTo(20));

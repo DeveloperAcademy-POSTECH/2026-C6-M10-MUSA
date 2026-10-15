@@ -30,6 +30,7 @@ namespace C6Lab
         private SpriteRenderer padlock;
         private SpriteRenderer ring;
         private SpriteRenderer glow;
+        private SpriteRenderer warningGlow;
         private SpriteRenderer badge;
         private TextMesh badgeCount;
         private TextMesh fuse;
@@ -38,6 +39,9 @@ namespace C6Lab
         private float unlockElapsed = -1f;
         private float unlockFromAlpha;
         private LabOrbAppearance unlockLook;
+        private LabOrbAppearance fuseLook;
+        private float fuseLeft = -1f;
+        private float warningPhase;
 
         public bool IconVisible => icon != null && icon.gameObject.activeSelf;
         public float IconAlpha => icon != null ? icon.color.a : 0f;
@@ -46,6 +50,10 @@ namespace C6Lab
         public bool RingVisible => ring != null && ring.gameObject.activeSelf;
         public float RingDiameter => ring != null ? ring.transform.localScale.x : 0f;
         public bool GlowVisible => glow != null && glow.gameObject.activeSelf;
+        /// <summary>How red the bomb's fuse warning is right now, 0..1; 0 when it is not warning.</summary>
+        public float WarningLevel { get; private set; }
+        /// <summary>Flashes per second of the fuse warning; 0 when it is not warning.</summary>
+        public float WarningHz { get; private set; }
         public bool BadgeVisible => badge != null && badge.gameObject.activeSelf;
         public string BadgeText => badgeCount != null ? badgeCount.text : string.Empty;
         public bool FuseVisible => fuse != null && fuse.gameObject.activeSelf;
@@ -138,12 +146,58 @@ namespace C6Lab
             AnimateUnlock();
         }
 
+        /// <summary>
+        /// A locked bomb's seconds left on its fuse (negative when it has none). In its last seconds
+        /// the bomb flashes red, faster and faster as the fuse runs out. Call after SetLocked.
+        /// </summary>
+        public void SetFuse(float secondsLeft, LabOrbAppearance look)
+        {
+            EnsureParts();
+            fuseLeft = secondsLeft;
+            fuseLook = LookOrDefault(look);
+            AnimateWarning(0f);
+        }
+
         private void LateUpdate()
         {
             FollowMount();
+            AnimateWarning(Time.deltaTime);
             if (!UnlockPlaying) return;
             unlockElapsed += Time.deltaTime;
             AnimateUnlock();
+        }
+
+        private void AnimateWarning(float step)
+        {
+            LabOrbAppearance look = fuseLook != null ? fuseLook : LookOrDefault(null);
+            float from = look.BombWarningSeconds;
+            if (fuseLeft < 0f || from <= 0f || fuseLeft > from)
+            {
+                if (WarningHz > 0f) StopWarning();
+                return;
+            }
+            // Snapshots update the seconds left; the phase keeps the flashing smooth between them.
+            float urgency = 1f - Mathf.Clamp01(fuseLeft / from);
+            WarningHz = Mathf.Lerp(look.BombWarningSlowHz, look.BombWarningFastHz, urgency);
+            warningPhase = Mathf.Repeat(warningPhase + step * WarningHz, 1f);
+            WarningLevel = .5f - .5f * Mathf.Cos(warningPhase * Mathf.PI * 2f);
+            Color red = look.BombWarningColor;
+            disc.color = Color.Lerp(DiscColor, red, WarningLevel);
+            Color tint = Color.Lerp(Color.white, red, .8f * WarningLevel);
+            icon.color = new Color(tint.r, tint.g, tint.b, icon.color.a);
+            warningGlow.gameObject.SetActive(true);
+            warningGlow.transform.localScale = Vector3.one * (2.4f * radius);
+            warningGlow.color = new Color(red.r, red.g, red.b, .6f * WarningLevel);
+        }
+
+        private void StopWarning()
+        {
+            WarningLevel = 0f;
+            WarningHz = 0f;
+            warningPhase = 0f;
+            disc.color = DiscColor;
+            icon.color = new Color(1f, 1f, 1f, icon.color.a);
+            warningGlow.gameObject.SetActive(false);
         }
 
         private void AnimateUnlock()
@@ -218,6 +272,8 @@ namespace C6Lab
             // The glow sits behind the disc so it lights the orb's rim, not the icon.
             glow = CreateSprite("Unlock Glow", Glow(), Color.white, -1);
             glow.gameObject.SetActive(false);
+            warningGlow = CreateSprite("Fuse Warning Glow", Glow(), Color.white, -2);
+            warningGlow.gameObject.SetActive(false);
             disc = CreateSprite("Icon Disc", Disc(), DiscColor, 0);
             ring = CreateSprite("Unlock Ring", Ring(), Color.white, 0);
             ring.transform.localPosition = new Vector3(0f, 0f, -.003f);

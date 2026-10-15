@@ -147,11 +147,11 @@ namespace C6Lab
     public sealed class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.3";
-        // P-slot assignments join lobby packets, and generate drums join the snapshot with the
-        // generate request naming one. Version 5617 also appends Gourd Mode to the
-        // shared config (80 values); older clients cannot share this room.
-        internal const ushort LabProtocolVersion = 5617;
-        private const string BombExplodedNotice = "BOMB! Every orb on your board was lost.";
+        // P-slot assignments join lobby packets, generate drums join the snapshot with the generate
+        // request naming one, Gourd Mode joins the shared config, and a bomb blast carries where it
+        // happened so the holder's board can push orbs away; older clients cannot share this room.
+        internal const ushort LabProtocolVersion = 5618;
+        private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
@@ -232,6 +232,8 @@ namespace C6Lab
         public event Action<LabConfig> ConfigApplied;
         /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (실제 피해량)</summary>
         public event Action<int> LocalThrowHit;
+        /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
+        public event Action<string, Vector2> BombBlasted;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
         public event Action LocalThrowMissed;
         private string lastMissNoticeId;
@@ -1226,12 +1228,22 @@ namespace C6Lab
 
         private void AnnounceBombExplosions()
         {
-            foreach (ulong owner in model.DrainBombExplosions())
+            foreach (LabBombBlast blast in model.DrainBombExplosions())
             {
-                Debug.Log("C6_LAB_BOMB_EXPLODED owner=" + owner);
-                if (owner == LocalPlayerId) SetNotice(BombExplodedNotice);
-                else Send(owner, new LabNetworkPacket { type = "notice", sessionId = sessionId, reason = BombExplodedNotice });
+                Debug.Log("C6_LAB_BOMB_EXPLODED owner=" + blast.Owner + " bomb=" + blast.BombId);
+                if (blast.Owner == LocalPlayerId) OnBombBlast(blast.BombId, blast.Position);
+                // Sent before this snapshot's chunks on the same ordered channel, so the holder still
+                // shows the bomb where it blew when the blast arrives.
+                else Send(blast.Owner, new LabNetworkPacket { type = "bombBlast", sessionId = sessionId,
+                    firstId = blast.BombId, x = blast.Position.x, y = blast.Position.y });
             }
+        }
+
+        private void OnBombBlast(string bombId, Vector2 position)
+        {
+            SetNotice(BombBlastNotice);
+            if (board != null) board.Blast(bombId, position);
+            BombBlasted?.Invoke(bombId, position);
         }
 
         private void AbortOversizedSnapshot(string reason)
@@ -1566,6 +1578,10 @@ namespace C6Lab
                     break;
                 case "notice":
                     if (packet.sessionId == sessionId) SetNotice(packet.reason);
+                    break;
+                case "bombBlast":
+                    if (packet.sessionId == sessionId && Finite(packet.x) && Finite(packet.y))
+                        OnBombBlast(packet.firstId, new Vector2(Mathf.Clamp01(packet.x), Mathf.Clamp01(packet.y)));
                     break;
                 case "targetImpact":
                     if (target != null && impactReceipts.TryAccept(packet.sessionId, packet.round,

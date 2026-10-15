@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(80));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(84));
             Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
@@ -78,6 +78,13 @@ namespace C6Lab.Tests
             values[77] = .5f;
             values[78] = 2f;
             values[79] = 1f; // gourd mode: crack
+            Assert.That(new[] { values[80], values[81] }, Is.EqualTo(new[] { .4f, 9f }),
+                "A bomb blast reaches 40% of the board width and pushes hardest right beside it.");
+            values[80] = .6f;
+            values[81] = 12f;
+            Assert.That(new[] { values[82], values[83] }, Is.EqualTo(new[] { 2f, 1f }), "A blast plays a full Heavy haptic.");
+            values[82] = 4f; // Rigid
+            values[83] = .5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
@@ -116,6 +123,10 @@ namespace C6Lab.Tests
             Assert.That(config.DrumDriftSpeed, Is.EqualTo(.2f));
             Assert.That(config.DrumDriftTurning, Is.EqualTo(.5f));
             Assert.That(config.DrumSpinStrength, Is.EqualTo(2f));
+            Assert.That(config.BombBlastRadius, Is.EqualTo(.6f));
+            Assert.That(config.BombBlastStrength, Is.EqualTo(12f));
+            Assert.That(config.BombHapticStyle, Is.EqualTo(LabHapticStyle.Rigid));
+            Assert.That(config.BombHapticIntensity, Is.EqualTo(.5f));
         }
 
         [Test]
@@ -312,7 +323,8 @@ namespace C6Lab.Tests
         [Test]
         public void GourdModeAppendsAtIndex79AndRoundTripsWithoutChangingExistingValues()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(80));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.GreaterThan(79),
+                "Later fields append after Gourd Mode; the total is checked by the form test.");
             Assert.That(LabConfig.DeveloperFields[78].Label, Is.EqualTo("Drum Spin Strength"));
             LabDeveloperField field = LabConfig.DeveloperFields[79];
             Assert.That(field.Label, Is.EqualTo("Gourd Mode (0 paint, 1 crack)"));
@@ -384,7 +396,7 @@ namespace C6Lab.Tests
                 "Clients must acknowledge the selected mode as part of the shared settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(80));
+            Assert.That(received.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(LabSessionSettings.Fingerprint(received, 3, protocol), Is.EqualTo(crackFingerprint));
             var clientConfig = ScriptableObject.CreateInstance<LabConfig>();
             try

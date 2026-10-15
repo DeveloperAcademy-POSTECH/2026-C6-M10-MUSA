@@ -603,7 +603,7 @@ namespace C6Lab.Tests
                 Assert.That(reason, Is.EqualTo("NO_DRUM"), "Passing the drum away stops its old holder generating.");
 
                 LabSnapshot afterFuse = room.Snapshot(bombs.ItemLifetimeSeconds + 1d);
-                Assert.That(room.DrainBombExplosions(), Does.Contain(20ul));
+                Assert.That(room.DrainBombExplosions().Select(blast => blast.Owner), Does.Contain(20ul));
                 Assert.That(afterFuse.orbs.Any(orb => orb.owner == 20ul), Is.False);
                 Assert.That(afterFuse.drums.Count(candidate => candidate.owner == 20ul), Is.EqualTo(2),
                     "A bomb never takes a drum.");
@@ -998,7 +998,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void UnthrownBombClearsItsCurrentHoldersBoardAtTheFuse()
+        public void UnthrownBombBlastsWhereItsHolderLastHadItWithoutRemovingAnyOrb()
         {
             var mixed = ConfigWith(1f, 50, 0, 0, 0, 0, 50);
             try
@@ -1015,16 +1015,27 @@ namespace C6Lab.Tests
                 Assert.That(PassRight(room, bomb.id, 10, 1d).owner, Is.EqualTo(20ul), "The bomb moves to the next holder.");
 
                 Assert.That(room.TryGenerate(10, "keep", 10d, out var kept, out _), Is.True);
+                var near = new List<string>();
                 for (int i = 0; i < 2; i++)
-                    Assert.That(room.TryGenerate(20, "lost-" + i, 10d, out _, out _), Is.True);
+                {
+                    Assert.That(room.TryGenerate(20, "near-" + i, 10d, out var orb, out _), Is.True);
+                    near.Add(orb.id);
+                }
+                Assert.That(room.TryUpdateMotion(20, bomb.id, new Vector2(.3f, .6f), Vector2.zero, 12d), Is.True);
                 Assert.That(room.Snapshot(14.9d).orbs.Count(orb => orb.owner == 20), Is.EqualTo(3));
                 Assert.That(room.DrainBombExplosions(), Is.Empty);
 
                 var after = room.Snapshot(15d);
-                Assert.That(after.orbs.Any(orb => orb.owner == 20), Is.False,
-                    "Every orb on the holder's board is lost, including the bomb.");
+                Assert.That(after.orbs.Select(orb => orb.id), Does.Not.Contain(bomb.id), "The bomb itself is gone.");
+                Assert.That(after.orbs.Select(orb => orb.id), Is.SupersetOf(near),
+                    "The blast loses no orb on the holder's board; it only pushes them.");
                 Assert.That(after.orbs.Select(orb => orb.id), Does.Contain(kept.id), "Other boards are untouched.");
-                Assert.That(room.DrainBombExplosions(), Is.EqualTo(new[] { 20ul }));
+                LabBombBlast[] blasts = room.DrainBombExplosions();
+                Assert.That(blasts.Length, Is.EqualTo(1));
+                Assert.That(blasts[0].Owner, Is.EqualTo(20ul), "The current holder's board takes the blast.");
+                Assert.That(blasts[0].BombId, Is.EqualTo(bomb.id));
+                Assert.That(blasts[0].Position, Is.EqualTo(new Vector2(.3f, .6f)),
+                    "It blasts where the holder's screen last had the bomb.");
                 Assert.That(room.DrainBombExplosions(), Is.Empty, "Each explosion is reported once.");
             }
             finally { UnityEngine.Object.DestroyImmediate(mixed); }
