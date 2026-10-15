@@ -1228,20 +1228,147 @@ namespace C6Lab.Tests
         {
             var players = new[]
             {
-                new LabPlayerState { id = 10, seat = 0, generatedTotal = 5, relayUsed = 1 },
-                new LabPlayerState { id = 20, seat = 1, generatedTotal = 5, passedTotal = 3 },
-                new LabPlayerState { id = 30, seat = 2, generatedTotal = 2, potionUsed = 1, bombUsed = 1 }
+                new LabPlayerState { id = 10, seat = 0, generatedTotal = 9, combinedTotal = 7, relayUsed = 4,
+                    damageTotal = 60, passedTotal = 3, drumSeconds = 40.2d },
+                new LabPlayerState { id = 20, seat = 1, generatedTotal = 5, damageTotal = 60, passedTotal = 3,
+                    drumSeconds = 39.8d, lastHit = true },
+                new LabPlayerState { id = 30, seat = 2, generatedTotal = 2, potionUsed = 1, drumSeconds = 12d,
+                    drumPassedTotal = 2 }
             };
-            var awards = LabResultStats.Awards(players);
-            Assert.That(awards.Select(a => a.Title), Is.EqualTo(new[]
-                { LabResultTitle.MostGenerated, LabResultTitle.MostItems, LabResultTitle.MostPassed }),
-                "Nobody combined, so there is no combine award.");
-            Assert.That(awards[0].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }));
-            Assert.That(awards[0].Value, Is.EqualTo(5));
-            Assert.That(awards[1].Winners.Single().id, Is.EqualTo(30ul));
-            Assert.That(awards[1].Value, Is.EqualTo(2));
-            Assert.That(awards[2].Winners.Single().id, Is.EqualTo(20ul));
-            Assert.That(LabResultStats.Awards(new LabPlayerState[0]), Is.Empty);
+            var won = LabResultStats.Awards(players, true);
+            Assert.That(won.Select(a => a.Title), Is.EqualTo(new[]
+                { LabResultTitle.MostDamage, LabResultTitle.MostPassed, LabResultTitle.MostDrumPassed,
+                    LabResultTitle.LastHit, LabResultTitle.MostDrum }),
+                "Generating, combining and items are records only; they give no title.");
+            Assert.That(won.Select(a => LabResultStats.Label(a.Title)),
+                Is.EqualTo(new[] { "딜왕", "구슬 패스왕", "북 패스왕", "막타", "북 독점" }));
+            Assert.That(won[0].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }), "Ties share the title.");
+            Assert.That(won[0].Value, Is.EqualTo(60));
+            Assert.That(won[1].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }));
+            Assert.That(won[2].Winners.Single().id, Is.EqualTo(30ul));
+            Assert.That(won[3].Winners.Single().id, Is.EqualTo(20ul));
+            Assert.That(won[4].Winners.Select(LabResultStats.PlayerName), Is.EqualTo(new[] { "P1", "P2" }),
+                "40.2s and 39.8s both show as 40s, so the drum title is shared.");
+
+            // 칭호 줄 글자: 누구 · 기록
+            players[0].hitTotal = 2;
+            players[1].hitTotal = 3;
+            Assert.That(LabResultStats.WinnerNames(won[0]), Is.EqualTo("P1, P2"));
+            Assert.That(LabResultStats.Record(won[0], 100d), Is.EqualTo("60 (2·3회 타격)"));
+            Assert.That(LabResultStats.Record(won[1], 100d), Is.EqualTo("3회"));
+            Assert.That(LabResultStats.Record(won[2], 100d), Is.EqualTo("2회"));
+            Assert.That(LabResultStats.Record(won[3], 100d), Is.Empty);
+            Assert.That(LabResultStats.Record(won[4], 100d), Is.EqualTo("40초 · 40%"));
+            var solo = new LabResultAward(LabResultTitle.MostDamage, 40,
+                new[] { new LabPlayerState { id = 30, seat = 2, damageTotal = 40, hitTotal = 2 } });
+            Assert.That(LabResultStats.Record(solo, 100d), Is.EqualTo("40 (2회 타격)"));
+            Assert.That(LabResultStats.WinnerNames(solo), Is.EqualTo("P3"));
+
+            players[1].lastHit = false;
+            players[0].damageTotal = players[1].damageTotal = 0;
+            players[0].passedTotal = players[1].passedTotal = 0;
+            players[2].drumPassedTotal = 0;
+            Assert.That(LabResultStats.Awards(players, true).Select(a => a.Title),
+                Is.EqualTo(new[] { LabResultTitle.MostDrum }), "Empty categories give no title.");
+
+            players[1].lastHit = true;
+            Assert.That(LabResultStats.Awards(players, false).Any(a => a.Title == LabResultTitle.LastHit), Is.False,
+                "The last hit title is only for a victory.");
+            Assert.That(LabResultStats.Awards(new LabPlayerState[0], true), Is.Empty);
+        }
+
+        [Test]
+        public void HitsAndDamageAreRecordedAndOnlyTheKillingBlowIsTheLastHit()
+        {
+            var shortFight = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                float[] values = shortFight.CaptureDeveloperValues();
+                values[0] = 30f; // Monster Max HP
+                values[1] = 20f; // Damage per Hit
+                Assert.That(shortFight.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                model.Begin("hit-records", new ulong[] { 10, 20, 30 }, 0d, shortFight);
+
+                var first = GeneratePair(10);
+                Assert.That(model.TryCombine(10, first.yin.id, first.yang.id, "c1", 0d, out var a, out _), Is.True);
+                Assert.That(ThrowAndHit(model, a.id, 10, .1d), Is.EqualTo(20));
+                var afterFirst = model.Snapshot(.1d).players.Single(p => p.id == 10);
+                Assert.That(afterFirst.hitTotal, Is.EqualTo(1));
+                Assert.That(afterFirst.damageTotal, Is.EqualTo(20));
+                Assert.That(afterFirst.lastHit, Is.False);
+
+                var second = GeneratePair(20, .2d);
+                Assert.That(model.TryCombine(20, second.yin.id, second.yang.id, "c2", .2d, out var b, out _), Is.True);
+                ThrowAndHit(model, b.id, 20, .3d);
+                var done = model.Snapshot(.3d);
+                Assert.That(done.phase, Is.EqualTo(LabPhase.Victory));
+                var killer = done.players.Single(p => p.id == 20);
+                Assert.That(killer.hitTotal, Is.EqualTo(1));
+                Assert.That(killer.damageTotal, Is.EqualTo(10), "Only the HP that was left counts as damage.");
+                Assert.That(done.players.Where(p => p.lastHit).Select(p => p.id), Is.EqualTo(new ulong[] { 20 }));
+                Assert.That(done.players.Single(p => p.id == 30).hitTotal, Is.EqualTo(0));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(shortFight); }
+        }
+
+        [Test]
+        public void DefeatHasNoLastHitAndANewRoundClearsHitRecords()
+        {
+            var pair = GeneratePair(10);
+            Assert.That(model.TryCombine(10, pair.yin.id, pair.yang.id, "c", 0d, out var combined, out _), Is.True);
+            ThrowAndHit(model, combined.id, 10, .1d);
+            model.Tick(180d);
+            var lost = model.Snapshot(180d);
+            Assert.That(lost.phase, Is.EqualTo(LabPhase.Defeat));
+            Assert.That(lost.players.Single(p => p.id == 10).hitTotal, Is.EqualTo(1));
+            Assert.That(lost.players.Any(p => p.lastHit), Is.False);
+
+            model.Begin("lab-test", new ulong[] { 10, 20, 30 }, 181d, config);
+            var retry = model.Snapshot(181d);
+            Assert.That(retry.players.All(p => p.hitTotal == 0 && p.damageTotal == 0 && !p.lastHit), Is.True);
+        }
+
+        [Test]
+        public void DrumHoldTimeFollowsTheDrumAndStopsWhenTheRoundEnds()
+        {
+            var single = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                float[] values = single.CaptureDeveloperValues();
+                values[74] = 1f; // drum count
+                Assert.That(single.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                model.Begin("drum-time", new ulong[] { 10, 20, 30 }, 0d, single);
+                LabOrbState drum = model.Snapshot(0d).drums.Single();
+                ulong first = drum.owner;
+
+                model.Tick(10d);
+                Assert.That(model.TryUpdateMotion(first, drum.id, new Vector2(.99f, .5f), Vector2.right, 10d), Is.True);
+                Assert.That(model.TryTransfer(first, drum.id, true, .5f, Vector2.right, "drum-pass", 10d,
+                    out var passed, out var reason), Is.True, reason);
+                ulong second = passed.owner;
+                Assert.That(second, Is.Not.EqualTo(first));
+                var afterPass = model.Snapshot(10d).players.Single(p => p.id == first);
+                Assert.That(afterPass.drumPassedTotal, Is.EqualTo(1), "Passing a drum counts as a drum pass.");
+                Assert.That(afterPass.passedTotal, Is.EqualTo(0), "A drum is not counted as an orb pass.");
+
+                var mid = model.Snapshot(40d);
+                Assert.That(mid.playedSeconds, Is.EqualTo(40d).Within(1e-6));
+                var a = mid.players.Single(p => p.id == first);
+                var b = mid.players.Single(p => p.id == second);
+                Assert.That(a.drumSeconds, Is.EqualTo(10d).Within(1e-6));
+                Assert.That(b.drumSeconds, Is.EqualTo(30d).Within(1e-6));
+                Assert.That(mid.players.Where(p => p.id != first && p.id != second).Single().drumSeconds, Is.EqualTo(0d));
+                Assert.That(LabResultStats.DrumSharePercent(a, mid.playedSeconds), Is.EqualTo(25));
+                Assert.That(LabResultStats.DrumSharePercent(b, mid.playedSeconds), Is.EqualTo(75));
+                Assert.That(LabResultStats.DrumText(b, mid.playedSeconds), Is.EqualTo("30초 · 75%"));
+
+                var ended = model.Snapshot(200d);
+                Assert.That(ended.phase, Is.EqualTo(LabPhase.Defeat));
+                Assert.That(ended.playedSeconds, Is.EqualTo(180d).Within(1e-6), "Time after the round ends is not counted.");
+                Assert.That(ended.players.Single(p => p.id == second).drumSeconds, Is.EqualTo(170d).Within(1e-6));
+                Assert.That(LabResultStats.DrumSharePercent(new LabPlayerState { drumSeconds = 5d }, 0d), Is.EqualTo(0));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(single); }
         }
 
         private static LabConfig ConfigWith(float generateCost, params int[] chances)

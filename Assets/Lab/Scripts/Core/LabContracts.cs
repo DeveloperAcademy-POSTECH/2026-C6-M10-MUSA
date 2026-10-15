@@ -77,8 +77,19 @@ namespace C6Lab
         public int combinedTotal;
         /// <summary>이웃에게 넘겨준 구슬 수 (북 제외)</summary>
         public int passedTotal;
+        /// <summary>이웃에게 넘겨준 북 수</summary>
+        public int drumPassedTotal;
         /// <summary>아이템 사용 수: 릴레이·폭탄은 던졌을 때, 비밀상자·포션은 더블탭 사용했을 때</summary>
         public int relayUsed, secretBoxUsed, potionUsed, bombUsed;
+
+        /// <summary>요괴에 맞힌 횟수 (Host가 타격을 확정한 것만)</summary>
+        public int hitTotal;
+        /// <summary>요괴에게 준 총 피해 (남은 HP보다 큰 피해는 남은 만큼만)</summary>
+        public int damageTotal;
+        /// <summary>요괴 HP를 0으로 만든 마지막 한 방(막타)을 쳤는지. 승리했을 때만 한 명이 true.</summary>
+        public bool lastHit;
+        /// <summary>북 점유 시간(초): 북을 하나 이상 점유한 시간. 여러 개여도 한 번만 센다. 북 점유율 = 이 값 / playedSeconds</summary>
+        public double drumSeconds;
 
         public int ItemsUsed => relayUsed + secretBoxUsed + potionUsed + bombUsed;
 
@@ -94,6 +105,8 @@ namespace C6Lab
         /// <summary>Host-approved full-session pause; the battle phase remains Playing.</summary>
         public bool paused;
         public double serverTime, remaining;
+        /// <summary>이번 라운드에 실제로 진행된 전투 시간(초). 결과 화면의 북 점유율 기준.</summary>
+        public double playedSeconds;
         public int hp;
         /// <summary>Host-owned presentation pose, synchronized separately from HP and collision.</summary>
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;

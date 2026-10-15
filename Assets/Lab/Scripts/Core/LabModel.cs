@@ -62,6 +62,7 @@ namespace C6Lab
         private double lastTime;
         private double deadline;
         private double remaining;
+        private double played;
         private LabPhase phase = LabPhase.Idle;
 
         public string SessionId => sessionId;
@@ -118,6 +119,7 @@ namespace C6Lab
             lastTime = now;
             deadline = nextDeadline;
             remaining = rules.BattleDurationSeconds;
+            played = 0d;
             phase = LabPhase.Playing;
         }
 
@@ -252,7 +254,8 @@ namespace C6Lab
             }
             else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
             current.revision = ++revision;
-            if (!current.kind.IsDrum()) players[sender].passedTotal++;
+            if (current.kind.IsDrum()) players[sender].drumPassedTotal++;
+            else players[sender].passedTotal++;
             reason = "TRANSFERRED";
             orb = current.Copy();
             return true;
@@ -297,7 +300,13 @@ namespace C6Lab
             hp = Math.Max(0, hp - DamageFor(orb));
             actualDamage = previousHp - hp;
             if (players.TryGetValue(orb.owner, out var attacker))
+            {
                 attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
+                // 결과 대시보드 기록: 타격 횟수·딜, 요괴를 쓰러뜨린 한 방이면 막타
+                attacker.hitTotal++;
+                attacker.damageTotal += actualDamage;
+                if (hp == 0) attacker.lastHit = true;
+            }
             if (hp == 0) phase = LabPhase.Victory;
             return true;
         }
@@ -406,6 +415,7 @@ namespace C6Lab
                 phase = phase,
                 serverTime = now,
                 remaining = remaining,
+                playedSeconds = played,
                 hp = hp,
                 players = players.Values.OrderBy(player => player.seat).Select(player => player.Copy()).ToArray(),
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
@@ -436,9 +446,16 @@ namespace C6Lab
                 double effectiveNow = Math.Min(now, deadline);
                 double elapsed = effectiveNow - lastTime;
                 if (elapsed > 0d)
+                {
+                    played += elapsed;
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond));
+                    // 결과 대시보드 기록: 이 사이에 북을 점유한 사람의 점유 시간 (북 점유율 계산용)
+                    // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)
+                    foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())
+                        if (players.TryGetValue(holder, out var drummer)) drummer.drumSeconds += elapsed;
+                }
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
                 {
