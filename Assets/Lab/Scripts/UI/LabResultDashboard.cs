@@ -111,7 +111,7 @@ namespace C6Lab
                 string[] cells =
                 {
                     LabResultStats.Label(award.Title),
-                    LabResultStats.WinnerNames(award, local),
+                    LabResultStats.WinnerNames(award),
                     LabResultStats.Record(award, playedSeconds)
                 };
                 bool[] bold = { true, false, false };

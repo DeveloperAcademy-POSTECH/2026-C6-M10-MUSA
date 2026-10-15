@@ -90,13 +90,9 @@ namespace C6Lab
             player == null ? "" : (int)Math.Round(player.drumSeconds, MidpointRounding.AwayFromZero) + "초 · "
                 + DrumSharePercent(player, playedSeconds) + "%";
 
-        /// <summary>내 이름 옆에 붙는 표시 (예: "P2 나")</summary>
-        public const string MeLabel = "나";
-
-        /// <summary>칭호를 받은 사람들 (예: "P1 나, P3"). 동점이면 좌석 순서로 모두 적는다.</summary>
-        public static string WinnerNames(LabResultAward award, ulong localId) =>
-            award.Winners == null ? "" : string.Join(", ", award.Winners.Select(p =>
-                p.id == localId ? PlayerName(p) + " " + MeLabel : PlayerName(p)));
+        /// <summary>칭호를 받은 사람들 (예: "P1, P3"). 동점이면 좌석 순서로 모두 적는다. 내 줄은 화면에서 색으로 구분한다.</summary>
+        public static string WinnerNames(LabResultAward award) =>
+            award.Winners == null ? "" : string.Join(", ", award.Winners.Select(PlayerName));
 
         /// <summary>
         /// 칭호 줄의 기록 칸. 딜왕 "40 (2회 타격)" (동점이면 "60 (2·3회 타격)", 이름 순서와 같음) ·
