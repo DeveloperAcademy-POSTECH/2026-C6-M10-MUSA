@@ -703,6 +703,23 @@ namespace C6Lab.Tests
                 "Flung past the right edge, both go to the neighbour through the usual handoff.");
         }
 
+        [UnityTest]
+        public IEnumerator ABlastShowsACartoonBurstWithBombThatClearsItself()
+        {
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2);
+            board.Blast("bomb", new Vector2(.5f, .5f));
+            var effect = board.GetComponentInChildren<LabBombBlastEffect>();
+            Assert.That(effect, Is.Not.Null, "A blast draws a burst where the bomb was.");
+            Assert.That(effect.Label, Is.EqualTo("BOMB!"));
+            Assert.That(effect.gameObject.layer, Is.EqualTo(board.gameObject.layer), "It shows on the board camera only.");
+            Assert.That(effect.GetComponentsInChildren<Collider>(), Is.Empty, "The burst never touches physics.");
+            Vector3 at = effect.transform.position;
+            Assert.That(new Vector2(at.x, at.y), Is.EqualTo(Vector2.zero), "It bursts at the bomb (board centre).");
+
+            yield return new WaitForSeconds(LabBombBlastEffect.Seconds + .2f);
+            Assert.That(board.GetComponentInChildren<LabBombBlastEffect>() == null, Is.True, "The burst clears itself.");
+        }
+
         private void SetDrumDrift(float speed, float turning)
         {
             float[] values = config.CaptureDeveloperValues();

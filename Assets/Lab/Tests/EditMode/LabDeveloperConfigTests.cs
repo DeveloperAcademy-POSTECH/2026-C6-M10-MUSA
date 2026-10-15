@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(81));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(83));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -76,10 +76,13 @@ namespace C6Lab.Tests
             values[76] = .2f;
             values[77] = .5f;
             values[78] = 2f;
-            Assert.That(new[] { values[79], values[80] }, Is.EqualTo(new[] { .4f, 3f }),
+            Assert.That(new[] { values[79], values[80] }, Is.EqualTo(new[] { .4f, 9f }),
                 "A bomb blast reaches 40% of the board width and pushes hardest right beside it.");
             values[79] = .6f;
-            values[80] = 4.5f;
+            values[80] = 12f;
+            Assert.That(new[] { values[81], values[82] }, Is.EqualTo(new[] { 2f, 1f }), "A blast plays a full Heavy haptic.");
+            values[81] = 4f; // Rigid
+            values[82] = .5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
@@ -118,7 +121,9 @@ namespace C6Lab.Tests
             Assert.That(config.DrumDriftTurning, Is.EqualTo(.5f));
             Assert.That(config.DrumSpinStrength, Is.EqualTo(2f));
             Assert.That(config.BombBlastRadius, Is.EqualTo(.6f));
-            Assert.That(config.BombBlastStrength, Is.EqualTo(4.5f));
+            Assert.That(config.BombBlastStrength, Is.EqualTo(12f));
+            Assert.That(config.BombHapticStyle, Is.EqualTo(LabHapticStyle.Rigid));
+            Assert.That(config.BombHapticIntensity, Is.EqualTo(.5f));
         }
 
         [Test]

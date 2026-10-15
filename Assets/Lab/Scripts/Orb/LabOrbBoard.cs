@@ -348,7 +348,7 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// A locked bomb blasted on this board. The bomb leaves at once, and every orb and drum whose
+        /// A locked bomb blasted on this board. The bomb leaves in a cartoon blast, and every orb and drum whose
         /// centre is within the blast radius is flung straight away from it, hardest right beside it
         /// and fading to nothing at the edge. Nothing is removed; an orb flung past a side edge goes
         /// to the neighbour through the usual Host-approved handoff. An orb held under a finger is
@@ -364,6 +364,8 @@ namespace C6Lab
             if (bombId != null) RemoveOrb(bombId);
             float reach = config.BombBlastRadius * bounds.width;
             float strength = config.BombBlastStrength * bounds.width;
+            // The cartoon blast shows even when the push is tuned off.
+            LabBombBlastEffect.Play(transform, center, reach > 0f ? reach : .4f * bounds.width);
             if (reach <= 0f || strength <= 0f) return 0;
 
             int pushed = 0;

@@ -39,6 +39,8 @@ MonoBehaviour:
   relayDoubleMultiplier: 2
   relayMaxMultiplier: 4
   bombMultiplier: 3
+  bombBlastRadius: 0.4
+  bombBlastStrength: 9
   orbLifetimeSeconds: 8
   orbRestitution: 0.8
   orbFloorDeceleration: 2
@@ -54,7 +56,11 @@ MonoBehaviour:
   spawnFanAngle: 180
   spawnMinSpeed: 1
   spawnMaxSpeed: 1.8
-  spawnOriginHeight: 0.2
+  drumCount: 1
+  drumRadius: 0.6
+  drumDriftSpeed: 0.1
+  drumDriftTurning: 0.25
+  drumSpinStrength: 1
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9
@@ -66,6 +72,8 @@ MonoBehaviour:
   hitHapticIntensity: 0.6
   itemHitHapticStyle: 2
   itemHitHapticIntensity: 1
+  bombHapticStyle: 2
+  bombHapticIntensity: 1
   orbAppearance: {fileID: 11400000, guid: 9fd06f927557d47e2ac8b342a6979ed0, type: 2}
   cameraRadius: 8
   cameraHeightOffset: 0.65
