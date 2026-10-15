@@ -8,7 +8,7 @@ namespace C6Lab
     /// <summary>
     /// 승리/패배 결과 화면에 이번 라운드 칭호(딜왕·패스왕·막타·북 독점)를 칭호별로 한 줄씩 보여주는 대시보드.
     /// 줄마다 칭호 · 받은 사람(동점이면 모두) · 기록. 기록이 0인 칭호는 줄을 만들지 않는다.
-    /// 장면 수정 없이 코드로 만들고, 기존 결과 카드(VICTORY/DEFEAT·버튼) 바로 위에 놓는다.
+    /// 장면 수정 없이 코드로 만들고, 결과 카드(VICTORY/DEFEAT·버튼 전체) 바로 밑에 놓는다.
     /// 값은 Host가 보낸 스냅샷의 플레이어 기록(LabPlayerState)을 그대로 쓰므로 모든 기기가 같다.
     /// 디자인이 정해지면 이 화면만 바꾸고, 계산은 LabResultStats를 그대로 쓴다.
     /// </summary>
@@ -16,7 +16,8 @@ namespace C6Lab
     public sealed class LabResultDashboard : MonoBehaviour
     {
         public float width = 284f;
-        public float gapAboveResult = 12f;
+        /// <summary>결과 카드 아랫변과 목록 사이 간격</summary>
+        public float gapBelowResult = 12f;
         public float headerHeight = 26f;
         public float rowHeight = 30f;
         public int fontSize = 14;
@@ -127,11 +128,11 @@ namespace C6Lab
             var border = new GameObject("ResultDashboard", typeof(RectTransform), typeof(Image));
             panel = (RectTransform)border.transform;
             panel.SetParent(canvas, false);
-            // 결과 카드 윗변 가운데에 붙여 그 위로 쌓는다.
-            float top = resultRect.anchorMax.y;
-            panel.anchorMin = panel.anchorMax = new Vector2(.5f, top);
-            panel.pivot = new Vector2(.5f, 0f);
-            panel.anchoredPosition = new Vector2(0f, gapAboveResult);
+            // 결과 카드 아랫변 가운데에 붙여 그 밑으로 내린다.
+            float bottom = resultRect.anchorMin.y;
+            panel.anchorMin = panel.anchorMax = new Vector2(.5f, bottom);
+            panel.pivot = new Vector2(.5f, 1f);
+            panel.anchoredPosition = new Vector2(0f, resultRect.offsetMin.y - gapBelowResult);
             border.GetComponent<Image>().color = borderColor;
 
             var inner = new GameObject("Inner", typeof(RectTransform), typeof(Image));
