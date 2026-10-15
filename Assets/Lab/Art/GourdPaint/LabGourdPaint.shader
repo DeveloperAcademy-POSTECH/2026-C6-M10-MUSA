@@ -1,4 +1,4 @@
-Shader "MUSA/GourdPaint"
+Shader "C6Lab/GourdPaint"
 {
  Properties { _BaseColor("White paper shell",Color)=(.96,.94,.86,1) }
  SubShader { Tags {"RenderPipeline"="UniversalPipeline" "RenderType"="Opaque"}

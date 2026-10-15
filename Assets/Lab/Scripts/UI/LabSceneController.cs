@@ -58,6 +58,9 @@ namespace C6Lab
             // 햅틱 (내 구슬 생성, 내가 던진 구슬 타격)
             if (boardNetwork != null && GetComponent<LabHaptics>() == null)
                 gameObject.AddComponent<LabHaptics>().Bind(boardNetwork, board);
+            // 박 페인트 (#153): 요괴 자리에 흰 박을 붙이고 승인된 타격마다 속성 색을 칠한다.
+            // 다른 컴포넌트의 Start보다 먼저 붙여야 크랙 박(#163)이 박 모델을 다시 붙이지 않는다.
+            if (LabGourdPaint.EnabledInMainScene) LabGourdPaint.Attach(boardNetwork);
             // 일시정지 메뉴에 BGM·효과음 크기 슬라이더를 붙인다. 값은 기기마다 따로 저장된다.
             LabHud hud = FindFirstObjectByType<LabHud>();
             if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)

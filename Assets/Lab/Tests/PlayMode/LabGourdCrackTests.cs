@@ -9,6 +9,9 @@ namespace C6Lab.Tests
 {
  public sealed class LabGourdCrackTests
  {
+  // 본 게임은 페인트 박(#153)을 쓰므로 크랙 박을 확인하는 이 테스트에서만 페인트를 끈다.
+  [SetUp] public void UseCrackGourd() => LabGourdPaint.EnabledInMainScene = false;
+  [TearDown] public void RestorePaintGourd() => LabGourdPaint.EnabledInMainScene = true;
   [TestCase(1000,0)] [TestCase(980,1)] [TestCase(660,2)] [TestCase(330,3)] [TestCase(0,3)]
   public void SharedHpDeterminesStage(int hp,int expected)
    =>Assert.That(LabGourdCrack.StageForHp(hp,1000),Is.EqualTo(expected));
