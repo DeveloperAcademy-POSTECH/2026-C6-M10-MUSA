@@ -1,6 +1,6 @@
 # 직선 투척 물리 실험 가이드
 
-기준: Unity 6000.6.5f1, `Assets/Lab/Scenes/Lab.unity`. 이 가이드는 커브볼 없이 Combined 구슬을 원통으로 던질 때의 조절값을 비교하기 위한 것이다. 기본값은 이번 변경 전의 중앙 투척 궤적을 유지한다. 새 수치는 `Assets/Lab/Resources/LabConfig.asset`에서 설정할 수 있고, Editor 또는 Development Build에서는 **DEV** 패널의 실행 중 복제본을 바꿔 솔로 라운드별로 시험할 수 있다. Host가 방을 만들기 전에도 DEV 복제본을 세션 전체에 적용할 수 있다. DEV 변경은 원본 에셋에 저장되지 않는다.
+기준: Unity 6000.6.5f1, `Assets/Lab/Scenes/Lab.unity`. 이 가이드는 커브볼 없이 Combined 구슬을 박 표적(기존 원통 판정)으로 던질 때의 조절값을 비교하기 위한 것이다. 기본값은 이번 변경 전의 중앙 투척 궤적을 유지한다. 새 수치는 `Assets/Lab/Resources/LabConfig.asset`에서 설정할 수 있고, Editor 또는 Development Build에서는 **DEV** 패널의 실행 중 복제본을 바꿔 솔로 라운드별로 시험할 수 있다. Host가 방을 만들기 전에도 DEV 복제본을 세션 전체에 적용할 수 있다. DEV 변경은 원본 에셋에 저장되지 않는다.
 
 ## 우선 조절할 값
 
