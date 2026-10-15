@@ -262,13 +262,13 @@ namespace C6Lab
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
         [SerializeField] private bool hapticsEnabled = true;
         [Tooltip("내 구슬이 생성되어 떠오를 때 진동 종류")]
-        [SerializeField] private LabHapticStyle generateHapticStyle = LabHapticStyle.Light;
+        [SerializeField] private LabHapticStyle generateHapticStyle = LabHapticStyle.Medium;
         [Tooltip("생성 진동 세기 (0 = 끔)")]
         [SerializeField, Range(0f, 1f)] private float generateHapticIntensity = .4f;
         [Tooltip("기본 피해(Damage per Hit) 이하로 맞았을 때 진동 종류")]
-        [SerializeField] private LabHapticStyle hitHapticStyle = LabHapticStyle.Light;
+        [SerializeField] private LabHapticStyle hitHapticStyle = LabHapticStyle.Heavy;
         [Tooltip("기본 피해일 때 진동 세기 (0 = 끔)")]
-        [SerializeField, Range(0f, 1f)] private float hitHapticIntensity = .6f;
+        [SerializeField, Range(0f, 1f)] private float hitHapticIntensity = .9f;
         [Tooltip("기본보다 큰 피해(아이템)로 맞았을 때 진동 종류")]
         [SerializeField] private LabHapticStyle itemHitHapticStyle = LabHapticStyle.Heavy;
         [Tooltip("큰 피해일 때 진동 세기 (0 = 끔)")]
@@ -380,7 +380,7 @@ namespace C6Lab
         public LabHapticStyle GenerateHapticStyle => ValidStyle(generateHapticStyle);
         public float GenerateHapticIntensity => Mathf.Clamp01(Finite(generateHapticIntensity, .4f));
         public LabHapticStyle HitHapticStyle => ValidStyle(hitHapticStyle);
-        public float HitHapticIntensity => Mathf.Clamp01(Finite(hitHapticIntensity, .6f));
+        public float HitHapticIntensity => Mathf.Clamp01(Finite(hitHapticIntensity, .9f));
         public LabHapticStyle ItemHitHapticStyle => ValidStyle(itemHitHapticStyle);
         public float ItemHitHapticIntensity => Mathf.Clamp01(Finite(itemHitHapticIntensity, 1f));
         public LabHapticStyle BombHapticStyle => ValidStyle(bombHapticStyle);

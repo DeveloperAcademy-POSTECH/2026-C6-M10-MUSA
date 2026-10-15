@@ -69,7 +69,7 @@ MonoBehaviour:
   generateHapticStyle: 1
   generateHapticIntensity: 0.4
   hitHapticStyle: 2
-  hitHapticIntensity: 0.6
+  hitHapticIntensity: 0.9
   itemHitHapticStyle: 2
   itemHitHapticIntensity: 1
   bombHapticStyle: 2
