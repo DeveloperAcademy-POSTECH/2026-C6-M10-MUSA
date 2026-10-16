@@ -1291,7 +1291,12 @@ namespace C6Lab
 
         private void OnGourdBomb(ulong target, string bombId, Vector2 position)
         {
-            if (target == LocalPlayerId) SetNotice(GourdBombNotice);
+            if (target == LocalPlayerId)
+            {
+                SetNotice(GourdBombNotice);
+                // Arrives before the snapshot holding the bomb, so the board can drop it in from above.
+                if (board != null) board.ExpectDrop(bombId);
+            }
             GourdBombDropped?.Invoke(target, bombId, position);
         }
 

@@ -55,6 +55,8 @@ namespace C6Lab
             public bool Locked;
             public bool Held;
             public bool EdgePending;
+            /// <summary>A gourd bomb still falling onto this board; it cannot be touched until it lands.</summary>
+            public bool Dropping;
             public string PendingPartnerId;
             public LabOrbEdgeCrossing PendingEdge;
             public Vector2 PressVelocity;
@@ -87,6 +89,7 @@ namespace C6Lab
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly HashSet<string> spawnedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> expectedDrops = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<PointerSample> samples = new List<PointerSample>();
         private readonly List<Entry> updateEntries = new List<Entry>();
         private LabConfig config;
@@ -126,6 +129,8 @@ namespace C6Lab
         public event Action<string> UseRequested;
         /// <summary>A tap on a drum asks the Host to generate an orb from it. (drum ID)</summary>
         public event Action<string> DrumTapped;
+        /// <summary>A gourd bomb finished falling onto this board and can now be touched. (bomb ID)</summary>
+        public event Action<string> DropLanded;
 
         public void Configure(LabConfig tuning, Camera camera, Rect worldCenterBounds)
         {
@@ -296,9 +301,11 @@ namespace C6Lab
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.mass = 1f;
             body.position = OnPlane(start);
-            var entry = new Entry { View = view, LocalOwner = localOwner, DriftSeed = DriftSeedFor(id) };
+            var entry = new Entry { View = view, LocalOwner = localOwner, DriftSeed = DriftSeedFor(id),
+                Dropping = expectedDrops.Remove(id) };
             entries.Add(id, entry);
             SetBodyMode(entry);
+            if (entry.Dropping) PlayDrop(entry, start);
             if (!body.isKinematic)
                 body.linearVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
                     config.OrbMaxReleaseSpeed * bounds.width));
@@ -373,7 +380,7 @@ namespace C6Lab
             updateEntries.AddRange(entries.Values);
             foreach (var entry in updateEntries)
             {
-                if (entry.View == null || !entry.LocalOwner || entry.Locked || entry.EdgePending) continue;
+                if (entry.View == null || !entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Dropping) continue;
                 Vector2 away = XY(entry.View.Body.position) - center;
                 float distance = away.magnitude;
                 if (distance > reach) continue;
@@ -399,6 +406,41 @@ namespace C6Lab
             return shortest;
         }
 
+        /// <summary>
+        /// The gourd is dropping this bomb onto this screen (#177). Call before its snapshot arrives:
+        /// when the bomb first appears, a "!" warning shows on its landing spot, then it falls in from
+        /// above the orb area and bounces. Until it lands it cannot be grabbed or pushed and nothing
+        /// bumps into it.
+        /// </summary>
+        public void ExpectDrop(string bombId)
+        {
+            if (!string.IsNullOrEmpty(bombId) && !entries.ContainsKey(bombId)) expectedDrops.Add(bombId);
+        }
+
+        public bool IsDropping(string id) => id != null && entries.TryGetValue(id, out var entry) && entry.Dropping;
+
+        private void PlayDrop(Entry entry, Vector2 landing)
+        {
+            LabOrbAppearance look = config.OrbAppearance != null ? config.OrbAppearance : LabOrbAppearance.Defaults;
+            LabOrbView view = entry.View;
+            float radius = view.HitSphere.radius;
+            LabDropWarning.Play(transform, landing, radius, look.DropWarningSeconds + look.DropFallSeconds,
+                look.DropWarningColor);
+            // It falls from just above the top of the orb area, straight down onto its spot.
+            Vector2 drop = new Vector2(0f, Mathf.Max(bounds.yMax + 2f * radius - landing.y, 2f * radius));
+            string id = view.OrbId;
+            view.PlayDrop(view.transform.InverseTransformVector(OnPlane(drop)), look.DropWarningSeconds,
+                look.DropFallSeconds, look.DropBounceSeconds,
+                view.transform.InverseTransformVector(OnPlane(Vector2.up * (look.DropBounceHeight * radius))).y,
+                () =>
+                {
+                    if (!entries.TryGetValue(id, out var landed) || landed != entry || view == null) return;
+                    entry.Dropping = false;
+                    SetBodyMode(entry);
+                    DropLanded?.Invoke(id);
+                });
+        }
+
         public bool RemoveOrb(string id)
         {
             if (id == null || !entries.TryGetValue(id, out var entry)) return false;
@@ -416,6 +458,7 @@ namespace C6Lab
             entries.Clear();
             spawnedIds.Clear();
             unlockEffectIds.Clear();
+            expectedDrops.Clear();
         }
 
         public void SetInteractionEnabled(bool enabled)
@@ -483,7 +526,7 @@ namespace C6Lab
             float best = 1f;
             foreach (var entry in entries.Values)
             {
-                if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held) continue;
+                if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held || entry.Dropping) continue;
                 float reach = entry.View.HitSphere.radius * 1.25f;
                 float closeness = (XY(entry.View.Body.position) - worldPoint).sqrMagnitude / (reach * reach);
                 if (closeness > best) continue;
@@ -669,7 +712,7 @@ namespace C6Lab
                 bool drum = entry.View.Kind.IsDrum();
                 // A bomb wanders like the drum, so it cannot simply be left lying in a corner.
                 bool drifts = drum || entry.View.Kind == LabOrbKind.Bomb;
-                if (!entry.LocalOwner || entry.Locked || entry.Held || entry.EdgePending)
+                if (!entry.LocalOwner || entry.Locked || entry.Held || entry.EdgePending || entry.Dropping)
                 {
                     if (drum) entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
                     continue;
@@ -941,7 +984,7 @@ namespace C6Lab
         private void SetBodyMode(Entry entry)
         {
             var body = entry.View.Body;
-            bool movable = entry.LocalOwner && !entry.Held && !entry.Locked && !entry.EdgePending;
+            bool movable = entry.LocalOwner && !entry.Held && !entry.Locked && !entry.EdgePending && !entry.Dropping;
             bool desiredKinematic = !movable;
             if (body.isKinematic != desiredKinematic)
             {
@@ -949,7 +992,8 @@ namespace C6Lab
                 body.isKinematic = desiredKinematic;
                 if (movable) body.linearVelocity = Vector3.zero;
             }
-            body.detectCollisions = true;
+            // A falling gourd bomb is still in the air: nothing bumps into it until it lands.
+            body.detectCollisions = !entry.Dropping;
             entry.View.HitSphere.isTrigger = entry.Held;
         }
 

@@ -26,8 +26,8 @@ MonoBehaviour:
   staminaRecoverySeconds: 1.7
   hitRecovery: 10
   orbStorageLimit: 20
-  yinChance: 40
-  yangChance: 40
+  yinChance: 50
+  yangChance: 50
   relayChance: 0
   secretBoxChance: 0
   potionChance: 0
@@ -74,7 +74,9 @@ MonoBehaviour:
   hitSoundVolumeDev: 50
   missSoundVolumeDev: 50
   combineSoundVolumeDev: 50
+  fuseSoundVolumeDev: 50
   combineSoundVolume: 0.8
+  fuseSoundVolume: 0.5
   hapticsEnabled: 1
   generateHapticStyle: 1
   generateHapticIntensity: 1
