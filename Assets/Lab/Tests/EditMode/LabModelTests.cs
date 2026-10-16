@@ -1277,22 +1277,283 @@ namespace C6Lab.Tests
             Assert.That(LabResultStats.Awards(new LabPlayerState[0], true), Is.Empty);
         }
 
-        [Test]
-        public void PaintCoverageWinsForEveryoneAndResetsOnNextRound()
+        [TestCase(1)]
+        [TestCase(80)]
+        [TestCase(100)]
+        public void AtomicElementHitsReachCapturedPaintGoalAndResetOnNextRound(int goal)
         {
-            Assert.That(model.ConfirmPaintCoverage(.79f, 10), Is.True);
-            Assert.That(model.Snapshot(0d).phase, Is.EqualTo(LabPhase.Playing));
-            Assert.That(model.ConfirmPaintCoverage(.1f, 10), Is.False);
-            Assert.That(model.ConfirmPaintCoverage(float.NaN, 10), Is.False);
-            Assert.That(model.ConfirmPaintCoverage(.8f, 20), Is.True);
-            var result = model.Snapshot(0d);
-            Assert.That(result.phase, Is.EqualTo(LabPhase.Victory));
-            Assert.That(result.paintCoverage, Is.EqualTo(.8f));
-            Assert.That(result.players.Single(player => player.id == 20).lastHit, Is.True);
-            Assert.That(model.ConfirmPaintCoverage(.9f, 30), Is.False);
-            model.Begin("lab-test", new ulong[] { 10, 20, 30 }, 1d, config);
-            Assert.That(model.Snapshot(1d).paintCoverage, Is.Zero);
-            Assert.That(model.Snapshot(1d).phase, Is.EqualTo(LabPhase.Playing));
+            var paintConfig = PaintFixture(goal);
+            try
+            {
+                var room = new LabModel();
+                room.BeginSolo("paint-goal-" + goal, 10, 0d, paintConfig);
+                int request = 0;
+                const int directions = 512;
+                int hits = 0;
+                for (int i = 0; i < directions && room.Phase == LabPhase.Playing; i++)
+                {
+                    var shot = LaunchElementShot(room, ref request, 0d);
+                    Assert.That(room.ConfirmHit(shot.id, 0d, SurfaceDirection(i, directions),
+                        out LabOrbElement element, out int actualDamage, out int impactValue), Is.True);
+                    Assert.That(element, Is.Not.EqualTo(LabOrbElement.None));
+                    Assert.That(actualDamage, Is.EqualTo(i == 0 ? 1 : 0));
+                    Assert.That(impactValue, Is.EqualTo(20));
+                    hits++;
+                    LabSnapshot current = room.Snapshot(0d);
+                    Assert.That(current.paintGoalPercent, Is.EqualTo(goal));
+                    Assert.That(current.paintCoverage, Is.EqualTo(room.PaintSurface.Coverage));
+                    if (current.phase == LabPhase.Playing)
+                        Assert.That(current.paintCoverage, Is.LessThan(goal / 100f));
+                    Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.up, out _, out _, out _), Is.False,
+                        "An already consumed projectile cannot repaint or receive another reward.");
+                }
+                LabSnapshot won = room.Snapshot(0d);
+                Assert.That(won.phase, Is.EqualTo(LabPhase.Victory), "Every configured goal is reachable with distributed hits.");
+                Assert.That(won.paintCoverage, Is.GreaterThanOrEqualTo(goal / 100f));
+                Assert.That(won.players.Single().lastHit, Is.True);
+                Assert.That(won.players.Single().hitTotal, Is.EqualTo(hits));
+                Assert.That(won.players.Single().damageTotal, Is.EqualTo(hits * 20),
+                    "Paint result damage remains the nominal attack score after diagnostic HP reaches zero.");
+                uint completedRound = won.round;
+                room.BeginSolo("paint-goal-" + goal, 10, 1d, paintConfig);
+                LabSnapshot retry = room.Snapshot(1d);
+                Assert.That(retry.round, Is.EqualTo(completedRound + 1));
+                Assert.That(retry.phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(retry.paintGoalPercent, Is.EqualTo(goal));
+                Assert.That(retry.paintCoverage, Is.Zero);
+                Assert.That(room.PaintSurface.PaintCount, Is.Zero);
+                Assert.That(room.PaintSurface.CoveredCount, Is.Zero);
+                Assert.That(retry.players.Single().lastHit, Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
+        }
+
+        [Test]
+        public void RepeatedPaintPast128HitsStillAcceptsNewSurfaceAndPositiveImpactAfterHpZero()
+        {
+            var paintConfig = PaintFixture(100);
+            try
+            {
+                var room = new LabModel();
+                room.BeginSolo("paint-repeat", 10, 0d, paintConfig);
+                int request = 0;
+                float firstCoverage = 0f;
+                for (int i = 0; i < 128; i++)
+                {
+                    LabOrbState shot = LaunchElementShot(room, ref request, 0d);
+                    float stamina = room.Snapshot(0d).players.Single().stamina;
+                    Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.forward,
+                        out _, out int actualDamage, out int impactValue), Is.True);
+                    Assert.That(actualDamage, Is.EqualTo(i == 0 ? 1 : 0));
+                    Assert.That(impactValue, Is.EqualTo(20));
+                    if (i == 0) firstCoverage = room.PaintSurface.Coverage;
+                    Assert.That(room.PaintSurface.Coverage, Is.EqualTo(firstCoverage));
+                    Assert.That(room.Snapshot(0d).players.Single().stamina,
+                        Is.EqualTo(Mathf.Min(paintConfig.StaminaMax, stamina + paintConfig.HitRecovery)).Within(.001f));
+                }
+                Assert.That(firstCoverage, Is.GreaterThan(0f));
+                Assert.That(room.PaintSurface.PaintCount, Is.EqualTo(128));
+                LabOrbState lastShot = LaunchElementShot(room, ref request, 0d);
+                Assert.That(room.ConfirmHit(lastShot.id, 0d, Vector3.back, out _, out int damage, out int impact), Is.True);
+                Assert.That(damage, Is.Zero);
+                Assert.That(impact, Is.EqualTo(20));
+                Assert.That(room.PaintSurface.PaintCount, Is.EqualTo(129));
+                Assert.That(room.PaintSurface.Coverage, Is.GreaterThan(firstCoverage));
+                Assert.That(room.Phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(room.Snapshot(0d).players.Single().lastHit, Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
+        }
+
+        [TestCase(.999d, true)]
+        [TestCase(1d, false)]
+        [TestCase(1.001d, false)]
+        public void PaintHitUsesTheSameAtomicDeadlineAsDamage(double hitTime, bool expected)
+        {
+            var paintConfig = PaintFixture(1, 1f);
+            try
+            {
+                var room = new LabModel();
+                room.BeginSolo("paint-deadline", 10, 0d, paintConfig);
+                int request = 0;
+                LabOrbState shot = LaunchElementShot(room, ref request, 0d);
+                Assert.That(room.ConfirmHit(shot.id, hitTime, Vector3.forward,
+                    out _, out int damage, out int impact), Is.EqualTo(expected));
+                Assert.That(room.Phase, Is.EqualTo(expected ? LabPhase.Victory : LabPhase.Defeat));
+                Assert.That(room.PaintSurface.PaintCount, Is.EqualTo(expected ? 1 : 0));
+                Assert.That(damage, Is.EqualTo(expected ? 1 : 0));
+                Assert.That(impact, Is.EqualTo(expected ? 20 : 0));
+                Assert.That(room.Snapshot(hitTime).players.Single().lastHit, Is.EqualTo(expected));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
+        }
+
+        [Test]
+        public void PausedHostClockCannotTurnAnOtherwiseValidPaintHitIntoTimeout()
+        {
+            var paintConfig = PaintFixture(1, 2f);
+            try
+            {
+                var clock = new LabBattleClock();
+                var room = new LabModel();
+                room.BeginSolo("paint-clock", 10, clock.Now(100d), paintConfig);
+                int request = 0;
+                LabOrbState shot = LaunchElementShot(room, ref request, clock.Now(100d));
+                Assert.That(clock.Pause(101d), Is.True);
+                LabSnapshot frozen = room.Snapshot(clock.Now(10001d));
+                Assert.That(frozen.phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(frozen.remaining, Is.EqualTo(1d));
+                Assert.That(clock.Resume(10001d), Is.True);
+                Assert.That(room.ConfirmHit(shot.id, clock.Now(10001.1d), Vector3.forward,
+                    out _, out _, out _), Is.True);
+                Assert.That(room.Phase, Is.EqualTo(LabPhase.Victory));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
+        }
+
+        [Test]
+        public void NoneElementAndCompatibilityOrInvalidDirectionHitsCannotCreatePaintVictory()
+        {
+            var paintConfig = PaintFixture(1);
+            try
+            {
+                var room = new LabModel();
+                room.BeginSolo("paint-invalid", 10, 0d, paintConfig);
+                int request = 0;
+                LabOrbState compatibility = LaunchElementShot(room, ref request, 0d);
+                Assert.That(room.ConfirmHit(compatibility.id, 0d, out _, out int firstDamage), Is.True);
+                Assert.That(firstDamage, Is.EqualTo(1));
+                foreach (Vector3 invalid in new[] { Vector3.zero, new Vector3(float.NaN, 0f, 0f),
+                    new Vector3(float.PositiveInfinity, 0f, 0f) })
+                {
+                    LabOrbState shot = LaunchElementShot(room, ref request, 0d);
+                    Assert.That(room.ConfirmHit(shot.id, 0d, invalid, out _, out int damage, out int impact), Is.True);
+                    Assert.That(damage, Is.Zero);
+                    Assert.That(impact, Is.EqualTo(20));
+                }
+                Assert.That(room.PaintSurface.PaintCount, Is.Zero);
+                Assert.That(room.Phase, Is.EqualTo(LabPhase.Playing));
+
+                float[] values = paintConfig.CaptureDeveloperValues();
+                values[42] = 0f; values[41] = 100f;
+                Assert.That(paintConfig.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                room = new LabModel();
+                room.BeginSolo("paint-none", 10, 0d, paintConfig);
+                Assert.That(room.TryGenerate(10, "relay", 0d, out var relay, out error), Is.True, error);
+                Assert.That(room.TryLaunch(10, relay.id, "relay-launch", 0d, out _, out error), Is.True, error);
+                Assert.That(room.ConfirmHit(relay.id, 0d, Vector3.forward,
+                    out LabOrbElement element, out int actual, out int feedback), Is.True);
+                Assert.That(element, Is.EqualTo(LabOrbElement.None));
+                Assert.That(actual, Is.EqualTo(1));
+                Assert.That(feedback, Is.EqualTo(20));
+                Assert.That(room.PaintSurface.Coverage, Is.Zero);
+                Assert.That(room.Phase, Is.EqualTo(LabPhase.Playing));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
+        }
+
+        [Test]
+        public void CrackModeKeepsActualHpVictoryAndNeverPaintsItsHitDirection()
+        {
+            var crackConfig = PaintFixture(1);
+            try
+            {
+                float[] values = crackConfig.CaptureDeveloperValues();
+                values[79] = 1f;
+                Assert.That(crackConfig.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.BeginSolo("crack-atomic", 10, 0d, crackConfig);
+                int request = 0;
+                LabOrbState shot = LaunchElementShot(room, ref request, 0d);
+                Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.forward,
+                    out _, out int actual, out int impact), Is.True);
+                Assert.That(actual, Is.EqualTo(1));
+                Assert.That(impact, Is.EqualTo(1));
+                Assert.That(room.Snapshot(0d).players.Single().damageTotal, Is.EqualTo(1));
+                Assert.That(room.Phase, Is.EqualTo(LabPhase.Victory));
+                Assert.That(room.PaintSurface.Coverage, Is.Zero);
+                Assert.That(room.PaintSurface.PaintCount, Is.Zero);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(crackConfig); }
+        }
+
+        [Test]
+        public void PaintGoalAndPaletteAreCapturedUntilTheRoundRestarts()
+        {
+            var paintConfig = PaintFixture(100);
+            var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            var material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            try
+            {
+                Color firstColor = new Color(.12f, .34f, .56f, 1f);
+                material.SetColor("_BaseColor", firstColor);
+                typeof(LabOrbAppearance).GetField("fireMaterial", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(appearance, material);
+                typeof(LabConfig).GetField("orbAppearance", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(paintConfig, appearance);
+                var room = new LabModel();
+                room.BeginSolo("paint-capture", 10, 0d, paintConfig);
+                Assert.That(Vector4.Distance(room.PaintColorFor(LabOrbElement.Fire), firstColor), Is.LessThan(.00001f));
+                Assert.That(room.PaintColorFor(LabOrbElement.None), Is.EqualTo(Color.clear));
+                material.SetColor("_BaseColor", Color.magenta);
+                float[] values = paintConfig.CaptureDeveloperValues();
+                values[87] = 1f;
+                Assert.That(paintConfig.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                int request = 0;
+                LabOrbState shot = LaunchElementShot(room, ref request, 0d);
+                Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.forward, out _, out _, out _), Is.True);
+                Assert.That(room.Snapshot(0d).paintGoalPercent, Is.EqualTo(100));
+                Assert.That(room.Phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(Vector4.Distance(room.PaintColorFor(LabOrbElement.Fire), firstColor), Is.LessThan(.00001f));
+                room.Tick(30d);
+                room.BeginSolo("paint-capture", 10, 31d, paintConfig);
+                Assert.That(room.Snapshot(31d).paintGoalPercent, Is.EqualTo(1));
+                Assert.That(room.PaintColorFor(LabOrbElement.Fire), Is.EqualTo(Color.magenta));
+                Assert.That(room.PaintSurface.Coverage, Is.Zero);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(material);
+                UnityEngine.Object.DestroyImmediate(appearance);
+                UnityEngine.Object.DestroyImmediate(paintConfig);
+            }
+        }
+
+        private static LabConfig PaintFixture(int goal, float duration = 30f)
+        {
+            var created = ConfigWith(.001f, 0, 0, 0, 100, 0, 0);
+            float[] values = created.CaptureDeveloperValues();
+            values[0] = 1f;
+            values[1] = 20f;
+            values[2] = duration;
+            values[9] = 100f;
+            values[46] = 0f; values[47] = 0f;
+            values[79] = 0f;
+            values[87] = goal;
+            Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            return created;
+        }
+
+        private static LabOrbState LaunchElementShot(LabModel room, ref int request, double now)
+        {
+            var shot = room.Snapshot(now).orbs.FirstOrDefault(orb => orb.kind == LabOrbKind.Combined && !orb.inFlight);
+            if (shot == null)
+            {
+                Assert.That(room.TryGenerate(10, "paint-box-" + request++, now, out var box, out string error), Is.True, error);
+                Assert.That(box.kind, Is.EqualTo(LabOrbKind.SecretBox));
+                Assert.That(room.TryUseItem(10, box.id, "paint-open-" + request++, now, out _, out error), Is.True, error);
+                shot = room.Snapshot(now).orbs.First(orb => orb.kind == LabOrbKind.Combined && !orb.inFlight);
+            }
+            Assert.That(room.TryLaunch(10, shot.id, "paint-launch-" + request++, now, out _, out string reason), Is.True, reason);
+            return shot;
+        }
+
+        private static Vector3 SurfaceDirection(int index, int count)
+        {
+            float y = 1f - 2f * (index + .5f) / count;
+            float angle = index * 2.39996323f;
+            float ring = Mathf.Sqrt(1f - y * y);
+            return new Vector3(Mathf.Cos(angle) * ring, y, Mathf.Sin(angle) * ring);
         }
 
         [Test]

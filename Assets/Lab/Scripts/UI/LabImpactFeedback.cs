@@ -40,7 +40,8 @@ namespace C6Lab
             LabOrbElement element, int actualDamage, Vector3 impactVelocity = default,
             bool showDamageNumber = true)
         {
-            if (actualDamage <= 0 || target == null || target.Hitbox == null || !isActiveAndEnabled)
+            if ((showDamageNumber && actualDamage <= 0) || target == null
+                || target.Hitbox == null || !isActiveAndEnabled)
                 return;
             if (!showDamageNumber)
             {

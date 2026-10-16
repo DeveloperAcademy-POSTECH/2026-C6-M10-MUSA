@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
@@ -80,9 +81,12 @@ namespace C6Lab
         private Camera capturedOrbCamera;
         private Color lobbyBattleBackgroundColor;
         private Color lobbyOrbBackgroundColor;
+        private UnityEngine.UI.Text goalTitle;
+        private bool goalTitleResolved;
 
         private void Awake()
         {
+            CacheGoalTitle();
             if (hostButton != null) hostButton.onClick.AddListener(Host);
             if (joinButton != null) joinButton.onClick.AddListener(Join);
             if (findHostButton != null) findHostButton.onClick.AddListener(FindHost);
@@ -128,6 +132,9 @@ namespace C6Lab
         {
             if (network == null) return;
             var snapshot = network.Snapshot;
+            bool paintGoal = network.config == null || network.config.GourdMode == LabGourdMode.Paint;
+            CacheGoalTitle();
+            Set(goalTitle, GourdGoalTitle(paintGoal ? LabGourdMode.Paint : LabGourdMode.Crack));
             bool playing = snapshot != null && snapshot.phase == LabPhase.Playing;
             bool terminal = snapshot != null && (snapshot.phase == LabPhase.Victory || snapshot.phase == LabPhase.Defeat);
             terminal = terminal && !LabGourdFinish.DelayVictory(network, snapshot);
@@ -230,10 +237,9 @@ namespace C6Lab
                 SetStaminaCells(0f);
                 return;
             }
-            bool paintGoal = network.config.GourdMode == LabGourdMode.Paint;
+            int goalPercent = PaintGoalPercentFor(snapshot, network.config);
             Set(hpText, paintGoal
-                ? "PAINT " + Mathf.RoundToInt(snapshot.paintCoverage * 100f) + "% / "
-                    + Mathf.RoundToInt(LabModel.PaintVictoryCoverage * 100f) + "%"
+                ? FormatPaintGoalProgress(snapshot.paintCoverage, goalPercent)
                 : snapshot.hp + " / " + network.config.MonsterMaxHp);
             int remainingSeconds = Mathf.Max(0, Mathf.CeilToInt((float)snapshot.remaining));
             Set(timeText, (remainingSeconds / 60).ToString("00") + ":" + (remainingSeconds % 60).ToString("00"));
@@ -248,7 +254,7 @@ namespace C6Lab
             Set(seatText, local == null ? "P—" : "P" + (local.seat + 1)
                 + (network.IsDeveloperSolo ? " · SOLO" : string.Empty));
             SetFill(yokaiHpFill, paintGoal
-                ? Mathf.Clamp01(snapshot.paintCoverage / LabModel.PaintVictoryCoverage)
+                ? PaintGoalFill(snapshot.paintCoverage, goalPercent)
                 : Fraction(snapshot.hp, network.config.MonsterMaxHp));
             SetFill(playerHpFill, local == null ? 0f : Fraction(local.personalHp, network.config.PlayerMaxHp));
             SetStaminaCells(local == null ? 0f : Fraction(local.stamina, network.config.StaminaMax));
@@ -259,6 +265,41 @@ namespace C6Lab
             SetPlayerCircle(leftPlayerCircle, ParsePlayerNumber(left));
             SetPlayerCircle(rightPlayerCircle, ParsePlayerNumber(right));
         }
+
+        private void CacheGoalTitle()
+        {
+            if (goalTitleResolved || hpText == null) return;
+            goalTitleResolved = true;
+            // Saved Lab: FigmaYokaiHpBar/{hpText, TitleMask/Title}. Resolve only the
+            // title beside this bound value; never search arbitrary Text objects or hide UI.
+            Transform bar = hpText.transform.parent;
+            Transform title = bar != null ? bar.Find("TitleMask/Title") : null;
+            if (title != null && title != hpText.transform)
+                goalTitle = title.GetComponent<UnityEngine.UI.Text>();
+        }
+
+        /// <summary>The authoritative round goal wins; old fixtures without it use Config.</summary>
+        public static int PaintGoalPercentFor(LabSnapshot snapshot, LabConfig tuning)
+            => snapshot != null && snapshot.paintGoalPercent > 0
+                ? Mathf.Clamp(snapshot.paintGoalPercent, 1, 100)
+                : tuning != null ? tuning.PaintVictoryPercent : LabConfig.DefaultPaintVictoryPercent;
+
+        public static string GourdGoalTitle(LabGourdMode mode)
+            => mode == LabGourdMode.Crack ? "YOKAI HP" : "GOAL";
+
+        /// <summary>Floor to one decimal so an unfinished near-goal value never rounds up.</summary>
+        public static string FormatPaintGoalProgress(float coverage, int goalPercent)
+        {
+            float percent = Mathf.FloorToInt(DisplayCoverage(coverage) * 1000f) / 10f;
+            return "PAINT " + percent.ToString("0.0", CultureInfo.InvariantCulture)
+                + "% / " + Mathf.Clamp(goalPercent, 1, 100).ToString(CultureInfo.InvariantCulture) + "%";
+        }
+
+        public static float PaintGoalFill(float coverage, int goalPercent)
+            => Mathf.Clamp01(DisplayCoverage(coverage) / (Mathf.Clamp(goalPercent, 1, 100) / 100f));
+
+        private static float DisplayCoverage(float coverage)
+            => float.IsNaN(coverage) || float.IsInfinity(coverage) ? 0f : Mathf.Clamp01(coverage);
 
         private static int ParsePlayerNumber(string label)
         {

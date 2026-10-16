@@ -31225,7 +31225,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: GOAL
+  m_Text: YOKAI HP
 --- !u!222 &1230500545
 CanvasRenderer:
   m_ObjectHideFlags: 0

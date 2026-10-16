@@ -110,6 +110,8 @@ namespace C6Lab
         public int hp;
         /// <summary>Host-approved fraction of the whole gourd shell covered by elemental paint.</summary>
         public float paintCoverage;
+        /// <summary>Paint victory percentage captured by the Host at round start (1..100).</summary>
+        public int paintGoalPercent;
         /// <summary>Host-owned presentation pose, synchronized separately from HP and collision.</summary>
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();

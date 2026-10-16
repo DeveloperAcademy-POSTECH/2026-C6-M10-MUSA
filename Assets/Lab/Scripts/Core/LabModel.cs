@@ -59,7 +59,7 @@ namespace C6Lab
         private uint combinedCount;
         private ulong revision;
         private int hp;
-        private float paintCoverage;
+        private readonly LabPaintSurface paintSurface = new LabPaintSurface();
         private double lastTime;
         private double deadline;
         private double remaining;
@@ -70,6 +70,13 @@ namespace C6Lab
         public uint Round => round;
         public LabPhase Phase => phase;
         public int Hp => hp;
+        /// <summary>Round-owned CPU paint state; rendering reads this state and never decides victory.</summary>
+        public LabPaintSurface PaintSurface => paintSurface;
+
+        /// <summary>The element palette captured when this round began, independent of later material edits.</summary>
+        public Color PaintColorFor(LabOrbElement element) => rules != null
+            && element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
+            ? rules.PaintColors[(int)element] : Color.clear;
 
         /// <summary>ids must be the Host-approved player IDs in P1..PN order.</summary>
         public void Begin(string id, ulong[] ids, double now, LabConfig config)
@@ -115,7 +122,7 @@ namespace C6Lab
             seed = SeedFor(id, round);
             combinedCount = 0;
             hp = rules.MonsterMaxHp;
-            paintCoverage = 0f;
+            paintSurface.Clear();
             revision = 0;
             PlaceDrums(now);
             lastTime = now;
@@ -287,48 +294,55 @@ namespace C6Lab
             => ConfirmHit(id, now, out _, out _);
 
         /// <summary>
-        /// Confirm one Host collision and return the consumed orb's element and the HP actually
-        /// removed. The latter can be less than configured damage for a finishing hit.
+        /// Compatibility path for callers without a surface direction. Confirms damage and hit
+        /// rewards, but cannot add paint or decide a paint victory from an external coverage value.
         /// </summary>
         public bool ConfirmHit(string id, double now, out LabOrbElement element, out int actualDamage)
+            => ConfirmHit(id, now, Vector3.zero, out element, out actualDamage, out _);
+
+        /// <summary>
+        /// Atomically confirm one Host-owned projectile collision, rewards, CPU paint and victory.
+        /// actualDamage is the HP really removed. impactValue is the positive presentation/attack
+        /// value in Paint (even after its diagnostic HP reaches zero), and actualDamage in Crack.
+        /// </summary>
+        public bool ConfirmHit(string id, double now, Vector3 paintDirection,
+            out LabOrbElement element, out int actualDamage, out int impactValue)
         {
             element = LabOrbElement.None;
             actualDamage = 0;
-            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !orbs.TryGetValue(id ?? string.Empty, out var orb)
-                || !orb.inFlight) return false;
+            impactValue = 0;
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing
+                || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight
+                || !players.TryGetValue(orb.owner, out var attacker)) return false;
             element = orb.element;
             orbs.Remove(id);
+            int attackValue = DamageFor(orb);
             int previousHp = hp;
-            hp = Math.Max(0, hp - DamageFor(orb));
-            // Paint rounds continue after the legacy HP counter reaches zero. Keep a positive
-            // approved impact value for the existing network receipt and hit feedback path.
-            actualDamage = rules.GourdMode == LabGourdMode.Paint
-                ? DamageFor(orb) : previousHp - hp;
-            if (players.TryGetValue(orb.owner, out var attacker))
+            hp = Math.Max(0, hp - attackValue);
+            actualDamage = previousHp - hp;
+            bool paintRound = rules.GourdMode == LabGourdMode.Paint;
+            impactValue = paintRound ? attackValue : actualDamage;
+            attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
+            attacker.hitTotal++;
+            // Paint keeps the existing attack-score statistic; Crack records actual HP removed.
+            // Long paint rounds can outlive diagnostic HP, so prevent the integer score wrapping.
+            attacker.damageTotal = (int)Math.Min(int.MaxValue,
+                (long)attacker.damageTotal + (paintRound ? attackValue : actualDamage));
+
+            if (paintRound)
             {
-                attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
-                // 결과 대시보드 기록: 타격 횟수·딜, 요괴를 쓰러뜨린 한 방이면 막타
-                attacker.hitTotal++;
-                attacker.damageTotal += actualDamage;
-                if (hp == 0 && rules.GourdMode == LabGourdMode.Crack) attacker.lastHit = true;
+                if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
+                    && paintSurface.Stamp(paintDirection, PaintColorFor(element), LabPaintSurface.DefaultRadius)
+                    && paintSurface.Coverage >= rules.PaintVictoryCoverage)
+                {
+                    phase = LabPhase.Victory;
+                    attacker.lastHit = true;
+                }
             }
-            if (hp == 0 && rules.GourdMode == LabGourdMode.Crack) phase = LabPhase.Victory;
-            return true;
-        }
-
-        public const float PaintVictoryCoverage = .8f;
-
-        /// <summary>Only the Host calls this after confirming and painting an elemental hit.</summary>
-        public bool ConfirmPaintCoverage(float coverage, ulong attacker)
-        {
-            if (phase != LabPhase.Playing || rules.GourdMode != LabGourdMode.Paint
-                || float.IsNaN(coverage) || float.IsInfinity(coverage)
-                || coverage < paintCoverage || coverage > 1f) return false;
-            paintCoverage = coverage;
-            if (paintCoverage >= PaintVictoryCoverage)
+            else if (hp == 0)
             {
                 phase = LabPhase.Victory;
-                if (players.TryGetValue(attacker, out var player)) player.lastHit = true;
+                attacker.lastHit = true;
             }
             return true;
         }
@@ -439,7 +453,8 @@ namespace C6Lab
                 remaining = remaining,
                 playedSeconds = played,
                 hp = hp,
-                paintCoverage = paintCoverage,
+                paintCoverage = paintSurface.Coverage,
+                paintGoalPercent = rules.PaintVictoryPercent,
                 players = players.Values.OrderBy(player => player.seat).Select(player => player.Copy()).ToArray(),
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
                 drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray()
@@ -647,6 +662,9 @@ namespace C6Lab
             public readonly int[] GenerationChances;
             public readonly int ItemUnlockSwipesMin, ItemUnlockSwipesMax, DrumCount;
             public readonly LabGourdMode GourdMode;
+            public readonly int PaintVictoryPercent;
+            public readonly float PaintVictoryCoverage;
+            public readonly Color[] PaintColors;
 
             public Rules(LabConfig config)
             {
@@ -656,6 +674,13 @@ namespace C6Lab
                 ItemUnlockSwipesMax = config.ItemUnlockSwipesMax;
                 MonsterMaxHp = config.MonsterMaxHp;
                 GourdMode = config.GourdMode;
+                PaintVictoryPercent = config.PaintVictoryPercent;
+                PaintVictoryCoverage = config.PaintVictoryCoverage;
+                PaintColors = new Color[(int)LabOrbElement.Earth + 1];
+                for (int i = (int)LabOrbElement.Fire; i <= (int)LabOrbElement.Earth; i++)
+                    PaintColors[i] = config.OrbAppearance != null
+                        ? config.OrbAppearance.ElementColorFor((LabOrbElement)i)
+                        : LabOrbAppearance.DefaultElementColor((LabOrbElement)i);
                 PlayerMaxHp = config.PlayerMaxHp;
                 PotionHeal = config.PotionHeal;
                 RelayDoubleMultiplier = config.RelayDoubleMultiplier;

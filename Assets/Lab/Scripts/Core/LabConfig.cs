@@ -135,7 +135,8 @@ namespace C6Lab
             new LabDeveloperField("Bomb Haptic Intensity", 0f, 1f),
             new LabDeveloperField("Combine Sound Volume (50 = Inspector)", 0f, 100f),
             new LabDeveloperField("Combine Haptic Style (0-4)", 0f, 4f, true),
-            new LabDeveloperField("Combine Haptic Intensity", 0f, 1f)
+            new LabDeveloperField("Combine Haptic Intensity", 0f, 1f),
+            new LabDeveloperField("Paint Victory Coverage (%)", 1f, 100f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -162,7 +163,7 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78),
-            new LabDeveloperCategory("Gourd", 79)
+            new LabDeveloperCategory("Gourd", 79, 87)
         });
 
 
@@ -251,6 +252,8 @@ namespace C6Lab
         [Header("Gourd (요괴 박)")]
         [Tooltip("Paint: 흰 박에 구슬 속성 색을 칠한다 (#153). Crack: 박 모델에 금이 가고 처치 연출이 나온다 (#163).")]
         [SerializeField] private LabGourdMode gourdMode = LabGourdMode.Paint;
+        [Tooltip("Paint 모드에서 Host가 승리를 확정할 전체 구면 칠하기 비율 (%). 새 판 시작 때 적용한다.")]
+        [SerializeField, Range(1, 100)] private int paintVictoryPercent = DefaultPaintVictoryPercent;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -388,6 +391,9 @@ namespace C6Lab
         public float DrumDriftTurning => Mathf.Clamp(Finite(drumDriftTurning, .25f), 0f, 2f);
         public float DrumSpinStrength => Mathf.Clamp(Finite(drumSpinStrength, 1f), 0f, 3f);
         public LabGourdMode GourdMode => gourdMode == LabGourdMode.Crack ? LabGourdMode.Crack : LabGourdMode.Paint;
+        public const int DefaultPaintVictoryPercent = 80;
+        public int PaintVictoryPercent => Mathf.Clamp(paintVictoryPercent, 1, 100);
+        public float PaintVictoryCoverage => PaintVictoryPercent / 100f;
         public LabOrbAppearance OrbAppearance => orbAppearance;
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
@@ -470,7 +476,8 @@ namespace C6Lab
                 (float)GourdMode,
                 BombBlastRadius, BombBlastStrength,
                 (float)BombHapticStyle, BombHapticIntensity,
-                DevVolume(combineSoundVolumeDev), (float)CombineHapticStyle, CombineHapticIntensity
+                DevVolume(combineSoundVolumeDev), (float)CombineHapticStyle, CombineHapticIntensity,
+                (float)PaintVictoryPercent
             };
         }
 
@@ -598,6 +605,7 @@ namespace C6Lab
             combineSoundVolumeDev = values[84];
             combineHapticStyle = (LabHapticStyle)(int)values[85];
             combineHapticIntensity = values[86];
+            paintVictoryPercent = (int)values[87];
             error = string.Empty;
             return true;
         }

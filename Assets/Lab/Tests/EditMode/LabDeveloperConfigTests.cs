@@ -17,7 +17,8 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(87));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(88));
+            Assert.That(values[87], Is.EqualTo(80f), "Paint victory defaults to 80% of the whole sphere.");
             Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
@@ -92,11 +93,14 @@ namespace C6Lab.Tests
             values[84] = 0f; // combine sound off
             values[85] = 3f; // Soft
             values[86] = .1f;
+            values[87] = 60f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
             Assert.That(config.CombineSoundVolume, Is.EqualTo(0f));
             Assert.That(config.CombineHapticStyle, Is.EqualTo(LabHapticStyle.Soft));
             Assert.That(config.CombineHapticIntensity, Is.EqualTo(.1f));
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(60));
+            Assert.That(config.PaintVictoryCoverage, Is.EqualTo(.6f));
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
             Assert.That(config.GenerateCost, Is.EqualTo(5f));
@@ -427,6 +431,214 @@ namespace C6Lab.Tests
             JsonUtility.FromJsonOverwrite("{\"gourdMode\":999}", config);
             Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
             Assert.That(config.CaptureDeveloperValues()[79], Is.Zero);
+        }
+
+        [Test]
+        public void PaintGoalAppendsAfterAllPrevious87FieldsWithoutChangingTheirIndices()
+        {
+            // Wire-schema fence captured from PR #176 / 119fbd39. These positions also
+            // address saved DEV rows, shared fingerprints and the existing sound/item fields.
+            string[] previousLabels =
+            {
+                "Monster Max HP",
+                "Damage per Hit",
+                "Battle Duration (seconds)",
+                "Maximum Stamina",
+                "Starting Stamina",
+                "Orb Generation Cost",
+                "Stamina Recovery Amount",
+                "Stamina Recovery Interval (seconds)",
+                "Stamina Reward per Hit",
+                "Stored Orb Limit",
+                "Orb Lifetime (seconds)",
+                "Orb Bounce",
+                "Orb Floor Deceleration",
+                "Orb Stop Speed",
+                "Orb Maximum Release Speed",
+                "Orb Radius",
+                "Orb Board Height",
+                "Spawn Pop Start Size (0-1 of the orb)",
+                "Spawn Pop Duration (seconds)",
+                "Camera Radius",
+                "Camera Height Offset",
+                "Throw Origin Radius",
+                "Throw Origin Height Offset",
+                "Throw Origin Lateral Range",
+                "Throw Minimum Swipe Speed",
+                "Throw Minimum Swipe Distance",
+                "Throw Upward Dominance",
+                "Throw Maximum Swipe Speed",
+                "Throw Minimum Upward Speed",
+                "Throw Lateral Gain",
+                "Throw Upward Gain",
+                "Throw Forward Gain",
+                "Throw Maximum World Speed",
+                "Throw Gravity",
+                "Throw Lifetime (seconds)",
+                "Throw Radius",
+                "Throw Power Exponent",
+                "Throw Loft Offset (degrees)",
+                "Throw Air Damping",
+                "Yin Chance (%)",
+                "Yang Chance (%)",
+                "Relay Orb Chance (%)",
+                "Secret Box Chance (%)",
+                "Potion Chance (%)",
+                "Bomb Chance (%)",
+                "Item Lifetime (seconds)",
+                "Item Unlock Swipes Min",
+                "Item Unlock Swipes Max",
+                "Player Max HP",
+                "Combine Speed",
+                "Drop Combine (0 off, 1 on)",
+                "Contact Combine (0 off, 1 on)",
+                "Potion Heal (HP)",
+                "Relay x2 Damage Multiplier",
+                "Relay MAX Damage Multiplier",
+                "Bomb Damage Multiplier",
+                "Camera Look Height Offset",
+                "Target Spin Strength",
+                "Target Spin Damping",
+                "Target Spin Maximum Speed (deg/s)",
+                "Spawn Fan Angle (deg each side, 180 = all directions)",
+                "Spawn Minimum Speed (board widths/s)",
+                "Spawn Maximum Speed (board widths/s)",
+                "BGM Volume (50 = Inspector)",
+                "Generate Sound Volume (50 = Inspector)",
+                "Hit Sound Volume (50 = Inspector)",
+                "Miss Sound Volume (50 = Inspector)",
+                "Haptics (0 off, 1 on)",
+                "Generate Haptic Style (0 Light 1 Medium 2 Heavy 3 Soft 4 Rigid)",
+                "Generate Haptic Intensity",
+                "Hit Haptic Style (0-4)",
+                "Hit Haptic Intensity",
+                "Item Hit Haptic Style (0-4)",
+                "Item Hit Haptic Intensity",
+                "Drum Count",
+                "Drum Radius",
+                "Drum Drift Speed (board widths/s)",
+                "Drum Drift Turning (per second)",
+                "Drum Spin Strength",
+                "Gourd Mode (0 paint, 1 crack)",
+                "Bomb Blast Radius (board widths)",
+                "Bomb Blast Strength (board widths/s)",
+                "Bomb Haptic Style (0-4)",
+                "Bomb Haptic Intensity",
+                "Combine Sound Volume (50 = Inspector)",
+                "Combine Haptic Style (0-4)",
+                "Combine Haptic Intensity",
+            };
+            Assert.That(previousLabels.Length, Is.EqualTo(87));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(88));
+            for (int i = 0; i < previousLabels.Length; i++)
+                Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
+            LabDeveloperField field = LabConfig.DeveloperFields[87];
+            Assert.That(field.Label, Is.EqualTo("Paint Victory Coverage (%)"));
+            Assert.That(field.Min, Is.EqualTo(1f));
+            Assert.That(field.Max, Is.EqualTo(100f));
+            Assert.That(field.WholeNumber, Is.True);
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(80));
+            Assert.That(config.PaintVictoryCoverage, Is.EqualTo(.8f));
+            Assert.That(config.CaptureDeveloperValues()[87], Is.EqualTo(80f));
+            int[] gourdIndices = null;
+            foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
+                if (category.Title == "Gourd") gourdIndices = category.FieldIndices;
+            Assert.That(gourdIndices, Is.Not.Null);
+            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87 }));
+        }
+
+        [TestCase(1)]
+        [TestCase(80)]
+        [TestCase(100)]
+        public void ValidPaintGoalsRoundTripWithoutModifyingThePrevious87Values(int percent)
+        {
+            float[] before = config.CaptureDeveloperValues();
+            float[] changed = (float[])before.Clone();
+            changed[87] = percent;
+            Assert.That(config.TryApplyDeveloperValues(changed, out string error), Is.True, error);
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(percent));
+            Assert.That(config.PaintVictoryCoverage, Is.EqualTo(percent / 100f));
+            float[] after = config.CaptureDeveloperValues();
+            for (int i = 0; i < 87; i++) Assert.That(after[i], Is.EqualTo(before[i]), "Unchanged index " + i);
+            Assert.That(after[87], Is.EqualTo(percent));
+            Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
+            Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
+            Assert.That(config.BombBlastRadius, Is.EqualTo(.4f));
+            Assert.That(config.BombBlastStrength, Is.EqualTo(9f));
+            Assert.That(config.CombineHapticStyle, Is.EqualTo(LabHapticStyle.Light));
+            Assert.That(config.CombineHapticIntensity, Is.EqualTo(1f));
+        }
+
+        [TestCase(0f)]
+        [TestCase(101f)]
+        [TestCase(-1f)]
+        [TestCase(80.5f)]
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void InvalidPaintGoalRejectsTheEntireDeveloperForm(float invalid)
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[87] = 37f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            float[] baseline = config.CaptureDeveloperValues();
+            values[0] = 777f;
+            values[79] = 1f;
+            values[86] = .4f;
+            values[87] = invalid;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
+            Assert.That(error, Does.Contain("Paint Victory Coverage"));
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline), "No earlier field may be partially applied.");
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(37));
+            Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
+            Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
+        }
+
+        [Test]
+        public void Previous87ValueSettingsAreRejectedByConfigAndFingerprint()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            var oldSchema = new float[87];
+            System.Array.Copy(values, oldSchema, 87);
+            oldSchema[0] = 777f;
+            Assert.That(config.TryApplyDeveloperValues(oldSchema, out string error), Is.False);
+            Assert.That(error, Does.Contain("incomplete"));
+            Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(80));
+            Assert.Throws<System.ArgumentException>(() => LabSessionSettings.Fingerprint(oldSchema, 3, 1));
+        }
+
+        [Test]
+        public void SharedPaintGoalChangesFingerprintAndSurvivesJsonAndClientConfigRoundTrip()
+        {
+            const ushort fixtureProtocol = 1;
+            float[] values = config.CaptureDeveloperValues();
+            string first = LabSessionSettings.Fingerprint(values, 3, fixtureProtocol);
+            values[87] = 65f;
+            string changed = LabSessionSettings.Fingerprint(values, 3, fixtureProtocol);
+            Assert.That(changed, Is.Not.EqualTo(first), "Participants must acknowledge the round's paint goal.");
+            string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
+            float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
+            var clientConfig = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                Assert.That(clientConfig.TryApplyDeveloperValues(received, out string error), Is.True, error);
+                Assert.That(clientConfig.PaintVictoryPercent, Is.EqualTo(65));
+                Assert.That(clientConfig.PaintVictoryCoverage, Is.EqualTo(.65f));
+                Assert.That(clientConfig.CaptureDeveloperValues(), Is.EqualTo(values));
+                Assert.That(LabSessionSettings.Fingerprint(received, 3, fixtureProtocol), Is.EqualTo(changed));
+            }
+            finally { Object.DestroyImmediate(clientConfig); }
+        }
+
+        [TestCase(0, 1)]
+        [TestCase(101, 100)]
+        public void InspectorPaintGoalIsClampedToTheSamePercentageRange(int serialized, int expected)
+        {
+            JsonUtility.FromJsonOverwrite("{\"paintVictoryPercent\":" + serialized + "}", config);
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(expected));
+            Assert.That(config.PaintVictoryCoverage, Is.EqualTo(expected / 100f));
+            Assert.That(config.CaptureDeveloperValues()[87], Is.EqualTo(expected));
         }
 
     }
