@@ -149,7 +149,9 @@ namespace C6Lab
         private const string MessageName = "C6Lab.Packet.3";
         // P-slot assignments join lobby packets, generate drums join the snapshot with the generate
         // request naming one, Gourd Mode joins the shared config, and a bomb blast carries where it
-        // happened so the holder's board can push orbs away; older clients cannot share this room.
+        // happened so the holder's board can push orbs away, combine sound/haptic settings join the
+        // shared config and the Host tells the combiner when a combine is approved; older clients
+        // cannot share this room.
         internal const ushort LabProtocolVersion = 5620;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
@@ -236,6 +238,8 @@ namespace C6Lab
         public event Action<string, Vector2> BombBlasted;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
         public event Action LocalThrowMissed;
+        /// <summary>내가 요청한 결합을 Host가 승인했을 때, 결합한 사람 기기에서만 한 번 알린다. (거절되면 알리지 않음)</summary>
+        public event Action LocalCombined;
         private string lastMissNoticeId;
         public string Status { get; private set; } = "Choose HOST or JOIN.";
         public string Notice { get; private set; } = string.Empty;
@@ -1342,10 +1346,18 @@ namespace C6Lab
                 Debug.Log("C6_LAB_ACTION type=" + packet.type + " sender=" + sender + " orb=" + (result == null ? "" : result.id)
                     + (result == null ? "" : " owner=" + result.owner + " vx=" + result.vx.ToString("F2")));
                 PublishSnapshot(true);
+                if (packet.type == "combine") NotifyCombined(sender);
             }
             else if (sender == LocalPlayerId) RejectLocally(packet.firstId, reason);
             else Send(sender, new LabNetworkPacket { type = "reject", sessionId = sessionId,
                 firstId = packet.firstId, reason = reason });
+        }
+
+        /// <summary>결합 승인을 결합한 사람에게만 알린다 (소리·진동용). Host 본인이면 바로 이벤트를 낸다.</summary>
+        private void NotifyCombined(ulong sender)
+        {
+            if (sender == LocalPlayerId) LocalCombined?.Invoke();
+            else Send(sender, new LabNetworkPacket { type = "combined", sessionId = sessionId });
         }
 
         private void SpawnHostProjectile(LabOrbState orb, Vector2 releaseVelocity, float releaseX01)
@@ -1582,6 +1594,9 @@ namespace C6Lab
                     break;
                 case "reject":
                     if (packet.sessionId == sessionId) RejectLocally(packet.firstId, packet.reason);
+                    break;
+                case "combined":
+                    if (packet.sessionId == sessionId) LocalCombined?.Invoke();
                     break;
                 case "notice":
                     if (packet.sessionId == sessionId) SetNotice(packet.reason);
