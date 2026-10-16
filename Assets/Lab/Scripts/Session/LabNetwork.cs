@@ -156,7 +156,7 @@ namespace C6Lab
         // shared config and the Host tells the combiner when a combine is approved; older clients
         // cannot share this room. Version 5621 adds the Paint goal setting and independent
         // approved impact values/directions/colors.
-        internal const ushort LabProtocolVersion = 5622;
+        internal const ushort LabProtocolVersion = 5623;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
@@ -1504,8 +1504,8 @@ namespace C6Lab
                 current.Add(orb.id);
                 bool showSpawn = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
                     && orb.kind != LabOrbKind.Combined;
-                // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
-                float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
+                // Every screen derives a bomb's fuse from the shared Host clock in the snapshot.
+                float fuse = orb.kind == LabOrbKind.Bomb && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,

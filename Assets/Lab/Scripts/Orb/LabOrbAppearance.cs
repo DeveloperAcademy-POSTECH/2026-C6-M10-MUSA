@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace C6Lab
 {
@@ -25,6 +26,27 @@ namespace C6Lab
         [SerializeField] private Texture2D secretBoxIcon;
         [SerializeField] private Texture2D potionIcon;
         [SerializeField] private Texture2D bombIcon;
+        [Header("Bomb art (drawn facing the board camera in place of the ball and its icon)")]
+        [Tooltip("The cartoon bomb's ball without its cap and fuse; its highlight stays put like a light. " +
+            "Empty = the round item look with the bomb icon and padlock.")]
+        [SerializeField] private Texture2D bombArt;
+        [Tooltip("The cap, fuse and spark on a square canvas centred on the ball. They roll around the ball in 3D " +
+            "as the bomb moves, passing behind it and back in front.")]
+        [SerializeField] private Texture2D bombFuseArt;
+        [Tooltip("Width of the ball image, in orb diameters.")]
+        [SerializeField, Min(.1f)] private float bombBodySize = 1.2f;
+        [Tooltip("Width of the fuse canvas, in ball image widths.")]
+        [SerializeField, Min(.1f)] private float bombFuseCanvasSize = 2.044f;
+        [Tooltip("Where the cap points in the images, in degrees anticlockwise from the right.")]
+        [SerializeField] private float bombCapAngle = 52f;
+        [Tooltip("The burning fuse tip from the ball centre in the images, in ball image half-widths. The flickering spark sits here.")]
+        [SerializeField] private Vector2 bombFuseTip = new Vector2(1.5f, .8f);
+        [Tooltip("Colour of the seconds left on the fuse, drawn on the bomb.")]
+        [FormerlySerializedAs("bombLockColor")]
+        [SerializeField] private Color bombTimeColor = new Color(1f, .16f, .1f, 1f);
+        [Tooltip("Height of the seconds left on the fuse, in orb radii.")]
+        [FormerlySerializedAs("bombLockSize")]
+        [SerializeField, Min(.1f)] private float bombTimeSize = 1.1f;
         [Header("Generate drum (drawn facing the board camera)")]
         [SerializeField] private Sprite drumSprite;
         [Header("Locked item (presentation only)")]
@@ -74,6 +96,14 @@ namespace C6Lab
         public Material YangMaterial => yangMaterial;
         public Material CombinedMaterial => combinedMaterial;
         public Sprite DrumSprite => drumSprite;
+        public Texture2D BombArt => bombArt;
+        public Texture2D BombFuseArt => bombFuseArt;
+        public float BombBodySize => bombBodySize > 0f ? bombBodySize : 1.2f;
+        public float BombFuseCanvasSize => bombFuseCanvasSize > 0f ? bombFuseCanvasSize : 2.044f;
+        public float BombCapAngle => bombCapAngle;
+        public Vector2 BombFuseTip => bombFuseTip;
+        public Color BombTimeColor => bombTimeColor;
+        public float BombTimeSize => bombTimeSize > 0f ? bombTimeSize : 1.1f;
         public Texture2D LockIcon => lockIcon;
         public float LockIconSize => lockIconSize > 0f ? lockIconSize : 1.2f;
         public float LockedIconAlpha => Mathf.Clamp01(lockedIconAlpha);

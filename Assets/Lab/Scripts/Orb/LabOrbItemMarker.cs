@@ -5,11 +5,13 @@ namespace C6Lab
 {
     /// <summary>
     /// Item presentation on the orb root: an icon on a disc, a padlock over the dimmed icon while
-    /// the item is locked, a badge (remaining unlock handoffs, or a relay orb's x1/x2/MAX stage)
-    /// and a bomb's fuse seconds above the orb, all facing the front-on board camera. On unlock
-    /// the padlock rises and fades while the icon sharpens, then a gold ring shrinks onto the orb
-    /// and the orb glows once. It follows the Visual mount's
-    /// rise animation but not its rolling rotation, and owns no collider.
+    /// the item is locked and a badge (remaining unlock handoffs, or a relay orb's x1/x2/MAX stage),
+    /// all facing the front-on board camera. A bomb with cartoon art shows that art instead, with
+    /// the seconds left on its fuse in red on the ball and a spark flickering on the fuse while it
+    /// burns. As the bomb moves it rolls: the ball and its highlight stay put like a lit sphere
+    /// while the cap and fuse tilt and swing around it in 3D, never turning away behind it. On unlock the padlock rises and fades while the icon sharpens, then a gold
+    /// ring shrinks onto the orb and the orb glows once. It follows the Visual mount's rise
+    /// animation but not its rolling rotation, and owns no collider.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabOrbItemMarker : MonoBehaviour
@@ -17,12 +19,28 @@ namespace C6Lab
         private const int BadgeFontSize = 64;
         private static readonly Color DiscColor = new Color(.97f, .97f, .97f);
         private static readonly Color BadgeColor = new Color(.12f, .12f, .14f, .95f);
-        private static readonly Color FuseColor = new Color(.95f, .2f, .15f);
+        private static readonly Color TimeOutlineColor = Color.white;
+        private static readonly Color SparkColor = new Color(1f, .93f, .45f);
+        private static readonly Color SparkDotColor = new Color(1f, .62f, .15f);
+        // The white outline around the bomb's red seconds, in orb radii, drawn by offset copies.
+        private const float TimeOutline = .06f;
+        private static readonly Vector2[] OutlineDirections =
+        {
+            new Vector2(1f, 1f), new Vector2(-1f, 1f), new Vector2(1f, -1f), new Vector2(-1f, -1f)
+        };
+        private const int SparkDotCount = 3;
+        // Sorting over the bomb's ball (order 0): the cap and fuse, then the spark.
+        private const int FuseOrder = 1, SparkOrder = 6;
+        // Seen end-on, a cap pointing at the camera would flatten to a line; keep some length as depth would.
+        private const float MinReach = .3f;
+        // A jump (a press snapping the bomb under the finger, or a snapshot) turns it at most this much in one frame.
+        private const float MaxRollDegreesPerFrame = 30f;
         private static readonly Dictionary<Texture2D, Sprite> iconSprites = new Dictionary<Texture2D, Sprite>();
         private static Sprite discSprite;
         private static Sprite squareSprite;
         private static Sprite ringSprite;
         private static Sprite glowSprite;
+        private static Sprite sparkSprite;
         private static LabOrbAppearance defaultLook;
 
         private SpriteRenderer disc;
@@ -33,7 +51,22 @@ namespace C6Lab
         private SpriteRenderer warningGlow;
         private SpriteRenderer badge;
         private TextMesh badgeCount;
-        private TextMesh fuse;
+        private SpriteRenderer bombArt;
+        private Transform fusePivot;
+        private SpriteRenderer fuseArt;
+        private Quaternion bombTurn = Quaternion.identity;
+        private float capAngle;
+        private Vector2 fuseTip;
+        private float ballRadius;
+        private Vector3 lastRootPosition;
+        private bool hasLastRootPosition;
+        private TextMesh bombTime;
+        private readonly TextMesh[] bombTimeOutline = new TextMesh[4];
+        private SpriteRenderer spark;
+        private readonly SpriteRenderer[] sparkDots = new SpriteRenderer[SparkDotCount];
+        private bool bombMode;
+        private Vector2 sparkOffset;
+        private float sparkTime;
         private Transform follow;
         private float radius;
         private float unlockElapsed = -1f;
@@ -56,8 +89,32 @@ namespace C6Lab
         public float WarningHz { get; private set; }
         public bool BadgeVisible => badge != null && badge.gameObject.activeSelf;
         public string BadgeText => badgeCount != null ? badgeCount.text : string.Empty;
-        public bool FuseVisible => fuse != null && fuse.gameObject.activeSelf;
-        public string FuseText => fuse != null ? fuse.text : string.Empty;
+        /// <summary>The cartoon bomb art is drawn in place of the disc and icon.</summary>
+        public bool BombArtVisible => bombArt != null && bombArt.gameObject.activeSelf;
+        /// <summary>The bomb art's current tint; it turns red while the fuse warning flashes.</summary>
+        public Color BombArtColor => bombArt != null ? bombArt.color : Color.clear;
+        public bool BombTimeVisible => bombTime != null && bombTime.gameObject.activeSelf;
+        /// <summary>The seconds left on the fuse, written on the bomb art; empty when it has no fuse.</summary>
+        public string BombTimeText => BombTimeVisible ? bombTime.text : string.Empty;
+        public Color BombTimeColor => bombTime != null ? bombTime.color : Color.clear;
+        /// <summary>The spark flickering on the bomb art's fuse while a locked bomb burns.</summary>
+        public bool SparkVisible => spark != null && spark.gameObject.activeSelf;
+        public bool FuseArtVisible => fuseArt != null && fuseArt.gameObject.activeInHierarchy;
+        /// <summary>How the bomb has rolled from the pose drawn in its images.</summary>
+        public Quaternion BombTurn => bombTurn;
+        /// <summary>Where the rolled cap points; it never turns away from the camera (z stays at or below 0).</summary>
+        public Vector3 CapDirection { get; private set; }
+        public int FuseSortingOrder => fuseArt != null ? fuseArt.sortingOrder : 0;
+        /// <summary>The fuse tip, where the spark burns, from the ball centre.</summary>
+        public Vector2 FuseTipPosition { get; private set; }
+
+        /// <summary>Sets how the bomb has rolled, for example a random tumble when it lands.</summary>
+        public void SetBombTurn(Quaternion turn)
+        {
+            bombTurn = turn;
+            KeepCapInView();
+            if (bombMode) UpdateBombPose();
+        }
 
         public static LabOrbItemMarker Create(Transform orbRoot)
         {
@@ -67,13 +124,14 @@ namespace C6Lab
             return marker.AddComponent<LabOrbItemMarker>();
         }
 
-        /// <summary>Shows the icon (when assigned), badge and fuse; null or empty text hides that part.</summary>
-        public void Show(Texture2D iconTexture, string badgeText, string fuseText, float orbRadius, Transform followMount)
+        /// <summary>Shows the icon (when assigned) and badge; null or empty text hides the badge.</summary>
+        public void Show(Texture2D iconTexture, string badgeText, float orbRadius, Transform followMount)
         {
             EnsureParts();
             radius = orbRadius;
             follow = followMount;
             FollowMount();
+            SetBombMode(false);
 
             bool hasIcon = iconTexture != null;
             disc.gameObject.SetActive(hasIcon);
@@ -98,14 +156,82 @@ namespace C6Lab
                 badgeCount.transform.localPosition = new Vector3(.62f * radius, -.62f * radius, -.02f);
                 badgeCount.characterSize = .5f * radius / (BadgeFontSize * .1f);
             }
-            if (fuse != null)
+        }
+
+        /// <summary>
+        /// Shows the appearance's cartoon bomb in place of the disc, icon, padlock and badge, with
+        /// timeText (the seconds left on its fuse) in red on its ball; null or empty hides it.
+        /// </summary>
+        public void ShowBomb(LabOrbAppearance look, string timeText, float orbRadius, Transform followMount)
+        {
+            EnsureParts();
+            look = LookOrDefault(look);
+            radius = orbRadius;
+            follow = followMount;
+            FollowMount();
+            SetBombMode(look.BombArt != null);
+            if (!bombMode) return;
+
+            // Sprites are one unit wide; the ball image width is set in orb diameters and the fuse
+            // canvas, centred on the ball, in ball image widths.
+            float bodyWidth = look.BombBodySize * 2f * radius;
+            ballRadius = .5f * bodyWidth;
+            bombArt.sprite = SpriteFor(look.BombArt);
+            bombArt.transform.localScale = Vector3.one * bodyWidth;
+            bombArt.transform.localPosition = Vector3.zero;
+            capAngle = look.BombCapAngle;
+            fuseTip = look.BombFuseTip * ballRadius;
+            bool hasFuse = look.BombFuseArt != null;
+            fuseArt.gameObject.SetActive(hasFuse);
+            if (hasFuse)
             {
-                bool burning = !string.IsNullOrEmpty(fuseText);
-                fuse.gameObject.SetActive(burning);
-                fuse.text = burning ? fuseText : string.Empty;
-                fuse.transform.localPosition = new Vector3(0f, 1.3f * radius, -.02f);
-                fuse.characterSize = .7f * radius / (BadgeFontSize * .1f);
+                fuseArt.sprite = SpriteFor(look.BombFuseArt);
+                fuseArt.transform.localScale = Vector3.one * (bodyWidth * look.BombFuseCanvasSize);
+                // Turn the cap onto the pivot's x axis, so the pivot can aim it and shorten it as it tilts.
+                fuseArt.transform.localRotation = Quaternion.Euler(0f, 0f, -capAngle);
             }
+            UpdateBombPose();
+
+            bool counting = !string.IsNullOrEmpty(timeText);
+            if (bombTime == null) return;
+            float size = look.BombTimeSize * radius / (BadgeFontSize * .1f);
+            bombTime.gameObject.SetActive(counting);
+            bombTime.text = counting ? timeText : string.Empty;
+            bombTime.color = look.BombTimeColor;
+            bombTime.characterSize = size;
+            bombTime.transform.localPosition = new Vector3(0f, 0f, -.02f);
+            for (int i = 0; i < bombTimeOutline.Length; i++)
+            {
+                TextMesh outline = bombTimeOutline[i];
+                outline.gameObject.SetActive(counting);
+                outline.text = bombTime.text;
+                outline.characterSize = size;
+                Vector2 offset = OutlineDirections[i] * (TimeOutline * radius);
+                outline.transform.localPosition = new Vector3(offset.x, offset.y, -.015f);
+            }
+        }
+
+        private void SetBombMode(bool on)
+        {
+            if (on && !bombMode) hasLastRootPosition = false;
+            bombMode = on;
+            bombArt.gameObject.SetActive(on);
+            fusePivot.gameObject.SetActive(on);
+            if (on)
+            {
+                disc.gameObject.SetActive(false);
+                icon.gameObject.SetActive(false);
+                padlock.gameObject.SetActive(false);
+                badge.gameObject.SetActive(false);
+                if (badgeCount != null) badgeCount.gameObject.SetActive(false);
+            }
+            else
+            {
+                if (bombTime != null) bombTime.gameObject.SetActive(false);
+                foreach (TextMesh outline in bombTimeOutline)
+                    if (outline != null) outline.gameObject.SetActive(false);
+            }
+            if (!on) SetSpark(false);
         }
 
         /// <summary>
@@ -120,7 +246,8 @@ namespace C6Lab
             StopUnlock();
             look = LookOrDefault(look);
             Texture2D lockTexture = look.LockIcon;
-            bool covered = locked && lockTexture != null;
+            // The bomb art never shows a padlock.
+            bool covered = locked && lockTexture != null && !bombMode;
             padlock.gameObject.SetActive(covered);
             if (covered)
             {
@@ -147,21 +274,29 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// A locked bomb's seconds left on its fuse (negative when it has none). In its last seconds
-        /// the bomb flashes red, faster and faster as the fuse runs out. Call after SetLocked.
+        /// A locked bomb's seconds left on its fuse (negative when it has none). The bomb art's
+        /// spark flickers while it burns. In its last seconds the bomb flashes red, faster and
+        /// faster as the fuse runs out. Call after SetLocked.
         /// </summary>
         public void SetFuse(float secondsLeft, LabOrbAppearance look)
         {
             EnsureParts();
             fuseLeft = secondsLeft;
             fuseLook = LookOrDefault(look);
+            SetSpark(bombMode && fuseLeft >= 0f);
             AnimateWarning(0f);
         }
 
         private void LateUpdate()
         {
             FollowMount();
+            if (bombMode)
+            {
+                RollBomb();
+                UpdateBombPose();
+            }
             AnimateWarning(Time.deltaTime);
+            AnimateSpark(Time.deltaTime);
             if (!UnlockPlaying) return;
             unlockElapsed += Time.deltaTime;
             AnimateUnlock();
@@ -185,6 +320,8 @@ namespace C6Lab
             disc.color = Color.Lerp(DiscColor, red, WarningLevel);
             Color tint = Color.Lerp(Color.white, red, .8f * WarningLevel);
             icon.color = new Color(tint.r, tint.g, tint.b, icon.color.a);
+            bombArt.color = Color.Lerp(Color.white, red, .75f * WarningLevel);
+            fuseArt.color = bombArt.color;
             warningGlow.gameObject.SetActive(true);
             warningGlow.transform.localScale = Vector3.one * (2.4f * radius);
             warningGlow.color = new Color(red.r, red.g, red.b, .6f * WarningLevel);
@@ -197,8 +334,117 @@ namespace C6Lab
             warningPhase = 0f;
             disc.color = DiscColor;
             icon.color = new Color(1f, 1f, 1f, icon.color.a);
+            bombArt.color = Color.white;
+            fuseArt.color = Color.white;
             warningGlow.gameObject.SetActive(false);
         }
+
+        /// <summary>
+        /// Rolls the bomb by how far it moved since the last frame, like a ball rolling on the board
+        /// behind it: the face toward the camera turns the way it travels.
+        /// </summary>
+        private void RollBomb()
+        {
+            Transform root = transform.parent;
+            if (root == null) return;
+            Vector3 position = root.localPosition;
+            if (hasLastRootPosition && ballRadius > 0f)
+            {
+                Vector3 moved = position - lastRootPosition;
+                moved.z = 0f;
+                float distance = moved.magnitude;
+                if (distance > 1e-5f)
+                {
+                    float degrees = Mathf.Min(distance / ballRadius * Mathf.Rad2Deg, MaxRollDegreesPerFrame);
+                    bombTurn = Quaternion.AngleAxis(degrees, Vector3.Cross(Vector3.back, moved / distance)) * bombTurn;
+                    KeepCapInView();
+                }
+            }
+            lastRootPosition = position;
+            hasLastRootPosition = true;
+        }
+
+        /// <summary>
+        /// The cap may roll toward the camera or out to the ball's outline, but never on round behind
+        /// the ball where it would vanish: a roll that would carry it there slides it along the outline.
+        /// </summary>
+        private void KeepCapInView()
+        {
+            float authored = capAngle * Mathf.Deg2Rad;
+            Vector3 cap = bombTurn * new Vector3(Mathf.Cos(authored), Mathf.Sin(authored), 0f);
+            // The board camera looks along +z, so a cap with positive z faces away from it.
+            if (cap.z > 0f)
+            {
+                var outline = new Vector3(cap.x, cap.y, 0f);
+                if (outline.sqrMagnitude < 1e-6f) outline = new Vector3(CapDirection.x, CapDirection.y, 0f);
+                if (outline.sqrMagnitude < 1e-6f) outline = new Vector3(Mathf.Cos(authored), Mathf.Sin(authored), 0f);
+                bombTurn = Quaternion.FromToRotation(cap, outline.normalized) * bombTurn;
+                cap = bombTurn * new Vector3(Mathf.Cos(authored), Mathf.Sin(authored), 0f);
+            }
+            CapDirection = cap;
+        }
+
+        /// <summary>
+        /// Places the cap and fuse for the bomb's roll. They stand on the ball where the rolled cap
+        /// direction points: aimed along its direction across the screen and shortened as it tilts
+        /// toward the camera, always drawn over the ball.
+        /// </summary>
+        private void UpdateBombPose()
+        {
+            float authored = capAngle * Mathf.Deg2Rad;
+            var along = new Vector2(Mathf.Cos(authored), Mathf.Sin(authored));
+            KeepCapInView();
+            var across = new Vector2(CapDirection.x, CapDirection.y);
+            float reach = Mathf.Max(across.magnitude, MinReach);
+            float facing = across.sqrMagnitude > 1e-8f ? Mathf.Atan2(across.y, across.x) : authored;
+            fusePivot.localPosition = new Vector3(0f, 0f, -.005f);
+            fusePivot.localRotation = Quaternion.Euler(0f, 0f, facing * Mathf.Rad2Deg);
+            fusePivot.localScale = new Vector3(reach, 1f, 1f);
+            fuseArt.sortingOrder = FuseOrder;
+
+            // The spark rides the fuse tip through the same aim and shortening.
+            var aim = new Vector2(Mathf.Cos(facing), Mathf.Sin(facing));
+            var side = new Vector2(-aim.y, aim.x);
+            var tipSide = new Vector2(-along.y, along.x);
+            FuseTipPosition = aim * (Vector2.Dot(fuseTip, along) * reach) + side * Vector2.Dot(fuseTip, tipSide);
+            sparkOffset = FuseTipPosition;
+        }
+
+        private void SetSpark(bool burning)
+        {
+            spark.gameObject.SetActive(burning);
+            foreach (SpriteRenderer dot in sparkDots) dot.gameObject.SetActive(burning);
+            if (burning) AnimateSpark(0f);
+        }
+
+        /// <summary>
+        /// The burning fuse: a bright star that flickers in size and turn at the fuse tip, and a few
+        /// sparks that shoot out from it and fade, each in a new direction.
+        /// </summary>
+        private void AnimateSpark(float step)
+        {
+            if (!SparkVisible) return;
+            sparkTime += step;
+            float flicker = Mathf.PerlinNoise(sparkTime * 14f, .37f);
+            spark.transform.localPosition = new Vector3(sparkOffset.x, sparkOffset.y, -.01f);
+            spark.transform.localScale = Vector3.one * (radius * Mathf.Lerp(.45f, .9f, flicker));
+            spark.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.PerlinNoise(.91f, sparkTime * 6f) * 180f);
+            spark.color = new Color(SparkColor.r, SparkColor.g, SparkColor.b, Mathf.Lerp(.65f, 1f, flicker));
+            for (int i = 0; i < SparkDotCount; i++)
+            {
+                float cycle = sparkTime * 4f + i / (float)SparkDotCount;
+                float t = cycle - Mathf.Floor(cycle);
+                float angle = Wobble((int)Mathf.Floor(cycle) * SparkDotCount + i) * Mathf.PI * 2f;
+                Vector2 flight = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * (radius * .9f * t);
+                SpriteRenderer dot = sparkDots[i];
+                dot.transform.localPosition = new Vector3(sparkOffset.x + flight.x, sparkOffset.y + flight.y, -.012f);
+                dot.transform.localScale = Vector3.one * (radius * .22f * (1f - t));
+                dot.color = new Color(SparkDotColor.r, SparkDotColor.g, SparkDotColor.b, 1f - t);
+            }
+        }
+
+        // A fixed 0..1 value per index, so each spark leaves in its own direction.
+        private static float Wobble(int index) => Mathf.Repeat(Mathf.Sin(index * 12.9898f + 1.7f) * 43758.547f, 1f);
 
         private void AnimateUnlock()
         {
@@ -282,13 +528,31 @@ namespace C6Lab
             padlock = CreateSprite("Padlock", null, Color.white, 2);
             padlock.gameObject.SetActive(false);
             badge = CreateSprite("Lock Badge", Square(), BadgeColor, 3);
+            bombArt = CreateSprite("Bomb Art", null, Color.white, 0);
+            bombArt.gameObject.SetActive(false);
+            fusePivot = new GameObject("Bomb Fuse Pivot").transform;
+            fusePivot.gameObject.layer = gameObject.layer;
+            fusePivot.SetParent(transform, false);
+            fuseArt = CreateSprite("Bomb Fuse Art", null, Color.white, FuseOrder);
+            fuseArt.transform.SetParent(fusePivot, false);
+            fusePivot.gameObject.SetActive(false);
+            spark = CreateSprite("Fuse Spark", Spark(), SparkColor, SparkOrder);
+            for (int i = 0; i < SparkDotCount; i++) sparkDots[i] = CreateSprite("Fuse Spark Dot", Glow(), SparkDotColor, SparkOrder);
+            SetSpark(false);
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (font == null) return;
             badgeCount = CreateText("Lock Count", font, Color.white);
-            fuse = CreateText("Fuse Seconds", font, FuseColor);
+            for (int i = 0; i < bombTimeOutline.Length; i++)
+            {
+                bombTimeOutline[i] = CreateText("Bomb Time Outline", font, TimeOutlineColor, 4, FontStyle.Bold);
+                bombTimeOutline[i].gameObject.SetActive(false);
+            }
+            bombTime = CreateText("Bomb Time", font, Color.red, 5, FontStyle.Bold);
+            bombTime.gameObject.SetActive(false);
         }
 
-        private TextMesh CreateText(string label, Font font, Color color)
+        private TextMesh CreateText(string label, Font font, Color color, int order = 4,
+            FontStyle style = FontStyle.Normal)
         {
             var part = new GameObject(label);
             part.layer = gameObject.layer;
@@ -296,12 +560,13 @@ namespace C6Lab
             var text = part.AddComponent<TextMesh>();
             text.font = font;
             text.fontSize = BadgeFontSize;
+            text.fontStyle = style;
             text.anchor = TextAnchor.MiddleCenter;
             text.alignment = TextAlignment.Center;
             text.color = color;
             var renderer = part.GetComponent<MeshRenderer>();
             renderer.sharedMaterial = font.material;
-            renderer.sortingOrder = 4;
+            renderer.sortingOrder = order;
             return text;
         }
 
@@ -384,6 +649,29 @@ namespace C6Lab
                 }
             glowSprite = CreateGeneratedSprite("Lab unlock glow", size, pixels);
             return glowSprite;
+        }
+
+        /// <summary>A small eight-pointed star for the burning fuse tip, one unit wide.</summary>
+        private static Sprite Spark()
+        {
+            if (sparkSprite != null) return sparkSprite;
+            const int size = 64;
+            const int points = 8;
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + .5f) / size * 2f - 1f;
+                    float dy = (y + .5f) / size * 2f - 1f;
+                    float distance = Mathf.Sqrt(dx * dx + dy * dy);
+                    float turn = (Mathf.Atan2(dy, dx) / (Mathf.PI * 2f) + 1f) * points;
+                    float along = Mathf.Abs(turn - Mathf.Floor(turn) - .5f) * 2f; // 1 at a point, 0 between
+                    float edge = Mathf.Lerp(.35f, 1f, along * along);
+                    float alpha = Mathf.Clamp01((edge - distance) * size * .5f);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
+                }
+            sparkSprite = CreateGeneratedSprite("Lab fuse spark", size, pixels);
+            return sparkSprite;
         }
 
         private static Sprite Square()

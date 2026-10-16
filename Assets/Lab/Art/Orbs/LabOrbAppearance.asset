@@ -24,7 +24,15 @@ MonoBehaviour:
   relayIcon: {fileID: 2800000, guid: f894f106135c2425191dda917c414f1d, type: 3}
   secretBoxIcon: {fileID: 2800000, guid: 9db8a74d0e7504e73828d0a2b7846275, type: 3}
   potionIcon: {fileID: 2800000, guid: d10f9e33aeb5d4549ac370bcca69ebb9, type: 3}
-  bombIcon: {fileID: 2800000, guid: dc7601458a62e4966907a6847ddfc966, type: 3}
+  bombIcon: {fileID: 2800000, guid: 12eb816e530194e729ba85ad40d0bae1, type: 3}
+  bombArt: {fileID: 2800000, guid: 12eb816e530194e729ba85ad40d0bae1, type: 3}
+  bombFuseArt: {fileID: 2800000, guid: 9f1c70eef1f064956be0a925a20d72fe, type: 3}
+  bombBodySize: 1.2
+  bombFuseCanvasSize: 2.044
+  bombCapAngle: 52
+  bombFuseTip: {x: 1.5, y: 0.8}
+  bombLockColor: {r: 1, g: 0.16, b: 0.1, a: 1}
+  bombLockSize: 1.1
   drumSprite: {fileID: 21300000, guid: 2732675626f72427387ada5d986dfa0f, type: 3}
   lockIcon: {fileID: 2800000, guid: 34345e2fb63124286a9d172adfb68664, type: 3}
   lockIconSize: 0.7
@@ -37,6 +45,10 @@ MonoBehaviour:
   unlockGlowSeconds: 0.1
   unlockRingColor: {r: 1, g: 0.8, b: 0.25, a: 1}
   unlockGlowColor: {r: 1, g: 0.95, b: 0.7, a: 0.85}
+  bombWarningSeconds: 3
+  bombWarningSlowHz: 2
+  bombWarningFastHz: 8
+  bombWarningColor: {r: 1, g: 0.12, b: 0.08, a: 1}
   shadowMaterial: {fileID: 2100000, guid: 1284cbabd166044c2b2a0fc78c6959bc, type: 2}
   shadowColor: {r: 0, g: 0, b: 0, a: 0.22}
   shadowScale: {x: 1.4, y: 0.8}

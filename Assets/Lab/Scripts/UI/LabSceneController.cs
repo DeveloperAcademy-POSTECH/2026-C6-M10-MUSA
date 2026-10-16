@@ -71,6 +71,9 @@ namespace C6Lab
             // 구슬 결합 소리 (Host가 결합을 승인했을 때, 결합한 사람 기기만)
             if (boardNetwork != null && GetComponent<LabCombineSound>() == null)
                 gameObject.AddComponent<LabCombineSound>().Bind(boardNetwork);
+            // 도화선 치지직 소리 (내 판에 잠긴 폭탄이 타는 동안)
+            if (board != null && GetComponent<LabFuseSound>() == null)
+                gameObject.AddComponent<LabFuseSound>().Bind(board, boardNetwork);
             // 햅틱 (내 구슬 생성, 내가 던진 구슬 타격)
             if (boardNetwork != null && GetComponent<LabHaptics>() == null)
                 gameObject.AddComponent<LabHaptics>().Bind(boardNetwork, board);

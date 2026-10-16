@@ -138,7 +138,8 @@ namespace C6Lab
             new LabDeveloperField("Combine Haptic Intensity", 0f, 1f),
             new LabDeveloperField("Paint Victory Coverage (%)", 1f, 100f, true),
             new LabDeveloperField("Gourd Bomb Interval Min (seconds, 0 = off)", 0f, 600f),
-            new LabDeveloperField("Gourd Bomb Interval Max (seconds, 0 = off)", 0f, 600f)
+            new LabDeveloperField("Gourd Bomb Interval Max (seconds, 0 = off)", 0f, 600f),
+            new LabDeveloperField("Fuse Sound Volume (50 = Inspector)", 0f, 100f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -163,7 +164,7 @@ namespace C6Lab
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86),
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78),
             new LabDeveloperCategory("Gourd", 79, 87, 88, 89)
         });
@@ -277,8 +278,11 @@ namespace C6Lab
         [SerializeField, HideInInspector] private float hitSoundVolumeDev = DevVolumeDefault;
         [SerializeField, HideInInspector] private float missSoundVolumeDev = DevVolumeDefault;
         [SerializeField, HideInInspector] private float combineSoundVolumeDev = DevVolumeDefault;
+        [SerializeField, HideInInspector] private float fuseSoundVolumeDev = DevVolumeDefault;
         [Tooltip("음·양 구슬이 결합될 때 소리 기본 크기 (결합한 사람 기기만)")]
         [SerializeField, Range(0f, 1f)] private float combineSoundVolume = .8f;
+        [Tooltip("내 판에 잠긴 폭탄이 있는 동안 도화선이 타는 치지직 소리 기본 크기 (그 판 주인 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float fuseSoundVolume = .5f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -412,6 +416,7 @@ namespace C6Lab
         public float HitSoundVolume => Scaled(Finite(hitSoundVolume, .9f), hitSoundVolumeDev);
         public float MissSoundVolume => Scaled(Finite(missSoundVolume, .7f), missSoundVolumeDev);
         public float CombineSoundVolume => Scaled(Finite(combineSoundVolume, .8f), combineSoundVolumeDev);
+        public float FuseSoundVolume => Scaled(Finite(fuseSoundVolume, .5f), fuseSoundVolumeDev);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;
@@ -486,7 +491,8 @@ namespace C6Lab
                 (float)BombHapticStyle, BombHapticIntensity,
                 DevVolume(combineSoundVolumeDev), (float)CombineHapticStyle, CombineHapticIntensity,
                 (float)PaintVictoryPercent,
-                GourdBombIntervalMin, GourdBombIntervalMax
+                GourdBombIntervalMin, GourdBombIntervalMax,
+                DevVolume(fuseSoundVolumeDev)
             };
         }
 
@@ -618,6 +624,7 @@ namespace C6Lab
             paintVictoryPercent = (int)values[87];
             gourdBombIntervalMin = values[88];
             gourdBombIntervalMax = values[89];
+            fuseSoundVolumeDev = values[90];
             error = string.Empty;
             return true;
         }

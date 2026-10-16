@@ -386,6 +386,19 @@ namespace C6Lab
             return pushed;
         }
 
+        /// <summary>The fewest seconds left on a burning bomb fuse on this screen; negative when none burns.</summary>
+        public float ShortestFuse()
+        {
+            float shortest = -1f;
+            foreach (var entry in entries.Values)
+            {
+                if (entry.View == null || !entry.LocalOwner || entry.View.Kind != LabOrbKind.Bomb) continue;
+                float left = entry.View.FuseSeconds;
+                if (left >= 0f && (shortest < 0f || left < shortest)) shortest = left;
+            }
+            return shortest;
+        }
+
         public bool RemoveOrb(string id)
         {
             if (id == null || !entries.TryGetValue(id, out var entry)) return false;
@@ -481,8 +494,10 @@ namespace C6Lab
             heldId = nearest.View.OrbId;
             nearest.Held = true;
             nearest.PressVelocity = XY(nearest.View.Body.linearVelocity);
-            // A drum is large: keep the grabbed point under the finger instead of jumping its centre there.
-            nearest.GrabOffset = nearest.View.Kind.IsDrum() ? XY(nearest.View.Body.position) - worldPoint : Vector2.zero;
+            // A drum is large, and a bomb's art is larger than its body: keep the grabbed point under the
+            // finger instead of jumping the centre there (which would also jerk the bomb's roll).
+            bool keepsGrabPoint = nearest.View.Kind.IsDrum() || nearest.View.Kind == LabOrbKind.Bomb;
+            nearest.GrabOffset = keepsGrabPoint ? XY(nearest.View.Body.position) - worldPoint : Vector2.zero;
             StopMotion(nearest.View.Body);
             SetBodyMode(nearest);
             samples.Clear();
@@ -652,6 +667,8 @@ namespace C6Lab
             {
                 if (entry.View == null) continue;
                 bool drum = entry.View.Kind.IsDrum();
+                // A bomb wanders like the drum, so it cannot simply be left lying in a corner.
+                bool drifts = drum || entry.View.Kind == LabOrbKind.Bomb;
                 if (!entry.LocalOwner || entry.Locked || entry.Held || entry.EdgePending)
                 {
                     if (drum) entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
@@ -663,7 +680,7 @@ namespace C6Lab
                 float speed = velocity.magnitude;
                 // Config motion is expressed in board widths, while Rigidbody uses world units.
                 // Convert at this boundary so different camera/board sizes retain the same feel.
-                if (drum) velocity = Drift(entry, velocity, position);
+                if (drifts) velocity = Drift(entry, velocity, position);
                 else if (speed <= config.OrbStopSpeed * bounds.width) velocity = Vector2.zero;
                 else velocity = velocity.normalized * Mathf.Max(0f,
                     speed - config.OrbFloorDeceleration * bounds.width * Time.fixedDeltaTime);
@@ -672,10 +689,10 @@ namespace C6Lab
                 bool left = position.x <= bounds.xMin && velocity.x < 0f;
                 bool right = position.x >= bounds.xMax && velocity.x > 0f;
                 if (!left && !right) continue;
-                if (drum && Mathf.Abs(velocity.x) < DrumPassSpeedFactor * config.DrumDriftSpeed * bounds.width)
+                if (drifts && Mathf.Abs(velocity.x) < DrumPassSpeedFactor * config.DrumDriftSpeed * bounds.width)
                 {
-                    // A drum never drifts onto a neighbour's screen by itself; only a push or a swipe
-                    // passes it. A gentle drift that reaches the edge turns back instead.
+                    // A drum or bomb never drifts onto a neighbour's screen by itself; only a push or
+                    // a swipe passes it. A gentle drift that reaches the edge turns back instead.
                     body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
                     body.linearVelocity = OnPlane(new Vector2(-velocity.x, velocity.y));
                     continue;
@@ -692,9 +709,10 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// A drum left alone drifts on its own along a smooth noise path in any direction, easing away
-        /// from the side edges and the top and bottom walls. A push or a flick first slides and slows
-        /// like an orb; the drift takes over again once it is gentle. Its art turns as the path curves.
+        /// A drum or bomb left alone drifts on its own along a smooth noise path in any direction,
+        /// easing away from the side edges and the top and bottom walls, at the drum's drift speed
+        /// and turning. A push or a flick first slides and slows like an orb; the drift takes over
+        /// again once it is gentle. A drum's art turns as the path curves.
         /// </summary>
         private Vector2 Drift(Entry entry, Vector2 velocity, Vector2 position)
         {

@@ -55,6 +55,8 @@ namespace C6Lab
         public float DrumSpin => spinVelocity;
         /// <summary>A drum shows its flat art instead of the sphere once the appearance provides it.</summary>
         public bool DrumArtVisible => drumArt != null && drumArt.gameObject.activeSelf;
+        /// <summary>A bomb shows its flat cartoon art instead of the sphere once the appearance provides it.</summary>
+        public bool BombArtVisible => itemMarker != null && itemMarker.BombArtVisible;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
         public Rigidbody Body { get; private set; }
@@ -158,7 +160,7 @@ namespace C6Lab
 
         public void SetLockSwipes(int value) => SetItemState(value, relayStage, fuseSeconds);
 
-        /// <summary>Host-approved lock count, relay stage and bomb fuse; they only change item labels.</summary>
+        /// <summary>Host-approved lock count, relay stage and bomb fuse seconds; they only change item labels.</summary>
         public void SetItemState(int lockCount, int stage, float fuse = -1f)
         {
             lockSwipes = Mathf.Max(0, lockCount);
@@ -346,11 +348,13 @@ namespace C6Lab
                     defaultRenderer.SetPropertyBlock(null);
             }
             Sprite drumSprite = kind.IsDrum() && appearance != null ? appearance.DrumSprite : null;
+            // Flat art (the drum's, or the cartoon bomb's on the item marker) replaces the ball.
+            bool flatArt = drumSprite != null || HasBombArt;
             Transform defaultSphere = visual.Find("Default Sphere");
-            if (defaultSphere != null) defaultSphere.gameObject.SetActive(drumSprite == null && replacementVisual == null);
+            if (defaultSphere != null) defaultSphere.gameObject.SetActive(!flatArt && replacementVisual == null);
             if (replacementVisual != null)
             {
-                replacementVisual.SetActive(drumSprite == null);
+                replacementVisual.SetActive(!flatArt);
                 replacementVisual.transform.localScale = Vector3.one * (2f * visualRadius);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, visual.gameObject.layer);
                 if (appearance != null && replacementPrefab == appearance.VisualPrefab)
@@ -396,16 +400,23 @@ namespace C6Lab
                 return;
             }
             if (itemMarker == null) itemMarker = LabOrbItemMarker.Create(transform);
-            string fuseText = kind == LabOrbKind.Bomb && fuseSeconds >= 0f
-                ? Mathf.CeilToInt(fuseSeconds).ToString() : null;
-            itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), fuseText,
-                visualRadius, visual);
+            // A bomb has no lock to count; it shows the whole seconds left on its fuse instead.
+            if (HasBombArt)
+                itemMarker.ShowBomb(appearance, FuseText(), visualRadius, visual);
+            else
+                itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), visualRadius, visual);
             itemMarker.SetLocked(lockSwipes > 0, appearance);
             itemMarker.SetFuse(kind == LabOrbKind.Bomb ? fuseSeconds : -1f, appearance);
         }
 
+        private bool HasBombArt => kind == LabOrbKind.Bomb && appearance != null && appearance.BombArt != null;
+
+        private string FuseText() =>
+            kind == LabOrbKind.Bomb && fuseSeconds >= 0f ? Mathf.CeilToInt(fuseSeconds).ToString() : null;
+
         private string BadgeText()
         {
+            if (kind == LabOrbKind.Bomb) return FuseText();
             if (lockSwipes > 0) return lockSwipes.ToString();
             if (kind != LabOrbKind.Relay || relayStage <= 0) return null;
             return relayStage >= 3 ? "MAX" : relayStage == 2 ? "×2" : "×1";

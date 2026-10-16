@@ -17,7 +17,8 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(90));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(91));
+            Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(values[87], Is.EqualTo(80f), "Paint victory defaults to 80% of the whole sphere.");
             Assert.That(new[] { values[88], values[89] }, Is.EqualTo(new[] { 20f, 30f }),
                 "The gourd drops a bomb every 20 to 30 seconds by default.");
@@ -101,7 +102,9 @@ namespace C6Lab.Tests
             values[87] = 60f;
             values[88] = 15f;
             values[89] = 25f;
+            values[90] = 100f; // fuse sizzle twice the Inspector volume
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.FuseSoundVolume, Is.EqualTo(1f).Within(1e-5f), "100 doubles the Inspector fuse volume (0.5).");
             Assert.That(config.GourdBombIntervalMin, Is.EqualTo(15f));
             Assert.That(config.GourdBombIntervalMax, Is.EqualTo(25f));
             Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
@@ -176,6 +179,20 @@ namespace C6Lab.Tests
                 "Set Yin 50, Yang 50 and every item 0 in the LabConfig Inspector.");
             Assert.That(saved.GourdBombIntervalMin, Is.EqualTo(20f));
             Assert.That(saved.GourdBombIntervalMax, Is.EqualTo(30f));
+        }
+
+        [Test]
+        public void SavedAppearanceDrawsTheCartoonBomb()
+        {
+            var saved = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(saved, Is.Not.Null);
+            Assert.That(saved.OrbAppearance, Is.Not.Null);
+            Assert.That(saved.OrbAppearance.BombArt, Is.Not.Null,
+                "Assign Art/Items/ItemBombBody to Bomb Art in the LabOrbAppearance Inspector.");
+            Assert.That(saved.OrbAppearance.BombArt.name, Is.EqualTo("ItemBombBody"));
+            Assert.That(saved.OrbAppearance.BombFuseArt, Is.Not.Null,
+                "Assign Art/Items/ItemBombFuse to Bomb Fuse Art in the LabOrbAppearance Inspector.");
+            Assert.That(saved.OrbAppearance.BombFuseArt.name, Is.EqualTo("ItemBombFuse"));
         }
 
         [Test]
