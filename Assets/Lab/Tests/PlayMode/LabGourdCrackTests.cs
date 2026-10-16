@@ -75,6 +75,9 @@ namespace C6Lab.Tests
    SetTuning(tuning, "Throw Power Exponent", 1f);
    SetTuning(tuning, "Throw Loft Offset (degrees)", 0f);
    SetTuning(tuning, "Throw Air Damping", 0f);
+   // The gourd's sabotage bombs would add unplanned orbs to the boards checked here.
+   SetTuning(tuning, "Gourd Bomb Interval Min (seconds, 0 = off)", 0f);
+   SetTuning(tuning, "Gourd Bomb Interval Max (seconds, 0 = off)", 0f);
    Assert.That(fixture.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
    network.config = fixture;
    controller.config = fixture;
@@ -319,6 +322,8 @@ namespace C6Lab.Tests
    var fixture = Object.Instantiate(network.config);
    float[] values = fixture.CaptureDeveloperValues();
    SetTuning(values, "Gourd Mode (0 paint, 1 crack)", 1f);
+   SetTuning(values, "Gourd Bomb Interval Min (seconds, 0 = off)", 0f);
+   SetTuning(values, "Gourd Bomb Interval Max (seconds, 0 = off)", 0f);
    Assert.That(fixture.TryApplyDeveloperValues(values, out string error), Is.True, error);
    try
    {

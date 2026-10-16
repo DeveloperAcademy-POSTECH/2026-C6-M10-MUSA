@@ -5,7 +5,8 @@ namespace C6Lab
     public enum LabPhase { Idle, Playing, Victory, Defeat }
     // Items and the drum are appended so the serialized numbers of existing kinds stay unchanged.
     public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum }
-    public enum LabOrbOrigin { Unknown, Generated, Combined }
+    // Gourd is appended for bombs the gourd drops as sabotage (#177).
+    public enum LabOrbOrigin { Unknown, Generated, Combined, Gourd }
 
     public static class LabOrbKindRules
     {

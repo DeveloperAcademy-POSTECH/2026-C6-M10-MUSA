@@ -364,6 +364,8 @@ namespace C6Lab.Tests
             // that bump while scattering cannot merge before the test drags Yin onto Yang.
             tuning[51] = 0f;
             tuning[79] = 1f; // Crack keeps the damage-number presentation checked below.
+            tuning[88] = 0f; // no gourd bombs: this test counts the orbs on the board
+            tuning[89] = 0f;
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
             network.config = rawOnly;
             // The board reads contact combining from its own config, so it needs the same tuning.

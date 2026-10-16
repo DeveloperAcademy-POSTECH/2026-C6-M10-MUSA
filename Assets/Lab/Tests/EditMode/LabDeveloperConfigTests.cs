@@ -17,8 +17,10 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(88));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(90));
             Assert.That(values[87], Is.EqualTo(80f), "Paint victory defaults to 80% of the whole sphere.");
+            Assert.That(new[] { values[88], values[89] }, Is.EqualTo(new[] { 20f, 30f }),
+                "The gourd drops a bomb every 20 to 30 seconds by default.");
             Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
@@ -38,7 +40,10 @@ namespace C6Lab.Tests
             values[38] = .45f; // flight damping
             values[39] = 50f; // Yin chance
             values[40] = 25f; // Yang chance
-            values[44] = 10f; // Bomb chance; Relay/Box/Potion stay 5 each
+            values[41] = 5f;  // Relay chance
+            values[42] = 5f;  // Secret Box chance
+            values[43] = 5f;  // Potion chance
+            values[44] = 10f; // Bomb chance
             values[48] = 120f; // existing player HP index remains stable as spin fields are appended
             Assert.That(values[52], Is.EqualTo(10f), "Potion heal defaults to 10 HP.");
             values[52] = 25f; // potion heal
@@ -94,7 +99,11 @@ namespace C6Lab.Tests
             values[85] = 3f; // Soft
             values[86] = .1f;
             values[87] = 60f;
+            values[88] = 15f;
+            values[89] = 25f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.GourdBombIntervalMin, Is.EqualTo(15f));
+            Assert.That(config.GourdBombIntervalMax, Is.EqualTo(25f));
             Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
             Assert.That(config.CombineSoundVolume, Is.EqualTo(0f));
             Assert.That(config.CombineHapticStyle, Is.EqualTo(LabHapticStyle.Soft));
@@ -155,6 +164,18 @@ namespace C6Lab.Tests
             Assert.That(saved.StaminaRecoverySeconds, Is.EqualTo(1.7f),
                 "A drained bar refills in about one lap of the drum around three players.");
             Assert.That(saved.HitRecovery, Is.EqualTo(10f), "A hit returns half an orb.");
+        }
+
+        [Test]
+        public void SavedConfigDrumMakesOnlyYinAndYangAndTheGourdDropsBombs()
+        {
+            // #177: items no longer come from the drum; the gourd drops bombs instead.
+            var saved = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(saved, Is.Not.Null);
+            Assert.That(saved.GenerationChances(), Is.EqualTo(new[] { 50, 50, 0, 0, 0, 0 }),
+                "Set Yin 50, Yang 50 and every item 0 in the LabConfig Inspector.");
+            Assert.That(saved.GourdBombIntervalMin, Is.EqualTo(20f));
+            Assert.That(saved.GourdBombIntervalMax, Is.EqualTo(30f));
         }
 
         [Test]
@@ -231,18 +252,19 @@ namespace C6Lab.Tests
         public void GenerationChancesStartFromIssueDefaultsAndMustTotalOneHundred()
         {
             float[] values = config.CaptureDeveloperValues();
+            // The drum makes Yin and Yang only (#177); the item chances stay in the form at 0.
             Assert.That(new[] { values[39], values[40], values[41], values[42], values[43], values[44] },
-                Is.EqualTo(new[] { 40f, 40f, 5f, 5f, 5f, 5f }));
+                Is.EqualTo(new[] { 50f, 50f, 0f, 0f, 0f, 0f }));
 
             values[0] = 240f;
-            values[39] = 41f; // total 101
+            values[39] = 51f; // total 101
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False);
             Assert.That(error, Does.Contain("100"));
             Assert.That(config.MonsterMaxHp, Is.EqualTo(1000), "A rejected form must not partially apply.");
-            Assert.That(config.GenerationChances(), Is.EqualTo(new[] { 40, 40, 5, 5, 5, 5 }));
+            Assert.That(config.GenerationChances(), Is.EqualTo(new[] { 50, 50, 0, 0, 0, 0 }));
 
-            values[39] = 39.5f;
-            values[40] = 40.5f;
+            values[39] = 49.5f;
+            values[40] = 50.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out _), Is.False, "Chances are whole percents.");
         }
 
@@ -529,7 +551,7 @@ namespace C6Lab.Tests
                 "Combine Haptic Intensity",
             };
             Assert.That(previousLabels.Length, Is.EqualTo(87));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(88));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.GreaterThanOrEqualTo(88));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             LabDeveloperField field = LabConfig.DeveloperFields[87];
@@ -544,7 +566,38 @@ namespace C6Lab.Tests
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
                 if (category.Title == "Gourd") gourdIndices = category.FieldIndices;
             Assert.That(gourdIndices, Is.Not.Null);
-            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87 }));
+            Assert.That(gourdIndices, Is.SupersetOf(new[] { 79, 87 }));
+        }
+
+        [Test]
+        public void GourdBombIntervalIsAppendedToTheGourdCategoryAndMinCannotExceedMax()
+        {
+            Assert.That(LabConfig.DeveloperFields[88].Label, Is.EqualTo("Gourd Bomb Interval Min (seconds, 0 = off)"));
+            Assert.That(LabConfig.DeveloperFields[89].Label, Is.EqualTo("Gourd Bomb Interval Max (seconds, 0 = off)"));
+            foreach (int index in new[] { 88, 89 })
+            {
+                Assert.That(LabConfig.DeveloperFields[index].Min, Is.EqualTo(0f));
+                Assert.That(LabConfig.DeveloperFields[index].Max, Is.EqualTo(600f));
+            }
+            int[] gourdIndices = null;
+            foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
+                if (category.Title == "Gourd") gourdIndices = category.FieldIndices;
+            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87, 88, 89 }));
+            Assert.That(config.GourdBombIntervalMin, Is.EqualTo(20f));
+            Assert.That(config.GourdBombIntervalMax, Is.EqualTo(30f));
+
+            float[] values = config.CaptureDeveloperValues();
+            values[0] = 777f;
+            values[88] = 31f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False);
+            Assert.That(error, Does.Contain("Gourd Bomb Interval"));
+            Assert.That(config.MonsterMaxHp, Is.EqualTo(1000), "A rejected form must not partially apply.");
+            Assert.That(config.GourdBombIntervalMin, Is.EqualTo(20f));
+
+            values[88] = 0f;
+            values[89] = 0f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.True, error);
+            Assert.That(config.GourdBombIntervalMax, Is.Zero, "A maximum of 0 turns the gourd's bombs off.");
         }
 
         [TestCase(1)]

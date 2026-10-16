@@ -156,8 +156,9 @@ namespace C6Lab
         // shared config and the Host tells the combiner when a combine is approved; older clients
         // cannot share this room. Version 5621 adds the Paint goal setting and independent
         // approved impact values/directions/colors.
-        internal const ushort LabProtocolVersion = 5621;
+        internal const ushort LabProtocolVersion = 5622;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
+        private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
@@ -261,6 +262,8 @@ namespace C6Lab
         public event Action<int> LocalThrowHit;
         /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
         public event Action<string, Vector2> BombBlasted;
+        /// <summary>박이 누군가의 판에 폭탄을 떨어뜨렸을 때 모든 기기에서 한 번 알린다. (받는 사람, 폭탄 ID, 떨어질 위치 0..1)</summary>
+        public event Action<ulong, string, Vector2> GourdBombDropped;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
         public event Action LocalThrowMissed;
         /// <summary>내가 요청한 결합을 Host가 승인했을 때, 결합한 사람 기기에서만 한 번 알린다. (거절되면 알리지 않음)</summary>
@@ -1222,6 +1225,7 @@ namespace C6Lab
             }
             latest.paused = battleClock.IsPaused && latest.phase == LabPhase.Playing;
             AnnounceBombExplosions();
+            AnnounceGourdBombs();
             // Large experimental states are deliberately updated less often instead of queuing
             // many reliable fragments per peer until the network becomes unusable.
             nextSnapshotAt = now + ((latest.orbs?.Length ?? 0) > 100 ? .5d : .1d);
@@ -1266,6 +1270,29 @@ namespace C6Lab
                 else Send(blast.Owner, new LabNetworkPacket { type = "bombBlast", sessionId = sessionId,
                     firstId = blast.BombId, x = blast.Position.x, y = blast.Position.y });
             }
+        }
+
+        private void AnnounceGourdBombs()
+        {
+            foreach (LabGourdBomb drop in model.DrainGourdBombs())
+            {
+                Debug.Log("C6_LAB_GOURD_BOMB target=" + drop.Target + " bomb=" + drop.BombId);
+                // Everyone sees the gourd warn; it reaches each player before the snapshot that
+                // first holds the bomb, so the drop can play before the bomb appears.
+                foreach (ulong id in order)
+                {
+                    if (id == manager.LocalClientId) continue;
+                    Send(id, new LabNetworkPacket { type = "gourdBomb", sessionId = sessionId, owner = drop.Target,
+                        firstId = drop.BombId, x = drop.Position.x, y = drop.Position.y });
+                }
+                OnGourdBomb(drop.Target, drop.BombId, drop.Position);
+            }
+        }
+
+        private void OnGourdBomb(ulong target, string bombId, Vector2 position)
+        {
+            if (target == LocalPlayerId) SetNotice(GourdBombNotice);
+            GourdBombDropped?.Invoke(target, bombId, position);
         }
 
         private void OnBombBlast(string bombId, Vector2 position)
@@ -1628,6 +1655,12 @@ namespace C6Lab
                 case "bombBlast":
                     if (packet.sessionId == sessionId && Finite(packet.x) && Finite(packet.y))
                         OnBombBlast(packet.firstId, new Vector2(Mathf.Clamp01(packet.x), Mathf.Clamp01(packet.y)));
+                    break;
+                case "gourdBomb":
+                    if (packet.sessionId == sessionId && !string.IsNullOrEmpty(packet.firstId)
+                        && Finite(packet.x) && Finite(packet.y))
+                        OnGourdBomb(packet.owner, packet.firstId,
+                            new Vector2(Mathf.Clamp01(packet.x), Mathf.Clamp01(packet.y)));
                     break;
                 case "targetImpact":
                     if (target != null && ValidPaintImpact(packet)
