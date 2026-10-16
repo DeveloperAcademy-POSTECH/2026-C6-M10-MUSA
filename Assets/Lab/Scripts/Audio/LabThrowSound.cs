@@ -4,7 +4,8 @@ namespace C6Lab
 {
     /// <summary>
     /// 내가 던진 구슬의 결과 소리. 던진 사람 기기에서만 난다.
-    /// - 요괴에 맞으면: Resources/Audio/Hit 폴더의 소리 중 하나 (여러 개면 무작위, 연속 같은 소리 X)
+    /// - 요괴에 맞으면: 박 모드가 Paint면 Resources/Audio/Hit(물감 터지는 소리), Crack이면 Resources/Audio/HitCrack 폴더의
+    ///   소리 중 하나 (여러 개면 무작위, 연속 같은 소리 X). 한쪽 폴더가 비어 있으면 다른 쪽 소리를 쓴다.
     /// - 빗나가면: Resources/Audio/Miss 폴더의 소리 중 하나 (같은 방식)
     /// 소리 파일이 없으면 조용히 넘어간다. 크기는 기본 크기 × 일시정지 메뉴 SFX 설정.
     /// </summary>
@@ -12,6 +13,7 @@ namespace C6Lab
     public sealed class LabThrowSound : MonoBehaviour
     {
         public const string HitFolder = "Audio/Hit";
+        public const string CrackHitFolder = "Audio/HitCrack";
         public const string MissFolder = "Audio/Miss";
 
         // LabConfig를 읽을 수 없을 때만 쓰는 기본 크기. 평소에는 LabConfig의 Hit/Miss Sound Volume을 쓴다.
@@ -23,13 +25,16 @@ namespace C6Lab
         private float MissBase => Config != null ? Config.MissSoundVolume : missVolume;
 
         private AudioClip[] hitClips;
+        private AudioClip[] crackHitClips;
         private AudioClip[] missClips;
         private int lastMissIndex = -1;
         private AudioSource source;
         private LabNetwork network;
         private int lastHitIndex = -1;
+        private AudioClip[] lastHitClips;
 
         public int HitClipCount => hitClips == null ? 0 : hitClips.Length;
+        public int CrackHitClipCount => crackHitClips == null ? 0 : crackHitClips.Length;
         public int MissClipCount => missClips == null ? 0 : missClips.Length;
 
         public void Bind(LabNetwork target)
@@ -50,6 +55,7 @@ namespace C6Lab
         private void Awake()
         {
             hitClips = Resources.LoadAll<AudioClip>(HitFolder);
+            crackHitClips = Resources.LoadAll<AudioClip>(CrackHitFolder);
             missClips = Resources.LoadAll<AudioClip>(MissFolder);
             source = gameObject.AddComponent<AudioSource>();
             source.playOnAwake = false;
@@ -58,7 +64,16 @@ namespace C6Lab
 
         private void OnLocalThrowHit(int damage) => PlayHit();
 
-        public void PlayHit() => PlayRandom(hitClips, ref lastHitIndex, HitBase);
+        /// <summary>박 모드에 맞는 타격음: Paint는 물감 소리, Crack은 기존 타격음.</summary>
+        public void PlayHit()
+        {
+            bool crack = Config != null && Config.GourdMode == LabGourdMode.Crack;
+            AudioClip[] clips = crack ? crackHitClips : hitClips;
+            if (clips == null || clips.Length == 0) clips = crack ? hitClips : crackHitClips;
+            if (clips != lastHitClips) lastHitIndex = -1;
+            lastHitClips = clips;
+            PlayRandom(clips, ref lastHitIndex, HitBase);
+        }
         public void PlayMiss() => PlayRandom(missClips, ref lastMissIndex, MissBase);
 
         private void PlayRandom(AudioClip[] clips, ref int lastIndex, float volume)

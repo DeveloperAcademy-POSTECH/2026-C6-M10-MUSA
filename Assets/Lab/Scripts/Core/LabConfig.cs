@@ -111,10 +111,11 @@ namespace C6Lab
             new LabDeveloperField("Spawn Fan Angle (deg each side, 180 = all directions)", 0f, 180f),
             new LabDeveloperField("Spawn Minimum Speed (board widths/s)", 0f, 10f),
             new LabDeveloperField("Spawn Maximum Speed (board widths/s)", 0f, 10f),
-            new LabDeveloperField("BGM Volume", 0f, 1f),
-            new LabDeveloperField("Generate Sound Volume", 0f, 1f),
-            new LabDeveloperField("Hit Sound Volume", 0f, 1f),
-            new LabDeveloperField("Miss Sound Volume", 0f, 1f),
+            // 소리 크기 5개는 DEV에서 0~100 (50 = Inspector 값 그대로, 100 = 2배, 0 = 끔)
+            new LabDeveloperField("BGM Volume (50 = Inspector)", 0f, 100f),
+            new LabDeveloperField("Generate Sound Volume (50 = Inspector)", 0f, 100f),
+            new LabDeveloperField("Hit Sound Volume (50 = Inspector)", 0f, 100f),
+            new LabDeveloperField("Miss Sound Volume (50 = Inspector)", 0f, 100f),
             new LabDeveloperField("Haptics (0 off, 1 on)", 0f, 1f, true),
             new LabDeveloperField("Generate Haptic Style (0 Light 1 Medium 2 Heavy 3 Soft 4 Rigid)", 0f, 4f, true),
             new LabDeveloperField("Generate Haptic Intensity", 0f, 1f),
@@ -131,7 +132,10 @@ namespace C6Lab
             new LabDeveloperField("Bomb Blast Radius (board widths)", 0f, 2f),
             new LabDeveloperField("Bomb Blast Strength (board widths/s)", 0f, 20f),
             new LabDeveloperField("Bomb Haptic Style (0-4)", 0f, 4f, true),
-            new LabDeveloperField("Bomb Haptic Intensity", 0f, 1f)
+            new LabDeveloperField("Bomb Haptic Intensity", 0f, 1f),
+            new LabDeveloperField("Combine Sound Volume (50 = Inspector)", 0f, 100f),
+            new LabDeveloperField("Combine Haptic Style (0-4)", 0f, 4f, true),
+            new LabDeveloperField("Combine Haptic Intensity", 0f, 1f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -156,7 +160,7 @@ namespace C6Lab
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83),
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78),
             new LabDeveloperCategory("Gourd", 79)
         });
@@ -257,18 +261,27 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float hitSoundVolume = .9f;
         [Tooltip("내가 던진 구슬이 빗나갔을 때 소리 기본 크기 (던진 사람 기기만)")]
         [SerializeField, Range(0f, 1f)] private float missSoundVolume = .7f;
+        // DEV에서 정하는 소리 크기 배율 (0~100, 50 = Inspector 값 그대로). Inspector에는 보이지 않고,
+        // DEV 적용·방 공유 때만 바뀐다. 실제 크기 = Inspector 값 × (배율 / 50)
+        [SerializeField, HideInInspector] private float bgmVolumeDev = DevVolumeDefault;
+        [SerializeField, HideInInspector] private float generateSoundVolumeDev = DevVolumeDefault;
+        [SerializeField, HideInInspector] private float hitSoundVolumeDev = DevVolumeDefault;
+        [SerializeField, HideInInspector] private float missSoundVolumeDev = DevVolumeDefault;
+        [SerializeField, HideInInspector] private float combineSoundVolumeDev = DevVolumeDefault;
+        [Tooltip("음·양 구슬이 결합될 때 소리 기본 크기 (결합한 사람 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float combineSoundVolume = .8f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
         [SerializeField] private bool hapticsEnabled = true;
         [Tooltip("내 구슬이 생성되어 떠오를 때 진동 종류")]
-        [SerializeField] private LabHapticStyle generateHapticStyle = LabHapticStyle.Light;
+        [SerializeField] private LabHapticStyle generateHapticStyle = LabHapticStyle.Medium;
         [Tooltip("생성 진동 세기 (0 = 끔)")]
-        [SerializeField, Range(0f, 1f)] private float generateHapticIntensity = .4f;
+        [SerializeField, Range(0f, 1f)] private float generateHapticIntensity = 1f;
         [Tooltip("기본 피해(Damage per Hit) 이하로 맞았을 때 진동 종류")]
-        [SerializeField] private LabHapticStyle hitHapticStyle = LabHapticStyle.Light;
+        [SerializeField] private LabHapticStyle hitHapticStyle = LabHapticStyle.Heavy;
         [Tooltip("기본 피해일 때 진동 세기 (0 = 끔)")]
-        [SerializeField, Range(0f, 1f)] private float hitHapticIntensity = .6f;
+        [SerializeField, Range(0f, 1f)] private float hitHapticIntensity = 1f;
         [Tooltip("기본보다 큰 피해(아이템)로 맞았을 때 진동 종류")]
         [SerializeField] private LabHapticStyle itemHitHapticStyle = LabHapticStyle.Heavy;
         [Tooltip("큰 피해일 때 진동 세기 (0 = 끔)")]
@@ -277,6 +290,10 @@ namespace C6Lab
         [SerializeField] private LabHapticStyle bombHapticStyle = LabHapticStyle.Heavy;
         [Tooltip("폭탄 폭발 진동 세기 (0이면 진동 없음)")]
         [SerializeField, Range(0f, 1f)] private float bombHapticIntensity = 1f;
+        [Tooltip("내가 구슬을 결합했을 때 진동 종류 (약하게)")]
+        [SerializeField] private LabHapticStyle combineHapticStyle = LabHapticStyle.Light;
+        [Tooltip("결합 진동 세기 (0 = 끔)")]
+        [SerializeField, Range(0f, 1f)] private float combineHapticIntensity = 1f;
 
         [Header("Replaceable orb presentation")]
         [SerializeField] private LabOrbAppearance orbAppearance;
@@ -372,19 +389,29 @@ namespace C6Lab
         public float DrumSpinStrength => Mathf.Clamp(Finite(drumSpinStrength, 1f), 0f, 3f);
         public LabGourdMode GourdMode => gourdMode == LabGourdMode.Crack ? LabGourdMode.Crack : LabGourdMode.Paint;
         public LabOrbAppearance OrbAppearance => orbAppearance;
-        public float BgmVolume => Mathf.Clamp01(Finite(bgmVolume, .2f));
-        public float GenerateSoundVolume => Mathf.Clamp01(Finite(generateSoundVolume, 1f));
-        public float HitSoundVolume => Mathf.Clamp01(Finite(hitSoundVolume, .9f));
-        public float MissSoundVolume => Mathf.Clamp01(Finite(missSoundVolume, .7f));
+        /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
+        public const float DevVolumeDefault = 50f;
+
+        // 실제 소리 크기 = Inspector 값 × DEV 배율(50 = 1배). 최대 Inspector 값의 2배.
+        public float BgmVolume => Scaled(Finite(bgmVolume, .2f), bgmVolumeDev);
+        public float GenerateSoundVolume => Scaled(Finite(generateSoundVolume, 1f), generateSoundVolumeDev);
+        public float HitSoundVolume => Scaled(Finite(hitSoundVolume, .9f), hitSoundVolumeDev);
+        public float MissSoundVolume => Scaled(Finite(missSoundVolume, .7f), missSoundVolumeDev);
+        public float CombineSoundVolume => Scaled(Finite(combineSoundVolume, .8f), combineSoundVolumeDev);
+        private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
+        private static float Scaled(float inspectorVolume, float devVolume) =>
+            Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;
         public bool HapticsEnabled => hapticsEnabled;
         public LabHapticStyle GenerateHapticStyle => ValidStyle(generateHapticStyle);
-        public float GenerateHapticIntensity => Mathf.Clamp01(Finite(generateHapticIntensity, .4f));
+        public float GenerateHapticIntensity => Mathf.Clamp01(Finite(generateHapticIntensity, 1f));
         public LabHapticStyle HitHapticStyle => ValidStyle(hitHapticStyle);
-        public float HitHapticIntensity => Mathf.Clamp01(Finite(hitHapticIntensity, .6f));
+        public float HitHapticIntensity => Mathf.Clamp01(Finite(hitHapticIntensity, 1f));
         public LabHapticStyle ItemHitHapticStyle => ValidStyle(itemHitHapticStyle);
         public float ItemHitHapticIntensity => Mathf.Clamp01(Finite(itemHitHapticIntensity, 1f));
         public LabHapticStyle BombHapticStyle => ValidStyle(bombHapticStyle);
         public float BombHapticIntensity => Mathf.Clamp01(Finite(bombHapticIntensity, 1f));
+        public LabHapticStyle CombineHapticStyle => ValidStyle(combineHapticStyle);
+        public float CombineHapticIntensity => Mathf.Clamp01(Finite(combineHapticIntensity, 1f));
         public float CameraRadius => Positive(cameraRadius, 8f);
         public float CameraHeightOffset => Finite(cameraHeightOffset, .65f);
         public float CameraLookHeightOffset => Mathf.Clamp(Finite(cameraLookHeightOffset, 2f), -10f, 10f);
@@ -433,7 +460,8 @@ namespace C6Lab
                 CameraLookHeightOffset, TargetSpinStrength, TargetSpinDamping,
                 TargetSpinMaximumSpeed,
                 SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed,
-                BgmVolume, GenerateSoundVolume, HitSoundVolume, MissSoundVolume,
+                DevVolume(bgmVolumeDev), DevVolume(generateSoundVolumeDev),
+                DevVolume(hitSoundVolumeDev), DevVolume(missSoundVolumeDev),
                 HapticsEnabled ? 1f : 0f,
                 (float)GenerateHapticStyle, GenerateHapticIntensity,
                 (float)HitHapticStyle, HitHapticIntensity,
@@ -441,7 +469,8 @@ namespace C6Lab
                 DrumCount, DrumRadius, DrumDriftSpeed, DrumDriftTurning, DrumSpinStrength,
                 (float)GourdMode,
                 BombBlastRadius, BombBlastStrength,
-                (float)BombHapticStyle, BombHapticIntensity
+                (float)BombHapticStyle, BombHapticIntensity,
+                DevVolume(combineSoundVolumeDev), (float)CombineHapticStyle, CombineHapticIntensity
             };
         }
 
@@ -545,10 +574,10 @@ namespace C6Lab
             spawnFanAngle = values[60];
             spawnMinSpeed = values[61];
             spawnMaxSpeed = values[62];
-            bgmVolume = values[63];
-            generateSoundVolume = values[64];
-            hitSoundVolume = values[65];
-            missSoundVolume = values[66];
+            bgmVolumeDev = values[63];
+            generateSoundVolumeDev = values[64];
+            hitSoundVolumeDev = values[65];
+            missSoundVolumeDev = values[66];
             hapticsEnabled = values[67] >= .5f;
             generateHapticStyle = (LabHapticStyle)(int)values[68];
             generateHapticIntensity = values[69];
@@ -566,6 +595,9 @@ namespace C6Lab
             bombBlastStrength = values[81];
             bombHapticStyle = (LabHapticStyle)(int)values[82];
             bombHapticIntensity = values[83];
+            combineSoundVolumeDev = values[84];
+            combineHapticStyle = (LabHapticStyle)(int)values[85];
+            combineHapticIntensity = values[86];
             error = string.Empty;
             return true;
         }
