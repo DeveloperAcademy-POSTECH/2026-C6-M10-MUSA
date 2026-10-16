@@ -9,9 +9,9 @@ using UnityEngine.TestTools;
 namespace C6Lab.Tests
 {
     /// <summary>
-    /// Default-Scene runtime wiring, presentation edge cases, and real Solo Host projectile collisions.
-    /// Direct ApprovedHit calls below test presentation inputs only; the Host integration test
-    /// generates and opens a deterministic SecretBox fixture through the saved board gestures.
+    /// Default-Scene runtime wiring, offline texture previews, and real Solo Host projectile collisions.
+    /// Connected approval events refresh already-owned state; they never inject Host paint.
+    /// Physics fixtures open deterministic SecretBoxes through the saved board gestures.
     /// </summary>
     public sealed class LabGourdPaintTests
     {
@@ -26,12 +26,12 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator MainSceneUsesWhiteGourdAndFiveElementPaintWithoutCrackFinish()
+        public IEnumerator MainSceneUsesWhiteGourdAndCumulativePaintTextureWithoutAHitCountCap()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
             var paint = Object.FindFirstObjectByType<LabGourdPaint>();
-            Assert.That(paint, Is.Not.Null, "The ordinary Lab controller must attach the paint presentation at runtime.");
+            Assert.That(paint, Is.Not.Null, "The ordinary controller attaches the presentation at runtime.");
             Assert.That(paint.IsReady, Is.True, paint.InitializationError);
             Assert.That(paint.InitializationError, Is.Null.Or.Empty);
             Assert.That(paint.target, Is.SameAs(paint.network.target));
@@ -44,106 +44,133 @@ namespace C6Lab.Tests
             Assert.That(paint.target.Hitbox.GetComponent<MeshRenderer>().enabled, Is.False);
             Assert.That(paint.VisualInstance.GetComponentsInChildren<Collider>(true), Is.Empty);
             Assert.That(paint.VisualInstance.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
-            var crack = paint.target.GetComponent<LabGourdCrack>();
-            var finish = paint.target.GetComponent<LabGourdFinish>();
-            Assert.That(crack, Is.Not.Null, "Keep the saved references for the preserved crack experiment.");
-            Assert.That(crack.enabled, Is.False);
-            Assert.That(finish, Is.Not.Null);
-            Assert.That(finish.enabled, Is.False);
+            Assert.That(paint.target.GetComponent<LabGourdCrack>().enabled, Is.False);
+            Assert.That(paint.target.GetComponent<LabGourdFinish>().enabled, Is.False);
             Assert.That(LabGourdFinish.DelayVictory(paint.network,
                 new LabSnapshot { sessionId = "paint", round = 1, phase = LabPhase.Victory }), Is.False);
             Assert.That(paint.PaintCount, Is.Zero);
+            Assert.That(paint.PaintTexture.width, Is.EqualTo(LabPaintSurface.Width));
+            Assert.That(paint.PaintTexture.height, Is.EqualTo(LabPaintSurface.Height));
+            Assert.That(paint.PaintTexture.mipmapCount, Is.EqualTo(1));
+            Assert.That(paint.PaintTexture.filterMode, Is.EqualTo(FilterMode.Point));
+            Assert.That(paint.PaintTexture.wrapModeU, Is.EqualTo(TextureWrapMode.Repeat));
+            Assert.That(paint.PaintTexture.wrapModeV, Is.EqualTo(TextureWrapMode.Clamp));
 
-            var retainedProperties = ReadBlock(paint);
-            retainedProperties.SetFloat("_TestRetainedProperty", .37f);
-            paint.Shell.GetComponent<Renderer>().SetPropertyBlock(retainedProperties);
+            // Before connecting, ApprovedHit is a presentation preview input only. Its CPU
+            // premultiplied colors must be uploaded without a second shader-side stamp list.
+            var retained = ReadBlock(paint);
+            retained.SetFloat("_TestRetainedProperty", .37f);
+            paint.Shell.GetComponent<Renderer>().SetPropertyBlock(retained);
+            var expected = new LabPaintSurface();
             for (int i = 0; i < 5; i++)
             {
                 var element = (LabOrbElement)(i + 1);
-                paint.target.NotifyApprovedHit(new Vector3(.1f * i, .1f, .5f), element);
+                Vector3 localPoint = new Vector3(.1f * i, .1f, .5f);
+                Vector3 world = paint.target.Hitbox.transform.TransformPoint(localPoint);
+                Vector3 direction = paint.Shell.InverseTransformPoint(world).normalized;
+                Color color = paint.network.config.OrbAppearance.ElementColorFor(element);
+                Assert.That(expected.Stamp(direction, color, paint.splatRadius), Is.True);
+                paint.target.NotifyApprovedHit(localPoint, element);
                 Assert.That(paint.PaintCount, Is.EqualTo(i + 1));
-                MaterialPropertyBlock block = ReadBlock(paint);
-                Color expected = paint.network.config.OrbAppearance.ElementColorFor(element);
-                Assert.That(block.GetVectorArray("_PaintColors")[i], Is.EqualTo((Vector4)expected));
-                Assert.That(block.GetFloat("_TestRetainedProperty"), Is.EqualTo(.37f),
-                    "Paint updates must preserve another presentation's property block values.");
+                AssertTextureMatches(expected, paint);
+                Assert.That(ReadBlock(paint).GetFloat("_TestRetainedProperty"), Is.EqualTo(.37f));
             }
             paint.target.NotifyApprovedHit(Vector3.forward, LabOrbElement.None);
             paint.target.NotifyApprovedHit(Vector3.forward, (LabOrbElement)999);
             paint.target.NotifyApprovedHit(new Vector3(float.NaN, 0f, 0f), LabOrbElement.Fire);
-            Assert.That(paint.PaintCount, Is.EqualTo(5), "None and out-of-range elements have no paint color.");
-            CaptureBattle(paint.network, "five-colors.png");
+            Assert.That(paint.PaintCount, Is.EqualTo(5));
+            AssertTextureMatches(expected, paint);
+            CaptureBattle(paint.network, "offline-five-color-map.png");
 
             paint.ClearPaint();
             Assert.That(paint.Paint(Vector3.zero, Color.red), Is.False);
             Assert.That(paint.Paint(new Vector3(float.NaN, 0f, 0f), Color.red), Is.False);
             Assert.That(paint.Paint(new Vector3(float.PositiveInfinity, 0f, 0f), Color.red), Is.False);
             Assert.That(paint.PaintCount, Is.Zero);
-            for (int i = 0; i < LabGourdPaint.Capacity; i++)
-                Assert.That(paint.Paint(Vector3.forward, Color.red), Is.True);
-            Assert.That(paint.Paint(Vector3.forward, Color.blue), Is.False);
+            for (int i = 0; i < 128; i++) Assert.That(paint.Paint(Vector3.forward, Color.red), Is.True);
+            float oneSpotCoverage = paint.Coverage;
+            Assert.That(oneSpotCoverage, Is.GreaterThan(0f));
+            Assert.That(oneSpotCoverage, Is.LessThan(.1f));
             Assert.That(paint.PaintCount, Is.EqualTo(128));
-            Assert.That(ReadBlock(paint).GetVectorArray("_PaintColors")[127], Is.EqualTo((Vector4)Color.red),
-                "The 129th hit must not replace any retained mark.");
+            Assert.That(paint.Paint(Vector3.forward, Color.blue), Is.True,
+                "The former 128-entry shader list cannot limit additional approved marks.");
+            Assert.That(paint.Coverage, Is.EqualTo(oneSpotCoverage), "Overpainting does not count a cell twice.");
+            Assert.That(paint.Paint(Vector3.back, Color.green), Is.True);
+            Assert.That(paint.PaintCount, Is.EqualTo(130));
+            Assert.That(paint.Coverage, Is.GreaterThan(oneSpotCoverage),
+                "A previously untouched direction must still advance coverage after 128 repeated hits.");
+            AssertTextureMatches(paint.Surface, paint);
             paint.ClearPaint();
             Assert.That(paint.PaintCount, Is.Zero);
-            Assert.That(ReadBlock(paint).GetInt("_PaintCount"), Is.Zero);
+            Assert.That(paint.Coverage, Is.Zero);
+            for (int i = 0; i < 64; i++)
+            {
+                float y = 1f - 2f * (i + .5f) / 64f;
+                float angle = i * 2.39996323f;
+                var direction = new Vector3(Mathf.Cos(angle) * Mathf.Sqrt(1f - y * y),
+                    y, Mathf.Sin(angle) * Mathf.Sqrt(1f - y * y));
+                Assert.That(paint.Paint(direction, Color.red), Is.True);
+            }
+            Assert.That(paint.Coverage, Is.GreaterThanOrEqualTo(.8f), "The default goal is reachable on the same visible map.");
+            AssertTextureMatches(paint.Surface, paint);
+            paint.ClearPaint();
+            Assert.That(paint.PaintTexture.GetPixels32().All(pixel => pixel.a == 0), Is.True);
         }
 
         [UnityTest]
-        public IEnumerator SameHitboxPointHasSameShellCoordinatesAcrossCommonSwingAndRotation()
+        public IEnumerator SameHitboxPointProducesTheSameMapAcrossCommonSwingAndRotation()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
             var paint = Object.FindFirstObjectByType<LabGourdPaint>();
             Assert.That(paint.IsReady, Is.True, paint.InitializationError);
-            var hitbox = paint.target.Hitbox.transform;
+            Transform hitbox = paint.target.Hitbox.transform;
             Transform common = hitbox.parent;
-            Assert.That(paint.target.VisualMount.parent, Is.SameAs(common),
-                "Hitbox and visual mount must share the hanging target pose.");
+            Assert.That(paint.target.VisualMount.parent, Is.SameAs(common));
             Quaternion initialRotation = common.localRotation;
             Vector3 localHit = new Vector3(.2f, .1f, .45f);
             paint.target.NotifyApprovedHit(localHit, LabOrbElement.Fire);
-            Vector4 first = ReadBlock(paint).GetVectorArray("_PaintPositions")[0];
+            Color32[] first = paint.PaintTexture.GetPixels32();
             try
             {
                 common.localRotation = Quaternion.Euler(16f, 73f, -11f) * initialRotation;
-                paint.target.NotifyApprovedHit(localHit, LabOrbElement.Water);
-                Vector4 second = ReadBlock(paint).GetVectorArray("_PaintPositions")[1];
-                Assert.That(Vector4.Distance(first, second), Is.LessThan(.0001f),
-                    "Common local-to-world and world-to-shell transforms cancel the current pose.");
-                Assert.That(ReadBlock(paint).GetVectorArray("_PaintPositions")[0], Is.EqualTo(first),
-                    "Rotating the target does not rewrite earlier marks.");
+                Assert.That(paint.PaintTexture.GetPixels32(), Is.EqualTo(first), "Changing pose does not rewrite the surface map.");
+                paint.ClearPaint();
+                paint.target.NotifyApprovedHit(localHit, LabOrbElement.Fire);
+                Color32[] second = paint.PaintTexture.GetPixels32();
+                AssertPixelsClose(first, second, 1,
+                    "Common local-to-world and world-to-shell transforms cancel; one byte allows float transform rounding.");
+                AssertTextureMatches(paint.Surface, paint);
             }
             finally { common.localRotation = initialRotation; }
         }
 
         [UnityTest]
-        public IEnumerator FirstHitBeforeNextFrameSurvivesAndRestartStopNewLobbyClearPaint()
+        public IEnumerator OfflinePreviewCannotLeakIntoConnectedRoundsAndUnapprovedViewCallsAreInert()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
             var paint = Object.FindFirstObjectByType<LabGourdPaint>();
             LabNetwork network = paint.network;
             network.port = 17785;
+            paint.target.NotifyApprovedHit(Vector3.forward, LabOrbElement.Fire);
+            Assert.That(paint.PaintCount, Is.EqualTo(1), "Direct input is allowed only in an offline preview.");
             try
             {
                 Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
-                // Deliberately notify before Paint.Update has observed the new session key.
+                Assert.That(paint.PaintCount, Is.Zero, "A real round starts with its own empty Host map.");
                 paint.target.NotifyApprovedHit(Vector3.forward, LabOrbElement.Fire);
-                Assert.That(paint.PaintCount, Is.EqualTo(1));
+                Assert.That(paint.Paint(Vector3.forward, Color.red), Is.False);
+                Assert.That(paint.PaintCount, Is.Zero, "A view event cannot manufacture an approved Host hit.");
                 yield return null;
-                Assert.That(paint.PaintCount, Is.EqualTo(1), "The first mark cannot be cleared a frame later.");
+                AssertTextureMatches(network.PaintSurface, paint);
                 Assert.That(network.RestartDeveloperSolo(), Is.True);
                 yield return null;
                 Assert.That(paint.PaintCount, Is.Zero);
-                paint.target.NotifyApprovedHit(Vector3.forward, LabOrbElement.Wood);
-                Assert.That(paint.PaintCount, Is.EqualTo(1));
                 network.Stop();
                 yield return null;
                 Assert.That(network.Snapshot, Is.Null);
-                Assert.That(paint.PaintCount, Is.Zero, "Leaving the session removes its marks.");
-                // Stop/Host are the same real session transitions as entering another room lobby.
+                Assert.That(paint.PaintCount, Is.Zero);
                 network.Host();
                 Assert.That(network.IsHost, Is.True, network.Notice);
                 Assert.That(network.Snapshot, Is.Null);
@@ -154,7 +181,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedSoloHostElementHitsPaintAndFinishImmediatelyThenRetryAndDevReset()
+        public IEnumerator SavedSoloHostElementHitsReachHpZeroWithoutWinningAndSurviveVisualReinitialization()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
@@ -165,37 +192,9 @@ namespace C6Lab.Tests
             var hud = Object.FindFirstObjectByType<LabHud>();
             LabConfig savedNetworkConfig = network.config;
             LabConfig savedBoardConfig = controller.config;
-            LabConfig fixture = Object.Instantiate(savedNetworkConfig);
+            LabConfig fixture = CollisionFixture(savedNetworkConfig, 80);
             float[] tuning = fixture.CaptureDeveloperValues();
-            SetTuning(tuning, "Monster Max HP", 40f);
-            SetTuning(tuning, "Damage per Hit", 20f);
-            SetTuning(tuning, "Battle Duration (seconds)", 30f);
-            SetTuning(tuning, "Orb Generation Cost", 1f);
-            SetTuning(tuning, "Item Lifetime (seconds)", 30f);
-            SetTuning(tuning, "Item Unlock Swipes Min", 0f);
-            SetTuning(tuning, "Item Unlock Swipes Max", 0f);
-            SetTuning(tuning, "Yin Chance (%)", 0f);
-            SetTuning(tuning, "Yang Chance (%)", 0f);
-            SetTuning(tuning, "Relay Orb Chance (%)", 0f);
-            SetTuning(tuning, "Secret Box Chance (%)", 100f);
-            SetTuning(tuning, "Potion Chance (%)", 0f);
-            SetTuning(tuning, "Bomb Chance (%)", 0f);
-            SetTuning(tuning, "Spawn Pop Duration (seconds)", 0f);
-            SetTuning(tuning, "Spawn Minimum Speed (board widths/s)", 0f);
-            SetTuning(tuning, "Spawn Maximum Speed (board widths/s)", 0f);
-            SetTuning(tuning, "Drum Drift Speed (board widths/s)", 0f);
-            SetTuning(tuning, "Throw Origin Radius", 4f);
-            SetTuning(tuning, "Throw Origin Height Offset", -.5f);
-            SetTuning(tuning, "Throw Minimum Upward Speed", 2f);
-            SetTuning(tuning, "Throw Lateral Gain", 2.5f);
-            SetTuning(tuning, "Throw Upward Gain", 2.1f);
-            SetTuning(tuning, "Throw Forward Gain", 4.5f);
-            SetTuning(tuning, "Throw Maximum World Speed", 18f);
-            SetTuning(tuning, "Throw Gravity", 9.81f);
-            SetTuning(tuning, "Throw Power Exponent", 1f);
-            SetTuning(tuning, "Throw Loft Offset (degrees)", 0f);
-            SetTuning(tuning, "Throw Air Damping", 0f);
-            Assert.That(fixture.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            string error;
             network.config = fixture;
             controller.config = fixture;
             controller.ReconfigureBoard();
@@ -221,7 +220,7 @@ namespace C6Lab.Tests
                 foreach (string shotId in shots)
                 {
                     network.target.GetComponent<LabHangingTarget>().ResetSwing();
-                    LabOrbElement element = network.Snapshot.orbs.Single(orb => orb.id == shotId).element;
+                    if (index == 1) paint.enabled = false;
                     LaunchThroughSavedBoard(network.board, shotId, 20d + index * 10d);
                     Assert.That(network.Snapshot.orbs.Single(orb => orb.id == shotId).inFlight, Is.True);
                     LabProjectile projectile = network.projectileRoot.GetComponentsInChildren<LabProjectile>()
@@ -237,30 +236,49 @@ namespace C6Lab.Tests
                     index++;
                     Assert.That(paint.PaintCount, Is.EqualTo(index));
                     Assert.That(approvedDamage.Count, Is.EqualTo(index));
-                    Assert.That(ReadBlock(paint).GetVectorArray("_PaintColors")[index - 1],
-                        Is.EqualTo((Vector4)fixture.OrbAppearance.ElementColorFor(element)));
+                    if (index == 2)
+                    {
+                        Assert.That(paint.IsReady, Is.False, "This actual Host hit occurred while the visual was disabled.");
+                        Assert.That(network.PaintSurface.PaintCount, Is.EqualTo(2));
+                        float retainedCoverage = network.PaintSurface.Coverage;
+                        Color32[] retainedMap = CopyPixels(network.PaintSurface);
+                        paint.enabled = true;
+                        yield return null;
+                        Assert.That(paint.IsReady, Is.True, paint.InitializationError);
+                        Assert.That(paint.PaintCount, Is.EqualTo(2));
+                        Assert.That(paint.Coverage, Is.EqualTo(retainedCoverage));
+                        Assert.That(paint.PaintTexture.GetPixels32(), Is.EqualTo(retainedMap),
+                            "Re-enabling uploads the authoritative map instead of erasing or replaying it.");
+                    }
+                    AssertTextureMatches(network.PaintSurface, paint);
                     yield return null;
                     Assert.That(paint.PaintCount, Is.EqualTo(index), "The mark survives the next frame.");
                     if (index == 1)
                     {
                         Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
                         Assert.That(hud.resultControls.activeSelf, Is.False);
+                        paint.ClearPaint();
+                        Assert.That(network.PaintSurface.PaintCount, Is.EqualTo(1),
+                            "A connected presentation clear cannot erase Host-owned progress.");
+                        AssertTextureMatches(network.PaintSurface, paint);
                         CaptureBattle(network, "approved-element-hit.png");
                     }
                 }
                 Assert.That(approvedDamage, Is.All.EqualTo(20));
-                Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
+                Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing),
+                    "Paint mode cannot win just because the old HP counter reached zero.");
+                Assert.That(network.Snapshot.paintCoverage, Is.GreaterThan(0f));
+                Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(80));
+                Assert.That(network.Snapshot.paintCoverage, Is.LessThan(network.config.PaintVictoryCoverage));
                 Assert.That(LabGourdFinish.DelayVictory(network, network.Snapshot), Is.False);
-                Assert.That(hud.resultControls.activeInHierarchy, Is.True,
-                    "Paint mode shows results immediately without the old 1.2-second finish.");
-                Assert.That(hud.resultStatusText.text, Is.EqualTo("VICTORY"));
+                Assert.That(hud.resultControls.activeSelf, Is.False);
                 Assert.That(paint.VisualInstance.activeSelf, Is.True);
                 Assert.That(network.target.VisualMount.Find("Gourd Left Half"), Is.Null);
                 Assert.That(network.target.VisualMount.Find("Gourd Right Half"), Is.Null);
                 Assert.That(network.target.VisualMount.Find("Small Yokai Spirit"), Is.Null);
-                CaptureBattle(network, "victory-two-marks.png");
+                CaptureBattle(network, "hp-zero-paint-still-playing.png");
                 string completedSession = network.Snapshot.sessionId;
-                hud.resultRestartButton.onClick.Invoke();
+                Assert.That(network.RestartDeveloperSolo(), Is.True);
                 yield return null;
                 Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(completedSession));
                 Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
@@ -289,7 +307,7 @@ namespace C6Lab.Tests
 
                 // Use the saved DEV form and public action to replace the current Solo round.
                 paint.target.NotifyApprovedHit(Vector3.forward, LabOrbElement.Earth);
-                Assert.That(paint.PaintCount, Is.EqualTo(1));
+                Assert.That(paint.PaintCount, Is.Zero, "A presentation event cannot manufacture a connected Host mark.");
                 var developerUi = Resources.FindObjectsOfTypeAll<LabDeveloperMode>()
                     .Single(ui => ui.gameObject.scene == SceneManager.GetActiveScene());
                 developerUi.Open();
@@ -309,6 +327,108 @@ namespace C6Lab.Tests
                 if (network.IsConnected) network.Stop();
                 network.config = savedNetworkConfig;
                 controller.config = savedBoardConfig;
+                controller.ReconfigureBoard();
+                Object.Destroy(fixture);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator OnePercentDeveloperGoalWinsByRealHostCollisionAndResultRetryResetsTheMap()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+            LabGourdPaint paint = Object.FindFirstObjectByType<LabGourdPaint>();
+            LabNetwork network = paint.network;
+            LabSceneController controller = Object.FindFirstObjectByType<LabSceneController>();
+            LabHud hud = Object.FindFirstObjectByType<LabHud>();
+            LabDeveloperMode developer = SavedDeveloperUi();
+            LabConfig savedNetwork = network.config, savedBoard = controller.config;
+            LabConfig fixture = CollisionFixture(savedNetwork, 1);
+            network.config = fixture;
+            controller.config = fixture;
+            controller.ReconfigureBoard();
+            network.port = 17789;
+            try
+            {
+                // Use the saved DEV form to start the real Solo round with a 1% target.
+                developer.Open();
+                float[] initialValues = fixture.CaptureDeveloperValues();
+                for (int i = 0; i < initialValues.Length; i++)
+                    developer.valueInputs[i].text = initialValues[i].ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+                SetInput(developer, "Paint Victory Coverage (%)", "1");
+                developer.ApplyAndStart();
+                yield return null;
+                Assert.That(network.IsDeveloperSolo, Is.True, developer.feedbackText.text);
+                Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(1));
+                Assert.That(network.config.PaintVictoryPercent, Is.EqualTo(1));
+                UnityEngine.UI.Text title = hud.hpText.transform.parent.Find("TitleMask/Title")
+                    .GetComponent<UnityEngine.UI.Text>();
+                Assert.That(title.text, Is.EqualTo("GOAL"));
+
+                for (int attempt = 0; attempt < 2; attempt++)
+                {
+                    network.Generate();
+                    LabOrbState box = network.Snapshot.orbs.Single();
+                    TapOrb(network.board, box.id, 100d + attempt * 20d);
+                    TapOrb(network.board, box.id, 100.2d + attempt * 20d);
+                    LabOrbState shot = network.Snapshot.orbs.First(orb => orb.kind == LabOrbKind.Combined);
+                    network.target.GetComponent<LabHangingTarget>().ResetSwing();
+                    LaunchThroughSavedBoard(network.board, shot.id, 110d + attempt * 20d);
+                    for (int step = 0; step < 150 && network.Snapshot.phase == LabPhase.Playing; step++)
+                        yield return new WaitForFixedUpdate();
+                    Assert.That(network.LastShotReport, Does.StartWith("SHOT HIT"));
+                    Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
+                    Assert.That(network.Snapshot.hp, Is.EqualTo(20),
+                        "Coverage wins before diagnostic HP reaches zero; this is not the Crack victory path.");
+                    Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(1));
+                    Assert.That(network.Snapshot.paintCoverage, Is.GreaterThanOrEqualTo(.01f));
+                    Assert.That(paint.PaintCount, Is.EqualTo(1));
+                    yield return null;
+                    Assert.That(paint.PaintCount, Is.EqualTo(1), "The first real mark survives the next presentation update.");
+                    AssertTextureMatches(network.PaintSurface, paint);
+                    Assert.That(hud.resultControls.activeInHierarchy, Is.True);
+                    Assert.That(hud.resultStatusText.text, Is.EqualTo("VICTORY"));
+                    Assert.That(hud.hpText.text,
+                        Is.EqualTo(LabHud.FormatPaintGoalProgress(network.Snapshot.paintCoverage, 1)));
+                    Assert.That(hud.yokaiHpFill.fillAmount, Is.EqualTo(1f));
+                    Assert.That(LabGourdFinish.DelayVictory(network, network.Snapshot), Is.False);
+                    CaptureBattle(network, "one-percent-goal-victory.png");
+                    string finishedSession = network.Snapshot.sessionId;
+                    if (attempt == 0)
+                    {
+                        Assert.That(hud.resultRestartButton.interactable, Is.True);
+                        hud.resultRestartButton.onClick.Invoke();
+                        yield return null;
+                        Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(finishedSession));
+                        Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
+                        Assert.That(network.Snapshot.hp, Is.EqualTo(40));
+                        Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(1));
+                        Assert.That(network.Snapshot.orbs, Is.Empty);
+                        Assert.That(paint.PaintCount, Is.Zero);
+                        Assert.That(network.Snapshot.paintCoverage, Is.Zero);
+                        Assert.That(hud.resultControls.activeSelf, Is.False);
+                    }
+                    else
+                    {
+                        developer.Open();
+                        SetInput(developer, "Paint Victory Coverage (%)", "80");
+                        SetInput(developer, "Monster Max HP", "80");
+                        developer.ApplyAndStart();
+                        yield return null;
+                        Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(finishedSession));
+                        Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
+                        Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(80));
+                        Assert.That(network.Snapshot.hp, Is.EqualTo(80));
+                        Assert.That(paint.PaintCount, Is.Zero, "DEV restart clears a nonempty prior authoritative map.");
+                        Assert.That(paint.PaintTexture.GetPixels32().All(pixel => pixel.a == 0), Is.True);
+                    }
+                }
+            }
+            finally
+            {
+                if (network.IsConnected) network.Stop();
+                network.config = savedNetwork;
+                controller.config = savedBoard;
                 controller.ReconfigureBoard();
                 Object.Destroy(fixture);
             }
@@ -370,6 +490,10 @@ namespace C6Lab.Tests
             {
                 Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
                 Assert.That(paint.IsReady, Is.True, paint.InitializationError);
+                LabHud savedHud = Object.FindFirstObjectByType<LabHud>();
+                UnityEngine.UI.Text title = savedHud.hpText.transform.parent.Find("TitleMask/Title")
+                    .GetComponent<UnityEngine.UI.Text>();
+                Assert.That(title.text, Is.EqualTo("GOAL"));
                 GameObject initialWhite = paint.VisualInstance;
                 Assert.That(LabGourdPaint.Attach(network), Is.SameAs(paint));
                 paint.ApplyMode();
@@ -392,6 +516,7 @@ namespace C6Lab.Tests
                 Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
                 Assert.That(crack.IsReady, Is.True, crack.InitializationError);
                 Assert.That(crack.enabled && finish.enabled, Is.True);
+                Assert.That(title.text, Is.EqualTo("YOKAI HP"));
                 Assert.That(paint.enabled, Is.False);
                 Assert.That(paint.Shell, Is.Null);
                 Assert.That(paint.PaintCount, Is.Zero);
@@ -421,15 +546,16 @@ namespace C6Lab.Tests
                 Assert.That(Time.timeScale, Is.EqualTo(runningTimeScale));
                 Assert.That(paint.IsReady, Is.True, paint.InitializationError);
                 Assert.That(crack.enabled || finish.enabled, Is.False);
+                Assert.That(title.text, Is.EqualTo("GOAL"));
                 Assert.That(intact == null, Is.True, "Crack's owned model must be released before paint mounts.");
                 Assert.That(paint.PaintCount, Is.Zero);
                 network.target.NotifyApprovedHit(Vector3.forward, LabOrbElement.Water);
-                Assert.That(paint.PaintCount, Is.EqualTo(1));
+                Assert.That(paint.PaintCount, Is.Zero, "Connected direct events only refresh the accepted map.");
                 GameObject newWhite = paint.VisualInstance;
                 paint.ApplyMode();
                 Assert.That(paint.InitializePresentation(), Is.True);
                 Assert.That(paint.VisualInstance, Is.SameAs(newWhite));
-                Assert.That(paint.PaintCount, Is.EqualTo(1), "Idempotent initialization cannot erase the current round's marks.");
+                Assert.That(paint.PaintCount, Is.Zero, "Idempotent initialization cannot inject a mark into the round.");
 
                 // Same-mode DEV restart is a new round and must erase its old marks.
                 string paintSession = network.Snapshot.sessionId;
@@ -550,6 +676,75 @@ namespace C6Lab.Tests
             }
         }
 
+        static LabConfig CollisionFixture(LabConfig source, int goalPercent)
+        {
+            LabConfig fixture = Object.Instantiate(source);
+            float[] tuning = fixture.CaptureDeveloperValues();
+            SetTuning(tuning, "Paint Victory Coverage (%)", goalPercent);
+            SetTuning(tuning, "Monster Max HP", 40f);
+            SetTuning(tuning, "Damage per Hit", 20f);
+            SetTuning(tuning, "Battle Duration (seconds)", 30f);
+            SetTuning(tuning, "Orb Generation Cost", 1f);
+            SetTuning(tuning, "Item Lifetime (seconds)", 30f);
+            SetTuning(tuning, "Item Unlock Swipes Min", 0f);
+            SetTuning(tuning, "Item Unlock Swipes Max", 0f);
+            SetTuning(tuning, "Yin Chance (%)", 0f);
+            SetTuning(tuning, "Yang Chance (%)", 0f);
+            SetTuning(tuning, "Relay Orb Chance (%)", 0f);
+            SetTuning(tuning, "Secret Box Chance (%)", 100f);
+            SetTuning(tuning, "Potion Chance (%)", 0f);
+            SetTuning(tuning, "Bomb Chance (%)", 0f);
+            SetTuning(tuning, "Spawn Pop Duration (seconds)", 0f);
+            SetTuning(tuning, "Spawn Minimum Speed (board widths/s)", 0f);
+            SetTuning(tuning, "Spawn Maximum Speed (board widths/s)", 0f);
+            SetTuning(tuning, "Drum Drift Speed (board widths/s)", 0f);
+            SetTuning(tuning, "Throw Origin Radius", 4f);
+            SetTuning(tuning, "Throw Origin Height Offset", -.5f);
+            SetTuning(tuning, "Throw Minimum Upward Speed", 2f);
+            SetTuning(tuning, "Throw Lateral Gain", 2.5f);
+            SetTuning(tuning, "Throw Upward Gain", 2.1f);
+            SetTuning(tuning, "Throw Forward Gain", 4.5f);
+            SetTuning(tuning, "Throw Maximum World Speed", 18f);
+            SetTuning(tuning, "Throw Gravity", 9.81f);
+            SetTuning(tuning, "Throw Power Exponent", 1f);
+            SetTuning(tuning, "Throw Loft Offset (degrees)", 0f);
+            SetTuning(tuning, "Throw Air Damping", 0f);
+            Assert.That(fixture.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            return fixture;
+        }
+
+        static Color32[] CopyPixels(LabPaintSurface surface)
+        {
+            var pixels = new Color32[LabPaintSurface.PixelCount];
+            surface.CopyPixels(pixels);
+            return pixels;
+        }
+
+        static void AssertTextureMatches(LabPaintSurface surface, LabGourdPaint paint)
+        {
+            Assert.That(paint.PaintTexture, Is.Not.Null);
+            Color32[] expected = CopyPixels(surface);
+            Assert.That(paint.PaintTexture.GetPixels32(), Is.EqualTo(expected),
+                "The renderer must upload exactly the CPU RGBA surface that owns coverage.");
+            Assert.That(expected.Count(pixel => pixel.a != 0), Is.EqualTo(surface.CoveredCount));
+            Assert.That(surface.Coverage, Is.EqualTo(surface.CoveredCount / (float)LabPaintSurface.PixelCount));
+            Assert.That(ReadBlock(paint).GetTexture("_PaintMap"), Is.SameAs(paint.PaintTexture));
+            Assert.That(ReadBlock(paint).GetFloat("_PaintMapReady"), Is.EqualTo(1f));
+        }
+
+        static void AssertPixelsClose(Color32[] expected, Color32[] actual, int tolerance, string message)
+        {
+            Assert.That(actual.Length, Is.EqualTo(expected.Length));
+            for (int i = 0; i < expected.Length; i++)
+            {
+                if (Mathf.Abs(actual[i].r - expected[i].r) > tolerance
+                    || Mathf.Abs(actual[i].g - expected[i].g) > tolerance
+                    || Mathf.Abs(actual[i].b - expected[i].b) > tolerance
+                    || Mathf.Abs(actual[i].a - expected[i].a) > tolerance)
+                    Assert.Fail(message + " Pixel " + i + ": " + actual[i] + " / " + expected[i]);
+            }
+        }
+
         static LabDeveloperMode SavedDeveloperUi() => Resources.FindObjectsOfTypeAll<LabDeveloperMode>()
             .Single(ui => ui.gameObject.scene == SceneManager.GetActiveScene());
 
@@ -598,8 +793,10 @@ namespace C6Lab.Tests
 
         static void CaptureBattle(LabNetwork network, string name)
         {
+            // Batch test workers have no render surface; gameplay assertions still run there.
+            if (Application.isBatchMode) return;
             Camera camera = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None).Single(c => c.name == "BattleCamera");
-            const string directory = "Library/Issue166ModeCaptures";
+            const string directory = "Library/Issue175Captures";
             Directory.CreateDirectory(directory);
             var texture = new RenderTexture(540, 960, 24);
             var image = new Texture2D(540, 960, TextureFormat.RGB24, false);

@@ -37,10 +37,17 @@ namespace C6Lab
         /// Host. Keeping that local coordinate makes the marker follow pendulum motion.
         /// </summary>
         public void PlayHit(LabTarget target, Vector3 targetLocalPoint,
-            LabOrbElement element, int actualDamage, Vector3 impactVelocity = default)
+            LabOrbElement element, int actualDamage, Vector3 impactVelocity = default,
+            bool showDamageNumber = true)
         {
-            if (actualDamage <= 0 || target == null || target.Hitbox == null || !isActiveAndEnabled)
+            if ((showDamageNumber && actualDamage <= 0) || target == null
+                || target.Hitbox == null || !isActiveAndEnabled)
                 return;
+            if (!showDamageNumber)
+            {
+                if (Finite(targetLocalPoint)) particleVfx?.Play(target, targetLocalPoint, element, impactVelocity);
+                return;
+            }
             if (!Finite(targetLocalPoint) || !EnsureLayer()) return;
 
             Transform hitbox = target.Hitbox.transform;

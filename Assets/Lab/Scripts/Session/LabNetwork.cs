@@ -36,6 +36,9 @@ namespace C6Lab
         public string secondId;
         public uint round;
         public int damage;
+        public int impactValue;
+        public float paintX, paintY, paintZ;
+        public float paintR, paintG, paintB, paintA;
         public bool right;
         public float x;
         public float y;
@@ -151,8 +154,9 @@ namespace C6Lab
         // request naming one, Gourd Mode joins the shared config, and a bomb blast carries where it
         // happened so the holder's board can push orbs away, combine sound/haptic settings join the
         // shared config and the Host tells the combiner when a combine is approved; older clients
-        // cannot share this room.
-        internal const ushort LabProtocolVersion = 5619;
+        // cannot share this room. Version 5621 adds the Paint goal setting and independent
+        // approved impact values/directions/colors.
+        internal const ushort LabProtocolVersion = 5621;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
         private const int MaximumPacketBytes = 32768;
@@ -177,6 +181,27 @@ namespace C6Lab
         private readonly Dictionary<ulong, double> pendingApprovals = new Dictionary<ulong, double>();
         private readonly HashSet<string> visibleOrbIds = new HashSet<string>();
         private readonly LabImpactReceiptGate impactReceipts = new LabImpactReceiptGate();
+        private readonly LabPaintSurface clientPaintSurface = new LabPaintSurface();
+        private string paintSession;
+        private uint paintRound;
+
+        /// <summary>Round-owned paint survives missing or disabled presentation components.</summary>
+        public LabPaintSurface PaintSurface
+        {
+            get
+            {
+                if (IsHost && model != null) return model.PaintSurface;
+                string nextSession = latest != null ? latest.sessionId : null;
+                uint nextRound = latest != null ? latest.round : 0;
+                if (paintSession != nextSession || paintRound != nextRound)
+                {
+                    clientPaintSurface.Clear();
+                    paintSession = nextSession;
+                    paintRound = nextRound;
+                }
+                return clientPaintSurface;
+            }
+        }
         private readonly LabBattleClock battleClock = new LabBattleClock();
         private readonly List<string> joinCandidates = new List<string>();
         private LabModel model;
@@ -232,7 +257,7 @@ namespace C6Lab
 
         public event Action Changed;
         public event Action<LabConfig> ConfigApplied;
-        /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (실제 피해량)</summary>
+        /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (승인 명중값: Paint 명목 공격 점수 / Crack 실제 피해량)</summary>
         public event Action<int> LocalThrowHit;
         /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
         public event Action<string, Vector2> BombBlasted;
@@ -1395,8 +1420,10 @@ namespace C6Lab
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
             if (result.Hit)
             {
-                if (model.ConfirmHit(result.ProjectileId, now, out var element, out int actualDamage)
-                    && target != null)
+                Vector3 paintDirection = target != null && target.VisualMount != null
+                    ? target.VisualMount.InverseTransformPoint(result.HitPoint).normalized : Vector3.zero;
+                if (model.ConfirmHit(result.ProjectileId, now, paintDirection,
+                    out var element, out int actualDamage, out int impactValue) && target != null)
                 {
                     Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
                     Vector3 targetLocalPoint = hitbox.InverseTransformPoint(result.HitPoint);
@@ -1404,11 +1431,15 @@ namespace C6Lab
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
                     target.NotifyApprovedHit(targetLocalPoint, element);
                     impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
-                        result.ImpactVelocity);
-                    if (result.OwnerPlayerId == LocalPlayerId) LocalThrowHit?.Invoke(actualDamage);
+                        result.ImpactVelocity, config == null || config.GourdMode == LabGourdMode.Crack);
+                    if (result.OwnerPlayerId == LocalPlayerId) LocalThrowHit?.Invoke(impactValue);
+                    Color paintColor = model.PaintColorFor(element);
                     var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
                         round = model.Round, firstId = result.ProjectileId, owner = result.OwnerPlayerId,
-                        element = (int)element, damage = actualDamage,
+                        element = (int)element, damage = actualDamage, impactValue = impactValue,
+                        paintX = paintDirection.x, paintY = paintDirection.y, paintZ = paintDirection.z,
+                        paintR = Mathf.Clamp01(paintColor.r), paintG = Mathf.Clamp01(paintColor.g),
+                        paintB = Mathf.Clamp01(paintColor.b), paintA = Mathf.Clamp01(paintColor.a),
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
                         spinImpulse = signedYawImpulse };
@@ -1599,19 +1630,25 @@ namespace C6Lab
                         OnBombBlast(packet.firstId, new Vector2(Mathf.Clamp01(packet.x), Mathf.Clamp01(packet.y)));
                     break;
                 case "targetImpact":
-                    if (target != null && impactReceipts.TryAccept(packet.sessionId, packet.round,
-                        packet.firstId, (LabOrbElement)packet.element, packet.damage,
+                    if (target != null && ValidPaintImpact(packet)
+                        && impactReceipts.TryAccept(packet.sessionId, packet.round,
+                        packet.firstId, (LabOrbElement)packet.element, packet.impactValue,
                         new Vector3(packet.x, packet.y, packet.z),
                         new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse))
                     {
+                        if (config != null && config.GourdMode == LabGourdMode.Paint
+                            && packet.element >= (int)LabOrbElement.Fire && packet.element <= (int)LabOrbElement.Earth)
+                            PaintSurface.Stamp(new Vector3(packet.paintX, packet.paintY, packet.paintZ),
+                                new Color(packet.paintR, packet.paintG, packet.paintB, packet.paintA));
                         target.GetComponent<LabHangingTarget>()?.ApplyRemoteImpact(
                             new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse);
                         target.NotifyApprovedHit(new Vector3(packet.x, packet.y, packet.z), (LabOrbElement)packet.element);
                         impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
                             (LabOrbElement)packet.element, packet.damage,
-                            new Vector3(packet.wx, packet.wy, packet.wz));
+                            new Vector3(packet.wx, packet.wy, packet.wz),
+                            config == null || config.GourdMode == LabGourdMode.Crack);
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
-                        if (packet.owner == LocalPlayerId) LocalThrowHit?.Invoke(packet.damage);
+                        if (packet.owner == LocalPlayerId) LocalThrowHit?.Invoke(packet.impactValue);
                     }
                     break;
                 case "targetMiss":
@@ -1784,10 +1821,26 @@ namespace C6Lab
             catch (Exception) { return false; }
         }
 
+        private static bool ValidPaintImpact(LabNetworkPacket packet)
+        {
+            if (packet.damage < 0 || packet.impactValue <= 0) return false;
+            if (packet.element == (int)LabOrbElement.None) return true;
+            Vector3 direction = new Vector3(packet.paintX, packet.paintY, packet.paintZ);
+            return Finite(direction.x) && Finite(direction.y) && Finite(direction.z)
+                && direction.sqrMagnitude > .00001f && direction.sqrMagnitude < 1.01f
+                && Finite(packet.paintR) && packet.paintR >= 0f && packet.paintR <= 1f
+                && Finite(packet.paintG) && packet.paintG >= 0f && packet.paintG <= 1f
+                && Finite(packet.paintB) && packet.paintB >= 0f && packet.paintB <= 1f
+                && Finite(packet.paintA) && packet.paintA >= 0f && packet.paintA <= 1f;
+        }
+
         private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
         private void ResetLocal()
         {
+            clientPaintSurface.Clear();
+            paintSession = null;
+            paintRound = 0;
             ApplyLocalPause(false);
             battleClock.Reset();
             pendingDeveloperRestart = false;

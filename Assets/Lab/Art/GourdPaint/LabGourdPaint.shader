@@ -1,30 +1,53 @@
 Shader "C6Lab/GourdPaint"
 {
- Properties { _BaseColor("White paper shell",Color)=(.96,.94,.86,1) }
- SubShader { Tags {"RenderPipeline"="UniversalPipeline" "RenderType"="Opaque"}
- Pass { Tags {"LightMode"="UniversalForward"}
- HLSLPROGRAM
- #pragma vertex vert
- #pragma fragment frag
- #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
- struct A{float4 positionOS:POSITION;float3 normalOS:NORMAL;};
- struct V{float4 positionCS:SV_POSITION;float3 p:TEXCOORD0;float3 n:TEXCOORD1;};
- float4 _BaseColor;int _PaintCount;float4 _PaintPositions[128];float4 _PaintColors[128];
- V vert(A i){V o;o.positionCS=TransformObjectToHClip(i.positionOS.xyz);o.p=i.positionOS.xyz;o.n=TransformObjectToWorldNormal(i.normalOS);return o;}
- half4 frag(V i):SV_Target
- {
- half3 color=_BaseColor.rgb;
- for(int k=0;k<_PaintCount;k++)
- {
- float3 delta=i.p-_PaintPositions[k].xyz;
- float ripple=1+.1*sin(delta.x*135+sin(delta.y*91))*sin(delta.z*119+delta.y*57);
- float radius=_PaintPositions[k].w*ripple;
- float ink=1-smoothstep(radius*.83,radius,length(delta));
- color=lerp(color,_PaintColors[k].rgb,ink*.93);
- }
- float light=.72+.28*saturate(dot(normalize(i.n),normalize(float3(-.4,.8,.5))));
- return half4(color*light,1);
- }
- ENDHLSL
- } }
+    Properties
+    {
+        _BaseColor("White paper shell", Color) = (.96,.94,.86,1)
+        [NoScaleOffset] _PaintMap("Cumulative premultiplied paint", 2D) = "black" {}
+        [HideInInspector] _PaintMapReady("Paint map ready", Float) = 0
+    }
+    SubShader
+    {
+        Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="Opaque" }
+        Pass
+        {
+            Tags { "LightMode"="UniversalForward" }
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            struct Attributes { float4 positionOS:POSITION; float3 normalOS:NORMAL; };
+            struct Varyings { float4 positionCS:SV_POSITION; float3 positionOS:TEXCOORD0; float3 normalWS:TEXCOORD1; };
+            TEXTURE2D(_PaintMap);
+            SAMPLER(sampler_PaintMap);
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseColor;
+                float _PaintMapReady;
+            CBUFFER_END
+
+            Varyings vert(Attributes input)
+            {
+                Varyings output;
+                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                output.positionOS = input.positionOS.xyz;
+                output.normalWS = TransformObjectToWorldNormal(input.normalOS);
+                return output;
+            }
+
+            half4 frag(Varyings input):SV_Target
+            {
+                float3 direction = normalize(input.positionOS);
+                // Matches the Host's equal-area cells. The runtime texture uses Point sampling,
+                // Repeat on U and Clamp on V; there are no per-fragment decal loops or mipmaps.
+                float2 uv = float2(atan2(direction.z, direction.x) / (2.0 * PI) + .5,
+                    .5 - direction.y * .5);
+                half4 paint = SAMPLE_TEXTURE2D(_PaintMap, sampler_PaintMap, uv) * saturate(_PaintMapReady);
+                half3 color = _BaseColor.rgb * (1.0 - paint.a) + paint.rgb;
+                float light = .72 + .28 * saturate(dot(normalize(input.normalWS), normalize(float3(-.4,.8,.5))));
+                return half4(color * light, 1);
+            }
+            ENDHLSL
+        }
+    }
 }

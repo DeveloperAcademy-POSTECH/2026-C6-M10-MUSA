@@ -1,20 +1,20 @@
 # C6 Physics Lab 개발자 모드 조정값 명세
 
-> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 원래 39개 수치는 PR #76의 설정 에셋을 기준으로 기록했으며, 이후 생성 확률·아이템 9개와 개인 HP 1개를 더했고, 아이템 효과·결합·카메라·요괴 회전·생성 연출·소리·햅틱·생성 북 값을 차례로 더해 현재 박 표현 모드·폭탄 충격파·결합 소리/햅틱까지 87개다. 64~74번째(인덱스 63~73) 소리 음량·햅틱 11개(#142)는 이 문서에 아직 따로 설명하지 않았다. 81~84번째(인덱스 80~83)는 #167의 폭탄 충격파·폭발 진동 값이고, 85~87번째(인덱스 84~86)는 #172의 결합 소리 크기·결합 진동 종류·세기다. 직렬화된 값이 없으면 C# 필드 초기값이 쓰인다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
+> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 원래 39개 수치는 PR #76의 설정 에셋을 기준으로 기록했으며, 이후 생성 확률·아이템 9개와 개인 HP 1개를 더했고, 아이템 효과·결합·카메라·요괴 회전·생성 연출·소리·햅틱·생성 북 값을 차례로 더해 현재 박 표현 모드·폭탄 충격파·결합 소리/햅틱·색칠 승리 비율까지 88개다. 64~74번째(인덱스 63~73) 소리 음량·햅틱 11개(#142)는 이 문서에 아직 따로 설명하지 않았다. 81~84번째(인덱스 80~83)는 #167의 폭탄 충격파·폭발 진동 값이고, 85~87번째(인덱스 84~86)는 #172의 결합 소리 크기·결합 진동 종류·세기다. 88번째(인덱스 87)는 #175의 색칠 승리 목표(기본 80%, 정수 1~100%)다. 직렬화된 값이 없으면 C# 필드 초기값이 쓰인다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
 
-이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 조정값 87개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
+이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 조정값 88개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
 
 ## 1. 패널의 적용 방식
 
 1. `Assets/Lab/Scenes/Lab.unity`를 Unity Editor에서 실행하거나 **Development Build**를 실행한다. 일반 배포 빌드에서는 DEV 버튼이 숨겨진다. 참가자는 일반 빌드여도 Host가 확정한 세션 설정을 수신한다.
-2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 숫자 입력칸 87개와 대응하는 슬라이더가 서로 값을 반영한다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
-3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 87개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
+2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 숫자 입력칸 88개와 대응하는 슬라이더가 서로 값을 반영한다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
+3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 88개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
 4. 혼자 시험할 때는 **START SOLO**를 누른다. 이미 솔로 전투 중이면 **RESTART SOLO**가 표시된다. 새 라운드가 시작되므로 요괴/개인 HP·시간·스태미나·구슬이 초기화된다. 진행 중인 네트워크 라운드에 값을 즉시 적용하는 동작은 없다.
 5. **DEFAULTS**는 저장된 `LabConfig.asset`의 숫자를 입력칸과 슬라이더에 불러올 뿐이다. 공유 방이나 솔로에 적용하려면 해당 시작·적용 버튼을 눌러야 한다. **END SOLO**는 솔로를 끝내고 원본 설정으로 복귀한다. 런타임 복사본은 앱이 실행 중인 동안만 유지되며 원본 에셋에는 저장되지 않는다.
 
 패널 열기 자체는 시간을 멈추지 않는다. 공유 전투에서 설정을 바꾸려면 먼저 공동 일시정지를 승인받아야 하며, 이때 시간은 그 일시정지 상태를 따른다. 마지막 `SHOT HIT/MISS` 보고는 솔로를 끝내거나 연결을 끊으면 지워질 수 있으므로 먼저 기록한다. 공유 방에서는 Host의 설정 지문과 확인 응답을 기준으로 시작을 판정한다. 이 절은 코드상 경로 설명이며 실제 기기 동기화 결과는 검증 기록과 구분한다.
 
-입력은 **87개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
+입력은 **88개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
 
 ## 2. 단위와 공통 판정
 
@@ -27,30 +27,37 @@
 
 | DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
 | --- | ---: | --- | --- |
-| Monster Max HP | 1000 | 정수 1–1,000,000 / HP | 새 라운드의 요괴 최대·초기 체력. 높이면 같은 피해량에서 더 많은 명중이 필요하다. 진행 중인 HP를 직접 고치는 값은 아니다. |
-| Damage per Hit | 20 | 정수 1–1,000,000 / HP | Host가 3D 투사체의 실제 요괴 피격을 확정할 때마다 차감할 체력. 빗나감에는 적용되지 않는다. HP는 0 아래로 내려가지 않는다. |
+| Monster Max HP | 1000 | 정수 1–1,000,000 / HP | 새 라운드의 요괴 최대·초기 체력. Crack에서는 HP 0 승리까지 필요한 명중 수를 바꾼다. Paint에서는 감소하는 내부 진단 HP이고 색칠 목표나 승리를 바꾸지 않는다. 진행 중인 HP를 직접 고치는 값은 아니다. |
+| Damage per Hit | 20 | 정수 1–1,000,000 / HP | Host가 실제 명중을 확정할 때 쓰는 기본 공격값. HP는 0 아래로 내려가지 않으며 `actualDamage`는 실제 감소량이다. Paint는 HP 0 이후에도 양수 `impactValue`와 기존 명목 공격값 점수를 유지한다. 이 값/아이템 배율은 색칠 반경이나 목표 면적을 늘리지 않는다. 빗나감에는 적용되지 않는다. |
 | Battle Duration (seconds) | 180 | 1–86,400 / 초 | Host가 라운드 시작 시 계산하는 제한 시간. 시간이 끝나면 패배한다. 패널 열기 자체는 시간을 멈추지 않으며 승인된 공동 일시정지만 시간에서 제외한다. |
 | Player Max HP | 300 | 정수 1–300 / 개인 HP | 각 플레이어의 새 라운드 최대·초기 체력. DEV 필드 배열에서는 **49번째(인덱스 48)**로 추가되어 앞선 48개 설정 순서를 보존한다. 한 사람의 개인 HP가 0이어도 전투를 계속하며 전원 0이면 패배한다. 진행 중인 개인 HP를 직접 바꾸는 슬라이더가 아니다. |
 
 개인 HP는 Host의 플레이어별 상태와 스냅샷에 보관되며 화면에는 내 값만 표시한다. 현재 요괴 공격이나 아이템 피해 이벤트는 이 값을 깎지 않는다. Host 모델의 `TryApplyPlayerDamage`는 향후 이벤트용 상태 변경 경로로, 양수 피해·유효한 플레이어·진행 중인 판에서만 적용하고 0에서 멈춘다. 실제 플레이에서 전원 0 패배를 시험하려면 별도 피해 이벤트 구현이 필요하다.
 
+Paint의 HP와 결과 대시보드는 구분한다. Paint의 `damageTotal`은 기존 공격값 누계로 유지되며 실제 HP 감소량이나 면적 기여도를 뜻하지 않는다. Crack은 실제 감소량을 누적한다. Host의 `ConfirmHit`는 시간 경과/종료를 먼저 확인한 뒤 같은 구슬의 소모·HP·보상·색칠·승리를 함께 확정한다.
+
 근거: `LabModel.BeginWithSeats`, `TryApplyPlayerDamage`, `ConfirmHit`, `TryAdvance`, `LabHud`.
 
-### 박 표현 모드 — 80번째 설정
+### 박 모드·공동 색칠 목표 — 80·88번째 설정
 
 | DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
 | --- | ---: | --- | --- |
-| Gourd Mode (0 paint, 1 crack) | 0 (Paint) | 정수 0–1 / 표현 모드 | 80번째(인덱스 79), `Gourd` 묶음. 0은 흰 박·오행 색칠, 1은 기존 박·HP 단계 크랙·승리 마무리다. 앞선 79개 필드의 인덱스는 바꾸지 않는다. 체력·피해·회전·투척 판정을 변경하지 않는다. |
+| Gourd Mode (0 paint, 1 crack) | 0 (Paint) | 정수 0–1 / 표현 모드 | 80번째(인덱스 79), `Gourd` 묶음. 0은 흰 박·오행 색칠, 1은 기존 박·HP 단계 크랙·승리 마무리다. 앞선 79개 필드의 인덱스는 바꾸지 않는다. Paint는 아래 색칠 목표, Crack은 HP 0 승리를 사용한다. 원통 충돌·회전·투척 입력은 유지한다. |
+| Paint Victory Coverage (%) | 80 | 정수 1–100 / 전체 구면 % | 88번째(인덱스 87), `Gourd` 묶음. Paint에서 Host가 Victory로 확정할 공동 색칠 비율. 이전 87개 인덱스를 유지하며 Crack에서는 값은 보존하지만 HP 승리에는 사용하지 않는다. |
 
-Inspector 원본은 `LabConfig`의 **Gourd Mode**(`LabGourdMode.Paint` / `Crack`)다. 저장된 `LabConfig.asset`에 필드가 없으면 C# 기본값 Paint(0)를 사용하며, 이번 통합은 기본값 추가를 위해 에셋을 다시 저장하지 않는다. Inspector 선택은 다음 설정 적용/시작에 사용하는 원본이다. Inspector나 DEV 입력칸 수정만으로 진행 중인 전투의 모드가 즉시 바뀌지는 않는다.
+Inspector 원본은 `LabConfig`의 **Gourd Mode**(`LabGourdMode.Paint` / `Crack`)와 **Paint Victory Percent**다. `PaintVictoryPercent`는 정수 1~100, `PaintVictoryCoverage`는 그 값÷100이다. 저장된 `LabConfig.asset`에 필드가 없으면 C# 기본값 Paint(0)·목표 80%를 사용하며, 이번 통합은 기본값 추가를 위해 에셋을 다시 저장하지 않는다. Inspector 선택은 다음 설정 적용/시작에 사용하는 원본이다. Inspector나 DEV 입력칸 수정만으로 진행 중인 전투의 모드가 즉시 바뀌지는 않는다.
 
-모드도 나머지 값과 함께 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 검증·적용한다. `LabSceneController`가 `LabGourdPaint.Attach(network)`로 표현을 준비하고 초기 적용 및 `LabNetwork.ConfigApplied`에서 `ApplyMode()`를 호출한다. 솔로 시작/재시작도 이 설정 변경 이벤트를 통해 적용된다. Client는 Host가 확정한 모드를 받으며 일반 결과의 Retry는 선택을 유지한다.
+모드와 목표 비율도 나머지 값과 함께 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 검증·적용한다. `LabSceneController`가 `LabGourdPaint.Attach(network)`로 표현을 준비하고 초기 적용 및 `LabNetwork.ConfigApplied`에서 `ApplyMode()`를 호출한다. 솔로 시작/재시작도 이 설정 변경 이벤트를 통해 적용된다. Client는 Host가 확정한 모드를 받으며 일반 결과의 Retry는 모드와 목표 비율을 유지하고 자국·판 상태를 초기화한다.
 
-Paint는 승인된 속성 명중을 한 판 최대 128개까지 표면에 칠하고 무속성·빗나감을 칠하지 않는다. 새 판·Retry·로비·방 이탈에서 자국을 지운다. Crack은 기존 HP 단계와 약 1.2초 승리 마무리를 유지한다. Paint 결과와 두 모드의 패배 결과는 지연하지 않는다. 모드 전환은 같은 원통 Collider·매달림·회전 루트를 사용한다.
+Paint는 승인된 속성 명중을 Host 모델의 256×128 동일 면적 구면 맵에 누적한다. 같은 영역의 덧칠은 색만 겹치며 이미 칠한 셀을 면적으로 다시 세지 않는다. 128개 자국 제한은 없고 뒤의 유효 명중도 계속 누적된다. 실제 명중 반경은 `LabPaintSurface.DefaultRadius = 0.15`로 고정하며 이 패널의 `Damage per Hit`·아이템 배율로 넓어지지 않는다. `LabGourdPaint.splatRadius`는 연결 전 미리보기 전용이다. 무속성·빗나감·중복/종료 뒤 명중은 목표를 늘리지 않는다.
 
-박 모드는 80번째 설정으로 #166에서 프로토콜 `5617`과 함께 추가됐고, #167의 폭탄 값 4개로 84개(프로토콜 `5618`), #172의 결합 소리·햅틱 3개를 더한 87개 설정과 결합 승인 알림을 공유하는 현재 프로토콜은 `5619`이다. 이전 형식 앱과 호환되지 않는다. 실제 Host/Client 모드 일치 검증은 `docs/VALIDATION.md`의 이번 통합 기록을 확인한다. 직렬화된 Paint 참조로 검사했던 #166의 이전 PASS를 이 경로에 승계하지 않는다.
+`CoveredCount / 32,768`이 진행도이며 같은 premultiplied RGBA 맵의 알파가 있는 셀을 Point 샘플링으로 표시한다. 실제 GPU 화면/메시 면적 측정값이 아닌 양자화된 구면 비율이다. 연결 중에는 View가 직접 색칠/초기화하지 못하고 Host 확정 상태를 읽는다. Renderer를 끄거나 외형을 재생성해도 라운드 상태는 보존된다. 새 판·Retry·로비·방 이탈은 해당 상태를 초기화한다. Crack은 기존 HP 단계와 약 1.2초 승리 마무리를 유지하고 Paint 결과와 두 모드의 패배 결과는 별도 지연이 없다.
 
-근거: `LabConfig.GourdMode`·`DeveloperFields`·`CaptureDeveloperValues`·`TryApplyDeveloperValues`, `LabSceneController.Awake`, `LabNetwork.ConfigApplied`, `LabGourdPaint.Attach`·`ApplyMode`, `LabGourdCrack`, `LabGourdFinish`.
+HUD는 `snapshot.paintCoverage`와 해당 판의 `snapshot.paintGoalPercent`를 우선 사용한다. 목표가 없는 기존 fixture만 Config로 보완한다. 숫자는 소수 첫째 자리까지 내림해, 예를 들어79.99%가 목표 80%에 도달했다고 보이지 않도록79.9%로 표시한다. 막대는 `coverage / (goalPercent / 100)`이며0~1로 제한한다. 목표 수정은 새 판 적용 경로를 통해서만 반영된다.
+
+박 모드는 #166의 80번째 설정(프로토콜 5617), 폭탄 값 4개는 #167의 81~84번째(5618), 결합 소리/햅틱 3개는 #172의 85~87번째(5619)로 추가됐다. #175 보완본은 목표 비율을 88번째로 추가하고, Host 확정 목표/색칠 방향·RGBA/별도 명중 효과 값을 공유하는 프로토콜 **`5621`**을 사용한다. 모든 기기가 같은 형식이어야 한다. 기존 PR #176의 123/123·95/95와 #166의 이전 PASS는 이 보완본의 실행 결과로 승계하지 않는다. 실제 결과와 다중 기기·iOS 미실행 범위는 `docs/VALIDATION.md`에서 확인한다.
+
+근거: `LabConfig.GourdMode`·`PaintVictoryPercent`·`DeveloperFields`·`CaptureDeveloperValues`·`TryApplyDeveloperValues`, `LabSceneController.Awake`, `LabNetwork.ConfigApplied`, `LabGourdPaint.Attach`·`ApplyMode`, `LabPaintSurface.Stamp`·`CopyPixels`, `LabModel.ConfirmHit`, `LabGourdCrack`, `LabGourdFinish`.
 
 ## 4. 스태미나·구슬 생성
 
@@ -210,7 +217,7 @@ BGM·생성·타격·빗나감·결합 소리 크기 5개(인덱스 63~66, 84)�
 
 **값 간 관계:** `Starting Stamina`, `Orb Generation Cost`, `Stamina Recovery Amount`, `Stamina Reward per Hit`은 모두 `Maximum Stamina` 이하여야 한다. `Orb Stop Speed ≤ Orb Maximum Release Speed`, `Throw Minimum Swipe Speed ≤ Throw Maximum Swipe Speed`, `Throw Minimum Upward Speed ≤ Throw Maximum World Speed`, 생성 확률 6개의 합 = 100, `Item Unlock Swipes Min ≤ Item Unlock Swipes Max`도 필수다. 관계 위반 시 전체 입력이 거절된다.
 
-**기준 실험:** DEFAULTS를 불러와 APPLY로 솔로를 시작한다. 비교 시간을 확보하려면 전투 시간·구슬 수명을 늘리고 생성 비용을 낮추되, 변경값을 함께 기록한다. Yin과 Yang을 직접 겹쳐 Combined를 만든 후 판 중앙에서 위로 던진다. 투척 비교에서 아이템이 섞이지 않게 하려면 `Yin Chance`·`Yang Chance`를 50으로, 아이템 확률을 0으로 둔다. `SHOT HIT/MISS | 비행 시간 | peak +최고 상승 | range 수평 이동`와 HP 변화를 적는다. 같은 손동작을 여러 번 반복하고 **한 번에 한 값**만 바꿔 APPLY + RESTART SOLO로 비교한다. Console/Player 로그에는 `C6_LAB_THROW`(입력·발사 속도)와 `C6_LAB_PROJECTILE`(충돌·비행 지표)가 남는다.
+**기준 실험:** DEFAULTS를 불러와 APPLY로 솔로를 시작한다. 비교 시간을 확보하려면 전투 시간·구슬 수명을 늘리고 생성 비용을 낮추되, 변경값을 함께 기록한다. Yin과 Yang을 직접 겹쳐 Combined를 만든 후 판 중앙에서 위로 던진다. 투척 비교에서 아이템이 섞이지 않게 하려면 `Yin Chance`·`Yang Chance`를 50으로, 아이템 확률을 0으로 둔다. `SHOT HIT/MISS | 비행 시간 | peak +최고 상승 | range 수평 이동`와 Paint 진행도 또는 Crack HP 변화를 적는다. 같은 손동작을 여러 번 반복하고 **한 번에 한 값**만 바꿔 APPLY + RESTART SOLO로 비교한다. Console/Player 로그에는 `C6_LAB_THROW`(입력·발사 속도)와 `C6_LAB_PROJECTILE`(충돌·비행 지표)가 남는다.
 
 **예시 질문별 첫 조정 대상**
 
@@ -226,13 +233,14 @@ BGM·생성·타격·빗나감·결합 소리 크기 5개(인덱스 63~66, 84)�
 | 아이템이 해금되기 전에 사라짐 | Item Lifetime ↑ 또는 Item Unlock Swipes Max ↓ | 세 명이 실제로 넘기는 데 걸리는 시간 |
 | 폭탄 충격파가 너무 약하거나 셈 | Bomb Blast Strength ↑↓, 넓이는 Bomb Blast Radius | 범위 안 구슬이 얼마나 이웃에게 넘어가는지 |
 | 폭탄을 해금할 시간이 부족함 | Item Lifetime ↑ 또는 Item Unlock Swipes Max ↓ | 잠긴 폭탄 타이머도 Item Lifetime을 쓰므로 다른 아이템 수명도 함께 바뀜. 해금 후 던질 시간은 Orb Lifetime |
-| 릴레이 MAX가 너무 약하거나 강함 | Relay MAX Damage Multiplier | 요괴 HP와 MAX까지 넘기는 데 걸리는 시간 |
+| 릴레이 MAX가 너무 약하거나 강함 | Relay MAX Damage Multiplier | Crack 요괴 HP/실제 피해 또는 Paint 공격값 기록, MAX까지 넘기는 시간; 무속성 릴레이는 색칠하지 않음 |
+| 공동 색칠 판의 목표가 너무 높거나 낮음 | Paint Victory Coverage (%) | 목표1~100%를 새 판에 적용, GOAL 숫자/막대와 Host 공동 결과, 반복 덧칠 후 새 부위 진행 |
 
 이 표의 화살표는 **시험 방향**이지 검증된 추천값이 아니다. 잘못된 투척을 자동 보정하거나 요괴를 추적하는 기능은 현재 없다.
 
 ## 10. 이 패널로 조정할 수 없는 것·검증 범위
 
-방의 **목표 인원**은 87개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport는 87개 입력칸으로 조정하지 않는다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
+방의 **목표 인원**은 88개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport는 88개 입력칸으로 조정하지 않는다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
 
 기존 PR #76 기준 문서는 해당 코드·Scene·설정 에셋과 당시 `docs/VALIDATION.md`의 증거를 **읽어 확인**해 작성됐다. 그 기록의 EditMode **12/12**, PlayMode **20/20** 및 Mac Development 앱 빌드는 이번 3D 조합판 전환의 통과 증거가 아니다. 이 전환의 Unity 컴파일·EditMode·PlayMode, Mac·iOS 빌드, 실제 조작은 새 실행 기록으로 구분해야 한다. 문서의 물리 용어를 갱신한 것만으로 실행 결과를 PASS로 보지 않는다.
 
@@ -240,7 +248,7 @@ BGM·생성·타격·빗나감·결합 소리 크기 5개(인덱스 63~66, 84)�
 
 - 설정 필드·범위·일괄 검사: `Assets/Lab/Scripts/Core/LabConfig.cs` — `DeveloperFields`, `CaptureDeveloperValues`, `TryApplyDeveloperValues`.
 - 저장 기본값: `Assets/Lab/Resources/LabConfig.asset`.
-- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 87개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
+- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 88개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
 - 패널 열기·DEFAULTS·SOLO/Host 설정 적용·슬라이더 변환: `Assets/Lab/Scripts/UI/LabDeveloperMode.cs`.
 - Host 전투 수치·개인 HP·전원 0 패배·스태미나·생성 확률·속성·아이템 잠금·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
 - 아이템 더블 탭 사용·효과(물약·상자), 릴레이 단계, 폭탄 폭발·피해 배율: `Assets/Lab/Scripts/Core/LabModel.cs`(`TryUseItem`·`TryTransfer`·`TryAdvance`·`ConfirmHit`)와 `LabOrbBoard.EndDragAtWorld`.
@@ -252,6 +260,8 @@ BGM·생성·타격·빗나감·결합 소리 크기 5개(인덱스 63~66, 84)�
 - 공의 중력·저항·충돌·수명: `Assets/Lab/Scripts/Throw/LabProjectile.cs`.
 - 요괴 매달림·Y축 회전 및 실제 피격체 이동: `Assets/Lab/Scripts/Throw/LabHangingTarget.cs`; 진단용 재질: `Assets/Lab/Art/Targets/TargetSpinGradient.mat`.
 - Host의 방 설정·동기화·발사·피격 확정·결과 로그: `Assets/Lab/Scripts/Session/LabNetwork.cs`와 `LabSessionSettings.cs`.
-- 박 표현 선택·연결: `LabConfig.GourdMode`·DEV 인덱스 79, `LabSceneController`의 초기/`ConfigApplied` 연결, `LabGourdPaint.Attach`·`ApplyMode`. Paint의 자국/MPB와 Crack의 HP 단계/마무리는 각 표현 컴포넌트가 처리한다.
+- 박 모드·목표 선택: `LabConfig.GourdMode`·DEV 인덱스 79, `PaintVictoryPercent`·인덱스 87, `LabSceneController`의 초기/`ConfigApplied` 연결, `LabGourdPaint.Attach`·`ApplyMode`.
+- Paint 누적·승리·표시: `Core/LabPaintSurface`의 `Stamp`·`CopyPixels`, `LabModel.ConfirmHit`·`PaintSurface`, `LabNetwork.PaintSurface`/승인 방향·RGBA 재생, `LabGourdPaint.Surface`·`PaintTexture`, `LabGourdPaint.shader`. View의 비활성/초기화는 모델을 지우지 않는다.
+- 목표 UI: `LabHud.PaintGoalPercentFor`·`FormatPaintGoalProgress`·`PaintGoalFill`; Crack의 HP 단계/마무리는 `LabGourdCrack`·`LabGourdFinish`.
 - 카메라·보드 크기 적용: `Assets/Lab/Scripts/UI/LabSeatCamera.cs`와 `LabSceneController.cs`.
 - 과거 검증 기록: `docs/VALIDATION.md`. 투척 비교 절차: `docs/THROW_TUNING_GUIDE.md`.
