@@ -81,12 +81,30 @@ namespace C6Lab.Tests
             Assert.That(paint.PaintCount, Is.Zero);
             for (int i = 0; i < LabGourdPaint.Capacity; i++)
                 Assert.That(paint.Paint(Vector3.forward, Color.red), Is.True);
+            float oneSpotCoverage = paint.Coverage;
+            Assert.That(oneSpotCoverage, Is.GreaterThan(0f));
+            Assert.That(oneSpotCoverage, Is.LessThan(.1f));
+            Assert.That(paint.PaintCount, Is.EqualTo(128));
             Assert.That(paint.Paint(Vector3.forward, Color.blue), Is.False);
+            Assert.That(paint.Coverage, Is.EqualTo(oneSpotCoverage),
+                "Repeated hits at one spot cannot fill the whole gourd.");
             Assert.That(paint.PaintCount, Is.EqualTo(128));
             Assert.That(ReadBlock(paint).GetVectorArray("_PaintColors")[127], Is.EqualTo((Vector4)Color.red),
                 "The 129th hit must not replace any retained mark.");
             paint.ClearPaint();
             Assert.That(paint.PaintCount, Is.Zero);
+            Assert.That(paint.Coverage, Is.Zero);
+            for (int i = 0; i < 64; i++)
+            {
+                float y = 1f - 2f * (i + .5f) / 64f;
+                float angle = i * 2.39996323f;
+                var direction = new Vector3(Mathf.Cos(angle) * Mathf.Sqrt(1f - y * y),
+                    y, Mathf.Sin(angle) * Mathf.Sqrt(1f - y * y));
+                Assert.That(paint.Paint(direction, Color.red), Is.True);
+            }
+            Assert.That(paint.Coverage, Is.GreaterThanOrEqualTo(LabModel.PaintVictoryCoverage),
+                "The 80% goal must be reachable before the 128-mark limit.");
+            paint.ClearPaint();
             Assert.That(ReadBlock(paint).GetInt("_PaintCount"), Is.Zero);
         }
 
@@ -249,18 +267,19 @@ namespace C6Lab.Tests
                     }
                 }
                 Assert.That(approvedDamage, Is.All.EqualTo(20));
-                Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
+                Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing),
+                    "Paint mode cannot win just because the old HP counter reached zero.");
+                Assert.That(network.Snapshot.paintCoverage, Is.GreaterThan(0f));
+                Assert.That(network.Snapshot.paintCoverage, Is.LessThan(LabModel.PaintVictoryCoverage));
                 Assert.That(LabGourdFinish.DelayVictory(network, network.Snapshot), Is.False);
-                Assert.That(hud.resultControls.activeInHierarchy, Is.True,
-                    "Paint mode shows results immediately without the old 1.2-second finish.");
-                Assert.That(hud.resultStatusText.text, Is.EqualTo("VICTORY"));
+                Assert.That(hud.resultControls.activeSelf, Is.False);
                 Assert.That(paint.VisualInstance.activeSelf, Is.True);
                 Assert.That(network.target.VisualMount.Find("Gourd Left Half"), Is.Null);
                 Assert.That(network.target.VisualMount.Find("Gourd Right Half"), Is.Null);
                 Assert.That(network.target.VisualMount.Find("Small Yokai Spirit"), Is.Null);
                 CaptureBattle(network, "victory-two-marks.png");
                 string completedSession = network.Snapshot.sessionId;
-                hud.resultRestartButton.onClick.Invoke();
+                Assert.That(network.RestartDeveloperSolo(), Is.True);
                 yield return null;
                 Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(completedSession));
                 Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
@@ -598,6 +617,8 @@ namespace C6Lab.Tests
 
         static void CaptureBattle(LabNetwork network, string name)
         {
+            // Batch test workers have no render surface; gameplay assertions still run there.
+            if (Application.isBatchMode) return;
             Camera camera = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None).Single(c => c.name == "BattleCamera");
             const string directory = "Library/Issue166ModeCaptures";
             Directory.CreateDirectory(directory);

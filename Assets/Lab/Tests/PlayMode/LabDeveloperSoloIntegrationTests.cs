@@ -363,6 +363,7 @@ namespace C6Lab.Tests
             // Orbs scatter from the drum in every direction. Turn off contact combining so orbs
             // that bump while scattering cannot merge before the test drags Yin onto Yang.
             tuning[51] = 0f;
+            tuning[79] = 1f; // Crack keeps the damage-number presentation checked below.
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
             network.config = rawOnly;
             // The board reads contact combining from its own config, so it needs the same tuning.

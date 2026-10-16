@@ -150,7 +150,7 @@ namespace C6Lab
         // P-slot assignments join lobby packets, generate drums join the snapshot with the generate
         // request naming one, Gourd Mode joins the shared config, and a bomb blast carries where it
         // happened so the holder's board can push orbs away; older clients cannot share this room.
-        internal const ushort LabProtocolVersion = 5618;
+        internal const ushort LabProtocolVersion = 5620;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
         private const int MaximumPacketBytes = 32768;
@@ -1391,8 +1391,15 @@ namespace C6Lab
                     float signedYawImpulse = target.GetComponent<LabHangingTarget>()
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
                     target.NotifyApprovedHit(targetLocalPoint, element);
+                    if (element != LabOrbElement.None && config != null
+                        && config.GourdMode == LabGourdMode.Paint)
+                    {
+                        var paint = target.GetComponent<LabGourdPaint>();
+                        if (paint != null && paint.IsReady)
+                            model.ConfirmPaintCoverage(paint.Coverage, result.OwnerPlayerId);
+                    }
                     impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
-                        result.ImpactVelocity);
+                        result.ImpactVelocity, config == null || config.GourdMode == LabGourdMode.Crack);
                     if (result.OwnerPlayerId == LocalPlayerId) LocalThrowHit?.Invoke(actualDamage);
                     var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
                         round = model.Round, firstId = result.ProjectileId, owner = result.OwnerPlayerId,
@@ -1594,7 +1601,8 @@ namespace C6Lab
                         target.NotifyApprovedHit(new Vector3(packet.x, packet.y, packet.z), (LabOrbElement)packet.element);
                         impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
                             (LabOrbElement)packet.element, packet.damage,
-                            new Vector3(packet.wx, packet.wy, packet.wz));
+                            new Vector3(packet.wx, packet.wy, packet.wz),
+                            config == null || config.GourdMode == LabGourdMode.Crack);
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
                         if (packet.owner == LocalPlayerId) LocalThrowHit?.Invoke(packet.damage);
                     }

@@ -5,13 +5,14 @@ namespace C6Lab
     public enum LabGourdMode { Paint = 0, Crack = 1 }
 
     /// <summary>
-    /// Presentation only: paint approved elemental impacts on the Scene's white sphere gourd.
-    /// The existing Host collision, HP, rewards, impact messages and hanging body remain authoritative.
+    /// Paint approved elemental impacts on the white sphere and measure covered surface.
+    /// The Host owns the win decision; clients use the same marks for display.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabGourdPaint : MonoBehaviour
     {
         public const int Capacity = 128;
+        private const int CoverageSamples = 4096;
         public const string ResourceFolder = "GourdPaint/";
 
         public LabTarget target;
@@ -22,6 +23,9 @@ namespace C6Lab
 
         private readonly Vector4[] positions = new Vector4[Capacity];
         private readonly Vector4[] colors = new Vector4[Capacity];
+        private readonly bool[] coveredSamples = new bool[CoverageSamples];
+        private static readonly Vector3[] surfaceSamples = MakeSurfaceSamples();
+        private int coveredCount;
         private MaterialPropertyBlock block;
         private Renderer shell;
         private LabTarget mountedTarget;
@@ -33,6 +37,7 @@ namespace C6Lab
         private bool started;
 
         public int PaintCount { get; private set; }
+        public float Coverage => coveredCount / (float)CoverageSamples;
         public Transform Shell => shell != null ? shell.transform : null;
         public GameObject VisualInstance { get; private set; }
         public string InitializationError { get; private set; }
@@ -200,6 +205,7 @@ namespace C6Lab
             positions[PaintCount] = new Vector4(point.x, point.y, point.z, radius);
             colors[PaintCount] = color;
             PaintCount++;
+            AddCoverage(point, radius);
             Apply();
             return true;
         }
@@ -207,7 +213,39 @@ namespace C6Lab
         public void ClearPaint()
         {
             PaintCount = 0;
+            coveredCount = 0;
+            System.Array.Clear(coveredSamples, 0, coveredSamples.Length);
             Apply();
+        }
+
+        private void AddCoverage(Vector3 point, float radius)
+        {
+            // The same irregular outer edge is used by the shader. A fixed, evenly spread
+            // sample set measures the entire shell, including the side facing away from a player.
+            for (int i = 0; i < CoverageSamples; i++)
+            {
+                if (coveredSamples[i]) continue;
+                Vector3 delta = surfaceSamples[i] - point;
+                float ripple = 1f + .1f * Mathf.Sin(delta.x * 135f + Mathf.Sin(delta.y * 91f))
+                    * Mathf.Sin(delta.z * 119f + delta.y * 57f);
+                if (delta.magnitude >= radius * ripple) continue;
+                coveredSamples[i] = true;
+                coveredCount++;
+            }
+        }
+
+        private static Vector3[] MakeSurfaceSamples()
+        {
+            var samples = new Vector3[CoverageSamples];
+            const float goldenAngle = 2.39996323f;
+            for (int i = 0; i < samples.Length; i++)
+            {
+                float y = 1f - 2f * (i + .5f) / samples.Length;
+                float ring = Mathf.Sqrt(1f - y * y);
+                float angle = i * goldenAngle;
+                samples[i] = new Vector3(Mathf.Cos(angle) * ring, y, Mathf.Sin(angle) * ring) * .5f;
+            }
+            return samples;
         }
 
         private void Apply()

@@ -1278,6 +1278,24 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void PaintCoverageWinsForEveryoneAndResetsOnNextRound()
+        {
+            Assert.That(model.ConfirmPaintCoverage(.79f, 10), Is.True);
+            Assert.That(model.Snapshot(0d).phase, Is.EqualTo(LabPhase.Playing));
+            Assert.That(model.ConfirmPaintCoverage(.1f, 10), Is.False);
+            Assert.That(model.ConfirmPaintCoverage(float.NaN, 10), Is.False);
+            Assert.That(model.ConfirmPaintCoverage(.8f, 20), Is.True);
+            var result = model.Snapshot(0d);
+            Assert.That(result.phase, Is.EqualTo(LabPhase.Victory));
+            Assert.That(result.paintCoverage, Is.EqualTo(.8f));
+            Assert.That(result.players.Single(player => player.id == 20).lastHit, Is.True);
+            Assert.That(model.ConfirmPaintCoverage(.9f, 30), Is.False);
+            model.Begin("lab-test", new ulong[] { 10, 20, 30 }, 1d, config);
+            Assert.That(model.Snapshot(1d).paintCoverage, Is.Zero);
+            Assert.That(model.Snapshot(1d).phase, Is.EqualTo(LabPhase.Playing));
+        }
+
+        [Test]
         public void HitsAndDamageAreRecordedAndOnlyTheKillingBlowIsTheLastHit()
         {
             var shortFight = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
@@ -1286,7 +1304,9 @@ namespace C6Lab.Tests
                 float[] values = shortFight.CaptureDeveloperValues();
                 values[0] = 30f; // Monster Max HP
                 values[1] = 20f; // Damage per Hit
+                values[79] = 1f; // Crack keeps the legacy HP finish.
                 Assert.That(shortFight.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                model = new LabModel();
                 model.Begin("hit-records", new ulong[] { 10, 20, 30 }, 0d, shortFight);
 
                 var first = GeneratePair(10);
@@ -1337,6 +1357,7 @@ namespace C6Lab.Tests
                 float[] values = single.CaptureDeveloperValues();
                 values[74] = 1f; // drum count
                 Assert.That(single.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                model = new LabModel();
                 model.Begin("drum-time", new ulong[] { 10, 20, 30 }, 0d, single);
                 LabOrbState drum = model.Snapshot(0d).drums.Single();
                 ulong first = drum.owner;

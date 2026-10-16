@@ -230,7 +230,11 @@ namespace C6Lab
                 SetStaminaCells(0f);
                 return;
             }
-            Set(hpText, snapshot.hp + " / " + network.config.MonsterMaxHp);
+            bool paintGoal = network.config.GourdMode == LabGourdMode.Paint;
+            Set(hpText, paintGoal
+                ? "PAINT " + Mathf.RoundToInt(snapshot.paintCoverage * 100f) + "% / "
+                    + Mathf.RoundToInt(LabModel.PaintVictoryCoverage * 100f) + "%"
+                : snapshot.hp + " / " + network.config.MonsterMaxHp);
             int remainingSeconds = Mathf.Max(0, Mathf.CeilToInt((float)snapshot.remaining));
             Set(timeText, (remainingSeconds / 60).ToString("00") + ":" + (remainingSeconds % 60).ToString("00"));
             LabPlayerState local = Array.Find(snapshot.players ?? Array.Empty<LabPlayerState>(), p => p.id == network.LocalPlayerId);
@@ -243,7 +247,9 @@ namespace C6Lab
             Set(orbsText, "ORBS " + count + " / " + network.config.OrbStorageLimit);
             Set(seatText, local == null ? "P—" : "P" + (local.seat + 1)
                 + (network.IsDeveloperSolo ? " · SOLO" : string.Empty));
-            SetFill(yokaiHpFill, Fraction(snapshot.hp, network.config.MonsterMaxHp));
+            SetFill(yokaiHpFill, paintGoal
+                ? Mathf.Clamp01(snapshot.paintCoverage / LabModel.PaintVictoryCoverage)
+                : Fraction(snapshot.hp, network.config.MonsterMaxHp));
             SetFill(playerHpFill, local == null ? 0f : Fraction(local.personalHp, network.config.PlayerMaxHp));
             SetStaminaCells(local == null ? 0f : Fraction(local.stamina, network.config.StaminaMax));
             GetNeighborLabels(snapshot, network.LocalPlayerId, out string left, out string right);

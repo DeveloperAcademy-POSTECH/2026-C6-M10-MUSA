@@ -14,6 +14,7 @@ namespace C6Lab.Tests
                 float[] values = config.CaptureDeveloperValues();
                 values[0] = 7f; // Monster HP is lower than the configured 20-point hit.
                 values[1] = 20f;
+                values[79] = 1f; // Legacy HP victory applies to Crack mode.
                 values[5] = .001f;
                 values[9] = 100f;
                 values[39] = 50f;

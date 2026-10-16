@@ -108,6 +108,8 @@ namespace C6Lab
         /// <summary>이번 라운드에 실제로 진행된 전투 시간(초). 결과 화면의 북 점유율 기준.</summary>
         public double playedSeconds;
         public int hp;
+        /// <summary>Host-approved fraction of the whole gourd shell covered by elemental paint.</summary>
+        public float paintCoverage;
         /// <summary>Host-owned presentation pose, synchronized separately from HP and collision.</summary>
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();
