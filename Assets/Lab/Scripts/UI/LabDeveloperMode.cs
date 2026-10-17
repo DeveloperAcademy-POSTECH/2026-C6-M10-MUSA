@@ -343,7 +343,8 @@ namespace C6Lab
                 title.fontSize = labelStyle.fontSize;
                 title.color = labelStyle.color;
                 title.fontStyle = FontStyle.Bold;
-                title.alignment = TextAnchor.MiddleCenter;
+                // 세모(▶/▼)가 세로 한 줄에 맞도록 왼쪽 정렬한다. 가운데 정렬이면 제목 길이마다 시작점이 달라 읽기 어렵다.
+                title.alignment = TextAnchor.MiddleLeft;
                 title.raycastTarget = true;
 
                 LayoutElement titleLayout = header.GetComponent<LayoutElement>();
