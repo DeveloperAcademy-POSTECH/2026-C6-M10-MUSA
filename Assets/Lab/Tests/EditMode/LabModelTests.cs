@@ -590,7 +590,7 @@ namespace C6Lab.Tests
                 LabOrbState drum = room.Snapshot(0d).drums.Single(candidate => candidate.owner == 10);
 
                 Assert.That(room.TryGenerate(20, "fill", 0d, out var bomb, out var reason), Is.True, reason);
-                Assert.That(bomb.lockSwipes, Is.GreaterThan(0));
+                Assert.That(bomb.lockSwipes, Is.Zero, "A bomb has no lock; its fuse alone decides when it blasts.");
                 Assert.That(room.TryGenerate(20, "over", 0d, out _, out reason), Is.False);
                 Assert.That(reason, Is.EqualTo("STORAGE_FULL"), "Player 20's board is full of orbs.");
                 Assert.That(room.TryGenerate(10, "beside-drum", 0d, out _, out reason), Is.True,

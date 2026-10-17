@@ -91,6 +91,10 @@ namespace C6Lab
                 && GetComponent<LabResultDashboard>() == null)
                 gameObject.AddComponent<LabResultDashboard>().Bind(boardNetwork, hud.resultControls,
                     hud.resultStatusText != null ? hud.resultStatusText.font : null);
+            // 박이 폭탄을 떨어뜨릴 때 전투 화면의 박 옆에 뜨는 "!" 말풍선 (모든 기기)
+            if (hud != null && boardNetwork != null && GetComponent<LabGourdAlert>() == null)
+                gameObject.AddComponent<LabGourdAlert>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>(),
+                    hud.battleCamera);
             ReconfigureBoard();
         }
 

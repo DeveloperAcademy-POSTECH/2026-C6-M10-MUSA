@@ -534,6 +534,9 @@ namespace C6Lab.Tests
                     "The drop signal reaches the board before the snapshot that holds the bomb.");
                 Assert.That(board.GetComponentInChildren<LabDropWarning>(), Is.Not.Null, "Its landing spot is marked.");
                 Assert.That(network.Notice, Does.Contain("gourd"));
+                var alert = UnityEngine.Object.FindFirstObjectByType<LabGourdAlert>();
+                Assert.That(alert, Is.Not.Null, "The saved scene shows the gourd's alert.");
+                Assert.That(alert.Active, Is.True, "Every player sees the gourd's \"!\" bubble.");
 
                 LabOrbAppearance look = network.config.OrbAppearance;
                 until = Time.realtimeSinceStartup + look.DropSeconds + 1.5f;
