@@ -11,9 +11,34 @@ namespace C6Lab
         public readonly float Min;
         public readonly float Max;
         public readonly bool WholeNumber;
+        /// <summary>켜기/끄기(또는 둘 중 하나) 항목이면 0일 때·1일 때 버튼 글자. 숫자 항목은 null.</summary>
+        public readonly string OffText, OnText;
+
+        /// <summary>DEV 화면에서 숫자 대신 토글 버튼으로 보여주는 0/1 항목인지</summary>
+        public bool IsToggle => OnText != null;
+
+        /// <summary>화면에 보이는 이름. 토글은 "(0 off, 1 on)" 같은 설명을 뗀다. Label 자체는 테스트·검색용으로 그대로 둔다.</summary>
+        public string DisplayLabel
+        {
+            get
+            {
+                if (!IsToggle || Label == null) return Label;
+                int bracket = Label.IndexOf(" (", StringComparison.Ordinal);
+                return bracket > 0 ? Label.Substring(0, bracket) : Label;
+            }
+        }
+
+        /// <summary>0/1 값을 토글 버튼으로 보여주는 항목. 값과 저장·공유 방식은 숫자 항목과 같다.</summary>
+        public static LabDeveloperField Toggle(string label, string offText = "OFF", string onText = "ON") =>
+            new LabDeveloperField(label, 0f, 1f, true, offText, onText);
 
         public LabDeveloperField(string label, float min, float max, bool wholeNumber = false)
+            : this(label, min, max, wholeNumber, null, null) { }
+
+        private LabDeveloperField(string label, float min, float max, bool wholeNumber, string offText, string onText)
         {
+            OffText = offText;
+            OnText = onText;
             Label = label;
             Min = min;
             Max = max;
@@ -98,8 +123,8 @@ namespace C6Lab
             new LabDeveloperField("Item Unlock Swipes Max", 0f, 20f, true),
             new LabDeveloperField("Player Max HP", 1f, 300f, true),
             new LabDeveloperField("Combine Speed", 0f, 10f),
-            new LabDeveloperField("Drop Combine (0 off, 1 on)", 0f, 1f, true),
-            new LabDeveloperField("Contact Combine (0 off, 1 on)", 0f, 1f, true),
+            LabDeveloperField.Toggle("Drop Combine (0 off, 1 on)"),
+            LabDeveloperField.Toggle("Contact Combine (0 off, 1 on)"),
             new LabDeveloperField("Potion Heal (HP)", 0f, 300f, true),
             new LabDeveloperField("Relay x2 Damage Multiplier", 1f, 20f),
             new LabDeveloperField("Relay MAX Damage Multiplier", 1f, 20f),
@@ -116,7 +141,7 @@ namespace C6Lab
             new LabDeveloperField("Generate Sound Volume (50 = Inspector)", 0f, 100f),
             new LabDeveloperField("Hit Sound Volume (50 = Inspector)", 0f, 100f),
             new LabDeveloperField("Miss Sound Volume (50 = Inspector)", 0f, 100f),
-            new LabDeveloperField("Haptics (0 off, 1 on)", 0f, 1f, true),
+            LabDeveloperField.Toggle("Haptics (0 off, 1 on)"),
             new LabDeveloperField("Generate Haptic Style (0 Light 1 Medium 2 Heavy 3 Soft 4 Rigid)", 0f, 4f, true),
             new LabDeveloperField("Generate Haptic Intensity", 0f, 1f),
             new LabDeveloperField("Hit Haptic Style (0-4)", 0f, 4f, true),
@@ -128,7 +153,7 @@ namespace C6Lab
             new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
             new LabDeveloperField("Drum Drift Turning (per second)", 0f, 2f),
             new LabDeveloperField("Drum Spin Strength", 0f, 3f),
-            new LabDeveloperField("Gourd Mode (0 paint, 1 crack)", 0f, 1f, true),
+            LabDeveloperField.Toggle("Gourd Mode (0 paint, 1 crack)", "PAINT", "CRACK"),
             new LabDeveloperField("Bomb Blast Radius (board widths)", 0f, 2f),
             new LabDeveloperField("Bomb Blast Strength (board widths/s)", 0f, 20f),
             new LabDeveloperField("Bomb Haptic Style (0-4)", 0f, 4f, true),
@@ -148,7 +173,7 @@ namespace C6Lab
             new LabDeveloperField("Drum Stop Middle Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Drum Stop Far Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Drum Pass Through Chance (%)", 0f, 100f, true),
-            new LabDeveloperField("Minimap (0 off, 1 on)", 0f, 1f, true),
+            LabDeveloperField.Toggle("Minimap (0 off, 1 on)"),
             new LabDeveloperField("Minimap Size (%, 50 = default)", 0f, 100f, true),
             new LabDeveloperField("Minimap Move X (- left, + right)", -300f, 100f, true),
             new LabDeveloperField("Minimap Move Y (- down, + up)", -300f, 500f, true)

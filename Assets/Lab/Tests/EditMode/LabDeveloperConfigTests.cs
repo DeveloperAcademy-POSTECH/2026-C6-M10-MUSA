@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -777,5 +778,21 @@ namespace C6Lab.Tests
             Assert.That(config.CaptureDeveloperValues()[87], Is.EqualTo(expected));
         }
 
+
+        [Test]
+        public void OnOffFieldsShowAsTogglesWithShortNamesButKeepTheirValuesAndLabels()
+        {
+            var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
+            Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap" }));
+            Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
+                "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
+            var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");
+            Assert.That(new[] { gourd.OffText, gourd.OnText }, Is.EqualTo(new[] { "PAINT", "CRACK" }));
+            Assert.That(gourd.Label, Is.EqualTo("Gourd Mode (0 paint, 1 crack)"), "The full label stays for lookups.");
+            var minimap = toggles.Single(field => field.DisplayLabel == "Minimap");
+            Assert.That(new[] { minimap.OffText, minimap.OnText }, Is.EqualTo(new[] { "OFF", "ON" }));
+            Assert.That(LabConfig.DeveloperFields.Single(field => field.Label.StartsWith("Minimap Size")).IsToggle, Is.False);
+        }
     }
 }
