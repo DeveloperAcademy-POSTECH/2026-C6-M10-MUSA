@@ -11,7 +11,8 @@ namespace C6Lab
     /// 왼쪽 이웃(이전 번호)은 왼쪽 위에 놓아 화면에서 넘기는 방향과 미니맵 방향이 같다.
     /// 북을 가진 사람의 원은 태극 무늬(Resources/Minimap/Taegeuk.png)로 덮고, 북이 넘어가면 태극이 선을 따라 미끄러진다.
     /// 장면 수정 없이 LabSceneController가 실행 시 붙이고, 전투 중(Playing)에만 보인다.
-    /// LabConfig의 Minimap Enabled(Inspector · DEV "Minimap")가 꺼져 있으면 보이지 않는다.
+    /// LabConfig의 Minimap Enabled(Inspector · DEV "Minimap")가 꺼져 있으면 보이지 않고,
+    /// Minimap Size(%)만큼 오른쪽 아래 모서리를 기준으로 크기가 바뀐다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabDrumMinimap : MonoBehaviour
@@ -89,6 +90,8 @@ namespace C6Lab
             EnsurePanel();
             if (panel == null) return;
             if (!panel.gameObject.activeSelf) panel.gameObject.SetActive(true);
+            float scale = network != null && network.config != null ? network.config.MinimapSizePercent / 100f : 1f;
+            if (!Mathf.Approximately(panel.localScale.x, scale)) panel.localScale = new Vector3(scale, scale, 1f);
             Rebuild(snapshot.players, network.LocalPlayerId);
             SyncDrums(snapshot.drums);
             Advance(Time.unscaledDeltaTime);

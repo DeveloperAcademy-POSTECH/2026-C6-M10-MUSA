@@ -89,6 +89,7 @@ MonoBehaviour:
   combineHapticStyle: 0
   combineHapticIntensity: 1
   minimapEnabled: 1
+  minimapSizePercent: 100
   orbAppearance: {fileID: 11400000, guid: 9fd06f927557d47e2ac8b342a6979ed0, type: 2}
   cameraRadius: 8
   cameraHeightOffset: 0.65

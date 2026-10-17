@@ -148,7 +148,8 @@ namespace C6Lab
             new LabDeveloperField("Drum Stop Middle Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Drum Stop Far Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Drum Pass Through Chance (%)", 0f, 100f, true),
-            new LabDeveloperField("Minimap (0 off, 1 on)", 0f, 1f, true)
+            new LabDeveloperField("Minimap (0 off, 1 on)", 0f, 1f, true),
+            new LabDeveloperField("Minimap Size (%)", 50f, 200f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -176,7 +177,7 @@ namespace C6Lab
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
             new LabDeveloperCategory("Gourd", 79, 87, 88, 89),
-            new LabDeveloperCategory("Minimap", 99)
+            new LabDeveloperCategory("Minimap", 99, 100)
         });
 
 
@@ -326,7 +327,10 @@ namespace C6Lab
         [Header("Minimap (#181)")]
         [Tooltip("전투 화면 오른쪽 아래에 북이 누구한테 있는지 보여주는 미니맵을 켠다.")]
         [SerializeField] private bool minimapEnabled = true;
+        [Tooltip("미니맵 크기 (%). 100 = 기본 크기, 150 = 1.5배. 오른쪽 아래 모서리를 기준으로 커진다.")]
+        [SerializeField, Range(50, 200)] private int minimapSizePercent = 100;
         public bool MinimapEnabled => minimapEnabled;
+        public int MinimapSizePercent => Mathf.Clamp(minimapSizePercent, 50, 200);
 
         [Header("Replaceable orb presentation")]
         [SerializeField] private LabOrbAppearance orbAppearance;
@@ -558,7 +562,7 @@ namespace C6Lab
                 Mathf.Round(stopBounds[0] * 100f), Mathf.Round(stopBounds[1] * 100f),
                 Mathf.Round(stopBounds[2] * 100f), Mathf.Round(stopBounds[3] * 100f),
                 stopChances[0], stopChances[1], stopChances[2], stopChances[3],
-                MinimapEnabled ? 1f : 0f
+                MinimapEnabled ? 1f : 0f, MinimapSizePercent
             };
         }
 
@@ -698,6 +702,7 @@ namespace C6Lab
             drumStopBounds = new[] { (int)values[91], (int)values[92], (int)values[93], (int)values[94] };
             drumStopChances = new[] { (int)values[95], (int)values[96], (int)values[97], (int)values[98] };
             minimapEnabled = values[99] >= .5f;
+            minimapSizePercent = (int)values[100];
             error = string.Empty;
             return true;
         }
