@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>
-    /// 전투 화면 오른쪽 아래(오른쪽 이웃 동그라미 바로 위)의 미니맵. 플레이어마다 원 하나를 정다각형 꼭짓점에 놓고
+    /// 전투 화면 오른쪽 아래(오른쪽 이웃 동그라미 바로 위, 오른쪽 테두리가 화면 안에 보이도록 조금 안쪽)의 미니맵. 플레이어마다 원 하나를 정다각형 꼭짓점에 놓고
     /// 이웃끼리 선으로 잇는다. 폰마다 "나"를 아래 가운데에 두고, 내 화면의 오른쪽 이웃(다음 번호)은 오른쪽 위,
     /// 왼쪽 이웃(이전 번호)은 왼쪽 위에 놓아 화면에서 넘기는 방향과 미니맵 방향이 같다.
     /// 북을 가진 사람의 원은 태극 무늬(Resources/Minimap/Taegeuk.png)로 덮고, 북이 넘어가면 태극이 선을 따라 미끄러진다.
@@ -20,6 +20,11 @@ namespace C6Lab
         public Vector2 size = new Vector2(128f, 116f);
         /// <summary>오른쪽 이웃 동그라미 위로 띄우는 간격</summary>
         public float gapAboveBadge = 8f;
+        /// <summary>
+        /// 미니맵 오른쪽 끝을 오른쪽 이웃 동그라미의 오른쪽 끝보다 이만큼 안쪽(왼쪽)에 둔다.
+        /// 동그라미가 화면 오른쪽 끝에 걸쳐 있어서, 그대로 맞추면 미니맵 오른쪽 테두리가 화면 밖으로 잘린다.
+        /// </summary>
+        public float insetFromBadgeRight = 16f;
         public float lineWidth = 3f;
         public int labelSize = 11;
         /// <summary>북이 이웃 한 칸을 건너가는 시간(초)</summary>
@@ -254,7 +259,8 @@ namespace C6Lab
             panel.anchorMin = panel.anchorMax = anchor.anchorMin;
             panel.pivot = new Vector2(1f, 0f);
             homePosition = anchor.anchoredPosition
-                + new Vector2(anchor.sizeDelta.x * (1f - anchor.pivot.x), anchor.sizeDelta.y * (1f - anchor.pivot.y) + gapAboveBadge);
+                + new Vector2(anchor.sizeDelta.x * (1f - anchor.pivot.x) - insetFromBadgeRight,
+                    anchor.sizeDelta.y * (1f - anchor.pivot.y) + gapAboveBadge);
             panel.anchoredPosition = homePosition;
             panel.sizeDelta = size;
             var borderImage = border.GetComponent<Image>();
