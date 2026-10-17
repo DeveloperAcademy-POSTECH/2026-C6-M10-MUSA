@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(99));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(100));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -27,6 +27,7 @@ namespace C6Lab.Tests
             Assert.That(new[] { values[88], values[89] }, Is.EqualTo(new[] { 20f, 30f }),
                 "The gourd drops a bomb every 20 to 30 seconds by default.");
             Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
+            Assert.That(values[99], Is.EqualTo(1f), "The minimap is on by default.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -109,7 +110,9 @@ namespace C6Lab.Tests
             values[90] = 100f; // fuse sizzle twice the Inspector volume
             values[91] = 10f; values[92] = 30f; values[93] = 50f; values[94] = 90f; // drum stop zone edges
             values[95] = 25f; values[96] = 25f; values[97] = 25f; values[98] = 25f; // drum stop chances
+            values[99] = 0f; // minimap off
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.MinimapEnabled, Is.False, "DEV can turn the minimap off.");
             Assert.That(config.FuseSoundVolume, Is.EqualTo(1f).Within(1e-5f), "100 doubles the Inspector fuse volume (0.5).");
             Assert.That(config.DrumStopBounds(), Is.EqualTo(new[] { .1f, .3f, .5f, .9f }).Within(1e-6f));
             Assert.That(config.DrumStopChances(), Is.EqualTo(new[] { 25, 25, 25, 25 }));

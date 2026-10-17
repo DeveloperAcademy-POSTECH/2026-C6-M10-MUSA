@@ -147,7 +147,8 @@ namespace C6Lab
             new LabDeveloperField("Drum Stop Near Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Drum Stop Middle Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Drum Stop Far Chance (%)", 0f, 100f, true),
-            new LabDeveloperField("Drum Pass Through Chance (%)", 0f, 100f, true)
+            new LabDeveloperField("Drum Pass Through Chance (%)", 0f, 100f, true),
+            new LabDeveloperField("Minimap (0 off, 1 on)", 0f, 1f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -174,7 +175,8 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 79, 87, 88, 89)
+            new LabDeveloperCategory("Gourd", 79, 87, 88, 89),
+            new LabDeveloperCategory("Minimap", 99)
         });
 
 
@@ -320,6 +322,11 @@ namespace C6Lab
         [SerializeField] private LabHapticStyle combineHapticStyle = LabHapticStyle.Light;
         [Tooltip("결합 진동 세기 (0 = 끔)")]
         [SerializeField, Range(0f, 1f)] private float combineHapticIntensity = 1f;
+
+        [Header("Minimap (#181)")]
+        [Tooltip("전투 화면 오른쪽 아래에 북이 누구한테 있는지 보여주는 미니맵을 켠다.")]
+        [SerializeField] private bool minimapEnabled = true;
+        public bool MinimapEnabled => minimapEnabled;
 
         [Header("Replaceable orb presentation")]
         [SerializeField] private LabOrbAppearance orbAppearance;
@@ -550,7 +557,8 @@ namespace C6Lab
                 DevVolume(fuseSoundVolumeDev),
                 Mathf.Round(stopBounds[0] * 100f), Mathf.Round(stopBounds[1] * 100f),
                 Mathf.Round(stopBounds[2] * 100f), Mathf.Round(stopBounds[3] * 100f),
-                stopChances[0], stopChances[1], stopChances[2], stopChances[3]
+                stopChances[0], stopChances[1], stopChances[2], stopChances[3],
+                MinimapEnabled ? 1f : 0f
             };
         }
 
@@ -689,6 +697,7 @@ namespace C6Lab
             fuseSoundVolumeDev = values[90];
             drumStopBounds = new[] { (int)values[91], (int)values[92], (int)values[93], (int)values[94] };
             drumStopChances = new[] { (int)values[95], (int)values[96], (int)values[97], (int)values[98] };
+            minimapEnabled = values[99] >= .5f;
             error = string.Empty;
             return true;
         }
