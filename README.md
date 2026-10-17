@@ -4,7 +4,7 @@
 
 ## 개발자 설정 빠른 참고
 
-Editor 또는 Development Build에서 **DEV**를 열면 요괴·개인 HP·시간·스태미나·생성 확률·아이템·구슬 물리·카메라·투척·피격 회전·생성 연출·생성 북·소리·햅틱·박 표현 모드·폭탄 충격파·결합 소리/햅틱·색칠 승리 비율·박 폭탄 간격·도화선 소리·북 멈춤 구간·미니맵 켜기/끄기·크기까지 **101개**를 숫자 입력과 슬라이더로 조정할 수 있습니다. 이 값은 솔로 라운드 또는 Host가 만드는 공유 방에 적용합니다. [개발자 모드 조정값 상세 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)에 모든 값의 현재 기본값, 입력 범위, 단위, 실제 효과, 값 사이의 제약과 코드 연결을 정리했습니다. 투척값을 비교하는 순서는 [투척 물리 실험 가이드](docs/THROW_TUNING_GUIDE.md)를 보세요.
+Editor 또는 Development Build에서 **DEV**를 열면 요괴·개인 HP·시간·스태미나·생성 확률·아이템·구슬 물리·카메라·투척·피격 회전·생성 연출·생성 북·소리·햅틱·박 표현 모드·폭탄 충격파·결합 소리/햅틱·색칠 승리 비율·박 폭탄 간격·도화선 소리·북 멈춤 구간·미니맵 켜기/끄기·크기·위치까지 **103개**를 숫자 입력과 슬라이더로 조정할 수 있습니다. 이 값은 솔로 라운드 또는 Host가 만드는 공유 방에 적용합니다. [개발자 모드 조정값 상세 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)에 모든 값의 현재 기본값, 입력 범위, 단위, 실제 효과, 값 사이의 제약과 코드 연결을 정리했습니다. 투척값을 비교하는 순서는 [투척 물리 실험 가이드](docs/THROW_TUNING_GUIDE.md)를 보세요.
 
 | 조정 영역 | 기본값 예시 | 무엇이 바뀌나 |
 | --- | --- | --- |
@@ -40,13 +40,13 @@ DEV 값은 **START/RESTART SOLO**로 1인 라운드에, **CREATE ROOM**으로 �
 
 ### 한 대로 조합·투척 실험하기
 
-Unity Editor에서 Play를 누르거나 **Development Build**로 만든 앱을 실행합니다. 화면 오른쪽의 **DEV**를 누르면 101개 조정값의 숫자 입력과 슬라이더가 있는 패널이 열립니다. `Monster Max HP`, `Orb Generation Cost`, `Orb Lifetime (seconds)`, `Throw ...` 등 필요한 값을 조정하고 **START SOLO**를 누르세요. 한 명의 Host 세션이 즉시 시작되며, 솔로 플레이어가 모든 북을 갖습니다. 조합판 위 **북**을 탭해 Yin/Yang을 만든 뒤 서로 다른 두 구슬을 직접 겹쳐 Combined를 만들고 위쪽으로 빠르게 스와이프해 박에 던질 수 있습니다. 북에서는 기본으로 음·양만 나오며(각 50%), 박이 20~30초마다 떨어뜨리는 폭탄은 솔로에서 모두 내 판에 떨어집니다. 좌우 끝 전달은 이웃이 없으므로 발생하지 않고, 같은 이유로 **잠긴 아이템도 솔로에서는 풀리지 않습니다.** 아이템을 시험하려면 아이템 확률을 올리고, 풀린 아이템을 혼자 보려면 `Item Unlock Swipes Min`·`Max`를 0으로 둡니다. 박 폭탄을 빨리 보려면 `Gourd Bomb Interval Min`·`Max`를 5처럼 작게, 폭탄 없이 투척만 비교하려면 `Gourd Bomb Interval Max`를 0으로 둡니다.
+Unity Editor에서 Play를 누르거나 **Development Build**로 만든 앱을 실행합니다. 화면 오른쪽의 **DEV**를 누르면 103개 조정값의 숫자 입력과 슬라이더가 있는 패널이 열립니다. `Monster Max HP`, `Orb Generation Cost`, `Orb Lifetime (seconds)`, `Throw ...` 등 필요한 값을 조정하고 **START SOLO**를 누르세요. 한 명의 Host 세션이 즉시 시작되며, 솔로 플레이어가 모든 북을 갖습니다. 조합판 위 **북**을 탭해 Yin/Yang을 만든 뒤 서로 다른 두 구슬을 직접 겹쳐 Combined를 만들고 위쪽으로 빠르게 스와이프해 박에 던질 수 있습니다. 북에서는 기본으로 음·양만 나오며(각 50%), 박이 20~30초마다 떨어뜨리는 폭탄은 솔로에서 모두 내 판에 떨어집니다. 좌우 끝 전달은 이웃이 없으므로 발생하지 않고, 같은 이유로 **잠긴 아이템도 솔로에서는 풀리지 않습니다.** 아이템을 시험하려면 아이템 확률을 올리고, 풀린 아이템을 혼자 보려면 `Item Unlock Swipes Min`·`Max`를 0으로 둡니다. 박 폭탄을 빨리 보려면 `Gourd Bomb Interval Min`·`Max`를 5처럼 작게, 폭탄 없이 투척만 비교하려면 `Gourd Bomb Interval Max`를 0으로 둡니다.
 
 값을 다시 조정하려면 **DEV → 값 변경 → RESTART SOLO**를 누릅니다. 새 값으로 새 판을 시작하며 구슬·요괴/개인 HP·시간·스태미나가 초기화됩니다. 예를 들어 느긋하게 조합을 시험하려면 `Battle Duration (seconds) = 600`, `Orb Lifetime (seconds) = 60`, `Orb Generation Cost = 1`로 입력합니다. **DEFAULTS**는 저장된 `LabConfig.asset` 값을 입력칸에 불러오고, **END SOLO**는 로비로 돌아갑니다. 오류가 있는 값은 적용하지 않고 패널에 이유를 표시합니다. 일반 빌드에서는 DEV 버튼이 숨겨집니다.
 
 ### 공유 방의 값 바꾸기
 
-Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤, 101개 값을 숫자 입력 또는 슬라이더로 조정합니다. 숫자 입력은 정확한 값을 지정할 때 사용하며 두 조작은 서로 같은 값을 보여줍니다. DEV의 **ROOM PLAYERS**는 일반 로비의 인원 선택과 같은 값을 표시·변경합니다. **CREATE ROOM**을 누르면 선택한 인원과 조정값으로 방을 만들고, 참가자가 **FIND ROOMS**의 방 목록에서 이름을 선택하거나 직접 IP **JOIN**으로 들어오면 Host 설정을 받습니다. Host 로비에서 전투 시작 전에 다시 DEV를 열어 값을 바꿀 수 있으며, 이때 버튼은 **APPLY TO ROOM**입니다. 변경된 설정에 대해 참가자의 확인이 끝나야 **START**할 수 있습니다. 인원수는 방을 만들기 전에 선택합니다. Editor·Development Build의 Host는 전투를 일시정지한 뒤 **DEV → APPLY & RESTART**로 새 설정을 참가자에게 보내고 확인을 받아 새 판을 시작할 수 있습니다. 진행 중인 판의 설정은 바꾸지 않고, 설정은 실행 중인 세션의 복사본에만 적용되며 `LabConfig.asset`에는 저장되지 않습니다.
+Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤, 103개 값을 숫자 입력 또는 슬라이더로 조정합니다. 숫자 입력은 정확한 값을 지정할 때 사용하며 두 조작은 서로 같은 값을 보여줍니다. DEV의 **ROOM PLAYERS**는 일반 로비의 인원 선택과 같은 값을 표시·변경합니다. **CREATE ROOM**을 누르면 선택한 인원과 조정값으로 방을 만들고, 참가자가 **FIND ROOMS**의 방 목록에서 이름을 선택하거나 직접 IP **JOIN**으로 들어오면 Host 설정을 받습니다. Host 로비에서 전투 시작 전에 다시 DEV를 열어 값을 바꿀 수 있으며, 이때 버튼은 **APPLY TO ROOM**입니다. 변경된 설정에 대해 참가자의 확인이 끝나야 **START**할 수 있습니다. 인원수는 방을 만들기 전에 선택합니다. Editor·Development Build의 Host는 전투를 일시정지한 뒤 **DEV → APPLY & RESTART**로 새 설정을 참가자에게 보내고 확인을 받아 새 판을 시작할 수 있습니다. 진행 중인 판의 설정은 바꾸지 않고, 설정은 실행 중인 세션의 복사본에만 적용되며 `LabConfig.asset`에는 저장되지 않습니다.
 
 ## 전투 UI와 일시정지
 
@@ -110,7 +110,7 @@ Paint의 승인 명중은 Host 모델이 구슬 소모·실제 HP 감소·명중
 
 자국은 **256×128 동일 면적 구면 맵**에 누적됩니다. 회전·흔들림을 따라가고 덧칠한 영역은 면적을 중복 계산하지 않습니다. 이전의 128개 자국 제한을 제거해 같은 곳을 반복해서 맞힌 뒤에도 새 위치를 계속 칠할 수 있습니다. 이 맵의 알파가 있는 셀 비율을 진행도로 사용하고 같은 맵을 Point 샘플링으로 표시합니다. 이는 GPU 화면이나 메시의 실제 삼각형 면적을 측정한 값이 아닌 고정 해상도 구면 진행도입니다. Renderer를 끄거나 외형을 다시 초기화해도 Host 모델의 진행도는 지워지지 않습니다. 일반 Retry는 모드와 목표 비율을 유지하면서 자국과 판 상태를 초기화하고, 로비 복귀·방 이탈도 자국을 지웁니다.
 
-기본 Scene을 바꾸거나 Paint 전용 연결 메뉴를 실행할 필요는 없습니다. `LabSceneController`가 실행 시 `LabGourdPaint.Attach(network)`로 Resources의 표현을 연결하고, 초기 설정과 `ConfigApplied`에서 `ApplyMode()`를 호출합니다. DEV 변경은 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 일시정지한 Host의 **APPLY & RESTART**로 적용합니다. Client는 Host가 보낸 모드를 사용하며 직접 고르지 않습니다. Inspector나 입력칸을 수정하는 것만으로 진행 중인 전투 표현이 즉시 전환되지는 않습니다. 101개 설정과 새 목표/명중 정보·박 폭탄 신호·북 도착 방식을 공유하는 프로토콜은 `5625`이므로 이전 버전 앱과 섞어 접속하지 않습니다. [박 색칠 연결 안내](Assets/Lab/Art/GourdPaint/README.md)를 참조하세요.
+기본 Scene을 바꾸거나 Paint 전용 연결 메뉴를 실행할 필요는 없습니다. `LabSceneController`가 실행 시 `LabGourdPaint.Attach(network)`로 Resources의 표현을 연결하고, 초기 설정과 `ConfigApplied`에서 `ApplyMode()`를 호출합니다. DEV 변경은 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 일시정지한 Host의 **APPLY & RESTART**로 적용합니다. Client는 Host가 보낸 모드를 사용하며 직접 고르지 않습니다. Inspector나 입력칸을 수정하는 것만으로 진행 중인 전투 표현이 즉시 전환되지는 않습니다. 103개 설정과 새 목표/명중 정보·박 폭탄 신호·북 도착 방식을 공유하는 프로토콜은 `5625`이므로 이전 버전 앱과 섞어 접속하지 않습니다. [박 색칠 연결 안내](Assets/Lab/Art/GourdPaint/README.md)를 참조하세요.
 
 직선 투척의 세기 반응·발사각·공기 저항은 **DEV**의 `Throw Power Exponent`, `Throw Loft Offset (degrees)`, `Throw Air Damping`으로 한 판씩 비교할 수 있습니다. 명중·빗나감 뒤 화면에 비행 시간·최고 상승·수평 이동 거리가 나타납니다. 값의 의미와 반복 시험 순서는 [직선 투척 물리 실험 가이드](docs/THROW_TUNING_GUIDE.md)를 참조하세요.
 

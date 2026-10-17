@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(101));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(103));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -29,6 +29,7 @@ namespace C6Lab.Tests
             Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
             Assert.That(values[99], Is.EqualTo(1f), "The minimap is on by default.");
             Assert.That(values[100], Is.EqualTo(100f), "The minimap starts at its normal size.");
+            Assert.That(new[] { values[101], values[102] }, Is.EqualTo(new[] { 0f, 0f }), "The minimap starts in its usual place.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -112,10 +113,13 @@ namespace C6Lab.Tests
             values[91] = 10f; values[92] = 30f; values[93] = 50f; values[94] = 90f; // drum stop zone edges
             values[95] = 25f; values[96] = 25f; values[97] = 25f; values[98] = 25f; // drum stop chances
             values[99] = 0f; // minimap off
-            values[100] = 150f; // minimap 1.5x
+            values[100] = 40f; // minimap 0.4x
+            values[101] = -120f; // 120 to the left
+            values[102] = 60f; // 60 up
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MinimapEnabled, Is.False, "DEV can turn the minimap off.");
-            Assert.That(config.MinimapSizePercent, Is.EqualTo(150), "DEV can resize the minimap.");
+            Assert.That(config.MinimapSizePercent, Is.EqualTo(40), "DEV can shrink the minimap well below its normal size.");
+            Assert.That(config.MinimapMove, Is.EqualTo(new Vector2(-120f, 60f)), "DEV can move the minimap left/right and up/down.");
             Assert.That(config.FuseSoundVolume, Is.EqualTo(1f).Within(1e-5f), "100 doubles the Inspector fuse volume (0.5).");
             Assert.That(config.DrumStopBounds(), Is.EqualTo(new[] { .1f, .3f, .5f, .9f }).Within(1e-6f));
             Assert.That(config.DrumStopChances(), Is.EqualTo(new[] { 25, 25, 25, 25 }));

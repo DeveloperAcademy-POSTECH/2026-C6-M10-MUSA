@@ -12,7 +12,7 @@ namespace C6Lab
     /// 북을 가진 사람의 원은 태극 무늬(Resources/Minimap/Taegeuk.png)로 덮고, 북이 넘어가면 태극이 선을 따라 미끄러진다.
     /// 장면 수정 없이 LabSceneController가 실행 시 붙이고, 전투 중(Playing)에만 보인다.
     /// LabConfig의 Minimap Enabled(Inspector · DEV "Minimap")가 꺼져 있으면 보이지 않고,
-    /// Minimap Size(%)만큼 오른쪽 아래 모서리를 기준으로 크기가 바뀐다.
+    /// Minimap Size(%)만큼 오른쪽 아래 모서리를 기준으로 크기가 바뀌고, Minimap Move X/Y만큼 기본 자리에서 옮겨진다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabDrumMinimap : MonoBehaviour
@@ -55,6 +55,7 @@ namespace C6Lab
             public float Progress; // 0..Path.Count-1, 정수 부분이 지금 지나는 구간
         }
         private string layoutKey;
+        private Vector2 homePosition;
         private readonly Dictionary<ulong, Vector2> seatPositions = new Dictionary<ulong, Vector2>();
 
         public bool IsShowing => panel != null && panel.gameObject.activeSelf;
@@ -92,6 +93,8 @@ namespace C6Lab
             if (!panel.gameObject.activeSelf) panel.gameObject.SetActive(true);
             float scale = network != null && network.config != null ? network.config.MinimapSizePercent / 100f : 1f;
             if (!Mathf.Approximately(panel.localScale.x, scale)) panel.localScale = new Vector3(scale, scale, 1f);
+            Vector2 move = network != null && network.config != null ? network.config.MinimapMove : Vector2.zero;
+            if (panel.anchoredPosition != homePosition + move) panel.anchoredPosition = homePosition + move;
             Rebuild(snapshot.players, network.LocalPlayerId);
             SyncDrums(snapshot.drums);
             Advance(Time.unscaledDeltaTime);
@@ -250,8 +253,9 @@ namespace C6Lab
             // 오른쪽 이웃 동그라미의 오른쪽 끝에 맞추고 그 위로 띄운다.
             panel.anchorMin = panel.anchorMax = anchor.anchorMin;
             panel.pivot = new Vector2(1f, 0f);
-            panel.anchoredPosition = anchor.anchoredPosition
+            homePosition = anchor.anchoredPosition
                 + new Vector2(anchor.sizeDelta.x * (1f - anchor.pivot.x), anchor.sizeDelta.y * (1f - anchor.pivot.y) + gapAboveBadge);
+            panel.anchoredPosition = homePosition;
             panel.sizeDelta = size;
             var borderImage = border.GetComponent<Image>();
             borderImage.color = borderColor;
