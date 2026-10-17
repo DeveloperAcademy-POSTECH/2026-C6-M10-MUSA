@@ -5,7 +5,8 @@ namespace C6Lab
     public enum LabPhase { Idle, Playing, Victory, Defeat }
     // Items and the drum are appended so the serialized numbers of existing kinds stay unchanged.
     public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum }
-    public enum LabOrbOrigin { Unknown, Generated, Combined }
+    // Gourd is appended for bombs the gourd drops as sabotage (#177).
+    public enum LabOrbOrigin { Unknown, Generated, Combined, Gourd }
 
     public static class LabOrbKindRules
     {
@@ -18,9 +19,12 @@ namespace C6Lab
         public static bool IsDrum(this LabOrbKind kind) => kind == LabOrbKind.Drum;
         /// <summary>Items used in place by a double tap once unlocked.</summary>
         public static bool IsDoubleTapUsable(this LabOrbKind kind) => kind == LabOrbKind.Potion || kind == LabOrbKind.SecretBox;
-        /// <summary>Orbs that an upward flick may throw at the target.</summary>
+        /// <summary>
+        /// Orbs that an upward flick may throw at the target. A bomb has no lock to open and is
+        /// never thrown: it can only be passed on before its fuse runs out.
+        /// </summary>
         public static bool CanThrow(this LabOrbKind kind, int lockSwipes) =>
-            kind == LabOrbKind.Combined || ((kind == LabOrbKind.Relay || kind == LabOrbKind.Bomb) && lockSwipes == 0);
+            kind == LabOrbKind.Combined || (kind == LabOrbKind.Relay && lockSwipes == 0);
     }
 
     /// <summary>

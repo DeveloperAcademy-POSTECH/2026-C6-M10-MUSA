@@ -39,6 +39,8 @@ namespace C6Lab
         private float visualRadius = .32f;
         private Coroutine spawnRoutine;
         private Action spawnCompleted;
+        private Coroutine dropRoutine;
+        private Action dropLanded;
 
         public string OrbId => orbId;
         public LabOrbKind Kind => kind;
@@ -55,8 +57,14 @@ namespace C6Lab
         public float DrumSpin => spinVelocity;
         /// <summary>A drum shows its flat art instead of the sphere once the appearance provides it.</summary>
         public bool DrumArtVisible => drumArt != null && drumArt.gameObject.activeSelf;
+        /// <summary>A bomb shows its flat cartoon art instead of the sphere once the appearance provides it.</summary>
+        public bool BombArtVisible => itemMarker != null && itemMarker.BombArtVisible;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
+        /// <summary>A gourd bomb still showing its landing warning, falling or bouncing.</summary>
+        public bool IsDropping { get; private set; }
+        /// <summary>The art is hidden while the landing warning shows, before the bomb falls into view.</summary>
+        public bool ArtHidden { get; private set; }
         public Rigidbody Body { get; private set; }
         public SphereCollider HitSphere { get; private set; }
 
@@ -158,7 +166,7 @@ namespace C6Lab
 
         public void SetLockSwipes(int value) => SetItemState(value, relayStage, fuseSeconds);
 
-        /// <summary>Host-approved lock count, relay stage and bomb fuse; they only change item labels.</summary>
+        /// <summary>Host-approved lock count, relay stage and bomb fuse seconds; they only change item labels.</summary>
         public void SetItemState(int lockCount, int stage, float fuse = -1f)
         {
             lockSwipes = Mathf.Max(0, lockCount);
@@ -277,14 +285,127 @@ namespace C6Lab
             CompleteSpawn();
         }
 
+        /// <summary>
+        /// A bomb the gourd dropped (#177): its art stays hidden for hideSeconds while the landing
+        /// warning shows, then falls from fromOffset (root-local, above the orb area) onto the root,
+        /// speeding up like a dropped thing, and lands with a squash and two shrinking hops of
+        /// bounceHeight (root-local). Only the art moves; the body waits on its landing spot.
+        /// onLanded runs once it settles, or if the view is disabled or destroyed first.
+        /// </summary>
+        public void PlayDrop(Vector3 fromOffset, float hideSeconds, float fallSeconds, float bounceSeconds,
+            float bounceHeight, Action onLanded = null)
+        {
+            EnsureVisual();
+            if (IsDropping || visual == null || !isActiveAndEnabled)
+            {
+                onLanded?.Invoke();
+                return;
+            }
+            CompleteSpawn();
+            IsDropping = true;
+            dropLanded = onLanded;
+            dropRoutine = StartCoroutine(Drop(fromOffset, Mathf.Max(0f, hideSeconds), Mathf.Max(.01f, fallSeconds),
+                Mathf.Max(0f, bounceSeconds), Mathf.Max(0f, bounceHeight)));
+        }
+
+        private IEnumerator Drop(Vector3 from, float hideSeconds, float fallSeconds, float bounceSeconds, float bounceHeight)
+        {
+            SetArtHidden(true);
+            float elapsed = 0f;
+            while (elapsed < hideSeconds)
+            {
+                yield return null;
+                elapsed += Time.deltaTime;
+            }
+
+            SetArtHidden(false);
+            visual.localPosition = from;
+            SetShadowScale(.3f);
+            elapsed = 0f;
+            while (elapsed < fallSeconds)
+            {
+                yield return null;
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / fallSeconds);
+                // Distance fallen grows with the square of time, like gravity.
+                visual.localPosition = from * (1f - t * t);
+                SetShadowScale(Mathf.Lerp(.3f, 1f, t));
+            }
+
+            elapsed = 0f;
+            while (elapsed < bounceSeconds)
+            {
+                yield return null;
+                elapsed += Time.deltaTime;
+                float u = Mathf.Clamp01(elapsed / bounceSeconds);
+                // Two hops, the second a third as high; it squashes at each touchdown and stretches as it rises.
+                float hop = u < .6f ? Mathf.Sin(u / .6f * Mathf.PI) : .35f * Mathf.Sin((u - .6f) / .4f * Mathf.PI);
+                float touch = u < .6f ? Mathf.Min(u, .6f - u) / .6f : Mathf.Min(u - .6f, 1f - u) / .4f;
+                float squash = .22f * (1f - u) * (1f - Mathf.Clamp01(touch * 6f));
+                visual.localPosition = Vector3.up * (bounceHeight * hop);
+                SetSquash(squash);
+                SetShadowScale(Mathf.Lerp(1f, .7f, hop));
+            }
+
+            dropRoutine = null;
+            CompleteDrop();
+        }
+
+        private void CompleteDrop()
+        {
+            if (!IsDropping) return;
+            IsDropping = false;
+            if (dropRoutine != null)
+            {
+                StopCoroutine(dropRoutine);
+                dropRoutine = null;
+            }
+            SetArtHidden(false);
+            SetSquash(0f);
+            SetShadowScale(1f);
+            ResetVisualPose();
+            Action landed = dropLanded;
+            dropLanded = null;
+            landed?.Invoke();
+        }
+
+        /// <summary>Hides the ball, its item marker and its shadow while the bomb is still out of sight.</summary>
+        private void SetArtHidden(bool hidden)
+        {
+            ArtHidden = hidden;
+            if (visual != null) visual.gameObject.SetActive(!hidden);
+            if (itemMarker != null) itemMarker.gameObject.SetActive(!hidden);
+            if (contactShadow != null) contactShadow.SetActive(!hidden);
+        }
+
+        /// <summary>Squashes the art wide and flat (positive) about its centre; 0 restores it.</summary>
+        private void SetSquash(float amount)
+        {
+            var scale = new Vector3(1f + amount, 1f - amount, 1f);
+            if (visual != null) visual.localScale = scale;
+            if (itemMarker != null) itemMarker.transform.localScale = scale;
+        }
+
+        /// <summary>The shadow under a falling bomb grows as it nears the board.</summary>
+        private void SetShadowScale(float share)
+        {
+            if (contactShadow == null || appearance == null) return;
+            Vector2 scale = appearance.ShadowScale;
+            contactShadow.transform.localScale = new Vector3(
+                Mathf.Max(0f, scale.x) * 2f * visualRadius * share,
+                Mathf.Max(0f, scale.y) * 2f * visualRadius * share, 1f);
+        }
+
         private void OnDisable()
         {
             CompleteSpawn();
+            CompleteDrop();
         }
 
         private void OnDestroy()
         {
             CompleteSpawn();
+            CompleteDrop();
         }
 
         private void CompleteSpawn()
@@ -346,11 +467,13 @@ namespace C6Lab
                     defaultRenderer.SetPropertyBlock(null);
             }
             Sprite drumSprite = kind.IsDrum() && appearance != null ? appearance.DrumSprite : null;
+            // Flat art (the drum's, or the cartoon bomb's on the item marker) replaces the ball.
+            bool flatArt = drumSprite != null || HasBombArt;
             Transform defaultSphere = visual.Find("Default Sphere");
-            if (defaultSphere != null) defaultSphere.gameObject.SetActive(drumSprite == null && replacementVisual == null);
+            if (defaultSphere != null) defaultSphere.gameObject.SetActive(!flatArt && replacementVisual == null);
             if (replacementVisual != null)
             {
-                replacementVisual.SetActive(drumSprite == null);
+                replacementVisual.SetActive(!flatArt);
                 replacementVisual.transform.localScale = Vector3.one * (2f * visualRadius);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, visual.gameObject.layer);
                 if (appearance != null && replacementPrefab == appearance.VisualPrefab)
@@ -396,16 +519,23 @@ namespace C6Lab
                 return;
             }
             if (itemMarker == null) itemMarker = LabOrbItemMarker.Create(transform);
-            string fuseText = kind == LabOrbKind.Bomb && fuseSeconds >= 0f
-                ? Mathf.CeilToInt(fuseSeconds).ToString() : null;
-            itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), fuseText,
-                visualRadius, visual);
+            // A bomb has no lock to count; it shows the whole seconds left on its fuse instead.
+            if (HasBombArt)
+                itemMarker.ShowBomb(appearance, FuseText(), visualRadius, visual);
+            else
+                itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), visualRadius, visual);
             itemMarker.SetLocked(lockSwipes > 0, appearance);
             itemMarker.SetFuse(kind == LabOrbKind.Bomb ? fuseSeconds : -1f, appearance);
         }
 
+        private bool HasBombArt => kind == LabOrbKind.Bomb && appearance != null && appearance.BombArt != null;
+
+        private string FuseText() =>
+            kind == LabOrbKind.Bomb && fuseSeconds >= 0f ? Mathf.CeilToInt(fuseSeconds).ToString() : null;
+
         private string BadgeText()
         {
+            if (kind == LabOrbKind.Bomb) return FuseText();
             if (lockSwipes > 0) return lockSwipes.ToString();
             if (kind != LabOrbKind.Relay || relayStage <= 0) return null;
             return relayStage >= 3 ? "MAX" : relayStage == 2 ? "×2" : "×1";

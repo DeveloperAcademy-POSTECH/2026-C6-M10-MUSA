@@ -136,7 +136,10 @@ namespace C6Lab
             new LabDeveloperField("Combine Sound Volume (50 = Inspector)", 0f, 100f),
             new LabDeveloperField("Combine Haptic Style (0-4)", 0f, 4f, true),
             new LabDeveloperField("Combine Haptic Intensity", 0f, 1f),
-            new LabDeveloperField("Paint Victory Coverage (%)", 1f, 100f, true)
+            new LabDeveloperField("Paint Victory Coverage (%)", 1f, 100f, true),
+            new LabDeveloperField("Gourd Bomb Interval Min (seconds, 0 = off)", 0f, 600f),
+            new LabDeveloperField("Gourd Bomb Interval Max (seconds, 0 = off)", 0f, 600f),
+            new LabDeveloperField("Fuse Sound Volume (50 = Inspector)", 0f, 100f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -161,9 +164,9 @@ namespace C6Lab
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86),
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78),
-            new LabDeveloperCategory("Gourd", 79, 87)
+            new LabDeveloperCategory("Gourd", 79, 87, 88, 89)
         });
 
 
@@ -188,12 +191,13 @@ namespace C6Lab
         [SerializeField, Range(1, 100)] private int orbStorageLimit = 20;
 
         [Header("Generation chances (percent, total 100)")]
-        [SerializeField, Range(0, 100)] private int yinChance = 40;
-        [SerializeField, Range(0, 100)] private int yangChance = 40;
-        [SerializeField, Range(0, 100)] private int relayChance = 5;
-        [SerializeField, Range(0, 100)] private int secretBoxChance = 5;
-        [SerializeField, Range(0, 100)] private int potionChance = 5;
-        [SerializeField, Range(0, 100)] private int bombChance = 5;
+        // 북은 음·양만 낸다 (#177). 아이템 확률은 0이지만 규칙 코드는 남겨 DEV에서 다시 켤 수 있다.
+        [SerializeField, Range(0, 100)] private int yinChance = 50;
+        [SerializeField, Range(0, 100)] private int yangChance = 50;
+        [SerializeField, Range(0, 100)] private int relayChance = 0;
+        [SerializeField, Range(0, 100)] private int secretBoxChance = 0;
+        [SerializeField, Range(0, 100)] private int potionChance = 0;
+        [SerializeField, Range(0, 100)] private int bombChance = 0;
 
         [Header("Item orbs")]
         [SerializeField, Min(.1f)] private float itemLifetimeSeconds = 15f;
@@ -254,6 +258,9 @@ namespace C6Lab
         [SerializeField] private LabGourdMode gourdMode = LabGourdMode.Paint;
         [Tooltip("Paint 모드에서 Host가 승리를 확정할 전체 구면 칠하기 비율 (%). 새 판 시작 때 적용한다.")]
         [SerializeField, Range(1, 100)] private int paintVictoryPercent = DefaultPaintVictoryPercent;
+        [Tooltip("박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다. 최대가 0이면 떨어뜨리지 않는다 (#177).")]
+        [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
+        [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -271,8 +278,11 @@ namespace C6Lab
         [SerializeField, HideInInspector] private float hitSoundVolumeDev = DevVolumeDefault;
         [SerializeField, HideInInspector] private float missSoundVolumeDev = DevVolumeDefault;
         [SerializeField, HideInInspector] private float combineSoundVolumeDev = DevVolumeDefault;
+        [SerializeField, HideInInspector] private float fuseSoundVolumeDev = DevVolumeDefault;
         [Tooltip("음·양 구슬이 결합될 때 소리 기본 크기 (결합한 사람 기기만)")]
         [SerializeField, Range(0f, 1f)] private float combineSoundVolume = .8f;
+        [Tooltip("내 판에 잠긴 폭탄이 있는 동안 도화선이 타는 치지직 소리 기본 크기 (그 판 주인 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float fuseSoundVolume = .5f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -394,6 +404,8 @@ namespace C6Lab
         public const int DefaultPaintVictoryPercent = 80;
         public int PaintVictoryPercent => Mathf.Clamp(paintVictoryPercent, 1, 100);
         public float PaintVictoryCoverage => PaintVictoryPercent / 100f;
+        public float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
+        public float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
@@ -404,6 +416,7 @@ namespace C6Lab
         public float HitSoundVolume => Scaled(Finite(hitSoundVolume, .9f), hitSoundVolumeDev);
         public float MissSoundVolume => Scaled(Finite(missSoundVolume, .7f), missSoundVolumeDev);
         public float CombineSoundVolume => Scaled(Finite(combineSoundVolume, .8f), combineSoundVolumeDev);
+        public float FuseSoundVolume => Scaled(Finite(fuseSoundVolume, .5f), fuseSoundVolumeDev);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;
@@ -477,7 +490,9 @@ namespace C6Lab
                 BombBlastRadius, BombBlastStrength,
                 (float)BombHapticStyle, BombHapticIntensity,
                 DevVolume(combineSoundVolumeDev), (float)CombineHapticStyle, CombineHapticIntensity,
-                (float)PaintVictoryPercent
+                (float)PaintVictoryPercent,
+                GourdBombIntervalMin, GourdBombIntervalMax,
+                DevVolume(fuseSoundVolumeDev)
             };
         }
 
@@ -517,6 +532,7 @@ namespace C6Lab
             if (chanceTotal != 100f) { error = "Generation chances must add up to 100 (now " + chanceTotal + ")."; return false; }
             if (values[46] > values[47]) { error = "Item Unlock Swipes Min cannot exceed Item Unlock Swipes Max."; return false; }
             if (values[61] > values[62]) { error = "Spawn Minimum Speed cannot exceed Spawn Maximum Speed."; return false; }
+            if (values[88] > values[89]) { error = "Gourd Bomb Interval Min cannot exceed Gourd Bomb Interval Max."; return false; }
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
@@ -606,6 +622,9 @@ namespace C6Lab
             combineHapticStyle = (LabHapticStyle)(int)values[85];
             combineHapticIntensity = values[86];
             paintVictoryPercent = (int)values[87];
+            gourdBombIntervalMin = values[88];
+            gourdBombIntervalMax = values[89];
+            fuseSoundVolumeDev = values[90];
             error = string.Empty;
             return true;
         }

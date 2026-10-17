@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace C6Lab
 {
@@ -25,6 +26,27 @@ namespace C6Lab
         [SerializeField] private Texture2D secretBoxIcon;
         [SerializeField] private Texture2D potionIcon;
         [SerializeField] private Texture2D bombIcon;
+        [Header("Bomb art (drawn facing the board camera in place of the ball and its icon)")]
+        [Tooltip("The cartoon bomb's ball without its cap and fuse; its highlight stays put like a light. " +
+            "Empty = the round item look with the bomb icon and padlock.")]
+        [SerializeField] private Texture2D bombArt;
+        [Tooltip("The cap, fuse and spark on a square canvas centred on the ball. They roll around the ball in 3D " +
+            "as the bomb moves, passing behind it and back in front.")]
+        [SerializeField] private Texture2D bombFuseArt;
+        [Tooltip("Width of the ball image, in orb diameters.")]
+        [SerializeField, Min(.1f)] private float bombBodySize = 1.2f;
+        [Tooltip("Width of the fuse canvas, in ball image widths.")]
+        [SerializeField, Min(.1f)] private float bombFuseCanvasSize = 2.044f;
+        [Tooltip("Where the cap points in the images, in degrees anticlockwise from the right.")]
+        [SerializeField] private float bombCapAngle = 52f;
+        [Tooltip("The burning fuse tip from the ball centre in the images, in ball image half-widths. The flickering spark sits here.")]
+        [SerializeField] private Vector2 bombFuseTip = new Vector2(1.5f, .8f);
+        [Tooltip("Colour of the seconds left on the fuse, drawn on the bomb.")]
+        [FormerlySerializedAs("bombLockColor")]
+        [SerializeField] private Color bombTimeColor = new Color(1f, .16f, .1f, 1f);
+        [Tooltip("Height of the seconds left on the fuse, in orb radii.")]
+        [FormerlySerializedAs("bombLockSize")]
+        [SerializeField, Min(.1f)] private float bombTimeSize = 1.1f;
         [Header("Generate drum (drawn facing the board camera)")]
         [SerializeField] private Sprite drumSprite;
         [Header("Locked item (presentation only)")]
@@ -57,6 +79,17 @@ namespace C6Lab
         [Tooltip("Flashes per second just before it blasts.")]
         [SerializeField, Min(.1f)] private float bombWarningFastHz = 8f;
         [SerializeField] private Color bombWarningColor = new Color(1f, .12f, .08f, 1f);
+        [Header("Gourd bomb drop (presentation only)")]
+        [Tooltip("Seconds the \"!\" warning shows at the landing spot before the bomb starts to fall.")]
+        [SerializeField, Min(0f)] private float dropWarningSeconds = .6f;
+        [Tooltip("Seconds the bomb takes to fall from above the orb area onto its landing spot.")]
+        [SerializeField, Min(.01f)] private float dropFallSeconds = .45f;
+        [Tooltip("Seconds of the two shrinking hops after it lands.")]
+        [SerializeField, Min(0f)] private float dropBounceSeconds = .45f;
+        [Tooltip("Height of the first hop, in orb radii.")]
+        [SerializeField, Min(0f)] private float dropBounceHeight = 1f;
+        [Tooltip("Colour of the landing warning badge behind the \"!\".")]
+        [SerializeField] private Color dropWarningColor = new Color(.93f, .16f, .1f, 1f);
         [Header("Board contact shadow (presentation only)")]
         [SerializeField] private Material shadowMaterial;
         [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, .22f);
@@ -74,6 +107,14 @@ namespace C6Lab
         public Material YangMaterial => yangMaterial;
         public Material CombinedMaterial => combinedMaterial;
         public Sprite DrumSprite => drumSprite;
+        public Texture2D BombArt => bombArt;
+        public Texture2D BombFuseArt => bombFuseArt;
+        public float BombBodySize => bombBodySize > 0f ? bombBodySize : 1.2f;
+        public float BombFuseCanvasSize => bombFuseCanvasSize > 0f ? bombFuseCanvasSize : 2.044f;
+        public float BombCapAngle => bombCapAngle;
+        public Vector2 BombFuseTip => bombFuseTip;
+        public Color BombTimeColor => bombTimeColor;
+        public float BombTimeSize => bombTimeSize > 0f ? bombTimeSize : 1.1f;
         public Texture2D LockIcon => lockIcon;
         public float LockIconSize => lockIconSize > 0f ? lockIconSize : 1.2f;
         public float LockedIconAlpha => Mathf.Clamp01(lockedIconAlpha);
@@ -89,6 +130,28 @@ namespace C6Lab
         public float BombWarningSlowHz => Mathf.Max(.1f, bombWarningSlowHz);
         public float BombWarningFastHz => Mathf.Max(BombWarningSlowHz, bombWarningFastHz);
         public Color BombWarningColor => bombWarningColor;
+        public float DropWarningSeconds => Mathf.Max(0f, dropWarningSeconds);
+        public float DropFallSeconds => dropFallSeconds > 0f ? dropFallSeconds : .45f;
+        public float DropBounceSeconds => Mathf.Max(0f, dropBounceSeconds);
+        public float DropBounceHeight => Mathf.Max(0f, dropBounceHeight);
+        public Color DropWarningColor => dropWarningColor;
+        /// <summary>The whole drop: the warning, the fall and the bounce.</summary>
+        public float DropSeconds => DropWarningSeconds + DropFallSeconds + DropBounceSeconds;
+
+        private static LabOrbAppearance defaults;
+        /// <summary>An appearance holding every default value, for boards without an assigned one.</summary>
+        public static LabOrbAppearance Defaults
+        {
+            get
+            {
+                if (defaults == null)
+                {
+                    defaults = CreateInstance<LabOrbAppearance>();
+                    defaults.hideFlags = HideFlags.DontSave;
+                }
+                return defaults;
+            }
+        }
         /// <summary>The whole unlock presentation: the padlock lift, or the ring landing and its glow.</summary>
         public float UnlockEffectSeconds =>
             Mathf.Max(UnlockLockSeconds, UnlockRingDelay + UnlockRingSeconds + UnlockGlowSeconds);

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -364,6 +365,8 @@ namespace C6Lab.Tests
             // that bump while scattering cannot merge before the test drags Yin onto Yang.
             tuning[51] = 0f;
             tuning[79] = 1f; // Crack keeps the damage-number presentation checked below.
+            tuning[88] = 0f; // no gourd bombs: this test counts the orbs on the board
+            tuning[89] = 0f;
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
             network.config = rawOnly;
             // The board reads contact combining from its own config, so it needs the same tuning.
@@ -487,6 +490,68 @@ namespace C6Lab.Tests
                 sceneController.config = savedBoardConfig;
                 sceneController.ReconfigureBoard();
                 UnityEngine.Object.Destroy(rawOnly);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator SavedSceneSoloGourdBombWarnsThenFallsOntoTheLocalBoard()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null; // Let Awake/Start bind the saved Scene references.
+
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabOrbBoard board = network.board;
+            LabConfig savedConfig = network.config;
+            LabConfig gourd = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = gourd.CaptureDeveloperValues();
+            tuning[88] = 1f; // a gourd bomb every second
+            tuning[89] = 1f;
+            Assert.That(gourd.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            network.config = gourd;
+            network.port = 17791;
+            // Record only: an assertion thrown inside the event would interrupt the Host's snapshot.
+            var drops = new List<string>();
+            var targets = new List<ulong>();
+            System.Action<ulong, string, Vector2> onDrop = (target, id, at) =>
+            {
+                targets.Add(target);
+                drops.Add(id);
+            };
+            network.GourdBombDropped += onDrop;
+            try
+            {
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                float until = Time.realtimeSinceStartup + 3f;
+                while (drops.Count == 0 && Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(drops, Is.Not.Empty, "The gourd drops a bomb after the interval.");
+                Assert.That(targets, Is.All.EqualTo(network.LocalPlayerId), "Solo, every bomb falls on the one player.");
+                string bombId = drops[0];
+                LabOrbState bomb = network.Snapshot.orbs.Single(orb => orb.id == bombId);
+                Assert.That(bomb.origin, Is.EqualTo(LabOrbOrigin.Gourd));
+                Assert.That(bomb.owner, Is.EqualTo(network.LocalPlayerId));
+                Assert.That(board.IsDropping(bombId), Is.True,
+                    "The drop signal reaches the board before the snapshot that holds the bomb.");
+                Assert.That(board.GetComponentInChildren<LabDropWarning>(), Is.Not.Null, "Its landing spot is marked.");
+                Assert.That(network.Notice, Does.Contain("gourd"));
+                var alert = UnityEngine.Object.FindFirstObjectByType<LabGourdAlert>();
+                Assert.That(alert, Is.Not.Null, "The saved scene shows the gourd's alert.");
+                Assert.That(alert.Active, Is.True, "Every player sees the gourd's \"!\" bubble.");
+
+                LabOrbAppearance look = network.config.OrbAppearance;
+                until = Time.realtimeSinceStartup + look.DropSeconds + 1.5f;
+                while (board.IsDropping(bombId) && Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(board.IsDropping(bombId), Is.False, "It lands and becomes an ordinary bomb.");
+                LabOrbView view = board.GetComponentsInChildren<LabOrbView>().Single(candidate => candidate.OrbId == bombId);
+                Assert.That(view.BombArtVisible, Is.True, "It shows the cartoon bomb.");
+                Assert.That(view.ItemMarker.BombTimeText, Is.Not.Empty, "With the seconds left on its fuse.");
+            }
+            finally
+            {
+                network.GourdBombDropped -= onDrop;
+                network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(gourd);
             }
         }
 

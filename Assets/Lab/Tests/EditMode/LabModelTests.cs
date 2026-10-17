@@ -590,7 +590,7 @@ namespace C6Lab.Tests
                 LabOrbState drum = room.Snapshot(0d).drums.Single(candidate => candidate.owner == 10);
 
                 Assert.That(room.TryGenerate(20, "fill", 0d, out var bomb, out var reason), Is.True, reason);
-                Assert.That(bomb.lockSwipes, Is.GreaterThan(0));
+                Assert.That(bomb.lockSwipes, Is.Zero, "A bomb has no lock; its fuse alone decides when it blasts.");
                 Assert.That(room.TryGenerate(20, "over", 0d, out _, out reason), Is.False);
                 Assert.That(reason, Is.EqualTo("STORAGE_FULL"), "Player 20's board is full of orbs.");
                 Assert.That(room.TryGenerate(10, "beside-drum", 0d, out _, out reason), Is.True,
@@ -656,7 +656,39 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GenerationFollowsDefaultChancesAndIncludesEveryItem()
+        public void DrumMakesOnlyYinAndYangByDefault()
+        {
+            var chances = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                Assert.That(chances.GenerationChances(), Is.EqualTo(new[] { 50, 50, 0, 0, 0, 0 }));
+                float[] values = chances.CaptureDeveloperValues();
+                values[5] = .001f; // generation cost
+                values[9] = 100f;  // stored orb limit
+                values[74] = 3f;   // every player holds a drum
+                Assert.That(chances.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("default-chance-test", new ulong[] { 10, 20, 30 }, 0d, chances);
+                var counts = new Dictionary<LabOrbKind, int>();
+                foreach (ulong player in new ulong[] { 10, 20, 30 })
+                    for (int i = 0; i < 100; i++)
+                    {
+                        Assert.That(room.TryGenerate(player, "draw-" + player + "-" + i, 0d, out var orb, out var reason),
+                            Is.True, reason);
+                        counts[orb.kind] = counts.TryGetValue(orb.kind, out int count) ? count + 1 : 1;
+                        Assert.That(orb.lockSwipes, Is.Zero);
+                    }
+
+                // 300 draws at 50/50 percent: expected 150 each, and never an item.
+                Assert.That(counts.Keys, Is.EquivalentTo(new[] { LabOrbKind.Yin, LabOrbKind.Yang }));
+                Assert.That(counts[LabOrbKind.Yin], Is.InRange(115, 185));
+                Assert.That(counts[LabOrbKind.Yang], Is.InRange(115, 185));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(chances); }
+        }
+
+        [Test]
+        public void GenerationFollowsConfiguredItemChancesAndIncludesEveryItem()
         {
             var chances = ScriptableObject.CreateInstance<LabConfig>();
             try
@@ -665,6 +697,9 @@ namespace C6Lab.Tests
                 values[5] = .001f; // generation cost
                 values[9] = 100f;  // stored orb limit
                 values[74] = 3f;   // every player holds a drum
+                // Items are off by default (#177) but the DEV form can still turn them back on.
+                values[39] = 40f; values[40] = 40f;
+                for (int i = 41; i <= 44; i++) values[i] = 5f;
                 Assert.That(chances.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var room = new LabModel();
                 room.Begin("chance-test", new ulong[] { 10, 20, 30 }, 0d, chances);
@@ -676,8 +711,8 @@ namespace C6Lab.Tests
                         Assert.That(room.TryGenerate(player, "draw-" + player + "-" + i, 0d, out var orb, out var reason),
                             Is.True, reason);
                         counts[orb.kind] = counts.TryGetValue(orb.kind, out int count) ? count + 1 : 1;
-                        if (orb.kind.IsItem()) lockCounts.Add(orb.lockSwipes);
-                        else Assert.That(orb.lockSwipes, Is.Zero, "Only items are locked.");
+                        if (orb.kind.IsItem() && orb.kind != LabOrbKind.Bomb) lockCounts.Add(orb.lockSwipes);
+                        else Assert.That(orb.lockSwipes, Is.Zero, "Only items other than the bomb are locked.");
                     }
 
                 // 300 draws at 40/40/5/5/5/5 percent: expected 120 each polarity and 15 each item.
@@ -739,41 +774,41 @@ namespace C6Lab.Tests
         [Test]
         public void EachHandoffToANeighborRemovesOneLockAndSoloCannotUnlock()
         {
-            var bombsOnly = ConfigWith(10f, 0, 0, 0, 0, 0, 100);
+            var potionsOnly = ConfigWith(10f, 0, 0, 0, 0, 100, 0);
             try
             {
                 var room = new LabModel();
-                room.Begin("unlock-test", new ulong[] { 10, 20, 30 }, 0d, bombsOnly);
-                Assert.That(room.TryGenerate(10, "bomb", 0d, out var bomb, out _), Is.True);
-                int locks = bomb.lockSwipes;
+                room.Begin("unlock-test", new ulong[] { 10, 20, 30 }, 0d, potionsOnly);
+                Assert.That(room.TryGenerate(10, "potion", 0d, out var potion, out _), Is.True);
+                int locks = potion.lockSwipes;
                 Assert.That(locks, Is.InRange(2, 4));
 
-                // Pass the bomb rightward around the ring; one extra pass shows the count stops at zero.
+                // Pass the potion rightward around the ring; one extra pass shows the count stops at zero.
                 ulong[] ring = { 10, 20, 30 };
                 for (int pass = 1; pass <= locks + 1; pass++)
                 {
                     ulong holder = ring[(pass - 1) % ring.Length];
                     double at = pass * .1d;
-                    Assert.That(room.TryUpdateMotion(holder, bomb.id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
-                    Assert.That(room.TryTransfer(holder, bomb.id, true, .5f, Vector2.right, "pass-" + pass, at,
+                    Assert.That(room.TryUpdateMotion(holder, potion.id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
+                    Assert.That(room.TryTransfer(holder, potion.id, true, .5f, Vector2.right, "pass-" + pass, at,
                         out var passed, out var reason), Is.True, reason);
                     Assert.That(passed.owner, Is.EqualTo(ring[pass % ring.Length]));
                     Assert.That(passed.lockSwipes, Is.EqualTo(Math.Max(0, locks - pass)));
-                    Assert.That(room.Snapshot(at).orbs.Single(orb => orb.id == bomb.id).lockSwipes,
+                    Assert.That(room.Snapshot(at).orbs.Single(orb => orb.id == potion.id).lockSwipes,
                         Is.EqualTo(passed.lockSwipes), "Every screen sees the remaining count.");
                 }
 
                 var solo = new LabModel();
-                solo.BeginSolo("unlock-solo", 7ul, 0d, bombsOnly);
-                Assert.That(solo.TryGenerate(7ul, "solo-bomb", 0d, out var soloBomb, out _), Is.True);
-                Assert.That(solo.TryUpdateMotion(7ul, soloBomb.id, new Vector2(.99f, .5f), Vector2.right, .1d), Is.True);
-                Assert.That(solo.TryTransfer(7ul, soloBomb.id, true, .5f, Vector2.right, "solo-pass", .1d,
+                solo.BeginSolo("unlock-solo", 7ul, 0d, potionsOnly);
+                Assert.That(solo.TryGenerate(7ul, "solo-potion", 0d, out var soloPotion, out _), Is.True);
+                Assert.That(solo.TryUpdateMotion(7ul, soloPotion.id, new Vector2(.99f, .5f), Vector2.right, .1d), Is.True);
+                Assert.That(solo.TryTransfer(7ul, soloPotion.id, true, .5f, Vector2.right, "solo-pass", .1d,
                     out _, out var soloReason), Is.False);
                 Assert.That(soloReason, Is.EqualTo("NO_NEIGHBOR"));
-                Assert.That(solo.Snapshot(.1d).orbs.Single().lockSwipes, Is.EqualTo(soloBomb.lockSwipes),
+                Assert.That(solo.Snapshot(.1d).orbs.Single().lockSwipes, Is.EqualTo(soloPotion.lockSwipes),
                     "Solo play has no neighbor, so items stay locked.");
             }
-            finally { UnityEngine.Object.DestroyImmediate(bombsOnly); }
+            finally { UnityEngine.Object.DestroyImmediate(potionsOnly); }
         }
 
         [Test]
@@ -1075,68 +1110,45 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void UnlockedBombIsDefusedAndLivesAFreshOrbLifetimeLikeAnAttackOrb()
+        public void ABombHasNoLockItsFuseBurnsOnHoweverOftenItIsPassedAndItIsNeverThrown()
         {
             var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
             try
             {
                 var room = new LabModel();
-                room.Begin("bomb-defuse", new ulong[] { 10, 20, 30 }, 0d, bombs);
+                room.Begin("bomb-fuse", new ulong[] { 10, 20, 30 }, 0d, bombs);
                 Assert.That(room.TryGenerate(10, "bomb", 0d, out var bomb, out _), Is.True);
-                int locks = bomb.lockSwipes;
+                Assert.That(bomb.lockSwipes, Is.Zero, "A bomb has no swipes to unlock.");
+                Assert.That(room.TryLaunch(10, bomb.id, "throw-new", .1d, out _, out var reason), Is.False);
+                Assert.That(reason, Is.EqualTo("RAW_CANNOT_ATTACK"), "It cannot be thrown at the target.");
+
                 ulong[] ring = { 10, 20, 30 };
-                LabOrbState unlocked = null;
-                for (int pass = 1; pass <= locks; pass++)
-                    unlocked = PassRight(room, bomb.id, ring[(pass - 1) % ring.Length], pass);
-                Assert.That(unlocked.lockSwipes, Is.Zero);
-                Assert.That(unlocked.createdAt, Is.EqualTo((double)locks), "Unlocking starts a fresh lifetime.");
+                LabOrbState passed = null;
+                for (int pass = 1; pass <= 5; pass++)
+                {
+                    passed = PassRight(room, bomb.id, ring[(pass - 1) % ring.Length], pass);
+                    Assert.That(passed.lockSwipes, Is.Zero);
+                    Assert.That(passed.unlockedAt, Is.EqualTo(-1d), "Passing never plays an unlock.");
+                    Assert.That(passed.createdAt, Is.Zero, "Passing never resets the fuse.");
+                }
+                ulong holder = passed.owner;
+                Assert.That(room.TryLaunch(holder, bomb.id, "throw-passed", 6d, out _, out reason), Is.False,
+                    "However often it is passed, it never opens up for throwing.");
+                Assert.That(room.Snapshot(14.9d).orbs.Select(orb => orb.id), Does.Contain(bomb.id));
+                Assert.That(room.Snapshot(15d).orbs.Select(orb => orb.id), Does.Not.Contain(bomb.id));
+                LabBombBlast[] blasts = room.DrainBombExplosions();
+                Assert.That(blasts.Length, Is.EqualTo(1), "It blasts when the item lifetime (its fuse) runs out.");
+                Assert.That(blasts[0].Owner, Is.EqualTo(holder), "On the board of whoever holds it then.");
 
-                ulong holder = unlocked.owner;
-                Assert.That(room.TryGenerate(holder, "bystander", locks + 1d, out var bystander, out _), Is.True);
-                Assert.That(room.Snapshot(locks + 7.9d).orbs.Select(orb => orb.id), Does.Contain(bomb.id));
-                var after = room.Snapshot(locks + 8d);
-                Assert.That(after.orbs.Select(orb => orb.id), Does.Not.Contain(bomb.id),
-                    "An unlocked bomb keeps the 8-second orb lifetime, not the 15-second fuse.");
-                Assert.That(after.orbs.Select(orb => orb.id), Does.Contain(bystander.id),
-                    "A defused bomb leaves the holder's board untouched.");
-                Assert.That(room.DrainBombExplosions(), Is.Empty);
-
+                // The DEV unlock swipes still lock the other items, never the bomb.
                 float[] values = bombs.CaptureDeveloperValues();
-                values[46] = 0f; // unlock swipes min
-                values[47] = 0f; // unlock swipes max
+                values[46] = 3f; // unlock swipes min
+                values[47] = 3f; // unlock swipes max
                 Assert.That(bombs.TryApplyDeveloperValues(values, out string error), Is.True, error);
-                var open = new LabModel();
-                open.Begin("bomb-open", new ulong[] { 10, 20, 30 }, 0d, bombs);
-                Assert.That(open.TryGenerate(10, "open", 0d, out var openBomb, out _), Is.True);
-                Assert.That(open.Snapshot(7.9d).orbs.Select(orb => orb.id), Does.Contain(openBomb.id));
-                Assert.That(open.Snapshot(8d).orbs, Is.Empty, "A bomb created unlocked follows the same rule.");
-                Assert.That(open.DrainBombExplosions(), Is.Empty);
-            }
-            finally { UnityEngine.Object.DestroyImmediate(bombs); }
-        }
-
-        [Test]
-        public void UnlockedBombHitsForTripleDamageAndAMissNeverExplodes()
-        {
-            var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
-            try
-            {
-                float[] values = bombs.CaptureDeveloperValues();
-                values[46] = 0f; // unlock swipes min
-                values[47] = 0f; // unlock swipes max
-                Assert.That(bombs.TryApplyDeveloperValues(values, out string error), Is.True, error);
-                var room = new LabModel();
-                room.Begin("bomb-throw", new ulong[] { 10, 20, 30 }, 0d, bombs);
-
-                Assert.That(room.TryGenerate(10, "hit", 0d, out var hitBomb, out _), Is.True);
-                Assert.That(ThrowAndHit(room, hitBomb.id, 10, .1d), Is.EqualTo(60));
-                Assert.That(room.Hp, Is.EqualTo(940));
-
-                Assert.That(room.TryGenerate(10, "miss", .2d, out var missBomb, out _), Is.True);
-                Assert.That(room.TryLaunch(10, missBomb.id, "throw-miss", .3d, out _, out _), Is.True);
-                Assert.That(room.ConfirmMiss(missBomb.id, .4d), Is.True);
-                Assert.That(room.Snapshot(20d).orbs, Is.Empty);
-                Assert.That(room.DrainBombExplosions(), Is.Empty, "A thrown bomb never explodes on a board.");
+                var locked = new LabModel();
+                locked.Begin("bomb-swipes", new ulong[] { 10, 20, 30 }, 0d, bombs);
+                Assert.That(locked.TryGenerate(10, "bomb", 0d, out var stillOpen, out _), Is.True);
+                Assert.That(stillOpen.lockSwipes, Is.Zero);
             }
             finally { UnityEngine.Object.DestroyImmediate(bombs); }
         }
@@ -1216,8 +1228,9 @@ namespace C6Lab.Tests
                 p => p.relayUsed, 1);
             Check(new[] { 0, 0, 0, 100, 0, 0 }, (room, id) => room.TryUseItem(10, id, "box", .5d, out _, out _),
                 p => p.secretBoxUsed, 1);
+            // A bomb cannot be thrown, so the refused throw is not counted.
             Check(new[] { 0, 0, 0, 0, 0, 100 }, (room, id) => room.TryLaunch(10, id, "bomb", .5d, out _, out _),
-                p => p.bombUsed, 1);
+                p => p.bombUsed, 0);
             // A potion at full HP is refused and kept, so it is not counted.
             Check(new[] { 0, 0, 0, 0, 100, 0 }, (room, id) => room.TryUseItem(10, id, "potion", .5d, out _, out _),
                 p => p.potionUsed, 0);
@@ -1653,12 +1666,154 @@ namespace C6Lab.Tests
             finally { UnityEngine.Object.DestroyImmediate(single); }
         }
 
+        [Test]
+        public void GourdDropsABombOnOnePlayerEveryTwentyToThirtySeconds()
+        {
+            var gourd = GourdConfig(20f, 30f);
+            try
+            {
+                var ids = new ulong[] { 10, 20, 30 };
+                var room = new LabModel();
+                room.Begin("gourd-test", ids, 0d, gourd);
+                room.Tick(19.9d);
+                Assert.That(room.DrainGourdBombs(), Is.Empty, "No bomb falls before the minimum interval.");
+
+                // Check every second so each new bomb is read well before its fuse.
+                var dropTimes = new List<double>();
+                for (int second = 20; second <= 180; second++)
+                {
+                    LabSnapshot snapshot = room.Snapshot(second);
+                    foreach (LabGourdBomb drop in room.DrainGourdBombs())
+                    {
+                        Assert.That(ids, Does.Contain(drop.Target));
+                        Assert.That(drop.Position.x, Is.InRange(.2f, .8f));
+                        Assert.That(drop.Position.y, Is.InRange(0f, 1f));
+                        LabOrbState bomb = snapshot.orbs.Single(orb => orb.id == drop.BombId);
+                        Assert.That(bomb.kind, Is.EqualTo(LabOrbKind.Bomb));
+                        Assert.That(bomb.owner, Is.EqualTo(drop.Target));
+                        Assert.That(bomb.origin, Is.EqualTo(LabOrbOrigin.Gourd));
+                        Assert.That(bomb.lockSwipes, Is.Zero, "A gourd bomb has no lock, only its fuse.");
+                        Assert.That(bomb.inFlight, Is.False);
+                        Assert.That(new Vector2(bomb.x, bomb.y), Is.EqualTo(drop.Position));
+                        dropTimes.Add(bomb.createdAt);
+                    }
+                    Assert.That(room.DrainGourdBombs(), Is.Empty, "Each drop is reported once.");
+                }
+
+                Assert.That(dropTimes.Count, Is.InRange(6, 9), "A 180 second round has 6 to 9 gourd bombs.");
+                Assert.That(dropTimes[0], Is.InRange(20d, 30d));
+                for (int i = 1; i < dropTimes.Count; i++)
+                    Assert.That(dropTimes[i] - dropTimes[i - 1], Is.InRange(20d - 1e-6, 30d + 1e-6));
+                LabSnapshot end = room.Snapshot(180d);
+                Assert.That(end.players.All(player => player.generatedTotal == 0), Is.True,
+                    "Gourd bombs are not anyone's generation.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(gourd); }
+        }
+
+        [Test]
+        public void GourdBombsReachEveryPlayerAndCanRepeatOnTheSamePlayer()
+        {
+            // The shortest interval (1 s) drops 180 bombs in a round, enough to see the spread.
+            var gourd = GourdConfig(1f, 1f);
+            try
+            {
+                var ids = new ulong[] { 10, 20, 30 };
+                var room = new LabModel();
+                room.Begin("gourd-spread", ids, 0d, gourd);
+                room.Tick(180d);
+                LabGourdBomb[] drops = room.DrainGourdBombs();
+                Assert.That(drops.Length, Is.EqualTo(180));
+                foreach (ulong id in ids)
+                    Assert.That(drops.Count(drop => drop.Target == id), Is.InRange(35, 85), id.ToString());
+                Assert.That(drops.Zip(drops.Skip(1), (a, b) => a.Target == b.Target).Any(same => same), Is.True,
+                    "The same player may receive two bombs in a row.");
+                Assert.That(drops.Min(drop => drop.Position.x), Is.LessThan(.35f));
+                Assert.That(drops.Max(drop => drop.Position.x), Is.GreaterThan(.65f));
+                Assert.That(drops.Select(drop => drop.BombId).Distinct().Count(), Is.EqualTo(180));
+
+                // The same session and round always pick the same players at the same times.
+                var again = new LabModel();
+                again.Begin("gourd-spread", ids, 0d, gourd);
+                again.Tick(180d);
+                Assert.That(again.DrainGourdBombs().Select(drop => drop.Target), Is.EqualTo(drops.Select(drop => drop.Target)));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(gourd); }
+        }
+
+        [Test]
+        public void GourdBombLandsOnAFullBoardWithoutSpendingStamina()
+        {
+            var gourd = GourdConfig(5f, 5f);
+            try
+            {
+                float[] values = gourd.CaptureDeveloperValues();
+                values[9] = 1f; // stored orb limit
+                Assert.That(gourd.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.BeginSolo("gourd-full", 7ul, 0d, gourd);
+                Assert.That(room.TryGenerate(7ul, "fill", 4d, out _, out string reason), Is.True, reason);
+                Assert.That(room.TryGenerate(7ul, "over", 4d, out _, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("STORAGE_FULL"));
+                float stamina = room.Snapshot(4.9d).players[0].stamina;
+
+                LabSnapshot after = room.Snapshot(5d);
+                LabGourdBomb drop = room.DrainGourdBombs().Single();
+                Assert.That(drop.Target, Is.EqualTo(7ul));
+                Assert.That(after.orbs.Length, Is.EqualTo(2), "The gourd ignores the stored orb limit.");
+                Assert.That(after.orbs.Single(orb => orb.id == drop.BombId).origin, Is.EqualTo(LabOrbOrigin.Gourd));
+                Assert.That(after.players[0].stamina, Is.GreaterThanOrEqualTo(stamina), "Gourd bombs cost no stamina.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(gourd); }
+        }
+
+        [Test]
+        public void GourdBombsStopWhenTheMaximumIntervalIsZeroOrTheRoundIsOver()
+        {
+            var off = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            var gourd = GourdConfig(20f, 30f);
+            try
+            {
+                var quiet = new LabModel();
+                quiet.Begin("gourd-off", new ulong[] { 10, 20, 30 }, 0d, off);
+                quiet.Tick(180d);
+                Assert.That(quiet.DrainGourdBombs(), Is.Empty);
+                Assert.That(quiet.Snapshot(180d).orbs, Is.Empty);
+
+                var ended = new LabModel();
+                ended.Begin("gourd-ended", new ulong[] { 10, 20, 30 }, 0d, gourd);
+                ended.Tick(180d);
+                ended.DrainGourdBombs();
+                Assert.That(ended.Phase, Is.EqualTo(LabPhase.Defeat));
+                ended.Tick(400d);
+                Assert.That(ended.DrainGourdBombs(), Is.Empty, "No bomb falls after the round ends.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(off);
+                UnityEngine.Object.DestroyImmediate(gourd);
+            }
+        }
+
+        private static LabConfig GourdConfig(float minimumSeconds, float maximumSeconds)
+        {
+            LabConfig created = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            float[] values = created.CaptureDeveloperValues();
+            values[88] = minimumSeconds;
+            values[89] = maximumSeconds;
+            Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            return created;
+        }
+
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {
             var created = ScriptableObject.CreateInstance<LabConfig>();
             float[] values = created.CaptureDeveloperValues();
             values[5] = generateCost;
             values[74] = LabModel.MaximumParticipants;
+            // The gourd's sabotage bombs are off here; GourdConfig turns them on for their own tests.
+            values[88] = 0f;
+            values[89] = 0f;
             for (int i = 0; i < chances.Length; i++) values[39 + i] = chances[i];
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;

@@ -24,6 +24,24 @@ namespace C6Lab
     }
 
     /// <summary>
+    /// A locked bomb the gourd dropped onto one player's board as sabotage (#177): who receives it
+    /// and where, in 0..1 board units, it lands.
+    /// </summary>
+    public readonly struct LabGourdBomb
+    {
+        public readonly ulong Target;
+        public readonly string BombId;
+        public readonly Vector2 Position;
+
+        public LabGourdBomb(ulong target, string bombId, Vector2 position)
+        {
+            Target = target;
+            BombId = bombId;
+            Position = position;
+        }
+    }
+
+    /// <summary>
     /// Plain Host-only battle state. Transport authenticates sender IDs before calling this class;
     /// clients render copies from Snapshot and never decide ownership, damage, or expiry.
     /// </summary>
@@ -40,6 +58,15 @@ namespace C6Lab
         private const uint SpawnAngleSalt = 0x5A4E0A11u;
         private const uint SpawnSpeedSalt = 0x5A4E05EDu;
         private const uint DrumSeatSalt = 0xD2D2D2D2u;
+        private const uint GourdDelaySalt = 0x60BDDE1Au;
+        private const uint GourdTargetSalt = 0x60BD7A26u;
+        private const uint GourdLandingSalt = 0x60BD1A4Du;
+        // 박 폭탄 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (북 자리 뽑기는 ulong.MaxValue).
+        private const ulong GourdDrawKey = ulong.MaxValue - 1UL;
+        // 박 폭탄이 떨어지는 곳: 판 너비의 20~80% 사이, 판 높이의 이 지점 (보드가 영역 안으로 맞춘다).
+        private const float GourdLandingMinX = .2f, GourdLandingMaxX = .8f, GourdLandingY = .6f;
+        // DEV에서 간격을 아주 작게 넣어도 한 프레임에 폭탄이 쏟아지지 않도록 하는 최소 간격.
+        private const double GourdMinimumDelaySeconds = 1d;
         // 갓 생성된 구슬은 옆 가장자리(이웃에게 넘어가는 선)에서 이만큼 안쪽까지만 미끄러진다.
         private const float SpawnEdgeMargin = .08f;
         // 한 판에 북이 여러 개 놓일 때 가운데부터 좌우로 벌려 놓는다.
@@ -52,6 +79,9 @@ namespace C6Lab
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
+        private readonly List<LabGourdBomb> gourdBombs = new List<LabGourdBomb>();
+        private double nextGourdBombAt;
+        private uint gourdBombCount;
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -111,6 +141,7 @@ namespace C6Lab
             Array.Clear(seats, 0, seats.Length);
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
             players.Clear(); orbs.Clear(); drums.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
+            gourdBombs.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState
@@ -125,6 +156,8 @@ namespace C6Lab
             paintSurface.Clear();
             revision = 0;
             PlaceDrums(now);
+            gourdBombCount = 0;
+            nextGourdBombAt = now + GourdBombDelay(0u);
             lastTime = now;
             deadline = nextDeadline;
             remaining = rules.BattleDurationSeconds;
@@ -165,7 +198,8 @@ namespace C6Lab
             if (generated == uint.MaxValue) return Reject("GENERATION_LIMIT", out reason);
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
             var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
-            int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
+            // A bomb has no lock; its fuse alone decides what happens to it.
+            int lockSwipes = kind.IsItem() && kind != LabOrbKind.Bomb ? LockSwipesFor(seed, sender, generated) : 0;
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
             player.generatedTotal++;
@@ -226,8 +260,8 @@ namespace C6Lab
         /// A right edge enters the next seat from its left; a left edge enters the previous seat
         /// from its right. The same ID, creation time, and velocity survive the handoff.
         /// Each handoff of a locked item removes one lock, so items unlock only by teamwork. A relay
-        /// orb becomes x1 when it unlocks, then each further handoff raises it to x2 and MAX. An
-        /// unlocked bomb becomes an ordinary attack orb: its fuse is cut and a fresh orb lifetime starts.
+        /// orb becomes x1 when it unlocks, then each further handoff raises it to x2 and MAX. A bomb
+        /// has no lock: its fuse keeps burning however often it is passed.
         /// </summary>
         public bool TryTransfer(ulong sender, string id, bool right, float height01,
             Vector2 normalizedVelocity, string requestId, double now, out LabOrbState orb, out string reason)
@@ -259,7 +293,6 @@ namespace C6Lab
                 current.lockSwipes--;
                 if (current.lockSwipes == 0) current.unlockedAt = now;
                 if (current.lockSwipes == 0 && current.kind == LabOrbKind.Relay) current.relayStage = 1;
-                if (current.lockSwipes == 0 && current.kind == LabOrbKind.Bomb) current.createdAt = now;
             }
             else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
             current.revision = ++revision;
@@ -415,6 +448,14 @@ namespace C6Lab
             return blasts;
         }
 
+        /// <summary>Bombs the gourd dropped since the last call, each reported once.</summary>
+        public LabGourdBomb[] DrainGourdBombs()
+        {
+            LabGourdBomb[] dropped = gourdBombs.ToArray();
+            gourdBombs.Clear();
+            return dropped;
+        }
+
         /// <summary>Remove an expired or missed projectile without damage or a hit reward.</summary>
         public bool ConfirmMiss(string id, double now)
         {
@@ -494,11 +535,12 @@ namespace C6Lab
                     foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())
                         if (players.TryGetValue(holder, out var drummer)) drummer.drumSeconds += elapsed;
                 }
+                DropGourdBombs(effectiveNow);
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
                 {
-                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0) continue;
-                    // A bomb still locked at its fuse blasts on its current holder's board. No orb is
+                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb) continue;
+                    // A bomb blasts at the end of its fuse on its current holder's board. No orb is
                     // lost: the holder's screen pushes the ones around it away from where it last was.
                     bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
                 }
@@ -507,6 +549,43 @@ namespace C6Lab
             }
             lastTime = now;
             return true;
+        }
+
+        /// <summary>
+        /// 박의 방해공작 (#177): 정해 둔 시각마다 무작위 한 명의 판에 잠긴 폭탄을 떨어뜨린다.
+        /// 구슬이 가득 찬 판에도 떨어지고, 같은 사람이 연달아 받을 수도 있으며, 스태미나는 쓰지 않는다.
+        /// 잠금 없이 도화선(아이템 수명)만 타며, 끝나면 그때 들고 있는 사람 판에서 터진다. 시간을 한 번에 많이 건너뛰어도 그 사이
+        /// 떨어졌어야 할 폭탄을 정해 둔 시각 그대로 차례대로 만든다.
+        /// </summary>
+        private void DropGourdBombs(double until)
+        {
+            while (nextGourdBombAt <= until)
+            {
+                double at = nextGourdBombAt;
+                uint index = gourdBombCount++;
+                ulong target = seats[(int)(DrawFor(seed ^ GourdTargetSalt, GourdDrawKey, index) % (ulong)activeSeatCount)];
+                var landing = new Vector2(
+                    Mathf.Lerp(GourdLandingMinX, GourdLandingMaxX, Unit01(DrawFor(seed ^ GourdLandingSalt, GourdDrawKey, index))),
+                    GourdLandingY);
+                var bomb = new LabOrbState
+                {
+                    id = NewOrbId(), owner = target, kind = LabOrbKind.Bomb,
+                    origin = LabOrbOrigin.Gourd, originOwner = target,
+                    x = landing.x, y = landing.y, createdAt = at, revision = ++revision, inFlight = false
+                };
+                orbs.Add(bomb.id, bomb);
+                gourdBombs.Add(new LabGourdBomb(target, bomb.id, landing));
+                nextGourdBombAt = at + GourdBombDelay(gourdBombCount);
+            }
+        }
+
+        /// <summary>다음 박 폭탄까지의 시간. 최대 간격이 0이면 떨어뜨리지 않는다.</summary>
+        private double GourdBombDelay(uint index)
+        {
+            if (rules.GourdBombIntervalMax <= 0f) return double.PositiveInfinity;
+            float delay = Mathf.Lerp(rules.GourdBombIntervalMin, rules.GourdBombIntervalMax,
+                Unit01(DrawFor(seed ^ GourdDelaySalt, GourdDrawKey, index)));
+            return Math.Max(GourdMinimumDelaySeconds, delay);
         }
 
         private int DamageFor(LabOrbState orb)
@@ -518,10 +597,9 @@ namespace C6Lab
             return Math.Max(1, (int)Math.Round(rules.Damage * multiplier));
         }
 
-        // An unlocked bomb is an ordinary attack orb and keeps the orb lifetime, not the fuse.
+        // Items last the item lifetime; for a bomb that is its fuse.
         private float LifetimeOf(LabOrbState orb) =>
-            orb.kind.IsItem() && !(orb.kind == LabOrbKind.Bomb && orb.lockSwipes == 0)
-                ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
+            orb.kind.IsItem() ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
 
         /// <summary>Orbs and drums both move between screens; look the ID up in either list.</summary>
@@ -664,6 +742,7 @@ namespace C6Lab
             public readonly LabGourdMode GourdMode;
             public readonly int PaintVictoryPercent;
             public readonly float PaintVictoryCoverage;
+            public readonly float GourdBombIntervalMin, GourdBombIntervalMax;
             public readonly Color[] PaintColors;
 
             public Rules(LabConfig config)
@@ -676,6 +755,8 @@ namespace C6Lab
                 GourdMode = config.GourdMode;
                 PaintVictoryPercent = config.PaintVictoryPercent;
                 PaintVictoryCoverage = config.PaintVictoryCoverage;
+                GourdBombIntervalMin = config.GourdBombIntervalMin;
+                GourdBombIntervalMax = config.GourdBombIntervalMax;
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];
                 for (int i = (int)LabOrbElement.Fire; i <= (int)LabOrbElement.Earth; i++)
                     PaintColors[i] = config.OrbAppearance != null

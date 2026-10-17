@@ -570,3 +570,33 @@ Scene 파일을 저장하거나 덮어쓰지 않고 **File → Open Scene으로 
 실제 충돌 검사는 **명시적 DEV fixture**로 수행했다. Solo는HP40/피해20·SecretBox100%·잠금0·생성속도0과 고정 투척값,2프로세스는HP1/피해20·북2개·동일 상자/투척값·30초 판·목표80→1%를 사용했다. 각 발 앞에서 매달림을 정지시키므로 연속 회전 중 조준 난이도 검사가 아니다. 일반 Config에셋을 저장하지 않았다.2프로세스 검사는 임시 입력 도구가 공개 보드/네트워크 API를 호출했고 모델 직접 명중/위조패킷/파일IPC로 결과를 만들지 않았다.
 
 진행도는 **구면 셀의 양자화 비율**이며 화면 픽셀이나 실제 저해상도 Sphere메시 면적 측정이 아니다. 실제 피격체와 박 외형의 차이·진행 중 재접속의 과거 맵 복원 미지원은 유지한다. 원시 XML·Editor/Player로그·앱·임시JSONL/검사도구는 로컬 검증자료이며 공개Git에 포함하지 않는다. 임시 도구는 최종 프로젝트에서 제거했다.
+
+## 박 폭탄 방해공작 — 2026-10-17, 이슈 #177
+
+기준은 Unity **6000.6.5f1**, main(`ff17e312`, #176 색칠 목표 포함)에서 분기한 `feat/#177-gourd-bomb-drop`이다.
+
+- **규칙**: 북은 기본으로 음·양만 낸다(50/50, 아이템 4종 0%; 아이템 규칙 코드는 유지). Host가 20~30초(DEV `Gourd Bomb Interval Min`·`Max`, 최대 0이면 끔, 최소 1초)마다 무작위 한 명의 판에 폭탄(출처 `Gourd`)을 만든다. 가득 찬 판·같은 사람 연속을 허용하고 스태미나를 쓰지 않는다. 폭탄은 **잠금이 없고 던질 수 없으며** 넘겨도 도화선(아이템 수명 15초)이 이어지고, 끝나면 그때 보유자 판에서 터진다(#167 충격파 유지). 이 때문에 `Bomb Damage Multiplier`와 폭탄 사용 기록은 지금 쓰이지 않는다.
+- **통신**: Host가 박 폭탄 신호(`gourdBomb`: 받는 사람·폭탄 ID·착지 위치)를 그 폭탄이 처음 담긴 스냅샷 조각보다 먼저 모든 참가자에게 보낸다. DEV 항목 88 → 91개(인덱스 88·89 박 폭탄 간격, 90 도화선 소리 크기). 통신 버전 `5621` → `5623`.
+- **연출**: 모든 화면은 전투 화면 박 옆 "!" 말풍선(`LabGourdAlert`). 받는 화면은 착지 지점 "!" 경고 0.6초 → 구슬판 위쪽에서 낙하 0.45초 → 두 번 튐 0.45초(`LabDropWarning`·`LabOrbView.PlayDrop`), 착지 전 잡기·충돌·폭발 밀림·떠돌기 차단. 폭탄은 몸통(`ItemBombBody.png`)·꼭지와 도화선(`ItemBombFuse.png`) 두 장으로 그리고, 움직인 만큼 굴러 꼭지가 공 둘레를 돌되 몸통 뒤로 숨지 않는다. 몸통에 빨간 남은 초, 도화선 끝 불꽃, 치지직 소리(`LabFuseSound`, 기본 코드 생성음), 마지막 3초 빨간 깜빡임과 소리 가속. 북처럼 혼자 떠돌되 혼자서는 이웃 화면으로 넘어가지 않으며, 누르면 누른 지점을 잡는다.
+- **설정 에셋**: `LabConfig.asset` 생성 확률 50/50/0/0/0/0(1단계 커밋의 40/40/0/0/0/0 합계 80을 3단계 커밋에서 바로잡음), `LabOrbAppearance.asset`의 Bomb Art·Bomb Fuse Art 연결은 Inspector에서 저장했다.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다 컴파일했다. 오류 0. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN (최종 기록 없음) | 중간 실행에서 `DrumPassesToANeighborButIsNeverStoredThrownExpiredOrBlownUp` 1건이 실패했다(폭탄 잠금을 가정한 기대값). 잠금 0으로 고쳤고 재실행 결과와 최종 전체 통과 수는 기록하지 않았다. |
+| 폭탄 굴림 계산 | 확인 (Unity 밖) | 같은 계산식으로 좌우 굴림 장면을 이미지로 그려 꼭지가 앞쪽·테두리에만 머무는지 확인했다. Unity 화면 확인이 아니다. |
+| DEV 솔로 화면 | NOT_RUN (부분 관찰) | 2단계 뒤 폭탄 그림이 회전하지 않는 점과 누를 때 꼭지가 사라지는 현상을 화면에서 보고 고쳤다. 고친 뒤의 굴림·낙하·말풍선·치지직 화면/소리 확인 기록은 없다. |
+| 3인 실행: 무작위 대상, 받지 않은 화면의 말풍선, 폭탄 전달·폭발 | NOT_RUN | Mac 앱 3개에서 모든 화면에 말풍선이 뜨고 받은 사람 화면에만 경고·낙하가 나오는지, 넘긴 폭탄의 남은 초가 이어지는지 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 치지직 소리 크기, 말풍선 크기(기본 150px)·위치, 낙하 느낌을 실기기에서 확인해야 한다. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`:
+  - 추가: `GourdDropsABombOnOnePlayerEveryTwentyToThirtySeconds`, `GourdBombsReachEveryPlayerAndCanRepeatOnTheSamePlayer`, `GourdBombLandsOnAFullBoardWithoutSpendingStamina`, `GourdBombsStopWhenTheMaximumIntervalIsZeroOrTheRoundIsOver`, `DrumMakesOnlyYinAndYangByDefault`, `ABombHasNoLockItsFuseBurnsOnHoweverOftenItIsPassedAndItIsNeverThrown`
+  - 변경: `GenerationFollowsConfiguredItemChancesAndIncludesEveryItem`(기본값 대신 40/40/5/5/5/5 지정), `EachHandoffToANeighborRemovesOneLockAndSoloCannotUnlock`(물약으로), `ItemsCountWhenUsedOrThrownButNotWhenRefused`(폭탄 투척 거절), `DrumPassesToANeighborButIsNeverStoredThrownExpiredOrBlownUp`(폭탄 잠금 0)
+  - 삭제: `UnlockedBombIsDefusedAndLivesAFreshOrbLifetimeLikeAnAttackOrb`, `UnlockedBombHitsForTripleDamageAndAMissNeverExplodes`(폭탄 해금 규칙 제거)
+- **EditMode** `LabDeveloperConfigTests`: DEV 91개·박 폭탄 간격·도화선 소리 기본값, `GourdBombIntervalIsAppendedToTheGourdCategoryAndMinCannotExceedMax`, `SavedConfigDrumMakesOnlyYinAndYangAndTheGourdDropsBombs`, `SavedAppearanceDrawsTheCartoonBomb`
+- **PlayMode** `LabOrbPhysicsTests`:
+  - 추가: `ABombWithArtDrawsTheCartoonBombWithItsRedSecondsAndASparkingFuse`, `AMovingBombRollsItsCapAndFuseAroundTheBallIn3D`, `AnExpectedGourdBombWarnsOnItsSpotThenFallsInAndBouncesBeforeItCanBeTouched`, `ABombDriftsOnItsOwnButOnlyAPushOrSwipePassesItToANeighbour`, `TheFuseSizzlesWhileABombBurnsAndStopsWithoutAFuse`, `TheGeneratedSizzleIsAOneSecondAudibleLoopWithinRange`, `BombCountsDownItsFuseAndAnUpwardFlickNeverThrowsIt`
+  - 변경: `LockedItemMovesLikeAnyOrbAndItsBadgeFollowsTheHostCount`(물약으로), #167의 `ALockedBombFlashesRedInItsLastSecondsFasterAsItRunsOut` → `ABombFlashesRedInItsLastSecondsFasterAsItRunsOut`
+- **PlayMode** `LabGourdAlertTests`(새 파일): `TheAlertPopsAnExclamationBubbleBesideTheGourdFollowsItAndLeavesByItself`
+- **PlayMode** `LabDeveloperSoloIntegrationTests`: `SavedSceneSoloGourdBombWarnsThenFallsOntoTheLocalBoard`(저장 Scene에서 실제 Host 신호 → 경고·낙하·말풍선 → 착지). 구슬 수를 세는 기존 저장 Scene 검사와 `LabGourdPaintTests`·`LabGourdCrackTests` fixture는 박 폭탄을 끈다.
