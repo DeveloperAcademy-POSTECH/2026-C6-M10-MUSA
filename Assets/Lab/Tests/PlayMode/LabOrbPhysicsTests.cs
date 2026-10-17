@@ -690,12 +690,21 @@ namespace C6Lab.Tests
             board.UpsertOrb("orb", LabOrbKind.Yin, new Vector2(.875f, .5f));                // world (3, 0)
             board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.875f, .75f));             // world (3, 1)
             var crossed = new System.Collections.Generic.List<string>();
-            board.EdgeCrossed += crossing => { if (crossing.ToRight) crossed.Add(crossing.OrbId); };
+            var kinds = new System.Collections.Generic.Dictionary<string, LabEdgeCrossingKind>();
+            board.EdgeCrossed += crossing =>
+            {
+                if (!crossing.ToRight) return;
+                crossed.Add(crossing.OrbId);
+                kinds[crossing.OrbId] = crossing.Kind;
+            };
 
             Assert.That(board.Blast("bomb", new Vector2(.75f, .5f)), Is.EqualTo(2));
             for (int step = 0; step < 15 && crossed.Count < 2; step++) yield return new WaitForFixedUpdate();
             Assert.That(crossed, Is.EquivalentTo(new[] { "orb", "drum" }),
                 "Flung past the right edge, both go to the neighbour through the usual handoff.");
+            Assert.That(kinds["drum"], Is.EqualTo(LabEdgeCrossingKind.Pushed),
+                "The drum tells the Host a blast flung it, so it stops inside the next board.");
+            Assert.That(kinds["orb"], Is.EqualTo(LabEdgeCrossingKind.Swipe), "Orbs keep the ordinary handoff.");
         }
 
         [UnityTest]
@@ -726,9 +735,11 @@ namespace C6Lab.Tests
             board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 2.8f);
             float early = bomb.ItemMarker.WarningHz;
             Assert.That(early, Is.GreaterThan(0f), "In its last three seconds the bomb starts flashing.");
+            // Watch long enough for several flashes and stop once one is seen, so a slow frame rate
+            // (few samples per second) cannot miss the bright part of every flash.
             float brightest = 0f;
-            float until = Time.time + .6f;
-            while (Time.time < until)
+            float until = Time.time + 2f;
+            while (Time.time < until && brightest <= .5f)
             {
                 yield return null;
                 brightest = Mathf.Max(brightest, bomb.ItemMarker.WarningLevel);
@@ -782,9 +793,10 @@ namespace C6Lab.Tests
 
                 board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), fuseSeconds: 2.5f);
                 Assert.That(marker.BombTimeText, Is.EqualTo("3"), "The seconds count down with the Host fuse.");
+                // Several flashes' worth, stopping at the first red one (see the fallback flashing test).
                 float reddest = 1f;
-                float until = Time.time + .6f;
-                while (Time.time < until)
+                float until = Time.time + 2f;
+                while (Time.time < until && reddest >= .6f)
                 {
                     yield return null;
                     reddest = Mathf.Min(reddest, marker.BombArtColor.g);
@@ -985,6 +997,47 @@ namespace C6Lab.Tests
             Assert.That(passing.Kind, Is.EqualTo(LabEdgeCrossingKind.Passing),
                 "It tells the Host it is passing on, so it stops on the near side of the next board.");
             Assert.That(crossed.Single(crossing => crossing.OrbId == "swiped").Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe));
+        }
+
+        [UnityTest]
+        public IEnumerator ADrumABlastFlungInSlidesOnItsOwnSpeedButStopsInsideTheBoard()
+        {
+            SetDrumDrift(0f, config.DrumDriftTurning); // no drift, so where it rests is the slide's alone
+            int crossings = 0;
+            board.EdgeCrossed += crossing => crossings++;
+            // Flung in hard from the left (it would slide over two board widths) and gently from the right.
+            var strong = board.UpsertOrb("strong", LabOrbKind.Drum, new Vector2(0f, .25f), new Vector2(3f, 0f),
+                arrival: LabDrumArrival.Coast, stopAt: .8f);
+            var gentle = board.UpsertOrb("gentle", LabOrbKind.Drum, new Vector2(1f, .75f), new Vector2(-.6f, 0f),
+                arrival: LabDrumArrival.Coast, stopAt: .8f);
+            Assert.That(strong.Body.linearVelocity.x, Is.EqualTo(3f * Width).Within(.01f), "It keeps the blast's speed.");
+            for (int step = 0; step < 150 && (board.ArrivalOf("strong") != LabDrumArrival.None
+                || board.ArrivalOf("gentle") != LabDrumArrival.None); step++) yield return new WaitForFixedUpdate();
+            for (int step = 0; step < 25; step++) yield return new WaitForFixedUpdate();
+
+            Rect bounds = board.CenterBounds;
+            Assert.That(crossings, Is.Zero, "Neither goes on to another player.");
+            Assert.That((BoardPoint(strong).x - bounds.xMin) / bounds.width, Is.EqualTo(.8f).Within(.02f),
+                "A hard fling stops at the far zone's end instead of sliding through.");
+            float gentleShare = (bounds.xMax - BoardPoint(gentle).x) / bounds.width;
+            Assert.That(gentleShare, Is.InRange(.05f, .3f), "A gentle fling slides only as far as its own speed takes it.");
+            Assert.That(strong.Body.linearVelocity.magnitude, Is.LessThan(.01f));
+            Assert.That(gentle.Body.linearVelocity.magnitude, Is.LessThan(.01f));
+        }
+
+        [UnityTest]
+        public IEnumerator GrabbingABlastFlungDrumMakesItsNextCrossingAnOrdinarySwipe()
+        {
+            var kinds = new System.Collections.Generic.List<LabEdgeCrossingKind>();
+            board.EdgeCrossed += crossing => kinds.Add(crossing.Kind);
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.4f, .5f));
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.35f, .5f), fuseSeconds: 1f);
+            board.Blast("bomb", new Vector2(.35f, .5f));
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(drum), 1d), Is.True, "Caught before it reaches the edge.");
+            board.CancelDrag();
+            drum.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f); // the player swipes it on
+            for (int step = 0; step < 30 && kinds.Count == 0; step++) yield return new WaitForFixedUpdate();
+            Assert.That(kinds, Is.EqualTo(new[] { LabEdgeCrossingKind.Swipe }), "Once caught, the blast no longer counts.");
         }
 
         [Test]
