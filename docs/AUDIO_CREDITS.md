@@ -13,17 +13,40 @@
 | 파일 | 용도 | 출처 | 이용 조건 | 가공 |
 | --- | --- | --- | --- | --- |
 | `Assets/Lab/Resources/Audio/Generate/Janggu_1_1.wav` ~ `Janggu_1_3.wav`, `Janggu_3_1.wav` ~ `Janggu_3_3.wav` (6개) | 구슬 생성 시 장구 소리 | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) | 출처 표시 조건으로 누구나 이용 가능 | 앞 무음 약 0.19초 제거, 길이 0.8초로 자름(끝 0.2초 페이드아웃, 연속 생성 시 소리가 겹쳐 묻히지 않도록). 작게 녹음된 `Janggu_1_3`·`Janggu_3_2`·`Janggu_3_3`은 가장 큰 순간이 -0.5dB가 되도록 음량만 키움(+5.6 / +4.9 / +11.1dB). 음색 변경 없음 |
-| `Assets/Lab/Resources/Audio/Hit/Splat_1.wav` ~ `Splat_4.wav` (4개) | 박 모드 Paint에서 내가 던진 구슬이 요괴에 맞았을 때, 물감이 터지는 소리 (던진 사람 기기만, 무작위) | "Squishes and Splats" 팩 by mrickey13, freesound.org (pack 29012), [검색 링크](https://freesound.org/search/?q=Squish+sound+effect&f=license%3A%22Creative+Commons+0%22+pack_grouping%3A%2229012_Squishes+and+Splats%22) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
+| `Assets/Lab/Resources/Audio/GenerateVoice/Eolssu_1.wav` ~ `Eolssu_3.wav` (3개) | 구슬 생성 시 세 번째마다 나는 "얼쑤" 추임새 (장구 → 장구 → 얼쑤 순서) | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 추임새: 정회석(`Chu-imsae by JungHoeseok_1`) → Eolssu_1, 강효주(`_5`) → Eolssu_2, 이춘희(`_3`) → Eolssu_3 | 출처 표시 조건으로 누구나 이용 가능 | 앞뒤 무음을 잘라 0.52~0.95초로 맞춤(끝 0.04초 페이드아웃). 작게 녹음되어 가장 큰 순간이 -1dB가 되도록 음량만 키움(+9.5~+12.2dB). 96kHz 스테레오를 44.1kHz 모노 16bit로 저장. 음색 변경 없음 |
+| `Assets/Lab/Resources/Audio/Hit/Splat_1.wav` | 박 모드 Paint에서 내가 던진 구슬이 요괴의 가운데 쪽에 맞았을 때 나는 물감 소리 (던진 사람 기기만, 3개 중 무작위) – 긴 찰싹 | "Squishes and Splats" 팩 by mrickey13, freesound.org (pack 29012), [검색 링크](https://freesound.org/search/?q=Squish+sound+effect&f=license%3A%22Creative+Commons+0%22+pack_grouping%3A%2229012_Squishes+and+Splats%22) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
+| `Assets/Lab/Resources/Audio/Hit/Splat_3.wav` | 박 모드 Paint에서 내가 던진 구슬이 요괴의 가운데 쪽에 맞았을 때 나는 물감 소리 (던진 사람 기기만, 3개 중 무작위) – 짧은 찰싹 | "Squishes and Splats" 팩 by mrickey13, freesound.org (pack 29012), [검색 링크](https://freesound.org/search/?q=Squish+sound+effect&f=license%3A%22Creative+Commons+0%22+pack_grouping%3A%2229012_Squishes+and+Splats%22) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
+| `Assets/Lab/Resources/Audio/Hit/Splat_4.wav` | 박 모드 Paint에서 내가 던진 구슬이 요괴의 가운데 쪽에 맞았을 때 나는 물감 소리 (던진 사람 기기만, 3개 중 무작위) – 중간 길이 찰싹 | "Squishes and Splats" 팩 by mrickey13, freesound.org (pack 29012), [검색 링크](https://freesound.org/search/?q=Squish+sound+effect&f=license%3A%22Creative+Commons+0%22+pack_grouping%3A%2229012_Squishes+and+Splats%22) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
+| `Assets/Lab/Resources/Audio/HitGlance/Squelch.wav` | 박 모드 Paint에서 내가 던진 구슬이 박의 옆을 스쳐 맞았을 때 나는 낮고 짧은 철퍽 소리 (던진 사람 기기만, 기준은 LabConfig `Glancing Hit Offset`) | "SFX_SQUELCH_slayer_215.wav" by MrFossy, [freesound.org](https://freesound.org/people/MrFossy/sounds/589836/) | CC0 (출처 표시 의무 없음) | 앞뒤 무음을 잘라 0.114초로 맞춤(끝 0.02초 페이드아웃). 24bit를 44.1kHz 16bit 스테레오로 저장. 음량·음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/HitCrack/Punch.wav` | 박 모드 Crack에서 내가 던진 구슬이 요괴에 맞았을 때 (던진 사람 기기만) | "Cartoon Punch Cassette E" by modusmogulus, [freesound.org](https://freesound.org/people/modusmogulus/sounds/785935/) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
 | `Assets/Lab/Resources/Audio/Combine/Combine_1.wav` ~ `Combine_5.wav` (5개) | 내가 음·양 구슬을 결합했을 때 (Host 승인 후 결합한 사람 기기만, 무작위) | "chimes" 시리즈 by _bliind, freesound.org: [chimes-1](https://freesound.org/people/_bliind/sounds/491655/) → Combine_1, [chimes-3](https://freesound.org/people/_bliind/sounds/491660/) → Combine_2, [chimes-7](https://freesound.org/people/_bliind/sounds/491668/) → Combine_3, [chimes-9](https://freesound.org/people/_bliind/sounds/491667/) → Combine_4, [chimes-16](https://freesound.org/people/_bliind/sounds/491656/) → Combine_5 | CC0 (출처 표시 의무 없음) | 소리가 끝난 뒤 남는 무음·잔향을 잘라 길이 0.27~0.57초로 맞춤(끝 0.05초 페이드아웃). 원본이 작게 녹음되어 가장 큰 순간이 -1dB가 되도록 음량만 키움(+11~+20dB). 16bit로 저장. 음색 변경 없음 |
+| `Assets/Lab/Resources/Audio/Bomb/Boom/Boom.wav` | 내 판에서 폭탄이 터질 때 (Bomb Sound = BOOM, 그 판 주인 기기만) | "rubble_explode" by canberries4, [freesound.org](https://freesound.org/people/canberries4/) | CC0 (출처 표시 의무 없음) | 앞 무음 약 0.035초 제거, 끝 0.06초 페이드아웃, 가장 큰 순간이 -1dB가 되도록 음량만 키움(+7dB). mp3를 44.1kHz 16bit wav로 저장. 음색 변경 없음 |
+| `Assets/Lab/Resources/Audio/Bomb/Ppeong/Ppeong.wav` | 내 판에서 폭탄이 터질 때 (Bomb Sound = PPEONG, 그 판 주인 기기만) | "뻥튀기 뻥2" by 김용배, [공유마당 (한국저작권위원회)](https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020) | **CC BY (저작자 표시)** – 출처 표시 의무 있음 | 끝 0.06초 페이드아웃, 스테레오를 모노로 합치고 가장 큰 순간이 -1dB가 되도록 맞춤. 44.1kHz 16bit로 저장. 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/Miss/Miss.wav` | 내가 던진 구슬이 요괴를 빗나갔을 때 (던진 사람 기기만) | "Woosh_Whip 3" by CAT-FOX_ALEX, [freesound.org](https://freesound.org/people/CAT-FOX_ALEX/sounds/870096/) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
 
-**출처 표시 문구**
+**출처 표시 문구 (공공누리 제1유형)**
 
-> 꽹과리·장구 소리: 국립국악원 국악 디지털 음원 (https://www.gugak.go.kr/digitaleum)
+국립국악원 국악 디지털 음원은 공공누리 제1유형(출처표시)으로 개방되어 있다. 상업적 이용과 변경(자르기·음량 조절)이 가능하며, 아래처럼 출처와 링크를 표시한다. 국립국악원이 이 게임을 후원하거나 특별한 관계가 있는 것처럼 표시하지 않는다. 다운로드 페이지에 작성 연도와 연주자가 나와 있지 않아 연도는 적지 않고, 연주자가 표시된 추임새만 작성자를 적었다.
 
-CC0 소리(Punch, Splat, Combine, Miss)는 표시 의무가 없지만, 크레딧 화면이 생기면 아래처럼 함께 적는 것을 권장한다.
+> 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '동살풀이(작성자: 국립국악원)'를 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
 
-> 타격음 "Cartoon Punch Cassette E" by modusmogulus, 페인트 타격음 "Squishes and Splats" by mrickey13, 결합 소리 "chimes" by _bliind, 빗나감 소리 "Woosh_Whip 3" by CAT-FOX_ALEX (freesound.org, CC0)
+> 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '장구-덩-강, 장구-덩-중, 장구-덩-약, 장구-쿵-강, 장구-쿵-중, 장구-쿵-약(작성자: 국립국악원)'을 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
+
+> 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '추임새(작성자: 정회석, 강효주, 이춘희)'를 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
+
+| 우리 파일 | 국립국악원 저작물명 |
+| --- | --- |
+| `BGM/Kkwaenggwari_13.wav` | 동살풀이 |
+| `Generate/Janggu_1_1.wav`, `Janggu_1_2.wav`, `Janggu_1_3.wav` | 장구-덩-강, 장구-덩-중, 장구-덩-약 |
+| `Generate/Janggu_3_1.wav`, `Janggu_3_2.wav`, `Janggu_3_3.wav` | 장구-쿵-강, 장구-쿵-중, 장구-쿵-약 |
+| `GenerateVoice/Eolssu_1.wav`, `Eolssu_2.wav`, `Eolssu_3.wav` | 추임새 (정회석, 강효주, 이춘희) |
+
+**CC BY 소리 (출처 표시 의무 있음)**
+
+> 김용배의 "뻥튀기 뻥2"(공유마당, https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020)은 CC BY 라이선스로 제공됩니다.
+
+CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom)는 표시 의무가 없지만, 크레딧 화면이 생기면 아래처럼 함께 적는 것을 권장한다.
+
+> 타격음 "Cartoon Punch Cassette E" by modusmogulus, 페인트 타격음 "Squishes and Splats" by mrickey13, 스친 타격음 "SFX_SQUELCH_slayer_215" by MrFossy, 결합 소리 "chimes" by _bliind, 빗나감 소리 "Woosh_Whip 3" by CAT-FOX_ALEX, 폭발음 "rubble_explode" by canberries4 (freesound.org, CC0)
 
 게임 안에 크레딧 화면이 생기면 위 문구를 함께 넣는다.

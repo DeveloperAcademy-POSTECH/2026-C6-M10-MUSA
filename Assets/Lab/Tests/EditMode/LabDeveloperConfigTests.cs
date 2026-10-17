@@ -18,7 +18,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(103));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(105));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -31,6 +31,9 @@ namespace C6Lab.Tests
             Assert.That(values[99], Is.EqualTo(1f), "The minimap is on by default.");
             Assert.That(values[100], Is.EqualTo(50f), "The minimap starts at half of its drawn size.");
             Assert.That(new[] { values[101], values[102] }, Is.EqualTo(new[] { 0f, 0f }), "The minimap starts in its usual place.");
+            Assert.That(values[103], Is.EqualTo(50f), "The bomb sound starts at the Inspector volume.");
+            Assert.That(config.BombSoundVolume, Is.EqualTo(.9f).Within(1e-5f));
+            Assert.That(values[104], Is.EqualTo(1f), "The bomb plays the popcorn-machine ppeong by default.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -117,10 +120,14 @@ namespace C6Lab.Tests
             values[100] = 80f; // minimap bigger than the default 50
             values[101] = -120f; // 120 to the left
             values[102] = 60f; // 60 up
+            values[103] = 25f; // bomb sound half the Inspector volume
+            values[104] = 0f; // bomb sound: boom
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MinimapEnabled, Is.False, "DEV can turn the minimap off.");
             Assert.That(config.MinimapSizePercent, Is.EqualTo(80), "DEV sizes the minimap from 0 to 100 with 50 in the middle.");
             Assert.That(config.MinimapMove, Is.EqualTo(new Vector2(-120f, 60f)), "DEV can move the minimap left/right and up/down.");
+            Assert.That(config.BombSoundVolume, Is.EqualTo(.45f).Within(1e-5f), "25 halves the Inspector bomb volume (0.9).");
+            Assert.That(config.BombSoundStyle, Is.EqualTo(LabBombSoundStyle.Boom), "DEV switches the bomb to the ordinary boom.");
             Assert.That(config.FuseSoundVolume, Is.EqualTo(1f).Within(1e-5f), "100 doubles the Inspector fuse volume (0.5).");
             Assert.That(config.DrumStopBounds(), Is.EqualTo(new[] { .1f, .3f, .5f, .9f }).Within(1e-6f));
             Assert.That(config.DrumStopChances(), Is.EqualTo(new[] { 25, 25, 25, 25 }));
@@ -784,7 +791,7 @@ namespace C6Lab.Tests
         {
             var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
             Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
-                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap" }));
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound" }));
             Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
                 "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
             var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");

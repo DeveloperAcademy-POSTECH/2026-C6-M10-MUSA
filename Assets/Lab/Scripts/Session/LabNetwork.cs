@@ -158,7 +158,8 @@ namespace C6Lab
         // shared config and the Host tells the combiner when a combine is approved; older clients
         // cannot share this room. Version 5621 adds the Paint goal setting and independent
         // approved impact values/directions/colors. Version 5625 adds the minimap on/off, size and position settings (#181).
-        internal const ushort LabProtocolVersion = 5625;
+        // Version 5626 adds the bomb sound volume setting (#183).
+        internal const ushort LabProtocolVersion = 5626;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
@@ -262,6 +263,11 @@ namespace C6Lab
         public event Action<LabConfig> ConfigApplied;
         /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (승인 명중값: Paint 명목 공격 점수 / Crack 실제 피해량)</summary>
         public event Action<int> LocalThrowHit;
+        /// <summary>
+        /// 마지막으로 내 구슬이 맞은 자리가 박 중심에서 얼마나 옆으로 벗어났는지 (0 = 정중앙, 1 = 가장자리를 스침).
+        /// LocalThrowHit을 부르기 바로 전에 정해지므로, 그 이벤트 안에서 읽으면 이번 타격 값이다.
+        /// </summary>
+        public float LastLocalHitOffset { get; private set; }
         /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
         public event Action<string, Vector2> BombBlasted;
         /// <summary>박이 누군가의 판에 폭탄을 떨어뜨렸을 때 모든 기기에서 한 번 알린다. (받는 사람, 폭탄 ID, 떨어질 위치 0..1)</summary>
@@ -1467,7 +1473,12 @@ namespace C6Lab
                     target.NotifyApprovedHit(targetLocalPoint, element);
                     impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
                         result.ImpactVelocity, config == null || config.GourdMode == LabGourdMode.Crack);
-                    if (result.OwnerPlayerId == LocalPlayerId) LocalThrowHit?.Invoke(impactValue);
+                    if (result.OwnerPlayerId == LocalPlayerId)
+                    {
+                        LastLocalHitOffset = LabThrowSound.HitOffset(targetLocalPoint,
+                            hitbox.InverseTransformDirection(result.ImpactVelocity));
+                        LocalThrowHit?.Invoke(impactValue);
+                    }
                     Color paintColor = model.PaintColorFor(element);
                     var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
                         round = model.Round, firstId = result.ProjectileId, owner = result.OwnerPlayerId,
@@ -1693,7 +1704,13 @@ namespace C6Lab
                             new Vector3(packet.wx, packet.wy, packet.wz),
                             config == null || config.GourdMode == LabGourdMode.Crack);
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
-                        if (packet.owner == LocalPlayerId) LocalThrowHit?.Invoke(packet.impactValue);
+                        if (packet.owner == LocalPlayerId)
+                        {
+                            Transform localHitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
+                            LastLocalHitOffset = LabThrowSound.HitOffset(new Vector3(packet.x, packet.y, packet.z),
+                                localHitbox.InverseTransformDirection(new Vector3(packet.wx, packet.wy, packet.wz)));
+                            LocalThrowHit?.Invoke(packet.impactValue);
+                        }
                     }
                     break;
                 case "targetMiss":
