@@ -314,6 +314,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float generateSoundVolume = 1f;
         [Tooltip("내가 던진 구슬이 요괴에 맞았을 때 소리 기본 크기 (던진 사람 기기만)")]
         [SerializeField, Range(0f, 1f)] private float hitSoundVolume = .9f;
+        [Tooltip("박 모드 Paint에서 구슬이 박의 옆을 스쳐 맞았다고 보는 기준 (0 = 정중앙, 1 = 가장자리). 박 중심축에서 날아온 방향 기준으로 이만큼 이상 벗어나 맞으면 Audio/HitGlance 소리가 난다.")]
+        [SerializeField, Range(0f, 1f)] private float glancingHitOffset = .7f;
         [Tooltip("내가 던진 구슬이 빗나갔을 때 소리 기본 크기 (던진 사람 기기만)")]
         [SerializeField, Range(0f, 1f)] private float missSoundVolume = .7f;
         // DEV에서 정하는 소리 크기 배율 (0~100, 50 = Inspector 값 그대로). Inspector에는 보이지 않고,
@@ -518,6 +520,7 @@ namespace C6Lab
         public float GenerateSoundVolume => Scaled(Finite(generateSoundVolume, 1f), generateSoundVolumeDev);
         public float HitSoundVolume => Scaled(Finite(hitSoundVolume, .9f), hitSoundVolumeDev);
         public float MissSoundVolume => Scaled(Finite(missSoundVolume, .7f), missSoundVolumeDev);
+        public float GlancingHitOffset => Mathf.Clamp01(Finite(glancingHitOffset, .7f));
         public float CombineSoundVolume => Scaled(Finite(combineSoundVolume, .8f), combineSoundVolumeDev);
         public float FuseSoundVolume => Scaled(Finite(fuseSoundVolume, .5f), fuseSoundVolumeDev);
         public float BombSoundVolume => Scaled(Finite(bombSoundVolume, .9f), bombSoundVolumeDev);

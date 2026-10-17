@@ -68,6 +68,7 @@ MonoBehaviour:
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9
+  glancingHitOffset: 0.7
   missSoundVolume: 0.7
   bgmVolumeDev: 50
   generateSoundVolumeDev: 50
