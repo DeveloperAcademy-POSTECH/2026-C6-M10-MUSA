@@ -9,6 +9,7 @@ namespace C6Lab
     /// 전투 화면 오른쪽 아래(오른쪽 이웃 동그라미 바로 위)의 미니맵. 플레이어마다 원 하나를 정다각형 꼭짓점에 놓고
     /// 이웃끼리 선으로 잇는다. 폰마다 "나"를 아래 가운데에 두고, 내 화면의 오른쪽 이웃(다음 번호)은 오른쪽 위,
     /// 왼쪽 이웃(이전 번호)은 왼쪽 위에 놓아 화면에서 넘기는 방향과 미니맵 방향이 같다.
+    /// 북을 가진 사람의 원은 태극 무늬(Resources/Minimap/Taegeuk.png)로 덮고, 북이 넘어가면 태극이 선을 따라 미끄러진다.
     /// 장면 수정 없이 LabSceneController가 실행 시 붙이고, 전투 중(Playing)에만 보인다.
     /// </summary>
     [DisallowMultipleComponent]
@@ -19,6 +20,9 @@ namespace C6Lab
         public float gapAboveBadge = 8f;
         public float lineWidth = 3f;
         public int labelSize = 11;
+        /// <summary>북이 이웃 한 칸을 건너가는 시간(초)</summary>
+        public float slideSeconds = .35f;
+        public const string TaegeukResource = "Minimap/Taegeuk";
 
         // 결과 카드와 같은 한지색 배경·갈색 테두리, "나"는 버튼·대시보드의 "내 줄"과 같은 갈색
         public Color backgroundColor = new Color(.973f, .914f, .804f, .96f);
@@ -35,12 +39,32 @@ namespace C6Lab
         private RectTransform panel;
         private RectTransform content;
         private Sprite circleSprite;
+        private Sprite taegeukSprite;
+        private RectTransform lineLayer, seatLayer, drumLayer, labelLayer;
+        private readonly List<ulong> ringOrder = new List<ulong>();
+        private readonly Dictionary<string, DrumMarker> drums = new Dictionary<string, DrumMarker>();
+
+        /// <summary>북 하나의 태극 표시. 지나갈 점(waypoints)을 차례로 따라 미끄러진다.</summary>
+        private sealed class DrumMarker
+        {
+            public RectTransform Rect;
+            public ulong Owner;
+            public readonly List<Vector2> Path = new List<Vector2>();
+            public float Progress; // 0..Path.Count-1, 정수 부분이 지금 지나는 구간
+        }
         private string layoutKey;
         private readonly Dictionary<ulong, Vector2> seatPositions = new Dictionary<ulong, Vector2>();
 
         public bool IsShowing => panel != null && panel.gameObject.activeSelf;
         /// <summary>마지막으로 그린 플레이어별 원 중심 (미니맵 안 좌표, 테스트용)</summary>
         public IReadOnlyDictionary<ulong, Vector2> SeatPositions => seatPositions;
+        /// <summary>북 ID → 지금 태극이 그려진 위치 (테스트용)</summary>
+        public Vector2? DrumPosition(string drumId) =>
+            drums.TryGetValue(drumId ?? string.Empty, out var marker) && marker.Rect != null
+                ? marker.Rect.anchoredPosition : (Vector2?)null;
+        /// <summary>북 ID → 미니맵이 알고 있는 주인 (테스트용)</summary>
+        public ulong? DrumOwner(string drumId) =>
+            drums.TryGetValue(drumId ?? string.Empty, out var marker) ? marker.Owner : (ulong?)null;
 
         /// <summary>badge: 오른쪽 이웃 동그라미. 미니맵은 그 바로 위, 같은 오른쪽 끝에 맞춘다.</summary>
         public void Bind(LabNetwork target, RectTransform badge, Font textFont)
@@ -64,6 +88,8 @@ namespace C6Lab
             if (panel == null) return;
             if (!panel.gameObject.activeSelf) panel.gameObject.SetActive(true);
             Rebuild(snapshot.players, network.LocalPlayerId);
+            SyncDrums(snapshot.drums);
+            Advance(Time.unscaledDeltaTime);
         }
 
         /// <summary>
@@ -89,6 +115,13 @@ namespace C6Lab
             layoutKey = key;
             for (int i = content.childCount - 1; i >= 0; i--) Remove(content.GetChild(i).gameObject);
             seatPositions.Clear();
+            ringOrder.Clear();
+            drums.Clear();
+            // 그리는 순서: 선 → 원 → 태극 → P번호 (번호는 태극 위에도 보인다)
+            lineLayer = AddLayer("Lines");
+            seatLayer = AddLayer("Seats");
+            drumLayer = AddLayer("Drums");
+            labelLayer = AddLayer("Labels");
 
             int n = seats.Length;
             int mine = System.Array.FindIndex(seats, p => p.id == localId);
@@ -122,8 +155,81 @@ namespace C6Lab
                 LabPlayerState player = seats[(mine + k) % n];
                 bool me = player.id == localId;
                 seatPositions[player.id] = points[k];
+                ringOrder.Add(player.id);
                 AddCircle(points[k], radius, me ? meColor : otherColor);
                 AddLabel(LabResultStats.PlayerName(player), points[k], radius, me ? meTextColor : otherTextColor);
+            }
+        }
+
+        /// <summary>
+        /// 스냅샷의 북 주인을 반영한다. 처음 보는 북은 주인 원에 바로 놓고, 주인이 바뀐 북은
+        /// 이웃 선을 따라(통과한 북은 중간 원을 거쳐) 새 주인 원까지 미끄러지게 한다.
+        /// </summary>
+        public void SyncDrums(LabOrbState[] snapshotDrums)
+        {
+            if (drumLayer == null) return;
+            var seen = new HashSet<string>();
+            foreach (var drum in snapshotDrums ?? new LabOrbState[0])
+            {
+                if (drum == null || string.IsNullOrEmpty(drum.id) || !seatPositions.ContainsKey(drum.owner)) continue;
+                seen.Add(drum.id);
+                if (!drums.TryGetValue(drum.id, out var marker))
+                {
+                    marker = new DrumMarker { Rect = AddTaegeuk(seatPositions[drum.owner]), Owner = drum.owner };
+                    drums.Add(drum.id, marker);
+                    continue;
+                }
+                if (marker.Owner == drum.owner) continue;
+                Vector2 from = marker.Rect.anchoredPosition;
+                marker.Path.Clear();
+                marker.Path.Add(from);
+                foreach (ulong seat in RingSteps(marker.Owner, drum.owner)) marker.Path.Add(seatPositions[seat]);
+                marker.Progress = 0f;
+                marker.Owner = drum.owner;
+            }
+            foreach (string gone in drums.Keys.Where(id => !seen.Contains(id)).ToArray())
+            {
+                Remove(drums[gone].Rect != null ? drums[gone].Rect.gameObject : null);
+                drums.Remove(gone);
+            }
+        }
+
+        /// <summary>태극을 경로를 따라 움직인다. 한 구간(이웃 한 칸)에 slideSeconds가 걸린다.</summary>
+        public void Advance(float deltaSeconds)
+        {
+            foreach (var marker in drums.Values)
+            {
+                if (marker.Rect == null || marker.Path.Count < 2) continue;
+                marker.Progress += deltaSeconds / Mathf.Max(.01f, slideSeconds);
+                int last = marker.Path.Count - 1;
+                if (marker.Progress >= last)
+                {
+                    marker.Rect.anchoredPosition = marker.Path[last];
+                    marker.Path.Clear();
+                    continue;
+                }
+                int index = Mathf.FloorToInt(marker.Progress);
+                float t = Mathf.SmoothStep(0f, 1f, marker.Progress - index);
+                marker.Rect.anchoredPosition = Vector2.Lerp(marker.Path[index], marker.Path[index + 1], t);
+            }
+        }
+
+        /// <summary>
+        /// from에서 to까지 둘레를 따라 지나는 자리들 (from 제외, to 포함). 가까운 쪽으로 돌고,
+        /// 같으면 오른쪽(다음 번호) 방향. 3인은 언제나 한 칸이다.
+        /// </summary>
+        private IEnumerable<ulong> RingSteps(ulong from, ulong to)
+        {
+            int n = ringOrder.Count;
+            int a = ringOrder.IndexOf(from), b = ringOrder.IndexOf(to);
+            if (n == 0 || b < 0) yield break;
+            if (a < 0) { yield return to; yield break; }
+            int forward = (b - a + n) % n, backward = (a - b + n) % n;
+            int step = forward <= backward ? 1 : -1;
+            for (int i = a; i != b;)
+            {
+                i = (i + step + n) % n;
+                yield return ringOrder[i];
             }
         }
 
@@ -169,7 +275,7 @@ namespace C6Lab
         {
             var go = new GameObject("Line", typeof(RectTransform), typeof(Image));
             var rect = (RectTransform)go.transform;
-            rect.SetParent(content, false);
+            rect.SetParent(lineLayer, false);
             Vector2 delta = to - from;
             rect.anchoredPosition = (from + to) * .5f;
             rect.sizeDelta = new Vector2(delta.magnitude, lineWidth);
@@ -183,7 +289,7 @@ namespace C6Lab
         {
             var go = new GameObject("Seat", typeof(RectTransform), typeof(Image));
             var rect = (RectTransform)go.transform;
-            rect.SetParent(content, false);
+            rect.SetParent(seatLayer, false);
             rect.anchoredPosition = at;
             rect.sizeDelta = Vector2.one * (radius * 2f);
             var image = go.GetComponent<Image>();
@@ -193,12 +299,50 @@ namespace C6Lab
             return image;
         }
 
+        private RectTransform AddLayer(string layerName)
+        {
+            var go = new GameObject(layerName, typeof(RectTransform));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(content, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
+            rect.sizeDelta = Vector2.zero;
+            return rect;
+        }
+
+        /// <summary>북을 가진 사람 원을 덮는 태극 (원과 같은 크기)</summary>
+        private RectTransform AddTaegeuk(Vector2 at)
+        {
+            var go = new GameObject("Drum", typeof(RectTransform), typeof(Image));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(drumLayer, false);
+            rect.anchoredPosition = at;
+            rect.sizeDelta = Vector2.one * (CircleRadius(ringOrder.Count) * 2f);
+            var image = go.GetComponent<Image>();
+            image.sprite = TaegeukSprite();
+            image.color = image.sprite != null ? Color.white : new Color(.8f, .18f, .23f, 1f);
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            return rect;
+        }
+
+        /// <summary>Resources/Minimap/Taegeuk.png. 스프라이트로 가져왔든 텍스처로 가져왔든 쓴다. 없으면 원으로 대신한다.</summary>
+        private Sprite TaegeukSprite()
+        {
+            if (taegeukSprite != null) return taegeukSprite;
+            taegeukSprite = Resources.Load<Sprite>(TaegeukResource);
+            if (taegeukSprite != null) return taegeukSprite;
+            var texture = Resources.Load<Texture2D>(TaegeukResource);
+            if (texture == null) return CircleSprite();
+            taegeukSprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(.5f, .5f), 100f);
+            return taegeukSprite;
+        }
+
         /// <summary>원 안쪽 위에 "P1" 같은 번호</summary>
         private void AddLabel(string value, Vector2 at, float radius, Color color)
         {
             var go = new GameObject("Label", typeof(RectTransform), typeof(Text));
             var rect = (RectTransform)go.transform;
-            rect.SetParent(content, false);
+            rect.SetParent(labelLayer, false);
             rect.anchoredPosition = at + new Vector2(0f, radius * .42f);
             rect.sizeDelta = new Vector2(radius * 2f, labelSize + 4f);
             var text = go.GetComponent<Text>();
