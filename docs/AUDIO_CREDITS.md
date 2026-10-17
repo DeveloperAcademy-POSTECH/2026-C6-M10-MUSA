@@ -17,6 +17,8 @@
 | `Assets/Lab/Resources/Audio/Hit/Splat_1.wav` ~ `Splat_4.wav` (4개) | 박 모드 Paint에서 내가 던진 구슬이 요괴에 맞았을 때, 물감이 터지는 소리 (던진 사람 기기만, 무작위) | "Squishes and Splats" 팩 by mrickey13, freesound.org (pack 29012), [검색 링크](https://freesound.org/search/?q=Squish+sound+effect&f=license%3A%22Creative+Commons+0%22+pack_grouping%3A%2229012_Squishes+and+Splats%22) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
 | `Assets/Lab/Resources/Audio/HitCrack/Punch.wav` | 박 모드 Crack에서 내가 던진 구슬이 요괴에 맞았을 때 (던진 사람 기기만) | "Cartoon Punch Cassette E" by modusmogulus, [freesound.org](https://freesound.org/people/modusmogulus/sounds/785935/) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
 | `Assets/Lab/Resources/Audio/Combine/Combine_1.wav` ~ `Combine_5.wav` (5개) | 내가 음·양 구슬을 결합했을 때 (Host 승인 후 결합한 사람 기기만, 무작위) | "chimes" 시리즈 by _bliind, freesound.org: [chimes-1](https://freesound.org/people/_bliind/sounds/491655/) → Combine_1, [chimes-3](https://freesound.org/people/_bliind/sounds/491660/) → Combine_2, [chimes-7](https://freesound.org/people/_bliind/sounds/491668/) → Combine_3, [chimes-9](https://freesound.org/people/_bliind/sounds/491667/) → Combine_4, [chimes-16](https://freesound.org/people/_bliind/sounds/491656/) → Combine_5 | CC0 (출처 표시 의무 없음) | 소리가 끝난 뒤 남는 무음·잔향을 잘라 길이 0.27~0.57초로 맞춤(끝 0.05초 페이드아웃). 원본이 작게 녹음되어 가장 큰 순간이 -1dB가 되도록 음량만 키움(+11~+20dB). 16bit로 저장. 음색 변경 없음 |
+| `Assets/Lab/Resources/Audio/Bomb/Boom/Boom.wav` | 내 판에서 폭탄이 터질 때 (Bomb Sound = BOOM, 그 판 주인 기기만) | "rubble_explode" by canberries4, [freesound.org](https://freesound.org/people/canberries4/) | CC0 (출처 표시 의무 없음) | 앞 무음 약 0.035초 제거, 끝 0.06초 페이드아웃, 가장 큰 순간이 -1dB가 되도록 음량만 키움(+7dB). mp3를 44.1kHz 16bit wav로 저장. 음색 변경 없음 |
+| `Assets/Lab/Resources/Audio/Bomb/Ppeong/Ppeong.wav` | 내 판에서 폭탄이 터질 때 (Bomb Sound = PPEONG, 그 판 주인 기기만) | "뻥튀기 뻥2" by 김용배, [공유마당 (한국저작권위원회)](https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020) | **CC BY (저작자 표시)** – 출처 표시 의무 있음 | 끝 0.06초 페이드아웃, 스테레오를 모노로 합치고 가장 큰 순간이 -1dB가 되도록 맞춤. 44.1kHz 16bit로 저장. 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/Miss/Miss.wav` | 내가 던진 구슬이 요괴를 빗나갔을 때 (던진 사람 기기만) | "Woosh_Whip 3" by CAT-FOX_ALEX, [freesound.org](https://freesound.org/people/CAT-FOX_ALEX/sounds/870096/) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
 
 **출처 표시 문구 (공공누리 제1유형)**
@@ -36,8 +38,12 @@
 | `Generate/Janggu_3_1.wav`, `Janggu_3_2.wav`, `Janggu_3_3.wav` | 장구-쿵-강, 장구-쿵-중, 장구-쿵-약 |
 | `GenerateVoice/Eolssu_1.wav`, `Eolssu_2.wav`, `Eolssu_3.wav` | 추임새 (정회석, 강효주, 이춘희) |
 
-CC0 소리(Punch, Splat, Combine, Miss)는 표시 의무가 없지만, 크레딧 화면이 생기면 아래처럼 함께 적는 것을 권장한다.
+**CC BY 소리 (출처 표시 의무 있음)**
 
-> 타격음 "Cartoon Punch Cassette E" by modusmogulus, 페인트 타격음 "Squishes and Splats" by mrickey13, 결합 소리 "chimes" by _bliind, 빗나감 소리 "Woosh_Whip 3" by CAT-FOX_ALEX (freesound.org, CC0)
+> 김용배의 "뻥튀기 뻥2"(공유마당, https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020)은 CC BY 라이선스로 제공됩니다.
+
+CC0 소리(Punch, Splat, Combine, Miss, Boom)는 표시 의무가 없지만, 크레딧 화면이 생기면 아래처럼 함께 적는 것을 권장한다.
+
+> 타격음 "Cartoon Punch Cassette E" by modusmogulus, 페인트 타격음 "Squishes and Splats" by mrickey13, 결합 소리 "chimes" by _bliind, 빗나감 소리 "Woosh_Whip 3" by CAT-FOX_ALEX, 폭발음 "rubble_explode" by canberries4 (freesound.org, CC0)
 
 게임 안에 크레딧 화면이 생기면 위 문구를 함께 넣는다.
