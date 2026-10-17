@@ -433,6 +433,9 @@ namespace C6Lab
                 valueSliders[i].minValue = 0f;
                 valueSliders[i].maxValue = 1f;
                 valueSliders[i].wholeNumbers = false;
+                bool fixedValue = LabConfig.DeveloperFields[i].Min == LabConfig.DeveloperFields[i].Max;
+                valueInputs[i].readOnly = fixedValue;
+                valueSliders[i].interactable = !fixedValue;
             }
             return targetParticipantsSlider != null && applyHostButton != null;
         }

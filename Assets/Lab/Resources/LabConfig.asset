@@ -61,8 +61,16 @@ MonoBehaviour:
   drumDriftSpeed: 0.1
   drumDriftTurning: 0.25
   drumSpinStrength: 1
+  drumStopBounds: 14000000280000003c00000050000000i
+  drumStopChances: 28000000230000000f0000000a000000i
   gourdMode: 0
-  paintVictoryPercent: 80
+  paintVictoryPercent: 100
+  paintSurfaceResolution: 2
+  paintInitialPercent: 2
+  paintRepeatPercent: 4
+  paintGrowthPercentPerSecond: 6
+  paintFillChancePercent: 60
+  paintVerticalWeight: 1.35
   gourdBombIntervalMin: 20
   gourdBombIntervalMax: 30
   bgmVolume: 0.2

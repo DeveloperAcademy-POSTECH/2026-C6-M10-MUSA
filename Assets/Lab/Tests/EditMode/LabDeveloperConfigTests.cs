@@ -18,13 +18,13 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(105));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(111));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
             Assert.That(new[] { values[95], values[96], values[97], values[98] }, Is.EqualTo(new[] { 40f, 35f, 15f, 10f }),
                 "Near, middle, far and pass-through chances.");
-            Assert.That(values[87], Is.EqualTo(80f), "Paint victory defaults to 80% of the whole sphere.");
+            Assert.That(values[87], Is.EqualTo(100f), "Paint victory always requires the whole surface.");
             Assert.That(new[] { values[88], values[89] }, Is.EqualTo(new[] { 20f, 30f }),
                 "The gourd drops a bomb every 20 to 30 seconds by default.");
             Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
@@ -110,7 +110,7 @@ namespace C6Lab.Tests
             values[84] = 0f; // combine sound off
             values[85] = 3f; // Soft
             values[86] = .1f;
-            values[87] = 60f;
+            values[87] = 100f;
             values[88] = 15f;
             values[89] = 25f;
             values[90] = 100f; // fuse sizzle twice the Inspector volume
@@ -122,6 +122,12 @@ namespace C6Lab.Tests
             values[102] = 60f; // 60 up
             values[103] = 25f; // bomb sound half the Inspector volume
             values[104] = 0f; // bomb sound: boom
+            values[105] = 0f; // low paint resolution
+            values[106] = 3f; // initial patch coverage
+            values[107] = 5f; // same-region hit expands its target area
+            values[108] = 8f; // growth per second
+            values[109] = 75f; // frontier fill chance
+            values[110] = 2f; // vertical preference
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MinimapEnabled, Is.False, "DEV can turn the minimap off.");
             Assert.That(config.MinimapSizePercent, Is.EqualTo(80), "DEV sizes the minimap from 0 to 100 with 50 in the middle.");
@@ -137,8 +143,15 @@ namespace C6Lab.Tests
             Assert.That(config.CombineSoundVolume, Is.EqualTo(0f));
             Assert.That(config.CombineHapticStyle, Is.EqualTo(LabHapticStyle.Soft));
             Assert.That(config.CombineHapticIntensity, Is.EqualTo(.1f));
-            Assert.That(config.PaintVictoryPercent, Is.EqualTo(60));
-            Assert.That(config.PaintVictoryCoverage, Is.EqualTo(.6f));
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(100));
+            Assert.That(config.PaintVictoryCoverage, Is.EqualTo(1f));
+            Assert.That(config.PaintSurfaceResolution, Is.Zero);
+            Assert.That(config.PaintInitialPercent, Is.EqualTo(3f));
+            Assert.That(config.PaintRepeatPercent, Is.EqualTo(5f));
+            Assert.That(config.PaintGrowthPercentPerSecond, Is.EqualTo(8f));
+            Assert.That(config.PaintFillChancePercent, Is.EqualTo(75f));
+            Assert.That(config.PaintVerticalWeight, Is.EqualTo(2f));
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "All 111 fields round-trip in wire order.");
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
             Assert.That(config.GenerateCost, Is.EqualTo(5f));
@@ -547,10 +560,10 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void PaintGoalAppendsAfterAllPrevious87FieldsWithoutChangingTheirIndices()
+        public void PaintGrowthAppendsAfterAllPrevious105FieldsWithoutChangingTheirIndices()
         {
-            // Wire-schema fence captured from PR #176 / 119fbd39. These positions also
-            // address saved DEV rows, shared fingerprints and the existing sound/item fields.
+            // Existing rows keep their indices, including the fixed victory goal and the
+            // last sound toggle. The six growth controls must append after this entire prefix.
             string[] previousLabels =
             {
                 "Monster Max HP",
@@ -640,19 +653,38 @@ namespace C6Lab.Tests
                 "Combine Sound Volume (50 = Inspector)",
                 "Combine Haptic Style (0-4)",
                 "Combine Haptic Intensity",
+                "Paint Victory Coverage (%)",
+                "Gourd Bomb Interval Min (seconds, 0 = off)",
+                "Gourd Bomb Interval Max (seconds, 0 = off)",
+                "Fuse Sound Volume (50 = Inspector)",
+                "Drum Stop Near From (% of board from entry)",
+                "Drum Stop Near To / Middle From (%)",
+                "Drum Stop Middle To / Far From (%)",
+                "Drum Stop Far To (%)",
+                "Drum Stop Near Chance (%)",
+                "Drum Stop Middle Chance (%)",
+                "Drum Stop Far Chance (%)",
+                "Drum Pass Through Chance (%)",
+                "Minimap (0 off, 1 on)",
+                "Minimap Size (%, 50 = default)",
+                "Minimap Move X (- left, + right)",
+                "Minimap Move Y (- down, + up)",
+                "Bomb Sound Volume (50 = Inspector)",
+                "Bomb Sound (0 boom, 1 ppeong)"
             };
-            Assert.That(previousLabels.Length, Is.EqualTo(87));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.GreaterThanOrEqualTo(88));
+            Assert.That(previousLabels.Length, Is.EqualTo(105));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(111));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             LabDeveloperField field = LabConfig.DeveloperFields[87];
             Assert.That(field.Label, Is.EqualTo("Paint Victory Coverage (%)"));
-            Assert.That(field.Min, Is.EqualTo(1f));
+            Assert.That(field.Min, Is.EqualTo(100f));
             Assert.That(field.Max, Is.EqualTo(100f));
             Assert.That(field.WholeNumber, Is.True);
-            Assert.That(config.PaintVictoryPercent, Is.EqualTo(80));
-            Assert.That(config.PaintVictoryCoverage, Is.EqualTo(.8f));
-            Assert.That(config.CaptureDeveloperValues()[87], Is.EqualTo(80f));
+            Assert.That(LabConfig.DefaultPaintVictoryPercent, Is.EqualTo(100));
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(100));
+            Assert.That(config.PaintVictoryCoverage, Is.EqualTo(1f));
+            Assert.That(config.CaptureDeveloperValues()[87], Is.EqualTo(100f));
             int[] gourdIndices = null;
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
                 if (category.Title == "Gourd") gourdIndices = category.FieldIndices;
@@ -673,7 +705,7 @@ namespace C6Lab.Tests
             int[] gourdIndices = null;
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
                 if (category.Title == "Gourd") gourdIndices = category.FieldIndices;
-            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87, 88, 89 }));
+            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110 }));
             Assert.That(config.GourdBombIntervalMin, Is.EqualTo(20f));
             Assert.That(config.GourdBombIntervalMax, Is.EqualTo(30f));
 
@@ -691,10 +723,8 @@ namespace C6Lab.Tests
             Assert.That(config.GourdBombIntervalMax, Is.Zero, "A maximum of 0 turns the gourd's bombs off.");
         }
 
-        [TestCase(1)]
-        [TestCase(80)]
         [TestCase(100)]
-        public void ValidPaintGoalsRoundTripWithoutModifyingThePrevious87Values(int percent)
+        public void FixedPaintGoalRoundTripsWithoutModifyingThePrevious87Values(int percent)
         {
             float[] before = config.CaptureDeveloperValues();
             float[] changed = (float[])before.Clone();
@@ -714,6 +744,9 @@ namespace C6Lab.Tests
         }
 
         [TestCase(0f)]
+        [TestCase(1f)]
+        [TestCase(80f)]
+        [TestCase(99f)]
         [TestCase(101f)]
         [TestCase(-1f)]
         [TestCase(80.5f)]
@@ -723,7 +756,6 @@ namespace C6Lab.Tests
         public void InvalidPaintGoalRejectsTheEntireDeveloperForm(float invalid)
         {
             float[] values = config.CaptureDeveloperValues();
-            values[87] = 37f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             float[] baseline = config.CaptureDeveloperValues();
             values[0] = 777f;
@@ -733,7 +765,7 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
             Assert.That(error, Does.Contain("Paint Victory Coverage"));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline), "No earlier field may be partially applied.");
-            Assert.That(config.PaintVictoryPercent, Is.EqualTo(37));
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(100));
             Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
             Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
         }
@@ -748,41 +780,189 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(oldSchema, out string error), Is.False);
             Assert.That(error, Does.Contain("incomplete"));
             Assert.That(config.MonsterMaxHp, Is.EqualTo(1000));
-            Assert.That(config.PaintVictoryPercent, Is.EqualTo(80));
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(100));
             Assert.Throws<System.ArgumentException>(() => LabSessionSettings.Fingerprint(oldSchema, 3, 1));
         }
 
         [Test]
-        public void SharedPaintGoalChangesFingerprintAndSurvivesJsonAndClientConfigRoundTrip()
+        public void SharedPaintGrowthChangesFingerprintAndSurvivesJsonAndClientConfigRoundTrip()
         {
             const ushort fixtureProtocol = 1;
             float[] values = config.CaptureDeveloperValues();
             string first = LabSessionSettings.Fingerprint(values, 3, fixtureProtocol);
-            values[87] = 65f;
+            values[106] = 3.5f;
+            values[107] = 8f;
+            values[108] = 12f;
+            values[109] = 100f;
+            values[110] = 2f;
             string changed = LabSessionSettings.Fingerprint(values, 3, fixtureProtocol);
-            Assert.That(changed, Is.Not.EqualTo(first), "Participants must acknowledge the round's paint goal.");
+            Assert.That(changed, Is.Not.EqualTo(first), "Participants must acknowledge the round's growth settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
             var clientConfig = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
                 Assert.That(clientConfig.TryApplyDeveloperValues(received, out string error), Is.True, error);
-                Assert.That(clientConfig.PaintVictoryPercent, Is.EqualTo(65));
-                Assert.That(clientConfig.PaintVictoryCoverage, Is.EqualTo(.65f));
+                Assert.That(clientConfig.PaintVictoryPercent, Is.EqualTo(100));
+                Assert.That(clientConfig.PaintVictoryCoverage, Is.EqualTo(1f));
+                Assert.That(clientConfig.PaintInitialPercent, Is.EqualTo(3.5f));
+                Assert.That(clientConfig.PaintRepeatPercent, Is.EqualTo(8f));
+                Assert.That(clientConfig.PaintGrowthPercentPerSecond, Is.EqualTo(12f));
+                Assert.That(clientConfig.PaintFillChancePercent, Is.EqualTo(100f));
+                Assert.That(clientConfig.PaintVerticalWeight, Is.EqualTo(2f));
                 Assert.That(clientConfig.CaptureDeveloperValues(), Is.EqualTo(values));
                 Assert.That(LabSessionSettings.Fingerprint(received, 3, fixtureProtocol), Is.EqualTo(changed));
             }
             finally { Object.DestroyImmediate(clientConfig); }
         }
 
-        [TestCase(0, 1)]
+        [TestCase(0, 100)]
+        [TestCase(1, 100)]
+        [TestCase(80, 100)]
+        [TestCase(100, 100)]
         [TestCase(101, 100)]
-        public void InspectorPaintGoalIsClampedToTheSamePercentageRange(int serialized, int expected)
+        public void LegacyInspectorPaintGoalIsNormalizedToFullSurface(int serialized, int expected)
         {
             JsonUtility.FromJsonOverwrite("{\"paintVictoryPercent\":" + serialized + "}", config);
             Assert.That(config.PaintVictoryPercent, Is.EqualTo(expected));
             Assert.That(config.PaintVictoryCoverage, Is.EqualTo(expected / 100f));
             Assert.That(config.CaptureDeveloperValues()[87], Is.EqualTo(expected));
+        }
+
+
+        [Test]
+        public void PaintGrowthControlsAppendWithTheirDefaultsAndBelongToTheGourdCategory()
+        {
+            string[] labels =
+            {
+                "Paint Surface Resolution (0 low 1 medium 2 high)",
+                "Paint Initial Coverage (%)",
+                "Paint Repeat Growth (%)",
+                "Paint Growth Speed (%/s)",
+                "Paint Fill Chance (%)",
+                "Paint Vertical Weight"
+            };
+            for (int i = 0; i < labels.Length; i++)
+                Assert.That(LabConfig.DeveloperFields[105 + i].Label, Is.EqualTo(labels[i]), "Appended index " + (105 + i));
+            Assert.That(config.CaptureDeveloperValues().Skip(105).ToArray(),
+                Is.EqualTo(new[] { 2f, 2f, 4f, 6f, 60f, 1.35f }));
+            Assert.That(LabConfig.DeveloperFields[105].WholeNumber, Is.True);
+            for (int i = 106; i <= 110; i++) Assert.That(LabConfig.DeveloperFields[i].WholeNumber, Is.False);
+            var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
+            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110 }));
+        }
+
+        [TestCase(105, 0f, 2f)]
+        [TestCase(106, .1f, 100f)]
+        [TestCase(107, .1f, 100f)]
+        [TestCase(108, .1f, 100f)]
+        [TestCase(109, 0f, 100f)]
+        [TestCase(110, 1f, 4f)]
+        public void PaintGrowthControlsAcceptBothEndpointsAndRejectInvalidFormsAtomically(int index, float min, float max)
+        {
+            Assert.That(LabConfig.DeveloperFields[index].Min, Is.EqualTo(min));
+            Assert.That(LabConfig.DeveloperFields[index].Max, Is.EqualTo(max));
+            foreach (float endpoint in new[] { min, max })
+            {
+                float[] values = config.CaptureDeveloperValues();
+                values[index] = endpoint;
+                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                Assert.That(config.CaptureDeveloperValues()[index], Is.EqualTo(endpoint));
+            }
+            float[] baseline = config.CaptureDeveloperValues();
+            foreach (float invalid in new[] { min - .1f, max + .1f, float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+            {
+                float[] values = (float[])baseline.Clone();
+                values[0] = 777f;
+                values[index] = invalid;
+                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False);
+                Assert.That(error, Does.Contain(LabConfig.DeveloperFields[index].Label));
+                Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline), "A growth error rejects the whole form.");
+            }
+            if (index == 105)
+            {
+                float[] values = (float[])baseline.Clone();
+                values[105] = .5f;
+                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False);
+                Assert.That(error, Does.Contain("whole number"));
+                Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
+            }
+        }
+
+        [Test]
+        public void EveryPaintGrowthControlChangesTheSharedFingerprint()
+        {
+            const ushort protocol = 1;
+            float[] values = config.CaptureDeveloperValues();
+            string original = LabSessionSettings.Fingerprint(values, 3, protocol);
+            for (int i = 105; i <= 110; i++)
+            {
+                float[] changed = (float[])values.Clone();
+                changed[i] = LabConfig.DeveloperFields[i].Min;
+                Assert.That(LabSessionSettings.Fingerprint(changed, 3, protocol), Is.Not.EqualTo(original),
+                    LabConfig.DeveloperFields[i].Label + " participates in the room settings fingerprint.");
+            }
+        }
+
+        [Test]
+        public void PaintGrowthSettingsReturnsASeparateEffectiveRoundPreset()
+        {
+            LabPaintGrowthSettings captured = config.PaintGrowthSettings;
+            float[] changed = config.CaptureDeveloperValues();
+            changed[105] = 0f;
+            changed[106] = 3.5f;
+            changed[107] = 8f;
+            changed[108] = 12f;
+            changed[109] = 100f;
+            changed[110] = 2f;
+            Assert.That(config.TryApplyDeveloperValues(changed, out string error), Is.True, error);
+            Assert.That(captured.Resolution, Is.EqualTo(2));
+            Assert.That(captured.InitialPercent, Is.EqualTo(2f), "A captured round preset cannot follow later config changes.");
+            Assert.That(captured.RepeatPercent, Is.EqualTo(4f));
+            Assert.That(captured.GrowthPercentPerSecond, Is.EqualTo(6f));
+            Assert.That(captured.FillChancePercent, Is.EqualTo(60f));
+            Assert.That(captured.VerticalWeight, Is.EqualTo(1.35f));
+            LabPaintGrowthSettings nextRound = config.PaintGrowthSettings;
+            Assert.That(nextRound.Resolution, Is.Zero);
+            Assert.That(nextRound.InitialPercent, Is.EqualTo(3.5f));
+            Assert.That(nextRound.RepeatPercent, Is.EqualTo(8f));
+            Assert.That(nextRound.GrowthPercentPerSecond, Is.EqualTo(12f));
+            Assert.That(nextRound.FillChancePercent, Is.EqualTo(100f));
+            Assert.That(nextRound.VerticalWeight, Is.EqualTo(2f));
+        }
+
+        [TestCase(0, 64, 32)]
+        [TestCase(1, 128, 64)]
+        [TestCase(2, 256, 128)]
+        public void PaintSurfaceResolutionSelectsTheCapturedRoundGrid(int resolution, int columns, int rows)
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[105] = resolution;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var surface = new LabPaintSurface(config.PaintGrowthSettings, 42u);
+            Assert.That(surface.Columns, Is.EqualTo(columns));
+            Assert.That(surface.Rows, Is.EqualTo(rows));
+            Assert.That(surface.CellCount, Is.EqualTo(columns * rows));
+            Assert.That(config.CaptureDeveloperValues()[105], Is.EqualTo(resolution));
+        }
+
+        [TestCase(105)]
+        [TestCase(110)]
+        public void OldOrIncompleteGrowthSettingsSchemasAreRejected(int count)
+        {
+            float[] previous = config.CaptureDeveloperValues().Take(count).ToArray();
+            Assert.That(config.TryApplyDeveloperValues(previous, out string error), Is.False);
+            Assert.That(error, Does.Contain("incomplete"));
+            Assert.Throws<System.ArgumentException>(() => LabSessionSettings.Fingerprint(previous, 3, 1));
+        }
+
+        [Test]
+        public void InspectorPaintGrowthValuesUseFiniteClampedSettings()
+        {
+            JsonUtility.FromJsonOverwrite("{\"paintSurfaceResolution\":-1,\"paintInitialPercent\":0,\"paintRepeatPercent\":200,\"paintGrowthPercentPerSecond\":0,\"paintFillChancePercent\":-1,\"paintVerticalWeight\":9}", config);
+            Assert.That(config.CaptureDeveloperValues().Skip(105).ToArray(), Is.EqualTo(new[] { 0f, .1f, 100f, .1f, 0f, 4f }));
+            JsonUtility.FromJsonOverwrite("{\"paintSurfaceResolution\":99,\"paintInitialPercent\":200,\"paintRepeatPercent\":0,\"paintGrowthPercentPerSecond\":200,\"paintFillChancePercent\":200,\"paintVerticalWeight\":0}", config);
+            Assert.That(config.CaptureDeveloperValues().Skip(105).ToArray(), Is.EqualTo(new[] { 2f, 100f, .1f, 100f, 100f, 1f }));
         }
 
 

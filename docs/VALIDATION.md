@@ -649,3 +649,44 @@ Scene 파일을 저장하거나 덮어쓰지 않고 **File → Open Scene으로 
 - `LabJoinRejectionTests`는 거절 사유 분류의 단위 검사이며 실제 구버전 앱 접속 검사가 아니다. Host가 제공한 정원 초과·전투 중·토큰 불일치는 구체적 사유를 표시한다. NGO가 프로토콜 불일치를 사유 없이 끊으면 일반 전송 실패와 완전히 구별할 수 없으므로, 모든 버전 불일치에 구체적 원인이 표시된다고 보장하지 않는다.
 - 새로고침의 캐시 행은 최대 5초 유지하지만 새 주소 확인 전에는 클릭을 막는다. 결과 0개 안내는 검색을 끝내지 않으며, native 검색 오류는 REFRESH로 재시도한다. 정원·전투 상태를 Bonjour TXT로 실시간 광고하는 기능은 추가하지 않았다.
 - Test Runner XML·Editor/Player 로그·검증용 앱·임시 실행 도구는 로컬 증거로 보존하고 공개 Git에 넣지 않는다. 문서의 PASS는 위 환경과 수행 시나리오에만 해당한다. 기존 과거 검증 기록은 그대로 보존한다.
+
+## 박 색칠 인접 성장·100% 고정 목표 — 2026-10-17, 이슈 #187
+
+기준은 main `a6f27ec2`에서 분기한 `feat/#187-gourd-paint-growth`, Unity **6000.6.5f1**, 기본 `Assets/Lab/Scenes/Lab.unity`다. 아래 결과는 이 변경의 최종 소스를 실행한 기록이며, #175·#185 등 과거 버전의 PASS를 승계하지 않는다. Scene 배치는 변경하지 않았고 기존 Crack·로비·북·폭탄·미니맵·음향 경로를 유지했다.
+
+- **설정**: DEV는 105 → **111개**다. 기존 0~104번 인덱스를 보존하고 인덱스 105~110에 해상도·초기 면적·반복 공급량·전역 성장 속도·채움 확률·세로 가중치를 추가했다. **DEMO_TUNING_VALUE** 기본값은 각각 **2(256×128), 2%, 4%, 6%/초, 60%, 1.35**다. 허용 범위는 해상도 정수 0~2(64×32/128×64/256×128), 초기·반복 면적 0.1~100%, 성장 속도 0.1~100%/초, 채움 확률 0~100%, 세로 가중치 1~4다. 기존 인덱스 87 `Paint Victory Coverage (%)`는 이름·위치를 보존하고 **100~100 고정**, 읽기 전용 입력·슬라이더 비활성으로 바꿨다. 옛 에셋의 목표 80은 유효값·Capture에서 100으로 정규화하고, DEV/공유 설정의 100 외 목표는 전체 설정과 함께 거절한다. 단일 `LabConfig.asset`은 Unity에서 목표 100과 성장 기본값을 저장했으며 기존 북 멈춤 구간 등 다른 설정의 유효값을 보존했다.
+- **Host 규칙**: 안 칠한 지점 명중은 초기 면적을 즉시 칠하고, 이미 칠한 지점 명중은 연결 영역에 성장 예산을 공급한다. Host 시간 진행에서 빈 인접 셀을 채우며 여러 영역이 전체 표면 기준 속도를 나눠 쓴다. 병합은 기존 셀 색과 영역별 FIFO 공급 순서를 보존한다. 한 셀을 완성한 마지막 소수 공급 기여자가 그 셀의 색·소유자를 정하고, 최종 셀 공급자가 `lastHit`를 받는다. 제한 시간 전 100%는 Victory, 정확한 deadline 동률은 Defeat다. pause는 성장과 전투 시계를 멈추고 Retry는 캡처 설정을 유지하면서 맵·예산·명중 수·난수 진행을 초기화한다.
+- **통신·표시**: 프로토콜 **5627 → 5628**. Host의 권위 `LabModel.PaintSurface`만 성장 계산을 하며 Host 화면도 Snapshot과 같은 버전의 표시 캐시를 사용한다. Client는 Host의 셀 delta/전체 체크포인트를 별도 수신 맵에 원자적으로 적용하고, 세션·라운드·해상도·Revision·칠한/전체 셀 수·명중 수가 Snapshot과 맞을 때 맵과 HUD를 함께 공개한다. 명중 수만 바뀌면 빈 delta도 발행한다. 수신 중 부분 맵은 공개 표시 캐시로 복사하지 않는다. 기준 맵 누락·손상은 체크포인트로 복구한다. 이 기능은 **계속 연결된 현재 라운드의 부분 맵 복구**이며 연결이 끊긴 뒤 전투에 재접속하는 기능은 아니다.
+
+| 항목 | 상태 | 이번 변경의 실제 근거·남은 확인 |
+| --- | --- | --- |
+| Unity Editor 컴파일·테스트 로드 | PASS | 실행 중인 Unity 6000.6.5f1에서 최종 Runtime·Editor·테스트 코드를 컴파일한 뒤 아래 실제 Test Runner 전체 실행을 완료했다. 앱 빌드·기기 실행 결과와 구분한다. |
+| 최종 EditMode 전체 | PASS | `Logs/Issue187-EditMode.xml`, **2026-10-17 13:42:36Z~13:42:38Z**. `result=Passed`, **total=304, passed=304, failed=0, skipped=0, inconclusive=0**. 설정·Host 모델·성장 표면·전송·HUD 검사와 기존 전체 EditMode를 포함한다. |
+| 최초 PlayMode 실행 | FAIL | 로컬 보존본 `PlayMode-initial.xml`, **13:36:38Z~13:37:41Z**. **total=113, passed=111, failed=2, skipped=0**. `OfflinePreviewCannotLeakIntoConnectedRoundsAndUnapprovedViewCallsAreInert`와 `SavedSoloHostElementHitsReachHpZeroWithoutWinningAndSurviveVisualReinitialization`에서 CPU 맵과 텍스처 RGBA 불일치를 확인했다. 실패 기록을 삭제하거나 최종 결과로 덮어 해석하지 않는다. |
+| 실패 원인·수정 | PASS | 텍스처 업로드 캐시가 Surface/Revision만 비교해 세션·라운드 전환의 같은 Revision에서 이전 미리보기 텍스처가 남았고, 표시 맵 commit 뒤 텍스처 갱신이 다음 프레임까지 늦어졌다. 캐시 키에 세션·라운드를 포함하고 Host/Client commit 경로에서 `RefreshCommittedMap`을 호출했다. 수정 후 중간 PlayMode 113/113을 확인했으며 아래 최종 전체 검사도 다시 실행했다. |
+| 후속 경계 보완 | PASS | 새로 일치한 Snapshot을 공개할 때 이전 `pendingPaintSnapshot`을 정리해 오래된 복구 대기가 남지 않게 했다. 초기 명중 영역의 즉시 병합으로 완성되는 경우에도 이번 공격자 대신 실제 최종 셀의 FIFO 공급자에게 `lastHit`를 부여하도록 바로잡았다. `AnImmediateNewSeedThatMergesUsesTheLastCellsActualSupplyOwner`를 포함한 최종 EditMode 전체가 통과했다. |
+| 최종 PlayMode 전체 | PASS | `Logs/Issue187-PlayMode.xml`, **2026-10-17 13:43:06Z~13:44:11Z**. `result=Passed`, **total=113, passed=113, failed=0, skipped=0, inconclusive=0**. 저장 Scene의 물리·투척·성장·모드·UI 및 기존 PlayMode 전체를 실행했다. |
+| 설정·HUD·표면 경계 | PASS | `LabDeveloperConfigTests` 57개, `LabPaintGoalHudTests` 31개, `LabPaintSurfaceTests` 27개가 최종 EditMode에 포함돼 모두 통과했다. 111개 왕복·지문·이전 105개 라벨/인덱스·6개 범위/해상도·잘못된 목표의 원자적 거절·직렬화 목표 80 정규화, 정수 셀 수의 미완료 100% 표시 방지, 인접 성장·전역 속도·병합/FIFO·소수 공급·이음새/극·동일 지점 반복 100% 도달 등을 검사한다. 이는 기본 수치로 실제 손 투척을 반복한 밸런스 검사가 아니다. |
+| Host 모델·시간·최종 기여자 | PASS | 최종 `LabModelTests` 74개에 100% 공동 승리·진단 HP 0 이후 진행·지연 Tick·deadline 동률 Defeat·성장 예산의 최종 공급자·즉시 병합 시 lastHit·설정/팔레트 캡처·pause/Retry 검사가 포함돼 모두 통과했다. 모델 시간 fixture와 실제 물리 충돌은 별도 범위다. |
+| 전송 단위 fixture·맵 복구 | PASS | `LabPaintReplicationTests` **46/46**. 저/중/고 해상도 전체 맵 3/11/43조각, 순서 교란·부분/완료 중복·단계별 원자성·delta·명중 수만 바뀐 빈 delta·기준 Revision 누락 후 체크포인트 복구·stale session/round/epoch/sequence·잘못된 헤더/payload/알파/해시/셀 ID·크기 제한·Snapshot 메타데이터 일치를 검사했다. 조각당 base64 최대 4,096자·수신 최대 64조각·32 KiB 패킷 한도, 최대 해상도 전체 맵 131,072바이트/base64 174,764자/43조각을 확인한다. **가짜 패킷을 직접 전달한 단위 fixture이며 실제 NGO/UTP 통신 성공 증거가 아니다.** |
+| 저장 Scene의 실제 Host 충돌·성장·pause·Retry | PASS | `FixedHundredPercentGoalGrowsFromRepeatedRealHitsFreezesOnPauseAndResetsOnRetry`: 저장 DEV 폼 → 실제 솔로 시작 → 상자 더블 탭 → Combined 보드 투척 → 실제 Sphere/원통 충돌 2회로 진행했다. 첫 50% 초기 면적 뒤 반복 명중은 즉시 재색칠하지 않고 성장 예산을 남긴다. 두 번째 명중 승인 직후 pause해 0.75초 동안 맵·Revision·남은 시간·플레이 시간이 고정됨을 확인하고 재개 후 추가 명중 없이 100% Victory·GOAL/Fill·결과 표시를 확인했다. Retry 후 같은 과정을 다시 통과하고 DEV 재시작의 맵 초기화도 확인했다. |
+| 진단 HP 0·표현 재초기화·Crack 회귀 | PASS | 실제 Host 충돌 2회로 HP40→20→0 뒤에도 100% 미달이면 Playing을 유지하며, 표현 비활성 중 명중과 재활성 뒤 같은 맵/텍스처 복원을 확인했다. 연결 중 직접 `Paint`/`ClearPaint`/미리보기 호출은 권위 상태를 바꾸지 않는다. 기존 Crack HP 승리·마무리·Retry와 모드 전환 검사는 최종 PlayMode 전체에서 통과했다. |
+| CPU 맵·텍스처 데이터 일치 | PASS | PlayMode에서 공개 표시 캐시의 `Color32` 배열과 `PaintTexture.GetPixels32()`·크기·MPB 텍스처 연결을 직접 비교했다. 세션/라운드 전환과 commit 직후 갱신도 포함한다. 자동 카메라 캡처 파일 생성과 이 데이터 검사를 전체 Game View·실기기 화면의 육안 확인으로 해석하지 않는다. |
+| Scene·설정 원본·사용자 수정 보존 | PASS | 기본 `Lab.unity`는 기준 main과 차이가 없다. `LabConfig.asset`만 Unity에서 고정 목표·성장 기본값을 저장했고 Scene UI 배치를 바꾸지 않았다. 작업 전부터 있던 `Target2_Binding.mat`·`Target2_Fracture.mat` 사용자 변경과 기존 미추적 폴더를 보존하며 이번 작업의 커밋 대상에서 제외한다. |
+| Mac 검증용 Development 앱 빌드 | PASS | `Builds/Lab/20261017-224614-ff4cf144/macOS/`의 검증용 앱, **318,244,816바이트**. 실제 통신 검사를 위한 임시 Runtime/Editor 도구를 포함한 빌드이며, 도구 제거 후 최종 일반 빌드와 구분한다. |
+| 실제 Mac 2프로세스·공유 설정·진단 HP 0 | PASS | **13:47:14Z~13:47:25Z**, 같은 Mac의 독립 Host/Client가 **127.0.0.1:17987**의 실제 NGO/UTP로 연결해 설정 ACK 후 시작했다. 64×32·초기2%/반복4%/성장6%/초·HP1·고정 목표100% fixture에서 Client의 실제 보드 투척 2회가 Host 충돌로 승인됐다. HP0·Playing·명중2·**42/2,048셀**인 상태에서 공동 pause 후 양쪽의 세션·Revision·셀/명중 수와 CPU 맵/재활성 텍스처 SHA-256이 같았다. Client Renderer 비활성 중에도 수신 캐시가 유지되고 재활성 뒤 같은 맵을 올렸다. 자동 단위 패킷 fixture와 구분한 실제 전송 검사이며 핫스팟 검사가 아니다. |
+| 실제 Mac 공동 DEV 재시작·성장 Victory | PASS | 같은 연결의 Host가 초기50%/반복50%/성장100%/초로 DEV 재시작하고 Client 확인 후 새 세션의 빈 맵으로 시작했다. 실제 첫 충돌은 **1,024/2,048셀·Playing**, 반복 명중 뒤 시간 성장으로 **2,048/2,048셀·Victory**가 됐다. 양쪽 `sameVersion=true`, 같은 세션·Revision2050·명중2·Snapshot 메타데이터와 같은 맵/텍스처 SHA-256을 기록했다. 목표는 전 과정 100%이며 낮추지 않았다. |
+| 실제 Mac 같은 방 로비·Crack 회귀 | PASS | 같은 두 참가자의 연결을 유지한 채 로비로 돌아가고, 공유 설정으로 Crack/HP20을 확인한 뒤 시작했다. Client의 실제 충돌 1회로 양쪽 HP0/Victory, 색칠0을 확인했다. 로컬 `network-host.jsonl`·`network-client.jsonl`은 각각 10개 체크포인트가 모두 `pass=true`이고 최종 `final`을 기록했다. 검사 완료 뒤 두 앱을 일반 종료했으며 두 실행 세션 모두 종료 코드 0을 확인했다. 자동 검증의 체크포인트 완료와 앱 종료를 구분해 확인했다. |
+| 임시 도구 제거 후 최종 일반 Mac 앱 빌드 | PASS | 검증용 Runtime/Editor 스크립트 2개와 `.meta`를 프로젝트에서 제거하고 에셋 Refresh·재컴파일 뒤 GUI 메뉴로 새 빌드를 생성했다. `C6_LAB_BUILD_OK target=StandaloneOSX`, `Builds/Lab/20261017-225010-2b73db59/macOS/C6_Physics_Lab.app`, **318,211,875바이트**. 임시 메뉴가 사라진 것을 확인했으며 최종 앱 어셈블리에 `Issue187NetworkHarness`가 없다. 이 일반 빌드를 다시 두 앱으로 연결한 검사는 미실행이다. |
+| iOS Xcode 출력·앱 빌드·서명·설치·실행 | NOT_RUN | 이번 변경에서 실행하지 않았다. 각 단계를 독립적으로 확인해야 한다. |
+| 핫스팟·서로 다른 기기·3~5인·구버전 혼용·불량 네트워크 | NOT_RUN | 실제 로컬 네트워크 권한·핫스팟·기기 간 전송, 3~5명 동시 플레이·새/구버전 앱의 실제 거절은 실행하지 않았다. 실제 전송에서 조각을 의도적으로 잃거나 순서를 바꿔 체크포인트 복구시키는 검사도 이번 2프로세스 시나리오에는 포함하지 않았다. |
+| 기기 성능·장시간 실행·소리·진동 | NOT_RUN | 최대 해상도·분할 전송의 실기기 프레임 시간/메모리/발열과 장시간 플레이, 실제 청취·진동은 확인하지 않았다. API·데이터 검사는 이를 대신하지 않는다. |
+| 기본 수치·일반 손 투척의 100% 난이도 | NOT_RUN | 기본 초기 2%·반복 4%·성장 6%/초·180초·음양 50/50과 실제 조준으로 100%에 도달하는 시간·난이도는 별도 플레이가 필요하다. 짧은 DEV 충돌 fixture와 규칙 검사로 기본 밸런스 PASS를 주장하지 않는다. |
+
+### Fixture와 증거의 범위
+
+실제 충돌 PlayMode는 **명시적 DEV fixture**다. 목표는 낮추지 않고 100%를 유지했으며, 64×32 해상도·HP40/피해20·30초 판·생성 비용1·SecretBox100%·잠금0·생성/북 이동0·박 폭탄 끔과 고정 투척값으로 재현했다. HP 0 이후 계속 진행 검사는 초기 2%, 성장 승리 검사는 초기50%·반복50%·성장100%/초·채움100%로 짧게 실행했다. 각 발 전 매달림을 정지시키므로 연속 흔들림 중 수동 조준 난이도를 측정한 검사는 아니다. 일반 `LabConfig.asset`의 기본 성장값과 이 fixture를 구분한다.
+
+실제 Mac 2프로세스도 **검증용 입력 도구와 튜닝 fixture**를 사용했다. 첫 판은 저해상도·HP1·초기2%/반복4%/성장6%/초, 둘째 판은 목표100%를 유지한 초기50%/반복50%/성장100%/초, Crack은 HP20이다. 임시 도구는 공개 보드/네트워크 경로로 생성·상자 사용·손동작 투척을 요청했고 Host의 실제 물리 충돌로 결과를 만들었다. 맵·모델 직접 주입이나 파일을 이용한 게임 진행 동기화로 전송 검사를 대신하지 않았다. localhost 두 프로세스의 맵/텍스처 데이터 일치와 일반 수동 플레이·실제 기기·핫스팟의 결과는 구분한다.
+
+최종 전체 XML은 `Logs/Issue187-EditMode.xml`·`Logs/Issue187-PlayMode.xml`이다. 최초 실패와 중간 수정 확인 XML도 로컬 보존본으로 구분한다. `Library/Issue187Captures/`의 카메라 캡처는 자동 검사 산출물이며, 관찰 범위를 따로 기록하지 않은 시각 결과에 PASS를 부여하지 않는다. 원시 XML·Editor/Player 로그·앱·임시 실행기와 JSONL은 로컬 증거로 보존하고 공개 Git에 넣지 않는다. 두 Mac 프로세스의 JSONL은 독립적으로 수집해 비교했고 일반 종료 코드 0을 확인했다. 도구 제거 후 최종 일반 빌드는 해당 행에서 별도로 기록한다. 실행되지 않은 NOT_RUN 행을 이전 검사로 PASS로 변경하지 않는다.
