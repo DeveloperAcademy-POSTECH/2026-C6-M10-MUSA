@@ -1153,6 +1153,103 @@ namespace C6Lab.Tests
             finally { UnityEngine.Object.DestroyImmediate(bombs); }
         }
 
+        [Test]
+        public void DrumHandoffDrawsAStopSpotFromTheEntryEdgeOrAPassByTheConfiguredChances()
+        {
+            var ids = new ulong[] { 10, 20, 30 };
+            var room = new LabModel();
+            room.Begin("drum-zones", ids, 0d, config);
+            LabOrbState drum = room.Snapshot(0d).drums.First(candidate => candidate.owner == 10);
+            Assert.That(drum.arrival, Is.EqualTo(LabDrumArrival.None), "A drum placed at the start has no arrival.");
+
+            var zones = new int[4];
+            var arrivals = new List<LabDrumArrival>();
+            for (int pass = 1; pass <= 400; pass++)
+            {
+                double at = pass * .01d;
+                LabOrbState passed = PassRight(room, drum.id, ids[(pass - 1) % ids.Length], at);
+                arrivals.Add(passed.arrival);
+                Assert.That(passed.arrivedAt, Is.EqualTo(at), "The arrival is stamped with the handoff time.");
+                if (passed.arrival == LabDrumArrival.Pass)
+                {
+                    Assert.That(passed.stopAt, Is.EqualTo(-1f));
+                    zones[3]++;
+                    continue;
+                }
+                Assert.That(passed.arrival, Is.EqualTo(LabDrumArrival.Stop));
+                Assert.That(passed.stopAt, Is.InRange(.2f, .8f), "It stops 20-80% of the board in from its entry edge.");
+                zones[passed.stopAt < .4f ? 0 : passed.stopAt < .6f ? 1 : 2]++;
+            }
+            // 400 handoffs at 40/35/15/10 percent: expected 160, 140, 60 and 40.
+            Assert.That(zones[0], Is.InRange(125, 195), "near");
+            Assert.That(zones[1], Is.InRange(105, 175), "middle");
+            Assert.That(zones[2], Is.InRange(35, 85), "far");
+            Assert.That(zones[3], Is.InRange(20, 60), "pass");
+            LabOrbState seen = room.Snapshot(5d).drums.Single(candidate => candidate.id == drum.id);
+            Assert.That(seen.arrival, Is.EqualTo(arrivals[arrivals.Count - 1]), "Every screen sees the Host's draw.");
+            Assert.That(seen.JustArrived(4d + .5d), Is.True);
+            Assert.That(seen.JustArrived(4d + LabOrbState.ArrivalWindowSeconds + .1d), Is.False,
+                "A screen that sees the handoff late does not replay the arrival.");
+
+            // The same room and round always draw the same arrivals.
+            var again = new LabModel();
+            again.Begin("drum-zones", ids, 0d, config);
+            LabOrbState twin = again.Snapshot(0d).drums.First(candidate => candidate.owner == 10);
+            for (int pass = 1; pass <= 50; pass++)
+                Assert.That(PassRight(again, twin.id, ids[(pass - 1) % ids.Length], pass * .01d).arrival,
+                    Is.EqualTo(arrivals[pass - 1]), "Handoff " + pass);
+        }
+
+        [Test]
+        public void APassingDrumStopsNearOnTheNextBoardABlastFlungDrumCoastsAndOrbsHaveNoArrival()
+        {
+            var passes = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                float[] values = passes.CaptureDeveloperValues();
+                values[95] = 0f; values[96] = 0f; values[97] = 0f; values[98] = 100f; // every swipe passes through
+                Assert.That(passes.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("drum-pass", new ulong[] { 10, 20, 30 }, 0d, passes);
+                LabOrbState drum = room.Snapshot(0d).drums.First(candidate => candidate.owner == 10);
+
+                LabOrbState first = PassRight(room, drum.id, 10, .1d);
+                Assert.That(first.arrival, Is.EqualTo(LabDrumArrival.Pass));
+                Assert.That(first.stopAt, Is.EqualTo(-1f));
+
+                // It runs on across player 20's board and crosses again: it must stop near on player 30's.
+                LabOrbState onward = Cross(room, drum.id, 20, .2d, LabEdgeCrossingKind.Passing);
+                Assert.That(onward.owner, Is.EqualTo(30ul));
+                Assert.That(onward.arrival, Is.EqualTo(LabDrumArrival.Stop));
+                Assert.That(onward.stopAt, Is.InRange(.2f, .4f), "A drum that passed through stops on the near side next.");
+
+                // Claiming to pass on without having arrived as a pass is an ordinary swipe (100% pass here).
+                Assert.That(Cross(room, drum.id, 30, .3d, LabEdgeCrossingKind.Passing).arrival, Is.EqualTo(LabDrumArrival.Pass));
+
+                // A drum a blast flung across slides on its own speed but stops inside, by the far zone's end.
+                LabOrbState flung = Cross(room, drum.id, 10, .4d, LabEdgeCrossingKind.Pushed);
+                Assert.That(flung.owner, Is.EqualTo(20ul));
+                Assert.That(flung.arrival, Is.EqualTo(LabDrumArrival.Coast));
+                Assert.That(flung.stopAt, Is.EqualTo(.8f).Within(1e-6f));
+
+                // Orbs keep their old handoff and never get an arrival.
+                Assert.That(room.TryGenerate(20, "orb", .5d, out var orb, out string reason), Is.True, reason);
+                LabOrbState sent = PassRight(room, orb.id, 20, .6d);
+                Assert.That(sent.arrival, Is.EqualTo(LabDrumArrival.None));
+                Assert.That(sent.stopAt, Is.EqualTo(-1f));
+                Assert.That(sent.arrivedAt, Is.EqualTo(-1d));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(passes); }
+        }
+
+        private static LabOrbState Cross(LabModel room, string id, ulong holder, double at, LabEdgeCrossingKind crossing)
+        {
+            Assert.That(room.TryUpdateMotion(holder, id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
+            Assert.That(room.TryTransfer(holder, id, true, .5f, Vector2.right, "cross-" + id + "-" + at, at, crossing,
+                out var passed, out var reason), Is.True, reason);
+            return passed;
+        }
+
         private static LabOrbState PassRight(LabModel room, string id, ulong holder, double at)
         {
             Assert.That(room.TryUpdateMotion(holder, id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);

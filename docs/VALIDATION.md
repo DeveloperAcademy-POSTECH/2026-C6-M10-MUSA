@@ -600,3 +600,26 @@ Scene 파일을 저장하거나 덮어쓰지 않고 **File → Open Scene으로 
   - 변경: `LockedItemMovesLikeAnyOrbAndItsBadgeFollowsTheHostCount`(물약으로), #167의 `ALockedBombFlashesRedInItsLastSecondsFasterAsItRunsOut` → `ABombFlashesRedInItsLastSecondsFasterAsItRunsOut`
 - **PlayMode** `LabGourdAlertTests`(새 파일): `TheAlertPopsAnExclamationBubbleBesideTheGourdFollowsItAndLeavesByItself`
 - **PlayMode** `LabDeveloperSoloIntegrationTests`: `SavedSceneSoloGourdBombWarnsThenFallsOntoTheLocalBoard`(저장 Scene에서 실제 Host 신호 → 경고·낙하·말풍선 → 착지). 구슬 수를 세는 기존 저장 Scene 검사와 `LabGourdPaintTests`·`LabGourdCrackTests` fixture는 박 폭탄을 끈다.
+
+## 북 멈춤 구간 — 2026-10-17, 이슈 #178
+
+기준은 Unity **6000.6.5f1**, main(`54cdc1d9`, #177 PR #179 포함)에서 분기한 `feat/#178-drum-stop-zones`다.
+
+- **규칙**: 북을 넘길 때마다 Host가 받는 판의 도착 방식을 정해 북 상태(`arrival`·`stopAt`·`arrivedAt`)에 담는다. 스와이프는 들어온 가장자리에서 판 폭 20~40%·40~60%·60~80% 구간(40·35·15%)의 한 지점에 멈추거나 그다음 사람에게 통과(10%). 앞 판을 통과해 온 북은 가까운 쪽 구간, 폭탄 충격파로 넘어온 북은 제 속도로 미끄러지되 80% 안에서 멈춘다. 뽑기는 seed와 넘김 순번으로 정해진다. 일반 구슬의 전달은 바뀌지 않는다.
+- **받는 화면**: 들어온 속도를 이어받아 남은 거리만큼만 감속해 지점에 선다(감속 상한 8 판 폭/초², 최대 1.2초). 통과면 최소 0.9 판 폭/초로 반대편까지 가며 Host에 "통과 중"으로 알린다. 폭발로 민 북은 느려져 떠돌기로 돌아가기 전까지 "폭발"로 알린다. 잡기·폭발·전달 거절이 도착을 끝낸다. 1초가 지난 전달(재접속 등)은 다시 적용하지 않는다.
+- **설정·통신**: DEV 91 → 99개(인덱스 91~94 경계, 95~98 확률, 순서·합 100 검사). `transfer` 패킷에 넘김 이유(`crossing`)를 더했다. 통신 버전 `5623` → `5624`.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다 컴파일했다. 오류 0. |
+| 도착 감속 계산 | 확인 (Unity 밖) | 같은 식을 물리 단계 0.02초로 시뮬레이션해 들어온 속도 0.05~8 판 폭/초·목표 20~80% 모두 목표의 0.5% 안에서 1.2초 이내 정지를 확인했다. Unity 실행 결과가 아니다. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN (최종 기록 없음) | 중간 실행에서 #177의 기존 검사 2건이 실패했다: 폭탄 남은 초 글자색 정확 비교(TextMesh 8비트 색) → `Color32` 비교로, 폭탄 깜빡임 0.6초 고정 관찰(느린 프레임에서 놓침) → 최대 2초·조건 충족 시 종료로 고쳤다. 박 말풍선 검사도 같은 이유로 프레임 속도와 무관하게 바꿨다. 수정 뒤 전체 재실행 결과는 기록하지 않았다. 같은 실행에서 Unity의 `_AdditionalShadowParams … Restart Unity` 렌더링 경고가 반복됐다(테스트 코드와 무관, Editor 재시작으로 해소). |
+| 3인 실행: 멈추는 자리의 변화·통과 체감·폭발로 넘어간 북 | NOT_RUN | 솔로에는 이웃이 없어 확인할 수 없다. Mac 앱 3개에서 같은 힘으로 여러 번 넘겨 자리가 달라지는지, 통과가 가끔(약 10%) 나오고 그다음 판 가까운 쪽에 서는지, 폭발로 넘어간 북이 받은 판 안에서 서는지 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 손가락 스와이프 세기에 따른 체감 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `DrumHandoffDrawsAStopSpotFromTheEntryEdgeOrAPassByTheConfiguredChances`(400회 분포·구간·같은 방 같은 결과·1초 창), `APassingDrumStopsNearOnTheNextBoardABlastFlungDrumCoastsAndOrbsHaveNoArrival`
+- **EditMode** `LabDeveloperConfigTests`: DEV 99개·기본값, `DrumStopZonesAreAppendedToTheDrumCategoryAndRejectBadOrderOrTotals`
+- **EditMode** `LabSessionSettingsTests`: 북 도착 정보의 스냅샷 JSON 왕복
+- **PlayMode** `LabOrbPhysicsTests`: `AHandedOnDrumComesToRestOnTheHostsSpotWhateverSpeedItCameInWith`, `APassingDrumRunsOnToTheNextPlayerAndSaysItIsPassing`, `GrabbingOrBlastingAnArrivingDrumHandsItBackToPhysics`, `ADrumABlastFlungInSlidesOnItsOwnSpeedButStopsInsideTheBoard`, `GrabbingABlastFlungDrumMakesItsNextCrossingAnOrdinarySwipe`; 변경 `AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour`(넘김 이유 확인), `ABombWithArtDrawsTheCartoonBombWithItsRedSecondsAndASparkingFuse`·`ABombFlashesRedInItsLastSecondsFasterAsItRunsOut`(위 실패 수정)
+- **PlayMode** `LabGourdAlertTests`: 프레임 속도와 무관하게 보완

@@ -17,8 +17,12 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(91));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(99));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
+            Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
+                "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
+            Assert.That(new[] { values[95], values[96], values[97], values[98] }, Is.EqualTo(new[] { 40f, 35f, 15f, 10f }),
+                "Near, middle, far and pass-through chances.");
             Assert.That(values[87], Is.EqualTo(80f), "Paint victory defaults to 80% of the whole sphere.");
             Assert.That(new[] { values[88], values[89] }, Is.EqualTo(new[] { 20f, 30f }),
                 "The gourd drops a bomb every 20 to 30 seconds by default.");
@@ -103,8 +107,12 @@ namespace C6Lab.Tests
             values[88] = 15f;
             values[89] = 25f;
             values[90] = 100f; // fuse sizzle twice the Inspector volume
+            values[91] = 10f; values[92] = 30f; values[93] = 50f; values[94] = 90f; // drum stop zone edges
+            values[95] = 25f; values[96] = 25f; values[97] = 25f; values[98] = 25f; // drum stop chances
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.FuseSoundVolume, Is.EqualTo(1f).Within(1e-5f), "100 doubles the Inspector fuse volume (0.5).");
+            Assert.That(config.DrumStopBounds(), Is.EqualTo(new[] { .1f, .3f, .5f, .9f }).Within(1e-6f));
+            Assert.That(config.DrumStopChances(), Is.EqualTo(new[] { 25, 25, 25, 25 }));
             Assert.That(config.GourdBombIntervalMin, Is.EqualTo(15f));
             Assert.That(config.GourdBombIntervalMax, Is.EqualTo(25f));
             Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
@@ -167,6 +175,54 @@ namespace C6Lab.Tests
             Assert.That(saved.StaminaRecoverySeconds, Is.EqualTo(1.7f),
                 "A drained bar refills in about one lap of the drum around three players.");
             Assert.That(saved.HitRecovery, Is.EqualTo(10f), "A hit returns half an orb.");
+        }
+
+        [Test]
+        public void DrumStopZonesAreAppendedToTheDrumCategoryAndRejectBadOrderOrTotals()
+        {
+            string[] labels =
+            {
+                "Drum Stop Near From (% of board from entry)",
+                "Drum Stop Near To / Middle From (%)",
+                "Drum Stop Middle To / Far From (%)",
+                "Drum Stop Far To (%)",
+                "Drum Stop Near Chance (%)",
+                "Drum Stop Middle Chance (%)",
+                "Drum Stop Far Chance (%)",
+                "Drum Pass Through Chance (%)"
+            };
+            for (int i = 0; i < labels.Length; i++)
+            {
+                LabDeveloperField field = LabConfig.DeveloperFields[91 + i];
+                Assert.That(field.Label, Is.EqualTo(labels[i]));
+                Assert.That(field.Min, Is.EqualTo(0f));
+                Assert.That(field.Max, Is.EqualTo(100f));
+                Assert.That(field.WholeNumber, Is.True);
+            }
+            int[] drumIndices = null;
+            foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
+                if (category.Title == "Drum") drumIndices = category.FieldIndices;
+            Assert.That(drumIndices, Is.EqualTo(new[] { 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98 }));
+            Assert.That(config.DrumStopBounds(), Is.EqualTo(new[] { .2f, .4f, .6f, .8f }).Within(1e-6f));
+            Assert.That(config.DrumStopChances(), Is.EqualTo(new[] { 40, 35, 15, 10 }));
+
+            float[] values = config.CaptureDeveloperValues();
+            values[0] = 777f;
+            values[92] = 70f; // near ends after middle ends
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False);
+            Assert.That(error, Does.Contain("Drum stop zone"));
+            Assert.That(config.MonsterMaxHp, Is.EqualTo(1000), "A rejected form must not partially apply.");
+
+            values[92] = 40f;
+            values[98] = 11f; // total 101
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
+            Assert.That(error, Does.Contain("Drum stop chances"));
+            Assert.That(config.DrumStopChances(), Is.EqualTo(new[] { 40, 35, 15, 10 }));
+
+            // A hand-edited Inspector array that does not make sense falls back to the defaults.
+            JsonUtility.FromJsonOverwrite("{\"drumStopBounds\":[60,40,20,10],\"drumStopChances\":[50,50,50,50]}", config);
+            Assert.That(config.DrumStopBounds(), Is.EqualTo(new[] { .2f, .4f, .6f, .8f }).Within(1e-6f));
+            Assert.That(config.DrumStopChances(), Is.EqualTo(new[] { 40, 35, 15, 10 }));
         }
 
         [Test]

@@ -170,7 +170,8 @@ namespace C6Lab.Tests
                 round = 1, phase = LabPhase.Playing, hp = 100000, remaining = 180d,
                 targetYawDegrees = 475.25f, targetYawSpeedDegreesPerSecond = -320.5f,
                 players = players, orbs = orbs,
-                drums = new[] { new LabOrbState { id = "drum", owner = 3ul, kind = LabOrbKind.Drum, x = .5f, y = .5f } } };
+                drums = new[] { new LabOrbState { id = "drum", owner = 3ul, kind = LabOrbKind.Drum, x = .5f, y = .5f,
+                    arrival = LabDrumArrival.Stop, stopAt = .37f, arrivedAt = 12345.5d } } };
             string[] chunks = LabSessionSettings.ChunkSnapshot(snapshot);
             Assert.That(chunks.Length, Is.GreaterThan(1));
             foreach (string chunk in chunks)
@@ -191,6 +192,10 @@ namespace C6Lab.Tests
             Assert.That(restored.orbs[0].unlockedAt, Is.EqualTo(-1d));
             Assert.That(restored.drums.Single().kind, Is.EqualTo(LabOrbKind.Drum), "Drums reach every screen.");
             Assert.That(restored.drums.Single().owner, Is.EqualTo(3ul));
+            Assert.That(restored.drums.Single().arrival, Is.EqualTo(LabDrumArrival.Stop), "How a handed-on drum arrives reaches every screen.");
+            Assert.That(restored.drums.Single().stopAt, Is.EqualTo(.37f));
+            Assert.That(restored.drums.Single().arrivedAt, Is.EqualTo(12345.5d));
+            Assert.That(restored.orbs[0].arrival, Is.EqualTo(LabDrumArrival.None));
             Assert.That(restored.targetYawDegrees, Is.EqualTo(475.25f));
             Assert.That(restored.targetYawSpeedDegreesPerSecond, Is.EqualTo(-320.5f));
         }

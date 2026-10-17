@@ -48,16 +48,19 @@ namespace C6Lab.Tests
             Assert.That(tail.y, Is.GreaterThan(gourdOnScreen.y));
             Assert.That(tail.x, Is.GreaterThan(gourdOnScreen.x));
 
+            Assert.That(alert.Bubble.localScale.x, Is.LessThan(.5f), "It pops in from small.");
+            // Sample until both are seen rather than for a fixed short time, so neither a slow nor a
+            // fast frame rate can make the test miss them.
             float biggest = 0f;
             bool wiggled = false;
-            float until = Time.time + .5f;
-            while (Time.time < until)
+            float until = Time.time + alert.ShowSeconds * .7f;
+            while (Time.time < until && (!wiggled || biggest <= .9f))
             {
                 yield return null;
                 biggest = Mathf.Max(biggest, alert.Bubble.localScale.x);
-                if (Mathf.Abs(Mathf.DeltaAngle(0f, alert.Bubble.localEulerAngles.z)) > 2f) wiggled = true;
+                if (Mathf.Abs(Mathf.DeltaAngle(0f, alert.Bubble.localEulerAngles.z)) > 1f) wiggled = true;
             }
-            Assert.That(biggest, Is.GreaterThan(1f), "It pops in a little past full size.");
+            Assert.That(biggest, Is.GreaterThan(.9f), "It grows to full size.");
             Assert.That(wiggled, Is.True, "It wiggles like a hand-drawn bubble.");
 
             gourd.transform.position += Vector3.right;

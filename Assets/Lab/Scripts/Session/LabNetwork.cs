@@ -34,6 +34,8 @@ namespace C6Lab
         public long requestId;
         public string firstId;
         public string secondId;
+        /// <summary>Why a transferred body crossed its edge (LabEdgeCrossingKind).</summary>
+        public int crossing;
         public uint round;
         public int damage;
         public int impactValue;
@@ -156,7 +158,7 @@ namespace C6Lab
         // shared config and the Host tells the combiner when a combine is approved; older clients
         // cannot share this room. Version 5621 adds the Paint goal setting and independent
         // approved impact values/directions/colors.
-        internal const ushort LabProtocolVersion = 5623;
+        internal const ushort LabProtocolVersion = 5624;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
@@ -1364,7 +1366,8 @@ namespace C6Lab
                         new Vector2(packet.vx, packet.vy), out result, out reason);
                     break;
                 case "transfer":
-                    accepted = model.TryTransfer(sender, packet.firstId, packet.right, packet.y, new Vector2(packet.vx, packet.vy), uniqueRequestId, now, out result, out reason);
+                    accepted = model.TryTransfer(sender, packet.firstId, packet.right, packet.y, new Vector2(packet.vx, packet.vy), uniqueRequestId, now,
+                        (LabEdgeCrossingKind)Mathf.Clamp(packet.crossing, 0, (int)LabEdgeCrossingKind.Pushed), out result, out reason);
                     break;
                 case "launch":
                     Vector2 swipe = new Vector2(packet.vx, packet.vy);
@@ -1520,7 +1523,10 @@ namespace C6Lab
             {
                 if (drum.owner != LocalPlayerId) continue;
                 current.Add(drum.id);
-                board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy));
+                // A drum just handed to this player arrives the way the Host drew it (#178); an older
+                // handoff, seen late after a reconnect, is not replayed.
+                board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy),
+                    arrival: drum.JustArrived(latest.serverTime) ? drum.arrival : LabDrumArrival.None, stopAt: drum.stopAt);
             }
             foreach (string id in visibleOrbIds) if (!current.Contains(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
@@ -1540,7 +1546,8 @@ namespace C6Lab
             board.SetOrbLocked(edge.OrbId, true);
             // The Host must receive the boundary sample before the ownership request.
             Request(new LabNetworkPacket { type = "motion", firstId = edge.OrbId, x = edge.ToRight ? 1f : 0f, y = edge.Height01, vx = edge.VelocityInBoardWidthsPerSecond.x, vy = edge.VelocityInBoardWidthsPerSecond.y });
-            Request(new LabNetworkPacket { type = "transfer", requestId = ++requestSequence, firstId = edge.OrbId, right = edge.ToRight, y = edge.Height01, vx = edge.VelocityInBoardWidthsPerSecond.x, vy = edge.VelocityInBoardWidthsPerSecond.y });
+            Request(new LabNetworkPacket { type = "transfer", requestId = ++requestSequence, firstId = edge.OrbId, right = edge.ToRight, y = edge.Height01, vx = edge.VelocityInBoardWidthsPerSecond.x, vy = edge.VelocityInBoardWidthsPerSecond.y,
+                crossing = (int)edge.Kind });
         }
 
         private void OnCombineRequested(string firstId, string secondId, Vector2 center, Vector2 velocity)

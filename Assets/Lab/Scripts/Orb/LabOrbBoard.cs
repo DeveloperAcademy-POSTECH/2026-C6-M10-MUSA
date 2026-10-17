@@ -13,13 +13,17 @@ namespace C6Lab
         public bool ToRight { get; }
         public float Height01 { get; }
         public Vector2 VelocityInBoardWidthsPerSecond { get; }
+        /// <summary>Why it crossed: a player's swipe, a drum passing on, or a bomb blast.</summary>
+        public LabEdgeCrossingKind Kind { get; }
 
-        public LabOrbEdgeCrossing(string orbId, bool toRight, float height01, Vector2 velocity)
+        public LabOrbEdgeCrossing(string orbId, bool toRight, float height01, Vector2 velocity,
+            LabEdgeCrossingKind kind = LabEdgeCrossingKind.Swipe)
         {
             OrbId = orbId;
             ToRight = toRight;
             Height01 = height01;
             VelocityInBoardWidthsPerSecond = velocity;
+            Kind = kind;
         }
     }
 
@@ -57,6 +61,14 @@ namespace C6Lab
             public bool EdgePending;
             /// <summary>A gourd bomb still falling onto this board; it cannot be touched until it lands.</summary>
             public bool Dropping;
+            /// <summary>How a drum handed to this board is still arriving (#178); None once it is the player's.</summary>
+            public LabDrumArrival Arrival;
+            /// <summary>+1 when the arriving drum came in from the left and travels right, -1 the other way.</summary>
+            public float ArrivalDirection;
+            /// <summary>World x where an arriving drum comes to rest (Stop), or the farthest it may slide (Coast).</summary>
+            public float ArrivalStopX;
+            /// <summary>A drum a bomb blast flung, until it slows to its drift; crossing now says so to the Host.</summary>
+            public bool Blasted;
             public string PendingPartnerId;
             public LabOrbEdgeCrossing PendingEdge;
             public Vector2 PressVelocity;
@@ -86,6 +98,15 @@ namespace C6Lab
         private const float DrumPassSpeedFactor = 1.5f;
         private const float DrumDriftSpinGain = .3f;
         private const float DrumDriftMaxSpin = 90f;
+        // A drum handed to this board (#178) reaches its spot within this many seconds even when it came in slowly,
+        private const float ArrivalMaxSeconds = 1.2f;
+        // and brakes no harder than this (board widths/s²), so a hard swipe slows on entry and then glides in.
+        private const float ArrivalMaxBrake = 8f;
+        // It has arrived once this close to its spot (board widths) or this slow (board widths/s).
+        private const float ArrivalTolerance = .005f;
+        private const float ArrivalRestSpeed = .02f;
+        // A drum passing through runs on to the next player at no less than this (board widths/s).
+        private const float PassMinSpeed = .9f;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly HashSet<string> spawnedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
@@ -255,7 +276,8 @@ namespace C6Lab
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
             bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
-            int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false)
+            int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
+            LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f)
         {
             RequireConfigured();
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
@@ -309,6 +331,9 @@ namespace C6Lab
             if (!body.isKinematic)
                 body.linearVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
                     config.OrbMaxReleaseSpeed * bounds.width));
+            // Starts from the speed it came in with, set just above.
+            if (arrival != LabDrumArrival.None && kind.IsDrum() && !body.isKinematic)
+                StartArrival(entry, arrival, stopAt, normalizedPosition.x);
             if (playSpawn && spawnedIds.Add(id))
             {
                 SpawnStarted?.Invoke(id);
@@ -385,6 +410,9 @@ namespace C6Lab
                 float distance = away.magnitude;
                 if (distance > reach) continue;
                 if (entry.Held) CancelDrag();
+                entry.Arrival = LabDrumArrival.None;
+                // A drum flung across tells the Host so it stops inside the next board (#178).
+                if (entry.View.Kind.IsDrum()) entry.Blasted = true;
                 Vector2 direction = distance > 1e-5f ? away / distance : Vector2.up;
                 Vector2 velocity = XY(entry.View.Body.linearVelocity) + direction * strength * (1f - distance / reach);
                 entry.View.Body.linearVelocity = OnPlane(velocity);
@@ -418,6 +446,86 @@ namespace C6Lab
         }
 
         public bool IsDropping(string id) => id != null && entries.TryGetValue(id, out var entry) && entry.Dropping;
+
+        /// <summary>How a drum handed to this board is still arriving; None once it rests or the player takes it.</summary>
+        public LabDrumArrival ArrivalOf(string id) =>
+            id != null && entries.TryGetValue(id, out var entry) ? entry.Arrival : LabDrumArrival.None;
+
+        /// <summary>
+        /// A drum just handed to this board (#178), entering by the side nearer entryX01 with the
+        /// speed it was swiped at. Stop: it glides on and comes to rest on the Host's spot, stopAt of
+        /// the board width in from that side; a slow drum is sped up to get there within
+        /// ArrivalMaxSeconds and a fast one slowed to brake no harder than ArrivalMaxBrake. Pass: it
+        /// runs on across to the next player at no less than PassMinSpeed. Coast (flung across by a
+        /// blast): it keeps the speed the blast gave it and slows like any drum, but brakes harder
+        /// when it must to stop no farther than stopAt in.
+        /// </summary>
+        private void StartArrival(Entry entry, LabDrumArrival arrival, float stopAt, float entryX01)
+        {
+            if (arrival == LabDrumArrival.None) return;
+            entry.Arrival = arrival;
+            entry.ArrivalDirection = entryX01 < .5f ? 1f : -1f;
+            var body = entry.View.Body;
+            Vector2 velocity = XY(body.linearVelocity);
+            float along = velocity.x * entry.ArrivalDirection;
+            if (arrival != LabDrumArrival.Pass)
+            {
+                float share = Mathf.Clamp01(Finite(stopAt) ? stopAt : .5f);
+                entry.ArrivalStopX = entry.ArrivalDirection > 0f
+                    ? bounds.xMin + share * bounds.width : bounds.xMax - share * bounds.width;
+            }
+            if (arrival == LabDrumArrival.Coast) return;
+            if (arrival == LabDrumArrival.Pass)
+                along = Mathf.Max(along, PassMinSpeed * bounds.width);
+            else
+            {
+                float distance = Mathf.Max(0f, (entry.ArrivalStopX - XY(body.position).x) * entry.ArrivalDirection);
+                float slowest = 2f * distance / ArrivalMaxSeconds;
+                float fastest = Mathf.Sqrt(2f * ArrivalMaxBrake * bounds.width * distance);
+                along = Mathf.Clamp(along, slowest, Mathf.Max(slowest, fastest));
+            }
+            body.linearVelocity = OnPlane(new Vector2(entry.ArrivalDirection * along, velocity.y));
+        }
+
+        /// <summary>
+        /// One physics step of an arriving drum. Stop brakes just hard enough to come to rest on its
+        /// spot (v² = 2·a·d, recomputed each step so a bump on the way is absorbed), then hands it
+        /// back to its usual drift. Pass keeps running on. Up and down motion slows like an orb's.
+        /// </summary>
+        private Vector2 Arrive(Entry entry, Vector2 velocity, Vector2 position)
+        {
+            entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
+            float side = entry.ArrivalDirection;
+            float step = Time.fixedDeltaTime;
+            float floorStep = config.OrbFloorDeceleration * bounds.width * step;
+            float vertical = Mathf.MoveTowards(velocity.y, 0f, floorStep);
+            float along = velocity.x * side;
+            if (entry.Arrival == LabDrumArrival.Pass)
+                return new Vector2(side * Mathf.Max(along - floorStep, PassMinSpeed * bounds.width), vertical);
+
+            float remaining = (entry.ArrivalStopX - position.x) * side;
+            if (entry.Arrival == LabDrumArrival.Coast)
+            {
+                // Slides on the blast's speed and slows like any drum; its drift takes over once it is
+                // gentle. Only when that would carry it past its limit does it brake harder, to stop there.
+                float driftSpeed = config.DrumDriftSpeed * bounds.width;
+                if (remaining <= ArrivalTolerance * bounds.width || along <= Mathf.Max(driftSpeed, ArrivalRestSpeed * bounds.width))
+                {
+                    entry.Arrival = LabDrumArrival.None;
+                    return new Vector2(remaining <= ArrivalTolerance * bounds.width ? 0f : velocity.x, vertical);
+                }
+                float limit = along * along / (2f * remaining);
+                float slowing = Mathf.Max(config.OrbFloorDeceleration * bounds.width, limit);
+                return new Vector2(side * Mathf.Max(0f, along - slowing * step), vertical);
+            }
+            if (remaining <= ArrivalTolerance * bounds.width || along <= ArrivalRestSpeed * bounds.width)
+            {
+                entry.Arrival = LabDrumArrival.None;
+                return new Vector2(0f, vertical);
+            }
+            float brake = along * along / (2f * remaining);
+            return new Vector2(side * Mathf.Max(0f, along - brake * step), vertical);
+        }
 
         private void PlayDrop(Entry entry, Vector2 landing)
         {
@@ -501,6 +609,8 @@ namespace C6Lab
             entry.PendingPartnerId = null;
             entry.EdgePending = false;
             entry.Locked = false;
+            entry.Arrival = LabDrumArrival.None;
+            entry.Blasted = false;
             StopMotion(entry.View.Body);
             entry.View.Body.position = OnPlane(Clamp(XY(entry.View.Body.position), entry.View.HitSphere.radius));
             SetBodyMode(entry);
@@ -536,6 +646,8 @@ namespace C6Lab
             if (nearest == null) return false;
             heldId = nearest.View.OrbId;
             nearest.Held = true;
+            nearest.Arrival = LabDrumArrival.None;
+            nearest.Blasted = false;
             nearest.PressVelocity = XY(nearest.View.Body.linearVelocity);
             // A drum is large, and a bomb's art is larger than its body: keep the grabbed point under the
             // finger instead of jumping the centre there (which would also jerk the bomb's roll).
@@ -723,7 +835,8 @@ namespace C6Lab
                 float speed = velocity.magnitude;
                 // Config motion is expressed in board widths, while Rigidbody uses world units.
                 // Convert at this boundary so different camera/board sizes retain the same feel.
-                if (drifts) velocity = Drift(entry, velocity, position);
+                if (entry.Arrival != LabDrumArrival.None) velocity = Arrive(entry, velocity, position);
+                else if (drifts) velocity = Drift(entry, velocity, position);
                 else if (speed <= config.OrbStopSpeed * bounds.width) velocity = Vector2.zero;
                 else velocity = velocity.normalized * Mathf.Max(0f,
                     speed - config.OrbFloorDeceleration * bounds.width * Time.fixedDeltaTime);
@@ -740,8 +853,11 @@ namespace C6Lab
                     body.linearVelocity = OnPlane(new Vector2(-velocity.x, velocity.y));
                     continue;
                 }
+                // A drum still passing through tells the Host so it stops on the near side next.
                 var crossing = new LabOrbEdgeCrossing(entry.View.OrbId, right,
-                    NormalizeForBody(areaShape, position, entry.View.HitSphere.radius).y, velocity / bounds.width);
+                    NormalizeForBody(areaShape, position, entry.View.HitSphere.radius).y, velocity / bounds.width,
+                    entry.Arrival == LabDrumArrival.Pass ? LabEdgeCrossingKind.Passing
+                    : entry.Blasted ? LabEdgeCrossingKind.Pushed : LabEdgeCrossingKind.Swipe);
                 entry.EdgePending = true;
                 entry.PendingEdge = crossing;
                 body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
@@ -770,6 +886,8 @@ namespace C6Lab
                     speed - config.OrbFloorDeceleration * bounds.width * step);
             }
 
+            // Gentle again: a blast that flung it is spent.
+            entry.Blasted = false;
             float time = Time.time * config.DrumDriftTurning;
             float heading = Mathf.PerlinNoise(entry.DriftSeed, time) * 4f * Mathf.PI;
             float pace = Mathf.Lerp(.5f, 1f, Mathf.PerlinNoise(entry.DriftSeed + 31.7f, time * .7f));
