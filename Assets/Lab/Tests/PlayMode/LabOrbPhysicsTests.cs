@@ -931,6 +931,83 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator AHandedOnDrumComesToRestOnTheHostsSpotWhateverSpeedItCameInWith()
+        {
+            SetDrumDrift(0f, config.DrumDriftTurning); // no drift, so the resting place is the arrival's alone
+            int crossings = 0;
+            board.EdgeCrossed += crossing => crossings++;
+            // A hard swipe in from the left aiming 30% in, and a slow one in from the right aiming 70% in.
+            var fast = board.UpsertOrb("fast", LabOrbKind.Drum, new Vector2(0f, .25f), new Vector2(5f, 0f),
+                arrival: LabDrumArrival.Stop, stopAt: .3f);
+            var slow = board.UpsertOrb("slow", LabOrbKind.Drum, new Vector2(1f, .75f), new Vector2(-.05f, 0f),
+                arrival: LabDrumArrival.Stop, stopAt: .7f);
+            Assert.That(board.ArrivalOf("fast"), Is.EqualTo(LabDrumArrival.Stop));
+            Assert.That(board.ArrivalOf("slow"), Is.EqualTo(LabDrumArrival.Stop));
+            // A later snapshot of the same drum does not restart or change its arrival.
+            board.UpsertOrb("fast", LabOrbKind.Drum, new Vector2(0f, .25f), new Vector2(5f, 0f),
+                arrival: LabDrumArrival.Pass, stopAt: -1f);
+            Assert.That(board.ArrivalOf("fast"), Is.EqualTo(LabDrumArrival.Stop));
+
+            Rect bounds = board.CenterBounds;
+            float slowestTravel = 0f;
+            for (int step = 0; step < 100 && (board.ArrivalOf("fast") != LabDrumArrival.None
+                || board.ArrivalOf("slow") != LabDrumArrival.None); step++) // up to 2 seconds
+            {
+                yield return new WaitForFixedUpdate();
+                slowestTravel = Mathf.Max(slowestTravel, Mathf.Abs(slow.Body.linearVelocity.x));
+            }
+            Assert.That(board.ArrivalOf("fast"), Is.EqualTo(LabDrumArrival.None), "The hard swipe has come to rest.");
+            Assert.That(board.ArrivalOf("slow"), Is.EqualTo(LabDrumArrival.None), "The slow one got there in time too.");
+            Assert.That((BoardPoint(fast).x - bounds.xMin) / bounds.width, Is.EqualTo(.3f).Within(.02f),
+                "However hard it came in, it rests 30% in from the side it entered by.");
+            Assert.That((bounds.xMax - BoardPoint(slow).x) / bounds.width, Is.EqualTo(.7f).Within(.02f),
+                "Counted from the right when it came in from the right.");
+            Assert.That(slowestTravel, Is.GreaterThan(.05f * Width), "A slow drum is sped up to arrive within a second or so.");
+            Assert.That(crossings, Is.Zero, "Neither went on to another player.");
+            for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();
+            Assert.That(fast.Body.linearVelocity.magnitude, Is.LessThan(.01f), "It stays at rest (no drift in this test).");
+        }
+
+        [UnityTest]
+        public IEnumerator APassingDrumRunsOnToTheNextPlayerAndSaysItIsPassing()
+        {
+            var crossed = new System.Collections.Generic.List<LabOrbEdgeCrossing>();
+            board.EdgeCrossed += crossing => crossed.Add(crossing);
+            // Even a slow pass keeps going across the whole board.
+            board.UpsertOrb("passing", LabOrbKind.Drum, new Vector2(0f, .25f), new Vector2(.1f, 0f),
+                arrival: LabDrumArrival.Pass);
+            var swiped = board.UpsertOrb("swiped", LabOrbKind.Drum, new Vector2(.6f, .75f));
+            swiped.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f); // an ordinary swipe to the right
+            for (int step = 0; step < 150 && crossed.Count < 2; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.Count, Is.EqualTo(2));
+            LabOrbEdgeCrossing passing = crossed.Single(crossing => crossing.OrbId == "passing");
+            Assert.That(passing.ToRight, Is.True, "It leaves by the far side.");
+            Assert.That(passing.Kind, Is.EqualTo(LabEdgeCrossingKind.Passing),
+                "It tells the Host it is passing on, so it stops on the near side of the next board.");
+            Assert.That(crossed.Single(crossing => crossing.OrbId == "swiped").Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe));
+        }
+
+        [Test]
+        public void GrabbingOrBlastingAnArrivingDrumHandsItBackToPhysics()
+        {
+            var held = board.UpsertOrb("held", LabOrbKind.Drum, new Vector2(0f, .25f), new Vector2(2f, 0f),
+                arrival: LabDrumArrival.Stop, stopAt: .5f);
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(held), 1d), Is.True);
+            Assert.That(board.ArrivalOf("held"), Is.EqualTo(LabDrumArrival.None), "The player takes it over.");
+            board.CancelDrag();
+
+            board.UpsertOrb("flung", LabOrbKind.Drum, new Vector2(1f, .75f), new Vector2(-2f, 0f),
+                arrival: LabDrumArrival.Pass);
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.95f, .75f), fuseSeconds: 1f);
+            board.Blast("bomb", new Vector2(.95f, .75f));
+            Assert.That(board.ArrivalOf("flung"), Is.EqualTo(LabDrumArrival.None), "A blast's push takes over from the arrival.");
+
+            var orb = board.UpsertOrb("orb", LabOrbKind.Yin, new Vector2(0f, .5f), new Vector2(1f, 0f),
+                arrival: LabDrumArrival.Stop, stopAt: .5f);
+            Assert.That(board.ArrivalOf("orb"), Is.EqualTo(LabDrumArrival.None), "Only drums arrive this way.");
+        }
+
+        [UnityTest]
         public IEnumerator ABombDriftsOnItsOwnButOnlyAPushOrSwipePassesItToANeighbour()
         {
             SetDrumDrift(.4f, 1f); // a quicker drift so a short test sees it wander

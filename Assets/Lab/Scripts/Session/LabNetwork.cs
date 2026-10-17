@@ -1523,7 +1523,10 @@ namespace C6Lab
             {
                 if (drum.owner != LocalPlayerId) continue;
                 current.Add(drum.id);
-                board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy));
+                // A drum just handed to this player arrives the way the Host drew it (#178); an older
+                // handoff, seen late after a reconnect, is not replayed.
+                board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy),
+                    arrival: drum.JustArrived(latest.serverTime) ? drum.arrival : LabDrumArrival.None, stopAt: drum.stopAt);
             }
             foreach (string id in visibleOrbIds) if (!current.Contains(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
