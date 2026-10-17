@@ -8,6 +8,24 @@ namespace C6Lab
     // Gourd is appended for bombs the gourd drops as sabotage (#177).
     public enum LabOrbOrigin { Unknown, Generated, Combined, Gourd }
 
+    /// <summary>
+    /// How a drum handed to a neighbour arrives on its new board (#178). Stop eases it to rest at a
+    /// Host-drawn spot; Pass keeps it going on to the next player; Coast lets a drum a blast flung
+    /// across slide on its own speed but still come to rest on that board. Numbers are serialized.
+    /// </summary>
+    public enum LabDrumArrival { None, Stop, Pass, Coast }
+
+    /// <summary>Why a body crossed a side edge, reported with its handoff request (#178). Numbers are serialized.</summary>
+    public enum LabEdgeCrossingKind
+    {
+        /// <summary>Swiped, flicked or dragged across by the player.</summary>
+        Swipe,
+        /// <summary>A drum still running on through this board after a Pass arrival.</summary>
+        Passing,
+        /// <summary>Flung across by a bomb blast.</summary>
+        Pushed
+    }
+
     public static class LabOrbKindRules
     {
         public static bool IsRaw(this LabOrbKind kind) => kind == LabOrbKind.Yin || kind == LabOrbKind.Yang;
@@ -56,14 +74,28 @@ namespace C6Lab
         public double unlockedAt = -1d;
         public ulong revision;
         public bool inFlight;
+        /// <summary>For a drum handed to this board (#178): how it arrives. None for every orb.</summary>
+        public LabDrumArrival arrival;
+        /// <summary>
+        /// Share of the board width, from the edge the drum entered by, where it comes to rest (Stop),
+        /// or the farthest it may slide (Coast); -1 otherwise.
+        /// </summary>
+        public float stopAt = -1f;
+        /// <summary>Host time of the handoff that set the arrival, so only the receiving screen applies it; -1 when none.</summary>
+        public double arrivedAt = -1d;
 
         /// <summary>An unlock older than this, for example seen after a reconnect, shows the item already open.</summary>
         public const double UnlockEffectWindowSeconds = 1d;
+        /// <summary>An arrival older than this, for example seen after a reconnect, is not replayed.</summary>
+        public const double ArrivalWindowSeconds = 1d;
 
         public LabOrbState Copy() => (LabOrbState)MemberwiseClone();
 
         public bool JustUnlocked(double serverTime) =>
             unlockedAt >= 0d && serverTime - unlockedAt <= UnlockEffectWindowSeconds;
+
+        public bool JustArrived(double serverTime) =>
+            arrival != LabDrumArrival.None && arrivedAt >= 0d && serverTime - arrivedAt <= ArrivalWindowSeconds;
     }
 
     [Serializable]

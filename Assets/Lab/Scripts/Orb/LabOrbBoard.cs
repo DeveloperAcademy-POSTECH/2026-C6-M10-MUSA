@@ -13,13 +13,17 @@ namespace C6Lab
         public bool ToRight { get; }
         public float Height01 { get; }
         public Vector2 VelocityInBoardWidthsPerSecond { get; }
+        /// <summary>Why it crossed: a player's swipe, a drum passing on, or a bomb blast.</summary>
+        public LabEdgeCrossingKind Kind { get; }
 
-        public LabOrbEdgeCrossing(string orbId, bool toRight, float height01, Vector2 velocity)
+        public LabOrbEdgeCrossing(string orbId, bool toRight, float height01, Vector2 velocity,
+            LabEdgeCrossingKind kind = LabEdgeCrossingKind.Swipe)
         {
             OrbId = orbId;
             ToRight = toRight;
             Height01 = height01;
             VelocityInBoardWidthsPerSecond = velocity;
+            Kind = kind;
         }
     }
 

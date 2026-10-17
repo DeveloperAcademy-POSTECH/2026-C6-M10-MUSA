@@ -139,7 +139,15 @@ namespace C6Lab
             new LabDeveloperField("Paint Victory Coverage (%)", 1f, 100f, true),
             new LabDeveloperField("Gourd Bomb Interval Min (seconds, 0 = off)", 0f, 600f),
             new LabDeveloperField("Gourd Bomb Interval Max (seconds, 0 = off)", 0f, 600f),
-            new LabDeveloperField("Fuse Sound Volume (50 = Inspector)", 0f, 100f)
+            new LabDeveloperField("Fuse Sound Volume (50 = Inspector)", 0f, 100f),
+            new LabDeveloperField("Drum Stop Near From (% of board from entry)", 0f, 100f, true),
+            new LabDeveloperField("Drum Stop Near To / Middle From (%)", 0f, 100f, true),
+            new LabDeveloperField("Drum Stop Middle To / Far From (%)", 0f, 100f, true),
+            new LabDeveloperField("Drum Stop Far To (%)", 0f, 100f, true),
+            new LabDeveloperField("Drum Stop Near Chance (%)", 0f, 100f, true),
+            new LabDeveloperField("Drum Stop Middle Chance (%)", 0f, 100f, true),
+            new LabDeveloperField("Drum Stop Far Chance (%)", 0f, 100f, true),
+            new LabDeveloperField("Drum Pass Through Chance (%)", 0f, 100f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -165,7 +173,7 @@ namespace C6Lab
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90),
-            new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78),
+            new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
             new LabDeveloperCategory("Gourd", 79, 87, 88, 89)
         });
 
@@ -252,6 +260,11 @@ namespace C6Lab
         [SerializeField, Range(0f, 2f)] private float drumDriftTurning = .25f;
         [Tooltip("떠돌며 돌 때와 부딪혀 돌 때의 회전 세기. 0이면 돌지 않는다.")]
         [SerializeField, Range(0f, 3f)] private float drumSpinStrength = 1f;
+        [Tooltip("옆 사람에게 넘긴 북이 받는 판에서 멈추는 구간 경계 (들어온 가장자리에서 판 폭 %). " +
+            "가까운 쪽 시작·가까운/가운데·가운데/먼 쪽·먼 쪽 끝 순서 (#178).")]
+        [SerializeField] private int[] drumStopBounds = { 20, 40, 60, 80 };
+        [Tooltip("넘긴 북이 가까운 쪽·가운데·먼 쪽에서 멈출 확률과 다음 사람에게 통과할 확률 (%, 합 100).")]
+        [SerializeField] private int[] drumStopChances = { 40, 35, 15, 10 };
 
         [Header("Gourd (요괴 박)")]
         [Tooltip("Paint: 흰 박에 구슬 속성 색을 칠한다 (#153). Crack: 박 모델에 금이 가고 처치 연출이 나온다 (#163).")]
@@ -400,6 +413,46 @@ namespace C6Lab
         public float DrumDriftSpeed => Mathf.Clamp(Finite(drumDriftSpeed, .1f), 0f, 1f);
         public float DrumDriftTurning => Mathf.Clamp(Finite(drumDriftTurning, .25f), 0f, 2f);
         public float DrumSpinStrength => Mathf.Clamp(Finite(drumSpinStrength, 1f), 0f, 3f);
+        private static readonly int[] DefaultDrumStopBounds = { 20, 40, 60, 80 };
+        private static readonly int[] DefaultDrumStopChances = { 40, 35, 15, 10 };
+
+        /// <summary>
+        /// Stop zone edges as shares of the board from the entry edge, in order: near from, near to /
+        /// middle from, middle to / far from, far to. An Inspector array that is not four increasing
+        /// percentages falls back to 20/40/60/80.
+        /// </summary>
+        public float[] DrumStopBounds()
+        {
+            int[] bounds = ValidDrumStopBounds(drumStopBounds) ? drumStopBounds : DefaultDrumStopBounds;
+            return new[] { bounds[0] / 100f, bounds[1] / 100f, bounds[2] / 100f, bounds[3] / 100f };
+        }
+
+        /// <summary>Near, middle, far and pass-through chances (%). An array not adding up to 100 falls back to 40/35/15/10.</summary>
+        public int[] DrumStopChances()
+        {
+            int[] chances = ValidDrumStopChances(drumStopChances) ? drumStopChances : DefaultDrumStopChances;
+            return (int[])chances.Clone();
+        }
+
+        private static bool ValidDrumStopBounds(int[] bounds)
+        {
+            if (bounds == null || bounds.Length != 4) return false;
+            for (int i = 0; i < 4; i++)
+                if (bounds[i] < 0 || bounds[i] > 100 || (i > 0 && bounds[i] < bounds[i - 1])) return false;
+            return true;
+        }
+
+        private static bool ValidDrumStopChances(int[] chances)
+        {
+            if (chances == null || chances.Length != 4) return false;
+            int total = 0;
+            foreach (int chance in chances)
+            {
+                if (chance < 0 || chance > 100) return false;
+                total += chance;
+            }
+            return total == 100;
+        }
         public LabGourdMode GourdMode => gourdMode == LabGourdMode.Crack ? LabGourdMode.Crack : LabGourdMode.Paint;
         public const int DefaultPaintVictoryPercent = 80;
         public int PaintVictoryPercent => Mathf.Clamp(paintVictoryPercent, 1, 100);
@@ -458,6 +511,8 @@ namespace C6Lab
         public float[] CaptureDeveloperValues()
         {
             int[] chances = GenerationChances();
+            float[] stopBounds = DrumStopBounds();
+            int[] stopChances = DrumStopChances();
             return new[]
             {
                 (float)MonsterMaxHp, (float)Damage, BattleDurationSeconds,
@@ -492,7 +547,10 @@ namespace C6Lab
                 DevVolume(combineSoundVolumeDev), (float)CombineHapticStyle, CombineHapticIntensity,
                 (float)PaintVictoryPercent,
                 GourdBombIntervalMin, GourdBombIntervalMax,
-                DevVolume(fuseSoundVolumeDev)
+                DevVolume(fuseSoundVolumeDev),
+                Mathf.Round(stopBounds[0] * 100f), Mathf.Round(stopBounds[1] * 100f),
+                Mathf.Round(stopBounds[2] * 100f), Mathf.Round(stopBounds[3] * 100f),
+                stopChances[0], stopChances[1], stopChances[2], stopChances[3]
             };
         }
 
@@ -533,6 +591,10 @@ namespace C6Lab
             if (values[46] > values[47]) { error = "Item Unlock Swipes Min cannot exceed Item Unlock Swipes Max."; return false; }
             if (values[61] > values[62]) { error = "Spawn Minimum Speed cannot exceed Spawn Maximum Speed."; return false; }
             if (values[88] > values[89]) { error = "Gourd Bomb Interval Min cannot exceed Gourd Bomb Interval Max."; return false; }
+            if (values[91] > values[92] || values[92] > values[93] || values[93] > values[94])
+            { error = "Drum stop zone edges must go from near to far (from <= to)."; return false; }
+            float drumStopTotal = values[95] + values[96] + values[97] + values[98];
+            if (drumStopTotal != 100f) { error = "Drum stop chances must add up to 100 (now " + drumStopTotal + ")."; return false; }
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
@@ -625,6 +687,8 @@ namespace C6Lab
             gourdBombIntervalMin = values[88];
             gourdBombIntervalMax = values[89];
             fuseSoundVolumeDev = values[90];
+            drumStopBounds = new[] { (int)values[91], (int)values[92], (int)values[93], (int)values[94] };
+            drumStopChances = new[] { (int)values[95], (int)values[96], (int)values[97], (int)values[98] };
             error = string.Empty;
             return true;
         }

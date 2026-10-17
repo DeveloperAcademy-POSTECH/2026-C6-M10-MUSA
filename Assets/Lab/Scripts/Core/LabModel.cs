@@ -61,6 +61,10 @@ namespace C6Lab
         private const uint GourdDelaySalt = 0x60BDDE1Au;
         private const uint GourdTargetSalt = 0x60BD7A26u;
         private const uint GourdLandingSalt = 0x60BD1A4Du;
+        private const uint DrumZoneSalt = 0xD2017E5Au;
+        private const uint DrumSpotSalt = 0xD2051075u;
+        // 북 전달 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다.
+        private const ulong DrumHandoffKey = ulong.MaxValue - 2UL;
         // 박 폭탄 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (북 자리 뽑기는 ulong.MaxValue).
         private const ulong GourdDrawKey = ulong.MaxValue - 1UL;
         // 박 폭탄이 떨어지는 곳: 판 너비의 20~80% 사이, 판 높이의 이 지점 (보드가 영역 안으로 맞춘다).
@@ -82,6 +86,7 @@ namespace C6Lab
         private readonly List<LabGourdBomb> gourdBombs = new List<LabGourdBomb>();
         private double nextGourdBombAt;
         private uint gourdBombCount;
+        private uint drumHandoffCount;
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -157,6 +162,7 @@ namespace C6Lab
             revision = 0;
             PlaceDrums(now);
             gourdBombCount = 0;
+            drumHandoffCount = 0;
             nextGourdBombAt = now + GourdBombDelay(0u);
             lastTime = now;
             deadline = nextDeadline;
@@ -265,6 +271,15 @@ namespace C6Lab
         /// </summary>
         public bool TryTransfer(ulong sender, string id, bool right, float height01,
             Vector2 normalizedVelocity, string requestId, double now, out LabOrbState orb, out string reason)
+            => TryTransfer(sender, id, right, height01, normalizedVelocity, requestId, now,
+                LabEdgeCrossingKind.Swipe, out orb, out reason);
+
+        /// <summary>
+        /// The same handoff, told why the body crossed. A drum also gets how it arrives on the next
+        /// board (#178); see <see cref="ArriveDrum"/>.
+        /// </summary>
+        public bool TryTransfer(ulong sender, string id, bool right, float height01, Vector2 normalizedVelocity,
+            string requestId, double now, LabEdgeCrossingKind crossing, out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
@@ -295,6 +310,7 @@ namespace C6Lab
                 if (current.lockSwipes == 0 && current.kind == LabOrbKind.Relay) current.relayStage = 1;
             }
             else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
+            if (current.kind.IsDrum()) ArriveDrum(current, crossing, now);
             current.revision = ++revision;
             if (current.kind.IsDrum()) players[sender].drumPassedTotal++;
             else players[sender].passedTotal++;
@@ -579,6 +595,54 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// 옆 사람에게 넘어가는 북이 받는 판에서 어떻게 들어올지 Host가 정한다 (#178).
+        /// 스와이프로 넘기면 가까운 쪽·가운데·먼 쪽 구간 또는 통과를 설정 확률로 뽑고, 구간 안의 멈출
+        /// 자리(들어온 가장자리에서 판 폭 비율)도 뽑는다. 앞 판을 통과해 온 북은 이번 판의 가까운 쪽에서
+        /// 반드시 멈추고, 폭발에 밀려 넘어온 북은 제 힘대로 미끄러지되 먼 쪽 끝 안에서 멈춘다.
+        /// 뽑기는 seed와 전달 순번으로 정해져 모든 기기가 스냅샷으로 같은 결과를 받는다.
+        /// </summary>
+        private void ArriveDrum(LabOrbState drum, LabEdgeCrossingKind crossing, double now)
+        {
+            uint index = drumHandoffCount++;
+            float[] bounds = rules.DrumStopBounds;
+            int zone;
+            if (crossing == LabEdgeCrossingKind.Pushed) zone = -1;
+            // Only a drum that really arrived as a pass may claim to be passing on.
+            else if (crossing == LabEdgeCrossingKind.Passing && drum.arrival == LabDrumArrival.Pass) zone = 0;
+            else zone = DrumZoneFor(DrawFor(seed ^ DrumZoneSalt, DrumHandoffKey, index), rules.DrumStopChances);
+
+            drum.arrivedAt = now;
+            if (zone < 0)
+            {
+                drum.arrival = LabDrumArrival.Coast;
+                drum.stopAt = bounds[3];
+            }
+            else if (zone >= 3)
+            {
+                drum.arrival = LabDrumArrival.Pass;
+                drum.stopAt = -1f;
+            }
+            else
+            {
+                drum.arrival = LabDrumArrival.Stop;
+                drum.stopAt = Mathf.Lerp(bounds[zone], bounds[zone + 1],
+                    Unit01(DrawFor(seed ^ DrumSpotSalt, DrumHandoffKey, index)));
+            }
+        }
+
+        /// <summary>0 near, 1 middle, 2 far, 3 pass, by the configured percentages.</summary>
+        private static int DrumZoneFor(ulong draw, int[] chances)
+        {
+            int roll = (int)(draw % 100UL);
+            for (int i = 0; i < chances.Length; i++)
+            {
+                roll -= chances[i];
+                if (roll < 0) return i;
+            }
+            return 0;
+        }
+
         /// <summary>다음 박 폭탄까지의 시간. 최대 간격이 0이면 떨어뜨리지 않는다.</summary>
         private double GourdBombDelay(uint index)
         {
@@ -743,6 +807,8 @@ namespace C6Lab
             public readonly int PaintVictoryPercent;
             public readonly float PaintVictoryCoverage;
             public readonly float GourdBombIntervalMin, GourdBombIntervalMax;
+            public readonly float[] DrumStopBounds;
+            public readonly int[] DrumStopChances;
             public readonly Color[] PaintColors;
 
             public Rules(LabConfig config)
@@ -757,6 +823,8 @@ namespace C6Lab
                 PaintVictoryCoverage = config.PaintVictoryCoverage;
                 GourdBombIntervalMin = config.GourdBombIntervalMin;
                 GourdBombIntervalMax = config.GourdBombIntervalMax;
+                DrumStopBounds = config.DrumStopBounds();
+                DrumStopChances = config.DrumStopChances();
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];
                 for (int i = (int)LabOrbElement.Fire; i <= (int)LabOrbElement.Earth; i++)
                     PaintColors[i] = config.OrbAppearance != null
