@@ -716,7 +716,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator ALockedBombFlashesRedInItsLastSecondsFasterAsItRunsOut()
+        public IEnumerator ABombFlashesRedInItsLastSecondsFasterAsItRunsOut()
         {
             var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 5f);
             var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.2f, .5f), lockSwipes: 0, relayStage: 1);
@@ -745,7 +745,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator ABombWithArtDrawsTheCartoonBombWithOnlyItsRedLockCountAndASparkingFuse()
+        public IEnumerator ABombWithArtDrawsTheCartoonBombWithItsRedSecondsAndASparkingFuse()
         {
             var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
             var bombArt = new Texture2D(8, 8);
@@ -960,7 +960,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator TheFuseSizzlesWhileALockedBombBurnsAndStopsOnceItIsOpen()
+        public IEnumerator TheFuseSizzlesWhileABombBurnsAndStopsWithoutAFuse()
         {
             var sound = root.AddComponent<LabFuseSound>();
             sound.Bind(board, null);

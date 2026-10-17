@@ -1667,7 +1667,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GourdDropsALockedBombOnOnePlayerEveryTwentyToThirtySeconds()
+        public void GourdDropsABombOnOnePlayerEveryTwentyToThirtySeconds()
         {
             var gourd = GourdConfig(20f, 30f);
             try

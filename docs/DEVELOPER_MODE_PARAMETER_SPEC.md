@@ -1,20 +1,20 @@
 # C6 Physics Lab 개발자 모드 조정값 명세
 
-> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 원래 39개 수치는 PR #76의 설정 에셋을 기준으로 기록했으며, 이후 생성 확률·아이템 9개와 개인 HP 1개를 더했고, 아이템 효과·결합·카메라·요괴 회전·생성 연출·소리·햅틱·생성 북 값을 차례로 더해 현재 박 표현 모드·폭탄 충격파·결합 소리/햅틱·색칠 승리 비율까지 88개다. 64~74번째(인덱스 63~73) 소리 음량·햅틱 11개(#142)는 이 문서에 아직 따로 설명하지 않았다. 81~84번째(인덱스 80~83)는 #167의 폭탄 충격파·폭발 진동 값이고, 85~87번째(인덱스 84~86)는 #172의 결합 소리 크기·결합 진동 종류·세기다. 88번째(인덱스 87)는 #175의 색칠 승리 목표(기본 80%, 정수 1~100%)다. 직렬화된 값이 없으면 C# 필드 초기값이 쓰인다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
+> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 원래 39개 수치는 PR #76의 설정 에셋을 기준으로 기록했으며, 이후 생성 확률·아이템 9개와 개인 HP 1개를 더했고, 아이템 효과·결합·카메라·요괴 회전·생성 연출·소리·햅틱·생성 북 값을 차례로 더해 현재 박 표현 모드·폭탄 충격파·결합 소리/햅틱·색칠 승리 비율·박 폭탄 간격·도화선 소리까지 91개다. 64~74번째(인덱스 63~73) 소리 음량·햅틱 11개(#142)는 이 문서에 아직 따로 설명하지 않았다. 81~84번째(인덱스 80~83)는 #167의 폭탄 충격파·폭발 진동 값이고, 85~87번째(인덱스 84~86)는 #172의 결합 소리 크기·결합 진동 종류·세기다. 88번째(인덱스 87)는 #175의 색칠 승리 목표(기본 80%, 정수 1~100%)다. 89·90번째(인덱스 88·89)는 #177의 박 폭탄 간격 최소·최대, 91번째(인덱스 90)는 #177의 도화선 치지직 소리 크기다. 직렬화된 값이 없으면 C# 필드 초기값이 쓰인다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
 
-이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 조정값 88개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
+이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 조정값 91개를 설명한다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
 
 ## 1. 패널의 적용 방식
 
 1. `Assets/Lab/Scenes/Lab.unity`를 Unity Editor에서 실행하거나 **Development Build**를 실행한다. 일반 배포 빌드에서는 DEV 버튼이 숨겨진다. 참가자는 일반 빌드여도 Host가 확정한 세션 설정을 수신한다.
-2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 숫자 입력칸 88개와 대응하는 슬라이더가 서로 값을 반영한다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
-3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 88개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
+2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 숫자 입력칸 91개와 대응하는 슬라이더가 서로 값을 반영한다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
+3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 91개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
 4. 혼자 시험할 때는 **START SOLO**를 누른다. 이미 솔로 전투 중이면 **RESTART SOLO**가 표시된다. 새 라운드가 시작되므로 요괴/개인 HP·시간·스태미나·구슬이 초기화된다. 진행 중인 네트워크 라운드에 값을 즉시 적용하는 동작은 없다.
 5. **DEFAULTS**는 저장된 `LabConfig.asset`의 숫자를 입력칸과 슬라이더에 불러올 뿐이다. 공유 방이나 솔로에 적용하려면 해당 시작·적용 버튼을 눌러야 한다. **END SOLO**는 솔로를 끝내고 원본 설정으로 복귀한다. 런타임 복사본은 앱이 실행 중인 동안만 유지되며 원본 에셋에는 저장되지 않는다.
 
 패널 열기 자체는 시간을 멈추지 않는다. 공유 전투에서 설정을 바꾸려면 먼저 공동 일시정지를 승인받아야 하며, 이때 시간은 그 일시정지 상태를 따른다. 마지막 `SHOT HIT/MISS` 보고는 솔로를 끝내거나 연결을 끊으면 지워질 수 있으므로 먼저 기록한다. 공유 방에서는 Host의 설정 지문과 확인 응답을 기준으로 시작을 판정한다. 이 절은 코드상 경로 설명이며 실제 기기 동기화 결과는 검증 기록과 구분한다.
 
-입력은 **88개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
+입력은 **91개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
 
 ## 2. 단위와 공통 판정
 
@@ -55,9 +55,22 @@ Paint는 승인된 속성 명중을 Host 모델의 256×128 동일 면적 구면
 
 HUD는 `snapshot.paintCoverage`와 해당 판의 `snapshot.paintGoalPercent`를 우선 사용한다. 목표가 없는 기존 fixture만 Config로 보완한다. 숫자는 소수 첫째 자리까지 내림해, 예를 들어79.99%가 목표 80%에 도달했다고 보이지 않도록79.9%로 표시한다. 막대는 `coverage / (goalPercent / 100)`이며0~1로 제한한다. 목표 수정은 새 판 적용 경로를 통해서만 반영된다.
 
-박 모드는 #166의 80번째 설정(프로토콜 5617), 폭탄 값 4개는 #167의 81~84번째(5618), 결합 소리/햅틱 3개는 #172의 85~87번째(5619)로 추가됐다. #175 보완본은 목표 비율을 88번째로 추가하고, Host 확정 목표/색칠 방향·RGBA/별도 명중 효과 값을 공유하는 프로토콜 **`5621`**을 사용한다. 모든 기기가 같은 형식이어야 한다. 기존 PR #176의 123/123·95/95와 #166의 이전 PASS는 이 보완본의 실행 결과로 승계하지 않는다. 실제 결과와 다중 기기·iOS 미실행 범위는 `docs/VALIDATION.md`에서 확인한다.
+박 모드는 #166의 80번째 설정(프로토콜 5617), 폭탄 값 4개는 #167의 81~84번째(5618), 결합 소리/햅틱 3개는 #172의 85~87번째(5619)로 추가됐다. #175 보완본은 목표 비율을 88번째로 추가하고, Host 확정 목표/색칠 방향·RGBA/별도 명중 효과 값을 공유하는 프로토콜 **`5621`**을 사용했다. #177은 박 폭탄 간격 2개(89·90번째)와 도화선 소리 크기(91번째), 박 폭탄 신호를 더해 프로토콜 **`5623`**을 사용한다. 모든 기기가 같은 형식이어야 한다. 기존 PR #176의 123/123·95/95와 #166의 이전 PASS는 이 보완본의 실행 결과로 승계하지 않는다. 실제 결과와 다중 기기·iOS 미실행 범위는 `docs/VALIDATION.md`에서 확인한다.
 
 근거: `LabConfig.GourdMode`·`PaintVictoryPercent`·`DeveloperFields`·`CaptureDeveloperValues`·`TryApplyDeveloperValues`, `LabSceneController.Awake`, `LabNetwork.ConfigApplied`, `LabGourdPaint.Attach`·`ApplyMode`, `LabPaintSurface.Stamp`·`CopyPixels`, `LabModel.ConfirmHit`, `LabGourdCrack`, `LabGourdFinish`.
+
+### 박 폭탄 방해공작 — 89·90번째 설정 (#177)
+
+| DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
+| --- | ---: | --- | --- |
+| Gourd Bomb Interval Min (seconds, 0 = off) | 20 | 0–600 / 초 | 89번째(인덱스 88), `Gourd` 묶음. 박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 하한. 매 폭탄마다 Min~Max 사이에서 새로 뽑는다. Min ≤ Max여야 한다. |
+| Gourd Bomb Interval Max (seconds, 0 = off) | 30 | 0–600 / 초 | 90번째(인덱스 89), `Gourd` 묶음. 간격의 상한. **0이면 박 폭탄이 나오지 않는다.** 아주 작은 값을 넣어도 한 번에 쏟아지지 않도록 실제 간격은 최소 1초다. |
+
+Host 모델이 라운드 시작 시각부터 간격을 세고, 시각마다 대상(활성 자리 중 무작위, 같은 사람 연속 허용)과 착지 위치(판 폭 20~80%, 높이 0.6)를 세션·라운드 seed로 추첨해 잠금 없는 폭탄(출처 `Gourd`)을 만든다. 가득 찬 판에도 넣고 스태미나를 쓰지 않으며 생성 기록에 세지 않는다. 일시정지 동안은 전투 시계와 함께 멈추고, 판이 끝나면 더 만들지 않는다. 기본값이면 180초 한 판에 6~9개다.
+
+Host는 박 폭탄 신호(받는 사람·폭탄 ID·착지 위치)를 그 폭탄이 처음 담긴 스냅샷보다 먼저 모든 참가자에게 보낸다. 모든 화면은 전투 화면 박 옆에 "!" 말풍선(`LabGourdAlert`, 약 1.4초)을 띄우고, 받는 화면은 착지 지점 "!" 경고(`LabDropWarning`) 뒤 폭탄을 구슬판 위쪽에서 떨어뜨려 튕긴다. 경고·낙하·튕김 시간과 높이, 경고 색은 `LabOrbAppearance`의 **Gourd bomb drop**(기본 0.6·0.45·0.45초, 튕김 높이 구슬 반지름 1배), 말풍선 크기·시간은 `LabGourdAlert`의 기본값(150px·1.4초)이며 DEV로 조정하지 않는다. 내려앉기 전에는 잡기·충돌·폭발 밀림·떠돌기가 없다.
+
+근거: `LabConfig.GourdBombIntervalMin`·`GourdBombIntervalMax`, `LabModel.DropGourdBombs`·`GourdBombDelay`·`DrainGourdBombs`, `LabNetwork.AnnounceGourdBombs`·`GourdBombDropped`, `LabOrbBoard.ExpectDrop`, `LabOrbView.PlayDrop`, `LabDropWarning`, `LabGourdAlert`.
 
 ## 4. 스태미나·구슬 생성
 
@@ -177,23 +190,23 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 
 | DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
 | --- | ---: | --- | --- |
-| Yin Chance (%) | 40 | 정수 0–100 / % | 생성 결과가 음(Yin)일 확률. |
-| Yang Chance (%) | 40 | 정수 0–100 / % | 생성 결과가 양(Yang)일 확률. |
-| Relay Orb Chance (%) | 5 | 정수 0–100 / % | 릴레이 구슬 아이템 확률. |
-| Secret Box Chance (%) | 5 | 정수 0–100 / % | 시크릿 상자 아이템 확률. |
-| Potion Chance (%) | 5 | 정수 0–100 / % | 회복물약 아이템 확률. |
-| Bomb Chance (%) | 5 | 정수 0–100 / % | 폭탄 아이템 확률. 6개 확률의 합은 반드시 100이어야 한다. |
-| Item Lifetime (seconds) | 15 | 0.1–86,400 / 초 | 보관 중인 아이템의 수명. 생성 시점부터 세며 이웃에게 전달해도 초기화되지 않는다. |
-| Item Unlock Swipes Min | 2 | 정수 0–20 / 회 | 아이템이 생성될 때 정해지는 잠금 횟수의 하한. 잠금은 **이웃 화면으로 넘길 때마다** 1씩 준다. |
+| Yin Chance (%) | 50 | 정수 0–100 / % | 생성 결과가 음(Yin)일 확률. |
+| Yang Chance (%) | 50 | 정수 0–100 / % | 생성 결과가 양(Yang)일 확률. #177부터 북은 기본으로 음·양만 낸다. |
+| Relay Orb Chance (%) | 0 | 정수 0–100 / % | 릴레이 구슬 아이템 확률. 아이템 규칙 코드는 남아 있어 값을 올리면 다시 나온다. |
+| Secret Box Chance (%) | 0 | 정수 0–100 / % | 시크릿 상자 아이템 확률. |
+| Potion Chance (%) | 0 | 정수 0–100 / % | 회복물약 아이템 확률. |
+| Bomb Chance (%) | 0 | 정수 0–100 / % | 북에서 나오는 폭탄 확률. 북 폭탄도 박 폭탄과 같은 규칙(잠금 없음·던질 수 없음)을 따른다. 6개 확률의 합은 반드시 100이어야 한다. |
+| Item Lifetime (seconds) | 15 | 0.1–86,400 / 초 | 보관 중인 아이템의 수명. 생성 시점부터 세며 이웃에게 전달해도 초기화되지 않는다. 폭탄에게는 도화선이며, 끝나면 그때 보유자의 판에서 터진다. |
+| Item Unlock Swipes Min | 2 | 정수 0–20 / 회 | 폭탄을 뺀 아이템이 생성될 때 정해지는 잠금 횟수의 하한(폭탄은 항상 잠금 0). 잠금은 **이웃 화면으로 넘길 때마다** 1씩 준다. |
 | Item Unlock Swipes Max | 4 | 정수 0–20 / 회 | 잠금 횟수의 상한. Min ≤ Max여야 한다. Min·Max를 모두 0으로 두면 아이템이 처음부터 해금된 상태로 생긴다. |
 | Potion Heal (HP) | 10 | 정수 0–300 / 개인 HP | 해금된 회복물약을 더블 탭했을 때 사용자의 개인 HP에 더하는 양. `Player Max HP`를 넘지 않는다. HP가 가득 차 있거나 0이면 사용이 거절되고 물약은 남는다. |
 | Relay x2 Damage Multiplier | 2 | 1–20 / 배 | 릴레이 구슬이 해금 후 한 번 더 넘겨져 `×2` 단계일 때 `Damage per Hit`에 곱하는 값. 해금 직후 `×1` 단계는 항상 1배다. |
 | Relay MAX Damage Multiplier | 4 | 1–20 / 배 | 릴레이 구슬이 해금 후 두 번 넘겨져 `MAX` 단계일 때의 배율. 이후 더 넘겨도 오르지 않는다. |
-| Bomb Damage Multiplier | 3 | 1–20 / 배 | 해금된 폭탄을 던져 명중했을 때 `Damage per Hit`에 곱하는 값. 빗나가면 피해도 폭발도 없다. |
-| Bomb Blast Radius (board widths) | 0.4 | 0–2 / 보드 폭 | 잠긴 폭탄이 터질 때 충격파가 닿는 거리. 폭탄 중심에서 이 거리 안에 중심이 있는 구슬·북·잡고 있던 구슬을 밀어낸다. 0이면 밀지 않고 이펙트만 나온다. 이펙트의 흰 원이 이 범위까지 퍼진다. **81번째(인덱스 80)**. |
+| Bomb Damage Multiplier | 3 | 1–20 / 배 | 폭탄을 던져 명중했을 때 `Damage per Hit`에 곱하는 값. #177부터 폭탄은 던질 수 없어 **지금은 쓰이지 않는다.** 폭탄 기믹을 다시 다듬을 때를 위해 값을 남겨 둔다. |
+| Bomb Blast Radius (board widths) | 0.4 | 0–2 / 보드 폭 | 폭탄이 터질 때 충격파가 닿는 거리. 폭탄 중심에서 이 거리 안에 중심이 있는 구슬·북·잡고 있던 구슬을 밀어낸다. 0이면 밀지 않고 이펙트만 나온다. 이펙트의 흰 원이 이 범위까지 퍼진다. **81번째(인덱스 80)**. |
 | Bomb Blast Strength (board widths/s) | 9 | 0–20 / 보드 폭/초 | 폭탄 바로 옆이 밀려나는 속도. 범위 끝으로 갈수록 0까지 줄고, 원래 움직이던 속도에 더해진다. 9면 범위 중간(판 폭 20%)의 구슬도 바닥 감속으로 멈추기 전 판 폭의 약 5배를 갈 만큼 세서, 범위 안 구슬은 대부분 옆 가장자리를 넘어 이웃에게 간다. #167에서 3으로 시작해 화면 확인 후 9로 올렸다. **82번째(인덱스 81)**. |
 
-아이템은 음·양과 조합되지 않는다. 해금된 **회복물약·시크릿 상자**는 같은 구슬을 0.35초 안에 두 번 탭해 그 자리에서 사용한다(한 번의 탭은 0.3초 이내, 이동 거리 구슬 반지름의 절반 이하). 시크릿 상자는 양옆에 속성 구슬 2개를 만들고 새 `Orb Lifetime`을 주며 보관 칸 하나가 더 필요하다. 해금된 **릴레이 구슬·폭탄**은 Combined처럼 위로 그어 던진다. 잠긴 폭탄의 타이머는 `Item Lifetime`이며, 잠긴 채 끝나면 보유자의 판에서 터져 충격파로 주변을 밀어낸다(아무것도 사라지지 않음). 터질 때의 진동은 `Sound and haptics` 칸의 `Bomb Haptic Style`(83번째, 기본 2 = Heavy)·`Bomb Haptic Intensity`(84번째, 기본 1, 0이면 끔)로 정하고, 남은 초가 몇 초부터 깜빡일지·빠르기·색은 `LabOrbAppearance`의 Inspector(`Bomb Fuse Warning`, 기본 3초·초당 2→8회)에서 정한다. 해금되는 순간 타이머가 꺼지고 일반 공격 구슬처럼 해금 시점부터 `Orb Lifetime`이 새로 시작되며, 끝나면 폭발 없이 사라진다. 피해 배율의 결과는 반올림한 정수이며 최소 1이다. 1인 솔로에는 이웃이 없어 잠긴 아이템이 해금되지 않으므로, 효과를 혼자 시험하려면 `Item Unlock Swipes Min`·`Max`를 0으로 둔다.
+아이템은 음·양과 조합되지 않는다. 해금된 **회복물약·시크릿 상자**는 같은 구슬을 0.35초 안에 두 번 탭해 그 자리에서 사용한다(한 번의 탭은 0.3초 이내, 이동 거리 구슬 반지름의 절반 이하). 시크릿 상자는 양옆에 속성 구슬 2개를 만들고 새 `Orb Lifetime`을 주며 보관 칸 하나가 더 필요하다. 해금된 **릴레이 구슬**은 Combined처럼 위로 그어 던진다. **폭탄**은 잠금이 없고 던질 수 없으며 넘겨도 도화선이 다시 시작되지 않는다. 도화선은 `Item Lifetime`이고, 끝나면 그때 보유자의 판에서 터져 충격파로 주변을 밀어낸다(아무것도 사라지지 않음). 몸통의 빨간 숫자가 남은 초이며, 도화선 끝 불꽃과 치지직 소리가 함께 난다. 터질 때의 진동은 `Sound and haptics` 칸의 `Bomb Haptic Style`(83번째, 기본 2 = Heavy)·`Bomb Haptic Intensity`(84번째, 기본 1, 0이면 끔)로 정하고, 남은 초가 몇 초부터 깜빡일지·빠르기·색은 `LabOrbAppearance`의 Inspector(`Bomb Fuse Warning`, 기본 3초·초당 2→8회)에서 정한다. 폭탄 그림(몸통 `ItemBombBody`·꼭지와 도화선 `ItemBombFuse`)의 크기·꼭지 방향·불꽃 위치·남은 초 글씨의 색·크기도 같은 Inspector의 **Bomb art**에서 정한다. 폭탄은 가만히 두면 북의 `Drum Drift Speed`·`Drum Drift Turning`으로 떠돌고 혼자서는 이웃 화면으로 넘어가지 않으며, 움직인 만큼 굴러 꼭지가 공 둘레를 돈다(몸통 뒤로 숨지 않음). 피해 배율의 결과는 반올림한 정수이며 최소 1이다. 1인 솔로에는 이웃이 없어 잠긴 아이템이 해금되지 않으므로, 효과를 혼자 시험하려면 `Item Unlock Swipes Min`·`Max`를 0으로 둔다.
 
 근거: `LabConfig.GenerationChances`, `LabModel.TryGenerate`·`TryCombine`·`TryTransfer`·`TryUseItem`·`TryAdvance`·`ConfirmHit`, `LabOrbBoard.EndDragAtWorld`, `LabOrbItemMarker.Show`, `LabNetwork.SyncBoard`.
 
@@ -207,9 +220,11 @@ GENERATE 한 번마다 Host가 아래 6개 확률로 종류를 정한다. 매 �
 
 결합이 거절되면 소리·진동이 나지 않는다. Host는 승인 즉시, Client는 Host가 보내는 `combined` 알림을 받았을 때 재생한다. 아이폰 빌드에서만 실제로 진동한다.
 
-### DEV 소리 크기 — 64~67번째, 85번째 설정
+### DEV 소리 크기 — 64~67번째, 85번째, 91번째 설정
 
-BGM·생성·타격·빗나감·결합 소리 크기 5개(인덱스 63~66, 84)는 DEV에서 **0~100**으로 입력하며 기본값은 **50**이다. 50은 Inspector(`Resources/LabConfig`)에 적힌 크기를 그대로 쓴다는 뜻이고, 실제 크기 = Inspector 값 × (DEV 값 ÷ 50)이다. 100은 Inspector 값의 2배, 25는 절반, 0은 소리 없음. DEV 값은 Inspector에 보이지 않으며 원본 에셋을 바꾸지 않는다. 기기별 일시정지 메뉴의 BGM/효과음 슬라이더가 여기에 한 번 더 곱해진다.
+BGM·생성·타격·빗나감·결합·도화선 소리 크기 6개(인덱스 63~66, 84, 90)는 DEV에서 **0~100**으로 입력하며 기본값은 **50**이다. 50은 Inspector(`Resources/LabConfig`)에 적힌 크기를 그대로 쓴다는 뜻이고, 실제 크기 = Inspector 값 × (DEV 값 ÷ 50)이다. 100은 Inspector 값의 2배, 25는 절반, 0은 소리 없음. DEV 값은 Inspector에 보이지 않으며 원본 에셋을 바꾸지 않는다. 기기별 일시정지 메뉴의 BGM/효과음 슬라이더가 여기에 한 번 더 곱해진다.
+
+91번째(인덱스 90) `Fuse Sound Volume (50 = Inspector)`는 #177의 도화선 치지직 소리다(Inspector 기본 0.5). 내 판에 폭탄이 타는 동안 반복하며, 가장 빨리 터질 폭탄의 마지막 3초에는 크기가 0.6배에서 1배로, 빠르기가 1.35배까지 오른다. 일시정지 중이거나 전투가 끝나면 멈춘다. `Assets/Lab/Resources/Audio/Fuse`에 소리 파일을 넣으면 그 첫 파일을, 없으면 코드로 만든 1초 반복음을 쓴다.
 
 #172 아이폰 확인 뒤 진동 기본값을 정리했다: 생성 Medium·1, 타격 Heavy·1, 아이템 타격 Heavy·1, 폭탄 Heavy·1, 결합 Light·1. 세기 차이는 진동 종류(Light < Medium < Heavy)로 낸다.
 
@@ -232,7 +247,8 @@ BGM·생성·타격·빗나감·결합 소리 크기 5개(인덱스 63~66, 84)�
 | 아이템이 너무 자주/드물게 나옴 | 아이템 4종 확률과 Yin/Yang 확률을 함께 조정 | 합 100 유지, 보유 한도에 아이템도 포함됨 |
 | 아이템이 해금되기 전에 사라짐 | Item Lifetime ↑ 또는 Item Unlock Swipes Max ↓ | 세 명이 실제로 넘기는 데 걸리는 시간 |
 | 폭탄 충격파가 너무 약하거나 셈 | Bomb Blast Strength ↑↓, 넓이는 Bomb Blast Radius | 범위 안 구슬이 얼마나 이웃에게 넘어가는지 |
-| 폭탄을 해금할 시간이 부족함 | Item Lifetime ↑ 또는 Item Unlock Swipes Max ↓ | 잠긴 폭탄 타이머도 Item Lifetime을 쓰므로 다른 아이템 수명도 함께 바뀜. 해금 후 던질 시간은 Orb Lifetime |
+| 폭탄을 넘길 시간이 너무 짧거나 김 | Item Lifetime ↑↓ | 폭탄 도화선도 Item Lifetime을 쓰므로 다른 아이템 수명도 함께 바뀜 |
+| 박 폭탄이 너무 잦거나 드묾 | Gourd Bomb Interval Min·Max ↑↓ (Max 0이면 끔) | 180초 한 판에 떨어지는 수(기본 6~9개)와 한 사람이 연달아 받는 빈도 |
 | 릴레이 MAX가 너무 약하거나 강함 | Relay MAX Damage Multiplier | Crack 요괴 HP/실제 피해 또는 Paint 공격값 기록, MAX까지 넘기는 시간; 무속성 릴레이는 색칠하지 않음 |
 | 공동 색칠 판의 목표가 너무 높거나 낮음 | Paint Victory Coverage (%) | 목표1~100%를 새 판에 적용, GOAL 숫자/막대와 Host 공동 결과, 반복 덧칠 후 새 부위 진행 |
 
@@ -240,7 +256,7 @@ BGM·생성·타격·빗나감·결합 소리 크기 5개(인덱스 63~66, 84)�
 
 ## 10. 이 패널로 조정할 수 없는 것·검증 범위
 
-방의 **목표 인원**은 88개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport는 88개 입력칸으로 조정하지 않는다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
+방의 **목표 인원**은 91개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport, 박 폭탄의 대상·착지 위치 추첨과 경고·낙하·말풍선 연출 시간은 91개 입력칸으로 조정하지 않는다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
 
 기존 PR #76 기준 문서는 해당 코드·Scene·설정 에셋과 당시 `docs/VALIDATION.md`의 증거를 **읽어 확인**해 작성됐다. 그 기록의 EditMode **12/12**, PlayMode **20/20** 및 Mac Development 앱 빌드는 이번 3D 조합판 전환의 통과 증거가 아니다. 이 전환의 Unity 컴파일·EditMode·PlayMode, Mac·iOS 빌드, 실제 조작은 새 실행 기록으로 구분해야 한다. 문서의 물리 용어를 갱신한 것만으로 실행 결과를 PASS로 보지 않는다.
 
@@ -248,11 +264,12 @@ BGM·생성·타격·빗나감·결합 소리 크기 5개(인덱스 63~66, 84)�
 
 - 설정 필드·범위·일괄 검사: `Assets/Lab/Scripts/Core/LabConfig.cs` — `DeveloperFields`, `CaptureDeveloperValues`, `TryApplyDeveloperValues`.
 - 저장 기본값: `Assets/Lab/Resources/LabConfig.asset`.
-- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 88개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
+- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 91개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
 - 패널 열기·DEFAULTS·SOLO/Host 설정 적용·슬라이더 변환: `Assets/Lab/Scripts/UI/LabDeveloperMode.cs`.
 - Host 전투 수치·개인 HP·전원 0 패배·스태미나·생성 확률·속성·아이템 잠금·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
 - 아이템 더블 탭 사용·효과(물약·상자), 릴레이 단계, 폭탄 폭발·피해 배율: `Assets/Lab/Scripts/Core/LabModel.cs`(`TryUseItem`·`TryTransfer`·`TryAdvance`·`ConfirmHit`)와 `LabOrbBoard.EndDragAtWorld`.
 - 폭탄 폭발: Host 폭발 기록은 `LabModel.TryAdvance`·`DrainBombExplosions`, 보유자 전달은 `LabNetwork`의 `bombBlast` 패킷, 충격파는 `LabOrbBoard.Blast`, 이펙트는 `LabBombBlastEffect`, 진동은 `LabHaptics.PlayForBomb`, 깜빡임은 `LabOrbItemMarker.SetFuse`.
+- 박 폭탄(#177): 간격·대상·착지 추첨은 `LabModel.DropGourdBombs`·`GourdBombDelay`·`DrainGourdBombs`, 신호는 `LabNetwork.AnnounceGourdBombs`(`gourdBomb` 패킷)·`GourdBombDropped`, 받는 판의 경고·낙하·튕김은 `LabOrbBoard.ExpectDrop`·`LabDropWarning`·`LabOrbView.PlayDrop`, 박 말풍선은 `LabGourdAlert`, 폭탄 그림·굴림·남은 초는 `LabOrbItemMarker.ShowBomb`, 치지직은 `LabFuseSound`, 떠돌기는 `LabOrbBoard.Drift`.
 - 아이템 아이콘·자물쇠·잠금/단계 배지·폭탄 남은 초·해금 연출: `Assets/Lab/Scripts/Orb/LabOrbItemMarker.cs`, 아이콘·자물쇠·속성 재질과 잠금·해금 연출 값: `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`. 해금 연출 값은 DEV 패널이 아닌 Inspector에서 조정한다.
 - 3D 조합판 구슬 물리·XY 손동작·공통 구체 외형: `Assets/Lab/Scripts/Orb/LabOrbBoard.cs`와 `LabOrbView.cs`.
 - 생성 북: 무작위 배치·북 보유자만 생성·북 위치와 360° 방향 추첨·벽 근처 속도 제한·북 전달은 `LabModel.cs`(`PlaceDrums`·`TryGenerate`·`SpawnVelocityFor`·`TryTransfer`), 탭 생성·끌기·떠돌기·가장자리 되돌림·튀어나오기는 `LabOrbBoard.cs`(`EndDragAtWorld`·`Drift`·`UpsertOrb`), 북 그림·회전은 `LabOrbView.cs`, 북 그림 지정은 `LabOrbAppearance.asset`의 `Drum Sprite`.
