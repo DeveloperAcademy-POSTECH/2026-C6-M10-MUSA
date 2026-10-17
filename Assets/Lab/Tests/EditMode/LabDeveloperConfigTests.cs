@@ -28,7 +28,7 @@ namespace C6Lab.Tests
                 "The gourd drops a bomb every 20 to 30 seconds by default.");
             Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
             Assert.That(values[99], Is.EqualTo(1f), "The minimap is on by default.");
-            Assert.That(values[100], Is.EqualTo(100f), "The minimap starts at its normal size.");
+            Assert.That(values[100], Is.EqualTo(50f), "The minimap starts at half of its drawn size.");
             Assert.That(new[] { values[101], values[102] }, Is.EqualTo(new[] { 0f, 0f }), "The minimap starts in its usual place.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
