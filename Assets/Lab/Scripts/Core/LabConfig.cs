@@ -176,7 +176,8 @@ namespace C6Lab
             LabDeveloperField.Toggle("Minimap (0 off, 1 on)"),
             new LabDeveloperField("Minimap Size (%, 50 = default)", 0f, 100f, true),
             new LabDeveloperField("Minimap Move X (- left, + right)", -300f, 100f, true),
-            new LabDeveloperField("Minimap Move Y (- down, + up)", -300f, 500f, true)
+            new LabDeveloperField("Minimap Move Y (- down, + up)", -300f, 500f, true),
+            new LabDeveloperField("Bomb Sound Volume (50 = Inspector)", 0f, 100f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -201,7 +202,7 @@ namespace C6Lab
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90),
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
             new LabDeveloperCategory("Gourd", 79, 87, 88, 89),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
@@ -322,10 +323,13 @@ namespace C6Lab
         [SerializeField, HideInInspector] private float missSoundVolumeDev = DevVolumeDefault;
         [SerializeField, HideInInspector] private float combineSoundVolumeDev = DevVolumeDefault;
         [SerializeField, HideInInspector] private float fuseSoundVolumeDev = DevVolumeDefault;
+        [SerializeField, HideInInspector] private float bombSoundVolumeDev = DevVolumeDefault;
         [Tooltip("음·양 구슬이 결합될 때 소리 기본 크기 (결합한 사람 기기만)")]
         [SerializeField, Range(0f, 1f)] private float combineSoundVolume = .8f;
         [Tooltip("내 판에 잠긴 폭탄이 있는 동안 도화선이 타는 치지직 소리 기본 크기 (그 판 주인 기기만)")]
         [SerializeField, Range(0f, 1f)] private float fuseSoundVolume = .5f;
+        [Tooltip("내 판에서 폭탄이 터질 때 \"뻥이요\"(또는 폭발음) 기본 크기 (그 판 주인 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float bombSoundVolume = .9f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -513,6 +517,7 @@ namespace C6Lab
         public float MissSoundVolume => Scaled(Finite(missSoundVolume, .7f), missSoundVolumeDev);
         public float CombineSoundVolume => Scaled(Finite(combineSoundVolume, .8f), combineSoundVolumeDev);
         public float FuseSoundVolume => Scaled(Finite(fuseSoundVolume, .5f), fuseSoundVolumeDev);
+        public float BombSoundVolume => Scaled(Finite(bombSoundVolume, .9f), bombSoundVolumeDev);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;
@@ -594,7 +599,8 @@ namespace C6Lab
                 Mathf.Round(stopBounds[0] * 100f), Mathf.Round(stopBounds[1] * 100f),
                 Mathf.Round(stopBounds[2] * 100f), Mathf.Round(stopBounds[3] * 100f),
                 stopChances[0], stopChances[1], stopChances[2], stopChances[3],
-                MinimapEnabled ? 1f : 0f, MinimapSizePercent, MinimapMove.x, MinimapMove.y
+                MinimapEnabled ? 1f : 0f, MinimapSizePercent, MinimapMove.x, MinimapMove.y,
+                DevVolume(bombSoundVolumeDev)
             };
         }
 
@@ -737,6 +743,7 @@ namespace C6Lab
             minimapSizePercent = (int)values[100];
             minimapMoveX = (int)values[101];
             minimapMoveY = (int)values[102];
+            bombSoundVolumeDev = values[103];
             error = string.Empty;
             return true;
         }

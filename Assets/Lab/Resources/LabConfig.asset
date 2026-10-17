@@ -75,8 +75,10 @@ MonoBehaviour:
   missSoundVolumeDev: 50
   combineSoundVolumeDev: 50
   fuseSoundVolumeDev: 50
+  bombSoundVolumeDev: 50
   combineSoundVolume: 0.8
   fuseSoundVolume: 0.5
+  bombSoundVolume: 0.9
   hapticsEnabled: 1
   generateHapticStyle: 1
   generateHapticIntensity: 1
