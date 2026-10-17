@@ -623,3 +623,29 @@ Scene 파일을 저장하거나 덮어쓰지 않고 **File → Open Scene으로 
 - **EditMode** `LabSessionSettingsTests`: 북 도착 정보의 스냅샷 JSON 왕복
 - **PlayMode** `LabOrbPhysicsTests`: `AHandedOnDrumComesToRestOnTheHostsSpotWhateverSpeedItCameInWith`, `APassingDrumRunsOnToTheNextPlayerAndSaysItIsPassing`, `GrabbingOrBlastingAnArrivingDrumHandsItBackToPhysics`, `ADrumABlastFlungInSlidesOnItsOwnSpeedButStopsInsideTheBoard`, `GrabbingABlastFlungDrumMakesItsNextCrossingAnOrdinarySwipe`; 변경 `AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour`(넘김 이유 확인), `ABombWithArtDrawsTheCartoonBombWithItsRedSecondsAndASparkingFuse`·`ABombFlashesRedInItsLastSecondsFasterAsItRunsOut`(위 실패 수정)
 - **PlayMode** `LabGourdAlertTests`: 프레임 속도와 무관하게 보완
+
+
+## 로비 빠른 연결 — 2026-10-17, 이슈 #185
+
+- 기준: `origin/main`의 `5436cceb`에서 분기한 `feat/#185-lobby-quick-connect`. Unity **6000.6.5f1**, `Assets/Lab/Scenes/Lab.unity`, Mac Development 빌드.
+- 범위: 앱 시작 자동 Bonjour 목록, 검색 중 방 생성·인원·DEV 사용, DIRECT IP 접기, 접속 중 행 유지·중복 요청 차단·취소, NGO 종료 완료 후 검색 복귀, 실패 사유 유지, Host 확정 이름의 Client 표시. 기존 전투 규칙·105개 설정 원본·IPv4/IPv6 경로 순서·경로별 12초/전체 60초는 변경하지 않았다. 이름을 로비 패킷에 추가해 통신 버전은 **5626 → 5627**이다. 모든 참가자는 같은 새 앱을 사용한다.
+- Scene은 기존 로비 객체를 재사용해 Unity Editor 메뉴 `C6 Lab/Upgrade Quick Connect UI`로 저장했다. 직렬화 레코드 **2,631 → 2,648**, 새 레코드 17개·삭제 0개. 변경 전후 전투 UI 컴포넌트와 설정 JSON이 같다는 메뉴 검사를 통과했고, 최종 Scene의 의미 없는 공백만 정리했다. 작업 전부터 있던 사용자 머터리얼 변경·미추적 폴더는 수정·커밋 대상에서 제외한다.
+
+| 검증 | 상태 | 실행 방법·결과·근거 |
+| --- | --- | --- |
+| Editor 컴파일 | PASS | 실행 중인 기존 Editor에서 컴파일. 신규 PlayMode 검사의 NGO 직접 타입 참조로 발생한 CS0012 2건은 공개 연결 게이트 검사로 바꿨다. 패키지·asmdef 변경 없음. 이후 실제 Test Runner와 두 Mac 빌드 성공. |
+| EditMode 전체 | PASS | Test Runner 실제 실행 **200개 / 통과 200 / 실패 0 / 생략 0**. 최종 XML `Issue185-EditMode.xml`, 11:05:42 UTC 종료. 일반 NGO disconnect는 다음 경로 재시도, Host 명시 사유는 종료하는 7개 분류 사례 포함. |
+| PlayMode 최초 실행 | FAIL → 수정 | **113개 / 통과 109 / 실패 4**. 3건은 같은 Update에서 검색 재개 후 이전 시각을 Tick에 전달한 역행 예외. `activeDiscovery.Tick()`에서 새 시각을 읽도록 수정. 1건은 Solo 종료 후 기존 접속 패널을 기대하던 검사여서 새 목록 패널 기대값으로 변경. 게임 규칙 검사를 제거하지 않았다. |
+| PlayMode 최종 전체 | PASS | 11:06:16~11:07:17 UTC, **113개 / 통과 113 / 실패 0 / 생략 0**. XML `Issue185-PlayMode.xml`. 저장 Scene의 자동 목록·인원·DIRECT IP·DEV 접근, 응답 없는 로컬 UDP 접속 취소·완전 종료 게이트, 빈 주소 및 Host 포트 오류 안내를 포함한다. |
+| Mac 빌드·실제 Bonjour 목록 접속 | PASS | 검증용 Development 앱(20:09 KST)을 같은 Mac에서 두 프로세스로 실행. 별도 포트의 실제 Bonjour 서비스를 검색하고 일반 목록 행의 onClick으로 선택했다. 직접 localhost Join 성공을 대체 근거로 사용하지 않았다. Host 7개·Client 9개 체크포인트 모두 통과, 양쪽 같은 확정 방 이름·설정 확인·공유 전투 시작 확인. |
+| Mac 취소·실패·복귀 | PASS | 위 실행에서 목록 선택 직후 취소 → NGO 종료 후 검색 → 늦은 연결 없음, 빈 직접 주소 사유 유지 → REFRESH → 실제 방 재선택·입장, Host 일시정지·같은 방 로비 복귀 → Client LEAVE → 자동 검색을 확인했다. 최종 JSONL의 모든 체크포인트 `pass=true`. 시험 도구는 검증 후 프로젝트에서 제거했다. |
+| 실제 Mac 화면 | PASS (관찰 범위) | 390×844 실행 창에서 LOCAL ROOMS·CREATE ROOM·인원 조정·방 행·REFRESH, DIRECT IP 펼침, DEV 설정 접근을 관찰했다. 전체 UI 디자인 개편이나 모든 해상도 검증은 아니다. |
+| 임시 도구 제거 후 일반 Mac 빌드 | PASS | 20:18 KST 일반 Development 빌드 `C6_LAB_BUILD_OK`, 크기 318,187,003바이트. 검증용 런타임/Editor 스크립트와 meta를 제거한 상태이며, 결과는 보이는 `Builds/Lab` 아래 새 폴더에 생성했다. |
+| iOS 출력·앱 서명·실기기·핫스팟 | NOT_RUN | 이번 브랜치에서 실행하지 않았다. 두 Mac 프로세스 결과를 iOS 권한·핫스팟·서로 다른 기기의 통신 성공으로 승계하지 않는다. |
+| 3~5기기·불량 네트워크·버전 혼합 | NOT_RUN | 현재 정원 허용 범위는 2~5명이나 이번 네트워크 실행은 두 Mac 프로세스다. 경로 전체 60초 소진, 실기기 권한 거절, 정원 초과·전투 중의 실제 다른 앱 접속은 이번에 재현하지 않았다. |
+
+### 결과 해석과 남은 확인
+
+- `LabJoinRejectionTests`는 거절 사유 분류의 단위 검사이며 실제 구버전 앱 접속 검사가 아니다. Host가 제공한 정원 초과·전투 중·토큰 불일치는 구체적 사유를 표시한다. NGO가 프로토콜 불일치를 사유 없이 끊으면 일반 전송 실패와 완전히 구별할 수 없으므로, 모든 버전 불일치에 구체적 원인이 표시된다고 보장하지 않는다.
+- 새로고침의 캐시 행은 최대 5초 유지하지만 새 주소 확인 전에는 클릭을 막는다. 결과 0개 안내는 검색을 끝내지 않으며, native 검색 오류는 REFRESH로 재시도한다. 정원·전투 상태를 Bonjour TXT로 실시간 광고하는 기능은 추가하지 않았다.
+- Test Runner XML·Editor/Player 로그·검증용 앱·임시 실행 도구는 로컬 증거로 보존하고 공개 Git에 넣지 않는다. 문서의 PASS는 위 환경과 수행 시나리오에만 해당한다. 기존 과거 검증 기록은 그대로 보존한다.

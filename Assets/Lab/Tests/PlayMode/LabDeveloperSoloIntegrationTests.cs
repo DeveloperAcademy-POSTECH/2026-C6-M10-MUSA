@@ -151,8 +151,8 @@ namespace C6Lab.Tests
                 "The room heading must stay above the scrolling rows, including on tall screens.");
             Assert.That(hud.roomSearchStatusText.rectTransform.anchorMin.y, Is.EqualTo(1f),
                 "The room-search hint must remain visible above the scrolling rows.");
-            Assert.That(hud.roomListPanel.activeSelf, Is.False,
-                "The room browser must not cover the lobby before searching.");
+            Assert.That(hud.roomListPanel.activeSelf, Is.True,
+                "The quick room browser appears automatically while disconnected.");
             Assert.That(hud.roomListRowTemplate.gameObject.activeSelf, Is.False,
                 "The template is not an actual discovered room.");
 

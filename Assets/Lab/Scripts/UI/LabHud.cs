@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -23,6 +24,11 @@ namespace C6Lab
         public GameObject roomListPanel;
         public Button refreshRoomsButton;
         public Button cancelRoomSearchButton;
+        [Header("Saved quick-connect lobby controls")]
+        public GameObject directConnectionPanel;
+        public Button directConnectionButton;
+        public Text quickPlayerCountText;
+        public RectTransform roomListScrollView;
         public RectTransform roomListContent;
         public Button roomListRowTemplate;
         public Text roomSearchStatusText;
@@ -75,6 +81,13 @@ namespace C6Lab
         public Button resultLeaveButton;
 
         private readonly List<Button> roomRows = new List<Button>();
+        private readonly List<Text> roomRowLabels = new List<Text>();
+        private readonly List<string> roomRowKeys = new List<string>();
+        private bool directConnectionExpanded;
+        private bool automaticRoomSearchPending;
+        private bool wasConnected;
+        private string lobbyInputError = string.Empty;
+        private Text directConnectionButtonLabel;
         private readonly Text[] playerSlotButtonLabels = new Text[LabModel.MaximumParticipants];
         private string renderedRoomList = string.Empty;
         private Camera capturedBattleCamera;
@@ -87,13 +100,17 @@ namespace C6Lab
         private void Awake()
         {
             CacheGoalTitle();
+            if (directConnectionButton != null)
+                directConnectionButtonLabel = directConnectionButton.GetComponentInChildren<Text>(true);
             if (hostButton != null) hostButton.onClick.AddListener(Host);
             if (joinButton != null) joinButton.onClick.AddListener(Join);
             if (findHostButton != null) findHostButton.onClick.AddListener(FindHost);
             if (decreasePlayersButton != null) decreasePlayersButton.onClick.AddListener(() => ChangePlayerCount(-1));
             if (increasePlayersButton != null) increasePlayersButton.onClick.AddListener(() => ChangePlayerCount(1));
             if (refreshRoomsButton != null) refreshRoomsButton.onClick.AddListener(RefreshRooms);
-            if (cancelRoomSearchButton != null) cancelRoomSearchButton.onClick.AddListener(() => network?.CancelRoomSearch());
+            if (cancelRoomSearchButton != null) cancelRoomSearchButton.onClick.AddListener(CancelConnection);
+            if (directConnectionButton != null) directConnectionButton.onClick.AddListener(ToggleDirectConnection);
+            if (port != null) port.onValueChanged.AddListener(_ => lobbyInputError = string.Empty);
             if (playerSlotButtons != null)
             {
                 for (int i = 0; i < playerSlotButtons.Length && i < LabModel.MaximumParticipants; i++)
@@ -110,22 +127,28 @@ namespace C6Lab
                 }
             }
             if (startButton != null) startButton.onClick.AddListener(() => network?.StartBattle());
-            if (leaveButton != null) leaveButton.onClick.AddListener(() => network?.Stop());
+            if (leaveButton != null) leaveButton.onClick.AddListener(Leave);
             if (pauseButton != null) pauseButton.onClick.AddListener(() => network?.PauseBattle());
             if (resumeButton != null) resumeButton.onClick.AddListener(() => network?.ResumeBattle());
             if (returnLobbyButton != null) returnLobbyButton.onClick.AddListener(() => network?.ReturnAllToLobby());
             if (developerSettingsButton != null) developerSettingsButton.onClick.AddListener(OpenDeveloperSettings);
             if (resultRestartButton != null) resultRestartButton.onClick.AddListener(RestartFromResult);
             if (resultReturnLobbyButton != null) resultReturnLobbyButton.onClick.AddListener(() => network?.ReturnAllToLobby());
-            if (resultLeaveButton != null) resultLeaveButton.onClick.AddListener(() => network?.Stop());
+            if (resultLeaveButton != null) resultLeaveButton.onClick.AddListener(Leave);
         }
 
-        private void Start()
+        private IEnumerator Start()
         {
             if (hostAddress != null && network != null) hostAddress.text = network.hostAddress;
             if (port != null && network != null) port.text = network.port.ToString();
             SetVisible(roomListPanel, false);
+            SetVisible(directConnectionPanel, false);
             SetVisible(roomListRowTemplate == null ? null : roomListRowTemplate.gameObject, false);
+            // Give command-line launchers and test fixtures their own Start callback first.
+            // This is one attempt, never a per-frame retry after discovery fails.
+            yield return null;
+            automaticRoomSearchPending = true;
+            TryAutomaticRoomSearch();
         }
 
         private void Update()
@@ -148,39 +171,68 @@ namespace C6Lab
             SetVisible(leftNeighborBadge, hasNeighbors);
             SetVisible(rightNeighborBadge, hasNeighbors);
             SetVisible(pauseButton == null ? null : pauseButton.gameObject, playing);
-            SetVisible(sessionControls, !battleVisible);
-            SetVisible(statusText == null ? null : statusText.gameObject, !battleVisible);
             SetVisible(resultControls, terminal);
             if (terminal)
                 Set(resultStatusText, snapshot.phase == LabPhase.Victory ? "VICTORY" : "DEFEAT");
             bool connected = network.IsConnected;
-            bool searching = network.IsSearchingRooms;
-            bool hostLobby = connected && network.IsHost && snapshot == null;
-            bool playerSlotLobby = connected && snapshot == null && !network.IsDeveloperSolo;
+            bool joining = network.IsJoiningRoom;
+            if (wasConnected && !connected && !joining)
+            {
+                directConnectionExpanded = false;
+                automaticRoomSearchPending = true;
+            }
+            wasConnected = connected;
+            bool showBrowser = !battleVisible && (!connected || joining);
+            bool developerOpen = developerMode != null && developerMode.panel != null
+                && developerMode.panel.activeInHierarchy;
+            TryAutomaticRoomSearch();
+            SetVisible(sessionControls, !battleVisible && connected && !joining);
+            SetVisible(statusText == null ? null : statusText.gameObject, !battleVisible && connected && !joining);
             SetVisible(playerSlotPanel, false);
             RefreshPlayerSlots(false);
-            SetVisible(roomListPanel, searching && !connected);
-            SetVisible(decreasePlayersButton == null ? null : decreasePlayersButton.gameObject, !connected && !searching);
-            SetVisible(increasePlayersButton == null ? null : increasePlayersButton.gameObject, !connected && !searching);
-            SetVisible(hostAddress == null ? null : hostAddress.gameObject, !hostLobby);
-            SetVisible(port == null ? null : port.gameObject, !hostLobby);
-            SetVisible(roomNameText == null ? null : roomNameText.gameObject, hostLobby);
-            if (hostLobby)
-                Set(roomNameText, network.HostRoomNamePending
+            // This panel is a saved Canvas object. Hide it behind DEV instead of bringing
+            // it forward each frame and accidentally covering the developer form.
+            SetVisible(roomListPanel, showBrowser && !developerOpen);
+            SetVisible(decreasePlayersButton == null ? null : decreasePlayersButton.gameObject, showBrowser);
+            SetVisible(increasePlayersButton == null ? null : increasePlayersButton.gameObject, showBrowser);
+            SetVisible(hostButton == null ? null : hostButton.gameObject, showBrowser);
+            SetVisible(findHostButton == null ? null : findHostButton.gameObject, false);
+            SetVisible(directConnectionPanel, showBrowser && directConnectionExpanded);
+            UpdateRoomListLayout();
+            SetVisible(hostAddress == null ? null : hostAddress.gameObject, showBrowser && directConnectionExpanded);
+            SetVisible(port == null ? null : port.gameObject, showBrowser && directConnectionExpanded);
+            SetVisible(joinButton == null ? null : joinButton.gameObject, showBrowser && directConnectionExpanded);
+            SetVisible(roomNameText == null ? null : roomNameText.gameObject, connected && !joining);
+            if (connected && !joining)
+                Set(roomNameText, network.IsHost && network.HostRoomNamePending
                     ? "REGISTERING ROOM…"
-                    : string.IsNullOrEmpty(network.HostRoomName)
-                        ? "ROOM NAME UNAVAILABLE · JOIN BY HOST IP : " + network.port
-                        : "ROOM " + network.HostRoomName);
+                    : string.IsNullOrEmpty(network.ConnectedRoomName)
+                        ? "ROOM NAME UNAVAILABLE · HOST IP : " + network.port
+                        : "ROOM " + network.ConnectedRoomName);
+            Set(quickPlayerCountText, "ROOM PLAYERS " + network.TargetParticipantCount + " / 5");
             if (decreasePlayersButton != null)
                 decreasePlayersButton.interactable = network.CanChooseConnection && network.TargetParticipantCount > 2;
             if (increasePlayersButton != null)
                 increasePlayersButton.interactable = network.CanChooseConnection && network.TargetParticipantCount < 5;
-            if (refreshRoomsButton != null) refreshRoomsButton.interactable = searching;
-            if (cancelRoomSearchButton != null) cancelRoomSearchButton.interactable = searching;
-            RefreshRoomRows(searching);
+            SetVisible(refreshRoomsButton == null ? null : refreshRoomsButton.gameObject, showBrowser && !joining);
+            if (refreshRoomsButton != null) refreshRoomsButton.interactable = network.CanChooseConnection;
+            SetVisible(cancelRoomSearchButton == null ? null : cancelRoomSearchButton.gameObject, showBrowser && joining);
+            if (cancelRoomSearchButton != null)
+                cancelRoomSearchButton.interactable = joining && !network.IsCancelingJoin;
+            if (directConnectionButton != null)
+            {
+                directConnectionButton.interactable = !joining && network.CanChooseConnection;
+                Set(directConnectionButtonLabel,
+                    directConnectionExpanded ? "HIDE DIRECT IP" : "DIRECT IP");
+            }
+            RefreshRoomRows(showBrowser);
             if (hostButton != null) hostButton.interactable = network.CanChooseConnection;
             if (joinButton != null) joinButton.interactable = network.CanChooseConnection;
+            if (hostAddress != null) hostAddress.interactable = network.CanChooseConnection;
+            if (port != null) port.interactable = network.CanChooseConnection;
             if (findHostButton != null) findHostButton.interactable = network.CanChooseConnection;
+            SetVisible(startButton == null ? null : startButton.gameObject, connected && network.IsHost && !joining);
+            SetVisible(leaveButton == null ? null : leaveButton.gameObject, connected && !joining);
             if (startButton != null) startButton.interactable = network.CanStartBattle;
             if (pauseButton != null) pauseButton.interactable = network.CanPauseBattle;
             if (resumeButton != null) resumeButton.interactable = network.CanResumeBattle;
@@ -443,18 +495,68 @@ namespace C6Lab
 
         private void Host()
         {
+            lobbyInputError = string.Empty;
             if (network == null || !TryPort()) return;
             network.Host();
         }
 
         private void Join()
         {
+            lobbyInputError = string.Empty;
             if (network == null || !TryPort()) return;
             network.Join(hostAddress == null ? network.hostAddress : hostAddress.text);
         }
 
+        private void Leave()
+        {
+            if (network == null) return;
+            directConnectionExpanded = false;
+            network.Stop();
+        }
+
+        private void TryAutomaticRoomSearch()
+        {
+            if (!automaticRoomSearchPending || network == null) return;
+            if (network.IsConnected || network.IsJoiningRoom || network.IsSearchingRooms
+                || network.RoomSearchFailed)
+            {
+                automaticRoomSearchPending = false;
+                return;
+            }
+            // Stop is asynchronous: wait for NGO shutdown before consuming this attempt.
+            if (!network.CanChooseConnection) return;
+            automaticRoomSearchPending = false;
+            network.StartRoomSearch();
+        }
+
+        private void CancelConnection()
+        {
+            if (network != null) network.CancelJoin();
+        }
+
+        private void ToggleDirectConnection()
+        {
+            if (network == null || !network.CanChooseConnection) return;
+            directConnectionExpanded = !directConnectionExpanded;
+        }
+
+        private void UpdateRoomListLayout()
+        {
+            if (roomListScrollView == null || directConnectionButton == null
+                || directConnectionPanel == null) return;
+            RectTransform panelRect = directConnectionPanel.transform as RectTransform;
+            RectTransform buttonRect = directConnectionButton.transform as RectTransform;
+            if (panelRect == null || buttonRect == null) return;
+            float bottom = (directConnectionExpanded ? panelRect.offsetMax.y : buttonRect.offsetMax.y) + 10f;
+            Vector2 offset = roomListScrollView.offsetMin;
+            if (Mathf.Approximately(offset.y, bottom)) return;
+            offset.y = bottom;
+            roomListScrollView.offsetMin = offset;
+        }
+
         private void FindHost()
         {
+            lobbyInputError = string.Empty;
             if (network == null) return;
             network.StartRoomSearch();
         }
@@ -467,15 +569,14 @@ namespace C6Lab
 
         private void RefreshRooms()
         {
-            if (network == null || !network.IsSearchingRooms) return;
-            network.CancelRoomSearch();
-            renderedRoomList = string.Empty;
+            lobbyInputError = string.Empty;
+            if (network == null || !network.CanChooseConnection) return;
             network.StartRoomSearch();
         }
 
-        private void RefreshRoomRows(bool searching)
+        private void RefreshRoomRows(bool visible)
         {
-            if (!searching || roomListContent == null || roomListRowTemplate == null)
+            if (!visible || roomListContent == null || roomListRowTemplate == null)
             {
                 if (roomRows.Count > 0) ClearRoomRows();
                 return;
@@ -496,15 +597,33 @@ namespace C6Lab
                     row.gameObject.SetActive(true);
                     row.onClick.RemoveAllListeners();
                     string key = room.Key;
-                    row.onClick.AddListener(() => network?.JoinDiscoveredRoom(key));
-                    Set(row.GetComponentInChildren<Text>(), room.Name);
+                    row.onClick.AddListener(() => JoinRoom(key));
+                    Text label = row.GetComponentInChildren<Text>(true);
+                    Set(label, room.Name);
                     roomRows.Add(row);
+                    roomRowLabels.Add(label);
+                    roomRowKeys.Add(key);
                 }
                 renderedRoomList = current;
             }
-            Set(roomSearchStatusText, network.Status.StartsWith("That room is no longer available", StringComparison.Ordinal)
-                ? network.Status
-                : rooms.Count == 0 ? "Searching for rooms…" : "Select a room to join.");
+            for (int i = 0; i < roomRows.Count; i++)
+            {
+                bool selected = network.IsJoiningRoom && string.Equals(roomRowKeys[i],
+                    network.JoiningRoomKey, StringComparison.OrdinalIgnoreCase);
+                roomRows[i].interactable = network.CanJoinDiscoveredRoom(roomRowKeys[i]);
+                Set(roomRowLabels[i], rooms[i].Name + (selected ? "\nCONNECTING…" : string.Empty));
+            }
+            Set(roomSearchStatusText, !string.IsNullOrEmpty(lobbyInputError) ? lobbyInputError
+                : network.IsJoiningRoom
+                ? network.IsCancelingJoin ? "Canceling connection…"
+                    : "Connecting… " + Mathf.FloorToInt(network.JoinElapsedSeconds) + "s"
+                : network.RoomSearchMessage);
+        }
+
+        private void JoinRoom(string key)
+        {
+            lobbyInputError = string.Empty;
+            if (network != null) network.JoinDiscoveredRoom(key);
         }
 
         private void ClearRoomRows()
@@ -516,6 +635,8 @@ namespace C6Lab
                 Destroy(row.gameObject);
             }
             roomRows.Clear();
+            roomRowLabels.Clear();
+            roomRowKeys.Clear();
             renderedRoomList = string.Empty;
         }
 
@@ -523,7 +644,8 @@ namespace C6Lab
         {
             if (port == null || !ushort.TryParse(port.text, out var parsed) || parsed == 0)
             {
-                if (noticeText != null) noticeText.text = "Enter port 1–65535.";
+                lobbyInputError = "Enter port 1–65535 in DIRECT IP.";
+                if (noticeText != null) noticeText.text = lobbyInputError;
                 return false;
             }
             network.port = parsed;
