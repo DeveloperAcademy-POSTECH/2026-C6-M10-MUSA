@@ -768,7 +768,8 @@ namespace C6Lab.Tests
                 Assert.That(marker.LockVisible, Is.False, "No padlock on the bomb art.");
                 Assert.That(marker.BadgeVisible, Is.False, "No badge square on the bomb art.");
                 Assert.That(marker.BombTimeText, Is.EqualTo("10"), "The whole seconds left on the fuse are written on it.");
-                Assert.That(marker.BombTimeColor, Is.EqualTo(appearance.BombTimeColor), "The seconds are red.");
+                // A TextMesh keeps its colour in 8-bit channels, so compare at that precision.
+                Assert.That((Color32)marker.BombTimeColor, Is.EqualTo((Color32)appearance.BombTimeColor), "The seconds are red.");
                 Assert.That(marker.SparkVisible, Is.True, "The bomb's fuse sparks while it burns.");
                 SpriteRenderer art = marker.GetComponentsInChildren<SpriteRenderer>()
                     .Single(renderer => renderer.name == "Bomb Art");
