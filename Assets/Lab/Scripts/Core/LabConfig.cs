@@ -11,9 +11,34 @@ namespace C6Lab
         public readonly float Min;
         public readonly float Max;
         public readonly bool WholeNumber;
+        /// <summary>켜기/끄기(또는 둘 중 하나) 항목이면 0일 때·1일 때 버튼 글자. 숫자 항목은 null.</summary>
+        public readonly string OffText, OnText;
+
+        /// <summary>DEV 화면에서 숫자 대신 토글 버튼으로 보여주는 0/1 항목인지</summary>
+        public bool IsToggle => OnText != null;
+
+        /// <summary>화면에 보이는 이름. 토글은 "(0 off, 1 on)" 같은 설명을 뗀다. Label 자체는 테스트·검색용으로 그대로 둔다.</summary>
+        public string DisplayLabel
+        {
+            get
+            {
+                if (!IsToggle || Label == null) return Label;
+                int bracket = Label.IndexOf(" (", StringComparison.Ordinal);
+                return bracket > 0 ? Label.Substring(0, bracket) : Label;
+            }
+        }
+
+        /// <summary>0/1 값을 토글 버튼으로 보여주는 항목. 값과 저장·공유 방식은 숫자 항목과 같다.</summary>
+        public static LabDeveloperField Toggle(string label, string offText = "OFF", string onText = "ON") =>
+            new LabDeveloperField(label, 0f, 1f, true, offText, onText);
 
         public LabDeveloperField(string label, float min, float max, bool wholeNumber = false)
+            : this(label, min, max, wholeNumber, null, null) { }
+
+        private LabDeveloperField(string label, float min, float max, bool wholeNumber, string offText, string onText)
         {
+            OffText = offText;
+            OnText = onText;
             Label = label;
             Min = min;
             Max = max;
@@ -98,8 +123,8 @@ namespace C6Lab
             new LabDeveloperField("Item Unlock Swipes Max", 0f, 20f, true),
             new LabDeveloperField("Player Max HP", 1f, 300f, true),
             new LabDeveloperField("Combine Speed", 0f, 10f),
-            new LabDeveloperField("Drop Combine (0 off, 1 on)", 0f, 1f, true),
-            new LabDeveloperField("Contact Combine (0 off, 1 on)", 0f, 1f, true),
+            LabDeveloperField.Toggle("Drop Combine (0 off, 1 on)"),
+            LabDeveloperField.Toggle("Contact Combine (0 off, 1 on)"),
             new LabDeveloperField("Potion Heal (HP)", 0f, 300f, true),
             new LabDeveloperField("Relay x2 Damage Multiplier", 1f, 20f),
             new LabDeveloperField("Relay MAX Damage Multiplier", 1f, 20f),
@@ -116,7 +141,7 @@ namespace C6Lab
             new LabDeveloperField("Generate Sound Volume (50 = Inspector)", 0f, 100f),
             new LabDeveloperField("Hit Sound Volume (50 = Inspector)", 0f, 100f),
             new LabDeveloperField("Miss Sound Volume (50 = Inspector)", 0f, 100f),
-            new LabDeveloperField("Haptics (0 off, 1 on)", 0f, 1f, true),
+            LabDeveloperField.Toggle("Haptics (0 off, 1 on)"),
             new LabDeveloperField("Generate Haptic Style (0 Light 1 Medium 2 Heavy 3 Soft 4 Rigid)", 0f, 4f, true),
             new LabDeveloperField("Generate Haptic Intensity", 0f, 1f),
             new LabDeveloperField("Hit Haptic Style (0-4)", 0f, 4f, true),
@@ -128,7 +153,7 @@ namespace C6Lab
             new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
             new LabDeveloperField("Drum Drift Turning (per second)", 0f, 2f),
             new LabDeveloperField("Drum Spin Strength", 0f, 3f),
-            new LabDeveloperField("Gourd Mode (0 paint, 1 crack)", 0f, 1f, true),
+            LabDeveloperField.Toggle("Gourd Mode (0 paint, 1 crack)", "PAINT", "CRACK"),
             new LabDeveloperField("Bomb Blast Radius (board widths)", 0f, 2f),
             new LabDeveloperField("Bomb Blast Strength (board widths/s)", 0f, 20f),
             new LabDeveloperField("Bomb Haptic Style (0-4)", 0f, 4f, true),
@@ -147,7 +172,11 @@ namespace C6Lab
             new LabDeveloperField("Drum Stop Near Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Drum Stop Middle Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Drum Stop Far Chance (%)", 0f, 100f, true),
-            new LabDeveloperField("Drum Pass Through Chance (%)", 0f, 100f, true)
+            new LabDeveloperField("Drum Pass Through Chance (%)", 0f, 100f, true),
+            LabDeveloperField.Toggle("Minimap (0 off, 1 on)"),
+            new LabDeveloperField("Minimap Size (%, 50 = default)", 0f, 100f, true),
+            new LabDeveloperField("Minimap Move X (- left, + right)", -300f, 100f, true),
+            new LabDeveloperField("Minimap Move Y (- down, + up)", -300f, 500f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -174,7 +203,8 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 79, 87, 88, 89)
+            new LabDeveloperCategory("Gourd", 79, 87, 88, 89),
+            new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
         });
 
 
@@ -320,6 +350,19 @@ namespace C6Lab
         [SerializeField] private LabHapticStyle combineHapticStyle = LabHapticStyle.Light;
         [Tooltip("결합 진동 세기 (0 = 끔)")]
         [SerializeField, Range(0f, 1f)] private float combineHapticIntensity = 1f;
+
+        [Header("Minimap (#181)")]
+        [Tooltip("전투 화면 오른쪽 아래에 북이 누구한테 있는지 보여주는 미니맵을 켠다.")]
+        [SerializeField] private bool minimapEnabled = true;
+        [Tooltip("미니맵 크기 0~100 (%). 기본 50이 가운데, 100 = 원래 그린 크기(128×116), 0 = 보이지 않음. 오른쪽 아래 모서리를 기준으로 커지거나 작아진다.")]
+        [SerializeField, Range(0, 100)] private int minimapSizePercent = 50;
+        [Tooltip("미니맵을 기본 자리(오른쪽 이웃 동그라미 위)에서 옮기는 거리. -는 왼쪽, +는 오른쪽 (화면 폭 390 기준 단위)")]
+        [SerializeField, Range(-300, 100)] private int minimapMoveX = 0;
+        [Tooltip("미니맵을 기본 자리에서 옮기는 거리. -는 아래, +는 위 (화면 높이 844 기준 단위)")]
+        [SerializeField, Range(-300, 500)] private int minimapMoveY = 0;
+        public bool MinimapEnabled => minimapEnabled;
+        public int MinimapSizePercent => Mathf.Clamp(minimapSizePercent, 0, 100);
+        public Vector2 MinimapMove => new Vector2(Mathf.Clamp(minimapMoveX, -300, 100), Mathf.Clamp(minimapMoveY, -300, 500));
 
         [Header("Replaceable orb presentation")]
         [SerializeField] private LabOrbAppearance orbAppearance;
@@ -550,7 +593,8 @@ namespace C6Lab
                 DevVolume(fuseSoundVolumeDev),
                 Mathf.Round(stopBounds[0] * 100f), Mathf.Round(stopBounds[1] * 100f),
                 Mathf.Round(stopBounds[2] * 100f), Mathf.Round(stopBounds[3] * 100f),
-                stopChances[0], stopChances[1], stopChances[2], stopChances[3]
+                stopChances[0], stopChances[1], stopChances[2], stopChances[3],
+                MinimapEnabled ? 1f : 0f, MinimapSizePercent, MinimapMove.x, MinimapMove.y
             };
         }
 
@@ -689,6 +733,10 @@ namespace C6Lab
             fuseSoundVolumeDev = values[90];
             drumStopBounds = new[] { (int)values[91], (int)values[92], (int)values[93], (int)values[94] };
             drumStopChances = new[] { (int)values[95], (int)values[96], (int)values[97], (int)values[98] };
+            minimapEnabled = values[99] >= .5f;
+            minimapSizePercent = (int)values[100];
+            minimapMoveX = (int)values[101];
+            minimapMoveY = (int)values[102];
             error = string.Empty;
             return true;
         }

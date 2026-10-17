@@ -157,8 +157,8 @@ namespace C6Lab
         // happened so the holder's board can push orbs away, combine sound/haptic settings join the
         // shared config and the Host tells the combiner when a combine is approved; older clients
         // cannot share this room. Version 5621 adds the Paint goal setting and independent
-        // approved impact values/directions/colors.
-        internal const ushort LabProtocolVersion = 5624;
+        // approved impact values/directions/colors. Version 5625 adds the minimap on/off, size and position settings (#181).
+        internal const ushort LabProtocolVersion = 5625;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");

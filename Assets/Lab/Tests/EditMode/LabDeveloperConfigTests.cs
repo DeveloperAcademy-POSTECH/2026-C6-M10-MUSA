@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -17,7 +18,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(99));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(103));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -27,6 +28,9 @@ namespace C6Lab.Tests
             Assert.That(new[] { values[88], values[89] }, Is.EqualTo(new[] { 20f, 30f }),
                 "The gourd drops a bomb every 20 to 30 seconds by default.");
             Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
+            Assert.That(values[99], Is.EqualTo(1f), "The minimap is on by default.");
+            Assert.That(values[100], Is.EqualTo(50f), "The minimap starts at half of its drawn size.");
+            Assert.That(new[] { values[101], values[102] }, Is.EqualTo(new[] { 0f, 0f }), "The minimap starts in its usual place.");
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -109,7 +113,14 @@ namespace C6Lab.Tests
             values[90] = 100f; // fuse sizzle twice the Inspector volume
             values[91] = 10f; values[92] = 30f; values[93] = 50f; values[94] = 90f; // drum stop zone edges
             values[95] = 25f; values[96] = 25f; values[97] = 25f; values[98] = 25f; // drum stop chances
+            values[99] = 0f; // minimap off
+            values[100] = 80f; // minimap bigger than the default 50
+            values[101] = -120f; // 120 to the left
+            values[102] = 60f; // 60 up
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.MinimapEnabled, Is.False, "DEV can turn the minimap off.");
+            Assert.That(config.MinimapSizePercent, Is.EqualTo(80), "DEV sizes the minimap from 0 to 100 with 50 in the middle.");
+            Assert.That(config.MinimapMove, Is.EqualTo(new Vector2(-120f, 60f)), "DEV can move the minimap left/right and up/down.");
             Assert.That(config.FuseSoundVolume, Is.EqualTo(1f).Within(1e-5f), "100 doubles the Inspector fuse volume (0.5).");
             Assert.That(config.DrumStopBounds(), Is.EqualTo(new[] { .1f, .3f, .5f, .9f }).Within(1e-6f));
             Assert.That(config.DrumStopChances(), Is.EqualTo(new[] { 25, 25, 25, 25 }));
@@ -767,5 +778,21 @@ namespace C6Lab.Tests
             Assert.That(config.CaptureDeveloperValues()[87], Is.EqualTo(expected));
         }
 
+
+        [Test]
+        public void OnOffFieldsShowAsTogglesWithShortNamesButKeepTheirValuesAndLabels()
+        {
+            var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
+            Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap" }));
+            Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
+                "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
+            var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");
+            Assert.That(new[] { gourd.OffText, gourd.OnText }, Is.EqualTo(new[] { "PAINT", "CRACK" }));
+            Assert.That(gourd.Label, Is.EqualTo("Gourd Mode (0 paint, 1 crack)"), "The full label stays for lookups.");
+            var minimap = toggles.Single(field => field.DisplayLabel == "Minimap");
+            Assert.That(new[] { minimap.OffText, minimap.OnText }, Is.EqualTo(new[] { "OFF", "ON" }));
+            Assert.That(LabConfig.DeveloperFields.Single(field => field.Label.StartsWith("Minimap Size")).IsToggle, Is.False);
+        }
     }
 }

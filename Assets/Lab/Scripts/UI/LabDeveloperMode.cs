@@ -74,6 +74,7 @@ namespace C6Lab
                 return;
             }
             BuildCategoryLayout();
+            BuildToggles();
 
             if (toggleButton != null) toggleButton.onClick.AddListener(Open);
             if (closeButton != null) closeButton.onClick.AddListener(Close);
@@ -107,6 +108,7 @@ namespace C6Lab
         private void Update()
         {
             if (!available || network == null) return;
+            RefreshToggles();
             if (soloTuningActive && !network.IsDeveloperSolo)
                 RestoreSourceConfig();
 
@@ -462,6 +464,94 @@ namespace C6Lab
             float value = LabDeveloperSliderScale.Denormalize(field, defaultValues[index], position);
             if (field.WholeNumber) value = Mathf.Round(value);
             valueInputs[index].SetTextWithoutNotify(value.ToString("0.######", CultureInfo.InvariantCulture));
+        }
+
+        // 0/1 항목(켜기/끄기, 박 모드)은 숫자 입력칸·슬라이더 대신 누를 때마다 바뀌는 버튼으로 보여준다.
+        // 숨긴 입력칸에 "0"/"1"을 그대로 넣기 때문에 APPLY·방 공유·검사는 숫자 항목과 똑같이 동작한다.
+        private static readonly Color ToggleOnColor = new Color(.565f, .337f, .247f, 1f);
+        private static readonly Color ToggleOffColor = new Color(.55f, .55f, .55f, 1f);
+        private Button[] toggleButtons;
+        private Text[] toggleLabels;
+
+        private void BuildToggles()
+        {
+            int count = LabConfig.DeveloperFields.Count;
+            toggleButtons = new Button[count];
+            toggleLabels = new Text[count];
+            for (int i = 0; i < count; i++)
+            {
+                LabDeveloperField field = LabConfig.DeveloperFields[i];
+                if (!field.IsToggle || valueInputs[i] == null || valueSliders[i] == null) continue;
+                Transform row = valueInputs[i].transform.parent;
+                Text rowLabel = row.Find("SettingLabel")?.GetComponent<Text>();
+                if (rowLabel != null) rowLabel.text = field.DisplayLabel;
+
+                // 숫자 입력칸은 숨기고(값은 그대로 보관), 슬라이더 자리에 버튼을 놓는다.
+                valueInputs[i].gameObject.SetActive(false);
+                Slider slider = valueSliders[i];
+                slider.interactable = false;
+                foreach (Transform part in slider.transform) part.gameObject.SetActive(false);
+
+                var go = new GameObject("SettingToggle", typeof(RectTransform), typeof(Image), typeof(Button));
+                go.layer = slider.gameObject.layer;
+                var rect = (RectTransform)go.transform;
+                rect.SetParent(slider.transform, false);
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = new Vector2(4f, 2f);
+                rect.offsetMax = new Vector2(-4f, -2f);
+
+                var textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+                textGo.layer = go.layer;
+                var textRect = (RectTransform)textGo.transform;
+                textRect.SetParent(rect, false);
+                textRect.anchorMin = Vector2.zero;
+                textRect.anchorMax = Vector2.one;
+                textRect.offsetMin = textRect.offsetMax = Vector2.zero;
+                Text text = textGo.GetComponent<Text>();
+                text.font = rowLabel != null ? rowLabel.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                text.fontSize = rowLabel != null ? rowLabel.fontSize : 14;
+                text.fontStyle = FontStyle.Bold;
+                text.alignment = TextAnchor.MiddleCenter;
+                text.color = Color.white;
+                text.raycastTarget = false;
+
+                int fieldIndex = i;
+                Button button = go.GetComponent<Button>();
+                button.targetGraphic = go.GetComponent<Image>();
+                button.onClick.AddListener(() => FlipToggle(fieldIndex));
+                toggleButtons[i] = button;
+                toggleLabels[i] = text;
+            }
+            RefreshToggles();
+        }
+
+        private static bool ToggleIsOn(InputField input) =>
+            input != null && TryParse(input.text, out float value) && value >= .5f;
+
+        private void FlipToggle(int index)
+        {
+            InputField input = valueInputs[index];
+            if (input == null) return;
+            input.text = ToggleIsOn(input) ? "0" : "1";
+            RefreshToggles();
+        }
+
+        /// <summary>숨긴 입력칸 값(DEFAULTS·방 설정 불러오기 포함)에 맞춰 버튼 글자·색을 바꾼다.</summary>
+        private void RefreshToggles()
+        {
+            if (toggleButtons == null) return;
+            for (int i = 0; i < toggleButtons.Length; i++)
+            {
+                if (toggleButtons[i] == null) continue;
+                LabDeveloperField field = LabConfig.DeveloperFields[i];
+                bool on = ToggleIsOn(valueInputs[i]);
+                string label = on ? field.OnText : field.OffText;
+                if (toggleLabels[i].text != label) toggleLabels[i].text = label;
+                var image = (Image)toggleButtons[i].targetGraphic;
+                Color color = on ? ToggleOnColor : ToggleOffColor;
+                if (image.color != color) image.color = color;
+            }
         }
 
         private void RefreshTargetLabel()
