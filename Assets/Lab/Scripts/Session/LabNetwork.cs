@@ -32,6 +32,7 @@ namespace C6Lab
         public long lobbyRevision;
         public string roomName;
         public LabSnapshot snapshot;
+        public LabPaintFrame paintFrame;
         public long requestId;
         public string firstId;
         public string secondId;
@@ -161,7 +162,8 @@ namespace C6Lab
         // approved impact values/directions/colors. Version 5625 adds the minimap on/off, size and position settings (#181).
         // Version 5626 adds the bomb sound volume setting (#183).
         // Version 5627 shares the confirmed room name in lobby packets.
-        internal const ushort LabProtocolVersion = 5627;
+        // #187: six growth settings, fixed 100% target, authoritative cell transactions.
+        internal const ushort LabProtocolVersion = 5628;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
@@ -188,26 +190,18 @@ namespace C6Lab
         private readonly HashSet<string> visibleOrbIds = new HashSet<string>();
         private readonly LabImpactReceiptGate impactReceipts = new LabImpactReceiptGate();
         private readonly LabPaintSurface clientPaintSurface = new LabPaintSurface();
-        private string paintSession;
-        private uint paintRound;
+        private readonly LabPaintSurface receivedPaintSurface = new LabPaintSurface();
+        private readonly LabPaintPublisher paintPublisher = new LabPaintPublisher();
+        private LabPaintReceiver paintReceiver;
+        private LabPaintReceiver PaintReceiver => paintReceiver ?? (paintReceiver = new LabPaintReceiver(receivedPaintSurface));
+        private readonly Dictionary<ulong, double> paintCheckpointRequests = new Dictionary<ulong, double>();
+        private LabSnapshot pendingPaintSnapshot;
+        private string awaitingPaintSession;
+        private uint awaitingPaintRound;
+        private double nextPaintRequestAt;
 
-        /// <summary>Round-owned paint survives missing or disabled presentation components.</summary>
-        public LabPaintSurface PaintSurface
-        {
-            get
-            {
-                if (IsHost && model != null) return model.PaintSurface;
-                string nextSession = latest != null ? latest.sessionId : null;
-                uint nextRound = latest != null ? latest.round : 0;
-                if (paintSession != nextSession || paintRound != nextRound)
-                {
-                    clientPaintSurface.Clear();
-                    paintSession = nextSession;
-                    paintRound = nextRound;
-                }
-                return clientPaintSurface;
-            }
-        }
+        /// <summary>The map committed with the displayed snapshot; never a client simulation.</summary>
+        public LabPaintSurface PaintSurface => clientPaintSurface;
         private readonly LabBattleClock battleClock = new LabBattleClock();
         private readonly List<string> joinCandidates = new List<string>();
         private LabModel model;
@@ -1052,6 +1046,7 @@ namespace C6Lab
             model = null;
             latest = null;
             sessionId = null;
+            ResetPaintTransport();
             battleClock.Reset();
             ApplyLocalPause(false);
             LastShotReport = string.Empty;
@@ -1154,6 +1149,8 @@ namespace C6Lab
                 model.Tick(battleClock.Now(now));
                 if (now >= nextSnapshotAt) PublishSnapshot(false);
             }
+            if (!IsHost && (pendingPaintSnapshot != null || PaintReceiver.HasPending)
+                && now >= nextPaintRequestAt) RequestPaintCheckpoint();
             // Command-line smoke mode is intentionally separate from ordinary UI play.
             if (IsConnected && latest != null && latest.phase == LabPhase.Playing && !latest.paused)
             {
@@ -1389,6 +1386,9 @@ namespace C6Lab
             // Large experimental states are deliberately updated less often instead of queuing
             // many reliable fragments per peer until the network becomes unusable.
             nextSnapshotAt = now + ((latest.orbs?.Length ?? 0) > 100 ? .5d : .1d);
+            // Commit the Host's view and counts from the very same authoritative map version.
+            CopyPaintToDisplay(model.PaintSurface, latest);
+            if (target != null) target.GetComponent<LabGourdPaint>()?.RefreshCommittedMap();
             ApplyLocalPause(latest.paused);
             SyncBoard();
             string[] pieces;
@@ -1399,9 +1399,15 @@ namespace C6Lab
                 return;
             }
             long sequence = ++snapshotSequence;
+            LabPaintFrame[] paintFrames = paintPublisher.Publish(model.PaintSurface, sessionId, latest.round, sequence);
             foreach (ulong id in order)
             {
                 if (id == manager.LocalClientId) continue;
+                if (!SendPaintFrames(id, paintFrames))
+                {
+                    AbortOversizedSnapshot("Could not send the complete paint transaction.");
+                    return;
+                }
                 for (int i = 0; i < pieces.Length; i++)
                 {
                     bool sent = Send(id, new LabNetworkPacket { type = "snapshot_chunk", sessionId = sessionId,
@@ -1757,6 +1763,20 @@ namespace C6Lab
                     }
                     return;
                 }
+                if (packet.type == "paint_resync")
+                {
+                    if (model != null && packet.sessionId == sessionId && packet.round == model.Round
+                        && packet.configRevision == configRevision && packet.configFingerprint == configFingerprint)
+                    {
+                        double now = Time.realtimeSinceStartupAsDouble;
+                        if (!paintCheckpointRequests.TryGetValue(sender, out double last) || now - last >= .5d)
+                        {
+                            paintCheckpointRequests[sender] = now;
+                            SendPaintFrames(sender, paintPublisher.Checkpoint());
+                        }
+                    }
+                    return;
+                }
                 HandleRequest(sender, packet);
                 return;
             }
@@ -1784,6 +1804,7 @@ namespace C6Lab
                     order.Clear();
                     latest = null;
                     sessionId = null;
+                    ResetPaintTransport();
                     pauseRequestPending = false;
                     impactReceipts.Reset();
                     impactFeedback?.Clear();
@@ -1817,6 +1838,9 @@ namespace C6Lab
                 case "config":
                     ReceiveSessionConfig(packet);
                     break;
+                case "paint_cells":
+                    ReceivePaintFrame(packet);
+                    break;
                 case "snapshot_chunk":
                     ReceiveSnapshotChunk(packet);
                     break;
@@ -1846,10 +1870,7 @@ namespace C6Lab
                         new Vector3(packet.x, packet.y, packet.z),
                         new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse))
                     {
-                        if (config != null && config.GourdMode == LabGourdMode.Paint
-                            && packet.element >= (int)LabOrbElement.Fire && packet.element <= (int)LabOrbElement.Earth)
-                            PaintSurface.Stamp(new Vector3(packet.paintX, packet.paintY, packet.paintZ),
-                                new Color(packet.paintR, packet.paintG, packet.paintB, packet.paintA));
+                        // Cell state arrives separately from feedback; never rerun a local Stamp.
                         target.GetComponent<LabHangingTarget>()?.ApplyRemoteImpact(
                             new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse);
                         target.NotifyApprovedHit(new Vector3(packet.x, packet.y, packet.z), (LabOrbElement)packet.element);
@@ -1965,6 +1986,22 @@ namespace C6Lab
             if (snapshot == null || snapshot.sessionId != packet.sessionId
                 || snapshot.players == null || snapshot.players.Length != targetParticipantCount) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
+            if (!PaintReceiver.Matches(snapshot))
+            {
+                pendingPaintSnapshot = snapshot;
+                awaitingPaintSession = snapshot.sessionId;
+                awaitingPaintRound = snapshot.round;
+                RequestPaintCheckpoint();
+                return;
+            }
+            ApplyPaintSnapshot(snapshot);
+        }
+
+        private void ApplyPaintSnapshot(LabSnapshot snapshot)
+        {
+            // A newer matched transaction supersedes any older snapshot waiting for recovery.
+            pendingPaintSnapshot = null;
+            CopyPaintToDisplay(receivedPaintSurface, snapshot);
             bool logTransition = latest == null || latest.sessionId != snapshot.sessionId
                 || latest.phase != snapshot.phase || latest.paused != snapshot.paused;
             if (sessionId != snapshot.sessionId || latest == null || latest.round != snapshot.round)
@@ -1974,6 +2011,7 @@ namespace C6Lab
             }
             sessionId = snapshot.sessionId;
             latest = snapshot;
+            if (target != null) target.GetComponent<LabGourdPaint>()?.RefreshCommittedMap();
             if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
             ApplyLocalPause(snapshot.phase == LabPhase.Playing && snapshot.paused);
@@ -1987,6 +2025,61 @@ namespace C6Lab
                 + ": " + targetParticipantCount + " / " + targetParticipantCount);
             if (logTransition) Debug.Log("C6_LAB_SNAPSHOT phase=" + latest.phase + " hp=" + latest.hp
                 + " remaining=" + latest.remaining.ToString("F1") + " orbs=" + (latest.orbs?.Length ?? 0));
+        }
+
+        private void CopyPaintToDisplay(LabPaintSurface source, LabSnapshot snapshot)
+        {
+            var pixels = new Color32[source.CellCount];
+            source.CopyPixels(pixels);
+            if (!clientPaintSurface.TryReplacePixels(source.Columns, source.Rows, source.Revision, pixels, snapshot.paintCount))
+                throw new InvalidOperationException("Invalid authoritative paint display state.");
+        }
+
+        private bool SendPaintFrames(ulong receiver, LabPaintFrame[] frames)
+        {
+            foreach (LabPaintFrame frame in frames)
+                if (!Send(receiver, new LabNetworkPacket { type = "paint_cells", sessionId = frame.session,
+                    round = frame.round, snapshotSequence = frame.epoch, configRevision = configRevision,
+                    configFingerprint = configFingerprint, paintFrame = frame })) return false;
+            return true;
+        }
+
+        private void ReceivePaintFrame(LabNetworkPacket packet)
+        {
+            LabPaintFrame frame = packet.paintFrame;
+            if (!clientConfigReady || packet.configRevision != configRevision || packet.configFingerprint != configFingerprint
+                || frame == null || frame.session != packet.sessionId || frame.round != packet.round
+                || frame.epoch != packet.snapshotSequence || frame.epoch <= lobbySnapshotSequenceFloor
+                || frame.epoch < PaintReceiver.Epoch) return;
+            awaitingPaintSession = frame.session;
+            awaitingPaintRound = frame.round;
+            LabPaintReceive result = PaintReceiver.Receive(frame);
+            if (result == LabPaintReceive.NeedCheckpoint) RequestPaintCheckpoint();
+            if (result == LabPaintReceive.Applied && pendingPaintSnapshot != null && PaintReceiver.Matches(pendingPaintSnapshot))
+            {
+                LabSnapshot ready = pendingPaintSnapshot;
+                pendingPaintSnapshot = null;
+                ApplyPaintSnapshot(ready);
+            }
+        }
+
+        private void RequestPaintCheckpoint()
+        {
+            if (IsHost || !IsConnected || string.IsNullOrEmpty(awaitingPaintSession)
+                || awaitingPaintRound == 0 || Time.realtimeSinceStartupAsDouble < nextPaintRequestAt) return;
+            nextPaintRequestAt = Time.realtimeSinceStartupAsDouble + 1d;
+            Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "paint_resync",
+                sessionId = awaitingPaintSession, round = awaitingPaintRound,
+                configRevision = configRevision, configFingerprint = configFingerprint });
+        }
+
+        private void ResetPaintTransport()
+        {
+            paintPublisher.Reset();
+            PaintReceiver.Reset();
+            clientPaintSurface.Reset(new LabPaintGrowthSettings(), 1);
+            pendingPaintSnapshot = null; awaitingPaintSession = null; awaitingPaintRound = 0;
+            nextPaintRequestAt = 0d; paintCheckpointRequests.Clear();
         }
 
         private void RejectLocally(string orbId, string reason)
@@ -2056,9 +2149,7 @@ namespace C6Lab
         {
             clientSessionConnected = false;
             connectedRoomName = string.Empty;
-            clientPaintSurface.Clear();
-            paintSession = null;
-            paintRound = 0;
+            ResetPaintTransport();
             ApplyLocalPause(false);
             battleClock.Reset();
             pendingDeveloperRestart = false;

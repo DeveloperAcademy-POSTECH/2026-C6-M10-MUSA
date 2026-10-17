@@ -111,7 +111,7 @@ namespace C6Lab.Tests
                     y, Mathf.Sin(angle) * Mathf.Sqrt(1f - y * y));
                 Assert.That(paint.Paint(direction, Color.red), Is.True);
             }
-            Assert.That(paint.Coverage, Is.GreaterThanOrEqualTo(.8f), "The default goal is reachable on the same visible map.");
+            Assert.That(paint.Coverage, Is.GreaterThanOrEqualTo(.8f), "Distributed offline preview marks cover the same visible map.");
             AssertTextureMatches(paint.Surface, paint);
             paint.ClearPaint();
             Assert.That(paint.PaintTexture.GetPixels32().All(pixel => pixel.a == 0), Is.True);
@@ -192,7 +192,7 @@ namespace C6Lab.Tests
             var hud = Object.FindFirstObjectByType<LabHud>();
             LabConfig savedNetworkConfig = network.config;
             LabConfig savedBoardConfig = controller.config;
-            LabConfig fixture = CollisionFixture(savedNetworkConfig, 80);
+            LabConfig fixture = CollisionFixture(savedNetworkConfig, 2f);
             float[] tuning = fixture.CaptureDeveloperValues();
             string error;
             network.config = fixture;
@@ -240,6 +240,7 @@ namespace C6Lab.Tests
                     {
                         Assert.That(paint.IsReady, Is.False, "This actual Host hit occurred while the visual was disabled.");
                         Assert.That(network.PaintSurface.PaintCount, Is.EqualTo(2));
+                        Assert.That(network.PauseBattle(), Is.True, "Freeze pending growth while the visual is rebuilt.");
                         float retainedCoverage = network.PaintSurface.Coverage;
                         Color32[] retainedMap = CopyPixels(network.PaintSurface);
                         paint.enabled = true;
@@ -251,6 +252,7 @@ namespace C6Lab.Tests
                             "Re-enabling uploads the authoritative map instead of erasing or replaying it.");
                     }
                     AssertTextureMatches(network.PaintSurface, paint);
+                    if (network.IsBattlePaused) Assert.That(network.ResumeBattle(), Is.True);
                     yield return null;
                     Assert.That(paint.PaintCount, Is.EqualTo(index), "The mark survives the next frame.");
                     if (index == 1)
@@ -268,7 +270,7 @@ namespace C6Lab.Tests
                 Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing),
                     "Paint mode cannot win just because the old HP counter reached zero.");
                 Assert.That(network.Snapshot.paintCoverage, Is.GreaterThan(0f));
-                Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(80));
+                Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(100));
                 Assert.That(network.Snapshot.paintCoverage, Is.LessThan(network.config.PaintVictoryCoverage));
                 Assert.That(LabGourdFinish.DelayVictory(network, network.Snapshot), Is.False);
                 Assert.That(hud.resultControls.activeSelf, Is.False);
@@ -333,7 +335,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator OnePercentDeveloperGoalWinsByRealHostCollisionAndResultRetryResetsTheMap()
+        public IEnumerator FixedHundredPercentGoalGrowsFromRepeatedRealHitsFreezesOnPauseAndResetsOnRetry()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
@@ -343,56 +345,115 @@ namespace C6Lab.Tests
             LabHud hud = Object.FindFirstObjectByType<LabHud>();
             LabDeveloperMode developer = SavedDeveloperUi();
             LabConfig savedNetwork = network.config, savedBoard = controller.config;
-            LabConfig fixture = CollisionFixture(savedNetwork, 1);
+            LabConfig fixture = CollisionFixture(savedNetwork, 50f);
+            float[] growthValues = fixture.CaptureDeveloperValues();
+            growthValues[107] = 50f;
+            growthValues[108] = 100f;
+            growthValues[109] = 100f;
+            Assert.That(fixture.TryApplyDeveloperValues(growthValues, out string fixtureError), Is.True, fixtureError);
             network.config = fixture;
             controller.config = fixture;
             controller.ReconfigureBoard();
             network.port = 17789;
+            System.Action<int> onHit = null;
             try
             {
-                // Use the saved DEV form to start the real Solo round with a 1% target.
+                // Use the saved DEV form; slot 87 remains the fixed 100% objective.
                 developer.Open();
                 float[] initialValues = fixture.CaptureDeveloperValues();
                 for (int i = 0; i < initialValues.Length; i++)
                     developer.valueInputs[i].text = initialValues[i].ToString("R", System.Globalization.CultureInfo.InvariantCulture);
-                SetInput(developer, "Paint Victory Coverage (%)", "1");
                 developer.ApplyAndStart();
                 yield return null;
                 Assert.That(network.IsDeveloperSolo, Is.True, developer.feedbackText.text);
-                Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(1));
-                Assert.That(network.config.PaintVictoryPercent, Is.EqualTo(1));
+                Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(100));
+                Assert.That(network.config.PaintVictoryPercent, Is.EqualTo(100));
+                Assert.That(network.PaintSurface.Columns, Is.EqualTo(64));
+                Assert.That(network.PaintSurface.Rows, Is.EqualTo(32));
                 UnityEngine.UI.Text title = hud.hpText.transform.parent.Find("TitleMask/Title")
                     .GetComponent<UnityEngine.UI.Text>();
                 Assert.That(title.text, Is.EqualTo("GOAL"));
 
                 for (int attempt = 0; attempt < 2; attempt++)
                 {
+                    int confirmedHits = 0;
+                    bool pausedOnSecondHit = false;
+                    onHit = _ =>
+                    {
+                        confirmedHits++;
+                        // Pause in the approval callback, before a slow rendered frame can consume
+                        // the repeated hit's half-second growth budget.
+                        if (confirmedHits == 2) pausedOnSecondHit = network.PauseBattle();
+                    };
+                    network.LocalThrowHit += onHit;
                     network.Generate();
                     LabOrbState box = network.Snapshot.orbs.Single();
-                    TapOrb(network.board, box.id, 100d + attempt * 20d);
-                    TapOrb(network.board, box.id, 100.2d + attempt * 20d);
-                    LabOrbState shot = network.Snapshot.orbs.First(orb => orb.kind == LabOrbKind.Combined);
-                    network.target.GetComponent<LabHangingTarget>().ResetSwing();
-                    LaunchThroughSavedBoard(network.board, shot.id, 110d + attempt * 20d);
-                    for (int step = 0; step < 150 && network.Snapshot.phase == LabPhase.Playing; step++)
-                        yield return new WaitForFixedUpdate();
-                    Assert.That(network.LastShotReport, Does.StartWith("SHOT HIT"));
+                    TapOrb(network.board, box.id, 100d + attempt * 40d);
+                    TapOrb(network.board, box.id, 100.2d + attempt * 40d);
+                    string[] shots = network.Snapshot.orbs.Where(orb => orb.kind == LabOrbKind.Combined)
+                        .Select(orb => orb.id).ToArray();
+                    Assert.That(shots.Length, Is.EqualTo(2));
+                    Color32[] firstMap = null;
+                    for (int shotIndex = 0; shotIndex < shots.Length; shotIndex++)
+                    {
+                        network.target.GetComponent<LabHangingTarget>().ResetSwing();
+                        LaunchThroughSavedBoard(network.board, shots[shotIndex], 110d + attempt * 40d + shotIndex * 10d);
+                        double hitDeadline = Time.realtimeSinceStartupAsDouble + 5d;
+                        while (confirmedHits < shotIndex + 1 && Time.realtimeSinceStartupAsDouble < hitDeadline)
+                            yield return null;
+                        Assert.That(confirmedHits, Is.EqualTo(shotIndex + 1), "An actual Host collision must approve each hit.");
+                        Assert.That(network.LastShotReport, Does.StartWith("SHOT HIT"));
+                        Assert.That(network.Snapshot.orbs.Any(orb => orb.id == shots[shotIndex]), Is.False);
+                        if (shotIndex == 0)
+                        {
+                            Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
+                            Assert.That(network.Snapshot.hp, Is.EqualTo(20));
+                            Assert.That(network.PaintSurface.Coverage, Is.EqualTo(.5f));
+                            Assert.That(hud.resultControls.activeSelf, Is.False);
+                            firstMap = CopyPixels(network.PaintSurface);
+                        }
+                    }
+                    Assert.That(pausedOnSecondHit, Is.True);
+                    Assert.That(network.IsBattlePaused, Is.True);
+                    Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing),
+                        "A repeated hit buys timed growth and cannot complete its region immediately.");
+                    Assert.That(network.Snapshot.hp, Is.Zero, "Diagnostic HP alone cannot decide the Paint result.");
+                    Assert.That(network.PaintSurface.CoveredCount, Is.LessThan(network.PaintSurface.CellCount));
+                    Color32[] frozenMap = CopyPixels(network.PaintSurface);
+                    for (int i = 0; i < firstMap.Length; i++)
+                        if (firstMap[i].a != 0) Assert.That(frozenMap[i], Is.EqualTo(firstMap[i]),
+                            "A differently colored repeated hit cannot recolor existing cells.");
+                    uint frozenRevision = network.PaintSurface.Revision;
+                    int frozenCount = network.PaintSurface.CoveredCount;
+                    double frozenRemaining = network.Snapshot.remaining;
+                    double frozenPlayed = network.Snapshot.playedSeconds;
+                    yield return new WaitForSecondsRealtime(.75f);
+                    Assert.That(network.PaintSurface.Revision, Is.EqualTo(frozenRevision));
+                    Assert.That(network.PaintSurface.CoveredCount, Is.EqualTo(frozenCount));
+                    Assert.That(CopyPixels(network.PaintSurface), Is.EqualTo(frozenMap));
+                    Assert.That(network.Snapshot.remaining, Is.EqualTo(frozenRemaining));
+                    Assert.That(network.Snapshot.playedSeconds, Is.EqualTo(frozenPlayed));
+                    Assert.That(network.ResumeBattle(), Is.True);
+                    double growthDeadline = Time.realtimeSinceStartupAsDouble + 3d;
+                    while (network.Snapshot.phase == LabPhase.Playing && Time.realtimeSinceStartupAsDouble < growthDeadline)
+                        yield return null;
                     Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
-                    Assert.That(network.Snapshot.hp, Is.EqualTo(20),
-                        "Coverage wins before diagnostic HP reaches zero; this is not the Crack victory path.");
-                    Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(1));
-                    Assert.That(network.Snapshot.paintCoverage, Is.GreaterThanOrEqualTo(.01f));
-                    Assert.That(paint.PaintCount, Is.EqualTo(1));
+                    Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(100));
+                    Assert.That(network.Snapshot.paintCoverage, Is.EqualTo(1f));
+                    Assert.That(network.Snapshot.paintCoveredCount, Is.EqualTo(network.Snapshot.paintCellCount));
+                    Assert.That(paint.PaintCount, Is.EqualTo(2));
+                    Assert.That(network.Snapshot.players.Single().hitTotal, Is.EqualTo(2));
+                    Assert.That(network.Snapshot.players.Single().lastHit, Is.True);
                     yield return null;
-                    Assert.That(paint.PaintCount, Is.EqualTo(1), "The first real mark survives the next presentation update.");
                     AssertTextureMatches(network.PaintSurface, paint);
                     Assert.That(hud.resultControls.activeInHierarchy, Is.True);
                     Assert.That(hud.resultStatusText.text, Is.EqualTo("VICTORY"));
-                    Assert.That(hud.hpText.text,
-                        Is.EqualTo(LabHud.FormatPaintGoalProgress(network.Snapshot.paintCoverage, 1)));
+                    Assert.That(hud.hpText.text, Is.EqualTo(LabHud.FormatPaintGoalProgress(1f, 100)));
                     Assert.That(hud.yokaiHpFill.fillAmount, Is.EqualTo(1f));
                     Assert.That(LabGourdFinish.DelayVictory(network, network.Snapshot), Is.False);
-                    CaptureBattle(network, "one-percent-goal-victory.png");
+                    CaptureBattle(network, "growth-hundred-percent-victory.png");
+                    network.LocalThrowHit -= onHit;
+                    onHit = null;
                     string finishedSession = network.Snapshot.sessionId;
                     if (attempt == 0)
                     {
@@ -402,7 +463,7 @@ namespace C6Lab.Tests
                         Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(finishedSession));
                         Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
                         Assert.That(network.Snapshot.hp, Is.EqualTo(40));
-                        Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(1));
+                        Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(100));
                         Assert.That(network.Snapshot.orbs, Is.Empty);
                         Assert.That(paint.PaintCount, Is.Zero);
                         Assert.That(network.Snapshot.paintCoverage, Is.Zero);
@@ -411,13 +472,14 @@ namespace C6Lab.Tests
                     else
                     {
                         developer.Open();
-                        SetInput(developer, "Paint Victory Coverage (%)", "80");
+                        SetInput(developer, "Paint Initial Coverage (%)", "2");
                         SetInput(developer, "Monster Max HP", "80");
                         developer.ApplyAndStart();
                         yield return null;
                         Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(finishedSession));
                         Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
-                        Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(80));
+                        Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(100));
+                        Assert.That(network.config.PaintInitialPercent, Is.EqualTo(2f));
                         Assert.That(network.Snapshot.hp, Is.EqualTo(80));
                         Assert.That(paint.PaintCount, Is.Zero, "DEV restart clears a nonempty prior authoritative map.");
                         Assert.That(paint.PaintTexture.GetPixels32().All(pixel => pixel.a == 0), Is.True);
@@ -426,6 +488,7 @@ namespace C6Lab.Tests
             }
             finally
             {
+                if (onHit != null) network.LocalThrowHit -= onHit;
                 if (network.IsConnected) network.Stop();
                 network.config = savedNetwork;
                 controller.config = savedBoard;
@@ -676,11 +739,17 @@ namespace C6Lab.Tests
             }
         }
 
-        static LabConfig CollisionFixture(LabConfig source, int goalPercent)
+        static LabConfig CollisionFixture(LabConfig source, float initialPercent = 2f)
         {
             LabConfig fixture = Object.Instantiate(source);
             float[] tuning = fixture.CaptureDeveloperValues();
-            SetTuning(tuning, "Paint Victory Coverage (%)", goalPercent);
+            SetTuning(tuning, "Paint Victory Coverage (%)", 100f);
+            tuning[105] = 0f;
+            tuning[106] = initialPercent;
+            tuning[107] = 4f;
+            tuning[108] = 6f;
+            tuning[109] = 60f;
+            tuning[110] = 1.35f;
             SetTuning(tuning, "Monster Max HP", 40f);
             SetTuning(tuning, "Damage per Hit", 20f);
             SetTuning(tuning, "Battle Duration (seconds)", 30f);
@@ -718,7 +787,7 @@ namespace C6Lab.Tests
 
         static Color32[] CopyPixels(LabPaintSurface surface)
         {
-            var pixels = new Color32[LabPaintSurface.PixelCount];
+            var pixels = new Color32[surface.CellCount];
             surface.CopyPixels(pixels);
             return pixels;
         }
@@ -726,11 +795,13 @@ namespace C6Lab.Tests
         static void AssertTextureMatches(LabPaintSurface surface, LabGourdPaint paint)
         {
             Assert.That(paint.PaintTexture, Is.Not.Null);
+            Assert.That(paint.PaintTexture.width, Is.EqualTo(surface.Columns));
+            Assert.That(paint.PaintTexture.height, Is.EqualTo(surface.Rows));
             Color32[] expected = CopyPixels(surface);
             Assert.That(paint.PaintTexture.GetPixels32(), Is.EqualTo(expected),
                 "The renderer must upload exactly the CPU RGBA surface that owns coverage.");
             Assert.That(expected.Count(pixel => pixel.a != 0), Is.EqualTo(surface.CoveredCount));
-            Assert.That(surface.Coverage, Is.EqualTo(surface.CoveredCount / (float)LabPaintSurface.PixelCount));
+            Assert.That(surface.Coverage, Is.EqualTo(surface.CoveredCount / (float)surface.CellCount));
             Assert.That(ReadBlock(paint).GetTexture("_PaintMap"), Is.SameAs(paint.PaintTexture));
             Assert.That(ReadBlock(paint).GetFloat("_PaintMapReady"), Is.EqualTo(1f));
         }
@@ -799,7 +870,7 @@ namespace C6Lab.Tests
             // Batch test workers have no render surface; gameplay assertions still run there.
             if (Application.isBatchMode) return;
             Camera camera = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None).Single(c => c.name == "BattleCamera");
-            const string directory = "Library/Issue175Captures";
+            const string directory = "Library/Issue187Captures";
             Directory.CreateDirectory(directory);
             var texture = new RenderTexture(540, 960, 24);
             var image = new Texture2D(540, 960, TextureFormat.RGB24, false);

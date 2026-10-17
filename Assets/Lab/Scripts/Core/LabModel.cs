@@ -158,7 +158,7 @@ namespace C6Lab
             seed = SeedFor(id, round);
             combinedCount = 0;
             hp = rules.MonsterMaxHp;
-            paintSurface.Clear();
+            paintSurface.Reset(rules.PaintGrowthSettings, seed);
             revision = 0;
             PlaceDrums(now);
             gourdBombCount = 0;
@@ -381,11 +381,11 @@ namespace C6Lab
             if (paintRound)
             {
                 if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
-                    && paintSurface.Stamp(paintDirection, PaintColorFor(element), LabPaintSurface.DefaultRadius)
-                    && paintSurface.Coverage >= rules.PaintVictoryCoverage)
+                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id)
+                    && paintSurface.IsComplete)
                 {
                     phase = LabPhase.Victory;
-                    attacker.lastHit = true;
+                    if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
                 }
             }
             else if (hp == 0)
@@ -512,6 +512,12 @@ namespace C6Lab
                 hp = hp,
                 paintCoverage = paintSurface.Coverage,
                 paintGoalPercent = rules.PaintVictoryPercent,
+                paintColumns = paintSurface.Columns,
+                paintRows = paintSurface.Rows,
+                paintRevision = paintSurface.Revision,
+                paintCoveredCount = paintSurface.CoveredCount,
+                paintCellCount = paintSurface.CellCount,
+                paintCount = paintSurface.PaintCount,
                 players = players.Values.OrderBy(player => player.seat).Select(player => player.Copy()).ToArray(),
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
                 drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray()
@@ -540,6 +546,19 @@ namespace C6Lab
             {
                 double effectiveNow = Math.Min(now, deadline);
                 double elapsed = effectiveNow - lastTime;
+                bool paintCompleted = false;
+                if (rules.GourdMode == LabGourdMode.Paint && elapsed > 0d)
+                {
+                    // A late frame still resolves growth that was due before the deadline.
+                    // Growth due exactly at the deadline cannot outrun the existing timeout rule.
+                    double completionOffset = paintSurface.Advance(elapsed, now < deadline);
+                    if (completionOffset >= 0d)
+                    {
+                        effectiveNow = lastTime + completionOffset;
+                        elapsed = completionOffset;
+                        paintCompleted = true;
+                    }
+                }
                 if (elapsed > 0d)
                 {
                     played += elapsed;
@@ -560,8 +579,13 @@ namespace C6Lab
                     // lost: the holder's screen pushes the ones around it away from where it last was.
                     bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
                 }
-                remaining = Math.Max(0d, deadline - now);
-                if (now >= deadline) phase = LabPhase.Defeat;
+                remaining = Math.Max(0d, deadline - effectiveNow);
+                if (paintCompleted)
+                {
+                    phase = LabPhase.Victory;
+                    if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
+                }
+                else if (now >= deadline) phase = LabPhase.Defeat;
             }
             lastTime = now;
             return true;
@@ -805,7 +829,7 @@ namespace C6Lab
             public readonly int ItemUnlockSwipesMin, ItemUnlockSwipesMax, DrumCount;
             public readonly LabGourdMode GourdMode;
             public readonly int PaintVictoryPercent;
-            public readonly float PaintVictoryCoverage;
+            public readonly LabPaintGrowthSettings PaintGrowthSettings;
             public readonly float GourdBombIntervalMin, GourdBombIntervalMax;
             public readonly float[] DrumStopBounds;
             public readonly int[] DrumStopChances;
@@ -820,7 +844,7 @@ namespace C6Lab
                 MonsterMaxHp = config.MonsterMaxHp;
                 GourdMode = config.GourdMode;
                 PaintVictoryPercent = config.PaintVictoryPercent;
-                PaintVictoryCoverage = config.PaintVictoryCoverage;
+                PaintGrowthSettings = config.PaintGrowthSettings;
                 GourdBombIntervalMin = config.GourdBombIntervalMin;
                 GourdBombIntervalMax = config.GourdBombIntervalMax;
                 DrumStopBounds = config.DrumStopBounds();

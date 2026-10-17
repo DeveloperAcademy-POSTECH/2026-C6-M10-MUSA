@@ -17,14 +17,16 @@ namespace C6Lab
         public LabNetwork network;
         public GameObject visualPrefab;
         public Material paintMaterial;
-        [Tooltip("Offline preview brush only. Real session impacts use LabPaintSurface.DefaultRadius on the Host.")]
+        [Tooltip("Offline preview brush only. Real session growth uses the Host round settings.")]
         [Range(.05f, .3f)] public float splatRadius = LabPaintSurface.DefaultRadius;
 
         private readonly LabPaintSurface localPreview = new LabPaintSurface();
-        private readonly Color32[] uploadPixels = new Color32[LabPaintSurface.PixelCount];
+        private Color32[] uploadPixels;
         private Texture2D paintTexture;
         private LabPaintSurface uploadedSurface;
         private uint uploadedRevision;
+        private string uploadedSession;
+        private uint uploadedRound;
         private bool hasUploadedSurface;
         private MaterialPropertyBlock block;
         private Renderer shell;
@@ -146,15 +148,7 @@ namespace C6Lab
                 animator.enabled = false;
             shell.sharedMaterial = paintMaterial;
             block = new MaterialPropertyBlock();
-            paintTexture = new Texture2D(LabPaintSurface.Width, LabPaintSurface.Height,
-                TextureFormat.RGBA32, false, true)
-            {
-                name = "Gourd cumulative paint (runtime)",
-                hideFlags = HideFlags.DontSave,
-                filterMode = FilterMode.Point,
-                wrapModeU = TextureWrapMode.Repeat,
-                wrapModeV = TextureWrapMode.Clamp
-            };
+            EnsureTexture(Surface);
             initialized = true;
             InitializationError = null;
             RefreshPaintMap(true);
@@ -214,12 +208,21 @@ namespace C6Lab
             RefreshPaintMap();
         }
 
+        /// <summary>Apply a network map/snapshot commit now, without waiting for component Update order.</summary>
+        public void RefreshCommittedMap()
+        {
+            if (IsReady) RefreshPaintMap();
+        }
+
         private void RefreshPaintMap(bool force = false)
         {
-            if (shell == null || paintTexture == null) return;
+            if (shell == null) return;
             LabPaintSurface source = Surface;
-            if (!force && hasUploadedSurface && uploadedSurface == source && uploadedRevision == source.Revision)
-                return;
+            EnsureTexture(source);
+            string currentSession = network != null ? network.Snapshot?.sessionId : null;
+            uint currentRound = network != null && network.Snapshot != null ? network.Snapshot.round : 0u;
+            if (!force && hasUploadedSurface && uploadedSurface == source && uploadedRevision == source.Revision
+                && uploadedSession == currentSession && uploadedRound == currentRound) return;
             source.CopyPixels(uploadPixels);
             paintTexture.SetPixels32(uploadPixels);
             paintTexture.Apply(false, false);
@@ -230,7 +233,21 @@ namespace C6Lab
             shell.SetPropertyBlock(block);
             uploadedSurface = source;
             uploadedRevision = source.Revision;
+            uploadedSession = currentSession; uploadedRound = currentRound;
             hasUploadedSurface = true;
+        }
+
+        private void EnsureTexture(LabPaintSurface source)
+        {
+            if (paintTexture != null && paintTexture.width == source.Columns && paintTexture.height == source.Rows) return;
+            if (paintTexture != null) LabVisualSafety.DestroyVisualObject(paintTexture);
+            uploadPixels = new Color32[source.CellCount];
+            paintTexture = new Texture2D(source.Columns, source.Rows, TextureFormat.RGBA32, false, true)
+            {
+                name = "Gourd cumulative paint (runtime)", hideFlags = HideFlags.DontSave,
+                filterMode = FilterMode.Point, wrapModeU = TextureWrapMode.Repeat, wrapModeV = TextureWrapMode.Clamp
+            };
+            hasUploadedSurface = false;
         }
 
         private void ReleasePresentation()

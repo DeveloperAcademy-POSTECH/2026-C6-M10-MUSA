@@ -289,9 +289,8 @@ namespace C6Lab
                 SetStaminaCells(0f);
                 return;
             }
-            int goalPercent = PaintGoalPercentFor(snapshot, network.config);
             Set(hpText, paintGoal
-                ? FormatPaintGoalProgress(snapshot.paintCoverage, goalPercent)
+                ? FormatPaintGoalProgress(snapshot)
                 : snapshot.hp + " / " + network.config.MonsterMaxHp);
             int remainingSeconds = Mathf.Max(0, Mathf.CeilToInt((float)snapshot.remaining));
             Set(timeText, (remainingSeconds / 60).ToString("00") + ":" + (remainingSeconds % 60).ToString("00"));
@@ -306,7 +305,7 @@ namespace C6Lab
             Set(seatText, local == null ? "P—" : "P" + (local.seat + 1)
                 + (network.IsDeveloperSolo ? " · SOLO" : string.Empty));
             SetFill(yokaiHpFill, paintGoal
-                ? PaintGoalFill(snapshot.paintCoverage, goalPercent)
+                ? PaintGoalFill(snapshot)
                 : Fraction(snapshot.hp, network.config.MonsterMaxHp));
             SetFill(playerHpFill, local == null ? 0f : Fraction(local.personalHp, network.config.PlayerMaxHp));
             SetStaminaCells(local == null ? 0f : Fraction(local.stamina, network.config.StaminaMax));
@@ -330,11 +329,9 @@ namespace C6Lab
                 goalTitle = title.GetComponent<UnityEngine.UI.Text>();
         }
 
-        /// <summary>The authoritative round goal wins; old fixtures without it use Config.</summary>
+        /// <summary>Every paint round requires the complete surface, including old serialized fixtures.</summary>
         public static int PaintGoalPercentFor(LabSnapshot snapshot, LabConfig tuning)
-            => snapshot != null && snapshot.paintGoalPercent > 0
-                ? Mathf.Clamp(snapshot.paintGoalPercent, 1, 100)
-                : tuning != null ? tuning.PaintVictoryPercent : LabConfig.DefaultPaintVictoryPercent;
+            => LabConfig.DefaultPaintVictoryPercent;
 
         public static string GourdGoalTitle(LabGourdMode mode)
             => mode == LabGourdMode.Crack ? "YOKAI HP" : "GOAL";
@@ -342,13 +339,36 @@ namespace C6Lab
         /// <summary>Floor to one decimal so an unfinished near-goal value never rounds up.</summary>
         public static string FormatPaintGoalProgress(float coverage, int goalPercent)
         {
-            float percent = Mathf.FloorToInt(DisplayCoverage(coverage) * 1000f) / 10f;
-            return "PAINT " + percent.ToString("0.0", CultureInfo.InvariantCulture)
-                + "% / " + Mathf.Clamp(goalPercent, 1, 100).ToString(CultureInfo.InvariantCulture) + "%";
+            float displayed = DisplayCoverage(coverage);
+            int tenths = Mathf.FloorToInt(displayed * 1000f);
+            return FormatPaintTenths(displayed < 1f ? Mathf.Min(tenths, 999) : tenths);
         }
 
+        /// <summary>Integer cell counts prevent float rounding from displaying an unfinished surface as 100%.</summary>
+        public static string FormatPaintGoalProgress(LabSnapshot snapshot)
+        {
+            if (snapshot == null) return FormatPaintTenths(0);
+            if (snapshot.paintCellCount <= 0)
+                return FormatPaintGoalProgress(snapshot.paintCoverage, LabConfig.DefaultPaintVictoryPercent);
+            int covered = Mathf.Clamp(snapshot.paintCoveredCount, 0, snapshot.paintCellCount);
+            int tenths = (int)((long)covered * 1000L / snapshot.paintCellCount);
+            return FormatPaintTenths(tenths);
+        }
+
+        private static string FormatPaintTenths(int tenths)
+            => "PAINT " + (tenths / 10m).ToString("0.0", CultureInfo.InvariantCulture) + "% / 100%";
+
         public static float PaintGoalFill(float coverage, int goalPercent)
-            => Mathf.Clamp01(DisplayCoverage(coverage) / (Mathf.Clamp(goalPercent, 1, 100) / 100f));
+            => DisplayCoverage(coverage);
+
+        public static float PaintGoalFill(LabSnapshot snapshot)
+        {
+            if (snapshot == null) return 0f;
+            if (snapshot.paintCellCount <= 0) return DisplayCoverage(snapshot.paintCoverage);
+            int covered = Mathf.Clamp(snapshot.paintCoveredCount, 0, snapshot.paintCellCount);
+            if (covered == snapshot.paintCellCount) return 1f;
+            return Mathf.Min((float)((double)covered / snapshot.paintCellCount), .99999994f);
+        }
 
         private static float DisplayCoverage(float coverage)
             => float.IsNaN(coverage) || float.IsInfinity(coverage) ? 0f : Mathf.Clamp01(coverage);

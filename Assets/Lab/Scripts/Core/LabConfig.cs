@@ -161,7 +161,7 @@ namespace C6Lab
             new LabDeveloperField("Combine Sound Volume (50 = Inspector)", 0f, 100f),
             new LabDeveloperField("Combine Haptic Style (0-4)", 0f, 4f, true),
             new LabDeveloperField("Combine Haptic Intensity", 0f, 1f),
-            new LabDeveloperField("Paint Victory Coverage (%)", 1f, 100f, true),
+            new LabDeveloperField("Paint Victory Coverage (%)", 100f, 100f, true),
             new LabDeveloperField("Gourd Bomb Interval Min (seconds, 0 = off)", 0f, 600f),
             new LabDeveloperField("Gourd Bomb Interval Max (seconds, 0 = off)", 0f, 600f),
             new LabDeveloperField("Fuse Sound Volume (50 = Inspector)", 0f, 100f),
@@ -178,7 +178,13 @@ namespace C6Lab
             new LabDeveloperField("Minimap Move X (- left, + right)", -300f, 100f, true),
             new LabDeveloperField("Minimap Move Y (- down, + up)", -300f, 500f, true),
             new LabDeveloperField("Bomb Sound Volume (50 = Inspector)", 0f, 100f),
-            LabDeveloperField.Toggle("Bomb Sound (0 boom, 1 ppeong)", "BOOM", "PPEONG")
+            LabDeveloperField.Toggle("Bomb Sound (0 boom, 1 ppeong)", "BOOM", "PPEONG"),
+            new LabDeveloperField("Paint Surface Resolution (0 low 1 medium 2 high)", 0f, 2f, true),
+            new LabDeveloperField("Paint Initial Coverage (%)", .1f, 100f),
+            new LabDeveloperField("Paint Repeat Growth (%)", .1f, 100f),
+            new LabDeveloperField("Paint Growth Speed (%/s)", .1f, 100f),
+            new LabDeveloperField("Paint Fill Chance (%)", 0f, 100f),
+            new LabDeveloperField("Paint Vertical Weight", 1f, 4f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -205,7 +211,7 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 79, 87, 88, 89),
+            new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
         });
 
@@ -301,8 +307,15 @@ namespace C6Lab
         [Header("Gourd (요괴 박)")]
         [Tooltip("Paint: 흰 박에 구슬 속성 색을 칠한다 (#153). Crack: 박 모델에 금이 가고 처치 연출이 나온다 (#163).")]
         [SerializeField] private LabGourdMode gourdMode = LabGourdMode.Paint;
-        [Tooltip("Paint 모드에서 Host가 승리를 확정할 전체 구면 칠하기 비율 (%). 새 판 시작 때 적용한다.")]
-        [SerializeField, Range(1, 100)] private int paintVictoryPercent = DefaultPaintVictoryPercent;
+        [Tooltip("Paint 승리는 전체 표면 100%에서 확정한다. 이전 에셋 값도 실행 시 100%로 정규화한다.")]
+        [SerializeField, Range(100, 100)] private int paintVictoryPercent = DefaultPaintVictoryPercent;
+        // DEMO_TUNING_VALUE: growth settings are captured when a round starts and may be tuned in DEV.
+        [SerializeField, Range(0, 2)] private int paintSurfaceResolution = 2;
+        [SerializeField, Range(.1f, 100f)] private float paintInitialPercent = 2f;
+        [SerializeField, Range(.1f, 100f)] private float paintRepeatPercent = 4f;
+        [SerializeField, Range(.1f, 100f)] private float paintGrowthPercentPerSecond = 6f;
+        [SerializeField, Range(0f, 100f)] private float paintFillChancePercent = 60f;
+        [SerializeField, Range(1f, 4f)] private float paintVerticalWeight = 1.35f;
         [Tooltip("박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다. 최대가 0이면 떨어뜨리지 않는다 (#177).")]
         [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
         [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
@@ -506,9 +519,25 @@ namespace C6Lab
             return total == 100;
         }
         public LabGourdMode GourdMode => gourdMode == LabGourdMode.Crack ? LabGourdMode.Crack : LabGourdMode.Paint;
-        public const int DefaultPaintVictoryPercent = 80;
-        public int PaintVictoryPercent => Mathf.Clamp(paintVictoryPercent, 1, 100);
-        public float PaintVictoryCoverage => PaintVictoryPercent / 100f;
+        public const int DefaultPaintVictoryPercent = 100;
+        // Old serialized assets can still contain 80; all effective and shared values use the fixed goal.
+        public int PaintVictoryPercent => DefaultPaintVictoryPercent;
+        public float PaintVictoryCoverage => 1f;
+        public int PaintSurfaceResolution => Mathf.Clamp(paintSurfaceResolution, 0, 2);
+        public float PaintInitialPercent => Mathf.Clamp(Finite(paintInitialPercent, 2f), .1f, 100f);
+        public float PaintRepeatPercent => Mathf.Clamp(Finite(paintRepeatPercent, 4f), .1f, 100f);
+        public float PaintGrowthPercentPerSecond => Mathf.Clamp(Finite(paintGrowthPercentPerSecond, 6f), .1f, 100f);
+        public float PaintFillChancePercent => Mathf.Clamp(Finite(paintFillChancePercent, 60f), 0f, 100f);
+        public float PaintVerticalWeight => Mathf.Clamp(Finite(paintVerticalWeight, 1.35f), 1f, 4f);
+        public LabPaintGrowthSettings PaintGrowthSettings => new LabPaintGrowthSettings
+        {
+            Resolution = PaintSurfaceResolution,
+            InitialPercent = PaintInitialPercent,
+            RepeatPercent = PaintRepeatPercent,
+            GrowthPercentPerSecond = PaintGrowthPercentPerSecond,
+            FillChancePercent = PaintFillChancePercent,
+            VerticalWeight = PaintVerticalWeight
+        };
         public float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         public float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -609,7 +638,9 @@ namespace C6Lab
                 stopChances[0], stopChances[1], stopChances[2], stopChances[3],
                 MinimapEnabled ? 1f : 0f, MinimapSizePercent, MinimapMove.x, MinimapMove.y,
                 DevVolume(bombSoundVolumeDev),
-                (float)BombSoundStyle
+                (float)BombSoundStyle,
+                (float)PaintSurfaceResolution, PaintInitialPercent, PaintRepeatPercent,
+                PaintGrowthPercentPerSecond, PaintFillChancePercent, PaintVerticalWeight
             };
         }
 
@@ -619,6 +650,12 @@ namespace C6Lab
             if (values == null || values.Length != DeveloperFields.Count)
             {
                 error = "The developer settings form is incomplete.";
+                return false;
+            }
+
+            if (values[87] != DefaultPaintVictoryPercent)
+            {
+                error = "Paint Victory Coverage (%) must be 100 for the current paint rules.";
                 return false;
             }
 
@@ -754,6 +791,12 @@ namespace C6Lab
             minimapMoveY = (int)values[102];
             bombSoundVolumeDev = values[103];
             bombSoundStyle = values[104] >= .5f ? LabBombSoundStyle.Ppeong : LabBombSoundStyle.Boom;
+            paintSurfaceResolution = (int)values[105];
+            paintInitialPercent = values[106];
+            paintRepeatPercent = values[107];
+            paintGrowthPercentPerSecond = values[108];
+            paintFillChancePercent = values[109];
+            paintVerticalWeight = values[110];
             error = string.Empty;
             return true;
         }

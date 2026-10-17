@@ -1387,53 +1387,227 @@ namespace C6Lab.Tests
             Assert.That(LabResultStats.Awards(new LabPlayerState[0], true), Is.Empty);
         }
 
-        [TestCase(1)]
-        [TestCase(80)]
-        [TestCase(100)]
-        public void AtomicElementHitsReachCapturedPaintGoalAndResetOnNextRound(int goal)
+        [Test]
+        public void AtomicElementHitCompletesEveryCellAtTheFixedGoalAndResetsOnNextRound()
         {
-            var paintConfig = PaintFixture(goal);
+            var paintConfig = PaintFixture(100f);
             try
             {
                 var room = new LabModel();
-                room.BeginSolo("paint-goal-" + goal, 10, 0d, paintConfig);
+                room.BeginSolo("paint-goal", 10, 0d, paintConfig);
                 int request = 0;
-                const int directions = 512;
-                int hits = 0;
-                for (int i = 0; i < directions && room.Phase == LabPhase.Playing; i++)
-                {
-                    var shot = LaunchElementShot(room, ref request, 0d);
-                    Assert.That(room.ConfirmHit(shot.id, 0d, SurfaceDirection(i, directions),
-                        out LabOrbElement element, out int actualDamage, out int impactValue), Is.True);
-                    Assert.That(element, Is.Not.EqualTo(LabOrbElement.None));
-                    Assert.That(actualDamage, Is.EqualTo(i == 0 ? 1 : 0));
-                    Assert.That(impactValue, Is.EqualTo(20));
-                    hits++;
-                    LabSnapshot current = room.Snapshot(0d);
-                    Assert.That(current.paintGoalPercent, Is.EqualTo(goal));
-                    Assert.That(current.paintCoverage, Is.EqualTo(room.PaintSurface.Coverage));
-                    if (current.phase == LabPhase.Playing)
-                        Assert.That(current.paintCoverage, Is.LessThan(goal / 100f));
-                    Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.up, out _, out _, out _), Is.False,
-                        "An already consumed projectile cannot repaint or receive another reward.");
-                }
+                var shot = LaunchElementShot(room, ref request, 0d);
+                Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.forward,
+                    out LabOrbElement element, out int actualDamage, out int impactValue), Is.True);
+                Assert.That(element, Is.Not.EqualTo(LabOrbElement.None));
+                Assert.That(actualDamage, Is.EqualTo(1));
+                Assert.That(impactValue, Is.EqualTo(20));
                 LabSnapshot won = room.Snapshot(0d);
-                Assert.That(won.phase, Is.EqualTo(LabPhase.Victory), "Every configured goal is reachable with distributed hits.");
-                Assert.That(won.paintCoverage, Is.GreaterThanOrEqualTo(goal / 100f));
+                Assert.That(won.phase, Is.EqualTo(LabPhase.Victory));
+                Assert.That(won.paintGoalPercent, Is.EqualTo(100));
+                Assert.That(won.paintCoverage, Is.EqualTo(1f));
+                Assert.That(won.paintCoveredCount, Is.EqualTo(won.paintCellCount));
+                Assert.That(won.paintCellCount, Is.EqualTo(won.paintColumns * won.paintRows));
+                Assert.That(won.paintColumns, Is.EqualTo(room.PaintSurface.Columns));
+                Assert.That(won.paintRows, Is.EqualTo(room.PaintSurface.Rows));
+                Assert.That(won.paintRevision, Is.EqualTo(room.PaintSurface.Revision));
+                Assert.That(won.paintCount, Is.EqualTo(1));
                 Assert.That(won.players.Single().lastHit, Is.True);
-                Assert.That(won.players.Single().hitTotal, Is.EqualTo(hits));
-                Assert.That(won.players.Single().damageTotal, Is.EqualTo(hits * 20),
-                    "Paint result damage remains the nominal attack score after diagnostic HP reaches zero.");
+                Assert.That(won.players.Single().hitTotal, Is.EqualTo(1));
+                Assert.That(won.players.Single().damageTotal, Is.EqualTo(20));
+                Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.up, out _, out _, out _), Is.False,
+                    "An already consumed projectile cannot repaint or receive another reward.");
+                Assert.That(room.Snapshot(0d).players.Single().hitTotal, Is.EqualTo(1));
                 uint completedRound = won.round;
-                room.BeginSolo("paint-goal-" + goal, 10, 1d, paintConfig);
+                room.BeginSolo("paint-goal", 10, 1d, paintConfig);
                 LabSnapshot retry = room.Snapshot(1d);
                 Assert.That(retry.round, Is.EqualTo(completedRound + 1));
                 Assert.That(retry.phase, Is.EqualTo(LabPhase.Playing));
-                Assert.That(retry.paintGoalPercent, Is.EqualTo(goal));
+                Assert.That(retry.paintGoalPercent, Is.EqualTo(100));
                 Assert.That(retry.paintCoverage, Is.Zero);
+                Assert.That(retry.paintCoveredCount, Is.Zero);
+                Assert.That(retry.paintCount, Is.Zero);
                 Assert.That(room.PaintSurface.PaintCount, Is.Zero);
                 Assert.That(room.PaintSurface.CoveredCount, Is.Zero);
                 Assert.That(retry.players.Single().lastHit, Is.False);
+                room.Tick(2d);
+                Assert.That(room.PaintSurface.CoveredCount, Is.Zero, "A retry cannot retain the previous round's growth.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
+        }
+
+        [Test]
+        public void AnImmediateNewSeedThatMergesUsesTheLastCellsActualSupplyOwner()
+        {
+            var tuning = PaintFixture(50f, 30f, 50f, 25f);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("immediate-merge-owner", new ulong[] { 10, 20 }, 0d, tuning);
+                int request = 0;
+                for (int i = 0; i < 2; i++)
+                {
+                    var shot = LaunchElementShot(room, ref request, 0d, 10);
+                    Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.forward, out _, out _, out _), Is.True);
+                }
+                var map = room.PaintSurface;
+                var pixels = new Color32[map.CellCount]; map.CopyPixels(pixels);
+                int boundary = -1;
+                for (int i = 0; i < pixels.Length && boundary < 0; i++)
+                {
+                    if (pixels[i].a != 0) continue;
+                    int x = i % map.Columns, y = i / map.Columns;
+                    if (pixels[y * map.Columns + (x + 1) % map.Columns].a != 0
+                        || pixels[y * map.Columns + (x + map.Columns - 1) % map.Columns].a != 0
+                        || y > 0 && pixels[i - map.Columns].a != 0
+                        || y + 1 < map.Rows && pixels[i + map.Columns].a != 0) boundary = i;
+                }
+                Assert.That(boundary, Is.GreaterThanOrEqualTo(0));
+                float vertical = 1f - 2f * ((boundary / map.Columns + .5f) / map.Rows);
+                float angle = ((boundary % map.Columns + .5f) / map.Columns - .5f) * (2f * Mathf.PI);
+                float ring = Mathf.Sqrt(1f - vertical * vertical);
+                var direction = new Vector3(Mathf.Cos(angle) * ring, vertical, Mathf.Sin(angle) * ring);
+                var finalShot = LaunchElementShot(room, ref request, 0d, 20);
+                Assert.That(room.ConfirmHit(finalShot.id, 0d, direction, out _, out _, out _), Is.True);
+                LabSnapshot won = room.Snapshot(0d);
+                Assert.That(won.phase, Is.EqualTo(LabPhase.Victory));
+                Assert.That(map.LastPainter, Is.EqualTo(10ul), "The earlier FIFO budget pays for the final cell after merging.");
+                Assert.That(won.players.Single(player => player.id == 10).lastHit, Is.True);
+                Assert.That(won.players.Single(player => player.id == 20).lastHit, Is.False);
+                Assert.That(won.players.Sum(player => player.hitTotal), Is.EqualTo(3));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(tuning); }
+        }
+
+        [TestCase(1f, false)]
+        [TestCase(2f, false)]
+        [TestCase(3f, true)]
+        public void DelayedTickResolvesGrowthBeforeTheDeadlineAndTimeoutWinsAnExactTie(float duration, bool victory)
+        {
+            // Half is painted now; the repeated hit buys the other half at 25% of the whole map/second.
+            var paintConfig = PaintFixture(50f, duration, 50f, 25f);
+            try
+            {
+                float[] values = paintConfig.CaptureDeveloperValues();
+                values[3] = 1000f; values[4] = 100f;
+                values[6] = 7f; values[7] = 1f; values[8] = 3f;
+                Assert.That(paintConfig.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.BeginSolo("growth-deadline", 10, 0d, paintConfig);
+                int request = 0;
+                for (int i = 0; i < 2; i++)
+                {
+                    LabOrbState shot = LaunchElementShot(room, ref request, 0d);
+                    Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.forward, out _, out _, out _), Is.True);
+                }
+                LabSnapshot afterHits = room.Snapshot(0d);
+                Assert.That(afterHits.phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(afterHits.paintCoverage, Is.EqualTo(.5f));
+                room.Tick(10d);
+                LabSnapshot ended = room.Snapshot(10d);
+                double endedAt = victory ? 2d : duration;
+                Assert.That(ended.phase, Is.EqualTo(victory ? LabPhase.Victory : LabPhase.Defeat));
+                Assert.That(ended.playedSeconds, Is.EqualTo(endedAt).Within(1e-9));
+                Assert.That(ended.remaining, Is.EqualTo(victory ? duration - 2d : 0d).Within(1e-9));
+                Assert.That(ended.players.Single().drumSeconds, Is.EqualTo(endedAt).Within(1e-9));
+                Assert.That(ended.players.Single().stamina,
+                    Is.EqualTo(afterHits.players.Single().stamina + 7d * endedAt).Within(.001));
+                Assert.That(ended.players.Single().hitTotal, Is.EqualTo(2), "Growing paint creates no extra hit reward.");
+                Assert.That(ended.players.Single().damageTotal, Is.EqualTo(40));
+                Assert.That(ended.players.Single().lastHit, Is.EqualTo(victory));
+                Assert.That(ended.paintCoveredCount == ended.paintCellCount, Is.EqualTo(victory));
+                LabSnapshot later = room.Snapshot(20d);
+                Assert.That(later.playedSeconds, Is.EqualTo(ended.playedSeconds));
+                Assert.That(later.remaining, Is.EqualTo(ended.remaining));
+                Assert.That(later.paintRevision, Is.EqualTo(ended.paintRevision));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
+        }
+
+        [Test]
+        public void GrowthVictoryCreditsThePlayerWhoSuppliedItsFinalBudgetWithoutAnotherHit()
+        {
+            var paintConfig = PaintFixture(50f, 10f, 50f, 25f);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("growth-credit", new ulong[] { 10, 20 }, 0d, paintConfig);
+                int request = 0;
+                LabOrbState first = LaunchElementShot(room, ref request, 0d, 10ul);
+                Assert.That(room.ConfirmHit(first.id, 0d, Vector3.forward, out _, out _, out _), Is.True);
+                LabOrbState repeated = LaunchElementShot(room, ref request, 0d, 20ul);
+                Assert.That(room.ConfirmHit(repeated.id, 0d, Vector3.forward, out _, out _, out _), Is.True);
+                Assert.That(room.ConfirmHit(repeated.id, 0d, Vector3.forward, out _, out _, out _), Is.False,
+                    "A repeated collision callback cannot buy another growth budget.");
+                Assert.That(room.Phase, Is.EqualTo(LabPhase.Playing));
+                LabSnapshot won = room.Snapshot(2d);
+                Assert.That(won.phase, Is.EqualTo(LabPhase.Victory));
+                Assert.That(won.players.Single(player => player.id == 20ul).lastHit, Is.True);
+                Assert.That(won.players.Single(player => player.id == 10ul).lastHit, Is.False);
+                Assert.That(won.players.Count(player => player.lastHit), Is.EqualTo(1));
+                Assert.That(won.players.Select(player => player.hitTotal), Is.EqualTo(new[] { 1, 1 }));
+                Assert.That(won.players.Select(player => player.damageTotal), Is.EqualTo(new[] { 20, 20 }));
+                Assert.That(won.paintCount, Is.EqualTo(2));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
+        }
+
+        [Test]
+        public void ANewRoundDropsUnfinishedGrowthAndAllPaintCounters()
+        {
+            var paintConfig = PaintFixture(50f, 1f, 50f, 25f);
+            try
+            {
+                var room = new LabModel();
+                room.BeginSolo("growth-retry", 10, 0d, paintConfig);
+                int request = 0;
+                for (int i = 0; i < 2; i++)
+                {
+                    LabOrbState shot = LaunchElementShot(room, ref request, 0d);
+                    Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.forward, out _, out _, out _), Is.True);
+                }
+                LabSnapshot timedOut = room.Snapshot(1d);
+                Assert.That(timedOut.phase, Is.EqualTo(LabPhase.Defeat));
+                Assert.That(timedOut.paintCoveredCount, Is.GreaterThan(0).And.LessThan(timedOut.paintCellCount));
+                room.BeginSolo("growth-retry", 10, 2d, paintConfig);
+                LabSnapshot retry = room.Snapshot(2.5d);
+                Assert.That(retry.round, Is.EqualTo(timedOut.round + 1u));
+                Assert.That(retry.phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(retry.paintCoveredCount, Is.Zero);
+                Assert.That(retry.paintCoverage, Is.Zero);
+                Assert.That(retry.paintCount, Is.Zero);
+                Assert.That(retry.players.Single().hitTotal, Is.Zero);
+                Assert.That(retry.players.Single().lastHit, Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
+        }
+
+        [Test]
+        public void PausingTheHostClockFreezesPaintAndResumeAddsOnlyBattleTime()
+        {
+            var paintConfig = PaintFixture(50f, 10f, 50f, 25f);
+            try
+            {
+                var clock = new LabBattleClock();
+                var room = new LabModel();
+                room.BeginSolo("growth-pause", 10, clock.Now(100d), paintConfig);
+                int request = 0;
+                for (int i = 0; i < 2; i++)
+                {
+                    LabOrbState shot = LaunchElementShot(room, ref request, clock.Now(100d));
+                    Assert.That(room.ConfirmHit(shot.id, clock.Now(100d), Vector3.forward, out _, out _, out _), Is.True);
+                }
+                Assert.That(clock.Pause(100.5d), Is.True);
+                LabSnapshot frozen = room.Snapshot(clock.Now(100.5d));
+                LabSnapshot muchLater = room.Snapshot(clock.Now(10000d));
+                Assert.That(muchLater.paintRevision, Is.EqualTo(frozen.paintRevision));
+                Assert.That(muchLater.paintCoveredCount, Is.EqualTo(frozen.paintCoveredCount));
+                Assert.That(muchLater.playedSeconds, Is.EqualTo(.5d));
+                Assert.That(muchLater.remaining, Is.EqualTo(9.5d));
+                Assert.That(muchLater.phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(clock.Resume(10000d), Is.True);
+                Assert.That(room.Snapshot(clock.Now(10001.5d)).phase, Is.EqualTo(LabPhase.Victory));
+                Assert.That(room.Snapshot(clock.Now(10002d)).playedSeconds, Is.EqualTo(2d).Within(1e-9));
             }
             finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
         }
@@ -1441,7 +1615,7 @@ namespace C6Lab.Tests
         [Test]
         public void RepeatedPaintPast128HitsStillAcceptsNewSurfaceAndPositiveImpactAfterHpZero()
         {
-            var paintConfig = PaintFixture(100);
+            var paintConfig = PaintFixture(2f);
             try
             {
                 var room = new LabModel();
@@ -1480,7 +1654,7 @@ namespace C6Lab.Tests
         [TestCase(1.001d, false)]
         public void PaintHitUsesTheSameAtomicDeadlineAsDamage(double hitTime, bool expected)
         {
-            var paintConfig = PaintFixture(1, 1f);
+            var paintConfig = PaintFixture(100f, 1f);
             try
             {
                 var room = new LabModel();
@@ -1501,7 +1675,7 @@ namespace C6Lab.Tests
         [Test]
         public void PausedHostClockCannotTurnAnOtherwiseValidPaintHitIntoTimeout()
         {
-            var paintConfig = PaintFixture(1, 2f);
+            var paintConfig = PaintFixture(100f, 2f);
             try
             {
                 var clock = new LabBattleClock();
@@ -1524,7 +1698,7 @@ namespace C6Lab.Tests
         [Test]
         public void NoneElementAndCompatibilityOrInvalidDirectionHitsCannotCreatePaintVictory()
         {
-            var paintConfig = PaintFixture(1);
+            var paintConfig = PaintFixture(100f);
             try
             {
                 var room = new LabModel();
@@ -1565,7 +1739,7 @@ namespace C6Lab.Tests
         [Test]
         public void CrackModeKeepsActualHpVictoryAndNeverPaintsItsHitDirection()
         {
-            var crackConfig = PaintFixture(1);
+            var crackConfig = PaintFixture(100f);
             try
             {
                 float[] values = crackConfig.CaptureDeveloperValues();
@@ -1588,9 +1762,9 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void PaintGoalAndPaletteAreCapturedUntilTheRoundRestarts()
+        public void PaintGrowthAndPaletteAreCapturedUntilTheRoundRestarts()
         {
-            var paintConfig = PaintFixture(100);
+            var paintConfig = PaintFixture(2f);
             var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
             var material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
             try
@@ -1607,19 +1781,26 @@ namespace C6Lab.Tests
                 Assert.That(room.PaintColorFor(LabOrbElement.None), Is.EqualTo(Color.clear));
                 material.SetColor("_BaseColor", Color.magenta);
                 float[] values = paintConfig.CaptureDeveloperValues();
-                values[87] = 1f;
+                values[106] = 100f;
+                values[105] = 2f;
                 Assert.That(paintConfig.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 int request = 0;
                 LabOrbState shot = LaunchElementShot(room, ref request, 0d);
                 Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.forward, out _, out _, out _), Is.True);
                 Assert.That(room.Snapshot(0d).paintGoalPercent, Is.EqualTo(100));
+                Assert.That(room.PaintSurface.Columns, Is.EqualTo(64), "Active rules retain the old resolution.");
                 Assert.That(room.Phase, Is.EqualTo(LabPhase.Playing));
                 Assert.That(Vector4.Distance(room.PaintColorFor(LabOrbElement.Fire), firstColor), Is.LessThan(.00001f));
                 room.Tick(30d);
                 room.BeginSolo("paint-capture", 10, 31d, paintConfig);
-                Assert.That(room.Snapshot(31d).paintGoalPercent, Is.EqualTo(1));
+                Assert.That(room.Snapshot(31d).paintGoalPercent, Is.EqualTo(100));
+                Assert.That(room.PaintSurface.Columns, Is.EqualTo(256));
+                Assert.That(room.PaintSurface.Rows, Is.EqualTo(128));
                 Assert.That(room.PaintColorFor(LabOrbElement.Fire), Is.EqualTo(Color.magenta));
                 Assert.That(room.PaintSurface.Coverage, Is.Zero);
+                LabOrbState retryShot = LaunchElementShot(room, ref request, 31d);
+                Assert.That(room.ConfirmHit(retryShot.id, 31d, Vector3.forward, out _, out _, out _), Is.True);
+                Assert.That(room.Phase, Is.EqualTo(LabPhase.Victory), "The retry captures the new 100% initial area.");
             }
             finally
             {
@@ -1629,7 +1810,8 @@ namespace C6Lab.Tests
             }
         }
 
-        private static LabConfig PaintFixture(int goal, float duration = 30f)
+        private static LabConfig PaintFixture(float initialPercent, float duration = 30f,
+            float repeatPercent = 4f, float growthPercentPerSecond = 6f)
         {
             var created = ConfigWith(.001f, 0, 0, 0, 100, 0, 0);
             float[] values = created.CaptureDeveloperValues();
@@ -1639,31 +1821,29 @@ namespace C6Lab.Tests
             values[9] = 100f;
             values[46] = 0f; values[47] = 0f;
             values[79] = 0f;
-            values[87] = goal;
+            values[87] = 100f;
+            values[105] = 0f; // The small real map keeps model rule fixtures fast.
+            values[106] = initialPercent;
+            values[107] = repeatPercent;
+            values[108] = growthPercentPerSecond;
+            values[109] = 100f; // No random holes in exact-time model fixtures.
+            values[110] = 1f;
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
         }
 
-        private static LabOrbState LaunchElementShot(LabModel room, ref int request, double now)
+        private static LabOrbState LaunchElementShot(LabModel room, ref int request, double now, ulong owner = 10ul)
         {
-            var shot = room.Snapshot(now).orbs.FirstOrDefault(orb => orb.kind == LabOrbKind.Combined && !orb.inFlight);
+            var shot = room.Snapshot(now).orbs.FirstOrDefault(orb => orb.owner == owner && orb.kind == LabOrbKind.Combined && !orb.inFlight);
             if (shot == null)
             {
-                Assert.That(room.TryGenerate(10, "paint-box-" + request++, now, out var box, out string error), Is.True, error);
+                Assert.That(room.TryGenerate(owner, "paint-box-" + request++, now, out var box, out string error), Is.True, error);
                 Assert.That(box.kind, Is.EqualTo(LabOrbKind.SecretBox));
-                Assert.That(room.TryUseItem(10, box.id, "paint-open-" + request++, now, out _, out error), Is.True, error);
-                shot = room.Snapshot(now).orbs.First(orb => orb.kind == LabOrbKind.Combined && !orb.inFlight);
+                Assert.That(room.TryUseItem(owner, box.id, "paint-open-" + request++, now, out _, out error), Is.True, error);
+                shot = room.Snapshot(now).orbs.First(orb => orb.owner == owner && orb.kind == LabOrbKind.Combined && !orb.inFlight);
             }
-            Assert.That(room.TryLaunch(10, shot.id, "paint-launch-" + request++, now, out _, out string reason), Is.True, reason);
+            Assert.That(room.TryLaunch(owner, shot.id, "paint-launch-" + request++, now, out _, out string reason), Is.True, reason);
             return shot;
-        }
-
-        private static Vector3 SurfaceDirection(int index, int count)
-        {
-            float y = 1f - 2f * (index + .5f) / count;
-            float angle = index * 2.39996323f;
-            float ring = Mathf.Sqrt(1f - y * y);
-            return new Vector3(Mathf.Cos(angle) * ring, y, Mathf.Sin(angle) * ring);
         }
 
         [Test]
