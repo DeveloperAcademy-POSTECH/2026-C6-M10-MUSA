@@ -113,12 +113,12 @@ namespace C6Lab.Tests
             values[91] = 10f; values[92] = 30f; values[93] = 50f; values[94] = 90f; // drum stop zone edges
             values[95] = 25f; values[96] = 25f; values[97] = 25f; values[98] = 25f; // drum stop chances
             values[99] = 0f; // minimap off
-            values[100] = 40f; // minimap 0.4x
+            values[100] = 80f; // minimap bigger than the default 50
             values[101] = -120f; // 120 to the left
             values[102] = 60f; // 60 up
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MinimapEnabled, Is.False, "DEV can turn the minimap off.");
-            Assert.That(config.MinimapSizePercent, Is.EqualTo(40), "DEV can shrink the minimap well below its normal size.");
+            Assert.That(config.MinimapSizePercent, Is.EqualTo(80), "DEV sizes the minimap from 0 to 100 with 50 in the middle.");
             Assert.That(config.MinimapMove, Is.EqualTo(new Vector2(-120f, 60f)), "DEV can move the minimap left/right and up/down.");
             Assert.That(config.FuseSoundVolume, Is.EqualTo(1f).Within(1e-5f), "100 doubles the Inspector fuse volume (0.5).");
             Assert.That(config.DrumStopBounds(), Is.EqualTo(new[] { .1f, .3f, .5f, .9f }).Within(1e-6f));
