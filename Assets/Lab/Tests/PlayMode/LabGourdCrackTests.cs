@@ -218,7 +218,8 @@ namespace C6Lab.Tests
     Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
     Assert.That(network.target.GetComponent<LabGourdPaint>().IsReady, Is.True);
     Assert.That(c.enabled, Is.False);
-    Assert.That(hud.sessionControls.activeInHierarchy, Is.True);
+    Assert.That(hud.roomListPanel.activeInHierarchy, Is.True,
+     "Leaving a Solo round returns to the automatic room browser.");
    }
    finally
    {

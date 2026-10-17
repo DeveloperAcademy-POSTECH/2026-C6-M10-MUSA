@@ -30,6 +30,7 @@ namespace C6Lab
         public int slotNumber;
         public bool accepted;
         public long lobbyRevision;
+        public string roomName;
         public LabSnapshot snapshot;
         public long requestId;
         public string firstId;
@@ -159,7 +160,8 @@ namespace C6Lab
         // cannot share this room. Version 5621 adds the Paint goal setting and independent
         // approved impact values/directions/colors. Version 5625 adds the minimap on/off, size and position settings (#181).
         // Version 5626 adds the bomb sound volume setting (#183).
-        internal const ushort LabProtocolVersion = 5626;
+        // Version 5627 shares the confirmed room name in lobby packets.
+        internal const ushort LabProtocolVersion = 5627;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
@@ -242,6 +244,15 @@ namespace C6Lab
         private string advertisedName;
         private IReadOnlyList<LabDiscoveredRoom> discoveredRooms = Array.Empty<LabDiscoveredRoom>();
         private bool roomSearchActive;
+        private bool resumeRoomSearchAfterStop;
+        private double roomSearchStartedAt;
+        private bool roomCacheGraceActive;
+        private string roomSearchMessage = string.Empty;
+        private bool roomSearchFailed;
+        private string connectedRoomName = string.Empty;
+        private bool joinFinishPending;
+        private bool joinCanceling;
+        private bool clientSessionConnected;
         private int targetParticipantCount = 3;
         private int configRevision;
         private string configFingerprint;
@@ -288,9 +299,31 @@ namespace C6Lab
         public ulong GetSlotOwner(int slotNumber) => playerSlots?.GetOwner(slotNumber) ?? ulong.MaxValue;
         public bool IsSearchingRooms => roomSearchActive && discovery != null && discovery.IsBrowsing;
         public IReadOnlyList<LabDiscoveredRoom> DiscoveredRooms => discoveredRooms;
-        // Bonjour may rename a duplicate service. Show only its confirmed registered name.
-        public string HostRoomName => IsHost && discovery != null && discovery.AdvertisingConfirmed
-            ? discovery.RegisteredServiceName ?? string.Empty : string.Empty;
+        /// <summary>Includes the NGO shutdown wait after cancellation or a failed attempt.</summary>
+        public bool IsJoiningRoom => joinInProgress || joinRetryPending || joinFinishPending;
+        public bool IsCancelingJoin => joinCanceling;
+        public string JoiningRoomKey => IsJoiningRoom ? discoveryRoomKey ?? string.Empty : string.Empty;
+        public float JoinElapsedSeconds => IsJoiningRoom
+            ? (float)Math.Max(0d, Time.realtimeSinceStartupAsDouble - joinStartedAt) : 0f;
+        public bool RoomSearchFailed => roomSearchFailed;
+        public string ConnectedRoomName => IsConnected ? connectedRoomName : string.Empty;
+        public string RoomSearchMessage
+        {
+            get
+            {
+                if (joinCanceling) return "Canceling connection…";
+                if (IsJoiningRoom) return joinFinishPending ? "Closing connection…" : "Connecting to room…";
+                // A resumed browse must not erase the reason a join or search failed.
+                if (!string.IsNullOrEmpty(roomSearchMessage)) return roomSearchMessage;
+                if (!IsSearchingRooms) return "Choose a room or refresh the list.";
+                if (discoveredRooms.Count > 0) return "Select a room to join.";
+                return Time.realtimeSinceStartupAsDouble - roomSearchStartedAt >= 5d
+                    ? "No rooms found yet. Keep the Host app open on the same network. Search continues…"
+                    : "Searching for rooms…";
+            }
+        }
+        // Bonjour may rename a duplicate service. Only its confirmed name is shared.
+        public string HostRoomName => IsHost ? connectedRoomName : string.Empty;
         public bool HostRoomNamePending => IsHost && discovery != null && discovery.IsAdvertising
             && !discovery.AdvertisingConfirmed;
         public bool SessionConfigReady => IsHost
@@ -301,10 +334,12 @@ namespace C6Lab
         /// <summary>Only a player with a drum on their board can generate orbs.</summary>
         public bool HasLocalDrum => LocalDrum() != null;
         public bool DeveloperBuildAvailable => Application.isEditor || Debug.isDebugBuild;
-        public bool IsConnected => manager != null && manager.IsListening && (manager.IsHost || manager.IsConnectedClient);
-        private bool CanBeginConnection => !IsConnected && !joinInProgress && !joinRetryPending
+        public bool IsConnected => !joinFinishPending && manager != null && manager.IsListening
+            && (manager.IsHost || manager.IsConnectedClient);
+        private bool CanBeginConnection => !IsConnected && !IsJoiningRoom
             && (manager == null || (!manager.IsListening && !manager.ShutdownInProgress));
-        public bool CanChooseConnection => CanBeginConnection && !roomSearchActive;
+        // Browsing does not occupy a connection: creating a room or using DEV closes it first.
+        public bool CanChooseConnection => CanBeginConnection;
         public ulong LocalPlayerId => IsConnected ? manager.LocalClientId : ulong.MaxValue;
         public LabSnapshot Snapshot => latest;
         public bool CanStartBattle => IsHost && !developerSolo && order.Count == targetParticipantCount
@@ -527,6 +562,8 @@ namespace C6Lab
         public void Host()
         {
             if (!CanChooseConnection || manager == null || transport == null || config == null) return;
+            resumeRoomSearchAfterStop = false;
+            ClearRoomSearchMessage();
             DisposeDiscovery();
             ResetLocal();
             playerSlots = new LabPlayerSlots(targetParticipantCount);
@@ -539,11 +576,16 @@ namespace C6Lab
                 if (transport is LabDualStackTransport dual) dual.ConfigureHost(port);
                 else transport.SetConnectionData("127.0.0.1", port, "0.0.0.0");
             }
-            catch (Exception e) { SetStatus("Host endpoint failed: " + e.Message); return; }
+            catch (Exception e)
+            {
+                SetRoomSearchMessage("Host endpoint failed: " + e.Message, true);
+                return;
+            }
             if (!manager.StartHost())
             {
                 string code = transport is LabDualStackTransport failed ? failed.LastFailureCode : string.Empty;
-                SetStatus("Host failed: " + (string.IsNullOrEmpty(code) ? "check port and network" : code) + ".");
+                SetRoomSearchMessage("Host failed: "
+                    + (string.IsNullOrEmpty(code) ? "check port and network" : code) + ".", true);
                 return;
             }
             RegisterHandler();
@@ -559,8 +601,14 @@ namespace C6Lab
         public void Join(string address)
         {
             if (!CanChooseConnection || manager == null || transport == null || config == null) return;
-            if (string.IsNullOrWhiteSpace(address)) { SetStatus("Enter the Host IP address."); return; }
-            DisposeDiscovery();
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                SetRoomSearchMessage("Enter the Host IP address.", true);
+                return;
+            }
+            resumeRoomSearchAfterStop = false;
+            ClearRoomSearchMessage();
+            DisposeDiscovery(true);
             discoveryJoinActive = false;
             discoveryRoomKey = null;
             hostAddress = address.Trim();
@@ -570,18 +618,30 @@ namespace C6Lab
                 if (IPAddress.TryParse(hostAddress, out var literal)) addresses.Add(literal.ToString());
                 else addresses.AddRange(Dns.GetHostAddresses(hostAddress).Select(ip => ip.ToString()));
             }
-            catch (Exception e) { SetStatus("Host address lookup failed: " + e.GetType().Name); return; }
+            catch (Exception e)
+            {
+                SetRoomSearchMessage("Host address lookup failed: " + e.GetType().Name, true);
+                StartRoomSearchInternal(true);
+                return;
+            }
             BeginJoinCandidates(addresses);
         }
 
-        /// <summary>Browse without joining. A player must explicitly select a visible room.</summary>
-        public bool StartRoomSearch()
+        /// <summary>Browse without joining. Refresh preserves cached rows briefly, never stale routes.</summary>
+        public bool StartRoomSearch() => StartRoomSearchInternal(false);
+
+        private bool StartRoomSearchInternal(bool preserveMessage)
         {
             if (!CanBeginConnection || manager == null || transport == null || config == null) return false;
-            DisposeDiscovery();
+            // A UI-initiated browse consumes a pending one-shot resume as well.
+            resumeRoomSearchAfterStop = false;
+            if (!preserveMessage) ClearRoomSearchMessage();
+            DisposeDiscovery(true);
+            roomSearchStartedAt = Time.realtimeSinceStartupAsDouble;
+            roomCacheGraceActive = discoveredRooms.Count > 0;
             if (!LabBonjourDiscovery.IsSupported)
             {
-                SetStatus("Room discovery is available on macOS and iOS. Use direct IP here.");
+                ReportRoomSearchFailure("Room discovery is available on macOS and iOS. Use direct IP here.", preserveMessage);
                 return false;
             }
             discovery = new LabBonjourDiscovery();
@@ -591,24 +651,32 @@ namespace C6Lab
             if (!discovery.StartBrowse())
             {
                 string error = discovery.LastError ?? "Room search could not start. Use direct IP.";
-                DisposeDiscovery();
-                SetStatus(error);
+                DisposeDiscovery(true);
+                ReportRoomSearchFailure(error, preserveMessage);
                 return false;
             }
             discoveryJoinActive = false;
             discoveryRoomKey = null;
-            SetStatus("Searching local rooms; keep the Host app open...");
+            if (!preserveMessage) SetStatus("Searching local rooms; keep the Host app open...");
+            else Changed?.Invoke();
             return true;
         }
 
         public void CancelRoomSearch()
         {
-            if (!roomSearchActive) return;
+            if (!roomSearchActive || IsJoiningRoom) return;
             DisposeDiscovery();
-            SetStatus("Room search canceled. Choose HOST or JOIN.");
+            SetRoomSearchMessage("Room search canceled. Create a room or refresh to search again.", false);
         }
 
-        /// <summary>Use only the selected room's current IPv4/IPv6 routes.</summary>
+        public bool CanJoinDiscoveredRoom(string roomKey)
+        {
+            return IsSearchingRooms && CanBeginConnection && !string.IsNullOrEmpty(roomKey)
+                && discoveredRooms.Any(item => string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase))
+                && LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey).Length > 0;
+        }
+
+        /// <summary>Use only fresh routes for the selected room; cached rows are never connection targets.</summary>
         public bool JoinDiscoveredRoom(string roomKey)
         {
             if (!IsSearchingRooms || !CanBeginConnection) return false;
@@ -617,17 +685,25 @@ namespace C6Lab
             LabBonjourTarget[] targets = LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey);
             if (room == null || targets.Length == 0)
             {
-                discoveredRooms = LabRoomCatalog.GroupTargets(discovery.Targets);
-                SetStatus("That room is no longer available. Refresh and choose another room.");
+                RefreshDiscoveredRooms();
+                SetRoomSearchMessage("That room is no longer available. Choose another room or refresh.", true);
                 return false;
             }
+            ClearRoomSearchMessage();
             port = room.Port;
-            roomSearchActive = false;
-            discoveredRooms = Array.Empty<LabDiscoveredRoom>();
+            // Keep browsing and showing the current list while one selected room connects.
             discoveryJoinActive = true;
             discoveryRoomKey = room.Key;
             BeginJoinCandidates(targets.Select(item => item.Address));
-            return joinInProgress;
+            return IsJoiningRoom;
+        }
+
+        /// <summary>Cancel only the current join. Re-open browsing once NGO has fully shut down.</summary>
+        public bool CancelJoin()
+        {
+            if (!IsJoiningRoom || joinFinishPending) return false;
+            FinishJoin("Connection canceled. Choose a room to try again.", false, true);
+            return true;
         }
 
         private void BeginJoinCandidates(IEnumerable<string> addresses)
@@ -635,16 +711,23 @@ namespace C6Lab
             ResetLocal();
             joinCandidates.Clear();
             joinCandidates.AddRange(LabConnectionCandidates.Initial(addresses, port));
-            if (joinCandidates.Count == 0) { SetStatus("No usable numeric IPv4/IPv6 address. Use direct IP."); return; }
             joinCandidateIndex = 0;
             joinStartedAt = Time.realtimeSinceStartupAsDouble;
             joinInProgress = true;
+            joinFinishPending = false;
+            joinCanceling = false;
+            if (joinCandidates.Count == 0)
+            {
+                FinishJoin("No usable numeric IPv4/IPv6 address. Use direct IP.", true);
+                return;
+            }
             StartJoinAttempt();
         }
 
         private void StartJoinAttempt()
         {
-            if (!joinInProgress || joinCandidateIndex >= joinCandidates.Count || manager == null || transport == null) return;
+            if (!joinInProgress || joinFinishPending || joinCandidateIndex >= joinCandidates.Count
+                || manager == null || transport == null) return;
             string address = joinCandidates[joinCandidateIndex];
             ConfigureManager();
             try
@@ -670,16 +753,11 @@ namespace C6Lab
 
         private void AdvanceJoinCandidate()
         {
-            if (!joinInProgress || joinRetryPending) return;
+            if (!joinInProgress || joinRetryPending || joinFinishPending) return;
             string rejection = manager == null ? string.Empty : manager.DisconnectReason;
-            if (!string.IsNullOrEmpty(rejection))
+            if (IsTerminalJoinRejection(rejection))
             {
-                joinInProgress = false;
-                discoveryJoinActive = false;
-                DisposeDiscovery();
-                UnregisterHandler();
-                if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
-                SetStatus("Join rejected: " + rejection);
+                FinishJoin("Join rejected: " + rejection, true);
                 return;
             }
             if (++joinCandidateIndex >= joinCandidates.Count
@@ -689,26 +767,67 @@ namespace C6Lab
                 {
                     joinRetryPending = true;
                     UnregisterHandler();
-                    if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
+                    RequestJoinShutdown();
                     SetStatus("Waiting for another local route to the discovered Host...");
                     return;
                 }
-                joinInProgress = false;
-                DisposeDiscovery();
-                UnregisterHandler();
-                if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
-                SetStatus("Connection failed on all local routes. Check Host, port, and network.");
+                FinishJoin("Connection failed on all local routes. Check Host, port, and network.", true);
                 return;
             }
             joinRetryPending = true;
             UnregisterHandler();
+            RequestJoinShutdown();
+        }
+
+        /// <summary>
+        /// NGO returns a server-supplied reason verbatim. Its generated transport diagnostic uses
+        /// this prefix instead; such a timeout/disconnect does not reject the other IP routes.
+        /// Unknown explicit Host reasons remain terminal rather than being retried blindly.
+        /// </summary>
+        public static bool IsTerminalJoinRejection(string reason) => !string.IsNullOrEmpty(reason)
+            && !reason.StartsWith("[Disconnect Event]", StringComparison.Ordinal);
+
+        private void FinishJoin(string message, bool failed, bool canceled = false)
+        {
+            // Keep the operation locked through shutdown. Late connect/disconnect callbacks cannot
+            // turn a canceled connection into a room or advance it to a second address.
+            joinFinishPending = true;
+            joinCanceling = canceled;
+            joinRetryPending = false;
+            discoveryJoinActive = false;
+            joinAttemptAt = 0d;
+            SetRoomSearchMessage(message, failed);
+            UnregisterHandler();
+            RequestJoinShutdown();
+        }
+
+        private void RequestJoinShutdown()
+        {
             if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
+        }
+
+        private void CompleteJoinShutdown()
+        {
+            RequestJoinShutdown();
+            if (manager != null && (manager.IsListening || manager.ShutdownInProgress)) return;
+            joinInProgress = false;
+            joinRetryPending = false;
+            joinFinishPending = false;
+            joinCanceling = false;
+            discoveryJoinActive = false;
+            discoveryRoomKey = null;
+            stopAfterDisconnect = false;
+            ResetLocal();
+            // Exactly one automatic resume for this failure/cancel. A Bonjour failure stays stopped.
+            StartRoomSearchInternal(true);
         }
 
         public void Stop()
         {
             if (stopping) return;
             stopping = true;
+            joinFinishPending = false;
+            joinCanceling = false;
             joinInProgress = false;
             joinRetryPending = false;
             discoveryJoinActive = false;
@@ -719,6 +838,8 @@ namespace C6Lab
             ResetLocal();
             RestoreSourceConfig();
             SetStatus("Disconnected. Choose HOST or JOIN.");
+            ClearRoomSearchMessage();
+            resumeRoomSearchAfterStop = true;
             stopping = false;
         }
 
@@ -959,10 +1080,20 @@ namespace C6Lab
                 stopAfterDisconnect = false;
                 string explanation = Status;
                 Stop();
-                SetStatus(explanation);
+                SetRoomSearchMessage(explanation, true);
                 return;
             }
             double now = Time.realtimeSinceStartupAsDouble;
+            if (resumeRoomSearchAfterStop && CanBeginConnection)
+            {
+                resumeRoomSearchAfterStop = false;
+                if (!IsSearchingRooms) StartRoomSearchInternal(true);
+            }
+            if (joinFinishPending)
+            {
+                CompleteJoinShutdown();
+                return;
+            }
             if (pauseRequestPending && now - pauseRequestSentAt >= 5d)
                 pauseRequestPending = false;
             if (slotSelectionPending && now - slotRequestSentAt >= 5d)
@@ -976,12 +1107,16 @@ namespace C6Lab
             LabBonjourDiscovery activeDiscovery = discovery;
             if (activeDiscovery != null)
             {
-                activeDiscovery.Tick(now);
+                // A resumed browse may have been created later in this Update.
+                // Sample native discovery time now so its monotonic clock never moves backwards.
+                activeDiscovery.Tick();
                 if (discovery == activeDiscovery && roomSearchActive && !activeDiscovery.IsBrowsing)
                 {
                     string error = activeDiscovery.LastError ?? "Room search ended. Use direct IP or search again.";
-                    DisposeDiscovery();
-                    SetStatus(error);
+                    DisposeDiscovery(true);
+                    roomSearchStartedAt = now;
+                    roomCacheGraceActive = discoveredRooms.Count > 0;
+                    ReportRoomSearchFailure(error, true);
                 }
                 if (discovery == activeDiscovery && discoveryJoinActive)
                 {
@@ -994,6 +1129,12 @@ namespace C6Lab
                     }
                 }
             }
+            if (roomCacheGraceActive && !IsJoiningRoom && now - roomSearchStartedAt >= 5d)
+            {
+                roomCacheGraceActive = false;
+                RefreshDiscoveredRooms();
+                Changed?.Invoke();
+            }
             if (joinRetryPending && manager != null && !manager.IsListening && !manager.ShutdownInProgress)
             {
                 if (joinCandidateIndex < joinCandidates.Count)
@@ -1003,13 +1144,10 @@ namespace C6Lab
                 }
                 else if (now - joinStartedAt > JoinBudgetSeconds)
                 {
-                    joinInProgress = false;
-                    joinRetryPending = false;
-                    DisposeDiscovery();
-                    SetStatus("No reachable route found. Use direct IP or check the Host network.");
+                    FinishJoin("No reachable route found. Use direct IP or check the Host network.", true);
                 }
             }
-            if (joinInProgress && !joinRetryPending && joinAttemptAt > 0
+            if (joinInProgress && !joinRetryPending && !joinFinishPending && joinAttemptAt > 0
                 && now - joinAttemptAt >= JoinAttemptSeconds) AdvanceJoinCandidate();
             if (IsHost && model != null)
             {
@@ -1074,14 +1212,18 @@ namespace C6Lab
         private void Approve(NetworkManager.ConnectionApprovalRequest request, NetworkManager.ConnectionApprovalResponse response)
         {
             bool alreadyPending = pendingApprovals.ContainsKey(request.ClientNetworkId);
-            bool allowed = manager.IsHost && order.Count + pendingApprovals.Count - (alreadyPending ? 1 : 0)
-                    < targetParticipantCount && model == null
-                && request.Payload != null && request.Payload.SequenceEqual(LabConnectionToken);
+            string rejection = !manager.IsHost ? "The room is no longer hosted."
+                : request.Payload == null || !request.Payload.SequenceEqual(LabConnectionToken)
+                    ? "Lab version mismatch. Use the same game version."
+                    : model != null ? "Battle already started. Wait for the Host to return to the lobby."
+                        : order.Count + pendingApprovals.Count - (alreadyPending ? 1 : 0) >= targetParticipantCount
+                            ? "Room is full. Choose another room." : string.Empty;
+            bool allowed = string.IsNullOrEmpty(rejection);
             if (allowed) pendingApprovals[request.ClientNetworkId] = Time.realtimeSinceStartupAsDouble;
             response.Approved = allowed;
             response.CreatePlayerObject = false;
             response.Pending = false;
-            response.Reason = allowed ? string.Empty : "Lab version mismatch, room full, or battle started.";
+            response.Reason = rejection;
         }
 
         private void RegisterHandler()
@@ -1101,6 +1243,11 @@ namespace C6Lab
         private void OnConnected(ulong id)
         {
             if (stopping || manager == null) return;
+            if (joinFinishPending || (!manager.IsHost && (!joinInProgress || manager.ShutdownInProgress)))
+            {
+                RequestJoinShutdown();
+                return;
+            }
             RegisterHandler();
             if (manager.IsHost)
             {
@@ -1121,8 +1268,10 @@ namespace C6Lab
             {
                 joinInProgress = false;
                 joinRetryPending = false;
+                clientSessionConnected = true;
                 discoveryJoinActive = false;
                 DisposeDiscovery();
+                ClearRoomSearchMessage();
                 SetStatus("Connected; waiting for Host settings.");
                 Debug.Log("C6_LAB_CONNECTED local=" + id);
             }
@@ -1130,7 +1279,7 @@ namespace C6Lab
 
         private void OnDisconnected(ulong id)
         {
-            if (stopping) return;
+            if (stopping || joinFinishPending) return;
             pendingApprovals.Remove(id);
             if (manager != null && manager.IsHost)
             {
@@ -1152,6 +1301,8 @@ namespace C6Lab
             else
             {
                 if (joinInProgress) { AdvanceJoinCandidate(); return; }
+                if (!clientSessionConnected) return; // Ignore a retired attempt's late shutdown callback.
+                clientSessionConnected = false;
                 stopAfterDisconnect = true;
                 string reason = manager == null ? string.Empty : manager.DisconnectReason;
                 SetStatus(string.IsNullOrEmpty(reason) ? "Connection ended. Rejoin the Host." : "Join failed: " + reason);
@@ -1161,8 +1312,9 @@ namespace C6Lab
 
         private void OnTransportFailure()
         {
+            if (joinFinishPending) return;
             if (joinInProgress) { AdvanceJoinCandidate(); return; }
-            SetStatus("Network transport failed. Check IP, port, and same network.");
+            SetRoomSearchMessage("Network transport failed. Check IP, port, and same network.", true);
             Debug.LogWarning("C6_LAB_TRANSPORT_FAILURE");
         }
 
@@ -1173,7 +1325,7 @@ namespace C6Lab
                 slotAssignments = playerSlots?.Snapshot() ?? Array.Empty<LabPlayerSlotAssignment>(),
                 targetParticipants = targetParticipantCount, configRevision = configRevision,
                 configFingerprint = configFingerprint, snapshotSequence = snapshotSequence,
-                lobbyRevision = ++lobbyRevision };
+                lobbyRevision = ++lobbyRevision, roomName = connectedRoomName };
             foreach (ulong id in order) if (id != manager.LocalClientId) Send(id, packet);
             SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
                 + " · P " + (playerSlots?.SelectedCount ?? 0) + "/" + targetParticipantCount
@@ -1584,7 +1736,7 @@ namespace C6Lab
 
         private void Receive(ulong sender, FastBufferReader reader)
         {
-            if (!TryRead(reader, out var packet)) return;
+            if (joinFinishPending || !TryRead(reader, out var packet)) return;
             if (IsHost)
             {
                 if (sender == LocalPlayerId || !order.Contains(sender)) return;
@@ -1616,12 +1768,14 @@ namespace C6Lab
                     if (packet.targetParticipants < 2 || packet.targetParticipants > 5
                         || packet.seats == null || packet.seats.Length > packet.targetParticipants
                         || packet.seats.Distinct().Count() != packet.seats.Length
-                        || packet.slotAssignments == null || packet.lobbyRevision <= receivedLobbyRevision
+                        || packet.slotAssignments == null || !ValidRoomName(packet.roomName)
+                        || packet.lobbyRevision <= receivedLobbyRevision
                         || packet.snapshotSequence < incomingSequence
                         || packet.snapshotSequence < lobbySnapshotSequenceFloor) return;
                     var newSlots = new LabPlayerSlots(packet.targetParticipants);
                     if (!newSlots.TryReplace(packet.slotAssignments, packet.seats)) return;
                     receivedLobbyRevision = packet.lobbyRevision;
+                    connectedRoomName = packet.roomName ?? string.Empty;
                     lobbySnapshotSequenceFloor = packet.snapshotSequence;
                     incomingSequence = Math.Max(incomingSequence, packet.snapshotSequence);
                     incomingChunks = null;
@@ -1900,6 +2054,8 @@ namespace C6Lab
 
         private void ResetLocal()
         {
+            clientSessionConnected = false;
+            connectedRoomName = string.Empty;
             clientPaintSurface.Clear();
             paintSession = null;
             paintRound = 0;
@@ -1961,7 +2117,7 @@ namespace C6Lab
             else Debug.Log("C6_LAB_LISTEN_FAMILIES ipv4=" + ipv4 + " ipv6=" + ipv6);
         }
 
-        private void DisposeDiscovery()
+        private void DisposeDiscovery(bool preserveRooms = false)
         {
             if (discovery != null)
             {
@@ -1970,8 +2126,12 @@ namespace C6Lab
                 discovery = null;
             }
             roomSearchActive = false;
-            discoveredRooms = Array.Empty<LabDiscoveredRoom>();
-            discoveryRoomKey = null;
+            if (!preserveRooms)
+            {
+                roomCacheGraceActive = false;
+                discoveredRooms = Array.Empty<LabDiscoveredRoom>();
+            }
+            if (!IsJoiningRoom) discoveryRoomKey = null;
             advertisedName = null;
             Changed?.Invoke();
         }
@@ -1980,10 +2140,60 @@ namespace C6Lab
         {
             if (roomSearchActive && discovery != null)
             {
-                discoveredRooms = LabRoomCatalog.GroupTargets(discovery.Targets);
+                RefreshDiscoveredRooms();
                 Debug.Log("C6_LAB_ROOM_LIST count=" + discoveredRooms.Count);
             }
+            else if (IsHost && discovery != null && discovery.AdvertisingConfirmed)
+            {
+                string confirmed = discovery.RegisteredServiceName ?? string.Empty;
+                if (confirmed != connectedRoomName && ValidRoomName(confirmed))
+                {
+                    connectedRoomName = confirmed;
+                    // Registration can finish after peers arrive. Send only when the confirmed name changes.
+                    if (!developerSolo && model == null) BroadcastLobby();
+                }
+            }
             Changed?.Invoke();
+        }
+
+        private void RefreshDiscoveredRooms()
+        {
+            IReadOnlyList<LabDiscoveredRoom> fresh = discovery == null
+                ? Array.Empty<LabDiscoveredRoom>() : LabRoomCatalog.GroupTargets(discovery.Targets);
+            if (roomCacheGraceActive && Time.realtimeSinceStartupAsDouble - roomSearchStartedAt < 5d)
+            {
+                discoveredRooms = fresh.Concat(discoveredRooms)
+                    .GroupBy(room => room.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First()).OrderBy(room => room.Name, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(room => room.Port).ToArray();
+            }
+            else discoveredRooms = fresh;
+        }
+
+        private void ClearRoomSearchMessage()
+        {
+            roomSearchMessage = string.Empty;
+            roomSearchFailed = false;
+        }
+
+        private void SetRoomSearchMessage(string message, bool failed)
+        {
+            roomSearchMessage = message ?? string.Empty;
+            roomSearchFailed = failed;
+            SetStatus(roomSearchMessage);
+        }
+
+        private void ReportRoomSearchFailure(string error, bool preserveMessage)
+        {
+            string message = preserveMessage && !string.IsNullOrEmpty(roomSearchMessage)
+                ? roomSearchMessage + " Search unavailable: " + error : error;
+            SetRoomSearchMessage(message, true);
+        }
+
+        private static bool ValidRoomName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return true; // Registration may still be pending.
+            return name.Length <= 63 && !name.Any(char.IsControl) && Encoding.UTF8.GetByteCount(name) <= 63;
         }
 
         private void ClearProjectiles()
