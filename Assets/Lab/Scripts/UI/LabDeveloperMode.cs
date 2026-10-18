@@ -461,7 +461,7 @@ namespace C6Lab
             LabDeveloperField field = LabConfig.DeveloperFields[index];
             if (float.IsNaN(value) || float.IsInfinity(value) || value < field.Min || value > field.Max) return;
             valueSliders[index].SetValueWithoutNotify(LabDeveloperSliderScale.Normalize(field, defaultValues[index], value));
-            if (index == 111) RefreshThrowFormInputs();
+            if (index == 112) RefreshThrowFormInputs();
         }
 
         private void SyncInputFromSlider(int index, float position)
@@ -470,7 +470,7 @@ namespace C6Lab
             float value = LabDeveloperSliderScale.Denormalize(field, defaultValues[index], position);
             if (field.WholeNumber) value = Mathf.Round(value);
             valueInputs[index].SetTextWithoutNotify(value.ToString("0.######", CultureInfo.InvariantCulture));
-            if (index == 111) RefreshThrowFormInputs();
+            if (index == 112) RefreshThrowFormInputs();
         }
 
         // 0/1 항목(켜기/끄기, 박 모드)은 숫자 입력칸·슬라이더 대신 누를 때마다 바뀌는 버튼으로 보여준다.
@@ -566,12 +566,12 @@ namespace C6Lab
         // The approved runtime config and original asset change only through their existing APPLY paths.
         private void RefreshThrowFormInputs()
         {
-            if (valueInputs == null || valueInputs.Length <= 117 || valueSliders == null
-                || valueSliders.Length <= 117) return;
+            if (valueInputs == null || valueInputs.Length <= 118 || valueSliders == null
+                || valueSliders.Length <= 118) return;
             bool canEdit = network != null && (network.CanChooseConnection || network.IsDeveloperSolo
                 || HostLobby || HostPausedBattle);
-            bool enabled = canEdit && ToggleIsOn(valueInputs[111]);
-            for (int i = 112; i <= 117; i++)
+            bool enabled = canEdit && ToggleIsOn(valueInputs[112]);
+            for (int i = 113; i <= 118; i++)
             {
                 if (valueInputs[i] != null)
                 {

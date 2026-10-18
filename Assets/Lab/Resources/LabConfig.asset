@@ -71,6 +71,7 @@ MonoBehaviour:
   paintGrowthPercentPerSecond: 6
   paintFillChancePercent: 60
   paintVerticalWeight: 1.35
+  completedGourdViewerEnabled: 0
   gourdBombIntervalMin: 20
   gourdBombIntervalMax: 30
   bgmVolume: 0.2

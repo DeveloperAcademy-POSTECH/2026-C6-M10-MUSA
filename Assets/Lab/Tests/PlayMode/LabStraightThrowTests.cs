@@ -217,8 +217,8 @@ namespace C6Lab.Tests
                 float capturedLifetime = active.LifetimeSeconds;
                 for (int step = 0; step < 8; step++) yield return new WaitForFixedUpdate();
                 float[] replacement = changed.CaptureDeveloperValues();
-                replacement[111] = 0f;
-                replacement[117] = 1f;
+                replacement[112] = 0f;
+                replacement[118] = 1f;
                 replacement[33] = changed.ThrowGravity * 2f;
                 replacement[34] = .02f;
                 Assert.That(changed.TryApplyDeveloperValues(replacement, out string error), Is.True, error);
@@ -247,7 +247,7 @@ namespace C6Lab.Tests
         private static void SetForm(LabConfig config, float value)
         {
             float[] values = config.CaptureDeveloperValues();
-            values[111] = value;
+            values[112] = value;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
         }
 
@@ -255,7 +255,7 @@ namespace C6Lab.Tests
         {
             LabConfig fixture = Object.Instantiate(source);
             float[] tuning = fixture.CaptureDeveloperValues();
-            tuning[111] = 1f;
+            tuning[112] = 1f;
             SetTuning(tuning, "Battle Duration (seconds)", 30f);
             SetTuning(tuning, "Orb Generation Cost", 1f);
             SetTuning(tuning, "Item Lifetime (seconds)", 30f);

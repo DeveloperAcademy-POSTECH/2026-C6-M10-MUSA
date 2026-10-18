@@ -692,7 +692,36 @@ Scene 파일을 저장하거나 덮어쓰지 않고 **File → Open Scene으로 
 최종 전체 XML은 `Logs/Issue187-EditMode.xml`·`Logs/Issue187-PlayMode.xml`이다. 최초 실패와 중간 수정 확인 XML도 로컬 보존본으로 구분한다. `Library/Issue187Captures/`의 카메라 캡처는 자동 검사 산출물이며, 관찰 범위를 따로 기록하지 않은 시각 결과에 PASS를 부여하지 않는다. 원시 XML·Editor/Player 로그·앱·임시 실행기와 JSONL은 로컬 증거로 보존하고 공개 Git에 넣지 않는다. 두 Mac 프로세스의 JSONL은 독립적으로 수집해 비교했고 일반 종료 코드 0을 확인했다. 도구 제거 후 최종 일반 빌드는 해당 행에서 별도로 기록한다. 실행되지 않은 NOT_RUN 행을 이전 검사로 PASS로 변경하지 않는다.
 
 
+## 완성 박 관람 DEV·공유 세션 통합 — #191 / 2026-10-18
+
+기준 main `e3e3be4e`, 브랜치 `feat/#191-gourd-result-viewer-dev`, Unity **6000.6.5f1**, 저장 Scene `Assets/Lab/Scenes/Lab.unity`. #189 실험 코드를 일반 Runtime·Resources와 기존 테스트 어셈블리로 이관한 새 통합본의 실행 기록이다. #189 당시 사용법·검증은 `docs/experiments/gourd-result-viewer-189/`에 역사 자료로 보존했으며 아래 결과로 승계하지 않는다.
+
+| 항목 | 상태 | 근거·범위 |
+| --- | --- | --- |
+| Unity 컴파일·설정·프리팹 연결 | PASS | 별도 작업 폴더에서 실제 Unity import/compile, `ISSUE191_PREPARE_OK fields=112 viewerDefault=OFF prefabReferences=OK`. Unity API로 Config의 bool 0과 기존 GUID의 프리팹 컴포넌트/라벨을 저장했고, 기존 111개 유효 설정값의 동일성을 검사했다. Scene·패키지·프로젝트 설정은 변경하지 않았다. |
+| 전체 EditMode | PASS | `editmode.xml` total=331, passed=331, failed=0, skipped=0, inconclusive=0. 2026-10-18 **07:51:08Z–07:51:10Z**. 기본 OFF/112개 왕복/구형 111개·잘못된 bool 원자적 거절/지문·JSON·Client 적용/100% 결과 자격 검사 포함. |
+| 전체 PlayMode | PASS | `playmode.xml` total=116, passed=116, failed=0, skipped=0, inconclusive=0. **07:51:43Z–07:52:51Z**. 공식 DEV 폼으로 ON 적용→실제 SecretBox 생성·보드 투척·Host 충돌→100% Victory→관람 진입·복사 픽셀 동일·격리 렌더·회전/줌/초기화/닫기·재진입·Retry 정리→OFF 재시작→두 번째 실제 충돌 Victory에서도 UI/Preview null→END SOLO 원본 OFF 복귀를 확인했다. |
+| Development Host + Release Client 실제 공유 실행 | PASS | 07:55:22Z–07:55:31Z. Development Host(186,377,437바이트)와 Release Client(91,886,142바이트)를 실제 NGO/UTP localhost로 연결했다. 각 앱 JSONL의 9개 체크포인트가 모두 pass=true·final까지 도달했고 두 프로세스 정상 종료 코드 0을 확인했다. 일반 Release Client는 Debug.isDebugBuild=false이며 관람 활성화 인자를 받지 않았다. |
+| 공유 ON 관람·원본 보존 | PASS | 112개 설정/지문/ACK 뒤 Client 보드의 실제 상자 사용·투척과 Host 물리 충돌로 양쪽 100% Victory를 만들었다. 양쪽 관람 버튼이 작동하고 복사 텍스처/원본 맵 SHA-256이 같으며 서로 다른 로컬 Quaternion을 유지했다. 입력 직후 원본 target·전투 카메라 pose와 도색 hash가 불변이었다. 각 450×900 실제 UI/RenderTexture PNG에서 모델과 버튼을 확인했다. 이는 한 색으로 완료하는 fixture이며 다색 완성 플레이의 시각 검사는 아니다. |
+| 공유 OFF 전파·같은 방 재시작 | PASS | 관람 중 Host의 ReturnAllToLobby로 두 앱의 Ui/Preview가 null, 소유 Texture/RenderTexture가 파괴된 것을 확인했다. 같은 연결의 ApplyHostLobbyConfig로 OFF를 전파하고 Client ACK 뒤 시작했다. 두 번째 실제 Client 투척/Host 충돌로 다시 2,048/2,048셀 Victory가 되어도 양쪽 CanInspect=false·Ui/Preview=null이었다. |
+| 임시 도구 제거 후 일반 Mac 빌드 | PASS | 임시 Runtime/Editor 실행기 2개와 대응 .meta를 제거한 뒤 `C6Lab.Editor.LabBuild.Mac`으로 새 빌드했다. `C6_LAB_BUILD_OK`, `Builds/Lab/20261018-165600-79e6e8e5/macOS/C6_Physics_Lab.app`, **186,344,398바이트**. 최종 `C6Lab.Runtime.dll`에 관람 클래스가 있고 `Issue191NetworkHarness`가 없음을 검사했다. 이 일반 앱으로 다시 두 프로세스를 연결한 검사는 미실행이다. |
+| iOS 출력·서명·설치·실기기 | NOT_RUN | 실제 핀치/손가락 인계·safe area·방향 전환·핫스팟·3~5기기·메모리/성능은 이번에 실행하지 않았다. 포인터 핸들러 회귀 검사와 실제 손가락 검증은 구분한다. |
+| 기본 성장 밸런스 | NOT_RUN | 관람 재현 fixture는 저해상도 64×32·초기100%·SecretBox100%/잠금0·박 폭탄 끔이다. 기본 초기2%/반복4% 성장 난이도 검사가 아니다. |
+
+### 적용·보존 범위
+
+- 새 허용값은 DEV `Gourd`의 마지막 **112번째/index111 `Completed Gourd Viewer (0 off, 1 on)`**이며 원본 기본 OFF다. 이전 0~110번과 고정100% 목표를 보존했다. 설정 배열 변경에 따라 프로토콜 **5629**, 연결 토큰 **`C6PhysicsLab/9`**로 구분하므로 이전 앱과 섞어 접속하지 않는다.
+- 기본 OFF와 ON의 Playing에서는 네트워크당 가벼운 관찰자만 존재한다. Paint 100% Victory와 일치한 공개 맵에서만 UI를 지연 생성하고, 버튼을 눌러야 독립 모델·카메라·RenderTexture·도색 복사본을 만든다. 회전/줌은 로컬이며 원본 물리·카메라·도색/통계는 수정하지 않는다.
+- 저장된 UI는 `Assets/Lab/Resources/GourdResultViewer/ViewerUI.prefab`, 실행 진입은 `LabSceneController.Awake → LabGourdResultViewer.Attach(network)`다. 실험용 CLI·Editor SessionState·Debug 관람 제한은 제거했지만 기존 DEV 설정 권한은 유지한다.
+- OFF 적용/다음 판/로비/연결 종료/컴포넌트 해제는 관람 Preview와 UI를 정리한다. 관람 중 Config를 직접 편집하는 새 경로를 추가하지 않았다.
+- 데스크탑 체크아웃의 별도 #190 작업과 사용자 Scene·Material은 건드리지 않았다. 원시 XML·Editor/Player 로그·PNG·앱과 임시 실행기는 로컬 증거로만 보존하고 공개 Git에 넣지 않는다.
+
+검증용 통신 입력 도구는 Host/Client가 각자의 JSONL에만 기록하며 파일로 게임 진행을 동기화하지 않았다. 공개 생성·아이템·보드 손동작·네트워크 경로와 실제 Host 물리 충돌을 사용했으며, 맵/승패 직접 주입을 하지 않았다. 기존 Scene/Material과 자동 생성 Performance/URP 재직렬화 항목은 이번 변경에 포함하지 않는다.
+
+
 ## #190 — 직구형 투구폼·Inspector/DEV 비교 (2026-10-18)
+
+이 절은 최초 main `e3e3be4e`에서 검사한 단계다. 이후 main의 #192 관람 기능과 함께 통합한 최종 설정 119개·프로토콜 5630은 다음 후속 기록을 기준으로 한다. 아래 118개·5629 및 337/118 결과는 최초 단계의 기록으로 보존한다.
 
 기준 main `e3e3be4e`, 브랜치 `feat/#190-straight-throw-form`, Unity **6000.6.5f1**, 저장 Scene `Assets/Lab/Scenes/Lab.unity`. 관람 실험 #189 커밋 `283dcb16`을 포함하지 않는 별도 main 기반 작업이다. 기존 로컬 Scene 공백 변경과 Target2 머티리얼 2개의 변경은 보존하고 이번 커밋에서 제외한다. 아래 결과는 이 로컬 환경에서 실행한 근거이며 iOS·실기기 결과로 승계하지 않는다.
 
@@ -722,3 +751,18 @@ Scene 파일을 저장하거나 덮어쓰지 않고 **File → Open Scene으로 
 두 앱 검사는 **Fixture**다. 전투 45초·상자 100%·생성 비용 1·해금 횟수 0·정지한 북 2개·생성 직후 속도/팝 0·박 폭탄 끔·표면 64×32로 실제 투척 입력을 반복 없이 준비했다. 기존 투척 Gain·Power Exponent·속력 상한·공통 중력은 원본 그대로 사용하고 Straight만 선택했다. 이 fixture를 기본 밸런스나 실기기 입력 증거로 기록하지 않는다.
 
 원시 로그·XML·PNG·빌드는 로컬에만 보존하며 공개 저장소에 올리지 않는다. 새 테스트 4파일과 각각의 Unity 생성 `.meta`는 커밋하고 임시 Runtime/Editor runner는 제거했다. 기존 Scene·사용자 머티리얼 2개·미추적 과거 폴더는 작업 전 보존본과 바이트 비교해 유지했다. 사용법·수치 원본·극값 한계는 [투척 가이드](THROW_TUNING_GUIDE.md)와 [DEV 상세 명세](DEVELOPER_MODE_PARAMETER_SPEC.md)를 참조한다.
+
+
+### #190 후속 — main #192 관람 설정과 통합한 최종 기준
+
+작업 도중 `origin/main`에 #192(`#191`)가 `6b5e407c`로 추가돼 최초 #190 커밋 `a2858fa`와 기능 브랜치에서 병합했다. main은 변경하지 않았다. 두 작업이 독립적으로 DEV 끝의 인덱스 111과 프로토콜 5629를 사용한 충돌을 해결했다. **관람 111번을 유지하고 직구 112~118번을 추가한 총 119개**, 프로토콜 **5630**, 연결 토큰 `C6PhysicsLab/10`이 최종 기준이다. 기존 관람 기능·UI 프리팹·검사·기록을 모두 보존했고 관람 검사의 배열 길이만 새 전체 수에 맞췄다. 최초 단계 337/118 결과를 아래 결과로 승계하지 않고 새로 실행했다.
+
+| 최종 통합 검증 | 상태 | 실제 근거 |
+| --- | --- | --- |
+| EditMode 전체 | PASS | `Logs/Issue190-Integrated-EditMode.xml`, **total=366, passed=366, failed=0, skipped=0**, **08:04:18Z~08:04:19Z**. main 관람 331개 + 직구 33개 + 구형 배열 거절 2개 추가. 관람 111번을 ON으로 둔 상태의 직구 공유 왕복·앞선 112개 값 보존과 111/112/118/120개 배열의 원자적 거절도 포함한다. |
+| PlayMode 전체 | PASS | `Logs/Issue190-Integrated-PlayMode.xml`, **total=121, passed=121, failed=0, skipped=0**, **08:04:51Z~08:05:59Z**. main 관람 116개와 직구 5개. 관람 허용/차단·자원 정리·입력과 직구 실제 충돌·낮은 비행·카메라 불변·DEV 전환을 함께 통과했다. 테스트 종료 뒤 NGO 다중 Singleton 정리 경고가 남았으므로 Console 전체가 경고 없이 깨끗하다는 의미는 아니다. |
+| 실제 Mac Host·Client | PASS | 최종 검사 빌드 `Builds/Lab/20261018-170634-ad244f80/`의 앱 2개, 실제 로컬 transport. **08:07:06Z**, 양쪽 **119개·관람 ON·직구 ON**, 같은 설정 지문·자리별 발사 위치/초기 속도·중력 3·수명 4초 확인. Host 승인 **1회**, 양쪽 HP **980**, hitTotal **1**, PaintCount **1**, 칠한 셀 **40/2048**, Revision **42**, CPU 맵/표시 텍스처 해시 일치. 양측 메시 중심/반지름·물리 중심·보간 제거 잔차 **0**, 실제 Client 비행 PNG도 열어 확인했다. 각각 7개 checkpoint와 종료 코드 **0**. `network-integrated/host.jsonl`, `client.jsonl`, `final-summary.json`, `client-straight-flight.png`는 로컬 보존본이며 공개 저장소에 올리지 않는다. |
+| 임시 도구 없는 최종 일반 Mac 빌드 | PASS | 임시 Runtime/Editor `.cs/.meta` 제거 후 기존 메뉴로 새 출력 `Builds/Lab/20261018-170748-c6d03bd0/macOS/C6_Physics_Lab.app`, **318,251,379 bytes**, `C6_LAB_BUILD_OK target=StandaloneOSX` 확인. 일반 빌드의 별도 수동 플레이는 미실행이다. |
+| iOS·실기기·핫스팟·3~5앱 동시 연결 | NOT_RUN | 최초 단계와 동일하게 미실행이다. 실제 손 스와이프의 느낌과 기기별 시작점 가시성은 별도 확인이 필요하다. |
+
+최종 두 앱 fixture는 최초 단계의 상자/정지 북/45초/저해상도 준비값을 사용하되 **관람 토글도 ON**으로 공유해 두 기능의 동시 적용을 검사했다. 실제 관람창을 여는 동작은 위 PlayMode의 관람 검사 근거와 구분한다. source Config의 기본값은 **관람 OFF·Arc**, 기존 투척 속력 상한·Gain·중력은 그대로다. 기존 사용자 Scene·머티리얼 2개는 작업 전 사본과 바이트가 같으며, 원본 Config는 main의 관람 bool과 직구 필드 추가 외에 기존 값을 보존했다. 최종 통합 사용법은 [직구 가이드](THROW_TUNING_GUIDE.md)의 119개 설정 기준을 따른다.

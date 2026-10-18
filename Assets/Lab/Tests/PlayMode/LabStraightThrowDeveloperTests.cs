@@ -36,8 +36,8 @@ namespace C6Lab.Tests
             LabDeveloperMode ui = SavedDeveloperUi();
             testedNetwork = ui.network;
             float[] original = ui.sourceConfig.CaptureDeveloperValues();
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(118));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(118));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(119));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(119));
             Assert.That(ui.sourceConfig.ThrowForm, Is.EqualTo(LabThrowForm.Arc));
             ui.Open();
             Assert.That(ui.panel.activeSelf, Is.True);
@@ -50,18 +50,18 @@ namespace C6Lab.Tests
             AssertControlsEnabled(ui, false);
             toggle.onClick.Invoke();
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("STRAIGHT"));
-            Assert.That(ui.valueInputs[111].text, Is.EqualTo("1"));
+            Assert.That(ui.valueInputs[112].text, Is.EqualTo("1"));
             AssertControlsEnabled(ui, true);
             Assert.That(ui.sourceConfig.CaptureDeveloperValues(), Is.EqualTo(original),
                 "Editing the form must not write the saved Inspector asset.");
             Assert.That(ui.network.config.ThrowForm, Is.EqualTo(LabThrowForm.Arc),
                 "A draft toggle must not change the running configuration before APPLY.");
-            ui.valueSliders[112].value = 1f;
-            Assert.That(ui.valueInputs[112].text, Is.EqualTo("5"));
-            ui.valueInputs[112].text = "-2.5";
-            Assert.That(ui.valueSliders[112].value, Is.EqualTo(.25f).Within(.0001f));
+            ui.valueSliders[113].value = 1f;
+            Assert.That(ui.valueInputs[113].text, Is.EqualTo("5"));
+            ui.valueInputs[113].text = "-2.5";
+            Assert.That(ui.valueSliders[113].value, Is.EqualTo(.25f).Within(.0001f));
             ui.defaultsButton.onClick.Invoke();
-            Assert.That(ui.valueInputs[111].text, Is.EqualTo("0"));
+            Assert.That(ui.valueInputs[112].text, Is.EqualTo("0"));
             AssertControlsEnabled(ui, false);
             Assert.That(ui.sourceConfig.CaptureDeveloperValues(), Is.EqualTo(original));
             ui.Close();
@@ -81,12 +81,12 @@ namespace C6Lab.Tests
             {
                 ui.Open();
                 ThrowToggle(ui).onClick.Invoke();
-                ui.valueInputs[112].text = "0.75";
-                ui.valueInputs[113].text = "0.1";
-                ui.valueInputs[114].text = "-0.2";
-                ui.valueInputs[115].text = "5";
-                ui.valueInputs[116].text = "0.2";
-                ui.valueInputs[117].text = "0";
+                ui.valueInputs[113].text = "0.75";
+                ui.valueInputs[114].text = "0.1";
+                ui.valueInputs[115].text = "-0.2";
+                ui.valueInputs[116].text = "5";
+                ui.valueInputs[117].text = "0.2";
+                ui.valueInputs[118].text = "0";
                 ui.ApplyAndStart();
                 Assert.That(network.IsDeveloperSolo, Is.True, ui.feedbackText.text);
                 yield return null;
@@ -99,7 +99,7 @@ namespace C6Lab.Tests
                 Assert.That(ui.sourceConfig.CaptureDeveloperValues(), Is.EqualTo(original));
                 string firstSession = network.Snapshot.sessionId;
                 ui.Open();
-                Assert.That(ui.valueInputs[111].text, Is.EqualTo("1"));
+                Assert.That(ui.valueInputs[112].text, Is.EqualTo("1"));
                 AssertControlsEnabled(ui, true);
                 ThrowToggle(ui).onClick.Invoke();
                 AssertControlsEnabled(ui, false);
@@ -119,11 +119,11 @@ namespace C6Lab.Tests
             .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
 
         private static Button ThrowToggle(LabDeveloperMode ui) =>
-            ui.valueSliders[111].transform.Find("SettingToggle").GetComponent<Button>();
+            ui.valueSliders[112].transform.Find("SettingToggle").GetComponent<Button>();
 
         private static void AssertControlsEnabled(LabDeveloperMode ui, bool enabled)
         {
-            for (int i = 112; i <= 117; i++)
+            for (int i = 113; i <= 118; i++)
             {
                 Assert.That(ui.valueInputs[i].readOnly, Is.EqualTo(!enabled), "ReadOnly index " + i);
                 Assert.That(ui.valueInputs[i].interactable, Is.EqualTo(enabled), "Input index " + i);
