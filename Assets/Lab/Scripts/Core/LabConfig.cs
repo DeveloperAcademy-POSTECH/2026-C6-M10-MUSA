@@ -390,7 +390,7 @@ namespace C6Lab
         [Header("Minimap (#181)")]
         [Tooltip("전투 화면 오른쪽 아래에 북이 누구한테 있는지 보여주는 미니맵을 켠다.")]
         [SerializeField] private bool minimapEnabled = true;
-        [Tooltip("미니맵 크기 0~100 (%). 기본 50이 가운데, 100 = 원래 그린 크기(128×117), 0 = 보이지 않음. 오른쪽 아래 모서리를 기준으로 커지거나 작아진다.")]
+        [Tooltip("미니맵 크기 0~100 (%). 기본 50이 가운데, 100 = 원래 그린 크기(128×116), 0 = 보이지 않음. 오른쪽 아래 모서리를 기준으로 커지거나 작아진다.")]
         [SerializeField, Range(0, 100)] private int minimapSizePercent = 50;
         [Tooltip("미니맵을 기본 자리(오른쪽 이웃 동그라미 위)에서 옮기는 거리. -는 왼쪽, +는 오른쪽 (화면 폭 390 기준 단위)")]
         [SerializeField, Range(-300, 100)] private int minimapMoveX = 0;
