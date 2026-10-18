@@ -163,7 +163,8 @@ namespace C6Lab
         // Version 5626 adds the bomb sound volume setting (#183).
         // Version 5627 shares the confirmed room name in lobby packets.
         // #187: six growth settings, fixed 100% target, authoritative cell transactions.
-        internal const ushort LabProtocolVersion = 5628;
+        // #190: Arc/Straight profile adds seven settings; old 111-field peers cannot join.
+        internal const ushort LabProtocolVersion = 5629;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
@@ -1607,7 +1608,9 @@ namespace C6Lab
                 wx = velocity.x, wy = velocity.y, wz = velocity.z };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
             Debug.Log("C6_LAB_THROW orb=" + orb.id + " seat=" + seat
+                + " form=" + config.ThrowForm + " origin=" + launchPosition
                 + " swipe=" + releaseVelocity + " launch=" + velocity
+                + " gravity=" + config.EffectiveThrowGravity.ToString("F2", CultureInfo.InvariantCulture)
                 + " exponent=" + config.ThrowPowerExponent.ToString("F2", CultureInfo.InvariantCulture)
                 + " loft=" + config.ThrowLoftOffsetDegrees.ToString("F1", CultureInfo.InvariantCulture)
                 + " damping=" + config.ThrowAirDamping.ToString("F2", CultureInfo.InvariantCulture));

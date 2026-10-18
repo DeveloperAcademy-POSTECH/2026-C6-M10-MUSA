@@ -18,7 +18,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(111));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(118));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -151,7 +151,7 @@ namespace C6Lab.Tests
             Assert.That(config.PaintGrowthPercentPerSecond, Is.EqualTo(8f));
             Assert.That(config.PaintFillChancePercent, Is.EqualTo(75f));
             Assert.That(config.PaintVerticalWeight, Is.EqualTo(2f));
-            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "All 111 fields round-trip in wire order.");
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "All 118 fields round-trip in wire order.");
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
             Assert.That(config.GenerateCost, Is.EqualTo(5f));
@@ -560,10 +560,10 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void PaintGrowthAppendsAfterAllPrevious105FieldsWithoutChangingTheirIndices()
+        public void ThrowFormAppendsAfterAllPrevious111FieldsWithoutChangingTheirIndices()
         {
             // Existing rows keep their indices, including the fixed victory goal and the
-            // last sound toggle. The six growth controls must append after this entire prefix.
+            // last sound toggle and the six paint-growth fields. The seven throw-form fields append after this prefix.
             string[] previousLabels =
             {
                 "Monster Max HP",
@@ -670,10 +670,16 @@ namespace C6Lab.Tests
                 "Minimap Move X (- left, + right)",
                 "Minimap Move Y (- down, + up)",
                 "Bomb Sound Volume (50 = Inspector)",
-                "Bomb Sound (0 boom, 1 ppeong)"
+                "Bomb Sound (0 boom, 1 ppeong)",
+                "Paint Surface Resolution (0 low 1 medium 2 high)",
+                "Paint Initial Coverage (%)",
+                "Paint Repeat Growth (%)",
+                "Paint Growth Speed (%/s)",
+                "Paint Fill Chance (%)",
+                "Paint Vertical Weight"
             };
-            Assert.That(previousLabels.Length, Is.EqualTo(105));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(111));
+            Assert.That(previousLabels.Length, Is.EqualTo(111));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(118));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             LabDeveloperField field = LabConfig.DeveloperFields[87];
@@ -844,7 +850,7 @@ namespace C6Lab.Tests
             };
             for (int i = 0; i < labels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[105 + i].Label, Is.EqualTo(labels[i]), "Appended index " + (105 + i));
-            Assert.That(config.CaptureDeveloperValues().Skip(105).ToArray(),
+            Assert.That(config.CaptureDeveloperValues().Skip(105).Take(6).ToArray(),
                 Is.EqualTo(new[] { 2f, 2f, 4f, 6f, 60f, 1.35f }));
             Assert.That(LabConfig.DeveloperFields[105].WholeNumber, Is.True);
             for (int i = 106; i <= 110; i++) Assert.That(LabConfig.DeveloperFields[i].WholeNumber, Is.False);
@@ -960,9 +966,9 @@ namespace C6Lab.Tests
         public void InspectorPaintGrowthValuesUseFiniteClampedSettings()
         {
             JsonUtility.FromJsonOverwrite("{\"paintSurfaceResolution\":-1,\"paintInitialPercent\":0,\"paintRepeatPercent\":200,\"paintGrowthPercentPerSecond\":0,\"paintFillChancePercent\":-1,\"paintVerticalWeight\":9}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(105).ToArray(), Is.EqualTo(new[] { 0f, .1f, 100f, .1f, 0f, 4f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(105).Take(6).ToArray(), Is.EqualTo(new[] { 0f, .1f, 100f, .1f, 0f, 4f }));
             JsonUtility.FromJsonOverwrite("{\"paintSurfaceResolution\":99,\"paintInitialPercent\":200,\"paintRepeatPercent\":0,\"paintGrowthPercentPerSecond\":200,\"paintFillChancePercent\":200,\"paintVerticalWeight\":0}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(105).ToArray(), Is.EqualTo(new[] { 2f, 100f, .1f, 100f, 100f, 1f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(105).Take(6).ToArray(), Is.EqualTo(new[] { 2f, 100f, .1f, 100f, 100f, 1f }));
         }
 
 
@@ -971,7 +977,7 @@ namespace C6Lab.Tests
         {
             var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
             Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
-                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound" }));
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Throw Form" }));
             Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
                 "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
             var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");

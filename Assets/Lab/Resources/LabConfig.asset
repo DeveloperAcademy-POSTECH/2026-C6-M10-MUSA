@@ -126,3 +126,8 @@ MonoBehaviour:
   throwPowerExponent: 1.2
   throwLoftOffsetDegrees: 0
   throwAirDamping: 0
+  throwForm: 0
+  straightOriginOffset: {x: 0.35, y: 0.4, z: 0}
+  straightPitchOffsetDegrees: 3
+  straightLoftScale: 0.1
+  straightGravityScale: 0.1

@@ -37,18 +37,48 @@ namespace C6Lab
             Vector3 anchor = SeatPosition(seatIndex, seatCount, targetCenter,
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
             Vector3 right = ScreenRight(anchor, targetCenter);
-            return anchor + right * ((releaseX01 * 2f - 1f) * config.ThrowOriginLateralRange);
+            Vector3 position = anchor + right * ((releaseX01 * 2f - 1f) * config.ThrowOriginLateralRange);
+            if (config.ThrowForm == LabThrowForm.Straight)
+            {
+                // The owner seat supplies this frame, never the Host's local battle camera.
+                // Keep release-X aiming, and shift the actual body and its visual together.
+                Vector3 offset = config.StraightOriginOffset;
+                position += right * offset.x + Vector3.up * offset.y
+                    + HorizontalForward(anchor, targetCenter) * offset.z;
+            }
+            return position;
         }
 
         /// <summary>
-        /// Maps an upward flick to inward travel and a visible gravity arc. Power response and
-        /// loft can be tuned independently; neither steers toward the target. X is the local
-        /// camera-right direction. Pass the unshifted seat anchor so a side release can miss.
+        /// Maps an upward flick through the existing power and horizontal-aim response, then
+        /// chooses arc elevation or the lower straight-form elevation. Neither form steers
+        /// toward the target. Pass the unshifted seat anchor so a side release can miss.
         /// </summary>
         public static Vector3 LaunchVelocity(Vector2 releaseVelocity, Vector3 seatAnchor,
             Vector3 targetCenter, LabConfig config)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
+            Vector3 legacy = ArcVelocity(releaseVelocity, seatAnchor, targetCenter, config);
+            if (config.ThrowForm != LabThrowForm.Straight) return legacy;
+
+            // Reuse the complete, capped swipe-to-power response and its horizontal aim.
+            // Only elevation changes: no correction from the shifted origin to the target.
+            float speed = legacy.magnitude;
+            Vector3 horizontal = Vector3.ProjectOnPlane(legacy, Vector3.up);
+            float horizontalSpeed = horizontal.magnitude;
+            Vector3 heading = horizontalSpeed > .000001f
+                ? horizontal / horizontalSpeed : HorizontalForward(seatAnchor, targetCenter);
+            float arcPitch = Mathf.Atan2(legacy.y, horizontalSpeed) * Mathf.Rad2Deg;
+            float pitch = Mathf.Clamp(arcPitch * config.StraightLoftScale
+                + config.StraightPitchOffsetDegrees, -30f, 60f) * Mathf.Deg2Rad;
+            Vector3 direction = heading * Mathf.Cos(pitch) + Vector3.up * Mathf.Sin(pitch);
+            return Vector3.ClampMagnitude(direction * speed, config.ThrowMaxWorldSpeed);
+        }
+
+        // Keep the original arc calculation intact so selecting Arc preserves old shots.
+        private static Vector3 ArcVelocity(Vector2 releaseVelocity, Vector3 seatAnchor,
+            Vector3 targetCenter, LabConfig config)
+        {
             Vector2 input = new Vector2(Finite(releaseVelocity.x),
                 Mathf.Max(0f, Finite(releaseVelocity.y)));
             float swipeSpeed = input.magnitude;

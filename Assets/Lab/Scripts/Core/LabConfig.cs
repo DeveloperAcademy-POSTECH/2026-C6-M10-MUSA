@@ -4,6 +4,9 @@ using UnityEngine;
 
 namespace C6Lab
 {
+    /// <summary>Arc preserves the existing release; Straight changes only launch pose and flight gravity.</summary>
+    public enum LabThrowForm { Arc = 0, Straight = 1 }
+
     /// <summary>One numeric field in the development-build tuning panel.</summary>
     public readonly struct LabDeveloperField
     {
@@ -184,7 +187,14 @@ namespace C6Lab
             new LabDeveloperField("Paint Repeat Growth (%)", .1f, 100f),
             new LabDeveloperField("Paint Growth Speed (%/s)", .1f, 100f),
             new LabDeveloperField("Paint Fill Chance (%)", 0f, 100f),
-            new LabDeveloperField("Paint Vertical Weight", 1f, 4f)
+            new LabDeveloperField("Paint Vertical Weight", 1f, 4f),
+            LabDeveloperField.Toggle("Throw Form (0 arc, 1 straight)", "ARC", "STRAIGHT"),
+            new LabDeveloperField("Straight Origin Offset X", -5f, 5f),
+            new LabDeveloperField("Straight Origin Offset Y", -5f, 5f),
+            new LabDeveloperField("Straight Origin Offset Z", -5f, 5f),
+            new LabDeveloperField("Straight Pitch Offset (degrees)", -30f, 30f),
+            new LabDeveloperField("Straight Loft Scale", 0f, 1f),
+            new LabDeveloperField("Straight Gravity Scale", 0f, 2f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -208,6 +218,7 @@ namespace C6Lab
             new LabDeveloperCategory("Camera and throw origin", 19, 20, 21, 22, 23, 56),
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
+            new LabDeveloperCategory("Throw form", 111, 112, 113, 114, 115, 116, 117),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
@@ -413,6 +424,26 @@ namespace C6Lab
         [SerializeField, Range(.25f, 3f)] private float throwPowerExponent = 1f;
         [SerializeField, Range(-30f, 30f)] private float throwLoftOffsetDegrees;
         [SerializeField, Range(0f, 5f)] private float throwAirDamping;
+
+        [Header("Projectile throw form")]
+        [Tooltip("Arc: 기존 포물선. Straight: 카메라는 유지하고 플레이어 기준 출발점·상향각·중력만 바꾼다.")]
+        [SerializeField] private LabThrowForm throwForm = LabThrowForm.Arc;
+        // DEMO_TUNING_VALUE: tune in DEV and compare with Arc before choosing production values.
+        [Tooltip("직구 출발점 (플레이어 오른쪽 X, 월드 위 Y, 타깃 쪽 Z). 기존 Throw Origin과 손을 놓은 가로 위치의 계산 결과에 더한다.")]
+        [SerializeField] private Vector3 straightOriginOffset = new Vector3(.35f, .4f, 0f);
+        [SerializeField, Range(-30f, 30f)] private float straightPitchOffsetDegrees = 3f;
+        [SerializeField, Range(0f, 1f)] private float straightLoftScale = .1f;
+        [SerializeField, Range(0f, 2f)] private float straightGravityScale = .1f;
+
+        public LabThrowForm ThrowForm => throwForm == LabThrowForm.Straight ? LabThrowForm.Straight : LabThrowForm.Arc;
+        public Vector3 StraightOriginOffset => new Vector3(
+            Mathf.Clamp(Finite(straightOriginOffset.x, .35f), -5f, 5f),
+            Mathf.Clamp(Finite(straightOriginOffset.y, .4f), -5f, 5f),
+            Mathf.Clamp(Finite(straightOriginOffset.z, 0f), -5f, 5f));
+        public float StraightPitchOffsetDegrees => Mathf.Clamp(Finite(straightPitchOffsetDegrees, 3f), -30f, 30f);
+        public float StraightLoftScale => Mathf.Clamp(Finite(straightLoftScale, .1f), 0f, 1f);
+        public float StraightGravityScale => Mathf.Clamp(Finite(straightGravityScale, .1f), 0f, 2f);
+        public float EffectiveThrowGravity => ThrowForm == LabThrowForm.Straight ? ThrowGravity * StraightGravityScale : ThrowGravity;
 
         public int MonsterMaxHp => Mathf.Max(1, monsterMaxHp);
         public int PlayerMaxHp => Mathf.Clamp(playerMaxHp, 1, 300);
@@ -640,7 +671,9 @@ namespace C6Lab
                 DevVolume(bombSoundVolumeDev),
                 (float)BombSoundStyle,
                 (float)PaintSurfaceResolution, PaintInitialPercent, PaintRepeatPercent,
-                PaintGrowthPercentPerSecond, PaintFillChancePercent, PaintVerticalWeight
+                PaintGrowthPercentPerSecond, PaintFillChancePercent, PaintVerticalWeight,
+                (float)ThrowForm, StraightOriginOffset.x, StraightOriginOffset.y, StraightOriginOffset.z,
+                StraightPitchOffsetDegrees, StraightLoftScale, StraightGravityScale
             };
         }
 
@@ -797,6 +830,11 @@ namespace C6Lab
             paintGrowthPercentPerSecond = values[108];
             paintFillChancePercent = values[109];
             paintVerticalWeight = values[110];
+            throwForm = values[111] >= .5f ? LabThrowForm.Straight : LabThrowForm.Arc;
+            straightOriginOffset = new Vector3(values[112], values[113], values[114]);
+            straightPitchOffsetDegrees = values[115];
+            straightLoftScale = values[116];
+            straightGravityScale = values[117];
             error = string.Empty;
             return true;
         }

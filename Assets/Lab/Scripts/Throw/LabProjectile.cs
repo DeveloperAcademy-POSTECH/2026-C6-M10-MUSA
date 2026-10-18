@@ -58,7 +58,9 @@ namespace C6Lab
         private ulong ownerPlayerId;
         private Vector3 lastPosition;
         private Vector3 incomingVelocity;
+        private float launchedGravity, launchedLifetime;
         private Vector3 launchPosition;
+        private Vector3 initialVelocity;
         private float peakHeight;
         private float launchedAt;
         private bool launched;
@@ -68,6 +70,10 @@ namespace C6Lab
         public string ProjectileId => projectileId;
         public ulong OwnerPlayerId => ownerPlayerId;
         public bool IsResolved => resolved;
+        public float GravityAcceleration => launchedGravity;
+        public float LifetimeSeconds => launchedLifetime;
+        public Vector3 LaunchPosition => launchPosition;
+        public Vector3 InitialVelocity => initialVelocity;
         public Transform VisualMount => visualMount;
         public TrailRenderer FlightTrail => flightTrail;
 
@@ -186,6 +192,9 @@ namespace C6Lab
         private void Prepare(Vector3 velocity, LabConfig tuning, bool visualOnly)
         {
             config = tuning;
+            // Freeze the launch profile: later Inspector/DEV edits cannot bend a shot already in flight.
+            launchedGravity = tuning.EffectiveThrowGravity;
+            launchedLifetime = tuning.ThrowLifetime;
             ConfigureAppearance(tuning.OrbAppearance);
             if (body == null) body = GetComponent<Rigidbody>();
             if (sphere == null) sphere = GetComponent<SphereCollider>();
@@ -202,6 +211,7 @@ namespace C6Lab
             body.angularDamping = 0f;
             body.linearVelocity = Vector3.ClampMagnitude(velocity, tuning.ThrowMaxWorldSpeed);
             incomingVelocity = body.linearVelocity;
+            initialVelocity = body.linearVelocity;
             body.WakeUp();
             lastPosition = body.position;
             launchPosition = body.position;
@@ -226,13 +236,13 @@ namespace C6Lab
             if (resolved) return;
 
             incomingVelocity = body.linearVelocity;
-            body.AddForce(Vector3.down * config.ThrowGravity, ForceMode.Acceleration);
+            body.AddForce(Vector3.down * launchedGravity, ForceMode.Acceleration);
             lastPosition = body.position;
         }
 
         private void Update()
         {
-            if (!launched || resolved || Time.time - launchedAt < config.ThrowLifetime) return;
+            if (!launched || resolved || Time.time - launchedAt < launchedLifetime) return;
             if (authoritative) Resolve(false, transform.position);
             else FinishVisual();
         }

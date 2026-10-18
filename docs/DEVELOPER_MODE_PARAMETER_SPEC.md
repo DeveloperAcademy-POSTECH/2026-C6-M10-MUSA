@@ -1,20 +1,20 @@
 # C6 Physics Lab 개발자 모드 조정값 명세
 
-> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 설정은 총 111개이며 기존 0~104번 인덱스를 보존하고 색칠 성장 6개를 105~110번에 추가했다. 88번째(인덱스 87) `Paint Victory Coverage (%)`는 100% 고정 행으로 유지한다. 64~74번째(인덱스 63~73) 소리 음량·햅틱 11개(#142)는 이 문서에 아직 따로 설명하지 않았다. 미니맵·북·박 폭탄·폭탄 소리의 기존 인덱스와 기본값은 유지한다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
+> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 설정은 총 118개이며 기존 0~110번 인덱스를 보존하고 직구 폼 7개를 111~117번에 추가했다. 색칠 성장 6개는 기존 105~110번을 유지한다. 88번째(인덱스 87) `Paint Victory Coverage (%)`는 100% 고정 행으로 유지한다. 64~74번째(인덱스 63~73) 소리 음량·햅틱 11개(#142)는 이 문서에 아직 따로 설명하지 않았다. 미니맵·북·박 폭탄·폭탄 소리의 기존 인덱스와 기본값은 유지한다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
 
-이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 설정 111개를 설명한다. 이 중 색칠 승리 목표는 읽기 전용 100% 고정값이다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
+이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 설정 118개를 설명한다. 이 중 색칠 승리 목표는 읽기 전용 100% 고정값이다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
 
 ## 1. 패널의 적용 방식
 
 1. `Assets/Lab/Scenes/Lab.unity`를 Unity Editor에서 실행하거나 **Development Build**를 실행한다. 일반 배포 빌드에서는 DEV 버튼이 숨겨진다. 참가자는 일반 빌드여도 Host가 확정한 세션 설정을 수신한다.
-2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 총 111개 설정 중 일반 숫자 입력칸과 대응 슬라이더는 서로 값을 반영한다. `Paint Victory Coverage (%)`는 100을 표시하는 읽기 전용 입력칸이며 슬라이더는 비활성이다. 단, 0/1 항목 6개(Drop Combine, Contact Combine, Haptics, Gourd Mode, Minimap, Bomb Sound)는 입력칸·슬라이더 대신 누를 때마다 바뀌는 토글 버튼(ON/OFF, Gourd Mode는 PAINT/CRACK, Bomb Sound는 BOOM/PPEONG)으로 보이며, 값은 그대로 0/1로 적용·공유된다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
-3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 111개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
+2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 총 118개 설정 중 일반 숫자 입력칸과 대응 슬라이더는 서로 값을 반영한다. `Paint Victory Coverage (%)`는 100을 표시하는 읽기 전용 입력칸이며 슬라이더는 비활성이다. 단, 0/1 항목 7개(Drop Combine, Contact Combine, Haptics, Gourd Mode, Minimap, Bomb Sound, Throw Form)는 입력칸·슬라이더 대신 누를 때마다 바뀌는 토글 버튼(ON/OFF, Gourd Mode는 PAINT/CRACK, Bomb Sound는 BOOM/PPEONG, Throw Form은 ARC/STRAIGHT)으로 보이며, 값은 그대로 0/1로 적용·공유된다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다. `Throw form`의 직구 전용 6개 행은 미적용 초안의 ARC/STRAIGHT 토글에 맞춰 즉시 비활성/활성화되며 값은 유지한다.
+3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 118개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
 4. 혼자 시험할 때는 **START SOLO**를 누른다. 이미 솔로 전투 중이면 **RESTART SOLO**가 표시된다. 새 라운드가 시작되므로 요괴/개인 HP·시간·스태미나·구슬이 초기화된다. 진행 중인 네트워크 라운드에 값을 즉시 적용하는 동작은 없다.
 5. **DEFAULTS**는 저장된 `LabConfig.asset`의 숫자를 입력칸과 슬라이더에 불러올 뿐이다. 공유 방이나 솔로에 적용하려면 해당 시작·적용 버튼을 눌러야 한다. **END SOLO**는 솔로를 끝내고 원본 설정으로 복귀한다. 런타임 복사본은 앱이 실행 중인 동안만 유지되며 원본 에셋에는 저장되지 않는다.
 
 패널 열기 자체는 시간을 멈추지 않는다. 공유 전투에서 설정을 바꾸려면 먼저 공동 일시정지를 승인받아야 하며, 이때 시간은 그 일시정지 상태를 따른다. 마지막 `SHOT HIT/MISS` 보고는 솔로를 끝내거나 연결을 끊으면 지워질 수 있으므로 먼저 기록한다. 공유 방에서는 Host의 설정 지문과 확인 응답을 기준으로 시작을 판정한다. 이 절은 코드상 경로 설명이며 실제 기기 동기화 결과는 검증 기록과 구분한다.
 
-입력은 **111개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
+입력은 **118개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
 
 ## 2. 단위와 공통 판정
 
@@ -45,7 +45,7 @@ Paint의 HP와 결과 대시보드는 구분한다. Paint의 `damageTotal`은 �
 | Gourd Mode (0 paint, 1 crack) | 0 (Paint) | 정수 0–1 / 표현 모드 | 80번째(인덱스 79), `Gourd` 묶음. Paint는 흰 박의 공동 색칠, Crack은 기존 박·HP 단계 크랙·승리 마무리다. 원통 충돌·회전·투척 입력을 공유한다. |
 | Paint Victory Coverage (%) | 100 | 정수 100–100 / 전체 구면 % | 88번째(인덱스 87), 기존 이름·인덱스를 보존한 고정 목표. 숫자 입력은 읽기 전용, 슬라이더는 비활성이다. 100 외 값을 받은 DEV/공유 설정은 다른 값과 함께 원자적으로 거절한다. Crack의 HP 승리에는 사용하지 않는다. |
 
-아래 6개는 **DEMO_TUNING_VALUE**이며 Inspector 원본 `LabConfig.asset`의 Gourd 항목 또는 DEV의 `Gourd` 묶음에서 조정한다. 기존 0~104번 순서는 그대로 두고 마지막에 덧붙였다. 수치 튜닝은 새 판에 적용하며, 현재 실행 중인 판의 규칙을 즉시 바꾸지 않는다.
+아래 6개는 **DEMO_TUNING_VALUE**이며 Inspector 원본 `LabConfig.asset`의 Gourd 항목 또는 DEV의 `Gourd` 묶음에서 조정한다. #187에서 기존 0~104번 뒤에 추가했으며 #190의 직구 항목 추가 후에도 105~110번과 기본값을 유지한다. 수치 튜닝은 새 판에 적용하며, 현재 실행 중인 판의 규칙을 즉시 바꾸지 않는다.
 
 | DEV 입력 이름 | 위치 | 기본값 | 입력 범위 | 효과 |
 | --- | --- | ---: | --- | --- |
@@ -58,7 +58,7 @@ Paint의 HP와 결과 대시보드는 구분한다. Paint의 `damageTotal`은 �
 
 `DefaultPaintVictoryPercent`·`PaintVictoryPercent`는 100, `PaintVictoryCoverage`는 1이다. 예전 에셋의 직렬화 목표 80이나 비정상 목표도 유효값과 `CaptureDeveloperValues`에서는 100으로 정규화한다. 저장 원본도 Unity에서 목표 100과 성장 기본값 6개를 기록했다. 원본 에셋을 불러오는 것과 DEV 입력을 검증하는 것은 구분한다. 이미 만들어진 구형 80 설정 배열은 현재 프로토콜과 100 고정 검사로 거절한다.
 
-111개 전체를 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 검증·적용한다. `LabConfig.PaintGrowthSettings`는 매번 새 설정 복사본을 반환하고 Host Rules는 새 라운드 시작 때 이를 캡처한다. 일반 Retry는 캡처한 설정을 유지한다. `LabSceneController`의 초기 적용/`LabNetwork.ConfigApplied`가 `LabGourdPaint.Attach`·`ApplyMode`를 호출하며 Client는 Host 모드를 받는다.
+118개 전체를 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 검증·적용한다. `LabConfig.PaintGrowthSettings`는 매번 새 설정 복사본을 반환하고 Host Rules는 새 라운드 시작 때 이를 캡처한다. 일반 Retry는 캡처한 설정을 유지한다. `LabSceneController`의 초기 적용/`LabNetwork.ConfigApplied`가 `LabGourdPaint.Attach`·`ApplyMode`를 호출하며 Client는 Host 모드를 받는다.
 
 유효한 오행 명중이 안 칠한 셀에 닿으면 초기 면적을 즉시 칠하고, 이미 칠한 셀에 닿으면 그 연결 영역에 반복 성장 면적을 공급한다. 이후 Host 전투 시계가 진행될 때 미사용 예산을 가진 영역들이 전체 표면 기준 `%/초` 속도를 나눠 쓰며 빈 인접 셀로 자란다. 시간이 흐르는 동안 공급 예산이 없으면 자라지 않으며, 그 대기 시간의 성장량을 미리 적립하지 않는다. 여러 영역은 차례대로 성장하고 서로 닿으면 하나로 병합된다.
 
@@ -72,11 +72,11 @@ HUD 목표는 항상 100%다. `snapshot.paintCellCount > 0`이면 `paintCoveredC
 
 Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 Host의 전투 시간 진행에서만 한다. Host 화면도 현재 Snapshot과 같은 버전의 `LabNetwork.PaintSurface` 표시 캐시를 사용해 맵과 HUD를 함께 반영한다. Client는 승인 명중 방향을 재생해 성장시키지 않고 Host가 보낸 셀 변경(delta) 또는 전체 체크포인트를 별도 수신 맵에 적용한다. 분할 수신 중에는 기존 공개 표시 캐시를 유지하고, 완성된 맵의 세션·라운드·해상도·Revision·칠한 셀 수·전체 셀 수·명중 수가 Snapshot 메타데이터와 모두 맞을 때 맵과 HUD를 함께 공개한다. 픽셀이 그대로인 반복 명중도 명중 수가 바뀌면 빈 delta를 발행한다.
 
-전송은 프로토콜 **5628**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID와 RGBA를 담은 delta보다 전체 맵이 작으면 전체 맵을 보낸다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송한다. 최대 해상도 전체 RGBA 맵은 131,072바이트이고 base64 174,764자를 43개로 나눈다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체한다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청한다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가한다.
+전송은 현재 프로토콜 **5629**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID와 RGBA를 담은 delta보다 전체 맵이 작으면 전체 맵을 보낸다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송한다. 최대 해상도 전체 RGBA 맵은 131,072바이트이고 base64 174,764자를 43개로 나눈다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체한다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청한다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가한다.
 
 이 복구는 **현재 라운드에 계속 연결된 Client의 부분 맵 누락**을 복원하는 기능이다. 연결이 끊어진 뒤 전투에 재접속하는 기능은 포함하지 않는다. 실제 다중 앱·기기에서의 전송과 화면 일치는 자동 패킷 fixture와 구분해 검증한다.
 
-앞선 프로토콜 변경에서 추가한 모드·폭탄·북·미니맵·소리 설정은 유지하며, 최신 main의 5627 다음인 **5628**이 111개 설정과 새 색칠 전송 형식을 사용한다. 이전 PASS는 이번 성장·동기화의 실행 결과로 승계하지 않는다. 실제 컴파일·EditMode·PlayMode·다중 앱·기기·iOS 결과는 `docs/VALIDATION.md`의 이번 변경 기록으로 구분한다.
+#187에서 프로토콜 **5628**과 당시 111개 설정·색칠 전송 형식을 추가했다. #190은 직구 설정을 덧붙여 프로토콜 **5629**와 총 **118개** 설정을 사용하며 기존 색칠 전송 형식은 유지한다. 111개 배열이나 다른 프로토콜은 현재 방 설정과 섞지 않는다. 이전 PASS는 직구 폼의 실행 결과로 승계하지 않으며 실제 컴파일·EditMode·PlayMode·다중 앱·기기·iOS 결과는 `docs/VALIDATION.md`에서 변경별로 구분한다.
 
 근거: `LabConfig.PaintGrowthSettings`·`DeveloperFields`·`CaptureDeveloperValues`·`TryApplyDeveloperValues`, `LabPaintSurface.RegisterHit`·`Advance`·`TryReplacePixels`·`CopyPixels`, `LabModel.ConfirmHit`·`TryAdvance`·라운드 Rules, `LabPaintPublisher`·`LabPaintReceiver`, `LabNetwork.PaintSurface`·Snapshot 공개 경로, `LabGourdPaint.Attach`·`ApplyMode`, `LabHud`, `LabGourdCrack`·`LabGourdFinish`.
 
@@ -212,16 +212,44 @@ Host는 구간을 확률로 뽑은 뒤 구간 안의 한 지점을 고르게 뽑
 | Throw Loft Offset (degrees) | 0 | −30–30 / 도 | 계산된 상승·전진 발사각에 더한다. 양수는 같은 종방향 속력을 더 위로, 덜 앞으로 배분한다. 최종 발사각은 3°–87°로 제한된다. |
 | Throw Air Damping | 0 | 0–5 / Rigidbody 선속도 감쇠값 | 비행 중 `linearDamping`. 높이면 전체 선속도가 줄어 사거리와 높이에 영향을 준다. 공을 좌우로 휘게 만드는 힘은 아니다. |
 
-현재 발사 계산은 개념적으로 다음 순서다.
+기존 **Arc** 발사 계산은 다음 순서이며 기본 모드도 Arc다. 저장 원본의 `Throw Power Exponent`는 1.2다. 코드로 새 `LabConfig`를 생성했을 때의 1과 구분한다.
 
 1. 손 속력 `s`에 대해 `shaped = 1.5 × (s / 1.5) ^ PowerExponent`를 구해 가로·세로 입력에 같은 비율로 적용한다.
 2. `up = max(MinimumUpwardSpeed, shapedY × UpwardGain)`, `forward = shapedY × ForwardGain`, `lateral = shapedX × LateralGain`을 구한다.
 3. `atan2(up, forward) + LoftOffset`을 3°–87°로 제한해 위·전진 성분을 다시 나누고, 전체 벡터 크기를 `MaximumWorldSpeed`로 제한한다.
-4. 투사체 Rigidbody는 이 초기 속도로 출발한다. 이후 매 물리 스텝 자체 중력과 `linearDamping`을 받고, Host의 Collider 충돌 또는 수명 종료로 HIT/MISS가 결정된다. Host만 HP와 명중 보상을 확정하며 다른 기기의 투사체는 표시용이다.
+4. 투사체 Rigidbody는 이 초기 속도로 출발한다. 이후 매 물리 스텝 발사 때 캡처한 자체 중력과 `linearDamping`을 받고, Host의 Collider 충돌 또는 발사 때 캡처한 수명 종료로 HIT/MISS가 결정된다. Host만 HP·명중 보상·색칠을 확정하며 다른 기기의 투사체는 표시용이다.
 
 **포물선 비교 팁:** `Forward Gain`만 올리면 목표에 너무 빨리 닿아 공이 거의 직선처럼 보일 수 있다. `Upward Gain`·`Forward Gain`·`Gravity`를 한 번에 모두 바꾸기보다 기준 조건을 기록한 뒤 하나씩 비교한다. `Power Exponent`는 세기 곡선, `Loft Offset`은 발사각, `Air Damping`은 비행 중 감속이므로 서로 다른 질문에 사용한다.
 
 근거: `LabOrbBoard.ReleaseVelocity`·`EndDragAtWorld`, `LabThrowMath.IsThrowGesture`·`LaunchVelocity`, `LabProjectile.Prepare`·`FixedUpdate`·`Resolve`, `LabNetwork.SpawnHostProjectile`·`OnProjectileResolved`.
+
+### 투구폼·직구 프로필 — 112~118번째 설정 (#190)
+
+Inspector의 `Projectile throw form` 또는 DEV의 **Throw form** 묶음에서 Arc와 Straight를 비교한다. Inspector의 원본 `Throw Form` 기본값은 Arc라서 기존 궤적을 유지한다. Straight는 위쪽 스와이프 조건·가로 놓기 위치·좌우 조준·세기 변환·최대 초기 속력·카메라·자리 배치를 바꾸지 않고 출발점·상승각·중력만 다르게 적용한다. 직구 초기값은 **DEMO_TUNING_VALUE**다.
+
+| DEV 입력 이름 | 순서 / 인덱스 | 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
+| --- | --- | ---: | --- | --- |
+| Throw Form (0 arc, 1 straight) | 112번째 / 111 | 0: Arc | 정수 0–1 | ARC/STRAIGHT 토글. Arc는 기존 `ArcVelocity` 결과를 그대로 사용한다. |
+| Straight Origin Offset X | 113번째 / 112 | 0.35 | −5–5 / 월드 거리 | 구슬 소유자 자리의 화면 오른쪽으로 더하는 거리. 0이면 기존 가로 놓기 위치를 유지한다. |
+| Straight Origin Offset Y | 114번째 / 113 | 0.4 | −5–5 / 월드 거리 | 기존 발사 위치에서 월드 위로 더하는 높이. |
+| Straight Origin Offset Z | 115번째 / 114 | 0 | −5–5 / 월드 거리 | 해당 자리에서 타깃 쪽 수평 방향으로 더하는 거리. |
+| Straight Pitch Offset (degrees) | 116번째 / 115 | 3 | −30–30 / 도 | 낮춘 상승각에 더하는 값. 음수는 아래 방향으로 던질 수도 있다. |
+| Straight Loft Scale | 117번째 / 116 | 0.1 | 0–1 / 배율 | 기존 Arc 최종 속도의 상승각을 남기는 비율. 0이면 Pitch Offset만 남는다. |
+| Straight Gravity Scale | 118번째 / 117 | 0.1 | 0–2 / 배율 | `Throw Gravity`에 곱하는 값. 0이면 중력이 없고, 현재 원본 기준 기본 직구 가속도는 30×0.1=3이다. |
+
+직구 전용 6개 행은 숫자 입력과 슬라이더를 모두 제공한다. ARC에서는 비활성화하고 STRAIGHT에서는 활성화한다. 이 전환은 아직 APPLY하지 않은 **폼 입력값**으로 즉시 반영하며 원본 에셋이나 이미 적용한 세션 설정을 즉시 바꾸지 않는다. ARC로 돌려도 직구 6개 값은 버리지 않으며 DEFAULTS를 누르면 저장 원본의 값으로 되돌린다.
+
+발사 위치는 `기존 LaunchPosition + 오른쪽×Offset.x + 월드 위×Offset.y + 타깃 쪽 수평 방향×Offset.z`다. Host가 **그 구슬 소유자의 실제 자리**를 사용하므로 Host의 로컬 카메라와 다인 플레이 자리 방향을 혼동하지 않는다. 위치를 옮긴 뒤 요괴 중심으로 자동 조준하지 않는다.
+
+기존 Arc의 최종 초기 속도를 `vArc`, 그 속력을 `s`, 수평 단위 방향을 `h`, 실제 상승각을 `a=atan2(vArc.y, |vArc 수평 성분|)`라고 하면 직구 상승각은 `b=clamp(a×StraightLoftScale + StraightPitchOffsetDegrees, −30°, 60°)`다. 직구 초기 속도는 `s×(h×cos(b)+위×sin(b))`이며 기존 초기 속력과 수평 조준 방향을 유지한다. 직구 모드도 `Throw Power Exponent`, 기존 Gain, `Throw Loft Offset`을 거친 Arc 결과를 기준으로 한다. `Loft Scale=1`이어도 직구의 각도 제한이 있으므로 기존 포물선 자체는 ARC에서 비교한다.
+
+`EffectiveThrowGravity`는 Arc일 때 기존 `ThrowGravity`, Straight일 때 `ThrowGravity×StraightGravityScale`다. 공은 발사 순간 중력·수명을 별도로 캡처하며 초기 위치·속도·충돌 반경·감쇠도 발사 시 설정한다. 비행 중 Inspector나 DEV 초안을 바꿔 이미 날아가는 공을 꺾지 않는다. 보이는 구슬과 실제 SphereCollider는 동일한 물리 루트에서 이동하고 기존 궤적·피격·색칠 경로를 재사용한다.
+
+솔로는 START/RESTART SOLO, 공유 방은 Host의 CREATE ROOM/APPLY TO ROOM/공동 일시정지 뒤 APPLY & RESTART로 적용한다. **118개 전체**를 검증·지문화한 설정을 참가자에게 전파하고 확인받은 뒤 시작한다. 프로토콜은 **5629**이며 Host는 확정한 발사 위치·속도를 Client에 보내고 Client는 공유 설정의 같은 중력을 사용한다. Client가 직접 모드를 바꾸지 않는다. Inspector 변경도 새 판 시작 시점에 적용해 비교한다.
+
+Inspector의 비정상 enum은 Arc로 보정하고 오프셋·각도·배율의 유효 Getter는 범위 제한과 유한수 대체값을 사용한다. DEV/네트워크는 잘못된 값 하나라도 있으면 118개 전체 적용을 거절한다. 극단적인 오프셋이나 음수 발사각은 화면 밖 출발·바닥 접촉·빗나감을 만들 수 있으며 자동 보정 대상이 아니다.
+
+근거: `LabConfig.ThrowForm`·`StraightOriginOffset`·`StraightPitchOffsetDegrees`·`StraightLoftScale`·`StraightGravityScale`·`EffectiveThrowGravity`, DEV 인덱스 111~117, `LabDeveloperMode.RefreshThrowFormInputs`, `LabThrowMath.LaunchPosition`·`LaunchVelocity`·`ArcVelocity`, `LabProjectile.Prepare`·`FixedUpdate`·`Update`, `LabNetwork.SpawnHostProjectile`, `LabSessionSettings.Fingerprint`. 이 절은 코드 연결 설명이며 실제 실행 결과를 단정하지 않는다.
 
 ### 요괴 피격 회전
 
@@ -295,6 +323,7 @@ BGM·생성·타격·빗나감·결합·도화선 소리 크기 6개(인덱스 6
 
 | 관찰·목표 | 먼저 비교할 값 | 함께 확인할 것 |
 | --- | --- | --- |
+| 직구를 낮고 빠르게 보이게 비교함 | Throw Form → STRAIGHT, Origin/Pitch/Loft/Gravity를 하나씩 변경 | 같은 초기 속력·수평 조준 유지, peak·실제 접촉점·색칠·소유자 자리별 출발점을 비교 |
 | 공이 너무 곧장 가서 하강이 안 보임 | Upward Gain ↑, Forward Gain ↓를 각각 시험 | peak·비행 시간·실제 HIT; 카메라가 정면이면 깊이감이 약할 수 있음 |
 | 약한 손동작도 투척으로 처리됨 | Minimum Swipe Speed 또는 Minimum Swipe Distance ↑ | 조합판 평면 이동과 투척의 경계, 최근 0.12초 입력 |
 | 강하게 던져도 거리 차이가 작음 | Maximum World Speed 상한 여부, Power Exponent | `C6_LAB_THROW`의 실제 launch 속도 |
@@ -315,7 +344,7 @@ BGM·생성·타격·빗나감·결합·도화선 소리 크기 6개(인덱스 6
 
 ## 10. 이 패널로 조정할 수 없는 것·검증 범위
 
-방의 **목표 인원**은 111개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport, 박 폭탄의 대상·착지 위치 추첨과 경고·낙하·말풍선 연출 시간, 북 도착의 감속 상한·최대 도착 시간·통과 속도는 111개 입력칸으로 조정하지 않는다. 색칠 승리 목표는 100% 고정이며 이 패널로 낮출 수 없다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
+방의 **목표 인원**은 118개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport, 박 폭탄의 대상·착지 위치 추첨과 경고·낙하·말풍선 연출 시간, 북 도착의 감속 상한·최대 도착 시간·통과 속도는 118개 입력칸으로 조정하지 않는다. 색칠 승리 목표는 100% 고정이며 이 패널로 낮출 수 없다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
 
 기존 PR #76 기준 문서는 해당 코드·Scene·설정 에셋과 당시 `docs/VALIDATION.md`의 증거를 **읽어 확인**해 작성됐다. 그 기록의 EditMode **12/12**, PlayMode **20/20** 및 Mac Development 앱 빌드는 이번 3D 조합판 전환의 통과 증거가 아니다. 이 전환의 Unity 컴파일·EditMode·PlayMode, Mac·iOS 빌드, 실제 조작은 새 실행 기록으로 구분해야 한다. 문서의 물리 용어를 갱신한 것만으로 실행 결과를 PASS로 보지 않는다.
 
@@ -323,7 +352,7 @@ BGM·생성·타격·빗나감·결합·도화선 소리 크기 6개(인덱스 6
 
 - 설정 필드·범위·일괄 검사: `Assets/Lab/Scripts/Core/LabConfig.cs` — `DeveloperFields`, `CaptureDeveloperValues`, `TryApplyDeveloperValues`.
 - 저장 기본값: `Assets/Lab/Resources/LabConfig.asset`.
-- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 111개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
+- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 118개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
 - 패널 열기·DEFAULTS·SOLO/Host 설정 적용·슬라이더 변환: `Assets/Lab/Scripts/UI/LabDeveloperMode.cs`.
 - Host 전투 수치·개인 HP·전원 0 패배·스태미나·생성 확률·속성·아이템 잠금·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
 - 아이템 더블 탭 사용·효과(물약·상자), 릴레이 단계, 폭탄 폭발·피해 배율: `Assets/Lab/Scripts/Core/LabModel.cs`(`TryUseItem`·`TryTransfer`·`TryAdvance`·`ConfirmHit`)와 `LabOrbBoard.EndDragAtWorld`.
@@ -333,8 +362,8 @@ BGM·생성·타격·빗나감·결합·도화선 소리 크기 6개(인덱스 6
 - 아이템 아이콘·자물쇠·잠금/단계 배지·폭탄 남은 초·해금 연출: `Assets/Lab/Scripts/Orb/LabOrbItemMarker.cs`, 아이콘·자물쇠·속성 재질과 잠금·해금 연출 값: `Assets/Lab/Art/Orbs/LabOrbAppearance.asset`. 해금 연출 값은 DEV 패널이 아닌 Inspector에서 조정한다.
 - 3D 조합판 구슬 물리·XY 손동작·공통 구체 외형: `Assets/Lab/Scripts/Orb/LabOrbBoard.cs`와 `LabOrbView.cs`.
 - 생성 북: 무작위 배치·북 보유자만 생성·북 위치와 360° 방향 추첨·벽 근처 속도 제한·북 전달은 `LabModel.cs`(`PlaceDrums`·`TryGenerate`·`SpawnVelocityFor`·`TryTransfer`), 탭 생성·끌기·떠돌기·가장자리 되돌림·튀어나오기는 `LabOrbBoard.cs`(`EndDragAtWorld`·`Drift`·`UpsertOrb`), 북 그림·회전은 `LabOrbView.cs`, 북 그림 지정은 `LabOrbAppearance.asset`의 `Drum Sprite`.
-- 발사 위치·초기 속도: `Assets/Lab/Scripts/Throw/LabThrowMath.cs`.
-- 공의 중력·저항·충돌·수명: `Assets/Lab/Scripts/Throw/LabProjectile.cs`.
+- 발사 위치·초기 속도: `Assets/Lab/Scripts/Throw/LabThrowMath.cs`의 `LaunchPosition`·`LaunchVelocity`·기존 `ArcVelocity`. 직구 7개 설정은 `LabConfig` 인덱스 111~117과 `Throw form` DEV 묶음에 연결한다.
+- 공의 중력·저항·충돌·수명: `Assets/Lab/Scripts/Throw/LabProjectile.cs`. `Prepare`에서 `EffectiveThrowGravity`와 수명을 캡처하고 같은 물리 루트의 SphereCollider와 표시를 이동한다.
 - 요괴 매달림·Y축 회전 및 실제 피격체 이동: `Assets/Lab/Scripts/Throw/LabHangingTarget.cs`; 진단용 재질: `Assets/Lab/Art/Targets/TargetSpinGradient.mat`.
 - Host의 방 설정·동기화·발사·피격 확정·결과 로그: `Assets/Lab/Scripts/Session/LabNetwork.cs`와 `LabSessionSettings.cs`.
 - 박 모드·고정 목표·성장 설정: `LabConfig.GourdMode`·DEV 인덱스 79, `PaintVictoryPercent`·인덱스 87(100% 고정), `PaintGrowthSettings`·인덱스 105~110, `LabSceneController`의 초기/`ConfigApplied` 연결, `LabGourdPaint.Attach`·`ApplyMode`.
