@@ -1,6 +1,6 @@
 # C6 Physics Lab
 
-> **Experiment #196 — 박 물감 내부 질감 실험 브랜치**입니다. 정식 반영 전 비교용이며 기본 OFF입니다. DEV → Gourd → Paint Grain을 ON으로 바꾸고 새 판에 적용합니다. 도색 외곽·비산점·면적·성장·승리 규칙은 변경하지 않습니다.
+> **박 물감 내부 질감(#196)**은 기본 OFF인 선택 표현입니다. DEV → Gourd → Paint Grain을 ON으로 바꾸고 새 판에 적용합니다. 도색 외곽·비산점·면적·성장·승리 규칙은 변경하지 않습니다.
 
 합이오의 **연결·구슬 물리·전달·투척**만 살펴보고 조정하기 위한 Unity 프로젝트입니다. 원래 프로젝트를 복제하거나 Task별 Scene을 누적하지 않았습니다. 필요한 동작을 역할별 새 코드와 한 개의 실험 Scene으로 구성합니다. 이전 MUSA 프로토타입은 `pre-physics-lab-rebuild-2026-10-10` 태그와 이전 Git 이력에 보존했습니다. [교체 이관 범위](docs/MIGRATION_PHYSICS_LAB.md)를 참조하세요.
 
@@ -66,7 +66,7 @@ Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤
 
 **DEV → Gourd → Paint Grain**을 ON으로 바꾸고 **START/RESTART SOLO**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지 후 Host의 **APPLY & RESTART**로 적용합니다. 기본은 OFF여서 기존 단색 표현을 유지합니다. `Paint Grain Size`는 클수록 입자가 커지고, `Paint Grain Strength`는 어두운 미세 입자, `Paint Mottle Strength`는 큰 농담 차이를 조절합니다. 두 강도를 0으로 하면 ON이어도 기존 색을 표시합니다. 표면에 구멍을 뚫거나 미도색 영역을 칠하지 않으며, 이 값들은 도색 면적·진행률·명중/물리·100% 완료를 변경하지 않습니다. 세부 값은 [DEV 상세 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)를 참조하세요.
 
-이 실험 앱끼리만 같은 방에 접속합니다(설정133개·프로토콜5633). 기존 main 앱과의 혼합 접속은 지원하지 않습니다. 완성품 관람도 같은 질감 설정을 복제합니다. iOS 화면·성능 검증 여부는 [검증 기록](docs/VALIDATION.md)의 #196 항목에서 확인합니다.
+설정133개·프로토콜5633을 사용하므로 참가자 모두 같은 버전 앱으로 접속합니다. 완성품 관람도 같은 질감 설정을 복제합니다. iOS 화면·성능 검증 여부는 [검증 기록](docs/VALIDATION.md)의 #196 항목에서 확인합니다.
 
 ### 완성된 박 관람하기 (#191)
 

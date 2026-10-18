@@ -1,6 +1,6 @@
 # 기본 전투의 100% 공동 색칠·인접 성장·완성 박 관람 — #187·#191
 
-> **Experiment #196**: 이 브랜치는 기존 판정 맵 위에 물감 내부 입자·농담을 표시하는 실험이다. 기본 OFF이며 DEV → Gourd → Paint Grain에서 켠다. 원본 도색·성장·완료 규칙은 유지하고 로컬 좌표 고정 RGB 명암만 추가한다. 새 설정129~132를 포함한133개·프로토콜5633을 사용하며 정식 main 반영 전이다. 세부 조절값과 검증은 루트 `README.md`·`docs/DEVELOPER_MODE_PARAMETER_SPEC.md`·`docs/VALIDATION.md`의 #196 항목을 따른다.
+> **Experiment #196**: 기존 판정 맵 위에 물감 내부 입자·농담을 표시하는 선택 표현이다. 기본 OFF이며 DEV → Gourd → Paint Grain에서 켠다. 원본 도색·성장·완료 규칙은 유지하고 로컬 좌표 고정 RGB 명암만 추가한다. 새 설정129~132를 포함한133개·프로토콜5633을 사용하며 사용자 승인으로 main에 포함하며 기본 OFF를 유지한다. 세부 조절값과 검증은 루트 `README.md`·`docs/DEVELOPER_MODE_PARAMETER_SPEC.md`·`docs/VALIDATION.md`의 #196 항목을 따른다.
 
 기본 실행·빌드 Scene은 `Assets/Lab/Scenes/Lab.unity`다. #153에서 이관한 `Resources/GourdPaint/WhiteGourd.prefab`·`WhiteGourd.mat`·`Stem.mat`의 원본 참조와 GUID, UI 배치와 빌드 Scene 목록을 유지한다. 박 외형과 실제 기존 원통 MeshCollider의 모양 차이도 유지한다. 단일 원본 `LabConfig.asset`은 Unity에서 목표 100과 성장 기본값 6개를 저장했으며 다른 설정의 유효값을 보존했다.
 
