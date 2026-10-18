@@ -856,3 +856,27 @@ Host는 프레임 경계에서 월드 아래를 `VisualMount` 로컬 방향으�
 
 
 #198 후속: 2026-10-18 사용자가 PR 작성·검토 후 main 병합을 승인했다. 위 기록은 구현 커밋 `93c0f397`에서 실행한 근거로 보존한다. 병합 준비 후속 변경은 README·DEV/에셋 안내·이 기록의 적용 범위 문구뿐이며 게임 코드·Config·Scene·Prefab·패키지·테스트 내용은 실행 당시와 같다. 기본 성장 ORIGINAL과 질감 OFF를 유지한다. iOS·실기기·성능 등 NOT_RUN 항목을 병합만으로 PASS로 바꾸지 않는다.
+
+
+### Experiment #200 — 실제 박 물감3종·사용자5색 비교 — 2026-10-18
+
+기준 main `a3cf6f3e`, 브랜치 `experiment/#200-gourd-paint-style-comparison`, Unity **6000.6.5f1 / URP17.6.0**. Editor 비교 도구의 구현·실행 기록이다. 기존 사용자 Scene/머티리얼이 남은 원본 프로젝트와 분리해 검사했으며 전투 Scene·Config·Prefab·Shader·Host 도색/네트워크 코드는 변경하지 않았다. 본 게임에 자동 연결하거나 main에 병합하지 않는다.
+
+넓은 얼룩형·튀긴 물감형·흐르는 물감형의 내장 image_gen 원본 마스크1254×1254를 만들어 실제 저장 WhiteGourd 프리팹·기존 셰이더로 렌더했다. 마스크의 실제 RGB에는 최대15/255의 채널 편차가 있어 luminance로 해석하며0.15 임계값 미만 배경 노이즈는 발자국이 아니다. 원본을 다시 그리거나 파일을 임의 보정하지 않았다. 생성 프롬프트·에셋 근거는 해당 폴더의 `GENERATION.md`에 남겼다.
+
+사용자 후속 팔레트는 첨부 이미지의 프로필을 sRGB로 변환해 주황 `#D85736`·노랑 `#F8B72A`·초록 `#3D8258`·파랑 `#1471A7`·갈색 `#6F4A32`를 사용한다. linear 지도에 쓰기 전에 sRGB→linear 변환을 적용했다. 이는 비교 도구의 기준색 변경이며 기존 전투의 속성/구슬색·Host 팔레트는 그대로다. 조명·내부 농담에 따른 화면 밝기 차이는 유지한다.
+
+| 검증 | 상태 | 근거·범위 |
+| --- | --- | --- |
+| 최초 Unity 컴파일 | FAIL | `render-initial-compile-failed.log` 보존. Unity6.6의 Scene.handle이 SceneHandle로 바뀌어 int 암시 변환이 오류였다. Scene 상태 비교를 Scene 값 자체로 보관하도록 수정한 뒤 재실행했다. |
+| 최초 임시 UI 검사 | FAIL | 렌더9개 출력은 끝났지만 패널이 없는 CreateInstance 창에서 Close하거나 값 변경 이벤트를 기대한 임시 검사기가 실패했다. 로그를 보존하고 실제 Show로 패널을 만든 뒤 조작하도록 수정했다. 게임 코드의 실패로 기록하지 않으며 아래 재실행 전에는 전체 PASS로 표시하지 않았다. |
+| 최종 실제 곡면 렌더·UI Toolkit 조작 | PASS | `render-editor.log`, `PAINT_STYLE_COMPARISON_EXPORTED count=9`, `PAINT_STYLE_VALIDATION_OK actualRenders=9 uiImages=3 yawChanged=True sourceConfigUnchanged=True`, 종료0. 실제 Metal·WhiteGourd 프리팹·기존 paint 셰이더로3스타일×3단계의512×512 그림9개와1536×512 비교3개를 출력했다. 메타데이터 시각 **14:02:29Z**. 각 그림의 실제 물감 픽셀·색 변화가 존재하고 단색 배경만 출력되지 않았는지 확인했다. 실제 UXML/USS를 가져온 창에 Image3개가 연결되고, Show 후 Yaw40 변경 시 이미지가 달라지며 Stage Single 전환 시6.0% 표시로 바뀌었다. 원본 Config 직렬화와 기존 활성/로드 Scene·dirty 상태 보존도 확인했다. 임시 검사기는 삭제했다. |
+| 같은 실제 표면 면적·모양 차이 | PASS | `paint-style-evidence.json`:1024×512 등면적 구면 지도·seed200·같은 색/위치/카메라. Single은세스타일모두31,457셀(6% 내림), Multicolor는94,371셀(18% 내림), Complete는524,288셀(100%)이다. 각 단계의3개 지도 해시·PNG 해시가 모두 다르다. 각 비교 그림을 직접 열어 큰 덩어리·튀긴 경계·가는 흐름이 구분되는지 확인했다. |
+| 최초 전체 EditMode | FAIL | **497건 중494통과/3실패**, skipped0. 세 마스크 바깥 픽셀에 RGB0이 아닌 어두운 생성 노이즈가 있어 ‘정확한 검정’ 기대가 틀렸다. 실제 발자국 판정과 같은 luminance0.15 미만인지 검사하도록 수정했으며 최초 XML/로그를 보존했다. |
+| 최종 전체 EditMode | PASS | **497/497**, failed/skipped/inconclusive=0. `editmode.xml` **14:05:21Z–14:05:24Z**. 기존468+새29. 마스크 복사·보간·바깥0·잘못된 입력, 동일 면적6/18/100%·결정성·3스타일 차이·실제 에셋/가져오기 설정·요청 팔레트5값을 포함한다. |
+| 최종 전체 PlayMode | PASS | **141/141**, failed/skipped/inconclusive=0. `playmode.xml` **14:06:02Z–14:07:18Z**. 임시 검사기 제거 후 기존 Lab 전투·도색/DEV/관람 회귀를 실행했다. 이 결과는 새 마스크가 실제 Host 전투에 연결됐다는 의미가 아니다. |
+| Mac/iOS 플레이어 빌드·실기기·핫스팟·다중 앱·성능 | NOT_RUN | 이번 변경에서 실행하지 않았다. Editor 도구의 GPU 출력·CPU 검사·기존 PlayMode 성공을 새 스타일의 게임/기기 검증으로 승계하지 않는다. |
+
+비교는 **준비된 시각 fixture**다. 단일 얼룩6%·다색18%·전체100%를 사용하며 Complete는 빈 셀을 가까운 기준 타격색으로 채운 미리보기다. 시간 성장·명중 승인·피격·실제 게임 승리나 네트워크 상태를 만들지 않는다. 같은 지점의 반복 명중 색띠 문제나 덧칠 규칙을 해결했다는 증거가 아니다. 실험 사용법/팔레트·기술 한계는 [3종 비교 안내](PAINT_STYLE_COMPARISON_EXPERIMENT.md)에 정리했다.
+
+전체 원시 PNG·XML·Editor 로그·메타데이터·임시 실행기는 로컬에 보존하고 공개 Git에 넣지 않는다. 개인 정보가 없는 선택용 다색 비교1장만 `docs/images/gourd-paint-style-comparison.png`에 그대로 복사했다(추가 합성·보정 없음). 자동 생성 URP 직렬화 변경은 보존 후 제외했고, 기존 사용자 Scene/머티리얼은 작업 전 해시와 비교해 보존했다.

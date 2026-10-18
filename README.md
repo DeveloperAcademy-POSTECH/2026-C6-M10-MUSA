@@ -1,5 +1,7 @@
 # C6 Physics Lab
 
+> **Experiment #200 — 물감 3종 비교**: Editor 메뉴 **C6 Lab → Experiments → Paint Style Comparison**에서 실제 박의 넓은 얼룩·튀긴 물감·아래 흐름을 나란히 비교합니다. 첨부 팔레트의5색을 사용한 별도 미리보기이며 기존 전투에는 자동 적용하지 않습니다. [사용법과 실험 한계](docs/PAINT_STYLE_COMPARISON_EXPERIMENT.md)를 참조하세요.
+
 > **Experiment #198 — 번짐·아래 흐름 성장**은 선택 가능한 실험 기능입니다. 기본은 ORIGINAL이며 DEV → Gourd → Paint Growth Style에서 SPREAD + FLOW로 바꿔 새 판에 적용합니다. #196의 내부 입자와 독립적으로 켜고 비교합니다. 사용자 승인으로 main에 포함하며 기본 성장 방식은 유지합니다.
 
 > **박 물감 내부 질감(#196)**은 기본 OFF인 선택 표현입니다. DEV → Gourd → Paint Grain을 ON으로 바꾸고 새 판에 적용합니다. 도색 외곽·비산점·면적·성장·승리 규칙은 변경하지 않습니다.
