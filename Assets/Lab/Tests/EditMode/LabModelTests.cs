@@ -1762,7 +1762,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void PaintGrowthAndPaletteAreCapturedUntilTheRoundRestarts()
+        public void PaintGrowthIsCapturedUntilRestartAndPaintPaletteIsIndependentOfOrbMaterials()
         {
             var paintConfig = PaintFixture(2f);
             var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
@@ -1777,7 +1777,7 @@ namespace C6Lab.Tests
                     .SetValue(paintConfig, appearance);
                 var room = new LabModel();
                 room.BeginSolo("paint-capture", 10, 0d, paintConfig);
-                Assert.That(Vector4.Distance(room.PaintColorFor(LabOrbElement.Fire), firstColor), Is.LessThan(.00001f));
+                Assert.That(Vector4.Distance(room.PaintColorFor(LabOrbElement.Fire), LabPaintPalette.ColorFor(LabOrbElement.Fire)), Is.LessThan(.00001f));
                 Assert.That(room.PaintColorFor(LabOrbElement.None), Is.EqualTo(Color.clear));
                 material.SetColor("_BaseColor", Color.magenta);
                 float[] values = paintConfig.CaptureDeveloperValues();
@@ -1790,13 +1790,13 @@ namespace C6Lab.Tests
                 Assert.That(room.Snapshot(0d).paintGoalPercent, Is.EqualTo(100));
                 Assert.That(room.PaintSurface.Columns, Is.EqualTo(64), "Active rules retain the old resolution.");
                 Assert.That(room.Phase, Is.EqualTo(LabPhase.Playing));
-                Assert.That(Vector4.Distance(room.PaintColorFor(LabOrbElement.Fire), firstColor), Is.LessThan(.00001f));
+                Assert.That(Vector4.Distance(room.PaintColorFor(LabOrbElement.Fire), LabPaintPalette.ColorFor(LabOrbElement.Fire)), Is.LessThan(.00001f));
                 room.Tick(30d);
                 room.BeginSolo("paint-capture", 10, 31d, paintConfig);
                 Assert.That(room.Snapshot(31d).paintGoalPercent, Is.EqualTo(100));
                 Assert.That(room.PaintSurface.Columns, Is.EqualTo(256));
                 Assert.That(room.PaintSurface.Rows, Is.EqualTo(128));
-                Assert.That(room.PaintColorFor(LabOrbElement.Fire), Is.EqualTo(Color.magenta));
+                Assert.That(room.PaintColorFor(LabOrbElement.Fire), Is.EqualTo(LabPaintPalette.ColorFor(LabOrbElement.Fire)));
                 Assert.That(room.PaintSurface.Coverage, Is.Zero);
                 LabOrbState retryShot = LaunchElementShot(room, ref request, 31d);
                 Assert.That(room.ConfirmHit(retryShot.id, 31d, Vector3.forward, out _, out _, out _), Is.True);

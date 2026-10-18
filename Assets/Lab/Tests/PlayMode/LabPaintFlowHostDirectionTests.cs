@@ -46,7 +46,7 @@ namespace C6Lab.Tests
             string source = JsonUtility.ToJson(original);
             try
             {
-                float[] values = fixture.CaptureDeveloperValues(); values[133] = 1;
+                float[] values = fixture.CaptureDeveloperValues(); values[133] = 1; values[139] = 0;
                 Assert.That(fixture.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 network.config = fixture; network.port = 19898;
                 Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);

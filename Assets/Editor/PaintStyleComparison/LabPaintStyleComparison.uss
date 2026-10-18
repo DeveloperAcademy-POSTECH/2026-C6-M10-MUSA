@@ -1,0 +1,73 @@
+.paint-study {
+    flex-grow: 1;
+    padding: 12px;
+    background-color: #20262d;
+    color: #f1eee5;
+}
+.paint-study-title {
+    font-size: 18px;
+    -unity-font-style: bold;
+    margin-bottom: 6px;
+}
+.paint-study-note {
+    white-space: normal;
+    margin-bottom: 10px;
+    color: #c6cbd0;
+}
+.paint-study-controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+.paint-study-control {
+    min-width: 190px;
+    flex-grow: 1;
+    margin-right: 12px;
+    margin-bottom: 6px;
+}
+.paint-study-actions {
+    flex-direction: row;
+    margin-bottom: 10px;
+}
+.paint-study-action {
+    margin-right: 8px;
+    min-width: 110px;
+}
+.paint-study-panels {
+    flex-direction: row;
+    flex-grow: 1;
+    min-height: 260px;
+}
+.paint-study-panel {
+    flex-grow: 1;
+    flex-basis: 0;
+    margin-right: 6px;
+    margin-left: 6px;
+    padding: 6px;
+    background-color: #12181e;
+    border-width: 1px;
+    border-color: #46505a;
+}
+.paint-study-heading {
+    -unity-font-style: bold;
+    font-size: 16px;
+    -unity-text-align: middle-center;
+    margin-bottom: 4px;
+}
+.paint-study-image {
+    flex-grow: 1;
+    min-height: 230px;
+}
+.paint-study-count {
+    white-space: normal;
+    -unity-text-align: middle-center;
+    color: #c6cbd0;
+    margin-top: 5px;
+}
+.paint-study-status {
+    white-space: normal;
+    margin-top: 8px;
+}
+.paint-study-error {
+    color: #ffb2a1;
+}

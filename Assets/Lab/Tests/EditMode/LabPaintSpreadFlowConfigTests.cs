@@ -43,9 +43,9 @@ namespace C6Lab.Tests
         [Test]
         public void SixSettingsAppendToGourdWhileNewConfigsKeepOriginalGrowthAndGrainOff()
         {
-            Assert.That(baseline.Length, Is.EqualTo(139));
-            Assert.That(baseline.Skip(133), Is.EqualTo(new[] { 0f, .55f, .35f, 3f, 60f, 3f }));
-            Assert.That(LabConfig.DeveloperFields.Skip(133).Select(field => field.Label), Is.EqualTo(new[]
+            Assert.That(baseline.Length, Is.EqualTo(140));
+            Assert.That(baseline.Skip(133).Take(6), Is.EqualTo(new[] { 0f, .55f, .35f, 3f, 60f, 3f }));
+            Assert.That(LabConfig.DeveloperFields.Skip(133).Take(6).Select(field => field.Label), Is.EqualTo(new[]
             {
                 "Paint Growth Style (0 original, 1 spread + flow)", "Paint Edge Raggedness", "Paint Flow Ratio",
                 "Paint Drip Width (surface degrees)", "Paint Drip Length (surface degrees)", "Paint Gravity Weight"
@@ -54,9 +54,9 @@ namespace C6Lab.Tests
             Assert.That(style.IsToggle && style.WholeNumber, Is.True);
             Assert.That(style.OffText, Is.EqualTo("ORIGINAL"));
             Assert.That(style.OnText, Is.EqualTo("SPREAD + FLOW"));
-            Assert.That(LabConfig.DeveloperFields.Skip(134).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
+            Assert.That(LabConfig.DeveloperFields.Skip(134).Take(5).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
             var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
-            Assert.That(gourd.FieldIndices.Skip(gourd.FieldIndices.Length - 6),
+            Assert.That(gourd.FieldIndices.Where(index => index >= 133 && index <= 138),
                 Is.EqualTo(new[] { 133, 134, 135, 136, 137, 138 }));
             var untouched = ScriptableObject.CreateInstance<LabConfig>();
             try
@@ -118,7 +118,7 @@ namespace C6Lab.Tests
         [Test]
         public void Old133ValueSchemaAndIncompleteTailAreRejectedBeforeApplyingAnyValue()
         {
-            foreach (int length in new[] { 133, 138, 140 })
+            foreach (int length in new[] { 133, 138, 139, 141 })
             {
                 var values = new float[length]; Array.Copy(baseline, values, Math.Min(length, baseline.Length));
                 values[0] = 777f;
@@ -127,7 +127,7 @@ namespace C6Lab.Tests
                 Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
                 Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(values, 3, Protocol));
             }
-            Assert.That(Protocol, Is.EqualTo(5634));
+            Assert.That(Protocol, Is.EqualTo(5635));
         }
 
         [Test]
@@ -137,7 +137,7 @@ namespace C6Lab.Tests
             JsonUtility.FromJsonOverwrite("{\"paintGrowthStyle\":7,\"paintEdgeRaggedness\":-2," +
                 "\"paintFlowRatio\":3,\"paintDripWidthDegrees\":-9,\"paintDripLengthDegrees\":999," +
                 "\"paintGravityWeight\":-5}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(133), Is.EqualTo(new[] { 1f, 0f, 1f, .5f, 135f, 1f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(133).Take(6), Is.EqualTo(new[] { 1f, 0f, 1f, .5f, 135f, 1f }));
             AssertSettingsMatch(config);
             Assert.That(previous.Style, Is.Zero);
             Assert.That(previous.Raggedness, Is.EqualTo(.55f));
