@@ -690,3 +690,30 @@ Scene 파일을 저장하거나 덮어쓰지 않고 **File → Open Scene으로 
 실제 Mac 2프로세스도 **검증용 입력 도구와 튜닝 fixture**를 사용했다. 첫 판은 저해상도·HP1·초기2%/반복4%/성장6%/초, 둘째 판은 목표100%를 유지한 초기50%/반복50%/성장100%/초, Crack은 HP20이다. 임시 도구는 공개 보드/네트워크 경로로 생성·상자 사용·손동작 투척을 요청했고 Host의 실제 물리 충돌로 결과를 만들었다. 맵·모델 직접 주입이나 파일을 이용한 게임 진행 동기화로 전송 검사를 대신하지 않았다. localhost 두 프로세스의 맵/텍스처 데이터 일치와 일반 수동 플레이·실제 기기·핫스팟의 결과는 구분한다.
 
 최종 전체 XML은 `Logs/Issue187-EditMode.xml`·`Logs/Issue187-PlayMode.xml`이다. 최초 실패와 중간 수정 확인 XML도 로컬 보존본으로 구분한다. `Library/Issue187Captures/`의 카메라 캡처는 자동 검사 산출물이며, 관찰 범위를 따로 기록하지 않은 시각 결과에 PASS를 부여하지 않는다. 원시 XML·Editor/Player 로그·앱·임시 실행기와 JSONL은 로컬 증거로 보존하고 공개 Git에 넣지 않는다. 두 Mac 프로세스의 JSONL은 독립적으로 수집해 비교했고 일반 종료 코드 0을 확인했다. 도구 제거 후 최종 일반 빌드는 해당 행에서 별도로 기록한다. 실행되지 않은 NOT_RUN 행을 이전 검사로 PASS로 변경하지 않는다.
+
+
+## 완성 박 관람 DEV·공유 세션 통합 — #191 / 2026-10-18
+
+기준 main `e3e3be4e`, 브랜치 `feat/#191-gourd-result-viewer-dev`, Unity **6000.6.5f1**, 저장 Scene `Assets/Lab/Scenes/Lab.unity`. #189 실험 코드를 일반 Runtime·Resources와 기존 테스트 어셈블리로 이관한 새 통합본의 실행 기록이다. #189 당시 사용법·검증은 `docs/experiments/gourd-result-viewer-189/`에 역사 자료로 보존했으며 아래 결과로 승계하지 않는다.
+
+| 항목 | 상태 | 근거·범위 |
+| --- | --- | --- |
+| Unity 컴파일·설정·프리팹 연결 | PASS | 별도 작업 폴더에서 실제 Unity import/compile, `ISSUE191_PREPARE_OK fields=112 viewerDefault=OFF prefabReferences=OK`. Unity API로 Config의 bool 0과 기존 GUID의 프리팹 컴포넌트/라벨을 저장했고, 기존 111개 유효 설정값의 동일성을 검사했다. Scene·패키지·프로젝트 설정은 변경하지 않았다. |
+| 전체 EditMode | PASS | `editmode.xml` total=331, passed=331, failed=0, skipped=0, inconclusive=0. 2026-10-18 **07:51:08Z–07:51:10Z**. 기본 OFF/112개 왕복/구형 111개·잘못된 bool 원자적 거절/지문·JSON·Client 적용/100% 결과 자격 검사 포함. |
+| 전체 PlayMode | PASS | `playmode.xml` total=116, passed=116, failed=0, skipped=0, inconclusive=0. **07:51:43Z–07:52:51Z**. 공식 DEV 폼으로 ON 적용→실제 SecretBox 생성·보드 투척·Host 충돌→100% Victory→관람 진입·복사 픽셀 동일·격리 렌더·회전/줌/초기화/닫기·재진입·Retry 정리→OFF 재시작→두 번째 실제 충돌 Victory에서도 UI/Preview null→END SOLO 원본 OFF 복귀를 확인했다. |
+| Development Host + Release Client 실제 공유 실행 | PASS | 07:55:22Z–07:55:31Z. Development Host(186,377,437바이트)와 Release Client(91,886,142바이트)를 실제 NGO/UTP localhost로 연결했다. 각 앱 JSONL의 9개 체크포인트가 모두 pass=true·final까지 도달했고 두 프로세스 정상 종료 코드 0을 확인했다. 일반 Release Client는 Debug.isDebugBuild=false이며 관람 활성화 인자를 받지 않았다. |
+| 공유 ON 관람·원본 보존 | PASS | 112개 설정/지문/ACK 뒤 Client 보드의 실제 상자 사용·투척과 Host 물리 충돌로 양쪽 100% Victory를 만들었다. 양쪽 관람 버튼이 작동하고 복사 텍스처/원본 맵 SHA-256이 같으며 서로 다른 로컬 Quaternion을 유지했다. 입력 직후 원본 target·전투 카메라 pose와 도색 hash가 불변이었다. 각 450×900 실제 UI/RenderTexture PNG에서 모델과 버튼을 확인했다. 이는 한 색으로 완료하는 fixture이며 다색 완성 플레이의 시각 검사는 아니다. |
+| 공유 OFF 전파·같은 방 재시작 | PASS | 관람 중 Host의 ReturnAllToLobby로 두 앱의 Ui/Preview가 null, 소유 Texture/RenderTexture가 파괴된 것을 확인했다. 같은 연결의 ApplyHostLobbyConfig로 OFF를 전파하고 Client ACK 뒤 시작했다. 두 번째 실제 Client 투척/Host 충돌로 다시 2,048/2,048셀 Victory가 되어도 양쪽 CanInspect=false·Ui/Preview=null이었다. |
+| 임시 도구 제거 후 일반 Mac 빌드 | PASS | 임시 Runtime/Editor 실행기 2개와 대응 .meta를 제거한 뒤 `C6Lab.Editor.LabBuild.Mac`으로 새 빌드했다. `C6_LAB_BUILD_OK`, `Builds/Lab/20261018-165600-79e6e8e5/macOS/C6_Physics_Lab.app`, **186,344,398바이트**. 최종 `C6Lab.Runtime.dll`에 관람 클래스가 있고 `Issue191NetworkHarness`가 없음을 검사했다. 이 일반 앱으로 다시 두 프로세스를 연결한 검사는 미실행이다. |
+| iOS 출력·서명·설치·실기기 | NOT_RUN | 실제 핀치/손가락 인계·safe area·방향 전환·핫스팟·3~5기기·메모리/성능은 이번에 실행하지 않았다. 포인터 핸들러 회귀 검사와 실제 손가락 검증은 구분한다. |
+| 기본 성장 밸런스 | NOT_RUN | 관람 재현 fixture는 저해상도 64×32·초기100%·SecretBox100%/잠금0·박 폭탄 끔이다. 기본 초기2%/반복4% 성장 난이도 검사가 아니다. |
+
+### 적용·보존 범위
+
+- 새 허용값은 DEV `Gourd`의 마지막 **112번째/index111 `Completed Gourd Viewer (0 off, 1 on)`**이며 원본 기본 OFF다. 이전 0~110번과 고정100% 목표를 보존했다. 설정 배열 변경에 따라 프로토콜 **5629**, 연결 토큰 **`C6PhysicsLab/9`**로 구분하므로 이전 앱과 섞어 접속하지 않는다.
+- 기본 OFF와 ON의 Playing에서는 네트워크당 가벼운 관찰자만 존재한다. Paint 100% Victory와 일치한 공개 맵에서만 UI를 지연 생성하고, 버튼을 눌러야 독립 모델·카메라·RenderTexture·도색 복사본을 만든다. 회전/줌은 로컬이며 원본 물리·카메라·도색/통계는 수정하지 않는다.
+- 저장된 UI는 `Assets/Lab/Resources/GourdResultViewer/ViewerUI.prefab`, 실행 진입은 `LabSceneController.Awake → LabGourdResultViewer.Attach(network)`다. 실험용 CLI·Editor SessionState·Debug 관람 제한은 제거했지만 기존 DEV 설정 권한은 유지한다.
+- OFF 적용/다음 판/로비/연결 종료/컴포넌트 해제는 관람 Preview와 UI를 정리한다. 관람 중 Config를 직접 편집하는 새 경로를 추가하지 않았다.
+- 데스크탑 체크아웃의 별도 #190 작업과 사용자 Scene·Material은 건드리지 않았다. 원시 XML·Editor/Player 로그·PNG·앱과 임시 실행기는 로컬 증거로만 보존하고 공개 Git에 넣지 않는다.
+
+검증용 통신 입력 도구는 Host/Client가 각자의 JSONL에만 기록하며 파일로 게임 진행을 동기화하지 않았다. 공개 생성·아이템·보드 손동작·네트워크 경로와 실제 Host 물리 충돌을 사용했으며, 맵/승패 직접 주입을 하지 않았다. 기존 Scene/Material과 자동 생성 Performance/URP 재직렬화 항목은 이번 변경에 포함하지 않는다.
