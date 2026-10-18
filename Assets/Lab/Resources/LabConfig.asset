@@ -82,6 +82,10 @@ MonoBehaviour:
   gourdSwingMaximumAngle: 40
   gourdSwingReturnStrength: 10
   gourdSwingDamping: 1.4
+  paintGrainEnabled: 0
+  paintGrainSize: 1
+  paintGrainStrength: 0.3
+  paintMottleStrength: 0.18
   gourdBombIntervalMin: 20
   gourdBombIntervalMax: 30
   bgmVolume: 0.2

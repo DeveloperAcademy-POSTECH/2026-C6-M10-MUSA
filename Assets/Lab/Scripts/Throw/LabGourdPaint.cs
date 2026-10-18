@@ -28,6 +28,9 @@ namespace C6Lab
         private string uploadedSession;
         private uint uploadedRound;
         private bool hasUploadedSurface;
+        private bool grainSettingsApplied;
+        private bool appliedGrainEnabled;
+        private float appliedGrainSize, appliedGrainStrength, appliedMottleStrength;
         private MaterialPropertyBlock block;
         private Renderer shell;
         private LabTarget mountedTarget;
@@ -110,7 +113,11 @@ namespace C6Lab
         /// <summary>Initialize assigned references once; only the runtime binder resolves Resources.</summary>
         public bool InitializePresentation()
         {
-            if (IsReady) return true;
+            if (IsReady)
+            {
+                RefreshPaintMap();
+                return true;
+            }
             ReleasePresentation();
             if (!isActiveAndEnabled) return FailInitialization("The paint presentation is disabled.");
             if (network == null || target == null || network.target != target
@@ -221,20 +228,39 @@ namespace C6Lab
             EnsureTexture(source);
             string currentSession = network != null ? network.Snapshot?.sessionId : null;
             uint currentRound = network != null && network.Snapshot != null ? network.Snapshot.round : 0u;
-            if (!force && hasUploadedSurface && uploadedSurface == source && uploadedRevision == source.Revision
-                && uploadedSession == currentSession && uploadedRound == currentRound) return;
-            source.CopyPixels(uploadPixels);
-            paintTexture.SetPixels32(uploadPixels);
-            paintTexture.Apply(false, false);
+            bool uploadMap = force || !hasUploadedSurface || uploadedSurface != source
+                || uploadedRevision != source.Revision || uploadedSession != currentSession || uploadedRound != currentRound;
+            LabConfig config = network != null ? network.config : null;
+            bool grainEnabled = config != null && config.PaintGrainEnabled;
+            float grainSize = config != null ? config.PaintGrainSize : 1f;
+            float grainStrength = config != null ? config.PaintGrainStrength : .3f;
+            float mottleStrength = config != null ? config.PaintMottleStrength : .18f;
+            bool grainChanged = !grainSettingsApplied || appliedGrainEnabled != grainEnabled
+                || appliedGrainSize != grainSize || appliedGrainStrength != grainStrength
+                || appliedMottleStrength != mottleStrength;
+            if (!uploadMap && !grainChanged) return;
             if (block == null) block = new MaterialPropertyBlock();
             shell.GetPropertyBlock(block);
-            block.SetTexture("_PaintMap", paintTexture);
-            block.SetFloat("_PaintMapReady", 1f);
+            if (uploadMap)
+            {
+                source.CopyPixels(uploadPixels);
+                paintTexture.SetPixels32(uploadPixels);
+                paintTexture.Apply(false, false);
+                block.SetTexture("_PaintMap", paintTexture);
+                block.SetFloat("_PaintMapReady", 1f);
+                uploadedSurface = source;
+                uploadedRevision = source.Revision;
+                uploadedSession = currentSession; uploadedRound = currentRound;
+                hasUploadedSurface = true;
+            }
+            block.SetFloat("_PaintGrainEnabled", grainEnabled ? 1f : 0f);
+            block.SetFloat("_PaintGrainSize", grainSize);
+            block.SetFloat("_PaintGrainStrength", grainStrength);
+            block.SetFloat("_PaintMottleStrength", mottleStrength);
             shell.SetPropertyBlock(block);
-            uploadedSurface = source;
-            uploadedRevision = source.Revision;
-            uploadedSession = currentSession; uploadedRound = currentRound;
-            hasUploadedSurface = true;
+            appliedGrainEnabled = grainEnabled; appliedGrainSize = grainSize;
+            appliedGrainStrength = grainStrength; appliedMottleStrength = mottleStrength;
+            grainSettingsApplied = true;
         }
 
         private void EnsureTexture(LabPaintSurface source)
@@ -248,6 +274,7 @@ namespace C6Lab
                 filterMode = FilterMode.Point, wrapModeU = TextureWrapMode.Repeat, wrapModeV = TextureWrapMode.Clamp
             };
             hasUploadedSurface = false;
+            grainSettingsApplied = false;
         }
 
         private void ReleasePresentation()

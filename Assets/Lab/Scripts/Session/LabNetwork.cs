@@ -165,7 +165,8 @@ namespace C6Lab
         // #187: six growth settings, fixed 100% target, authoritative cell transactions.
         // #190: Arc/Straight profile adds seven settings; preserve viewer field 111; reject older 112-field peers.
         // 5632: Host-shared side-hit swing tuning for the exposed gourd underside.
-        internal const ushort LabProtocolVersion = 5632;
+        // 5633: Host-shared experimental paint grain presentation (four appended values).
+        internal const ushort LabProtocolVersion = 5633;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/10");
