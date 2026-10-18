@@ -22,7 +22,7 @@
 | Paint Fill Chance (%) | 110번째 · 인덱스 109 | 60 | 0–100% | 이웃이 둘 이상 칠해진 빈 셀을 우선 채울 확률. 해당 후보가 없으면 다른 인접 후보로 진행한다. |
 | Paint Vertical Weight | 111번째 · 인덱스 110 | 1.35 | 1–4 | 세로 방향 인접 후보의 선택 가중치. 1은 가로와 같은 가중치다. |
 
-옛 에셋의 직렬화 목표 80은 `PaintVictoryPercent`·`CaptureDeveloperValues`에서 100으로 정규화한다. DEV/공유 설정으로 100 외 목표를 보내면 전체 설정을 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**로 나머지 설정과 함께 검증·적용한다. 새 판의 Rules는 `PaintGrowthSettings` 복사본을 캡처하므로 Inspector·입력칸만 바꿔 진행 중인 판에 적용하지 않는다. 현재 공유 설정은 총 **141개**(#201 추임새 2개 포함), 프로토콜은 **5635**, 연결 토큰은 `C6PhysicsLab/10`이며 모든 참가자가 같은 새 버전을 사용해야 한다.
+옛 에셋의 직렬화 목표 80은 `PaintVictoryPercent`·`CaptureDeveloperValues`에서 100으로 정규화한다. DEV/공유 설정으로 100 외 목표를 보내면 전체 설정을 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**로 나머지 설정과 함께 검증·적용한다. 새 판의 Rules는 `PaintGrowthSettings` 복사본을 캡처하므로 Inspector·입력칸만 바꿔 진행 중인 판에 적용하지 않는다. 현재 패턴 실험의 공유 설정은 총 **142개**, 프로토콜은 **5636**, 연결 토큰은 `C6PhysicsLab/11`이며 모든 참가자가 같은 새 버전을 사용해야 한다.
 
 ## 실제 명중과 공동 승리
 
@@ -42,7 +42,7 @@
 | --- | --- | --- | --- | --- |
 | Completed Gourd Viewer (0 off, 1 on) | 112번째 · 인덱스 111 · Gourd | OFF(0) | 정수 0–1 | Host가 전원의 관람 허용을 공유한다. 열기·회전·확대/축소는 각자 로컬에서 한다. |
 
-`LabConfig.CompletedGourdViewerEnabled`는 단일 원본의 bool이며 저장 필드가 없는 에셋도 false다. 기존 0~110번과 111번째 `Paint Vertical Weight`를 보존한다. 141개 배열 전체를 검증하므로 잘못된 bool 입력과 구형 140개 이하 배열은 원자적으로 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 기존 지문·참가자 확인 응답과 함께 적용한다. 진행 중인 판에 즉시 바꾸지 않는다. 일반 Release 참가자도 Host 허용값을 따르며 관람에 별도 Debug·실행 인자·Editor 메뉴 조건을 요구하지 않는다.
+`LabConfig.CompletedGourdViewerEnabled`는 단일 원본의 bool이며 저장 필드가 없는 에셋도 false다. 기존 0~110번과 111번째 `Paint Vertical Weight`를 보존한다. 142개 배열 전체를 검증하므로 잘못된 bool 입력과 구형 141개 이하 배열은 원자적으로 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 기존 지문·참가자 확인 응답과 함께 적용한다. 진행 중인 판에 즉시 바꾸지 않는다. 일반 Release 참가자도 Host 허용값을 따르며 관람에 별도 Debug·실행 인자·Editor 메뉴 조건을 요구하지 않는다.
 
 ON인 Paint **100% Victory**에서 Snapshot과 공개 표시 맵의 세션·라운드·해상도·Revision·칠한/전체 셀 수·명중 수가 일치해야 관람 버튼이 나타난다. Crack·Defeat·분할 수신 중 맵에는 나타나지 않는다. 필요한 결과에서 `Assets/Lab/Resources/GourdResultViewer/ViewerUI.prefab`을 불러오며 드래그 회전·핀치/마우스 휠 확대·축소·**RESET VIEW**는 각자 화면에만 적용한다. 불투명 모달은 아래 결과 버튼 입력을 막는다.
 
@@ -64,11 +64,11 @@ ON인 Paint **100% Victory**에서 Snapshot과 공개 표시 맵의 세션·라�
 
 ## Host/Client와 수정 지점
 
-라운드 시작 시 Host가 오행 재질 색(`_BaseColor`→`_Color`→공통 팔레트)을 캡처한다. 기본색은 화=빨강·수=파랑·목=초록·금=노랑·토=갈색이다. 승인 피격 신호의 방향과 RGBA는 피격 표현에 쓰며 Client에서 `RegisterHit`·`Advance`를 재생하지 않는다.
+라운드 시작 시 Host가 물감 전용 `LabPaintPalette.ColorFor`를 캡처한다. 작성용 sRGB는 화=#D85736·수=#1471A7·목=#3D8258·금=#F8B72A·토=#6F4A32이며 linear 지도에 맞춰 변환한다. 구슬 재질과 분리되어 있다. 승인 피격 신호의 방향과 RGBA는 피격 표현에 쓰며 Client에서 `RegisterHit`·`Advance`를 재생하지 않는다.
 
 Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 Host의 전투 시간 진행에서만 한다. Host 화면도 현재 Snapshot과 같은 버전의 `LabNetwork.PaintSurface` 표시 캐시를 사용해 맵과 HUD를 함께 반영한다. Client는 승인 명중 방향을 재생해 성장시키지 않고 Host가 보낸 셀 변경(delta) 또는 전체 체크포인트를 별도 수신 맵에 적용한다. 분할 수신 중에는 기존 공개 표시 캐시를 유지하고, 완성된 맵의 세션·라운드·해상도·Revision·칠한 셀 수·전체 셀 수·명중 수가 Snapshot 메타데이터와 모두 맞을 때 맵과 HUD를 함께 공개한다. 픽셀이 그대로인 반복 명중도 명중 수가 바뀌면 빈 delta를 발행한다.
 
-전송은 프로토콜 **5632**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID와 RGBA를 담은 delta보다 전체 맵이 작으면 전체 맵을 보낸다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송한다. 최대 해상도 전체 RGBA 맵은 131,072바이트이고 base64 174,764자를 43개로 나눈다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체한다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청한다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가한다.
+전송은 프로토콜 **5636**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID와 RGBA를 담은 delta보다 전체 맵이 작으면 전체 맵을 보낸다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송한다. 최대 해상도 전체 RGBA 맵은 131,072바이트이고 base64 174,764자를 43개로 나눈다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체한다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청한다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가한다.
 
 이 복구는 **현재 라운드에 계속 연결된 Client의 부분 맵 누락**을 복원하는 기능이다. 연결이 끊어진 뒤 전투에 재접속하는 기능은 포함하지 않는다. 실제 다중 앱·기기에서의 전송과 화면 일치는 자동 패킷 fixture와 구분해 검증한다.
 
@@ -76,7 +76,7 @@ Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 
 | --- | --- |
 | `Core/LabPaintSurface.cs` — `Reset`, `RegisterHit`, `Advance`, `CopyPixels`, `TryReplacePixels` | Host 인접 성장·FIFO/병합·정수 진행도·Replica 원자적 교체 |
 | `Core/LabModel.cs` — `ConfirmHit`, `TryAdvance`, `PaintSurface`, `PaintColorFor` | Host 명중·보상·100% 승리·시간 경계·마지막 셀 기여자·라운드 팔레트 |
-| `Core/LabConfig.cs` — `PaintVictoryPercent`, `PaintGrowthSettings`, `CompletedGourdViewerEnabled` | 단일 설정 원본·총 129개·DEV 고정 87번·성장 105~110번·관람 111번·새 판 설정 복사 |
+| `Core/LabConfig.cs` — `PaintVictoryPercent`, `PaintGrowthSettings`, `CompletedGourdViewerEnabled` | 단일 설정 원본·총 142개·DEV 고정 87번·성장 105~110번·관람 111번·새 판 설정 복사 |
 | `Session/LabPaintReplication.cs` — `LabPaintPublisher`, `LabPaintReceiver` | 셀 delta·체크포인트·분할/검증·기준 맵 복구·Snapshot 메타데이터 일치 |
 | `Session/LabNetwork.cs` — `PaintSurface`, Snapshot 공개 경로 | Host/Client의 표시 캐시와 HUD 동시 반영·새 판/로비 초기화 |
 | `Throw/LabGourdPaint.cs` — `Attach`, `ApplyMode`, `Surface`, `PaintTexture` | 외형 선택·안전 초기화·공개 맵 텍스처 표시. 모델 진행도를 지우지 않음 |
@@ -93,6 +93,11 @@ Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 
 
 ## Experiment #198 — 번짐·흐름 성장
 
-기본 성장 ORIGINAL을 보존하며 DEV → Gourd → Paint Growth Style을 SPREAD + FLOW로 바꾸면 연결된 비대칭 초기 얼룩과 아래 방향의 지속 꼬리를 사용한다. 불규칙도·흐름 선택 확률·구면 각거리 폭/길이·중력 우대는 인덱스134~138이다. 초기/반복 명중 면적과 시간당 성장량은 기존 단일 예산을 쓰며, 흐름의 폭을 채우는 셀도 예산을 소비한다. 막힌 꼬리·바닥·최대 길이는 일반 경계 확장으로 돌아가 마지막 셀까지 도달한다. 원래 색을 덮거나 혼합하지 않는다.
+LEGACY의 기존 성장 ORIGINAL을 보존하며 DEV → Gourd → Paint Pattern을 LEGACY로 고른 뒤 Paint Growth Style을 SPREAD + FLOW로 바꾸면 연결된 비대칭 초기 얼룩과 아래 방향의 지속 꼬리를 사용한다. 불규칙도·흐름 선택 확률·구면 각거리 폭/길이·중력 우대는 인덱스134~138이다. 초기/반복 명중 면적과 시간당 성장량은 기존 단일 예산을 쓰며, 흐름의 폭을 채우는 셀도 예산을 소비한다. 막힌 꼬리·바닥·최대 길이는 일반 경계 확장으로 돌아가 마지막 셀까지 도달한다. 원래 색을 덮거나 혼합하지 않는다.
 
-Host가 전투 프레임 경계에서 월드 아래를 `VisualMount` 로컬 방향으로 변환해 다음 성장 구간에 적용한다. 기존 도색은 박에 고정되고, Client는 Host RGBA 지도를 받아 표시한다. 새 입력마다 방향을 다시 뽑지 않으며, 서로 다른 FPS의 독립 시뮬레이션이 같은 지도를 만든다고 보장하지 않는다. Paint Grain과는 독립 설정이다. 사용자 승인으로 main에 포함하며 기본 성장 방식 ORIGINAL은 유지한다. 실제 실행 범위는 `docs/VALIDATION.md`의 #198 기록을 따른다.
+Host가 전투 프레임 경계에서 월드 아래를 `VisualMount` 로컬 방향으로 변환해 다음 성장 구간에 적용한다. 기존 도색은 박에 고정되고, Client는 Host RGBA 지도를 받아 표시한다. 새 입력마다 방향을 다시 뽑지 않으며, 서로 다른 FPS의 독립 시뮬레이션이 같은 지도를 만든다고 보장하지 않는다. Paint Grain과는 독립 설정이다. 사용자 승인으로 main에 포함하며 LEGACY 하위의 ORIGINAL을 유지하며 새 패턴 기본값은 SPLATTER다. 실제 실행 범위는 `docs/VALIDATION.md`의 #198 기록을 따른다.
+
+
+## Experiment #200 후속 — 실제 명중 패턴4종
+
+DEV → Gourd → Paint Pattern의 LEGACY/BROAD/SPLATTER/FLOW를 새 판에 적용한다. 기본은 첨부 Splatter다. 최초의 독립 튀김점도 같은 초기 예산을 쓰는 실제 불투명 셀이며, 각 연결 성분을 별도 관리하고 반복 명중은 맞은 연결 성분에만 공급한다. 새 Resources 마스크를 최초 명중 때 읽으며 MonoBehaviour 필드 초기화/직렬화에서는 Resources.Load를 호출하지 않는다. 세부 동작·파일 지도·실제 렌더 및 검증 범위는 `docs/PAINT_PATTERN_RUNTIME.md`·`docs/VALIDATION.md`를 따른다.

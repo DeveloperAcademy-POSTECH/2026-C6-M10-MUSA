@@ -11,7 +11,7 @@ namespace C6Lab.Tests
     public sealed class LabPaintSpreadFlowTests
     {
         private static LabPaintGrowthSettings Settings(int resolution = 0) => new LabPaintGrowthSettings
-        {
+        { Pattern = LabPaintPattern.Legacy,
             Resolution = resolution, Style = 1, InitialPercent = 2f, RepeatPercent = 37f,
             GrowthPercentPerSecond = 6f, Raggedness = .55f, FlowRatio = .35f,
             DripWidthDegrees = 3f, DripLengthDegrees = 60f, GravityWeight = 3f
@@ -24,7 +24,7 @@ namespace C6Lab.Tests
         [TestCase(2, "6e4a8fca6a46d335e91ef789e80e1891dc35df6a59513a0553d234a37dfa3b23")]
         public void OriginalStylePreservesTheHistoricalMainMapHashAtEveryResolution(int resolution, string expectedHash)
         {
-            var surface = new LabPaintSurface(new LabPaintGrowthSettings { Resolution = resolution, Style = 0 }, 198u);
+            var surface = new LabPaintSurface(new LabPaintGrowthSettings { Pattern = LabPaintPattern.Legacy, Resolution = resolution, Style = 0 }, 198u);
             for (int i = 0; i < 8; i++)
             {
                 Vector3 point = new Vector3(Mathf.Sin(i * 1.7f), .6f - i * .17f, Mathf.Cos(i * 1.7f));

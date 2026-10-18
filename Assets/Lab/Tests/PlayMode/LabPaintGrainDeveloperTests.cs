@@ -25,8 +25,8 @@ namespace C6Lab.Tests
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(141));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(141));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(142));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(142));
         }
 
         [UnityTearDown]

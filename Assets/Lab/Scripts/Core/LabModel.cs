@@ -864,9 +864,7 @@ namespace C6Lab
                 DrumStopChances = config.DrumStopChances();
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];
                 for (int i = (int)LabOrbElement.Fire; i <= (int)LabOrbElement.Earth; i++)
-                    PaintColors[i] = config.OrbAppearance != null
-                        ? config.OrbAppearance.ElementColorFor((LabOrbElement)i)
-                        : LabOrbAppearance.DefaultElementColor((LabOrbElement)i);
+                    PaintColors[i] = LabPaintPalette.ColorFor((LabOrbElement)i);
                 PlayerMaxHp = config.PlayerMaxHp;
                 PotionHeal = config.PotionHeal;
                 RelayDoubleMultiplier = config.RelayDoubleMultiplier;

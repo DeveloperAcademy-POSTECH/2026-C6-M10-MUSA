@@ -1,0 +1,30 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="LabPaintStyleComparison.uss" />
+    <ui:VisualElement class="paint-study">
+        <ui:Label text="Gourd Paint · Three Style Study" class="paint-study-title" />
+        <ui:Label text="EDITOR FIXTURE ONLY — This compares prepared paint maps on the actual saved gourd. It does not run hits, Host growth, progress or victory. All panels share one camera, seed and stage." class="paint-study-note" />
+        <ui:VisualElement name="controls" class="paint-study-controls" />
+        <ui:VisualElement class="paint-study-actions">
+            <ui:Button name="resetView" text="Reset View" class="paint-study-action" />
+            <ui:Button name="exportPng" text="Export PNG…" class="paint-study-action" />
+        </ui:VisualElement>
+        <ui:VisualElement class="paint-study-panels">
+            <ui:VisualElement class="paint-study-panel">
+                <ui:Label text="BROAD / 넓은 얼룩형" class="paint-study-heading" />
+                <ui:Image name="broadImage" class="paint-study-image" />
+                <ui:Label name="broadCount" class="paint-study-count" />
+            </ui:VisualElement>
+            <ui:VisualElement class="paint-study-panel">
+                <ui:Label text="SPLATTER / 튀긴 물감형" class="paint-study-heading" />
+                <ui:Image name="splatterImage" class="paint-study-image" />
+                <ui:Label name="splatterCount" class="paint-study-count" />
+            </ui:VisualElement>
+            <ui:VisualElement class="paint-study-panel">
+                <ui:Label text="FLOW / 흐르는 물감형" class="paint-study-heading" />
+                <ui:Image name="flowImage" class="paint-study-image" />
+                <ui:Label name="flowCount" class="paint-study-count" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:Label name="status" class="paint-study-status" />
+    </ui:VisualElement>
+</ui:UXML>

@@ -34,8 +34,8 @@ namespace C6Lab.Tests
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             testedNetwork = ui.network;
             Assert.That(testedNetwork, Is.Not.Null);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(141));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(141));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(142));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(142));
             savedValues = ui.sourceConfig.CaptureDeveloperValues();
             savedJson = JsonUtility.ToJson(ui.sourceConfig);
         }

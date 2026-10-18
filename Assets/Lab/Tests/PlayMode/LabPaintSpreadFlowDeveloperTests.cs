@@ -25,8 +25,8 @@ namespace C6Lab.Tests
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(141));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(141));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(142));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(142));
         }
 
         [UnityTearDown]
@@ -51,6 +51,7 @@ namespace C6Lab.Tests
             for (int index = 133; index <= 138; index++)
                 Assert.That(ui.valueInputs[index].transform.parent.gameObject.activeSelf, Is.False);
             category.onClick.Invoke();
+            ui.valueInputs[139].text = "0"; // Explicitly test the preserved LEGACY submode.
             Button toggle = ui.valueInputs[133].transform.parent.Find("SettingSlider/SettingToggle").GetComponent<Button>();
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("ORIGINAL"));
             Assert.That(ui.valueInputs[133].gameObject.activeSelf, Is.False);
@@ -100,7 +101,7 @@ namespace C6Lab.Tests
         public IEnumerator SoloRestartAppliesSpreadFlowThenReturnsToOriginalWithoutChangingTheSourceAsset()
         {
             ui.network.port = 19198;
-            ui.Open();
+            ui.Open(); ui.valueInputs[139].text = "0";
             string[] profile = { "1", "0.8", "0.6", "5", "100", "6" };
             for (int index = 133; index <= 138; index++) ui.valueInputs[index].text = profile[index - 133];
             ui.applyStartButton.onClick.Invoke();

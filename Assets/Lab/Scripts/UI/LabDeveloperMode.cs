@@ -75,6 +75,7 @@ namespace C6Lab
             }
             BuildCategoryLayout();
             BuildToggles();
+            BuildChoices();
 
             if (toggleButton != null) toggleButton.onClick.AddListener(Open);
             if (closeButton != null) closeButton.onClick.AddListener(Close);
@@ -455,7 +456,7 @@ namespace C6Lab
                     valueSliders[i].SetValueWithoutNotify(LabDeveloperSliderScale.Normalize(
                         LabConfig.DeveloperFields[i], defaultValues[i], values[i]));
             }
-            RefreshThrowFormInputs();
+            RefreshToggles();
         }
 
         private void SyncSliderFromInput(int index, string raw)
@@ -464,7 +465,7 @@ namespace C6Lab
             LabDeveloperField field = LabConfig.DeveloperFields[index];
             if (float.IsNaN(value) || float.IsInfinity(value) || value < field.Min || value > field.Max) return;
             valueSliders[index].SetValueWithoutNotify(LabDeveloperSliderScale.Normalize(field, defaultValues[index], value));
-            if (index == 112) RefreshThrowFormInputs();
+            if (index == 112 || index == 139) RefreshToggles();
         }
 
         private void SyncInputFromSlider(int index, float position)
@@ -473,7 +474,7 @@ namespace C6Lab
             float value = LabDeveloperSliderScale.Denormalize(field, defaultValues[index], position);
             if (field.WholeNumber) value = Mathf.Round(value);
             valueInputs[index].SetTextWithoutNotify(value.ToString("0.######", CultureInfo.InvariantCulture));
-            if (index == 112) RefreshThrowFormInputs();
+            if (index == 112 || index == 139) RefreshToggles();
         }
 
         // 0/1 항목(켜기/끄기, 박 모드)은 숫자 입력칸·슬라이더 대신 누를 때마다 바뀌는 버튼으로 보여준다.
@@ -536,11 +537,114 @@ namespace C6Lab
             RefreshToggles();
         }
 
+        private const int PaintPatternField = 139;
+        private const int LegacyGrowthField = 133;
+        private Button[][] choiceButtons;
+
+        /// <summary>Four named buttons replace the pattern's numeric input and slider.</summary>
+        private void BuildChoices()
+        {
+            choiceButtons = new Button[LabConfig.DeveloperFields.Count][];
+            for (int i = 0; i < choiceButtons.Length; i++)
+            {
+                LabDeveloperField field = LabConfig.DeveloperFields[i];
+                if (!field.IsChoice) continue;
+                Transform row = valueInputs[i].transform.parent;
+                Text rowLabel = row.Find("SettingLabel")?.GetComponent<Text>();
+                valueInputs[i].gameObject.SetActive(false);
+                Slider slider = valueSliders[i];
+                slider.interactable = false;
+                foreach (Transform part in slider.transform) part.gameObject.SetActive(false);
+                LayoutElement rowLayout = row.GetComponent<LayoutElement>();
+                if (rowLayout != null) rowLayout.preferredHeight = 82f;
+                LayoutElement sliderLayout = slider.GetComponent<LayoutElement>();
+                if (sliderLayout != null) sliderLayout.preferredHeight = 76f;
+
+                var container = new GameObject("SettingChoices", typeof(RectTransform));
+                container.layer = slider.gameObject.layer;
+                RectTransform containerRect = (RectTransform)container.transform;
+                containerRect.SetParent(slider.transform, false);
+                containerRect.anchorMin = Vector2.zero;
+                containerRect.anchorMax = Vector2.one;
+                containerRect.offsetMin = containerRect.offsetMax = Vector2.zero;
+                choiceButtons[i] = new Button[field.Choices.Count];
+                for (int option = 0; option < field.Choices.Count; option++)
+                {
+                    var go = new GameObject("Choice" + option, typeof(RectTransform), typeof(Image), typeof(Button));
+                    go.layer = container.layer;
+                    RectTransform rect = (RectTransform)go.transform;
+                    rect.SetParent(containerRect, false);
+                    // Two columns keep all four names readable on the narrow mobile panel.
+                    float x = (option % 2) * .5f;
+                    float y = 1f - ((option / 2) + 1) * .5f;
+                    rect.anchorMin = new Vector2(x, y);
+                    rect.anchorMax = new Vector2(x + .5f, y + .5f);
+                    rect.offsetMin = new Vector2(3f, 2f);
+                    rect.offsetMax = new Vector2(-3f, -2f);
+                    var textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+                    textGo.layer = go.layer;
+                    RectTransform textRect = (RectTransform)textGo.transform;
+                    textRect.SetParent(rect, false);
+                    textRect.anchorMin = Vector2.zero;
+                    textRect.anchorMax = Vector2.one;
+                    textRect.offsetMin = textRect.offsetMax = Vector2.zero;
+                    Text text = textGo.GetComponent<Text>();
+                    text.font = rowLabel != null ? rowLabel.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                    text.fontSize = 11;
+                    text.fontStyle = FontStyle.Bold;
+                    text.alignment = TextAnchor.MiddleCenter;
+                    text.color = Color.white;
+                    text.raycastTarget = false;
+                    text.text = field.Choices[option];
+                    Button button = go.GetComponent<Button>();
+                    button.targetGraphic = go.GetComponent<Image>();
+                    int fieldIndex = i, selected = option;
+                    button.onClick.AddListener(() => SelectChoice(fieldIndex, selected));
+                    choiceButtons[i][option] = button;
+                }
+            }
+            RefreshChoices();
+        }
+
+        private void SelectChoice(int index, int selected)
+        {
+            LabDeveloperField field = LabConfig.DeveloperFields[index];
+            if (!field.IsChoice || selected < 0 || selected >= field.Choices.Count) return;
+            valueInputs[index].text = selected.ToString(CultureInfo.InvariantCulture);
+            RefreshToggles();
+        }
+
+        private void RefreshChoices()
+        {
+            if (choiceButtons == null) return;
+            bool canEdit = network != null && (network.CanChooseConnection || network.IsDeveloperSolo
+                || HostLobby || HostPausedBattle);
+            for (int i = 0; i < choiceButtons.Length; i++)
+            {
+                if (choiceButtons[i] == null) continue;
+                int selected = TryParse(valueInputs[i].text, out float value) ? Mathf.RoundToInt(value) : -1;
+                for (int option = 0; option < choiceButtons[i].Length; option++)
+                {
+                    Button button = choiceButtons[i][option];
+                    button.interactable = canEdit;
+                    ((Image)button.targetGraphic).color = option == selected ? ToggleOnColor : ToggleOffColor;
+                }
+            }
+            if (valueInputs.Length <= PaintPatternField || toggleButtons == null) return;
+            bool legacy = TryParse(valueInputs[PaintPatternField].text, out float pattern)
+                && pattern == (float)LabPaintPattern.Legacy;
+            if (toggleButtons[LegacyGrowthField] != null)
+                toggleButtons[LegacyGrowthField].interactable = canEdit && legacy;
+        }
+
         private static bool ToggleIsOn(InputField input) =>
             input != null && TryParse(input.text, out float value) && value >= .5f;
 
         private void FlipToggle(int index)
         {
+            if (index == LegacyGrowthField && valueInputs.Length > PaintPatternField
+                && (!TryParse(valueInputs[PaintPatternField].text, out float pattern)
+                    || pattern != (float)LabPaintPattern.Legacy)) return;
             InputField input = valueInputs[index];
             if (input == null) return;
             input.text = ToggleIsOn(input) ? "0" : "1";
@@ -563,6 +667,7 @@ namespace C6Lab
                 if (image.color != color) image.color = color;
             }
             RefreshThrowFormInputs();
+            RefreshChoices();
         }
 
         // Read the uncommitted form value so ARC/STRAIGHT immediately enables its own controls.

@@ -175,7 +175,7 @@ namespace C6Lab.Tests
         public void FiniteBudgetStopsAndIdleTimeCannotBeSavedForTheNextHit()
         {
             var settings = new LabPaintGrowthSettings
-            {
+            { Pattern = LabPaintPattern.Legacy,
                 Resolution = 0, InitialPercent = .1f, RepeatPercent = .1f, GrowthPercentPerSecond = 1
             };
             var surface = new LabPaintSurface(settings, 91);
@@ -202,7 +202,7 @@ namespace C6Lab.Tests
         public void FractionCrossingUsesTheCompletingSupplyColorAndNeverRepaintsOldCells()
         {
             var surface = new LabPaintSurface(new LabPaintGrowthSettings
-            { Resolution = 0, InitialPercent = .1f, RepeatPercent = .1f }, 101);
+            { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = .1f, RepeatPercent = .1f }, 101);
             surface.RegisterHit(Vector3.forward, Color.red, 1);
             Color32[] first = GrowthPixels(surface);
             surface.RegisterHit(Vector3.forward, Color.blue, 2);
@@ -220,7 +220,7 @@ namespace C6Lab.Tests
         public void TimePartitionAndSeedProduceIdenticalPixelsAndResidualCredit()
         {
             var settings = new LabPaintGrowthSettings
-            { Resolution = 0, InitialPercent = 2, RepeatPercent = 37, GrowthPercentPerSecond = 6 };
+            { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = 2, RepeatPercent = 37, GrowthPercentPerSecond = 6 };
             var whole = new LabPaintSurface(settings, 729);
             var pieces = new LabPaintSurface(settings, 729);
             foreach (var surface in new[] { whole, pieces })
@@ -243,7 +243,7 @@ namespace C6Lab.Tests
         public void SeveralRegionsShareOneGlobalRateAndBothReceiveGrowth()
         {
             var surface = new LabPaintSurface(new LabPaintGrowthSettings
-            { Resolution = 0, InitialPercent = .1f, RepeatPercent = 10, GrowthPercentPerSecond = 1 }, 23);
+            { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = .1f, RepeatPercent = 10, GrowthPercentPerSecond = 1 }, 23);
             surface.RegisterHit(Vector3.forward, Color.red, 1);
             surface.RegisterHit(Vector3.back, Color.blue, 2);
             surface.RegisterHit(Vector3.forward, Color.red, 1);
@@ -259,7 +259,7 @@ namespace C6Lab.Tests
         [Test]
         public void LongitudeSeamConnectsButNorthAndSouthCapsDoNotWrapToEachOther()
         {
-            var settings = new LabPaintGrowthSettings { Resolution = 0, InitialPercent = .1f };
+            var settings = new LabPaintGrowthSettings { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = .1f };
             var seam = new LabPaintSurface(settings, 17);
             seam.RegisterHit(CellDirection(0, 16, 64, 32), Color.red, 1);
             seam.RegisterHit(CellDirection(63, 16, 64, 32), Color.blue, 2);
@@ -279,7 +279,7 @@ namespace C6Lab.Tests
         public void MeetingRegionsMergeBudgetsWithoutOverwritingEitherColor()
         {
             var surface = new LabPaintSurface(new LabPaintGrowthSettings
-            { Resolution = 0, InitialPercent = .1f, RepeatPercent = 100, GrowthPercentPerSecond = 100 }, 77);
+            { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = .1f, RepeatPercent = 100, GrowthPercentPerSecond = 100 }, 77);
             surface.RegisterHit(Vector3.forward, Color.red, 1);
             surface.RegisterHit(Vector3.back, Color.blue, 2);
             Color32[] before = GrowthPixels(surface);
@@ -297,7 +297,7 @@ namespace C6Lab.Tests
         public void AnEnclosedInteriorHoleRemainsOnTheGrowthFrontierAndGetsFilled()
         {
             var surface = new LabPaintSurface(new LabPaintGrowthSettings
-            {
+            { Pattern = LabPaintPattern.Legacy,
                 Resolution = 0, InitialPercent = .1f, RepeatPercent = 100,
                 GrowthPercentPerSecond = 100, FillChancePercent = 100
             }, 33);
@@ -327,7 +327,7 @@ namespace C6Lab.Tests
             for (uint seed = 1; seed <= 12; seed++)
             {
                 var surface = new LabPaintSurface(new LabPaintGrowthSettings
-                {
+                { Pattern = LabPaintPattern.Legacy,
                     Resolution = 0, InitialPercent = .1f, RepeatPercent = 100,
                     GrowthPercentPerSecond = 100, FillChancePercent = seed % 2 == 0 ? 100 : 0,
                     VerticalWeight = seed % 3 + 1
@@ -357,7 +357,7 @@ namespace C6Lab.Tests
         public void InitialAndTimedAreaPercentAreIndependentOfResolutionWithinOneCell(int resolution)
         {
             var surface = new LabPaintSurface(new LabPaintGrowthSettings
-            { Resolution = resolution, InitialPercent = 2, RepeatPercent = 10, GrowthPercentPerSecond = 3 }, 5);
+            { Pattern = LabPaintPattern.Legacy, Resolution = resolution, InitialPercent = 2, RepeatPercent = 10, GrowthPercentPerSecond = 3 }, 5);
             surface.RegisterHit(Vector3.forward, Color.red, 1);
             Assert.That(Math.Abs(surface.Coverage - .02d), Is.LessThanOrEqualTo(1d / surface.CellCount));
             int initial = surface.CoveredCount;
@@ -371,9 +371,9 @@ namespace C6Lab.Tests
         public void VerticalWeightChangesTheShapeWhileHorizontalGrowthRemainsPossible()
         {
             var horizontal = new LabPaintSurface(new LabPaintGrowthSettings
-            { Resolution = 0, InitialPercent = 2, VerticalWeight = 1, FillChancePercent = 0 }, 848);
+            { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = 2, VerticalWeight = 1, FillChancePercent = 0 }, 848);
             var vertical = new LabPaintSurface(new LabPaintGrowthSettings
-            { Resolution = 0, InitialPercent = 2, VerticalWeight = 100, FillChancePercent = 0 }, 848);
+            { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = 2, VerticalWeight = 100, FillChancePercent = 0 }, 848);
             horizontal.RegisterHit(Vector3.forward, Color.red, 1);
             vertical.RegisterHit(Vector3.forward, Color.red, 1);
             Assert.That(GrowthPixels(vertical), Is.Not.EqualTo(GrowthPixels(horizontal)));
@@ -394,7 +394,7 @@ namespace C6Lab.Tests
         public void ExactFinalCellCanBeDeferredAtAnExclusiveDeadline()
         {
             var settings = new LabPaintGrowthSettings
-            { Resolution = 0, InitialPercent = 50, RepeatPercent = 50, GrowthPercentPerSecond = 50 };
+            { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = 50, RepeatPercent = 50, GrowthPercentPerSecond = 50 };
             var exclusive = new LabPaintSurface(settings, 331);
             var inclusive = new LabPaintSurface(settings, 331);
             foreach (var surface in new[] { exclusive, inclusive })
@@ -415,7 +415,7 @@ namespace C6Lab.Tests
         [Test]
         public void InitialWholeSurfaceCompletesImmediatelyWithOpaqueCells()
         {
-            var surface = new LabPaintSurface(new LabPaintGrowthSettings { Resolution = 0, InitialPercent = 100 }, 4);
+            var surface = new LabPaintSurface(new LabPaintGrowthSettings { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = 100 }, 4);
             surface.RegisterHit(Vector3.up, new Color(.2f, .3f, .4f, .01f), 80);
             Assert.That(surface.IsComplete, Is.True);
             Assert.That(surface.LastPainter, Is.EqualTo(80));
@@ -465,7 +465,7 @@ namespace C6Lab.Tests
             Assert.That(surface.RegisterHit(Vector3.back, Color.clear, 2), Is.False);
             Assert.Throws<ArgumentOutOfRangeException>(() => surface.Advance(double.NaN));
             Assert.Throws<ArgumentOutOfRangeException>(() => surface.Advance(-1));
-            Assert.Throws<ArgumentOutOfRangeException>(() => surface.Reset(new LabPaintGrowthSettings { Resolution = 3 }, 1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => surface.Reset(new LabPaintGrowthSettings { Pattern = LabPaintPattern.Legacy, Resolution = 3 }, 1));
             Assert.That(surface.Revision, Is.EqualTo(revision));
             Assert.That(surface.PendingCoverage, Is.EqualTo(pending));
             Assert.That(surface.PaintCount, Is.EqualTo(count));
@@ -473,7 +473,7 @@ namespace C6Lab.Tests
         }
 
         private static LabPaintSurface Growth(int resolution) => new LabPaintSurface(
-            new LabPaintGrowthSettings { Resolution = resolution }, 333);
+            new LabPaintGrowthSettings { Pattern = LabPaintPattern.Legacy, Resolution = resolution }, 333);
 
         private static Vector3 CellDirection(int x, int y, int columns, int rows)
         {
