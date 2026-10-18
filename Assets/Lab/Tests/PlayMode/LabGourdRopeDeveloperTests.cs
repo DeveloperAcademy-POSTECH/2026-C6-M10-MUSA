@@ -34,8 +34,8 @@ namespace C6Lab.Tests
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             testedNetwork = ui.network;
             Assert.That(testedNetwork, Is.Not.Null);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(133));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(133));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(139));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(139));
             savedValues = ui.sourceConfig.CaptureDeveloperValues();
             savedJson = JsonUtility.ToJson(ui.sourceConfig);
         }
@@ -106,6 +106,13 @@ namespace C6Lab.Tests
                 yield return null;
                 scroll.StopMovement();
             }
+            Rebuild(scroll);
+            // The rope group is followed by newer Gourd controls. Bring the tested rope
+            // input into view explicitly instead of relying on it being the final row.
+            var lastRopeInput = (RectTransform)ui.valueInputs[128].transform;
+            Vector3 ropeCenter = scroll.viewport.InverseTransformPoint(lastRopeInput.TransformPoint(lastRopeInput.rect.center));
+            scroll.content.anchoredPosition += Vector2.up * (scroll.viewport.rect.center.y - ropeCenter.y);
+            scroll.StopMovement();
             Rebuild(scroll);
             Assert.That(RowCenterIsVisible(scroll, 128), Is.True,
                 "The Gourd expansion must resize Content so the last row can enter the masked viewport.");

@@ -177,6 +177,19 @@ namespace C6Lab
             if (!TryAdvance(now, out string reason)) throw new ArgumentOutOfRangeException(nameof(now), reason);
         }
 
+        /// <summary>
+        /// Install the Host's next local gravity sample after consuming the previous interval.
+        /// Requests and snapshots share this state; they do not resample target pose themselves.
+        /// </summary>
+        public bool SetPaintFlowDirection(Vector3 localDown, double now)
+        {
+            float magnitude = localDown.sqrMagnitude;
+            if (!Finite(localDown.x) || !Finite(localDown.y) || !Finite(localDown.z)
+                || !Finite(magnitude) || magnitude < .00001f) return false;
+            if (!TryAdvance(now, out _)) return false;
+            return paintSurface.SetFlowDirection(localDown);
+        }
+
         /// <summary>Generate from the sender's first drum at its last Host-known position.</summary>
         public bool TryGenerate(ulong sender, string requestId, double now, out LabOrbState orb, out string reason)
             => TryGenerate(sender, null, null, requestId, now, out orb, out reason);

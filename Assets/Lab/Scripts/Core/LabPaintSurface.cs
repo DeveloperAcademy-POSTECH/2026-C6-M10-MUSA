@@ -13,13 +13,19 @@ namespace C6Lab
         public float GrowthPercentPerSecond = 6f;
         public float FillChancePercent = 60f;
         public float VerticalWeight = 1.35f;
+        public int Style = 0;
+        public float Raggedness = .55f;
+        public float FlowRatio = .35f;
+        public float DripWidthDegrees = 3f;
+        public float DripLengthDegrees = 60f;
+        public float GravityWeight = 3f;
     }
 
     /// <summary>
     /// Equal-area sphere cells shared by Host rules and rendering. Growth writes opaque
     /// cells; Stamp retains the translucent brush for isolated offline previews only.
     /// </summary>
-    public sealed class LabPaintSurface
+    public sealed partial class LabPaintSurface
     {
         // Legacy preview defaults. Sessions use the instance dimensions below.
         public const int Width = 256, Height = 128, PixelCount = Width * Height;
@@ -70,7 +76,13 @@ namespace C6Lab
                 || !Finite(settings.GrowthPercentPerSecond) || settings.GrowthPercentPerSecond < 0f
                 || settings.GrowthPercentPerSecond > 1000f
                 || !Finite(settings.FillChancePercent) || settings.FillChancePercent < 0f || settings.FillChancePercent > 100f
-                || !Finite(settings.VerticalWeight) || settings.VerticalWeight <= 0f || settings.VerticalWeight > 1000f)
+                || !Finite(settings.VerticalWeight) || settings.VerticalWeight <= 0f || settings.VerticalWeight > 1000f
+                || settings.Style < 0 || settings.Style > 1
+                || !Finite(settings.Raggedness) || settings.Raggedness < 0f || settings.Raggedness > 1f
+                || !Finite(settings.FlowRatio) || settings.FlowRatio < 0f || settings.FlowRatio > 1f
+                || !Finite(settings.DripWidthDegrees) || settings.DripWidthDegrees < .5f || settings.DripWidthDegrees > 12f
+                || !Finite(settings.DripLengthDegrees) || settings.DripLengthDegrees < 5f || settings.DripLengthDegrees > 135f
+                || !Finite(settings.GravityWeight) || settings.GravityWeight < 1f || settings.GravityWeight > 8f)
                 throw new ArgumentOutOfRangeException(nameof(settings), "Invalid paint growth settings.");
             int columns = 64 << settings.Resolution, rows = 32 << settings.Resolution;
             if (pixels == null || Columns != columns || Rows != rows)
@@ -85,6 +97,12 @@ namespace C6Lab
             cellsPerSecond = (decimal)settings.GrowthPercentPerSecond * CellCount / 100m;
             fillChance = settings.FillChancePercent / 100f;
             verticalWeight = settings.VerticalWeight;
+            flowStyle = settings.Style;
+            raggedness = settings.Raggedness;
+            flowRatio = settings.FlowRatio;
+            dripHalfWidth = settings.DripWidthDegrees * .5f * Mathf.Deg2Rad;
+            dripMaxLength = settings.DripLengthDegrees * Mathf.Deg2Rad;
+            gravityWeight = settings.GravityWeight;
             initialSeed = seed;
             Clear();
         }
@@ -114,8 +132,9 @@ namespace C6Lab
             Supply(region, initialCells, opaque, attackerId);
             int immediate = (int)Math.Min(decimal.Floor(initialCells), CellCount - CoveredCount);
             region = PaintCell(region, cell);
+            InitialPatch patch = flowStyle == 1 ? new InitialPatch(this, direction.normalized, cell) : null;
             for (int i = 1; i < immediate && !IsComplete; i++)
-                region = PaintCell(region, ChooseCell(region));
+                region = PaintCell(region, patch != null ? patch.Take(region) : ChooseCell(region));
             return true;
         }
 
@@ -143,7 +162,7 @@ namespace C6Lab
             {
                 Region region = NextRegion();
                 lastServed = region.Id;
-                PaintCell(region, ChooseCell(region));
+                PaintCell(region, flowStyle == 1 ? ChooseSpreadFlowCell(region) : ChooseCell(region));
                 painted++;
                 if (IsComplete) return (double)((painted - startCredit) / cellsPerSecond);
             }
@@ -247,6 +266,8 @@ namespace C6Lab
             donor.Budget = 0m;
             foreach (var pair in donor.Supplies) keep.Supplies.Add(pair.Key, pair.Value);
             donor.Supplies.Clear();
+            if (donor.Flow != null && (keep.Flow == null || donor.Flow.Sequence > keep.Flow.Sequence))
+                keep.Flow = donor.Flow;
             for (int bucket = 0; bucket < 6; bucket++)
             {
                 List<int> cells = donor.Buckets[bucket];
@@ -354,6 +375,8 @@ namespace C6Lab
             supplySequence = 0; lastServed = -1;
             randomState = initialSeed == 0u ? 0x9E3779B9u : initialSeed;
             preview = replica = false;
+            flowDirection = Vector3.down;
+            flowSequence = 0;
             unchecked { Revision++; }
         }
 
@@ -462,6 +485,7 @@ namespace C6Lab
             public readonly int Id;
             public int Parent;
             public decimal Budget;
+            public FlowTip Flow;
             public readonly SortedDictionary<ulong, Ink> Supplies = new SortedDictionary<ulong, Ink>();
             public readonly List<int>[] Buckets = new List<int>[6];
             private readonly Dictionary<int, Entry> candidates = new Dictionary<int, Entry>();

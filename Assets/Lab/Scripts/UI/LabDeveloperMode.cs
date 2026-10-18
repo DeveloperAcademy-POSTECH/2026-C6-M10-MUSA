@@ -158,6 +158,9 @@ namespace C6Lab
         {
             if (!available) return;
             Fill(sourceConfig);
+            // Fill suppresses input callbacks; update the visible toggle state in this
+            // button action rather than leaving the previous label until the next frame.
+            RefreshToggles();
             SetFeedback("Asset defaults loaded. Choose SOLO or CREATE ROOM to apply them.");
         }
 
