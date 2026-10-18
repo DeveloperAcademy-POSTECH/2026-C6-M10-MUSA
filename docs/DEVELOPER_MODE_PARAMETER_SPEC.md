@@ -1,20 +1,20 @@
 # C6 Physics Lab 개발자 모드 조정값 명세
 
-> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 설정은 총 119개이며 직구 7개는 112~118번이다. 기존 0~104번 인덱스를 보존하고 색칠 성장 6개를 105~110번에 추가했다. 기존 0~110번을 보존하고 완성 박 관람 허용 토글을 112번째(인덱스 111)에 추가했으며 기본값은 OFF다. 88번째(인덱스 87) `Paint Victory Coverage (%)`는 100% 고정 행으로 유지한다. 64~74번째(인덱스 63~73) 소리 음량·햅틱 11개(#142)는 이 문서에 아직 따로 설명하지 않았다. 미니맵·북·박 폭탄·폭탄 소리의 기존 인덱스와 기본값은 유지한다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
+> 기본 수치 기준: Unity 6000.6.5f1의 현재 `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig` 런타임 보정값. 설정은 총 129개이며 직구 7개는 112~118번, 박 줄 움직임 6개는 119~124번, 측면 타격 흔들림 4개는 125~128번이다. 기존 0~104번 인덱스를 보존하고 색칠 성장 6개를 105~110번에 추가했다. 기존 0~110번을 보존하고 완성 박 관람 허용 토글을 112번째(인덱스 111)에 추가했으며 기본값은 OFF다. 88번째(인덱스 87) `Paint Victory Coverage (%)`는 100% 고정 행으로 유지한다. 64~74번째(인덱스 63~73) 소리 음량·햅틱 11개(#142)는 이 문서에 아직 따로 설명하지 않았다. 미니맵·북·박 폭탄·폭탄 소리의 기존 인덱스와 기본값은 유지한다. 실행 검증 결과는 `docs/VALIDATION.md`에서 변경별로 확인한다.
 
-이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 설정 119개를 설명한다. 이 중 색칠 승리 목표는 읽기 전용 100% 고정값이다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
+이 문서는 **새 실험실(C6_Physics_Lab)**의 개발자 패널에 실제로 연결된 설정 129개를 설명한다. 이 중 색칠 승리 목표는 읽기 전용 100% 고정값이다. 이전 C6 프로토타입이나 향후 기획값을 정의하지 않는다. 각 값의 입력 허용 범위는 `LabConfig.DeveloperFields`, 게임에서 읽는 유효값은 `LabConfig` 속성, 사용 지점은 아래 코드 근거를 기준으로 했다.
 
 ## 1. 패널의 적용 방식
 
 1. `Assets/Lab/Scenes/Lab.unity`를 Unity Editor에서 실행하거나 **Development Build**를 실행한다. 일반 배포 빌드에서는 DEV 버튼이 숨겨진다. 참가자는 일반 빌드여도 Host가 확정한 세션 설정을 수신한다.
-2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 총 119개 설정 중 일반 숫자 입력칸과 대응 슬라이더는 서로 값을 반영한다. `Paint Victory Coverage (%)`는 100을 표시하는 읽기 전용 입력칸이며 슬라이더는 비활성이다. 단, 0/1 항목 8개(Drop Combine, Contact Combine, Haptics, Gourd Mode, Minimap, Bomb Sound, Completed Gourd Viewer, Throw Form)는 입력칸·슬라이더 대신 누를 때마다 바뀌는 토글 버튼(ON/OFF, Gourd Mode는 PAINT/CRACK, Bomb Sound는 BOOM/PPEONG, Throw Form은 ARC/STRAIGHT)으로 보이며, 값은 그대로 0/1로 적용·공유된다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
-3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 119개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
+2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 총 129개 설정 중 일반 숫자 입력칸과 대응 슬라이더는 서로 값을 반영한다. `Paint Victory Coverage (%)`는 100을 표시하는 읽기 전용 입력칸이며 슬라이더는 비활성이다. 단, 0/1 항목 8개(Drop Combine, Contact Combine, Haptics, Gourd Mode, Minimap, Bomb Sound, Completed Gourd Viewer, Throw Form)는 입력칸·슬라이더 대신 누를 때마다 바뀌는 토글 버튼(ON/OFF, Gourd Mode는 PAINT/CRACK, Bomb Sound는 BOOM/PPEONG, Throw Form은 ARC/STRAIGHT)으로 보이며, 값은 그대로 0/1로 적용·공유된다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
+3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 129개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
 4. 혼자 시험할 때는 **START SOLO**를 누른다. 이미 솔로 전투 중이면 **RESTART SOLO**가 표시된다. 새 라운드가 시작되므로 요괴/개인 HP·시간·스태미나·구슬이 초기화된다. 진행 중인 네트워크 라운드에 값을 즉시 적용하는 동작은 없다.
 5. **DEFAULTS**는 저장된 `LabConfig.asset`의 숫자를 입력칸과 슬라이더에 불러올 뿐이다. 공유 방이나 솔로에 적용하려면 해당 시작·적용 버튼을 눌러야 한다. **END SOLO**는 솔로를 끝내고 원본 설정으로 복귀한다. 런타임 복사본은 앱이 실행 중인 동안만 유지되며 원본 에셋에는 저장되지 않는다.
 
 패널 열기 자체는 시간을 멈추지 않는다. 공유 전투에서 설정을 바꾸려면 먼저 공동 일시정지를 승인받아야 하며, 이때 시간은 그 일시정지 상태를 따른다. 마지막 `SHOT HIT/MISS` 보고는 솔로를 끝내거나 연결을 끊으면 지워질 수 있으므로 먼저 기록한다. 공유 방에서는 Host의 설정 지문과 확인 응답을 기준으로 시작을 판정한다. 이 절은 코드상 경로 설명이며 실제 기기 동기화 결과는 검증 기록과 구분한다.
 
-입력은 **119개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
+입력은 **129개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
 
 ## 2. 단위와 공통 판정
 
@@ -58,7 +58,7 @@ Paint의 HP와 결과 대시보드는 구분한다. Paint의 `damageTotal`은 �
 
 `DefaultPaintVictoryPercent`·`PaintVictoryPercent`는 100, `PaintVictoryCoverage`는 1이다. 예전 에셋의 직렬화 목표 80이나 비정상 목표도 유효값과 `CaptureDeveloperValues`에서는 100으로 정규화한다. 저장 원본도 Unity에서 목표 100과 성장 기본값 6개를 기록했다. 원본 에셋을 불러오는 것과 DEV 입력을 검증하는 것은 구분한다. 이미 만들어진 구형 80 설정 배열은 현재 프로토콜과 100 고정 검사로 거절한다.
 
-119개 전체를 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 검증·적용한다. `LabConfig.PaintGrowthSettings`는 매번 새 설정 복사본을 반환하고 Host Rules는 새 라운드 시작 때 이를 캡처한다. 일반 Retry는 캡처한 설정을 유지한다. `LabSceneController`의 초기 적용/`LabNetwork.ConfigApplied`가 `LabGourdPaint.Attach`·`ApplyMode`를 호출하며 Client는 Host 모드를 받는다.
+129개 전체를 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 검증·적용한다. `LabConfig.PaintGrowthSettings`는 매번 새 설정 복사본을 반환하고 Host Rules는 새 라운드 시작 때 이를 캡처한다. 일반 Retry는 캡처한 설정을 유지한다. `LabSceneController`의 초기 적용/`LabNetwork.ConfigApplied`가 `LabGourdPaint.Attach`·`ApplyMode`를 호출하며 Client는 Host 모드를 받는다.
 
 유효한 오행 명중이 안 칠한 셀에 닿으면 초기 면적을 즉시 칠하고, 이미 칠한 셀에 닿으면 그 연결 영역에 반복 성장 면적을 공급한다. 이후 Host 전투 시계가 진행될 때 미사용 예산을 가진 영역들이 전체 표면 기준 `%/초` 속도를 나눠 쓰며 빈 인접 셀로 자란다. 시간이 흐르는 동안 공급 예산이 없으면 자라지 않으며, 그 대기 시간의 성장량을 미리 적립하지 않는다. 여러 영역은 차례대로 성장하고 서로 닿으면 하나로 병합된다.
 
@@ -72,11 +72,11 @@ HUD 목표는 항상 100%다. `snapshot.paintCellCount > 0`이면 `paintCoveredC
 
 Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 Host의 전투 시간 진행에서만 한다. Host 화면도 현재 Snapshot과 같은 버전의 `LabNetwork.PaintSurface` 표시 캐시를 사용해 맵과 HUD를 함께 반영한다. Client는 승인 명중 방향을 재생해 성장시키지 않고 Host가 보낸 셀 변경(delta) 또는 전체 체크포인트를 별도 수신 맵에 적용한다. 분할 수신 중에는 기존 공개 표시 캐시를 유지하고, 완성된 맵의 세션·라운드·해상도·Revision·칠한 셀 수·전체 셀 수·명중 수가 Snapshot 메타데이터와 모두 맞을 때 맵과 HUD를 함께 공개한다. 픽셀이 그대로인 반복 명중도 명중 수가 바뀌면 빈 delta를 발행한다.
 
-전송은 프로토콜 **5630**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID와 RGBA를 담은 delta보다 전체 맵이 작으면 전체 맵을 보낸다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송한다. 최대 해상도 전체 RGBA 맵은 131,072바이트이고 base64 174,764자를 43개로 나눈다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체한다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청한다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가한다.
+전송은 프로토콜 **5632**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID와 RGBA를 담은 delta보다 전체 맵이 작으면 전체 맵을 보낸다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송한다. 최대 해상도 전체 RGBA 맵은 131,072바이트이고 base64 174,764자를 43개로 나눈다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체한다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청한다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가한다.
 
 이 복구는 **현재 라운드에 계속 연결된 Client의 부분 맵 누락**을 복원하는 기능이다. 연결이 끊어진 뒤 전투에 재접속하는 기능은 포함하지 않는다. 실제 다중 앱·기기에서의 전송과 화면 일치는 자동 패킷 fixture와 구분해 검증한다.
 
-현재 프로토콜은 **5630**, 연결 토큰은 `C6PhysicsLab/10`다. 완성 박 관람 허용을 포함한 119개 설정을 지문·참가자 확인 응답에 사용하며 구형 112개 이하의 구형 배열은 거절한다. 이전 모드·폭탄·북·미니맵·소리·성장 설정과 색칠 전송 형식은 유지한다. 모든 참가자가 같은 새 버전을 사용해야 하며 이전 PASS를 이번 통합의 결과로 승계하지 않는다. 실제 실행 결과는 `docs/VALIDATION.md`에서 변경별로 구분한다.
+현재 프로토콜은 **5632**, 연결 토큰은 `C6PhysicsLab/10`다. 박 줄·측면 타격 움직임을 포함한 129개 설정을 지문·참가자 확인 응답에 사용하며 구형 128개 이하의 배열은 거절한다. 이전 모드·폭탄·북·미니맵·소리·성장 설정과 색칠 전송 형식은 유지한다. 모든 참가자가 같은 새 버전을 사용해야 하며 이전 PASS를 이번 통합의 결과로 승계하지 않는다. 실제 실행 결과는 `docs/VALIDATION.md`에서 변경별로 구분한다.
 
 근거: `LabConfig.PaintGrowthSettings`·`DeveloperFields`·`CaptureDeveloperValues`·`TryApplyDeveloperValues`, `LabPaintSurface.RegisterHit`·`Advance`·`TryReplacePixels`·`CopyPixels`, `LabModel.ConfirmHit`·`TryAdvance`·라운드 Rules, `LabPaintPublisher`·`LabPaintReceiver`, `LabNetwork.PaintSurface`·Snapshot 공개 경로, `LabGourdPaint.Attach`·`ApplyMode`, `LabHud`, `LabGourdCrack`·`LabGourdFinish`.
 
@@ -86,7 +86,7 @@ Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 
 | --- | --- | --- | --- | --- |
 | Completed Gourd Viewer (0 off, 1 on) | 112번째 · 인덱스 111 · Gourd | OFF(0) | 정수 0–1 | OFF는 관람 진입을 숨긴다. ON은 Host가 모든 참가자에게 Paint 100% 승리 결과의 관람을 허용한다. |
 
-Inspector의 `Completed Gourd Viewer Enabled`와 `LabConfig.CompletedGourdViewerEnabled`를 사용한다. 저장 필드가 없는 에셋도 false가 기본이다. 성장 6개와 별개의 기능 허용 토글이며 기존 0~110번 인덱스, 111번째 `Paint Vertical Weight`, 인덱스 87의 100% 고정 목표를 보존한다. 119개 전체의 유한값·범위·정수 검사를 먼저 통과해야 하므로 소수·범위 밖 bool이나 구형 112개 이하 배열은 일부 값도 적용하지 않는다.
+Inspector의 `Completed Gourd Viewer Enabled`와 `LabConfig.CompletedGourdViewerEnabled`를 사용한다. 저장 필드가 없는 에셋도 false가 기본이다. 성장 6개와 별개의 기능 허용 토글이며 기존 0~110번 인덱스, 111번째 `Paint Vertical Weight`, 인덱스 87의 100% 고정 목표를 보존한다. 129개 전체의 유한값·범위·정수 검사를 먼저 통과해야 하므로 소수·범위 밖 bool이나 구형 112개 이하 배열은 일부 값도 적용하지 않는다.
 
 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 기존 공유 설정과 함께 적용한다. Host 설정 지문과 전원 확인 응답이 시작을 제어한다. Client가 로컬로 허용값을 바꾸는 기능은 없으며 진행 중인 판에 즉시 적용하지 않는다. **일반 Release 참가자도 Host 설정을 따른다.** DEV 패널만 Editor·Development Build에 제한하며 관람 자체에는 Debug 빌드·실행 인자·Editor 메뉴 활성화가 필요하지 않다.
 
@@ -261,12 +261,40 @@ Inspector의 `Projectile throw form` 또는 DEV의 **Throw form** 묶음에서 A
 
 `EffectiveThrowGravity`는 Arc일 때 기존 `ThrowGravity`, Straight일 때 `ThrowGravity×StraightGravityScale`다. 공은 발사 순간 중력·수명을 별도로 캡처하며 초기 위치·속도·충돌 반경·감쇠도 발사 시 설정한다. 비행 중 Inspector나 DEV 초안을 바꿔 이미 날아가는 공을 꺾지 않는다. 보이는 구슬과 실제 SphereCollider는 동일한 물리 루트에서 이동하고 기존 궤적·피격·색칠 경로를 재사용한다.
 
-솔로는 START/RESTART SOLO, 공유 방은 Host의 CREATE ROOM/APPLY TO ROOM/공동 일시정지 뒤 APPLY & RESTART로 적용한다. **119개 전체**를 검증·지문화한 설정을 참가자에게 전파하고 확인받은 뒤 시작한다. 프로토콜은 **5630**이며 Host는 확정한 발사 위치·속도를 Client에 보내고 Client는 공유 설정의 같은 중력을 사용한다. Client가 직접 모드를 바꾸지 않는다. Inspector 변경도 새 판 시작 시점에 적용해 비교한다.
+솔로는 START/RESTART SOLO, 공유 방은 Host의 CREATE ROOM/APPLY TO ROOM/공동 일시정지 뒤 APPLY & RESTART로 적용한다. **129개 전체**를 검증·지문화한 설정을 참가자에게 전파하고 확인받은 뒤 시작한다. 프로토콜은 **5632**이며 Host는 확정한 발사 위치·속도를 Client에 보내고 Client는 공유 설정의 같은 중력을 사용한다. Client가 직접 모드를 바꾸지 않는다. Inspector 변경도 새 판 시작 시점에 적용해 비교한다.
 
-Inspector의 비정상 enum은 Arc로 보정하고 오프셋·각도·배율의 유효 Getter는 범위 제한과 유한수 대체값을 사용한다. DEV/네트워크는 잘못된 값 하나라도 있으면 119개 전체 적용을 거절한다. 극단적인 오프셋이나 음수 발사각은 화면 밖 출발·바닥 접촉·빗나감을 만들 수 있으며 자동 보정 대상이 아니다.
+Inspector의 비정상 enum은 Arc로 보정하고 오프셋·각도·배율의 유효 Getter는 범위 제한과 유한수 대체값을 사용한다. DEV/네트워크는 잘못된 값 하나라도 있으면 129개 전체 적용을 거절한다. 극단적인 오프셋이나 음수 발사각은 화면 밖 출발·바닥 접촉·빗나감을 만들 수 있으며 자동 보정 대상이 아니다.
 
 근거: `LabConfig.ThrowForm`·`StraightOriginOffset`·`StraightPitchOffsetDegrees`·`StraightLoftScale`·`StraightGravityScale`·`EffectiveThrowGravity`, DEV 인덱스 112~118, `LabDeveloperMode.RefreshThrowFormInputs`, `LabThrowMath.LaunchPosition`·`LaunchVelocity`·`ArcVelocity`, `LabProjectile.Prepare`·`FixedUpdate`·`Update`, `LabNetwork.SpawnHostProjectile`, `LabSessionSettings.Fingerprint`. 이 절은 코드 연결 설명이며 실제 실행 결과를 단정하지 않는다.
 
+
+### 박 줄의 주기 움직임·탄성 — 120~125번째 설정
+
+`Gourd` 묶음의 아래 6개 행은 숫자 입력과 슬라이더를 함께 제공한다. 기본값은 `LabConfig.asset`에 있으며 DEV에서 조정한 값은 **START/RESTART SOLO**, **CREATE ROOM**, **APPLY TO ROOM**, 공동 일시정지 후 **APPLY & RESTART**로 새 판에 적용된다. 이미 진행 중인 판에는 즉시 반영되지 않는다.
+
+| DEV 입력 이름 | 순서 / 인덱스 | 기본값 | 범위 | 효과 |
+| --- | --- | ---: | --- | --- |
+| Gourd Rope Cycle Amplitude (world units) | 120번째 / 119 | 0.45 | 0–1 | 줄이 스스로 늘고 줄어드는 거리. 0이면 주기 움직임을 끈다. |
+| Gourd Rope Cycle Period (seconds) | 121번째 / 120 | 3 | 0.5–10초 | 늘었다 줄어드는 한 주기. 작을수록 빠르다. |
+| Gourd Rope Hit Bounce | 122번째 / 121 | 0.32 | 0–2 | 명중 때 추가로 아래로 당기는 세기. |
+| Gourd Rope Spring | 123번째 / 122 | 42 | 0–100 | 명중 후 원래 길이로 돌아가는 복원력. |
+| Gourd Rope Damping | 124번째 / 123 | 2 | 0–20 | 명중 후 상하 왕복의 감쇠. 작을수록 오래 흔들린다. |
+| Gourd Rope Maximum Hit Extension | 125번째 / 124 | 0.65 | 0–3 월드 단위 | 명중으로 추가 늘어나는 길이의 상한. 0이면 명중 탄성을 끈다. |
+
+주기 움직임과 명중 탄성은 합쳐져 **보이는 줄·박 모델·실제 충돌체**를 함께 움직인다. Host의 주기 위상과 명중 탄성 상태는 Snapshot으로 전달해 Client 표시를 보정한다. Host의 충돌 판정이 기준이므로 실제 다중 기기에서 빠른 움직임의 시야·명중 일치를 별도로 확인해야 한다.
+
+### 강한 측면 타격의 박 기울기 — 126~129번째 설정
+
+같은 방향에서 더 빠르게 날아온 공은 박에 더 큰 흔들림 속도를 준다. 박이 기울면 모델과 실제 충돌체의 아랫면도 함께 기울어져 다른 플레이어가 공략할 수 있다. 기본 최대 기울기는 40도다. 아래 값은 `Gourd` 묶음에 있으며 줄 설정과 같이 새 판을 시작할 때 Host가 공유한다.
+
+| DEV 입력 이름 | 순서 / 인덱스 | 기본값 | 범위 | 효과 |
+| --- | --- | ---: | --- | --- |
+| Gourd Swing Impact Strength | 126번째 / 125 | 12 | 0–20 | 타격 속도를 흔들림 속도로 바꾸는 배율. |
+| Gourd Swing Maximum Angle (degrees) | 127번째 / 126 | 40 | 1–75도 | 수직에서 기울어질 수 있는 최대 각도. |
+| Gourd Swing Return Strength | 128번째 / 127 | 10 | 0–100 | 중앙으로 돌아오는 힘. |
+| Gourd Swing Damping | 129번째 / 128 | 1.4 | 0–20 | 좌우 흔들림이 사라지는 속도. 작을수록 공격 기회가 오래 남는다. |
+
+최대 각도에 닿으면 더 세게 맞아도 그 이상 기울지 않는다. 카메라에서 실제 아랫면이 보이고 맞는 시간은 화면과 기기에서 조정해야 한다.
 
 ### 요괴 피격 회전
 
@@ -361,7 +389,7 @@ BGM·생성·타격·빗나감·결합·도화선 소리 크기 6개(인덱스 6
 
 ## 10. 이 패널로 조정할 수 없는 것·검증 범위
 
-방의 **목표 인원**은 119개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport, 박 폭탄의 대상·착지 위치 추첨과 경고·낙하·말풍선 연출 시간, 북 도착의 감속 상한·최대 도착 시간·통과 속도는 119개 입력칸으로 조정하지 않는다. 색칠 승리 목표는 100% 고정이며 이 패널로 낮출 수 없다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
+방의 **목표 인원**은 129개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport, 박 폭탄의 대상·착지 위치 추첨과 경고·낙하·말풍선 연출 시간, 북 도착의 감속 상한·최대 도착 시간·통과 속도는 129개 입력칸으로 조정하지 않는다. 색칠 승리 목표는 100% 고정이며 이 패널로 낮출 수 없다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
 
 기존 PR #76 기준 문서는 해당 코드·Scene·설정 에셋과 당시 `docs/VALIDATION.md`의 증거를 **읽어 확인**해 작성됐다. 그 기록의 EditMode **12/12**, PlayMode **20/20** 및 Mac Development 앱 빌드는 이번 3D 조합판 전환의 통과 증거가 아니다. 이 전환의 Unity 컴파일·EditMode·PlayMode, Mac·iOS 빌드, 실제 조작은 새 실행 기록으로 구분해야 한다. 문서의 물리 용어를 갱신한 것만으로 실행 결과를 PASS로 보지 않는다.
 
@@ -371,7 +399,7 @@ BGM·생성·타격·빗나감·결합·도화선 소리 크기 6개(인덱스 6
 
 - 설정 필드·범위·일괄 검사: `Assets/Lab/Scripts/Core/LabConfig.cs` — `DeveloperFields`, `CaptureDeveloperValues`, `TryApplyDeveloperValues`.
 - 저장 기본값: `Assets/Lab/Resources/LabConfig.asset`.
-- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 119개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
+- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 129개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
 - 패널 열기·DEFAULTS·SOLO/Host 설정 적용·슬라이더 변환: `Assets/Lab/Scripts/UI/LabDeveloperMode.cs`.
 - Host 전투 수치·개인 HP·전원 0 패배·스태미나·생성 확률·속성·아이템 잠금·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
 - 아이템 더블 탭 사용·효과(물약·상자), 릴레이 단계, 폭탄 폭발·피해 배율: `Assets/Lab/Scripts/Core/LabModel.cs`(`TryUseItem`·`TryTransfer`·`TryAdvance`·`ConfirmHit`)와 `LabOrbBoard.EndDragAtWorld`.
@@ -392,4 +420,4 @@ BGM·생성·타격·빗나감·결합·도화선 소리 크기 6개(인덱스 6
 - 카메라·보드 크기 적용: `Assets/Lab/Scripts/UI/LabSeatCamera.cs`와 `LabSceneController.cs`.
 - 과거 검증 기록: `docs/VALIDATION.md`. 투척 비교 절차: `docs/THROW_TUNING_GUIDE.md`.
 
-#190 통합 후의 실제 실행 결과는 `docs/VALIDATION.md`의 후속 통합 기록을 참조한다. 위 #191의 331/116 결과는 관람 통합 당시 기록이며 현재 119개 설정 검증으로 승계하지 않는다.
+#190 통합 후의 실제 실행 결과는 `docs/VALIDATION.md`의 후속 통합 기록을 참조한다. 위 #191의 331/116 결과는 관람 통합 당시 기록이며 현재 129개 설정 검증으로 승계하지 않는다.

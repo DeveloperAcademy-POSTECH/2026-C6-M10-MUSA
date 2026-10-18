@@ -47,6 +47,33 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator FasterSideHitTiltsTheUndersideFurtherWithinSharedAngleLimit()
+        {
+            var slow = LabTarget.CreateCylinder(null, new Vector3(-4, 0, 0), .6f, 2.7f);
+            var fast = LabTarget.CreateCylinder(null, new Vector3(4, 0, 0), .6f, 2.7f);
+            var a = slow.gameObject.AddComponent<LabHangingTarget>();
+            var b = fast.gameObject.AddComponent<LabHangingTarget>();
+            a.ConfigureSwing(12f, 40f, 10f, 1.4f);
+            b.ConfigureSwing(12f, 40f, 10f, 1.4f);
+            a.Kick(Vector3.right * 5f);
+            b.Kick(Vector3.right * 12.5f); // Saved config's maximum throw speed.
+            float slowPeak = 0f, fastPeak = 0f, undersideHorizontal = 0f;
+            for (int i = 0; i < 80; i++)
+            {
+                yield return new WaitForFixedUpdate();
+                slowPeak = Mathf.Max(slowPeak, a.SwingAngles.magnitude);
+                fastPeak = Mathf.Max(fastPeak, b.SwingAngles.magnitude);
+                undersideHorizontal = Mathf.Max(undersideHorizontal,
+                    Mathf.Abs(fast.Hitbox.transform.TransformDirection(Vector3.down).x));
+                Assert.That(b.SwingAngles.magnitude, Is.LessThanOrEqualTo(40.001f));
+            }
+            Assert.That(fastPeak, Is.GreaterThan(slowPeak * 2f));
+            Assert.That(fastPeak, Is.GreaterThan(30f));
+            Assert.That(undersideHorizontal, Is.GreaterThan(.5f));
+            Object.Destroy(slow.gameObject); Object.Destroy(fast.gameObject);
+        }
+
+        [UnityTest]
         public IEnumerator DampingAndReturnForceCanBeTunedIndependently()
         {
             var free = LabTarget.CreateCylinder(null, new Vector3(-4, 0, 0), .6f, 2.7f).gameObject;
@@ -136,6 +163,28 @@ namespace C6Lab.Tests
             Assert.That(hanging.VerticalOffset, Is.EqualTo(0f));
             Assert.That(target.transform.Find("Suspension Pivot/Rope").localScale.y * 2f,
                 Is.EqualTo(hanging.RopeLength).Within(.001f));
+            Object.Destroy(target.gameObject);
+        }
+
+        [UnityTest]
+        public IEnumerator SharedRopeCycleMovesHitboxAboveAndBelowAimPointWithAttachedCord()
+        {
+            var target = LabTarget.CreateCylinder(null, Vector3.zero, .6f, 2.7f);
+            var hanging = target.gameObject.AddComponent<LabHangingTarget>();
+            hanging.ConfigureRopeMotion(.5f, 1.6f, .4f, 42f, 2f, .65f);
+            float restingY = target.Hitbox.transform.position.y;
+            for (int i = 0; i < 20; i++) yield return new WaitForFixedUpdate();
+            Assert.That(target.Hitbox.transform.position.y, Is.LessThan(restingY - .4f));
+            for (int i = 0; i < 40; i++) yield return new WaitForFixedUpdate();
+            Assert.That(target.Hitbox.transform.position.y, Is.GreaterThan(restingY + .4f));
+            Transform rope = target.transform.Find("Suspension Pivot/Rope");
+            Assert.That(rope.localScale.y * 2f, Is.EqualTo(hanging.RopeLength + hanging.CurrentRopeOffset).Within(.001f));
+            Assert.That(Vector3.Distance(rope.TransformPoint(Vector3.down),
+                target.Hitbox.transform.TransformPoint(Vector3.up)), Is.LessThan(.001f));
+            Assert.That(Vector3.Distance(target.VisualMount.position,
+                target.Hitbox.transform.position), Is.LessThan(.001f));
+            hanging.ResetSwing();
+            Assert.That(target.Hitbox.transform.position.y, Is.EqualTo(restingY).Within(.001f));
             Object.Destroy(target.gameObject);
         }
 

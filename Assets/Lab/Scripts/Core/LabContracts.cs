@@ -154,6 +154,8 @@ namespace C6Lab
         public int paintCoveredCount, paintCellCount, paintCount;
         /// <summary>Host-owned presentation pose, synchronized separately from HP and collision.</summary>
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
+        /// <summary>Host rope cycle phase and hit spring state for the moving target collider.</summary>
+        public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();
         public LabOrbState[] orbs = Array.Empty<LabOrbState>();
         /// <summary>Generate drums. Only a player whose board holds one can create orbs.</summary>

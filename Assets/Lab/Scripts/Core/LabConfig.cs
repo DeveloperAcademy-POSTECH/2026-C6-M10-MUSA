@@ -195,7 +195,17 @@ namespace C6Lab
             new LabDeveloperField("Straight Origin Offset Z", -5f, 5f),
             new LabDeveloperField("Straight Pitch Offset (degrees)", -30f, 30f),
             new LabDeveloperField("Straight Loft Scale", 0f, 1f),
-            new LabDeveloperField("Straight Gravity Scale", 0f, 2f)
+            new LabDeveloperField("Straight Gravity Scale", 0f, 2f),
+            new LabDeveloperField("Gourd Rope Cycle Amplitude (world units)", 0f, 1f),
+            new LabDeveloperField("Gourd Rope Cycle Period (seconds)", .5f, 10f),
+            new LabDeveloperField("Gourd Rope Hit Bounce", 0f, 2f),
+            new LabDeveloperField("Gourd Rope Spring", 0f, 100f),
+            new LabDeveloperField("Gourd Rope Damping", 0f, 20f),
+            new LabDeveloperField("Gourd Rope Maximum Hit Extension", 0f, 3f),
+            new LabDeveloperField("Gourd Swing Impact Strength", 0f, 20f),
+            new LabDeveloperField("Gourd Swing Maximum Angle (degrees)", 1f, 75f),
+            new LabDeveloperField("Gourd Swing Return Strength", 0f, 100f),
+            new LabDeveloperField("Gourd Swing Damping", 0f, 20f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -223,7 +233,8 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111),
+            new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111,
+                119, 120, 121, 122, 123, 124, 125, 126, 127, 128),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
         });
 
@@ -330,6 +341,26 @@ namespace C6Lab
         [SerializeField, Range(1f, 4f)] private float paintVerticalWeight = 1.35f;
         [Tooltip("Paint 100% 승리 뒤 모든 참가자에게 완성된 박의 로컬 관람을 허용한다. 새 판에 적용한다.")]
         [SerializeField] private bool completedGourdViewerEnabled = false;
+        [Tooltip("줄이 스스로 늘고 줄어드는 폭(월드 단위). 0이면 주기 움직임을 끈다.")]
+        [SerializeField, Range(0f, 1f)] private float gourdRopeCycleAmplitude = .45f;
+        [Tooltip("줄이 한 번 늘었다 줄어드는 데 걸리는 시간(초).")]
+        [SerializeField, Range(.5f, 10f)] private float gourdRopeCyclePeriod = 3f;
+        [Tooltip("구슬 명중 시 줄을 아래로 당기는 힘. 클수록 더 크게 튕긴다.")]
+        [SerializeField, Range(0f, 2f)] private float gourdRopeHitBounce = .32f;
+        [Tooltip("명중 후 줄이 원래 길이로 돌아가는 탄성. 클수록 빠르게 왕복한다.")]
+        [SerializeField, Range(0f, 100f)] private float gourdRopeSpring = 42f;
+        [Tooltip("명중 후 줄의 상하 흔들림이 줄어드는 속도. 작을수록 오래 탱글거린다.")]
+        [SerializeField, Range(0f, 20f)] private float gourdRopeDamping = 2f;
+        [Tooltip("명중으로 추가로 늘어날 수 있는 최대 길이(월드 단위).")]
+        [SerializeField, Range(0f, 3f)] private float gourdRopeMaximumHitExtension = .65f;
+        [Tooltip("옆에서 빠르게 맞았을 때 박이 기울어지는 세기.")]
+        [SerializeField, Range(0f, 20f)] private float gourdSwingImpactStrength = 12f;
+        [Tooltip("박이 수직에서 기울어질 수 있는 최대 각도.")]
+        [SerializeField, Range(1f, 75f)] private float gourdSwingMaximumAngle = 40f;
+        [Tooltip("박이 중앙으로 돌아오는 힘.")]
+        [SerializeField, Range(0f, 100f)] private float gourdSwingReturnStrength = 10f;
+        [Tooltip("좌우 흔들림이 줄어드는 속도.")]
+        [SerializeField, Range(0f, 20f)] private float gourdSwingDamping = 1.4f;
         [Tooltip("박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다. 최대가 0이면 떨어뜨리지 않는다 (#177).")]
         [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
         [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
@@ -573,6 +604,16 @@ namespace C6Lab
             VerticalWeight = PaintVerticalWeight
         };
         public bool CompletedGourdViewerEnabled => completedGourdViewerEnabled;
+        public float GourdRopeCycleAmplitude => Mathf.Clamp(Finite(gourdRopeCycleAmplitude, .45f), 0f, 1f);
+        public float GourdRopeCyclePeriod => Mathf.Clamp(Finite(gourdRopeCyclePeriod, 3f), .5f, 10f);
+        public float GourdRopeHitBounce => Mathf.Clamp(Finite(gourdRopeHitBounce, .32f), 0f, 2f);
+        public float GourdRopeSpring => Mathf.Clamp(Finite(gourdRopeSpring, 42f), 0f, 100f);
+        public float GourdRopeDamping => Mathf.Clamp(Finite(gourdRopeDamping, 2f), 0f, 20f);
+        public float GourdRopeMaximumHitExtension => Mathf.Clamp(Finite(gourdRopeMaximumHitExtension, .65f), 0f, 3f);
+        public float GourdSwingImpactStrength => Mathf.Clamp(Finite(gourdSwingImpactStrength, 12f), 0f, 20f);
+        public float GourdSwingMaximumAngle => Mathf.Clamp(Finite(gourdSwingMaximumAngle, 40f), 1f, 75f);
+        public float GourdSwingReturnStrength => Mathf.Clamp(Finite(gourdSwingReturnStrength, 10f), 0f, 100f);
+        public float GourdSwingDamping => Mathf.Clamp(Finite(gourdSwingDamping, 1.4f), 0f, 20f);
         public float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         public float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -678,7 +719,11 @@ namespace C6Lab
                 PaintGrowthPercentPerSecond, PaintFillChancePercent, PaintVerticalWeight,
                 CompletedGourdViewerEnabled ? 1f : 0f,
                 (float)ThrowForm, StraightOriginOffset.x, StraightOriginOffset.y, StraightOriginOffset.z,
-                StraightPitchOffsetDegrees, StraightLoftScale, StraightGravityScale
+                StraightPitchOffsetDegrees, StraightLoftScale, StraightGravityScale,
+                GourdRopeCycleAmplitude, GourdRopeCyclePeriod, GourdRopeHitBounce,
+                GourdRopeSpring, GourdRopeDamping, GourdRopeMaximumHitExtension,
+                GourdSwingImpactStrength, GourdSwingMaximumAngle,
+                GourdSwingReturnStrength, GourdSwingDamping
             };
         }
 
@@ -841,6 +886,16 @@ namespace C6Lab
             straightPitchOffsetDegrees = values[116];
             straightLoftScale = values[117];
             straightGravityScale = values[118];
+            gourdRopeCycleAmplitude = values[119];
+            gourdRopeCyclePeriod = values[120];
+            gourdRopeHitBounce = values[121];
+            gourdRopeSpring = values[122];
+            gourdRopeDamping = values[123];
+            gourdRopeMaximumHitExtension = values[124];
+            gourdSwingImpactStrength = values[125];
+            gourdSwingMaximumAngle = values[126];
+            gourdSwingReturnStrength = values[127];
+            gourdSwingDamping = values[128];
             error = string.Empty;
             return true;
         }

@@ -51,7 +51,7 @@ DEV의 `Throw form` 묶음은 기존 0~111번 뒤에 **112~118번**으로 추가
 
 - 솔로: DEV에서 **START SOLO / RESTART SOLO**로 새 판에 적용한다.
 - 공유 방: Host가 접속 전 **CREATE ROOM**, 전투 전 **APPLY TO ROOM**, 공동 일시정지 뒤 **APPLY & RESTART**를 사용한다. Client는 Host 설정을 받으며 직접 변경하지 않는다.
-- 설정은 **119개 전체**를 원자적으로 검증하고 공유 지문에 포함한다. 프로토콜은 **5630**이며 예전 112개 설정·다른 프로토콜을 혼합하지 않는다.
+- 설정은 **129개 전체**를 원자적으로 검증하고 공유 지문에 포함한다. 프로토콜은 **5632**이며 예전 128개 이하 설정·다른 프로토콜을 혼합하지 않는다.
 - 각 공은 발사 순간 중력·수명을 캡처한다. 초기 위치·속도·반경·감쇠도 발사 시 정하며, 비행 중 원본 Inspector나 DEV 초안을 바꿔 이미 날아가는 공을 꺾지 않는다.
 - Host가 구슬 소유자의 자리로 위치·속도를 계산해 Client에 보내며 Client는 그 발사값을 재생한다. 실제 접촉·명중 보상·피해·색칠 승리는 기존 Host 판정을 따른다.
 
@@ -66,4 +66,4 @@ DEV의 `Throw form` 묶음은 기존 0~111번 뒤에 **112~118번**으로 추가
 
 이 순서는 검증 시나리오이며 수행 완료를 뜻하지 않는다. 실제 터치 조작감·시각 피드백은 iPhone Development Build에서 별도 확인한다. Mac 자동 입력·단위 검사·PlayMode의 직접 메서드 호출을 실기기 통과로 기록하지 않는다.
 
-관련 코드: `LabConfig`(단일 원본·7개 설정·119개 공유 값), `LabDeveloperMode`(Throw form 토글·슬라이더), `LabOrbBoard`(기존 입력), `LabThrowMath`(자리별 출발점·모드별 방향), `LabProjectile`(발사 시 캡처한 중력·수명·실제 충돌), `LabNetwork`(Host 확정·공유 설정·발사값), `LabSessionSettings`(지문).
+관련 코드: `LabConfig`(단일 원본·7개 설정·129개 공유 값), `LabDeveloperMode`(Throw form 토글·슬라이더), `LabOrbBoard`(기존 입력), `LabThrowMath`(자리별 출발점·모드별 방향), `LabProjectile`(발사 시 캡처한 중력·수명·실제 충돌), `LabNetwork`(Host 확정·공유 설정·발사값), `LabSessionSettings`(지문).

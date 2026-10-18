@@ -72,6 +72,16 @@ MonoBehaviour:
   paintFillChancePercent: 60
   paintVerticalWeight: 1.35
   completedGourdViewerEnabled: 0
+  gourdRopeCycleAmplitude: 0.45
+  gourdRopeCyclePeriod: 3
+  gourdRopeHitBounce: 0.32
+  gourdRopeSpring: 42
+  gourdRopeDamping: 2
+  gourdRopeMaximumHitExtension: 0.65
+  gourdSwingImpactStrength: 12
+  gourdSwingMaximumAngle: 40
+  gourdSwingReturnStrength: 10
+  gourdSwingDamping: 1.4
   gourdBombIntervalMin: 20
   gourdBombIntervalMax: 30
   bgmVolume: 0.2

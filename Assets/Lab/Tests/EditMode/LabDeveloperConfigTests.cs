@@ -18,7 +18,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(119));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(129));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -34,6 +34,10 @@ namespace C6Lab.Tests
             Assert.That(values[103], Is.EqualTo(50f), "The bomb sound starts at the Inspector volume.");
             Assert.That(config.BombSoundVolume, Is.EqualTo(.9f).Within(1e-5f));
             Assert.That(values[104], Is.EqualTo(1f), "The bomb plays the popcorn-machine ppeong by default.");
+            Assert.That(values.Skip(119).Take(6).ToArray(),
+                Is.EqualTo(new[] { .45f, 3f, .32f, 42f, 2f, .65f }),
+                "The gourd rope has a slow cycle and a lively hit spring by default.");
+            Assert.That(values.Skip(125).ToArray(), Is.EqualTo(new[] { 12f, 40f, 10f, 1.4f }));
             Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
 
             values[0] = 240f; // HP
@@ -130,6 +134,16 @@ namespace C6Lab.Tests
             values[110] = 2f; // vertical preference
             Assert.That(values[111], Is.Zero, "Completed-gourd viewing is off by default.");
             values[111] = 1f; // allow the room to inspect completed Paint results locally
+            values[119] = .6f; // automatic rope travel
+            values[120] = 2.5f; // cycle duration
+            values[121] = .55f; // impact bounce
+            values[122] = 60f; // spring
+            values[123] = 1.5f; // damping
+            values[124] = .9f; // maximum hit extension
+            values[125] = 8f; // swing impact
+            values[126] = 45f; // swing angle limit
+            values[127] = 12f; // swing restoring force
+            values[128] = 1.8f; // swing damping
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MinimapEnabled, Is.False, "DEV can turn the minimap off.");
             Assert.That(config.MinimapSizePercent, Is.EqualTo(80), "DEV sizes the minimap from 0 to 100 with 50 in the middle.");
@@ -154,7 +168,14 @@ namespace C6Lab.Tests
             Assert.That(config.PaintFillChancePercent, Is.EqualTo(75f));
             Assert.That(config.PaintVerticalWeight, Is.EqualTo(2f));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
-            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "All 119 fields round-trip in wire order.");
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "All 129 fields round-trip in wire order.");
+            Assert.That(new[] { config.GourdRopeCycleAmplitude, config.GourdRopeCyclePeriod,
+                    config.GourdRopeHitBounce, config.GourdRopeSpring, config.GourdRopeDamping,
+                    config.GourdRopeMaximumHitExtension },
+                Is.EqualTo(new[] { .6f, 2.5f, .55f, 60f, 1.5f, .9f }));
+            Assert.That(new[] { config.GourdSwingImpactStrength, config.GourdSwingMaximumAngle,
+                config.GourdSwingReturnStrength, config.GourdSwingDamping },
+                Is.EqualTo(new[] { 8f, 45f, 12f, 1.8f }));
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
             Assert.That(config.GenerateCost, Is.EqualTo(5f));
@@ -683,7 +704,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(112));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(119));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(129));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             LabDeveloperField field = LabConfig.DeveloperFields[87];
@@ -715,7 +736,8 @@ namespace C6Lab.Tests
             int[] gourdIndices = null;
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
                 if (category.Title == "Gourd") gourdIndices = category.FieldIndices;
-            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111 }));
+            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111,
+                119, 120, 121, 122, 123, 124, 125, 126, 127, 128 }));
             Assert.That(config.GourdBombIntervalMin, Is.EqualTo(20f));
             Assert.That(config.GourdBombIntervalMax, Is.EqualTo(30f));
 
@@ -859,7 +881,8 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields[105].WholeNumber, Is.True);
             for (int i = 106; i <= 110; i++) Assert.That(LabConfig.DeveloperFields[i].WholeNumber, Is.False);
             var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
-            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111 }));
+            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111,
+                119, 120, 121, 122, 123, 124, 125, 126, 127, 128 }));
         }
 
         [TestCase(105, 0f, 2f)]
@@ -980,7 +1003,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOffAtTheLastGourdToggleWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(119));
+            Assert.That(values.Length, Is.EqualTo(129));
             Assert.That(config.CompletedGourdViewerEnabled, Is.False);
             Assert.That(values[111], Is.Zero);
             LabDeveloperField field = LabConfig.DeveloperFields[111];
@@ -991,7 +1014,8 @@ namespace C6Lab.Tests
             Assert.That(new[] { field.Min, field.Max }, Is.EqualTo(new[] { 0f, 1f }));
             Assert.That(new[] { field.OffText, field.OnText }, Is.EqualTo(new[] { "OFF", "ON" }));
             var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
-            Assert.That(gourd.FieldIndices.Last(), Is.EqualTo(111));
+            Assert.That(gourd.FieldIndices.Last(), Is.EqualTo(128));
+            Assert.That(gourd.FieldIndices, Does.Contain(111));
             Assert.That(LabConfig.DeveloperFields[110].Label, Is.EqualTo("Paint Vertical Weight"));
             Assert.That(LabConfig.DeveloperFields[87].Label, Is.EqualTo("Paint Victory Coverage (%)"));
             Assert.That(new[] { LabConfig.DeveloperFields[87].Min, LabConfig.DeveloperFields[87].Max },
@@ -1046,6 +1070,8 @@ namespace C6Lab.Tests
         [TestCase(112)]
         [TestCase(118)]
         [TestCase(120)]
+        [TestCase(126)]
+        [TestCase(130)]
         public void PreviousOrOversizedViewerSettingsAreRejectedAtomically(int count)
         {
             float[] values = config.CaptureDeveloperValues();
@@ -1061,13 +1087,13 @@ namespace C6Lab.Tests
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline),
                 "A legacy schema must not silently append fields or apply any earlier value.");
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
-            Assert.Throws<System.ArgumentException>(() => LabSessionSettings.Fingerprint(obsolete, 3, 5630));
+            Assert.Throws<System.ArgumentException>(() => LabSessionSettings.Fingerprint(obsolete, 3, 5632));
         }
 
         [Test]
         public void SharedCompletedGourdViewerOnOffChangesFingerprintAndSurvivesJsonAndClientApply()
         {
-            const ushort protocol = 5630;
+            const ushort protocol = 5632;
             float[] values = config.CaptureDeveloperValues();
             string offFingerprint = LabSessionSettings.Fingerprint(values, 3, protocol);
             values[111] = 1f;
@@ -1076,7 +1102,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(119));
+            Assert.That(received.Length, Is.EqualTo(129));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1092,6 +1118,45 @@ namespace C6Lab.Tests
                     Is.EqualTo(offFingerprint));
             }
             finally { Object.DestroyImmediate(client); }
+        }
+
+        [Test]
+        public void RopeTuningIsAtomicAndChangesTheSharedSettingsFingerprint()
+        {
+            float[] baseline = config.CaptureDeveloperValues();
+            string original = LabSessionSettings.Fingerprint(baseline, 3, 5632);
+            float[] changed = (float[])baseline.Clone();
+            changed[119] = .8f;
+            changed[120] = 1.8f;
+            changed[121] = .6f;
+            Assert.That(config.TryApplyDeveloperValues(changed, out string error), Is.True, error);
+            Assert.That(config.GourdRopeCycleAmplitude, Is.EqualTo(.8f));
+            Assert.That(LabSessionSettings.Fingerprint(config.CaptureDeveloperValues(), 3, 5632),
+                Is.Not.EqualTo(original));
+            changed[122] = 101f;
+            Assert.That(config.TryApplyDeveloperValues(changed, out error), Is.False);
+            Assert.That(error, Does.Contain("Gourd Rope Spring"));
+            Assert.That(config.CaptureDeveloperValues()[122], Is.EqualTo(baseline[122]));
+        }
+
+        [Test]
+        public void SwingTuningIsSharedAndRejectsInvalidAnglesAtomically()
+        {
+            float[] baseline = config.CaptureDeveloperValues();
+            string original = LabSessionSettings.Fingerprint(baseline, 3, 5632);
+            float[] changed = (float[])baseline.Clone();
+            changed[125] = 9f;
+            changed[126] = 48f;
+            changed[127] = 12f;
+            changed[128] = .8f;
+            Assert.That(config.TryApplyDeveloperValues(changed, out string error), Is.True, error);
+            Assert.That(config.GourdSwingMaximumAngle, Is.EqualTo(48f));
+            Assert.That(LabSessionSettings.Fingerprint(config.CaptureDeveloperValues(), 3, 5632),
+                Is.Not.EqualTo(original));
+            changed[126] = 76f;
+            Assert.That(config.TryApplyDeveloperValues(changed, out error), Is.False);
+            Assert.That(error, Does.Contain("Gourd Swing Maximum Angle"));
+            Assert.That(config.CaptureDeveloperValues()[126], Is.EqualTo(48f));
         }
 
         [Test]
