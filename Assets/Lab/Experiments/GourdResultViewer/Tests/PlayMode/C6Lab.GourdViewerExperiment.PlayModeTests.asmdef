@@ -1,0 +1,12 @@
+{
+  "name": "C6Lab.GourdViewerExperiment.PlayModeTests",
+  "rootNamespace": "C6Lab.Experiments.Tests",
+  "references": ["C6Lab.Runtime", "C6Lab.GourdViewerExperiment", "UnityEngine.UI"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}
