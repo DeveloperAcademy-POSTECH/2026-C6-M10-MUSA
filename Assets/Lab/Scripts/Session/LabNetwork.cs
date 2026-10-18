@@ -166,7 +166,8 @@ namespace C6Lab
         // #190: Arc/Straight profile adds seven settings; preserve viewer field 111; reject older 112-field peers.
         // 5632: Host-shared side-hit swing tuning for the exposed gourd underside.
         // 5633: Host-shared experimental paint grain presentation (four appended values).
-        internal const ushort LabProtocolVersion = 5633;
+        // 5634: Host-shared optional spread/drip morphology and gravity-directed growth.
+        internal const ushort LabProtocolVersion = 5634;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/10");
@@ -867,6 +868,7 @@ namespace C6Lab
             model = new LabModel();
             ulong[] playersInPOrder = playerSlots.PlayersInSlotOrder();
             model.Begin(sessionId, playersInPOrder, Time.realtimeSinceStartupAsDouble, config);
+            SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
             PublishSnapshot(true);
@@ -927,6 +929,7 @@ namespace C6Lab
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             model.BeginSolo(sessionId, LocalPlayerId, Time.realtimeSinceStartupAsDouble, config);
+            SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
             PublishSnapshot(true);
@@ -1156,7 +1159,7 @@ namespace C6Lab
                 && now - joinAttemptAt >= JoinAttemptSeconds) AdvanceJoinCandidate();
             if (IsHost && model != null)
             {
-                model.Tick(battleClock.Now(now));
+                SampleHostPaintFlow(battleClock.Now(now));
                 if (now >= nextSnapshotAt) PublishSnapshot(false);
             }
             if (!IsHost && (pendingPaintSnapshot != null || PaintReceiver.HasPending)
@@ -1626,6 +1629,18 @@ namespace C6Lab
                 + " exponent=" + config.ThrowPowerExponent.ToString("F2", CultureInfo.InvariantCulture)
                 + " loft=" + config.ThrowLoftOffsetDegrees.ToString("F1", CultureInfo.InvariantCulture)
                 + " damping=" + config.ThrowAirDamping.ToString("F2", CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>
+        /// Only the Host frame boundary samples world-down. Model requests use its last sample;
+        /// advancing before replacing it prevents the new pose from changing elapsed history.
+        /// </summary>
+        private void SampleHostPaintFlow(double now)
+        {
+            if (!IsHost || model == null) return;
+            Vector3 localDown = target != null && target.VisualMount != null
+                ? target.VisualMount.InverseTransformDirection(Vector3.down) : Vector3.down;
+            if (!model.SetPaintFlowDirection(localDown, now)) model.Tick(now);
         }
 
         private void OnProjectileResolved(LabProjectileResult result)

@@ -1,6 +1,6 @@
 # 기본 전투의 100% 공동 색칠·인접 성장·완성 박 관람 — #187·#191
 
-> **Experiment #196**: 기존 판정 맵 위에 물감 내부 입자·농담을 표시하는 선택 표현이다. 기본 OFF이며 DEV → Gourd → Paint Grain에서 켠다. 원본 도색·성장·완료 규칙은 유지하고 로컬 좌표 고정 RGB 명암만 추가한다. 새 설정129~132를 포함한133개·프로토콜5633을 사용하며 사용자 승인으로 main에 포함하며 기본 OFF를 유지한다. 세부 조절값과 검증은 루트 `README.md`·`docs/DEVELOPER_MODE_PARAMETER_SPEC.md`·`docs/VALIDATION.md`의 #196 항목을 따른다.
+> **Experiment #196**: 기존 판정 맵 위에 물감 내부 입자·농담을 표시하는 선택 표현이다. 기본 OFF이며 DEV → Gourd → Paint Grain에서 켠다. 원본 도색·성장·완료 규칙은 유지하고 로컬 좌표 고정 RGB 명암만 추가한다. 설정129~132를 추가한 #196은 사용자 승인으로 main에 병합됐으며 기본 OFF를 유지한다. 세부 조절값과 검증은 루트 `README.md`·`docs/DEVELOPER_MODE_PARAMETER_SPEC.md`·`docs/VALIDATION.md`의 #196 항목을 따른다.
 
 기본 실행·빌드 Scene은 `Assets/Lab/Scenes/Lab.unity`다. #153에서 이관한 `Resources/GourdPaint/WhiteGourd.prefab`·`WhiteGourd.mat`·`Stem.mat`의 원본 참조와 GUID, UI 배치와 빌드 Scene 목록을 유지한다. 박 외형과 실제 기존 원통 MeshCollider의 모양 차이도 유지한다. 단일 원본 `LabConfig.asset`은 Unity에서 목표 100과 성장 기본값 6개를 저장했으며 다른 설정의 유효값을 보존했다.
 
@@ -22,7 +22,7 @@
 | Paint Fill Chance (%) | 110번째 · 인덱스 109 | 60 | 0–100% | 이웃이 둘 이상 칠해진 빈 셀을 우선 채울 확률. 해당 후보가 없으면 다른 인접 후보로 진행한다. |
 | Paint Vertical Weight | 111번째 · 인덱스 110 | 1.35 | 1–4 | 세로 방향 인접 후보의 선택 가중치. 1은 가로와 같은 가중치다. |
 
-옛 에셋의 직렬화 목표 80은 `PaintVictoryPercent`·`CaptureDeveloperValues`에서 100으로 정규화한다. DEV/공유 설정으로 100 외 목표를 보내면 전체 설정을 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**로 나머지 설정과 함께 검증·적용한다. 새 판의 Rules는 `PaintGrowthSettings` 복사본을 캡처하므로 Inspector·입력칸만 바꿔 진행 중인 판에 적용하지 않는다. 현재 공유 설정은 총 **133개**, 프로토콜은 **5633**, 연결 토큰은 `C6PhysicsLab/10`이며 모든 참가자가 같은 새 버전을 사용해야 한다.
+옛 에셋의 직렬화 목표 80은 `PaintVictoryPercent`·`CaptureDeveloperValues`에서 100으로 정규화한다. DEV/공유 설정으로 100 외 목표를 보내면 전체 설정을 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**로 나머지 설정과 함께 검증·적용한다. 새 판의 Rules는 `PaintGrowthSettings` 복사본을 캡처하므로 Inspector·입력칸만 바꿔 진행 중인 판에 적용하지 않는다. 현재 #198 실험의 공유 설정은 총 **139개**, 프로토콜은 **5634**, 연결 토큰은 `C6PhysicsLab/10`이며 모든 참가자가 같은 새 버전을 사용해야 한다.
 
 ## 실제 명중과 공동 승리
 
@@ -42,7 +42,7 @@
 | --- | --- | --- | --- | --- |
 | Completed Gourd Viewer (0 off, 1 on) | 112번째 · 인덱스 111 · Gourd | OFF(0) | 정수 0–1 | Host가 전원의 관람 허용을 공유한다. 열기·회전·확대/축소는 각자 로컬에서 한다. |
 
-`LabConfig.CompletedGourdViewerEnabled`는 단일 원본의 bool이며 저장 필드가 없는 에셋도 false다. 기존 0~110번과 111번째 `Paint Vertical Weight`를 보존한다. 133개 배열 전체를 검증하므로 잘못된 bool 입력과 구형 132개 이하 배열은 원자적으로 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 기존 지문·참가자 확인 응답과 함께 적용한다. 진행 중인 판에 즉시 바꾸지 않는다. 일반 Release 참가자도 Host 허용값을 따르며 관람에 별도 Debug·실행 인자·Editor 메뉴 조건을 요구하지 않는다.
+`LabConfig.CompletedGourdViewerEnabled`는 단일 원본의 bool이며 저장 필드가 없는 에셋도 false다. 기존 0~110번과 111번째 `Paint Vertical Weight`를 보존한다. 139개 배열 전체를 검증하므로 잘못된 bool 입력과 구형 138개 이하 배열은 원자적으로 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 기존 지문·참가자 확인 응답과 함께 적용한다. 진행 중인 판에 즉시 바꾸지 않는다. 일반 Release 참가자도 Host 허용값을 따르며 관람에 별도 Debug·실행 인자·Editor 메뉴 조건을 요구하지 않는다.
 
 ON인 Paint **100% Victory**에서 Snapshot과 공개 표시 맵의 세션·라운드·해상도·Revision·칠한/전체 셀 수·명중 수가 일치해야 관람 버튼이 나타난다. Crack·Defeat·분할 수신 중 맵에는 나타나지 않는다. 필요한 결과에서 `Assets/Lab/Resources/GourdResultViewer/ViewerUI.prefab`을 불러오며 드래그 회전·핀치/마우스 휠 확대·축소·**RESET VIEW**는 각자 화면에만 적용한다. 불투명 모달은 아래 결과 버튼 입력을 막는다.
 
@@ -90,3 +90,9 @@ Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 
 과거 PR의 EditMode·PlayMode·빌드 PASS는 이번 인접 성장·111개 설정·100% 고정·셀 delta·체크포인트·표시 동시 반영의 결과로 승계하지 않는다. 실제 컴파일·테스트·다중 앱 결과는 `docs/VALIDATION.md`의 #187 기록을 따른다. 이 문서는 실행 PASS를 부여하지 않으며 패킷 fixture를 실제 네트워크 실행으로 보고하지 않는다. 실제 기기·핫스팟·iOS 빌드/조작/성능은 별도 실행 항목으로 남긴다.
 
 #191 통합본은 EditMode 331/331·PlayMode 116/116, 실제 Mac Development Host + Release Client의 ON 관람·같은 방 OFF 재시작/완료 차단 및 최종 일반 Mac 빌드를 새로 확인했다. 두 앱의 각 9개 체크포인트와 종료 코드 0을 기록했다. iOS·실제 터치·핫스팟·3~5기기·기본 밸런스는 NOT_RUN이다. 실행 fixture와 한계는 저장소 `docs/VALIDATION.md`에 기록하며 과거 #187·#189 PASS와 구분한다.
+
+## Experiment #198 — 번짐·흐름 성장
+
+기본 성장 ORIGINAL을 보존하며 DEV → Gourd → Paint Growth Style을 SPREAD + FLOW로 바꾸면 연결된 비대칭 초기 얼룩과 아래 방향의 지속 꼬리를 사용한다. 불규칙도·흐름 선택 확률·구면 각거리 폭/길이·중력 우대는 인덱스134~138이다. 초기/반복 명중 면적과 시간당 성장량은 기존 단일 예산을 쓰며, 흐름의 폭을 채우는 셀도 예산을 소비한다. 막힌 꼬리·바닥·최대 길이는 일반 경계 확장으로 돌아가 마지막 셀까지 도달한다. 원래 색을 덮거나 혼합하지 않는다.
+
+Host가 전투 프레임 경계에서 월드 아래를 `VisualMount` 로컬 방향으로 변환해 다음 성장 구간에 적용한다. 기존 도색은 박에 고정되고, Client는 Host RGBA 지도를 받아 표시한다. 새 입력마다 방향을 다시 뽑지 않으며, 서로 다른 FPS의 독립 시뮬레이션이 같은 지도를 만든다고 보장하지 않는다. Paint Grain과는 독립 설정이다. 사용자 승인으로 main에 포함하며 기본 성장 방식 ORIGINAL은 유지한다. 실제 실행 범위는 `docs/VALIDATION.md`의 #198 기록을 따른다.

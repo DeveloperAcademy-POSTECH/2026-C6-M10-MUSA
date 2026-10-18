@@ -209,7 +209,13 @@ namespace C6Lab
             LabDeveloperField.Toggle("Paint Grain (0 off, 1 on)"),
             new LabDeveloperField("Paint Grain Size", .25f, 4f),
             new LabDeveloperField("Paint Grain Strength", 0f, 1f),
-            new LabDeveloperField("Paint Mottle Strength", 0f, 1f)
+            new LabDeveloperField("Paint Mottle Strength", 0f, 1f),
+            LabDeveloperField.Toggle("Paint Growth Style (0 original, 1 spread + flow)", "ORIGINAL", "SPREAD + FLOW"),
+            new LabDeveloperField("Paint Edge Raggedness", 0f, 1f),
+            new LabDeveloperField("Paint Flow Ratio", 0f, 1f),
+            new LabDeveloperField("Paint Drip Width (surface degrees)", .5f, 12f),
+            new LabDeveloperField("Paint Drip Length (surface degrees)", 5f, 135f),
+            new LabDeveloperField("Paint Gravity Weight", 1f, 8f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -238,7 +244,8 @@ namespace C6Lab
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
             new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111,
-                119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132),
+                119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
+                133, 134, 135, 136, 137, 138),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
         });
 
@@ -373,6 +380,18 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float paintGrainStrength = .3f;
         [Tooltip("도색된 표면의 큰 얼룩 농담 세기. 0이면 큰 얼룩 변화를 끈다.")]
         [SerializeField, Range(0f, 1f)] private float paintMottleStrength = .18f;
+        [Tooltip("실험용 성장 방식. 0은 기존 성장, 1은 퍼짐과 중력 방향 흐름을 함께 사용한다. 새 판에 적용한다.")]
+        [SerializeField, Range(0, 1)] private int paintGrowthStyle = 0;
+        [Tooltip("퍼짐 경계의 불규칙한 정도. 도색 면적 예산과는 별개다.")]
+        [SerializeField, Range(0f, 1f)] private float paintEdgeRaggedness = .55f;
+        [Tooltip("성장 셀마다 흐름 경로를 시도할 확률. 막히면 같은 예산으로 일반 퍼짐을 사용한다.")]
+        [SerializeField, Range(0f, 1f)] private float paintFlowRatio = .35f;
+        [Tooltip("흐름 띠의 전체 폭을 구면 각도로 지정한다. 표면 분할 해상도와 독립적이다.")]
+        [SerializeField, Range(.5f, 12f)] private float paintDripWidthDegrees = 3f;
+        [Tooltip("한 흐름이 표면을 따라 내려갈 최대 길이(구면 각도).")]
+        [SerializeField, Range(5f, 135f)] private float paintDripLengthDegrees = 60f;
+        [Tooltip("가능한 이웃 중 중력 방향을 선택하는 상대 가중치. 1이면 추가 우대하지 않는다.")]
+        [SerializeField, Range(1f, 8f)] private float paintGravityWeight = 3f;
         [Tooltip("박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다. 최대가 0이면 떨어뜨리지 않는다 (#177).")]
         [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
         [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
@@ -613,7 +632,13 @@ namespace C6Lab
             RepeatPercent = PaintRepeatPercent,
             GrowthPercentPerSecond = PaintGrowthPercentPerSecond,
             FillChancePercent = PaintFillChancePercent,
-            VerticalWeight = PaintVerticalWeight
+            VerticalWeight = PaintVerticalWeight,
+            Style = PaintGrowthStyle,
+            Raggedness = PaintEdgeRaggedness,
+            FlowRatio = PaintFlowRatio,
+            DripWidthDegrees = PaintDripWidthDegrees,
+            DripLengthDegrees = PaintDripLengthDegrees,
+            GravityWeight = PaintGravityWeight
         };
         public bool CompletedGourdViewerEnabled => completedGourdViewerEnabled;
         public float GourdRopeCycleAmplitude => Mathf.Clamp(Finite(gourdRopeCycleAmplitude, .45f), 0f, 1f);
@@ -630,6 +655,12 @@ namespace C6Lab
         public float PaintGrainSize => Mathf.Clamp(Finite(paintGrainSize, 1f), .25f, 4f);
         public float PaintGrainStrength => Mathf.Clamp01(Finite(paintGrainStrength, .3f));
         public float PaintMottleStrength => Mathf.Clamp01(Finite(paintMottleStrength, .18f));
+        public int PaintGrowthStyle => Mathf.Clamp(paintGrowthStyle, 0, 1);
+        public float PaintEdgeRaggedness => Mathf.Clamp01(Finite(paintEdgeRaggedness, .55f));
+        public float PaintFlowRatio => Mathf.Clamp01(Finite(paintFlowRatio, .35f));
+        public float PaintDripWidthDegrees => Mathf.Clamp(Finite(paintDripWidthDegrees, 3f), .5f, 12f);
+        public float PaintDripLengthDegrees => Mathf.Clamp(Finite(paintDripLengthDegrees, 60f), 5f, 135f);
+        public float PaintGravityWeight => Mathf.Clamp(Finite(paintGravityWeight, 3f), 1f, 8f);
         public float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         public float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -740,7 +771,9 @@ namespace C6Lab
                 GourdRopeSpring, GourdRopeDamping, GourdRopeMaximumHitExtension,
                 GourdSwingImpactStrength, GourdSwingMaximumAngle,
                 GourdSwingReturnStrength, GourdSwingDamping,
-                PaintGrainEnabled ? 1f : 0f, PaintGrainSize, PaintGrainStrength, PaintMottleStrength
+                PaintGrainEnabled ? 1f : 0f, PaintGrainSize, PaintGrainStrength, PaintMottleStrength,
+                (float)PaintGrowthStyle, PaintEdgeRaggedness, PaintFlowRatio,
+                PaintDripWidthDegrees, PaintDripLengthDegrees, PaintGravityWeight
             };
         }
 
@@ -917,6 +950,12 @@ namespace C6Lab
             paintGrainSize = values[130];
             paintGrainStrength = values[131];
             paintMottleStrength = values[132];
+            paintGrowthStyle = (int)values[133];
+            paintEdgeRaggedness = values[134];
+            paintFlowRatio = values[135];
+            paintDripWidthDegrees = values[136];
+            paintDripLengthDegrees = values[137];
+            paintGravityWeight = values[138];
             error = string.Empty;
             return true;
         }

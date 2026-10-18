@@ -25,8 +25,8 @@ namespace C6Lab.Tests
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(133));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(133));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(139));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(139));
         }
 
         [UnityTearDown]
@@ -89,6 +89,12 @@ namespace C6Lab.Tests
             yield return null;
             Canvas.ForceUpdateCanvases();
             var input = (RectTransform)ui.valueInputs[132].transform;
+            // More Gourd settings can follow the grain group; scroll to this input rather
+            // than assuming that the grain group remains the content's final rows.
+            Vector3 rowCenter = scroll.viewport.InverseTransformPoint(input.TransformPoint(input.rect.center));
+            scroll.content.anchoredPosition += Vector2.up * (scroll.viewport.rect.center.y - rowCenter.y);
+            scroll.StopMovement();
+            Canvas.ForceUpdateCanvases();
             Vector3 center = scroll.viewport.InverseTransformPoint(input.TransformPoint(input.rect.center));
             Assert.That(scroll.viewport.rect.Contains(new Vector2(center.x, center.y)), Is.True,
                 "The final grain slider and input must be reachable after scrolling.");

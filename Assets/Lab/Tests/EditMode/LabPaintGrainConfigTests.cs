@@ -44,17 +44,17 @@ namespace C6Lab.Tests
         [Test]
         public void FourVisualSettingsAppendDisabledByDefaultWithoutReplacingPreviousFields()
         {
-            Assert.That(baseline.Length, Is.EqualTo(133));
-            Assert.That(baseline.Skip(129), Is.EqualTo(new[] { 0f, 1f, .3f, .18f }));
+            Assert.That(baseline.Length, Is.EqualTo(139));
+            Assert.That(baseline.Skip(129).Take(4), Is.EqualTo(new[] { 0f, 1f, .3f, .18f }));
             Assert.That(config.PaintGrainEnabled, Is.False);
-            Assert.That(LabConfig.DeveloperFields.Skip(129).Select(field => field.Label), Is.EqualTo(new[]
+            Assert.That(LabConfig.DeveloperFields.Skip(129).Take(4).Select(field => field.Label), Is.EqualTo(new[]
             {
                 "Paint Grain (0 off, 1 on)", "Paint Grain Size", "Paint Grain Strength", "Paint Mottle Strength"
             }));
             Assert.That(LabConfig.DeveloperFields[129].IsToggle, Is.True);
-            Assert.That(LabConfig.DeveloperFields.Skip(130).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
+            Assert.That(LabConfig.DeveloperFields.Skip(130).Take(3).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
             var category = LabConfig.DeveloperCategories.Single(item => item.Title == "Gourd");
-            Assert.That(category.FieldIndices.Skip(category.FieldIndices.Length - 4), Is.EqualTo(new[] { 129, 130, 131, 132 }));
+            Assert.That(category.FieldIndices.Where(index => index >= 129 && index <= 132), Is.EqualTo(new[] { 129, 130, 131, 132 }));
         }
 
         [TestCaseSource(nameof(Fields))]
@@ -120,7 +120,7 @@ namespace C6Lab.Tests
             Assert.That(error, Does.Contain("incomplete"));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
             Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(values, 3, Protocol));
-            Assert.That(Protocol, Is.EqualTo(5633));
+            Assert.That(Protocol, Is.EqualTo(5634));
         }
 
         [Test]
