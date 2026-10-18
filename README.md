@@ -1,6 +1,6 @@
 # C6 Physics Lab
 
-> **Experiment #198 — 번짐·아래 흐름 성장 실험 브랜치**입니다. 기본은 ORIGINAL이며 DEV → Gourd → Paint Growth Style에서 SPREAD + FLOW로 바꿔 새 판에 적용합니다. #196의 내부 입자와 별도로 비교하며 이번 실험은 main에 자동 병합하지 않습니다.
+> **Experiment #198 — 번짐·아래 흐름 성장**은 선택 가능한 실험 기능입니다. 기본은 ORIGINAL이며 DEV → Gourd → Paint Growth Style에서 SPREAD + FLOW로 바꿔 새 판에 적용합니다. #196의 내부 입자와 독립적으로 켜고 비교합니다. 사용자 승인으로 main에 포함하며 기본 성장 방식은 유지합니다.
 
 > **박 물감 내부 질감(#196)**은 기본 OFF인 선택 표현입니다. DEV → Gourd → Paint Grain을 ON으로 바꾸고 새 판에 적용합니다. 도색 외곽·비산점·면적·성장·승리 규칙은 변경하지 않습니다.
 
