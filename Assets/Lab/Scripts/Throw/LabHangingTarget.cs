@@ -134,11 +134,21 @@ namespace C6Lab
             ApplyRopeLength();
         }
 
-        /// <summary>Keep a remote target close to the Host's moving hitbox between impact packets.</summary>
-        public void ReconcileRope(float elapsed, float hitOffset, float hitVelocity)
+        /// <summary>Keep a remote target close to the Host, or pin its rope state while paused.</summary>
+        public void ReconcileRope(float elapsed, float hitOffset, float hitVelocity, bool paused = false)
         {
             if (pivot == null || !Finite(elapsed) || !Finite(hitOffset) || !Finite(hitVelocity)) return;
             float phase = Mathf.Repeat(elapsed, CyclePeriod);
+            if (paused)
+            {
+                // FixedUpdate is stopped during a shared pause. Resolve the remaining error
+                // once so identical paused snapshots cannot keep moving the collider and art.
+                cycleElapsed = phase;
+                verticalOffset = hitOffset;
+                verticalVelocity = hitVelocity;
+                ApplyRopeLength();
+                return;
+            }
             float phaseError = Mathf.DeltaAngle(cycleElapsed / CyclePeriod * 360f,
                 phase / CyclePeriod * 360f) / 360f * CyclePeriod;
             if (Mathf.Abs(phaseError) > .25f) cycleElapsed = phase;
@@ -177,9 +187,18 @@ namespace C6Lab
         }
 
         /// <summary>Reconcile unwrapped yaw from the latest host snapshot.</summary>
-        public void ReconcileYaw(float angleDegrees, float speedDegreesPerSecond)
+        public void ReconcileYaw(float angleDegrees, float speedDegreesPerSecond, bool paused = false)
         {
             if (twistPivot == null || !Finite(angleDegrees) || !Finite(speedDegreesPerSecond)) return;
+            if (paused)
+            {
+                // A paused target has one authoritative pose, rather than a moving blend.
+                yawAngleDegrees = angleDegrees;
+                yawSpeedDegreesPerSecond = Mathf.Clamp(speedDegreesPerSecond,
+                    -maximumSpinSpeed, maximumSpinSpeed);
+                ApplyYawRotation();
+                return;
+            }
             float difference = angleDegrees - yawAngleDegrees;
             // Snapshot angles describe the Host at send time. During a fast spin, ordinary
             // transit delay makes them older than the locally integrated pose. Avoid pulling
@@ -230,7 +249,9 @@ namespace C6Lab
 
         private void FixedUpdate()
         {
-            if (pivot == null) return;
+            // A snapshot can pause during NetworkEarlyUpdate after this frame's fixed ticks
+            // were queued. Do not integrate that last queued callback after the pose is pinned.
+            if (pivot == null || Time.timeScale <= 0f) return;
             ApplyRopeLength();
             float dt = Time.fixedDeltaTime;
             cycleElapsed = Mathf.Repeat(cycleElapsed + dt, CyclePeriod);

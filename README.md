@@ -56,6 +56,10 @@ Unity Editor에서 Play를 누르거나 **Development Build**로 만든 앱을 �
 
 Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤, 129개 설정을 확인하고 고정 목표 외의 값을 숫자 입력·슬라이더·토글로 조정합니다. 숫자 입력은 정확한 값을 지정할 때 사용하며 두 조작은 서로 같은 값을 보여줍니다. DEV의 **ROOM PLAYERS**는 일반 로비의 인원 선택과 같은 값을 표시·변경합니다. **CREATE ROOM**을 누르면 선택한 인원과 조정값으로 방을 만들고, 참가자가 자동 방 목록에서 이름을 선택하거나 직접 IP **JOIN**으로 들어오면 Host 설정을 받습니다. Host 로비에서 전투 시작 전에 다시 DEV를 열어 값을 바꿀 수 있으며, 이때 버튼은 **APPLY TO ROOM**입니다. 변경된 설정에 대해 참가자의 확인이 끝나야 **START**할 수 있습니다. 인원수는 방을 만들기 전에 선택합니다. Editor·Development Build의 Host는 전투를 일시정지한 뒤 **DEV → APPLY & RESTART**로 새 설정을 참가자에게 보내고 확인을 받아 새 판을 시작할 수 있습니다. 진행 중인 판의 설정은 바꾸지 않고, 설정은 실행 중인 세션의 복사본에만 적용되며 `LabConfig.asset`에는 저장되지 않습니다.
 
+### 박 줄·기울기 조절하기 (#194 / #195)
+
+**DEV → Gourd**를 펼쳐 줄 6개와 기울기 4개 값을 숫자나 슬라이더로 바꿉니다. 항목이 아래에 있으면 패널 안을 스크롤하세요. 솔로는 **RESTART SOLO**, 공유 방은 Host 로비의 **APPLY TO ROOM** 또는 공동 일시정지 후 **APPLY & RESTART**로 적용합니다. 후자는 참가자 확인 뒤 새 판을 시작합니다. 값 조작과 DEFAULTS는 폼만 바꾸며 원본 Config에 저장하지 않습니다. [조정 방법과 각 항목](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)을 참고하세요.
+
 ### 완성된 박 관람하기 (#191)
 
 DEV의 `Gourd` 묶음에 있는 **Completed Gourd Viewer (0 off, 1 on)**은 **112번째(인덱스 111)** 설정이며 기본값은 **OFF(0)**입니다. 기존 0~110번 설정과 111번째 `Paint Vertical Weight`의 위치는 그대로 유지합니다. ON으로 적용한 판에서 Paint가 전체 셀을 칠해 **100% Victory**가 되고 Snapshot과 공개 표시 맵의 세션·라운드·해상도·Revision·셀 수·명중 수가 일치하면 결과 화면에 관람 버튼을 표시합니다. Crack·Defeat·미완성 또는 아직 수신 중인 맵에는 표시하지 않습니다.

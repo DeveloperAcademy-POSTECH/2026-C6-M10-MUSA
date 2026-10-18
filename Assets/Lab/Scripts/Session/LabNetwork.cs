@@ -2029,14 +2029,15 @@ namespace C6Lab
             if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
             ApplyLocalPause(snapshot.phase == LabPhase.Playing && snapshot.paused);
+            bool targetPaused = snapshot.phase == LabPhase.Playing && snapshot.paused;
             if (target != null && Finite(snapshot.targetYawDegrees)
                 && Finite(snapshot.targetYawSpeedDegreesPerSecond))
                 target.GetComponent<LabHangingTarget>()?.ReconcileYaw(
-                    snapshot.targetYawDegrees, snapshot.targetYawSpeedDegreesPerSecond);
+                    snapshot.targetYawDegrees, snapshot.targetYawSpeedDegreesPerSecond, targetPaused);
             if (target != null)
                 target.GetComponent<LabHangingTarget>()?.ReconcileRope(
                     snapshot.targetRopeCycleElapsed, snapshot.targetRopeHitOffset,
-                    snapshot.targetRopeHitVelocity);
+                    snapshot.targetRopeHitVelocity, targetPaused);
             SyncBoard();
             if (logTransition && latest.phase == LabPhase.Playing) SetNotice(string.Empty);
             SetStatus((latest.paused ? "PAUSED" : latest.phase.ToString())
