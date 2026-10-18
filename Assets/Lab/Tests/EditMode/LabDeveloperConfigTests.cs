@@ -18,7 +18,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(111));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(112));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -128,6 +128,8 @@ namespace C6Lab.Tests
             values[108] = 8f; // growth per second
             values[109] = 75f; // frontier fill chance
             values[110] = 2f; // vertical preference
+            Assert.That(values[111], Is.Zero, "Completed-gourd viewing is off by default.");
+            values[111] = 1f; // allow the room to inspect completed Paint results locally
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.MinimapEnabled, Is.False, "DEV can turn the minimap off.");
             Assert.That(config.MinimapSizePercent, Is.EqualTo(80), "DEV sizes the minimap from 0 to 100 with 50 in the middle.");
@@ -151,7 +153,8 @@ namespace C6Lab.Tests
             Assert.That(config.PaintGrowthPercentPerSecond, Is.EqualTo(8f));
             Assert.That(config.PaintFillChancePercent, Is.EqualTo(75f));
             Assert.That(config.PaintVerticalWeight, Is.EqualTo(2f));
-            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "All 111 fields round-trip in wire order.");
+            Assert.That(config.CompletedGourdViewerEnabled, Is.True);
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "All 112 fields round-trip in wire order.");
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
             Assert.That(config.GenerateCost, Is.EqualTo(5f));
@@ -673,7 +676,7 @@ namespace C6Lab.Tests
                 "Bomb Sound (0 boom, 1 ppeong)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(105));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(111));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(112));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             LabDeveloperField field = LabConfig.DeveloperFields[87];
@@ -705,7 +708,7 @@ namespace C6Lab.Tests
             int[] gourdIndices = null;
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
                 if (category.Title == "Gourd") gourdIndices = category.FieldIndices;
-            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110 }));
+            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111 }));
             Assert.That(config.GourdBombIntervalMin, Is.EqualTo(20f));
             Assert.That(config.GourdBombIntervalMax, Is.EqualTo(30f));
 
@@ -844,12 +847,12 @@ namespace C6Lab.Tests
             };
             for (int i = 0; i < labels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[105 + i].Label, Is.EqualTo(labels[i]), "Appended index " + (105 + i));
-            Assert.That(config.CaptureDeveloperValues().Skip(105).ToArray(),
+            Assert.That(config.CaptureDeveloperValues().Skip(105).Take(6).ToArray(),
                 Is.EqualTo(new[] { 2f, 2f, 4f, 6f, 60f, 1.35f }));
             Assert.That(LabConfig.DeveloperFields[105].WholeNumber, Is.True);
             for (int i = 106; i <= 110; i++) Assert.That(LabConfig.DeveloperFields[i].WholeNumber, Is.False);
             var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
-            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110 }));
+            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111 }));
         }
 
         [TestCase(105, 0f, 2f)]
@@ -960,18 +963,143 @@ namespace C6Lab.Tests
         public void InspectorPaintGrowthValuesUseFiniteClampedSettings()
         {
             JsonUtility.FromJsonOverwrite("{\"paintSurfaceResolution\":-1,\"paintInitialPercent\":0,\"paintRepeatPercent\":200,\"paintGrowthPercentPerSecond\":0,\"paintFillChancePercent\":-1,\"paintVerticalWeight\":9}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(105).ToArray(), Is.EqualTo(new[] { 0f, .1f, 100f, .1f, 0f, 4f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(105).Take(6).ToArray(), Is.EqualTo(new[] { 0f, .1f, 100f, .1f, 0f, 4f }));
             JsonUtility.FromJsonOverwrite("{\"paintSurfaceResolution\":99,\"paintInitialPercent\":200,\"paintRepeatPercent\":0,\"paintGrowthPercentPerSecond\":200,\"paintFillChancePercent\":200,\"paintVerticalWeight\":0}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(105).ToArray(), Is.EqualTo(new[] { 2f, 100f, .1f, 100f, 100f, 1f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(105).Take(6).ToArray(), Is.EqualTo(new[] { 2f, 100f, .1f, 100f, 100f, 1f }));
         }
 
+
+        [Test]
+        public void CompletedGourdViewerDefaultsOffAtTheLastGourdToggleWithoutChangingTheFixedGoal()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            Assert.That(values.Length, Is.EqualTo(112));
+            Assert.That(config.CompletedGourdViewerEnabled, Is.False);
+            Assert.That(values[111], Is.Zero);
+            LabDeveloperField field = LabConfig.DeveloperFields[111];
+            Assert.That(field.Label, Is.EqualTo("Completed Gourd Viewer (0 off, 1 on)"));
+            Assert.That(field.DisplayLabel, Is.EqualTo("Completed Gourd Viewer"));
+            Assert.That(field.IsToggle, Is.True);
+            Assert.That(field.WholeNumber, Is.True);
+            Assert.That(new[] { field.Min, field.Max }, Is.EqualTo(new[] { 0f, 1f }));
+            Assert.That(new[] { field.OffText, field.OnText }, Is.EqualTo(new[] { "OFF", "ON" }));
+            var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
+            Assert.That(gourd.FieldIndices.Last(), Is.EqualTo(111));
+            Assert.That(LabConfig.DeveloperFields[110].Label, Is.EqualTo("Paint Vertical Weight"));
+            Assert.That(LabConfig.DeveloperFields[87].Label, Is.EqualTo("Paint Victory Coverage (%)"));
+            Assert.That(new[] { LabConfig.DeveloperFields[87].Min, LabConfig.DeveloperFields[87].Max },
+                Is.EqualTo(new[] { 100f, 100f }));
+            Assert.That(values[87], Is.EqualTo(100f));
+        }
+
+        [TestCase(0f)]
+        [TestCase(1f)]
+        public void CompletedGourdViewerRoundTripsWithoutChangingAnyPrevious111Values(float enabled)
+        {
+            float[] before = config.CaptureDeveloperValues();
+            float[] values = (float[])before.Clone();
+            values[111] = enabled;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.CompletedGourdViewerEnabled, Is.EqualTo(enabled == 1f));
+            float[] after = config.CaptureDeveloperValues();
+            Assert.That(after, Is.EqualTo(values));
+            Assert.That(after.Take(111).ToArray(), Is.EqualTo(before.Take(111).ToArray()),
+                "Appending a presentation toggle cannot change existing gameplay settings.");
+            Assert.That(config.PaintVictoryPercent, Is.EqualTo(100));
+            Assert.That(config.PaintVictoryCoverage, Is.EqualTo(1f));
+        }
+
+        [TestCase(-1f)]
+        [TestCase(2f)]
+        [TestCase(.5f)]
+        [TestCase(.9999f)]
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void InvalidCompletedGourdViewerToggleRejectsTheWholeForm(float invalid)
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[111] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            float[] baseline = config.CaptureDeveloperValues();
+            values[0] = 777f;
+            values[79] = 1f;
+            values[110] = 2f;
+            values[111] = invalid;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
+            Assert.That(error, Does.Contain("Completed Gourd Viewer"));
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline),
+                "A bad final field cannot partially change earlier settings or disable the accepted toggle.");
+            Assert.That(config.CompletedGourdViewerEnabled, Is.True);
+        }
+
+        [TestCase(111)]
+        [TestCase(113)]
+        public void Previous111OrOversizedViewerSettingsAreRejectedAtomically(int count)
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[111] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            float[] baseline = config.CaptureDeveloperValues();
+            var obsolete = new float[count];
+            System.Array.Copy(baseline, obsolete, Mathf.Min(count, baseline.Length));
+            obsolete[0] = 777f;
+            obsolete[79] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(obsolete, out error), Is.False);
+            Assert.That(error, Does.Contain("incomplete"));
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline),
+                "A legacy 111-value form must not silently append OFF or apply any earlier field.");
+            Assert.That(config.CompletedGourdViewerEnabled, Is.True);
+            Assert.Throws<System.ArgumentException>(() => LabSessionSettings.Fingerprint(obsolete, 3, 5629));
+        }
+
+        [Test]
+        public void SharedCompletedGourdViewerOnOffChangesFingerprintAndSurvivesJsonAndClientApply()
+        {
+            const ushort protocol = 5629;
+            float[] values = config.CaptureDeveloperValues();
+            string offFingerprint = LabSessionSettings.Fingerprint(values, 3, protocol);
+            values[111] = 1f;
+            string onFingerprint = LabSessionSettings.Fingerprint(values, 3, protocol);
+            Assert.That(onFingerprint, Is.Not.EqualTo(offFingerprint),
+                "The room must acknowledge the Host's viewing permission with its other settings.");
+            string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
+            float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
+            Assert.That(received.Length, Is.EqualTo(112));
+            var client = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                Assert.That(client.TryApplyDeveloperValues(received, out string error), Is.True, error);
+                Assert.That(client.CompletedGourdViewerEnabled, Is.True);
+                Assert.That(client.CaptureDeveloperValues(), Is.EqualTo(values));
+                Assert.That(LabSessionSettings.Fingerprint(client.CaptureDeveloperValues(), 3, protocol),
+                    Is.EqualTo(onFingerprint));
+                received[111] = 0f;
+                Assert.That(client.TryApplyDeveloperValues(received, out error), Is.True, error);
+                Assert.That(client.CompletedGourdViewerEnabled, Is.False);
+                Assert.That(LabSessionSettings.Fingerprint(client.CaptureDeveloperValues(), 3, protocol),
+                    Is.EqualTo(offFingerprint));
+            }
+            finally { Object.DestroyImmediate(client); }
+        }
+
+        [Test]
+        public void InspectorCompletedGourdViewerFlagUsesTheSameCapturedBoolean()
+        {
+            JsonUtility.FromJsonOverwrite("{\"completedGourdViewerEnabled\":true}", config);
+            Assert.That(config.CompletedGourdViewerEnabled, Is.True);
+            Assert.That(config.CaptureDeveloperValues()[111], Is.EqualTo(1f));
+            JsonUtility.FromJsonOverwrite("{\"completedGourdViewerEnabled\":false}", config);
+            Assert.That(config.CompletedGourdViewerEnabled, Is.False);
+            Assert.That(config.CaptureDeveloperValues()[111], Is.Zero);
+        }
 
         [Test]
         public void OnOffFieldsShowAsTogglesWithShortNamesButKeepTheirValuesAndLabels()
         {
             var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
             Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
-                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound" }));
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer" }));
             Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
                 "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
             var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");

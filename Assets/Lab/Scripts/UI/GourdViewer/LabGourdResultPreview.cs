@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace C6Lab.Experiments
+namespace C6Lab
 {
     /// <summary>
     /// A local, disposable render-only copy of one committed Paint victory. It owns every
@@ -42,7 +42,7 @@ namespace C6Lab.Experiments
         public uint PaintRevision { get; private set; }
         public int PaintCellCount { get; private set; }
         public string PaintPixelHash { get; private set; }
-        /// <summary>Read-only observation points for Experiment rendering/isolation tests.</summary>
+        /// <summary>Read-only observation points for completed-result rendering/isolation tests.</summary>
         public Transform ModelRoot => modelPivot;
         public Camera PreviewCamera => previewCamera;
 
@@ -99,9 +99,9 @@ namespace C6Lab.Experiments
         public static bool SurfaceMatches(LabNetwork network, out string error)
         {
             if (network == null || !network.IsConnected || network.config == null
-                || network.config.GourdMode != LabGourdMode.Paint)
+                || !network.config.CompletedGourdViewerEnabled || network.config.GourdMode != LabGourdMode.Paint)
             {
-                error = "A connected Paint result is required.";
+                error = "A connected Paint result with completed gourd viewing enabled is required.";
                 return false;
             }
             LabSnapshot snapshot = network.Snapshot;
@@ -140,13 +140,13 @@ namespace C6Lab.Experiments
             PaintPixelHash = HashPixels(pixels);
             paintTexture = new Texture2D(surface.Columns, surface.Rows, TextureFormat.RGBA32, false, true)
             {
-                name = "Experiment result paint copy", hideFlags = HideFlags.HideAndDontSave,
+                name = "Completed gourd paint copy", hideFlags = HideFlags.HideAndDontSave,
                 filterMode = FilterMode.Point, wrapModeU = TextureWrapMode.Repeat, wrapModeV = TextureWrapMode.Clamp
             };
             paintTexture.SetPixels32(pixels);
             paintTexture.Apply(false, false);
 
-            root = NewObject("Experiment result preview", null);
+            root = NewObject("Completed gourd preview", null);
             root.SetActive(false);
             modelPivot = NewObject("Local model rotation", root.transform).transform;
             Transform normalization = NewObject("Centered model", modelPivot).transform;
@@ -188,7 +188,7 @@ namespace C6Lab.Experiments
             previewCamera.farClipPlane = fitDistance * 2f + 3f;
             texture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32)
             {
-                name = "Experiment result view", hideFlags = HideFlags.HideAndDontSave,
+                name = "Completed gourd view", hideFlags = HideFlags.HideAndDontSave,
                 antiAliasing = 1, useMipMap = false, autoGenerateMips = false,
                 filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp
             };

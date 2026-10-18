@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
-namespace C6Lab.Experiments
+namespace C6Lab
 {
     /// <summary>Pointer drag/wheel and two-finger pinch restricted to the preview rectangle.</summary>
     public sealed class GourdViewerGestureSurface : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,

@@ -1,7 +1,7 @@
 using NUnit.Framework;
 using UnityEngine;
 
-namespace C6Lab.Experiments.Tests
+namespace C6Lab.Tests
 {
     public sealed class GourdResultViewerEligibilityTests
     {
@@ -9,9 +9,9 @@ namespace C6Lab.Experiments.Tests
         public void OnlyACompleteCommittedVictoryIsEligible()
         {
             LabPaintSurface map = CompletedMap();
-            Assert.That(GourdResultViewerExperiment.IsEligible(Snapshot(map), map), Is.True);
-            Assert.That(GourdResultViewerExperiment.IsEligible(null, map), Is.False);
-            Assert.That(GourdResultViewerExperiment.IsEligible(Snapshot(map), null), Is.False);
+            Assert.That(LabGourdResultViewer.IsEligible(Snapshot(map), map), Is.True);
+            Assert.That(LabGourdResultViewer.IsEligible(null, map), Is.False);
+            Assert.That(LabGourdResultViewer.IsEligible(Snapshot(map), null), Is.False);
         }
 
         [TestCase("phase")]
@@ -41,7 +41,7 @@ namespace C6Lab.Experiments.Tests
                     snapshot = Snapshot(map);
                     break;
             }
-            Assert.That(GourdResultViewerExperiment.IsEligible(snapshot, map), Is.False, mismatch);
+            Assert.That(LabGourdResultViewer.IsEligible(snapshot, map), Is.False, mismatch);
         }
 
         [TestCase(LabPhase.Idle)]
@@ -52,7 +52,7 @@ namespace C6Lab.Experiments.Tests
             LabPaintSurface map = CompletedMap();
             LabSnapshot snapshot = Snapshot(map);
             snapshot.phase = phase;
-            Assert.That(GourdResultViewerExperiment.IsEligible(snapshot, map), Is.False);
+            Assert.That(LabGourdResultViewer.IsEligible(snapshot, map), Is.False);
         }
 
         [Test]
@@ -61,13 +61,13 @@ namespace C6Lab.Experiments.Tests
             LabPaintSurface map = CompletedMap();
             LabSnapshot snapshot = Snapshot(map);
             snapshot.sessionId = null;
-            Assert.That(GourdResultViewerExperiment.IsEligible(snapshot, map), Is.False);
+            Assert.That(LabGourdResultViewer.IsEligible(snapshot, map), Is.False);
             snapshot = Snapshot(map); snapshot.round = 0;
-            Assert.That(GourdResultViewerExperiment.IsEligible(snapshot, map), Is.False);
+            Assert.That(LabGourdResultViewer.IsEligible(snapshot, map), Is.False);
             snapshot = Snapshot(map); snapshot.paintGoalPercent = 80;
-            Assert.That(GourdResultViewerExperiment.IsEligible(snapshot, map), Is.False);
+            Assert.That(LabGourdResultViewer.IsEligible(snapshot, map), Is.False);
             snapshot = Snapshot(map); snapshot.paintCellCount = snapshot.paintCoveredCount = 0;
-            Assert.That(GourdResultViewerExperiment.IsEligible(snapshot, map), Is.False);
+            Assert.That(LabGourdResultViewer.IsEligible(snapshot, map), Is.False);
         }
 
         private static LabPaintSurface CompletedMap()

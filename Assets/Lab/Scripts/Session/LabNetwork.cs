@@ -163,10 +163,10 @@ namespace C6Lab
         // Version 5626 adds the bomb sound volume setting (#183).
         // Version 5627 shares the confirmed room name in lobby packets.
         // #187: six growth settings, fixed 100% target, authoritative cell transactions.
-        internal const ushort LabProtocolVersion = 5628;
+        internal const ushort LabProtocolVersion = 5629;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/8");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/9");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

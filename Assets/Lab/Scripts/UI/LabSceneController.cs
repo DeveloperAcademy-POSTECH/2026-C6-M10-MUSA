@@ -85,6 +85,8 @@ namespace C6Lab
             gourdNetwork = boardNetwork;
             gourdPaint = LabGourdPaint.Attach(boardNetwork);
             if (gourdNetwork != null) gourdNetwork.ConfigApplied += OnGourdConfigApplied;
+            // The shared setting gates all viewer UI and render resources; Release clients use it too.
+            LabGourdResultViewer.Attach(boardNetwork);
             // 일시정지 메뉴에 BGM·효과음 크기 슬라이더를 붙인다. 값은 기기마다 따로 저장된다.
             LabHud hud = FindFirstObjectByType<LabHud>();
             if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)

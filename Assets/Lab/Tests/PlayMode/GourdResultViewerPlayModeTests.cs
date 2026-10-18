@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Globalization;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -6,40 +7,47 @@ using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-namespace C6Lab.Experiments.Tests
+namespace C6Lab.Tests
 {
     /// <summary>
-    /// Opt-in experiment checks. The completed source uses the saved board's actual Host
-    /// projectile collision with an explicit low-resolution/100%-initial DEV fixture.
+    /// Completed-result viewer checks. The source uses the saved board's actual Host
+    /// projectile collision with explicit low-resolution/100%-initial DEV tuning.
     /// </summary>
     public sealed class GourdResultViewerPlayModeTests
     {
         [UnityTearDown]
         public IEnumerator Cleanup()
         {
-            GourdResultViewerExperiment.StopInCurrentScene();
+            foreach (LabGourdResultViewer viewer in Object.FindObjectsByType<LabGourdResultViewer>(FindObjectsSortMode.None))
+                viewer.CloseViewer();
             LabNetwork network = Object.FindFirstObjectByType<LabNetwork>();
             if (network != null && network.IsConnected) network.Stop();
             yield return null;
             Scene scene = SceneManager.GetSceneByName("Lab");
             if (!scene.IsValid() || !scene.isLoaded) yield break;
-            Scene cleanup = SceneManager.CreateScene("Gourd viewer experiment test cleanup");
+            Scene cleanup = SceneManager.CreateScene("Gourd result viewer test cleanup");
             SceneManager.SetActiveScene(cleanup);
             yield return SceneManager.UnloadSceneAsync(scene);
         }
 
         [UnityTest]
-        public IEnumerator DefaultLabDoesNotCreateTheOptInExperimentOrItsUi()
+        public IEnumerator DefaultOffCreatesOnlyTheLightweightObserverWithoutViewerUi()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
-            Assert.That(Object.FindFirstObjectByType<LabNetwork>(), Is.Not.Null);
-            Assert.That(Resources.FindObjectsOfTypeAll<GourdResultViewerExperiment>()
-                .Where(item => item.gameObject.scene == SceneManager.GetActiveScene()), Is.Empty,
-                "The test runner disables and preserves the Editor opt-in SessionState flag.");
+            LabNetwork network = Object.FindFirstObjectByType<LabNetwork>();
+            Assert.That(network, Is.Not.Null);
+            Assert.That(network.config.CompletedGourdViewerEnabled, Is.False);
+            LabGourdResultViewer viewer = Object.FindObjectsByType<LabGourdResultViewer>(FindObjectsSortMode.None)
+                .Single(item => item.Network == network);
+            Assert.That(LabGourdResultViewer.Attach(network), Is.SameAs(viewer),
+                "SceneController already attaches one observer per network.");
+            Assert.That(viewer.Ui, Is.Null, "Default OFF does not instantiate the saved UI prefab.");
+            Assert.That(viewer.Preview, Is.Null);
+            Assert.That(viewer.OpenViewer(), Is.False);
             Assert.That(Resources.FindObjectsOfTypeAll<GourdResultViewerUI>()
                 .Where(item => item.gameObject.scene == SceneManager.GetActiveScene()), Is.Empty,
-                "The normal Scene does not include the experimental result entry/modal.");
+                "The default Scene has no result entry, modal, or preview camera.");
         }
 
         [UnityTest]
@@ -58,38 +66,37 @@ namespace C6Lab.Experiments.Tests
             controller.config = fixture;
             controller.ReconfigureBoard();
             network.port = 17891;
+            LabGourdResultViewer viewer = null;
+            LabDeveloperMode developer = Resources.FindObjectsOfTypeAll<LabDeveloperMode>()
+                .Single(item => item.gameObject.scene == SceneManager.GetActiveScene());
             try
             {
-                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                // Apply through the ordinary DEV form, including the final shared Config toggle.
+                developer.Open();
+                float[] tuning = fixture.CaptureDeveloperValues();
+                Assert.That(tuning.Length, Is.EqualTo(112));
+                for (int i = 0; i < tuning.Length; i++)
+                    developer.valueInputs[i].text = tuning[i].ToString("R", CultureInfo.InvariantCulture);
+                developer.ApplyAndStart();
                 yield return null;
-                GourdResultViewerExperiment experiment = GourdResultViewerExperiment.StartInCurrentScene();
-                Assert.That(experiment, Is.Not.Null, "The saved experiment UI prefab is required.");
-                Assert.That(experiment.Ui.HasRequiredReferences, Is.True);
-                Assert.That(GourdResultViewerExperiment.StartInCurrentScene(), Is.SameAs(experiment),
-                    "Repeated opt-in cannot duplicate the controller or UI.");
-                Assert.That(experiment.Network, Is.SameAs(network));
-                Assert.That(experiment.OpenViewer(), Is.False, "A Playing round cannot be inspected.");
-                Assert.That(experiment.Ui.entryButton.gameObject.activeSelf, Is.False);
-                Assert.That(experiment.Ui.viewerPanel.activeSelf, Is.False);
+                Assert.That(network.IsDeveloperSolo, Is.True, developer.feedbackText.text);
+                Assert.That(network.config.CompletedGourdViewerEnabled, Is.True);
+                viewer = Object.FindObjectsByType<LabGourdResultViewer>(FindObjectsSortMode.None)
+                    .Single(item => item.Network == network);
+                Assert.That(viewer.Network, Is.SameAs(network));
+                Assert.That(viewer.OpenViewer(), Is.False, "A Playing round cannot be inspected.");
+                Assert.That(viewer.Ui, Is.Null, "The UI is lazy even with the DEV toggle enabled.");
+                Assert.That(viewer.Preview, Is.Null);
 
-                network.Generate();
-                LabOrbState box = network.Snapshot.orbs.Single();
-                Assert.That(box.kind, Is.EqualTo(LabOrbKind.SecretBox));
-                Tap(network.board, box.id, 10d);
-                Tap(network.board, box.id, 10.2d);
-                string shot = network.Snapshot.orbs.First(orb => orb.kind == LabOrbKind.Combined).id;
-                network.target.GetComponent<LabHangingTarget>().ResetSwing();
-                Launch(network.board, shot, 20d);
-                double deadline = Time.realtimeSinceStartupAsDouble + 6d;
-                while (network.Snapshot.phase == LabPhase.Playing && Time.realtimeSinceStartupAsDouble < deadline)
-                    yield return null;
-                Assert.That(network.LastShotReport, Does.StartWith("SHOT HIT"), "The result comes from a real Host collision.");
+                yield return CompleteFromActualHit(network, 10d);
                 Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
                 Assert.That(network.Snapshot.paintCoveredCount, Is.EqualTo(network.Snapshot.paintCellCount));
                 Assert.That(network.PaintSurface.IsComplete, Is.True);
                 Assert.That(network.PaintSurface.PaintCount, Is.EqualTo(1));
-                experiment.RefreshState();
-                Assert.That(experiment.Ui.entryButton.gameObject.activeSelf, Is.True);
+                viewer.RefreshState();
+                Assert.That(viewer.Ui, Is.Not.Null, viewer.LastError);
+                Assert.That(viewer.Ui.HasRequiredReferences, Is.True);
+                Assert.That(viewer.Ui.entryButton.gameObject.activeSelf, Is.True);
 
                 Color32[] originalPixels = Pixels(network.PaintSurface);
                 string originalHash = LabPaintPublisher.Hash(originalPixels);
@@ -101,14 +108,14 @@ namespace C6Lab.Experiments.Tests
                 int cameraCount = SceneCameraCount();
                 Material liveMaterial = paint.Shell.GetComponent<Renderer>().sharedMaterial;
 
-                experiment.Ui.entryButton.onClick.Invoke();
-                Assert.That(experiment.IsOpen, Is.True, experiment.LastError);
-                Assert.That(experiment.Ui.IsShowing, Is.True);
-                Assert.That(experiment.Ui.entryButton.gameObject.activeSelf, Is.False);
-                LabGourdResultPreview preview = experiment.Preview;
+                viewer.Ui.entryButton.onClick.Invoke();
+                Assert.That(viewer.IsOpen, Is.True, viewer.LastError);
+                Assert.That(viewer.Ui.IsShowing, Is.True);
+                Assert.That(viewer.Ui.entryButton.gameObject.activeSelf, Is.False);
+                LabGourdResultPreview preview = viewer.Preview;
                 RenderTexture firstTexture = preview.Texture;
                 Texture2D firstPaint = preview.PaintTexture;
-                Assert.That(experiment.Ui.previewImage.texture, Is.SameAs(firstTexture));
+                Assert.That(viewer.Ui.previewImage.texture, Is.SameAs(firstTexture));
                 Assert.That(firstTexture.IsCreated(), Is.True);
                 Assert.That(preview.PaintTexture, Is.Not.SameAs(paint.PaintTexture));
                 Assert.That(preview.PaintTexture.GetPixels32(), Is.EqualTo(originalPixels));
@@ -123,13 +130,13 @@ namespace C6Lab.Experiments.Tests
 
                 Quaternion initialRotation = preview.ModelRotation;
                 float initialZoom = preview.ZoomNormalized;
-                experiment.Rotate(new Vector2(.23f, -.13f));
-                experiment.Zoom(.2f);
+                viewer.Rotate(new Vector2(.23f, -.13f));
+                viewer.Zoom(.2f);
                 Assert.That(Quaternion.Angle(initialRotation, preview.ModelRotation), Is.GreaterThan(1f));
                 Assert.That(preview.ZoomNormalized, Is.GreaterThan(initialZoom));
                 Assert.That(paint.VisualInstance.transform.localRotation, Is.EqualTo(liveRotation),
                     "Viewer input rotates only the copied model.");
-                experiment.Ui.resetButton.onClick.Invoke();
+                viewer.Ui.resetButton.onClick.Invoke();
                 Assert.That(Quaternion.Angle(initialRotation, preview.ModelRotation), Is.LessThan(.001f));
                 Assert.That(preview.ZoomNormalized, Is.EqualTo(initialZoom).Within(.00001f));
                 yield return null;
@@ -139,49 +146,70 @@ namespace C6Lab.Experiments.Tests
                 AssertUnchangedResult(network, originalPixels, revision, paintCount, completed);
                 Assert.That(savedNetwork.CaptureDeveloperValues(), Is.EqualTo(savedTuning));
 
-                experiment.Ui.closeButton.onClick.Invoke();
-                Assert.That(experiment.IsOpen, Is.False);
+                viewer.Ui.closeButton.onClick.Invoke();
+                Assert.That(viewer.IsOpen, Is.False);
                 Assert.That(preview.IsDisposed, Is.True);
-                Assert.That(experiment.Ui.IsShowing, Is.False);
-                Assert.That(experiment.Ui.previewImage.texture, Is.Null);
+                Assert.That(viewer.Ui.IsShowing, Is.False);
+                Assert.That(viewer.Ui.previewImage.texture, Is.Null);
                 yield return null;
-                experiment.RefreshState();
-                Assert.That(experiment.Ui.entryButton.gameObject.activeSelf, Is.True);
+                viewer.RefreshState();
+                Assert.That(viewer.Ui.entryButton.gameObject.activeSelf, Is.True);
                 Assert.That(firstTexture == null, Is.True, "Close releases the owned render texture.");
                 Assert.That(firstPaint == null, Is.True, "Close releases the copied paint texture.");
                 Assert.That(SceneCameraCount(), Is.EqualTo(cameraCount));
 
                 for (int iteration = 0; iteration < 2; iteration++)
                 {
-                    Assert.That(experiment.OpenViewer(), Is.True, experiment.LastError);
-                    Assert.That(experiment.Preview.PaintPixelHash, Is.EqualTo(originalHash));
-                    LabGourdResultPreview repeated = experiment.Preview;
-                    experiment.CloseViewer();
+                    Assert.That(viewer.OpenViewer(), Is.True, viewer.LastError);
+                    Assert.That(viewer.Preview.PaintPixelHash, Is.EqualTo(originalHash));
+                    LabGourdResultPreview repeated = viewer.Preview;
+                    viewer.CloseViewer();
                     Assert.That(repeated.IsDisposed, Is.True);
                     yield return null;
-                    experiment.RefreshState();
+                    viewer.RefreshState();
                     Assert.That(SceneCameraCount(), Is.EqualTo(cameraCount), "Repeated open/close cannot leak cameras.");
                 }
                 AssertUnchangedResult(network, originalPixels, revision, paintCount, completed);
 
-                Assert.That(experiment.OpenViewer(), Is.True, experiment.LastError);
-                LabGourdResultPreview beforeRetry = experiment.Preview;
+                Assert.That(viewer.OpenViewer(), Is.True, viewer.LastError);
+                LabGourdResultPreview beforeRetry = viewer.Preview;
                 string session = network.Snapshot.sessionId;
                 Assert.That(network.RestartDeveloperSolo(), Is.True, network.Notice);
                 yield return null;
-                experiment.RefreshState();
+                viewer.RefreshState();
                 Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(session));
                 Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
                 Assert.That(network.PaintSurface.CoveredCount, Is.Zero);
-                Assert.That(experiment.IsOpen, Is.False);
+                Assert.That(viewer.IsOpen, Is.False);
                 Assert.That(beforeRetry.IsDisposed, Is.True);
-                Assert.That(experiment.Ui.IsShowing, Is.False);
-                Assert.That(experiment.Ui.entryButton.gameObject.activeSelf, Is.False);
-                Assert.That(experiment.Ui.previewImage.texture, Is.Null);
+                Assert.That(viewer.Ui, Is.Null, "A fresh Playing round releases the lazy result UI.");
+                Assert.That(viewer.Preview, Is.Null);
+
+                // OFF uses the ordinary DEV form and a fresh round, not a private controller flag.
+                developer.Open();
+                developer.valueInputs[111].text = "0";
+                developer.ApplyAndStart();
+                yield return null;
+                Assert.That(network.config.CompletedGourdViewerEnabled, Is.False, developer.feedbackText.text);
+                Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(viewer.Ui, Is.Null);
+                yield return CompleteFromActualHit(network, 60d);
+                viewer.RefreshState();
+                Assert.That(LabGourdResultViewer.IsEligible(network.Snapshot, network.PaintSurface), Is.True,
+                    "The OFF result still completes the normal game rules.");
+                Assert.That(LabGourdResultViewer.CanInspect(network), Is.False);
+                Assert.That(viewer.OpenViewer(), Is.False);
+                Assert.That(viewer.Ui, Is.Null, "OFF keeps the UI absent even after a complete Paint victory.");
+                Assert.That(viewer.Preview, Is.Null);
+                developer.EndSolo();
+                yield return null;
+                Assert.That(network.config, Is.SameAs(savedNetwork));
+                Assert.That(network.config.CompletedGourdViewerEnabled, Is.False);
+                Assert.That(savedNetwork.CaptureDeveloperValues(), Is.EqualTo(savedTuning));
             }
             finally
             {
-                GourdResultViewerExperiment.StopInCurrentScene();
+                if (viewer != null) viewer.CloseViewer();
                 if (network.IsConnected) network.Stop();
                 network.config = savedNetwork;
                 controller.config = savedBoard;
@@ -189,7 +217,26 @@ namespace C6Lab.Experiments.Tests
                 Object.Destroy(fixture);
             }
             yield return null;
-            Assert.That(Object.FindObjectsByType<GourdResultViewerExperiment>(FindObjectsSortMode.None), Is.Empty);
+            Assert.That(viewer.Network, Is.SameAs(network));
+            Assert.That(viewer.Ui, Is.Null);
+            Assert.That(viewer.Preview, Is.Null);
+        }
+
+        private static IEnumerator CompleteFromActualHit(LabNetwork network, double gestureTime)
+        {
+            network.Generate();
+            LabOrbState box = network.Snapshot.orbs.Single();
+            Assert.That(box.kind, Is.EqualTo(LabOrbKind.SecretBox));
+            Tap(network.board, box.id, gestureTime);
+            Tap(network.board, box.id, gestureTime + .2d);
+            string shot = network.Snapshot.orbs.First(orb => orb.kind == LabOrbKind.Combined).id;
+            network.target.GetComponent<LabHangingTarget>().ResetSwing();
+            Launch(network.board, shot, gestureTime + 10d);
+            double deadline = Time.realtimeSinceStartupAsDouble + 6d;
+            while (network.Snapshot.phase == LabPhase.Playing && Time.realtimeSinceStartupAsDouble < deadline)
+                yield return null;
+            Assert.That(network.LastShotReport, Does.StartWith("SHOT HIT"), "The result comes from a real Host collision.");
+            Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
         }
 
         private static void AssertUnchangedResult(LabNetwork network, Color32[] pixels, uint revision,
@@ -259,6 +306,7 @@ namespace C6Lab.Experiments.Tests
             LabConfig result = Object.Instantiate(source);
             float[] values = result.CaptureDeveloperValues();
             values[105] = 0; values[106] = 100; values[107] = 4; values[108] = 6;
+            values[111] = 1;
             Set(values, "Gourd Mode (0 paint, 1 crack)", 0);
             Set(values, "Paint Victory Coverage (%)", 100);
             Set(values, "Monster Max HP", 40);

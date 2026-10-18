@@ -184,7 +184,8 @@ namespace C6Lab
             new LabDeveloperField("Paint Repeat Growth (%)", .1f, 100f),
             new LabDeveloperField("Paint Growth Speed (%/s)", .1f, 100f),
             new LabDeveloperField("Paint Fill Chance (%)", 0f, 100f),
-            new LabDeveloperField("Paint Vertical Weight", 1f, 4f)
+            new LabDeveloperField("Paint Vertical Weight", 1f, 4f),
+            LabDeveloperField.Toggle("Completed Gourd Viewer (0 off, 1 on)")
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -211,7 +212,7 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110),
+            new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
         });
 
@@ -316,6 +317,8 @@ namespace C6Lab
         [SerializeField, Range(.1f, 100f)] private float paintGrowthPercentPerSecond = 6f;
         [SerializeField, Range(0f, 100f)] private float paintFillChancePercent = 60f;
         [SerializeField, Range(1f, 4f)] private float paintVerticalWeight = 1.35f;
+        [Tooltip("Paint 100% 승리 뒤 모든 참가자에게 완성된 박의 로컬 관람을 허용한다. 새 판에 적용한다.")]
+        [SerializeField] private bool completedGourdViewerEnabled = false;
         [Tooltip("박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다. 최대가 0이면 떨어뜨리지 않는다 (#177).")]
         [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
         [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
@@ -538,6 +541,7 @@ namespace C6Lab
             FillChancePercent = PaintFillChancePercent,
             VerticalWeight = PaintVerticalWeight
         };
+        public bool CompletedGourdViewerEnabled => completedGourdViewerEnabled;
         public float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         public float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -640,7 +644,8 @@ namespace C6Lab
                 DevVolume(bombSoundVolumeDev),
                 (float)BombSoundStyle,
                 (float)PaintSurfaceResolution, PaintInitialPercent, PaintRepeatPercent,
-                PaintGrowthPercentPerSecond, PaintFillChancePercent, PaintVerticalWeight
+                PaintGrowthPercentPerSecond, PaintFillChancePercent, PaintVerticalWeight,
+                CompletedGourdViewerEnabled ? 1f : 0f
             };
         }
 
@@ -797,6 +802,7 @@ namespace C6Lab
             paintGrowthPercentPerSecond = values[108];
             paintFillChancePercent = values[109];
             paintVerticalWeight = values[110];
+            completedGourdViewerEnabled = values[111] >= .5f;
             error = string.Empty;
             return true;
         }

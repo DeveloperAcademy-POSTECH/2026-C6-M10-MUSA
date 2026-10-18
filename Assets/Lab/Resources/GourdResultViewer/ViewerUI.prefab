@@ -604,7 +604,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "EXPERIMENT \xB7 COMPLETED GOURD"
+  m_Text: COMPLETED GOURD
 --- !u!1 &2542479538548654562
 GameObject:
   m_ObjectHideFlags: 0
@@ -883,7 +883,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "EXPERIMENT \xB7 VIEW GOURD"
+  m_Text: VIEW COMPLETED GOURD
 --- !u!1 &5324069987185766056
 GameObject:
   m_ObjectHideFlags: 0
@@ -1000,7 +1000,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0726972e713f14928b37a9153c6a439e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: C6Lab.GourdViewerExperiment::C6Lab.Experiments.GourdResultViewerUI
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.GourdResultViewerUI
   entryButton: {fileID: 7569874119641992175}
   viewerPanel: {fileID: 6722358599940171089}
   previewImage: {fileID: 2907798060754770830}

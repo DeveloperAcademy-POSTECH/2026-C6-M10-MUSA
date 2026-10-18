@@ -1,18 +1,18 @@
 using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.UI;
 
-namespace C6Lab.Experiments
+namespace C6Lab
 {
     /// <summary>Saved prefab references. The opaque modal blocks the existing result buttons underneath it.</summary>
     public sealed class GourdResultViewerUI : MonoBehaviour
     {
-        public Button entryButton;
+        public UnityEngine.UI.Button entryButton;
         public GameObject viewerPanel;
-        public RawImage previewImage;
-        public Button closeButton, resetButton;
-        public Text statusText;
+        public UnityEngine.UI.RawImage previewImage;
+        public UnityEngine.UI.Button closeButton, resetButton;
+        public UnityEngine.UI.Text statusText;
+        // Keep the serialized field name to preserve the existing prefab reference.
         public GameObject experimentTag;
         [Range(128, 2048)] public int previewTextureSize = 768;
         private GourdViewerGestureSurface gestures;

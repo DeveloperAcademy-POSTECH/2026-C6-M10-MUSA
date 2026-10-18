@@ -1,7 +1,0 @@
-{
-  "name": "C6Lab.GourdViewerExperiment",
-  "rootNamespace": "C6Lab.Experiments",
-  "references": ["C6Lab.Runtime", "UnityEngine.UI", "Unity.InputSystem"],
-  "includePlatforms": [], "excludePlatforms": [], "allowUnsafeCode": false,
-  "autoReferenced": true
-}

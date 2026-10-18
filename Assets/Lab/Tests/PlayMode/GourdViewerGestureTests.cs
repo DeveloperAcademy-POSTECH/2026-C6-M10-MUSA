@@ -6,7 +6,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 
-namespace C6Lab.Experiments.Tests
+namespace C6Lab.Tests
 {
     /// <summary>
     /// Pointer-event regression on the saved UI layout. This does not synthesize a hardware
@@ -27,7 +27,7 @@ namespace C6Lab.Experiments.Tests
         [UnityTest]
         public IEnumerator RemainingPointerResumesWithANewBaselineAfterTheFirstPointerLifts()
         {
-            GameObject prefab = Resources.Load<GameObject>(GourdResultViewerExperiment.ResourcePath);
+            GameObject prefab = Resources.Load<GameObject>(LabGourdResultViewer.ResourcePath);
             Assert.That(prefab, Is.Not.Null);
             ownedUi = Object.Instantiate(prefab);
             GourdResultViewerUI ui = ownedUi.GetComponent<GourdResultViewerUI>();
@@ -92,7 +92,7 @@ namespace C6Lab.Experiments.Tests
             Rect local = rectangle.rect;
             Vector3 world = rectangle.TransformPoint(new Vector3(local.xMin + local.width * x,
                 local.yMin + local.height * y, 0f));
-            // The saved experiment prefab uses an overlay Canvas, so its event camera is null.
+            // The saved viewer prefab uses an overlay Canvas, so its event camera is null.
             return RectTransformUtility.WorldToScreenPoint(null, world);
         }
     }

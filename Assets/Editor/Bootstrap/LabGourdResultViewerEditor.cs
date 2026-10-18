@@ -6,30 +6,18 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace C6Lab.Experiments.Editor
+namespace C6Lab.Editor
 {
-    /// <summary>Creates only the experiment asset and keeps Play-mode opt-in local to this Editor session.</summary>
-    [InitializeOnLoad]
-    public static class GourdResultViewerExperimentEditor
+    /// <summary>Creates the completed-gourd viewer prefab without saving the current Scene.</summary>
+    public static class LabGourdResultViewerEditor
     {
-        public const string PrefabPath = "Assets/Lab/Experiments/GourdResultViewer/Resources/GourdResultViewer/ViewerUI.prefab";
-        public const string MenuRoot = "C6 Lab/Experiments/Gourd Result Viewer/";
-        private const string EnableMenu = MenuRoot + "Enable in Play Mode";
-        private const string SessionKey = "C6Lab.Experiments.GourdResultViewer.Enabled.v1";
+        public const string PrefabPath = "Assets/Lab/Resources/GourdResultViewer/ViewerUI.prefab";
+        public const string MenuRoot = "C6 Lab/Gourd Result Viewer/";
         private static readonly Color Ink = new Color(.94f, .96f, .98f, 1f);
         private static readonly Color DimInk = new Color(.65f, .73f, .78f, 1f);
         private static readonly Color Background = new Color(.035f, .055f, .075f, 1f);
         private static readonly Color ButtonColor = new Color(.15f, .35f, .43f, 1f);
-        private static readonly Color ExperimentColor = new Color(.38f, .30f, .55f, 1f);
-
-        public static bool EnabledForPlayMode => SessionState.GetBool(SessionKey, false);
-
-        static GourdResultViewerExperimentEditor()
-        {
-            EditorApplication.playModeStateChanged -= OnPlayModeChanged;
-            EditorApplication.playModeStateChanged += OnPlayModeChanged;
-            EditorApplication.delayCall += RefreshMenuCheck;
-        }
+        private static readonly Color AccentColor = new Color(.38f, .30f, .55f, 1f);
 
         [MenuItem(MenuRoot + "Build UI Prefab", false, 0)]
         public static void BuildUiPrefab()
@@ -38,8 +26,7 @@ namespace C6Lab.Experiments.Editor
             var asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             Selection.activeObject = asset;
             EditorGUIUtility.PingObject(asset);
-            Debug.Log("C6_GOURD_RESULT_VIEWER_UI_READY path=" + path
-                + " enabled=" + EnabledForPlayMode);
+            Debug.Log("C6_GOURD_RESULT_VIEWER_UI_READY path=" + path);
         }
 
         [MenuItem(MenuRoot + "Build UI Prefab", true)]
@@ -48,7 +35,7 @@ namespace C6Lab.Experiments.Editor
         /// <summary>
         /// Create the initial prefab through Unity APIs. An existing file is never overwritten.
         /// The temporary hierarchy lives in a preview Scene; the current Scene is never saved.
-        /// This method does not enable the experiment.
+        /// This method does not change the session setting.
         /// </summary>
         public static string EnsureUiPrefab()
         {
@@ -92,7 +79,7 @@ namespace C6Lab.Experiments.Editor
 
                 GourdResultViewerUI ui = root.GetComponent<GourdResultViewerUI>();
                 ui.entryButton = MakeButton("EntryButton", root.transform,
-                    "EXPERIMENT · VIEW GOURD", new Vector2(.5f, .88f), new Vector2(250f, 40f), 14, ExperimentColor);
+                    "VIEW COMPLETED GOURD", new Vector2(.5f, .88f), new Vector2(250f, 40f), 14, AccentColor);
                 ui.entryButton.gameObject.SetActive(false);
 
                 RectTransform panel = StretchRect("ViewerPanel", root.transform, Vector2.zero, Vector2.one);
@@ -101,7 +88,7 @@ namespace C6Lab.Experiments.Editor
                 backdrop.raycastTarget = true;
                 ui.viewerPanel = panel.gameObject;
 
-                var heading = MakeText("ExperimentHeading", panel, "EXPERIMENT · COMPLETED GOURD", 16,
+                var heading = MakeText("ExperimentHeading", panel, "COMPLETED GOURD", 16,
                     Ink, new Vector2(.04f, .875f), new Vector2(.96f, .93f), FontStyle.Bold);
                 ui.experimentTag = heading.gameObject;
                 MakeText("CompletionLabel", panel, "100% PAINTED", 24,
@@ -128,7 +115,7 @@ namespace C6Lab.Experiments.Editor
                 ui.closeButton = MakeButton("BackToResultsButton", panel, "BACK TO RESULTS",
                     new Vector2(.725f, .105f), new Vector2(150f, 46f), 14, ButtonColor);
 
-                // Keep the canvas ready for the opt-in runtime, with both entry and modal hidden.
+                // Keep the canvas ready for the eligible result state, with both entry and modal hidden.
                 panel.gameObject.SetActive(false);
                 root.SetActive(true);
                 GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath, out bool success);
@@ -142,45 +129,6 @@ namespace C6Lab.Experiments.Editor
                 EditorSceneManager.ClosePreviewScene(previewScene);
             }
         }
-
-        [MenuItem(EnableMenu, false, 20)]
-        public static void EnableInPlayMode()
-        {
-            SessionState.SetBool(SessionKey, true);
-            RefreshMenuCheck();
-            if (EditorApplication.isPlaying)
-                GourdResultViewerExperiment.StartInCurrentScene();
-            Debug.Log("C6_GOURD_RESULT_VIEWER_OPT_IN enabled=true");
-        }
-
-        [MenuItem(EnableMenu, true)]
-        private static bool CanEnableInPlayMode()
-        {
-            RefreshMenuCheck();
-            return !EditorApplication.isCompiling;
-        }
-
-        [MenuItem(MenuRoot + "Disable", false, 21)]
-        public static void Disable()
-        {
-            SessionState.SetBool(SessionKey, false);
-            RefreshMenuCheck();
-            if (EditorApplication.isPlaying)
-                GourdResultViewerExperiment.StopInCurrentScene();
-            Debug.Log("C6_GOURD_RESULT_VIEWER_OPT_IN enabled=false");
-        }
-
-        [MenuItem(MenuRoot + "Disable", true)]
-        private static bool CanDisable() => !EditorApplication.isCompiling;
-
-        private static void OnPlayModeChanged(PlayModeStateChange state)
-        {
-            RefreshMenuCheck();
-            if (state == PlayModeStateChange.EnteredPlayMode && EnabledForPlayMode)
-                GourdResultViewerExperiment.StartInCurrentScene();
-        }
-
-        private static void RefreshMenuCheck() => Menu.SetChecked(EnableMenu, EnabledForPlayMode);
 
         private static void EnsureAssetFolders(string folder)
         {

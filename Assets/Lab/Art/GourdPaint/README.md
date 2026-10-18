@@ -1,4 +1,4 @@
-# 기본 전투의 100% 공동 색칠·인접 성장 — #187
+# 기본 전투의 100% 공동 색칠·인접 성장·완성 박 관람 — #187·#191
 
 기본 실행·빌드 Scene은 `Assets/Lab/Scenes/Lab.unity`다. #153에서 이관한 `Resources/GourdPaint/WhiteGourd.prefab`·`WhiteGourd.mat`·`Stem.mat`의 원본 참조와 GUID, UI 배치와 빌드 Scene 목록을 유지한다. 박 외형과 실제 기존 원통 MeshCollider의 모양 차이도 유지한다. 단일 원본 `LabConfig.asset`은 Unity에서 목표 100과 성장 기본값 6개를 저장했으며 다른 설정의 유효값을 보존했다.
 
@@ -20,7 +20,7 @@
 | Paint Fill Chance (%) | 110번째 · 인덱스 109 | 60 | 0–100% | 이웃이 둘 이상 칠해진 빈 셀을 우선 채울 확률. 해당 후보가 없으면 다른 인접 후보로 진행한다. |
 | Paint Vertical Weight | 111번째 · 인덱스 110 | 1.35 | 1–4 | 세로 방향 인접 후보의 선택 가중치. 1은 가로와 같은 가중치다. |
 
-옛 에셋의 직렬화 목표 80은 `PaintVictoryPercent`·`CaptureDeveloperValues`에서 100으로 정규화한다. DEV/공유 설정으로 100 외 목표를 보내면 전체 설정을 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**로 나머지 설정과 함께 검증·적용한다. 새 판의 Rules는 `PaintGrowthSettings` 복사본을 캡처하므로 Inspector·입력칸만 바꿔 진행 중인 판에 적용하지 않는다. 프로토콜은 **5628**이며 모든 참가자가 같은 형식을 사용해야 한다.
+옛 에셋의 직렬화 목표 80은 `PaintVictoryPercent`·`CaptureDeveloperValues`에서 100으로 정규화한다. DEV/공유 설정으로 100 외 목표를 보내면 전체 설정을 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**로 나머지 설정과 함께 검증·적용한다. 새 판의 Rules는 `PaintGrowthSettings` 복사본을 캡처하므로 Inspector·입력칸만 바꿔 진행 중인 판에 적용하지 않는다. 현재 공유 설정은 총 **112개**, 프로토콜은 **5629**, 연결 토큰은 `C6PhysicsLab/9`이며 모든 참가자가 같은 새 버전을 사용해야 한다.
 
 ## 실제 명중과 공동 승리
 
@@ -33,6 +33,18 @@
 `actualDamage`는 실제 HP 감소량이다. Paint에서는 내부 HP 0 뒤에도 승인 명중 입자·소리·햅틱·보상을 유지하도록 별도 양수 `impactValue`를 전한다. Paint 결과의 `damageTotal`은 기존 명목 공격값 점수로 유지하고 실제 HP 감소량이나 색칠 기여 면적과 구분한다. Crack은 실제 감소량을 누적한다. Paint는 피해 숫자를 숨기고 색칠·입자로 표현한다.
 
 제한 시간 전에 마지막 셀이 완성되면 공동 Victory가 되고, 마지막 성장 시각과 제한 시간 종료가 정확히 같으면 Defeat가 우선한다. 늦게 도착한 Tick도 제한 시간 전에 완료될 성장은 해당 시각까지 계산한다. 공동 일시정지 동안 성장·전투 시계·입력·물리는 멈추며 재개 뒤 이어간다. 일반 Retry는 모드와 캡처한 성장 설정을 유지하면서 맵·영역·공급 예산·명중 수·난수 진행을 초기화한다. 새 DEV 값은 다음 시작/재시작에 캡처하며 진행 중인 판에는 적용하지 않는다. 로비 복귀와 방 이탈도 표시·수신 상태를 정리한다.
+
+## 완성된 박 관람 (#191)
+
+| DEV 입력 이름 | 위치 | 기본값 | 입력 범위 | 적용 |
+| --- | --- | --- | --- | --- |
+| Completed Gourd Viewer (0 off, 1 on) | 112번째 · 인덱스 111 · Gourd | OFF(0) | 정수 0–1 | Host가 전원의 관람 허용을 공유한다. 열기·회전·확대/축소는 각자 로컬에서 한다. |
+
+`LabConfig.CompletedGourdViewerEnabled`는 단일 원본의 bool이며 저장 필드가 없는 에셋도 false다. 기존 0~110번과 111번째 `Paint Vertical Weight`를 보존한다. 112개 배열 전체를 검증하므로 잘못된 bool 입력과 구형 111개 배열은 원자적으로 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 기존 지문·참가자 확인 응답과 함께 적용한다. 진행 중인 판에 즉시 바꾸지 않는다. 일반 Release 참가자도 Host 허용값을 따르며 관람에 별도 Debug·실행 인자·Editor 메뉴 조건을 요구하지 않는다.
+
+ON인 Paint **100% Victory**에서 Snapshot과 공개 표시 맵의 세션·라운드·해상도·Revision·칠한/전체 셀 수·명중 수가 일치해야 관람 버튼이 나타난다. Crack·Defeat·분할 수신 중 맵에는 나타나지 않는다. 필요한 결과에서 `Assets/Lab/Resources/GourdResultViewer/ViewerUI.prefab`을 불러오며 드래그 회전·핀치/마우스 휠 확대·축소·**RESET VIEW**는 각자 화면에만 적용한다. 불투명 모달은 아래 결과 버튼 입력을 막는다.
+
+관람은 확정된 색칠 맵을 별도 카메라·텍스처와 복사한 박 표현으로 표시하며 본 전투의 맵·판정·점수·카메라·물리를 변경하지 않는다. **BACK TO RESULTS**로 닫으면 미리보기 자원을 해제한다. 일반 Retry는 허용값을 유지하지만 관람창과 이전 미리보기를 닫고 새 결과를 기다린다. 새 설정 적용·로비 복귀·연결 종료·모드 변경도 이전 UI·미리보기 자원을 정리한다. 저장 Scene의 배치는 유지한다.
 
 ## 성장 표면과 색 보존
 
@@ -54,7 +66,7 @@
 
 Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 Host의 전투 시간 진행에서만 한다. Host 화면도 현재 Snapshot과 같은 버전의 `LabNetwork.PaintSurface` 표시 캐시를 사용해 맵과 HUD를 함께 반영한다. Client는 승인 명중 방향을 재생해 성장시키지 않고 Host가 보낸 셀 변경(delta) 또는 전체 체크포인트를 별도 수신 맵에 적용한다. 분할 수신 중에는 기존 공개 표시 캐시를 유지하고, 완성된 맵의 세션·라운드·해상도·Revision·칠한 셀 수·전체 셀 수·명중 수가 Snapshot 메타데이터와 모두 맞을 때 맵과 HUD를 함께 공개한다. 픽셀이 그대로인 반복 명중도 명중 수가 바뀌면 빈 delta를 발행한다.
 
-전송은 프로토콜 **5628**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID와 RGBA를 담은 delta보다 전체 맵이 작으면 전체 맵을 보낸다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송한다. 최대 해상도 전체 RGBA 맵은 131,072바이트이고 base64 174,764자를 43개로 나눈다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체한다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청한다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가한다.
+전송은 프로토콜 **5629**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID와 RGBA를 담은 delta보다 전체 맵이 작으면 전체 맵을 보낸다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송한다. 최대 해상도 전체 RGBA 맵은 131,072바이트이고 base64 174,764자를 43개로 나눈다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체한다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청한다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가한다.
 
 이 복구는 **현재 라운드에 계속 연결된 Client의 부분 맵 누락**을 복원하는 기능이다. 연결이 끊어진 뒤 전투에 재접속하는 기능은 포함하지 않는다. 실제 다중 앱·기기에서의 전송과 화면 일치는 자동 패킷 fixture와 구분해 검증한다.
 
@@ -62,14 +74,17 @@ Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 
 | --- | --- |
 | `Core/LabPaintSurface.cs` — `Reset`, `RegisterHit`, `Advance`, `CopyPixels`, `TryReplacePixels` | Host 인접 성장·FIFO/병합·정수 진행도·Replica 원자적 교체 |
 | `Core/LabModel.cs` — `ConfirmHit`, `TryAdvance`, `PaintSurface`, `PaintColorFor` | Host 명중·보상·100% 승리·시간 경계·마지막 셀 기여자·라운드 팔레트 |
-| `Core/LabConfig.cs` — `PaintVictoryPercent`, `PaintGrowthSettings` | 단일 설정 원본·DEV 고정 87번·성장 105~110번·새 판 설정 복사 |
+| `Core/LabConfig.cs` — `PaintVictoryPercent`, `PaintGrowthSettings`, `CompletedGourdViewerEnabled` | 단일 설정 원본·총 112개·DEV 고정 87번·성장 105~110번·관람 111번·새 판 설정 복사 |
 | `Session/LabPaintReplication.cs` — `LabPaintPublisher`, `LabPaintReceiver` | 셀 delta·체크포인트·분할/검증·기준 맵 복구·Snapshot 메타데이터 일치 |
 | `Session/LabNetwork.cs` — `PaintSurface`, Snapshot 공개 경로 | Host/Client의 표시 캐시와 HUD 동시 반영·새 판/로비 초기화 |
 | `Throw/LabGourdPaint.cs` — `Attach`, `ApplyMode`, `Surface`, `PaintTexture` | 외형 선택·안전 초기화·공개 맵 텍스처 표시. 모델 진행도를 지우지 않음 |
 | `Art/GourdPaint/LabGourdPaint.shader` | 맵 1회 샘플링과 기존 조명 |
+| `UI/GourdViewer/` — `LabGourdResultViewer`, `LabGourdResultPreview`, `GourdResultViewerUI`, `GourdViewerGestureSurface` | 공유 허용/완료 맵 확인·개별 모달 입력·격리 렌더·미리보기 자원 수명 |
 | `UI/LabHud.cs` — `PaintGoalPercentFor`, `FormatPaintGoalProgress`, `PaintGoalFill` | 고정 100%·정수 셀 기반 내림 숫자와 막대 |
 | `LabSceneController`·`ConfigApplied`, `LabGourdCrack`·`LabGourdFinish` | 기존 설정 적용 경로와 Crack의 독립된 HP 표현/마무리 |
 
 ## 검증을 읽는 법
 
 과거 PR의 EditMode·PlayMode·빌드 PASS는 이번 인접 성장·111개 설정·100% 고정·셀 delta·체크포인트·표시 동시 반영의 결과로 승계하지 않는다. 실제 컴파일·테스트·다중 앱 결과는 `docs/VALIDATION.md`의 #187 기록을 따른다. 이 문서는 실행 PASS를 부여하지 않으며 패킷 fixture를 실제 네트워크 실행으로 보고하지 않는다. 실제 기기·핫스팟·iOS 빌드/조작/성능은 별도 실행 항목으로 남긴다.
+
+#191 통합본은 EditMode 331/331·PlayMode 116/116, 실제 Mac Development Host + Release Client의 ON 관람·같은 방 OFF 재시작/완료 차단 및 최종 일반 Mac 빌드를 새로 확인했다. 두 앱의 각 9개 체크포인트와 종료 코드 0을 기록했다. iOS·실제 터치·핫스팟·3~5기기·기본 밸런스는 NOT_RUN이다. 실행 fixture와 한계는 저장소 `docs/VALIDATION.md`에 기록하며 과거 #187·#189 PASS와 구분한다.
