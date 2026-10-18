@@ -201,7 +201,7 @@ namespace C6Lab.Tests
 
         private static LabPaintGrowthSettings Settings(int style, float initial, float repeat, float speed) =>
             new LabPaintGrowthSettings
-            {
+            { Pattern = LabPaintPattern.Legacy,
                 Resolution = 2, InitialPercent = initial, RepeatPercent = repeat,
                 GrowthPercentPerSecond = speed, FillChancePercent = 60f, VerticalWeight = 1.35f,
                 Style = style, Raggedness = .55f, FlowRatio = .35f, DripWidthDegrees = 3f,

@@ -16,6 +16,9 @@ namespace C6Lab
         public readonly bool WholeNumber;
         /// <summary>켜기/끄기(또는 둘 중 하나) 항목이면 0일 때·1일 때 버튼 글자. 숫자 항목은 null.</summary>
         public readonly string OffText, OnText;
+        /// <summary>Named choices preserve their numeric wire values without a numeric UI.</summary>
+        public readonly IReadOnlyList<string> Choices;
+        public bool IsChoice => Choices != null;
 
         /// <summary>DEV 화면에서 숫자 대신 토글 버튼으로 보여주는 0/1 항목인지</summary>
         public bool IsToggle => OnText != null;
@@ -35,11 +38,17 @@ namespace C6Lab
         public static LabDeveloperField Toggle(string label, string offText = "OFF", string onText = "ON") =>
             new LabDeveloperField(label, 0f, 1f, true, offText, onText);
 
+        public static LabDeveloperField Choice(string label, params string[] choices) =>
+            new LabDeveloperField(label, 0f, choices.Length - 1, true, null, null,
+                Array.AsReadOnly((string[])choices.Clone()));
+
         public LabDeveloperField(string label, float min, float max, bool wholeNumber = false)
             : this(label, min, max, wholeNumber, null, null) { }
 
-        private LabDeveloperField(string label, float min, float max, bool wholeNumber, string offText, string onText)
+        private LabDeveloperField(string label, float min, float max, bool wholeNumber, string offText, string onText,
+            IReadOnlyList<string> choices = null)
         {
+            Choices = choices;
             OffText = offText;
             OnText = onText;
             Label = label;
@@ -215,7 +224,8 @@ namespace C6Lab
             new LabDeveloperField("Paint Flow Ratio", 0f, 1f),
             new LabDeveloperField("Paint Drip Width (surface degrees)", .5f, 12f),
             new LabDeveloperField("Paint Drip Length (surface degrees)", 5f, 135f),
-            new LabDeveloperField("Paint Gravity Weight", 1f, 8f)
+            new LabDeveloperField("Paint Gravity Weight", 1f, 8f),
+            LabDeveloperField.Choice("Paint Pattern", "LEGACY", "BROAD", "SPLATTER", "FLOW")
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -245,7 +255,7 @@ namespace C6Lab
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
             new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
-                133, 134, 135, 136, 137, 138),
+                139, 133, 134, 135, 136, 137, 138),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
         });
 
@@ -382,6 +392,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float paintMottleStrength = .18f;
         [Tooltip("실험용 성장 방식. 0은 기존 성장, 1은 퍼짐과 중력 방향 흐름을 함께 사용한다. 새 판에 적용한다.")]
         [SerializeField, Range(0, 1)] private int paintGrowthStyle = 0;
+        [Tooltip("Actual impact footprint. Splatter is the default. Applied only when a new round starts.")]
+        [SerializeField] private LabPaintPattern paintPattern = LabPaintPattern.Splatter;
         [Tooltip("퍼짐 경계의 불규칙한 정도. 도색 면적 예산과는 별개다.")]
         [SerializeField, Range(0f, 1f)] private float paintEdgeRaggedness = .55f;
         [Tooltip("성장 셀마다 흐름 경로를 시도할 확률. 막히면 같은 예산으로 일반 퍼짐을 사용한다.")]
@@ -634,6 +646,7 @@ namespace C6Lab
             FillChancePercent = PaintFillChancePercent,
             VerticalWeight = PaintVerticalWeight,
             Style = PaintGrowthStyle,
+            Pattern = PaintPattern,
             Raggedness = PaintEdgeRaggedness,
             FlowRatio = PaintFlowRatio,
             DripWidthDegrees = PaintDripWidthDegrees,
@@ -656,6 +669,8 @@ namespace C6Lab
         public float PaintGrainStrength => Mathf.Clamp01(Finite(paintGrainStrength, .3f));
         public float PaintMottleStrength => Mathf.Clamp01(Finite(paintMottleStrength, .18f));
         public int PaintGrowthStyle => Mathf.Clamp(paintGrowthStyle, 0, 1);
+        public LabPaintPattern PaintPattern => paintPattern >= LabPaintPattern.Legacy && paintPattern <= LabPaintPattern.Flow
+            ? paintPattern : LabPaintPattern.Splatter;
         public float PaintEdgeRaggedness => Mathf.Clamp01(Finite(paintEdgeRaggedness, .55f));
         public float PaintFlowRatio => Mathf.Clamp01(Finite(paintFlowRatio, .35f));
         public float PaintDripWidthDegrees => Mathf.Clamp(Finite(paintDripWidthDegrees, 3f), .5f, 12f);
@@ -773,7 +788,7 @@ namespace C6Lab
                 GourdSwingReturnStrength, GourdSwingDamping,
                 PaintGrainEnabled ? 1f : 0f, PaintGrainSize, PaintGrainStrength, PaintMottleStrength,
                 (float)PaintGrowthStyle, PaintEdgeRaggedness, PaintFlowRatio,
-                PaintDripWidthDegrees, PaintDripLengthDegrees, PaintGravityWeight
+                PaintDripWidthDegrees, PaintDripLengthDegrees, PaintGravityWeight, (float)PaintPattern
             };
         }
 
@@ -956,6 +971,7 @@ namespace C6Lab
             paintDripWidthDegrees = values[136];
             paintDripLengthDegrees = values[137];
             paintGravityWeight = values[138];
+            paintPattern = (LabPaintPattern)(int)values[139];
             error = string.Empty;
             return true;
         }

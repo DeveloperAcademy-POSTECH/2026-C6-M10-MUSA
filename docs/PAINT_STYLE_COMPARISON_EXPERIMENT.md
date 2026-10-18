@@ -1,5 +1,7 @@
 # Experiment #200 — 실제 박 물감 3종 비교
 
+> 후속 승인으로 실제 전투에도 4종 선택이 연결됐다. 아래 본문은 처음 작성한 **Editor 전용 비교 도구**의 범위와 당시 기록이다. 현재 DEV 기본값·실제 명중/성장 연결은 [실제 전투 패턴 안내](PAINT_PATTERN_RUNTIME.md)를 기준으로 한다. 오프라인 Complete fixture는 여전히 게임 로직에 사용하지 않는다.
+
 ## 범위와 열기
 
 실제 저장된 `Assets/Lab/Resources/GourdPaint/WhiteGourd.prefab`과 기존 `LabGourdPaint.shader`를 사용해 **넓은 얼룩형(Broad)·튀긴 물감형(Splatter)·흐르는 물감형(Flow)**을 비교하는 Editor 실험이다. Unity **6000.6.5f1 / URP17.6.0**, 기준 main `a3cf6f3e`, 브랜치 `experiment/#200-gourd-paint-style-comparison`에서 작성했다.
@@ -48,7 +50,7 @@
 | 파랑 | `#1471A7` | 20, 113, 167 |
 | 갈색 | `#6F4A32` | 111, 74, 50 |
 
-단일 원본은 `LabPaintStyleStudy.PaletteColor`의 작성용 sRGB 값이다. 비교 지도가 linear 데이터 텍스처이므로 지도에 쓰기 전에 linear로 변환해 이중 밝아짐을 방지한다. 실제 화면의 색은 기존 셰이더의 곡면 조명·질감·농담에 따라 밝기가 달라진다. 색 순서/위치는 세 스타일에 동일하며 기존 전투 구슬·속성색·Host 도색 팔레트는 변경하지 않는다.
+후속 실제 전투 통합부터 단일 작성용 팔레트는 `LabPaintPalette.SrgbColorFor`이며 `LabPaintStyleStudy.PaletteColor`가 같은 값을 참조한다. 최초 비교 당시의 값은 동일하다. 비교 지도가 linear 데이터 텍스처이므로 지도에 쓰기 전에 linear로 변환해 이중 밝아짐을 방지한다. 실제 화면의 색은 기존 셰이더의 곡면 조명·질감·농담에 따라 밝기가 달라진다. 색 순서/위치는 세 스타일에 동일하며 기존 전투 구슬·속성색·Host 도색 팔레트는 변경하지 않는다.
 
 ## 게임과 구분할 것
 

@@ -87,6 +87,7 @@ MonoBehaviour:
   paintGrainStrength: 0.3
   paintMottleStrength: 0.18
   paintGrowthStyle: 0
+  paintPattern: 2
   paintEdgeRaggedness: 0.55
   paintFlowRatio: 0.35
   paintDripWidthDegrees: 3

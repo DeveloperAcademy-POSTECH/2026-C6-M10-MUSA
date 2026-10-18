@@ -428,7 +428,7 @@ namespace C6Lab.Tests
         }
 
         private static LabPaintSurface NewSurface(int resolution = 0)
-            => new LabPaintSurface(new LabPaintGrowthSettings { Resolution = resolution }, 42u);
+            => new LabPaintSurface(new LabPaintGrowthSettings { Pattern = LabPaintPattern.Legacy, Resolution = resolution }, 42u);
 
         private static Color32[] Pixels(LabPaintSurface surface)
         {

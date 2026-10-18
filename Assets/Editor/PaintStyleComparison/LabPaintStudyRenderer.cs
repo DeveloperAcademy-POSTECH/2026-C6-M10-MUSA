@@ -29,6 +29,7 @@ namespace C6Lab.Experiments.Editor
         private Camera camera;
         private RenderTexture target;
         private Material paintMaterial;
+        private Texture2D runtimeMapTexture;
         private readonly Dictionary<LabPaintStudyMap, Texture2D> mapTextures = new Dictionary<LabPaintStudyMap, Texture2D>();
         private readonly List<Material> materialCopies = new List<Material>();
         private bool disposed;
@@ -129,6 +130,35 @@ namespace C6Lab.Experiments.Editor
                 mapTexture.Apply(false, false);
                 mapTextures.Add(map, mapTexture);
             }
+            return RenderMap(mapTexture, grain, yaw, zoom);
+        }
+
+        /// <summary>Render genuine Host-rule bytes at their native resolution and Point sampling.</summary>
+        public Texture2D RenderSurface(LabPaintSurface surface, bool grain, float yaw = 0f, float zoom = 1f)
+        {
+            if (disposed) throw new ObjectDisposedException(nameof(LabPaintStudyRenderer));
+            if (surface == null) throw new ArgumentNullException(nameof(surface));
+            if (runtimeMapTexture == null || runtimeMapTexture.width != surface.Columns
+                || runtimeMapTexture.height != surface.Rows)
+            {
+                if (runtimeMapTexture != null) Object.DestroyImmediate(runtimeMapTexture);
+                runtimeMapTexture = new Texture2D(surface.Columns, surface.Rows, TextureFormat.RGBA32, false, true)
+                {
+                    hideFlags = HideFlags.HideAndDontSave,
+                    filterMode = FilterMode.Point,
+                    wrapModeU = TextureWrapMode.Repeat,
+                    wrapModeV = TextureWrapMode.Clamp
+                };
+            }
+            var pixels = new Color32[surface.CellCount];
+            surface.CopyPixels(pixels);
+            runtimeMapTexture.SetPixels32(pixels);
+            runtimeMapTexture.Apply(false, false);
+            return RenderMap(runtimeMapTexture, grain, yaw, zoom);
+        }
+
+        private Texture2D RenderMap(Texture2D mapTexture, bool grain, float yaw, float zoom)
+        {
             paintMaterial.SetTexture("_PaintMap", mapTexture);
             paintMaterial.SetFloat("_PaintMapReady", 1f);
             paintMaterial.SetFloat("_PaintGrainEnabled", grain ? 1f : 0f);
@@ -174,8 +204,8 @@ namespace C6Lab.Experiments.Editor
 
         public static Texture2D Combine(Texture2D[] images)
         {
-            if (images == null || images.Length != 3)
-                throw new ArgumentException("Exactly three paint style images are required.", nameof(images));
+            if (images == null || images.Length == 0 || images[0] == null)
+                throw new ArgumentException("At least one paint style image is required.", nameof(images));
             int width = images[0].width, height = images[0].height;
             var pixels = new Color32[width * height * images.Length];
             for (int i = 0; i < images.Length; i++)
@@ -184,9 +214,9 @@ namespace C6Lab.Experiments.Editor
                     throw new ArgumentException("Comparison images must have identical sizes.", nameof(images));
                 Color32[] source = images[i].GetPixels32();
                 for (int y = 0; y < height; y++)
-                    Array.Copy(source, y * width, pixels, y * width * 3 + i * width, width);
+                    Array.Copy(source, y * width, pixels, y * width * images.Length + i * width, width);
             }
-            var combined = new Texture2D(width * 3, height, TextureFormat.RGBA32, false, false)
+            var combined = new Texture2D(width * images.Length, height, TextureFormat.RGBA32, false, false)
                 { hideFlags = HideFlags.HideAndDontSave };
             combined.SetPixels32(pixels);
             combined.Apply(false, false);
@@ -199,6 +229,8 @@ namespace C6Lab.Experiments.Editor
             foreach (Texture2D texture in mapTextures.Values)
                 if (texture != null) Object.DestroyImmediate(texture);
             mapTextures.Clear();
+            if (runtimeMapTexture != null) Object.DestroyImmediate(runtimeMapTexture);
+            runtimeMapTexture = null;
         }
 
         public void Dispose()

@@ -36,7 +36,7 @@ namespace C6Lab.Tests
                 case "revision": snapshot.paintRevision++; break;
                 case "paint-count": snapshot.paintCount++; break;
                 case "incomplete-map":
-                    map = new LabPaintSurface(new LabPaintGrowthSettings { Resolution = 0 }, 10);
+                    map = new LabPaintSurface(new LabPaintGrowthSettings { Pattern = LabPaintPattern.Legacy, Resolution = 0 }, 10);
                     map.RegisterHit(Vector3.forward, Color.red, 1);
                     snapshot = Snapshot(map);
                     break;
@@ -73,7 +73,7 @@ namespace C6Lab.Tests
         private static LabPaintSurface CompletedMap()
         {
             var map = new LabPaintSurface(new LabPaintGrowthSettings
-                { Resolution = 0, InitialPercent = 100 }, 42);
+                { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = 100 }, 42);
             Assert.That(map.RegisterHit(Vector3.forward, new Color(.1f, .7f, .2f, 1), 9), Is.True);
             return map;
         }

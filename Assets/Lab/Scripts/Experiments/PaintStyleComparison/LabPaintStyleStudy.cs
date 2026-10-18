@@ -33,17 +33,16 @@ namespace C6Lab.Experiments
             new Vector3(.68f, -.23f, .65f).normalized,
             new Vector3(-.57f, -.52f, .60f).normalized
         };
-        private static readonly Color32[] Colors = {
-            new Color32(216, 87, 54, 255), new Color32(248, 183, 42, 255),
-            new Color32(20, 113, 167, 255), new Color32(61, 130, 88, 255),
-            new Color32(111, 74, 50, 255)
+        private static readonly LabOrbElement[] PaletteElements = {
+            LabOrbElement.Fire, LabOrbElement.Metal, LabOrbElement.Water,
+            LabOrbElement.Wood, LabOrbElement.Earth
         };
 
         /// <summary>Authoring colors in sRGB, sampled from the user's profiled palette image.</summary>
         public static Color32 PaletteColor(int index)
         {
-            if (index < 0 || index >= Colors.Length) throw new ArgumentOutOfRangeException(nameof(index));
-            return Colors[index];
+            if (index < 0 || index >= PaletteElements.Length) throw new ArgumentOutOfRangeException(nameof(index));
+            return LabPaintPalette.SrgbColorFor(PaletteElements[index]);
         }
 
         public static LabPaintStudyMap Build(LabPaintStudyMask mask, LabPaintStudyStyle style,
@@ -72,7 +71,7 @@ namespace C6Lab.Experiments
                     uint stampSeed = Hash(seed ^ ((uint)stamp + 1u) * 0x9E3779B9u);
                     float rotation = style == LabPaintStudyStyle.Flow ? 0f
                         : (Unit(stampSeed) - .5f) * (style == LabPaintStudyStyle.Broad ? .44f : 1f);
-                    PaintStamp(mask, points, pixels, Hits[stamp], Colors[stamp], rotation,
+                    PaintStamp(mask, points, pixels, Hits[stamp], PaletteColor(stamp), rotation,
                         requested, columns, rows, stampSeed);
                     covered += requested;
                 }
@@ -91,7 +90,7 @@ namespace C6Lab.Experiments
                         float dot = Vector3.Dot(points[i], Hits[hit]);
                         if (dot > best) { best = dot; nearest = hit; }
                     }
-                    pixels[i] = Shade(Colors[nearest], points[i], seed);
+                    pixels[i] = Shade(PaletteColor(nearest), points[i], seed);
                 }
                 covered = total;
             }

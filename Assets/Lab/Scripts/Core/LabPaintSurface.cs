@@ -13,6 +13,7 @@ namespace C6Lab
         public float GrowthPercentPerSecond = 6f;
         public float FillChancePercent = 60f;
         public float VerticalWeight = 1.35f;
+        public LabPaintPattern Pattern = LabPaintPattern.Splatter;
         public int Style = 0;
         public float Raggedness = .55f;
         public float FlowRatio = .35f;
@@ -77,6 +78,7 @@ namespace C6Lab
                 || settings.GrowthPercentPerSecond > 1000f
                 || !Finite(settings.FillChancePercent) || settings.FillChancePercent < 0f || settings.FillChancePercent > 100f
                 || !Finite(settings.VerticalWeight) || settings.VerticalWeight <= 0f || settings.VerticalWeight > 1000f
+                || settings.Pattern < LabPaintPattern.Legacy || settings.Pattern > LabPaintPattern.Flow
                 || settings.Style < 0 || settings.Style > 1
                 || !Finite(settings.Raggedness) || settings.Raggedness < 0f || settings.Raggedness > 1f
                 || !Finite(settings.FlowRatio) || settings.FlowRatio < 0f || settings.FlowRatio > 1f
@@ -97,6 +99,11 @@ namespace C6Lab
             cellsPerSecond = (decimal)settings.GrowthPercentPerSecond * CellCount / 100m;
             fillChance = settings.FillChancePercent / 100f;
             verticalWeight = settings.VerticalWeight;
+            pattern = settings.Pattern;
+            // Models are also constructed from MonoBehaviour field initializers while Unity
+            // deserializes a scene. Resource APIs are illegal there; resolve the mask only for
+            // an actual new impact, before that impact changes authoritative state.
+            patternMask = null;
             flowStyle = settings.Style;
             raggedness = settings.Raggedness;
             flowRatio = settings.FlowRatio;
@@ -116,6 +123,8 @@ namespace C6Lab
         {
             if (preview || replica || IsComplete || !ValidHit(direction, color)) return false;
             int cell = CellFor(direction);
+            if (pattern != LabPaintPattern.Legacy && pixels[cell].a == 0 && patternMask == null)
+                patternMask = LabPaintPatternMask.Load(pattern);
             if (PaintCount < int.MaxValue) PaintCount++;
             var opaque = new Color32((byte)Mathf.RoundToInt(Mathf.Clamp01(color.r) * 255f),
                 (byte)Mathf.RoundToInt(Mathf.Clamp01(color.g) * 255f),
@@ -125,6 +134,11 @@ namespace C6Lab
                 Region existing = Root(cellRegions[cell]);
                 Supply(existing, repeatCells, opaque, attackerId);
                 RefreshActive(existing);
+                return true;
+            }
+            if (pattern != LabPaintPattern.Legacy)
+            {
+                RegisterPatternHit(direction.normalized, cell, opaque, attackerId);
                 return true;
             }
             var region = new Region(regions.Count);
@@ -162,7 +176,9 @@ namespace C6Lab
             {
                 Region region = NextRegion();
                 lastServed = region.Id;
-                PaintCell(region, flowStyle == 1 ? ChooseSpreadFlowCell(region) : ChooseCell(region));
+                PaintCell(region, pattern == LabPaintPattern.Legacy
+                    ? (flowStyle == 1 ? ChooseSpreadFlowCell(region) : ChooseCell(region))
+                    : ChoosePatternCell(region));
                 painted++;
                 if (IsComplete) return (double)((painted - startCredit) / cellsPerSecond);
             }
@@ -268,6 +284,9 @@ namespace C6Lab
             donor.Supplies.Clear();
             if (donor.Flow != null && (keep.Flow == null || donor.Flow.Sequence > keep.Flow.Sequence))
                 keep.Flow = donor.Flow;
+            if (donor.PatternPatch != null && (keep.PatternPatch == null
+                || donor.PatternPatch.Sequence > keep.PatternPatch.Sequence))
+                keep.PatternPatch = donor.PatternPatch;
             for (int bucket = 0; bucket < 6; bucket++)
             {
                 List<int> cells = donor.Buckets[bucket];
@@ -377,6 +396,7 @@ namespace C6Lab
             preview = replica = false;
             flowDirection = Vector3.down;
             flowSequence = 0;
+            patternSequence = 0;
             unchecked { Revision++; }
         }
 
@@ -486,6 +506,7 @@ namespace C6Lab
             public int Parent;
             public decimal Budget;
             public FlowTip Flow;
+            public PatternPatch PatternPatch;
             public readonly SortedDictionary<ulong, Ink> Supplies = new SortedDictionary<ulong, Ink>();
             public readonly List<int>[] Buckets = new List<int>[6];
             private readonly Dictionary<int, Entry> candidates = new Dictionary<int, Entry>();

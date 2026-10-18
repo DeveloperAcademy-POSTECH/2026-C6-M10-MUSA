@@ -108,7 +108,7 @@ namespace C6Lab.Tests
             float[] values = source.CaptureDeveloperValues();
             values[2] = duration; values[79] = 0; values[105] = 0;
             values[106] = initial; values[107] = repeat; values[108] = speed;
-            values[133] = 1;
+            values[133] = 1; values[139] = 0;
             Assert.That(source.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return source;
         }
