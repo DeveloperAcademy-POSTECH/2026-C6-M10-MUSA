@@ -802,3 +802,27 @@ Scene 파일을 저장하거나 덮어쓰지 않고 **File → Open Scene으로 
 DEV 사용 방법은 [DEV 상세 명세](DEVELOPER_MODE_PARAMETER_SPEC.md)의 줄·기울기 조정 순서를 따른다. 수치를 바꾼 후 솔로 시작/재시작, Host 방 생성/로비 적용 또는 공동 정지 후 적용/재시작을 눌러 새 판에 반영한다. 숫자를 움직이기만 해서는 진행 중 값이나 원본 에셋을 바꾸지 않는다. 미적용 상태로 닫고 열면 마지막 적용값을 불러오며 DEFAULTS는 폼만 복원한다.
 
 원시 XML·Editor/Player 로그·앱·PNG·임시 실행기와 자동 생성 Performance/URP 직렬화 변경은 공개 Git에 넣지 않는다. 위 실행과 단순 코드 존재, 작성자의 과거 임시 프로젝트 실행을 구분한다.
+
+### Experiment #196 — 박 물감 내부 입자·농담 — 2026-10-18
+
+기준 main `e429da10`, 브랜치 `experiment/#196-gourd-paint-grain`, Unity **6000.6.5f1 / URP17.6.0**. 정식 반영 전 실험이며 main에 자동 적용하거나 병합하지 않는다. 사용자 Scene·머티리얼 수정이 남은 원본 작업 폴더를 건드리지 않고 분리된 작업 폴더에서 검사한다.
+
+도색 지도의 RGB에만 박 로컬 방향의 고정3D 노이즈를 곱해 미세 입자와 큰 농담을 표현한다. OFF 또는 두 강도0은 기존 합성식을 사용하고 미도색 종이·alpha·도색 셀·성장량·색 소유·승리 판정은 유지한다. 시간·화면 좌표·기기별 난수·새 텍스처를 사용하지 않으며 미해상 입자는 fwidth로 대비를 낮춘다. 기기간 GPU의 미세 픽셀까지 비트 단위로 같다는 보장은 하지 않는다. 실제 RGBA 지도·진행률을 공유하는 구조는 유지한다.
+
+DEV의 Gourd에 인덱스129~132 네 개를 추가해 총133개, 프로토콜5633/기존 토큰10을 사용한다. 기본 OFF·크기1·입자 강도0.3·농담0.18이다. 해당 실험 버전끼리 접속하며 구 main 앱과 혼합하지 않는다. 기존 설정129개·관람111번·직구112~118번·줄/기울기119~128번을 보존한다. Config 에셋은 Unity 저장 API로 새 네 필드만 기록했다. MPB는 맵 revision과 별도로 설정 변경을 감지하고 기존 다른 속성을 보존하며, 완료품 관람 복제도 같은 설정을 캡처한다.
+
+| 검증 | 상태 | 실행 근거·범위 |
+| --- | --- | --- |
+| Unity import/컴파일·저장 Config | PASS | 분리 프로젝트의 `PaintGrainValidation.Initialize`, `PAINT_GRAIN_EXPERIMENT_CONFIG_OK fields=133 enabled=False size=1 strength=0.3 mottle=0.18` 확인. 원본 Config diff는 새 네 필드 추가뿐이다. |
+| 최종 전체 EditMode | PASS | `editmode.xml`: **404/404**, failed/skipped/inconclusive=0, **11:52:56Z–11:52:58Z**. 기존391+신규13. 네 설정의 끝값·JSON/공유 fingerprint·기존129개 보존·잘못된 값 원자 거절·구형 스키마 거절·Inspector 범위 방어를 포함한다. 이것은 실제 두 앱 연결 검증과 다르다. |
+| 최종 전체 PlayMode | PASS | `playmode.xml`: **136/136**, failed/skipped/inconclusive=0, **11:53:16Z–11:54:30Z**. 기존132+신규 DEV2/렌더2를 전체 실행했다. GPU 부재의 렌더 Ignore는 발생하지 않았다. |
+| 실제 곡면 셰이더 비교 | PASS | `SavedGourdShaderChangesOnlyPigmentAndZeroStrengthMatchesOffExactly`: 저장 WhiteGourd 실제 메시·재질의 512×512 렌더에서 미도색/불투명 alpha 불변, 도색 내부 변경100픽셀 초과, 시간 경과 후 같은 이미지, 크기 변경 시 다른 입자, 두 강도0/OFF의 원래 이미지 일치, CPU 맵·Revision·면적·명중 수 보존을 확인했다. `grain-partial-OFF.png`·`grain-partial-ON-default.png`·`grain-partial-ON-size3.png` 세 장을 열어 미세/굵은 입자 차이를 확인했다. 단순 PNG 파일 생성만으로 PASS를 기록하지 않았다. |
+| DEV·완료품 관람 연결 | PASS | `LabPaintGrainDeveloperTests` 2개: 실제 저장 패널의 ON/OFF 버튼·세 슬라이더/숫자·마지막 행 스크롤/raycast·초안 폐기·솔로 ON→OFF 재시작·원본 보존. `UnchangedMapRebindsGrainWithoutEditingSharedMaterialAndViewerCopiesOverrides`: 같은 Revision에서 설정만 갱신하고 다른 MPB 속성/공유 재질을 보존하며, 완료 관람의 독립 재질/맵/새 네 값이 원본 변경 후에도 유지됨을 확인했다. 실제 연결 Client ACK나 실제 피격 완료는 이 검사의 범위가 아니다. |
+| 일반 Mac 빌드 | PASS | 임시 Editor 저장기 `.cs/.meta`를 제거하고 기존 메뉴로 `Builds/Lab/20261018-205501-f03f0eb4/macOS/C6_Physics_Lab.app` 빌드. **186,359,980 bytes**, `C6_LAB_BUILD_OK target=StandaloneOSX`, 종료0. Runtime 어셈블리에 질감 설정 코드가 있고 임시 저장기는 없다. 이 앱의 별도 수동 플레이는 미실행이다. |
+| 실제2앱·iOS·실기기·핫스팟·3~5기기·성능 | NOT_RUN | 이 실험에서 실행하지 않았다. 실제 손 조작·원거리/회전 시 반짝임·GPU 시간·발열·메모리·전송 화면 일치의 결과로 확대하지 않는다. |
+
+렌더 검사는 저장 WhiteGourd 메시와 기존 셰이더 재질을 사용하는 **Fixture**다. 미리보기 `Paint`로 부분 색을 넣거나 일치하는 완료 맵/결과를 직접 준비한다. 실제 투척·Host 물리 피격·일반 플레이 승리 증거가 아니다. 원래 RGBA 지도와 revision을 보존한 채 OFF/ON/크기3/두 강도0을 비교한다. 그림은 로컬에만 보존하며 공개 저장소에 원시 XML·로그·PNG·빌드·임시 검사 실행기를 올리지 않는다.
+
+이번 범위에는 도색 외곽 모양·위성 비산점·흰 구멍·Normal/높이맵·새 조명·Decal·계산 해상도 변경이 없다. 질감 사용법과 조절값은 [DEV 상세 명세](DEVELOPER_MODE_PARAMETER_SPEC.md)의 Experiment #196 항목을 따른다. 실험의 기본은 OFF이며 원본 프로젝트의 사용자 변경은 작업 전 해시와 비교해 보존한다.
+
+#196 후속: 2026-10-18 사용자가 질감 실험의 PR 작성·main 병합을 승인했다. 위 기록은 당시 실험 실행 근거로 보존한다. 코드·기본 OFF 설정은 검증한 `4949ad9`와 같으며 병합용 후속 변경은 사용 문구 정리뿐이다. 미실행 실기기·실제2앱·성능 항목을 PASS로 승계하지 않는다.

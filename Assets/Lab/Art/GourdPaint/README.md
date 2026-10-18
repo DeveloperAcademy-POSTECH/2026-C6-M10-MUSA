@@ -1,5 +1,7 @@
 # 기본 전투의 100% 공동 색칠·인접 성장·완성 박 관람 — #187·#191
 
+> **Experiment #196**: 기존 판정 맵 위에 물감 내부 입자·농담을 표시하는 선택 표현이다. 기본 OFF이며 DEV → Gourd → Paint Grain에서 켠다. 원본 도색·성장·완료 규칙은 유지하고 로컬 좌표 고정 RGB 명암만 추가한다. 새 설정129~132를 포함한133개·프로토콜5633을 사용하며 사용자 승인으로 main에 포함하며 기본 OFF를 유지한다. 세부 조절값과 검증은 루트 `README.md`·`docs/DEVELOPER_MODE_PARAMETER_SPEC.md`·`docs/VALIDATION.md`의 #196 항목을 따른다.
+
 기본 실행·빌드 Scene은 `Assets/Lab/Scenes/Lab.unity`다. #153에서 이관한 `Resources/GourdPaint/WhiteGourd.prefab`·`WhiteGourd.mat`·`Stem.mat`의 원본 참조와 GUID, UI 배치와 빌드 Scene 목록을 유지한다. 박 외형과 실제 기존 원통 MeshCollider의 모양 차이도 유지한다. 단일 원본 `LabConfig.asset`은 Unity에서 목표 100과 성장 기본값 6개를 저장했으며 다른 설정의 유효값을 보존했다.
 
 ## 모드·고정 목표·성장 설정
@@ -20,7 +22,7 @@
 | Paint Fill Chance (%) | 110번째 · 인덱스 109 | 60 | 0–100% | 이웃이 둘 이상 칠해진 빈 셀을 우선 채울 확률. 해당 후보가 없으면 다른 인접 후보로 진행한다. |
 | Paint Vertical Weight | 111번째 · 인덱스 110 | 1.35 | 1–4 | 세로 방향 인접 후보의 선택 가중치. 1은 가로와 같은 가중치다. |
 
-옛 에셋의 직렬화 목표 80은 `PaintVictoryPercent`·`CaptureDeveloperValues`에서 100으로 정규화한다. DEV/공유 설정으로 100 외 목표를 보내면 전체 설정을 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**로 나머지 설정과 함께 검증·적용한다. 새 판의 Rules는 `PaintGrowthSettings` 복사본을 캡처하므로 Inspector·입력칸만 바꿔 진행 중인 판에 적용하지 않는다. 현재 공유 설정은 총 **129개**, 프로토콜은 **5632**, 연결 토큰은 `C6PhysicsLab/10`이며 모든 참가자가 같은 새 버전을 사용해야 한다.
+옛 에셋의 직렬화 목표 80은 `PaintVictoryPercent`·`CaptureDeveloperValues`에서 100으로 정규화한다. DEV/공유 설정으로 100 외 목표를 보내면 전체 설정을 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**로 나머지 설정과 함께 검증·적용한다. 새 판의 Rules는 `PaintGrowthSettings` 복사본을 캡처하므로 Inspector·입력칸만 바꿔 진행 중인 판에 적용하지 않는다. 현재 공유 설정은 총 **133개**, 프로토콜은 **5633**, 연결 토큰은 `C6PhysicsLab/10`이며 모든 참가자가 같은 새 버전을 사용해야 한다.
 
 ## 실제 명중과 공동 승리
 
@@ -40,7 +42,7 @@
 | --- | --- | --- | --- | --- |
 | Completed Gourd Viewer (0 off, 1 on) | 112번째 · 인덱스 111 · Gourd | OFF(0) | 정수 0–1 | Host가 전원의 관람 허용을 공유한다. 열기·회전·확대/축소는 각자 로컬에서 한다. |
 
-`LabConfig.CompletedGourdViewerEnabled`는 단일 원본의 bool이며 저장 필드가 없는 에셋도 false다. 기존 0~110번과 111번째 `Paint Vertical Weight`를 보존한다. 129개 배열 전체를 검증하므로 잘못된 bool 입력과 구형 128개 이하 배열은 원자적으로 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 기존 지문·참가자 확인 응답과 함께 적용한다. 진행 중인 판에 즉시 바꾸지 않는다. 일반 Release 참가자도 Host 허용값을 따르며 관람에 별도 Debug·실행 인자·Editor 메뉴 조건을 요구하지 않는다.
+`LabConfig.CompletedGourdViewerEnabled`는 단일 원본의 bool이며 저장 필드가 없는 에셋도 false다. 기존 0~110번과 111번째 `Paint Vertical Weight`를 보존한다. 133개 배열 전체를 검증하므로 잘못된 bool 입력과 구형 132개 이하 배열은 원자적으로 거절한다. **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 기존 지문·참가자 확인 응답과 함께 적용한다. 진행 중인 판에 즉시 바꾸지 않는다. 일반 Release 참가자도 Host 허용값을 따르며 관람에 별도 Debug·실행 인자·Editor 메뉴 조건을 요구하지 않는다.
 
 ON인 Paint **100% Victory**에서 Snapshot과 공개 표시 맵의 세션·라운드·해상도·Revision·칠한/전체 셀 수·명중 수가 일치해야 관람 버튼이 나타난다. Crack·Defeat·분할 수신 중 맵에는 나타나지 않는다. 필요한 결과에서 `Assets/Lab/Resources/GourdResultViewer/ViewerUI.prefab`을 불러오며 드래그 회전·핀치/마우스 휠 확대·축소·**RESET VIEW**는 각자 화면에만 적용한다. 불투명 모달은 아래 결과 버튼 입력을 막는다.
 

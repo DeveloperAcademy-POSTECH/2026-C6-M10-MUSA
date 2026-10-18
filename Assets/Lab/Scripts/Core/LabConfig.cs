@@ -205,7 +205,11 @@ namespace C6Lab
             new LabDeveloperField("Gourd Swing Impact Strength", 0f, 20f),
             new LabDeveloperField("Gourd Swing Maximum Angle (degrees)", 1f, 75f),
             new LabDeveloperField("Gourd Swing Return Strength", 0f, 100f),
-            new LabDeveloperField("Gourd Swing Damping", 0f, 20f)
+            new LabDeveloperField("Gourd Swing Damping", 0f, 20f),
+            LabDeveloperField.Toggle("Paint Grain (0 off, 1 on)"),
+            new LabDeveloperField("Paint Grain Size", .25f, 4f),
+            new LabDeveloperField("Paint Grain Strength", 0f, 1f),
+            new LabDeveloperField("Paint Mottle Strength", 0f, 1f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -234,7 +238,7 @@ namespace C6Lab
             new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
             new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111,
-                119, 120, 121, 122, 123, 124, 125, 126, 127, 128),
+                119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
         });
 
@@ -361,6 +365,14 @@ namespace C6Lab
         [SerializeField, Range(0f, 100f)] private float gourdSwingReturnStrength = 10f;
         [Tooltip("좌우 흔들림이 줄어드는 속도.")]
         [SerializeField, Range(0f, 20f)] private float gourdSwingDamping = 1.4f;
+        [Tooltip("실험용 물감 입자·농담 표현. 도색 셀·면적·속성·승리 판정을 바꾸지 않는다.")]
+        [SerializeField] private bool paintGrainEnabled = false;
+        [Tooltip("박 표면에 고정된 물감 입자의 상대 크기. 클수록 입자가 크다.")]
+        [SerializeField, Range(.25f, 4f)] private float paintGrainSize = 1f;
+        [Tooltip("도색된 표면의 작은 입자 명암 세기. 0이면 작은 입자 변화를 끈다.")]
+        [SerializeField, Range(0f, 1f)] private float paintGrainStrength = .3f;
+        [Tooltip("도색된 표면의 큰 얼룩 농담 세기. 0이면 큰 얼룩 변화를 끈다.")]
+        [SerializeField, Range(0f, 1f)] private float paintMottleStrength = .18f;
         [Tooltip("박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다. 최대가 0이면 떨어뜨리지 않는다 (#177).")]
         [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
         [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
@@ -614,6 +626,10 @@ namespace C6Lab
         public float GourdSwingMaximumAngle => Mathf.Clamp(Finite(gourdSwingMaximumAngle, 40f), 1f, 75f);
         public float GourdSwingReturnStrength => Mathf.Clamp(Finite(gourdSwingReturnStrength, 10f), 0f, 100f);
         public float GourdSwingDamping => Mathf.Clamp(Finite(gourdSwingDamping, 1.4f), 0f, 20f);
+        public bool PaintGrainEnabled => paintGrainEnabled;
+        public float PaintGrainSize => Mathf.Clamp(Finite(paintGrainSize, 1f), .25f, 4f);
+        public float PaintGrainStrength => Mathf.Clamp01(Finite(paintGrainStrength, .3f));
+        public float PaintMottleStrength => Mathf.Clamp01(Finite(paintMottleStrength, .18f));
         public float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         public float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -723,7 +739,8 @@ namespace C6Lab
                 GourdRopeCycleAmplitude, GourdRopeCyclePeriod, GourdRopeHitBounce,
                 GourdRopeSpring, GourdRopeDamping, GourdRopeMaximumHitExtension,
                 GourdSwingImpactStrength, GourdSwingMaximumAngle,
-                GourdSwingReturnStrength, GourdSwingDamping
+                GourdSwingReturnStrength, GourdSwingDamping,
+                PaintGrainEnabled ? 1f : 0f, PaintGrainSize, PaintGrainStrength, PaintMottleStrength
             };
         }
 
@@ -896,6 +913,10 @@ namespace C6Lab
             gourdSwingMaximumAngle = values[126];
             gourdSwingReturnStrength = values[127];
             gourdSwingDamping = values[128];
+            paintGrainEnabled = values[129] >= .5f;
+            paintGrainSize = values[130];
+            paintGrainStrength = values[131];
+            paintMottleStrength = values[132];
             error = string.Empty;
             return true;
         }
