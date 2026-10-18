@@ -8,7 +8,7 @@
 
 ## 개발자 설정 빠른 참고
 
-Editor 또는 Development Build에서 **DEV**를 열면 요괴·개인 HP·시간·스태미나·생성 확률·아이템·구슬 물리·카메라·투척·피격 회전·생성 연출·생성 북·소리·햅틱·박 모드·폭탄 충격파·결합 소리/햅틱·박 폭탄 간격·도화선 소리·북 멈춤 구간·미니맵·폭탄 소리·색칠 성장·완성 박 관람·직구 폼·박 줄 움직임·측면 타격 흔들림까지 **139개 설정**을 확인합니다. `Paint Victory Coverage (%)`는 100% 고정 행이며 숫자 입력은 읽기 전용, 슬라이더는 비활성입니다. 나머지 값은 숫자 입력·슬라이더 또는 기존 토글로 조정해 솔로 라운드나 Host 공유 방에 적용합니다. [개발자 모드 조정값 상세 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)에 기본값·범위·단위·효과·제약을 정리했습니다. 투척값 비교 순서는 [투척 물리 실험 가이드](docs/THROW_TUNING_GUIDE.md)를 보세요.
+Editor 또는 Development Build에서 **DEV**를 열면 요괴·개인 HP·시간·스태미나·생성 확률·아이템·구슬 물리·카메라·투척·피격 회전·생성 연출·생성 북·소리·햅틱·박 모드·폭탄 충격파·결합 소리/햅틱·박 폭탄 간격·도화선 소리·북 멈춤 구간·미니맵·폭탄 소리·색칠 성장·완성 박 관람·직구 폼·박 줄 움직임·측면 타격 흔들림·추임새 빈도까지 **141개 설정**을 확인합니다. `Paint Victory Coverage (%)`는 100% 고정 행이며 숫자 입력은 읽기 전용, 슬라이더는 비활성입니다. 나머지 값은 숫자 입력·슬라이더 또는 기존 토글로 조정해 솔로 라운드나 Host 공유 방에 적용합니다. [개발자 모드 조정값 상세 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)에 기본값·범위·단위·효과·제약을 정리했습니다. 투척값 비교 순서는 [투척 물리 실험 가이드](docs/THROW_TUNING_GUIDE.md)를 보세요.
 
 | 조정 영역 | 기본값 예시 | 무엇이 바뀌나 |
 | --- | --- | --- |
@@ -52,13 +52,13 @@ Host가 명시한 정원 초과·전투 진행 중·버전 거절은 이유를 �
 
 ### 한 대로 조합·투척 실험하기
 
-Unity Editor에서 Play를 누르거나 **Development Build**로 만든 앱을 실행합니다. 화면 오른쪽의 **DEV**를 누르면 139개 설정의 입력·토글과 고정 목표 행이 있는 패널이 열립니다. `Monster Max HP`, `Orb Generation Cost`, `Orb Lifetime (seconds)`, `Throw ...` 등 필요한 값을 조정하고 **START SOLO**를 누르세요. 한 명의 Host 세션이 즉시 시작되며, 솔로 플레이어가 모든 북을 갖습니다. 조합판 위 **북**을 탭해 Yin/Yang을 만든 뒤 서로 다른 두 구슬을 직접 겹쳐 Combined를 만들고 위쪽으로 빠르게 스와이프해 박에 던질 수 있습니다. 북에서는 기본으로 음·양만 나오며(각 50%), 박이 20~30초마다 떨어뜨리는 폭탄은 솔로에서 모두 내 판에 떨어집니다. 좌우 끝 전달은 이웃이 없으므로 발생하지 않고, 같은 이유로 **잠긴 아이템도 솔로에서는 풀리지 않습니다.** 아이템을 시험하려면 아이템 확률을 올리고, 풀린 아이템을 혼자 보려면 `Item Unlock Swipes Min`·`Max`를 0으로 둡니다. 박 폭탄을 빨리 보려면 `Gourd Bomb Interval Min`·`Max`를 5처럼 작게, 폭탄 없이 투척만 비교하려면 `Gourd Bomb Interval Max`를 0으로 둡니다. 박의 상하 움직임을 비교하려면 DEV의 **Gourd** 묶음에서 `Gourd Rope Cycle Amplitude`와 `Period`를 조정하고 **RESTART SOLO**를 누릅니다. 명중 뒤 더 탱글거리는 반응은 `Hit Bounce`를 올리고 `Damping`을 낮춰 비교하세요. 강한 측면 타격으로 박 아랫면을 드러내려면 `Gourd Swing Impact Strength`와 `Maximum Angle`을 조정하고, `Return Strength`와 `Damping`으로 공략 시간을 맞춥니다.
+Unity Editor에서 Play를 누르거나 **Development Build**로 만든 앱을 실행합니다. 화면 오른쪽의 **DEV**를 누르면 141개 설정의 입력·토글과 고정 목표 행이 있는 패널이 열립니다. `Monster Max HP`, `Orb Generation Cost`, `Orb Lifetime (seconds)`, `Throw ...` 등 필요한 값을 조정하고 **START SOLO**를 누르세요. 한 명의 Host 세션이 즉시 시작되며, 솔로 플레이어가 모든 북을 갖습니다. 조합판 위 **북**을 탭해 Yin/Yang을 만든 뒤 서로 다른 두 구슬을 직접 겹쳐 Combined를 만들고 위쪽으로 빠르게 스와이프해 박에 던질 수 있습니다. 북에서는 기본으로 음·양만 나오며(각 50%), 박이 20~30초마다 떨어뜨리는 폭탄은 솔로에서 모두 내 판에 떨어집니다. 좌우 끝 전달은 이웃이 없으므로 발생하지 않고, 같은 이유로 **잠긴 아이템도 솔로에서는 풀리지 않습니다.** 아이템을 시험하려면 아이템 확률을 올리고, 풀린 아이템을 혼자 보려면 `Item Unlock Swipes Min`·`Max`를 0으로 둡니다. 박 폭탄을 빨리 보려면 `Gourd Bomb Interval Min`·`Max`를 5처럼 작게, 폭탄 없이 투척만 비교하려면 `Gourd Bomb Interval Max`를 0으로 둡니다. 박의 상하 움직임을 비교하려면 DEV의 **Gourd** 묶음에서 `Gourd Rope Cycle Amplitude`와 `Period`를 조정하고 **RESTART SOLO**를 누릅니다. 명중 뒤 더 탱글거리는 반응은 `Hit Bounce`를 올리고 `Damping`을 낮춰 비교하세요. 강한 측면 타격으로 박 아랫면을 드러내려면 `Gourd Swing Impact Strength`와 `Maximum Angle`을 조정하고, `Return Strength`와 `Damping`으로 공략 시간을 맞춥니다.
 
 값을 다시 조정하려면 **DEV → 값 변경 → RESTART SOLO**를 누릅니다. 새 값으로 새 판을 시작하며 구슬·요괴/개인 HP·시간·스태미나가 초기화됩니다. 예를 들어 느긋하게 조합을 시험하려면 `Battle Duration (seconds) = 600`, `Orb Lifetime (seconds) = 60`, `Orb Generation Cost = 1`로 입력합니다. **DEFAULTS**는 저장된 `LabConfig.asset` 값을 입력칸에 불러오고, **END SOLO**는 로비로 돌아갑니다. 오류가 있는 값은 적용하지 않고 패널에 이유를 표시합니다. 일반 빌드에서는 DEV 버튼이 숨겨집니다.
 
 ### 공유 방의 값 바꾸기
 
-Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤, 139개 설정을 확인하고 고정 목표 외의 값을 숫자 입력·슬라이더·토글로 조정합니다. 숫자 입력은 정확한 값을 지정할 때 사용하며 두 조작은 서로 같은 값을 보여줍니다. DEV의 **ROOM PLAYERS**는 일반 로비의 인원 선택과 같은 값을 표시·변경합니다. **CREATE ROOM**을 누르면 선택한 인원과 조정값으로 방을 만들고, 참가자가 자동 방 목록에서 이름을 선택하거나 직접 IP **JOIN**으로 들어오면 Host 설정을 받습니다. Host 로비에서 전투 시작 전에 다시 DEV를 열어 값을 바꿀 수 있으며, 이때 버튼은 **APPLY TO ROOM**입니다. 변경된 설정에 대해 참가자의 확인이 끝나야 **START**할 수 있습니다. 인원수는 방을 만들기 전에 선택합니다. Editor·Development Build의 Host는 전투를 일시정지한 뒤 **DEV → APPLY & RESTART**로 새 설정을 참가자에게 보내고 확인을 받아 새 판을 시작할 수 있습니다. 진행 중인 판의 설정은 바꾸지 않고, 설정은 실행 중인 세션의 복사본에만 적용되며 `LabConfig.asset`에는 저장되지 않습니다.
+Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤, 141개 설정을 확인하고 고정 목표 외의 값을 숫자 입력·슬라이더·토글로 조정합니다. 숫자 입력은 정확한 값을 지정할 때 사용하며 두 조작은 서로 같은 값을 보여줍니다. DEV의 **ROOM PLAYERS**는 일반 로비의 인원 선택과 같은 값을 표시·변경합니다. **CREATE ROOM**을 누르면 선택한 인원과 조정값으로 방을 만들고, 참가자가 자동 방 목록에서 이름을 선택하거나 직접 IP **JOIN**으로 들어오면 Host 설정을 받습니다. Host 로비에서 전투 시작 전에 다시 DEV를 열어 값을 바꿀 수 있으며, 이때 버튼은 **APPLY TO ROOM**입니다. 변경된 설정에 대해 참가자의 확인이 끝나야 **START**할 수 있습니다. 인원수는 방을 만들기 전에 선택합니다. Editor·Development Build의 Host는 전투를 일시정지한 뒤 **DEV → APPLY & RESTART**로 새 설정을 참가자에게 보내고 확인을 받아 새 판을 시작할 수 있습니다. 진행 중인 판의 설정은 바꾸지 않고, 설정은 실행 중인 세션의 복사본에만 적용되며 `LabConfig.asset`에는 저장되지 않습니다.
 
 ### 박 줄·기울기 조절하기 (#194 / #195)
 
@@ -68,19 +68,19 @@ Host에서 **DEV**를 열고 **ROOM PLAYERS**를 2~5명 중 하나로 정한 뒤
 
 **DEV → Gourd → Paint Growth Style → SPREAD + FLOW**를 선택하고 새 판에 적용합니다. `Paint Edge Raggedness`는 최초 얼룩 경계의 불규칙함, `Paint Flow Ratio`는 넓은 성장과 흐름의 비중, `Paint Drip Width/Length`는 구면 각도 기준 꼬리 전폭/길이 상한, `Paint Gravity Weight`는 아래 방향 우대를 조절합니다. 기본 ORIGINAL은 기존 성장·난수 경로를 유지합니다. 내부 질감은 별도 `Paint Grain`으로 켭니다.
 
-최초·반복 도색량과 전체 성장 속도는 기존 값을 함께 사용하며 새 셀마다 같은 면적을 소비합니다. 새 흐름은 Host가 샘플한 세계 아래 방향을 따르고 과거 자국은 박에 고정됩니다. 꼬리가 막히거나 길이 한계에 닿으면 일반 경계로 돌아가 마지막 빈 셀까지 칠할 수 있습니다. 기존 색을 덮거나 혼합하지 않으며 별도 액체 입자/떨어지는 방울을 만들지 않습니다. 실험 버전의 설정139개·프로토콜5634가 같아야 함께 접속할 수 있습니다.
+최초·반복 도색량과 전체 성장 속도는 기존 값을 함께 사용하며 새 셀마다 같은 면적을 소비합니다. 새 흐름은 Host가 샘플한 세계 아래 방향을 따르고 과거 자국은 박에 고정됩니다. 꼬리가 막히거나 길이 한계에 닿으면 일반 경계로 돌아가 마지막 빈 셀까지 칠할 수 있습니다. 기존 색을 덮거나 혼합하지 않으며 별도 액체 입자/떨어지는 방울을 만들지 않습니다. 실험 버전의 설정141개·프로토콜5635가 같아야 함께 접속할 수 있습니다.
 
 ### 실험: 물감 내부 입자·농담 (#196)
 
 **DEV → Gourd → Paint Grain**을 ON으로 바꾸고 **START/RESTART SOLO**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지 후 Host의 **APPLY & RESTART**로 적용합니다. 기본은 OFF여서 기존 단색 표현을 유지합니다. `Paint Grain Size`는 클수록 입자가 커지고, `Paint Grain Strength`는 어두운 미세 입자, `Paint Mottle Strength`는 큰 농담 차이를 조절합니다. 두 강도를 0으로 하면 ON이어도 기존 색을 표시합니다. 표면에 구멍을 뚫거나 미도색 영역을 칠하지 않으며, 이 값들은 도색 면적·진행률·명중/물리·100% 완료를 변경하지 않습니다. 세부 값은 [DEV 상세 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)를 참조하세요.
 
-설정139개·프로토콜5634을 사용하므로 참가자 모두 같은 버전 앱으로 접속합니다. 완성품 관람도 같은 질감 설정을 복제합니다. iOS 화면·성능 검증 여부는 [검증 기록](docs/VALIDATION.md)의 #196 항목에서 확인합니다.
+설정141개·프로토콜5635을 사용하므로 참가자 모두 같은 버전 앱으로 접속합니다. 완성품 관람도 같은 질감 설정을 복제합니다. iOS 화면·성능 검증 여부는 [검증 기록](docs/VALIDATION.md)의 #196 항목에서 확인합니다.
 
 ### 완성된 박 관람하기 (#191)
 
 DEV의 `Gourd` 묶음에 있는 **Completed Gourd Viewer (0 off, 1 on)**은 **112번째(인덱스 111)** 설정이며 기본값은 **OFF(0)**입니다. 기존 0~110번 설정과 111번째 `Paint Vertical Weight`의 위치는 그대로 유지합니다. ON으로 적용한 판에서 Paint가 전체 셀을 칠해 **100% Victory**가 되고 Snapshot과 공개 표시 맵의 세션·라운드·해상도·Revision·셀 수·명중 수가 일치하면 결과 화면에 관람 버튼을 표시합니다. Crack·Defeat·미완성 또는 아직 수신 중인 맵에는 표시하지 않습니다.
 
-이 허용값도 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 전체 139개 설정을 함께 검증·적용합니다. Host의 설정 지문과 참가자 확인 응답을 사용하며 진행 중인 판에 즉시 적용하지 않습니다. **일반 Release 참가자도 Host의 허용값을 따릅니다.** DEV 버튼은 Editor·Development Build에만 보이지만 관람에 별도 실행 인자나 Editor 메뉴 활성화는 필요하지 않습니다.
+이 허용값도 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 전체 141개 설정을 함께 검증·적용합니다. Host의 설정 지문과 참가자 확인 응답을 사용하며 진행 중인 판에 즉시 적용하지 않습니다. **일반 Release 참가자도 Host의 허용값을 따릅니다.** DEV 버튼은 Editor·Development Build에만 보이지만 관람에 별도 실행 인자나 Editor 메뉴 활성화는 필요하지 않습니다.
 
 관람창은 각자 열고 닫으며, 드래그 회전·핀치 또는 마우스 휠 확대/축소·**RESET VIEW**는 자기 화면에만 적용됩니다. **BACK TO RESULTS**로 닫으면 미리보기 자원을 해제합니다. 관람 중에는 불투명 모달이 아래 결과 버튼 입력을 막으며 게임 맵·판정·점수를 바꾸지 않습니다. 일반 Retry는 허용값을 유지하지만 관람창과 이전 미리보기는 닫고 새 판의 완료 결과를 기다립니다. 새 설정 적용, 로비 복귀, 연결 종료, 모드 변경 때도 관람 UI와 미리보기 자원을 정리합니다. 저장 Scene은 바꾸지 않고 `Assets/Lab/Resources/GourdResultViewer/ViewerUI.prefab`을 필요한 결과에서만 불러옵니다.
 
@@ -163,7 +163,7 @@ Paint의 승인 명중은 Host 모델이 구슬 소모·실제 HP 감소·명중
 
 제한 시간 전에 마지막 셀이 완성되면 공동 Victory가 되고, 마지막 성장 시각과 제한 시간 종료가 정확히 같으면 Defeat가 우선합니다. 늦게 도착한 Tick도 제한 시간 전에 완료될 성장은 해당 시각까지 계산합니다. 공동 일시정지 동안 성장·전투 시계·입력·물리는 멈추며 재개 뒤 이어갑니다. 일반 Retry는 모드와 캡처한 성장 설정을 유지하면서 맵·영역·공급 예산·명중 수·난수 진행을 초기화합니다. 새 DEV 값은 다음 시작/재시작에 캡처하며 진행 중인 판에는 적용하지 않습니다. 로비 복귀와 방 이탈도 표시·수신 상태를 정리합니다.
 
-기본 Scene을 바꾸거나 Paint 전용 연결 메뉴를 실행할 필요는 없습니다. `LabSceneController`가 실행 시 `LabGourdPaint.Attach(network)`로 Resources의 표현을 연결하고, 초기 설정과 `ConfigApplied`에서 `ApplyMode()`를 호출합니다. DEV 변경은 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 일시정지한 Host의 **APPLY & RESTART**로 적용합니다. Client는 Host 설정을 사용합니다. 139개 설정(완성 박 관람 허용 포함)과 셀 delta/체크포인트를 공유하는 프로토콜은 **5634**, 연결 토큰은 `C6PhysicsLab/10`이며 이전 버전 앱과 섞어 접속하지 않습니다. [박 색칠 연결 안내](Assets/Lab/Art/GourdPaint/README.md)를 참조하세요.
+기본 Scene을 바꾸거나 Paint 전용 연결 메뉴를 실행할 필요는 없습니다. `LabSceneController`가 실행 시 `LabGourdPaint.Attach(network)`로 Resources의 표현을 연결하고, 초기 설정과 `ConfigApplied`에서 `ApplyMode()`를 호출합니다. DEV 변경은 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 일시정지한 Host의 **APPLY & RESTART**로 적용합니다. Client는 Host 설정을 사용합니다. 141개 설정(완성 박 관람 허용, #201 추임새 확률·간격 포함)과 셀 delta/체크포인트를 공유하는 프로토콜은 **5635**, 연결 토큰은 `C6PhysicsLab/10`이며 이전 버전 앱과 섞어 접속하지 않습니다. [박 색칠 연결 안내](Assets/Lab/Art/GourdPaint/README.md)를 참조하세요.
 
 기존 포물선은 기본 **ARC**로 유지합니다. **DEV → Throw form**에서 **STRAIGHT**를 선택하면 기존 스와이프 입력·초기 속력·좌우 조준·카메라를 유지한 채 더 낮은 직구를 비교할 수 있습니다. 출발 오프셋 XYZ·발사각·떠오름 비율·중력 배율은 6개 숫자 입력과 슬라이더로 조정하며 Host 설정으로 공유합니다. 관람 토글 인덱스 **111**을 보존하고 직구 7개를 **112~118**에 추가했습니다. [포물선·직구 비교 가이드](docs/THROW_TUNING_GUIDE.md)를 참조하세요. 공통 세기 반응·발사각·공기 저항은 **DEV**의 `Throw Power Exponent`, `Throw Loft Offset (degrees)`, `Throw Air Damping`으로 한 판씩 비교할 수 있습니다. 명중·빗나감 뒤 화면에 비행 시간·최고 상승·수평 이동 거리가 나타납니다. 값의 의미와 반복 시험 순서는 [직선 투척 물리 실험 가이드](docs/THROW_TUNING_GUIDE.md)를 참조하세요.
 
@@ -237,7 +237,7 @@ DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" xcodebuild \
 
 Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 Host의 전투 시간 진행에서만 합니다. Host 화면도 현재 Snapshot과 같은 버전의 `LabNetwork.PaintSurface` 표시 캐시를 사용해 맵과 HUD를 함께 반영합니다. Client는 승인 명중 방향을 재생해 성장시키지 않고 Host가 보낸 셀 변경(delta) 또는 전체 체크포인트를 별도 수신 맵에 적용합니다. 분할 수신 중에는 기존 공개 표시 캐시를 유지하고, 완성된 맵의 세션·라운드·해상도·Revision·칠한 셀 수·전체 셀 수·명중 수가 Snapshot 메타데이터와 모두 맞을 때 맵과 HUD를 함께 공개합니다. 픽셀이 그대로인 반복 명중도 명중 수가 바뀌면 빈 delta를 발행합니다.
 
-전송은 프로토콜 **5634**의 `paint_cells`·`paint_resync` 경로를 사용합니다. 셀 ID와 RGBA를 담은 delta보다 전체 맵이 작으면 전체 맵을 보냅니다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송합니다. 최대 해상도 전체 RGBA 맵은 131,072바이트이고 base64 174,764자를 43개로 나눕니다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체합니다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청합니다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호입니다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가합니다.
+전송은 프로토콜 **5635**의 `paint_cells`·`paint_resync` 경로를 사용합니다. 셀 ID와 RGBA를 담은 delta보다 전체 맵이 작으면 전체 맵을 보냅니다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송합니다. 최대 해상도 전체 RGBA 맵은 131,072바이트이고 base64 174,764자를 43개로 나눕니다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체합니다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청합니다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호입니다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가합니다.
 
 이 복구는 **현재 라운드에 계속 연결된 Client의 부분 맵 누락**을 복원하는 기능입니다. 연결이 끊어진 뒤 전투에 재접속하는 기능은 포함하지 않습니다. 실제 다중 앱·기기에서의 전송과 화면 일치는 자동 패킷 fixture와 구분해 검증합니다.
 

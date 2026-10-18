@@ -403,6 +403,8 @@ BGM·생성·타격·빗나감·결합·도화선 소리 크기 6개(인덱스 6
 
 105번째(인덱스 104) `Bomb Sound (0 boom, 1 ppeong)`는 폭탄 소리 종류를 고르는 토글이다(기본 1 = PPEONG). BOOM은 `Audio/Bomb/Boom`의 일반 폭발음, PPEONG은 `Audio/Bomb/Ppeong`의 뻥튀기 기계 소리를 쓴다. 고른 쪽 파일이 없으면 다른 쪽을 쓴다. 팀 플레이 테스트 뒤 하나로 정할 예정이며, Inspector `Bomb Sound Style`과 같은 값이다.
 
+#201: 140·141번째(인덱스 139·140) `Chuimsae Chance (%)`·`Chuimsae Min Gap (generates)`는 구슬 생성 소리에 섞이는 추임새(얼쑤·얼씨구)의 빈도를 정한다. 생성할 때마다 Chance(기본 15%) 확률로 장구 대신 추임새가 나고, 한 번 나온 뒤에는 Min Gap(기본 5번)만큼 장구만 나서 연달아 나오지 않는다(기본값이면 평균 약 9~10번에 한 번). 둘 다 정수이고 Chance 0이면 추임새를 끈다. 이전의 "세 번째마다 고정" 방식(`voiceEvery`)을 대체한다. `Sound and haptics` 칸에서 `Generate Sound Volume` 바로 아래에 보이며, Inspector `Chuimsae Chance Percent`·`Chuimsae Min Gap`과 같은 값이다. 기존 0~138번을 유지하고 끝에 2개를 추가해 총 141개·프로토콜 5635로 공유하며, 같은 버전끼리 접속한다. 코드: `LabGenerateSound.ShouldPlayVoice`·`PlayNext`.
+
 #172 아이폰 확인 뒤 진동 기본값을 정리했다: 생성 Medium·1, 타격 Heavy·1, 아이템 타격 Heavy·1, 폭탄 Heavy·1, 결합 Light·1. 세기 차이는 진동 종류(Light < Medium < Heavy)로 낸다.
 
 ## 9. 입력 제약과 조정 실험 예시
