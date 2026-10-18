@@ -50,6 +50,10 @@ namespace C6Lab.Tests
             Assert.That(developerUi, Is.Not.Null);
             Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(developerUi.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
+            Assert.That(developerUi.valueSliders[119], Is.Not.Null,
+                "The saved DEV panel extends its Gourd rows with the rope motion slider.");
+            Assert.That(developerUi.valueSliders[126], Is.Not.Null,
+                "The saved DEV panel extends its Gourd rows with the swing-angle slider.");
             Assert.That(hud.playerHpText.text, Is.EqualTo("—"));
 
             LabNetwork network = hud.network;
@@ -58,11 +62,22 @@ namespace C6Lab.Tests
             {
                 developerUi.Open();
                 developerUi.valueInputs[48].text = "125";
+                developerUi.valueInputs[119].text = "0.7";
+                developerUi.valueInputs[126].text = "45";
                 Assert.That(developerUi.valueSliders[48].value,
                     Is.EqualTo(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[48], 300f, 125f))
                         .Within(.0001f));
+                Assert.That(developerUi.valueSliders[119].value,
+                    Is.EqualTo(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[119], .45f, .7f))
+                        .Within(.0001f));
                 developerUi.ApplyAndStart();
                 Assert.That(network.IsDeveloperSolo, Is.True, developerUi.feedbackText.text);
+                Assert.That(network.config.GourdRopeCycleAmplitude, Is.EqualTo(.7f).Within(.0001f));
+                Assert.That(network.config.GourdSwingMaximumAngle, Is.EqualTo(45f));
+                Assert.That(network.target.GetComponent<LabHangingTarget>().CycleAmplitude,
+                    Is.EqualTo(.7f).Within(.0001f));
+                Assert.That(network.target.GetComponent<LabHangingTarget>().MaximumAngle,
+                    Is.EqualTo(45f));
                 yield return null;
                 Assert.That(network.Snapshot.players.Single().personalHp, Is.EqualTo(125));
                 Assert.That(hud.playerHpText.text, Is.EqualTo("125 / 125"));

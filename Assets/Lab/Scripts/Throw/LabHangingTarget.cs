@@ -7,13 +7,13 @@ namespace C6Lab
     public sealed class LabHangingTarget : MonoBehaviour
     {
         [SerializeField, Min(0f), Tooltip("Higher values produce a stronger swing from the same impact. Range: 0–20.")]
-        private float impactStrength = 2.4f;
+        private float impactStrength = 12f;
         [SerializeField, Min(0f), Tooltip("How quickly swing momentum fades. Zero keeps oscillating. Range: 0–20.")]
-        private float swingDamping = 1.15f;
+        private float swingDamping = 1.4f;
         [SerializeField, Min(1f), Tooltip("Maximum swing from vertical, in degrees.")]
-        private float maximumAngle = 24f;
+        private float maximumAngle = 40f;
         [SerializeField, Min(0f), Tooltip("How strongly the target returns to its resting position. Range: 0–100.")]
-        private float returnStrength = 13f;
+        private float returnStrength = 10f;
 
         [SerializeField, Min(.1f), Tooltip("Visible rope length in world units, from the ceiling pivot to the top of the target. Range: 0.1–8.")]
         private float ropeLength = .85f;
@@ -26,21 +26,30 @@ namespace C6Lab
         private float bounceDamping = 3f;
         [SerializeField, Min(0f), Tooltip("Maximum extra rope length in world units. Zero disables vertical bounce. Range: 0–3.")]
         private float maximumExtension = .5f;
+        [SerializeField, Range(0f, 1f), Tooltip("Automatic up/down rope motion amplitude. Zero disables the cycle.")]
+        private float cycleAmplitude;
+        [SerializeField, Range(.5f, 10f), Tooltip("Seconds for one complete rope length cycle.")]
+        private float cyclePeriod = 3f;
 
         public float BounceStrength => Safe(bounceStrength, .18f, 0f, 2f);
         public float BounceReturnStrength => Safe(bounceReturnStrength, 45f, 0f, 100f);
         public float BounceDamping => Safe(bounceDamping, 3f, 0f, 20f);
         public float MaximumExtension => Safe(maximumExtension, .5f, 0f, 3f);
         public float VerticalOffset => verticalOffset;
+        public float VerticalVelocity => verticalVelocity;
+        public float CycleElapsed => cycleElapsed;
+        public float CurrentRopeOffset => currentRopeOffset;
+        public float CycleAmplitude => Safe(cycleAmplitude, 0f, 0f, 1f);
+        public float CyclePeriod => Safe(cyclePeriod, 3f, .5f, 10f);
         public float RopeLength => Safe(ropeLength, .85f, .1f, 8f);
-        public float ImpactStrength => Safe(impactStrength, 2.4f, 0f, 20f);
-        public float SwingDamping => Safe(swingDamping, 1.15f, 0f, 20f);
-        public float MaximumAngle => Safe(maximumAngle, 24f, 1f, 75f);
-        public float ReturnStrength => Safe(returnStrength, 13f, 0f, 100f);
+        public float ImpactStrength => Safe(impactStrength, 12f, 0f, 20f);
+        public float SwingDamping => Safe(swingDamping, 1.4f, 0f, 20f);
+        public float MaximumAngle => Safe(maximumAngle, 40f, 1f, 75f);
+        public float ReturnStrength => Safe(returnStrength, 10f, 0f, 100f);
         // Configured from the session's LabConfig copy; these are only safe standalone defaults.
         private float spinStrength = 80f, spinDamping = 1.2f, maximumSpinSpeed = 720f;
         private Transform pivot, twistPivot, hangingBody, visualMount, rope, ceilingBeam, ceilingPlate;
-        private float verticalOffset, verticalVelocity;
+        private float verticalOffset, verticalVelocity, cycleElapsed, currentRopeOffset;
         private Vector2 angle, velocity;
         private float yawAngleDegrees, yawSpeedDegreesPerSecond;
         private Material bodyMaterial, ropeMaterial;
@@ -100,6 +109,58 @@ namespace C6Lab
                 -maximumSpinSpeed, maximumSpinSpeed);
         }
 
+        /// <summary>Apply the shared side-hit swing tuning for this round.</summary>
+        public void ConfigureSwing(float impact, float maximum, float restoring, float damping)
+        {
+            impactStrength = Safe(impact, 12f, 0f, 20f);
+            maximumAngle = Safe(maximum, 40f, 1f, 75f);
+            returnStrength = Safe(restoring, 10f, 0f, 100f);
+            swingDamping = Safe(damping, 1.4f, 0f, 20f);
+            angle = Vector2.ClampMagnitude(angle, MaximumAngle);
+            if (pivot != null) pivot.localRotation = Quaternion.Euler(angle.x, 0, angle.y);
+        }
+
+        /// <summary>Use the Host-shared round settings for both the repeating motion and hit spring.</summary>
+        public void ConfigureRopeMotion(float amplitude, float period, float hitBounce,
+            float spring, float damping, float maxHitExtension)
+        {
+            cycleAmplitude = Safe(amplitude, 0f, 0f, 1f);
+            cyclePeriod = Safe(period, 3f, .5f, 10f);
+            bounceStrength = Safe(hitBounce, .18f, 0f, 2f);
+            bounceReturnStrength = Safe(spring, 45f, 0f, 100f);
+            bounceDamping = Safe(damping, 3f, 0f, 20f);
+            maximumExtension = Safe(maxHitExtension, .5f, 0f, 3f);
+            cycleElapsed = Mathf.Repeat(cycleElapsed, CyclePeriod);
+            ApplyRopeLength();
+        }
+
+        /// <summary>Keep a remote target close to the Host, or pin its rope state while paused.</summary>
+        public void ReconcileRope(float elapsed, float hitOffset, float hitVelocity, bool paused = false)
+        {
+            if (pivot == null || !Finite(elapsed) || !Finite(hitOffset) || !Finite(hitVelocity)) return;
+            float phase = Mathf.Repeat(elapsed, CyclePeriod);
+            if (paused)
+            {
+                // FixedUpdate is stopped during a shared pause. Resolve the remaining error
+                // once so identical paused snapshots cannot keep moving the collider and art.
+                cycleElapsed = phase;
+                verticalOffset = hitOffset;
+                verticalVelocity = hitVelocity;
+                ApplyRopeLength();
+                return;
+            }
+            float phaseError = Mathf.DeltaAngle(cycleElapsed / CyclePeriod * 360f,
+                phase / CyclePeriod * 360f) / 360f * CyclePeriod;
+            if (Mathf.Abs(phaseError) > .25f) cycleElapsed = phase;
+            else if (Mathf.Abs(phaseError) > .03f)
+                cycleElapsed = Mathf.Repeat(cycleElapsed + phaseError * .25f, CyclePeriod);
+            if (Mathf.Abs(hitOffset - verticalOffset) > .08f)
+                verticalOffset = Mathf.Lerp(verticalOffset, hitOffset, .5f);
+            if (Mathf.Abs(hitVelocity - verticalVelocity) > .5f)
+                verticalVelocity = Mathf.Lerp(verticalVelocity, hitVelocity, .5f);
+            ApplyRopeLength();
+        }
+
         /// <summary>Host-authoritative hit: return the signed yaw impulse for the impact packet.</summary>
         public float ApplyHostImpact(Vector3 hitPointWorld, Vector3 impactVelocity)
         {
@@ -126,9 +187,18 @@ namespace C6Lab
         }
 
         /// <summary>Reconcile unwrapped yaw from the latest host snapshot.</summary>
-        public void ReconcileYaw(float angleDegrees, float speedDegreesPerSecond)
+        public void ReconcileYaw(float angleDegrees, float speedDegreesPerSecond, bool paused = false)
         {
             if (twistPivot == null || !Finite(angleDegrees) || !Finite(speedDegreesPerSecond)) return;
+            if (paused)
+            {
+                // A paused target has one authoritative pose, rather than a moving blend.
+                yawAngleDegrees = angleDegrees;
+                yawSpeedDegreesPerSecond = Mathf.Clamp(speedDegreesPerSecond,
+                    -maximumSpinSpeed, maximumSpinSpeed);
+                ApplyYawRotation();
+                return;
+            }
             float difference = angleDegrees - yawAngleDegrees;
             // Snapshot angles describe the Host at send time. During a fast spin, ordinary
             // transit delay makes them older than the locally integrated pose. Avoid pulling
@@ -159,8 +229,8 @@ namespace C6Lab
             ApplyRopeLength();
             Vector3 local = transform.InverseTransformDirection(incomingVelocity);
             if (!Finite(local.x) || !Finite(local.y) || !Finite(local.z)) return;
-            velocity += Vector2.ClampMagnitude(new Vector2(-local.z, local.x) * ImpactStrength, 55f);
-            velocity = Vector2.ClampMagnitude(velocity, 85f);
+            velocity += Vector2.ClampMagnitude(new Vector2(-local.z, local.x) * ImpactStrength, 180f);
+            velocity = Vector2.ClampMagnitude(velocity, 220f);
             verticalVelocity = Mathf.Clamp(verticalVelocity + Mathf.Min(local.magnitude, 30f) * BounceStrength, -8f, 8f);
             flash = .16f;
         }
@@ -169,6 +239,7 @@ namespace C6Lab
         {
             angle = velocity = Vector2.zero;
             verticalOffset = verticalVelocity = 0f;
+            cycleElapsed = 0f;
             yawAngleDegrees = yawSpeedDegreesPerSecond = 0f;
             flash = 0;
             if (pivot != null) pivot.localRotation = Quaternion.identity;
@@ -178,9 +249,12 @@ namespace C6Lab
 
         private void FixedUpdate()
         {
-            if (pivot == null) return;
+            // A snapshot can pause during NetworkEarlyUpdate after this frame's fixed ticks
+            // were queued. Do not integrate that last queued callback after the pose is pinned.
+            if (pivot == null || Time.timeScale <= 0f) return;
             ApplyRopeLength();
             float dt = Time.fixedDeltaTime;
+            cycleElapsed = Mathf.Repeat(cycleElapsed + dt, CyclePeriod);
             velocity += (-angle * ReturnStrength - velocity * SwingDamping) * dt;
             angle += velocity * dt;
             if (angle.magnitude > MaximumAngle)
@@ -233,10 +307,12 @@ namespace C6Lab
             float halfBodyHeight = hangingBody.localScale.y; // Unity's cylinder is two units tall.
             float pivotHeight = length + halfBodyHeight;
             pivot.localPosition = Vector3.up * pivotHeight;
-            twistPivot.localPosition = Vector3.down * (pivotHeight + verticalOffset);
             hangingBody.localPosition = Vector3.zero;
             visualMount.localPosition = Vector3.zero;
-            float stretchedLength = length + verticalOffset;
+            currentRopeOffset = Mathf.Max(.1f - length, verticalOffset
+                + CycleAmplitude * Mathf.Sin(cycleElapsed / CyclePeriod * Mathf.PI * 2f));
+            twistPivot.localPosition = Vector3.down * (pivotHeight + currentRopeOffset);
+            float stretchedLength = length + currentRopeOffset;
             rope.localPosition = Vector3.down * (stretchedLength * .5f);
             rope.localScale = new Vector3(.055f, stretchedLength * .5f, .055f);
             ceilingBeam.localPosition = Vector3.up * (pivotHeight + .1f);

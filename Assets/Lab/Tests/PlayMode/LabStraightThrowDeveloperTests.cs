@@ -36,8 +36,8 @@ namespace C6Lab.Tests
             LabDeveloperMode ui = SavedDeveloperUi();
             testedNetwork = ui.network;
             float[] original = ui.sourceConfig.CaptureDeveloperValues();
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(119));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(119));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(129));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(129));
             Assert.That(ui.sourceConfig.ThrowForm, Is.EqualTo(LabThrowForm.Arc));
             ui.Open();
             Assert.That(ui.panel.activeSelf, Is.True);

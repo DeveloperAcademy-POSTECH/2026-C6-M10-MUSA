@@ -164,7 +164,8 @@ namespace C6Lab
         // Version 5627 shares the confirmed room name in lobby packets.
         // #187: six growth settings, fixed 100% target, authoritative cell transactions.
         // #190: Arc/Straight profile adds seven settings; preserve viewer field 111; reject older 112-field peers.
-        internal const ushort LabProtocolVersion = 5630;
+        // 5632: Host-shared side-hit swing tuning for the exposed gourd underside.
+        internal const ushort LabProtocolVersion = 5632;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/10");
@@ -552,6 +553,13 @@ namespace C6Lab
             if (config == null || target == null) return;
             target.GetComponent<LabHangingTarget>()?.ConfigureSpin(
                 config.TargetSpinStrength, config.TargetSpinDamping, config.TargetSpinMaximumSpeed);
+            target.GetComponent<LabHangingTarget>()?.ConfigureRopeMotion(
+                config.GourdRopeCycleAmplitude, config.GourdRopeCyclePeriod,
+                config.GourdRopeHitBounce, config.GourdRopeSpring,
+                config.GourdRopeDamping, config.GourdRopeMaximumHitExtension);
+            target.GetComponent<LabHangingTarget>()?.ConfigureSwing(
+                config.GourdSwingImpactStrength, config.GourdSwingMaximumAngle,
+                config.GourdSwingReturnStrength, config.GourdSwingDamping);
         }
 
         public void Host()
@@ -1380,6 +1388,9 @@ namespace C6Lab
             {
                 latest.targetYawDegrees = hanging.YawAngleDegrees;
                 latest.targetYawSpeedDegreesPerSecond = hanging.YawSpeedDegreesPerSecond;
+                latest.targetRopeCycleElapsed = hanging.CycleElapsed;
+                latest.targetRopeHitOffset = hanging.VerticalOffset;
+                latest.targetRopeHitVelocity = hanging.VerticalVelocity;
             }
             latest.paused = battleClock.IsPaused && latest.phase == LabPhase.Playing;
             AnnounceBombExplosions();
@@ -2018,10 +2029,15 @@ namespace C6Lab
             if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
             ApplyLocalPause(snapshot.phase == LabPhase.Playing && snapshot.paused);
+            bool targetPaused = snapshot.phase == LabPhase.Playing && snapshot.paused;
             if (target != null && Finite(snapshot.targetYawDegrees)
                 && Finite(snapshot.targetYawSpeedDegreesPerSecond))
                 target.GetComponent<LabHangingTarget>()?.ReconcileYaw(
-                    snapshot.targetYawDegrees, snapshot.targetYawSpeedDegreesPerSecond);
+                    snapshot.targetYawDegrees, snapshot.targetYawSpeedDegreesPerSecond, targetPaused);
+            if (target != null)
+                target.GetComponent<LabHangingTarget>()?.ReconcileRope(
+                    snapshot.targetRopeCycleElapsed, snapshot.targetRopeHitOffset,
+                    snapshot.targetRopeHitVelocity, targetPaused);
             SyncBoard();
             if (logTransition && latest.phase == LabPhase.Playing) SetNotice(string.Empty);
             SetStatus((latest.paused ? "PAUSED" : latest.phase.ToString())

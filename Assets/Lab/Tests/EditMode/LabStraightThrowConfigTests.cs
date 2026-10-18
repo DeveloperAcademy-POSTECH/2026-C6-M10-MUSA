@@ -18,13 +18,13 @@ namespace C6Lab.Tests
             Assert.That(config.ThrowForm, Is.EqualTo(LabThrowForm.Arc));
             Assert.That(config.EffectiveThrowGravity, Is.EqualTo(config.ThrowGravity));
             Assert.That(config.StraightOriginOffset, Is.EqualTo(new Vector3(.35f, .4f, 0f)));
-            Assert.That(config.CaptureDeveloperValues().Skip(112).ToArray(),
+            Assert.That(config.CaptureDeveloperValues().Skip(112).Take(7).ToArray(),
                 Is.EqualTo(new[] { 0f, .35f, .4f, 0f, 3f, .1f, .1f }));
             string[] names = {
                 "Throw Form (0 arc, 1 straight)", "Straight Origin Offset X", "Straight Origin Offset Y",
                 "Straight Origin Offset Z", "Straight Pitch Offset (degrees)", "Straight Loft Scale", "Straight Gravity Scale"
             };
-            Assert.That(LabConfig.DeveloperFields.Skip(112).Select(field => field.Label).ToArray(), Is.EqualTo(names));
+            Assert.That(LabConfig.DeveloperFields.Skip(112).Take(7).Select(field => field.Label).ToArray(), Is.EqualTo(names));
             Assert.That(LabConfig.DeveloperFields[112].IsToggle, Is.True);
             Assert.That(new[] { LabConfig.DeveloperFields[112].OffText, LabConfig.DeveloperFields[112].OnText },
                 Is.EqualTo(new[] { "ARC", "STRAIGHT" }));
@@ -121,13 +121,13 @@ namespace C6Lab.Tests
         public void InspectorValuesClampAndNonFiniteCoordinatesFallBackPerAxis()
         {
             JsonUtility.FromJsonOverwrite("{\"throwForm\":99,\"straightOriginOffset\":{\"x\":-99,\"y\":99,\"z\":10},\"straightPitchOffsetDegrees\":99,\"straightLoftScale\":-1,\"straightGravityScale\":9}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(112).ToArray(),
+            Assert.That(config.CaptureDeveloperValues().Skip(112).Take(7).ToArray(),
                 Is.EqualTo(new[] { 0f, -5f, 5f, 5f, 30f, 0f, 2f }));
             SetPrivate("straightOriginOffset", new Vector3(float.NaN, float.PositiveInfinity, float.NegativeInfinity));
             SetPrivate("straightPitchOffsetDegrees", float.NaN);
             SetPrivate("straightLoftScale", float.PositiveInfinity);
             SetPrivate("straightGravityScale", float.NegativeInfinity);
-            Assert.That(config.CaptureDeveloperValues().Skip(112).ToArray(),
+            Assert.That(config.CaptureDeveloperValues().Skip(112).Take(7).ToArray(),
                 Is.EqualTo(new[] { 0f, .35f, .4f, 0f, 3f, .1f, .1f }));
         }
 
