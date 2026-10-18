@@ -18,7 +18,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(112));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(119));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -154,7 +154,7 @@ namespace C6Lab.Tests
             Assert.That(config.PaintFillChancePercent, Is.EqualTo(75f));
             Assert.That(config.PaintVerticalWeight, Is.EqualTo(2f));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
-            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "All 112 fields round-trip in wire order.");
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "All 119 fields round-trip in wire order.");
             Assert.That(config.MonsterMaxHp, Is.EqualTo(240));
             Assert.That(config.BattleDurationSeconds, Is.EqualTo(90f));
             Assert.That(config.GenerateCost, Is.EqualTo(5f));
@@ -563,10 +563,10 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void PaintGrowthAppendsAfterAllPrevious105FieldsWithoutChangingTheirIndices()
+        public void ThrowFormAppendsAfterAllPrevious112FieldsWithoutChangingTheirIndices()
         {
             // Existing rows keep their indices, including the fixed victory goal and the
-            // last sound toggle. The six growth controls must append after this entire prefix.
+            // last sound toggle, six paint-growth fields and viewer permission at 111. Straight appends after this prefix.
             string[] previousLabels =
             {
                 "Monster Max HP",
@@ -673,10 +673,17 @@ namespace C6Lab.Tests
                 "Minimap Move X (- left, + right)",
                 "Minimap Move Y (- down, + up)",
                 "Bomb Sound Volume (50 = Inspector)",
-                "Bomb Sound (0 boom, 1 ppeong)"
+                "Bomb Sound (0 boom, 1 ppeong)",
+                "Paint Surface Resolution (0 low 1 medium 2 high)",
+                "Paint Initial Coverage (%)",
+                "Paint Repeat Growth (%)",
+                "Paint Growth Speed (%/s)",
+                "Paint Fill Chance (%)",
+                "Paint Vertical Weight",
+                "Completed Gourd Viewer (0 off, 1 on)"
             };
-            Assert.That(previousLabels.Length, Is.EqualTo(105));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(112));
+            Assert.That(previousLabels.Length, Is.EqualTo(112));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(119));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             LabDeveloperField field = LabConfig.DeveloperFields[87];
@@ -973,7 +980,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOffAtTheLastGourdToggleWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(112));
+            Assert.That(values.Length, Is.EqualTo(119));
             Assert.That(config.CompletedGourdViewerEnabled, Is.False);
             Assert.That(values[111], Is.Zero);
             LabDeveloperField field = LabConfig.DeveloperFields[111];
@@ -1005,6 +1012,8 @@ namespace C6Lab.Tests
             Assert.That(after, Is.EqualTo(values));
             Assert.That(after.Take(111).ToArray(), Is.EqualTo(before.Take(111).ToArray()),
                 "Appending a presentation toggle cannot change existing gameplay settings.");
+            Assert.That(after.Skip(112).ToArray(), Is.EqualTo(before.Skip(112).ToArray()),
+                "Changing the viewer permission cannot change any Straight profile setting.");
             Assert.That(config.PaintVictoryPercent, Is.EqualTo(100));
             Assert.That(config.PaintVictoryCoverage, Is.EqualTo(1f));
         }
@@ -1029,13 +1038,15 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
             Assert.That(error, Does.Contain("Completed Gourd Viewer"));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline),
-                "A bad final field cannot partially change earlier settings or disable the accepted toggle.");
+                "A bad viewer field cannot partially change earlier settings or disable the accepted toggle.");
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
         }
 
         [TestCase(111)]
-        [TestCase(113)]
-        public void Previous111OrOversizedViewerSettingsAreRejectedAtomically(int count)
+        [TestCase(112)]
+        [TestCase(118)]
+        [TestCase(120)]
+        public void PreviousOrOversizedViewerSettingsAreRejectedAtomically(int count)
         {
             float[] values = config.CaptureDeveloperValues();
             values[111] = 1f;
@@ -1048,15 +1059,15 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(obsolete, out error), Is.False);
             Assert.That(error, Does.Contain("incomplete"));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline),
-                "A legacy 111-value form must not silently append OFF or apply any earlier field.");
+                "A legacy schema must not silently append fields or apply any earlier value.");
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
-            Assert.Throws<System.ArgumentException>(() => LabSessionSettings.Fingerprint(obsolete, 3, 5629));
+            Assert.Throws<System.ArgumentException>(() => LabSessionSettings.Fingerprint(obsolete, 3, 5630));
         }
 
         [Test]
         public void SharedCompletedGourdViewerOnOffChangesFingerprintAndSurvivesJsonAndClientApply()
         {
-            const ushort protocol = 5629;
+            const ushort protocol = 5630;
             float[] values = config.CaptureDeveloperValues();
             string offFingerprint = LabSessionSettings.Fingerprint(values, 3, protocol);
             values[111] = 1f;
@@ -1065,7 +1076,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(112));
+            Assert.That(received.Length, Is.EqualTo(119));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1099,7 +1110,7 @@ namespace C6Lab.Tests
         {
             var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
             Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
-                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer" }));
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form" }));
             Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
                 "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
             var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");
