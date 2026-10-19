@@ -1283,18 +1283,24 @@ namespace C6Lab.Tests
                 // The neighbour that passes this way hands its orb to the blocked player.
                 ulong toBlocked = ring[(seat + (way ? 2 : 1)) % 3];
 
-                var stopped = Pass(room, OrbOf(room, blocked, "own", 40.1d), blocked, way, 41d);
+                // Every orb is made first: the Host clock never runs backwards between requests.
+                string own = OrbOf(room, blocked, "own", 40.1d);
+                string back = OrbOf(room, blocked, "back", 40.1d);
+                string pushed = OrbOf(room, blocked, "pushed", 40.1d);
+                string passing = OrbOf(room, blocked, "passing", 40.1d);
+                string others = OrbOf(room, other, "other", 40.1d);
+                string comingIn = OrbOf(room, toBlocked, "incoming", 40.1d);
+
+                var stopped = Pass(room, own, blocked, way, 41d);
                 Assert.That(stopped.passed, Is.False, "The blocked player cannot pass that way.");
                 Assert.That(stopped.reason, Is.EqualTo("SWIPE_BLOCKED"));
-                Assert.That(Pass(room, OrbOf(room, blocked, "back", 40.1d), blocked, !way, 41.1d).passed, Is.True,
-                    "The other way stays open.");
-                Assert.That(Pass(room, OrbOf(room, blocked, "pushed", 40.1d), blocked, way, 41.2d,
-                    LabEdgeCrossingKind.Pushed).passed, Is.True, "A blast's push still goes.");
-                Assert.That(Pass(room, OrbOf(room, blocked, "passing", 40.1d), blocked, way, 41.3d,
-                    LabEdgeCrossingKind.Passing).passed, Is.True, "A drum running on through still goes.");
-                Assert.That(Pass(room, OrbOf(room, other, "other", 40.1d), other, way, 41.4d).passed, Is.True,
-                    "Nobody else is stopped.");
-                var incoming = Pass(room, OrbOf(room, toBlocked, "incoming", 40.1d), toBlocked, way, 41.5d);
+                Assert.That(Pass(room, back, blocked, !way, 41.1d).passed, Is.True, "The other way stays open.");
+                Assert.That(Pass(room, pushed, blocked, way, 41.2d, LabEdgeCrossingKind.Pushed).passed, Is.True,
+                    "A blast's push still goes.");
+                Assert.That(Pass(room, passing, blocked, way, 41.3d, LabEdgeCrossingKind.Passing).passed, Is.True,
+                    "A drum running on through still goes.");
+                Assert.That(Pass(room, others, other, way, 41.4d).passed, Is.True, "Nobody else is stopped.");
+                var incoming = Pass(room, comingIn, toBlocked, way, 41.5d);
                 Assert.That(incoming.passed, Is.True, "What comes in to the blocked player is never stopped.");
                 Assert.That(incoming.orb.owner, Is.EqualTo(blocked));
 
