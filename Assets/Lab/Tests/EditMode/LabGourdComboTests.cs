@@ -263,7 +263,7 @@ namespace C6Lab.Tests
         {
             LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f);
             float[] values = config.CaptureDeveloperValues();
-            values[152] = 3f; // a new combo every 3 seconds
+            values[162] = 3f; // a new combo every 3 seconds
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var model = new LabModel();
             model.Begin("combo-latest", new ulong[] { 10, 20 }, 0d, config);
@@ -359,10 +359,10 @@ namespace C6Lab.Tests
             values[88] = 0f;   // no gourd bombs
             values[89] = 0f;
             values[39] = 50; values[40] = 50; values[41] = 0; values[42] = 0; values[43] = 0; values[44] = 0;
-            values[150] = enabled ? 1f : 0f;
-            values[151] = firstStart;
-            values[153] = timeLimit;
-            values[156] = throwerOnly ? 1f : 0f;
+            values[160] = enabled ? 1f : 0f;
+            values[161] = firstStart;
+            values[163] = timeLimit;
+            values[166] = throwerOnly ? 1f : 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return config;
         }

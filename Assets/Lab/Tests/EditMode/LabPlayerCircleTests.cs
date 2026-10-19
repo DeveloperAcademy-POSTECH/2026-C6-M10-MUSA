@@ -88,9 +88,9 @@ namespace C6Lab.Tests
                 Assert.That(hud, Is.Not.Null);
                 Assert.That(hud.playerCircleSprites.Length, Is.EqualTo(5));
                 foreach (var sprite in hud.playerCircleSprites) Assert.That(sprite, Is.Not.Null);
-                AssertCircle(hud.localPlayerCircle.rectTransform, 201, 833);
-                AssertCircle(hud.leftPlayerCircle.rectTransform, 17, 461);
-                AssertCircle(hud.rightPlayerCircle.rectTransform, 384, 461);
+                AssertCircle(hud.localPlayerCircle.rectTransform, 87.5f, 832.5f);
+                AssertCircle(hud.leftPlayerCircle.rectTransform, 16.5f, 503.5f);
+                AssertCircle(hud.rightPlayerCircle.rectTransform, 387.5f, 503.5f);
                 Assert.That(hud.localPlayerCircle.raycastTarget, Is.False);
             }
             finally { EditorSceneManager.CloseScene(scene, true); }
@@ -98,7 +98,7 @@ namespace C6Lab.Tests
 
         private static void AssertCircle(RectTransform rect, float x, float y)
         {
-            Assert.That(rect.sizeDelta, Is.EqualTo(new Vector2(48, 48)));
+            Assert.That(rect.sizeDelta, Is.EqualTo(new Vector2(45, 47)));
             Assert.That(rect.anchorMin.x, Is.EqualTo(x / 402f).Within(.00001f));
             Assert.That(rect.anchorMin.y, Is.EqualTo(1f - y / 874f).Within(.00001f));
         }

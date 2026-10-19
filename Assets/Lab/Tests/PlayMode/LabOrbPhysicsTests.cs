@@ -668,12 +668,17 @@ namespace C6Lab.Tests
             var far = board.UpsertOrb("far", LabOrbKind.Yin, new Vector2(.95f, .95f));     // beyond the reach
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(held), 1d), Is.True);
 
-            int pushed = board.Blast("bomb", new Vector2(.5f, .5f));
+            var other = board.UpsertOrb("other-bomb", LabOrbKind.Bomb, new Vector2(.5f, .25f), lockSwipes: 2); // world (0, -1)
+            var flung = new System.Collections.Generic.List<string>();
+            int pushed = board.Blast("bomb", new Vector2(.5f, .5f), flung);
             float reach = config.BombBlastRadius * Width;
             float strength = config.BombBlastStrength * Width;
-            Assert.That(pushed, Is.EqualTo(3));
+            Assert.That(pushed, Is.EqualTo(4));
             Assert.That(board.TryGetMotion("bomb", out _, out _), Is.False, "The bomb itself is gone.");
-            Assert.That(board.Count, Is.EqualTo(4), "The blast removes no other orb.");
+            Assert.That(board.Count, Is.EqualTo(5), "The blast removes no other orb.");
+            Assert.That(flung, Is.EquivalentTo(new[] { "near", "held" }),
+                "It names the orbs it flung for the Host to set alight; not the drum, the other bomb or the far orb (#213).");
+            Assert.That(other.Body.linearVelocity.y, Is.LessThan(0f), "Another bomb is flung, but does not burn.");
             Assert.That(near.Body.linearVelocity.x, Is.EqualTo(strength * (1f - 1f / reach)).Within(.01f),
                 "An orb is flung straight away from the bomb, harder the closer it was.");
             Assert.That(near.Body.linearVelocity.y, Is.EqualTo(0f).Within(.001f));
@@ -682,6 +687,155 @@ namespace C6Lab.Tests
             Assert.That(held.Body.linearVelocity.y, Is.GreaterThan(0f));
             Assert.That(far.Body.linearVelocity.magnitude, Is.EqualTo(0f), "Beyond the blast radius nothing moves.");
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(far), 2d), Is.True, "No gesture is left stuck after the blast.");
+        }
+
+        [Test]
+        public void ABlastShrunkOrbIsSmallerToSeeGrabAndBumpAndStaysSmall()
+        {
+            Assert.That(config.BlastShrinkScale, Is.EqualTo(.5f));
+            float radius = config.OrbRadius;
+            var whole = board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.3f, .5f));
+            var small = board.UpsertOrb("small", LabOrbKind.Yin, new Vector2(.7f, .5f), small: true);
+            Assert.That(whole.HitSphere.radius, Is.EqualTo(radius).Within(1e-5f));
+            Assert.That(small.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f),
+                "A blast-shrunk orb bumps into others at half the radius (#213).");
+            Assert.That(small.Visual.Find("Default Sphere").localScale.x, Is.EqualTo(radius).Within(1e-4f),
+                "It looks half as big.");
+            Assert.That(whole.Visual.Find("Default Sphere").localScale.x, Is.EqualTo(2f * radius).Within(1e-4f));
+
+            // A touch just past a small orb's reach misses it, where the same touch grabs a whole one.
+            Vector2 offset = new Vector2(0f, .9f * radius);
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(small) + offset, 1d), Is.False, "It is harder to grab.");
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(whole) + offset, 2d), Is.True);
+            board.CancelDrag();
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(small), 3d), Is.True, "Right on it, it is still grabbed.");
+            board.CancelDrag();
+
+            board.UpsertOrb("small", LabOrbKind.Yin, new Vector2(.7f, .5f), small: true);
+            Assert.That(small.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f), "Repeated snapshots keep it small.");
+            board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.3f, .5f), small: true);
+            Assert.That(whole.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f),
+                "An orb the Host has just marked shrinks where it is.");
+            Assert.That(whole.Visual.Find("Default Sphere").localScale.x, Is.EqualTo(radius).Within(1e-4f));
+
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.5f, .2f), small: true);
+            Assert.That(drum.HitSphere.radius, Is.EqualTo(config.DrumRadius).Within(1e-5f), "A drum never shrinks.");
+
+            // The DEV form sets how small.
+            float[] values = config.CaptureDeveloperValues();
+            values[151] = .25f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var smaller = board.UpsertOrb("smaller", LabOrbKind.Yang, new Vector2(.5f, .8f), small: true);
+            Assert.That(smaller.HitSphere.radius, Is.EqualTo(.25f * radius).Within(1e-5f));
+        }
+
+        [UnityTest]
+        public IEnumerator ABlastFlungOrbBurnsForTheHostsSecondsThenGoesOut()
+        {
+            var cold = board.UpsertOrb("cold", LabOrbKind.Yang, new Vector2(.2f, .5f));
+            Assert.That(cold.Burning, Is.False);
+            Assert.That(cold.Burn, Is.Null, "An orb no blast touched carries no fire at all.");
+
+            var hot = board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: .8f);
+            LabOrbBurn fire = hot.Burn;
+            Assert.That(hot.Burning, Is.True, "An orb a blast flung burns (#213).");
+            Assert.That(fire.SecondsLeft, Is.EqualTo(.8f).Within(1e-4f), "For the seconds the Host gives.");
+            Assert.That(fire.Life, Is.LessThan(.1f), "It catches from nothing...");
+            Assert.That(fire.PartsShown, Is.GreaterThan(10), "Tongues of flame, a halo and embers.");
+            Assert.That(fire.FullHeight, Is.GreaterThan(2f * hot.HitSphere.radius), "Its flames rise well above the ball.");
+            Assert.That(fire.BackDepth, Is.EqualTo(0f),
+                "The big flames stand in the ball's middle, so the ball hides their roots and keeps its colour,");
+            Assert.That(fire.FrontDepth, Is.LessThan(-hot.HitSphere.radius), "and only short licks come over its front.");
+
+            var whole = board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.8f, .5f), burnSeconds: .8f);
+            Assert.That(whole.Burn.FullHeight, Is.EqualTo(2f * fire.FullHeight).Within(1e-4f),
+                "The fire is sized to its ball: a shrunk orb's is half as tall.");
+            board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.8f, .5f), burnSeconds: 3f);
+            Assert.That(whole.Burn.SecondsLeft, Is.EqualTo(3f).Within(1e-4f), "A Host clock well apart puts it right.");
+
+            float until = Time.time + .6f;
+            while (Time.time < until && fire.Life < .9f) yield return null;
+            Assert.That(fire.Life, Is.GreaterThan(.9f), "...and is soon at full size.");
+
+            float left = fire.SecondsLeft;
+            board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: left + .1f);
+            Assert.That(fire.SecondsLeft, Is.EqualTo(left).Within(1e-4f),
+                "A later snapshot a moment apart does not restart or nudge it.");
+
+            until = Time.time + 1.5f;
+            while (Time.time < until && hot.Burning) yield return null;
+            Assert.That(hot.Burning, Is.False, "It goes out when its seconds run down.");
+            Assert.That(fire.PartsShown, Is.Zero);
+            Assert.That(hot.HitSphere.radius, Is.EqualTo(.5f * config.OrbRadius).Within(1e-5f), "The orb stays small.");
+            board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: 0f);
+            Assert.That(hot.Burning, Is.False, "A snapshot after the fire does not relight it.");
+        }
+
+        [UnityTest]
+        public IEnumerator AnOrbABlastJustShrankSqueezesDownToItsNewSize()
+        {
+            var orb = board.UpsertOrb("orb", LabOrbKind.Yin, new Vector2(.5f, .5f));
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(1f).Within(1e-4f));
+            board.UpsertOrb("orb", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: 4f);
+            Assert.That(orb.HitSphere.radius, Is.EqualTo(.5f * config.OrbRadius).Within(1e-5f), "Its body is small at once (#213).");
+            Assert.That(orb.IsShrinking, Is.True);
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(2f).Within(1e-4f), "Its art starts at its old size...");
+
+            float until = Time.time + 1f;
+            while (Time.time < until && orb.IsShrinking) yield return null;
+            Assert.That(orb.IsShrinking, Is.False);
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(1f).Within(1e-4f), "...and squeezes down to the new one.");
+
+            var arrived = board.UpsertOrb("arrived", LabOrbKind.Yang, new Vector2(.2f, .5f), small: true, burnSeconds: 2f);
+            Assert.That(arrived.IsShrinking, Is.False, "An orb that comes in already small just is small.");
+            Assert.That(arrived.Visual.localScale.x, Is.EqualTo(1f).Within(1e-4f));
+            Assert.That(arrived.Burning, Is.True, "And it still burns for what is left of its fire.");
+        }
+
+        [UnityTest]
+        public IEnumerator AnOrbABlastFlungIsOrdinaryAgainOnceItStopsOrIsGrabbed()
+        {
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2);
+            var rests = board.UpsertOrb("rests", LabOrbKind.Yin, new Vector2(.35f, .5f));
+            var held = board.UpsertOrb("held", LabOrbKind.Yang, new Vector2(.65f, .5f));
+            var kinds = new System.Collections.Generic.Dictionary<string, LabEdgeCrossingKind>();
+            board.EdgeCrossed += crossing => kinds[crossing.OrbId] = crossing.Kind;
+            float[] values = config.CaptureDeveloperValues();
+            values[81] = .5f; // A weak blast comes to rest well before either edge.
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Vector2 before = BoardPoint(rests);
+            Assert.That(board.Blast("bomb", new Vector2(.5f, .5f)), Is.EqualTo(2));
+            Assert.That(rests.Body.linearVelocity.x, Is.LessThan(0f));
+            Assert.That(held.Body.linearVelocity.x, Is.GreaterThan(0f));
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(held), 1d), Is.True, "Caught in the hand.");
+            board.CancelDrag();
+            for (int step = 0; step < 150 && rests.Body.linearVelocity.sqrMagnitude > 0f; step++) yield return new WaitForFixedUpdate();
+            Assert.That(rests.Body.linearVelocity.sqrMagnitude, Is.Zero, "The other comes to rest.");
+            Assert.That(BoardPoint(rests).x, Is.LessThan(before.x), "It actually moved from the blast before stopping.");
+            Assert.That(kinds, Is.Empty, "The weak blast and the caught orb never crossed an edge.");
+
+            // Check the stop path before any grab could clear it. The other orb exercises the grab path.
+            var entries = (System.Collections.IDictionary)typeof(LabOrbBoard)
+                .GetField("entries", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(board);
+            foreach (string id in new[] { "rests", "held" })
+            {
+                object entry = entries[id];
+                bool blasted = (bool)entry.GetType().GetField("Blasted").GetValue(entry);
+                Assert.That(blasted, Is.False, id + " has lost the blast exemption before being relaunched.");
+            }
+
+            // A real impulse wakes a body that has naturally gone to sleep; the board must still report
+            // both actual edge crossings as ordinary passes after the two independent reset paths.
+            rests.Body.AddForce(new Vector3(-3f * Width, 0f, 0f), ForceMode.VelocityChange);
+            held.Body.AddForce(new Vector3(3f * Width, 0f, 0f), ForceMode.VelocityChange);
+            for (int step = 0; step < 50 && (!kinds.ContainsKey("rests") || !kinds.ContainsKey("held")); step++)
+                yield return new WaitForFixedUpdate();
+            Assert.That(kinds.ContainsKey("rests"), Is.True, "Rested orb must cross: position=" + rests.Body.position
+                + ", velocity=" + rests.Body.linearVelocity + ", kinematic=" + rests.Body.isKinematic);
+            Assert.That(kinds.ContainsKey("held"), Is.True, "Caught orb must cross: position=" + held.Body.position
+                + ", velocity=" + held.Body.linearVelocity + ", kinematic=" + held.Body.isKinematic);
+            Assert.That(kinds["rests"], Is.EqualTo(LabEdgeCrossingKind.Swipe));
+            Assert.That(kinds["held"], Is.EqualTo(LabEdgeCrossingKind.Swipe));
         }
 
         [UnityTest]
@@ -705,7 +859,8 @@ namespace C6Lab.Tests
                 "Flung past the right edge, both go to the neighbour through the usual handoff.");
             Assert.That(kinds["drum"], Is.EqualTo(LabEdgeCrossingKind.Pushed),
                 "The drum tells the Host a blast flung it, so it stops inside the next board.");
-            Assert.That(kinds["orb"], Is.EqualTo(LabEdgeCrossingKind.Swipe), "Orbs keep the ordinary handoff.");
+            Assert.That(kinds["orb"], Is.EqualTo(LabEdgeCrossingKind.Pushed),
+                "A flung orb says it was pushed too, so the gourd's swipe block never stops it (#215).");
         }
 
         [UnityTest]
@@ -1165,6 +1320,119 @@ namespace C6Lab.Tests
             Assert.That(crossings, Is.Zero, "Neither went on to another player.");
             for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();
             Assert.That(fast.Body.linearVelocity.magnitude, Is.LessThan(.01f), "It stays at rest (no drift in this test).");
+        }
+
+        [UnityTest]
+        public IEnumerator ABlockedEdgeBouncesTheBoardsOwnPassesButLetsAPushOrAPassingDrumThrough()
+        {
+            var crossed = new System.Collections.Generic.Dictionary<string, LabOrbEdgeCrossing>();
+            board.EdgeCrossed += crossing => crossed[crossing.OrbId] = crossing;
+            board.SetSwipeBlock(1, 5f);
+            Assert.That(board.BlockedSide, Is.EqualTo(1), "The gourd holds this board's right edge shut (#215).");
+
+            var own = board.UpsertOrb("own", LabOrbKind.Yin, new Vector2(.9f, .3f));
+            var back = board.UpsertOrb("back", LabOrbKind.Yang, new Vector2(.1f, .3f));
+            own.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f);   // swiped right, into the block
+            back.Body.linearVelocity = new Vector3(-3f * Width, 0f, 0f); // swiped left
+            for (int step = 0; step < 20 && !crossed.ContainsKey("back"); step++) yield return new WaitForFixedUpdate();
+            for (int step = 0; step < 5; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("own"), Is.False, "The player's own pass that way does not cross...");
+            Assert.That(own.Body.linearVelocity.x, Is.LessThan(0f), "...it bounces off the edge like a wall.");
+            Assert.That(BoardPoint(own).x, Is.LessThanOrEqualTo(board.CenterBounds.xMax + 1e-4f));
+            Assert.That(board.BlockBounces, Is.GreaterThanOrEqualTo(1));
+            Assert.That(crossed["back"].ToRight, Is.False, "The other way stays open.");
+            Assert.That(crossed["back"].Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe));
+            board.RemoveOrb("own");
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.8f, .7f), lockSwipes: 2);
+            board.UpsertOrb("flung", LabOrbKind.Yin, new Vector2(.9f, .7f));
+            Assert.That(board.Blast("bomb", new Vector2(.8f, .7f)), Is.EqualTo(1));
+            for (int step = 0; step < 20 && !crossed.ContainsKey("flung"); step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("flung"), Is.True, "A blast's push still goes through.");
+            Assert.That(crossed["flung"].ToRight, Is.True);
+            Assert.That(crossed["flung"].Kind, Is.EqualTo(LabEdgeCrossingKind.Pushed));
+
+            // Clear the bodies waiting at the edges, so nothing stands in the drum's way.
+            board.RemoveOrb("back");
+            board.RemoveOrb("flung");
+            board.UpsertOrb("passing", LabOrbKind.Drum, new Vector2(0f, .25f), new Vector2(.5f, 0f), arrival: LabDrumArrival.Pass);
+            for (int step = 0; step < 150 && !crossed.ContainsKey("passing"); step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("passing"), Is.True, "And so does a drum running on through.");
+            Assert.That(crossed["passing"].Kind, Is.EqualTo(LabEdgeCrossingKind.Passing));
+
+            board.SetSwipeBlock(0, 0f);
+            Assert.That(board.BlockedSide, Is.Zero);
+            var after = board.UpsertOrb("after", LabOrbKind.Yang, new Vector2(.9f, .5f));
+            after.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f);
+            for (int step = 0; step < 20 && !crossed.ContainsKey("after"); step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("after"), Is.True, "Once lifted, the edge passes again.");
+            Assert.That(crossed["after"].Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe));
+        }
+
+        [UnityTest]
+        public IEnumerator ClearingTheBoardLiftsAnActiveSwipeBlockBeforeTheNextRound()
+        {
+            board.UpsertOrb("old-round", LabOrbKind.Yin, new Vector2(.5f, .5f));
+            board.SetSwipeBlock(1, 10f);
+            LabOrbEdgeBlock edge = board.EdgeBlock;
+            Assert.That(edge.Visible, Is.True);
+
+            board.Clear(); // Stop and return-to-lobby use this without another battle snapshot.
+            Assert.That(board.Count, Is.Zero);
+            Assert.That(board.BlockedSide, Is.Zero);
+            Assert.That(board.BlockSecondsLeft, Is.Zero);
+            Assert.That(edge.Visible, Is.False, "The previous round's glow and seconds disappear immediately.");
+
+            LabOrbEdgeCrossing? crossed = null;
+            board.EdgeCrossed += crossing => crossed = crossing;
+            var next = board.UpsertOrb("new-round", LabOrbKind.Yang, new Vector2(.9f, .5f));
+            next.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f);
+            for (int step = 0; step < 20 && !crossed.HasValue; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.HasValue, Is.True, "The old block cannot bounce an orb in the next round.");
+            Assert.That(crossed.Value.ToRight, Is.True);
+            Assert.That(crossed.Value.Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe));
+            Assert.That(edge.Visible, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator ABlockedEdgeGlowsRedAndCountsItsSecondsDownInItsMiddle()
+        {
+            Rect bounds = board.CenterBounds;
+            board.SetSwipeBlock(-1, 3.2f);
+            LabOrbEdgeBlock edge = board.EdgeBlock;
+            Assert.That(edge, Is.Not.Null);
+            Assert.That(edge.Visible, Is.True, "The blocked edge glows (#215).");
+            Assert.That(edge.Right, Is.False);
+            Assert.That(edge.SecondsText, Is.EqualTo("4"), "The whole seconds left, rounded up.");
+            Assert.That(edge.GlowPosition.x, Is.EqualTo(bounds.xMin).Within(1e-4f), "The glow lies on the left edge...");
+            Assert.That(edge.SecondsPosition.y, Is.EqualTo(bounds.center.y).Within(1e-3f), "...with the seconds at its middle...");
+            Assert.That(edge.SecondsPosition.x, Is.InRange(bounds.xMin, bounds.xMin + .15f * bounds.width), "...just inside it.");
+            Assert.That(edge.SecondsPosition.z, Is.LessThan(-config.OrbRadius), "The seconds stay in front of the orbs.");
+            Assert.That(edge.Opening, Is.True, "As the block begins, the edge flashes...");
+            Assert.That(edge.Brightness, Is.GreaterThan(.9f), "...bright red...");
+            Assert.That(edge.GlowReach, Is.GreaterThan(.15f * bounds.width), "...reaching further in than its glow.");
+
+            board.SetSwipeBlock(-1, 3.1f);
+            Assert.That(board.BlockSecondsLeft, Is.EqualTo(3.2f).Within(1e-4f),
+                "A Host snapshot a moment apart does not nudge the countdown.");
+            float until = Time.time + 1.5f;
+            while (Time.time < until && edge.SecondsText != "3") yield return null;
+            until = Time.time + LabOrbEdgeBlock.OpeningSeconds + .5f;
+            Assert.That(edge.SecondsText, Is.EqualTo("3"), "It counts down.");
+            while (Time.time < until && edge.Opening) yield return null;
+            Assert.That(edge.Opening, Is.False, "After three flashes...");
+            Assert.That(edge.Brightness, Is.InRange(.2f, .6f), "...it settles into a light red that stays...");
+            Assert.That(edge.GlowReach, Is.EqualTo(.1f * bounds.width).Within(1e-3f), "...at its usual width.");
+            Assert.That(edge.Visible, Is.True, "...for as long as the block lasts.");
+
+            board.SetSwipeBlock(1, .6f);
+            Assert.That(edge.Right, Is.True, "A new block moves it to the other edge.");
+            Assert.That(edge.GlowPosition.x, Is.EqualTo(bounds.xMax).Within(1e-4f));
+            Assert.That(edge.SecondsText, Is.EqualTo("1"));
+            until = Time.time + 2f;
+            while (Time.time < until && edge.Visible) yield return null;
+            Assert.That(edge.Visible, Is.False, "It disappears when its seconds run out.");
+            Assert.That(board.BlockedSide, Is.Zero, "And the edge is open again.");
         }
 
         [UnityTest]

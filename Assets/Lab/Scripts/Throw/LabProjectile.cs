@@ -37,6 +37,7 @@ namespace C6Lab
     [RequireComponent(typeof(Rigidbody), typeof(SphereCollider))]
     public sealed class LabProjectile : MonoBehaviour
     {
+        private float sizeScale = 1f;
         private const float DefaultTrailSeconds = .28f;
         private const float DefaultTrailWidthScale = .75f;
         private const float DefaultTrailMinVertexDistance = .035f;
@@ -76,12 +77,15 @@ namespace C6Lab
         public float GravityAcceleration => launchedGravity;
         public float LifetimeSeconds => launchedLifetime;
         public Vector3 LaunchPosition => launchPosition;
+        /// <summary>The share of the configured throw radius this projectile has; below 1 for a blast-shrunk orb (#213).</summary>
+        public float SizeScale => sizeScale;
+        // 폭발로 작아진 구슬(#213)의 sizeScale과 콤보 페널티/보상(#222)의 radiusScale을 함께 곱한다.
+        private float ScaledRadius => (config != null ? config.ThrowRadius : .165f) * sizeScale * radiusScale;
         public Vector3 InitialVelocity => initialVelocity;
         public Transform VisualMount => visualMount;
         public TrailRenderer FlightTrail => flightTrail;
         public LabElementFlightTrail ElementFlightTrail => elementFlightTrail;
         public float RadiusScale => radiusScale;
-        private float ScaledRadius => (config != null ? config.ThrowRadius : .165f) * radiusScale;
 
         /// <summary>
         /// 던지기 전에 공 크기 배율(0.01~3)을 정한다. 1이면 기존 크기다. Launch/LaunchVisual 전에 부른다.
@@ -149,8 +153,12 @@ namespace C6Lab
         }
 
         /// <summary>Creates the default Unity sphere presentation with an independent root collider.</summary>
+        /// <summary>
+        /// Builds a projectile. <paramref name="sizeScale"/> shrinks its body, art and trail for an orb a
+        /// bomb blast made small (#213), so it also has less reach on the gourd.
+        /// </summary>
         public static LabProjectile Create(Vector3 position, LabConfig config, Transform parent = null,
-            LabOrbElement element = LabOrbElement.None)
+            LabOrbElement element = LabOrbElement.None, float sizeScale = 1f)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
             GameObject root = new GameObject("Throw Projectile");
@@ -161,9 +169,10 @@ namespace C6Lab
             LabProjectile projectile = root.AddComponent<LabProjectile>();
             projectile.config = config;
             projectile.element = element;
+            projectile.sizeScale = sizeScale > 0f && sizeScale <= 1f ? sizeScale : 1f;
             projectile.ConfigureAppearance(config.OrbAppearance);
-            projectile.EnsureDefaultVisual(config.ThrowRadius);
-            projectile.EnsureFlightTrail(config.ThrowRadius);
+            projectile.EnsureDefaultVisual(projectile.ScaledRadius);
+            projectile.EnsureFlightTrail(projectile.ScaledRadius);
             return projectile;
         }
 
@@ -216,7 +225,7 @@ namespace C6Lab
             if (body == null || sphere == null)
                 throw new InvalidOperationException("Projectile needs Rigidbody and SphereCollider.");
 
-            sphere.radius = tuning.ThrowRadius * radiusScale;
+            sphere.radius = ScaledRadius;
             sphere.isTrigger = visualOnly;
             body.useGravity = false;
             body.isKinematic = false;
@@ -233,8 +242,8 @@ namespace C6Lab
             peakHeight = body.position.y;
             launchedAt = Time.time;
             launched = true;
-            EnsureDefaultVisual(tuning.ThrowRadius * radiusScale);
-            EnsureFlightTrail(tuning.ThrowRadius * radiusScale);
+            EnsureDefaultVisual(ScaledRadius);
+            EnsureFlightTrail(ScaledRadius);
             if (elementFlightTrail != null)
                 elementFlightTrail.Begin(transform, appearance.ElementTrailFor(element));
             if (flightTrail != null)

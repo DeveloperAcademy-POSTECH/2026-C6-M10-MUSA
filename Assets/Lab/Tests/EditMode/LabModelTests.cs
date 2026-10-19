@@ -1077,6 +1077,383 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ABlastBurnsAndShrinksOnlyTheOrbsItsHolderReportsAndOnlyOnce()
+        {
+            var mixed = ConfigWith(1f, 50, 0, 0, 0, 0, 50);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("blast-burn", new ulong[] { 10, 20, 30 }, 0d, mixed);
+                LabOrbState bomb = null;
+                for (int i = 0; i < 20 && bomb == null; i++)
+                {
+                    Assert.That(room.TryGenerate(10, "early-" + i, 0d, out var orb, out _), Is.True);
+                    if (orb.kind == LabOrbKind.Bomb) bomb = orb;
+                }
+                Assert.That(bomb, Is.Not.Null);
+                var yins = new List<string>();
+                LabOrbState nearBomb = null;
+                for (int i = 0; i < 30 && (yins.Count < 3 || nearBomb == null); i++)
+                {
+                    Assert.That(room.TryGenerate(10, "late-" + i, 10d, out var orb, out _), Is.True);
+                    if (orb.kind == LabOrbKind.Yin) yins.Add(orb.id);
+                    else if (nearBomb == null) nearBomb = orb;
+                }
+                Assert.That(yins.Count, Is.GreaterThanOrEqualTo(3));
+                Assert.That(nearBomb, Is.Not.Null);
+                Assert.That(room.TryGenerate(20, "elsewhere", 10d, out var elsewhere, out _), Is.True);
+                string drum = room.Snapshot(10d).drums.First().id;
+                Assert.That(room.MarkBlasted(10, bomb.id, new[] { yins[0] }, 14d), Is.Zero, "No blast has happened yet.");
+
+                Assert.That(room.Snapshot(15d).orbs.Select(orb => orb.id), Does.Not.Contain(bomb.id));
+                Assert.That(room.DrainBombExplosions().Single().BombId, Is.EqualTo(bomb.id));
+                string[] report = { yins[0], yins[1], yins[0], nearBomb.id, elsewhere.id, drum, "missing", null };
+                Assert.That(room.MarkBlasted(20, bomb.id, report, 15.1d), Is.Zero, "Only the board it blew on reports it.");
+                Assert.That(room.MarkBlasted(10, "other-bomb", report, 15.1d), Is.Zero, "Nor for a blast that never was.");
+                Assert.That(room.MarkBlasted(10, bomb.id, report, 15.2d), Is.EqualTo(2),
+                    "The holder's two flung orbs catch fire; a bomb, a drum and another player's orb do not.");
+                Assert.That(room.MarkBlasted(10, bomb.id, report, 15.3d), Is.Zero, "A blast is reported once.");
+
+                LabSnapshot after = room.Snapshot(15.5d);
+                LabOrbState burnt = after.orbs.Single(orb => orb.id == yins[0]);
+                Assert.That(burnt.small, Is.True, "A flung orb shrinks.");
+                Assert.That(burnt.burnedAt, Is.EqualTo(15.2d), "It caught fire when the Host took the report.");
+                Assert.That(burnt.BurnSecondsLeft(15.5d, 4f), Is.EqualTo(3.7f).Within(1e-4f));
+                Assert.That(burnt.BurnSecondsLeft(19.2d, 4f), Is.Zero, "The fire goes out after the burn time...");
+                Assert.That(after.orbs.Single(orb => orb.id == yins[1]).small, Is.True);
+                foreach (string id in new[] { yins[2], nearBomb.id, elsewhere.id })
+                {
+                    LabOrbState untouched = after.orbs.Single(orb => orb.id == id);
+                    Assert.That(untouched.small, Is.False, id);
+                    Assert.That(untouched.burnedAt, Is.EqualTo(-1d), id);
+                    Assert.That(untouched.BurnSecondsLeft(15.5d, 4f), Is.Zero);
+                }
+                Assert.That(after.drums.Single(state => state.id == drum).small, Is.False, "Drums never burn.");
+
+                LabOrbState passed = PassRight(room, yins[0], 10, 16d);
+                Assert.That(passed.owner, Is.EqualTo(20ul));
+                Assert.That(passed.small, Is.True, "...but the orb stays small, and carries its fire to the next board.");
+                Assert.That(passed.burnedAt, Is.EqualTo(15.2d));
+
+                // A report that comes too late is dropped.
+                Assert.That(room.TryGenerate(10, "fresh", 24d, out var fresh, out _), Is.True);
+                Assert.That(room.Snapshot(25d).orbs.Select(orb => orb.id), Does.Not.Contain(nearBomb.id));
+                Assert.That(room.DrainBombExplosions().Select(blast => blast.BombId), Does.Contain(nearBomb.id));
+                Assert.That(room.MarkBlasted(10, nearBomb.id, new[] { fresh.id },
+                    25d + LabModel.BlastReportWindowSeconds + .1d), Is.Zero);
+                Assert.That(room.Snapshot(28.5d).orbs.Single(orb => orb.id == fresh.id).small, Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mixed); }
+        }
+
+        [Test]
+        public void AnOrbCombinedFromABlastShrunkHalfIsSmallAndBurnsOn()
+        {
+            var mixed = ConfigWith(1f, 25, 25, 0, 0, 0, 50);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("blast-combine", new ulong[] { 10, 20, 30 }, 0d, mixed);
+                LabOrbState bomb = null;
+                for (int i = 0; i < 20 && bomb == null; i++)
+                {
+                    Assert.That(room.TryGenerate(10, "early-" + i, 0d, out var orb, out _), Is.True);
+                    if (orb.kind == LabOrbKind.Bomb) bomb = orb;
+                }
+                Assert.That(bomb, Is.Not.Null);
+                (LabOrbState yin, LabOrbState yang) Pair(string prefix, double at)
+                {
+                    LabOrbState foundYin = null, foundYang = null;
+                    for (int i = 0; i < 30 && (foundYin == null || foundYang == null); i++)
+                    {
+                        Assert.That(room.TryGenerate(10, prefix + i, at, out var orb, out _), Is.True);
+                        if (orb.kind == LabOrbKind.Yin && foundYin == null) foundYin = orb;
+                        if (orb.kind == LabOrbKind.Yang && foundYang == null) foundYang = orb;
+                    }
+                    Assert.That(foundYin, Is.Not.Null);
+                    Assert.That(foundYang, Is.Not.Null);
+                    return (foundYin, foundYang);
+                }
+                var burnt = Pair("burnt-", 10d);
+                room.Snapshot(15d);
+                Assert.That(room.DrainBombExplosions().Select(blast => blast.BombId), Does.Contain(bomb.id));
+                Assert.That(room.MarkBlasted(10, bomb.id, new[] { burnt.yin.id }, 15.1d), Is.EqualTo(1));
+
+                Assert.That(room.TryCombine(10, burnt.yin.id, burnt.yang.id, "combine-burnt", 15.5d,
+                    out var combined, out var reason), Is.True, reason);
+                Assert.That(combined.small, Is.True, "One small half makes the combined orb small.");
+                Assert.That(combined.burnedAt, Is.EqualTo(15.1d), "It burns on for the rest of that fire.");
+
+                var plain = Pair("plain-", 16d);
+                Assert.That(room.TryCombine(10, plain.yin.id, plain.yang.id, "combine-plain", 16.5d,
+                    out var whole, out reason), Is.True, reason);
+                Assert.That(whole.small, Is.False, "Two whole halves make a whole orb.");
+                Assert.That(whole.burnedAt, Is.EqualTo(-1d));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mixed); }
+        }
+
+        [Test]
+        public void ABlastShrunkOrbPaintsOnlyItsShareOfWhatAWholeOnePaints()
+        {
+            int Painted(bool shrink)
+            {
+                var mixed = ConfigWith(1f, 25, 25, 0, 0, 0, 50);
+                try
+                {
+                    var room = new LabModel();
+                    room.Begin("small-paint", new ulong[] { 10, 20, 30 }, 0d, mixed);
+                    LabOrbState bomb = null;
+                    for (int i = 0; i < 20 && bomb == null; i++)
+                    {
+                        Assert.That(room.TryGenerate(10, "early-" + i, 0d, out var orb, out _), Is.True);
+                        if (orb.kind == LabOrbKind.Bomb) bomb = orb;
+                    }
+                    Assert.That(bomb, Is.Not.Null);
+                    LabOrbState yin = null, yang = null;
+                    for (int i = 0; i < 30 && (yin == null || yang == null); i++)
+                    {
+                        Assert.That(room.TryGenerate(10, "pair-" + i, 10d, out var orb, out _), Is.True);
+                        if (orb.kind == LabOrbKind.Yin && yin == null) yin = orb;
+                        if (orb.kind == LabOrbKind.Yang && yang == null) yang = orb;
+                    }
+                    Assert.That(yin, Is.Not.Null);
+                    Assert.That(yang, Is.Not.Null);
+                    room.Snapshot(15d);
+                    Assert.That(room.DrainBombExplosions().Select(blast => blast.BombId), Does.Contain(bomb.id));
+                    if (shrink) Assert.That(room.MarkBlasted(10, bomb.id, new[] { yin.id }, 15.1d), Is.EqualTo(1));
+                    Assert.That(room.TryCombine(10, yin.id, yang.id, "combine", 15.5d, out var combined, out var reason),
+                        Is.True, reason);
+                    Assert.That(combined.small, Is.EqualTo(shrink));
+                    Assert.That(room.TryLaunch(10, combined.id, "throw", 15.6d, out _, out reason), Is.True, reason);
+                    Assert.That(room.ConfirmHit(combined.id, 15.7d, Vector3.forward, out _, out _, out _), Is.True);
+                    // Spend the hit's paint before the default five-second drying grace expires.
+                    // A 60-second wait now correctly dries both splashes away and cannot compare their shares.
+                    room.Snapshot(16.7d);
+                    Assert.That(room.PaintSurface.PendingCoverage, Is.LessThan(1d / room.PaintSurface.CellCount),
+                        "Only an unspendable fractional cell may remain before comparing the actual painted area.");
+                    return room.PaintSurface.CoveredCount;
+                }
+                finally { UnityEngine.Object.DestroyImmediate(mixed); }
+            }
+
+            int whole = Painted(false);
+            int small = Painted(true);
+            Assert.That(whole, Is.GreaterThan(100), "A whole combined orb paints its full first splash.");
+            Assert.That(small, Is.EqualTo(whole / 2).Within(3),
+                "One shrunk by a blast paints half as much by default (#213).");
+        }
+
+        [Test]
+        public void APaintShareOutsideZeroToOnePaintsNothingAndHalfPaintsHalf()
+        {
+            var settings = new LabPaintGrowthSettings();
+            var surface = new LabPaintSurface(settings, 3u);
+            foreach (float bad in new[] { 0f, -.5f, 1.5f, float.NaN, float.PositiveInfinity })
+                Assert.That(surface.RegisterHit(Vector3.forward, Color.red, 1, 1, bad), Is.False, bad.ToString());
+            Assert.That(surface.PaintCount, Is.Zero, "A refused hit is not counted.");
+            Assert.That(surface.CoveredCount, Is.Zero);
+
+            var whole = new LabPaintSurface(settings, 3u);
+            Assert.That(surface.RegisterHit(Vector3.forward, Color.red, 1, 1, .5f), Is.True);
+            Assert.That(whole.RegisterHit(Vector3.forward, Color.red, 1, 1), Is.True);
+            surface.Advance(30d);
+            whole.Advance(30d);
+            Assert.That(surface.CoveredCount, Is.EqualTo(whole.CoveredCount / 2).Within(3));
+        }
+
+        [Test]
+        public void TheGourdBlocksOnePlayersOwnPassesOneWayForTheBlockSeconds()
+        {
+            var blocking = BlockConfig(40f, 10f, 4f);
+            try
+            {
+                float[] tuning = blocking.CaptureDeveloperValues();
+                tuning[95] = tuning[96] = tuning[97] = 0f;
+                tuning[98] = 100f; // Every ordinary drum handoff arrives as a pass.
+                Assert.That(blocking.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+                var room = new LabModel();
+                ulong[] ring = { 10, 20, 30 };
+                room.Begin("swipe-block", ring, 0d, blocking);
+                Assert.That(room.Snapshot(39.9d).swipeBlockedUntil, Is.EqualTo(-1d), "Nothing is blocked before the first 40 seconds.");
+
+                LabSnapshot on = room.Snapshot(40d);
+                Assert.That(on.swipeBlockStartedAt, Is.EqualTo(40d));
+                Assert.That(on.swipeBlockedUntil, Is.EqualTo(50d), "It lasts the block seconds (#215).");
+                ulong blocked = on.swipeBlockedPlayer;
+                bool way = on.swipeBlockedRight;
+                Assert.That(ring, Does.Contain(blocked));
+                Assert.That(on.SwipeBlockOn(blocked), Is.True);
+                Assert.That(ring.Where(id => id != blocked).Any(id => on.SwipeBlockOn(id)), Is.False, "Only one player is blocked.");
+                int seat = Array.IndexOf(ring, blocked);
+                ulong other = ring[(seat + 1) % 3];
+                // The neighbour that passes this way hands its orb to the blocked player.
+                ulong toBlocked = ring[(seat + (way ? 2 : 1)) % 3];
+
+                // Every orb is made first: the Host clock never runs backwards between requests.
+                string own = OrbOf(room, blocked, "own", 40.1d);
+                string back = OrbOf(room, blocked, "back", 40.1d);
+                string pushed = OrbOf(room, blocked, "pushed", 40.1d);
+                string others = OrbOf(room, other, "other", 40.1d);
+                string comingIn = OrbOf(room, toBlocked, "incoming", 40.1d);
+                string passing = room.Snapshot(40.1d).drums.First(drum => drum.owner == toBlocked).id;
+                var arrivingDrum = Pass(room, passing, toBlocked, way, 40.2d);
+                Assert.That(arrivingDrum.passed, Is.True);
+                Assert.That(arrivingDrum.orb.arrival, Is.EqualTo(LabDrumArrival.Pass));
+                Assert.That(arrivingDrum.orb.owner, Is.EqualTo(blocked));
+
+                var stopped = Pass(room, own, blocked, way, 41d);
+                Assert.That(stopped.passed, Is.False, "The blocked player cannot pass that way.");
+                Assert.That(stopped.reason, Is.EqualTo("SWIPE_BLOCKED"));
+                Assert.That(Pass(room, back, blocked, !way, 41.1d).passed, Is.True, "The other way stays open.");
+                Assert.That(Pass(room, pushed, blocked, way, 41.2d, LabEdgeCrossingKind.Pushed).passed, Is.True,
+                    "A blast's push still goes.");
+                Assert.That(Pass(room, passing, blocked, way, 41.3d, LabEdgeCrossingKind.Passing).passed, Is.True,
+                    "A drum running on through still goes.");
+                Assert.That(Pass(room, others, other, way, 41.4d).passed, Is.True, "Nobody else is stopped.");
+                var incoming = Pass(room, comingIn, toBlocked, way, 41.5d);
+                Assert.That(incoming.passed, Is.True, "What comes in to the blocked player is never stopped.");
+                Assert.That(incoming.orb.owner, Is.EqualTo(blocked));
+
+                Assert.That(room.Snapshot(49.9d).SwipeBlockOn(blocked), Is.True);
+                LabSnapshot off = room.Snapshot(50d);
+                Assert.That(off.swipeBlockedUntil, Is.EqualTo(-1d), "It lifts after 10 seconds.");
+                Assert.That(off.SwipeBlockOn(blocked), Is.False);
+                Assert.That(Pass(room, OrbOf(room, blocked, "after", 50d), blocked, way, 50.5d).passed, Is.True);
+                Assert.That(room.Snapshot(80d).swipeBlockStartedAt, Is.EqualTo(80d), "And comes again 40 seconds after it began.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(blocking); }
+        }
+
+        [Test]
+        public void SwipeBlocksFallOnEveryPlayerBothWaysAndAreTheSameOnEveryScreen()
+        {
+            var blocking = BlockConfig(5f, 2f, 0f);
+            try
+            {
+                List<(double start, double until, ulong player, bool right)> Blocks()
+                {
+                    var room = new LabModel();
+                    room.Begin("block-draws", new ulong[] { 10, 20, 30 }, 0d, blocking);
+                    var seen = new List<(double, double, ulong, bool)>();
+                    for (double at = 0d; at < 179.9d; at += .5d)
+                    {
+                        LabSnapshot snapshot = room.Snapshot(at);
+                        if (snapshot.swipeBlockedUntil < 0d) continue;
+                        var block = (snapshot.swipeBlockStartedAt, snapshot.swipeBlockedUntil,
+                            snapshot.swipeBlockedPlayer, snapshot.swipeBlockedRight);
+                        if (seen.Count == 0 || seen[seen.Count - 1] != block) seen.Add(block);
+                    }
+                    return seen;
+                }
+
+                var blocks = Blocks();
+                Assert.That(blocks.Count, Is.GreaterThanOrEqualTo(30), "Every 5 seconds through a 180-second round.");
+                for (int i = 0; i < blocks.Count; i++)
+                {
+                    Assert.That(blocks[i].start, Is.EqualTo(5d * (i + 1)).Within(1e-9), "On the interval.");
+                    Assert.That(blocks[i].until - blocks[i].start, Is.EqualTo(2d).Within(1e-9), "For the block seconds.");
+                }
+                Assert.That(blocks.Select(block => block.player).Distinct(), Is.EquivalentTo(new ulong[] { 10, 20, 30 }),
+                    "Any player can be blocked.");
+                Assert.That(blocks.Select(block => block.right).Distinct().Count(), Is.EqualTo(2), "Either way.");
+                Assert.That(Blocks(), Is.EqualTo(blocks), "The Host's draws repeat exactly for the same room and round.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(blocking); }
+        }
+
+        [Test]
+        public void ASwipeBlockKeepsItsGapFromTheGourdsBombsAndIntervalZeroTurnsItOff()
+        {
+            var blocking = BlockConfig(40f, 10f, 8f, 20f, 30f);
+            var off = BlockConfig(0f, 10f, 4f, 20f, 30f);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("block-gap", new ulong[] { 10, 20, 30 }, 0d, blocking);
+                var bombs = new SortedSet<double>();
+                var starts = new SortedSet<double>();
+                for (double at = 0d; at < 179.9d; at += .1d)
+                {
+                    LabSnapshot snapshot = room.Snapshot(at);
+                    foreach (LabOrbState orb in snapshot.orbs)
+                        if (orb.origin == LabOrbOrigin.Gourd) bombs.Add(orb.createdAt);
+                    if (snapshot.swipeBlockedUntil > 0d) starts.Add(snapshot.swipeBlockStartedAt);
+                }
+                Assert.That(bombs.Count, Is.GreaterThanOrEqualTo(5), "The gourd drops its bombs through the round.");
+                Assert.That(starts.Count, Is.GreaterThanOrEqualTo(2), "And blocks swipes too.");
+                foreach (double start in starts)
+                    foreach (double bomb in bombs)
+                        Assert.That(Math.Abs(start - bomb), Is.GreaterThanOrEqualTo(8d - 1e-9),
+                            "A block never starts within the gap of a gourd bomb (#215).");
+
+                var quiet = new LabModel();
+                quiet.Begin("block-off", new ulong[] { 10, 20, 30 }, 0d, off);
+                for (double at = 0d; at < 179.9d; at += .5d)
+                    Assert.That(quiet.Snapshot(at).swipeBlockedUntil, Is.EqualTo(-1d), "An interval of 0 turns the block off.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(blocking);
+                UnityEngine.Object.DestroyImmediate(off);
+            }
+        }
+
+        [Test]
+        public void ASwipeBlockCannotBeBypassedByCallingAnOrdinaryOrbOrRestingDrumPassing()
+        {
+            var blocking = BlockConfig(40f, 10f, 0f);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("false-passing", new ulong[] { 10, 20, 30 }, 0d, blocking);
+                LabSnapshot on = room.Snapshot(40d);
+                ulong blocked = on.swipeBlockedPlayer;
+                string raw = OrbOf(room, blocked, "ordinary", 40.1d);
+                string drum = room.Snapshot(40.1d).drums.First(item => item.owner == blocked).id;
+
+                var refusedRaw = Pass(room, raw, blocked, on.swipeBlockedRight, 41d, LabEdgeCrossingKind.Passing);
+                Assert.That(refusedRaw.passed, Is.False, "A Raw has no automatic drum arrival to exempt.");
+                Assert.That(refusedRaw.reason, Is.EqualTo("SWIPE_BLOCKED"));
+                var refusedDrum = Pass(room, drum, blocked, on.swipeBlockedRight, 41.1d, LabEdgeCrossingKind.Passing);
+                Assert.That(refusedDrum.passed, Is.False, "A resting drum is also the player's own pass.");
+                Assert.That(refusedDrum.reason, Is.EqualTo("SWIPE_BLOCKED"));
+                Assert.That(room.Snapshot(41.1d).orbs.Single(item => item.id == raw).owner, Is.EqualTo(blocked));
+                Assert.That(room.Snapshot(41.1d).drums.Single(item => item.id == drum).owner, Is.EqualTo(blocked));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(blocking); }
+        }
+
+        [Test]
+        public void SwipeBlockCatchUpKeepsTheSameBombGapAndDrawsAfterMoreThanEightBombs()
+        {
+            var blocking = BlockConfig(20f, 10f, 3f, 7f, 7f);
+            try
+            {
+                var stepped = new LabModel();
+                var late = new LabModel();
+                ulong[] ring = { 10, 20, 30 };
+                stepped.Begin("late-blocks", ring, 0d, blocking);
+                late.Begin("late-blocks", ring, 0d, blocking);
+                for (int step = 1; step < 1799; step++) stepped.Snapshot(step / 10d);
+                LabSnapshot expected = stepped.Snapshot(179.9d);
+                LabSnapshot actual = late.Snapshot(179.9d);
+
+                Assert.That(expected.swipeBlockStartedAt, Is.EqualTo(171d));
+                Assert.That(actual.swipeBlockStartedAt, Is.EqualTo(expected.swipeBlockStartedAt));
+                Assert.That(actual.swipeBlockedUntil, Is.EqualTo(expected.swipeBlockedUntil));
+                Assert.That(actual.swipeBlockedPlayer, Is.EqualTo(expected.swipeBlockedPlayer), "Catch-up consumes the same draws.");
+                Assert.That(actual.swipeBlockedRight, Is.EqualTo(expected.swipeBlockedRight));
+                Assert.That(actual.SwipeBlockOn(actual.swipeBlockedPlayer), Is.True);
+                LabGourdBomb[] bombs = late.DrainGourdBombs();
+                Assert.That(bombs.Length, Is.EqualTo(25), "This catch-up exceeds the former eight-bomb history limit.");
+                for (int i = 0; i < bombs.Length; i++)
+                    Assert.That(Math.Abs(actual.swipeBlockStartedAt - (i + 1) * 7d), Is.GreaterThanOrEqualTo(3d));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(blocking); }
+        }
+
+        [Test]
         public void OnlyTheUnlockingHandoffStampsTheUnlockTimeAndTheNextHandoffClearsIt()
         {
             var relays = ConfigWith(10f, 0, 0, 100, 0, 0, 0);
@@ -2103,6 +2480,36 @@ namespace C6Lab.Tests
             }
         }
 
+        /// <summary>The gourd's swipe block every interval seconds for seconds long; bombs at bombMin..bombMax (0 = off).</summary>
+        private static LabConfig BlockConfig(float interval, float seconds, float bombGap, float bombMin = 0f, float bombMax = 0f)
+        {
+            LabConfig created = ConfigWith(1f, 50, 50, 0, 0, 0, 0);
+            float[] values = created.CaptureDeveloperValues();
+            values[88] = bombMin;
+            values[89] = bombMax;
+            values[157] = interval;
+            values[158] = seconds;
+            values[159] = bombGap;
+            Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            return created;
+        }
+
+        private static (bool passed, string reason, LabOrbState orb) Pass(LabModel room, string id, ulong holder,
+            bool right, double at, LabEdgeCrossingKind crossing = LabEdgeCrossingKind.Swipe)
+        {
+            Assert.That(room.TryUpdateMotion(holder, id, new Vector2(right ? .99f : .01f, .5f),
+                right ? Vector2.right : Vector2.left, at), Is.True);
+            bool passed = room.TryTransfer(holder, id, right, .5f, right ? Vector2.right : Vector2.left,
+                "pass-" + id + "-" + at, at, crossing, out var orb, out var reason);
+            return (passed, reason, orb);
+        }
+
+        private static string OrbOf(LabModel room, ulong owner, string request, double at)
+        {
+            Assert.That(room.TryGenerate(owner, request, at, out var orb, out var reason), Is.True, reason);
+            return orb.id;
+        }
+
         private static LabConfig GourdConfig(float minimumSeconds, float maximumSeconds)
         {
             LabConfig created = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
@@ -2122,6 +2529,8 @@ namespace C6Lab.Tests
             // The gourd's sabotage bombs are off here; GourdConfig turns them on for their own tests.
             values[88] = 0f;
             values[89] = 0f;
+            // The gourd's swipe block is off too; BlockConfig turns it on for its own tests (#215).
+            values[157] = 0f;
             for (int i = 0; i < chances.Length; i++) values[39 + i] = chances[i];
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;

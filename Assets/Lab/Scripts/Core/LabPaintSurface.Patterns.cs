@@ -13,14 +13,15 @@ namespace C6Lab
         /// <summary>Local growth setting. A pixel-only display replica takes its pattern name from shared LabConfig.</summary>
         public LabPaintPattern Pattern => pattern;
 
-        private void RegisterPatternHit(Vector3 direction, int hitCell, Color32 color, ulong owner, byte painterSlot)
+        private void RegisterPatternHit(Vector3 direction, int hitCell, Color32 color, ulong owner, byte painterSlot,
+            decimal initial)
         {
-            int requested = (int)Math.Min(decimal.Floor(initialCells), CellCount - CoveredCount);
+            int requested = (int)Math.Min(decimal.Floor(initial), CellCount - CoveredCount);
             uint salt = initialSeed ^ unchecked((uint)PaintCount * 0x9E3779B9u);
             var patch = new PatternPatch(patternMask, direction, pattern == LabPaintPattern.Flow
                 ? -flowDirection : Vector3.up, pattern == LabPaintPattern.Flow ? 0f
                 : (StableUnit(salt) - .5f) * Mathf.PI * 2f, ++patternSequence, salt);
-            bool[] footprint = MakePatternFootprint(patch, hitCell, (int)decimal.Floor(initialCells));
+            bool[] footprint = MakePatternFootprint(patch, hitCell, (int)decimal.Floor(initial));
 
             // An impact may seed detached splashes, but those are not one connected region.
             // Each receives only the integer ink it immediately spends. The impact component
@@ -28,8 +29,8 @@ namespace C6Lab
             var visited = new bool[CellCount];
             var queue = new Queue<int>();
             var component = new List<int>();
-            decimal fraction = requested == decimal.Floor(initialCells)
-                ? initialCells - requested : 0m;
+            decimal fraction = requested == decimal.Floor(initial)
+                ? initial - requested : 0m;
             PaintPatternComponent(hitCell, footprint, visited, queue, component, patch, color, owner, painterSlot, fraction);
             for (int i = 0; i < footprint.Length; i++)
                 if (footprint[i] && !visited[i])

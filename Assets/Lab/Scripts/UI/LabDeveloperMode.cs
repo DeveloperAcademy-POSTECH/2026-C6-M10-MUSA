@@ -465,7 +465,7 @@ namespace C6Lab
             LabDeveloperField field = LabConfig.DeveloperFields[index];
             if (float.IsNaN(value) || float.IsInfinity(value) || value < field.Min || value > field.Max) return;
             valueSliders[index].SetValueWithoutNotify(LabDeveloperSliderScale.Normalize(field, defaultValues[index], value));
-            if (index == 112 || index == 139) RefreshToggles();
+            if (index == 112 || index == 139 || index == PaintDryingField) RefreshToggles();
         }
 
         private void SyncInputFromSlider(int index, float position)
@@ -474,7 +474,7 @@ namespace C6Lab
             float value = LabDeveloperSliderScale.Denormalize(field, defaultValues[index], position);
             if (field.WholeNumber) value = Mathf.Round(value);
             valueInputs[index].SetTextWithoutNotify(value.ToString("0.######", CultureInfo.InvariantCulture));
-            if (index == 112 || index == 139) RefreshToggles();
+            if (index == 112 || index == 139 || index == PaintDryingField) RefreshToggles();
         }
 
         // 0/1 항목(켜기/끄기, 박 모드)은 숫자 입력칸·슬라이더 대신 누를 때마다 바뀌는 버튼으로 보여준다.
@@ -537,6 +537,7 @@ namespace C6Lab
             RefreshToggles();
         }
 
+        private const int PaintDryingField = 153;
         private const int PaintPatternField = 139;
         private const int LegacyGrowthField = 133;
         private Button[][] choiceButtons;
@@ -667,6 +668,7 @@ namespace C6Lab
                 if (image.color != color) image.color = color;
             }
             RefreshThrowFormInputs();
+            RefreshPaintDryingInputs();
             RefreshChoices();
         }
 
@@ -688,6 +690,28 @@ namespace C6Lab
                 }
                 if (valueSliders[i] != null) valueSliders[i].interactable = enabled;
             }
+        }
+
+        // Pending form state controls editability immediately; only APPLY installs shared settings.
+        private void RefreshPaintDryingInputs()
+        {
+            if (valueInputs == null || valueInputs.Length <= 156 || valueSliders == null
+                || valueSliders.Length <= 156) return;
+            bool canEdit = network != null && (network.CanChooseConnection || network.IsDeveloperSolo
+                || HostLobby || HostPausedBattle);
+            bool enabled = canEdit && ToggleIsOn(valueInputs[PaintDryingField]);
+            for (int i = 154; i <= 156; i++)
+            {
+                if (valueInputs[i] != null)
+                {
+                    valueInputs[i].readOnly = !enabled;
+                    valueInputs[i].interactable = enabled;
+                }
+                if (valueSliders[i] != null) valueSliders[i].interactable = enabled;
+            }
+            if (toggleButtons != null && toggleButtons.Length > PaintDryingField
+                && toggleButtons[PaintDryingField] != null)
+                toggleButtons[PaintDryingField].interactable = canEdit;
         }
 
         private void RefreshTargetLabel()

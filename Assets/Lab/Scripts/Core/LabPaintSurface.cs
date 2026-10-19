@@ -22,6 +22,10 @@ namespace C6Lab
         public float DripWidthDegrees = 3f;
         public float DripLengthDegrees = 60f;
         public float GravityWeight = 3f;
+        public bool DryingEnabled = false;
+        public float DryingDelaySeconds = 5f;
+        public float DryingPercentPerSecond = .2f;
+        public float NearbyHitRadiusDegrees = 20f;
     }
 
     /// <summary>
@@ -89,7 +93,8 @@ namespace C6Lab
                 || !Finite(settings.FlowRatio) || settings.FlowRatio < 0f || settings.FlowRatio > 1f
                 || !Finite(settings.DripWidthDegrees) || settings.DripWidthDegrees < .5f || settings.DripWidthDegrees > 12f
                 || !Finite(settings.DripLengthDegrees) || settings.DripLengthDegrees < 5f || settings.DripLengthDegrees > 135f
-                || !Finite(settings.GravityWeight) || settings.GravityWeight < 1f || settings.GravityWeight > 8f)
+                || !Finite(settings.GravityWeight) || settings.GravityWeight < 1f || settings.GravityWeight > 8f
+                || !ValidDryingSettings(settings))
                 throw new ArgumentOutOfRangeException(nameof(settings), "Invalid paint growth settings.");
             int columns = 64 << settings.Resolution, rows = 32 << settings.Resolution;
             if (pixels == null || Columns != columns || Rows != rows)
@@ -119,6 +124,7 @@ namespace C6Lab
             dripMaxLength = settings.DripLengthDegrees * Mathf.Deg2Rad;
             gravityWeight = settings.GravityWeight;
             initialSeed = seed;
+            ConfigureDrying(settings);
             Clear();
         }
 
@@ -128,37 +134,20 @@ namespace C6Lab
         /// hit supplies its connected component with FIFO growth credit. Fractions survive.
         /// A cell crossing supplies uses the final supply's opaque color, connection owner and
         /// P number together, never a blend. Zero P is reserved for neutral offline fixtures.
+        /// <paramref name="share"/> scales this one hit's initial and repeat amounts: a blast-shrunk
+        /// orb paints less (#213). A share of 0 paints nothing. 박 색상 콤보(#222)의 페널티(1보다 작음)/보상(1보다 큼)
+        /// 배율도 여기에 곱해서 들어오므로 최대 3까지 받는다.
         /// </summary>
-        public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0)
-            => RegisterHit(direction, color, attackerId, painterSlot, 1f);
-
-        /// <summary>
-        /// areaScale (0.01~3)는 이번 한 번의 타격이 칠하는 양(처음 칠 면적과 재타격 성장량)에 곱한다.
-        /// 박 색상 콤보의 실패 페널티(1보다 작음)/성공 보상(1보다 큼, #222)에서 쓰며, 1이면 기존 타격과 똑같다.
-        /// </summary>
-        public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot, float areaScale)
-        {
-            if (float.IsNaN(areaScale) || float.IsInfinity(areaScale) || areaScale == 1f)
-                return RegisterHitUnscaled(direction, color, attackerId, painterSlot);
-            decimal savedInitial = initialCells, savedRepeat = repeatCells;
-            decimal scale = (decimal)Mathf.Clamp(areaScale, .01f, 3f);
-            initialCells = savedInitial * scale;
-            repeatCells = savedRepeat * scale;
-            try { return RegisterHitUnscaled(direction, color, attackerId, painterSlot); }
-            finally
-            {
-                initialCells = savedInitial;
-                repeatCells = savedRepeat;
-            }
-        }
-
-        private bool RegisterHitUnscaled(Vector3 direction, Color color, ulong attackerId, int painterSlot)
+        public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0, float share = 1f)
         {
             if (painterSlot < 0 || painterSlot > 5) return false;
+            if (!Finite(share) || share <= 0f || share > 3f) return false;
+            decimal initial = initialCells * (decimal)share, repeat = repeatCells * (decimal)share;
             if (preview || replica || IsComplete || !ValidHit(direction, color)) return false;
             int cell = CellFor(direction);
             if (pattern != LabPaintPattern.Legacy && patternMask == null)
                 patternMask = LabPaintPatternMask.Load(pattern);
+            RefreshNearbyPaint(direction.normalized);
             if (PaintCount < int.MaxValue) PaintCount++;
             var opaque = new Color32((byte)Mathf.RoundToInt(Mathf.Clamp01(color.r) * 255f),
                 (byte)Mathf.RoundToInt(Mathf.Clamp01(color.g) * 255f),
@@ -166,19 +155,19 @@ namespace C6Lab
             if (pixels[cell].a != 0)
             {
                 Region existing = Root(cellRegions[cell]);
-                Supply(existing, repeatCells, opaque, attackerId, (byte)painterSlot, true);
+                Supply(existing, repeat, opaque, attackerId, (byte)painterSlot, true);
                 RefreshActive(existing);
                 return true;
             }
             if (pattern != LabPaintPattern.Legacy)
             {
-                RegisterPatternHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot);
+                RegisterPatternHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot, initial);
                 return true;
             }
             var region = new Region(regions.Count);
             regions.Add(region);
-            Ink initialInk = Supply(region, initialCells, opaque, attackerId, (byte)painterSlot);
-            int immediate = (int)Math.Min(decimal.Floor(initialCells), CellCount - CoveredCount);
+            Ink initialInk = Supply(region, initial, opaque, attackerId, (byte)painterSlot);
+            int immediate = (int)Math.Min(decimal.Floor(initial), CellCount - CoveredCount);
             region = PaintFundedCell(region, cell, initialInk);
             InitialPatch patch = flowStyle == 1 ? new InitialPatch(this, direction.normalized, cell) : null;
             for (int i = 1; i < immediate && !IsComplete; i++)
@@ -191,7 +180,7 @@ namespace C6Lab
         /// earns no speed credit. An end-boundary cell can be deferred until the next call.
         /// Returns completion offset, -1 while incomplete, or 0 if already complete.
         /// </summary>
-        public double Advance(double elapsedSeconds, bool includeEnd = true)
+        private double AdvanceGrowth(double elapsedSeconds, bool includeEnd)
         {
             if (double.IsNaN(elapsedSeconds) || double.IsInfinity(elapsedSeconds) || elapsedSeconds < 0d
                 || elapsedSeconds >= (double)decimal.MaxValue)
@@ -199,6 +188,7 @@ namespace C6Lab
             if (IsComplete) return 0d;
             if (preview || replica || cellsPerSecond == 0m || activeRegions.Count == 0) return -1d;
             decimal duration = (decimal)elapsedSeconds;
+            decimal segmentStart = dryingClock;
             decimal startCredit = speedCredit;
             // Only at most the remaining map can be emitted. Bound arithmetic even for a huge dt.
             decimal usefulDuration = Math.Min(duration, (CellCount - CoveredCount + 1m) / cellsPerSecond);
@@ -210,6 +200,8 @@ namespace C6Lab
             {
                 Region region = NextRegion();
                 lastServed = region.Id;
+                if (dryingEnabled)
+                    dryingClock = segmentStart + Math.Max(0m, (painted + 1m - startCredit) / cellsPerSecond);
                 PaintCell(region, ChooseClusterCell(region));
                 painted++;
                 if (IsComplete) return (double)((painted - startCredit) / cellsPerSecond);
@@ -239,7 +231,7 @@ namespace C6Lab
             // Overlap credit instead stays centered on its own initial impact. Subsequent
             // cells use the frozen job's geometry rather than another global boundary draw.
             if (chooseClusterAnchor) ink.Cluster = new GrowthCluster(this,
-                clusterAnchor >= 0 ? clusterAnchor : ChooseCell(region), sequence, amount);
+                ink.Anchor = clusterAnchor >= 0 ? clusterAnchor : ChooseCell(region), sequence, amount);
             region.Supplies.Add(sequence, ink);
             region.Budget += amount;
             totalBudget += amount;
@@ -294,9 +286,11 @@ namespace C6Lab
             if (pixels[cell].a != 0 || region.Budget < 1m)
                 throw new InvalidOperationException("Growth must fund a new surface cell.");
             Ink ink = Consume(region, immediateInk);
+            if (ink.Anchor < 0) ink.Anchor = cell;
             pixels[cell] = ink.Color;
             painterSlots[cell] = ink.PainterSlot;
             cellRegions[cell] = region.Id;
+            RecordNewPaint(cell);
             region.Remove(cell);
             CoveredCount++;
             LastPainter = ink.Owner;
@@ -462,6 +456,7 @@ namespace C6Lab
             flowDirection = Vector3.down;
             flowSequence = 0;
             patternSequence = 0;
+            ClearDrying();
             unchecked { Revision++; }
         }
 
@@ -528,6 +523,7 @@ namespace C6Lab
             CoveredCount = covered; PaintCount = paintCount; Revision = revision;
             LastPainter = 0; speedCredit = totalBudget = 0m;
             preview = false; replica = true;
+            ClearDryingReplica();
             return true;
         }
 
@@ -587,6 +583,7 @@ namespace C6Lab
 
         private sealed class Ink
         {
+            public int Anchor = -1;
             public ulong Sequence;
             public decimal Remaining;
             public Color32 Color;

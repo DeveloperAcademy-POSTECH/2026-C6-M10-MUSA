@@ -83,6 +83,10 @@ namespace C6Lab
         public float stopAt = -1f;
         /// <summary>Host time of the handoff that set the arrival, so only the receiving screen applies it; -1 when none.</summary>
         public double arrivedAt = -1d;
+        /// <summary>Host time a bomb blast set this orb alight (#213); -1 when it never burned.</summary>
+        public double burnedAt = -1d;
+        /// <summary>A bomb blast shrank this orb for the rest of its life, and any orb combined from it (#213).</summary>
+        public bool small;
 
         /// <summary>An unlock older than this, for example seen after a reconnect, shows the item already open.</summary>
         public const double UnlockEffectWindowSeconds = 1d;
@@ -96,6 +100,10 @@ namespace C6Lab
 
         public bool JustArrived(double serverTime) =>
             arrival != LabDrumArrival.None && arrivedAt >= 0d && serverTime - arrivedAt <= ArrivalWindowSeconds;
+
+        /// <summary>Seconds this orb still burns at the given Host time; 0 once out, or when it never burned.</summary>
+        public float BurnSecondsLeft(double serverTime, float burnSeconds) =>
+            burnedAt < 0d ? 0f : (float)Math.Max(0d, burnedAt + burnSeconds - serverTime);
     }
 
     [Serializable]
@@ -170,6 +178,16 @@ namespace C6Lab
         public LabOrbState[] orbs = Array.Empty<LabOrbState>();
         /// <summary>Generate drums. Only a player whose board holds one can create orbs.</summary>
         public LabOrbState[] drums = Array.Empty<LabOrbState>();
+        /// <summary>
+        /// The gourd's swipe block (#215): the player whose own passes one way are stopped, which way,
+        /// and the Host times it started and ends. swipeBlockedUntil is -1 while none is on.
+        /// </summary>
+        public ulong swipeBlockedPlayer;
+        public bool swipeBlockedRight;
+        public double swipeBlockStartedAt = -1d, swipeBlockedUntil = -1d;
+
+        /// <summary>Whether a swipe block is on this player at this snapshot.</summary>
+        public bool SwipeBlockOn(ulong player) => swipeBlockedUntil > serverTime && swipeBlockedPlayer == player;
 
         // 박 색상 콤보 실험 (#222). DEV에서 끄면 모두 기본값(콤보 없음)이다.
         // 시각은 serverTime과 같은 전투 시계 기준이다.

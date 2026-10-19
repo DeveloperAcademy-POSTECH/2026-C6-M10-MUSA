@@ -1108,17 +1108,256 @@ PR #216의 첫 병합 시도 직전 #214가 main `929d9244`에 들어와 실제 
 
 원본 작업 폴더의 사용자 Scene·Target2 머터리얼2개·미추적 Scenes.meta는 별도 보존하며 이 통합 커밋에는 포함하지 않는다. 원시 XML·로그·빌드 산출물과 임시 검사 도구도 공개 Git에 넣지 않는다. 기존 main 명중점 정합성 확인 항목 #218은 이번 표현·폭탄 통합으로 해결됐다고 표시하지 않는다.
 
+## 폭발 패널티(노란 불·축소) — 2026-10-19, 이슈 #213
+
+기준은 Unity **6000.6.5f1**, main(`dc4917d3`, #212 PR #220·#219 PR #221 포함)에서 분기한 `feat/#213-blast-burn-shrink`다. PR 직전 원격 main도 `dc4917d3`로 같았다.
+
+- **누가 맞았나**: 폭탄이 터진 보유자 판이 충격파로 밀어낸 구슬(북·폭탄 제외)의 ID를 Host에 `blastHit`로 보낸다. 이 보고는 밀린 구슬이 옆으로 넘어가기 전에 같은 순서 보장 통로로 도착한다. Host는 3초 안에 그 사람에게 보낸 폭발인지, 그 사람 판의 날아가지 않은 구슬인지 확인해 `burnedAt`·`small`을 기록한다(폭발당 한 번). Host 자신의 폭발은 스냅샷을 만드는 도중이라 바로 기록하고 다음 정기 스냅샷에 싣는다.
+- **패널티**: 반지름 × `Blast Shrink Scale`(0.5)가 보이는 크기·충돌·잡기·투사체 몸체와 그림에 적용되고 사라질 때까지 유지된다. 작은 구슬의 색칠량은 × `Small Orb Paint Share`(0.5)이며(팀원 도색 코드 `RegisterHit`에 기본값 1의 비율 인자 추가), Crack 피해는 그대로다. 작은 구슬이 들어간 결합 구슬은 작고 남은 불을 이어받는다.
+- **표시**: 노란 불(뒤에서 솟는 불길 5개·윗가장자리 불꽃 3개·빛무리·불티)이 `Blast Burn Seconds`(4초) 동안 Host 시계 기준으로 타고, 넘겨받은 화면에서도 남은 만큼 보인다. 각 화면은 스스로 세고 Host 값과 0.3초 넘게 다를 때만 맞춘다. 일시정지 중에는 멈춘다. 작아질 때 그림은 0.3초 동안 줄어든다.
+- **설정·통신**: DEV 151~153번째(인덱스 150~152) 추가, 설정 150 → 153개. 구슬 상태에 `burnedAt`·`small`, 패킷에 `ids`(`blastHit`)·`small`(`projectile`)을 더해 통신 버전 `5642` → `5643`.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다 컴파일했다. 오류 0. 새 파일 `LabOrbBurn.cs`가 Runtime에 포함된 것도 확인했다. |
+| 불 모양 미리보기 | 확인 (Unity 밖) | C#과 같은 도형·색으로 Python 렌더링한 미리보기로 모양을 정했다. 실제 Unity 화면(URP 정사영 카메라·깊이 가림)이 아니다. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN | 이번 변경의 Test Runner 결과는 기록하지 않았다. |
+| 솔로 화면: 불·크기·축소 연출, 작은 구슬 잡기·던지기 | NOT_RUN | DEV `Bomb Chance`를 올려 폭탄 주변 구슬로 확인한다. 불이 구슬 색을 가리지 않는지, 여러 구슬이 동시에 탈 때 판이 어지럽지 않은지 본다. |
+| 3인 실행: 넘어간 구슬의 불·크기, 패널티 강도 | NOT_RUN | Mac 앱 3개에서 폭탄 때문에 넘어온 구슬을 바로 알아보는지, 절반 크기·색칠량이 적당한지 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 작아진 구슬을 손가락으로 잡는 난이도와 성능 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `ABlastBurnsAndShrinksOnlyTheOrbsItsHolderReportsAndOnlyOnce`, `AnOrbCombinedFromABlastShrunkHalfIsSmallAndBurnsOn`, `ABlastShrunkOrbPaintsOnlyItsShareOfWhatAWholeOnePaints`, `APaintShareOutsideZeroToOnePaintsNothingAndHalfPaintsHalf`
+- **EditMode** `LabDeveloperConfigTests`: `BlastPenaltyFieldsJoinTheItemOrbsGroupWithTheirDefaultsAndApply`; #212 무거운 폭탄 검사를 146~149번 4개만 읽도록 수정; DEV 개수·프로토콜을 고정한 팀원 검사들을 153개·5643으로 갱신
+- **EditMode** `LabSessionSettingsTests`: 스냅샷 JSON 왕복에 `burnedAt`·`small` 추가
+- **PlayMode** `LabOrbPhysicsTests`: `ABlastShrunkOrbIsSmallerToSeeGrabAndBumpAndStaysSmall`, `ABlastFlungOrbBurnsForTheHostsSecondsThenGoesOut`, `AnOrbABlastJustShrankSqueezesDownToItsNewSize`; 변경 `ABlastFlingsNearbyOrbsDrumsAndTheHeldOrbAwayWithoutRemovingAny`(보고 목록 확인)
+- **PlayMode** `LabThrowTests`: `AProjectileFromABlastShrunkOrbIsSmallerAndMissesWhereAWholeOneGrazes`
+
+
+## #225 — 근처 재타격 보호와 점진적 페인트 건조 — 2026-10-19
+
+아래는 기본 OFF·157개/5644였던 최초 검증 기록이다. 기본 ON·#224 통합 이후의 현재 결과는 문서 끝의 후속 기록을 따른다.
+
+기준 `origin/main` **52ca3861**(#223 폭발 패널티 포함), 브랜치 `feat/#225-nearby-hit-paint-drying`. Unity **6000.6.5f1 / URP17.6.0 / macOS ARM64**. 기본 OFF·유예5초·전체 표면0.2%p/초·인접20°이며 DEV 뒤에4개를 추가해 **157개·프로토콜5644**로 공유한다. 과거 검증과 이 변경의 실제 실행 결과를 구분한다.
+
+Host의 실제 유효 명중점 주변만 유지 시간을 갱신하고, 빈 표면 경계부터0.1초 tick으로 실제 셀을 제거한다. 무작위 성장 시작점이나 연결된 전체 성분을 보호하지 않는다. 자동 성장의 새 셀은 자체 유예를 받고 색/P번호·CoveredCount·Revision은 기존 지도 경로로 함께 공유한다. 소멸로 분리된 연결 영역은 다시 구성하고, 공급 잔량을 원래 성분의 최근접 생존 성분 하나에만 귀속한다. 관련 사용법과 실제 GPU 비교는 [PAINT_DRYING](PAINT_DRYING.md)을 참조한다.
+
+| 검사 | 결과 | 실제 실행 근거·범위 |
+| --- | --- | --- |
+| Unity API 기본값 저장 | PASS | 임시 `Issue225Authoring.SaveDefaults`가 원본을 SerializedObject/AssetDatabase로 저장했다. `C6_DRYING_DEFAULTS_OK count=157 existing153Unchanged=true drying=0 delay=5 rate=0.2 radius=20`. 기존 코드에만 있던 폭탄7개 기본값도 직렬화됐지만 기존153개 유효 캡처 값은 동일하다. 임시 작성기와meta는 검사·빌드 전에 제거했다. Scene·Prefab·마스크·셰이더·패키지는 변경하지 않았다. |
+| 성장 순서 결함 재현 | FAIL 재현 | 새 구현 중간의 cursor 복원만 제거한 `fairness-before-fix.xml`: **0/1**, skipped0, 11:31:42 UTC. 삭제 뒤 매번 첫 영역부터 성장해 다른 영역의 추가 성장색이0이었다. 실제로 실패하는 검사를 확인한 뒤 생존 영역으로 성장 순서를 이어주는 수정 코드를 복원했다. |
+| 최종 전체 EditMode | PASS | `editmode-final.xml`: **752/752**, failed/skipped/inconclusive0, 11:35:58~11:36:22 UTC, 약24초. 신규49건(설정16·Surface26·모델/복제5·시간 경계2)을 포함한다. OFF·3해상도 실제 면적·근처/반대면/UV이음새·색/P보존·유효 무성장/무효 명중·재도색·새 성장 유예·시간 분할·연결부 분리·공급 보존·성장 공정성·완료/제한시간 경계를 검사했다. |
+| 신규 PlayMode | PASS(통제 fixture) | `playmode-drying-first.xml`: **4/4**, failed/skipped0, 11:34:02~11:34:06 UTC. 저장 DEV의 토글·3슬라이더 양방향 연결·솔로 적용/재시작·원본 불변, 실제 박 색상/P지도·HUD 삭제 일치, 완료 박 관람 고정을 확인했다. 가짜 Host 시계와 명시적 표시 커밋을 쓰며 독립 네트워크·실제 투사체 충돌 시험으로 확대하지 않는다. |
+| 최종 전체 PlayMode | **FAIL, 190/191** | `playmode-final.xml`, skipped/inconclusive0, 11:36:28~11:38:01 UTC, 약93초. 신규 건조4건을 포함한190건이 통과했다. 기존 `LabThrowTests.AProjectileFromABlastShrunkOrbIsSmallerAndMissesWhereAWholeOneGrazes`만 smallHit=False 기대에 True를 반환했다. 전체 PlayMode 통과로 기록하지 않는다. |
+| 기존 투척 실패 구분 | FAIL 재현(기준 main) | 현재 브랜치 단독 `existing-shrunk-projectile-isolated.xml` **0/1**, 11:39:48 UTC. 건조 코드가 없는 기준 main을 별도 사본으로 만들어 실행한 `baseline-shrunk-projectile.xml`도 **0/1**, 11:41:50 UTC, 동일 smallHit=True였다. baseline의 LabProjectile·LabTarget·해당 검사·DynamicsManager가 기준 main 원본 바이트와 같은지 대조했다. 이번 변경에서 투척/충돌 판정을 바꾸지 않으며 이 기존 실패는 미해결로 남긴다. |
+| 실제 박 GPU 표현 | PASS(범위 한정) | 위 신규 PlayMode의 저장 WhiteGourd 메시·생산 셰이더 fixture. 최초6%·유예1초·건조2%p/초·반경90°에서 초기→실제 경계 축소→근처 명중 보호→완전 소멸을 렌더했다. 칠한 화면 픽셀 감소, 보호 시 같은 지도/화면, 소멸 시 원래 표면 복귀, OFF100초 불변과 RGBA/P0를 확인했다. `docs/images/paint-*-drying-*.png`는 실제 캡처이며 기본 설정의 손맛·실기기 품질 보장이 아니다. |
+| Mac CPU 코어 관찰 | 측정(성능 보장 아님) | 최대256×128·4방향 도색과 누적 공급을 가진100개의0.1초 Advance에서 중앙3.996ms·95백분위6.082ms·최대8.739ms를 관찰했다. Editor의 통제 코어 fixture이며 실제 프레임 전체·메모리 안정성·모바일 성능 시험은 아니다. |
+| 일반 Mac Development 빌드 | PASS(빌드) | 기존 `C6Lab.Editor.LabBuild.Mac`가 종료0·`C6_LAB_BUILD_OK`, **BuildReport203,161,598바이트**를 기록했다. `Builds/Lab/issue225-nearby-hit-paint-drying/macOS/C6_Physics_Lab.app`. 검사 어셈블리와 임시 작성기를 넣은 특수 앱이 아니다. 별도 앱 수동 플레이는 미실행이다. |
+| 독립 Host/Client·iOS·실기기·핫스팟·모바일 성능 | NOT_RUN | 이번 건조 변경에서는 실행하지 않았다. 설정 JSON/지문과 맵 delta·삭제/checkpoint 검사를 실환경 검증으로 승계하지 않는다. 참가자는 모두 프로토콜5644인 같은 새 빌드를 사용해야 한다. |
+
+초기 신규 EditMode46건 중19건은 정확1셀 fixture의 float→decimal 유효 자릿수 가정이 틀려 기존 최소1셀 예산에 못 미친 실패였다. 정확히 표현되는 초기0.125%×share0.390625로 보정했다. 다음47건 중3건은 같은1셀/초 정밀도 가정과 침식 후 작은 섬 분리를 허용하지 않던 검사 조건이었다. 정확한2셀/초·0.5초 간격으로 바꾸고, 공정성은 양쪽 색의 실제 추가 성장을 계속 요구했다. 최초 전체 EditMode751/752의1건은 기존 토글11개 목록에 새12번째를 반영하지 않은 기대값이었다. 이 보조 검사 오류를 생산 코드 결함이나 건조 성공으로 기록하지 않으며 위 최종 실제 결과를 따른다.
+
+독립 소스 검토에서 실제 명중점·고정 tick·공급 단일 귀속·군집 Rebase·성장 순서·DEV 권한/설정 공유에 명확한 차단 결함을 찾지 못했다. 검사 시작 후 소스·설정·Scene/Prefab 해시가 바뀌지 않았는지 대조했다. 사용자 작업 폴더의 Scene·Target2 머터리얼2개·미추적 Scenes.meta는 별도 보존한다. 검사용 복사본에서 생긴 Target2 float 재직렬화2건은 제외하며 원시 로그/XML·빌드·임시 도구·기기 정보는 공개 Git에 넣지 않는다. 기존 좌표 정합성 확인 항목 #218과 위 기존 축소 투척 실패를 이번 기능의 해결 사항으로 표시하지 않는다.
+
+## 박의 넘기기 막기 — 2026-10-19, 이슈 #215
+
+아래는 PR #224 원래 작성 당시 기록이다. 153~155번/156개·5644는 당시 값이며, 건조 통합 이후에는 막기157~159번/160개·5645를 사용한다. 최종 실행 결과는 문서 끝의 후속 기록을 따른다.
+
+기준은 Unity **6000.6.5f1**, main(`52ca3861`, #213 PR #223 포함)에서 다시 맞춘 `feat/#215-swipe-block-sabotage`다(이슈 생성 때 만든 #208 시점 브랜치를 커밋 없이 최신 main으로 재설정). PR 직전 원격 main도 `52ca3861`로 같았다.
+
+- **일정**: Host가 라운드 시작부터 `Swipe Block Interval`(40초)마다 seed로 대상·방향을 뽑아 `Swipe Block Seconds`(10초) 동안 막는다. 박 폭탄이 떨어졌거나 떨어질 시각과 `Swipe Block Bomb Gap`(4초) 안이면 그 폭탄 뒤로 미룬다. 한 번에 하나만 걸린다.
+- **막기**: Host가 그 사람의 그 방향 "스와이프" 넘김을 `SWIPE_BLOCKED`로 거절한다. 폭발에 밀린 구슬도 이제 "폭발"로 넘겨(멈추거나 잡으면 해제) 막히지 않고, 통과 북·들어오는 넘김·반대쪽도 열려 있다. 막힌 판은 그 가장자리를 벽처럼 튕긴다.
+- **표시(막힌 사람만)**: 박 옆 "← 🚫 / → 🚫" 말풍선 약 2초(그림으로 그림), 막힌 가장자리의 시작 번쩍임 3번 → 연한 빨간빛 유지, 세로 가운데 남은 초.
+- **그리기 순서 수정**: 판의 종이 배경(`OrbBoardPlate`, `Sprites/Default` 셰이더, 정렬 순서 0)이 투명 그리기 순서에서 빨간 빛(-20)을 덮어 화면에 숫자만 보였다(사용자 화면 확인으로 발견). 배경 정렬 순서를 실행 시 -100으로 두어 항상 가장 먼저 그린다. #212의 해금 폭탄 무지개 테두리(-1)도 같은 원인으로 가려졌을 수 있으며 이 수정으로 함께 보이게 되지만 화면 확인은 하지 않았다.
+- **설정·통신**: DEV 154~156번째(인덱스 153~155, Gourd 묶음의 박 폭탄 간격 뒤) 추가, 설정 153 → 156개. 스냅샷에 막기 상태 4개를 더하고 폭발에 밀린 구슬의 넘김 이유가 바뀌어 통신 버전 `5643` → `5644`.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다 컴파일했다. 오류 0. |
+| 말풍선 모양 미리보기 | 확인 (Unity 밖) | C#과 같은 도형으로 Python 렌더링한 미리보기로 모양을 정했다. 실제 Unity 화면이 아니다. |
+| EditMode 중간 실행 | FAIL → 수정 | `TheGourdBlocksOnePlayersOwnPassesOneWayForTheBlockSeconds`가 `INVALID_TIME`으로 실패했다: 검사가 41초에 넘긴 뒤 40.1초에 구슬을 만들어 Host 시계가 거꾸로 갔다. 구슬을 모두 먼저 만들도록 검사를 고쳤다. 수정 뒤 재실행 결과는 기록하지 않았다. |
+| EditMode·PlayMode 최종 실행 | NOT_RUN | 최종 커밋 기준 Test Runner 결과는 기록하지 않았다. |
+| 솔로 화면: 빨간 가장자리 | FAIL → 수정, 재확인 NOT_RUN | 남은 초만 보이고 빨간 빛이 안 보였다(종이 배경이 덮음). 정렬 순서 수정 뒤 화면 재확인은 기록하지 않았다. |
+| 3인 실행: 막힌 사람에게만 표시, 들어오는 넘김·폭발 허용, 40초·10초 체감 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 손가락 스와이프로 튕김 체감과 번쩍임이 너무 세지 않은지 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `TheGourdBlocksOnePlayersOwnPassesOneWayForTheBlockSeconds`, `SwipeBlocksFallOnEveryPlayerBothWaysAndAreTheSameOnEveryScreen`, `ASwipeBlockKeepsItsGapFromTheGourdsBombsAndIntervalZeroTurnsItOff`; 공용 설정(`ConfigWith`)은 막기를 끄고 막기 검사만 켠다
+- **EditMode** `LabDeveloperConfigTests`: `SwipeBlockFieldsJoinTheGourdGroupBesideItsBombIntervalsAndApply`; Gourd 묶음 배열 2곳 갱신; #213 폭발 패널티 검사를 150~152번 3개만 읽도록 수정; DEV 개수·프로토콜을 고정한 팀원 검사들을 156개·5644로 갱신
+- **EditMode** `LabSessionSettingsTests`: 스냅샷 JSON 왕복에 막기 상태 4개 추가
+- **PlayMode** `LabOrbPhysicsTests`: `ABlockedEdgeBouncesTheBoardsOwnPassesButLetsAPushOrAPassingDrumThrough`, `ABlockedEdgeGlowsRedAndCountsItsSecondsDownInItsMiddle`(시작 번쩍임 포함), `AnOrbABlastFlungIsOrdinaryAgainOnceItStopsOrIsGrabbed`; 변경 `AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour`(폭발에 밀린 구슬은 "폭발")
+- **PlayMode** `LabGourdAlertTests`: `TheBlockBubbleShowsTheBlockedWayInsteadOfTheExclamationAndStaysLonger`
+- **PlayMode** `LabDeveloperSoloIntegrationTests`: `SavedSceneSoloSwipeBlockBouncesAndShowsOnTheBlockedPlayersOwnScreen`(저장 Scene 솔로에서 막기·가장자리·말풍선·한 번 알림·종이 배경 정렬 순서)
+
+
+
+
+## #225 기본 ON 단독 후속 확인 — 2026-10-19
+
+저장 `LabConfig.asset`·새 `LabConfig`·DEV DEFAULTS의 Paint Drying을 **ON**으로 맞췄다. 유예5초·0.2%p/초·반경20° 및157개/5644는 이 PR 단독 기준으로 유지한다. `Issue225DefaultsOn.Save`의 Unity API 저장은 기존153개와 건조 토글 외 값을 바꾸지 않았다. 임시 작성기/meta는 검사 전에 제거했다.
+
+- 전체 EditMode **752/752**, failed/skipped0, 2026-10-19 12:08:48Z~2026-10-19 12:09:13Z, 25.013초 (`editmode225-only-on.xml`).
+- 건조 PlayMode **4/4**, failed/skipped0, 2026-10-19 12:09:18Z~2026-10-19 12:09:22Z, 4.207초 (`playmode225-only-on.xml`). 초기 ON→임시 OFF의 accepted config 불변/수치 잠금→ON 값 적용→실제 OFF 재시작→미적용 DEFAULTS ON, 실제 박/HUD 삭제 일치와 관람 동결을 확인한다.
+- 기존 축소 구슬 도색 비율은60초에 모두 건조된 뒤 비교하지 않고, 유예 안인16.7초의 성장 소진과 실제 면적을 비교하도록 검사한다. 게임의 건조 규칙은 끄지 않는다.
+- 독립 코어 `new LabPaintGrowthSettings()`의 opt-in OFF는 실제 게임 Config 기본 ON과 별개다. 전체 PlayMode의 기존 축소 투사체 실패 및 미실행 실기기 범위는 앞의 기록에 남긴다. #224와 함께 통합한160개/5645의 실제 결과는 후속 통합 절에서 따로 기록한다.
+
+
+## #225 기본 ON · #224 방해공작 통합 후속 검증 — 2026-10-19
+
+기준은 건조 `42c3cbd4`와 PR #224 `69135a3e`의 통합 소스다. Unity **6000.6.5f1 / URP17.6.0 / macOS ARM64**. 게임 `LabConfig`·저장 원본·DEV DEFAULTS의 Paint Drying은 **ON**, 유예5초·0.2%p/초·반경20°를 유지한다. 독립 코어 fixture용 `new LabPaintGrowthSettings()`의 opt-in OFF와 게임 기본값을 구별한다. 건조153~156을 유지하고 막기를157~159에 붙여 **총160개·프로토콜5645**로 구분한다. 양쪽 원래 브랜치의5644는 서로 다른 스키마였으므로 재사용하지 않는다.
+
+유지한 PR #224 기능은 일정/seed 추첨·폭탄 간격·Host 거절·폭발 예외·실제 통과 북·막힌 화면 경계/남은 초/말풍선·판 정렬순서다. 통합 리뷰에서 보드 Clear의 즉시 해제, 라운드 전체 폭탄 이력의 시간 따라잡기 일치, 일반 구슬/정지 북의 `Passing` 우회 거절을 보완했다. 새 EditMode2건·PlayMode1건을 더했다. 이전 문서의 미실행·중간 실패를 이번 결과로 소급해 지우지 않는다.
+
+| 검사 | 결과 | 실제 근거·범위 |
+| --- | --- | --- |
+| Unity API 기본 ON 저장 | PASS | 임시 `Issue225DefaultsOn.Save`가 SerializedObject/AssetDatabase로 저장. `C6_DEFAULT_DRYING_ON_OK count=160 existing153Unchanged=true otherValuesUnchanged=true`. 건조 토글 외 유효 캡처값은 그대로이며 새 막기3값도 명시 직렬화. 작성기/meta는 실행 검사 전에 제거. |
+| 전체 EditMode | PASS | `editmode-integrated.xml`: **758/758**, failed/skipped0, 11:58:06~11:58:31 UTC, 24.914초. 기존 도색/건조 검사와 막기 일정·25개 폭탄 catch-up·일반 Raw/정지 북 Passing 거절·실제 통과 북 허용을 포함. |
+| 전체 PlayMode | **FAIL,196/197** | `playmode-integrated.xml`: skipped0, 12:04:51~12:06:30 UTC, 99.085초. 저장 DEV 기본 ON/임시 OFF 격리/실제 OFF 재시작/DEFAULTS ON, 건조4건과 저장 Scene 막기·표시·물리·로비 Clear 회귀를 포함한196건 통과. 아래 기존 투척 검사1건은 미해결. |
+| 기존 투척 실패 | FAIL, 기존 기준에서도 재현 | `LabThrowTests.AProjectileFromABlastShrunkOrbIsSmallerAndMissesWhereAWholeOneGrazes`: smallHit=False 기대에True. 앞 #225 기록의 깨끗한 main52ca3861 단독 재현과 같은 실패다. 검사 제외나 투척/충돌 코드 수정으로 숨기지 않았다. 원인 자체는 확정하지 않았다. |
+| 일반 Mac Development 빌드 | PASS(빌드만) | 기존 LabBuild.Mac 종료0·C6_LAB_BUILD_OK, BuildReport **203,197,170바이트**. 임시 작성기와 검사 어셈블리를 넣은 별도 앱이 아니며 수동 앱 플레이는 미실행. |
+| 범위 경계 | NOT_RUN | 독립 Mac 다중 앱·실기기·iOS·핫스팟·모바일 성능은 이번 통합에서 실행하지 않았다. 저장 Scene·통제 Host 시계·GPU/물리 fixture를 실환경 성공으로 승계하지 않는다. |
+
+기본 ON 전환 직후 EditMode757/758의 기존 축소 구슬 도색 비교는 명중 후60초에 측정해 두 얼룩이 실제로 모두 건조돼0이 된 경우였다. 생산 규칙을 끄는 대신 유예 안인16.7초에 성장 소진(남는 것은1셀 미만 소수 예산)과 전체/축소 면적 비율을 비교하도록 수정했다. 첫 합본 PlayMode195/197 중 새 폭발 후 전달 검사는 누락된 ID를 참조했다. 수정 후 실제 폭발 이동·정지, 재잡기 전 정지 경로와 별도 잡기 경로의 면제 해제, 실제 물리 충격 뒤 두 ID의 Swipe 전달을 각각 요구한다. 단독 **1/1**과 위 전체 실행에서 통과했다. 최초 실패의 근본 원인을 확정했다고 기록하지 않는다.
+
+EditMode 통과 이후 최종 PlayMode까지 Runtime 핵심 파일·저장 Config SHA256이 같음을 대조했다. 사용자 폴더의 Scene·Target2 머터리얼2개·미추적 Scenes.meta는 별도 보존하고 검사 사본을 사용했다. 원시 로그/XML·임시 작성기·빌드·개인 경로는 공개 Git에서 제외한다.
+
+## #227 조합대 이미지 적용 — 2026-10-20
+
+`feat/#227-new-ui`의 `Lab.unity`에 사용자 제공 조합대 PNG를 적용했다. 투명 상단 여백만 제거하고 전용 머터리얼을 연결했으며, 원본 화면의 높이 비율에 맞춘 OrbCamera/OrbInteractionArea와 새 알파 곡선(위·아래 각65점)을 저장했다. 다른 UI는 이번 적용 범위 밖이다.
+
+- Unity **6000.6.5f1** Editor 컴파일: 오류 없이 에셋 적용 및 검사 실행.
+- EditMode **13/13**, 실패·건너뜀0: LabOrbAreaGeometryTests(5), LabOrbAreaShapeTests(8).
+- PlayMode **8/8**, 실패·건너뜀0: LabOrbAreaLayoutTests(3), LabCurvedOrbAreaPhysicsTests(5). 저장 Scene 참조·곡선 배치·구슬 물리 경로 확인.
+- Editor Game View **402×874** 솔로 화면에서 새 종이 질감·손그림 테두리·구슬 및 북의 표시 확인.
+- Mac/iOS 빌드·실기기·다중 연결: **NOT_RUN**. 원시 XML과 임시 검사 도구는 공개 저장소에서 제외.
+
+### #227 플레이어 번호 PNG 교체 — 2026-10-20
+
+사용자 제공 P1~P5(각90×94) 원본을 Player1Circle~Player5Circle.png에 적용했다. 기존 `.meta`·GUID·Scene 참조와48×48 표시 위치는 유지한다.
+
+- Unity6000.6.5f1 재가져오기·임시 검사 도구 컴파일 완료. 저장 Scene의 P1/P2/P3 새 배지를 Game View에서 확인.
+- EditMode LabPlayerCircleTests **6/6**(완료 콜백 결과), PlayMode LabPlayerPaintPatternUiTests **3/3**, 실패·건너뜀0. 기존 본인/이웃 번호의 sprite 연결과 배치 유지 확인.
+- 실기기·빌드·다중 연결은 **NOT_RUN**. 임시 검사 소스와 원시 결과는 공개 저장소에서 제외.
+
+### #227 Figma 플레이어 번호 배치 — 2026-10-20
+
+Figma `2527:7969`의 디자인 컨텍스트·스크린샷과 하단 그룹 `2527:7988`을 확인했다. 402×874 기준45×47 배지를 왼쪽(-6,480), 오른쪽(365,480), 본인(65,809)에 저장했다. 본인 배지는 스태미나 옆의 하단 왼쪽 자리이며 스태미나 자체의 재배치는 이번 범위 밖이다. 기존 PNG와 선택 번호/순환 이웃 연결을 유지한다. 재적용 도구와 기존 좌표 검사의 기대값도 갱신했다.
+
+- Unity6000.6.5f1 컴파일·Scene 저장 완료. Game View에서 세 배지의 위치·비율 확인.
+- EditMode LabPlayerCircleTests **6/6**, PlayMode LabPlayerPaintPatternUiTests **3/3**, 실패·건너뜀0. 저장 배지 좌표·크기와 런타임 본인/이웃 이미지 연결을 검증했다.
+- 실기기·빌드·다중 연결 **NOT_RUN**. 다른 UI의 기존 디자인 차이는 이번 검증 범위에 포함하지 않는다.
+
+### #227 새 스태미나 바·색상 — 2026-10-20
+
+사용자 제공446×88 PNG에서 원본 테두리와 내부 칸의 알파를 분리했다. 스태미나 바는 본인 번호 오른쪽의223×44(중심229,832.5)에 배치한다. 내부 마스크는 여백을 뺀374×50이며 찬 영역 `#2F62A2`, 소모 영역 `#C1D2E0`를 왼쪽부터 연속 표시한다. 기존 HUD의 현재/최대 스태미나 연결과 게임 수치는 유지한다. 전용 `Apply New Stamina Bar` 메뉴로 재적용할 수 있다.
+
+- Unity6000.6.5f1 최종 컴파일·Scene 저장 완료. 재시작한 Editor Game View에서 테두리·다섯 칸·완충 색상·배치 확인.
+- EditMode LabStaminaBarDesignTests **4/4**, 실패·건너뜀0: 0/50/80/100%의 실제 채움 메시 색상과 분할 좌표·저장 배치·에셋 연결 확인.
+- PlayMode **4/4**, 실패·건너뜀0: LabStaminaBarHudTests(1)의 합성 로컬 스태미나 스냅샷으로 소모·회복·로비 초기화 반영, LabPlayerPaintPatternUiTests(3)의 기존 번호/패턴 UI 회귀 확인. 다중 기기 통신 결과와 구분한다.
+- 검증 도중 Editor의 `ADTM: Attempting to update control while a mix is ongoing` 오디오 오류로 종료했다. 저장 후 Editor를 재시작해 위 최종 검사를 통과했다. 오디오 오류의 근본 원인을 해결했다고 주장하지 않는다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 실행 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 스태미나 뒤의 개인 HP 표시 제거 — 2026-10-20
+
+기존 FigmaPlayerHpBar와 BottomHudBackground를 비활성으로 저장했다. 본인 배지·새 스태미나 바를 유지하고, 사라진 배경의 곡선이 보이지 않는 벽으로 남지 않도록 비활성 배경은 물리 영역에서 제외한다. 활성 배경을 사용하는 기존 경로는 유지한다. HP 수치·아이템 효과·판정은 바꾸지 않았다.
+
+- Unity6000.6.5f1 최종 컴파일·Scene 저장 완료.
+- EditMode **12/12**, 실패·건너뜀0: LabOrbAreaProfileTests(8), LabStaminaBarDesignTests(4).
+- PlayMode **10/10**, 실패·건너뜀0: LabStaminaBarHudTests(1), LabOrbAreaLayoutTests(4), LabCurvedOrbAreaPhysicsTests(5). 숨겨진 HP/배경, 실제 종이 하단 곡선, 비활성 HUD 위치 변경 시 물리 불변, 기존 활성 HUD 경로와 구슬 물리를 확인했다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 원시 로그/XML과 임시 검사 도구는 저장소에서 제외한다.
+
+### #227 일시정지·타이머·신라문화체 Bold22pt — 2026-10-20
+
+사용자 제공 PauseButton PNG와 글자 없는 TimeFrame PNG를 적용하고 기존 GUID를 유지했다. 제공된 ShillaCultureBold.otf를 포함해 타이머 Text에22pt로 지정했다. 폰트 파일 자체가 Bold이므로 합성 Bold·자동 크기 맞춤은 끈다. 기존 숫자 덮개는 숨기고 실제 남은 시간의 MM:SS 갱신과 기존 pauseButton 연결은 유지한다. 402×874 기준 타이머78×33.5(27.5,25.25), 일시정지33×34(340,24)로 원본 비율을 유지했다.
+
+- Unity6000.6.5f1 최종 컴파일·Scene 저장 완료. 실제 Editor 솔로 Game View에서 새 타이머의02:55 표시·폰트·새 일시정지 아이콘을 확인했다.
+- EditMode LabBattlePauseTests **3/3**, 실패·건너뜀0: 공유 시계의 정지/재개·스냅샷 pause 상태.
+- PlayMode 기존 SavedHudAndDeveloperSliderShowLocalPlayerHpAcrossSoloRestart **1/1**, 실패·건너뜀0: 저장 HUD 참조와 실제 개발자 솔로 시작·재시작 경로 회귀 확인.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 검사 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 페인트 비율 바 교체 — 2026-10-20
+
+사용자 제공 PNG의 종이 바를 분리하고 고정7.9% 글자와 예시 채움을 실제 런타임 UI로 대체했다. 원본 파일을 보존하며 파생 빈 바/마스크를 저장한다. 기존 GOAL 장식·트랙 덮개를 숨기고, 오른쪽에 신라문화체 Bold21pt 흰색 퍼센트만 표시한다. 찬 부분은 원본 `#AF4738`이다. 저장 Lab Scene의 compactPaintProgress만 켜며 기존 전체 목표 문구 API와 다른 Scene의 기본 경로는 유지한다. 셀 수 기반 소수점 한 자리 내림·미완성99.9% 상한·100% 승리 목표는 유지한다.
+
+- Unity6000.6.5f1 최종 컴파일·Scene 저장 완료. 실제 Editor 솔로 Game View에서 새 바의0.0%와 고정 빨간 부분/고정7.9%가 남지 않는 것을 확인했다.
+- EditMode LabPaintGoalHudTests **31/31**, 실패·건너뜀0. 기존 계산과 셀 수 경계에서 새 퍼센트 전용 문구를 확인한다.
+- PlayMode **4/4**, 실패·건너뜀0: LabPaintDryingPlayModeTests(3) 및 FixedHundredPercentGoalGrowsFromRepeatedRealHitsFreezesOnPauseAndResetsOnRetry(1). 실제 도색·성장·건조·100% 완성·일시정지·재시작과 HUD 비율 일치를 확인했다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 실행 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 플레이어 위치 표시 디자인 — 2026-10-20
+
+Figma `2527:7760` 디자인 컨텍스트·스크린샷에서 위치 표시 영역(323,402),75.5×71을 확인했다. 제공된 세 PNG 원본을 보존하고, 기존 P1~P5 배지·제공된 태극을 조합해 인원/선택 번호/북 주인을 동적으로 표시한다. 솔로는 제공된 완성 배지, 여러 명은 각자의 색상 링을 유지한 태극 표시를 사용한다. 사각 배경을 제거하고 북의 이웃 선 이동과 다중 북 추적을 유지했다. 저장 LabDrumMinimap을 SceneController가 다시 Bind하도록 연결했다. Config 기본 Minimap Size50% 및 원본 수치는 바꾸지 않았다.
+
+- Unity6000.6.5f1 컴파일·Scene 저장 완료. 컴파일된 새 스크립트가 Editor에 반영되지 않아 Editor를 재시작한 뒤 적용·검증했다.
+- EditMode LabDrumMinimapTests **6/6**, 실패·건너뜀0: 2~5명 자기 기준 배치, 북의 이웃 경로, 선택 P번호와 이미지 연결, 다중 북, 솔로 태극 및 북 제거 시 번호 복귀 확인.
+- PlayMode **4/4**, 실패·건너뜀0: LabPlayerPaintPatternUiTests(3)와 저장 HUD/실제 솔로 시작·재시작 검사(1).
+- 실제 Editor 솔로 Game View에서 투명 배경·제공된 태극·Figma 자리의 표시를 확인했다. 여러 명의 상태 전환은 통제된 UI fixture이며 실제 원격 다중 접속 결과와 구분한다.
+- 빌드·실기기·원격 다중 연결 **NOT_RUN**. 임시 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 박 구도·상단 판자 숨김 — 2026-10-20
+
+Camera Look Height Offset 기본값을2에서0.8로 맞춰 화면의 박을 위로 옮겼다. 원본 LabConfig.asset과 새 Config 기본값·유효하지 않은 값의 대체값을 일치시켰다. Lab Scene의 suspensionVisualExtension은4월드 단위로 저장했다. 기존 물리 줄 길이1.5와 흔들림 축은 유지하고, 물리 피벗 위에 충돌체 없는 표현용 줄을 이어 판자를 화면 밖으로 올린다. 초기 BattleCamera 구도도 같은 Config 값으로 저장한다.
+
+- Unity6000.6.5f1 컴파일·Scene 저장 완료. 실제 Editor 솔로402×874 화면에서 판자가 사라지고 줄이 화면 위에서 이어지며, 박이 위쪽에 표시되는 것을 확인했다.
+- EditMode **103/103**, 실패·건너뜀0: LabDeveloperConfigTests와 LabStraightThrowMathTests. 새 카메라 기본값 및 기존 투척 계산 확인.
+- PlayMode **2/2**, 실패·건너뜀0: RopeLengthUpdatesTheRigAndPreservesTheRestingAimPoint 및 SavedSoloHostElementHitsReachHpZeroWithoutWinningAndSurviveVisualReinitialization. 표현용 줄 연장 후에도 물리 축·기본 조준점·줄 접점·충돌체 제거·실제 명중 경로를 확인했다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 검사 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 임시 배경 매핑 — 2026-10-20
+
+사용자 제공804×1162 PNG를 TemporaryBattleBackground.png로 보존했다. BattleCamera의 자식 Temporary Battle Background에 조명 영향을 받지 않는 SpriteRenderer로 매핑하고, 원본 비율·상단 정렬·화면 너비 맞춤을 적용했다. 시점/FOV/화면 비율 변경에 맞춰 카메라 뒤쪽 원경에 배치하며 넓은 창에서는 화면 높이도 채운다. 기존 BattleFloor의 MeshRenderer만 비활성화하고 빗나간 투척 판정용 Collider는 유지했다. 이후 3D 배경으로 바꿀 때 해당 배경 오브젝트를 제거/비활성화할 수 있다.
+
+- Unity6000.6.5f1 컴파일·Scene 저장 완료. 저장 Scene의 배경 Sprite 참조와 바닥 Renderer OFF/Collider ON을 확인했다.
+- 실제 Editor 솔로402×874 Game View에서 원본 소나무·산수 배경과 그 앞의 줄·박·기존 UI가 표시되는 것을 확인했다.
+- 기존 PlayMode RopeLengthUpdatesTheRigAndPreservesTheRestingAimPoint **1/1**, 실패·건너뜀0. 배경 추가 후 줄·물리 축·기본 조준점 회귀 확인.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 실행 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 페인트 퍼센트 검정 글씨 — 2026-10-20
+
+저장 Scene의 hpText와 Apply New Paint Ratio Bar 도구를 검정(#000000)으로 맞췄다. 파일 수정 후에도 실행 중이던 Editor 화면에는 기존 흰색 설정이 남아 있어 Play Mode 종료 후 Scene을 다시 불러와 저장했다. 실제 솔로 실행 화면에서 검정 0.0%를 확인하고 런타임 Text.color=000000FF를 확인했다. 이번 색상 수정의 자동 검사·빌드·실기기는 NOT_RUN이다.
+
+
+### #227 조합대 재첨부 원본 색상 교체 — 2026-10-20
+
+재첨부한 조합대 PNG의 상단 투명 여백914px만 제외한804×834 RGBA 픽셀을 CombinationBoard.png에 다시 적용했다. 기존 파일은 같은 알파 윤곽에 RGB 값이 달랐으며, 이번 파일은 첨부 원본의 잘라낸 영역과 픽셀 단위로 일치한다. 기존 meta/GUID·머터리얼·Scene 참조·카메라 배치를 유지한다. Unity에서 새 이미지로 경계를 재계산하여 저장된 위·아래 각65점과 일치함을 확인했으므로 Scene 곡선은 다시 저장하지 않았다.
+
+- Unity6000.6.5f1 컴파일·재가져오기 완료. Scene의 SourceTexture/머터리얼 연결과 현재 Config의 판 영역 유효성을 Unity API로 확인했다.
+- EditMode **21/21**, 실패·건너뜀0: LabOrbAreaGeometryTests(5), LabOrbAreaShapeTests(8), LabOrbAreaProfileTests(8).
+- PlayMode **9/9**, 실패·건너뜀0: LabOrbAreaLayoutTests(4), LabCurvedOrbAreaPhysicsTests(5). 저장 Scene 배치·숨긴 하단 HUD 처리·곡선 경계·구슬 물리 회귀 확인.
+- 빌드·iOS 실기기·다중 연결 **NOT_RUN**. 원시 결과·임시 적용/검사 도구는 공개 저장소에서 제외한다.
+
+
+### #227 조합대 위 남색 띠 가림 — 2026-10-20
+
+OrbCamera의 단색 바탕이 조합대 상단 투명 곡선에서 보이던 부분에 같은 임시 배경을 이어 그렸다. OrbCamera 자식 Temporary Board Background는 LabOrbBoard 레이어·정렬순서-1000으로 종이(-100) 뒤에 두며, 화면 상단과 BattleCamera의 배경 채움 비율을 공유한다. 판 위치·크기·카메라 viewport·구슬 물리 경계·Config는 유지한다. Apply Temporary Battle Background 도구도 두 배경을 함께 연결한다.
+
+- Unity6000.6.5f1 컴파일·Scene 저장 완료. 실제 Editor402×874 솔로 화면에서 위쪽 배경이 조합대 곡선까지 이어지고 중간 남색 띠가 사라진 것을 확인했다.
+- EditMode LabOrbAreaProfileTests **8/8**, PlayMode LabOrbAreaLayoutTests(4)·LabCurvedOrbAreaPhysicsTests(5) **9/9**, 실패·건너뜀0. 저장 Scene 배치·곡선 경계·구슬 물리 회귀 확인.
+- 변경 중 재생 상태의 스크립트 재컴파일 후 기존 판/네트워크 객체에서 NullReferenceException이 발생했다. 재생 종료 후 Scene 재적용·새 재생으로 위 검사와 솔로 확인을 완료했으며 해당 예외의 원인 수정은 이번 범위에 포함하지 않는다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 검사 도구와 원시 결과는 저장소에서 제외한다.
+
+### #227 구슬 생성 북 이미지 교체 — 2026-10-20
+
+사용자 제공198×198 PNG를 GenerateButton.png에 원본 그대로 적용했다(파일 바이트 일치). 기존 meta/GUID와 LabOrbAppearance.drumSprite 및 저장 Config 연결을 유지했다. 런타임의 지름 맞춤 표시를 사용하므로 북의 게임 크기·콜라이더·탭 생성·드래그·전달 수치는 바꾸지 않았다. 미니맵 아이콘은 별도 디자인을 유지한다.
+
+- Unity6000.6.5f1 재가져오기·임시 검사 도구 컴파일 완료. Unity API로198×198 Sprite와 저장 Config→Appearance→DrumSprite 연결을 확인했다.
+- EditMode **2/2**, 실패·건너뜀0: OneDrumGoesToARandomPlayerAndOnlyItsHolderCanGenerate, DrumMakesOnlyYinAndYangByDefault.
+- PlayMode **3/3**, 실패·건너뜀0: SharedAppearanceKeepsBoardAndProjectileArtSeparateFromPhysics, TappingADrumGeneratesWithoutStoppingItAndAFlickMovesItButNeverThrows, SavedSceneSoloCanGenerateCombineAndHitTheCylinder. 이미지와 물리 분리, 탭·플릭, 저장 Scene의 실제 솔로 생성·조합·명중 경로 확인.
+- 실제 Editor402×874 솔로 Game View에서 새 삼태극·손그림 테두리·질감 표시를 확인했다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 검사 도구와 원시 결과는 저장소에서 제외한다.
+
 ## 박 색상 콤보 실험 — 2026-10-19, 이슈 #222
 
 기준은 Unity **6000.6.5f1**, main(`dc4917d3`, #212 PR #220 포함)에서 분기한 `experiment/#222-gourd-color-combo`다.
 
-- **DEV**: 맨 아래 `Combo` 묶음에 151~157번째(인덱스 150~156) 7개를 추가했다. `Gourd Color Combo` 기본 OFF, `Combo First Start` 20초, `Combo Repeat Interval` 30초, `Combo Time Limit` 10초, `Combo Penalty Duration` 10초, `Combo Penalty Size (x)` 0.3(처음 0.5에서 낮춤), `Combo Penalty Target` TEAM(THROWER 선택). `LabConfig.asset`은 바꾸지 않았고 저장 필드가 없으면 코드 기본값을 쓴다.
+- **DEV**: 맨 아래 `Combo` 묶음에 7개를 추가했다(이후 보상 2개 추가, main 통합 후 번호는 161~169번째/인덱스 160~168). `Gourd Color Combo` 기본 OFF, `Combo First Start` 20초, `Combo Repeat Interval` 30초, `Combo Time Limit` 10초, `Combo Penalty Duration` 10초, `Combo Penalty Size (x)` 0.3(처음 0.5에서 낮춤), `Combo Penalty Target` TEAM(THROWER 선택). `LabConfig.asset`은 바꾸지 않았고 저장 필드가 없으면 코드 기본값을 쓴다.
 - **판정(Host)**: `LabGourdCombo`가 4칸 순서/색을 판정한다. 틀린 색은 즉시 실패(던진 사람 기록), 시간 초과는 마감 시각에 실패. 색 없는 공(폭탄/릴레이)은 무시한다. `LabModel`이 박 폭탄과 같은 방식으로 전투 시계 기준 예약(시간을 건너뛰어도 순서대로 처리)하고 색은 라운드 seed로 뽑는다.
 - **페널티**: 실패하면 `LabPlayerState.comboPenaltyUntil`을 기록한다(TEAM 전원 / THROWER 틀린 사람만 / 시간 초과는 언제나 전원). 던질 때 `ThrowScaleFor`로 정한 배율을 공 ID별로 기억해 공 반지름(`LabProjectile.SetRadiusScale`)과 칠 면적(`LabPaintSurface.RegisterHit(..., areaScale)`)에 함께 쓴다. 다른 기기에는 `projectile` 패킷의 `sizeScale`로 같은 크기를 보낸다.
 - **화면**: `LabGourdComboHud`가 실행 시 붙어 4칸 색/체크/남은 시간 막대/`CLEAR!`, `WRONG COLOR`, `TIME UP`을 그린다. 후속 수정으로 남은 시간 숫자를 지우고(막대는 3초 이하에서 빨개짐), 페널티/보상 남은 시간은 글자 한 줄 대신 패널 아래 가장자리의 알약 배지(빨강 `SMALL` / 노랑 `BIG`, 공 아이콘, 줄어드는 게이지, 남은 초, 나타날 때 톡 튀고 마지막 3초 두근거림)로 바꿨다. 이어서 콤보 패널/결과 문구/배지가 겹치지 않도록 순서를 정했다: 결과가 나오면 패널이 바로 사라지고 그 자리에 결과 문구(실패는 1.8배로 쾅 튀고 0.7초 흔들림 + 화면 빨간 번쩍임)가 뜨며, 문구가 끝난 뒤 배지가 톡 튀어나온다.
 - **진동(후속)**: `LabHaptics`가 스냅샷의 콤보 결과 변화를 보고 모든 기기에서 울린다. 성공은 Heavy 탭 3번(0.14초 간격), 실패(틀린 색/시간 초과)는 2초 연속 진동(`C6Lab_PlayContinuousHaptic`, Core Haptics; 미지원 기기는 Heavy 탭 반복). iOS 빌드 후처리에서 `CoreHaptics.framework`를 UnityFramework에 weak로 연결한다. 실기기 진동 느낌은 NOT_RUN. 씬 파일은 바꾸지 않았다.
 - **성공 보상(후속)**: 성공하면 팀 전체 `comboRewardUntil`을 기록하고 `Combo Reward Duration` 10초 동안 `Combo Reward Size (x)` 1.5배로 던지고 칠한다. 보상과 페널티는 마지막 결과만 남으며 한 사람에게 겹치면 페널티가 우선이다. 콤보 패널 기본 칸 크기는 64 → 40px로 줄였고 글자/막대가 칸 크기에 비례한다.
-- **설정/통신**: 설정 150 → 159개(콤보 7개 + 보상 2개), 스냅샷에 콤보 필드 추가, 프로토콜 `5642` → `5643`.
+- **설정/통신**: 콤보 7개 + 보상 2개. 스냅샷에 콤보 필드 추가.
+- **main 통합(2026-10-20)**: 브랜치를 딴 뒤 main에 #213(폭발 패널티, DEV 150~152)/#225(건조, 153~156)/#215(넘기기 막기, 157~159)/#227(새 UI)이 합쳐져 같은 번호와 프로토콜이 겹쳤다. 콤보 9개를 160~168로 옮겨 설정 160 → **169개**, 프로토콜 `5645` → **`5646`**으로 올렸다. 공 크기는 폭발 축소(`sizeScale`)와 콤보 배율(`radiusScale`)을 곱하고, 칠 양은 작은 구슬 몫(`SmallOrbPaintShare`)과 콤보 배율을 곱한다(`RegisterHit` share 상한 1 → 3).
 
 | 항목 | 상태 | 실행 결과/남은 확인 |
 | --- | --- | --- |
@@ -1131,4 +1370,4 @@ PR #216의 첫 병합 시도 직전 #214가 main `929d9244`에 들어와 실제 
 
 추가/변경한 검사:
 - **EditMode** `LabGourdComboTests`(새 파일): `FourHitsInOrderAndColorSucceed`, `AWrongColorFailsAtOnceAndRemembersTheThrower`, `TheTimeLimitEndsTheComboAtItsDeadline`, `StartRejectsNonElementColors`, `WhenTheToggleIsOffNoComboEverAppears`, `ATimedOutComboPenalizesTheWholeTeamAndTheNextComboFollowsTheInterval`, `EveryDeviceSeesTheSameColorsForTheSameRound`, `AWrongColorPenalizesTheTeamOrOnlyTheThrowerAsConfigured`(TEAM/THROWER 2건), `APenalizedThrowRemembersItsSizeUntilItLandsOrMisses`, `AScaledPaintHitCoversLessAndTheNextHitIsFullSizeAgain`, `ASuccessGivesTheWholeTeamBigBallsAndEndsAPenalty`, `ASuccessEndsARunningPenalty`, `ARewardPaintHitCoversMore`
-- **EditMode** `LabDeveloperConfigTests`: `GourdColorComboFieldsFormTheComboGroupAndStartOff`; 무거운 폭탄 검사는 146~149번만 읽도록 범위 고정. 개수/프로토콜을 고정한 팀원 검사들을 159개/5643으로 갱신.
+- **EditMode** `LabDeveloperConfigTests`: `GourdColorComboFieldsFormTheComboGroupAndStartOff`; 무거운 폭탄 검사는 146~149번만 읽도록 범위 고정. 개수/프로토콜을 고정한 팀원 검사들을 169개/5646으로 갱신.

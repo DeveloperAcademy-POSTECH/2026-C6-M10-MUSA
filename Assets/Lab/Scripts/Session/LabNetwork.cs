@@ -37,6 +37,10 @@ namespace C6Lab
         public long requestId;
         public string firstId;
         public string secondId;
+        /// <summary>The orbs a blast flung, in a holder's blastHit report (#213).</summary>
+        public string[] ids;
+        /// <summary>A projectile thrown from a blast-shrunk orb (#213).</summary>
+        public bool small;
         /// <summary>Why a transferred body crossed its edge (LabEdgeCrossingKind).</summary>
         public int crossing;
         public uint round;
@@ -177,8 +181,11 @@ namespace C6Lab
         // 5640: #208 Host-shared clustered repeat growth tuning (two appended values).
         // 5641: shared gourd visual size appended at index 145.
         // 5642: #212 bombs come locked again (an unlocked bomb is a throwable attack orb); heavy bomb DEV 146-149.
-        // 5643: #222 gourd color combo experiment (DEV 150-156, combo snapshot, projectile size scale).
-        internal const ushort LabProtocolVersion = 5643;
+        // 5643: #213 blast-burnt, shrunk orbs (orb burnedAt/small, blastHit report); DEV 150-152.
+        // 5644: #225 nearby-hit paint drying adds shared DEV 153-156.
+        // 5645: #215 swipe-block snapshots and pushed crossings integrate at DEV 157-159; 160 shared values.
+        // 5646: #222 gourd color combo experiment (DEV 160-168, combo snapshot, projectile size scale); 169 shared values.
+        internal const ushort LabProtocolVersion = 5646;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");
@@ -292,6 +299,15 @@ namespace C6Lab
         public float LastLocalHitOffset { get; private set; }
         /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
         public event Action<string, Vector2> BombBlasted;
+        /// <summary>
+        /// The gourd just blocked this player's own passes one way (#215): to the right or not, and the
+        /// seconds it lasts. Raised once per block, on the blocked player's screen only.
+        /// </summary>
+        public event Action<bool, float> SwipeBlockStarted;
+        /// <summary>A block first seen later than this after it began (a reconnect) is not announced again.</summary>
+        private const double SwipeBlockAnnounceWindowSeconds = 1d;
+        private uint announcedBlockRound;
+        private double announcedBlockStart = -1d;
         /// <summary>박이 누군가의 판에 폭탄을 떨어뜨렸을 때 모든 기기에서 한 번 알린다. (받는 사람, 폭탄 ID, 떨어질 위치 0..1)</summary>
         public event Action<ulong, string, Vector2> GourdBombDropped;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
@@ -1462,6 +1478,8 @@ namespace C6Lab
             Changed?.Invoke();
         }
 
+        private readonly List<string> blastFlung = new List<string>();
+
         private void AnnounceBombExplosions()
         {
             foreach (LabBombBlast blast in model.DrainBombExplosions())
@@ -1506,8 +1524,31 @@ namespace C6Lab
         private void OnBombBlast(string bombId, Vector2 position)
         {
             SetNotice(BombBlastNotice);
-            if (board != null) board.Blast(bombId, position);
+            if (board != null)
+            {
+                blastFlung.Clear();
+                board.Blast(bombId, position, blastFlung);
+                if (blastFlung.Count > 0) ReportBlast(bombId, blastFlung.ToArray());
+            }
             BombBlasted?.Invoke(bombId, position);
+        }
+
+        /// <summary>
+        /// Tells the Host which orbs this board's blast flung, so they burn and shrink (#213). It goes
+        /// out before any of them crosses an edge, on the same ordered channel, so the Host still finds
+        /// them here. The Host's own blast arrives while it publishes a snapshot: it marks them at once
+        /// and the next regular snapshot carries them, rather than publishing again from inside.
+        /// </summary>
+        private void ReportBlast(string bombId, string[] flung)
+        {
+            if (!IsHost)
+            {
+                Request(new LabNetworkPacket { type = "blastHit", firstId = bombId, ids = flung });
+                return;
+            }
+            int burned = model?.MarkBlasted(LocalPlayerId, bombId, flung,
+                battleClock.Now(Time.realtimeSinceStartupAsDouble)) ?? 0;
+            Debug.Log("C6_LAB_BLAST_BURN owner=" + LocalPlayerId + " bomb=" + bombId + " burned=" + burned);
         }
 
         private void AbortOversizedSnapshot(string reason)
@@ -1538,6 +1579,14 @@ namespace C6Lab
                     return;
                 pauseRequestIds[sender] = packet.requestId;
                 PauseAsHost();
+                return;
+            }
+            if (packet.type == "blastHit")
+            {
+                // Best effort, like motion: a late, repeated or unknown report is dropped without a reply.
+                int burned = model.MarkBlasted(sender, packet.firstId, packet.ids, now);
+                Debug.Log("C6_LAB_BLAST_BURN owner=" + sender + " bomb=" + packet.firstId + " burned=" + burned);
+                if (burned > 0) PublishSnapshot(true);
                 return;
             }
             if (battleClock.IsPaused)
@@ -1634,14 +1683,16 @@ namespace C6Lab
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
             Vector3 launchPosition = LabThrowMath.LaunchPosition(seat, seatCount, targetCenter, releaseX01, config);
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
-            var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element);
+            // A blast-shrunk orb flies small and so has less reach on the gourd (#213).
+            var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element,
+                orb.small ? config.BlastShrinkScale : 1f);
             projectile.name = "Projectile " + orb.id;
             float sizeScale = model != null ? model.LaunchScaleOf(orb.id) : 1f;
             projectile.SetRadiusScale(sizeScale);
             projectile.SetMissSurface(battleFloor);
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
-                firstId = orb.id, owner = orb.owner, element = (int)orb.element,
+                firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
                 wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
@@ -1740,7 +1791,9 @@ namespace C6Lab
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
-                    orb.JustUnlocked(latest.serverTime));
+                    orb.JustUnlocked(latest.serverTime), small: orb.small,
+                    // Every screen counts the blast fire down from the same Host clock (#213).
+                    burnSeconds: config != null ? orb.BurnSecondsLeft(latest.serverTime, config.BlastBurnSeconds) : 0f);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
@@ -1755,6 +1808,17 @@ namespace C6Lab
             visibleOrbIds.Clear();
             foreach (string id in current) visibleOrbIds.Add(id);
             board.SetInteractionEnabled(latest.phase == LabPhase.Playing && !latest.paused);
+            // The gourd's swipe block (#215) shows and bounces only on the blocked player's own board.
+            bool blockedHere = latest.SwipeBlockOn(LocalPlayerId);
+            board.SetSwipeBlock(blockedHere ? (latest.swipeBlockedRight ? 1 : -1) : 0,
+                blockedHere ? (float)(latest.swipeBlockedUntil - latest.serverTime) : 0f);
+            if (blockedHere && (latest.round != announcedBlockRound || latest.swipeBlockStartedAt != announcedBlockStart))
+            {
+                announcedBlockRound = latest.round;
+                announcedBlockStart = latest.swipeBlockStartedAt;
+                if (latest.serverTime - latest.swipeBlockStartedAt <= SwipeBlockAnnounceWindowSeconds)
+                    SwipeBlockStarted?.Invoke(latest.swipeBlockedRight, (float)(latest.swipeBlockedUntil - latest.serverTime));
+            }
         }
 
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)
@@ -1954,7 +2018,8 @@ namespace C6Lab
                         Vector3 velocity = new Vector3(packet.wx, packet.wy, packet.wz);
                         LabOrbElement element = packet.element >= (int)LabOrbElement.None && packet.element <= (int)LabOrbElement.Earth
                             ? (LabOrbElement)packet.element : LabOrbElement.None;
-                        LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element);
+                        LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element,
+                            packet.small ? config.BlastShrinkScale : 1f);
                         if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetMissSurface(battleFloor);
                         visual.LaunchVisual(velocity, config, target);

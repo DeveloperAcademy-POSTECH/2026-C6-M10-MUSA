@@ -20,7 +20,8 @@ namespace C6Lab
                 if (needed > 0m) continue;
                 // Initial footprints keep their original immediate choices. A merge can
                 // leave initial ink for later growth, so only that uncommon case anchors here.
-                if (ink.Cluster == null) ink.Cluster = new GrowthCluster(this, ChooseCell(region), pair.Key, ink.Remaining);
+                if (ink.Cluster == null)
+                    ink.Cluster = new GrowthCluster(this, ink.Anchor = ChooseCell(region), pair.Key, ink.Remaining);
                 return ink.Cluster.Take(region);
             }
             throw new InvalidOperationException("Missing paint supply for cluster growth.");
@@ -32,7 +33,7 @@ namespace C6Lab
         private sealed class GrowthCluster
         {
             private readonly LabPaintSurface surface;
-            private readonly int anchor;
+            private int anchor;
             private readonly Vector3 center, waveA, waveB;
             private readonly float phaseA, phaseB, cellAngle;
             private readonly PatternPatch patch;
@@ -41,6 +42,15 @@ namespace C6Lab
             private readonly HashSet<int> seen = new HashSet<int>();
             private int nextVersion, pendingCell = -1;
             private bool started;
+
+            // Keep this supply's shape, size and original center while discarding traversal
+            // through cells that a drying boundary may have removed or disconnected.
+            public void Rebase(Region region)
+            {
+                heap.Clear(); queued.Clear(); seen.Clear();
+                pendingCell = -1; nextVersion = 0; started = false;
+                anchor = surface.NearestFrontier(region, center);
+            }
 
             public GrowthCluster(LabPaintSurface surface, int anchor, ulong sequence, decimal budget)
             {

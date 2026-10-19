@@ -61,6 +61,10 @@ namespace C6Lab
         private const uint GourdDelaySalt = 0x60BDDE1Au;
         private const uint GourdTargetSalt = 0x60BD7A26u;
         private const uint GourdLandingSalt = 0x60BD1A4Du;
+        private const uint SwipeBlockTargetSalt = 0x5B10C7A6u;
+        private const uint SwipeBlockSideSalt = 0x5B105D1Eu;
+        // 박의 넘기기 막기 뽑기도 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (#215).
+        private const ulong SwipeBlockDrawKey = ulong.MaxValue - 3UL;
         private const uint DrumZoneSalt = 0xD2017E5Au;
         private const uint DrumSpotSalt = 0xD2051075u;
         private const uint ComboColorSalt = 0xC0B0C010u;
@@ -86,6 +90,20 @@ namespace C6Lab
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
+        /// <summary>Bomb times for this round, retained so a late frame schedules the same swipe blocks as small steps (#215).</summary>
+        private readonly List<double> gourdBombTimes = new List<double>();
+        private double nextSwipeBlockAt;
+        private uint swipeBlockCount;
+        private ulong swipeBlockedPlayer;
+        private bool swipeBlockedRight;
+        private double swipeBlockStartedAt = -1d, swipeBlockedUntil = -1d;
+        /// <summary>Blasts sent to their holders and not yet reported back, by bomb ID, with their Host time (#213).</summary>
+        private readonly Dictionary<string, KeyValuePair<ulong, double>> unreportedBlasts =
+            new Dictionary<string, KeyValuePair<ulong, double>>();
+        /// <summary>How long after a blast the Host still takes its holder's report of the orbs it flung.</summary>
+        public const double BlastReportWindowSeconds = 3d;
+        /// <summary>More orb IDs than any board holds; a longer report is dropped.</summary>
+        public const int MaximumBlastReportOrbs = 64;
         private readonly List<LabGourdBomb> gourdBombs = new List<LabGourdBomb>();
         private double nextGourdBombAt;
         private uint gourdBombCount;
@@ -153,7 +171,9 @@ namespace C6Lab
             Array.Clear(seats, 0, seats.Length);
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
             players.Clear(); orbs.Clear(); drums.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
+            unreportedBlasts.Clear();
             gourdBombs.Clear();
+            gourdBombTimes.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState
@@ -171,6 +191,11 @@ namespace C6Lab
             gourdBombCount = 0;
             drumHandoffCount = 0;
             nextGourdBombAt = now + GourdBombDelay(0u);
+            swipeBlockCount = 0;
+            swipeBlockedPlayer = 0;
+            swipeBlockedRight = false;
+            swipeBlockStartedAt = swipeBlockedUntil = -1d;
+            nextSwipeBlockAt = rules.SwipeBlockInterval > 0f ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
             combo.Reset();
             launchScales.Clear();
             nextComboAt = now + rules.ComboFirstStartSeconds;
@@ -275,7 +300,9 @@ namespace C6Lab
                 id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = element,
                 origin = LabOrbOrigin.Combined, originOwner = sender,
                 x = (first.x + second.x) * .5f, y = (first.y + second.y) * .5f,
-                vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false
+                vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false,
+                // One blast-shrunk half makes the whole orb small, and its fire burns on (#213).
+                small = first.small || second.small, burnedAt = Math.Max(first.burnedAt, second.burnedAt)
             };
             orbs.Add(orb.id, orb);
             players[sender].combinedTotal++;
@@ -314,6 +341,12 @@ namespace C6Lab
             if (right ? current.x < 1f - EdgeTolerance || normalizedVelocity.x <= 0f
                 : current.x > EdgeTolerance || normalizedVelocity.x >= 0f)
                 return Reject("NOT_OUTWARD_EDGE", out reason);
+            // The gourd's swipe block (#215) stops only this player's own passes that way; a blast's push
+            // and a drum running on through still go, and nothing coming in is stopped.
+            bool passingDrum = crossing == LabEdgeCrossingKind.Passing
+                && current.kind.IsDrum() && current.arrival == LabDrumArrival.Pass;
+            if (crossing != LabEdgeCrossingKind.Pushed && !passingDrum && SwipeBlocked(sender, right, now))
+                return Reject("SWIPE_BLOCKED", out reason);
             int receiverSeat = (players[sender].seat + (right ? 1 : activeSeatCount - 1)) % activeSeatCount;
             ulong receiver = seats[receiverSeat];
             // A drum is not a stored orb, so a full board still receives it.
@@ -408,7 +441,8 @@ namespace C6Lab
             if (paintRound)
             {
                 if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
-                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, areaScale)
+                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1,
+                        (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale)
                     && paintSurface.IsComplete)
                 {
                     phase = LabPhase.Victory;
@@ -565,6 +599,37 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>
+        /// The holder's board reports which orbs a blast flung (#213). Only that board knows where its
+        /// orbs were, so it names them; the Host checks that it sent this blast to this player a moment
+        /// ago and that each orb is still theirs on the board, then sets it alight and shrinks it for the
+        /// rest of its life. Drums and bombs never burn. Each blast is taken once. Returns how many
+        /// orbs caught fire.
+        /// </summary>
+        public int MarkBlasted(ulong sender, string bombId, IReadOnlyList<string> orbIds, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing) return 0;
+            foreach (string stale in unreportedBlasts.Where(blast => now - blast.Value.Value > BlastReportWindowSeconds)
+                .Select(blast => blast.Key).ToArray())
+                unreportedBlasts.Remove(stale);
+            if (bombId == null || orbIds == null || orbIds.Count > MaximumBlastReportOrbs
+                || !unreportedBlasts.TryGetValue(bombId, out var blast) || blast.Key != sender)
+                return 0;
+            unreportedBlasts.Remove(bombId);
+            int burned = 0;
+            foreach (string id in orbIds.Distinct())
+            {
+                if (id == null || !orbs.TryGetValue(id, out var orb) || orb.owner != sender || orb.inFlight
+                    || orb.kind == LabOrbKind.Bomb || orb.kind.IsDrum())
+                    continue;
+                orb.burnedAt = now;
+                orb.small = true;
+                orb.revision = ++revision;
+                burned++;
+            }
+            return burned;
+        }
+
         /// <summary>Locked bombs that blasted at their fuse since the last call, each reported once.</summary>
         public LabBombBlast[] DrainBombExplosions()
         {
@@ -603,6 +668,8 @@ namespace C6Lab
             return true;
         }
 
+        private bool BlockOn(double now) => phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt;
+
         public LabSnapshot Snapshot(double now)
         {
             if (phase == LabPhase.Idle)
@@ -631,6 +698,10 @@ namespace C6Lab
                 players = players.Values.OrderBy(player => player.seat).Select(player => player.Copy()).ToArray(),
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
                 drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray(),
+                swipeBlockedPlayer = BlockOn(now) ? swipeBlockedPlayer : 0,
+                swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
+                swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
+                swipeBlockedUntil = BlockOn(now) ? swipeBlockedUntil : -1d,
                 comboActive = combo.Active,
                 comboColors = combo.Count == 0 ? Array.Empty<LabOrbElement>() : combo.Colors,
                 comboProgress = combo.Progress,
@@ -691,6 +762,7 @@ namespace C6Lab
                         if (players.TryGetValue(holder, out var drummer)) drummer.drumSeconds += elapsed;
                 }
                 DropGourdBombs(effectiveNow);
+                StartSwipeBlocks(effectiveNow);
                 AdvanceCombo(effectiveNow);
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
@@ -699,6 +771,7 @@ namespace C6Lab
                     // A bomb still locked at the end of its fuse blasts on its current holder's board. No
                     // orb is lost: the holder's screen pushes the ones around it away from where it last was.
                     bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
+                    unreportedBlasts[expired.id] = new KeyValuePair<ulong, double>(expired.owner, effectiveNow);
                 }
                 remaining = Math.Max(0d, deadline - effectiveNow);
                 if (paintCompleted)
@@ -737,6 +810,7 @@ namespace C6Lab
                 };
                 orbs.Add(bomb.id, bomb);
                 gourdBombs.Add(new LabGourdBomb(target, bomb.id, landing));
+                gourdBombTimes.Add(at);
                 nextGourdBombAt = at + GourdBombDelay(gourdBombCount);
             }
         }
@@ -790,6 +864,50 @@ namespace C6Lab
         }
 
         /// <summary>다음 박 폭탄까지의 시간. 최대 간격이 0이면 떨어뜨리지 않는다.</summary>
+        /// <summary>
+        /// 박의 방해공작 (#215): 정해 둔 간격마다 무작위 한 명과 무작위 방향(왼쪽·오른쪽)을 골라, 그 사람이
+        /// 그쪽으로 스스로 넘기는 것을 정해 둔 시간 동안 막는다. 박 폭탄과 연출이 겹치지 않도록 폭탄이
+        /// 떨어졌거나 떨어질 시각과 최소 간격 안이면 그 폭탄 뒤로 미룬다. 한 번에 하나만 걸리고, 다음 막기는
+        /// 지금 것이 끝난 뒤에 온다. 뽑기는 seed와 순번으로 정해 모든 기기가 같은 결과를 받는다.
+        /// </summary>
+        private void StartSwipeBlocks(double until)
+        {
+            while (nextSwipeBlockAt <= until)
+            {
+                double at = nextSwipeBlockAt;
+                double clear = ClearOfGourdBombs(at);
+                if (clear > at)
+                {
+                    nextSwipeBlockAt = clear;
+                    continue;
+                }
+                uint index = swipeBlockCount++;
+                swipeBlockedPlayer = seats[(int)(DrawFor(seed ^ SwipeBlockTargetSalt, SwipeBlockDrawKey, index)
+                    % (ulong)activeSeatCount)];
+                swipeBlockedRight = (DrawFor(seed ^ SwipeBlockSideSalt, SwipeBlockDrawKey, index) & 1UL) == 1UL;
+                swipeBlockStartedAt = at;
+                swipeBlockedUntil = at + rules.SwipeBlockSeconds;
+                nextSwipeBlockAt = Math.Max(at + rules.SwipeBlockInterval, swipeBlockedUntil);
+            }
+        }
+
+        /// <summary>The earliest time from at that is at least the bomb gap from the gourd's bombs near it.</summary>
+        private double ClearOfGourdBombs(double at)
+        {
+            double gap = rules.SwipeBlockBombGap;
+            if (gap <= 0d) return at;
+            double clear = at;
+            foreach (double bomb in gourdBombTimes)
+                if (Math.Abs(clear - bomb) < gap) clear = Math.Max(clear, bomb + gap);
+            if (Math.Abs(clear - nextGourdBombAt) < gap) clear = Math.Max(clear, nextGourdBombAt + gap);
+            return clear;
+        }
+
+        /// <summary>Whether the gourd's swipe block (#215) stops this player's own passes that way at this Host time.</summary>
+        public bool SwipeBlocked(ulong player, bool right, double now) =>
+            phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt
+            && player == swipeBlockedPlayer && right == swipeBlockedRight;
+
         private double GourdBombDelay(uint index)
         {
             if (rules.GourdBombIntervalMax <= 0f) return double.PositiveInfinity;
@@ -946,6 +1064,8 @@ namespace C6Lab
         {
             public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
             public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
+            /// <summary>How much a blast-shrunk orb paints, against a whole one (#213).</summary>
+            public readonly float SmallOrbPaintShare;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
             public readonly float SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, FloorDeceleration;
@@ -955,6 +1075,8 @@ namespace C6Lab
             public readonly int PaintVictoryPercent;
             public readonly LabPaintGrowthSettings PaintGrowthSettings;
             public readonly float GourdBombIntervalMin, GourdBombIntervalMax;
+            /// <summary>The gourd's swipe block (#215): every how long, for how long, and how far from its bombs.</summary>
+            public readonly float SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap;
             public readonly float[] DrumStopBounds;
             public readonly int[] DrumStopChances;
             public readonly Color[] PaintColors;
@@ -974,6 +1096,9 @@ namespace C6Lab
                 PaintGrowthSettings = config.PaintGrowthSettings;
                 GourdBombIntervalMin = config.GourdBombIntervalMin;
                 GourdBombIntervalMax = config.GourdBombIntervalMax;
+                SwipeBlockInterval = config.SwipeBlockInterval;
+                SwipeBlockSeconds = config.SwipeBlockSeconds;
+                SwipeBlockBombGap = config.SwipeBlockBombGap;
                 DrumStopBounds = config.DrumStopBounds();
                 DrumStopChances = config.DrumStopChances();
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];
@@ -984,6 +1109,7 @@ namespace C6Lab
                 RelayDoubleMultiplier = config.RelayDoubleMultiplier;
                 RelayMaxMultiplier = config.RelayMaxMultiplier;
                 BombMultiplier = config.BombMultiplier;
+                SmallOrbPaintShare = config.SmallOrbPaintShare;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
                 BattleDurationSeconds = config.BattleDurationSeconds;

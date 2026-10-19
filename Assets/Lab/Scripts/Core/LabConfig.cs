@@ -236,6 +236,16 @@ namespace C6Lab
             new LabDeveloperField("Bomb Release Speed (x orb)", .05f, 1f),
             new LabDeveloperField("Bomb Slide Deceleration (x orb)", 1f, 5f),
             new LabDeveloperField("Bomb Mass (x orb)", 1f, 20f),
+            new LabDeveloperField("Blast Burn Seconds", 3f, 5f),
+            new LabDeveloperField("Blast Shrink Scale (x radius)", .2f, 1f),
+            new LabDeveloperField("Small Orb Paint Share (x paint)", 0f, 1f),
+            LabDeveloperField.Toggle("Paint Drying (0 off, 1 on)"),
+            new LabDeveloperField("Drying Delay (seconds)", 0f, 60f),
+            new LabDeveloperField("Drying Rate (%/s)", 0f, 5f),
+            new LabDeveloperField("Nearby Hit Radius (surface degrees)", 1f, 90f),
+            new LabDeveloperField("Swipe Block Interval (seconds, 0 = off)", 0f, 600f),
+            new LabDeveloperField("Swipe Block Seconds", 1f, 60f),
+            new LabDeveloperField("Swipe Block Bomb Gap (seconds)", 0f, 15f),
             LabDeveloperField.Toggle("Gourd Color Combo (0 off, 1 on)"),
             new LabDeveloperField("Combo First Start (seconds)", 1f, 3600f),
             new LabDeveloperField("Combo Repeat Interval (seconds)", 1f, 3600f),
@@ -260,7 +270,7 @@ namespace C6Lab
             new LabDeveloperCategory("Battle", 0, 1, 2, 48),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
             new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44),
-            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 146, 147, 148, 149),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 146, 147, 148, 149, 150, 151, 152),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
@@ -272,11 +282,11 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 140, 141, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 145, 79, 87, 88, 89, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
+            new LabDeveloperCategory("Gourd", 145, 79, 87, 88, 89, 157, 158, 159, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
-                139, 133, 134, 135, 136, 137, 138),
+                139, 133, 134, 135, 136, 137, 138, 153, 154, 155, 156),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102),
-            new LabDeveloperCategory("Combo", 150, 151, 152, 153, 154, 155, 156, 157, 158)
+            new LabDeveloperCategory("Combo", 160, 161, 162, 163, 164, 165, 166, 167, 168)
         });
 
 
@@ -329,6 +339,12 @@ namespace C6Lab
         [SerializeField, Range(1f, 5f)] private float bombSlideDeceleration = 2f;
         [Tooltip("무거운 폭탄: 질량 배율 (구슬 = 1). 클수록 구슬과 부딪혀도 덜 밀린다.")]
         [SerializeField, Range(1f, 20f)] private float bombMass = 4f;
+        [Tooltip("폭발 패널티 (#213): 폭탄 충격파에 맞은 구슬에 노란 불이 붙어 있는 시간 (초).")]
+        [SerializeField, Range(3f, 5f)] private float blastBurnSeconds = 4f;
+        [Tooltip("폭발 패널티: 충격파에 맞은 구슬의 반지름 배율. 보이는 크기·충돌·잡기·던졌을 때 박 판정에 모두 쓰고, 사라질 때까지 유지한다.")]
+        [SerializeField, Range(.2f, 1f)] private float blastShrinkScale = .5f;
+        [Tooltip("폭발 패널티: 작아진 구슬이 박에 맞았을 때 칠하는 양의 배율 (보통 구슬 = 1).")]
+        [SerializeField, Range(0f, 1f)] private float smallOrbPaintShare = .5f;
 
         [Header("Experiment: gourd color combo (#222)")]
         [Tooltip("켜면 전투 중 박이 4칸 색 콤보를 낸다. 끄면 기존 플레이와 같다.")]
@@ -414,6 +430,14 @@ namespace C6Lab
         [SerializeField, Range(.1f, 100f)] private float paintGrowthPercentPerSecond = 6f;
         [SerializeField, Range(0f, 100f)] private float paintFillChancePercent = 60f;
         [SerializeField, Range(1f, 4f)] private float paintVerticalWeight = 1.35f;
+        [Tooltip("근처 유효 명중이 없는 도색을 빈 표면과 맞닿은 경계부터 점진적으로 지운다. 새 판에 적용한다.")]
+        [SerializeField] private bool paintDryingEnabled = true;
+        [Tooltip("박 표면의 근처에 마지막으로 명중한 뒤 도색을 유지하는 시간 (초).")]
+        [SerializeField, Range(0f, 60f)] private float paintDryingDelaySeconds = 5f;
+        [Tooltip("건조로 지우는 전체 박 표면 대비 초당 면적 (%p/초). 표면 분할 해상도와 독립적이다.")]
+        [SerializeField, Range(0f, 5f)] private float paintDryingPercentPerSecond = .2f;
+        [Tooltip("실제 명중점에서 박 표면을 따라 주변 도색의 유지 시간을 갱신하는 범위 (도).")]
+        [SerializeField, Range(1f, 90f)] private float paintNearbyHitRadiusDegrees = 20f;
         [Tooltip("Paint 100% 승리 뒤 모든 참가자에게 완성된 박의 로컬 관람을 허용한다. 새 판에 적용한다.")]
         [SerializeField] private bool completedGourdViewerEnabled = true;
         [Tooltip("플레이어 P번호별 물감 무늬를 박과 HUD에 표시한다. 색칠·면적·승리 판정은 바꾸지 않으며 새 판에 적용한다.")]
@@ -463,6 +487,12 @@ namespace C6Lab
         [Tooltip("박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다. 최대가 0이면 떨어뜨리지 않는다 (#177).")]
         [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
         [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
+        [Tooltip("박의 넘기기 막기 (#215): 무작위 한 명의 한쪽 방향 넘기기를 막는 간격 (초). 0이면 막지 않는다.")]
+        [SerializeField, Range(0f, 600f)] private float swipeBlockInterval = 40f;
+        [Tooltip("넘기기 막기가 이어지는 시간 (초).")]
+        [SerializeField, Range(1f, 60f)] private float swipeBlockSeconds = 10f;
+        [Tooltip("넘기기 막기가 박 폭탄과 최소 이만큼 떨어져 시작한다 (초). 가까우면 그 폭탄 뒤로 미룬다.")]
+        [SerializeField, Range(0f, 15f)] private float swipeBlockBombGap = 4f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -540,7 +570,7 @@ namespace C6Lab
         [Header("Battle view and throw origin")]
         [SerializeField, Min(.001f)] private float cameraRadius = 8f;
         [SerializeField] private float cameraHeightOffset = .65f;
-        [SerializeField, Range(-10f, 10f)] private float cameraLookHeightOffset = 2f;
+        [SerializeField, Range(-10f, 10f)] private float cameraLookHeightOffset = .8f;
         [SerializeField, Min(.001f)] private float throwOriginRadius = 4f;
         [SerializeField] private float throwOriginHeightOffset = -.5f;
         [SerializeField, Min(0f)] private float throwOriginLateralRange = 1f;
@@ -629,6 +659,9 @@ namespace C6Lab
         public float BombReleaseSpeed => Mathf.Clamp(Finite(bombReleaseSpeed, .5f), .05f, 1f);
         public float BombSlideDeceleration => Mathf.Clamp(Finite(bombSlideDeceleration, 2f), 1f, 5f);
         public float BombMass => Mathf.Clamp(Finite(bombMass, 4f), 1f, 20f);
+        public float BlastBurnSeconds => Mathf.Clamp(Finite(blastBurnSeconds, 4f), 3f, 5f);
+        public float BlastShrinkScale => Mathf.Clamp(Finite(blastShrinkScale, .5f), .2f, 1f);
+        public float SmallOrbPaintShare => Mathf.Clamp(Finite(smallOrbPaintShare, .5f), 0f, 1f);
         public bool GourdColorComboEnabled => gourdColorComboEnabled;
         public float ComboFirstStartSeconds => Mathf.Clamp(Finite(comboFirstStartSeconds, 20f), 1f, 3600f);
         public float ComboRepeatIntervalSeconds => Mathf.Clamp(Finite(comboRepeatIntervalSeconds, 30f), 1f, 3600f);
@@ -712,6 +745,10 @@ namespace C6Lab
         public float PaintGrowthPercentPerSecond => Mathf.Clamp(Finite(paintGrowthPercentPerSecond, 6f), .1f, 100f);
         public float PaintFillChancePercent => Mathf.Clamp(Finite(paintFillChancePercent, 60f), 0f, 100f);
         public float PaintVerticalWeight => Mathf.Clamp(Finite(paintVerticalWeight, 1.35f), 1f, 4f);
+        public bool PaintDryingEnabled => paintDryingEnabled;
+        public float PaintDryingDelaySeconds => Mathf.Clamp(Finite(paintDryingDelaySeconds, 5f), 0f, 60f);
+        public float PaintDryingPercentPerSecond => Mathf.Clamp(Finite(paintDryingPercentPerSecond, .2f), 0f, 5f);
+        public float PaintNearbyHitRadiusDegrees => Mathf.Clamp(Finite(paintNearbyHitRadiusDegrees, 20f), 1f, 90f);
         public LabPaintGrowthSettings PaintGrowthSettings => new LabPaintGrowthSettings
         {
             Resolution = PaintSurfaceResolution,
@@ -728,7 +765,11 @@ namespace C6Lab
             FlowRatio = PaintFlowRatio,
             DripWidthDegrees = PaintDripWidthDegrees,
             DripLengthDegrees = PaintDripLengthDegrees,
-            GravityWeight = PaintGravityWeight
+            GravityWeight = PaintGravityWeight,
+            DryingEnabled = PaintDryingEnabled,
+            DryingDelaySeconds = PaintDryingDelaySeconds,
+            DryingPercentPerSecond = PaintDryingPercentPerSecond,
+            NearbyHitRadiusDegrees = PaintNearbyHitRadiusDegrees
         };
         public bool CompletedGourdViewerEnabled => completedGourdViewerEnabled;
         public bool PlayerPaintPatternsEnabled => playerPaintPatternsEnabled;
@@ -756,6 +797,9 @@ namespace C6Lab
         public float PaintGravityWeight => Mathf.Clamp(Finite(paintGravityWeight, 3f), 1f, 8f);
         public float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         public float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
+        public float SwipeBlockInterval => Mathf.Clamp(Finite(swipeBlockInterval, 40f), 0f, 600f);
+        public float SwipeBlockSeconds => Mathf.Clamp(Finite(swipeBlockSeconds, 10f), 1f, 60f);
+        public float SwipeBlockBombGap => Mathf.Clamp(Finite(swipeBlockBombGap, 4f), 0f, 15f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
@@ -789,7 +833,7 @@ namespace C6Lab
         public float CombineHapticIntensity => Mathf.Clamp01(Finite(combineHapticIntensity, 1f));
         public float CameraRadius => Positive(cameraRadius, 8f);
         public float CameraHeightOffset => Finite(cameraHeightOffset, .65f);
-        public float CameraLookHeightOffset => Mathf.Clamp(Finite(cameraLookHeightOffset, 2f), -10f, 10f);
+        public float CameraLookHeightOffset => Mathf.Clamp(Finite(cameraLookHeightOffset, .8f), -10f, 10f);
         public float ThrowOriginRadius => Positive(throwOriginRadius, 4f);
         public float ThrowOriginHeightOffset => Finite(throwOriginHeightOffset, -.5f);
         public float ThrowOriginLateralRange => Mathf.Max(0f, Finite(throwOriginLateralRange, 1f));
@@ -873,6 +917,10 @@ namespace C6Lab
                 PlayerPaintPatternsEnabled ? 1f : 0f,
                 PaintClusterCompactness, PaintClusterIrregularity, GourdVisualSize,
                 BombDragLag, BombReleaseSpeed, BombSlideDeceleration, BombMass,
+                BlastBurnSeconds, BlastShrinkScale, SmallOrbPaintShare,
+                PaintDryingEnabled ? 1f : 0f, PaintDryingDelaySeconds,
+                PaintDryingPercentPerSecond, PaintNearbyHitRadiusDegrees,
+                SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap,
                 GourdColorComboEnabled ? 1f : 0f, ComboFirstStartSeconds, ComboRepeatIntervalSeconds,
                 ComboTimeLimitSeconds, ComboPenaltyDurationSeconds, ComboPenaltySizeScale,
                 ComboPenaltyThrowerOnly ? 1f : 0f, ComboRewardDurationSeconds, ComboRewardSizeScale
@@ -1069,15 +1117,25 @@ namespace C6Lab
             bombReleaseSpeed = values[147];
             bombSlideDeceleration = values[148];
             bombMass = values[149];
-            gourdColorComboEnabled = values[150] >= .5f;
-            comboFirstStartSeconds = values[151];
-            comboRepeatIntervalSeconds = values[152];
-            comboTimeLimitSeconds = values[153];
-            comboPenaltyDurationSeconds = values[154];
-            comboPenaltySizeScale = values[155];
-            comboPenaltyThrowerOnly = values[156] >= .5f;
-            comboRewardDurationSeconds = values[157];
-            comboRewardSizeScale = values[158];
+            blastBurnSeconds = values[150];
+            blastShrinkScale = values[151];
+            smallOrbPaintShare = values[152];
+            paintDryingEnabled = values[153] == 1f;
+            paintDryingDelaySeconds = values[154];
+            paintDryingPercentPerSecond = values[155];
+            paintNearbyHitRadiusDegrees = values[156];
+            swipeBlockInterval = values[157];
+            swipeBlockSeconds = values[158];
+            swipeBlockBombGap = values[159];
+            gourdColorComboEnabled = values[160] >= .5f;
+            comboFirstStartSeconds = values[161];
+            comboRepeatIntervalSeconds = values[162];
+            comboTimeLimitSeconds = values[163];
+            comboPenaltyDurationSeconds = values[164];
+            comboPenaltySizeScale = values[165];
+            comboPenaltyThrowerOnly = values[166] >= .5f;
+            comboRewardDurationSeconds = values[167];
+            comboRewardSizeScale = values[168];
             error = string.Empty;
             return true;
         }

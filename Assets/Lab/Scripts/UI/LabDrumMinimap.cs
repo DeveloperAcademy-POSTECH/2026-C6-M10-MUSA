@@ -9,8 +9,8 @@ namespace C6Lab
     /// 전투 화면 오른쪽 아래(오른쪽 이웃 동그라미 바로 위, 오른쪽 테두리가 화면 안에 보이도록 조금 안쪽)의 미니맵. 플레이어마다 원 하나를 정다각형 꼭짓점에 놓고
     /// 이웃끼리 선으로 잇는다. 폰마다 "나"를 아래 가운데에 두고, 내 화면의 오른쪽 이웃(다음 번호)은 오른쪽 위,
     /// 왼쪽 이웃(이전 번호)은 왼쪽 위에 놓아 화면에서 넘기는 방향과 미니맵 방향이 같다.
-    /// 북을 가진 사람의 원은 태극 무늬(Resources/Minimap/Taegeuk.png)로 덮고, 북이 넘어가면 태극이 선을 따라 미끄러진다.
-    /// 장면 수정 없이 LabSceneController가 실행 시 붙이고, 전투 중(Playing)에만 보인다.
+    /// 북을 가진 사람의 원은 제공된 태극 무늬로 덮고, 북이 넘어가면 태극이 선을 따라 미끄러진다.
+    /// Scene의 새 디자인 에셋을 쓰며, 저장 컴포넌트가 없는 실험 Scene은 런타임에 붙인다. 전투 중(Playing)에만 보인다.
     /// LabConfig의 Minimap Enabled(Inspector · DEV "Minimap")가 꺼져 있으면 보이지 않고,
     /// Minimap Size(%)만큼 오른쪽 아래 모서리를 기준으로 크기가 바뀌고, Minimap Move X/Y만큼 기본 자리에서 옮겨진다.
     /// </summary>
@@ -39,6 +39,15 @@ namespace C6Lab
         public Color otherTextColor = new Color(.29f, .247f, .212f, 1f);
         public Color meColor = new Color(.565f, .337f, .247f, 1f);
         public Color meTextColor = Color.white;
+
+        [Header("Saved concept artwork")]
+        public Sprite[] playerSprites;
+        public Sprite drumIconSprite;
+        public Sprite soloDrumSprite;
+        private bool HasConceptArt => playerSprites != null && playerSprites.Length >= 5
+            && playerSprites.All(sprite => sprite != null) && drumIconSprite != null;
+        private readonly Dictionary<ulong, Image> seatImages = new Dictionary<ulong, Image>();
+        private readonly Dictionary<ulong, int> seatNumbers = new Dictionary<ulong, int>();
 
         private LabNetwork network;
         private RectTransform anchor;
@@ -128,9 +137,11 @@ namespace C6Lab
             layoutKey = key;
             for (int i = content.childCount - 1; i >= 0; i--) Remove(content.GetChild(i).gameObject);
             seatPositions.Clear();
+            seatImages.Clear();
+            seatNumbers.Clear();
             ringOrder.Clear();
             drums.Clear();
-            // 그리는 순서: 선 → 원 → 태극 → P번호 (번호는 태극 위에도 보인다)
+            // 선 → 번호가 포함된 배지 → 태극. 구형 단색 원만 별도 번호 텍스트를 쓴다.
             lineLayer = AddLayer("Lines");
             seatLayer = AddLayer("Seats");
             drumLayer = AddLayer("Drums");
@@ -152,7 +163,7 @@ namespace C6Lab
                 max = Vector2.Max(max, p);
             }
             Vector2 span = max - min;
-            Vector2 inner = size - new Vector2(12f, 12f) - Vector2.one * (2f * radius);
+            Vector2 inner = size - Vector2.one * (HasConceptArt ? 23f : 12f) - Vector2.one * (2f * radius);
             float scale = Mathf.Min(span.x > .001f ? inner.x / span.x : float.MaxValue,
                 span.y > .001f ? inner.y / span.y : float.MaxValue);
             if (float.IsInfinity(scale) || scale == float.MaxValue) scale = 0f;
@@ -169,8 +180,17 @@ namespace C6Lab
                 bool me = player.id == localId;
                 seatPositions[player.id] = points[k];
                 ringOrder.Add(player.id);
-                AddCircle(points[k], radius, me ? meColor : otherColor);
-                AddLabel(LabResultStats.PlayerName(player), points[k], radius, me ? meTextColor : otherTextColor);
+                int number = player.seat + 1;
+                Image circle = AddCircle(points[k], radius, me ? meColor : otherColor);
+                seatImages[player.id] = circle;
+                seatNumbers[player.id] = number;
+                if (HasConceptArt && number >= 1 && number <= playerSprites.Length)
+                {
+                    circle.sprite = playerSprites[number - 1];
+                    circle.color = Color.white;
+                    circle.preserveAspect = true;
+                }
+                else AddLabel(LabResultStats.PlayerName(player), points[k], radius, me ? meTextColor : otherTextColor);
             }
         }
 
@@ -199,6 +219,11 @@ namespace C6Lab
                 foreach (ulong seat in RingSteps(marker.Owner, drum.owner)) marker.Path.Add(seatPositions[seat]);
                 marker.Progress = 0f;
                 marker.Owner = drum.owner;
+            }
+            if (HasConceptArt && ringOrder.Count == 1 && soloDrumSprite != null)
+            {
+                ulong owner = ringOrder[0];
+                seatImages[owner].sprite = drums.Any(pair => pair.Value.Owner == owner && seen.Contains(pair.Key)) ? soloDrumSprite : playerSprites[seatNumbers[owner] - 1];
             }
             foreach (string gone in drums.Keys.Where(id => !seen.Contains(id)).ToArray())
             {
@@ -246,13 +271,15 @@ namespace C6Lab
             }
         }
 
-        private static float CircleRadius(int count) => count <= 3 ? 17f : count == 4 ? 15f : 13f;
+        private float CircleRadius(int count) => HasConceptArt
+            ? (count <= 1 ? 35.5f : 18.5f)
+            : count <= 3 ? 17f : count == 4 ? 15f : 13f;
 
         private void EnsurePanel()
         {
             if (panel != null) return;
             if (anchor == null || anchor.parent == null) return;
-            var border = new GameObject("DrumMinimap", typeof(RectTransform), typeof(Image));
+            var border = new GameObject("DrumMinimap", typeof(RectTransform));
             panel = (RectTransform)border.transform;
             panel.SetParent(anchor.parent, false);
             // 오른쪽 이웃 동그라미의 오른쪽 끝에 맞추고 그 위로 띄운다.
@@ -263,20 +290,22 @@ namespace C6Lab
                     anchor.sizeDelta.y * (1f - anchor.pivot.y) + gapAboveBadge);
             panel.anchoredPosition = homePosition;
             panel.sizeDelta = size;
-            var borderImage = border.GetComponent<Image>();
-            borderImage.color = borderColor;
-            borderImage.raycastTarget = false;
-
-            var inner = new GameObject("Background", typeof(RectTransform), typeof(Image));
-            var innerRect = (RectTransform)inner.transform;
-            innerRect.SetParent(panel, false);
-            innerRect.anchorMin = Vector2.zero;
-            innerRect.anchorMax = Vector2.one;
-            innerRect.offsetMin = new Vector2(3f, 3f);
-            innerRect.offsetMax = new Vector2(-3f, -3f);
-            var innerImage = inner.GetComponent<Image>();
-            innerImage.color = backgroundColor;
-            innerImage.raycastTarget = false;
+            if (!HasConceptArt)
+            {
+                var borderImage = border.AddComponent<Image>();
+                borderImage.color = borderColor;
+                borderImage.raycastTarget = false;
+                var inner = new GameObject("Background", typeof(RectTransform), typeof(Image));
+                var innerRect = (RectTransform)inner.transform;
+                innerRect.SetParent(panel, false);
+                innerRect.anchorMin = Vector2.zero;
+                innerRect.anchorMax = Vector2.one;
+                innerRect.offsetMin = new Vector2(3f, 3f);
+                innerRect.offsetMax = new Vector2(-3f, -3f);
+                var innerImage = inner.GetComponent<Image>();
+                innerImage.color = backgroundColor;
+                innerImage.raycastTarget = false;
+            }
 
             var layer = new GameObject("Content", typeof(RectTransform));
             content = (RectTransform)layer.transform;
@@ -308,7 +337,7 @@ namespace C6Lab
             rect.anchoredPosition = at;
             rect.sizeDelta = Vector2.one * (radius * 2f);
             var image = go.GetComponent<Image>();
-            image.sprite = CircleSprite();
+            image.sprite = HasConceptArt ? playerSprites[0] : CircleSprite();
             image.color = color;
             image.raycastTarget = false;
             return image;
@@ -324,16 +353,17 @@ namespace C6Lab
             return rect;
         }
 
-        /// <summary>북을 가진 사람 원을 덮는 태극 (원과 같은 크기)</summary>
+        /// <summary>북을 가진 사람 원 안쪽의 태극. 솔로는 제공된 완성 배지를 쓴다.</summary>
         private RectTransform AddTaegeuk(Vector2 at)
         {
             var go = new GameObject("Drum", typeof(RectTransform), typeof(Image));
             var rect = (RectTransform)go.transform;
             rect.SetParent(drumLayer, false);
             rect.anchoredPosition = at;
-            rect.sizeDelta = Vector2.one * (CircleRadius(ringOrder.Count) * 2f);
+            rect.sizeDelta = Vector2.one * (CircleRadius(ringOrder.Count) * 2f * (HasConceptArt ? .746f : 1f));
             var image = go.GetComponent<Image>();
-            image.sprite = TaegeukSprite();
+            image.sprite = HasConceptArt ? drumIconSprite : TaegeukSprite();
+            image.enabled = !(HasConceptArt && ringOrder.Count == 1 && soloDrumSprite != null);
             image.color = image.sprite != null ? Color.white : new Color(.8f, .18f, .23f, 1f);
             image.preserveAspect = true;
             image.raycastTarget = false;

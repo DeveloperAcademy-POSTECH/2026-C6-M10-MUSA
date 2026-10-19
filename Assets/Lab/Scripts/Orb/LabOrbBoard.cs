@@ -69,6 +69,8 @@ namespace C6Lab
             public float ArrivalStopX;
             /// <summary>A drum a bomb blast flung, until it slows to its drift; crossing now says so to the Host.</summary>
             public bool Blasted;
+            /// <summary>A bomb blast shrank this orb for the rest of its life (#213).</summary>
+            public bool Small;
             /// <summary>When the held body last followed the finger, for a heavy bomb's lag (#212).</summary>
             public double LastDragAt;
             public string PendingPartnerId;
@@ -118,6 +120,11 @@ namespace C6Lab
         private LabConfig config;
         private Camera inputCamera;
         private Rect bounds;
+        private int blockedSide;
+        private float blockSecondsLeft;
+        private LabOrbEdgeBlock edgeBlock;
+        /// <summary>The board keeps its own swipe-block countdown unless the Host's differs by more than this.</summary>
+        private const float BlockResyncSeconds = .3f;
         private LabOrbAreaShape areaShape;
         private readonly List<Mesh> areaWallMeshes = new List<Mesh>();
         private Rect inputScreenRect;
@@ -135,6 +142,13 @@ namespace C6Lab
         private bool configured;
 
         public int Count => entries.Count;
+        /// <summary>The edge the gourd's swipe block (#215) holds shut on this board: -1 left, +1 right, 0 none.</summary>
+        public int BlockedSide => blockedSide;
+        /// <summary>Seconds this board still shows the swipe block.</summary>
+        public float BlockSecondsLeft => blockedSide != 0 ? blockSecondsLeft : 0f;
+        /// <summary>How many of this board's own passes have bounced off a blocked edge.</summary>
+        public int BlockBounces { get; private set; }
+        public LabOrbEdgeBlock EdgeBlock => edgeBlock;
         /// <summary>World-space limits for orb centres; the visual extends by OrbRadius.</summary>
         public Rect CenterBounds => bounds;
         public LabOrbAreaShape AreaShape => areaShape;
@@ -183,7 +197,7 @@ namespace C6Lab
             BuildHorizontalWalls();
             foreach (var entry in entries.Values)
             {
-                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind), entry.View.Element);
+                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind, entry.Small), entry.View.Element);
                 entry.View.ConfigureAppearance(config.OrbAppearance);
                 SetLayerRecursively(entry.View.transform, gameObject.layer);
                 entry.View.HitSphere.sharedMaterial = contactMaterial;
@@ -274,23 +288,30 @@ namespace C6Lab
         /// Add a newly approved orb, or update its kind/owner. Existing local physics is never
         /// reset by a repeated snapshot. Positions are 0..1; velocity is board widths/second.
         /// justUnlocked plays the unlock effect once per orb, however many snapshots repeat it.
+        /// A small orb, shrunk by a bomb blast (#213), is smaller to see, to grab and to bump into;
+        /// burnSeconds is how much longer that blast's fire burns on it.
         /// </summary>
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
             bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
-            LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f)
+            LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false,
+            float burnSeconds = 0f)
         {
             RequireConfigured();
+            small &= !kind.IsDrum();
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
                 throw new ArgumentException("A finite orb identity, position and velocity are required.");
             if (entries.TryGetValue(id, out var existing))
             {
                 existing.LocalOwner = localOwner;
                 existing.View.FuseTotalSeconds = config.ItemLifetimeSeconds;
-                if (existing.View.Kind != kind || existing.View.Element != element)
+                if (existing.View.Kind != kind || existing.View.Element != element || existing.Small != small)
                 {
-                    existing.View.Configure(id, kind, RadiusFor(kind), element);
+                    bool shrinking = small && !existing.Small && existing.View.Kind == kind;
+                    existing.Small = small;
+                    existing.View.Configure(id, kind, RadiusFor(kind, small), element);
+                    if (shrinking) existing.View.PlayShrink(1f / config.BlastShrinkScale, ShrinkSeconds);
                     existing.View.Body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
@@ -298,24 +319,26 @@ namespace C6Lab
                     || existing.View.FuseSeconds != fuseSeconds)
                     existing.View.SetItemState(lockSwipes, relayStage, fuseSeconds);
                 if (justUnlocked && unlockEffectIds.Add(id)) existing.View.PlayUnlockEffect();
+                existing.View.SetBurn(burnSeconds);
                 SetBodyMode(existing);
                 return existing.View;
             }
 
-            Vector2 start = ToWorld(normalizedPosition, RadiusFor(kind));
+            Vector2 start = ToWorld(normalizedPosition, RadiusFor(kind, small));
             Vector2 popFrom = start;
             if (playSpawn) start = OutsideDrums(start, velocityInBoardWidthsPerSecond, out popFrom);
-            start = Clamp(start, RadiusFor(kind));
+            start = Clamp(start, RadiusFor(kind, small));
             var gameObject = new GameObject("Orb " + id);
             gameObject.layer = this.gameObject.layer;
             gameObject.transform.SetParent(transform, false);
             gameObject.transform.position = OnPlane(start);
             var view = gameObject.AddComponent<LabOrbView>();
-            view.Configure(id, kind, RadiusFor(kind), element);
+            view.Configure(id, kind, RadiusFor(kind, small), element);
             view.ConfigureAppearance(config.OrbAppearance);
             view.FuseTotalSeconds = config.ItemLifetimeSeconds;
             view.SetItemState(lockSwipes, relayStage, fuseSeconds);
             if (justUnlocked && unlockEffectIds.Add(id)) view.PlayUnlockEffect();
+            view.SetBurn(burnSeconds);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
@@ -330,7 +353,7 @@ namespace C6Lab
             body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
             body.position = OnPlane(start);
             var entry = new Entry { View = view, LocalOwner = localOwner, DriftSeed = DriftSeedFor(id),
-                Dropping = expectedDrops.Remove(id) };
+                Dropping = expectedDrops.Remove(id), Small = small };
             entries.Add(id, entry);
             SetBodyMode(entry);
             if (entry.Dropping) PlayDrop(entry, start);
@@ -392,9 +415,10 @@ namespace C6Lab
         /// to the neighbour through the usual Host-approved handoff. An orb held under a finger is
         /// knocked out of the hand too. Orbs already waiting on a Host answer stay put. The blast
         /// centre is where this screen shows the bomb, or the Host's last position for it if it is
-        /// gone. Returns how many bodies were pushed.
+        /// gone. Returns how many bodies were pushed. Every flung orb that is not a drum or a bomb is
+        /// added to <paramref name="burned"/>, for the Host to set alight (#213).
         /// </summary>
-        public int Blast(string bombId, Vector2 normalizedPosition)
+        public int Blast(string bombId, Vector2 normalizedPosition, ICollection<string> burned = null)
         {
             if (!configured || !Finite(normalizedPosition)) return 0;
             Vector2 center = bombId != null && entries.TryGetValue(bombId, out var bomb) && bomb.View != null
@@ -417,14 +441,63 @@ namespace C6Lab
                 if (distance > reach) continue;
                 if (entry.Held) CancelDrag();
                 entry.Arrival = LabDrumArrival.None;
-                // A drum flung across tells the Host so it stops inside the next board (#178).
-                if (entry.View.Kind.IsDrum()) entry.Blasted = true;
+                // Anything flung tells the Host it was pushed if it crosses: a drum then stops inside the
+                // next board (#178), and the gourd's swipe block never stops it (#215).
+                entry.Blasted = true;
+                if (!entry.View.Kind.IsDrum() && entry.View.Kind != LabOrbKind.Bomb) burned?.Add(entry.View.OrbId);
                 Vector2 direction = distance > 1e-5f ? away / distance : Vector2.up;
                 Vector2 velocity = XY(entry.View.Body.linearVelocity) + direction * strength * (1f - distance / reach);
                 entry.View.Body.linearVelocity = OnPlane(velocity);
                 pushed++;
             }
             return pushed;
+        }
+
+        /// <summary>
+        /// The gourd's swipe block on this player (#215): side -1 holds the left edge shut, +1 the right,
+        /// 0 (or no seconds) lifts it. While it is on, this board's own passes that way bounce off the edge
+        /// like a wall; a blast's push and a drum running on through still cross, and nothing is stopped
+        /// coming in. The edge glows red with the seconds left in its middle. The board counts down by
+        /// itself and only takes the Host's seconds when they differ by more than a moment.
+        /// </summary>
+        public void SetSwipeBlock(int side, float secondsLeft)
+        {
+            side = Math.Sign(side);
+            if (!configured || side == 0 || !(secondsLeft > 0f) || float.IsInfinity(secondsLeft))
+            {
+                LiftSwipeBlock();
+                return;
+            }
+            if (side != blockedSide || Mathf.Abs(blockSecondsLeft - secondsLeft) > BlockResyncSeconds)
+                blockSecondsLeft = secondsLeft;
+            blockedSide = side;
+            ShowSwipeBlock();
+        }
+
+        private void LiftSwipeBlock()
+        {
+            blockedSide = 0;
+            blockSecondsLeft = 0f;
+            if (edgeBlock != null) edgeBlock.Hide();
+        }
+
+        private void ShowSwipeBlock()
+        {
+            if (edgeBlock == null) edgeBlock = LabOrbEdgeBlock.Create(transform);
+            // The side planes are the board's visible side edges; the area gives the edge's height there.
+            float edgeX = blockedSide > 0 ? bounds.xMax : bounds.xMin;
+            Vector2 range = areaShape.VerticalRange(edgeX, 0f);
+            edgeBlock.Show(blockedSide > 0, edgeX, range.x, range.y, bounds.width, config.OrbRadius);
+            edgeBlock.SetSeconds(blockSecondsLeft);
+        }
+
+        private void LateUpdate()
+        {
+            if (blockedSide == 0) return;
+            blockSecondsLeft -= Time.deltaTime;
+            if (blockSecondsLeft <= 0f) LiftSwipeBlock();
+            // Follows the board if its area was resized.
+            else ShowSwipeBlock();
         }
 
         /// <summary>The fewest seconds left on a burning bomb fuse on this screen; negative when none burns.</summary>
@@ -565,6 +638,7 @@ namespace C6Lab
         public void Clear()
         {
             CancelDrag();
+            LiftSwipeBlock();
             foreach (var entry in entries.Values)
                 Retire(entry);
             entries.Clear();
@@ -853,7 +927,12 @@ namespace C6Lab
                 // Convert at this boundary so different camera/board sizes retain the same feel.
                 if (entry.Arrival != LabDrumArrival.None) velocity = Arrive(entry, velocity, position);
                 else if (drifts) velocity = Drift(entry, velocity, position);
-                else if (speed <= config.OrbStopSpeed * bounds.width) velocity = Vector2.zero;
+                else if (speed <= config.OrbStopSpeed * bounds.width)
+                {
+                    // A blast-flung orb that has come to rest is an ordinary orb again.
+                    velocity = Vector2.zero;
+                    entry.Blasted = false;
+                }
                 else velocity = velocity.normalized * Mathf.Max(0f,
                     speed - config.OrbFloorDeceleration * bounds.width * Time.fixedDeltaTime);
                 body.linearVelocity = OnPlane(velocity);
@@ -870,10 +949,20 @@ namespace C6Lab
                     continue;
                 }
                 // A drum still passing through tells the Host so it stops on the near side next.
+                LabEdgeCrossingKind kind = entry.Arrival == LabDrumArrival.Pass ? LabEdgeCrossingKind.Passing
+                    : entry.Blasted ? LabEdgeCrossingKind.Pushed : LabEdgeCrossingKind.Swipe;
+                if (kind == LabEdgeCrossingKind.Swipe && blockedSide == (right ? 1 : -1))
+                {
+                    // The gourd's swipe block (#215): this player's own pass that way bounces off the edge
+                    // like the top and bottom walls; a blast's push or a drum running on through still crosses.
+                    body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
+                    body.linearVelocity = OnPlane(new Vector2(-velocity.x * config.OrbRestitution, velocity.y));
+                    BlockBounces++;
+                    if (edgeBlock != null) edgeBlock.Flash();
+                    continue;
+                }
                 var crossing = new LabOrbEdgeCrossing(entry.View.OrbId, right,
-                    NormalizeForBody(areaShape, position, entry.View.HitSphere.radius).y, velocity / bounds.width,
-                    entry.Arrival == LabDrumArrival.Pass ? LabEdgeCrossingKind.Passing
-                    : entry.Blasted ? LabEdgeCrossingKind.Pushed : LabEdgeCrossingKind.Swipe);
+                    NormalizeForBody(areaShape, position, entry.View.HitSphere.radius).y, velocity / bounds.width, kind);
                 entry.EdgePending = true;
                 entry.PendingEdge = crossing;
                 body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
@@ -1207,7 +1296,10 @@ namespace C6Lab
             return areaShape.Clamp(world, radius);
         }
 
-        private float RadiusFor(LabOrbKind kind) => kind.IsDrum() ? config.DrumRadius : config.OrbRadius;
+        /// <summary>How long a blast-shrunk orb's art takes to squeeze down to its new size (#213).</summary>
+        private const float ShrinkSeconds = .3f;
+        private float RadiusFor(LabOrbKind kind, bool small = false) =>
+            kind.IsDrum() ? config.DrumRadius : config.OrbRadius * (small ? config.BlastShrinkScale : 1f);
         private static Vector2 XY(Vector3 value) => new Vector2(value.x, value.y);
         private static Vector3 OnPlane(Vector2 value) => new Vector3(value.x, value.y, 0f);
         private static void StopMotion(Rigidbody body)
