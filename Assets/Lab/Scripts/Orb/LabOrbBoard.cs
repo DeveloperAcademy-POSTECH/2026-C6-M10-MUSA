@@ -285,6 +285,7 @@ namespace C6Lab
             if (entries.TryGetValue(id, out var existing))
             {
                 existing.LocalOwner = localOwner;
+                existing.View.FuseTotalSeconds = config.ItemLifetimeSeconds;
                 if (existing.View.Kind != kind || existing.View.Element != element)
                 {
                     existing.View.Configure(id, kind, RadiusFor(kind), element);
@@ -309,6 +310,7 @@ namespace C6Lab
             var view = gameObject.AddComponent<LabOrbView>();
             view.Configure(id, kind, RadiusFor(kind), element);
             view.ConfigureAppearance(config.OrbAppearance);
+            view.FuseTotalSeconds = config.ItemLifetimeSeconds;
             view.SetItemState(lockSwipes, relayStage, fuseSeconds);
             if (justUnlocked && unlockEffectIds.Add(id)) view.PlayUnlockEffect();
             SetLayerRecursively(gameObject.transform, gameObject.layer);

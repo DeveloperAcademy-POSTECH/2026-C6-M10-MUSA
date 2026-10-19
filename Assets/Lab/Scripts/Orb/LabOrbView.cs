@@ -61,6 +61,8 @@ namespace C6Lab
         public bool BombArtVisible => itemMarker != null && itemMarker.BombArtVisible;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
+        /// <summary>How long a bomb's whole fuse is (the item lifetime), so its rope burns at the right pace.</summary>
+        public float FuseTotalSeconds { get; set; } = 15f;
         /// <summary>A gourd bomb still falling or bouncing.</summary>
         public bool IsDropping { get; private set; }
         public Rigidbody Body { get; private set; }
@@ -498,23 +500,19 @@ namespace C6Lab
                 return;
             }
             if (itemMarker == null) itemMarker = LabOrbItemMarker.Create(transform);
-            // A bomb has no lock to count; it shows the whole seconds left on its fuse instead.
+            // A bomb shows the unlock handoffs left; its burning rope shows the time left (#212).
             if (HasBombArt)
-                itemMarker.ShowBomb(appearance, FuseText(), visualRadius, visual);
+                itemMarker.ShowBomb(appearance, lockSwipes > 0 ? lockSwipes.ToString() : null, visualRadius, visual);
             else
                 itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), visualRadius, visual);
             itemMarker.SetLocked(lockSwipes > 0, appearance);
-            itemMarker.SetFuse(kind == LabOrbKind.Bomb ? fuseSeconds : -1f, appearance);
+            itemMarker.SetFuse(kind == LabOrbKind.Bomb ? fuseSeconds : -1f, FuseTotalSeconds, appearance);
         }
 
         private bool HasBombArt => kind == LabOrbKind.Bomb && appearance != null && appearance.BombArt != null;
 
-        private string FuseText() =>
-            kind == LabOrbKind.Bomb && fuseSeconds >= 0f ? Mathf.CeilToInt(fuseSeconds).ToString() : null;
-
         private string BadgeText()
         {
-            if (kind == LabOrbKind.Bomb) return FuseText();
             if (lockSwipes > 0) return lockSwipes.ToString();
             if (kind != LabOrbKind.Relay || relayStage <= 0) return null;
             return relayStage >= 3 ? "MAX" : relayStage == 2 ? "×2" : "×1";

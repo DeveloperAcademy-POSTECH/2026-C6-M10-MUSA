@@ -7,9 +7,12 @@ namespace C6Lab
     /// Item presentation on the orb root: an icon on a disc, a padlock over the dimmed icon while
     /// the item is locked and a badge (remaining unlock handoffs, or a relay orb's x1/x2/MAX stage),
     /// all facing the front-on board camera. A bomb with cartoon art shows that art instead, with
-    /// the seconds left on its fuse in red on the ball and a spark flickering on the fuse while it
-    /// burns. As the bomb moves it rolls: the ball and its highlight stay put like a lit sphere
-    /// while the cap and fuse tilt and swing around it in 3D, never turning away behind it. On unlock the padlock rises and fades while the icon sharpens, then a gold
+    /// its unlock handoffs left in red on the ball. Its time left is the fuse: a rope burning down
+    /// toward the cap over the fuse less its last warning seconds, a spark flickering where it burns,
+    /// then the bomb flashing red. Once unlocked the spark goes out in a puff of smoke and a rainbow
+    /// ring circles the ball to show it can be thrown (#212). As the bomb moves it rolls: the ball
+    /// and its highlight stay put like a lit sphere while the cap and rope tilt and swing around it
+    /// in 3D, never turning away behind it. On unlock the padlock rises and fades while the icon sharpens, then a gold
     /// ring shrinks onto the orb and the orb glows once. It follows the Visual mount's rise
     /// animation but not its rolling rotation, and owns no collider.
     /// </summary>
@@ -19,18 +22,44 @@ namespace C6Lab
         private const int BadgeFontSize = 64;
         private static readonly Color DiscColor = new Color(.97f, .97f, .97f);
         private static readonly Color BadgeColor = new Color(.12f, .12f, .14f, .95f);
-        private static readonly Color TimeOutlineColor = Color.white;
-        private static readonly Color SparkColor = new Color(1f, .93f, .45f);
+        private static readonly Color CountOutlineColor = Color.white;
+        // The spark is the original picture's two-tone star: orange with a yellow heart.
+        private static readonly Color SparkColor = new Color(1f, .34f, .15f);
+        private static readonly Color SparkHeartColor = new Color(1f, .8f, .15f);
         private static readonly Color SparkDotColor = new Color(1f, .62f, .15f);
-        // The white outline around the bomb's red seconds, in orb radii, drawn by offset copies.
-        private const float TimeOutline = .06f;
+        private static readonly Color SmokeColor = new Color(.55f, .52f, .5f);
+        // The white outline around the bomb's red count, in orb radii, drawn by offset copies.
+        private const float CountOutline = .06f;
         private static readonly Vector2[] OutlineDirections =
         {
             new Vector2(1f, 1f), new Vector2(-1f, 1f), new Vector2(1f, -1f), new Vector2(-1f, -1f)
         };
         private const int SparkDotCount = 3;
-        // Sorting over the bomb's ball (order 0): the cap and fuse, then the spark.
-        private const int FuseOrder = 1, SparkOrder = 6;
+        private const int SmokePuffs = 3;
+        private const float SmokeSeconds = .9f;
+        // Sorting around the bomb's ball (order 0): the rainbow ring behind it, the rope and then
+        // the cap over it (the rope starts under the cap), then the spark.
+        private const int RainbowOrder = -1, RopeOrder = 1, FuseOrder = 2, SparkOrder = 6;
+        // The rope's course in the images' pose, from inside the cap outward, in ball image
+        // half-widths: the original picture's S-shaped rope carried on in the same waves, long
+        // enough for three times its length (#212). The appearance sets how much of it is used.
+        private static readonly Vector2[] RopePath =
+        {
+            new Vector2(.715f, .947f), new Vector2(.87f, 1.024f), new Vector2(1.014f, .918f),
+            new Vector2(1.159f, .831f), new Vector2(1.314f, .85f), new Vector2(1.449f, .937f),
+            new Vector2(1.575f, .995f), new Vector2(1.71f, .96f), new Vector2(1.84f, .88f),
+            new Vector2(1.98f, .86f), new Vector2(2.12f, .92f), new Vector2(2.25f, .99f),
+            new Vector2(2.39f, .97f)
+        };
+        // How long the rope in the original picture is, in ball image half-widths.
+        private const float PictureRopeLength = .6f;
+        // Enough dots for the longest rope to read as one line.
+        private const int RopeDotCount = 60;
+        private const float RainbowTurnDegrees = 120f;
+        private static Vector2[] ropeCourse;
+        private static float[] ropeCourseLengths;
+        private static Vector2[] ropeSamples;
+        private static float ropeSamplesLength = -1f;
         // Seen end-on, a cap pointing at the camera would flatten to a line; keep some length as depth would.
         private const float MinReach = .3f;
         // A jump (a press snapping the bomb under the finger, or a snapshot) turns it at most this much in one frame.
@@ -41,6 +70,7 @@ namespace C6Lab
         private static Sprite ringSprite;
         private static Sprite glowSprite;
         private static Sprite sparkSprite;
+        private static Sprite rainbowSprite;
         private static LabOrbAppearance defaultLook;
 
         private SpriteRenderer disc;
@@ -56,14 +86,24 @@ namespace C6Lab
         private SpriteRenderer fuseArt;
         private Quaternion bombTurn = Quaternion.identity;
         private float capAngle;
-        private Vector2 fuseTip;
         private float ballRadius;
+        private float ropeLength = 2f * PictureRopeLength;
         private Vector3 lastRootPosition;
         private bool hasLastRootPosition;
-        private TextMesh bombTime;
-        private readonly TextMesh[] bombTimeOutline = new TextMesh[4];
+        private TextMesh bombCount;
+        private readonly TextMesh[] bombCountOutline = new TextMesh[4];
         private SpriteRenderer spark;
+        private SpriteRenderer sparkHeart;
         private readonly SpriteRenderer[] sparkDots = new SpriteRenderer[SparkDotCount];
+        private readonly SpriteRenderer[] ropeDots = new SpriteRenderer[RopeDotCount];
+        private readonly SpriteRenderer[] smokePuffs = new SpriteRenderer[SmokePuffs];
+        private SpriteRenderer rainbow;
+        private float ropeShare = 1f;
+        private float fuseTotal = 15f;
+        private bool burning;
+        private float smokeElapsed = -1f;
+        private Vector2 smokeAt;
+        private float rainbowTime;
         private bool bombMode;
         private Vector2 sparkOffset;
         private float sparkTime;
@@ -93,10 +133,26 @@ namespace C6Lab
         public bool BombArtVisible => bombArt != null && bombArt.gameObject.activeSelf;
         /// <summary>The bomb art's current tint; it turns red while the fuse warning flashes.</summary>
         public Color BombArtColor => bombArt != null ? bombArt.color : Color.clear;
-        public bool BombTimeVisible => bombTime != null && bombTime.gameObject.activeSelf;
-        /// <summary>The seconds left on the fuse, written on the bomb art; empty when it has no fuse.</summary>
-        public string BombTimeText => BombTimeVisible ? bombTime.text : string.Empty;
-        public Color BombTimeColor => bombTime != null ? bombTime.color : Color.clear;
+        public bool BombCountVisible => bombCount != null && bombCount.gameObject.activeSelf;
+        /// <summary>The unlock handoffs left, written on the bomb art; empty once it is open.</summary>
+        public string BombCountText => BombCountVisible ? bombCount.text : string.Empty;
+        public Color BombCountColor => bombCount != null ? bombCount.color : Color.clear;
+        /// <summary>How much of the fuse rope is left, 1 unburnt to 0 burnt down to the cap.</summary>
+        public float RopeShare => ropeShare;
+        /// <summary>How many of the rope's dots are drawn.</summary>
+        public int RopeDotsShown
+        {
+            get
+            {
+                int shown = 0;
+                foreach (SpriteRenderer dot in ropeDots) if (dot != null && dot.gameObject.activeSelf) shown++;
+                return shown;
+            }
+        }
+        /// <summary>The rainbow ring that marks an unlocked bomb as throwable.</summary>
+        public bool RainbowVisible => rainbow != null && rainbow.gameObject.activeSelf;
+        /// <summary>The puff of smoke where the spark went out when the bomb unlocked.</summary>
+        public bool SmokeVisible => smokeElapsed >= 0f;
         /// <summary>The spark flickering on the bomb art's fuse while a locked bomb burns.</summary>
         public bool SparkVisible => spark != null && spark.gameObject.activeSelf;
         public bool FuseArtVisible => fuseArt != null && fuseArt.gameObject.activeInHierarchy;
@@ -105,7 +161,7 @@ namespace C6Lab
         /// <summary>Where the rolled cap points; it never turns away from the camera (z stays at or below 0).</summary>
         public Vector3 CapDirection { get; private set; }
         public int FuseSortingOrder => fuseArt != null ? fuseArt.sortingOrder : 0;
-        /// <summary>The fuse tip, where the spark burns, from the ball centre.</summary>
+        /// <summary>Where the rope burns (its end), from the ball centre: the spark sits here.</summary>
         public Vector2 FuseTipPosition { get; private set; }
 
         /// <summary>Sets how the bomb has rolled, for example a random tumble when it lands.</summary>
@@ -160,9 +216,9 @@ namespace C6Lab
 
         /// <summary>
         /// Shows the appearance's cartoon bomb in place of the disc, icon, padlock and badge, with
-        /// timeText (the seconds left on its fuse) in red on its ball; null or empty hides it.
+        /// countText (the unlock handoffs left) in red on its ball; null or empty hides it.
         /// </summary>
-        public void ShowBomb(LabOrbAppearance look, string timeText, float orbRadius, Transform followMount)
+        public void ShowBomb(LabOrbAppearance look, string countText, float orbRadius, Transform followMount)
         {
             EnsureParts();
             look = LookOrDefault(look);
@@ -180,7 +236,15 @@ namespace C6Lab
             bombArt.transform.localScale = Vector3.one * bodyWidth;
             bombArt.transform.localPosition = Vector3.zero;
             capAngle = look.BombCapAngle;
-            fuseTip = look.BombFuseTip * ballRadius;
+            ropeLength = look.BombRopeLength * PictureRopeLength;
+            float ropeWidth = look.BombRopeThickness * ballRadius;
+            foreach (SpriteRenderer dot in ropeDots)
+            {
+                dot.transform.localScale = Vector3.one * ropeWidth;
+                dot.color = look.BombRopeColor;
+            }
+            // Just outside the ball, so its inner edge hides behind it as a glowing rim.
+            rainbow.transform.localScale = Vector3.one * (2.5f * ballRadius);
             bool hasFuse = look.BombFuseArt != null;
             fuseArt.gameObject.SetActive(hasFuse);
             if (hasFuse)
@@ -192,21 +256,21 @@ namespace C6Lab
             }
             UpdateBombPose();
 
-            bool counting = !string.IsNullOrEmpty(timeText);
-            if (bombTime == null) return;
-            float size = look.BombTimeSize * radius / (BadgeFontSize * .1f);
-            bombTime.gameObject.SetActive(counting);
-            bombTime.text = counting ? timeText : string.Empty;
-            bombTime.color = look.BombTimeColor;
-            bombTime.characterSize = size;
-            bombTime.transform.localPosition = new Vector3(0f, 0f, -.02f);
-            for (int i = 0; i < bombTimeOutline.Length; i++)
+            bool counting = !string.IsNullOrEmpty(countText);
+            if (bombCount == null) return;
+            float size = look.BombCountSize * radius / (BadgeFontSize * .1f);
+            bombCount.gameObject.SetActive(counting);
+            bombCount.text = counting ? countText : string.Empty;
+            bombCount.color = look.BombCountColor;
+            bombCount.characterSize = size;
+            bombCount.transform.localPosition = new Vector3(0f, 0f, -.02f);
+            for (int i = 0; i < bombCountOutline.Length; i++)
             {
-                TextMesh outline = bombTimeOutline[i];
+                TextMesh outline = bombCountOutline[i];
                 outline.gameObject.SetActive(counting);
-                outline.text = bombTime.text;
+                outline.text = bombCount.text;
                 outline.characterSize = size;
-                Vector2 offset = OutlineDirections[i] * (TimeOutline * radius);
+                Vector2 offset = OutlineDirections[i] * (CountOutline * radius);
                 outline.transform.localPosition = new Vector3(offset.x, offset.y, -.015f);
             }
         }
@@ -227,9 +291,12 @@ namespace C6Lab
             }
             else
             {
-                if (bombTime != null) bombTime.gameObject.SetActive(false);
-                foreach (TextMesh outline in bombTimeOutline)
+                if (bombCount != null) bombCount.gameObject.SetActive(false);
+                foreach (TextMesh outline in bombCountOutline)
                     if (outline != null) outline.gameObject.SetActive(false);
+                foreach (SpriteRenderer dot in ropeDots) dot.gameObject.SetActive(false);
+                rainbow.gameObject.SetActive(false);
+                StopSmoke();
             }
             if (!on) SetSpark(false);
         }
@@ -246,8 +313,9 @@ namespace C6Lab
             StopUnlock();
             look = LookOrDefault(look);
             Texture2D lockTexture = look.LockIcon;
-            // The bomb art never shows a padlock.
+            // The bomb art never shows a padlock; once open, a rainbow ring says it can be thrown.
             bool covered = locked && lockTexture != null && !bombMode;
+            rainbow.gameObject.SetActive(bombMode && !locked);
             padlock.gameObject.SetActive(covered);
             if (covered)
             {
@@ -267,6 +335,8 @@ namespace C6Lab
         public void PlayUnlock(LabOrbAppearance look)
         {
             SetLocked(true, look);
+            // The effect starts from the locked look, but an unlocked bomb keeps its rainbow throughout.
+            rainbow.gameObject.SetActive(bombMode);
             unlockLook = LookOrDefault(look);
             unlockFromAlpha = icon.color.a;
             unlockElapsed = 0f;
@@ -274,16 +344,28 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// A locked bomb's seconds left on its fuse (negative when it has none). The bomb art's
-        /// spark flickers while it burns. In its last seconds the bomb flashes red, faster and
-        /// faster as the fuse runs out. Call after SetLocked.
+        /// A locked bomb's seconds left on its fuse of totalSeconds (negative when it has none).
+        /// The bomb art's rope burns down toward the cap over the fuse less its warning seconds,
+        /// with a spark flickering where it burns; then the bomb flashes red, faster and faster as
+        /// the fuse runs out. A fuse that stops burning, because the bomb unlocked, goes out in a
+        /// puff of smoke and leaves the rope as long as it was. Call after SetLocked.
         /// </summary>
-        public void SetFuse(float secondsLeft, LabOrbAppearance look)
+        public void SetFuse(float secondsLeft, float totalSeconds, LabOrbAppearance look)
         {
             EnsureParts();
             fuseLeft = secondsLeft;
             fuseLook = LookOrDefault(look);
-            SetSpark(bombMode && fuseLeft >= 0f);
+            if (totalSeconds > 0f) fuseTotal = totalSeconds;
+            bool wasBurning = burning;
+            burning = bombMode && fuseLeft >= 0f;
+            if (burning)
+            {
+                float warning = fuseLook.BombWarningSeconds;
+                ropeShare = Mathf.Clamp01((fuseLeft - warning) / Mathf.Max(.01f, fuseTotal - warning));
+            }
+            else if (wasBurning && bombMode) StartSmoke();
+            SetSpark(burning);
+            if (bombMode) UpdateBombPose();
             AnimateWarning(0f);
         }
 
@@ -297,6 +379,8 @@ namespace C6Lab
             }
             AnimateWarning(Time.deltaTime);
             AnimateSpark(Time.deltaTime);
+            AnimateSmoke(Time.deltaTime);
+            AnimateRainbow(Time.deltaTime);
             if (!UnlockPlaying) return;
             unlockElapsed += Time.deltaTime;
             AnimateUnlock();
@@ -402,19 +486,138 @@ namespace C6Lab
             fusePivot.localScale = new Vector3(reach, 1f, 1f);
             fuseArt.sortingOrder = FuseOrder;
 
-            // The spark rides the fuse tip through the same aim and shortening.
+            // The rope and its spark ride the cap through the same aim and shortening. The rope is
+            // drawn up to where it has burnt; the spark sits at that end.
             var aim = new Vector2(Mathf.Cos(facing), Mathf.Sin(facing));
             var side = new Vector2(-aim.y, aim.x);
             var tipSide = new Vector2(-along.y, along.x);
-            FuseTipPosition = aim * (Vector2.Dot(fuseTip, along) * reach) + side * Vector2.Dot(fuseTip, tipSide);
+            Vector2 Place(Vector2 authoredPoint)
+            {
+                Vector2 point = authoredPoint * ballRadius;
+                return aim * (Vector2.Dot(point, along) * reach) + side * Vector2.Dot(point, tipSide);
+            }
+            Vector2[] samples = RopeSamples(ropeLength);
+            for (int i = 0; i < RopeDotCount; i++)
+            {
+                float share = i / (float)(RopeDotCount - 1);
+                SpriteRenderer dot = ropeDots[i];
+                bool shown = share <= ropeShare + 1e-4f;
+                dot.gameObject.SetActive(shown);
+                if (!shown) continue;
+                Vector2 at = Place(samples[i]);
+                dot.transform.localPosition = new Vector3(at.x, at.y, -.004f);
+            }
+            float end = ropeShare * (RopeDotCount - 1);
+            int below = Mathf.Min(RopeDotCount - 2, Mathf.FloorToInt(end));
+            FuseTipPosition = Place(Vector2.Lerp(samples[below], samples[below + 1], end - below));
             sparkOffset = FuseTipPosition;
         }
 
-        private void SetSpark(bool burning)
+        /// <summary>
+        /// The first length (ball image half-widths) of RopePath, smoothed into a curve through its
+        /// points and sampled into RopeDotCount points an even distance apart, so the dots read as one
+        /// rope and burn down at a steady pace.
+        /// </summary>
+        private static Vector2[] RopeSamples(float length)
         {
-            spark.gameObject.SetActive(burning);
-            foreach (SpriteRenderer dot in sparkDots) dot.gameObject.SetActive(burning);
-            if (burning) AnimateSpark(0f);
+            if (ropeSamples != null && Mathf.Approximately(ropeSamplesLength, length)) return ropeSamples;
+            RopeCourse(out Vector2[] points, out float[] lengths);
+            int dense = points.Length - 1;
+            float wanted = Mathf.Clamp(length, .01f, lengths[dense]);
+            var samples = new Vector2[RopeDotCount];
+            int at = 0;
+            for (int i = 0; i < RopeDotCount; i++)
+            {
+                float target = wanted * i / (RopeDotCount - 1);
+                while (at < dense - 1 && lengths[at + 1] < target) at++;
+                float segment = Mathf.Max(1e-6f, lengths[at + 1] - lengths[at]);
+                samples[i] = Vector2.Lerp(points[at], points[at + 1], Mathf.Clamp01((target - lengths[at]) / segment));
+            }
+            ropeSamples = samples;
+            ropeSamplesLength = length;
+            return ropeSamples;
+        }
+
+        /// <summary>The whole of RopePath as a dense Catmull-Rom curve with its running length.</summary>
+        private static void RopeCourse(out Vector2[] points, out float[] lengths)
+        {
+            if (ropeCourse != null)
+            {
+                points = ropeCourse;
+                lengths = ropeCourseLengths;
+                return;
+            }
+            const int dense = 480;
+            points = new Vector2[dense + 1];
+            lengths = new float[dense + 1];
+            int spans = RopePath.Length - 1;
+            for (int i = 0; i <= dense; i++)
+            {
+                float t = i / (float)dense * spans;
+                int span = Mathf.Min(spans - 1, Mathf.FloorToInt(t));
+                float u = t - span;
+                Vector2 p0 = RopePath[Mathf.Max(0, span - 1)], p1 = RopePath[span];
+                Vector2 p2 = RopePath[span + 1], p3 = RopePath[Mathf.Min(spans, span + 2)];
+                // Catmull-Rom through p1..p2.
+                points[i] = .5f * (2f * p1 + (p2 - p0) * u + (2f * p0 - 5f * p1 + 4f * p2 - p3) * u * u
+                    + (3f * p1 - p0 - 3f * p2 + p3) * u * u * u);
+                if (i > 0) lengths[i] = lengths[i - 1] + Vector2.Distance(points[i - 1], points[i]);
+            }
+            ropeCourse = points;
+            ropeCourseLengths = lengths;
+        }
+
+        private void SetSpark(bool lit)
+        {
+            spark.gameObject.SetActive(lit);
+            sparkHeart.gameObject.SetActive(lit);
+            foreach (SpriteRenderer dot in sparkDots) dot.gameObject.SetActive(lit);
+            if (lit) AnimateSpark(0f);
+        }
+
+        private void StartSmoke()
+        {
+            smokeElapsed = 0f;
+            smokeAt = FuseTipPosition;
+            AnimateSmoke(0f);
+        }
+
+        private void StopSmoke()
+        {
+            smokeElapsed = -1f;
+            foreach (SpriteRenderer puff in smokePuffs) puff.gameObject.SetActive(false);
+        }
+
+        /// <summary>A few grey puffs rise, swell and fade where the spark went out.</summary>
+        private void AnimateSmoke(float step)
+        {
+            if (smokeElapsed < 0f) return;
+            smokeElapsed += step;
+            float t = smokeElapsed / SmokeSeconds;
+            if (t >= 1f)
+            {
+                StopSmoke();
+                return;
+            }
+            for (int i = 0; i < SmokePuffs; i++)
+            {
+                SpriteRenderer puff = smokePuffs[i];
+                float own = Mathf.Clamp01(t * 1.3f - i * .15f);
+                puff.gameObject.SetActive(own > 0f && own < 1f);
+                float drift = (i - 1) * .25f * ballRadius * own;
+                puff.transform.localPosition = new Vector3(smokeAt.x + drift, smokeAt.y + .9f * ballRadius * own, -.011f);
+                puff.transform.localScale = Vector3.one * (ballRadius * (.25f + .45f * own));
+                puff.color = new Color(SmokeColor.r, SmokeColor.g, SmokeColor.b, .65f * (1f - own));
+            }
+        }
+
+        /// <summary>The unlocked bomb's rainbow ring turns slowly and breathes.</summary>
+        private void AnimateRainbow(float step)
+        {
+            if (!RainbowVisible) return;
+            rainbowTime += step;
+            rainbow.transform.localRotation = Quaternion.Euler(0f, 0f, -rainbowTime * RainbowTurnDegrees);
+            rainbow.color = new Color(1f, 1f, 1f, .8f + .2f * Mathf.Sin(rainbowTime * Mathf.PI * 2f));
         }
 
         /// <summary>
@@ -426,10 +629,18 @@ namespace C6Lab
             if (!SparkVisible) return;
             sparkTime += step;
             float flicker = Mathf.PerlinNoise(sparkTime * 14f, .37f);
+            float turn = Mathf.PerlinNoise(.91f, sparkTime * 6f) * 180f;
+            // The picture's star at about 60%, so it marks where the rope burns without hiding how
+            // much is left; it swells and shrinks as it burns.
+            float size = (ballRadius > 0f ? ballRadius : radius) * Mathf.Lerp(.48f, .62f, flicker);
             spark.transform.localPosition = new Vector3(sparkOffset.x, sparkOffset.y, -.01f);
-            spark.transform.localScale = Vector3.one * (radius * Mathf.Lerp(.45f, .9f, flicker));
-            spark.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.PerlinNoise(.91f, sparkTime * 6f) * 180f);
-            spark.color = new Color(SparkColor.r, SparkColor.g, SparkColor.b, Mathf.Lerp(.65f, 1f, flicker));
+            spark.transform.localScale = Vector3.one * size;
+            spark.transform.localRotation = Quaternion.Euler(0f, 0f, turn);
+            spark.color = new Color(SparkColor.r, SparkColor.g, SparkColor.b, Mathf.Lerp(.75f, 1f, flicker));
+            sparkHeart.transform.localPosition = new Vector3(sparkOffset.x, sparkOffset.y, -.011f);
+            sparkHeart.transform.localScale = Vector3.one * (.55f * size);
+            sparkHeart.transform.localRotation = Quaternion.Euler(0f, 0f, -turn * .5f);
+            sparkHeart.color = SparkHeartColor;
             for (int i = 0; i < SparkDotCount; i++)
             {
                 float cycle = sparkTime * 4f + i / (float)SparkDotCount;
@@ -536,19 +747,32 @@ namespace C6Lab
             fuseArt = CreateSprite("Bomb Fuse Art", null, Color.white, FuseOrder);
             fuseArt.transform.SetParent(fusePivot, false);
             fusePivot.gameObject.SetActive(false);
+            for (int i = 0; i < RopeDotCount; i++)
+            {
+                ropeDots[i] = CreateSprite("Fuse Rope", Disc(), Color.white, RopeOrder);
+                ropeDots[i].gameObject.SetActive(false);
+            }
+            rainbow = CreateSprite("Unlocked Rainbow Ring", RainbowRing(), Color.white, RainbowOrder);
+            rainbow.gameObject.SetActive(false);
             spark = CreateSprite("Fuse Spark", Spark(), SparkColor, SparkOrder);
+            sparkHeart = CreateSprite("Fuse Spark Heart", Spark(), SparkHeartColor, SparkOrder + 1);
             for (int i = 0; i < SparkDotCount; i++) sparkDots[i] = CreateSprite("Fuse Spark Dot", Glow(), SparkDotColor, SparkOrder);
+            for (int i = 0; i < SmokePuffs; i++)
+            {
+                smokePuffs[i] = CreateSprite("Fuse Smoke", Glow(), SmokeColor, SparkOrder);
+                smokePuffs[i].gameObject.SetActive(false);
+            }
             SetSpark(false);
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (font == null) return;
             badgeCount = CreateText("Lock Count", font, Color.white);
-            for (int i = 0; i < bombTimeOutline.Length; i++)
+            for (int i = 0; i < bombCountOutline.Length; i++)
             {
-                bombTimeOutline[i] = CreateText("Bomb Time Outline", font, TimeOutlineColor, 4, FontStyle.Bold);
-                bombTimeOutline[i].gameObject.SetActive(false);
+                bombCountOutline[i] = CreateText("Bomb Count Outline", font, CountOutlineColor, 4, FontStyle.Bold);
+                bombCountOutline[i].gameObject.SetActive(false);
             }
-            bombTime = CreateText("Bomb Time", font, Color.red, 5, FontStyle.Bold);
-            bombTime.gameObject.SetActive(false);
+            bombCount = CreateText("Bomb Count", font, Color.red, 5, FontStyle.Bold);
+            bombCount.gameObject.SetActive(false);
         }
 
         private TextMesh CreateText(string label, Font font, Color color, int order = 4,
@@ -651,12 +875,12 @@ namespace C6Lab
             return glowSprite;
         }
 
-        /// <summary>A small eight-pointed star for the burning fuse tip, one unit wide.</summary>
+        /// <summary>A jagged, hand-drawn star like the spark in the bomb picture, one unit wide.</summary>
         private static Sprite Spark()
         {
             if (sparkSprite != null) return sparkSprite;
-            const int size = 64;
-            const int points = 8;
+            const int size = 96;
+            const int points = 9;
             var pixels = new Color32[size * size];
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
@@ -665,13 +889,43 @@ namespace C6Lab
                     float dy = (y + .5f) / size * 2f - 1f;
                     float distance = Mathf.Sqrt(dx * dx + dy * dy);
                     float turn = (Mathf.Atan2(dy, dx) / (Mathf.PI * 2f) + 1f) * points;
-                    float along = Mathf.Abs(turn - Mathf.Floor(turn) - .5f) * 2f; // 1 at a point, 0 between
-                    float edge = Mathf.Lerp(.35f, 1f, along * along);
+                    int point = (int)turn % points;
+                    float along = turn - Mathf.Floor(turn);
+                    // Each point leans a little and reaches its own length, like the drawn star.
+                    float peak = .5f + .3f * (Wobble(point + 17) - .5f);
+                    float tip = along < peak ? along / peak : (1f - along) / (1f - peak);
+                    float edge = Mathf.Lerp(.45f, .78f + .22f * Wobble(point + 5), tip);
                     float alpha = Mathf.Clamp01((edge - distance) * size * .5f);
                     pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
                 }
             sparkSprite = CreateGeneratedSprite("Lab fuse spark", size, pixels);
             return sparkSprite;
+        }
+
+        /// <summary>
+        /// A soft ring whose colour runs round the rainbow, one unit wide: brightest just outside a
+        /// ball of 0.8 of its half-width, so the part inside hides behind the bomb.
+        /// </summary>
+        private static Sprite RainbowRing()
+        {
+            if (rainbowSprite != null) return rainbowSprite;
+            const int size = 128;
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + .5f) / size * 2f - 1f;
+                    float dy = (y + .5f) / size * 2f - 1f;
+                    float distance = Mathf.Sqrt(dx * dx + dy * dy);
+                    float band = 1f - Mathf.Abs(distance - .86f) / .14f;
+                    float alpha = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(band));
+                    float hue = Mathf.Repeat(Mathf.Atan2(dy, dx) / (Mathf.PI * 2f), 1f);
+                    Color color = Color.HSVToRGB(hue, .75f, 1f);
+                    pixels[y * size + x] = new Color32((byte)(color.r * 255f), (byte)(color.g * 255f),
+                        (byte)(color.b * 255f), (byte)Mathf.RoundToInt(alpha * 255f));
+                }
+            rainbowSprite = CreateGeneratedSprite("Lab bomb rainbow ring", size, pixels);
+            return rainbowSprite;
         }
 
         private static Sprite Square()

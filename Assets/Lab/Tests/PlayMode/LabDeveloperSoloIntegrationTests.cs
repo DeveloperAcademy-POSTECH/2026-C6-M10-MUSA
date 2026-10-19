@@ -591,7 +591,7 @@ namespace C6Lab.Tests
                 Assert.That(board.IsDropping(bombId), Is.False, "It lands and becomes an ordinary bomb.");
                 LabOrbView view = board.GetComponentsInChildren<LabOrbView>().Single(candidate => candidate.OrbId == bombId);
                 Assert.That(view.BombArtVisible, Is.True, "It shows the cartoon bomb.");
-                Assert.That(view.ItemMarker.BombTimeText, Is.Not.Empty, "With the seconds left on its fuse.");
+                Assert.That(view.ItemMarker.BombCountText, Is.Not.Empty, "With its unlock handoffs left in red.");
             }
             finally
             {
