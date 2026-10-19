@@ -65,7 +65,7 @@ namespace C6Lab
         private float peakHeight;
         private float launchedAt;
         private bool launched;
-        // 박 색상 콤보 실패 페널티(#222)에서 공 크기를 줄이는 배율. 충돌 반지름·모양·꼬리에 함께 곱한다.
+        // 박 색상 콤보(#222)의 공 크기 배율: 실패 페널티면 1보다 작고 성공 보상이면 크다. 충돌 반지름/모양/꼬리에 함께 곱한다.
         private float radiusScale = 1f;
         private bool authoritative;
         private bool resolved;
@@ -84,11 +84,11 @@ namespace C6Lab
         private float ScaledRadius => (config != null ? config.ThrowRadius : .165f) * radiusScale;
 
         /// <summary>
-        /// 던지기 전에 공 크기 배율(0~1)을 정한다. 1이면 기존 크기다. Launch·LaunchVisual 전에 부른다.
+        /// 던지기 전에 공 크기 배율(0.01~3)을 정한다. 1이면 기존 크기다. Launch/LaunchVisual 전에 부른다.
         /// </summary>
         public void SetRadiusScale(float scale)
         {
-            radiusScale = float.IsNaN(scale) || float.IsInfinity(scale) ? 1f : Mathf.Clamp(scale, .01f, 1f);
+            radiusScale = float.IsNaN(scale) || float.IsInfinity(scale) ? 1f : Mathf.Clamp(scale, .01f, 3f);
             EnsureDefaultVisual(ScaledRadius);
         }
 

@@ -237,6 +237,90 @@ namespace C6Lab.Tests
                 "The scale applies to one hit only; the next ordinary hit paints the full amount.");
         }
 
+        [Test]
+        public void ASuccessGivesTheWholeTeamBigBallsAndEndsAPenalty()
+        {
+            LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 100f, throwerOnly: true);
+            var model = new LabModel();
+            model.Begin("combo-success", new ulong[] { 10, 20, 30 }, 0d, config);
+            LabSnapshot snapshot = model.Snapshot(1d);
+            Assert.That(snapshot.comboActive, Is.True);
+
+            HitEveryColorInOrder(model, 2d);
+            snapshot = model.Snapshot(2d);
+            Assert.That(snapshot.comboResult, Is.EqualTo(LabComboResult.Success));
+            Assert.That(snapshot.players.Select(player => player.comboRewardUntil), Is.All.EqualTo(12d),
+                "Everyone filled the combo together, so the whole team gets 10 seconds of big balls.");
+            foreach (ulong id in new ulong[] { 10, 20, 30 })
+                Assert.That(model.ThrowScaleFor(id, 5d), Is.EqualTo(1.5f));
+            Assert.That(model.ThrowScaleFor(10, 12d), Is.EqualTo(1f), "The reward ends on time.");
+        }
+
+        [Test]
+        public void ASuccessEndsARunningPenalty()
+        {
+            LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f);
+            float[] values = config.CaptureDeveloperValues();
+            values[152] = 3f; // a new combo every 3 seconds
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var model = new LabModel();
+            model.Begin("combo-latest", new ulong[] { 10, 20 }, 0d, config);
+
+            Assert.That(model.Snapshot(2.5d).comboResult, Is.EqualTo(LabComboResult.Timeout));
+            Assert.That(model.ThrowScaleFor(10, 3d), Is.EqualTo(.5f), "The first combo timed out: small balls until 12 s.");
+
+            Assert.That(model.Snapshot(4d).comboActive, Is.True, "The second combo appears at 4 seconds.");
+            HitEveryColorInOrder(model, 4d);
+            LabSnapshot snapshot = model.Snapshot(4d);
+            Assert.That(snapshot.comboResult, Is.EqualTo(LabComboResult.Success));
+            Assert.That(snapshot.players.Select(player => player.comboPenaltyUntil), Is.All.EqualTo(4d),
+                "The latest result wins: success ends the penalty right away.");
+            Assert.That(model.ThrowScaleFor(10, 5d), Is.EqualTo(1.5f));
+        }
+
+        [Test]
+        public void ARewardPaintHitCoversMore()
+        {
+            var settings = new LabPaintGrowthSettings
+            {
+                Resolution = 1, Pattern = LabPaintPattern.Legacy, Style = 1,
+                InitialPercent = 6.25f, RepeatPercent = 3.125f, GrowthPercentPerSecond = 100f,
+                Raggedness = 0f, ClusterCompactness = .85f, ClusterIrregularity = .25f
+            };
+            var full = new LabPaintSurface(settings, 43u);
+            var big = new LabPaintSurface(settings, 43u);
+            Assert.That(full.RegisterHit(Vector3.forward, Color.red, 1, 1), Is.True);
+            Assert.That(big.RegisterHit(Vector3.forward, Color.red, 1, 1, 1.5f), Is.True);
+            full.Advance(5d);
+            big.Advance(5d);
+            Assert.That(big.CoveredCount, Is.InRange(full.CoveredCount * 14 / 10, full.CoveredCount * 16 / 10),
+                "A 1.5x reward hit paints about one and a half times the area.");
+        }
+
+        /// <summary>진행 중인 콤보의 색을 차례로 만들어 맞힌다. 다른 색은 던지지 않고 남겨 둔다.</summary>
+        private static void HitEveryColorInOrder(LabModel model, double at)
+        {
+            var pool = new List<LabOrbState>();
+            var spare = new List<LabOrbState>();
+            int requests = (int)(at * 1000d);
+            for (int attempt = 0; attempt < 200 && model.Snapshot(at).comboActive; attempt++)
+            {
+                LabSnapshot snapshot = model.Snapshot(at);
+                LabOrbElement wanted = snapshot.comboColors[snapshot.comboProgress];
+                LabOrbState ready = spare.FirstOrDefault(orb => orb.element == wanted);
+                if (ready == null)
+                {
+                    LabOrbState made = Combine(model, 10, pool, ref requests, at);
+                    if (made.element != wanted) { spare.Add(made); continue; }
+                    ready = made;
+                }
+                spare.Remove(ready);
+                Assert.That(model.TryLaunch(10, ready.id, "success-launch-" + at + "-" + attempt, at, out _, out string reason),
+                    Is.True, reason);
+                Assert.That(model.ConfirmHit(ready.id, at), Is.True);
+            }
+        }
+
         private static LabOrbState Combine(LabModel model, ulong owner, List<LabOrbState> pool, ref int requests,
             double at = 2d)
         {
@@ -265,6 +349,8 @@ namespace C6Lab.Tests
             var config = ScriptableObject.CreateInstance<LabConfig>();
             created.Add(config);
             float[] values = config.CaptureDeveloperValues();
+            values[3] = 1000f; // plenty of stamina for the success tests
+            values[4] = 1000f;
             values[5] = 1f;    // cheap generation
             values[9] = 100f;  // room for leftover raw orbs
             values[74] = LabModel.MaximumParticipants;

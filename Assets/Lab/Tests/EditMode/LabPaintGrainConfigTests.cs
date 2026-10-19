@@ -44,7 +44,7 @@ namespace C6Lab.Tests
         [Test]
         public void FourVisualSettingsAppendDisabledByDefaultWithoutReplacingPreviousFields()
         {
-            Assert.That(baseline.Length, Is.EqualTo(157));
+            Assert.That(baseline.Length, Is.EqualTo(159));
             Assert.That(baseline.Skip(129).Take(4), Is.EqualTo(new[] { 0f, 1f, .3f, .18f }));
             Assert.That(config.PaintGrainEnabled, Is.False);
             Assert.That(LabConfig.DeveloperFields.Skip(129).Take(4).Select(field => field.Label), Is.EqualTo(new[]

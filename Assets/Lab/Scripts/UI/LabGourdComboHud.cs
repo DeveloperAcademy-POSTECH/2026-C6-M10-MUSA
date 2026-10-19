@@ -18,6 +18,7 @@ namespace C6Lab
         public const string WrongColorText = "WRONG COLOR";
         public const string TimeUpText = "TIME UP";
         public const string PenaltyPrefix = "SMALL BALL ";
+        public const string RewardPrefix = "BIG BALL ";
 
         private const int TextureSize = 96;
         private const float ResultSeconds = 1.6f;
@@ -73,7 +74,8 @@ namespace C6Lab
             bool battle = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused;
             bool anyCombo = snapshot != null && snapshot.comboCount > 0;
             double serverNow = battle ? EstimateServerNow(snapshot) : 0d;
-            double penalty = battle ? LocalPenaltyRemaining(snapshot, serverNow) : 0d;
+            bool reward = false;
+            double penalty = battle ? LocalEffectRemaining(snapshot, serverNow, out reward) : 0d;
             if (!battle || (!anyCombo && penalty <= 0d))
             {
                 if (layer != null) layer.gameObject.SetActive(false);
@@ -88,7 +90,7 @@ namespace C6Lab
             DetectChanges(snapshot);
             DrawCombo(snapshot, serverNow);
             DrawResult();
-            DrawPenalty(penalty);
+            DrawPenalty(penalty, reward);
         }
 
         /// <summary>스냅샷 사이에도 남은 시간이 매끄럽게 줄도록, 받은 뒤 흐른 실제 시간을 더한다.</summary>
@@ -104,12 +106,21 @@ namespace C6Lab
             return snapshot.serverTime + System.Math.Min(1d, realtime - seenAtRealtime);
         }
 
-        private double LocalPenaltyRemaining(LabSnapshot snapshot, double serverNow)
+        /// <summary>이 기기 플레이어의 페널티(우선) 또는 보상 남은 시간. reward는 보상이면 true.</summary>
+        private double LocalEffectRemaining(LabSnapshot snapshot, double serverNow, out bool reward)
         {
+            reward = false;
             if (snapshot.players == null || network == null) return 0d;
             ulong local = network.LocalPlayerId;
             foreach (LabPlayerState player in snapshot.players)
-                if (player != null && player.id == local) return System.Math.Max(0d, player.comboPenaltyUntil - serverNow);
+            {
+                if (player == null || player.id != local) continue;
+                double penalty = player.comboPenaltyUntil - serverNow;
+                if (penalty > 0d) return penalty;
+                double bonus = player.comboRewardUntil - serverNow;
+                reward = bonus > 0d;
+                return System.Math.Max(0d, bonus);
+            }
             return 0d;
         }
 
@@ -201,12 +212,13 @@ namespace C6Lab
                 clear ? 0f : 6f * Mathf.Sin(t * 30f) * (1f - Mathf.Clamp01(t / .5f)));
         }
 
-        private void DrawPenalty(double remaining)
+        private void DrawPenalty(double remaining, bool reward)
         {
             bool show = remaining > 0d;
             penaltyText.gameObject.SetActive(show);
             if (!show) return;
-            penaltyText.text = PenaltyPrefix + remaining.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "s";
+            penaltyText.color = reward ? ClearColor : FailColor;
+            penaltyText.text = (reward ? RewardPrefix : PenaltyPrefix) + remaining.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "s";
         }
 
         private void ResetRound()

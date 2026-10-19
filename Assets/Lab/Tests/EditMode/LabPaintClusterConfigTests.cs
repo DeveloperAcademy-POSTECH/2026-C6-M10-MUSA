@@ -28,7 +28,7 @@ namespace C6Lab.Tests
         [Test]
         public void TwoSlidersAppendToTheSchemaBesideRepeatGrowthWithPreservedDefaults()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(157));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(159));
             Assert.That(Protocol, Is.EqualTo(5643));
             Assert.That(LabConfig.DeveloperFields.Skip(143).Take(2).Select(field => field.Label), Is.EqualTo(new[]
             {
@@ -50,7 +50,7 @@ namespace C6Lab.Tests
             foreach (LabConfig source in new[] { config, authored })
             {
                 float[] values = source.CaptureDeveloperValues();
-                Assert.That(values.Length, Is.EqualTo(157));
+                Assert.That(values.Length, Is.EqualTo(159));
                 Assert.That(values.Skip(143).Take(2), Is.EqualTo(new[] { .85f, .25f }));
                 Assert.That(source.PaintRepeatPercent, Is.EqualTo(1.5f));
                 Assert.That(source.PaintGrowthPercentPerSecond, Is.EqualTo(6f));

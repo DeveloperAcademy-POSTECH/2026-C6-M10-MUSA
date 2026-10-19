@@ -55,7 +55,7 @@ namespace C6Lab
         public float wy;
         public float wz;
         public float spinImpulse;
-        /// <summary>던지는 공 크기 배율 (#222 콤보 페널티). 0(옛 패킷)이면 1로 본다.</summary>
+        /// <summary>던지는 공 크기 배율 (#222 콤보 페널티/보상). 0(옛 패킷)이면 1로 본다.</summary>
         public float sizeScale;
         public string reason;
         public ulong owner;
@@ -1955,7 +1955,7 @@ namespace C6Lab
                         LabOrbElement element = packet.element >= (int)LabOrbElement.None && packet.element <= (int)LabOrbElement.Earth
                             ? (LabOrbElement)packet.element : LabOrbElement.None;
                         LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element);
-                        if (packet.sizeScale > 0f && packet.sizeScale < 1f) visual.SetRadiusScale(packet.sizeScale);
+                        if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetMissSurface(battleFloor);
                         visual.LaunchVisual(velocity, config, target);
                     }

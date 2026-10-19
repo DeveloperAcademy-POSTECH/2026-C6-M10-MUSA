@@ -131,6 +131,11 @@ namespace C6Lab
         /// 칠 면적이 줄어든다. 페널티가 없으면 0 이하. 남은 시간 = 이 값 - 스냅샷 serverTime.
         /// </summary>
         public double comboPenaltyUntil;
+        /// <summary>
+        /// 박 색상 콤보 성공 보상(#222)이 끝나는 전투 시각. 이 시각 전까지 이 사람이 던지는 공과
+        /// 칠 면적이 커진다. 페널티와 보상은 마지막 결과 하나만 남는다(하나를 걸면 다른 하나는 끝난다).
+        /// </summary>
+        public double comboRewardUntil;
 
         public int ItemsUsed => relayUsed + secretBoxUsed + potionUsed + bombUsed;
 

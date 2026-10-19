@@ -357,7 +357,7 @@ namespace C6Lab
             if (current.kind == LabOrbKind.Relay) players[sender].relayUsed++;
             else if (current.kind == LabOrbKind.Bomb) players[sender].bombUsed++;
             float launchScale = ThrowScaleFor(sender, now);
-            if (launchScale < 1f) launchScales[current.id] = launchScale;
+            if (launchScale != 1f) launchScales[current.id] = launchScale;
             reason = "LAUNCHED";
             orb = current.Copy();
             return true;
@@ -435,11 +435,12 @@ namespace C6Lab
         public float LaunchScaleOf(string id) =>
             id != null && launchScales.TryGetValue(id, out float scale) ? scale : 1f;
 
-        /// <summary>박 색상 콤보 페널티(#222) 배율. 던지는 공 반지름과 칠 면적에 곱한다.</summary>
+        /// <summary>박 색상 콤보 페널티/보상(#222) 배율. 던지는 공 반지름과 칠 면적에 곱한다.</summary>
         public float ThrowScaleFor(ulong playerId, double now)
         {
             if (rules == null || !rules.ComboEnabled || !players.TryGetValue(playerId, out var player)) return 1f;
-            return player.comboPenaltyUntil > now ? rules.ComboPenaltySizeScale : 1f;
+            if (player.comboPenaltyUntil > now) return rules.ComboPenaltySizeScale;
+            return player.comboRewardUntil > now ? rules.ComboRewardSizeScale : 1f;
         }
 
         /// <summary>
@@ -480,13 +481,27 @@ namespace C6Lab
         {
             double at = combo.LastResultAt;
             if (nextComboAt < at) nextComboAt = at;
-            if (result == LabComboResult.Success || rules.ComboPenaltyDurationSeconds <= 0f) return;
+            if (result == LabComboResult.Success)
+            {
+                // 4칸을 다 같이 채웠으므로 보상은 언제나 팀 전체. 진행 중이던 페널티는 여기서 끝난다.
+                if (rules.ComboRewardDurationSeconds <= 0f) return;
+                double rewardUntil = at + rules.ComboRewardDurationSeconds;
+                foreach (var player in players.Values)
+                {
+                    player.comboRewardUntil = Math.Max(player.comboRewardUntil, rewardUntil);
+                    player.comboPenaltyUntil = Math.Min(player.comboPenaltyUntil, at);
+                }
+                return;
+            }
+            if (rules.ComboPenaltyDurationSeconds <= 0f) return;
             double until = at + rules.ComboPenaltyDurationSeconds;
             bool throwerOnly = rules.ComboPenaltyThrowerOnly && result == LabComboResult.WrongColor;
             foreach (var player in players.Values)
             {
                 if (throwerOnly && player.id != combo.LastFailedBy) continue;
                 player.comboPenaltyUntil = Math.Max(player.comboPenaltyUntil, until);
+                // 진행 중이던 보상은 페널티를 받는 사람에게서만 끝난다.
+                player.comboRewardUntil = Math.Min(player.comboRewardUntil, at);
             }
         }
 
@@ -945,7 +960,7 @@ namespace C6Lab
             public readonly Color[] PaintColors;
             public readonly bool ComboEnabled, ComboPenaltyThrowerOnly;
             public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
-                ComboPenaltyDurationSeconds, ComboPenaltySizeScale;
+                ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale;
 
             public Rules(LabConfig config)
             {
@@ -991,6 +1006,8 @@ namespace C6Lab
                 ComboPenaltyDurationSeconds = config.ComboPenaltyDurationSeconds;
                 ComboPenaltySizeScale = config.ComboPenaltySizeScale;
                 ComboPenaltyThrowerOnly = config.ComboPenaltyThrowerOnly;
+                ComboRewardDurationSeconds = config.ComboRewardDurationSeconds;
+                ComboRewardSizeScale = config.ComboRewardSizeScale;
             }
         }
     }

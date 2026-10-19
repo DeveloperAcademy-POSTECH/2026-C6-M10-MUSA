@@ -34,8 +34,8 @@ namespace C6Lab.Tests
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             testedNetwork = ui.network;
             Assert.That(testedNetwork, Is.Not.Null);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(157), "The saved DEV panel includes both appended cluster controls.");
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(157), "The saved DEV panel includes both appended cluster controls.");
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(159), "The saved DEV panel includes both appended cluster controls.");
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(159), "The saved DEV panel includes both appended cluster controls.");
             savedValues = ui.sourceConfig.CaptureDeveloperValues();
             savedJson = JsonUtility.ToJson(ui.sourceConfig);
         }
