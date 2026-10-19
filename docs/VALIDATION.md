@@ -1107,3 +1107,28 @@ PR #216의 첫 병합 시도 직전 #214가 main `929d9244`에 들어와 실제 
 | 독립 Host/Client·3인 앱·iOS·실기기·핫스팟·모바일 성능 | NOT_RUN | 이번 통합에서는 실행하지 않았다. 원래 PR의 수동 확인 표시와 오프라인 컴파일을 이번 합본의 플레이 검증 결과로 승계하지 않는다. 모든 참가자는 프로토콜5642인 새 빌드를 사용해야 한다. |
 
 원본 작업 폴더의 사용자 Scene·Target2 머터리얼2개·미추적 Scenes.meta는 별도 보존하며 이 통합 커밋에는 포함하지 않는다. 원시 XML·로그·빌드 산출물과 임시 검사 도구도 공개 Git에 넣지 않는다. 기존 main 명중점 정합성 확인 항목 #218은 이번 표현·폭탄 통합으로 해결됐다고 표시하지 않는다.
+
+## 폭발 패널티(노란 불·축소) — 2026-10-19, 이슈 #213
+
+기준은 Unity **6000.6.5f1**, main(`dc4917d3`, #212 PR #220·#219 PR #221 포함)에서 분기한 `feat/#213-blast-burn-shrink`다. PR 직전 원격 main도 `dc4917d3`로 같았다.
+
+- **누가 맞았나**: 폭탄이 터진 보유자 판이 충격파로 밀어낸 구슬(북·폭탄 제외)의 ID를 Host에 `blastHit`로 보낸다. 이 보고는 밀린 구슬이 옆으로 넘어가기 전에 같은 순서 보장 통로로 도착한다. Host는 3초 안에 그 사람에게 보낸 폭발인지, 그 사람 판의 날아가지 않은 구슬인지 확인해 `burnedAt`·`small`을 기록한다(폭발당 한 번). Host 자신의 폭발은 스냅샷을 만드는 도중이라 바로 기록하고 다음 정기 스냅샷에 싣는다.
+- **패널티**: 반지름 × `Blast Shrink Scale`(0.5)가 보이는 크기·충돌·잡기·투사체 몸체와 그림에 적용되고 사라질 때까지 유지된다. 작은 구슬의 색칠량은 × `Small Orb Paint Share`(0.5)이며(팀원 도색 코드 `RegisterHit`에 기본값 1의 비율 인자 추가), Crack 피해는 그대로다. 작은 구슬이 들어간 결합 구슬은 작고 남은 불을 이어받는다.
+- **표시**: 노란 불(뒤에서 솟는 불길 5개·윗가장자리 불꽃 3개·빛무리·불티)이 `Blast Burn Seconds`(4초) 동안 Host 시계 기준으로 타고, 넘겨받은 화면에서도 남은 만큼 보인다. 각 화면은 스스로 세고 Host 값과 0.3초 넘게 다를 때만 맞춘다. 일시정지 중에는 멈춘다. 작아질 때 그림은 0.3초 동안 줄어든다.
+- **설정·통신**: DEV 151~153번째(인덱스 150~152) 추가, 설정 150 → 153개. 구슬 상태에 `burnedAt`·`small`, 패킷에 `ids`(`blastHit`)·`small`(`projectile`)을 더해 통신 버전 `5642` → `5643`.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다 컴파일했다. 오류 0. 새 파일 `LabOrbBurn.cs`가 Runtime에 포함된 것도 확인했다. |
+| 불 모양 미리보기 | 확인 (Unity 밖) | C#과 같은 도형·색으로 Python 렌더링한 미리보기로 모양을 정했다. 실제 Unity 화면(URP 정사영 카메라·깊이 가림)이 아니다. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN | 이번 변경의 Test Runner 결과는 기록하지 않았다. |
+| 솔로 화면: 불·크기·축소 연출, 작은 구슬 잡기·던지기 | NOT_RUN | DEV `Bomb Chance`를 올려 폭탄 주변 구슬로 확인한다. 불이 구슬 색을 가리지 않는지, 여러 구슬이 동시에 탈 때 판이 어지럽지 않은지 본다. |
+| 3인 실행: 넘어간 구슬의 불·크기, 패널티 강도 | NOT_RUN | Mac 앱 3개에서 폭탄 때문에 넘어온 구슬을 바로 알아보는지, 절반 크기·색칠량이 적당한지 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 작아진 구슬을 손가락으로 잡는 난이도와 성능 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `ABlastBurnsAndShrinksOnlyTheOrbsItsHolderReportsAndOnlyOnce`, `AnOrbCombinedFromABlastShrunkHalfIsSmallAndBurnsOn`, `ABlastShrunkOrbPaintsOnlyItsShareOfWhatAWholeOnePaints`, `APaintShareOutsideZeroToOnePaintsNothingAndHalfPaintsHalf`
+- **EditMode** `LabDeveloperConfigTests`: `BlastPenaltyFieldsJoinTheItemOrbsGroupWithTheirDefaultsAndApply`; #212 무거운 폭탄 검사를 146~149번 4개만 읽도록 수정; DEV 개수·프로토콜을 고정한 팀원 검사들을 153개·5643으로 갱신
+- **EditMode** `LabSessionSettingsTests`: 스냅샷 JSON 왕복에 `burnedAt`·`small` 추가
+- **PlayMode** `LabOrbPhysicsTests`: `ABlastShrunkOrbIsSmallerToSeeGrabAndBumpAndStaysSmall`, `ABlastFlungOrbBurnsForTheHostsSecondsThenGoesOut`, `AnOrbABlastJustShrankSqueezesDownToItsNewSize`; 변경 `ABlastFlingsNearbyOrbsDrumsAndTheHeldOrbAwayWithoutRemovingAny`(보고 목록 확인)
+- **PlayMode** `LabThrowTests`: `AProjectileFromABlastShrunkOrbIsSmallerAndMissesWhereAWholeOneGrazes`

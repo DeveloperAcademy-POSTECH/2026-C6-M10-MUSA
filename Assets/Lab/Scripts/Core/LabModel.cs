@@ -83,6 +83,13 @@ namespace C6Lab
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
+        /// <summary>Blasts sent to their holders and not yet reported back, by bomb ID, with their Host time (#213).</summary>
+        private readonly Dictionary<string, KeyValuePair<ulong, double>> unreportedBlasts =
+            new Dictionary<string, KeyValuePair<ulong, double>>();
+        /// <summary>How long after a blast the Host still takes its holder's report of the orbs it flung.</summary>
+        public const double BlastReportWindowSeconds = 3d;
+        /// <summary>More orb IDs than any board holds; a longer report is dropped.</summary>
+        public const int MaximumBlastReportOrbs = 64;
         private readonly List<LabGourdBomb> gourdBombs = new List<LabGourdBomb>();
         private double nextGourdBombAt;
         private uint gourdBombCount;
@@ -146,6 +153,7 @@ namespace C6Lab
             Array.Clear(seats, 0, seats.Length);
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
             players.Clear(); orbs.Clear(); drums.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
+            unreportedBlasts.Clear();
             gourdBombs.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
@@ -265,7 +273,9 @@ namespace C6Lab
                 id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = element,
                 origin = LabOrbOrigin.Combined, originOwner = sender,
                 x = (first.x + second.x) * .5f, y = (first.y + second.y) * .5f,
-                vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false
+                vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false,
+                // One blast-shrunk half makes the whole orb small, and its fire burns on (#213).
+                small = first.small || second.small, burnedAt = Math.Max(first.burnedAt, second.burnedAt)
             };
             orbs.Add(orb.id, orb);
             players[sender].combinedTotal++;
@@ -394,7 +404,8 @@ namespace C6Lab
             if (paintRound)
             {
                 if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
-                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1)
+                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1,
+                        orb.small ? rules.SmallOrbPaintShare : 1f)
                     && paintSurface.IsComplete)
                 {
                     phase = LabPhase.Victory;
@@ -467,6 +478,37 @@ namespace C6Lab
             reason = "ITEM_USED";
             orb = current.Copy();
             return true;
+        }
+
+        /// <summary>
+        /// The holder's board reports which orbs a blast flung (#213). Only that board knows where its
+        /// orbs were, so it names them; the Host checks that it sent this blast to this player a moment
+        /// ago and that each orb is still theirs on the board, then sets it alight and shrinks it for the
+        /// rest of its life. Drums and bombs never burn. Each blast is taken once. Returns how many
+        /// orbs caught fire.
+        /// </summary>
+        public int MarkBlasted(ulong sender, string bombId, IReadOnlyList<string> orbIds, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing) return 0;
+            foreach (string stale in unreportedBlasts.Where(blast => now - blast.Value.Value > BlastReportWindowSeconds)
+                .Select(blast => blast.Key).ToArray())
+                unreportedBlasts.Remove(stale);
+            if (bombId == null || orbIds == null || orbIds.Count > MaximumBlastReportOrbs
+                || !unreportedBlasts.TryGetValue(bombId, out var blast) || blast.Key != sender)
+                return 0;
+            unreportedBlasts.Remove(bombId);
+            int burned = 0;
+            foreach (string id in orbIds.Distinct())
+            {
+                if (id == null || !orbs.TryGetValue(id, out var orb) || orb.owner != sender || orb.inFlight
+                    || orb.kind == LabOrbKind.Bomb || orb.kind.IsDrum())
+                    continue;
+                orb.burnedAt = now;
+                orb.small = true;
+                orb.revision = ++revision;
+                burned++;
+            }
+            return burned;
         }
 
         /// <summary>Locked bombs that blasted at their fuse since the last call, each reported once.</summary>
@@ -591,6 +633,7 @@ namespace C6Lab
                     // A bomb still locked at the end of its fuse blasts on its current holder's board. No
                     // orb is lost: the holder's screen pushes the ones around it away from where it last was.
                     bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
+                    unreportedBlasts[expired.id] = new KeyValuePair<ulong, double>(expired.owner, effectiveNow);
                 }
                 remaining = Math.Max(0d, deadline - effectiveNow);
                 if (paintCompleted)
@@ -838,6 +881,8 @@ namespace C6Lab
         {
             public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
             public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
+            /// <summary>How much a blast-shrunk orb paints, against a whole one (#213).</summary>
+            public readonly float SmallOrbPaintShare;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
             public readonly float SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, FloorDeceleration;
@@ -873,6 +918,7 @@ namespace C6Lab
                 RelayDoubleMultiplier = config.RelayDoubleMultiplier;
                 RelayMaxMultiplier = config.RelayMaxMultiplier;
                 BombMultiplier = config.BombMultiplier;
+                SmallOrbPaintShare = config.SmallOrbPaintShare;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
                 BattleDurationSeconds = config.BattleDurationSeconds;

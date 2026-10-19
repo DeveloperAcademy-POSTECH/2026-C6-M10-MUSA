@@ -37,6 +37,7 @@ namespace C6Lab
     [RequireComponent(typeof(Rigidbody), typeof(SphereCollider))]
     public sealed class LabProjectile : MonoBehaviour
     {
+        private float sizeScale = 1f;
         private const float DefaultTrailSeconds = .28f;
         private const float DefaultTrailWidthScale = .75f;
         private const float DefaultTrailMinVertexDistance = .035f;
@@ -74,6 +75,9 @@ namespace C6Lab
         public float GravityAcceleration => launchedGravity;
         public float LifetimeSeconds => launchedLifetime;
         public Vector3 LaunchPosition => launchPosition;
+        /// <summary>The share of the configured throw radius this projectile has; below 1 for a blast-shrunk orb (#213).</summary>
+        public float SizeScale => sizeScale;
+        private float ScaledRadius => (config != null ? config.ThrowRadius : .165f) * sizeScale;
         public Vector3 InitialVelocity => initialVelocity;
         public Transform VisualMount => visualMount;
         public TrailRenderer FlightTrail => flightTrail;
@@ -84,7 +88,7 @@ namespace C6Lab
         {
             if (appearance == value)
             {
-                EnsureDefaultVisual(config != null ? config.ThrowRadius : .165f);
+                EnsureDefaultVisual(ScaledRadius);
                 return;
             }
             appearance = value;
@@ -105,7 +109,7 @@ namespace C6Lab
 
         private void SetVisualPrefabInternal(GameObject prefab)
         {
-            float radius = config != null ? config.ThrowRadius : 0.165f;
+            float radius = ScaledRadius;
             EnsureDefaultVisual(radius);
             // A destroyed source prefab compares equal to null in Unity. Do not skip
             // removing an instantiated visual when callers clear that source.
@@ -136,8 +140,12 @@ namespace C6Lab
         }
 
         /// <summary>Creates the default Unity sphere presentation with an independent root collider.</summary>
+        /// <summary>
+        /// Builds a projectile. <paramref name="sizeScale"/> shrinks its body, art and trail for an orb a
+        /// bomb blast made small (#213), so it also has less reach on the gourd.
+        /// </summary>
         public static LabProjectile Create(Vector3 position, LabConfig config, Transform parent = null,
-            LabOrbElement element = LabOrbElement.None)
+            LabOrbElement element = LabOrbElement.None, float sizeScale = 1f)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
             GameObject root = new GameObject("Throw Projectile");
@@ -148,9 +156,10 @@ namespace C6Lab
             LabProjectile projectile = root.AddComponent<LabProjectile>();
             projectile.config = config;
             projectile.element = element;
+            projectile.sizeScale = sizeScale > 0f && sizeScale <= 1f ? sizeScale : 1f;
             projectile.ConfigureAppearance(config.OrbAppearance);
-            projectile.EnsureDefaultVisual(config.ThrowRadius);
-            projectile.EnsureFlightTrail(config.ThrowRadius);
+            projectile.EnsureDefaultVisual(projectile.ScaledRadius);
+            projectile.EnsureFlightTrail(projectile.ScaledRadius);
             return projectile;
         }
 
@@ -203,7 +212,7 @@ namespace C6Lab
             if (body == null || sphere == null)
                 throw new InvalidOperationException("Projectile needs Rigidbody and SphereCollider.");
 
-            sphere.radius = tuning.ThrowRadius;
+            sphere.radius = ScaledRadius;
             sphere.isTrigger = visualOnly;
             body.useGravity = false;
             body.isKinematic = false;
@@ -220,8 +229,8 @@ namespace C6Lab
             peakHeight = body.position.y;
             launchedAt = Time.time;
             launched = true;
-            EnsureDefaultVisual(tuning.ThrowRadius);
-            EnsureFlightTrail(tuning.ThrowRadius);
+            EnsureDefaultVisual(ScaledRadius);
+            EnsureFlightTrail(ScaledRadius);
             if (elementFlightTrail != null)
                 elementFlightTrail.Begin(transform, appearance.ElementTrailFor(element));
             if (flightTrail != null)

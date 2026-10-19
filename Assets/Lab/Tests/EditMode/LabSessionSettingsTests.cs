@@ -165,7 +165,8 @@ namespace C6Lab.Tests
                     kind = LabOrbKind.Combined, origin = LabOrbOrigin.Combined,
                     originOwner = (ulong)(i / 100 + 1), x = .12345f, y = .98765f,
                     vx = 3.14159f, vy = -2.71828f, createdAt = 12345.6789d,
-                    unlockedAt = i == 499 ? 12340.5d : -1d, revision = (ulong)(i + 1) };
+                    unlockedAt = i == 499 ? 12340.5d : -1d, revision = (ulong)(i + 1),
+                    burnedAt = i == 7 ? 12344.25d : -1d, small = i == 7 };
             var snapshot = new LabSnapshot { sessionId = Guid.NewGuid().ToString("N"),
                 round = 1, phase = LabPhase.Playing, hp = 100000, remaining = 180d,
                 targetYawDegrees = 475.25f, targetYawSpeedDegreesPerSecond = -320.5f,
@@ -190,6 +191,10 @@ namespace C6Lab.Tests
             Assert.That(restored.orbs[499].owner, Is.EqualTo(5ul));
             Assert.That(restored.orbs[499].unlockedAt, Is.EqualTo(12340.5d), "The unlock time reaches every screen.");
             Assert.That(restored.orbs[0].unlockedAt, Is.EqualTo(-1d));
+            Assert.That(restored.orbs[7].small, Is.True, "A blast-shrunk orb is small on every screen (#213).");
+            Assert.That(restored.orbs[7].burnedAt, Is.EqualTo(12344.25d), "Its fire burns for the same time everywhere.");
+            Assert.That(restored.orbs[0].small, Is.False);
+            Assert.That(restored.orbs[0].burnedAt, Is.EqualTo(-1d));
             Assert.That(restored.drums.Single().kind, Is.EqualTo(LabOrbKind.Drum), "Drums reach every screen.");
             Assert.That(restored.drums.Single().owner, Is.EqualTo(3ul));
             Assert.That(restored.drums.Single().arrival, Is.EqualTo(LabDrumArrival.Stop), "How a handed-on drum arrives reaches every screen.");

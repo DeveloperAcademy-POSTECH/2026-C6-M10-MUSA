@@ -668,12 +668,17 @@ namespace C6Lab.Tests
             var far = board.UpsertOrb("far", LabOrbKind.Yin, new Vector2(.95f, .95f));     // beyond the reach
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(held), 1d), Is.True);
 
-            int pushed = board.Blast("bomb", new Vector2(.5f, .5f));
+            var other = board.UpsertOrb("other-bomb", LabOrbKind.Bomb, new Vector2(.5f, .25f), lockSwipes: 2); // world (0, -1)
+            var flung = new System.Collections.Generic.List<string>();
+            int pushed = board.Blast("bomb", new Vector2(.5f, .5f), flung);
             float reach = config.BombBlastRadius * Width;
             float strength = config.BombBlastStrength * Width;
-            Assert.That(pushed, Is.EqualTo(3));
+            Assert.That(pushed, Is.EqualTo(4));
             Assert.That(board.TryGetMotion("bomb", out _, out _), Is.False, "The bomb itself is gone.");
-            Assert.That(board.Count, Is.EqualTo(4), "The blast removes no other orb.");
+            Assert.That(board.Count, Is.EqualTo(5), "The blast removes no other orb.");
+            Assert.That(flung, Is.EquivalentTo(new[] { "near", "held" }),
+                "It names the orbs it flung for the Host to set alight; not the drum, the other bomb or the far orb (#213).");
+            Assert.That(other.Body.linearVelocity.y, Is.LessThan(0f), "Another bomb is flung, but does not burn.");
             Assert.That(near.Body.linearVelocity.x, Is.EqualTo(strength * (1f - 1f / reach)).Within(.01f),
                 "An orb is flung straight away from the bomb, harder the closer it was.");
             Assert.That(near.Body.linearVelocity.y, Is.EqualTo(0f).Within(.001f));
@@ -682,6 +687,109 @@ namespace C6Lab.Tests
             Assert.That(held.Body.linearVelocity.y, Is.GreaterThan(0f));
             Assert.That(far.Body.linearVelocity.magnitude, Is.EqualTo(0f), "Beyond the blast radius nothing moves.");
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(far), 2d), Is.True, "No gesture is left stuck after the blast.");
+        }
+
+        [Test]
+        public void ABlastShrunkOrbIsSmallerToSeeGrabAndBumpAndStaysSmall()
+        {
+            Assert.That(config.BlastShrinkScale, Is.EqualTo(.5f));
+            float radius = config.OrbRadius;
+            var whole = board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.3f, .5f));
+            var small = board.UpsertOrb("small", LabOrbKind.Yin, new Vector2(.7f, .5f), small: true);
+            Assert.That(whole.HitSphere.radius, Is.EqualTo(radius).Within(1e-5f));
+            Assert.That(small.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f),
+                "A blast-shrunk orb bumps into others at half the radius (#213).");
+            Assert.That(small.Visual.Find("Default Sphere").localScale.x, Is.EqualTo(radius).Within(1e-4f),
+                "It looks half as big.");
+            Assert.That(whole.Visual.Find("Default Sphere").localScale.x, Is.EqualTo(2f * radius).Within(1e-4f));
+
+            // A touch just past a small orb's reach misses it, where the same touch grabs a whole one.
+            Vector2 offset = new Vector2(0f, .9f * radius);
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(small) + offset, 1d), Is.False, "It is harder to grab.");
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(whole) + offset, 2d), Is.True);
+            board.CancelDrag();
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(small), 3d), Is.True, "Right on it, it is still grabbed.");
+            board.CancelDrag();
+
+            board.UpsertOrb("small", LabOrbKind.Yin, new Vector2(.7f, .5f), small: true);
+            Assert.That(small.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f), "Repeated snapshots keep it small.");
+            board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.3f, .5f), small: true);
+            Assert.That(whole.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f),
+                "An orb the Host has just marked shrinks where it is.");
+            Assert.That(whole.Visual.Find("Default Sphere").localScale.x, Is.EqualTo(radius).Within(1e-4f));
+
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.5f, .2f), small: true);
+            Assert.That(drum.HitSphere.radius, Is.EqualTo(config.DrumRadius).Within(1e-5f), "A drum never shrinks.");
+
+            // The DEV form sets how small.
+            float[] values = config.CaptureDeveloperValues();
+            values[151] = .25f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var smaller = board.UpsertOrb("smaller", LabOrbKind.Yang, new Vector2(.5f, .8f), small: true);
+            Assert.That(smaller.HitSphere.radius, Is.EqualTo(.25f * radius).Within(1e-5f));
+        }
+
+        [UnityTest]
+        public IEnumerator ABlastFlungOrbBurnsForTheHostsSecondsThenGoesOut()
+        {
+            var cold = board.UpsertOrb("cold", LabOrbKind.Yang, new Vector2(.2f, .5f));
+            Assert.That(cold.Burning, Is.False);
+            Assert.That(cold.Burn, Is.Null, "An orb no blast touched carries no fire at all.");
+
+            var hot = board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: .8f);
+            LabOrbBurn fire = hot.Burn;
+            Assert.That(hot.Burning, Is.True, "An orb a blast flung burns (#213).");
+            Assert.That(fire.SecondsLeft, Is.EqualTo(.8f).Within(1e-4f), "For the seconds the Host gives.");
+            Assert.That(fire.Life, Is.LessThan(.1f), "It catches from nothing...");
+            Assert.That(fire.PartsShown, Is.GreaterThan(10), "Tongues of flame, a halo and embers.");
+            Assert.That(fire.FullHeight, Is.GreaterThan(2f * hot.HitSphere.radius), "Its flames rise well above the ball.");
+            Assert.That(fire.BackDepth, Is.EqualTo(0f),
+                "The big flames stand in the ball's middle, so the ball hides their roots and keeps its colour,");
+            Assert.That(fire.FrontDepth, Is.LessThan(-hot.HitSphere.radius), "and only short licks come over its front.");
+
+            var whole = board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.8f, .5f), burnSeconds: .8f);
+            Assert.That(whole.Burn.FullHeight, Is.EqualTo(2f * fire.FullHeight).Within(1e-4f),
+                "The fire is sized to its ball: a shrunk orb's is half as tall.");
+            board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.8f, .5f), burnSeconds: 3f);
+            Assert.That(whole.Burn.SecondsLeft, Is.EqualTo(3f).Within(1e-4f), "A Host clock well apart puts it right.");
+
+            float until = Time.time + .6f;
+            while (Time.time < until && fire.Life < .9f) yield return null;
+            Assert.That(fire.Life, Is.GreaterThan(.9f), "...and is soon at full size.");
+
+            float left = fire.SecondsLeft;
+            board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: left + .1f);
+            Assert.That(fire.SecondsLeft, Is.EqualTo(left).Within(1e-4f),
+                "A later snapshot a moment apart does not restart or nudge it.");
+
+            until = Time.time + 1.5f;
+            while (Time.time < until && hot.Burning) yield return null;
+            Assert.That(hot.Burning, Is.False, "It goes out when its seconds run down.");
+            Assert.That(fire.PartsShown, Is.Zero);
+            Assert.That(hot.HitSphere.radius, Is.EqualTo(.5f * config.OrbRadius).Within(1e-5f), "The orb stays small.");
+            board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: 0f);
+            Assert.That(hot.Burning, Is.False, "A snapshot after the fire does not relight it.");
+        }
+
+        [UnityTest]
+        public IEnumerator AnOrbABlastJustShrankSqueezesDownToItsNewSize()
+        {
+            var orb = board.UpsertOrb("orb", LabOrbKind.Yin, new Vector2(.5f, .5f));
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(1f).Within(1e-4f));
+            board.UpsertOrb("orb", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: 4f);
+            Assert.That(orb.HitSphere.radius, Is.EqualTo(.5f * config.OrbRadius).Within(1e-5f), "Its body is small at once (#213).");
+            Assert.That(orb.IsShrinking, Is.True);
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(2f).Within(1e-4f), "Its art starts at its old size...");
+
+            float until = Time.time + 1f;
+            while (Time.time < until && orb.IsShrinking) yield return null;
+            Assert.That(orb.IsShrinking, Is.False);
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(1f).Within(1e-4f), "...and squeezes down to the new one.");
+
+            var arrived = board.UpsertOrb("arrived", LabOrbKind.Yang, new Vector2(.2f, .5f), small: true, burnSeconds: 2f);
+            Assert.That(arrived.IsShrinking, Is.False, "An orb that comes in already small just is small.");
+            Assert.That(arrived.Visual.localScale.x, Is.EqualTo(1f).Within(1e-4f));
+            Assert.That(arrived.Burning, Is.True, "And it still burns for what is left of its fire.");
         }
 
         [UnityTest]

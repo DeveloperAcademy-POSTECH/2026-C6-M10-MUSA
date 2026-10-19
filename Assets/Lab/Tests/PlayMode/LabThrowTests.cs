@@ -239,6 +239,52 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator AProjectileFromABlastShrunkOrbIsSmallerAndMissesWhereAWholeOneGrazes()
+        {
+            LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
+            LabTarget target = LabTarget.CreateCylinder(null, new Vector3(0f, 1f, 0f), .8f, 2f);
+            GameObject floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            floor.transform.position = new Vector3(0f, -.1f, 0f);
+            floor.transform.localScale = Vector3.one * 2f;
+            Collider floorCollider = floor.GetComponent<Collider>();
+            // Past either side of the gourd: 0.92 from its axis, inside a whole orb's reach (0.8 + 0.165)
+            // but outside a half-size one's (0.8 + 0.0825).
+            LabProjectile whole = LabProjectile.Create(new Vector3(.92f, 1f, 3f), config);
+            // The other side, so the two shots never meet.
+            LabProjectile small = LabProjectile.Create(new Vector3(-.92f, 1f, 3f), config, null, LabOrbElement.Fire, .5f);
+            try
+            {
+                Assert.That(whole.SizeScale, Is.EqualTo(1f));
+                Assert.That(small.SizeScale, Is.EqualTo(.5f));
+                Assert.That(small.VisualMount.Find("Default Sphere").localScale.x,
+                    Is.EqualTo(config.ThrowRadius).Within(1e-4f), "It flies half as big (#213).");
+                whole.SetMissSurface(floorCollider);
+                small.SetMissSurface(floorCollider);
+                int reports = 0;
+                bool wholeHit = false, smallHit = true;
+                Assert.That(whole.Launch("whole", 1UL, new Vector3(0f, 0f, -12f), config, target,
+                    result => { reports++; wholeHit = result.Hit; }), Is.True);
+                Assert.That(small.Launch("small", 1UL, new Vector3(0f, 0f, -12f), config, target,
+                    result => { reports++; smallHit = result.Hit; }), Is.True);
+                Assert.That(small.GetComponent<SphereCollider>().radius, Is.EqualTo(.5f * config.ThrowRadius).Within(1e-5f),
+                    "Its body is half the radius too.");
+                Assert.That(whole.GetComponent<SphereCollider>().radius, Is.EqualTo(config.ThrowRadius).Within(1e-5f));
+                for (int step = 0; step < 240 && reports < 2; step++) yield return new WaitForFixedUpdate();
+                Assert.That(reports, Is.EqualTo(2));
+                Assert.That(wholeHit, Is.True, "A whole orb grazes the gourd's side.");
+                Assert.That(smallHit, Is.False, "A shrunk one, thrown the same, flies past it.");
+            }
+            finally
+            {
+                if (whole != null) Object.Destroy(whole.gameObject);
+                if (small != null) Object.Destroy(small.gameObject);
+                Object.Destroy(target.gameObject);
+                Object.Destroy(floor);
+                Object.Destroy(config);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator HostProjectileReportsOnePhysicalHit()
         {
             LabConfig config = ScriptableObject.CreateInstance<LabConfig>();

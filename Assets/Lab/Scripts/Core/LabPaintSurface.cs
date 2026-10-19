@@ -128,10 +128,14 @@ namespace C6Lab
         /// hit supplies its connected component with FIFO growth credit. Fractions survive.
         /// A cell crossing supplies uses the final supply's opaque color, connection owner and
         /// P number together, never a blend. Zero P is reserved for neutral offline fixtures.
+        /// <paramref name="share"/> scales this one hit's initial and repeat amounts: a blast-shrunk
+        /// orb paints less (#213). A share of 0 paints nothing.
         /// </summary>
-        public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0)
+        public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0, float share = 1f)
         {
             if (painterSlot < 0 || painterSlot > 5) return false;
+            if (!Finite(share) || share <= 0f || share > 1f) return false;
+            decimal initial = initialCells * (decimal)share, repeat = repeatCells * (decimal)share;
             if (preview || replica || IsComplete || !ValidHit(direction, color)) return false;
             int cell = CellFor(direction);
             if (pattern != LabPaintPattern.Legacy && patternMask == null)
@@ -143,19 +147,19 @@ namespace C6Lab
             if (pixels[cell].a != 0)
             {
                 Region existing = Root(cellRegions[cell]);
-                Supply(existing, repeatCells, opaque, attackerId, (byte)painterSlot, true);
+                Supply(existing, repeat, opaque, attackerId, (byte)painterSlot, true);
                 RefreshActive(existing);
                 return true;
             }
             if (pattern != LabPaintPattern.Legacy)
             {
-                RegisterPatternHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot);
+                RegisterPatternHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot, initial);
                 return true;
             }
             var region = new Region(regions.Count);
             regions.Add(region);
-            Ink initialInk = Supply(region, initialCells, opaque, attackerId, (byte)painterSlot);
-            int immediate = (int)Math.Min(decimal.Floor(initialCells), CellCount - CoveredCount);
+            Ink initialInk = Supply(region, initial, opaque, attackerId, (byte)painterSlot);
+            int immediate = (int)Math.Min(decimal.Floor(initial), CellCount - CoveredCount);
             region = PaintFundedCell(region, cell, initialInk);
             InitialPatch patch = flowStyle == 1 ? new InitialPatch(this, direction.normalized, cell) : null;
             for (int i = 1; i < immediate && !IsComplete; i++)

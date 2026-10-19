@@ -83,6 +83,10 @@ namespace C6Lab
         public float stopAt = -1f;
         /// <summary>Host time of the handoff that set the arrival, so only the receiving screen applies it; -1 when none.</summary>
         public double arrivedAt = -1d;
+        /// <summary>Host time a bomb blast set this orb alight (#213); -1 when it never burned.</summary>
+        public double burnedAt = -1d;
+        /// <summary>A bomb blast shrank this orb for the rest of its life, and any orb combined from it (#213).</summary>
+        public bool small;
 
         /// <summary>An unlock older than this, for example seen after a reconnect, shows the item already open.</summary>
         public const double UnlockEffectWindowSeconds = 1d;
@@ -96,6 +100,10 @@ namespace C6Lab
 
         public bool JustArrived(double serverTime) =>
             arrival != LabDrumArrival.None && arrivedAt >= 0d && serverTime - arrivedAt <= ArrivalWindowSeconds;
+
+        /// <summary>Seconds this orb still burns at the given Host time; 0 once out, or when it never burned.</summary>
+        public float BurnSecondsLeft(double serverTime, float burnSeconds) =>
+            burnedAt < 0d ? 0f : (float)Math.Max(0d, burnedAt + burnSeconds - serverTime);
     }
 
     [Serializable]
