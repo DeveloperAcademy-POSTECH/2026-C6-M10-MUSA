@@ -5,9 +5,8 @@ namespace C6Lab
 {
     /// <summary>
     /// 박 색상 콤보 실험 (#222)의 전투 화면 표시. 모든 기기가 Host 스냅샷만 읽어서 같은 콤보를 보여준다.
-    /// - 진행 중: 4칸 색 (맞힌 칸은 체크, 다음 칸은 통통 튐), 남은 시간 숫자와 줄어드는 막대
+    /// - 진행 중: 4칸 색 (맞힌 칸은 체크, 다음 칸은 통통 튐), 줄어드는 남은 시간 막대 (숫자 없음)
     /// - 끝남: CLEAR! (성공) / WRONG COLOR, TIME UP (실패) 문구가 잠깐 튀어나옴
-    /// - 페널티 중: 이 기기 플레이어의 "SMALL BALL" 남은 시간
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
     /// 일시정지 중이거나 전투가 끝나면 숨는다.
     /// </summary>
@@ -17,8 +16,6 @@ namespace C6Lab
         public const string ClearText = "CLEAR!";
         public const string WrongColorText = "WRONG COLOR";
         public const string TimeUpText = "TIME UP";
-        public const string PenaltyPrefix = "SMALL BALL ";
-        public const string RewardPrefix = "BIG BALL ";
 
         private const int TextureSize = 96;
         private const float ResultSeconds = 1.6f;
@@ -39,7 +36,8 @@ namespace C6Lab
         private readonly RectTransform[] slots = new RectTransform[LabGourdCombo.Length];
         private readonly Image[] slotFills = new Image[LabGourdCombo.Length];
         private readonly Image[] slotChecks = new Image[LabGourdCombo.Length];
-        private Text timeText, resultText, penaltyText;
+        private Image timeBarFill;
+        private Text resultText;
         private Font font;
 
         private LabSnapshot seenSnapshot;
@@ -53,11 +51,8 @@ namespace C6Lab
         private int popSlot = -1;
 
         public bool PanelVisible => panel != null && panel.gameObject.activeSelf;
-        public bool PenaltyVisible => penaltyText != null && penaltyText.gameObject.activeSelf;
         public bool ResultVisible => resultText != null && resultText.gameObject.activeSelf;
         public string ResultLabel => resultText != null ? resultText.text : string.Empty;
-        public string TimeLabel => timeText != null ? timeText.text : string.Empty;
-        public string PenaltyLabel => penaltyText != null ? penaltyText.text : string.Empty;
         public bool SlotChecked(int index) => slotChecks[index] != null && slotChecks[index].gameObject.activeSelf;
         public Color SlotColor(int index) => slotFills[index] != null ? slotFills[index].color : Color.clear;
 
@@ -74,9 +69,7 @@ namespace C6Lab
             bool battle = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused;
             bool anyCombo = snapshot != null && snapshot.comboCount > 0;
             double serverNow = battle ? EstimateServerNow(snapshot) : 0d;
-            bool reward = false;
-            double penalty = battle ? LocalEffectRemaining(snapshot, serverNow, out reward) : 0d;
-            if (!battle || (!anyCombo && penalty <= 0d))
+            if (!battle || !anyCombo)
             {
                 if (layer != null) layer.gameObject.SetActive(false);
                 if (snapshot == null || snapshot.phase != LabPhase.Playing) ResetRound();
@@ -90,7 +83,6 @@ namespace C6Lab
             DetectChanges(snapshot);
             DrawCombo(snapshot, serverNow);
             DrawResult();
-            DrawPenalty(penalty, reward);
         }
 
         /// <summary>스냅샷 사이에도 남은 시간이 매끄럽게 줄도록, 받은 뒤 흐른 실제 시간을 더한다.</summary>
@@ -104,24 +96,6 @@ namespace C6Lab
             }
             // 스냅샷이 늦게 와도 최대 1초까지만 앞당겨 본다.
             return snapshot.serverTime + System.Math.Min(1d, realtime - seenAtRealtime);
-        }
-
-        /// <summary>이 기기 플레이어의 페널티(우선) 또는 보상 남은 시간. reward는 보상이면 true.</summary>
-        private double LocalEffectRemaining(LabSnapshot snapshot, double serverNow, out bool reward)
-        {
-            reward = false;
-            if (snapshot.players == null || network == null) return 0d;
-            ulong local = network.LocalPlayerId;
-            foreach (LabPlayerState player in snapshot.players)
-            {
-                if (player == null || player.id != local) continue;
-                double penalty = player.comboPenaltyUntil - serverNow;
-                if (penalty > 0d) return penalty;
-                double bonus = player.comboRewardUntil - serverNow;
-                reward = bonus > 0d;
-                return System.Math.Max(0d, bonus);
-            }
-            return 0d;
         }
 
         private void DetectChanges(LabSnapshot snapshot)
@@ -171,19 +145,14 @@ namespace C6Lab
 
             if (snapshot.comboActive)
             {
+                // 남은 시간은 숫자 없이 막대로만 보여준다. 3초 이하면 막대가 빨개진다.
                 double left = System.Math.Max(0d, snapshot.comboEndsAt - serverNow);
-                timeText.text = left.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
-                timeText.color = left <= 3d ? FailColor : (Color)InkColor;
                 double limit = snapshot.comboEndsAt - snapshot.comboStartedAt;
                 timeBar.anchorMax = new Vector2(limit > 0d ? Mathf.Clamp01((float)(left / limit)) : 0f, 1f);
+                timeBarFill.color = left <= 3d ? FailColor : (Color)InkColor;
                 timeBar.parent.gameObject.SetActive(true);
-                timeText.gameObject.SetActive(true);
             }
-            else
-            {
-                timeBar.parent.gameObject.SetActive(false);
-                timeText.gameObject.SetActive(false);
-            }
+            else timeBar.parent.gameObject.SetActive(false);
         }
 
         private void DrawResult()
@@ -210,15 +179,6 @@ namespace C6Lab
             resultText.rectTransform.localScale = Vector3.one * pop * (1f - leave);
             resultText.rectTransform.localRotation = Quaternion.Euler(0f, 0f,
                 clear ? 0f : 6f * Mathf.Sin(t * 30f) * (1f - Mathf.Clamp01(t / .5f)));
-        }
-
-        private void DrawPenalty(double remaining, bool reward)
-        {
-            bool show = remaining > 0d;
-            penaltyText.gameObject.SetActive(show);
-            if (!show) return;
-            penaltyText.color = reward ? ClearColor : FailColor;
-            penaltyText.text = (reward ? RewardPrefix : PenaltyPrefix) + remaining.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "s";
         }
 
         private void ResetRound()
@@ -256,7 +216,7 @@ namespace C6Lab
             float width = slotSize * LabGourdCombo.Length + gap * (LabGourdCombo.Length + 1);
             panel = NewRect("Gourd Combo Panel", layer);
             panel.anchorMin = panel.anchorMax = panelAnchor;
-            panel.sizeDelta = new Vector2(width, slotSize + gap * 2f + 34f * u);
+            panel.sizeDelta = new Vector2(width, slotSize + gap * 3f + 10f * u);
             Image back = panel.gameObject.AddComponent<Image>();
             back.sprite = RoundedSprite();
             back.type = Image.Type.Sliced;
@@ -291,7 +251,7 @@ namespace C6Lab
             barBack.anchorMax = new Vector2(1f, 0f);
             barBack.pivot = new Vector2(.5f, 0f);
             barBack.offsetMin = new Vector2(gap, gap);
-            barBack.offsetMax = new Vector2(-gap - 56f * u, gap + 10f * u);
+            barBack.offsetMax = new Vector2(-gap, gap + 10f * u);
             Image barBackImage = barBack.gameObject.AddComponent<Image>();
             barBackImage.color = new Color(0f, 0f, 0f, .15f);
             barBackImage.raycastTarget = false;
@@ -299,16 +259,9 @@ namespace C6Lab
             timeBar.anchorMin = Vector2.zero;
             timeBar.anchorMax = Vector2.one;
             timeBar.offsetMin = timeBar.offsetMax = Vector2.zero;
-            Image barFill = timeBar.gameObject.AddComponent<Image>();
-            barFill.color = InkColor;
-            barFill.raycastTarget = false;
-
-            timeText = NewText("Combo Time", panel, Mathf.Max(10, Mathf.RoundToInt(26f * u)), TextAnchor.MiddleRight);
-            timeText.rectTransform.anchorMin = new Vector2(1f, 0f);
-            timeText.rectTransform.anchorMax = new Vector2(1f, 0f);
-            timeText.rectTransform.pivot = new Vector2(1f, 0f);
-            timeText.rectTransform.sizeDelta = new Vector2(60f * u, 30f * u);
-            timeText.rectTransform.anchoredPosition = new Vector2(-gap, gap - 9f * u);
+            timeBarFill = timeBar.gameObject.AddComponent<Image>();
+            timeBarFill.color = InkColor;
+            timeBarFill.raycastTarget = false;
 
             resultText = NewText("Combo Result", layer, Mathf.Max(14, Mathf.RoundToInt(54f * u)), TextAnchor.MiddleCenter);
             resultText.rectTransform.anchorMin = resultText.rectTransform.anchorMax = panelAnchor;
@@ -318,16 +271,6 @@ namespace C6Lab
             resultOutline.effectColor = InkColor;
             resultOutline.effectDistance = new Vector2(3f, -3f) * Mathf.Max(.5f, u);
             resultText.gameObject.SetActive(false);
-
-            penaltyText = NewText("Combo Penalty", layer, Mathf.Max(10, Mathf.RoundToInt(28f * u)), TextAnchor.MiddleCenter);
-            penaltyText.rectTransform.anchorMin = penaltyText.rectTransform.anchorMax = panelAnchor;
-            penaltyText.rectTransform.sizeDelta = new Vector2(width * 1.6f, 40f * u);
-            penaltyText.rectTransform.anchoredPosition = new Vector2(0f, panel.sizeDelta.y * .5f + 24f * u);
-            penaltyText.color = FailColor;
-            Outline penaltyOutline = penaltyText.gameObject.AddComponent<Outline>();
-            penaltyOutline.effectColor = Color.white;
-            penaltyOutline.effectDistance = new Vector2(2f, -2f);
-            penaltyText.gameObject.SetActive(false);
 
             panel.gameObject.SetActive(false);
             return true;
