@@ -1220,3 +1220,128 @@ Host의 실제 유효 명중점 주변만 유지 시간을 갱신하고, 빈 표
 기본 ON 전환 직후 EditMode757/758의 기존 축소 구슬 도색 비교는 명중 후60초에 측정해 두 얼룩이 실제로 모두 건조돼0이 된 경우였다. 생산 규칙을 끄는 대신 유예 안인16.7초에 성장 소진(남는 것은1셀 미만 소수 예산)과 전체/축소 면적 비율을 비교하도록 수정했다. 첫 합본 PlayMode195/197 중 새 폭발 후 전달 검사는 누락된 ID를 참조했다. 수정 후 실제 폭발 이동·정지, 재잡기 전 정지 경로와 별도 잡기 경로의 면제 해제, 실제 물리 충격 뒤 두 ID의 Swipe 전달을 각각 요구한다. 단독 **1/1**과 위 전체 실행에서 통과했다. 최초 실패의 근본 원인을 확정했다고 기록하지 않는다.
 
 EditMode 통과 이후 최종 PlayMode까지 Runtime 핵심 파일·저장 Config SHA256이 같음을 대조했다. 사용자 폴더의 Scene·Target2 머터리얼2개·미추적 Scenes.meta는 별도 보존하고 검사 사본을 사용했다. 원시 로그/XML·임시 작성기·빌드·개인 경로는 공개 Git에서 제외한다.
+
+## #227 조합대 이미지 적용 — 2026-10-20
+
+`feat/#227-new-ui`의 `Lab.unity`에 사용자 제공 조합대 PNG를 적용했다. 투명 상단 여백만 제거하고 전용 머터리얼을 연결했으며, 원본 화면의 높이 비율에 맞춘 OrbCamera/OrbInteractionArea와 새 알파 곡선(위·아래 각65점)을 저장했다. 다른 UI는 이번 적용 범위 밖이다.
+
+- Unity **6000.6.5f1** Editor 컴파일: 오류 없이 에셋 적용 및 검사 실행.
+- EditMode **13/13**, 실패·건너뜀0: LabOrbAreaGeometryTests(5), LabOrbAreaShapeTests(8).
+- PlayMode **8/8**, 실패·건너뜀0: LabOrbAreaLayoutTests(3), LabCurvedOrbAreaPhysicsTests(5). 저장 Scene 참조·곡선 배치·구슬 물리 경로 확인.
+- Editor Game View **402×874** 솔로 화면에서 새 종이 질감·손그림 테두리·구슬 및 북의 표시 확인.
+- Mac/iOS 빌드·실기기·다중 연결: **NOT_RUN**. 원시 XML과 임시 검사 도구는 공개 저장소에서 제외.
+
+### #227 플레이어 번호 PNG 교체 — 2026-10-20
+
+사용자 제공 P1~P5(각90×94) 원본을 Player1Circle~Player5Circle.png에 적용했다. 기존 `.meta`·GUID·Scene 참조와48×48 표시 위치는 유지한다.
+
+- Unity6000.6.5f1 재가져오기·임시 검사 도구 컴파일 완료. 저장 Scene의 P1/P2/P3 새 배지를 Game View에서 확인.
+- EditMode LabPlayerCircleTests **6/6**(완료 콜백 결과), PlayMode LabPlayerPaintPatternUiTests **3/3**, 실패·건너뜀0. 기존 본인/이웃 번호의 sprite 연결과 배치 유지 확인.
+- 실기기·빌드·다중 연결은 **NOT_RUN**. 임시 검사 소스와 원시 결과는 공개 저장소에서 제외.
+
+### #227 Figma 플레이어 번호 배치 — 2026-10-20
+
+Figma `2527:7969`의 디자인 컨텍스트·스크린샷과 하단 그룹 `2527:7988`을 확인했다. 402×874 기준45×47 배지를 왼쪽(-6,480), 오른쪽(365,480), 본인(65,809)에 저장했다. 본인 배지는 스태미나 옆의 하단 왼쪽 자리이며 스태미나 자체의 재배치는 이번 범위 밖이다. 기존 PNG와 선택 번호/순환 이웃 연결을 유지한다. 재적용 도구와 기존 좌표 검사의 기대값도 갱신했다.
+
+- Unity6000.6.5f1 컴파일·Scene 저장 완료. Game View에서 세 배지의 위치·비율 확인.
+- EditMode LabPlayerCircleTests **6/6**, PlayMode LabPlayerPaintPatternUiTests **3/3**, 실패·건너뜀0. 저장 배지 좌표·크기와 런타임 본인/이웃 이미지 연결을 검증했다.
+- 실기기·빌드·다중 연결 **NOT_RUN**. 다른 UI의 기존 디자인 차이는 이번 검증 범위에 포함하지 않는다.
+
+### #227 새 스태미나 바·색상 — 2026-10-20
+
+사용자 제공446×88 PNG에서 원본 테두리와 내부 칸의 알파를 분리했다. 스태미나 바는 본인 번호 오른쪽의223×44(중심229,832.5)에 배치한다. 내부 마스크는 여백을 뺀374×50이며 찬 영역 `#2F62A2`, 소모 영역 `#C1D2E0`를 왼쪽부터 연속 표시한다. 기존 HUD의 현재/최대 스태미나 연결과 게임 수치는 유지한다. 전용 `Apply New Stamina Bar` 메뉴로 재적용할 수 있다.
+
+- Unity6000.6.5f1 최종 컴파일·Scene 저장 완료. 재시작한 Editor Game View에서 테두리·다섯 칸·완충 색상·배치 확인.
+- EditMode LabStaminaBarDesignTests **4/4**, 실패·건너뜀0: 0/50/80/100%의 실제 채움 메시 색상과 분할 좌표·저장 배치·에셋 연결 확인.
+- PlayMode **4/4**, 실패·건너뜀0: LabStaminaBarHudTests(1)의 합성 로컬 스태미나 스냅샷으로 소모·회복·로비 초기화 반영, LabPlayerPaintPatternUiTests(3)의 기존 번호/패턴 UI 회귀 확인. 다중 기기 통신 결과와 구분한다.
+- 검증 도중 Editor의 `ADTM: Attempting to update control while a mix is ongoing` 오디오 오류로 종료했다. 저장 후 Editor를 재시작해 위 최종 검사를 통과했다. 오디오 오류의 근본 원인을 해결했다고 주장하지 않는다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 실행 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 스태미나 뒤의 개인 HP 표시 제거 — 2026-10-20
+
+기존 FigmaPlayerHpBar와 BottomHudBackground를 비활성으로 저장했다. 본인 배지·새 스태미나 바를 유지하고, 사라진 배경의 곡선이 보이지 않는 벽으로 남지 않도록 비활성 배경은 물리 영역에서 제외한다. 활성 배경을 사용하는 기존 경로는 유지한다. HP 수치·아이템 효과·판정은 바꾸지 않았다.
+
+- Unity6000.6.5f1 최종 컴파일·Scene 저장 완료.
+- EditMode **12/12**, 실패·건너뜀0: LabOrbAreaProfileTests(8), LabStaminaBarDesignTests(4).
+- PlayMode **10/10**, 실패·건너뜀0: LabStaminaBarHudTests(1), LabOrbAreaLayoutTests(4), LabCurvedOrbAreaPhysicsTests(5). 숨겨진 HP/배경, 실제 종이 하단 곡선, 비활성 HUD 위치 변경 시 물리 불변, 기존 활성 HUD 경로와 구슬 물리를 확인했다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 원시 로그/XML과 임시 검사 도구는 저장소에서 제외한다.
+
+### #227 일시정지·타이머·신라문화체 Bold22pt — 2026-10-20
+
+사용자 제공 PauseButton PNG와 글자 없는 TimeFrame PNG를 적용하고 기존 GUID를 유지했다. 제공된 ShillaCultureBold.otf를 포함해 타이머 Text에22pt로 지정했다. 폰트 파일 자체가 Bold이므로 합성 Bold·자동 크기 맞춤은 끈다. 기존 숫자 덮개는 숨기고 실제 남은 시간의 MM:SS 갱신과 기존 pauseButton 연결은 유지한다. 402×874 기준 타이머78×33.5(27.5,25.25), 일시정지33×34(340,24)로 원본 비율을 유지했다.
+
+- Unity6000.6.5f1 최종 컴파일·Scene 저장 완료. 실제 Editor 솔로 Game View에서 새 타이머의02:55 표시·폰트·새 일시정지 아이콘을 확인했다.
+- EditMode LabBattlePauseTests **3/3**, 실패·건너뜀0: 공유 시계의 정지/재개·스냅샷 pause 상태.
+- PlayMode 기존 SavedHudAndDeveloperSliderShowLocalPlayerHpAcrossSoloRestart **1/1**, 실패·건너뜀0: 저장 HUD 참조와 실제 개발자 솔로 시작·재시작 경로 회귀 확인.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 검사 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 페인트 비율 바 교체 — 2026-10-20
+
+사용자 제공 PNG의 종이 바를 분리하고 고정7.9% 글자와 예시 채움을 실제 런타임 UI로 대체했다. 원본 파일을 보존하며 파생 빈 바/마스크를 저장한다. 기존 GOAL 장식·트랙 덮개를 숨기고, 오른쪽에 신라문화체 Bold21pt 흰색 퍼센트만 표시한다. 찬 부분은 원본 `#AF4738`이다. 저장 Lab Scene의 compactPaintProgress만 켜며 기존 전체 목표 문구 API와 다른 Scene의 기본 경로는 유지한다. 셀 수 기반 소수점 한 자리 내림·미완성99.9% 상한·100% 승리 목표는 유지한다.
+
+- Unity6000.6.5f1 최종 컴파일·Scene 저장 완료. 실제 Editor 솔로 Game View에서 새 바의0.0%와 고정 빨간 부분/고정7.9%가 남지 않는 것을 확인했다.
+- EditMode LabPaintGoalHudTests **31/31**, 실패·건너뜀0. 기존 계산과 셀 수 경계에서 새 퍼센트 전용 문구를 확인한다.
+- PlayMode **4/4**, 실패·건너뜀0: LabPaintDryingPlayModeTests(3) 및 FixedHundredPercentGoalGrowsFromRepeatedRealHitsFreezesOnPauseAndResetsOnRetry(1). 실제 도색·성장·건조·100% 완성·일시정지·재시작과 HUD 비율 일치를 확인했다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 실행 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 플레이어 위치 표시 디자인 — 2026-10-20
+
+Figma `2527:7760` 디자인 컨텍스트·스크린샷에서 위치 표시 영역(323,402),75.5×71을 확인했다. 제공된 세 PNG 원본을 보존하고, 기존 P1~P5 배지·제공된 태극을 조합해 인원/선택 번호/북 주인을 동적으로 표시한다. 솔로는 제공된 완성 배지, 여러 명은 각자의 색상 링을 유지한 태극 표시를 사용한다. 사각 배경을 제거하고 북의 이웃 선 이동과 다중 북 추적을 유지했다. 저장 LabDrumMinimap을 SceneController가 다시 Bind하도록 연결했다. Config 기본 Minimap Size50% 및 원본 수치는 바꾸지 않았다.
+
+- Unity6000.6.5f1 컴파일·Scene 저장 완료. 컴파일된 새 스크립트가 Editor에 반영되지 않아 Editor를 재시작한 뒤 적용·검증했다.
+- EditMode LabDrumMinimapTests **6/6**, 실패·건너뜀0: 2~5명 자기 기준 배치, 북의 이웃 경로, 선택 P번호와 이미지 연결, 다중 북, 솔로 태극 및 북 제거 시 번호 복귀 확인.
+- PlayMode **4/4**, 실패·건너뜀0: LabPlayerPaintPatternUiTests(3)와 저장 HUD/실제 솔로 시작·재시작 검사(1).
+- 실제 Editor 솔로 Game View에서 투명 배경·제공된 태극·Figma 자리의 표시를 확인했다. 여러 명의 상태 전환은 통제된 UI fixture이며 실제 원격 다중 접속 결과와 구분한다.
+- 빌드·실기기·원격 다중 연결 **NOT_RUN**. 임시 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 박 구도·상단 판자 숨김 — 2026-10-20
+
+Camera Look Height Offset 기본값을2에서0.8로 맞춰 화면의 박을 위로 옮겼다. 원본 LabConfig.asset과 새 Config 기본값·유효하지 않은 값의 대체값을 일치시켰다. Lab Scene의 suspensionVisualExtension은4월드 단위로 저장했다. 기존 물리 줄 길이1.5와 흔들림 축은 유지하고, 물리 피벗 위에 충돌체 없는 표현용 줄을 이어 판자를 화면 밖으로 올린다. 초기 BattleCamera 구도도 같은 Config 값으로 저장한다.
+
+- Unity6000.6.5f1 컴파일·Scene 저장 완료. 실제 Editor 솔로402×874 화면에서 판자가 사라지고 줄이 화면 위에서 이어지며, 박이 위쪽에 표시되는 것을 확인했다.
+- EditMode **103/103**, 실패·건너뜀0: LabDeveloperConfigTests와 LabStraightThrowMathTests. 새 카메라 기본값 및 기존 투척 계산 확인.
+- PlayMode **2/2**, 실패·건너뜀0: RopeLengthUpdatesTheRigAndPreservesTheRestingAimPoint 및 SavedSoloHostElementHitsReachHpZeroWithoutWinningAndSurviveVisualReinitialization. 표현용 줄 연장 후에도 물리 축·기본 조준점·줄 접점·충돌체 제거·실제 명중 경로를 확인했다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 검사 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 임시 배경 매핑 — 2026-10-20
+
+사용자 제공804×1162 PNG를 TemporaryBattleBackground.png로 보존했다. BattleCamera의 자식 Temporary Battle Background에 조명 영향을 받지 않는 SpriteRenderer로 매핑하고, 원본 비율·상단 정렬·화면 너비 맞춤을 적용했다. 시점/FOV/화면 비율 변경에 맞춰 카메라 뒤쪽 원경에 배치하며 넓은 창에서는 화면 높이도 채운다. 기존 BattleFloor의 MeshRenderer만 비활성화하고 빗나간 투척 판정용 Collider는 유지했다. 이후 3D 배경으로 바꿀 때 해당 배경 오브젝트를 제거/비활성화할 수 있다.
+
+- Unity6000.6.5f1 컴파일·Scene 저장 완료. 저장 Scene의 배경 Sprite 참조와 바닥 Renderer OFF/Collider ON을 확인했다.
+- 실제 Editor 솔로402×874 Game View에서 원본 소나무·산수 배경과 그 앞의 줄·박·기존 UI가 표시되는 것을 확인했다.
+- 기존 PlayMode RopeLengthUpdatesTheRigAndPreservesTheRestingAimPoint **1/1**, 실패·건너뜀0. 배경 추가 후 줄·물리 축·기본 조준점 회귀 확인.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 실행 도구·원시 로그/XML은 공개 저장소에서 제외한다.
+
+### #227 페인트 퍼센트 검정 글씨 — 2026-10-20
+
+저장 Scene의 hpText와 Apply New Paint Ratio Bar 도구를 검정(#000000)으로 맞췄다. 파일 수정 후에도 실행 중이던 Editor 화면에는 기존 흰색 설정이 남아 있어 Play Mode 종료 후 Scene을 다시 불러와 저장했다. 실제 솔로 실행 화면에서 검정 0.0%를 확인하고 런타임 Text.color=000000FF를 확인했다. 이번 색상 수정의 자동 검사·빌드·실기기는 NOT_RUN이다.
+
+
+### #227 조합대 재첨부 원본 색상 교체 — 2026-10-20
+
+재첨부한 조합대 PNG의 상단 투명 여백914px만 제외한804×834 RGBA 픽셀을 CombinationBoard.png에 다시 적용했다. 기존 파일은 같은 알파 윤곽에 RGB 값이 달랐으며, 이번 파일은 첨부 원본의 잘라낸 영역과 픽셀 단위로 일치한다. 기존 meta/GUID·머터리얼·Scene 참조·카메라 배치를 유지한다. Unity에서 새 이미지로 경계를 재계산하여 저장된 위·아래 각65점과 일치함을 확인했으므로 Scene 곡선은 다시 저장하지 않았다.
+
+- Unity6000.6.5f1 컴파일·재가져오기 완료. Scene의 SourceTexture/머터리얼 연결과 현재 Config의 판 영역 유효성을 Unity API로 확인했다.
+- EditMode **21/21**, 실패·건너뜀0: LabOrbAreaGeometryTests(5), LabOrbAreaShapeTests(8), LabOrbAreaProfileTests(8).
+- PlayMode **9/9**, 실패·건너뜀0: LabOrbAreaLayoutTests(4), LabCurvedOrbAreaPhysicsTests(5). 저장 Scene 배치·숨긴 하단 HUD 처리·곡선 경계·구슬 물리 회귀 확인.
+- 빌드·iOS 실기기·다중 연결 **NOT_RUN**. 원시 결과·임시 적용/검사 도구는 공개 저장소에서 제외한다.
+
+
+### #227 조합대 위 남색 띠 가림 — 2026-10-20
+
+OrbCamera의 단색 바탕이 조합대 상단 투명 곡선에서 보이던 부분에 같은 임시 배경을 이어 그렸다. OrbCamera 자식 Temporary Board Background는 LabOrbBoard 레이어·정렬순서-1000으로 종이(-100) 뒤에 두며, 화면 상단과 BattleCamera의 배경 채움 비율을 공유한다. 판 위치·크기·카메라 viewport·구슬 물리 경계·Config는 유지한다. Apply Temporary Battle Background 도구도 두 배경을 함께 연결한다.
+
+- Unity6000.6.5f1 컴파일·Scene 저장 완료. 실제 Editor402×874 솔로 화면에서 위쪽 배경이 조합대 곡선까지 이어지고 중간 남색 띠가 사라진 것을 확인했다.
+- EditMode LabOrbAreaProfileTests **8/8**, PlayMode LabOrbAreaLayoutTests(4)·LabCurvedOrbAreaPhysicsTests(5) **9/9**, 실패·건너뜀0. 저장 Scene 배치·곡선 경계·구슬 물리 회귀 확인.
+- 변경 중 재생 상태의 스크립트 재컴파일 후 기존 판/네트워크 객체에서 NullReferenceException이 발생했다. 재생 종료 후 Scene 재적용·새 재생으로 위 검사와 솔로 확인을 완료했으며 해당 예외의 원인 수정은 이번 범위에 포함하지 않는다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 검사 도구와 원시 결과는 저장소에서 제외한다.
+
+### #227 구슬 생성 북 이미지 교체 — 2026-10-20
+
+사용자 제공198×198 PNG를 GenerateButton.png에 원본 그대로 적용했다(파일 바이트 일치). 기존 meta/GUID와 LabOrbAppearance.drumSprite 및 저장 Config 연결을 유지했다. 런타임의 지름 맞춤 표시를 사용하므로 북의 게임 크기·콜라이더·탭 생성·드래그·전달 수치는 바꾸지 않았다. 미니맵 아이콘은 별도 디자인을 유지한다.
+
+- Unity6000.6.5f1 재가져오기·임시 검사 도구 컴파일 완료. Unity API로198×198 Sprite와 저장 Config→Appearance→DrumSprite 연결을 확인했다.
+- EditMode **2/2**, 실패·건너뜀0: OneDrumGoesToARandomPlayerAndOnlyItsHolderCanGenerate, DrumMakesOnlyYinAndYangByDefault.
+- PlayMode **3/3**, 실패·건너뜀0: SharedAppearanceKeepsBoardAndProjectileArtSeparateFromPhysics, TappingADrumGeneratesWithoutStoppingItAndAFlickMovesItButNeverThrows, SavedSceneSoloCanGenerateCombineAndHitTheCylinder. 이미지와 물리 분리, 탭·플릭, 저장 Scene의 실제 솔로 생성·조합·명중 경로 확인.
+- 실제 Editor402×874 솔로 Game View에서 새 삼태극·손그림 테두리·질감 표시를 확인했다.
+- 빌드·실기기·다중 연결 **NOT_RUN**. 임시 검사 도구와 원시 결과는 저장소에서 제외한다.

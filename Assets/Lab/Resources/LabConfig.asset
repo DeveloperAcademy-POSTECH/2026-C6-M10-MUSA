@@ -149,7 +149,7 @@ MonoBehaviour:
   orbAppearance: {fileID: 11400000, guid: 9fd06f927557d47e2ac8b342a6979ed0, type: 2}
   cameraRadius: 8
   cameraHeightOffset: 0.65
-  cameraLookHeightOffset: 2
+  cameraLookHeightOffset: 0.8
   throwOriginRadius: 4
   throwOriginHeightOffset: -0.5
   throwOriginLateralRange: 1

@@ -91,7 +91,7 @@ namespace C6Lab.Tests
             values[54] = 3f;
             Assert.That(values[55], Is.EqualTo(3f), "Bomb damage multiplier.");
             values[55] = 2.5f;
-            Assert.That(values[56], Is.EqualTo(2f), "The camera looks 2 units above the target centre by default.");
+            Assert.That(values[56], Is.EqualTo(.8f), "The camera looks 0.8 units above the target centre in the new UI composition.");
             values[56] = -1.5f;
             Assert.That(new[] { values[57], values[58], values[59] },
                 Is.EqualTo(new[] { 80f, 1.2f, 720f }));

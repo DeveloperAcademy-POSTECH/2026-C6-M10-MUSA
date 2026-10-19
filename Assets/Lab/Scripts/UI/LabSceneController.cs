@@ -99,11 +99,13 @@ namespace C6Lab
                 gameObject.AddComponent<LabResultDashboard>().Bind(boardNetwork, hud.resultControls,
                     hud.resultStatusText != null ? hud.resultStatusText.font : null);
             // 전투 화면 오른쪽 아래 미니맵 (오른쪽 이웃 동그라미 위). 북이 누구한테 있는지 보여준다.
-            if (hud != null && hud.rightPlayerCircle != null && boardNetwork != null
-                && GetComponent<LabDrumMinimap>() == null)
-                gameObject.AddComponent<LabDrumMinimap>().Bind(boardNetwork,
-                    hud.rightPlayerCircle.rectTransform,
+            if (hud != null && hud.rightPlayerCircle != null && boardNetwork != null)
+            {
+                LabDrumMinimap minimap = GetComponent<LabDrumMinimap>();
+                if (minimap == null) minimap = gameObject.AddComponent<LabDrumMinimap>();
+                minimap.Bind(boardNetwork, hud.rightPlayerCircle.rectTransform,
                     hud.resultStatusText != null ? hud.resultStatusText.font : null);
+            }
             // 박이 폭탄을 떨어뜨릴 때 전투 화면의 박 옆에 뜨는 "!" 말풍선 (모든 기기)
             if (hud != null && boardNetwork != null && GetComponent<LabGourdAlert>() == null)
                 gameObject.AddComponent<LabGourdAlert>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>(),
@@ -195,6 +197,19 @@ namespace C6Lab
                 {
                     error = "The saved curved area requires its nonvisual guide and lower HUD references.";
                     return false;
+                }
+                // A removed bottom HUD cannot occlude the paper or leave an invisible wall.
+                // activeSelf distinguishes the saved artwork toggle from the whole battle UI
+                // being hidden while the player is in the lobby.
+                if (!lowerHudBoundary.gameObject.activeSelf)
+                {
+                    if (!TryPaperWorldRect(boardHeight, out plateRect))
+                    {
+                        error = "The paper requires a valid orthographic screen-to-world rectangle.";
+                        return false;
+                    }
+                    return curvedAreaProfile.TryBuildShape(plateRect, orbRadius, drumRadius,
+                        out shape, out error);
                 }
                 Canvas canvas = lowerHudBoundary.GetComponentInParent<Canvas>(true);
                 UnityEngine.UI.Image hudImage = lowerHudBoundary.GetComponent<UnityEngine.UI.Image>();

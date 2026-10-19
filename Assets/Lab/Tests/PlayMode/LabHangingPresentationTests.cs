@@ -98,11 +98,18 @@ namespace C6Lab.Tests
             var hanging = target.gameObject.AddComponent<LabHangingTarget>();
             Vector3 centre = target.Hitbox.transform.position;
             Set(hanging, "ropeLength", 2f);
+            Set(hanging, "suspensionVisualExtension", 4f);
             yield return new WaitForFixedUpdate();
             Transform pivot = target.transform.Find("Suspension Pivot");
             Transform rope = pivot.Find("Rope");
             Assert.That(rope.localScale.y * 2f, Is.EqualTo(2f).Within(.001f));
             Assert.That(pivot.localPosition.y, Is.EqualTo(2.9f).Within(.001f));
+            Transform upper = target.transform.Find("Upper Rope");
+            Assert.That(upper.gameObject.activeSelf, Is.True);
+            Assert.That(upper.localScale.y * 2f, Is.EqualTo(4f).Within(.001f));
+            Assert.That(Vector3.Distance(upper.TransformPoint(Vector3.down), pivot.position), Is.LessThan(.001f));
+            Assert.That(upper.GetComponent<Collider>(), Is.Null,
+                "The visible extension must not add a projectile collider.");
             Assert.That(Vector3.Distance(centre, target.Hitbox.transform.position), Is.LessThan(.001f));
             Vector3 ropeBottom = rope.TransformPoint(Vector3.down);
             Vector3 bodyTop = target.Hitbox.transform.TransformPoint(Vector3.up);

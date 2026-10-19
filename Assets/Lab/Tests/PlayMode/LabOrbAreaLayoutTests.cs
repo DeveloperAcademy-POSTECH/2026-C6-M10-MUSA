@@ -21,11 +21,13 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedPaperKeeps154CompositionAndPhysicsFollowsTheVisibleCompositeCurve()
+        public IEnumerator EnabledLegacyHudKeepsPaperCompositionAndPhysicsFollowsTheVisibleCompositeCurve()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
             LabSceneController controller = Controller();
+            controller.lowerHudBoundary.gameObject.SetActive(true);
+            controller.ReconfigureBoard();
             LabOrbAreaProfile profile = controller.curvedAreaProfile;
             Assert.That(controller.requireCurvedAreaProfile, Is.True);
             Assert.That(profile, Is.Not.Null);
@@ -86,6 +88,8 @@ namespace C6Lab.Tests
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
             LabSceneController controller = Controller();
+            controller.lowerHudBoundary.gameObject.SetActive(true);
+            controller.ReconfigureBoard();
             LabOrbBoard board = controller.board;
             LabOrbAreaShape previous = board.AreaShape;
             Vector3 platePosition = controller.curvedAreaProfile.transform.localPosition;
@@ -140,6 +144,31 @@ namespace C6Lab.Tests
             Assert.That(controller.ValidateBoardTuning(controller.config.BoardHeight,
                 controller.config.OrbRadius, controller.config.DrumRadius, out error), Is.False);
             StringAssert.Contains("lower HUD references", error);
+        }
+
+        [UnityTest]
+        public IEnumerator RemovedHpBackgroundLeavesThePaperBoundaryWithoutAnInvisibleHudWall()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+            LabSceneController controller = Controller();
+            Assert.That(controller.lowerHudBoundary.gameObject.activeSelf, Is.False);
+            var hud = Object.FindAnyObjectByType<LabHud>();
+            Assert.That(hud.playerHpFill.transform.parent.gameObject.activeSelf, Is.False);
+            Rect paper = PaperWorldRect(controller.curvedAreaProfile);
+            LabOrbAreaShape shape = controller.board.AreaShape;
+            foreach (Vector2 uv in controller.curvedAreaProfile.LowerBoundary)
+            {
+                float x = Mathf.Lerp(paper.xMin, paper.xMax, uv.x);
+                Assert.That(shape.VerticalRange(x, 0f).x,
+                    Is.EqualTo(Mathf.Lerp(paper.yMin, paper.yMax, uv.y)).Within(.0001f));
+            }
+            controller.lowerHudBoundary.anchorMax += new Vector2(0f, .1f);
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+            Assert.That(controller.board.AreaShape.ApproximatelyEquals(shape), Is.True,
+                "The hidden artwork must not restrict the new combination surface.");
+            Assert154Paper(controller);
         }
 
         private static void Assert154Paper(LabSceneController controller)

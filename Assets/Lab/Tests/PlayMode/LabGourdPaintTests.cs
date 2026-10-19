@@ -448,7 +448,7 @@ namespace C6Lab.Tests
                     AssertTextureMatches(network.PaintSurface, paint);
                     Assert.That(hud.resultControls.activeInHierarchy, Is.True);
                     Assert.That(hud.resultStatusText.text, Is.EqualTo("VICTORY"));
-                    Assert.That(hud.hpText.text, Is.EqualTo(LabHud.FormatPaintGoalProgress(1f, 100)));
+                    Assert.That(hud.hpText.text, Is.EqualTo(LabHud.FormatPaintPercentage(network.Snapshot)));
                     Assert.That(hud.yokaiHpFill.fillAmount, Is.EqualTo(1f));
                     Assert.That(LabGourdFinish.DelayVictory(network, network.Snapshot), Is.False);
                     CaptureBattle(network, "growth-hundred-percent-victory.png");

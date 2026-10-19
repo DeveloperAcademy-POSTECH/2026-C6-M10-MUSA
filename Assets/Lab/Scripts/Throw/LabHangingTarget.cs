@@ -17,6 +17,8 @@ namespace C6Lab
 
         [SerializeField, Min(.1f), Tooltip("Visible rope length in world units, from the ceiling pivot to the top of the target. Range: 0.1–8.")]
         private float ropeLength = .85f;
+        [SerializeField, Min(0f), Tooltip("Extra rope above the physical suspension pivot. Presentation only; does not change the swing arm or hitbox.")]
+        private float suspensionVisualExtension;
 
         [SerializeField, Min(0f), Tooltip("Downward bounce impulse per unit of impact speed. Range: 0–2.")]
         private float bounceStrength = .18f;
@@ -48,7 +50,7 @@ namespace C6Lab
         public float ReturnStrength => Safe(returnStrength, 10f, 0f, 100f);
         // Configured from the session's LabConfig copy; these are only safe standalone defaults.
         private float spinStrength = 80f, spinDamping = 1.2f, maximumSpinSpeed = 720f;
-        private Transform pivot, twistPivot, hangingBody, visualMount, rope, ceilingBeam, ceilingPlate;
+        private Transform pivot, twistPivot, hangingBody, visualMount, rope, upperRope, ceilingBeam, ceilingPlate;
         private float verticalOffset, verticalVelocity, cycleElapsed, currentRopeOffset;
         private Vector2 angle, velocity;
         private float yawAngleDegrees, yawSpeedDegreesPerSecond;
@@ -92,6 +94,8 @@ namespace C6Lab
             ropeMaterial = MakeMaterial(new Color(.64f, .52f, .32f), .1f);
             rope = Primitive("Rope", PrimitiveType.Cylinder, pivot,
                 new Vector3(0, -.425f, 0), new Vector3(.055f, .425f, .055f), ropeMaterial);
+            upperRope = Primitive("Upper Rope", PrimitiveType.Cylinder, transform,
+                Vector3.zero, Vector3.one, ropeMaterial);
             ceilingBeam = Primitive("Ceiling Beam", PrimitiveType.Cube, transform,
                 new Vector3(0, 1.85f, 0), new Vector3(5f, .18f, .5f), ropeMaterial);
             ceilingPlate = Primitive("Ceiling Plate", PrimitiveType.Cube, transform,
@@ -315,8 +319,15 @@ namespace C6Lab
             float stretchedLength = length + currentRopeOffset;
             rope.localPosition = Vector3.down * (stretchedLength * .5f);
             rope.localScale = new Vector3(.055f, stretchedLength * .5f, .055f);
-            ceilingBeam.localPosition = Vector3.up * (pivotHeight + .1f);
-            ceilingPlate.localPosition = Vector3.up * (pivotHeight + .26f);
+            float extension = Safe(suspensionVisualExtension, 0f, 0f, 20f);
+            if (upperRope != null)
+            {
+                upperRope.gameObject.SetActive(extension > 0f);
+                upperRope.localPosition = Vector3.up * (pivotHeight + extension * .5f);
+                upperRope.localScale = new Vector3(.055f, extension * .5f, .055f);
+            }
+            ceilingBeam.localPosition = Vector3.up * (pivotHeight + extension + .1f);
+            ceilingPlate.localPosition = Vector3.up * (pivotHeight + extension + .26f);
             // Keep the resting target centre fixed so tuning length doesn't change the aim point.
 
         }
