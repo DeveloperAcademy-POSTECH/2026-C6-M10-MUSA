@@ -67,7 +67,7 @@ MonoBehaviour:
   paintVictoryPercent: 100
   paintSurfaceResolution: 2
   paintInitialPercent: 2
-  paintRepeatPercent: 4
+  paintRepeatPercent: 1.5
   paintClusterCompactness: 0.85
   paintClusterIrregularity: 0.25
   gourdVisualSize: 1.4

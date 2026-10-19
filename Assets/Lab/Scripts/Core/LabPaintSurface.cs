@@ -9,7 +9,7 @@ namespace C6Lab
     {
         public int Resolution = 2;
         public float InitialPercent = 2f;
-        public float RepeatPercent = 4f;
+        public float RepeatPercent = 1.5f;
         public float GrowthPercentPerSecond = 6f;
         public float FillChancePercent = 60f;
         public float VerticalWeight = 1.35f;
@@ -123,8 +123,9 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// A new seed spends floor(initial area) immediately. A painted hit supplies its
-        /// connected component with FIFO growth credit. Cell fractions survive between hits.
+        /// A new seed spends its local initial footprint immediately; already painted mask
+        /// area continues as timed local growth rather than widening the splash. A painted
+        /// hit supplies its connected component with FIFO growth credit. Fractions survive.
         /// A cell crossing supplies uses the final supply's opaque color, connection owner and
         /// P number together, never a blend. Zero P is reserved for neutral offline fixtures.
         /// </summary>
@@ -133,7 +134,7 @@ namespace C6Lab
             if (painterSlot < 0 || painterSlot > 5) return false;
             if (preview || replica || IsComplete || !ValidHit(direction, color)) return false;
             int cell = CellFor(direction);
-            if (pattern != LabPaintPattern.Legacy && pixels[cell].a == 0 && patternMask == null)
+            if (pattern != LabPaintPattern.Legacy && patternMask == null)
                 patternMask = LabPaintPatternMask.Load(pattern);
             if (PaintCount < int.MaxValue) PaintCount++;
             var opaque = new Color32((byte)Mathf.RoundToInt(Mathf.Clamp01(color.r) * 255f),
@@ -153,12 +154,12 @@ namespace C6Lab
             }
             var region = new Region(regions.Count);
             regions.Add(region);
-            Supply(region, initialCells, opaque, attackerId, (byte)painterSlot);
+            Ink initialInk = Supply(region, initialCells, opaque, attackerId, (byte)painterSlot);
             int immediate = (int)Math.Min(decimal.Floor(initialCells), CellCount - CoveredCount);
-            region = PaintCell(region, cell);
+            region = PaintFundedCell(region, cell, initialInk);
             InitialPatch patch = flowStyle == 1 ? new InitialPatch(this, direction.normalized, cell) : null;
             for (int i = 1; i < immediate && !IsComplete; i++)
-                region = PaintCell(region, patch != null ? patch.Take(region) : ChooseCell(region));
+                region = PaintFundedCell(region, patch != null ? patch.Take(region) : ChooseCell(region), initialInk);
             return true;
         }
 
@@ -203,24 +204,40 @@ namespace C6Lab
             return regions[activeRegions.Min];
         }
 
-        private void Supply(Region region, decimal amount, Color32 color, ulong owner, byte painterSlot,
-            bool chooseClusterAnchor = false)
+        private Ink Supply(Region region, decimal amount, Color32 color, ulong owner, byte painterSlot,
+            bool chooseClusterAnchor = false, int clusterAnchor = -1)
         {
             // Cap each component independently: a global cap can strand separate cell fractions.
             amount = Math.Max(0m, Math.Min(amount, CellCount - CoveredCount - region.Budget));
-            if (amount == 0m) return;
+            if (amount == 0m) return null;
             ulong sequence = ++supplySequence;
-            var ink = new Ink { Remaining = amount, Color = color, Owner = owner, PainterSlot = painterSlot };
+            var ink = new Ink { Sequence = sequence, Remaining = amount, Color = color, Owner = owner, PainterSlot = painterSlot };
             // Existing fill/vertical weights choose a boundary once per accepted repeat hit.
-            // Its subsequent blob uses geodesic distance rather than a directional cell bias.
-            if (chooseClusterAnchor) ink.Cluster = new GrowthCluster(this, ChooseCell(region), sequence);
+            // Overlap credit instead stays centered on its own initial impact. Subsequent
+            // cells use the frozen job's geometry rather than another global boundary draw.
+            if (chooseClusterAnchor) ink.Cluster = new GrowthCluster(this,
+                clusterAnchor >= 0 ? clusterAnchor : ChooseCell(region), sequence, amount);
             region.Supplies.Add(sequence, ink);
             region.Budget += amount;
             totalBudget += amount;
+            return ink;
         }
 
-        private Ink Consume(Region region)
+        private Ink Consume(Region region, Ink immediateInk = null)
         {
+            // Immediate impact geometry belongs to that impact, even if painting its first
+            // cell merges it into a component with older pending timed supplies. Timed growth
+            // still uses global FIFO below; an unrelated footprint cannot spend those jobs.
+            if (immediateInk != null)
+            {
+                if (immediateInk.Remaining < 1m || !region.Supplies.ContainsKey(immediateInk.Sequence))
+                    throw new InvalidOperationException("An immediate paint footprint needs its own funded cell.");
+                immediateInk.Remaining -= 1m;
+                if (immediateInk.Remaining == 0m) region.Supplies.Remove(immediateInk.Sequence);
+                region.Budget -= 1m;
+                totalBudget -= 1m;
+                return immediateInk;
+            }
             decimal needed = 1m;
             Ink final = null;
             while (needed > 0m)
@@ -246,12 +263,14 @@ namespace C6Lab
             return final;
         }
 
-        private Region PaintCell(Region region, int cell)
+        private Region PaintCell(Region region, int cell) => PaintFundedCell(region, cell, null);
+
+        private Region PaintFundedCell(Region region, int cell, Ink immediateInk)
         {
             region = Root(region.Id);
             if (pixels[cell].a != 0 || region.Budget < 1m)
                 throw new InvalidOperationException("Growth must fund a new surface cell.");
-            Ink ink = Consume(region);
+            Ink ink = Consume(region, immediateInk);
             pixels[cell] = ink.Color;
             painterSlots[cell] = ink.PainterSlot;
             cellRegions[cell] = region.Id;
@@ -545,6 +564,7 @@ namespace C6Lab
 
         private sealed class Ink
         {
+            public ulong Sequence;
             public decimal Remaining;
             public Color32 Color;
             public ulong Owner;

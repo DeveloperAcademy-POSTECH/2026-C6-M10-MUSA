@@ -52,7 +52,7 @@ namespace C6Lab.Tests
                 float[] values = source.CaptureDeveloperValues();
                 Assert.That(values.Length, Is.EqualTo(146));
                 Assert.That(values.Skip(143).Take(2), Is.EqualTo(new[] { .85f, .25f }));
-                Assert.That(source.PaintRepeatPercent, Is.EqualTo(4f));
+                Assert.That(source.PaintRepeatPercent, Is.EqualTo(1.5f));
                 Assert.That(source.PaintGrowthPercentPerSecond, Is.EqualTo(6f));
                 Assert.That(source.CompletedGourdViewerEnabled && source.PlayerPaintPatternsEnabled, Is.True);
                 Assert.That(source.PaintVictoryPercent, Is.EqualTo(100));
@@ -146,7 +146,8 @@ namespace C6Lab.Tests
 
         [TestCase(143)]
         [TestCase(144)]
-        [TestCase(146)]
+        [TestCase(145)]
+        [TestCase(147)]
         public void PreviousIncompleteAndUnknownSharedSchemasCannotApplyAnyField(int count)
         {
             var requested = new float[count];

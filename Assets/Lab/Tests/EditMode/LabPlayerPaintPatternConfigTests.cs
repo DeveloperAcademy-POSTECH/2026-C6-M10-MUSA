@@ -113,7 +113,8 @@ namespace C6Lab.Tests
 
         [TestCase(142)]
         [TestCase(143)]
-        [TestCase(146)]
+        [TestCase(145)]
+        [TestCase(147)]
         public void OldOrUnknownSharedSettingsSchemasAreRejectedBeforeApplyingAnyField(int count)
         {
             float[] before = config.CaptureDeveloperValues();

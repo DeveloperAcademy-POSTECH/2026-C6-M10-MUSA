@@ -1437,7 +1437,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void AnImmediateNewSeedThatMergesUsesTheLastCellsActualSupplyOwner()
+        public void AnOverlappingNewSeedKeepsItsOwnInkBeforeQueuedGrowthChoosesTheFinalOwner()
         {
             var tuning = PaintFixture(50f, 30f, 50f, 25f);
             try
@@ -1469,9 +1469,15 @@ namespace C6Lab.Tests
                 var direction = new Vector3(Mathf.Cos(angle) * ring, vertical, Mathf.Sin(angle) * ring);
                 var finalShot = LaunchElementShot(room, ref request, 0d, 20);
                 Assert.That(room.ConfirmHit(finalShot.id, 0d, direction, out _, out _, out _), Is.True);
-                LabSnapshot won = room.Snapshot(0d);
+                Assert.That(room.Phase, Is.EqualTo(LabPhase.Playing),
+                    "A fixed-size initial splash cannot instantly fill distant white cells to recover its overlap.");
+                Assert.That(map.LastPainter, Is.EqualTo(20ul),
+                    "The new impact's immediate footprint uses its own ink even after merging with queued growth.");
+                Assert.That(map.PendingCoverage, Is.GreaterThan(0d));
+                room.Tick(2d);
+                LabSnapshot won = room.Snapshot(2d);
                 Assert.That(won.phase, Is.EqualTo(LabPhase.Victory));
-                Assert.That(map.LastPainter, Is.EqualTo(10ul), "The earlier FIFO budget pays for the final cell after merging.");
+                Assert.That(map.LastPainter, Is.EqualTo(10ul), "The earlier FIFO budget pays for the final timed cell after merging.");
                 Assert.That(won.players.Single(player => player.id == 10).lastHit, Is.True);
                 Assert.That(won.players.Single(player => player.id == 20).lastHit, Is.False);
                 Assert.That(won.players.Sum(player => player.hitTotal), Is.EqualTo(3));
