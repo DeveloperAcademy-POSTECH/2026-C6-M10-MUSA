@@ -21,13 +21,15 @@ namespace C6Lab
     public enum LabPaintReceive { Rejected, Pending, Applied, NeedCheckpoint }
 
     /// <summary>
-    /// Host sends changed cell IDs + RGBA (6 bytes/cell), or a full RGBA checkpoint when smaller.
+    /// Host sends cell IDs + RGBA + painter P number (7 bytes/cell), or full 5-byte cells.
+    /// Color and painter identity share one hash and commit; partial maps are never displayed.
     /// Frames have <=4096 ASCII base64 characters, well below the existing 32 KiB packet bound.
     /// </summary>
     public sealed class LabPaintPublisher
     {
         public const int FragmentCharacters = 4096;
         private Color32[] published;
+        private byte[] publishedPainters;
         private string session;
         private uint round, revision;
         private int columns, rows, paintCount, covered;
@@ -37,24 +39,28 @@ namespace C6Lab
         public LabPaintFrame[] Publish(LabPaintSurface source, string nextSession, uint nextRound, long nextEpoch)
         {
             var current = new Color32[source.CellCount];
+            var painters = new byte[source.CellCount];
             source.CopyPixels(current);
+            source.CopyPainterSlots(painters);
             bool fresh = published == null || session != nextSession || round != nextRound
                 || columns != source.Columns || rows != source.Rows;
             if (!fresh && revision == source.Revision && paintCount == source.PaintCount) return Array.Empty<LabPaintFrame>();
             var delta = new List<byte>();
             if (!fresh)
                 for (int i = 0; i < current.Length; i++)
-                    if (!current[i].Equals(published[i]))
+                    if (!current[i].Equals(published[i]) || painters[i] != publishedPainters[i])
                     {
                         delta.Add((byte)i); delta.Add((byte)(i >> 8));
                         AddPixel(delta, current[i]);
+                        delta.Add(painters[i]);
                     }
-            bool full = fresh || delta.Count >= current.Length * 4;
-            byte[] payload = full ? PixelBytes(current) : delta.ToArray();
+            bool full = fresh || delta.Count >= current.Length * 5;
+            byte[] payload = full ? CellBytes(current, painters) : delta.ToArray();
             var frames = Frames(nextSession, nextRound, nextEpoch, ++sequence, full,
                 fresh ? 0u : revision, source.Revision, source.Columns, source.Rows,
-                source.PaintCount, source.CoveredCount, Hash(current), payload);
-            published = current; session = nextSession; round = nextRound; epoch = nextEpoch;
+                source.PaintCount, source.CoveredCount, Hash(current, painters), payload);
+            published = current; publishedPainters = painters;
+            session = nextSession; round = nextRound; epoch = nextEpoch;
             columns = source.Columns; rows = source.Rows; revision = source.Revision;
             paintCount = source.PaintCount; covered = source.CoveredCount; hash = frames[0].hash;
             return frames;
@@ -63,11 +69,12 @@ namespace C6Lab
         public LabPaintFrame[] Checkpoint()
             => published == null ? Array.Empty<LabPaintFrame>()
                 : Frames(session, round, epoch, ++sequence, true, 0, revision, columns, rows,
-                    paintCount, covered, hash, PixelBytes(published));
+                    paintCount, covered, hash, CellBytes(published, publishedPainters));
 
         public void Reset()
         {
-            published = null; session = null; round = revision = 0; columns = rows = paintCount = covered = 0;
+            published = null; publishedPainters = null; session = null;
+            round = revision = 0; columns = rows = paintCount = covered = 0;
             hash = null; epoch = sequence = 0;
         }
 
@@ -105,6 +112,29 @@ namespace C6Lab
         {
             using (var sha = SHA256.Create())
                 return BitConverter.ToString(sha.ComputeHash(PixelBytes(pixels))).Replace("-", "").ToLowerInvariant();
+        }
+
+        internal static byte[] CellBytes(Color32[] pixels, byte[] painters)
+        {
+            if (pixels == null || painters == null || pixels.Length != painters.Length)
+                throw new ArgumentException("Paint color and painter maps must have equal lengths.");
+            var bytes = new byte[pixels.Length * 5];
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                int at = i * 5;
+                bytes[at] = pixels[i].r; bytes[at + 1] = pixels[i].g;
+                bytes[at + 2] = pixels[i].b; bytes[at + 3] = pixels[i].a;
+                bytes[at + 4] = painters[i];
+            }
+            return bytes;
+        }
+
+        /// <summary>Transaction identity includes attribution even when pigment colors match.</summary>
+        public static string Hash(Color32[] pixels, byte[] painters)
+        {
+            using (var sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(CellBytes(pixels, painters)))
+                    .Replace("-", "").ToLowerInvariant();
         }
     }
 
@@ -154,38 +184,44 @@ namespace C6Lab
             catch (FormatException) { return LabPaintReceive.NeedCheckpoint; }
             int size = head.columns * head.rows;
             Color32[] next;
+            byte[] nextPainters;
             if (head.full)
             {
-                if (bytes.Length != size * 4) return LabPaintReceive.NeedCheckpoint;
+                if (bytes.Length != size * 5) return LabPaintReceive.NeedCheckpoint;
                 if (session == head.session && round == head.round && head.revision < surface.Revision)
                     return LabPaintReceive.Rejected;
                 next = new Color32[size];
-                for (int i = 0; i < size; i++) next[i] = Pixel(bytes, i * 4);
+                nextPainters = new byte[size];
+                for (int i = 0; i < size; i++)
+                { next[i] = Pixel(bytes, i * 5); nextPainters[i] = bytes[i * 5 + 4]; }
             }
             else
             {
                 if (head.columns != surface.Columns || head.rows != surface.Rows
                     || head.fromRevision != surface.Revision || head.revision < head.fromRevision
-                    || bytes.Length % 6 != 0 || bytes.Length > size * 6)
+                    || bytes.Length % 7 != 0 || bytes.Length > size * 7)
                     return LabPaintReceive.NeedCheckpoint;
                 next = new Color32[size]; surface.CopyPixels(next);
+                nextPainters = new byte[size]; surface.CopyPainterSlots(nextPainters);
                 int previous = -1;
-                for (int at = 0; at < bytes.Length; at += 6)
+                for (int at = 0; at < bytes.Length; at += 7)
                 {
                     int index = bytes[at] | bytes[at + 1] << 8;
                     if (index >= size || index <= previous) return LabPaintReceive.NeedCheckpoint;
-                    next[index] = Pixel(bytes, at + 2); previous = index;
+                    next[index] = Pixel(bytes, at + 2); nextPainters[index] = bytes[at + 6]; previous = index;
                 }
             }
             int covered = 0;
-            foreach (Color32 pixel in next)
+            for (int i = 0; i < size; i++)
             {
+                Color32 pixel = next[i];
                 if (pixel.a != 0 && pixel.a != 255) return LabPaintReceive.NeedCheckpoint;
                 if (pixel.a == 0 && (pixel.r != 0 || pixel.g != 0 || pixel.b != 0)) return LabPaintReceive.NeedCheckpoint;
+                if (nextPainters[i] > 5 || (pixel.a == 0 && nextPainters[i] != 0)) return LabPaintReceive.NeedCheckpoint;
                 if (pixel.a == 255) covered++;
             }
-            if (covered != head.coveredCount || LabPaintPublisher.Hash(next) != head.hash
-                || !surface.TryReplacePixels(head.columns, head.rows, head.revision, next, head.paintCount))
+            if (covered != head.coveredCount || LabPaintPublisher.Hash(next, nextPainters) != head.hash
+                || !surface.TryReplacePixels(head.columns, head.rows, head.revision, next, nextPainters, head.paintCount))
                 return LabPaintReceive.NeedCheckpoint;
             session = head.session; round = head.round; epoch = head.epoch; completedSequence = head.sequence;
             return LabPaintReceive.Applied;

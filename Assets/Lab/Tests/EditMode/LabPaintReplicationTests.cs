@@ -13,9 +13,9 @@ namespace C6Lab.Tests
         private const string Session = "paint-fixture-session";
         private const uint Round = 1u;
 
-        [TestCase(0, 64, 32, 3)]
-        [TestCase(1, 128, 64, 11)]
-        [TestCase(2, 256, 128, 43)]
+        [TestCase(0, 64, 32, 4)]
+        [TestCase(1, 128, 64, 14)]
+        [TestCase(2, 256, 128, 54)]
         public void FullCheckpointsAreBoundedAndReassembleAtEverySupportedResolution(
             int resolution, int columns, int rows, int parts)
         {
@@ -32,7 +32,7 @@ namespace C6Lab.Tests
             Assert.That(frames.All(frame => Encoding.UTF8.GetByteCount(JsonUtility.ToJson(frame)) < 32 * 1024), Is.True,
                 "Even the maximum-resolution paint-only fragment leaves room for its packet envelope.");
             Assert.That(string.Concat(frames.Select(frame => frame.data)).Length,
-                Is.EqualTo(((columns * rows * 4 + 2) / 3) * 4));
+                Is.EqualTo(((columns * rows * 5 + 2) / 3) * 4));
             var replica = NewSurface();
             var receiver = new LabPaintReceiver(replica);
             Assert.That(ReceiveAll(receiver, frames.Reverse().ToArray()), Is.EqualTo(LabPaintReceive.Applied));
@@ -344,8 +344,8 @@ namespace C6Lab.Tests
             {
                 case "hash": foreach (LabPaintFrame frame in frames) frame.hash = new string('f', 64); break;
                 case "base64": frames[0].data = "!" + frames[0].data.Substring(1); break;
-                case "full-short": frames = Reframe(frames[0], payload.Take(payload.Length - 4).ToArray()); break;
-                case "full-long": frames = Reframe(frames[0], payload.Concat(new byte[4]).ToArray()); break;
+                case "full-short": frames = Reframe(frames[0], payload.Take(payload.Length - 5).ToArray()); break;
+                case "full-long": frames = Reframe(frames[0], payload.Concat(new byte[5]).ToArray()); break;
                 case "alpha": payload[3] = 127; frames = Reframe(frames[0], payload); break;
                 case "transparent-rgb": payload[0] = 1; frames = Reframe(frames[0], payload); break;
                 case "covered-mismatch": foreach (LabPaintFrame frame in frames) frame.coveredCount = 1; break;
@@ -390,10 +390,10 @@ namespace C6Lab.Tests
                 case "base": foreach (LabPaintFrame frame in frames) frame.fromRevision++; break;
                 case "revision": foreach (LabPaintFrame frame in frames) frame.revision = frame.fromRevision - 1; break;
                 case "length": frames = Reframe(frames[0], new byte[5]); break;
-                case "too-long": frames = Reframe(frames[0], new byte[(source.CellCount + 1) * 6]); break;
-                case "outside": frames = Reframe(frames[0], new byte[] { 0, 8, 1, 2, 3, 255 }); break;
-                case "duplicate": frames = Reframe(frames[0], new byte[] { 1, 0, 1, 2, 3, 255, 1, 0, 3, 2, 1, 255 }); break;
-                case "unsorted": frames = Reframe(frames[0], new byte[] { 2, 0, 1, 2, 3, 255, 1, 0, 3, 2, 1, 255 }); break;
+                case "too-long": frames = Reframe(frames[0], new byte[(source.CellCount + 1) * 7]); break;
+                case "outside": frames = Reframe(frames[0], new byte[] { 0, 8, 1, 2, 3, 255, 1 }); break;
+                case "duplicate": frames = Reframe(frames[0], new byte[] { 1, 0, 1, 2, 3, 255, 1, 1, 0, 3, 2, 1, 255, 2 }); break;
+                case "unsorted": frames = Reframe(frames[0], new byte[] { 2, 0, 1, 2, 3, 255, 1, 1, 0, 3, 2, 1, 255, 2 }); break;
                 case "dimensions": foreach (LabPaintFrame frame in frames) { frame.columns = 128; frame.rows = 64; } break;
             }
             Assert.That(ReceiveAll(receiver, frames), Is.EqualTo(LabPaintReceive.NeedCheckpoint));
@@ -467,6 +467,9 @@ namespace C6Lab.Tests
             Assert.That(replica.CoveredCount, Is.EqualTo(source.CoveredCount));
             Assert.That(replica.PaintCount, Is.EqualTo(source.PaintCount));
             Assert.That(Pixels(replica), Is.EqualTo(Pixels(source)));
+            var expectedPainters = new byte[source.CellCount]; source.CopyPainterSlots(expectedPainters);
+            var actualPainters = new byte[replica.CellCount]; replica.CopyPainterSlots(actualPainters);
+            Assert.That(actualPainters, Is.EqualTo(expectedPainters));
         }
 
         private static void AssertUnchanged(LabPaintSurface surface, Color32[] pixels, uint revision, int covered, int count)

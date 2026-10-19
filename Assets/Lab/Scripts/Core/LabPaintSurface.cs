@@ -32,6 +32,7 @@ namespace C6Lab
         public const int Width = 256, Height = 128, PixelCount = Width * Height;
         public const float DefaultRadius = .15f;
         private Color32[] pixels;
+        private byte[] painterSlots;
         private Vector3[] points;
         private int[] cellRegions;
         private readonly List<Region> regions = new List<Region>();
@@ -91,6 +92,7 @@ namespace C6Lab
             {
                 Columns = columns; Rows = rows;
                 pixels = new Color32[columns * rows];
+                painterSlots = new byte[pixels.Length];
                 cellRegions = new int[pixels.Length];
                 points = MakePoints(columns, rows);
             }
@@ -117,10 +119,12 @@ namespace C6Lab
         /// <summary>
         /// A new seed spends floor(initial area) immediately. A painted hit supplies its
         /// connected component with FIFO growth credit. Cell fractions survive between hits.
-        /// A cell crossing supplies uses the final supply's opaque color and owner, never a blend.
+        /// A cell crossing supplies uses the final supply's opaque color, connection owner and
+        /// P number together, never a blend. Zero P is reserved for neutral offline fixtures.
         /// </summary>
-        public bool RegisterHit(Vector3 direction, Color color, ulong attackerId)
+        public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0)
         {
+            if (painterSlot < 0 || painterSlot > 5) return false;
             if (preview || replica || IsComplete || !ValidHit(direction, color)) return false;
             int cell = CellFor(direction);
             if (pattern != LabPaintPattern.Legacy && pixels[cell].a == 0 && patternMask == null)
@@ -132,18 +136,18 @@ namespace C6Lab
             if (pixels[cell].a != 0)
             {
                 Region existing = Root(cellRegions[cell]);
-                Supply(existing, repeatCells, opaque, attackerId);
+                Supply(existing, repeatCells, opaque, attackerId, (byte)painterSlot);
                 RefreshActive(existing);
                 return true;
             }
             if (pattern != LabPaintPattern.Legacy)
             {
-                RegisterPatternHit(direction.normalized, cell, opaque, attackerId);
+                RegisterPatternHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot);
                 return true;
             }
             var region = new Region(regions.Count);
             regions.Add(region);
-            Supply(region, initialCells, opaque, attackerId);
+            Supply(region, initialCells, opaque, attackerId, (byte)painterSlot);
             int immediate = (int)Math.Min(decimal.Floor(initialCells), CellCount - CoveredCount);
             region = PaintCell(region, cell);
             InitialPatch patch = flowStyle == 1 ? new InitialPatch(this, direction.normalized, cell) : null;
@@ -195,12 +199,12 @@ namespace C6Lab
             return regions[activeRegions.Min];
         }
 
-        private void Supply(Region region, decimal amount, Color32 color, ulong owner)
+        private void Supply(Region region, decimal amount, Color32 color, ulong owner, byte painterSlot)
         {
             // Cap each component independently: a global cap can strand separate cell fractions.
             amount = Math.Max(0m, Math.Min(amount, CellCount - CoveredCount - region.Budget));
             if (amount == 0m) return;
-            region.Supplies.Add(++supplySequence, new Ink { Remaining = amount, Color = color, Owner = owner });
+            region.Supplies.Add(++supplySequence, new Ink { Remaining = amount, Color = color, Owner = owner, PainterSlot = painterSlot });
             region.Budget += amount;
             totalBudget += amount;
         }
@@ -235,6 +239,7 @@ namespace C6Lab
                 throw new InvalidOperationException("Growth must fund a new surface cell.");
             Ink ink = Consume(region);
             pixels[cell] = ink.Color;
+            painterSlots[cell] = ink.PainterSlot;
             cellRegions[cell] = region.Id;
             region.Remove(cell);
             CoveredCount++;
@@ -384,6 +389,8 @@ namespace C6Lab
         public void Clear()
         {
             Array.Clear(pixels, 0, pixels.Length);
+            if (painterSlots == null || painterSlots.Length != pixels.Length) painterSlots = new byte[pixels.Length];
+            else Array.Clear(painterSlots, 0, painterSlots.Length);
             if (cellRegions == null || cellRegions.Length != pixels.Length) cellRegions = new int[pixels.Length];
             if (points == null || points.Length != pixels.Length) points = MakePoints(Columns, Rows);
             for (int i = 0; i < cellRegions.Length; i++) cellRegions[i] = -1;
@@ -409,30 +416,55 @@ namespace C6Lab
             Array.Copy(pixels, destination, CellCount);
         }
 
+        /// <summary>Copy stable P1..P5 paint provenance; zero means an unpainted or offline-preview cell.</summary>
+        public void CopyPainterSlots(byte[] destination)
+        {
+            if (destination == null) throw new ArgumentNullException(nameof(destination));
+            if (destination.Length != CellCount)
+                throw new ArgumentException("A painter map needs exactly Columns * Rows entries.", nameof(destination));
+            Array.Copy(painterSlots, destination, CellCount);
+        }
+
+        public byte GetPainterSlot(int cell)
+        {
+            if (cell < 0 || cell >= CellCount) throw new ArgumentOutOfRangeException(nameof(cell));
+            return painterSlots[cell];
+        }
+
+        /// <summary>Compatibility path for neutral, offline color-only fixtures.</summary>
+        public bool TryReplacePixels(int columns, int rows, uint revision, Color32[] source, int paintCount)
+            => TryReplacePixels(columns, rows, revision, source,
+                source == null ? null : new byte[source.Length], paintCount);
+
         /// <summary>
         /// Atomically install a validated Client replica. It has no reconstructed growth
         /// authority. Reset/Clear is needed before the instance can paint a fresh local map.
         /// </summary>
-        public bool TryReplacePixels(int columns, int rows, uint revision, Color32[] source, int paintCount)
+        public bool TryReplacePixels(int columns, int rows, uint revision, Color32[] source, byte[] painterSlots, int paintCount)
         {
             if (!((columns == 64 && rows == 32) || (columns == 128 && rows == 64)
                 || (columns == Width && rows == Height)) || source == null
-                || source.Length != columns * rows || paintCount < 0) return false;
+                || source.Length != columns * rows || painterSlots == null
+                || painterSlots.Length != source.Length || paintCount < 0) return false;
             int covered = 0;
             for (int i = 0; i < source.Length; i++)
             {
                 Color32 value = source[i];
+                if (painterSlots[i] > 5 || value.a == 0 && painterSlots[i] != 0) return false;
                 if (value.a != 0 && value.a != 255) return false;
                 if (value.a == 0 && (value.r != 0 || value.g != 0 || value.b != 0)) return false;
                 if (value.a == 255) covered++;
             }
             var replacement = new Color32[source.Length];
             Array.Copy(source, replacement, source.Length);
+            var replacementSlots = new byte[painterSlots.Length];
+            Array.Copy(painterSlots, replacementSlots, painterSlots.Length);
             decimal oldCount = CellCount;
             initialCells = initialCells / oldCount * replacement.Length;
             repeatCells = repeatCells / oldCount * replacement.Length;
             cellsPerSecond = cellsPerSecond / oldCount * replacement.Length;
             Columns = columns; Rows = rows; pixels = replacement;
+            this.painterSlots = replacementSlots;
             points = null; cellRegions = null;
             regions.Clear(); activeRegions.Clear();
             CoveredCount = covered; PaintCount = paintCount; Revision = revision;
@@ -471,6 +503,7 @@ namespace C6Lab
                 if (next.a == 0) next = default;
                 if (old.a == 0 && next.a != 0) CoveredCount++;
                 pixels[i] = next;
+                painterSlots[i] = 0;
             }
             if (PaintCount < int.MaxValue) PaintCount++;
             unchecked { Revision++; }
@@ -499,6 +532,7 @@ namespace C6Lab
             public decimal Remaining;
             public Color32 Color;
             public ulong Owner;
+            public byte PainterSlot;
         }
         private sealed class Region
         {

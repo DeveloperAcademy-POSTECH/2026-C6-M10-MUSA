@@ -13,7 +13,7 @@ namespace C6Lab
         /// <summary>Local growth setting. A pixel-only display replica takes its pattern name from shared LabConfig.</summary>
         public LabPaintPattern Pattern => pattern;
 
-        private void RegisterPatternHit(Vector3 direction, int hitCell, Color32 color, ulong owner)
+        private void RegisterPatternHit(Vector3 direction, int hitCell, Color32 color, ulong owner, byte painterSlot)
         {
             int requested = (int)Math.Min(decimal.Floor(initialCells), CellCount - CoveredCount);
             uint salt = initialSeed ^ unchecked((uint)PaintCount * 0x9E3779B9u);
@@ -30,14 +30,14 @@ namespace C6Lab
             var component = new List<int>();
             decimal fraction = requested == decimal.Floor(initialCells)
                 ? initialCells - requested : 0m;
-            PaintPatternComponent(hitCell, footprint, visited, queue, component, patch, color, owner, fraction);
+            PaintPatternComponent(hitCell, footprint, visited, queue, component, patch, color, owner, painterSlot, fraction);
             for (int i = 0; i < footprint.Length; i++)
                 if (footprint[i] && !visited[i])
-                    PaintPatternComponent(i, footprint, visited, queue, component, patch, color, owner, 0m);
+                    PaintPatternComponent(i, footprint, visited, queue, component, patch, color, owner, painterSlot, 0m);
         }
 
         private void PaintPatternComponent(int first, bool[] footprint, bool[] visited,
-            Queue<int> queue, List<int> component, PatternPatch patch, Color32 color, ulong owner, decimal fraction)
+            Queue<int> queue, List<int> component, PatternPatch patch, Color32 color, ulong owner, byte painterSlot, decimal fraction)
         {
             component.Clear(); queue.Clear();
             visited[first] = true; queue.Enqueue(first);
@@ -54,7 +54,7 @@ namespace C6Lab
             }
             var region = new Region(regions.Count) { PatternPatch = patch };
             regions.Add(region);
-            Supply(region, component.Count + fraction, color, owner);
+            Supply(region, component.Count + fraction, color, owner, painterSlot);
             // BFS order is connected inside this component. PaintCell also merges components
             // that are joined by pre-existing opaque paint, preserving the global FIFO order.
             for (int i = 0; i < component.Count; i++) region = PaintCell(region, component[i]);

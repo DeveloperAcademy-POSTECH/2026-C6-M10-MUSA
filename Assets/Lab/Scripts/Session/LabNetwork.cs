@@ -170,7 +170,8 @@ namespace C6Lab
         // 5635: Host-shared four-pattern impact footprints and independent paint palette.
         // 5636: #201 Host-shared chuimsae chance and minimum gap (two appended values).
         // 5637: #204 manual lobby P selection; results name the authoritative lobby revision.
-        internal const ushort LabProtocolVersion = 5637;
+        // 5638: #206 paint transactions commit RGBA and the actual thrower's P number together.
+        internal const ushort LabProtocolVersion = 5638;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");
@@ -2113,8 +2114,10 @@ namespace C6Lab
         private void CopyPaintToDisplay(LabPaintSurface source, LabSnapshot snapshot)
         {
             var pixels = new Color32[source.CellCount];
+            var painters = new byte[source.CellCount];
             source.CopyPixels(pixels);
-            if (!clientPaintSurface.TryReplacePixels(source.Columns, source.Rows, source.Revision, pixels, snapshot.paintCount))
+            source.CopyPainterSlots(painters);
+            if (!clientPaintSurface.TryReplacePixels(source.Columns, source.Rows, source.Revision, pixels, painters, snapshot.paintCount))
                 throw new InvalidOperationException("Invalid authoritative paint display state.");
         }
 

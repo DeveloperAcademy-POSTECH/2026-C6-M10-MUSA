@@ -1,0 +1,283 @@
+using System;
+using System.Collections;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
+using Object = UnityEngine.Object;
+
+namespace C6Lab.Tests
+{
+    /// <summary>Real saved-mesh/shader pixels; fixtures do not claim projectile or network approval.</summary>
+    public sealed class LabPlayerPaintPatternRenderTests
+    {
+        [UnityTearDown]
+        public IEnumerator UnloadScene()
+        {
+            Scene scene = SceneManager.GetSceneByName("Lab");
+            if (!scene.IsValid() || !scene.isLoaded) yield break;
+            SceneManager.SetActiveScene(SceneManager.CreateScene("Painter render cleanup"));
+            yield return SceneManager.UnloadSceneAsync(scene);
+        }
+
+        [Test]
+        public void FiveCachedLegendBadgesHaveDistinctPatternsAndIdenticalCircularAlpha()
+        {
+            Assert.That(LabPlayerPaintPatterns.SpriteFor(0), Is.Null);
+            Assert.That(LabPlayerPaintPatterns.SpriteFor(6), Is.Null);
+            Assert.That(LabPlayerPaintPatterns.NameFor(0), Is.EqualTo("None"));
+            var pixels = new Color32[5][];
+            string[] expected = { "Dots", "Diagonal", "Horizontal", "Waves", "Grid" };
+            for (int slot = 1; slot <= 5; slot++)
+            {
+                Sprite sprite = LabPlayerPaintPatterns.SpriteFor(slot);
+                Assert.That(sprite, Is.SameAs(LabPlayerPaintPatterns.SpriteFor(slot)), "Badges must be cached, not allocated per HUD refresh.");
+                Assert.That(LabPlayerPaintPatterns.NameFor(slot), Is.EqualTo(expected[slot - 1]));
+                pixels[slot - 1] = sprite.texture.GetPixels32();
+                Assert.That(pixels[slot - 1].Count(pixel => pixel.a == 0), Is.GreaterThan(100));
+                Assert.That(pixels[slot - 1].Count(pixel => pixel.a == 255 && pixel.r < 100), Is.GreaterThan(100));
+                for (int other = 0; other < slot - 1; other++)
+                {
+                    Assert.That(pixels[slot - 1], Is.Not.EqualTo(pixels[other]));
+                    Assert.That(pixels[slot - 1].Select(pixel => pixel.a), Is.EqualTo(pixels[other].Select(pixel => pixel.a)));
+                }
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator ActualSavedShaderDistinguishesAllFivePaintersWithoutChangingPaperAlphaOrCoverage()
+        {
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+                Assert.Ignore("A real graphics device is required; shader pixels were not tested.");
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+            var paint = Object.FindFirstObjectByType<LabGourdPaint>();
+            Assert.That(paint.IsReady, Is.True, paint.InitializationError);
+            Assert.That(paint.paintMaterial.shader.isSupported, Is.True);
+            LabPaintSurface surface = paint.Surface;
+            var pixels = new Color32[surface.CellCount];
+            var owners = new byte[surface.CellCount];
+            using (var rig = new ShellRenderRig(paint))
+            {
+                paint.ClearPaint();
+                Color32[] paper = rig.Capture(paint, null);
+                for (int y = surface.Rows / 5; y < surface.Rows * 4 / 5; y++)
+                    for (int x = surface.Columns * 3 / 5; x < surface.Columns * 9 / 10; x++)
+                        pixels[y * surface.Columns + x] = new Color32(220, 110, 55, 255);
+                Replace(surface, pixels, owners);
+                paint.RefreshCommittedMap();
+                Color32[] neutral = rig.Capture(paint, "painter-P0-neutral.png");
+                Assert.That(neutral.Where((pixel, i) => !pixel.Equals(paper[i])).Count(), Is.GreaterThan(1000));
+                float coverage = surface.Coverage;
+                int covered = surface.CoveredCount;
+                var captures = new Color32[5][];
+                for (int slot = 1; slot <= 5; slot++)
+                {
+                    for (int i = 0; i < owners.Length; i++) owners[i] = pixels[i].a > 0 ? (byte)slot : (byte)0;
+                    Replace(surface, pixels, owners);
+                    paint.RefreshCommittedMap();
+                    Assert.That(paint.PaintTexture.GetPixels32(), Is.EqualTo(pixels));
+                    Assert.That(paint.PainterTexture.filterMode, Is.EqualTo(FilterMode.Point));
+                    Assert.That(paint.PainterTexture.mipmapCount, Is.EqualTo(1));
+                    Assert.That(paint.PainterTexture.wrapModeU, Is.EqualTo(TextureWrapMode.Repeat));
+                    Assert.That(paint.PainterTexture.wrapModeV, Is.EqualTo(TextureWrapMode.Clamp));
+                    Color32[] upload = paint.PainterTexture.GetPixels32();
+                    Assert.That(upload.Select(pixel => pixel.r), Is.EqualTo(owners), "P byte must survive linear upload exactly.");
+                    MaterialPropertyBlock block = ReadBlock(paint.Shell.GetComponent<Renderer>());
+                    Assert.That(block.GetTexture("_PainterMap"), Is.SameAs(paint.PainterTexture));
+                    Color32[] current = captures[slot - 1] = rig.Capture(paint, $"painter-P{slot}-{LabPlayerPaintPatterns.NameFor(slot)}.png");
+                    int changed = 0, paperCount = 0;
+                    for (int i = 0; i < current.Length; i++)
+                    {
+                        if (current[i].a != neutral[i].a) Assert.Fail("Painter pattern changed shell/background alpha at " + i);
+                        if (neutral[i].Equals(paper[i]))
+                        {
+                            if (!current[i].Equals(neutral[i])) Assert.Fail("A painter pattern changed unpainted paper/background at " + i);
+                            paperCount++;
+                        }
+                        else
+                        {
+                            if (current[i].r > neutral[i].r || current[i].g > neutral[i].g || current[i].b > neutral[i].b)
+                                Assert.Fail("The ownership motif must modulate pigment brightness only at " + i);
+                            // The darkest ink retains at least 60% of each element-color
+                            // channel. There are no black gaps or alpha cutouts in pigment.
+                            if (current[i].r < neutral[i].r * .6f || current[i].g < neutral[i].g * .6f || current[i].b < neutral[i].b * .6f)
+                                Assert.Fail("Ownership ink hid the element color or punched a dark hole at " + i);
+                            if (!current[i].Equals(neutral[i])) changed++;
+                        }
+                    }
+                    Assert.That(changed, Is.GreaterThan(100), $"P{slot} must show actual visible shader ink.");
+                    Assert.That(paperCount, Is.GreaterThan(1000));
+                    Assert.That(surface.Coverage, Is.EqualTo(coverage));
+                    Assert.That(surface.CoveredCount, Is.EqualTo(covered));
+                    for (int other = 0; other < slot - 1; other++)
+                        Assert.That(current.Where((pixel, i) => !pixel.Equals(captures[other][i])).Count(), Is.GreaterThan(100),
+                            $"P{slot} and P{other + 1} must differ on the same saved gourd and color.");
+                    Vector3 move = new Vector3(2.37f, -1.13f, .71f);
+                    rig.MoveTogether(move);
+                    yield return null;
+                    Color32[] moved = rig.Capture(paint, null);
+                    long error = 0;
+                    for (int i = 0; i < current.Length; i++)
+                        error += Math.Abs(current[i].r - moved[i].r) + Math.Abs(current[i].g - moved[i].g)
+                            + Math.Abs(current[i].b - moved[i].b) + Math.Abs(current[i].a - moved[i].a);
+                    Assert.That(error / (float)(current.Length * 4), Is.LessThan(.1f),
+                        "Pattern must stay on the shell when model and camera move together. Allow sub-byte projection rounding at the isolated staging coordinates.");
+                    rig.MoveTogether(-move);
+                }
+                Array.Clear(owners, 0, owners.Length);
+                Replace(surface, pixels, owners);
+                paint.RefreshCommittedMap();
+                Assert.That(rig.Capture(paint, null), Is.EqualTo(neutral), "Neutral owner 0 must retain the original shader arithmetic.");
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator CompletedViewerOwnsItsPainterMapAcrossLiveResetRotationAndDisposal()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+            var paint = Object.FindFirstObjectByType<LabGourdPaint>();
+            LabNetwork network = paint.network;
+            LabConfig saved = network.config;
+            var config = Object.Instantiate(saved);
+            float[] values = config.CaptureDeveloperValues();
+            int index = Enumerable.Range(0, LabConfig.DeveloperFields.Count)
+                .Single(i => LabConfig.DeveloperFields[i].Label == "Completed Gourd Viewer (0 off, 1 on)");
+            Assert.That(index, Is.GreaterThanOrEqualTo(0));
+            values[index] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string configError), Is.True, configError);
+            network.config = config;
+            LabGourdResultPreview preview = null;
+            try
+            {
+                network.port = 17946;
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                LabPaintSurface surface = network.PaintSurface;
+                var pixels = new Color32[surface.CellCount];
+                var owners = new byte[surface.CellCount];
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    pixels[i] = new Color32(55, 140, 180, 255);
+                    owners[i] = (byte)(i % 5 + 1);
+                }
+                Replace(surface, pixels, owners);
+                var snapshot = new LabSnapshot
+                {
+                    sessionId = "owner-viewer-fixture", round = 1, phase = LabPhase.Victory,
+                    paintGoalPercent = 100, paintCoverage = surface.Coverage,
+                    paintColumns = surface.Columns, paintRows = surface.Rows,
+                    paintRevision = surface.Revision, paintCellCount = surface.CellCount,
+                    paintCoveredCount = surface.CoveredCount, paintCount = surface.PaintCount
+                };
+                typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(network, snapshot);
+                paint.RefreshCommittedMap();
+                Assert.That(LabGourdResultPreview.TryCreate(network, out preview, out string error, 256), Is.True, error);
+                Texture2D owned = preview.PainterTexture;
+                Assert.That(owned, Is.Not.SameAs(paint.PainterTexture));
+                Assert.That(owned.GetPixels32().Select(pixel => pixel.r), Is.EqualTo(owners));
+                Renderer renderer = preview.ModelRoot.GetComponentsInChildren<Renderer>(true)
+                    .Single(item => item.sharedMaterial != null && item.sharedMaterial.shader == paint.paintMaterial.shader);
+                Assert.That(ReadBlock(renderer).GetTexture("_PainterMap"), Is.SameAs(owned));
+                surface.Clear();
+                paint.RefreshCommittedMap();
+                Assert.That(paint.PainterTexture.GetPixels32().All(pixel => pixel.r == 0), Is.True);
+                Assert.That(owned.GetPixels32().Select(pixel => pixel.r), Is.EqualTo(owners));
+                preview.Rotate(new Vector2(.25f, -.3f));
+                preview.Zoom(.2f);
+                Assert.That(ReadBlock(renderer).GetTexture("_PainterMap"), Is.SameAs(owned));
+                Assert.That(owned.GetPixels32().Select(pixel => pixel.r), Is.EqualTo(owners));
+                preview.Dispose();
+                yield return null;
+                Assert.That(owned == null, Is.True, "Closing the viewer must destroy its independent owner texture.");
+                Assert.That(preview.PainterTexture, Is.Null);
+            }
+            finally
+            {
+                preview?.Dispose();
+                if (network.IsConnected) network.Stop();
+                network.config = saved;
+                Object.Destroy(config);
+            }
+        }
+
+        private static void Replace(LabPaintSurface surface, Color32[] pixels, byte[] owners) =>
+            Assert.That(surface.TryReplacePixels(surface.Columns, surface.Rows, surface.Revision + 1, pixels, owners, 1), Is.True);
+
+        private static MaterialPropertyBlock ReadBlock(Renderer renderer)
+        {
+            var block = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(block);
+            return block;
+        }
+
+        private sealed class ShellRenderRig : IDisposable
+        {
+            private readonly GameObject root;
+            private readonly Renderer renderer;
+            private readonly Camera camera;
+            private readonly RenderTexture texture;
+            private readonly Texture2D readback;
+
+            public ShellRenderRig(LabGourdPaint paint)
+            {
+                root = new GameObject("Painter saved-shell GPU fixture");
+                root.transform.position = new Vector3(1000f, 1000f, 1000f);
+                var shell = new GameObject("Saved White Gourd shell");
+                shell.layer = 30; shell.transform.SetParent(root.transform, false);
+                Mesh mesh = paint.Shell.GetComponent<MeshFilter>().sharedMesh;
+                shell.AddComponent<MeshFilter>().sharedMesh = mesh;
+                renderer = shell.AddComponent<MeshRenderer>();
+                renderer.sharedMaterial = paint.paintMaterial;
+                var cameraObject = new GameObject("Painter camera");
+                cameraObject.transform.SetParent(root.transform, false);
+                cameraObject.transform.localPosition = mesh.bounds.center + Vector3.forward * 3f;
+                cameraObject.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                camera = cameraObject.AddComponent<Camera>();
+                camera.enabled = false; camera.orthographic = true;
+                camera.orthographicSize = Mathf.Max(mesh.bounds.extents.x, mesh.bounds.extents.y) * 1.1f;
+                camera.cullingMask = 1 << 30; camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = new Color(.03f, .04f, .05f, 0f);
+                camera.nearClipPlane = .01f; camera.farClipPlane = 10f;
+                camera.allowHDR = false; camera.allowMSAA = false;
+                texture = new RenderTexture(512, 512, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+                Assert.That(texture.Create(), Is.True);
+                camera.targetTexture = texture;
+                readback = new Texture2D(512, 512, TextureFormat.RGBA32, false, true);
+            }
+
+            public void MoveTogether(Vector3 delta) => root.transform.position += delta;
+
+            public Color32[] Capture(LabGourdPaint paint, string evidenceName)
+            {
+                renderer.SetPropertyBlock(ReadBlock(paint.Shell.GetComponent<Renderer>()));
+                camera.Render();
+                RenderTexture previous = RenderTexture.active;
+                try
+                {
+                    RenderTexture.active = texture;
+                    readback.ReadPixels(new Rect(0, 0, 512, 512), 0, 0); readback.Apply(false, false);
+                    string directory = Environment.GetEnvironmentVariable("C6_PAINTER_EVIDENCE_DIR");
+                    if (string.IsNullOrEmpty(directory)) directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/PlayerPaintPatterns"));
+                    if (!string.IsNullOrEmpty(directory) && !string.IsNullOrEmpty(evidenceName))
+                    {
+                        Directory.CreateDirectory(directory);
+                        File.WriteAllBytes(Path.Combine(directory, evidenceName), readback.EncodeToPNG());
+                    }
+                    return readback.GetPixels32();
+                }
+                finally { RenderTexture.active = previous; }
+            }
+
+            public void Dispose()
+            {
+                camera.targetTexture = null; texture.Release();
+                Object.Destroy(readback); Object.Destroy(texture); Object.Destroy(root);
+            }
+        }
+    }
+}

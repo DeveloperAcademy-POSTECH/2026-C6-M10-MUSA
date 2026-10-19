@@ -22,7 +22,10 @@ namespace C6Lab
 
         private readonly LabPaintSurface localPreview = new LabPaintSurface();
         private Color32[] uploadPixels;
+        private byte[] uploadPainterSlots;
+        private Color32[] uploadPainterPixels;
         private Texture2D paintTexture;
+        private Texture2D painterTexture;
         private LabPaintSurface uploadedSurface;
         private uint uploadedRevision;
         private string uploadedSession;
@@ -44,6 +47,7 @@ namespace C6Lab
         public int PaintCount => Surface.PaintCount;
         public float Coverage => Surface.Coverage;
         public Texture2D PaintTexture => paintTexture;
+        public Texture2D PainterTexture => painterTexture;
         public Transform Shell => shell != null ? shell.transform : null;
         public GameObject VisualInstance { get; private set; }
         public string InitializationError { get; private set; }
@@ -51,7 +55,7 @@ namespace C6Lab
             && network != null && network.target == target && target.Hitbox != null
             && target.VisualMount != null && VisualInstance != null && target.MountedVisual == VisualInstance
             && shell != null && shell.enabled && shell.gameObject.activeInHierarchy && paintMaterial != null
-            && shell.sharedMaterial == paintMaterial && paintTexture != null;
+            && shell.sharedMaterial == paintMaterial && paintTexture != null && painterTexture != null;
 
         /// <summary>Bind the ordinary target before presentation Start methods run.</summary>
         public static LabGourdPaint Attach(LabNetwork network)
@@ -125,7 +129,8 @@ namespace C6Lab
                 return FailInitialization("The paint network, target, or target transforms are not ready.");
             if (visualPrefab == null || paintMaterial == null || paintMaterial.shader == null
                 || paintMaterial.shader.name != "C6Lab/GourdPaint"
-                || !paintMaterial.HasProperty("_PaintMap") || !paintMaterial.HasProperty("_PaintMapReady"))
+                || !paintMaterial.HasProperty("_PaintMap") || !paintMaterial.HasProperty("_PaintMapReady")
+                || !paintMaterial.HasProperty("_PainterMap"))
                 return FailInitialization("The white gourd prefab or C6Lab/GourdPaint material is missing.");
             Transform prefabShell = visualPrefab.transform.Find("White Gourd");
             MeshFilter mesh = prefabShell != null ? prefabShell.GetComponent<MeshFilter>() : null;
@@ -244,9 +249,17 @@ namespace C6Lab
             if (uploadMap)
             {
                 source.CopyPixels(uploadPixels);
+                source.CopyPainterSlots(uploadPainterSlots);
+                for (int i = 0; i < uploadPainterSlots.Length; i++)
+                    uploadPainterPixels[i] = new Color32(uploadPainterSlots[i], 0, 0, 255);
                 paintTexture.SetPixels32(uploadPixels);
                 paintTexture.Apply(false, false);
+                painterTexture.SetPixels32(uploadPainterPixels);
+                painterTexture.Apply(false, false);
+                // Both maps describe the same committed surface. Bind together only after
+                // both CPU uploads finish; an in-flight network map is never sampled here.
                 block.SetTexture("_PaintMap", paintTexture);
+                block.SetTexture("_PainterMap", painterTexture);
                 block.SetFloat("_PaintMapReady", 1f);
                 uploadedSurface = source;
                 uploadedRevision = source.Revision;
@@ -265,12 +278,23 @@ namespace C6Lab
 
         private void EnsureTexture(LabPaintSurface source)
         {
-            if (paintTexture != null && paintTexture.width == source.Columns && paintTexture.height == source.Rows) return;
+            if (paintTexture != null && painterTexture != null
+                && paintTexture.width == source.Columns && paintTexture.height == source.Rows) return;
             if (paintTexture != null) LabVisualSafety.DestroyVisualObject(paintTexture);
+            if (painterTexture != null) LabVisualSafety.DestroyVisualObject(painterTexture);
             uploadPixels = new Color32[source.CellCount];
+            uploadPainterSlots = new byte[source.CellCount];
+            uploadPainterPixels = new Color32[source.CellCount];
             paintTexture = new Texture2D(source.Columns, source.Rows, TextureFormat.RGBA32, false, true)
             {
                 name = "Gourd cumulative paint (runtime)", hideFlags = HideFlags.DontSave,
+                filterMode = FilterMode.Point, wrapModeU = TextureWrapMode.Repeat, wrapModeV = TextureWrapMode.Clamp
+            };
+            // Linear RGBA32 keeps the P byte exact on Metal and ordinary desktop GPUs.
+            // Point sampling avoids inventing a P number at a boundary between players.
+            painterTexture = new Texture2D(source.Columns, source.Rows, TextureFormat.RGBA32, false, true)
+            {
+                name = "Gourd painter P numbers (runtime)", hideFlags = HideFlags.DontSave,
                 filterMode = FilterMode.Point, wrapModeU = TextureWrapMode.Repeat, wrapModeV = TextureWrapMode.Clamp
             };
             hasUploadedSurface = false;
@@ -289,7 +313,11 @@ namespace C6Lab
             mountedTarget = null;
             initialized = false;
             if (paintTexture != null) LabVisualSafety.DestroyVisualObject(paintTexture);
+            if (painterTexture != null) LabVisualSafety.DestroyVisualObject(painterTexture);
             paintTexture = null;
+            painterTexture = null;
+            uploadPixels = uploadPainterPixels = null;
+            uploadPainterSlots = null;
             uploadedSurface = null;
             hasUploadedSurface = false;
         }
