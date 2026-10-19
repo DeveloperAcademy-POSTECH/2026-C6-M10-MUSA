@@ -1305,7 +1305,7 @@ namespace C6Lab.Tests
             Assert.That(config.CaptureDeveloperValues().Take(150), Is.EqualTo(before.Take(150)),
                 "Earlier settings keep their places and values.");
 
-            values[155] = .05f;
+            values[155] = .005f; // below the 0.01 minimum
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
             Assert.That(error, Does.Contain("Combo Penalty Size"));
         }
