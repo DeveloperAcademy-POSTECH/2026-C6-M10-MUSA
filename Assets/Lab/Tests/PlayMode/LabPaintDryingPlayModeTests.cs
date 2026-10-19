@@ -153,7 +153,7 @@ namespace C6Lab.Tests
             Assert.That(erased, Is.GreaterThan(0));
             Assert.That(after, Is.EqualTo(Pixels(model.PaintSurface)));
             Assert.That(paint.Coverage, Is.EqualTo(network.Snapshot.paintCoverage));
-            Assert.That(hud.hpText.text, Is.EqualTo(LabHud.FormatPaintGoalProgress(network.Snapshot)));
+            Assert.That(hud.hpText.text, Is.EqualTo(LabHud.FormatPaintPercentage(network.Snapshot)));
             Assert.That(hud.yokaiHpFill.fillAmount, Is.EqualTo(model.PaintSurface.Coverage).Within(.00001f));
             Assert.That(hud.yokaiHpFill.fillAmount, Is.LessThan(initialFill));
             Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
@@ -188,7 +188,7 @@ namespace C6Lab.Tests
             Assert.That(paint.PaintTexture.GetPixels32(), Is.EqualTo(frozen));
             Assert.That(Slots(model.PaintSurface), Is.EqualTo(owners));
             Assert.That(network.Snapshot.paintCoveredCount, Is.EqualTo(network.Snapshot.paintCellCount));
-            Assert.That(hud.hpText.text, Is.EqualTo("PAINT 100.0% / 100%"));
+            Assert.That(hud.hpText.text, Is.EqualTo("100.0%"));
             viewer.CloseViewer();
             yield return null;
         }

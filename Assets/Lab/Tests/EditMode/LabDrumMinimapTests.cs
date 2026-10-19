@@ -1,5 +1,7 @@
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEditor;
 
 namespace C6Lab.Tests
 {
@@ -129,6 +131,87 @@ namespace C6Lab.Tests
                 Object.DestroyImmediate(minimap.gameObject);
                 Object.DestroyImmediate(root);
             }
+        }
+        [Test]
+        public void ConceptSpritesFollowActualSeatsAndDrumMarkersDoNotCoverTheirRingColours()
+        {
+            var root = new GameObject("concept ui", typeof(RectTransform));
+            var badge = new GameObject("badge", typeof(RectTransform));
+            badge.transform.SetParent(root.transform, false);
+            var minimap = new GameObject("map").AddComponent<LabDrumMinimap>();
+            try
+            {
+                ApplyConceptSprites(minimap);
+                minimap.Bind(null, (RectTransform)badge.transform, null);
+                var players = new[] {
+                    new LabPlayerState { id = 50, seat = 4 }, new LabPlayerState { id = 10, seat = 0 },
+                    new LabPlayerState { id = 40, seat = 3 }, new LabPlayerState { id = 20, seat = 1 },
+                    new LabPlayerState { id = 30, seat = 2 }
+                };
+                minimap.Rebuild(players, 40);
+                var panel = root.transform.Find("DrumMinimap");
+                Assert.That(panel.GetComponent<Image>(), Is.Null, "The concept map has no rectangular backing.");
+                var seats = panel.Find("Content/Seats");
+                int[] numbers = { 4, 5, 1, 2, 3 };
+                for (int i = 0; i < numbers.Length; i++)
+                {
+                    var image = seats.GetChild(i).GetComponent<Image>();
+                    Assert.That(image.sprite, Is.SameAs(minimap.playerSprites[numbers[i] - 1]));
+                    Assert.That(image.color, Is.EqualTo(Color.white));
+                }
+                Assert.That(panel.Find("Content/Labels").childCount, Is.Zero,
+                    "The supplied badges contain the number; a second label must not cover the drum.");
+                Assert.That(minimap.SeatPositions[50].x, Is.GreaterThan(minimap.SeatPositions[40].x));
+                minimap.SyncDrums(new[] {
+                    new LabOrbState { id = "a", owner = 20, kind = LabOrbKind.Drum },
+                    new LabOrbState { id = "b", owner = 50, kind = LabOrbKind.Drum }
+                });
+                Assert.That(panel.Find("Content/Drums").childCount, Is.EqualTo(2));
+                Assert.That(panel.Find("Content/Drums").GetChild(0).GetComponent<Image>().sprite,
+                    Is.SameAs(minimap.drumIconSprite));
+                Assert.That(minimap.DrumPosition("a"), Is.EqualTo(minimap.SeatPositions[20]));
+                minimap.SyncDrums(new[] { new LabOrbState { id = "a", owner = 30, kind = LabOrbKind.Drum } });
+                minimap.Advance(1f);
+                Assert.That(minimap.DrumPosition("a"), Is.EqualTo(minimap.SeatPositions[30]));
+                Assert.That(minimap.DrumPosition("b"), Is.Null);
+            }
+            finally { Object.DestroyImmediate(minimap.gameObject); Object.DestroyImmediate(root); }
+        }
+
+        [Test]
+        public void SoloUsesTheSuppliedDrumTokenAndReturnsToItsNumberWhenTheDrumDisappears()
+        {
+            var root = new GameObject("solo ui", typeof(RectTransform));
+            var badge = new GameObject("badge", typeof(RectTransform));
+            badge.transform.SetParent(root.transform, false);
+            var minimap = new GameObject("map").AddComponent<LabDrumMinimap>();
+            try
+            {
+                ApplyConceptSprites(minimap);
+                minimap.Bind(null, (RectTransform)badge.transform, null);
+                minimap.Rebuild(new[] { new LabPlayerState { id = 10, seat = 0 } }, 10);
+                var seat = root.transform.Find("DrumMinimap/Content/Seats").GetChild(0).GetComponent<Image>();
+                Assert.That(seat.sprite, Is.SameAs(minimap.playerSprites[0]));
+                minimap.SyncDrums(new[] { new LabOrbState { id = "solo", owner = 10, kind = LabOrbKind.Drum } });
+                Assert.That(seat.sprite, Is.SameAs(minimap.soloDrumSprite));
+                Assert.That(minimap.DrumPosition("solo"), Is.EqualTo(Vector2.zero));
+                minimap.SyncDrums(new LabOrbState[0]);
+                Assert.That(seat.sprite, Is.SameAs(minimap.playerSprites[0]));
+            }
+            finally { Object.DestroyImmediate(minimap.gameObject); Object.DestroyImmediate(root); }
+        }
+
+        private static void ApplyConceptSprites(LabDrumMinimap map)
+        {
+            const string art = "Assets/Lab/Art/UI/";
+            map.playerSprites = new Sprite[5];
+            for (int i = 0; i < 5; i++)
+                map.playerSprites[i] = AssetDatabase.LoadAssetAtPath<Sprite>(art + "Player" + (i + 1) + "Circle.png");
+            map.drumIconSprite = AssetDatabase.LoadAssetAtPath<Sprite>(art + "PlayerPositionDrumIcon.png");
+            map.soloDrumSprite = AssetDatabase.LoadAssetAtPath<Sprite>(art + "PlayerPositionSoloIcon.png");
+            Assert.That(map.drumIconSprite, Is.Not.Null);
+            Assert.That(map.soloDrumSprite, Is.Not.Null);
+            map.size = new Vector2(151, 142);
         }
     }
 }

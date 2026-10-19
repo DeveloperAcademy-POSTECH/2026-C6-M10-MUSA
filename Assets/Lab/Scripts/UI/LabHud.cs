@@ -38,6 +38,7 @@ namespace C6Lab
         public Text noticeText;
         public Text peersText;
         public Text hpText;
+        public bool compactPaintProgress;
         public Text playerHpText;
         public Text timeText;
         public Text staminaText;
@@ -280,7 +281,7 @@ namespace C6Lab
                     : "ROOM PLAYERS " + network.TargetParticipantCount + " / 5");
             if (snapshot == null)
             {
-                Set(hpText, "—");
+                Set(hpText, compactPaintProgress ? "0.0%" : "—");
                 Set(playerHpText, "—");
                 Set(timeText, "--:--");
                 Set(staminaText, "STAMINA —");
@@ -300,7 +301,7 @@ namespace C6Lab
                 return;
             }
             Set(hpText, paintGoal
-                ? FormatPaintGoalProgress(snapshot)
+                ? (compactPaintProgress ? FormatPaintPercentage(snapshot) : FormatPaintGoalProgress(snapshot))
                 : snapshot.hp + " / " + network.config.MonsterMaxHp);
             int remainingSeconds = Mathf.Max(0, Mathf.CeilToInt((float)snapshot.remaining));
             Set(timeText, (remainingSeconds / 60).ToString("00") + ":" + (remainingSeconds % 60).ToString("00"));
@@ -359,13 +360,22 @@ namespace C6Lab
 
         /// <summary>Integer cell counts prevent float rounding from displaying an unfinished surface as 100%.</summary>
         public static string FormatPaintGoalProgress(LabSnapshot snapshot)
+            => FormatPaintTenths(PaintProgressTenths(snapshot));
+
+        public static string FormatPaintPercentage(LabSnapshot snapshot)
+            => (PaintProgressTenths(snapshot) / 10m).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+
+        private static int PaintProgressTenths(LabSnapshot snapshot)
         {
-            if (snapshot == null) return FormatPaintTenths(0);
+            if (snapshot == null) return 0;
             if (snapshot.paintCellCount <= 0)
-                return FormatPaintGoalProgress(snapshot.paintCoverage, LabConfig.DefaultPaintVictoryPercent);
+            {
+                float coverage = DisplayCoverage(snapshot.paintCoverage);
+                int value = Mathf.FloorToInt(coverage * 1000f);
+                return coverage < 1f ? Mathf.Min(value, 999) : value;
+            }
             int covered = Mathf.Clamp(snapshot.paintCoveredCount, 0, snapshot.paintCellCount);
-            int tenths = (int)((long)covered * 1000L / snapshot.paintCellCount);
-            return FormatPaintTenths(tenths);
+            return (int)((long)covered * 1000L / snapshot.paintCellCount);
         }
 
         private static string FormatPaintTenths(int tenths)

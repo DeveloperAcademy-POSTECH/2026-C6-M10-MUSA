@@ -540,7 +540,7 @@ namespace C6Lab
         [Header("Battle view and throw origin")]
         [SerializeField, Min(.001f)] private float cameraRadius = 8f;
         [SerializeField] private float cameraHeightOffset = .65f;
-        [SerializeField, Range(-10f, 10f)] private float cameraLookHeightOffset = 2f;
+        [SerializeField, Range(-10f, 10f)] private float cameraLookHeightOffset = .8f;
         [SerializeField, Min(.001f)] private float throwOriginRadius = 4f;
         [SerializeField] private float throwOriginHeightOffset = -.5f;
         [SerializeField, Min(0f)] private float throwOriginLateralRange = 1f;
@@ -794,7 +794,7 @@ namespace C6Lab
         public float CombineHapticIntensity => Mathf.Clamp01(Finite(combineHapticIntensity, 1f));
         public float CameraRadius => Positive(cameraRadius, 8f);
         public float CameraHeightOffset => Finite(cameraHeightOffset, .65f);
-        public float CameraLookHeightOffset => Mathf.Clamp(Finite(cameraLookHeightOffset, 2f), -10f, 10f);
+        public float CameraLookHeightOffset => Mathf.Clamp(Finite(cameraLookHeightOffset, .8f), -10f, 10f);
         public float ThrowOriginRadius => Positive(throwOriginRadius, 4f);
         public float ThrowOriginHeightOffset => Finite(throwOriginHeightOffset, -.5f);
         public float ThrowOriginLateralRange => Mathf.Max(0f, Finite(throwOriginLateralRange, 1f));

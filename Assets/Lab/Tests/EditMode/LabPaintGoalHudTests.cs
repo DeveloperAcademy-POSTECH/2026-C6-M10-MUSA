@@ -66,6 +66,8 @@ namespace C6Lab.Tests
                 paintCellCount = total
             };
             Assert.That(LabHud.FormatPaintGoalProgress(snapshot), Is.EqualTo(expected));
+            Assert.That(LabHud.FormatPaintPercentage(snapshot),
+                Is.EqualTo(expected.Replace("PAINT ", "").Replace(" / 100%", "")));
             float fill = LabHud.PaintGoalFill(snapshot);
             if (covered < total) Assert.That(fill, Is.LessThan(1f));
             else Assert.That(fill, Is.EqualTo(1f));

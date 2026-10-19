@@ -70,10 +70,11 @@ namespace C6Lab.Editor
                 importer.SaveAndReimport();
                 hud.playerCircleSprites[i] = AssetDatabase.LoadAssetAtPath<Sprite>(path);
             }
+            // Figma 2527:7969, 402×874: plate (-165,459) + badge offsets.
             var parent = hud.battleUi.transform;
-            hud.leftPlayerCircle = Circle(parent, "LeftNeighborBadge", -7, 437, hud.playerCircleSprites[0]);
-            hud.rightPlayerCircle = Circle(parent, "RightNeighborBadge", 360, 437, hud.playerCircleSprites[2]);
-            hud.localPlayerCircle = Circle(parent, "LocalPlayerCircle", 177, 809, hud.playerCircleSprites[1]);
+            hud.leftPlayerCircle = Circle(parent, "LeftNeighborBadge", -6, 480, hud.playerCircleSprites[0]);
+            hud.rightPlayerCircle = Circle(parent, "RightNeighborBadge", 365, 480, hud.playerCircleSprites[2]);
+            hud.localPlayerCircle = Circle(parent, "LocalPlayerCircle", 65, 809, hud.playerCircleSprites[1]);
             hud.leftNeighborBadge = hud.leftPlayerCircle.gameObject;
             hud.rightNeighborBadge = hud.rightPlayerCircle.gameObject;
             if (hud.seatText != null) hud.seatText.gameObject.SetActive(false);
@@ -91,11 +92,11 @@ namespace C6Lab.Editor
             Transform found = parent.Find(name);
             var rect = found != null ? (RectTransform)found : new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
             rect.SetParent(parent, false);
-            rect.anchorMin = new Vector2((x + 24) / 402f, 1f - (y + 24) / 874f);
+            rect.anchorMin = new Vector2((x + 22.5f) / 402f, 1f - (y + 23.5f) / 874f);
             rect.anchorMax = rect.anchorMin;
             rect.pivot = new Vector2(.5f, .5f);
             rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(48, 48);
+            rect.sizeDelta = new Vector2(45, 47);
             rect.gameObject.SetActive(true);
             rect.SetAsLastSibling();
             var image = rect.GetComponent<Image>() ?? rect.gameObject.AddComponent<Image>();
