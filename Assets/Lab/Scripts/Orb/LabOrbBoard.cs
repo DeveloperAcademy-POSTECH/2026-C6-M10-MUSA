@@ -69,6 +69,8 @@ namespace C6Lab
             public float ArrivalStopX;
             /// <summary>A drum a bomb blast flung, until it slows to its drift; crossing now says so to the Host.</summary>
             public bool Blasted;
+            /// <summary>A bomb blast shrank this orb for the rest of its life (#213).</summary>
+            public bool Small;
             /// <summary>When the held body last followed the finger, for a heavy bomb's lag (#212).</summary>
             public double LastDragAt;
             public string PendingPartnerId;
@@ -183,7 +185,7 @@ namespace C6Lab
             BuildHorizontalWalls();
             foreach (var entry in entries.Values)
             {
-                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind), entry.View.Element);
+                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind, entry.Small), entry.View.Element);
                 entry.View.ConfigureAppearance(config.OrbAppearance);
                 SetLayerRecursively(entry.View.transform, gameObject.layer);
                 entry.View.HitSphere.sharedMaterial = contactMaterial;
@@ -274,23 +276,26 @@ namespace C6Lab
         /// Add a newly approved orb, or update its kind/owner. Existing local physics is never
         /// reset by a repeated snapshot. Positions are 0..1; velocity is board widths/second.
         /// justUnlocked plays the unlock effect once per orb, however many snapshots repeat it.
+        /// A small orb, shrunk by a bomb blast (#213), is smaller to see, to grab and to bump into.
         /// </summary>
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
             bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
-            LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f)
+            LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false)
         {
             RequireConfigured();
+            small &= !kind.IsDrum();
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
                 throw new ArgumentException("A finite orb identity, position and velocity are required.");
             if (entries.TryGetValue(id, out var existing))
             {
                 existing.LocalOwner = localOwner;
                 existing.View.FuseTotalSeconds = config.ItemLifetimeSeconds;
-                if (existing.View.Kind != kind || existing.View.Element != element)
+                if (existing.View.Kind != kind || existing.View.Element != element || existing.Small != small)
                 {
-                    existing.View.Configure(id, kind, RadiusFor(kind), element);
+                    existing.Small = small;
+                    existing.View.Configure(id, kind, RadiusFor(kind, small), element);
                     existing.View.Body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
@@ -302,16 +307,16 @@ namespace C6Lab
                 return existing.View;
             }
 
-            Vector2 start = ToWorld(normalizedPosition, RadiusFor(kind));
+            Vector2 start = ToWorld(normalizedPosition, RadiusFor(kind, small));
             Vector2 popFrom = start;
             if (playSpawn) start = OutsideDrums(start, velocityInBoardWidthsPerSecond, out popFrom);
-            start = Clamp(start, RadiusFor(kind));
+            start = Clamp(start, RadiusFor(kind, small));
             var gameObject = new GameObject("Orb " + id);
             gameObject.layer = this.gameObject.layer;
             gameObject.transform.SetParent(transform, false);
             gameObject.transform.position = OnPlane(start);
             var view = gameObject.AddComponent<LabOrbView>();
-            view.Configure(id, kind, RadiusFor(kind), element);
+            view.Configure(id, kind, RadiusFor(kind, small), element);
             view.ConfigureAppearance(config.OrbAppearance);
             view.FuseTotalSeconds = config.ItemLifetimeSeconds;
             view.SetItemState(lockSwipes, relayStage, fuseSeconds);
@@ -330,7 +335,7 @@ namespace C6Lab
             body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
             body.position = OnPlane(start);
             var entry = new Entry { View = view, LocalOwner = localOwner, DriftSeed = DriftSeedFor(id),
-                Dropping = expectedDrops.Remove(id) };
+                Dropping = expectedDrops.Remove(id), Small = small };
             entries.Add(id, entry);
             SetBodyMode(entry);
             if (entry.Dropping) PlayDrop(entry, start);
@@ -1209,7 +1214,8 @@ namespace C6Lab
             return areaShape.Clamp(world, radius);
         }
 
-        private float RadiusFor(LabOrbKind kind) => kind.IsDrum() ? config.DrumRadius : config.OrbRadius;
+        private float RadiusFor(LabOrbKind kind, bool small = false) =>
+            kind.IsDrum() ? config.DrumRadius : config.OrbRadius * (small ? config.BlastShrinkScale : 1f);
         private static Vector2 XY(Vector3 value) => new Vector2(value.x, value.y);
         private static Vector3 OnPlane(Vector2 value) => new Vector3(value.x, value.y, 0f);
         private static void StopMotion(Rigidbody body)

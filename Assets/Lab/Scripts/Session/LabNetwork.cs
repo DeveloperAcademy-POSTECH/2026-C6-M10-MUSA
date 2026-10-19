@@ -39,6 +39,8 @@ namespace C6Lab
         public string secondId;
         /// <summary>The orbs a blast flung, in a holder's blastHit report (#213).</summary>
         public string[] ids;
+        /// <summary>A projectile thrown from a blast-shrunk orb (#213).</summary>
+        public bool small;
         /// <summary>Why a transferred body crossed its edge (LabEdgeCrossingKind).</summary>
         public int crossing;
         public uint round;
@@ -1667,12 +1669,14 @@ namespace C6Lab
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
             Vector3 launchPosition = LabThrowMath.LaunchPosition(seat, seatCount, targetCenter, releaseX01, config);
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
-            var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element);
+            // A blast-shrunk orb flies small and so has less reach on the gourd (#213).
+            var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element,
+                orb.small ? config.BlastShrinkScale : 1f);
             projectile.name = "Projectile " + orb.id;
             projectile.SetMissSurface(battleFloor);
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
-                firstId = orb.id, owner = orb.owner, element = (int)orb.element,
+                firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
                 wx = velocity.x, wy = velocity.y, wz = velocity.z };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
@@ -1770,7 +1774,7 @@ namespace C6Lab
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
-                    orb.JustUnlocked(latest.serverTime));
+                    orb.JustUnlocked(latest.serverTime), small: orb.small);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
@@ -1984,7 +1988,8 @@ namespace C6Lab
                         Vector3 velocity = new Vector3(packet.wx, packet.wy, packet.wz);
                         LabOrbElement element = packet.element >= (int)LabOrbElement.None && packet.element <= (int)LabOrbElement.Earth
                             ? (LabOrbElement)packet.element : LabOrbElement.None;
-                        LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element);
+                        LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element,
+                            packet.small ? config.BlastShrinkScale : 1f);
                         visual.SetMissSurface(battleFloor);
                         visual.LaunchVisual(velocity, config, target);
                     }

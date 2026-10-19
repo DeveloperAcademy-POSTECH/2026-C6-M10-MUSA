@@ -689,6 +689,46 @@ namespace C6Lab.Tests
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(far), 2d), Is.True, "No gesture is left stuck after the blast.");
         }
 
+        [Test]
+        public void ABlastShrunkOrbIsSmallerToSeeGrabAndBumpAndStaysSmall()
+        {
+            Assert.That(config.BlastShrinkScale, Is.EqualTo(.5f));
+            float radius = config.OrbRadius;
+            var whole = board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.3f, .5f));
+            var small = board.UpsertOrb("small", LabOrbKind.Yin, new Vector2(.7f, .5f), small: true);
+            Assert.That(whole.HitSphere.radius, Is.EqualTo(radius).Within(1e-5f));
+            Assert.That(small.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f),
+                "A blast-shrunk orb bumps into others at half the radius (#213).");
+            Assert.That(small.Visual.Find("Default Sphere").localScale.x, Is.EqualTo(radius).Within(1e-4f),
+                "It looks half as big.");
+            Assert.That(whole.Visual.Find("Default Sphere").localScale.x, Is.EqualTo(2f * radius).Within(1e-4f));
+
+            // A touch just past a small orb's reach misses it, where the same touch grabs a whole one.
+            Vector2 offset = new Vector2(0f, .9f * radius);
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(small) + offset, 1d), Is.False, "It is harder to grab.");
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(whole) + offset, 2d), Is.True);
+            board.CancelDrag();
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(small), 3d), Is.True, "Right on it, it is still grabbed.");
+            board.CancelDrag();
+
+            board.UpsertOrb("small", LabOrbKind.Yin, new Vector2(.7f, .5f), small: true);
+            Assert.That(small.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f), "Repeated snapshots keep it small.");
+            board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.3f, .5f), small: true);
+            Assert.That(whole.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f),
+                "An orb the Host has just marked shrinks where it is.");
+            Assert.That(whole.Visual.Find("Default Sphere").localScale.x, Is.EqualTo(radius).Within(1e-4f));
+
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.5f, .2f), small: true);
+            Assert.That(drum.HitSphere.radius, Is.EqualTo(config.DrumRadius).Within(1e-5f), "A drum never shrinks.");
+
+            // The DEV form sets how small.
+            float[] values = config.CaptureDeveloperValues();
+            values[151] = .25f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var smaller = board.UpsertOrb("smaller", LabOrbKind.Yang, new Vector2(.5f, .8f), small: true);
+            Assert.That(smaller.HitSphere.radius, Is.EqualTo(.25f * radius).Within(1e-5f));
+        }
+
         [UnityTest]
         public IEnumerator AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour()
         {

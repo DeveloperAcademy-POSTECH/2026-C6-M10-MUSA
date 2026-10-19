@@ -1194,6 +1194,72 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ABlastShrunkOrbPaintsOnlyItsShareOfWhatAWholeOnePaints()
+        {
+            int Painted(bool shrink)
+            {
+                var mixed = ConfigWith(1f, 25, 25, 0, 0, 0, 50);
+                try
+                {
+                    var room = new LabModel();
+                    room.Begin("small-paint", new ulong[] { 10, 20, 30 }, 0d, mixed);
+                    LabOrbState bomb = null;
+                    for (int i = 0; i < 20 && bomb == null; i++)
+                    {
+                        Assert.That(room.TryGenerate(10, "early-" + i, 0d, out var orb, out _), Is.True);
+                        if (orb.kind == LabOrbKind.Bomb) bomb = orb;
+                    }
+                    Assert.That(bomb, Is.Not.Null);
+                    LabOrbState yin = null, yang = null;
+                    for (int i = 0; i < 30 && (yin == null || yang == null); i++)
+                    {
+                        Assert.That(room.TryGenerate(10, "pair-" + i, 10d, out var orb, out _), Is.True);
+                        if (orb.kind == LabOrbKind.Yin && yin == null) yin = orb;
+                        if (orb.kind == LabOrbKind.Yang && yang == null) yang = orb;
+                    }
+                    Assert.That(yin, Is.Not.Null);
+                    Assert.That(yang, Is.Not.Null);
+                    room.Snapshot(15d);
+                    Assert.That(room.DrainBombExplosions().Select(blast => blast.BombId), Does.Contain(bomb.id));
+                    if (shrink) Assert.That(room.MarkBlasted(10, bomb.id, new[] { yin.id }, 15.1d), Is.EqualTo(1));
+                    Assert.That(room.TryCombine(10, yin.id, yang.id, "combine", 15.5d, out var combined, out var reason),
+                        Is.True, reason);
+                    Assert.That(combined.small, Is.EqualTo(shrink));
+                    Assert.That(room.TryLaunch(10, combined.id, "throw", 15.6d, out _, out reason), Is.True, reason);
+                    Assert.That(room.ConfirmHit(combined.id, 15.7d, Vector3.forward, out _, out _, out _), Is.True);
+                    // Let the growth spend every bit of the hit's paint.
+                    room.Snapshot(60d);
+                    return room.PaintSurface.CoveredCount;
+                }
+                finally { UnityEngine.Object.DestroyImmediate(mixed); }
+            }
+
+            int whole = Painted(false);
+            int small = Painted(true);
+            Assert.That(whole, Is.GreaterThan(100), "A whole combined orb paints its full first splash.");
+            Assert.That(small, Is.EqualTo(whole / 2).Within(3),
+                "One shrunk by a blast paints half as much by default (#213).");
+        }
+
+        [Test]
+        public void APaintShareOutsideZeroToOnePaintsNothingAndHalfPaintsHalf()
+        {
+            var settings = new LabPaintGrowthSettings();
+            var surface = new LabPaintSurface(settings, 3u);
+            foreach (float bad in new[] { 0f, -.5f, 1.5f, float.NaN, float.PositiveInfinity })
+                Assert.That(surface.RegisterHit(Vector3.forward, Color.red, 1, 1, bad), Is.False, bad.ToString());
+            Assert.That(surface.PaintCount, Is.Zero, "A refused hit is not counted.");
+            Assert.That(surface.CoveredCount, Is.Zero);
+
+            var whole = new LabPaintSurface(settings, 3u);
+            Assert.That(surface.RegisterHit(Vector3.forward, Color.red, 1, 1, .5f), Is.True);
+            Assert.That(whole.RegisterHit(Vector3.forward, Color.red, 1, 1), Is.True);
+            surface.Advance(30d);
+            whole.Advance(30d);
+            Assert.That(surface.CoveredCount, Is.EqualTo(whole.CoveredCount / 2).Within(3));
+        }
+
+        [Test]
         public void OnlyTheUnlockingHandoffStampsTheUnlockTimeAndTheNextHandoffClearsIt()
         {
             var relays = ConfigWith(10f, 0, 0, 100, 0, 0, 0);

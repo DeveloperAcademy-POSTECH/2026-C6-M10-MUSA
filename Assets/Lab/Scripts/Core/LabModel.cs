@@ -404,7 +404,8 @@ namespace C6Lab
             if (paintRound)
             {
                 if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
-                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1)
+                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1,
+                        orb.small ? rules.SmallOrbPaintShare : 1f)
                     && paintSurface.IsComplete)
                 {
                     phase = LabPhase.Victory;
@@ -880,6 +881,8 @@ namespace C6Lab
         {
             public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
             public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
+            /// <summary>How much a blast-shrunk orb paints, against a whole one (#213).</summary>
+            public readonly float SmallOrbPaintShare;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
             public readonly float SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, FloorDeceleration;
@@ -915,6 +918,7 @@ namespace C6Lab
                 RelayDoubleMultiplier = config.RelayDoubleMultiplier;
                 RelayMaxMultiplier = config.RelayMaxMultiplier;
                 BombMultiplier = config.BombMultiplier;
+                SmallOrbPaintShare = config.SmallOrbPaintShare;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
                 BattleDurationSeconds = config.BattleDurationSeconds;
