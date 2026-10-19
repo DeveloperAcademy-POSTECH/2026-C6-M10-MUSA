@@ -436,8 +436,7 @@ namespace C6Lab
 
         /// <summary>
         /// The gourd is dropping this bomb onto this screen (#177). Call before its snapshot arrives:
-        /// when the bomb first appears, a "!" warning shows on its landing spot, then it falls in from
-        /// above the orb area and bounces. Until it lands it cannot be grabbed or pushed and nothing
+        /// when the bomb first appears it falls in from above the orb area and bounces. Until it lands it cannot be grabbed or pushed and nothing
         /// bumps into it.
         /// </summary>
         public void ExpectDrop(string bombId)
@@ -532,12 +531,11 @@ namespace C6Lab
             LabOrbAppearance look = config.OrbAppearance != null ? config.OrbAppearance : LabOrbAppearance.Defaults;
             LabOrbView view = entry.View;
             float radius = view.HitSphere.radius;
-            LabDropWarning.Play(transform, landing, radius, look.DropWarningSeconds + look.DropFallSeconds,
-                look.DropWarningColor);
-            // It falls from just above the top of the orb area, straight down onto its spot.
+            // It falls at once from just above the top of the orb area, straight down onto its spot;
+            // its growing shadow marks where it will land (#212).
             Vector2 drop = new Vector2(0f, Mathf.Max(bounds.yMax + 2f * radius - landing.y, 2f * radius));
             string id = view.OrbId;
-            view.PlayDrop(view.transform.InverseTransformVector(OnPlane(drop)), look.DropWarningSeconds,
+            view.PlayDrop(view.transform.InverseTransformVector(OnPlane(drop)),
                 look.DropFallSeconds, look.DropBounceSeconds,
                 view.transform.InverseTransformVector(OnPlane(Vector2.up * (look.DropBounceHeight * radius))).y,
                 () =>

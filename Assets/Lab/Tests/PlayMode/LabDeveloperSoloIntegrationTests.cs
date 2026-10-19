@@ -576,7 +576,10 @@ namespace C6Lab.Tests
                 Assert.That(bomb.owner, Is.EqualTo(network.LocalPlayerId));
                 Assert.That(board.IsDropping(bombId), Is.True,
                     "The drop signal reaches the board before the snapshot that holds the bomb.");
-                Assert.That(board.GetComponentInChildren<LabDropWarning>(), Is.Not.Null, "Its landing spot is marked.");
+                LabOrbView falling = board.GetComponentsInChildren<LabOrbView>().Single(candidate => candidate.OrbId == bombId);
+                Assert.That(falling.Visual.localPosition.y, Is.GreaterThan(0f),
+                    "It falls in from above at once, with no landing warning (#212).");
+                Assert.That(bomb.lockSwipes, Is.InRange(2, 4), "A gourd bomb comes locked.");
                 Assert.That(network.Notice, Does.Contain("gourd"));
                 var alert = UnityEngine.Object.FindFirstObjectByType<LabGourdAlert>();
                 Assert.That(alert, Is.Not.Null, "The saved scene shows the gourd's alert.");

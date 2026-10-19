@@ -61,10 +61,8 @@ namespace C6Lab
         public bool BombArtVisible => itemMarker != null && itemMarker.BombArtVisible;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
-        /// <summary>A gourd bomb still showing its landing warning, falling or bouncing.</summary>
+        /// <summary>A gourd bomb still falling or bouncing.</summary>
         public bool IsDropping { get; private set; }
-        /// <summary>The art is hidden while the landing warning shows, before the bomb falls into view.</summary>
-        public bool ArtHidden { get; private set; }
         public Rigidbody Body { get; private set; }
         public SphereCollider HitSphere { get; private set; }
 
@@ -286,13 +284,12 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// A bomb the gourd dropped (#177): its art stays hidden for hideSeconds while the landing
-        /// warning shows, then falls from fromOffset (root-local, above the orb area) onto the root,
-        /// speeding up like a dropped thing, and lands with a squash and two shrinking hops of
-        /// bounceHeight (root-local). Only the art moves; the body waits on its landing spot.
-        /// onLanded runs once it settles, or if the view is disabled or destroyed first.
+        /// A bomb the gourd dropped (#177): its art falls at once from fromOffset (root-local, above
+        /// the orb area) onto the root, speeding up like a dropped thing, and lands with a squash and
+        /// two shrinking hops of bounceHeight (root-local). Only the art moves; the body waits on its
+        /// landing spot. onLanded runs once it settles, or if the view is disabled or destroyed first.
         /// </summary>
-        public void PlayDrop(Vector3 fromOffset, float hideSeconds, float fallSeconds, float bounceSeconds,
+        public void PlayDrop(Vector3 fromOffset, float fallSeconds, float bounceSeconds,
             float bounceHeight, Action onLanded = null)
         {
             EnsureVisual();
@@ -304,24 +301,16 @@ namespace C6Lab
             CompleteSpawn();
             IsDropping = true;
             dropLanded = onLanded;
-            dropRoutine = StartCoroutine(Drop(fromOffset, Mathf.Max(0f, hideSeconds), Mathf.Max(.01f, fallSeconds),
+            dropRoutine = StartCoroutine(Drop(fromOffset, Mathf.Max(.01f, fallSeconds),
                 Mathf.Max(0f, bounceSeconds), Mathf.Max(0f, bounceHeight)));
         }
 
-        private IEnumerator Drop(Vector3 from, float hideSeconds, float fallSeconds, float bounceSeconds, float bounceHeight)
+        private IEnumerator Drop(Vector3 from, float fallSeconds, float bounceSeconds, float bounceHeight)
         {
-            SetArtHidden(true);
-            float elapsed = 0f;
-            while (elapsed < hideSeconds)
-            {
-                yield return null;
-                elapsed += Time.deltaTime;
-            }
-
-            SetArtHidden(false);
+            // Set before the first frame renders, so it is never seen on its spot before falling.
             visual.localPosition = from;
             SetShadowScale(.3f);
-            elapsed = 0f;
+            float elapsed = 0f;
             while (elapsed < fallSeconds)
             {
                 yield return null;
@@ -360,22 +349,12 @@ namespace C6Lab
                 StopCoroutine(dropRoutine);
                 dropRoutine = null;
             }
-            SetArtHidden(false);
             SetSquash(0f);
             SetShadowScale(1f);
             ResetVisualPose();
             Action landed = dropLanded;
             dropLanded = null;
             landed?.Invoke();
-        }
-
-        /// <summary>Hides the ball, its item marker and its shadow while the bomb is still out of sight.</summary>
-        private void SetArtHidden(bool hidden)
-        {
-            ArtHidden = hidden;
-            if (visual != null) visual.gameObject.SetActive(!hidden);
-            if (itemMarker != null) itemMarker.gameObject.SetActive(!hidden);
-            if (contactShadow != null) contactShadow.SetActive(!hidden);
         }
 
         /// <summary>Squashes the art wide and flat (positive) about its centre; 0 restores it.</summary>

@@ -80,16 +80,12 @@ namespace C6Lab
         [SerializeField, Min(.1f)] private float bombWarningFastHz = 8f;
         [SerializeField] private Color bombWarningColor = new Color(1f, .12f, .08f, 1f);
         [Header("Gourd bomb drop (presentation only)")]
-        [Tooltip("Seconds the \"!\" warning shows at the landing spot before the bomb starts to fall.")]
-        [SerializeField, Min(0f)] private float dropWarningSeconds = .6f;
         [Tooltip("Seconds the bomb takes to fall from above the orb area onto its landing spot.")]
         [SerializeField, Min(.01f)] private float dropFallSeconds = .45f;
         [Tooltip("Seconds of the two shrinking hops after it lands.")]
         [SerializeField, Min(0f)] private float dropBounceSeconds = .45f;
         [Tooltip("Height of the first hop, in orb radii.")]
         [SerializeField, Min(0f)] private float dropBounceHeight = 1f;
-        [Tooltip("Colour of the landing warning badge behind the \"!\".")]
-        [SerializeField] private Color dropWarningColor = new Color(.93f, .16f, .1f, 1f);
         [Header("Board contact shadow (presentation only)")]
         [SerializeField] private Material shadowMaterial;
         [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, .22f);
@@ -130,13 +126,11 @@ namespace C6Lab
         public float BombWarningSlowHz => Mathf.Max(.1f, bombWarningSlowHz);
         public float BombWarningFastHz => Mathf.Max(BombWarningSlowHz, bombWarningFastHz);
         public Color BombWarningColor => bombWarningColor;
-        public float DropWarningSeconds => Mathf.Max(0f, dropWarningSeconds);
         public float DropFallSeconds => dropFallSeconds > 0f ? dropFallSeconds : .45f;
         public float DropBounceSeconds => Mathf.Max(0f, dropBounceSeconds);
         public float DropBounceHeight => Mathf.Max(0f, dropBounceHeight);
-        public Color DropWarningColor => dropWarningColor;
-        /// <summary>The whole drop: the warning, the fall and the bounce.</summary>
-        public float DropSeconds => DropWarningSeconds + DropFallSeconds + DropBounceSeconds;
+        /// <summary>The whole drop: the fall and the bounce.</summary>
+        public float DropSeconds => DropFallSeconds + DropBounceSeconds;
 
         private static LabOrbAppearance defaults;
         /// <summary>An appearance holding every default value, for boards without an assigned one.</summary>

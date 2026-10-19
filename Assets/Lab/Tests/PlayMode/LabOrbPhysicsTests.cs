@@ -580,22 +580,23 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void BombCountsDownItsFuseAndAnUpwardFlickNeverThrowsIt()
+        public void ALockedBombCannotBeThrownButAnUnlockedOneCanWithAnUpwardFlick()
         {
-            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), fuseSeconds: 11.2f);
-            Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("12"), "The whole seconds left on the fuse, rounded up.");
-            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), fuseSeconds: 3.4f);
-            Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("4"), "The seconds follow the Host fuse.");
-
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), lockSwipes: 2, fuseSeconds: 11.2f);
             int throws = 0;
-            board.ThrowRequested += gesture => throws++;
+            string thrown = null;
+            board.ThrowRequested += gesture => { throws++; thrown = gesture.OrbId; };
             Vector2 from = BoardPoint(bomb);
             Assert.That(board.TryBeginDragAtWorld(from, 1d), Is.True);
             Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1f), 1.1d), Is.True);
-            Assert.That(throws, Is.Zero, "A bomb has no lock to open and is never thrown; it can only be passed on.");
+            Assert.That(throws, Is.Zero, "A locked bomb can only be passed on.");
 
-            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), fuseSeconds: -1f);
-            Assert.That(bomb.ItemMarker.BadgeVisible, Is.False, "Without a fuse there are no seconds to show.");
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), lockSwipes: 0, fuseSeconds: -1f);
+            from = BoardPoint(bomb);
+            Assert.That(board.TryBeginDragAtWorld(from, 2d), Is.True);
+            Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1f), 2.1d), Is.True);
+            Assert.That(throws, Is.EqualTo(1), "Once handoffs open it, it is thrown like an attack orb (#212).");
+            Assert.That(thrown, Is.EqualTo("bomb"));
         }
 
         [UnityTest]
@@ -887,39 +888,29 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator AnExpectedGourdBombWarnsOnItsSpotThenFallsInAndBouncesBeforeItCanBeTouched()
+        public IEnumerator AnExpectedGourdBombFallsInAtOnceWithNoLandingWarningAndBouncesBeforeItCanBeTouched()
         {
             LabOrbAppearance look = LabOrbAppearance.Defaults;
             int landed = 0;
             board.DropLanded += id => { if (id == "gourd") landed++; };
+            int childrenBefore = board.transform.childCount;
             board.ExpectDrop("gourd");
-            var bomb = board.UpsertOrb("gourd", LabOrbKind.Bomb, new Vector2(.5f, .5f), fuseSeconds: 14f);
+            var bomb = board.UpsertOrb("gourd", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 3, fuseSeconds: 14f);
             float radius = bomb.HitSphere.radius;
             Assert.That(board.IsDropping("gourd"), Is.True);
             Assert.That(bomb.IsDropping, Is.True);
-            var warning = board.GetComponentInChildren<LabDropWarning>();
-            Assert.That(warning, Is.Not.Null, "A warning marks where the bomb will land.");
-            Assert.That(warning.Label, Is.EqualTo("!"));
-            Vector3 at = warning.transform.position;
-            Assert.That(new Vector2(at.x, at.y), Is.EqualTo(BoardPoint(bomb)), "Right on the bomb's landing spot.");
-            Assert.That(warning.gameObject.layer, Is.EqualTo(board.gameObject.layer), "It shows on the board camera only.");
-            Assert.That(warning.GetComponentsInChildren<Collider>(), Is.Empty, "The warning never touches physics.");
-            Assert.That(warning.LandsAfter, Is.EqualTo(look.DropWarningSeconds + look.DropFallSeconds).Within(1e-4f));
-            Assert.That(bomb.ArtHidden, Is.True, "The bomb is out of sight while the warning shows.");
+            Assert.That(board.transform.childCount, Is.EqualTo(childrenBefore + 1),
+                "Only the bomb itself appears: no landing warning on the board (#212).");
+            Assert.That(bomb.Visual.gameObject.activeSelf, Is.True, "It is in sight from the start.");
+            Assert.That(bomb.Visual.localPosition.y, Is.GreaterThan(radius), "It starts falling at once, from above its spot.");
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(bomb), 1d), Is.False, "It cannot be grabbed in the air.");
             Assert.That(bomb.Body.isKinematic, Is.True, "It waits on its spot without drifting.");
             Assert.That(bomb.Body.detectCollisions, Is.False, "Nothing bumps into it in the air.");
             Assert.That(board.ShortestFuse(), Is.EqualTo(14f), "Its fuse is already burning.");
 
-            float until = Time.time + look.DropWarningSeconds + look.DropFallSeconds * .5f;
-            while (Time.time < until) yield return null;
-            Assert.That(bomb.ArtHidden, Is.False, "After the warning it falls into view.");
-            Assert.That(bomb.Visual.localPosition.y, Is.GreaterThan(radius), "From above its spot.");
-            Assert.That(warning.RingDiameter, Is.LessThan(6f * radius), "The ring closes in as it falls.");
-
             bool touchedDown = false;
             float highestHop = 0f;
-            until = Time.time + look.DropSeconds + 1f;
+            float until = Time.time + look.DropSeconds + 1f;
             while (landed == 0 && Time.time < until)
             {
                 yield return null;
@@ -935,11 +926,9 @@ namespace C6Lab.Tests
             Assert.That(bomb.Body.detectCollisions, Is.True);
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(bomb), 5d), Is.True, "Once landed it is an ordinary bomb.");
             board.CancelDrag();
-            Assert.That(board.GetComponentInChildren<LabDropWarning>() == null, Is.True, "The warning clears itself.");
 
-            var plain = board.UpsertOrb("plain", LabOrbKind.Bomb, new Vector2(.2f, .3f), fuseSeconds: 14f);
+            var plain = board.UpsertOrb("plain", LabOrbKind.Bomb, new Vector2(.2f, .3f), lockSwipes: 2, fuseSeconds: 14f);
             Assert.That(plain.IsDropping, Is.False, "Only a bomb the gourd announced drops in.");
-            Assert.That(board.GetComponentInChildren<LabDropWarning>() == null, Is.True);
         }
 
         [UnityTest]

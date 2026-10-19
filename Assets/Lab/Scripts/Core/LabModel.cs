@@ -217,8 +217,7 @@ namespace C6Lab
             if (generated == uint.MaxValue) return Reject("GENERATION_LIMIT", out reason);
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
             var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
-            // A bomb has no lock; its fuse alone decides what happens to it.
-            int lockSwipes = kind.IsItem() && kind != LabOrbKind.Bomb ? LockSwipesFor(seed, sender, generated) : 0;
+            int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
             player.generatedTotal++;
@@ -280,7 +279,7 @@ namespace C6Lab
         /// from its right. The same ID, creation time, and velocity survive the handoff.
         /// Each handoff of a locked item removes one lock, so items unlock only by teamwork. A relay
         /// orb becomes x1 when it unlocks, then each further handoff raises it to x2 and MAX. A bomb
-        /// has no lock: its fuse keeps burning however often it is passed.
+        /// that unlocks is defused into an attack orb: its fuse is cut and a fresh orb lifetime starts.
         /// </summary>
         public bool TryTransfer(ulong sender, string id, bool right, float height01,
             Vector2 normalizedVelocity, string requestId, double now, out LabOrbState orb, out string reason)
@@ -321,6 +320,7 @@ namespace C6Lab
                 current.lockSwipes--;
                 if (current.lockSwipes == 0) current.unlockedAt = now;
                 if (current.lockSwipes == 0 && current.kind == LabOrbKind.Relay) current.relayStage = 1;
+                if (current.lockSwipes == 0 && current.kind == LabOrbKind.Bomb) current.createdAt = now;
             }
             else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
             if (current.kind.IsDrum()) ArriveDrum(current, crossing, now);
@@ -587,9 +587,9 @@ namespace C6Lab
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
                 {
-                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb) continue;
-                    // A bomb blasts at the end of its fuse on its current holder's board. No orb is
-                    // lost: the holder's screen pushes the ones around it away from where it last was.
+                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0) continue;
+                    // A bomb still locked at the end of its fuse blasts on its current holder's board. No
+                    // orb is lost: the holder's screen pushes the ones around it away from where it last was.
                     bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
                 }
                 remaining = Math.Max(0d, deadline - effectiveNow);
@@ -607,7 +607,7 @@ namespace C6Lab
         /// <summary>
         /// 박의 방해공작 (#177): 정해 둔 시각마다 무작위 한 명의 판에 잠긴 폭탄을 떨어뜨린다.
         /// 구슬이 가득 찬 판에도 떨어지고, 같은 사람이 연달아 받을 수도 있으며, 스태미나는 쓰지 않는다.
-        /// 잠금 없이 도화선(아이템 수명)만 타며, 끝나면 그때 들고 있는 사람 판에서 터진다. 시간을 한 번에 많이 건너뛰어도 그 사이
+        /// 잠금 횟수·도화선은 북에서 나온 폭탄과 같다: 잠긴 채 도화선(아이템 수명)이 끝나면 그때 들고 있는 사람 판에서 터진다. 시간을 한 번에 많이 건너뛰어도 그 사이
         /// 떨어졌어야 할 폭탄을 정해 둔 시각 그대로 차례대로 만든다.
         /// </summary>
         private void DropGourdBombs(double until)
@@ -623,6 +623,7 @@ namespace C6Lab
                 var bomb = new LabOrbState
                 {
                     id = NewOrbId(), owner = target, kind = LabOrbKind.Bomb,
+                    lockSwipes = LockSwipesFor(seed, GourdDrawKey, index),
                     origin = LabOrbOrigin.Gourd, originOwner = target,
                     x = landing.x, y = landing.y, createdAt = at, revision = ++revision, inFlight = false
                 };
@@ -698,9 +699,11 @@ namespace C6Lab
             return Math.Max(1, (int)Math.Round(rules.Damage * multiplier));
         }
 
-        // Items last the item lifetime; for a bomb that is its fuse.
+        // Items last the item lifetime; for a locked bomb that is its fuse. An unlocked bomb is an
+        // ordinary attack orb and keeps the orb lifetime.
         private float LifetimeOf(LabOrbState orb) =>
-            orb.kind.IsItem() ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
+            orb.kind.IsItem() && !(orb.kind == LabOrbKind.Bomb && orb.lockSwipes == 0)
+                ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
 
         /// <summary>Orbs and drums both move between screens; look the ID up in either list.</summary>

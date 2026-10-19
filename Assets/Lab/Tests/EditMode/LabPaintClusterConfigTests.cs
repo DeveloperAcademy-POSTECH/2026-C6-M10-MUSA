@@ -29,7 +29,7 @@ namespace C6Lab.Tests
         public void TwoSlidersAppendToTheSchemaBesideRepeatGrowthWithPreservedDefaults()
         {
             Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(145));
-            Assert.That(Protocol, Is.EqualTo(5640));
+            Assert.That(Protocol, Is.EqualTo(5641));
             Assert.That(LabConfig.DeveloperFields.Skip(143).Select(field => field.Label), Is.EqualTo(new[]
             {
                 "Paint Cluster Compactness", "Paint Cluster Irregularity"
