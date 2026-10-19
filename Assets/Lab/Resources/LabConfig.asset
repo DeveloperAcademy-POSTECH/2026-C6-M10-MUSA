@@ -111,6 +111,8 @@ MonoBehaviour:
   fuseSoundVolume: 0.5
   bombSoundVolume: 0.9
   bombSoundStyle: 1
+  chuimsaeChancePercent: 15
+  chuimsaeMinGap: 5
   hapticsEnabled: 1
   generateHapticStyle: 1
   generateHapticIntensity: 1

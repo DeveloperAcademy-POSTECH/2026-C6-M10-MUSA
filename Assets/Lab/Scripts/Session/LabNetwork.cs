@@ -167,7 +167,8 @@ namespace C6Lab
         // 5632: Host-shared side-hit swing tuning for the exposed gourd underside.
         // 5633: Host-shared experimental paint grain presentation (four appended values).
         // 5635: Host-shared four-pattern impact footprints and independent paint palette.
-        internal const ushort LabProtocolVersion = 5635;
+        // 5636: #201 Host-shared chuimsae chance and minimum gap (two appended values).
+        internal const ushort LabProtocolVersion = 5636;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");

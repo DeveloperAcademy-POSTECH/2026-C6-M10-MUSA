@@ -225,7 +225,9 @@ namespace C6Lab
             new LabDeveloperField("Paint Drip Width (surface degrees)", .5f, 12f),
             new LabDeveloperField("Paint Drip Length (surface degrees)", 5f, 135f),
             new LabDeveloperField("Paint Gravity Weight", 1f, 8f),
-            LabDeveloperField.Choice("Paint Pattern", "LEGACY", "BROAD", "SPLATTER", "FLOW")
+            LabDeveloperField.Choice("Paint Pattern", "LEGACY", "BROAD", "SPLATTER", "FLOW"),
+            new LabDeveloperField("Chuimsae Chance (%)", 0f, 100f, true),
+            new LabDeveloperField("Chuimsae Min Gap (generates)", 0f, 20f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -251,7 +253,7 @@ namespace C6Lab
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Throw form", 112, 113, 114, 115, 116, 117, 118),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Sound and haptics", 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 140, 141, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
             new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
@@ -436,6 +438,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float bombSoundVolume = .9f;
         [Tooltip("폭탄 소리 종류. Boom: 일반 폭발음, Ppeong: 뻥튀기 기계 \"뻥\" 소리. 팀 플레이 테스트로 하나를 고를 예정")]
         [SerializeField] private LabBombSoundStyle bombSoundStyle = LabBombSoundStyle.Ppeong;
+        [Tooltip("구슬을 생성할 때마다 장구 대신 추임새(얼쑤·얼씨구)가 날 확률 (%). 0이면 추임새를 내지 않는다.")]
+        [SerializeField, Range(0, 100)] private int chuimsaeChancePercent = 15;
+        [Tooltip("추임새가 한 번 나온 뒤 최소 몇 번은 장구 소리만 낼지. 연달아 나오지 않게 한다.")]
+        [SerializeField, Range(0, 20)] private int chuimsaeMinGap = 5;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -685,6 +691,8 @@ namespace C6Lab
         // 실제 소리 크기 = Inspector 값 × DEV 배율(50 = 1배). 최대 Inspector 값의 2배.
         public float BgmVolume => Scaled(Finite(bgmVolume, .2f), bgmVolumeDev);
         public float GenerateSoundVolume => Scaled(Finite(generateSoundVolume, 1f), generateSoundVolumeDev);
+        public int ChuimsaeChancePercent => Mathf.Clamp(chuimsaeChancePercent, 0, 100);
+        public int ChuimsaeMinGap => Mathf.Clamp(chuimsaeMinGap, 0, 20);
         public float HitSoundVolume => Scaled(Finite(hitSoundVolume, .9f), hitSoundVolumeDev);
         public float MissSoundVolume => Scaled(Finite(missSoundVolume, .7f), missSoundVolumeDev);
         public float GlancingHitOffset => Mathf.Clamp01(Finite(glancingHitOffset, .7f));
@@ -788,7 +796,8 @@ namespace C6Lab
                 GourdSwingReturnStrength, GourdSwingDamping,
                 PaintGrainEnabled ? 1f : 0f, PaintGrainSize, PaintGrainStrength, PaintMottleStrength,
                 (float)PaintGrowthStyle, PaintEdgeRaggedness, PaintFlowRatio,
-                PaintDripWidthDegrees, PaintDripLengthDegrees, PaintGravityWeight, (float)PaintPattern
+                PaintDripWidthDegrees, PaintDripLengthDegrees, PaintGravityWeight, (float)PaintPattern,
+                (float)ChuimsaeChancePercent, (float)ChuimsaeMinGap
             };
         }
 
@@ -972,6 +981,8 @@ namespace C6Lab
             paintDripLengthDegrees = values[137];
             paintGravityWeight = values[138];
             paintPattern = (LabPaintPattern)(int)values[139];
+            chuimsaeChancePercent = (int)values[140];
+            chuimsaeMinGap = (int)values[141];
             error = string.Empty;
             return true;
         }
