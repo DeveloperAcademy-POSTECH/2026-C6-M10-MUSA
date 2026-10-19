@@ -923,8 +923,8 @@ namespace C6Lab.Tests
 
             // From the DEV form: no lag sticks the bomb to the finger like an orb; a new mass applies to new bombs.
             float[] values = config.CaptureDeveloperValues();
-            values[145] = 0f;
-            values[148] = 10f;
+            values[146] = 0f;
+            values[149] = 10f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             start = BoardPoint(bomb);
             Assert.That(board.TryBeginDragAtWorld(start, 4d), Is.True);

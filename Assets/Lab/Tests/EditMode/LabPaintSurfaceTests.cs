@@ -156,9 +156,11 @@ namespace C6Lab.Tests
         [TestCase(2)]
         public void OneStationaryHitPointCanEventuallyCoverEveryCell(int resolution)
         {
-            var surface = Growth(resolution);
+            var settings = new LabPaintGrowthSettings { Pattern = LabPaintPattern.Legacy, Resolution = resolution };
+            var surface = new LabPaintSurface(settings, 333);
             Assert.That(surface.RegisterHit(Vector3.forward, Color.red, 7), Is.True);
-            for (int hit = 0; hit < 26 && !surface.IsComplete; hit++)
+            int suppliedHits = (int)decimal.Ceiling((100m - (decimal)settings.InitialPercent) / (decimal)settings.RepeatPercent);
+            for (int hit = 0; hit < suppliedHits && !surface.IsComplete; hit++)
             {
                 surface.RegisterHit(Vector3.forward, Color.blue, 9);
                 surface.Advance(10);
@@ -372,8 +374,9 @@ namespace C6Lab.Tests
         {
             var horizontal = new LabPaintSurface(new LabPaintGrowthSettings
             { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = 2, VerticalWeight = 1, FillChancePercent = 0 }, 848);
-            var vertical = new LabPaintSurface(new LabPaintGrowthSettings
-            { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = 2, VerticalWeight = 100, FillChancePercent = 0 }, 848);
+            var verticalSettings = new LabPaintGrowthSettings
+            { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = 2, VerticalWeight = 100, FillChancePercent = 0 };
+            var vertical = new LabPaintSurface(verticalSettings, 848);
             horizontal.RegisterHit(Vector3.forward, Color.red, 1);
             vertical.RegisterHit(Vector3.forward, Color.red, 1);
             Assert.That(GrowthPixels(vertical), Is.Not.EqualTo(GrowthPixels(horizontal)));
@@ -381,8 +384,9 @@ namespace C6Lab.Tests
                 .Where(index => index >= 0).ToArray();
             Assert.That(occupied.Select(index => index / 64).Distinct().Count(), Is.GreaterThan(2));
             Assert.That(occupied.Select(index => index % 64).Distinct().Count(), Is.GreaterThan(1));
-            vertical.RegisterHit(Vector3.forward, Color.blue, 2);
-            for (int i = 0; i < 25 && !vertical.IsComplete; i++)
+            int suppliedHits = (int)decimal.Ceiling((100m - (decimal)verticalSettings.InitialPercent)
+                / (decimal)verticalSettings.RepeatPercent);
+            for (int i = 0; i < suppliedHits && !vertical.IsComplete; i++)
             {
                 vertical.RegisterHit(Vector3.forward, Color.blue, 2);
                 vertical.Advance(10);
