@@ -28,13 +28,13 @@ namespace C6Lab.Tests
         [Test]
         public void TwoSlidersAppendToTheSchemaBesideRepeatGrowthWithPreservedDefaults()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(145));
-            Assert.That(Protocol, Is.EqualTo(5640));
-            Assert.That(LabConfig.DeveloperFields.Skip(143).Select(field => field.Label), Is.EqualTo(new[]
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(146));
+            Assert.That(Protocol, Is.EqualTo(5641));
+            Assert.That(LabConfig.DeveloperFields.Skip(143).Take(2).Select(field => field.Label), Is.EqualTo(new[]
             {
                 "Paint Cluster Compactness", "Paint Cluster Irregularity"
             }));
-            foreach (LabDeveloperField field in LabConfig.DeveloperFields.Skip(143))
+            foreach (LabDeveloperField field in LabConfig.DeveloperFields.Skip(143).Take(2))
             {
                 Assert.That(new[] { field.Min, field.Max }, Is.EqualTo(new[] { 0f, 1f }));
                 Assert.That(field.WholeNumber || field.IsToggle || field.IsChoice, Is.False);
@@ -50,8 +50,8 @@ namespace C6Lab.Tests
             foreach (LabConfig source in new[] { config, authored })
             {
                 float[] values = source.CaptureDeveloperValues();
-                Assert.That(values.Length, Is.EqualTo(145));
-                Assert.That(values.Skip(143), Is.EqualTo(new[] { .85f, .25f }));
+                Assert.That(values.Length, Is.EqualTo(146));
+                Assert.That(values.Skip(143).Take(2), Is.EqualTo(new[] { .85f, .25f }));
                 Assert.That(source.PaintRepeatPercent, Is.EqualTo(4f));
                 Assert.That(source.PaintGrowthPercentPerSecond, Is.EqualTo(6f));
                 Assert.That(source.CompletedGourdViewerEnabled && source.PlayerPaintPatternsEnabled, Is.True);
@@ -163,19 +163,19 @@ namespace C6Lab.Tests
         public void InspectorRangesClampAndNonfiniteValuesUseIndependentDefaults()
         {
             JsonUtility.FromJsonOverwrite("{\"paintClusterCompactness\":-2,\"paintClusterIrregularity\":4}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(143), Is.EqualTo(new[] { 0f, 1f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(143).Take(2), Is.EqualTo(new[] { 0f, 1f }));
             JsonUtility.FromJsonOverwrite("{\"paintClusterCompactness\":4,\"paintClusterIrregularity\":-2}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(143), Is.EqualTo(new[] { 1f, 0f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(143).Take(2), Is.EqualTo(new[] { 1f, 0f }));
             FieldInfo compactness = typeof(LabConfig).GetField("paintClusterCompactness", BindingFlags.NonPublic | BindingFlags.Instance);
             FieldInfo irregularity = typeof(LabConfig).GetField("paintClusterIrregularity", BindingFlags.NonPublic | BindingFlags.Instance);
             foreach (float invalid in new[] { float.NaN, float.NegativeInfinity, float.PositiveInfinity })
             {
                 compactness.SetValue(config, invalid);
                 irregularity.SetValue(config, .75f);
-                Assert.That(config.CaptureDeveloperValues().Skip(143), Is.EqualTo(new[] { .85f, .75f }));
+                Assert.That(config.CaptureDeveloperValues().Skip(143).Take(2), Is.EqualTo(new[] { .85f, .75f }));
                 compactness.SetValue(config, .125f);
                 irregularity.SetValue(config, invalid);
-                Assert.That(config.CaptureDeveloperValues().Skip(143), Is.EqualTo(new[] { .125f, .25f }));
+                Assert.That(config.CaptureDeveloperValues().Skip(143).Take(2), Is.EqualTo(new[] { .125f, .25f }));
                 AssertSettingsMatch(config);
             }
             Assert.That(config.CaptureDeveloperValues().Take(143), Is.EqualTo(baseline.Take(143)));
@@ -189,7 +189,7 @@ namespace C6Lab.Tests
             Assert.That(config.PaintRepeatPercent, Is.EqualTo(8f));
             Assert.That(config.PaintGrowthPercentPerSecond, Is.EqualTo(12f));
             Assert.That(config.CompletedGourdViewerEnabled || config.PlayerPaintPatternsEnabled, Is.False);
-            Assert.That(config.CaptureDeveloperValues().Skip(143), Is.EqualTo(new[] { .85f, .25f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(143).Take(2), Is.EqualTo(new[] { .85f, .25f }));
             AssertSettingsMatch(config);
         }
 
