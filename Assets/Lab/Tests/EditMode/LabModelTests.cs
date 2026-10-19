@@ -1227,8 +1227,11 @@ namespace C6Lab.Tests
                     Assert.That(combined.small, Is.EqualTo(shrink));
                     Assert.That(room.TryLaunch(10, combined.id, "throw", 15.6d, out _, out reason), Is.True, reason);
                     Assert.That(room.ConfirmHit(combined.id, 15.7d, Vector3.forward, out _, out _, out _), Is.True);
-                    // Let the growth spend every bit of the hit's paint.
-                    room.Snapshot(60d);
+                    // Spend the hit's paint before the default five-second drying grace expires.
+                    // A 60-second wait now correctly dries both splashes away and cannot compare their shares.
+                    room.Snapshot(16.7d);
+                    Assert.That(room.PaintSurface.PendingCoverage, Is.LessThan(1d / room.PaintSurface.CellCount),
+                        "Only an unspendable fractional cell may remain before comparing the actual painted area.");
                     return room.PaintSurface.CoveredCount;
                 }
                 finally { UnityEngine.Object.DestroyImmediate(mixed); }
