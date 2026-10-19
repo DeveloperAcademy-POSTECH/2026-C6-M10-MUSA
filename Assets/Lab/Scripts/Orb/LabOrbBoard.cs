@@ -120,6 +120,11 @@ namespace C6Lab
         private LabConfig config;
         private Camera inputCamera;
         private Rect bounds;
+        private int blockedSide;
+        private float blockSecondsLeft;
+        private LabOrbEdgeBlock edgeBlock;
+        /// <summary>The board keeps its own swipe-block countdown unless the Host's differs by more than this.</summary>
+        private const float BlockResyncSeconds = .3f;
         private LabOrbAreaShape areaShape;
         private readonly List<Mesh> areaWallMeshes = new List<Mesh>();
         private Rect inputScreenRect;
@@ -137,6 +142,13 @@ namespace C6Lab
         private bool configured;
 
         public int Count => entries.Count;
+        /// <summary>The edge the gourd's swipe block (#215) holds shut on this board: -1 left, +1 right, 0 none.</summary>
+        public int BlockedSide => blockedSide;
+        /// <summary>Seconds this board still shows the swipe block.</summary>
+        public float BlockSecondsLeft => blockedSide != 0 ? blockSecondsLeft : 0f;
+        /// <summary>How many of this board's own passes have bounced off a blocked edge.</summary>
+        public int BlockBounces { get; private set; }
+        public LabOrbEdgeBlock EdgeBlock => edgeBlock;
         /// <summary>World-space limits for orb centres; the visual extends by OrbRadius.</summary>
         public Rect CenterBounds => bounds;
         public LabOrbAreaShape AreaShape => areaShape;
@@ -439,6 +451,53 @@ namespace C6Lab
                 pushed++;
             }
             return pushed;
+        }
+
+        /// <summary>
+        /// The gourd's swipe block on this player (#215): side -1 holds the left edge shut, +1 the right,
+        /// 0 (or no seconds) lifts it. While it is on, this board's own passes that way bounce off the edge
+        /// like a wall; a blast's push and a drum running on through still cross, and nothing is stopped
+        /// coming in. The edge glows red with the seconds left in its middle. The board counts down by
+        /// itself and only takes the Host's seconds when they differ by more than a moment.
+        /// </summary>
+        public void SetSwipeBlock(int side, float secondsLeft)
+        {
+            side = Math.Sign(side);
+            if (!configured || side == 0 || !(secondsLeft > 0f) || float.IsInfinity(secondsLeft))
+            {
+                LiftSwipeBlock();
+                return;
+            }
+            if (side != blockedSide || Mathf.Abs(blockSecondsLeft - secondsLeft) > BlockResyncSeconds)
+                blockSecondsLeft = secondsLeft;
+            blockedSide = side;
+            ShowSwipeBlock();
+        }
+
+        private void LiftSwipeBlock()
+        {
+            blockedSide = 0;
+            blockSecondsLeft = 0f;
+            if (edgeBlock != null) edgeBlock.Hide();
+        }
+
+        private void ShowSwipeBlock()
+        {
+            if (edgeBlock == null) edgeBlock = LabOrbEdgeBlock.Create(transform);
+            // The side planes are the board's visible side edges; the area gives the edge's height there.
+            float edgeX = blockedSide > 0 ? bounds.xMax : bounds.xMin;
+            Vector2 range = areaShape.VerticalRange(edgeX, 0f);
+            edgeBlock.Show(blockedSide > 0, edgeX, range.x, range.y, bounds.width, config.OrbRadius);
+            edgeBlock.SetSeconds(blockSecondsLeft);
+        }
+
+        private void LateUpdate()
+        {
+            if (blockedSide == 0) return;
+            blockSecondsLeft -= Time.deltaTime;
+            if (blockSecondsLeft <= 0f) LiftSwipeBlock();
+            // Follows the board if its area was resized.
+            else ShowSwipeBlock();
         }
 
         /// <summary>The fewest seconds left on a burning bomb fuse on this screen; negative when none burns.</summary>
@@ -889,10 +948,20 @@ namespace C6Lab
                     continue;
                 }
                 // A drum still passing through tells the Host so it stops on the near side next.
+                LabEdgeCrossingKind kind = entry.Arrival == LabDrumArrival.Pass ? LabEdgeCrossingKind.Passing
+                    : entry.Blasted ? LabEdgeCrossingKind.Pushed : LabEdgeCrossingKind.Swipe;
+                if (kind == LabEdgeCrossingKind.Swipe && blockedSide == (right ? 1 : -1))
+                {
+                    // The gourd's swipe block (#215): this player's own pass that way bounces off the edge
+                    // like the top and bottom walls; a blast's push or a drum running on through still crosses.
+                    body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
+                    body.linearVelocity = OnPlane(new Vector2(-velocity.x * config.OrbRestitution, velocity.y));
+                    BlockBounces++;
+                    if (edgeBlock != null) edgeBlock.Flash();
+                    continue;
+                }
                 var crossing = new LabOrbEdgeCrossing(entry.View.OrbId, right,
-                    NormalizeForBody(areaShape, position, entry.View.HitSphere.radius).y, velocity / bounds.width,
-                    entry.Arrival == LabDrumArrival.Pass ? LabEdgeCrossingKind.Passing
-                    : entry.Blasted ? LabEdgeCrossingKind.Pushed : LabEdgeCrossingKind.Swipe);
+                    NormalizeForBody(areaShape, position, entry.View.HitSphere.radius).y, velocity / bounds.width, kind);
                 entry.EdgePending = true;
                 entry.PendingEdge = crossing;
                 body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));

@@ -1792,6 +1792,10 @@ namespace C6Lab
             visibleOrbIds.Clear();
             foreach (string id in current) visibleOrbIds.Add(id);
             board.SetInteractionEnabled(latest.phase == LabPhase.Playing && !latest.paused);
+            // The gourd's swipe block (#215) shows and bounces only on the blocked player's own board.
+            bool blockedHere = latest.SwipeBlockOn(LocalPlayerId);
+            board.SetSwipeBlock(blockedHere ? (latest.swipeBlockedRight ? 1 : -1) : 0,
+                blockedHere ? (float)(latest.swipeBlockedUntil - latest.serverTime) : 0f);
         }
 
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)

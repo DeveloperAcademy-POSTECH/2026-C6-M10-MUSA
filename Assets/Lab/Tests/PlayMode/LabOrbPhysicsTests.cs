@@ -1302,6 +1302,86 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator ABlockedEdgeBouncesTheBoardsOwnPassesButLetsAPushOrAPassingDrumThrough()
+        {
+            var crossed = new System.Collections.Generic.Dictionary<string, LabOrbEdgeCrossing>();
+            board.EdgeCrossed += crossing => crossed[crossing.OrbId] = crossing;
+            board.SetSwipeBlock(1, 5f);
+            Assert.That(board.BlockedSide, Is.EqualTo(1), "The gourd holds this board's right edge shut (#215).");
+
+            var own = board.UpsertOrb("own", LabOrbKind.Yin, new Vector2(.9f, .3f));
+            var back = board.UpsertOrb("back", LabOrbKind.Yang, new Vector2(.1f, .3f));
+            own.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f);   // swiped right, into the block
+            back.Body.linearVelocity = new Vector3(-3f * Width, 0f, 0f); // swiped left
+            for (int step = 0; step < 20 && !crossed.ContainsKey("back"); step++) yield return new WaitForFixedUpdate();
+            for (int step = 0; step < 5; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("own"), Is.False, "The player's own pass that way does not cross...");
+            Assert.That(own.Body.linearVelocity.x, Is.LessThan(0f), "...it bounces off the edge like a wall.");
+            Assert.That(BoardPoint(own).x, Is.LessThanOrEqualTo(board.CenterBounds.xMax + 1e-4f));
+            Assert.That(board.BlockBounces, Is.GreaterThanOrEqualTo(1));
+            Assert.That(crossed["back"].ToRight, Is.False, "The other way stays open.");
+            Assert.That(crossed["back"].Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe));
+            board.RemoveOrb("own");
+
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.8f, .7f), lockSwipes: 2);
+            board.UpsertOrb("flung", LabOrbKind.Yin, new Vector2(.9f, .7f));
+            Assert.That(board.Blast("bomb", new Vector2(.8f, .7f)), Is.EqualTo(1));
+            for (int step = 0; step < 20 && !crossed.ContainsKey("flung"); step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("flung"), Is.True, "A blast's push still goes through.");
+            Assert.That(crossed["flung"].ToRight, Is.True);
+            Assert.That(crossed["flung"].Kind, Is.EqualTo(LabEdgeCrossingKind.Pushed));
+
+            // Clear the bodies waiting at the edges, so nothing stands in the drum's way.
+            board.RemoveOrb("back");
+            board.RemoveOrb("flung");
+            board.UpsertOrb("passing", LabOrbKind.Drum, new Vector2(0f, .25f), new Vector2(.5f, 0f), arrival: LabDrumArrival.Pass);
+            for (int step = 0; step < 150 && !crossed.ContainsKey("passing"); step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("passing"), Is.True, "And so does a drum running on through.");
+            Assert.That(crossed["passing"].Kind, Is.EqualTo(LabEdgeCrossingKind.Passing));
+
+            board.SetSwipeBlock(0, 0f);
+            Assert.That(board.BlockedSide, Is.Zero);
+            var after = board.UpsertOrb("after", LabOrbKind.Yang, new Vector2(.9f, .5f));
+            after.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f);
+            for (int step = 0; step < 20 && !crossed.ContainsKey("after"); step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("after"), Is.True, "Once lifted, the edge passes again.");
+            Assert.That(crossed["after"].Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe));
+        }
+
+        [UnityTest]
+        public IEnumerator ABlockedEdgeGlowsRedAndCountsItsSecondsDownInItsMiddle()
+        {
+            Rect bounds = board.CenterBounds;
+            board.SetSwipeBlock(-1, 3.2f);
+            LabOrbEdgeBlock edge = board.EdgeBlock;
+            Assert.That(edge, Is.Not.Null);
+            Assert.That(edge.Visible, Is.True, "The blocked edge glows (#215).");
+            Assert.That(edge.Right, Is.False);
+            Assert.That(edge.SecondsText, Is.EqualTo("4"), "The whole seconds left, rounded up.");
+            Assert.That(edge.GlowPosition.x, Is.EqualTo(bounds.xMin).Within(1e-4f), "The glow lies on the left edge...");
+            Assert.That(edge.SecondsPosition.y, Is.EqualTo(bounds.center.y).Within(1e-3f), "...with the seconds at its middle...");
+            Assert.That(edge.SecondsPosition.x, Is.InRange(bounds.xMin, bounds.xMin + .15f * bounds.width), "...just inside it.");
+            Assert.That(edge.SecondsPosition.z, Is.LessThan(-config.OrbRadius), "The seconds stay in front of the orbs.");
+            Assert.That(edge.Brightness, Is.InRange(.2f, .7f), "A soft red.");
+
+            board.SetSwipeBlock(-1, 3.1f);
+            Assert.That(board.BlockSecondsLeft, Is.EqualTo(3.2f).Within(1e-4f),
+                "A Host snapshot a moment apart does not nudge the countdown.");
+            float until = Time.time + 1.5f;
+            while (Time.time < until && edge.SecondsText != "3") yield return null;
+            Assert.That(edge.SecondsText, Is.EqualTo("3"), "It counts down.");
+
+            board.SetSwipeBlock(1, .6f);
+            Assert.That(edge.Right, Is.True, "A new block moves it to the other edge.");
+            Assert.That(edge.GlowPosition.x, Is.EqualTo(bounds.xMax).Within(1e-4f));
+            Assert.That(edge.SecondsText, Is.EqualTo("1"));
+            until = Time.time + 2f;
+            while (Time.time < until && edge.Visible) yield return null;
+            Assert.That(edge.Visible, Is.False, "It disappears when its seconds run out.");
+            Assert.That(board.BlockedSide, Is.Zero, "And the edge is open again.");
+        }
+
+        [UnityTest]
         public IEnumerator APassingDrumRunsOnToTheNextPlayerAndSaysItIsPassing()
         {
             var crossed = new System.Collections.Generic.List<LabOrbEdgeCrossing>();
