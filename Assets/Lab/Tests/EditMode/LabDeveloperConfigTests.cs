@@ -877,7 +877,7 @@ namespace C6Lab.Tests
             for (int i = 0; i < labels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[105 + i].Label, Is.EqualTo(labels[i]), "Appended index " + (105 + i));
             Assert.That(config.CaptureDeveloperValues().Skip(105).Take(6).ToArray(),
-                Is.EqualTo(new[] { 2f, 2f, 4f, 6f, 60f, 1.35f }));
+                Is.EqualTo(new[] { 2f, 2f, 1.5f, 6f, 60f, 1.35f }));
             Assert.That(LabConfig.DeveloperFields[105].WholeNumber, Is.True);
             for (int i = 106; i <= 110; i++) Assert.That(LabConfig.DeveloperFields[i].WholeNumber, Is.False);
             var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
@@ -951,7 +951,7 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(changed, out string error), Is.True, error);
             Assert.That(captured.Resolution, Is.EqualTo(2));
             Assert.That(captured.InitialPercent, Is.EqualTo(2f), "A captured round preset cannot follow later config changes.");
-            Assert.That(captured.RepeatPercent, Is.EqualTo(4f));
+            Assert.That(captured.RepeatPercent, Is.EqualTo(1.5f));
             Assert.That(captured.GrowthPercentPerSecond, Is.EqualTo(6f));
             Assert.That(captured.FillChancePercent, Is.EqualTo(60f));
             Assert.That(captured.VerticalWeight, Is.EqualTo(1.35f));

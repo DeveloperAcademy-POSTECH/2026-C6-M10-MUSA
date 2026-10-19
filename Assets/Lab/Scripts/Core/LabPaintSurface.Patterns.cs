@@ -20,7 +20,7 @@ namespace C6Lab
             var patch = new PatternPatch(patternMask, direction, pattern == LabPaintPattern.Flow
                 ? -flowDirection : Vector3.up, pattern == LabPaintPattern.Flow ? 0f
                 : (StableUnit(salt) - .5f) * Mathf.PI * 2f, ++patternSequence, salt);
-            bool[] footprint = MakePatternFootprint(patch, hitCell, requested);
+            bool[] footprint = MakePatternFootprint(patch, hitCell, (int)decimal.Floor(initialCells));
 
             // An impact may seed detached splashes, but those are not one connected region.
             // Each receives only the integer ink it immediately spends. The impact component
@@ -34,6 +34,19 @@ namespace C6Lab
             for (int i = 0; i < footprint.Length; i++)
                 if (footprint[i] && !visited[i])
                     PaintPatternComponent(i, footprint, visited, queue, component, patch, color, owner, painterSlot, 0m);
+
+            // Size the splash by the impact's area, not by how many white cells remain under
+            // it. Overlap never stretches one splash across distant holes to recover its quota.
+            // Its unspent whole cells continue locally at the usual timed growth rate instead.
+            int immediate = 0;
+            for (int i = 0; i < footprint.Length; i++) if (footprint[i]) immediate++;
+            int shortfall = requested - immediate;
+            if (shortfall > 0 && !IsComplete)
+            {
+                Region root = Root(cellRegions[hitCell]);
+                Supply(root, shortfall, color, owner, painterSlot, true, hitCell);
+                RefreshActive(root);
+            }
         }
 
         private void PaintPatternComponent(int first, bool[] footprint, bool[] visited,
@@ -54,10 +67,11 @@ namespace C6Lab
             }
             var region = new Region(regions.Count) { PatternPatch = patch };
             regions.Add(region);
-            Supply(region, component.Count + fraction, color, owner, painterSlot);
+            Ink immediateInk = Supply(region, component.Count + fraction, color, owner, painterSlot);
             // BFS order is connected inside this component. PaintCell also merges components
-            // that are joined by pre-existing opaque paint, preserving the global FIFO order.
-            for (int i = 0; i < component.Count; i++) region = PaintCell(region, component[i]);
+            // that are joined by pre-existing opaque paint. Debit this footprint's own ink;
+            // older queued growth must keep its frozen location, color and painter together.
+            for (int i = 0; i < component.Count; i++) region = PaintFundedCell(region, component[i], immediateInk);
         }
 
         private bool[] MakePatternFootprint(PatternPatch patch, int hitCell, int requested)
@@ -67,8 +81,9 @@ namespace C6Lab
             float estimate = Mathf.Sqrt(requested / (float)CellCount * Mathf.PI / patternMask.FootprintFraction);
             float low = 0f, high = Mathf.Max(.02f, estimate), bestRadius = high;
             int bestCount = int.MaxValue;
-            // A centered opaque mask eventually covers every remaining cell as its projection
-            // widens. This also supports very large DEV areas and nearly completed surfaces.
+            // Calibrate the complete mask including already painted cells. This preserves the
+            // virgin-surface footprint and keeps a late white hit local rather than inflating
+            // until it finds the last scattered white cells across the whole gourd.
             for (int attempt = 0; attempt < 32; attempt++)
             {
                 int count = CountPattern(planar, high, hitCell);
@@ -91,7 +106,7 @@ namespace C6Lab
             patch.Radius = bestRadius;
             var footprint = new bool[CellCount];
             for (int i = 0; i < footprint.Length; i++)
-                footprint[i] = pixels[i].a == 0 && (i == hitCell || PatternInk(planar[i], bestRadius));
+                footprint[i] = i == hitCell || PatternInk(planar[i], bestRadius);
 
             // Correct discrete cell rounding at the outer boundary, never by ranking all ink
             // brightness. Thin endpoints and isolated splashes are removed after thick corners.
@@ -118,6 +133,7 @@ namespace C6Lab
                     }
                 }
             }
+            for (int i = 0; i < footprint.Length; i++) if (pixels[i].a != 0) footprint[i] = false;
             return footprint;
         }
 
@@ -125,7 +141,7 @@ namespace C6Lab
         {
             int count = 0;
             for (int i = 0; i < planar.Length; i++)
-                if (pixels[i].a == 0 && (i == hitCell || PatternInk(planar[i], radius))) count++;
+                if (i == hitCell || PatternInk(planar[i], radius)) count++;
             return count;
         }
 
@@ -197,12 +213,15 @@ namespace C6Lab
 
         private sealed class PatternPatch
         {
+            private const int ClusterAngles = 128;
             public readonly ulong Sequence;
             public readonly uint Salt;
             public float Radius;
             private readonly LabPaintPatternMask mask;
             private readonly Vector3 center, right, up;
             private readonly float cosine, sine;
+            private float[] clusterRadii;
+            private float meanClusterRadius;
             public PatternPatch(LabPaintPatternMask mask, Vector3 center, Vector3 upHint,
                 float rotation, ulong sequence, uint salt)
             {
@@ -230,6 +249,52 @@ namespace C6Lab
                 float near = Radius * 1.6f, far = Radius * 2.4f;
                 return mask.Sample(.5f + point.x / (2f * near), .5f + point.y / (2f * near)) * .7f
                     + mask.Sample(.5f + point.x / (2f * far), .5f + point.y / (2f * far)) * .3f;
+            }
+
+            public float ClusterShapeFactor(Vector3 direction)
+            {
+                if (clusterRadii == null) BuildClusterRadii();
+                Vector2 point = Project(direction);
+                float position = (Mathf.Atan2(point.y, point.x) / (2f * Mathf.PI) + 1f) * ClusterAngles;
+                int first = Mathf.FloorToInt(position) % ClusterAngles;
+                float radius = Mathf.Lerp(clusterRadii[first], clusterRadii[(first + 1) % ClusterAngles],
+                    position - Mathf.Floor(position));
+                return meanClusterRadius / radius;
+            }
+
+            private void BuildClusterRadii()
+            {
+                // Keep the central splash's broad lobes from the same runtime mask as the
+                // first hit. A sustained empty run ends a ray: detached satellite dots and
+                // sub-pixel nicks must not turn connected growth into spikes or many islands.
+                var sampled = new float[ClusterAngles];
+                for (int angle = 0; angle < sampled.Length; angle++)
+                {
+                    float radians = angle * (2f * Mathf.PI / ClusterAngles);
+                    Vector2 axis = new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
+                    float lastInk = .04f;
+                    int empty = 0;
+                    for (int step = 1; step <= 128; step++)
+                    {
+                        float distance = step * (.7f / 128f);
+                        if (mask.Sample(.5f + axis.x * distance, .5f + axis.y * distance)
+                            >= LabPaintPatternMask.Threshold)
+                        { lastInk = distance; empty = 0; }
+                        else if (++empty >= 3) break;
+                    }
+                    sampled[angle] = Mathf.Max(.08f, lastInk);
+                }
+                clusterRadii = new float[ClusterAngles];
+                meanClusterRadius = 0f;
+                for (int angle = 0; angle < sampled.Length; angle++)
+                {
+                    float radius = sampled[(angle + ClusterAngles - 2) % ClusterAngles] * .125f
+                        + sampled[(angle + ClusterAngles - 1) % ClusterAngles] * .25f
+                        + sampled[angle] * .25f + sampled[(angle + 1) % ClusterAngles] * .25f
+                        + sampled[(angle + 2) % ClusterAngles] * .125f;
+                    clusterRadii[angle] = radius;
+                    meanClusterRadius += radius / ClusterAngles;
+                }
             }
         }
 

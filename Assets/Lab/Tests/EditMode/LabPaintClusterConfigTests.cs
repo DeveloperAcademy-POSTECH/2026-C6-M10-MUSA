@@ -52,7 +52,7 @@ namespace C6Lab.Tests
                 float[] values = source.CaptureDeveloperValues();
                 Assert.That(values.Length, Is.EqualTo(145));
                 Assert.That(values.Skip(143), Is.EqualTo(new[] { .85f, .25f }));
-                Assert.That(source.PaintRepeatPercent, Is.EqualTo(4f));
+                Assert.That(source.PaintRepeatPercent, Is.EqualTo(1.5f));
                 Assert.That(source.PaintGrowthPercentPerSecond, Is.EqualTo(6f));
                 Assert.That(source.CompletedGourdViewerEnabled && source.PlayerPaintPatternsEnabled, Is.True);
                 Assert.That(source.PaintVictoryPercent, Is.EqualTo(100));

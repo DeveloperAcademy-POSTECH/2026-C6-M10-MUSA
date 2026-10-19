@@ -20,7 +20,7 @@ namespace C6Lab
                 if (needed > 0m) continue;
                 // Initial footprints keep their original immediate choices. A merge can
                 // leave initial ink for later growth, so only that uncommon case anchors here.
-                if (ink.Cluster == null) ink.Cluster = new GrowthCluster(this, ChooseCell(region), pair.Key);
+                if (ink.Cluster == null) ink.Cluster = new GrowthCluster(this, ChooseCell(region), pair.Key, ink.Remaining);
                 return ink.Cluster.Take(region);
             }
             throw new InvalidOperationException("Missing paint supply for cluster growth.");
@@ -35,13 +35,14 @@ namespace C6Lab
             private readonly int anchor;
             private readonly Vector3 center, waveA, waveB;
             private readonly float phaseA, phaseB, cellAngle;
+            private readonly PatternPatch patch;
             private readonly List<Entry> heap = new List<Entry>();
             private readonly Dictionary<int, Entry> queued = new Dictionary<int, Entry>();
             private readonly HashSet<int> seen = new HashSet<int>();
             private int nextVersion, pendingCell = -1;
             private bool started;
 
-            public GrowthCluster(LabPaintSurface surface, int anchor, ulong sequence)
+            public GrowthCluster(LabPaintSurface surface, int anchor, ulong sequence, decimal budget)
             {
                 this.surface = surface;
                 this.anchor = anchor;
@@ -53,6 +54,18 @@ namespace C6Lab
                 phaseA = StableUnit(salt ^ 0xB5297A4Du) * Mathf.PI * 2f;
                 phaseB = StableUnit(salt ^ 0x68E31DA4u) * Mathf.PI * 2f;
                 cellAngle = Mathf.Sqrt(4f * Mathf.PI / surface.CellCount);
+                if (surface.pattern != LabPaintPattern.Legacy)
+                {
+                    // The same mask and rotation family shape initial and repeated bursts.
+                    // Its scale is fixed from this job's amount; older paint cannot enlarge
+                    // the descriptor in search of far-away white cells.
+                    patch = new PatternPatch(surface.patternMask, center,
+                        surface.pattern == LabPaintPattern.Flow ? -surface.flowDirection : Vector3.up,
+                        surface.pattern == LabPaintPattern.Flow ? 0f
+                            : (StableUnit(salt) - .5f) * Mathf.PI * 2f, sequence, salt);
+                    patch.Radius = Mathf.Max(cellAngle, Mathf.Sqrt((float)(budget / surface.CellCount)
+                        * Mathf.PI / surface.patternMask.FootprintFraction));
+                }
             }
 
             public int Take(Region region)
@@ -85,8 +98,6 @@ namespace C6Lab
 
             public void Commit(Region region, int cell)
             {
-                // An immediate initial footprint can spend this Ink after a FIFO merge.
-                // It must not open a blank search path before this cluster selects it.
                 if (pendingCell != cell) return;
                 pendingCell = -1;
                 Expand(region, cell);
@@ -127,7 +138,20 @@ namespace C6Lab
                 float noise = (Mathf.Sin(Vector3.Dot(direction, waveA) * 6f + phaseA)
                     + .5f * Mathf.Sin(Vector3.Dot(direction, waveB) * 9f + phaseB)) / 1.5f;
                 float variation = surface.clusterIrregularity * (.4f - .15f * surface.clusterCompactness);
-                return Arc(center, direction) * (1f + variation * noise);
+                float distance = Arc(center, direction);
+                float shape = 1f;
+                if (patch != null)
+                {
+                    // A radial, softly weighted central-body envelope retains the selected
+                    // splash's lobes at every growth amount. It never forbids a cell, so a
+                    // nearly complete map can still reach its last separated white pocket.
+                    // Coarse angular filtering lives in PatternPatch rather than cell noise.
+                    float locality = 1f - Mathf.SmoothStep(0f, 1f,
+                        Mathf.InverseLerp(patch.Radius * 2f, patch.Radius * 4f, distance));
+                    float strength = (.85f + .15f * surface.raggedness) * locality;
+                    shape = Mathf.Lerp(1f, patch.ClusterShapeFactor(direction), strength);
+                }
+                return distance * shape * (1f + variation * noise);
             }
 
             private float ContactCost(Region region, int cell)
