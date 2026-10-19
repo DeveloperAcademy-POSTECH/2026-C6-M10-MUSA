@@ -29,8 +29,8 @@ namespace C6Lab
 
         [Tooltip("화면에서 콤보 패널 가운데 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 panelAnchor = new Vector2(.5f, .8f);
-        [Tooltip("색 칸 하나의 크기 (Canvas 기준 픽셀)")]
-        [SerializeField, Min(20f)] private float slotSize = 64f;
+        [Tooltip("색 칸 하나의 크기 (Canvas 기준 픽셀). 패널/글자/막대가 모두 이 크기에 비례한다.")]
+        [SerializeField, Min(16f)] private float slotSize = 40f;
 
         private LabNetwork network;
         private Canvas canvas;
@@ -238,11 +238,13 @@ namespace C6Lab
             layer.anchorMax = Vector2.one;
             layer.offsetMin = layer.offsetMax = Vector2.zero;
 
+            // 모든 크기를 칸 크기에 비례시킨다 (처음 만든 64px 칸 기준 값 × u).
+            float u = slotSize / 64f;
             float gap = slotSize * .22f;
             float width = slotSize * LabGourdCombo.Length + gap * (LabGourdCombo.Length + 1);
             panel = NewRect("Gourd Combo Panel", layer);
             panel.anchorMin = panel.anchorMax = panelAnchor;
-            panel.sizeDelta = new Vector2(width, slotSize + gap * 2f + 34f);
+            panel.sizeDelta = new Vector2(width, slotSize + gap * 2f + 34f * u);
             Image back = panel.gameObject.AddComponent<Image>();
             back.sprite = RoundedSprite();
             back.type = Image.Type.Sliced;
@@ -277,7 +279,7 @@ namespace C6Lab
             barBack.anchorMax = new Vector2(1f, 0f);
             barBack.pivot = new Vector2(.5f, 0f);
             barBack.offsetMin = new Vector2(gap, gap);
-            barBack.offsetMax = new Vector2(-gap - 56f, gap + 10f);
+            barBack.offsetMax = new Vector2(-gap - 56f * u, gap + 10f * u);
             Image barBackImage = barBack.gameObject.AddComponent<Image>();
             barBackImage.color = new Color(0f, 0f, 0f, .15f);
             barBackImage.raycastTarget = false;
@@ -289,26 +291,26 @@ namespace C6Lab
             barFill.color = InkColor;
             barFill.raycastTarget = false;
 
-            timeText = NewText("Combo Time", panel, 26, TextAnchor.MiddleRight);
+            timeText = NewText("Combo Time", panel, Mathf.Max(10, Mathf.RoundToInt(26f * u)), TextAnchor.MiddleRight);
             timeText.rectTransform.anchorMin = new Vector2(1f, 0f);
             timeText.rectTransform.anchorMax = new Vector2(1f, 0f);
             timeText.rectTransform.pivot = new Vector2(1f, 0f);
-            timeText.rectTransform.sizeDelta = new Vector2(60f, 30f);
-            timeText.rectTransform.anchoredPosition = new Vector2(-gap, gap - 9f);
+            timeText.rectTransform.sizeDelta = new Vector2(60f * u, 30f * u);
+            timeText.rectTransform.anchoredPosition = new Vector2(-gap, gap - 9f * u);
 
-            resultText = NewText("Combo Result", layer, 54, TextAnchor.MiddleCenter);
+            resultText = NewText("Combo Result", layer, Mathf.Max(14, Mathf.RoundToInt(54f * u)), TextAnchor.MiddleCenter);
             resultText.rectTransform.anchorMin = resultText.rectTransform.anchorMax = panelAnchor;
-            resultText.rectTransform.sizeDelta = new Vector2(width * 1.6f, 80f);
-            resultText.rectTransform.anchoredPosition = new Vector2(0f, -(panel.sizeDelta.y * .5f + 44f));
+            resultText.rectTransform.sizeDelta = new Vector2(width * 1.6f, 80f * u);
+            resultText.rectTransform.anchoredPosition = new Vector2(0f, -(panel.sizeDelta.y * .5f + 44f * u));
             Outline resultOutline = resultText.gameObject.AddComponent<Outline>();
             resultOutline.effectColor = InkColor;
-            resultOutline.effectDistance = new Vector2(3f, -3f);
+            resultOutline.effectDistance = new Vector2(3f, -3f) * Mathf.Max(.5f, u);
             resultText.gameObject.SetActive(false);
 
-            penaltyText = NewText("Combo Penalty", layer, 28, TextAnchor.MiddleCenter);
+            penaltyText = NewText("Combo Penalty", layer, Mathf.Max(10, Mathf.RoundToInt(28f * u)), TextAnchor.MiddleCenter);
             penaltyText.rectTransform.anchorMin = penaltyText.rectTransform.anchorMax = panelAnchor;
-            penaltyText.rectTransform.sizeDelta = new Vector2(width * 1.6f, 40f);
-            penaltyText.rectTransform.anchoredPosition = new Vector2(0f, panel.sizeDelta.y * .5f + 24f);
+            penaltyText.rectTransform.sizeDelta = new Vector2(width * 1.6f, 40f * u);
+            penaltyText.rectTransform.anchoredPosition = new Vector2(0f, panel.sizeDelta.y * .5f + 24f * u);
             penaltyText.color = FailColor;
             Outline penaltyOutline = penaltyText.gameObject.AddComponent<Outline>();
             penaltyOutline.effectColor = Color.white;
