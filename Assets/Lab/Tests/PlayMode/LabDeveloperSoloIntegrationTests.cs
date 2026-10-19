@@ -202,18 +202,47 @@ namespace C6Lab.Tests
                 Assert.That(hud.roomNameText.text, Is.Not.Empty,
                     "The Host must see the registered room name or an explicit registration status.");
                 Assert.That(developerUi.targetParticipantsSlider.interactable, Is.False);
-                Assert.That(network.LocalSlotNumber, Is.EqualTo(1));
+                Assert.That(network.LocalSlotNumber, Is.Zero,
+                    "Normal rooms start with an unselected Host, just like joining participants.");
                 Assert.That(network.CanStartBattle, Is.False,
-                    "The room still needs its remaining participants.");
-                Assert.That(hud.playerSlotPanel.activeSelf, Is.False);
-                Assert.That(network.CanSelectPlayerSlot, Is.False);
+                    "The room still needs its remaining participants and their selections.");
+                Assert.That(hud.playerSlotPanel.activeSelf, Is.True);
+                Assert.That(network.CanSelectPlayerSlot, Is.True);
+                Assert.That(hud.playerSlotStatusText.text, Does.Contain("POSITIONS 0 / 4"));
+                for (int i = 0; i < hud.playerSlotButtons.Length; i++)
+                {
+                    Assert.That(hud.playerSlotButtons[i].gameObject.activeSelf, Is.EqualTo(i < 4),
+                        "Only P1 through the configured room size should be offered.");
+                    if (i < 4) Assert.That(hud.playerSlotButtons[i].interactable, Is.True);
+                }
 
-                // Legacy controls cannot override the host's first-arrival P1 number.
+                // Use the saved Canvas button: the Host role does not reserve P1.
                 hud.playerSlotButtons[2].onClick.Invoke();
                 yield return null;
-                Assert.That(network.LocalSlotNumber, Is.EqualTo(1));
-                Assert.That(hud.seatText.text, Does.Contain("P1"));
-                Assert.That(network.RequestPlayerSlot(0), Is.False);
+                Assert.That(network.LocalSlotNumber, Is.EqualTo(3));
+                Assert.That(network.IsHost, Is.True);
+                Assert.That(hud.seatText.text, Does.Contain("P3"));
+                Assert.That(hud.playerSlotButtons[2].GetComponentInChildren<UnityEngine.UI.Text>().text,
+                    Does.Contain("YOU/CLEAR"));
+                Assert.That(hud.playerSlotStatusText.text, Does.Contain("POSITIONS 1 / 4"));
+
+                developerUi.Open();
+                yield return null;
+                Assert.That(hud.playerSlotPanel.activeSelf, Is.False,
+                    "The chooser must not show through the developer settings panel.");
+                developerUi.Close();
+                yield return null;
+                Assert.That(hud.playerSlotPanel.activeSelf, Is.True);
+
+                hud.playerSlotButtons[2].onClick.Invoke();
+                yield return null;
+                Assert.That(network.LocalSlotNumber, Is.Zero,
+                    "Clicking the selected position clears only that choice.");
+                Assert.That(network.GetSlotOwner(3), Is.EqualTo(ulong.MaxValue));
+                Assert.That(hud.playerSlotButtons[2].GetComponentInChildren<UnityEngine.UI.Text>().text,
+                    Does.Contain("OPEN"));
+                Assert.That(network.RequestPlayerSlot(5), Is.False,
+                    "A four-player room cannot select P5 through a direct request either.");
                 Assert.That(network.CanStartBattle, Is.False);
             }
             finally

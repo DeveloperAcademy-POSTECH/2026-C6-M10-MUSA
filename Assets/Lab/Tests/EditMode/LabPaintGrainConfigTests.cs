@@ -120,7 +120,7 @@ namespace C6Lab.Tests
             Assert.That(error, Does.Contain("incomplete"));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
             Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(values, 3, Protocol));
-            Assert.That(Protocol, Is.EqualTo(5636));
+            Assert.That(Protocol, Is.EqualTo(5637));
         }
 
         [Test]

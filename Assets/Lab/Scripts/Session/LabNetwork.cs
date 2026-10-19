@@ -29,6 +29,7 @@ namespace C6Lab
         public LabPlayerSlotAssignment[] slotAssignments;
         public int slotNumber;
         public bool accepted;
+        public bool restarting;
         public long lobbyRevision;
         public string roomName;
         public LabSnapshot snapshot;
@@ -168,7 +169,8 @@ namespace C6Lab
         // 5633: Host-shared experimental paint grain presentation (four appended values).
         // 5635: Host-shared four-pattern impact footprints and independent paint palette.
         // 5636: #201 Host-shared chuimsae chance and minimum gap (two appended values).
-        internal const ushort LabProtocolVersion = 5636;
+        // 5637: #204 manual lobby P selection; results name the authoritative lobby revision.
+        internal const ushort LabProtocolVersion = 5637;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");
@@ -230,6 +232,8 @@ namespace C6Lab
         private long pendingSlotRequestId;
         private int pendingSlotNumber;
         private double slotRequestSentAt;
+        private bool pendingSlotApproved;
+        private long pendingSlotLobbyRevision;
         private bool locallyPaused;
         private float timeScaleBeforePause = 1f;
         private long lobbySnapshotSequenceFloor;
@@ -294,7 +298,9 @@ namespace C6Lab
         public int TargetParticipantCount => targetParticipantCount;
         public int LocalSlotNumber => IsConnected && playerSlots != null ? playerSlots.GetSlot(LocalPlayerId) : 0;
         public bool SlotSelectionPending => slotSelectionPending;
-        public bool CanSelectPlayerSlot => false;
+        public bool IsDeveloperRestartPending => pendingDeveloperRestart;
+        public bool CanSelectPlayerSlot => IsConnected && !developerSolo && model == null && latest == null
+            && playerSlots != null && order.Contains(LocalPlayerId) && !slotSelectionPending && !pendingDeveloperRestart;
         public ulong GetSlotOwner(int slotNumber) => playerSlots?.GetOwner(slotNumber) ?? ulong.MaxValue;
         public bool IsSearchingRooms => roomSearchActive && discovery != null && discovery.IsBrowsing;
         public IReadOnlyList<LabDiscoveredRoom> DiscoveredRooms => discoveredRooms;
@@ -442,7 +448,9 @@ namespace C6Lab
             pendingSlotRequestId = id;
             pendingSlotNumber = slotNumber;
             slotRequestSentAt = Time.realtimeSinceStartupAsDouble;
-            Changed?.Invoke();
+            pendingSlotApproved = false;
+            pendingSlotLobbyRevision = 0;
+            SetNotice(string.Empty);
             return true;
         }
 
@@ -462,12 +470,13 @@ namespace C6Lab
             return true;
         }
 
-        private void SyncArrivalSlots()
+        private void AssignAutomaticTestSlot(ulong playerId)
         {
-            // The host's connection list preserves arrival order, not numeric client IDs.
-            playerSlots = new LabPlayerSlots(targetParticipantCount);
-            for (int i = 0; i < order.Count; i++)
-                playerSlots.TrySelect(order[i], i + 1, out _);
+            // Only explicit scripted smoke tests opt into automatic claims. Normal joins
+            // start unselected and never replace another participant's chosen P number.
+            if (!autoStart || playerSlots == null || playerSlots.GetSlot(playerId) != 0) return;
+            int slot = FirstAvailableSlot();
+            if (slot > 0) playerSlots.TrySelect(playerId, slot, out _);
         }
 
         private int FirstAvailableSlot()
@@ -596,7 +605,7 @@ namespace C6Lab
             }
             RegisterHandler();
             if (!order.Contains(manager.LocalClientId)) order.Add(manager.LocalClientId);
-            SyncArrivalSlots();
+            AssignAutomaticTestSlot(manager.LocalClientId);
             configAcknowledgements.Add(manager.LocalClientId);
             StartAdvertising();
             SetStatus("HOST listening on port " + port + "; waiting for " + (targetParticipantCount - 1) + " peers.");
@@ -1107,8 +1116,7 @@ namespace C6Lab
                 pauseRequestPending = false;
             if (slotSelectionPending && now - slotRequestSentAt >= 5d)
             {
-                slotSelectionPending = false;
-                pendingSlotRequestId = 0;
+                ClearPendingSlotSelection();
                 SetNotice("P number selection timed out. Try again.");
             }
             foreach (ulong stale in pendingApprovals.Where(item => now - item.Value > 15d)
@@ -1269,7 +1277,7 @@ namespace C6Lab
                     manager.DisconnectClient(id);
                     return;
                 }
-                SyncArrivalSlots();
+                AssignAutomaticTestSlot(id);
                 Debug.Log("C6_LAB_PEER_JOIN id=" + id + " participants=" + order.Count);
                 BroadcastLobby();
                 if (id != LocalPlayerId) SendSessionConfig(id);
@@ -1303,7 +1311,6 @@ namespace C6Lab
                 slotRequestIds.Remove(id);
                 Debug.LogWarning("C6_LAB_PEER_LEFT id=" + id);
                 if (model != null) EndBattleToLobby();
-                SyncArrivalSlots();
                 pendingDeveloperRestart = false;
                 configAcknowledgements.Remove(id);
                 BroadcastLobby();
@@ -1336,7 +1343,8 @@ namespace C6Lab
                 slotAssignments = playerSlots?.Snapshot() ?? Array.Empty<LabPlayerSlotAssignment>(),
                 targetParticipants = targetParticipantCount, configRevision = configRevision,
                 configFingerprint = configFingerprint, snapshotSequence = snapshotSequence,
-                lobbyRevision = ++lobbyRevision, roomName = connectedRoomName };
+                lobbyRevision = ++lobbyRevision, roomName = connectedRoomName,
+                restarting = pendingDeveloperRestart };
             foreach (ulong id in order) if (id != manager.LocalClientId) Send(id, packet);
             SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
                 + " · P " + (playerSlots?.SelectedCount ?? 0) + "/" + targetParticipantCount
@@ -1349,7 +1357,7 @@ namespace C6Lab
             bool accepted = false;
             bool changed = false;
             string reason;
-            if (!CanSelectPlayerSlot || developerSolo || model != null || playerSlots == null)
+            if (!CanSelectPlayerSlot || !order.Contains(sender))
                 reason = "SLOT_SELECTION_CLOSED";
             else if (packet.requestId <= 0)
                 reason = "INVALID_SLOT_REQUEST";
@@ -1367,9 +1375,13 @@ namespace C6Lab
                 changed = accepted && previousSlot != packet.slotNumber;
             }
             Send(sender, new LabNetworkPacket { type = "slot_result", requestId = packet.requestId,
-                slotNumber = packet.slotNumber, accepted = accepted, reason = reason });
-            if (!changed) return;
+                slotNumber = packet.slotNumber, accepted = accepted, reason = reason,
+                lobbyRevision = accepted ? lobbyRevision + 1 : 0 });
+            if (!accepted) return;
+            // Also republish an unchanged accepted selection. A retried request must be
+            // able to recover both its approval and the matching authoritative mapping.
             BroadcastLobby();
+            if (!changed) return;
             Debug.Log("C6_LAB_SLOT player=" + sender + " p=" + packet.slotNumber + " result=" + reason);
             if (autoStart && CanStartBattle) StartBattle();
             else TryStartPendingDeveloperRestart();
@@ -1847,6 +1859,8 @@ namespace C6Lab
                     order.AddRange(packet.seats);
                     playerSlots = newSlots;
                     targetParticipantCount = packet.targetParticipants;
+                    pendingDeveloperRestart = packet.restarting;
+                    TryCompleteSlotSelection();
                     if (packet.configRevision != configRevision || packet.configFingerprint != configFingerprint)
                         clientConfigReady = false;
                     SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
@@ -1857,14 +1871,7 @@ namespace C6Lab
                     break;
                 }
                 case "slot_result":
-                    if (!slotSelectionPending || packet.requestId != pendingSlotRequestId
-                        || packet.slotNumber != pendingSlotNumber) return;
-                    slotSelectionPending = false;
-                    pendingSlotRequestId = 0;
-                    if (!packet.accepted)
-                        SetNotice(packet.reason == "SLOT_TAKEN" ? "That P number is already selected."
-                            : "P number selection was rejected: " + packet.reason);
-                    else SetNotice(string.Empty);
+                    ReceiveSlotResult(packet);
                     break;
                 case "config":
                     ReceiveSessionConfig(packet);
@@ -1942,6 +1949,44 @@ namespace C6Lab
                     }
                     break;
             }
+        }
+
+        private void ReceiveSlotResult(LabNetworkPacket packet)
+        {
+            if (!slotSelectionPending || packet.requestId != pendingSlotRequestId
+                || packet.slotNumber != pendingSlotNumber) return;
+            if (!packet.accepted)
+            {
+                ClearPendingSlotSelection();
+                SetNotice(packet.reason == "SLOT_TAKEN" ? "That P number is already selected."
+                    : "P number selection was rejected: " + packet.reason);
+                return;
+            }
+            if (packet.lobbyRevision <= 0) return;
+            pendingSlotApproved = true;
+            pendingSlotLobbyRevision = packet.lobbyRevision;
+            TryCompleteSlotSelection();
+        }
+
+        private void TryCompleteSlotSelection()
+        {
+            // Approval and lobby data may be processed separately. Do not unlock the
+            // controls or display a speculative assignment until both agree.
+            if (!slotSelectionPending || !pendingSlotApproved
+                || receivedLobbyRevision < pendingSlotLobbyRevision
+                || playerSlots == null || playerSlots.GetSlot(LocalPlayerId) != pendingSlotNumber) return;
+            ClearPendingSlotSelection();
+            SetNotice(string.Empty);
+        }
+
+        private void ClearPendingSlotSelection()
+        {
+            slotSelectionPending = false;
+            pendingSlotRequestId = 0;
+            pendingSlotNumber = 0;
+            slotRequestSentAt = 0d;
+            pendingSlotApproved = false;
+            pendingSlotLobbyRevision = 0;
         }
 
         private void ReceiveSessionConfig(LabNetworkPacket packet)
@@ -2042,6 +2087,8 @@ namespace C6Lab
             }
             sessionId = snapshot.sessionId;
             latest = snapshot;
+            pendingDeveloperRestart = false;
+            ClearPendingSlotSelection();
             if (target != null) target.GetComponent<LabGourdPaint>()?.RefreshCommittedMap();
             if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
@@ -2192,10 +2239,7 @@ namespace C6Lab
             pauseRequestIds.Clear();
             slotRequestIds.Clear();
             pauseRequestPending = false;
-            slotSelectionPending = false;
-            pendingSlotRequestId = 0;
-            pendingSlotNumber = 0;
-            slotRequestSentAt = 0d;
+            ClearPendingSlotSelection();
             ClearProjectiles();
             order.Clear();
             playerSlots = null;
