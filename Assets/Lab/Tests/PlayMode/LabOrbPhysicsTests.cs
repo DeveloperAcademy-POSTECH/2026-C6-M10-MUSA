@@ -1362,14 +1362,22 @@ namespace C6Lab.Tests
             Assert.That(edge.SecondsPosition.y, Is.EqualTo(bounds.center.y).Within(1e-3f), "...with the seconds at its middle...");
             Assert.That(edge.SecondsPosition.x, Is.InRange(bounds.xMin, bounds.xMin + .15f * bounds.width), "...just inside it.");
             Assert.That(edge.SecondsPosition.z, Is.LessThan(-config.OrbRadius), "The seconds stay in front of the orbs.");
-            Assert.That(edge.Brightness, Is.InRange(.2f, .7f), "A soft red.");
+            Assert.That(edge.Opening, Is.True, "As the block begins, the edge flashes...");
+            Assert.That(edge.Brightness, Is.GreaterThan(.9f), "...bright red...");
+            Assert.That(edge.GlowReach, Is.GreaterThan(.15f * bounds.width), "...reaching further in than its glow.");
 
             board.SetSwipeBlock(-1, 3.1f);
             Assert.That(board.BlockSecondsLeft, Is.EqualTo(3.2f).Within(1e-4f),
                 "A Host snapshot a moment apart does not nudge the countdown.");
             float until = Time.time + 1.5f;
             while (Time.time < until && edge.SecondsText != "3") yield return null;
+            until = Time.time + LabOrbEdgeBlock.OpeningSeconds + .5f;
             Assert.That(edge.SecondsText, Is.EqualTo("3"), "It counts down.");
+            while (Time.time < until && edge.Opening) yield return null;
+            Assert.That(edge.Opening, Is.False, "After three flashes...");
+            Assert.That(edge.Brightness, Is.InRange(.2f, .6f), "...it settles into a light red that stays...");
+            Assert.That(edge.GlowReach, Is.EqualTo(.1f * bounds.width).Within(1e-3f), "...at its usual width.");
+            Assert.That(edge.Visible, Is.True, "...for as long as the block lasts.");
 
             board.SetSwipeBlock(1, .6f);
             Assert.That(edge.Right, Is.True, "A new block moves it to the other edge.");

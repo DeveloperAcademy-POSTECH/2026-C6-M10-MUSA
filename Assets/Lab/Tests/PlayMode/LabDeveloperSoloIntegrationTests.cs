@@ -643,6 +643,10 @@ namespace C6Lab.Tests
                 Assert.That(board.BlockedSide, Is.EqualTo(right ? 1 : -1), "This board holds that edge shut.");
                 Assert.That(board.EdgeBlock.Visible, Is.True, "It glows red...");
                 Assert.That(board.EdgeBlock.SecondsText, Is.Not.Empty, "...with the seconds left.");
+                Renderer paper = board.transform.Find("OrbBoardPlate").GetComponent<Renderer>();
+                Assert.That(paper.sortingOrder, Is.LessThan(board.EdgeBlock.GlowSortingOrder),
+                    "The transparent paper plate is drawn first, so it never covers the red glow.");
+                Assert.That(paper.sortingOrder, Is.EqualTo(LabSceneController.PlateSortingOrder));
                 var alert = UnityEngine.Object.FindFirstObjectByType<LabGourdAlert>();
                 Assert.That(alert, Is.Not.Null);
                 Assert.That(alert.ShowingBlock, Is.True, "The gourd's bubble shows the blocked way.");

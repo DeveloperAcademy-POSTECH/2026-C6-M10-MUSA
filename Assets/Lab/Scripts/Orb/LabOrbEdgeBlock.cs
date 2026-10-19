@@ -3,9 +3,11 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
-    /// The gourd's swipe block on this player's board (#215): the blocked side edge glows a soft red
-    /// that breathes slowly, a bright line runs down the edge itself, and the whole seconds left sit
-    /// in the edge's vertical middle. It flashes when something bounces off it. Presentation only;
+    /// The gourd's swipe block on this player's board (#215): as the block begins, the blocked side edge
+    /// flashes bright red three times, wider than its glow, so the player sees it at once; then it settles
+    /// into a light red that breathes slowly until the block ends. A bright line runs down the edge
+    /// itself, and the whole seconds left sit in the edge's vertical middle. It brightens for a moment
+    /// when something bounces off it. Presentation only;
     /// the board does the bouncing. The glow lies in the orbs' middle plane, so the balls pass in
     /// front of it; the seconds stay on top so they can always be read.
     /// </summary>
@@ -14,6 +16,12 @@ namespace C6Lab
         private const float GlowShare = .1f, LineShare = .012f;
         private const float GlowAlpha = .45f, LineAlpha = .8f;
         private const float BreatheHz = .8f, FlashSeconds = .35f;
+        /// <summary>The bright flashes as a block begins: three of this length.</summary>
+        private const float BlinkSeconds = .35f;
+        private const int Blinks = 3;
+        /// <summary>How much wider than its usual glow the edge flashes.</summary>
+        private const float FlashWiden = .9f;
+        private static readonly Color FlashRed = new Color(1f, .22f, .16f);
         private const int GlowOrder = -20, LineOrder = -19, TextOrder = 30, FontSize = 64;
         private static readonly Color Red = new Color(.93f, .16f, .12f);
         private static readonly Color Outline = new Color(1f, 1f, 1f, .95f);
@@ -28,6 +36,7 @@ namespace C6Lab
         private bool right;
         private float age;
         private float flash;
+        private Vector3 glowScale = Vector3.one;
 
         public bool Visible => glow != null && glow.gameObject.activeSelf;
         /// <summary>The right edge is blocked; otherwise the left.</summary>
@@ -36,8 +45,16 @@ namespace C6Lab
         /// <summary>Where the seconds and the glow's edge sit, in world space.</summary>
         public Vector3 SecondsPosition => seconds != null ? seconds.transform.position : Vector3.zero;
         public Vector3 GlowPosition => glow != null ? glow.transform.position : Vector3.zero;
-        /// <summary>The glow's current opacity, brighter for a moment after a bounce.</summary>
+        /// <summary>The glow's current opacity: full in the opening flashes, then a light red, brighter for a moment after a bounce.</summary>
         public float Brightness => glow != null ? glow.color.a : 0f;
+        /// <summary>How long the opening flashes last.</summary>
+        public const float OpeningSeconds = BlinkSeconds * Blinks;
+        /// <summary>Still in the opening flashes of this block.</summary>
+        public bool Opening => Visible && age < OpeningSeconds;
+        /// <summary>How far the glow reaches in from the edge now, in world units.</summary>
+        public float GlowReach => glow != null ? Mathf.Abs(glow.transform.lossyScale.x) : 0f;
+        /// <summary>The glow's sorting order; the board's paper plate must stay below it.</summary>
+        public int GlowSortingOrder => GlowOrder;
 
         public static LabOrbEdgeBlock Create(Transform board)
         {
@@ -51,7 +68,8 @@ namespace C6Lab
         public void Show(bool rightEdge, float edgeX, float bottom, float top, float boardWidth, float orbRadius)
         {
             EnsureParts();
-            if (!Visible) age = 0f;
+            // A new block, or one moved to the other edge, opens with its flashes again.
+            if (!Visible || rightEdge != right) age = 0f;
             right = rightEdge;
             float inward = right ? -1f : 1f;
             float height = Mathf.Max(.01f, top - bottom);
@@ -59,7 +77,8 @@ namespace C6Lab
             float glowWidth = GlowShare * boardWidth;
             // The sprites grow inward from their pivot on the edge; a negative width mirrors them.
             glow.transform.position = new Vector3(edgeX, middle, 0f);
-            glow.transform.localScale = new Vector3(inward * glowWidth, height, 1f);
+            glowScale = new Vector3(inward * glowWidth, height, 1f);
+            glow.transform.localScale = glowScale;
             line.transform.position = new Vector3(edgeX, middle, 0f);
             line.transform.localScale = new Vector3(inward * LineShare * boardWidth, height, 1f);
 
@@ -109,8 +128,19 @@ namespace C6Lab
         {
             float breathe = .75f + .25f * Mathf.Sin(age * BreatheHz * 2f * Mathf.PI);
             float lift = flash / FlashSeconds;
-            glow.color = new Color(Red.r, Red.g, Red.b, Mathf.Min(1f, GlowAlpha * breathe + .4f * lift));
-            line.color = new Color(Red.r, Red.g, Red.b, Mathf.Min(1f, LineAlpha * breathe + .2f * lift));
+            // The opening flashes: each blink jumps to full red at once and fades, three times over.
+            float opening = 0f;
+            if (age < OpeningSeconds)
+            {
+                float blink = (age % BlinkSeconds) / BlinkSeconds;
+                opening = 1f - blink * blink;
+            }
+            Color red = Color.Lerp(Red, FlashRed, opening);
+            glow.color = new Color(red.r, red.g, red.b,
+                Mathf.Min(1f, Mathf.Lerp(GlowAlpha * breathe, 1f, opening) + .4f * lift));
+            line.color = new Color(red.r, red.g, red.b,
+                Mathf.Min(1f, Mathf.Lerp(LineAlpha * breathe, 1f, opening) + .2f * lift));
+            glow.transform.localScale = new Vector3(glowScale.x * (1f + FlashWiden * opening), glowScale.y, 1f);
         }
 
         private void EnsureParts()

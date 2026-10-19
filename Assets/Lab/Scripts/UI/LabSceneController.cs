@@ -18,6 +18,8 @@ namespace C6Lab
         public bool requireCurvedAreaProfile;
 
         private readonly Vector3[] areaCorners = new Vector3[4];
+        /// <summary>The paper plate's sorting order: below every sprite drawn on the board.</summary>
+        public const int PlateSortingOrder = -100;
         private bool boardConfigured;
         private Rect appliedScreenArea;
         private string lastAreaError;
@@ -299,6 +301,11 @@ namespace C6Lab
             // A curved physics boundary must follow that composition, never resize the artwork.
             plate.localPosition = new Vector3(0f, 0f, plate.localPosition.z);
             plate.localScale = new Vector3(halfWidth * 2f, halfHeight * 2f, 1f);
+            // The paper is drawn with the transparent sprite shader, so it is ordered with the board's
+            // sprites rather than hidden behind them by depth. Keep it first, under every board sprite,
+            // even those with negative orders: the swipe block's edge glow (#215), an open bomb's rainbow (#212).
+            Renderer paper = plate.GetComponent<Renderer>();
+            if (paper != null) paper.sortingOrder = PlateSortingOrder;
         }
 
         private void ReportAreaError(string error)
