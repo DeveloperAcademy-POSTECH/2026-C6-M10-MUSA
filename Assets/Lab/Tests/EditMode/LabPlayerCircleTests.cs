@@ -9,25 +9,68 @@ namespace C6Lab.Tests
 {
     public sealed class LabPlayerCircleTests
     {
-        [Test]
-        public void ArrivalOrderNotClientIdDeterminesNumbersAndRejoinGoesLast()
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void AutomaticClaimsRequireTheExplicitSmokeTestFlagAndNeverReplaceChoices(int capacity)
         {
-            var go = new GameObject("Arrival test");
+            var go = new GameObject("Automatic smoke-test positions");
+            try
+            {
+                var network = go.AddComponent<LabNetwork>();
+                var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+                var slots = new LabPlayerSlots(capacity);
+                typeof(LabNetwork).GetField("targetParticipantCount", flags).SetValue(network, capacity);
+                typeof(LabNetwork).GetField("playerSlots", flags).SetValue(network, slots);
+                var assign = typeof(LabNetwork).GetMethod("AssignAutomaticTestSlot", flags);
+                assign.Invoke(network, new object[] { 0ul });
+                assign.Invoke(network, new object[] { 12ul });
+                Assert.That(slots.SelectedCount, Is.Zero,
+                    "Normal Host and Client joins must remain unselected.");
+
+                Assert.That(slots.TrySelect(0ul, capacity, out _), Is.True);
+                typeof(LabNetwork).GetField("autoStart", flags).SetValue(network, true);
+                assign.Invoke(network, new object[] { 0ul });
+                assign.Invoke(network, new object[] { 12ul });
+                Assert.That(slots.GetSlot(0ul), Is.EqualTo(capacity),
+                    "Enabling scripted smoke tests must not renumber an already selected Host.");
+                Assert.That(slots.GetSlot(12ul), Is.EqualTo(1));
+                assign.Invoke(network, new object[] { 12ul });
+                Assert.That(slots.SelectedCount, Is.EqualTo(2));
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void ReturningToTheSameLobbyKeepsChosenNumbersButLeavingTheRoomClearsThem()
+        {
+            var go = new GameObject("Chosen position lifecycle");
             try
             {
                 var network = go.AddComponent<LabNetwork>();
                 var flags = BindingFlags.Instance | BindingFlags.NonPublic;
                 var order = (List<ulong>)typeof(LabNetwork).GetField("order", flags).GetValue(network);
                 order.AddRange(new ulong[] { 50, 2, 90 });
-                var sync = typeof(LabNetwork).GetMethod("SyncArrivalSlots", flags);
-                sync.Invoke(network, null);
-                var slots = (LabPlayerSlots)typeof(LabNetwork).GetField("playerSlots", flags).GetValue(network);
-                Assert.That(slots.PlayersInSlotOrder(), Is.EqualTo(new ulong[] { 50, 2, 90 }));
-                order.Remove(2);
-                order.Add(100);
-                sync.Invoke(network, null);
-                slots = (LabPlayerSlots)typeof(LabNetwork).GetField("playerSlots", flags).GetValue(network);
-                Assert.That(slots.PlayersInSlotOrder(), Is.EqualTo(new ulong[] { 50, 90, 100 }));
+                var slots = new LabPlayerSlots(3);
+                Assert.That(slots.TrySelect(50, 3, out _), Is.True);
+                Assert.That(slots.TrySelect(2, 1, out _), Is.True);
+                Assert.That(slots.TrySelect(90, 2, out _), Is.True);
+                typeof(LabNetwork).GetField("playerSlots", flags).SetValue(network, slots);
+
+                typeof(LabNetwork).GetMethod("EndBattleToLobby", flags).Invoke(network, null);
+                Assert.That(network.GetSlotOwner(1), Is.EqualTo(2ul));
+                Assert.That(network.GetSlotOwner(2), Is.EqualTo(90ul));
+                Assert.That(network.GetSlotOwner(3), Is.EqualTo(50ul));
+                Assert.That(slots.PlayersInSlotOrder(), Is.EqualTo(new ulong[] { 2, 90, 50 }),
+                    "Returning to the same room must not restore arrival order or redraw positions.");
+                Assert.That(order, Is.EqualTo(new ulong[] { 50, 2, 90 }));
+
+                typeof(LabNetwork).GetMethod("ResetLocal", flags).Invoke(network, null);
+                Assert.That(order, Is.Empty);
+                Assert.That(network.GetSlotOwner(1), Is.EqualTo(ulong.MaxValue));
+                Assert.That(network.GetSlotOwner(2), Is.EqualTo(ulong.MaxValue));
+                Assert.That(network.GetSlotOwner(3), Is.EqualTo(ulong.MaxValue));
                 Assert.That(network.CanSelectPlayerSlot, Is.False);
             }
             finally { Object.DestroyImmediate(go); }

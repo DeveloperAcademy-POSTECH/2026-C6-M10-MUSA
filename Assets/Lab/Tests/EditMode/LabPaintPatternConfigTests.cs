@@ -37,7 +37,7 @@ namespace C6Lab.Tests
             int[] gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd").FieldIndices;
             Assert.That(gourd, Does.Contain(139));
             Assert.That(gourd.Distinct().Count(), Is.EqualTo(gourd.Length));
-            Assert.That(Protocol, Is.EqualTo(5636));
+            Assert.That(Protocol, Is.EqualTo(5637));
         }
 
         [TestCase(LabPaintPattern.Legacy)]

@@ -188,8 +188,10 @@ namespace C6Lab
             TryAutomaticRoomSearch();
             SetVisible(sessionControls, !battleVisible && connected && !joining);
             SetVisible(statusText == null ? null : statusText.gameObject, !battleVisible && connected && !joining);
-            SetVisible(playerSlotPanel, false);
-            RefreshPlayerSlots(false);
+            bool showPlayerSlots = connected && !joining && snapshot == null
+                && !network.IsDeveloperSolo && !developerOpen;
+            SetVisible(playerSlotPanel, showPlayerSlots);
+            RefreshPlayerSlots(showPlayerSlots);
             // This panel is a saved Canvas object. Hide it behind DEV instead of bringing
             // it forward each frame and accidentally covering the developer form.
             SetVisible(roomListPanel, showBrowser && !developerOpen);
@@ -476,9 +478,18 @@ namespace C6Lab
             int selected = network.LocalSlotNumber;
             bool pending = network.SlotSelectionPending;
             if (visible)
-                Set(playerSlotStatusText, pending ? "WAITING FOR HOST APPROVAL…"
+            {
+                int assigned = 0;
+                for (int slot = 1; slot <= target; slot++)
+                    if (network.GetSlotOwner(slot) != ulong.MaxValue) assigned++;
+                string selection = network.IsDeveloperRestartPending ? "WAITING FOR SETTINGS · RESTARTING…"
+                    : pending ? "WAITING FOR HOST APPROVAL…"
                     : selected > 0 ? "YOUR POSITION: P" + selected
-                    : "CHOOSE AN OPEN P NUMBER BEFORE START");
+                    : "CHOOSE AN OPEN P NUMBER BEFORE START";
+                int remaining = target - assigned;
+                Set(playerSlotStatusText, selection + "\nPOSITIONS " + assigned + " / " + target
+                    + (remaining > 0 ? " · " + remaining + " STILL OPEN" : " · ALL POSITIONS SELECTED"));
+            }
 
             for (int i = 0; i < playerSlotButtons.Length && i < LabModel.MaximumParticipants; i++)
             {
