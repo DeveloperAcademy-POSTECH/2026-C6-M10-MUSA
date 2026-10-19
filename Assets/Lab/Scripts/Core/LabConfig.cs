@@ -228,7 +228,9 @@ namespace C6Lab
             LabDeveloperField.Choice("Paint Pattern", "LEGACY", "BROAD", "SPLATTER", "FLOW"),
             new LabDeveloperField("Chuimsae Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Chuimsae Min Gap (generates)", 0f, 20f, true),
-            LabDeveloperField.Toggle("Player Paint Patterns (0 off, 1 on)")
+            LabDeveloperField.Toggle("Player Paint Patterns (0 off, 1 on)"),
+            new LabDeveloperField("Paint Cluster Compactness", 0f, 1f),
+            new LabDeveloperField("Paint Cluster Irregularity", 0f, 1f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -256,7 +258,7 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 140, 141, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111, 142,
+            new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
                 139, 133, 134, 135, 136, 137, 138),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
@@ -360,6 +362,10 @@ namespace C6Lab
         [SerializeField, Range(0, 2)] private int paintSurfaceResolution = 2;
         [SerializeField, Range(.1f, 100f)] private float paintInitialPercent = 2f;
         [SerializeField, Range(.1f, 100f)] private float paintRepeatPercent = 4f;
+        [Tooltip("반복 명중 성장을 맞은 영역 가까이에 모으는 정도. 새 판에 적용한다.")]
+        [SerializeField, Range(0f, 1f)] private float paintClusterCompactness = .85f;
+        [Tooltip("반복 명중 성장 덩어리 경계의 불규칙한 정도. 새 판에 적용한다.")]
+        [SerializeField, Range(0f, 1f)] private float paintClusterIrregularity = .25f;
         [SerializeField, Range(.1f, 100f)] private float paintGrowthPercentPerSecond = 6f;
         [SerializeField, Range(0f, 100f)] private float paintFillChancePercent = 60f;
         [SerializeField, Range(1f, 4f)] private float paintVerticalWeight = 1.35f;
@@ -643,6 +649,8 @@ namespace C6Lab
         public int PaintSurfaceResolution => Mathf.Clamp(paintSurfaceResolution, 0, 2);
         public float PaintInitialPercent => Mathf.Clamp(Finite(paintInitialPercent, 2f), .1f, 100f);
         public float PaintRepeatPercent => Mathf.Clamp(Finite(paintRepeatPercent, 4f), .1f, 100f);
+        public float PaintClusterCompactness => Mathf.Clamp01(Finite(paintClusterCompactness, .85f));
+        public float PaintClusterIrregularity => Mathf.Clamp01(Finite(paintClusterIrregularity, .25f));
         public float PaintGrowthPercentPerSecond => Mathf.Clamp(Finite(paintGrowthPercentPerSecond, 6f), .1f, 100f);
         public float PaintFillChancePercent => Mathf.Clamp(Finite(paintFillChancePercent, 60f), 0f, 100f);
         public float PaintVerticalWeight => Mathf.Clamp(Finite(paintVerticalWeight, 1.35f), 1f, 4f);
@@ -651,6 +659,8 @@ namespace C6Lab
             Resolution = PaintSurfaceResolution,
             InitialPercent = PaintInitialPercent,
             RepeatPercent = PaintRepeatPercent,
+            ClusterCompactness = PaintClusterCompactness,
+            ClusterIrregularity = PaintClusterIrregularity,
             GrowthPercentPerSecond = PaintGrowthPercentPerSecond,
             FillChancePercent = PaintFillChancePercent,
             VerticalWeight = PaintVerticalWeight,
@@ -802,7 +812,8 @@ namespace C6Lab
                 (float)PaintGrowthStyle, PaintEdgeRaggedness, PaintFlowRatio,
                 PaintDripWidthDegrees, PaintDripLengthDegrees, PaintGravityWeight, (float)PaintPattern,
                 (float)ChuimsaeChancePercent, (float)ChuimsaeMinGap,
-                PlayerPaintPatternsEnabled ? 1f : 0f
+                PlayerPaintPatternsEnabled ? 1f : 0f,
+                PaintClusterCompactness, PaintClusterIrregularity
             };
         }
 
@@ -989,6 +1000,8 @@ namespace C6Lab
             chuimsaeChancePercent = (int)values[140];
             chuimsaeMinGap = (int)values[141];
             playerPaintPatternsEnabled = values[142] == 1f;
+            paintClusterCompactness = values[143];
+            paintClusterIrregularity = values[144];
             error = string.Empty;
             return true;
         }
