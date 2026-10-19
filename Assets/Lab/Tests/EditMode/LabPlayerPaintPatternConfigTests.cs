@@ -27,7 +27,7 @@ namespace C6Lab.Tests
                 Assert.That(source.PlayerPaintPatternsEnabled, Is.True);
                 Assert.That(source.CompletedGourdViewerEnabled, Is.True);
                 float[] values = source.CaptureDeveloperValues();
-                Assert.That(values.Length, Is.EqualTo(150));
+                Assert.That(values.Length, Is.EqualTo(153));
                 Assert.That(values[111], Is.EqualTo(1f));
                 Assert.That(values[142], Is.EqualTo(1f));
             }
@@ -45,7 +45,7 @@ namespace C6Lab.Tests
             Assert.That(gourd, Does.Contain(111));
             Assert.That(gourd, Does.Contain(142));
             Assert.That(gourd.Count(index => index == 142), Is.EqualTo(1));
-            Assert.That(Protocol, Is.EqualTo(5642));
+            Assert.That(Protocol, Is.EqualTo(5643));
         }
 
         [TestCase(0f, 0f)]

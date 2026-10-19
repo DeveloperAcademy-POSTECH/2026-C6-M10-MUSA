@@ -235,7 +235,10 @@ namespace C6Lab
             new LabDeveloperField("Bomb Drag Lag (seconds, 0 = sticks to finger)", 0f, 1f),
             new LabDeveloperField("Bomb Release Speed (x orb)", .05f, 1f),
             new LabDeveloperField("Bomb Slide Deceleration (x orb)", 1f, 5f),
-            new LabDeveloperField("Bomb Mass (x orb)", 1f, 20f)
+            new LabDeveloperField("Bomb Mass (x orb)", 1f, 20f),
+            new LabDeveloperField("Blast Burn Seconds", 3f, 5f),
+            new LabDeveloperField("Blast Shrink Scale (x radius)", .2f, 1f),
+            new LabDeveloperField("Small Orb Paint Share (x paint)", 0f, 1f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -251,7 +254,7 @@ namespace C6Lab
             new LabDeveloperCategory("Battle", 0, 1, 2, 48),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
             new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44),
-            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 146, 147, 148, 149),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 146, 147, 148, 149, 150, 151, 152),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
@@ -319,6 +322,12 @@ namespace C6Lab
         [SerializeField, Range(1f, 5f)] private float bombSlideDeceleration = 2f;
         [Tooltip("무거운 폭탄: 질량 배율 (구슬 = 1). 클수록 구슬과 부딪혀도 덜 밀린다.")]
         [SerializeField, Range(1f, 20f)] private float bombMass = 4f;
+        [Tooltip("폭발 패널티 (#213): 폭탄 충격파에 맞은 구슬에 노란 불이 붙어 있는 시간 (초).")]
+        [SerializeField, Range(3f, 5f)] private float blastBurnSeconds = 4f;
+        [Tooltip("폭발 패널티: 충격파에 맞은 구슬의 반지름 배율. 보이는 크기·충돌·잡기·던졌을 때 박 판정에 모두 쓰고, 사라질 때까지 유지한다.")]
+        [SerializeField, Range(.2f, 1f)] private float blastShrinkScale = .5f;
+        [Tooltip("폭발 패널티: 작아진 구슬이 박에 맞았을 때 칠하는 양의 배율 (보통 구슬 = 1).")]
+        [SerializeField, Range(0f, 1f)] private float smallOrbPaintShare = .5f;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -599,6 +608,9 @@ namespace C6Lab
         public float BombReleaseSpeed => Mathf.Clamp(Finite(bombReleaseSpeed, .5f), .05f, 1f);
         public float BombSlideDeceleration => Mathf.Clamp(Finite(bombSlideDeceleration, 2f), 1f, 5f);
         public float BombMass => Mathf.Clamp(Finite(bombMass, 4f), 1f, 20f);
+        public float BlastBurnSeconds => Mathf.Clamp(Finite(blastBurnSeconds, 4f), 3f, 5f);
+        public float BlastShrinkScale => Mathf.Clamp(Finite(blastShrinkScale, .5f), .2f, 1f);
+        public float SmallOrbPaintShare => Mathf.Clamp(Finite(smallOrbPaintShare, .5f), 0f, 1f);
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
         public float OrbStopSpeed => Mathf.Clamp(Finite(orbStopSpeed, .065f), 0f, OrbMaxReleaseSpeed);
@@ -833,7 +845,8 @@ namespace C6Lab
                 (float)ChuimsaeChancePercent, (float)ChuimsaeMinGap,
                 PlayerPaintPatternsEnabled ? 1f : 0f,
                 PaintClusterCompactness, PaintClusterIrregularity, GourdVisualSize,
-                BombDragLag, BombReleaseSpeed, BombSlideDeceleration, BombMass
+                BombDragLag, BombReleaseSpeed, BombSlideDeceleration, BombMass,
+                BlastBurnSeconds, BlastShrinkScale, SmallOrbPaintShare
             };
         }
 
@@ -1027,6 +1040,9 @@ namespace C6Lab
             bombReleaseSpeed = values[147];
             bombSlideDeceleration = values[148];
             bombMass = values[149];
+            blastBurnSeconds = values[150];
+            blastShrinkScale = values[151];
+            smallOrbPaintShare = values[152];
             error = string.Empty;
             return true;
         }

@@ -668,12 +668,17 @@ namespace C6Lab.Tests
             var far = board.UpsertOrb("far", LabOrbKind.Yin, new Vector2(.95f, .95f));     // beyond the reach
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(held), 1d), Is.True);
 
-            int pushed = board.Blast("bomb", new Vector2(.5f, .5f));
+            var other = board.UpsertOrb("other-bomb", LabOrbKind.Bomb, new Vector2(.5f, .25f), lockSwipes: 2); // world (0, -1)
+            var flung = new System.Collections.Generic.List<string>();
+            int pushed = board.Blast("bomb", new Vector2(.5f, .5f), flung);
             float reach = config.BombBlastRadius * Width;
             float strength = config.BombBlastStrength * Width;
-            Assert.That(pushed, Is.EqualTo(3));
+            Assert.That(pushed, Is.EqualTo(4));
             Assert.That(board.TryGetMotion("bomb", out _, out _), Is.False, "The bomb itself is gone.");
-            Assert.That(board.Count, Is.EqualTo(4), "The blast removes no other orb.");
+            Assert.That(board.Count, Is.EqualTo(5), "The blast removes no other orb.");
+            Assert.That(flung, Is.EquivalentTo(new[] { "near", "held" }),
+                "It names the orbs it flung for the Host to set alight; not the drum, the other bomb or the far orb (#213).");
+            Assert.That(other.Body.linearVelocity.y, Is.LessThan(0f), "Another bomb is flung, but does not burn.");
             Assert.That(near.Body.linearVelocity.x, Is.EqualTo(strength * (1f - 1f / reach)).Within(.01f),
                 "An orb is flung straight away from the bomb, harder the closer it was.");
             Assert.That(near.Body.linearVelocity.y, Is.EqualTo(0f).Within(.001f));

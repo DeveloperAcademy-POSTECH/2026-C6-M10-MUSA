@@ -392,9 +392,10 @@ namespace C6Lab
         /// to the neighbour through the usual Host-approved handoff. An orb held under a finger is
         /// knocked out of the hand too. Orbs already waiting on a Host answer stay put. The blast
         /// centre is where this screen shows the bomb, or the Host's last position for it if it is
-        /// gone. Returns how many bodies were pushed.
+        /// gone. Returns how many bodies were pushed. Every flung orb that is not a drum or a bomb is
+        /// added to <paramref name="burned"/>, for the Host to set alight (#213).
         /// </summary>
-        public int Blast(string bombId, Vector2 normalizedPosition)
+        public int Blast(string bombId, Vector2 normalizedPosition, ICollection<string> burned = null)
         {
             if (!configured || !Finite(normalizedPosition)) return 0;
             Vector2 center = bombId != null && entries.TryGetValue(bombId, out var bomb) && bomb.View != null
@@ -419,6 +420,7 @@ namespace C6Lab
                 entry.Arrival = LabDrumArrival.None;
                 // A drum flung across tells the Host so it stops inside the next board (#178).
                 if (entry.View.Kind.IsDrum()) entry.Blasted = true;
+                else if (entry.View.Kind != LabOrbKind.Bomb) burned?.Add(entry.View.OrbId);
                 Vector2 direction = distance > 1e-5f ? away / distance : Vector2.up;
                 Vector2 velocity = XY(entry.View.Body.linearVelocity) + direction * strength * (1f - distance / reach);
                 entry.View.Body.linearVelocity = OnPlane(velocity);

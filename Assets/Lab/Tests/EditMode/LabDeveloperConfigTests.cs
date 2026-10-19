@@ -41,7 +41,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(150));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(153));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -727,7 +727,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(112));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(150));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(153));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             LabDeveloperField field = LabConfig.DeveloperFields[87];
@@ -1026,7 +1026,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOnAtItsPreservedIndexWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(150));
+            Assert.That(values.Length, Is.EqualTo(153));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
             Assert.That(values[111], Is.EqualTo(1f));
             LabDeveloperField field = LabConfig.DeveloperFields[111];
@@ -1126,7 +1126,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(150));
+            Assert.That(received.Length, Is.EqualTo(153));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1213,7 +1213,7 @@ namespace C6Lab.Tests
         [Test]
         public void HeavyBombFieldsJoinTheItemOrbsGroupWithTheirDefaultsAndApply()
         {
-            LabDeveloperField[] heavy = LabConfig.DeveloperFields.Skip(146).ToArray();
+            LabDeveloperField[] heavy = LabConfig.DeveloperFields.Skip(146).Take(4).ToArray();
             Assert.That(heavy.Select(field => field.Label), Is.EqualTo(new[]
             {
                 "Bomb Drag Lag (seconds, 0 = sticks to finger)", "Bomb Release Speed (x orb)",
@@ -1223,15 +1223,15 @@ namespace C6Lab.Tests
             Assert.That(heavy.Select(field => field.Max), Is.EqualTo(new[] { 1f, 1f, 5f, 20f }));
             Assert.That(heavy.Any(field => field.WholeNumber || field.IsToggle || field.IsChoice), Is.False);
             int[] items = LabConfig.DeveloperCategories.Single(category => category.Title == "Item orbs").FieldIndices;
-            Assert.That(items.Skip(items.Length - 4), Is.EqualTo(new[] { 146, 147, 148, 149 }),
+            Assert.That(items.SkipWhile(index => index != 146).Take(4), Is.EqualTo(new[] { 146, 147, 148, 149 }),
                 "They sit with the other item settings.");
-            Assert.That(LabConfig.DeveloperCategories.Sum(category => category.FieldIndices.Count(index => index >= 146)),
+            Assert.That(LabConfig.DeveloperCategories.Sum(category => category.FieldIndices.Count(index => index >= 146 && index <= 149)),
                 Is.EqualTo(4), "Each shows once.");
 
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(146), Is.EqualTo(new[] { .12f, .5f, 2f, 4f }));
+                Assert.That(source.CaptureDeveloperValues().Skip(146).Take(4), Is.EqualTo(new[] { .12f, .5f, 2f, 4f }));
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();
@@ -1254,6 +1254,50 @@ namespace C6Lab.Tests
             JsonUtility.FromJsonOverwrite("{\"bombDragLag\":-1,\"bombReleaseSpeed\":3,\"bombSlideDeceleration\":0,\"bombMass\":99}", config);
             Assert.That(new[] { config.BombDragLag, config.BombReleaseSpeed, config.BombSlideDeceleration, config.BombMass },
                 Is.EqualTo(new[] { 0f, 1f, 1f, 20f }), "Inspector values outside the ranges are clamped.");
+        }
+
+        [Test]
+        public void BlastPenaltyFieldsJoinTheItemOrbsGroupWithTheirDefaultsAndApply()
+        {
+            LabDeveloperField[] penalty = LabConfig.DeveloperFields.Skip(150).ToArray();
+            Assert.That(penalty.Select(field => field.Label), Is.EqualTo(new[]
+            {
+                "Blast Burn Seconds", "Blast Shrink Scale (x radius)", "Small Orb Paint Share (x paint)"
+            }));
+            Assert.That(penalty.Select(field => field.Min), Is.EqualTo(new[] { 3f, .2f, 0f }));
+            Assert.That(penalty.Select(field => field.Max), Is.EqualTo(new[] { 5f, 1f, 1f }));
+            Assert.That(penalty.Any(field => field.WholeNumber || field.IsToggle || field.IsChoice), Is.False);
+            int[] items = LabConfig.DeveloperCategories.Single(category => category.Title == "Item orbs").FieldIndices;
+            Assert.That(items.Skip(items.Length - 3), Is.EqualTo(new[] { 150, 151, 152 }),
+                "They follow the heavy bomb settings.");
+            Assert.That(LabConfig.DeveloperCategories.Sum(category => category.FieldIndices.Count(index => index >= 150)),
+                Is.EqualTo(3), "Each shows once.");
+
+            LabConfig authored = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(authored, Is.Not.Null);
+            foreach (LabConfig source in new[] { config, authored })
+                Assert.That(source.CaptureDeveloperValues().Skip(150), Is.EqualTo(new[] { 4f, .5f, .5f }));
+
+            float[] values = config.CaptureDeveloperValues();
+            float[] before = (float[])values.Clone();
+            values[150] = 3.5f;
+            values[151] = .25f;
+            values[152] = 0f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(new[] { config.BlastBurnSeconds, config.BlastShrinkScale, config.SmallOrbPaintShare },
+                Is.EqualTo(new[] { 3.5f, .25f, 0f }));
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values));
+            Assert.That(config.CaptureDeveloperValues().Take(150), Is.EqualTo(before.Take(150)),
+                "Earlier settings keep their places and values.");
+
+            values[150] = 2f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
+            Assert.That(error, Does.Contain("Blast Burn Seconds"));
+            Assert.That(config.BlastBurnSeconds, Is.EqualTo(3.5f), "A rejected form changes nothing.");
+
+            JsonUtility.FromJsonOverwrite("{\"blastBurnSeconds\":9,\"blastShrinkScale\":0,\"smallOrbPaintShare\":-1}", config);
+            Assert.That(new[] { config.BlastBurnSeconds, config.BlastShrinkScale, config.SmallOrbPaintShare },
+                Is.EqualTo(new[] { 5f, .2f, 0f }), "Inspector values outside the ranges are clamped.");
         }
     }
 }
