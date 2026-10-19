@@ -458,7 +458,8 @@ namespace C6Lab.Tests
                 Assert.That(yinView, Is.Not.Null);
                 Assert.That(yinView.GetComponent<Rigidbody>(), Is.Not.Null);
                 Assert.That(yinView.GetComponent<SphereCollider>(), Is.Not.Null);
-                Assert.That(yinView.Visual.GetComponentInChildren<MeshRenderer>(), Is.Not.Null);
+                Assert.That(yinView.Visual.GetComponentInChildren<SpriteRenderer>().sprite,
+                    Is.SameAs(appearance.SpriteFor(LabOrbKind.Yin)));
 
                 // Generated orbs pop out of the drum, fly off at once and slide to a stop before
                 // the drag. Use the same public board gesture methods the pointer path calls.
@@ -481,8 +482,8 @@ namespace C6Lab.Tests
                 LabOrbView combinedView = board.GetComponentsInChildren<LabOrbView>()
                     .Single(view => view.OrbId == combined.id);
                 Assert.That(combinedView.HitSphere, Is.Not.Null);
-                Assert.That(combinedView.Visual.GetComponentInChildren<MeshRenderer>(), Is.Not.Null,
-                    "The attackable Combined orb must use the same 3D sphere presentation as Raw orbs.");
+                Assert.That(combinedView.Visual.GetComponentInChildren<SpriteRenderer>().sprite,
+                    Is.SameAs(appearance.SpriteFor(LabOrbKind.Combined, combined.element)));
 
                 // A centred upward release produces the same seat-zero arc as manual Solo play.
                 // Keep the orb held while moving it into position, pause, then flick up.
@@ -498,8 +499,9 @@ namespace C6Lab.Tests
                 LabProjectile projectile = UnityEngine.Object.FindFirstObjectByType<LabProjectile>();
                 Assert.That(projectile, Is.Not.Null);
                 Assert.That(projectile.GetComponent<SphereCollider>(), Is.Not.Null);
-                Assert.That(projectile.VisualMount.GetComponentInChildren<MeshRenderer>(), Is.Not.Null,
-                    "The thrown orb must retain the 3D sphere presentation.");
+                Assert.That(projectile.VisualMount.GetComponentInChildren<SpriteRenderer>().sprite,
+                    Is.SameAs(appearance.SpriteFor(LabOrbKind.Combined, combined.element)),
+                    "The thrown orb keeps the approved element artwork.");
                 Assert.That(projectile.ElementFlightTrail, Is.Not.Null);
                 Assert.That(projectile.ElementFlightTrail.IsEmitting, Is.True);
                 Assert.That(projectile.ElementFlightTrail.Element, Is.EqualTo(combined.element));

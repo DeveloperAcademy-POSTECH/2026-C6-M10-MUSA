@@ -1345,3 +1345,31 @@ OrbCamera의 단색 바탕이 조합대 상단 투명 곡선에서 보이던 부
 - PlayMode **3/3**, 실패·건너뜀0: SharedAppearanceKeepsBoardAndProjectileArtSeparateFromPhysics, TappingADrumGeneratesWithoutStoppingItAndAFlickMovesItButNeverThrows, SavedSceneSoloCanGenerateCombineAndHitTheCylinder. 이미지와 물리 분리, 탭·플릭, 저장 Scene의 실제 솔로 생성·조합·명중 경로 확인.
 - 실제 Editor402×874 솔로 Game View에서 새 삼태극·손그림 테두리·질감 표시를 확인했다.
 - 빌드·실기기·다중 연결 **NOT_RUN**. 임시 검사 도구와 원시 결과는 저장소에서 제외한다.
+
+## #229 음양·오행 구슬 PNG 적용 — 2026-10-20
+
+현재 `orgin/experiment/#229-new-2d-orbs`는 처음에227 머지 전532ba3bd에서 시작했다. 원격을 갱신해 PR#228의227 UI 머지652c5081을 확인하고 fast-forward로 포함했다. 진행 중인229 소스와 원본 PNG는 보존했다.
+
+사용자 제공 음·양·화·수·목·금·토 PNG7개를 원본 그대로 추가하고 LabOrbAppearance.asset의 새 Sprite 슬롯에 연결했다. 조합판은 이미지가 회전해 옆면이 되지 않도록 평면으로 표시하며, 투척은 렌더링하는 각 카메라를 향한다. 물리 루트와 기존 SphereCollider/Rigidbody·생성·조합·전달·투척·색칠 색상·축소 비율·속성 궤적은 유지한다. Sprite가 없는 종류·기존 fixture는 머터리얼/프리팹 표현으로 돌아간다. Config 수치·Scene 참조는 변경하지 않았다.
+
+- Unity6000.6.5f1 재가져오기·컴파일 완료. 새 이미지 가져오기/연결 메뉴를 포함한다.
+- EditMode LabOrbSpriteDesignTests **7/7**, 실패·건너뜀0: 저장 Config에서 종류/속성과 원본 Sprite 연결·피벗·mipmap 확인.
+- 최종 PlayMode **57/57**, 실패·건너뜀0: LabOrbSpriteTests(3), LabOrbPhysicsTests(53), SavedSceneSoloCanGenerateCombineAndHitTheCylinder(1). 이미지 전환/3D 복귀·게임 지름/콜라이더 독립·축소 투사체·속성 궤적·여러 카메라 방향과 기존 물리·실제 솔로 생성/조합/명중을 확인했다.
+- 첫 PlayMode54/57에서 기존 통합 검사의 MeshRenderer 존재 가정1건과 새 fixture의 가로폭/발사 전 collider 기본값 가정2건이 실패했다. 새 Sprite 연결 검사와 긴 변 기준·실제 LaunchVisual 이후 검사로 고친 뒤 위57건이 통과했다. 물리 수치를 바꿔 검사를 맞추지 않았다.
+- Editor402×874 화면에서227 배경·UI 복구와7종 이미지의 실제 보드 표시를 확인했다.7종 동시 표시는 임시 로컬 표현 fixture이며 Host의 자연 생성/속성 추첨 결과와 구분한다. 원시 캡처·결과·임시 도구는 저장소에서 제외한다.
+- 빌드·iOS 실기기·다중 연결 **NOT_RUN**. 재생 중 스크립트 갱신에서 보인 기존 판/네트워크 NullReferenceException의 원인 해결은 이번 범위 밖이다.
+
+### #229 음양 구슬 표시 크기 조정 — 2026-10-20
+
+사용자 예시를 기준으로 조합판의 음·양 Sprite만 오행 Sprite 대비80% 지름으로 표시한다. 원본 이미지·SphereCollider·드래그/조합 판정·수치 Config·오행/투척 크기는 유지한다.
+
+- Unity6000.6.5f1 컴파일 완료. EditMode LabOrbSpriteDesignTests **7/7**, PlayMode LabOrbSpriteTests(3)·SavedSceneSoloCanGenerateCombineAndHitTheCylinder(1) **4/4**, 실패·건너뜀0. 같은 물리 반지름0.32에서 음양 표시 지름0.512/오행0.64, Collider 유지·표현 전환·투척 회귀·실제 솔로 조합/명중을 확인했다.
+- Editor402×874 화면의 임시7종 보드 표시에서 음·양이 더 작게 보이는 것을 확인했다. 빌드·실기기·다중 연결은 **NOT_RUN**. 임시 도구·원시 결과·캡처는 저장소에서 제외한다.
+
+
+### #229 음양 원래 크기·오행120% 표시로 변경 — 2026-10-20
+
+사용자 후속 요청으로 앞의 음양80% 표시를 철회했다. 음양은 원래 지름, 오행은 조합판과 투척 중 모두120% 지름으로 표시한다. 물리 반지름·잡기·조합 판정·축소 패널티 비율은 유지한다. 공통 표시 배율을 두 경로에서 사용한다.
+
+- Unity6000.6.5f1 컴파일 완료. EditMode7/7, PlayMode4/4, 실패·건너뜀0(앞과 같은7종 연결 및 이미지/물리 분리·카메라·실제 솔로 조합/명중 검사). 반지름0.32에서 음양 지름0.64/오행0.768을 확인하고, 축소 투사체도 기존Collider에120% 표시만 적용됨을 확인했다.
+- 빌드·실기기·다중 연결은 NOT_RUN. 임시 도구·원시 결과는 저장소에서 제외한다.

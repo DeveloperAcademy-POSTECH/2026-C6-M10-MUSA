@@ -26,6 +26,7 @@ namespace C6Lab
         private LabOrbItemMarker itemMarker;
         private LabOrbBurn burn;
         private SpriteRenderer drumArt;
+        private LabOrbSpriteArt orbSpriteArt;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
         private string orbId;
@@ -105,6 +106,11 @@ namespace C6Lab
                 // The flat art keeps facing the camera and turns about the view axis instead of rolling.
                 spinVelocity = Mathf.Lerp(spinVelocity, spinTarget, 1f - Mathf.Exp(-DrumSpinEase * Time.deltaTime));
                 visual.Rotate(0f, 0f, spinVelocity * Time.deltaTime, Space.Self);
+                return;
+            }
+            if (orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf)
+            {
+                visual.localRotation = Quaternion.identity;
                 return;
             }
             Vector3 velocity = Body.linearVelocity;
@@ -504,8 +510,9 @@ namespace C6Lab
                     defaultRenderer.SetPropertyBlock(null);
             }
             Sprite drumSprite = kind.IsDrum() && appearance != null ? appearance.DrumSprite : null;
+            Sprite orbSprite = appearance != null ? appearance.SpriteFor(kind, element) : null;
             // Flat art (the drum's, or the cartoon bomb's on the item marker) replaces the ball.
-            bool flatArt = drumSprite != null || HasBombArt;
+            bool flatArt = drumSprite != null || HasBombArt || orbSprite != null;
             Transform defaultSphere = visual.Find("Default Sphere");
             if (defaultSphere != null) defaultSphere.gameObject.SetActive(!flatArt && replacementVisual == null);
             if (replacementVisual != null)
@@ -517,6 +524,9 @@ namespace C6Lab
                     appearance.ApplyKindMaterial(replacementVisual, kind, element);
             }
             UpdateDrumArt(drumSprite);
+            // Element art is 20% larger; Yin/Yang art and every collider retain their original size.
+            float spriteRadius = visualRadius * LabOrbSpriteArt.SizeScaleFor(kind);
+            orbSpriteArt = LabOrbSpriteArt.Set(visual, orbSpriteArt, orbSprite, spriteRadius, -visualRadius);
             UpdateContactShadow();
             UpdateItemMarker();
         }
