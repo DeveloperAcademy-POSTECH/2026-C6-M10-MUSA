@@ -13,6 +13,8 @@ namespace C6Lab.Tests
             { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Water, LabOrbElement.Earth };
 
         private readonly List<LabConfig> created = new List<LabConfig>();
+        /// <summary>DEV 기본 페널티 배율 (Combo Penalty Size)</summary>
+        private const float PenaltyScale = .3f;
 
         [TearDown]
         public void TearDown()
@@ -127,7 +129,7 @@ namespace C6Lab.Tests
             Assert.That(failed.players.Select(player => player.comboPenaltyUntil), Is.All.EqualTo(40d),
                 "A timeout has no culprit, so the whole team shrinks for 10 seconds.");
             foreach (ulong id in new ulong[] { 10, 20, 30 })
-                Assert.That(model.ThrowScaleFor(id, 35d), Is.EqualTo(.5f));
+                Assert.That(model.ThrowScaleFor(id, 35d), Is.EqualTo(PenaltyScale));
             Assert.That(model.ThrowScaleFor(10, 40d), Is.EqualTo(1f), "The penalty ends on time.");
 
             LabSnapshot received = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(failed));
@@ -178,10 +180,10 @@ namespace C6Lab.Tests
                 "Four lucky colors in a row would succeed instead; that path is covered elsewhere.");
             Assert.That(snapshot.comboFailedBy, Is.EqualTo(10ul));
             Assert.That(snapshot.players.Single(player => player.id == 10).comboPenaltyUntil, Is.EqualTo(12d));
-            float otherScale = throwerOnly ? 1f : .5f;
+            float otherScale = throwerOnly ? 1f : PenaltyScale;
             Assert.That(model.ThrowScaleFor(20, 5d), Is.EqualTo(otherScale));
             Assert.That(model.ThrowScaleFor(30, 5d), Is.EqualTo(otherScale));
-            Assert.That(model.ThrowScaleFor(10, 5d), Is.EqualTo(.5f));
+            Assert.That(model.ThrowScaleFor(10, 5d), Is.EqualTo(PenaltyScale));
         }
 
         [Test]
@@ -195,7 +197,7 @@ namespace C6Lab.Tests
 
             LabOrbState before = Combine(model, 10, pool, ref requests);
             Assert.That(model.TryLaunch(10, before.id, "scale-before", 2d, out _, out _), Is.True);
-            Assert.That(model.LaunchScaleOf(before.id), Is.EqualTo(.5f),
+            Assert.That(model.LaunchScaleOf(before.id), Is.EqualTo(PenaltyScale),
                 "The combo timed out at 2 seconds, so this throw is already small.");
 
             Assert.That(model.Snapshot(12d).players.All(player => player.comboPenaltyUntil == 12d), Is.True);
@@ -204,7 +206,7 @@ namespace C6Lab.Tests
             Assert.That(model.TryLaunch(10, after.id, "scale-after", 12d, out _, out _), Is.True);
             Assert.That(model.LaunchScaleOf(after.id), Is.EqualTo(1f), "The penalty is over at 12 seconds.");
 
-            Assert.That(model.LaunchScaleOf(before.id), Is.EqualTo(.5f),
+            Assert.That(model.LaunchScaleOf(before.id), Is.EqualTo(PenaltyScale),
                 "A ball thrown during the penalty keeps its small size even if it lands later.");
             Assert.That(model.ConfirmMiss(before.id, 12d), Is.True);
             Assert.That(model.LaunchScaleOf(before.id), Is.EqualTo(1f), "A resolved ball is forgotten.");
@@ -267,7 +269,7 @@ namespace C6Lab.Tests
             model.Begin("combo-latest", new ulong[] { 10, 20 }, 0d, config);
 
             Assert.That(model.Snapshot(2.5d).comboResult, Is.EqualTo(LabComboResult.Timeout));
-            Assert.That(model.ThrowScaleFor(10, 3d), Is.EqualTo(.5f), "The first combo timed out: small balls until 12 s.");
+            Assert.That(model.ThrowScaleFor(10, 3d), Is.EqualTo(PenaltyScale), "The first combo timed out: small balls until 12 s.");
 
             Assert.That(model.Snapshot(4d).comboActive, Is.True, "The second combo appears at 4 seconds.");
             HitEveryColorInOrder(model, 4d);

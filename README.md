@@ -184,10 +184,10 @@ DEV → **Combo**의 `Gourd Color Combo`를 켜면(기본 OFF) 전투 중 박이
 
 - **제시**: 전투 20초부터 30초마다(앞 콤보가 나온 시각 기준, 일시정지 제외) Host가 화/수/목/금/토 5색 중 4개를 무작위로(반복 허용) 정해 모든 화면 위쪽 가운데에 같은 4칸을 띄웁니다. 맞힌 칸은 체크, 다음 칸은 통통 튀고, 남은 시간은 숫자 없이 줄어드는 막대로 보이고, 3초 이하면 막대가 빨개집니다. 페널티/보상 중에는 패널 아래 가장자리에 알약 모양 배지(빨강 `SMALL` / 노랑 `BIG`, 공 아이콘, 줄어드는 게이지, 남은 초)가 붙습니다. 배지는 그 기기 플레이어 기준입니다.
 - **판정**: 팀이 박에 맞힌 결합 구슬을 순서대로 봅니다. 순서와 색이 모두 맞으면 다음 칸, 다른 색이 맞으면 바로 `WRONG COLOR`, 제한 시간(10초) 안에 4칸을 못 채우면 `TIME UP`입니다. 폭탄/릴레이처럼 색이 없는 공은 세지 않습니다. 성공하면 `CLEAR!`가 뜨고 아래 보상을 받습니다.
-- **실패 페널티**: 10초 동안 던지는 공의 크기(충돌 반지름/모양/꼬리)와 박에 칠해지는 면적이 0.5배가 됩니다. 던진 순간의 크기가 착지까지 유지되며, 다른 기기에도 같은 크기로 보입니다.
+- **실패 페널티**: 10초 동안 던지는 공의 크기(충돌 반지름/모양/꼬리)와 박에 칠해지는 면적이 0.3배가 됩니다. 던진 순간의 크기가 착지까지 유지되며, 다른 기기에도 같은 크기로 보입니다.
 - **페널티 대상**: `Combo Penalty Target`이 TEAM(기본)이면 팀 전체, THROWER면 틀린 색을 던진 사람만입니다. 시간 초과는 틀린 사람이 없으므로 언제나 팀 전체입니다.
 - **성공 보상**: 4칸을 다 맞히면 10초 동안 팀 전체의 공 크기와 칠 면적이 1.5배가 되고 보상과 페널티는 마지막 결과 하나만 남습니다(성공하면 진행 중이던 페널티가 끝나고, 실패하면 페널티를 받는 사람의 보상이 끝남).
-- **DEV 값**: `Combo First Start` 20초, `Combo Repeat Interval` 30초, `Combo Time Limit` 10초, `Combo Penalty Duration` 10초(0이면 페널티 없음), `Combo Penalty Size (x)` 0.5, `Combo Reward Duration` 10초(0이면 보상 없음), `Combo Reward Size (x)` 1.5. 상세는 [DEV 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)의 Combo 항목을 보세요.
+- **DEV 값**: `Combo First Start` 20초, `Combo Repeat Interval` 30초, `Combo Time Limit` 10초, `Combo Penalty Duration` 10초(0이면 페널티 없음), `Combo Penalty Size (x)` 0.3, `Combo Reward Duration` 10초(0이면 보상 없음), `Combo Reward Size (x)` 1.5. 상세는 [DEV 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)의 Combo 항목을 보세요.
 
 ## 개인 HP 확인
 

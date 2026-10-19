@@ -126,7 +126,7 @@ Inspector의 `Completed Gourd Viewer Enabled`와 `LabConfig.CompletedGourdViewer
 
 | V-32 | #191 기본 OFF·112번째 토글·119개 왕복/지문·구형 111개 배열/잘못된 bool의 원자적 거절, 표준 적용 경계·Host ACK·일반 Release 참가자, Paint 100% 일치 맵의 개별 관람·회전/줌·모달 입력·Retry/로비/연결 종료 자원 정리 | EditMode·PlayMode·Release/Development 빌드와 실제 Host/Client·기기 실행을 구분 | EditMode 331/331·PlayMode 116/116·Development Host/Release Client 두 앱·일반 Mac 빌드 PASS. iOS/실제 터치/핫스팟/3~5기기 NOT_RUN. [범위·근거](VALIDATION.md) |
 | V-33 | #212 폭탄 잠금 복원: 북·박 폭탄 모두 잠금 2~4·넘길 때마다 1 감소·빨간 숫자 = 남은 해금 횟수, 잠긴 채 `Item Lifetime` 종료 시만 폭발, 해금 전달에서 도화선 소등(연기)·무지개 테두리·`Orb Lifetime` 재시작, 해금 폭탄 투척 시 `Bomb Damage Multiplier` 피해·빗나감/만료 무폭발, 밧줄 도화선이 마지막 3초 전까지 타 들어감, 박 폭탄 착지 경고 없이 즉시 낙하, 무거운 폭탄 DEV 146~149(끌기 지연·놓기 속도·미끄럼 감속·질량), 설정 150개·프로토콜 5642 | Core EditMode·Orb PlayMode·저장 Scene 솔로·세 실행본 | [검증 기록](VALIDATION.md) |
-| V-34 | #222 박 색상 콤보 실험(기본 OFF): 20초부터 30초 간격 4칸 색 콤보(화/수/목/금/토 무작위, 반복 허용, 모든 기기 같은 색), 순서/색 일치 판정, 틀린 색 즉시 실패/10초 시간 초과, 실패 시 10초간 공 크기/칠 면적 0.5배(TEAM 기본, THROWER 선택, 시간 초과는 팀 전체), 성공 시 10초간 팀 전체 1.5배(마지막 결과만 유지), HUD 4칸/체크/남은 시간/결과(남은 시간은 막대만)/페널티/보상 알약 배지, OFF 시 기존과 동일, 설정 159개/프로토콜 5643 | Core EditMode(`LabGourdComboTests`, `LabDeveloperConfigTests`)/저장 Scene 솔로/세 실행본 | [검증 기록](VALIDATION.md) |
+| V-34 | #222 박 색상 콤보 실험(기본 OFF): 20초부터 30초 간격 4칸 색 콤보(화/수/목/금/토 무작위, 반복 허용, 모든 기기 같은 색), 순서/색 일치 판정, 틀린 색 즉시 실패/10초 시간 초과, 실패 시 10초간 공 크기/칠 면적 0.3배(TEAM 기본, THROWER 선택, 시간 초과는 팀 전체), 성공 시 10초간 팀 전체 1.5배(마지막 결과만 유지), HUD 4칸/체크/남은 시간/결과(남은 시간은 막대만)/페널티/보상 알약 배지, OFF 시 기존과 동일, 설정 159개/프로토콜 5643 | Core EditMode(`LabGourdComboTests`, `LabDeveloperConfigTests`)/저장 Scene 솔로/세 실행본 | [검증 기록](VALIDATION.md) |
 
 검증에 필요한 자료는 이 새 코드와 관련 검사에 한정한다. 과거 프로토타입의 통과 기록은 새 Unity 버전 또는 새 코드의 통과 증거로 승계하지 않는다.
 

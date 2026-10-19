@@ -1279,8 +1279,8 @@ namespace C6Lab.Tests
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
                 Assert.That(source.CaptureDeveloperValues().Skip(150),
-                    Is.EqualTo(new[] { 0f, 20f, 30f, 10f, 10f, .5f, 0f, 10f, 1.5f }),
-                    "The experiment is off, penalizes the whole team and rewards with 1.5x for 10 seconds by default.");
+                    Is.EqualTo(new[] { 0f, 20f, 30f, 10f, 10f, .3f, 0f, 10f, 1.5f }),
+                    "The experiment is off, shrinks the whole team to 0.3x and rewards with 1.5x for 10 seconds by default.");
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();
