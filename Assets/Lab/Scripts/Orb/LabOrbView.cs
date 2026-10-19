@@ -24,6 +24,7 @@ namespace C6Lab
         private GameObject replacementVisual;
         private GameObject contactShadow;
         private LabOrbItemMarker itemMarker;
+        private LabOrbBurn burn;
         private SpriteRenderer drumArt;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
@@ -41,6 +42,7 @@ namespace C6Lab
         private Action spawnCompleted;
         private Coroutine dropRoutine;
         private Action dropLanded;
+        private Coroutine shrinkRoutine;
 
         public string OrbId => orbId;
         public LabOrbKind Kind => kind;
@@ -53,6 +55,11 @@ namespace C6Lab
         /// <summary>How many times this item has started its unlock presentation.</summary>
         public int UnlockEffectPlays { get; private set; }
         public LabOrbItemMarker ItemMarker => itemMarker;
+        /// <summary>The yellow fire of an orb a bomb blast flung (#213); null until it first burns.</summary>
+        public LabOrbBurn Burn => burn;
+        public bool Burning => burn != null && burn.Burning;
+        /// <summary>The art squeezing down to a size a blast just shrank the orb to (#213).</summary>
+        public bool IsShrinking => shrinkRoutine != null;
         /// <summary>The drum art's spin about the view axis, in degrees per second.</summary>
         public float DrumSpin => spinVelocity;
         /// <summary>A drum shows its flat art instead of the sphere once the appearance provides it.</summary>
@@ -162,6 +169,49 @@ namespace C6Lab
             HitSphere.center = Vector3.zero;
             EnsureVisual();
             UpdateVisual();
+            if (burn != null) burn.SetRadius(radius);
+        }
+
+        /// <summary>Seconds the Host says this orb still burns after a blast flung it (#213); 0 or less lets the fire die.</summary>
+        public void SetBurn(float secondsLeft)
+        {
+            if (burn == null)
+            {
+                if (!(secondsLeft > 0f)) return;
+                burn = LabOrbBurn.Create(transform);
+            }
+            burn.Burn(secondsLeft, visualRadius);
+        }
+
+        /// <summary>
+        /// A blast just shrank this orb (#213). Its body is already small; the art starts at its old
+        /// size (fromScale times the new one) and squeezes down to match, dipping just under before
+        /// it settles, instead of jumping.
+        /// </summary>
+        public void PlayShrink(float fromScale, float duration)
+        {
+            if (visual == null || IsSpawning || IsDropping || !isActiveAndEnabled
+                || !(fromScale > 1f) || float.IsInfinity(fromScale) || !(duration > 0f) || float.IsInfinity(duration))
+                return;
+            if (shrinkRoutine != null) StopCoroutine(shrinkRoutine);
+            visual.localScale = Vector3.one * fromScale;
+            shrinkRoutine = StartCoroutine(ShrinkVisual(fromScale, duration));
+        }
+
+        private IEnumerator ShrinkVisual(float fromScale, float duration)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                yield return null;
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration) - 1f;
+                // Ease out with a small overshoot, so it dips just below its new size and settles.
+                float eased = 1f + 2.4f * t * t * t + 1.4f * t * t;
+                if (visual != null) visual.localScale = Vector3.one * Mathf.LerpUnclamped(fromScale, 1f, eased);
+            }
+            if (visual != null) visual.localScale = Vector3.one;
+            shrinkRoutine = null;
         }
 
         public void SetLockSwipes(int value) => SetItemState(value, relayStage, fuseSeconds);
@@ -381,6 +431,12 @@ namespace C6Lab
         {
             CompleteSpawn();
             CompleteDrop();
+            if (shrinkRoutine != null)
+            {
+                StopCoroutine(shrinkRoutine);
+                shrinkRoutine = null;
+                if (visual != null) visual.localScale = Vector3.one;
+            }
         }
 
         private void OnDestroy()

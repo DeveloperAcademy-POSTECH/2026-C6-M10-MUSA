@@ -1774,7 +1774,9 @@ namespace C6Lab
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
-                    orb.JustUnlocked(latest.serverTime), small: orb.small);
+                    orb.JustUnlocked(latest.serverTime), small: orb.small,
+                    // Every screen counts the blast fire down from the same Host clock (#213).
+                    burnSeconds: config != null ? orb.BurnSecondsLeft(latest.serverTime, config.BlastBurnSeconds) : 0f);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {

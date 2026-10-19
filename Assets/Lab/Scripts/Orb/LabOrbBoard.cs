@@ -276,13 +276,15 @@ namespace C6Lab
         /// Add a newly approved orb, or update its kind/owner. Existing local physics is never
         /// reset by a repeated snapshot. Positions are 0..1; velocity is board widths/second.
         /// justUnlocked plays the unlock effect once per orb, however many snapshots repeat it.
-        /// A small orb, shrunk by a bomb blast (#213), is smaller to see, to grab and to bump into.
+        /// A small orb, shrunk by a bomb blast (#213), is smaller to see, to grab and to bump into;
+        /// burnSeconds is how much longer that blast's fire burns on it.
         /// </summary>
         public LabOrbView UpsertOrb(string id, LabOrbKind kind, Vector2 normalizedPosition,
             Vector2 velocityInBoardWidthsPerSecond = default, bool localOwner = true,
             bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
-            LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false)
+            LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false,
+            float burnSeconds = 0f)
         {
             RequireConfigured();
             small &= !kind.IsDrum();
@@ -294,8 +296,10 @@ namespace C6Lab
                 existing.View.FuseTotalSeconds = config.ItemLifetimeSeconds;
                 if (existing.View.Kind != kind || existing.View.Element != element || existing.Small != small)
                 {
+                    bool shrinking = small && !existing.Small && existing.View.Kind == kind;
                     existing.Small = small;
                     existing.View.Configure(id, kind, RadiusFor(kind, small), element);
+                    if (shrinking) existing.View.PlayShrink(1f / config.BlastShrinkScale, ShrinkSeconds);
                     existing.View.Body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
@@ -303,6 +307,7 @@ namespace C6Lab
                     || existing.View.FuseSeconds != fuseSeconds)
                     existing.View.SetItemState(lockSwipes, relayStage, fuseSeconds);
                 if (justUnlocked && unlockEffectIds.Add(id)) existing.View.PlayUnlockEffect();
+                existing.View.SetBurn(burnSeconds);
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -321,6 +326,7 @@ namespace C6Lab
             view.FuseTotalSeconds = config.ItemLifetimeSeconds;
             view.SetItemState(lockSwipes, relayStage, fuseSeconds);
             if (justUnlocked && unlockEffectIds.Add(id)) view.PlayUnlockEffect();
+            view.SetBurn(burnSeconds);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
@@ -1214,6 +1220,8 @@ namespace C6Lab
             return areaShape.Clamp(world, radius);
         }
 
+        /// <summary>How long a blast-shrunk orb's art takes to squeeze down to its new size (#213).</summary>
+        private const float ShrinkSeconds = .3f;
         private float RadiusFor(LabOrbKind kind, bool small = false) =>
             kind.IsDrum() ? config.DrumRadius : config.OrbRadius * (small ? config.BlastShrinkScale : 1f);
         private static Vector2 XY(Vector3 value) => new Vector2(value.x, value.y);

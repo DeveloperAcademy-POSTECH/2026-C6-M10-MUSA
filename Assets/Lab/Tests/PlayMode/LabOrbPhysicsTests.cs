@@ -730,6 +730,69 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator ABlastFlungOrbBurnsForTheHostsSecondsThenGoesOut()
+        {
+            var cold = board.UpsertOrb("cold", LabOrbKind.Yang, new Vector2(.2f, .5f));
+            Assert.That(cold.Burning, Is.False);
+            Assert.That(cold.Burn, Is.Null, "An orb no blast touched carries no fire at all.");
+
+            var hot = board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: .8f);
+            LabOrbBurn fire = hot.Burn;
+            Assert.That(hot.Burning, Is.True, "An orb a blast flung burns (#213).");
+            Assert.That(fire.SecondsLeft, Is.EqualTo(.8f).Within(1e-4f), "For the seconds the Host gives.");
+            Assert.That(fire.Life, Is.LessThan(.1f), "It catches from nothing...");
+            Assert.That(fire.PartsShown, Is.GreaterThan(10), "Tongues of flame, a halo and embers.");
+            Assert.That(fire.FullHeight, Is.GreaterThan(2f * hot.HitSphere.radius), "Its flames rise well above the ball.");
+            Assert.That(fire.BackDepth, Is.EqualTo(0f),
+                "The big flames stand in the ball's middle, so the ball hides their roots and keeps its colour,");
+            Assert.That(fire.FrontDepth, Is.LessThan(-hot.HitSphere.radius), "and only short licks come over its front.");
+
+            var whole = board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.8f, .5f), burnSeconds: .8f);
+            Assert.That(whole.Burn.FullHeight, Is.EqualTo(2f * fire.FullHeight).Within(1e-4f),
+                "The fire is sized to its ball: a shrunk orb's is half as tall.");
+            board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.8f, .5f), burnSeconds: 3f);
+            Assert.That(whole.Burn.SecondsLeft, Is.EqualTo(3f).Within(1e-4f), "A Host clock well apart puts it right.");
+
+            float until = Time.time + .6f;
+            while (Time.time < until && fire.Life < .9f) yield return null;
+            Assert.That(fire.Life, Is.GreaterThan(.9f), "...and is soon at full size.");
+
+            float left = fire.SecondsLeft;
+            board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: left + .1f);
+            Assert.That(fire.SecondsLeft, Is.EqualTo(left).Within(1e-4f),
+                "A later snapshot a moment apart does not restart or nudge it.");
+
+            until = Time.time + 1.5f;
+            while (Time.time < until && hot.Burning) yield return null;
+            Assert.That(hot.Burning, Is.False, "It goes out when its seconds run down.");
+            Assert.That(fire.PartsShown, Is.Zero);
+            Assert.That(hot.HitSphere.radius, Is.EqualTo(.5f * config.OrbRadius).Within(1e-5f), "The orb stays small.");
+            board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: 0f);
+            Assert.That(hot.Burning, Is.False, "A snapshot after the fire does not relight it.");
+        }
+
+        [UnityTest]
+        public IEnumerator AnOrbABlastJustShrankSqueezesDownToItsNewSize()
+        {
+            var orb = board.UpsertOrb("orb", LabOrbKind.Yin, new Vector2(.5f, .5f));
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(1f).Within(1e-4f));
+            board.UpsertOrb("orb", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: 4f);
+            Assert.That(orb.HitSphere.radius, Is.EqualTo(.5f * config.OrbRadius).Within(1e-5f), "Its body is small at once (#213).");
+            Assert.That(orb.IsShrinking, Is.True);
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(2f).Within(1e-4f), "Its art starts at its old size...");
+
+            float until = Time.time + 1f;
+            while (Time.time < until && orb.IsShrinking) yield return null;
+            Assert.That(orb.IsShrinking, Is.False);
+            Assert.That(orb.Visual.localScale.x, Is.EqualTo(1f).Within(1e-4f), "...and squeezes down to the new one.");
+
+            var arrived = board.UpsertOrb("arrived", LabOrbKind.Yang, new Vector2(.2f, .5f), small: true, burnSeconds: 2f);
+            Assert.That(arrived.IsShrinking, Is.False, "An orb that comes in already small just is small.");
+            Assert.That(arrived.Visual.localScale.x, Is.EqualTo(1f).Within(1e-4f));
+            Assert.That(arrived.Burning, Is.True, "And it still burns for what is left of its fire.");
+        }
+
+        [UnityTest]
         public IEnumerator AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour()
         {
             board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.75f, .5f), lockSwipes: 2); // world (2, 0)
