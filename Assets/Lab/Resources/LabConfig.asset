@@ -71,7 +71,8 @@ MonoBehaviour:
   paintGrowthPercentPerSecond: 6
   paintFillChancePercent: 60
   paintVerticalWeight: 1.35
-  completedGourdViewerEnabled: 0
+  completedGourdViewerEnabled: 1
+  playerPaintPatternsEnabled: 1
   gourdRopeCycleAmplitude: 0.45
   gourdRopeCyclePeriod: 3
   gourdRopeHitBounce: 0.32

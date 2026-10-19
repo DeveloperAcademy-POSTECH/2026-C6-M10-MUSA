@@ -19,6 +19,7 @@ namespace C6Lab
         private const float RotationDegreesPerView = 180f;
         private static readonly List<LabGourdResultPreview> ActivePreviews = new List<LabGourdResultPreview>();
         private static readonly int PaintMapId = Shader.PropertyToID("_PaintMap");
+        private static readonly int PainterMapId = Shader.PropertyToID("_PainterMap");
         private static readonly int PaintReadyId = Shader.PropertyToID("_PaintMapReady");
 
         private readonly List<Material> ownedMaterials = new List<Material>();
@@ -27,6 +28,7 @@ namespace C6Lab
         private Camera previewCamera;
         private RenderTexture texture;
         private Texture2D paintTexture;
+        private Texture2D painterTexture;
         private float zoomNormalized = DefaultZoom;
         private float fitDistance;
         private int previewSlot = -1;
@@ -34,6 +36,7 @@ namespace C6Lab
 
         public RenderTexture Texture => texture;
         public Texture2D PaintTexture => paintTexture;
+        public Texture2D PainterTexture => painterTexture;
         public Quaternion ModelRotation => modelPivot != null ? modelPivot.localRotation : Quaternion.identity;
         public float ZoomNormalized => zoomNormalized;
         public bool IsDisposed => disposed;
@@ -145,6 +148,18 @@ namespace C6Lab
             };
             paintTexture.SetPixels32(pixels);
             paintTexture.Apply(false, false);
+            var painterSlots = new byte[surface.CellCount];
+            var painterPixels = new Color32[surface.CellCount];
+            surface.CopyPainterSlots(painterSlots);
+            for (int i = 0; i < painterSlots.Length; i++)
+                painterPixels[i] = new Color32(painterSlots[i], 0, 0, 255);
+            painterTexture = new Texture2D(surface.Columns, surface.Rows, TextureFormat.RGBA32, false, true)
+            {
+                name = "Completed gourd painter copy", hideFlags = HideFlags.HideAndDontSave,
+                filterMode = FilterMode.Point, wrapModeU = TextureWrapMode.Repeat, wrapModeV = TextureWrapMode.Clamp
+            };
+            painterTexture.SetPixels32(painterPixels);
+            painterTexture.Apply(false, false);
 
             root = NewObject("Completed gourd preview", null);
             root.SetActive(false);
@@ -248,6 +263,7 @@ namespace C6Lab
                 if (painted)
                 {
                     block.SetTexture(PaintMapId, paintTexture);
+                    block.SetTexture(PainterMapId, painterTexture);
                     block.SetFloat(PaintReadyId, 1f);
                     paintedRenderers++;
                 }
@@ -262,6 +278,7 @@ namespace C6Lab
                         && materials[i].HasProperty(PaintReadyId))
                     {
                         block.SetTexture(PaintMapId, paintTexture);
+                        block.SetTexture(PainterMapId, painterTexture);
                         block.SetFloat(PaintReadyId, 1f);
                     }
                     renderer.SetPropertyBlock(block, i);
@@ -353,11 +370,13 @@ namespace C6Lab
             if (texture != null) texture.Release();
             DestroyOwned(texture);
             DestroyOwned(paintTexture);
+            DestroyOwned(painterTexture);
             root = null;
             modelPivot = null;
             previewCamera = null;
             texture = null;
             paintTexture = null;
+            painterTexture = null;
         }
 
         private void AcquirePreviewSlot()

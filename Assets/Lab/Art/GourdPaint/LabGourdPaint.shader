@@ -4,7 +4,9 @@ Shader "C6Lab/GourdPaint"
     {
         _BaseColor("White paper shell", Color) = (.96,.94,.86,1)
         [NoScaleOffset] _PaintMap("Cumulative premultiplied paint", 2D) = "black" {}
+        [NoScaleOffset] _PainterMap("Committed painter P byte (linear point)", 2D) = "black" {}
         [HideInInspector] _PaintMapReady("Paint map ready", Float) = 0
+        [HideInInspector] _PlayerPaintPatternsEnabled("Player paint patterns enabled", Float) = 1
         [HideInInspector] _PaintGrainEnabled("Paint grain enabled", Float) = 0
         [HideInInspector] _PaintGrainSize("Paint grain size", Float) = 1
         [HideInInspector] _PaintGrainStrength("Paint grain strength", Float) = .3
@@ -25,9 +27,12 @@ Shader "C6Lab/GourdPaint"
             struct Varyings { float4 positionCS:SV_POSITION; float3 positionOS:TEXCOORD0; float3 normalWS:TEXCOORD1; };
             TEXTURE2D(_PaintMap);
             SAMPLER(sampler_PaintMap);
+            TEXTURE2D(_PainterMap);
+            SAMPLER(sampler_PainterMap);
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
                 float _PaintMapReady;
+                float _PlayerPaintPatternsEnabled;
                 float _PaintGrainEnabled;
                 float _PaintGrainSize;
                 float _PaintGrainStrength;
@@ -68,6 +73,32 @@ Shader "C6Lab/GourdPaint"
                 return saturate(paintColor * brightness);
             }
 
+            float PeriodicLine(float coordinate, float width)
+            {
+                float distance = abs(frac(coordinate + .5) - .5);
+                float aa = max(fwidth(coordinate), .015);
+                return 1.0 - smoothstep(width - aa, width + aa, distance);
+            }
+
+            // Fixed P mapping also documented by LabPlayerPaintPatterns. This samples
+            // the shell's local equal-area UV, so marks turn with the gourd and its
+            // independent result copy. Integer longitude periods meet at the seam.
+            float PainterInk(float painter, float2 uv)
+            {
+                float2 q = uv * float2(12.0, 6.0);
+                if (painter < .5 || painter > 5.5) return 0;
+                if (painter < 1.5)
+                {
+                    float distance = length(frac(q) - .5);
+                    float aa = max(fwidth(distance), .015);
+                    return 1.0 - smoothstep(.17 - aa, .17 + aa, distance);
+                }
+                if (painter < 2.5) return PeriodicLine(q.x + q.y, .115);
+                if (painter < 3.5) return PeriodicLine(q.y, .115);
+                if (painter < 4.5) return PeriodicLine(q.y + .2 * sin(q.x * PI), .115);
+                return max(PeriodicLine(q.x, .075), PeriodicLine(q.y, .075));
+            }
+
             Varyings vert(Attributes input)
             {
                 Varyings output;
@@ -89,6 +120,13 @@ Shader "C6Lab/GourdPaint"
                 // paper retain the original map. OFF and both strengths zero bypass exactly.
                 if (_PaintGrainEnabled > .5 && (_PaintGrainStrength > 0 || _PaintMottleStrength > 0))
                     paint.rgb = GrainColor(paint.rgb, direction);
+                // Ownership changes brightness only. It cannot punch holes into pigment,
+                // alter coverage, replace element hues, or touch unpainted paper.
+                if (_PlayerPaintPatternsEnabled > .5)
+                {
+                    float painter = round(SAMPLE_TEXTURE2D(_PainterMap, sampler_PainterMap, uv).r * 255.0);
+                    paint.rgb *= 1.0 - .32 * PainterInk(painter, uv);
+                }
                 half3 color = _BaseColor.rgb * (1.0 - paint.a) + paint.rgb;
                 float light = .72 + .28 * saturate(dot(normalize(input.normalWS), normalize(float3(-.4,.8,.5))));
                 return half4(color * light, 1);

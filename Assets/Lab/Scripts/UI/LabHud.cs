@@ -66,6 +66,11 @@ namespace C6Lab
         public Image leftPlayerCircle;
         public Image rightPlayerCircle;
         public Sprite[] playerCircleSprites;
+        [Header("Saved player paint-pattern samples")]
+        public Image[] playerSlotPatternSamples;
+        public Image localPlayerPatternSample;
+        public Image leftPlayerPatternSample;
+        public Image rightPlayerPatternSample;
         public Button pauseButton;
         public GameObject pauseMenu;
         public Button resumeButton;
@@ -289,6 +294,9 @@ namespace C6Lab
                 SetFill(yokaiHpFill, 0f);
                 SetFill(playerHpFill, 0f);
                 SetStaminaCells(0f);
+                SetPaintPatternSample(localPlayerPatternSample, 0, false);
+                SetPaintPatternSample(leftPlayerPatternSample, 0, false);
+                SetPaintPatternSample(rightPlayerPatternSample, 0, false);
                 return;
             }
             Set(hpText, paintGoal
@@ -317,6 +325,9 @@ namespace C6Lab
             SetPlayerCircle(localPlayerCircle, local == null ? 0 : local.seat + 1);
             SetPlayerCircle(leftPlayerCircle, ParsePlayerNumber(left));
             SetPlayerCircle(rightPlayerCircle, ParsePlayerNumber(right));
+            SetPaintPatternSample(localPlayerPatternSample, local == null ? 0 : local.seat + 1, battleVisible);
+            SetPaintPatternSample(leftPlayerPatternSample, ParsePlayerNumber(left), hasNeighbors);
+            SetPaintPatternSample(rightPlayerPatternSample, ParsePlayerNumber(right), hasNeighbors);
         }
 
         private void CacheGoalTitle()
@@ -388,6 +399,16 @@ namespace C6Lab
                 ? playerCircleSprites[number - 1] : null;
             image.enabled = art != null;
             if (image.sprite != art) image.sprite = art;
+        }
+
+        private void SetPaintPatternSample(Image image, int number, bool visible)
+        {
+            if (image == null) return;
+            Sprite art = LabPlayerPaintPatterns.SpriteFor(number);
+            if (image.sprite != art) image.sprite = art;
+            image.enabled = art != null;
+            bool patternsEnabled = network.config == null || network.config.PlayerPaintPatternsEnabled;
+            SetVisible(image.gameObject, visible && art != null && patternsEnabled);
         }
 
         private void OnDisable()
@@ -497,6 +518,8 @@ namespace C6Lab
                 if (button == null) continue;
                 int slot = i + 1;
                 bool inRoom = visible && slot <= target;
+                if (playerSlotPatternSamples != null && i < playerSlotPatternSamples.Length)
+                    SetPaintPatternSample(playerSlotPatternSamples[i], slot, inRoom);
                 SetVisible(button.gameObject, inRoom);
                 if (!inRoom) continue;
 

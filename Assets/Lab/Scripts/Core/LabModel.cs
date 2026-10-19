@@ -394,7 +394,7 @@ namespace C6Lab
             if (paintRound)
             {
                 if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
-                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id)
+                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1)
                     && paintSurface.IsComplete)
                 {
                     phase = LabPhase.Victory;

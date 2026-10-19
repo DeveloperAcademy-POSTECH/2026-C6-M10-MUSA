@@ -925,3 +925,42 @@ Host는 프레임 경계에서 월드 아래를 `VisualMount` 로컬 방향으�
 선택 응답은 요청 ID·번호가 일치해야 하며 승인 결과가 지정한 로비 Revision 이상의 실제 점유표까지 받아야 연속 변경 잠금이 풀린다. 거절·시간 초과는 승인되지 않은 번호를 만들지 않는다. DEV 재시작의 설정 ACK 대기는 Host가 `restarting` 상태로 공유해 번호 변경을 잠근다. 일반 같은 방 로비 복귀에서는 변경을 다시 허용한다. 시작 조건은 설정 인원 전원 입장·고유 P번호 선택·최신 설정 ACK이며, Host 권한과 P번호는 독립이다. 솔로 P1과 명시적 자동 검증용 빈 번호 할당은 별도 경로다.
 
 원시 로그·XML·명령 JSON·앱·임시 검사 도구는 공개 Git에 포함하지 않는다. 이번 작업에서 기존 사용자 Scene·에셋 배치를 덮어쓰거나 저장 Scene을 다시 생성하지 않았다.
+
+
+### Feat #206 — 실제 투척자 P번호별 도색 무늬 — 2026-10-19
+
+기준 main `b438581f`(#204), 브랜치 `feat/#206-player-paint-patterns`, Unity **6000.6.5f1 / URP17.6.0 / macOS ARM64**. 프로토콜 **5638**, 공유 설정 **142개**를 유지했다. 기존 사용자 Scene·머터리얼·미추적 파일은 분리 작업 폴더 밖에서 보존하고 해시를 대조했다.
+
+| 검증 | 상태 | 근거·범위 |
+| --- | --- | --- |
+| 전체 EditMode | PASS | **609/609**, failed/skipped/inconclusive=0. `editmode.xml`. 새 귀속 코어33건·전송10건을 포함한다. P1~P5, 실제 투척자와 생성자 분리, 동일색/다른P·다른색/동일P, FIFO 마지막 공급자·부분 성장량·영역 합류·기존 성장/난수/완료 불변, 원자적 색상/투척자 복제·손상 복구·최대54조각을 확인했다. |
+| 최초 전체 PlayMode | FAIL | **152/153**, 실패1. 새 GPU 검사의 이동 전후 픽셀 완전 일치가 큰 스테이징 좌표의 투영 반올림 차이를 허용하지 않았다. 새 UI 검사 .meta의33자리 GUID도 발견돼 두 검사가 수집되지 않았다. 결과를 PASS로 기록하지 않았다. `first-attempt-playmode.xml/log`에 보존했다. |
+| 보완 후 무늬/UI 한정 검사 | FAIL | **4/5**, 실패1. GPU 비교를 비주기 이동·서브바이트 평균 오차 조건으로 바꾸고 UI GUID를 수정했다. 5종 실제 GPU 검사와 결과 복사는 통과했다. UI 검사는 숨겨진 로비의 저장 좌표를 LayoutGroup 최초 배치 후 좌표와 비교하는 검사 조건 문제였다. 기존 레이아웃 변경 없이 기준 시점을 Canvas 배치 완료 후로 수정했다. `pattern-playmode.xml/log`. |
+| 최종 전체 PlayMode | PASS | **155/155**, failed/skipped/inconclusive=0. `playmode-final.xml`, **04:15:50Z–04:17:04Z**. 저장 Canvas8개 표본·선택/DEV/좌우P 연결, 실제 저장 박 메시/셰이더 P0~P5 GPU 픽셀·도색 알파/피복/미도색 표면 보존, 이동/시간 불변, 결과 관람의 독립 P맵 복사·해제를 포함했다. GPU 검사 건너뜀은 없다. 합성 지도/스냅샷을 쓰는 로컬 검사와 실제 물리·통신 검증은 구분한다. |
+| 실제 독립 Mac Host/Client | PASS | 임시 opt-in 도구를 포함한 Development 앱의 실제 NGO/UTP `127.0.0.1`. Host **14/14**, Client **14/14** 기록과 교차 비교 **32/32** 통과, 두 앱 종료0. 저장 DEV142개·Host P2/Client P1 선택·Join/Start → 실제 음양 생성·드래그 조합 → Client P1 물리 명중 → 다시 만든 Combined를 실제 보드 끝으로 전달 → Host P2 물리 명중을 실행했다. 모델·목표·피격 상태를 직접 주입하지 않았다. |
+| 실제 두 투척자·맵·결과·Retry | PASS | **04:18:12Z** 첫 명중 **1,024/2,048셀**, P1 **1,024**, P2 **0**. **04:18:14Z** 두 번째 명중 Victory **2,048/2,048셀**, P1·P2 각각 **1,024**. 최초 생성자가 P1인 두 번째 구슬의 실제 투척자 P2가 새 셀에 기록됐다. 양쪽과 Host 모델의 색상+P 해시 `eed692c9…0194c1e` 및 결과 관람 복제 맵 해시가 일치했다. **04:18:17Z** 저장 RETRY 뒤 도색/명중0·P맵 전부0·선택 P1/P2 유지를 확인했다. `network-01/network-summary.json`·양쪽 JSONL/로그·PNG가 로컬 근거다. |
+| 시각 확인 | PASS (범위 한정) | 실제 GPU의 같은 색상 P1~P5 비교 이미지, 두 앱 결과 화면과 독립 완성 박 관람 PNG를 열어 확인했다. [5종 비교](images/player-paint-patterns.png)는 합성 부분 맵의 실제 GPU 렌더, [두 투척자 완성 박](images/player-paint-two-throwers.png)은 실제 위 물리/통신 실행 결과다. 기본256×128·일반 수동 플레이 전체를 확인한 기록은 아니다. |
+| 임시 도구 없는 일반 Mac 빌드 | PASS | 임시 Runtime/Editor 검사기·meta를 프로젝트 밖으로 제거한 뒤 기존 `C6Lab.Editor.LabBuild.Mac` 성공. `Builds/Lab/issue206-final/macOS/C6_Physics_Lab.app`, **195,847,690 bytes**, `C6_LAB_BUILD_OK`, 종료0. 일반 앱 별도 수동 플레이는 미실행. |
+| iOS·실기기·핫스팟·3~5실기기·모바일 성능 | NOT_RUN | 이번 변경에서 실행하지 않았다. 실제 Mac 두 프로세스·인원별 자동 검사를 모바일 검증으로 확대하지 않는다. |
+
+실제 두 앱은 빠른 경계 검증을 위한 **64×32·최초/반복 도색50%·성장100%/초·시간70초·생성비용1·Yin/Yang50:50·직선 투척·움직임 조정**의 세션 복사본을 사용했다. 마지막 빈 셀까지 일반 성장 예산으로 완료하며, 원본 Config는 모든 기록에서 변경되지 않았음을 확인했다. 실제 실행에서는 소유 패턴 전체5종이 아닌 P1/P2를 확인했고 P3~P5는 코어/전송/GPU 검사로 구분했다.
+
+Scene은 기존 UI 위치·크기를 유지하며 자식 Image8개(새 YAML블록32개), 부모 연결8개, HUD참조를 저장했다. Unity 저장 시 기존 코드 기본값과 같은 `cycleAmplitude:0`, `cyclePeriod:3`도 직렬화됐다. 객체/참조/값을 바꾸지 않는 새 블록·기존 빈 이름의 공백 정리만 추가했다. Config·패키지는 기준 main과 동일하며 Unity가 재직렬화한 Target2 머티리얼 소수점 차이는 별도 보존 후 제외했다.
+
+원시 로그·XML·개인 경로·임시 검사 도구·빌드 산출물은 공개 Git에 넣지 않는다. 시나리오·코드 존재를 실행 통과로 기록하지 않았다.
+
+### Feat #206 후속 — 개인 무늬·완성 박 관람 기본 ON 및 독립 DEV 토글 — 2026-10-19
+
+위 최초 구현 커밋 `c5c9fdd` 이후 같은 `feat/#206-player-paint-patterns`에서 수행했다. Unity **6000.6.5f1 / URP17.6.0 / macOS ARM64**, 저장 Scene `Assets/Lab/Scenes/Lab.unity`. 공유 설정은 **143개**, 개인 무늬는 마지막 **인덱스142**, 기존 관람은 **111**을 보존한다. 프로토콜 **5639**로 이전142개 설정 앱과 구분한다. C# 초기값과 단일 원본 Config 모두 두 기능을 ON으로 저장했다. 기존 Scene·패키지는 이 후속에서 변경하지 않았다.
+
+| 검증 | 상태 | 근거·범위 |
+| --- | --- | --- |
+| Unity 설정 저장·컴파일 | PASS | 임시 Editor 검사기를 통해 SerializedObject로 `completedGourdViewerEnabled`·`playerPaintPatternsEnabled`를 true로 저장했다. `PLAYER_PAINT_DEFAULTS_OK fields=143 viewer=ON patterns=ON otherValuesUnchanged=true`. 다른141개 유효값 불변을 확인했고 임시 소스/meta는 검사 후 제거했다. |
+| 전체 EditMode | PASS | **625/625**, failed/skipped/inconclusive=0. `editmode.xml`, **04:28:05Z–04:28:09Z**. 새 설정16건은 저장/코드 기본 ON·독립4조합·복사/공유 JSON·지문·기존 인덱스·범주·0/1 외 입력 원자적 거절·구형/미지 배열 차단을 검사했다. 실제 원격 앱 연결 검사가 아니다. |
+| 전체 PlayMode | PASS | **161/161**, failed/skipped/inconclusive=0. `playmode.xml`, **04:28:26Z–04:29:45Z**. DEV 버튼과 입력·DEFAULTS 미적용 초안/복원·솔로 재시작·Host 로비 적용·인원/일시정지 조건, 무늬8개 ON→OFF→ON과 P번호/라벨/원본/배치 보존을 검사했다. UI의 전투 이웃 확인은 합성 Snapshot fixture이며 실제5앱 실행으로 해석하지 않는다. |
+| GPU 무늬 OFF·복원 | PASS | 실제 저장 박 메시/셰이더의 P2 도색을 ON→OFF→ON→OFF로 렌더했다. Revision·칠한 셀 수·색상/P텍스처 객체/픽셀 불변, 도색 데이터 변경 없이 표시 설정 즉시 반영, alpha 불변, OFF 그림 일치·ON 무늬 복원을 확인했다. 저장된 ON/OFF PNG를 열어 사선 표시 차이를 확인했다. 합성 부분 도색 지도에 대한 GPU 검사로 실제 투척/모바일 결과가 아니다. |
+| 완성 박 관람 4조합 | PASS | 로컬 PlayMode의 실제 충돌 명중·성장으로 네 조합 모두100% Victory를 만들었다. 관람은 관람 토글에만 따라 결과 버튼을 제공하고 자동으로 열리지 않았다. ON에서 독립 맵·표현값을 복사하며 OFF에서 버튼/미리보기가 생성되지 않았다. 별도 복제 검사는 일반 및 submesh MaterialPropertyBlock의 무늬 플래그·독립 P맵 교체·회전/줌/해제를 확인했다. |
+| 임시 도구 없는 일반 Mac Development 빌드 | PASS | 기존 `C6Lab.Editor.LabBuild.Mac`로 **195,848,670 bytes**, `C6_LAB_BUILD_OK`, 종료0. `Builds/Lab/issue206-toggle-defaults/macOS/C6_Physics_Lab.app`. 저장 Scene과 일반 코드만 포함하며 별도 빌드 앱 수동 플레이는 미실행이다. |
+| 이 후속의 독립 Host/Client 앱·iOS·실기기·핫스팟·모바일 성능 | NOT_RUN | 최초 프로토콜5638의 두 앱 실행 기록을 이번5639의 통과로 승계하지 않는다. 이번 공유 경로 근거는 EditMode 전송/지문과 로컬 Host 설정 PlayMode다. |
+
+무늬 OFF는 도색 알파·색상·투척자 기록·성장량·승리 판정을 바꾸지 않고 박의 RGB 무늬와 HUD 표본만 숨긴다. 두 설정은 기존 새 판 적용 경계를 따르며, DEFAULTS 자체는 초안만 복원한다. 관람은 100% Paint 결과의 버튼으로 수동 진입한다. 원본 작업 폴더의 사용자 Scene·머터리얼·미추적 참조4개는 기존 해시와 동일했다. Unity의 Target2 머터리얼 소수점 재직렬화2건은 사본을 보존한 뒤 이번 변경에서 제외했다. 원시 로그·XML·임시 검사 도구·빌드는 로컬에만 보관한다.

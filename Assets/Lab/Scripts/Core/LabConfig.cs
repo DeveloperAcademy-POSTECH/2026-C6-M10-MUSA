@@ -227,7 +227,8 @@ namespace C6Lab
             new LabDeveloperField("Paint Gravity Weight", 1f, 8f),
             LabDeveloperField.Choice("Paint Pattern", "LEGACY", "BROAD", "SPLATTER", "FLOW"),
             new LabDeveloperField("Chuimsae Chance (%)", 0f, 100f, true),
-            new LabDeveloperField("Chuimsae Min Gap (generates)", 0f, 20f, true)
+            new LabDeveloperField("Chuimsae Min Gap (generates)", 0f, 20f, true),
+            LabDeveloperField.Toggle("Player Paint Patterns (0 off, 1 on)")
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -255,7 +256,7 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 140, 141, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111,
+            new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111, 142,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
                 139, 133, 134, 135, 136, 137, 138),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
@@ -363,7 +364,9 @@ namespace C6Lab
         [SerializeField, Range(0f, 100f)] private float paintFillChancePercent = 60f;
         [SerializeField, Range(1f, 4f)] private float paintVerticalWeight = 1.35f;
         [Tooltip("Paint 100% 승리 뒤 모든 참가자에게 완성된 박의 로컬 관람을 허용한다. 새 판에 적용한다.")]
-        [SerializeField] private bool completedGourdViewerEnabled = false;
+        [SerializeField] private bool completedGourdViewerEnabled = true;
+        [Tooltip("플레이어 P번호별 물감 무늬를 박과 HUD에 표시한다. 색칠·면적·승리 판정은 바꾸지 않으며 새 판에 적용한다.")]
+        [SerializeField] private bool playerPaintPatternsEnabled = true;
         [Tooltip("줄이 스스로 늘고 줄어드는 폭(월드 단위). 0이면 주기 움직임을 끈다.")]
         [SerializeField, Range(0f, 1f)] private float gourdRopeCycleAmplitude = .45f;
         [Tooltip("줄이 한 번 늘었다 줄어드는 데 걸리는 시간(초).")]
@@ -660,6 +663,7 @@ namespace C6Lab
             GravityWeight = PaintGravityWeight
         };
         public bool CompletedGourdViewerEnabled => completedGourdViewerEnabled;
+        public bool PlayerPaintPatternsEnabled => playerPaintPatternsEnabled;
         public float GourdRopeCycleAmplitude => Mathf.Clamp(Finite(gourdRopeCycleAmplitude, .45f), 0f, 1f);
         public float GourdRopeCyclePeriod => Mathf.Clamp(Finite(gourdRopeCyclePeriod, 3f), .5f, 10f);
         public float GourdRopeHitBounce => Mathf.Clamp(Finite(gourdRopeHitBounce, .32f), 0f, 2f);
@@ -797,7 +801,8 @@ namespace C6Lab
                 PaintGrainEnabled ? 1f : 0f, PaintGrainSize, PaintGrainStrength, PaintMottleStrength,
                 (float)PaintGrowthStyle, PaintEdgeRaggedness, PaintFlowRatio,
                 PaintDripWidthDegrees, PaintDripLengthDegrees, PaintGravityWeight, (float)PaintPattern,
-                (float)ChuimsaeChancePercent, (float)ChuimsaeMinGap
+                (float)ChuimsaeChancePercent, (float)ChuimsaeMinGap,
+                PlayerPaintPatternsEnabled ? 1f : 0f
             };
         }
 
@@ -983,6 +988,7 @@ namespace C6Lab
             paintPattern = (LabPaintPattern)(int)values[139];
             chuimsaeChancePercent = (int)values[140];
             chuimsaeMinGap = (int)values[141];
+            playerPaintPatternsEnabled = values[142] == 1f;
             error = string.Empty;
             return true;
         }
