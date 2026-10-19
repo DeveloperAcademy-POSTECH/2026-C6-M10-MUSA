@@ -68,6 +68,8 @@ MonoBehaviour:
   paintSurfaceResolution: 2
   paintInitialPercent: 2
   paintRepeatPercent: 4
+  paintClusterCompactness: 0.85
+  paintClusterIrregularity: 0.25
   paintGrowthPercentPerSecond: 6
   paintFillChancePercent: 60
   paintVerticalWeight: 1.35

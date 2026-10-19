@@ -1,8 +1,6 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -17,24 +15,41 @@ namespace C6Lab.Tests
             DripWidthDegrees = 3f, DripLengthDegrees = 60f, GravityWeight = 3f
         };
 
-        // Captured by executing the unchanged a26811b2 surface and this implementation
-        // against the same fixture. Preserve the historical RNG order and opaque RGBA map.
-        [TestCase(0, "4273982525467f9bc010a2268509c7fbdd39cbbc78b0c34a2593cd7fb9b98bab")]
-        [TestCase(1, "707515ff7b960a3bf0a7261a1e0e49d92ffc347c3394c2fe51681ac118b9ee99")]
-        [TestCase(2, "6e4a8fca6a46d335e91ef789e80e1891dc35df6a59513a0553d234a37dfa3b23")]
-        public void OriginalStylePreservesTheHistoricalMainMapHashAtEveryResolution(int resolution, string expectedHash)
+        // The historical timeline hashes included timed repeat growth, which intentionally
+        // changed for clusters. Isolate the original initial footprint from those controls.
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void OriginalInitialFootprintsIgnoreRepeatClusterAndFlowControlsAtEveryResolution(int resolution)
         {
-            var surface = new LabPaintSurface(new LabPaintGrowthSettings { Pattern = LabPaintPattern.Legacy, Resolution = resolution, Style = 0 }, 198u);
-            for (int i = 0; i < 8; i++)
+            var original = Settings(resolution); original.Style = 0;
+            var changed = Settings(resolution); changed.Style = 0;
+            changed.RepeatPercent = 100f;
+            changed.GrowthPercentPerSecond = 100f;
+            changed.ClusterCompactness = 0f;
+            changed.ClusterIrregularity = 1f;
+            changed.Raggedness = 1f;
+            changed.FlowRatio = 1f;
+            changed.DripWidthDegrees = 12f;
+            changed.DripLengthDegrees = 135f;
+            changed.GravityWeight = 8f;
+            var first = new LabPaintSurface(original, 198u);
+            var second = new LabPaintSurface(changed, 198u);
+            second.SetFlowDirection(Vector3.right);
+            Vector3[] points = { Vector3.forward, Vector3.back, Vector3.left,
+                Vector3.right, Vector3.up, Vector3.down };
+            int initialCells = (int)decimal.Floor(2m * first.CellCount / 100m);
+            for (int i = 0; i < points.Length; i++)
             {
-                Vector3 point = new Vector3(Mathf.Sin(i * 1.7f), .6f - i * .17f, Mathf.Cos(i * 1.7f));
                 Color color = i % 2 == 0 ? Color.red : Color.blue;
-                surface.RegisterHit(point, color, 1);
-                surface.RegisterHit(point, Color.green, 2);
-                surface.Advance(.17d);
+                Assert.That(first.RegisterHit(points[i], color, 1, 1), Is.True);
+                Assert.That(second.RegisterHit(points[i], color, 1, 1), Is.True);
+                Assert.That(first.CoveredCount, Is.EqualTo(initialCells * (i + 1)));
+                Assert.That(Pixels(second), Is.EqualTo(Pixels(first)));
+                Assert.That(second.PendingCoverage, Is.EqualTo(first.PendingCoverage));
+                Assert.That(second.Revision, Is.EqualTo(first.Revision));
             }
-            surface.Advance(4d);
-            Assert.That(LabPaintPublisher.Hash(Pixels(surface)), Is.EqualTo(expectedHash));
+            Assert.That(Pixels(first).All(pixel => pixel.a == 0 || pixel.a == 255), Is.True);
         }
 
         [Test]
@@ -200,7 +215,7 @@ namespace C6Lab.Tests
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(2)]
-        public void FullyFlowingWideShortDripsStillReachTheLastCellAndCompleteFromOneStationaryHit(int resolution)
+        public void ClusterGrowthIgnoresShortDripLimitsAndCompletesFromOneStationaryHit(int resolution)
         {
             var settings = Settings(resolution);
             settings.InitialPercent = .1f;
@@ -230,46 +245,53 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void NewCellsFollowTheSuppliedLocalGravityWhilePreviouslyPaintedCellsRemainFixed()
+        public void RepeatClusterIgnoresChangedLocalGravityWhilePreviouslyPaintedCellsRemainFixed()
         {
-            double downHeight = 0, upHeight = 0;
             for (uint seed = 1; seed <= 8; seed++)
             {
-                foreach (bool up in new[] { false, true })
+                var settings = Settings();
+                settings.InitialPercent = .1f;
+                settings.RepeatPercent = 100f;
+                settings.GrowthPercentPerSecond = 100f;
+                settings.FlowRatio = 1f;
+                settings.DripWidthDegrees = .5f;
+                settings.DripLengthDegrees = 135f;
+                settings.GravityWeight = 8f;
+                var down = new LabPaintSurface(settings, seed);
+                var redirected = new LabPaintSurface(settings, seed);
+                foreach (LabPaintSurface surface in new[] { down, redirected })
+                    surface.RegisterHit(Vector3.forward, Color.red, 1, 1);
+                redirected.SetFlowDirection(Vector3.up);
+                foreach (LabPaintSurface surface in new[] { down, redirected })
+                    surface.RegisterHit(Vector3.forward, Color.blue, 2, 2);
+                Color32[] before = Pixels(down);
+                down.Advance(40d / down.CellCount);
+                redirected.Advance(40d / redirected.CellCount);
+                redirected.SetFlowDirection(Vector3.right);
+                down.Advance(40d / down.CellCount);
+                redirected.Advance(40d / redirected.CellCount);
+                Assert.That(Pixels(redirected), Is.EqualTo(Pixels(down)));
+                Assert.That(redirected.PendingCoverage, Is.EqualTo(down.PendingCoverage));
+                Assert.That(redirected.CoveredCount, Is.EqualTo(before.Count(pixel => pixel.a != 0) + 80));
+                foreach (LabPaintSurface surface in new[] { down, redirected })
                 {
-                    var settings = Settings();
-                    settings.InitialPercent = .1f;
-                    settings.RepeatPercent = 100;
-                    settings.GrowthPercentPerSecond = 100;
-                    settings.FlowRatio = 1;
-                    settings.DripWidthDegrees = .5f;
-                    settings.DripLengthDegrees = 135;
-                    settings.GravityWeight = 8;
-                    var surface = new LabPaintSurface(settings, seed);
-                    surface.RegisterHit(Vector3.forward, Color.red, 1);
-                    Color32[] before = Pixels(surface);
-                    surface.SetFlowDirection(up ? Vector3.up : Vector3.down);
-                    surface.RegisterHit(Vector3.forward, Color.blue, 2);
-                    surface.Advance(80d / surface.CellCount);
                     Color32[] after = Pixels(surface);
                     for (int i = 0; i < after.Length; i++)
                     {
                         if (before[i].a != 0) Assert.That(after[i], Is.EqualTo(before[i]));
                         else if (after[i].a != 0)
                         {
-                            if (up) upHeight += Direction(surface, i).y;
-                            else downHeight += Direction(surface, i).y;
+                            Assert.That(after[i], Is.EqualTo((Color32)Color.blue));
+                            Assert.That(surface.GetPainterSlot(i), Is.EqualTo(2));
                         }
                     }
                     AssertConnected(surface);
                 }
             }
-            Assert.That(downHeight / 640d, Is.LessThan(-.1d));
-            Assert.That(upHeight / 640d, Is.GreaterThan(.1d));
         }
 
         [Test]
-        public void BottomCapUsesGeneralSpreadingInsteadOfStartingAnUphillDrip()
+        public void BottomCapStartsAnAdjacentClusterDespiteGravityPointingIntoTheCap()
         {
             var settings = Settings();
             settings.Raggedness = 0f;
@@ -289,18 +311,19 @@ namespace C6Lab.Tests
             surface.RegisterHit(Vector3.down, Color.blue, 2);
             surface.Advance(1d / surface.CellCount);
             Assert.That(surface.CoveredCount, Is.EqualTo(count + 1),
-                "Blocking a drip cannot stall the ordinary spreading fallback.");
-            Assert.That(ReadFlow(surface), Is.Null,
-                "A polar cap's lateral/uphill frontier is spreading, not a new descending drip.");
+                "The local gravity direction cannot stall cluster growth from a polar cap.");
+            Color32[] after = Pixels(surface);
+            int added = Array.FindIndex(after, pixel => pixel.Equals((Color32)Color.blue));
+            Assert.That(added, Is.GreaterThanOrEqualTo(0));
+            Assert.That(Neighbors(surface, added).Any(cell => cell >= 0 && before[cell].a != 0), Is.True);
         }
 
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(2)]
-        public void PersistentDripsNeverRunUphillAndEveryReseedHasAnUpstreamPaintedSource(int axis)
+        public void GravityChangesDuringCellwiseClusterGrowthPreserveTheMapAndAdjacentGrowth(int axis)
         {
             Vector3 gravity = new[] { Vector3.down, Vector3.up, Vector3.right }[axis];
-            int checkedStarts = 0, checkedContinuations = 0;
             for (uint seed = 1; seed <= 4; seed++)
             {
                 var settings = Settings();
@@ -310,46 +333,47 @@ namespace C6Lab.Tests
                 settings.FlowRatio = 1f;
                 settings.DripWidthDegrees = .5f;
                 settings.DripLengthDegrees = 135f;
-                var surface = new LabPaintSurface(settings, seed);
-                surface.SetFlowDirection(gravity);
-                surface.RegisterHit(Vector3.forward, Color.red, 1);
-                surface.RegisterHit(Vector3.forward, Color.blue, 2);
+                var fixedDirection = new LabPaintSurface(settings, seed);
+                var changingDirection = new LabPaintSurface(settings, seed);
+                foreach (LabPaintSurface surface in new[] { fixedDirection, changingDirection })
+                {
+                    surface.SetFlowDirection(gravity);
+                    surface.RegisterHit(Vector3.forward, Color.red, 1, 1);
+                    surface.RegisterHit(Vector3.forward, Color.blue, 2, 2);
+                }
+                int initial = fixedDirection.CoveredCount;
                 for (int tick = 0; tick < 200; tick++)
                 {
-                    object previousFlow = ReadFlow(surface);
-                    int previousCell = previousFlow != null ? ReadFlowCell(previousFlow) : -1;
-                    Color32[] before = Pixels(surface);
-                    surface.Advance(1d / surface.CellCount);
-                    object currentFlow = ReadFlow(surface);
-                    if (currentFlow == null) continue;
-                    int currentCell = ReadFlowCell(currentFlow);
-                    if (ReferenceEquals(previousFlow, currentFlow))
+                    Color32[] before = Pixels(fixedDirection);
+                    changingDirection.SetFlowDirection(tick % 2 == 0 ? -gravity : Vector3.forward);
+                    fixedDirection.Advance(1d / fixedDirection.CellCount);
+                    changingDirection.Advance(1d / changingDirection.CellCount);
+                    Color32[] after = Pixels(fixedDirection);
+                    Assert.That(Pixels(changingDirection), Is.EqualTo(after));
+                    int added = 0;
+                    for (int cell = 0; cell < after.Length; cell++)
                     {
-                        if (previousCell == currentCell) continue;
-                        checkedContinuations++;
-                        float descent = Vector3.Dot(Direction(surface, currentCell)
-                            - Direction(surface, previousCell), gravity);
-                        Assert.That(descent, Is.GreaterThanOrEqualTo(-.0000011f),
-                            "An existing drip cannot climb after reaching the bottom or being redirected.");
+                        if (before[cell].a != 0) Assert.That(after[cell], Is.EqualTo(before[cell]));
+                        else if (after[cell].a != 0)
+                        {
+                            added++;
+                            Assert.That(Neighbors(fixedDirection, cell).Any(next => next >= 0 && before[next].a != 0), Is.True,
+                                "A cluster may cross existing paint but cannot skip over blank cells.");
+                            Assert.That(after[cell], Is.EqualTo((Color32)Color.blue));
+                            Assert.That(changingDirection.GetPainterSlot(cell), Is.EqualTo(2));
+                        }
                     }
-                    else
-                    {
-                        checkedStarts++;
-                        bool upstream = Neighbors(surface, currentCell).Any(cell => cell >= 0
-                            && before[cell].a == 255
-                            && Vector3.Dot(Direction(surface, currentCell) - Direction(surface, cell), gravity) > .000001f);
-                        Assert.That(upstream, Is.True,
-                            "Selecting a low absolute frontier alone cannot justify an uphill reseed.");
-                    }
+                    Assert.That(added, Is.EqualTo(1));
                 }
+                Assert.That(changingDirection.CoveredCount, Is.EqualTo(initial + 200));
+                Assert.That(changingDirection.PendingCoverage, Is.EqualTo(fixedDirection.PendingCoverage));
+                AssertConnected(changingDirection);
             }
-            Assert.That(checkedStarts, Is.GreaterThan(0));
-            Assert.That(checkedContinuations, Is.GreaterThan(0));
         }
 
         [TestCase(true)]
         [TestCase(false)]
-        public void AngularWidthAndMaximumRunLengthChangeShapeWhilePreservingTheSameAreaBudget(bool varyWidth)
+        public void LegacyDripControlsDoNotChangeRepeatedClusterGeometryOrItsAreaBudget(bool varyWidth)
         {
             var firstSettings = Settings(2);
             firstSettings.InitialPercent = .1f;
@@ -359,22 +383,29 @@ namespace C6Lab.Tests
             firstSettings.DripLengthDegrees = 135f;
             var secondSettings = Settings(2);
             secondSettings.InitialPercent = .1f;
-            secondSettings.FlowRatio = 1f;
+            secondSettings.FlowRatio = 0f;
+            secondSettings.GravityWeight = 1f;
             secondSettings.GrowthPercentPerSecond = 100f;
             secondSettings.DripWidthDegrees = varyWidth ? 12f : .5f;
             secondSettings.DripLengthDegrees = varyWidth ? 135f : 5f;
             var first = new LabPaintSurface(firstSettings, 17);
             var second = new LabPaintSurface(secondSettings, 17);
+            Color32[] before = null;
             foreach (LabPaintSurface surface in new[] { first, second })
             {
                 surface.RegisterHit(Vector3.forward, Color.red, 1);
+                before = Pixels(surface);
                 surface.RegisterHit(Vector3.forward, Color.blue, 2);
                 surface.Advance(200d / surface.CellCount);
                 AssertConnected(surface);
             }
             Assert.That(second.CoveredCount, Is.EqualTo(first.CoveredCount));
+            Assert.That(second.CoveredCount, Is.EqualTo(before.Count(pixel => pixel.a != 0) + 200));
             Assert.That(second.PendingCoverage, Is.EqualTo(first.PendingCoverage));
-            Assert.That(LabPaintPublisher.Hash(Pixels(second)), Is.Not.EqualTo(LabPaintPublisher.Hash(Pixels(first))));
+            Assert.That(Pixels(second), Is.EqualTo(Pixels(first)));
+            Color32[] after = Pixels(second);
+            for (int cell = 0; cell < before.Length; cell++)
+                if (before[cell].a != 0) Assert.That(after[cell], Is.EqualTo(before[cell]));
         }
 
         [Test]
@@ -398,7 +429,7 @@ namespace C6Lab.Tests
                 if (first[i].a != 0) Assert.That(next[i], Is.EqualTo(first[i]));
             Assert.That(next.All(pixel => pixel.a == 0 || pixel.a == 255), Is.True);
             surface.Advance(1000000d);
-            Assert.That(Pixels(surface), Is.EqualTo(next), "No retained flow tip can grow after its finite ink is exhausted.");
+            Assert.That(Pixels(surface), Is.EqualTo(next), "No retained cluster can grow after its finite ink is exhausted.");
         }
 
         private static Color32[] Pixels(LabPaintSurface surface)
@@ -416,18 +447,6 @@ namespace C6Lab.Tests
             float angle = ((x + .5f) / surface.Columns - .5f) * Mathf.PI * 2f;
             return new Vector3(Mathf.Cos(angle) * ring, height, Mathf.Sin(angle) * ring);
         }
-
-        // Read-only observations distinguish descending flow from the deliberately permitted
-        // all-direction completion fallback; the test drives growth only through public methods.
-        private static object ReadFlow(LabPaintSurface surface)
-        {
-            var regions = (IList)typeof(LabPaintSurface).GetField("regions", BindingFlags.Instance | BindingFlags.NonPublic)
-                .GetValue(surface);
-            return regions[0].GetType().GetField("Flow", BindingFlags.Instance | BindingFlags.Public).GetValue(regions[0]);
-        }
-
-        private static int ReadFlowCell(object flow) => (int)flow.GetType()
-            .GetField("LastCell", BindingFlags.Instance | BindingFlags.Public).GetValue(flow);
 
         private static int[] Neighbors(LabPaintSurface surface, int cell)
         {

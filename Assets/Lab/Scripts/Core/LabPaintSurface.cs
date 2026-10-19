@@ -13,6 +13,8 @@ namespace C6Lab
         public float GrowthPercentPerSecond = 6f;
         public float FillChancePercent = 60f;
         public float VerticalWeight = 1.35f;
+        public float ClusterCompactness = .85f;
+        public float ClusterIrregularity = .25f;
         public LabPaintPattern Pattern = LabPaintPattern.Splatter;
         public int Style = 0;
         public float Raggedness = .55f;
@@ -79,6 +81,8 @@ namespace C6Lab
                 || settings.GrowthPercentPerSecond > 1000f
                 || !Finite(settings.FillChancePercent) || settings.FillChancePercent < 0f || settings.FillChancePercent > 100f
                 || !Finite(settings.VerticalWeight) || settings.VerticalWeight <= 0f || settings.VerticalWeight > 1000f
+                || !Finite(settings.ClusterCompactness) || settings.ClusterCompactness < 0f || settings.ClusterCompactness > 1f
+                || !Finite(settings.ClusterIrregularity) || settings.ClusterIrregularity < 0f || settings.ClusterIrregularity > 1f
                 || settings.Pattern < LabPaintPattern.Legacy || settings.Pattern > LabPaintPattern.Flow
                 || settings.Style < 0 || settings.Style > 1
                 || !Finite(settings.Raggedness) || settings.Raggedness < 0f || settings.Raggedness > 1f
@@ -101,6 +105,8 @@ namespace C6Lab
             cellsPerSecond = (decimal)settings.GrowthPercentPerSecond * CellCount / 100m;
             fillChance = settings.FillChancePercent / 100f;
             verticalWeight = settings.VerticalWeight;
+            clusterCompactness = settings.ClusterCompactness;
+            clusterIrregularity = settings.ClusterIrregularity;
             pattern = settings.Pattern;
             // Models are also constructed from MonoBehaviour field initializers while Unity
             // deserializes a scene. Resource APIs are illegal there; resolve the mask only for
@@ -136,7 +142,7 @@ namespace C6Lab
             if (pixels[cell].a != 0)
             {
                 Region existing = Root(cellRegions[cell]);
-                Supply(existing, repeatCells, opaque, attackerId, (byte)painterSlot);
+                Supply(existing, repeatCells, opaque, attackerId, (byte)painterSlot, true);
                 RefreshActive(existing);
                 return true;
             }
@@ -180,9 +186,7 @@ namespace C6Lab
             {
                 Region region = NextRegion();
                 lastServed = region.Id;
-                PaintCell(region, pattern == LabPaintPattern.Legacy
-                    ? (flowStyle == 1 ? ChooseSpreadFlowCell(region) : ChooseCell(region))
-                    : ChoosePatternCell(region));
+                PaintCell(region, ChooseClusterCell(region));
                 painted++;
                 if (IsComplete) return (double)((painted - startCredit) / cellsPerSecond);
             }
@@ -199,12 +203,18 @@ namespace C6Lab
             return regions[activeRegions.Min];
         }
 
-        private void Supply(Region region, decimal amount, Color32 color, ulong owner, byte painterSlot)
+        private void Supply(Region region, decimal amount, Color32 color, ulong owner, byte painterSlot,
+            bool chooseClusterAnchor = false)
         {
             // Cap each component independently: a global cap can strand separate cell fractions.
             amount = Math.Max(0m, Math.Min(amount, CellCount - CoveredCount - region.Budget));
             if (amount == 0m) return;
-            region.Supplies.Add(++supplySequence, new Ink { Remaining = amount, Color = color, Owner = owner, PainterSlot = painterSlot });
+            ulong sequence = ++supplySequence;
+            var ink = new Ink { Remaining = amount, Color = color, Owner = owner, PainterSlot = painterSlot };
+            // Existing fill/vertical weights choose a boundary once per accepted repeat hit.
+            // Its subsequent blob uses geodesic distance rather than a directional cell bias.
+            if (chooseClusterAnchor) ink.Cluster = new GrowthCluster(this, ChooseCell(region), sequence);
+            region.Supplies.Add(sequence, ink);
             region.Budget += amount;
             totalBudget += amount;
         }
@@ -225,7 +235,11 @@ namespace C6Lab
                 decimal take = Math.Min(needed, final.Remaining);
                 needed -= take;
                 final.Remaining -= take;
-                if (final.Remaining == 0m) region.Supplies.Remove(key);
+                if (final.Remaining == 0m)
+                {
+                    region.Supplies.Remove(key);
+                    if (needed > 0m) final.Cluster = null;
+                }
             }
             region.Budget -= 1m;
             totalBudget -= 1m;
@@ -263,6 +277,8 @@ namespace C6Lab
             // before it absorbed the seed's otherwise empty component.
             region.Remove(cell);
             RefreshActive(region);
+            ink.Cluster?.Commit(region, cell);
+            if (ink.Remaining == 0m) ink.Cluster = null;
             if (IsComplete)
             {
                 activeRegions.Clear(); totalBudget = speedCredit = 0m;
@@ -533,6 +549,7 @@ namespace C6Lab
             public Color32 Color;
             public ulong Owner;
             public byte PainterSlot;
+            public GrowthCluster Cluster;
         }
         private sealed class Region
         {
