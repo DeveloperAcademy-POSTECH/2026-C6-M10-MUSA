@@ -295,6 +295,15 @@ namespace C6Lab
         public float LastLocalHitOffset { get; private set; }
         /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
         public event Action<string, Vector2> BombBlasted;
+        /// <summary>
+        /// The gourd just blocked this player's own passes one way (#215): to the right or not, and the
+        /// seconds it lasts. Raised once per block, on the blocked player's screen only.
+        /// </summary>
+        public event Action<bool, float> SwipeBlockStarted;
+        /// <summary>A block first seen later than this after it began (a reconnect) is not announced again.</summary>
+        private const double SwipeBlockAnnounceWindowSeconds = 1d;
+        private uint announcedBlockRound;
+        private double announcedBlockStart = -1d;
         /// <summary>박이 누군가의 판에 폭탄을 떨어뜨렸을 때 모든 기기에서 한 번 알린다. (받는 사람, 폭탄 ID, 떨어질 위치 0..1)</summary>
         public event Action<ulong, string, Vector2> GourdBombDropped;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
@@ -1796,6 +1805,13 @@ namespace C6Lab
             bool blockedHere = latest.SwipeBlockOn(LocalPlayerId);
             board.SetSwipeBlock(blockedHere ? (latest.swipeBlockedRight ? 1 : -1) : 0,
                 blockedHere ? (float)(latest.swipeBlockedUntil - latest.serverTime) : 0f);
+            if (blockedHere && (latest.round != announcedBlockRound || latest.swipeBlockStartedAt != announcedBlockStart))
+            {
+                announcedBlockRound = latest.round;
+                announcedBlockStart = latest.swipeBlockStartedAt;
+                if (latest.serverTime - latest.swipeBlockStartedAt <= SwipeBlockAnnounceWindowSeconds)
+                    SwipeBlockStarted?.Invoke(latest.swipeBlockedRight, (float)(latest.swipeBlockedUntil - latest.serverTime));
+            }
         }
 
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)

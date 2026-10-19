@@ -608,6 +608,59 @@ namespace C6Lab.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator SavedSceneSoloSwipeBlockBouncesAndShowsOnTheBlockedPlayersOwnScreen()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null; // Let Awake/Start bind the saved Scene references.
+
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabOrbBoard board = network.board;
+            LabConfig savedConfig = network.config;
+            LabConfig blocking = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = blocking.CaptureDeveloperValues();
+            tuning[88] = 0f; // no gourd bombs
+            tuning[89] = 0f;
+            tuning[153] = 1f; // a swipe block one second in
+            tuning[154] = 3f;
+            tuning[155] = 0f;
+            Assert.That(blocking.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            network.config = blocking;
+            network.port = 17792;
+            // Record only: an assertion thrown inside the event would interrupt the Host's snapshot.
+            var started = new List<bool>();
+            System.Action<bool, float> onBlock = (right, seconds) => started.Add(right);
+            network.SwipeBlockStarted += onBlock;
+            try
+            {
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                float until = Time.realtimeSinceStartup + 3f;
+                while (started.Count == 0 && Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(started, Is.Not.Empty, "The gourd blocks a way after the interval (#215).");
+                bool right = started[0];
+                Assert.That(network.Snapshot.SwipeBlockOn(network.LocalPlayerId), Is.True, "Solo, it falls on the one player.");
+                Assert.That(board.BlockedSide, Is.EqualTo(right ? 1 : -1), "This board holds that edge shut.");
+                Assert.That(board.EdgeBlock.Visible, Is.True, "It glows red...");
+                Assert.That(board.EdgeBlock.SecondsText, Is.Not.Empty, "...with the seconds left.");
+                var alert = UnityEngine.Object.FindFirstObjectByType<LabGourdAlert>();
+                Assert.That(alert, Is.Not.Null);
+                Assert.That(alert.ShowingBlock, Is.True, "The gourd's bubble shows the blocked way.");
+                Assert.That(alert.BlockRight, Is.EqualTo(right));
+
+                until = Time.realtimeSinceStartup + .5f;
+                while (Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(started.Count, Is.EqualTo(1), "Each block is announced once, however many snapshots repeat it.");
+            }
+            finally
+            {
+                network.SwipeBlockStarted -= onBlock;
+                network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(blocking);
+            }
+        }
+
         private static LabDeveloperMode SavedDeveloperUi() =>
             SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true))
