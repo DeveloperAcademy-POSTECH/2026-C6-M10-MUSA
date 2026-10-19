@@ -6,9 +6,11 @@ namespace C6Lab
     /// <summary>
     /// 박 색상 콤보 실험 (#222)의 전투 화면 표시. 모든 기기가 Host 스냅샷만 읽어서 같은 콤보를 보여준다.
     /// - 진행 중: 4칸 색 (맞힌 칸은 체크, 다음 칸은 통통 튐), 줄어드는 남은 시간 막대 (숫자 없음)
-    /// - 끝남: CLEAR! (성공) / WRONG COLOR, TIME UP (실패) 문구가 잠깐 튀어나옴
-    /// - 페널티/보상 중: 패널 아래 가장자리에 붙는 알약 배지 (빨강 SMALL / 노랑 BIG, 공 아이콘,
-    ///   줄어드는 게이지, 남은 초). 이 기기 플레이어 기준이다.
+    /// - 끝남: 콤보 패널이 바로 사라지고 같은 자리에 CLEAR! (성공) / WRONG COLOR, TIME UP (실패) 문구가
+    ///   튀어나옴. 실패는 크게 튀고 흔들리며 화면이 빨갛게 번쩍인다.
+    /// - 페널티/보상 중: 결과 문구가 끝난 뒤에 알약 배지 (빨강 SMALL / 노랑 BIG, 공 아이콘,
+    ///   줄어드는 게이지, 남은 초)가 나온다. 이 기기 플레이어 기준이다.
+    /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음).
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
     /// 일시정지 중이거나 전투가 끝나면 숨는다.
     /// </summary>
@@ -45,6 +47,8 @@ namespace C6Lab
         private readonly Image[] slotChecks = new Image[LabGourdCombo.Length];
         private Image timeBarFill;
         private Text resultText;
+        private Image flash;
+        private float unit = 1f;
         private RectTransform effectBadge, effectGauge, effectIcon;
         private Image effectBack;
         private Text effectText;
@@ -115,12 +119,16 @@ namespace C6Lab
                     if (player.comboPenaltyUntil > serverNow) { kind = -1; until = player.comboPenaltyUntil; }
                     else if (player.comboRewardUntil > serverNow) { kind = 1; until = player.comboRewardUntil; }
                 }
-            if (kind == 0)
+            // 결과 문구가 떠 있는 동안에는 숨겨 두었다가, 문구가 끝나면 톡 튀어나온다.
+            if (kind == 0 || resultElapsed >= 0f)
             {
                 effectKind = 0;
                 effectBadge.gameObject.SetActive(false);
                 return;
             }
+            // 콤보 패널이 있으면 패널 아래 가장자리에, 없으면 패널 자리 가운데에 놓는다.
+            effectBadge.anchoredPosition = panel.gameObject.activeSelf
+                ? new Vector2(0f, -panel.sizeDelta.y * .5f) : Vector2.zero;
             if (kind != effectKind) effectPopElapsed = 0f;
             effectKind = kind;
             effectBadge.gameObject.SetActive(true);
@@ -185,10 +193,8 @@ namespace C6Lab
 
         private void DrawCombo(LabSnapshot snapshot, double serverNow)
         {
-            bool showPanel = snapshot.comboActive && snapshot.comboColors != null
-                && snapshot.comboColors.Length == LabGourdCombo.Length;
-            // 끝난 직후에는 결과 문구와 함께 마지막 칸 상태를 잠깐 더 보여준다.
-            showPanel |= resultElapsed >= 0f && snapshot.comboColors != null
+            // 결과 문구가 떠 있는 동안에는 패널을 숨긴다 (콤보 → 결과 → 배지가 겹치지 않게).
+            bool showPanel = snapshot.comboActive && resultElapsed < 0f && snapshot.comboColors != null
                 && snapshot.comboColors.Length == LabGourdCombo.Length;
             panel.gameObject.SetActive(showPanel);
             if (!showPanel) return;
@@ -224,6 +230,7 @@ namespace C6Lab
             if (resultElapsed < 0f)
             {
                 resultText.gameObject.SetActive(false);
+                flash.gameObject.SetActive(false);
                 return;
             }
             resultElapsed += Time.unscaledDeltaTime;
@@ -231,6 +238,7 @@ namespace C6Lab
             {
                 resultElapsed = -1f;
                 resultText.gameObject.SetActive(false);
+                flash.gameObject.SetActive(false);
                 return;
             }
             resultText.gameObject.SetActive(true);
@@ -238,11 +246,32 @@ namespace C6Lab
             resultText.text = clear ? ClearText : shownResult == LabComboResult.Timeout ? TimeUpText : WrongColorText;
             resultText.color = clear ? ClearColor : FailColor;
             float t = resultElapsed;
-            float pop = t < .18f ? 1.3f * (1f - Mathf.Pow(1f - t / .18f, 3f)) : Mathf.Lerp(1.3f, 1f, Mathf.Clamp01((t - .18f) / .15f));
             float leave = Mathf.Clamp01((t - (ResultSeconds - .2f)) / .2f);
-            resultText.rectTransform.localScale = Vector3.one * pop * (1f - leave);
-            resultText.rectTransform.localRotation = Quaternion.Euler(0f, 0f,
-                clear ? 0f : 6f * Mathf.Sin(t * 30f) * (1f - Mathf.Clamp01(t / .5f)));
+            if (clear)
+            {
+                float pop = t < .18f ? 1.3f * (1f - Mathf.Pow(1f - t / .18f, 3f)) : Mathf.Lerp(1.3f, 1f, Mathf.Clamp01((t - .18f) / .15f));
+                resultText.rectTransform.localScale = Vector3.one * pop * (1f - leave);
+                resultText.rectTransform.localRotation = Quaternion.identity;
+                resultText.rectTransform.anchoredPosition = Vector2.zero;
+                flash.gameObject.SetActive(false);
+                return;
+            }
+            // 실패: 크게 쾅 튀어나온 뒤(1.8배 → 1배), 처음 0.7초 동안 세게 흔들리고 기울며,
+            // 시작 순간 화면 전체가 빨갛게 두 번 번쩍인다.
+            float slam = t < .12f ? 1.8f * (1f - Mathf.Pow(1f - t / .12f, 3f))
+                : Mathf.Lerp(1.8f, 1f, Mathf.Clamp01((t - .12f) / .2f));
+            float thump = 1f + .12f * Mathf.Max(0f, Mathf.Sin((t - .45f) * Mathf.PI / .2f)) * (t > .45f && t < .65f ? 1f : 0f);
+            float shake = Mathf.Clamp01(1f - t / .7f);
+            shake *= shake;
+            resultText.rectTransform.localScale = Vector3.one * slam * thump * (1f - leave);
+            resultText.rectTransform.anchoredPosition = new Vector2(
+                Mathf.Sin(t * 95f) * 16f * unit * shake, Mathf.Cos(t * 71f) * 8f * unit * shake);
+            resultText.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 12f * Mathf.Sin(t * 47f) * shake);
+            float blink = t < .12f ? 1f - t / .12f : t < .3f ? .6f * Mathf.Clamp01(1f - (t - .18f) / .12f) * (t > .18f ? 1f : 0f) : 0f;
+            flash.gameObject.SetActive(blink > 0f);
+            Color flashColor = FailColor;
+            flashColor.a = .38f * blink;
+            flash.color = flashColor;
         }
 
         private void ResetRound()
@@ -278,6 +307,17 @@ namespace C6Lab
 
             // 모든 크기를 칸 크기에 비례시킨다 (처음 만든 64px 칸 기준 값 × u).
             float u = slotSize / 64f;
+            unit = u;
+
+            // 실패할 때 화면 전체가 빨갛게 번쩍이는 막. 맨 뒤에 두고 터치를 막지 않는다.
+            RectTransform flashRect = NewRect("Combo Fail Flash", layer);
+            flashRect.anchorMin = Vector2.zero;
+            flashRect.anchorMax = Vector2.one;
+            flashRect.offsetMin = flashRect.offsetMax = Vector2.zero;
+            flash = flashRect.gameObject.AddComponent<Image>();
+            flash.color = Color.clear;
+            flash.raycastTarget = false;
+            flashRect.gameObject.SetActive(false);
             float gap = slotSize * .22f;
             float width = slotSize * LabGourdCombo.Length + gap * (LabGourdCombo.Length + 1);
             panel = NewRect("Gourd Combo Panel", layer);
@@ -333,7 +373,8 @@ namespace C6Lab
             resultText.rectTransform.anchorMin = resultText.rectTransform.anchorMax = panelAnchor;
             resultText.rectTransform.sizeDelta = new Vector2(width * 1.6f, 80f * u);
             float badgeHeight = 34f * u;
-            resultText.rectTransform.anchoredPosition = new Vector2(0f, -(panel.sizeDelta.y * .5f + badgeHeight * .5f + 44f * u));
+            // 결과 문구는 사라진 콤보 패널 자리 가운데에 뜬다.
+            resultText.rectTransform.anchoredPosition = Vector2.zero;
             Outline resultOutline = resultText.gameObject.AddComponent<Outline>();
             resultOutline.effectColor = InkColor;
             resultOutline.effectDistance = new Vector2(3f, -3f) * Mathf.Max(.5f, u);
