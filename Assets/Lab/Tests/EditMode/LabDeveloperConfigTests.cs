@@ -15,10 +15,33 @@ namespace C6Lab.Tests
         public void TearDown() => Object.DestroyImmediate(config);
 
         [Test]
+        public void GourdSizeRoundTripsAndRejectsInvalidValuesAtomically()
+        {
+            var baseline = config.CaptureDeveloperValues();
+            Assert.That(baseline[145], Is.EqualTo(1.4f));
+            foreach (float size in new[] { .5f, 1f, 1.8f, 3f })
+            {
+                var values = (float[])baseline.Clone();
+                values[145] = size;
+                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                Assert.That(config.GourdVisualSize, Is.EqualTo(size));
+                Assert.That(config.CaptureDeveloperValues().Take(145), Is.EqualTo(baseline.Take(145)));
+            }
+            var before = config.CaptureDeveloperValues();
+            foreach (float invalid in new[] { .49f, 3.01f, float.NaN, float.PositiveInfinity })
+            {
+                var values = (float[])before.Clone();
+                values[145] = invalid;
+                Assert.That(config.TryApplyDeveloperValues(values, out _), Is.False);
+                Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(before));
+            }
+        }
+
+        [Test]
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(145));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(146));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -704,7 +727,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(112));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(145));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(146));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             LabDeveloperField field = LabConfig.DeveloperFields[87];
@@ -1003,7 +1026,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOnAtItsPreservedIndexWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(145));
+            Assert.That(values.Length, Is.EqualTo(146));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
             Assert.That(values[111], Is.EqualTo(1f));
             LabDeveloperField field = LabConfig.DeveloperFields[111];
@@ -1103,7 +1126,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(145));
+            Assert.That(received.Length, Is.EqualTo(146));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
