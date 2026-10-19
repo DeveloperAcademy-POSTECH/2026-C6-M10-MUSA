@@ -101,6 +101,8 @@ namespace C6Lab
         [SerializeField] private float throwTrailWidthScale = .75f;
         [SerializeField] private float throwTrailMinVertexDistance = .035f;
         [SerializeField] private Material throwTrailMaterial;
+        [Header("Element ink flight trails (empty/unassigned element = legacy trail)")]
+        [SerializeField] private LabElementTrailProfile[] elementFlightTrails;
 
         public GameObject VisualPrefab => visualPrefab;
         public Material YinMaterial => yinMaterial;
@@ -165,6 +167,17 @@ namespace C6Lab
         public float ThrowTrailMinVertexDistance => throwTrailMinVertexDistance > 0f
             ? throwTrailMinVertexDistance : .035f;
         public Material ThrowTrailMaterial => throwTrailMaterial;
+
+        public LabElementTrailProfile ElementTrailFor(LabOrbElement element)
+        {
+            if (element == LabOrbElement.None || elementFlightTrails == null) return null;
+            for (int i = 0; i < elementFlightTrails.Length; i++)
+            {
+                LabElementTrailProfile profile = elementFlightTrails[i];
+                if (profile != null && profile.Element == element) return profile;
+            }
+            return null;
+        }
 
         public Material MaterialFor(LabOrbKind kind, LabOrbElement element = LabOrbElement.None)
         {

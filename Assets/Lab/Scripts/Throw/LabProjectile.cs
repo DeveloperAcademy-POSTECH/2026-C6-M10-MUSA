@@ -44,6 +44,7 @@ namespace C6Lab
 
         [SerializeField] private Transform visualMount;
         [SerializeField] private TrailRenderer flightTrail;
+        private LabElementFlightTrail elementFlightTrail;
         private GameObject replacementVisual;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
@@ -76,6 +77,7 @@ namespace C6Lab
         public Vector3 InitialVelocity => initialVelocity;
         public Transform VisualMount => visualMount;
         public TrailRenderer FlightTrail => flightTrail;
+        public LabElementFlightTrail ElementFlightTrail => elementFlightTrail;
 
         /// <summary>Sets shared presentation; this projectile's root collider is unchanged.</summary>
         public void ConfigureAppearance(LabOrbAppearance value)
@@ -220,6 +222,8 @@ namespace C6Lab
             launched = true;
             EnsureDefaultVisual(tuning.ThrowRadius);
             EnsureFlightTrail(tuning.ThrowRadius);
+            if (elementFlightTrail != null)
+                elementFlightTrail.Begin(transform, appearance.ElementTrailFor(element));
             if (flightTrail != null)
             {
                 flightTrail.Clear();
@@ -340,6 +344,32 @@ namespace C6Lab
 
         private void EnsureFlightTrail(float radius)
         {
+            LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(element) : null;
+            if (profile != null)
+            {
+                if (flightTrail != null)
+                {
+                    flightTrail.Clear();
+                    flightTrail.gameObject.SetActive(false);
+                    LabVisualSafety.DestroyVisualObject(flightTrail.gameObject);
+                    flightTrail = null;
+                }
+                if (elementFlightTrail == null)
+                {
+                    GameObject ink = new GameObject("Element Flight Trail");
+                    ink.transform.SetParent(transform, false);
+                    ink.layer = gameObject.layer;
+                    elementFlightTrail = ink.AddComponent<LabElementFlightTrail>();
+                }
+                return;
+            }
+            if (elementFlightTrail != null)
+            {
+                elementFlightTrail.Clear();
+                elementFlightTrail.gameObject.SetActive(false);
+                LabVisualSafety.DestroyVisualObject(elementFlightTrail.gameObject);
+                elementFlightTrail = null;
+            }
             if (flightTrail == null)
             {
                 GameObject trailObject = new GameObject("Flight Trail");
@@ -374,12 +404,26 @@ namespace C6Lab
 
         private void LeaveFadingTrail()
         {
+            if (elementFlightTrail != null)
+            {
+                LabElementFlightTrail fadingInk = elementFlightTrail;
+                elementFlightTrail = null;
+                fadingInk.StopAndFade(transform.parent);
+            }
             if (flightTrail == null) return;
             TrailRenderer fadingTrail = flightTrail;
             flightTrail = null;
             fadingTrail.emitting = false;
             fadingTrail.transform.SetParent(transform.parent, true);
             Destroy(fadingTrail.gameObject, fadingTrail.time);
+        }
+
+        private void OnDisable()
+        {
+            // A restart/room exit cancels an attached effect immediately. A resolved shot's
+            // detached fading effect is no longer owned here and keeps its natural lifetime.
+            if (elementFlightTrail != null) elementFlightTrail.Clear();
+            if (flightTrail != null) flightTrail.Clear();
         }
 
         private static Material GetTrailMaterial()
