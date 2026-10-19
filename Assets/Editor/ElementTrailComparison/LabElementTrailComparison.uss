@@ -1,0 +1,61 @@
+.trail-comparison {
+    padding: 12px;
+}
+
+.trail-title {
+    font-size: 18px;
+    -unity-font-style: bold;
+    margin-bottom: 6px;
+}
+
+.trail-description, .trail-status {
+    white-space: normal;
+    margin-bottom: 8px;
+}
+
+.trail-controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.trail-control {
+    margin-right: 12px;
+    margin-bottom: 4px;
+}
+
+.trail-time-field {
+    width: 220px;
+}
+
+.trail-panels {
+    flex-direction: row;
+    flex-grow: 1;
+    min-height: 350px;
+    margin-bottom: 8px;
+}
+
+.trail-panel {
+    flex-grow: 1;
+    flex-basis: 0px;
+    margin-right: 5px;
+    margin-left: 5px;
+    min-width: 0px;
+}
+
+.trail-panel-title {
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    margin-bottom: 6px;
+}
+
+.trail-frame {
+    flex-grow: 1;
+    min-height: 320px;
+    background-color: rgb(201, 204, 201);
+}
+
+.trail-status {
+    min-height: 42px;
+}

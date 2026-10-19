@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d4d67d6c7d134d119cbd07acc26c7b0, type: 3}
+  m_Name: EarthFlightTrail
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabElementTrailProfile
+  element: 5
+  shape: 4
+  color: {r: 0.48, g: 0.27, b: 0.14, a: 1}
+  maxLength: 1.8
+  width: 0.5
+  lifetime: 0.5
+  particleSpacing: 0.4
+  particleSize: 0.54
+  ribbonTexture: {fileID: 2800000, guid: a7a6830b9e8cb4153a09dc59e74e4d51, type: 3}
+  particleTexture: {fileID: 2800000, guid: a7a6830b9e8cb4153a09dc59e74e4d51, type: 3}
+  material: {fileID: 2100000, guid: c36a81757c0a34f3d9ef9c5a970443e4, type: 2}

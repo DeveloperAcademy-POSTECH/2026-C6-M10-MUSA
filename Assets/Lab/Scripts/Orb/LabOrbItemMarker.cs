@@ -337,6 +337,10 @@ namespace C6Lab
             SetLocked(true, look);
             // The effect starts from the locked look, but an unlocked bomb keeps its rainbow throughout.
             rainbow.gameObject.SetActive(bombMode);
+            // The last handoff creates a fresh view on the receiving board, so that view has never
+            // observed a burning fuse. The Host-approved unlock must also put its spark out in smoke.
+            // An existing view may already have started that puff when SetFuse stopped its fuse.
+            if (bombMode && !SmokeVisible) StartSmoke();
             unlockLook = LookOrDefault(look);
             unlockFromAlpha = icon.color.a;
             unlockElapsed = 0f;

@@ -834,6 +834,59 @@ namespace C6Lab.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator ABombReceivedOnItsUnlockingHandoffSmokesOnceWithoutAPriorLocalFuse()
+        {
+            var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            var bombArt = new Texture2D(8, 8);
+            var bombFuse = new Texture2D(8, 8);
+            SetSerializedField(appearance, "bombArt", bombArt);
+            SetSerializedField(appearance, "bombFuseArt", bombFuse);
+            SetSerializedField(config, "orbAppearance", appearance);
+            try
+            {
+                board.Configure(config, inputCamera, Bounds);
+                // SyncBoard first sees the receiving player's orb after the Host's last handoff
+                // has already removed its lock and fuse. There is no burning local view to update.
+                var bomb = board.UpsertOrb("received", LabOrbKind.Bomb, new Vector2(.5f, .5f),
+                    lockSwipes: 0, fuseSeconds: -1f, justUnlocked: true);
+                LabOrbItemMarker marker = bomb.ItemMarker;
+                Assert.That(bomb.UnlockEffectPlays, Is.EqualTo(1));
+                Assert.That(marker.SmokeVisible, Is.True,
+                    "The actual receiving-board path must show the fuse going out, even with no previous local fuse.");
+                Assert.That(marker.SparkVisible, Is.False);
+                Assert.That(marker.RainbowVisible, Is.True);
+                Assert.That(marker.BombCountVisible, Is.False);
+
+                var repeated = board.UpsertOrb("received", LabOrbKind.Bomb, new Vector2(.5f, .5f),
+                    lockSwipes: 0, fuseSeconds: -1f, justUnlocked: true);
+                Assert.That(repeated, Is.SameAs(bomb));
+                Assert.That(bomb.UnlockEffectPlays, Is.EqualTo(1), "A repeated unlock snapshot is not another handoff.");
+
+                float until = Time.time + 2f;
+                while (Time.time < until && marker.SmokeVisible) yield return null;
+                Assert.That(marker.SmokeVisible, Is.False, "The receiving-board puff fades out.");
+                board.UpsertOrb("received", LabOrbKind.Bomb, new Vector2(.5f, .5f),
+                    lockSwipes: 0, fuseSeconds: -1f, justUnlocked: true);
+                Assert.That(marker.SmokeVisible, Is.False, "Repeated snapshots cannot restart a completed puff.");
+                Assert.That(bomb.UnlockEffectPlays, Is.EqualTo(1));
+                Assert.That(marker.RainbowVisible, Is.True, "The throwable state remains after the smoke ends.");
+
+                var alreadyOpen = board.UpsertOrb("already-open", LabOrbKind.Bomb, new Vector2(.2f, .5f),
+                    lockSwipes: 0, fuseSeconds: -1f);
+                Assert.That(alreadyOpen.UnlockEffectPlays, Is.Zero);
+                Assert.That(alreadyOpen.ItemMarker.SmokeVisible, Is.False,
+                    "An orb created unlocked, or received after the unlock event, must not invent an unlock puff.");
+            }
+            finally
+            {
+                SetSerializedField(config, "orbAppearance", null);
+                Object.Destroy(appearance);
+                Object.Destroy(bombArt);
+                Object.Destroy(bombFuse);
+            }
+        }
+
         [Test]
         public void TheFuseRopeBurnsDownTowardTheCapOverTheFuseLessItsWarningSeconds()
         {

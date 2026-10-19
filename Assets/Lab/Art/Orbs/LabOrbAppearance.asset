@@ -30,9 +30,11 @@ MonoBehaviour:
   bombBodySize: 1.2
   bombFuseCanvasSize: 2.044
   bombCapAngle: 52
-  bombFuseTip: {x: 1.5, y: 0.8}
-  bombLockColor: {r: 1, g: 0.16, b: 0.1, a: 1}
-  bombLockSize: 1.1
+  bombRopeLength: 2
+  bombRopeColor: {r: 0.686, g: 0.533, b: 0.435, a: 1}
+  bombRopeThickness: 0.072
+  bombCountColor: {r: 1, g: 0.16, b: 0.1, a: 1}
+  bombCountSize: 1.1
   drumSprite: {fileID: 21300000, guid: 2732675626f72427387ada5d986dfa0f, type: 3}
   lockIcon: {fileID: 2800000, guid: 34345e2fb63124286a9d172adfb68664, type: 3}
   lockIconSize: 0.7
@@ -49,6 +51,9 @@ MonoBehaviour:
   bombWarningSlowHz: 2
   bombWarningFastHz: 8
   bombWarningColor: {r: 1, g: 0.12, b: 0.08, a: 1}
+  dropFallSeconds: 0.45
+  dropBounceSeconds: 0.45
+  dropBounceHeight: 1
   shadowMaterial: {fileID: 2100000, guid: 1284cbabd166044c2b2a0fc78c6959bc, type: 2}
   shadowColor: {r: 0, g: 0, b: 0, a: 0.22}
   shadowScale: {x: 1.4, y: 0.8}
@@ -58,3 +63,9 @@ MonoBehaviour:
   throwTrailWidthScale: 0.75
   throwTrailMinVertexDistance: 0.035
   throwTrailMaterial: {fileID: 2100000, guid: b6650dd786ec4b37a1436448587b4a88, type: 2}
+  elementFlightTrails:
+  - {fileID: 11400000, guid: 987dd158726a245d9ad9d668de1f9d24, type: 2}
+  - {fileID: 11400000, guid: 4adbdc3d793f140b28fb10244c90c91f, type: 2}
+  - {fileID: 11400000, guid: 5b5b92d2567cf4a90b0a777e5566284c, type: 2}
+  - {fileID: 11400000, guid: 7f5e51f4509a24cec8e58867915aa3a9, type: 2}
+  - {fileID: 11400000, guid: 32c504b4bb80e4d8b97d1b8510752cad, type: 2}

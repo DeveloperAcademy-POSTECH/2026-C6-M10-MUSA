@@ -361,8 +361,10 @@ namespace C6Lab.Tests
             Assert.That(appearance.YangMaterial, Is.Not.Null);
             Assert.That(appearance.CombinedMaterial, Is.Not.Null);
             Assert.That(appearance.ShadowMaterial, Is.Not.Null);
-            Assert.That(appearance.ThrowTrailMaterial, Is.Not.Null,
-                "The saved orb appearance must provide the flight trail material.");
+            foreach (LabOrbElement element in new[] { LabOrbElement.Fire, LabOrbElement.Water,
+                LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth })
+                Assert.That(appearance.ElementTrailFor(element), Is.Not.Null,
+                    "The saved orb appearance must bind an Inspector-editable profile for " + element + ".");
             Assert.That(appearance.DrumSprite, Is.Not.Null,
                 "The saved orb appearance must provide the generate drum art.");
             Assert.That(network.impactFeedback, Is.Not.Null,
@@ -498,10 +500,14 @@ namespace C6Lab.Tests
                 Assert.That(projectile.GetComponent<SphereCollider>(), Is.Not.Null);
                 Assert.That(projectile.VisualMount.GetComponentInChildren<MeshRenderer>(), Is.Not.Null,
                     "The thrown orb must retain the 3D sphere presentation.");
-                Assert.That(projectile.FlightTrail, Is.Not.Null);
-                Assert.That(projectile.FlightTrail.emitting, Is.True);
-                Assert.That(projectile.FlightTrail.sharedMaterial, Is.SameAs(appearance.ThrowTrailMaterial));
-                Color expectedDamageColor = projectile.FlightTrail.startColor;
+                Assert.That(projectile.ElementFlightTrail, Is.Not.Null);
+                Assert.That(projectile.ElementFlightTrail.IsEmitting, Is.True);
+                Assert.That(projectile.ElementFlightTrail.Element, Is.EqualTo(combined.element));
+                Assert.That(projectile.ElementFlightTrail.Profile,
+                    Is.SameAs(appearance.ElementTrailFor(combined.element)));
+                Assert.That(projectile.FlightTrail, Is.Null,
+                    "Configured elemental effects replace, rather than overlap, the legacy trail.");
+                Color expectedDamageColor = (Color32)LabOrbAppearance.DefaultElementColor(combined.element);
 
                 for (int step = 0; step < 150 && network.Snapshot.hp == initialHp; step++)
                     yield return new WaitForFixedUpdate();
@@ -513,7 +519,7 @@ namespace C6Lab.Tests
                 var damageLabel = impactLayer.GetComponentInChildren<UnityEngine.UI.Text>();
                 Assert.That(damageLabel, Is.Not.Null);
                 Assert.That(damageLabel.text, Is.EqualTo("-" + network.config.Damage));
-                // The trail reads back 8-bit channels, so compare the label at the same precision.
+                // Trail art has its own palette; approved damage labels retain the gameplay palette.
                 Color damageColor = (Color32)damageLabel.color;
                 Assert.That(damageColor.r, Is.EqualTo(expectedDamageColor.r).Within(.001f));
                 Assert.That(damageColor.g, Is.EqualTo(expectedDamageColor.g).Within(.001f));
