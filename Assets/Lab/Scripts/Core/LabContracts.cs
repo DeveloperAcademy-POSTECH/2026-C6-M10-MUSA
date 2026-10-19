@@ -38,11 +38,11 @@ namespace C6Lab
         /// <summary>Items used in place by a double tap once unlocked.</summary>
         public static bool IsDoubleTapUsable(this LabOrbKind kind) => kind == LabOrbKind.Potion || kind == LabOrbKind.SecretBox;
         /// <summary>
-        /// Orbs that an upward flick may throw at the target. A bomb has no lock to open and is
-        /// never thrown: it can only be passed on before its fuse runs out.
+        /// Orbs that an upward flick may throw at the target: Combined, and a relay orb or bomb once
+        /// handoffs have opened its lock (#212). A locked bomb can only be passed on.
         /// </summary>
         public static bool CanThrow(this LabOrbKind kind, int lockSwipes) =>
-            kind == LabOrbKind.Combined || (kind == LabOrbKind.Relay && lockSwipes == 0);
+            kind == LabOrbKind.Combined || ((kind == LabOrbKind.Relay || kind == LabOrbKind.Bomb) && lockSwipes == 0);
     }
 
     /// <summary>

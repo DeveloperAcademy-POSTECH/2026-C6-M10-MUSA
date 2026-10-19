@@ -61,10 +61,10 @@ namespace C6Lab
         public bool BombArtVisible => itemMarker != null && itemMarker.BombArtVisible;
         public Transform Visual => visual;
         public bool IsSpawning { get; private set; }
-        /// <summary>A gourd bomb still showing its landing warning, falling or bouncing.</summary>
+        /// <summary>How long a bomb's whole fuse is (the item lifetime), so its rope burns at the right pace.</summary>
+        public float FuseTotalSeconds { get; set; } = 15f;
+        /// <summary>A gourd bomb still falling or bouncing.</summary>
         public bool IsDropping { get; private set; }
-        /// <summary>The art is hidden while the landing warning shows, before the bomb falls into view.</summary>
-        public bool ArtHidden { get; private set; }
         public Rigidbody Body { get; private set; }
         public SphereCollider HitSphere { get; private set; }
 
@@ -286,13 +286,12 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// A bomb the gourd dropped (#177): its art stays hidden for hideSeconds while the landing
-        /// warning shows, then falls from fromOffset (root-local, above the orb area) onto the root,
-        /// speeding up like a dropped thing, and lands with a squash and two shrinking hops of
-        /// bounceHeight (root-local). Only the art moves; the body waits on its landing spot.
-        /// onLanded runs once it settles, or if the view is disabled or destroyed first.
+        /// A bomb the gourd dropped (#177): its art falls at once from fromOffset (root-local, above
+        /// the orb area) onto the root, speeding up like a dropped thing, and lands with a squash and
+        /// two shrinking hops of bounceHeight (root-local). Only the art moves; the body waits on its
+        /// landing spot. onLanded runs once it settles, or if the view is disabled or destroyed first.
         /// </summary>
-        public void PlayDrop(Vector3 fromOffset, float hideSeconds, float fallSeconds, float bounceSeconds,
+        public void PlayDrop(Vector3 fromOffset, float fallSeconds, float bounceSeconds,
             float bounceHeight, Action onLanded = null)
         {
             EnsureVisual();
@@ -304,24 +303,16 @@ namespace C6Lab
             CompleteSpawn();
             IsDropping = true;
             dropLanded = onLanded;
-            dropRoutine = StartCoroutine(Drop(fromOffset, Mathf.Max(0f, hideSeconds), Mathf.Max(.01f, fallSeconds),
+            dropRoutine = StartCoroutine(Drop(fromOffset, Mathf.Max(.01f, fallSeconds),
                 Mathf.Max(0f, bounceSeconds), Mathf.Max(0f, bounceHeight)));
         }
 
-        private IEnumerator Drop(Vector3 from, float hideSeconds, float fallSeconds, float bounceSeconds, float bounceHeight)
+        private IEnumerator Drop(Vector3 from, float fallSeconds, float bounceSeconds, float bounceHeight)
         {
-            SetArtHidden(true);
-            float elapsed = 0f;
-            while (elapsed < hideSeconds)
-            {
-                yield return null;
-                elapsed += Time.deltaTime;
-            }
-
-            SetArtHidden(false);
+            // Set before the first frame renders, so it is never seen on its spot before falling.
             visual.localPosition = from;
             SetShadowScale(.3f);
-            elapsed = 0f;
+            float elapsed = 0f;
             while (elapsed < fallSeconds)
             {
                 yield return null;
@@ -360,22 +351,12 @@ namespace C6Lab
                 StopCoroutine(dropRoutine);
                 dropRoutine = null;
             }
-            SetArtHidden(false);
             SetSquash(0f);
             SetShadowScale(1f);
             ResetVisualPose();
             Action landed = dropLanded;
             dropLanded = null;
             landed?.Invoke();
-        }
-
-        /// <summary>Hides the ball, its item marker and its shadow while the bomb is still out of sight.</summary>
-        private void SetArtHidden(bool hidden)
-        {
-            ArtHidden = hidden;
-            if (visual != null) visual.gameObject.SetActive(!hidden);
-            if (itemMarker != null) itemMarker.gameObject.SetActive(!hidden);
-            if (contactShadow != null) contactShadow.SetActive(!hidden);
         }
 
         /// <summary>Squashes the art wide and flat (positive) about its centre; 0 restores it.</summary>
@@ -519,23 +500,19 @@ namespace C6Lab
                 return;
             }
             if (itemMarker == null) itemMarker = LabOrbItemMarker.Create(transform);
-            // A bomb has no lock to count; it shows the whole seconds left on its fuse instead.
+            // A bomb shows the unlock handoffs left; its burning rope shows the time left (#212).
             if (HasBombArt)
-                itemMarker.ShowBomb(appearance, FuseText(), visualRadius, visual);
+                itemMarker.ShowBomb(appearance, lockSwipes > 0 ? lockSwipes.ToString() : null, visualRadius, visual);
             else
                 itemMarker.Show(appearance != null ? appearance.IconFor(kind) : null, BadgeText(), visualRadius, visual);
             itemMarker.SetLocked(lockSwipes > 0, appearance);
-            itemMarker.SetFuse(kind == LabOrbKind.Bomb ? fuseSeconds : -1f, appearance);
+            itemMarker.SetFuse(kind == LabOrbKind.Bomb ? fuseSeconds : -1f, FuseTotalSeconds, appearance);
         }
 
         private bool HasBombArt => kind == LabOrbKind.Bomb && appearance != null && appearance.BombArt != null;
 
-        private string FuseText() =>
-            kind == LabOrbKind.Bomb && fuseSeconds >= 0f ? Mathf.CeilToInt(fuseSeconds).ToString() : null;
-
         private string BadgeText()
         {
-            if (kind == LabOrbKind.Bomb) return FuseText();
             if (lockSwipes > 0) return lockSwipes.ToString();
             if (kind != LabOrbKind.Relay || relayStage <= 0) return null;
             return relayStage >= 3 ? "MAX" : relayStage == 2 ? "×2" : "×1";

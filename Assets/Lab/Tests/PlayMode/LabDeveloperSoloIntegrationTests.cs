@@ -544,7 +544,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedSceneSoloGourdBombWarnsThenFallsOntoTheLocalBoard()
+        public IEnumerator SavedSceneSoloGourdBombFallsStraightOntoTheLocalBoard()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null; // Let Awake/Start bind the saved Scene references.
@@ -582,7 +582,10 @@ namespace C6Lab.Tests
                 Assert.That(bomb.owner, Is.EqualTo(network.LocalPlayerId));
                 Assert.That(board.IsDropping(bombId), Is.True,
                     "The drop signal reaches the board before the snapshot that holds the bomb.");
-                Assert.That(board.GetComponentInChildren<LabDropWarning>(), Is.Not.Null, "Its landing spot is marked.");
+                LabOrbView falling = board.GetComponentsInChildren<LabOrbView>().Single(candidate => candidate.OrbId == bombId);
+                Assert.That(falling.Visual.localPosition.y, Is.GreaterThan(0f),
+                    "It falls in from above at once, with no landing warning (#212).");
+                Assert.That(bomb.lockSwipes, Is.InRange(2, 4), "A gourd bomb comes locked.");
                 Assert.That(network.Notice, Does.Contain("gourd"));
                 var alert = UnityEngine.Object.FindFirstObjectByType<LabGourdAlert>();
                 Assert.That(alert, Is.Not.Null, "The saved scene shows the gourd's alert.");
@@ -594,7 +597,7 @@ namespace C6Lab.Tests
                 Assert.That(board.IsDropping(bombId), Is.False, "It lands and becomes an ordinary bomb.");
                 LabOrbView view = board.GetComponentsInChildren<LabOrbView>().Single(candidate => candidate.OrbId == bombId);
                 Assert.That(view.BombArtVisible, Is.True, "It shows the cartoon bomb.");
-                Assert.That(view.ItemMarker.BombTimeText, Is.Not.Empty, "With the seconds left on its fuse.");
+                Assert.That(view.ItemMarker.BombCountText, Is.Not.Empty, "With its unlock handoffs left in red.");
             }
             finally
             {

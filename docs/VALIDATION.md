@@ -1062,3 +1062,48 @@ PR #216의 첫 병합 시도 직전 #214가 main `929d9244`에 들어와 실제 
 초기 전체 PlayMode는175/179였다. 신규 fixture3건은 코루틴이 `LateUpdate` 기록 전에 값을 읽는 순서 문제였으며 제한시간 내 실제 이력·입자가 생길 때까지 기다리도록 수정했다. GPU1건은 비교용 측면 카메라의 잘못된 화면 범위였다. 기본 정면의 전투 카메라 비율을 보존하고 보조 시점은 실제 기록 경로를 같은 배율로 담도록 바꿨다. 이어 금의 짧은 정면 비행에서 세 리본이 원근 축소로 사라지는 문제를 발견해, 실제 거리 샘플에 세 붓자국을 함께 남기는 표현을 추가했다. 중간 실패를 최종 PASS로 덮어쓰거나 게임 판정을 변경하지 않았다.
 
 투척 입력·Rigidbody 수치·피해·도색·게임 설정146개·프로토콜5641·Scene·Prefab은 변경하지 않았다. `LabOrbAppearance.asset`은 새5개 프로필 참조를 추가하며 Unity가 기존 `FormerlySerializedAs` 필드 이름과 이미 코드에 있던 낙하 기본값도 재저장했다. 값의 의미는 기존과 같다. 기존 main의 미저장/미커밋 Scene·머터리얼·구형 폴더 파일은 별도 작업 폴더 사용으로 보존했다.
+
+## 폭탄 잠금 복원·무거운 폭탄 — 2026-10-19, 이슈 #212
+
+기준은 Unity **6000.6.5f1**, main(`19289cbf`, #208 PR #209 포함)에서 분기한 `feat/#212-bomb-rework`이며, PR 전에 최신 main(`9d290fc9`, #214·#216 포함)을 병합했다.
+
+- **잠금·해금**: 북 폭탄과 박 폭탄 모두 다른 아이템처럼 잠금 2~4(`Item Unlock Swipes Min`~`Max`)로 생긴다. 옆 사람에게 넘길 때마다 1 줄고, 잠긴 채 `Item Lifetime`(15초)이 끝나면 보유자 판에서 터진다. 마지막 잠금을 푸는 전달에서 Host가 수명을 새로 시작해, 해금된 폭탄은 `Orb Lifetime`(8초) 동안 던질 수 있는 공격 구슬이 된다(피해 `Bomb Damage Multiplier` 3배, 빗나감·만료 시 폭발 없음). Host는 잠긴 폭탄에만 도화선 시간을 보낸다.
+- **박 폭탄 낙하**: 착지 지점 "!" 경고(`LabDropWarning`)를 지우고, 신호를 받으면 곧바로 떨어져 튕긴다. 박의 "!" 말풍선은 그대로다.
+- **그림**: 몸통의 빨간 숫자는 남은 해금 횟수다. 꼭지에서 뻗은 밧줄 도화선(그림 기준 길이 × `Bomb Rope Length` 2)이 `Item Lifetime − 3초`(기본 12초) 동안 끝부터 타 들어가고, 두 색 별 모양 불꽃이 탄 끝을 따라온다. 마지막 3초는 기존 빨간 깜빡임이다. 해금 시 불이 연기와 함께 꺼지고 무지개 테두리가 돈다. 꼭지 그림 `ItemBombFuse.png`는 꼭지만 남기고 같은 GUID로 교체했다.
+- **무거운 폭탄**: DEV 147~150번째(인덱스 146~149) `Bomb Drag Lag` 0.12초·`Bomb Release Speed` 0.5배·`Bomb Slide Deceleration` 2배·`Bomb Mass` 4배. 위로 던지는 투척 세기는 바꾸지 않는다.
+- **설정·통신**: main #214의 `Gourd Visual Size`(인덱스 145)가 먼저 들어와, 병합하면서 무거운 폭탄을 146~149로 옮겼다. 설정 146 → 150개. 통신 버전은 main의 5641과 데이터가 달라 `5641` → `5642`로 올렸다.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다, main 병합 뒤에도 컴파일했다. 오류 0. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN (최종 기록 없음) | 1단계 중간 실행에서 EditMode 7건이 실패했다: 팀원 검사 6개 파일의 프로토콜 고정값(5640)이 갱신되지 않았다 → 고정값을 갱신했다. 그 뒤 단계와 main 병합 뒤 전체 재실행 결과는 기록하지 않았다. |
+| 솔로 화면: 도화선·숫자·무지개·연기, 즉시 낙하, 무거운 끌기 | NOT_RUN | 솔로에서는 이웃이 없어 해금이 일어나지 않는다. 해금 화면은 `Item Unlock Swipes Min`·`Max` = 0(처음부터 해금된 폭탄)이나 3인 실행으로 확인한다. |
+| 3인 실행: 넘길 때 숫자 감소·해금 투척·잠긴 폭발, 무거운 폭탄 넘기기 손맛 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 손가락으로 끌 때의 지연과 넘기기 세기 체감 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `ALockedBombBlastsAtItsFuseButHandoffsDefuseItIntoAnAttackOrb`, `AnUnlockedBombHitsForTripleDamageAndAMissNeverExplodes`(기존 `ABombHasNoLockItsFuseBurnsOnHoweverOftenItIsPassedAndItIsNeverThrown` 대체)
+- **EditMode** `LabDeveloperConfigTests`: `HeavyBombFieldsJoinTheItemOrbsGroupWithTheirDefaultsAndApply`; DEV 개수·프로토콜을 고정한 팀원 검사들을 150개·5642로 갱신, `LabPaintClusterConfigTests`는 143번부터 끝까지가 아니라 2개만 읽도록 수정
+- **PlayMode** `LabOrbPhysicsTests`: `ALockedBombCannotBeThrownButAnUnlockedOneCanWithAnUpwardFlick`, `ABombWithArtDrawsTheCartoonBombWithItsRedUnlockCountAndABurningFuse`, `TheFuseRopeBurnsDownTowardTheCapOverTheFuseLessItsWarningSeconds`, `AnExpectedGourdBombFallsInAtOnceWithNoLandingWarningAndBouncesBeforeItCanBeTouched`, `AHeavyBombTrailsTheFingerAndOutweighsAnOrbWhileAnOrbSticksToTheFinger`, `AHeavyBombLeavesTheFingerSlowerAndSlidesToAStopSoonerThanAnOrb`
+- **PlayMode** `LabDeveloperSoloIntegrationTests`: `SavedSceneSoloGourdBombFallsStraightOntoTheLocalBoard`(착지 경고 대신 즉시 낙하·잠금 2~4 확인)
+
+
+## #219·#212 — 두 PR 최종 통합 검증 — 2026-10-19
+
+사용자가 두 PR 모두 검증 후 main 병합을 승인했다. 기준 main `9d290fc9`, 트레일 PR #221의 `ccadb694`, 폭탄 PR #220의 `d56c80da`를 합친 코드에서 실행했다. Unity **6000.6.5f1 / URP17.6.0 / macOS ARM64**. 위 각 PR의 과거 검증·미실행 기록과 아래 합본 결과는 구분한다.
+
+- 실제 충돌은 `README.md`와 이 검증 문서의 추가 문단 두 곳이었다. 오행 트레일 설명과 폭탄 기능·과거 검증 기록을 모두 보존했다. 현재 계약은 **설정150개·프로토콜5642**이며 기존 #214 크기 설정 인덱스145와 폭탄146~149를 유지한다. 반복 성장 기본값1.5%도 보존한다.
+- Unity API로 외형 에셋의 폭탄 도화선·해금 횟수 필드를 다시 저장하고 오행 프로필5개·기존 숫자색을 보존했다. 삭제한 착지 경고 스크립트 참조가 저장 Scene·Prefab·에셋에 남지 않았는지 확인했다. Scene·Prefab·패키지는 수정하지 않았다.
+- 독립 소스 검토에서 새 수신 View의 마지막 해금 전달에 연기가 빠지는 경로를 찾았다. 수신 View는 기존에 불타던 도화선이 없으므로 `SetFuse`의 소화 조건만으로는 효과를 시작하지 못했다. `PlayUnlock`에서 폭탄일 때 연기를 시작하되 이미 재생 중이면 재시작하지 않도록 최소 보완했다.
+
+| 확인 범위 | 결과 | 실제 근거·제한 |
+| --- | --- | --- |
+| 해금 연기 결함 재현 | FAIL 재현 | `merge220-smoke-before-fix.xml`: 신규 수신 Board 회귀1건을 보완 전 코드에서 실행해0/1, 실제 SmokeVisible=false를 재현했다. 08:35:25 UTC. 테스트 작성만으로 결함 재현을 주장하지 않는다. |
+| 최종 전체 EditMode | PASS | `merge220-final-editmode.xml`: **698/698**, failed/skipped/inconclusive0, 08:36:36~08:37:03 UTC, 약27.5초. 폭탄 규칙·설정150개·프로토콜5642와 기존 도색/게임 검사를 포함한다. |
+| 최종 전체 PlayMode | PASS | `merge220-final-playmode.xml`: **183/183**, failed/skipped/inconclusive0, 08:37:08~08:38:38 UTC, 약89.5초. 오행 트레일9건·폭탄 물리/표현과 신규 수신 해금 회귀를 함께 실행했다. |
+| 수신 해금·중복·종료 경계 | PASS(PlayMode fixture) | `ABombReceivedOnItsUnlockingHandoffSmokesOnceWithoutAPriorLocalFuse`: 실제 `LabOrbBoard.UpsertOrb`로 이전 도화선이 없는 새 View에서 연기·무지개·불꽃 종료를 확인했다. 반복 스냅샷이 효과를 재시작하지 않고 연기가 끝나며, 처음부터 열린 폭탄은 해금 연기를 만들지 않는지도 검사했다. 독립 기기 간 전달 실험은 아니다. |
+| 일반 Mac Development 빌드 | PASS(빌드) | 임시 작성/검증 도구를 제거한 기존 `C6Lab.Editor.LabBuild.Mac`, 종료0·`C6_LAB_BUILD_OK`, **BuildReport203,134,644바이트**. `Builds/Lab/issue219-220-verified/macOS/C6_Physics_Lab.app`. 빌드 앱의 별도 수동 플레이는 미실행이다. |
+| 코드·에셋 호환 검토 | PASS(정적 확인) | None 속성 폭탄의 기존 잔상 경로와 오행의 새5개 프로필, 삭제 스크립트 참조, 공유 설정 인덱스·통신 버전 및 충돌 표식을 확인했다. Unity 재직렬화만 생긴 Target2 머터리얼2개는 제외했다. |
+| 독립 Host/Client·3인 앱·iOS·실기기·핫스팟·모바일 성능 | NOT_RUN | 이번 통합에서는 실행하지 않았다. 원래 PR의 수동 확인 표시와 오프라인 컴파일을 이번 합본의 플레이 검증 결과로 승계하지 않는다. 모든 참가자는 프로토콜5642인 새 빌드를 사용해야 한다. |
+
+원본 작업 폴더의 사용자 Scene·Target2 머터리얼2개·미추적 Scenes.meta는 별도 보존하며 이 통합 커밋에는 포함하지 않는다. 원시 XML·로그·빌드 산출물과 임시 검사 도구도 공개 Git에 넣지 않는다. 기존 main 명중점 정합성 확인 항목 #218은 이번 표현·폭탄 통합으로 해결됐다고 표시하지 않는다.

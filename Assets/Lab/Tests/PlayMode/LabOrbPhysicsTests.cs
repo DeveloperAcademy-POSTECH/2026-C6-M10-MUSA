@@ -580,22 +580,23 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void BombCountsDownItsFuseAndAnUpwardFlickNeverThrowsIt()
+        public void ALockedBombCannotBeThrownButAnUnlockedOneCanWithAnUpwardFlick()
         {
-            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), fuseSeconds: 11.2f);
-            Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("12"), "The whole seconds left on the fuse, rounded up.");
-            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), fuseSeconds: 3.4f);
-            Assert.That(bomb.ItemMarker.BadgeText, Is.EqualTo("4"), "The seconds follow the Host fuse.");
-
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), lockSwipes: 2, fuseSeconds: 11.2f);
             int throws = 0;
-            board.ThrowRequested += gesture => throws++;
+            string thrown = null;
+            board.ThrowRequested += gesture => { throws++; thrown = gesture.OrbId; };
             Vector2 from = BoardPoint(bomb);
             Assert.That(board.TryBeginDragAtWorld(from, 1d), Is.True);
             Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1f), 1.1d), Is.True);
-            Assert.That(throws, Is.Zero, "A bomb has no lock to open and is never thrown; it can only be passed on.");
+            Assert.That(throws, Is.Zero, "A locked bomb can only be passed on.");
 
-            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), fuseSeconds: -1f);
-            Assert.That(bomb.ItemMarker.BadgeVisible, Is.False, "Without a fuse there are no seconds to show.");
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), lockSwipes: 0, fuseSeconds: -1f);
+            from = BoardPoint(bomb);
+            Assert.That(board.TryBeginDragAtWorld(from, 2d), Is.True);
+            Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1f), 2.1d), Is.True);
+            Assert.That(throws, Is.EqualTo(1), "Once handoffs open it, it is thrown like an attack orb (#212).");
+            Assert.That(thrown, Is.EqualTo("bomb"));
         }
 
         [UnityTest]
@@ -756,7 +757,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator ABombWithArtDrawsTheCartoonBombWithItsRedSecondsAndASparkingFuse()
+        public IEnumerator ABombWithArtDrawsTheCartoonBombWithItsRedUnlockCountAndABurningFuse()
         {
             var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
             var bombArt = new Texture2D(8, 8);
@@ -771,17 +772,18 @@ namespace C6Lab.Tests
             try
             {
                 board.Configure(config, inputCamera, Bounds);
-                var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), fuseSeconds: 9.2f);
+                var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 3, fuseSeconds: 9.2f);
                 LabOrbItemMarker marker = bomb.ItemMarker;
                 Assert.That(bomb.BombArtVisible, Is.True, "An assigned bomb image is drawn on the orb.");
                 Assert.That(bomb.Visual.GetComponentInChildren<MeshRenderer>(), Is.Null, "The bomb art replaces the ball.");
                 Assert.That(marker.IconVisible, Is.False, "No icon disc under the art.");
                 Assert.That(marker.LockVisible, Is.False, "No padlock on the bomb art.");
                 Assert.That(marker.BadgeVisible, Is.False, "No badge square on the bomb art.");
-                Assert.That(marker.BombTimeText, Is.EqualTo("10"), "The whole seconds left on the fuse are written on it.");
+                Assert.That(marker.BombCountText, Is.EqualTo("3"), "The unlock handoffs left are written on it (#212).");
                 // A TextMesh keeps its colour in 8-bit channels, so compare at that precision.
-                Assert.That((Color32)marker.BombTimeColor, Is.EqualTo((Color32)appearance.BombTimeColor), "The seconds are red.");
+                Assert.That((Color32)marker.BombCountColor, Is.EqualTo((Color32)appearance.BombCountColor), "The count is red.");
                 Assert.That(marker.SparkVisible, Is.True, "The bomb's fuse sparks while it burns.");
+                Assert.That(marker.RainbowVisible, Is.False, "A locked bomb has no rainbow.");
                 SpriteRenderer art = marker.GetComponentsInChildren<SpriteRenderer>()
                     .Single(renderer => renderer.name == "Bomb Art");
                 Assert.That(art.bounds.size.x, Is.EqualTo(appearance.BombBodySize * 2f * config.OrbRadius).Within(.01f),
@@ -791,8 +793,9 @@ namespace C6Lab.Tests
                 Assert.That(bomb.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1), "The art adds no collider.");
                 Assert.That(bomb.HitSphere.radius, Is.EqualTo(config.OrbRadius).Within(.001f), "Its body stays orb sized.");
 
-                board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), fuseSeconds: 2.5f);
-                Assert.That(marker.BombTimeText, Is.EqualTo("3"), "The seconds count down with the Host fuse.");
+                board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 2.5f);
+                Assert.That(marker.BombCountText, Is.EqualTo("2"), "The count follows the Host's handoffs.");
+                Assert.That(marker.RopeShare, Is.Zero, "In its last three seconds the rope has burnt down to the cap.");
                 // Several flashes' worth, stopping at the first red one (see the fallback flashing test).
                 float reddest = 1f;
                 float until = Time.time + 2f;
@@ -803,11 +806,18 @@ namespace C6Lab.Tests
                 }
                 Assert.That(reddest, Is.LessThan(.6f), "In its last seconds the bomb art itself flashes red.");
 
-                board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), fuseSeconds: -1f);
+                // The last handoff opens it: the Host cuts its fuse.
+                board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 0, fuseSeconds: -1f);
                 Assert.That(bomb.BombArtVisible, Is.True);
-                Assert.That(marker.BombTimeVisible, Is.False, "Without a fuse there are no seconds to show.");
-                Assert.That(marker.SparkVisible, Is.False, "Nor a spark.");
+                Assert.That(marker.BombCountVisible, Is.False, "With no handoffs left there is no count.");
+                Assert.That(marker.SparkVisible, Is.False, "The fuse goes out...");
+                Assert.That(marker.SmokeVisible, Is.True, "...in a puff of smoke.");
+                Assert.That(marker.RainbowVisible, Is.True, "A rainbow ring says it can now be thrown.");
                 Assert.That(marker.BombArtColor, Is.EqualTo(Color.white), "And it stops flashing.");
+                until = Time.time + 2f;
+                while (Time.time < until && marker.SmokeVisible) yield return null;
+                Assert.That(marker.SmokeVisible, Is.False, "The smoke clears.");
+                Assert.That(marker.RainbowVisible, Is.True, "The rainbow stays while it can be thrown.");
 
                 var relay = board.UpsertOrb("relay", LabOrbKind.Relay, new Vector2(.2f, .5f), lockSwipes: 1);
                 Assert.That(relay.BombArtVisible, Is.False, "Only bombs use the bomb art.");
@@ -825,6 +835,195 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator ABombReceivedOnItsUnlockingHandoffSmokesOnceWithoutAPriorLocalFuse()
+        {
+            var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            var bombArt = new Texture2D(8, 8);
+            var bombFuse = new Texture2D(8, 8);
+            SetSerializedField(appearance, "bombArt", bombArt);
+            SetSerializedField(appearance, "bombFuseArt", bombFuse);
+            SetSerializedField(config, "orbAppearance", appearance);
+            try
+            {
+                board.Configure(config, inputCamera, Bounds);
+                // SyncBoard first sees the receiving player's orb after the Host's last handoff
+                // has already removed its lock and fuse. There is no burning local view to update.
+                var bomb = board.UpsertOrb("received", LabOrbKind.Bomb, new Vector2(.5f, .5f),
+                    lockSwipes: 0, fuseSeconds: -1f, justUnlocked: true);
+                LabOrbItemMarker marker = bomb.ItemMarker;
+                Assert.That(bomb.UnlockEffectPlays, Is.EqualTo(1));
+                Assert.That(marker.SmokeVisible, Is.True,
+                    "The actual receiving-board path must show the fuse going out, even with no previous local fuse.");
+                Assert.That(marker.SparkVisible, Is.False);
+                Assert.That(marker.RainbowVisible, Is.True);
+                Assert.That(marker.BombCountVisible, Is.False);
+
+                var repeated = board.UpsertOrb("received", LabOrbKind.Bomb, new Vector2(.5f, .5f),
+                    lockSwipes: 0, fuseSeconds: -1f, justUnlocked: true);
+                Assert.That(repeated, Is.SameAs(bomb));
+                Assert.That(bomb.UnlockEffectPlays, Is.EqualTo(1), "A repeated unlock snapshot is not another handoff.");
+
+                float until = Time.time + 2f;
+                while (Time.time < until && marker.SmokeVisible) yield return null;
+                Assert.That(marker.SmokeVisible, Is.False, "The receiving-board puff fades out.");
+                board.UpsertOrb("received", LabOrbKind.Bomb, new Vector2(.5f, .5f),
+                    lockSwipes: 0, fuseSeconds: -1f, justUnlocked: true);
+                Assert.That(marker.SmokeVisible, Is.False, "Repeated snapshots cannot restart a completed puff.");
+                Assert.That(bomb.UnlockEffectPlays, Is.EqualTo(1));
+                Assert.That(marker.RainbowVisible, Is.True, "The throwable state remains after the smoke ends.");
+
+                var alreadyOpen = board.UpsertOrb("already-open", LabOrbKind.Bomb, new Vector2(.2f, .5f),
+                    lockSwipes: 0, fuseSeconds: -1f);
+                Assert.That(alreadyOpen.UnlockEffectPlays, Is.Zero);
+                Assert.That(alreadyOpen.ItemMarker.SmokeVisible, Is.False,
+                    "An orb created unlocked, or received after the unlock event, must not invent an unlock puff.");
+            }
+            finally
+            {
+                SetSerializedField(config, "orbAppearance", null);
+                Object.Destroy(appearance);
+                Object.Destroy(bombArt);
+                Object.Destroy(bombFuse);
+            }
+        }
+
+        [Test]
+        public void TheFuseRopeBurnsDownTowardTheCapOverTheFuseLessItsWarningSeconds()
+        {
+            var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            var bombArt = new Texture2D(8, 8);
+            var bombFuse = new Texture2D(8, 8);
+            SetSerializedField(appearance, "bombArt", bombArt);
+            SetSerializedField(appearance, "bombFuseArt", bombFuse);
+            SetSerializedField(config, "orbAppearance", appearance);
+            try
+            {
+                board.Configure(config, inputCamera, Bounds);
+                Assert.That(config.ItemLifetimeSeconds, Is.EqualTo(15f));
+                Assert.That(appearance.BombWarningSeconds, Is.EqualTo(3f));
+                var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 15f);
+                LabOrbItemMarker marker = bomb.ItemMarker;
+                Assert.That(marker.RopeShare, Is.EqualTo(1f).Within(1e-4f), "A new bomb's rope is whole.");
+                int wholeDots = marker.RopeDotsShown;
+                float wholeReach = marker.FuseTipPosition.magnitude;
+
+                board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 9f);
+                Assert.That(marker.RopeShare, Is.EqualTo(.5f).Within(1e-4f), "It burns over the first 12 of 15 seconds.");
+                Assert.That(marker.RopeDotsShown, Is.InRange(wholeDots / 2 - 1, wholeDots / 2 + 1));
+                float halfReach = marker.FuseTipPosition.magnitude;
+                Assert.That(halfReach, Is.LessThan(wholeReach), "The spark moves in toward the bomb.");
+                Assert.That(marker.WarningHz, Is.Zero, "No red glow while the rope still burns.");
+
+                board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 3f);
+                Assert.That(marker.RopeShare, Is.Zero, "At three seconds left the spark reaches the cap...");
+                Assert.That(marker.FuseTipPosition.magnitude, Is.LessThan(halfReach));
+                board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 2.9f);
+                Assert.That(marker.WarningHz, Is.GreaterThan(0f), "...and the bomb starts to glow red.");
+
+                // A longer item lifetime from the DEV form burns the rope more slowly to the same end.
+                float[] values = config.CaptureDeveloperValues();
+                values[45] = 27f; // item lifetime (seconds)
+                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var slow = board.UpsertOrb("slow", LabOrbKind.Bomb, new Vector2(.3f, .3f), lockSwipes: 2, fuseSeconds: 15f);
+                Assert.That(slow.ItemMarker.RopeShare, Is.EqualTo(.5f).Within(1e-4f), "12 of its 24 burning seconds left.");
+
+                // The handoff that unlocks it also plays the unlock effect, which must not hide the rainbow.
+                board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 0, fuseSeconds: -1f, justUnlocked: true);
+                Assert.That(marker.UnlockPlaying, Is.True);
+                Assert.That(marker.RainbowVisible, Is.True, "The rainbow shows from the moment it unlocks.");
+
+                var open = board.UpsertOrb("open", LabOrbKind.Bomb, new Vector2(.7f, .7f), lockSwipes: 0, fuseSeconds: -1f);
+                Assert.That(open.ItemMarker.RopeShare, Is.EqualTo(1f), "A bomb made open never lit its rope.");
+                Assert.That(open.ItemMarker.SparkVisible, Is.False);
+                Assert.That(open.ItemMarker.SmokeVisible, Is.False, "Nothing went out, so no smoke.");
+                Assert.That(open.ItemMarker.RainbowVisible, Is.True);
+            }
+            finally
+            {
+                SetSerializedField(config, "orbAppearance", null);
+                Object.Destroy(appearance);
+                Object.Destroy(bombArt);
+                Object.Destroy(bombFuse);
+            }
+        }
+
+        [Test]
+        public void AHeavyBombTrailsTheFingerAndOutweighsAnOrbWhileAnOrbSticksToTheFinger()
+        {
+            Assert.That(config.BombDragLag, Is.EqualTo(.12f));
+            var orb = board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.3f, .3f));
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.3f, .7f), lockSwipes: 2, fuseSeconds: 10f);
+            Assert.That(orb.Body.mass, Is.EqualTo(1f));
+            Assert.That(bomb.Body.mass, Is.EqualTo(4f), "A bomb is heavy, so orbs bump off it (#212).");
+
+            Vector2 move = new Vector2(1.5f, 0f);
+            Vector2 start = BoardPoint(orb);
+            Assert.That(board.TryBeginDragAtWorld(start, 1d), Is.True);
+            Assert.That(board.DragToWorld(start + move, 1.05d), Is.True);
+            Assert.That(Vector2.Distance(BoardPoint(orb), start + move), Is.LessThan(1e-4f), "An orb is right under the finger.");
+            board.CancelDrag();
+
+            start = BoardPoint(bomb);
+            Assert.That(board.TryBeginDragAtWorld(start, 2d), Is.True);
+            Assert.That(board.DragToWorld(start + move, 2.05d), Is.True);
+            float share = Vector2.Distance(BoardPoint(bomb), start) / move.magnitude;
+            Assert.That(share, Is.EqualTo(1f - Mathf.Exp(-.05f / .12f)).Within(.01f),
+                "50 ms after the finger moves, the bomb has closed about a third of the gap.");
+            for (int i = 1; i <= 20; i++) board.DragToWorld(start + move, 2.05d + i * .05d);
+            Assert.That(Vector2.Distance(BoardPoint(bomb), start + move), Is.LessThan(.01f),
+                "Held still, it catches up with the finger.");
+            board.CancelDrag();
+
+            // From the DEV form: no lag sticks the bomb to the finger like an orb; a new mass applies to new bombs.
+            float[] values = config.CaptureDeveloperValues();
+            values[146] = 0f;
+            values[149] = 10f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            start = BoardPoint(bomb);
+            Assert.That(board.TryBeginDragAtWorld(start, 4d), Is.True);
+            Assert.That(board.DragToWorld(start - move, 4.05d), Is.True);
+            Assert.That(Vector2.Distance(BoardPoint(bomb), start - move), Is.LessThan(1e-4f));
+            board.CancelDrag();
+            Assert.That(board.UpsertOrb("heavier", LabOrbKind.Bomb, new Vector2(.7f, .5f), lockSwipes: 2, fuseSeconds: 10f).Body.mass,
+                Is.EqualTo(10f));
+        }
+
+        [UnityTest]
+        public IEnumerator AHeavyBombLeavesTheFingerSlowerAndSlidesToAStopSoonerThanAnOrb()
+        {
+            var orb = board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.2f, .3f));
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.2f, .7f), lockSwipes: 2, fuseSeconds: 10f);
+
+            // The same sideways flick on each: the release is worked out from the finger, not the trailing bomb.
+            Vector2 Flick(LabOrbView view, double at)
+            {
+                Vector2 from = BoardPoint(view);
+                Assert.That(board.TryBeginDragAtWorld(from, at), Is.True);
+                Assert.That(board.DragToWorld(from + new Vector2(.4f, 0f), at + .05d), Is.True);
+                Assert.That(board.EndDragAtWorld(from + new Vector2(.8f, 0f), at + .1d), Is.True);
+                return new Vector2(view.Body.linearVelocity.x, view.Body.linearVelocity.y);
+            }
+            Vector2 orbRelease = Flick(orb, 1d);
+            Vector2 bombRelease = Flick(bomb, 2d);
+            Assert.That(orbRelease.x, Is.GreaterThan(.2f * Width), "The flick sends the orb on.");
+            Assert.That(bombRelease.x, Is.EqualTo(.5f * orbRelease.x).Within(.001f * Width),
+                "A bomb leaves the finger at half an orb's speed, so passing it takes a harder swipe (#212).");
+            Assert.That(Mathf.Abs(bombRelease.y), Is.LessThan(.001f));
+
+            // Then each slides on the floor: the bomb loses speed twice as fast.
+            const float Launch = .6f * Width;
+            orb.Body.linearVelocity = new Vector3(Launch, 0f, 0f);
+            bomb.Body.linearVelocity = new Vector3(Launch, 0f, 0f);
+            for (int i = 0; i < 5; i++) yield return new WaitForFixedUpdate();
+            float orbLoss = Launch - orb.Body.linearVelocity.x;
+            float bombLoss = Launch - bomb.Body.linearVelocity.x;
+            Assert.That(orbLoss, Is.GreaterThan(0f));
+            Assert.That(bomb.Body.linearVelocity.x, Is.GreaterThan(config.DrumDriftSpeed * Width * 1.05f),
+                "Still sliding, not yet drifting.");
+            Assert.That(bombLoss / orbLoss, Is.EqualTo(config.BombSlideDeceleration).Within(.15f));
+        }
+
+        [UnityTest]
         public IEnumerator AMovingBombRollsItsCapAndFuseAroundTheBallIn3D()
         {
             var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
@@ -837,7 +1036,7 @@ namespace C6Lab.Tests
             try
             {
                 board.Configure(config, inputCamera, Bounds);
-                var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), fuseSeconds: 10f);
+                var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 10f);
                 LabOrbItemMarker marker = bomb.ItemMarker;
                 yield return null;
                 Assert.That(Quaternion.Angle(marker.BombTurn, Quaternion.identity), Is.LessThan(.01f), "A still bomb does not roll.");
@@ -875,7 +1074,7 @@ namespace C6Lab.Tests
                 Assert.That(new Vector2(marker.CapDirection.x, marker.CapDirection.y).magnitude, Is.EqualTo(1f).Within(.01f));
                 marker.SetBombTurn(Quaternion.FromToRotation(cap, (cap + Vector3.back).normalized));
                 Assert.That(marker.CapDirection.z, Is.LessThan(0f), "Rolled toward the camera, it stands out over the ball.");
-                Assert.That(marker.BombTimeText, Is.EqualTo("10"), "The red seconds stay upright on the ball.");
+                Assert.That(marker.BombCountText, Is.EqualTo("2"), "The red count stays upright on the ball.");
             }
             finally
             {
@@ -887,39 +1086,29 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator AnExpectedGourdBombWarnsOnItsSpotThenFallsInAndBouncesBeforeItCanBeTouched()
+        public IEnumerator AnExpectedGourdBombFallsInAtOnceWithNoLandingWarningAndBouncesBeforeItCanBeTouched()
         {
             LabOrbAppearance look = LabOrbAppearance.Defaults;
             int landed = 0;
             board.DropLanded += id => { if (id == "gourd") landed++; };
+            int childrenBefore = board.transform.childCount;
             board.ExpectDrop("gourd");
-            var bomb = board.UpsertOrb("gourd", LabOrbKind.Bomb, new Vector2(.5f, .5f), fuseSeconds: 14f);
+            var bomb = board.UpsertOrb("gourd", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 3, fuseSeconds: 14f);
             float radius = bomb.HitSphere.radius;
             Assert.That(board.IsDropping("gourd"), Is.True);
             Assert.That(bomb.IsDropping, Is.True);
-            var warning = board.GetComponentInChildren<LabDropWarning>();
-            Assert.That(warning, Is.Not.Null, "A warning marks where the bomb will land.");
-            Assert.That(warning.Label, Is.EqualTo("!"));
-            Vector3 at = warning.transform.position;
-            Assert.That(new Vector2(at.x, at.y), Is.EqualTo(BoardPoint(bomb)), "Right on the bomb's landing spot.");
-            Assert.That(warning.gameObject.layer, Is.EqualTo(board.gameObject.layer), "It shows on the board camera only.");
-            Assert.That(warning.GetComponentsInChildren<Collider>(), Is.Empty, "The warning never touches physics.");
-            Assert.That(warning.LandsAfter, Is.EqualTo(look.DropWarningSeconds + look.DropFallSeconds).Within(1e-4f));
-            Assert.That(bomb.ArtHidden, Is.True, "The bomb is out of sight while the warning shows.");
+            Assert.That(board.transform.childCount, Is.EqualTo(childrenBefore + 1),
+                "Only the bomb itself appears: no landing warning on the board (#212).");
+            Assert.That(bomb.Visual.gameObject.activeSelf, Is.True, "It is in sight from the start.");
+            Assert.That(bomb.Visual.localPosition.y, Is.GreaterThan(radius), "It starts falling at once, from above its spot.");
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(bomb), 1d), Is.False, "It cannot be grabbed in the air.");
             Assert.That(bomb.Body.isKinematic, Is.True, "It waits on its spot without drifting.");
             Assert.That(bomb.Body.detectCollisions, Is.False, "Nothing bumps into it in the air.");
             Assert.That(board.ShortestFuse(), Is.EqualTo(14f), "Its fuse is already burning.");
 
-            float until = Time.time + look.DropWarningSeconds + look.DropFallSeconds * .5f;
-            while (Time.time < until) yield return null;
-            Assert.That(bomb.ArtHidden, Is.False, "After the warning it falls into view.");
-            Assert.That(bomb.Visual.localPosition.y, Is.GreaterThan(radius), "From above its spot.");
-            Assert.That(warning.RingDiameter, Is.LessThan(6f * radius), "The ring closes in as it falls.");
-
             bool touchedDown = false;
             float highestHop = 0f;
-            until = Time.time + look.DropSeconds + 1f;
+            float until = Time.time + look.DropSeconds + 1f;
             while (landed == 0 && Time.time < until)
             {
                 yield return null;
@@ -935,11 +1124,9 @@ namespace C6Lab.Tests
             Assert.That(bomb.Body.detectCollisions, Is.True);
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(bomb), 5d), Is.True, "Once landed it is an ordinary bomb.");
             board.CancelDrag();
-            Assert.That(board.GetComponentInChildren<LabDropWarning>() == null, Is.True, "The warning clears itself.");
 
-            var plain = board.UpsertOrb("plain", LabOrbKind.Bomb, new Vector2(.2f, .3f), fuseSeconds: 14f);
+            var plain = board.UpsertOrb("plain", LabOrbKind.Bomb, new Vector2(.2f, .3f), lockSwipes: 2, fuseSeconds: 14f);
             Assert.That(plain.IsDropping, Is.False, "Only a bomb the gourd announced drops in.");
-            Assert.That(board.GetComponentInChildren<LabDropWarning>() == null, Is.True);
         }
 
         [UnityTest]

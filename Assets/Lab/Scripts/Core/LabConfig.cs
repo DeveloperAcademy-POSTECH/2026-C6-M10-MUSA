@@ -231,7 +231,11 @@ namespace C6Lab
             LabDeveloperField.Toggle("Player Paint Patterns (0 off, 1 on)"),
             new LabDeveloperField("Paint Cluster Compactness", 0f, 1f),
             new LabDeveloperField("Paint Cluster Irregularity", 0f, 1f),
-            new LabDeveloperField("Gourd Visual Size (x)", .5f, 3f)
+            new LabDeveloperField("Gourd Visual Size (x)", .5f, 3f),
+            new LabDeveloperField("Bomb Drag Lag (seconds, 0 = sticks to finger)", 0f, 1f),
+            new LabDeveloperField("Bomb Release Speed (x orb)", .05f, 1f),
+            new LabDeveloperField("Bomb Slide Deceleration (x orb)", 1f, 5f),
+            new LabDeveloperField("Bomb Mass (x orb)", 1f, 20f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -247,7 +251,7 @@ namespace C6Lab
             new LabDeveloperCategory("Battle", 0, 1, 2, 48),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
             new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44),
-            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 146, 147, 148, 149),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
@@ -307,6 +311,14 @@ namespace C6Lab
         [SerializeField, Range(0f, 2f)] private float bombBlastRadius = .4f;
         [Tooltip("폭탄 바로 옆 구슬이 밀려나는 속도 (보드 너비/초). 범위 끝으로 갈수록 약해진다.")]
         [SerializeField, Range(0f, 20f)] private float bombBlastStrength = 9f;
+        [Tooltip("무거운 폭탄 (#212): 끄는 폭탄이 손가락을 따라오는 데 걸리는 시간 (초). 0이면 구슬처럼 손가락에 붙는다.")]
+        [SerializeField, Range(0f, 1f)] private float bombDragLag = .12f;
+        [Tooltip("무거운 폭탄: 놓을 때 튕겨 나가는 속도 배율 (구슬 = 1). 작을수록 세게 그어야 옆으로 넘어간다. 던지기에는 쓰지 않는다.")]
+        [SerializeField, Range(.05f, 1f)] private float bombReleaseSpeed = .5f;
+        [Tooltip("무거운 폭탄: 미끄러질 때 감속 배율 (구슬 = 1). 클수록 빨리 멈춘다.")]
+        [SerializeField, Range(1f, 5f)] private float bombSlideDeceleration = 2f;
+        [Tooltip("무거운 폭탄: 질량 배율 (구슬 = 1). 클수록 구슬과 부딪혀도 덜 밀린다.")]
+        [SerializeField, Range(1f, 20f)] private float bombMass = 4f;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -583,6 +595,10 @@ namespace C6Lab
         public float BombMultiplier => Mathf.Clamp(Finite(bombMultiplier, 3f), 1f, 20f);
         public float BombBlastRadius => Mathf.Clamp(Finite(bombBlastRadius, .4f), 0f, 2f);
         public float BombBlastStrength => Mathf.Clamp(Finite(bombBlastStrength, 9f), 0f, 20f);
+        public float BombDragLag => Mathf.Clamp(Finite(bombDragLag, .12f), 0f, 1f);
+        public float BombReleaseSpeed => Mathf.Clamp(Finite(bombReleaseSpeed, .5f), .05f, 1f);
+        public float BombSlideDeceleration => Mathf.Clamp(Finite(bombSlideDeceleration, 2f), 1f, 5f);
+        public float BombMass => Mathf.Clamp(Finite(bombMass, 4f), 1f, 20f);
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
         public float OrbStopSpeed => Mathf.Clamp(Finite(orbStopSpeed, .065f), 0f, OrbMaxReleaseSpeed);
@@ -816,7 +832,8 @@ namespace C6Lab
                 PaintDripWidthDegrees, PaintDripLengthDegrees, PaintGravityWeight, (float)PaintPattern,
                 (float)ChuimsaeChancePercent, (float)ChuimsaeMinGap,
                 PlayerPaintPatternsEnabled ? 1f : 0f,
-                PaintClusterCompactness, PaintClusterIrregularity, GourdVisualSize
+                PaintClusterCompactness, PaintClusterIrregularity, GourdVisualSize,
+                BombDragLag, BombReleaseSpeed, BombSlideDeceleration, BombMass
             };
         }
 
@@ -1006,6 +1023,10 @@ namespace C6Lab
             paintClusterCompactness = values[143];
             paintClusterIrregularity = values[144];
             gourdVisualSize = values[145];
+            bombDragLag = values[146];
+            bombReleaseSpeed = values[147];
+            bombSlideDeceleration = values[148];
+            bombMass = values[149];
             error = string.Empty;
             return true;
         }

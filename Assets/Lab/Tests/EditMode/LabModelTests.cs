@@ -590,7 +590,7 @@ namespace C6Lab.Tests
                 LabOrbState drum = room.Snapshot(0d).drums.Single(candidate => candidate.owner == 10);
 
                 Assert.That(room.TryGenerate(20, "fill", 0d, out var bomb, out var reason), Is.True, reason);
-                Assert.That(bomb.lockSwipes, Is.Zero, "A bomb has no lock; its fuse alone decides when it blasts.");
+                Assert.That(bomb.lockSwipes, Is.InRange(2, 4), "A bomb is locked, so its fuse blasts it.");
                 Assert.That(room.TryGenerate(20, "over", 0d, out _, out reason), Is.False);
                 Assert.That(reason, Is.EqualTo("STORAGE_FULL"), "Player 20's board is full of orbs.");
                 Assert.That(room.TryGenerate(10, "beside-drum", 0d, out _, out reason), Is.True,
@@ -711,8 +711,8 @@ namespace C6Lab.Tests
                         Assert.That(room.TryGenerate(player, "draw-" + player + "-" + i, 0d, out var orb, out var reason),
                             Is.True, reason);
                         counts[orb.kind] = counts.TryGetValue(orb.kind, out int count) ? count + 1 : 1;
-                        if (orb.kind.IsItem() && orb.kind != LabOrbKind.Bomb) lockCounts.Add(orb.lockSwipes);
-                        else Assert.That(orb.lockSwipes, Is.Zero, "Only items other than the bomb are locked.");
+                        if (orb.kind.IsItem()) lockCounts.Add(orb.lockSwipes);
+                        else Assert.That(orb.lockSwipes, Is.Zero, "Only items are locked.");
                     }
 
                 // 300 draws at 40/40/5/5/5/5 percent: expected 120 each polarity and 15 each item.
@@ -1110,45 +1110,71 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ABombHasNoLockItsFuseBurnsOnHoweverOftenItIsPassedAndItIsNeverThrown()
+        public void ALockedBombBlastsAtItsFuseButHandoffsDefuseItIntoAnAttackOrb()
         {
             var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
             try
             {
                 var room = new LabModel();
-                room.Begin("bomb-fuse", new ulong[] { 10, 20, 30 }, 0d, bombs);
+                room.Begin("bomb-defuse", new ulong[] { 10, 20, 30 }, 0d, bombs);
                 Assert.That(room.TryGenerate(10, "bomb", 0d, out var bomb, out _), Is.True);
-                Assert.That(bomb.lockSwipes, Is.Zero, "A bomb has no swipes to unlock.");
-                Assert.That(room.TryLaunch(10, bomb.id, "throw-new", .1d, out _, out var reason), Is.False);
-                Assert.That(reason, Is.EqualTo("RAW_CANNOT_ATTACK"), "It cannot be thrown at the target.");
+                int locks = bomb.lockSwipes;
+                Assert.That(locks, Is.InRange(2, 4), "A bomb comes locked again (#212).");
+                Assert.That(room.TryLaunch(10, bomb.id, "throw-locked", .1d, out _, out var reason), Is.False);
+                Assert.That(reason, Is.EqualTo("RAW_CANNOT_ATTACK"), "A locked bomb can only be passed on.");
 
                 ulong[] ring = { 10, 20, 30 };
-                LabOrbState passed = null;
-                for (int pass = 1; pass <= 5; pass++)
+                LabOrbState unlocked = null;
+                for (int pass = 1; pass <= locks; pass++)
                 {
-                    passed = PassRight(room, bomb.id, ring[(pass - 1) % ring.Length], pass);
-                    Assert.That(passed.lockSwipes, Is.Zero);
-                    Assert.That(passed.unlockedAt, Is.EqualTo(-1d), "Passing never plays an unlock.");
-                    Assert.That(passed.createdAt, Is.Zero, "Passing never resets the fuse.");
+                    unlocked = PassRight(room, bomb.id, ring[(pass - 1) % ring.Length], pass);
+                    if (pass < locks) Assert.That(unlocked.createdAt, Is.Zero, "Passing a locked bomb never resets its fuse.");
                 }
-                ulong holder = passed.owner;
-                Assert.That(room.TryLaunch(holder, bomb.id, "throw-passed", 6d, out _, out reason), Is.False,
-                    "However often it is passed, it never opens up for throwing.");
-                Assert.That(room.Snapshot(14.9d).orbs.Select(orb => orb.id), Does.Contain(bomb.id));
-                Assert.That(room.Snapshot(15d).orbs.Select(orb => orb.id), Does.Not.Contain(bomb.id));
-                LabBombBlast[] blasts = room.DrainBombExplosions();
-                Assert.That(blasts.Length, Is.EqualTo(1), "It blasts when the item lifetime (its fuse) runs out.");
-                Assert.That(blasts[0].Owner, Is.EqualTo(holder), "On the board of whoever holds it then.");
+                Assert.That(unlocked.lockSwipes, Is.Zero);
+                Assert.That(unlocked.unlockedAt, Is.EqualTo((double)locks), "The unlocking handoff plays the unlock effect.");
+                Assert.That(unlocked.createdAt, Is.EqualTo((double)locks), "Unlocking cuts the fuse and starts a fresh lifetime.");
 
-                // The DEV unlock swipes still lock the other items, never the bomb.
+                ulong holder = unlocked.owner;
+                Assert.That(room.TryGenerate(holder, "bystander", locks + 1d, out var bystander, out _), Is.True);
+                Assert.That(room.Snapshot(locks + 7.9d).orbs.Select(orb => orb.id), Does.Contain(bomb.id),
+                    "Past its old fuse and still there.");
+                var after = room.Snapshot(locks + 8d);
+                Assert.That(after.orbs.Select(orb => orb.id), Does.Not.Contain(bomb.id),
+                    "An unlocked bomb keeps the 8-second orb lifetime, not the 15-second fuse.");
+                Assert.That(after.orbs.Select(orb => orb.id), Does.Contain(bystander.id));
+                Assert.That(room.DrainBombExplosions(), Is.Empty, "A defused bomb never blasts.");
+
+                // One that is never unlocked blasts on its holder's board at the end of its fuse.
+                Assert.That(room.TryGenerate(holder, "fused", 20d, out var fused, out _), Is.True);
+                Assert.That(room.Snapshot(34.9d).orbs.Select(orb => orb.id), Does.Contain(fused.id));
+                Assert.That(room.Snapshot(35d).orbs.Select(orb => orb.id), Does.Not.Contain(fused.id));
+                Assert.That(room.DrainBombExplosions().Select(blast => blast.BombId), Does.Contain(fused.id));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(bombs); }
+        }
+
+        [Test]
+        public void AnUnlockedBombHitsForTripleDamageAndAMissNeverExplodes()
+        {
+            var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
+            try
+            {
                 float[] values = bombs.CaptureDeveloperValues();
-                values[46] = 3f; // unlock swipes min
-                values[47] = 3f; // unlock swipes max
+                values[46] = 0f; // unlock swipes min
+                values[47] = 0f; // unlock swipes max
                 Assert.That(bombs.TryApplyDeveloperValues(values, out string error), Is.True, error);
-                var locked = new LabModel();
-                locked.Begin("bomb-swipes", new ulong[] { 10, 20, 30 }, 0d, bombs);
-                Assert.That(locked.TryGenerate(10, "bomb", 0d, out var stillOpen, out _), Is.True);
-                Assert.That(stillOpen.lockSwipes, Is.Zero);
+                var room = new LabModel();
+                room.Begin("bomb-throw", new ulong[] { 10, 20, 30 }, 0d, bombs);
+
+                Assert.That(room.TryGenerate(10, "hit", 0d, out var hitBomb, out _), Is.True);
+                Assert.That(hitBomb.lockSwipes, Is.Zero, "With no swipes set it comes open.");
+                Assert.That(ThrowAndHit(room, hitBomb.id, 10, .1d), Is.EqualTo(60), "Three times the base damage of 20.");
+
+                Assert.That(room.TryGenerate(10, "miss", .2d, out var missBomb, out _), Is.True);
+                Assert.That(room.TryLaunch(10, missBomb.id, "throw-miss", .3d, out _, out _), Is.True);
+                Assert.That(room.ConfirmMiss(missBomb.id, .4d), Is.True);
+                Assert.That(room.Snapshot(20d).orbs, Is.Empty);
+                Assert.That(room.DrainBombExplosions(), Is.Empty, "A thrown bomb never explodes on a board.");
             }
             finally { UnityEngine.Object.DestroyImmediate(bombs); }
         }
@@ -1325,9 +1351,8 @@ namespace C6Lab.Tests
                 p => p.relayUsed, 1);
             Check(new[] { 0, 0, 0, 100, 0, 0 }, (room, id) => room.TryUseItem(10, id, "box", .5d, out _, out _),
                 p => p.secretBoxUsed, 1);
-            // A bomb cannot be thrown, so the refused throw is not counted.
             Check(new[] { 0, 0, 0, 0, 0, 100 }, (room, id) => room.TryLaunch(10, id, "bomb", .5d, out _, out _),
-                p => p.bombUsed, 0);
+                p => p.bombUsed, 1);
             // A potion at full HP is refused and kept, so it is not counted.
             Check(new[] { 0, 0, 0, 0, 100, 0 }, (room, id) => room.TryUseItem(10, id, "potion", .5d, out _, out _),
                 p => p.potionUsed, 0);
@@ -1975,7 +2000,7 @@ namespace C6Lab.Tests
                         Assert.That(bomb.kind, Is.EqualTo(LabOrbKind.Bomb));
                         Assert.That(bomb.owner, Is.EqualTo(drop.Target));
                         Assert.That(bomb.origin, Is.EqualTo(LabOrbOrigin.Gourd));
-                        Assert.That(bomb.lockSwipes, Is.Zero, "A gourd bomb has no lock, only its fuse.");
+                        Assert.That(bomb.lockSwipes, Is.InRange(2, 4), "A gourd bomb keeps the item unlock rule.");
                         Assert.That(bomb.inFlight, Is.False);
                         Assert.That(new Vector2(bomb.x, bomb.y), Is.EqualTo(drop.Position));
                         dropTimes.Add(bomb.createdAt);

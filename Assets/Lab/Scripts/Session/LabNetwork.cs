@@ -174,7 +174,8 @@ namespace C6Lab
         // 5639: #206 Host-shared player paint pattern presentation toggle (one appended value).
         // 5640: #208 Host-shared clustered repeat growth tuning (two appended values).
         // 5641: shared gourd visual size appended at index 145.
-        internal const ushort LabProtocolVersion = 5641;
+        // 5642: #212 bombs come locked again (an unlocked bomb is a throwable attack orb); heavy bomb DEV 146-149.
+        internal const ushort LabProtocolVersion = 5642;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");
@@ -1728,8 +1729,8 @@ namespace C6Lab
                 current.Add(orb.id);
                 bool showSpawn = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
                     && orb.kind != LabOrbKind.Combined;
-                // Every screen derives a bomb's fuse from the shared Host clock in the snapshot.
-                float fuse = orb.kind == LabOrbKind.Bomb && config != null
+                // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
+                float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
                 board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
