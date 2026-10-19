@@ -1136,7 +1136,7 @@ PR #216의 첫 병합 시도 직전 #214가 main `929d9244`에 들어와 실제 
 
 ## #225 — 근처 재타격 보호와 점진적 페인트 건조 — 2026-10-19
 
-아래는 기본 OFF였던 최초 검증 기록이며, 현재 게임 기본 ON은 뒤의 후속 기록을 따른다.
+아래는 기본 OFF·157개/5644였던 최초 검증 기록이다. 기본 ON·#224 통합 이후의 현재 결과는 문서 끝의 후속 기록을 따른다.
 
 기준 `origin/main` **52ca3861**(#223 폭발 패널티 포함), 브랜치 `feat/#225-nearby-hit-paint-drying`. Unity **6000.6.5f1 / URP17.6.0 / macOS ARM64**. 기본 OFF·유예5초·전체 표면0.2%p/초·인접20°이며 DEV 뒤에4개를 추가해 **157개·프로토콜5644**로 공유한다. 과거 검증과 이 변경의 실제 실행 결과를 구분한다.
 
@@ -1159,6 +1159,38 @@ Host의 실제 유효 명중점 주변만 유지 시간을 갱신하고, 빈 표
 
 독립 소스 검토에서 실제 명중점·고정 tick·공급 단일 귀속·군집 Rebase·성장 순서·DEV 권한/설정 공유에 명확한 차단 결함을 찾지 못했다. 검사 시작 후 소스·설정·Scene/Prefab 해시가 바뀌지 않았는지 대조했다. 사용자 작업 폴더의 Scene·Target2 머터리얼2개·미추적 Scenes.meta는 별도 보존한다. 검사용 복사본에서 생긴 Target2 float 재직렬화2건은 제외하며 원시 로그/XML·빌드·임시 도구·기기 정보는 공개 Git에 넣지 않는다. 기존 좌표 정합성 확인 항목 #218과 위 기존 축소 투척 실패를 이번 기능의 해결 사항으로 표시하지 않는다.
 
+## 박의 넘기기 막기 — 2026-10-19, 이슈 #215
+
+아래는 PR #224 원래 작성 당시 기록이다. 153~155번/156개·5644는 당시 값이며, 건조 통합 이후에는 막기157~159번/160개·5645를 사용한다. 최종 실행 결과는 문서 끝의 후속 기록을 따른다.
+
+기준은 Unity **6000.6.5f1**, main(`52ca3861`, #213 PR #223 포함)에서 다시 맞춘 `feat/#215-swipe-block-sabotage`다(이슈 생성 때 만든 #208 시점 브랜치를 커밋 없이 최신 main으로 재설정). PR 직전 원격 main도 `52ca3861`로 같았다.
+
+- **일정**: Host가 라운드 시작부터 `Swipe Block Interval`(40초)마다 seed로 대상·방향을 뽑아 `Swipe Block Seconds`(10초) 동안 막는다. 박 폭탄이 떨어졌거나 떨어질 시각과 `Swipe Block Bomb Gap`(4초) 안이면 그 폭탄 뒤로 미룬다. 한 번에 하나만 걸린다.
+- **막기**: Host가 그 사람의 그 방향 "스와이프" 넘김을 `SWIPE_BLOCKED`로 거절한다. 폭발에 밀린 구슬도 이제 "폭발"로 넘겨(멈추거나 잡으면 해제) 막히지 않고, 통과 북·들어오는 넘김·반대쪽도 열려 있다. 막힌 판은 그 가장자리를 벽처럼 튕긴다.
+- **표시(막힌 사람만)**: 박 옆 "← 🚫 / → 🚫" 말풍선 약 2초(그림으로 그림), 막힌 가장자리의 시작 번쩍임 3번 → 연한 빨간빛 유지, 세로 가운데 남은 초.
+- **그리기 순서 수정**: 판의 종이 배경(`OrbBoardPlate`, `Sprites/Default` 셰이더, 정렬 순서 0)이 투명 그리기 순서에서 빨간 빛(-20)을 덮어 화면에 숫자만 보였다(사용자 화면 확인으로 발견). 배경 정렬 순서를 실행 시 -100으로 두어 항상 가장 먼저 그린다. #212의 해금 폭탄 무지개 테두리(-1)도 같은 원인으로 가려졌을 수 있으며 이 수정으로 함께 보이게 되지만 화면 확인은 하지 않았다.
+- **설정·통신**: DEV 154~156번째(인덱스 153~155, Gourd 묶음의 박 폭탄 간격 뒤) 추가, 설정 153 → 156개. 스냅샷에 막기 상태 4개를 더하고 폭발에 밀린 구슬의 넘김 이유가 바뀌어 통신 버전 `5643` → `5644`.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다 컴파일했다. 오류 0. |
+| 말풍선 모양 미리보기 | 확인 (Unity 밖) | C#과 같은 도형으로 Python 렌더링한 미리보기로 모양을 정했다. 실제 Unity 화면이 아니다. |
+| EditMode 중간 실행 | FAIL → 수정 | `TheGourdBlocksOnePlayersOwnPassesOneWayForTheBlockSeconds`가 `INVALID_TIME`으로 실패했다: 검사가 41초에 넘긴 뒤 40.1초에 구슬을 만들어 Host 시계가 거꾸로 갔다. 구슬을 모두 먼저 만들도록 검사를 고쳤다. 수정 뒤 재실행 결과는 기록하지 않았다. |
+| EditMode·PlayMode 최종 실행 | NOT_RUN | 최종 커밋 기준 Test Runner 결과는 기록하지 않았다. |
+| 솔로 화면: 빨간 가장자리 | FAIL → 수정, 재확인 NOT_RUN | 남은 초만 보이고 빨간 빛이 안 보였다(종이 배경이 덮음). 정렬 순서 수정 뒤 화면 재확인은 기록하지 않았다. |
+| 3인 실행: 막힌 사람에게만 표시, 들어오는 넘김·폭발 허용, 40초·10초 체감 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 손가락 스와이프로 튕김 체감과 번쩍임이 너무 세지 않은지 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `TheGourdBlocksOnePlayersOwnPassesOneWayForTheBlockSeconds`, `SwipeBlocksFallOnEveryPlayerBothWaysAndAreTheSameOnEveryScreen`, `ASwipeBlockKeepsItsGapFromTheGourdsBombsAndIntervalZeroTurnsItOff`; 공용 설정(`ConfigWith`)은 막기를 끄고 막기 검사만 켠다
+- **EditMode** `LabDeveloperConfigTests`: `SwipeBlockFieldsJoinTheGourdGroupBesideItsBombIntervalsAndApply`; Gourd 묶음 배열 2곳 갱신; #213 폭발 패널티 검사를 150~152번 3개만 읽도록 수정; DEV 개수·프로토콜을 고정한 팀원 검사들을 156개·5644로 갱신
+- **EditMode** `LabSessionSettingsTests`: 스냅샷 JSON 왕복에 막기 상태 4개 추가
+- **PlayMode** `LabOrbPhysicsTests`: `ABlockedEdgeBouncesTheBoardsOwnPassesButLetsAPushOrAPassingDrumThrough`, `ABlockedEdgeGlowsRedAndCountsItsSecondsDownInItsMiddle`(시작 번쩍임 포함), `AnOrbABlastFlungIsOrdinaryAgainOnceItStopsOrIsGrabbed`; 변경 `AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour`(폭발에 밀린 구슬은 "폭발")
+- **PlayMode** `LabGourdAlertTests`: `TheBlockBubbleShowsTheBlockedWayInsteadOfTheExclamationAndStaysLonger`
+- **PlayMode** `LabDeveloperSoloIntegrationTests`: `SavedSceneSoloSwipeBlockBouncesAndShowsOnTheBlockedPlayersOwnScreen`(저장 Scene 솔로에서 막기·가장자리·말풍선·한 번 알림·종이 배경 정렬 순서)
+
+
+
 
 ## #225 기본 ON 단독 후속 확인 — 2026-10-19
 
@@ -1168,3 +1200,23 @@ Host의 실제 유효 명중점 주변만 유지 시간을 갱신하고, 빈 표
 - 건조 PlayMode **4/4**, failed/skipped0, 2026-10-19 12:09:18Z~2026-10-19 12:09:22Z, 4.207초 (`playmode225-only-on.xml`). 초기 ON→임시 OFF의 accepted config 불변/수치 잠금→ON 값 적용→실제 OFF 재시작→미적용 DEFAULTS ON, 실제 박/HUD 삭제 일치와 관람 동결을 확인한다.
 - 기존 축소 구슬 도색 비율은60초에 모두 건조된 뒤 비교하지 않고, 유예 안인16.7초의 성장 소진과 실제 면적을 비교하도록 검사한다. 게임의 건조 규칙은 끄지 않는다.
 - 독립 코어 `new LabPaintGrowthSettings()`의 opt-in OFF는 실제 게임 Config 기본 ON과 별개다. 전체 PlayMode의 기존 축소 투사체 실패 및 미실행 실기기 범위는 앞의 기록에 남긴다. #224와 함께 통합한160개/5645의 실제 결과는 후속 통합 절에서 따로 기록한다.
+
+
+## #225 기본 ON · #224 방해공작 통합 후속 검증 — 2026-10-19
+
+기준은 건조 `42c3cbd4`와 PR #224 `69135a3e`의 통합 소스다. Unity **6000.6.5f1 / URP17.6.0 / macOS ARM64**. 게임 `LabConfig`·저장 원본·DEV DEFAULTS의 Paint Drying은 **ON**, 유예5초·0.2%p/초·반경20°를 유지한다. 독립 코어 fixture용 `new LabPaintGrowthSettings()`의 opt-in OFF와 게임 기본값을 구별한다. 건조153~156을 유지하고 막기를157~159에 붙여 **총160개·프로토콜5645**로 구분한다. 양쪽 원래 브랜치의5644는 서로 다른 스키마였으므로 재사용하지 않는다.
+
+유지한 PR #224 기능은 일정/seed 추첨·폭탄 간격·Host 거절·폭발 예외·실제 통과 북·막힌 화면 경계/남은 초/말풍선·판 정렬순서다. 통합 리뷰에서 보드 Clear의 즉시 해제, 라운드 전체 폭탄 이력의 시간 따라잡기 일치, 일반 구슬/정지 북의 `Passing` 우회 거절을 보완했다. 새 EditMode2건·PlayMode1건을 더했다. 이전 문서의 미실행·중간 실패를 이번 결과로 소급해 지우지 않는다.
+
+| 검사 | 결과 | 실제 근거·범위 |
+| --- | --- | --- |
+| Unity API 기본 ON 저장 | PASS | 임시 `Issue225DefaultsOn.Save`가 SerializedObject/AssetDatabase로 저장. `C6_DEFAULT_DRYING_ON_OK count=160 existing153Unchanged=true otherValuesUnchanged=true`. 건조 토글 외 유효 캡처값은 그대로이며 새 막기3값도 명시 직렬화. 작성기/meta는 실행 검사 전에 제거. |
+| 전체 EditMode | PASS | `editmode-integrated.xml`: **758/758**, failed/skipped0, 11:58:06~11:58:31 UTC, 24.914초. 기존 도색/건조 검사와 막기 일정·25개 폭탄 catch-up·일반 Raw/정지 북 Passing 거절·실제 통과 북 허용을 포함. |
+| 전체 PlayMode | **FAIL,196/197** | `playmode-integrated.xml`: skipped0, 12:04:51~12:06:30 UTC, 99.085초. 저장 DEV 기본 ON/임시 OFF 격리/실제 OFF 재시작/DEFAULTS ON, 건조4건과 저장 Scene 막기·표시·물리·로비 Clear 회귀를 포함한196건 통과. 아래 기존 투척 검사1건은 미해결. |
+| 기존 투척 실패 | FAIL, 기존 기준에서도 재현 | `LabThrowTests.AProjectileFromABlastShrunkOrbIsSmallerAndMissesWhereAWholeOneGrazes`: smallHit=False 기대에True. 앞 #225 기록의 깨끗한 main52ca3861 단독 재현과 같은 실패다. 검사 제외나 투척/충돌 코드 수정으로 숨기지 않았다. 원인 자체는 확정하지 않았다. |
+| 일반 Mac Development 빌드 | PASS(빌드만) | 기존 LabBuild.Mac 종료0·C6_LAB_BUILD_OK, BuildReport **203,197,170바이트**. 임시 작성기와 검사 어셈블리를 넣은 별도 앱이 아니며 수동 앱 플레이는 미실행. |
+| 범위 경계 | NOT_RUN | 독립 Mac 다중 앱·실기기·iOS·핫스팟·모바일 성능은 이번 통합에서 실행하지 않았다. 저장 Scene·통제 Host 시계·GPU/물리 fixture를 실환경 성공으로 승계하지 않는다. |
+
+기본 ON 전환 직후 EditMode757/758의 기존 축소 구슬 도색 비교는 명중 후60초에 측정해 두 얼룩이 실제로 모두 건조돼0이 된 경우였다. 생산 규칙을 끄는 대신 유예 안인16.7초에 성장 소진(남는 것은1셀 미만 소수 예산)과 전체/축소 면적 비율을 비교하도록 수정했다. 첫 합본 PlayMode195/197 중 새 폭발 후 전달 검사는 누락된 ID를 참조했다. 수정 후 실제 폭발 이동·정지, 재잡기 전 정지 경로와 별도 잡기 경로의 면제 해제, 실제 물리 충격 뒤 두 ID의 Swipe 전달을 각각 요구한다. 단독 **1/1**과 위 전체 실행에서 통과했다. 최초 실패의 근본 원인을 확정했다고 기록하지 않는다.
+
+EditMode 통과 이후 최종 PlayMode까지 Runtime 핵심 파일·저장 Config SHA256이 같음을 대조했다. 사용자 폴더의 Scene·Target2 머터리얼2개·미추적 Scenes.meta는 별도 보존하고 검사 사본을 사용했다. 원시 로그/XML·임시 작성기·빌드·개인 경로는 공개 Git에서 제외한다.

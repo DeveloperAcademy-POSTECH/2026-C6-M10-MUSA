@@ -172,7 +172,8 @@ namespace C6Lab.Tests
                 targetYawDegrees = 475.25f, targetYawSpeedDegreesPerSecond = -320.5f,
                 players = players, orbs = orbs,
                 drums = new[] { new LabOrbState { id = "drum", owner = 3ul, kind = LabOrbKind.Drum, x = .5f, y = .5f,
-                    arrival = LabDrumArrival.Stop, stopAt = .37f, arrivedAt = 12345.5d } } };
+                    arrival = LabDrumArrival.Stop, stopAt = .37f, arrivedAt = 12345.5d } },
+                swipeBlockedPlayer = 4ul, swipeBlockedRight = true, swipeBlockStartedAt = 12340d, swipeBlockedUntil = 12350d };
             string[] chunks = LabSessionSettings.ChunkSnapshot(snapshot);
             Assert.That(chunks.Length, Is.GreaterThan(1));
             foreach (string chunk in chunks)
@@ -201,6 +202,10 @@ namespace C6Lab.Tests
             Assert.That(restored.drums.Single().stopAt, Is.EqualTo(.37f));
             Assert.That(restored.drums.Single().arrivedAt, Is.EqualTo(12345.5d));
             Assert.That(restored.orbs[0].arrival, Is.EqualTo(LabDrumArrival.None));
+            Assert.That(restored.swipeBlockedPlayer, Is.EqualTo(4ul), "The gourd's swipe block reaches every screen (#215).");
+            Assert.That(restored.swipeBlockedRight, Is.True);
+            Assert.That(restored.swipeBlockStartedAt, Is.EqualTo(12340d));
+            Assert.That(restored.swipeBlockedUntil, Is.EqualTo(12350d));
             Assert.That(restored.targetYawDegrees, Is.EqualTo(475.25f));
             Assert.That(restored.targetYawSpeedDegreesPerSecond, Is.EqualTo(-320.5f));
         }

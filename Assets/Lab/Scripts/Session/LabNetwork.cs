@@ -179,8 +179,10 @@ namespace C6Lab
         // 5640: #208 Host-shared clustered repeat growth tuning (two appended values).
         // 5641: shared gourd visual size appended at index 145.
         // 5642: #212 bombs come locked again (an unlocked bomb is a throwable attack orb); heavy bomb DEV 146-149.
-        // 5644: #225 nearby-hit paint drying adds shared DEV 153-156; prior blast fields stay at 150-152.
-        internal const ushort LabProtocolVersion = 5644;
+        // 5643: #213 blast-burnt, shrunk orbs (orb burnedAt/small, blastHit report); DEV 150-152.
+        // 5644: #225 nearby-hit paint drying adds shared DEV 153-156.
+        // 5645: #215 swipe-block snapshots and pushed crossings integrate at DEV 157-159; 160 shared values.
+        internal const ushort LabProtocolVersion = 5645;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");
@@ -294,6 +296,15 @@ namespace C6Lab
         public float LastLocalHitOffset { get; private set; }
         /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
         public event Action<string, Vector2> BombBlasted;
+        /// <summary>
+        /// The gourd just blocked this player's own passes one way (#215): to the right or not, and the
+        /// seconds it lasts. Raised once per block, on the blocked player's screen only.
+        /// </summary>
+        public event Action<bool, float> SwipeBlockStarted;
+        /// <summary>A block first seen later than this after it began (a reconnect) is not announced again.</summary>
+        private const double SwipeBlockAnnounceWindowSeconds = 1d;
+        private uint announcedBlockRound;
+        private double announcedBlockStart = -1d;
         /// <summary>박이 누군가의 판에 폭탄을 떨어뜨렸을 때 모든 기기에서 한 번 알린다. (받는 사람, 폭탄 ID, 떨어질 위치 0..1)</summary>
         public event Action<ulong, string, Vector2> GourdBombDropped;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
@@ -1791,6 +1802,17 @@ namespace C6Lab
             visibleOrbIds.Clear();
             foreach (string id in current) visibleOrbIds.Add(id);
             board.SetInteractionEnabled(latest.phase == LabPhase.Playing && !latest.paused);
+            // The gourd's swipe block (#215) shows and bounces only on the blocked player's own board.
+            bool blockedHere = latest.SwipeBlockOn(LocalPlayerId);
+            board.SetSwipeBlock(blockedHere ? (latest.swipeBlockedRight ? 1 : -1) : 0,
+                blockedHere ? (float)(latest.swipeBlockedUntil - latest.serverTime) : 0f);
+            if (blockedHere && (latest.round != announcedBlockRound || latest.swipeBlockStartedAt != announcedBlockStart))
+            {
+                announcedBlockRound = latest.round;
+                announcedBlockStart = latest.swipeBlockStartedAt;
+                if (latest.serverTime - latest.swipeBlockStartedAt <= SwipeBlockAnnounceWindowSeconds)
+                    SwipeBlockStarted?.Invoke(latest.swipeBlockedRight, (float)(latest.swipeBlockedUntil - latest.serverTime));
+            }
         }
 
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)

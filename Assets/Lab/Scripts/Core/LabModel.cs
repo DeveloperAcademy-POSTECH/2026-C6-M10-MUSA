@@ -61,6 +61,10 @@ namespace C6Lab
         private const uint GourdDelaySalt = 0x60BDDE1Au;
         private const uint GourdTargetSalt = 0x60BD7A26u;
         private const uint GourdLandingSalt = 0x60BD1A4Du;
+        private const uint SwipeBlockTargetSalt = 0x5B10C7A6u;
+        private const uint SwipeBlockSideSalt = 0x5B105D1Eu;
+        // 박의 넘기기 막기 뽑기도 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (#215).
+        private const ulong SwipeBlockDrawKey = ulong.MaxValue - 3UL;
         private const uint DrumZoneSalt = 0xD2017E5Au;
         private const uint DrumSpotSalt = 0xD2051075u;
         // 북 전달 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다.
@@ -83,6 +87,13 @@ namespace C6Lab
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
+        /// <summary>Bomb times for this round, retained so a late frame schedules the same swipe blocks as small steps (#215).</summary>
+        private readonly List<double> gourdBombTimes = new List<double>();
+        private double nextSwipeBlockAt;
+        private uint swipeBlockCount;
+        private ulong swipeBlockedPlayer;
+        private bool swipeBlockedRight;
+        private double swipeBlockStartedAt = -1d, swipeBlockedUntil = -1d;
         /// <summary>Blasts sent to their holders and not yet reported back, by bomb ID, with their Host time (#213).</summary>
         private readonly Dictionary<string, KeyValuePair<ulong, double>> unreportedBlasts =
             new Dictionary<string, KeyValuePair<ulong, double>>();
@@ -155,6 +166,7 @@ namespace C6Lab
             players.Clear(); orbs.Clear(); drums.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
             unreportedBlasts.Clear();
             gourdBombs.Clear();
+            gourdBombTimes.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState
@@ -172,6 +184,11 @@ namespace C6Lab
             gourdBombCount = 0;
             drumHandoffCount = 0;
             nextGourdBombAt = now + GourdBombDelay(0u);
+            swipeBlockCount = 0;
+            swipeBlockedPlayer = 0;
+            swipeBlockedRight = false;
+            swipeBlockStartedAt = swipeBlockedUntil = -1d;
+            nextSwipeBlockAt = rules.SwipeBlockInterval > 0f ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
             lastTime = now;
             deadline = nextDeadline;
             remaining = rules.BattleDurationSeconds;
@@ -314,6 +331,12 @@ namespace C6Lab
             if (right ? current.x < 1f - EdgeTolerance || normalizedVelocity.x <= 0f
                 : current.x > EdgeTolerance || normalizedVelocity.x >= 0f)
                 return Reject("NOT_OUTWARD_EDGE", out reason);
+            // The gourd's swipe block (#215) stops only this player's own passes that way; a blast's push
+            // and a drum running on through still go, and nothing coming in is stopped.
+            bool passingDrum = crossing == LabEdgeCrossingKind.Passing
+                && current.kind.IsDrum() && current.arrival == LabDrumArrival.Pass;
+            if (crossing != LabEdgeCrossingKind.Pushed && !passingDrum && SwipeBlocked(sender, right, now))
+                return Reject("SWIPE_BLOCKED", out reason);
             int receiverSeat = (players[sender].seat + (right ? 1 : activeSeatCount - 1)) % activeSeatCount;
             ulong receiver = seats[receiverSeat];
             // A drum is not a stored orb, so a full board still receives it.
@@ -548,6 +571,8 @@ namespace C6Lab
             return true;
         }
 
+        private bool BlockOn(double now) => phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt;
+
         public LabSnapshot Snapshot(double now)
         {
             if (phase == LabPhase.Idle)
@@ -575,7 +600,11 @@ namespace C6Lab
                 paintCount = paintSurface.PaintCount,
                 players = players.Values.OrderBy(player => player.seat).Select(player => player.Copy()).ToArray(),
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
-                drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray()
+                drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray(),
+                swipeBlockedPlayer = BlockOn(now) ? swipeBlockedPlayer : 0,
+                swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
+                swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
+                swipeBlockedUntil = BlockOn(now) ? swipeBlockedUntil : -1d
             };
         }
 
@@ -626,6 +655,7 @@ namespace C6Lab
                         if (players.TryGetValue(holder, out var drummer)) drummer.drumSeconds += elapsed;
                 }
                 DropGourdBombs(effectiveNow);
+                StartSwipeBlocks(effectiveNow);
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
                 {
@@ -672,6 +702,7 @@ namespace C6Lab
                 };
                 orbs.Add(bomb.id, bomb);
                 gourdBombs.Add(new LabGourdBomb(target, bomb.id, landing));
+                gourdBombTimes.Add(at);
                 nextGourdBombAt = at + GourdBombDelay(gourdBombCount);
             }
         }
@@ -725,6 +756,50 @@ namespace C6Lab
         }
 
         /// <summary>다음 박 폭탄까지의 시간. 최대 간격이 0이면 떨어뜨리지 않는다.</summary>
+        /// <summary>
+        /// 박의 방해공작 (#215): 정해 둔 간격마다 무작위 한 명과 무작위 방향(왼쪽·오른쪽)을 골라, 그 사람이
+        /// 그쪽으로 스스로 넘기는 것을 정해 둔 시간 동안 막는다. 박 폭탄과 연출이 겹치지 않도록 폭탄이
+        /// 떨어졌거나 떨어질 시각과 최소 간격 안이면 그 폭탄 뒤로 미룬다. 한 번에 하나만 걸리고, 다음 막기는
+        /// 지금 것이 끝난 뒤에 온다. 뽑기는 seed와 순번으로 정해 모든 기기가 같은 결과를 받는다.
+        /// </summary>
+        private void StartSwipeBlocks(double until)
+        {
+            while (nextSwipeBlockAt <= until)
+            {
+                double at = nextSwipeBlockAt;
+                double clear = ClearOfGourdBombs(at);
+                if (clear > at)
+                {
+                    nextSwipeBlockAt = clear;
+                    continue;
+                }
+                uint index = swipeBlockCount++;
+                swipeBlockedPlayer = seats[(int)(DrawFor(seed ^ SwipeBlockTargetSalt, SwipeBlockDrawKey, index)
+                    % (ulong)activeSeatCount)];
+                swipeBlockedRight = (DrawFor(seed ^ SwipeBlockSideSalt, SwipeBlockDrawKey, index) & 1UL) == 1UL;
+                swipeBlockStartedAt = at;
+                swipeBlockedUntil = at + rules.SwipeBlockSeconds;
+                nextSwipeBlockAt = Math.Max(at + rules.SwipeBlockInterval, swipeBlockedUntil);
+            }
+        }
+
+        /// <summary>The earliest time from at that is at least the bomb gap from the gourd's bombs near it.</summary>
+        private double ClearOfGourdBombs(double at)
+        {
+            double gap = rules.SwipeBlockBombGap;
+            if (gap <= 0d) return at;
+            double clear = at;
+            foreach (double bomb in gourdBombTimes)
+                if (Math.Abs(clear - bomb) < gap) clear = Math.Max(clear, bomb + gap);
+            if (Math.Abs(clear - nextGourdBombAt) < gap) clear = Math.Max(clear, nextGourdBombAt + gap);
+            return clear;
+        }
+
+        /// <summary>Whether the gourd's swipe block (#215) stops this player's own passes that way at this Host time.</summary>
+        public bool SwipeBlocked(ulong player, bool right, double now) =>
+            phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt
+            && player == swipeBlockedPlayer && right == swipeBlockedRight;
+
         private double GourdBombDelay(uint index)
         {
             if (rules.GourdBombIntervalMax <= 0f) return double.PositiveInfinity;
@@ -892,6 +967,8 @@ namespace C6Lab
             public readonly int PaintVictoryPercent;
             public readonly LabPaintGrowthSettings PaintGrowthSettings;
             public readonly float GourdBombIntervalMin, GourdBombIntervalMax;
+            /// <summary>The gourd's swipe block (#215): every how long, for how long, and how far from its bombs.</summary>
+            public readonly float SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap;
             public readonly float[] DrumStopBounds;
             public readonly int[] DrumStopChances;
             public readonly Color[] PaintColors;
@@ -908,6 +985,9 @@ namespace C6Lab
                 PaintGrowthSettings = config.PaintGrowthSettings;
                 GourdBombIntervalMin = config.GourdBombIntervalMin;
                 GourdBombIntervalMax = config.GourdBombIntervalMax;
+                SwipeBlockInterval = config.SwipeBlockInterval;
+                SwipeBlockSeconds = config.SwipeBlockSeconds;
+                SwipeBlockBombGap = config.SwipeBlockBombGap;
                 DrumStopBounds = config.DrumStopBounds();
                 DrumStopChances = config.DrumStopChances();
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];

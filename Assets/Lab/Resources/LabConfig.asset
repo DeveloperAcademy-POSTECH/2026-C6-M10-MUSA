@@ -110,6 +110,9 @@ MonoBehaviour:
   paintGravityWeight: 3
   gourdBombIntervalMin: 20
   gourdBombIntervalMax: 30
+  swipeBlockInterval: 40
+  swipeBlockSeconds: 10
+  swipeBlockBombGap: 4
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9
