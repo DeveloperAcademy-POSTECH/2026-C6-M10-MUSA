@@ -18,7 +18,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(142));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(143));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -132,7 +132,7 @@ namespace C6Lab.Tests
             values[108] = 8f; // growth per second
             values[109] = 75f; // frontier fill chance
             values[110] = 2f; // vertical preference
-            Assert.That(values[111], Is.Zero, "Completed-gourd viewing is off by default.");
+            Assert.That(values[111], Is.EqualTo(1f), "Completed-gourd viewing is on by default.");
             values[111] = 1f; // allow the room to inspect completed Paint results locally
             values[119] = .6f; // automatic rope travel
             values[120] = 2.5f; // cycle duration
@@ -704,7 +704,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(112));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(142));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(143));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             LabDeveloperField field = LabConfig.DeveloperFields[87];
@@ -736,7 +736,7 @@ namespace C6Lab.Tests
             int[] gourdIndices = null;
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
                 if (category.Title == "Gourd") gourdIndices = category.FieldIndices;
-            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111,
+            Assert.That(gourdIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111, 142,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 139, 133, 134, 135, 136, 137, 138 }));
             Assert.That(config.GourdBombIntervalMin, Is.EqualTo(20f));
             Assert.That(config.GourdBombIntervalMax, Is.EqualTo(30f));
@@ -881,7 +881,7 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields[105].WholeNumber, Is.True);
             for (int i = 106; i <= 110; i++) Assert.That(LabConfig.DeveloperFields[i].WholeNumber, Is.False);
             var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
-            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111,
+            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 79, 87, 88, 89, 105, 106, 107, 108, 109, 110, 111, 142,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 139, 133, 134, 135, 136, 137, 138 }));
         }
 
@@ -1000,12 +1000,12 @@ namespace C6Lab.Tests
 
 
         [Test]
-        public void CompletedGourdViewerDefaultsOffAtTheLastGourdToggleWithoutChangingTheFixedGoal()
+        public void CompletedGourdViewerDefaultsOnAtItsPreservedIndexWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(142));
-            Assert.That(config.CompletedGourdViewerEnabled, Is.False);
-            Assert.That(values[111], Is.Zero);
+            Assert.That(values.Length, Is.EqualTo(143));
+            Assert.That(config.CompletedGourdViewerEnabled, Is.True);
+            Assert.That(values[111], Is.EqualTo(1f));
             LabDeveloperField field = LabConfig.DeveloperFields[111];
             Assert.That(field.Label, Is.EqualTo("Completed Gourd Viewer (0 off, 1 on)"));
             Assert.That(field.DisplayLabel, Is.EqualTo("Completed Gourd Viewer"));
@@ -1095,6 +1095,7 @@ namespace C6Lab.Tests
         {
             const ushort protocol = 5633;
             float[] values = config.CaptureDeveloperValues();
+            values[111] = 0f;
             string offFingerprint = LabSessionSettings.Fingerprint(values, 3, protocol);
             values[111] = 1f;
             string onFingerprint = LabSessionSettings.Fingerprint(values, 3, protocol);
@@ -1102,7 +1103,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(142));
+            Assert.That(received.Length, Is.EqualTo(143));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1175,7 +1176,7 @@ namespace C6Lab.Tests
         {
             var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
             Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
-                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style" }));
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns" }));
             Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
                 "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
             var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");

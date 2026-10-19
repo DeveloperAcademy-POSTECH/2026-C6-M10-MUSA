@@ -6,6 +6,7 @@ Shader "C6Lab/GourdPaint"
         [NoScaleOffset] _PaintMap("Cumulative premultiplied paint", 2D) = "black" {}
         [NoScaleOffset] _PainterMap("Committed painter P byte (linear point)", 2D) = "black" {}
         [HideInInspector] _PaintMapReady("Paint map ready", Float) = 0
+        [HideInInspector] _PlayerPaintPatternsEnabled("Player paint patterns enabled", Float) = 1
         [HideInInspector] _PaintGrainEnabled("Paint grain enabled", Float) = 0
         [HideInInspector] _PaintGrainSize("Paint grain size", Float) = 1
         [HideInInspector] _PaintGrainStrength("Paint grain strength", Float) = .3
@@ -31,6 +32,7 @@ Shader "C6Lab/GourdPaint"
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
                 float _PaintMapReady;
+                float _PlayerPaintPatternsEnabled;
                 float _PaintGrainEnabled;
                 float _PaintGrainSize;
                 float _PaintGrainStrength;
@@ -118,10 +120,13 @@ Shader "C6Lab/GourdPaint"
                 // paper retain the original map. OFF and both strengths zero bypass exactly.
                 if (_PaintGrainEnabled > .5 && (_PaintGrainStrength > 0 || _PaintMottleStrength > 0))
                     paint.rgb = GrainColor(paint.rgb, direction);
-                float painter = round(SAMPLE_TEXTURE2D(_PainterMap, sampler_PainterMap, uv).r * 255.0);
                 // Ownership changes brightness only. It cannot punch holes into pigment,
                 // alter coverage, replace element hues, or touch unpainted paper.
-                paint.rgb *= 1.0 - .32 * PainterInk(painter, uv);
+                if (_PlayerPaintPatternsEnabled > .5)
+                {
+                    float painter = round(SAMPLE_TEXTURE2D(_PainterMap, sampler_PainterMap, uv).r * 255.0);
+                    paint.rgb *= 1.0 - .32 * PainterInk(painter, uv);
+                }
                 half3 color = _BaseColor.rgb * (1.0 - paint.a) + paint.rgb;
                 float light = .72 + .28 * saturate(dot(normalize(input.normalWS), normalize(float3(-.4,.8,.5))));
                 return half4(color * light, 1);

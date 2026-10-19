@@ -101,6 +101,104 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator DeveloperRoomApplyHidesAndRestoresAllSamplesWithoutChangingPlayerIdentity()
+        {
+            Assert.That(network.config.PlayerPaintPatternsEnabled, Is.True,
+                "The saved room configuration enables player patterns by default.");
+            Assert.That(network.SetTargetParticipantCount(5), Is.True);
+            network.Host();
+            Assert.That(network.IsHost, Is.True, network.Notice);
+            yield return null;
+            hud.playerSlotButtons[3].onClick.Invoke();
+            yield return null;
+            Assert.That(network.LocalSlotNumber, Is.EqualTo(4));
+
+            LabDeveloperMode developer = hud.GetComponent<LabDeveloperMode>();
+            float[] sourceValues = developer.sourceConfig.CaptureDeveloperValues();
+            string[] lobbyLabels = hud.playerSlotButtons
+                .Select(button => button.GetComponentInChildren<Text>().text).ToArray();
+            RectTransform[] buttons = hud.playerSlotButtons.Select(button => (RectTransform)button.transform).ToArray();
+            Canvas.ForceUpdateCanvases();
+            Vector2[] lobbyPositions = buttons.Select(rect => rect.anchoredPosition).ToArray();
+            Vector2[] lobbySizes = buttons.Select(rect => rect.sizeDelta).ToArray();
+            ulong localId = network.LocalPlayerId;
+            var battle = new LabSnapshot {
+                sessionId = "pattern-ui-identity", round = 7, phase = LabPhase.Playing,
+                hp = 725, remaining = 54.3d, playedSeconds = 12.5d,
+                paintCoverage = .25f, paintCoveredCount = 512, paintCellCount = 2048,
+                players = new[] {
+                    new LabPlayerState { id = 101, seat = 0 },
+                    new LabPlayerState { id = localId, seat = 3, personalHp = 123, stamina = 60f, hitTotal = 4, damageTotal = 80 },
+                    new LabPlayerState { id = 104, seat = 4 },
+                    new LabPlayerState { id = 103, seat = 2 },
+                    new LabPlayerState { id = 102, seat = 1 }
+                }
+            };
+            string battleState = JsonUtility.ToJson(battle);
+            Image[] circles = { hud.localPlayerCircle, hud.leftPlayerCircle, hud.rightPlayerCircle };
+            Image[] battleSamples = { hud.localPlayerPatternSample, hud.leftPlayerPatternSample, hud.rightPlayerPatternSample };
+            int[] numbers = { 4, 3, 5 };
+            Vector2[] battlePositions = null, battleSizes = null;
+
+            // The settings use the ordinary Host lobby form. Battle ownership below is
+            // a fixed synthetic snapshot, so these checks do not claim a remote round.
+            network.enabled = false;
+            hud.enabled = false;
+            foreach (bool enabled in new[] { true, false, true })
+            {
+                SetSnapshot(null);
+                developer.Open();
+                developer.valueInputs[142].text = enabled ? "1" : "0";
+                developer.ApplyAndHost();
+                Assert.That(network.config.PlayerPaintPatternsEnabled, Is.EqualTo(enabled), developer.feedbackText.text);
+                yield return null;
+                RefreshHud();
+                Canvas.ForceUpdateCanvases();
+                Assert.That(network.LocalPlayerId, Is.EqualTo(localId));
+                Assert.That(network.LocalSlotNumber, Is.EqualTo(4));
+                Assert.That(network.GetSlotOwner(4), Is.EqualTo(localId));
+                Assert.That(hud.playerSlotButtons.Select(button => button.GetComponentInChildren<Text>().text),
+                    Is.EqualTo(lobbyLabels), "The pattern setting must preserve the P labels and selection.");
+                for (int i = 0; i < 5; i++)
+                {
+                    Assert.That(hud.playerSlotPatternSamples[i].gameObject.activeInHierarchy, Is.EqualTo(enabled));
+                    Assert.That(hud.playerSlotPatternSamples[i].sprite, Is.SameAs(LabPlayerPaintPatterns.SpriteFor(i + 1)));
+                    Assert.That(buttons[i].anchoredPosition, Is.EqualTo(lobbyPositions[i]));
+                    Assert.That(buttons[i].sizeDelta, Is.EqualTo(lobbySizes[i]));
+                }
+                Assert.That(battleSamples.All(sample => !sample.gameObject.activeSelf), Is.True);
+
+                SetSnapshot(battle);
+                RefreshHud();
+                Canvas.ForceUpdateCanvases();
+                Assert.That(hud.seatText.text, Is.EqualTo("P4"));
+                Assert.That(hud.leftNeighborText.text, Is.EqualTo("P3"));
+                Assert.That(hud.rightNeighborText.text, Is.EqualTo("P5"));
+                for (int i = 0; i < battleSamples.Length; i++)
+                {
+                    Assert.That(battleSamples[i].gameObject.activeInHierarchy, Is.EqualTo(enabled));
+                    Assert.That(battleSamples[i].sprite, Is.SameAs(LabPlayerPaintPatterns.SpriteFor(numbers[i])));
+                    Assert.That(circles[i].enabled, Is.True);
+                    Assert.That(circles[i].sprite, Is.SameAs(hud.playerCircleSprites[numbers[i] - 1]));
+                }
+                Vector2[] positions = circles.Select(circle => ((RectTransform)circle.transform).anchoredPosition).ToArray();
+                Vector2[] sizes = circles.Select(circle => ((RectTransform)circle.transform).sizeDelta).ToArray();
+                if (battlePositions != null)
+                {
+                    Assert.That(positions, Is.EqualTo(battlePositions));
+                    Assert.That(sizes, Is.EqualTo(battleSizes));
+                }
+                battlePositions = positions;
+                battleSizes = sizes;
+                Assert.That(hud.playerSlotPatternSamples.All(sample => !sample.gameObject.activeInHierarchy), Is.True);
+                Assert.That(network.Snapshot, Is.SameAs(battle));
+                Assert.That(JsonUtility.ToJson(battle), Is.EqualTo(battleState),
+                    "Refreshing either pattern setting must preserve seats, health, stamina, score, paint, and round state.");
+                Assert.That(developer.sourceConfig.CaptureDeveloperValues(), Is.EqualTo(sourceValues));
+            }
+        }
+
+        [UnityTest]
         public IEnumerator BattleSamplesUseActualPSeatsRatherThanHostConnectionOrSnapshotArrayOrder()
         {
             network.Host();

@@ -33,6 +33,7 @@ namespace C6Lab
         private bool hasUploadedSurface;
         private bool grainSettingsApplied;
         private bool appliedGrainEnabled;
+        private bool appliedPlayerPaintPatternsEnabled;
         private float appliedGrainSize, appliedGrainStrength, appliedMottleStrength;
         private MaterialPropertyBlock block;
         private Renderer shell;
@@ -236,6 +237,7 @@ namespace C6Lab
             bool uploadMap = force || !hasUploadedSurface || uploadedSurface != source
                 || uploadedRevision != source.Revision || uploadedSession != currentSession || uploadedRound != currentRound;
             LabConfig config = network != null ? network.config : null;
+            bool playerPaintPatternsEnabled = config == null || config.PlayerPaintPatternsEnabled;
             bool grainEnabled = config != null && config.PaintGrainEnabled;
             float grainSize = config != null ? config.PaintGrainSize : 1f;
             float grainStrength = config != null ? config.PaintGrainStrength : .3f;
@@ -243,7 +245,8 @@ namespace C6Lab
             bool grainChanged = !grainSettingsApplied || appliedGrainEnabled != grainEnabled
                 || appliedGrainSize != grainSize || appliedGrainStrength != grainStrength
                 || appliedMottleStrength != mottleStrength;
-            if (!uploadMap && !grainChanged) return;
+            bool patternsChanged = !grainSettingsApplied || appliedPlayerPaintPatternsEnabled != playerPaintPatternsEnabled;
+            if (!uploadMap && !grainChanged && !patternsChanged) return;
             if (block == null) block = new MaterialPropertyBlock();
             shell.GetPropertyBlock(block);
             if (uploadMap)
@@ -270,7 +273,10 @@ namespace C6Lab
             block.SetFloat("_PaintGrainSize", grainSize);
             block.SetFloat("_PaintGrainStrength", grainStrength);
             block.SetFloat("_PaintMottleStrength", mottleStrength);
+            // This is a presentation switch. Keep both authoritative maps intact while OFF.
+            block.SetFloat("_PlayerPaintPatternsEnabled", playerPaintPatternsEnabled ? 1f : 0f);
             shell.SetPropertyBlock(block);
+            appliedPlayerPaintPatternsEnabled = playerPaintPatternsEnabled;
             appliedGrainEnabled = grainEnabled; appliedGrainSize = grainSize;
             appliedGrainStrength = grainStrength; appliedMottleStrength = mottleStrength;
             grainSettingsApplied = true;

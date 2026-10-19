@@ -31,23 +31,24 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator DefaultOffCreatesOnlyTheLightweightObserverWithoutViewerUi()
+        public IEnumerator DefaultsEnableBothFeaturesButCreateOnlyTheLightweightObserverBeforeAResult()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
             LabNetwork network = Object.FindFirstObjectByType<LabNetwork>();
             Assert.That(network, Is.Not.Null);
-            Assert.That(network.config.CompletedGourdViewerEnabled, Is.False);
+            Assert.That(network.config.CompletedGourdViewerEnabled, Is.True);
+            Assert.That(network.config.PlayerPaintPatternsEnabled, Is.True);
             LabGourdResultViewer viewer = Object.FindObjectsByType<LabGourdResultViewer>(FindObjectsSortMode.None)
                 .Single(item => item.Network == network);
             Assert.That(LabGourdResultViewer.Attach(network), Is.SameAs(viewer),
                 "SceneController already attaches one observer per network.");
-            Assert.That(viewer.Ui, Is.Null, "Default OFF does not instantiate the saved UI prefab.");
+            Assert.That(viewer.Ui, Is.Null, "The enabled default waits for a complete Paint victory before creating result UI.");
             Assert.That(viewer.Preview, Is.Null);
             Assert.That(viewer.OpenViewer(), Is.False);
             Assert.That(Resources.FindObjectsOfTypeAll<GourdResultViewerUI>()
                 .Where(item => item.gameObject.scene == SceneManager.GetActiveScene()), Is.Empty,
-                "The default Scene has no result entry, modal, or preview camera.");
+                "The initial Scene has no eligible result entry or preview camera.");
         }
 
         [UnityTest]
@@ -71,10 +72,10 @@ namespace C6Lab.Tests
                 .Single(item => item.gameObject.scene == SceneManager.GetActiveScene());
             try
             {
-                // Apply through the ordinary DEV form, including the final shared Config toggle.
+                // Apply through the ordinary DEV form, including both independent shared Config toggles.
                 developer.Open();
                 float[] tuning = fixture.CaptureDeveloperValues();
-                Assert.That(tuning.Length, Is.EqualTo(142));
+                Assert.That(tuning.Length, Is.EqualTo(143), "Both shared feature toggles must survive the ordinary DEV form.");
                 for (int i = 0; i < tuning.Length; i++)
                     developer.valueInputs[i].text = tuning[i].ToString("R", CultureInfo.InvariantCulture);
                 developer.ApplyAndStart();
@@ -97,6 +98,8 @@ namespace C6Lab.Tests
                 Assert.That(viewer.Ui, Is.Not.Null, viewer.LastError);
                 Assert.That(viewer.Ui.HasRequiredReferences, Is.True);
                 Assert.That(viewer.Ui.entryButton.gameObject.activeSelf, Is.True);
+                Assert.That(viewer.IsOpen, Is.False, "A completed result offers a button; it never opens the modal automatically.");
+                Assert.That(viewer.Preview, Is.Null);
 
                 Color32[] originalPixels = Pixels(network.PaintSurface);
                 string originalHash = LabPaintPublisher.Hash(originalPixels);
@@ -204,7 +207,8 @@ namespace C6Lab.Tests
                 developer.EndSolo();
                 yield return null;
                 Assert.That(network.config, Is.SameAs(savedNetwork));
-                Assert.That(network.config.CompletedGourdViewerEnabled, Is.False);
+                Assert.That(network.config.CompletedGourdViewerEnabled, Is.True);
+                Assert.That(network.config.PlayerPaintPatternsEnabled, Is.True);
                 Assert.That(savedNetwork.CaptureDeveloperValues(), Is.EqualTo(savedTuning));
             }
             finally
@@ -220,6 +224,108 @@ namespace C6Lab.Tests
             Assert.That(viewer.Network, Is.SameAs(network));
             Assert.That(viewer.Ui, Is.Null);
             Assert.That(viewer.Preview, Is.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator IndependentViewerAndPlayerPatternCombinationsKeepEligibilityAndManualPreviewEntry()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+            LabDeveloperMode developer = Resources.FindObjectsOfTypeAll<LabDeveloperMode>()
+                .Single(item => item.gameObject.scene == SceneManager.GetActiveScene());
+            LabNetwork network = developer.network;
+            LabSceneController controller = developer.sceneController;
+            LabConfig savedNetwork = network.config, savedBoard = controller.config;
+            LabConfig savedSeat = developer.seatCamera.config;
+            float[] savedValues = savedNetwork.CaptureDeveloperValues();
+            LabConfig fixture = CollisionFixture(savedNetwork);
+            LabGourdResultViewer viewer = LabGourdResultViewer.Attach(network);
+            network.port = 17892;
+            try
+            {
+                // Use all four accepted DEV configurations on real fresh Solo rounds.
+                // Patterns are presentation-only; completed result eligibility stays the same.
+                for (int combination = 0; combination < 4; combination++)
+                {
+                    bool viewerEnabled = (combination & 2) != 0;
+                    bool patternsEnabled = (combination & 1) != 0;
+                    string previousSession = network.Snapshot == null ? null : network.Snapshot.sessionId;
+                    developer.Open();
+                    float[] values = fixture.CaptureDeveloperValues();
+                    values[111] = viewerEnabled ? 1f : 0f;
+                    values[142] = patternsEnabled ? 1f : 0f;
+                    for (int i = 0; i < values.Length; i++)
+                        developer.valueInputs[i].text = values[i].ToString("R", CultureInfo.InvariantCulture);
+                    developer.applyStartButton.onClick.Invoke();
+                    yield return null;
+                    Assert.That(network.IsDeveloperSolo, Is.True, developer.feedbackText.text);
+                    Assert.That(network.config.CompletedGourdViewerEnabled, Is.EqualTo(viewerEnabled));
+                    Assert.That(network.config.PlayerPaintPatternsEnabled, Is.EqualTo(patternsEnabled));
+                    Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(previousSession));
+                    Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
+                    Assert.That(network.PaintSurface.CoveredCount, Is.Zero);
+                    Assert.That(LabGourdResultViewer.IsEligible(network.Snapshot, network.PaintSurface), Is.False);
+                    viewer.RefreshState();
+                    Assert.That(viewer.Ui, Is.Null, "Both toggles keep result UI lazy during Playing.");
+                    Assert.That(viewer.Preview, Is.Null);
+
+                    yield return CompleteFromActualHit(network, 20d + combination * 40d);
+                    viewer.RefreshState();
+                    Assert.That(network.Snapshot.paintCoveredCount, Is.EqualTo(network.Snapshot.paintCellCount));
+                    Assert.That(LabGourdResultViewer.IsEligible(network.Snapshot, network.PaintSurface), Is.True,
+                        "Viewer and player-pattern settings cannot change the normal 100% Paint victory rule.");
+                    Assert.That(LabGourdResultViewer.CanInspect(network), Is.EqualTo(viewerEnabled));
+                    Assert.That(viewer.IsOpen, Is.False, "Victory never opens the preview automatically.");
+                    Assert.That(viewer.Preview, Is.Null);
+                    if (!viewerEnabled)
+                    {
+                        Assert.That(viewer.Ui, Is.Null);
+                        Assert.That(viewer.OpenViewer(), Is.False);
+                        Assert.That(viewer.Preview, Is.Null);
+                        continue;
+                    }
+
+                    Assert.That(viewer.Ui, Is.Not.Null, viewer.LastError);
+                    Assert.That(viewer.Ui.IsShowing, Is.False);
+                    Assert.That(viewer.Ui.entryButton.gameObject.activeSelf, Is.True);
+                    Color32[] pixels = Pixels(network.PaintSurface);
+                    uint revision = network.PaintSurface.Revision;
+                    int paintCount = network.PaintSurface.PaintCount;
+                    LabSnapshot result = network.Snapshot;
+                    viewer.Ui.entryButton.onClick.Invoke();
+                    Assert.That(viewer.IsOpen, Is.True, viewer.LastError);
+                    Assert.That(viewer.Preview.PaintTexture.GetPixels32(), Is.EqualTo(pixels));
+                    Renderer[] paintRenderers = viewer.Preview.ModelRoot.GetComponentsInChildren<Renderer>(true)
+                        .Where(renderer => renderer.sharedMaterials.Any(material => material != null
+                            && material.HasProperty("_PlayerPaintPatternsEnabled"))).ToArray();
+                    Assert.That(paintRenderers, Is.Not.Empty);
+                    foreach (Renderer renderer in paintRenderers)
+                    {
+                        var block = new MaterialPropertyBlock();
+                        renderer.GetPropertyBlock(block);
+                        Assert.That(block.GetFloat("_PlayerPaintPatternsEnabled"), Is.EqualTo(patternsEnabled ? 1f : 0f),
+                            "The render-only preview retains the accepted player-pattern presentation setting.");
+                    }
+                    AssertUnchangedResult(network, pixels, revision, paintCount, result);
+                    viewer.CloseViewer();
+                    yield return null;
+                    viewer.RefreshState();
+                    Assert.That(viewer.Ui.entryButton.gameObject.activeSelf, Is.True);
+                }
+                developer.EndSolo();
+                Assert.That(network.config, Is.SameAs(savedNetwork));
+                Assert.That(savedNetwork.CaptureDeveloperValues(), Is.EqualTo(savedValues));
+            }
+            finally
+            {
+                viewer.CloseViewer();
+                if (network.IsConnected) network.Stop();
+                network.config = savedNetwork;
+                controller.config = savedBoard;
+                developer.seatCamera.config = savedSeat;
+                controller.ReconfigureBoard();
+                Object.Destroy(fixture);
+            }
         }
 
         private static IEnumerator CompleteFromActualHit(LabNetwork network, double gestureTime)
@@ -306,7 +412,7 @@ namespace C6Lab.Tests
             LabConfig result = Object.Instantiate(source);
             float[] values = result.CaptureDeveloperValues();
             values[105] = 0; values[106] = 100; values[107] = 4; values[108] = 6;
-            values[111] = 1;
+            values[111] = 1; values[142] = 1;
             Set(values, "Gourd Mode (0 paint, 1 crack)", 0);
             Set(values, "Paint Victory Coverage (%)", 100);
             Set(values, "Monster Max HP", 40);

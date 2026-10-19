@@ -171,7 +171,8 @@ namespace C6Lab
         // 5636: #201 Host-shared chuimsae chance and minimum gap (two appended values).
         // 5637: #204 manual lobby P selection; results name the authoritative lobby revision.
         // 5638: #206 paint transactions commit RGBA and the actual thrower's P number together.
-        internal const ushort LabProtocolVersion = 5638;
+        // 5639: #206 Host-shared player paint pattern presentation toggle (one appended value).
+        internal const ushort LabProtocolVersion = 5639;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");

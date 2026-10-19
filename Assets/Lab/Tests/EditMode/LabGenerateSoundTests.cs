@@ -29,7 +29,7 @@ namespace C6Lab.Tests
             try
             {
                 float[] values = config.CaptureDeveloperValues();
-                Assert.That(values.Length, Is.EqualTo(142));
+                Assert.That(values.Length, Is.EqualTo(143));
                 Assert.That(new[] { values[140], values[141] }, Is.EqualTo(new[] { 15f, 5f }));
                 Assert.That(LabConfig.DeveloperFields[140].Label, Is.EqualTo("Chuimsae Chance (%)"));
                 Assert.That(LabConfig.DeveloperFields[141].Label, Is.EqualTo("Chuimsae Min Gap (generates)"));

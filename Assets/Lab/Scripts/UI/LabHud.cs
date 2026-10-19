@@ -401,13 +401,14 @@ namespace C6Lab
             if (image.sprite != art) image.sprite = art;
         }
 
-        private static void SetPaintPatternSample(Image image, int number, bool visible)
+        private void SetPaintPatternSample(Image image, int number, bool visible)
         {
             if (image == null) return;
             Sprite art = LabPlayerPaintPatterns.SpriteFor(number);
             if (image.sprite != art) image.sprite = art;
             image.enabled = art != null;
-            SetVisible(image.gameObject, visible && art != null);
+            bool patternsEnabled = network.config == null || network.config.PlayerPaintPatternsEnabled;
+            SetVisible(image.gameObject, visible && art != null && patternsEnabled);
         }
 
         private void OnDisable()

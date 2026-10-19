@@ -137,6 +137,77 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator PatternToggleChangesOnlyRenderedInkWithoutReuploadingOrRevisingMaps()
+        {
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+                Assert.Ignore("A real graphics device is required; shader pixels were not tested.");
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+            var paint = Object.FindFirstObjectByType<LabGourdPaint>();
+            Assert.That(paint.IsReady, Is.True, paint.InitializationError);
+            LabConfig config = paint.network.config;
+            float[] original = config.CaptureDeveloperValues();
+            int field = Enumerable.Range(0, LabConfig.DeveloperFields.Count)
+                .Single(i => LabConfig.DeveloperFields[i].Label == "Player Paint Patterns (0 off, 1 on)");
+            LabPaintSurface surface = paint.Surface;
+            var pixels = new Color32[surface.CellCount];
+            var owners = new byte[surface.CellCount];
+            for (int y = surface.Rows / 5; y < surface.Rows * 4 / 5; y++)
+                for (int x = surface.Columns * 3 / 5; x < surface.Columns * 9 / 10; x++)
+                {
+                    int i = y * surface.Columns + x;
+                    pixels[i] = new Color32(220, 110, 55, 255);
+                    owners[i] = 2;
+                }
+            Replace(surface, pixels, owners);
+            paint.RefreshCommittedMap();
+            uint revision = surface.Revision;
+            int count = surface.CoveredCount;
+            Texture2D colorTexture = paint.PaintTexture, ownerTexture = paint.PainterTexture;
+            try
+            {
+                using (var rig = new ShellRenderRig(paint))
+                {
+                    Color32[] on = null, off = null;
+                    foreach (bool enabled in new[] { true, false, true, false })
+                    {
+                        float[] values = config.CaptureDeveloperValues(); values[field] = enabled ? 1f : 0f;
+                        Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                        // No growth, map replacement, new revision, or frame delay: a setting-only
+                        // change must invalidate the presentation cache on this existing surface.
+                        paint.RefreshCommittedMap();
+                        Assert.That(ReadBlock(paint.Shell.GetComponent<Renderer>()).GetFloat("_PlayerPaintPatternsEnabled"),
+                            Is.EqualTo(enabled ? 1f : 0f));
+                        Color32[] current = rig.Capture(paint, enabled ? "pattern-toggle-ON.png" : "pattern-toggle-OFF.png");
+                        if (enabled)
+                        {
+                            if (on == null) on = current;
+                            else Assert.That(current, Is.EqualTo(on), "Restoring ON must restore the same visible ink.");
+                        }
+                        else
+                        {
+                            if (off == null) off = current;
+                            else Assert.That(current, Is.EqualTo(off), "OFF must consistently render color without ownership ink.");
+                            Assert.That(current.Where((pixel, i) => !pixel.Equals(on[i])).Count(), Is.GreaterThan(100));
+                            Assert.That(current.Select(pixel => pixel.a), Is.EqualTo(on.Select(pixel => pixel.a)));
+                        }
+                        Assert.That(surface.Revision, Is.EqualTo(revision));
+                        Assert.That(surface.CoveredCount, Is.EqualTo(count));
+                        Assert.That(paint.PaintTexture, Is.SameAs(colorTexture));
+                        Assert.That(paint.PainterTexture, Is.SameAs(ownerTexture));
+                        Assert.That(colorTexture.GetPixels32(), Is.EqualTo(pixels));
+                        Assert.That(ownerTexture.GetPixels32().Select(pixel => pixel.r), Is.EqualTo(owners));
+                    }
+                }
+            }
+            finally
+            {
+                Assert.That(config.TryApplyDeveloperValues(original, out string error), Is.True, error);
+                paint.RefreshCommittedMap();
+            }
+        }
+
+        [UnityTest]
         public IEnumerator CompletedViewerOwnsItsPainterMapAcrossLiveResetRotationAndDisposal()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
@@ -176,6 +247,29 @@ namespace C6Lab.Tests
                 };
                 typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(network, snapshot);
                 paint.RefreshCommittedMap();
+                // Per-submesh property blocks take precedence over renderer-level blocks.
+                // The viewer must preserve the display switch while replacing both textures.
+                Renderer liveRenderer = paint.Shell.GetComponent<Renderer>();
+                foreach (bool patternsEnabled in new[] { false, true })
+                {
+                    float[] toggleValues = config.CaptureDeveloperValues();
+                    toggleValues[142] = patternsEnabled ? 1f : 0f;
+                    Assert.That(config.TryApplyDeveloperValues(toggleValues, out configError), Is.True, configError);
+                    paint.RefreshCommittedMap();
+                    liveRenderer.SetPropertyBlock(ReadBlock(liveRenderer), 0);
+                    Assert.That(LabGourdResultPreview.TryCreate(network, out var togglePreview, out string toggleError, 256), Is.True, toggleError);
+                    using (togglePreview)
+                    {
+                        Renderer copy = togglePreview.ModelRoot.GetComponentsInChildren<Renderer>(true)
+                            .Single(item => item.sharedMaterial != null && item.sharedMaterial.shader == paint.paintMaterial.shader);
+                        Assert.That(ReadBlock(copy).GetFloat("_PlayerPaintPatternsEnabled"), Is.EqualTo(patternsEnabled ? 1f : 0f));
+                        var perMaterial = new MaterialPropertyBlock(); copy.GetPropertyBlock(perMaterial, 0);
+                        Assert.That(perMaterial.GetFloat("_PlayerPaintPatternsEnabled"), Is.EqualTo(patternsEnabled ? 1f : 0f));
+                        Assert.That(perMaterial.GetTexture("_PainterMap"), Is.SameAs(togglePreview.PainterTexture));
+                        Assert.That(togglePreview.PainterTexture.GetPixels32().Select(pixel => pixel.r), Is.EqualTo(owners));
+                    }
+                }
+                liveRenderer.SetPropertyBlock(null, 0);
                 Assert.That(LabGourdResultPreview.TryCreate(network, out preview, out string error, 256), Is.True, error);
                 Texture2D owned = preview.PainterTexture;
                 Assert.That(owned, Is.Not.SameAs(paint.PainterTexture));
