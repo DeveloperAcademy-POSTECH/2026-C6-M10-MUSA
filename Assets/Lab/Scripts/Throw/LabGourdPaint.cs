@@ -163,6 +163,7 @@ namespace C6Lab
             block = new MaterialPropertyBlock();
             EnsureTexture(Surface);
             initialized = true;
+            ApplyVisualSize();
             InitializationError = null;
             RefreshPaintMap(true);
             subscribedTarget = target;
@@ -179,7 +180,20 @@ namespace C6Lab
 
         private void Update()
         {
-            if (IsReady) RefreshPaintMap();
+            if (IsReady)
+            {
+                ApplyVisualSize();
+                RefreshPaintMap();
+            }
+        }
+
+        private void ApplyVisualSize()
+        {
+            if (VisualInstance == null) return;
+            float size = network != null && network.config != null ? network.config.GourdVisualSize : 1.4f;
+            float ratio = size / 1.8f;
+            VisualInstance.transform.localScale = Vector3.one * ratio;
+            VisualInstance.transform.localPosition = Vector3.up * (.84f * (1f - ratio));
         }
 
         private void OnHit(Vector3 localPoint, LabOrbElement element)
@@ -224,7 +238,11 @@ namespace C6Lab
         /// <summary>Apply a network map/snapshot commit now, without waiting for component Update order.</summary>
         public void RefreshCommittedMap()
         {
-            if (IsReady) RefreshPaintMap();
+            if (IsReady)
+            {
+                ApplyVisualSize();
+                RefreshPaintMap();
+            }
         }
 
         private void RefreshPaintMap(bool force = false)

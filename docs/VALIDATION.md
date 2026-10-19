@@ -1027,3 +1027,18 @@ Scene은 기존 UI 위치·크기를 유지하며 자식 Image8개(새 YAML블�
 | 독립 Host/Client 앱·iOS·실기기·핫스팟·모바일 성능 | NOT_RUN | 이번 최종 기본값 변경에서도 실행하지 않았다. 이전 다중 앱 실행이나 로컬 전송 fixture를 실환경 검증으로 승계하지 않는다. |
 
 독립 소스 검토에서 초기 자기 Ink·겹침 예산·최후 빈칸 도달·1.5% 기본값 일치와 변경된 완료 검사에 병합 차단 사항을 찾지 못했다. 사용자의 원본 Scene/머터리얼/미추적 파일과 패키지를 보존하고 검사 복사본의 Target2 float 재직렬화2건을 제외한다. 최종 변경에는 사용자 요청의 Config 한 값만 포함하며 기존 검증의 ‘Config 불변’은 위 최초4% 단계의 범위다.
+
+### Fix #211 — 병합 직전 main #214 통합 — 2026-10-19
+
+PR #216의 첫 병합 시도 직전 #214가 main `929d9244`에 들어와 실제 GitHub 병합이 충돌로 거절됐다. main을 수정 브랜치에 병합하고 두 텍스트 충돌(`LabPaintClusterConfigTests`, DEV 명세)을 해결했다. 새 박/요괴 메시·애니메이션·WhiteGourd 프리팹·LabGourdPaint 크기 적용·146번째 설정 `Gourd Visual Size`(인덱스145·기본1.4)·프로토콜5641은 최신 main과 동일하게 보존한다. Config는 main 대비 재타격1.5% 한 값만 다르다. 위145개/5640 결과는 통합 전 단계이며 현재 계약으로 해석하지 않는다.
+
+| 검사 | 상태 | 통합 최종 근거·범위 |
+| --- | --- | --- |
+| 통합 최초 전체 EditMode | FAIL | `editmode-main214.xml` **694/696**, 실패2·skipped0, **07:22:42Z–07:23:09Z**. main에 추가된 Gourd 카테고리 선두145번을 예상 배열2개가 반영하지 못했다. 유효해진146개 스키마를 거절하던 구형 검사도145개 구형·147개 미지원으로 갱신해 검증 계약을 유지했다. |
+| 통합 최종 전체 EditMode | PASS | `editmode-main214-final.xml` **696/696**, failed/skipped/inconclusive0, **07:24:58Z–07:25:26Z**. 새 크기 설정의 카테고리/공유 스키마·1.5% 기본값·#211 면적/소유권/완료 검사를 포함한다. |
+| 통합 전체 PlayMode | PASS | `playmode-main214.xml` **170/170**, failed/skipped/inconclusive0, **07:25:45Z–07:27:11Z**. 새 저장 박 표면 메시와1.5%/4% fixture·DEV·투척/피격·관람을 포함한다. 자동 지도/렌더와 실제 물리 검사 범위를 구분한다. |
+| 새 박 표면 GPU | PASS (분리 메시 fixture) | `default1_5-repeat3` 등4방향을 다시 렌더했다. [새 표면의1.5% 결과](images/paint-splatter-main214-repeat1_5.png)는 새 PaintBody 메시를 분리한 렌더로, 전체 프리팹의 이동/크기/애니메이션이나 실제 명중점 정합성 검증이 아니다. 기존3개 비교 이미지는 통합 전 메시의 조건부 기록으로 보존한다. |
+| 통합 일반 Mac Development 빌드 | PASS | 기존 `C6Lab.Editor.LabBuild.Mac`, `C6_LAB_BUILD_OK`, 종료0, **BuildReport198,906,969 bytes**. `Builds/Lab/issue211-main214/macOS/C6_Physics_Lab.app`. 새 main 에셋을 포함하고 임시 전용 도구는 포함하지 않는다. 별도 빌드 앱 수동 플레이는 미실행이다. |
+| 독립 Host/Client 앱·iOS·실기기·핫스팟·모바일 성능 | NOT_RUN | 통합본에서도 실행하지 않았다. 앞선 통합 전 결과나 다른 변경의 실기기 기록을 승계하지 않는다. |
+
+새 main 모델의 Host 피격 방향과 shell-local 셰이더 방향은 부모/자식 위치·크기에 따라 달라질 수 있다. 저장 메시 정점과 Transform을 사용한 정적 대조에서 차이를 확인했지만 실제 충돌/화면 재현은 하지 않았다. 이 기존-main 확인 항목은 [#218](https://github.com/DeveloperAcademy-POSTECH/2026-C6-M10-MUSA/issues/218)에 분리했고 #211에서 해당 코드·프리팹·물리 좌표는 변경하지 않았다. 통합본 검사의 PASS를 이 미확인 항목의 해결로 해석하지 않는다.
