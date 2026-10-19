@@ -183,7 +183,61 @@ namespace C6Lab.Tests
             Assert.That(model.ThrowScaleFor(10, 5d), Is.EqualTo(.5f));
         }
 
-        private static LabOrbState Combine(LabModel model, ulong owner, List<LabOrbState> pool, ref int requests)
+        [Test]
+        public void APenalizedThrowRemembersItsSizeUntilItLandsOrMisses()
+        {
+            LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f);
+            var model = new LabModel();
+            model.Begin("combo-launch-scale", new ulong[] { 10, 20, 30 }, 0d, config);
+            var pool = new List<LabOrbState>();
+            int requests = 0;
+
+            LabOrbState before = Combine(model, 10, pool, ref requests);
+            Assert.That(model.TryLaunch(10, before.id, "scale-before", 2d, out _, out _), Is.True);
+            Assert.That(model.LaunchScaleOf(before.id), Is.EqualTo(.5f),
+                "The combo timed out at 2 seconds, so this throw is already small.");
+
+            Assert.That(model.Snapshot(12d).players.All(player => player.comboPenaltyUntil == 12d), Is.True);
+            pool.Clear(); // leftover raw orbs from 2 seconds have expired by now
+            LabOrbState after = Combine(model, 10, pool, ref requests, 12d);
+            Assert.That(model.TryLaunch(10, after.id, "scale-after", 12d, out _, out _), Is.True);
+            Assert.That(model.LaunchScaleOf(after.id), Is.EqualTo(1f), "The penalty is over at 12 seconds.");
+
+            Assert.That(model.LaunchScaleOf(before.id), Is.EqualTo(.5f),
+                "A ball thrown during the penalty keeps its small size even if it lands later.");
+            Assert.That(model.ConfirmMiss(before.id, 12d), Is.True);
+            Assert.That(model.LaunchScaleOf(before.id), Is.EqualTo(1f), "A resolved ball is forgotten.");
+        }
+
+        [Test]
+        public void AScaledPaintHitCoversLessAndTheNextHitIsFullSizeAgain()
+        {
+            var settings = new LabPaintGrowthSettings
+            {
+                Resolution = 1, Pattern = LabPaintPattern.Legacy, Style = 1,
+                InitialPercent = 6.25f, RepeatPercent = 3.125f, GrowthPercentPerSecond = 100f,
+                Raggedness = 0f, ClusterCompactness = .85f, ClusterIrregularity = .25f
+            };
+            var full = new LabPaintSurface(settings, 41u);
+            var half = new LabPaintSurface(settings, 41u);
+            Assert.That(full.RegisterHit(Vector3.forward, Color.red, 1, 1), Is.True);
+            Assert.That(half.RegisterHit(Vector3.forward, Color.red, 1, 1, .5f), Is.True);
+            full.Advance(5d);
+            half.Advance(5d);
+            int fullArea = full.CoveredCount;
+            Assert.That(fullArea, Is.GreaterThan(0));
+            Assert.That(half.CoveredCount, Is.InRange(fullArea * 4 / 10, fullArea * 6 / 10),
+                "A half-size penalty hit paints about half the area.");
+
+            int beforeNext = half.CoveredCount;
+            Assert.That(half.RegisterHit(Vector3.back, Color.blue, 2, 2), Is.True);
+            half.Advance(5d);
+            Assert.That(half.CoveredCount - beforeNext, Is.EqualTo(fullArea),
+                "The scale applies to one hit only; the next ordinary hit paints the full amount.");
+        }
+
+        private static LabOrbState Combine(LabModel model, ulong owner, List<LabOrbState> pool, ref int requests,
+            double at = 2d)
         {
             for (int i = 0; i < 20; i++)
             {
@@ -193,11 +247,11 @@ namespace C6Lab.Tests
                 {
                     pool.Remove(yin);
                     pool.Remove(yang);
-                    Assert.That(model.TryCombine(owner, yin.id, yang.id, "combo-combine-" + requests++, 2d,
+                    Assert.That(model.TryCombine(owner, yin.id, yang.id, "combo-combine-" + requests++, at,
                         out var combined, out string reason), Is.True, reason);
                     return combined;
                 }
-                Assert.That(model.TryGenerate(owner, "combo-generate-" + requests++, 2d, out var raw, out string why),
+                Assert.That(model.TryGenerate(owner, "combo-generate-" + requests++, at, out var raw, out string why),
                     Is.True, why);
                 pool.Add(raw);
             }

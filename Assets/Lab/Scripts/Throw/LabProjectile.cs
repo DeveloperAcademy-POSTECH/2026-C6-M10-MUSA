@@ -65,6 +65,8 @@ namespace C6Lab
         private float peakHeight;
         private float launchedAt;
         private bool launched;
+        // 박 색상 콤보 실패 페널티(#222)에서 공 크기를 줄이는 배율. 충돌 반지름·모양·꼬리에 함께 곱한다.
+        private float radiusScale = 1f;
         private bool authoritative;
         private bool resolved;
 
@@ -78,13 +80,24 @@ namespace C6Lab
         public Transform VisualMount => visualMount;
         public TrailRenderer FlightTrail => flightTrail;
         public LabElementFlightTrail ElementFlightTrail => elementFlightTrail;
+        public float RadiusScale => radiusScale;
+        private float ScaledRadius => (config != null ? config.ThrowRadius : .165f) * radiusScale;
+
+        /// <summary>
+        /// 던지기 전에 공 크기 배율(0~1)을 정한다. 1이면 기존 크기다. Launch·LaunchVisual 전에 부른다.
+        /// </summary>
+        public void SetRadiusScale(float scale)
+        {
+            radiusScale = float.IsNaN(scale) || float.IsInfinity(scale) ? 1f : Mathf.Clamp(scale, .01f, 1f);
+            EnsureDefaultVisual(ScaledRadius);
+        }
 
         /// <summary>Sets shared presentation; this projectile's root collider is unchanged.</summary>
         public void ConfigureAppearance(LabOrbAppearance value)
         {
             if (appearance == value)
             {
-                EnsureDefaultVisual(config != null ? config.ThrowRadius : .165f);
+                EnsureDefaultVisual(ScaledRadius);
                 return;
             }
             appearance = value;
@@ -105,7 +118,7 @@ namespace C6Lab
 
         private void SetVisualPrefabInternal(GameObject prefab)
         {
-            float radius = config != null ? config.ThrowRadius : 0.165f;
+            float radius = ScaledRadius;
             EnsureDefaultVisual(radius);
             // A destroyed source prefab compares equal to null in Unity. Do not skip
             // removing an instantiated visual when callers clear that source.
@@ -203,7 +216,7 @@ namespace C6Lab
             if (body == null || sphere == null)
                 throw new InvalidOperationException("Projectile needs Rigidbody and SphereCollider.");
 
-            sphere.radius = tuning.ThrowRadius;
+            sphere.radius = tuning.ThrowRadius * radiusScale;
             sphere.isTrigger = visualOnly;
             body.useGravity = false;
             body.isKinematic = false;
@@ -220,8 +233,8 @@ namespace C6Lab
             peakHeight = body.position.y;
             launchedAt = Time.time;
             launched = true;
-            EnsureDefaultVisual(tuning.ThrowRadius);
-            EnsureFlightTrail(tuning.ThrowRadius);
+            EnsureDefaultVisual(tuning.ThrowRadius * radiusScale);
+            EnsureFlightTrail(tuning.ThrowRadius * radiusScale);
             if (elementFlightTrail != null)
                 elementFlightTrail.Begin(transform, appearance.ElementTrailFor(element));
             if (flightTrail != null)

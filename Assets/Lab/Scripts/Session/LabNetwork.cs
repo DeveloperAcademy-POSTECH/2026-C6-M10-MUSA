@@ -55,6 +55,8 @@ namespace C6Lab
         public float wy;
         public float wz;
         public float spinImpulse;
+        /// <summary>던지는 공 크기 배율 (#222 콤보 페널티). 0(옛 패킷)이면 1로 본다.</summary>
+        public float sizeScale;
         public string reason;
         public ulong owner;
         public int element;
@@ -1634,14 +1636,17 @@ namespace C6Lab
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
             var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element);
             projectile.name = "Projectile " + orb.id;
+            float sizeScale = model != null ? model.LaunchScaleOf(orb.id) : 1f;
+            projectile.SetRadiusScale(sizeScale);
             projectile.SetMissSurface(battleFloor);
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
-                wx = velocity.x, wy = velocity.y, wz = velocity.z };
+                wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
             Debug.Log("C6_LAB_THROW orb=" + orb.id + " seat=" + seat
+                + " size=" + sizeScale.ToString("F2", CultureInfo.InvariantCulture)
                 + " form=" + config.ThrowForm + " origin=" + launchPosition
                 + " swipe=" + releaseVelocity + " launch=" + velocity
                 + " gravity=" + config.EffectiveThrowGravity.ToString("F2", CultureInfo.InvariantCulture)
@@ -1950,6 +1955,7 @@ namespace C6Lab
                         LabOrbElement element = packet.element >= (int)LabOrbElement.None && packet.element <= (int)LabOrbElement.Earth
                             ? (LabOrbElement)packet.element : LabOrbElement.None;
                         LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element);
+                        if (packet.sizeScale > 0f && packet.sizeScale < 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetMissSurface(battleFloor);
                         visual.LaunchVisual(velocity, config, target);
                     }

@@ -130,6 +130,28 @@ namespace C6Lab
         /// P number together, never a blend. Zero P is reserved for neutral offline fixtures.
         /// </summary>
         public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0)
+            => RegisterHit(direction, color, attackerId, painterSlot, 1f);
+
+        /// <summary>
+        /// areaScale (0~1)는 이번 한 번의 타격이 칠하는 양(처음 칠 면적과 재타격 성장량)에 곱한다.
+        /// 박 색상 콤보 실패 페널티(#222)에서 쓰며, 1이면 기존 타격과 똑같다.
+        /// </summary>
+        public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot, float areaScale)
+        {
+            if (float.IsNaN(areaScale) || areaScale >= 1f) return RegisterHitUnscaled(direction, color, attackerId, painterSlot);
+            decimal savedInitial = initialCells, savedRepeat = repeatCells;
+            decimal scale = (decimal)Mathf.Clamp(areaScale, .01f, 1f);
+            initialCells = savedInitial * scale;
+            repeatCells = savedRepeat * scale;
+            try { return RegisterHitUnscaled(direction, color, attackerId, painterSlot); }
+            finally
+            {
+                initialCells = savedInitial;
+                repeatCells = savedRepeat;
+            }
+        }
+
+        private bool RegisterHitUnscaled(Vector3 direction, Color color, ulong attackerId, int painterSlot)
         {
             if (painterSlot < 0 || painterSlot > 5) return false;
             if (preview || replica || IsComplete || !ValidHit(direction, color)) return false;

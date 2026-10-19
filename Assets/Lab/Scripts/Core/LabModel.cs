@@ -91,6 +91,8 @@ namespace C6Lab
         private uint gourdBombCount;
         private uint drumHandoffCount;
         private readonly LabGourdCombo combo = new LabGourdCombo();
+        // 던진 순간의 페널티 배율 (#222). 날아가는 동안 페널티가 끝나도 그 공은 던질 때 크기 그대로 칠한다.
+        private readonly Dictionary<string, float> launchScales = new Dictionary<string, float>(StringComparer.Ordinal);
         private double nextComboAt;
         private Rules rules;
         private string sessionId;
@@ -170,6 +172,7 @@ namespace C6Lab
             drumHandoffCount = 0;
             nextGourdBombAt = now + GourdBombDelay(0u);
             combo.Reset();
+            launchScales.Clear();
             nextComboAt = now + rules.ComboFirstStartSeconds;
             lastTime = now;
             deadline = nextDeadline;
@@ -353,6 +356,8 @@ namespace C6Lab
             // 릴레이·폭탄은 던지는 것이 곧 아이템 사용이다.
             if (current.kind == LabOrbKind.Relay) players[sender].relayUsed++;
             else if (current.kind == LabOrbKind.Bomb) players[sender].bombUsed++;
+            float launchScale = ThrowScaleFor(sender, now);
+            if (launchScale < 1f) launchScales[current.id] = launchScale;
             reason = "LAUNCHED";
             orb = current.Copy();
             return true;
@@ -385,6 +390,8 @@ namespace C6Lab
                 || !players.TryGetValue(orb.owner, out var attacker)) return false;
             element = orb.element;
             orbs.Remove(id);
+            float areaScale = LaunchScaleOf(id);
+            launchScales.Remove(id);
             int attackValue = DamageFor(orb);
             int previousHp = hp;
             hp = Math.Max(0, hp - attackValue);
@@ -401,7 +408,7 @@ namespace C6Lab
             if (paintRound)
             {
                 if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
-                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1)
+                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, areaScale)
                     && paintSurface.IsComplete)
                 {
                     phase = LabPhase.Victory;
@@ -425,6 +432,10 @@ namespace C6Lab
         /// 박 색상 콤보 실패 페널티(#222) 중이면 이 사람이 지금 던지는 공의 크기·칠 면적 배율,
         /// 아니면 1. 실험이 꺼져 있으면 언제나 1이다.
         /// </summary>
+        public float LaunchScaleOf(string id) =>
+            id != null && launchScales.TryGetValue(id, out float scale) ? scale : 1f;
+
+        /// <summary>박 색상 콤보 페널티(#222) 배율. 던지는 공 반지름과 칠 면적에 곱한다.</summary>
         public float ThrowScaleFor(ulong playerId, double now)
         {
             if (rules == null || !rules.ComboEnabled || !players.TryGetValue(playerId, out var player)) return 1f;
@@ -559,6 +570,7 @@ namespace C6Lab
         public bool ConfirmMiss(string id, double now)
         {
             if (!TryAdvance(now, out _) || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight) return false;
+            launchScales.Remove(id);
             return orbs.Remove(id);
         }
 
