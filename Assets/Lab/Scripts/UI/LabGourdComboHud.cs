@@ -7,6 +7,8 @@ namespace C6Lab
     /// 박 색상 콤보 실험 (#222)의 전투 화면 표시. 모든 기기가 Host 스냅샷만 읽어서 같은 콤보를 보여준다.
     /// - 진행 중: 4칸 색 (맞힌 칸은 체크, 다음 칸은 통통 튐), 줄어드는 남은 시간 막대 (숫자 없음)
     /// - 끝남: CLEAR! (성공) / WRONG COLOR, TIME UP (실패) 문구가 잠깐 튀어나옴
+    /// - 페널티/보상 중: 패널 아래 가장자리에 붙는 알약 배지 (빨강 SMALL / 노랑 BIG, 공 아이콘,
+    ///   줄어드는 게이지, 남은 초). 이 기기 플레이어 기준이다.
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
     /// 일시정지 중이거나 전투가 끝나면 숨는다.
     /// </summary>
@@ -16,6 +18,8 @@ namespace C6Lab
         public const string ClearText = "CLEAR!";
         public const string WrongColorText = "WRONG COLOR";
         public const string TimeUpText = "TIME UP";
+        public const string PenaltyLabel = "SMALL";
+        public const string RewardLabel = "BIG";
 
         private const int TextureSize = 96;
         private const float ResultSeconds = 1.6f;
@@ -23,7 +27,10 @@ namespace C6Lab
         private static readonly Color PanelColor = new Color(1f, .98f, .93f, .92f);
         private static readonly Color ClearColor = new Color(.98f, .78f, .16f);
         private static readonly Color FailColor = new Color(.91f, .16f, .1f);
-        private static Sprite discSprite, checkSprite, roundedSprite;
+        // 배지 배경: 결과 문구보다 살짝 차분한 빨강/노랑 (흰 글자가 잘 읽히도록)
+        private static readonly Color PenaltyBadgeColor = new Color(.84f, .25f, .2f, 1f);
+        private static readonly Color RewardBadgeColor = new Color(.95f, .69f, .13f, 1f);
+        private static Sprite discSprite, checkSprite, roundedSprite, pillSprite;
 
         [Tooltip("화면에서 콤보 패널 가운데 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 panelAnchor = new Vector2(.5f, .8f);
@@ -38,6 +45,11 @@ namespace C6Lab
         private readonly Image[] slotChecks = new Image[LabGourdCombo.Length];
         private Image timeBarFill;
         private Text resultText;
+        private RectTransform effectBadge, effectGauge, effectIcon;
+        private Image effectBack;
+        private Text effectText;
+        private int effectKind; // 0 없음, -1 페널티, 1 보상
+        private float effectPopElapsed = -1f;
         private Font font;
 
         private LabSnapshot seenSnapshot;
@@ -51,6 +63,8 @@ namespace C6Lab
         private int popSlot = -1;
 
         public bool PanelVisible => panel != null && panel.gameObject.activeSelf;
+        public bool EffectVisible => effectBadge != null && effectBadge.gameObject.activeSelf;
+        public string EffectLabel => effectText != null ? effectText.text : string.Empty;
         public bool ResultVisible => resultText != null && resultText.gameObject.activeSelf;
         public string ResultLabel => resultText != null ? resultText.text : string.Empty;
         public bool SlotChecked(int index) => slotChecks[index] != null && slotChecks[index].gameObject.activeSelf;
@@ -83,6 +97,56 @@ namespace C6Lab
             DetectChanges(snapshot);
             DrawCombo(snapshot, serverNow);
             DrawResult();
+            DrawEffect(snapshot, serverNow);
+        }
+
+        /// <summary>
+        /// 이 기기 플레이어의 페널티(우선) 또는 보상 배지. 게이지는 효과가 시작된 시각(마지막 콤보 결과)부터
+        /// 끝 시각까지를 1 → 0으로 줄인다. 새로 생기거나 종류가 바뀌면 톡 튀어나오고, 마지막 3초는 두근거린다.
+        /// </summary>
+        private void DrawEffect(LabSnapshot snapshot, double serverNow)
+        {
+            int kind = 0;
+            double until = 0d;
+            if (snapshot.players != null && network != null)
+                foreach (LabPlayerState player in snapshot.players)
+                {
+                    if (player == null || player.id != network.LocalPlayerId) continue;
+                    if (player.comboPenaltyUntil > serverNow) { kind = -1; until = player.comboPenaltyUntil; }
+                    else if (player.comboRewardUntil > serverNow) { kind = 1; until = player.comboRewardUntil; }
+                }
+            if (kind == 0)
+            {
+                effectKind = 0;
+                effectBadge.gameObject.SetActive(false);
+                return;
+            }
+            if (kind != effectKind) effectPopElapsed = 0f;
+            effectKind = kind;
+            effectBadge.gameObject.SetActive(true);
+
+            double left = until - serverNow;
+            double total = until - snapshot.comboResultAt;
+            float fraction = total > 0d ? Mathf.Clamp01((float)(left / total)) : 1f;
+            effectGauge.anchorMax = new Vector2(fraction, 1f);
+            bool reward = kind > 0;
+            effectBack.color = reward ? RewardBadgeColor : PenaltyBadgeColor;
+            effectIcon.localScale = Vector3.one * (reward ? 1f : .55f);
+            effectText.text = (reward ? RewardLabel : PenaltyLabel) + "  "
+                + Mathf.CeilToInt((float)left).ToString(System.Globalization.CultureInfo.InvariantCulture) + "s";
+
+            float scale = 1f;
+            if (effectPopElapsed >= 0f)
+            {
+                effectPopElapsed += Time.unscaledDeltaTime;
+                float t = effectPopElapsed;
+                scale = t < .16f ? 1.2f * (1f - Mathf.Pow(1f - t / .16f, 3f))
+                    : Mathf.Lerp(1.2f, 1f, Mathf.Clamp01((t - .16f) / .14f));
+                if (t >= .3f) effectPopElapsed = -1f;
+            }
+            else if (left <= 3d)
+                scale += .06f * Mathf.Max(0f, Mathf.Sin(Time.unscaledTime * Mathf.PI * 4f));
+            effectBadge.localScale = Vector3.one * scale;
         }
 
         /// <summary>스냅샷 사이에도 남은 시간이 매끄럽게 줄도록, 받은 뒤 흐른 실제 시간을 더한다.</summary>
@@ -189,6 +253,8 @@ namespace C6Lab
             lastComboCount = 0;
             popElapsed = -1f;
             popSlot = -1;
+            effectKind = 0;
+            effectPopElapsed = -1f;
         }
 
         private bool EnsureLayer()
@@ -266,11 +332,56 @@ namespace C6Lab
             resultText = NewText("Combo Result", layer, Mathf.Max(14, Mathf.RoundToInt(54f * u)), TextAnchor.MiddleCenter);
             resultText.rectTransform.anchorMin = resultText.rectTransform.anchorMax = panelAnchor;
             resultText.rectTransform.sizeDelta = new Vector2(width * 1.6f, 80f * u);
-            resultText.rectTransform.anchoredPosition = new Vector2(0f, -(panel.sizeDelta.y * .5f + 44f * u));
+            float badgeHeight = 34f * u;
+            resultText.rectTransform.anchoredPosition = new Vector2(0f, -(panel.sizeDelta.y * .5f + badgeHeight * .5f + 44f * u));
             Outline resultOutline = resultText.gameObject.AddComponent<Outline>();
             resultOutline.effectColor = InkColor;
             resultOutline.effectDistance = new Vector2(3f, -3f) * Mathf.Max(.5f, u);
             resultText.gameObject.SetActive(false);
+
+            // 페널티/보상 배지: 패널 아래 가장자리에 반쯤 걸친 알약 모양. 패널이 숨어도 같은 자리에 남는다.
+            effectBadge = NewRect("Combo Effect Badge", layer);
+            effectBadge.anchorMin = effectBadge.anchorMax = panelAnchor;
+            effectBadge.sizeDelta = new Vector2(slotSize * 2.6f, badgeHeight);
+            effectBadge.anchoredPosition = new Vector2(0f, -panel.sizeDelta.y * .5f);
+            effectBack = effectBadge.gameObject.AddComponent<Image>();
+            effectBack.sprite = PillSprite();
+            effectBack.type = Image.Type.Sliced;
+            effectBack.raycastTarget = false;
+
+            RectTransform gaugeArea = NewRect("Gauge Area", effectBadge);
+            gaugeArea.anchorMin = Vector2.zero;
+            gaugeArea.anchorMax = Vector2.one;
+            gaugeArea.offsetMin = new Vector2(badgeHeight * .5f, badgeHeight * .22f);
+            gaugeArea.offsetMax = new Vector2(-badgeHeight * .5f, -badgeHeight * .22f);
+            effectGauge = NewRect("Gauge", gaugeArea);
+            effectGauge.anchorMin = Vector2.zero;
+            effectGauge.anchorMax = Vector2.one;
+            effectGauge.offsetMin = effectGauge.offsetMax = Vector2.zero;
+            Image gauge = effectGauge.gameObject.AddComponent<Image>();
+            gauge.sprite = PillSprite();
+            gauge.type = Image.Type.Sliced;
+            gauge.color = new Color(1f, 1f, 1f, .28f);
+            gauge.raycastTarget = false;
+
+            effectIcon = NewRect("Ball Icon", effectBadge);
+            effectIcon.anchorMin = effectIcon.anchorMax = new Vector2(0f, .5f);
+            effectIcon.sizeDelta = new Vector2(badgeHeight * .7f, badgeHeight * .7f);
+            effectIcon.anchoredPosition = new Vector2(badgeHeight * .62f, 0f);
+            Image icon = effectIcon.gameObject.AddComponent<Image>();
+            icon.sprite = DiscSprite();
+            icon.raycastTarget = false;
+
+            effectText = NewText("Effect Time", effectBadge, Mathf.Max(10, Mathf.RoundToInt(20f * u)), TextAnchor.MiddleCenter);
+            effectText.rectTransform.anchorMin = Vector2.zero;
+            effectText.rectTransform.anchorMax = Vector2.one;
+            effectText.rectTransform.offsetMin = new Vector2(badgeHeight * 1.05f, 0f);
+            effectText.rectTransform.offsetMax = new Vector2(-badgeHeight * .35f, 0f);
+            effectText.color = Color.white;
+            Outline effectOutline = effectText.gameObject.AddComponent<Outline>();
+            effectOutline.effectColor = new Color32(43, 36, 32, 160);
+            effectOutline.effectDistance = new Vector2(1.5f, -1.5f);
+            effectBadge.gameObject.SetActive(false);
 
             panel.gameObject.SetActive(false);
             return true;
@@ -331,6 +442,23 @@ namespace C6Lab
                 return color;
             }, Vector4.zero);
             return checkSprite;
+        }
+
+        /// <summary>양 끝이 완전히 둥근 알약 모양 (진한 테두리). 9-slice로 늘린다.</summary>
+        private static Sprite PillSprite()
+        {
+            if (pillSprite != null) return pillSprite;
+            float radius = TextureSize * .5f;
+            pillSprite = Draw("Lab combo pill", (p, c) =>
+            {
+                float distance = Vector2.Distance(p, c) - (radius - 1f);
+                float alpha = Mathf.Clamp01(.5f - distance);
+                float ink = Mathf.Clamp01(distance + 4f + .5f);
+                Color color = Color.Lerp(Color.white, (Color)InkColor, ink);
+                color.a = alpha;
+                return color;
+            }, new Vector4(radius - 1f, radius - 1f, radius - 1f, radius - 1f));
+            return pillSprite;
         }
 
         private static Sprite RoundedSprite()
