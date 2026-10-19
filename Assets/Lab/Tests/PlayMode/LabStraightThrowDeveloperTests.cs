@@ -36,8 +36,8 @@ namespace C6Lab.Tests
             LabDeveloperMode ui = SavedDeveloperUi();
             testedNetwork = ui.network;
             float[] original = ui.sourceConfig.CaptureDeveloperValues();
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(146), "The saved DEV panel includes both appended cluster controls.");
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(146), "The saved DEV panel includes both appended cluster controls.");
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(145), "The saved DEV panel includes both appended cluster controls.");
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(145), "The saved DEV panel includes both appended cluster controls.");
             Assert.That(ui.sourceConfig.ThrowForm, Is.EqualTo(LabThrowForm.Arc));
             ui.Open();
             Assert.That(ui.panel.activeSelf, Is.True);

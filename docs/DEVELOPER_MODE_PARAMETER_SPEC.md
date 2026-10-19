@@ -499,8 +499,3 @@ DEV → Gourd의 `Player Paint Patterns`(143번째, 인덱스142)와 `Completed 
 두 새 숫자/슬라이더는 Gourd 묶음의 재타격 성장량 다음에 배치된다. 원본 저장값·DEFAULTS와 Capture/Apply가 같은 값을 사용하며 새 판에만 적용한다. Host는145개와5640 지문을 공유해 참가자 ACK 후 시작한다. 기존143개 순서는 보존한다. 수직 우대(110)와 Fill Chance(109)는 한 타격의 경계 시작점 선택에만 작용한다. 셀마다 그 방향을 계속 우대해 군집을 가늘게 늘이지 않는다.
 
 위의 #198 당시 '성장 셀마다 흐름 시도/아래 방향/꼬리 폭·길이' 설명은 **과거 구현**이다. 현재 최초 명중에서 LEGACY Style/Edge Raggedness와4종 마스크 선택은 유지하지만 재타격은 모두 공통 군집 경로로 처리한다.135~138번 Flow Ratio·Drip Width·Drip Length·Gravity Weight는 이번 재타격에 영향을 주지 않는다. 원본 필드와 입력 검증은 보존하며 과거 실행 결과를 현재 군집의 검증으로 승계하지 않는다. 새 구현 근거는 `LabPaintSurface.RegisterHit`·`Supply`·`ChooseClusterCell`·`GrowthCluster.Take/Commit`·`PaintCell/Consume/Merge`와 `LabConfig.PaintGrowthSettings`다.
-
-
-### Gourd Visual Size
-
-DEV → Gourd → `Gourd Visual Size (x)` (index 145): range 0.5–3.0, default 1.4. Applies to the paint-mode body, lid, yokai and decorations together while retaining the neck attachment. Uses the existing APPLY/new-round flow and Host-shared settings (protocol 5641). Collision size is unchanged.

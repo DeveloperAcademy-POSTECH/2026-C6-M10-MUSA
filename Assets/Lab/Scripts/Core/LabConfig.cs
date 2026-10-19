@@ -230,8 +230,7 @@ namespace C6Lab
             new LabDeveloperField("Chuimsae Min Gap (generates)", 0f, 20f, true),
             LabDeveloperField.Toggle("Player Paint Patterns (0 off, 1 on)"),
             new LabDeveloperField("Paint Cluster Compactness", 0f, 1f),
-            new LabDeveloperField("Paint Cluster Irregularity", 0f, 1f),
-            new LabDeveloperField("Gourd Visual Size (x)", .5f, 3f)
+            new LabDeveloperField("Paint Cluster Irregularity", 0f, 1f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -259,7 +258,7 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 140, 141, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 145, 79, 87, 88, 89, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
+            new LabDeveloperCategory("Gourd", 79, 87, 88, 89, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
                 139, 133, 134, 135, 136, 137, 138),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
@@ -367,8 +366,6 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float paintClusterCompactness = .85f;
         [Tooltip("반복 명중 성장 덩어리 경계의 불규칙한 정도. 새 판에 적용한다.")]
         [SerializeField, Range(0f, 1f)] private float paintClusterIrregularity = .25f;
-        [SerializeField, Range(.5f, 3f)] private float gourdVisualSize = 1.4f;
-        public float GourdVisualSize => Mathf.Clamp(Finite(gourdVisualSize, 1.4f), .5f, 3f);
         [SerializeField, Range(.1f, 100f)] private float paintGrowthPercentPerSecond = 6f;
         [SerializeField, Range(0f, 100f)] private float paintFillChancePercent = 60f;
         [SerializeField, Range(1f, 4f)] private float paintVerticalWeight = 1.35f;
@@ -816,7 +813,7 @@ namespace C6Lab
                 PaintDripWidthDegrees, PaintDripLengthDegrees, PaintGravityWeight, (float)PaintPattern,
                 (float)ChuimsaeChancePercent, (float)ChuimsaeMinGap,
                 PlayerPaintPatternsEnabled ? 1f : 0f,
-                PaintClusterCompactness, PaintClusterIrregularity, GourdVisualSize
+                PaintClusterCompactness, PaintClusterIrregularity
             };
         }
 
@@ -1005,7 +1002,6 @@ namespace C6Lab
             playerPaintPatternsEnabled = values[142] == 1f;
             paintClusterCompactness = values[143];
             paintClusterIrregularity = values[144];
-            gourdVisualSize = values[145];
             error = string.Empty;
             return true;
         }
