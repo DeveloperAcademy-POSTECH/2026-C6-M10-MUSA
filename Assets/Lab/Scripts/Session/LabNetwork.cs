@@ -175,7 +175,8 @@ namespace C6Lab
         // 5640: #208 Host-shared clustered repeat growth tuning (two appended values).
         // 5641: shared gourd visual size appended at index 145.
         // 5642: #212 bombs come locked again (an unlocked bomb is a throwable attack orb); heavy bomb DEV 146-149.
-        internal const ushort LabProtocolVersion = 5642;
+        // 5643: #222 gourd color combo experiment (DEV 150-156, combo snapshot, projectile size scale).
+        internal const ushort LabProtocolVersion = 5643;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");
