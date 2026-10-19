@@ -174,7 +174,8 @@ namespace C6Lab
         public LabOrbElement[] comboColors = Array.Empty<LabOrbElement>();
         /// <summary>맞힌 칸 수 (0~4)</summary>
         public int comboProgress;
-        /// <summary>진행 중인 콤보의 제한 시간이 끝나는 시각</summary>
+        /// <summary>진행 중인 콤보가 나온 시각과 제한 시간이 끝나는 시각</summary>
+        public double comboStartedAt = -1d;
         public double comboEndsAt = -1d;
         /// <summary>이번 라운드에 나온 콤보 수. 바뀌면 새 콤보가 나온 것이다.</summary>
         public uint comboCount;

@@ -115,6 +115,7 @@ namespace C6Lab.Tests
             Assert.That(first.comboColors.Length, Is.EqualTo(4));
             Assert.That(first.comboColors.All(color => color >= LabOrbElement.Fire && color <= LabOrbElement.Earth),
                 Is.True, "Colors come from the five elements (Tue-Sat).");
+            Assert.That(first.comboStartedAt, Is.EqualTo(20d));
             Assert.That(first.comboEndsAt, Is.EqualTo(30d));
             Assert.That(model.ThrowScaleFor(10, 25d), Is.EqualTo(1f));
 

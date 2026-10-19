@@ -106,6 +106,9 @@ namespace C6Lab
             if (hud != null && boardNetwork != null && GetComponent<LabGourdAlert>() == null)
                 gameObject.AddComponent<LabGourdAlert>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>(),
                     hud.battleCamera);
+            // 박 색상 콤보 실험 (#222): 4칸 색/남은 시간/결과/페널티 표시. 실험이 꺼져 있으면 아무것도 안 그린다.
+            if (hud != null && boardNetwork != null && GetComponent<LabGourdComboHud>() == null)
+                gameObject.AddComponent<LabGourdComboHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
             ReconfigureBoard();
         }
 

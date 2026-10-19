@@ -619,6 +619,7 @@ namespace C6Lab
                 comboActive = combo.Active,
                 comboColors = combo.Count == 0 ? Array.Empty<LabOrbElement>() : combo.Colors,
                 comboProgress = combo.Progress,
+                comboStartedAt = combo.StartedAt,
                 comboEndsAt = combo.EndsAt,
                 comboCount = combo.Count,
                 comboResult = combo.LastResult,
