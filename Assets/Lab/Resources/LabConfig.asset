@@ -41,6 +41,13 @@ MonoBehaviour:
   bombMultiplier: 3
   bombBlastRadius: 0.4
   bombBlastStrength: 9
+  bombDragLag: 0.12
+  bombReleaseSpeed: 0.5
+  bombSlideDeceleration: 2
+  bombMass: 4
+  blastBurnSeconds: 4
+  blastShrinkScale: 0.5
+  smallOrbPaintShare: 0.5
   orbLifetimeSeconds: 8
   orbRestitution: 0.8
   orbFloorDeceleration: 2
@@ -74,6 +81,10 @@ MonoBehaviour:
   paintGrowthPercentPerSecond: 6
   paintFillChancePercent: 60
   paintVerticalWeight: 1.35
+  paintDryingEnabled: 1
+  paintDryingDelaySeconds: 5
+  paintDryingPercentPerSecond: 0.2
+  paintNearbyHitRadiusDegrees: 20
   completedGourdViewerEnabled: 1
   playerPaintPatternsEnabled: 1
   gourdRopeCycleAmplitude: 0.45
@@ -99,6 +110,9 @@ MonoBehaviour:
   paintGravityWeight: 3
   gourdBombIntervalMin: 20
   gourdBombIntervalMax: 30
+  swipeBlockInterval: 40
+  swipeBlockSeconds: 10
+  swipeBlockBombGap: 4
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9

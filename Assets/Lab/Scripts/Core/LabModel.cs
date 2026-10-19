@@ -87,8 +87,8 @@ namespace C6Lab
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
-        /// <summary>When the gourd last dropped bombs, so a swipe block keeps clear of them (#215).</summary>
-        private readonly List<double> recentGourdBombTimes = new List<double>();
+        /// <summary>Bomb times for this round, retained so a late frame schedules the same swipe blocks as small steps (#215).</summary>
+        private readonly List<double> gourdBombTimes = new List<double>();
         private double nextSwipeBlockAt;
         private uint swipeBlockCount;
         private ulong swipeBlockedPlayer;
@@ -166,7 +166,7 @@ namespace C6Lab
             players.Clear(); orbs.Clear(); drums.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
             unreportedBlasts.Clear();
             gourdBombs.Clear();
-            recentGourdBombTimes.Clear();
+            gourdBombTimes.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState
@@ -333,7 +333,9 @@ namespace C6Lab
                 return Reject("NOT_OUTWARD_EDGE", out reason);
             // The gourd's swipe block (#215) stops only this player's own passes that way; a blast's push
             // and a drum running on through still go, and nothing coming in is stopped.
-            if (crossing == LabEdgeCrossingKind.Swipe && SwipeBlocked(sender, right, now))
+            bool passingDrum = crossing == LabEdgeCrossingKind.Passing
+                && current.kind.IsDrum() && current.arrival == LabDrumArrival.Pass;
+            if (crossing != LabEdgeCrossingKind.Pushed && !passingDrum && SwipeBlocked(sender, right, now))
                 return Reject("SWIPE_BLOCKED", out reason);
             int receiverSeat = (players[sender].seat + (right ? 1 : activeSeatCount - 1)) % activeSeatCount;
             ulong receiver = seats[receiverSeat];
@@ -700,8 +702,7 @@ namespace C6Lab
                 };
                 orbs.Add(bomb.id, bomb);
                 gourdBombs.Add(new LabGourdBomb(target, bomb.id, landing));
-                recentGourdBombTimes.Add(at);
-                if (recentGourdBombTimes.Count > 8) recentGourdBombTimes.RemoveAt(0);
+                gourdBombTimes.Add(at);
                 nextGourdBombAt = at + GourdBombDelay(gourdBombCount);
             }
         }
@@ -788,7 +789,7 @@ namespace C6Lab
             double gap = rules.SwipeBlockBombGap;
             if (gap <= 0d) return at;
             double clear = at;
-            foreach (double bomb in recentGourdBombTimes)
+            foreach (double bomb in gourdBombTimes)
                 if (Math.Abs(clear - bomb) < gap) clear = Math.Max(clear, bomb + gap);
             if (Math.Abs(clear - nextGourdBombAt) < gap) clear = Math.Max(clear, nextGourdBombAt + gap);
             return clear;

@@ -796,23 +796,44 @@ namespace C6Lab.Tests
         public IEnumerator AnOrbABlastFlungIsOrdinaryAgainOnceItStopsOrIsGrabbed()
         {
             board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2);
-            var rests = board.UpsertOrb("rests", LabOrbKind.Yin, new Vector2(.45f, .5f));   // flung gently left
-            var held = board.UpsertOrb("held", LabOrbKind.Yang, new Vector2(.55f, .5f));     // flung right, then caught
+            var rests = board.UpsertOrb("rests", LabOrbKind.Yin, new Vector2(.35f, .5f));
+            var held = board.UpsertOrb("held", LabOrbKind.Yang, new Vector2(.65f, .5f));
             var kinds = new System.Collections.Generic.Dictionary<string, LabEdgeCrossingKind>();
             board.EdgeCrossed += crossing => kinds[crossing.OrbId] = crossing.Kind;
             float[] values = config.CaptureDeveloperValues();
-            values[81] = .5f; // a weak blast, so nothing reaches an edge on its own
+            values[81] = .5f; // A weak blast comes to rest well before either edge.
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Vector2 before = BoardPoint(rests);
             Assert.That(board.Blast("bomb", new Vector2(.5f, .5f)), Is.EqualTo(2));
+            Assert.That(rests.Body.linearVelocity.x, Is.LessThan(0f));
+            Assert.That(held.Body.linearVelocity.x, Is.GreaterThan(0f));
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(held), 1d), Is.True, "Caught in the hand.");
             board.CancelDrag();
             for (int step = 0; step < 150 && rests.Body.linearVelocity.sqrMagnitude > 0f; step++) yield return new WaitForFixedUpdate();
             Assert.That(rests.Body.linearVelocity.sqrMagnitude, Is.Zero, "The other comes to rest.");
+            Assert.That(BoardPoint(rests).x, Is.LessThan(before.x), "It actually moved from the blast before stopping.");
+            Assert.That(kinds, Is.Empty, "The weak blast and the caught orb never crossed an edge.");
 
-            // Now both are thrown across by hand: that is the player's own pass.
-            rests.Body.linearVelocity = new Vector3(-3f * Width, 0f, 0f);
-            held.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f);
-            for (int step = 0; step < 30 && kinds.Count < 2; step++) yield return new WaitForFixedUpdate();
+            // Check the stop path before any grab could clear it. The other orb exercises the grab path.
+            var entries = (System.Collections.IDictionary)typeof(LabOrbBoard)
+                .GetField("entries", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(board);
+            foreach (string id in new[] { "rests", "held" })
+            {
+                object entry = entries[id];
+                bool blasted = (bool)entry.GetType().GetField("Blasted").GetValue(entry);
+                Assert.That(blasted, Is.False, id + " has lost the blast exemption before being relaunched.");
+            }
+
+            // A real impulse wakes a body that has naturally gone to sleep; the board must still report
+            // both actual edge crossings as ordinary passes after the two independent reset paths.
+            rests.Body.AddForce(new Vector3(-3f * Width, 0f, 0f), ForceMode.VelocityChange);
+            held.Body.AddForce(new Vector3(3f * Width, 0f, 0f), ForceMode.VelocityChange);
+            for (int step = 0; step < 50 && (!kinds.ContainsKey("rests") || !kinds.ContainsKey("held")); step++)
+                yield return new WaitForFixedUpdate();
+            Assert.That(kinds.ContainsKey("rests"), Is.True, "Rested orb must cross: position=" + rests.Body.position
+                + ", velocity=" + rests.Body.linearVelocity + ", kinematic=" + rests.Body.isKinematic);
+            Assert.That(kinds.ContainsKey("held"), Is.True, "Caught orb must cross: position=" + held.Body.position
+                + ", velocity=" + held.Body.linearVelocity + ", kinematic=" + held.Body.isKinematic);
             Assert.That(kinds["rests"], Is.EqualTo(LabEdgeCrossingKind.Swipe));
             Assert.That(kinds["held"], Is.EqualTo(LabEdgeCrossingKind.Swipe));
         }
@@ -1346,6 +1367,31 @@ namespace C6Lab.Tests
             for (int step = 0; step < 20 && !crossed.ContainsKey("after"); step++) yield return new WaitForFixedUpdate();
             Assert.That(crossed.ContainsKey("after"), Is.True, "Once lifted, the edge passes again.");
             Assert.That(crossed["after"].Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe));
+        }
+
+        [UnityTest]
+        public IEnumerator ClearingTheBoardLiftsAnActiveSwipeBlockBeforeTheNextRound()
+        {
+            board.UpsertOrb("old-round", LabOrbKind.Yin, new Vector2(.5f, .5f));
+            board.SetSwipeBlock(1, 10f);
+            LabOrbEdgeBlock edge = board.EdgeBlock;
+            Assert.That(edge.Visible, Is.True);
+
+            board.Clear(); // Stop and return-to-lobby use this without another battle snapshot.
+            Assert.That(board.Count, Is.Zero);
+            Assert.That(board.BlockedSide, Is.Zero);
+            Assert.That(board.BlockSecondsLeft, Is.Zero);
+            Assert.That(edge.Visible, Is.False, "The previous round's glow and seconds disappear immediately.");
+
+            LabOrbEdgeCrossing? crossed = null;
+            board.EdgeCrossed += crossing => crossed = crossing;
+            var next = board.UpsertOrb("new-round", LabOrbKind.Yang, new Vector2(.9f, .5f));
+            next.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f);
+            for (int step = 0; step < 20 && !crossed.HasValue; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.HasValue, Is.True, "The old block cannot bounce an orb in the next round.");
+            Assert.That(crossed.Value.ToRight, Is.True);
+            Assert.That(crossed.Value.Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe));
+            Assert.That(edge.Visible, Is.False);
         }
 
         [UnityTest]

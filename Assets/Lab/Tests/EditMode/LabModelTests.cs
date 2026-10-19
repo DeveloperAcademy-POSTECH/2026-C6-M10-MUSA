@@ -1227,8 +1227,11 @@ namespace C6Lab.Tests
                     Assert.That(combined.small, Is.EqualTo(shrink));
                     Assert.That(room.TryLaunch(10, combined.id, "throw", 15.6d, out _, out reason), Is.True, reason);
                     Assert.That(room.ConfirmHit(combined.id, 15.7d, Vector3.forward, out _, out _, out _), Is.True);
-                    // Let the growth spend every bit of the hit's paint.
-                    room.Snapshot(60d);
+                    // Spend the hit's paint before the default five-second drying grace expires.
+                    // A 60-second wait now correctly dries both splashes away and cannot compare their shares.
+                    room.Snapshot(16.7d);
+                    Assert.That(room.PaintSurface.PendingCoverage, Is.LessThan(1d / room.PaintSurface.CellCount),
+                        "Only an unspendable fractional cell may remain before comparing the actual painted area.");
                     return room.PaintSurface.CoveredCount;
                 }
                 finally { UnityEngine.Object.DestroyImmediate(mixed); }
@@ -1265,6 +1268,10 @@ namespace C6Lab.Tests
             var blocking = BlockConfig(40f, 10f, 4f);
             try
             {
+                float[] tuning = blocking.CaptureDeveloperValues();
+                tuning[95] = tuning[96] = tuning[97] = 0f;
+                tuning[98] = 100f; // Every ordinary drum handoff arrives as a pass.
+                Assert.That(blocking.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
                 var room = new LabModel();
                 ulong[] ring = { 10, 20, 30 };
                 room.Begin("swipe-block", ring, 0d, blocking);
@@ -1287,9 +1294,13 @@ namespace C6Lab.Tests
                 string own = OrbOf(room, blocked, "own", 40.1d);
                 string back = OrbOf(room, blocked, "back", 40.1d);
                 string pushed = OrbOf(room, blocked, "pushed", 40.1d);
-                string passing = OrbOf(room, blocked, "passing", 40.1d);
                 string others = OrbOf(room, other, "other", 40.1d);
                 string comingIn = OrbOf(room, toBlocked, "incoming", 40.1d);
+                string passing = room.Snapshot(40.1d).drums.First(drum => drum.owner == toBlocked).id;
+                var arrivingDrum = Pass(room, passing, toBlocked, way, 40.2d);
+                Assert.That(arrivingDrum.passed, Is.True);
+                Assert.That(arrivingDrum.orb.arrival, Is.EqualTo(LabDrumArrival.Pass));
+                Assert.That(arrivingDrum.orb.owner, Is.EqualTo(blocked));
 
                 var stopped = Pass(room, own, blocked, way, 41d);
                 Assert.That(stopped.passed, Is.False, "The blocked player cannot pass that way.");
@@ -1386,6 +1397,60 @@ namespace C6Lab.Tests
                 UnityEngine.Object.DestroyImmediate(blocking);
                 UnityEngine.Object.DestroyImmediate(off);
             }
+        }
+
+        [Test]
+        public void ASwipeBlockCannotBeBypassedByCallingAnOrdinaryOrbOrRestingDrumPassing()
+        {
+            var blocking = BlockConfig(40f, 10f, 0f);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("false-passing", new ulong[] { 10, 20, 30 }, 0d, blocking);
+                LabSnapshot on = room.Snapshot(40d);
+                ulong blocked = on.swipeBlockedPlayer;
+                string raw = OrbOf(room, blocked, "ordinary", 40.1d);
+                string drum = room.Snapshot(40.1d).drums.First(item => item.owner == blocked).id;
+
+                var refusedRaw = Pass(room, raw, blocked, on.swipeBlockedRight, 41d, LabEdgeCrossingKind.Passing);
+                Assert.That(refusedRaw.passed, Is.False, "A Raw has no automatic drum arrival to exempt.");
+                Assert.That(refusedRaw.reason, Is.EqualTo("SWIPE_BLOCKED"));
+                var refusedDrum = Pass(room, drum, blocked, on.swipeBlockedRight, 41.1d, LabEdgeCrossingKind.Passing);
+                Assert.That(refusedDrum.passed, Is.False, "A resting drum is also the player's own pass.");
+                Assert.That(refusedDrum.reason, Is.EqualTo("SWIPE_BLOCKED"));
+                Assert.That(room.Snapshot(41.1d).orbs.Single(item => item.id == raw).owner, Is.EqualTo(blocked));
+                Assert.That(room.Snapshot(41.1d).drums.Single(item => item.id == drum).owner, Is.EqualTo(blocked));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(blocking); }
+        }
+
+        [Test]
+        public void SwipeBlockCatchUpKeepsTheSameBombGapAndDrawsAfterMoreThanEightBombs()
+        {
+            var blocking = BlockConfig(20f, 10f, 3f, 7f, 7f);
+            try
+            {
+                var stepped = new LabModel();
+                var late = new LabModel();
+                ulong[] ring = { 10, 20, 30 };
+                stepped.Begin("late-blocks", ring, 0d, blocking);
+                late.Begin("late-blocks", ring, 0d, blocking);
+                for (int step = 1; step < 1799; step++) stepped.Snapshot(step / 10d);
+                LabSnapshot expected = stepped.Snapshot(179.9d);
+                LabSnapshot actual = late.Snapshot(179.9d);
+
+                Assert.That(expected.swipeBlockStartedAt, Is.EqualTo(171d));
+                Assert.That(actual.swipeBlockStartedAt, Is.EqualTo(expected.swipeBlockStartedAt));
+                Assert.That(actual.swipeBlockedUntil, Is.EqualTo(expected.swipeBlockedUntil));
+                Assert.That(actual.swipeBlockedPlayer, Is.EqualTo(expected.swipeBlockedPlayer), "Catch-up consumes the same draws.");
+                Assert.That(actual.swipeBlockedRight, Is.EqualTo(expected.swipeBlockedRight));
+                Assert.That(actual.SwipeBlockOn(actual.swipeBlockedPlayer), Is.True);
+                LabGourdBomb[] bombs = late.DrainGourdBombs();
+                Assert.That(bombs.Length, Is.EqualTo(25), "This catch-up exceeds the former eight-bomb history limit.");
+                for (int i = 0; i < bombs.Length; i++)
+                    Assert.That(Math.Abs(actual.swipeBlockStartedAt - (i + 1) * 7d), Is.GreaterThanOrEqualTo(3d));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(blocking); }
         }
 
         [Test]
@@ -2422,9 +2487,9 @@ namespace C6Lab.Tests
             float[] values = created.CaptureDeveloperValues();
             values[88] = bombMin;
             values[89] = bombMax;
-            values[153] = interval;
-            values[154] = seconds;
-            values[155] = bombGap;
+            values[157] = interval;
+            values[158] = seconds;
+            values[159] = bombGap;
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
         }
@@ -2465,7 +2530,7 @@ namespace C6Lab.Tests
             values[88] = 0f;
             values[89] = 0f;
             // The gourd's swipe block is off too; BlockConfig turns it on for its own tests (#215).
-            values[153] = 0f;
+            values[157] = 0f;
             for (int i = 0; i < chances.Length; i++) values[39 + i] = chances[i];
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;

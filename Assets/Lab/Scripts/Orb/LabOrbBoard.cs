@@ -638,6 +638,7 @@ namespace C6Lab
         public void Clear()
         {
             CancelDrag();
+            LiftSwipeBlock();
             foreach (var entry in entries.Values)
                 Retire(entry);
             entries.Clear();

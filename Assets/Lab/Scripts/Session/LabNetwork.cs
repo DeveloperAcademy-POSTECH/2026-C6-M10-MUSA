@@ -180,8 +180,9 @@ namespace C6Lab
         // 5641: shared gourd visual size appended at index 145.
         // 5642: #212 bombs come locked again (an unlocked bomb is a throwable attack orb); heavy bomb DEV 146-149.
         // 5643: #213 blast-burnt, shrunk orbs (orb burnedAt/small, blastHit report); DEV 150-152.
-        // 5644: #215 the gourd's swipe block in the snapshot; blast-flung orbs cross as pushed; DEV 153-155.
-        internal const ushort LabProtocolVersion = 5644;
+        // 5644: #225 nearby-hit paint drying adds shared DEV 153-156.
+        // 5645: #215 swipe-block snapshots and pushed crossings integrate at DEV 157-159; 160 shared values.
+        internal const ushort LabProtocolVersion = 5645;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");

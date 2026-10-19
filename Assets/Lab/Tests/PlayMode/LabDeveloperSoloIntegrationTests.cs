@@ -622,9 +622,9 @@ namespace C6Lab.Tests
             float[] tuning = blocking.CaptureDeveloperValues();
             tuning[88] = 0f; // no gourd bombs
             tuning[89] = 0f;
-            tuning[153] = 1f; // a swipe block one second in
-            tuning[154] = 3f;
-            tuning[155] = 0f;
+            tuning[157] = 1f; // a swipe block one second in
+            tuning[158] = 3f;
+            tuning[159] = 0f;
             Assert.That(blocking.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = blocking;
             network.port = 17792;

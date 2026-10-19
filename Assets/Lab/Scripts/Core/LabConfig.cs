@@ -239,6 +239,10 @@ namespace C6Lab
             new LabDeveloperField("Blast Burn Seconds", 3f, 5f),
             new LabDeveloperField("Blast Shrink Scale (x radius)", .2f, 1f),
             new LabDeveloperField("Small Orb Paint Share (x paint)", 0f, 1f),
+            LabDeveloperField.Toggle("Paint Drying (0 off, 1 on)"),
+            new LabDeveloperField("Drying Delay (seconds)", 0f, 60f),
+            new LabDeveloperField("Drying Rate (%/s)", 0f, 5f),
+            new LabDeveloperField("Nearby Hit Radius (surface degrees)", 1f, 90f),
             new LabDeveloperField("Swipe Block Interval (seconds, 0 = off)", 0f, 600f),
             new LabDeveloperField("Swipe Block Seconds", 1f, 60f),
             new LabDeveloperField("Swipe Block Bomb Gap (seconds)", 0f, 15f)
@@ -269,9 +273,9 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 140, 141, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 145, 79, 87, 88, 89, 153, 154, 155, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
+            new LabDeveloperCategory("Gourd", 145, 79, 87, 88, 89, 157, 158, 159, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
-                139, 133, 134, 135, 136, 137, 138),
+                139, 133, 134, 135, 136, 137, 138, 153, 154, 155, 156),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
         });
 
@@ -396,6 +400,14 @@ namespace C6Lab
         [SerializeField, Range(.1f, 100f)] private float paintGrowthPercentPerSecond = 6f;
         [SerializeField, Range(0f, 100f)] private float paintFillChancePercent = 60f;
         [SerializeField, Range(1f, 4f)] private float paintVerticalWeight = 1.35f;
+        [Tooltip("근처 유효 명중이 없는 도색을 빈 표면과 맞닿은 경계부터 점진적으로 지운다. 새 판에 적용한다.")]
+        [SerializeField] private bool paintDryingEnabled = true;
+        [Tooltip("박 표면의 근처에 마지막으로 명중한 뒤 도색을 유지하는 시간 (초).")]
+        [SerializeField, Range(0f, 60f)] private float paintDryingDelaySeconds = 5f;
+        [Tooltip("건조로 지우는 전체 박 표면 대비 초당 면적 (%p/초). 표면 분할 해상도와 독립적이다.")]
+        [SerializeField, Range(0f, 5f)] private float paintDryingPercentPerSecond = .2f;
+        [Tooltip("실제 명중점에서 박 표면을 따라 주변 도색의 유지 시간을 갱신하는 범위 (도).")]
+        [SerializeField, Range(1f, 90f)] private float paintNearbyHitRadiusDegrees = 20f;
         [Tooltip("Paint 100% 승리 뒤 모든 참가자에게 완성된 박의 로컬 관람을 허용한다. 새 판에 적용한다.")]
         [SerializeField] private bool completedGourdViewerEnabled = true;
         [Tooltip("플레이어 P번호별 물감 무늬를 박과 HUD에 표시한다. 색칠·면적·승리 판정은 바꾸지 않으며 새 판에 적용한다.")]
@@ -694,6 +706,10 @@ namespace C6Lab
         public float PaintGrowthPercentPerSecond => Mathf.Clamp(Finite(paintGrowthPercentPerSecond, 6f), .1f, 100f);
         public float PaintFillChancePercent => Mathf.Clamp(Finite(paintFillChancePercent, 60f), 0f, 100f);
         public float PaintVerticalWeight => Mathf.Clamp(Finite(paintVerticalWeight, 1.35f), 1f, 4f);
+        public bool PaintDryingEnabled => paintDryingEnabled;
+        public float PaintDryingDelaySeconds => Mathf.Clamp(Finite(paintDryingDelaySeconds, 5f), 0f, 60f);
+        public float PaintDryingPercentPerSecond => Mathf.Clamp(Finite(paintDryingPercentPerSecond, .2f), 0f, 5f);
+        public float PaintNearbyHitRadiusDegrees => Mathf.Clamp(Finite(paintNearbyHitRadiusDegrees, 20f), 1f, 90f);
         public LabPaintGrowthSettings PaintGrowthSettings => new LabPaintGrowthSettings
         {
             Resolution = PaintSurfaceResolution,
@@ -710,7 +726,11 @@ namespace C6Lab
             FlowRatio = PaintFlowRatio,
             DripWidthDegrees = PaintDripWidthDegrees,
             DripLengthDegrees = PaintDripLengthDegrees,
-            GravityWeight = PaintGravityWeight
+            GravityWeight = PaintGravityWeight,
+            DryingEnabled = PaintDryingEnabled,
+            DryingDelaySeconds = PaintDryingDelaySeconds,
+            DryingPercentPerSecond = PaintDryingPercentPerSecond,
+            NearbyHitRadiusDegrees = PaintNearbyHitRadiusDegrees
         };
         public bool CompletedGourdViewerEnabled => completedGourdViewerEnabled;
         public bool PlayerPaintPatternsEnabled => playerPaintPatternsEnabled;
@@ -859,6 +879,8 @@ namespace C6Lab
                 PaintClusterCompactness, PaintClusterIrregularity, GourdVisualSize,
                 BombDragLag, BombReleaseSpeed, BombSlideDeceleration, BombMass,
                 BlastBurnSeconds, BlastShrinkScale, SmallOrbPaintShare,
+                PaintDryingEnabled ? 1f : 0f, PaintDryingDelaySeconds,
+                PaintDryingPercentPerSecond, PaintNearbyHitRadiusDegrees,
                 SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap
             };
         }
@@ -1056,9 +1078,13 @@ namespace C6Lab
             blastBurnSeconds = values[150];
             blastShrinkScale = values[151];
             smallOrbPaintShare = values[152];
-            swipeBlockInterval = values[153];
-            swipeBlockSeconds = values[154];
-            swipeBlockBombGap = values[155];
+            paintDryingEnabled = values[153] == 1f;
+            paintDryingDelaySeconds = values[154];
+            paintDryingPercentPerSecond = values[155];
+            paintNearbyHitRadiusDegrees = values[156];
+            swipeBlockInterval = values[157];
+            swipeBlockSeconds = values[158];
+            swipeBlockBombGap = values[159];
             error = string.Empty;
             return true;
         }
