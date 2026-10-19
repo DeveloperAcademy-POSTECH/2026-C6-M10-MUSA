@@ -25,8 +25,8 @@ namespace C6Lab.Tests
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(145), "The saved DEV panel includes both appended cluster controls.");
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(145), "The saved DEV panel includes both appended cluster controls.");
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(149), "The saved DEV panel includes both appended cluster controls.");
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(149), "The saved DEV panel includes both appended cluster controls.");
         }
 
         [UnityTearDown]

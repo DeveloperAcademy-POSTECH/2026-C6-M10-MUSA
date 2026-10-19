@@ -43,7 +43,7 @@ namespace C6Lab.Tests
         [Test]
         public void SixSettingsAppendToGourdWhileNewConfigsKeepOriginalGrowthAndGrainOff()
         {
-            Assert.That(baseline.Length, Is.EqualTo(145));
+            Assert.That(baseline.Length, Is.EqualTo(149));
             Assert.That(baseline.Skip(133).Take(6), Is.EqualTo(new[] { 0f, .55f, .35f, 3f, 60f, 3f }));
             Assert.That(LabConfig.DeveloperFields.Skip(133).Take(6).Select(field => field.Label), Is.EqualTo(new[]
             {

@@ -894,6 +894,82 @@ namespace C6Lab.Tests
             }
         }
 
+        [Test]
+        public void AHeavyBombTrailsTheFingerAndOutweighsAnOrbWhileAnOrbSticksToTheFinger()
+        {
+            Assert.That(config.BombDragLag, Is.EqualTo(.12f));
+            var orb = board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.3f, .3f));
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.3f, .7f), lockSwipes: 2, fuseSeconds: 10f);
+            Assert.That(orb.Body.mass, Is.EqualTo(1f));
+            Assert.That(bomb.Body.mass, Is.EqualTo(4f), "A bomb is heavy, so orbs bump off it (#212).");
+
+            Vector2 move = new Vector2(1.5f, 0f);
+            Vector2 start = BoardPoint(orb);
+            Assert.That(board.TryBeginDragAtWorld(start, 1d), Is.True);
+            Assert.That(board.DragToWorld(start + move, 1.05d), Is.True);
+            Assert.That(Vector2.Distance(BoardPoint(orb), start + move), Is.LessThan(1e-4f), "An orb is right under the finger.");
+            board.CancelDrag();
+
+            start = BoardPoint(bomb);
+            Assert.That(board.TryBeginDragAtWorld(start, 2d), Is.True);
+            Assert.That(board.DragToWorld(start + move, 2.05d), Is.True);
+            float share = Vector2.Distance(BoardPoint(bomb), start) / move.magnitude;
+            Assert.That(share, Is.EqualTo(1f - Mathf.Exp(-.05f / .12f)).Within(.01f),
+                "50 ms after the finger moves, the bomb has closed about a third of the gap.");
+            for (int i = 1; i <= 20; i++) board.DragToWorld(start + move, 2.05d + i * .05d);
+            Assert.That(Vector2.Distance(BoardPoint(bomb), start + move), Is.LessThan(.01f),
+                "Held still, it catches up with the finger.");
+            board.CancelDrag();
+
+            // From the DEV form: no lag sticks the bomb to the finger like an orb; a new mass applies to new bombs.
+            float[] values = config.CaptureDeveloperValues();
+            values[145] = 0f;
+            values[148] = 10f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            start = BoardPoint(bomb);
+            Assert.That(board.TryBeginDragAtWorld(start, 4d), Is.True);
+            Assert.That(board.DragToWorld(start - move, 4.05d), Is.True);
+            Assert.That(Vector2.Distance(BoardPoint(bomb), start - move), Is.LessThan(1e-4f));
+            board.CancelDrag();
+            Assert.That(board.UpsertOrb("heavier", LabOrbKind.Bomb, new Vector2(.7f, .5f), lockSwipes: 2, fuseSeconds: 10f).Body.mass,
+                Is.EqualTo(10f));
+        }
+
+        [UnityTest]
+        public IEnumerator AHeavyBombLeavesTheFingerSlowerAndSlidesToAStopSoonerThanAnOrb()
+        {
+            var orb = board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.2f, .3f));
+            var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.2f, .7f), lockSwipes: 2, fuseSeconds: 10f);
+
+            // The same sideways flick on each: the release is worked out from the finger, not the trailing bomb.
+            Vector2 Flick(LabOrbView view, double at)
+            {
+                Vector2 from = BoardPoint(view);
+                Assert.That(board.TryBeginDragAtWorld(from, at), Is.True);
+                Assert.That(board.DragToWorld(from + new Vector2(.4f, 0f), at + .05d), Is.True);
+                Assert.That(board.EndDragAtWorld(from + new Vector2(.8f, 0f), at + .1d), Is.True);
+                return new Vector2(view.Body.linearVelocity.x, view.Body.linearVelocity.y);
+            }
+            Vector2 orbRelease = Flick(orb, 1d);
+            Vector2 bombRelease = Flick(bomb, 2d);
+            Assert.That(orbRelease.x, Is.GreaterThan(.2f * Width), "The flick sends the orb on.");
+            Assert.That(bombRelease.x, Is.EqualTo(.5f * orbRelease.x).Within(.001f * Width),
+                "A bomb leaves the finger at half an orb's speed, so passing it takes a harder swipe (#212).");
+            Assert.That(Mathf.Abs(bombRelease.y), Is.LessThan(.001f));
+
+            // Then each slides on the floor: the bomb loses speed twice as fast.
+            const float Launch = .6f * Width;
+            orb.Body.linearVelocity = new Vector3(Launch, 0f, 0f);
+            bomb.Body.linearVelocity = new Vector3(Launch, 0f, 0f);
+            for (int i = 0; i < 5; i++) yield return new WaitForFixedUpdate();
+            float orbLoss = Launch - orb.Body.linearVelocity.x;
+            float bombLoss = Launch - bomb.Body.linearVelocity.x;
+            Assert.That(orbLoss, Is.GreaterThan(0f));
+            Assert.That(bomb.Body.linearVelocity.x, Is.GreaterThan(config.DrumDriftSpeed * Width * 1.05f),
+                "Still sliding, not yet drifting.");
+            Assert.That(bombLoss / orbLoss, Is.EqualTo(config.BombSlideDeceleration).Within(.15f));
+        }
+
         [UnityTest]
         public IEnumerator AMovingBombRollsItsCapAndFuseAroundTheBallIn3D()
         {

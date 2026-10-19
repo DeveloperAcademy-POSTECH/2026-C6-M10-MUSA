@@ -538,7 +538,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedSceneSoloGourdBombWarnsThenFallsOntoTheLocalBoard()
+        public IEnumerator SavedSceneSoloGourdBombFallsStraightOntoTheLocalBoard()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null; // Let Awake/Start bind the saved Scene references.

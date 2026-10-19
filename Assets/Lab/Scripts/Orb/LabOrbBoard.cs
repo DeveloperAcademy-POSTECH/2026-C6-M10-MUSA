@@ -69,6 +69,8 @@ namespace C6Lab
             public float ArrivalStopX;
             /// <summary>A drum a bomb blast flung, until it slows to its drift; crossing now says so to the Host.</summary>
             public bool Blasted;
+            /// <summary>When the held body last followed the finger, for a heavy bomb's lag (#212).</summary>
+            public double LastDragAt;
             public string PendingPartnerId;
             public LabOrbEdgeCrossing PendingEdge;
             public Vector2 PressVelocity;
@@ -289,6 +291,7 @@ namespace C6Lab
                 if (existing.View.Kind != kind || existing.View.Element != element)
                 {
                     existing.View.Configure(id, kind, RadiusFor(kind), element);
+                    existing.View.Body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
                 if (existing.View.LockSwipes != lockSwipes || existing.View.RelayStage != relayStage
@@ -323,7 +326,8 @@ namespace C6Lab
             body.constraints = RigidbodyConstraints.FreezePositionZ | RigidbodyConstraints.FreezeRotation;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             body.interpolation = RigidbodyInterpolation.Interpolate;
-            body.mass = 1f;
+            // A bomb is heavy (#212): orbs bump off it rather than shoving it.
+            body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
             body.position = OnPlane(start);
             var entry = new Entry { View = view, LocalOwner = localOwner, DriftSeed = DriftSeedFor(id),
                 Dropping = expectedDrops.Remove(id) };
@@ -646,6 +650,7 @@ namespace C6Lab
             if (nearest == null) return false;
             heldId = nearest.View.OrbId;
             nearest.Held = true;
+            nearest.LastDragAt = now;
             nearest.Arrival = LabDrumArrival.None;
             nearest.Blasted = false;
             nearest.PressVelocity = XY(nearest.View.Body.linearVelocity);
@@ -666,7 +671,16 @@ namespace C6Lab
         {
             if (heldId == null || !entries.TryGetValue(heldId, out var entry) || !Finite(worldPoint) || !Finite(now))
                 return false;
-            entry.View.Body.position = OnPlane(Clamp(worldPoint + entry.GrabOffset, entry.View.HitSphere.radius));
+            Vector2 target = Clamp(worldPoint + entry.GrabOffset, entry.View.HitSphere.radius);
+            // A heavy bomb (#212) trails the finger, closing the gap at a rate set by its drag lag
+            // for however long passed since it last followed; anything else sticks to the finger.
+            if (entry.View.Kind == LabOrbKind.Bomb && config.BombDragLag > 0f)
+            {
+                float passed = (float)Math.Max(0d, now - entry.LastDragAt);
+                target = Vector2.Lerp(XY(entry.View.Body.position), target, 1f - Mathf.Exp(-passed / config.BombDragLag));
+            }
+            entry.LastDragAt = now;
+            entry.View.Body.position = OnPlane(target);
             AddSample(worldPoint, now);
             return true;
         }
@@ -736,9 +750,11 @@ namespace C6Lab
             }
 
             SetBodyMode(entry);
-            Vector2 worldVelocity = inputVelocity * bounds.width;
+            // A heavy bomb leaves the finger slower, so it takes a harder swipe to pass it on (#212).
+            float heft = entry.View.Kind == LabOrbKind.Bomb ? config.BombReleaseSpeed : 1f;
+            Vector2 worldVelocity = inputVelocity * bounds.width * heft;
             entry.View.Body.linearVelocity = OnPlane(Vector2.ClampMagnitude(worldVelocity,
-                config.OrbMaxReleaseSpeed * bounds.width));
+                config.OrbMaxReleaseSpeed * bounds.width * heft));
             return true;
         }
 
@@ -882,8 +898,10 @@ namespace C6Lab
             {
                 entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
                 entry.HasDriftHeading = false;
-                return velocity.normalized * Mathf.Max(driftSpeed,
-                    speed - config.OrbFloorDeceleration * bounds.width * step);
+                // A heavy bomb slides to a stop sooner than a drum or an orb (#212).
+                float slowing = config.OrbFloorDeceleration
+                    * (entry.View.Kind == LabOrbKind.Bomb ? config.BombSlideDeceleration : 1f);
+                return velocity.normalized * Mathf.Max(driftSpeed, speed - slowing * bounds.width * step);
             }
 
             // Gentle again: a blast that flung it is spent.
