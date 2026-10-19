@@ -238,7 +238,10 @@ namespace C6Lab
             new LabDeveloperField("Bomb Mass (x orb)", 1f, 20f),
             new LabDeveloperField("Blast Burn Seconds", 3f, 5f),
             new LabDeveloperField("Blast Shrink Scale (x radius)", .2f, 1f),
-            new LabDeveloperField("Small Orb Paint Share (x paint)", 0f, 1f)
+            new LabDeveloperField("Small Orb Paint Share (x paint)", 0f, 1f),
+            new LabDeveloperField("Swipe Block Interval (seconds, 0 = off)", 0f, 600f),
+            new LabDeveloperField("Swipe Block Seconds", 1f, 60f),
+            new LabDeveloperField("Swipe Block Bomb Gap (seconds)", 0f, 15f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -266,7 +269,7 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 140, 141, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 145, 79, 87, 88, 89, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
+            new LabDeveloperCategory("Gourd", 145, 79, 87, 88, 89, 153, 154, 155, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
                 139, 133, 134, 135, 136, 137, 138),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
@@ -442,6 +445,12 @@ namespace C6Lab
         [Tooltip("박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다. 최대가 0이면 떨어뜨리지 않는다 (#177).")]
         [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
         [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
+        [Tooltip("박의 넘기기 막기 (#215): 무작위 한 명의 한쪽 방향 넘기기를 막는 간격 (초). 0이면 막지 않는다.")]
+        [SerializeField, Range(0f, 600f)] private float swipeBlockInterval = 40f;
+        [Tooltip("넘기기 막기가 이어지는 시간 (초).")]
+        [SerializeField, Range(1f, 60f)] private float swipeBlockSeconds = 10f;
+        [Tooltip("넘기기 막기가 박 폭탄과 최소 이만큼 떨어져 시작한다 (초). 가까우면 그 폭탄 뒤로 미룬다.")]
+        [SerializeField, Range(0f, 15f)] private float swipeBlockBombGap = 4f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -729,6 +738,9 @@ namespace C6Lab
         public float PaintGravityWeight => Mathf.Clamp(Finite(paintGravityWeight, 3f), 1f, 8f);
         public float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         public float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
+        public float SwipeBlockInterval => Mathf.Clamp(Finite(swipeBlockInterval, 40f), 0f, 600f);
+        public float SwipeBlockSeconds => Mathf.Clamp(Finite(swipeBlockSeconds, 10f), 1f, 60f);
+        public float SwipeBlockBombGap => Mathf.Clamp(Finite(swipeBlockBombGap, 4f), 0f, 15f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
@@ -846,7 +858,8 @@ namespace C6Lab
                 PlayerPaintPatternsEnabled ? 1f : 0f,
                 PaintClusterCompactness, PaintClusterIrregularity, GourdVisualSize,
                 BombDragLag, BombReleaseSpeed, BombSlideDeceleration, BombMass,
-                BlastBurnSeconds, BlastShrinkScale, SmallOrbPaintShare
+                BlastBurnSeconds, BlastShrinkScale, SmallOrbPaintShare,
+                SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap
             };
         }
 
@@ -1043,6 +1056,9 @@ namespace C6Lab
             blastBurnSeconds = values[150];
             blastShrinkScale = values[151];
             smallOrbPaintShare = values[152];
+            swipeBlockInterval = values[153];
+            swipeBlockSeconds = values[154];
+            swipeBlockBombGap = values[155];
             error = string.Empty;
             return true;
         }

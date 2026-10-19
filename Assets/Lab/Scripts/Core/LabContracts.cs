@@ -168,5 +168,15 @@ namespace C6Lab
         public LabOrbState[] orbs = Array.Empty<LabOrbState>();
         /// <summary>Generate drums. Only a player whose board holds one can create orbs.</summary>
         public LabOrbState[] drums = Array.Empty<LabOrbState>();
+        /// <summary>
+        /// The gourd's swipe block (#215): the player whose own passes one way are stopped, which way,
+        /// and the Host times it started and ends. swipeBlockedUntil is -1 while none is on.
+        /// </summary>
+        public ulong swipeBlockedPlayer;
+        public bool swipeBlockedRight;
+        public double swipeBlockStartedAt = -1d, swipeBlockedUntil = -1d;
+
+        /// <summary>Whether a swipe block is on this player at this snapshot.</summary>
+        public bool SwipeBlockOn(ulong player) => swipeBlockedUntil > serverTime && swipeBlockedPlayer == player;
     }
 }

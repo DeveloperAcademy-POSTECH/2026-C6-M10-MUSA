@@ -429,9 +429,10 @@ namespace C6Lab
                 if (distance > reach) continue;
                 if (entry.Held) CancelDrag();
                 entry.Arrival = LabDrumArrival.None;
-                // A drum flung across tells the Host so it stops inside the next board (#178).
-                if (entry.View.Kind.IsDrum()) entry.Blasted = true;
-                else if (entry.View.Kind != LabOrbKind.Bomb) burned?.Add(entry.View.OrbId);
+                // Anything flung tells the Host it was pushed if it crosses: a drum then stops inside the
+                // next board (#178), and the gourd's swipe block never stops it (#215).
+                entry.Blasted = true;
+                if (!entry.View.Kind.IsDrum() && entry.View.Kind != LabOrbKind.Bomb) burned?.Add(entry.View.OrbId);
                 Vector2 direction = distance > 1e-5f ? away / distance : Vector2.up;
                 Vector2 velocity = XY(entry.View.Body.linearVelocity) + direction * strength * (1f - distance / reach);
                 entry.View.Body.linearVelocity = OnPlane(velocity);
@@ -866,7 +867,12 @@ namespace C6Lab
                 // Convert at this boundary so different camera/board sizes retain the same feel.
                 if (entry.Arrival != LabDrumArrival.None) velocity = Arrive(entry, velocity, position);
                 else if (drifts) velocity = Drift(entry, velocity, position);
-                else if (speed <= config.OrbStopSpeed * bounds.width) velocity = Vector2.zero;
+                else if (speed <= config.OrbStopSpeed * bounds.width)
+                {
+                    // A blast-flung orb that has come to rest is an ordinary orb again.
+                    velocity = Vector2.zero;
+                    entry.Blasted = false;
+                }
                 else velocity = velocity.normalized * Mathf.Max(0f,
                     speed - config.OrbFloorDeceleration * bounds.width * Time.fixedDeltaTime);
                 body.linearVelocity = OnPlane(velocity);

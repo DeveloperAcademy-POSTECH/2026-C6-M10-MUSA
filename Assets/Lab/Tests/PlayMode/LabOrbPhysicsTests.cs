@@ -793,6 +793,31 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator AnOrbABlastFlungIsOrdinaryAgainOnceItStopsOrIsGrabbed()
+        {
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2);
+            var rests = board.UpsertOrb("rests", LabOrbKind.Yin, new Vector2(.45f, .5f));   // flung gently left
+            var held = board.UpsertOrb("held", LabOrbKind.Yang, new Vector2(.55f, .5f));     // flung right, then caught
+            var kinds = new System.Collections.Generic.Dictionary<string, LabEdgeCrossingKind>();
+            board.EdgeCrossed += crossing => kinds[crossing.OrbId] = crossing.Kind;
+            float[] values = config.CaptureDeveloperValues();
+            values[81] = .5f; // a weak blast, so nothing reaches an edge on its own
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(board.Blast("bomb", new Vector2(.5f, .5f)), Is.EqualTo(2));
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(held), 1d), Is.True, "Caught in the hand.");
+            board.CancelDrag();
+            for (int step = 0; step < 150 && rests.Body.linearVelocity.sqrMagnitude > 0f; step++) yield return new WaitForFixedUpdate();
+            Assert.That(rests.Body.linearVelocity.sqrMagnitude, Is.Zero, "The other comes to rest.");
+
+            // Now both are thrown across by hand: that is the player's own pass.
+            rests.Body.linearVelocity = new Vector3(-3f * Width, 0f, 0f);
+            held.Body.linearVelocity = new Vector3(3f * Width, 0f, 0f);
+            for (int step = 0; step < 30 && kinds.Count < 2; step++) yield return new WaitForFixedUpdate();
+            Assert.That(kinds["rests"], Is.EqualTo(LabEdgeCrossingKind.Swipe));
+            Assert.That(kinds["held"], Is.EqualTo(LabEdgeCrossingKind.Swipe));
+        }
+
+        [UnityTest]
         public IEnumerator AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour()
         {
             board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.75f, .5f), lockSwipes: 2); // world (2, 0)
@@ -813,7 +838,8 @@ namespace C6Lab.Tests
                 "Flung past the right edge, both go to the neighbour through the usual handoff.");
             Assert.That(kinds["drum"], Is.EqualTo(LabEdgeCrossingKind.Pushed),
                 "The drum tells the Host a blast flung it, so it stops inside the next board.");
-            Assert.That(kinds["orb"], Is.EqualTo(LabEdgeCrossingKind.Swipe), "Orbs keep the ordinary handoff.");
+            Assert.That(kinds["orb"], Is.EqualTo(LabEdgeCrossingKind.Pushed),
+                "A flung orb says it was pushed too, so the gourd's swipe block never stops it (#215).");
         }
 
         [UnityTest]
