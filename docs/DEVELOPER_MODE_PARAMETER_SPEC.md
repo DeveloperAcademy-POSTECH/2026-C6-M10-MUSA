@@ -551,7 +551,7 @@ DEV **Gourd**의 마지막 네 행이다. `Paint Drying`이 OFF이면 세 숫자
 
 | DEV 입력 이름 | 인덱스 | 현재 기본값 | DEV 범위 / 단위 | 실제 적용 |
 | --- | ---: | ---: | --- | --- |
-| Paint Drying | 153 | OFF(0) | OFF / ON | Paint 전투에서 경계 침식 활성화. OFF이면 기존 누적 도색을 유지한다. |
+| Paint Drying | 153 | ON(1) | OFF / ON | Paint 전투에서 경계 침식 활성화. OFF이면 기존 누적 도색을 유지한다. |
 | Drying Delay (seconds) | 154 | 5 | 0~60초 | 각 셀의 최초 도색 또는 마지막 근처 명중에서 줄기 시작하기까지의 유예. |
 | Drying Rate (%/s) | 155 | 0.2 | 0~5%p/초 | 전체 박 표면 기준 총 감소 속도. 0이면 ON이어도 도색을 지우지 않는다. |
 | Nearby Hit Radius (surface degrees) | 156 | 20 | 1~90도 | 실제 피격점의 정규화된 박 로컬 방향에서 주변 도색을 보호하는 구면각도. |

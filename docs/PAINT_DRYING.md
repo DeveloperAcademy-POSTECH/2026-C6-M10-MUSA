@@ -10,7 +10,7 @@ Unity 6000.6.5f1의 `Assets/Lab/Scenes/Lab.unity`에 연결된 Paint 모델·공
 
 | 설정 | DEV 인덱스 | 기본값 | DEV 허용 범위 | Config 필드 / 공개 속성 |
 | --- | ---: | ---: | --- | --- |
-| Paint Drying | 153 | OFF | 정수0/1, ON/OFF 버튼 | `paintDryingEnabled` / `PaintDryingEnabled` |
+| Paint Drying | 153 | ON | 정수0/1, ON/OFF 버튼 | `paintDryingEnabled` / `PaintDryingEnabled` |
 | Drying Delay (seconds) | 154 | 5초 | 0~60초 | `paintDryingDelaySeconds` / `PaintDryingDelaySeconds` |
 | Drying Rate (%/s) | 155 | 0.2%p/초 | 0~5%p/초 | `paintDryingPercentPerSecond` / `PaintDryingPercentPerSecond` |
 | Nearby Hit Radius (surface degrees) | 156 | 20° | 1~90° | `paintNearbyHitRadiusDegrees` / `PaintNearbyHitRadiusDegrees` |
@@ -22,12 +22,12 @@ Unity 6000.6.5f1의 `Assets/Lab/Scenes/Lab.unity`에 연결된 Paint 모델·공
 ## DEV 사용 순서
 
 1. Editor Play Mode 또는 Development 앱에서 **DEV → Gourd**를 펼치고 마지막 **Paint Drying**을 ON으로 바꾼다.
-2. 세 숫자와 대응 슬라이더를 조정한다. OFF이면 이 세 조작을 잠그고 기존 입력값은 유지한다. **DEFAULTS**는 원본의 OFF·5·0.2·20을 입력에 불러온다.
+2. 세 숫자와 대응 슬라이더를 조정한다. OFF이면 이 세 조작을 잠그고 기존 입력값은 유지한다. **DEFAULTS**는 원본의 ON·5·0.2·20을 입력에 불러온다.
 3. 혼자는 **START/RESTART SOLO**, 접속 전 Host는 **CREATE ROOM**, 기존 Host 로비는 **APPLY TO ROOM**으로 적용한다. 공유 전투 중에는 먼저 공동 일시정지하고 Host의 **APPLY & RESTART**를 사용한다.
 4. 공유 방은 네 값을 포함한 전체157개 지문을 참가자에게 확인받은 뒤 시작한다. Client가 자신의 DEV에서 세션값을 바꾸는 경로는 없다. 패널 입력만 바꾸거나 닫으면 진행 중인 판의 규칙은 바뀌지 않는다.
 5. Paint 전투에서 주변을 반복해서 맞혀 유지되는 부분과 멀리 떨어져 줄어드는 부분을 비교한다. 종료 후에도 확인하려면 먼저 결과를 기록한 뒤 Retry/설정 변경을 한다.
 
-기본 OFF는 이전 성장 알고리즘을 그대로 호출한다. Crack에서는 Paint Surface 시간을 진행하지 않으므로 이 규칙을 적용하지 않는다. 구슬 입력·이동·전달·투척·명중 승인·명중 보상·크랙 피해는 변경하지 않는다.
+기본은 ON이다. DEV에서 OFF로 적용하면 이전 성장 알고리즘을 그대로 호출한다. Crack에서는 Paint Surface 시간을 진행하지 않으므로 이 규칙을 적용하지 않는다. 구슬 입력·이동·전달·투척·명중 승인·명중 보상·크랙 피해는 변경하지 않는다.
 
 ## 명중과 보호 시간
 
@@ -66,7 +66,7 @@ Host 전투 시간의 **0.1초 고정 tick**을 사용한다. 화면 프레임�
 
 `Coverage = CoveredCount / CellCount`를 유지하므로 건조로 지운 실제 셀만큼 목표 표시가 내려간다. 화면에100%로 보이게만 처리하거나, 과거 최고 도색률로 승리를 결정하지 않는다. 기존 숫자 표시의 내림과 마지막 빈 셀 확인 규칙을 유지한다.
 
-Host 모델만 건조를 계산한다. Host 표시 캐시와 Client는 기존 `paint_cells` delta/체크포인트의 **색상과 P번호 맵**을 받는다. 삭제용 빈 RGBA/P0도 같은 원자적 검증/해시/Revision/Snapshot 공개 경로를 사용하며 별도 로컬 건조 애니메이션을 판정으로 삼지 않는다. Replica와 관람 복사본은 스스로 시간을 진행해 칠을 지우지 않는다.
+Host 모델만 건조를 계산한다. Host 표시 캐시와 Client는 기존 `paint_cells` delta/체크포인트의 **색상과 P번호 맵**을 받는다. 삭제용 빈 RGBA/P0도 같은 원자적 검증/해시/Revision/Snapshot 공개 경로를 사용하며 별도 로컬 건조 애니메이션을 판정으로 삼지 않는다. Replica와 관람 복사본은 스스로 시간을 진행해 칠을 지우지 않는다. 독립 코어 fixture의 new LabPaintGrowthSettings()는 명시적 설정 전까지 OFF이며, 실제 게임은 LabConfig에서 기본 ON을 캡처한다.
 
 100% Victory 또는 다른 결과 상태로 넘어가면 모델이 Surface 시간을 더 진행하지 않는다. Surface 자체도 완료 후 Advance를 즉시 반환하므로 완성 박은 보존된다. 기본 ON의 완성 박 관람·개인 무늬 설정은 유지한다. Retry/새 판은 맵과 성장 공급뿐 아니라 건조 시계·보호/노출 시각·경계/큐·잔량도 초기화한다. 설정을 바꾸지 않는 Retry는 기존 건조 설정을 유지한다.
 

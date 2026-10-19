@@ -398,7 +398,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 100f)] private float paintFillChancePercent = 60f;
         [SerializeField, Range(1f, 4f)] private float paintVerticalWeight = 1.35f;
         [Tooltip("근처 유효 명중이 없는 도색을 빈 표면과 맞닿은 경계부터 점진적으로 지운다. 새 판에 적용한다.")]
-        [SerializeField] private bool paintDryingEnabled = false;
+        [SerializeField] private bool paintDryingEnabled = true;
         [Tooltip("박 표면의 근처에 마지막으로 명중한 뒤 도색을 유지하는 시간 (초).")]
         [SerializeField, Range(0f, 60f)] private float paintDryingDelaySeconds = 5f;
         [Tooltip("건조로 지우는 전체 박 표면 대비 초당 면적 (%p/초). 표면 분할 해상도와 독립적이다.")]

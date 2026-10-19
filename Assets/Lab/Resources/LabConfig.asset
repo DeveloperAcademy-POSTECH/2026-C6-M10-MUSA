@@ -81,7 +81,7 @@ MonoBehaviour:
   paintGrowthPercentPerSecond: 6
   paintFillChancePercent: 60
   paintVerticalWeight: 1.35
-  paintDryingEnabled: 0
+  paintDryingEnabled: 1
   paintDryingDelaySeconds: 5
   paintDryingPercentPerSecond: 0.2
   paintNearbyHitRadiusDegrees: 20

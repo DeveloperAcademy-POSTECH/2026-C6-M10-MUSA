@@ -63,7 +63,7 @@ namespace C6Lab.Tests
         {
             Assert.That(developer.valueInputs.Length, Is.EqualTo(157));
             Assert.That(developer.valueSliders.Length, Is.EqualTo(157));
-            Assert.That(network.config.PaintDryingEnabled, Is.False);
+            Assert.That(network.config.PaintDryingEnabled, Is.True, "Fresh game sessions enable drying by default.");
             developer.Open();
             developer.panel.GetComponentsInChildren<Button>(true)
                 .Single(button => button.name == "Category Gourd").onClick.Invoke();
@@ -71,7 +71,16 @@ namespace C6Lab.Tests
             Button toggle = toggleRow.Find("SettingSlider/SettingToggle").GetComponent<Button>();
             Assert.That(toggleRow.gameObject.activeInHierarchy, Is.True);
             Assert.That(developer.valueInputs[153].gameObject.activeSelf, Is.False);
+            Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("ON"));
+            toggle.onClick.Invoke();
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("OFF"));
+            Assert.That(network.config.PaintDryingEnabled, Is.True, "Draft OFF must not change the accepted config before APPLY.");
+            for (int i = 154; i <= 156; i++)
+            {
+                Assert.That(developer.valueInputs[i].readOnly, Is.True);
+                Assert.That(developer.valueInputs[i].interactable, Is.False);
+                Assert.That(developer.valueSliders[i].interactable, Is.False);
+            }
             toggle.onClick.Invoke();
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("ON"));
             float[] requested = { 7f, .3f, 25f };
@@ -87,7 +96,7 @@ namespace C6Lab.Tests
                 Assert.That(developer.valueSliders[i].value,
                     Is.EqualTo(Mathf.InverseLerp(field.Min, field.Max, requested[i - 154])).Within(.0001f));
             }
-            Assert.That(network.config.PaintDryingEnabled, Is.False, "A draft toggle cannot change an accepted room.");
+            Assert.That(network.config.PaintDryingEnabled, Is.True, "Draft values cannot change an accepted room.");
             developer.applyStartButton.onClick.Invoke();
             yield return null; yield return null;
             Assert.That(network.IsDeveloperSolo, Is.True, developer.feedbackText.text);
@@ -109,6 +118,13 @@ namespace C6Lab.Tests
             Assert.That(network.config.PaintNearbyHitRadiusDegrees, Is.EqualTo(25f));
             Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(previousSession));
             Assert.That(Model().PaintSurface.CoveredCount, Is.Zero, "APPLY & RESTART clears old wet cells and protection.");
+            developer.Open();
+            developer.ShowDefaults();
+            Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("ON"), "DEFAULTS restores the game asset's ON setting.");
+            Assert.That(network.config.PaintDryingEnabled, Is.False, "Loading defaults is not an APPLY operation.");
+            Assert.That(developer.valueInputs[154].text, Is.EqualTo("5"));
+            Assert.That(developer.valueInputs[155].text, Is.EqualTo("0.2"));
+            Assert.That(developer.valueInputs[156].text, Is.EqualTo("20"));
             Assert.That(JsonUtility.ToJson(developer.sourceConfig), Is.EqualTo(sourceJson));
         }
 

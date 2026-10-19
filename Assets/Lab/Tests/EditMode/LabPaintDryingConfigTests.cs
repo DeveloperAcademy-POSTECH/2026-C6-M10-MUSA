@@ -24,18 +24,19 @@ namespace C6Lab.Tests
         [TearDown] public void Dispose() => Object.DestroyImmediate(config);
 
         [Test]
-        public void FreshAndAuthoredDefaultsKeepDryingOffAndExposeFourAppendedGourdControls()
+        public void FreshAndAuthoredGameDefaultsEnableDryingAndExposeFourAppendedGourdControls()
         {
+            Assert.That(new LabPaintGrowthSettings().DryingEnabled, Is.False, "Bare surface fixtures remain opt-in, independently of the game config default.");
             Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(157));
             Assert.That(Protocol, Is.EqualTo(5644));
-            Assert.That(LabConfig.DeveloperFields.Skip(153).Select(field => field.DisplayLabel), Is.EqualTo(new[]
+            Assert.That(LabConfig.DeveloperFields.Skip(153).Take(4).Select(field => field.DisplayLabel), Is.EqualTo(new[]
             {
                 "Paint Drying", "Drying Delay (seconds)", "Drying Rate (%/s)", "Nearby Hit Radius (surface degrees)"
             }));
             Assert.That(LabConfig.DeveloperFields[153].IsToggle, Is.True);
-            Assert.That(LabConfig.DeveloperFields.Skip(154).Select(field => field.Min), Is.EqualTo(new[] { 0f, 0f, 1f }));
-            Assert.That(LabConfig.DeveloperFields.Skip(154).Select(field => field.Max), Is.EqualTo(new[] { 60f, 5f, 90f }));
-            Assert.That(LabConfig.DeveloperFields.Skip(154).All(field => !field.IsToggle && !field.IsChoice && !field.WholeNumber), Is.True);
+            Assert.That(LabConfig.DeveloperFields.Skip(154).Take(3).Select(field => field.Min), Is.EqualTo(new[] { 0f, 0f, 1f }));
+            Assert.That(LabConfig.DeveloperFields.Skip(154).Take(3).Select(field => field.Max), Is.EqualTo(new[] { 60f, 5f, 90f }));
+            Assert.That(LabConfig.DeveloperFields.Skip(154).Take(3).All(field => !field.IsToggle && !field.IsChoice && !field.WholeNumber), Is.True);
             int[] gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd").FieldIndices;
             Assert.That(gourd.Skip(gourd.Length - 4), Is.EqualTo(new[] { 153, 154, 155, 156 }));
             foreach (int field in Enumerable.Range(153, 4))
@@ -46,8 +47,8 @@ namespace C6Lab.Tests
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
             {
-                Assert.That(source.CaptureDeveloperValues().Skip(153), Is.EqualTo(new[] { 0f, 5f, .2f, 20f }));
-                Assert.That(source.PaintDryingEnabled, Is.False);
+                Assert.That(source.CaptureDeveloperValues().Skip(153).Take(4), Is.EqualTo(new[] { 1f, 5f, .2f, 20f }));
+                Assert.That(source.PaintDryingEnabled, Is.True);
                 Assert.That(source.PaintRepeatPercent, Is.EqualTo(1.5f));
                 Assert.That(source.CompletedGourdViewerEnabled && source.PlayerPaintPatternsEnabled, Is.True);
                 AssertSettingsMatch(source);
@@ -92,7 +93,7 @@ namespace C6Lab.Tests
             finally { Object.DestroyImmediate(clone); Object.DestroyImmediate(client); }
         }
 
-        [TestCase(153, 1f)]
+        [TestCase(153, 0f)]
         [TestCase(154, 0f)]
         [TestCase(155, 0f)]
         [TestCase(156, 90f)]
@@ -116,7 +117,7 @@ namespace C6Lab.Tests
                 : new[] { schema.Min - .01f, schema.Max + .01f, float.NaN, float.NegativeInfinity, float.PositiveInfinity };
             foreach (float invalid in invalids)
             {
-                float[] values = (float[])baseline.Clone(); values[0] = 777f; values[111] = 0f; values[field] = invalid;
+                float[] values = (float[])baseline.Clone(); values[0] = 777f; values[111] = 0f; values[153] = 0f; values[field] = invalid;
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False);
                 Assert.That(error, Does.Contain(schema.Label));
                 Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
@@ -139,14 +140,14 @@ namespace C6Lab.Tests
         public void InspectorValuesClampAndNonfiniteValuesFallBackWithoutAlteringOtherSettings()
         {
             JsonUtility.FromJsonOverwrite("{\"paintDryingDelaySeconds\":-1,\"paintDryingPercentPerSecond\":10,\"paintNearbyHitRadiusDegrees\":0}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(154), Is.EqualTo(new[] { 0f, 5f, 1f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(154).Take(3), Is.EqualTo(new[] { 0f, 5f, 1f }));
             JsonUtility.FromJsonOverwrite("{\"paintDryingDelaySeconds\":100,\"paintDryingPercentPerSecond\":-1,\"paintNearbyHitRadiusDegrees\":100}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(154), Is.EqualTo(new[] { 60f, 0f, 90f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(154).Take(3), Is.EqualTo(new[] { 60f, 0f, 90f }));
             foreach (float invalid in new[] { float.NaN, float.NegativeInfinity, float.PositiveInfinity })
             {
                 foreach (string field in new[] { "paintDryingDelaySeconds", "paintDryingPercentPerSecond", "paintNearbyHitRadiusDegrees" })
                     typeof(LabConfig).GetField(field, BindingFlags.NonPublic | BindingFlags.Instance).SetValue(config, invalid);
-                Assert.That(config.CaptureDeveloperValues().Skip(153), Is.EqualTo(new[] { 0f, 5f, .2f, 20f }));
+                Assert.That(config.CaptureDeveloperValues().Skip(153).Take(4), Is.EqualTo(new[] { 1f, 5f, .2f, 20f }));
                 AssertSettingsMatch(config);
             }
             Assert.That(config.CaptureDeveloperValues().Take(153), Is.EqualTo(baseline.Take(153)));
