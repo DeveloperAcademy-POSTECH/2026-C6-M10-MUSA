@@ -1245,21 +1245,36 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void APaintShareOutsideZeroToOnePaintsNothingAndHalfPaintsHalf()
+        public void PaintSharesRejectInvalidAmountsAndScaleBothShrunkAndRewardHits()
         {
-            var settings = new LabPaintGrowthSettings();
+            // Isolate supplied paint area from the artistic stamp and real-time drying.
+            var settings = new LabPaintGrowthSettings
+            {
+                Resolution = 1, Pattern = LabPaintPattern.Legacy, Style = 1,
+                InitialPercent = 6.25f, GrowthPercentPerSecond = 100f, Raggedness = 0f
+            };
             var surface = new LabPaintSurface(settings, 3u);
-            foreach (float bad in new[] { 0f, -.5f, 1.5f, float.NaN, float.PositiveInfinity })
+            foreach (float bad in new[] { 0f, -.5f, 3.001f, 4f, float.NaN,
+                float.PositiveInfinity, float.NegativeInfinity })
                 Assert.That(surface.RegisterHit(Vector3.forward, Color.red, 1, 1, bad), Is.False, bad.ToString());
             Assert.That(surface.PaintCount, Is.Zero, "A refused hit is not counted.");
             Assert.That(surface.CoveredCount, Is.Zero);
 
             var whole = new LabPaintSurface(settings, 3u);
-            Assert.That(surface.RegisterHit(Vector3.forward, Color.red, 1, 1, .5f), Is.True);
             Assert.That(whole.RegisterHit(Vector3.forward, Color.red, 1, 1), Is.True);
-            surface.Advance(30d);
-            whole.Advance(30d);
-            Assert.That(surface.CoveredCount, Is.EqualTo(whole.CoveredCount / 2).Within(3));
+            whole.Advance(1d);
+            Assert.That(whole.CoveredCount, Is.GreaterThan(0));
+            foreach (float share in new[] { .5f, 1.5f, 3f })
+            {
+                var scaled = new LabPaintSurface(settings, 3u);
+                Assert.That(scaled.RegisterHit(Vector3.forward, Color.red, 1, 1, share), Is.True,
+                    "Both blast shrink and combo reward shares must be accepted, including the upper bound.");
+                scaled.Advance(1d);
+                Assert.That(scaled.PaintCount, Is.EqualTo(1));
+                Assert.That(scaled.PendingCoverage, Is.LessThan(1d / scaled.CellCount));
+                Assert.That(scaled.CoveredCount, Is.EqualTo(whole.CoveredCount * share).Within(3),
+                    "Only the accepted hit's actual paint budget scales: share=" + share);
+            }
         }
 
         [Test]

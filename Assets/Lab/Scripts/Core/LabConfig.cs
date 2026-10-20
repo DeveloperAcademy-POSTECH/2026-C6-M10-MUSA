@@ -245,7 +245,16 @@ namespace C6Lab
             new LabDeveloperField("Nearby Hit Radius (surface degrees)", 1f, 90f),
             new LabDeveloperField("Swipe Block Interval (seconds, 0 = off)", 0f, 600f),
             new LabDeveloperField("Swipe Block Seconds", 1f, 60f),
-            new LabDeveloperField("Swipe Block Bomb Gap (seconds)", 0f, 15f)
+            new LabDeveloperField("Swipe Block Bomb Gap (seconds)", 0f, 15f),
+            LabDeveloperField.Toggle("Gourd Color Combo (0 off, 1 on)"),
+            new LabDeveloperField("Combo First Start (seconds)", 1f, 3600f),
+            new LabDeveloperField("Combo Repeat Interval (seconds)", 1f, 3600f),
+            new LabDeveloperField("Combo Time Limit (seconds)", 1f, 600f),
+            new LabDeveloperField("Combo Penalty Duration (seconds)", 0f, 600f),
+            new LabDeveloperField("Combo Penalty Size (x)", .01f, 1f),
+            LabDeveloperField.Toggle("Combo Penalty Target (0 team, 1 thrower)", "TEAM", "THROWER"),
+            new LabDeveloperField("Combo Reward Duration (seconds)", 0f, 600f),
+            new LabDeveloperField("Combo Reward Size (x)", 1f, 3f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -276,7 +285,8 @@ namespace C6Lab
             new LabDeveloperCategory("Gourd", 145, 79, 87, 88, 89, 157, 158, 159, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
                 139, 133, 134, 135, 136, 137, 138, 153, 154, 155, 156),
-            new LabDeveloperCategory("Minimap", 99, 100, 101, 102)
+            new LabDeveloperCategory("Minimap", 99, 100, 101, 102),
+            new LabDeveloperCategory("Combo", 160, 161, 162, 163, 164, 165, 166, 167, 168)
         });
 
 
@@ -335,6 +345,26 @@ namespace C6Lab
         [SerializeField, Range(.2f, 1f)] private float blastShrinkScale = .5f;
         [Tooltip("폭발 패널티: 작아진 구슬이 박에 맞았을 때 칠하는 양의 배율 (보통 구슬 = 1).")]
         [SerializeField, Range(0f, 1f)] private float smallOrbPaintShare = .5f;
+
+        [Header("Experiment: gourd color combo (#222)")]
+        [Tooltip("켜면 전투 중 박이 4칸 색 콤보를 낸다. 끄면 기존 플레이와 같다.")]
+        [SerializeField] private bool gourdColorComboEnabled;
+        [Tooltip("전투 시작 후 첫 콤보가 나오는 시각 (초, 일시정지 시간 제외)")]
+        [SerializeField, Range(1f, 3600f)] private float comboFirstStartSeconds = 20f;
+        [Tooltip("콤보가 나오는 간격 (초). 앞 콤보가 나온 시각부터 잰다. 앞 콤보가 아직 진행 중이면 끝난 직후에 나온다.")]
+        [SerializeField, Range(1f, 3600f)] private float comboRepeatIntervalSeconds = 30f;
+        [Tooltip("콤보 4칸을 모두 맞혀야 하는 제한 시간 (초)")]
+        [SerializeField, Range(1f, 600f)] private float comboTimeLimitSeconds = 10f;
+        [Tooltip("콤보 실패 후 공 크기·칠 면적이 줄어드는 시간 (초). 0이면 페널티 없음.")]
+        [SerializeField, Range(0f, 600f)] private float comboPenaltyDurationSeconds = 10f;
+        [Tooltip("페널티 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
+        [SerializeField, Range(.01f, 1f)] private float comboPenaltySizeScale = .3f;
+        [Tooltip("페널티 대상. 팀 전체, 또는 틀린 색을 맞힌 사람만 (시간 초과는 언제나 팀 전체).")]
+        [SerializeField] private bool comboPenaltyThrowerOnly;
+        [Tooltip("콤보 성공 후 팀 전체의 공 크기/칠 면적이 커지는 시간 (초). 0이면 보상 없음.")]
+        [SerializeField, Range(0f, 600f)] private float comboRewardDurationSeconds = 10f;
+        [Tooltip("보상 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
+        [SerializeField, Range(1f, 3f)] private float comboRewardSizeScale = 1.5f;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -632,6 +662,15 @@ namespace C6Lab
         public float BlastBurnSeconds => Mathf.Clamp(Finite(blastBurnSeconds, 4f), 3f, 5f);
         public float BlastShrinkScale => Mathf.Clamp(Finite(blastShrinkScale, .5f), .2f, 1f);
         public float SmallOrbPaintShare => Mathf.Clamp(Finite(smallOrbPaintShare, .5f), 0f, 1f);
+        public bool GourdColorComboEnabled => gourdColorComboEnabled;
+        public float ComboFirstStartSeconds => Mathf.Clamp(Finite(comboFirstStartSeconds, 20f), 1f, 3600f);
+        public float ComboRepeatIntervalSeconds => Mathf.Clamp(Finite(comboRepeatIntervalSeconds, 30f), 1f, 3600f);
+        public float ComboTimeLimitSeconds => Mathf.Clamp(Finite(comboTimeLimitSeconds, 10f), 1f, 600f);
+        public float ComboPenaltyDurationSeconds => Mathf.Clamp(Finite(comboPenaltyDurationSeconds, 10f), 0f, 600f);
+        public float ComboPenaltySizeScale => Mathf.Clamp(Finite(comboPenaltySizeScale, .3f), .01f, 1f);
+        public bool ComboPenaltyThrowerOnly => comboPenaltyThrowerOnly;
+        public float ComboRewardDurationSeconds => Mathf.Clamp(Finite(comboRewardDurationSeconds, 10f), 0f, 600f);
+        public float ComboRewardSizeScale => Mathf.Clamp(Finite(comboRewardSizeScale, 1.5f), 1f, 3f);
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
         public float OrbStopSpeed => Mathf.Clamp(Finite(orbStopSpeed, .065f), 0f, OrbMaxReleaseSpeed);
@@ -881,7 +920,10 @@ namespace C6Lab
                 BlastBurnSeconds, BlastShrinkScale, SmallOrbPaintShare,
                 PaintDryingEnabled ? 1f : 0f, PaintDryingDelaySeconds,
                 PaintDryingPercentPerSecond, PaintNearbyHitRadiusDegrees,
-                SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap
+                SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap,
+                GourdColorComboEnabled ? 1f : 0f, ComboFirstStartSeconds, ComboRepeatIntervalSeconds,
+                ComboTimeLimitSeconds, ComboPenaltyDurationSeconds, ComboPenaltySizeScale,
+                ComboPenaltyThrowerOnly ? 1f : 0f, ComboRewardDurationSeconds, ComboRewardSizeScale
             };
         }
 
@@ -1085,6 +1127,15 @@ namespace C6Lab
             swipeBlockInterval = values[157];
             swipeBlockSeconds = values[158];
             swipeBlockBombGap = values[159];
+            gourdColorComboEnabled = values[160] >= .5f;
+            comboFirstStartSeconds = values[161];
+            comboRepeatIntervalSeconds = values[162];
+            comboTimeLimitSeconds = values[163];
+            comboPenaltyDurationSeconds = values[164];
+            comboPenaltySizeScale = values[165];
+            comboPenaltyThrowerOnly = values[166] >= .5f;
+            comboRewardDurationSeconds = values[167];
+            comboRewardSizeScale = values[168];
             error = string.Empty;
             return true;
         }

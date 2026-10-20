@@ -27,8 +27,8 @@ namespace C6Lab.Tests
         public void FreshAndAuthoredGameDefaultsEnableDryingAndExposeFourAppendedGourdControls()
         {
             Assert.That(new LabPaintGrowthSettings().DryingEnabled, Is.False, "Bare surface fixtures remain opt-in, independently of the game config default.");
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(160));
-            Assert.That(Protocol, Is.EqualTo(5645));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(169));
+            Assert.That(Protocol, Is.EqualTo(5646));
             Assert.That(LabConfig.DeveloperFields.Skip(153).Take(4).Select(field => field.DisplayLabel), Is.EqualTo(new[]
             {
                 "Paint Drying", "Drying Delay (seconds)", "Drying Rate (%/s)", "Nearby Hit Radius (surface degrees)"

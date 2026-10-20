@@ -1373,3 +1373,57 @@ OrbCamera의 단색 바탕이 조합대 상단 투명 곡선에서 보이던 부
 
 - Unity6000.6.5f1 컴파일 완료. EditMode7/7, PlayMode4/4, 실패·건너뜀0(앞과 같은7종 연결 및 이미지/물리 분리·카메라·실제 솔로 조합/명중 검사). 반지름0.32에서 음양 지름0.64/오행0.768을 확인하고, 축소 투사체도 기존Collider에120% 표시만 적용됨을 확인했다.
 - 빌드·실기기·다중 연결은 NOT_RUN. 임시 도구·원시 결과는 저장소에서 제외한다.
+
+
+## 박 색상 콤보 실험 — 2026-10-19, 이슈 #222
+
+기준은 Unity **6000.6.5f1**, main(`dc4917d3`, #212 PR #220 포함)에서 분기한 `experiment/#222-gourd-color-combo`다.
+
+- **DEV**: 맨 아래 `Combo` 묶음에 7개를 추가했다(이후 보상 2개 추가, main 통합 후 번호는 161~169번째/인덱스 160~168). `Gourd Color Combo` 기본 OFF, `Combo First Start` 20초, `Combo Repeat Interval` 30초, `Combo Time Limit` 10초, `Combo Penalty Duration` 10초, `Combo Penalty Size (x)` 0.3(처음 0.5에서 낮춤), `Combo Penalty Target` TEAM(THROWER 선택). `LabConfig.asset`은 바꾸지 않았고 저장 필드가 없으면 코드 기본값을 쓴다.
+- **판정(Host)**: `LabGourdCombo`가 4칸 순서/색을 판정한다. 틀린 색은 즉시 실패(던진 사람 기록), 시간 초과는 마감 시각에 실패. 색 없는 공(폭탄/릴레이)은 무시한다. `LabModel`이 박 폭탄과 같은 방식으로 전투 시계 기준 예약(시간을 건너뛰어도 순서대로 처리)하고 색은 라운드 seed로 뽑는다.
+- **페널티**: 실패하면 `LabPlayerState.comboPenaltyUntil`을 기록한다(TEAM 전원 / THROWER 틀린 사람만 / 시간 초과는 언제나 전원). 던질 때 `ThrowScaleFor`로 정한 배율을 공 ID별로 기억해 공 반지름(`LabProjectile.SetRadiusScale`)과 칠 면적(`LabPaintSurface.RegisterHit(..., areaScale)`)에 함께 쓴다. 다른 기기에는 `projectile` 패킷의 `sizeScale`로 같은 크기를 보낸다.
+- **화면**: `LabGourdComboHud`가 실행 시 붙어 4칸 색/체크/남은 시간 막대/`CLEAR!`, `WRONG COLOR`, `TIME UP`을 그린다. 후속 수정으로 남은 시간 숫자를 지우고(막대는 3초 이하에서 빨개짐), 페널티/보상 남은 시간은 글자 한 줄 대신 패널 아래 가장자리의 알약 배지(빨강 `SMALL` / 노랑 `BIG`, 공 아이콘, 줄어드는 게이지, 남은 초, 나타날 때 톡 튀고 마지막 3초 두근거림)로 바꿨다. 이어서 콤보 패널/결과 문구/배지가 겹치지 않도록 순서를 정했다: 결과가 나오면 패널이 바로 사라지고 그 자리에 결과 문구(실패는 1.8배로 쾅 튀고 0.7초 흔들림 + 화면 빨간 번쩍임)가 뜨며, 문구가 끝난 뒤 배지가 톡 튀어나온다.
+- **진동(후속)**: `LabHaptics`가 스냅샷의 콤보 결과 변화를 보고 모든 기기에서 울린다. 성공은 Heavy 탭 3번(0.14초 간격), 실패(틀린 색/시간 초과)는 2초 연속 진동(`C6Lab_PlayContinuousHaptic`, Core Haptics; 미지원 기기는 Heavy 탭 반복). iOS 빌드 후처리에서 `CoreHaptics.framework`를 UnityFramework에 weak로 연결한다. 실기기 진동 느낌은 NOT_RUN. 씬 파일은 바꾸지 않았다.
+- **성공 보상(후속)**: 성공하면 팀 전체 `comboRewardUntil`을 기록하고 `Combo Reward Duration` 10초 동안 `Combo Reward Size (x)` 1.5배로 던지고 칠한다. 보상과 페널티는 마지막 결과만 남으며 한 사람에게 겹치면 페널티가 우선이다. 콤보 패널 기본 칸 크기는 64 → 40px로 줄였고 글자/막대가 칸 크기에 비례한다.
+- **설정/통신**: 콤보 7개 + 보상 2개. 스냅샷에 콤보 필드 추가.
+- **main 통합(2026-10-20)**: 브랜치를 딴 뒤 main에 #213(폭발 패널티, DEV 150~152)/#225(건조, 153~156)/#215(넘기기 막기, 157~159)/#227(새 UI)이 합쳐져 같은 번호와 프로토콜이 겹쳤다. 콤보 9개를 160~168로 옮겨 설정 160 → **169개**, 프로토콜 `5645` → **`5646`**으로 올렸다. 공 크기는 폭발 축소(`sizeScale`)와 콤보 배율(`radiusScale`)을 곱하고, 칠 양은 작은 구슬 몫(`SmallOrbPaintShare`)과 콤보 배율을 곱한다(`RegisterHit` share 상한 1 → 3).
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. `LabGourdCombo`는 Unity 없이 단독 컴파일했다. Unity 컴파일은 아래 실행 결과로 확인한다. |
+| EditMode 실제 실행 | NOT_RUN (기록 없음) | `LabGourdComboTests` 14개, `LabDeveloperConfigTests`와 개수/프로토콜 고정 검사 갱신분, 기존 전체 EditMode. |
+| PlayMode 실제 실행 | NOT_RUN | 개수 고정을 갱신한 Developer PlayMode 검사와 기존 전체 PlayMode. |
+| 솔로 화면: 콤보 표시/체크/시간/결과 연출, 실패 후 작은 공/작은 칠, OFF 시 기존과 동일 | NOT_RUN | DEV → Combo ON, `Combo First Start`를 5초 정도로 두면 빠르게 확인할 수 있다. |
+| 3인 실행: 모든 화면 같은 콤보, 클라이언트에서 작은 공이 같은 크기로 보임, THROWER 모드에서 틀린 사람만 페널티 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | HUD 위치가 위쪽 HUD/노치와 겹치지 않는지(`LabGourdComboHud.panelAnchor`) 확인 필요. |
+
+추가/변경한 검사:
+- **EditMode** `LabGourdComboTests`(새 파일): `FourHitsInOrderAndColorSucceed`, `AWrongColorFailsAtOnceAndRemembersTheThrower`, `TheTimeLimitEndsTheComboAtItsDeadline`, `StartRejectsNonElementColors`, `WhenTheToggleIsOffNoComboEverAppears`, `ATimedOutComboPenalizesTheWholeTeamAndTheNextComboFollowsTheInterval`, `EveryDeviceSeesTheSameColorsForTheSameRound`, `AWrongColorPenalizesTheTeamOrOnlyTheThrowerAsConfigured`(TEAM/THROWER 2건), `APenalizedThrowRemembersItsSizeUntilItLandsOrMisses`, `AScaledPaintHitCoversLessAndTheNextHitIsFullSizeAgain`, `ASuccessGivesTheWholeTeamBigBallsAndEndsAPenalty`, `ASuccessEndsARunningPenalty`, `ARewardPaintHitCoversMore`
+- **EditMode** `LabDeveloperConfigTests`: `GourdColorComboFieldsFormTheComboGroupAndStartOff`; 무거운 폭탄 검사는 146~149번만 읽도록 범위 고정. 개수/프로토콜을 고정한 팀원 검사들을 169개/5646으로 갱신.
+
+
+## PR #231 2D 구슬 · #232 색상 콤보 통합 검증 — 2026-10-20 (KST)
+
+기준 main `652c5081`(#228 새 UI), PR #231 `333761d6`, PR #232 `b802bad2`의 합본이다. Unity6000.6.5f1·URP17.6.0·macOS ARM64를 사용했다. 새 UI Scene과 건조 기본 ON은 유지하며 콤보는 기본 OFF, 설정169개/프로토콜5646이다. #231의 무관한 Target2 머터리얼 float 재저장2건은 제외했다. 아래는 실제 합본 실행 결과이며 각 PR 단독 전체 결과로 확대하지 않는다.
+
+| 확인 | 결과 | 실행 근거·범위 |
+| --- | --- | --- |
+| 전체 EditMode | PASS | `editmode-final.xml` **787/787**, failed/skipped0, 00:41:42~00:42:06 UTC,24.107초. 설정/콤보·Host 판정·공유 패킷·도색 상한·건조 인접 보호와 기존 검사를 포함한다. |
+| 전체 PlayMode | **FAIL,204/205** | `playmode-final.xml`, skipped0,00:46:38~00:48:18 UTC,100.055초. 2D 이미지/카메라·물리·생성·DEV·새 통합3건을 포함해204건 통과. 아래 기존 투사체 검사만 실패했다. |
+| 새 통합3건 | PASS(통제 fixture) | 실제 저장 Sprite의 폭발.5×콤보.3/1.5에 따른 Host/복제 Collider·이미지·중력 동결, 기본 Trail 폭,4색/체크·일시정지/OFF 새 라운드 HUD 정리를 확인했다. 소켓 대신 패킷 JSON/스냅샷 fixture를 사용하며 실제 다중 앱 실행이 아니다. 기존 오행 먹선의 프로파일 폭은 고정으로 유지하고 비례 폭 검증에 포함하지 않았다. |
+| Mac Development 빌드 | PASS(빌드만) | 표준 LabBuild.Mac 종료0·C6_LAB_BUILD_OK, BuildReport **215,271,244바이트**. 수동 앱 플레이는 미실행이다. |
+| iOS Xcode 프로젝트 내보내기 | PASS(내보내기만) | 표준 LabBuild.Ios 종료0·C6_LAB_BUILD_OK·C6_LAB_IOS_CORE_HAPTICS_LINKED. 실제 PBX의 CoreHaptics.framework BuildFile에 Weak 속성1개가 있음을 확인했다. 서명/기기 설치/실행 결과가 아니다. |
+| iOS 네이티브 구문 컴파일 | PASS,경고1 | Xcode iOS26.5 SDK·arm64·ARC·iOS15 target의 clang++ 종료0/오류0. 엔진 resetHandler의 강한 캡처/retain-cycle 경고1개가 있다. 엔진은 코드상 앱 생애 동안 보관되며 실제 메모리/백그라운드/진동 검증은 미실행이다. 완성 앱의 링크 검증과 구별한다. |
+| 다중 앱·실기기·진동·기기 성능 | NOT_RUN | 실제 네트워크/기기 화면·진동·모바일 성능은 이번 통합에서 실행하지 않았다. |
+
+첫 합본 EditMode785/787의2건은 새 콤보 토글이 빠진 목록과 예전 share≤1 거부 전제였다. 두 토글 문구와 유효 share1/1.5/3의 인접 보호/실제 면적,3초과·NaN/무한대 거부 검사를 유지하며 새 계약으로 갱신했다. 첫 PlayMode202/205 중 새 HUD의 Color32/Color 비교 형식, 기존 DEV의138번 행이 맨 아래라는 위치 가정을 수정했다. 실제 행·콘텐츠/뷰포트 크기로 스크롤한 뒤 화면 내 포함·EventSystem 최상위 Raycast 검증은 그대로 유지했다. 이 검사 수정으로 생산 물리나 명중 기대값을 바꾸지 않았다.
+
+Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드까지 SHA256을 대조했다. 진단 코드·임시 도구·원시 로그/XML·개인 경로·빌드 산출물은 커밋하지 않는다. 사용자 작업의 Scene·머터리얼·미추적 meta는 별도 보존한다.
+
+### 기존 축소 투사체 실패의 경로 진단 — 수정 계획 단계
+
+`LabThrowTests.AProjectileFromABlastShrunkOrbIsSmallerAndMissesWhereAWholeOneGrazes`는 기존 main 재현과 동일하게 smallHit=False 기대에True였다. #231의 기존 표현 검사는 이 명중/빗나감 검사를 포함하지 않는다.
+
+검사 사본에서 판정 경로만 임시 기록하고 기존 코드로 복원했다. `shrunk-diagnostic.xml`은0/1로 같은 실패를 재현했다. 실제 반지름은 whole0.165/small0.0825로 맞지만 둘 다 target의 OnCollisionEnter에서 명중됐다. 작은 공의 기록은 separation=+0.219470, 실제 이동 구간 SphereCast=false, ComputePenetration=false였다. 전체 공도 실제 스윕/겹침 전에 콜백으로 명중됐다. `ContinuousSpeculative`의 예상 접촉을 `OnCollisionEnter`가 곧바로 Resolve(true)로 수용하는 것이 이 재현의 오탐 경로다. 반지름 누락이나 새 Sprite의 Collider 확대가 원인이 아니다.
+
+후속 수정은 실제 유효 반지름(폭발×콤보 포함)을 캡처해 Collision/기존 sweep의 명중 승인을 실제 경로·접촉 검증으로 통일하는 범위다. 원래±0.92 전체 명중/축소 빗나감 기대를 유지하고 좌우 교환·정면·고속·바닥 우선·중복 결과1회·움직이는 대상 경계를 확인한다. 이번 통합에서는 임시 기록을 제거한 기존 판정을 유지하며 사용자에게 수정 계획을 제시한다.

@@ -134,6 +134,16 @@ namespace C6Lab
         public bool lastHit;
         /// <summary>북 점유 시간(초): 북을 하나 이상 점유한 시간. 여러 개여도 한 번만 센다. 북 점유율 = 이 값 / playedSeconds</summary>
         public double drumSeconds;
+        /// <summary>
+        /// 박 색상 콤보 실패 페널티(#222)가 끝나는 전투 시각. 이 시각 전까지 이 사람이 던지는 공과
+        /// 칠 면적이 줄어든다. 페널티가 없으면 0 이하. 남은 시간 = 이 값 - 스냅샷 serverTime.
+        /// </summary>
+        public double comboPenaltyUntil;
+        /// <summary>
+        /// 박 색상 콤보 성공 보상(#222)이 끝나는 전투 시각. 이 시각 전까지 이 사람이 던지는 공과
+        /// 칠 면적이 커진다. 페널티와 보상은 마지막 결과 하나만 남는다(하나를 걸면 다른 하나는 끝난다).
+        /// </summary>
+        public double comboRewardUntil;
 
         public int ItemsUsed => relayUsed + secretBoxUsed + potionUsed + bombUsed;
 
@@ -178,5 +188,24 @@ namespace C6Lab
 
         /// <summary>Whether a swipe block is on this player at this snapshot.</summary>
         public bool SwipeBlockOn(ulong player) => swipeBlockedUntil > serverTime && swipeBlockedPlayer == player;
+
+        // 박 색상 콤보 실험 (#222). DEV에서 끄면 모두 기본값(콤보 없음)이다.
+        // 시각은 serverTime과 같은 전투 시계 기준이다.
+        /// <summary>지금 진행 중인 콤보가 있는지</summary>
+        public bool comboActive;
+        /// <summary>진행 중인(또는 마지막) 콤보의 4칸 색. 콤보가 한 번도 안 나왔으면 빈 배열.</summary>
+        public LabOrbElement[] comboColors = Array.Empty<LabOrbElement>();
+        /// <summary>맞힌 칸 수 (0~4)</summary>
+        public int comboProgress;
+        /// <summary>진행 중인 콤보가 나온 시각과 제한 시간이 끝나는 시각</summary>
+        public double comboStartedAt = -1d;
+        public double comboEndsAt = -1d;
+        /// <summary>이번 라운드에 나온 콤보 수. 바뀌면 새 콤보가 나온 것이다.</summary>
+        public uint comboCount;
+        /// <summary>마지막으로 끝난 콤보의 결과·번호·끝난 시각·틀린 색을 던진 사람(틀린 색일 때만)</summary>
+        public LabComboResult comboResult;
+        public uint comboResultCount;
+        public double comboResultAt = -1d;
+        public ulong comboFailedBy;
     }
 }

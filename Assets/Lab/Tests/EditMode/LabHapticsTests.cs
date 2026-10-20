@@ -94,5 +94,24 @@ namespace C6Lab.Tests
             Assert.That(haptics.PlayForHit(20, config), Is.True);
             Assert.That(haptics.PlayCount, Is.EqualTo(1));
         }
+
+        [Test]
+        public void AComboClearPulsesThreeTimesAndAFailBuzzesForTwoSecondsUnlessHapticsAreOff()
+        {
+            Assert.That(haptics.ComboClearPulses, Is.EqualTo(3));
+            Assert.That(haptics.ComboFailSeconds, Is.EqualTo(2f));
+            Assert.That(haptics.PlayForComboClear(config), Is.True);
+            Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.ComboClear));
+            Assert.That(haptics.PlayForComboFail(config), Is.True);
+            Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.ComboFail));
+
+            float[] values = config.CaptureDeveloperValues();
+            values[67] = 0f; // haptics off
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            int before = haptics.PlayCount;
+            Assert.That(haptics.PlayForComboClear(config), Is.False);
+            Assert.That(haptics.PlayForComboFail(config), Is.False);
+            Assert.That(haptics.PlayCount, Is.EqualTo(before));
+        }
     }
 }

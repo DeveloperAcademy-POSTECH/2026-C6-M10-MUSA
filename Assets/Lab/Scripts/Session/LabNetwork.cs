@@ -59,6 +59,8 @@ namespace C6Lab
         public float wy;
         public float wz;
         public float spinImpulse;
+        /// <summary>던지는 공 크기 배율 (#222 콤보 페널티/보상). 0(옛 패킷)이면 1로 본다.</summary>
+        public float sizeScale;
         public string reason;
         public ulong owner;
         public int element;
@@ -182,7 +184,8 @@ namespace C6Lab
         // 5643: #213 blast-burnt, shrunk orbs (orb burnedAt/small, blastHit report); DEV 150-152.
         // 5644: #225 nearby-hit paint drying adds shared DEV 153-156.
         // 5645: #215 swipe-block snapshots and pushed crossings integrate at DEV 157-159; 160 shared values.
-        internal const ushort LabProtocolVersion = 5645;
+        // 5646: #222 gourd color combo experiment (DEV 160-168, combo snapshot, projectile size scale); 169 shared values.
+        internal const ushort LabProtocolVersion = 5646;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");
@@ -1684,14 +1687,17 @@ namespace C6Lab
             var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element,
                 orb.small ? config.BlastShrinkScale : 1f);
             projectile.name = "Projectile " + orb.id;
+            float sizeScale = model != null ? model.LaunchScaleOf(orb.id) : 1f;
+            projectile.SetRadiusScale(sizeScale);
             projectile.SetMissSurface(battleFloor);
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
-                wx = velocity.x, wy = velocity.y, wz = velocity.z };
+                wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
             Debug.Log("C6_LAB_THROW orb=" + orb.id + " seat=" + seat
+                + " size=" + sizeScale.ToString("F2", CultureInfo.InvariantCulture)
                 + " form=" + config.ThrowForm + " origin=" + launchPosition
                 + " swipe=" + releaseVelocity + " launch=" + velocity
                 + " gravity=" + config.EffectiveThrowGravity.ToString("F2", CultureInfo.InvariantCulture)
@@ -2014,6 +2020,7 @@ namespace C6Lab
                             ? (LabOrbElement)packet.element : LabOrbElement.None;
                         LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element,
                             packet.small ? config.BlastShrinkScale : 1f);
+                        if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetMissSurface(battleFloor);
                         visual.LaunchVisual(velocity, config, target);
                     }

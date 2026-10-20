@@ -27,7 +27,7 @@ namespace C6Lab.Tests
             Assert.That(authored, Is.Not.Null);
             Assert.That(authored.PaintPattern, Is.EqualTo(LabPaintPattern.Splatter));
             LabDeveloperField field = LabConfig.DeveloperFields[139];
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(160));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(169));
             Assert.That(field.Label, Is.EqualTo("Paint Pattern"));
             Assert.That(field.IsChoice, Is.True);
             Assert.That(field.IsToggle, Is.False);
@@ -37,7 +37,7 @@ namespace C6Lab.Tests
             int[] gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd").FieldIndices;
             Assert.That(gourd, Does.Contain(139));
             Assert.That(gourd.Distinct().Count(), Is.EqualTo(gourd.Length));
-            Assert.That(Protocol, Is.EqualTo(5645));
+            Assert.That(Protocol, Is.EqualTo(5646));
         }
 
         [TestCase(LabPaintPattern.Legacy)]

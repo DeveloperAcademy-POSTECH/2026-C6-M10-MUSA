@@ -67,6 +67,9 @@ namespace C6Lab
         private const ulong SwipeBlockDrawKey = ulong.MaxValue - 3UL;
         private const uint DrumZoneSalt = 0xD2017E5Au;
         private const uint DrumSpotSalt = 0xD2051075u;
+        private const uint ComboColorSalt = 0xC0B0C010u;
+        // 박 색상 콤보 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다.
+        private const ulong ComboDrawKey = ulong.MaxValue - 3UL;
         // 북 전달 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다.
         private const ulong DrumHandoffKey = ulong.MaxValue - 2UL;
         // 박 폭탄 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (북 자리 뽑기는 ulong.MaxValue).
@@ -105,6 +108,10 @@ namespace C6Lab
         private double nextGourdBombAt;
         private uint gourdBombCount;
         private uint drumHandoffCount;
+        private readonly LabGourdCombo combo = new LabGourdCombo();
+        // 던진 순간의 페널티 배율 (#222). 날아가는 동안 페널티가 끝나도 그 공은 던질 때 크기 그대로 칠한다.
+        private readonly Dictionary<string, float> launchScales = new Dictionary<string, float>(StringComparer.Ordinal);
+        private double nextComboAt;
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -189,6 +196,9 @@ namespace C6Lab
             swipeBlockedRight = false;
             swipeBlockStartedAt = swipeBlockedUntil = -1d;
             nextSwipeBlockAt = rules.SwipeBlockInterval > 0f ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
+            combo.Reset();
+            launchScales.Clear();
+            nextComboAt = now + rules.ComboFirstStartSeconds;
             lastTime = now;
             deadline = nextDeadline;
             remaining = rules.BattleDurationSeconds;
@@ -379,6 +389,8 @@ namespace C6Lab
             // 릴레이·폭탄은 던지는 것이 곧 아이템 사용이다.
             if (current.kind == LabOrbKind.Relay) players[sender].relayUsed++;
             else if (current.kind == LabOrbKind.Bomb) players[sender].bombUsed++;
+            float launchScale = ThrowScaleFor(sender, now);
+            if (launchScale != 1f) launchScales[current.id] = launchScale;
             reason = "LAUNCHED";
             orb = current.Copy();
             return true;
@@ -411,6 +423,8 @@ namespace C6Lab
                 || !players.TryGetValue(orb.owner, out var attacker)) return false;
             element = orb.element;
             orbs.Remove(id);
+            float areaScale = LaunchScaleOf(id);
+            launchScales.Remove(id);
             int attackValue = DamageFor(orb);
             int previousHp = hp;
             hp = Math.Max(0, hp - attackValue);
@@ -428,7 +442,7 @@ namespace C6Lab
             {
                 if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
                     && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1,
-                        orb.small ? rules.SmallOrbPaintShare : 1f)
+                        (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale)
                     && paintSurface.IsComplete)
                 {
                     phase = LabPhase.Victory;
@@ -440,7 +454,89 @@ namespace C6Lab
                 phase = LabPhase.Victory;
                 attacker.lastHit = true;
             }
+            if (rules.ComboEnabled && combo.Active)
+            {
+                LabComboResult result = combo.Judge(element, attacker.id, now);
+                if (result != LabComboResult.None) OnComboFinished(result);
+            }
             return true;
+        }
+
+        /// <summary>
+        /// 박 색상 콤보 실패 페널티(#222) 중이면 이 사람이 지금 던지는 공의 크기·칠 면적 배율,
+        /// 아니면 1. 실험이 꺼져 있으면 언제나 1이다.
+        /// </summary>
+        public float LaunchScaleOf(string id) =>
+            id != null && launchScales.TryGetValue(id, out float scale) ? scale : 1f;
+
+        /// <summary>박 색상 콤보 페널티/보상(#222) 배율. 던지는 공 반지름과 칠 면적에 곱한다.</summary>
+        public float ThrowScaleFor(ulong playerId, double now)
+        {
+            if (rules == null || !rules.ComboEnabled || !players.TryGetValue(playerId, out var player)) return 1f;
+            if (player.comboPenaltyUntil > now) return rules.ComboPenaltySizeScale;
+            return player.comboRewardUntil > now ? rules.ComboRewardSizeScale : 1f;
+        }
+
+        /// <summary>
+        /// 박 색상 콤보 (#222): 정해 둔 시각마다 4칸 색 콤보를 내고, 제한 시간이 지나면 실패로 끝낸다.
+        /// 박 폭탄처럼 시간을 한 번에 많이 건너뛰어도 그 사이 있었어야 할 일을 시각 순서대로 처리한다.
+        /// 간격은 앞 콤보가 나온 시각부터 재고, 앞 콤보가 그때까지 진행 중이면 끝난 직후에 나온다.
+        /// </summary>
+        private void AdvanceCombo(double until)
+        {
+            if (!rules.ComboEnabled) return;
+            while (true)
+            {
+                if (combo.Active)
+                {
+                    if (!combo.TryExpire(until)) return;
+                    OnComboFinished(LabComboResult.Timeout);
+                    continue;
+                }
+                if (nextComboAt > until) return;
+                double at = nextComboAt;
+                var colors = new LabOrbElement[LabGourdCombo.Length];
+                for (int i = 0; i < colors.Length; i++)
+                {
+                    uint index = combo.Count * (uint)LabGourdCombo.Length + (uint)i;
+                    colors[i] = (LabOrbElement)(1 + (int)(DrawFor(seed ^ ComboColorSalt, ComboDrawKey, index) % 5UL));
+                }
+                combo.Start(colors, at, rules.ComboTimeLimitSeconds);
+                nextComboAt = at + rules.ComboRepeatIntervalSeconds;
+            }
+        }
+
+        /// <summary>
+        /// 콤보가 끝난 뒤 처리. 성공은 팀 전체에 보상을 주고, 실패는 페널티를 건다.
+        /// 틀린 색 + "던진 사람만" 설정이면 그 사람에게만, 그 밖(시간 초과 포함)에는 모두에게 건다.
+        /// 다음 콤보 시각이 이미 지났으면 지금 바로 나오게 한다.
+        /// </summary>
+        private void OnComboFinished(LabComboResult result)
+        {
+            double at = combo.LastResultAt;
+            if (nextComboAt < at) nextComboAt = at;
+            if (result == LabComboResult.Success)
+            {
+                // 4칸을 다 같이 채웠으므로 보상은 언제나 팀 전체. 진행 중이던 페널티는 여기서 끝난다.
+                if (rules.ComboRewardDurationSeconds <= 0f) return;
+                double rewardUntil = at + rules.ComboRewardDurationSeconds;
+                foreach (var player in players.Values)
+                {
+                    player.comboRewardUntil = Math.Max(player.comboRewardUntil, rewardUntil);
+                    player.comboPenaltyUntil = Math.Min(player.comboPenaltyUntil, at);
+                }
+                return;
+            }
+            if (rules.ComboPenaltyDurationSeconds <= 0f) return;
+            double until = at + rules.ComboPenaltyDurationSeconds;
+            bool throwerOnly = rules.ComboPenaltyThrowerOnly && result == LabComboResult.WrongColor;
+            foreach (var player in players.Values)
+            {
+                if (throwerOnly && player.id != combo.LastFailedBy) continue;
+                player.comboPenaltyUntil = Math.Max(player.comboPenaltyUntil, until);
+                // 진행 중이던 보상은 페널티를 받는 사람에게서만 끝난다.
+                player.comboRewardUntil = Math.Min(player.comboRewardUntil, at);
+            }
         }
 
         /// <summary>
@@ -554,6 +650,7 @@ namespace C6Lab
         public bool ConfirmMiss(string id, double now)
         {
             if (!TryAdvance(now, out _) || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight) return false;
+            launchScales.Remove(id);
             return orbs.Remove(id);
         }
 
@@ -604,7 +701,17 @@ namespace C6Lab
                 swipeBlockedPlayer = BlockOn(now) ? swipeBlockedPlayer : 0,
                 swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
                 swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
-                swipeBlockedUntil = BlockOn(now) ? swipeBlockedUntil : -1d
+                swipeBlockedUntil = BlockOn(now) ? swipeBlockedUntil : -1d,
+                comboActive = combo.Active,
+                comboColors = combo.Count == 0 ? Array.Empty<LabOrbElement>() : combo.Colors,
+                comboProgress = combo.Progress,
+                comboStartedAt = combo.StartedAt,
+                comboEndsAt = combo.EndsAt,
+                comboCount = combo.Count,
+                comboResult = combo.LastResult,
+                comboResultCount = combo.LastResultCount,
+                comboResultAt = combo.LastResultAt,
+                comboFailedBy = combo.LastFailedBy
             };
         }
 
@@ -656,6 +763,7 @@ namespace C6Lab
                 }
                 DropGourdBombs(effectiveNow);
                 StartSwipeBlocks(effectiveNow);
+                AdvanceCombo(effectiveNow);
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
                 {
@@ -972,6 +1080,9 @@ namespace C6Lab
             public readonly float[] DrumStopBounds;
             public readonly int[] DrumStopChances;
             public readonly Color[] PaintColors;
+            public readonly bool ComboEnabled, ComboPenaltyThrowerOnly;
+            public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
+                ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale;
 
             public Rules(LabConfig config)
             {
@@ -1014,6 +1125,15 @@ namespace C6Lab
                 SpawnMaxSpeed = config.SpawnMaxSpeed;
                 FloorDeceleration = config.OrbFloorDeceleration;
                 DrumCount = config.DrumCount;
+                ComboEnabled = config.GourdColorComboEnabled;
+                ComboFirstStartSeconds = config.ComboFirstStartSeconds;
+                ComboRepeatIntervalSeconds = config.ComboRepeatIntervalSeconds;
+                ComboTimeLimitSeconds = config.ComboTimeLimitSeconds;
+                ComboPenaltyDurationSeconds = config.ComboPenaltyDurationSeconds;
+                ComboPenaltySizeScale = config.ComboPenaltySizeScale;
+                ComboPenaltyThrowerOnly = config.ComboPenaltyThrowerOnly;
+                ComboRewardDurationSeconds = config.ComboRewardDurationSeconds;
+                ComboRewardSizeScale = config.ComboRewardSizeScale;
             }
         }
     }

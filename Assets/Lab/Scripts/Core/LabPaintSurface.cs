@@ -135,12 +135,13 @@ namespace C6Lab
         /// A cell crossing supplies uses the final supply's opaque color, connection owner and
         /// P number together, never a blend. Zero P is reserved for neutral offline fixtures.
         /// <paramref name="share"/> scales this one hit's initial and repeat amounts: a blast-shrunk
-        /// orb paints less (#213). A share of 0 paints nothing.
+        /// orb paints less (#213). A share of 0 paints nothing. 박 색상 콤보(#222)의 페널티(1보다 작음)/보상(1보다 큼)
+        /// 배율도 여기에 곱해서 들어오므로 최대 3까지 받는다.
         /// </summary>
         public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0, float share = 1f)
         {
             if (painterSlot < 0 || painterSlot > 5) return false;
-            if (!Finite(share) || share <= 0f || share > 1f) return false;
+            if (!Finite(share) || share <= 0f || share > 3f) return false;
             decimal initial = initialCells * (decimal)share, repeat = repeatCells * (decimal)share;
             if (preview || replica || IsComplete || !ValidHit(direction, color)) return false;
             int cell = CellFor(direction);
