@@ -14,7 +14,9 @@ namespace C6Lab.Tests
 
         private readonly List<LabConfig> created = new List<LabConfig>();
         /// <summary>DEV 기본 페널티 배율 (Combo Penalty Size)</summary>
-        private const float PenaltyScale = .3f;
+        private const float PenaltyScale = .1f;
+        /// <summary>DEV 기본 보상 배율 (Combo Reward Size)</summary>
+        private const float RewardScale = 2.5f;
 
         [TearDown]
         public void TearDown()
@@ -138,9 +140,9 @@ namespace C6Lab.Tests
             Assert.That(received.comboResultCount, Is.EqualTo(1u));
             Assert.That(received.players.Select(player => player.comboPenaltyUntil), Is.All.EqualTo(40d));
 
-            Assert.That(model.Snapshot(49.9d).comboCount, Is.EqualTo(1u));
-            LabSnapshot second = model.Snapshot(50d);
-            Assert.That(second.comboActive, Is.True, "The next combo comes 30 seconds after the first appeared.");
+            Assert.That(model.Snapshot(34.9d).comboCount, Is.EqualTo(1u));
+            LabSnapshot second = model.Snapshot(35d);
+            Assert.That(second.comboActive, Is.True, "The next combo comes 15 seconds after the first appeared.");
             Assert.That(second.comboCount, Is.EqualTo(2u));
         }
 
@@ -254,7 +256,7 @@ namespace C6Lab.Tests
             Assert.That(snapshot.players.Select(player => player.comboRewardUntil), Is.All.EqualTo(12d),
                 "Everyone filled the combo together, so the whole team gets 10 seconds of big balls.");
             foreach (ulong id in new ulong[] { 10, 20, 30 })
-                Assert.That(model.ThrowScaleFor(id, 5d), Is.EqualTo(1.5f));
+                Assert.That(model.ThrowScaleFor(id, 5d), Is.EqualTo(RewardScale));
             Assert.That(model.ThrowScaleFor(10, 12d), Is.EqualTo(1f), "The reward ends on time.");
         }
 
@@ -277,7 +279,7 @@ namespace C6Lab.Tests
             Assert.That(snapshot.comboResult, Is.EqualTo(LabComboResult.Success));
             Assert.That(snapshot.players.Select(player => player.comboPenaltyUntil), Is.All.EqualTo(4d),
                 "The latest result wins: success ends the penalty right away.");
-            Assert.That(model.ThrowScaleFor(10, 5d), Is.EqualTo(1.5f));
+            Assert.That(model.ThrowScaleFor(10, 5d), Is.EqualTo(RewardScale));
         }
 
         [Test]

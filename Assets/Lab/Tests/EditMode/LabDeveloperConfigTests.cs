@@ -1352,7 +1352,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GourdColorComboFieldsFormTheComboGroupAndStartOff()
+        public void GourdColorComboFieldsFormTheComboGroupAndStartOn()
         {
             LabDeveloperField[] combo = LabConfig.DeveloperFields.Skip(160).ToArray();
             Assert.That(combo.Select(field => field.Label), Is.EqualTo(new[]
@@ -1378,13 +1378,13 @@ namespace C6Lab.Tests
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
                 Assert.That(source.CaptureDeveloperValues().Skip(160),
-                    Is.EqualTo(new[] { 0f, 20f, 30f, 10f, 10f, .3f, 0f, 10f, 1.5f, 3f }),
-                    "The experiment is off, shrinks the whole team to 0.3x and rewards with 1.5x for 10 seconds, "
-                    + "and warns 3 seconds ahead by default.");
+                    Is.EqualTo(new[] { 1f, 20f, 15f, 10f, 10f, .1f, 0f, 10f, 2.5f, 3f }),
+                    "By default the combo is on: first at 20 s, every 15 s, 10 s to clear, the whole team shrinks "
+                    + "to 0.1x or grows to 2.5x for 10 seconds, and a 3-second warning comes first.");
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();
-            values[160] = 1f;
+            values[160] = 0f;
             values[161] = 5f;
             values[162] = 15f;
             values[163] = 8f;
@@ -1395,7 +1395,7 @@ namespace C6Lab.Tests
             values[168] = 2f;
             values[169] = 5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
-            Assert.That(config.GourdColorComboEnabled, Is.True);
+            Assert.That(config.GourdColorComboEnabled, Is.False);
             Assert.That(new[] { config.ComboFirstStartSeconds, config.ComboRepeatIntervalSeconds,
                 config.ComboTimeLimitSeconds, config.ComboPenaltyDurationSeconds, config.ComboPenaltySizeScale },
                 Is.EqualTo(new[] { 5f, 15f, 8f, 4f, .25f }));
