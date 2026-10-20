@@ -1467,3 +1467,24 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 검사는 통제한 Editor 물리 fixture이며 실제 참가자가 다중 앱에서 주고받은 플레이 결과로 확대하지 않는다. 임시 진단/환경 도구·원시 XML/로그·캡처·빌드는 저장소에서 제외한다. 사용자 Scene·Target2 머터리얼·미추적 meta는 별도 보존한다.
 
 최종 검사부터 두 빌드까지 게임 런타임/검사/Shader/Config/Scene/패키지/설정 **191개 파일의 SHA256이 일치**했다. 세로 검사 도구는 빌드 전에 제거했고 글로벌 GameView 설정 파일도 기존 바이트와 같음을 확인했다. Scene/에셋/검사 임계값을 변경해 GPU 통과를 맞추지 않았다.
+
+## 구슬 소멸 예고 — 2026-10-20, 이슈 #235
+
+기준은 Unity **6000.6.5f1**, main(`63a587da`, #233 PR #234 포함)에서 분기한 `feat/#235-orb-expiry-warning`이다.
+
+- **Host 만료 보고**: 수명이 끝난 구슬을 Host가 기록해 지금 가진 사람에게만 스냅샷보다 먼저 `orbExpired`로 알린다. 조합·넘김·던지기·사용으로 사라진 구슬, 날아가는 구슬, 터지는 잠긴 폭탄은 보고하지 않는다. 수명 규칙(아이템 15초·잠긴 폭탄 도화선 15초·그 밖에 해금 폭탄 포함 8초)을 `LabOrbKindRules.LifetimeFor` 하나로 모아 Host와 모든 화면이 같이 쓴다.
+- **표시**: 마지막 3초 동안 구슬 그림 전체(먹선 테두리 포함)를 흰 막과 옅은 빛으로 덮었다 걷는 번쩍임이 초당 1.5번에서 7번까지 빨라진다(결합 구슬 1.2배·폭탄 그림 크기에 맞춤, 북·잠긴 폭탄 제외). 사라질 때 따뜻한 회색 연기 6덩이가 0.6초 동안 퍼졌다 걷힌다. 판 종이가 크림색 한지이고 양 구슬이 흰색이라, 흰 빛만이 아니라 그림 전체를 하얗게 덮어 보이게 했다.
+- **값**: 번쩍임 시작 시간·빠르기·색, 연기 크기·시간·색은 `LabOrbAppearance` Inspector의 Orb expiry 칸이다(DEV 없음, 설정 169개 유지). 통신 버전 `5646` → `5647`.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다 컴파일했다. 오류 0. 새 파일 `LabOrbVanishSmoke.cs`가 Runtime에 포함된 것을 확인했다. |
+| 모양 미리보기 | 확인 (Unity 밖) | 실제 `BoardPlate.png`와 음·양·화 구슬 그림으로 Python 렌더링해 번쩍임·연기 모양을 정했다. 실제 Unity 화면이 아니다. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN | 이번 변경의 Test Runner 결과는 기록하지 않았다. |
+| 솔로 화면: 번쩍임이 잘 보이는지·산만하지 않은지, 연기 | NOT_RUN | 구슬 하나를 만들고 8초를 기다려 5초쯤부터 번쩍이고 8초에 연기와 함께 사라지는지 본다. |
+| 3인 실행: 넘겨받은 구슬의 번쩍임, 넘김·조합 시 연기 없음 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 휴대폰 화면 밝기에서 번쩍임 가독성 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `AnOrbWhoseLifetimeRunsOutIsReportedToItsHolderOnceButNotOneThatLeftAnotherWay`, `ExpiredItemsAndUnlockedBombsAreReportedButALockedBombBlastsInstead`, `EveryScreenCountsAnOrbsLifeDownByTheSameRule`; 프로토콜을 고정한 팀원 검사 7개를 5647로 갱신
+- **PlayMode** `LabOrbPhysicsTests`: `VanishingAnOrbTakesItOffTheBoardAndSaysSoUnlikeRemovingIt`, `AnOrbFlashesWhiteInItsLastSecondsThenGoesUpInSmoke`, `TheExpiryWarningSecondsComeFromTheAppearanceInspector`
