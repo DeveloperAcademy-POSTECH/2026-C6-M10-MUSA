@@ -1815,7 +1815,10 @@ namespace C6Lab
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
                     orb.JustUnlocked(latest.serverTime), small: orb.small,
                     // Every screen counts the blast fire down from the same Host clock (#213).
-                    burnSeconds: config != null ? orb.BurnSecondsLeft(latest.serverTime, config.BlastBurnSeconds) : 0f);
+                    burnSeconds: config != null ? orb.BurnSecondsLeft(latest.serverTime, config.BlastBurnSeconds) : 0f,
+                    // The white flash before an orb runs out (#235); a locked bomb shows its own red one.
+                    lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
+                        : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds));
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {

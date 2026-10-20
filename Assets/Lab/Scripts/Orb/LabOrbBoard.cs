@@ -296,7 +296,7 @@ namespace C6Lab
             bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
             LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false,
-            float burnSeconds = 0f)
+            float burnSeconds = 0f, float lifeSeconds = -1f)
         {
             RequireConfigured();
             small &= !kind.IsDrum();
@@ -320,6 +320,7 @@ namespace C6Lab
                     existing.View.SetItemState(lockSwipes, relayStage, fuseSeconds);
                 if (justUnlocked && unlockEffectIds.Add(id)) existing.View.PlayUnlockEffect();
                 existing.View.SetBurn(burnSeconds);
+                existing.View.SetLife(lifeSeconds);
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -339,6 +340,7 @@ namespace C6Lab
             view.SetItemState(lockSwipes, relayStage, fuseSeconds);
             if (justUnlocked && unlockEffectIds.Add(id)) view.PlayUnlockEffect();
             view.SetBurn(burnSeconds);
+            view.SetLife(lifeSeconds);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
@@ -636,6 +638,9 @@ namespace C6Lab
         public bool Vanish(string id)
         {
             if (id == null || !entries.TryGetValue(id, out var entry) || entry.View == null) return false;
+            // It goes up in a puff of smoke where this screen shows it (#235).
+            LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius,
+                config != null ? config.OrbAppearance : null);
             RemoveOrb(id);
             OrbVanished?.Invoke(id);
             return true;

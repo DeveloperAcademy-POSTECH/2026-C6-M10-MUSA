@@ -92,6 +92,21 @@ namespace C6Lab
         [Tooltip("Flashes per second just before it blasts.")]
         [SerializeField, Min(.1f)] private float bombWarningFastHz = 8f;
         [SerializeField] private Color bombWarningColor = new Color(1f, .12f, .08f, 1f);
+        [Header("Orb expiry (#235, presentation only)")]
+        [Tooltip("구슬이 사라지기 몇 초 전부터 하얗게 번쩍일지 (초). 0이면 번쩍이지 않는다.")]
+        [SerializeField, Min(0f)] private float expiryWarningSeconds = 3f;
+        [Tooltip("번쩍이기 시작할 때의 빠르기 (초당 횟수).")]
+        [SerializeField, Min(.1f)] private float expiryFlashStartHz = 1.5f;
+        [Tooltip("사라지기 직전의 빠르기 (초당 횟수). 남은 시간이 줄수록 이 빠르기로 다가간다.")]
+        [SerializeField, Min(.1f)] private float expiryFlashFastHz = 7f;
+        [Tooltip("번쩍임 색. 알파가 가장 밝을 때의 진하기다.")]
+        [SerializeField] private Color expiryFlashColor = new Color(1f, 1f, 1f, .9f);
+        [Tooltip("사라질 때 연기 크기 (구슬 반지름 배).")]
+        [SerializeField, Min(0f)] private float expirySmokeSize = 1.1f;
+        [Tooltip("사라질 때 연기가 퍼졌다 걷히는 시간 (초).")]
+        [SerializeField, Min(.05f)] private float expirySmokeSeconds = .6f;
+        [Tooltip("연기 색. 알파가 처음 진하기다.")]
+        [SerializeField] private Color expirySmokeColor = new Color(.62f, .6f, .57f, .75f);
         [Header("Gourd bomb drop (presentation only)")]
         [Tooltip("Seconds the bomb takes to fall from above the orb area onto its landing spot.")]
         [SerializeField, Min(.01f)] private float dropFallSeconds = .45f;
@@ -158,6 +173,13 @@ namespace C6Lab
         public float BombWarningSlowHz => Mathf.Max(.1f, bombWarningSlowHz);
         public float BombWarningFastHz => Mathf.Max(BombWarningSlowHz, bombWarningFastHz);
         public Color BombWarningColor => bombWarningColor;
+        public float ExpiryWarningSeconds => Mathf.Max(0f, expiryWarningSeconds);
+        public float ExpiryFlashStartHz => expiryFlashStartHz > 0f ? expiryFlashStartHz : 1.5f;
+        public float ExpiryFlashFastHz => expiryFlashFastHz > 0f ? expiryFlashFastHz : 7f;
+        public Color ExpiryFlashColor => expiryFlashColor;
+        public float ExpirySmokeSize => Mathf.Max(0f, expirySmokeSize);
+        public float ExpirySmokeSeconds => expirySmokeSeconds > 0f ? expirySmokeSeconds : .6f;
+        public Color ExpirySmokeColor => expirySmokeColor;
         public float DropFallSeconds => dropFallSeconds > 0f ? dropFallSeconds : .45f;
         public float DropBounceSeconds => Mathf.Max(0f, dropBounceSeconds);
         public float DropBounceHeight => Mathf.Max(0f, dropBounceHeight);
