@@ -48,6 +48,7 @@ namespace C6Lab
         private LabElementFlightTrail elementFlightTrail;
         private GameObject replacementVisual;
         private GameObject replacementPrefab;
+        private LabOrbSpriteArt orbSpriteArt;
         private LabOrbAppearance appearance;
         private LabOrbElement element;
         private Rigidbody body;
@@ -137,6 +138,7 @@ namespace C6Lab
             }
             Transform defaultSphere = visualMount.Find("Default Sphere");
             if (defaultSphere != null) defaultSphere.gameObject.SetActive(prefab == null);
+            EnsureDefaultVisual(radius);
         }
 
         /// <summary>Creates the default Unity sphere presentation with an independent root collider.</summary>
@@ -482,9 +484,13 @@ namespace C6Lab
                 appearance == null || appearance.NeedsTemporaryElementColor(LabOrbKind.Combined, element)
                     ? element : LabOrbElement.None);
             Transform defaultSphere = visualMount.Find("Default Sphere");
-            if (defaultSphere != null) defaultSphere.gameObject.SetActive(replacementVisual == null);
+            Sprite sprite = appearance != null ? appearance.SpriteFor(LabOrbKind.Combined, element) : null;
+            orbSpriteArt = LabOrbSpriteArt.Set(visualMount, orbSpriteArt, sprite,
+                radius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined));
+            if (defaultSphere != null) defaultSphere.gameObject.SetActive(sprite == null && replacementVisual == null);
             if (replacementVisual != null)
             {
+                replacementVisual.SetActive(sprite == null);
                 replacementVisual.transform.localScale = Vector3.one * (2f * radius);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, gameObject.layer);
                 if (appearance != null && replacementPrefab == appearance.VisualPrefab)

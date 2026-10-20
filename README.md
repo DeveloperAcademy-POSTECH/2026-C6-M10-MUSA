@@ -1,5 +1,7 @@
 # C6 Physics Lab
 
+음·양과 화·수·목·금·토 구슬은 사용자 제공 PNG로 표시합니다(#229). 조합판과 투척 중 같은 이미지를 사용하며, 기존 3D 구체의 충돌·조합·투척·도색 규칙은 유지합니다. 이미지 연결은 `LabOrbAppearance.asset`의 Sprite 슬롯에서 조정합니다.
+
 > **Experiment #200 — 실제 전투 물감 4종**: **DEV → Gourd → Paint Pattern**에서 **LEGACY / BROAD / SPLATTER / FLOW**를 선택합니다. 기본은 사용자 첨부 마스크의 **SPLATTER**입니다. 최초 명중의 떨어진 튀김점도 실제 도색 면적에 포함하며, 반복 명중은 맞은 연결 영역에 성장량을 공급합니다. [실제 전투 적용 안내](docs/PAINT_PATTERN_RUNTIME.md)와 [별도 Editor 비교 도구](docs/PAINT_STYLE_COMPARISON_EXPERIMENT.md)를 구분해 확인하세요.
 
 > **Experiment #198 — 번짐·아래 흐름 성장**은 선택 가능한 실험 기능입니다. DEV → Gourd → Paint Pattern에서 LEGACY를 선택한 뒤 Paint Growth Style을 ORIGINAL 또는 SPREAD + FLOW로 바꿔 기존 방식과 비교합니다. #196의 내부 입자와 독립적으로 켜고 비교합니다. 사용자 승인으로 main에 포함하며 기본 성장 방식은 유지합니다.
