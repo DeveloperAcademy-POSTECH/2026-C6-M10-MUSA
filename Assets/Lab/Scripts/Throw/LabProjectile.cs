@@ -60,6 +60,29 @@ namespace C6Lab
         private string projectileId;
         private ulong ownerPlayerId;
         private Vector3 lastPosition;
+        private SurfacePose previousTargetPose, previousMissPose;
+        private const float SurfaceDistanceTolerance = .0001f;
+        private const float ActualContactTolerance = .000001f;
+
+        private readonly struct SurfacePose
+        {
+            public readonly Collider Collider;
+            public readonly Vector3 Position;
+            public readonly Quaternion Rotation;
+            public SurfacePose(Collider collider)
+            {
+                Collider = collider;
+                Position = collider != null ? collider.transform.position : Vector3.zero;
+                Rotation = collider != null ? collider.transform.rotation : Quaternion.identity;
+            }
+        }
+
+        private struct ResolutionSurface
+        {
+            public bool Found, HitTarget;
+            public float Distance;
+            public Vector3 Point;
+        }
         private Vector3 incomingVelocity;
         private float launchedGravity, launchedLifetime;
         private Vector3 launchPosition;
@@ -113,6 +136,7 @@ namespace C6Lab
         public void SetMissSurface(Collider floor)
         {
             missSurface = floor;
+            previousMissPose = new SurfacePose(floor);
         }
 
         /// <summary>Replaces the default sphere's presentation; the root SphereCollider stays put.</summary>
@@ -231,7 +255,9 @@ namespace C6Lab
             sphere.isTrigger = visualOnly;
             body.useGravity = false;
             body.isKinematic = false;
-            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            // Sweep-based CCD avoids speculative contacts that can deflect a small sphere
+            // before its real surface ever reaches the target. Forces and launch tuning are unchanged.
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.linearDamping = tuning.ThrowAirDamping;
             body.angularDamping = 0f;
@@ -240,6 +266,7 @@ namespace C6Lab
             initialVelocity = body.linearVelocity;
             body.WakeUp();
             lastPosition = body.position;
+            RememberSurfacePoses();
             launchPosition = body.position;
             peakHeight = body.position.y;
             launchedAt = Time.time;
@@ -266,6 +293,7 @@ namespace C6Lab
             incomingVelocity = body.linearVelocity;
             body.AddForce(Vector3.down * launchedGravity, ForceMode.Acceleration);
             lastPosition = body.position;
+            RememberSurfacePoses();
         }
 
         private void Update()
@@ -278,55 +306,141 @@ namespace C6Lab
         private void OnCollisionEnter(Collision collision)
         {
             if (!launched || !authoritative || resolved) return;
-            if (target != null && collision.collider == target.Hitbox)
-            {
-                Vector3 point = collision.contactCount > 0
-                    ? collision.GetContact(0).point : transform.position;
-                Resolve(true, point);
-            }
-            else if (missSurface != null && collision.collider == missSurface)
-            {
-                Vector3 point = collision.contactCount > 0
-                    ? collision.GetContact(0).point : transform.position;
-                Resolve(false, point);
-            }
+            if (!IsResolutionSurface(collision.collider)) return;
+            // Speculative CCD can report a separated contact. The callback alone is not a hit.
+            ResolveSurfaceIfFound(collision);
         }
+
+        private void OnCollisionStay(Collision collision) => OnCollisionEnter(collision);
 
         private void OnTriggerEnter(Collider other)
         {
             if (!launched || authoritative || resolved) return;
-            if ((target != null && other == target.Hitbox) || other == missSurface)
-                FinishVisual();
+            if (IsResolutionSurface(other)) FinishVisual();
         }
 
-        // A swept sphere supplements Continuous Speculative for fast shots through thin mesh triangles.
-        // SphereCastAll is not distance-sorted, so choose the first registered surface along the path.
-        private void SweepForResolutionSurface()
+        // The completed physics segment is shared by the FixedUpdate sweep and collision callback.
+        // Preserve nearest-surface ordering, with the target winning the existing distance tie.
+        private void SweepForResolutionSurface() => ResolveSurfaceIfFound(null);
+
+        private void ResolveSurfaceIfFound(Collision collision)
         {
-            Vector3 displacement = body.position - lastPosition;
+            ResolutionSurface nearest = FindResolutionSurface(collision);
+            if (!nearest.Found) return;
+            if (authoritative) Resolve(nearest.HitTarget, nearest.Point);
+            else FinishVisual();
+        }
+
+        private ResolutionSurface FindResolutionSurface(Collision collision)
+        {
+            var nearest = new ResolutionSurface();
+            Vector3 position = body.position;
+            Vector3 displacement = position - lastPosition;
             float distance = displacement.magnitude;
-            if (distance <= 0.0001f) return;
-            RaycastHit[] hits = Physics.SphereCastAll(lastPosition, sphere.radius,
+            float radius = WorldRadius;
+
+            // Test the start against its captured surface pose, not a moving target's new pose.
+            // A target moving behind the shot must not create an overlap retroactively.
+            ConsiderOverlap(previousTargetPose, lastPosition, 0f, radius, ref nearest);
+            ConsiderOverlap(previousMissPose, lastPosition, 0f, radius, ref nearest);
+
+            ConsiderSweep(displacement, radius, ref nearest);
+
+            // This also handles a stationary sphere touched by a moving target.
+            ConsiderOverlap(new SurfacePose(target != null ? target.Hitbox : null),
+                position, distance, radius, ref nearest);
+            ConsiderOverlap(new SurfacePose(missSurface), position, distance, radius, ref nearest);
+
+            // CCD can stop or slide a real contact within the engine's contact skin.
+            // A large positive speculative separation is never accepted. A small positive
+            // contact must also have geometric proof within these two colliders' offsets.
+            if (collision != null && IsResolutionSurface(collision.collider))
+            {
+                float skin = sphere.contactOffset + collision.collider.contactOffset;
+                for (int i = 0; i < collision.contactCount; i++)
+                {
+                    ContactPoint contact = collision.GetContact(i);
+                    if (contact.separation <= ActualContactTolerance)
+                        ConsiderSurface(collision.collider, contact.point, distance, ref nearest);
+                    else if (contact.separation <= skin + ActualContactTolerance)
+                    {
+                        ConsiderSweep(displacement, radius + skin, ref nearest, collision.collider);
+                        ConsiderSkinPoint(collision.collider, lastPosition, -contact.normal,
+                            radius + skin, 0f, ref nearest);
+                        ConsiderSkinPoint(collision.collider, position, -contact.normal,
+                            radius + skin, distance, ref nearest);
+                    }
+                }
+            }
+            return nearest;
+        }
+
+        private void ConsiderSweep(Vector3 displacement, float radius,
+            ref ResolutionSurface nearest, Collider contactSurface = null)
+        {
+            float distance = displacement.magnitude;
+            if (distance <= SurfaceDistanceTolerance) return;
+            RaycastHit[] hits = Physics.SphereCastAll(lastPosition, radius,
                 displacement / distance, distance, Physics.DefaultRaycastLayers,
                 QueryTriggerInteraction.Ignore);
-            RaycastHit nearest = default;
-            bool found = false;
-            bool hitTarget = false;
             for (int i = 0; i < hits.Length; i++)
             {
-                bool isTarget = target != null && hits[i].collider == target.Hitbox;
-                bool isFloor = missSurface != null && hits[i].collider == missSurface;
-                if (!isTarget && !isFloor) continue;
-                if (found && hits[i].distance > nearest.distance + 0.0001f) continue;
-                if (found && Mathf.Abs(hits[i].distance - nearest.distance) <= 0.0001f && !isTarget)
-                    continue;
-                nearest = hits[i];
-                found = true;
-                hitTarget = isTarget;
+                if (!IsResolutionSurface(hits[i].collider)) continue;
+                if (contactSurface != null && hits[i].collider != contactSurface) continue;
+                // An initial-overlap cast has no surface point (Unity returns point zero).
+                // Penetration and contact-normal rays supply genuine surface points instead.
+                if (hits[i].distance == 0f && hits[i].point == Vector3.zero) continue;
+                ConsiderSurface(hits[i].collider, hits[i].point, hits[i].distance, ref nearest);
             }
-            if (!found) return;
-            if (authoritative) Resolve(hitTarget, nearest.point);
-            else FinishVisual();
+        }
+
+        private void ConsiderSkinPoint(Collider collider, Vector3 center, Vector3 direction,
+            float reach, float distance, ref ResolutionSurface nearest)
+        {
+            if (collider.Raycast(new Ray(center, direction), out RaycastHit hit, reach))
+                ConsiderSurface(collider, hit.point, distance, ref nearest);
+        }
+
+        private void ConsiderOverlap(SurfacePose surface, Vector3 center, float distance,
+            float radius, ref ResolutionSurface nearest)
+        {
+            if (!IsResolutionSurface(surface.Collider)) return;
+            if (!Physics.ComputePenetration(sphere, center, body.rotation,
+                surface.Collider, surface.Position, surface.Rotation, out Vector3 direction, out float depth)) return;
+            // Move the sphere out, then step back one radius to its point on the surface.
+            Vector3 point = center + direction * (depth - radius);
+            ConsiderSurface(surface.Collider, point, distance, ref nearest);
+        }
+
+        private void ConsiderSurface(Collider collider, Vector3 point, float distance,
+            ref ResolutionSurface nearest)
+        {
+            bool hitTarget = target != null && collider == target.Hitbox;
+            if (nearest.Found && distance > nearest.Distance + SurfaceDistanceTolerance) return;
+            if (nearest.Found && Mathf.Abs(distance - nearest.Distance) <= SurfaceDistanceTolerance && !hitTarget) return;
+            nearest.Found = true;
+            nearest.HitTarget = hitTarget;
+            nearest.Point = point;
+            nearest.Distance = distance;
+        }
+
+        private bool IsResolutionSurface(Collider collider) => collider != null && collider.enabled
+            && collider.gameObject.activeInHierarchy && !collider.isTrigger
+            && ((target != null && collider == target.Hitbox) || collider == missSurface);
+
+        private float WorldRadius
+        {
+            get
+            {
+                Vector3 scale = transform.lossyScale;
+                return sphere.radius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+            }
+        }
+
+        private void RememberSurfacePoses()
+        {
+            previousTargetPose = new SurfacePose(target != null ? target.Hitbox : null);
+            previousMissPose = new SurfacePose(missSurface);
         }
 
         private void FinishVisual()
