@@ -173,6 +173,64 @@ namespace C6Lab.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator TheWarningCountsDownWithoutColorsOrBadgeThenTheComboAppears()
+        {
+            var root = new GameObject("Combo warning fixture");
+            var network = root.AddComponent<LabNetwork>();
+            network.enabled = false;
+            var canvasRoot = new GameObject("Combo warning canvas", typeof(RectTransform), typeof(Canvas));
+            var hud = root.AddComponent<LabGourdComboHud>();
+            hud.Bind(network, canvasRoot.GetComponent<Canvas>());
+            var colors = new[] { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Metal, LabOrbElement.Earth };
+            // The first combo already ended with a penalty for this player; the next one is 1.5 s away.
+            var waiting = new LabSnapshot
+            {
+                sessionId = "combo-warning", round = 1, phase = LabPhase.Playing, serverTime = 31.5d,
+                comboCount = 1, comboActive = false, comboColors = colors, comboProgress = 1,
+                comboWarningAt = 30d, comboNextAt = 33d,
+                players = new[] { new LabPlayerState { id = network.LocalPlayerId, comboPenaltyUntil = 40d } }
+            };
+            FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(latest, Is.Not.Null);
+            try
+            {
+                latest.SetValue(network, JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(waiting)));
+                yield return null;
+                Assert.That(hud.WarningVisible, Is.True);
+                Assert.That(hud.WarningCount, Is.EqualTo("2"), "1.5 s left shows 2, counting 3, 2, 1.");
+                Assert.That(hud.PanelVisible, Is.False, "The colors stay hidden until the combo starts.");
+                Assert.That(hud.EffectVisible, Is.False, "The SMALL badge steps aside during the warning.");
+                foreach (Graphic graphic in canvasRoot.GetComponentsInChildren<Graphic>(true))
+                    Assert.That(graphic.raycastTarget, Is.False, "The warning cannot steal throw/board input.");
+
+                // The very first combo has a warning too, before any combo has been counted.
+                latest.SetValue(network, new LabSnapshot
+                {
+                    sessionId = "combo-warning", round = 2, phase = LabPhase.Playing, serverTime = 17.2d,
+                    comboWarningAt = 17d, comboNextAt = 20d
+                });
+                yield return null;
+                Assert.That(hud.WarningVisible, Is.True);
+                Assert.That(hud.WarningCount, Is.EqualTo("3"));
+
+                latest.SetValue(network, new LabSnapshot
+                {
+                    sessionId = "combo-warning", round = 2, phase = LabPhase.Playing, serverTime = 20d,
+                    comboCount = 1, comboActive = true, comboColors = colors, comboStartedAt = 20d, comboEndsAt = 30d
+                });
+                yield return null;
+                Assert.That(hud.WarningVisible, Is.False);
+                Assert.That(hud.PanelVisible, Is.True, "At zero the four slots appear.");
+                Assert.That(hud.SlotColor(0), Is.EqualTo((Color)LabPaintPalette.SrgbColorFor(colors[0])));
+            }
+            finally
+            {
+                Object.Destroy(root);
+                Object.Destroy(canvasRoot);
+            }
+        }
+
         private static void AssertScaledSprite(LabProjectile shot, LabConfig config, float radius, bool replica)
         {
             SphereCollider collider = shot.GetComponent<SphereCollider>();
