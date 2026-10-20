@@ -1427,3 +1427,43 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 검사 사본에서 판정 경로만 임시 기록하고 기존 코드로 복원했다. `shrunk-diagnostic.xml`은0/1로 같은 실패를 재현했다. 실제 반지름은 whole0.165/small0.0825로 맞지만 둘 다 target의 OnCollisionEnter에서 명중됐다. 작은 공의 기록은 separation=+0.219470, 실제 이동 구간 SphereCast=false, ComputePenetration=false였다. 전체 공도 실제 스윕/겹침 전에 콜백으로 명중됐다. `ContinuousSpeculative`의 예상 접촉을 `OnCollisionEnter`가 곧바로 Resolve(true)로 수용하는 것이 이 재현의 오탐 경로다. 반지름 누락이나 새 Sprite의 Collider 확대가 원인이 아니다.
 
 후속 수정은 실제 유효 반지름(폭발×콤보 포함)을 캡처해 Collision/기존 sweep의 명중 승인을 실제 경로·접촉 검증으로 통일하는 범위다. 원래±0.92 전체 명중/축소 빗나감 기대를 유지하고 좌우 교환·정면·고속·바닥 우선·중복 결과1회·움직이는 대상 경계를 확인한다. 이번 통합에서는 임시 기록을 제거한 기존 판정을 유지하며 사용자에게 수정 계획을 제시한다.
+
+
+## 축소 투사체의 실제 접촉 판정 보완 — 2026-10-20, #233
+
+기준은 main `a61c3f84`에서 분기한 `fix/#233-shrunk-projectile-hit-validation`, Unity6000.6.5f1·URP17.6.0·macOS ARM64다. #231/#232 통합 때 남긴 축소 공 검사 실패를 이 작업에서 수정한다. 앞선 실패 기록은 당시 결과로 보존한다.
+
+### 수정한 판정과 계획 보완
+
+- `Assets/Lab/Scripts/Throw/LabProjectile.cs`의 Collision Enter/Stay와 FixedUpdate가 같은 표면 선택·결과 확정 경로를 사용한다. 등록된 활성 target/missSurface만 대상으로 하고, 최근접 표면·동거리에서 target 우선·결과 한 번 확정을 유지한다.
+- 판정 반경은 발사 시 설정된 **실제 SphereCollider 반경**과 world scale이다. 폭발 축소와 콤보 배율을 곱한 크기를 그대로 사용하며 게임 반지름이나 Config 값은 키우지 않는다. 기존 실제 이동 구간의 SphereCast에 시작·끝 표면 겹침을 보완한다. 과거 시작 겹침은 저장한 표면 위치/회전을 사용하고, 끝 겹침은 현재 표면을 사용한다.
+- 최초 계획에서는 CCD 유지도 예상했으나, 양수 접촉을 무시하는 것만으로는 Speculative 솔버가 정상 공의 경로도 미리 꺾는 것을 확인했다. 충돌 전 한 tick의 이동을 별도 적분해 확인하는 후보도 작은 공의 스침을 누락했다. 최종은 **투사체에만 `ContinuousDynamic`**을 적용하고 이 별도 적분식을 제거했다. 박의 kinematic 구조·조합판 물리·발사 속도·중력·감쇠·도색량·보상·패킷/설정169개는 유지한다.
+- 실제 접촉과 엔진의 얇은 **contact skin**을 구분한다. 접촉 콜백의 separation이 양수이면 두 Collider의 `contactOffset` 합 이내인지 확인하고, 해당 콜백 표면에 한해서 실제 반경+그 간격의 스윕/법선 방향 ray로 표면 근접성도 증명해야 한다. Collider 자체를 확대하지 않으며 과거 +0.219470 같은 먼 예상 접촉은 승인하지 않는다. 접촉면의 ray/sweep 좌표를 사용한다.
+- Unity의 [충돌 검사 모드 선택](https://docs.unity3d.com/6000.0/Documentation/Manual/choose-collision-detection-mode.html), [Speculative CCD](https://docs.unity3d.com/6000.0/Documentation/Manual/speculative-ccd.html), [스윕 기반 CCD](https://docs.unity3d.com/6000.0/Documentation/Manual/sweep-based-ccd.html)를 확인했다. 이 선택은 이번 구체/메시 재현에 대한 보완이며, 모든 고속 상대운동이나 회전 메시의 전체 연속 궤적을 재구성한다는 뜻이 아니다.
+
+### 실행 결과
+
+| 확인 | 결과 | 근거·범위 |
+| --- | --- | --- |
+| 투척 집중 PlayMode | PASS **22/22** | `throw-final-candidate.xml`,03:13:14~03:13:23 UTC,9.149초,실패·건너뜀0. 기존 `LabThrowTests`15개는 위치/기대값을 포함해 수정하지 않았다. 새 접촉7개를 포함한다. |
+| 전체 EditMode | PASS **787/787** | `editmode-final.xml`,03:14:21~03:14:47 UTC,25.294초,실패·건너뜀0. |
+| 첫 전체 PlayMode | **211/212**,실패1 | `playmode-final.xml`,03:14:51~03:16:37 UTC. 축소 공과 새 접촉7개는 통과했다. 기존 `LabElementTrailRenderTests`의 정면 금 트레일 픽셀 검사가 실패했다. |
+| 위 GPU 실패의 변경 전 비교 | 같은 실패 재현 | `trail-main-baseline-real.xml`에서 `LabProjectile.cs`만 main 원본으로 되돌려 동일 실패를 확인한 뒤 수정본을 복원했다. 4:3 검사 화면에서 비교 카메라의 정면 표시가 가늘어지는 비율 의존성이 있다. 게임/테스트 코드·입자 설정·픽셀 통과 기준은 바꾸지 않았다. |
+| GPU 세로 화면 단독 확인 | PASS **1/1** | `trail-portrait.xml`,4개 시점/비행 조건×5속성 실제 픽셀 확인. 임시 Editor 환경 도구로 세로 GameView를 선택했으며 Scene이나 프로필을 수정하지 않았다. |
+| 최종 전체 PlayMode | PASS **212/212** | `playmode-portrait-verified.xml`,03:26:53~03:28:40 UTC,106.702초,실패·건너뜀0. 기존 세로 GameView 항목을 선택했다(시작 시 Screen642×1156 기록). 트레일·새 접촉7건·기존 축소 공을 모두 포함한다. |
+| Mac Development 빌드 | PASS(빌드만) | 표준 `LabBuild.Mac`,종료0·C6_LAB_BUILD_OK,BuildReport **215,273,900바이트**. 수동 앱 플레이와 구분한다. |
+| iOS Xcode 내보내기 | PASS(내보내기만) | 표준 `LabBuild.Ios`,종료0·C6_LAB_BUILD_OK. 서명·설치·기기 실행과 구분한다. |
+| 실제 네트워크·iOS 기기·성능 | **NOT_RUN** | 실제 다중 앱 연결·핫스팟·폰 조작·모바일 CCD 비용은 이번 작업에서 검증하지 않는다. |
+
+새 `Assets/Lab/Tests/PlayMode/LabProjectileContactTests.cs`의 경계 시나리오:
+
+1. 기존 ±0.92 위치와 좌우 교환에서 전체 공은 스치며 명중, 절반 공은 빗나감.
+2. 폭발.5×콤보.3/1.5 반경의 실제 스침/밖 경로와 Collider 수치.
+3. 작은 공의 고속 정면 명중과 그 앞 등록 missSurface 우선, 결과1회.
+4. 시작부터 표면에 걸친 정지 공과, 표면이 나중에 움직여 닿는 거의 정지한 공.
+5. 대상이 경로 안/밖으로 이동하는 경우, 클라이언트 시각 복제의 권한 승격 거절과 정리.
+6. 실제 `LabHangingTarget`의 kinematic 부모·비볼록 Hitbox·회전·줄 주기 운동을 확인한 후 고속 축소 공의 명중.
+
+검사는 통제한 Editor 물리 fixture이며 실제 참가자가 다중 앱에서 주고받은 플레이 결과로 확대하지 않는다. 임시 진단/환경 도구·원시 XML/로그·캡처·빌드는 저장소에서 제외한다. 사용자 Scene·Target2 머터리얼·미추적 meta는 별도 보존한다.
+
+최종 검사부터 두 빌드까지 게임 런타임/검사/Shader/Config/Scene/패키지/설정 **191개 파일의 SHA256이 일치**했다. 세로 검사 도구는 빌드 전에 제거했고 글로벌 GameView 설정 파일도 기존 바이트와 같음을 확인했다. Scene/에셋/검사 임계값을 변경해 GPU 통과를 맞추지 않았다.
