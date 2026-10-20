@@ -626,6 +626,21 @@ namespace C6Lab
                 });
         }
 
+        /// <summary>Raised when an orb's lifetime ran out on this board and it went (#235).</summary>
+        public event Action<string> OrbVanished;
+
+        /// <summary>
+        /// The Host says this orb's lifetime ran out (#235): it leaves this board, unlike an orb that is
+        /// handed on, combined or thrown. Returns false when this board does not show it.
+        /// </summary>
+        public bool Vanish(string id)
+        {
+            if (id == null || !entries.TryGetValue(id, out var entry) || entry.View == null) return false;
+            RemoveOrb(id);
+            OrbVanished?.Invoke(id);
+            return true;
+        }
+
         public bool RemoveOrb(string id)
         {
             if (id == null || !entries.TryGetValue(id, out var entry)) return false;

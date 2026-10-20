@@ -838,6 +838,27 @@ namespace C6Lab.Tests
             Assert.That(kinds["held"], Is.EqualTo(LabEdgeCrossingKind.Swipe));
         }
 
+        [Test]
+        public void VanishingAnOrbTakesItOffTheBoardAndSaysSoUnlikeRemovingIt()
+        {
+            var vanished = new System.Collections.Generic.List<string>();
+            board.OrbVanished += id => vanished.Add(id);
+            var old = board.UpsertOrb("old", LabOrbKind.Yin, new Vector2(.5f, .5f));
+            var passed = board.UpsertOrb("passed", LabOrbKind.Yang, new Vector2(.2f, .5f));
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(old), 1d), Is.True, "Held as its time runs out.");
+
+            Assert.That(board.Vanish("old"), Is.True);
+            Assert.That(board.TryGetMotion("old", out _, out _), Is.False, "Its lifetime ran out, so it is gone (#235).");
+            Assert.That(vanished, Is.EqualTo(new[] { "old" }), "The board says it expired.");
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(passed), 2d), Is.True, "No gesture is left stuck on it.");
+            board.CancelDrag();
+
+            Assert.That(board.RemoveOrb("passed"), Is.True);
+            Assert.That(vanished, Is.EqualTo(new[] { "old" }), "An orb handed on or combined just leaves; it did not expire.");
+            Assert.That(board.Vanish("never"), Is.False);
+            Assert.That(board.Vanish(null), Is.False);
+        }
+
         [UnityTest]
         public IEnumerator AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour()
         {

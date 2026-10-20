@@ -43,6 +43,14 @@ namespace C6Lab
         /// </summary>
         public static bool CanThrow(this LabOrbKind kind, int lockSwipes) =>
             kind == LabOrbKind.Combined || ((kind == LabOrbKind.Relay || kind == LabOrbKind.Bomb) && lockSwipes == 0);
+
+        /// <summary>
+        /// How long an orb lasts on the boards, the same on the Host and every screen (#235): items the
+        /// item lifetime, which is a locked bomb's fuse; everything else, an unlocked bomb included, the
+        /// orb lifetime.
+        /// </summary>
+        public static float LifetimeFor(this LabOrbKind kind, int lockSwipes, float orbLifetime, float itemLifetime) =>
+            kind.IsItem() && !(kind == LabOrbKind.Bomb && lockSwipes == 0) ? itemLifetime : orbLifetime;
     }
 
     /// <summary>
@@ -100,6 +108,10 @@ namespace C6Lab
 
         public bool JustArrived(double serverTime) =>
             arrival != LabDrumArrival.None && arrivedAt >= 0d && serverTime - arrivedAt <= ArrivalWindowSeconds;
+
+        /// <summary>Seconds left in this orb's lifetime at the given Host time (#235); never below 0.</summary>
+        public float LifeSecondsLeft(double serverTime, float orbLifetime, float itemLifetime) =>
+            (float)Math.Max(0d, createdAt + kind.LifetimeFor(lockSwipes, orbLifetime, itemLifetime) - serverTime);
 
         /// <summary>Seconds this orb still burns at the given Host time; 0 once out, or when it never burned.</summary>
         public float BurnSecondsLeft(double serverTime, float burnSeconds) =>

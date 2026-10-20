@@ -1469,6 +1469,108 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void AnOrbWhoseLifetimeRunsOutIsReportedToItsHolderOnceButNotOneThatLeftAnotherWay()
+        {
+            var raw = ConfigWith(1f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("orb-expiry", new ulong[] { 10, 20, 30 }, 0d, raw);
+                LabOrbState yin = null, yang = null;
+                var spare = new List<string>();
+                for (int i = 0; i < 20 && (yin == null || yang == null || spare.Count < 2); i++)
+                {
+                    Assert.That(room.TryGenerate(10, "draw-" + i, 0d, out var orb, out _), Is.True);
+                    if (orb.kind == LabOrbKind.Yin && yin == null) yin = orb;
+                    else if (orb.kind == LabOrbKind.Yang && yang == null) yang = orb;
+                    else spare.Add(orb.id);
+                }
+                Assert.That(spare.Count, Is.GreaterThanOrEqualTo(2));
+                string passed = spare[0], kept = spare[1];
+                Assert.That(PassRight(room, passed, 10, 1d).owner, Is.EqualTo(20ul));
+                Assert.That(room.TryCombine(10, yin.id, yang.id, "combine", 2d, out var combined, out var reason),
+                    Is.True, reason);
+
+                room.Snapshot(7.9d);
+                Assert.That(room.DrainOrbExpiries(), Is.Empty, "Nothing has run out yet.");
+                room.Snapshot(8d);
+                LabOrbExpiry[] expired = room.DrainOrbExpiries();
+                Assert.That(expired.Select(expiry => expiry.OrbId), Is.SupersetOf(new[] { passed, kept }),
+                    "Orbs made at 0 run out at their 8 seconds (#235).");
+                Assert.That(expired.Single(expiry => expiry.OrbId == passed).Owner, Is.EqualTo(20ul),
+                    "It is told to the board that holds it now.");
+                Assert.That(expired.Single(expiry => expiry.OrbId == kept).Owner, Is.EqualTo(10ul));
+                Assert.That(expired.Select(expiry => expiry.OrbId), Does.Not.Contain(yin.id), "Orbs combined away did not run out.");
+                Assert.That(expired.Select(expiry => expiry.OrbId), Does.Not.Contain(yang.id));
+                Assert.That(room.DrainOrbExpiries(), Is.Empty, "Each is reported once.");
+                Assert.That(room.Snapshot(8.1d).orbs.Select(orb => orb.id), Does.Not.Contain(passed));
+
+                Assert.That(room.TryLaunch(10, combined.id, "throw", 9d, out _, out reason), Is.True, reason);
+                room.Snapshot(12d);
+                Assert.That(room.DrainOrbExpiries(), Is.Empty, "An orb in flight is the throw's to settle, not the clock's.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(raw); }
+        }
+
+        [Test]
+        public void ExpiredItemsAndUnlockedBombsAreReportedButALockedBombBlastsInstead()
+        {
+            var relays = ConfigWith(1f, 0, 0, 100, 0, 0, 0);
+            var bombs = ConfigWith(1f, 0, 0, 0, 0, 0, 100);
+            try
+            {
+                var items = new LabModel();
+                items.Begin("item-expiry", new ulong[] { 10, 20, 30 }, 0d, relays);
+                Assert.That(items.TryGenerate(10, "relay", 0d, out var relay, out _), Is.True);
+                items.Snapshot(14.9d);
+                Assert.That(items.DrainOrbExpiries(), Is.Empty);
+                items.Snapshot(15d);
+                Assert.That(items.DrainOrbExpiries().Single().OrbId, Is.EqualTo(relay.id),
+                    "An item lasts the item lifetime, then goes the same way (#235).");
+
+                var room = new LabModel();
+                ulong[] ring = { 10, 20, 30 };
+                room.Begin("bomb-expiry", ring, 0d, bombs);
+                Assert.That(room.TryGenerate(10, "locked", 0d, out var locked, out _), Is.True);
+                Assert.That(room.TryGenerate(10, "opened", 0d, out var opened, out _), Is.True);
+                int locks = opened.lockSwipes;
+                for (int pass = 1; pass <= locks; pass++) PassRight(room, opened.id, ring[(pass - 1) % ring.Length], pass);
+                room.Snapshot(locks + 7.9d);
+                Assert.That(room.DrainOrbExpiries(), Is.Empty);
+                room.Snapshot(locks + 8d);
+                LabOrbExpiry gone = room.DrainOrbExpiries().Single();
+                Assert.That(gone.OrbId, Is.EqualTo(opened.id), "An unlocked bomb runs out like an attack orb.");
+                Assert.That(gone.Owner, Is.EqualTo(ring[locks % ring.Length]));
+
+                room.Snapshot(15d);
+                Assert.That(room.DrainBombExplosions().Select(blast => blast.BombId), Does.Contain(locked.id));
+                Assert.That(room.DrainOrbExpiries(), Is.Empty, "A locked bomb at its fuse blasts; it does not quietly expire.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(relays);
+                UnityEngine.Object.DestroyImmediate(bombs);
+            }
+        }
+
+        [Test]
+        public void EveryScreenCountsAnOrbsLifeDownByTheSameRule()
+        {
+            var orb = new LabOrbState { kind = LabOrbKind.Yin, createdAt = 2d };
+            Assert.That(orb.LifeSecondsLeft(5d, 8f, 15f), Is.EqualTo(5f).Within(1e-5f), "The orb lifetime from when it was made (#235).");
+            Assert.That(orb.LifeSecondsLeft(11d, 8f, 15f), Is.Zero, "Never below zero.");
+            var item = new LabOrbState { kind = LabOrbKind.Potion, createdAt = 2d, lockSwipes = 3 };
+            Assert.That(item.LifeSecondsLeft(5d, 8f, 15f), Is.EqualTo(12f).Within(1e-5f), "An item has the item lifetime.");
+            var locked = new LabOrbState { kind = LabOrbKind.Bomb, createdAt = 2d, lockSwipes = 2 };
+            Assert.That(locked.LifeSecondsLeft(5d, 8f, 15f), Is.EqualTo(12f).Within(1e-5f), "A locked bomb's is its fuse.");
+            var opened = new LabOrbState { kind = LabOrbKind.Bomb, createdAt = 2d, lockSwipes = 0 };
+            Assert.That(opened.LifeSecondsLeft(5d, 8f, 15f), Is.EqualTo(5f).Within(1e-5f),
+                "An unlocked bomb is an attack orb with the orb lifetime.");
+            Assert.That(LabOrbKind.Combined.LifetimeFor(0, 8f, 15f), Is.EqualTo(8f));
+            Assert.That(LabOrbKind.Relay.LifetimeFor(0, 8f, 15f), Is.EqualTo(15f));
+        }
+
+        [Test]
         public void OnlyTheUnlockingHandoffStampsTheUnlockTimeAndTheNextHandoffClearsIt()
         {
             var relays = ConfigWith(10f, 0, 0, 100, 0, 0, 0);
