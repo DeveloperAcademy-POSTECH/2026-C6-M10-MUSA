@@ -1467,3 +1467,22 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 검사는 통제한 Editor 물리 fixture이며 실제 참가자가 다중 앱에서 주고받은 플레이 결과로 확대하지 않는다. 임시 진단/환경 도구·원시 XML/로그·캡처·빌드는 저장소에서 제외한다. 사용자 Scene·Target2 머터리얼·미추적 meta는 별도 보존한다.
 
 최종 검사부터 두 빌드까지 게임 런타임/검사/Shader/Config/Scene/패키지/설정 **191개 파일의 SHA256이 일치**했다. 세로 검사 도구는 빌드 전에 제거했고 글로벌 GameView 설정 파일도 기존 바이트와 같음을 확인했다. Scene/에셋/검사 임계값을 변경해 GPU 통과를 맞추지 않았다.
+
+
+## 콤보 예고와 콤보 기본값 — 2026-10-21, 이슈 #241
+
+기준은 main `63a587da`(#232 콤보, #234 축소 투사체 판정 포함)에서 분기한 `feat/#241-combo-warning`이다. Unity는 실행하지 않았다.
+
+- **DEV**: `Combo Warning (seconds)`를 170번째(인덱스 169)에 추가했다. 범위 0~10초, 기본 3초, 0이면 예고 없음. `Combo` 묶음에서는 `Combo First Start` 바로 아래에 보인다(표시 순서 160, 161, 169, 162~168). 설정 169 → **170개**, 프로토콜 `5646` → **`5647`**.
+- **기본값 변경**: `Gourd Color Combo` OFF → **ON**, `Combo Repeat Interval` 30 → **15초**, `Combo Penalty Size (x)` 0.3 → **0.1**, `Combo Reward Size (x)` 1.5 → **2.5**. 첫 시작 20초/제한 10초는 그대로다. 이전에는 `LabConfig.asset`에 콤보 필드가 없어 코드 기본값에 기댔는데, 열려 있던 Unity 에디터가 메모리의 옛 값을 유지해 DEV/DEFAULTS에 옛 값이 보였다. 그래서 콤보 10개 값을 `LabConfig.asset`에도 같은 값으로 저장했다.
+- **Host 모델**: 콤보를 기다리는 동안 스냅샷에 `comboNextAt`(4칸 등장 시각)과 `comboWarningAt`(= 등장 시각 − 예고 시간)을 싣고, 진행 중이거나 꺼져 있으면 -1이다. `LabSnapshot.ComboWarningOn(now)`로 예고 중인지 판단한다. 콤보가 끝나면 다음 콤보 시각을 최소 "끝난 시각 + 예고 시간"으로 미뤄 예고를 끝까지 보여준다(기본값 20/15/10/3에서는 해당 없음, 예고 0이면 이전과 같음). 예고 중에는 콤보가 없으므로 맞힌 구슬을 판정하지 않는다.
+- **화면**: `LabGourdComboHud`가 예고 중 패널 자리에 같은 크기의 `COMBO!`(노랑, 진한 테두리) + 남은 초를 그린다. 숫자는 바뀔 때마다 1.7배에서 1배로 튀고 마지막 1은 빨강이며, 글자와 패널은 0에 가까울수록 빠르게 들썩인다. 예고 중 색 4칸과 SMALL/BIG 배지는 숨기고, 앞 콤보의 결과 문구가 떠 있으면 그것이 끝난 뒤 남은 카운트다운을 보인다. 첫 콤보 예고(콤보 수 0)에서도 보인다. 터치를 막지 않는다. 예고 소리는 이번 범위가 아니다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. `LabModel.cs`의 기존 CS0136(`blast`)은 main 원본에서도 나는 mcs 한계라 제외했다. |
+| EditMode 실제 실행 | NOT_RUN | `LabGourdComboTests` 새 3건(`TheWarningCountsDownBeforeTheFourSlotsAppearOnTime`, `ALateFinishStillLeavesTheWholeWarningBeforeTheNextCombo`, `AZeroWarningMeansTheComboAppearsWithoutOne`)과 기본값 갱신분, `LabDeveloperConfigTests.GourdColorComboFieldsFormTheComboGroupAndStartOn`, 개수/프로토콜 고정 검사 170/5647, 기존 전체 EditMode. 콤보가 기본 ON이 되어 전투 20초를 넘기는 기존 검사가 콤보를 만나는지도 이 실행으로 확인한다. |
+| PlayMode 실제 실행 | NOT_RUN | 새 `LabComboProjectileIntegrationTests.TheWarningCountsDownWithoutColorsOrBadgeThenTheComboAppears`, 개수 고정 Developer PlayMode 검사, 기존 전체 PlayMode. |
+| 솔로 화면: 17~20초 `COMBO!` 3/2/1, 20초에 4칸 등장, 예고 중 색/배지 숨김, 글자 크기·위치 | NOT_RUN | 기본값 그대로 솔로 시작 후 17초부터 확인한다. |
+| 3인 실행: 모든 화면에서 같은 카운트다운과 같은 시각의 4칸 등장 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 예고 패널이 위쪽 HUD/노치와 겹치지 않는지 확인 필요. |
