@@ -334,9 +334,9 @@ namespace C6Lab
         [Tooltip("무거운 폭탄 (#212): 끄는 폭탄이 손가락을 따라오는 데 걸리는 시간 (초). 0이면 구슬처럼 손가락에 붙는다.")]
         [SerializeField, Range(0f, 1f)] private float bombDragLag = .12f;
         [Tooltip("무거운 폭탄: 놓을 때 튕겨 나가는 속도 배율 (구슬 = 1). 작을수록 세게 그어야 옆으로 넘어간다. 던지기에는 쓰지 않는다.")]
-        [SerializeField, Range(.05f, 1f)] private float bombReleaseSpeed = .5f;
+        [SerializeField, Range(.05f, 1f)] private float bombReleaseSpeed = .75f;
         [Tooltip("무거운 폭탄: 미끄러질 때 감속 배율 (구슬 = 1). 클수록 빨리 멈춘다.")]
-        [SerializeField, Range(1f, 5f)] private float bombSlideDeceleration = 2f;
+        [SerializeField, Range(1f, 5f)] private float bombSlideDeceleration = 1.3f;
         [Tooltip("무거운 폭탄: 질량 배율 (구슬 = 1). 클수록 구슬과 부딪혀도 덜 밀린다.")]
         [SerializeField, Range(1f, 20f)] private float bombMass = 4f;
         [Tooltip("폭발 패널티 (#213): 폭탄 충격파에 맞은 구슬에 노란 불이 붙어 있는 시간 (초).")]
@@ -656,8 +656,8 @@ namespace C6Lab
         public float BombBlastRadius => Mathf.Clamp(Finite(bombBlastRadius, .4f), 0f, 2f);
         public float BombBlastStrength => Mathf.Clamp(Finite(bombBlastStrength, 9f), 0f, 20f);
         public float BombDragLag => Mathf.Clamp(Finite(bombDragLag, .12f), 0f, 1f);
-        public float BombReleaseSpeed => Mathf.Clamp(Finite(bombReleaseSpeed, .5f), .05f, 1f);
-        public float BombSlideDeceleration => Mathf.Clamp(Finite(bombSlideDeceleration, 2f), 1f, 5f);
+        public float BombReleaseSpeed => Mathf.Clamp(Finite(bombReleaseSpeed, .75f), .05f, 1f);
+        public float BombSlideDeceleration => Mathf.Clamp(Finite(bombSlideDeceleration, 1.3f), 1f, 5f);
         public float BombMass => Mathf.Clamp(Finite(bombMass, 4f), 1f, 20f);
         public float BlastBurnSeconds => Mathf.Clamp(Finite(blastBurnSeconds, 4f), 3f, 5f);
         public float BlastShrinkScale => Mathf.Clamp(Finite(blastShrinkScale, .5f), .2f, 1f);
