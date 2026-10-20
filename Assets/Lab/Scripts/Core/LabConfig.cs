@@ -254,7 +254,8 @@ namespace C6Lab
             new LabDeveloperField("Combo Penalty Size (x)", .01f, 1f),
             LabDeveloperField.Toggle("Combo Penalty Target (0 team, 1 thrower)", "TEAM", "THROWER"),
             new LabDeveloperField("Combo Reward Duration (seconds)", 0f, 600f),
-            new LabDeveloperField("Combo Reward Size (x)", 1f, 3f)
+            new LabDeveloperField("Combo Reward Size (x)", 1f, 3f),
+            new LabDeveloperField("Combo Warning (seconds)", 0f, 10f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -286,7 +287,7 @@ namespace C6Lab
                 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
                 139, 133, 134, 135, 136, 137, 138, 153, 154, 155, 156),
             new LabDeveloperCategory("Minimap", 99, 100, 101, 102),
-            new LabDeveloperCategory("Combo", 160, 161, 162, 163, 164, 165, 166, 167, 168)
+            new LabDeveloperCategory("Combo", 160, 161, 169, 162, 163, 164, 165, 166, 167, 168)
         });
 
 
@@ -365,6 +366,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 600f)] private float comboRewardDurationSeconds = 10f;
         [Tooltip("보상 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
         [SerializeField, Range(1f, 3f)] private float comboRewardSizeScale = 1.5f;
+        [Tooltip("콤보 4칸이 나오기 전 COMBO! 3, 2, 1 예고를 보여주는 시간 (초, #241). 0이면 예고 없이 바로 나온다.")]
+        [SerializeField, Range(0f, 10f)] private float comboWarningSeconds = 3f;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -671,6 +674,7 @@ namespace C6Lab
         public bool ComboPenaltyThrowerOnly => comboPenaltyThrowerOnly;
         public float ComboRewardDurationSeconds => Mathf.Clamp(Finite(comboRewardDurationSeconds, 10f), 0f, 600f);
         public float ComboRewardSizeScale => Mathf.Clamp(Finite(comboRewardSizeScale, 1.5f), 1f, 3f);
+        public float ComboWarningSeconds => Mathf.Clamp(Finite(comboWarningSeconds, 3f), 0f, 10f);
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
         public float OrbStopSpeed => Mathf.Clamp(Finite(orbStopSpeed, .065f), 0f, OrbMaxReleaseSpeed);
@@ -923,7 +927,8 @@ namespace C6Lab
                 SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap,
                 GourdColorComboEnabled ? 1f : 0f, ComboFirstStartSeconds, ComboRepeatIntervalSeconds,
                 ComboTimeLimitSeconds, ComboPenaltyDurationSeconds, ComboPenaltySizeScale,
-                ComboPenaltyThrowerOnly ? 1f : 0f, ComboRewardDurationSeconds, ComboRewardSizeScale
+                ComboPenaltyThrowerOnly ? 1f : 0f, ComboRewardDurationSeconds, ComboRewardSizeScale,
+                ComboWarningSeconds
             };
         }
 
@@ -1136,6 +1141,7 @@ namespace C6Lab
             comboPenaltyThrowerOnly = values[166] >= .5f;
             comboRewardDurationSeconds = values[167];
             comboRewardSizeScale = values[168];
+            comboWarningSeconds = values[169];
             error = string.Empty;
             return true;
         }
