@@ -74,10 +74,23 @@ namespace C6Lab.Tests
             }
             ScrollRect scroll = ui.panel.GetComponentsInChildren<ScrollRect>(true).Single();
             Canvas.ForceUpdateCanvases(); LayoutRebuilder.ForceRebuildLayoutImmediate(scroll.content);
-            scroll.verticalNormalizedPosition = 0f; scroll.StopMovement();
             yield return null;
             Canvas.ForceUpdateCanvases();
             var input = (RectTransform)ui.valueInputs[138].transform;
+            // Newer Gourd groups follow flow. Scroll to this row's actual viewport position,
+            // using the content's transformed height rather than assuming it is the bottom row.
+            Vector3 rowCenter = scroll.viewport.InverseTransformPoint(input.TransformPoint(input.rect.center));
+            var corners = new Vector3[4];
+            scroll.content.GetWorldCorners(corners);
+            float contentHeight = Mathf.Abs(scroll.viewport.InverseTransformPoint(corners[1]).y
+                - scroll.viewport.InverseTransformPoint(corners[0]).y);
+            float scrollableHeight = contentHeight - scroll.viewport.rect.height;
+            if (scrollableHeight > .001f)
+                scroll.verticalNormalizedPosition = Mathf.Clamp01(scroll.verticalNormalizedPosition
+                    - (scroll.viewport.rect.center.y - rowCenter.y) / scrollableHeight);
+            scroll.StopMovement();
+            yield return null;
+            Canvas.ForceUpdateCanvases();
             Vector3 center = scroll.viewport.InverseTransformPoint(input.TransformPoint(input.rect.center));
             Assert.That(scroll.viewport.rect.Contains(new Vector2(center.x, center.y)), Is.True);
             Canvas canvas = ui.panel.GetComponentInParent<Canvas>();

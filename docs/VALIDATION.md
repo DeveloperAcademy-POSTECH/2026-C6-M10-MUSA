@@ -1346,6 +1346,35 @@ OrbCamera의 단색 바탕이 조합대 상단 투명 곡선에서 보이던 부
 - 실제 Editor402×874 솔로 Game View에서 새 삼태극·손그림 테두리·질감 표시를 확인했다.
 - 빌드·실기기·다중 연결 **NOT_RUN**. 임시 검사 도구와 원시 결과는 저장소에서 제외한다.
 
+## #229 음양·오행 구슬 PNG 적용 — 2026-10-20
+
+현재 `orgin/experiment/#229-new-2d-orbs`는 처음에227 머지 전532ba3bd에서 시작했다. 원격을 갱신해 PR#228의227 UI 머지652c5081을 확인하고 fast-forward로 포함했다. 진행 중인229 소스와 원본 PNG는 보존했다.
+
+사용자 제공 음·양·화·수·목·금·토 PNG7개를 원본 그대로 추가하고 LabOrbAppearance.asset의 새 Sprite 슬롯에 연결했다. 조합판은 이미지가 회전해 옆면이 되지 않도록 평면으로 표시하며, 투척은 렌더링하는 각 카메라를 향한다. 물리 루트와 기존 SphereCollider/Rigidbody·생성·조합·전달·투척·색칠 색상·축소 비율·속성 궤적은 유지한다. Sprite가 없는 종류·기존 fixture는 머터리얼/프리팹 표현으로 돌아간다. Config 수치·Scene 참조는 변경하지 않았다.
+
+- Unity6000.6.5f1 재가져오기·컴파일 완료. 새 이미지 가져오기/연결 메뉴를 포함한다.
+- EditMode LabOrbSpriteDesignTests **7/7**, 실패·건너뜀0: 저장 Config에서 종류/속성과 원본 Sprite 연결·피벗·mipmap 확인.
+- 최종 PlayMode **57/57**, 실패·건너뜀0: LabOrbSpriteTests(3), LabOrbPhysicsTests(53), SavedSceneSoloCanGenerateCombineAndHitTheCylinder(1). 이미지 전환/3D 복귀·게임 지름/콜라이더 독립·축소 투사체·속성 궤적·여러 카메라 방향과 기존 물리·실제 솔로 생성/조합/명중을 확인했다.
+- 첫 PlayMode54/57에서 기존 통합 검사의 MeshRenderer 존재 가정1건과 새 fixture의 가로폭/발사 전 collider 기본값 가정2건이 실패했다. 새 Sprite 연결 검사와 긴 변 기준·실제 LaunchVisual 이후 검사로 고친 뒤 위57건이 통과했다. 물리 수치를 바꿔 검사를 맞추지 않았다.
+- Editor402×874 화면에서227 배경·UI 복구와7종 이미지의 실제 보드 표시를 확인했다.7종 동시 표시는 임시 로컬 표현 fixture이며 Host의 자연 생성/속성 추첨 결과와 구분한다. 원시 캡처·결과·임시 도구는 저장소에서 제외한다.
+- 빌드·iOS 실기기·다중 연결 **NOT_RUN**. 재생 중 스크립트 갱신에서 보인 기존 판/네트워크 NullReferenceException의 원인 해결은 이번 범위 밖이다.
+
+### #229 음양 구슬 표시 크기 조정 — 2026-10-20
+
+사용자 예시를 기준으로 조합판의 음·양 Sprite만 오행 Sprite 대비80% 지름으로 표시한다. 원본 이미지·SphereCollider·드래그/조합 판정·수치 Config·오행/투척 크기는 유지한다.
+
+- Unity6000.6.5f1 컴파일 완료. EditMode LabOrbSpriteDesignTests **7/7**, PlayMode LabOrbSpriteTests(3)·SavedSceneSoloCanGenerateCombineAndHitTheCylinder(1) **4/4**, 실패·건너뜀0. 같은 물리 반지름0.32에서 음양 표시 지름0.512/오행0.64, Collider 유지·표현 전환·투척 회귀·실제 솔로 조합/명중을 확인했다.
+- Editor402×874 화면의 임시7종 보드 표시에서 음·양이 더 작게 보이는 것을 확인했다. 빌드·실기기·다중 연결은 **NOT_RUN**. 임시 도구·원시 결과·캡처는 저장소에서 제외한다.
+
+
+### #229 음양 원래 크기·오행120% 표시로 변경 — 2026-10-20
+
+사용자 후속 요청으로 앞의 음양80% 표시를 철회했다. 음양은 원래 지름, 오행은 조합판과 투척 중 모두120% 지름으로 표시한다. 물리 반지름·잡기·조합 판정·축소 패널티 비율은 유지한다. 공통 표시 배율을 두 경로에서 사용한다.
+
+- Unity6000.6.5f1 컴파일 완료. EditMode7/7, PlayMode4/4, 실패·건너뜀0(앞과 같은7종 연결 및 이미지/물리 분리·카메라·실제 솔로 조합/명중 검사). 반지름0.32에서 음양 지름0.64/오행0.768을 확인하고, 축소 투사체도 기존Collider에120% 표시만 적용됨을 확인했다.
+- 빌드·실기기·다중 연결은 NOT_RUN. 임시 도구·원시 결과는 저장소에서 제외한다.
+
+
 ## 박 색상 콤보 실험 — 2026-10-19, 이슈 #222
 
 기준은 Unity **6000.6.5f1**, main(`dc4917d3`, #212 PR #220 포함)에서 분기한 `experiment/#222-gourd-color-combo`다.
@@ -1371,3 +1400,30 @@ OrbCamera의 단색 바탕이 조합대 상단 투명 곡선에서 보이던 부
 추가/변경한 검사:
 - **EditMode** `LabGourdComboTests`(새 파일): `FourHitsInOrderAndColorSucceed`, `AWrongColorFailsAtOnceAndRemembersTheThrower`, `TheTimeLimitEndsTheComboAtItsDeadline`, `StartRejectsNonElementColors`, `WhenTheToggleIsOffNoComboEverAppears`, `ATimedOutComboPenalizesTheWholeTeamAndTheNextComboFollowsTheInterval`, `EveryDeviceSeesTheSameColorsForTheSameRound`, `AWrongColorPenalizesTheTeamOrOnlyTheThrowerAsConfigured`(TEAM/THROWER 2건), `APenalizedThrowRemembersItsSizeUntilItLandsOrMisses`, `AScaledPaintHitCoversLessAndTheNextHitIsFullSizeAgain`, `ASuccessGivesTheWholeTeamBigBallsAndEndsAPenalty`, `ASuccessEndsARunningPenalty`, `ARewardPaintHitCoversMore`
 - **EditMode** `LabDeveloperConfigTests`: `GourdColorComboFieldsFormTheComboGroupAndStartOff`; 무거운 폭탄 검사는 146~149번만 읽도록 범위 고정. 개수/프로토콜을 고정한 팀원 검사들을 169개/5646으로 갱신.
+
+
+## PR #231 2D 구슬 · #232 색상 콤보 통합 검증 — 2026-10-20 (KST)
+
+기준 main `652c5081`(#228 새 UI), PR #231 `333761d6`, PR #232 `b802bad2`의 합본이다. Unity6000.6.5f1·URP17.6.0·macOS ARM64를 사용했다. 새 UI Scene과 건조 기본 ON은 유지하며 콤보는 기본 OFF, 설정169개/프로토콜5646이다. #231의 무관한 Target2 머터리얼 float 재저장2건은 제외했다. 아래는 실제 합본 실행 결과이며 각 PR 단독 전체 결과로 확대하지 않는다.
+
+| 확인 | 결과 | 실행 근거·범위 |
+| --- | --- | --- |
+| 전체 EditMode | PASS | `editmode-final.xml` **787/787**, failed/skipped0, 00:41:42~00:42:06 UTC,24.107초. 설정/콤보·Host 판정·공유 패킷·도색 상한·건조 인접 보호와 기존 검사를 포함한다. |
+| 전체 PlayMode | **FAIL,204/205** | `playmode-final.xml`, skipped0,00:46:38~00:48:18 UTC,100.055초. 2D 이미지/카메라·물리·생성·DEV·새 통합3건을 포함해204건 통과. 아래 기존 투사체 검사만 실패했다. |
+| 새 통합3건 | PASS(통제 fixture) | 실제 저장 Sprite의 폭발.5×콤보.3/1.5에 따른 Host/복제 Collider·이미지·중력 동결, 기본 Trail 폭,4색/체크·일시정지/OFF 새 라운드 HUD 정리를 확인했다. 소켓 대신 패킷 JSON/스냅샷 fixture를 사용하며 실제 다중 앱 실행이 아니다. 기존 오행 먹선의 프로파일 폭은 고정으로 유지하고 비례 폭 검증에 포함하지 않았다. |
+| Mac Development 빌드 | PASS(빌드만) | 표준 LabBuild.Mac 종료0·C6_LAB_BUILD_OK, BuildReport **215,271,244바이트**. 수동 앱 플레이는 미실행이다. |
+| iOS Xcode 프로젝트 내보내기 | PASS(내보내기만) | 표준 LabBuild.Ios 종료0·C6_LAB_BUILD_OK·C6_LAB_IOS_CORE_HAPTICS_LINKED. 실제 PBX의 CoreHaptics.framework BuildFile에 Weak 속성1개가 있음을 확인했다. 서명/기기 설치/실행 결과가 아니다. |
+| iOS 네이티브 구문 컴파일 | PASS,경고1 | Xcode iOS26.5 SDK·arm64·ARC·iOS15 target의 clang++ 종료0/오류0. 엔진 resetHandler의 강한 캡처/retain-cycle 경고1개가 있다. 엔진은 코드상 앱 생애 동안 보관되며 실제 메모리/백그라운드/진동 검증은 미실행이다. 완성 앱의 링크 검증과 구별한다. |
+| 다중 앱·실기기·진동·기기 성능 | NOT_RUN | 실제 네트워크/기기 화면·진동·모바일 성능은 이번 통합에서 실행하지 않았다. |
+
+첫 합본 EditMode785/787의2건은 새 콤보 토글이 빠진 목록과 예전 share≤1 거부 전제였다. 두 토글 문구와 유효 share1/1.5/3의 인접 보호/실제 면적,3초과·NaN/무한대 거부 검사를 유지하며 새 계약으로 갱신했다. 첫 PlayMode202/205 중 새 HUD의 Color32/Color 비교 형식, 기존 DEV의138번 행이 맨 아래라는 위치 가정을 수정했다. 실제 행·콘텐츠/뷰포트 크기로 스크롤한 뒤 화면 내 포함·EventSystem 최상위 Raycast 검증은 그대로 유지했다. 이 검사 수정으로 생산 물리나 명중 기대값을 바꾸지 않았다.
+
+Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드까지 SHA256을 대조했다. 진단 코드·임시 도구·원시 로그/XML·개인 경로·빌드 산출물은 커밋하지 않는다. 사용자 작업의 Scene·머터리얼·미추적 meta는 별도 보존한다.
+
+### 기존 축소 투사체 실패의 경로 진단 — 수정 계획 단계
+
+`LabThrowTests.AProjectileFromABlastShrunkOrbIsSmallerAndMissesWhereAWholeOneGrazes`는 기존 main 재현과 동일하게 smallHit=False 기대에True였다. #231의 기존 표현 검사는 이 명중/빗나감 검사를 포함하지 않는다.
+
+검사 사본에서 판정 경로만 임시 기록하고 기존 코드로 복원했다. `shrunk-diagnostic.xml`은0/1로 같은 실패를 재현했다. 실제 반지름은 whole0.165/small0.0825로 맞지만 둘 다 target의 OnCollisionEnter에서 명중됐다. 작은 공의 기록은 separation=+0.219470, 실제 이동 구간 SphereCast=false, ComputePenetration=false였다. 전체 공도 실제 스윕/겹침 전에 콜백으로 명중됐다. `ContinuousSpeculative`의 예상 접촉을 `OnCollisionEnter`가 곧바로 Resolve(true)로 수용하는 것이 이 재현의 오탐 경로다. 반지름 누락이나 새 Sprite의 Collider 확대가 원인이 아니다.
+
+후속 수정은 실제 유효 반지름(폭발×콤보 포함)을 캡처해 Collision/기존 sweep의 명중 승인을 실제 경로·접촉 검증으로 통일하는 범위다. 원래±0.92 전체 명중/축소 빗나감 기대를 유지하고 좌우 교환·정면·고속·바닥 우선·중복 결과1회·움직이는 대상 경계를 확인한다. 이번 통합에서는 임시 기록을 제거한 기존 판정을 유지하며 사용자에게 수정 계획을 제시한다.

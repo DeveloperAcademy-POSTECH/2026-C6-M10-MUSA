@@ -95,22 +95,26 @@ namespace C6Lab.Tests
         [Test]
         public void NearbyHitProtectsAnotherColorAndDisconnectedPatchWithoutProtectingTheBack()
         {
-            var surface = new LabPaintSurface(Settings(), 64);
-            Seed(surface, 32, 16, Color.red, 1);
-            Seed(surface, 34, 16, Color.blue, 2);
-            Seed(surface, 0, 16, Color.green, 3);
-            Assert.That(surface.RegionCount, Is.EqualTo(3));
-            surface.Advance(.75d);
-            Assert.That(surface.RegisterHit(Direction(surface, 32, 16), Color.yellow, 4, 4), Is.True);
-            surface.Advance(.5d);
-            Color32[] after = Pixels(surface);
-            Assert.That(after[Index(surface, 32, 16)], Is.EqualTo((Color32)Color.red));
-            Assert.That(after[Index(surface, 34, 16)], Is.EqualTo((Color32)Color.blue));
-            Assert.That(surface.GetPainterSlot(Index(surface, 34, 16)), Is.EqualTo(2));
-            Assert.That(after[Index(surface, 0, 16)].a, Is.Zero,
-                "A hit in front must not protect the geometrically opposite side of the gourd.");
-            Assert.That(surface.CoveredCount, Is.EqualTo(2));
-            Assert.That(surface.PendingCoverage, Is.Zero);
+            // Combo rewards change paint supply, not the nearby-hit protection radius or provenance.
+            foreach (float share in new[] { 1f, 1.5f, 3f })
+            {
+                var surface = new LabPaintSurface(Settings(), 64);
+                Seed(surface, 32, 16, Color.red, 1);
+                Seed(surface, 34, 16, Color.blue, 2);
+                Seed(surface, 0, 16, Color.green, 3);
+                Assert.That(surface.RegionCount, Is.EqualTo(3));
+                surface.Advance(.75d);
+                Assert.That(surface.RegisterHit(Direction(surface, 32, 16), Color.yellow, 4, 4, share), Is.True);
+                surface.Advance(.5d);
+                Color32[] after = Pixels(surface);
+                Assert.That(after[Index(surface, 32, 16)], Is.EqualTo((Color32)Color.red));
+                Assert.That(after[Index(surface, 34, 16)], Is.EqualTo((Color32)Color.blue));
+                Assert.That(surface.GetPainterSlot(Index(surface, 34, 16)), Is.EqualTo(2));
+                Assert.That(after[Index(surface, 0, 16)].a, Is.Zero,
+                    "A hit in front must not protect the geometrically opposite side of the gourd.");
+                Assert.That(surface.CoveredCount, Is.EqualTo(2));
+                Assert.That(surface.PendingCoverage, Is.Zero);
+            }
         }
 
         [Test]
@@ -173,7 +177,7 @@ namespace C6Lab.Tests
             {
                 case "zero-share": share = 0f; break;
                 case "negative-share": share = -1f; break;
-                case "large-share": share = 2f; break;
+                case "large-share": share = 3.001f; break;
                 case "nan-share": share = float.NaN; break;
                 case "negative-slot": slot = -1; break;
                 case "large-slot": slot = 6; break;

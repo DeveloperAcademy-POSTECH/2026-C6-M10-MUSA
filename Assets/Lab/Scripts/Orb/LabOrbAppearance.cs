@@ -21,6 +21,14 @@ namespace C6Lab
         [SerializeField] private Material woodMaterial;
         [SerializeField] private Material metalMaterial;
         [SerializeField] private Material earthMaterial;
+        [Header("Camera-facing orb art (empty = existing 3D presentation)")]
+        [SerializeField] private Sprite yinSprite;
+        [SerializeField] private Sprite yangSprite;
+        [SerializeField] private Sprite fireSprite;
+        [SerializeField] private Sprite waterSprite;
+        [SerializeField] private Sprite woodSprite;
+        [SerializeField] private Sprite metalSprite;
+        [SerializeField] private Sprite earthSprite;
         [Header("Item icons (drawn on a disc facing the board camera)")]
         [SerializeField] private Texture2D relayIcon;
         [SerializeField] private Texture2D secretBoxIcon;
@@ -110,6 +118,21 @@ namespace C6Lab
         public Material YangMaterial => yangMaterial;
         public Material CombinedMaterial => combinedMaterial;
         public Sprite DrumSprite => drumSprite;
+        public Sprite SpriteFor(LabOrbKind kind, LabOrbElement element = LabOrbElement.None)
+        {
+            if (kind == LabOrbKind.Yin) return yinSprite;
+            if (kind == LabOrbKind.Yang) return yangSprite;
+            if (kind != LabOrbKind.Combined) return null;
+            return element switch
+            {
+                LabOrbElement.Fire => fireSprite,
+                LabOrbElement.Water => waterSprite,
+                LabOrbElement.Wood => woodSprite,
+                LabOrbElement.Metal => metalSprite,
+                LabOrbElement.Earth => earthSprite,
+                _ => null
+            };
+        }
         public Texture2D BombArt => bombArt;
         public Texture2D BombFuseArt => bombFuseArt;
         public float BombBodySize => bombBodySize > 0f ? bombBodySize : 1.2f;
