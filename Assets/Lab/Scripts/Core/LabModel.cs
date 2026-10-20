@@ -506,15 +506,20 @@ namespace C6Lab
             }
         }
 
+        /// <summary>전투 중이고 콤보가 켜져 있으며, 진행 중인 콤보 없이 다음 콤보를 기다리는 중인지 (#241)</summary>
+        private bool ComboWaiting => phase == LabPhase.Playing && rules != null && rules.ComboEnabled && !combo.Active;
+
         /// <summary>
         /// 콤보가 끝난 뒤 처리. 성공은 팀 전체에 보상을 주고, 실패는 페널티를 건다.
         /// 틀린 색 + "던진 사람만" 설정이면 그 사람에게만, 그 밖(시간 초과 포함)에는 모두에게 건다.
-        /// 다음 콤보 시각이 이미 지났으면 지금 바로 나오게 한다.
+        /// 다음 콤보는 아무리 일러도 끝난 시각 + 예고 시간(#241) 뒤에 나온다. 앞 콤보가 늦게 끝나도
+        /// 예고(COMBO! 3, 2, 1)를 다 보여준 다음 4칸이 나오게 하려는 것이다.
         /// </summary>
         private void OnComboFinished(LabComboResult result)
         {
             double at = combo.LastResultAt;
-            if (nextComboAt < at) nextComboAt = at;
+            double earliest = at + rules.ComboWarningSeconds;
+            if (nextComboAt < earliest) nextComboAt = earliest;
             if (result == LabComboResult.Success)
             {
                 // 4칸을 다 같이 채웠으므로 보상은 언제나 팀 전체. 진행 중이던 페널티는 여기서 끝난다.
@@ -711,7 +716,9 @@ namespace C6Lab
                 comboResult = combo.LastResult,
                 comboResultCount = combo.LastResultCount,
                 comboResultAt = combo.LastResultAt,
-                comboFailedBy = combo.LastFailedBy
+                comboFailedBy = combo.LastFailedBy,
+                comboNextAt = ComboWaiting ? nextComboAt : -1d,
+                comboWarningAt = ComboWaiting ? nextComboAt - rules.ComboWarningSeconds : -1d
             };
         }
 
@@ -1082,7 +1089,8 @@ namespace C6Lab
             public readonly Color[] PaintColors;
             public readonly bool ComboEnabled, ComboPenaltyThrowerOnly;
             public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
-                ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale;
+                ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale,
+                ComboWarningSeconds;
 
             public Rules(LabConfig config)
             {
@@ -1134,6 +1142,7 @@ namespace C6Lab
                 ComboPenaltyThrowerOnly = config.ComboPenaltyThrowerOnly;
                 ComboRewardDurationSeconds = config.ComboRewardDurationSeconds;
                 ComboRewardSizeScale = config.ComboRewardSizeScale;
+                ComboWarningSeconds = config.ComboWarningSeconds;
             }
         }
     }
