@@ -185,8 +185,9 @@ namespace C6Lab
         // 5644: #225 nearby-hit paint drying adds shared DEV 153-156.
         // 5645: #215 swipe-block snapshots and pushed crossings integrate at DEV 157-159; 160 shared values.
         // 5646: #222 gourd color combo experiment (DEV 160-168, combo snapshot, projectile size scale); 169 shared values.
-        // 5647: #241 combo warning (DEV 169, next combo time in the snapshot); 170 shared values.
-        internal const ushort LabProtocolVersion = 5647;
+        // 5647: #235 the Host tells an orb's holder when its lifetime ran out (orbExpired), before the snapshot.
+        // 5648: #241 combo warning (DEV 169, next combo time in the snapshot); 170 shared values.
+        internal const ushort LabProtocolVersion = 5648;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");
@@ -300,6 +301,8 @@ namespace C6Lab
         public float LastLocalHitOffset { get; private set; }
         /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
         public event Action<string, Vector2> BombBlasted;
+        /// <summary>An orb on this player's board reached the end of its lifetime and went (#235).</summary>
+        public event Action<string> OrbExpired;
         /// <summary>
         /// The gourd just blocked this player's own passes one way (#215): to the right or not, and the
         /// seconds it lasts. Raised once per block, on the blocked player's screen only.
@@ -1436,6 +1439,7 @@ namespace C6Lab
             }
             latest.paused = battleClock.IsPaused && latest.phase == LabPhase.Playing;
             AnnounceBombExplosions();
+            AnnounceOrbExpiries();
             AnnounceGourdBombs();
             // Large experimental states are deliberately updated less often instead of queuing
             // many reliable fragments per peer until the network becomes unusable.
@@ -1480,6 +1484,24 @@ namespace C6Lab
         }
 
         private readonly List<string> blastFlung = new List<string>();
+
+        private void AnnounceOrbExpiries()
+        {
+            foreach (LabOrbExpiry expiry in model.DrainOrbExpiries())
+            {
+                // Sent before this snapshot's chunks on the same ordered channel, so the holder's board
+                // lets the orb go as expired rather than just dropping it with the next snapshot.
+                if (expiry.Owner == LocalPlayerId) OnOrbExpired(expiry.OrbId);
+                else Send(expiry.Owner, new LabNetworkPacket { type = "orbExpired", sessionId = sessionId,
+                    firstId = expiry.OrbId });
+            }
+        }
+
+        private void OnOrbExpired(string orbId)
+        {
+            if (board != null) board.Vanish(orbId);
+            OrbExpired?.Invoke(orbId);
+        }
 
         private void AnnounceBombExplosions()
         {
@@ -1794,7 +1816,10 @@ namespace C6Lab
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
                     orb.JustUnlocked(latest.serverTime), small: orb.small,
                     // Every screen counts the blast fire down from the same Host clock (#213).
-                    burnSeconds: config != null ? orb.BurnSecondsLeft(latest.serverTime, config.BlastBurnSeconds) : 0f);
+                    burnSeconds: config != null ? orb.BurnSecondsLeft(latest.serverTime, config.BlastBurnSeconds) : 0f,
+                    // The white flash before an orb runs out (#235); a locked bomb shows its own red one.
+                    lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
+                        : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds));
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
@@ -1966,6 +1991,9 @@ namespace C6Lab
                     break;
                 case "notice":
                     if (packet.sessionId == sessionId) SetNotice(packet.reason);
+                    break;
+                case "orbExpired":
+                    if (packet.sessionId == sessionId && !string.IsNullOrEmpty(packet.firstId)) OnOrbExpired(packet.firstId);
                     break;
                 case "bombBlast":
                     if (packet.sessionId == sessionId && Finite(packet.x) && Finite(packet.y))

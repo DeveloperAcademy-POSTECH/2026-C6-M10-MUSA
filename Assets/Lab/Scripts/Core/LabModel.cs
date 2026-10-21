@@ -24,6 +24,22 @@ namespace C6Lab
     }
 
     /// <summary>
+    /// An orb whose lifetime ran out (#235): the board that held it, which goes there in a puff of
+    /// smoke, unlike an orb that was handed on, combined, thrown or used.
+    /// </summary>
+    public readonly struct LabOrbExpiry
+    {
+        public readonly ulong Owner;
+        public readonly string OrbId;
+
+        public LabOrbExpiry(ulong owner, string orbId)
+        {
+            Owner = owner;
+            OrbId = orbId;
+        }
+    }
+
+    /// <summary>
     /// A locked bomb the gourd dropped onto one player's board as sabotage (#177): who receives it
     /// and where, in 0..1 board units, it lands.
     /// </summary>
@@ -90,6 +106,7 @@ namespace C6Lab
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
+        private readonly List<LabOrbExpiry> orbExpiries = new List<LabOrbExpiry>();
         /// <summary>Bomb times for this round, retained so a late frame schedules the same swipe blocks as small steps (#215).</summary>
         private readonly List<double> gourdBombTimes = new List<double>();
         private double nextSwipeBlockAt;
@@ -172,6 +189,7 @@ namespace C6Lab
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
             players.Clear(); orbs.Clear(); drums.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
             unreportedBlasts.Clear();
+            orbExpiries.Clear();
             gourdBombs.Clear();
             gourdBombTimes.Clear();
             for (int i = 0; i < activeSeatCount; i++)
@@ -635,6 +653,14 @@ namespace C6Lab
             return burned;
         }
 
+        /// <summary>Orbs whose lifetime ran out since the last call, each reported once (#235).</summary>
+        public LabOrbExpiry[] DrainOrbExpiries()
+        {
+            LabOrbExpiry[] expired = orbExpiries.ToArray();
+            orbExpiries.Clear();
+            return expired;
+        }
+
         /// <summary>Locked bombs that blasted at their fuse since the last call, each reported once.</summary>
         public LabBombBlast[] DrainBombExplosions()
         {
@@ -774,7 +800,13 @@ namespace C6Lab
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
                 {
-                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0) continue;
+                    if (!orbs.Remove(expired.id)) continue;
+                    if (expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0)
+                    {
+                        // Its lifetime ran out: its holder's screen sees it go in a puff of smoke (#235).
+                        orbExpiries.Add(new LabOrbExpiry(expired.owner, expired.id));
+                        continue;
+                    }
                     // A bomb still locked at the end of its fuse blasts on its current holder's board. No
                     // orb is lost: the holder's screen pushes the ones around it away from where it last was.
                     bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
@@ -935,8 +967,7 @@ namespace C6Lab
         // Items last the item lifetime; for a locked bomb that is its fuse. An unlocked bomb is an
         // ordinary attack orb and keeps the orb lifetime.
         private float LifetimeOf(LabOrbState orb) =>
-            orb.kind.IsItem() && !(orb.kind == LabOrbKind.Bomb && orb.lockSwipes == 0)
-                ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
+            orb.kind.LifetimeFor(orb.lockSwipes, rules.OrbLifetimeSeconds, rules.ItemLifetimeSeconds);
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
 
         /// <summary>Orbs and drums both move between screens; look the ID up in either list.</summary>

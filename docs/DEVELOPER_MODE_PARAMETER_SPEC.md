@@ -13,7 +13,7 @@
 - `Paint Edge Raggedness`는 새 성장 경계의 요철 선호도에 관여한다. 옛 `Paint Flow Ratio/Drip Width/Drip Length/Gravity Weight`는 보존하지만 현재 재타격 군집에는 적용하지 않는다(#208/#211). 초기 3종 외곽은 원본 마스크로 정하고, 초기/반복 면적·속도·메우기·세로 가중치는 기존 공통 값을 사용한다.
 - DEFAULTS는 원본 Config의 Splatter로 돌아간다. 솔로 시작/재시작·Host 방 생성·로비 적용·공동 일시정지 후 APPLY & RESTART에서만 확정한다. 선택 버튼만 눌러서는 진행 중인 도색을 바꾸지 않는다.
 - 최초 튀김점은 같은 초기 면적 예산을 소비하는 실제 opaque 셀이다. 떨어진 성분은 별도 Region이며 반복 명중은 그 지점의 연결 성분에만 공급한다. 접촉하면 기존 FIFO 규칙으로 병합한다.
-- 실제 물감은 공용 `LabPaintPalette`의 사용자5색이며 구슬 재질과 분리된다. [패턴 구현·검증 안내](PAINT_PATTERN_RUNTIME.md)를 참조한다. 현재 설정170개·프로토콜5647·토큰 `C6PhysicsLab/11`을 사용한다. 구형139개 배열과 다른 버전 참가자는 새 설정을 일부만 적용할 수 없다.
+- 실제 물감은 공용 `LabPaintPalette`의 사용자5색이며 구슬 재질과 분리된다. [패턴 구현·검증 안내](PAINT_PATTERN_RUNTIME.md)를 참조한다. 현재 설정170개·프로토콜5648·토큰 `C6PhysicsLab/11`을 사용한다. 구형139개 배열과 다른 버전 참가자는 새 설정을 일부만 적용할 수 없다.
 
 ## 1. 패널의 적용 방식
 
@@ -83,11 +83,11 @@ HUD 목표는 항상 100%다. `snapshot.paintCellCount > 0`이면 `paintCoveredC
 
 Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 Host의 전투 시간 진행에서만 한다. Host 화면도 현재 Snapshot과 같은 버전의 `LabNetwork.PaintSurface` 표시 캐시를 사용해 맵과 HUD를 함께 반영한다. Client는 승인 명중 방향을 재생해 성장시키지 않고 Host가 보낸 셀 변경(delta) 또는 전체 체크포인트를 별도 수신 맵에 적용한다. 분할 수신 중에는 기존 공개 표시 캐시를 유지하고, 완성된 맵의 세션·라운드·해상도·Revision·칠한 셀 수·전체 셀 수·명중 수가 Snapshot 메타데이터와 모두 맞을 때 맵과 HUD를 함께 공개한다. 픽셀이 그대로인 반복 명중도 명중 수가 바뀌면 빈 delta를 발행한다.
 
-전송은 프로토콜 **5647**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID·RGBA·투척자 P번호를 담은 delta보다 전체 맵이 작으면 전체 맵을 보낸다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송한다. 최대 해상도 전체 RGBA+P 맵은 163,840바이트이고 base64 218,456자를 54개로 나눈다. 색상과 투척자 맵은 동일 트랜잭션·SHA-256 해시로 함께 확정한다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체한다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청한다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가한다.
+전송은 프로토콜 **5648**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID·RGBA·투척자 P번호를 담은 delta보다 전체 맵이 작으면 전체 맵을 보낸다. base64 데이터는 조각당 최대 4,096자, 수신 조각 수는 최대 64개이며 기존 패킷 한도 32 KiB 안에서 전송한다. 최대 해상도 전체 RGBA+P 맵은 163,840바이트이고 base64 218,456자를 54개로 나눈다. 색상과 투척자 맵은 동일 트랜잭션·SHA-256 해시로 함께 확정한다. 수신 시 헤더·기준 Revision·셀 ID 범위와 순서·payload 크기·알파/색·칠한 셀 수·SHA-256 해시를 검사한 뒤 전체 맵을 한 번에 교체한다. 중복 완료·이전 전송/스냅샷 번호·이전 라운드를 거절하고, 기준 맵 누락이나 손상에는 Host의 마지막 발행 맵 복사본으로 체크포인트를 요청한다. `sequence`는 연결 전체의 색칠 전송 번호, `epoch`는 그 맵을 발행한 게임 Snapshot 번호다. 체크포인트는 같은 맵 버전의 `epoch`를 유지하며 `sequence`는 새 번호로 증가한다.
 
 이 복구는 **현재 라운드에 계속 연결된 Client의 부분 맵 누락**을 복원하는 기능이다. 연결이 끊어진 뒤 전투에 재접속하는 기능은 포함하지 않는다. 실제 다중 앱·기기에서의 전송과 화면 일치는 자동 패킷 fixture와 구분해 검증한다.
 
-현재 프로토콜은 **5647**, 연결 토큰은 `C6PhysicsLab/11`다. 박 줄·측면 타격 움직임을 포함한 170개 설정을 지문·참가자 확인 응답에 사용하며 현재 170개가 아닌 배열은 거절한다. 이전 모드·폭탄·북·미니맵·소리·성장 설정과 색칠 전송 형식은 유지한다. 모든 참가자가 같은 새 버전을 사용해야 하며 이전 PASS를 이번 통합의 결과로 승계하지 않는다. 실제 실행 결과는 `docs/VALIDATION.md`에서 변경별로 구분한다.
+현재 프로토콜은 **5648**, 연결 토큰은 `C6PhysicsLab/11`다. 박 줄·측면 타격 움직임을 포함한 170개 설정을 지문·참가자 확인 응답에 사용하며 현재 170개가 아닌 배열은 거절한다. 이전 모드·폭탄·북·미니맵·소리·성장 설정과 색칠 전송 형식은 유지한다. 모든 참가자가 같은 새 버전을 사용해야 하며 이전 PASS를 이번 통합의 결과로 승계하지 않는다. 실제 실행 결과는 `docs/VALIDATION.md`에서 변경별로 구분한다.
 
 근거: `LabConfig.PaintGrowthSettings`·`DeveloperFields`·`CaptureDeveloperValues`·`TryApplyDeveloperValues`, `LabPaintSurface.RegisterHit`·`Advance`·`TryReplacePixels`·`CopyPixels`, `LabModel.ConfirmHit`·`TryAdvance`·라운드 Rules, `LabPaintPublisher`·`LabPaintReceiver`, `LabNetwork.PaintSurface`·Snapshot 공개 경로, `LabGourdPaint.Attach`·`ApplyMode`, `LabHud`, `LabGourdCrack`·`LabGourdFinish`.
 
@@ -156,7 +156,7 @@ DEV의 `Gourd` 묶음에서 박 폭탄 간격(89·90번째) 바로 뒤에 있다
 
 | DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
 | --- | ---: | --- | --- |
-| Orb Lifetime (seconds) | 8 | 0.1–86,400 / 초 | 보관 중인 Raw·Combined의 수명(아이템은 8절의 `Item Lifetime`). Raw는 생성 시점, Combined는 조합 시점부터 센다. 이웃에게 전달해도 수명은 초기화되지 않는다. 이미 발사돼 비행 중인 구슬은 이 만료 대상이 아니다. |
+| Orb Lifetime (seconds) | 8 | 0.1–86,400 / 초 | 보관 중인 Raw·Combined의 수명(아이템은 8절의 `Item Lifetime`). Raw는 생성 시점, Combined는 조합 시점부터 센다. 이웃에게 전달해도 수명은 초기화되지 않는다. 이미 발사돼 비행 중인 구슬은 이 만료 대상이 아니다. 마지막 3초에는 구슬이 하얗게 번쩍이고 끝나면 연기와 함께 사라진다(#235, 번쩍임 시간은 Inspector `Expiry Warning Seconds`). |
 | Orb Bounce | 0.8 | 0–1 / 3D 접촉 탄성 | 구슬·상하 벽의 `PhysicsMaterial.bounciness`. 높이면 접촉 후 더 잘 튀는 경향이 있다. 충돌 결과는 상대 물체와 물리 설정에도 영향을 받는다. |
 | Orb Floor Deceleration | 2 | 0–100,000 / 보드 폭/초² | 손을 놓은 뒤 XY 평면에서 움직이는 3D 구슬의 속력에서 매 물리 스텝 감산한다. 높이면 더 빨리 멈춘다. Unity의 `Rigidbody.linearDamping`이나 접촉 재질의 마찰을 조정하는 값은 아니다. |
 | Orb Stop Speed | 0.065 | 0–100,000 / 보드 폭/초 | 구슬 속력이 이 값 이하이면 0으로 만든다. 높이면 낮은 속도의 구슬이 일찍 멈춘다. `Orb Maximum Release Speed` 이하여야 한다. |
@@ -288,7 +288,7 @@ Inspector의 `Projectile throw form` 또는 DEV의 **Throw form** 묶음에서 A
 
 `EffectiveThrowGravity`는 Arc일 때 기존 `ThrowGravity`, Straight일 때 `ThrowGravity×StraightGravityScale`다. 공은 발사 순간 중력·수명을 별도로 캡처하며 초기 위치·속도·충돌 반경·감쇠도 발사 시 설정한다. 비행 중 Inspector나 DEV 초안을 바꿔 이미 날아가는 공을 꺾지 않는다. 보이는 구슬과 실제 SphereCollider는 동일한 물리 루트에서 이동하고 기존 궤적·피격·색칠 경로를 재사용한다.
 
-솔로는 START/RESTART SOLO, 공유 방은 Host의 CREATE ROOM/APPLY TO ROOM/공동 일시정지 뒤 APPLY & RESTART로 적용한다. **170개 전체**를 검증·지문화한 설정을 참가자에게 전파하고 확인받은 뒤 시작한다. 프로토콜은 **5647**이며 Host는 확정한 발사 위치·속도를 Client에 보내고 Client는 공유 설정의 같은 중력을 사용한다. Client가 직접 모드를 바꾸지 않는다. Inspector 변경도 새 판 시작 시점에 적용해 비교한다.
+솔로는 START/RESTART SOLO, 공유 방은 Host의 CREATE ROOM/APPLY TO ROOM/공동 일시정지 뒤 APPLY & RESTART로 적용한다. **170개 전체**를 검증·지문화한 설정을 참가자에게 전파하고 확인받은 뒤 시작한다. 프로토콜은 **5648**이며 Host는 확정한 발사 위치·속도를 Client에 보내고 Client는 공유 설정의 같은 중력을 사용한다. Client가 직접 모드를 바꾸지 않는다. Inspector 변경도 새 판 시작 시점에 적용해 비교한다.
 
 Inspector의 비정상 enum은 Arc로 보정하고 오프셋·각도·배율의 유효 Getter는 범위 제한과 유한수 대체값을 사용한다. DEV/네트워크는 잘못된 값 하나라도 있으면 170개 전체 적용을 거절한다. 극단적인 오프셋이나 음수 발사각은 화면 밖 출발·바닥 접촉·빗나감을 만들 수 있으며 자동 보정 대상이 아니다.
 
@@ -335,7 +335,7 @@ Inspector의 비정상 enum은 Arc로 보정하고 오프셋·각도·배율의 
 
 ### Experiment #196 — 물감 내부 입자·농담 (130~133번째)
 
-사용자 승인으로 main에 반영하는 기본 OFF 선택 표현이다. 기존0~128번을 유지하고 네 개를 끝에 추가한다. 단일 `LabConfig.asset`의 기본은 OFF이며 DEV는 실행 중 복사본만 조정한다. #196 당시 공유 전체는133개·프로토콜5633이었다. 이 문서의 현재 #225 건조 통합은170개·5647이며 같은 버전끼리 접속한다.
+사용자 승인으로 main에 반영하는 기본 OFF 선택 표현이다. 기존0~128번을 유지하고 네 개를 끝에 추가한다. 단일 `LabConfig.asset`의 기본은 OFF이며 DEV는 실행 중 복사본만 조정한다. #196 당시 공유 전체는133개·프로토콜5633이었다. 이 문서의 현재 #241 통합은170개·5648이며 같은 버전끼리 접속한다.
 
 | DEV 입력 이름 | 인덱스 | 기본값 | 범위 | 효과 |
 | --- | ---: | ---: | --- | --- |
@@ -352,7 +352,7 @@ DEV의 Gourd를 펼쳐 토글/숫자/슬라이더로 변경한 뒤 솔로 시작
 
 ### Experiment #198 — 번짐·흐름 성장 (134~139번째)
 
-기존0~132번을 유지하고 아래6개를 추가했던 #198 설정이다. 현재는 LEGACY의 하위 옵션으로 유지하며 ORIGINAL이 그 하위 기본이다. #198 당시139개·프로토콜5634였고, 현재 전체는170개·프로토콜5647 및 기본 패턴SPLATTER다. 아래 기본값은 **DEMO_TUNING_VALUE**이며 기본 밸런스나 기기 성능 검증값이 아니다.
+기존0~132번을 유지하고 아래6개를 추가했던 #198 설정이다. 현재는 LEGACY의 하위 옵션으로 유지하며 ORIGINAL이 그 하위 기본이다. #198 당시139개·프로토콜5634였고, 현재 전체는170개·프로토콜5648 및 기본 패턴SPLATTER다. 아래 기본값은 **DEMO_TUNING_VALUE**이며 기본 밸런스나 기기 성능 검증값이 아니다.
 
 | DEV 입력 이름 | 인덱스 | 기본값 | 범위 | 의미 |
 | --- | ---: | ---: | --- | --- |
@@ -522,7 +522,7 @@ DEV의 맨 아래 `Combo` 묶음이다. 첫 토글은 기본 ON이다(#241에서
 
 ## 10. 이 패널로 조정할 수 없는 것·검증 범위
 
-방의 **목표 인원**은 170개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport, 박 폭탄의 대상·착지 위치 추첨과 낙하·말풍선 연출 시간, 폭탄 그림의 밧줄 길이·무지개·연기, 폭발 불의 모양·색과 축소 연출 시간, 북 도착의 감속 상한·최대 도착 시간·통과 속도는 170개 입력칸으로 조정하지 않는다. 색칠 승리 목표는 100% 고정이며 이 패널로 낮출 수 없다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
+방의 **목표 인원**은 170개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport, 박 폭탄의 대상·착지 위치 추첨과 낙하·말풍선 연출 시간, 구슬 소멸 예고의 번쩍임·연기(Inspector `LabOrbAppearance` Orb expiry), 폭탄 그림의 밧줄 길이·무지개·연기, 폭발 불의 모양·색과 축소 연출 시간, 북 도착의 감속 상한·최대 도착 시간·통과 속도는 170개 입력칸으로 조정하지 않는다. 색칠 승리 목표는 100% 고정이며 이 패널로 낮출 수 없다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
 
 기존 PR #76 기준 문서는 해당 코드·Scene·설정 에셋과 당시 `docs/VALIDATION.md`의 증거를 **읽어 확인**해 작성됐다. 그 기록의 EditMode **12/12**, PlayMode **20/20** 및 Mac Development 앱 빌드는 이번 3D 조합판 전환의 통과 증거가 아니다. 이 전환의 Unity 컴파일·EditMode·PlayMode, Mac·iOS 빌드, 실제 조작은 새 실행 기록으로 구분해야 한다. 문서의 물리 용어를 갱신한 것만으로 실행 결과를 PASS로 보지 않는다.
 
@@ -539,6 +539,7 @@ DEV의 맨 아래 `Combo` 묶음이다. 첫 토글은 기본 ON이다(#241에서
 - 폭탄 폭발: Host 폭발 기록은 `LabModel.TryAdvance`·`DrainBombExplosions`, 보유자 전달은 `LabNetwork`의 `bombBlast` 패킷, 충격파는 `LabOrbBoard.Blast`, 이펙트는 `LabBombBlastEffect`, 진동은 `LabHaptics.PlayForBomb`, 깜빡임은 `LabOrbItemMarker.SetFuse`.
 - 북 멈춤 구간(#178): 추첨은 `LabModel.ArriveDrum`(`TryTransfer`에서 호출), 넘김 이유는 `LabOrbEdgeCrossing.Kind`·`transfer` 패킷 `crossing`, 받는 판의 도착은 `LabOrbBoard.StartArrival`·`Arrive`, 스냅샷 적용은 `LabNetwork.SyncBoard`(`LabOrbState.JustArrived`).
 - 박 폭탄(#177): 간격·대상·착지 추첨은 `LabModel.DropGourdBombs`·`GourdBombDelay`·`DrainGourdBombs`, 신호는 `LabNetwork.AnnounceGourdBombs`(`gourdBomb` 패킷)·`GourdBombDropped`, 받는 판의 낙하·튕김은 `LabOrbBoard.ExpectDrop`·`LabOrbView.PlayDrop`(#212에서 착지 경고 제거), 박 말풍선은 `LabGourdAlert`, 폭탄 그림·굴림·해금 횟수는 `LabOrbItemMarker.ShowBomb`, 밧줄 도화선·불꽃·연기는 `SetFuse`, 무지개 테두리는 `SetLocked`, 치지직은 `LabFuseSound`, 떠돌기는 `LabOrbBoard.Drift`.
+- 구슬 소멸 예고(#235): 수명 규칙은 `LabOrbKindRules.LifetimeFor`·`LabOrbState.LifeSecondsLeft`, Host 만료 보고는 `LabModel.DrainOrbExpiries`, 주인 화면 알림은 `LabNetwork.AnnounceOrbExpiries`(`orbExpired` 패킷)·`OrbExpired`, 판의 연기와 제거는 `LabOrbBoard.Vanish`·`LabOrbVanishSmoke`, 하얀 번쩍임은 `LabOrbView.SetLife`, 값은 `LabOrbAppearance`의 Orb expiry 칸.
 - 넘기기 막기(#215): 일정·대상·방향·폭탄 간격은 `LabModel.StartSwipeBlocks`·`ClearOfGourdBombs`, 거절은 `TryTransfer`(`SwipeBlocked`, `SWIPE_BLOCKED`), 스냅샷은 `LabSnapshot.swipeBlockedPlayer`·`swipeBlockedRight`·`swipeBlockStartedAt`·`swipeBlockedUntil`, 막힌 판의 튕기기·표시는 `LabOrbBoard.SetSwipeBlock`·`LabOrbEdgeBlock`, 박 말풍선은 `LabNetwork.SwipeBlockStarted`·`LabGourdAlert.ShowBlock`, 폭발에 밀린 구슬의 "폭발" 넘김은 `LabOrbBoard.Blast`(`Blasted`). 종이 배경을 모든 판 스프라이트 아래에 두는 정렬 순서는 `LabSceneController.FitPlateToCamera`(`PlateSortingOrder` -100).
 - 폭탄 잠금·해금(#212): 잠금 추첨은 `LabModel.TryGenerate`·`DropGourdBombs`(`LockSwipesFor`), 해금과 수명 재시작은 `TryTransfer`, 잠긴 폭탄만 폭발은 `TryAdvance`, 해금 폭탄 투척 허용은 `LabOrbKindRules.CanThrow`, 도화선 시간은 잠긴 폭탄에만 보내는 `LabNetwork.SyncBoard`. 무거운 폭탄은 `LabOrbBoard.DragToWorld`·`EndDragAtWorld`·`Drift`와 `UpsertOrb`의 `Rigidbody.mass`.
 - 폭발 패널티(#213): 밀린 구슬 목록은 `LabOrbBoard.Blast`, 보고는 `LabNetwork.ReportBlast`(`blastHit` 패킷), Host 확인·기록은 `LabModel.MarkBlasted`(`LabOrbState.burnedAt`·`small`), 결합 상속은 `TryCombine`, 크기는 `LabOrbBoard.RadiusFor`·`LabOrbView.PlayShrink`, 투사체 크기는 `LabProjectile.Create`(`sizeScale`, `projectile` 패킷의 `small`), 색칠량은 `LabPaintSurface.RegisterHit`(`share`), 불은 `LabOrbBurn`(`LabOrbView.SetBurn`).
@@ -562,7 +563,7 @@ DEV의 맨 아래 `Combo` 묶음이다. 첫 토글은 기본 ON이다(#241에서
 
 ### 실제 투척자 무늬·완성 박 관람의 기본값 — #206
 
-DEV → Gourd의 `Player Paint Patterns`(143번째, 인덱스142)와 `Completed Gourd Viewer`(112번째, 인덱스111)는 **서로 독립적인 ON/OFF 버튼이며 코드·저장 Config 기본값은 모두 ON**이다. `DEFAULTS`는 두 입력을 ON으로 되돌리며, 기존 APPLY/START/RESTART를 눌러 적용한다. 무늬 OFF는 박의 RGB 무늬와 로비·내/좌우 표본만 숨긴다. 투척자 P기록·색상·알파·성장·100% 목표는 유지한다. 관람 ON은 동기화된 Paint 100% Victory에서 결과 관람 버튼을 제공하며 자동 진입하지 않는다. 관람창은 무늬 설정과 색상/투척자 맵을 복사해 회전·확대하므로 무늬 OFF의 완성품도 색상만으로 관람할 수 있다. Host가 170개 값과 지문을 공유하고 참가자 ACK를 받은 뒤 시작한다. 프로토콜5647에서는 이전 설정 개수의 앱을 섞어 접속하지 않는다.
+DEV → Gourd의 `Player Paint Patterns`(143번째, 인덱스142)와 `Completed Gourd Viewer`(112번째, 인덱스111)는 **서로 독립적인 ON/OFF 버튼이며 코드·저장 Config 기본값은 모두 ON**이다. `DEFAULTS`는 두 입력을 ON으로 되돌리며, 기존 APPLY/START/RESTART를 눌러 적용한다. 무늬 OFF는 박의 RGB 무늬와 로비·내/좌우 표본만 숨긴다. 투척자 P기록·색상·알파·성장·100% 목표는 유지한다. 관람 ON은 동기화된 Paint 100% Victory에서 결과 관람 버튼을 제공하며 자동 진입하지 않는다. 관람창은 무늬 설정과 색상/투척자 맵을 복사해 회전·확대하므로 무늬 OFF의 완성품도 색상만으로 관람할 수 있다. Host가 170개 값과 지문을 공유하고 참가자 ACK를 받은 뒤 시작한다. 프로토콜5648에서는 이전 설정 개수의 앱을 섞어 접속하지 않는다.
 
 
 ### 재타격 군집 설정 — #208
@@ -574,7 +575,7 @@ DEV → Gourd의 `Player Paint Patterns`(143번째, 인덱스142)와 `Completed 
 | Paint Cluster Compactness |143|0.85|0~1|군집의 넓은 접촉·빈틈 메우기 선호도.0이어도 지역 군집 탐색은 유지|
 | Paint Cluster Irregularity |144|0.25|0~1|군집별 고정된 완만한 구면 굴곡. 셀별 백색 잡음은 추가하지 않음|
 
-두 새 숫자/슬라이더는 Gourd 묶음의 재타격 성장량 다음에 배치된다. 원본 저장값·DEFAULTS와 Capture/Apply가 같은 값을 사용하며 새 판에만 적용한다. Host는170개와5647 지문을 공유해 참가자 ACK 후 시작한다. 기존143개 순서는 보존한다. 수직 우대(110)와 Fill Chance(109)는 한 타격의 경계 시작점 선택에만 작용한다. 셀마다 그 방향을 계속 우대해 군집을 가늘게 늘이지 않는다.
+두 새 숫자/슬라이더는 Gourd 묶음의 재타격 성장량 다음에 배치된다. 원본 저장값·DEFAULTS와 Capture/Apply가 같은 값을 사용하며 새 판에만 적용한다. Host는170개와5648 지문을 공유해 참가자 ACK 후 시작한다. 기존143개 순서는 보존한다. 수직 우대(110)와 Fill Chance(109)는 한 타격의 경계 시작점 선택에만 작용한다. 셀마다 그 방향을 계속 우대해 군집을 가늘게 늘이지 않는다.
 
 위의 #198 당시 '성장 셀마다 흐름 시도/아래 방향/꼬리 폭·길이' 설명은 **과거 구현**이다. 현재 최초 명중에서 LEGACY Style/Edge Raggedness와4종 마스크 선택은 유지하지만 재타격은 모두 공통 군집 경로로 처리한다.135~138번 Flow Ratio·Drip Width·Drip Length·Gravity Weight는 이번 재타격에 영향을 주지 않는다. 원본 필드와 입력 검증은 보존하며 과거 실행 결과를 현재 군집의 검증으로 승계하지 않는다. 새 구현 근거는 `LabPaintSurface.RegisterHit`·`Supply`·`ChooseClusterCell`·`GrowthCluster.Take/Commit`·`PaintCell/Consume/Merge`와 `LabConfig.PaintGrowthSettings`다.
 
@@ -583,7 +584,7 @@ DEV → Gourd의 `Player Paint Patterns`(143번째, 인덱스142)와 `Completed 
 
 ### Gourd Visual Size
 
-DEV → Gourd → `Gourd Visual Size (x)`는 #214에서 추가한 **146번째/인덱스145** 설정이다. 범위0.5~3.0, 기본1.4이며 Paint 모드의 몸체·뚜껑·요괴·장식을 함께 확대/축소하고 목의 연결 위치를 유지한다. 기존 APPLY/새 판 적용 경계와 Host 공유170개 설정·프로토콜5647을 사용한다. 충돌체 크기는 변경하지 않는다. 기존0~144번과 #211의 재타격 기본값1.5%를 보존한다.
+DEV → Gourd → `Gourd Visual Size (x)`는 #214에서 추가한 **146번째/인덱스145** 설정이다. 범위0.5~3.0, 기본1.4이며 Paint 모드의 몸체·뚜껑·요괴·장식을 함께 확대/축소하고 목의 연결 위치를 유지한다. 기존 APPLY/새 판 적용 경계와 Host 공유170개 설정·프로토콜5648을 사용한다. 충돌체 크기는 변경하지 않는다. 기존0~144번과 #211의 재타격 기본값1.5%를 보존한다.
 
 
 ### 근처 유효 명중으로 유지하는 건조 — 154~157번째 설정 (#225)
@@ -597,7 +598,7 @@ DEV **Gourd**의 마지막 네 행이다. `Paint Drying`이 OFF이면 세 숫자
 | Drying Rate (%/s) | 155 | 0.2 | 0~5%p/초 | 전체 박 표면 기준 총 감소 속도. 0이면 ON이어도 도색을 지우지 않는다. |
 | Nearby Hit Radius (surface degrees) | 156 | 20 | 1~90도 | 실제 피격점의 정규화된 박 로컬 방향에서 주변 도색을 보호하는 구면각도. |
 
-`LabConfig` 공개 속성은 `PaintDryingEnabled`, `PaintDryingDelaySeconds`, `PaintDryingPercentPerSecond`, `PaintNearbyHitRadiusDegrees`다. `PaintGrowthSettings`는 라운드 시작에 이 값을 복사한다. 기존 0~152번은 유지하고 전체 **170개**를 유한수·범위·정수 조건으로 원자적으로 검사·캡처·적용한다. 네 값 모두 프로토콜 **5647**의 설정 지문과 참가자 확인에 포함한다. 이전153개 배열을 부분 적용하지 않는다. Inspector 비정상 수치는 유효 Getter에서 범위 제한 또는 독립 기본값으로 대체하지만 DEV/네트워크 입력은 거절한다.
+`LabConfig` 공개 속성은 `PaintDryingEnabled`, `PaintDryingDelaySeconds`, `PaintDryingPercentPerSecond`, `PaintNearbyHitRadiusDegrees`다. `PaintGrowthSettings`는 라운드 시작에 이 값을 복사한다. 기존 0~152번은 유지하고 전체 **170개**를 유한수·범위·정수 조건으로 원자적으로 검사·캡처·적용한다. 네 값 모두 프로토콜 **5648**의 설정 지문과 참가자 확인에 포함한다. 이전153개 배열을 부분 적용하지 않는다. Inspector 비정상 수치는 유효 Getter에서 범위 제한 또는 독립 기본값으로 대체하지만 DEV/네트워크 입력은 거절한다.
 
 실제 명중점의 주변 기존 칠(다른 색·P번호·분리된 영역 포함)에만 시간을 갱신하며 기존 색/무늬는 유지한다. 빈곳 첫 명중도 주변 보호를 갱신하고, 성장량이 생기지 않는 유효 재타격도 보호한다. 군집의 무작위 성장 시작점은 보호 지점이 아니다. 새 성장 셀만 자체 유예를 받으며 자동 성장은 기존 칠의 시간을 연장하지 않는다. 무효·중복·share 0인 요청은 보호하지 않는다.
 
