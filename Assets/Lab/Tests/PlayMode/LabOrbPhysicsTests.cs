@@ -723,7 +723,7 @@ namespace C6Lab.Tests
 
             // The DEV form sets how small.
             float[] values = config.CaptureDeveloperValues();
-            values[151] = .25f;
+            values[146] = .25f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var smaller = board.UpsertOrb("smaller", LabOrbKind.Yang, new Vector2(.5f, .8f), small: true);
             Assert.That(smaller.HitSphere.radius, Is.EqualTo(.25f * radius).Within(1e-5f));
@@ -1230,8 +1230,8 @@ namespace C6Lab.Tests
 
             // From the DEV form: no lag sticks the bomb to the finger like an orb; a new mass applies to new bombs.
             float[] values = config.CaptureDeveloperValues();
-            values[146] = 0f;
-            values[149] = 10f;
+            values[141] = 0f;
+            values[144] = 10f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             start = BoardPoint(bomb);
             Assert.That(board.TryBeginDragAtWorld(start, 4d), Is.True);

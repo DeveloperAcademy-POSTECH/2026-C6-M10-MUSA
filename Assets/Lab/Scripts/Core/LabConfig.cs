@@ -173,7 +173,6 @@ namespace C6Lab
             new LabDeveloperField("Combine Sound Volume (50 = Inspector)", 0f, 100f),
             new LabDeveloperField("Combine Haptic Style (0-4)", 0f, 4f, true),
             new LabDeveloperField("Combine Haptic Intensity", 0f, 1f),
-            new LabDeveloperField("Paint Victory Coverage (%)", 100f, 100f, true),
             new LabDeveloperField("Gourd Bomb Interval Min (seconds, 0 = off)", 0f, 600f),
             new LabDeveloperField("Gourd Bomb Interval Max (seconds, 0 = off)", 0f, 600f),
             new LabDeveloperField("Fuse Sound Volume (50 = Inspector)", 0f, 100f),
@@ -221,10 +220,6 @@ namespace C6Lab
             new LabDeveloperField("Paint Mottle Strength", 0f, 1f),
             LabDeveloperField.Toggle("Paint Growth Style (0 original, 1 spread + flow)", "ORIGINAL", "SPREAD + FLOW"),
             new LabDeveloperField("Paint Edge Raggedness", 0f, 1f),
-            new LabDeveloperField("Paint Flow Ratio", 0f, 1f),
-            new LabDeveloperField("Paint Drip Width (surface degrees)", .5f, 12f),
-            new LabDeveloperField("Paint Drip Length (surface degrees)", 5f, 135f),
-            new LabDeveloperField("Paint Gravity Weight", 1f, 8f),
             LabDeveloperField.Choice("Paint Pattern", "LEGACY", "BROAD", "SPLATTER", "FLOW"),
             new LabDeveloperField("Chuimsae Chance (%)", 0f, 100f, true),
             new LabDeveloperField("Chuimsae Min Gap (generates)", 0f, 20f, true),
@@ -271,7 +266,7 @@ namespace C6Lab
             new LabDeveloperCategory("Battle", 0, 1, 2, 48),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
             new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44),
-            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 146, 147, 148, 149, 150, 151, 152),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 141, 142, 143, 144, 145, 146, 147),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
@@ -279,15 +274,15 @@ namespace C6Lab
             new LabDeveloperCategory("Camera and throw origin", 19, 20, 21, 22, 23, 56),
             new LabDeveloperCategory("Throw gesture", 24, 25, 26, 27),
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
-            new LabDeveloperCategory("Throw form", 112, 113, 114, 115, 116, 117, 118),
+            new LabDeveloperCategory("Throw form", 111, 112, 113, 114, 115, 116, 117),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Sound and haptics", 63, 64, 140, 141, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 90, 103, 104),
-            new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 91, 92, 93, 94, 95, 96, 97, 98),
-            new LabDeveloperCategory("Gourd", 145, 79, 87, 88, 89, 157, 158, 159, 105, 106, 107, 143, 144, 108, 109, 110, 111, 142,
-                119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
-                139, 133, 134, 135, 136, 137, 138, 153, 154, 155, 156),
-            new LabDeveloperCategory("Minimap", 99, 100, 101, 102),
-            new LabDeveloperCategory("Combo", 160, 161, 169, 162, 163, 164, 165, 166, 167, 168)
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 135, 136, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 89, 102, 103),
+            new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 90, 91, 92, 93, 94, 95, 96, 97),
+            new LabDeveloperCategory("Gourd", 140, 79, 87, 88, 152, 153, 154, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137,
+                118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
+                134, 132, 133, 148, 149, 150, 151),
+            new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
+            new LabDeveloperCategory("Combo", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163)
         });
 
 
@@ -418,8 +413,6 @@ namespace C6Lab
         [Header("Gourd (요괴 박)")]
         [Tooltip("Paint: 흰 박에 구슬 속성 색을 칠한다 (#153). Crack: 박 모델에 금이 가고 처치 연출이 나온다 (#163).")]
         [SerializeField] private LabGourdMode gourdMode = LabGourdMode.Paint;
-        [Tooltip("Paint 승리는 전체 표면 100%에서 확정한다. 이전 에셋 값도 실행 시 100%로 정규화한다.")]
-        [SerializeField, Range(100, 100)] private int paintVictoryPercent = DefaultPaintVictoryPercent;
         // DEMO_TUNING_VALUE: growth settings are captured when a round starts and may be tuned in DEV.
         [SerializeField, Range(0, 2)] private int paintSurfaceResolution = 2;
         [SerializeField, Range(.1f, 100f)] private float paintInitialPercent = 2f;
@@ -479,14 +472,6 @@ namespace C6Lab
         [SerializeField] private LabPaintPattern paintPattern = LabPaintPattern.Splatter;
         [Tooltip("퍼짐 경계의 불규칙한 정도. 도색 면적 예산과는 별개다.")]
         [SerializeField, Range(0f, 1f)] private float paintEdgeRaggedness = .55f;
-        [Tooltip("성장 셀마다 흐름 경로를 시도할 확률. 막히면 같은 예산으로 일반 퍼짐을 사용한다.")]
-        [SerializeField, Range(0f, 1f)] private float paintFlowRatio = .35f;
-        [Tooltip("흐름 띠의 전체 폭을 구면 각도로 지정한다. 표면 분할 해상도와 독립적이다.")]
-        [SerializeField, Range(.5f, 12f)] private float paintDripWidthDegrees = 3f;
-        [Tooltip("한 흐름이 표면을 따라 내려갈 최대 길이(구면 각도).")]
-        [SerializeField, Range(5f, 135f)] private float paintDripLengthDegrees = 60f;
-        [Tooltip("가능한 이웃 중 중력 방향을 선택하는 상대 가중치. 1이면 추가 우대하지 않는다.")]
-        [SerializeField, Range(1f, 8f)] private float paintGravityWeight = 3f;
         [Tooltip("박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다. 최대가 0이면 떨어뜨리지 않는다 (#177).")]
         [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
         [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
@@ -738,9 +723,8 @@ namespace C6Lab
         }
         public LabGourdMode GourdMode => gourdMode == LabGourdMode.Crack ? LabGourdMode.Crack : LabGourdMode.Paint;
         public const int DefaultPaintVictoryPercent = 100;
-        // Old serialized assets can still contain 80; all effective and shared values use the fixed goal.
+        // Paint victory requires the entire target surface; it is not a DEV tuning value.
         public int PaintVictoryPercent => DefaultPaintVictoryPercent;
-        public float PaintVictoryCoverage => 1f;
         public int PaintSurfaceResolution => Mathf.Clamp(paintSurfaceResolution, 0, 2);
         public float PaintInitialPercent => Mathf.Clamp(Finite(paintInitialPercent, 2f), .1f, 100f);
         public float PaintRepeatPercent => Mathf.Clamp(Finite(paintRepeatPercent, 1.5f), .1f, 100f);
@@ -766,10 +750,6 @@ namespace C6Lab
             Style = PaintGrowthStyle,
             Pattern = PaintPattern,
             Raggedness = PaintEdgeRaggedness,
-            FlowRatio = PaintFlowRatio,
-            DripWidthDegrees = PaintDripWidthDegrees,
-            DripLengthDegrees = PaintDripLengthDegrees,
-            GravityWeight = PaintGravityWeight,
             DryingEnabled = PaintDryingEnabled,
             DryingDelaySeconds = PaintDryingDelaySeconds,
             DryingPercentPerSecond = PaintDryingPercentPerSecond,
@@ -795,10 +775,6 @@ namespace C6Lab
         public LabPaintPattern PaintPattern => paintPattern >= LabPaintPattern.Legacy && paintPattern <= LabPaintPattern.Flow
             ? paintPattern : LabPaintPattern.Splatter;
         public float PaintEdgeRaggedness => Mathf.Clamp01(Finite(paintEdgeRaggedness, .55f));
-        public float PaintFlowRatio => Mathf.Clamp01(Finite(paintFlowRatio, .35f));
-        public float PaintDripWidthDegrees => Mathf.Clamp(Finite(paintDripWidthDegrees, 3f), .5f, 12f);
-        public float PaintDripLengthDegrees => Mathf.Clamp(Finite(paintDripLengthDegrees, 60f), 5f, 135f);
-        public float PaintGravityWeight => Mathf.Clamp(Finite(paintGravityWeight, 3f), 1f, 8f);
         public float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         public float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
         public float SwipeBlockInterval => Mathf.Clamp(Finite(swipeBlockInterval, 40f), 0f, 600f);
@@ -896,7 +872,6 @@ namespace C6Lab
                 BombBlastRadius, BombBlastStrength,
                 (float)BombHapticStyle, BombHapticIntensity,
                 DevVolume(combineSoundVolumeDev), (float)CombineHapticStyle, CombineHapticIntensity,
-                (float)PaintVictoryPercent,
                 GourdBombIntervalMin, GourdBombIntervalMax,
                 DevVolume(fuseSoundVolumeDev),
                 Mathf.Round(stopBounds[0] * 100f), Mathf.Round(stopBounds[1] * 100f),
@@ -915,8 +890,7 @@ namespace C6Lab
                 GourdSwingImpactStrength, GourdSwingMaximumAngle,
                 GourdSwingReturnStrength, GourdSwingDamping,
                 PaintGrainEnabled ? 1f : 0f, PaintGrainSize, PaintGrainStrength, PaintMottleStrength,
-                (float)PaintGrowthStyle, PaintEdgeRaggedness, PaintFlowRatio,
-                PaintDripWidthDegrees, PaintDripLengthDegrees, PaintGravityWeight, (float)PaintPattern,
+                (float)PaintGrowthStyle, PaintEdgeRaggedness, (float)PaintPattern,
                 (float)ChuimsaeChancePercent, (float)ChuimsaeMinGap,
                 PlayerPaintPatternsEnabled ? 1f : 0f,
                 PaintClusterCompactness, PaintClusterIrregularity, GourdVisualSize,
@@ -938,12 +912,6 @@ namespace C6Lab
             if (values == null || values.Length != DeveloperFields.Count)
             {
                 error = "The developer settings form is incomplete.";
-                return false;
-            }
-
-            if (values[87] != DefaultPaintVictoryPercent)
-            {
-                error = "Paint Victory Coverage (%) must be 100 for the current paint rules.";
                 return false;
             }
 
@@ -974,10 +942,10 @@ namespace C6Lab
             if (chanceTotal != 100f) { error = "Generation chances must add up to 100 (now " + chanceTotal + ")."; return false; }
             if (values[46] > values[47]) { error = "Item Unlock Swipes Min cannot exceed Item Unlock Swipes Max."; return false; }
             if (values[61] > values[62]) { error = "Spawn Minimum Speed cannot exceed Spawn Maximum Speed."; return false; }
-            if (values[88] > values[89]) { error = "Gourd Bomb Interval Min cannot exceed Gourd Bomb Interval Max."; return false; }
-            if (values[91] > values[92] || values[92] > values[93] || values[93] > values[94])
+            if (values[87] > values[88]) { error = "Gourd Bomb Interval Min cannot exceed Gourd Bomb Interval Max."; return false; }
+            if (values[90] > values[91] || values[91] > values[92] || values[92] > values[93])
             { error = "Drum stop zone edges must go from near to far (from <= to)."; return false; }
-            float drumStopTotal = values[95] + values[96] + values[97] + values[98];
+            float drumStopTotal = values[94] + values[95] + values[96] + values[97];
             if (drumStopTotal != 100f) { error = "Drum stop chances must add up to 100 (now " + drumStopTotal + ")."; return false; }
 
             monsterMaxHp = (int)values[0];
@@ -1067,81 +1035,76 @@ namespace C6Lab
             combineSoundVolumeDev = values[84];
             combineHapticStyle = (LabHapticStyle)(int)values[85];
             combineHapticIntensity = values[86];
-            paintVictoryPercent = (int)values[87];
-            gourdBombIntervalMin = values[88];
-            gourdBombIntervalMax = values[89];
-            fuseSoundVolumeDev = values[90];
-            drumStopBounds = new[] { (int)values[91], (int)values[92], (int)values[93], (int)values[94] };
-            drumStopChances = new[] { (int)values[95], (int)values[96], (int)values[97], (int)values[98] };
-            minimapEnabled = values[99] >= .5f;
-            minimapSizePercent = (int)values[100];
-            minimapMoveX = (int)values[101];
-            minimapMoveY = (int)values[102];
-            bombSoundVolumeDev = values[103];
-            bombSoundStyle = values[104] >= .5f ? LabBombSoundStyle.Ppeong : LabBombSoundStyle.Boom;
-            paintSurfaceResolution = (int)values[105];
-            paintInitialPercent = values[106];
-            paintRepeatPercent = values[107];
-            paintGrowthPercentPerSecond = values[108];
-            paintFillChancePercent = values[109];
-            paintVerticalWeight = values[110];
-            completedGourdViewerEnabled = values[111] >= .5f;
-            throwForm = values[112] >= .5f ? LabThrowForm.Straight : LabThrowForm.Arc;
-            straightOriginOffset = new Vector3(values[113], values[114], values[115]);
-            straightPitchOffsetDegrees = values[116];
-            straightLoftScale = values[117];
-            straightGravityScale = values[118];
-            gourdRopeCycleAmplitude = values[119];
-            gourdRopeCyclePeriod = values[120];
-            gourdRopeHitBounce = values[121];
-            gourdRopeSpring = values[122];
-            gourdRopeDamping = values[123];
-            gourdRopeMaximumHitExtension = values[124];
-            gourdSwingImpactStrength = values[125];
-            gourdSwingMaximumAngle = values[126];
-            gourdSwingReturnStrength = values[127];
-            gourdSwingDamping = values[128];
-            paintGrainEnabled = values[129] >= .5f;
-            paintGrainSize = values[130];
-            paintGrainStrength = values[131];
-            paintMottleStrength = values[132];
-            paintGrowthStyle = (int)values[133];
-            paintEdgeRaggedness = values[134];
-            paintFlowRatio = values[135];
-            paintDripWidthDegrees = values[136];
-            paintDripLengthDegrees = values[137];
-            paintGravityWeight = values[138];
-            paintPattern = (LabPaintPattern)(int)values[139];
-            chuimsaeChancePercent = (int)values[140];
-            chuimsaeMinGap = (int)values[141];
-            playerPaintPatternsEnabled = values[142] == 1f;
-            paintClusterCompactness = values[143];
-            paintClusterIrregularity = values[144];
-            gourdVisualSize = values[145];
-            bombDragLag = values[146];
-            bombReleaseSpeed = values[147];
-            bombSlideDeceleration = values[148];
-            bombMass = values[149];
-            blastBurnSeconds = values[150];
-            blastShrinkScale = values[151];
-            smallOrbPaintShare = values[152];
-            paintDryingEnabled = values[153] == 1f;
-            paintDryingDelaySeconds = values[154];
-            paintDryingPercentPerSecond = values[155];
-            paintNearbyHitRadiusDegrees = values[156];
-            swipeBlockInterval = values[157];
-            swipeBlockSeconds = values[158];
-            swipeBlockBombGap = values[159];
-            gourdColorComboEnabled = values[160] >= .5f;
-            comboFirstStartSeconds = values[161];
-            comboRepeatIntervalSeconds = values[162];
-            comboTimeLimitSeconds = values[163];
-            comboPenaltyDurationSeconds = values[164];
-            comboPenaltySizeScale = values[165];
-            comboPenaltyThrowerOnly = values[166] >= .5f;
-            comboRewardDurationSeconds = values[167];
-            comboRewardSizeScale = values[168];
-            comboWarningSeconds = values[169];
+            gourdBombIntervalMin = values[87];
+            gourdBombIntervalMax = values[88];
+            fuseSoundVolumeDev = values[89];
+            drumStopBounds = new[] { (int)values[90], (int)values[91], (int)values[92], (int)values[93] };
+            drumStopChances = new[] { (int)values[94], (int)values[95], (int)values[96], (int)values[97] };
+            minimapEnabled = values[98] >= .5f;
+            minimapSizePercent = (int)values[99];
+            minimapMoveX = (int)values[100];
+            minimapMoveY = (int)values[101];
+            bombSoundVolumeDev = values[102];
+            bombSoundStyle = values[103] >= .5f ? LabBombSoundStyle.Ppeong : LabBombSoundStyle.Boom;
+            paintSurfaceResolution = (int)values[104];
+            paintInitialPercent = values[105];
+            paintRepeatPercent = values[106];
+            paintGrowthPercentPerSecond = values[107];
+            paintFillChancePercent = values[108];
+            paintVerticalWeight = values[109];
+            completedGourdViewerEnabled = values[110] >= .5f;
+            throwForm = values[111] >= .5f ? LabThrowForm.Straight : LabThrowForm.Arc;
+            straightOriginOffset = new Vector3(values[112], values[113], values[114]);
+            straightPitchOffsetDegrees = values[115];
+            straightLoftScale = values[116];
+            straightGravityScale = values[117];
+            gourdRopeCycleAmplitude = values[118];
+            gourdRopeCyclePeriod = values[119];
+            gourdRopeHitBounce = values[120];
+            gourdRopeSpring = values[121];
+            gourdRopeDamping = values[122];
+            gourdRopeMaximumHitExtension = values[123];
+            gourdSwingImpactStrength = values[124];
+            gourdSwingMaximumAngle = values[125];
+            gourdSwingReturnStrength = values[126];
+            gourdSwingDamping = values[127];
+            paintGrainEnabled = values[128] >= .5f;
+            paintGrainSize = values[129];
+            paintGrainStrength = values[130];
+            paintMottleStrength = values[131];
+            paintGrowthStyle = (int)values[132];
+            paintEdgeRaggedness = values[133];
+            paintPattern = (LabPaintPattern)(int)values[134];
+            chuimsaeChancePercent = (int)values[135];
+            chuimsaeMinGap = (int)values[136];
+            playerPaintPatternsEnabled = values[137] == 1f;
+            paintClusterCompactness = values[138];
+            paintClusterIrregularity = values[139];
+            gourdVisualSize = values[140];
+            bombDragLag = values[141];
+            bombReleaseSpeed = values[142];
+            bombSlideDeceleration = values[143];
+            bombMass = values[144];
+            blastBurnSeconds = values[145];
+            blastShrinkScale = values[146];
+            smallOrbPaintShare = values[147];
+            paintDryingEnabled = values[148] == 1f;
+            paintDryingDelaySeconds = values[149];
+            paintDryingPercentPerSecond = values[150];
+            paintNearbyHitRadiusDegrees = values[151];
+            swipeBlockInterval = values[152];
+            swipeBlockSeconds = values[153];
+            swipeBlockBombGap = values[154];
+            gourdColorComboEnabled = values[155] >= .5f;
+            comboFirstStartSeconds = values[156];
+            comboRepeatIntervalSeconds = values[157];
+            comboTimeLimitSeconds = values[158];
+            comboPenaltyDurationSeconds = values[159];
+            comboPenaltySizeScale = values[160];
+            comboPenaltyThrowerOnly = values[161] >= .5f;
+            comboRewardDurationSeconds = values[162];
+            comboRewardSizeScale = values[163];
+            comboWarningSeconds = values[164];
             error = string.Empty;
             return true;
         }

@@ -50,9 +50,9 @@ namespace C6Lab.Tests
             Assert.That(developerUi, Is.Not.Null);
             Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(developerUi.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
-            Assert.That(developerUi.valueSliders[119], Is.Not.Null,
+            Assert.That(developerUi.valueSliders[118], Is.Not.Null,
                 "The saved DEV panel extends its Gourd rows with the rope motion slider.");
-            Assert.That(developerUi.valueSliders[126], Is.Not.Null,
+            Assert.That(developerUi.valueSliders[125], Is.Not.Null,
                 "The saved DEV panel extends its Gourd rows with the swing-angle slider.");
             Assert.That(hud.playerHpText.text, Is.EqualTo("—"));
 
@@ -62,13 +62,13 @@ namespace C6Lab.Tests
             {
                 developerUi.Open();
                 developerUi.valueInputs[48].text = "125";
-                developerUi.valueInputs[119].text = "0.7";
-                developerUi.valueInputs[126].text = "45";
+                developerUi.valueInputs[118].text = "0.7";
+                developerUi.valueInputs[125].text = "45";
                 Assert.That(developerUi.valueSliders[48].value,
                     Is.EqualTo(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[48], 300f, 125f))
                         .Within(.0001f));
-                Assert.That(developerUi.valueSliders[119].value,
-                    Is.EqualTo(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[119], .45f, .7f))
+                Assert.That(developerUi.valueSliders[118].value,
+                    Is.EqualTo(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[118], .45f, .7f))
                         .Within(.0001f));
                 developerUi.ApplyAndStart();
                 Assert.That(network.IsDeveloperSolo, Is.True, developerUi.feedbackText.text);
@@ -411,8 +411,8 @@ namespace C6Lab.Tests
             // that bump while scattering cannot merge before the test drags Yin onto Yang.
             tuning[51] = 0f;
             tuning[79] = 1f; // Crack keeps the damage-number presentation checked below.
-            tuning[88] = 0f; // no gourd bombs: this test counts the orbs on the board
-            tuning[89] = 0f;
+            tuning[87] = 0f; // no gourd bombs: this test counts the orbs on the board
+            tuning[88] = 0f;
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
             network.config = rawOnly;
             // The board reads contact combining from its own config, so it needs the same tuning.
@@ -557,8 +557,8 @@ namespace C6Lab.Tests
             LabConfig savedConfig = network.config;
             LabConfig gourd = UnityEngine.Object.Instantiate(savedConfig);
             float[] tuning = gourd.CaptureDeveloperValues();
-            tuning[88] = 1f; // a gourd bomb every second
-            tuning[89] = 1f;
+            tuning[87] = 1f; // a gourd bomb every second
+            tuning[88] = 1f;
             Assert.That(gourd.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = gourd;
             network.port = 17791;
@@ -622,11 +622,11 @@ namespace C6Lab.Tests
             LabConfig savedConfig = network.config;
             LabConfig blocking = UnityEngine.Object.Instantiate(savedConfig);
             float[] tuning = blocking.CaptureDeveloperValues();
-            tuning[88] = 0f; // no gourd bombs
-            tuning[89] = 0f;
-            tuning[157] = 1f; // a swipe block one second in
-            tuning[158] = 3f;
-            tuning[159] = 0f;
+            tuning[87] = 0f; // no gourd bombs
+            tuning[88] = 0f;
+            tuning[152] = 1f; // a swipe block one second in
+            tuning[153] = 3f;
+            tuning[154] = 0f;
             Assert.That(blocking.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = blocking;
             network.port = 17792;

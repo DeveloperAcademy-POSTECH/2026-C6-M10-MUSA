@@ -150,6 +150,9 @@ namespace C6Lab.Tests
                 Assert.That(surface.CoveredCount, Is.EqualTo(surface.CellCount));
                 Assert.That(surface.PendingCoverage, Is.EqualTo(0d));
                 Color32[] full = Copy(surface);
+                var fullPainters = new byte[surface.CellCount];
+                surface.CopyPainterSlots(fullPainters);
+                Assert.That(fullPainters, Is.All.EqualTo((byte)0), "This renderer fixture uses neutral offline provenance.");
                 Assert.That(full.All(pixel => pixel.a == 255), Is.True);
                 Assert.That(full.Distinct().Count(), Is.EqualTo(5), "All five FIFO pigments must remain represented.");
                 uint revision = surface.Revision;
@@ -171,7 +174,7 @@ namespace C6Lab.Tests
                         Color32[] paper = rig.Capture(paint, null);
                         // Install the genuine completed-growth bytes only for camera comparison;
                         // this is a renderer replica fixture, not a simulated gameplay victory.
-                        Assert.That(surface.TryReplacePixels(columns, rows, revision, full, paintCount), Is.True);
+                        Assert.That(surface.TryReplacePixels(columns, rows, revision, full, fullPainters, paintCount), Is.True);
                         paint.RefreshCommittedMap();
                         Color32[] colored = rig.Capture(paint, "spread-flow-complete-view-" + view + ".png");
                         int shellPixels = 0;
@@ -204,15 +207,14 @@ namespace C6Lab.Tests
             { Pattern = LabPaintPattern.Legacy,
                 Resolution = 2, InitialPercent = initial, RepeatPercent = repeat,
                 GrowthPercentPerSecond = speed, FillChancePercent = 60f, VerticalWeight = 1.35f,
-                Style = style, Raggedness = .55f, FlowRatio = .35f, DripWidthDegrees = 3f,
-                DripLengthDegrees = 60f, GravityWeight = 3f
+                Style = style, Raggedness = .55f
             };
 
         private static void TuneGrain(LabConfig config, bool enabled)
         {
             float[] values = config.CaptureDeveloperValues();
-            values[129] = enabled ? 1f : 0f;
-            values[130] = 1f; values[131] = .3f; values[132] = .18f;
+            values[128] = enabled ? 1f : 0f;
+            values[129] = 1f; values[130] = .3f; values[131] = .18f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
         }
 

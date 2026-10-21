@@ -302,19 +302,6 @@ namespace C6Lab
             return true;
         }
 
-        public bool TryCombine(ulong sender, string firstId, string secondId, string requestId,
-            double now, out LabOrbState orb, out string reason)
-            => TryCombine(sender, firstId, secondId, requestId, now, Vector2.zero, out orb, out reason);
-
-        /// <summary>
-        /// 결합 구슬이 결합 직전 두 구슬의 움직임을 이어받는다. 속도는 요청한 기기가 계산해
-        /// 보내며(보드 폭/초), Host는 유한한 값인지 확인하고 최대 이동 속도 안으로 제한한다.
-        /// </summary>
-        public bool TryCombine(ulong sender, string firstId, string secondId, string requestId,
-            double now, Vector2 normalizedVelocity, out LabOrbState orb, out string reason)
-            => TryCombineCore(sender, firstId, secondId, requestId, now, null, normalizedVelocity,
-                out orb, out reason);
-
         /// <summary>
         /// Use the owner's current local combination center rather than a periodic motion sample.
         /// The Host still decides polarity, consumption, the new ID and the global element draw.
@@ -322,17 +309,10 @@ namespace C6Lab
         public bool TryCombineAt(ulong sender, string firstId, string secondId, string requestId,
             double now, Vector2 normalizedCenter, Vector2 normalizedVelocity,
             out LabOrbState orb, out string reason)
-            => TryCombineCore(sender, firstId, secondId, requestId, now, normalizedCenter,
-                normalizedVelocity, out orb, out reason);
-
-        private bool TryCombineCore(ulong sender, string firstId, string secondId, string requestId,
-            double now, Vector2? normalizedCenter, Vector2 normalizedVelocity,
-            out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
-            if (normalizedCenter.HasValue && (!Unit(normalizedCenter.Value.x)
-                || !Unit(normalizedCenter.Value.y) || !Finite(normalizedVelocity)))
+            if (!Unit(normalizedCenter.x) || !Unit(normalizedCenter.y) || !Finite(normalizedVelocity))
                 return Reject("INVALID_MOTION", out reason);
             if (string.IsNullOrEmpty(firstId) || string.IsNullOrEmpty(secondId) || firstId == secondId ||
                 !orbs.TryGetValue(firstId, out var first) || !orbs.TryGetValue(secondId, out var second))
@@ -343,15 +323,12 @@ namespace C6Lab
 
             orbs.Remove(firstId); orbs.Remove(secondId);
             var element = ElementFor(seed, combinedCount++);
-            Vector2 velocity = Finite(normalizedVelocity)
-                ? Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed)
-                : Vector2.zero;
+            Vector2 velocity = Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed);
             orb = new LabOrbState
             {
                 id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = element,
                 origin = LabOrbOrigin.Combined, originOwner = sender,
-                x = normalizedCenter?.x ?? (first.x + second.x) * .5f,
-                y = normalizedCenter?.y ?? (first.y + second.y) * .5f,
+                x = normalizedCenter.x, y = normalizedCenter.y,
                 vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false,
                 // One blast-shrunk half makes the whole orb small, and its fire burns on (#213).
                 small = first.small || second.small, burnedAt = Math.Max(first.burnedAt, second.burnedAt)
@@ -364,50 +341,22 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// A right edge enters the next seat from its left; a left edge enters the previous seat
-        /// from its right. The same ID, creation time, and velocity survive the handoff.
-        /// Each handoff of a locked item removes one lock, so items unlock only by teamwork. A relay
-        /// orb becomes x1 when it unlocks, then each further handoff raises it to x2 and MAX. A bomb
-        /// that unlocks is defused into an attack orb: its fuse is cut and a fresh orb lifetime starts.
-        /// </summary>
-        public bool TryTransfer(ulong sender, string id, bool right, float height01,
-            Vector2 normalizedVelocity, string requestId, double now, out LabOrbState orb, out string reason)
-            => TryTransfer(sender, id, right, height01, normalizedVelocity, requestId, now,
-                LabEdgeCrossingKind.Swipe, out orb, out reason);
-
-        /// <summary>
-        /// The same handoff, told why the body crossed. A drum also gets how it arrives on the next
-        /// board (#178); see <see cref="ArriveDrum"/>.
-        /// </summary>
-        public bool TryTransfer(ulong sender, string id, bool right, float height01, Vector2 normalizedVelocity,
-            string requestId, double now, LabEdgeCrossingKind crossing, out LabOrbState orb, out string reason)
-            => TryTransferCore(sender, id, right, null, height01, normalizedVelocity,
-                requestId, now, crossing, out orb, out reason);
-
-        /// <summary>
         /// Atomically validate the current boundary position and hand off the orb. No preceding
         /// motion packet is required and rejected geometry never overwrites the stored position.
         /// </summary>
         public bool TryTransferAt(ulong sender, string id, bool right, Vector2 normalizedPosition,
             Vector2 normalizedVelocity, string requestId, double now, LabEdgeCrossingKind crossing,
             out LabOrbState orb, out string reason)
-            => TryTransferCore(sender, id, right, normalizedPosition, normalizedPosition.y,
-                normalizedVelocity, requestId, now, crossing, out orb, out reason);
-
-        private bool TryTransferCore(ulong sender, string id, bool right, Vector2? normalizedPosition,
-            float height01, Vector2 normalizedVelocity, string requestId, double now,
-            LabEdgeCrossingKind crossing, out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!TryFindMovable(id, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (activeSeatCount == 1) return Reject("NO_NEIGHBOR", out reason);
-            if ((normalizedPosition.HasValue && !Unit(normalizedPosition.Value.x))
-                || !Unit(height01) || !Finite(normalizedVelocity) ||
+            if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y) || !Finite(normalizedVelocity) ||
                 normalizedVelocity.sqrMagnitude > rules.MaximumMotionSpeed * rules.MaximumMotionSpeed)
                 return Reject("INVALID_MOTION", out reason);
-            float boundaryX = normalizedPosition?.x ?? current.x;
+            float boundaryX = normalizedPosition.x;
             if (right ? boundaryX < 1f - EdgeTolerance || normalizedVelocity.x <= 0f
                 : boundaryX > EdgeTolerance || normalizedVelocity.x >= 0f)
                 return Reject("NOT_OUTWARD_EDGE", out reason);
@@ -427,7 +376,7 @@ namespace C6Lab
             current.owner = receiver;
             current.ownershipVersion++;
             current.x = right ? 0f : 1f;
-            current.y = height01;
+            current.y = normalizedPosition.y;
             current.vx = normalizedVelocity.x;
             current.vy = normalizedVelocity.y;
             current.unlockedAt = -1d;
@@ -636,23 +585,14 @@ namespace C6Lab
         /// orbs beside it, which needs one more free storage slot. A potion heals its user's personal
         /// HP up to the maximum; at full HP it is refused and kept so it can still be passed to a
         /// neighbor. A player already at 0 HP cannot be revived by a potion.
+        /// The owner supplies its actual local position without a motion pre-update.
         /// </summary>
-        public bool TryUseItem(ulong sender, string id, string requestId, double now,
-            out LabOrbState orb, out string reason)
-            => TryUseItemCore(sender, id, requestId, now, null, out orb, out reason);
-
-        /// <summary>Open an item at its actual owner-simulated position, without a motion pre-update.</summary>
         public bool TryUseItemAt(ulong sender, string id, string requestId, double now,
             Vector2 normalizedPosition, out LabOrbState orb, out string reason)
-            => TryUseItemCore(sender, id, requestId, now, normalizedPosition, out orb, out reason);
-
-        private bool TryUseItemCore(ulong sender, string id, string requestId, double now,
-            Vector2? normalizedPosition, out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
-            if (normalizedPosition.HasValue && (!Unit(normalizedPosition.Value.x)
-                || !Unit(normalizedPosition.Value.y))) return Reject("INVALID_MOTION", out reason);
+            if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y)) return Reject("INVALID_MOTION", out reason);
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (!current.kind.IsDoubleTapUsable()) return Reject("NOT_USABLE", out reason);
@@ -667,8 +607,8 @@ namespace C6Lab
                     {
                         id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = ElementFor(seed, combinedCount++),
                         origin = LabOrbOrigin.Combined, originOwner = sender,
-                        x = Mathf.Clamp01((normalizedPosition?.x ?? current.x) + side * SecretBoxSpread),
-                        y = normalizedPosition?.y ?? current.y,
+                        x = Mathf.Clamp01(normalizedPosition.x + side * SecretBoxSpread),
+                        y = normalizedPosition.y,
                         vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
                     };
                     orbs.Add(opened.id, opened);
@@ -750,20 +690,6 @@ namespace C6Lab
             if (!TryAdvance(now, out _) || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight) return false;
             launchScales.Remove(id);
             return orbs.Remove(id);
-        }
-
-        /// <summary>Only the current owner may submit a finite local physics sample.</summary>
-        public bool TryUpdateMotion(ulong sender, string id, Vector2 normalizedPosition,
-            Vector2 normalizedVelocity, double now)
-        {
-            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !TryFindMovable(id, out var orb)
-                || !UsableBy(orb, sender) || !Unit(normalizedPosition.x) || !Unit(normalizedPosition.y)
-                || !Finite(normalizedVelocity) ||
-                normalizedVelocity.sqrMagnitude > rules.MaximumMotionSpeed * rules.MaximumMotionSpeed) return false;
-            orb.x = normalizedPosition.x; orb.y = normalizedPosition.y;
-            orb.vx = normalizedVelocity.x; orb.vy = normalizedVelocity.y;
-            orb.revision = ++revision;
-            return true;
         }
 
         private bool BlockOn(double now) => phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt;

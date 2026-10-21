@@ -11,8 +11,7 @@ namespace C6Lab.Tests
         private static LabPaintGrowthSettings Settings(int resolution = 0) => new LabPaintGrowthSettings
         { Pattern = LabPaintPattern.Legacy,
             Resolution = resolution, Style = 1, InitialPercent = 2f, RepeatPercent = 37f,
-            GrowthPercentPerSecond = 6f, Raggedness = .55f, FlowRatio = .35f,
-            DripWidthDegrees = 3f, DripLengthDegrees = 60f, GravityWeight = 3f
+            GrowthPercentPerSecond = 6f, Raggedness = .55f
         };
 
         // The historical timeline hashes included timed repeat growth, which intentionally
@@ -20,7 +19,7 @@ namespace C6Lab.Tests
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(2)]
-        public void OriginalInitialFootprintsIgnoreRepeatClusterAndFlowControlsAtEveryResolution(int resolution)
+        public void OriginalInitialFootprintsIgnoreRepeatClusterControlsAtEveryResolution(int resolution)
         {
             var original = Settings(resolution); original.Style = 0;
             var changed = Settings(resolution); changed.Style = 0;
@@ -29,10 +28,6 @@ namespace C6Lab.Tests
             changed.ClusterCompactness = 0f;
             changed.ClusterIrregularity = 1f;
             changed.Raggedness = 1f;
-            changed.FlowRatio = 1f;
-            changed.DripWidthDegrees = 12f;
-            changed.DripLengthDegrees = 135f;
-            changed.GravityWeight = 8f;
             var first = new LabPaintSurface(original, 198u);
             var second = new LabPaintSurface(changed, 198u);
             second.SetFlowDirection(Vector3.right);
@@ -60,10 +55,6 @@ namespace C6Lab.Tests
             var changed = Settings();
             changed.Style = 0;
             changed.Raggedness = 1f;
-            changed.FlowRatio = 1f;
-            changed.DripWidthDegrees = 12f;
-            changed.DripLengthDegrees = 135f;
-            changed.GravityWeight = 8f;
             var first = new LabPaintSurface(ordinary, 729u);
             var second = new LabPaintSurface(changed, 729u);
             Assert.That(second.SetFlowDirection(Vector3.right), Is.True);
@@ -116,18 +107,6 @@ namespace C6Lab.Tests
         [TestCase("Raggedness", -.1f)]
         [TestCase("Raggedness", 1.1f)]
         [TestCase("Raggedness", float.NaN)]
-        [TestCase("FlowRatio", -.1f)]
-        [TestCase("FlowRatio", 1.1f)]
-        [TestCase("FlowRatio", float.PositiveInfinity)]
-        [TestCase("DripWidthDegrees", .49f)]
-        [TestCase("DripWidthDegrees", 12.1f)]
-        [TestCase("DripWidthDegrees", float.NaN)]
-        [TestCase("DripLengthDegrees", 4.9f)]
-        [TestCase("DripLengthDegrees", 135.1f)]
-        [TestCase("DripLengthDegrees", float.NegativeInfinity)]
-        [TestCase("GravityWeight", .9f)]
-        [TestCase("GravityWeight", 8.1f)]
-        [TestCase("GravityWeight", float.NaN)]
         public void InvalidSettingsCannotPartiallyResetAnExistingMap(string fieldName, float value)
         {
             var surface = new LabPaintSurface(Settings(), 91);
@@ -215,16 +194,12 @@ namespace C6Lab.Tests
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(2)]
-        public void ClusterGrowthIgnoresShortDripLimitsAndCompletesFromOneStationaryHit(int resolution)
+        public void ClusterGrowthCompletesFromOneStationaryHit(int resolution)
         {
             var settings = Settings(resolution);
             settings.InitialPercent = .1f;
             settings.RepeatPercent = 100f;
             settings.GrowthPercentPerSecond = 100f;
-            settings.FlowRatio = 1f;
-            settings.DripWidthDegrees = 12f;
-            settings.DripLengthDegrees = 5f;
-            settings.GravityWeight = 8f;
             var surface = new LabPaintSurface(settings, 107);
             surface.RegisterHit(Vector3.forward, Color.red, 1);
             var original = Pixels(surface);
@@ -253,10 +228,6 @@ namespace C6Lab.Tests
                 settings.InitialPercent = .1f;
                 settings.RepeatPercent = 100f;
                 settings.GrowthPercentPerSecond = 100f;
-                settings.FlowRatio = 1f;
-                settings.DripWidthDegrees = .5f;
-                settings.DripLengthDegrees = 135f;
-                settings.GravityWeight = 8f;
                 var down = new LabPaintSurface(settings, seed);
                 var redirected = new LabPaintSurface(settings, seed);
                 foreach (LabPaintSurface surface in new[] { down, redirected })
@@ -297,9 +268,6 @@ namespace C6Lab.Tests
             settings.Raggedness = 0f;
             settings.RepeatPercent = 100f;
             settings.GrowthPercentPerSecond = 100f;
-            settings.FlowRatio = 1f;
-            settings.DripWidthDegrees = .5f;
-            settings.DripLengthDegrees = 135f;
             var surface = new LabPaintSurface(settings, 202);
             surface.RegisterHit(Vector3.down, Color.red, 1);
             Color32[] before = Pixels(surface);
@@ -330,9 +298,6 @@ namespace C6Lab.Tests
                 settings.InitialPercent = .1f;
                 settings.RepeatPercent = 100f;
                 settings.GrowthPercentPerSecond = 100f;
-                settings.FlowRatio = 1f;
-                settings.DripWidthDegrees = .5f;
-                settings.DripLengthDegrees = 135f;
                 var fixedDirection = new LabPaintSurface(settings, seed);
                 var changingDirection = new LabPaintSurface(settings, seed);
                 foreach (LabPaintSurface surface in new[] { fixedDirection, changingDirection })
@@ -369,43 +334,6 @@ namespace C6Lab.Tests
                 Assert.That(changingDirection.PendingCoverage, Is.EqualTo(fixedDirection.PendingCoverage));
                 AssertConnected(changingDirection);
             }
-        }
-
-        [TestCase(true)]
-        [TestCase(false)]
-        public void LegacyDripControlsDoNotChangeRepeatedClusterGeometryOrItsAreaBudget(bool varyWidth)
-        {
-            var firstSettings = Settings(2);
-            firstSettings.InitialPercent = .1f;
-            firstSettings.FlowRatio = 1f;
-            firstSettings.GrowthPercentPerSecond = 100f;
-            firstSettings.DripWidthDegrees = .5f;
-            firstSettings.DripLengthDegrees = 135f;
-            var secondSettings = Settings(2);
-            secondSettings.InitialPercent = .1f;
-            secondSettings.FlowRatio = 0f;
-            secondSettings.GravityWeight = 1f;
-            secondSettings.GrowthPercentPerSecond = 100f;
-            secondSettings.DripWidthDegrees = varyWidth ? 12f : .5f;
-            secondSettings.DripLengthDegrees = varyWidth ? 135f : 5f;
-            var first = new LabPaintSurface(firstSettings, 17);
-            var second = new LabPaintSurface(secondSettings, 17);
-            Color32[] before = null;
-            foreach (LabPaintSurface surface in new[] { first, second })
-            {
-                surface.RegisterHit(Vector3.forward, Color.red, 1);
-                before = Pixels(surface);
-                surface.RegisterHit(Vector3.forward, Color.blue, 2);
-                surface.Advance(200d / surface.CellCount);
-                AssertConnected(surface);
-            }
-            Assert.That(second.CoveredCount, Is.EqualTo(first.CoveredCount));
-            Assert.That(second.CoveredCount, Is.EqualTo(before.Count(pixel => pixel.a != 0) + 200));
-            Assert.That(second.PendingCoverage, Is.EqualTo(first.PendingCoverage));
-            Assert.That(Pixels(second), Is.EqualTo(Pixels(first)));
-            Color32[] after = Pixels(second);
-            for (int cell = 0; cell < before.Length; cell++)
-                if (before[cell].a != 0) Assert.That(after[cell], Is.EqualTo(before[cell]));
         }
 
         [Test]

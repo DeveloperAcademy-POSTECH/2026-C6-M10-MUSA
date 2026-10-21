@@ -72,7 +72,7 @@ namespace C6Lab
                     patch = new PatternPatch(surface.patternMask, center,
                         surface.pattern == LabPaintPattern.Flow ? -surface.flowDirection : Vector3.up,
                         surface.pattern == LabPaintPattern.Flow ? 0f
-                            : (StableUnit(salt) - .5f) * Mathf.PI * 2f, sequence, salt);
+                            : (StableUnit(salt) - .5f) * Mathf.PI * 2f, salt);
                     patch.Radius = Mathf.Max(cellAngle, Mathf.Sqrt((float)(budget / surface.CellCount)
                         * Mathf.PI / surface.patternMask.FootprintFraction));
                 }

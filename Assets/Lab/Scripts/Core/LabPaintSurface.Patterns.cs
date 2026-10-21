@@ -6,10 +6,8 @@ namespace C6Lab
 {
     public sealed partial class LabPaintSurface
     {
-        private const int PatternFrontierSamples = 12;
         private LabPaintPattern pattern;
         private LabPaintPatternMask patternMask;
-        private ulong patternSequence;
         /// <summary>Local growth setting. A pixel-only display replica takes its pattern name from shared LabConfig.</summary>
         public LabPaintPattern Pattern => pattern;
 
@@ -20,7 +18,7 @@ namespace C6Lab
             uint salt = initialSeed ^ unchecked((uint)PaintCount * 0x9E3779B9u);
             var patch = new PatternPatch(patternMask, direction, pattern == LabPaintPattern.Flow
                 ? -flowDirection : Vector3.up, pattern == LabPaintPattern.Flow ? 0f
-                : (StableUnit(salt) - .5f) * Mathf.PI * 2f, ++patternSequence, salt);
+                : (StableUnit(salt) - .5f) * Mathf.PI * 2f, salt);
             bool[] footprint = MakePatternFootprint(patch, hitCell, (int)decimal.Floor(initial));
 
             // An impact may seed detached splashes, but those are not one connected region.
@@ -31,10 +29,10 @@ namespace C6Lab
             var component = new List<int>();
             decimal fraction = requested == decimal.Floor(initial)
                 ? initial - requested : 0m;
-            PaintPatternComponent(hitCell, footprint, visited, queue, component, patch, color, owner, painterSlot, fraction);
+            PaintPatternComponent(hitCell, footprint, visited, queue, component, color, owner, painterSlot, fraction);
             for (int i = 0; i < footprint.Length; i++)
                 if (footprint[i] && !visited[i])
-                    PaintPatternComponent(i, footprint, visited, queue, component, patch, color, owner, painterSlot, 0m);
+                    PaintPatternComponent(i, footprint, visited, queue, component, color, owner, painterSlot, 0m);
 
             // Size the splash by the impact's area, not by how many white cells remain under
             // it. Overlap never stretches one splash across distant holes to recover its quota.
@@ -51,7 +49,7 @@ namespace C6Lab
         }
 
         private void PaintPatternComponent(int first, bool[] footprint, bool[] visited,
-            Queue<int> queue, List<int> component, PatternPatch patch, Color32 color, ulong owner, byte painterSlot, decimal fraction)
+            Queue<int> queue, List<int> component, Color32 color, ulong owner, byte painterSlot, decimal fraction)
         {
             component.Clear(); queue.Clear();
             visited[first] = true; queue.Enqueue(first);
@@ -66,7 +64,7 @@ namespace C6Lab
                     visited[next] = true; queue.Enqueue(next);
                 }
             }
-            var region = new Region(regions.Count) { PatternPatch = patch };
+            var region = new Region(regions.Count);
             regions.Add(region);
             Ink immediateInk = Supply(region, component.Count + fraction, color, owner, painterSlot);
             // BFS order is connected inside this component. PaintCell also merges components
@@ -174,34 +172,6 @@ namespace C6Lab
             heap.Push(cell, ((ulong)category << 32) | hash);
         }
 
-        private int ChoosePatternCell(Region region)
-        {
-            // Flow continues down the Host-sampled gravity tangent; poles, blocked tips and
-            // exhausted lengths still fall back to the ordinary reachable frontier.
-            if (pattern == LabPaintPattern.Flow && NextUnit() < flowRatio
-                && TryChooseFlowCell(region, out int flowing)) return flowing;
-            PatternPatch patch = region.PatternPatch;
-            int chosen = -1;
-            double total = 0d;
-            for (int sample = 0; sample < PatternFrontierSamples; sample++)
-            {
-                // The established fill/extend and vertical weighting remain the base choice.
-                int cell = ChooseCell(region);
-                Vector3 direction = CellDirection(cell);
-                float smooth = .5f + .5f * Mathf.Sin(Vector3.Dot(direction,
-                    pattern == LabPaintPattern.Broad ? new Vector3(5.3f, 7.7f, 3.9f)
-                        : new Vector3(17.3f, 11.7f, 19.9f)) + (patch == null ? 0f : (patch.Salt & 255u) * .024f));
-                float potential = patch == null ? 0f : patch.Potential(direction);
-                double weight = .2d + potential * (pattern == LabPaintPattern.Broad ? .8d : 1.6d)
-                    + Mathf.Lerp(.5f, smooth, raggedness) * (pattern == LabPaintPattern.Splatter ? 1.8d : .6d);
-                total += weight;
-                if (chosen < 0 || NextUnit() * total < weight) chosen = cell;
-            }
-            // Every sampled candidate is an adjacent unpainted cell with positive weight.
-            // The mask is a shape preference, never a barrier to the last unpainted cell.
-            return chosen;
-        }
-
         private static uint PatternHash(uint value)
         {
             unchecked
@@ -215,7 +185,6 @@ namespace C6Lab
         private sealed class PatternPatch
         {
             private const int ClusterAngles = 128;
-            public readonly ulong Sequence;
             public readonly uint Salt;
             public float Radius;
             private readonly LabPaintPatternMask mask;
@@ -224,9 +193,9 @@ namespace C6Lab
             private float[] clusterRadii;
             private float meanClusterRadius;
             public PatternPatch(LabPaintPatternMask mask, Vector3 center, Vector3 upHint,
-                float rotation, ulong sequence, uint salt)
+                float rotation, uint salt)
             {
-                this.mask = mask; this.center = center; Sequence = sequence; Salt = salt;
+                this.mask = mask; this.center = center; Salt = salt;
                 Vector3 tangent = Vector3.ProjectOnPlane(upHint, center);
                 if (tangent.sqrMagnitude < .000001f) tangent = Vector3.ProjectOnPlane(Vector3.forward, center);
                 if (tangent.sqrMagnitude < .000001f) tangent = Vector3.ProjectOnPlane(Vector3.right, center);
@@ -242,16 +211,6 @@ namespace C6Lab
                 float x = Vector3.Dot(direction, right) * scale, y = Vector3.Dot(direction, up) * scale;
                 return new Vector2(x * cosine + y * sine, -x * sine + y * cosine);
             }
-            public float Potential(Vector3 direction)
-            {
-                Vector2 point = Project(direction);
-                // Fixed, enlarged outline preferences retain lobes as the actual connected
-                // frontier grows. The radius is not animated and cannot paint across gaps.
-                float near = Radius * 1.6f, far = Radius * 2.4f;
-                return mask.Sample(.5f + point.x / (2f * near), .5f + point.y / (2f * near)) * .7f
-                    + mask.Sample(.5f + point.x / (2f * far), .5f + point.y / (2f * far)) * .3f;
-            }
-
             public float ClusterShapeFactor(Vector3 direction)
             {
                 if (clusterRadii == null) BuildClusterRadii();

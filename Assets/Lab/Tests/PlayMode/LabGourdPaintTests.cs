@@ -271,7 +271,7 @@ namespace C6Lab.Tests
                     "Paint mode cannot win just because the old HP counter reached zero.");
                 Assert.That(network.Snapshot.paintCoverage, Is.GreaterThan(0f));
                 Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(100));
-                Assert.That(network.Snapshot.paintCoverage, Is.LessThan(network.config.PaintVictoryCoverage));
+                Assert.That(network.Snapshot.paintCoverage, Is.LessThan(1f));
                 Assert.That(LabGourdFinish.DelayVictory(network, network.Snapshot), Is.False);
                 Assert.That(hud.resultControls.activeSelf, Is.False);
                 Assert.That(paint.VisualInstance.activeSelf, Is.True);
@@ -347,9 +347,9 @@ namespace C6Lab.Tests
             LabConfig savedNetwork = network.config, savedBoard = controller.config;
             LabConfig fixture = CollisionFixture(savedNetwork, 50f);
             float[] growthValues = fixture.CaptureDeveloperValues();
-            growthValues[107] = 50f;
+            growthValues[106] = 50f;
+            growthValues[107] = 100f;
             growthValues[108] = 100f;
-            growthValues[109] = 100f;
             Assert.That(fixture.TryApplyDeveloperValues(growthValues, out string fixtureError), Is.True, fixtureError);
             network.config = fixture;
             controller.config = fixture;
@@ -743,13 +743,12 @@ namespace C6Lab.Tests
         {
             LabConfig fixture = Object.Instantiate(source);
             float[] tuning = fixture.CaptureDeveloperValues();
-            SetTuning(tuning, "Paint Victory Coverage (%)", 100f);
-            tuning[105] = 0f;
-            tuning[106] = initialPercent;
-            tuning[107] = 4f;
-            tuning[108] = 6f;
-            tuning[109] = 60f;
-            tuning[110] = 1.35f;
+            tuning[104] = 0f;
+            tuning[105] = initialPercent;
+            tuning[106] = 4f;
+            tuning[107] = 6f;
+            tuning[108] = 60f;
+            tuning[109] = 1.35f;
             SetTuning(tuning, "Monster Max HP", 40f);
             SetTuning(tuning, "Damage per Hit", 20f);
             SetTuning(tuning, "Battle Duration (seconds)", 30f);
