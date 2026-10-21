@@ -21,7 +21,7 @@ namespace C6Lab.Tests
         [Test]
         public void FlashFieldsAreKoreanStartOffAndShareTheYaguangGroupWithTheCombo()
         {
-            LabDeveloperField[] flash = LabConfig.DeveloperFields.Skip(178).ToArray();
+            LabDeveloperField[] flash = LabConfig.DeveloperFields.Skip(178).Take(7).ToArray();
             Assert.That(flash.Select(field => field.Label), Is.EqualTo(new[]
             {
                 "야광귀 섬광 (0 off, 1 on)", "섬광 대상 (0 모두, 1 한 명)", "섬광 첫 시작 (초)", "섬광 간격 (초)",
@@ -40,9 +40,10 @@ namespace C6Lab.Tests
                 "The combo moved into the 야광귀 group.");
             LabDeveloperCategory yaguang = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀");
             Assert.That(yaguang.FieldIndices, Is.EqualTo(new[]
-                { 155, 156, 164, 157, 158, 159, 160, 161, 162, 163, 178, 179, 180, 181, 182, 183, 184 }));
+                { 155, 185, 156, 164, 157, 158, 159, 160, 161, 162, 163, 178, 179, 180, 181, 182, 183, 184 }),
+                "The yaguang counting toggle (#271) sits right under the combo switch.");
             Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 178 }), "One switch turns the combo and the flash on together.");
-            Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 10 }));
+            Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 11 }));
             Assert.That(yaguang.DividerLabels, Is.EqualTo(new[] { "── 콤보 ──", "── 섬광 ──" }));
             foreach (int index in new[] { 159, 162 })
                 Assert.That((LabConfig.DeveloperFields[index].Min + LabConfig.DeveloperFields[index].Max) * .5f, Is.EqualTo(15f),
@@ -54,7 +55,7 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(178), Is.EqualTo(new[] { 0f, 0f, 31f, 60f, 2f, 7f, 2f }),
+                Assert.That(source.CaptureDeveloperValues().Skip(178).Take(7), Is.EqualTo(new[] { 0f, 0f, 31f, 60f, 2f, 7f, 2f }),
                     "Off by default; once on, everyone flashes at 31 s and every 60 s, 19 s before each combo, "
                     + "with a 2 s warning, 7 s of glare and 2 s to recover.");
 
