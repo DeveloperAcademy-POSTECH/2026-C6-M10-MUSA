@@ -4,7 +4,8 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>
-    /// 콤보 성공 보상(BIG, #257) 동안 전투 화면 위에서 노란 별이 쏟아진다. 남은 시간이 줄수록 별이 줄어들어
+    /// 콤보 성공 보상(BIG, #257) 동안 전투 화면 위에서 부적이 쏟아진다(#268, 임시 그림 `Resources/Combo/Bujeok`).
+    /// 그림이 없으면 예전처럼 노란 별이 쏟아진다. 남은 시간이 줄수록 별이 줄어들어
     /// 숫자 대신 남은 시간을 보여준다. 콤보 HUD가 매 프레임 <see cref="Step"/>을 부르고, 별은 화면 맨 위에서
     /// 조합판 위쪽 가장자리까지 떨어지며 사라진다. 화면 표시만 하며 터치를 막지 않는다.
     /// </summary>
@@ -16,6 +17,11 @@ namespace C6Lab
         private static readonly Color32 InkColor = new Color32(43, 36, 32, 255);
         private static readonly Color StarColor = new Color(1f, .82f, .2f, 1f);
         private static Sprite starSprite;
+        /// <summary>쏟아지는 부적 그림 (#268). 이 경로에 그림을 덮어쓰면 그대로 바뀐다.</summary>
+        public const string BujeokPath = "Combo/Bujeok";
+        private Sprite fallingSprite;
+        private bool bujeok;
+        private Color baseColor = StarColor;
 
         [Tooltip("보상이 막 시작됐을 때 초당 떨어지는 별 수. 남은 시간 비율만큼 줄어든다.")]
         [SerializeField, Min(0f)] private float starsPerSecond = 16f;
@@ -39,6 +45,8 @@ namespace C6Lab
         public int ActiveCount { get; private set; }
         public float StarsPerSecondNow { get; private set; }
         public int StartBurst => startBurst;
+        /// <summary>별 대신 부적 그림을 쓰는지 (#268)</summary>
+        public bool UsesBujeok => bujeok;
 
         /// <summary>HUD 레이어 안에 별 영역을 만든다. unit은 HUD 크기 비율(칸 크기 / 64).</summary>
         public void Initialize(RectTransform parent, float hudUnit)
@@ -51,6 +59,11 @@ namespace C6Lab
             area.anchorMin = Vector2.zero;
             area.anchorMax = Vector2.one;
             area.offsetMin = area.offsetMax = Vector2.zero;
+            Sprite art = Resources.Load<Sprite>(BujeokPath);
+            bujeok = art != null;
+            fallingSprite = bujeok ? art : StarSprite();
+            // 부적 그림은 제 색 그대로, 별은 노랗게 칠한다.
+            baseColor = bujeok ? Color.white : StarColor;
             for (int i = 0; i < MaximumStars; i++)
             {
                 var rect = new GameObject("Star", typeof(RectTransform)).GetComponent<RectTransform>();
@@ -58,9 +71,10 @@ namespace C6Lab
                 rect.SetParent(area, false);
                 rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
                 Image image = rect.gameObject.AddComponent<Image>();
-                image.sprite = StarSprite();
+                image.sprite = fallingSprite;
+                image.preserveAspect = true;
                 image.raycastTarget = false;
-                image.color = StarColor;
+                image.color = baseColor;
                 rect.gameObject.SetActive(false);
                 stars[i] = image;
             }
@@ -108,7 +122,7 @@ namespace C6Lab
                 rect.localRotation = Quaternion.Euler(0f, 0f, rect.localEulerAngles.z + spin[i] * deltaTime);
                 // 떨어지는 길의 마지막 30%에서 점점 투명해진다.
                 float travel = Mathf.InverseLerp(top, bottomY, position.y);
-                Color color = StarColor;
+                Color color = baseColor;
                 color.a = travel < .7f ? 1f : Mathf.Clamp01(1f - (travel - .7f) / .3f);
                 stars[i].color = color;
                 if (position.y <= bottomY || color.a <= 0f)
@@ -143,18 +157,21 @@ namespace C6Lab
             Rect rect = area.rect;
             RectTransform star = stars[slot].rectTransform;
             float size = Mathf.Lerp(18f, 34f, Next()) * unit;
-            star.sizeDelta = new Vector2(size, size);
+            // 부적은 세로로 긴 종이라 별보다 조금 크게, 폭은 높이의 절반으로 그린다.
+            if (bujeok) size *= 1.8f;
+            star.sizeDelta = bujeok ? new Vector2(size * .5f, size) : new Vector2(size, size);
             float x = Mathf.Lerp(rect.xMin + size, rect.xMax - size, Next());
             // 한꺼번에 쏟아질 때는 위쪽 띠 여러 높이에서 시작해 비처럼 보이게 한다.
             float y = rect.yMax + size + (burst ? Next() * (rect.yMax - bottomY) * .35f * -1f : 0f);
             star.anchoredPosition = new Vector2(x, y);
-            star.localRotation = Quaternion.Euler(0f, 0f, Next() * 360f);
+            // 부적은 거꾸로 뒤집히지 않고 살짝 기운 채 팔랑이며, 별은 아무 방향으로나 돈다.
+            star.localRotation = Quaternion.Euler(0f, 0f, bujeok ? Mathf.Lerp(-35f, 35f, Next()) : Next() * 360f);
             velocity[slot] = new Vector2(Mathf.Lerp(-30f, 30f, Next()), -Mathf.Lerp(260f, 460f, Next())) * unit;
-            spin[slot] = Mathf.Lerp(-220f, 220f, Next());
+            spin[slot] = bujeok ? Mathf.Lerp(-70f, 70f, Next()) : Mathf.Lerp(-220f, 220f, Next());
             sway[slot] = Next() * Mathf.PI * 2f;
             age[slot] = 0f;
             alive[slot] = true;
-            stars[slot].color = StarColor;
+            stars[slot].color = baseColor;
             star.gameObject.SetActive(true);
         }
 

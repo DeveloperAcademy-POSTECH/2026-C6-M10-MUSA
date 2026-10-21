@@ -70,6 +70,27 @@ namespace C6Lab.Tests
             }
         }
 
+        [Test]
+        public void TheRewardRainsTheBujeokArtInsteadOfStars()
+        {
+            Assert.That(Resources.Load<Sprite>(LabComboRewardStars.BujeokPath), Is.Not.Null, "The talisman art (#268) is in Resources.");
+            var parent = new GameObject("Reward rain parent", typeof(RectTransform));
+            try
+            {
+                var rain = parent.AddComponent<LabComboRewardStars>();
+                rain.Initialize((RectTransform)parent.transform, 1f);
+                Assert.That(rain.UsesBujeok, Is.True);
+                Image first = rain.Area.GetComponentInChildren<Image>(true);
+                Assert.That(first.sprite.texture.name, Is.EqualTo("Bujeok"));
+                Assert.That(first.color, Is.EqualTo(Color.white), "Its own colours, not tinted yellow.");
+                Assert.That(first.raycastTarget, Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(parent);
+            }
+        }
+
         [UnityTest]
         public IEnumerator SmallShowsABarWithoutSecondsAndBigRainsStarsInstead()
         {
