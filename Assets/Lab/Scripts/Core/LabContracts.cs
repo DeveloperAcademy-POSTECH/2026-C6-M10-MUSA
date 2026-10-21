@@ -219,5 +219,15 @@ namespace C6Lab
         public uint comboResultCount;
         public double comboResultAt = -1d;
         public ulong comboFailedBy;
+        /// <summary>
+        /// 다음 콤보 4칸이 나오는 시각과 그 예고(COMBO! 3, 2, 1)가 시작되는 시각 (#241). 둘 다 전투 시계 기준이고,
+        /// 콤보가 진행 중이거나 꺼져 있으면 -1이다. 예고 시간이 0이면 두 시각이 같다(예고 없음).
+        /// 예고 시작 시각은 전투 시작보다 이를 수 있다(첫 시작 시각이 예고 시간보다 짧을 때).
+        /// </summary>
+        public double comboNextAt = -1d;
+        public double comboWarningAt = -1d;
+
+        /// <summary>이 시각에 콤보 예고 중인지 (#241). 예고 중에는 콤보가 없으므로 맞힌 구슬도 판정하지 않는다.</summary>
+        public bool ComboWarningOn(double now) => comboNextAt > comboWarningAt && now >= comboWarningAt && now < comboNextAt;
     }
 }

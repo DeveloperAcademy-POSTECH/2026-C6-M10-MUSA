@@ -44,7 +44,7 @@ namespace C6Lab.Tests
         [Test]
         public void FourVisualSettingsAppendDisabledByDefaultWithoutReplacingPreviousFields()
         {
-            Assert.That(baseline.Length, Is.EqualTo(169));
+            Assert.That(baseline.Length, Is.EqualTo(170));
             Assert.That(baseline.Skip(129).Take(4), Is.EqualTo(new[] { 0f, 1f, .3f, .18f }));
             Assert.That(config.PaintGrainEnabled, Is.False);
             Assert.That(LabConfig.DeveloperFields.Skip(129).Take(4).Select(field => field.Label), Is.EqualTo(new[]
@@ -120,7 +120,7 @@ namespace C6Lab.Tests
             Assert.That(error, Does.Contain("incomplete"));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
             Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(values, 3, Protocol));
-            Assert.That(Protocol, Is.EqualTo(5648));
+            Assert.That(Protocol, Is.EqualTo(5649));
         }
 
         [Test]
