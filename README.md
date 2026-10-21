@@ -234,8 +234,8 @@ DEV → **Combo**의 `Gourd Color Combo`가 켜져 있으면(기본 ON, #241에�
 - **판정**: 팀이 박에 맞힌 결합 구슬을 순서대로 봅니다. 순서와 색이 모두 맞으면 다음 칸, 다른 색이 맞으면 바로 `WRONG COLOR`, 제한 시간(15초) 안에 4칸을 못 채우면 `TIME UP`입니다. 폭탄/릴레이처럼 색이 없는 공은 세지 않습니다. 성공하면 `CLEAR!`가 뜨고 아래 보상을 받습니다.
 - **실패 페널티**: 10초 동안 던지는 공의 크기(충돌 반지름/모양/꼬리)와 박에 칠해지는 면적이 0.1배가 됩니다. 던진 순간의 크기가 착지까지 유지되며, 다른 기기에도 같은 크기로 보입니다.
 - **페널티 대상**: `Combo Penalty Target`이 TEAM(기본)이면 팀 전체, THROWER면 틀린 색을 던진 사람만입니다. 시간 초과는 틀린 사람이 없으므로 언제나 팀 전체입니다.
-- **성공 보상**: 4칸을 다 맞히면 10초 동안 팀 전체의 공 크기와 칠 면적이 2.5배가 되고 보상과 페널티는 마지막 결과 하나만 남습니다(성공하면 진행 중이던 페널티가 끝나고, 실패하면 페널티를 받는 사람의 보상이 끝남).
-- **DEV 값**: `Gourd Color Combo` ON, `Combo First Start` 20초, `Combo Warning` 3초(0이면 예고 없음), `Combo Repeat Interval` 40초, `Combo Time Limit` 15초(#257에서 15/10초 → 40/15초, 근거는 [검증 기록](docs/VALIDATION.md)의 #257 절), `Combo Penalty Duration` 10초(0이면 페널티 없음), `Combo Penalty Size (x)` 0.1, `Combo Reward Duration` 10초(0이면 보상 없음), `Combo Reward Size (x)` 2.5. 이 기본값은 코드와 `LabConfig.asset` 양쪽에 저장되어 있습니다. 상세는 [DEV 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)의 Combo 항목을 보세요.
+- **성공 보상**: 4칸을 다 맞히면 15초 동안 팀 전체의 공 크기와 칠 면적이 2.5배가 되고 보상과 페널티는 마지막 결과 하나만 남습니다(성공하면 진행 중이던 페널티가 끝나고, 실패하면 페널티를 받는 사람의 보상이 끝남).
+- **DEV 값**: `Gourd Color Combo` ON, `Combo First Start` 20초, `Combo Warning` 3초(0이면 예고 없음), `Combo Repeat Interval` 40초, `Combo Time Limit` 15초(#257에서 15/10초 → 40/15초, 페널티/보상 10 → 15초, 근거는 [검증 기록](docs/VALIDATION.md)의 #257 절), `Combo Penalty Duration` 15초(0이면 페널티 없음), `Combo Penalty Size (x)` 0.1, `Combo Reward Duration` 15초(0이면 보상 없음), `Combo Reward Size (x)` 2.5. 이 기본값은 코드와 `LabConfig.asset` 양쪽에 저장되어 있습니다. 상세는 [DEV 명세](docs/DEVELOPER_MODE_PARAMETER_SPEC.md)의 Combo 항목을 보세요.
 
 ## 개인 HP 확인
 

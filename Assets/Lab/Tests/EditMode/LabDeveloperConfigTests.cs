@@ -1324,9 +1324,9 @@ namespace C6Lab.Tests
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
                 Assert.That(source.CaptureDeveloperValues().Skip(155).Take(10),
-                    Is.EqualTo(new[] { 1f, 20f, 40f, 15f, 10f, .1f, 0f, 10f, 2.5f, 3f }),
+                    Is.EqualTo(new[] { 1f, 20f, 40f, 15f, 15f, .1f, 0f, 15f, 2.5f, 3f }),
                     "By default the combo is on: first at 20 s, every 40 s, 15 s to clear, the whole team shrinks "
-                    + "to 0.1x or grows to 2.5x for 10 seconds, and a 3-second warning comes first.");
+                    + "to 0.1x or grows to 2.5x for 15 seconds, and a 3-second warning comes first.");
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();

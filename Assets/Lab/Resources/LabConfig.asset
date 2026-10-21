@@ -52,10 +52,10 @@ MonoBehaviour:
   comboFirstStartSeconds: 20
   comboRepeatIntervalSeconds: 40
   comboTimeLimitSeconds: 15
-  comboPenaltyDurationSeconds: 10
+  comboPenaltyDurationSeconds: 15
   comboPenaltySizeScale: 0.1
   comboPenaltyThrowerOnly: 0
-  comboRewardDurationSeconds: 10
+  comboRewardDurationSeconds: 15
   comboRewardSizeScale: 2.5
   comboWarningSeconds: 3
   orbLifetimeSeconds: 8

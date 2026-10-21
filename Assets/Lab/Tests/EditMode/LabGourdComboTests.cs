@@ -455,7 +455,9 @@ namespace C6Lab.Tests
             values[155] = enabled ? 1f : 0f;
             values[156] = firstStart;
             values[158] = timeLimit;
+            values[159] = 10f; // the rule tests below count a 10-second penalty and reward, whatever the default
             values[161] = throwerOnly ? 1f : 0f;
+            values[162] = 10f;
             values[164] = warning;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return config;
