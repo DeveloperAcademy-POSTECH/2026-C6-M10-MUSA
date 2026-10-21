@@ -1,7 +1,7 @@
 using UnityEngine;
 namespace C6Lab
 {
-    /// <summary>Presentation only: approved shared HP determines cracks on every device.</summary>
+    /// <summary>Approved shared HP determines cracks; the visible shell also supplies collision geometry.</summary>
     [DefaultExecutionOrder(100)]
     public sealed class LabGourdCrack : MonoBehaviour
     {
@@ -93,7 +93,24 @@ namespace C6Lab
             visual.localScale *= 1.8f / size;
             bounds = shells[0].bounds;
             foreach (var r in shells) bounds.Encapsulate(r.bounds);
-            visual.position += target.Hitbox.bounds.center - bounds.center;
+            // Align to the stable hanging frame, not the previous mode's offset shell bounds.
+            visual.position += target.VisualMount.position - bounds.center;
+            var collisionShells = new System.Collections.Generic.List<MeshFilter>();
+            foreach (var r in shells)
+            {
+                MeshFilter shellMesh = r.GetComponent<MeshFilter>();
+                if (shellMesh == null || shellMesh.sharedMesh == null)
+                {
+                    FailInitialization("Every visible crack shell needs a collision mesh.");
+                    return false;
+                }
+                collisionShells.Add(shellMesh);
+            }
+            if (!target.BindHitboxMeshes(collisionShells.ToArray()))
+            {
+                FailInitialization("The crack shells could not supply a combined collision mesh.");
+                return false;
+            }
             // The shared hanging system supplies the cord; avoid an imported duplicate.
             foreach (var r in renderers)
                 if (System.Array.Exists(r.sharedMaterials, m => m != null && m.name.Contains("Rope")))

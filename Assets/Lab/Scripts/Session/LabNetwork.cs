@@ -187,10 +187,11 @@ namespace C6Lab
         // 5650: #236 AUTO drum count integrated with #240; 170 shared values.
         // 5651: #246 removes unused tuning and legacy payloads, retaining AUTO; 165 shared values.
         // 5652: #254 board orb trail toggle (DEV 165); 166 shared values.
-        internal const ushort LabProtocolVersion = 5652;
+        // 5653: #258 visible gourd mesh collision and mesh-local approved paint coordinates.
+        internal const ushort LabProtocolVersion = 5653;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/15");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/16");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1679,8 +1680,10 @@ namespace C6Lab
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
             if (result.Hit)
             {
-                Vector3 paintDirection = target != null && target.VisualMount != null
-                    ? target.VisualMount.InverseTransformPoint(result.HitPoint).normalized : Vector3.zero;
+                // The paint shader samples normalized mesh-local positions, including the shell's
+                // size and offset. The bound hitbox shares that exact mesh and transform.
+                Vector3 paintDirection = target != null && target.Hitbox != null
+                    ? target.Hitbox.transform.InverseTransformPoint(result.HitPoint).normalized : Vector3.zero;
                 if (model.ConfirmHit(result.ProjectileId, now, paintDirection,
                     out var element, out int actualDamage, out int impactValue) && target != null)
                 {

@@ -158,8 +158,11 @@ namespace C6Lab.Tests
             var paint = Object.FindFirstObjectByType<LabGourdPaint>();
             Assert.That(paint.IsReady, Is.True, paint.InitializationError);
             Transform hitbox = paint.target.Hitbox.transform;
-            Transform common = hitbox.parent;
-            Assert.That(paint.target.VisualMount.parent, Is.SameAs(common));
+            Transform mount = paint.target.VisualMount;
+            Transform common = mount.parent;
+            Assert.That(hitbox.parent, Is.SameAs(mount));
+            Assert.That(paint.Shell.IsChildOf(mount), Is.True,
+                "The exact shell collider and its visible mesh must inherit the same hanging frame.");
             Quaternion initialRotation = common.localRotation;
             Vector3 localHit = new Vector3(.2f, .1f, .45f);
             paint.target.NotifyApprovedHit(localHit, LabOrbElement.Fire);

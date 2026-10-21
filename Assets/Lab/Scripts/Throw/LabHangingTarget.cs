@@ -55,6 +55,7 @@ namespace C6Lab
         private Vector2 angle, velocity;
         private float yawAngleDegrees, yawSpeedDegreesPerSecond;
         private Material bodyMaterial, ropeMaterial;
+        private LabTarget mountedTarget;
         private Color bodyBaseColor;
         private float flash;
         public Vector2 SwingAngles => angle;
@@ -72,25 +73,28 @@ namespace C6Lab
             var rigidbody = pivot.gameObject.AddComponent<Rigidbody>();
             rigidbody.isKinematic = true;
             rigidbody.useGravity = false;
+            mountedTarget = target;
             Transform body = target.Hitbox.transform;
-            hangingBody = body;
             visualMount = target.VisualMount;
+            // Suspension moves the shared frame. The shell collider owns its independent
+            // mesh-local offset and scale, exactly matching the mounted gourd surface.
+            hangingBody = visualMount;
             twistPivot = new GameObject("Body Twist Pivot").transform;
             twistPivot.SetParent(pivot, false);
-            body.SetParent(twistPivot, true);
-            // A shorter body leaves an unmistakable rope above it and air below it.
-            body.localScale = new Vector3(body.localScale.x, .9f, body.localScale.z);
-            target.VisualMount.SetParent(twistPivot, true);
-            // The saved Scene may supply a diagnostic texture. Own a runtime clone so flash
-            // never edits the asset or replaces the visible cylinder with a flat color.
-            var sourceMaterial = body.GetComponent<Renderer>().sharedMaterial;
-            bodyMaterial = sourceMaterial != null && sourceMaterial.shader != null &&
-                sourceMaterial.shader.name.StartsWith("Universal Render Pipeline/")
-                ? new Material(sourceMaterial)
-                : MakeMaterial(new Color(.85f, .28f, .09f), .32f);
-            bodyBaseColor = bodyMaterial.HasProperty("_BaseColor")
-                ? bodyMaterial.GetColor("_BaseColor") : Color.white;
-            body.GetComponent<Renderer>().sharedMaterial = bodyMaterial;
+            visualMount.SetParent(twistPivot, true);
+            body.SetParent(visualMount, true);
+            // A fixture may have a plain diagnostic renderer. Never replace the real
+            // gourd's paint material or reshape its collision mesh for a hit flash.
+            var bodyRenderer = body.GetComponent<Renderer>();
+            var sourceMaterial = bodyRenderer != null ? bodyRenderer.sharedMaterial : null;
+            if (sourceMaterial != null && sourceMaterial.shader != null
+                && sourceMaterial.shader.name.StartsWith("Universal Render Pipeline/"))
+            {
+                bodyMaterial = new Material(sourceMaterial);
+                bodyBaseColor = bodyMaterial.HasProperty("_BaseColor")
+                    ? bodyMaterial.GetColor("_BaseColor") : Color.white;
+                bodyRenderer.sharedMaterial = bodyMaterial;
+            }
             ropeMaterial = MakeMaterial(new Color(.64f, .52f, .32f), .1f);
             rope = Primitive("Rope", PrimitiveType.Cylinder, pivot,
                 new Vector3(0, -.425f, 0), new Vector3(.055f, .425f, .055f), ropeMaterial);
@@ -308,10 +312,11 @@ namespace C6Lab
                 if (verticalVelocity < 0f) verticalVelocity *= -.2f;
             }
             float length = RopeLength;
-            float halfBodyHeight = hangingBody.localScale.y; // Unity's cylinder is two units tall.
-            float pivotHeight = length + halfBodyHeight;
+            // Measure the actual mesh in the shared hanging frame; a cylinder's scale
+            // is not the height of a gourd. Common swing/yaw must not change this value.
+            float top = BodyTopInMount();
+            float pivotHeight = length + top;
             pivot.localPosition = Vector3.up * pivotHeight;
-            hangingBody.localPosition = Vector3.zero;
             visualMount.localPosition = Vector3.zero;
             currentRopeOffset = Mathf.Max(.1f - length, verticalOffset
                 + CycleAmplitude * Mathf.Sin(cycleElapsed / CyclePeriod * Mathf.PI * 2f));
@@ -330,6 +335,24 @@ namespace C6Lab
             ceilingPlate.localPosition = Vector3.up * (pivotHeight + extension + .26f);
             // Keep the resting target centre fixed so tuning length doesn't change the aim point.
 
+        }
+
+        private float BodyTopInMount()
+        {
+            if (mountedTarget == null || mountedTarget.Hitbox == null
+                || mountedTarget.Hitbox.sharedMesh == null || visualMount == null) return .9f;
+            var hitbox = mountedTarget.Hitbox;
+            Bounds bounds = hitbox.sharedMesh.bounds;
+            Matrix4x4 matrix = visualMount.worldToLocalMatrix * hitbox.transform.localToWorldMatrix;
+            float top = float.NegativeInfinity;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 point = bounds.center + Vector3.Scale(bounds.extents,
+                    new Vector3((i & 1) == 0 ? -1f : 1f, (i & 2) == 0 ? -1f : 1f,
+                        (i & 4) == 0 ? -1f : 1f));
+                top = Mathf.Max(top, matrix.MultiplyPoint3x4(point).y);
+            }
+            return Finite(top) ? Mathf.Max(.01f, top) : .9f;
         }
 
         private static Material MakeMaterial(Color color, float smoothness)
