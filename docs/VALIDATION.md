@@ -1810,9 +1810,105 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | 3인 실행: 넘겨받은 결합 구슬에도 꼬리, DEV OFF 공유 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
 | iOS 실기기: 성능(구슬 많을 때)·가독성 | NOT_RUN | 결합 구슬이 많을 때 프레임을 확인해야 한다. |
 
+## 박 폭탄 때 요괴가 톡 튀어나오기 — 2026-10-21, 이슈 #250
+
+기준은 `feat/#244-combo-yokai`(`5d2f2384`)에서 분기한 `feat/#250-bomb-yokai`다. Unity는 실행하지 않았다.
+
+- **신호**: 박이 폭탄을 떨어뜨리면 Host가 모든 참가자에게 보내는 기존 `LabNetwork.GourdBombDropped`(박 옆 "!" 말풍선과 같은 신호)를 `LabGourdYokai.Bind`가 듣는다. 새 패킷이나 스냅샷 필드는 없다.
+- **동작**: 신호가 오면 `bombShowSeconds`(1.4초, 말풍선 `LabGourdAlert.showSeconds`와 같게) 동안 요괴를 붙잡는다. 콤보 구간이 아니면 올라오기/되감기를 `bombRiseSpeed`(3배)로 빠르게 해 닫힌 상태에서도 약 0.4초에 다 올라오고, 다 올라온 순간 0.3초 동안 커지며(최대 약 22%) 위로 튀었다 돌아온다. 콤보 중이면 이미 나와 있으므로 바로 튀고, 콤보와 폭탄 시간이 둘 다 끝나야 들어간다. 남은 시간은 전투 중 프레임 시간으로만 줄어 일시정지 중에는 멈추고, 전투가 아니면 바로 0이 된다.
+- **범위**: DEV 설정·프로토콜·프리팹·애니메이션 파일 변경 없음. 넘기기 막기(#215)와 평소 6초 반복은 그대로다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. |
+| PlayMode 실제 실행 | NOT_RUN | `LabGourdYokaiTests` 새 3개(`ABombDropBringsTheYokaiOutQuicklyWithAPopForAsLongAsTheBubble`, `ABombDuringAComboOnlyPopsAndBothMustEndBeforeItGoesIn`, `TheNetworksGourdBombSignalReachesTheYokaiAndPausesHoldIt`)와 #244 기존 4개. |
+| 솔로 화면: 박 폭탄(20~30초) 때 요괴가 쏙 나와 톡 튀고 말풍선과 함께 들어감, 콤보 중 폭탄 | NOT_RUN | 기본값으로 솔로 시작 후 확인한다. |
+| 3인 실행: 모든 화면에서 같이 나옴 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | |
+
+
+위 #250 단독 기록은 이전 분기 당시 자료다. 최신 main #252 통합은 별도 실행 기록으로 구분한다. 각 기기는 폭탄 신호 수신 시점에 로컬 타이머를 시작하므로 기기 사이 정확히 같은 프레임/시각을 보장하지 않는다. 일시정지 중 요괴는 상태를 유지하지만 기존 말풍선은 숨겨진다.
+
+
+## #250/PR #253 최신 main 통합 검증 — 2026-10-21 KST
+
+#252를 먼저 병합한 main `681d80e5`와 #253을 통합한 소스 `2a35a8eb`다. #246의795 EditMode·설정165개/5651/token15·AUTO와 기존 네트워크/물리/도색은 유지했다. Runtime 차이는 `LabGourdYokai.cs` 한 파일이며 Config·EditMode·패키지·Scene·Prefab·Animation은 변경하지 않았다.
+
+### 충돌·경계 보완
+
+- 기존 main의 첫 수신에 포함된 콤보 명중 감지, 정지 프레임 기본 자세 샘플링, 비활성화 후 자세/스케일 복원을 유지하면서 폭탄 Pop·이벤트 구독을 합쳤다.
+- 폭탄만으로 Holding인 상태에서 처음 받은 과거 완료 콤보를 새 명중으로 오인했다. 새 검사1건을 추가해 수정 전 ExpectedFalse/ActualTrue로 재현했고, 직전 콤보 구간을 별도 `wasInComboWindow`로 보관해 현재/직전 콤보일 때만 명중 반응을 허용했다. 첫 활성 수신·마지막 명중·정지 자세·폭탄 연출은 유지한다.
+- 기존 문서의 “모든 기기 같은 순간”을 수신 프레임 기준으로 보정했다. 폭탄 타이머는 로컬 전투 프레임으로1.4초 유지하며 정확한 동시성을 보장하지 않는다. pause시 요괴는 유지하고 기존 말풍선은 숨긴다. 두 Inspector시간은 자동 연결하지 않는다.
+
+| 확인 | 결과 | 실제 근거·범위 |
+| --- | --- | --- |
+| 최초 통합 전체 PlayMode | PASS259/259 | `play.xml`, 실패·생략0. 새 경계 검사 추가 전 결과 |
+| 새 경계 검사 수정 전 | FAIL0/1 | `repro.xml`, 폭탄 유지 중 지연 완료 콤보의 거짓 명중 재현 |
+| 수정 후 전체 PlayMode | **PASS260/260** | `final-play.xml`, 실패·생략0, 107.944초. UTC 2026-10-21 02:27:36Z~2026-10-21 02:29:24Z. 최신 콤보8·폭탄3·추가 회귀1 = 요괴12건 포함 |
+| EditMode | 이번 미실행 | #252의795/795 결과와 구분. 해당 검사/공통Core/Config·패키지는 main과 동일함을 비교 |
+| 실제 Mac2앱 자연 폭탄 | **PASS28/28** | `network-regression/direct-two-player/n2/summary.json`. 기존24항목과 자연 폭탄4항목: DEV 5/5초·콤보OFF 공유, 양쪽 같은 실제 Host 폭탄ID 수신, 각 `LabGourdYokai`의 Ready·약1.4초 타이머·Holding·Popping, 원본Config 불변. 이벤트/Advance 직접 호출 없음 |
+| 사용자 변경 보존 | PASS4파일 | Scene·Target2머터리얼2·미추적meta의 시작 해시 유지. 커밋에서 제외 |
+| 수동솔로·기기간정확한시각/외형평가·iOS/실제LAN/핫스팟·3~5인·성능 | NOT_RUN | 위 자동/같은 Mac 결과로 확대하지 않음 |
+
+마지막 전체 검사 전후 Runtime·Config·테스트·패키지 해시를 대조했다. 원시 XML·로그·검증 앱·임시 helper는 저장소에 포함하지 않는다. 예전 #250 단독 NOT_RUN 자료는 이 통합 결과와 구분해 보존했다.
+
+최종 Mac 검사의 `gameplay-preservation.json`에서 사용자4파일·원본Config·패키지·런타임과 최종 소스/메타521파일의 해시 일치, 임시 helper 제거, 양쪽 실행 오류0을 확인했다. 검증 프로세스는 종료했다. Mac loopback 독립 앱2개이며 DEV 북 수2개 지정으로 기존 양방향 생성/전달을 검사했다. 이번 결과를 AUTO 기본 북 배분·다기기 동시 수신·실제LAN/핫스팟·모바일 성능 검증으로 확대하지 않는다.
+
+## PR #255·#256 통합 검증 — 2026-10-21 KST
+
+기준은 main `166d1ab3`에 한지 PR #255(#243)와 조합판 잔상 PR #256(#254)을 함께 반영한 소스 `cff0cf9`다. Unity6000.6.5f1·macOS ARM64에서 별도 작업 폴더로 검사했다. 설정166개·프로토콜5652·연결 토큰 `C6PhysicsLab/15`를 사용하며 구버전 앱과 혼용하지 않는다. 기존 main의 요괴 코드·검사12개와 Scene은 바이트 단위로 유지한다.
+
+### 검토 중 보완한 내용
+
+- **#255**: 한지 PNG → `WhiteGourd.mat._PaperTex` → 기존 셸 Material 연결을 확인했다. 추가 Scene 컴포넌트 `LabPaperStage`와 참조 `paperShader` 원본은 저장소에서 찾지 못했다. 이 컴포넌트와 의미 없는 Scene 공백 변경을 제외하여 Missing Script를 방지했다. `LabPaperShadow.shader`는 보존하되 **박 움직임에 따른 그림자는 미연결**로 남기며 #243 전체 완료로 처리하지 않는다. 원본 없는 동작을 새로 설계하지 않았다.
+- **#256**: 숨긴 요청 대기 구슬을 다음 보드 프레임에서 다시 잔상 발행하던 경로와, 축소 구슬에도 원래 폭·길이를 사용하던 경로를 회귀 검사로 재현했다. 숨김/비활성 상태를 제외하고 실제 Collider 반지름으로 크기를 계산한다. ID·Rigidbody·입력·소비·물리·명중 규칙은 유지한다.
+- DEV 토글 목록 기대값에 새 `Board Orb Trail`이 누락돼 실패한 기존 검사1개를 보완했다. 항목과 OFF/ON 계약을 추가했으며 검사나 기존 기대값은 삭제하지 않았다.
+- 저장 Scene의 Missing Script·실제 Material/Texture GUID·Import·Shader 연결 검사1개, 실제 보드 pending 숨김/복원과 축소/복원 검사2개를 추가했다. PR 원래 잔상 검사3개와 기존 전체 검사를 함께 실행했다.
+
+| 확인 | 결과 | 실제 근거·범위 |
+| --- | --- | --- |
+| 원래 잔상 구현 + 새 회귀 | **3/5 통과·2실패 재현** | `repro.xml`. pending의 On이 true로 재시작, 축소 폭0.34909 기대에0.69818 관측 |
+| 첫 통합 EditMode | **795/796 통과·1실패** | `edit.xml`. 새 DEV 토글이 기존 표시 목록 기대값에 없던 검사 |
+| 보완 후 전체 EditMode | **PASS796/796** | `final-edit.xml`, 실패·생략0, 25.067초. UTC 2026-10-21 02:46:02Z~2026-10-21 02:46:27Z |
+| 보완 후 전체 PlayMode | **PASS266/266** | `final-play.xml`, 실패·생략0, 108.872초. UTC 2026-10-21 02:46:31Z~2026-10-21 02:48:20Z. 한지 실제 연결·기존 GPU/P무늬/관람·요괴12개·보드 잔상5개 포함 |
+| 실제 Mac2앱 | **PASS35/35** | `network-regression/direct-two-player/n2/summary.json`:166/5652/token15, 공유DEV ON/OFF재시작, 실제 Raw제외·직접 조합·동일ID전달·수신자 오행 잔상·실이동 진하기 증가, 정지 중 위치/진하기0/경로증가없음·재개, 실제 명중·HP/색/P맵·인벤토리·pending·기존 북 전달 확인 |
+| iOS·실제LAN/핫스팟·3~5인·가독성/모바일 성능 | **NOT_RUN** | 같은 Mac 결과로 확대하지 않음. 한지의 추가 텍스처 샘플링과 구슬 다수 잔상 비용은 기기별 미확인 |
+
+원본 Desktop 프로젝트의 사용자 Scene·Target2 Material2개·기존 미추적meta는 수정하거나 커밋하지 않는다. 별도 검증 폴더에서 Unity가 Target2 Material2개의 `_Color`를 약3e-8 범위로 재직렬화한 것은 private 사본에 보존하고 PR에서 제외한다. Runtime·Config·검사·패키지의 해시와 별도 사용자4파일 해시를 대조한다. 원시XML·로그·앱·임시 helper·개인 경로는 공개 저장소에 넣지 않는다.
+
+최종 Mac `final-preservation.json`: 검증 소스887개·원본 Desktop 사용자4파일 변경0, 임시 helper 제거, 검증 프로세스 종료, managed/runtime/shader 오류0을 확인했다. Mac loopback의 실제2앱 시험이며 DEV 북2개·자연 폭탄/콤보/건조OFF 등 통제된 fixture를 사용했다. AUTO 기본 북 배분·실기기LAN/핫스팟·3~5인·외형 만족도·모바일 성능을 검증한 것은 아니다. 소스 해시에는 검증 폴더의 Unity Material 재직렬화2건을 별도로 기록했으며 최종 PR에서는 제외한다.
+
+
+## #258 구형 원통 제거·실제 박 메시 피격 — 2026-10-21
+
+기준 main `1ec8581a`에서 분기한 `fix/#258-gourd-mesh-hitbox`다. 솔로에서도 보이는 박 외곽을 공이 통과한다는 보고에 따라 소스·저장 Scene·실제 메시를 비교했다. 기존 외형은 기본 폭 약2.493·높이2.390인데 숨겨진 Cylinder 판정은 폭1.2·높이1.8이었다. `LabGourdPaint.ApplyVisualSize`만 외형을 이동/확대하고 `LabHangingTarget`은 원통 높이를0.9로 덮어쓰던 구조가 불일치의 근거다. 원통에만 쏘던 기존 물리 검사는 이 차이를 다루지 않았다.
+
+### 변경
+
+- 저장 Scene의 같은 객체/컴포넌트 ID를 보존하며 `Hitbox Cylinder`를 `Gourd Body Hitbox`로 교체했다. Collider·기본 MeshFilter가 `PaintBody` 메시를 사용하고, 실제 White Gourd shell과 같은 위치·회전·크기를 따른다. 정상 전투에서 예전 원통을 다시 생성하지 않는다. 명시적 `CreateCylinder`는 독립 물리 검사 fixture API로만 유지한다.
+- `LabTarget.BindHitboxMesh/BindHitboxMeshes/RefreshBoundHitbox`는 같은 MeshCollider 객체를 유지한다. Paint는 실제 몸체 메시를 직접 공유하며, Crack은 선택된 실제 Shell 메시를 연결한다. 현재 Crack FBX는 Shell Renderer1개이고 Inner/Fracture도 같은 몸체에 속한다. 줄·Binding·장식은 판정에서 제외된다. 기존 Read/Write 설정을 변경하지 않았다.
+- 줄·회전은 공통 VisualMount 프레임을 움직인다. 몸체 Collider의 상대 pose/scale을 덮어쓰지 않으며 로프 부착 높이는 실제 메시로 계산한다. Crack은 이전 모드의 편심된 bounds 대신 안정된 매달림 프레임에 정렬한다.
+- Host 명중 도색 방향은 몸체 메시 로컬 hitPoint를 정규화해, 셰이더 `normalize(positionOS)`와 일치한다. 피격 이벤트의 Hitbox 로컬 좌표와 기존 물리/투척/보상 규칙을 유지한다.
+- 좌표 의미가 바뀌어 **프로토콜5653·연결 토큰 `C6PhysicsLab/16`**, 공유 설정은 기존166개다. 모든 참가자가 새 빌드를 사용해야 한다. Source Config·패키지·사용자 Scene/머터리얼을 덮어쓰지 않았다.
+
+### 실행 근거
+
+| 검사 | 결과 | 범위 |
+| --- | --- | --- |
+| Editor API Scene 변경·컴파일 | **PASS** | `GOURD258_SCENE_MIGRATED mesh=PaintBody size=1.4`, savedScene의 참조 ID 보존. 임시 마이그레이션 코드는 제거했다. |
+| 최초 집중 PlayMode | **FAIL46/51** | `c6-gourd258-focused-play.xml`,39.692초. 새 기하6건은 통과. 원통 기반 부모/높이를 가정한 기존3건, 이전 모드 bounds로 정렬한 Crack 투척1건, 원자적 생성 확률 적용이 필요했던 새 fixture1건을 보완했다. 실패 기록을 보존했다. |
+| 보완 후 집중 PlayMode | **PASS39/39** | `c6-gourd258-focused-play-2.xml`,34.711초. Paint/Crack·실제 솔로/새 기하7건·매달림 포함. 최초 실행의 Contact/Rope12건과 선택 범위가 다르므로51건 재실행으로 표현하지 않는다. |
+| 최종 전체 PlayMode | **PASS273/273** | `c6-gourd258-all-play.xml`,110.234초,03:26:06Z~03:27:56Z. 실패·생략·inconclusive0. |
+| 최종 전체 EditMode | **PASS796/796** | `c6-gourd258-all-edit.xml`,28.032초,03:28:49Z~03:29:17Z. 실패·생략·inconclusive0. |
+| Mac 다중 앱·iOS·핫스팟 실기기 | **NOT_RUN** | 이번 변경에서는 별도 앱 빌드·실기기 설치/수동 조작을 수행하지 않았다. 자동 검사 결과와 구분한다. |
+
+새 `LabGourdHitboxTests`7건은 (1)원통 부재·단일 몸체 판정, (2)크기0.5/1.4/3과 축소 시 실제 범위, (3)옛 원통 밖 좌우X±0.9·하단Y−1.2 명중, (4)240m/s·축소 공 명중 및 실제 바깥 빗나감, (5)흔들림·회전 동행, (6)Paint→Crack→Paint 전환, (7)저장 Scene 솔로 생성/상자 해금/드래그 투척 후 Host 명중·실제 접촉 위치의 도색 셀/텍스처를 확인한다. 모델 명중을 직접 주입하지 않는다. 기존 검사의 숨겨진 원통 부모/높이 가정은 실제 메시·공통 프레임 기준으로 바꾸되 동일 좌표 도색·Reset·명중/승리 검증은 유지했다.
+
+구현 위치: `LabTarget`, `LabGourdPaint`, `LabGourdCrack`, `LabHangingTarget`, `LabNetwork.OnProjectileResolved`, 저장 `Lab.unity`. 새 테스트의 구슬 크기/속도 설정은 실행 복사본에만 적용했다. 원시 XML·로그는 프로젝트 밖에 보관하고 공개 저장소에 넣지 않는다.
+
 ## 콤보 SMALL/BIG 표시와 콤보 시간 기본값 — 2026-10-21, 이슈 #257
 
-기준은 `feat/#254-board-orb-trail`(main `681d80e5` 통합본, 설정 166개·프로토콜 5652)에서 분기한 `feat/#257-combo-effect-look`이다. Unity 테스트는 실행하지 않았다. 설정 개수와 프로토콜은 바꾸지 않았다.
+기준은 `feat/#254-board-orb-trail`(main `681d80e5` 통합본, 설정 166개·프로토콜 5652)에서 분기한 `feat/#257-combo-effect-look`이다. #254·#250·#255·#258 머지 뒤 main `d690360`을 합쳤다(설정 166개·프로토콜 5653 그대로). 충돌은 `LabOrbBoard` 꼬리 크기 한 줄로, main의 실제 판 구슬 반지름(`HitSphere`) 비율에 콤보 그림 배율을 곱했다. README는 main의 새 소개문을 그대로 쓰고 #257 README 변경은 뺐다(콤보 값은 DEV 명세에 있음). Unity 테스트는 실행하지 않았다. 설정 개수와 프로토콜은 바꾸지 않았다.
 
 - **조합판 구슬 크기**: 콤보 HUD가 이 기기 플레이어의 효과(-1 SMALL, 1 BIG, 0)를 매 프레임 `LabOrbBoard.SetComboLook`으로 알리고(일시정지 중에는 유지), 판이 음양·결합 구슬에 `comboSmallScale` 0.6 / `comboBigScale` 1.4 목표를 준다. `LabOrbView.StepComboScale`은 약 0.25초에 걸쳐 그림(`Visual`)에만 배율을 곱한다. 생성·낙하·결합 연출이 그림 크기를 직접 쓰면 그 값을 새 기준으로 삼아 곱하므로 겹치거나 누적되지 않는다. `SphereCollider` 반지름·잡기·결합 거리·통신은 바꾸지 않는다. 소멸 번쩍임(#235)과 결합 구슬 꼬리(#254)도 배율을 따른다.
 - **SMALL**: 빨간 알약 배지에서 남은 초를 뺐다(`SMALL` 글자·작은 공 아이콘·줄어드는 게이지·마지막 3초 두근거림).

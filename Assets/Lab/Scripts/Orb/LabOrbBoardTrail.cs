@@ -42,7 +42,8 @@ namespace C6Lab
         public void Sync(LabOrbView orb, LabOrbAppearance look, bool enabledByDev, float boardToThrowScale)
         {
             view = orb;
-            LabElementTrailProfile wanted = enabledByDev && orb != null && orb.Kind == LabOrbKind.Combined
+            LabElementTrailProfile wanted = enabledByDev && orb != null && orb.gameObject.activeInHierarchy
+                && orb.Kind == LabOrbKind.Combined
                 && look != null ? look.ElementTrailFor(orb.Element) : null;
             float scale = boardToThrowScale * size;
             if (wanted == null)

@@ -168,6 +168,8 @@ namespace C6Lab
             EnsureTexture(Surface);
             initialized = true;
             ApplyVisualSize();
+            if (!target.BindHitboxMesh(shell.GetComponent<MeshFilter>()))
+                return FailInitialization("The visible white gourd shell could not supply its collision mesh.");
             InitializationError = null;
             RefreshPaintMap(true);
             subscribedTarget = target;
@@ -196,8 +198,13 @@ namespace C6Lab
             if (VisualInstance == null) return;
             float size = network != null && network.config != null ? network.config.GourdVisualSize : 1.4f;
             float ratio = size / 1.8f;
-            VisualInstance.transform.localScale = Vector3.one * ratio;
-            VisualInstance.transform.localPosition = Vector3.up * (.84f * (1f - ratio));
+            Vector3 scale = Vector3.one * ratio;
+            Vector3 position = Vector3.up * (.84f * (1f - ratio));
+            if (VisualInstance.transform.localScale == scale
+                && VisualInstance.transform.localPosition == position) return;
+            VisualInstance.transform.localScale = scale;
+            VisualInstance.transform.localPosition = position;
+            target.RefreshBoundHitbox();
         }
 
         private void OnHit(Vector3 localPoint, LabOrbElement element)

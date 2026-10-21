@@ -1,5 +1,7 @@
+using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace C6Lab.Tests
 {
@@ -14,6 +16,8 @@ namespace C6Lab.Tests
         private LabOrbView view;
         private LabOrbBoardTrail trail;
         private LabOrbAppearance look;
+        private GameObject boardRoot;
+        private LabConfig boardConfig;
 
         [SetUp]
         public void MakeOrb()
@@ -33,6 +37,8 @@ namespace C6Lab.Tests
         public void DestroyOrb()
         {
             if (orb != null) Object.DestroyImmediate(orb);
+            if (boardRoot != null) Object.DestroyImmediate(boardRoot);
+            if (boardConfig != null) Object.DestroyImmediate(boardConfig);
         }
 
         [Test]
@@ -95,6 +101,93 @@ namespace C6Lab.Tests
             trail.Sync(view, look, true, BoardRadius / ThrowRadius);
             Assume.That(look.ElementTrailFor(LabOrbElement.Water), Is.Not.Null);
             Assert.That(trail.Trail.Element, Is.EqualTo(LabOrbElement.Water), "A new element brings its own ink.");
+        }
+
+        [UnityTest]
+        public IEnumerator PendingLaunchStaysClearUntilRestoredAtItsApprovedBoardPosition()
+        {
+            LabOrbBoard board = CreateBoard();
+            view = board.UpsertOrb("pending-trail", LabOrbKind.Combined, new Vector2(.3f, .5f),
+                element: LabOrbElement.Fire);
+            orb = view.gameObject;
+            Rigidbody originalBody = view.Body;
+            Vector3 approvedPosition = view.Body.position;
+            yield return null;
+            trail = view.GetComponent<LabOrbBoardTrail>();
+            Assert.That(trail, Is.Not.Null, "The real board attaches the effect in LateUpdate.");
+            Assert.That(trail.On, Is.True);
+
+            Assert.That(board.BeginPendingLaunch(view.OrbId), Is.True);
+            Assert.That(view.gameObject.activeInHierarchy, Is.False);
+            // An outstanding request may later be restored to its saved position. It is not a flight.
+            view.Body.position = approvedPosition + Vector3.right;
+            yield return null;
+            yield return null;
+            Assert.That(trail.On, Is.False, "Board LateUpdate must not restart a hidden pending body's trail.");
+            Assert.That(trail.Trail.PathCount, Is.Zero);
+
+            Assert.That(board.RejectPendingLaunch(view.OrbId), Is.True);
+            yield return null;
+            Assert.That(view.Body, Is.SameAs(originalBody), "Presentation reset preserves the existing body and identity.");
+            Assert.That(view.OrbId, Is.EqualTo("pending-trail"));
+            Assert.That(view.Body.position, Is.EqualTo(approvedPosition));
+            Assert.That(trail.On, Is.True);
+            Assert.That(trail.Trail.PathCount, Is.EqualTo(1), "Restore starts a new path without a bridge from the hidden body.");
+            Assert.That(trail.Trail.GetPathPosition(0), Is.EqualTo(approvedPosition));
+            Assert.That(trail.Intensity, Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator ABlastShrunkCombinedOrbRescalesItsTrailFromTheActualColliderRadius()
+        {
+            LabOrbBoard board = CreateBoard();
+            LabElementTrailProfile authored = look.ElementTrailFor(LabOrbElement.Fire);
+            Assert.That(authored, Is.Not.Null);
+            float authoredWidth = authored.Width;
+            view = board.UpsertOrb("shrinking-trail", LabOrbKind.Combined, Vector2.one * .5f,
+                element: LabOrbElement.Fire);
+            orb = view.gameObject;
+            Rigidbody originalBody = view.Body;
+            yield return null;
+            trail = view.GetComponent<LabOrbBoardTrail>();
+            Assert.That(trail, Is.Not.Null);
+            float originalWidth = trail.Trail.Profile.Width;
+
+            board.UpsertOrb(view.OrbId, LabOrbKind.Combined, Vector2.one * .5f,
+                element: LabOrbElement.Fire, small: true);
+            yield return null;
+            Assert.That(view.HitSphere.radius, Is.LessThan(boardConfig.OrbRadius));
+            float actualScale = view.HitSphere.radius / boardConfig.ThrowRadius * trail.Size;
+            Assert.That(trail.Trail.Profile.Width, Is.EqualTo(authored.Width * actualScale).Within(1e-4f));
+            Assert.That(trail.Trail.Profile.MaxLength, Is.EqualTo(authored.MaxLength * actualScale).Within(1e-4f));
+            Assert.That(trail.Trail.Profile.Width, Is.LessThan(originalWidth));
+            Assert.That(view.Body, Is.SameAs(originalBody));
+            Assert.That(authored.Width, Is.EqualTo(authoredWidth), "A board's radius must never edit the shared flight profile.");
+
+            board.UpsertOrb(view.OrbId, LabOrbKind.Combined, Vector2.one * .5f,
+                element: LabOrbElement.Fire, small: false);
+            yield return null;
+            Assert.That(trail.Trail.Profile.Width, Is.EqualTo(originalWidth).Within(1e-4f));
+        }
+
+        private LabOrbBoard CreateBoard()
+        {
+            Object.DestroyImmediate(orb);
+            orb = null;
+            boardConfig = Object.Instantiate(Resources.Load<LabConfig>("LabConfig"));
+            boardRoot = new GameObject("Board trail integration");
+            var cameraObject = new GameObject("Board trail camera");
+            cameraObject.transform.SetParent(boardRoot.transform, false);
+            cameraObject.transform.position = new Vector3(0f, 0f, -10f);
+            var camera = cameraObject.AddComponent<Camera>();
+            camera.orthographic = true;
+            camera.enabled = false;
+            var boardObject = new GameObject("Board");
+            boardObject.transform.SetParent(boardRoot.transform, false);
+            var board = boardObject.AddComponent<LabOrbBoard>();
+            board.Configure(boardConfig, camera, new Rect(-4f, -2f, 8f, 4f));
+            board.SetInteractionEnabled(false);
+            return board;
         }
     }
 }
