@@ -644,6 +644,63 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavedSceneSoloSabotageMixAnnouncesEachCastOnTheOnePlayer()
+        {
+            yield return fixture.Load();
+
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabConfig savedConfig = network.config;
+            LabConfig mixing = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = mixing.CaptureDeveloperValues();
+            tuning[166] = 1f; // the yokai's sabotage mix (#251), every second
+            tuning[167] = 1f;
+            tuning[168] = 1f;
+            tuning[169] = 0f; // only the swipe block
+            tuning[171] = 0f;
+            tuning[172] = 0f;
+            Assert.That(mixing.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            network.config = mixing;
+            fixture.UseAvailablePort(network);
+            // Record only: an assertion thrown inside the event would interrupt the Host's snapshot.
+            var kinds = new List<LabSabotageKind>();
+            var targets = new List<ulong>();
+            var blocks = new List<bool>();
+            System.Action<LabSabotageKind, ulong> onCast = (kind, target) =>
+            {
+                kinds.Add(kind);
+                targets.Add(target);
+            };
+            System.Action<bool, float> onBlock = (right, seconds) => blocks.Add(right);
+            network.SabotageCast += onCast;
+            network.SwipeBlockStarted += onBlock;
+            try
+            {
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                float until = Time.realtimeSinceStartup + 3f;
+                while ((kinds.Count == 0 || blocks.Count == 0) && Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(kinds, Is.Not.Empty, "The mix casts after its interval.");
+                Assert.That(kinds, Is.All.EqualTo(LabSabotageKind.SwipeBlock));
+                Assert.That(targets, Is.All.EqualTo(network.LocalPlayerId), "Solo, it falls on the one player.");
+                Assert.That(blocks, Is.Not.Empty, "What it cast is the gourd's ordinary swipe block.");
+                Assert.That(network.Snapshot.SwipeBlockOn(network.LocalPlayerId), Is.True);
+
+                until = Time.realtimeSinceStartup + .5f;
+                while (Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(kinds.Count, Is.EqualTo(1),
+                    "Each cast is announced once, and no second block comes while the first still holds.");
+            }
+            finally
+            {
+                network.SabotageCast -= onCast;
+                network.SwipeBlockStarted -= onBlock;
+                network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(mixing);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator SavedSceneSoloSwipeBlockBouncesAndShowsOnTheBlockedPlayersOwnScreen()
         {
             yield return fixture.Load();

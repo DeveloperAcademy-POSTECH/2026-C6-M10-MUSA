@@ -57,6 +57,21 @@ namespace C6Lab
         }
     }
 
+    /// <summary>A sabotage the sabotage mix cast on one player (#251), and the Host time it began.</summary>
+    public readonly struct LabSabotage
+    {
+        public readonly LabSabotageKind Kind;
+        public readonly ulong Target;
+        public readonly double At;
+
+        public LabSabotage(LabSabotageKind kind, ulong target, double at)
+        {
+            Kind = kind;
+            Target = target;
+            At = at;
+        }
+    }
+
     /// <summary>
     /// Plain Host-only battle state. Transport authenticates sender IDs before calling this class;
     /// clients render copies from Snapshot and never decide ownership, damage, or expiry.
@@ -90,6 +105,13 @@ namespace C6Lab
         private const ulong DrumHandoffKey = ulong.MaxValue - 2UL;
         // 박 폭탄 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (북 자리 뽑기는 ulong.MaxValue).
         private const ulong GourdDrawKey = ulong.MaxValue - 1UL;
+        private const uint SabotageDelaySalt = 0x5AB0DE1Au;
+        private const uint SabotageKindSalt = 0x5AB0C1D5u;
+        private const uint SabotageTargetSalt = 0x5AB07A26u;
+        // 통합 방해공작 추첨도 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (#251).
+        private const ulong SabotageDrawKey = ulong.MaxValue - 4UL;
+        /// <summary>매혹은 양옆에 깨워 줄 두 사람이 따로 있어야 걸린다 (솔로는 확인용으로 허용).</summary>
+        public const int CharmMinimumPlayers = 3;
         // 박 폭탄이 떨어지는 곳: 판 너비의 20~80% 사이, 판 높이의 이 지점 (보드가 영역 안으로 맞춘다).
         private const float GourdLandingMinX = .2f, GourdLandingMaxX = .8f, GourdLandingY = .6f;
         // DEV에서 간격을 아주 작게 넣어도 한 프레임에 폭탄이 쏟아지지 않도록 하는 최소 간격.
@@ -124,6 +146,10 @@ namespace C6Lab
         private readonly List<LabGourdBomb> gourdBombs = new List<LabGourdBomb>();
         private double nextGourdBombAt;
         private uint gourdBombCount;
+        private readonly List<LabSabotage> sabotages = new List<LabSabotage>();
+        private double nextSabotageAt;
+        private uint sabotageCount;
+        private ulong lastSabotageTarget;
         private uint drumHandoffCount;
         private readonly LabGourdCombo combo = new LabGourdCombo();
         // 던진 순간의 페널티 배율 (#222). 날아가는 동안 페널티가 끝나도 그 공은 던질 때 크기 그대로 칠한다.
@@ -206,6 +232,7 @@ namespace C6Lab
             orbExpiries.Clear();
             gourdBombs.Clear();
             gourdBombTimes.Clear();
+            sabotages.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState
@@ -222,12 +249,17 @@ namespace C6Lab
             PlaceDrums(now);
             gourdBombCount = 0;
             drumHandoffCount = 0;
-            nextGourdBombAt = now + GourdBombDelay(0u);
+            // With the sabotage mix on (#251) the gourd's bombs and swipe blocks keep no timers of their own.
+            nextGourdBombAt = rules.SabotageMix ? double.PositiveInfinity : now + GourdBombDelay(0u);
             swipeBlockCount = 0;
             swipeBlockedPlayer = 0;
             swipeBlockedRight = false;
             swipeBlockStartedAt = swipeBlockedUntil = -1d;
-            nextSwipeBlockAt = rules.SwipeBlockInterval > 0f ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
+            nextSwipeBlockAt = !rules.SabotageMix && rules.SwipeBlockInterval > 0f
+                ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
+            sabotageCount = 0;
+            lastSabotageTarget = 0;
+            nextSabotageAt = rules.SabotageMix ? now + SabotageDelay(0u) : double.PositiveInfinity;
             combo.Reset();
             launchScales.Clear();
             nextComboAt = now + rules.ComboFirstStartSeconds;
@@ -684,6 +716,14 @@ namespace C6Lab
             return dropped;
         }
 
+        /// <summary>Sabotages the sabotage mix cast since the last call, each reported once (#251).</summary>
+        public LabSabotage[] DrainSabotages()
+        {
+            LabSabotage[] cast = sabotages.ToArray();
+            sabotages.Clear();
+            return cast;
+        }
+
         /// <summary>Remove an expired or missed projectile without damage or a hit reward.</summary>
         public bool ConfirmMiss(string id, double now)
         {
@@ -789,6 +829,7 @@ namespace C6Lab
                 }
                 DropGourdBombs(effectiveNow);
                 StartSwipeBlocks(effectiveNow);
+                CastSabotages(effectiveNow);
                 AdvanceCombo(effectiveNow);
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
@@ -828,23 +869,29 @@ namespace C6Lab
             while (nextGourdBombAt <= until)
             {
                 double at = nextGourdBombAt;
-                uint index = gourdBombCount++;
-                ulong target = seats[(int)(DrawFor(seed ^ GourdTargetSalt, GourdDrawKey, index) % (ulong)activeSeatCount)];
-                var landing = new Vector2(
-                    Mathf.Lerp(GourdLandingMinX, GourdLandingMaxX, Unit01(DrawFor(seed ^ GourdLandingSalt, GourdDrawKey, index))),
-                    GourdLandingY);
-                var bomb = new LabOrbState
-                {
-                    id = NewOrbId(), owner = target, kind = LabOrbKind.Bomb,
-                    lockSwipes = LockSwipesFor(seed, GourdDrawKey, index),
-                    origin = LabOrbOrigin.Gourd, originOwner = target,
-                    x = landing.x, y = landing.y, createdAt = at, revision = ++revision, inFlight = false
-                };
-                orbs.Add(bomb.id, bomb);
-                gourdBombs.Add(new LabGourdBomb(target, bomb.id, landing));
-                gourdBombTimes.Add(at);
+                DropGourdBomb(seats[(int)(DrawFor(seed ^ GourdTargetSalt, GourdDrawKey, gourdBombCount)
+                    % (ulong)activeSeatCount)], at);
                 nextGourdBombAt = at + GourdBombDelay(gourdBombCount);
             }
+        }
+
+        /// <summary>The gourd drops its next locked bomb onto this player's board.</summary>
+        private void DropGourdBomb(ulong target, double at)
+        {
+            uint index = gourdBombCount++;
+            var landing = new Vector2(
+                Mathf.Lerp(GourdLandingMinX, GourdLandingMaxX, Unit01(DrawFor(seed ^ GourdLandingSalt, GourdDrawKey, index))),
+                GourdLandingY);
+            var bomb = new LabOrbState
+            {
+                id = NewOrbId(), owner = target, kind = LabOrbKind.Bomb,
+                lockSwipes = LockSwipesFor(seed, GourdDrawKey, index),
+                origin = LabOrbOrigin.Gourd, originOwner = target,
+                x = landing.x, y = landing.y, createdAt = at, revision = ++revision, inFlight = false
+            };
+            orbs.Add(bomb.id, bomb);
+            gourdBombs.Add(new LabGourdBomb(target, bomb.id, landing));
+            gourdBombTimes.Add(at);
         }
 
         /// <summary>
@@ -913,14 +960,91 @@ namespace C6Lab
                     nextSwipeBlockAt = clear;
                     continue;
                 }
-                uint index = swipeBlockCount++;
-                swipeBlockedPlayer = seats[(int)(DrawFor(seed ^ SwipeBlockTargetSalt, SwipeBlockDrawKey, index)
-                    % (ulong)activeSeatCount)];
-                swipeBlockedRight = (DrawFor(seed ^ SwipeBlockSideSalt, SwipeBlockDrawKey, index) & 1UL) == 1UL;
-                swipeBlockStartedAt = at;
-                swipeBlockedUntil = at + rules.SwipeBlockSeconds;
+                StartSwipeBlock(seats[(int)(DrawFor(seed ^ SwipeBlockTargetSalt, SwipeBlockDrawKey, swipeBlockCount)
+                    % (ulong)activeSeatCount)], at);
                 nextSwipeBlockAt = Math.Max(at + rules.SwipeBlockInterval, swipeBlockedUntil);
             }
+        }
+
+        /// <summary>The gourd blocks one way, drawn at random, of this player's own passes.</summary>
+        private void StartSwipeBlock(ulong target, double at)
+        {
+            uint index = swipeBlockCount++;
+            swipeBlockedPlayer = target;
+            swipeBlockedRight = (DrawFor(seed ^ SwipeBlockSideSalt, SwipeBlockDrawKey, index) & 1UL) == 1UL;
+            swipeBlockStartedAt = at;
+            swipeBlockedUntil = at + rules.SwipeBlockSeconds;
+        }
+
+        /// <summary>
+        /// 요괴의 통합 방해공작 추첨 (#251): 켜 두면 박 폭탄·넘기기 막기의 각자 타이머 대신, 정해 둔 간격마다 비율이 0보다
+        /// 큰 방해공작 중 하나를 비율대로 골라 무작위 한 명에게 건다. 걸 사람이 없는 방해공작은 이번 후보에서 빠지고,
+        /// 하나도 걸 수 없으면 이번 차례는 건너뛴다. 뽑기는 seed와 순번으로 정해 모든 기기가 같은 결과를 받는다.
+        /// </summary>
+        private void CastSabotages(double until)
+        {
+            while (nextSabotageAt <= until)
+            {
+                double at = nextSabotageAt;
+                uint index = sabotageCount++;
+                nextSabotageAt = at + SabotageDelay(sabotageCount);
+                if (!TryDrawSabotage(at, index, out LabSabotageKind kind, out ulong target)) continue;
+                lastSabotageTarget = target;
+                if (kind == LabSabotageKind.GourdBomb) DropGourdBomb(target, at);
+                else if (kind == LabSabotageKind.SwipeBlock) StartSwipeBlock(target, at);
+                sabotages.Add(new LabSabotage(kind, target, at));
+            }
+        }
+
+        private bool TryDrawSabotage(double at, uint index, out LabSabotageKind kind, out ulong target)
+        {
+            kind = LabSabotageKind.GourdBomb;
+            target = 0;
+            var weights = new int[rules.SabotageWeights.Length];
+            int total = 0;
+            for (int i = 0; i < weights.Length; i++)
+                if (rules.SabotageWeights[i] > 0 && SabotageTargets((LabSabotageKind)i, at).Count > 0)
+                    total += weights[i] = rules.SabotageWeights[i];
+            if (total == 0) return false;
+            int roll = (int)(DrawFor(seed ^ SabotageKindSalt, SabotageDrawKey, index) % (ulong)total);
+            for (int i = 0; i < weights.Length; i++)
+            {
+                roll -= weights[i];
+                if (roll >= 0) continue;
+                kind = (LabSabotageKind)i;
+                List<ulong> targets = SabotageTargets(kind, at);
+                target = targets[(int)(DrawFor(seed ^ SabotageTargetSalt, SabotageDrawKey, index) % (ulong)targets.Count)];
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Who this sabotage may fall on now, in seat order. Not the player the last one fell on (unless solo),
+        /// nor one whose ways are still blocked. One swipe block at a time, and a charm only with someone on
+        /// each side to wake the charmed player (or solo, to try it out).
+        /// </summary>
+        private List<ulong> SabotageTargets(LabSabotageKind kind, double at)
+        {
+            var targets = new List<ulong>();
+            bool blocking = BlockOn(at);
+            if (kind == LabSabotageKind.SwipeBlock && blocking) return targets;
+            if (kind == LabSabotageKind.Charm && activeSeatCount > 1 && activeSeatCount < CharmMinimumPlayers) return targets;
+            for (int i = 0; i < activeSeatCount; i++)
+            {
+                ulong player = seats[i];
+                if (player == lastSabotageTarget && activeSeatCount > 1) continue;
+                if (blocking && player == swipeBlockedPlayer) continue;
+                targets.Add(player);
+            }
+            return targets;
+        }
+
+        private double SabotageDelay(uint index)
+        {
+            float delay = Mathf.Lerp(rules.SabotageIntervalMin, rules.SabotageIntervalMax,
+                Unit01(DrawFor(seed ^ SabotageDelaySalt, SabotageDrawKey, index)));
+            return Math.Max(GourdMinimumDelaySeconds, delay);
         }
 
         /// <summary>The earliest time from at that is at least the bomb gap from the gourd's bombs near it.</summary>
@@ -1124,6 +1248,10 @@ namespace C6Lab
             public readonly float GourdBombIntervalMin, GourdBombIntervalMax;
             /// <summary>The gourd's swipe block (#215): every how long, for how long, and how far from its bombs.</summary>
             public readonly float SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap;
+            /// <summary>The yokai's sabotage mix (#251): on, how often, and how likely each sabotage is.</summary>
+            public readonly bool SabotageMix;
+            public readonly float SabotageIntervalMin, SabotageIntervalMax;
+            public readonly int[] SabotageWeights;
             public readonly float[] DrumStopBounds;
             public readonly int[] DrumStopChances;
             public readonly Color[] PaintColors;
@@ -1147,6 +1275,10 @@ namespace C6Lab
                 SwipeBlockInterval = config.SwipeBlockInterval;
                 SwipeBlockSeconds = config.SwipeBlockSeconds;
                 SwipeBlockBombGap = config.SwipeBlockBombGap;
+                SabotageMix = config.SabotageMixEnabled;
+                SabotageIntervalMin = config.SabotageIntervalMin;
+                SabotageIntervalMax = config.SabotageIntervalMax;
+                SabotageWeights = config.SabotageWeights();
                 DrumStopBounds = config.DrumStopBounds();
                 DrumStopChances = config.DrumStopChances();
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];

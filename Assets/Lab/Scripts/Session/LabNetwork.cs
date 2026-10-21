@@ -188,7 +188,8 @@ namespace C6Lab
         // 5651: #246 removes unused tuning and legacy payloads, retaining AUTO; 165 shared values.
         // 5652: #254 board orb trail toggle (DEV 165); 166 shared values.
         // 5653: #258 visible gourd mesh collision and mesh-local approved paint coordinates.
-        internal const ushort LabProtocolVersion = 5653;
+        // 5654: #251 the yokai's sabotage mix announces each sabotage it casts; DEV 166-177, 178 shared values.
+        internal const ushort LabProtocolVersion = 5654;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/16");
@@ -314,6 +315,8 @@ namespace C6Lab
         private double announcedBlockStart = -1d;
         /// <summary>박이 누군가의 판에 폭탄을 떨어뜨렸을 때 모든 기기에서 한 번 알린다. (받는 사람, 폭탄 ID, 떨어질 위치 0..1)</summary>
         public event Action<ulong, string, Vector2> GourdBombDropped;
+        /// <summary>요괴가 통합 추첨으로 방해공작을 걸었을 때 모든 기기에서 한 번 알린다 (#251). (종류, 받는 사람)</summary>
+        public event Action<LabSabotageKind, ulong> SabotageCast;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
         public event Action LocalThrowMissed;
         /// <summary>내가 요청한 결합을 Host가 승인했을 때, 결합한 사람 기기에서만 한 번 알린다. (거절되면 알리지 않음)</summary>
@@ -1526,6 +1529,23 @@ namespace C6Lab
                 }
                 OnGourdBomb(drop.Target, drop.BombId, drop.Position);
             }
+            AnnounceSabotages();
+        }
+
+        /// <summary>The sabotage mix's casts go out with the gourd's bombs, before the snapshot that shows them (#251).</summary>
+        private void AnnounceSabotages()
+        {
+            foreach (LabSabotage cast in model.DrainSabotages())
+            {
+                Debug.Log("C6_LAB_SABOTAGE kind=" + cast.Kind + " target=" + cast.Target);
+                foreach (ulong id in order)
+                {
+                    if (id == manager.LocalClientId) continue;
+                    Send(id, new LabNetworkPacket { type = "sabotage", sessionId = sessionId, round = model.Round,
+                        owner = cast.Target, element = (int)cast.Kind });
+                }
+                SabotageCast?.Invoke(cast.Kind, cast.Target);
+            }
         }
 
         private void OnGourdBomb(ulong target, string bombId, Vector2 position)
@@ -1948,6 +1968,11 @@ namespace C6Lab
                 case "bombBlast":
                     if (packet.sessionId == sessionId && Finite(packet.x) && Finite(packet.y))
                         OnBombBlast(packet.firstId, new Vector2(Mathf.Clamp01(packet.x), Mathf.Clamp01(packet.y)));
+                    break;
+                case "sabotage":
+                    if (packet.sessionId == sessionId && packet.element >= (int)LabSabotageKind.GourdBomb
+                        && packet.element <= (int)LabSabotageKind.Charm)
+                        SabotageCast?.Invoke((LabSabotageKind)packet.element, packet.owner);
                     break;
                 case "gourdBomb":
                     if (packet.sessionId == sessionId && !string.IsNullOrEmpty(packet.firstId)

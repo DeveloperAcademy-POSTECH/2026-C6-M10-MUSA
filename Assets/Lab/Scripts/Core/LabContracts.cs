@@ -7,6 +7,8 @@ namespace C6Lab
     public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum }
     // Gourd is appended for bombs the gourd drops as sabotage (#177).
     public enum LabOrbOrigin { Unknown, Generated, Combined, Gourd }
+    // The yokai's sabotages the sabotage mix draws from (#251), in the order of their DEV weights. Numbers are serialized.
+    public enum LabSabotageKind { GourdBomb, SwipeBlock, FoxFire, Charm }
 
     /// <summary>
     /// How a drum handed to a neighbour arrives on its new board (#178). Stop eases it to rest at a

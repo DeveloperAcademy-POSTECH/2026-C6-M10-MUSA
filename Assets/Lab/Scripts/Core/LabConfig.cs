@@ -252,7 +252,20 @@ namespace C6Lab
             new LabDeveloperField("Combo Reward Duration (seconds)", 0f, 600f),
             new LabDeveloperField("Combo Reward Size (x)", 1f, 3f),
             new LabDeveloperField("Combo Warning (seconds)", 0f, 10f),
-            LabDeveloperField.Toggle("Board Orb Trail (0 off, 1 on)")
+            LabDeveloperField.Toggle("Board Orb Trail (0 off, 1 on)"),
+            // The yokai's sabotage mix and the nine-tailed fox's sabotages (#251). An experiment, off by default.
+            LabDeveloperField.Toggle("Sabotage Mix (0 off, 1 on)"),
+            new LabDeveloperField("Sabotage Interval Min (seconds)", 1f, 600f),
+            new LabDeveloperField("Sabotage Interval Max (seconds)", 1f, 600f),
+            new LabDeveloperField("Sabotage Weight Gourd Bomb", 0f, 10f, true),
+            new LabDeveloperField("Sabotage Weight Swipe Block", 0f, 10f, true),
+            new LabDeveloperField("Sabotage Weight Fox Fire", 0f, 10f, true),
+            new LabDeveloperField("Sabotage Weight Charm", 0f, 10f, true),
+            new LabDeveloperField("Fox Fire Count Min", 1f, 10f, true),
+            new LabDeveloperField("Fox Fire Count Max", 1f, 10f, true),
+            new LabDeveloperField("Fox Fire Safe Seconds", 0f, 3f),
+            new LabDeveloperField("Charm Seconds", 1f, 30f),
+            new LabDeveloperField("Charm Rescue Taps (0 = none)", 0f, 10f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -284,7 +297,8 @@ namespace C6Lab
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
                 134, 132, 133, 148, 149, 150, 151),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
-            new LabDeveloperCategory("Combo", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163)
+            new LabDeveloperCategory("Combo", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163),
+            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177)
         });
 
 
@@ -485,6 +499,27 @@ namespace C6Lab
         [SerializeField, Range(1f, 60f)] private float swipeBlockSeconds = 10f;
         [Tooltip("넘기기 막기가 박 폭탄과 최소 이만큼 떨어져 시작한다 (초). 가까우면 그 폭탄 뒤로 미룬다.")]
         [SerializeField, Range(0f, 15f)] private float swipeBlockBombGap = 4f;
+
+        [Header("Sabotage mix (#251)")]
+        [Tooltip("요괴의 통합 방해공작 추첨. 켜면 박 폭탄·넘기기 막기의 각자 타이머를 멈추고, 아래 간격마다 켜진 방해공작 중 하나를 비율대로 골라 무작위 한 명에게 건다. 실험이라 기본은 끔.")]
+        [SerializeField] private bool sabotageMixEnabled;
+        [Tooltip("통합 추첨 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다.")]
+        [SerializeField, Range(1f, 600f)] private float sabotageIntervalMin = 20f;
+        [SerializeField, Range(1f, 600f)] private float sabotageIntervalMax = 30f;
+        [Tooltip("방해공작별 비율. 0이면 후보에서 뺀다.")]
+        [SerializeField, Range(0, 10)] private int sabotageWeightGourdBomb = 1;
+        [SerializeField, Range(0, 10)] private int sabotageWeightSwipeBlock = 1;
+        [SerializeField, Range(0, 10)] private int sabotageWeightFoxFire = 1;
+        [SerializeField, Range(0, 10)] private int sabotageWeightCharm = 1;
+        [Tooltip("여우불: 한 번에 떨어지는 여우구슬 개수의 최소·최대. 판이 거의 차 있으면 빈 칸 수만큼만 떨어진다.")]
+        [SerializeField, Range(1, 10)] private int foxFireCountMin = 2;
+        [SerializeField, Range(1, 10)] private int foxFireCountMax = 5;
+        [Tooltip("여우불: 떨어진 뒤 이 시간 (초) 동안은 음·양과 닿아도 조합되지 않는다.")]
+        [SerializeField, Range(0f, 3f)] private float foxFireSafeSeconds = 1f;
+        [Tooltip("매혹: 공격(위로 던지기)을 못 하는 시간 (초).")]
+        [SerializeField, Range(1f, 30f)] private float charmSeconds = 10f;
+        [Tooltip("매혹: 양옆 사람이 합쳐 이만큼 하트 말풍선을 누르면 바로 풀린다. 0이면 시간으로만 풀린다.")]
+        [SerializeField, Range(0, 10)] private int charmRescueTaps = 3;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -792,6 +827,20 @@ namespace C6Lab
         public float SwipeBlockInterval => Mathf.Clamp(Finite(swipeBlockInterval, 40f), 0f, 600f);
         public float SwipeBlockSeconds => Mathf.Clamp(Finite(swipeBlockSeconds, 10f), 1f, 60f);
         public float SwipeBlockBombGap => Mathf.Clamp(Finite(swipeBlockBombGap, 4f), 0f, 15f);
+        public bool SabotageMixEnabled => sabotageMixEnabled;
+        public float SabotageIntervalMin => Mathf.Clamp(Finite(sabotageIntervalMin, 20f), 1f, 600f);
+        public float SabotageIntervalMax => Mathf.Clamp(Finite(sabotageIntervalMax, 30f), SabotageIntervalMin, 600f);
+        /// <summary>How often the sabotage mix draws each sabotage, in <see cref="LabSabotageKind"/> order (#251).</summary>
+        public int[] SabotageWeights() => new[]
+        {
+            Mathf.Clamp(sabotageWeightGourdBomb, 0, 10), Mathf.Clamp(sabotageWeightSwipeBlock, 0, 10),
+            Mathf.Clamp(sabotageWeightFoxFire, 0, 10), Mathf.Clamp(sabotageWeightCharm, 0, 10)
+        };
+        public int FoxFireCountMin => Mathf.Clamp(foxFireCountMin, 1, 10);
+        public int FoxFireCountMax => Mathf.Clamp(foxFireCountMax, FoxFireCountMin, 10);
+        public float FoxFireSafeSeconds => Mathf.Clamp(Finite(foxFireSafeSeconds, 1f), 0f, 3f);
+        public float CharmSeconds => Mathf.Clamp(Finite(charmSeconds, 10f), 1f, 30f);
+        public int CharmRescueTaps => Mathf.Clamp(charmRescueTaps, 0, 10);
         public LabOrbAppearance OrbAppearance => orbAppearance;
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
@@ -852,6 +901,7 @@ namespace C6Lab
             int[] chances = GenerationChances();
             float[] stopBounds = DrumStopBounds();
             int[] stopChances = DrumStopChances();
+            int[] sabotageWeights = SabotageWeights();
             return new[]
             {
                 (float)MonsterMaxHp, (float)Damage, BattleDurationSeconds,
@@ -915,7 +965,10 @@ namespace C6Lab
                 ComboTimeLimitSeconds, ComboPenaltyDurationSeconds, ComboPenaltySizeScale,
                 ComboPenaltyThrowerOnly ? 1f : 0f, ComboRewardDurationSeconds, ComboRewardSizeScale,
                 ComboWarningSeconds,
-                BoardOrbTrailEnabled ? 1f : 0f
+                BoardOrbTrailEnabled ? 1f : 0f,
+                SabotageMixEnabled ? 1f : 0f, SabotageIntervalMin, SabotageIntervalMax,
+                sabotageWeights[0], sabotageWeights[1], sabotageWeights[2], sabotageWeights[3],
+                FoxFireCountMin, FoxFireCountMax, FoxFireSafeSeconds, CharmSeconds, CharmRescueTaps
             };
         }
 
@@ -960,6 +1013,8 @@ namespace C6Lab
             { error = "Drum stop zone edges must go from near to far (from <= to)."; return false; }
             float drumStopTotal = values[94] + values[95] + values[96] + values[97];
             if (drumStopTotal != 100f) { error = "Drum stop chances must add up to 100 (now " + drumStopTotal + ")."; return false; }
+            if (values[167] > values[168]) { error = "Sabotage Interval Min cannot exceed Sabotage Interval Max."; return false; }
+            if (values[173] > values[174]) { error = "Fox Fire Count Min cannot exceed Fox Fire Count Max."; return false; }
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
@@ -1119,6 +1174,18 @@ namespace C6Lab
             comboRewardSizeScale = values[163];
             comboWarningSeconds = values[164];
             boardOrbTrailEnabled = values[165] >= .5f;
+            sabotageMixEnabled = values[166] >= .5f;
+            sabotageIntervalMin = values[167];
+            sabotageIntervalMax = values[168];
+            sabotageWeightGourdBomb = (int)values[169];
+            sabotageWeightSwipeBlock = (int)values[170];
+            sabotageWeightFoxFire = (int)values[171];
+            sabotageWeightCharm = (int)values[172];
+            foxFireCountMin = (int)values[173];
+            foxFireCountMax = (int)values[174];
+            foxFireSafeSeconds = values[175];
+            charmSeconds = values[176];
+            charmRescueTaps = (int)values[177];
             error = string.Empty;
             return true;
         }

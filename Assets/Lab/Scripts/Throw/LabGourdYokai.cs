@@ -11,7 +11,8 @@ namespace C6Lab
     /// 때 나오고 들어간다. 평소 반복은 기기마다 따로 돈다(이전과 같음). 화면 표시만 하며 판정에 관여하지 않는다.
     /// 박이 폭탄을 떨어뜨리면(#250, 각 기기가 수신하는 `GourdBombDropped`) "!" 말풍선이 떠 있는 동안
     /// 평소보다 빠르게 쏙 올라와 톡 튀고 두리번거린다. 콤보 중이면 들어가지 않고 톡 튀기만 하며, 콤보와 폭탄이
-    /// 둘 다 끝나야 들어간다.
+    /// 둘 다 끝나야 들어간다. 통합 방해공작 추첨(#251)이 넘기기 막기·여우불·매혹을 걸 때도 똑같이 나온다
+    /// (폭탄은 위의 `GourdBombDropped`로 이미 나온다).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabGourdYokai : MonoBehaviour
@@ -81,12 +82,25 @@ namespace C6Lab
         public void Bind(LabNetwork target)
         {
             if (network == target) return;
-            if (network != null) network.GourdBombDropped -= OnGourdBombDropped;
+            if (network != null)
+            {
+                network.GourdBombDropped -= OnGourdBombDropped;
+                network.SabotageCast -= OnSabotageCast;
+            }
             network = target;
-            if (network != null) network.GourdBombDropped += OnGourdBombDropped;
+            if (network != null)
+            {
+                network.GourdBombDropped += OnGourdBombDropped;
+                network.SabotageCast += OnSabotageCast;
+            }
         }
 
         private void OnGourdBombDropped(ulong targetPlayer, string bombId, Vector2 landing) => BombDropped();
+
+        private void OnSabotageCast(LabSabotageKind kind, ulong targetPlayer)
+        {
+            if (kind != LabSabotageKind.GourdBomb) BombDropped();
+        }
 
         /// <summary>박이 폭탄을 떨어뜨렸다: 말풍선이 떠 있는 동안 나와 있고, 다 올라오면 톡 튄다.</summary>
         public void BombDropped()
@@ -304,7 +318,9 @@ namespace C6Lab
 
         private void OnDestroy()
         {
-            if (network != null) network.GourdBombDropped -= OnGourdBombDropped;
+            if (network == null) return;
+            network.GourdBombDropped -= OnGourdBombDropped;
+            network.SabotageCast -= OnSabotageCast;
         }
 
         private void OnDisable()
