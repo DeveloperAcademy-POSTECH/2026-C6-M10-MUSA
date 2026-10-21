@@ -28,6 +28,7 @@ namespace C6Lab
         public ulong charmedPlayer;
         public double charmStartedAt = -1d, charmUntil = -1d;
         public int charmTaps;
+        public LabJigwiState[] jigwi = Array.Empty<LabJigwiState>();
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
         public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
 
@@ -37,6 +38,7 @@ namespace C6Lab
             copy.states = Array.Empty<LabOrbState>();
             copy.removedIds = Array.Empty<string>();
             copy.players = Array.Empty<LabPlayerState>();
+            copy.jigwi = LabJigwiNetworkValidation.Copy(jigwi);
             return copy;
         }
     }
@@ -97,6 +99,7 @@ namespace C6Lab
                 swipeBlockStartedAt = snapshot.swipeBlockStartedAt, swipeBlockedUntil = snapshot.swipeBlockedUntil,
                 charmedPlayer = snapshot.charmedPlayer, charmStartedAt = snapshot.charmStartedAt,
                 charmUntil = snapshot.charmUntil, charmTaps = snapshot.charmTaps,
+                jigwi = LabJigwiNetworkValidation.Copy(snapshot.jigwi),
                 targetYawDegrees = snapshot.targetYawDegrees,
                 targetYawSpeedDegreesPerSecond = snapshot.targetYawSpeedDegreesPerSecond,
                 targetRopeCycleElapsed = snapshot.targetRopeCycleElapsed,
@@ -116,7 +119,9 @@ namespace C6Lab
             && a.lockSwipes == b.lockSwipes && a.relayStage == b.relayStage && a.origin == b.origin
             && a.originOwner == b.originOwner && a.createdAt == b.createdAt && a.unlockedAt == b.unlockedAt
             && a.inFlight == b.inFlight && a.arrival == b.arrival && a.stopAt == b.stopAt
-            && a.arrivedAt == b.arrivedAt && a.burnedAt == b.burnedAt && a.small == b.small;
+            && a.arrivedAt == b.arrivedAt && a.burnedAt == b.burnedAt && a.small == b.small
+            && a.jigwiRadiusScale == b.jigwiRadiusScale && a.expiresAt == b.expiresAt
+            && a.jigwiSupply == b.jigwiSupply && a.jigwiGenerationBurn == b.jigwiGenerationBurn;
 
         internal static LabPlayerState[] CopyPlayers(LabPlayerState[] players) =>
             (players ?? Array.Empty<LabPlayerState>()).Select(player => player?.Copy()).ToArray();
@@ -249,6 +254,7 @@ namespace C6Lab
                 copy.swipeBlockStartedAt = header.swipeBlockStartedAt; copy.swipeBlockedUntil = header.swipeBlockedUntil;
                 copy.charmedPlayer = header.charmedPlayer; copy.charmStartedAt = header.charmStartedAt;
                 copy.charmUntil = header.charmUntil; copy.charmTaps = header.charmTaps;
+                copy.jigwi = LabJigwiNetworkValidation.Copy(header.jigwi);
                 copy.targetYawDegrees = header.targetYawDegrees;
                 copy.targetYawSpeedDegreesPerSecond = header.targetYawSpeedDegreesPerSecond;
                 copy.targetRopeCycleElapsed = header.targetRopeCycleElapsed;
@@ -307,6 +313,7 @@ namespace C6Lab
             && Finite(frame.charmStartedAt) && Finite(frame.charmUntil) && frame.charmTaps >= 0
             && Finite(frame.targetYawDegrees) && Finite(frame.targetYawSpeedDegreesPerSecond)
             && Finite(frame.targetRopeCycleElapsed) && Finite(frame.targetRopeHitOffset) && Finite(frame.targetRopeHitVelocity)
+            && LabJigwiNetworkValidation.Valid(frame.jigwi)
             && ValidStates(frame.states, true) && ValidRemoved(frame.removedIds) && ValidPlayers(frame.players);
 
         private bool ValidStates(LabOrbState[] values, bool forThisOwner)
@@ -323,6 +330,8 @@ namespace C6Lab
                     || !Unit(state.x) || !Unit(state.y) || !Finite(state.vx) || !Finite(state.vy)
                     || !Finite(state.createdAt) || state.createdAt < 0d || !Finite(state.unlockedAt)
                     || !Finite(state.arrivedAt) || !Finite(state.burnedAt) || !Finite(state.stopAt)
+                    || !Finite(state.jigwiRadiusScale) || state.jigwiRadiusScale <= 0f || state.jigwiRadiusScale > 1f
+                    || !Finite(state.expiresAt) || state.expiresAt < -1d
                     || state.arrival < LabDrumArrival.None || state.arrival > LabDrumArrival.Coast
                     || (forThisOwner && !state.kind.IsDrum() && state.owner != owner)) return false;
                 if (state.kind.IsDrum() && ++drums > MaximumDrums) return false;
@@ -367,6 +376,7 @@ namespace C6Lab
             swipeBlockedRight = source.swipeBlockedRight, swipeBlockStartedAt = source.swipeBlockStartedAt,
             swipeBlockedUntil = source.swipeBlockedUntil, charmedPlayer = source.charmedPlayer,
             charmStartedAt = source.charmStartedAt, charmUntil = source.charmUntil, charmTaps = source.charmTaps,
+            jigwi = LabJigwiNetworkValidation.Copy(source.jigwi),
             comboActive = source.comboActive,
             comboColors = source.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboColors.Clone(),
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,

@@ -34,6 +34,8 @@ namespace C6Lab
         public long requestId;
         public string firstId;
         public string secondId;
+        /// <summary>True only for owner-local passive contact combination, not a player release.</summary>
+        public bool passiveCombine;
         /// <summary>The orbs a blast flung, in a holder's blastHit report (#213).</summary>
         public string[] ids;
         /// <summary>A projectile thrown from a blast-shrunk orb (#213).</summary>
@@ -191,14 +193,15 @@ namespace C6Lab
         // 5654: #251 the yokai's sabotage mix announces each sabotage it casts, and fox fire adds the FoxFire orb
         //       kind with its foxFire drop and fox touch messages, and the charm travels in the snapshot and board
         //       header with charmTap wake-ups from the players beside and a charmWoken notice; DEV 166-177, 178 shared values.
-        // 5655: #268 the yaguang-gwi's flash settings (DEV 178-184); 185 shared values.
-        internal const ushort LabProtocolVersion = 5655;
+        // 5655: #272 per-player Jigwi fire targets, overheat consumption and generated Raw burn metadata; DEV 178-183.
+        // 5656: #268 merged after #272; the yaguang-gwi's flash settings move to DEV 184-190; 191 shared values.
+        internal const ushort LabProtocolVersion = 5656;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/16");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/17");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -413,6 +416,7 @@ namespace C6Lab
                 board.ThrowRequested += OnThrowRequested;
                 board.UseRequested += OnUseRequested;
                 board.DrumTapped += Generate;
+                board.JigwiBurnRequested += OnJigwiBurnRequested;
             }
             if (manager != null)
             {
@@ -1214,6 +1218,7 @@ namespace C6Lab
                 SampleHostPaintFlow(battleClock.Now(now));
                 if (now >= nextSnapshotAt) PublishSnapshot(false);
             }
+            SyncJigwiFireSurfaces();
             FlushPendingBlastReports(now);
             FlushBoardActions(now);
             FlushBulkPackets();
@@ -1709,6 +1714,8 @@ namespace C6Lab
             float sizeScale = model != null ? model.LaunchScaleOf(orb.id) : 1f;
             projectile.SetRadiusScale(sizeScale);
             projectile.SetMissSurface(battleFloor);
+            SyncJigwiFireSurfaces();
+            projectile.SetFireSurfaces(JigwiFireSurfacesFor(orb.owner));
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 round = model.Round, requestId = actionId,
@@ -1742,7 +1749,13 @@ namespace C6Lab
         {
             if (!IsHost || model == null) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
-            if (result.Hit)
+            if (result.Kind == LabProjectileHitKind.Fire)
+            {
+                if (!model.ConfirmJigwiFireHit(result.ProjectileId, result.FireId, result.FireTargetId, now, out bool extinguished))
+                    model.ConfirmMiss(result.ProjectileId, now);
+                SetNotice(extinguished ? "Water extinguished a flame." : "Only a Water Combined orb extinguishes fire.");
+            }
+            else if (result.Hit)
             {
                 // The paint shader samples normalized mesh-local positions, including the shell's
                 // size and offset. The bound hitbox shares that exact mesh and transform.
@@ -1800,6 +1813,7 @@ namespace C6Lab
 
         private void SyncBoard()
         {
+            SyncJigwiFireSurfaces();
             if (board == null || latest == null) return;
             var current = new HashSet<string>();
             foreach (var orb in latest.orbs ?? Array.Empty<LabOrbState>())
@@ -1816,10 +1830,13 @@ namespace C6Lab
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
                     orb.JustUnlocked(latest.serverTime), small: orb.small,
                     // Every screen counts the blast fire down from the same Host clock (#213).
-                    burnSeconds: config != null ? orb.BurnSecondsLeft(latest.serverTime, config.BlastBurnSeconds) : 0f,
+                    burnSeconds: config != null ? Mathf.Max(orb.BurnSecondsLeft(latest.serverTime, config.BlastBurnSeconds),
+                        orb.jigwiGenerationBurn && orb.kind.IsRaw()
+                            ? orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds) : 0f) : 0f,
                     // The white flash before an orb runs out (#235); a locked bomb shows its own red one.
                     lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
-                        : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds));
+                        : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
+                    jigwiScale: orb.jigwiRadiusScale);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
@@ -1844,6 +1861,8 @@ namespace C6Lab
             // The fox's charm (#251) stops throws and shows its haze only on the charmed player's own board.
             bool charmedHere = latest.CharmOn(LocalPlayerId);
             board.SetCharm(charmedHere ? (float)(latest.charmUntil - latest.serverTime) : 0f);
+            board.SetJigwiOverheat(latest.phase == LabPhase.Playing
+                && latest.JigwiFor(LocalPlayerId)?.Overheated(latest.serverTime) == true);
             if (blockedHere && (latest.round != announcedBlockRound || latest.swipeBlockStartedAt != announcedBlockStart))
             {
                 announcedBlockRound = latest.round;
@@ -1871,7 +1890,8 @@ namespace C6Lab
         private void OnCombineRequested(string firstId, string secondId, Vector2 center, Vector2 velocity)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y, vx = velocity.x, vy = velocity.y });
+            Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y, vx = velocity.x, vy = velocity.y,
+                passiveCombine = board != null && board.IsContactCombineRequest });
         }
 
         /// <summary>매혹 (#251): 하트 말풍선을 눌러 옆 사람을 깨우는 한 번을 Host에 보낸다. 셈은 Host가 한다.</summary>
@@ -2101,6 +2121,8 @@ namespace C6Lab
                             packet.small ? config.BlastShrinkScale : 1f);
                         if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetMissSurface(battleFloor);
+                        SyncJigwiFireSurfaces();
+                        visual.SetFireSurfaces(JigwiFireSurfacesFor(packet.owner));
                         visual.LaunchVisual(velocity, config, target);
                     }
                     break;
@@ -2216,7 +2238,8 @@ namespace C6Lab
             try { snapshot = JsonUtility.FromJson<LabSnapshot>(json); }
             catch (Exception) { return; }
             if (snapshot == null || snapshot.sessionId != packet.sessionId
-                || snapshot.players == null || snapshot.players.Length != targetParticipantCount) return;
+                || snapshot.players == null || snapshot.players.Length != targetParticipantCount
+                || !LabJigwiNetworkValidation.Valid(snapshot.jigwi)) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
             if (!PaintReceiver.Matches(snapshot))
             {
@@ -2563,6 +2586,7 @@ namespace C6Lab
                 board.ThrowRequested -= OnThrowRequested;
                 board.UseRequested -= OnUseRequested;
                 board.DrumTapped -= Generate;
+                board.JigwiBurnRequested -= OnJigwiBurnRequested;
             }
             if (manager != null)
             {

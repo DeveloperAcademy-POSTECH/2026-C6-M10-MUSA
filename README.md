@@ -92,3 +92,8 @@ Apple Developer Academy @ POSTECH
 | Game Developer & Project Manager  | Game Developer & Art | Game Developer & Sound | Game Developer & Game Director  |  Game Developer & Art | Game Developer & Art |
 
 ---
+
+
+### 개발용 지귀 패턴 시험 (#272)
+
+기존 `Lab.unity` 전투에서 Host 또는 솔로의 **JIGWI DEV** 버튼으로 화재 도전·생성 Raw 화상을 수동 발동할 수 있습니다. 대상 P번호와 **Jigwi** DEV 수치를 조절하는 방법은 [지귀 패턴 안내](docs/JIGWI_PATTERNS.md)를 참고하세요. 실제 기기별 실행 결과는 [검증 기록](docs/VALIDATION.md)에 구분합니다.
