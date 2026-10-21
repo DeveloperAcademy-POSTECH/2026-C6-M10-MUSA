@@ -37,6 +37,9 @@ namespace C6Lab.Tests
             Assert.That(paint.target, Is.SameAs(paint.network.target));
             Assert.That(paint.VisualInstance, Is.SameAs(paint.target.MountedVisual));
             Assert.That(paint.VisualInstance.activeInHierarchy, Is.True);
+            var yokai = paint.VisualInstance.GetComponent<LabGourdYokai>();
+            Assert.That(yokai, Is.Not.Null, "The paint gourd brings its yokai along for combos (#244).");
+            Assert.That(yokai.Ready, Is.True);
             Assert.That(paint.Shell.IsChildOf(paint.VisualInstance.transform), Is.True);
             Assert.That(paint.Shell.GetComponent<Renderer>().sharedMaterial, Is.SameAs(paint.paintMaterial));
             Assert.That(paint.paintMaterial.shader.isSupported, Is.True);
