@@ -12,8 +12,8 @@ namespace C6Lab.Tests
     /// <summary>Saved Canvas and real local Host boundaries; no synthetic remote ACK or device claim.</summary>
     public sealed class LabPaintPatternDeveloperTests
     {
-        private const int ViewerField = 111;
-        private const int PlayerPatternsField = 142;
+        private const int ViewerField = 110;
+        private const int PlayerPatternsField = 137;
         private LabDeveloperMode ui;
         private string sourceJson;
 
@@ -25,8 +25,8 @@ namespace C6Lab.Tests
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(170), "The live DEV panel includes all appended settings, including nearby-hit drying.");
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(170), "Every DEV field keeps its corresponding control slot.");
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(165), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(165), "Every DEV field keeps its corresponding control slot.");
         }
 
         [UnityTearDown]
@@ -48,23 +48,23 @@ namespace C6Lab.Tests
         {
             ui.Open();
             var category = ui.panel.GetComponentsInChildren<Button>(true).Single(button => button.name == "Category Gourd");
-            Transform row = ui.valueInputs[139].transform.parent;
+            Transform row = ui.valueInputs[134].transform.parent;
             Assert.That(row.gameObject.activeSelf, Is.False);
             category.onClick.Invoke();
             Assert.That(row.gameObject.activeInHierarchy, Is.True);
-            Assert.That(ui.valueInputs[139].gameObject.activeSelf, Is.False);
-            Assert.That(ui.valueSliders[139].interactable, Is.False);
+            Assert.That(ui.valueInputs[134].gameObject.activeSelf, Is.False);
+            Assert.That(ui.valueSliders[134].interactable, Is.False);
             Button[] choices = Choices();
             Assert.That(choices.Select(button => button.GetComponentInChildren<Text>().text),
                 Is.EqualTo(new[] { "LEGACY", "BROAD", "SPLATTER", "FLOW" }));
             Assert.That(choices.All(button => button.interactable), Is.True);
-            Assert.That(ui.valueInputs[139].text, Is.EqualTo("2"));
-            Button legacyStyle = ui.valueInputs[133].transform.parent.Find("SettingSlider/SettingToggle").GetComponent<Button>();
+            Assert.That(ui.valueInputs[134].text, Is.EqualTo("2"));
+            Button legacyStyle = ui.valueInputs[132].transform.parent.Find("SettingSlider/SettingToggle").GetComponent<Button>();
             Assert.That(legacyStyle.interactable, Is.False);
             for (int pattern = 0; pattern < 4; pattern++)
             {
                 choices[pattern].onClick.Invoke();
-                Assert.That(ui.valueInputs[139].text, Is.EqualTo(pattern.ToString()));
+                Assert.That(ui.valueInputs[134].text, Is.EqualTo(pattern.ToString()));
                 Assert.That(legacyStyle.interactable, Is.EqualTo(pattern == 0));
                 Assert.That(ui.network.config.PaintPattern, Is.EqualTo(LabPaintPattern.Splatter), "A button selection is not APPLY.");
                 Color selected = ((Image)choices[pattern].targetGraphic).color;
@@ -73,7 +73,7 @@ namespace C6Lab.Tests
                     "The accepted draft choice must be visually distinguishable.");
             }
             ui.defaultsButton.onClick.Invoke();
-            Assert.That(ui.valueInputs[139].text, Is.EqualTo("2"));
+            Assert.That(ui.valueInputs[134].text, Is.EqualTo("2"));
             Assert.That(legacyStyle.interactable, Is.False);
             Assert.That(JsonUtility.ToJson(ui.sourceConfig), Is.EqualTo(sourceJson));
             Assert.That(ui.network.Snapshot, Is.Null);
@@ -120,7 +120,7 @@ namespace C6Lab.Tests
             Assert.That(ui.network.Snapshot, Is.Null);
             ui.Open(); Choices()[3].onClick.Invoke();
             Assert.That(ui.network.config.PaintPattern, Is.EqualTo(LabPaintPattern.Broad));
-            ui.valueInputs[139].text = "4";
+            ui.valueInputs[134].text = "4";
             ui.applyHostButton.onClick.Invoke();
             Assert.That(ui.feedbackText.text, Does.Contain("Paint Pattern"));
             Assert.That(ui.network.config.PaintPattern, Is.EqualTo(LabPaintPattern.Broad));
@@ -145,7 +145,7 @@ namespace C6Lab.Tests
             ui.closeButton.onClick.Invoke();
             ui.Open();
             yield return null;
-            Assert.That(ui.valueInputs[139].text, Is.EqualTo("2"));
+            Assert.That(ui.valueInputs[134].text, Is.EqualTo("2"));
             Assert.That(Choices()[0].transform.parent, Is.SameAs(choiceParent));
             Assert.That(choiceParent.childCount, Is.EqualTo(count));
             Assert.That(count, Is.EqualTo(4));
@@ -287,7 +287,7 @@ namespace C6Lab.Tests
             Assert.That(config.PlayerPaintPatternsEnabled, Is.EqualTo(patternsEnabled));
         }
 
-        private Button[] Choices() => Enumerable.Range(0, 4).Select(option => ui.valueInputs[139].transform.parent
+        private Button[] Choices() => Enumerable.Range(0, 4).Select(option => ui.valueInputs[134].transform.parent
             .Find("SettingSlider/SettingChoices/Choice" + option).GetComponent<Button>()).ToArray();
         private LabModel Model() => (LabModel)typeof(LabNetwork).GetField("model", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(ui.network);
     }

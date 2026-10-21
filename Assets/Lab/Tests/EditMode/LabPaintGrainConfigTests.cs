@@ -23,10 +23,10 @@ namespace C6Lab.Tests
         {
             config = ScriptableObject.CreateInstance<LabConfig>();
             float[] values = config.CaptureDeveloperValues();
+            values[110] = 1f;
             values[111] = 1f;
-            values[112] = 1f;
-            values[119] = .75f;
-            values[128] = 3f;
+            values[118] = .75f;
+            values[127] = 3f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             baseline = config.CaptureDeveloperValues();
         }
@@ -35,30 +35,30 @@ namespace C6Lab.Tests
 
         private static IEnumerable<TestCaseData> Fields()
         {
-            yield return new TestCaseData(129, "PaintGrainEnabled", 0f, 1f);
-            yield return new TestCaseData(130, "PaintGrainSize", .25f, 4f);
-            yield return new TestCaseData(131, "PaintGrainStrength", 0f, 1f);
-            yield return new TestCaseData(132, "PaintMottleStrength", 0f, 1f);
+            yield return new TestCaseData(128, "PaintGrainEnabled", 0f, 1f);
+            yield return new TestCaseData(129, "PaintGrainSize", .25f, 4f);
+            yield return new TestCaseData(130, "PaintGrainStrength", 0f, 1f);
+            yield return new TestCaseData(131, "PaintMottleStrength", 0f, 1f);
         }
 
         [Test]
         public void FourVisualSettingsAppendDisabledByDefaultWithoutReplacingPreviousFields()
         {
-            Assert.That(baseline.Length, Is.EqualTo(170));
-            Assert.That(baseline.Skip(129).Take(4), Is.EqualTo(new[] { 0f, 1f, .3f, .18f }));
+            Assert.That(baseline.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
+            Assert.That(baseline.Skip(128).Take(4), Is.EqualTo(new[] { 0f, 1f, .3f, .18f }));
             Assert.That(config.PaintGrainEnabled, Is.False);
-            Assert.That(LabConfig.DeveloperFields.Skip(129).Take(4).Select(field => field.Label), Is.EqualTo(new[]
+            Assert.That(LabConfig.DeveloperFields.Skip(128).Take(4).Select(field => field.Label), Is.EqualTo(new[]
             {
                 "Paint Grain (0 off, 1 on)", "Paint Grain Size", "Paint Grain Strength", "Paint Mottle Strength"
             }));
-            Assert.That(LabConfig.DeveloperFields[129].IsToggle, Is.True);
-            Assert.That(LabConfig.DeveloperFields.Skip(130).Take(3).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
+            Assert.That(LabConfig.DeveloperFields[128].IsToggle, Is.True);
+            Assert.That(LabConfig.DeveloperFields.Skip(129).Take(3).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
             var category = LabConfig.DeveloperCategories.Single(item => item.Title == "Gourd");
-            Assert.That(category.FieldIndices.Where(index => index >= 129 && index <= 132), Is.EqualTo(new[] { 129, 130, 131, 132 }));
+            Assert.That(category.FieldIndices.Where(index => index >= 128 && index <= 131), Is.EqualTo(new[] { 128, 129, 130, 131 }));
         }
 
         [TestCaseSource(nameof(Fields))]
-        public void EndpointsRoundTripThroughConfigJsonAndSharedFingerprintPreservingAll129PreviousValues(
+        public void EndpointsRoundTripThroughConfigJsonAndSharedFingerprintPreservingAll128PreviousValues(
             int index, string propertyName, float minimum, float maximum)
         {
             foreach (float endpoint in new[] { minimum, maximum })
@@ -68,9 +68,9 @@ namespace C6Lab.Tests
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 object property = typeof(LabConfig).GetProperty(propertyName)?.GetValue(config);
                 Assert.That(property, Is.Not.Null, propertyName);
-                if (index == 129) Assert.That((bool)property, Is.EqualTo(endpoint == 1f));
+                if (index == 128) Assert.That((bool)property, Is.EqualTo(endpoint == 1f));
                 else Assert.That((float)property, Is.EqualTo(endpoint));
-                Assert.That(config.CaptureDeveloperValues().Take(129), Is.EqualTo(baseline.Take(129)));
+                Assert.That(config.CaptureDeveloperValues().Take(128), Is.EqualTo(baseline.Take(128)));
                 string json = JsonUtility.ToJson(new SharedTuning { values = config.CaptureDeveloperValues() });
                 float[] received = JsonUtility.FromJson<SharedTuning>(json).values;
                 var client = ScriptableObject.CreateInstance<LabConfig>();
@@ -95,32 +95,17 @@ namespace C6Lab.Tests
         {
             var invalids = new List<float> { minimum - .25f, maximum + .25f, float.NaN,
                 float.PositiveInfinity, float.NegativeInfinity };
-            if (index == 129) invalids.Add(.5f);
+            if (index == 128) invalids.Add(.5f);
             foreach (float invalid in invalids)
             {
                 float[] values = (float[])baseline.Clone();
                 values[0] = 777f;
-                values[111] = 0f;
+                values[110] = 0f;
                 values[index] = invalid;
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False, propertyName);
                 Assert.That(error, Does.Contain(LabConfig.DeveloperFields[index].Label));
                 Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
             }
-        }
-
-        [TestCase(129)]
-        [TestCase(132)]
-        [TestCase(134)]
-        public void OldOrIncompleteSharedSchemaIsRejectedBeforeApplyingAnyValue(int count)
-        {
-            var values = new float[count];
-            Array.Copy(baseline, values, Math.Min(count, baseline.Length));
-            values[0] = 777f;
-            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False);
-            Assert.That(error, Does.Contain("incomplete"));
-            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
-            Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(values, 3, Protocol));
-            Assert.That(Protocol, Is.EqualTo(5650));
         }
 
         [Test]

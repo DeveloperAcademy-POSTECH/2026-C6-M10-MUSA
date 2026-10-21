@@ -49,9 +49,9 @@ namespace C6Lab.Tests
 
                         // Expired/reconfigured combo settings apply to future throws, not these shots.
                         float[] changed = config.CaptureDeveloperValues();
-                        changed[160] = 0f;
-                        changed[165] = 1f;
-                        changed[168] = 1f;
+                        changed[155] = 0f;
+                        changed[160] = 1f;
+                        changed[163] = 1f;
                         changed[33] = gravity * 2f;
                         Assert.That(config.TryApplyDeveloperValues(changed, out string error), Is.True, error);
                         yield return new WaitForFixedUpdate();

@@ -148,7 +148,7 @@ namespace C6Lab.Tests
             {
                 SetSnapshot(null);
                 developer.Open();
-                developer.valueInputs[142].text = enabled ? "1" : "0";
+                developer.valueInputs[137].text = enabled ? "1" : "0";
                 developer.ApplyAndHost();
                 Assert.That(network.config.PlayerPaintPatternsEnabled, Is.EqualTo(enabled), developer.feedbackText.text);
                 yield return null;

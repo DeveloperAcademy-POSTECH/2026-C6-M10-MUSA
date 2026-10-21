@@ -12,13 +12,6 @@ using UnityEngine;
 namespace C6Lab
 {
     [Serializable]
-    internal sealed class LabMotionSample
-    {
-        public string id;
-        public float x, y, vx, vy;
-    }
-
-    [Serializable]
     internal sealed class LabNetworkPacket
     {
         public int protocol = 3;
@@ -76,7 +69,6 @@ namespace C6Lab
         public int chunkIndex;
         public int chunkCount;
         public string chunkData;
-        public LabMotionSample[] motionSamples;
     }
 
     /// <summary>
@@ -192,11 +184,12 @@ namespace C6Lab
         // 5647: #235 holder expiry notices before board removal.
         // 5648: #241 combo warning (DEV 169); 170 shared values.
         // 5649: #240 owner-local transactions/board deltas and independent Bulk, integrated with #235/#241.
-        // 5650: #236 AUTO drum count integrated with #240 local-board authority; 170 shared values.
-        internal const ushort LabProtocolVersion = 5650;
+        // 5650: #236 AUTO drum count integrated with #240; 170 shared values.
+        // 5651: #246 removes unused tuning and legacy payloads, retaining AUTO; 165 shared values.
+        internal const ushort LabProtocolVersion = 5651;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/14");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/15");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

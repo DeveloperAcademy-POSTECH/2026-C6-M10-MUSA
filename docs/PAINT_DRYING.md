@@ -4,16 +4,16 @@
 
 Unity 6000.6.5f1의 `Assets/Lab/Scenes/Lab.unity`에 연결된 Paint 모델·공유 설정·DEV 조작을 설명한다. 이 문서에서 “건조”는 색의 명암 변화가 아니라 **시간이 지나면 실제 도색 셀이 빈 표면 경계부터 사라지는 규칙**이다. 새 게임·도색 마스크·물리 판정을 설계하는 문서가 아니다.
 
-현재 설정은 **160개, 프로토콜 5645, 연결 토큰 `C6PhysicsLab/11`**이다. 이전 0~152번을 보존하고 153~156번에 건조 네 값을 유지하고 넘기기 막기는157~159번에 덧붙인다. 과거153개·5643 앱을 섞어 접속하지 않는다. 검증 결과는 [VALIDATION](VALIDATION.md)의 이번 변경 기록을 따른다. 아래 시나리오와 코드 설명 자체는 실행 증거가 아니다.
+현재 공유 설정은 **165개, 프로토콜5651, 연결 토큰 `C6PhysicsLab/15`**다. 건조4개는 인덱스148~151, 넘기기 막기3개는152~154다. #246에서100% 고정 목표 행과 미사용 Flow4값을 제거했으며 건조 규칙·기본값은 유지한다. 다른 버전 앱을 섞지 않는다. 검증 결과는 [VALIDATION](VALIDATION.md)의 해당 변경 기록을 따른다. 아래 시나리오와 코드 설명 자체는 실행 증거가 아니다.
 
 ## 기본값과 변경 위치
 
 | 설정 | DEV 인덱스 | 기본값 | DEV 허용 범위 | Config 필드 / 공개 속성 |
 | --- | ---: | ---: | --- | --- |
-| Paint Drying | 153 | ON | 정수0/1, ON/OFF 버튼 | `paintDryingEnabled` / `PaintDryingEnabled` |
-| Drying Delay (seconds) | 154 | 5초 | 0~60초 | `paintDryingDelaySeconds` / `PaintDryingDelaySeconds` |
-| Drying Rate (%/s) | 155 | 0.2%p/초 | 0~5%p/초 | `paintDryingPercentPerSecond` / `PaintDryingPercentPerSecond` |
-| Nearby Hit Radius (surface degrees) | 156 | 20° | 1~90° | `paintNearbyHitRadiusDegrees` / `PaintNearbyHitRadiusDegrees` |
+| Paint Drying | 148 | ON | 정수0/1, ON/OFF 버튼 | `paintDryingEnabled` / `PaintDryingEnabled` |
+| Drying Delay (seconds) | 149 | 5초 | 0~60초 | `paintDryingDelaySeconds` / `PaintDryingDelaySeconds` |
+| Drying Rate (%/s) | 150 | 0.2%p/초 | 0~5%p/초 | `paintDryingPercentPerSecond` / `PaintDryingPercentPerSecond` |
+| Nearby Hit Radius (surface degrees) | 151 | 20° | 1~90° | `paintNearbyHitRadiusDegrees` / `PaintNearbyHitRadiusDegrees` |
 
 원본은 `Assets/Lab/Resources/LabConfig.asset`이며 런타임 DEV는 복사본만 바꾼다. `PaintGrowthSettings`가 라운드에 `DryingEnabled`, `DryingDelaySeconds`, `DryingPercentPerSecond`, `NearbyHitRadiusDegrees`를 캡처한다. Inspector에서 범위를 벗어난 수치는 Getter에서 제한하고 NaN/Infinity는 각 기본값으로 대체한다. DEV·공유 배열은 유한수·범위·정수 조건을 통과해야 하며 한 항목이라도 잘못되면 전체 적용을 거절한다.
 
@@ -24,7 +24,7 @@ Unity 6000.6.5f1의 `Assets/Lab/Scenes/Lab.unity`에 연결된 Paint 모델·공
 1. Editor Play Mode 또는 Development 앱에서 **DEV → Gourd**를 펼치고 마지막 **Paint Drying**을 ON으로 바꾼다.
 2. 세 숫자와 대응 슬라이더를 조정한다. OFF이면 이 세 조작을 잠그고 기존 입력값은 유지한다. **DEFAULTS**는 원본의 ON·5·0.2·20을 입력에 불러온다.
 3. 혼자는 **START/RESTART SOLO**, 접속 전 Host는 **CREATE ROOM**, 기존 Host 로비는 **APPLY TO ROOM**으로 적용한다. 공유 전투 중에는 먼저 공동 일시정지하고 Host의 **APPLY & RESTART**를 사용한다.
-4. 공유 방은 네 값을 포함한 전체160개 지문을 참가자에게 확인받은 뒤 시작한다. Client가 자신의 DEV에서 세션값을 바꾸는 경로는 없다. 패널 입력만 바꾸거나 닫으면 진행 중인 판의 규칙은 바뀌지 않는다.
+4. 공유 방은 네 값을 포함한 전체165개 지문을 참가자에게 확인받은 뒤 시작한다. Client가 자신의 DEV에서 세션값을 바꾸는 경로는 없다. 패널 입력만 바꾸거나 닫으면 진행 중인 판의 규칙은 바뀌지 않는다.
 5. Paint 전투에서 주변을 반복해서 맞혀 유지되는 부분과 멀리 떨어져 줄어드는 부분을 비교한다. 종료 후에도 확인하려면 먼저 결과를 기록한 뒤 Retry/설정 변경을 한다.
 
 기본은 ON이다. DEV에서 OFF로 적용하면 이전 성장 알고리즘을 그대로 호출한다. Crack에서는 Paint Surface 시간을 진행하지 않으므로 이 규칙을 적용하지 않는다. 구슬 입력·이동·전달·투척·명중 승인·명중 보상·크랙 피해는 변경하지 않는다.
@@ -74,16 +74,16 @@ Host 모델만 건조를 계산한다. Host 표시 캐시와 Client는 기존 `p
 
 | 파일 | 변경·확인 지점 |
 | --- | --- |
-| `Assets/Lab/Scripts/Core/LabConfig.cs` | 네 Inspector 원본값·유효 속성·DEV153~156·Gourd 분류·160개 Capture/Apply·라운드 설정 캡처 |
+| `Assets/Lab/Scripts/Core/LabConfig.cs` | 네 Inspector 원본값·유효 속성·DEV148~151·Gourd 분류·165개 Capture/Apply·라운드 설정 캡처 |
 | `Assets/Lab/Scripts/UI/LabDeveloperMode.cs` | 이전 저장 패널을 늘려 새 행 생성, 토글·세 슬라이더, OFF/Host 권한에 따른 잠금, 기존 적용 버튼 경로 |
 | `Assets/Lab/Scripts/Core/LabPaintSurface.cs` | `RegisterHit` 주변 보호, `AdvanceGrowth` 실제 emit 시각, `PaintFundedCell` 새 셀 기록, Clear/Replica 경계 |
 | `Assets/Lab/Scripts/Core/LabPaintSurface.Drying.cs` | 보호/노출 시각, 고정 tick, 경계 heap 침식, 실제 셀 삭제, 성분 재구성·공급 귀속 |
 | `Assets/Lab/Scripts/Core/LabPaintSurface.Clusters.cs` | 분리 후 기존 군집 형상을 유지하는 `GrowthCluster.Rebase` |
 | `Assets/Lab/Scripts/Core/LabModel.cs` | 기존 `ConfirmHit`·`TryAdvance`를 통한 유효 명중·전투 시간·pause/deadline/결과 경계 |
-| `Assets/Lab/Scripts/Session/LabNetwork.cs` | 프로토콜5645, 기존 Host 설정 승인과 맵/Snapshot 공개 경로 |
+| `Assets/Lab/Scripts/Session/LabNetwork.cs` | 프로토콜5651, 기존 Host 설정 승인과 맵/Snapshot 공개 경로 |
 | `Assets/Lab/Scripts/Session/LabPaintReplication.cs` | 기존 RGBA/P번호 delta·체크포인트의 빈 셀 수신 경로. 새 wire 형식을 만들지 않음 |
 
-이번 `LabConfig.asset` 재저장은 Unity API로 새 건조4값을 기록한다. 코드 기본값으로 이미 사용하던 무거운 폭탄4값·폭발 패널티3값도 직렬화되므로 에셋 diff에 함께 나타난다. 해당 기존153개 유효값·인덱스를 바꾸는 기획 변경과 구별한다. Scene·Prefab·마스크·구슬 재질·패키지는 이 기능의 변경 대상이 아니다.
+과거 #225의 `LabConfig.asset` 재저장은 Unity API로 당시 새 건조4값을 기록했다. 코드 기본값으로 이미 사용하던 무거운 폭탄4값·폭발 패널티3값도 직렬화되므로 에셋 diff에 함께 나타난다. 해당 기존153개 유효값·인덱스를 바꾸는 기획 변경과 구별한다. Scene·Prefab·마스크·구슬 재질·패키지는 이 기능의 변경 대상이 아니다.
 
 ## 확인 시나리오와 검증 범위
 

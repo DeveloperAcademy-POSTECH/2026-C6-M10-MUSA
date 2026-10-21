@@ -268,7 +268,7 @@ namespace C6Lab.Tests
         {
             LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f, warning: 0f);
             float[] values = config.CaptureDeveloperValues();
-            values[162] = 3f; // a new combo every 3 seconds
+            values[157] = 3f; // a new combo every 3 seconds
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var model = new LabModel();
             model.Begin("combo-latest", new ulong[] { 10, 20 }, 0d, config);
@@ -355,7 +355,7 @@ namespace C6Lab.Tests
         {
             LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f);
             float[] values = config.CaptureDeveloperValues();
-            values[162] = 1.5f; // the next combo would be due before this one even ends
+            values[157] = 1.5f; // the next combo would be due before this one even ends
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var model = new LabModel();
             model.Begin("combo-late-warning", new ulong[] { 10, 20 }, 0d, config);
@@ -376,7 +376,7 @@ namespace C6Lab.Tests
         {
             LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f, warning: 0f);
             float[] values = config.CaptureDeveloperValues();
-            values[162] = 1f; // due exactly when the first one times out at 2 s
+            values[157] = 1f; // due exactly when the first one times out at 2 s
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var model = new LabModel();
             model.Begin("combo-no-warning", new ulong[] { 10, 20 }, 0d, config);
@@ -425,7 +425,8 @@ namespace C6Lab.Tests
                 {
                     pool.Remove(yin);
                     pool.Remove(yang);
-                    Assert.That(model.TryCombine(owner, yin.id, yang.id, "combo-combine-" + requests++, at,
+                    Assert.That(model.TryCombineAt(owner, yin.id, yang.id, "combo-combine-" + requests++, at,
+                        new Vector2((yin.x + yang.x) * .5f, (yin.y + yang.y) * .5f), Vector2.zero,
                         out var combined, out string reason), Is.True, reason);
                     return combined;
                 }
@@ -448,14 +449,14 @@ namespace C6Lab.Tests
             values[5] = 1f;    // cheap generation
             values[9] = 100f;  // room for leftover raw orbs
             values[74] = LabModel.MaximumParticipants;
-            values[88] = 0f;   // no gourd bombs
-            values[89] = 0f;
+            values[87] = 0f;   // no gourd bombs
+            values[88] = 0f;
             values[39] = 50; values[40] = 50; values[41] = 0; values[42] = 0; values[43] = 0; values[44] = 0;
-            values[160] = enabled ? 1f : 0f;
-            values[161] = firstStart;
-            values[163] = timeLimit;
-            values[166] = throwerOnly ? 1f : 0f;
-            values[169] = warning;
+            values[155] = enabled ? 1f : 0f;
+            values[156] = firstStart;
+            values[158] = timeLimit;
+            values[161] = throwerOnly ? 1f : 0f;
+            values[164] = warning;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return config;
         }
