@@ -160,7 +160,8 @@ namespace C6Lab
             new LabDeveloperField("Hit Haptic Intensity", 0f, 1f),
             new LabDeveloperField("Item Hit Haptic Style (0-4)", 0f, 4f, true),
             new LabDeveloperField("Item Hit Haptic Intensity", 0f, 1f),
-            new LabDeveloperField("Drum Count", 1f, 5f, true),
+            // AUTO (0) follows the room's player count (#236); 1 to 5 fix the number of drums.
+            LabDeveloperField.Choice("Drum Count", "AUTO", "1", "2", "3", "4", "5"),
             new LabDeveloperField("Drum Radius", .1f, 1.5f),
             new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
             new LabDeveloperField("Drum Drift Turning (per second)", 0f, 2f),
@@ -399,8 +400,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 10f)] private float spawnMaxSpeed = 1.8f;
 
         [Header("Drum")]
-        [Tooltip("한 판에 놓이는 생성 북 개수. 판 시작 때 받을 사람을 무작위로 정한다.")]
-        [SerializeField, Range(1, 5)] private int drumCount = 1;
+        [Tooltip("한 판에 놓이는 생성 북 개수. 0이면 AUTO(#236): 인원에 맞춰 2·3명은 1개, 4·5명은 2개(솔로 1개). 1~5면 인원과 상관없이 그 개수. 판 시작 때 받을 사람을 무작위로 정한다.")]
+        [SerializeField, Range(0, 5)] private int drumCount = AutoDrumCount;
         [Tooltip("북의 충돌·표시 반지름 (월드 단위). 기본은 예전 화면 아래 생성 버튼 크기.")]
         [SerializeField, Range(.1f, 1.5f)] private float drumRadius = .6f;
         [Tooltip("가만히 둔 북이 저절로 떠도는 최고 속도 (보드 너비/초). 0이면 떠돌지 않는다.")]
@@ -691,7 +692,14 @@ namespace C6Lab
         public float SpawnFanAngle => Mathf.Clamp(Finite(spawnFanAngle, 180f), 0f, 180f);
         public float SpawnMinSpeed => Mathf.Clamp(Finite(spawnMinSpeed, 1f), 0f, 10f);
         public float SpawnMaxSpeed => Mathf.Clamp(Finite(spawnMaxSpeed, 1.8f), SpawnMinSpeed, 10f);
-        public int DrumCount => Mathf.Clamp(drumCount, 1, 5);
+        /// <summary>The Drum Count setting: <see cref="AutoDrumCount"/> (0) follows the players, 1 to 5 is fixed.</summary>
+        public int DrumCount => Mathf.Clamp(drumCount, 0, 5);
+        /// <summary>The Drum Count value that sets the number of drums by the room's player count (#236).</summary>
+        public const int AutoDrumCount = 0;
+        /// <summary>How many drums AUTO gives a room: one for up to three players, two for four or five.</summary>
+        public static int DrumsForPlayers(int players) => players >= 4 ? 2 : 1;
+        /// <summary>How many drums a round with this many players starts with.</summary>
+        public int DrumsFor(int players) => DrumCount != AutoDrumCount ? DrumCount : DrumsForPlayers(players);
         public float DrumRadius => Mathf.Clamp(Finite(drumRadius, .6f), .1f, 1.5f);
         public float DrumDriftSpeed => Mathf.Clamp(Finite(drumDriftSpeed, .1f), 0f, 1f);
         public float DrumDriftTurning => Mathf.Clamp(Finite(drumDriftTurning, .25f), 0f, 2f);
