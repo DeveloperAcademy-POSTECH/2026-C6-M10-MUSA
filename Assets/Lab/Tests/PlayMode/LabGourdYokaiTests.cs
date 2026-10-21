@@ -6,7 +6,8 @@ using UnityEngine.TestTools;
 namespace C6Lab.Tests
 {
     /// <summary>
-    /// 박 속 요괴 (#244): 콤보 예고부터 콤보가 끝날 때까지 요괴가 나와 있고, 칸을 맞히면 움찔하며,
+    /// 박 속 요괴 (#244, #250): 콤보 예고부터 콤보가 끝날 때까지 요괴가 나와 있고, 칸을 맞히면 움찔하며,
+    /// 박이 폭탄을 떨어뜨리면 말풍선이 떠 있는 동안 쏙 나와 톡 튀고,
     /// 평소 반복의 어느 순간에 콤보가 시작돼도 모습이 튀지 않는다. 저장된 WhiteGourd 프리팹과 애니메이션을
     /// 그대로 쓰고, 시간은 Advance로 직접 넘긴다.
     /// </summary>
@@ -150,6 +151,101 @@ namespace C6Lab.Tests
             yokai.Advance(over, 18d, 0f);
             Assert.That(yokai.Holding, Is.False, "Only during the battle.");
         }
+
+        [Test]
+        public void ABombDropBringsTheYokaiOutQuicklyWithAPopForAsLongAsTheBubble()
+        {
+            SetClip(5.6f); // closed
+            var calm = Calm(40d);
+            yokai.BombDropped();
+            yokai.Advance(calm, 40d, 0f);
+            Assert.That(yokai.Holding, Is.True, "The gourd drops a bomb: out comes the yokai.");
+            Assert.That(yokai.BombSecondsLeft, Is.EqualTo(yokai.BombShowSeconds));
+
+            bool popped = false;
+            float elapsed = 0f;
+            for (; elapsed < .6f; elapsed += .05f)
+            {
+                yokai.Advance(calm, 40d + elapsed, .05f);
+                popped |= yokai.Popping;
+            }
+            Assert.That(root.localPosition.z, Is.GreaterThan(Up - .0004f), "Out quickly, well before the bubble goes.");
+            Assert.That(popped, Is.True, "It pops once it is out.");
+            Assert.That(yokai.Flinching, Is.False, "A pop is not a combo flinch.");
+
+            for (; elapsed < yokai.BombShowSeconds - .06f; elapsed += .05f)
+            {
+                yokai.Advance(calm, 40d + elapsed, .05f);
+                Assert.That(yokai.Holding, Is.True, "Out while the \"!\" bubble is up.");
+            }
+            Step(calm, 40d + elapsed, .2f);
+            Assert.That(yokai.Holding, Is.False, "When the bubble goes, so does the yokai.");
+        }
+
+        [Test]
+        public void ABombDuringAComboOnlyPopsAndBothMustEndBeforeItGoesIn()
+        {
+            SetClip(2.4f);
+            var combo = Active(25d, 1);
+            Step(combo, 25d, 1f);
+            Assert.That(yokai.Holding, Is.True);
+            yokai.BombDropped();
+            yokai.Advance(combo, 26d, .05f);
+            Assert.That(yokai.Popping, Is.True, "Already out, so it pops straight away.");
+            Assert.That(root.localPosition.z, Is.GreaterThan(Up - .0004f));
+
+            var ended = Calm(26.1d);
+            ended.comboCount = 1;
+            ended.comboResult = LabComboResult.Timeout;
+            ended.comboResultCount = 1;
+            yokai.Advance(ended, 26.1d, .05f);
+            Assert.That(yokai.Holding, Is.True, "The combo is over but the bomb bubble is still up.");
+            Step(ended, 26.1d, yokai.BombShowSeconds);
+            Assert.That(yokai.Holding, Is.False, "Both over: back in.");
+        }
+
+        [Test]
+        public void TheNetworksGourdBombSignalReachesTheYokaiAndPausesHoldIt()
+        {
+            var host = new GameObject("Yokai bomb network fixture");
+            try
+            {
+                var network = host.AddComponent<LabNetwork>();
+                network.enabled = false;
+                yokai.Bind(network);
+                var field = typeof(LabNetwork).GetField("GourdBombDropped",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(field, Is.Not.Null);
+                var signal = (System.Action<ulong, string, Vector2>)field.GetValue(network);
+                Assert.That(signal, Is.Not.Null, "Bind listens for the gourd's bombs.");
+                signal(2ul, "gourd-bomb-1", new Vector2(.5f, .5f));
+                Assert.That(yokai.BombSecondsLeft, Is.EqualTo(yokai.BombShowSeconds));
+
+                var paused = Calm(40d);
+                paused.paused = true;
+                yokai.Advance(paused, 40d, 0f);
+                Assert.That(yokai.Holding, Is.True);
+                yokai.Advance(paused, 40d, 0f);
+                Assert.That(yokai.BombSecondsLeft, Is.EqualTo(yokai.BombShowSeconds), "No time passes in a pause.");
+
+                yokai.Advance(new LabSnapshot { sessionId = "yokai", round = 1, phase = LabPhase.Defeat, serverTime = 41d },
+                    41d, .05f);
+                Assert.That(yokai.Holding, Is.False, "Only during the battle.");
+                Assert.That(yokai.BombSecondsLeft, Is.Zero);
+
+                yokai.Bind(null);
+                Assert.That(field.GetValue(network), Is.Null, "Rebinding stops listening to the old network.");
+            }
+            finally
+            {
+                Object.Destroy(host);
+            }
+        }
+
+        private static LabSnapshot Calm(double now) => new LabSnapshot
+        {
+            sessionId = "yokai", round = 1, phase = LabPhase.Playing, serverTime = now
+        };
 
         private void Step(LabSnapshot snapshot, double from, float seconds)
         {
