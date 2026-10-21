@@ -372,7 +372,9 @@ namespace C6Lab
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,
             comboCount = source.comboCount, comboResult = source.comboResult, comboResultCount = source.comboResultCount,
             comboResultAt = source.comboResultAt, comboFailedBy = source.comboFailedBy,
-            comboNextAt = source.comboNextAt, comboWarningAt = source.comboWarningAt
+            comboNextAt = source.comboNextAt, comboWarningAt = source.comboWarningAt,
+            flashWarningAt = source.flashWarningAt, flashAt = source.flashAt, flashTarget = source.flashTarget,
+            flashCount = source.flashCount, flashLastAt = source.flashLastAt, flashLastTarget = source.flashLastTarget
         };
     }
 }
