@@ -18,13 +18,13 @@ namespace C6Lab.Tests
         [Test]
         public void TheCountingLookIsAnOnToggleUnderTheComboSwitch()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(186));
-            LabDeveloperField field = LabConfig.DeveloperFields[185];
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(192));
+            LabDeveloperField field = LabConfig.DeveloperFields[191];
             Assert.That(field.Label, Is.EqualTo("야광귀 셈법 (0 off, 1 on)"));
             Assert.That(field.DisplayLabel, Is.EqualTo("야광귀 셈법"));
             Assert.That(new[] { field.OffText, field.OnText }, Is.EqualTo(new[] { "끔", "켬" }));
             int[] group = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀").FieldIndices;
-            Assert.That(group.Take(2), Is.EqualTo(new[] { 155, 185 }));
+            Assert.That(group.Take(2), Is.EqualTo(new[] { 155, 191 }));
 
             var config = ScriptableObject.CreateInstance<LabConfig>();
             try
@@ -34,11 +34,11 @@ namespace C6Lab.Tests
                 foreach (LabConfig source in new[] { config, authored })
                 {
                     Assert.That(source.ComboYaguangCountEnabled, Is.True, "On by default (it only shows when the combo is on).");
-                    Assert.That(source.CaptureDeveloperValues()[185], Is.EqualTo(1f));
+                    Assert.That(source.CaptureDeveloperValues()[191], Is.EqualTo(1f));
                     Assert.That(source.ComboWarningSeconds, Is.EqualTo(4f), "One count a second: 하나, 둘, 셋, 넷.");
                 }
                 float[] values = config.CaptureDeveloperValues();
-                values[185] = 0f;
+                values[191] = 0f;
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 Assert.That(config.ComboYaguangCountEnabled, Is.False);
             }

@@ -53,7 +53,7 @@ namespace C6Lab.Tests
 
                 // Off: the old look.
                 float[] values = config.CaptureDeveloperValues();
-                values[185] = 0f;
+                values[191] = 0f;
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var again = Snapshot(100d, progress: 2, active: true);
                 again.comboCount = 2;
