@@ -22,7 +22,9 @@ namespace C6Lab
         [Range(0f, 1f)] public float volume = .5f;
 
         private static AudioClip generatedClip;
+        private static bool listeningForAudioChanges;
         private AudioSource source;
+        private bool usesGeneratedClip;
         private LabOrbBoard board;
         private LabNetwork network;
 
@@ -49,11 +51,16 @@ namespace C6Lab
             source.playOnAwake = false;
             source.loop = true;
             source.spatialBlend = 0f; // 화면 기준 소리라 위치와 상관없이 같은 크기로 들린다.
-            source.clip = clips.Length > 0 ? clips[0] : GeneratedSizzle();
+            usesGeneratedClip = clips.Length == 0;
+            source.clip = usesGeneratedClip ? GeneratedSizzle() : clips[0];
         }
 
         private void Update()
         {
+            // Unity recreates imported clips after an audio device reset, but loses clips
+            // created by script. Rebind every source to the replacement shared loop.
+            if (usesGeneratedClip && (source.clip != generatedClip || !ValidGeneratedClip(source.clip)))
+                source.clip = GeneratedSizzle();
             float fuse = board != null ? board.ShortestFuse() : -1f;
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool battle = network == null
@@ -78,7 +85,13 @@ namespace C6Lab
         /// </summary>
         public static AudioClip GeneratedSizzle()
         {
-            if (generatedClip != null) return generatedClip;
+            if (!listeningForAudioChanges)
+            {
+                AudioSettings.OnAudioConfigurationChanged += OnAudioConfigurationChanged;
+                listeningForAudioChanges = true;
+            }
+            if (ValidGeneratedClip(generatedClip)) return generatedClip;
+            if (generatedClip != null) Destroy(generatedClip);
             var random = new System.Random(177);
             var samples = new float[GeneratedRate];
             float previous = 0f, crackle = 0f, flutter = 1f;
@@ -100,6 +113,21 @@ namespace C6Lab
             generatedClip.SetData(samples, 0);
             generatedClip.hideFlags = HideFlags.DontSave;
             return generatedClip;
+        }
+
+        private static bool ValidGeneratedClip(AudioClip clip)
+        {
+            return clip != null && clip.samples == GeneratedRate && clip.channels == 1
+                && clip.frequency == GeneratedRate && clip.length > 0f;
+        }
+
+        private static void OnAudioConfigurationChanged(bool deviceWasChanged)
+        {
+            // A non-null Unity object can survive the reset with no native sample data.
+            // Drop it even when its wrapper still reports the old dimensions.
+            AudioClip previous = generatedClip;
+            generatedClip = null;
+            if (previous != null) Destroy(previous);
         }
     }
 }
