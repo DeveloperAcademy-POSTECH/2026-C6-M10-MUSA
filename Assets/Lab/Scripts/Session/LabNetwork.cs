@@ -1674,9 +1674,9 @@ namespace C6Lab
             if (packet.type == "charmTap")
             {
                 // Only a player beside the charmed one counts; enough taps wake them at once (#251).
-                if (!model.TryCharmTap(sender, now, out ulong woken)) return;
+                if (!model.TryCharmTap(sender, now, out var woken)) return;
                 // Sent before the snapshot that no longer holds the charm, so every screen knows it was woken.
-                if (woken != 0) AnnounceCharmWoken(woken);
+                if (woken.HasValue) AnnounceCharmWoken(woken.Value);
                 PublishSnapshot(true);
                 return;
             }

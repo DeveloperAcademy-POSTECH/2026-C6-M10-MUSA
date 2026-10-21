@@ -2879,8 +2879,8 @@ namespace C6Lab.Tests
 
                 Assert.That(room.TryCharmTap(far, 5.1d, out _), Is.False, "Only the two beside can wake them.");
                 Assert.That(room.TryCharmTap(charmed.id, 5.1d, out _), Is.False, "Nor can they wake themselves.");
-                Assert.That(room.TryCharmTap(leftOf, 5.2d, out ulong woken), Is.True);
-                Assert.That(woken, Is.Zero, "Not yet.");
+                Assert.That(room.TryCharmTap(leftOf, 5.2d, out var woken), Is.True);
+                Assert.That(woken, Is.Null, "Not yet.");
                 Assert.That(room.TryCharmTap(rightOf, 5.3d, out _), Is.True);
                 LabSnapshot tapped = room.Snapshot(5.3d);
                 Assert.That(tapped.charmTaps, Is.EqualTo(2), "Their taps count together.");

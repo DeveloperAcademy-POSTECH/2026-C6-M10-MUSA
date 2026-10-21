@@ -195,4 +195,63 @@ namespace C6Lab.Tests
                 "With wake-up taps off it only shows.");
         }
     }
+
+    /// <summary>The saved Lab layout must leave its drum minimap readable during a neighbour's charm.</summary>
+    public sealed class LabCharmSavedSceneTests
+    {
+        private readonly LabSavedSceneNetworkFixture fixture = new LabSavedSceneNetworkFixture();
+
+        [UnityTearDown]
+        public IEnumerator UnloadSavedScene() => fixture.Cleanup();
+
+        [UnityTest]
+        public IEnumerator SavedSceneCharmBubbleLeavesTheDrumMinimapVisible()
+        {
+            yield return fixture.Load();
+            LabHud hud = Object.FindFirstObjectByType<LabHud>();
+            LabSceneController controller = Object.FindFirstObjectByType<LabSceneController>();
+            Assert.That(hud, Is.Not.Null);
+            Assert.That(controller, Is.Not.Null);
+            LabDrumMinimap minimap = controller.GetComponent<LabDrumMinimap>();
+            LabCharmBubbles bubbles = controller.GetComponent<LabCharmBubbles>();
+            Assert.That(minimap, Is.Not.Null, "Use the minimap saved in Lab.unity, including its serialized spacing.");
+            Assert.That(bubbles, Is.Not.Null, "The saved Scene's controller must attach the charm presentation.");
+
+            // Keep the saved hierarchy and anchors, presenting a two-player snapshot without opening a room.
+            // The other player is on both sides in this case, including beside the drum minimap.
+            hud.enabled = minimap.enabled = bubbles.enabled = false;
+            hud.battleUi.SetActive(true);
+            hud.leftNeighborBadge.SetActive(true);
+            hud.rightNeighborBadge.SetActive(true);
+            var snapshot = new LabSnapshot
+            {
+                sessionId = "saved-charm-layout", round = 1, phase = LabPhase.Playing, serverTime = 1d,
+                players = new[]
+                {
+                    new LabPlayerState { id = 10, seat = 0 },
+                    new LabPlayerState { id = 20, seat = 1 }
+                },
+                charmedPlayer = 20, charmStartedAt = 0d, charmUntil = 10d
+            };
+            minimap.Rebuild(snapshot.players, 10);
+            Assert.That(minimap.Panel, Is.Not.Null);
+            minimap.Panel.localScale = Vector3.one * (hud.network.config.MinimapSizePercent / 100f);
+            minimap.Panel.gameObject.SetActive(true);
+            Canvas.ForceUpdateCanvases();
+            bubbles.Present(snapshot, 10, 1d, 3);
+            Canvas.ForceUpdateCanvases();
+
+            Assert.That(bubbles.LeftShowing && bubbles.RightShowing, Is.True);
+            Assert.That(WorldRect(bubbles.RightBubble).Overlaps(WorldRect(minimap.Panel)), Is.False,
+                "The right charm bubble must not cover the saved drum minimap; updating a field default alone "
+                + "does not migrate the minimap's serialized gap in Lab.unity.");
+        }
+
+        private static Rect WorldRect(RectTransform rect)
+        {
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            return Rect.MinMaxRect(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+        }
+    }
 }

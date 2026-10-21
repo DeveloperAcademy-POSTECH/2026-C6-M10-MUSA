@@ -165,7 +165,7 @@ namespace C6Lab
         private readonly List<LabSabotage> sabotages = new List<LabSabotage>();
         private double nextSabotageAt;
         private uint sabotageCount;
-        private ulong lastSabotageTarget;
+        private ulong? lastSabotageTarget;
         private readonly List<LabFoxFireDrop> foxFires = new List<LabFoxFireDrop>();
         private ulong charmedPlayer;
         private double charmStartedAt = -1d, charmUntil = -1d;
@@ -279,7 +279,7 @@ namespace C6Lab
             nextSwipeBlockAt = !rules.SabotageMix && rules.SwipeBlockInterval > 0f
                 ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
             sabotageCount = 0;
-            lastSabotageTarget = 0;
+            lastSabotageTarget = null;
             charmedPlayer = 0;
             charmStartedAt = charmUntil = -1d;
             charmTaps = 0;
@@ -801,11 +801,11 @@ namespace C6Lab
         /// <summary>
         /// 매혹 (#251): 홀린 사람의 양옆 사람이 하트 말풍선을 누른 한 번. 정해 둔 횟수가 모이면 매혹이 바로 풀린다.
         /// 양옆이 아닌 사람, 홀린 사람 자신, 매혹이 없을 때, 깨우기가 꺼져 있을 때는 받지 않는다. 이 탭으로 깨어났으면
-        /// woken에 그 사람을, 아니면 0을 돌려준다.
+        /// woken에 그 사람을, 아니면 null을 돌려준다 (Host의 플레이어 ID도 0이므로 구분한다).
         /// </summary>
-        public bool TryCharmTap(ulong sender, double now, out ulong woken)
+        public bool TryCharmTap(ulong sender, double now, out ulong? woken)
         {
-            woken = 0;
+            woken = null;
             if (!TryAdvance(now, out _) || !CharmOn(now) || rules.CharmRescueTaps <= 0 || sender == charmedPlayer
                 || !players.TryGetValue(sender, out var tapper) || !players.TryGetValue(charmedPlayer, out var charmed))
                 return false;
@@ -1080,7 +1080,7 @@ namespace C6Lab
         private void DropFoxFire(ulong target, double at, uint index)
         {
             int span = rules.FoxFireCountMax - rules.FoxFireCountMin + 1;
-            int count = Math.Min(rules.OrbStorageLimit - CountStored(target),
+            int count = Math.Min(rules.OrbStorageLimit - CountStored(target, at),
                 rules.FoxFireCountMin + (int)(DrawFor(seed ^ FoxCountSalt, SabotageDrawKey, index) % (ulong)span));
             var ids = new string[count];
             for (int i = 0; i < count; i++)
@@ -1160,10 +1160,10 @@ namespace C6Lab
             for (int i = 0; i < activeSeatCount; i++)
             {
                 ulong player = seats[i];
-                if (player == lastSabotageTarget && activeSeatCount > 1) continue;
+                if (lastSabotageTarget.HasValue && player == lastSabotageTarget.Value && activeSeatCount > 1) continue;
                 if (blocking && player == swipeBlockedPlayer) continue;
                 if (charming && player == charmedPlayer) continue;
-                if (kind == LabSabotageKind.FoxFire && CountStored(player) >= rules.OrbStorageLimit) continue;
+                if (kind == LabSabotageKind.FoxFire && CountStored(player, at) >= rules.OrbStorageLimit) continue;
                 targets.Add(player);
             }
             return targets;
@@ -1215,6 +1215,10 @@ namespace C6Lab
         private float LifetimeOf(LabOrbState orb) =>
             orb.kind.LifetimeFor(orb.lockSwipes, rules.OrbLifetimeSeconds, rules.ItemLifetimeSeconds);
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
+
+        /// <summary>A late frame's earlier sabotage draws ignore orbs whose lifetime had already ended at that draw.</summary>
+        private int CountStored(ulong owner, double at) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight
+            && at - orb.createdAt < LifetimeOf(orb));
 
         /// <summary>Orbs and drums both move between screens; look the ID up in either list.</summary>
         private bool TryFindMovable(string id, out LabOrbState found) =>
