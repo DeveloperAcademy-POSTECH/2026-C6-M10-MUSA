@@ -265,7 +265,13 @@ namespace C6Lab
             new LabDeveloperField("Fox Fire Count Max", 1f, 10f, true),
             new LabDeveloperField("Fox Fire Safe Seconds", 0f, 3f),
             new LabDeveloperField("Charm Seconds", 1f, 30f),
-            new LabDeveloperField("Charm Rescue Taps (0 = none)", 0f, 10f, true)
+            new LabDeveloperField("Charm Rescue Taps (0 = none)", 0f, 10f, true),
+            new LabDeveloperField("Jigwi Fire Target Count", 1f, 5f, true),
+            new LabDeveloperField("Jigwi Fire Seconds", 1f, 120f),
+            new LabDeveloperField("Jigwi Overheat Seconds", .1f, 60f),
+            new LabDeveloperField("Jigwi Generation Burn Seconds", .1f, 120f),
+            new LabDeveloperField("Jigwi Raw Radius Scale", .2f, 1f),
+            new LabDeveloperField("Jigwi Raw Life Scale", .05f, 1f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -298,7 +304,8 @@ namespace C6Lab
                 134, 132, 133, 148, 149, 150, 151),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Combo", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163),
-            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177)
+            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
+            new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183)
         });
 
 
@@ -520,6 +527,14 @@ namespace C6Lab
         [SerializeField, Range(1f, 30f)] private float charmSeconds = 10f;
         [Tooltip("매혹: 양옆 사람이 합쳐 이만큼 하트 말풍선을 누르면 바로 풀린다. 0이면 시간으로만 풀린다.")]
         [SerializeField, Range(0, 10)] private int charmRescueTaps = 3;
+
+        [Header("Jigwi fire experiment (#272)")]
+        [SerializeField, Range(1, 5)] private int jigwiFireTargetCount = 1;
+        [SerializeField, Range(1f, 120f)] private float jigwiFireSeconds = 15f;
+        [SerializeField, Range(.1f, 60f)] private float jigwiOverheatSeconds = 4f;
+        [SerializeField, Range(.1f, 120f)] private float jigwiGenerationBurnSeconds = 10f;
+        [SerializeField, Range(.2f, 1f)] private float jigwiRawRadiusScale = .65f;
+        [SerializeField, Range(.05f, 1f)] private float jigwiRawLifeScale = .5f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -841,6 +856,12 @@ namespace C6Lab
         public float FoxFireSafeSeconds => Mathf.Clamp(Finite(foxFireSafeSeconds, 1f), 0f, 3f);
         public float CharmSeconds => Mathf.Clamp(Finite(charmSeconds, 10f), 1f, 30f);
         public int CharmRescueTaps => Mathf.Clamp(charmRescueTaps, 0, 10);
+        public int JigwiFireTargetCount => Mathf.Clamp(jigwiFireTargetCount, 1, 5);
+        public float JigwiFireSeconds => Mathf.Clamp(Finite(jigwiFireSeconds, 15f), 1f, 120f);
+        public float JigwiOverheatSeconds => Mathf.Clamp(Finite(jigwiOverheatSeconds, 4f), .1f, 60f);
+        public float JigwiGenerationBurnSeconds => Mathf.Clamp(Finite(jigwiGenerationBurnSeconds, 10f), .1f, 120f);
+        public float JigwiRawRadiusScale => Mathf.Clamp(Finite(jigwiRawRadiusScale, .65f), .2f, 1f);
+        public float JigwiRawLifeScale => Mathf.Clamp(Finite(jigwiRawLifeScale, .5f), .05f, 1f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
@@ -968,7 +989,9 @@ namespace C6Lab
                 BoardOrbTrailEnabled ? 1f : 0f,
                 SabotageMixEnabled ? 1f : 0f, SabotageIntervalMin, SabotageIntervalMax,
                 sabotageWeights[0], sabotageWeights[1], sabotageWeights[2], sabotageWeights[3],
-                FoxFireCountMin, FoxFireCountMax, FoxFireSafeSeconds, CharmSeconds, CharmRescueTaps
+                FoxFireCountMin, FoxFireCountMax, FoxFireSafeSeconds, CharmSeconds, CharmRescueTaps,
+                JigwiFireTargetCount, JigwiFireSeconds, JigwiOverheatSeconds,
+                JigwiGenerationBurnSeconds, JigwiRawRadiusScale, JigwiRawLifeScale
             };
         }
 
@@ -1186,6 +1209,12 @@ namespace C6Lab
             foxFireSafeSeconds = values[175];
             charmSeconds = values[176];
             charmRescueTaps = (int)values[177];
+            jigwiFireTargetCount = (int)values[178];
+            jigwiFireSeconds = values[179];
+            jigwiOverheatSeconds = values[180];
+            jigwiGenerationBurnSeconds = values[181];
+            jigwiRawRadiusScale = values[182];
+            jigwiRawLifeScale = values[183];
             error = string.Empty;
             return true;
         }

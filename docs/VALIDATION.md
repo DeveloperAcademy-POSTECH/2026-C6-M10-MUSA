@@ -2003,3 +2003,24 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | --- | --- | --- |
 | 전체 EditMode | **PASS820/820** | `c6-pr265-final-edit.xml`, 실패·생략·inconclusive0,24.860초. UTC09:09:13Z~09:09:38Z. |
 | 전체 PlayMode | **PASS291/291** | `c6-pr265-final-play.xml`, 실패·생략·inconclusive0,122.105초. UTC09:10:09Z~09:12:11Z. 콤보 OFF·방해공작 OFF 기본값을 포함한 최종 통합 소스. |
+
+
+## 지귀 수동 패턴 — #272 / 2026-10-21
+
+기준은 `origin/main`의 `2adc3e94`에서 분기한 `feat/#272-jigwi-fire-patterns`, Unity **6000.6.5f1**, 기존 `Assets/Lab/Scenes/Lab.unity` 단일 Scene이다. #262/Draft #269의 3스테이지 코드는 포함하지 않는다. 원시 로그·XML·진단 앱과 임시 제어 스크립트는 저장소에 올리지 않는다.
+
+| 항목 | 상태 | 이 브랜치에서 수행한 방법·결과 |
+| --- | --- | --- |
+| 최종 전체 EditMode | PASS | `c6-jigwi-release-edit.xml`: total=864, passed=864, failed=0, skipped=0. 실제 실행 시간 약24.9초. 모델·설정·보급·소유권/중복·화재 실패/소화·새 Raw 수명·과열 자연 조합 포함. |
+| 최종 전체 PlayMode | PASS | `c6-jigwi-release-play.xml`: total=310, passed=310, failed=0, skipped=0. 실제 실행 시간 약124.9초. 기존 투척·페인트·구슬 물리·로컬 예측 검사도 포함. |
+| 저장 Lab Scene의 수동 UI·라운드 초기화 | PASS | `LabJigwiSavedSceneTests`가 실제 저장 Scene과 NGO 솔로 Host로 실행. 저장된 버튼의 발동, 수 Combined3개 무료 지급, 일시정지 중 금지·전투 시계 정지, 실패 후 과열, 들고 있을 때 보존·취소 보존·놓을 때 소각, 유료 생성 소각, Raw 축소·만료, Restart 초기화를 확인했다. |
+| 실제 불길 물리 명중 → Host 소화 | PASS | 저장 Scene의 실제 Fire collider 앞에 테스트용 투사체 시작 위치/속도를 지정하고 물리로 명중시켜 실제 Host callback을 통과시켰다. 불길 소화와 함께 박 HP·도색·명중 보상이 유지되는지 확인했다. 플레이어 손 조작으로 조준한 실기기 검사는 아니다. |
+| 과열 자연 접촉·거절 복원 | PASS | 실제 Rigidbody 음양 충돌은 기존 정상 조합을 유지하고 자연 접촉 플래그를 요청/JSON/Host까지 보존한다. 직접 놓는 조합과 구분한다. 체크포인트 대기·중복 등록·일시정지 거절은 숨긴 두 입력을 복원한다. 자유롭게 굴러가는 둘째 구슬의 속도는 거절 처리로0이 되지 않는다. |
+| Mac Development 진단 앱 | PASS | 기존 `LabBuild.Mac`으로 저장 Lab만 빌드. 임시 두 프로세스 제어기는 진단 빌드에만 포함하고 소스와 `.meta`는 빌드 뒤 제거했다. 일반 제품 코드에는 자동 발동·자동 입력을 넣지 않았다. |
+| Mac Host/Client 실제 UDP | PASS | 같은 Mac의 실제2개 Development 실행본을 loopback UDP로 연결하고 P1/P2·공유 설정 확인 뒤 시작했다. Host가 Client에게 발동한 화재/N+2=3개 보급·무료 지급, 실패 후 들기 보존/놓기 소각의 Host 승인, 생성 화상 Raw 반지름0.65/수명0.5와 실제 만료/효과 종료 후 정상 생성을 확인했다. 양쪽 진단 종료값0, PASS marker, 예외 로그0이며 약15초에 완료했다. 시험 프로필은 북2개·이동 없는 생성으로 고정했고 제품 AUTO 북/생성 물리는 유지했다. 이는 외부 LAN/핫스팟 검사가 아니다. |
+| iPhone/iPad 설치·실제 터치/조준·LAN/핫스팟 | NOT_RUN | 이번 작업에서는 기기 설치/서명/네트워크별 플레이를 수행하지 않았다. 기존 호환성 기록을 이번 기능의 실행 결과로 승계하지 않는다. |
+| 기존 파일·Scene 참조 보존 | PASS | 원래 main 작업 폴더의 HEAD·상태·기존 미추적 파일 SHA256이 작업 전과 같다. 새 worktree의 Lab Scene 기존3007개 fileID가 모두 남았고110개가 추가됐다. Build Settings는 기존 Lab 단일 Scene 그대로이며 패키지·프로젝트 이름을 변경하지 않았다. |
+
+중간 검사에서 발견한 이전 설정 개수178/프로토콜5654 단정은 현재184/5655에 맞춰 수정했다. 거절 시 자유 partner의 수동 물리를 멈추던 경로는 pending인 둘째 입력만 복원하도록 수정했다. 최종 결과는 이 수정 및 과열 자연 접촉 구분 이후의 전체 검사다.
+
+실행 방법·기본 조정값·소각 예외·관련 코드는 [JIGWI_PATTERNS](JIGWI_PATTERNS.md)를 따른다. 이번 요청에서는 PR/main 병합을 수행하지 않는다.

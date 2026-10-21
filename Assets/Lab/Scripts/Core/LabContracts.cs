@@ -103,6 +103,12 @@ namespace C6Lab
         public double burnedAt = -1d;
         /// <summary>A bomb blast shrank this orb for the rest of its life, and any orb combined from it (#213).</summary>
         public bool small;
+        /// <summary>Jigwi generation curse only: independent of bomb shrink and paint damage.</summary>
+        public float jigwiRadiusScale = 1f;
+        /// <summary>Explicit Host battle-clock expiry; -1 retains the existing kind lifetime.</summary>
+        public double expiresAt = -1d;
+        public bool jigwiSupply;
+        public bool jigwiGenerationBurn;
 
         /// <summary>An unlock older than this, for example seen after a reconnect, shows the item already open.</summary>
         public const double UnlockEffectWindowSeconds = 1d;
@@ -119,11 +125,46 @@ namespace C6Lab
 
         /// <summary>Seconds left in this orb's lifetime at the given Host time (#235); never below 0.</summary>
         public float LifeSecondsLeft(double serverTime, float orbLifetime, float itemLifetime) =>
-            (float)Math.Max(0d, createdAt + kind.LifetimeFor(lockSwipes, orbLifetime, itemLifetime) - serverTime);
+            (float)Math.Max(0d, (expiresAt >= 0d ? expiresAt
+                : createdAt + kind.LifetimeFor(lockSwipes, orbLifetime, itemLifetime)) - serverTime);
 
         /// <summary>Seconds this orb still burns at the given Host time; 0 once out, or when it never burned.</summary>
         public float BurnSecondsLeft(double serverTime, float burnSeconds) =>
             burnedAt < 0d ? 0f : (float)Math.Max(0d, burnedAt + burnSeconds - serverTime);
+    }
+
+    [Serializable]
+    public sealed class LabJigwiFireTarget
+    {
+        public string id;
+        public float x, y;
+        public bool extinguished;
+        public LabJigwiFireTarget Copy() => (LabJigwiFireTarget)MemberwiseClone();
+    }
+
+    /// <summary>Host-approved, per-player Jigwi experiment state. All times use the paused battle clock.</summary>
+    [Serializable]
+    public sealed class LabJigwiState
+    {
+        public ulong playerId;
+        public string fireId;
+        public double fireStartedAt = -1d, fireEndsAt = -1d, overheatUntil = -1d, generationBurnUntil = -1d;
+        public LabJigwiFireTarget[] targets = Array.Empty<LabJigwiFireTarget>();
+        public bool FireActive(double now)
+        {
+            if (fireStartedAt < 0d || now < fireStartedAt || now >= fireEndsAt || targets == null) return false;
+            foreach (var target in targets) if (target != null && !target.extinguished) return true;
+            return false;
+        }
+        public bool Overheated(double now) => overheatUntil > now;
+        public bool GenerationBurnActive(double now) => generationBurnUntil > now;
+        public LabJigwiState Copy()
+        {
+            var copy = (LabJigwiState)MemberwiseClone();
+            copy.targets = targets == null ? Array.Empty<LabJigwiFireTarget>()
+                : Array.ConvertAll(targets, target => target?.Copy());
+            return copy;
+        }
     }
 
     [Serializable]
@@ -195,6 +236,13 @@ namespace C6Lab
         /// <summary>Host rope cycle phase and hit spring state for the moving target collider.</summary>
         public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();
+        public LabJigwiState[] jigwi = Array.Empty<LabJigwiState>();
+        public LabJigwiState JigwiFor(ulong player)
+        {
+            foreach (var state in jigwi ?? Array.Empty<LabJigwiState>())
+                if (state != null && state.playerId == player) return state;
+            return null;
+        }
         public LabOrbState[] orbs = Array.Empty<LabOrbState>();
         /// <summary>Generate drums. Only a player whose board holds one can create orbs.</summary>
         public LabOrbState[] drums = Array.Empty<LabOrbState>();
