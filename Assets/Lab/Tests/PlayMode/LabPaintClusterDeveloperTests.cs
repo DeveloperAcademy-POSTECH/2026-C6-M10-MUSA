@@ -204,7 +204,7 @@ namespace C6Lab.Tests
             Assert.That(NetworkField<int>("configRevision"), Is.EqualTo(revision + 1));
             Assert.That(NetworkField<string>("configFingerprint"), Is.Not.EqualTo(fingerprint));
             Assert.That(NetworkField<string>("configFingerprint"), Is.EqualTo(
-                LabSessionSettings.Fingerprint(ui.network.config.CaptureDeveloperValues(), 2, 5646)));
+                LabSessionSettings.Fingerprint(ui.network.config.CaptureDeveloperValues(), 2, 5647)));
             Assert.That(ui.network.CanStartBattle, Is.False);
             ui.network.StartBattle();
             Assert.That(ui.network.Snapshot, Is.Null,
