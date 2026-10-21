@@ -67,11 +67,43 @@ namespace C6Lab
         public readonly string Title;
         public readonly int[] FieldIndices;
 
+        /// <summary>
+        /// 묶음 안 구분선 (#268). DividerAt[k] 번째 줄(FieldIndices 안 위치) 바로 위에 DividerLabels[k]를 보여준다.
+        /// 화면 표시만 바뀌고 값 번호는 그대로다. 없으면 null.
+        /// </summary>
+        public readonly int[] DividerAt;
+        public readonly string[] DividerLabels;
+        /// <summary>
+        /// 묶음 제목 오른쪽의 한꺼번에 켜기/끄기 버튼이 함께 바꾸는 토글 항목 번호 (#268). 없으면 null.
+        /// 새 설정값이 아니라 아래 토글들을 같은 값으로 맞추는 화면 단축키다.
+        /// </summary>
+        public readonly int[] SwitchFields;
+
         public LabDeveloperCategory(string title, params int[] fieldIndices)
+            : this(title, fieldIndices, null, null, null) { }
+
+        private LabDeveloperCategory(string title, int[] fieldIndices, int[] dividerAt, string[] dividerLabels,
+            int[] switchFields)
         {
             Title = title;
             FieldIndices = fieldIndices;
+            DividerAt = dividerAt;
+            DividerLabels = dividerLabels;
+            SwitchFields = switchFields;
         }
+
+        /// <summary>줄 위치(FieldIndices 안 순서)와 글자를 짝지어 구분선을 붙인다.</summary>
+        public LabDeveloperCategory WithDividers(params (int before, string label)[] dividers)
+        {
+            var at = new int[dividers.Length];
+            var labels = new string[dividers.Length];
+            for (int i = 0; i < dividers.Length; i++) { at[i] = dividers[i].before; labels[i] = dividers[i].label; }
+            return new LabDeveloperCategory(Title, FieldIndices, at, labels, SwitchFields);
+        }
+
+        /// <summary>제목 오른쪽 버튼 하나로 이 토글들을 함께 켜고 끄게 한다.</summary>
+        public LabDeveloperCategory WithSwitch(params int[] toggleFields) =>
+            new LabDeveloperCategory(Title, FieldIndices, DividerAt, DividerLabels, toggleFields);
     }
 
     /// <summary>
@@ -307,9 +339,11 @@ namespace C6Lab
                 134, 132, 133, 148, 149, 150, 151),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
-            // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광을 함께 켜고 끈다.
+            // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             new LabDeveloperCategory("야광귀", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163,
                 178, 179, 180, 181, 182, 183, 184)
+                .WithSwitch(155, 178)
+                .WithDividers((0, "── 콤보 ──"), (10, "── 섬광 ──"))
         });
 
 
@@ -539,8 +573,8 @@ namespace C6Lab
         [SerializeField] private bool yaguangFlashTargetOne;
         [Tooltip("전투 시작 후 첫 섬광(번쩍이는 순간)까지의 시간 (초, 일시정지 제외). 예고는 그 직전에 온다.")]
         [SerializeField, Range(1f, 3600f)] private float yaguangFlashFirstStartSeconds = 30f;
-        [Tooltip("섬광과 다음 섬광 사이 간격 (초). 콤보 예고·진행 중이면 콤보가 끝날 때까지 미룬다.")]
-        [SerializeField, Range(1f, 3600f)] private float yaguangFlashIntervalSeconds = 40f;
+        [Tooltip("섬광과 다음 섬광 사이 간격 (초). 콤보 예고·진행 중이면 콤보가 끝날 때까지 미룬다. 기본 30·60초는 콤보(50초 시작·60초 간격)와 같은 박자로 콤보 20초 전마다 터져, 섬광(예고~회복 6초)과 콤보(예고~효과 끝 약 30초)가 겹치지 않고 사이에 12초 이상 평소 플레이가 남는다.")]
+        [SerializeField, Range(1f, 3600f)] private float yaguangFlashIntervalSeconds = 60f;
         [Tooltip("번쩍이기 전 요괴가 빼꼼 나와 눈이 밝아지는 예고 시간 (초). 0이면 예고 없이 번쩍인다.")]
         [SerializeField, Range(0f, 10f)] private float yaguangFlashWarningSeconds = 1.5f;
         [Tooltip("번쩍인 뒤 구슬·아이템이 완전히 하얗게 보이는 시간 (초)")]
@@ -872,7 +906,7 @@ namespace C6Lab
         /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
         public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
         public float YaguangFlashFirstStartSeconds => Mathf.Clamp(Finite(yaguangFlashFirstStartSeconds, 30f), 1f, 3600f);
-        public float YaguangFlashIntervalSeconds => Mathf.Clamp(Finite(yaguangFlashIntervalSeconds, 40f), 1f, 3600f);
+        public float YaguangFlashIntervalSeconds => Mathf.Clamp(Finite(yaguangFlashIntervalSeconds, 60f), 1f, 3600f);
         public float YaguangFlashWarningSeconds => Mathf.Clamp(Finite(yaguangFlashWarningSeconds, 1.5f), 0f, 10f);
         public float YaguangFlashGlareSeconds => Mathf.Clamp(Finite(yaguangFlashGlareSeconds, 3f), .1f, 30f);
         public float YaguangFlashRecoverySeconds => Mathf.Clamp(Finite(yaguangFlashRecoverySeconds, 1.5f), 0f, 10f);
