@@ -265,7 +265,15 @@ namespace C6Lab
             new LabDeveloperField("Fox Fire Count Max", 1f, 10f, true),
             new LabDeveloperField("Fox Fire Safe Seconds", 0f, 3f),
             new LabDeveloperField("Charm Seconds", 1f, 30f),
-            new LabDeveloperField("Charm Rescue Taps (0 = none)", 0f, 10f, true)
+            new LabDeveloperField("Charm Rescue Taps (0 = none)", 0f, 10f, true),
+            // The yaguang-gwi's flash (#268): its own schedule, separate from the sabotage mix.
+            LabDeveloperField.Toggle("Yaguang Flash (0 off, 1 on)"),
+            LabDeveloperField.Toggle("Yaguang Flash Target (0 all, 1 one)", "ALL", "ONE"),
+            new LabDeveloperField("Yaguang Flash First Start (seconds)", 1f, 3600f),
+            new LabDeveloperField("Yaguang Flash Interval (seconds)", 1f, 3600f),
+            new LabDeveloperField("Yaguang Flash Warning (seconds)", 0f, 10f),
+            new LabDeveloperField("Yaguang Flash Glare (seconds)", .1f, 30f),
+            new LabDeveloperField("Yaguang Flash Recovery (seconds)", 0f, 10f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -298,7 +306,8 @@ namespace C6Lab
                 134, 132, 133, 148, 149, 150, 151),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Combo", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163),
-            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177)
+            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
+            new LabDeveloperCategory("Yaguang flash", 178, 179, 180, 181, 182, 183, 184)
         });
 
 
@@ -520,6 +529,22 @@ namespace C6Lab
         [SerializeField, Range(1f, 30f)] private float charmSeconds = 10f;
         [Tooltip("매혹: 양옆 사람이 합쳐 이만큼 하트 말풍선을 누르면 바로 풀린다. 0이면 시간으로만 풀린다.")]
         [SerializeField, Range(0, 10)] private int charmRescueTaps = 3;
+
+        [Header("Yaguang flash (#268)")]
+        [Tooltip("야광귀 섬광. 박에서 요괴가 빼꼼 나와 눈이 밝아진 뒤(예고) 화면이 하얗게 번쩍이고, 눈부신 동안 판 위 음양·결합 구슬과 아이템이 하얗게 보인다(북·박 색칠·HUD는 그대로). 화면 표시만 바뀌고 조작·판정은 그대로다. 방해공작 묶음(#251)과 따로 돈다. 기본 켬.")]
+        [SerializeField] private bool yaguangFlashEnabled = true;
+        [Tooltip("섬광 대상. 끄면(ALL) 모두에게 동시에, 켜면(ONE) 매번 무작위 한 명에게만.")]
+        [SerializeField] private bool yaguangFlashTargetOne;
+        [Tooltip("전투 시작 후 첫 섬광(번쩍이는 순간)까지의 시간 (초, 일시정지 제외). 예고는 그 직전에 온다.")]
+        [SerializeField, Range(1f, 3600f)] private float yaguangFlashFirstStartSeconds = 30f;
+        [Tooltip("섬광과 다음 섬광 사이 간격 (초). 콤보 예고·진행 중이면 콤보가 끝날 때까지 미룬다.")]
+        [SerializeField, Range(1f, 3600f)] private float yaguangFlashIntervalSeconds = 40f;
+        [Tooltip("번쩍이기 전 요괴가 빼꼼 나와 눈이 밝아지는 예고 시간 (초). 0이면 예고 없이 번쩍인다.")]
+        [SerializeField, Range(0f, 10f)] private float yaguangFlashWarningSeconds = 1.5f;
+        [Tooltip("번쩍인 뒤 구슬·아이템이 완전히 하얗게 보이는 시간 (초)")]
+        [SerializeField, Range(.1f, 30f)] private float yaguangFlashGlareSeconds = 3f;
+        [Tooltip("눈부심이 끝난 뒤 색이 천천히 돌아오는 시간 (초). 0이면 바로 돌아온다.")]
+        [SerializeField, Range(0f, 10f)] private float yaguangFlashRecoverySeconds = 1.5f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -841,6 +866,14 @@ namespace C6Lab
         public float FoxFireSafeSeconds => Mathf.Clamp(Finite(foxFireSafeSeconds, 1f), 0f, 3f);
         public float CharmSeconds => Mathf.Clamp(Finite(charmSeconds, 10f), 1f, 30f);
         public int CharmRescueTaps => Mathf.Clamp(charmRescueTaps, 0, 10);
+        public bool YaguangFlashEnabled => yaguangFlashEnabled;
+        /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
+        public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
+        public float YaguangFlashFirstStartSeconds => Mathf.Clamp(Finite(yaguangFlashFirstStartSeconds, 30f), 1f, 3600f);
+        public float YaguangFlashIntervalSeconds => Mathf.Clamp(Finite(yaguangFlashIntervalSeconds, 40f), 1f, 3600f);
+        public float YaguangFlashWarningSeconds => Mathf.Clamp(Finite(yaguangFlashWarningSeconds, 1.5f), 0f, 10f);
+        public float YaguangFlashGlareSeconds => Mathf.Clamp(Finite(yaguangFlashGlareSeconds, 3f), .1f, 30f);
+        public float YaguangFlashRecoverySeconds => Mathf.Clamp(Finite(yaguangFlashRecoverySeconds, 1.5f), 0f, 10f);
         public LabOrbAppearance OrbAppearance => orbAppearance;
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
@@ -968,7 +1001,10 @@ namespace C6Lab
                 BoardOrbTrailEnabled ? 1f : 0f,
                 SabotageMixEnabled ? 1f : 0f, SabotageIntervalMin, SabotageIntervalMax,
                 sabotageWeights[0], sabotageWeights[1], sabotageWeights[2], sabotageWeights[3],
-                FoxFireCountMin, FoxFireCountMax, FoxFireSafeSeconds, CharmSeconds, CharmRescueTaps
+                FoxFireCountMin, FoxFireCountMax, FoxFireSafeSeconds, CharmSeconds, CharmRescueTaps,
+                YaguangFlashEnabled ? 1f : 0f, YaguangFlashTargetOne ? 1f : 0f, YaguangFlashFirstStartSeconds,
+                YaguangFlashIntervalSeconds, YaguangFlashWarningSeconds, YaguangFlashGlareSeconds,
+                YaguangFlashRecoverySeconds
             };
         }
 
@@ -1186,6 +1222,13 @@ namespace C6Lab
             foxFireSafeSeconds = values[175];
             charmSeconds = values[176];
             charmRescueTaps = (int)values[177];
+            yaguangFlashEnabled = values[178] >= .5f;
+            yaguangFlashTargetOne = values[179] >= .5f;
+            yaguangFlashFirstStartSeconds = values[180];
+            yaguangFlashIntervalSeconds = values[181];
+            yaguangFlashWarningSeconds = values[182];
+            yaguangFlashGlareSeconds = values[183];
+            yaguangFlashRecoverySeconds = values[184];
             error = string.Empty;
             return true;
         }
