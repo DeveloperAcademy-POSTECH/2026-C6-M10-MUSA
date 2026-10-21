@@ -107,6 +107,17 @@ namespace C6Lab
         [SerializeField, Min(.05f)] private float expirySmokeSeconds = .6f;
         [Tooltip("연기 색. 알파가 처음 진하기다.")]
         [SerializeField] private Color expirySmokeColor = new Color(.62f, .6f, .57f, .75f);
+        [Header("Fox fire (#251, presentation only)")]
+        [Tooltip("여우구슬 그림. 비우면 Resources/Sabotage/FoxOrb를 쓴다.")]
+        [SerializeField] private Sprite foxFireSprite;
+        [Tooltip("여우구슬 둘레의 푸른 빛. 알파가 가장 밝을 때의 진하기다. 같은 파란색인 수(水) 결합 구슬과 구분해 준다.")]
+        [SerializeField] private Color foxFireGlowColor = new Color(.35f, .75f, 1f, .7f);
+        [Tooltip("푸른 빛의 크기 (구슬 지름 배).")]
+        [SerializeField, Min(1f)] private float foxFireGlowSize = 1.6f;
+        [Tooltip("푸른 빛이 일렁이는 빠르기 (초당 횟수).")]
+        [SerializeField, Min(.1f)] private float foxFireGlowHz = 1.5f;
+        [Tooltip("여우구슬과, 그와 닿아 함께 사라지는 구슬의 연기 색.")]
+        [SerializeField] private Color foxFireSmokeColor = new Color(.35f, .62f, 1f, .8f);
         [Header("Gourd bomb drop (presentation only)")]
         [Tooltip("Seconds the bomb takes to fall from above the orb area onto its landing spot.")]
         [SerializeField, Min(.01f)] private float dropFallSeconds = .45f;
@@ -137,6 +148,7 @@ namespace C6Lab
         {
             if (kind == LabOrbKind.Yin) return yinSprite;
             if (kind == LabOrbKind.Yang) return yangSprite;
+            if (kind == LabOrbKind.FoxFire) return FoxFireSprite;
             if (kind != LabOrbKind.Combined) return null;
             return element switch
             {
@@ -148,6 +160,16 @@ namespace C6Lab
                 _ => null
             };
         }
+        /// <summary>The fox orb's art (#251); the Resources image when the Inspector leaves it empty.</summary>
+        public Sprite FoxFireSprite => foxFireSprite != null ? foxFireSprite
+            : defaultFoxFireSprite != null ? defaultFoxFireSprite
+            : defaultFoxFireSprite = Resources.Load<Sprite>(FoxFireSpritePath);
+        public const string FoxFireSpritePath = "Sabotage/FoxOrb";
+        private static Sprite defaultFoxFireSprite;
+        public Color FoxFireGlowColor => foxFireGlowColor;
+        public float FoxFireGlowSize => Mathf.Max(1f, foxFireGlowSize);
+        public float FoxFireGlowHz => foxFireGlowHz > 0f ? foxFireGlowHz : 1.5f;
+        public Color FoxFireSmokeColor => foxFireSmokeColor;
         public Texture2D BombArt => bombArt;
         public Texture2D BombFuseArt => bombFuseArt;
         public float BombBodySize => bombBodySize > 0f ? bombBodySize : 1.2f;

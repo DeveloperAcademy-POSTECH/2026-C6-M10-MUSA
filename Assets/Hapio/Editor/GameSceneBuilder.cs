@@ -13,7 +13,7 @@ using UnityEngine.SceneManagement;
 
 namespace Hapio.Editor
 {
-    /// <summary>Creates missing game assets once through Unity APIs. Never regenerates a designer's existing Scene.</summary>
+    /// <summary>Creates missing game assets through Unity APIs; existing assets change only through explicit upgrades.</summary>
     public static class GameSceneBuilder
     {
         public const string SessionPrefab = "Assets/Hapio/Resources/Hapio/GameSession.prefab";
@@ -98,6 +98,92 @@ namespace Hapio.Editor
             });
         }
 
+        /// <summary>Explicitly refresh the separate Battle copy and extend only the menu DEV settings.</summary>
+        [MenuItem("Hapio/Upgrade Existing Game Scenes From Current Lab")]
+        public static void UpgradeScenesForCurrentLab()
+        {
+            UpgradeBattleFromSavedLab();
+            UpgradeMenuDeveloperSchema();
+        }
+
+        /// <summary>Copy the current saved Lab through Unity while keeping the existing Battle asset identity.</summary>
+        public static void UpgradeBattleFromSavedLab()
+        {
+            if (!File.Exists(GameScenePaths.Battle))
+                throw new InvalidOperationException("Create the separate game Scenes before upgrading Battle.");
+            Scene loadedBattle = SceneManager.GetSceneByPath(GameScenePaths.Battle);
+            if (loadedBattle.IsValid() && loadedBattle.isLoaded)
+                throw new InvalidOperationException("Close Battle before refreshing its saved Lab copy.");
+            string guid = AssetDatabase.AssetPathToGUID(GameScenePaths.Battle);
+            Scene previous = SceneManager.GetActiveScene();
+            Scene source = SceneManager.GetSceneByPath(SourceBattle);
+            bool owned = !source.IsValid() || !source.isLoaded;
+            if (!owned && source.isDirty)
+                throw new InvalidOperationException("Save the current Lab edits before copying its saved Scene.");
+            if (owned) source = EditorSceneManager.OpenScene(SourceBattle, OpenSceneMode.Additive);
+            try
+            {
+                // saveAsCopy leaves the loaded source path and Lab file untouched. Saving over the
+                // existing destination preserves its .meta/GUID, unlike deleting and copying an asset.
+                if (!EditorSceneManager.SaveScene(source, GameScenePaths.Battle, true))
+                    throw new InvalidOperationException("Could not refresh the separate Battle copy.");
+            }
+            finally
+            {
+                if (owned && source.IsValid() && source.isLoaded) EditorSceneManager.CloseScene(source, true);
+                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
+            }
+            if (AssetDatabase.AssetPathToGUID(GameScenePaths.Battle) != guid)
+                throw new InvalidOperationException("Refreshing Battle unexpectedly changed its asset GUID.");
+            UpgradeScene(GameScenePaths.Battle, ConfigureBattle);
+        }
+
+        /// <summary>Append new DEV fields without regenerating either menu or its existing rows and layout.</summary>
+        public static void UpgradeMenuDeveloperSchema()
+        {
+            UpgradeScene(GameScenePaths.Home, UpgradeDeveloperRows);
+            UpgradeScene(GameScenePaths.Lobby, UpgradeDeveloperRows);
+        }
+
+        private static void UpgradeDeveloperRows(Scene scene)
+        {
+            GameScreen screen = Find<GameScreen>(scene);
+            if (screen == null || screen.developerPanel == null)
+                throw new InvalidOperationException("The saved menu DEV panel is missing.");
+            var scroll = screen.developerPanel.GetComponentInChildren<UnityEngine.UI.ScrollRect>(true);
+            if (scroll == null || scroll.content == null)
+                throw new InvalidOperationException("The saved menu DEV settings scroll is missing.");
+            int count = LabConfig.DeveloperFields.Count;
+            int existing = screen.developerInputs == null ? 0 : screen.developerInputs.Length;
+            if (existing > count || screen.developerSliders == null || screen.developerSliders.Length != existing)
+                throw new InvalidOperationException("The saved DEV inputs and sliders have an incompatible schema.");
+            // Validate first, so an unsupported custom row cannot leave a partially upgraded asset.
+            for (int i = 0; i < existing; i++)
+                if (screen.developerInputs[i] == null || screen.developerSliders[i] == null
+                    || screen.developerInputs[i].transform.parent != screen.developerSliders[i].transform.parent
+                    || screen.developerInputs[i].transform.parent.parent != scroll.content
+                    || screen.developerInputs[i].transform.parent.Find("Label") == null)
+                    throw new InvalidOperationException("The saved DEV row is incomplete: " + i);
+            Array.Resize(ref screen.developerInputs, count);
+            Array.Resize(ref screen.developerSliders, count);
+            float[] values = AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset").CaptureDeveloperValues();
+            for (int i = 0; i < count; i++)
+            {
+                if (i >= existing) CreateDeveloperRow(screen, scroll.content, i, values[i]);
+                else
+                {
+                    LabDeveloperField field = LabConfig.DeveloperFields[i];
+                    var label = screen.developerInputs[i].transform.parent.Find("Label").GetComponent<UnityEngine.UI.Text>();
+                    label.text = DeveloperLabel(field);
+                    screen.developerInputs[i].SetTextWithoutNotify(values[i].ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    UnityEngine.UI.Slider slider = screen.developerSliders[i];
+                    slider.minValue = field.Min; slider.maxValue = field.Max; slider.wholeNumbers = field.WholeNumber;
+                    slider.SetValueWithoutNotify(values[i]);
+                }
+            }
+            EditorUtility.SetDirty(screen);
+        }
+
         private static void UpgradeScene(string path, Action<Scene> change)
         {
             if (!File.Exists(path)) throw new InvalidOperationException("The saved game Scene is missing: " + path);
@@ -156,35 +242,7 @@ namespace Hapio.Editor
             SceneManager.SetActiveScene(scene);
             try
             {
-                LabNetwork old = Find<LabNetwork>(scene);
-                LabSceneController controller = Find<LabSceneController>(scene);
-                if (old == null || controller == null) throw new InvalidOperationException("Battle source references are incomplete.");
-                GameBattleBindings bindings = controller.gameObject.AddComponent<GameBattleBindings>();
-                bindings.board = old.board; bindings.target = old.target; bindings.battleFloor = old.battleFloor;
-                bindings.impactFeedback = old.impactFeedback; bindings.projectileRoot = old.projectileRoot;
-                bindings.sceneController = controller; bindings.hud = Find<LabHud>(scene);
-                bindings.developerMode = Find<LabDeveloperMode>(scene); bindings.seatCamera = Find<LabSeatCamera>(scene);
-                bindings.battleCamera = bindings.seatCamera == null ? null : bindings.seatCamera.battleCamera;
-                if (bindings.hud != null)
-                {
-                    bindings.hud.gameObject.name = "BattleCanvas";
-                    Transform parent = bindings.hud.transform;
-                    bindings.stageLabel = Label("StageLabel", parent, "STAGE 1 / 3", 14);
-                    bindings.stageLabel.color = StageInk;
-                    Rect(bindings.stageLabel.rectTransform, new Vector2(.32f, .945f), new Vector2(.7f, .98f), Vector2.zero, Vector2.zero);
-                }
-                // Only this new copy loses its standalone session. Existing assets and file IDs are preserved.
-                bool ownsBattleHierarchy = new Component[] { bindings.board, bindings.target, controller, bindings.hud, bindings.seatCamera, bindings.developerMode }
-                    .Any(component => component != null && component.transform.IsChildOf(old.transform));
-                if (ownsBattleHierarchy)
-                {
-                    NetworkManager manager = old.manager;
-                    var transport = old.transport;
-                    UnityEngine.Object.DestroyImmediate(old);
-                    if (manager != null) UnityEngine.Object.DestroyImmediate(manager);
-                    if (transport != null) UnityEngine.Object.DestroyImmediate(transport);
-                }
-                else UnityEngine.Object.DestroyImmediate(old.gameObject);
+                ConfigureBattle(scene);
                 EditorSceneManager.SaveScene(scene, GameScenePaths.Battle);
             }
             finally
@@ -192,6 +250,39 @@ namespace Hapio.Editor
                 EditorSceneManager.CloseScene(scene, true);
                 if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
             }
+        }
+
+        private static void ConfigureBattle(Scene scene)
+        {
+            LabNetwork old = Find<LabNetwork>(scene);
+            LabSceneController controller = Find<LabSceneController>(scene);
+            if (old == null || controller == null) throw new InvalidOperationException("Battle source references are incomplete.");
+            GameBattleBindings bindings = controller.gameObject.AddComponent<GameBattleBindings>();
+            bindings.board = old.board; bindings.target = old.target; bindings.battleFloor = old.battleFloor;
+            bindings.impactFeedback = old.impactFeedback; bindings.projectileRoot = old.projectileRoot;
+            bindings.sceneController = controller; bindings.hud = Find<LabHud>(scene);
+            bindings.developerMode = Find<LabDeveloperMode>(scene); bindings.seatCamera = Find<LabSeatCamera>(scene);
+            bindings.battleCamera = bindings.seatCamera == null ? null : bindings.seatCamera.battleCamera;
+            if (bindings.hud != null)
+            {
+                bindings.hud.gameObject.name = "BattleCanvas";
+                Transform parent = bindings.hud.transform;
+                bindings.stageLabel = Label("StageLabel", parent, "STAGE 1 / 3", 14);
+                bindings.stageLabel.color = StageInk;
+                Rect(bindings.stageLabel.rectTransform, new Vector2(.32f, .945f), new Vector2(.7f, .98f), Vector2.zero, Vector2.zero);
+            }
+            // Only this new copy loses its standalone session. Existing assets and file IDs are preserved.
+            bool ownsBattleHierarchy = new Component[] { bindings.board, bindings.target, controller, bindings.hud, bindings.seatCamera, bindings.developerMode }
+                .Any(component => component != null && component.transform.IsChildOf(old.transform));
+            if (ownsBattleHierarchy)
+            {
+                NetworkManager manager = old.manager;
+                var transport = old.transport;
+                UnityEngine.Object.DestroyImmediate(old);
+                if (manager != null) UnityEngine.Object.DestroyImmediate(manager);
+                if (transport != null) UnityEngine.Object.DestroyImmediate(transport);
+            }
+            else UnityEngine.Object.DestroyImmediate(old.gameObject);
         }
 
         private static void CreateMenu(string path, GameScreenKind kind)
@@ -302,22 +393,28 @@ namespace Hapio.Editor
             s.developerInputs = new UnityEngine.UI.InputField[count]; s.developerSliders = new UnityEngine.UI.Slider[count];
             float[] values = AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset").CaptureDeveloperValues();
             for (int i = 0; i < count; i++)
-            {
-                LabDeveloperField field = LabConfig.DeveloperFields[i];
-                Transform row = Box("Setting" + i.ToString("000"), content, Panel);
-                row.gameObject.AddComponent<UnityEngine.UI.LayoutElement>().preferredHeight = 88f;
-                var label = Label("Label", row, field.Label + (field.IsChoice ? " · " + string.Join(" / ", field.Choices) : ""), 11);
-                label.alignment = TextAnchor.MiddleLeft;
-                Rect(label.rectTransform, new Vector2(.025f, .57f), new Vector2(.975f, .98f), Vector2.zero, Vector2.zero);
-                s.developerInputs[i] = Input("Value", row, values[i].ToString(System.Globalization.CultureInfo.InvariantCulture));
-                Rect(s.developerInputs[i].GetComponent<RectTransform>(), new Vector2(.025f, .07f), new Vector2(.34f, .55f), Vector2.zero, Vector2.zero);
-                s.developerSliders[i] = Slider(row, field.Min, field.Max, field.WholeNumber, values[i]);
-            }
+                CreateDeveloperRow(s, content, i, values[i]);
             s.developerFeedback = Label("Feedback", panel, "Run settings only; the saved LabConfig is not changed.", 12);
             Rect(s.developerFeedback.rectTransform, new Vector2(.05f, .12f), new Vector2(.95f, .19f), Vector2.zero, Vector2.zero);
             s.applyDeveloperButton = Button("ApplySettings", panel, "APPLY SETTINGS", .05f, .035f, .69f, .11f);
             s.closeDeveloperButton = Button("CloseSettings", panel, "CLOSE", .72f, .035f, .95f, .11f);
             panel.gameObject.SetActive(false);
+        }
+
+        private static string DeveloperLabel(LabDeveloperField field) =>
+            field.Label + (field.IsChoice ? " · " + string.Join(" / ", field.Choices) : "");
+
+        private static void CreateDeveloperRow(GameScreen screen, Transform content, int index, float value)
+        {
+            LabDeveloperField field = LabConfig.DeveloperFields[index];
+            Transform row = Box("Setting" + index.ToString("000"), content, Panel);
+            row.gameObject.AddComponent<UnityEngine.UI.LayoutElement>().preferredHeight = 88f;
+            var label = Label("Label", row, DeveloperLabel(field), 11);
+            label.alignment = TextAnchor.MiddleLeft;
+            Rect(label.rectTransform, new Vector2(.025f, .57f), new Vector2(.975f, .98f), Vector2.zero, Vector2.zero);
+            screen.developerInputs[index] = Input("Value", row, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Rect(screen.developerInputs[index].GetComponent<RectTransform>(), new Vector2(.025f, .07f), new Vector2(.34f, .55f), Vector2.zero, Vector2.zero);
+            screen.developerSliders[index] = Slider(row, field.Min, field.Max, field.WholeNumber, value);
         }
 
         private static UnityEngine.UI.Slider Slider(Transform parent, float min, float max, bool whole, float value)

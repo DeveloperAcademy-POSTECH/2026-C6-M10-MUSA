@@ -245,6 +245,149 @@ namespace Hapio.Tests
             Assert.That(network.Snapshot.players.Single().stamina, Is.EqualTo(73f).Within(.01f));
         }
 
+        [UnityTest]
+        public IEnumerator SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset()
+        {
+            GameSession persistent = session;
+            LabNetwork persistentNetwork = network;
+            float[] foxSettings = network.config.CaptureDeveloperValues();
+            Set(foxSettings, "Drop Combine (0 off, 1 on)", 1f);
+            Set(foxSettings, "Sabotage Mix (0 off, 1 on)", 1f);
+            Set(foxSettings, "Sabotage Interval Min (seconds)", 2f);
+            Set(foxSettings, "Sabotage Interval Max (seconds)", 2f);
+            Set(foxSettings, "Sabotage Weight Gourd Bomb", 0f);
+            Set(foxSettings, "Sabotage Weight Swipe Block", 0f);
+            Set(foxSettings, "Sabotage Weight Fox Fire", 3f);
+            Set(foxSettings, "Sabotage Weight Charm", 0f);
+            Set(foxSettings, "Fox Fire Count Min", 2f);
+            Set(foxSettings, "Fox Fire Count Max", 2f);
+            Set(foxSettings, "Fox Fire Safe Seconds", .25f);
+            Set(foxSettings, "Charm Seconds", 9f);
+            Set(foxSettings, "Charm Rescue Taps (0 = none)", 5f);
+            Assert.That(session.ApplyDeveloperSettings(foxSettings, out string error), Is.True, error);
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            AssertDeveloperSettings(foxSettings);
+
+            LabOrbBoard foxBoard = network.board;
+            yield return Until(() => network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.FoxFire),
+                "The persisted Home settings must cast real Fox Fire in the saved Battle.");
+            LabOrbState[] foxes = network.Snapshot.orbs.Where(orb => orb.kind == LabOrbKind.FoxFire).ToArray();
+            Assert.That(foxes.Length, Is.EqualTo(2), "The new shared Fox Fire count must reach the live model.");
+            yield return Until(() => foxes.All(fox => foxBoard.IsFoxFire(fox.id)),
+                "The saved board must receive the real Fox Fire drop.");
+            LabOrbView foxView = foxBoard.GetComponentsInChildren<LabOrbView>()
+                .Single(view => view.OrbId == foxes[0].id);
+            Assert.That(foxView.FoxGlowVisible, Is.True);
+            Assert.That(foxView.GetComponentInChildren<LabOrbSpriteArt>(), Is.Not.Null);
+            yield return Until(() => !foxBoard.IsDropping(foxes[0].id), "The fox must land before it can consume Yin.");
+            yield return new WaitForSeconds(network.config.FoxFireSafeSeconds + .1f);
+
+            network.Generate();
+            yield return Until(() => network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.Yin),
+                "The actual Generate path must create a Yin for Fox Fire contact.");
+            string yinId = network.Snapshot.orbs.Single(orb => orb.kind == LabOrbKind.Yin).id;
+            yield return Until(() => foxBoard.GetComponentsInChildren<LabOrbView>().Any(view => view.OrbId == yinId),
+                "The generated Yin must reach the saved board.");
+            LabOrbView yinView = foxBoard.GetComponentsInChildren<LabOrbView>().Single(view => view.OrbId == yinId);
+            // Controlled pointer positions exercise the actual board -> network -> Host request path.
+            // This is a drop-overlap fixture, not a claim about uncontrolled collision accuracy.
+            double gestureAt = Time.timeAsDouble;
+            Vector2 foxPoint = new Vector2(foxView.Body.position.x, foxView.Body.position.y);
+            Assert.That(foxBoard.TryBeginDragAtWorld(new Vector2(yinView.Body.position.x, yinView.Body.position.y),
+                gestureAt), Is.True);
+            Assert.That(foxBoard.DragToWorld(foxPoint, gestureAt + .1d), Is.True);
+            Assert.That(foxBoard.EndDragAtWorld(foxPoint, gestureAt + .5d), Is.True);
+            yield return Until(() => network.Snapshot.orbs.All(orb => orb.id != foxes[0].id && orb.id != yinId),
+                "Fox contact must consume both real model orbs; hiding local previews is insufficient.");
+            Assert.That(network.Snapshot.players.Single().passedTotal, Is.Zero);
+            Assert.That(foxBoard.IsFoxFire(foxes[1].id), Is.True,
+                "An unconsumed Fox remains to exercise cleanup during the same-stage reload.");
+
+            string runId = session.State.runId;
+            string firstBattleId = session.State.battleSessionId;
+            session.Pause();
+            Assert.That(network.IsBattlePaused, Is.True);
+            float[] charmSettings = network.config.CaptureDeveloperValues();
+            Set(charmSettings, "Sabotage Interval Min (seconds)", 3f);
+            Set(charmSettings, "Sabotage Interval Max (seconds)", 3f);
+            Set(charmSettings, "Sabotage Weight Fox Fire", 0f);
+            Set(charmSettings, "Sabotage Weight Charm", 4f);
+            Set(charmSettings, "Fox Fire Count Min", 3f);
+            Set(charmSettings, "Fox Fire Count Max", 4f);
+            Set(charmSettings, "Fox Fire Safe Seconds", .75f);
+            Set(charmSettings, "Charm Seconds", 11f);
+            Set(charmSettings, "Charm Rescue Taps (0 = none)", 6f);
+            Assert.That(session.ApplyDeveloperSettings(charmSettings, out error), Is.True, error);
+            yield return Until(() => session.State.phase == GameFlowPhase.Playing
+                && session.State.battleSessionId != firstBattleId && !session.IsLoadingScene,
+                "The new Sabotage settings must restart the current stage through a fresh saved Battle.");
+            Assert.That(GameSession.Instance, Is.SameAs(persistent));
+            Assert.That(session.Network, Is.SameAs(persistentNetwork));
+            Assert.That(session.State.runId, Is.EqualTo(runId));
+            Assert.That(session.State.stageIndex, Is.EqualTo(1));
+            Assert.That(foxBoard == null, Is.True);
+            Assert.That(foxView == null && yinView == null, Is.True);
+            AssertDeveloperSettings(charmSettings);
+            AssertFreshStage();
+            AssertFreshSabotagePresentation();
+
+            LabOrbBoard charmBoard = network.board;
+            LabCharmHud charmHud = Object.FindAnyObjectByType<LabCharmHud>();
+            LabGourdAlert charmAlert = Object.FindAnyObjectByType<LabGourdAlert>();
+            yield return Until(() => charmBoard.Charmed && charmHud.GaugeVisible && charmAlert.ShowingHeart,
+                "The retained settings must cast real Charm and reach all saved Battle presentations.");
+            Assert.That(network.Snapshot.CharmOn(network.LocalPlayerId), Is.True);
+            Assert.That(network.Snapshot.charmUntil - network.Snapshot.charmStartedAt, Is.EqualTo(11d).Within(.001d));
+            Assert.That(charmBoard.CharmEdge.Visible, Is.True);
+            Assert.That(charmHud.GaugeFill, Is.InRange(.01f, 1f));
+            string charmBattleId = session.State.battleSessionId;
+            CompleteMapInFixture(Model());
+            yield return Until(() => session.State.phase == GameFlowPhase.StageResult
+                && !session.IsLoadingScene && session.CanAdvanceStage,
+                "A real committed victory must reach the next-stage barrier while Charm is active.");
+            Assert.That(charmBoard == null && charmHud == null && charmAlert == null, Is.True);
+            session.NextStage();
+            yield return WaitPlaying(2);
+            Assert.That(GameSession.Instance, Is.SameAs(persistent));
+            Assert.That(session.Network, Is.SameAs(persistentNetwork));
+            Assert.That(session.State.runId, Is.EqualTo(runId));
+            Assert.That(session.State.battleSessionId, Is.Not.EqualTo(charmBattleId));
+            AssertDeveloperSettings(charmSettings);
+            AssertFreshStage();
+            AssertFreshSabotagePresentation();
+        }
+
+        private void AssertDeveloperSettings(float[] expected)
+        {
+            float[] actual = network.config.CaptureDeveloperValues();
+            Assert.That(actual.Length, Is.EqualTo(178), "The persistent game session must use the current shared schema.");
+            Assert.That(actual, Is.EqualTo(expected),
+                "All approved values, including the twelve Sabotage fields, must survive Scene-owned DEV cleanup.");
+        }
+
+        private void AssertFreshSabotagePresentation()
+        {
+            LabSnapshot snapshot = network.Snapshot;
+            Assert.That(snapshot.charmStartedAt, Is.LessThan(0d));
+            Assert.That(snapshot.charmUntil, Is.LessThanOrEqualTo(snapshot.serverTime));
+            Assert.That(snapshot.charmTaps, Is.Zero);
+            Assert.That(snapshot.CharmOn(network.LocalPlayerId), Is.False);
+            Assert.That(network.board.Charmed, Is.False);
+            Assert.That(network.board.CharmEdge == null || !network.board.CharmEdge.Visible, Is.True);
+            Assert.That(network.board.GetComponentsInChildren<LabOrbView>()
+                .Any(view => view.Kind == LabOrbKind.FoxFire), Is.False);
+            LabCharmHud hud = Object.FindAnyObjectByType<LabCharmHud>();
+            LabCharmBubbles bubbles = Object.FindAnyObjectByType<LabCharmBubbles>();
+            LabGourdAlert alert = Object.FindAnyObjectByType<LabGourdAlert>();
+            Assert.That(hud, Is.Not.Null, "The saved Battle must bind its own Charm HUD to the persistent network.");
+            Assert.That(bubbles, Is.Not.Null);
+            Assert.That(alert, Is.Not.Null);
+            Assert.That(hud.GaugeVisible || hud.AwakeShowing, Is.False);
+            Assert.That(bubbles.LeftShowing || bubbles.RightShowing, Is.False);
+            Assert.That(alert.Active, Is.False);
+        }
+
         private void AssertFreshStage()
         {
             LabSnapshot snapshot = network.Snapshot;

@@ -2584,6 +2584,359 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void SabotageMixOffKeepsTheGourdsOwnTimersAndCastsNothing()
+        {
+            var gourd = GourdConfig(5f, 5f);
+            try
+            {
+                Assert.That(gourd.SabotageMixEnabled, Is.False, "The mix is an experiment, off by default (#251).");
+                var room = new LabModel();
+                room.Begin("mix-off", new ulong[] { 10, 20, 30 }, 0d, gourd);
+                room.Tick(21d);
+                Assert.That(room.DrainGourdBombs().Length, Is.EqualTo(4), "Bombs keep their own 5 s timer.");
+                Assert.That(room.DrainSabotages(), Is.Empty);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(gourd); }
+        }
+
+        [Test]
+        public void SabotageMixCastsOneSabotageEachIntervalInsteadOfTheBombAndBlockTimers()
+        {
+            var mix = MixConfig(5f, bomb: 1, block: 0, fox: 0, charm: 0);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("mix-bombs", new ulong[] { 10, 20, 30 }, 0d, mix);
+                room.Tick(21d);
+                LabSabotage[] cast = room.DrainSabotages();
+                Assert.That(cast.Select(item => item.At), Is.EqualTo(new[] { 5d, 10d, 15d, 20d }));
+                Assert.That(cast.All(item => item.Kind == LabSabotageKind.GourdBomb), Is.True);
+                Assert.That(room.DrainGourdBombs().Select(drop => drop.Target), Is.EqualTo(cast.Select(item => item.Target)),
+                    "Each bomb the mix casts is the gourd's ordinary bomb, and their own 1 s timer is stopped.");
+                Assert.That(room.Snapshot(21d).swipeBlockedPlayer, Is.Zero, "The swipe block's own timer is stopped too.");
+                Assert.That(cast.Zip(cast.Skip(1), (a, b) => a.Target != b.Target).All(differs => differs), Is.True,
+                    "No one gets two sabotages in a row.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void SabotageMixWaitsOutASwipeBlockAndNeverAddsToTheBlockedPlayer()
+        {
+            var mix = MixConfig(3f, bomb: 1, block: 1, fox: 0, charm: 0);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("mix-blocks", new ulong[] { 10, 20, 30, 40 }, 0d, mix);
+                room.Tick(180d);
+                LabSabotage[] cast = room.DrainSabotages();
+                LabSabotage[] blocks = cast.Where(item => item.Kind == LabSabotageKind.SwipeBlock).ToArray();
+                Assert.That(blocks, Is.Not.Empty);
+                Assert.That(cast.Any(item => item.Kind == LabSabotageKind.GourdBomb), Is.True);
+                foreach (LabSabotage block in blocks)
+                    foreach (LabSabotage other in cast.Where(item => item.At > block.At && item.At < block.At + 10d))
+                    {
+                        Assert.That(other.Kind, Is.Not.EqualTo(LabSabotageKind.SwipeBlock), "One swipe block at a time.");
+                        Assert.That(other.Target, Is.Not.EqualTo(block.Target), "Nothing more falls on the blocked player.");
+                    }
+                Assert.That(cast.Zip(cast.Skip(1), (a, b) => a.Target != b.Target).All(differs => differs), Is.True);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void SabotageMixCharmsInAnyRoomAndSolo()
+        {
+            var mix = MixConfig(11f, bomb: 0, block: 0, fox: 0, charm: 1);
+            try
+            {
+                var pair = new LabModel();
+                pair.Begin("charm-pair", new ulong[] { 10, 20 }, 0d, mix);
+                pair.Tick(34d);
+                LabSabotage[] pairCharms = pair.DrainSabotages();
+                Assert.That(pairCharms.Select(item => item.At), Is.EqualTo(new[] { 11d, 22d, 33d }), "Two players are charmed too.");
+                Assert.That(pairCharms.Zip(pairCharms.Skip(1), (a, b) => a.Target != b.Target).All(differs => differs), Is.True,
+                    "Taking turns, as no one gets two sabotages in a row.");
+                ulong charmed = pairCharms[2].Target;
+                ulong other = charmed == 10ul ? 20ul : 10ul;
+                for (int tap = 1; tap <= 3; tap++)
+                    Assert.That(pair.TryCharmTap(other, 34d + tap * .1d, out _), Is.True, "The other player is beside them both ways.");
+                Assert.That(pair.Snapshot(34.3d).CharmOn(charmed), Is.False, "Alone, they wake them with three taps.");
+
+                var trio = new LabModel();
+                trio.Begin("charm-trio", new ulong[] { 10, 20, 30 }, 0d, mix);
+                trio.Tick(34d);
+                LabSabotage[] charms = trio.DrainSabotages();
+                Assert.That(charms.Select(item => item.At), Is.EqualTo(new[] { 11d, 22d, 33d }));
+                Assert.That(charms.All(item => item.Kind == LabSabotageKind.Charm), Is.True);
+
+                var solo = new LabModel();
+                solo.BeginSolo("charm-solo", 42ul, 0d, mix);
+                solo.Tick(23d);
+                Assert.That(solo.DrainSabotages().Select(item => item.Target), Is.EqualTo(new[] { 42ul, 42ul }),
+                    "Solo, to try it out, it falls on the one player every time.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void SabotageMixDrawsTheSameSabotagesOnEveryScreenAndSkipsWeightZero()
+        {
+            var mix = MixConfig(2f, bomb: 1, block: 1, fox: 1, charm: 0);
+            try
+            {
+                var ids = new ulong[] { 10, 20, 30 };
+                var room = new LabModel();
+                room.Begin("mix-same", ids, 0d, mix);
+                room.Tick(120d);
+                LabSabotage[] cast = room.DrainSabotages();
+                Assert.That(cast.Select(item => item.Kind).Distinct(), Is.EquivalentTo(new[]
+                    { LabSabotageKind.GourdBomb, LabSabotageKind.SwipeBlock, LabSabotageKind.FoxFire }),
+                    "Every weighted sabotage comes up; the charm, weighted 0, never does.");
+
+                var again = new LabModel();
+                again.Begin("mix-same", ids, 0d, mix);
+                again.Tick(120d);
+                Assert.That(again.DrainSabotages().Select(item => (item.Kind, item.Target, item.At)),
+                    Is.EqualTo(cast.Select(item => (item.Kind, item.Target, item.At))),
+                    "The same session and round cast the same sabotages on the same players at the same times.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void FoxFireDropsTwoToFiveFoxOrbsOnOnePlayerButNoMoreThanItsBoardHolds()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("fox-drop", new ulong[] { 10, 20, 30 }, 0d, mix);
+                room.Tick(5d);
+                LabFoxFireDrop drop = room.DrainFoxFires().Single();
+                Assert.That(room.DrainSabotages().Single().Target, Is.EqualTo(drop.Target));
+                Assert.That(drop.OrbIds.Length, Is.InRange(2, 5));
+                LabOrbState[] foxes = room.Snapshot(5d).orbs.Where(orb => orb.kind == LabOrbKind.FoxFire).ToArray();
+                Assert.That(foxes.Select(orb => orb.id), Is.EquivalentTo(drop.OrbIds));
+                Assert.That(foxes.All(orb => orb.owner == drop.Target && orb.origin == LabOrbOrigin.Gourd
+                    && orb.createdAt == 5d), Is.True);
+                Assert.That(foxes.All(orb => orb.x >= .15f && orb.x <= .85f && orb.y >= .25f && orb.y <= .8f), Is.True,
+                    "They fall well inside the board.");
+                Assert.That(foxes.Any(orb => orb.kind.CanThrow(orb.lockSwipes)), Is.False, "A fox orb is never an attack.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+
+            var tight = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                float[] values = tight.CaptureDeveloperValues();
+                values[9] = 3f;   // three stored orbs at most
+                values[173] = 5f; // and always five fox orbs
+                values[174] = 5f;
+                Assert.That(tight.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var solo = new LabModel();
+                solo.BeginSolo("fox-full", 42ul, 0d, tight);
+                solo.Tick(5d);
+                Assert.That(solo.DrainFoxFires().Single().OrbIds.Length, Is.EqualTo(3), "Only as many as the board still holds.");
+                solo.Tick(11d);
+                Assert.That(solo.DrainFoxFires(), Is.Empty, "A full board is passed over.");
+                Assert.That(solo.DrainSabotages().Length, Is.EqualTo(1));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(tight); }
+        }
+
+        [Test]
+        public void AFoxOrbTakesAYinOrYangAwayWithItButNotInItsSafeSecond()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var solo = new LabModel();
+                solo.BeginSolo("fox-touch", 42ul, 0d, mix);
+                solo.Tick(5d);
+                string[] foxes = solo.DrainFoxFires().Single().OrbIds;
+                LabOrbState yin = null, yang = null;
+                for (int i = 0; i < 10 && (yin == null || yang == null); i++)
+                {
+                    Assert.That(solo.TryGenerate(42ul, "fox-pair-" + i, 5.1d, out var orb, out string generated), Is.True, generated);
+                    if (orb.kind == LabOrbKind.Yin) yin = orb;
+                    else if (orb.kind == LabOrbKind.Yang) yang = orb;
+                }
+                Assert.That(yin, Is.Not.Null);
+                Assert.That(yang, Is.Not.Null);
+
+                Assert.That(solo.TryFoxFireAt(42ul, foxes[0], yin.id, "fox-early", 5.5d, out string reason), Is.False);
+                Assert.That(reason, Is.EqualTo("FOX_FIRE_SAFE"), "Safe for a second after it falls.");
+                Assert.That(solo.TryFoxFireAt(42ul, foxes[0], foxes[1], "fox-fox", 6.1d, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("NOT_FOX_FIRE"), "Two fox orbs just bump.");
+                Assert.That(solo.TryFoxFireAt(42ul, yin.id, foxes[0], "fox-backwards", 6.1d, out reason), Is.False);
+                Assert.That(solo.TryCombineAt(42ul, foxes[0], yin.id, "fox-combine", 6.1d, new Vector2(.5f, .5f), Vector2.zero,
+                    out _, out reason), Is.False, "It never combines into an attack orb.");
+
+                Assert.That(solo.TryFoxFireAt(42ul, foxes[0], yin.id, "fox-takes-yin", 6.1d, out reason), Is.True, reason);
+                Assert.That(reason, Is.EqualTo("FOX_FIRE"));
+                LabOrbState[] left = solo.Snapshot(6.1d).orbs;
+                Assert.That(left.Any(orb => orb.id == foxes[0] || orb.id == yin.id), Is.False, "Both go.");
+                Assert.That(left.Any(orb => orb.kind == LabOrbKind.Combined), Is.False, "Nothing comes of it.");
+                Assert.That(solo.TryFoxFireAt(42ul, foxes[1], yang.id, "fox-takes-yang", 6.2d, out reason), Is.True, reason);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void AFoxOrbOverASideEdgeGoesEvenSoloAndNeverReachesANeighbour()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("fox-edge", new ulong[] { 10, 20, 30 }, 0d, mix);
+                room.Tick(5d);
+                LabFoxFireDrop drop = room.DrainFoxFires().Single();
+                string fox = drop.OrbIds[0];
+                Assert.That(room.TryTransferAt(drop.Target, fox, true, new Vector2(.99f, .5f), Vector2.right, "fox-edge", 5.2d,
+                    LabEdgeCrossingKind.Swipe, out var passed, out string reason), Is.True, reason);
+                Assert.That(reason, Is.EqualTo("FOX_FIRE_GONE"));
+                Assert.That(passed, Is.Null, "Nothing is handed on.");
+                LabSnapshot after = room.Snapshot(5.2d);
+                Assert.That(after.orbs.Any(orb => orb.id == fox), Is.False);
+                Assert.That(after.players.All(player => player.passedTotal == 0), Is.True, "It does not count as a pass.");
+
+                var solo = new LabModel();
+                solo.BeginSolo("fox-edge-solo", 42ul, 0d, mix);
+                solo.Tick(5d);
+                string alone = solo.DrainFoxFires().Single().OrbIds[0];
+                Assert.That(solo.TryTransferAt(42ul, alone, false, new Vector2(.01f, .5f), Vector2.left, "fox-edge-solo", 5.2d,
+                    LabEdgeCrossingKind.Pushed, out _, out reason), Is.True, reason);
+                Assert.That(solo.Snapshot(5.2d).orbs.Any(orb => orb.id == alone), Is.False, "Even solo, with no one beside.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void FoxOrbsRunOutAfterTheOrbLifetime()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var solo = new LabModel();
+                solo.BeginSolo("fox-life", 42ul, 0d, mix);
+                solo.Tick(5d);
+                string[] foxes = solo.DrainFoxFires().Single().OrbIds;
+                solo.Tick(12.9d);
+                Assert.That(solo.DrainOrbExpiries().Select(item => item.OrbId).Intersect(foxes), Is.Empty);
+                solo.Tick(13.1d);
+                Assert.That(solo.DrainOrbExpiries().Select(item => item.OrbId), Is.SupersetOf(foxes),
+                    "They last as long as any orb, then go in smoke on their holder's screen.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void ACharmStopsOnlyTheCharmedPlayersThrowsUntilItEnds()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
+            try
+            {
+                var ids = new ulong[] { 10, 20, 30 };
+                var room = new LabModel();
+                room.Begin("charm-throw", ids, 0d, mix);
+                room.Tick(5d);
+                ulong charmed = room.DrainSabotages().Single().Target;
+                LabSnapshot on = room.Snapshot(5d);
+                Assert.That(on.charmedPlayer, Is.EqualTo(charmed));
+                Assert.That(on.CharmOn(charmed), Is.True);
+                Assert.That(on.charmUntil, Is.EqualTo(15d), "Ten seconds by default.");
+                Assert.That(on.charmTaps, Is.Zero);
+                ulong other = ids.First(id => id != charmed);
+
+                string charmedOrb = CombinedFor(room, charmed, 7.5d);
+                string otherOrb = CombinedFor(room, other, 7.5d);
+                Assert.That(room.TryLaunch(charmed, charmedOrb, "charm-throw-1", 7.6d, out _, out string reason), Is.False);
+                Assert.That(reason, Is.EqualTo("CHARMED"), "Too dazed to attack.");
+                Assert.That(room.TryLaunch(other, otherOrb, "charm-throw-2", 7.6d, out _, out reason), Is.True,
+                    "Only the charmed player is stopped. " + reason);
+                Assert.That(room.Snapshot(14.9d).CharmOn(charmed), Is.True);
+                Assert.That(room.Snapshot(15.1d).CharmOn(charmed), Is.False, "It wears off after its seconds.");
+                Assert.That(room.TryLaunch(charmed, charmedOrb, "charm-throw-3", 15.1d, out _, out reason), Is.True, reason);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void ThePlayersBesideACharmedOneTapItAwayButNoOneElseCan()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("charm-wake", new ulong[] { 10, 20, 30, 40, 50 }, 0d, mix);
+                room.Tick(5d);
+                LabSnapshot on = room.Snapshot(5d);
+                LabPlayerState charmed = on.players.Single(player => player.id == on.charmedPlayer);
+                ulong BySeat(int offset) => on.players.Single(player => player.seat == (charmed.seat + offset + 5) % 5).id;
+                ulong leftOf = BySeat(-1), rightOf = BySeat(1), far = BySeat(2);
+
+                Assert.That(room.TryCharmTap(far, 5.1d, out _), Is.False, "Only the two beside can wake them.");
+                Assert.That(room.TryCharmTap(charmed.id, 5.1d, out _), Is.False, "Nor can they wake themselves.");
+                Assert.That(room.TryCharmTap(leftOf, 5.2d, out var woken), Is.True);
+                Assert.That(woken, Is.Null, "Not yet.");
+                Assert.That(room.TryCharmTap(rightOf, 5.3d, out _), Is.True);
+                LabSnapshot tapped = room.Snapshot(5.3d);
+                Assert.That(tapped.charmTaps, Is.EqualTo(2), "Their taps count together.");
+                Assert.That(tapped.CharmOn(charmed.id), Is.True);
+                Assert.That(room.TryCharmTap(leftOf, 5.4d, out woken), Is.True);
+                Assert.That(woken, Is.EqualTo(charmed.id), "The third tap says whom it woke.");
+                Assert.That(room.Snapshot(5.4d).CharmOn(charmed.id), Is.False, "Three taps wake the charmed player at once.");
+                Assert.That(room.Charmed(charmed.id, 5.4d), Is.False);
+                Assert.That(room.TryCharmTap(rightOf, 5.5d, out _), Is.False, "Nothing left to wake.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void WithWakeTapsOffACharmOnlyWearsOff()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
+            try
+            {
+                float[] values = mix.CaptureDeveloperValues();
+                values[177] = 0f; // Charm Rescue Taps: none
+                Assert.That(mix.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("charm-no-wake", new ulong[] { 10, 20, 30 }, 0d, mix);
+                room.Tick(5d);
+                ulong charmed = room.Snapshot(5d).charmedPlayer;
+                ulong beside = new ulong[] { 10, 20, 30 }.First(id => id != charmed);
+                Assert.That(room.TryCharmTap(beside, 5.1d, out _), Is.False);
+                Assert.That(room.Snapshot(14.9d).CharmOn(charmed), Is.True, "It lasts its full ten seconds.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void SabotageMixCharmsOneAtATimeAndNeverAddsToTheCharmedPlayer()
+        {
+            var mix = MixConfig(3f, bomb: 1, block: 0, fox: 0, charm: 1);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("mix-charms", new ulong[] { 10, 20, 30, 40 }, 0d, mix);
+                room.Tick(180d);
+                LabSabotage[] cast = room.DrainSabotages();
+                LabSabotage[] charms = cast.Where(item => item.Kind == LabSabotageKind.Charm).ToArray();
+                Assert.That(charms, Is.Not.Empty);
+                foreach (LabSabotage charm in charms)
+                    foreach (LabSabotage other in cast.Where(item => item.At > charm.At && item.At < charm.At + 10d))
+                    {
+                        Assert.That(other.Kind, Is.Not.EqualTo(LabSabotageKind.Charm), "One charm at a time.");
+                        Assert.That(other.Target, Is.Not.EqualTo(charm.Target), "Nothing more falls on the charmed player.");
+                    }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
         public void GourdBombsReachEveryPlayerAndCanRepeatOnTheSamePlayer()
         {
             // The shortest interval (1 s) drops 180 bombs in a round, enough to see the spread.
@@ -2703,6 +3056,42 @@ namespace C6Lab.Tests
             float[] values = created.CaptureDeveloperValues();
             values[87] = minimumSeconds;
             values[88] = maximumSeconds;
+            Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            return created;
+        }
+
+        /// <summary>A Combined orb made on this player's board at this Host time.</summary>
+        private static string CombinedFor(LabModel room, ulong owner, double at)
+        {
+            LabOrbState yin = null, yang = null;
+            for (int i = 0; i < 12 && (yin == null || yang == null); i++)
+            {
+                Assert.That(room.TryGenerate(owner, "combined-for-" + owner + "-" + i, at, out var orb, out string reason),
+                    Is.True, reason);
+                if (orb.kind == LabOrbKind.Yin) yin = orb;
+                else if (orb.kind == LabOrbKind.Yang) yang = orb;
+            }
+            Assert.That(yin != null && yang != null, Is.True);
+            Assert.That(room.TryCombineAt(owner, yin.id, yang.id, "combined-for-" + owner, at, new Vector2(.5f, .5f),
+                Vector2.zero, out var combined, out string why), Is.True, why);
+            return combined.id;
+        }
+
+        private static LabConfig MixConfig(float interval, int bomb, int block, int fox, int charm)
+        {
+            LabConfig created = ConfigWith(1f, 50, 50, 0, 0, 0, 0);
+            float[] values = created.CaptureDeveloperValues();
+            // Their own timers would drop a bomb and block a way every second; the mix stops both (#251).
+            values[87] = 1f;
+            values[88] = 1f;
+            values[152] = 1f;
+            values[166] = 1f;
+            values[167] = interval;
+            values[168] = interval;
+            values[169] = bomb;
+            values[170] = block;
+            values[171] = fox;
+            values[172] = charm;
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
         }

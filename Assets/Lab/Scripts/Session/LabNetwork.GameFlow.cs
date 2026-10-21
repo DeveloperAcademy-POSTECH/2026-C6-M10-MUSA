@@ -26,6 +26,7 @@ namespace C6Lab
         public event Action GameFlowDeveloperRestartRequested;
         public bool GameFlowEnabled => gameFlowEnabled;
         public bool HasBattleReferences => board != null && target != null && battleFloor != null;
+        private bool CanProcessBattleActions => !gameBattleFrozen && (!gameFlowEnabled || HasBattleReferences);
         /// <summary>A copy of confirmed transport members, independent of chosen P numbers.</summary>
         public ulong[] ConnectedPlayerIds => order.ToArray();
         public Camera BattleCamera { get; private set; }
@@ -85,6 +86,9 @@ namespace C6Lab
         {
             if (!gameFlowEnabled) return;
             ClearProjectiles();
+            // Scene-owned previews and their dependent retries cannot survive the board
+            // that produced them. Keep the committed result, paint and room separately.
+            ResetActionTransport();
             UnsubscribeBoard(board);
             if (board != null)
             {
@@ -110,6 +114,7 @@ namespace C6Lab
             if (value == null) return;
             value.EdgeCrossed += OnEdgeCrossed;
             value.CombineRequested += OnCombineRequested;
+            value.FoxFireTouched += OnFoxFireTouched;
             value.ThrowRequested += OnThrowRequested;
             value.UseRequested += OnUseRequested;
             value.DrumTapped += Generate;
@@ -120,6 +125,7 @@ namespace C6Lab
             if (value == null) return;
             value.EdgeCrossed -= OnEdgeCrossed;
             value.CombineRequested -= OnCombineRequested;
+            value.FoxFireTouched -= OnFoxFireTouched;
             value.ThrowRequested -= OnThrowRequested;
             value.UseRequested -= OnUseRequested;
             value.DrumTapped -= Generate;

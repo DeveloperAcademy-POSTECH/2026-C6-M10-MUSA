@@ -331,6 +331,37 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheSabotageMixSignalBringsTheYokaiOutForEverySabotageButTheBomb()
+        {
+            var host = new GameObject("Yokai sabotage network fixture");
+            try
+            {
+                var network = host.AddComponent<LabNetwork>();
+                network.enabled = false;
+                yokai.Bind(network);
+                var field = typeof(LabNetwork).GetField("SabotageCast",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(field, Is.Not.Null);
+                var signal = (System.Action<LabSabotageKind, ulong>)field.GetValue(network);
+                Assert.That(signal, Is.Not.Null, "Bind listens for the yokai's sabotages (#251).");
+                signal(LabSabotageKind.GourdBomb, 2ul);
+                Assert.That(yokai.BombSecondsLeft, Is.Zero, "A bomb already brings the yokai out through its own drop signal.");
+                foreach (LabSabotageKind kind in new[] { LabSabotageKind.SwipeBlock, LabSabotageKind.FoxFire, LabSabotageKind.Charm })
+                {
+                    signal(kind, 2ul);
+                    Assert.That(yokai.BombSecondsLeft, Is.EqualTo(yokai.BombShowSeconds), kind.ToString());
+                }
+
+                yokai.Bind(null);
+                Assert.That(field.GetValue(network), Is.Null, "Rebinding stops listening to the old network.");
+            }
+            finally
+            {
+                Object.Destroy(host);
+            }
+        }
+
+        [Test]
         public void ABombOnlyHoldDoesNotTurnAnOldCompletedComboIntoANewHit()
         {
             SetClip(2.4f);

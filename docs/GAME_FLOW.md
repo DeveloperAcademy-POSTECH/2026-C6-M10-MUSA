@@ -11,7 +11,7 @@
 
 빠른 로컬 확인은 Home의 개발자 SOLO 버튼으로 가능하다. 일반 방은 기존 2~5명 연결 규칙을 사용한다. 새 게임과 구형 Lab은 연결 승인 토큰이 다르므로 같은 방에서 섞어 사용할 수 없다. 새 게임 방 이름은 `Hapio-`로 시작한다. Bonjour 서비스 자체는 공유하므로 검색 목록에 구형 Lab 방이 보일 수 있으나 입장은 거절된다.
 
-새 게임 빌드는 `Hapio > Development Build > Build Mac App / Export iOS Xcode Project`를 사용한다. 새 Scene 5개만 포함하고 Home이 첫 진입점이다. 결과물은 프로젝트의 `Builds/Hapio/<날짜-고유번호>/`에 생성하며 이전 결과물을 덮어쓰지 않는다. 항상 Development Build다. 기본 Build Settings는 기존 Lab 첫 항목을 유지하고 새 Scene을 뒤에 추가하므로 일반 Unity Build 버튼 대신 위 전용 메뉴를 사용한다.
+새 게임 빌드는 `Hapio > Development Build > Build Mac App / Export iOS Xcode Project`를 사용한다. 새 Scene 5개만 포함하고 Home이 첫 진입점이다. 결과물은 프로젝트의 `Builds/Hapio/<날짜-고유번호>/`에 생성하며 이전 결과물을 덮어쓰지 않는다. 항상 Development Build다. 기본 Build Settings는 기존 Lab 첫 항목을 유지하고 새 Scene을 뒤에 추가하므로 일반 Unity Build 버튼 대신 위 전용 메뉴를 사용한다. 현재 브랜치는 Draft로 보관하며 main의 기본 진입점이나 기존 Lab 파일 경로를 바꾸지 않는다.
 
 ## Scene의 책임
 
@@ -24,6 +24,8 @@
 | GameOver | 종료 사유와 HOME. 자동으로 홈으로 사라지지 않는다. |
 
 모든 새 메뉴의 Canvas·버튼·Text·슬라이더·입력·안전 영역은 저장된 GameObject다. `GameScreen`은 참조를 읽어 값과 버튼 동작만 연결한다. `GameSceneBuilder.CreateMissing`은 없는 에셋만 Unity API로 생성하며 이미 편집한 새 Scene을 재생성하지 않는다. 구형 Lab Scene은 저장하지 않는다.
+
+이번 main 동기화에서는 최신 Lab의 3D 배경·미니맵 배치를 별도 Battle에 반영했다. Battle은 저장된 복사본이므로 이후 Lab Scene 수정이 자동으로 전달되지는 않는다. `Hapio > Upgrade Existing Game Scenes From Current Lab`은 명시적인 동기화 도구이며 Battle의 전투 구성을 다시 복사한다. Battle 전용 수정은 먼저 차이를 확인해 반영한다. 같은 도구의 Home/Lobby 설정 확장은 기존 객체와 배치를 유지하면서 새 DEV 행을 추가한다. 일반 Play·빌드는 이 도구를 자동 호출하지 않는다.
 
 ## 세션과 전투의 수명
 
@@ -57,6 +59,10 @@
 
 새 코드: `Assets/Hapio/Scripts/Core/{GameSession,GameRunFlow,GameFlowState,GameFlowSnapshot,GameScenePaths}.cs`, `Scripts/UI`, `Editor/GameSceneBuilder.cs`, `Editor/GameBuild.cs`.
 
-기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정 166개와 기존 프로토콜5653은 유지하며 새 게임 연결 토큰은 `C6HapioGame/1`이다.
+기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 최신 main `2adc3e94`의 공유 설정 **178개·프로토콜5654**, 요괴 방해공작과 콤보 기본 OFF를 반영했다. 새 게임 연결 토큰은 `C6HapioGame/1`이며 Lab의 `C6PhysicsLab/16`과는 분리한다. 예전 #262의 166개·5653 빌드와 이번 빌드를 혼용하지 않는다.
 
 검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 실제 실행 결과는 `VALIDATION.md`의 #262 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
+
+## Draft 브랜치 운영
+
+현재 팀 작업의 기준은 기존 main과 Lab이다. #262의 새 게임 흐름은 별도 브랜치/Draft PR로 보관하며 main에 병합하지 않는다. main의 후속 변경은 이 브랜치로 가져와 코드·설정·Scene 사본을 비교한다. Lab 코드의 폴더 이동·이름 변경·별도 프로젝트 복제나 Shared 폴더로의 일괄 이전은 이번 범위에 포함하지 않는다.

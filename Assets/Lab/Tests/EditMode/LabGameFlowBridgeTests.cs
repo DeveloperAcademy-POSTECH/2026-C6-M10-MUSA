@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
@@ -12,7 +13,7 @@ namespace C6Lab.Tests
         private const BindingFlags Private = BindingFlags.NonPublic | BindingFlags.Instance;
 
         [Test]
-        public void GameRoomsUseAnOptInTokenWhileLegacyLabProtocolAndSettingsStayUnchanged()
+        public void GameRoomsUseAnOptInTokenWithTheCurrentSharedProtocolAndSettings()
         {
             var root = new GameObject("bridge-token-test");
             try
@@ -21,7 +22,8 @@ namespace C6Lab.Tests
                 Assert.That(network.GameFlowEnabled, Is.False);
                 Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/16"));
                 Assert.That(typeof(LabNetwork).GetField("LabProtocolVersion",
-                    BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue(), Is.EqualTo((ushort)5653));
+                    BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue(), Is.EqualTo((ushort)5654));
+                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(178));
                 Assert.That(network.SetGameFlowEnabled(true), Is.True);
                 Assert.That(Token(network), Is.EqualTo("C6HapioGame/1"));
                 Assert.That(network.SetGameFlowEnabled(false), Is.True);
@@ -70,6 +72,11 @@ namespace C6Lab.Tests
                 members.Add(20);
                 members.Add(40);
                 network.BindBattleReferences(board, target, null, floor, null, projectileContainer.transform);
+                network.BindBattleReferences(board, target, null, floor, null, projectileContainer.transform);
+                var actions = (LabLocalActionCoordinator)typeof(LabNetwork).GetField("localActions", Private).GetValue(network);
+                actions.SetActive("finished-stage", 1, 20);
+                Assert.That(actions.TryRegister(1, new[] { "fox", "yin" }, null, 0d, out _), Is.True);
+                Assert.That(BoardListenerCount(board, "FoxFireTouched"), Is.EqualTo(1));
                 typeof(LabNetwork).GetField("latest", Private).SetValue(network, last);
                 network.UnbindBattleReferences();
                 Assert.That(network.HasBattleReferences, Is.False);
@@ -78,6 +85,9 @@ namespace C6Lab.Tests
                 Assert.That(network.battleFloor, Is.Null);
                 Assert.That(network.projectileRoot, Is.Null);
                 Assert.That(network.Snapshot, Is.SameAs(last));
+                Assert.That(actions.Count, Is.Zero, "Old Scene previews and retries must retire with their board.");
+                Assert.That(BoardListenerCount(board, "FoxFireTouched"), Is.Zero,
+                    "An unloaded board must not keep sending fox contacts to the persistent session.");
                 Assert.That(network.ConnectedPlayerIds, Is.EqualTo(new ulong[] { 20, 40 }));
                 ulong[] copy = network.ConnectedPlayerIds;
                 copy[0] = 999;
@@ -86,6 +96,83 @@ namespace C6Lab.Tests
                     "An explicitly supplied Scene container belongs to its Scene owner.");
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        [Test]
+        public void FrozenGameIgnoresLateReceiptWithoutUnlockingItsDependentAction()
+        {
+            using (var fixture = new BattleBridgeFixture())
+            {
+                object combine = fixture.PendingPacket("combine", 1);
+                combine.GetType().GetField("provisionalId").SetValue(combine, "pending-combined");
+                Assert.That(fixture.Actions.TryRegister(1, new[] { "yin", "yang" }, "pending-combined", 0d, out _), Is.True);
+                fixture.PendingPacket("launch", 2);
+                Assert.That(fixture.Actions.TryRegister(2, new[] { "pending-combined" }, null, 0d, out _), Is.True);
+                int combined = 0;
+                fixture.Network.LocalCombined += () => combined++;
+                LabSnapshot before = fixture.Network.Snapshot;
+                fixture.Network.FreezeGameBattle();
+
+                Invoke(fixture.Network, "ReceiveActionReceipt", new LabActionReceipt
+                {
+                    sessionId = before.sessionId, round = before.round, sender = fixture.Network.LocalPlayerId,
+                    requestId = 1, accepted = true, provisionalId = "pending-combined", outputId = "combined"
+                });
+
+                Assert.That(fixture.Actions.TryGetPending(1, out var first), Is.True);
+                Assert.That(first.state, Is.EqualTo(LabPendingActionState.Ready));
+                Assert.That(fixture.Actions.TryGetPending(2, out var dependent), Is.True);
+                Assert.That(dependent.state, Is.EqualTo(LabPendingActionState.WaitingForDependencies));
+                Assert.That(combined, Is.Zero);
+                Assert.That(fixture.Network.Snapshot, Is.SameAs(before));
+                Assert.That(fixture.Network.ActionRequestTransmissions, Is.Zero);
+            }
+        }
+
+        [Test]
+        public void FrozenGameIgnoresHostRetryForAnUnconfirmedSceneAction()
+        {
+            using (var fixture = new BattleBridgeFixture())
+            {
+                object retry = fixture.PendingPacket("launch", 1);
+                Assert.That(fixture.Actions.TryRegister(1, new[] { "orb" }, null, 0d, out _), Is.True);
+                for (int attempt = 0; attempt < 6; attempt++)
+                    Assert.That(fixture.Actions.MarkSent(1, attempt * 3d), Is.True);
+                Assert.That(fixture.Actions.GetDueRequestIds(100d, true), Is.Empty);
+                Assert.That(fixture.Actions.GetRecoveryRequiredRequestIds(), Is.EqualTo(new long[] { 1 }));
+                fixture.Network.FreezeGameBattle();
+
+                Assert.That(Invoke(fixture.Network, "ReceiveActionRetry", retry), Is.False);
+                Assert.That(fixture.Network.ActionRequestTransmissions, Is.Zero,
+                    "An action_retry arriving after Game Over must not restart old gameplay traffic.");
+            }
+        }
+
+        [Test]
+        public void FrozenGameStillReceivesBoardDataWithoutPausingItsTerminalScreen()
+        {
+            float timeScale = Time.timeScale;
+            try
+            {
+                Time.timeScale = .75f;
+                using (var fixture = new BattleBridgeFixture())
+                {
+                    fixture.Network.FreezeGameBattle();
+                    LabSnapshot before = fixture.Network.Snapshot;
+                    Invoke(fixture.Network, "ReceiveBoardFrame", new LabBoardFrame
+                    {
+                        sessionId = before.sessionId, round = before.round, sequence = 1,
+                        checkpoint = true, localOwner = fixture.Network.LocalPlayerId,
+                        serverTime = 1d, remaining = 179d, phase = LabPhase.Playing, paused = true
+                    });
+                    Assert.That(fixture.Network.ReceivedBoardFrames, Is.EqualTo(1));
+                    Assert.That(fixture.Network.Snapshot.paused, Is.True,
+                        "The committed board data remains available for result synchronization.");
+                    Assert.That(Time.timeScale, Is.EqualTo(.75f),
+                        "A delayed paused board frame must not stop Game Over or scene-loading UI.");
+                }
+            }
+            finally { Time.timeScale = timeScale; }
         }
 
         [Test]
@@ -225,6 +312,61 @@ namespace C6Lab.Tests
                 UnityEngine.Object.DestroyImmediate(root);
             }
         }
+
+        private sealed class BattleBridgeFixture : IDisposable
+        {
+            private readonly GameObject root = new GameObject("Game battle bridge lifecycle");
+            public readonly LabNetwork Network;
+            public readonly LabLocalActionCoordinator Actions;
+
+            public BattleBridgeFixture()
+            {
+                Network = root.AddComponent<LabNetwork>();
+                Assert.That(Network.SetGameFlowEnabled(true), Is.True);
+                var boardObject = new GameObject("board");
+                boardObject.transform.SetParent(root.transform);
+                var targetObject = new GameObject("target");
+                targetObject.transform.SetParent(root.transform);
+                var projectiles = new GameObject("projectiles");
+                projectiles.transform.SetParent(root.transform);
+                Network.BindBattleReferences(boardObject.AddComponent<LabOrbBoard>(),
+                    targetObject.AddComponent<LabTarget>(), null, root.AddComponent<BoxCollider>(),
+                    null, projectiles.transform);
+                typeof(LabNetwork).GetField("latest", Private).SetValue(Network, new LabSnapshot
+                {
+                    sessionId = "battle-stage", round = 1, phase = LabPhase.Playing,
+                    players = Array.Empty<LabPlayerState>(), orbs = Array.Empty<LabOrbState>(),
+                    drums = Array.Empty<LabOrbState>()
+                });
+                Invoke(Network, "EnsureActionRound");
+                Actions = (LabLocalActionCoordinator)typeof(LabNetwork).GetField("localActions", Private).GetValue(Network);
+            }
+
+            public object PendingPacket(string type, long id)
+            {
+                Type packetType = typeof(LabNetwork).Assembly.GetType("C6Lab.LabNetworkPacket");
+                object packet = Activator.CreateInstance(packetType);
+                packetType.GetField("type").SetValue(packet, type);
+                packetType.GetField("requestId").SetValue(packet, id);
+                packetType.GetField("sessionId").SetValue(packet, Network.Snapshot.sessionId);
+                packetType.GetField("round").SetValue(packet, Network.Snapshot.round);
+                foreach (string field in new[] { "actionRequests", "actionWireRequests" })
+                    ((IDictionary)typeof(LabNetwork).GetField(field, Private).GetValue(Network)).Add(id, packet);
+                return packet;
+            }
+
+            public void Dispose()
+            {
+                Network.UnbindBattleReferences();
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        private static int BoardListenerCount(LabOrbBoard board, string name) =>
+            ((Delegate)typeof(LabOrbBoard).GetField(name, Private).GetValue(board))?.GetInvocationList().Length ?? 0;
+
+        private static object Invoke(LabNetwork network, string method, params object[] arguments) =>
+            typeof(LabNetwork).GetMethod(method, Private).Invoke(network, arguments);
 
         private static string Token(LabNetwork network) => Encoding.ASCII.GetString((byte[])typeof(LabNetwork)
             .GetProperty("ActiveConnectionToken", Private).GetValue(network));

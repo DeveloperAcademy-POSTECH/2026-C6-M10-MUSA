@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using C6Lab;
@@ -75,7 +77,66 @@ namespace Hapio.Tests
                 Assert.That(bindings.stageLabel.color, Is.EqualTo(new Color(.16f, .12f, .09f, 1f)), "Stage text needs dark ink over the light paper plate.");
                 Assert.That(bindings.hud.network, Is.Null, "The persistent network is bound by the adapter before battle Awake.");
                 Assert.That(bindings.target.Hitbox.sharedMesh, Is.Not.Null);
+                Assert.That(bindings.developerMode.sourceConfig, Is.SameAs(SavedConfig()), "DEV defaults keep the saved source; runtime config is bound separately.");
+                Assert.That(bindings.developerMode.valueInputs.All(input => input != null), Is.True);
+                Assert.That(bindings.developerMode.valueSliders.All(slider => slider != null), Is.True);
+                Assert.That(bindings.hud.leftNeighborBadge, Is.Not.Null, "Charm bubbles use these saved neighbor anchors.");
+                Assert.That(bindings.hud.rightNeighborBadge, Is.Not.Null);
+                Assert.That(bindings.sceneController.GetComponent<LabDrumMinimap>().gapAboveBadge,
+                    Is.EqualTo(120f), "The saved minimap must leave room for the charm bubbles.");
             });
+        }
+
+        [Test]
+        public void BattleCopy_PreservesTheCurrentSavedLabEnvironment()
+        {
+            WithScene("Assets/Lab/Scenes/Lab.unity", source => WithScene(GameScenePaths.Battle, battle =>
+            {
+                LabBackgroundStudio original = All<LabBackgroundStudio>(source).Single();
+                LabBackgroundStudio studio = All<LabBackgroundStudio>(battle).Single();
+                GameBattleBindings bindings = All<GameBattleBindings>(battle).Single();
+                Assert.That(studio.target, Is.SameAs(bindings.target.transform));
+                Assert.That(studio.collisionFloor, Is.SameAs(bindings.battleFloor.transform));
+                Assert.That(studio.boardCamera, Is.SameAs(bindings.sceneController.orbCamera));
+                Assert.That(studio.groundPng, Is.Not.Null);
+                AssertSameSavedAsset(studio.groundPng, original.groundPng, "Ground texture");
+                AssertSameSavedAsset(studio.paperPng, original.paperPng, "Surround texture");
+                AssertSameSavedAsset(studio.boardBackgroundPng, original.boardBackgroundPng, "Board backing texture");
+                Assert.That(studio.groundSize, Is.EqualTo(original.groundSize));
+                Assert.That(studio.groundTiling, Is.EqualTo(original.groundTiling));
+                Assert.That(studio.showGround && studio.showSurround && studio.fillBoardBackground, Is.True);
+                Assert.That(studio.transform.Find("Generated Background"), Is.Not.Null);
+                Assert.That(studio.decorations.Count, Is.EqualTo(original.decorations.Count));
+                for (int i = 0; i < original.decorations.Count; i++)
+                {
+                    LabBackgroundStudio.Decoration expected = original.decorations[i];
+                    LabBackgroundStudio.Decoration actual = studio.decorations[i];
+                    Assert.That(actual.stableId, Is.EqualTo(expected.stableId));
+                    AssertSameSavedAsset(actual.png, expected.png, expected.title);
+                    AssertSameSavedAsset(actual.material, expected.material, expected.title);
+                    Assert.That(actual.visible, Is.EqualTo(expected.visible));
+                    Assert.That(actual.count, Is.EqualTo(expected.count));
+                }
+                Dictionary<string, LabEnvironmentCard> expectedCards = All<LabEnvironmentCard>(source)
+                    .ToDictionary(card => HierarchyPath(card.transform), card => card);
+                LabEnvironmentCard[] actualCards = All<LabEnvironmentCard>(battle);
+                Assert.That(actualCards.Length, Is.GreaterThan(0), "The Battle must contain the saved 3D environment cards.");
+                Assert.That(actualCards.Length, Is.EqualTo(expectedCards.Count));
+                foreach (LabEnvironmentCard card in actualCards)
+                {
+                    string path = HierarchyPath(card.transform);
+                    Assert.That(expectedCards.ContainsKey(path), Is.True, path);
+                    LabEnvironmentCard expected = expectedCards[path];
+                    AssertSameSavedAsset(card.png, expected.png, path);
+                    Assert.That(card.gameObject.activeSelf, Is.EqualTo(expected.gameObject.activeSelf), path);
+                    Assert.That(Vector3.Distance(card.transform.localPosition, expected.transform.localPosition), Is.LessThan(.0001f), path);
+                    Assert.That(Mathf.Abs(Quaternion.Dot(card.transform.localRotation, expected.transform.localRotation)), Is.EqualTo(1f).Within(.0001f), path);
+                    Assert.That(Vector3.Distance(card.transform.localScale, expected.transform.localScale), Is.LessThan(.0001f), path);
+                    Assert.That(card.opacity, Is.EqualTo(expected.opacity), path);
+                    AssertSameSavedAsset(card.GetComponent<MeshRenderer>().sharedMaterial,
+                        expected.GetComponent<MeshRenderer>().sharedMaterial, path);
+                }
+            }));
         }
 
         [TestCase("Assets/Hapio/Scenes/Home.unity", GameScreenKind.Home)]
@@ -128,12 +189,46 @@ namespace Hapio.Tests
                     Assert.That(screen.developerInputs.All(value => value != null), Is.True);
                     Assert.That(screen.developerSliders.All(value => value != null), Is.True);
                     Assert.That(screen.developerPanel.activeSelf, Is.False);
+                    Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(178), "The current Lab schema includes the twelve sabotage/charm fields.");
+                    Assert.That(SavedConfig().GourdColorComboEnabled, Is.False);
+                    Assert.That(SavedConfig().SabotageMixEnabled, Is.False);
+                    float[] defaults = SavedConfig().CaptureDeveloperValues();
+                    for (int i = 0; i < defaults.Length; i++)
+                    {
+                        LabDeveloperField field = LabConfig.DeveloperFields[i];
+                        var input = screen.developerInputs[i];
+                        var slider = screen.developerSliders[i];
+                        string row = "Setting" + i.ToString("000");
+                        Assert.That(input.transform.parent.name, Is.EqualTo(row));
+                        Assert.That(slider.transform.parent, Is.SameAs(input.transform.parent));
+                        string label = field.Label + (field.IsChoice ? " · " + string.Join(" / ", field.Choices) : "");
+                        Assert.That(input.transform.parent.Find("Label").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo(label));
+                        Assert.That(slider.minValue, Is.EqualTo(field.Min));
+                        Assert.That(slider.maxValue, Is.EqualTo(field.Max));
+                        Assert.That(slider.wholeNumbers, Is.EqualTo(field.WholeNumber));
+                        Assert.That(float.Parse(input.text, CultureInfo.InvariantCulture), Is.EqualTo(defaults[i]), row);
+                        Assert.That(slider.value, Is.EqualTo(defaults[i]), row);
+                    }
                 }
             });
         }
 
         private static T[] All<T>(Scene scene) where T : Component => scene.GetRootGameObjects()
             .SelectMany(root => root.GetComponentsInChildren<T>(true)).ToArray();
+        private static void AssertSameSavedAsset(UnityEngine.Object actual, UnityEngine.Object expected, string context)
+        {
+            // Distinct managed wrappers can both compare null under Unity's object semantics.
+            // Match source availability first; live references must identify the same saved asset.
+            Assert.That(actual == null, Is.EqualTo(expected == null), context);
+            if (expected == null) return;
+            Assert.That(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(expected, out string expectedGuid, out long expectedId), Is.True, context);
+            Assert.That(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(actual, out string actualGuid, out long actualId), Is.True, context);
+            Assert.That(actualGuid, Is.EqualTo(expectedGuid), context);
+            Assert.That(actualId, Is.EqualTo(expectedId), context);
+        }
+        private static LabConfig SavedConfig() => AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset");
+        private static string HierarchyPath(Transform transform) => transform.parent == null
+            ? transform.name : HierarchyPath(transform.parent) + "/" + transform.name;
         private static void WithScene(string path, Action<Scene> check)
         {
             Scene previous = SceneManager.GetActiveScene();

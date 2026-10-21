@@ -89,6 +89,8 @@ namespace C6Lab
             public bool Provisional;
             public bool HiddenForPending;
             public MotionState? BeforeRequest;
+            /// <summary>A fox orb cannot be touched off until this time (#251): a moment after it lands.</summary>
+            public float FoxSafeUntil;
         }
 
         private readonly struct MotionState
@@ -216,6 +218,11 @@ namespace C6Lab
         /// 결합 요청. (첫 구슬, 두 번째 구슬, 결합 위치 0..1, 결합 구슬이 이어받을 속도 보드 폭/초)
         /// </summary>
         public event Action<string, string, Vector2, Vector2> CombineRequested;
+        /// <summary>
+        /// A fox orb touched a Yin or Yang orb (#251): (fox orb, the orb it took). Both already went up in blue smoke
+        /// here and wait hidden for the Host; a rejection brings them back.
+        /// </summary>
+        public event Action<string, string> FoxFireTouched;
         /// <summary>The velocity is input displacement divided by board width and seconds.</summary>
         public event Action<LabOrbThrowGesture> ThrowRequested;
         /// <summary>내가 생성한 구슬이 북에서 튀어나오기 시작할 때 한 번 알린다. (구슬 ID)</summary>
@@ -425,6 +432,13 @@ namespace C6Lab
             var entry = new Entry { View = view, LocalOwner = localOwner, DriftSeed = DriftSeedFor(id),
                 Dropping = expectedDrops.Remove(id), Small = small };
             entries.Add(id, entry);
+            if (kind == LabOrbKind.FoxFire)
+            {
+                // Safe for a moment after it lands, so one falling among orbs is not an unfair loss (#251).
+                LabOrbAppearance look = config.OrbAppearance != null ? config.OrbAppearance : LabOrbAppearance.Defaults;
+                entry.FoxSafeUntil = Time.time + config.FoxFireSafeSeconds
+                    + (entry.Dropping ? look.DropFallSeconds + look.DropBounceSeconds : 0f);
+            }
             SetBodyMode(entry);
             if (entry.Dropping) PlayDrop(entry, start);
             if (!body.isKinematic)
@@ -532,6 +546,31 @@ namespace C6Lab
         /// coming in. The edge glows red with the seconds left in its middle. The board counts down by
         /// itself and only takes the Host's seconds when they differ by more than a moment.
         /// </summary>
+        private LabCharmEdgeFlash charmEdge;
+        private bool charmed;
+
+        /// <summary>This board's player is charmed (#251): an upward swipe is only a flick that bounces off the top.</summary>
+        public bool Charmed => charmed;
+        public LabCharmEdgeFlash CharmEdge => charmEdge;
+
+        /// <summary>
+        /// 매혹 (#251): 이 판의 주인이 헤롱헤롱해 공격(위로 던지기)을 못 한다. secondsLeft가 0보다 크면 걸린 것이고, 던지는 쪽
+        /// 가장자리(판 위쪽 곡선)가 빨갛게 은은히 빛난다. 풀리면 부드럽게 사라진다.
+        /// </summary>
+        public void SetCharm(float secondsLeft)
+        {
+            if (configured && secondsLeft > 0f && !float.IsInfinity(secondsLeft))
+            {
+                charmed = true;
+                if (charmEdge == null) charmEdge = LabCharmEdgeFlash.Create(transform);
+                charmEdge.Show(areaShape.UpperBoundary, bounds.width);
+                return;
+            }
+            if (!charmed) return;
+            charmed = false;
+            if (charmEdge != null) charmEdge.Release();
+        }
+
         public void SetSwipeBlock(int side, float secondsLeft)
         {
             side = Math.Sign(side);
@@ -977,8 +1016,9 @@ namespace C6Lab
         public bool Vanish(string id)
         {
             if (id == null || !entries.TryGetValue(id, out var entry) || entry.View == null) return false;
-            // It goes up in a puff of smoke where this screen shows it (#235).
-            LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius,
+            // It goes up in a puff of smoke where this screen shows it (#235); a fox orb's is blue (#251).
+            if (entry.View.Kind == LabOrbKind.FoxFire) PlayFoxSmoke(entry);
+            else LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius,
                 config != null ? config.OrbAppearance : null);
             RemoveOrb(id);
             OrbVanished?.Invoke(id);
@@ -1007,6 +1047,8 @@ namespace C6Lab
         {
             CancelDrag();
             LiftSwipeBlock();
+            charmed = false;
+            if (charmEdge != null) charmEdge.Hide();
             foreach (var entry in entries.Values)
                 Retire(entry);
             entries.Clear();
@@ -1187,7 +1229,8 @@ namespace C6Lab
             // Side exits keep their existing screen-to-screen handoff even on a diagonal flick.
             bool outwardSide = (worldPoint.x <= bounds.xMin && inputVelocity.x < 0f)
                 || (worldPoint.x >= bounds.xMax && inputVelocity.x > 0f);
-            if (entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
+            // Charmed (#251), an upward swipe is no throw: the orb slides up like any flick and bounces off the top.
+            if (!charmed && entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
                 && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
             {
                 entry.BeforeRequest = CaptureMotion(entry);
@@ -1199,12 +1242,14 @@ namespace C6Lab
                 return true;
             }
 
-            if (config.DropCombineEnabled && entry.View.Kind.IsRaw())
+            if (config.DropCombineEnabled && (entry.View.Kind.IsRaw() || FoxReady(entry)))
             {
                 Entry target = FindOppositeOverlap(entry);
                 if (target != null)
                 {
-                    RequestCombine(entry, target);
+                    if (entry.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(entry, target);
+                    else if (target.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(target, entry);
+                    else RequestCombine(entry, target);
                     return true;
                 }
             }
@@ -1363,6 +1408,12 @@ namespace C6Lab
                 body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
                 StopMotion(body);
                 SetBodyMode(entry);
+                if (entry.View.Kind == LabOrbKind.FoxFire)
+                {
+                    // A fox orb never reaches a neighbour (#251): it goes up in blue smoke at the edge it crossed.
+                    PlayFoxSmoke(entry);
+                    BeginPendingLaunch(entry.View.OrbId);
+                }
                 EdgeCrossed?.Invoke(crossing);
             }
         }
@@ -1503,13 +1554,43 @@ namespace C6Lab
             float speed = worldSpeed / bounds.width;
             if (speed < config.CombineSpeed) return;
 
-            RequestCombine(first, second);
+            if (first.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(first, second);
+            else if (second.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(second, first);
+            else RequestCombine(first, second);
         }
 
-        /// <summary>닿으면 결합에 쓸 수 있는 구슬인지 확인한다.</summary>
+        /// <summary>
+        /// 여우불 (#251): 여우구슬과 음·양 구슬이 닿거나 겹쳐지면 둘 다 그 자리에서 푸른 연기로 사라진다.
+        /// 이 화면에서 바로 보여 주고 Host의 확인을 기다린다 (거절되면 둘 다 돌아온다).
+        /// </summary>
+        private void TouchFoxFire(Entry fox, Entry orb)
+        {
+            PlayFoxSmoke(fox);
+            PlayFoxSmoke(orb);
+            BeginPendingLaunch(fox.View.OrbId);
+            BeginPendingLaunch(orb.View.OrbId);
+            FoxFireTouched?.Invoke(fox.View.OrbId, orb.View.OrbId);
+        }
+
+        private void PlayFoxSmoke(Entry entry)
+        {
+            LabOrbAppearance look = config != null && config.OrbAppearance != null ? config.OrbAppearance : LabOrbAppearance.Defaults;
+            LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius, look,
+                look.FoxFireSmokeColor);
+        }
+
+        /// <summary>A fox orb that has landed and is past its safe moment (#251).</summary>
+        private static bool FoxReady(Entry entry) =>
+            entry.View.Kind == LabOrbKind.FoxFire && !entry.Dropping && Time.time >= entry.FoxSafeUntil;
+
+        /// <summary>Whether this board shows the orb as a fox orb (#251).</summary>
+        public bool IsFoxFire(string id) => id != null && entries.TryGetValue(id, out var entry)
+            && entry.View != null && entry.View.Kind == LabOrbKind.FoxFire;
+
+        /// <summary>닿으면 결합에 쓸 수 있는 구슬인지 확인한다. 여우구슬은 보호 시간이 지난 뒤부터 (#251).</summary>
         private static bool CanContactCombine(Entry entry)
         {
-            return entry.View.Kind.IsRaw()
+            return (entry.View.Kind.IsRaw() || FoxReady(entry))
                 && entry.LocalOwner
                 && !entry.Held
                 && !entry.Locked
@@ -1525,8 +1606,10 @@ namespace C6Lab
             float best = Mathf.Pow(config.OrbRadius * 2f, 2f);
             foreach (var candidate in entries.Values)
             {
-                if (candidate == dragged || !candidate.View.Kind.IsRaw()
-                    || candidate.View.Kind == dragged.View.Kind || !candidate.LocalOwner
+                // Yin meets Yang; a fox orb meets either, and either meets a fox orb past its safe moment (#251).
+                bool partner = dragged.View.Kind == LabOrbKind.FoxFire ? candidate.View.Kind.IsRaw()
+                    : candidate.View.Kind.IsRaw() ? candidate.View.Kind != dragged.View.Kind : FoxReady(candidate);
+                if (candidate == dragged || !partner || !candidate.LocalOwner
                     || candidate.Locked || candidate.EdgePending || candidate.Held || candidate.HiddenForPending) continue;
                 float distance = (XY(candidate.View.Body.position) - XY(dragged.View.Body.position)).sqrMagnitude;
                 if (distance <= best) { best = distance; nearest = candidate; }

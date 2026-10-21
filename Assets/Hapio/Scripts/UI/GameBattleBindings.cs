@@ -41,7 +41,10 @@ namespace Hapio
                     {
                         if (field.IsInitOnly) continue;
                         if (field.FieldType == typeof(LabNetwork)) field.SetValue(component, network);
-                        else if (field.FieldType == typeof(LabConfig) && field.Name != "sourceConfig")
+                        // DEV defaults must keep the saved LabConfig; every live config reference
+                        // uses the persistent room's accepted runtime copy instead.
+                        else if (field.FieldType == typeof(LabConfig)
+                            && !(component is LabDeveloperMode && field.Name == nameof(LabDeveloperMode.sourceConfig)))
                             field.SetValue(component, network.config);
                     }
                 }
