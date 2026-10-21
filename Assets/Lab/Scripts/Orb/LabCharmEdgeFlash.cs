@@ -12,7 +12,9 @@ namespace C6Lab
     {
         // The band reaches this share of the board width into the board, and a little above the line.
         private const float InwardShare = .07f, OutwardShare = .015f;
-        private const float DimAlpha = .30f, BrightAlpha = .75f, BreatheHz = .6f;
+        /// <summary>The glow's opacity at its faintest and brightest as it slowly breathes.</summary>
+        public const float DimAlpha = .30f, BrightAlpha = .75f;
+        private const float BreatheHz = .6f;
         /// <summary>How long the glow takes to fade away when the charm ends.</summary>
         public const float ReleaseSeconds = .45f;
         private const int GlowOrder = -21;

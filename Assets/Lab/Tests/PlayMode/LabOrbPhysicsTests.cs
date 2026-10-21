@@ -97,7 +97,9 @@ namespace C6Lab.Tests
                 dimmest = Mathf.Min(dimmest, board.CharmEdge.Brightness);
                 brightest = Mathf.Max(brightest, board.CharmEdge.Brightness);
             }
-            Assert.That(brightest, Is.LessThanOrEqualTo(.6f), "A soft glow, never a bright flash.");
+            Assert.That(brightest, Is.LessThanOrEqualTo(LabCharmEdgeFlash.BrightAlpha + .001f),
+                "It never goes past its set brightness: a glow, not a flash.");
+            Assert.That(dimmest, Is.GreaterThanOrEqualTo(LabCharmEdgeFlash.DimAlpha - .001f), "Nor fades out while charmed.");
             Assert.That(brightest - dimmest, Is.GreaterThan(.05f), "It slowly brightens and dims.");
 
             Vector2 from = BoardPoint(combined);
