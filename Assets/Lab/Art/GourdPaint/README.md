@@ -1,3 +1,38 @@
+## 한지 머티리얼 조절 — PR #255
+
+현재 실행 외형은 `Resources/GourdPaint/WhiteGourd.mat`를 `LabGourdPaint.InitializePresentation()`이 박의 `White Gourd` Renderer에 연결한다. Project에서 이 Material을 선택해 **Hanji Paper**를 조정한다. Play 모드 밖에서 저장한 값이 다음 실행과 빌드에 적용되며 DEV 공유 설정에는 추가하지 않는다.
+
+**셰이더 선언 기본값과 저장 Material의 실제 적용값은 다르다.** 기존 Material을 사용하는 현재 게임에는 오른쪽 열을 적용한다.
+
+| Inspector 항목 | 셰이더 선언 기본값 | 저장된 `WhiteGourd.mat` 값 |
+| --- | --- | --- |
+| Hanji PNG (Color and Height) | white | `Textures/Hanji.png` (1254×1254) |
+| Paper Tint | (0.96, 0.94, 0.86, 1) | (1, 1, 1, 1) |
+| Texture Repeat | 3 | 0.85 |
+| Fiber Direction Variation | 0.06 | 0.06 |
+| Paper Color Saturation | 0.6 | 0.85 |
+| Paper Light Direction | (-0.65, 0.8, 0.6) | (-0.65, 0.8, 0.6) |
+| Fiber Contrast | 1 | 1.15 |
+| Surface Relief | 0.012 | 0.004 |
+| Relief Under Paint | 0.5 | 0.3 |
+| Paper Shape Shading | 0.55 | 0.78 |
+| Paper Brightness | 1.08 | 1.12 |
+| Smoothness (0 = Matte) | 0.05 | 0.015 |
+
+Texture Repeat가 클수록 섬유 무늬가 촘촘해진다. Fiber Direction Variation은 투영 샘플의 무작위 회전량이고 0이면 그 회전을 끈다. Fiber Contrast는 어두운 섬유 강도, Surface Relief는 같은 PNG의 밝기로 계산한 요철 강도다. 요철은 메시 윤곽이나 충돌체를 바꾸지 않는다. Relief Under Paint는 칠해진 부분의 요철 비율이고 Smoothness는 정반사 강도를 조절한다. Paper Shape Shading·Brightness·Light Direction은 종이 바탕의 고정 조명을 조절하며 물감에는 기존 고정 광원 방향을 유지한다.
+
+`Hanji.png`는 Texture Type=Default, sRGB ON, Wrap Mode=Repeat, mipmaps ON, Trilinear로 저장한다. 박 로컬 좌표의 삼중 투영과 투영면별 세 회전·오프셋 샘플의 연속 블렌딩으로 극점 늘어짐과 규칙적인 반복을 줄인다. 텍스처는 박의 회전과 함께 움직이며 시간 애니메이션은 없다. 이는 표현 변경이며 도색 맵·소유권·네트워크·피복률의 판정을 바꾸지 않는다. 종이 텍스처 샘플링과 요철 계산의 iOS 성능은 별도 실기기 검증 대상이다.
+
+### Scene·그림자 연결 범위
+
+PR 원본 Scene에는 `LabPaperStage` 컴포넌트와 `paperShader` 참조가 추가돼 있었지만, 대응하는 스크립트와 셰이더 원본이 저장소 및 확인한 로컬 작업 폴더에서 발견되지 않았다. Missing Script를 새로 추가하지 않도록 **해당 Scene 추가와 공백 직렬화 변경을 제외하고 `Lab.unity`를 현재 main과 동일하게 유지**한다. 기존 Scene·메타 GUID를 유지하며 새 스테이지 기능을 대체 구현하지 않는다.
+
+`Art/UI/LabPaperShadow.shader`는 에셋만 보존한 **미연결 셰이더**다. 현재 Scene·Prefab·런타임 코드에서 사용하는 Material이나 컴포넌트가 없으므로 그림자가 게임에 적용됐다고 간주하지 않는다. 한지 Material 적용은 이 그림자 셰이더나 제외한 컴포넌트에 의존하지 않는다.
+
+### 과거 튜닝 기록과 검증 범위
+
+초기 시안 값(Repeat 0.65, Contrast 1.15, Relief 0.006, Shape Shading 0.8, Brightness 1.04)은 과거 튜닝 기록이며 현재 기본값이 아니다. 2026-10-21 조정 후 저장된 실제 값은 위 Material 열을 따른다. 아래 #187~#208 설명은 당시 구조·검증 이력이며, 당시 설정 개수·통신 버전·성장 수치를 현재 값으로 사용하지 않는다. 현행 수치와 실행 증거는 루트 문서·`LabConfig.asset`·`docs/VALIDATION.md`를 확인한다. 이 문서만으로 이번 브랜치의 실행·실기기 PASS를 부여하지 않는다.
+
 # 기본 전투의 100% 공동 색칠·인접 성장·완성 박 관람 — #187·#191
 
 > **Experiment #196**: 기존 판정 맵 위에 물감 내부 입자·농담을 표시하는 선택 표현이다. 기본 OFF이며 DEV → Gourd → Paint Grain에서 켠다. 원본 도색·성장·완료 규칙은 유지하고 로컬 좌표 고정 RGB 명암만 추가한다. 설정129~132를 추가한 #196은 사용자 승인으로 main에 병합됐으며 기본 OFF를 유지한다. 세부 조절값과 검증은 루트 `README.md`·`docs/DEVELOPER_MODE_PARAMETER_SPEC.md`·`docs/VALIDATION.md`의 #196 항목을 따른다.

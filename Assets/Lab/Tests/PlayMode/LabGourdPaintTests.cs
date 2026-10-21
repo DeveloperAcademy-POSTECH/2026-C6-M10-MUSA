@@ -21,6 +21,43 @@ namespace C6Lab.Tests
         public IEnumerator UnloadSavedScene() => fixture.Cleanup();
 
         [UnityTest]
+        public IEnumerator SavedSceneUsesImportedHanjiMaterialWithoutMissingScripts()
+        {
+            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
+            yield return null;
+            Scene scene = SceneManager.GetActiveScene();
+            foreach (GameObject root in scene.GetRootGameObjects())
+                foreach (MonoBehaviour component in root.GetComponentsInChildren<MonoBehaviour>(true))
+                    Assert.That(component, Is.Not.Null,
+                        "The saved Lab hierarchy must not contain an unresolved script: " + root.name);
+
+            var paint = Object.FindFirstObjectByType<LabGourdPaint>();
+            Assert.That(paint, Is.Not.Null);
+            Assert.That(paint.IsReady, Is.True, paint.InitializationError);
+            Material material = Resources.Load<Material>("GourdPaint/WhiteGourd");
+            Assert.That(paint.Shell.GetComponent<Renderer>().sharedMaterial, Is.SameAs(material));
+            Assert.That(material.shader.name, Is.EqualTo("C6Lab/GourdPaint"));
+            Assert.That(material.shader.isSupported, Is.True);
+            Assert.That(material.HasProperty("_PaperTex"), Is.True);
+            var paper = material.GetTexture("_PaperTex") as Texture2D;
+            Assert.That(paper, Is.Not.Null, "The production Material must reference an imported fiber texture.");
+            Assert.That(paper.mipmapCount, Is.GreaterThan(1));
+            Assert.That(paper.wrapModeU, Is.EqualTo(TextureWrapMode.Repeat));
+            Assert.That(paper.wrapModeV, Is.EqualTo(TextureWrapMode.Repeat));
+            Assert.That(paper.filterMode, Is.EqualTo(FilterMode.Trilinear));
+#if UNITY_EDITOR
+            string path = UnityEditor.AssetDatabase.GetAssetPath(paper);
+            Assert.That(UnityEditor.AssetDatabase.AssetPathToGUID(path),
+                Is.EqualTo("35b15acfe93d492ba7bc02f831ec670d"));
+            var importer = UnityEditor.AssetImporter.GetAtPath(path) as UnityEditor.TextureImporter;
+            Assert.That(importer, Is.Not.Null);
+            Assert.That(importer.textureType, Is.EqualTo(UnityEditor.TextureImporterType.Default));
+            Assert.That(importer.sRGBTexture, Is.True);
+            Assert.That(importer.mipmapEnabled, Is.True);
+#endif
+        }
+
+        [UnityTest]
         public IEnumerator MainSceneUsesWhiteGourdAndCumulativePaintTextureWithoutAHitCountCap()
         {
             yield return this.fixture.Load();
