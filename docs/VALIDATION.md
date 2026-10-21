@@ -2173,3 +2173,16 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | EditMode 검사 실행 | PASS (Mono, NUnit 흉내) | Core만 쓰는 34건 통과(`Resources.Load` 1건 제외). 쉬는 시간 3초를 반영해 폭탄·섬광·콤보 대기 검사 7건의 시각을 옮겼고, 기본값 한 판 검사가 첫 이벤트 5~9초·화면별 쉬는 시간 2.85초 초과를 함께 본다(쉬는 시간을 0으로 바꾸면 실패함을 확인). |
 | Unity EditMode 실제 실행 | NOT_RUN | 위 검사와 기존 전체(`LabDeveloperConfigTests` 포함). |
 | 에디터·3인 확인 | NOT_RUN | 7초쯤 야광귀가 먼저 나오는지, 폭탄이 터진 뒤 같은 화면에 3초 안에 다음 이벤트가 오지 않는지. |
+
+### #271 콤보 성공 추임새 "좋다"
+
+- 콤보를 성공하면(`CLEAR!`) 국립국악원 단음 추임새 중 염경애의 "좋타"(`Chu-imsaebyYeomKyeongae_2.wav`)를 낸다. 팀 전체의 성공이라 모든 기기에서 난다(`LabComboClearSound`, `LabSceneController`가 붙임). 실패(틀린 색·시간 초과)에는 내지 않는다.
+- Host 스냅샷의 콤보 결과 순번이 새로 늘고 결과가 성공일 때 한 번만 낸다. 접속 직후 이미 끝난 결과, 새 라운드 첫 스냅샷, 전투가 끝난 뒤에는 내지 않는다(진동 `LabHaptics`와 같은 기준이라 진동 3번과 함께 난다).
+- 파일: `Resources/Audio/ComboClear/Jota.wav` (1.97초, 44.1kHz 모노 16bit, 가공은 `AUDIO_CREDITS.md`). 크기 = 1 × 일시정지 메뉴 효과음.
+- 이용 조건: 공공누리 제1유형(출처표시). `AUDIO_CREDITS.md`의 추임새 출처 문구에 염경애를 더했다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 새 `LabComboClearSound`, `LabComboClearSoundTests`, 고친 `LabSceneController`를 Mono `mcs --parse`로 검사했다. |
+| EditMode 실제 실행 | NOT_RUN | `LabComboClearSoundTests` 3건(파일 1개 로드, 새 성공에서만 한 번, 새 라운드). |
+| 에디터·기기 확인 | NOT_RUN | `CLEAR!`와 함께 "좋다"가 들리는지, 효과음 크기 슬라이더를 따르는지, 다른 소리에 비해 크기가 알맞은지. |
