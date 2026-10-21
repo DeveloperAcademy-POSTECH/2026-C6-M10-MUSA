@@ -1729,6 +1729,49 @@ namespace C6Lab.Tests
             Assert.That(samples.Max(Mathf.Abs), Is.InRange(.2f, 1f), "It is audible and never clips past full scale.");
         }
 
+        [UnityTest]
+        public IEnumerator AudioConfigurationChangeRecreatesTheSharedSizzleAndRebindsBurningSources()
+        {
+            var first = root.AddComponent<LabFuseSound>();
+            first.Bind(board, null);
+            var secondObject = new GameObject("Second fuse sound");
+            secondObject.transform.SetParent(root.transform, false);
+            var second = secondObject.AddComponent<LabFuseSound>();
+            second.Bind(board, null);
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 10f);
+            yield return null;
+            AudioClip previous = first.Clip;
+            Assert.That(second.Clip, Is.SameAs(previous));
+
+            // Exercise the registered callback without resetting the user's audio device.
+            typeof(LabFuseSound).GetMethod("OnAudioConfigurationChanged", BindingFlags.NonPublic | BindingFlags.Static)
+                .Invoke(null, new object[] { true });
+            yield return null;
+
+            Assert.That(first.Clip, Is.Not.SameAs(previous), "Generated sample data must be rebuilt after a device change.");
+            Assert.That(second.Clip, Is.SameAs(first.Clip), "All live sources use the same replacement.");
+            Assert.That(first.Clip.length, Is.EqualTo(1f).Within(.01f));
+            var samples = new float[first.Clip.samples];
+            Assert.That(first.Clip.GetData(samples, 0), Is.True);
+            Assert.That(samples.Max(Mathf.Abs), Is.InRange(.2f, 1f));
+            Assert.That(first.Burning && second.Burning, Is.True, "The active fuse state survives audio reconfiguration.");
+        }
+
+        [Test]
+        public void InvalidCachedSizzleIsRebuiltEvenWhenItsUnityObjectStillExists()
+        {
+            AudioClip previous = LabFuseSound.GeneratedSizzle();
+            AudioClip invalid = AudioClip.Create("Incomplete fuse sample data", 1, 1, 22050, false);
+            typeof(LabFuseSound).GetField("generatedClip", BindingFlags.NonPublic | BindingFlags.Static)
+                .SetValue(null, invalid);
+            AudioClip replacement = LabFuseSound.GeneratedSizzle();
+
+            Assert.That(replacement, Is.Not.SameAs(invalid), "A surviving wrapper is not evidence of usable sample data.");
+            Assert.That(replacement.length, Is.EqualTo(1f).Within(.01f));
+            Assert.That(LabFuseSound.GeneratedSizzle(), Is.SameAs(replacement), "A valid replacement remains cached.");
+            Object.Destroy(previous);
+        }
+
         private void SetDrumDrift(float speed, float turning)
         {
             float[] values = config.CaptureDeveloperValues();

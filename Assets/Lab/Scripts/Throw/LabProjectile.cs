@@ -233,6 +233,20 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>Correct only a predicted shot's appearance; never rewind its local flight or award a hit.</summary>
+        public void ReconcileVisual(LabOrbElement approvedElement, float approvedSize, float approvedRadius)
+        {
+            if (authoritative || resolved || approvedElement < LabOrbElement.None || approvedElement > LabOrbElement.Earth) return;
+            bool changed = element != approvedElement;
+            element = approvedElement;
+            sizeScale = approvedSize > 0f && approvedSize <= 1f ? approvedSize : 1f;
+            SetRadiusScale(approvedRadius > 0f ? approvedRadius : 1f);
+            EnsureDefaultVisual(ScaledRadius);
+            EnsureFlightTrail(ScaledRadius);
+            if (changed && elementFlightTrail != null && appearance != null)
+                elementFlightTrail.Begin(transform, appearance.ElementTrailFor(element));
+        }
+
         private void Awake()
         {
             body = GetComponent<Rigidbody>();

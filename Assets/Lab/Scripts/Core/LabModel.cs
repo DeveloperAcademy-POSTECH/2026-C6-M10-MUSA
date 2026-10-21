@@ -146,6 +146,20 @@ namespace C6Lab
         public string SessionId => sessionId;
         public uint Round => round;
         public LabPhase Phase => phase;
+        /// <summary>Current ledger revision; reading it does not advance the Host battle clock.</summary>
+        public ulong Revision => revision;
+
+        /// <summary>Independent player resource/statistic records in the established P/seat order.</summary>
+        public LabPlayerState[] CopyPlayers() => players.Values.OrderBy(player => player.seat)
+            .Select(player => player.Copy()).ToArray();
+
+        /// <summary>
+        /// Independent ledger entries for one owner, including drums and in-flight orbs. Callers
+        /// select which entries to display; this does not tick expiry or allocate every board.
+        /// </summary>
+        public LabOrbState[] CopyOwnedStates(ulong owner) => orbs.Values.Concat(drums.Values)
+            .Where(orb => orb.owner == owner).OrderBy(orb => orb.id, StringComparer.Ordinal)
+            .Select(orb => orb.Copy()).ToArray();
         public int Hp => hp;
         /// <summary>Round-owned CPU paint state; rendering reads this state and never decides victory.</summary>
         public LabPaintSurface PaintSurface => paintSurface;
@@ -298,9 +312,28 @@ namespace C6Lab
         /// </summary>
         public bool TryCombine(ulong sender, string firstId, string secondId, string requestId,
             double now, Vector2 normalizedVelocity, out LabOrbState orb, out string reason)
+            => TryCombineCore(sender, firstId, secondId, requestId, now, null, normalizedVelocity,
+                out orb, out reason);
+
+        /// <summary>
+        /// Use the owner's current local combination center rather than a periodic motion sample.
+        /// The Host still decides polarity, consumption, the new ID and the global element draw.
+        /// </summary>
+        public bool TryCombineAt(ulong sender, string firstId, string secondId, string requestId,
+            double now, Vector2 normalizedCenter, Vector2 normalizedVelocity,
+            out LabOrbState orb, out string reason)
+            => TryCombineCore(sender, firstId, secondId, requestId, now, normalizedCenter,
+                normalizedVelocity, out orb, out reason);
+
+        private bool TryCombineCore(ulong sender, string firstId, string secondId, string requestId,
+            double now, Vector2? normalizedCenter, Vector2 normalizedVelocity,
+            out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (normalizedCenter.HasValue && (!Unit(normalizedCenter.Value.x)
+                || !Unit(normalizedCenter.Value.y) || !Finite(normalizedVelocity)))
+                return Reject("INVALID_MOTION", out reason);
             if (string.IsNullOrEmpty(firstId) || string.IsNullOrEmpty(secondId) || firstId == secondId ||
                 !orbs.TryGetValue(firstId, out var first) || !orbs.TryGetValue(secondId, out var second))
                 return Reject("ORB_NOT_FOUND", out reason);
@@ -317,7 +350,8 @@ namespace C6Lab
             {
                 id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = element,
                 origin = LabOrbOrigin.Combined, originOwner = sender,
-                x = (first.x + second.x) * .5f, y = (first.y + second.y) * .5f,
+                x = normalizedCenter?.x ?? (first.x + second.x) * .5f,
+                y = normalizedCenter?.y ?? (first.y + second.y) * .5f,
                 vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false,
                 // One blast-shrunk half makes the whole orb small, and its fire burns on (#213).
                 small = first.small || second.small, burnedAt = Math.Max(first.burnedAt, second.burnedAt)
@@ -347,17 +381,35 @@ namespace C6Lab
         /// </summary>
         public bool TryTransfer(ulong sender, string id, bool right, float height01, Vector2 normalizedVelocity,
             string requestId, double now, LabEdgeCrossingKind crossing, out LabOrbState orb, out string reason)
+            => TryTransferCore(sender, id, right, null, height01, normalizedVelocity,
+                requestId, now, crossing, out orb, out reason);
+
+        /// <summary>
+        /// Atomically validate the current boundary position and hand off the orb. No preceding
+        /// motion packet is required and rejected geometry never overwrites the stored position.
+        /// </summary>
+        public bool TryTransferAt(ulong sender, string id, bool right, Vector2 normalizedPosition,
+            Vector2 normalizedVelocity, string requestId, double now, LabEdgeCrossingKind crossing,
+            out LabOrbState orb, out string reason)
+            => TryTransferCore(sender, id, right, normalizedPosition, normalizedPosition.y,
+                normalizedVelocity, requestId, now, crossing, out orb, out reason);
+
+        private bool TryTransferCore(ulong sender, string id, bool right, Vector2? normalizedPosition,
+            float height01, Vector2 normalizedVelocity, string requestId, double now,
+            LabEdgeCrossingKind crossing, out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!TryFindMovable(id, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (activeSeatCount == 1) return Reject("NO_NEIGHBOR", out reason);
-            if (!Unit(height01) || !Finite(normalizedVelocity) ||
+            if ((normalizedPosition.HasValue && !Unit(normalizedPosition.Value.x))
+                || !Unit(height01) || !Finite(normalizedVelocity) ||
                 normalizedVelocity.sqrMagnitude > rules.MaximumMotionSpeed * rules.MaximumMotionSpeed)
                 return Reject("INVALID_MOTION", out reason);
-            if (right ? current.x < 1f - EdgeTolerance || normalizedVelocity.x <= 0f
-                : current.x > EdgeTolerance || normalizedVelocity.x >= 0f)
+            float boundaryX = normalizedPosition?.x ?? current.x;
+            if (right ? boundaryX < 1f - EdgeTolerance || normalizedVelocity.x <= 0f
+                : boundaryX > EdgeTolerance || normalizedVelocity.x >= 0f)
                 return Reject("NOT_OUTWARD_EDGE", out reason);
             // The gourd's swipe block (#215) stops only this player's own passes that way; a blast's push
             // and a drum running on through still go, and nothing coming in is stopped.
@@ -370,7 +422,10 @@ namespace C6Lab
             // A drum is not a stored orb, so a full board still receives it.
             if (!current.kind.IsDrum() && CountStored(receiver) >= rules.OrbStorageLimit)
                 return Reject("RECEIVER_FULL", out reason);
+            if (current.ownershipVersion == ulong.MaxValue)
+                return Reject("OWNERSHIP_VERSION_LIMIT", out reason);
             current.owner = receiver;
+            current.ownershipVersion++;
             current.x = right ? 0f : 1f;
             current.y = height01;
             current.vx = normalizedVelocity.x;
@@ -584,9 +639,20 @@ namespace C6Lab
         /// </summary>
         public bool TryUseItem(ulong sender, string id, string requestId, double now,
             out LabOrbState orb, out string reason)
+            => TryUseItemCore(sender, id, requestId, now, null, out orb, out reason);
+
+        /// <summary>Open an item at its actual owner-simulated position, without a motion pre-update.</summary>
+        public bool TryUseItemAt(ulong sender, string id, string requestId, double now,
+            Vector2 normalizedPosition, out LabOrbState orb, out string reason)
+            => TryUseItemCore(sender, id, requestId, now, normalizedPosition, out orb, out reason);
+
+        private bool TryUseItemCore(ulong sender, string id, string requestId, double now,
+            Vector2? normalizedPosition, out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (normalizedPosition.HasValue && (!Unit(normalizedPosition.Value.x)
+                || !Unit(normalizedPosition.Value.y))) return Reject("INVALID_MOTION", out reason);
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (!current.kind.IsDoubleTapUsable()) return Reject("NOT_USABLE", out reason);
@@ -601,7 +667,8 @@ namespace C6Lab
                     {
                         id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = ElementFor(seed, combinedCount++),
                         origin = LabOrbOrigin.Combined, originOwner = sender,
-                        x = Mathf.Clamp01(current.x + side * SecretBoxSpread), y = current.y,
+                        x = Mathf.Clamp01((normalizedPosition?.x ?? current.x) + side * SecretBoxSpread),
+                        y = normalizedPosition?.y ?? current.y,
                         vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
                     };
                     orbs.Add(opened.id, opened);
@@ -973,6 +1040,18 @@ namespace C6Lab
         /// <summary>Orbs and drums both move between screens; look the ID up in either list.</summary>
         private bool TryFindMovable(string id, out LabOrbState found) =>
             orbs.TryGetValue(id ?? string.Empty, out found) || drums.TryGetValue(id ?? string.Empty, out found);
+
+        /// <summary>
+        /// Read one authoritative orb or drum without advancing time or exposing mutable ledger
+        /// state. Command validation can inspect ownership without allocating a full snapshot.
+        /// </summary>
+        public bool TryGetMovableState(string id, out LabOrbState state)
+        {
+            state = null;
+            if (!TryFindMovable(id, out var found)) return false;
+            state = found.Copy();
+            return true;
+        }
 
         /// <summary>
         /// 판마다 북을 받을 사람을 무작위로 정한다. 북이 인원 이하이면 서로 다른 사람이 받고,
