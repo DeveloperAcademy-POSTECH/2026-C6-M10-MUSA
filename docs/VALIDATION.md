@@ -1620,6 +1620,41 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 
 최종 전체 검사에서 `Server failed to bind` 3건과 오디오 장치 초기화 실패 로그를 확인했다. 분리한 오디오2건은 통과했으나 전체 실행에서는 다시 실패했다. 실행 중 포트/오디오 환경 간섭 여부와 깨끗한 환경의 재현은 추가 확인 사항이며 원인을 확정하거나 정상으로 간주하지 않는다. 게임 코드·검사 기대값·오디오 설정을 변경하지 않았다. 추가 통합 작업 사본의 소스·검사·Scene·에셋196개 해시는 두 전체 실행과 분리 검사 전후 동일하다.
 
+
+## PR #247 PlayMode 실패 5건 보완 — 2026-10-21, 전체 검사 통과
+
+기준은 #240의 PR #247(`c00b34e4`, main `f36678b3` 통합)의 위 최종 전체 실행 **239/244**다. 실패한 최초 전체 실행·분리 실행·최종 전체 실행 기록을 삭제하거나 PASS로 바꾸지 않는다. 아래는 그 이후 소스 보완이며, 새 전체 실행 결과는 아직 **PASS**다. 이 단계에서 연결 규약·게임 규칙·원본 Scene·Config·오디오 기기 설정은 변경하지 않는다.
+
+### 확인된 원인과 판단 범위
+
+| 실패 | 확인한 근거 | 판단과 보완 |
+| --- | --- | --- |
+| `LabDeveloperSoloIntegrationTests.SavedSceneSoloCanGenerateCombineAndHitTheCylinder` | 고정 검사 포트 **17777**, `C6_LAB_UDP_BIND_FAILED error=AddressAlreadyInUse` 후 실제 Host 시작 실패 | 고정 검사 포트를 공유하지 않도록 OS가 배정한 사용 가능한 IPv4·IPv6 포트를 선택한다. 실제 Host 시작과 게임 동작 검증은 유지한다. |
+| `LabDeveloperSoloIntegrationTests.SavedSceneSoloSwipeBlockBouncesAndShowsOnTheBlockedPlayersOwnScreen` | 고정 검사 포트 **17792**, 같은 `AddressAlreadyInUse`와 Host 시작 실패 | 위와 같은 포트 분리와 검사 소유 NetworkManager 정리를 적용한다. |
+| `LabGourdPaintTests.FixedHundredPercentGoalGrowsFromRepeatedRealHitsFreezesOnPauseAndResetsOnRetry` | 고정 검사 포트 **17789**, 같은 `AddressAlreadyInUse`와 Host 시작 실패 | 위와 같은 포트 분리와 검사 소유 NetworkManager 정리를 적용한다. 성장·일시정지·승리·초기화 기대값을 낮추지 않는다. |
+| `LabOrbPhysicsTests.TheFuseSizzlesWhileABombBurnsAndStopsWithoutAFuse` | 생성 AudioClip이 null은 아니지만 길이가 **0**; 같은 전체 실행에 오디오 장치 초기화 실패·시스템 재설정 기록 | `LabFuseSound`의 정적 캐시가 Unity 객체 존재만 검사하던 부분을 보완한다. 샘플 수·채널·주파수·길이를 검사하고, 오디오 설정 변경 시 캐시를 무효화하여 다시 생성한다. |
+| `LabOrbPhysicsTests.TheGeneratedSizzleIsAOneSecondAudibleLoopWithinRange` | 위 생성 클립 길이0; 같은 코드의 분리 실행은2/2 통과하고 전체 실행에서 재실패 | 모든 활성 도화선 소스가 새 공유 클립을 다시 연결하게 한다. 기존1초 길이·실제 샘플 데이터·음량 검증은 유지한다. |
+
+- **포트 점유 자체는 확인됐으나 점유 주체는 확인 불가**다. 당시 다른 Unity 검사 프로세스가 같은 고정 포트를 사용했을 가능성과 이전 실행의 정리 문제를 구분해야 한다. 종료 후 포트7777만 조회한 결과는 실패 포트17777·17792·17789의 점유 여부를 확인한 근거가 아니다.
+- **검사 객체 정리 누락은 별도로 확인**됐다. NGO `NetworkManager.OnEnable`은 루트 GameObject를 `DontDestroyOnLoad`로 옮긴다. 기존 `LabDeveloperSoloIntegrationTests`에는 공통 정리 단계가 없었고, `LabGourdPaintTests`는 Lab Scene만 내렸다. `LabNetwork.Stop()`은 NGO 종료를 요청하지만 그 GameObject를 제거하지 않는다. 이것이 당시 세 포트를 점유한 직접 원인이라고 단정하지 않는다.
+- **오디오 복구 결함은 소스와 증상으로 확인**했다. 캐시의 Unity 객체가 남았다는 사실만으로 네이티브 샘플 데이터가 유효하다고 보장할 수 없다. 오디오 초기화가 실패한 외부 원인까지 확정한 것은 아니며, 이번에는 장치/전역 오디오 설정을 변경하지 않고 런타임 생성 클립의 복구 경로를 보완한다.
+
+### 변경 범위와 새 회귀 검사
+
+`Assets/Lab/Tests/PlayMode/LabSavedSceneNetworkFixture.cs`는 저장된 UI에 연결된 NetworkManager 한 개만 소유한다. 두 검사 묶음이 이 helper로 Scene을 불러오고, 정리 시 해당 NetworkManager를 Stop·Destroy한 뒤 프레임을 기다려 제거를 확인한다. 다른 검사나 사용자 객체를 일괄 제거하지 않는다. 포트 선택은 IPv4에서 OS 임시 포트를 배정받고 같은 IPv6 포트도 비어 있는지 검사한 뒤 실제 Host 시작 전에 탐색 소켓을 해제한다. 외부 프로세스가 해제 직후 포트를 선점하는 경쟁 가능성은 남으며, 실제 Host의 바인딩 실패를 숨기거나 재시도로 PASS 처리하지 않는다.
+
+| 새 검사 | 확인하려는 결과 | 현재 상태 |
+| --- | --- | --- |
+| `LabDeveloperSoloIntegrationTests.SavedHostFixtureUsesAnAvailablePortAndDisposesItsPersistentNetwork` | 점유 중인 UDP 포트와 다른 포트 선택, 실제 Solo Host 시작, 수동 Stop 없이 helper 정리, DDOL NetworkManager 제거와 Host 포트 재바인딩 | **PASS** |
+| `LabOrbPhysicsTests.AudioConfigurationChangeRecreatesTheSharedSizzleAndRebindsBurningSources` | 오디오 설정 변경 콜백 후 클립 재생성, 활성 소스2개의 같은 새 클립 연결,1초 길이와 샘플 데이터·도화선 상태 유지. 실제 기기 설정은 바꾸지 않고 등록된 콜백을 호출한다. | **PASS** |
+| `LabOrbPhysicsTests.InvalidCachedSizzleIsRebuiltEvenWhenItsUnityObjectStillExists` | 잘못된 샘플 수의 살아 있는 캐시를 교체하고, 올바른1초 대체 클립을 다시 공유 | **PASS** |
+| 보완 후 전체 EditMode·PlayMode | Unity6000.6.5f1, `pr247-fixed-edit.xml` **844/844**(25.142초), `pr247-fixed-play.xml` **247/247**(112.554초). 새3건과 기존 실패5건 포함, 실패·생략·inconclusive0. Edit 01:48:09Z~01:48:35Z, Play 01:45:44Z~01:47:37Z. | **PASS** |
+| 보완 후 Mac 실제 연결·iOS/LAN/핫스팟·모바일 성능 | 해당 소스의 별도 앱/환경 실행 증거 | **NOT_RUN** |
+
+구현 근거: `Assets/Lab/Scripts/Audio/LabFuseSound.cs`의 `GeneratedSizzle`·`ValidGeneratedClip`·`OnAudioConfigurationChanged`·`Update`, 위 fixture helper와 두 검사 묶음의 `UnloadSavedScene`, `Assets/Lab/Tests/PlayMode/LabOrbPhysicsTests.cs`의 새2건. 원시 로그·XML·앱·개인 경로는 공개 저장소에 포함하지 않는다.
+
+오디오 분리 검사도 `pr247-fix-audio.xml` **4/4**(0.230초) 통과했다. 전역 오디오 설정이나 장치를 변경하지 않았으며, 이번 전체 실행에서는 고정 포트·오디오 실패가 재발하지 않았다. 이전 실패 XML은 보존한다.
+
 ## 미사용 변수와 과거 테스트 정리 — 2026-10-21 KST #246
 
 기준은 로컬 병합 완료 커밋 `2272d25a`(#240 + main `ae13b4f1`의 #235·#241·검사 수정)다. 정리 작업 브랜치는 `refactor/#246-legacy-variable-test-cleanup`이며 새 규약은 **5650 / `C6PhysicsLab/14` / 공유 설정165개**다. 이후 다른 PR의 main 반영 여부와 구분한다. 제거·이관 상세는 [정리 기록](LEGACY_VARIABLE_TEST_CLEANUP.md), 현재 검사 분류는 [테스트 보고서](TEST_SUITE_REPORT.md)를 따른다.

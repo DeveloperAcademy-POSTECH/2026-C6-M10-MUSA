@@ -105,3 +105,6 @@ Unity CLI에서 프로젝트 경로에 대해 `unity test <프로젝트 경로> 
 - [EditMode](../Assets/Lab/Tests/EditMode), [PlayMode](../Assets/Lab/Tests/PlayMode)
 - [검증 기록](VALIDATION.md), [정리 내역](LEGACY_VARIABLE_TEST_CLEANUP.md)
 - [DEV 명세](DEVELOPER_MODE_PARAMETER_SPEC.md), [개인 조합판 구조](LOCAL_BOARD_AUTHORITY.md)
+
+
+선행 #247 최종 main 병합본 `79858189`/`29ce13bc`의 도화선 생성 오디오 복구와 저장 Scene 테스트용 동적 포트/정리 fixture도 추가 통합했다. 이번 통합본의 전체 실행 결과는 VALIDATION의 #246 PR 최종 절에서 구분한다.
