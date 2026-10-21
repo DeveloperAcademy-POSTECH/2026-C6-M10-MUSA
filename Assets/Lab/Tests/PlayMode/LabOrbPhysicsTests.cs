@@ -1243,6 +1243,51 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator ABombThePlayerSendsOnPassesAtTheEdgeEvenSlowlyButADriftingOneTurnsBack()
+        {
+            // No drag lag here, so the dragged bomb sits exactly on the edge when it is let go.
+            float[] values = config.CaptureDeveloperValues();
+            values[146] = 0f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var crossed = new System.Collections.Generic.Dictionary<string, LabOrbEdgeCrossing>();
+            board.EdgeCrossed += crossing => crossed[crossing.OrbId] = crossing;
+            float edge = board.CenterBounds.xMax;
+            float driftPass = 1.5f * config.DrumDriftSpeed * Width; // slower than this, a drifting bomb turns back
+
+            var sent = board.UpsertOrb("sent", LabOrbKind.Bomb, new Vector2(.9f, .5f), lockSwipes: 2, fuseSeconds: 10f);
+            Vector2 start = BoardPoint(sent);
+            Assert.That(board.TryBeginDragAtWorld(start, 1d), Is.True);
+            // The finger drags it to the edge and past it, then lets go with a gentle push outward.
+            Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 1.05d), Is.True);
+            Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 1.5d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(edge + .45f, start.y), 1.6d), Is.True);
+            Assert.That(sent.Body.linearVelocity.x, Is.InRange(.01f, driftPass), "A gentle push, slower than a drift could ever pass.");
+            for (int step = 0; step < 20 && !crossed.ContainsKey("sent"); step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("sent"), Is.True, "Sent on by the player, it passes at the edge however slowly (#237).");
+            Assert.That(crossed["sent"].ToRight, Is.True);
+            Assert.That(crossed["sent"].Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe), "It is the player's own pass.");
+
+            // The gourd's swipe block still holds that edge against it.
+            board.SetSwipeBlock(1, 5f);
+            var blocked = board.UpsertOrb("blocked", LabOrbKind.Bomb, new Vector2(.9f, .2f), lockSwipes: 2, fuseSeconds: 10f);
+            start = BoardPoint(blocked);
+            Assert.That(board.TryBeginDragAtWorld(start, 2d), Is.True);
+            Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 2.05d), Is.True);
+            Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 2.5d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(edge + .45f, start.y), 2.6d), Is.True);
+            for (int step = 0; step < 20; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("blocked"), Is.False, "A blocked edge still bounces the player's pass (#215).");
+            Assert.That(board.BlockBounces, Is.GreaterThanOrEqualTo(1));
+            board.SetSwipeBlock(0, 0f);
+
+            // A bomb nobody sent drifts and turns back at the edge, as before.
+            var drifting = board.UpsertOrb("drifting", LabOrbKind.Bomb, new Vector2(.98f, .8f), lockSwipes: 2, fuseSeconds: 10f);
+            drifting.Body.linearVelocity = new Vector3(.5f * driftPass, 0f, 0f);
+            for (int step = 0; step < 40; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("drifting"), Is.False, "A bomb nobody sent never wanders across.");
+        }
+
+        [UnityTest]
         public IEnumerator AHeavyBombLeavesTheFingerSlowerAndSlidesToAStopSoonerThanAnOrb()
         {
             var orb = board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.2f, .3f));
@@ -1260,7 +1305,8 @@ namespace C6Lab.Tests
             Vector2 orbRelease = Flick(orb, 1d);
             Vector2 bombRelease = Flick(bomb, 2d);
             Assert.That(orbRelease.x, Is.GreaterThan(.2f * Width), "The flick sends the orb on.");
-            Assert.That(bombRelease.x, Is.EqualTo(.5f * orbRelease.x).Within(.001f * Width),
+            Assert.That(config.BombReleaseSpeed, Is.EqualTo(.75f), "Since #237, three quarters of an orb's release.");
+            Assert.That(bombRelease.x, Is.EqualTo(config.BombReleaseSpeed * orbRelease.x).Within(.001f * Width),
                 "A bomb leaves the finger at half an orb's speed, so passing it takes a harder swipe (#212).");
             Assert.That(Mathf.Abs(bombRelease.y), Is.LessThan(.001f));
 
