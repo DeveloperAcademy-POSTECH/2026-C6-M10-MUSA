@@ -1,23 +1,21 @@
 # C6 테스트 구성과 검증 범위 보고서
 
-작성일: 2026-10-21 KST. 현행 정리 작업 `refactor/#246-legacy-variable-test-cleanup`, 기준 커밋 `2272d25a` 이후 작업 파일을 분석했다. 기준은 #240 개인 조합판 개편과 main의 #235 소멸·#241 콤보 예고·프로토콜 검사 수정을 통합한 코드다. Unity 6000.6.5f1, 실행 Scene `Assets/Lab/Scenes/Lab.unity`, 현재 공유 설정165개·프로토콜5650·연결 토큰 `C6PhysicsLab/14`다. #246 정리 커밋은 `13c051c3`이며, 현재는 선행 PR #247의 `c00b34e4`(main `f36678b3`·#237/PR #239 폭탄 전달 포함)를 추가 통합 중이다.
+작성일: 2026-10-21 KST. 기준은 main `79858189`(#247 최종 `29ce13bc`)를 통합한 #246 브랜치의 커밋 `470561b`다. Unity6000.6.5f1·macOS ARM64, 실행 Scene `Assets/Lab/Scenes/Lab.unity`, 현재165개 공유 설정·프로토콜5650·토큰 `C6PhysicsLab/14`다.
 
-추가 통합 전 #246 정리 커밋의 자동 검사는 **88개 C# 파일, EditMode794개 + PlayMode243개 = 1,037개 케이스**다. 여러 값·해상도의 매개변수 검사는 각각 한 케이스로 센다. 게임 전체를1,037번 실행한다는 뜻은 아니다. 코드 존재, 실제 자동 실행, 실제 기기 연결은 구분한다. 정리 내역은 [LEGACY_VARIABLE_TEST_CLEANUP](LEGACY_VARIABLE_TEST_CLEANUP.md)을 따른다.
+현재 **EditMode48파일·794케이스, PlayMode41파일·247케이스 = C#89파일·1,041케이스**다. PlayMode41파일 중1개는 공통 준비/정리 helper이고 실제 fixture는40개다. 같은 함수를 여러 값·해상도로 실행하는 매개변수 케이스를 각각 세며, 게임 전체를1,041번 실행하는 뜻은 아니다.
 
-> **추가 통합 검증 대기:** 아래 분류표와794/243·Mac24의 PASS는 `13c051c3`의 실행 근거다. #239의 폭탄 전달 PlayMode1건이 추가되어 새 전체 검사 수는 EditMode794·PlayMode244(총1,038)가 예상되며, 실제 발견 수와 통과 여부는 새 실행 XML로 확정한다. 이전 선행 `c00b34e4`/`f36678b3` 통합의 전체 PlayMode는239/244(서버 bind3·오디오2 실패)였다. 현재 추가 통합본을 전체 PASS로 표시하지 않으며 새 결과는 [VALIDATION](VALIDATION.md)에 별도로 기록한다.
+## 최종 실행 결과
 
-## 추가 통합 전 #246 정리 커밋의 실행 결과
+| 종류 | 실제 결과 | 확인 범위 |
+| --- | --- | --- |
+| EditMode | **794/794 통과**, 실패·생략0, 27.847초 | 규칙·수치·직렬화·저장 참조 |
+| PlayMode | **247/247 통과**, 실패·생략0, 110.924초 | 컴포넌트·입력·실제 물리·GPU·Scene·HUD·오디오 복구·소켓 정리 |
+| Mac 독립 앱 | **2인24/24 통과**. [상세 근거](VALIDATION.md)의 #246 PR 최종 절 참조 | 같은 Mac loopback 독립 앱의 실제 설정·게임 흐름 |
+| iOS·실기기LAN/핫스팟·모바일성능 | **미실행** | Mac 결과로 대체하지 않음 |
 
-| 종류 | 코드 규모 | 실제 결과 | 범위 |
-| --- | ---: | --- | --- |
-| EditMode | 48파일·794케이스 | **794/794 통과**, 실패·생략0, 25.709초 | 규칙·수치·직렬화·소스/저장 참조 |
-| PlayMode | 40파일·243케이스 | **243/243 통과**, 실패·생략0, 106.118초 | 컴포넌트·입력·실제 물리·GPU·Scene·HUD |
-| Mac 독립 앱 | 위 NUnit 수와 별도 | **2인 직접 연결24/24 통과** | 같은 Mac loopback의 실제 독립 앱·설정/소유권/명중/맵/pause/restart |
-| iOS·실기기 LAN/핫스팟 | 별도 | **미실행** | 실제 터치·권한·무선 네트워크·기기 성능 |
+근거 XML은 `pr-main-edit.xml`·`pr-main-play.xml`이다. 시간은 Unity 시작·불러오기·컴파일·빌드를 제외한 XML 검사 수행 시간이다. 이전 정리 커밋13c051c3의794/243·Mac24, 폭탄 통합90451a7의794/244와 최신 실행은 구분한다. 실패·중단 이력은 VALIDATION에 보존한다.
 
-EditMode는 `edit-01.xml`, PlayMode는 단독 실행 `play-02.xml`에서 확인했다. 시간은 XML의 검사 수행 시간으로 Unity 시작·불러오기·컴파일·빌드 시간과 다르다. 첫 PlayMode의238개 통과·5개 실패와 수정/환경 원인은 VALIDATION에 보존했다. 앞선 버전의 Mac3/5인·모바일 결과를 이번 버전의 통과로 승계하지 않는다.
-
-## 추가 통합 전 EditMode 구성
+## EditMode 구성
 
 | 주된 책임 | 파일 | 케이스 | 확인 범위 |
 | --- | ---: | ---: | --- |
@@ -31,80 +29,68 @@ EditMode는 `edit-01.xml`, PlayMode는 단독 실행 `play-02.xml`에서 확인�
 | 사운드와 햅틱 | 3 | 13 | 효과 선택·빈도·볼륨 규칙 |
 | 합계 | 48 | 794 | |
 
-EditMode도 Unity API를 사용한다. 일부는 ScriptableObject·GameObject를 만들거나 Scene·에셋 참조를 읽는다. 모델은 드래그의 프레임별 물리 대신 행동 좌표를 포함한 `TryCombineAt`·`TryTransferAt`·`TryUseItemAt`을 검사한다.
+표는 fixture 파일의 주된 책임별 분류다. 일부는 GameObject·ScriptableObject를 만들거나 실제 Scene/에셋 참조를 읽는다. 모델은 현행 `TryCombineAt`·`TryTransferAt`·`TryUseItemAt` 경로의 좌표·규칙·소비를 검사한다.
 
-`LabSharedSettingsSchemaTests`는 잘못된 길이4종과 현재 버전1종을 공통으로 검사한다. 기능별 검사에서는 각 설정의 기본값·경계값·NaN/Infinity·정수 조건·왕복을 계속 검사한다. `LabActionTransactionTests`는 중복 요청/재전송, `LabBoardReplicationTests`는 순번/체크포인트, `LabBulkChannelTests`는 손실/재정렬/ACK를 통제된 입력으로 검사한다. 실제 핫스팟 품질 측정은 아니다.
+`LabSharedSettingsSchemaTests`는 잘못된 길이4종·현재 규약1종을 공통 검사한다. 개별 기능은 수치 기본값·경계·NaN/Infinity·정수·왕복·원자적 거절을 유지한다. ActionTransaction·BoardReplication·BulkChannel 검사는 순서/중복/유실/재전송을 통제된 입력으로 검사하며 실제 핫스팟 품질 시험과 다르다.
 
-## 추가 통합 전 PlayMode 구성
+## PlayMode 구성
 
 | 주된 책임 | 파일 | 케이스 | 확인 범위 |
 | --- | ---: | ---: | --- |
-| 조합판 물리와 입력 | 6 | 88 | Rigidbody·굴림·마찰·충돌·잡기·곡선 경계·전달·로컬 예고 |
+| 조합판 물리와 입력 | 6 | 91 | Rigidbody·굴림·마찰·충돌·잡기·곡선 경계·전달·로컬 예고 |
 | 투사체와 충돌 | 4 | 29 | 실제 비행·축소 반경·바닥 우선·명중/빗나감・중복 방지 |
 | 박의 운동 | 2 | 19 | 흔들림·회전·감쇠·줄 상하 운동·원격 보정 |
 | 도색 런타임과 렌더링 | 9 | 27 | 실제 맵·군집·건조·질감·P무늬·Shader 픽셀 |
 | 비행과 피격 연출 | 5 | 21 | 오행 트레일·명중·경고·크랙 |
-| 저장 Scene과 HUD | 9 | 32 | 실제 Scene·솔로·DEV 슬라이더/토글·적용·배치·스태미나 |
+| 저장 Scene과 HUD | 9 | 33 | 실제 Scene·솔로·DEV 슬라이더/토글·적용·배치·스태미나 |
 | 로비와 통신 처리 | 3 | 23 | P선택·접속 취소/실패·행동/보드 수신 처리 |
 | 완성 박 관람 | 2 | 4 | 결과 복제·관람 자격·모달 입력·회전/확대 |
-| 합계 | 40 | 243 | |
+| 합계 | 40 | 247 | |
 
-재생 환경의 즉시 실행 `[Test]`와 여러 프레임을 기다리는 `[UnityTest]`가 섞여 있다. 모든 케이스가 전체 Scene이나 네트워크 방을 여는 것은 아니다. 저장 Scene 검사는 실제 DEV 입력·토글·솔로 시작/재시작을 연결해 확인한다.
+위 표의40 fixture 파일에 공통 `LabSavedSceneNetworkFixture.cs`1개가 별도로 있다. 즉시 실행 `[Test]`와 여러 프레임을 기다리는 `[UnityTest]`가 함께 있으며 모든 검사가 전체 Scene/네트워크 방을 여는 것은 아니다.
 
-일부 렌더 검사는 실제 RenderTexture 픽셀을 읽는다. 이번 실행의 생략은0이다. GPU가 없는 다른 환경에서는 해당 검사가 생략될 수 있으므로 skipped를 함께 확인한다. 픽셀 검사 통과는 미술적 완성도나 모든 화면 비율을 보장하지 않는다.
+렌더 검사 일부는 실제 RenderTexture 픽셀을 읽는다. 이번 생략은0이며 GPU가 없는 환경에서는 skipped도 확인한다. 픽셀 검사 통과가 미술적 완성도나 모든 화면 비율을 보장하지 않는다. 저장 Scene 검사는 DEV 버튼·슬라이더·솔로 시작/재시작까지 연결한다.
 
-`LabLocalBoardNetworkIntegrationTests`는 실제 처리 메서드에 합성 패킷을 넣으며 외부 기기 소켓을 사용하지 않는다. `LabQuickConnectTests`는 저장 UI와 로컬 UDP 지점 일부를 사용하지만 다른 휴대폰의 방 검색·입장을 보장하지 않는다. 실제 앱 소켓 검증을 별도로 기록하는 이유다.
+`LabLocalBoardNetworkIntegrationTests`는 실제 처리 메서드에 합성 패킷을 넣으며 외부 기기 소켓을 사용하지 않는다. `LabQuickConnectTests`는 로컬 UDP·저장 UI 일부를 확인하나 다른 휴대폰 입장을 증명하지 않는다. 실제 독립 앱 소켓은 별도 검사한다.
 
 ## 정리 전후 비교
 
-| 항목 | 정리 기준본 | #246 정리본 |
+| 항목 | 최신 선행 main | #246 정리 |
 | --- | ---: | ---: |
-| EditMode 파일 | 47 | 48 |
-| EditMode 케이스 | 844 | 794 |
-| PlayMode 파일·케이스 | 40·243 | 40·243 |
-| 전체 케이스 | 1,087 | 1,037 |
+| EditMode 파일/케이스 | 47 / 844 | 48 / 794 |
+| PlayMode 파일/케이스 | 41 / 247 | 41 / 247 |
+| 총 케이스 | 1,091 | 1,041 |
 
-폐기된 설정 전용 검사55개를 제거하고 공통 설정 스키마5개를 추가해 EditMode가50개 줄었다.55개는 고정 목표 조정 전용16개, 반복 구형 배열 길이17개, 폐기 Flow 수치20개, 사용되지 않던 조절값 무효과 확인2개다. 현재 군집 성장·최초 도색·물리·렌더링·소유권·소비·복구·기본 OFF 선택 기능은 유지한다. PlayMode 케이스 수는 유지하며 옛 private selector 렌더 검사를 현재 공개 성장 경로로 이관했다.
+고정 목표 조정16개·반복 구형 배열 길이17개·폐기 Flow수치20개·미사용 조절값 확인2개 =55개를 제거하고 공통 스키마5개를 추가해50개 줄었다. 현재 API로 이관한 핵심 게임 검사는 삭제하지 않았다. 초기 정리 기준의PlayMode243개에 선행 main의 폭탄 전달1개·오디오 복구2개·동적 포트/정리1개가 추가된247개를 모두 보존했다.
 
-테스트 이름이 같아도 모델 규칙·보드 물리·UI 연결·네트워크 처리·실제 앱 소켓은 다른 층이다. 이름에 LEGACY가 있거나 기본 OFF라는 이유만으로 불필요하다고 판단하지 않았다. 과거 단독 #240의837/233과 후속 통합844/243은 당시 기록이며 이번 수치와 구분한다.
+기능 이름이 같아도 모델 규칙·보드 물리·UI 연결·패킷 처리·실제 앱은 서로 다른 층이다. LEGACY라는 이름이나 기본 OFF만으로 검사를 삭제하지 않는다. 과거 단독 #240의837/233·이전 통합844/243 기록은 현재 실행 결과와 다르다.
 
-## 시간이 많이 쓰이는 검사
+## 시간이 많이 쓰이는 묶음
 
 | EditMode fixture | 케이스 | 수행 시간 |
 | --- | ---: | ---: |
-| LabPaintSplatterConsistencyTests | 24 | 10.58초 |
-| LabPaintSpreadFlowTests | 29 | 9.02초 |
+| LabPaintSplatterConsistencyTests | 24 | 11.31초 |
+| LabPaintSpreadFlowTests | 29 | 10.03초 |
 
 | PlayMode fixture | 케이스 | 수행 시간 |
 | --- | ---: | ---: |
-| LabOrbPhysicsTests | 56 | 27.69초 |
+| LabOrbPhysicsTests | 59 | 28.87초 |
 | LabHangingPresentationTests | 14 | 22.65초 |
 
-fixture 시간은 일부 준비/정리 시간을 포함한다. 시간이 긴 도색 묶음은 여러 해상도에서 군집과100% 완성을 계산하고, 물리 묶음은 실제 프레임·감쇠 시간을 기다린다. 이 시간은 플레이 중 FPS나 네트워크 지연의 성능 지표가 아니다.
+도색은 여러 해상도의 성장/완성 계산을, 물리는 실제 프레임·감쇠 시간을 기다린다. 위 시간은 FPS·네트워크 지연의 성능 지표가 아니다.
 
-## 실행 방법과 동시 실행 주의
+## 실행과 동시 실행 주의
 
-Unity CLI에서 프로젝트 경로에 대해 `unity test <프로젝트 경로> --mode EditMode --output <저장소 밖 XML 경로> --timeout 480 --format json`을 실행한다. 완료 후 `--mode PlayMode`로 바꿔 순서대로 실행한다. Editor에서 실행한다면 Test Runner의 EditMode와 PlayMode 탭을 사용한다.
+CLI: `unity test <프로젝트 경로> --mode EditMode --output <저장소 밖 XML 경로> --timeout 480 --format json` 완료 후 PlayMode로 바꿔 순차 실행한다. Editor에서는 Test Runner의 두 탭을 이용한다.
 
-**같은 Mac에서는 프로젝트 사본이 달라도 네트워크 PlayMode 전체 검사를 동시에 실행하지 않는다.** 저장 Scene 검사들이 고정된 로컬 UDP 포트를 공유한다. #246 첫 실행의 서버 bind3건은 다른 채팅의 동일 fixture 실행과 포트 점유가 겹쳤으며, 단독 실행에서 모두 통과했다. 일반 파일 조회만으로는 이 충돌이 발생하지 않는다.
+같은 Mac에서 네트워크 PlayMode를 동시에 실행하지 않는다. 사본이 달라도 일부 fixture는 같은 고정 UDP 포트를 사용한다. 선행 main은 저장 Scene 솔로/도색 검사에 사용 가능한 IPv4·IPv6 포트를 찾고 자신이 만든 persistent NetworkManager를 정리하는 helper를 추가했다. 모든 fixture의 포트가 동적으로 바뀐 것은 아니므로 동시 실행 안전을 보장하지 않는다. 파일 조회만으로 이 포트 충돌은 생기지 않는다.
 
-## 자동 검사 외의 확인 범위
+#246 첫 실행의 bind3건은 다른 채팅의 포트 점유와 대조했고 단독 실행으로 확인했다. 선행 오디오 복구도 보존해 생성된 클립이 오디오 장치 재설정 후 유효한 샘플로 다시 연결되는지 검사한다. 실패를 무시하거나 기대값을 낮추지 않았다.
 
-| 수단 | 용도 |
-| --- | --- |
-| Editor 검증 메뉴 | 저장 참조/구성 확인. Scene을 변경하는 설치·업그레이드 메뉴와 구분 |
-| 물감·트레일 비교 도구 | 같은 조건의 시각 결과 비교. 게임 전체 통과와 구분 |
-| Mac 여러 앱 | 실제 UDP·소유권·소비·도색·설정 적용·pause/restart. 같은 Mac loopback임을 명시 |
-| iPhone/iPad | 실제 터치·권한·LAN/핫스팟·진동·체감. Mac으로 대체 불가 |
-| 빌드/서명 | 플랫폼 앱 생성·설치·실행·플레이를 각각 구분 |
+## 자동 검사 외의 확인
 
-현재 검사 묶음은 FPS·장시간 메모리/GC·실기기 응답 지연·발열·배터리의 합격 기준을 제공하지 않는다. `.github`에는 이슈/PR 양식만 있고 자동 검사 workflow는 없다. 이번 결과는 로컬 Unity 실행이다. 원시 XML·로그·빌드·검증 도구·주소·개인 경로는 공개 저장소에 넣지 않는다.
+Editor 검증 메뉴는 저장 참조/구성을, 비교 도구는 같은 조건의 시각 결과를 확인한다. 실제 Mac 여러 앱은 소유권·소비·도색·pause/restart·설정 공유를, iPhone/iPad는 터치·권한·LAN/핫스팟·진동을 별도로 확인한다. 빌드·서명·설치·실행·플레이도 각각 구분한다.
 
-## 확인할 파일
+현재 자동 검사에는 FPS·장시간 메모리/GC·실기기 지연·발열·배터리의 합격 기준이 없다. `.github`에는 양식만 있고 테스트 workflow는 없어 이번 결과는 로컬 Unity 실행이다. 원시XML·로그·빌드·임시도구·개인 경로는 저장소에 넣지 않는다.
 
-- [EditMode](../Assets/Lab/Tests/EditMode), [PlayMode](../Assets/Lab/Tests/PlayMode)
-- [검증 기록](VALIDATION.md), [정리 내역](LEGACY_VARIABLE_TEST_CLEANUP.md)
-- [DEV 명세](DEVELOPER_MODE_PARAMETER_SPEC.md), [개인 조합판 구조](LOCAL_BOARD_AUTHORITY.md)
-
-
-선행 #247 최종 main 병합본 `79858189`/`29ce13bc`의 도화선 생성 오디오 복구와 저장 Scene 테스트용 동적 포트/정리 fixture도 추가 통합했다. 이번 통합본의 전체 실행 결과는 VALIDATION의 #246 PR 최종 절에서 구분한다.
+관련: [EditMode](../Assets/Lab/Tests/EditMode), [PlayMode](../Assets/Lab/Tests/PlayMode), [검증 기록](VALIDATION.md), [정리 내역](LEGACY_VARIABLE_TEST_CLEANUP.md), [DEV 명세](DEVELOPER_MODE_PARAMETER_SPEC.md), [구조](LOCAL_BOARD_AUTHORITY.md).
