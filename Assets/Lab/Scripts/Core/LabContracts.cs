@@ -209,6 +209,18 @@ namespace C6Lab
         /// <summary>Whether a swipe block is on this player at this snapshot.</summary>
         public bool SwipeBlockOn(ulong player) => swipeBlockedUntil > serverTime && swipeBlockedPlayer == player;
 
+        /// <summary>
+        /// The nine-tailed fox's charm (#251): the player too dazed to attack (throw upward), the Host times it
+        /// started and ends, and how many times the players beside them have tapped to wake them. charmUntil is
+        /// -1 while no one is charmed.
+        /// </summary>
+        public ulong charmedPlayer;
+        public double charmStartedAt = -1d, charmUntil = -1d;
+        public int charmTaps;
+
+        /// <summary>Whether this player is charmed at this snapshot.</summary>
+        public bool CharmOn(ulong player) => charmUntil > serverTime && serverTime >= charmStartedAt && charmedPlayer == player;
+
         // 박 색상 콤보 실험 (#222). DEV에서 끄면 모두 기본값(콤보 없음)이다.
         // 시각은 serverTime과 같은 전투 시계 기준이다.
         /// <summary>지금 진행 중인 콤보가 있는지</summary>

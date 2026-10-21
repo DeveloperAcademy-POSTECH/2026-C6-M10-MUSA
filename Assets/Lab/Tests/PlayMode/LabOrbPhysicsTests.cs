@@ -76,6 +76,55 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator ACharmedBoardFlashesAndAnUpwardSwipeOnlyFlicksTheOrbUntilItIsReleased()
+        {
+            var combined = board.UpsertOrb("charmed-throw", LabOrbKind.Combined, new Vector2(.5f, .3f),
+                element: LabOrbElement.Fire);
+            int throws = 0;
+            board.ThrowRequested += gesture => throws++;
+            board.SetCharm(5f);
+            Assert.That(board.Charmed, Is.True);
+            Assert.That(board.CharmEdge.Visible, Is.True, "The board's edges glow in the heart colour (#251).");
+            Color glow = board.GetComponentsInChildren<SpriteRenderer>()
+                .First(part => part.name == "Charm Edge Flash Left").color;
+            Assert.That(glow.r, Is.GreaterThan(glow.b), "A heart pink, not the old purple.");
+            float dimmest = 1f, brightest = 0f;
+            float until = Time.time + 1f;
+            while (Time.time < until)
+            {
+                yield return null;
+                dimmest = Mathf.Min(dimmest, board.CharmEdge.Brightness);
+                brightest = Mathf.Max(brightest, board.CharmEdge.Brightness);
+            }
+            Assert.That(brightest, Is.LessThanOrEqualTo(.5f), "A soft glow, never a bright flash.");
+            Assert.That(brightest - dimmest, Is.GreaterThan(.05f), "It slowly brightens and dims.");
+
+            Vector2 from = BoardPoint(combined);
+            Assert.That(board.TryBeginDragAtWorld(from, 1d), Is.True);
+            Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1.7f), 1.1d), Is.True);
+            Assert.That(throws, Is.Zero, "A charmed player cannot attack.");
+            Assert.That(board.IsSnapshotSuppressed("charmed-throw"), Is.False, "The orb stays on the board...");
+            Assert.That(combined.Body.linearVelocity.y, Is.GreaterThan(0f), "...sliding up like a flick, to bounce off the top.");
+            until = Time.time + 1.5f;
+            while (combined.Body.linearVelocity.y >= 0f && Time.time < until) yield return new WaitForFixedUpdate();
+            Assert.That(combined.Body.linearVelocity.y, Is.LessThan(0f), "It bounced back off the top wall.");
+
+            board.SetCharm(0f);
+            Assert.That(board.Charmed, Is.False);
+            Assert.That(board.CharmEdge.Releasing, Is.True, "As the charm ends it fades...");
+            until = Time.time + LabCharmEdgeFlash.ReleaseSeconds + .3f;
+            while (board.CharmEdge.Visible && Time.time < until) yield return null;
+            Assert.That(board.CharmEdge.Visible, Is.False, "...gently away.");
+
+            until = Time.time + 2f;
+            while (combined.Body.linearVelocity.sqrMagnitude > 0f && Time.time < until) yield return new WaitForFixedUpdate();
+            from = BoardPoint(combined);
+            Assert.That(board.TryBeginDragAtWorld(from, 3d), Is.True);
+            Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1.7f), 3.1d), Is.True);
+            Assert.That(throws, Is.EqualTo(1), "Awake again, the throw goes.");
+        }
+
+        [UnityTest]
         public IEnumerator AFoxOrbOverASideEdgeGoesUpInBlueSmokeInsteadOfPassing()
         {
             var crossed = new System.Collections.Generic.List<LabOrbEdgeCrossing>();

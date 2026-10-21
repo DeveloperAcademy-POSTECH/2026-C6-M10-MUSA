@@ -696,6 +696,65 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavedSceneSoloCharmShowsOnTheOnePlayersScreenAndWearsOff()
+        {
+            yield return fixture.Load();
+
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabOrbBoard board = network.board;
+            LabConfig savedConfig = network.config;
+            LabConfig charming = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = charming.CaptureDeveloperValues();
+            tuning[166] = 1f; // the sabotage mix (#251), every two seconds
+            tuning[167] = 2f;
+            tuning[168] = 2f;
+            tuning[169] = 0f; // only the charm
+            tuning[170] = 0f;
+            tuning[171] = 0f;
+            tuning[176] = 1f; // for one second
+            Assert.That(charming.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            network.config = charming;
+            fixture.UseAvailablePort(network);
+            try
+            {
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                var hud = UnityEngine.Object.FindAnyObjectByType<LabCharmHud>();
+                Assert.That(hud, Is.Not.Null, "The saved scene adds the charmed player's own display.");
+                float until = Time.realtimeSinceStartup + 4f;
+                while (!board.Charmed && Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(board.Charmed, Is.True, "Solo, to try it out, the charm falls on the one player.");
+                Assert.That(board.CharmEdge.Visible, Is.True);
+                yield return null;
+                Assert.That(hud.GaugeVisible, Is.True, "The time left shows on the gauge.");
+                Assert.That(hud.GaugeFill, Is.InRange(.01f, 1f));
+                var minimap = UnityEngine.Object.FindAnyObjectByType<LabDrumMinimap>();
+                if (minimap != null && minimap.IsShowing)
+                {
+                    var gaugeCorners = new Vector3[4];
+                    var minimapCorners = new Vector3[4];
+                    hud.Gauge.GetWorldCorners(gaugeCorners);
+                    minimap.Panel.GetWorldCorners(minimapCorners);
+                    Assert.That(gaugeCorners[0].y, Is.GreaterThanOrEqualTo(minimapCorners[1].y),
+                        "The gauge stands just above the drum minimap.");
+                }
+
+                until = Time.realtimeSinceStartup + 2f;
+                while (board.Charmed && Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(board.Charmed, Is.False, "Solo there is no one to wake them: it wears off after its second.");
+                yield return null;
+                Assert.That(hud.AwakeShowing, Is.True, "\"정신 차림!\" as it ends.");
+                Assert.That(hud.GaugeVisible, Is.False);
+            }
+            finally
+            {
+                network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(charming);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator SavedSceneSoloSabotageMixAnnouncesEachCastOnTheOnePlayer()
         {
             yield return fixture.Load();

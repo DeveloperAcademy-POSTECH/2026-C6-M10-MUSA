@@ -2825,6 +2825,59 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ACharmStopsOnlyTheCharmedPlayersThrowsUntilItEnds()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
+            try
+            {
+                var ids = new ulong[] { 10, 20, 30 };
+                var room = new LabModel();
+                room.Begin("charm-throw", ids, 0d, mix);
+                room.Tick(5d);
+                ulong charmed = room.DrainSabotages().Single().Target;
+                LabSnapshot on = room.Snapshot(5d);
+                Assert.That(on.charmedPlayer, Is.EqualTo(charmed));
+                Assert.That(on.CharmOn(charmed), Is.True);
+                Assert.That(on.charmUntil, Is.EqualTo(15d), "Ten seconds by default.");
+                Assert.That(on.charmTaps, Is.Zero);
+                ulong other = ids.First(id => id != charmed);
+
+                string charmedOrb = CombinedFor(room, charmed, 7.5d);
+                string otherOrb = CombinedFor(room, other, 7.5d);
+                Assert.That(room.TryLaunch(charmed, charmedOrb, "charm-throw-1", 7.6d, out _, out string reason), Is.False);
+                Assert.That(reason, Is.EqualTo("CHARMED"), "Too dazed to attack.");
+                Assert.That(room.TryLaunch(other, otherOrb, "charm-throw-2", 7.6d, out _, out reason), Is.True,
+                    "Only the charmed player is stopped. " + reason);
+                Assert.That(room.Snapshot(14.9d).CharmOn(charmed), Is.True);
+                Assert.That(room.Snapshot(15.1d).CharmOn(charmed), Is.False, "It wears off after its seconds.");
+                Assert.That(room.TryLaunch(charmed, charmedOrb, "charm-throw-3", 15.1d, out _, out reason), Is.True, reason);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void SabotageMixCharmsOneAtATimeAndNeverAddsToTheCharmedPlayer()
+        {
+            var mix = MixConfig(3f, bomb: 1, block: 0, fox: 0, charm: 1);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("mix-charms", new ulong[] { 10, 20, 30, 40 }, 0d, mix);
+                room.Tick(180d);
+                LabSabotage[] cast = room.DrainSabotages();
+                LabSabotage[] charms = cast.Where(item => item.Kind == LabSabotageKind.Charm).ToArray();
+                Assert.That(charms, Is.Not.Empty);
+                foreach (LabSabotage charm in charms)
+                    foreach (LabSabotage other in cast.Where(item => item.At > charm.At && item.At < charm.At + 10d))
+                    {
+                        Assert.That(other.Kind, Is.Not.EqualTo(LabSabotageKind.Charm), "One charm at a time.");
+                        Assert.That(other.Target, Is.Not.EqualTo(charm.Target), "Nothing more falls on the charmed player.");
+                    }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
         public void GourdBombsReachEveryPlayerAndCanRepeatOnTheSamePlayer()
         {
             // The shortest interval (1 s) drops 180 bombs in a round, enough to see the spread.
@@ -2946,6 +2999,23 @@ namespace C6Lab.Tests
             values[88] = maximumSeconds;
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
+        }
+
+        /// <summary>A Combined orb made on this player's board at this Host time.</summary>
+        private static string CombinedFor(LabModel room, ulong owner, double at)
+        {
+            LabOrbState yin = null, yang = null;
+            for (int i = 0; i < 12 && (yin == null || yang == null); i++)
+            {
+                Assert.That(room.TryGenerate(owner, "combined-for-" + owner + "-" + i, at, out var orb, out string reason),
+                    Is.True, reason);
+                if (orb.kind == LabOrbKind.Yin) yin = orb;
+                else if (orb.kind == LabOrbKind.Yang) yang = orb;
+            }
+            Assert.That(yin != null && yang != null, Is.True);
+            Assert.That(room.TryCombineAt(owner, yin.id, yang.id, "combined-for-" + owner, at, new Vector2(.5f, .5f),
+                Vector2.zero, out var combined, out string why), Is.True, why);
+            return combined.id;
         }
 
         private static LabConfig MixConfig(float interval, int bomb, int block, int fox, int charm)

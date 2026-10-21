@@ -546,6 +546,32 @@ namespace C6Lab
         /// coming in. The edge glows red with the seconds left in its middle. The board counts down by
         /// itself and only takes the Host's seconds when they differ by more than a moment.
         /// </summary>
+        private LabCharmEdgeFlash charmEdge;
+        private bool charmed;
+
+        /// <summary>This board's player is charmed (#251): an upward swipe is only a flick that bounces off the top.</summary>
+        public bool Charmed => charmed;
+        public LabCharmEdgeFlash CharmEdge => charmEdge;
+
+        /// <summary>
+        /// 매혹 (#251): 이 판의 주인이 헤롱헤롱해 공격(위로 던지기)을 못 한다. secondsLeft가 0보다 크면 걸린 것이고, 판 양쪽
+        /// 가장자리가 하트색으로 은은하게 빛난다. 풀리면 부드럽게 사라진다.
+        /// </summary>
+        public void SetCharm(float secondsLeft)
+        {
+            if (configured && secondsLeft > 0f && !float.IsInfinity(secondsLeft))
+            {
+                charmed = true;
+                if (charmEdge == null) charmEdge = LabCharmEdgeFlash.Create(transform);
+                charmEdge.Show(bounds.xMin, bounds.xMax, areaShape.VerticalRange(bounds.xMin, 0f),
+                    areaShape.VerticalRange(bounds.xMax, 0f), bounds.width);
+                return;
+            }
+            if (!charmed) return;
+            charmed = false;
+            if (charmEdge != null) charmEdge.Release();
+        }
+
         public void SetSwipeBlock(int side, float secondsLeft)
         {
             side = Math.Sign(side);
@@ -1022,6 +1048,8 @@ namespace C6Lab
         {
             CancelDrag();
             LiftSwipeBlock();
+            charmed = false;
+            if (charmEdge != null) charmEdge.Hide();
             foreach (var entry in entries.Values)
                 Retire(entry);
             entries.Clear();
@@ -1202,7 +1230,8 @@ namespace C6Lab
             // Side exits keep their existing screen-to-screen handoff even on a diagonal flick.
             bool outwardSide = (worldPoint.x <= bounds.xMin && inputVelocity.x < 0f)
                 || (worldPoint.x >= bounds.xMax && inputVelocity.x > 0f);
-            if (entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
+            // Charmed (#251), an upward swipe is no throw: the orb slides up like any flick and bounces off the top.
+            if (!charmed && entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
                 && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
             {
                 entry.BeforeRequest = CaptureMotion(entry);

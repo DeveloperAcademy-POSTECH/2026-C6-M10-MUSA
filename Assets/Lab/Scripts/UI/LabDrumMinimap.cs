@@ -73,6 +73,8 @@ namespace C6Lab
         private readonly Dictionary<ulong, Vector2> seatPositions = new Dictionary<ulong, Vector2>();
 
         public bool IsShowing => panel != null && panel.gameObject.activeSelf;
+        /// <summary>The minimap's panel on the Canvas; the charm gauge (#251) sits just above it.</summary>
+        public RectTransform Panel => panel;
         /// <summary>마지막으로 그린 플레이어별 원 중심 (미니맵 안 좌표, 테스트용)</summary>
         public IReadOnlyDictionary<ulong, Vector2> SeatPositions => seatPositions;
         /// <summary>북 ID → 지금 태극이 그려진 위치 (테스트용)</summary>

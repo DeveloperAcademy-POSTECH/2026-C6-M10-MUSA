@@ -189,7 +189,8 @@ namespace C6Lab
         // 5652: #254 board orb trail toggle (DEV 165); 166 shared values.
         // 5653: #258 visible gourd mesh collision and mesh-local approved paint coordinates.
         // 5654: #251 the yokai's sabotage mix announces each sabotage it casts, and fox fire adds the FoxFire orb
-        //       kind with its foxFire drop and fox touch messages; DEV 166-177, 178 shared values.
+        //       kind with its foxFire drop and fox touch messages, and the charm travels in the snapshot and board
+        //       header; DEV 166-177, 178 shared values.
         internal const ushort LabProtocolVersion = 5654;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
@@ -1817,6 +1818,9 @@ namespace C6Lab
             bool blockedHere = latest.SwipeBlockOn(LocalPlayerId);
             board.SetSwipeBlock(blockedHere ? (latest.swipeBlockedRight ? 1 : -1) : 0,
                 blockedHere ? (float)(latest.swipeBlockedUntil - latest.serverTime) : 0f);
+            // The fox's charm (#251) stops throws and shows its haze only on the charmed player's own board.
+            bool charmedHere = latest.CharmOn(LocalPlayerId);
+            board.SetCharm(charmedHere ? (float)(latest.charmUntil - latest.serverTime) : 0f);
             if (blockedHere && (latest.round != announcedBlockRound || latest.swipeBlockStartedAt != announcedBlockStart))
             {
                 announcedBlockRound = latest.round;

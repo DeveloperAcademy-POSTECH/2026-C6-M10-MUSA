@@ -169,6 +169,9 @@ namespace C6Lab
         private uint sabotageCount;
         private ulong lastSabotageTarget;
         private readonly List<LabFoxFireDrop> foxFires = new List<LabFoxFireDrop>();
+        private ulong charmedPlayer;
+        private double charmStartedAt = -1d, charmUntil = -1d;
+        private int charmTaps;
         private uint drumHandoffCount;
         private readonly LabGourdCombo combo = new LabGourdCombo();
         // 던진 순간의 페널티 배율 (#222). 날아가는 동안 페널티가 끝나도 그 공은 던질 때 크기 그대로 칠한다.
@@ -279,6 +282,9 @@ namespace C6Lab
                 ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
             sabotageCount = 0;
             lastSabotageTarget = 0;
+            charmedPlayer = 0;
+            charmStartedAt = charmUntil = -1d;
+            charmTaps = 0;
             nextSabotageAt = rules.SabotageMix ? now + SabotageDelay(0u) : double.PositiveInfinity;
             combo.Reset();
             launchScales.Clear();
@@ -483,6 +489,8 @@ namespace C6Lab
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (!current.kind.CanThrow(current.lockSwipes)) return Reject("RAW_CANNOT_ATTACK", out reason);
+            // Charmed (#251): too dazed to attack until it ends or the players beside wake them.
+            if (Charmed(sender, now)) return Reject("CHARMED", out reason);
             current.inFlight = true;
             current.vx = current.vy = 0f;
             current.revision = ++revision;
@@ -787,6 +795,10 @@ namespace C6Lab
         }
 
         private bool BlockOn(double now) => phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt;
+        private bool CharmOn(double now) => phase == LabPhase.Playing && charmUntil > now && now >= charmStartedAt;
+
+        /// <summary>Whether the fox's charm (#251) keeps this player from attacking at this Host time.</summary>
+        public bool Charmed(ulong player, double now) => CharmOn(now) && player == charmedPlayer;
 
         public LabSnapshot Snapshot(double now)
         {
@@ -820,6 +832,10 @@ namespace C6Lab
                 swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
                 swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
                 swipeBlockedUntil = BlockOn(now) ? swipeBlockedUntil : -1d,
+                charmedPlayer = CharmOn(now) ? charmedPlayer : 0,
+                charmStartedAt = CharmOn(now) ? charmStartedAt : -1d,
+                charmUntil = CharmOn(now) ? charmUntil : -1d,
+                charmTaps = CharmOn(now) ? charmTaps : 0,
                 comboActive = combo.Active,
                 comboColors = combo.Count == 0 ? Array.Empty<LabOrbElement>() : combo.Colors,
                 comboProgress = combo.Progress,
@@ -1030,6 +1046,15 @@ namespace C6Lab
             swipeBlockedUntil = at + rules.SwipeBlockSeconds;
         }
 
+        /// <summary>매혹 (#251): 이 사람은 정해 둔 시간 동안 헤롱헤롱해 공격(위로 던지기)을 못 한다.</summary>
+        private void StartCharm(ulong target, double at)
+        {
+            charmedPlayer = target;
+            charmStartedAt = at;
+            charmUntil = at + rules.CharmSeconds;
+            charmTaps = 0;
+        }
+
         /// <summary>
         /// 여우불 (#251): 이 사람의 판에 푸른 여우구슬을 정해 둔 개수만큼 떨어뜨린다. 판이 거의 차 있으면 빈 칸 수만큼만
         /// 떨어진다. 떨어질 자리는 판 안쪽에서 seed로 하나씩 뽑는다.
@@ -1074,6 +1099,7 @@ namespace C6Lab
                 if (kind == LabSabotageKind.GourdBomb) DropGourdBomb(target, at);
                 else if (kind == LabSabotageKind.SwipeBlock) StartSwipeBlock(target, at);
                 else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index);
+                else if (kind == LabSabotageKind.Charm) StartCharm(target, at);
                 sabotages.Add(new LabSabotage(kind, target, at));
             }
         }
@@ -1103,20 +1129,23 @@ namespace C6Lab
 
         /// <summary>
         /// Who this sabotage may fall on now, in seat order. Not the player the last one fell on (unless solo),
-        /// nor one whose ways are still blocked. One swipe block at a time, and a charm only with someone on
-        /// each side to wake the charmed player (or solo, to try it out).
+        /// nor one whose ways are still blocked or who is still charmed. One swipe block and one charm at a time,
+        /// and a charm only with someone on each side to wake the charmed player (or solo, to try it out).
         /// </summary>
         private List<ulong> SabotageTargets(LabSabotageKind kind, double at)
         {
             var targets = new List<ulong>();
             bool blocking = BlockOn(at);
+            bool charming = CharmOn(at);
             if (kind == LabSabotageKind.SwipeBlock && blocking) return targets;
+            if (kind == LabSabotageKind.Charm && charming) return targets;
             if (kind == LabSabotageKind.Charm && activeSeatCount > 1 && activeSeatCount < CharmMinimumPlayers) return targets;
             for (int i = 0; i < activeSeatCount; i++)
             {
                 ulong player = seats[i];
                 if (player == lastSabotageTarget && activeSeatCount > 1) continue;
                 if (blocking && player == swipeBlockedPlayer) continue;
+                if (charming && player == charmedPlayer) continue;
                 if (kind == LabSabotageKind.FoxFire && CountStored(player) >= rules.OrbStorageLimit) continue;
                 targets.Add(player);
             }
@@ -1338,6 +1367,9 @@ namespace C6Lab
             /// <summary>Fox fire (#251): how many fox orbs fall, and how long after they fall they cannot be touched off.</summary>
             public readonly int FoxFireCountMin, FoxFireCountMax;
             public readonly float FoxFireSafeSeconds;
+            /// <summary>Charm (#251): how long it lasts, and how many taps from the players beside wake the charmed one.</summary>
+            public readonly float CharmSeconds;
+            public readonly int CharmRescueTaps;
             public readonly float[] DrumStopBounds;
             public readonly int[] DrumStopChances;
             public readonly Color[] PaintColors;
@@ -1368,6 +1400,8 @@ namespace C6Lab
                 FoxFireCountMin = config.FoxFireCountMin;
                 FoxFireCountMax = config.FoxFireCountMax;
                 FoxFireSafeSeconds = config.FoxFireSafeSeconds;
+                CharmSeconds = config.CharmSeconds;
+                CharmRescueTaps = config.CharmRescueTaps;
                 DrumStopBounds = config.DrumStopBounds();
                 DrumStopChances = config.DrumStopChances();
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];
