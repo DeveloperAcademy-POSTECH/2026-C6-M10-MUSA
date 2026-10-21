@@ -1623,7 +1623,7 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 
 ## PR #247 PlayMode 실패 5건 보완 — 2026-10-21, 전체 검사 통과
 
-기준은 #240의 PR #247(`c00b34e4`, main `f36678b3` 통합)의 위 최종 전체 실행 **239/244**다. 실패한 최초 전체 실행·분리 실행·최종 전체 실행 기록을 삭제하거나 PASS로 바꾸지 않는다. 아래는 그 이후 소스 보완이며, 새 전체 실행 결과는 아직 **PASS**다. 이 단계에서 연결 규약·게임 규칙·원본 Scene·Config·오디오 기기 설정은 변경하지 않는다.
+기준은 #240의 PR #247(`c00b34e4`, main `f36678b3` 통합)의 위 최종 전체 실행 **239/244**다. 실패한 최초 전체 실행·분리 실행·최종 전체 실행 기록을 삭제하거나 PASS로 바꾸지 않는다. 아래는 그 이후 소스 보완이며, 새 전체 실행 결과는 아래와 같이 **PASS**다. 이 단계에서 연결 규약·게임 규칙·원본 Scene·Config·오디오 기기 설정은 변경하지 않는다.
 
 ### 확인된 원인과 판단 범위
 
@@ -1654,3 +1654,20 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 구현 근거: `Assets/Lab/Scripts/Audio/LabFuseSound.cs`의 `GeneratedSizzle`·`ValidGeneratedClip`·`OnAudioConfigurationChanged`·`Update`, 위 fixture helper와 두 검사 묶음의 `UnloadSavedScene`, `Assets/Lab/Tests/PlayMode/LabOrbPhysicsTests.cs`의 새2건. 원시 로그·XML·앱·개인 경로는 공개 저장소에 포함하지 않는다.
 
 오디오 분리 검사도 `pr247-fix-audio.xml` **4/4**(0.230초) 통과했다. 전역 오디오 설정이나 장치를 변경하지 않았으며, 이번 전체 실행에서는 고정 포트·오디오 실패가 재발하지 않았다. 이전 실패 XML은 보존한다.
+
+
+## PR #248 AUTO 북 + #247 통합 — 2026-10-21
+
+기준은 #248에 main `79858189`(#247의 포트/오디오 보완 포함)을 반영한 `1e3d1403` 소스다. 두 PR이 각각5649를 사용해 의미가 겹쳤으므로 **프로토콜5650·연결 토큰 `C6PhysicsLab/14`·공유 설정170개**로 구분했다. #247의 로컬 조합판/행동 응답/Bulk 구조와 #239 폭탄 전달, #241 콤보 예고를 보존한다.
+
+- AUTO(Drum Count=0)는 솔로·2·3인1개, 4·5인2개를 Host가 판 시작에 배치한다. 인원 이하 개수는 서로 다른 소유자에게 배치하고, 고정1~5 선택은 유지한다. 원본 Config 기본0을 보존했다.
+- 새 DEV 버튼 검사는 #247의 저장 Scene 수명 helper를 사용하도록 연결하여 검사 후 DDOL 객체가 남지 않는다.
+- AUTO 모델 검사는2~5인 개수·소유자 분산 외에 전달받은 북으로 생성, Retry 판 증가·Raw 초기화·북 개수 및 분산 유지를 확인한다.
+
+| 검증 | 결과 | 근거와 한계 |
+| --- | --- | --- |
+| 전체 EditMode | **PASS845/845** | `pr248-integrated-edit.xml`,25.372초, 실패·생략·inconclusive0. |
+| 전체 PlayMode | **PASS248/248** | `pr248-integrated-play.xml`,109.227초,01:53:41Z~01:55:30Z, 실패·생략·inconclusive0. #247 보완3건과 DEV AUTO 선택·기존4종 선택 배치를 포함한다. |
+| Mac 실제 앱·iOS·LAN/핫스팟 | **NOT_RUN** | 위 자동 검사를 실제 다중 앱/환경의 실행으로 간주하지 않는다. |
+
+README·현행 DEV 명세·범위/도색 연결 문서의 통신 규약도5650/14로 맞췄다. 기존 검증 이력의 버전·실패 기록은 바꾸지 않는다. Scene·Prefab·패키지 및 사용자 로컬 머터리얼은 변경하지 않았다.
