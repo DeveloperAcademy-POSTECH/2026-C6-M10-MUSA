@@ -1671,3 +1671,19 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 | Mac 실제 앱·iOS·LAN/핫스팟 | **NOT_RUN** | 위 자동 검사를 실제 다중 앱/환경의 실행으로 간주하지 않는다. |
 
 README·현행 DEV 명세·범위/도색 연결 문서의 통신 규약도5650/14로 맞췄다. 기존 검증 이력의 버전·실패 기록은 바꾸지 않는다. Scene·Prefab·패키지 및 사용자 로컬 머터리얼은 변경하지 않았다.
+
+## 조합판 결합 구슬 꼬리 — 2026-10-21, 이슈 #254
+
+기준은 main `05e2dab6`(#248 북 AUTO, 프로토콜 5650까지)에서 분기한 `feat/#254-board-orb-trail`이다. Unity 테스트 실행은 하지 않았다(Jess가 에디터에서 화면을 확인함).
+
+- **DEV**: `Flat orb board` 묶음에 `Board Orb Trail (0 off, 1 on)`을 171번째(인덱스 170)로 추가했다. 기본 ON이며 `LabConfig.asset`에도 `boardOrbTrailEnabled: 1`로 저장했다. 설정 170 → **171개**, 프로토콜 `5650` → **`5651`**.
+- **표시**: 새 `LabOrbBoardTrail`이 결합(오행) 구슬마다 기존 `LabElementFlightTrail`을 붙인다. 그림은 `LabOrbAppearance.ElementTrailFor`의 던진 구슬 꼬리와 같고, `LabElementTrailProfile.CreateScaled`로 만든 복사본에서 너비·도장 크기·간격·길이를 (Orb Radius / Throw Radius) × `size`(0.6)로 줄인다. 진하기는 화면 위 위치 변화로 잰 속도(초당 반지름 1.5개 → 0, 10개 → 최대 `strength` 0.55, smoothstep)로 `LabElementFlightTrail.Intensity`에 넣는다. 던진 구슬은 `Intensity` 1 그대로다.
+- **연결**: `LabOrbBoard.LateUpdate`가 매 프레임 DEV 값을 보고 결합 구슬에 붙이거나(오행이 바뀌면 다시 그림) 지운다. 음양·아이템·북은 제외. 물리·판정·통신은 바꾸지 않는다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. `LabOrbBoard`/`LabElementFlightTrail`은 main 원본과 같은 mcs 한계 오류만 남는다(switch 식 등). |
+| 에디터 화면 확인 | 확인 (Jess) | 결합 구슬을 밀었을 때 꼬리가 얕게 보이는 것을 에디터에서 봤다. 기기·다중 앱은 아래. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN | `LabDeveloperConfigTests.BoardOrbTrailIsAnOnToggleInTheFlatOrbBoardGroup`, 개수/프로토콜 고정 검사 171/5651, 새 `LabOrbBoardTrailTests` 3개, 기존 전체. |
+| 3인 실행: 넘겨받은 결합 구슬에도 꼬리, DEV OFF 공유 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기: 성능(구슬 많을 때)·가독성 | NOT_RUN | 결합 구슬이 많을 때 프레임을 확인해야 한다. |
