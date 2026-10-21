@@ -45,7 +45,7 @@ namespace C6Lab.Tests
             Assert.That(gourd, Does.Contain(111));
             Assert.That(gourd, Does.Contain(142));
             Assert.That(gourd.Count(index => index == 142), Is.EqualTo(1));
-            Assert.That(Protocol, Is.EqualTo(5647));
+            Assert.That(Protocol, Is.EqualTo(5648));
         }
 
         [TestCase(0f, 0f)]
