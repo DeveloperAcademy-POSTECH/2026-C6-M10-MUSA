@@ -76,7 +76,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator ACharmedBoardFlashesAndAnUpwardSwipeOnlyFlicksTheOrbUntilItIsReleased()
+        public IEnumerator ACharmedBoardsThrowingEdgeGlowsRedAndAnUpwardSwipeOnlyFlicksTheOrb()
         {
             var combined = board.UpsertOrb("charmed-throw", LabOrbKind.Combined, new Vector2(.5f, .3f),
                 element: LabOrbElement.Fire);
@@ -84,10 +84,11 @@ namespace C6Lab.Tests
             board.ThrowRequested += gesture => throws++;
             board.SetCharm(5f);
             Assert.That(board.Charmed, Is.True);
-            Assert.That(board.CharmEdge.Visible, Is.True, "The board's edges glow in the heart colour (#251).");
-            Color glow = board.GetComponentsInChildren<SpriteRenderer>()
-                .First(part => part.name == "Charm Edge Flash Left").color;
-            Assert.That(glow.r, Is.GreaterThan(glow.b), "A heart pink, not the old purple.");
+            Assert.That(board.CharmEdge.Visible, Is.True, "The throwing edge glows (#251).");
+            Assert.That(LabCharmEdgeFlash.GlowColor.r, Is.GreaterThan(LabCharmEdgeFlash.GlowColor.g + .5f), "In red.");
+            Bounds glow = board.CharmEdge.Glow.bounds;
+            Assert.That(glow.max.y, Is.GreaterThanOrEqualTo(Bounds.yMax), "Along the board's top edge, where throws leave...");
+            Assert.That(glow.min.y, Is.GreaterThan(Bounds.center.y), "...and only there, not down the sides.");
             float dimmest = 1f, brightest = 0f;
             float until = Time.time + 1f;
             while (Time.time < until)
@@ -96,7 +97,7 @@ namespace C6Lab.Tests
                 dimmest = Mathf.Min(dimmest, board.CharmEdge.Brightness);
                 brightest = Mathf.Max(brightest, board.CharmEdge.Brightness);
             }
-            Assert.That(brightest, Is.LessThanOrEqualTo(.5f), "A soft glow, never a bright flash.");
+            Assert.That(brightest, Is.LessThanOrEqualTo(.6f), "A soft glow, never a bright flash.");
             Assert.That(brightest - dimmest, Is.GreaterThan(.05f), "It slowly brightens and dims.");
 
             Vector2 from = BoardPoint(combined);

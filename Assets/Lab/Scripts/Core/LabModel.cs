@@ -123,8 +123,6 @@ namespace C6Lab
         private const uint SabotageTargetSalt = 0x5AB07A26u;
         // 통합 방해공작 추첨도 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (#251).
         private const ulong SabotageDrawKey = ulong.MaxValue - 4UL;
-        /// <summary>매혹은 양옆에 깨워 줄 두 사람이 따로 있어야 걸린다 (솔로는 확인용으로 허용).</summary>
-        public const int CharmMinimumPlayers = 3;
         private const uint FoxCountSalt = 0xF0C5C017u;
         private const uint FoxLandingXSalt = 0xF0C51A0Du;
         private const uint FoxLandingYSalt = 0xF0C51A1Du;
@@ -800,6 +798,26 @@ namespace C6Lab
         /// <summary>Whether the fox's charm (#251) keeps this player from attacking at this Host time.</summary>
         public bool Charmed(ulong player, double now) => CharmOn(now) && player == charmedPlayer;
 
+        /// <summary>
+        /// 매혹 (#251): 홀린 사람의 양옆 사람이 하트 말풍선을 누른 한 번. 정해 둔 횟수가 모이면 매혹이 바로 풀린다.
+        /// 양옆이 아닌 사람, 홀린 사람 자신, 매혹이 없을 때, 깨우기가 꺼져 있을 때는 받지 않는다. 이 탭으로 깨어났으면
+        /// woken에 그 사람을, 아니면 0을 돌려준다.
+        /// </summary>
+        public bool TryCharmTap(ulong sender, double now, out ulong woken)
+        {
+            woken = 0;
+            if (!TryAdvance(now, out _) || !CharmOn(now) || rules.CharmRescueTaps <= 0 || sender == charmedPlayer
+                || !players.TryGetValue(sender, out var tapper) || !players.TryGetValue(charmedPlayer, out var charmed))
+                return false;
+            int apart = (tapper.seat - charmed.seat + activeSeatCount) % activeSeatCount;
+            if (apart != 1 && apart != activeSeatCount - 1) return false;
+            charmTaps++;
+            if (charmTaps < rules.CharmRescueTaps) return true;
+            charmUntil = now;
+            woken = charmedPlayer;
+            return true;
+        }
+
         public LabSnapshot Snapshot(double now)
         {
             if (phase == LabPhase.Idle)
@@ -1129,8 +1147,8 @@ namespace C6Lab
 
         /// <summary>
         /// Who this sabotage may fall on now, in seat order. Not the player the last one fell on (unless solo),
-        /// nor one whose ways are still blocked or who is still charmed. One swipe block and one charm at a time,
-        /// and a charm only with someone on each side to wake the charmed player (or solo, to try it out).
+        /// nor one whose ways are still blocked or who is still charmed. One swipe block and one charm at a time.
+        /// A charm falls in any room: with two players the other one alone wakes them, and solo it only wears off.
         /// </summary>
         private List<ulong> SabotageTargets(LabSabotageKind kind, double at)
         {
@@ -1139,7 +1157,6 @@ namespace C6Lab
             bool charming = CharmOn(at);
             if (kind == LabSabotageKind.SwipeBlock && blocking) return targets;
             if (kind == LabSabotageKind.Charm && charming) return targets;
-            if (kind == LabSabotageKind.Charm && activeSeatCount > 1 && activeSeatCount < CharmMinimumPlayers) return targets;
             for (int i = 0; i < activeSeatCount; i++)
             {
                 ulong player = seats[i];

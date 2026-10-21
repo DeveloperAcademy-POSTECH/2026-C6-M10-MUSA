@@ -190,7 +190,7 @@ namespace C6Lab
         // 5653: #258 visible gourd mesh collision and mesh-local approved paint coordinates.
         // 5654: #251 the yokai's sabotage mix announces each sabotage it casts, and fox fire adds the FoxFire orb
         //       kind with its foxFire drop and fox touch messages, and the charm travels in the snapshot and board
-        //       header; DEV 166-177, 178 shared values.
+        //       header with charmTap wake-ups from the players beside and a charmWoken notice; DEV 166-177, 178 shared values.
         internal const ushort LabProtocolVersion = 5654;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
@@ -322,6 +322,8 @@ namespace C6Lab
         public event Action<ulong, string, Vector2> GourdBombDropped;
         /// <summary>요괴가 통합 추첨으로 방해공작을 걸었을 때 모든 기기에서 한 번 알린다 (#251). (종류, 받는 사람)</summary>
         public event Action<LabSabotageKind, ulong> SabotageCast;
+        /// <summary>옆 사람들이 깨워 매혹이 풀렸을 때 모든 기기에서 한 번 알린다 (#251). (깨어난 사람) 시간이 다 되어 풀리면 알리지 않는다.</summary>
+        public event Action<ulong> CharmWoken;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
         public event Action LocalThrowMissed;
         /// <summary>내가 요청한 결합을 Host가 승인했을 때, 결합한 사람 기기에서만 한 번 알린다. (거절되면 알리지 않음)</summary>
@@ -1562,6 +1564,17 @@ namespace C6Lab
             }
         }
 
+        private void AnnounceCharmWoken(ulong player)
+        {
+            Debug.Log("C6_LAB_CHARM_WOKEN player=" + player);
+            foreach (ulong id in order)
+            {
+                if (id == manager.LocalClientId) continue;
+                Send(id, new LabNetworkPacket { type = "charmWoken", sessionId = sessionId, round = model.Round, owner = player });
+            }
+            CharmWoken?.Invoke(player);
+        }
+
         private void OnFoxFire(string[] orbIds)
         {
             SetNotice(FoxFireNotice);
@@ -1656,6 +1669,15 @@ namespace C6Lab
                     && packet.requestId <= previous)) return;
                 pauseRequestIds[sender] = packet.requestId;
                 PauseAsHost();
+                return;
+            }
+            if (packet.type == "charmTap")
+            {
+                // Only a player beside the charmed one counts; enough taps wake them at once (#251).
+                if (!model.TryCharmTap(sender, now, out ulong woken)) return;
+                // Sent before the snapshot that no longer holds the charm, so every screen knows it was woken.
+                if (woken != 0) AnnounceCharmWoken(woken);
+                PublishSnapshot(true);
                 return;
             }
             if (packet.type == "blastHit")
@@ -1851,6 +1873,13 @@ namespace C6Lab
             Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y, vx = velocity.x, vy = velocity.y });
         }
 
+        /// <summary>매혹 (#251): 하트 말풍선을 눌러 옆 사람을 깨우는 한 번을 Host에 보낸다. 셈은 Host가 한다.</summary>
+        public void TapCharm()
+        {
+            if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
+            Request(new LabNetworkPacket { type = "charmTap", requestId = ++requestSequence });
+        }
+
         private void OnFoxFireTouched(string foxId, string orbId)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused)
@@ -2010,6 +2039,9 @@ namespace C6Lab
                         && packet.ids.Length > 0 && packet.ids.Length <= MaximumFoxFireOrbs
                         && packet.ids.All(id => !string.IsNullOrEmpty(id)))
                         OnFoxFire(packet.ids);
+                    break;
+                case "charmWoken":
+                    if (packet.sessionId == sessionId) CharmWoken?.Invoke(packet.owner);
                     break;
                 case "sabotage":
                     if (packet.sessionId == sessionId && packet.element >= (int)LabSabotageKind.GourdBomb

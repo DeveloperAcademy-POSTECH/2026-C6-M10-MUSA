@@ -725,6 +725,10 @@ namespace C6Lab.Tests
                 while (!board.Charmed && Time.realtimeSinceStartup < until) yield return null;
                 Assert.That(board.Charmed, Is.True, "Solo, to try it out, the charm falls on the one player.");
                 Assert.That(board.CharmEdge.Visible, Is.True);
+                var alert = UnityEngine.Object.FindAnyObjectByType<LabGourdAlert>();
+                Assert.That(alert, Is.Not.Null);
+                Assert.That(alert.ShowingHeart, Is.True, "The gourd's bubble shows a heart to the charmed player.");
+                Assert.That(alert.Label, Is.EqualTo("♥"));
                 yield return null;
                 Assert.That(hud.GaugeVisible, Is.True, "The time left shows on the gauge.");
                 Assert.That(hud.GaugeFill, Is.InRange(.01f, 1f));

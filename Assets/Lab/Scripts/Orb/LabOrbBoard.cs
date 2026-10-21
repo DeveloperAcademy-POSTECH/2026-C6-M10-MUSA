@@ -554,8 +554,8 @@ namespace C6Lab
         public LabCharmEdgeFlash CharmEdge => charmEdge;
 
         /// <summary>
-        /// 매혹 (#251): 이 판의 주인이 헤롱헤롱해 공격(위로 던지기)을 못 한다. secondsLeft가 0보다 크면 걸린 것이고, 판 양쪽
-        /// 가장자리가 하트색으로 은은하게 빛난다. 풀리면 부드럽게 사라진다.
+        /// 매혹 (#251): 이 판의 주인이 헤롱헤롱해 공격(위로 던지기)을 못 한다. secondsLeft가 0보다 크면 걸린 것이고, 던지는 쪽
+        /// 가장자리(판 위쪽 곡선)가 빨갛게 은은히 빛난다. 풀리면 부드럽게 사라진다.
         /// </summary>
         public void SetCharm(float secondsLeft)
         {
@@ -563,8 +563,7 @@ namespace C6Lab
             {
                 charmed = true;
                 if (charmEdge == null) charmEdge = LabCharmEdgeFlash.Create(transform);
-                charmEdge.Show(bounds.xMin, bounds.xMax, areaShape.VerticalRange(bounds.xMin, 0f),
-                    areaShape.VerticalRange(bounds.xMax, 0f), bounds.width);
+                charmEdge.Show(areaShape.UpperBoundary, bounds.width);
                 return;
             }
             if (!charmed) return;

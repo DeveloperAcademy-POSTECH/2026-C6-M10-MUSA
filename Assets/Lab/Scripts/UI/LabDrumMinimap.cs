@@ -18,8 +18,8 @@ namespace C6Lab
     public sealed class LabDrumMinimap : MonoBehaviour
     {
         public Vector2 size = new Vector2(128f, 116f);
-        /// <summary>오른쪽 이웃 동그라미 위로 띄우는 간격</summary>
-        public float gapAboveBadge = 8f;
+        /// <summary>오른쪽 이웃 동그라미 위로 띄우는 간격. 그 사이에 매혹 말풍선(#251)이 뜰 자리를 남긴다.</summary>
+        public float gapAboveBadge = 120f;
         /// <summary>
         /// 미니맵 오른쪽 끝을 오른쪽 이웃 동그라미의 오른쪽 끝보다 이만큼 안쪽(왼쪽)에 둔다.
         /// 동그라미가 화면 오른쪽 끝에 걸쳐 있어서, 그대로 맞추면 미니맵 오른쪽 테두리가 화면 밖으로 잘린다.

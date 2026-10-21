@@ -10,6 +10,7 @@ namespace C6Lab
     /// 일시정지 중이거나 전투가 끝나면 사라진다.
     /// 박이 내 한쪽 넘기기를 막을 때(#215)는 같은 말풍선에 "← 🚫" 또는 "→ 🚫"(먹색 화살표와 빨간 금지
     /// 표시를 직접 그림)가 떠, 막힌 사람 화면에만 보인다.
+    /// 요괴가 통합 추첨으로 매혹을 걸 때(#251)는 같은 말풍선에 하트(직접 그림)가 떠, 매혹된 사람 화면에만 보인다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabGourdAlert : MonoBehaviour
@@ -38,6 +39,10 @@ namespace C6Lab
         private static Sprite bubbleSprite;
         private static Sprite blockLeftSprite;
         private static Sprite blockRightSprite;
+        private static Sprite heartSprite;
+        // 매혹 하트 그림 (#251): 정사각형 픽셀 크기와, 먹색 테두리 안쪽 하트의 크기 비율.
+        private const int HeartSize = 96;
+        private const float HeartInner = .8f;
 
         [Tooltip("말풍선 크기 (Canvas 기준 픽셀)")]
         [SerializeField, Min(10f)] private float bubbleSize = 110f;
@@ -53,6 +58,8 @@ namespace C6Lab
         private RectTransform bubble;
         private UnityEngine.UI.Text mark;
         private Image blockMark;
+        private Image heartMark;
+        private bool showingHeart;
         private float elapsed = -1f;
         private float duration;
         private bool showingBlock;
@@ -63,8 +70,11 @@ namespace C6Lab
         /// <summary>말풍선이 지금 화면에 그려지고 있는지.</summary>
         public bool Visible => bubble != null && bubble.gameObject.activeSelf;
         public RectTransform Bubble => bubble;
-        /// <summary>말풍선의 내용: 폭탄이면 "!", 넘기기 막기면 "← 🚫" 또는 "→ 🚫".</summary>
-        public string Label => showingBlock ? (blockRight ? "→ 🚫" : "← 🚫") : mark != null ? mark.text : string.Empty;
+        /// <summary>말풍선의 내용: 폭탄이면 "!", 넘기기 막기면 "← 🚫" 또는 "→ 🚫", 매혹이면 "♥".</summary>
+        public string Label => showingBlock ? (blockRight ? "→ 🚫" : "← 🚫") : showingHeart ? "♥"
+            : mark != null ? mark.text : string.Empty;
+        /// <summary>지금 매혹 하트 말풍선을 보여 주는 중인지 (#251).</summary>
+        public bool ShowingHeart => Active && showingHeart;
         public float ShowSeconds => showSeconds;
         /// <summary>지금 넘기기 막기 말풍선을 보여 주는 중인지 (#215).</summary>
         public bool ShowingBlock => Active && showingBlock;
@@ -91,10 +101,13 @@ namespace C6Lab
             }
         }
 
-        // 통합 추첨의 여우불·매혹도 모든 기기에서 박 옆에 "!"를 띄운다 (#251). 폭탄과 넘기기 막기는 위에서 따로 띄운다.
+        // 통합 추첨의 여우불은 모든 기기에서 박 옆에 "!"를, 매혹은 걸린 사람 화면에만 하트를 띄운다 (#251).
+        // 폭탄과 넘기기 막기는 위에서 따로 띄운다.
         private void OnSabotageCast(LabSabotageKind kind, ulong targetPlayer)
         {
-            if (network != null && (kind == LabSabotageKind.FoxFire || kind == LabSabotageKind.Charm)) Show(network.target);
+            if (network == null) return;
+            if (kind == LabSabotageKind.FoxFire) Show(network.target);
+            else if (kind == LabSabotageKind.Charm && targetPlayer == network.LocalPlayerId) ShowHeart(network.target);
         }
 
         private void OnGourdBombDropped(ulong targetPlayer, string bombId, Vector2 landing)
@@ -112,9 +125,22 @@ namespace C6Lab
         public void Show(LabTarget gourd)
         {
             if (gourd == null || !EnsureBubble()) return;
-            showingBlock = false;
+            showingBlock = showingHeart = false;
             mark.gameObject.SetActive(true);
             blockMark.gameObject.SetActive(false);
+            heartMark.gameObject.SetActive(false);
+            Begin(gourd, showSeconds);
+        }
+
+        /// <summary>요괴가 이 사람에게 매혹을 걸었다고(#251) 박 옆에 하트 말풍선을 띄운다. 매혹된 사람 화면에서만 부른다.</summary>
+        public void ShowHeart(LabTarget gourd)
+        {
+            if (gourd == null || !EnsureBubble()) return;
+            showingBlock = false;
+            showingHeart = true;
+            mark.gameObject.SetActive(false);
+            blockMark.gameObject.SetActive(false);
+            heartMark.gameObject.SetActive(true);
             Begin(gourd, showSeconds);
         }
 
@@ -125,8 +151,10 @@ namespace C6Lab
         {
             if (gourd == null || !EnsureBubble()) return;
             showingBlock = true;
+            showingHeart = false;
             blockRight = right;
             mark.gameObject.SetActive(false);
+            heartMark.gameObject.SetActive(false);
             blockMark.sprite = right ? BlockRightSprite() : BlockLeftSprite();
             blockMark.gameObject.SetActive(true);
             Begin(gourd, BlockShowSeconds);
@@ -254,8 +282,66 @@ namespace C6Lab
             blockMark.preserveAspect = true;
             blockMark.raycastTarget = false;
             blockRect.gameObject.SetActive(false);
+
+            RectTransform heartRect = NewRect("Gourd Alert Heart", bubble);
+            heartRect.anchorMin = heartRect.anchorMax = center;
+            heartRect.sizeDelta = new Vector2(bubbleSize * .52f, bubbleSize * .52f);
+            heartMark = heartRect.gameObject.AddComponent<Image>();
+            heartMark.sprite = HeartSprite();
+            heartMark.preserveAspect = true;
+            heartMark.raycastTarget = false;
+            heartRect.gameObject.SetActive(false);
             bubble.gameObject.SetActive(false);
             return true;
+        }
+
+        /// <summary>
+        /// 매혹 표시 (#251): 먹색 테두리를 두른 하트색 하트. 글꼴에 없을 수 있는 ♥ 대신 직접 그린다.
+        /// 테두리는 같은 하트를 조금 작게 그린 안쪽과의 차이다.
+        /// </summary>
+        private static Sprite HeartSprite()
+        {
+            if (heartSprite != null) return heartSprite;
+            const int samples = 3;
+            Color32 fill = LabCharmEdgeFlash.HeartColor;
+            var pixels = new Color32[HeartSize * HeartSize];
+            for (int y = 0; y < HeartSize; y++)
+                for (int x = 0; x < HeartSize; x++)
+                {
+                    int outer = 0, inner = 0;
+                    for (int sy = 0; sy < samples; sy++)
+                        for (int sx = 0; sx < samples; sx++)
+                        {
+                            float u = ((x + (sx + .5f) / samples) / HeartSize * 2f - 1f) * 1.25f;
+                            float v = ((y + (sy + .5f) / samples) / HeartSize * 2f - 1f) * 1.25f + .12f;
+                            if (InHeart(u, v)) outer++;
+                            if (InHeart(u / HeartInner, v / HeartInner)) inner++;
+                        }
+                    float alpha = outer / (float)(samples * samples);
+                    Color32 color = Color32.Lerp(InkColor, fill, outer > 0 ? inner / (float)outer : 0f);
+                    color.a = (byte)Mathf.RoundToInt(alpha * 255f);
+                    pixels[y * HeartSize + x] = color;
+                }
+            var texture = new Texture2D(HeartSize, HeartSize, TextureFormat.RGBA32, false)
+            {
+                name = "Lab gourd charm heart",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            heartSprite = Sprite.Create(texture, new Rect(0f, 0f, HeartSize, HeartSize), new Vector2(.5f, .5f), 100f);
+            heartSprite.name = texture.name;
+            heartSprite.hideFlags = HideFlags.DontSave;
+            return heartSprite;
+        }
+
+        /// <summary>The classic heart curve, (u² + v² − 1)³ − u²v³ ≤ 0, lobes up.</summary>
+        private static bool InHeart(float u, float v)
+        {
+            float a = u * u + v * v - 1f;
+            return a * a * a - u * u * v * v * v <= 0f;
         }
 
         private static Sprite BlockLeftSprite() =>

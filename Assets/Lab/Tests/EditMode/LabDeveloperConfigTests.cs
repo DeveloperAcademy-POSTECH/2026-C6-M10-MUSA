@@ -1409,6 +1409,15 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheCharmBubblesAndSurprisedBubbleImportAsSprites()
+        {
+            foreach (string path in new[] { LabCharmBubbles.LeftBubblePath, LabCharmBubbles.RightBubblePath,
+                LabCharmBubbles.WokenPath })
+                Assert.That(Resources.Load<Sprite>(path), Is.Not.Null,
+                    "Assets/Lab/Resources/" + path + ".png imports as a Sprite through LabSabotageArtImporter (#251).");
+        }
+
+        [Test]
         public void SabotageFieldsFormTheSabotageGroupStartOffAndApply()
         {
             LabDeveloperField[] sabotage = LabConfig.DeveloperFields.Skip(166).ToArray();
