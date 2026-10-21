@@ -8,7 +8,7 @@ namespace C6Lab
     public enum LabHapticStyle { Light = 0, Medium = 1, Heavy = 2, Soft = 3, Rigid = 4 }
 
     /// <summary>어떤 상황의 진동이었는지 (테스트·로그용).</summary>
-    public enum LabHapticKind { None, Generate, Hit, ItemHit, Bomb, Combine, ComboClear, ComboFail }
+    public enum LabHapticKind { None, Generate, Hit, ItemHit, Bomb, Combine, ComboClear, ComboFail, YaguangFlash }
 
     /// <summary>
     /// 아이폰 진동. 설정(종류·세기·켜기)은 모두 LabConfig 에서 읽는다 (Inspector · DEV 패널).
@@ -18,6 +18,7 @@ namespace C6Lab
     /// - 내가 구슬을 결합했을 때(Host 승인): 결합 진동 (약하게)
     /// - 박 색상 콤보(#222) 성공: 센 진동 3번 (모든 기기)
     /// - 박 색상 콤보 실패(틀린 색 / 시간 초과): 약 2초 동안 크게 이어지는 진동 (모든 기기)
+    /// - 야광귀 섬광(#268)을 맞았을 때: 센(Heavy) 진동 한 번 (맞은 사람 기기)
     /// 콤보 진동 외에는 해당 플레이어 기기에서만 난다. 아이폰 빌드에서만 실제로 진동하고, 에디터·Mac에서는 아무 일도 하지 않는다.
     /// </summary>
     [DisallowMultipleComponent]
@@ -84,6 +85,13 @@ namespace C6Lab
         {
             if (config == null || !config.HapticsEnabled) return false;
             return Play(LabHapticKind.Combine, config.CombineHapticStyle, config.CombineHapticIntensity);
+        }
+
+        /// <summary>야광귀 섬광 (#268): 번쩍이는 순간 센(Heavy) 진동 한 번. 섬광 화면이 부른다.</summary>
+        public bool PlayForFlash(LabConfig config)
+        {
+            if (config == null || !config.HapticsEnabled) return false;
+            return Play(LabHapticKind.YaguangFlash, LabHapticStyle.Heavy, 1f);
         }
 
         public float ComboFailSeconds => comboFailSeconds;
