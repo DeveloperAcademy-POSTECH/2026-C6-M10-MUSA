@@ -192,7 +192,8 @@ namespace C6Lab
         //       kind with its foxFire drop and fox touch messages, and the charm travels in the snapshot and board
         //       header with charmTap wake-ups from the players beside and a charmWoken notice; DEV 166-177, 178 shared values.
         // 5655: #268 the yaguang-gwi's flash settings (DEV 178-184); 185 shared values.
-        internal const ushort LabProtocolVersion = 5655;
+        // 5656: #271 the combo's yaguang counting look toggle (DEV 185); 186 shared values.
+        internal const ushort LabProtocolVersion = 5656;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";

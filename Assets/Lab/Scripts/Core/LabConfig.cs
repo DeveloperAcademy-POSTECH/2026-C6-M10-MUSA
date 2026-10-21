@@ -275,15 +275,15 @@ namespace C6Lab
             new LabDeveloperField("Swipe Block Seconds", 1f, 60f),
             new LabDeveloperField("Swipe Block Bomb Gap (seconds)", 0f, 15f),
             LabDeveloperField.Toggle("Gourd Color Combo (0 off, 1 on)"),
-            new LabDeveloperField("Combo First Start (seconds)", 1f, 3600f),
-            new LabDeveloperField("Combo Repeat Interval (seconds)", 1f, 3600f),
-            new LabDeveloperField("Combo Time Limit (seconds)", 1f, 600f),
+            new LabDeveloperField("Combo First Start (seconds)", 1f, 99f),
+            new LabDeveloperField("Combo Repeat Interval (seconds)", 20f, 100f),
+            new LabDeveloperField("Combo Time Limit (seconds)", 5f, 25f),
             new LabDeveloperField("Combo Penalty Duration (seconds)", 0f, 30f),
-            new LabDeveloperField("Combo Penalty Size (x)", .01f, 1f),
+            new LabDeveloperField("Combo Penalty Size (x)", .01f, .19f),
             LabDeveloperField.Toggle("Combo Penalty Target (0 team, 1 thrower)", "TEAM", "THROWER"),
             new LabDeveloperField("Combo Reward Duration (seconds)", 0f, 30f),
-            new LabDeveloperField("Combo Reward Size (x)", 1f, 3f),
-            new LabDeveloperField("Combo Warning (seconds)", 0f, 10f),
+            new LabDeveloperField("Combo Reward Size (x)", 1f, 4f),
+            new LabDeveloperField("Combo Warning (seconds)", 0f, 8f),
             LabDeveloperField.Toggle("Board Orb Trail (0 off, 1 on)"),
             // The yokai's sabotage mix and the nine-tailed fox's sabotages (#251). An experiment, off by default.
             LabDeveloperField.Toggle("Sabotage Mix (0 off, 1 on)"),
@@ -307,7 +307,9 @@ namespace C6Lab
             new LabDeveloperField("섬광 간격 (초)", 20f, 100f),
             new LabDeveloperField("섬광 예고 (초)", 0f, 4f),
             new LabDeveloperField("섬광 눈부심 (초)", 1f, 13f),
-            new LabDeveloperField("섬광 회복 (초)", 0f, 4f)
+            new LabDeveloperField("섬광 회복 (초)", 0f, 4f),
+            // The yaguang-gwi's counting look for the combo (#271): it counts 하나 둘 셋 넷 and cannot go past four.
+            LabDeveloperField.Toggle("야광귀 셈법 (0 off, 1 on)", "끔", "켬")
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -341,10 +343,10 @@ namespace C6Lab
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
-            new LabDeveloperCategory("야광귀", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163,
+            new LabDeveloperCategory("야광귀", 155, 185, 156, 164, 157, 158, 159, 160, 161, 162, 163,
                 178, 179, 180, 181, 182, 183, 184)
                 .WithSwitch(155, 178)
-                .WithDividers((0, "── 콤보 ──"), (10, "── 섬광 ──"))
+                .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──"))
         });
 
 
@@ -407,24 +409,27 @@ namespace C6Lab
         [Header("Experiment: gourd color combo (#222)")]
         [Tooltip("켜면 전투 중 박이 4칸 색 콤보를 낸다. 끄면 기존 플레이와 같다. 기본 OFF (#266). DEV `Gourd Color Combo`로도 켤 수 있다.")]
         [SerializeField] private bool gourdColorComboEnabled;
+        [Tooltip("야광귀 셈법 (#271): 콤보 예고를 하나·둘·셋·넷으로 세고, 칸을 맞힐 때마다 그 칸 위에 수를 띄우며, 넷 다음 칸은 흐린 ?로 둔다. 성공하면 '넷… 다섯? …하나?' 하고 헷갈린다. 화면 표시만 바뀐다. 기본 켬.")]
+        [SerializeField] private bool comboYaguangCountEnabled = true;
+        // 아래 콤보 숫자 칸들의 DEV 범위는 기본값이 슬라이더 가운데에 오도록 정했다 (#271). Inspector에서도 같은 범위다.
         [Tooltip("전투 시작 후 첫 콤보가 나오는 시각 (초, 일시정지 시간 제외)")]
-        [SerializeField, Range(1f, 3600f)] private float comboFirstStartSeconds = 50f;
+        [SerializeField, Range(1f, 99f)] private float comboFirstStartSeconds = 50f;
         [Tooltip("콤보가 나오는 간격 (초). 앞 콤보가 나온 시각부터 잰다. 앞 콤보가 아직 진행 중이면 끝난 직후에 나온다.")]
-        [SerializeField, Range(1f, 3600f)] private float comboRepeatIntervalSeconds = 60f;
+        [SerializeField, Range(20f, 100f)] private float comboRepeatIntervalSeconds = 60f;
         [Tooltip("콤보 4칸을 모두 맞혀야 하는 제한 시간 (초)")]
-        [SerializeField, Range(1f, 600f)] private float comboTimeLimitSeconds = 15f;
+        [SerializeField, Range(5f, 25f)] private float comboTimeLimitSeconds = 15f;
         [Tooltip("콤보 실패 후 공 크기·칠 면적이 줄어드는 시간 (초). 0이면 페널티 없음.")]
         [SerializeField, Range(0f, 30f)] private float comboPenaltyDurationSeconds = 15f;
         [Tooltip("페널티 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
-        [SerializeField, Range(.01f, 1f)] private float comboPenaltySizeScale = .1f;
+        [SerializeField, Range(.01f, .19f)] private float comboPenaltySizeScale = .1f;
         [Tooltip("페널티 대상. 팀 전체, 또는 틀린 색을 맞힌 사람만 (시간 초과는 언제나 팀 전체).")]
         [SerializeField] private bool comboPenaltyThrowerOnly;
         [Tooltip("콤보 성공 후 팀 전체의 공 크기/칠 면적이 커지는 시간 (초). 0이면 보상 없음.")]
         [SerializeField, Range(0f, 30f)] private float comboRewardDurationSeconds = 15f;
         [Tooltip("보상 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
-        [SerializeField, Range(1f, 3f)] private float comboRewardSizeScale = 2.5f;
-        [Tooltip("콤보 4칸이 나오기 전 COMBO! 3, 2, 1 예고를 보여주는 시간 (초, #241). 0이면 예고 없이 바로 나온다.")]
-        [SerializeField, Range(0f, 10f)] private float comboWarningSeconds = 3f;
+        [SerializeField, Range(1f, 4f)] private float comboRewardSizeScale = 2.5f;
+        [Tooltip("콤보 4칸이 나오기 전 예고 시간 (초, #241). 야광귀 셈법이면 1초에 한 번 하나·둘·셋·넷으로 세고(#271, 기본 4초), 끄면 COMBO! 4, 3, 2, 1로 센다. 0이면 예고 없이 바로 나온다.")]
+        [SerializeField, Range(0f, 8f)] private float comboWarningSeconds = 4f;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -759,8 +764,8 @@ namespace C6Lab
         public float ComboPenaltySizeScale => Mathf.Clamp(Finite(comboPenaltySizeScale, .1f), .01f, 1f);
         public bool ComboPenaltyThrowerOnly => comboPenaltyThrowerOnly;
         public float ComboRewardDurationSeconds => Mathf.Clamp(Finite(comboRewardDurationSeconds, 15f), 0f, 30f);
-        public float ComboRewardSizeScale => Mathf.Clamp(Finite(comboRewardSizeScale, 2.5f), 1f, 3f);
-        public float ComboWarningSeconds => Mathf.Clamp(Finite(comboWarningSeconds, 3f), 0f, 10f);
+        public float ComboRewardSizeScale => Mathf.Clamp(Finite(comboRewardSizeScale, 2.5f), 1f, 4f);
+        public float ComboWarningSeconds => Mathf.Clamp(Finite(comboWarningSeconds, 4f), 0f, 10f);
         public bool BoardOrbTrailEnabled => boardOrbTrailEnabled;
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
@@ -911,6 +916,8 @@ namespace C6Lab
         public float YaguangFlashWarningSeconds => Mathf.Clamp(Finite(yaguangFlashWarningSeconds, 2f), 0f, 4f);
         public float YaguangFlashGlareSeconds => Mathf.Clamp(Finite(yaguangFlashGlareSeconds, 7f), 1f, 13f);
         public float YaguangFlashRecoverySeconds => Mathf.Clamp(Finite(yaguangFlashRecoverySeconds, 2f), 0f, 4f);
+        /// <summary>콤보를 야광귀 셈법(하나 둘 셋 넷)으로 보여주는지 (#271). 화면 표시만 바꾼다.</summary>
+        public bool ComboYaguangCountEnabled => comboYaguangCountEnabled;
         public LabOrbAppearance OrbAppearance => orbAppearance;
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
@@ -1041,7 +1048,8 @@ namespace C6Lab
                 FoxFireCountMin, FoxFireCountMax, FoxFireSafeSeconds, CharmSeconds, CharmRescueTaps,
                 YaguangFlashEnabled ? 1f : 0f, YaguangFlashTargetOne ? 1f : 0f, YaguangFlashFirstStartSeconds,
                 YaguangFlashIntervalSeconds, YaguangFlashWarningSeconds, YaguangFlashGlareSeconds,
-                YaguangFlashRecoverySeconds
+                YaguangFlashRecoverySeconds,
+                ComboYaguangCountEnabled ? 1f : 0f
             };
         }
 
@@ -1266,6 +1274,7 @@ namespace C6Lab
             yaguangFlashWarningSeconds = values[182];
             yaguangFlashGlareSeconds = values[183];
             yaguangFlashRecoverySeconds = values[184];
+            comboYaguangCountEnabled = values[185] >= .5f;
             error = string.Empty;
             return true;
         }
