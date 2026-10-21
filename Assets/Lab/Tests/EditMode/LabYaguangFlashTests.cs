@@ -192,6 +192,58 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ABombDueDuringAFlashWaitsUntilTheFlashIsOver()
+        {
+            var model = new LabModel();
+            // Flash: warning 22.5 s, flash 24 s, glare and recovery over at 28.5 s. The gourd's bomb is due at 25 s.
+            model.Begin("flash-then-bomb", Three, 0d, Config(flash: true, first: 24f, bombEvery: 25f));
+            Assert.That(model.Snapshot(22.6d).FlashWarningOn(22.6d), Is.True);
+            Assert.That(model.Snapshot(24d).flashCount, Is.EqualTo(1u));
+            Assert.That(GourdBombs(model.Snapshot(25d)), Is.Zero, "No bomb while the flash is open (#271).");
+            Assert.That(GourdBombs(model.Snapshot(28.4d)), Is.Zero);
+            LabSnapshot after = model.Snapshot(28.6d);
+            Assert.That(GourdBombs(after), Is.EqualTo(1), "It drops as soon as the flash closes.");
+            Assert.That(after.orbs.Single(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd).createdAt,
+                Is.EqualTo(28.6d));
+        }
+
+        [Test]
+        public void AFlashWaitsWhileTheGourdsBombIsStillOnABoard()
+        {
+            var model = new LabModel();
+            // The bomb drops at 10 s and blasts at the end of its 15 s fuse (25 s). The flash is due at 20 s.
+            model.Begin("bomb-then-flash", Three, 0d, Config(flash: true, first: 20f, bombEvery: 10f));
+            Assert.That(GourdBombs(model.Snapshot(10d)), Is.EqualTo(1));
+            LabSnapshot held = model.Snapshot(18.6d);
+            Assert.That(held.flashAt, Is.EqualTo(-1d), "No eyes while the bomb is out.");
+            Assert.That(model.Snapshot(24.9d).flashCount, Is.Zero);
+            model.Snapshot(25d);
+            LabSnapshot after = model.Snapshot(26d);
+            Assert.That(GourdBombs(after), Is.Zero);
+            Assert.That(new[] { after.flashWarningAt, after.flashAt }, Is.EqualTo(new[] { 26d, 27.5d }),
+                "Once the bomb is gone, the full warning, then the flash.");
+        }
+
+        [Test]
+        public void AComboWaitsWhileTheGourdsBombIsStillOnABoard()
+        {
+            var model = new LabModel();
+            // The bomb drops at 10 s and is gone at 25 s. The combo's warning is due at 17 s.
+            model.Begin("bomb-then-combo", Three, 0d, Config(combo: true, bombEvery: 10f));
+            Assert.That(model.Snapshot(10d).comboNextAt, Is.EqualTo(-1d), "Not announced while the bomb is out.");
+            LabSnapshot held = model.Snapshot(20d);
+            Assert.That(held.comboActive, Is.False, "No combo over the bomb (#271).");
+            Assert.That(held.ComboWarningOn(20d), Is.False);
+            model.Snapshot(25d);
+            LabSnapshot warned = model.Snapshot(25.5d);
+            Assert.That(new[] { warned.comboWarningAt, warned.comboNextAt }, Is.EqualTo(new[] { 25.5d, 28.5d }));
+            Assert.That(model.Snapshot(28.5d).comboActive, Is.True);
+        }
+
+        private static int GourdBombs(LabSnapshot snapshot) =>
+            snapshot.orbs.Count(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd);
+
+        [Test]
         public void AShortIntervalStillLeavesTheGlareRecoveryAndNextWarningApart()
         {
             var model = new LabModel();
@@ -247,13 +299,14 @@ namespace C6Lab.Tests
         }
 
         private LabConfig Config(bool flash = false, bool one = false, float first = 30f, float interval = 60f,
-            bool combo = false, float warning = 1.5f, float glare = 3f, float recovery = 1.5f)
+            bool combo = false, float warning = 1.5f, float glare = 3f, float recovery = 1.5f, float bombEvery = 0f)
         {
             var config = ScriptableObject.CreateInstance<LabConfig>();
             created.Add(config);
             float[] values = config.CaptureDeveloperValues();
-            values[87] = 0f; // no gourd bombs
-            values[88] = 0f;
+            values[87] = bombEvery; // 0: no gourd bombs
+            values[88] = bombEvery;
+            values[152] = 0f; // no swipe blocks unless a test turns them on
             values[155] = combo ? 1f : 0f;
             values[156] = 30f; // combo slots at 30 s, warned from 27 s
             values[157] = 60f;
