@@ -57,6 +57,11 @@ namespace C6Lab
     {
         public string id;
         public ulong owner;
+        /// <summary>
+        /// Ownership epoch. Starts at one and advances only after an accepted handoff, so a late
+        /// request from an earlier visit to the same board cannot use this orb again.
+        /// </summary>
+        public ulong ownershipVersion = 1;
         public LabOrbKind kind;
         public LabOrbElement element;
         /// <summary>Handoffs to a neighbor's screen still needed before an item can be used; 0 means unlocked.</summary>

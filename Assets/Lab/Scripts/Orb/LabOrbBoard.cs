@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -80,6 +81,29 @@ namespace C6Lab
             public float DriftSeed;
             public float DriftHeading;
             public bool HasDriftHeading;
+            public bool Provisional;
+            public bool HiddenForPending;
+            public MotionState? BeforeRequest;
+        }
+
+        private readonly struct MotionState
+        {
+            public readonly Vector2 Position01;
+            public readonly Vector2 Velocity;
+            public MotionState(Vector2 position01, Vector2 velocity)
+            { Position01 = position01; Velocity = velocity; }
+        }
+
+        private sealed class CombinePreview
+        {
+            public string FirstId, SecondId;
+            public MotionState FirstMotion, SecondMotion;
+        }
+
+        private sealed class GenerationPreview
+        {
+            public GameObject Root;
+            public Material Material;
         }
 
         private readonly struct PointerSample
@@ -115,6 +139,9 @@ namespace C6Lab
         private readonly HashSet<string> spawnedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> expectedDrops = new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, CombinePreview> combinePreviews = new Dictionary<string, CombinePreview>(StringComparer.Ordinal);
+        private readonly Dictionary<string, GenerationPreview> generationPreviews = new Dictionary<string, GenerationPreview>(StringComparer.Ordinal);
+        private readonly Dictionary<string, MotionState> pendingLaunches = new Dictionary<string, MotionState>(StringComparer.Ordinal);
         private readonly List<PointerSample> samples = new List<PointerSample>();
         private readonly List<Entry> updateEntries = new List<Entry>();
         private LabConfig config;
@@ -141,7 +168,25 @@ namespace C6Lab
         private bool uiInputBlocked;
         private bool configured;
 
-        public int Count => entries.Count;
+        public int Count
+        {
+            get
+            {
+                int visible = 0;
+                foreach (Entry entry in entries.Values) if (!entry.HiddenForPending) visible++;
+                return visible;
+            }
+        }
+        /// <summary>A stable enumeration for reconciliation; callers may remove bodies while iterating this copy.</summary>
+        public string[] OrbIds
+        {
+            get
+            {
+                var ids = new string[entries.Count];
+                entries.Keys.CopyTo(ids, 0);
+                return ids;
+            }
+        }
         /// <summary>The edge the gourd's swipe block (#215) holds shut on this board: -1 left, +1 right, 0 none.</summary>
         public int BlockedSide => blockedSide;
         /// <summary>Seconds this board still shows the swipe block.</summary>
@@ -304,6 +349,9 @@ namespace C6Lab
                 throw new ArgumentException("A finite orb identity, position and velocity are required.");
             if (entries.TryGetValue(id, out var existing))
             {
+                // Old snapshots must not put materials or a locally launched orb back on screen
+                // while the command's explicit result is still outstanding.
+                if (existing.HiddenForPending) return existing.View;
                 existing.LocalOwner = localOwner;
                 existing.View.FuseTotalSeconds = config.ItemLifetimeSeconds;
                 if (existing.View.Kind != kind || existing.View.Element != element || existing.Small != small)
@@ -435,7 +483,8 @@ namespace C6Lab
             updateEntries.AddRange(entries.Values);
             foreach (var entry in updateEntries)
             {
-                if (entry.View == null || !entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Dropping) continue;
+                if (entry.View == null || !entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Dropping
+                    || entry.HiddenForPending) continue;
                 Vector2 away = XY(entry.View.Body.position) - center;
                 float distance = away.magnitude;
                 if (distance > reach) continue;
@@ -626,11 +675,238 @@ namespace C6Lab
                 });
         }
 
+        /// <summary>
+        /// Show an immediate, physically movable combination without inventing the Host's random
+        /// element. The two real inputs remain disabled until the command commits or is rejected.
+        /// </summary>
+        public bool TryCreateCombinePreview(string temporaryId, string firstId, string secondId,
+            Vector2 center01, Vector2 velocity)
+        {
+            if (!configured || string.IsNullOrWhiteSpace(temporaryId) || entries.ContainsKey(temporaryId)
+                || generationPreviews.ContainsKey(temporaryId) || firstId == secondId
+                || !Finite(center01) || !Finite(velocity)
+                || firstId == null || secondId == null
+                || !entries.TryGetValue(firstId, out Entry first)
+                || !entries.TryGetValue(secondId, out Entry second)
+                || first.HiddenForPending || second.HiddenForPending
+                || !first.LocalOwner || !second.LocalOwner
+                || !first.View.Kind.IsRaw() || !second.View.Kind.IsRaw()
+                || first.View.Kind == second.View.Kind) return false;
+
+            var preview = new CombinePreview
+            {
+                FirstId = firstId, SecondId = secondId,
+                FirstMotion = first.BeforeRequest ?? CaptureMotion(first),
+                SecondMotion = second.BeforeRequest ?? CaptureMotion(second)
+            };
+            if (heldId == firstId || heldId == secondId) CancelDrag();
+            HidePending(first);
+            HidePending(second);
+            LabOrbView view = UpsertOrb(temporaryId, LabOrbKind.Combined, center01, velocity,
+                element: LabOrbElement.None, small: first.Small || second.Small);
+            entries[temporaryId].Provisional = true;
+            combinePreviews.Add(temporaryId, preview);
+            return view != null;
+        }
+
+        /// <summary>
+        /// Promote the same body to the approved identity. Its current local motion, held gesture,
+        /// and any subsequent pending transfer/launch survive the acknowledgement.
+        /// </summary>
+        public bool CommitCombinePreview(string temporaryId, LabOrbState approved)
+        {
+            if (temporaryId == null || approved == null || string.IsNullOrWhiteSpace(approved.id)
+                || approved.kind != LabOrbKind.Combined
+                || !combinePreviews.TryGetValue(temporaryId, out CombinePreview preview)
+                || !entries.TryGetValue(temporaryId, out Entry entry)) return false;
+
+            combinePreviews.Remove(temporaryId);
+            RemoveOrb(preview.FirstId);
+            RemoveOrb(preview.SecondId);
+            // A recovery snapshot may beat the receipt and already create the approved ID.
+            // Keep the body the finger has been moving, rather than showing both copies.
+            if (approved.id != temporaryId && entries.TryGetValue(approved.id, out Entry duplicate))
+            {
+                duplicate.View.gameObject.SetActive(false);
+                RemoveOrb(approved.id);
+            }
+            entries.Remove(temporaryId);
+            entries[approved.id] = entry;
+            entry.Provisional = false;
+            entry.Small = approved.small;
+            entry.View.Configure(approved.id, approved.kind, RadiusFor(approved.kind, approved.small), approved.element);
+            entry.View.SetItemState(approved.lockSwipes, approved.relayStage, -1f);
+            SetLayerRecursively(entry.View.transform, gameObject.layer);
+            entry.View.gameObject.name = "Orb " + approved.id;
+            if (heldId == temporaryId) heldId = approved.id;
+            if (lastTapId == temporaryId) lastTapId = approved.id;
+            if (entry.EdgePending)
+                entry.PendingEdge = new LabOrbEdgeCrossing(approved.id, entry.PendingEdge.ToRight,
+                    entry.PendingEdge.Height01, entry.PendingEdge.VelocityInBoardWidthsPerSecond, entry.PendingEdge.Kind);
+            if (pendingLaunches.TryGetValue(temporaryId, out MotionState launch))
+            {
+                pendingLaunches.Remove(temporaryId);
+                pendingLaunches[approved.id] = launch;
+            }
+            spawnedIds.Add(approved.id);
+            return true;
+        }
+
+        public bool RejectCombinePreview(string temporaryId)
+        {
+            if (temporaryId == null || !combinePreviews.TryGetValue(temporaryId, out CombinePreview preview)) return false;
+            combinePreviews.Remove(temporaryId);
+            RemoveOrb(temporaryId);
+            RestorePending(preview.FirstId, preview.FirstMotion);
+            RestorePending(preview.SecondId, preview.SecondMotion);
+            return true;
+        }
+
+        /// <summary>
+        /// A neutral, collider-free request marker. It is deliberately not an orb: generation kind,
+        /// color, launch direction and random draw remain Host decisions.
+        /// </summary>
+        public bool TryCreateGenerationPreview(string temporaryId, Vector2 center01)
+        {
+            if (!configured || string.IsNullOrWhiteSpace(temporaryId) || entries.ContainsKey(temporaryId)
+                || generationPreviews.ContainsKey(temporaryId) || !Finite(center01)) return false;
+            var root = new GameObject("Pending generation " + temporaryId);
+            root.layer = gameObject.layer;
+            root.transform.SetParent(transform, false);
+            root.transform.position = OnPlane(ToWorld(center01, config.OrbRadius)) - Vector3.forward * .02f;
+            var ring = root.AddComponent<LineRenderer>();
+            ring.useWorldSpace = false;
+            ring.loop = true;
+            ring.positionCount = 32;
+            ring.widthMultiplier = config.OrbRadius * .12f;
+            ring.startColor = ring.endColor = new Color(.88f, .88f, .88f, .7f);
+            for (int i = 0; i < ring.positionCount; i++)
+            {
+                float angle = i * Mathf.PI * 2f / ring.positionCount;
+                ring.SetPosition(i, new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * config.OrbRadius);
+            }
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
+            Material material = shader != null ? new Material(shader) { hideFlags = HideFlags.DontSave } : null;
+            if (material != null)
+            {
+                if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", new Color(.88f, .88f, .88f, .7f));
+                if (material.HasProperty("_Color")) material.SetColor("_Color", new Color(.88f, .88f, .88f, .7f));
+                ring.sharedMaterial = material;
+            }
+            generationPreviews.Add(temporaryId, new GenerationPreview { Root = root, Material = material });
+            StartCoroutine(AnimateGenerationPreview(temporaryId, root));
+            return true;
+        }
+
+        private IEnumerator AnimateGenerationPreview(string id, GameObject root)
+        {
+            float elapsed = 0f;
+            while (root != null && generationPreviews.ContainsKey(id))
+            {
+                elapsed += Time.deltaTime;
+                float size = Mathf.Lerp(.3f, 1f, Mathf.Clamp01(elapsed / Mathf.Max(.01f, config.SpawnPopDuration)));
+                root.transform.localScale = Vector3.one * size;
+                yield return null;
+            }
+        }
+
+        public bool RemoveGenerationPreview(string temporaryId)
+        {
+            if (temporaryId == null || !generationPreviews.TryGetValue(temporaryId, out GenerationPreview preview)) return false;
+            generationPreviews.Remove(temporaryId);
+            if (preview.Root != null) Destroy(preview.Root);
+            if (preview.Material != null) Destroy(preview.Material);
+            return true;
+        }
+
+        /// <summary>Keep the launch's board body for an explicit rejection, but remove it from view and collision now.</summary>
+        public bool BeginPendingLaunch(string id)
+        {
+            if (id == null || !entries.TryGetValue(id, out Entry entry)
+                || !entry.LocalOwner || entry.HiddenForPending || pendingLaunches.ContainsKey(id)) return false;
+            pendingLaunches.Add(id, entry.BeforeRequest ?? CaptureMotion(entry));
+            if (heldId == id) CancelDrag();
+            HidePending(entry);
+            return true;
+        }
+
+        public bool RejectPendingLaunch(string id)
+        {
+            if (id == null || !pendingLaunches.TryGetValue(id, out MotionState motion)) return false;
+            pendingLaunches.Remove(id);
+            return RestorePending(id, motion);
+        }
+
+        public bool CommitPendingLaunch(string id)
+        {
+            if (id == null || !pendingLaunches.ContainsKey(id)) return false;
+            pendingLaunches.Remove(id);
+            return RemoveOrb(id);
+        }
+
+        public bool IsProvisional(string id) => id != null
+            && ((entries.TryGetValue(id, out Entry entry) && entry.Provisional) || generationPreviews.ContainsKey(id));
+
+        /// <summary>Appearance already known locally, including a provisional combination's inherited size.</summary>
+        public bool TryGetLocalAppearance(string id, out LabOrbElement element, out bool small)
+        {
+            element = LabOrbElement.None;
+            small = false;
+            if (id == null || !entries.TryGetValue(id, out Entry entry)) return false;
+            element = entry.View.Element;
+            small = entry.Small;
+            return true;
+        }
+
+        public bool IsSnapshotSuppressed(string id) => id != null
+            && entries.TryGetValue(id, out Entry entry) && entry.HiddenForPending;
+
+        public bool ShouldPreserveFromSnapshot(string id) => id != null
+            && entries.TryGetValue(id, out Entry entry) && (entry.Provisional || entry.HiddenForPending);
+
+        private MotionState CaptureMotion(Entry entry) => new MotionState(
+            NormalizeForBody(areaShape, XY(entry.View.Body.position), entry.View.HitSphere.radius),
+            XY(entry.View.Body.linearVelocity) / bounds.width);
+
+        private void HidePending(Entry entry)
+        {
+            entry.Locked = true;
+            entry.HiddenForPending = true;
+            StopMotion(entry.View.Body);
+            SetBodyMode(entry);
+            entry.View.gameObject.SetActive(false);
+        }
+
+        private bool RestorePending(string id, MotionState motion)
+        {
+            if (!entries.TryGetValue(id, out Entry entry)) return false;
+            entry.HiddenForPending = false;
+            entry.Locked = false;
+            entry.EdgePending = false;
+            entry.PendingPartnerId = null;
+            entry.BeforeRequest = null;
+            entry.View.gameObject.SetActive(true);
+            entry.View.Body.position = OnPlane(ToWorld(motion.Position01, entry.View.HitSphere.radius));
+            SetBodyMode(entry);
+            if (!entry.View.Body.isKinematic)
+                entry.View.Body.linearVelocity = OnPlane(motion.Velocity * bounds.width);
+            return true;
+        }
+
         public bool RemoveOrb(string id)
         {
             if (id == null || !entries.TryGetValue(id, out var entry)) return false;
+            // Definitive removal discards the preview and its retained materials. A rejection
+            // removes this record first and explicitly restores the surviving inputs instead.
+            if (combinePreviews.TryGetValue(id, out CombinePreview preview))
+            {
+                combinePreviews.Remove(id);
+                RemoveOrb(preview.FirstId);
+                RemoveOrb(preview.SecondId);
+            }
             if (heldId == id) CancelDrag();
             entries.Remove(id);
+            pendingLaunches.Remove(id);
             Retire(entry);
             return true;
         }
@@ -645,6 +921,14 @@ namespace C6Lab
             spawnedIds.Clear();
             unlockEffectIds.Clear();
             expectedDrops.Clear();
+            combinePreviews.Clear();
+            pendingLaunches.Clear();
+            foreach (GenerationPreview preview in generationPreviews.Values)
+            {
+                if (preview.Root != null) Destroy(preview.Root);
+                if (preview.Material != null) Destroy(preview.Material);
+            }
+            generationPreviews.Clear();
         }
 
         public void SetInteractionEnabled(bool enabled)
@@ -676,6 +960,12 @@ namespace C6Lab
         /// </summary>
         public bool RejectEdge(string id)
         {
+            if (id != null && pendingLaunches.ContainsKey(id)) return RejectPendingLaunch(id);
+            if (id != null && combinePreviews.ContainsKey(id)) return RejectCombinePreview(id);
+            string rejectedPreview = null;
+            foreach (KeyValuePair<string, CombinePreview> pair in combinePreviews)
+                if (pair.Value.FirstId == id || pair.Value.SecondId == id) { rejectedPreview = pair.Key; break; }
+            if (rejectedPreview != null) return RejectCombinePreview(rejectedPreview);
             if (id == null || !entries.TryGetValue(id, out var entry)) return false;
             if (entry.PendingPartnerId != null && entries.TryGetValue(entry.PendingPartnerId, out var partner))
             {
@@ -689,6 +979,7 @@ namespace C6Lab
             entry.Locked = false;
             entry.Arrival = LabDrumArrival.None;
             entry.Blasted = false;
+            entry.BeforeRequest = null;
             StopMotion(entry.View.Body);
             entry.View.Body.position = OnPlane(Clamp(XY(entry.View.Body.position), entry.View.HitSphere.radius));
             SetBodyMode(entry);
@@ -714,7 +1005,8 @@ namespace C6Lab
             float best = 1f;
             foreach (var entry in entries.Values)
             {
-                if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held || entry.Dropping) continue;
+                if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held || entry.Dropping
+                    || entry.HiddenForPending) continue;
                 float reach = entry.View.HitSphere.radius * 1.25f;
                 float closeness = (XY(entry.View.Body.position) - worldPoint).sqrMagnitude / (reach * reach);
                 if (closeness > best) continue;
@@ -805,6 +1097,7 @@ namespace C6Lab
             if (entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
                 && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
             {
+                entry.BeforeRequest = CaptureMotion(entry);
                 entry.Locked = true;
                 StopMotion(entry.View.Body);
                 SetBodyMode(entry);
@@ -914,7 +1207,8 @@ namespace C6Lab
                 bool drum = entry.View.Kind.IsDrum();
                 // A bomb wanders like the drum, so it cannot simply be left lying in a corner.
                 bool drifts = drum || entry.View.Kind == LabOrbKind.Bomb;
-                if (!entry.LocalOwner || entry.Locked || entry.Held || entry.EdgePending || entry.Dropping)
+                if (!entry.LocalOwner || entry.Locked || entry.Held || entry.EdgePending || entry.Dropping
+                    || entry.HiddenForPending)
                 {
                     if (drum) entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
                     continue;
@@ -1058,6 +1352,8 @@ namespace C6Lab
         /// </summary>
         private void RequestCombine(Entry first, Entry second)
         {
+            first.BeforeRequest = CaptureMotion(first);
+            second.BeforeRequest = CaptureMotion(second);
             first.Locked = true;
             second.Locked = true;
             first.PendingPartnerId = second.View.OrbId;
@@ -1106,6 +1402,7 @@ namespace C6Lab
                 && !entry.Held
                 && !entry.Locked
                 && !entry.EdgePending
+                && !entry.HiddenForPending
                 && entry.PendingPartnerId == null;
         }
 
@@ -1118,7 +1415,7 @@ namespace C6Lab
             {
                 if (candidate == dragged || !candidate.View.Kind.IsRaw()
                     || candidate.View.Kind == dragged.View.Kind || !candidate.LocalOwner
-                    || candidate.Locked || candidate.EdgePending || candidate.Held) continue;
+                    || candidate.Locked || candidate.EdgePending || candidate.Held || candidate.HiddenForPending) continue;
                 float distance = (XY(candidate.View.Body.position) - XY(dragged.View.Body.position)).sqrMagnitude;
                 if (distance <= best) { best = distance; nearest = candidate; }
             }
@@ -1209,7 +1506,8 @@ namespace C6Lab
         private void SetBodyMode(Entry entry)
         {
             var body = entry.View.Body;
-            bool movable = entry.LocalOwner && !entry.Held && !entry.Locked && !entry.EdgePending && !entry.Dropping;
+            bool movable = entry.LocalOwner && !entry.Held && !entry.Locked && !entry.EdgePending && !entry.Dropping
+                && !entry.HiddenForPending;
             bool desiredKinematic = !movable;
             if (body.isKinematic != desiredKinematic)
             {
@@ -1218,7 +1516,7 @@ namespace C6Lab
                 if (movable) body.linearVelocity = Vector3.zero;
             }
             // A falling gourd bomb is still in the air: nothing bumps into it until it lands.
-            body.detectCollisions = !entry.Dropping;
+            body.detectCollisions = !entry.Dropping && !entry.HiddenForPending;
             entry.View.HitSphere.isTrigger = entry.Held;
         }
 
@@ -1325,6 +1623,8 @@ namespace C6Lab
         {
             if (contactMaterial != null) Destroy(contactMaterial);
             foreach (Mesh mesh in areaWallMeshes) if (mesh != null) Destroy(mesh);
+            foreach (GenerationPreview preview in generationPreviews.Values)
+                if (preview.Material != null) Destroy(preview.Material);
         }
     }
 }

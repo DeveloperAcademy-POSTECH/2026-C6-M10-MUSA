@@ -23,11 +23,14 @@ namespace C6Lab
     /// <summary>
     /// Host sends cell IDs + RGBA + painter P number (7 bytes/cell), or full 5-byte cells.
     /// Color and painter identity share one hash and commit; partial maps are never displayed.
-    /// Frames have <=4096 ASCII base64 characters, well below the existing 32 KiB packet bound.
+    /// Frames have <=2048 ASCII base64 characters, leaving room for the bounded bulk envelope.
     /// </summary>
     public sealed class LabPaintPublisher
     {
-        public const int FragmentCharacters = 4096;
+        public const int FragmentCharacters = 2048;
+        /// <summary>Enough fragments for the largest supported full RGBA/P-number checkpoint.</summary>
+        public const int MaximumFragmentCount = (((256 * 128 * 5 + 2) / 3) * 4
+            + FragmentCharacters - 1) / FragmentCharacters;
         private Color32[] published;
         private byte[] publishedPainters;
         private string session;
@@ -244,7 +247,7 @@ namespace C6Lab
             => f != null && !string.IsNullOrEmpty(f.session) && f.session.Length <= 128 && f.round > 0
                 && f.epoch > 0 && f.sequence > 0 && LabPaintPublisher.ValidDimensions(f.columns, f.rows)
                 && f.paintCount >= 0 && f.coveredCount >= 0 && f.coveredCount <= f.columns * f.rows
-                && f.parts >= 1 && f.parts <= 64 && f.part >= 0 && f.part < f.parts
+                && f.parts >= 1 && f.parts <= LabPaintPublisher.MaximumFragmentCount && f.part >= 0 && f.part < f.parts
                 && f.data != null && f.data.Length <= LabPaintPublisher.FragmentCharacters
                 && f.hash != null && f.hash.Length == 64;
         private static bool SameHeader(LabPaintFrame a, LabPaintFrame b)

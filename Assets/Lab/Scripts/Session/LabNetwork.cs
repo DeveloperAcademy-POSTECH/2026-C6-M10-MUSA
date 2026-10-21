@@ -34,6 +34,10 @@ namespace C6Lab
         public string roomName;
         public LabSnapshot snapshot;
         public LabPaintFrame paintFrame;
+        public LabActionReceipt actionReceipt;
+        public LabBoardFrame boardFrame;
+        public ulong ownershipVersion, secondOwnershipVersion;
+        public string provisionalId;
         public long requestId;
         public string firstId;
         public string secondId;
@@ -158,7 +162,7 @@ namespace C6Lab
     /// Local Host/Join experiment. The host alone owns LabModel and session tuning.
     /// Only owner motion is simulated locally; requests and damage are accepted by the host.
     /// </summary>
-    public sealed class LabNetwork : MonoBehaviour
+    public sealed partial class LabNetwork : MonoBehaviour
     {
         private const string MessageName = "C6Lab.Packet.3";
         // P-slot assignments join lobby packets, generate drums join the snapshot with the generate
@@ -185,10 +189,11 @@ namespace C6Lab
         // 5644: #225 nearby-hit paint drying adds shared DEV 153-156.
         // 5645: #215 swipe-block snapshots and pushed crossings integrate at DEV 157-159; 160 shared values.
         // 5646: #222 gourd color combo experiment (DEV 160-168, combo snapshot, projectile size scale); 169 shared values.
-        internal const ushort LabProtocolVersion = 5646;
+        // 5647: owner-local board transactions, ownership epochs and independently applied board deltas.
+        internal const ushort LabProtocolVersion = 5647;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/12");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -213,7 +218,6 @@ namespace C6Lab
         private readonly LabImpactReceiptGate impactReceipts = new LabImpactReceiptGate();
         private readonly LabPaintSurface clientPaintSurface = new LabPaintSurface();
         private readonly LabPaintSurface receivedPaintSurface = new LabPaintSurface();
-        private readonly LabPaintPublisher paintPublisher = new LabPaintPublisher();
         private LabPaintReceiver paintReceiver;
         private LabPaintReceiver PaintReceiver => paintReceiver ?? (paintReceiver = new LabPaintReceiver(receivedPaintSurface));
         private readonly Dictionary<ulong, double> paintCheckpointRequests = new Dictionary<ulong, double>();
@@ -229,7 +233,7 @@ namespace C6Lab
         private LabModel model;
         private LabPlayerSlots playerSlots;
         private double nextSnapshotAt;
-        private double nextMotionAt;
+
         private long requestSequence;
         private bool handlerRegistered;
         private bool autoStart;
@@ -890,6 +894,7 @@ namespace C6Lab
                 return;
             }
             pendingDeveloperRestart = false;
+            ResetActionTransport();
             pauseRequestIds.Clear();
             pauseRequestPending = false;
             battleClock.Reset();
@@ -1003,7 +1008,7 @@ namespace C6Lab
             if (IsHost) return PauseAsHost();
             bool sent = Send(NetworkManager.ServerClientId, new LabNetworkPacket
             {
-                type = "pause", sessionId = sessionId, requestId = ++requestSequence
+                type = "pause", sessionId = sessionId, round = latest.round, requestId = ++requestSequence
             });
             if (sent)
             {
@@ -1080,6 +1085,7 @@ namespace C6Lab
         private void EndBattleToLobby()
         {
             pendingDeveloperRestart = false;
+            ResetActionTransport();
             pauseRequestIds.Clear();
             pauseRequestPending = false;
             ClearProjectiles();
@@ -1094,6 +1100,7 @@ namespace C6Lab
             latest = null;
             sessionId = null;
             ResetPaintTransport();
+            ResetActionTransport();
             battleClock.Reset();
             ApplyLocalPause(false);
             LastShotReport = string.Empty;
@@ -1195,6 +1202,9 @@ namespace C6Lab
                 SampleHostPaintFlow(battleClock.Now(now));
                 if (now >= nextSnapshotAt) PublishSnapshot(false);
             }
+            FlushPendingBlastReports(now);
+            FlushBoardActions(now);
+            FlushBulkPackets();
             if (!IsHost && (pendingPaintSnapshot != null || PaintReceiver.HasPending)
                 && now >= nextPaintRequestAt) RequestPaintCheckpoint();
             // Command-line smoke mode is intentionally separate from ordinary UI play.
@@ -1213,27 +1223,11 @@ namespace C6Lab
                     if (candidate != null)
                     {
                         autoTransferredSession = latest.sessionId;
-                        Request(new LabNetworkPacket { type = "motion", firstId = candidate.id, x = 1f, y = .5f, vx = 3f, vy = 0f });
                         Request(new LabNetworkPacket { type = "transfer", firstId = candidate.id, requestId = ++requestSequence,
-                            right = true, y = .5f, vx = 3f, vy = 0f });
+                            right = true, x = 1f, y = .5f, vx = 3f, vy = 0f });
                         Debug.Log("C6_LAB_SMOKE_EDGE orb=" + candidate.id);
                     }
                 }
-            }
-            if (IsConnected && board != null && latest != null && latest.phase == LabPhase.Playing
-                && !latest.paused && now >= nextMotionAt)
-            {
-                nextMotionAt = now + 0.1;
-                var samples = new List<LabMotionSample>();
-                foreach (var orb in (latest.orbs ?? Array.Empty<LabOrbState>())
-                    .Concat(latest.drums ?? Array.Empty<LabOrbState>()))
-                {
-                    if (orb.owner != LocalPlayerId || orb.inFlight) continue;
-                    if (board.TryGetMotion(orb.id, out var position, out var velocity))
-                        samples.Add(new LabMotionSample { id = orb.id, x = position.x, y = position.y,
-                            vx = velocity.x, vy = velocity.y });
-                }
-                if (samples.Count > 0) Request(new LabNetworkPacket { type = "motion_batch", motionSamples = samples.ToArray() });
             }
         }
 
@@ -1273,13 +1267,17 @@ namespace C6Lab
         {
             if (handlerRegistered || manager.CustomMessagingManager == null) return;
             manager.CustomMessagingManager.RegisterNamedMessageHandler(MessageName, Receive);
+            manager.CustomMessagingManager.RegisterNamedMessageHandler(BulkMessageName, ReceiveBulk);
             handlerRegistered = true;
         }
 
         private void UnregisterHandler()
         {
             if (handlerRegistered && manager != null && manager.CustomMessagingManager != null)
+            {
                 manager.CustomMessagingManager.UnregisterNamedMessageHandler(MessageName);
+                manager.CustomMessagingManager.UnregisterNamedMessageHandler(BulkMessageName);
+            }
             handlerRegistered = false;
         }
 
@@ -1331,6 +1329,8 @@ namespace C6Lab
                     Debug.Log("C6_LAB_JOIN_REJECTED id=" + id);
                     return;
                 }
+                bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id);
+                boardSequences.Remove(id);
                 playerSlots?.Release(id);
                 slotRequestIds.Remove(id);
                 Debug.LogWarning("C6_LAB_PEER_LEFT id=" + id);
@@ -1424,6 +1424,7 @@ namespace C6Lab
             if (!IsHost || model == null) return;
             double now = Time.realtimeSinceStartupAsDouble;
             latest = model.Snapshot(battleClock.Now(now));
+            EnsureActionRound();
             LabHangingTarget hanging = target == null ? null : target.GetComponent<LabHangingTarget>();
             if (hanging != null)
             {
@@ -1436,6 +1437,7 @@ namespace C6Lab
             latest.paused = battleClock.IsPaused && latest.phase == LabPhase.Playing;
             AnnounceBombExplosions();
             AnnounceGourdBombs();
+            PublishOwnerBoards(latest);
             // Large experimental states are deliberately updated less often instead of queuing
             // many reliable fragments per peer until the network becomes unusable.
             nextSnapshotAt = now + ((latest.orbs?.Length ?? 0) > 100 ? .5d : .1d);
@@ -1444,35 +1446,32 @@ namespace C6Lab
             if (target != null) target.GetComponent<LabGourdPaint>()?.RefreshCommittedMap();
             ApplyLocalPause(latest.paused);
             SyncBoard();
-            string[] pieces;
-            try { pieces = LabSessionSettings.ChunkSnapshot(latest); }
-            catch (ArgumentException e)
-            {
-                AbortOversizedSnapshot(e.Message);
-                return;
-            }
             long sequence = ++snapshotSequence;
-            LabPaintFrame[] paintFrames = paintPublisher.Publish(model.PaintSurface, sessionId, latest.round, sequence);
             foreach (ulong id in order)
             {
-                if (id == manager.LocalClientId) continue;
-                if (!SendPaintFrames(id, paintFrames))
+                if (id == manager.LocalClientId || HasPendingBulk(id)) continue;
+                // A slow peer coalesces to the newest shared state, without holding up board actions or other peers.
+                var shared = LabBoardReplica.CopySnapshot(latest);
+                string roundKey = latest.sessionId + "/" + latest.round;
+                if (peerSharedRounds.TryGetValue(id, out string sentRound) && sentRound == roundKey)
                 {
-                    AbortOversizedSnapshot("Could not send the complete paint transaction.");
-                    return;
+                    shared.orbs = Array.Empty<LabOrbState>();
+                    shared.drums = Array.Empty<LabOrbState>();
                 }
+                string[] pieces;
+                try { pieces = LabSessionSettings.ChunkSnapshot(shared); }
+                catch (ArgumentException exception) { AbortOversizedSnapshot(exception.Message); return; }
+                LabPaintFrame[] paintFrames = PeerPaintPublisher(id).Publish(model.PaintSurface, sessionId, latest.round, sequence);
+                if (!SendPaintFrames(id, paintFrames))
+                { AbortOversizedSnapshot("Could not queue the complete paint transaction."); return; }
                 for (int i = 0; i < pieces.Length; i++)
                 {
-                    bool sent = Send(id, new LabNetworkPacket { type = "snapshot_chunk", sessionId = sessionId,
-                        configRevision = configRevision, configFingerprint = configFingerprint,
-                        snapshotSequence = sequence, chunkIndex = i, chunkCount = pieces.Length,
-                        chunkData = pieces[i] });
-                    if (!sent)
-                    {
-                        AbortOversizedSnapshot("Could not send the complete battle state to all players.");
-                        return;
-                    }
+                    if (!QueueBulk(id, new LabNetworkPacket { type = "snapshot_chunk", sessionId = sessionId,
+                        round = latest.round, configRevision = configRevision, configFingerprint = configFingerprint,
+                        snapshotSequence = sequence, chunkIndex = i, chunkCount = pieces.Length, chunkData = pieces[i] }))
+                    { AbortOversizedSnapshot("Could not queue the complete battle state."); return; }
                 }
+                peerSharedRounds[id] = roundKey;
             }
             if (immediate) Debug.Log("C6_LAB_STATE phase=" + latest.phase + " hp=" + latest.hp + " remaining=" + latest.remaining.ToString("F1"));
             Changed?.Invoke();
@@ -1561,6 +1560,9 @@ namespace C6Lab
         private void Request(LabNetworkPacket packet)
         {
             packet.sessionId = sessionId;
+            packet.round = latest?.round ?? model?.Round ?? 0;
+            if (IsBoardAction(packet.type)) { SubmitBoardAction(packet); return; }
+            if (packet.type == "blastHit" && DeferBlastReport(packet)) return;
             if (IsHost) HandleRequest(LocalPlayerId, packet);
             else Send(NetworkManager.ServerClientId, packet);
         }
@@ -1568,109 +1570,42 @@ namespace C6Lab
         private void HandleRequest(ulong sender, LabNetworkPacket packet)
         {
             if (!IsHost || model == null || packet == null || !order.Contains(sender)) return;
+            if (IsBoardAction(packet.type)) { HandleBoardAction(sender, packet); return; }
+            if (packet.sessionId != sessionId || packet.round != model.Round) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
-            bool accepted = false;
-            string reason = "Rejected";
-            if (packet.sessionId != sessionId) return;
+            if (packet.type == "action_query")
+            {
+                if (actionResults.TryGet(new LabActionIdentity(sessionId, model.Round, sender, packet.requestId), out var receipt))
+                    DeliverReceipt(sender, receipt);
+                else Send(sender, new LabNetworkPacket { type = "action_retry", sessionId = sessionId,
+                    round = model.Round, requestId = packet.requestId });
+                return;
+            }
+            if (packet.type == "board_checkpoint")
+            {
+                LabSnapshot checkpoint = model.Snapshot(now);
+                AnnounceBombExplosions();
+                AnnounceGourdBombs();
+                PublishOwnerBoards(checkpoint, true, sender);
+                return;
+            }
             if (packet.type == "pause")
             {
-                if (packet.requestId < 1
-                    || (pauseRequestIds.TryGetValue(sender, out long previous) && packet.requestId <= previous))
-                    return;
+                if (packet.requestId < 1 || (pauseRequestIds.TryGetValue(sender, out long previous)
+                    && packet.requestId <= previous)) return;
                 pauseRequestIds[sender] = packet.requestId;
                 PauseAsHost();
                 return;
             }
             if (packet.type == "blastHit")
             {
-                // Best effort, like motion: a late, repeated or unknown report is dropped without a reply.
                 int burned = model.MarkBlasted(sender, packet.firstId, packet.ids, now);
                 Debug.Log("C6_LAB_BLAST_BURN owner=" + sender + " bomb=" + packet.firstId + " burned=" + burned);
                 if (burned > 0) PublishSnapshot(true);
-                return;
             }
-            if (battleClock.IsPaused)
-            {
-                if (packet.type == "motion" || packet.type == "motion_batch") return;
-                if (sender == LocalPlayerId) RejectLocally(packet.firstId, "BATTLE_PAUSED");
-                else Send(sender, new LabNetworkPacket { type = "reject", sessionId = sessionId,
-                    firstId = packet.firstId, reason = "BATTLE_PAUSED" });
-                return;
-            }
-            LabOrbState result = null;
-            string uniqueRequestId = sender + ":" + packet.requestId;
-            switch (packet.type)
-            {
-                case "generate":
-                    accepted = string.IsNullOrEmpty(packet.secondId)
-                        ? model.TryGenerate(sender, uniqueRequestId, now, out result, out reason)
-                        : model.TryGenerate(sender, packet.secondId, new Vector2(packet.x, packet.y),
-                            uniqueRequestId, now, out result, out reason);
-                    break;
-                case "use":
-                    accepted = model.TryUseItem(sender, packet.firstId, uniqueRequestId, now, out result, out reason);
-                    break;
-                case "combine":
-                    // 요청한 기기가 보낸 결합 직전 속도(보드 폭/초). Model이 유효성 검사와 상한 제한을 한다.
-                    accepted = model.TryCombine(sender, packet.firstId, packet.secondId, uniqueRequestId, now,
-                        new Vector2(packet.vx, packet.vy), out result, out reason);
-                    break;
-                case "transfer":
-                    accepted = model.TryTransfer(sender, packet.firstId, packet.right, packet.y, new Vector2(packet.vx, packet.vy), uniqueRequestId, now,
-                        (LabEdgeCrossingKind)Mathf.Clamp(packet.crossing, 0, (int)LabEdgeCrossingKind.Pushed), out result, out reason);
-                    break;
-                case "launch":
-                    Vector2 swipe = new Vector2(packet.vx, packet.vy);
-                    if (target == null || target.Hitbox == null || battleFloor == null)
-                    {
-                        reason = "Battle target or floor is unavailable.";
-                        break;
-                    }
-                    if (!Finite(packet.x) || packet.x < 0f || packet.x > 1f
-                        || !LabThrowMath.IsThrowGesture(swipe, packet.y, config))
-                    {
-                        reason = "Swipe the Combined orb upward to throw.";
-                        break;
-                    }
-                    accepted = model.TryLaunch(sender, packet.firstId, uniqueRequestId, now, out result, out reason);
-                    if (accepted) SpawnHostProjectile(result, swipe, packet.x);
-                    break;
-                case "motion":
-                    if (Finite(packet.x) && Finite(packet.y) && Finite(packet.vx) && Finite(packet.vy))
-                        accepted = model.TryUpdateMotion(sender, packet.firstId, new Vector2(packet.x, packet.y), new Vector2(packet.vx, packet.vy), now);
-                    // Frequent or late motion samples are best-effort; never unlock an orb from them.
-                    return;
-                case "motion_batch":
-                    if (packet.motionSamples == null || packet.motionSamples.Length > 100) return;
-                    foreach (LabMotionSample motion in packet.motionSamples)
-                    {
-                        if (motion == null || !Finite(motion.x) || !Finite(motion.y)
-                            || !Finite(motion.vx) || !Finite(motion.vy)) continue;
-                        model.TryUpdateMotion(sender, motion.id, new Vector2(motion.x, motion.y),
-                            new Vector2(motion.vx, motion.vy), now);
-                    }
-                    return;
-            }
-            if (accepted)
-            {
-                Debug.Log("C6_LAB_ACTION type=" + packet.type + " sender=" + sender + " orb=" + (result == null ? "" : result.id)
-                    + (result == null ? "" : " owner=" + result.owner + " vx=" + result.vx.ToString("F2")));
-                PublishSnapshot(true);
-                if (packet.type == "combine") NotifyCombined(sender);
-            }
-            else if (sender == LocalPlayerId) RejectLocally(packet.firstId, reason);
-            else Send(sender, new LabNetworkPacket { type = "reject", sessionId = sessionId,
-                firstId = packet.firstId, reason = reason });
         }
 
-        /// <summary>결합 승인을 결합한 사람에게만 알린다 (소리·진동용). Host 본인이면 바로 이벤트를 낸다.</summary>
-        private void NotifyCombined(ulong sender)
-        {
-            if (sender == LocalPlayerId) LocalCombined?.Invoke();
-            else Send(sender, new LabNetworkPacket { type = "combined", sessionId = sessionId });
-        }
-
-        private void SpawnHostProjectile(LabOrbState orb, Vector2 releaseVelocity, float releaseX01)
+        private void SpawnHostProjectile(LabOrbState orb, Vector2 releaseVelocity, float releaseX01, long actionId = 0)
         {
             if (orb == null || target == null || config == null) return;
             int selectedSeat = (playerSlots?.GetSlot(orb.owner) ?? 0) - 1;
@@ -1692,6 +1627,7 @@ namespace C6Lab
             projectile.SetMissSurface(battleFloor);
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
+                round = model.Round, requestId = actionId,
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
                 wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale };
@@ -1784,6 +1720,7 @@ namespace C6Lab
             {
                 if (orb.owner != LocalPlayerId || orb.inFlight) continue;
                 current.Add(orb.id);
+                if (board.IsSnapshotSuppressed(orb.id)) continue;
                 bool showSpawn = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
                     && orb.kind != LabOrbKind.Combined;
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
@@ -1804,10 +1741,13 @@ namespace C6Lab
                 board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy),
                     arrival: drum.JustArrived(latest.serverTime) ? drum.arrival : LabDrumArrival.None, stopAt: drum.stopAt);
             }
-            foreach (string id in visibleOrbIds) if (!current.Contains(id)) board.RemoveOrb(id);
+            foreach (string id in board.OrbIds)
+                if (!current.Contains(id) && !board.ShouldPreserveFromSnapshot(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
             foreach (string id in current) visibleOrbIds.Add(id);
-            board.SetInteractionEnabled(latest.phase == LabPhase.Playing && !latest.paused);
+            board.SetInteractionEnabled(latest.phase == LabPhase.Playing && !latest.paused
+                && (IsHost || !boardReplica.NeedsCheckpoint
+                    && (boardReplica.LatestSequence == 0 || boardReplica.InteractionAllowed)));
             // The gourd's swipe block (#215) shows and bounces only on the blocked player's own board.
             bool blockedHere = latest.SwipeBlockOn(LocalPlayerId);
             board.SetSwipeBlock(blockedHere ? (latest.swipeBlockedRight ? 1 : -1) : 0,
@@ -1831,9 +1771,7 @@ namespace C6Lab
                 return;
             }
             board.SetOrbLocked(edge.OrbId, true);
-            // The Host must receive the boundary sample before the ownership request.
-            Request(new LabNetworkPacket { type = "motion", firstId = edge.OrbId, x = edge.ToRight ? 1f : 0f, y = edge.Height01, vx = edge.VelocityInBoardWidthsPerSecond.x, vy = edge.VelocityInBoardWidthsPerSecond.y });
-            Request(new LabNetworkPacket { type = "transfer", requestId = ++requestSequence, firstId = edge.OrbId, right = edge.ToRight, y = edge.Height01, vx = edge.VelocityInBoardWidthsPerSecond.x, vy = edge.VelocityInBoardWidthsPerSecond.y,
+            Request(new LabNetworkPacket { type = "transfer", requestId = ++requestSequence, firstId = edge.OrbId, right = edge.ToRight, x = edge.ToRight ? 1f : 0f, y = edge.Height01, vx = edge.VelocityInBoardWidthsPerSecond.x, vy = edge.VelocityInBoardWidthsPerSecond.y,
                 crossing = (int)edge.Kind });
         }
 
@@ -1846,7 +1784,9 @@ namespace C6Lab
         private void OnUseRequested(string orbId)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            Request(new LabNetworkPacket { type = "use", requestId = ++requestSequence, firstId = orbId });
+            Vector2 position = board != null && board.TryGetMotion(orbId, out var point, out _) ? point : Vector2.one * .5f;
+            Request(new LabNetworkPacket { type = "use", requestId = ++requestSequence, firstId = orbId,
+                x = position.x, y = position.y });
         }
 
         private void OnThrowRequested(LabOrbThrowGesture gesture)
@@ -1890,7 +1830,7 @@ namespace C6Lab
                         if (!paintCheckpointRequests.TryGetValue(sender, out double last) || now - last >= .5d)
                         {
                             paintCheckpointRequests[sender] = now;
-                            SendPaintFrames(sender, paintPublisher.Checkpoint());
+                            if (!HasPendingBulk(sender)) SendPaintFrames(sender, PeerPaintPublisher(sender).Checkpoint());
                         }
                     }
                     return;
@@ -1901,6 +1841,15 @@ namespace C6Lab
             if (sender != NetworkManager.ServerClientId) return;
             switch (packet.type)
             {
+                case "action_retry":
+                    ReceiveActionRetry(packet);
+                    break;
+                case "action_result":
+                    ReceiveActionReceipt(packet.actionReceipt);
+                    break;
+                case "board_delta":
+                    ReceiveBoardChunk(packet);
+                    break;
                 case "lobby":
                 {
                     if (packet.targetParticipants < 2 || packet.targetParticipants > 5
@@ -1923,6 +1872,7 @@ namespace C6Lab
                     latest = null;
                     sessionId = null;
                     ResetPaintTransport();
+                    ResetActionTransport();
                     pauseRequestPending = false;
                     impactReceipts.Reset();
                     impactFeedback?.Clear();
@@ -2010,7 +1960,7 @@ namespace C6Lab
                     }
                     break;
                 case "projectile":
-                    if (latest != null && packet.sessionId == sessionId
+                    if (latest != null && packet.sessionId == sessionId && !HasPresentedProjectile(packet)
                         && target != null && config != null && Finite(packet.x) && Finite(packet.y)
                         && Finite(packet.z) && Finite(packet.wx) && Finite(packet.wy) && Finite(packet.wz))
                     {
@@ -2107,7 +2057,7 @@ namespace C6Lab
                 || packet.configFingerprint != configFingerprint
                 || string.IsNullOrEmpty(packet.sessionId) || packet.snapshotSequence < 1
                 || packet.snapshotSequence <= lobbySnapshotSequenceFloor
-                || packet.chunkCount < 1 || packet.chunkCount > 256
+                || packet.chunkCount < 1 || packet.chunkCount > 1024
                 || packet.chunkIndex < 0 || packet.chunkIndex >= packet.chunkCount
                 || string.IsNullOrEmpty(packet.chunkData)
                 || packet.chunkData.Length > LabSessionSettings.SnapshotChunkCharacters) return;
@@ -2164,21 +2114,26 @@ namespace C6Lab
             }
             sessionId = snapshot.sessionId;
             latest = snapshot;
+            LabBoardFrame deferred = deferredBoardFrame;
+            EnsureActionRound();
+            if (!IsHost) latest = boardReplica.Overlay(latest);
+            if (deferred != null && deferred.sessionId == snapshot.sessionId && deferred.round == snapshot.round)
+                ReceiveBoardFrame(deferred);
             pendingDeveloperRestart = false;
             ClearPendingSlotSelection();
             if (target != null) target.GetComponent<LabGourdPaint>()?.RefreshCommittedMap();
             if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
-            ApplyLocalPause(snapshot.phase == LabPhase.Playing && snapshot.paused);
-            bool targetPaused = snapshot.phase == LabPhase.Playing && snapshot.paused;
-            if (target != null && Finite(snapshot.targetYawDegrees)
-                && Finite(snapshot.targetYawSpeedDegreesPerSecond))
+            ApplyLocalPause(latest.phase == LabPhase.Playing && latest.paused);
+            bool targetPaused = latest.phase == LabPhase.Playing && latest.paused;
+            if (target != null && Finite(latest.targetYawDegrees)
+                && Finite(latest.targetYawSpeedDegreesPerSecond))
                 target.GetComponent<LabHangingTarget>()?.ReconcileYaw(
-                    snapshot.targetYawDegrees, snapshot.targetYawSpeedDegreesPerSecond, targetPaused);
+                    latest.targetYawDegrees, latest.targetYawSpeedDegreesPerSecond, targetPaused);
             if (target != null)
                 target.GetComponent<LabHangingTarget>()?.ReconcileRope(
-                    snapshot.targetRopeCycleElapsed, snapshot.targetRopeHitOffset,
-                    snapshot.targetRopeHitVelocity, targetPaused);
+                    latest.targetRopeCycleElapsed, latest.targetRopeHitOffset,
+                    latest.targetRopeHitVelocity, targetPaused);
             SyncBoard();
             if (logTransition && latest.phase == LabPhase.Playing) SetNotice(string.Empty);
             SetStatus((latest.paused ? "PAUSED" : latest.phase.ToString())
@@ -2189,18 +2144,23 @@ namespace C6Lab
 
         private void CopyPaintToDisplay(LabPaintSurface source, LabSnapshot snapshot)
         {
+            if (displayedPaintSession == snapshot.sessionId && displayedPaintRound == snapshot.round
+                && displayedPaintRevision == source.Revision && displayedPaintCount == snapshot.paintCount
+                && clientPaintSurface.Columns == source.Columns && clientPaintSurface.Rows == source.Rows) return;
             var pixels = new Color32[source.CellCount];
             var painters = new byte[source.CellCount];
             source.CopyPixels(pixels);
             source.CopyPainterSlots(painters);
             if (!clientPaintSurface.TryReplacePixels(source.Columns, source.Rows, source.Revision, pixels, painters, snapshot.paintCount))
                 throw new InvalidOperationException("Invalid authoritative paint display state.");
+            displayedPaintSession = snapshot.sessionId; displayedPaintRound = snapshot.round;
+            displayedPaintRevision = source.Revision; displayedPaintCount = snapshot.paintCount;
         }
 
         private bool SendPaintFrames(ulong receiver, LabPaintFrame[] frames)
         {
             foreach (LabPaintFrame frame in frames)
-                if (!Send(receiver, new LabNetworkPacket { type = "paint_cells", sessionId = frame.session,
+                if (!QueueBulk(receiver, new LabNetworkPacket { type = "paint_cells", sessionId = frame.session,
                     round = frame.round, snapshotSequence = frame.epoch, configRevision = configRevision,
                     configFingerprint = configFingerprint, paintFrame = frame })) return false;
             return true;
@@ -2237,7 +2197,8 @@ namespace C6Lab
 
         private void ResetPaintTransport()
         {
-            paintPublisher.Reset();
+            peerPaintPublishers.Clear();
+            peerSharedRounds.Clear();
             PaintReceiver.Reset();
             clientPaintSurface.Reset(new LabPaintGrowthSettings(), 1);
             pendingPaintSnapshot = null; awaitingPaintSession = null; awaitingPaintRound = 0;
@@ -2251,7 +2212,7 @@ namespace C6Lab
             Debug.LogWarning("C6_LAB_REJECT orb=" + orbId + " reason=" + reason);
         }
 
-        private bool Send(ulong receiver, LabNetworkPacket packet)
+        private bool Send(ulong receiver, LabNetworkPacket packet, NetworkDelivery delivery = NetworkDelivery.ReliableFragmentedSequenced)
         {
             if (manager == null || !manager.IsListening || manager.ShutdownInProgress || manager.CustomMessagingManager == null) return false;
             try
@@ -2263,7 +2224,8 @@ namespace C6Lab
                     writer.WriteValueSafe(packet.protocol);
                     writer.WriteValueSafe(bytes.Length);
                     writer.WriteBytesSafe(bytes);
-                    manager.CustomMessagingManager.SendNamedMessage(MessageName, receiver, writer, NetworkDelivery.ReliableFragmentedSequenced);
+                    manager.CustomMessagingManager.SendNamedMessage(MessageName, receiver, writer, delivery);
+                    SentControlBytes += bytes.Length + 8;
                 }
                 return true;
             }
@@ -2315,6 +2277,8 @@ namespace C6Lab
             ApplyLocalPause(false);
             battleClock.Reset();
             pendingDeveloperRestart = false;
+            ResetActionTransport();
+            ResetBulkTransport();
             pauseRequestIds.Clear();
             slotRequestIds.Clear();
             pauseRequestPending = false;
