@@ -28,7 +28,7 @@ namespace C6Lab.Tests
         {
             Assert.That(new LabPaintGrowthSettings().DryingEnabled, Is.False, "Bare surface fixtures remain opt-in, independently of the game config default.");
             Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(170));
-            Assert.That(Protocol, Is.EqualTo(5649));
+            Assert.That(Protocol, Is.EqualTo(5650));
             Assert.That(LabConfig.DeveloperFields.Skip(153).Take(4).Select(field => field.DisplayLabel), Is.EqualTo(new[]
             {
                 "Paint Drying", "Drying Delay (seconds)", "Drying Rate (%/s)", "Nearby Hit Radius (surface degrees)"

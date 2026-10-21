@@ -14,11 +14,15 @@ namespace C6Lab.Tests
     /// </summary>
     public sealed class LabDeveloperSoloIntegrationTests
     {
+        private readonly LabSavedSceneNetworkFixture fixture = new LabSavedSceneNetworkFixture();
+
+        [UnityTearDown]
+        public IEnumerator UnloadSavedScene() => fixture.Cleanup();
+
         [UnityTest]
         public IEnumerator SavedHudAndDeveloperSliderShowLocalPlayerHpAcrossSoloRestart()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
 
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabHud hud = developerUi.GetComponent<LabHud>();
@@ -57,7 +61,7 @@ namespace C6Lab.Tests
             Assert.That(hud.playerHpText.text, Is.EqualTo("—"));
 
             LabNetwork network = hud.network;
-            network.port = 17776;
+            fixture.UseAvailablePort(network);
             try
             {
                 developerUi.Open();
@@ -111,8 +115,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedLobbyCanChooseTwoToFivePlayersBeforeHosting()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
 
             GameObject[] roots = SceneManager.GetActiveScene().GetRootGameObjects();
             LabHud hud = roots.SelectMany(root => root.GetComponentsInChildren<LabHud>(true))
@@ -189,7 +192,8 @@ namespace C6Lab.Tests
             Assert.That(network.TargetParticipantCount, Is.EqualTo(4));
 
             // Use the saved ordinary HOST button, not the DEV room-creation shortcut.
-            hud.port.text = "17780";
+            hud.port.text = fixture.UseAvailablePort(network).ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
             try
             {
                 hud.hostButton.onClick.Invoke();
@@ -254,8 +258,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedDeveloperPanelPicksDrumCountFromAutoAndOneToFiveThreeToARow()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
             LabDeveloperMode developerUi = SavedDeveloperUi();
             developerUi.Open();
             developerUi.panel.GetComponentsInChildren<UnityEngine.UI.Button>(true)
@@ -288,8 +291,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedDeveloperPanelCreatesAndRetunesTwoPlayerHostLobby()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabNetwork network = developerUi.network;
             LabSceneController sceneController = developerUi.sceneController;
@@ -298,7 +300,7 @@ namespace C6Lab.Tests
             Assert.That(network, Is.Not.Null);
             Assert.That(developerUi.applyHostButton, Is.Not.Null);
             Assert.That(developerUi.targetParticipantsSlider, Is.Not.Null);
-            network.port = 17779;
+            fixture.UseAvailablePort(network);
             try
             {
                 developerUi.Open();
@@ -333,8 +335,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedDeveloperPanelCanApplyAndRestartStraightThrowTuning()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabNetwork network = developerUi.network;
             Assert.That(network, Is.Not.Null);
@@ -343,7 +344,7 @@ namespace C6Lab.Tests
             Assert.That(developerUi.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(developerUi.applyHostButton, Is.Not.Null);
             Assert.That(developerUi.targetParticipantsSlider.value, Is.EqualTo(3f));
-            network.port = 17778;
+            fixture.UseAvailablePort(network);
             try
             {
                 developerUi.Open();
@@ -378,8 +379,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedSceneSoloCanGenerateCombineAndHitTheCylinder()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null; // Let Awake/Start bind the saved Scene references.
+            yield return fixture.Load();
 
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabNetwork network = developerUi.network;
@@ -455,8 +455,8 @@ namespace C6Lab.Tests
             sceneController.config = rawOnly;
             sceneController.ReconfigureBoard();
 
-            // Keep the test independent of an ordinary app using the default port 7777.
-            network.port = 17777;
+            // Separate this real Host from other Editor/test processes on the machine.
+            fixture.UseAvailablePort(network);
             try
             {
                 Assert.That(network.StartDeveloperSolo(), Is.True);
@@ -582,8 +582,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedSceneSoloGourdBombFallsStraightOntoTheLocalBoard()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null; // Let Awake/Start bind the saved Scene references.
+            yield return fixture.Load();
 
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabNetwork network = developerUi.network;
@@ -595,7 +594,7 @@ namespace C6Lab.Tests
             tuning[89] = 1f;
             Assert.That(gourd.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = gourd;
-            network.port = 17791;
+            fixture.UseAvailablePort(network);
             // Record only: an assertion thrown inside the event would interrupt the Host's snapshot.
             var drops = new List<string>();
             var targets = new List<ulong>();
@@ -647,8 +646,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedSceneSoloSwipeBlockBouncesAndShowsOnTheBlockedPlayersOwnScreen()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null; // Let Awake/Start bind the saved Scene references.
+            yield return fixture.Load();
 
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabNetwork network = developerUi.network;
@@ -663,7 +661,7 @@ namespace C6Lab.Tests
             tuning[159] = 0f;
             Assert.That(blocking.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = blocking;
-            network.port = 17792;
+            fixture.UseAvailablePort(network);
             // Record only: an assertion thrown inside the event would interrupt the Host's snapshot.
             var started = new List<bool>();
             System.Action<bool, float> onBlock = (right, seconds) => started.Add(right);
@@ -698,6 +696,32 @@ namespace C6Lab.Tests
                 network.Stop();
                 network.config = savedConfig;
                 UnityEngine.Object.Destroy(blocking);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator SavedHostFixtureUsesAnAvailablePortAndDisposesItsPersistentNetwork()
+        {
+            yield return fixture.Load();
+            LabNetwork network = SavedDeveloperUi().network;
+            ushort occupiedPort = fixture.UseAvailablePort(network);
+            using (var occupied = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
+                System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp))
+            {
+                occupied.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, occupiedPort));
+                ushort hostPort = fixture.UseAvailablePort(network);
+                Assert.That(hostPort, Is.Not.EqualTo(occupiedPort),
+                    "An external listener must not make this fixture reuse an occupied port.");
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                Assert.That(network.IsHost, Is.True);
+                // Do not Stop here: cleanup must also handle a test that exits while hosting.
+                yield return fixture.Cleanup();
+                Assert.That(network == null, Is.True,
+                    "Scene unload alone cannot release an NGO object in DontDestroyOnLoad.");
+                using (var released = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
+                    System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp))
+                    Assert.DoesNotThrow(() => released.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, hostPort)),
+                        "Disposing the owned manager must release the Host socket before the next fixture.");
             }
         }
 

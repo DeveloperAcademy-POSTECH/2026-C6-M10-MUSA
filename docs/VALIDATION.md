@@ -1527,3 +1527,130 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 추가·변경한 검사:
 - **PlayMode** `LabOrbPhysicsTests`: `ABombThePlayerSendsOnPassesAtTheEdgeEvenSlowlyButADriftingOneTurnsBack`(끌기 지연 0으로 가장자리에 놓고 예전 규칙이라면 되돌아왔을 속도로 놓기, 막힌 쪽 튕김, 혼자 떠도는 폭탄 되돌아옴); 변경 `AHeavyBombLeavesTheFingerSlowerAndSlidesToAStopSoonerThanAnOrb`(놓기 속도 비교를 설정값 0.75로)
 - **EditMode** `LabDeveloperConfigTests`: `HeavyBombFieldsJoinTheItemOrbsGroupWithTheirDefaultsAndApply`의 코드·저장 원본 기본값을 0.12·0.75·1.3·4로
+
+## 개인 조합판 로컬 처리와 Host 확정 분리 — 2026-10-21 KST 이슈 240 단독 작업
+
+이 절은 단독 #240 커밋 `9ee7bd2`의 기록이며 최신 main `7021c40e`의 #235·#241 통합 전 결과다. 아래 837/233 검사·Mac 92항목을 프로토콜5649/170개 통합본의 통과로 해석하지 않는다.
+
+기준 main `63a587d`에서 분기한 `refactor/#240-local-board-authority`다. Unity6000.6.5f1·NGO2.13.3·Unity Transport6.6.0·URP17.6.0·macOS ARM64에서 확인했다. 프로토콜은5647/연결 토큰`C6PhysicsLab/12`, 공유 설정169개다. 기존 LAN·Bonjour·직접 IPv4/IPv6·핫스팟 전송 코드를 유지하며 Scene·Prefab·원본 Config·패키지는 수정하지 않았다. 구현 경계와 파일 지도는 [LOCAL_BOARD_AUTHORITY](LOCAL_BOARD_AUTHORITY.md), 검사 분류는 [TEST_SUITE_REPORT](TEST_SUITE_REPORT.md)에 기록한다.
+
+### 구현과 검사 범위
+
+- 로컬 조합 임시 결과·중립 생성 예고·시각 투척을 먼저 만들고 Host가 종류/RNG·소유권·한 번의 소비·자원·실제 명중·도색·공동 결과를 확정한다. 평상시 `motion_batch`는 제거하고 행동 자체에 좌표·속도를 담는다.
+- 세션/판/요청 ID, 소유권 세대, 변경하지 않는 재전송 본문, 결과 재조회, 임시 ID 의존 동작, 거절/누락 복구와 보드 순번을 검사한다. 늦은 전체 스냅샷으로 소비·전달된 구슬을 되살리지 않는다.
+- 소유자별 작은 보드 프레임/행동 응답과 도색·공동 스냅샷 Bulk를 분리했다. Bulk는 NGO Unreliable 파이프라인 위에서 앱 순서·ACK·재전송을 구현한다. 도색 logical fragment2048문자/최대107개, wire fragment접두부 포함900문자/외부 메시지1200바이트 이하를 지킨다.
+- 전투 규칙·Host 난수 순서·P번호 고리·북 소유 생성·아이템/폭탄·축소·콤보·Paint/Crack·일시정지/재시작을 유지한다. 과거 프로토타입의 로비 속성 선택 제한을 추가하지 않는다.
+
+### 실제 실행 결과
+
+| 확인 | 결과 | 방법과 범위 |
+| --- | --- | --- |
+| 변경 전 전체 EditMode | PASS787/787 | `baseline-edit.xml`, 실패·생략0,24.630초. |
+| 변경 전 전체 PlayMode | PASS212/212 | `baseline-play.xml`, 실패·생략0,103.814초. |
+| 변경 전 실제 Mac2앱 | PASS직접19항목·지연조건18항목 | 같은 Mac loopback과 실제 UDP 프록시. 모바일 성능 기준선이 아니다. |
+| 개편 후 최종 전체 EditMode | **PASS837/837** | `final-edit-04.xml`, 실패·생략0, 28.642초. 2026-10-21 00:52:25Z~2026-10-21 00:52:54Z UTC. |
+| 개편 후 최종 전체 PlayMode | **PASS233/233** | `final-play-03.xml`, 실패·생략0, 104.429초. 2026-10-21 00:50:18Z~2026-10-21 00:52:03Z UTC. GPU 픽셀·저장 Scene·실제 물리와 새 보드/응답 fixture 포함. |
+| Mac Development 검증 앱 빌드 | PASS빌드와 실행 | 임시 검증 helper를 포함한 별도 앱이다. helper를 제거한 일반 배포 빌드 결과와 구분한다. 최종03/04의 게임 런타임 소스 해시가 같고04는 진단 helper만 보강했다. |
+| 실제 Mac2앱 직접 연결 | **PASS22항목** | `final04/network-direct2`, 실제Raw생성·드래그 조합·참가자/Host투척2회 명중·구슬/북 동일ID전달·소유자 합집합과 Host재고 일치·HP/색상/P맵·일시정지/재개·DEV재시작/P보존. |
+| 실제 Mac2앱 지연/손실 | **PASS22항목** | `final04/network-delay2`, 편도60ms·지터±10ms·데이터그램1% 손실 확률의 실제 UDP 프록시. 관측 패킷2294개 중25개를 버렸고 proxy오류0. 위게임흐름과 로컬 표시 확인. |
+| 실제 Mac3앱 | **PASS23항목** | `final04/network-direct35/n3`, Host P3/참가자P1·P2, 동일ID구슬·북 전달·공동 명중/도색·소유권·일시정지/DEV재시작 확인. |
+| 실제 Mac5앱 | **PASS25항목** | `final04/network-direct35/n5`, Host P5/참가자P1~P4, 위흐름과 각 기기 설정/지도/재고 일치 확인. 장시간 부하 시험은 아니다. |
+| iOS빌드·서명·설치·터치·LAN/핫스팟 | **NOT_RUN** | 기존 버전의 기기 PASS를 개편본에 승계하지 않는다. |
+| 모바일 FPS/GC·발열·배터리·반복지연분포 | **NOT_RUN** | 기능 검사와 Mac단발 관측으로 성능 목표 달성을 주장하지 않는다. |
+
+자동 패킷/순서/복구 검사는 통제 fixture이며 실제 앱 소켓 검사와 구분한다. Mac검증은 저장 Scene의 Host/Join/P선택과 공개 입력 경로를 사용한다. 재현 조건을 위한 DEV복사본만 조정했으며 원본 Config는 유지했다. 원시 로그·XML·주소·기기 식별자·검증용 앱/helper는 저장소에 포함하지 않는다.
+
+### 지연 관측의 해석
+
+같은60ms/±10ms/1%조건의 변경 전 참가자 조합표시는151.8/167.7ms(2회), 투척표시는171.3ms(1회) 뒤 관찰됐다. 개편 후 참가자 조합2회·투척1회 모두 **입력 호출 안에 시각 오브젝트를 생성**했다. Host의 조합 승인 도착은169.4/170.3ms였다. 통신 확정을 기다리지 않고 표시를 시작한 구조를 확인한 결과이며 화면 표시·손가락 입력이0ms라는 의미가 아니다.
+
+개편 후 수신자 구슬/북 관찰은158.2/157.9ms, 변경 전 구슬 관찰은266.5ms였다. 파일 조회·프레임·관찰 부하가 섞인 소수 표본이므로 전달 개선률·평균·p95로 해석하지 않는다. 전달 수신과 공동 명중의 최종 확정에는 여전히 통신 시간이 필요하다. 본문 바이트 카운터는 UDP 전체 헤더/하위 재전송을 포함하지 않는다.
+
+### 검사 도중 발견해 수정한 사항
+
+1. 도색 논리 조각을 줄였을 때 최대 해상도의 수신107조각을 허용하도록 함께 보완했다. 이후 실제 NGO named Unreliable 메시지 한도가 하위 UTP 설정보다 작아 접속시 OverflowException이 발생한 경로를 확인하고, 별도900문자 wire분할/재조립과1200바이트 검사를 추가했다. MTU·도색 해상도는 늘리거나 줄이지 않았다.
+2. 작은 보드 프레임의 박 자세를 실제 Host target에서 캡처하고, 오래된 응답/새 판 정리·복구 재전송·폭탄 알림 순서를 보완했다.
+3. 원격 일시정지 요청에 새 round가 빠져 거절되던 경로를 수정했다. 최종 실제 앱의 참가자Pause/HostResume 검사를 통과했다.
+4. 초기 전체지도 수신 중 보드 체크포인트가 복구되는 구간에서는 입력이 잠긴다. 실험 도구는 실제 보드 프레임 준비를 기다리도록 보완했다. helper의 진단/객체 조회 문제는 게임 오류와 구분해 수정했으며 실패 기록은 로컬에 보존했다.
+
+최종 코드/검사171개 파일 해시와 사용자 Scene·Target2머터리얼2개·미추적meta의 보존 해시를 대조한다. 테스트 임계값이나 물리 수치를 변경해 실패를 숨기지 않았다. 큰 조합판 체크포인트 자체는 아직 NGO신뢰성 제어 큐를 쓰므로 매우 많은 구슬 조건의 대기는 남을 수 있다. Host이전·전투중재접속·완전한 물리되감기는 추가하지 않았다.
+
+
+## main `7021c40e` 통합 기록 — #240 + #235 구슬 소멸 + #241 콤보 예고
+
+통합 기준은 단독 #240 `9ee7bd2`와 `origin/main` `7021c40e`다. 현재 통합 통신 규약은 **프로토콜5649·연결 토큰 `C6PhysicsLab/13`·공유 설정170개**이며, 이전5647/169개 또는5648/170개 앱과 섞어 접속하지 않는다.
+
+- #240의 로컬 조합판·임시 조합/투척·소유권/소비 원장·개인 보드와 도색 Bulk 분리를 유지한다.
+- #235의 구슬 종류별 수명 규칙·소멸 예고·Host 만료 알림과 연기를 보존한다. 만료 연출을 일반 조합/전달/소비에 잘못 재생하지 않는지 통합 검사한다.
+- #241의 `comboWarningAt`/`comboNextAt`, 예고 HUD와 DEV 170번째(인덱스169) 설정을 보존한다. 최신 main의 기본 ON·15초 반복·페널티0.1배·보상2.5배도 유지한다.
+- 문서 충돌은 현재 연결 정보와 규칙을 위 통합 기준으로 맞추고, #235·#241·단독#240의 당시 실행/미실행 기록은 삭제하거나 새 PASS로 바꾸지 않았다.
+
+| 확인 | 상태 | 필요한 근거 |
+| --- | --- | --- |
+| 통합 Runtime·Editor·검사 컴파일 | **PASS** | 아래 두 Unity 전체 검사가 같은 통합 소스에서 컴파일·실행을 완료했다. |
+| 통합 전체 EditMode | **PASS 844/844** | `merge-edit.xml`, 실패·생략0, 2026-10-21 01:06:09Z~01:06:35Z UTC, 25.850초. 콤보 예고 시각의 복사/빠른 보드 시계 보존 검사 포함. |
+| 통합 전체 PlayMode | **PASS 243/243** | `merge-play.xml`, 실패·생략0, 01:07:11Z~01:08:58Z UTC, 107.152초. 만료 후 거절로 숨긴 구슬 부활 금지, 행동 처리 중 만료 알림이 결과 삭제보다 선행, 이전 판/방 만료 패킷 거부, 일반 조합/투척/전달의 거짓 만료 없음과 최신 main 검사를 포함. |
+| 통합 Mac 검증 앱 빌드 | **PASS** | `merge-mac`의 새 Development 검증 앱 생성. 임시 helper를 포함한 앱이며 일반 배포/iOS 빌드와 구분. 빌드 전후 모든 런타임 C#과 사용자 보존 파일의 해시 일치, helper 제거 확인. |
+| 통합 Mac 직접2인·지연/손실2인 | **PASS 22+22항목** | `merge-mac/network-direct2/summary.json`, `merge-mac/network-delay2/summary.json`. 실제 소켓·편도60ms/지터±10ms/1% 손실 확률, 프로토콜5649·설정170개 확인. 조합·즉시 시각 투척·실제 명중·구슬/북 동일 ID 전달·Host/소유자 재고·HP·색/P맵·일시정지·DEV 재시작 검증. |
+| 통합 iOS·실기기·LAN/핫스팟 | **NOT_RUN** | 같은 통합 빌드의 서명·설치·터치·네트워크 환경별 실행 |
+
+전체 검사 전후 소스·Shader·Config·Scene·Prefab 196개 파일의 해시가 일치했다. 통합 Mac 지연 조건에서도 조합/비행 객체가 입력 호출 안에서 생성됐고, Host 조합 승인은174.1/167.0ms로 별도 도착했다. 통합본의 실제 Mac3/5인·iOS·LAN/핫스팟 실기기는 미실행이며 단독 결과로 승계하지 않는다.
+
+
+## 최신 main 추가 통합 — #240 + #239 폭탄 가장자리 전달
+
+이 절의 추가 통합 기준은 `origin/main` **`f36678b3`**(이슈 #237의 PR #239)다. 위 `7021c40e` 통합 결과 이후 main에 추가된 폭탄 가장자리 전달 변경을 #240에 합친 소스 기준이며, **프로토콜5649·연결 토큰 `C6PhysicsLab/13`·공유 설정170개**를 유지한다.
+
+- 플레이어가 놓은 폭탄의 전송 의도를 멈출 때까지 유지하여 느린 가장자리 도달도 스와이프 전달로 처리한다. #215의 막힌 방향은 계속 튕기며, 혼자 떠도는 폭탄은 되돌아온다.
+- 무거운 폭탄의 코드·저장 Config 기본값은 놓기 속도0.75배·미끄럼 감속1.3배·끌기 지연0.12초·질량4를 보존한다. 콤보는 #241의 기본 ON·15초 간격·페널티0.1배·보상2.5배·예고3초를 유지한다.
+- 단독 #240의837/233검사·Mac92항목과 `7021c40e` 통합의844/243검사·Mac44항목은 각각 당시 소스의 기록이다. **아래 추가 통합본의 결과로 승계하지 않는다.**
+
+| 확인 | 상태 | 필요한 근거 |
+| --- | --- | --- |
+| 추가 통합 Runtime·Editor·검사 컴파일 | **PASS** | 별도 깨끗한 작업 사본에서 Runtime·Editor·검사 어셈블리를 컴파일하고 실행했다. |
+| 추가 통합 전체 EditMode | **PASS 844/844** | `pr247-edit.xml`, 실패·생략0, 24.945초. |
+| 추가 통합 첫 전체 PlayMode | **FAIL 242/244** | `pr247-play.xml`, 실패2·생략0, 108.323초. 도화선 AudioClip 길이0으로 기존 오디오2건 실패. 같은 실행에 오디오 장치 초기화 실패/시스템 재설정 로그가 있었다. |
+| 위 오디오2건 동일 소스 분리 실행 | **PASS 2/2** | `pr247-audio.xml`, 실패·생략0, 0.277초. 게임 코드·검사 기대값·오디오 설정 변경 없음. |
+| 추가 통합 최종 전체 PlayMode | **FAIL 239/244** | `pr247-play-final.xml`, 실패5·생략0, 101.962초. 저장 Scene/도색 통합3건의 서버 bind 실패와 위 오디오2건. 전체 PASS로 기록하지 않는다. |
+| 최신 #240 보드 표시·네트워크 처리 검사 | **PASS 27/27** | 같은 최종 전체 실행의 `LabLocalBoardPredictionTests`13건·`LabLocalBoardNetworkIntegrationTests`14건 모두 통과. 별도 소켓/실기기 검사와 구분한다. |
+| 추가 통합 Mac 빌드·실제 앱 연결 | **NOT_RUN** | 같은 소스로 새 검증 앱 빌드와 실제 앱 실행 결과 필요. 위 Mac44항목은 `7021c40e` 기준이다. |
+| 추가 통합 iOS·실기기·LAN/핫스팟 | **NOT_RUN** | 같은 빌드의 서명·설치·터치·환경별 실행 필요. |
+
+이 추가 통합 검사는 커밋된 Scene·에셋 그대로 별도 작업 사본에서 실행했다. 이전 Mac44항목의 사용자 로컬 Scene 보존 환경과 구분한다. 원래 작업 폴더의 사용자 변경과 다른 작업 브랜치는 유지했다.
+
+최종 전체 검사에서 `Server failed to bind` 3건과 오디오 장치 초기화 실패 로그를 확인했다. 분리한 오디오2건은 통과했으나 전체 실행에서는 다시 실패했다. 실행 중 포트/오디오 환경 간섭 여부와 깨끗한 환경의 재현은 추가 확인 사항이며 원인을 확정하거나 정상으로 간주하지 않는다. 게임 코드·검사 기대값·오디오 설정을 변경하지 않았다. 추가 통합 작업 사본의 소스·검사·Scene·에셋196개 해시는 두 전체 실행과 분리 검사 전후 동일하다.
+
+
+## PR #247 PlayMode 실패 5건 보완 — 2026-10-21, 전체 검사 통과
+
+기준은 #240의 PR #247(`c00b34e4`, main `f36678b3` 통합)의 위 최종 전체 실행 **239/244**다. 실패한 최초 전체 실행·분리 실행·최종 전체 실행 기록을 삭제하거나 PASS로 바꾸지 않는다. 아래는 그 이후 소스 보완이며, 새 전체 실행 결과는 아직 **PASS**다. 이 단계에서 연결 규약·게임 규칙·원본 Scene·Config·오디오 기기 설정은 변경하지 않는다.
+
+### 확인된 원인과 판단 범위
+
+| 실패 | 확인한 근거 | 판단과 보완 |
+| --- | --- | --- |
+| `LabDeveloperSoloIntegrationTests.SavedSceneSoloCanGenerateCombineAndHitTheCylinder` | 고정 검사 포트 **17777**, `C6_LAB_UDP_BIND_FAILED error=AddressAlreadyInUse` 후 실제 Host 시작 실패 | 고정 검사 포트를 공유하지 않도록 OS가 배정한 사용 가능한 IPv4·IPv6 포트를 선택한다. 실제 Host 시작과 게임 동작 검증은 유지한다. |
+| `LabDeveloperSoloIntegrationTests.SavedSceneSoloSwipeBlockBouncesAndShowsOnTheBlockedPlayersOwnScreen` | 고정 검사 포트 **17792**, 같은 `AddressAlreadyInUse`와 Host 시작 실패 | 위와 같은 포트 분리와 검사 소유 NetworkManager 정리를 적용한다. |
+| `LabGourdPaintTests.FixedHundredPercentGoalGrowsFromRepeatedRealHitsFreezesOnPauseAndResetsOnRetry` | 고정 검사 포트 **17789**, 같은 `AddressAlreadyInUse`와 Host 시작 실패 | 위와 같은 포트 분리와 검사 소유 NetworkManager 정리를 적용한다. 성장·일시정지·승리·초기화 기대값을 낮추지 않는다. |
+| `LabOrbPhysicsTests.TheFuseSizzlesWhileABombBurnsAndStopsWithoutAFuse` | 생성 AudioClip이 null은 아니지만 길이가 **0**; 같은 전체 실행에 오디오 장치 초기화 실패·시스템 재설정 기록 | `LabFuseSound`의 정적 캐시가 Unity 객체 존재만 검사하던 부분을 보완한다. 샘플 수·채널·주파수·길이를 검사하고, 오디오 설정 변경 시 캐시를 무효화하여 다시 생성한다. |
+| `LabOrbPhysicsTests.TheGeneratedSizzleIsAOneSecondAudibleLoopWithinRange` | 위 생성 클립 길이0; 같은 코드의 분리 실행은2/2 통과하고 전체 실행에서 재실패 | 모든 활성 도화선 소스가 새 공유 클립을 다시 연결하게 한다. 기존1초 길이·실제 샘플 데이터·음량 검증은 유지한다. |
+
+- **포트 점유 자체는 확인됐으나 점유 주체는 확인 불가**다. 당시 다른 Unity 검사 프로세스가 같은 고정 포트를 사용했을 가능성과 이전 실행의 정리 문제를 구분해야 한다. 종료 후 포트7777만 조회한 결과는 실패 포트17777·17792·17789의 점유 여부를 확인한 근거가 아니다.
+- **검사 객체 정리 누락은 별도로 확인**됐다. NGO `NetworkManager.OnEnable`은 루트 GameObject를 `DontDestroyOnLoad`로 옮긴다. 기존 `LabDeveloperSoloIntegrationTests`에는 공통 정리 단계가 없었고, `LabGourdPaintTests`는 Lab Scene만 내렸다. `LabNetwork.Stop()`은 NGO 종료를 요청하지만 그 GameObject를 제거하지 않는다. 이것이 당시 세 포트를 점유한 직접 원인이라고 단정하지 않는다.
+- **오디오 복구 결함은 소스와 증상으로 확인**했다. 캐시의 Unity 객체가 남았다는 사실만으로 네이티브 샘플 데이터가 유효하다고 보장할 수 없다. 오디오 초기화가 실패한 외부 원인까지 확정한 것은 아니며, 이번에는 장치/전역 오디오 설정을 변경하지 않고 런타임 생성 클립의 복구 경로를 보완한다.
+
+### 변경 범위와 새 회귀 검사
+
+`Assets/Lab/Tests/PlayMode/LabSavedSceneNetworkFixture.cs`는 저장된 UI에 연결된 NetworkManager 한 개만 소유한다. 두 검사 묶음이 이 helper로 Scene을 불러오고, 정리 시 해당 NetworkManager를 Stop·Destroy한 뒤 프레임을 기다려 제거를 확인한다. 다른 검사나 사용자 객체를 일괄 제거하지 않는다. 포트 선택은 IPv4에서 OS 임시 포트를 배정받고 같은 IPv6 포트도 비어 있는지 검사한 뒤 실제 Host 시작 전에 탐색 소켓을 해제한다. 외부 프로세스가 해제 직후 포트를 선점하는 경쟁 가능성은 남으며, 실제 Host의 바인딩 실패를 숨기거나 재시도로 PASS 처리하지 않는다.
+
+| 새 검사 | 확인하려는 결과 | 현재 상태 |
+| --- | --- | --- |
+| `LabDeveloperSoloIntegrationTests.SavedHostFixtureUsesAnAvailablePortAndDisposesItsPersistentNetwork` | 점유 중인 UDP 포트와 다른 포트 선택, 실제 Solo Host 시작, 수동 Stop 없이 helper 정리, DDOL NetworkManager 제거와 Host 포트 재바인딩 | **PASS** |
+| `LabOrbPhysicsTests.AudioConfigurationChangeRecreatesTheSharedSizzleAndRebindsBurningSources` | 오디오 설정 변경 콜백 후 클립 재생성, 활성 소스2개의 같은 새 클립 연결,1초 길이와 샘플 데이터·도화선 상태 유지. 실제 기기 설정은 바꾸지 않고 등록된 콜백을 호출한다. | **PASS** |
+| `LabOrbPhysicsTests.InvalidCachedSizzleIsRebuiltEvenWhenItsUnityObjectStillExists` | 잘못된 샘플 수의 살아 있는 캐시를 교체하고, 올바른1초 대체 클립을 다시 공유 | **PASS** |
+| 보완 후 전체 EditMode·PlayMode | Unity6000.6.5f1, `pr247-fixed-edit.xml` **844/844**(25.142초), `pr247-fixed-play.xml` **247/247**(112.554초). 새3건과 기존 실패5건 포함, 실패·생략·inconclusive0. Edit 01:48:09Z~01:48:35Z, Play 01:45:44Z~01:47:37Z. | **PASS** |
+| 보완 후 Mac 실제 연결·iOS/LAN/핫스팟·모바일 성능 | 해당 소스의 별도 앱/환경 실행 증거 | **NOT_RUN** |
+
+구현 근거: `Assets/Lab/Scripts/Audio/LabFuseSound.cs`의 `GeneratedSizzle`·`ValidGeneratedClip`·`OnAudioConfigurationChanged`·`Update`, 위 fixture helper와 두 검사 묶음의 `UnloadSavedScene`, `Assets/Lab/Tests/PlayMode/LabOrbPhysicsTests.cs`의 새2건. 원시 로그·XML·앱·개인 경로는 공개 저장소에 포함하지 않는다.
+
+오디오 분리 검사도 `pr247-fix-audio.xml` **4/4**(0.230초) 통과했다. 전역 오디오 설정이나 장치를 변경하지 않았으며, 이번 전체 실행에서는 고정 포트·오디오 실패가 재발하지 않았다. 이전 실패 XML은 보존한다.

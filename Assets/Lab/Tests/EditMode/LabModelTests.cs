@@ -1695,6 +1695,19 @@ namespace C6Lab.Tests
                     Assert.That(drums.Length, Is.EqualTo(players >= 4 ? 2 : 1), players + " players (#236).");
                     Assert.That(drums.Select(drum => drum.owner).Distinct().Count(), Is.EqualTo(drums.Length),
                         "Two drums start with two different players.");
+
+                    LabOrbState passed = PassRight(room, drums[0].id, drums[0].owner, .1d);
+                    Assert.That(passed.owner, Is.Not.EqualTo(drums[0].owner));
+                    Assert.That(room.TryGenerate(passed.owner, "auto-after-pass", .2d,
+                        out _, out string generateError), Is.True, generateError);
+                    room.Tick(500d);
+                    room.Begin("auto-" + players, ids, 500d, auto);
+                    LabSnapshot retried = room.Snapshot(500d);
+                    Assert.That(retried.round, Is.EqualTo(2u));
+                    Assert.That(retried.orbs, Is.Empty, "Retry clears the previous drum holder's generated Raw.");
+                    Assert.That(retried.drums.Length, Is.EqualTo(drums.Length), "AUTO is recalculated for Retry.");
+                    Assert.That(retried.drums.Select(drum => drum.owner).Distinct().Count(),
+                        Is.EqualTo(drums.Length), "Retry also assigns each AUTO drum to a different player.");
                 }
 
                 // A count picked in DEV is used as it is, whatever the number of players.
