@@ -308,7 +308,7 @@ namespace C6Lab
             foreach (LabOrbState state in values)
             {
                 if (state == null || !ValidId(state.id) || !ids.Add(state.id) || state.ownershipVersion == 0
-                    || state.kind < LabOrbKind.Yin || state.kind > LabOrbKind.Drum
+                    || state.kind < LabOrbKind.Yin || state.kind > LabOrbKind.FoxFire
                     || state.element < LabOrbElement.None || state.element > LabOrbElement.Earth
                     || state.lockSwipes < 0 || state.relayStage < 0 || state.relayStage > 3
                     || !Unit(state.x) || !Unit(state.y) || !Finite(state.vx) || !Finite(state.vy)

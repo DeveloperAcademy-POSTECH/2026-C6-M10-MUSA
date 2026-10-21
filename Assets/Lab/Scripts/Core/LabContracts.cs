@@ -4,7 +4,8 @@ namespace C6Lab
 {
     public enum LabPhase { Idle, Playing, Victory, Defeat }
     // Items and the drum are appended so the serialized numbers of existing kinds stay unchanged.
-    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum }
+    // FoxFire is the nine-tailed fox's fake orb (#251).
+    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum, FoxFire }
     // Gourd is appended for bombs the gourd drops as sabotage (#177).
     public enum LabOrbOrigin { Unknown, Generated, Combined, Gourd }
     // The yokai's sabotages the sabotage mix draws from (#251), in the order of their DEV weights. Numbers are serialized.

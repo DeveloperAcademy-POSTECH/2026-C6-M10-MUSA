@@ -72,6 +72,19 @@ namespace C6Lab
         }
     }
 
+    /// <summary>Fox orbs the fox fire dropped onto one player's board (#251).</summary>
+    public readonly struct LabFoxFireDrop
+    {
+        public readonly ulong Target;
+        public readonly string[] OrbIds;
+
+        public LabFoxFireDrop(ulong target, string[] orbIds)
+        {
+            Target = target;
+            OrbIds = orbIds;
+        }
+    }
+
     /// <summary>
     /// Plain Host-only battle state. Transport authenticates sender IDs before calling this class;
     /// clients render copies from Snapshot and never decide ownership, damage, or expiry.
@@ -112,6 +125,11 @@ namespace C6Lab
         private const ulong SabotageDrawKey = ulong.MaxValue - 4UL;
         /// <summary>매혹은 양옆에 깨워 줄 두 사람이 따로 있어야 걸린다 (솔로는 확인용으로 허용).</summary>
         public const int CharmMinimumPlayers = 3;
+        private const uint FoxCountSalt = 0xF0C5C017u;
+        private const uint FoxLandingXSalt = 0xF0C51A0Du;
+        private const uint FoxLandingYSalt = 0xF0C51A1Du;
+        // 여우구슬이 떨어지는 곳: 판 너비의 15~85%, 높이의 25~80% 사이에서 하나씩 뽑는다.
+        private const float FoxLandingMinX = .15f, FoxLandingMaxX = .85f, FoxLandingMinY = .25f, FoxLandingMaxY = .8f;
         // 박 폭탄이 떨어지는 곳: 판 너비의 20~80% 사이, 판 높이의 이 지점 (보드가 영역 안으로 맞춘다).
         private const float GourdLandingMinX = .2f, GourdLandingMaxX = .8f, GourdLandingY = .6f;
         // DEV에서 간격을 아주 작게 넣어도 한 프레임에 폭탄이 쏟아지지 않도록 하는 최소 간격.
@@ -150,6 +168,7 @@ namespace C6Lab
         private double nextSabotageAt;
         private uint sabotageCount;
         private ulong lastSabotageTarget;
+        private readonly List<LabFoxFireDrop> foxFires = new List<LabFoxFireDrop>();
         private uint drumHandoffCount;
         private readonly LabGourdCombo combo = new LabGourdCombo();
         // 던진 순간의 페널티 배율 (#222). 날아가는 동안 페널티가 끝나도 그 공은 던질 때 크기 그대로 칠한다.
@@ -233,6 +252,7 @@ namespace C6Lab
             gourdBombs.Clear();
             gourdBombTimes.Clear();
             sabotages.Clear();
+            foxFires.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState
@@ -373,6 +393,25 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// 여우불 (#251): 여우구슬과 음·양 구슬이 닿거나 겹쳐지면 둘 다 사라진다. 떨어진 뒤 보호 시간 동안은 받지 않는다.
+        /// 결합 구슬도, 새 ID도 만들지 않는다.
+        /// </summary>
+        public bool TryFoxFireAt(ulong sender, string foxId, string orbId, string requestId, double now, out string reason)
+        {
+            if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (string.IsNullOrEmpty(foxId) || string.IsNullOrEmpty(orbId) || foxId == orbId
+                || !orbs.TryGetValue(foxId, out var fox) || !orbs.TryGetValue(orbId, out var orb))
+                return Reject("ORB_NOT_FOUND", out reason);
+            if (!UsableBy(fox, sender) || !UsableBy(orb, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            if (fox.kind != LabOrbKind.FoxFire || !orb.kind.IsRaw()) return Reject("NOT_FOX_FIRE", out reason);
+            if (now - fox.createdAt < rules.FoxFireSafeSeconds) return Reject("FOX_FIRE_SAFE", out reason);
+            orbs.Remove(foxId);
+            orbs.Remove(orbId);
+            reason = "FOX_FIRE";
+            return true;
+        }
+
+        /// <summary>
         /// Atomically validate the current boundary position and hand off the orb. No preceding
         /// motion packet is required and rejected geometry never overwrites the stored position.
         /// </summary>
@@ -384,7 +423,7 @@ namespace C6Lab
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!TryFindMovable(id, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
-            if (activeSeatCount == 1) return Reject("NO_NEIGHBOR", out reason);
+            if (activeSeatCount == 1 && current.kind != LabOrbKind.FoxFire) return Reject("NO_NEIGHBOR", out reason);
             if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y) || !Finite(normalizedVelocity) ||
                 normalizedVelocity.sqrMagnitude > rules.MaximumMotionSpeed * rules.MaximumMotionSpeed)
                 return Reject("INVALID_MOTION", out reason);
@@ -398,6 +437,13 @@ namespace C6Lab
                 && current.kind.IsDrum() && current.arrival == LabDrumArrival.Pass;
             if (crossing != LabEdgeCrossingKind.Pushed && !passingDrum && SwipeBlocked(sender, right, now))
                 return Reject("SWIPE_BLOCKED", out reason);
+            if (current.kind == LabOrbKind.FoxFire)
+            {
+                // A fox orb never reaches a neighbour (#251): over a side edge, even solo, it goes up in blue smoke.
+                orbs.Remove(current.id);
+                reason = "FOX_FIRE_GONE";
+                return true;
+            }
             int receiverSeat = (players[sender].seat + (right ? 1 : activeSeatCount - 1)) % activeSeatCount;
             ulong receiver = seats[receiverSeat];
             // A drum is not a stored orb, so a full board still receives it.
@@ -682,7 +728,7 @@ namespace C6Lab
             foreach (string id in orbIds.Distinct())
             {
                 if (id == null || !orbs.TryGetValue(id, out var orb) || orb.owner != sender || orb.inFlight
-                    || orb.kind == LabOrbKind.Bomb || orb.kind.IsDrum())
+                    || orb.kind == LabOrbKind.Bomb || orb.kind.IsDrum() || orb.kind == LabOrbKind.FoxFire)
                     continue;
                 orb.burnedAt = now;
                 orb.small = true;
@@ -713,6 +759,14 @@ namespace C6Lab
         {
             LabGourdBomb[] dropped = gourdBombs.ToArray();
             gourdBombs.Clear();
+            return dropped;
+        }
+
+        /// <summary>Fox orbs the fox fire dropped since the last call, each drop reported once (#251).</summary>
+        public LabFoxFireDrop[] DrainFoxFires()
+        {
+            LabFoxFireDrop[] dropped = foxFires.ToArray();
+            foxFires.Clear();
             return dropped;
         }
 
@@ -977,6 +1031,33 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// 여우불 (#251): 이 사람의 판에 푸른 여우구슬을 정해 둔 개수만큼 떨어뜨린다. 판이 거의 차 있으면 빈 칸 수만큼만
+        /// 떨어진다. 떨어질 자리는 판 안쪽에서 seed로 하나씩 뽑는다.
+        /// </summary>
+        private void DropFoxFire(ulong target, double at, uint index)
+        {
+            int span = rules.FoxFireCountMax - rules.FoxFireCountMin + 1;
+            int count = Math.Min(rules.OrbStorageLimit - CountStored(target),
+                rules.FoxFireCountMin + (int)(DrawFor(seed ^ FoxCountSalt, SabotageDrawKey, index) % (ulong)span));
+            var ids = new string[count];
+            for (int i = 0; i < count; i++)
+            {
+                uint spot = index * 16u + (uint)i;
+                var fox = new LabOrbState
+                {
+                    id = NewOrbId(), owner = target, kind = LabOrbKind.FoxFire,
+                    origin = LabOrbOrigin.Gourd, originOwner = target,
+                    x = Mathf.Lerp(FoxLandingMinX, FoxLandingMaxX, Unit01(DrawFor(seed ^ FoxLandingXSalt, SabotageDrawKey, spot))),
+                    y = Mathf.Lerp(FoxLandingMinY, FoxLandingMaxY, Unit01(DrawFor(seed ^ FoxLandingYSalt, SabotageDrawKey, spot))),
+                    createdAt = at, revision = ++revision, inFlight = false
+                };
+                orbs.Add(fox.id, fox);
+                ids[i] = fox.id;
+            }
+            foxFires.Add(new LabFoxFireDrop(target, ids));
+        }
+
+        /// <summary>
         /// 요괴의 통합 방해공작 추첨 (#251): 켜 두면 박 폭탄·넘기기 막기의 각자 타이머 대신, 정해 둔 간격마다 비율이 0보다
         /// 큰 방해공작 중 하나를 비율대로 골라 무작위 한 명에게 건다. 걸 사람이 없는 방해공작은 이번 후보에서 빠지고,
         /// 하나도 걸 수 없으면 이번 차례는 건너뛴다. 뽑기는 seed와 순번으로 정해 모든 기기가 같은 결과를 받는다.
@@ -992,6 +1073,7 @@ namespace C6Lab
                 lastSabotageTarget = target;
                 if (kind == LabSabotageKind.GourdBomb) DropGourdBomb(target, at);
                 else if (kind == LabSabotageKind.SwipeBlock) StartSwipeBlock(target, at);
+                else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index);
                 sabotages.Add(new LabSabotage(kind, target, at));
             }
         }
@@ -1035,6 +1117,7 @@ namespace C6Lab
                 ulong player = seats[i];
                 if (player == lastSabotageTarget && activeSeatCount > 1) continue;
                 if (blocking && player == swipeBlockedPlayer) continue;
+                if (kind == LabSabotageKind.FoxFire && CountStored(player) >= rules.OrbStorageLimit) continue;
                 targets.Add(player);
             }
             return targets;
@@ -1252,6 +1335,9 @@ namespace C6Lab
             public readonly bool SabotageMix;
             public readonly float SabotageIntervalMin, SabotageIntervalMax;
             public readonly int[] SabotageWeights;
+            /// <summary>Fox fire (#251): how many fox orbs fall, and how long after they fall they cannot be touched off.</summary>
+            public readonly int FoxFireCountMin, FoxFireCountMax;
+            public readonly float FoxFireSafeSeconds;
             public readonly float[] DrumStopBounds;
             public readonly int[] DrumStopChances;
             public readonly Color[] PaintColors;
@@ -1279,6 +1365,9 @@ namespace C6Lab
                 SabotageIntervalMin = config.SabotageIntervalMin;
                 SabotageIntervalMax = config.SabotageIntervalMax;
                 SabotageWeights = config.SabotageWeights();
+                FoxFireCountMin = config.FoxFireCountMin;
+                FoxFireCountMax = config.FoxFireCountMax;
+                FoxFireSafeSeconds = config.FoxFireSafeSeconds;
                 DrumStopBounds = config.DrumStopBounds();
                 DrumStopChances = config.DrumStopChances();
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];

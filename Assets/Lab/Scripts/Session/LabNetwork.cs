@@ -188,10 +188,14 @@ namespace C6Lab
         // 5651: #246 removes unused tuning and legacy payloads, retaining AUTO; 165 shared values.
         // 5652: #254 board orb trail toggle (DEV 165); 166 shared values.
         // 5653: #258 visible gourd mesh collision and mesh-local approved paint coordinates.
-        // 5654: #251 the yokai's sabotage mix announces each sabotage it casts; DEV 166-177, 178 shared values.
+        // 5654: #251 the yokai's sabotage mix announces each sabotage it casts, and fox fire adds the FoxFire orb
+        //       kind with its foxFire drop and fox touch messages; DEV 166-177, 178 shared values.
         internal const ushort LabProtocolVersion = 5654;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
+        private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
+        /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
+        private const int MaximumFoxFireOrbs = 10;
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/16");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
@@ -401,6 +405,7 @@ namespace C6Lab
             {
                 board.EdgeCrossed += OnEdgeCrossed;
                 board.CombineRequested += OnCombineRequested;
+                board.FoxFireTouched += OnFoxFireTouched;
                 board.ThrowRequested += OnThrowRequested;
                 board.UseRequested += OnUseRequested;
                 board.DrumTapped += Generate;
@@ -1535,6 +1540,14 @@ namespace C6Lab
         /// <summary>The sabotage mix's casts go out with the gourd's bombs, before the snapshot that shows them (#251).</summary>
         private void AnnounceSabotages()
         {
+            foreach (LabFoxFireDrop drop in model.DrainFoxFires())
+            {
+                Debug.Log("C6_LAB_FOX_FIRE target=" + drop.Target + " orbs=" + drop.OrbIds.Length);
+                // Only its holder's board drops the fox orbs in; it reaches them before the snapshot holding them.
+                if (drop.Target == LocalPlayerId) OnFoxFire(drop.OrbIds);
+                else Send(drop.Target, new LabNetworkPacket { type = "foxFire", sessionId = sessionId, round = model.Round,
+                    owner = drop.Target, ids = drop.OrbIds });
+            }
             foreach (LabSabotage cast in model.DrainSabotages())
             {
                 Debug.Log("C6_LAB_SABOTAGE kind=" + cast.Kind + " target=" + cast.Target);
@@ -1546,6 +1559,13 @@ namespace C6Lab
                 }
                 SabotageCast?.Invoke(cast.Kind, cast.Target);
             }
+        }
+
+        private void OnFoxFire(string[] orbIds)
+        {
+            SetNotice(FoxFireNotice);
+            if (board == null) return;
+            foreach (string id in orbIds) board.ExpectDrop(id);
         }
 
         private void OnGourdBomb(ulong target, string bombId, Vector2 position)
@@ -1809,9 +1829,10 @@ namespace C6Lab
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            if (developerSolo)
+            if (developerSolo && !board.IsFoxFire(edge.OrbId))
             {
                 // The single player has no neighbor. Restore the stopped edge orb immediately.
+                // A fox orb still goes at the edge (#251), so the Host is asked even solo.
                 board.RejectEdge(edge.OrbId);
                 return;
             }
@@ -1824,6 +1845,17 @@ namespace C6Lab
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
             Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y, vx = velocity.x, vy = velocity.y });
+        }
+
+        private void OnFoxFireTouched(string foxId, string orbId)
+        {
+            if (latest == null || latest.phase != LabPhase.Playing || latest.paused)
+            {
+                board.RejectPendingLaunch(foxId);
+                board.RejectPendingLaunch(orbId);
+                return;
+            }
+            Request(new LabNetworkPacket { type = "fox", requestId = ++requestSequence, firstId = foxId, secondId = orbId });
         }
 
         private void OnUseRequested(string orbId)
@@ -1968,6 +2000,12 @@ namespace C6Lab
                 case "bombBlast":
                     if (packet.sessionId == sessionId && Finite(packet.x) && Finite(packet.y))
                         OnBombBlast(packet.firstId, new Vector2(Mathf.Clamp01(packet.x), Mathf.Clamp01(packet.y)));
+                    break;
+                case "foxFire":
+                    if (packet.sessionId == sessionId && packet.owner == LocalPlayerId && packet.ids != null
+                        && packet.ids.Length > 0 && packet.ids.Length <= MaximumFoxFireOrbs
+                        && packet.ids.All(id => !string.IsNullOrEmpty(id)))
+                        OnFoxFire(packet.ids);
                     break;
                 case "sabotage":
                     if (packet.sessionId == sessionId && packet.element >= (int)LabSabotageKind.GourdBomb
@@ -2484,6 +2522,7 @@ namespace C6Lab
             {
                 board.EdgeCrossed -= OnEdgeCrossed;
                 board.CombineRequested -= OnCombineRequested;
+                board.FoxFireTouched -= OnFoxFireTouched;
                 board.ThrowRequested -= OnThrowRequested;
                 board.UseRequested -= OnUseRequested;
                 board.DrumTapped -= Generate;

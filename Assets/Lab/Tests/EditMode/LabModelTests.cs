@@ -2697,6 +2697,134 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void FoxFireDropsTwoToFiveFoxOrbsOnOnePlayerButNoMoreThanItsBoardHolds()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("fox-drop", new ulong[] { 10, 20, 30 }, 0d, mix);
+                room.Tick(5d);
+                LabFoxFireDrop drop = room.DrainFoxFires().Single();
+                Assert.That(room.DrainSabotages().Single().Target, Is.EqualTo(drop.Target));
+                Assert.That(drop.OrbIds.Length, Is.InRange(2, 5));
+                LabOrbState[] foxes = room.Snapshot(5d).orbs.Where(orb => orb.kind == LabOrbKind.FoxFire).ToArray();
+                Assert.That(foxes.Select(orb => orb.id), Is.EquivalentTo(drop.OrbIds));
+                Assert.That(foxes.All(orb => orb.owner == drop.Target && orb.origin == LabOrbOrigin.Gourd
+                    && orb.createdAt == 5d), Is.True);
+                Assert.That(foxes.All(orb => orb.x >= .15f && orb.x <= .85f && orb.y >= .25f && orb.y <= .8f), Is.True,
+                    "They fall well inside the board.");
+                Assert.That(foxes.Any(orb => orb.kind.CanThrow(orb.lockSwipes)), Is.False, "A fox orb is never an attack.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+
+            var tight = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                float[] values = tight.CaptureDeveloperValues();
+                values[9] = 3f;   // three stored orbs at most
+                values[173] = 5f; // and always five fox orbs
+                values[174] = 5f;
+                Assert.That(tight.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var solo = new LabModel();
+                solo.BeginSolo("fox-full", 42ul, 0d, tight);
+                solo.Tick(5d);
+                Assert.That(solo.DrainFoxFires().Single().OrbIds.Length, Is.EqualTo(3), "Only as many as the board still holds.");
+                solo.Tick(11d);
+                Assert.That(solo.DrainFoxFires(), Is.Empty, "A full board is passed over.");
+                Assert.That(solo.DrainSabotages().Length, Is.EqualTo(1));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(tight); }
+        }
+
+        [Test]
+        public void AFoxOrbTakesAYinOrYangAwayWithItButNotInItsSafeSecond()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var solo = new LabModel();
+                solo.BeginSolo("fox-touch", 42ul, 0d, mix);
+                solo.Tick(5d);
+                string[] foxes = solo.DrainFoxFires().Single().OrbIds;
+                LabOrbState yin = null, yang = null;
+                for (int i = 0; i < 10 && (yin == null || yang == null); i++)
+                {
+                    Assert.That(solo.TryGenerate(42ul, "fox-pair-" + i, 5.1d, out var orb, out string generated), Is.True, generated);
+                    if (orb.kind == LabOrbKind.Yin) yin = orb;
+                    else if (orb.kind == LabOrbKind.Yang) yang = orb;
+                }
+                Assert.That(yin, Is.Not.Null);
+                Assert.That(yang, Is.Not.Null);
+
+                Assert.That(solo.TryFoxFireAt(42ul, foxes[0], yin.id, "fox-early", 5.5d, out string reason), Is.False);
+                Assert.That(reason, Is.EqualTo("FOX_FIRE_SAFE"), "Safe for a second after it falls.");
+                Assert.That(solo.TryFoxFireAt(42ul, foxes[0], foxes[1], "fox-fox", 6.1d, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("NOT_FOX_FIRE"), "Two fox orbs just bump.");
+                Assert.That(solo.TryFoxFireAt(42ul, yin.id, foxes[0], "fox-backwards", 6.1d, out reason), Is.False);
+                Assert.That(solo.TryCombineAt(42ul, foxes[0], yin.id, "fox-combine", 6.1d, new Vector2(.5f, .5f), Vector2.zero,
+                    out _, out reason), Is.False, "It never combines into an attack orb.");
+
+                Assert.That(solo.TryFoxFireAt(42ul, foxes[0], yin.id, "fox-takes-yin", 6.1d, out reason), Is.True, reason);
+                Assert.That(reason, Is.EqualTo("FOX_FIRE"));
+                LabOrbState[] left = solo.Snapshot(6.1d).orbs;
+                Assert.That(left.Any(orb => orb.id == foxes[0] || orb.id == yin.id), Is.False, "Both go.");
+                Assert.That(left.Any(orb => orb.kind == LabOrbKind.Combined), Is.False, "Nothing comes of it.");
+                Assert.That(solo.TryFoxFireAt(42ul, foxes[1], yang.id, "fox-takes-yang", 6.2d, out reason), Is.True, reason);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void AFoxOrbOverASideEdgeGoesEvenSoloAndNeverReachesANeighbour()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("fox-edge", new ulong[] { 10, 20, 30 }, 0d, mix);
+                room.Tick(5d);
+                LabFoxFireDrop drop = room.DrainFoxFires().Single();
+                string fox = drop.OrbIds[0];
+                Assert.That(room.TryTransferAt(drop.Target, fox, true, new Vector2(.99f, .5f), Vector2.right, "fox-edge", 5.2d,
+                    LabEdgeCrossingKind.Swipe, out var passed, out string reason), Is.True, reason);
+                Assert.That(reason, Is.EqualTo("FOX_FIRE_GONE"));
+                Assert.That(passed, Is.Null, "Nothing is handed on.");
+                LabSnapshot after = room.Snapshot(5.2d);
+                Assert.That(after.orbs.Any(orb => orb.id == fox), Is.False);
+                Assert.That(after.players.All(player => player.passedTotal == 0), Is.True, "It does not count as a pass.");
+
+                var solo = new LabModel();
+                solo.BeginSolo("fox-edge-solo", 42ul, 0d, mix);
+                solo.Tick(5d);
+                string alone = solo.DrainFoxFires().Single().OrbIds[0];
+                Assert.That(solo.TryTransferAt(42ul, alone, false, new Vector2(.01f, .5f), Vector2.left, "fox-edge-solo", 5.2d,
+                    LabEdgeCrossingKind.Pushed, out _, out reason), Is.True, reason);
+                Assert.That(solo.Snapshot(5.2d).orbs.Any(orb => orb.id == alone), Is.False, "Even solo, with no one beside.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void FoxOrbsRunOutAfterTheOrbLifetime()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var solo = new LabModel();
+                solo.BeginSolo("fox-life", 42ul, 0d, mix);
+                solo.Tick(5d);
+                string[] foxes = solo.DrainFoxFires().Single().OrbIds;
+                solo.Tick(12.9d);
+                Assert.That(solo.DrainOrbExpiries().Select(item => item.OrbId).Intersect(foxes), Is.Empty);
+                solo.Tick(13.1d);
+                Assert.That(solo.DrainOrbExpiries().Select(item => item.OrbId), Is.SupersetOf(foxes),
+                    "They last as long as any orb, then go in smoke on their holder's screen.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
         public void GourdBombsReachEveryPlayerAndCanRepeatOnTheSamePlayer()
         {
             // The shortest interval (1 s) drops 180 bombs in a round, enough to see the spread.

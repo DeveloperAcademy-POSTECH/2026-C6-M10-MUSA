@@ -78,6 +78,7 @@ namespace C6Lab
             {
                 network.GourdBombDropped -= OnGourdBombDropped;
                 network.SwipeBlockStarted -= OnSwipeBlockStarted;
+                network.SabotageCast -= OnSabotageCast;
             }
             network = target;
             canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
@@ -86,7 +87,14 @@ namespace C6Lab
             {
                 network.GourdBombDropped += OnGourdBombDropped;
                 network.SwipeBlockStarted += OnSwipeBlockStarted;
+                network.SabotageCast += OnSabotageCast;
             }
+        }
+
+        // 통합 추첨의 여우불·매혹도 모든 기기에서 박 옆에 "!"를 띄운다 (#251). 폭탄과 넘기기 막기는 위에서 따로 띄운다.
+        private void OnSabotageCast(LabSabotageKind kind, ulong targetPlayer)
+        {
+            if (network != null && (kind == LabSabotageKind.FoxFire || kind == LabSabotageKind.Charm)) Show(network.target);
         }
 
         private void OnGourdBombDropped(ulong targetPlayer, string bombId, Vector2 landing)
@@ -388,6 +396,7 @@ namespace C6Lab
             {
                 network.GourdBombDropped -= OnGourdBombDropped;
                 network.SwipeBlockStarted -= OnSwipeBlockStarted;
+                network.SabotageCast -= OnSabotageCast;
             }
             if (layer != null) Destroy(layer.gameObject);
         }

@@ -41,6 +41,53 @@ namespace C6Lab.Tests
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator AFoxOrbAndAYinThatTouchGoUpInBlueSmokeTogetherOnceItsSafeMomentIsOver()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[175] = .3f; // a fox orb is safe for 0.3 s (#251)
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var touched = new System.Collections.Generic.List<string>();
+            board.FoxFireTouched += (foxId, orbId) => touched.Add(foxId + ">" + orbId);
+            var fox = board.UpsertOrb("fox", LabOrbKind.FoxFire, new Vector2(.5f, .5f));
+            Assert.That(fox.FoxGlowVisible, Is.True, "A fox orb glows blue, unlike the blue Water orb.");
+
+            // A Yin nudges it straight away, inside its safe moment: they only bump.
+            board.UpsertOrb("early", LabOrbKind.Yin, new Vector2(.4f, .5f), new Vector2(.5f, 0f));
+            float until = Time.time + .25f;
+            while (Time.time < until) yield return new WaitForFixedUpdate();
+            Assert.That(touched, Is.Empty, "Safe while it has just landed.");
+
+            until = Time.time + .2f;
+            while (Time.time < until) yield return new WaitForFixedUpdate();
+            var late = board.UpsertOrb("late", LabOrbKind.Yang, new Vector2(.8f, .5f), new Vector2(-1.5f, 0f));
+            for (int step = 0; step < 30 && touched.Count == 0; step++) yield return new WaitForFixedUpdate();
+            Assert.That(touched, Is.EqualTo(new[] { "fox>late" }), "Past it, a touch takes the Yang away with the fox orb.");
+            Assert.That(board.IsSnapshotSuppressed("fox"), Is.True, "Both leave this screen at once...");
+            Assert.That(board.IsSnapshotSuppressed("late"), Is.True);
+            LabOrbVanishSmoke[] smoke = board.GetComponentsInChildren<LabOrbVanishSmoke>();
+            Assert.That(smoke.Length, Is.EqualTo(2), "...each in a puff of smoke...");
+            Color puff = smoke[0].GetComponentInChildren<SpriteRenderer>().color;
+            Assert.That(puff.b, Is.GreaterThan(puff.r), "...a blue one.");
+
+            Assert.That(board.RejectPendingLaunch("late"), Is.True, "Should the Host say no, the Yang comes back.");
+            Assert.That(late.gameObject.activeSelf, Is.True);
+            Assert.That(board.CommitPendingLaunch("fox"), Is.True, "Its yes takes the fox orb away for good.");
+        }
+
+        [UnityTest]
+        public IEnumerator AFoxOrbOverASideEdgeGoesUpInBlueSmokeInsteadOfPassing()
+        {
+            var crossed = new System.Collections.Generic.List<LabOrbEdgeCrossing>();
+            board.EdgeCrossed += crossing => crossed.Add(crossing);
+            board.UpsertOrb("fox-edge", LabOrbKind.FoxFire, new Vector2(.9f, .5f), new Vector2(1.5f, 0f));
+            for (int step = 0; step < 30 && crossed.Count == 0; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.Select(crossing => crossing.OrbId), Is.EqualTo(new[] { "fox-edge" }));
+            Assert.That(board.IsSnapshotSuppressed("fox-edge"), Is.True, "It leaves this screen at once...");
+            Assert.That(board.GetComponentsInChildren<LabOrbVanishSmoke>(), Is.Not.Empty, "...in blue smoke, never to a neighbour.");
+            Assert.That(board.CommitPendingLaunch("fox-edge"), Is.True);
+        }
+
         [Test]
         public void BoardOrbUsesA3DSphereAndAnIndependentReplaceableMeshVisual()
         {

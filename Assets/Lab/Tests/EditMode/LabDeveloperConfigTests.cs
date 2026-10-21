@@ -1394,6 +1394,21 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheFoxOrbDrawsItsOwnBlueArtFromResources()
+        {
+            Sprite art = Resources.Load<Sprite>(LabOrbAppearance.FoxFireSpritePath);
+            Assert.That(art, Is.Not.Null,
+                "Assets/Lab/Resources/Sabotage/FoxOrb.png imports as a Sprite through LabSabotageArtImporter (#251). Reimport it if not.");
+            var look = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            try
+            {
+                Assert.That(look.SpriteFor(LabOrbKind.FoxFire), Is.SameAs(art), "An empty Inspector slot falls back to it.");
+                Assert.That(look.FoxFireSmokeColor.b, Is.GreaterThan(look.FoxFireSmokeColor.r), "Its smoke is blue.");
+            }
+            finally { Object.DestroyImmediate(look); }
+        }
+
+        [Test]
         public void SabotageFieldsFormTheSabotageGroupStartOffAndApply()
         {
             LabDeveloperField[] sabotage = LabConfig.DeveloperFields.Skip(166).ToArray();

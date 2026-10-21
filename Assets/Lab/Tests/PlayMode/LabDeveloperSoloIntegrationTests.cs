@@ -644,6 +644,58 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavedSceneSoloFoxFireDropsGlowingFoxOrbsOntoTheOnePlayersBoard()
+        {
+            yield return fixture.Load();
+
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabOrbBoard board = network.board;
+            LabConfig savedConfig = network.config;
+            LabConfig foxy = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = foxy.CaptureDeveloperValues();
+            tuning[166] = 1f; // the sabotage mix (#251), one second in
+            tuning[167] = 1f;
+            tuning[168] = 1f;
+            tuning[169] = 0f; // only the fox fire
+            tuning[170] = 0f;
+            tuning[172] = 0f;
+            Assert.That(foxy.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            network.config = foxy;
+            fixture.UseAvailablePort(network);
+            try
+            {
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                float until = Time.realtimeSinceStartup + 3f;
+                LabOrbState[] foxes = System.Array.Empty<LabOrbState>();
+                while (foxes.Length == 0 && Time.realtimeSinceStartup < until)
+                {
+                    yield return null;
+                    foxes = (network.Snapshot?.orbs ?? System.Array.Empty<LabOrbState>())
+                        .Where(orb => orb.kind == LabOrbKind.FoxFire).ToArray();
+                }
+                yield return null; // the board takes the snapshot that holds them
+                Assert.That(foxes.Length, Is.InRange(2, 5), "The fox fire drops two to five fox orbs.");
+                Assert.That(foxes.All(orb => orb.owner == network.LocalPlayerId), Is.True, "Solo, on the one player.");
+                Assert.That(foxes.Any(orb => board.IsDropping(orb.id)), Is.True,
+                    "The drop signal reaches the board before the snapshot holding them, so they fall in.");
+                Assert.That(network.Notice, Does.Contain("Fox fire"));
+                var alert = UnityEngine.Object.FindAnyObjectByType<LabGourdAlert>();
+                Assert.That(alert, Is.Not.Null);
+                Assert.That(alert.Active, Is.True, "Every player sees the gourd's \"!\" bubble.");
+                LabOrbView view = board.GetComponentsInChildren<LabOrbView>().First(candidate => candidate.OrbId == foxes[0].id);
+                Assert.That(view.FoxGlowVisible, Is.True);
+                Assert.That(view.GetComponentInChildren<LabOrbSpriteArt>(), Is.Not.Null, "It shows the fox orb art.");
+            }
+            finally
+            {
+                network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(foxy);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator SavedSceneSoloSabotageMixAnnouncesEachCastOnTheOnePlayer()
         {
             yield return fixture.Load();
