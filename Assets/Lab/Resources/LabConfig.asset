@@ -50,7 +50,7 @@ MonoBehaviour:
   smallOrbPaintShare: 0.5
   gourdColorComboEnabled: 1
   comboFirstStartSeconds: 20
-  comboRepeatIntervalSeconds: 15
+  comboRepeatIntervalSeconds: 40
   comboTimeLimitSeconds: 10
   comboPenaltyDurationSeconds: 10
   comboPenaltySizeScale: 0.1
