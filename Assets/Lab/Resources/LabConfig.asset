@@ -49,9 +49,9 @@ MonoBehaviour:
   blastShrinkScale: 0.5
   smallOrbPaintShare: 0.5
   gourdColorComboEnabled: 1
-  comboFirstStartSeconds: 20
-  comboRepeatIntervalSeconds: 15
-  comboTimeLimitSeconds: 10
+  comboFirstStartSeconds: 50
+  comboRepeatIntervalSeconds: 60
+  comboTimeLimitSeconds: 15
   comboPenaltyDurationSeconds: 10
   comboPenaltySizeScale: 0.1
   comboPenaltyThrowerOnly: 0

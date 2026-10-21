@@ -143,9 +143,9 @@ namespace C6Lab.Tests
             Assert.That(received.comboResultCount, Is.EqualTo(1u));
             Assert.That(received.players.Select(player => player.comboPenaltyUntil), Is.All.EqualTo(40d));
 
-            Assert.That(model.Snapshot(34.9d).comboCount, Is.EqualTo(1u));
-            LabSnapshot second = model.Snapshot(35d);
-            Assert.That(second.comboActive, Is.True, "The next combo comes 15 seconds after the first appeared.");
+            Assert.That(model.Snapshot(59.9d).comboCount, Is.EqualTo(1u));
+            LabSnapshot second = model.Snapshot(60d);
+            Assert.That(second.comboActive, Is.True, "The next combo comes 40 seconds after the first appeared.");
             Assert.That(second.comboCount, Is.EqualTo(2u));
         }
 
@@ -346,8 +346,8 @@ namespace C6Lab.Tests
 
             LabSnapshot next = model.Snapshot(31d);
             Assert.That(next.comboResult, Is.EqualTo(LabComboResult.Timeout));
-            Assert.That(next.comboNextAt, Is.EqualTo(35d), "The next combo still follows the 15-second interval.");
-            Assert.That(next.comboWarningAt, Is.EqualTo(32d));
+            Assert.That(next.comboNextAt, Is.EqualTo(60d), "The next combo still follows the 40-second interval.");
+            Assert.That(next.comboWarningAt, Is.EqualTo(57d));
         }
 
         [Test]
@@ -454,8 +454,11 @@ namespace C6Lab.Tests
             values[39] = 50; values[40] = 50; values[41] = 0; values[42] = 0; values[43] = 0; values[44] = 0;
             values[155] = enabled ? 1f : 0f;
             values[156] = firstStart;
-            values[158] = timeLimit;
+            values[157] = 40f; // the rule tests below count a 40-second interval and a 10-second penalty
+            values[158] = timeLimit; // and reward, whatever the defaults are
+            values[159] = 10f;
             values[161] = throwerOnly ? 1f : 0f;
+            values[162] = 10f;
             values[164] = warning;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return config;
