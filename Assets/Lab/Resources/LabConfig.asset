@@ -183,7 +183,7 @@ MonoBehaviour:
   yaguangFlashTargetOne: 0
   yaguangFlashFirstStartSeconds: 31
   yaguangFlashIntervalSeconds: 60
-  yaguangFlashWarningSeconds: 2
+  yaguangFlashWarningSeconds: 3
   yaguangFlashGlareSeconds: 7
   yaguangFlashRecoverySeconds: 2
   comboYaguangCountEnabled: 1

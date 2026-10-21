@@ -685,7 +685,10 @@ namespace C6Lab
             return at >= comboWarningAt || flashEndsAt > comboWarningAt;
         }
 
-        private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled && !flashHeld;
+        // 콤보 때문에 미룰 섬광은 예고 시각도 알리지 않는다(#271): 지금 콤보 한 판 중이거나, 예정된 예고 시작 시각에
+        // 지금 상태 그대로라면 미뤄질 섬광이면 -1을 보내, 어느 기기에서도 요괴·눈 말풍선이 미리 나오지 않게 한다.
+        private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled && !flashHeld
+            && !ComboHoldsFlash(lastTime) && !ComboHoldsFlash(Math.Max(lastTime, nextFlashAt - rules.FlashWarningSeconds));
 
         /// <summary>
         /// 섬광 대상. ALL이면 0(모두). ONE이면 자리 순서에서 seed와 순번으로 한 명을 뽑아 모든 기기가 같은 사람을 받는다.

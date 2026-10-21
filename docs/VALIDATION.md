@@ -2077,3 +2077,15 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | EditMode 실제 실행 | NOT_RUN | `TheFlashWaitsOutTheComboAndItsPenaltyThenWarnsAgainInFull`(40초 시간 초과 → 55초까지 페널티 → 55.5초부터 예고 → 57초 섬광), 새 `AFlashThatEndsBeforeTheComboWarningGoesAheadAsPlanned`·`AFlashThatWouldRunIntoTheComboWarningWaitsForTheWholeCombo`. |
 | PlayMode 실제 실행 | NOT_RUN | `LabYaguangCountLookTests`(예고 중 `COMBO!` 판 없음, 말풍선 세기 중). |
 | 에디터 확인 | NOT_RUN | 페널티 중 섬광이 오지 않는지, 예고 때 패널 자리가 비어 있고 말풍선만 세는지. |
+
+### #271 피드백 반영: 콤보 중 눈 말풍선 막기, 노란 눈 더 오래
+
+- **원인**: Host는 콤보 중 섬광을 미뤘지만, 미룰 섬광의 예고 시각을 미리 알렸고(스냅샷 `flashWarningAt`), 기기는 다음 스냅샷 전까지 시각을 앞서 추정하므로 콤보 위에 눈 말풍선이 떴다. 한 번 뜬 말풍선은 정해 둔 시간 동안 남았다.
+- **고침**: (1) Host는 지금 콤보 한 판 중이거나, 예정된 예고 시작 시각에 지금 상태라면 미뤄질 섬광이면 예고 시각을 -1로 보낸다(`LabModel.FlashWaiting`). (2) `LabSnapshot.FlashWarningOn`은 콤보가 진행 중이거나 콤보 예고 중이면 언제나 false다. (3) 예고가 끝나거나 취소되면 눈 말풍선을 바로 거둔다. 요괴 빼꼼·가장자리 빛도 같은 판단을 쓴다.
+- **노란 눈**: 섬광 예고 2 → **3초**(DEV 범위 0–6, 가운데 3). 앞 30% 보통 눈 → 15% 동안 노랗게 → 남은 55%(약 1.6초, 전에는 0.6초) 빛나는 노란 눈의 둘레 빛이 두근거리다 번쩍인다. 섬광 한 번 12초(28–40초 등), 콤보와의 여유는 앞뒤 약 6초.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. |
+| EditMode 실제 실행 | NOT_RUN | 새 `NoWarningShowsWhileTheComboIsUpEvenFromALateSnapshot`, 미룰 섬광은 예고 시각 -1, 눈 빛 곡선 30/45%, 기본값 31/60/3/7/2. |
+| 에디터 확인 | 부분 (Jess) | 콤보 중 섬광은 없었지만 눈 말풍선이 나온 것을 봄(이번에 고침). 노란 눈이 너무 짧다는 피드백(이번에 늘림). 수정 뒤 화면은 아직. |

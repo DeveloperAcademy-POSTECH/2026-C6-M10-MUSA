@@ -31,7 +31,7 @@ namespace C6Lab.Tests
             Assert.That(new[] { flash[0].OffText, flash[0].OnText }, Is.EqualTo(new[] { "끔", "켬" }));
             Assert.That(new[] { flash[1].OffText, flash[1].OnText }, Is.EqualTo(new[] { "모두", "한 명" }));
             Assert.That(flash.Skip(2).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
-            float[] defaults = { 31f, 60f, 2f, 7f, 2f };
+            float[] defaults = { 31f, 60f, 3f, 7f, 2f };
             for (int i = 0; i < defaults.Length; i++)
                 Assert.That((flash[i + 2].Min + flash[i + 2].Max) * .5f, Is.EqualTo(defaults[i]),
                     flash[i + 2].Label + ": every slider starts in the middle of its range.");
@@ -55,9 +55,9 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(178).Take(7), Is.EqualTo(new[] { 0f, 0f, 31f, 60f, 2f, 7f, 2f }),
+                Assert.That(source.CaptureDeveloperValues().Skip(178).Take(7), Is.EqualTo(new[] { 0f, 0f, 31f, 60f, 3f, 7f, 2f }),
                     "Off by default; once on, everyone flashes at 31 s and every 60 s, 19 s before each combo, "
-                    + "with a 2 s warning, 7 s of glare and 2 s to recover.");
+                    + "with a 3 s warning (yellow eyes for most of it), 7 s of glare and 2 s to recover.");
 
             float[] values = config.CaptureDeveloperValues();
             values[178] = 1f; values[179] = 1f; values[180] = 5f; values[181] = 24f;
@@ -130,7 +130,8 @@ namespace C6Lab.Tests
             // The combo's warning starts at 27 s and its slots stay up until 40 s; the flash is due at 31 s.
             // Nobody clears it, so everyone is SMALL for 15 s after the 40 s timeout.
             model.Begin("flash-combo", Three, 0d, Config(flash: true, first: 31f, combo: true));
-            Assert.That(model.Snapshot(26d).flashAt, Is.EqualTo(31d), "Only planned so far.");
+            Assert.That(model.Snapshot(20d).flashAt, Is.EqualTo(-1d),
+                "Already known to wait for the combo, so no device is told a time to peek out (#271).");
             LabSnapshot held = model.Snapshot(29.6d);
             Assert.That(held.flashAt, Is.EqualTo(-1d), "No flash warning over the combo warning.");
             Assert.That(model.Snapshot(35d).flashCount, Is.Zero, "Nor during the combo.");
@@ -165,12 +166,29 @@ namespace C6Lab.Tests
             var model = new LabModel();
             // Due at 25 s, its warning would start at 23.5 s and its recovery end at 29.5 s, after the combo warning at 27 s.
             model.Begin("flash-into-combo", Three, 0d, Config(flash: true, first: 25f, combo: true));
+            Assert.That(model.Snapshot(10d).flashAt, Is.EqualTo(-1d), "Not announced: it would be held.");
             LabSnapshot due = model.Snapshot(23.6d);
             Assert.That(due.flashAt, Is.EqualTo(-1d), "It does not start: it would not finish before the combo.");
             Assert.That(due.FlashWarningOn(23.6d), Is.False);
             Assert.That(model.Snapshot(30d).comboActive, Is.True, "The combo comes on time.");
             Assert.That(model.Snapshot(54.9d).flashCount, Is.Zero, "Still waiting through the combo and its penalty.");
             Assert.That(model.Snapshot(55.5d).flashAt, Is.EqualTo(57d));
+        }
+
+        [Test]
+        public void NoWarningShowsWhileTheComboIsUpEvenFromALateSnapshot()
+        {
+            var snapshot = new LabSnapshot
+            {
+                phase = LabPhase.Playing, flashWarningAt = 10d, flashAt = 12d, comboActive = true
+            };
+            Assert.That(snapshot.FlashWarningOn(11d), Is.False, "No eyes over a running combo.");
+            snapshot.comboActive = false;
+            snapshot.comboWarningAt = 10.5d;
+            snapshot.comboNextAt = 13d;
+            Assert.That(snapshot.FlashWarningOn(11d), Is.False, "Nor over the combo warning.");
+            snapshot.comboWarningAt = snapshot.comboNextAt = -1d;
+            Assert.That(snapshot.FlashWarningOn(11d), Is.True);
         }
 
         [Test]
@@ -186,10 +204,10 @@ namespace C6Lab.Tests
         public void TheEyesStayPlainThenLightUpSuddenlyBeforeTheFlash()
         {
             Assert.That(LabYaguangFlashHud.EyeGlowAt(0f), Is.Zero);
-            Assert.That(LabYaguangFlashHud.EyeGlowAt(.45f), Is.Zero, "Plain eyes for the first part of the warning.");
-            Assert.That(LabYaguangFlashHud.EyeGlowAt(.575f), Is.EqualTo(.5f).Within(1e-4f));
-            Assert.That(LabYaguangFlashHud.EyeGlowAt(.7f), Is.EqualTo(1f), "Fully lit quickly...");
-            Assert.That(LabYaguangFlashHud.EyeGlowAt(1f), Is.EqualTo(1f), "...and held until the flash.");
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(.3f), Is.Zero, "Plain eyes for the first 30% of the warning.");
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(.375f), Is.EqualTo(.5f).Within(1e-4f));
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(.45f), Is.EqualTo(1f), "Fully lit quickly...");
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(1f), Is.EqualTo(1f), "...and held for the last 55% to enjoy.");
         }
 
         [Test]

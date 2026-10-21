@@ -213,7 +213,9 @@ namespace C6Lab
             if (eyesLit == null) return;
             eyesLit.color = new Color(1f, 1f, 1f, eyeGlow);
             eyesHalo.color = new Color(1f, 1f, 1f, .85f * eyeGlow);
-            eyesHalo.rectTransform.localScale = Vector3.one * (1f + .3f * eyeGlow);
+            // 다 빛난 뒤에는 둘레 빛이 두근거린다.
+            float beat = eyeGlow >= 1f ? .08f * Mathf.Sin(Time.unscaledTime * 9f) : 0f;
+            eyesHalo.rectTransform.localScale = Vector3.one * (1f + .3f * eyeGlow + beat);
         }
 
         // 말풍선 안 표시는 한 번에 하나만 보인다.

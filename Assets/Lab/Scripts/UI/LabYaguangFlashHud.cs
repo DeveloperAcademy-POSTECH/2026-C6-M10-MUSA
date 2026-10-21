@@ -38,10 +38,11 @@ namespace C6Lab
         private double eyesShownFor = -1d;
 
         /// <summary>예고 중 눈이 빛나기 시작하는 지점과 다 빛나는 지점 (예고 길이 비율). 그 전에는 보통 눈이다.</summary>
-        public const float EyesLightFrom = .45f, EyesLitAt = .7f;
+        public const float EyesLightFrom = .3f, EyesLitAt = .45f;
 
         /// <summary>
-        /// 예고 진행(0~1)에 따른 눈 빛 (0~1). 앞 절반쯤은 보통 눈으로 보여 주고, 그 뒤 짧게 확 빛난 다음 번쩍일 때까지 유지한다.
+        /// 예고 진행(0~1)에 따른 눈 빛 (0~1). 앞 30%는 보통 눈, 그 뒤 15% 동안 확 노랗게 빛나고, 남은 55%(기본 예고 3초면
+        /// 약 1.6초)는 빛나는 노란 눈을 두근거리며 보여 준 다음 번쩍인다 (#271 피드백: 노란 눈을 더 오래 보이게).
         /// </summary>
         public static float EyeGlowAt(float progress)
         {
@@ -113,7 +114,13 @@ namespace C6Lab
         /// </summary>
         private float DriveEyes(LabSnapshot snapshot, double now)
         {
-            if (!snapshot.FlashWarningOn(now)) return -1f;
+            LabGourdAlert eyes = GetComponent<LabGourdAlert>();
+            if (!snapshot.FlashWarningOn(now))
+            {
+                // 예고가 끝났거나(번쩍임), 콤보 때문에 취소됐으면 눈 말풍선을 바로 거둔다.
+                if (eyes != null && eyes.ShowingEyes) eyes.Hide();
+                return -1f;
+            }
             double length = snapshot.flashAt - snapshot.flashWarningAt;
             float progress = length > 0d ? Mathf.Clamp01((float)((now - snapshot.flashWarningAt) / length)) : 1f;
             LabGourdAlert alert = GetComponent<LabGourdAlert>();
