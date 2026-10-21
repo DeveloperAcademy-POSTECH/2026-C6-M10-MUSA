@@ -575,11 +575,14 @@ namespace C6Lab
                     go.layer = container.layer;
                     RectTransform rect = (RectTransform)go.transform;
                     rect.SetParent(containerRect, false);
-                    // Two columns keep all four names readable on the narrow mobile panel.
-                    float x = (option % 2) * .5f;
-                    float y = 1f - ((option / 2) + 1) * .5f;
+                    // Two rows of two keep four names readable on the narrow mobile panel; six short
+                    // choices (Drum Count's AUTO and 1-5, #236) go three to a row.
+                    int columns = field.Choices.Count <= 4 ? 2 : 3;
+                    float width = 1f / columns;
+                    float x = (option % columns) * width;
+                    float y = 1f - ((option / columns) + 1) * .5f;
                     rect.anchorMin = new Vector2(x, y);
-                    rect.anchorMax = new Vector2(x + .5f, y + .5f);
+                    rect.anchorMax = new Vector2(x + width, y + .5f);
                     rect.offsetMin = new Vector2(3f, 2f);
                     rect.offsetMax = new Vector2(-3f, -2f);
                     var textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));

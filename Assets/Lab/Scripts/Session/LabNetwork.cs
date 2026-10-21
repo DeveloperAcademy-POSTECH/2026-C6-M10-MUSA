@@ -186,7 +186,8 @@ namespace C6Lab
         // 5645: #215 swipe-block snapshots and pushed crossings integrate at DEV 157-159; 160 shared values.
         // 5646: #222 gourd color combo experiment (DEV 160-168, combo snapshot, projectile size scale); 169 shared values.
         // 5647: #235 the Host tells an orb's holder when its lifetime ran out (orbExpired), before the snapshot.
-        internal const ushort LabProtocolVersion = 5647;
+        // 5648: #236 Drum Count takes AUTO (0, the default): drums follow the round's player count.
+        internal const ushort LabProtocolVersion = 5648;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/11");

@@ -48,6 +48,15 @@ MonoBehaviour:
   blastBurnSeconds: 4
   blastShrinkScale: 0.5
   smallOrbPaintShare: 0.5
+  gourdColorComboEnabled: 0
+  comboFirstStartSeconds: 20
+  comboRepeatIntervalSeconds: 30
+  comboTimeLimitSeconds: 10
+  comboPenaltyDurationSeconds: 10
+  comboPenaltySizeScale: 0.3
+  comboPenaltyThrowerOnly: 0
+  comboRewardDurationSeconds: 10
+  comboRewardSizeScale: 1.5
   orbLifetimeSeconds: 8
   orbRestitution: 0.8
   orbFloorDeceleration: 2
@@ -63,7 +72,7 @@ MonoBehaviour:
   spawnFanAngle: 180
   spawnMinSpeed: 1
   spawnMaxSpeed: 1.8
-  drumCount: 1
+  drumCount: 0
   drumRadius: 0.6
   drumDriftSpeed: 0.1
   drumDriftTurning: 0.25
