@@ -1238,7 +1238,8 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(146).Take(4), Is.EqualTo(new[] { .12f, .5f, 2f, 4f }));
+                Assert.That(source.CaptureDeveloperValues().Skip(146).Take(4), Is.EqualTo(new[] { .12f, .75f, 1.3f, 4f }),
+                    "Lighter release and slide since #237, so a bomb can be passed on; still heavy to drag and bump");
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();
