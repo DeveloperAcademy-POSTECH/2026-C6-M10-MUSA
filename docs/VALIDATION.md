@@ -2124,3 +2124,27 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. `LabModel`은 원본과 같은 mcs 한계 오류만 남는다. |
 | EditMode 실제 실행 | NOT_RUN | 새 `EachScreenHoldsOneEventSoASecondBombGoesToAFreeScreen`, `AOnePlayerFlashPicksAScreenWithoutAnEvent`, 시각을 옮긴 폭탄·섬광·콤보 대기 검사 3건, 기존 전체. |
 | 에디터·3인 확인 | NOT_RUN | 한 사람 화면에 폭탄이 있는 동안 다른 사람에게만 폭탄·막기가 가는지, 모두 섬광·콤보는 기다리는지. |
+
+### #271 섬광이 잘 나오지 않던 문제: 콤보·섬광 차례 지키기
+
+**증상**: 야광귀를 켜고 기본값으로 하면 콤보는 나오는데 섬광은 거의 나오지 않았다.
+
+**원인** (기본값 3인, 180초, seed 200개를 Mono로 모의 실행: 섬광 평균 0.16번, 콤보 2.05번)
+1. 모두 섬광은 **모든 화면**이 비어야 시작한다. 그런데 박 폭탄(20~30초마다, 판에 최대 15초)과 넘기기 막기(40초마다 10초)가 거의 언제나 어느 한 화면에는 열려 있었다.
+2. 섬광이 기다리는 동안에도 새 폭탄·막기가 계속 걸려 빈틈이 잘 생기지 않았다.
+3. 섬광은 끝나기(예고 3 + 눈부심 7 + 회복 2 = 12초) 전에 다음 콤보 예고가 올 차례면 미리 비켜 줬다. 폭탄 때문에 몇 초만 밀려도 이 12초 틈이 사라져, 콤보 한 판(예고·제한·효과 약 34초) 뒤로 다시 밀렸다.
+4. 밀린 섬광은 실제로 번쩍인 시각부터 간격 60초를 다시 재므로, 한 번 밀리면 다음 차례도 함께 밀렸다.
+
+**고친 것** (`LabModel`)
+- 콤보·섬광이 예고를 시작할 때가 됐는데 막혀서 기다리기 시작하면(`comboQueuedAt`·`flashQueuedAt`) 그동안 새 폭탄·넘기기 막기·방해공작을 걸지 않는다(`ScreenOpen`). 이미 열린 것만 끝나면 바로 차례가 온다.
+- 섬광이 곧 올 콤보를 위해 미리 비켜 주던 계산을 없앴다. 먼저 예고를 시작한 쪽이 먼저 하고, 다른 쪽은 끝나기를 기다렸다가 예고부터 한다. 둘 다 기다리면 먼저 기다린 쪽이 먼저다(`ComboGoesFirst`·`FlashGoesFirst`).
+- 미뤄질 쪽은 예고 시각을 알리지 않는다: 콤보 예고가 먼저 올 차례인 섬광(`ComboWarnsBeforeFlash`), 섬광이 먼저 시작해 콤보 예고 시각까지 이어질 콤보(`FlashRunsIntoCombo`).
+
+**결과** (같은 모의 실행): 섬광 **3.00번**(200개 모두 3번), 콤보 **2.65번**(2번 70개·3번 130개, 세 번째 콤보가 180초 끝에 걸리는 경우가 2번). 대신 박 폭탄은 4.37개 → 3.00개로 줄었다(콤보·섬광 차례에 양보).
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| Core 컴파일 | PASS (Mono, Unity 흉내) | `Core` 폴더를 UnityEngine 최소 흉내와 함께 Mono `mcs`로 컴파일했다. |
+| EditMode 검사 실행 | PASS (Mono, NUnit 흉내) | `LabYaguangFlashTests`·`LabGourdComboTests` 중 Core만 쓰는 34건 통과. `Resources.Load`가 필요한 1건과 HUD·복제 검사는 실행하지 않았다. 새 `AFlashThatStartsFirstTakesItsTurnAndTheComboWaitsForIt`, `AWaitingFlashKeepsNewBombsOffSoItIsNotPushedBackAgainAndAgain`, `WithTheDefaultsFlashesComeAboutAsOftenAsCombos`(3 seed). 앞 커밋의 `EachScreenHoldsOneEventSoASecondBombGoesToAFreeScreen`이 섬광 첫 시작 90초(범위 1~61 밖)를 써서 설정 적용에서 실패하던 것을 61초로 고쳤다. |
+| Unity EditMode 실제 실행 | NOT_RUN | 위 검사와 기존 전체. |
+| 에디터·3인 확인 | NOT_RUN | 기본값으로 한 판에 섬광이 콤보만큼 나오는지, 섬광을 기다리는 동안 폭탄이 잠시 멈췄다가 다시 오는지. |

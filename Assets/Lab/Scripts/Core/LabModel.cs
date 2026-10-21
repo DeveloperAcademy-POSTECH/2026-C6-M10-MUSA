@@ -195,6 +195,9 @@ namespace C6Lab
         // 야광귀 모드의 이벤트 차례 (#271): 콤보 예고가 실제로 시작됐는지, 다른 이벤트 때문에 미뤘는지
         private bool comboWarned, comboHeld, comboWasHeld;
         private bool gourdBombWasHeld, swipeBlockWasHeld;
+        // 차례를 기다리는 콤보·섬광 (#271): 예고를 시작할 때가 됐는데 다른 이벤트 때문에 미루기 시작한 시각, 없으면 -1.
+        // 기다리는 동안 새 폭탄·넘기기 막기·방해공작을 걸지 않아 화면이 곧 비고, 둘 다 기다리면 먼저 기다린 쪽이 먼저 한다.
+        private double comboQueuedAt = -1d, flashQueuedAt = -1d;
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -315,6 +318,7 @@ namespace C6Lab
             flashWarned = false;
             comboWarned = comboHeld = comboWasHeld = false;
             gourdBombWasHeld = swipeBlockWasHeld = false;
+            comboQueuedAt = flashQueuedAt = -1d;
             nextFlashAt = rules.FlashEnabled ? now + rules.FlashFirstStartSeconds : double.PositiveInfinity;
             nextFlashTarget = DrawFlashTarget(0u);
             lastTime = now;
@@ -621,7 +625,7 @@ namespace C6Lab
         private void AdvanceCombo(double until)
         {
             comboHeld = false;
-            if (!rules.ComboEnabled) return;
+            if (!rules.ComboEnabled) { comboQueuedAt = -1d; return; }
             while (true)
             {
                 if (combo.Active)
@@ -635,8 +639,9 @@ namespace C6Lab
                     // 야광귀 모드 (#271): 다른 이벤트(폭탄·넘기기 막기·섬광·방해공작)가 열려 있으면 예고를 시작하지 않고,
                     // 그것이 닫히면 예고부터 처음 다시 보여준다.
                     if (nextComboAt - rules.ComboWarningSeconds > until) return;
-                    if (AnyScreenOpen(LabYaguangEvent.Combo, until))
+                    if (AnyScreenOpen(LabYaguangEvent.Combo, until) || FlashGoesFirst)
                     {
+                        if (comboQueuedAt < 0d) comboQueuedAt = until;
                         comboHeld = comboWasHeld = true;
                         nextComboAt = Math.Max(nextComboAt, until + rules.ComboWarningSeconds);
                         return;
@@ -646,6 +651,7 @@ namespace C6Lab
                         comboWasHeld = false;
                         nextComboAt = Math.Max(nextComboAt, until + rules.ComboWarningSeconds);
                     }
+                    comboQueuedAt = -1d;
                     comboWarned = true;
                 }
                 if (nextComboAt > until) return;
@@ -665,14 +671,15 @@ namespace C6Lab
         /// <summary>
         /// 야광귀 섬광 (#268): 정해 둔 시각마다 번쩍인다. 화면 표시(하얗게 보이기)만 하므로 Host는 시각과 대상만 정한다.
         /// 콤보 한 판(예고 → 4칸 → 결과 → 페널티/보상 효과)이 진행 중인 동안에는 섬광을 시작하지 않고 기다렸다가,
-        /// 그 판이 완전히 끝나면 예고부터 다시 보여준다(#271). 다음 콤보가 섬광이 끝나기 전에 시작될 차례여도 시작하지
-        /// 않는다. 그래서 섬광과 콤보 한 판은 상태로 서로를 피하고, DEV에서 시각을 어떻게 당겨도 겹치지 않는다.
+        /// 그 판이 완전히 끝나면 예고부터 다시 보여준다(#271). 섬광이 먼저 시작했으면 콤보가 섬광이 끝나기를 기다린다.
+        /// 차례를 기다리는 동안은 새 폭탄·넘기기 막기를 걸지 않아, 섬광도 콤보처럼 정해 둔 간격 가까이 나온다.
+        /// 그래서 섬광과 콤보 한 판은 상태로 서로를 피하고, DEV에서 시각을 어떻게 당겨도 겹치지 않는다.
         /// 간격은 번쩍인 시각부터 재고, 눈부심·회복·다음 예고가 겹치지 않을 만큼은 언제나 띄운다.
         /// </summary>
         private void AdvanceFlash(double until)
         {
             flashHeld = false;
-            if (!rules.FlashEnabled) return;
+            if (!rules.FlashEnabled) { flashQueuedAt = -1d; return; }
             while (true)
             {
                 if (!flashWarned)
@@ -681,6 +688,7 @@ namespace C6Lab
                     if (FlashBlocked(until))
                     {
                         // 예고가 시작될 때가 됐는데 콤보 한 판이나 다른 이벤트가 열려 있으면, 닫힌 뒤 예고를 처음부터 보여준다.
+                        if (flashQueuedAt < 0d) flashQueuedAt = until;
                         flashHeld = flashWasHeld = true;
                         nextFlashAt = Math.Max(nextFlashAt, until + rules.FlashWarningSeconds);
                         return;
@@ -692,6 +700,7 @@ namespace C6Lab
                         nextFlashAt = Math.Max(nextFlashAt, until + rules.FlashWarningSeconds);
                     }
                     SettleFlashTarget(until);
+                    flashQueuedAt = -1d;
                     flashWarned = true;
                 }
                 if (nextFlashAt > until) return; // 예고 중
@@ -708,19 +717,19 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 콤보 한 판이 섬광을 막는지 (#271): 콤보가 진행 중이거나 예고 중이거나, 지금 섬광을 시작하면 끝나기
-        /// (예고 + 눈부심 + 회복) 전에 다음 콤보 예고가 시작될 때. 콤보 뒤 페널티/보상은 받은 사람 화면에서 막는다.
+        /// 콤보 한 판이 섬광을 막는지 (#271): 콤보가 진행 중이거나 예고 중이거나, 섬광보다 먼저 차례를 기다리고 있을 때.
+        /// 다음 콤보가 곧 올 차례라고 섬광이 미리 비켜 주지는 않는다. 먼저 시작한 쪽이 먼저 하고, 다른 쪽은 끝나기를
+        /// 기다렸다가 예고부터 다시 한다. 콤보 뒤 페널티/보상은 받은 사람 화면에서 막는다(ScreenOpen).
         /// </summary>
-        private bool ComboHoldsFlash(double at)
-        {
-            if (!rules.ComboEnabled) return false;
-            if (combo.Active || comboWarned) return true;
-            // 페널티/보상 효과는 받은 사람 화면만 막는다(ScreenOpen). 섬광이 모두(ALL)면 그중 한 화면만 있어도 막힌다.
-            if (!ComboWaiting) return false;
-            double comboWarningAt = nextComboAt - rules.ComboWarningSeconds;
-            double flashEndsAt = at + rules.FlashWarningSeconds + rules.FlashGlareSeconds + rules.FlashRecoverySeconds;
-            return at >= comboWarningAt || flashEndsAt > comboWarningAt;
-        }
+        private bool ComboHoldsFlash(double at) => rules.ComboEnabled && (combo.Active || comboWarned || ComboGoesFirst);
+
+        /// <summary>둘 다 차례를 기다릴 때 콤보가 먼저인지: 콤보가 먼저(같은 순간이면 콤보) 기다리기 시작했을 때.</summary>
+        private bool ComboGoesFirst => rules.ComboEnabled && comboQueuedAt >= 0d
+            && (flashQueuedAt < 0d || comboQueuedAt <= flashQueuedAt);
+
+        /// <summary>섬광이 콤보보다 먼저 차례를 기다리고 있는지</summary>
+        private bool FlashGoesFirst => rules.FlashEnabled && flashQueuedAt >= 0d
+            && (comboQueuedAt < 0d || flashQueuedAt < comboQueuedAt);
 
         /// <summary>
         /// 섬광 예고를 지금 시작하면 안 되는지 (#271): 콤보 한 판(직전 포함) 중이거나, 맞을 화면에 다른 이벤트가 열려 있을 때.
@@ -731,9 +740,26 @@ namespace C6Lab
 
         // 미룰 섬광은 예고 시각도 알리지 않는다(#271): 지금 막혀 있거나, 예정된 예고 시작 시각에 지금 상태 그대로라면
         // 미뤄질 섬광이면 -1을 보내, 어느 기기에서도 요괴·눈 말풍선이 미리 나오지 않게 한다. 이미 시작한 예고는 그대로 알린다.
+        // 콤보 예고가 섬광 예고보다 먼저(같은 순간 포함) 시작될 차례면 섬광은 그 콤보 한 판 뒤로 밀리므로 역시 알리지 않는다.
         private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled && !flashHeld
-            && (flashWarned || (!FlashBlocked(lastTime)
+            && (flashWarned || (!FlashBlocked(lastTime) && !ComboWarnsBeforeFlash
                 && !FlashBlocked(Math.Max(lastTime, nextFlashAt - rules.FlashWarningSeconds))));
+
+        private bool ComboWarnsBeforeFlash => ComboWaiting && !comboWarned
+            && nextComboAt - rules.ComboWarningSeconds <= nextFlashAt - rules.FlashWarningSeconds;
+
+        // 섬광 예고가 콤보 예고보다 먼저 시작되고 콤보 예고 시각까지 이어질 차례면, 콤보는 그 섬광 뒤로 밀린다.
+        private bool FlashRunsIntoCombo
+        {
+            get
+            {
+                if (rules == null || !rules.FlashEnabled || flashWarned || phase != LabPhase.Playing) return false;
+                double flashWarningAt = nextFlashAt - rules.FlashWarningSeconds;
+                double comboWarningAt = nextComboAt - rules.ComboWarningSeconds;
+                return flashWarningAt < comboWarningAt
+                    && nextFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds > comboWarningAt;
+            }
+        }
 
         /// <summary>
         /// 야광귀 모드 (#271): 콤보나 섬광이 켜져 있으면 <b>각자의 화면에서</b> 이벤트가 한 번에 하나만 열린다.
@@ -752,6 +778,10 @@ namespace C6Lab
         private bool ScreenOpen(ulong player, double at, LabYaguangEvent self)
         {
             if (!ExclusiveEvents) return false;
+            // 콤보·섬광이 차례를 기다리는 동안에는 새 폭탄·넘기기 막기·방해공작을 걸지 않는다(이미 열린 것은 끝까지 간다).
+            // 그래야 화면이 곧 비어 콤보·섬광이 밀리지 않고 정해 둔 간격 가까이 나온다.
+            if (self != LabYaguangEvent.Combo && self != LabYaguangEvent.Flash
+                && ((rules.ComboEnabled && comboQueuedAt >= 0d) || (rules.FlashEnabled && flashQueuedAt >= 0d))) return true;
             if (self != LabYaguangEvent.Combo && rules.ComboEnabled)
             {
                 if (comboWarned || combo.Active) return true;
@@ -843,7 +873,7 @@ namespace C6Lab
 
         // 다른 이벤트 때문에 미룰 콤보 예고는 알리지 않는다 (#271). 이미 시작한 예고는 그대로 알린다.
         private bool ComboAnnounced => ComboWaiting && !comboHeld
-            && (comboWarned || !AnyScreenOpen(LabYaguangEvent.Combo, lastTime));
+            && (comboWarned || (!AnyScreenOpen(LabYaguangEvent.Combo, lastTime) && !FlashGoesFirst && !FlashRunsIntoCombo));
 
         /// <summary>
         /// 콤보가 끝난 뒤 처리. 성공은 팀 전체에 보상을 주고, 실패는 페널티를 건다.

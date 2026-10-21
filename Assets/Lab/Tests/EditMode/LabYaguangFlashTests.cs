@@ -161,18 +161,64 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void AFlashThatWouldRunIntoTheComboWarningWaitsForTheWholeCombo()
+        public void AFlashThatStartsFirstTakesItsTurnAndTheComboWaitsForIt()
         {
             var model = new LabModel();
-            // Due at 25 s, its warning would start at 23.5 s and its recovery end at 29.5 s, after the combo warning at 27 s.
+            // Flash warning from 23.5 s, flash at 25 s, glare and recovery over at 29.5 s. The combo would warn from 27 s.
+            // Whoever starts first goes first (#271): the flash no longer steps aside for a combo that is merely coming up.
             model.Begin("flash-into-combo", Three, 0d, Config(flash: true, first: 25f, combo: true));
-            Assert.That(model.Snapshot(10d).flashAt, Is.EqualTo(-1d), "Not announced: it would be held.");
-            LabSnapshot due = model.Snapshot(23.6d);
-            Assert.That(due.flashAt, Is.EqualTo(-1d), "It does not start: it would not finish before the combo.");
-            Assert.That(due.FlashWarningOn(23.6d), Is.False);
-            Assert.That(model.Snapshot(30d).comboActive, Is.True, "The combo comes on time.");
-            Assert.That(model.Snapshot(54.9d).flashCount, Is.Zero, "Still waiting through the combo and its penalty.");
-            Assert.That(model.Snapshot(55.5d).flashAt, Is.EqualTo(57d));
+            LabSnapshot early = model.Snapshot(10d);
+            Assert.That(early.flashAt, Is.EqualTo(25d), "The flash comes on time.");
+            Assert.That(early.comboNextAt, Is.EqualTo(-1d), "The combo is not announced: it will wait for the flash.");
+            Assert.That(model.Snapshot(23.6d).FlashWarningOn(23.6d), Is.True);
+            Assert.That(model.Snapshot(25d).flashCount, Is.EqualTo(1u));
+            LabSnapshot during = model.Snapshot(27.5d);
+            Assert.That(during.ComboWarningOn(27.5d), Is.False, "No combo warning over the glare.");
+            Assert.That(during.comboActive, Is.False);
+            model.Snapshot(29.4d);
+            LabSnapshot warned = model.Snapshot(29.6d);
+            Assert.That(new[] { warned.comboWarningAt, warned.comboNextAt }, Is.EqualTo(new[] { 29.6d, 32.6d }),
+                "Once the flash is over, the combo's full warning, then the combo.");
+            Assert.That(model.Snapshot(32.6d).comboActive, Is.True);
+        }
+
+        [Test]
+        public void AWaitingFlashKeepsNewBombsOffSoItIsNotPushedBackAgainAndAgain()
+        {
+            var model = new LabModel();
+            // Bombs every 10 s, each out for 15 s, so some screen nearly always has one. The flash is due at 15 s.
+            model.Begin("flash-queue", Three, 0d, Config(flash: true, first: 15f, bombEvery: 10f));
+            Assert.That(GourdBombs(model.Snapshot(10d)), Is.EqualTo(1));
+            Assert.That(model.Snapshot(13.6d).flashAt, Is.EqualTo(-1d), "Held by the first bomb.");
+            Assert.That(GourdBombs(model.Snapshot(20d)), Is.EqualTo(1), "The second bomb waits while the flash waits for its turn.");
+            model.Snapshot(25d);
+            LabSnapshot warned = model.Snapshot(25.5d);
+            Assert.That(GourdBombs(warned), Is.Zero);
+            Assert.That(new[] { warned.flashWarningAt, warned.flashAt }, Is.EqualTo(new[] { 25.5d, 27d }),
+                "As soon as the first bomb is gone the flash takes its turn.");
+            Assert.That(GourdBombs(model.Snapshot(31.4d)), Is.Zero, "Nothing new during the glare and recovery.");
+            Assert.That(GourdBombs(model.Snapshot(31.6d)), Is.EqualTo(1), "Then the waiting bomb drops.");
+        }
+
+        [TestCase("round-a")]
+        [TestCase("round-b")]
+        [TestCase("round-c")]
+        public void WithTheDefaultsFlashesComeAboutAsOftenAsCombos(string id)
+        {
+            var config = ScriptableObject.CreateInstance<LabConfig>();
+            created.Add(config);
+            float[] values = config.CaptureDeveloperValues();
+            values[155] = 1f; // 야광귀 on: combo and flash with the default gourd bombs and swipe blocks
+            values[178] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var model = new LabModel();
+            model.Begin(id, Three, 0d, config);
+            LabSnapshot last = null;
+            for (double at = 0d; at <= 180d; at += .1d) last = model.Snapshot(at);
+            Assert.That(last.flashCount, Is.EqualTo(3u), "A flash about every 60 s, as set.");
+            Assert.That(last.comboCount, Is.InRange(2u, 3u));
+            Assert.That(System.Math.Abs((int)last.flashCount - (int)last.comboCount), Is.InRange(0, 1),
+                "Neither event crowds the other out (#271).");
         }
 
         [Test]
@@ -245,7 +291,7 @@ namespace C6Lab.Tests
         {
             var model = new LabModel();
             // Bombs every 5 s with a 15 s fuse: the first is still out when the second comes (#271, one event per screen).
-            model.Begin("bomb-per-screen", Three, 0d, Config(flash: true, first: 90f, bombEvery: 5f));
+            model.Begin("bomb-per-screen", Three, 0d, Config(flash: true, first: 61f, bombEvery: 5f));
             Assert.That(GourdBombs(model.Snapshot(5d)), Is.EqualTo(1));
             LabSnapshot two = model.Snapshot(10d);
             LabOrbState[] bombs = two.orbs.Where(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd).ToArray();
