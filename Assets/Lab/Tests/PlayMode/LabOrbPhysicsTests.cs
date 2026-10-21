@@ -723,7 +723,7 @@ namespace C6Lab.Tests
 
             // The DEV form sets how small.
             float[] values = config.CaptureDeveloperValues();
-            values[151] = .25f;
+            values[146] = .25f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var smaller = board.UpsertOrb("smaller", LabOrbKind.Yang, new Vector2(.5f, .8f), small: true);
             Assert.That(smaller.HitSphere.radius, Is.EqualTo(.25f * radius).Within(1e-5f));
@@ -836,6 +836,105 @@ namespace C6Lab.Tests
                 + ", velocity=" + held.Body.linearVelocity + ", kinematic=" + held.Body.isKinematic);
             Assert.That(kinds["rests"], Is.EqualTo(LabEdgeCrossingKind.Swipe));
             Assert.That(kinds["held"], Is.EqualTo(LabEdgeCrossingKind.Swipe));
+        }
+
+        [Test]
+        public void VanishingAnOrbTakesItOffTheBoardAndSaysSoUnlikeRemovingIt()
+        {
+            var vanished = new System.Collections.Generic.List<string>();
+            board.OrbVanished += id => vanished.Add(id);
+            var old = board.UpsertOrb("old", LabOrbKind.Yin, new Vector2(.5f, .5f));
+            var passed = board.UpsertOrb("passed", LabOrbKind.Yang, new Vector2(.2f, .5f));
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(old), 1d), Is.True, "Held as its time runs out.");
+
+            Assert.That(board.Vanish("old"), Is.True);
+            Assert.That(board.TryGetMotion("old", out _, out _), Is.False, "Its lifetime ran out, so it is gone (#235).");
+            Assert.That(vanished, Is.EqualTo(new[] { "old" }), "The board says it expired.");
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(passed), 2d), Is.True, "No gesture is left stuck on it.");
+            board.CancelDrag();
+
+            Assert.That(board.RemoveOrb("passed"), Is.True);
+            Assert.That(vanished, Is.EqualTo(new[] { "old" }), "An orb handed on or combined just leaves; it did not expire.");
+            Assert.That(board.Vanish("never"), Is.False);
+            Assert.That(board.Vanish(null), Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator AnOrbFlashesWhiteInItsLastSecondsThenGoesUpInSmoke()
+        {
+            var fresh = board.UpsertOrb("fresh", LabOrbKind.Yin, new Vector2(.5f, .5f), lifeSeconds: 6f);
+            Assert.That(fresh.LifeSecondsLeft, Is.EqualTo(6f).Within(1e-4f));
+            Assert.That(fresh.ExpiryWarning, Is.False, "Not yet in its last three seconds.");
+            Assert.That(fresh.ExpiryFlash, Is.Zero);
+            board.UpsertOrb("fresh", LabOrbKind.Yin, new Vector2(.5f, .5f), lifeSeconds: 5.9f);
+            Assert.That(fresh.LifeSecondsLeft, Is.EqualTo(6f).Within(1e-4f),
+                "A later snapshot a moment apart does not nudge the countdown.");
+
+            var dying = board.UpsertOrb("dying", LabOrbKind.Yang, new Vector2(.3f, .5f), lifeSeconds: 2.5f);
+            Assert.That(dying.ExpiryWarning, Is.True, "In its last three seconds it warns (#235)...");
+            Assert.That(dying.ExpiryFlash, Is.GreaterThan(.8f), "...jumping to white at once...");
+            Assert.That(dying.ExpiryFlashRadius, Is.EqualTo(dying.HitSphere.radius).Within(1e-4f), "...over the whole ball.");
+
+            int jumps = 0;
+            float last = dying.ExpiryFlash;
+            float until = Time.time + 1.5f;
+            while (Time.time < until)
+            {
+                yield return null;
+                float now = dying.ExpiryFlash;
+                if (now > last + .2f) jumps++;
+                last = now;
+            }
+            Assert.That(jumps, Is.GreaterThanOrEqualTo(2), "It flashes again and again.");
+            Assert.That(dying.LifeSecondsLeft, Is.LessThan(1.1f), "And counts its own seconds down.");
+
+            Vector3 at = dying.transform.position;
+            Assert.That(board.Vanish("dying"), Is.True);
+            var smoke = Object.FindFirstObjectByType<LabOrbVanishSmoke>();
+            Assert.That(smoke, Is.Not.Null, "When it goes, it goes up in smoke...");
+            Assert.That(smoke.transform.position.x, Is.EqualTo(at.x).Within(1e-4f), "...where it was...");
+            Assert.That(smoke.transform.position.z, Is.LessThan(at.z - dying.HitSphere.radius), "...in front of the orbs.");
+            until = Time.time + 2f;
+            while (Time.time < until && smoke != null) yield return null;
+            Assert.That(smoke == null, Is.True, "The smoke clears by itself.");
+
+            board.UpsertOrb("fresh", LabOrbKind.Yin, new Vector2(.5f, .5f), lifeSeconds: -1f);
+            Assert.That(fresh.LifeSecondsLeft, Is.LessThan(0f), "No lifetime given: nothing to warn about.");
+            Assert.That(fresh.ExpiryWarning, Is.False);
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.7f, .2f), lifeSeconds: 1f);
+            Assert.That(drum.ExpiryWarning, Is.False, "A drum never runs out.");
+            Assert.That(drum.ExpiryFlash, Is.Zero);
+        }
+
+        [Test]
+        public void TheExpiryWarningSecondsComeFromTheAppearanceInspector()
+        {
+            var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            SetSerializedField(appearance, "expiryWarningSeconds", 1f);
+            SetSerializedField(config, "orbAppearance", appearance);
+            try
+            {
+                board.Configure(config, inputCamera, Bounds);
+                Assert.That(appearance.ExpiryWarningSeconds, Is.EqualTo(1f));
+                var orb = board.UpsertOrb("orb", LabOrbKind.Combined, new Vector2(.5f, .5f), element: LabOrbElement.Fire,
+                    lifeSeconds: 1.5f);
+                Assert.That(orb.ExpiryWarning, Is.False, "With one second set, 1.5 seconds left is not yet the warning.");
+                board.UpsertOrb("orb", LabOrbKind.Combined, new Vector2(.5f, .5f), element: LabOrbElement.Fire,
+                    lifeSeconds: .9f);
+                Assert.That(orb.ExpiryWarning, Is.True);
+                Assert.That(orb.ExpiryFlash, Is.GreaterThan(.8f));
+
+                SetSerializedField(appearance, "expiryWarningSeconds", 0f);
+                board.UpsertOrb("orb", LabOrbKind.Combined, new Vector2(.5f, .5f), element: LabOrbElement.Fire,
+                    lifeSeconds: .5f);
+                Assert.That(orb.ExpiryWarning, Is.False, "Zero turns the flash off.");
+                Assert.That(orb.ExpiryFlash, Is.Zero);
+            }
+            finally
+            {
+                SetSerializedField(config, "orbAppearance", null);
+                Object.Destroy(appearance);
+            }
         }
 
         [UnityTest]
@@ -1131,8 +1230,8 @@ namespace C6Lab.Tests
 
             // From the DEV form: no lag sticks the bomb to the finger like an orb; a new mass applies to new bombs.
             float[] values = config.CaptureDeveloperValues();
-            values[146] = 0f;
-            values[149] = 10f;
+            values[141] = 0f;
+            values[144] = 10f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             start = BoardPoint(bomb);
             Assert.That(board.TryBeginDragAtWorld(start, 4d), Is.True);
@@ -1141,6 +1240,51 @@ namespace C6Lab.Tests
             board.CancelDrag();
             Assert.That(board.UpsertOrb("heavier", LabOrbKind.Bomb, new Vector2(.7f, .5f), lockSwipes: 2, fuseSeconds: 10f).Body.mass,
                 Is.EqualTo(10f));
+        }
+
+        [UnityTest]
+        public IEnumerator ABombThePlayerSendsOnPassesAtTheEdgeEvenSlowlyButADriftingOneTurnsBack()
+        {
+            // No drag lag here, so the dragged bomb sits exactly on the edge when it is let go.
+            float[] values = config.CaptureDeveloperValues();
+            values[141] = 0f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var crossed = new System.Collections.Generic.Dictionary<string, LabOrbEdgeCrossing>();
+            board.EdgeCrossed += crossing => crossed[crossing.OrbId] = crossing;
+            float edge = board.CenterBounds.xMax;
+            float driftPass = 1.5f * config.DrumDriftSpeed * Width; // slower than this, a drifting bomb turns back
+
+            var sent = board.UpsertOrb("sent", LabOrbKind.Bomb, new Vector2(.9f, .5f), lockSwipes: 2, fuseSeconds: 10f);
+            Vector2 start = BoardPoint(sent);
+            Assert.That(board.TryBeginDragAtWorld(start, 1d), Is.True);
+            // The finger drags it to the edge and past it, then lets go with a gentle push outward.
+            Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 1.05d), Is.True);
+            Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 1.5d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(edge + .45f, start.y), 1.6d), Is.True);
+            Assert.That(sent.Body.linearVelocity.x, Is.InRange(.01f, driftPass), "A gentle push, slower than a drift could ever pass.");
+            for (int step = 0; step < 20 && !crossed.ContainsKey("sent"); step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("sent"), Is.True, "Sent on by the player, it passes at the edge however slowly (#237).");
+            Assert.That(crossed["sent"].ToRight, Is.True);
+            Assert.That(crossed["sent"].Kind, Is.EqualTo(LabEdgeCrossingKind.Swipe), "It is the player's own pass.");
+
+            // The gourd's swipe block still holds that edge against it.
+            board.SetSwipeBlock(1, 5f);
+            var blocked = board.UpsertOrb("blocked", LabOrbKind.Bomb, new Vector2(.9f, .2f), lockSwipes: 2, fuseSeconds: 10f);
+            start = BoardPoint(blocked);
+            Assert.That(board.TryBeginDragAtWorld(start, 2d), Is.True);
+            Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 2.05d), Is.True);
+            Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 2.5d), Is.True);
+            Assert.That(board.EndDragAtWorld(new Vector2(edge + .45f, start.y), 2.6d), Is.True);
+            for (int step = 0; step < 20; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("blocked"), Is.False, "A blocked edge still bounces the player's pass (#215).");
+            Assert.That(board.BlockBounces, Is.GreaterThanOrEqualTo(1));
+            board.SetSwipeBlock(0, 0f);
+
+            // A bomb nobody sent drifts and turns back at the edge, as before.
+            var drifting = board.UpsertOrb("drifting", LabOrbKind.Bomb, new Vector2(.98f, .8f), lockSwipes: 2, fuseSeconds: 10f);
+            drifting.Body.linearVelocity = new Vector3(.5f * driftPass, 0f, 0f);
+            for (int step = 0; step < 40; step++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed.ContainsKey("drifting"), Is.False, "A bomb nobody sent never wanders across.");
         }
 
         [UnityTest]
@@ -1161,8 +1305,9 @@ namespace C6Lab.Tests
             Vector2 orbRelease = Flick(orb, 1d);
             Vector2 bombRelease = Flick(bomb, 2d);
             Assert.That(orbRelease.x, Is.GreaterThan(.2f * Width), "The flick sends the orb on.");
-            Assert.That(bombRelease.x, Is.EqualTo(.5f * orbRelease.x).Within(.001f * Width),
-                "A bomb leaves the finger at half an orb's speed, so passing it takes a harder swipe (#212).");
+            Assert.That(config.BombReleaseSpeed, Is.EqualTo(.75f), "Since #237, three quarters of an orb's release.");
+            Assert.That(bombRelease.x, Is.EqualTo(config.BombReleaseSpeed * orbRelease.x).Within(.001f * Width),
+                "A bomb leaves the finger at three quarters of an orb's speed; it stays heavier than an orb (#237).");
             Assert.That(Mathf.Abs(bombRelease.y), Is.LessThan(.001f));
 
             // Then each slides on the floor: the bomb loses speed twice as fast.
@@ -1582,6 +1727,49 @@ namespace C6Lab.Tests
             var samples = new float[clip.samples];
             Assert.That(clip.GetData(samples, 0), Is.True);
             Assert.That(samples.Max(Mathf.Abs), Is.InRange(.2f, 1f), "It is audible and never clips past full scale.");
+        }
+
+        [UnityTest]
+        public IEnumerator AudioConfigurationChangeRecreatesTheSharedSizzleAndRebindsBurningSources()
+        {
+            var first = root.AddComponent<LabFuseSound>();
+            first.Bind(board, null);
+            var secondObject = new GameObject("Second fuse sound");
+            secondObject.transform.SetParent(root.transform, false);
+            var second = secondObject.AddComponent<LabFuseSound>();
+            second.Bind(board, null);
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 10f);
+            yield return null;
+            AudioClip previous = first.Clip;
+            Assert.That(second.Clip, Is.SameAs(previous));
+
+            // Exercise the registered callback without resetting the user's audio device.
+            typeof(LabFuseSound).GetMethod("OnAudioConfigurationChanged", BindingFlags.NonPublic | BindingFlags.Static)
+                .Invoke(null, new object[] { true });
+            yield return null;
+
+            Assert.That(first.Clip, Is.Not.SameAs(previous), "Generated sample data must be rebuilt after a device change.");
+            Assert.That(second.Clip, Is.SameAs(first.Clip), "All live sources use the same replacement.");
+            Assert.That(first.Clip.length, Is.EqualTo(1f).Within(.01f));
+            var samples = new float[first.Clip.samples];
+            Assert.That(first.Clip.GetData(samples, 0), Is.True);
+            Assert.That(samples.Max(Mathf.Abs), Is.InRange(.2f, 1f));
+            Assert.That(first.Burning && second.Burning, Is.True, "The active fuse state survives audio reconfiguration.");
+        }
+
+        [Test]
+        public void InvalidCachedSizzleIsRebuiltEvenWhenItsUnityObjectStillExists()
+        {
+            AudioClip previous = LabFuseSound.GeneratedSizzle();
+            AudioClip invalid = AudioClip.Create("Incomplete fuse sample data", 1, 1, 22050, false);
+            typeof(LabFuseSound).GetField("generatedClip", BindingFlags.NonPublic | BindingFlags.Static)
+                .SetValue(null, invalid);
+            AudioClip replacement = LabFuseSound.GeneratedSizzle();
+
+            Assert.That(replacement, Is.Not.SameAs(invalid), "A surviving wrapper is not evidence of usable sample data.");
+            Assert.That(replacement.length, Is.EqualTo(1f).Within(.01f));
+            Assert.That(LabFuseSound.GeneratedSizzle(), Is.SameAs(replacement), "A valid replacement remains cached.");
+            Object.Destroy(previous);
         }
 
         private void SetDrumDrift(float speed, float turning)

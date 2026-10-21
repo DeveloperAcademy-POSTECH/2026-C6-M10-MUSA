@@ -25,8 +25,8 @@ namespace C6Lab.Tests
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(169), "The live DEV panel includes all appended settings, including nearby-hit drying.");
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(169), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(165), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(165), "The live DEV panel includes all appended settings, including nearby-hit drying.");
         }
 
         [UnityTearDown]
@@ -52,30 +52,30 @@ namespace C6Lab.Tests
             Assert.That(ui.panel.activeSelf, Is.True);
             Button category = ui.panel.GetComponentsInChildren<Button>(true)
                 .Single(button => button.name == "Category Gourd");
-            for (int i = 129; i <= 132; i++)
+            for (int i = 128; i <= 131; i++)
                 Assert.That(ui.valueInputs[i].transform.parent.gameObject.activeSelf, Is.False);
             category.onClick.Invoke();
-            Transform toggleRow = ui.valueInputs[129].transform.parent;
+            Transform toggleRow = ui.valueInputs[128].transform.parent;
             Button toggle = toggleRow.Find("SettingSlider/SettingToggle").GetComponent<Button>();
             Assert.That(toggleRow.gameObject.activeInHierarchy, Is.True);
-            Assert.That(ui.valueInputs[129].gameObject.activeSelf, Is.False,
+            Assert.That(ui.valueInputs[128].gameObject.activeSelf, Is.False,
                 "The enable field must appear as a real ON/OFF control, not a numeric slider.");
             Assert.That(toggle.interactable, Is.True);
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("OFF"));
             toggle.onClick.Invoke();
-            Assert.That(ui.valueInputs[129].text, Is.EqualTo("1"));
+            Assert.That(ui.valueInputs[128].text, Is.EqualTo("1"));
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("ON"));
 
             float[] profile = { 2f, .6f, .4f };
-            for (int i = 130; i <= 132; i++)
+            for (int i = 129; i <= 131; i++)
             {
                 var field = LabConfig.DeveloperFields[i];
                 Assert.That(ui.valueInputs[i].gameObject.activeInHierarchy, Is.True);
                 Assert.That(ui.valueInputs[i].interactable && !ui.valueInputs[i].readOnly, Is.True);
                 Assert.That(ui.valueSliders[i].interactable, Is.True);
-                ui.valueInputs[i].text = profile[i - 130].ToString(CultureInfo.InvariantCulture);
+                ui.valueInputs[i].text = profile[i - 129].ToString(CultureInfo.InvariantCulture);
                 Assert.That(ui.valueSliders[i].value,
-                    Is.EqualTo(Mathf.InverseLerp(field.Min, field.Max, profile[i - 130])).Within(.0001f));
+                    Is.EqualTo(Mathf.InverseLerp(field.Min, field.Max, profile[i - 129])).Within(.0001f));
                 ui.valueSliders[i].value = .75f;
                 Assert.That(float.Parse(ui.valueInputs[i].text, CultureInfo.InvariantCulture),
                     Is.EqualTo(Mathf.Lerp(field.Min, field.Max, .75f)).Within(.0001f));
@@ -88,7 +88,7 @@ namespace C6Lab.Tests
             scroll.StopMovement();
             yield return null;
             Canvas.ForceUpdateCanvases();
-            var input = (RectTransform)ui.valueInputs[132].transform;
+            var input = (RectTransform)ui.valueInputs[131].transform;
             // More Gourd settings can follow the grain group; scroll to this input rather
             // than assuming that the grain group remains the content's final rows.
             Vector3 rowCenter = scroll.viewport.InverseTransformPoint(input.TransformPoint(input.rect.center));
@@ -113,7 +113,7 @@ namespace C6Lab.Tests
             ui.Close();
             ui.Open();
             yield return null;
-            Assert.That(ui.valueInputs[129].text, Is.EqualTo("0"));
+            Assert.That(ui.valueInputs[128].text, Is.EqualTo("0"));
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("OFF"));
         }
 
@@ -122,10 +122,10 @@ namespace C6Lab.Tests
         {
             ui.network.port = 19196;
             ui.Open();
-            ui.valueInputs[129].text = "1";
-            ui.valueInputs[130].text = "2";
-            ui.valueInputs[131].text = "0.6";
-            ui.valueInputs[132].text = "0.4";
+            ui.valueInputs[128].text = "1";
+            ui.valueInputs[129].text = "2";
+            ui.valueInputs[130].text = "0.6";
+            ui.valueInputs[131].text = "0.4";
             ui.applyStartButton.onClick.Invoke();
             yield return null;
             yield return null;
@@ -137,7 +137,7 @@ namespace C6Lab.Tests
             Assert.That(ui.network.config.PaintMottleStrength, Is.EqualTo(.4f));
             Assert.That(JsonUtility.ToJson(ui.sourceConfig), Is.EqualTo(sourceJson));
             ui.Open();
-            ui.valueInputs[129].text = "0";
+            ui.valueInputs[128].text = "0";
             ui.applyStartButton.onClick.Invoke();
             yield return null;
             yield return null;

@@ -1467,3 +1467,373 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 검사는 통제한 Editor 물리 fixture이며 실제 참가자가 다중 앱에서 주고받은 플레이 결과로 확대하지 않는다. 임시 진단/환경 도구·원시 XML/로그·캡처·빌드는 저장소에서 제외한다. 사용자 Scene·Target2 머터리얼·미추적 meta는 별도 보존한다.
 
 최종 검사부터 두 빌드까지 게임 런타임/검사/Shader/Config/Scene/패키지/설정 **191개 파일의 SHA256이 일치**했다. 세로 검사 도구는 빌드 전에 제거했고 글로벌 GameView 설정 파일도 기존 바이트와 같음을 확인했다. Scene/에셋/검사 임계값을 변경해 GPU 통과를 맞추지 않았다.
+
+## 구슬 소멸 예고 — 2026-10-20, 이슈 #235
+
+기준은 Unity **6000.6.5f1**, main(`63a587da`, #233 PR #234 포함)에서 분기한 `feat/#235-orb-expiry-warning`이다.
+
+- **Host 만료 보고**: 수명이 끝난 구슬을 Host가 기록해 지금 가진 사람에게만 스냅샷보다 먼저 `orbExpired`로 알린다. 조합·넘김·던지기·사용으로 사라진 구슬, 날아가는 구슬, 터지는 잠긴 폭탄은 보고하지 않는다. 수명 규칙(아이템 15초·잠긴 폭탄 도화선 15초·그 밖에 해금 폭탄 포함 8초)을 `LabOrbKindRules.LifetimeFor` 하나로 모아 Host와 모든 화면이 같이 쓴다.
+- **표시**: 마지막 3초 동안 구슬 그림 전체(먹선 테두리 포함)를 흰 막과 옅은 빛으로 덮었다 걷는 번쩍임이 초당 1.5번에서 7번까지 빨라진다(결합 구슬 1.2배·폭탄 그림 크기에 맞춤, 북·잠긴 폭탄 제외). 사라질 때 따뜻한 회색 연기 6덩이가 0.6초 동안 퍼졌다 걷힌다. 판 종이가 크림색 한지이고 양 구슬이 흰색이라, 흰 빛만이 아니라 그림 전체를 하얗게 덮어 보이게 했다.
+- **값**: 번쩍임 시작 시간·빠르기·색, 연기 크기·시간·색은 `LabOrbAppearance` Inspector의 Orb expiry 칸이다(DEV 없음, 설정 169개 유지). 통신 버전 `5646` → `5647`.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다 컴파일했다. 오류 0. 새 파일 `LabOrbVanishSmoke.cs`가 Runtime에 포함된 것을 확인했다. |
+| 모양 미리보기 | 확인 (Unity 밖) | 실제 `BoardPlate.png`와 음·양·화 구슬 그림으로 Python 렌더링해 번쩍임·연기 모양을 정했다. 실제 Unity 화면이 아니다. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN | 이번 변경의 Test Runner 결과는 기록하지 않았다. |
+| 솔로 화면: 번쩍임이 잘 보이는지·산만하지 않은지, 연기 | NOT_RUN | 구슬 하나를 만들고 8초를 기다려 5초쯤부터 번쩍이고 8초에 연기와 함께 사라지는지 본다. |
+| 3인 실행: 넘겨받은 구슬의 번쩍임, 넘김·조합 시 연기 없음 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 휴대폰 화면 밝기에서 번쩍임 가독성 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `AnOrbWhoseLifetimeRunsOutIsReportedToItsHolderOnceButNotOneThatLeftAnotherWay`, `ExpiredItemsAndUnlockedBombsAreReportedButALockedBombBlastsInstead`, `EveryScreenCountsAnOrbsLifeDownByTheSameRule`; 프로토콜을 고정한 팀원 검사 7개를 5647로 갱신
+- **PlayMode** `LabOrbPhysicsTests`: `VanishingAnOrbTakesItOffTheBoardAndSaysSoUnlikeRemovingIt`, `AnOrbFlashesWhiteInItsLastSecondsThenGoesUpInSmoke`, `TheExpiryWarningSecondsComeFromTheAppearanceInspector`
+
+
+## 콤보 예고와 콤보 기본값 — 2026-10-21, 이슈 #241
+
+기준은 main `63a587da`(#232 콤보, #234 축소 투사체 판정 포함)에서 분기한 `feat/#241-combo-warning`이다. Unity는 실행하지 않았다.
+
+- **DEV**: `Combo Warning (seconds)`를 170번째(인덱스 169)에 추가했다. 범위 0~10초, 기본 3초, 0이면 예고 없음. `Combo` 묶음에서는 `Combo First Start` 바로 아래에 보인다(표시 순서 160, 161, 169, 162~168). 설정 169 → **170개**, 프로토콜 `5646` → **`5647`**. 이후 main에 #235(PR #238, 프로토콜 5647)가 먼저 머지되어 main 통합 시 프로토콜을 **`5648`**로 한 칸 올렸다.
+- **기본값 변경**: `Gourd Color Combo` OFF → **ON**, `Combo Repeat Interval` 30 → **15초**, `Combo Penalty Size (x)` 0.3 → **0.1**, `Combo Reward Size (x)` 1.5 → **2.5**. 첫 시작 20초/제한 10초는 그대로다. 이전에는 `LabConfig.asset`에 콤보 필드가 없어 코드 기본값에 기댔는데, 열려 있던 Unity 에디터가 메모리의 옛 값을 유지해 DEV/DEFAULTS에 옛 값이 보였다. 그래서 콤보 10개 값을 `LabConfig.asset`에도 같은 값으로 저장했다.
+- **Host 모델**: 콤보를 기다리는 동안 스냅샷에 `comboNextAt`(4칸 등장 시각)과 `comboWarningAt`(= 등장 시각 − 예고 시간)을 싣고, 진행 중이거나 꺼져 있으면 -1이다. `LabSnapshot.ComboWarningOn(now)`로 예고 중인지 판단한다. 콤보가 끝나면 다음 콤보 시각을 최소 "끝난 시각 + 예고 시간"으로 미뤄 예고를 끝까지 보여준다(기본값 20/15/10/3에서는 해당 없음, 예고 0이면 이전과 같음). 예고 중에는 콤보가 없으므로 맞힌 구슬을 판정하지 않는다.
+- **화면**: `LabGourdComboHud`가 예고 중 패널 자리에 같은 크기의 `COMBO!`(노랑, 진한 테두리) + 남은 초를 그린다. 숫자는 바뀔 때마다 1.7배에서 1배로 튀고 마지막 1은 빨강이며, 글자와 패널은 0에 가까울수록 빠르게 들썩인다. 예고 중 색 4칸과 SMALL/BIG 배지는 숨기고, 앞 콤보의 결과 문구가 떠 있으면 그것이 끝난 뒤 남은 카운트다운을 보인다. 첫 콤보 예고(콤보 수 0)에서도 보인다. 터치를 막지 않는다. 예고 소리는 이번 범위가 아니다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. `LabModel.cs`의 기존 CS0136(`blast`)은 main 원본에서도 나는 mcs 한계라 제외했다. |
+| EditMode 실제 실행 | NOT_RUN | `LabGourdComboTests` 새 3건(`TheWarningCountsDownBeforeTheFourSlotsAppearOnTime`, `ALateFinishStillLeavesTheWholeWarningBeforeTheNextCombo`, `AZeroWarningMeansTheComboAppearsWithoutOne`)과 기본값 갱신분, `LabDeveloperConfigTests.GourdColorComboFieldsFormTheComboGroupAndStartOn`, 개수/프로토콜 고정 검사 170/5648, 기존 전체 EditMode. 콤보가 기본 ON이 되어 전투 20초를 넘기는 기존 검사가 콤보를 만나는지도 이 실행으로 확인한다. |
+| PlayMode 실제 실행 | NOT_RUN | 새 `LabComboProjectileIntegrationTests.TheWarningCountsDownWithoutColorsOrBadgeThenTheComboAppears`, 개수 고정 Developer PlayMode 검사, 기존 전체 PlayMode. |
+| 솔로 화면: 17~20초 `COMBO!` 3/2/1, 20초에 4칸 등장, 예고 중 색/배지 숨김, 글자 크기·위치 | NOT_RUN | 기본값 그대로 솔로 시작 후 17초부터 확인한다. |
+| 3인 실행: 모든 화면에서 같은 카운트다운과 같은 시각의 4칸 등장 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 예고 패널이 위쪽 HUD/노치와 겹치지 않는지 확인 필요. |
+
+## 폭탄 가장자리 전달 — 2026-10-20, 이슈 #237
+
+기준은 Unity **6000.6.5f1**, main(`63a587da`, #233 PR #234 포함)에서 분기한 `feat/#237-bomb-edge-pass`다. 열린 #235 PR(#238)과 독립적으로 진행했다(통신 버전·설정 개수 변경 없음).
+
+- **원인**: #212의 무거운 폭탄 기본값(놓기 0.5배 × 감속 2배)으로 미끄러지는 거리가 구슬의 12.5%였고, 느려지면 떠돌기로 바뀌어 가장자리에서 밀려나거나, 느리게 닿으면(드리프트 속도의 1.5배 미만) 되돌아왔다.
+- **규칙**: 플레이어가 스와이프하거나 끌어서 놓은 폭탄은 "내가 보냄" 표시가 붙어 멈출 때까지 미끄러지고, 바깥쪽으로 가장자리에 닿으면 속도와 상관없이 넘어간다(미끄럼이 끝나는 바로 그 단계에 닿아도). 넘김 이유는 "스와이프"라 넘기기 막기(#215)는 그대로 튕긴다. 멈추거나 다시 잡히거나 폭발에 밀리면 풀린다. 혼자 떠도는 폭탄과 북은 바꾸지 않았다.
+- **기본값**: 코드와 저장 `LabConfig.asset` 모두 `Bomb Release Speed` 0.75·`Bomb Slide Deceleration` 1.3(사용자가 Inspector에서 저장). 미끄러지는 거리는 구슬의 약 43%다. Unity가 이 에셋을 저장하면서 #222 콤보 설정 9개를 코드 기본값 그대로(콤보 꺼짐, 시작 20초·간격 30초·제한 10초, 벌칙 10초·0.3배·TEAM, 보상 10초·1.5배) 기록했으며 동작은 바뀌지 않는다. main 통합(2026-10-21) 때 이 에셋의 콤보 값은 #241에서 정한 main 쪽 값(ON/15초/0.1/2.5/예고 3초, 10개)을 유지했다.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 컴파일했다. 오류 0. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN | 이번 변경의 Test Runner 결과는 기록하지 않았다. |
+| 솔로 손맛: 판 가운데에서 넘어가는 세기, 무거운 느낌 | NOT_RUN | 솔로에는 이웃이 없어 넘어가는 순간은 확인할 수 없다(가장자리 도달만 확인 가능). |
+| 3인 실행: 보통 스와이프로 넘어가는지, DEV 값 비교 | NOT_RUN | Mac 앱 3개에서 0.75/1.3과 후보값(0.85/1.15, 0.9/1.1)을 비교해 확정해야 한다. |
+| iOS 실기기 | NOT_RUN | 손가락 스와이프 세기 체감 확인 필요. |
+
+추가·변경한 검사:
+- **PlayMode** `LabOrbPhysicsTests`: `ABombThePlayerSendsOnPassesAtTheEdgeEvenSlowlyButADriftingOneTurnsBack`(끌기 지연 0으로 가장자리에 놓고 예전 규칙이라면 되돌아왔을 속도로 놓기, 막힌 쪽 튕김, 혼자 떠도는 폭탄 되돌아옴); 변경 `AHeavyBombLeavesTheFingerSlowerAndSlidesToAStopSoonerThanAnOrb`(놓기 속도 비교를 설정값 0.75로)
+- **EditMode** `LabDeveloperConfigTests`: `HeavyBombFieldsJoinTheItemOrbsGroupWithTheirDefaultsAndApply`의 코드·저장 원본 기본값을 0.12·0.75·1.3·4로
+
+## 개인 조합판 로컬 처리와 Host 확정 분리 — 2026-10-21 KST 이슈 240 단독 작업
+
+이 절은 단독 #240 커밋 `9ee7bd2`의 기록이며 최신 main `7021c40e`의 #235·#241 통합 전 결과다. 아래 837/233 검사·Mac 92항목을 프로토콜5649/170개 통합본의 통과로 해석하지 않는다.
+
+기준 main `63a587d`에서 분기한 `refactor/#240-local-board-authority`다. Unity6000.6.5f1·NGO2.13.3·Unity Transport6.6.0·URP17.6.0·macOS ARM64에서 확인했다. 프로토콜은5647/연결 토큰`C6PhysicsLab/12`, 공유 설정169개다. 기존 LAN·Bonjour·직접 IPv4/IPv6·핫스팟 전송 코드를 유지하며 Scene·Prefab·원본 Config·패키지는 수정하지 않았다. 구현 경계와 파일 지도는 [LOCAL_BOARD_AUTHORITY](LOCAL_BOARD_AUTHORITY.md), 검사 분류는 [TEST_SUITE_REPORT](TEST_SUITE_REPORT.md)에 기록한다.
+
+### 구현과 검사 범위
+
+- 로컬 조합 임시 결과·중립 생성 예고·시각 투척을 먼저 만들고 Host가 종류/RNG·소유권·한 번의 소비·자원·실제 명중·도색·공동 결과를 확정한다. 평상시 `motion_batch`는 제거하고 행동 자체에 좌표·속도를 담는다.
+- 세션/판/요청 ID, 소유권 세대, 변경하지 않는 재전송 본문, 결과 재조회, 임시 ID 의존 동작, 거절/누락 복구와 보드 순번을 검사한다. 늦은 전체 스냅샷으로 소비·전달된 구슬을 되살리지 않는다.
+- 소유자별 작은 보드 프레임/행동 응답과 도색·공동 스냅샷 Bulk를 분리했다. Bulk는 NGO Unreliable 파이프라인 위에서 앱 순서·ACK·재전송을 구현한다. 도색 logical fragment2048문자/최대107개, wire fragment접두부 포함900문자/외부 메시지1200바이트 이하를 지킨다.
+- 전투 규칙·Host 난수 순서·P번호 고리·북 소유 생성·아이템/폭탄·축소·콤보·Paint/Crack·일시정지/재시작을 유지한다. 과거 프로토타입의 로비 속성 선택 제한을 추가하지 않는다.
+
+### 실제 실행 결과
+
+| 확인 | 결과 | 방법과 범위 |
+| --- | --- | --- |
+| 변경 전 전체 EditMode | PASS787/787 | `baseline-edit.xml`, 실패·생략0,24.630초. |
+| 변경 전 전체 PlayMode | PASS212/212 | `baseline-play.xml`, 실패·생략0,103.814초. |
+| 변경 전 실제 Mac2앱 | PASS직접19항목·지연조건18항목 | 같은 Mac loopback과 실제 UDP 프록시. 모바일 성능 기준선이 아니다. |
+| 개편 후 최종 전체 EditMode | **PASS837/837** | `final-edit-04.xml`, 실패·생략0, 28.642초. 2026-10-21 00:52:25Z~2026-10-21 00:52:54Z UTC. |
+| 개편 후 최종 전체 PlayMode | **PASS233/233** | `final-play-03.xml`, 실패·생략0, 104.429초. 2026-10-21 00:50:18Z~2026-10-21 00:52:03Z UTC. GPU 픽셀·저장 Scene·실제 물리와 새 보드/응답 fixture 포함. |
+| Mac Development 검증 앱 빌드 | PASS빌드와 실행 | 임시 검증 helper를 포함한 별도 앱이다. helper를 제거한 일반 배포 빌드 결과와 구분한다. 최종03/04의 게임 런타임 소스 해시가 같고04는 진단 helper만 보강했다. |
+| 실제 Mac2앱 직접 연결 | **PASS22항목** | `final04/network-direct2`, 실제Raw생성·드래그 조합·참가자/Host투척2회 명중·구슬/북 동일ID전달·소유자 합집합과 Host재고 일치·HP/색상/P맵·일시정지/재개·DEV재시작/P보존. |
+| 실제 Mac2앱 지연/손실 | **PASS22항목** | `final04/network-delay2`, 편도60ms·지터±10ms·데이터그램1% 손실 확률의 실제 UDP 프록시. 관측 패킷2294개 중25개를 버렸고 proxy오류0. 위게임흐름과 로컬 표시 확인. |
+| 실제 Mac3앱 | **PASS23항목** | `final04/network-direct35/n3`, Host P3/참가자P1·P2, 동일ID구슬·북 전달·공동 명중/도색·소유권·일시정지/DEV재시작 확인. |
+| 실제 Mac5앱 | **PASS25항목** | `final04/network-direct35/n5`, Host P5/참가자P1~P4, 위흐름과 각 기기 설정/지도/재고 일치 확인. 장시간 부하 시험은 아니다. |
+| iOS빌드·서명·설치·터치·LAN/핫스팟 | **NOT_RUN** | 기존 버전의 기기 PASS를 개편본에 승계하지 않는다. |
+| 모바일 FPS/GC·발열·배터리·반복지연분포 | **NOT_RUN** | 기능 검사와 Mac단발 관측으로 성능 목표 달성을 주장하지 않는다. |
+
+자동 패킷/순서/복구 검사는 통제 fixture이며 실제 앱 소켓 검사와 구분한다. Mac검증은 저장 Scene의 Host/Join/P선택과 공개 입력 경로를 사용한다. 재현 조건을 위한 DEV복사본만 조정했으며 원본 Config는 유지했다. 원시 로그·XML·주소·기기 식별자·검증용 앱/helper는 저장소에 포함하지 않는다.
+
+### 지연 관측의 해석
+
+같은60ms/±10ms/1%조건의 변경 전 참가자 조합표시는151.8/167.7ms(2회), 투척표시는171.3ms(1회) 뒤 관찰됐다. 개편 후 참가자 조합2회·투척1회 모두 **입력 호출 안에 시각 오브젝트를 생성**했다. Host의 조합 승인 도착은169.4/170.3ms였다. 통신 확정을 기다리지 않고 표시를 시작한 구조를 확인한 결과이며 화면 표시·손가락 입력이0ms라는 의미가 아니다.
+
+개편 후 수신자 구슬/북 관찰은158.2/157.9ms, 변경 전 구슬 관찰은266.5ms였다. 파일 조회·프레임·관찰 부하가 섞인 소수 표본이므로 전달 개선률·평균·p95로 해석하지 않는다. 전달 수신과 공동 명중의 최종 확정에는 여전히 통신 시간이 필요하다. 본문 바이트 카운터는 UDP 전체 헤더/하위 재전송을 포함하지 않는다.
+
+### 검사 도중 발견해 수정한 사항
+
+1. 도색 논리 조각을 줄였을 때 최대 해상도의 수신107조각을 허용하도록 함께 보완했다. 이후 실제 NGO named Unreliable 메시지 한도가 하위 UTP 설정보다 작아 접속시 OverflowException이 발생한 경로를 확인하고, 별도900문자 wire분할/재조립과1200바이트 검사를 추가했다. MTU·도색 해상도는 늘리거나 줄이지 않았다.
+2. 작은 보드 프레임의 박 자세를 실제 Host target에서 캡처하고, 오래된 응답/새 판 정리·복구 재전송·폭탄 알림 순서를 보완했다.
+3. 원격 일시정지 요청에 새 round가 빠져 거절되던 경로를 수정했다. 최종 실제 앱의 참가자Pause/HostResume 검사를 통과했다.
+4. 초기 전체지도 수신 중 보드 체크포인트가 복구되는 구간에서는 입력이 잠긴다. 실험 도구는 실제 보드 프레임 준비를 기다리도록 보완했다. helper의 진단/객체 조회 문제는 게임 오류와 구분해 수정했으며 실패 기록은 로컬에 보존했다.
+
+최종 코드/검사171개 파일 해시와 사용자 Scene·Target2머터리얼2개·미추적meta의 보존 해시를 대조한다. 테스트 임계값이나 물리 수치를 변경해 실패를 숨기지 않았다. 큰 조합판 체크포인트 자체는 아직 NGO신뢰성 제어 큐를 쓰므로 매우 많은 구슬 조건의 대기는 남을 수 있다. Host이전·전투중재접속·완전한 물리되감기는 추가하지 않았다.
+
+
+## main `7021c40e` 통합 기록 — #240 + #235 구슬 소멸 + #241 콤보 예고
+
+통합 기준은 단독 #240 `9ee7bd2`와 `origin/main` `7021c40e`다. 현재 통합 통신 규약은 **프로토콜5649·연결 토큰 `C6PhysicsLab/13`·공유 설정170개**이며, 이전5647/169개 또는5648/170개 앱과 섞어 접속하지 않는다.
+
+- #240의 로컬 조합판·임시 조합/투척·소유권/소비 원장·개인 보드와 도색 Bulk 분리를 유지한다.
+- #235의 구슬 종류별 수명 규칙·소멸 예고·Host 만료 알림과 연기를 보존한다. 만료 연출을 일반 조합/전달/소비에 잘못 재생하지 않는지 통합 검사한다.
+- #241의 `comboWarningAt`/`comboNextAt`, 예고 HUD와 DEV 170번째(인덱스169) 설정을 보존한다. 최신 main의 기본 ON·15초 반복·페널티0.1배·보상2.5배도 유지한다.
+- 문서 충돌은 현재 연결 정보와 규칙을 위 통합 기준으로 맞추고, #235·#241·단독#240의 당시 실행/미실행 기록은 삭제하거나 새 PASS로 바꾸지 않았다.
+
+| 확인 | 상태 | 필요한 근거 |
+| --- | --- | --- |
+| 통합 Runtime·Editor·검사 컴파일 | **PASS** | 아래 두 Unity 전체 검사가 같은 통합 소스에서 컴파일·실행을 완료했다. |
+| 통합 전체 EditMode | **PASS 844/844** | `merge-edit.xml`, 실패·생략0, 2026-10-21 01:06:09Z~01:06:35Z UTC, 25.850초. 콤보 예고 시각의 복사/빠른 보드 시계 보존 검사 포함. |
+| 통합 전체 PlayMode | **PASS 243/243** | `merge-play.xml`, 실패·생략0, 01:07:11Z~01:08:58Z UTC, 107.152초. 만료 후 거절로 숨긴 구슬 부활 금지, 행동 처리 중 만료 알림이 결과 삭제보다 선행, 이전 판/방 만료 패킷 거부, 일반 조합/투척/전달의 거짓 만료 없음과 최신 main 검사를 포함. |
+| 통합 Mac 검증 앱 빌드 | **PASS** | `merge-mac`의 새 Development 검증 앱 생성. 임시 helper를 포함한 앱이며 일반 배포/iOS 빌드와 구분. 빌드 전후 모든 런타임 C#과 사용자 보존 파일의 해시 일치, helper 제거 확인. |
+| 통합 Mac 직접2인·지연/손실2인 | **PASS 22+22항목** | `merge-mac/network-direct2/summary.json`, `merge-mac/network-delay2/summary.json`. 실제 소켓·편도60ms/지터±10ms/1% 손실 확률, 프로토콜5649·설정170개 확인. 조합·즉시 시각 투척·실제 명중·구슬/북 동일 ID 전달·Host/소유자 재고·HP·색/P맵·일시정지·DEV 재시작 검증. |
+| 통합 iOS·실기기·LAN/핫스팟 | **NOT_RUN** | 같은 통합 빌드의 서명·설치·터치·네트워크 환경별 실행 |
+
+전체 검사 전후 소스·Shader·Config·Scene·Prefab 196개 파일의 해시가 일치했다. 통합 Mac 지연 조건에서도 조합/비행 객체가 입력 호출 안에서 생성됐고, Host 조합 승인은174.1/167.0ms로 별도 도착했다. 통합본의 실제 Mac3/5인·iOS·LAN/핫스팟 실기기는 미실행이며 단독 결과로 승계하지 않는다.
+
+
+## 최신 main 추가 통합 — #240 + #239 폭탄 가장자리 전달
+
+이 절의 추가 통합 기준은 `origin/main` **`f36678b3`**(이슈 #237의 PR #239)다. 위 `7021c40e` 통합 결과 이후 main에 추가된 폭탄 가장자리 전달 변경을 #240에 합친 소스 기준이며, **프로토콜5649·연결 토큰 `C6PhysicsLab/13`·공유 설정170개**를 유지한다.
+
+- 플레이어가 놓은 폭탄의 전송 의도를 멈출 때까지 유지하여 느린 가장자리 도달도 스와이프 전달로 처리한다. #215의 막힌 방향은 계속 튕기며, 혼자 떠도는 폭탄은 되돌아온다.
+- 무거운 폭탄의 코드·저장 Config 기본값은 놓기 속도0.75배·미끄럼 감속1.3배·끌기 지연0.12초·질량4를 보존한다. 콤보는 #241의 기본 ON·15초 간격·페널티0.1배·보상2.5배·예고3초를 유지한다.
+- 단독 #240의837/233검사·Mac92항목과 `7021c40e` 통합의844/243검사·Mac44항목은 각각 당시 소스의 기록이다. **아래 추가 통합본의 결과로 승계하지 않는다.**
+
+| 확인 | 상태 | 필요한 근거 |
+| --- | --- | --- |
+| 추가 통합 Runtime·Editor·검사 컴파일 | **PASS** | 별도 깨끗한 작업 사본에서 Runtime·Editor·검사 어셈블리를 컴파일하고 실행했다. |
+| 추가 통합 전체 EditMode | **PASS 844/844** | `pr247-edit.xml`, 실패·생략0, 24.945초. |
+| 추가 통합 첫 전체 PlayMode | **FAIL 242/244** | `pr247-play.xml`, 실패2·생략0, 108.323초. 도화선 AudioClip 길이0으로 기존 오디오2건 실패. 같은 실행에 오디오 장치 초기화 실패/시스템 재설정 로그가 있었다. |
+| 위 오디오2건 동일 소스 분리 실행 | **PASS 2/2** | `pr247-audio.xml`, 실패·생략0, 0.277초. 게임 코드·검사 기대값·오디오 설정 변경 없음. |
+| 추가 통합 최종 전체 PlayMode | **FAIL 239/244** | `pr247-play-final.xml`, 실패5·생략0, 101.962초. 저장 Scene/도색 통합3건의 서버 bind 실패와 위 오디오2건. 전체 PASS로 기록하지 않는다. |
+| 최신 #240 보드 표시·네트워크 처리 검사 | **PASS 27/27** | 같은 최종 전체 실행의 `LabLocalBoardPredictionTests`13건·`LabLocalBoardNetworkIntegrationTests`14건 모두 통과. 별도 소켓/실기기 검사와 구분한다. |
+| 추가 통합 Mac 빌드·실제 앱 연결 | **NOT_RUN** | 같은 소스로 새 검증 앱 빌드와 실제 앱 실행 결과 필요. 위 Mac44항목은 `7021c40e` 기준이다. |
+| 추가 통합 iOS·실기기·LAN/핫스팟 | **NOT_RUN** | 같은 빌드의 서명·설치·터치·환경별 실행 필요. |
+
+이 추가 통합 검사는 커밋된 Scene·에셋 그대로 별도 작업 사본에서 실행했다. 이전 Mac44항목의 사용자 로컬 Scene 보존 환경과 구분한다. 원래 작업 폴더의 사용자 변경과 다른 작업 브랜치는 유지했다.
+
+최종 전체 검사에서 `Server failed to bind` 3건과 오디오 장치 초기화 실패 로그를 확인했다. 분리한 오디오2건은 통과했으나 전체 실행에서는 다시 실패했다. 실행 중 포트/오디오 환경 간섭 여부와 깨끗한 환경의 재현은 추가 확인 사항이며 원인을 확정하거나 정상으로 간주하지 않는다. 게임 코드·검사 기대값·오디오 설정을 변경하지 않았다. 추가 통합 작업 사본의 소스·검사·Scene·에셋196개 해시는 두 전체 실행과 분리 검사 전후 동일하다.
+
+
+## PR #247 PlayMode 실패 5건 보완 — 2026-10-21, 전체 검사 통과
+
+기준은 #240의 PR #247(`c00b34e4`, main `f36678b3` 통합)의 위 최종 전체 실행 **239/244**다. 실패한 최초 전체 실행·분리 실행·최종 전체 실행 기록을 삭제하거나 PASS로 바꾸지 않는다. 아래는 그 이후 소스 보완이며, 새 전체 실행 결과는 아래와 같이 **PASS**다. 이 단계에서 연결 규약·게임 규칙·원본 Scene·Config·오디오 기기 설정은 변경하지 않는다.
+
+### 확인된 원인과 판단 범위
+
+| 실패 | 확인한 근거 | 판단과 보완 |
+| --- | --- | --- |
+| `LabDeveloperSoloIntegrationTests.SavedSceneSoloCanGenerateCombineAndHitTheCylinder` | 고정 검사 포트 **17777**, `C6_LAB_UDP_BIND_FAILED error=AddressAlreadyInUse` 후 실제 Host 시작 실패 | 고정 검사 포트를 공유하지 않도록 OS가 배정한 사용 가능한 IPv4·IPv6 포트를 선택한다. 실제 Host 시작과 게임 동작 검증은 유지한다. |
+| `LabDeveloperSoloIntegrationTests.SavedSceneSoloSwipeBlockBouncesAndShowsOnTheBlockedPlayersOwnScreen` | 고정 검사 포트 **17792**, 같은 `AddressAlreadyInUse`와 Host 시작 실패 | 위와 같은 포트 분리와 검사 소유 NetworkManager 정리를 적용한다. |
+| `LabGourdPaintTests.FixedHundredPercentGoalGrowsFromRepeatedRealHitsFreezesOnPauseAndResetsOnRetry` | 고정 검사 포트 **17789**, 같은 `AddressAlreadyInUse`와 Host 시작 실패 | 위와 같은 포트 분리와 검사 소유 NetworkManager 정리를 적용한다. 성장·일시정지·승리·초기화 기대값을 낮추지 않는다. |
+| `LabOrbPhysicsTests.TheFuseSizzlesWhileABombBurnsAndStopsWithoutAFuse` | 생성 AudioClip이 null은 아니지만 길이가 **0**; 같은 전체 실행에 오디오 장치 초기화 실패·시스템 재설정 기록 | `LabFuseSound`의 정적 캐시가 Unity 객체 존재만 검사하던 부분을 보완한다. 샘플 수·채널·주파수·길이를 검사하고, 오디오 설정 변경 시 캐시를 무효화하여 다시 생성한다. |
+| `LabOrbPhysicsTests.TheGeneratedSizzleIsAOneSecondAudibleLoopWithinRange` | 위 생성 클립 길이0; 같은 코드의 분리 실행은2/2 통과하고 전체 실행에서 재실패 | 모든 활성 도화선 소스가 새 공유 클립을 다시 연결하게 한다. 기존1초 길이·실제 샘플 데이터·음량 검증은 유지한다. |
+
+- **포트 점유 자체는 확인됐으나 점유 주체는 확인 불가**다. 당시 다른 Unity 검사 프로세스가 같은 고정 포트를 사용했을 가능성과 이전 실행의 정리 문제를 구분해야 한다. 종료 후 포트7777만 조회한 결과는 실패 포트17777·17792·17789의 점유 여부를 확인한 근거가 아니다.
+- **검사 객체 정리 누락은 별도로 확인**됐다. NGO `NetworkManager.OnEnable`은 루트 GameObject를 `DontDestroyOnLoad`로 옮긴다. 기존 `LabDeveloperSoloIntegrationTests`에는 공통 정리 단계가 없었고, `LabGourdPaintTests`는 Lab Scene만 내렸다. `LabNetwork.Stop()`은 NGO 종료를 요청하지만 그 GameObject를 제거하지 않는다. 이것이 당시 세 포트를 점유한 직접 원인이라고 단정하지 않는다.
+- **오디오 복구 결함은 소스와 증상으로 확인**했다. 캐시의 Unity 객체가 남았다는 사실만으로 네이티브 샘플 데이터가 유효하다고 보장할 수 없다. 오디오 초기화가 실패한 외부 원인까지 확정한 것은 아니며, 이번에는 장치/전역 오디오 설정을 변경하지 않고 런타임 생성 클립의 복구 경로를 보완한다.
+
+### 변경 범위와 새 회귀 검사
+
+`Assets/Lab/Tests/PlayMode/LabSavedSceneNetworkFixture.cs`는 저장된 UI에 연결된 NetworkManager 한 개만 소유한다. 두 검사 묶음이 이 helper로 Scene을 불러오고, 정리 시 해당 NetworkManager를 Stop·Destroy한 뒤 프레임을 기다려 제거를 확인한다. 다른 검사나 사용자 객체를 일괄 제거하지 않는다. 포트 선택은 IPv4에서 OS 임시 포트를 배정받고 같은 IPv6 포트도 비어 있는지 검사한 뒤 실제 Host 시작 전에 탐색 소켓을 해제한다. 외부 프로세스가 해제 직후 포트를 선점하는 경쟁 가능성은 남으며, 실제 Host의 바인딩 실패를 숨기거나 재시도로 PASS 처리하지 않는다.
+
+| 새 검사 | 확인하려는 결과 | 현재 상태 |
+| --- | --- | --- |
+| `LabDeveloperSoloIntegrationTests.SavedHostFixtureUsesAnAvailablePortAndDisposesItsPersistentNetwork` | 점유 중인 UDP 포트와 다른 포트 선택, 실제 Solo Host 시작, 수동 Stop 없이 helper 정리, DDOL NetworkManager 제거와 Host 포트 재바인딩 | **PASS** |
+| `LabOrbPhysicsTests.AudioConfigurationChangeRecreatesTheSharedSizzleAndRebindsBurningSources` | 오디오 설정 변경 콜백 후 클립 재생성, 활성 소스2개의 같은 새 클립 연결,1초 길이와 샘플 데이터·도화선 상태 유지. 실제 기기 설정은 바꾸지 않고 등록된 콜백을 호출한다. | **PASS** |
+| `LabOrbPhysicsTests.InvalidCachedSizzleIsRebuiltEvenWhenItsUnityObjectStillExists` | 잘못된 샘플 수의 살아 있는 캐시를 교체하고, 올바른1초 대체 클립을 다시 공유 | **PASS** |
+| 보완 후 전체 EditMode·PlayMode | Unity6000.6.5f1, `pr247-fixed-edit.xml` **844/844**(25.142초), `pr247-fixed-play.xml` **247/247**(112.554초). 새3건과 기존 실패5건 포함, 실패·생략·inconclusive0. Edit 01:48:09Z~01:48:35Z, Play 01:45:44Z~01:47:37Z. | **PASS** |
+| 보완 후 Mac 실제 연결·iOS/LAN/핫스팟·모바일 성능 | 해당 소스의 별도 앱/환경 실행 증거 | **NOT_RUN** |
+
+구현 근거: `Assets/Lab/Scripts/Audio/LabFuseSound.cs`의 `GeneratedSizzle`·`ValidGeneratedClip`·`OnAudioConfigurationChanged`·`Update`, 위 fixture helper와 두 검사 묶음의 `UnloadSavedScene`, `Assets/Lab/Tests/PlayMode/LabOrbPhysicsTests.cs`의 새2건. 원시 로그·XML·앱·개인 경로는 공개 저장소에 포함하지 않는다.
+
+오디오 분리 검사도 `pr247-fix-audio.xml` **4/4**(0.230초) 통과했다. 전역 오디오 설정이나 장치를 변경하지 않았으며, 이번 전체 실행에서는 고정 포트·오디오 실패가 재발하지 않았다. 이전 실패 XML은 보존한다.
+
+
+## PR #248 AUTO 북 + #247 통합 — 2026-10-21
+
+기준은 #248에 main `79858189`(#247의 포트/오디오 보완 포함)을 반영한 `1e3d1403` 소스다. 두 PR이 각각5649를 사용해 의미가 겹쳤으므로 **프로토콜5650·연결 토큰 `C6PhysicsLab/14`·공유 설정170개**로 구분했다. #247의 로컬 조합판/행동 응답/Bulk 구조와 #239 폭탄 전달, #241 콤보 예고를 보존한다.
+
+- AUTO(Drum Count=0)는 솔로·2·3인1개, 4·5인2개를 Host가 판 시작에 배치한다. 인원 이하 개수는 서로 다른 소유자에게 배치하고, 고정1~5 선택은 유지한다. 원본 Config 기본0을 보존했다.
+- 새 DEV 버튼 검사는 #247의 저장 Scene 수명 helper를 사용하도록 연결하여 검사 후 DDOL 객체가 남지 않는다.
+- AUTO 모델 검사는2~5인 개수·소유자 분산 외에 전달받은 북으로 생성, Retry 판 증가·Raw 초기화·북 개수 및 분산 유지를 확인한다.
+
+| 검증 | 결과 | 근거와 한계 |
+| --- | --- | --- |
+| 전체 EditMode | **PASS845/845** | `pr248-integrated-edit.xml`,25.372초, 실패·생략·inconclusive0. |
+| 전체 PlayMode | **PASS248/248** | `pr248-integrated-play.xml`,109.227초,01:53:41Z~01:55:30Z, 실패·생략·inconclusive0. #247 보완3건과 DEV AUTO 선택·기존4종 선택 배치를 포함한다. |
+| Mac 실제 앱·iOS·LAN/핫스팟 | **NOT_RUN** | 위 자동 검사를 실제 다중 앱/환경의 실행으로 간주하지 않는다. |
+
+README·현행 DEV 명세·범위/도색 연결 문서의 통신 규약도5650/14로 맞췄다. 기존 검증 이력의 버전·실패 기록은 바꾸지 않는다. Scene·Prefab·패키지 및 사용자 로컬 머터리얼은 변경하지 않았다.
+
+## 콤보 동안 박 속 요괴 — 2026-10-21, 이슈 #244
+
+기준은 main `f36678b3`(#237 PR #239까지 포함)를 합친 `feat/#244-combo-yokai`다. Unity는 실행하지 않았다.
+
+- **이전 동작**: 박 프리팹(`WhiteGourd`)의 `GourdYokai_Details`에 붙은 Legacy `Animation`이 6초짜리 `Gourd_Demo`를 계속 반복했다(0.5~1.2초 뚜껑 열림, 1.1~1.8초 요괴 올라옴, 2~3.5초 두리번, 3.8~4.5초 들어감, 4.5~5.3초 뚜껑 닫힘). 제어 코드가 없어 기기마다 따로 돌았다.
+- **새 `LabGourdYokai`**: `LabGourdPaint`가 Paint 박을 붙일 때 함께 붙인다. 스냅샷이 예고 중(`ComboWarningOn`)이거나 콤보 진행 중(`comboActive`)이면 애니메이션 속도를 0으로 두고 시각을 직접 정해 `Sample()`한다. 올라온 뒤에는 2.0~2.8초(눈 +24°↔-24°) 구간을 오가며 두리번거린다. 콤보가 끝나면 그 시각부터 속도 1로 다시 틀어 평소처럼 들어가고 6초 반복으로 돌아간다.
+- **이음새**: 애니메이션 키가 모두 기울기 0이라 키 사이가 S자(smoothstep)다. 평소 반복의 시각 t에서 시작할 때 t≤2.8은 그대로, 2.8~3.5(눈이 가운데로 돌아옴)는 같은 눈 각도의 두리번 시각(S자 역함수), 3.5~3.8은 2.4초, 3.8~5.3(들어감·뚜껑 닫힘)은 그 자리에서 거꾸로 되감아 3.8초에서 같은 모습의 2.4초로, 5.3초 이후(닫힘)는 0.5초로 잇는다. 곡선 계산상 높이/뚜껑/눈 차이는 0이고, 가장 늦어도 1.5초 안에 다 올라온다(예고 3초 안).
+- **움찔**: 콤보 진행 칸이 늘면 0.35초 동안 크기가 먼저 줄었다 커지며(최대 약 16%) 위로 살짝 들썩인다. 마지막 칸(성공)도 움찔한 뒤 들어간다.
+- **범위**: DEV 설정·프로토콜·프리팹·애니메이션 파일 변경 없음. Crack 모드와 콤보 OFF는 이전과 같다. 일시정지 중에는 멈춰 있다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. |
+| 곡선 이음새 계산 | 확인 (Unity 밖) | `Gourd_Demo.anim`의 키를 smoothstep으로 계산해, 0~6초 0.1초 간격 시작 시 높이/뚜껑/눈 차이 0을 확인했다. 실제 Unity 샘플링 결과가 아니다. |
+| PlayMode 실제 실행 | NOT_RUN | 새 `LabGourdYokaiTests` 4개(`TheYokaiComesOutForTheWarningStaysForTheComboAndGoesBackAfter`, `HittingASlotMakesTheYokaiFlinchOnce`, `AComboStartingAnywhereInTheOrdinaryLoopDoesNotJump`, `NoComboOrAPausedWarningKeepsTheOrdinaryLoopOrHoldsStill`), `LabGourdPaintTests` Scene 연결 확인 추가분. |
+| 솔로 화면: 17초쯤 요괴가 올라와 콤보 끝까지 머묾, 칸 명중 시 움찔, 끝나면 들어감 | NOT_RUN | 기본값으로 솔로 시작 후 확인한다. |
+| 3인 실행: 모든 화면에서 같은 때 나오고 들어감 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | |
+
+
+## PR #249 요괴 연출 보완 + #247·#248 최종 통합 — 2026-10-21
+
+기준은 main `05e2dab6`(#247·#248 병합)을 합친 `9d70768` 소스다. 연결 규약5650/`C6PhysicsLab/14`·공유170개 설정과 AUTO 북 기본값을 유지하며, #249 자체는 Scene·Prefab·설정·통신 데이터 형식을 추가로 변경하지 않는다. 위 #244 최초 작성 시 미실행 기록과 아래 새 실행 결과를 구분한다.
+
+### 리뷰에서 보완한 실제 연출 결함
+
+- 마지막 콤보 성공 직후 일반 애니메이션으로 돌아가면서 움찔이 남아 있는 때, 일시정지로 애니메이션이 멈추면 기존 `localPosition += hop`이 매 프레임 누적될 수 있었다. 매 프레임 현재 애니메이션 pose를 샘플링한 뒤 오프셋을 적용하고, 움찔 종료·컴포넌트 비활성화 때 자세/크기를 복원한다.
+- 새 콤보의 최초 수신 스냅샷이 이미 progress1 이상이면 첫 명중 반응을 놓쳤다. 새 콤보는 progress0을 비교 기준으로 삼되 활성/기존 유지 상태일 때만 반응한다. 늦게 처음 받은 이미 끝난 콤보로 가짜 명중 효과를 만들지 않는다.
+
+| 검증 | 결과 | 실제 범위 |
+| --- | --- | --- |
+| 최종 전체 EditMode | **PASS845/845** | `pr249-integrated-edit.xml`,28.039초,02:00:10Z~02:00:38Z, 실패·생략·inconclusive0. |
+| 최종 전체 PlayMode | **PASS256/256** | `pr249-integrated-play.xml`,115.826초,01:57:52Z~01:59:47Z, 실패·생략·inconclusive0. 기존 실패5건, #247 회귀3건, AUTO UI, 요괴8건과 저장 Scene 연결 포함. |
+| 요괴 추가 회귀4건 | **PASS4/4** | 첫/다음 콤보의 progress0 생략 수신, 늦은 완료 스냅샷 무반응, 마지막 성공 후 정지120프레임의 위치/크기/애니메이션 시각 유지 및 재개 복원, 비활성화 복원. 실제 저장 WhiteGourd/Animation을 샘플링한다. |
+| 최종 Mac Development 검증 앱 빌드 | **PASS** | `AUTHORITY_PROBE_BUILD_OK`, BuildReport347,313,513bytes. 로컬 검증 helper를 포함한 별도 앱이며 일반 배포 빌드와 구분한다. 빌드 후 helper 제거, 게임 C#·Scene·Config 보존 확인. |
+| 실제 Mac2앱 직접 연결 | **PASS22항목** |5650·170개 공유, 실제 드래그 조합/시각 투척, Host 실제 충돌·소비·HP·RGB/P맵 일치, 구슬/북 동일ID 전달, 공동 pause/resume·DEV재시작. |
+| 실제 Mac2앱 지연·손실 | **PASS22항목** | 실제UDP 프록시 편도60ms·지터±10ms·손실확률1%, 같은22항목. 조합/투척 시각 객체는 입력 호출 안에서 보였고 Host 승인은 별도로 기다렸다. 이 관찰을 화면/터치 지연0ms로 해석하지 않는다. |
+| 요괴 연출의 다기기 시각 동시성·수동 외형 평가 | **NOT_RUN** | Mac 통신 probe는 요괴 포즈 동시성을 관찰하는 도구가 아니다. 위8개 PlayMode의 실제Transform/Animation 검사와 구분한다. |
+| iOS·실기기 LAN/핫스팟·모바일 성능 | **NOT_RUN** | Mac loopback 결과를 기기/네트워크 환경 호환성으로 확대하지 않는다. |
+
+Mac 자동 조작은 양쪽의 생성·전달을 검사하기 위해 실행 복사본의 북 수를 고정2개로 설정한다. 따라서 AUTO 기본 개수의 실제 다중 앱 검사로 주장하지 않는다. AUTO2~5인·Retry·전달 후 생성 규칙은 전체 EditMode의 모델 검사에서 확인했다. 검증 전후 C#·Scene·Config·패키지는 동일하며 Unity import가 재직렬화한 Target2 머터리얼2개는 커밋하지 않았다. 원래 사용자 작업 폴더의 Scene·머터리얼·기존 미추적 메타 해시는 유지했다. 원시XML/로그/앱은 로컬에 보관한다.
+
+## 미사용 변수와 과거 테스트 정리 — 2026-10-21 KST #246
+
+기준은 로컬 병합 완료 커밋 `2272d25a`(#240 + main `ae13b4f1`의 #235·#241·검사 수정)다. 정리 작업 브랜치는 `refactor/#246-legacy-variable-test-cleanup`이며 새 규약은 **5650 / `C6PhysicsLab/14` / 공유 설정165개**다. 이후 다른 PR의 main 반영 여부와 구분한다. 제거·이관 상세는 [정리 기록](LEGACY_VARIABLE_TEST_CLEANUP.md), 현재 검사 분류는 [테스트 보고서](TEST_SUITE_REPORT.md)를 따른다.
+
+### 정리와 보존 근거
+
+- 현재 쓰지 않는 이동 패킷 자료형·과거 모델 API·도색자 생략 오버로드를 정리하고 게임 규칙 검사는 원자적 좌표 포함 API와 명시적 도색자 배열로 이관했다.
+- 효과 없는 Flow4설정과100% 고정 목표 DEV 행만 제거했다. LEGACY/BROAD/SPLATTER/FLOW·초기 얼룩·활성 흐름 방향·군집·건조·목표100%와 현행 DEV 기능을 보존했다.
+- 원본 Config는 Unity API로 다시 저장해 위5개 키만 삭제했다. 남은165개 라벨/유효값은 정리 전170개에서5개를 뺀 결과와 정확히 일치했다.
+- 3해상도×4패턴×2스타일×2seed의48조건에서 RGBA·도색자 맵/셀 수가 정리 전후 동일했다. 건조는 비교 조건에서 OFF이며 건조 검사는 전체 검사에 별도 유지했다.
+- Scene의 저장 DEV 입력39행은 제거 지점보다 앞이고 기존 초기화가165행으로 확장한다. Scene 참조·배치, Target2 머터리얼2개와 기존 미추적 메타의 사용자 변경4파일 해시를 보존했다.
+- 공유 스키마 변경에 따라 프로토콜/토큰을 함께 올렸다.170개/5649/token13 이전 앱과 혼합하지 않는다. LAN/Bonjour/직접IPv4/IPv6/핫스팟 전송 코드는 변경하지 않았다.
+
+### 실제 실행 결과
+
+| 확인 | 결과 | 근거·환경 |
+| --- | --- | --- |
+| Runtime·Editor·검사 컴파일 | **PASS** | Unity6000.6.5f1·macOS ARM64에서 아래 전체 검사와 새 Mac 검증 앱 빌드 완료 |
+| 전체 EditMode | **PASS794/794** | `edit-01.xml`, 실패·생략0, 25.709초. UTC 2026-10-21 01:24:46Z~2026-10-21 01:25:11Z |
+| 첫 전체 PlayMode | **FAIL: 238통과·5실패** | `play-01.xml`, 실패5·생략0. 설정 재인덱싱 검사2건과 동시 실행 포트 충돌3건. 실패 원인을 아래에 기록 |
+| 수정 후 단독 전체 PlayMode | **PASS243/243** | `play-02.xml`, 실패·생략0, 106.118초. UTC 2026-10-21 01:33:15Z~2026-10-21 01:35:01Z |
+| 새 Mac Development 검증 앱 빌드 | **PASS** | 임시 검증 도구를 포함한 앱을 생성·실행. 도구 없는 배포/iOS 빌드와 구분 |
+| 실제 Mac2인 직접 연결 | **PASS24/24** | `network-regression/direct-two-player/n2/summary.json`. 같은 Mac loopback의 독립 앱2개. 두 기기의165개 설정/5650·같은 방/판·P고리·생성/직접 조합·동일ID 구슬/북 전달·명중/소비·HP·RGBA/P맵·Host/개인 재고·미확정 요청 없음·참가자Pause/HostResume·DEVRestart 초기화/P보존 확인 |
+| 빌드·Mac 실행 중 변경 보존 | **PASS** | `gameplay-preservation.json`: 사용자4파일·Config·패키지·런타임 코드 변경0, 임시 도구 제거, 두 앱 오류 로그0. 검증 프로세스 종료 |
+| iOS빌드·서명·설치·터치·실제LAN/핫스팟 | **NOT_RUN** | 기존 버전의 기기 결과나 Mac loopback 결과를 승계하지 않는다 |
+| 이번 버전3~5인·지연/손실·모바일FPS/GC | **NOT_RUN** | 과거 #240 검증과 구분. 정리 후 새 증거 없음 |
+
+### 첫 PlayMode 실패와 처리
+
+1. 건조 슬라이더 검사에서149~151의 새 인덱스에 과거 `i-154` 배열 오프셋을 사용했고, 줄 설정 검사에서는127행을 정렬한 뒤128행을 raycast했다. 현재 인덱스에 맞춰 **테스트만 수정**했고 실제 슬라이더/입력/레이캐스트 기대값을 유지했다. 게임 설정·물리 수치를 바꾸거나 오류 로그를 무시하지 않았다.
+2. 다른 채팅의 별도 프로젝트 사본 PlayMode가 UTC01:26:26~01:28:08, 이번 첫 실행은01:26:28~01:28:09로 겹쳤다. Viewer17892(다른 앱01:26:29~31, 실패30초), 솔로 박폭탄17791(32~34, 실패33초), Crack17781(40~43, 실패41초)의 동일 fixture 포트 점유를 대조했다. 네트워크 코드를 변경하지 않고 다른 실행 종료 후 전체 검사를 단독으로 실행해 모두 통과했다.
+
+Mac2인에서는 참가자 조합·투사체 오브젝트가 입력 호출 안에서 생성됐다. 이는 실제 화면/터치 지연0ms나 모바일 성능 향상을 증명하지 않는다. 검증을 위한 DEV복사본 값만 조정했고 원본 저장값은 유지했다. 원시 XML·주소·로그·앱·임시 도구는 공개 저장소에 포함하지 않는다.
+
+### 검사 수 변화
+
+EditMode844에서 폐기 계약 전용55개(고정 목표16·역사 배열길이17·폐기 Flow수치20·무효 조절값2)를 빼고 공통 스키마5개를 더해794개다. PlayMode243개는 유지했다. 이관/이름 변경 검사는 새 게임 기능으로 세지 않으며 핵심 규칙·물리·렌더·복구 검사를 개수 감소 목적으로 삭제하지 않았다. 테스트 실행량 감소를 플레이 성능 개선으로 표시하지 않는다.
+
+
+## #246 PR 최종 main 통합 검증 — 2026-10-21 KST
+
+정리 커밋 `13c051c3`에 선행 main `79858189`(#247 최종 `29ce13bc`)를 통합한 런타임/검사 소스 `470561b` 기준이다. 공유 설정165개·프로토콜5650·토큰14를 유지한다. main의 폭탄 전달/0.75·1.3 기본값·도화선 오디오 장치 복구·저장 Scene의 동적 포트/지속 NetworkManager 정리 fixture를 보존했다. main 대비 Config는 폐기5키만 삭제했고, OrbBoard·오디오·fixture는 그대로다.
+
+| 검증 | 결과 | 실제 근거 |
+| --- | --- | --- |
+| 중간 `90451a7` 전체 자동 검사 | PASS794/794·244/244 | `pr-edit.xml`·`pr-play-final.xml`. 마지막 오디오/포트 수정 전 기록이며 최종 결과와 구분 |
+| 최종 전체 EditMode | **PASS794/794** | `pr-main-edit.xml`, 실패·생략0, 27.847초, UTC 2026-10-21 01:54:05Z~2026-10-21 01:54:33Z |
+| 최종 전체 PlayMode | **PASS247/247** | `pr-main-play.xml`, 실패·생략0, 110.924초, UTC 2026-10-21 01:57:00Z~2026-10-21 01:58:51Z |
+| 최종 Mac2인 실제 앱 | **PASS24/24** | `pr-network-regression/direct-two-player/n2/summary.json`. 같은 Mac loopback 독립 앱2개에서165개/5650·P고리·생성/조합/동일ID 구슬·북 전달/실제2명중·소비·HP/색/P맵·소유자합집합·미확정 요청 없음·참가자Pause/HostResume·DEVRestart 초기화/P보존 확인 |
+| 사용자 변경 보존 | PASS4파일 | Scene·Target2 머터리얼2개·기존 미추적 메타를 시작 해시와 대조하고 커밋에서 제외 |
+| iOS·실제LAN/핫스팟·3~5인·모바일 성능 | NOT_RUN | 이 최종 소스로 새 기기 증거 없음 |
+
+중간 `pr-play.xml` 실행은 다른 채팅의 PlayMode 동시 실행을 확인해 이번 배치 프로세스만 SIGTERM으로 중단했다. 통과로 세지 않았고, 이후 다른 검사가 없는 시점에 새 전체 실행을 시작했다. 일부 fixed-port fixture는 남아 있어 동시 검사 안전을 보장하지 않는다.
+
+최종 검사 소스·설정·검사·패키지 해시를 실행 전후 대조한다. 선행 검사4개(폭탄 전달1·오디오 복구2·소켓 정리1)를 삭제하지 않아 최신 main의PlayMode247개를 유지했다. EditMode는844−55+5=794개다. 원시 로그·XML·주소·검증 도구·앱은 저장소에 포함하지 않는다.
+
+최종 Mac 빌드/실행의 `gameplay-preservation.json`에서 사용자4파일·원본Config·패키지·런타임코드 변경0과 임시 도구 제거를 확인했다. 두 앱 오류 로그0이며 검증 프로세스는 종료했다. 실제LAN/핫스팟·iOS·모바일 성능으로 확대하지 않는다.
+
+## #246 + main 북 AUTO·콤보 요괴 재개 최종 검증
+
+main `f3c7cec4`(#236/PR #248 북 AUTO·#244/PR #249 콤보 요괴)를 #246 정리에 추가 통합한다. #246의 `309b90d`/소스 `470561b`에서 확인한794/794·247/247·Mac2인24/24와, #248의170개/5650/token14에서 확인한845/845·248/248, #249의 같은170개 계약에서 확인한845/845·256/256·Mac직접/지연손실22+22항목은 각각 이전 소스의 근거로 위에 그대로 보존한다. 현재 추가 통합본의 PASS로 승계하지 않는다.
+
+두 부모가5650/token14를 사용하지만 공유 설정 길이가165개/170개로 달랐으므로 현재는 **프로토콜5651·연결 토큰 `C6PhysicsLab/15`·공유 설정165개**로 구분한다. 북 AUTO는 기본0·인덱스74이며 솔로·2~3인1개/4~5인2개, 고정1~5 선택과 기존 새 판/Host ACK 적용 경계를 유지한다. 콤보 요괴는 Paint 모드의 예고·콤보·칸 명중·종료 Host 스냅샷에 맞춘 출입/두리번/움찔과 일시정지를 보존하며 게임 판정이나 추가 DEV 필드는 만들지 않는다. 전체 검사·Mac 실제 앱·사용자 파일 보존 결과는 실행 뒤 이 절에 별도로 확정한다. iOS·실제LAN/핫스팟·모바일 성능은 새 실행 증거가 없으면 NOT_RUN이다.
+
+
+### 재개 후 같은 소스의 실제 결과
+
+현재 코드는 `cfd4dca`이며 main `f3c7cec4`의 AUTO·콤보 요괴·원래 물리/도색/전송 구현을 보존했다. 현재165개·5651·token15로 main170개·5650·token14와 구분한다. 기존 사용자4파일은 이번 통합/검사에서 보존했다.
+
+| 검증 | 결과 | 실제 근거 |
+| --- | --- | --- |
+| 최종 전체 EditMode | **PASS795/795** | `resume-edit.xml`, 실패·생략0, 27.251초, UTC 2026-10-21 02:10:21Z~2026-10-21 02:10:48Z |
+| 최종 전체 PlayMode | **PASS256/256** | `resume-play.xml`, 실패·생략0, 110.922초, UTC 2026-10-21 02:11:45Z~2026-10-21 02:13:36Z |
+| 새 규약 실제 Mac2인 | **PASS24/24** | `pr-auto-network-regression/direct-two-player/n2/summary.json`: 새165개/5651/token15, P고리·생성/직접조합/투척2실제명중·동일ID구슬/북전달·소비/소유자합집합·HP/색/P맵·pending없음·참가자Pause/HostResume·DEVRestart/P보존 확인 |
+| iOS·실제LAN/핫스팟·모바일 성능 | NOT_RUN | 같은 버전 기기 실행 근거 없음 |
+
+EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키마5개를 추가한795개다. PlayMode는 최신main256개를 모두 보존했다. Runtime·설정·테스트·패키지의 실행 전후 해시를 대조했다. Mac에서는 양쪽의 생성·전달을 검사하도록 DEV복사본 북 수를2개로 고정한다. 따라서 AUTO 기본 배분의 실제 다중 앱 결과로 쓰지 않으며, AUTO 솔로/2~5인·고정1~5·Retry/로비 설정은 모델과 저장Scene 전체 검사로 확인했다. 원시 로그/앱/helper는 공개 저장소에 포함하지 않는다.
+
+재개 최종 Mac의 `gameplay-preservation.json`에서 사용자4파일·원본Config·패키지·런타임 코드 변경0, 임시 helper 제거, 두 앱 오류0을 확인했고 검증 프로세스는 종료했다. 북2개 지정 시험이므로 AUTO 기본 배분 실앱 검증으로 쓰지 않는다. 요괴 코드는 원본대로 포함했으나 외형별도 수동 평가/다기기 시각 동시성은 미실행이다.
+
+## 박 폭탄 때 요괴가 톡 튀어나오기 — 2026-10-21, 이슈 #250
+
+기준은 `feat/#244-combo-yokai`(`5d2f2384`)에서 분기한 `feat/#250-bomb-yokai`다. Unity는 실행하지 않았다.
+
+- **신호**: 박이 폭탄을 떨어뜨리면 Host가 모든 참가자에게 보내는 기존 `LabNetwork.GourdBombDropped`(박 옆 "!" 말풍선과 같은 신호)를 `LabGourdYokai.Bind`가 듣는다. 새 패킷이나 스냅샷 필드는 없다.
+- **동작**: 신호가 오면 `bombShowSeconds`(1.4초, 말풍선 `LabGourdAlert.showSeconds`와 같게) 동안 요괴를 붙잡는다. 콤보 구간이 아니면 올라오기/되감기를 `bombRiseSpeed`(3배)로 빠르게 해 닫힌 상태에서도 약 0.4초에 다 올라오고, 다 올라온 순간 0.3초 동안 커지며(최대 약 22%) 위로 튀었다 돌아온다. 콤보 중이면 이미 나와 있으므로 바로 튀고, 콤보와 폭탄 시간이 둘 다 끝나야 들어간다. 남은 시간은 전투 중 프레임 시간으로만 줄어 일시정지 중에는 멈추고, 전투가 아니면 바로 0이 된다.
+- **범위**: DEV 설정·프로토콜·프리팹·애니메이션 파일 변경 없음. 넘기기 막기(#215)와 평소 6초 반복은 그대로다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. |
+| PlayMode 실제 실행 | NOT_RUN | `LabGourdYokaiTests` 새 3개(`ABombDropBringsTheYokaiOutQuicklyWithAPopForAsLongAsTheBubble`, `ABombDuringAComboOnlyPopsAndBothMustEndBeforeItGoesIn`, `TheNetworksGourdBombSignalReachesTheYokaiAndPausesHoldIt`)와 #244 기존 4개. |
+| 솔로 화면: 박 폭탄(20~30초) 때 요괴가 쏙 나와 톡 튀고 말풍선과 함께 들어감, 콤보 중 폭탄 | NOT_RUN | 기본값으로 솔로 시작 후 확인한다. |
+| 3인 실행: 모든 화면에서 같이 나옴 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | |
+
+
+위 #250 단독 기록은 이전 분기 당시 자료다. 최신 main #252 통합은 별도 실행 기록으로 구분한다. 각 기기는 폭탄 신호 수신 시점에 로컬 타이머를 시작하므로 기기 사이 정확히 같은 프레임/시각을 보장하지 않는다. 일시정지 중 요괴는 상태를 유지하지만 기존 말풍선은 숨겨진다.
+
+
+## #250/PR #253 최신 main 통합 검증 — 2026-10-21 KST
+
+#252를 먼저 병합한 main `681d80e5`와 #253을 통합한 소스 `2a35a8eb`다. #246의795 EditMode·설정165개/5651/token15·AUTO와 기존 네트워크/물리/도색은 유지했다. Runtime 차이는 `LabGourdYokai.cs` 한 파일이며 Config·EditMode·패키지·Scene·Prefab·Animation은 변경하지 않았다.
+
+### 충돌·경계 보완
+
+- 기존 main의 첫 수신에 포함된 콤보 명중 감지, 정지 프레임 기본 자세 샘플링, 비활성화 후 자세/스케일 복원을 유지하면서 폭탄 Pop·이벤트 구독을 합쳤다.
+- 폭탄만으로 Holding인 상태에서 처음 받은 과거 완료 콤보를 새 명중으로 오인했다. 새 검사1건을 추가해 수정 전 ExpectedFalse/ActualTrue로 재현했고, 직전 콤보 구간을 별도 `wasInComboWindow`로 보관해 현재/직전 콤보일 때만 명중 반응을 허용했다. 첫 활성 수신·마지막 명중·정지 자세·폭탄 연출은 유지한다.
+- 기존 문서의 “모든 기기 같은 순간”을 수신 프레임 기준으로 보정했다. 폭탄 타이머는 로컬 전투 프레임으로1.4초 유지하며 정확한 동시성을 보장하지 않는다. pause시 요괴는 유지하고 기존 말풍선은 숨긴다. 두 Inspector시간은 자동 연결하지 않는다.
+
+| 확인 | 결과 | 실제 근거·범위 |
+| --- | --- | --- |
+| 최초 통합 전체 PlayMode | PASS259/259 | `play.xml`, 실패·생략0. 새 경계 검사 추가 전 결과 |
+| 새 경계 검사 수정 전 | FAIL0/1 | `repro.xml`, 폭탄 유지 중 지연 완료 콤보의 거짓 명중 재현 |
+| 수정 후 전체 PlayMode | **PASS260/260** | `final-play.xml`, 실패·생략0, 107.944초. UTC 2026-10-21 02:27:36Z~2026-10-21 02:29:24Z. 최신 콤보8·폭탄3·추가 회귀1 = 요괴12건 포함 |
+| EditMode | 이번 미실행 | #252의795/795 결과와 구분. 해당 검사/공통Core/Config·패키지는 main과 동일함을 비교 |
+| 실제 Mac2앱 자연 폭탄 | **PASS28/28** | `network-regression/direct-two-player/n2/summary.json`. 기존24항목과 자연 폭탄4항목: DEV 5/5초·콤보OFF 공유, 양쪽 같은 실제 Host 폭탄ID 수신, 각 `LabGourdYokai`의 Ready·약1.4초 타이머·Holding·Popping, 원본Config 불변. 이벤트/Advance 직접 호출 없음 |
+| 사용자 변경 보존 | PASS4파일 | Scene·Target2머터리얼2·미추적meta의 시작 해시 유지. 커밋에서 제외 |
+| 수동솔로·기기간정확한시각/외형평가·iOS/실제LAN/핫스팟·3~5인·성능 | NOT_RUN | 위 자동/같은 Mac 결과로 확대하지 않음 |
+
+마지막 전체 검사 전후 Runtime·Config·테스트·패키지 해시를 대조했다. 원시 XML·로그·검증 앱·임시 helper는 저장소에 포함하지 않는다. 예전 #250 단독 NOT_RUN 자료는 이 통합 결과와 구분해 보존했다.
+
+최종 Mac 검사의 `gameplay-preservation.json`에서 사용자4파일·원본Config·패키지·런타임과 최종 소스/메타521파일의 해시 일치, 임시 helper 제거, 양쪽 실행 오류0을 확인했다. 검증 프로세스는 종료했다. Mac loopback 독립 앱2개이며 DEV 북 수2개 지정으로 기존 양방향 생성/전달을 검사했다. 이번 결과를 AUTO 기본 북 배분·다기기 동시 수신·실제LAN/핫스팟·모바일 성능 검증으로 확대하지 않는다.

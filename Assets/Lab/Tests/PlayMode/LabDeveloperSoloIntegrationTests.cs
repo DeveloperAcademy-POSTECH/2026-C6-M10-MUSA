@@ -14,11 +14,15 @@ namespace C6Lab.Tests
     /// </summary>
     public sealed class LabDeveloperSoloIntegrationTests
     {
+        private readonly LabSavedSceneNetworkFixture fixture = new LabSavedSceneNetworkFixture();
+
+        [UnityTearDown]
+        public IEnumerator UnloadSavedScene() => fixture.Cleanup();
+
         [UnityTest]
         public IEnumerator SavedHudAndDeveloperSliderShowLocalPlayerHpAcrossSoloRestart()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
 
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabHud hud = developerUi.GetComponent<LabHud>();
@@ -50,25 +54,25 @@ namespace C6Lab.Tests
             Assert.That(developerUi, Is.Not.Null);
             Assert.That(developerUi.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(developerUi.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
-            Assert.That(developerUi.valueSliders[119], Is.Not.Null,
+            Assert.That(developerUi.valueSliders[118], Is.Not.Null,
                 "The saved DEV panel extends its Gourd rows with the rope motion slider.");
-            Assert.That(developerUi.valueSliders[126], Is.Not.Null,
+            Assert.That(developerUi.valueSliders[125], Is.Not.Null,
                 "The saved DEV panel extends its Gourd rows with the swing-angle slider.");
             Assert.That(hud.playerHpText.text, Is.EqualTo("—"));
 
             LabNetwork network = hud.network;
-            network.port = 17776;
+            fixture.UseAvailablePort(network);
             try
             {
                 developerUi.Open();
                 developerUi.valueInputs[48].text = "125";
-                developerUi.valueInputs[119].text = "0.7";
-                developerUi.valueInputs[126].text = "45";
+                developerUi.valueInputs[118].text = "0.7";
+                developerUi.valueInputs[125].text = "45";
                 Assert.That(developerUi.valueSliders[48].value,
                     Is.EqualTo(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[48], 300f, 125f))
                         .Within(.0001f));
-                Assert.That(developerUi.valueSliders[119].value,
-                    Is.EqualTo(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[119], .45f, .7f))
+                Assert.That(developerUi.valueSliders[118].value,
+                    Is.EqualTo(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[118], .45f, .7f))
                         .Within(.0001f));
                 developerUi.ApplyAndStart();
                 Assert.That(network.IsDeveloperSolo, Is.True, developerUi.feedbackText.text);
@@ -111,8 +115,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedLobbyCanChooseTwoToFivePlayersBeforeHosting()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
 
             GameObject[] roots = SceneManager.GetActiveScene().GetRootGameObjects();
             LabHud hud = roots.SelectMany(root => root.GetComponentsInChildren<LabHud>(true))
@@ -189,7 +192,8 @@ namespace C6Lab.Tests
             Assert.That(network.TargetParticipantCount, Is.EqualTo(4));
 
             // Use the saved ordinary HOST button, not the DEV room-creation shortcut.
-            hud.port.text = "17780";
+            hud.port.text = fixture.UseAvailablePort(network).ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
             try
             {
                 hud.hostButton.onClick.Invoke();
@@ -252,10 +256,42 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavedDeveloperPanelPicksDrumCountFromAutoAndOneToFiveThreeToARow()
+        {
+            yield return fixture.Load();
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            developerUi.Open();
+            developerUi.panel.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                .Single(button => button.name == "Category Drum").onClick.Invoke();
+            Transform row = developerUi.valueInputs[74].transform.parent;
+            Assert.That(row.gameObject.activeInHierarchy, Is.True);
+            Assert.That(developerUi.valueInputs[74].gameObject.activeSelf, Is.False, "Drum Count is picked with buttons (#236).");
+            UnityEngine.UI.Button[] choices = Enumerable.Range(0, 6).Select(option =>
+                row.Find("SettingSlider/SettingChoices/Choice" + option).GetComponent<UnityEngine.UI.Button>()).ToArray();
+            Assert.That(choices.Select(button => button.GetComponentInChildren<UnityEngine.UI.Text>().text),
+                Is.EqualTo(new[] { "AUTO", "1", "2", "3", "4", "5" }));
+            Assert.That(developerUi.valueInputs[74].text, Is.EqualTo("0"), "The saved config starts on AUTO.");
+            for (int option = 0; option < choices.Length; option++)
+            {
+                var rect = (RectTransform)choices[option].transform;
+                Assert.That(rect.anchorMin.x, Is.EqualTo(option % 3 / 3f).Within(1e-4f), "Three to a row.");
+                Assert.That(rect.anchorMax.x, Is.EqualTo((option % 3 + 1) / 3f).Within(1e-4f));
+                Assert.That(rect.anchorMin.y, Is.EqualTo(option < 3 ? .5f : 0f).Within(1e-4f), "Two rows.");
+            }
+            int savedCount = developerUi.network.config.DrumCount;
+            for (int option = choices.Length - 1; option >= 0; option--)
+            {
+                choices[option].onClick.Invoke();
+                Assert.That(developerUi.valueInputs[74].text, Is.EqualTo(option.ToString()));
+                Assert.That(developerUi.network.config.DrumCount, Is.EqualTo(savedCount), "A button selection is not APPLY.");
+            }
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator SavedDeveloperPanelCreatesAndRetunesTwoPlayerHostLobby()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabNetwork network = developerUi.network;
             LabSceneController sceneController = developerUi.sceneController;
@@ -264,7 +300,7 @@ namespace C6Lab.Tests
             Assert.That(network, Is.Not.Null);
             Assert.That(developerUi.applyHostButton, Is.Not.Null);
             Assert.That(developerUi.targetParticipantsSlider, Is.Not.Null);
-            network.port = 17779;
+            fixture.UseAvailablePort(network);
             try
             {
                 developerUi.Open();
@@ -299,8 +335,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedDeveloperPanelCanApplyAndRestartStraightThrowTuning()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabNetwork network = developerUi.network;
             Assert.That(network, Is.Not.Null);
@@ -309,7 +344,7 @@ namespace C6Lab.Tests
             Assert.That(developerUi.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(developerUi.applyHostButton, Is.Not.Null);
             Assert.That(developerUi.targetParticipantsSlider.value, Is.EqualTo(3f));
-            network.port = 17778;
+            fixture.UseAvailablePort(network);
             try
             {
                 developerUi.Open();
@@ -344,8 +379,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedSceneSoloCanGenerateCombineAndHitTheCylinder()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null; // Let Awake/Start bind the saved Scene references.
+            yield return fixture.Load();
 
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabNetwork network = developerUi.network;
@@ -411,8 +445,8 @@ namespace C6Lab.Tests
             // that bump while scattering cannot merge before the test drags Yin onto Yang.
             tuning[51] = 0f;
             tuning[79] = 1f; // Crack keeps the damage-number presentation checked below.
-            tuning[88] = 0f; // no gourd bombs: this test counts the orbs on the board
-            tuning[89] = 0f;
+            tuning[87] = 0f; // no gourd bombs: this test counts the orbs on the board
+            tuning[88] = 0f;
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
             network.config = rawOnly;
             // The board reads contact combining from its own config, so it needs the same tuning.
@@ -421,8 +455,8 @@ namespace C6Lab.Tests
             sceneController.config = rawOnly;
             sceneController.ReconfigureBoard();
 
-            // Keep the test independent of an ordinary app using the default port 7777.
-            network.port = 17777;
+            // Separate this real Host from other Editor/test processes on the machine.
+            fixture.UseAvailablePort(network);
             try
             {
                 Assert.That(network.StartDeveloperSolo(), Is.True);
@@ -548,8 +582,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedSceneSoloGourdBombFallsStraightOntoTheLocalBoard()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null; // Let Awake/Start bind the saved Scene references.
+            yield return fixture.Load();
 
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabNetwork network = developerUi.network;
@@ -557,11 +590,11 @@ namespace C6Lab.Tests
             LabConfig savedConfig = network.config;
             LabConfig gourd = UnityEngine.Object.Instantiate(savedConfig);
             float[] tuning = gourd.CaptureDeveloperValues();
-            tuning[88] = 1f; // a gourd bomb every second
-            tuning[89] = 1f;
+            tuning[87] = 1f; // a gourd bomb every second
+            tuning[88] = 1f;
             Assert.That(gourd.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = gourd;
-            network.port = 17791;
+            fixture.UseAvailablePort(network);
             // Record only: an assertion thrown inside the event would interrupt the Host's snapshot.
             var drops = new List<string>();
             var targets = new List<ulong>();
@@ -613,8 +646,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedSceneSoloSwipeBlockBouncesAndShowsOnTheBlockedPlayersOwnScreen()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null; // Let Awake/Start bind the saved Scene references.
+            yield return fixture.Load();
 
             LabDeveloperMode developerUi = SavedDeveloperUi();
             LabNetwork network = developerUi.network;
@@ -622,14 +654,14 @@ namespace C6Lab.Tests
             LabConfig savedConfig = network.config;
             LabConfig blocking = UnityEngine.Object.Instantiate(savedConfig);
             float[] tuning = blocking.CaptureDeveloperValues();
-            tuning[88] = 0f; // no gourd bombs
-            tuning[89] = 0f;
-            tuning[157] = 1f; // a swipe block one second in
-            tuning[158] = 3f;
-            tuning[159] = 0f;
+            tuning[87] = 0f; // no gourd bombs
+            tuning[88] = 0f;
+            tuning[152] = 1f; // a swipe block one second in
+            tuning[153] = 3f;
+            tuning[154] = 0f;
             Assert.That(blocking.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = blocking;
-            network.port = 17792;
+            fixture.UseAvailablePort(network);
             // Record only: an assertion thrown inside the event would interrupt the Host's snapshot.
             var started = new List<bool>();
             System.Action<bool, float> onBlock = (right, seconds) => started.Add(right);
@@ -664,6 +696,32 @@ namespace C6Lab.Tests
                 network.Stop();
                 network.config = savedConfig;
                 UnityEngine.Object.Destroy(blocking);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator SavedHostFixtureUsesAnAvailablePortAndDisposesItsPersistentNetwork()
+        {
+            yield return fixture.Load();
+            LabNetwork network = SavedDeveloperUi().network;
+            ushort occupiedPort = fixture.UseAvailablePort(network);
+            using (var occupied = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
+                System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp))
+            {
+                occupied.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, occupiedPort));
+                ushort hostPort = fixture.UseAvailablePort(network);
+                Assert.That(hostPort, Is.Not.EqualTo(occupiedPort),
+                    "An external listener must not make this fixture reuse an occupied port.");
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                Assert.That(network.IsHost, Is.True);
+                // Do not Stop here: cleanup must also handle a test that exits while hosting.
+                yield return fixture.Cleanup();
+                Assert.That(network == null, Is.True,
+                    "Scene unload alone cannot release an NGO object in DontDestroyOnLoad.");
+                using (var released = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
+                    System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp))
+                    Assert.DoesNotThrow(() => released.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, hostPort)),
+                        "Disposing the owned manager must release the Host socket before the next fixture.");
             }
         }
 

@@ -217,8 +217,8 @@ namespace C6Lab.Tests
                 float capturedLifetime = active.LifetimeSeconds;
                 for (int step = 0; step < 8; step++) yield return new WaitForFixedUpdate();
                 float[] replacement = changed.CaptureDeveloperValues();
-                replacement[112] = 0f;
-                replacement[118] = 1f;
+                replacement[111] = 0f;
+                replacement[117] = 1f;
                 replacement[33] = changed.ThrowGravity * 2f;
                 replacement[34] = .02f;
                 Assert.That(changed.TryApplyDeveloperValues(replacement, out string error), Is.True, error);
@@ -247,7 +247,7 @@ namespace C6Lab.Tests
         private static void SetForm(LabConfig config, float value)
         {
             float[] values = config.CaptureDeveloperValues();
-            values[112] = value;
+            values[111] = value;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
         }
 
@@ -255,7 +255,7 @@ namespace C6Lab.Tests
         {
             LabConfig fixture = Object.Instantiate(source);
             float[] tuning = fixture.CaptureDeveloperValues();
-            tuning[112] = 1f;
+            tuning[111] = 1f;
             SetTuning(tuning, "Battle Duration (seconds)", 30f);
             SetTuning(tuning, "Orb Generation Cost", 1f);
             SetTuning(tuning, "Item Lifetime (seconds)", 30f);
@@ -273,7 +273,7 @@ namespace C6Lab.Tests
             SetTuning(tuning, "Drum Drift Speed (board widths/s)", 0f);
             SetTuning(tuning, "Gourd Bomb Interval Min (seconds, 0 = off)", 0f);
             SetTuning(tuning, "Gourd Bomb Interval Max (seconds, 0 = off)", 0f);
-            tuning[105] = 0f;
+            tuning[104] = 0f;
             Assert.That(fixture.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             return fixture;
         }

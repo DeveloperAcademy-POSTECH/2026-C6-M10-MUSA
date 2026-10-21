@@ -25,17 +25,17 @@
 
 ## 직구 설정 7개
 
-DEV의 `Throw form` 묶음은 기존 0~111번 뒤에 **112~118번**으로 추가된다. `Throw Form`은 ARC/STRAIGHT 토글이고 나머지 6개는 숫자 입력과 슬라이더다. 토글을 바꾸면 **아직 APPLY하지 않은 입력값**을 기준으로 직구 전용 행을 즉시 켜거나 끈다. Arc에서는 직구 6개 행이 비활성화되지만 입력값은 유지된다. 기본 프로필은 **DEMO_TUNING_VALUE**이며 최종 조작감의 확정값이 아니다.
+현재 DEV의 `Throw form`7개는 인덱스 **111~117**에 있다. `Throw Form`은 ARC/STRAIGHT 토글이고 나머지 6개는 숫자 입력과 슬라이더다. 토글을 바꾸면 **아직 APPLY하지 않은 입력값**을 기준으로 직구 전용 행을 즉시 켜거나 끈다. Arc에서는 직구 6개 행이 비활성화되지만 입력값은 유지된다. 기본 프로필은 **DEMO_TUNING_VALUE**이며 최종 조작감의 확정값이 아니다.
 
 | DEV 입력 / Inspector 필드 | 인덱스 | 기본값 | DEV 허용 범위 | 의미 |
 | --- | ---: | ---: | --- | --- |
-| Throw Form / Throw Form | 112 | 0: Arc | 정수 0–1 | 0: 기존 포물선, 1: 직구. |
-| Straight Origin Offset X / Straight Origin Offset.x | 113 | 0.35 | −5–5 / 월드 거리 | 던진 사람의 화면 오른쪽으로 더하는 거리. 0이면 기존 가로 출발 위치를 유지한다. |
-| Straight Origin Offset Y / Straight Origin Offset.y | 114 | 0.4 | −5–5 / 월드 거리 | 월드 위쪽으로 더하는 높이. |
-| Straight Origin Offset Z / Straight Origin Offset.z | 115 | 0 | −5–5 / 월드 거리 | 해당 자리에서 타깃 쪽 수평 방향으로 더하는 거리. |
-| Straight Pitch Offset (degrees) / Straight Pitch Offset Degrees | 116 | 3 | −30–30 / 도 | 낮춘 발사각에 추가할 각도. 음수면 아래쪽으로 향할 수 있다. |
-| Straight Loft Scale / Straight Loft Scale | 117 | 0.1 | 0–1 / 배율 | Arc의 실제 상승각을 남기는 비율. 0이면 Pitch Offset만 사용한다. |
-| Straight Gravity Scale / Straight Gravity Scale | 118 | 0.1 | 0–2 / 배율 | 공통 Throw Gravity에 곱한다. 0이면 중력 없음, 기본 원본 값 기준 30×0.1=3이다. |
+| Throw Form / Throw Form | 111 | 0: Arc | 정수 0–1 | 0: 기존 포물선, 1: 직구. |
+| Straight Origin Offset X / Straight Origin Offset.x | 112 | 0.35 | −5–5 / 월드 거리 | 던진 사람의 화면 오른쪽으로 더하는 거리. 0이면 기존 가로 출발 위치를 유지한다. |
+| Straight Origin Offset Y / Straight Origin Offset.y | 113 | 0.4 | −5–5 / 월드 거리 | 월드 위쪽으로 더하는 높이. |
+| Straight Origin Offset Z / Straight Origin Offset.z | 114 | 0 | −5–5 / 월드 거리 | 해당 자리에서 타깃 쪽 수평 방향으로 더하는 거리. |
+| Straight Pitch Offset (degrees) / Straight Pitch Offset Degrees | 115 | 3 | −30–30 / 도 | 낮춘 발사각에 추가할 각도. 음수면 아래쪽으로 향할 수 있다. |
+| Straight Loft Scale / Straight Loft Scale | 116 | 0.1 | 0–1 / 배율 | Arc의 실제 상승각을 남기는 비율. 0이면 Pitch Offset만 사용한다. |
+| Straight Gravity Scale / Straight Gravity Scale | 117 | 0.1 | 0–2 / 배율 | 공통 Throw Gravity에 곱한다. 0이면 중력 없음, 기본 원본 값 기준 30×0.1=3이다. |
 
 ### 발사 위치·방향의 계산
 
@@ -51,7 +51,7 @@ DEV의 `Throw form` 묶음은 기존 0~111번 뒤에 **112~118번**으로 추가
 
 - 솔로: DEV에서 **START SOLO / RESTART SOLO**로 새 판에 적용한다.
 - 공유 방: Host가 접속 전 **CREATE ROOM**, 전투 전 **APPLY TO ROOM**, 공동 일시정지 뒤 **APPLY & RESTART**를 사용한다. Client는 Host 설정을 받으며 직접 변경하지 않는다.
-- 설정은 **129개 전체**를 원자적으로 검증하고 공유 지문에 포함한다. 프로토콜은 **5632**이며 예전 128개 이하 설정·다른 프로토콜을 혼합하지 않는다.
+- 설정은 **165개 전체**를 원자적으로 검증하고 공유 지문에 포함한다. 프로토콜은 **5651**, 연결 토큰은 `C6PhysicsLab/15`이며 길이가 다른 배열·다른 프로토콜을 혼합하지 않는다.
 - 각 공은 발사 순간 중력·수명을 캡처한다. 초기 위치·속도·반경·감쇠도 발사 시 정하며, 비행 중 원본 Inspector나 DEV 초안을 바꿔 이미 날아가는 공을 꺾지 않는다.
 - Host가 구슬 소유자의 자리로 위치·속도를 계산해 Client에 보내며 Client는 그 발사값을 재생한다. 실제 접촉·명중 보상·피해·색칠 승리는 기존 Host 판정을 따른다.
 
@@ -66,4 +66,4 @@ DEV의 `Throw form` 묶음은 기존 0~111번 뒤에 **112~118번**으로 추가
 
 이 순서는 검증 시나리오이며 수행 완료를 뜻하지 않는다. 실제 터치 조작감·시각 피드백은 iPhone Development Build에서 별도 확인한다. Mac 자동 입력·단위 검사·PlayMode의 직접 메서드 호출을 실기기 통과로 기록하지 않는다.
 
-관련 코드: `LabConfig`(단일 원본·7개 설정·129개 공유 값), `LabDeveloperMode`(Throw form 토글·슬라이더), `LabOrbBoard`(기존 입력), `LabThrowMath`(자리별 출발점·모드별 방향), `LabProjectile`(발사 시 캡처한 중력·수명·실제 충돌), `LabNetwork`(Host 확정·공유 설정·발사값), `LabSessionSettings`(지문).
+관련 코드: `LabConfig`(단일 원본·7개 설정·165개 공유 값), `LabDeveloperMode`(Throw form 토글·슬라이더), `LabOrbBoard`(기존 입력), `LabThrowMath`(자리별 출발점·모드별 방향), `LabProjectile`(발사 시 캡처한 중력·수명·실제 충돌), `LabNetwork`(Host 확정·공유 설정·발사값), `LabSessionSettings`(지문).

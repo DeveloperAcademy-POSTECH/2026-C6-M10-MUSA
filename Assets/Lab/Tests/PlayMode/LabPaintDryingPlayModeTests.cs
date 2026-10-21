@@ -61,21 +61,21 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator GourdToggleAndThreeSlidersApplyToSoloRestartWithoutEditingTheSource()
         {
-            Assert.That(developer.valueInputs.Length, Is.EqualTo(169));
-            Assert.That(developer.valueSliders.Length, Is.EqualTo(169));
+            Assert.That(developer.valueInputs.Length, Is.EqualTo(165));
+            Assert.That(developer.valueSliders.Length, Is.EqualTo(165));
             Assert.That(network.config.PaintDryingEnabled, Is.True, "Fresh game sessions enable drying by default.");
             developer.Open();
             developer.panel.GetComponentsInChildren<Button>(true)
                 .Single(button => button.name == "Category Gourd").onClick.Invoke();
-            Transform toggleRow = developer.valueInputs[153].transform.parent;
+            Transform toggleRow = developer.valueInputs[148].transform.parent;
             Button toggle = toggleRow.Find("SettingSlider/SettingToggle").GetComponent<Button>();
             Assert.That(toggleRow.gameObject.activeInHierarchy, Is.True);
-            Assert.That(developer.valueInputs[153].gameObject.activeSelf, Is.False);
+            Assert.That(developer.valueInputs[148].gameObject.activeSelf, Is.False);
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("ON"));
             toggle.onClick.Invoke();
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("OFF"));
             Assert.That(network.config.PaintDryingEnabled, Is.True, "Draft OFF must not change the accepted config before APPLY.");
-            for (int i = 154; i <= 156; i++)
+            for (int i = 149; i <= 151; i++)
             {
                 Assert.That(developer.valueInputs[i].readOnly, Is.True);
                 Assert.That(developer.valueInputs[i].interactable, Is.False);
@@ -84,7 +84,7 @@ namespace C6Lab.Tests
             toggle.onClick.Invoke();
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("ON"));
             float[] requested = { 7f, .3f, 25f };
-            for (int i = 154; i <= 156; i++)
+            for (int i = 149; i <= 151; i++)
             {
                 var field = LabConfig.DeveloperFields[i];
                 Assert.That(developer.valueInputs[i].gameObject.activeInHierarchy, Is.True);
@@ -92,9 +92,9 @@ namespace C6Lab.Tests
                 developer.valueSliders[i].value = .5f;
                 Assert.That(float.Parse(developer.valueInputs[i].text, CultureInfo.InvariantCulture),
                     Is.EqualTo(Mathf.Lerp(field.Min, field.Max, .5f)).Within(.0001f));
-                developer.valueInputs[i].text = requested[i - 154].ToString(CultureInfo.InvariantCulture);
+                developer.valueInputs[i].text = requested[i - 149].ToString(CultureInfo.InvariantCulture);
                 Assert.That(developer.valueSliders[i].value,
-                    Is.EqualTo(Mathf.InverseLerp(field.Min, field.Max, requested[i - 154])).Within(.0001f));
+                    Is.EqualTo(Mathf.InverseLerp(field.Min, field.Max, requested[i - 149])).Within(.0001f));
             }
             Assert.That(network.config.PaintDryingEnabled, Is.True, "Draft values cannot change an accepted room.");
             developer.applyStartButton.onClick.Invoke();
@@ -109,7 +109,7 @@ namespace C6Lab.Tests
             Assert.That(firstModel.PaintSurface.RegisterHit(Vector3.forward, Color.red, network.LocalPlayerId, 1), Is.True);
             string previousSession = network.Snapshot.sessionId;
             developer.Open();
-            developer.valueInputs[153].text = "0";
+            developer.valueInputs[148].text = "0";
             developer.applyStartButton.onClick.Invoke();
             yield return null; yield return null;
             Assert.That(network.config.PaintDryingEnabled, Is.False);
@@ -122,9 +122,9 @@ namespace C6Lab.Tests
             developer.ShowDefaults();
             Assert.That(toggle.GetComponentInChildren<Text>().text, Is.EqualTo("ON"), "DEFAULTS restores the game asset's ON setting.");
             Assert.That(network.config.PaintDryingEnabled, Is.False, "Loading defaults is not an APPLY operation.");
-            Assert.That(developer.valueInputs[154].text, Is.EqualTo("5"));
-            Assert.That(developer.valueInputs[155].text, Is.EqualTo("0.2"));
-            Assert.That(developer.valueInputs[156].text, Is.EqualTo("20"));
+            Assert.That(developer.valueInputs[149].text, Is.EqualTo("5"));
+            Assert.That(developer.valueInputs[150].text, Is.EqualTo("0.2"));
+            Assert.That(developer.valueInputs[151].text, Is.EqualTo("20"));
             Assert.That(JsonUtility.ToJson(developer.sourceConfig), Is.EqualTo(sourceJson));
         }
 
@@ -199,9 +199,9 @@ namespace C6Lab.Tests
             network.enabled = false; // fake-clock integration, no real-time PublishSnapshot can race this fixture
             fixture = Object.Instantiate(network.config);
             float[] values = fixture.CaptureDeveloperValues();
-            values[2] = 20f; values[79] = 0f; values[105] = 0f; values[106] = initial;
-            values[111] = 1f; values[139] = 0f;
-            values[153] = 1f; values[154] = 5f; values[155] = .2f; values[156] = 20f;
+            values[2] = 20f; values[79] = 0f; values[104] = 0f; values[105] = initial;
+            values[110] = 1f; values[134] = 0f;
+            values[148] = 1f; values[149] = 5f; values[150] = .2f; values[151] = 20f;
             Assert.That(fixture.TryApplyDeveloperValues(values, out string error), Is.True, error);
             network.config = fixture;
             var model = new LabModel(); model.BeginSolo("drying-presentation", network.LocalPlayerId, 0d, fixture);

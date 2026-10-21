@@ -13,7 +13,7 @@ namespace C6Lab
         public const int MaximumSnapshotBytes = 512 * 1024;
         // A JSON character can expand to a six-byte escape in the outer packet. 4096 keeps
         // that worst case plus packet metadata below LabNetwork's 32 KiB receive bound.
-        public const int SnapshotChunkCharacters = 4096;
+        public const int SnapshotChunkCharacters = 512;
 
         public static string Fingerprint(float[] values, int participants, ushort protocol)
         {

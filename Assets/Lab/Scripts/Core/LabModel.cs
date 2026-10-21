@@ -24,6 +24,22 @@ namespace C6Lab
     }
 
     /// <summary>
+    /// An orb whose lifetime ran out (#235): the board that held it, which goes there in a puff of
+    /// smoke, unlike an orb that was handed on, combined, thrown or used.
+    /// </summary>
+    public readonly struct LabOrbExpiry
+    {
+        public readonly ulong Owner;
+        public readonly string OrbId;
+
+        public LabOrbExpiry(ulong owner, string orbId)
+        {
+            Owner = owner;
+            OrbId = orbId;
+        }
+    }
+
+    /// <summary>
     /// A locked bomb the gourd dropped onto one player's board as sabotage (#177): who receives it
     /// and where, in 0..1 board units, it lands.
     /// </summary>
@@ -90,6 +106,7 @@ namespace C6Lab
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
+        private readonly List<LabOrbExpiry> orbExpiries = new List<LabOrbExpiry>();
         /// <summary>Bomb times for this round, retained so a late frame schedules the same swipe blocks as small steps (#215).</summary>
         private readonly List<double> gourdBombTimes = new List<double>();
         private double nextSwipeBlockAt;
@@ -129,6 +146,20 @@ namespace C6Lab
         public string SessionId => sessionId;
         public uint Round => round;
         public LabPhase Phase => phase;
+        /// <summary>Current ledger revision; reading it does not advance the Host battle clock.</summary>
+        public ulong Revision => revision;
+
+        /// <summary>Independent player resource/statistic records in the established P/seat order.</summary>
+        public LabPlayerState[] CopyPlayers() => players.Values.OrderBy(player => player.seat)
+            .Select(player => player.Copy()).ToArray();
+
+        /// <summary>
+        /// Independent ledger entries for one owner, including drums and in-flight orbs. Callers
+        /// select which entries to display; this does not tick expiry or allocate every board.
+        /// </summary>
+        public LabOrbState[] CopyOwnedStates(ulong owner) => orbs.Values.Concat(drums.Values)
+            .Where(orb => orb.owner == owner).OrderBy(orb => orb.id, StringComparer.Ordinal)
+            .Select(orb => orb.Copy()).ToArray();
         public int Hp => hp;
         /// <summary>Round-owned CPU paint state; rendering reads this state and never decides victory.</summary>
         public LabPaintSurface PaintSurface => paintSurface;
@@ -172,6 +203,7 @@ namespace C6Lab
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
             players.Clear(); orbs.Clear(); drums.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
             unreportedBlasts.Clear();
+            orbExpiries.Clear();
             gourdBombs.Clear();
             gourdBombTimes.Clear();
             for (int i = 0; i < activeSeatCount; i++)
@@ -270,19 +302,18 @@ namespace C6Lab
             return true;
         }
 
-        public bool TryCombine(ulong sender, string firstId, string secondId, string requestId,
-            double now, out LabOrbState orb, out string reason)
-            => TryCombine(sender, firstId, secondId, requestId, now, Vector2.zero, out orb, out reason);
-
         /// <summary>
-        /// 결합 구슬이 결합 직전 두 구슬의 움직임을 이어받는다. 속도는 요청한 기기가 계산해
-        /// 보내며(보드 폭/초), Host는 유한한 값인지 확인하고 최대 이동 속도 안으로 제한한다.
+        /// Use the owner's current local combination center rather than a periodic motion sample.
+        /// The Host still decides polarity, consumption, the new ID and the global element draw.
         /// </summary>
-        public bool TryCombine(ulong sender, string firstId, string secondId, string requestId,
-            double now, Vector2 normalizedVelocity, out LabOrbState orb, out string reason)
+        public bool TryCombineAt(ulong sender, string firstId, string secondId, string requestId,
+            double now, Vector2 normalizedCenter, Vector2 normalizedVelocity,
+            out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (!Unit(normalizedCenter.x) || !Unit(normalizedCenter.y) || !Finite(normalizedVelocity))
+                return Reject("INVALID_MOTION", out reason);
             if (string.IsNullOrEmpty(firstId) || string.IsNullOrEmpty(secondId) || firstId == secondId ||
                 !orbs.TryGetValue(firstId, out var first) || !orbs.TryGetValue(secondId, out var second))
                 return Reject("ORB_NOT_FOUND", out reason);
@@ -292,14 +323,12 @@ namespace C6Lab
 
             orbs.Remove(firstId); orbs.Remove(secondId);
             var element = ElementFor(seed, combinedCount++);
-            Vector2 velocity = Finite(normalizedVelocity)
-                ? Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed)
-                : Vector2.zero;
+            Vector2 velocity = Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed);
             orb = new LabOrbState
             {
                 id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = element,
                 origin = LabOrbOrigin.Combined, originOwner = sender,
-                x = (first.x + second.x) * .5f, y = (first.y + second.y) * .5f,
+                x = normalizedCenter.x, y = normalizedCenter.y,
                 vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false,
                 // One blast-shrunk half makes the whole orb small, and its fire burns on (#213).
                 small = first.small || second.small, burnedAt = Math.Max(first.burnedAt, second.burnedAt)
@@ -312,34 +341,24 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// A right edge enters the next seat from its left; a left edge enters the previous seat
-        /// from its right. The same ID, creation time, and velocity survive the handoff.
-        /// Each handoff of a locked item removes one lock, so items unlock only by teamwork. A relay
-        /// orb becomes x1 when it unlocks, then each further handoff raises it to x2 and MAX. A bomb
-        /// that unlocks is defused into an attack orb: its fuse is cut and a fresh orb lifetime starts.
+        /// Atomically validate the current boundary position and hand off the orb. No preceding
+        /// motion packet is required and rejected geometry never overwrites the stored position.
         /// </summary>
-        public bool TryTransfer(ulong sender, string id, bool right, float height01,
-            Vector2 normalizedVelocity, string requestId, double now, out LabOrbState orb, out string reason)
-            => TryTransfer(sender, id, right, height01, normalizedVelocity, requestId, now,
-                LabEdgeCrossingKind.Swipe, out orb, out reason);
-
-        /// <summary>
-        /// The same handoff, told why the body crossed. A drum also gets how it arrives on the next
-        /// board (#178); see <see cref="ArriveDrum"/>.
-        /// </summary>
-        public bool TryTransfer(ulong sender, string id, bool right, float height01, Vector2 normalizedVelocity,
-            string requestId, double now, LabEdgeCrossingKind crossing, out LabOrbState orb, out string reason)
+        public bool TryTransferAt(ulong sender, string id, bool right, Vector2 normalizedPosition,
+            Vector2 normalizedVelocity, string requestId, double now, LabEdgeCrossingKind crossing,
+            out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!TryFindMovable(id, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (activeSeatCount == 1) return Reject("NO_NEIGHBOR", out reason);
-            if (!Unit(height01) || !Finite(normalizedVelocity) ||
+            if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y) || !Finite(normalizedVelocity) ||
                 normalizedVelocity.sqrMagnitude > rules.MaximumMotionSpeed * rules.MaximumMotionSpeed)
                 return Reject("INVALID_MOTION", out reason);
-            if (right ? current.x < 1f - EdgeTolerance || normalizedVelocity.x <= 0f
-                : current.x > EdgeTolerance || normalizedVelocity.x >= 0f)
+            float boundaryX = normalizedPosition.x;
+            if (right ? boundaryX < 1f - EdgeTolerance || normalizedVelocity.x <= 0f
+                : boundaryX > EdgeTolerance || normalizedVelocity.x >= 0f)
                 return Reject("NOT_OUTWARD_EDGE", out reason);
             // The gourd's swipe block (#215) stops only this player's own passes that way; a blast's push
             // and a drum running on through still go, and nothing coming in is stopped.
@@ -352,9 +371,12 @@ namespace C6Lab
             // A drum is not a stored orb, so a full board still receives it.
             if (!current.kind.IsDrum() && CountStored(receiver) >= rules.OrbStorageLimit)
                 return Reject("RECEIVER_FULL", out reason);
+            if (current.ownershipVersion == ulong.MaxValue)
+                return Reject("OWNERSHIP_VERSION_LIMIT", out reason);
             current.owner = receiver;
+            current.ownershipVersion++;
             current.x = right ? 0f : 1f;
-            current.y = height01;
+            current.y = normalizedPosition.y;
             current.vx = normalizedVelocity.x;
             current.vy = normalizedVelocity.y;
             current.unlockedAt = -1d;
@@ -506,15 +528,20 @@ namespace C6Lab
             }
         }
 
+        /// <summary>전투 중이고 콤보가 켜져 있으며, 진행 중인 콤보 없이 다음 콤보를 기다리는 중인지 (#241)</summary>
+        private bool ComboWaiting => phase == LabPhase.Playing && rules != null && rules.ComboEnabled && !combo.Active;
+
         /// <summary>
         /// 콤보가 끝난 뒤 처리. 성공은 팀 전체에 보상을 주고, 실패는 페널티를 건다.
         /// 틀린 색 + "던진 사람만" 설정이면 그 사람에게만, 그 밖(시간 초과 포함)에는 모두에게 건다.
-        /// 다음 콤보 시각이 이미 지났으면 지금 바로 나오게 한다.
+        /// 다음 콤보는 아무리 일러도 끝난 시각 + 예고 시간(#241) 뒤에 나온다. 앞 콤보가 늦게 끝나도
+        /// 예고(COMBO! 3, 2, 1)를 다 보여준 다음 4칸이 나오게 하려는 것이다.
         /// </summary>
         private void OnComboFinished(LabComboResult result)
         {
             double at = combo.LastResultAt;
-            if (nextComboAt < at) nextComboAt = at;
+            double earliest = at + rules.ComboWarningSeconds;
+            if (nextComboAt < earliest) nextComboAt = earliest;
             if (result == LabComboResult.Success)
             {
                 // 4칸을 다 같이 채웠으므로 보상은 언제나 팀 전체. 진행 중이던 페널티는 여기서 끝난다.
@@ -558,12 +585,14 @@ namespace C6Lab
         /// orbs beside it, which needs one more free storage slot. A potion heals its user's personal
         /// HP up to the maximum; at full HP it is refused and kept so it can still be passed to a
         /// neighbor. A player already at 0 HP cannot be revived by a potion.
+        /// The owner supplies its actual local position without a motion pre-update.
         /// </summary>
-        public bool TryUseItem(ulong sender, string id, string requestId, double now,
-            out LabOrbState orb, out string reason)
+        public bool TryUseItemAt(ulong sender, string id, string requestId, double now,
+            Vector2 normalizedPosition, out LabOrbState orb, out string reason)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y)) return Reject("INVALID_MOTION", out reason);
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (!current.kind.IsDoubleTapUsable()) return Reject("NOT_USABLE", out reason);
@@ -578,7 +607,8 @@ namespace C6Lab
                     {
                         id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = ElementFor(seed, combinedCount++),
                         origin = LabOrbOrigin.Combined, originOwner = sender,
-                        x = Mathf.Clamp01(current.x + side * SecretBoxSpread), y = current.y,
+                        x = Mathf.Clamp01(normalizedPosition.x + side * SecretBoxSpread),
+                        y = normalizedPosition.y,
                         vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
                     };
                     orbs.Add(opened.id, opened);
@@ -630,6 +660,14 @@ namespace C6Lab
             return burned;
         }
 
+        /// <summary>Orbs whose lifetime ran out since the last call, each reported once (#235).</summary>
+        public LabOrbExpiry[] DrainOrbExpiries()
+        {
+            LabOrbExpiry[] expired = orbExpiries.ToArray();
+            orbExpiries.Clear();
+            return expired;
+        }
+
         /// <summary>Locked bombs that blasted at their fuse since the last call, each reported once.</summary>
         public LabBombBlast[] DrainBombExplosions()
         {
@@ -652,20 +690,6 @@ namespace C6Lab
             if (!TryAdvance(now, out _) || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight) return false;
             launchScales.Remove(id);
             return orbs.Remove(id);
-        }
-
-        /// <summary>Only the current owner may submit a finite local physics sample.</summary>
-        public bool TryUpdateMotion(ulong sender, string id, Vector2 normalizedPosition,
-            Vector2 normalizedVelocity, double now)
-        {
-            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !TryFindMovable(id, out var orb)
-                || !UsableBy(orb, sender) || !Unit(normalizedPosition.x) || !Unit(normalizedPosition.y)
-                || !Finite(normalizedVelocity) ||
-                normalizedVelocity.sqrMagnitude > rules.MaximumMotionSpeed * rules.MaximumMotionSpeed) return false;
-            orb.x = normalizedPosition.x; orb.y = normalizedPosition.y;
-            orb.vx = normalizedVelocity.x; orb.vy = normalizedVelocity.y;
-            orb.revision = ++revision;
-            return true;
         }
 
         private bool BlockOn(double now) => phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt;
@@ -711,7 +735,9 @@ namespace C6Lab
                 comboResult = combo.LastResult,
                 comboResultCount = combo.LastResultCount,
                 comboResultAt = combo.LastResultAt,
-                comboFailedBy = combo.LastFailedBy
+                comboFailedBy = combo.LastFailedBy,
+                comboNextAt = ComboWaiting ? nextComboAt : -1d,
+                comboWarningAt = ComboWaiting ? nextComboAt - rules.ComboWarningSeconds : -1d
             };
         }
 
@@ -767,7 +793,13 @@ namespace C6Lab
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
                 {
-                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0) continue;
+                    if (!orbs.Remove(expired.id)) continue;
+                    if (expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0)
+                    {
+                        // Its lifetime ran out: its holder's screen sees it go in a puff of smoke (#235).
+                        orbExpiries.Add(new LabOrbExpiry(expired.owner, expired.id));
+                        continue;
+                    }
                     // A bomb still locked at the end of its fuse blasts on its current holder's board. No
                     // orb is lost: the holder's screen pushes the ones around it away from where it last was.
                     bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
@@ -928,8 +960,7 @@ namespace C6Lab
         // Items last the item lifetime; for a locked bomb that is its fuse. An unlocked bomb is an
         // ordinary attack orb and keeps the orb lifetime.
         private float LifetimeOf(LabOrbState orb) =>
-            orb.kind.IsItem() && !(orb.kind == LabOrbKind.Bomb && orb.lockSwipes == 0)
-                ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
+            orb.kind.LifetimeFor(orb.lockSwipes, rules.OrbLifetimeSeconds, rules.ItemLifetimeSeconds);
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
 
         /// <summary>Orbs and drums both move between screens; look the ID up in either list.</summary>
@@ -937,16 +968,32 @@ namespace C6Lab
             orbs.TryGetValue(id ?? string.Empty, out found) || drums.TryGetValue(id ?? string.Empty, out found);
 
         /// <summary>
+        /// Read one authoritative orb or drum without advancing time or exposing mutable ledger
+        /// state. Command validation can inspect ownership without allocating a full snapshot.
+        /// </summary>
+        public bool TryGetMovableState(string id, out LabOrbState state)
+        {
+            state = null;
+            if (!TryFindMovable(id, out var found)) return false;
+            state = found.Copy();
+            return true;
+        }
+
+        /// <summary>
         /// 판마다 북을 받을 사람을 무작위로 정한다. 북이 인원 이하이면 서로 다른 사람이 받고,
         /// 더 많으면 모두 하나씩 받은 뒤 남는 북도 무작위로 나눈다. Host만 뽑으므로 모든 기기가
         /// 스냅샷으로 같은 결과를 받는다. 북은 받은 사람 판의 가운데에서 시작한다.
+        /// Drum Count가 AUTO(0)이면 이번 판 인원으로 개수를 정한다(#236, 2·3명 1개, 4·5명 2개).
         /// </summary>
         private void PlaceDrums(double now)
         {
             int[] shuffled = Enumerable.Range(0, activeSeatCount)
                 .OrderBy(seat => DrawFor(seed ^ DrumSeatSalt, (ulong)seat, 0u)).ToArray();
             var perBoard = new int[activeSeatCount];
-            for (int i = 0; i < rules.DrumCount; i++)
+            // AUTO follows the players in this round (#236); a fixed count is used as it is.
+            int drumCount = rules.DrumCount != LabConfig.AutoDrumCount ? rules.DrumCount
+                : LabConfig.DrumsForPlayers(activeSeatCount);
+            for (int i = 0; i < drumCount; i++)
             {
                 int seat = i < activeSeatCount ? shuffled[i]
                     : (int)(DrawFor(seed ^ DrumSeatSalt, ulong.MaxValue, (uint)i) % (ulong)activeSeatCount);
@@ -1082,7 +1129,8 @@ namespace C6Lab
             public readonly Color[] PaintColors;
             public readonly bool ComboEnabled, ComboPenaltyThrowerOnly;
             public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
-                ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale;
+                ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale,
+                ComboWarningSeconds;
 
             public Rules(LabConfig config)
             {
@@ -1134,6 +1182,7 @@ namespace C6Lab
                 ComboPenaltyThrowerOnly = config.ComboPenaltyThrowerOnly;
                 ComboRewardDurationSeconds = config.ComboRewardDurationSeconds;
                 ComboRewardSizeScale = config.ComboRewardSizeScale;
+                ComboWarningSeconds = config.ComboWarningSeconds;
             }
         }
     }

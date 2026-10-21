@@ -32,12 +32,11 @@ namespace C6Lab.Tests
         [TestCase(1)]
         [TestCase(80)]
         [TestCase(100)]
-        public void SnapshotAndLegacyConfigGoalsAlwaysResolveToOneHundred(int legacyGoal)
+        public void SnapshotGoalsAlwaysResolveToOneHundred(int legacyGoal)
         {
             var tuning = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
-                JsonUtility.FromJsonOverwrite("{\"paintVictoryPercent\":80}", tuning);
                 var snapshot = new LabSnapshot { paintGoalPercent = legacyGoal };
                 Assert.That(LabHud.PaintGoalPercentFor(snapshot, tuning), Is.EqualTo(100));
                 Assert.That(LabHud.FormatPaintGoalProgress(.5f, LabHud.PaintGoalPercentFor(snapshot, tuning)),
