@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Text;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
@@ -299,6 +301,149 @@ namespace C6Lab.Tests
             Submit("combine", 2, "yin", "yang");
             Assert.That(coordinator.Count, Is.EqualTo(1));
             Assert.That(board.Count, Is.EqualTo(1));
+        }
+
+        [UnityTest]
+        public IEnumerator AnActionTriggeredExpiryVanishesBeforeItsReceiptRemovesTheSourceBody()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[5] = 1f;
+            values[10] = .1f;
+            values[39] = values[40] = 50f;
+            for (int i = 41; i <= 44; i++) values[i] = 0f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            double began = Time.realtimeSinceStartupAsDouble;
+            var model = new LabModel();
+            model.BeginSolo(Session, owner, began, config);
+            Assert.That(model.TryGenerate(owner, "expiry-source", began, out var expiring, out error), Is.True, error);
+            initial = model.Snapshot(began);
+            Set("model", model);
+            Set("latest", initial);
+            Invoke("SyncBoard");
+            Assert.That(board.TryGetMotion(expiring.id, out _, out _), Is.True);
+            var vanished = new List<string>();
+            var notices = new List<string>();
+            board.OrbVanished += id => vanished.Add(id);
+            network.OrbExpired += id => notices.Add(id);
+            yield return new WaitForSecondsRealtime(.15f);
+            Assert.That(board.TryGetMotion(expiring.id, out _, out _), Is.True,
+                "A local life countdown must not authoritatively remove an orb before the Host advances.");
+            LabOrbState drum = initial.drums.Single();
+            object request = Submit("generate", 500, null, drum.id);
+            request.GetType().GetField("ownershipVersion").SetValue(request, drum.ownershipVersion);
+            request.GetType().GetField("configRevision").SetValue(request, Get<int>("configRevision"));
+            request.GetType().GetField("configFingerprint").SetValue(request, Get<string>("configFingerprint"));
+
+            // Execute the actual Host rule handler without sockets. TryGenerate advances the real
+            // model clock, so the earlier orb expires while this command is being processed.
+            var receipt = (LabActionReceipt)Invoke("ExecuteBoardAction", owner, request);
+
+            Assert.That(receipt.accepted, Is.True, receipt.reason);
+            Assert.That(receipt.removedIds, Does.Contain(expiring.id));
+            Assert.That(vanished, Is.EqualTo(new[] { expiring.id }),
+                "The expiry must be announced before its action receipt is delivered, while Vanish can still find the body.");
+            Assert.That(notices, Is.EqualTo(new[] { expiring.id }));
+            Assert.That(board.GetComponentsInChildren<LabOrbVanishSmoke>(true).Length, Is.EqualTo(1));
+            Assert.That(board.TryGetMotion(expiring.id, out _, out _), Is.False);
+            receipt.sessionId = Session;
+            receipt.round = 1u;
+            receipt.sender = owner;
+            receipt.requestId = 500;
+            Invoke("ReceiveActionReceipt", receipt);
+            Assert.That(vanished.Count, Is.EqualTo(1), "The later ledger removal must not create another expiry effect.");
+            Assert.That(network.Snapshot.orbs.Any(orb => orb.id == expiring.id), Is.False);
+            Assert.That(network.Snapshot.orbs.Any(orb => orb.id == receipt.outputId), Is.True);
+        }
+
+        [Test]
+        public void AnOldRoundExpiryNoticeCannotVanishANewRoundOrbAndCurrentNoticePrecedesCheckpointRemoval()
+        {
+            initial.round = 2u;
+            Set("latest", initial);
+            Invoke("EnsureActionRound");
+            Invoke("SyncBoard");
+            var vanished = new List<string>();
+            var notices = new List<string>();
+            board.OrbVanished += id => vanished.Add(id);
+            network.OrbExpired += id => notices.Add(id);
+            ReceiveControl("orbExpired", "yin", Session, 1u);
+            ReceiveControl("orbExpired", "yin", "previous-room", 2u);
+            Assert.That(vanished, Is.Empty);
+            Assert.That(notices, Is.Empty);
+            Assert.That(board.TryGetMotion("yin", out _, out _), Is.True,
+                "An old round/session cannot expire a current orb even if its ID is reused.");
+
+            ReceiveControl("orbExpired", "yin", Session, 2u);
+
+            Assert.That(vanished, Is.EqualTo(new[] { "yin" }));
+            Assert.That(notices, Is.EqualTo(new[] { "yin" }));
+            Assert.That(board.GetComponentsInChildren<LabOrbVanishSmoke>(true).Length, Is.EqualTo(1));
+            Assert.That(board.TryGetMotion("yin", out _, out _), Is.False);
+            LabBoardFrame checkpoint = EmptyCheckpoint(1);
+            checkpoint.round = 2u;
+            checkpoint.states = initial.orbs.Where(orb => orb.id == "yang").ToArray();
+            Invoke("ReceiveBoardFrame", checkpoint);
+            Assert.That(network.Snapshot.orbs.Select(orb => orb.id), Is.EqualTo(new[] { "yang" }));
+            Assert.That(vanished, Is.EqualTo(new[] { "yin" }), "The owner-board removal is not a second expiry.");
+            Assert.That(board.GetComponentsInChildren<LabOrbVanishSmoke>(true).Length, Is.EqualTo(1));
+        }
+
+        [TestCase("combine")]
+        [TestCase("launch")]
+        [TestCase("transfer")]
+        public void AConsumedOrTransferredOrbDoesNotPlayAnExpirySmokeOrExpiryNotice(string action)
+        {
+            int vanished = 0, notices = 0;
+            board.OrbVanished += _ => vanished++;
+            network.OrbExpired += _ => notices++;
+            if (action == "combine")
+            {
+                object request = Submit("combine", 1, "yin", "yang");
+                Invoke("ReceiveActionReceipt", CombinedReceipt(1, PacketField<string>(request, "provisionalId"), 1));
+                Assert.That(board.TryGetMotion("yin", out _, out _) || board.TryGetMotion("yang", out _, out _), Is.False);
+                Assert.That(board.TryGetMotion("combined", out _, out _), Is.True);
+            }
+            else
+            {
+                initial.orbs = new[] { Combined() };
+                Invoke("SyncBoard");
+                Submit(action, 1, "combined");
+                LabOrbState result = Combined();
+                if (action == "launch") result.inFlight = true;
+                else { result.owner = 2ul; result.ownershipVersion++; }
+                Invoke("ReceiveActionReceipt", new LabActionReceipt
+                {
+                    sessionId = Session, round = 1u, sender = owner, requestId = 1, sequence = 1,
+                    accepted = true, reason = action == "launch" ? "LAUNCHED" : "TRANSFERRED", serverTime = 2d,
+                    states = new[] { result }, removedIds = new[] { "combined" }, players = initial.players
+                });
+                Assert.That(board.TryGetMotion("combined", out _, out _), Is.False);
+            }
+            Assert.That(vanished, Is.Zero, "Only a Host lifetime-expiry notice may invoke Vanish.");
+            Assert.That(notices, Is.Zero);
+            Assert.That(board.GetComponentsInChildren<LabOrbVanishSmoke>(true), Is.Empty);
+        }
+
+        private void ReceiveControl(string type, string orbId, string session, uint round)
+        {
+            object packet = NewPacket(type, 0, orbId);
+            packet.GetType().GetField("sessionId").SetValue(packet, session);
+            packet.GetType().GetField("round").SetValue(packet, round);
+            byte[] payload = Encoding.UTF8.GetBytes(JsonUtility.ToJson(packet));
+            var wire = new byte[payload.Length + 8];
+            Buffer.BlockCopy(BitConverter.GetBytes(3), 0, wire, 0, 4);
+            Buffer.BlockCopy(BitConverter.GetBytes(payload.Length), 0, wire, 4, 4);
+            Buffer.BlockCopy(payload, 0, wire, 8, payload.Length);
+            // The fixture intentionally references only the game assembly. Reflection constructs
+            // the real NGO reader and invokes its actual authenticated receive path without a socket.
+            MethodInfo receive = typeof(LabNetwork).GetMethod("Receive", Private);
+            Type readerType = receive.GetParameters()[1].ParameterType;
+            ConstructorInfo constructor = readerType.GetConstructors().Single(candidate =>
+                candidate.GetParameters().Length == 4 && candidate.GetParameters()[0].ParameterType == typeof(byte[]));
+            Type allocatorType = constructor.GetParameters()[1].ParameterType;
+            object reader = constructor.Invoke(new[] { (object)wire, Enum.Parse(allocatorType, "Temp"), -1, 0 });
+            try { receive.Invoke(network, new[] { (object)0ul, reader }); }
+            finally { ((IDisposable)reader).Dispose(); }
         }
 
         private LabBoardFrame EmptyCheckpoint(long sequence) => new LabBoardFrame

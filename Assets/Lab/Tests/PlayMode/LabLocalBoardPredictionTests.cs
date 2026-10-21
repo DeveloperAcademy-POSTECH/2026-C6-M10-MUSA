@@ -64,6 +64,29 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void HostExpiryCannotBeUndoneByRejectingPendingCombinationOrLaunch()
+        {
+            AddPair();
+            Assert.That(board.TryCreateCombinePreview("preview", "yin", "yang", Vector2.one * .5f,
+                Vector2.zero), Is.True);
+            int vanished = 0;
+            board.OrbVanished += _ => vanished++;
+            Assert.That(board.Vanish("yin"), Is.True);
+            Assert.That(board.Vanish("yin"), Is.False);
+            Assert.That(board.RejectCombinePreview("preview"), Is.True);
+            Assert.That(board.TryGetMotion("yin", out _, out _), Is.False);
+            Assert.That(board.TryGetMotion("yang", out _, out _), Is.True);
+            Assert.That(board.Count, Is.EqualTo(1));
+            Assert.That(vanished, Is.EqualTo(1));
+
+            Assert.That(board.BeginPendingLaunch("yang"), Is.True);
+            Assert.That(board.Vanish("yang"), Is.True);
+            Assert.That(board.RejectPendingLaunch("yang"), Is.False);
+            Assert.That(board.Count, Is.Zero);
+            Assert.That(vanished, Is.EqualTo(2));
+        }
+
+        [Test]
         public void RejectedCombinationRestoresItsOriginalInputsAndSavedMotion()
         {
             LabOrbView yin = board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.4f, .4f), new Vector2(.2f, .1f));

@@ -155,6 +155,33 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void SnapshotCopyAndFastClockOverlayPreserveTheIncomingComboWarningWindow()
+        {
+            var snapshot = Snapshot(15d);
+            snapshot.comboNextAt = 20d;
+            snapshot.comboWarningAt = 17d;
+            LabSnapshot sharedCopy = LabBoardReplica.CopySnapshot(snapshot);
+            Assert.That(sharedCopy.comboNextAt, Is.EqualTo(20d));
+            Assert.That(sharedCopy.comboWarningAt, Is.EqualTo(17d));
+            Assert.That(sharedCopy.ComboWarningOn(sharedCopy.serverTime), Is.False);
+
+            var replica = ActiveReplica();
+            var frame = Frame(1, true);
+            frame.serverTime = 18d;
+            frame.remaining = 162d;
+            Assert.That(replica.TryApply(frame, out _), Is.True);
+            LabSnapshot visible = replica.Overlay(sharedCopy);
+            Assert.That(visible.serverTime, Is.EqualTo(18d));
+            Assert.That(visible.comboNextAt, Is.EqualTo(20d));
+            Assert.That(visible.comboWarningAt, Is.EqualTo(17d));
+            Assert.That(visible.ComboWarningOn(visible.serverTime), Is.True);
+            visible.comboNextAt = 30d;
+            Assert.That(snapshot.comboNextAt, Is.EqualTo(20d));
+            snapshot.comboNextAt = snapshot.comboWarningAt = -1d;
+            Assert.That(replica.Overlay(snapshot).ComboWarningOn(18d), Is.False);
+        }
+
+        [Test]
         public void SameRoundSetActiveRetainsReceiptsButNewRoundRejectsEveryOldPacket()
         {
             var replica = ActiveReplica();

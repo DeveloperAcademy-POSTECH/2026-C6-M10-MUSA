@@ -36,8 +36,8 @@ namespace C6Lab.Tests
             LabDeveloperMode ui = SavedDeveloperUi();
             testedNetwork = ui.network;
             float[] original = ui.sourceConfig.CaptureDeveloperValues();
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(169), "The live DEV panel includes all appended settings, including nearby-hit drying.");
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(169), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(170), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(170), "The live DEV panel includes all appended settings, including nearby-hit drying.");
             Assert.That(ui.sourceConfig.ThrowForm, Is.EqualTo(LabThrowForm.Arc));
             ui.Open();
             Assert.That(ui.panel.activeSelf, Is.True);

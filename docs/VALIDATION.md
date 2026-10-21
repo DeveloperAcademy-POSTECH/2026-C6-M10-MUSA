@@ -1468,8 +1468,49 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 
 최종 검사부터 두 빌드까지 게임 런타임/검사/Shader/Config/Scene/패키지/설정 **191개 파일의 SHA256이 일치**했다. 세로 검사 도구는 빌드 전에 제거했고 글로벌 GameView 설정 파일도 기존 바이트와 같음을 확인했다. Scene/에셋/검사 임계값을 변경해 GPU 통과를 맞추지 않았다.
 
+## 구슬 소멸 예고 — 2026-10-20, 이슈 #235
 
-## 개인 조합판 로컬 처리와 Host 확정 분리 — 2026-10-21 KST 이슈 240
+기준은 Unity **6000.6.5f1**, main(`63a587da`, #233 PR #234 포함)에서 분기한 `feat/#235-orb-expiry-warning`이다.
+
+- **Host 만료 보고**: 수명이 끝난 구슬을 Host가 기록해 지금 가진 사람에게만 스냅샷보다 먼저 `orbExpired`로 알린다. 조합·넘김·던지기·사용으로 사라진 구슬, 날아가는 구슬, 터지는 잠긴 폭탄은 보고하지 않는다. 수명 규칙(아이템 15초·잠긴 폭탄 도화선 15초·그 밖에 해금 폭탄 포함 8초)을 `LabOrbKindRules.LifetimeFor` 하나로 모아 Host와 모든 화면이 같이 쓴다.
+- **표시**: 마지막 3초 동안 구슬 그림 전체(먹선 테두리 포함)를 흰 막과 옅은 빛으로 덮었다 걷는 번쩍임이 초당 1.5번에서 7번까지 빨라진다(결합 구슬 1.2배·폭탄 그림 크기에 맞춤, 북·잠긴 폭탄 제외). 사라질 때 따뜻한 회색 연기 6덩이가 0.6초 동안 퍼졌다 걷힌다. 판 종이가 크림색 한지이고 양 구슬이 흰색이라, 흰 빛만이 아니라 그림 전체를 하얗게 덮어 보이게 했다.
+- **값**: 번쩍임 시작 시간·빠르기·색, 연기 크기·시간·색은 `LabOrbAppearance` Inspector의 Orb expiry 칸이다(DEV 없음, 설정 169개 유지). 통신 버전 `5646` → `5647`.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다 컴파일했다. 오류 0. 새 파일 `LabOrbVanishSmoke.cs`가 Runtime에 포함된 것을 확인했다. |
+| 모양 미리보기 | 확인 (Unity 밖) | 실제 `BoardPlate.png`와 음·양·화 구슬 그림으로 Python 렌더링해 번쩍임·연기 모양을 정했다. 실제 Unity 화면이 아니다. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN | 이번 변경의 Test Runner 결과는 기록하지 않았다. |
+| 솔로 화면: 번쩍임이 잘 보이는지·산만하지 않은지, 연기 | NOT_RUN | 구슬 하나를 만들고 8초를 기다려 5초쯤부터 번쩍이고 8초에 연기와 함께 사라지는지 본다. |
+| 3인 실행: 넘겨받은 구슬의 번쩍임, 넘김·조합 시 연기 없음 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 휴대폰 화면 밝기에서 번쩍임 가독성 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `AnOrbWhoseLifetimeRunsOutIsReportedToItsHolderOnceButNotOneThatLeftAnotherWay`, `ExpiredItemsAndUnlockedBombsAreReportedButALockedBombBlastsInstead`, `EveryScreenCountsAnOrbsLifeDownByTheSameRule`; 프로토콜을 고정한 팀원 검사 7개를 5647로 갱신
+- **PlayMode** `LabOrbPhysicsTests`: `VanishingAnOrbTakesItOffTheBoardAndSaysSoUnlikeRemovingIt`, `AnOrbFlashesWhiteInItsLastSecondsThenGoesUpInSmoke`, `TheExpiryWarningSecondsComeFromTheAppearanceInspector`
+
+
+## 콤보 예고와 콤보 기본값 — 2026-10-21, 이슈 #241
+
+기준은 main `63a587da`(#232 콤보, #234 축소 투사체 판정 포함)에서 분기한 `feat/#241-combo-warning`이다. Unity는 실행하지 않았다.
+
+- **DEV**: `Combo Warning (seconds)`를 170번째(인덱스 169)에 추가했다. 범위 0~10초, 기본 3초, 0이면 예고 없음. `Combo` 묶음에서는 `Combo First Start` 바로 아래에 보인다(표시 순서 160, 161, 169, 162~168). 설정 169 → **170개**, 프로토콜 `5646` → **`5647`**. 이후 main에 #235(PR #238, 프로토콜 5647)가 먼저 머지되어 main 통합 시 프로토콜을 **`5648`**로 한 칸 올렸다.
+- **기본값 변경**: `Gourd Color Combo` OFF → **ON**, `Combo Repeat Interval` 30 → **15초**, `Combo Penalty Size (x)` 0.3 → **0.1**, `Combo Reward Size (x)` 1.5 → **2.5**. 첫 시작 20초/제한 10초는 그대로다. 이전에는 `LabConfig.asset`에 콤보 필드가 없어 코드 기본값에 기댔는데, 열려 있던 Unity 에디터가 메모리의 옛 값을 유지해 DEV/DEFAULTS에 옛 값이 보였다. 그래서 콤보 10개 값을 `LabConfig.asset`에도 같은 값으로 저장했다.
+- **Host 모델**: 콤보를 기다리는 동안 스냅샷에 `comboNextAt`(4칸 등장 시각)과 `comboWarningAt`(= 등장 시각 − 예고 시간)을 싣고, 진행 중이거나 꺼져 있으면 -1이다. `LabSnapshot.ComboWarningOn(now)`로 예고 중인지 판단한다. 콤보가 끝나면 다음 콤보 시각을 최소 "끝난 시각 + 예고 시간"으로 미뤄 예고를 끝까지 보여준다(기본값 20/15/10/3에서는 해당 없음, 예고 0이면 이전과 같음). 예고 중에는 콤보가 없으므로 맞힌 구슬을 판정하지 않는다.
+- **화면**: `LabGourdComboHud`가 예고 중 패널 자리에 같은 크기의 `COMBO!`(노랑, 진한 테두리) + 남은 초를 그린다. 숫자는 바뀔 때마다 1.7배에서 1배로 튀고 마지막 1은 빨강이며, 글자와 패널은 0에 가까울수록 빠르게 들썩인다. 예고 중 색 4칸과 SMALL/BIG 배지는 숨기고, 앞 콤보의 결과 문구가 떠 있으면 그것이 끝난 뒤 남은 카운트다운을 보인다. 첫 콤보 예고(콤보 수 0)에서도 보인다. 터치를 막지 않는다. 예고 소리는 이번 범위가 아니다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. `LabModel.cs`의 기존 CS0136(`blast`)은 main 원본에서도 나는 mcs 한계라 제외했다. |
+| EditMode 실제 실행 | NOT_RUN | `LabGourdComboTests` 새 3건(`TheWarningCountsDownBeforeTheFourSlotsAppearOnTime`, `ALateFinishStillLeavesTheWholeWarningBeforeTheNextCombo`, `AZeroWarningMeansTheComboAppearsWithoutOne`)과 기본값 갱신분, `LabDeveloperConfigTests.GourdColorComboFieldsFormTheComboGroupAndStartOn`, 개수/프로토콜 고정 검사 170/5648, 기존 전체 EditMode. 콤보가 기본 ON이 되어 전투 20초를 넘기는 기존 검사가 콤보를 만나는지도 이 실행으로 확인한다. |
+| PlayMode 실제 실행 | NOT_RUN | 새 `LabComboProjectileIntegrationTests.TheWarningCountsDownWithoutColorsOrBadgeThenTheComboAppears`, 개수 고정 Developer PlayMode 검사, 기존 전체 PlayMode. |
+| 솔로 화면: 17~20초 `COMBO!` 3/2/1, 20초에 4칸 등장, 예고 중 색/배지 숨김, 글자 크기·위치 | NOT_RUN | 기본값 그대로 솔로 시작 후 17초부터 확인한다. |
+| 3인 실행: 모든 화면에서 같은 카운트다운과 같은 시각의 4칸 등장 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 예고 패널이 위쪽 HUD/노치와 겹치지 않는지 확인 필요. |
+
+## 개인 조합판 로컬 처리와 Host 확정 분리 — 2026-10-21 KST 이슈 240 단독 작업
+
+이 절은 단독 #240 커밋 `9ee7bd2`의 기록이며 최신 main `7021c40e`의 #235·#241 통합 전 결과다. 아래 837/233 검사·Mac 92항목을 프로토콜5649/170개 통합본의 통과로 해석하지 않는다.
 
 기준 main `63a587d`에서 분기한 `refactor/#240-local-board-authority`다. Unity6000.6.5f1·NGO2.13.3·Unity Transport6.6.0·URP17.6.0·macOS ARM64에서 확인했다. 프로토콜은5647/연결 토큰`C6PhysicsLab/12`, 공유 설정169개다. 기존 LAN·Bonjour·직접 IPv4/IPv6·핫스팟 전송 코드를 유지하며 Scene·Prefab·원본 Config·패키지는 수정하지 않았다. 구현 경계와 파일 지도는 [LOCAL_BOARD_AUTHORITY](LOCAL_BOARD_AUTHORITY.md), 검사 분류는 [TEST_SUITE_REPORT](TEST_SUITE_REPORT.md)에 기록한다.
 
@@ -1513,3 +1554,24 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 4. 초기 전체지도 수신 중 보드 체크포인트가 복구되는 구간에서는 입력이 잠긴다. 실험 도구는 실제 보드 프레임 준비를 기다리도록 보완했다. helper의 진단/객체 조회 문제는 게임 오류와 구분해 수정했으며 실패 기록은 로컬에 보존했다.
 
 최종 코드/검사171개 파일 해시와 사용자 Scene·Target2머터리얼2개·미추적meta의 보존 해시를 대조한다. 테스트 임계값이나 물리 수치를 변경해 실패를 숨기지 않았다. 큰 조합판 체크포인트 자체는 아직 NGO신뢰성 제어 큐를 쓰므로 매우 많은 구슬 조건의 대기는 남을 수 있다. Host이전·전투중재접속·완전한 물리되감기는 추가하지 않았다.
+
+
+## 최신 main 통합 — #240 + #235 구슬 소멸 + #241 콤보 예고
+
+통합 기준은 단독 #240 `9ee7bd2`와 `origin/main` `7021c40e`다. 현재 통합 통신 규약은 **프로토콜5649·연결 토큰 `C6PhysicsLab/13`·공유 설정170개**이며, 이전5647/169개 또는5648/170개 앱과 섞어 접속하지 않는다.
+
+- #240의 로컬 조합판·임시 조합/투척·소유권/소비 원장·개인 보드와 도색 Bulk 분리를 유지한다.
+- #235의 구슬 종류별 수명 규칙·소멸 예고·Host 만료 알림과 연기를 보존한다. 만료 연출을 일반 조합/전달/소비에 잘못 재생하지 않는지 통합 검사한다.
+- #241의 `comboWarningAt`/`comboNextAt`, 예고 HUD와 DEV 170번째(인덱스169) 설정을 보존한다. 최신 main의 기본 ON·15초 반복·페널티0.1배·보상2.5배도 유지한다.
+- 문서 충돌은 현재 연결 정보와 규칙을 위 통합 기준으로 맞추고, #235·#241·단독#240의 당시 실행/미실행 기록은 삭제하거나 새 PASS로 바꾸지 않았다.
+
+| 확인 | 상태 | 필요한 근거 |
+| --- | --- | --- |
+| 통합 Runtime·Editor·검사 컴파일 | **PASS** | 아래 두 Unity 전체 검사가 같은 통합 소스에서 컴파일·실행을 완료했다. |
+| 통합 전체 EditMode | **PASS 844/844** | `merge-edit.xml`, 실패·생략0, 2026-10-21 01:06:09Z~01:06:35Z UTC, 25.850초. 콤보 예고 시각의 복사/빠른 보드 시계 보존 검사 포함. |
+| 통합 전체 PlayMode | **PASS 243/243** | `merge-play.xml`, 실패·생략0, 01:07:11Z~01:08:58Z UTC, 107.152초. 만료 후 거절로 숨긴 구슬 부활 금지, 행동 처리 중 만료 알림이 결과 삭제보다 선행, 이전 판/방 만료 패킷 거부, 일반 조합/투척/전달의 거짓 만료 없음과 최신 main 검사를 포함. |
+| 통합 Mac 검증 앱 빌드 | **PASS** | `merge-mac`의 새 Development 검증 앱 생성. 임시 helper를 포함한 앱이며 일반 배포/iOS 빌드와 구분. 빌드 전후 모든 런타임 C#과 사용자 보존 파일의 해시 일치, helper 제거 확인. |
+| 통합 Mac 직접2인·지연/손실2인 | **PASS 22+22항목** | `merge-mac/network-direct2/summary.json`, `merge-mac/network-delay2/summary.json`. 실제 소켓·편도60ms/지터±10ms/1% 손실 확률, 프로토콜5649·설정170개 확인. 조합·즉시 시각 투척·실제 명중·구슬/북 동일 ID 전달·Host/소유자 재고·HP·색/P맵·일시정지·DEV 재시작 검증. |
+| 통합 iOS·실기기·LAN/핫스팟 | **NOT_RUN** | 같은 통합 빌드의 서명·설치·터치·네트워크 환경별 실행 |
+
+전체 검사 전후 소스·Shader·Config·Scene·Prefab 196개 파일의 해시가 일치했다. 통합 Mac 지연 조건에서도 조합/비행 객체가 입력 호출 안에서 생성됐고, Host 조합 승인은174.1/167.0ms로 별도 도착했다. 통합본의 실제 Mac3/5인·iOS·LAN/핫스팟 실기기는 미실행이며 단독 결과로 승계하지 않는다.

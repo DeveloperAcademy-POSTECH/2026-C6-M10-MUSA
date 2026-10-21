@@ -207,6 +207,7 @@ namespace C6Lab
                 latest = model.Snapshot(battleClock.Now(Time.realtimeSinceStartupAsDouble));
                 latest.paused = battleClock.IsPaused && latest.phase == LabPhase.Playing;
                 AnnounceBombExplosions();
+                AnnounceOrbExpiries();
                 AnnounceGourdBombs();
                 SyncBoard();
                 // Publish small board state before paint checkpoints; accepted actions need no full snapshot.
@@ -270,6 +271,7 @@ namespace C6Lab
             }
             // Expiry may have exploded a bomb while processing this command. Announce before removing its local body.
             AnnounceBombExplosions();
+            AnnounceOrbExpiries();
             AnnounceGourdBombs();
             LabOrbState[] after = model.CopyOwnedStates(sender);
             var afterIds = new HashSet<string>(after.Select(item => item.id), StringComparer.Ordinal);
@@ -357,6 +359,7 @@ namespace C6Lab
         {
             if (snapshot == null || !IsHost || model == null) return;
             AnnounceBombExplosions();
+            AnnounceOrbExpiries();
             AnnounceGourdBombs();
             CaptureTargetPose(snapshot);
             foreach (ulong peer in order)

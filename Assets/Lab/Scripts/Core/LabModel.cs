@@ -24,6 +24,22 @@ namespace C6Lab
     }
 
     /// <summary>
+    /// An orb whose lifetime ran out (#235): the board that held it, which goes there in a puff of
+    /// smoke, unlike an orb that was handed on, combined, thrown or used.
+    /// </summary>
+    public readonly struct LabOrbExpiry
+    {
+        public readonly ulong Owner;
+        public readonly string OrbId;
+
+        public LabOrbExpiry(ulong owner, string orbId)
+        {
+            Owner = owner;
+            OrbId = orbId;
+        }
+    }
+
+    /// <summary>
     /// A locked bomb the gourd dropped onto one player's board as sabotage (#177): who receives it
     /// and where, in 0..1 board units, it lands.
     /// </summary>
@@ -90,6 +106,7 @@ namespace C6Lab
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
+        private readonly List<LabOrbExpiry> orbExpiries = new List<LabOrbExpiry>();
         /// <summary>Bomb times for this round, retained so a late frame schedules the same swipe blocks as small steps (#215).</summary>
         private readonly List<double> gourdBombTimes = new List<double>();
         private double nextSwipeBlockAt;
@@ -186,6 +203,7 @@ namespace C6Lab
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
             players.Clear(); orbs.Clear(); drums.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
             unreportedBlasts.Clear();
+            orbExpiries.Clear();
             gourdBombs.Clear();
             gourdBombTimes.Clear();
             for (int i = 0; i < activeSeatCount; i++)
@@ -561,15 +579,20 @@ namespace C6Lab
             }
         }
 
+        /// <summary>전투 중이고 콤보가 켜져 있으며, 진행 중인 콤보 없이 다음 콤보를 기다리는 중인지 (#241)</summary>
+        private bool ComboWaiting => phase == LabPhase.Playing && rules != null && rules.ComboEnabled && !combo.Active;
+
         /// <summary>
         /// 콤보가 끝난 뒤 처리. 성공은 팀 전체에 보상을 주고, 실패는 페널티를 건다.
         /// 틀린 색 + "던진 사람만" 설정이면 그 사람에게만, 그 밖(시간 초과 포함)에는 모두에게 건다.
-        /// 다음 콤보 시각이 이미 지났으면 지금 바로 나오게 한다.
+        /// 다음 콤보는 아무리 일러도 끝난 시각 + 예고 시간(#241) 뒤에 나온다. 앞 콤보가 늦게 끝나도
+        /// 예고(COMBO! 3, 2, 1)를 다 보여준 다음 4칸이 나오게 하려는 것이다.
         /// </summary>
         private void OnComboFinished(LabComboResult result)
         {
             double at = combo.LastResultAt;
-            if (nextComboAt < at) nextComboAt = at;
+            double earliest = at + rules.ComboWarningSeconds;
+            if (nextComboAt < earliest) nextComboAt = earliest;
             if (result == LabComboResult.Success)
             {
                 // 4칸을 다 같이 채웠으므로 보상은 언제나 팀 전체. 진행 중이던 페널티는 여기서 끝난다.
@@ -697,6 +720,14 @@ namespace C6Lab
             return burned;
         }
 
+        /// <summary>Orbs whose lifetime ran out since the last call, each reported once (#235).</summary>
+        public LabOrbExpiry[] DrainOrbExpiries()
+        {
+            LabOrbExpiry[] expired = orbExpiries.ToArray();
+            orbExpiries.Clear();
+            return expired;
+        }
+
         /// <summary>Locked bombs that blasted at their fuse since the last call, each reported once.</summary>
         public LabBombBlast[] DrainBombExplosions()
         {
@@ -778,7 +809,9 @@ namespace C6Lab
                 comboResult = combo.LastResult,
                 comboResultCount = combo.LastResultCount,
                 comboResultAt = combo.LastResultAt,
-                comboFailedBy = combo.LastFailedBy
+                comboFailedBy = combo.LastFailedBy,
+                comboNextAt = ComboWaiting ? nextComboAt : -1d,
+                comboWarningAt = ComboWaiting ? nextComboAt - rules.ComboWarningSeconds : -1d
             };
         }
 
@@ -834,7 +867,13 @@ namespace C6Lab
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
                     .ToArray())
                 {
-                    if (!orbs.Remove(expired.id) || expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0) continue;
+                    if (!orbs.Remove(expired.id)) continue;
+                    if (expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0)
+                    {
+                        // Its lifetime ran out: its holder's screen sees it go in a puff of smoke (#235).
+                        orbExpiries.Add(new LabOrbExpiry(expired.owner, expired.id));
+                        continue;
+                    }
                     // A bomb still locked at the end of its fuse blasts on its current holder's board. No
                     // orb is lost: the holder's screen pushes the ones around it away from where it last was.
                     bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
@@ -995,8 +1034,7 @@ namespace C6Lab
         // Items last the item lifetime; for a locked bomb that is its fuse. An unlocked bomb is an
         // ordinary attack orb and keeps the orb lifetime.
         private float LifetimeOf(LabOrbState orb) =>
-            orb.kind.IsItem() && !(orb.kind == LabOrbKind.Bomb && orb.lockSwipes == 0)
-                ? rules.ItemLifetimeSeconds : rules.OrbLifetimeSeconds;
+            orb.kind.LifetimeFor(orb.lockSwipes, rules.OrbLifetimeSeconds, rules.ItemLifetimeSeconds);
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
 
         /// <summary>Orbs and drums both move between screens; look the ID up in either list.</summary>
@@ -1161,7 +1199,8 @@ namespace C6Lab
             public readonly Color[] PaintColors;
             public readonly bool ComboEnabled, ComboPenaltyThrowerOnly;
             public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
-                ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale;
+                ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale,
+                ComboWarningSeconds;
 
             public Rules(LabConfig config)
             {
@@ -1213,6 +1252,7 @@ namespace C6Lab
                 ComboPenaltyThrowerOnly = config.ComboPenaltyThrowerOnly;
                 ComboRewardDurationSeconds = config.ComboRewardDurationSeconds;
                 ComboRewardSizeScale = config.ComboRewardSizeScale;
+                ComboWarningSeconds = config.ComboWarningSeconds;
             }
         }
     }

@@ -360,7 +360,8 @@ namespace C6Lab
             comboColors = source.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboColors.Clone(),
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,
             comboCount = source.comboCount, comboResult = source.comboResult, comboResultCount = source.comboResultCount,
-            comboResultAt = source.comboResultAt, comboFailedBy = source.comboFailedBy
+            comboResultAt = source.comboResultAt, comboFailedBy = source.comboFailedBy,
+            comboNextAt = source.comboNextAt, comboWarningAt = source.comboWarningAt
         };
     }
 }
