@@ -359,8 +359,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float smallOrbPaintShare = .5f;
 
         [Header("Experiment: gourd color combo (#222)")]
-        [Tooltip("켜면 전투 중 박이 4칸 색 콤보를 낸다. 끄면 기존 플레이와 같다.")]
-        [SerializeField] private bool gourdColorComboEnabled = true;
+        [Tooltip("켜면 전투 중 박이 4칸 색 콤보를 낸다. 끄면 기존 플레이와 같다. 기본 OFF (#266). DEV `Gourd Color Combo`로도 켤 수 있다.")]
+        [SerializeField] private bool gourdColorComboEnabled;
         [Tooltip("전투 시작 후 첫 콤보가 나오는 시각 (초, 일시정지 시간 제외)")]
         [SerializeField, Range(1f, 3600f)] private float comboFirstStartSeconds = 50f;
         [Tooltip("콤보가 나오는 간격 (초). 앞 콤보가 나온 시각부터 잰다. 앞 콤보가 아직 진행 중이면 끝난 직후에 나온다.")]

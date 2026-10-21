@@ -1301,7 +1301,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GourdColorComboFieldsFormTheComboGroupAndStartOn()
+        public void GourdColorComboFieldsFormTheComboGroupAndStartOff()
         {
             LabDeveloperField[] combo = LabConfig.DeveloperFields.Skip(155).Take(10).ToArray();
             Assert.That(combo.Select(field => field.Label), Is.EqualTo(new[]
@@ -1327,13 +1327,13 @@ namespace C6Lab.Tests
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
                 Assert.That(source.CaptureDeveloperValues().Skip(155).Take(10),
-                    Is.EqualTo(new[] { 1f, 50f, 60f, 15f, 10f, .1f, 0f, 10f, 2.5f, 3f }),
-                    "By default the combo is on: first at 50 s, every 60 s, 15 s to clear, the whole team shrinks "
+                    Is.EqualTo(new[] { 0f, 50f, 60f, 15f, 10f, .1f, 0f, 10f, 2.5f, 3f }),
+                    "By default the combo is off (#266); once turned on it comes first at 50 s, every 60 s, 15 s to clear, the whole team shrinks "
                     + "to 0.1x or grows to 2.5x for 10 seconds, and a 3-second warning comes first.");
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();
-            values[155] = 0f;
+            values[155] = 1f;
             values[156] = 5f;
             values[157] = 15f;
             values[158] = 8f;
@@ -1344,7 +1344,7 @@ namespace C6Lab.Tests
             values[163] = 2f;
             values[164] = 5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
-            Assert.That(config.GourdColorComboEnabled, Is.False);
+            Assert.That(config.GourdColorComboEnabled, Is.True, "DEV can still turn the combo on.");
             Assert.That(new[] { config.ComboFirstStartSeconds, config.ComboRepeatIntervalSeconds,
                 config.ComboTimeLimitSeconds, config.ComboPenaltyDurationSeconds, config.ComboPenaltySizeScale },
                 Is.EqualTo(new[] { 5f, 15f, 8f, 4f, .25f }));

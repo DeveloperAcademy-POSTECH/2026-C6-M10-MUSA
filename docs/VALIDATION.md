@@ -1980,3 +1980,26 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | Mac 다중 앱·iOS 빌드/실기기·실제 LAN/핫스팟·3~5인·모바일 성능 | **NOT_RUN** | 이번 검토의 자동 검사로 기기간 통신·수동 가독성 검증까지 통과했다고 확대하지 않는다. |
 
 `LabCharmHostIdentityPlayTests`는 실제 저장 Scene의 NGO Host와 실제 요청 처리기를 실행하되, 두 명의 모델과 이웃 요청자를 명시적인 fixture로 구성해 로컬 해제 이벤트를 검사한다. **실제 원격 참가자 연결 시험이 아니다.** `LabCharmSavedSceneTests`는 저장된 Canvas·이름표·미니맵을 사용해 실제 Rect의 비겹침을 확인한다. 새 그림·물리·기존 투척·도색·관람 등은 전체 회귀 검사에 포함하며, 원시 XML·로그·임시 테스트 Scene·캐시는 커밋하지 않는다.
+
+## 콤보 기본값 OFF — 2026-10-21, 이슈 #266
+
+기준은 main `a30dafda`(#257·#264 머지 뒤, 설정 166개·프로토콜 5653)에서 분기한 `fix/#266combo-default-off`이다. 설정 개수와 프로토콜은 바꾸지 않았다.
+
+- **기본값**: `Gourd Color Combo` ON → **OFF**. 코드 기본값과 저장 `LabConfig.asset`(Inspector의 `Experiment: gourd color combo (#222)` 묶음 첫 칸) 모두 OFF다. 콤보 시간 값(첫 시작 50·간격 60·제한 15·페널티/보상 10·예고 3초, 0.1/2.5배)은 그대로라 DEV나 Inspector에서 켜면 이전과 같이 동작한다.
+- **테스트**: `GourdColorComboFieldsFormTheComboGroupAndStartOff`가 코드·저장 기본값 첫 칸 0을 확인하고, DEV 값으로 켜지는지 확인한다. 콤보 규칙 검사(`LabGourdComboTests`)는 원래 직접 켜서 쓰므로 그대로다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. |
+| EditMode 실제 실행 | NOT_RUN | `GourdColorComboFieldsFormTheComboGroupAndStartOff`, 기존 전체. |
+| 에디터 확인 | NOT_RUN | Inspector에서 `Gourd Color Combo Enabled`가 꺼져 있는지, 전투 중 콤보가 안 나오는지, DEV에서 켜면 50초에 나오는지. |
+
+
+### #267 콤보 기본 OFF 동시 통합
+
+검토 중 main에 `b1d3bb31`(PR #267)이 추가되어 다시 통합했다. 충돌은 `LAB_SCOPE.md`와 `VALIDATION.md`의 같은 문단/끝부분이었다. 현재 콤보 기본 **OFF**, 방해공작 기본 **OFF**, 설정178개·프로토콜5654를 함께 유지하고 양쪽 검증 기록을 보존했다. 코드·저장 `LabConfig.asset`·DEV 기본값 검사는 #267의 OFF를 따르며, 콤보를 DEV에서 켤 수 있는 검사도 유지한다. #262는 여전히 제외한다.
+
+| 최종 통합 검사 | 결과 | 근거 |
+| --- | --- | --- |
+| 전체 EditMode | **PASS820/820** | `c6-pr265-final-edit.xml`, 실패·생략·inconclusive0,24.860초. UTC09:09:13Z~09:09:38Z. |
+| 전체 PlayMode | **PASS291/291** | `c6-pr265-final-play.xml`, 실패·생략·inconclusive0,122.105초. UTC09:10:09Z~09:12:11Z. 콤보 OFF·방해공작 OFF 기본값을 포함한 최종 통합 소스. |
