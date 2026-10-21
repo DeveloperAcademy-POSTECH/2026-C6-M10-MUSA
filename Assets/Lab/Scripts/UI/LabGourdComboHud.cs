@@ -9,8 +9,10 @@ namespace C6Lab
     /// - 진행 중: 4칸 색 (맞힌 칸은 체크, 다음 칸은 통통 튐), 줄어드는 남은 시간 막대 (숫자 없음)
     /// - 끝남: 콤보 패널이 바로 사라지고 같은 자리에 CLEAR! (성공) / WRONG COLOR, TIME UP (실패) 문구가
     ///   튀어나옴. 실패는 크게 튀고 흔들리며 화면이 빨갛게 번쩍인다.
-    /// - 페널티/보상 중: 결과 문구가 끝난 뒤에 알약 배지 (빨강 SMALL / 노랑 BIG, 공 아이콘,
-    ///   줄어드는 게이지, 남은 초)가 나온다. 이 기기 플레이어 기준이다.
+    /// - 페널티 중: 결과 문구가 끝난 뒤에 빨간 알약 배지 (SMALL 글자, 작은 공 아이콘, 줄어드는 게이지)가
+    ///   나온다. 남은 초 숫자는 없다(#257). 이 기기 플레이어 기준이다.
+    /// - 보상 중: 배지 대신 전투 화면 위에서 노란 별이 쏟아지고, 남은 시간이 줄수록 별이 줄어든다(#257).
+    /// - 이 기기 플레이어의 SMALL/BIG을 조합판에도 알려 판 구슬 그림이 작아지거나 커지게 한다(#257).
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
     /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
@@ -63,6 +65,10 @@ namespace C6Lab
         private int shownWarningCount = -1;
         private float warningPopElapsed = -1f;
 
+        private LabComboRewardStars stars;
+        private int boardLook;
+        private bool starsWereOn;
+
         private LabSnapshot seenSnapshot;
         private double seenAtRealtime;
         private uint shownResultCount;
@@ -76,6 +82,12 @@ namespace C6Lab
         public bool PanelVisible => panel != null && panel.gameObject.activeSelf;
         public bool EffectVisible => effectBadge != null && effectBadge.gameObject.activeSelf;
         public string EffectLabel => effectText != null ? effectText.text : string.Empty;
+        /// <summary>보상(BIG) 별이 지금 쏟아지고 있는지 (#257)</summary>
+        public bool StarsEmitting => stars != null && stars.Emitting;
+        public int StarCount => stars != null ? stars.ActiveCount : 0;
+        public float StarsPerSecond => stars != null ? stars.StarsPerSecondNow : 0f;
+        /// <summary>조합판에 알린 이 기기 플레이어의 콤보 효과: -1 SMALL, 1 BIG, 0 없음 (#257)</summary>
+        public int BoardLook => boardLook;
         public bool ResultVisible => resultText != null && resultText.gameObject.activeSelf;
         /// <summary>COMBO! 카운트다운 예고가 보이는지 (#241)</summary>
         public bool WarningVisible => warningPanel != null && warningPanel.gameObject.activeSelf;
@@ -97,6 +109,9 @@ namespace C6Lab
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool battle = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused;
             double serverNow = battle ? EstimateServerNow(snapshot) : 0d;
+            // 조합판 구슬 크기(#257)는 콤보 화면이 숨어 있어도 정한다. 일시정지 중에는 그대로 둔다.
+            if (snapshot == null || snapshot.phase != LabPhase.Playing) SetBoardLook(0);
+            else if (!snapshot.paused) SetBoardLook(LocalEffect(snapshot, serverNow, out _));
             // 첫 콤보 예고 (#241)는 아직 콤보가 한 번도 안 나왔을 때 시작하므로 따로 본다.
             bool warning = battle && snapshot.ComboWarningOn(serverNow);
             bool anyCombo = snapshot != null && (snapshot.comboCount > 0 || warning);
@@ -161,19 +176,60 @@ namespace C6Lab
         /// 이 기기 플레이어의 페널티(우선) 또는 보상 배지. 게이지는 효과가 시작된 시각(마지막 콤보 결과)부터
         /// 끝 시각까지를 1 → 0으로 줄인다. 새로 생기거나 종류가 바뀌면 톡 튀어나오고, 마지막 3초는 두근거린다.
         /// </summary>
+        /// <summary>이 기기 플레이어의 콤보 효과: -1 페널티(SMALL, 우선), 1 보상(BIG), 0 없음과 그 끝 시각</summary>
+        private int LocalEffect(LabSnapshot snapshot, double serverNow, out double until)
+        {
+            until = 0d;
+            if (snapshot == null || snapshot.players == null || network == null) return 0;
+            foreach (LabPlayerState player in snapshot.players)
+            {
+                if (player == null || player.id != network.LocalPlayerId) continue;
+                if (player.comboPenaltyUntil > serverNow) { until = player.comboPenaltyUntil; return -1; }
+                if (player.comboRewardUntil > serverNow) { until = player.comboRewardUntil; return 1; }
+            }
+            return 0;
+        }
+
+        private void SetBoardLook(int look)
+        {
+            boardLook = look;
+            if (network != null && network.board != null) network.board.SetComboLook(look);
+        }
+
+        /// <summary>
+        /// 보상(BIG) 별 (#257). 결과 문구가 끝난 뒤부터 보상이 끝날 때까지 쏟아지고, 남은 시간 비율만큼 줄어든다.
+        /// 별은 화면 위에서 조합판 위쪽 가장자리까지 떨어진다.
+        /// </summary>
+        private void DrawStars(bool on, float fraction)
+        {
+            if (stars == null) return;
+            float bottom = StarsBottom();
+            if (on && !starsWereOn) stars.Burst(bottom);
+            starsWereOn = on;
+            stars.Step(on, fraction, Time.unscaledDeltaTime, bottom);
+        }
+
+        /// <summary>별이 사라지는 높이: 조합판 위쪽 가장자리(레이어 로컬 y). 모르면 화면 높이의 45% 지점.</summary>
+        private float StarsBottom()
+        {
+            Rect area = layer.rect;
+            float fallback = Mathf.Lerp(area.yMin, area.yMax, .45f);
+            if (network == null || network.board == null || !network.board.TryGetInputScreenRect(out Rect screen))
+                return fallback;
+            Camera uiCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+            return RectTransformUtility.ScreenPointToLocalPointInRectangle(stars.Area,
+                new Vector2(screen.center.x, screen.yMax), uiCamera, out Vector2 local) ? local.y : fallback;
+        }
+
         private void DrawEffect(LabSnapshot snapshot, double serverNow)
         {
-            int kind = 0;
-            double until = 0d;
-            if (snapshot.players != null && network != null)
-                foreach (LabPlayerState player in snapshot.players)
-                {
-                    if (player == null || player.id != network.LocalPlayerId) continue;
-                    if (player.comboPenaltyUntil > serverNow) { kind = -1; until = player.comboPenaltyUntil; }
-                    else if (player.comboRewardUntil > serverNow) { kind = 1; until = player.comboRewardUntil; }
-                }
+            int kind = LocalEffect(snapshot, serverNow, out double until);
+            double totalTime = until - snapshot.comboResultAt;
+            float remaining = kind != 0 && totalTime > 0d ? Mathf.Clamp01((float)((until - serverNow) / totalTime)) : 0f;
+            // 보상은 배지 대신 별로 보여준다. 결과 문구가 끝난 뒤부터.
+            DrawStars(kind > 0 && resultElapsed < 0f, remaining);
             // 결과 문구나 다음 콤보 예고(#241)가 떠 있는 동안에는 숨겨 두었다가, 끝나면 톡 튀어나온다.
-            if (kind == 0 || resultElapsed >= 0f || warningPanel.gameObject.activeSelf)
+            if (kind >= 0 || resultElapsed >= 0f || warningPanel.gameObject.activeSelf)
             {
                 effectKind = 0;
                 effectBadge.gameObject.SetActive(false);
@@ -193,8 +249,8 @@ namespace C6Lab
             bool reward = kind > 0;
             effectBack.color = reward ? RewardBadgeColor : PenaltyBadgeColor;
             effectIcon.localScale = Vector3.one * (reward ? 1f : .55f);
-            effectText.text = (reward ? RewardLabel : PenaltyLabel) + "  "
-                + Mathf.CeilToInt((float)left).ToString(System.Globalization.CultureInfo.InvariantCulture) + "s";
+            // 남은 시간은 숫자 없이 게이지로만 (#257).
+            effectText.text = reward ? RewardLabel : PenaltyLabel;
 
             float scale = 1f;
             if (effectPopElapsed >= 0f)
@@ -337,6 +393,8 @@ namespace C6Lab
             popSlot = -1;
             effectKind = 0;
             effectPopElapsed = -1f;
+            starsWereOn = false;
+            if (stars != null) stars.Clear();
             shownWarningCount = -1;
             warningPopElapsed = -1f;
         }
@@ -373,6 +431,10 @@ namespace C6Lab
             flash.color = Color.clear;
             flash.raycastTarget = false;
             flashRect.gameObject.SetActive(false);
+
+            // 보상 별(#257): 번쩍임 바로 앞, 콤보 패널·결과 문구·배지 뒤에 그린다.
+            stars = layer.gameObject.AddComponent<LabComboRewardStars>();
+            stars.Initialize(layer, u);
             float gap = slotSize * .22f;
             float width = slotSize * LabGourdCombo.Length + gap * (LabGourdCombo.Length + 1);
             panel = NewRect("Gourd Combo Panel", layer);
