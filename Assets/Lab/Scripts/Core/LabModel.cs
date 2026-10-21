@@ -983,13 +983,17 @@ namespace C6Lab
         /// 판마다 북을 받을 사람을 무작위로 정한다. 북이 인원 이하이면 서로 다른 사람이 받고,
         /// 더 많으면 모두 하나씩 받은 뒤 남는 북도 무작위로 나눈다. Host만 뽑으므로 모든 기기가
         /// 스냅샷으로 같은 결과를 받는다. 북은 받은 사람 판의 가운데에서 시작한다.
+        /// Drum Count가 AUTO(0)이면 이번 판 인원으로 개수를 정한다(#236, 2·3명 1개, 4·5명 2개).
         /// </summary>
         private void PlaceDrums(double now)
         {
             int[] shuffled = Enumerable.Range(0, activeSeatCount)
                 .OrderBy(seat => DrawFor(seed ^ DrumSeatSalt, (ulong)seat, 0u)).ToArray();
             var perBoard = new int[activeSeatCount];
-            for (int i = 0; i < rules.DrumCount; i++)
+            // AUTO follows the players in this round (#236); a fixed count is used as it is.
+            int drumCount = rules.DrumCount != LabConfig.AutoDrumCount ? rules.DrumCount
+                : LabConfig.DrumsForPlayers(activeSeatCount);
+            for (int i = 0; i < drumCount; i++)
             {
                 int seat = i < activeSeatCount ? shuffled[i]
                     : (int)(DrawFor(seed ^ DrumSeatSalt, ulong.MaxValue, (uint)i) % (ulong)activeSeatCount);

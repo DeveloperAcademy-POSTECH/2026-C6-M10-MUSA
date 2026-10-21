@@ -1693,6 +1693,53 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void AutoDrumCountPlacesOneDrumUpToThreePlayersAndTwoOnDifferentBoardsForFourOrFive()
+        {
+            var auto = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            try
+            {
+                float[] values = auto.CaptureDeveloperValues();
+                values[74] = LabConfig.AutoDrumCount;
+                Assert.That(auto.TryApplyDeveloperValues(values, out string error), Is.True, error);
+
+                var solo = new LabModel();
+                solo.BeginSolo("auto-solo", 42ul, 0d, auto);
+                Assert.That(solo.Snapshot(0d).drums.Length, Is.EqualTo(1), "A solo player gets one drum.");
+                for (int players = 2; players <= LabModel.MaximumParticipants; players++)
+                {
+                    ulong[] ids = Enumerable.Range(1, players).Select(seat => (ulong)(seat * 10)).ToArray();
+                    var room = new LabModel();
+                    room.Begin("auto-" + players, ids, 0d, auto);
+                    LabOrbState[] drums = room.Snapshot(0d).drums;
+                    Assert.That(drums.Length, Is.EqualTo(players >= 4 ? 2 : 1), players + " players (#236).");
+                    Assert.That(drums.Select(drum => drum.owner).Distinct().Count(), Is.EqualTo(drums.Length),
+                        "Two drums start with two different players.");
+
+                    LabOrbState passed = PassRight(room, drums[0].id, drums[0].owner, .1d);
+                    Assert.That(passed.owner, Is.Not.EqualTo(drums[0].owner));
+                    Assert.That(room.TryGenerate(passed.owner, "auto-after-pass", .2d,
+                        out _, out string generateError), Is.True, generateError);
+                    room.Tick(500d);
+                    room.Begin("auto-" + players, ids, 500d, auto);
+                    LabSnapshot retried = room.Snapshot(500d);
+                    Assert.That(retried.round, Is.EqualTo(2u));
+                    Assert.That(retried.orbs, Is.Empty, "Retry clears the previous drum holder's generated Raw.");
+                    Assert.That(retried.drums.Length, Is.EqualTo(drums.Length), "AUTO is recalculated for Retry.");
+                    Assert.That(retried.drums.Select(drum => drum.owner).Distinct().Count(),
+                        Is.EqualTo(drums.Length), "Retry also assigns each AUTO drum to a different player.");
+                }
+
+                // A count picked in DEV is used as it is, whatever the number of players.
+                values[74] = 3f;
+                Assert.That(auto.TryApplyDeveloperValues(values, out error), Is.True, error);
+                var pair = new LabModel();
+                pair.Begin("fixed-three", new ulong[] { 10, 20 }, 0d, auto);
+                Assert.That(pair.Snapshot(0d).drums.Length, Is.EqualTo(3));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(auto); }
+        }
+
+        [Test]
         public void DrumHandoffDrawsAStopSpotFromTheEntryEdgeOrAPassByTheConfiguredChances()
         {
             var ids = new ulong[] { 10, 20, 30 };

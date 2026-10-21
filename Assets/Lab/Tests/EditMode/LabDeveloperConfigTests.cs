@@ -114,7 +114,7 @@ namespace C6Lab.Tests
             values[68] = 1f; // Medium
             values[72] = 4f; // Rigid
             values[73] = .7f;
-            Assert.That(values[74], Is.EqualTo(1f), "One drum per game by default.");
+            Assert.That(values[74], Is.EqualTo(0f), "Drum Count is AUTO by default: the drums follow the player count (#236).");
             values[74] = 3f;
             Assert.That(values[75], Is.EqualTo(.6f), "The drum keeps the old generate button's size.");
             values[75] = .8f;
@@ -327,16 +327,39 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void DrumCountIsAWholeNumberFromOneToFive()
+        public void DrumCountIsAutoOrAWholeNumberFromOneToFive()
         {
-            foreach (float invalid in new[] { 0f, 6f, 2.5f })
+            LabDeveloperField field = LabConfig.DeveloperFields[74];
+            Assert.That(field.IsChoice, Is.True, "Drum Count is picked with buttons (#236).");
+            Assert.That(field.Choices, Is.EqualTo(new[] { "AUTO", "1", "2", "3", "4", "5" }),
+                "Each button's value is the count it names; AUTO is 0.");
+            Assert.That(LabConfig.AutoDrumCount, Is.Zero);
+            foreach (float invalid in new[] { -1f, 6f, 2.5f })
             {
                 float[] values = config.CaptureDeveloperValues();
                 values[74] = invalid;
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False, invalid.ToString());
                 Assert.That(error, Does.Contain("Drum Count"));
             }
-            Assert.That(config.DrumCount, Is.EqualTo(1));
+            Assert.That(config.DrumCount, Is.EqualTo(LabConfig.AutoDrumCount));
+
+            LabConfig authored = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(authored, Is.Not.Null);
+            Assert.That(authored.DrumCount, Is.EqualTo(LabConfig.AutoDrumCount),
+                "Set Drum Count to 0 (AUTO) in the LabConfig Inspector (#236).");
+
+            Assert.That(Enumerable.Range(1, 5).Select(LabConfig.DrumsForPlayers), Is.EqualTo(new[] { 1, 1, 1, 2, 2 }),
+                "AUTO: one drum for up to three players (and solo), two for four or five.");
+            Assert.That(Enumerable.Range(1, 5).Select(config.DrumsFor), Is.EqualTo(new[] { 1, 1, 1, 2, 2 }));
+            for (int count = 1; count <= 5; count++)
+            {
+                float[] values = config.CaptureDeveloperValues();
+                values[74] = count;
+                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                Assert.That(config.DrumCount, Is.EqualTo(count));
+                Assert.That(Enumerable.Range(1, 5).Select(config.DrumsFor), Is.All.EqualTo(count),
+                    "A fixed count is used whatever the number of players.");
+            }
         }
 
         [Test]

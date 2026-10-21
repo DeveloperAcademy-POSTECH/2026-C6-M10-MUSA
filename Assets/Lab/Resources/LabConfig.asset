@@ -73,7 +73,7 @@ MonoBehaviour:
   spawnFanAngle: 180
   spawnMinSpeed: 1
   spawnMaxSpeed: 1.8
-  drumCount: 1
+  drumCount: 0
   drumRadius: 0.6
   drumDriftSpeed: 0.1
   drumDriftTurning: 0.25
