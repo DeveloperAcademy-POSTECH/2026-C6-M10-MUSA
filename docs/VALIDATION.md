@@ -1934,3 +1934,35 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | 솔로 화면: 판 구슬 크기 변화, SMALL bar, BIG 별 | NOT_RUN | DEV `Combo First Start`를 5초로 두면 빠르게 확인할 수 있다. |
 | 3인 실행: THROWER 모드에서 틀린 사람 판만 작아짐, 각자 화면의 별 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
 | iOS 실기기: 별 성능·가독성 | NOT_RUN | |
+
+## #262 별도 개발용 3스테이지 게임 흐름 — 2026-10-21
+
+기준 main은 `0664aadf`이며 작업 브랜치는 `feat/#262-three-stage-game-flow`다. Unity **6000.6.5f1**, macOS ARM64에서 기존 Lab과 별도 작업 폴더로 검사했다. 새 `Assets/Hapio`의 Home·Lobby·Battle·StageResult·GameOver와 영속 GameSession Prefab을 사용한다. **1~3스테이지는 모두 같은 Battle Scene**을 로드한다. 기존 Lab Scene과 Lab 첫 Build Settings 항목·빌드 메뉴·원본 Config·패키지는 보존한다. 설정166개·프로토콜5653을 유지하고, 새 게임만 연결 토큰 `C6HapioGame/1`을 사용한다. Lab의 `C6PhysicsLab/16`과 같은 방에서 혼용하지 않는다.
+
+### 구현과 검토 중 보완
+
+- Host가 runId·스테이지·revision·전투 ID/round를 확정한다. 전원 Scene 로딩과 최신 설정 ACK를 확인한 뒤 시작한다. 결과에서도 실제 종료 스냅샷·도색 사본·결과 Scene 준비 ACK를 기다려 다음 단계로 진행한다.
+- 방·P번호·좌우 순서·승인된 설정은 유지하고, 전투 모델·시간·개인 HP·스태미나·구슬·북·도색·투사체·흔들림·콤보·기록은 새 스테이지에서 초기화한다. DEV 적용 재시작은 같은 스테이지 번호로 새 Battle을 로드한다.
+- 시간 초과·전멸·진행 중 나가기/연결 종료는 GameOver를 유지하고 명시적인 HOME 입력을 기다린다. 로비 퇴장과 최종 클리어 후 정상 종료는 제외한다. 지연 로딩/스냅샷이 종료 화면을 다시 전투로 바꾸지 않도록 방어한다.
+- 이미 확정된 최종 클리어에서 관람 사본 동기화가 시간 초과되면 클리어를 유지하고 사본 미확보 안내를 표시한다. 중간 스테이지 동기화 실패는 GameOver다. 이 시간 초과 경로의 추가 다중 앱 장애 주입은 미실행이다.
+- 실제 화면 캡처에서 스테이지 글자의 대비와 중간 결과 NEXT/QUIT 버튼 배치를 보완했다. 저장된 새 Scene만 Unity API로 수정했으며 Lab을 저장하지 않았다.
+- 시작 직전 보낸 P번호 CLEAR가 모델 없는 로딩 구간에 도착하면 P번호가 사라지고, 빈자리 신규 입장도 승인되는 경쟁 조건을 회귀 검사로 먼저 재현했다. 새 게임의 첫 준비부터 방 종료까지 P변경·새 입장을 잠근다. 시작 조건/설정 ACK는 유지하고 새 방에서는 잠금을 해제한다. 일반 Lab은 잠그지 않는다.
+
+### 실행 기록
+
+| 검사 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| Scene 생성·컴파일 | PASS | Unity API로 새 Scene5개·Prefab 생성. 초기 생성의 미저장 Untitled 처리 및 새 검사의 Unity6.6 폐기 API 컴파일 오류를 수정한 뒤 성공했다. 기존 Lab은 기준 커밋과 바이트 동일. |
+| 최초 새 Scene 집중 PlayMode | 4/5 통과·1실패 | `c6-game262-flow-play.xml`. 검사 fixture가 모델 시계를 미래로 보내 Network 시계와 충돌했다. 실제 제한시간1초를 기다리는 검사로 보완했다. 프로덕션 시간 검증은 약화하지 않았다. |
+| 참가자 잠금 수정 전 회귀 | 3/5 통과·2실패 | `c6-game262-roster-repro.xml`. 지연 CLEAR 뒤 P1 owner 유실, 로딩 중 신규 입장 승인 재현. 비활성 NGO 역할 fixture이며 실제 소켓 연결 검사가 아니다. |
+| 최종 전체 EditMode | **PASS826/826** | `c6-game262-final-edit.xml`, 실패·생략·inconclusive0, 24.939초. UTC08:17:39Z~08:18:04Z. 기존796 + 순수 흐름/수신17 + 저장 에셋7 + bridge6. |
+| 전체 PlayMode, 참가자 잠금 보완 전 | **PASS281/281** | `c6-game262-final-play.xml`,113.988초. UTC08:12:37Z~08:14:31Z. 이 결과와 보완 후 최종 결과는 구분한다. |
+| 참가자 잠금 보완 후 최종 전체 PlayMode | **PASS281/281** | `c6-game262-verified-play.xml`, 실패·생략·inconclusive0,114.718초. UTC08:19:49Z~08:21:44Z. 기존276 + 새 실제 Scene 흐름5건. 임시 smoke helper 제거 후 실행. |
+| 최종 Mac 개발 앱 빌드 | **PASS** | `c6-game262-final-smoke-build.log`. 새 Scene5개만 포함하고 Home으로 시작하는 Development Build. 기존 앱 식별자/제품명 등 출시 설정은 변경하지 않았다. |
+| 실제 Mac Host·Client 2프로세스 | **양쪽 PASS** | `c6-game262-final-smoke-host.txt`·`client.txt`. 동일 Mac UDP loopback, Host P2/Client P1. 3스테이지·공통 Battle 재로드·방/P 유지·매 단계 초기화·100% 결과/관람 사본·준비 ACK, 정상 Home, 같은 앱에서 새 방 재입장 후 Client QUIT→양쪽 GameOver→각자 Home 확인. |
+| 저장 UI와 완성 박 관람 | **PASS, Mac 자동 조작** | Home·Lobby·Battle·StageResult·GameOver·GourdViewer 캡처를 확인했다. Host에서 관람 열기·회전/확대/초기화 API·닫기를 실제 저장 UI에 반영했다. 터치 제스처의 iOS 수동 평가는 별도다. |
+| iOS 빌드/설치·실제 LAN/핫스팟·3~5인·기기 잠금/백그라운드·전송망 강제 단절·모바일 성능 | **NOT_RUN** | 같은 Mac 두 앱 및 자동 검사 결과로 확대하지 않는다. 기존 연결 코드를 재사용했다는 사실과 이번 환경 검증을 구분한다. |
+
+새 PlayMode5건은 실제 저장 Scene·Prefab을 실행해 (1)솔로 3스테이지/자원 초기화/관람 사본 보존, (2)중도 종료 유지, (3)실제1초 시간 초과, (4)실제 모델의 개인 HP0 패배, (5)일시정지/재개와 DEV 동일 스테이지 재로드를 확인한다. 승리 유도는 **실제 Host CPU 도색 표면을 완성하는 명시적 fixture**다. Mac2앱도 같은 도색 완료 fixture를 쓰며 실제 투척·명중 판정을 검증했다고 표현하지 않는다. 기존 투척/피격 검사는 전체 PlayMode에 별도로 포함한다.
+
+원본 Desktop의 사용자 Scene·Target2 Material2개·미추적meta는 시작 시 사본과 해시를 보관했고 검사 후 네 파일의 일치를 확인했다. 별도 검증 폴더에서 Unity가 Material2개에 쓴 미세한 float 재직렬화는 최종 변경에서 제외한다. 원시 XML·로그·앱·스크린샷과 임시 smoke helper는 커밋하지 않는다. 검증 앱에는 전용 helper가 있었으며 프로젝트 소스에서는 빌드 직후 제거했다.

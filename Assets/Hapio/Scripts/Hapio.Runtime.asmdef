@@ -1,0 +1,11 @@
+{
+  "name": "Hapio.Runtime",
+  "rootNamespace": "Hapio",
+  "references": [
+    "C6Lab.Runtime",
+    "Unity.Netcode.Runtime",
+    "Unity.InputSystem",
+    "UnityEngine.UI"
+  ],
+  "autoReferenced": true
+}

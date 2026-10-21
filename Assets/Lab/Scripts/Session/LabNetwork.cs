@@ -328,6 +328,7 @@ namespace C6Lab
         public bool SlotSelectionPending => slotSelectionPending;
         public bool IsDeveloperRestartPending => pendingDeveloperRestart;
         public bool CanSelectPlayerSlot => IsConnected && !developerSolo && model == null && latest == null
+            && (!gameFlowEnabled || !gameRosterLocked)
             && playerSlots != null && order.Contains(LocalPlayerId) && !slotSelectionPending && !pendingDeveloperRestart;
         public ulong GetSlotOwner(int slotNumber) => playerSlots?.GetOwner(slotNumber) ?? ulong.MaxValue;
         public bool IsSearchingRooms => roomSearchActive && discovery != null && discovery.IsBrowsing;
@@ -394,14 +395,7 @@ namespace C6Lab
             if (manager == null) manager = GetComponent<NetworkManager>();
             if (transport == null) transport = GetComponent<UnityTransport>();
             if (impactFeedback == null) impactFeedback = FindFirstObjectByType<LabImpactFeedback>();
-            if (board != null)
-            {
-                board.EdgeCrossed += OnEdgeCrossed;
-                board.CombineRequested += OnCombineRequested;
-                board.ThrowRequested += OnThrowRequested;
-                board.UseRequested += OnUseRequested;
-                board.DrumTapped += Generate;
-            }
+            SubscribeBoard(board);
             if (manager != null)
             {
                 manager.OnClientConnectedCallback += OnConnected;
@@ -888,6 +882,7 @@ namespace C6Lab
 
         public void StartBattle()
         {
+            if (gameFlowEnabled && (!gameStageStarting || !HasBattleReferences || model != null || latest != null)) return;
             if (!CanStartBattle)
             {
                 SetNotice("Wait for " + targetParticipantCount + " selected P numbers and matching settings confirmations.");
@@ -943,6 +938,18 @@ namespace C6Lab
             {
                 SetNotice("Start Developer Solo before applying a new round.");
                 return false;
+            }
+            if (gameFlowEnabled)
+            {
+                // LabDeveloperMode installs its Scene-owned runtime object directly. Own a
+                // validated copy before that Scene unloads and destroys its DEV panel copy.
+                if (!TryInstallSessionConfig(config, out string error))
+                {
+                    SetNotice(error);
+                    return false;
+                }
+                RequestGameSoloRestart();
+                return true;
             }
             ClearProjectiles();
             battleClock.Reset();
@@ -1068,6 +1075,13 @@ namespace C6Lab
             {
                 SetNotice(error);
                 return false;
+            }
+            if (gameFlowEnabled)
+            {
+                EndBattleToLobby();
+                PublishHostConfigRevision();
+                GameFlowDeveloperRestartRequested?.Invoke();
+                return true;
             }
             EndBattleToLobby();
             pendingDeveloperRestart = true;
@@ -1197,13 +1211,16 @@ namespace C6Lab
             }
             if (joinInProgress && !joinRetryPending && !joinFinishPending && joinAttemptAt > 0
                 && now - joinAttemptAt >= JoinAttemptSeconds) AdvanceJoinCandidate();
-            if (IsHost && model != null)
+            if (IsHost && model != null && !gameBattleFrozen)
             {
                 SampleHostPaintFlow(battleClock.Now(now));
                 if (now >= nextSnapshotAt) PublishSnapshot(false);
             }
-            FlushPendingBlastReports(now);
-            FlushBoardActions(now);
+            if (!gameBattleFrozen)
+            {
+                FlushPendingBlastReports(now);
+                FlushBoardActions(now);
+            }
             FlushBulkPackets();
             if (!IsHost && (pendingPaintSnapshot != null || PaintReceiver.HasPending)
                 && now >= nextPaintRequestAt) RequestPaintCheckpoint();
@@ -1237,7 +1254,7 @@ namespace C6Lab
             {
                 NetworkTransport = transport,
                 ProtocolVersion = LabProtocolVersion,
-                ConnectionData = (byte[])LabConnectionToken.Clone(),
+                ConnectionData = (byte[])ActiveConnectionToken.Clone(),
                 EnableSceneManagement = false,
                 ConnectionApproval = true,
                 PlayerPrefab = null,
@@ -1250,9 +1267,10 @@ namespace C6Lab
         {
             bool alreadyPending = pendingApprovals.ContainsKey(request.ClientNetworkId);
             string rejection = !manager.IsHost ? "The room is no longer hosted."
-                : request.Payload == null || !request.Payload.SequenceEqual(LabConnectionToken)
+                : request.Payload == null || !request.Payload.SequenceEqual(ActiveConnectionToken)
                     ? "Lab version mismatch. Use the same game version."
-                    : model != null ? "Battle already started. Wait for the Host to return to the lobby."
+                    : model != null || (gameFlowEnabled && gameRosterLocked)
+                        ? "Battle already started. Wait for the Host to return to the lobby."
                         : order.Count + pendingApprovals.Count - (alreadyPending ? 1 : 0) >= targetParticipantCount
                             ? "Room is full. Choose another room." : string.Empty;
             bool allowed = string.IsNullOrEmpty(rejection);
@@ -1324,6 +1342,22 @@ namespace C6Lab
             pendingApprovals.Remove(id);
             if (manager != null && manager.IsHost)
             {
+                if (gameFlowEnabled && order.Contains(id))
+                {
+                    GameFlowDisconnected?.Invoke(id, false);
+                    // GameSession owns the GameOver transition; never clear the result or
+                    // publish a legacy lobby that would erase it on the remaining peers.
+                    if (stopping || manager == null || !manager.IsHost) return;
+                    order.Remove(id);
+                    bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id);
+                    boardSequences.Remove(id);
+                    playerSlots?.Release(id);
+                    slotRequestIds.Remove(id);
+                    configAcknowledgements.Remove(id);
+                    pendingDeveloperRestart = false;
+                    if (model == null && !gameBattleFrozen) BroadcastLobby();
+                    return;
+                }
                 if (!order.Remove(id))
                 {
                     Debug.Log("C6_LAB_JOIN_REJECTED id=" + id);
@@ -1344,6 +1378,15 @@ namespace C6Lab
             {
                 if (joinInProgress) { AdvanceJoinCandidate(); return; }
                 if (!clientSessionConnected) return; // Ignore a retired attempt's late shutdown callback.
+                if (gameFlowEnabled)
+                {
+                    GameFlowDisconnected?.Invoke(id, true);
+                    clientSessionConnected = false;
+                    // Keep the last snapshot until GameSession captures the terminal screen.
+                    // Its Home action performs the eventual transport shutdown.
+                    SetStatus("Connection ended. Return home from Game Over.");
+                    return;
+                }
                 clientSessionConnected = false;
                 stopAfterDisconnect = true;
                 string reason = manager == null ? string.Empty : manager.DisconnectReason;
@@ -1356,6 +1399,8 @@ namespace C6Lab
         {
             if (joinFinishPending) return;
             if (joinInProgress) { AdvanceJoinCandidate(); return; }
+            if (gameFlowEnabled && (IsConnected || clientSessionConnected))
+                GameFlowDisconnected?.Invoke(manager == null ? ulong.MaxValue : manager.LocalClientId, !IsHost);
             SetRoomSearchMessage("Network transport failed. Check IP, port, and same network.", true);
             Debug.LogWarning("C6_LAB_TRANSPORT_FAILURE");
         }
@@ -1588,7 +1633,7 @@ namespace C6Lab
 
         private void HandleRequest(ulong sender, LabNetworkPacket packet)
         {
-            if (!IsHost || model == null || packet == null || !order.Contains(sender)) return;
+            if (!IsHost || model == null || packet == null || !order.Contains(sender) || gameBattleFrozen) return;
             if (IsBoardAction(packet.type)) { HandleBoardAction(sender, packet); return; }
             if (packet.sessionId != sessionId || packet.round != model.Round) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
@@ -1770,7 +1815,7 @@ namespace C6Lab
                 if (!current.Contains(id) && !board.ShouldPreserveFromSnapshot(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
             foreach (string id in current) visibleOrbIds.Add(id);
-            board.SetInteractionEnabled(latest.phase == LabPhase.Playing && !latest.paused
+            board.SetInteractionEnabled(!gameBattleFrozen && latest.phase == LabPhase.Playing && !latest.paused
                 && (IsHost || !boardReplica.NeedsCheckpoint
                     && (boardReplica.LatestSequence == 0 || boardReplica.InteractionAllowed)));
             // The gourd's swipe block (#215) shows and bounces only on the blocked player's own board.
@@ -1826,6 +1871,11 @@ namespace C6Lab
         private void Receive(ulong sender, FastBufferReader reader)
         {
             if (joinFinishPending || !TryRead(reader, out var packet)) return;
+            if (packet.type == "game_flow")
+            {
+                ReceiveGameFlow(sender, packet.reason);
+                return;
+            }
             if (IsHost)
             {
                 if (sender == LocalPlayerId || !order.Contains(sender)) return;
@@ -2153,7 +2203,7 @@ namespace C6Lab
             if (target != null) target.GetComponent<LabGourdPaint>()?.RefreshCommittedMap();
             if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
-            ApplyLocalPause(latest.phase == LabPhase.Playing && latest.paused);
+            ApplyLocalPause(!gameBattleFrozen && latest.phase == LabPhase.Playing && latest.paused);
             bool targetPaused = latest.phase == LabPhase.Playing && latest.paused;
             if (target != null && Finite(latest.targetYawDegrees)
                 && Finite(latest.targetYawSpeedDegreesPerSecond))
@@ -2301,6 +2351,8 @@ namespace C6Lab
         private void ResetLocal()
         {
             clientSessionConnected = false;
+            gameBattleFrozen = false;
+            gameRosterLocked = false;
             connectedRoomName = string.Empty;
             ResetPaintTransport();
             ApplyLocalPause(false);
@@ -2349,7 +2401,7 @@ namespace C6Lab
             discovery = new LabBonjourDiscovery();
             discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
             discovery.Changed += OnDiscoveryChanged;
-            advertisedName = "C6Lab-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            advertisedName = (gameFlowEnabled ? "Hapio-" : "C6Lab-") + Guid.NewGuid().ToString("N").Substring(0, 8);
             bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
             bool ipv6 = transport is LabDualStackTransport second && second.HasIpv6Listener;
             if (!discovery.StartAdvertise(advertisedName, port, ipv4, ipv6))
@@ -2455,14 +2507,7 @@ namespace C6Lab
 
         private void OnDestroy()
         {
-            if (board != null)
-            {
-                board.EdgeCrossed -= OnEdgeCrossed;
-                board.CombineRequested -= OnCombineRequested;
-                board.ThrowRequested -= OnThrowRequested;
-                board.UseRequested -= OnUseRequested;
-                board.DrumTapped -= Generate;
-            }
+            UnsubscribeBoard(board);
             if (manager != null)
             {
                 manager.OnClientConnectedCallback -= OnConnected;
