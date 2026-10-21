@@ -13,9 +13,9 @@ namespace C6Lab.Tests
         private const string Session = "paint-fixture-session";
         private const uint Round = 1u;
 
-        [TestCase(0, 64, 32, 4)]
-        [TestCase(1, 128, 64, 14)]
-        [TestCase(2, 256, 128, 54)]
+        [TestCase(0, 64, 32, 7)]
+        [TestCase(1, 128, 64, 27)]
+        [TestCase(2, 256, 128, 107)]
         public void FullCheckpointsAreBoundedAndReassembleAtEverySupportedResolution(
             int resolution, int columns, int rows, int parts)
         {
@@ -24,6 +24,10 @@ namespace C6Lab.Tests
             var publisher = new LabPaintPublisher();
             LabPaintFrame[] frames = publisher.Publish(source, Session, Round, 10);
             Assert.That(frames.Length, Is.EqualTo(parts));
+            int encodedCharacters = ((columns * rows * 5 + 2) / 3) * 4;
+            Assert.That(parts, Is.EqualTo((encodedCharacters + LabPaintPublisher.FragmentCharacters - 1)
+                / LabPaintPublisher.FragmentCharacters));
+            Assert.That(parts, Is.LessThanOrEqualTo(LabPaintPublisher.MaximumFragmentCount));
             Assert.That(frames.All(frame => frame.full), Is.True);
             Assert.That(frames.All(frame => frame.columns == columns && frame.rows == rows), Is.True);
             Assert.That(frames.Select(frame => frame.part), Is.EqualTo(Enumerable.Range(0, parts)));
@@ -38,6 +42,49 @@ namespace C6Lab.Tests
             Assert.That(ReceiveAll(receiver, frames.Reverse().ToArray()), Is.EqualTo(LabPaintReceive.Applied));
             AssertReplica(source, replica);
             Assert.That(receiver.Matches(Snapshot(source)), Is.True);
+        }
+
+        [Test]
+        public void MaximumResolutionCheckpointFitsTheActualBulkPayloadAndWireEnvelopes()
+        {
+            var source = NewSurface(2);
+            LabPaintFrame[] frames = new LabPaintPublisher().Publish(source, new string('s', 128), uint.MaxValue, long.MaxValue);
+            Assert.That(frames.Length, Is.EqualTo(LabPaintPublisher.MaximumFragmentCount));
+            // Exercise the real compact runtime DTOs, without creating a NetworkManager or socket.
+            var assembly = typeof(LabNetwork).Assembly;
+            Type bodyType = assembly.GetType("C6Lab.LabBulkPayload", true);
+            Type envelopeType = assembly.GetType("C6Lab.LabBulkEnvelope", true);
+            foreach (LabPaintFrame frame in frames)
+            {
+                object body = Activator.CreateInstance(bodyType, true);
+                bodyType.GetField("type").SetValue(body, "paint_cells");
+                bodyType.GetField("sessionId").SetValue(body, frame.session);
+                bodyType.GetField("round").SetValue(body, frame.round);
+                bodyType.GetField("configRevision").SetValue(body, int.MaxValue);
+                bodyType.GetField("configFingerprint").SetValue(body, new string('f', 64));
+                bodyType.GetField("snapshotSequence").SetValue(body, long.MaxValue);
+                bodyType.GetField("paintFrame").SetValue(body, frame);
+                string payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonUtility.ToJson(body)));
+                Assert.That(Encoding.UTF8.GetByteCount(payload), Is.LessThanOrEqualTo(LabBulkSender.MaximumPayloadBytes));
+                var assembler = new LabBulkMessageAssembler();
+                string assembled = null;
+                int completed = 0;
+                foreach (string fragment in LabBulkMessageChunks.Split(payload))
+                {
+                    object envelope = Activator.CreateInstance(envelopeType, true);
+                    envelopeType.GetField("sequence").SetValue(envelope, long.MaxValue);
+                    envelopeType.GetField("payload").SetValue(envelope, fragment);
+                    Assert.That(Encoding.UTF8.GetByteCount(JsonUtility.ToJson(envelope)) + 4,
+                        Is.LessThanOrEqualTo(1200), "Bulk wire messages must fit NGO's nonfragmented message budget.");
+                    if (assembler.Receive(fragment, out var logical)) { assembled = logical; completed++; }
+                }
+                Assert.That(completed, Is.EqualTo(1));
+                Assert.That(assembled, Is.EqualTo(payload));
+            }
+            var replica = NewSurface();
+            var receiver = new LabPaintReceiver(replica);
+            Assert.That(ReceiveAll(receiver, frames), Is.EqualTo(LabPaintReceive.Applied));
+            AssertReplica(source, replica);
         }
 
         [Test]
@@ -310,7 +357,7 @@ namespace C6Lab.Tests
                 case "covered-negative": frame.coveredCount = -1; break;
                 case "covered-large": frame.coveredCount = source.CellCount + 1; break;
                 case "parts-zero": frame.parts = 0; break;
-                case "parts-large": frame.parts = 65; break;
+                case "parts-large": frame.parts = LabPaintPublisher.MaximumFragmentCount + 1; break;
                 case "part-negative": frame.part = -1; break;
                 case "part-outside": frame.part = frame.parts; break;
                 case "data-null": frame.data = null; break;

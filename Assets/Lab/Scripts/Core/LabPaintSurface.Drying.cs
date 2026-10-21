@@ -249,13 +249,12 @@ namespace C6Lab
                 if (regions[i].Parent == i)
                     foreach (Ink ink in regions[i].Supplies.Values)
                         jobs.Add(new SurvivingSupply { Ink = ink, OldRoot = i });
-            var oldRegions = regions.ToArray();
             regions.Clear(); activeRegions.Clear();
             for (int i = 0; i < CellCount; i++) cellRegions[i] = -1;
             for (int first = 0; first < CellCount; first++)
             {
                 if (pixels[first].a == 0 || cellRegions[first] >= 0) continue;
-                var region = new Region(regions.Count) { PatternPatch = oldRegions[previousRoots[first]].PatternPatch };
+                var region = new Region(regions.Count);
                 regions.Add(region);
                 int read = 0, count = 1;
                 topologyQueue[0] = first; cellRegions[first] = region.Id;

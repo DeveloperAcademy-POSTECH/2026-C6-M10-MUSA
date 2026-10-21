@@ -106,9 +106,9 @@ namespace C6Lab.Tests
         {
             var source = ScriptableObject.CreateInstance<LabConfig>();
             float[] values = source.CaptureDeveloperValues();
-            values[2] = duration; values[79] = 0; values[105] = 0;
-            values[106] = initial; values[107] = repeat; values[108] = speed;
-            values[133] = 1; values[139] = 0;
+            values[2] = duration; values[79] = 0; values[104] = 0;
+            values[105] = initial; values[106] = repeat; values[107] = speed;
+            values[132] = 1; values[134] = 0;
             Assert.That(source.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return source;
         }

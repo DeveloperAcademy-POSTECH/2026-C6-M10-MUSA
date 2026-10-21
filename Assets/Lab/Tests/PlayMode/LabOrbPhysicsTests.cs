@@ -723,7 +723,7 @@ namespace C6Lab.Tests
 
             // The DEV form sets how small.
             float[] values = config.CaptureDeveloperValues();
-            values[151] = .25f;
+            values[146] = .25f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var smaller = board.UpsertOrb("smaller", LabOrbKind.Yang, new Vector2(.5f, .8f), small: true);
             Assert.That(smaller.HitSphere.radius, Is.EqualTo(.25f * radius).Within(1e-5f));
@@ -1230,8 +1230,8 @@ namespace C6Lab.Tests
 
             // From the DEV form: no lag sticks the bomb to the finger like an orb; a new mass applies to new bombs.
             float[] values = config.CaptureDeveloperValues();
-            values[146] = 0f;
-            values[149] = 10f;
+            values[141] = 0f;
+            values[144] = 10f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             start = BoardPoint(bomb);
             Assert.That(board.TryBeginDragAtWorld(start, 4d), Is.True);
@@ -1247,7 +1247,7 @@ namespace C6Lab.Tests
         {
             // No drag lag here, so the dragged bomb sits exactly on the edge when it is let go.
             float[] values = config.CaptureDeveloperValues();
-            values[146] = 0f;
+            values[141] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var crossed = new System.Collections.Generic.Dictionary<string, LabOrbEdgeCrossing>();
             board.EdgeCrossed += crossing => crossed[crossing.OrbId] = crossing;
@@ -1307,7 +1307,7 @@ namespace C6Lab.Tests
             Assert.That(orbRelease.x, Is.GreaterThan(.2f * Width), "The flick sends the orb on.");
             Assert.That(config.BombReleaseSpeed, Is.EqualTo(.75f), "Since #237, three quarters of an orb's release.");
             Assert.That(bombRelease.x, Is.EqualTo(config.BombReleaseSpeed * orbRelease.x).Within(.001f * Width),
-                "A bomb leaves the finger at half an orb's speed, so passing it takes a harder swipe (#212).");
+                "A bomb leaves the finger at three quarters of an orb's speed; it stays heavier than an orb (#237).");
             Assert.That(Mathf.Abs(bombRelease.y), Is.LessThan(.001f));
 
             // Then each slides on the floor: the bomb loses speed twice as fast.
@@ -1727,6 +1727,49 @@ namespace C6Lab.Tests
             var samples = new float[clip.samples];
             Assert.That(clip.GetData(samples, 0), Is.True);
             Assert.That(samples.Max(Mathf.Abs), Is.InRange(.2f, 1f), "It is audible and never clips past full scale.");
+        }
+
+        [UnityTest]
+        public IEnumerator AudioConfigurationChangeRecreatesTheSharedSizzleAndRebindsBurningSources()
+        {
+            var first = root.AddComponent<LabFuseSound>();
+            first.Bind(board, null);
+            var secondObject = new GameObject("Second fuse sound");
+            secondObject.transform.SetParent(root.transform, false);
+            var second = secondObject.AddComponent<LabFuseSound>();
+            second.Bind(board, null);
+            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 10f);
+            yield return null;
+            AudioClip previous = first.Clip;
+            Assert.That(second.Clip, Is.SameAs(previous));
+
+            // Exercise the registered callback without resetting the user's audio device.
+            typeof(LabFuseSound).GetMethod("OnAudioConfigurationChanged", BindingFlags.NonPublic | BindingFlags.Static)
+                .Invoke(null, new object[] { true });
+            yield return null;
+
+            Assert.That(first.Clip, Is.Not.SameAs(previous), "Generated sample data must be rebuilt after a device change.");
+            Assert.That(second.Clip, Is.SameAs(first.Clip), "All live sources use the same replacement.");
+            Assert.That(first.Clip.length, Is.EqualTo(1f).Within(.01f));
+            var samples = new float[first.Clip.samples];
+            Assert.That(first.Clip.GetData(samples, 0), Is.True);
+            Assert.That(samples.Max(Mathf.Abs), Is.InRange(.2f, 1f));
+            Assert.That(first.Burning && second.Burning, Is.True, "The active fuse state survives audio reconfiguration.");
+        }
+
+        [Test]
+        public void InvalidCachedSizzleIsRebuiltEvenWhenItsUnityObjectStillExists()
+        {
+            AudioClip previous = LabFuseSound.GeneratedSizzle();
+            AudioClip invalid = AudioClip.Create("Incomplete fuse sample data", 1, 1, 22050, false);
+            typeof(LabFuseSound).GetField("generatedClip", BindingFlags.NonPublic | BindingFlags.Static)
+                .SetValue(null, invalid);
+            AudioClip replacement = LabFuseSound.GeneratedSizzle();
+
+            Assert.That(replacement, Is.Not.SameAs(invalid), "A surviving wrapper is not evidence of usable sample data.");
+            Assert.That(replacement.length, Is.EqualTo(1f).Within(.01f));
+            Assert.That(LabFuseSound.GeneratedSizzle(), Is.SameAs(replacement), "A valid replacement remains cached.");
+            Object.Destroy(previous);
         }
 
         private void SetDrumDrift(float speed, float turning)

@@ -114,6 +114,94 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ANewComboSnapshotThatAlreadyContainsAHitFlinchesWithoutReplayingIt()
+        {
+            SetClip(2.4f);
+            // A client can receive progress 1 before it ever receives progress 0.
+            var firstHit = Active(20.1d, 1);
+            yokai.Advance(firstHit, 20.1d, .05f);
+            Assert.That(yokai.Holding, Is.True);
+            Assert.That(yokai.Flinching, Is.True, "The first received active snapshot includes an accepted hit.");
+            Step(firstHit, 20.1d, LabGourdYokai.FlinchSeconds);
+            Assert.That(yokai.Flinching, Is.False);
+            yokai.Advance(firstHit, 20.5d, .05f);
+            Assert.That(yokai.Flinching, Is.False, "Receiving the same progress never replays a hit.");
+
+            // A later combo can skip progress 0 in the same way, after its warning.
+            var warning = Waiting(32d);
+            warning.comboCount = 1;
+            warning.comboProgress = 1;
+            warning.comboWarningAt = 32d;
+            warning.comboNextAt = 35d;
+            yokai.Advance(warning, 32d, 0f);
+            var nextHit = Active(35.1d, 1);
+            nextHit.comboCount = 2;
+            yokai.Advance(nextHit, 35.1d, .05f);
+            Assert.That(yokai.Flinching, Is.True, "A new combo has a fresh zero-progress baseline.");
+        }
+
+        [Test]
+        public void AnOldCompletedComboDoesNotInventAHitWhenFirstObservedAfterItEnded()
+        {
+            SetClip(2.4f);
+            var completed = Success(23d);
+            yokai.Advance(completed, 23d, .05f);
+            Assert.That(yokai.Holding, Is.False);
+            Assert.That(yokai.Flinching, Is.False, "There was no live combo window or held warning to react to.");
+            yokai.Advance(completed, 23.1d, .05f);
+            Assert.That(yokai.Flinching, Is.False);
+        }
+
+        [Test]
+        public void PausingTheFinalHitFlinchKeepsItsPoseAndResumingRestoresTheAnimationPose()
+        {
+            SetClip(2.4f);
+            yokai.Advance(Active(22.9d, 3), 22.9d, 0f);
+            Step(Active(22.9d, 3), 22.9d, LabGourdYokai.FlinchSeconds);
+            Vector3 normalScale = root.localScale;
+            var completed = Success(23d);
+            yokai.Advance(completed, 23d, .05f);
+            Assert.That(yokai.Holding, Is.False, "The last hit releases the ordinary animation.");
+            Assert.That(yokai.Flinching, Is.True);
+            Vector3 pausedPosition = root.localPosition, pausedScale = root.localScale;
+            float pausedTime = yokai.ClipTime;
+            completed.paused = true;
+            for (int frame = 0; frame < 120; frame++) yokai.Advance(completed, 23d, 0f);
+            Assert.That(root.localPosition, Is.EqualTo(pausedPosition), "A frozen frame must not add another hop.");
+            Assert.That(root.localScale, Is.EqualTo(pausedScale));
+            Assert.That(yokai.ClipTime, Is.EqualTo(pausedTime));
+            Assert.That(yokai.Flinching, Is.True, "Pause does not consume flinch time.");
+
+            completed.paused = false;
+            Step(completed, 23d, LabGourdYokai.FlinchSeconds);
+            Assert.That(yokai.Flinching, Is.False);
+            Assert.That(root.localScale, Is.EqualTo(normalScale));
+            Vector3 restoredPosition = root.localPosition;
+            clipPlayer.Sample();
+            Assert.That(root.localPosition, Is.EqualTo(restoredPosition), "The completed flinch leaves no hop offset.");
+            Assert.That(clipPlayer[clipPlayer.clip.name].speed, Is.EqualTo(1f));
+        }
+
+        [Test]
+        public void DisablingDuringAFinalHitFlinchClearsItsOffsetAndScale()
+        {
+            SetClip(2.4f);
+            yokai.Advance(Active(22.9d, 3), 22.9d, 0f);
+            Step(Active(22.9d, 3), 22.9d, LabGourdYokai.FlinchSeconds);
+            Vector3 normalScale = root.localScale;
+            // The setup disables LateUpdate to drive time; enable it only within this synchronous test.
+            yokai.enabled = true;
+            yokai.Advance(Success(23d), 23d, .05f);
+            Assert.That(yokai.Flinching, Is.True);
+            yokai.enabled = false;
+            Assert.That(yokai.Flinching, Is.False);
+            Assert.That(root.localScale, Is.EqualTo(normalScale));
+            Vector3 restoredPosition = root.localPosition;
+            clipPlayer.Sample();
+            Assert.That(root.localPosition, Is.EqualTo(restoredPosition));
+        }
+
+        [Test]
         public void AComboStartingAnywhereInTheOrdinaryLoopDoesNotJump()
         {
             for (float t = 0f; t < LabGourdYokai.ClipLength; t += .1f)
@@ -242,6 +330,28 @@ namespace C6Lab.Tests
             }
         }
 
+        [Test]
+        public void ABombOnlyHoldDoesNotTurnAnOldCompletedComboIntoANewHit()
+        {
+            SetClip(2.4f);
+            var calm = Calm(40d);
+            yokai.BombDropped();
+            yokai.Advance(calm, 40d, 0f);
+            Step(calm, 40d, .6f);
+            Assert.That(yokai.Holding, Is.True, "The bomb still keeps the yokai out.");
+            Assert.That(yokai.BombSecondsLeft, Is.GreaterThan(0f));
+            Assert.That(yokai.Popping, Is.False, "The separate pop has already finished.");
+            Assert.That(yokai.Flinching, Is.False);
+
+            var lateResult = Success(40.7d);
+            yokai.Advance(lateResult, 40.7d, 0f);
+            Assert.That(yokai.Holding, Is.True);
+            Assert.That(yokai.Flinching, Is.False,
+                "A bomb-only hold is not evidence of a live combo hit in a delayed completed snapshot.");
+            yokai.Advance(lateResult, 40.7d, 0f);
+            Assert.That(yokai.Flinching, Is.False, "Repeated completed snapshots must remain inert.");
+        }
+
         private static LabSnapshot Calm(double now) => new LabSnapshot
         {
             sessionId = "yokai", round = 1, phase = LabPhase.Playing, serverTime = now
@@ -270,6 +380,14 @@ namespace C6Lab.Tests
         {
             sessionId = "yokai", round = 1, phase = LabPhase.Playing, serverTime = now,
             comboWarningAt = 17d, comboNextAt = 20d
+        };
+
+        private static LabSnapshot Success(double now) => new LabSnapshot
+        {
+            sessionId = "yokai", round = 1, phase = LabPhase.Playing, serverTime = now,
+            comboCount = 1, comboProgress = LabGourdCombo.Length,
+            comboResult = LabComboResult.Success, comboResultCount = 1,
+            comboWarningAt = 32d, comboNextAt = 35d
         };
 
         private static LabSnapshot Active(double now, int progress) => new LabSnapshot

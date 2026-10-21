@@ -5,12 +5,9 @@ namespace C6Lab
 {
     public sealed partial class LabPaintSurface
     {
-        private const int FrontierSamples = 24;
-        private const int MaximumBandCells = 128;
         private int flowStyle;
-        private float raggedness, flowRatio, dripHalfWidth, dripMaxLength, gravityWeight;
+        private float raggedness;
         private Vector3 flowDirection = Vector3.down;
-        private ulong flowSequence;
 
         /// <summary>Last Host-sampled world-down direction expressed in the painted shell's local space.</summary>
         public Vector3 FlowDirection => flowDirection;
@@ -127,151 +124,6 @@ namespace C6Lab
             return (value & 0xFFFFFFu) / 16777216f;
         }
 
-        private int ChooseSpreadFlowCell(Region region)
-        {
-            // Keep a non-flow fallback available even with FlowRatio=1. A blocked chain,
-            // pole or reached length is never a restriction on the component's total reach.
-            if (NextUnit() < flowRatio && TryChooseFlowCell(region, out int flowing)) return flowing;
-            return ChooseCell(region);
-        }
-
-        private bool TryChooseFlowCell(Region region, out int chosen)
-        {
-            chosen = -1;
-            FlowTip tip = region.Flow;
-            if (tip != null)
-            {
-                while (tip.BandIndex < tip.Band.Count)
-                {
-                    int bandCell = tip.Band[tip.BandIndex++];
-                    if (pixels[bandCell].a == 0 && Touches(region, bandCell))
-                    {
-                        tip.Sequence = ++flowSequence;
-                        chosen = bandCell;
-                        return true;
-                    }
-                }
-                if (tip.LastCell >= 0 && pixels[tip.LastCell].a != 0
-                    && Root(cellRegions[tip.LastCell]).Id == region.Id && tip.Length < dripMaxLength
-                    && ChooseNextTip(tip, out chosen))
-                {
-                    StartBand(tip, chosen);
-                    tip.Sequence = ++flowSequence;
-                    return true;
-                }
-                region.Flow = null;
-                // Do not keep attempting a blocked tip in this same decision. Filling its
-                // surroundings can free another starting edge on a later growth step.
-                return false;
-            }
-
-            // Sample bounded component frontier entries. Favor a lower edge of the painted
-            // component without inspecting all of its cells every time a drip starts.
-            float best = float.NegativeInfinity;
-            int parent = -1;
-            for (int sample = 0; sample < FrontierSamples; sample++)
-            {
-                int candidate = SampleFrontier(region);
-                int upstream = DownhillParent(region, candidate);
-                if (upstream < 0) continue;
-                float score = Vector3.Dot(CellDirection(candidate), flowDirection)
-                    + raggedness * .08f * StableUnit(unchecked((uint)candidate) ^ initialSeed);
-                if (score > best) { best = score; chosen = candidate; parent = upstream; }
-            }
-            if (chosen < 0 || parent < 0) return false;
-            Vector3 from = CellDirection(parent), to = CellDirection(chosen);
-            float firstArc = Arc(from, to);
-            if (firstArc > dripMaxLength) return false;
-            tip = new FlowTip
-            {
-                LastCell = chosen, Length = firstArc,
-                Heading = Vector3.ProjectOnPlane(to - from, to).normalized,
-                Sequence = ++flowSequence
-            };
-            region.Flow = tip;
-            StartBand(tip, chosen);
-            return true;
-        }
-
-        private int DownhillParent(Region region, int candidate)
-        {
-            int parent = -1;
-            Vector3 destination = CellDirection(candidate);
-            float destinationHeight = Vector3.Dot(destination, flowDirection);
-            for (int side = 0; side < 4; side++)
-            {
-                int next = Neighbor(candidate, side);
-                if (next < 0 || pixels[next].a == 0 || Root(cellRegions[next]).Id != region.Id) continue;
-                Vector3 source = CellDirection(next);
-                // The lowest available frontier may be uphill of an already-painted polar
-                // cap. It is general spreading, not a valid source for a new flowing drip.
-                if (destinationHeight <= Vector3.Dot(source, flowDirection) + .000001f
-                    || Arc(source, destination) > dripMaxLength) continue;
-                if (parent < 0 || Vector3.Dot(source, flowDirection)
-                    < Vector3.Dot(CellDirection(parent), flowDirection)) parent = next;
-            }
-            return parent;
-        }
-
-        private int SampleFrontier(Region region)
-        {
-            int index = (int)(NextUInt() % (uint)region.Count);
-            for (int bucket = 0; bucket < 6; bucket++)
-            {
-                List<int> entries = region.Buckets[bucket];
-                if (index < entries.Count) return entries[index];
-                index -= entries.Count;
-            }
-            throw new System.InvalidOperationException("A nonempty paint component needs a frontier entry.");
-        }
-
-        private bool ChooseNextTip(FlowTip tip, out int chosen)
-        {
-            chosen = -1;
-            Vector3 current = CellDirection(tip.LastCell);
-            Vector3 gravity = Vector3.ProjectOnPlane(flowDirection, current);
-            if (gravity.sqrMagnitude < .0000001f) return false;
-            gravity.Normalize();
-            Vector3 heading = Vector3.ProjectOnPlane(tip.Heading, current).normalized;
-            // Only four adjacent choices: the continuation can never teleport across unpainted cells.
-            float total = 0f;
-            bool downhillAvailable = false;
-            for (int side = 0; side < 4; side++)
-            {
-                int next = Neighbor(tip.LastCell, side);
-                if (!EligibleTipCell(tip, current, next, out float distance)) continue;
-                float descent = Vector3.Dot(CellDirection(next) - current, flowDirection);
-                if (descent < -.000001f) continue;
-                if (descent > .000001f) downhillAvailable = true;
-                float weight = TipWeight(current, CellDirection(next), gravity, heading);
-                total += weight;
-                if (NextUnit() * total < weight) chosen = next;
-            }
-            // A lateral option may soften an active downhill run. It cannot sustain a
-            // radial/circumferential fan once the bottom or another obstacle blocks descent.
-            if (chosen < 0 || !downhillAvailable) return false;
-            Vector3 destination = CellDirection(chosen);
-            tip.Length += Arc(current, destination);
-            tip.Heading = Vector3.ProjectOnPlane(destination - current, destination).normalized;
-            tip.LastCell = chosen;
-            return true;
-        }
-
-        private bool EligibleTipCell(FlowTip tip, Vector3 current, int next, out float distance)
-        {
-            distance = 0f;
-            if (next < 0 || pixels[next].a != 0) return false;
-            distance = Arc(current, CellDirection(next));
-            return tip.Length + distance <= dripMaxLength + .000001f;
-        }
-
-        private float TipWeight(Vector3 current, Vector3 next, Vector3 gravity, Vector3 heading)
-        {
-            Vector3 step = Vector3.ProjectOnPlane(next - current, current).normalized;
-            return Mathf.Pow(gravityWeight, Vector3.Dot(step, gravity) * 2f)
-                * Mathf.Exp(Vector3.Dot(step, heading) * (1.3f - raggedness * .6f));
-        }
-
         private bool Touches(Region region, int cell)
         {
             for (int side = 0; side < 4; side++)
@@ -282,45 +134,5 @@ namespace C6Lab
             return false;
         }
 
-        private void StartBand(FlowTip tip, int centerCell)
-        {
-            tip.Band.Clear();
-            tip.BandIndex = 0;
-            var visited = new HashSet<int> { centerCell };
-            var queue = new Queue<int>();
-            queue.Enqueue(centerCell);
-            Vector3 center = CellDirection(centerCell);
-            float minimumDot = Mathf.Cos(dripHalfWidth);
-            while (queue.Count > 0 && visited.Count <= MaximumBandCells)
-            {
-                int current = queue.Dequeue();
-                for (int side = 0; side < 4; side++)
-                {
-                    int next = Neighbor(current, side);
-                    if (next < 0 || visited.Contains(next)
-                        || Vector3.Dot(center, CellDirection(next)) < minimumDot) continue;
-                    // Leave the forward sector available to the next centerline step. A disk
-                    // filling all four neighboring cells would otherwise stop its own drip.
-                    Vector3 across = Vector3.ProjectOnPlane(CellDirection(next) - center, center);
-                    if (across.sqrMagnitude > .000000001f
-                        && Vector3.Dot(across.normalized, tip.Heading) > .25f) continue;
-                    visited.Add(next);
-                    queue.Enqueue(next);
-                    if (pixels[next].a == 0) tip.Band.Add(next);
-                    if (visited.Count >= MaximumBandCells) break;
-                }
-                if (visited.Count >= MaximumBandCells) break;
-            }
-        }
-
-        private sealed class FlowTip
-        {
-            public int LastCell = -1;
-            public float Length;
-            public Vector3 Heading;
-            public ulong Sequence;
-            public readonly List<int> Band = new List<int>();
-            public int BandIndex;
-        }
     }
 }

@@ -15,21 +15,15 @@ namespace C6Lab.Tests
     /// </summary>
     public sealed class LabGourdPaintTests
     {
+        private readonly LabSavedSceneNetworkFixture fixture = new LabSavedSceneNetworkFixture();
+
         [UnityTearDown]
-        public IEnumerator UnloadSavedScene()
-        {
-            Scene scene = SceneManager.GetSceneByName("Lab");
-            if (!scene.IsValid() || !scene.isLoaded) yield break;
-            Scene cleanup = SceneManager.CreateScene("Gourd paint test cleanup");
-            SceneManager.SetActiveScene(cleanup);
-            yield return SceneManager.UnloadSceneAsync(scene);
-        }
+        public IEnumerator UnloadSavedScene() => fixture.Cleanup();
 
         [UnityTest]
         public IEnumerator MainSceneUsesWhiteGourdAndCumulativePaintTextureWithoutAHitCountCap()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return this.fixture.Load();
             var paint = Object.FindFirstObjectByType<LabGourdPaint>();
             Assert.That(paint, Is.Not.Null, "The ordinary controller attaches the presentation at runtime.");
             Assert.That(paint.IsReady, Is.True, paint.InitializationError);
@@ -123,8 +117,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SameHitboxPointProducesTheSameMapAcrossCommonSwingAndRotation()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return this.fixture.Load();
             var paint = Object.FindFirstObjectByType<LabGourdPaint>();
             Assert.That(paint.IsReady, Is.True, paint.InitializationError);
             Transform hitbox = paint.target.Hitbox.transform;
@@ -151,11 +144,10 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator OfflinePreviewCannotLeakIntoConnectedRoundsAndUnapprovedViewCallsAreInert()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return this.fixture.Load();
             var paint = Object.FindFirstObjectByType<LabGourdPaint>();
             LabNetwork network = paint.network;
-            network.port = 17785;
+            this.fixture.UseAvailablePort(network);
             paint.target.NotifyApprovedHit(Vector3.forward, LabOrbElement.Fire);
             Assert.That(paint.PaintCount, Is.EqualTo(1), "Direct input is allowed only in an offline preview.");
             try
@@ -186,8 +178,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SavedSoloHostElementHitsReachHpZeroWithoutWinningAndSurviveVisualReinitialization()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return this.fixture.Load();
             var paint = Object.FindFirstObjectByType<LabGourdPaint>();
             Assert.That(paint.IsReady, Is.True, paint.InitializationError);
             LabNetwork network = paint.network;
@@ -201,7 +192,7 @@ namespace C6Lab.Tests
             network.config = fixture;
             controller.config = fixture;
             controller.ReconfigureBoard();
-            network.port = 17784;
+            this.fixture.UseAvailablePort(network);
             var approvedDamage = new System.Collections.Generic.List<int>();
             System.Action<int> countHit = approvedDamage.Add;
             network.LocalThrowHit += countHit;
@@ -274,7 +265,7 @@ namespace C6Lab.Tests
                     "Paint mode cannot win just because the old HP counter reached zero.");
                 Assert.That(network.Snapshot.paintCoverage, Is.GreaterThan(0f));
                 Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(100));
-                Assert.That(network.Snapshot.paintCoverage, Is.LessThan(network.config.PaintVictoryCoverage));
+                Assert.That(network.Snapshot.paintCoverage, Is.LessThan(1f));
                 Assert.That(LabGourdFinish.DelayVictory(network, network.Snapshot), Is.False);
                 Assert.That(hud.resultControls.activeSelf, Is.False);
                 Assert.That(paint.VisualInstance.activeSelf, Is.True);
@@ -340,8 +331,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator FixedHundredPercentGoalGrowsFromRepeatedRealHitsFreezesOnPauseAndResetsOnRetry()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return this.fixture.Load();
             LabGourdPaint paint = Object.FindFirstObjectByType<LabGourdPaint>();
             LabNetwork network = paint.network;
             LabSceneController controller = Object.FindFirstObjectByType<LabSceneController>();
@@ -350,14 +340,14 @@ namespace C6Lab.Tests
             LabConfig savedNetwork = network.config, savedBoard = controller.config;
             LabConfig fixture = CollisionFixture(savedNetwork, 50f);
             float[] growthValues = fixture.CaptureDeveloperValues();
-            growthValues[107] = 50f;
+            growthValues[106] = 50f;
+            growthValues[107] = 100f;
             growthValues[108] = 100f;
-            growthValues[109] = 100f;
             Assert.That(fixture.TryApplyDeveloperValues(growthValues, out string fixtureError), Is.True, fixtureError);
             network.config = fixture;
             controller.config = fixture;
             controller.ReconfigureBoard();
-            network.port = 17789;
+            this.fixture.UseAvailablePort(network);
             System.Action<int> onHit = null;
             try
             {
@@ -503,8 +493,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator DisabledPaintDoesNotListenAndMissingReferencesKeepTargetVisible()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return this.fixture.Load();
             var paint = Object.FindFirstObjectByType<LabGourdPaint>();
             Assert.That(paint.IsReady, Is.True, paint.InitializationError);
             paint.enabled = false;
@@ -542,15 +531,14 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator DeveloperSliderAppliesModesToFreshSoloRoundsAndDoesNotRemountUnchangedMode()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return this.fixture.Load();
             LabDeveloperMode ui = SavedDeveloperUi();
             LabNetwork network = ui.network;
             LabGourdPaint paint = network.target.GetComponent<LabGourdPaint>();
             LabGourdCrack crack = network.target.GetComponent<LabGourdCrack>();
             LabGourdFinish finish = network.target.GetComponent<LabGourdFinish>();
             float[] savedValues = ui.sourceConfig.CaptureDeveloperValues();
-            network.port = 17786;
+            this.fixture.UseAvailablePort(network);
             int modeIndex = FieldIndex("Gourd Mode (0 paint, 1 crack)");
             try
             {
@@ -643,14 +631,13 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator DeveloperRoomCreationAndLobbyRetuningApplyTheHostGourdMode()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return this.fixture.Load();
             LabDeveloperMode ui = SavedDeveloperUi();
             LabNetwork network = ui.network;
             LabGourdPaint paint = network.target.GetComponent<LabGourdPaint>();
             LabGourdCrack crack = network.target.GetComponent<LabGourdCrack>();
             float[] savedValues = ui.sourceConfig.CaptureDeveloperValues();
-            network.port = 17787;
+            this.fixture.UseAvailablePort(network);
             try
             {
                 ui.Open();
@@ -692,8 +679,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator BrokenModeReferencesFallBackWithoutHoldingVictoryAndCanBeRetried()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return this.fixture.Load();
             LabDeveloperMode ui = SavedDeveloperUi();
             LabNetwork network = ui.network;
             LabGourdPaint paint = network.target.GetComponent<LabGourdPaint>();
@@ -701,7 +687,7 @@ namespace C6Lab.Tests
             GameObject savedWhite = paint.visualPrefab;
             GameObject savedCrack = crack.gourdPrefab;
             var victory = new LabSnapshot { sessionId = "invalid-mode", round = 1, phase = LabPhase.Victory, hp = 0 };
-            network.port = 17788;
+            this.fixture.UseAvailablePort(network);
             try
             {
                 paint.enabled = false;
@@ -746,13 +732,12 @@ namespace C6Lab.Tests
         {
             LabConfig fixture = Object.Instantiate(source);
             float[] tuning = fixture.CaptureDeveloperValues();
-            SetTuning(tuning, "Paint Victory Coverage (%)", 100f);
-            tuning[105] = 0f;
-            tuning[106] = initialPercent;
-            tuning[107] = 4f;
-            tuning[108] = 6f;
-            tuning[109] = 60f;
-            tuning[110] = 1.35f;
+            tuning[104] = 0f;
+            tuning[105] = initialPercent;
+            tuning[106] = 4f;
+            tuning[107] = 6f;
+            tuning[108] = 60f;
+            tuning[109] = 1.35f;
             SetTuning(tuning, "Monster Max HP", 40f);
             SetTuning(tuning, "Damage per Hit", 20f);
             SetTuning(tuning, "Battle Duration (seconds)", 30f);

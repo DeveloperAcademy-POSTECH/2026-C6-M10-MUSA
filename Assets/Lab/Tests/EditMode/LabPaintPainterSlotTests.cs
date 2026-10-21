@@ -233,7 +233,7 @@ namespace C6Lab.Tests
             Assert.That(Pixels(replica)[first], Is.EqualTo((Color32)Color.red));
             Assert.That(replica.RegisterHit(Vector3.back, Color.green, 8ul, 5), Is.False);
             Assert.That(replica.Advance(1d), Is.EqualTo(-1d));
-            Assert.That(replica.TryReplacePixels(64, 32, 81u, Pixels(source), 10), Is.True);
+            Assert.That(replica.TryReplacePixels(64, 32, 81u, Pixels(source), new byte[source.CellCount], 10), Is.True);
             Assert.That(Slots(replica), Is.All.EqualTo((byte)0), "Old offline color-only fixtures explicitly install neutral provenance.");
         }
 
@@ -310,9 +310,9 @@ namespace C6Lab.Tests
                 var model = new LabModel(); model.Begin("paint-passed-owner", new ulong[] { 901ul, 0ul }, 0d, config);
                 LabOrbState shot = CreateElementOrb(model, 901ul);
                 Assert.That(shot.originOwner, Is.EqualTo(901ul));
-                Assert.That(model.TryUpdateMotion(901ul, shot.id, new Vector2(1f, .5f), Vector2.right, 0d), Is.True);
-                Assert.That(model.TryTransfer(901ul, shot.id, true, .5f, Vector2.right, "pass", 0d,
-                    out var passed, out string error), Is.True, error);
+
+                Assert.That(model.TryTransferAt(901ul, shot.id, true, new Vector2(.99f, .5f), Vector2.right, "pass", 0d,
+                LabEdgeCrossingKind.Swipe, out var passed, out string error), Is.True, error);
                 Assert.That(passed.owner, Is.Zero);
                 Assert.That(passed.originOwner, Is.EqualTo(901ul));
                 Assert.That(model.TryLaunch(0ul, shot.id, "launch", 0d, out _, out error), Is.True, error);
@@ -343,8 +343,8 @@ namespace C6Lab.Tests
             for (int i = 39; i <= 44; i++) values[i] = 0f;
             values[42] = 100f; // A secret box supplies deterministic element orbs for the model fixture.
             values[46] = values[47] = 0f;
-            values[79] = 0f; values[88] = values[89] = 0f;
-            values[105] = 0f; values[106] = .1f; values[139] = 0f;
+            values[79] = 0f; values[87] = values[88] = 0f;
+            values[104] = 0f; values[105] = .1f; values[134] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return config;
         }
@@ -353,7 +353,7 @@ namespace C6Lab.Tests
         {
             Assert.That(model.TryGenerate(owner, "box", 0d, out var box, out string error), Is.True, error);
             Assert.That(box.kind, Is.EqualTo(LabOrbKind.SecretBox));
-            Assert.That(model.TryUseItem(owner, box.id, "open", 0d, out _, out error), Is.True, error);
+            Assert.That(model.TryUseItemAt(owner, box.id, "open", 0d, new Vector2(.5f, .5f), out _, out error), Is.True, error);
             return model.Snapshot(0d).orbs.First(orb => orb.owner == owner && orb.kind == LabOrbKind.Combined);
         }
 

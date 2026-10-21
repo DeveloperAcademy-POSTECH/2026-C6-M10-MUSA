@@ -29,7 +29,7 @@ namespace C6Lab.Tests
             values[32] = 18f;
             values[36] = 1f;
             values[37] = 0f;
-            values[112] = (float)LabThrowForm.Arc;
+            values[111] = (float)LabThrowForm.Arc;
             Apply(values);
 
             Vector3 actual = LabThrowMath.LaunchVelocity(new Vector2(x, y), Anchor(0, 3), Center, config);
@@ -79,9 +79,9 @@ namespace C6Lab.Tests
         public void ZeroLoftCanProduceAnExactlyLevelStraightShot()
         {
             float[] values = config.CaptureDeveloperValues();
-            values[112] = (float)LabThrowForm.Straight;
+            values[111] = (float)LabThrowForm.Straight;
+            values[115] = 0f;
             values[116] = 0f;
-            values[117] = 0f;
             Apply(values);
             Vector3 shot = LabThrowMath.LaunchVelocity(new Vector2(.6f, 2f), Anchor(1, 3), Center, config);
             Assert.That(shot.y, Is.EqualTo(0f).Within(.00001f));
@@ -95,16 +95,16 @@ namespace C6Lab.Tests
             Vector2 swipe = new Vector2(.7f, 2f);
             Vector3 arc = LabThrowMath.LaunchVelocity(swipe, anchor, Center, config);
             float[] values = config.CaptureDeveloperValues();
-            values[112] = (float)LabThrowForm.Straight;
-            values[116] = 12f;
-            values[117] = 0f;
+            values[111] = (float)LabThrowForm.Straight;
+            values[115] = 12f;
+            values[116] = 0f;
             Apply(values);
             Vector3 tilted = LabThrowMath.LaunchVelocity(swipe, anchor, Center, config);
             Assert.That(Pitch(tilted), Is.EqualTo(12f).Within(.0001f));
             Assert.That(tilted.magnitude, Is.EqualTo(arc.magnitude).Within(.00001f));
 
-            values[116] = 0f;
-            values[117] = 1f;
+            values[115] = 0f;
+            values[116] = 1f;
             Apply(values);
             AssertVector(LabThrowMath.LaunchVelocity(swipe, anchor, Center, config), arc);
         }
@@ -124,10 +124,10 @@ namespace C6Lab.Tests
                 Vector3 forward = Vector3.ProjectOnPlane(Center - anchor, Vector3.up).normalized;
                 Vector3 right = Vector3.Cross(Vector3.up, forward);
                 float[] values = config.CaptureDeveloperValues();
-                values[112] = (float)LabThrowForm.Straight;
-                values[113] = .4f;
-                values[114] = .2f;
-                values[115] = .7f;
+                values[111] = (float)LabThrowForm.Straight;
+                values[112] = .4f;
+                values[113] = .2f;
+                values[114] = .7f;
                 Apply(values);
                 Vector3 straightLeft = LabThrowMath.LaunchPosition(seat, seats, Center, 0f, config);
                 Vector3 straightRight = LabThrowMath.LaunchPosition(seat, seats, Center, 1f, config);
@@ -151,9 +151,9 @@ namespace C6Lab.Tests
             Vector3 velocity = LabThrowMath.LaunchVelocity(swipe, anchor, Center, config);
             Assert.That(velocity.x, Is.EqualTo(0f).Within(.00001f));
             float[] values = config.CaptureDeveloperValues();
-            values[113] = -1.5f;
-            values[114] = 1.5f;
-            values[115] = -.5f;
+            values[112] = -1.5f;
+            values[113] = 1.5f;
+            values[114] = -.5f;
             Apply(values);
             AssertVector(LabThrowMath.LaunchVelocity(swipe, anchor, Center, config), velocity);
         }
@@ -166,12 +166,12 @@ namespace C6Lab.Tests
             Vector3 oldPosition = LabThrowMath.LaunchPosition(2, 5, Center, .25f, config);
             Vector3 oldVelocity = LabThrowMath.LaunchVelocity(swipe, anchor, Center, config);
             float[] values = config.CaptureDeveloperValues();
-            values[113] = 1.5f;
-            values[114] = -1.5f;
-            values[115] = .5f;
-            values[116] = -25f;
-            values[117] = 1f;
-            values[118] = 0f;
+            values[112] = 1.5f;
+            values[113] = -1.5f;
+            values[114] = .5f;
+            values[115] = -25f;
+            values[116] = 1f;
+            values[117] = 0f;
             Apply(values);
             Assert.That(LabThrowMath.LaunchPosition(2, 5, Center, .25f, config), Is.EqualTo(oldPosition));
             Assert.That(LabThrowMath.LaunchVelocity(swipe, anchor, Center, config), Is.EqualTo(oldVelocity));
@@ -204,9 +204,9 @@ namespace C6Lab.Tests
         public void ExtremeElevationControlsStayFiniteAndPointIntoTheArena(float pitch, float loft)
         {
             float[] values = config.CaptureDeveloperValues();
-            values[112] = (float)LabThrowForm.Straight;
-            values[116] = pitch;
-            values[117] = loft;
+            values[111] = (float)LabThrowForm.Straight;
+            values[115] = pitch;
+            values[116] = loft;
             Apply(values);
             for (int seats = 2; seats <= 5; seats++)
             for (int seat = 0; seat < seats; seat++)
@@ -237,7 +237,7 @@ namespace C6Lab.Tests
         private void SetForm(LabThrowForm form)
         {
             float[] values = config.CaptureDeveloperValues();
-            values[112] = (float)form;
+            values[111] = (float)form;
             Apply(values);
         }
 

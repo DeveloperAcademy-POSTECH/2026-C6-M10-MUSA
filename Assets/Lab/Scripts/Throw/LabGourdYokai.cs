@@ -9,7 +9,7 @@ namespace C6Lab
     /// 애니메이션을 이어서 틀어 들어가고, 다시 평소 반복으로 돌아간다.
     /// 콤보 구간은 Host 스냅샷(`comboWarningAt`/`comboNextAt`/`comboActive`)으로 정하므로 모든 기기에서 같은
     /// 때 나오고 들어간다. 평소 반복은 기기마다 따로 돈다(이전과 같음). 화면 표시만 하며 판정에 관여하지 않는다.
-    /// 박이 폭탄을 떨어뜨리면(#250, 모든 기기에 같은 순간 오는 `GourdBombDropped`) "!" 말풍선이 떠 있는 동안
+    /// 박이 폭탄을 떨어뜨리면(#250, 각 기기가 수신하는 `GourdBombDropped`) "!" 말풍선이 떠 있는 동안
     /// 평소보다 빠르게 쏙 올라와 톡 튀고 두리번거린다. 콤보 중이면 들어가지 않고 톡 튀기만 하며, 콤보와 폭탄이
     /// 둘 다 끝나야 들어간다.
     /// </summary>
@@ -50,6 +50,7 @@ namespace C6Lab
         private bool ready;
 
         private bool holding;
+        private bool wasInComboWindow;
         private float cursor;
         private float lookDirection = 1f;
         private bool rewinding;
@@ -64,7 +65,7 @@ namespace C6Lab
         private LabSnapshot seenSnapshot;
         private double seenAtRealtime;
 
-        /// <summary>콤보 때문에 요괴를 붙잡아 두고 있는지 (예고 ~ 콤보 끝)</summary>
+        /// <summary>콤보 또는 폭탄 때문에 요괴를 붙잡아 두고 있는지</summary>
         public bool Holding => holding;
         /// <summary>움찔하는 중인지</summary>
         public bool Flinching => flinchElapsed >= 0f && effectSign < 0f;
@@ -131,6 +132,7 @@ namespace C6Lab
             else bombLeft = Mathf.Max(0f, bombLeft - deltaTime);
             bool want = combo || bombLeft > 0f;
             DetectHits(snapshot, combo);
+            wasInComboWindow = combo;
 
             if (want && !holding) Hold();
             else if (!want && holding) Release();
@@ -156,17 +158,19 @@ namespace C6Lab
             snapshot != null && snapshot.phase == LabPhase.Playing
             && (snapshot.comboActive || snapshot.ComboWarningOn(serverNow));
 
-        private void DetectHits(LabSnapshot snapshot, bool want)
+        private void DetectHits(LabSnapshot snapshot, bool currentCombo)
         {
             if (snapshot == null) return;
             if (snapshot.comboCount != seenComboCount)
             {
                 seenComboCount = snapshot.comboCount;
-                seenProgress = snapshot.comboProgress;
-                return;
+                // A coalesced snapshot may already include the first hit of this combo.
+                // Compare it with a fresh combo's zero progress, while the window/holding
+                // check below keeps an old completed combo from replaying on late arrival.
+                seenProgress = 0;
             }
             // 칸을 맞혀 진행이 늘면 움찔. 마지막 칸(성공)은 콤보가 끝나도 움찔한 뒤 들어간다.
-            if (snapshot.comboProgress > seenProgress && (want || holding)) StartEffect(-1f, FlinchSeconds);
+            if (snapshot.comboProgress > seenProgress && (currentCombo || wasInComboWindow)) StartEffect(-1f, FlinchSeconds);
             seenProgress = snapshot.comboProgress;
         }
 
@@ -266,6 +270,10 @@ namespace C6Lab
         private void ApplyFlinch(float deltaTime)
         {
             if (flinchElapsed < 0f) return;
+            // Held poses were sampled by Advance. After Release, sample the ordinary
+            // animation's current pose too: a paused Animation does not overwrite the
+            // previous frame's hop, so adding to that transform would otherwise drift.
+            if (!holding) clipPlayer.Sample();
             flinchElapsed += deltaTime;
             float u = flinchElapsed / effectSeconds;
             if (u >= 1f)
@@ -279,7 +287,7 @@ namespace C6Lab
             float wave = Mathf.Sin(u * Mathf.PI * 2f) * (1f - u);
             bool pop = effectSign > 0f;
             yokai.localScale = yokaiScale * (pop ? 1f + PopStretch * wave : 1f - FlinchSquash * wave);
-            // 위치는 애니메이션이 매 프레임 다시 쓰므로 더하기만 해도 쌓이지 않는다.
+            // Add the hop only after sampling the base pose, including paused frames.
             yokai.localPosition += new Vector3(0f, 0f, (pop ? 2f : 1f) * FlinchHop * Mathf.Sin(u * Mathf.PI));
         }
 
@@ -301,10 +309,12 @@ namespace C6Lab
 
         private void OnDisable()
         {
+            wasInComboWindow = false;
             bombLeft = 0f;
             popPending = false;
             if (!ready) return;
             if (holding) Release();
+            if (flinchElapsed >= 0f) clipPlayer.Sample();
             flinchElapsed = -1f;
             if (yokai != null) yokai.localScale = yokaiScale;
         }

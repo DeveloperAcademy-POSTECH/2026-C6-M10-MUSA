@@ -73,7 +73,7 @@ MonoBehaviour:
   spawnFanAngle: 180
   spawnMinSpeed: 1
   spawnMaxSpeed: 1.8
-  drumCount: 1
+  drumCount: 0
   drumRadius: 0.6
   drumDriftSpeed: 0.1
   drumDriftTurning: 0.25
@@ -81,7 +81,6 @@ MonoBehaviour:
   drumStopBounds: 14000000280000003c00000050000000i
   drumStopChances: 28000000230000000f0000000a000000i
   gourdMode: 0
-  paintVictoryPercent: 100
   paintSurfaceResolution: 2
   paintInitialPercent: 2
   paintRepeatPercent: 1.5
@@ -114,10 +113,6 @@ MonoBehaviour:
   paintGrowthStyle: 0
   paintPattern: 2
   paintEdgeRaggedness: 0.55
-  paintFlowRatio: 0.35
-  paintDripWidthDegrees: 3
-  paintDripLengthDegrees: 60
-  paintGravityWeight: 3
   gourdBombIntervalMin: 20
   gourdBombIntervalMax: 30
   swipeBlockInterval: 40

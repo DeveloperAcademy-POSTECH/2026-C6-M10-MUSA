@@ -18,10 +18,6 @@ namespace C6Lab
         public LabPaintPattern Pattern = LabPaintPattern.Splatter;
         public int Style = 0;
         public float Raggedness = .55f;
-        public float FlowRatio = .35f;
-        public float DripWidthDegrees = 3f;
-        public float DripLengthDegrees = 60f;
-        public float GravityWeight = 3f;
         public bool DryingEnabled = false;
         public float DryingDelaySeconds = 5f;
         public float DryingPercentPerSecond = .2f;
@@ -90,10 +86,6 @@ namespace C6Lab
                 || settings.Pattern < LabPaintPattern.Legacy || settings.Pattern > LabPaintPattern.Flow
                 || settings.Style < 0 || settings.Style > 1
                 || !Finite(settings.Raggedness) || settings.Raggedness < 0f || settings.Raggedness > 1f
-                || !Finite(settings.FlowRatio) || settings.FlowRatio < 0f || settings.FlowRatio > 1f
-                || !Finite(settings.DripWidthDegrees) || settings.DripWidthDegrees < .5f || settings.DripWidthDegrees > 12f
-                || !Finite(settings.DripLengthDegrees) || settings.DripLengthDegrees < 5f || settings.DripLengthDegrees > 135f
-                || !Finite(settings.GravityWeight) || settings.GravityWeight < 1f || settings.GravityWeight > 8f
                 || !ValidDryingSettings(settings))
                 throw new ArgumentOutOfRangeException(nameof(settings), "Invalid paint growth settings.");
             int columns = 64 << settings.Resolution, rows = 32 << settings.Resolution;
@@ -119,10 +111,6 @@ namespace C6Lab
             patternMask = null;
             flowStyle = settings.Style;
             raggedness = settings.Raggedness;
-            flowRatio = settings.FlowRatio;
-            dripHalfWidth = settings.DripWidthDegrees * .5f * Mathf.Deg2Rad;
-            dripMaxLength = settings.DripLengthDegrees * Mathf.Deg2Rad;
-            gravityWeight = settings.GravityWeight;
             initialSeed = seed;
             ConfigureDrying(settings);
             Clear();
@@ -339,11 +327,6 @@ namespace C6Lab
             donor.Budget = 0m;
             foreach (var pair in donor.Supplies) keep.Supplies.Add(pair.Key, pair.Value);
             donor.Supplies.Clear();
-            if (donor.Flow != null && (keep.Flow == null || donor.Flow.Sequence > keep.Flow.Sequence))
-                keep.Flow = donor.Flow;
-            if (donor.PatternPatch != null && (keep.PatternPatch == null
-                || donor.PatternPatch.Sequence > keep.PatternPatch.Sequence))
-                keep.PatternPatch = donor.PatternPatch;
             for (int bucket = 0; bucket < 6; bucket++)
             {
                 List<int> cells = donor.Buckets[bucket];
@@ -454,8 +437,6 @@ namespace C6Lab
             randomState = initialSeed == 0u ? 0x9E3779B9u : initialSeed;
             preview = replica = false;
             flowDirection = Vector3.down;
-            flowSequence = 0;
-            patternSequence = 0;
             ClearDrying();
             unchecked { Revision++; }
         }
@@ -483,11 +464,6 @@ namespace C6Lab
             if (cell < 0 || cell >= CellCount) throw new ArgumentOutOfRangeException(nameof(cell));
             return painterSlots[cell];
         }
-
-        /// <summary>Compatibility path for neutral, offline color-only fixtures.</summary>
-        public bool TryReplacePixels(int columns, int rows, uint revision, Color32[] source, int paintCount)
-            => TryReplacePixels(columns, rows, revision, source,
-                source == null ? null : new byte[source.Length], paintCount);
 
         /// <summary>
         /// Atomically install a validated Client replica. It has no reconstructed growth
@@ -596,8 +572,6 @@ namespace C6Lab
             public readonly int Id;
             public int Parent;
             public decimal Budget;
-            public FlowTip Flow;
-            public PatternPatch PatternPatch;
             public readonly SortedDictionary<ulong, Ink> Supplies = new SortedDictionary<ulong, Ink>();
             public readonly List<int>[] Buckets = new List<int>[6];
             private readonly Dictionary<int, Entry> candidates = new Dictionary<int, Entry>();

@@ -21,14 +21,14 @@ namespace C6Lab.Tests
         {
             config = ScriptableObject.CreateInstance<LabConfig>();
             float[] values = config.CaptureDeveloperValues();
+            values[110] = 1f;
             values[111] = 1f;
-            values[112] = 1f;
-            values[113] = -.75f;
-            values[114] = .85f;
-            values[115] = .25f;
-            values[116] = -7.5f;
-            values[117] = .6f;
-            values[118] = 1.25f;
+            values[112] = -.75f;
+            values[113] = .85f;
+            values[114] = .25f;
+            values[115] = -7.5f;
+            values[116] = .6f;
+            values[117] = 1.25f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             baseline = config.CaptureDeveloperValues();
         }
@@ -38,16 +38,16 @@ namespace C6Lab.Tests
 
         private static IEnumerable<TestCaseData> TuningFields()
         {
-            yield return new TestCaseData(119, "GourdRopeCycleAmplitude", 0f, 1f);
-            yield return new TestCaseData(120, "GourdRopeCyclePeriod", .5f, 10f);
-            yield return new TestCaseData(121, "GourdRopeHitBounce", 0f, 2f);
-            yield return new TestCaseData(122, "GourdRopeSpring", 0f, 100f);
-            yield return new TestCaseData(123, "GourdRopeDamping", 0f, 20f);
-            yield return new TestCaseData(124, "GourdRopeMaximumHitExtension", 0f, 3f);
-            yield return new TestCaseData(125, "GourdSwingImpactStrength", 0f, 20f);
-            yield return new TestCaseData(126, "GourdSwingMaximumAngle", 1f, 75f);
-            yield return new TestCaseData(127, "GourdSwingReturnStrength", 0f, 100f);
-            yield return new TestCaseData(128, "GourdSwingDamping", 0f, 20f);
+            yield return new TestCaseData(118, "GourdRopeCycleAmplitude", 0f, 1f);
+            yield return new TestCaseData(119, "GourdRopeCyclePeriod", .5f, 10f);
+            yield return new TestCaseData(120, "GourdRopeHitBounce", 0f, 2f);
+            yield return new TestCaseData(121, "GourdRopeSpring", 0f, 100f);
+            yield return new TestCaseData(122, "GourdRopeDamping", 0f, 20f);
+            yield return new TestCaseData(123, "GourdRopeMaximumHitExtension", 0f, 3f);
+            yield return new TestCaseData(124, "GourdSwingImpactStrength", 0f, 20f);
+            yield return new TestCaseData(125, "GourdSwingMaximumAngle", 1f, 75f);
+            yield return new TestCaseData(126, "GourdSwingReturnStrength", 0f, 100f);
+            yield return new TestCaseData(127, "GourdSwingDamping", 0f, 20f);
         }
 
         [TestCaseSource(nameof(TuningFields))]
@@ -66,7 +66,7 @@ namespace C6Lab.Tests
                     "Applying the motion tail must preserve every preceding shared value.");
                 Assert.That(config.CompletedGourdViewerEnabled, Is.True);
                 Assert.That(config.ThrowForm, Is.EqualTo(LabThrowForm.Straight));
-                Assert.That(config.CaptureDeveloperValues().Take(119), Is.EqualTo(baseline.Take(119)));
+                Assert.That(config.CaptureDeveloperValues().Take(118), Is.EqualTo(baseline.Take(118)));
             }
         }
 
@@ -79,8 +79,8 @@ namespace C6Lab.Tests
             {
                 float[] values = (float[])baseline.Clone();
                 values[0] += 1f;
+                values[110] = 0f;
                 values[111] = 0f;
-                values[112] = 0f;
                 values[index] = invalid;
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False,
                     propertyName + " accepted " + invalid);

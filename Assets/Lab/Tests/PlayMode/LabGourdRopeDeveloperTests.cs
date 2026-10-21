@@ -16,7 +16,7 @@ namespace C6Lab.Tests
     /// </summary>
     public sealed class LabGourdRopeDeveloperTests
     {
-        private const int First = 119;
+        private const int First = 118;
         private const int Count = 10;
         private static readonly float[] ProfileA = { .8f, 1.6f, .5f, 30f, 1.2f, 1.1f, 9f, 50f, 12f, .8f };
         private static readonly float[] ProfileB = { .2f, 4f, .15f, 65f, 5f, .3f, 4f, 25f, 25f, 3f };
@@ -34,8 +34,8 @@ namespace C6Lab.Tests
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             testedNetwork = ui.network;
             Assert.That(testedNetwork, Is.Not.Null);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(170), "The live DEV panel includes all appended settings, including nearby-hit drying.");
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(170), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(165), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(165), "The live DEV panel includes all appended settings, including nearby-hit drying.");
             savedValues = ui.sourceConfig.CaptureDeveloperValues();
             savedJson = JsonUtility.ToJson(ui.sourceConfig);
         }
@@ -91,7 +91,7 @@ namespace C6Lab.Tests
             UnityEngine.UI.ScrollRect scroll = ui.panel.GetComponentsInChildren<UnityEngine.UI.ScrollRect>(true).Single();
             Assert.That(scroll.vertical, Is.True);
             Assert.That(scroll.viewport, Is.Not.Null);
-            Assert.That(scroll.content, Is.SameAs(ui.valueInputs[128].transform.parent.parent));
+            Assert.That(scroll.content, Is.SameAs(ui.valueInputs[127].transform.parent.parent));
             Assert.That(scroll.viewport.GetComponent<UnityEngine.UI.Mask>(), Is.Not.Null);
             Assert.That(scroll.viewport.GetComponent<UnityEngine.UI.Image>().raycastTarget, Is.True);
             Rebuild(scroll);
@@ -99,7 +99,7 @@ namespace C6Lab.Tests
             scroll.StopMovement();
             if (scroll.content.rect.height > scroll.viewport.rect.height)
             {
-                Assert.That(RowCenterIsVisible(scroll, 128), Is.False,
+                Assert.That(RowCenterIsVisible(scroll, 127), Is.False,
                     "This layout needs scrolling to reach the final new setting.");
                 Assert.That(EventSystem.current, Is.Not.Null);
                 scroll.OnScroll(new PointerEventData(EventSystem.current) { scrollDelta = new Vector2(0f, -1000f) });
@@ -109,14 +109,14 @@ namespace C6Lab.Tests
             Rebuild(scroll);
             // The rope group is followed by newer Gourd controls. Bring the tested rope
             // input into view explicitly instead of relying on it being the final row.
-            var lastRopeInput = (RectTransform)ui.valueInputs[128].transform;
+            var lastRopeInput = (RectTransform)ui.valueInputs[127].transform;
             Vector3 ropeCenter = scroll.viewport.InverseTransformPoint(lastRopeInput.TransformPoint(lastRopeInput.rect.center));
             scroll.content.anchoredPosition += Vector2.up * (scroll.viewport.rect.center.y - ropeCenter.y);
             scroll.StopMovement();
             Rebuild(scroll);
-            Assert.That(RowCenterIsVisible(scroll, 128), Is.True,
+            Assert.That(RowCenterIsVisible(scroll, 127), Is.True,
                 "The Gourd expansion must resize Content so the last row can enter the masked viewport.");
-            AssertInputReceivesRaycast(128);
+            AssertInputReceivesRaycast(127);
             AssertSourceUnchanged();
             Assert.That(testedNetwork.config.CaptureDeveloperValues(), Is.EqualTo(savedValues),
                 "Moving controls only edits the form until APPLY.");
@@ -218,12 +218,12 @@ namespace C6Lab.Tests
             Assert.That(ui.applyHostLabel.text, Is.EqualTo("APPLY TO ROOM"));
             AssertForm(ProfileA);
             SetForm(ProfileB);
-            ui.valueInputs[128].text = "21";
+            ui.valueInputs[127].text = "21";
             ui.applyHostButton.onClick.Invoke();
             Assert.That(ui.panel.activeSelf, Is.True);
             Assert.That(ui.feedbackText.text, Does.Contain("Gourd Swing Damping"));
             AssertRuntime(ProfileA);
-            ui.valueInputs[128].text = ProfileB[9].ToString(CultureInfo.InvariantCulture);
+            ui.valueInputs[127].text = ProfileB[9].ToString(CultureInfo.InvariantCulture);
             ui.applyHostButton.onClick.Invoke();
             yield return null;
             Assert.That(ui.panel.activeSelf, Is.False);

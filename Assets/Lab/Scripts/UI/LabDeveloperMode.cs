@@ -465,7 +465,7 @@ namespace C6Lab
             LabDeveloperField field = LabConfig.DeveloperFields[index];
             if (float.IsNaN(value) || float.IsInfinity(value) || value < field.Min || value > field.Max) return;
             valueSliders[index].SetValueWithoutNotify(LabDeveloperSliderScale.Normalize(field, defaultValues[index], value));
-            if (index == 112 || index == 139 || index == PaintDryingField) RefreshToggles();
+            if (index == 111 || index == PaintPatternField || index == PaintDryingField) RefreshToggles();
         }
 
         private void SyncInputFromSlider(int index, float position)
@@ -474,7 +474,7 @@ namespace C6Lab
             float value = LabDeveloperSliderScale.Denormalize(field, defaultValues[index], position);
             if (field.WholeNumber) value = Mathf.Round(value);
             valueInputs[index].SetTextWithoutNotify(value.ToString("0.######", CultureInfo.InvariantCulture));
-            if (index == 112 || index == 139 || index == PaintDryingField) RefreshToggles();
+            if (index == 111 || index == PaintPatternField || index == PaintDryingField) RefreshToggles();
         }
 
         // 0/1 항목(켜기/끄기, 박 모드)은 숫자 입력칸·슬라이더 대신 누를 때마다 바뀌는 버튼으로 보여준다.
@@ -537,9 +537,9 @@ namespace C6Lab
             RefreshToggles();
         }
 
-        private const int PaintDryingField = 153;
-        private const int PaintPatternField = 139;
-        private const int LegacyGrowthField = 133;
+        private const int PaintDryingField = 148;
+        private const int PaintPatternField = 134;
+        private const int LegacyGrowthField = 132;
         private Button[][] choiceButtons;
 
         /// <summary>Four named buttons replace the pattern's numeric input and slider.</summary>
@@ -575,11 +575,14 @@ namespace C6Lab
                     go.layer = container.layer;
                     RectTransform rect = (RectTransform)go.transform;
                     rect.SetParent(containerRect, false);
-                    // Two columns keep all four names readable on the narrow mobile panel.
-                    float x = (option % 2) * .5f;
-                    float y = 1f - ((option / 2) + 1) * .5f;
+                    // Two rows of two keep four names readable on the narrow mobile panel; six short
+                    // choices (Drum Count's AUTO and 1-5, #236) go three to a row.
+                    int columns = field.Choices.Count <= 4 ? 2 : 3;
+                    float width = 1f / columns;
+                    float x = (option % columns) * width;
+                    float y = 1f - ((option / columns) + 1) * .5f;
                     rect.anchorMin = new Vector2(x, y);
-                    rect.anchorMax = new Vector2(x + .5f, y + .5f);
+                    rect.anchorMax = new Vector2(x + width, y + .5f);
                     rect.offsetMin = new Vector2(3f, 2f);
                     rect.offsetMax = new Vector2(-3f, -2f);
                     var textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
@@ -676,12 +679,12 @@ namespace C6Lab
         // The approved runtime config and original asset change only through their existing APPLY paths.
         private void RefreshThrowFormInputs()
         {
-            if (valueInputs == null || valueInputs.Length <= 118 || valueSliders == null
-                || valueSliders.Length <= 118) return;
+            if (valueInputs == null || valueInputs.Length <= 117 || valueSliders == null
+                || valueSliders.Length <= 117) return;
             bool canEdit = network != null && (network.CanChooseConnection || network.IsDeveloperSolo
                 || HostLobby || HostPausedBattle);
-            bool enabled = canEdit && ToggleIsOn(valueInputs[112]);
-            for (int i = 113; i <= 118; i++)
+            bool enabled = canEdit && ToggleIsOn(valueInputs[111]);
+            for (int i = 112; i <= 117; i++)
             {
                 if (valueInputs[i] != null)
                 {
@@ -695,12 +698,12 @@ namespace C6Lab
         // Pending form state controls editability immediately; only APPLY installs shared settings.
         private void RefreshPaintDryingInputs()
         {
-            if (valueInputs == null || valueInputs.Length <= 156 || valueSliders == null
-                || valueSliders.Length <= 156) return;
+            if (valueInputs == null || valueInputs.Length <= 151 || valueSliders == null
+                || valueSliders.Length <= 151) return;
             bool canEdit = network != null && (network.CanChooseConnection || network.IsDeveloperSolo
                 || HostLobby || HostPausedBattle);
             bool enabled = canEdit && ToggleIsOn(valueInputs[PaintDryingField]);
-            for (int i = 154; i <= 156; i++)
+            for (int i = 149; i <= 151; i++)
             {
                 if (valueInputs[i] != null)
                 {

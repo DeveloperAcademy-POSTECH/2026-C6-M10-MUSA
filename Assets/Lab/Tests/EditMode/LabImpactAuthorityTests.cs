@@ -34,7 +34,8 @@ namespace C6Lab.Tests
                 }
                 Assert.That(yin, Is.Not.Null);
                 Assert.That(yang, Is.Not.Null);
-                Assert.That(model.TryCombine(1ul, yin.id, yang.id, "combine", 0d,
+                Assert.That(model.TryCombineAt(1ul, yin.id, yang.id, "combine", 0d,
+                    new Vector2((yin.x + yang.x) * .5f, (yin.y + yang.y) * .5f), Vector2.zero,
                     out var combined, out error), Is.True, error);
                 Assert.That(model.TryLaunch(1ul, combined.id, "launch", 0d,
                     out _, out error), Is.True, error);
