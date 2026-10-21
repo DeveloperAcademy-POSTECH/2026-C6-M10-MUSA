@@ -14,16 +14,16 @@ namespace C6Lab.Tests
             var config = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
-                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(184));
+                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(191), "The yaguang flash (#268) follows at 184-190.");
                 Assert.That(LabConfig.DeveloperFields[177].Label, Is.EqualTo("Charm Rescue Taps (0 = none)"));
-                Assert.That(LabConfig.DeveloperFields.Skip(178).Select(field => field.Label), Is.EqualTo(new[]
+                Assert.That(LabConfig.DeveloperFields.Skip(178).Take(6).Select(field => field.Label), Is.EqualTo(new[]
                 {
                     "Jigwi Fire Target Count", "Jigwi Fire Seconds", "Jigwi Overheat Seconds",
                     "Jigwi Generation Burn Seconds", "Jigwi Raw Radius Scale", "Jigwi Raw Life Scale"
                 }));
                 Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Jigwi").FieldIndices,
                     Is.EqualTo(Enumerable.Range(178, 6)));
-                Assert.That(config.CaptureDeveloperValues().Skip(178), Is.EqualTo(new[] { 1f, 15f, 4f, 10f, .65f, .5f }));
+                Assert.That(config.CaptureDeveloperValues().Skip(178).Take(6), Is.EqualTo(new[] { 1f, 15f, 4f, 10f, .65f, .5f }));
                 Assert.That(config.SabotageWeights().Length, Is.EqualTo(4),
                     "The manual Jigwi experiment must not silently enter the legacy sabotage lottery.");
             }
