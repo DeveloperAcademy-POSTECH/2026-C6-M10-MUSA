@@ -138,6 +138,7 @@ Inspector의 `Completed Gourd Viewer Enabled`와 `LabConfig.CompletedGourdViewer
 | V-40 | #244 콤보 동안 박 속 요괴: 예고 시작에 올라와 콤보 끝까지 머묾(두리번 반복), 칸 명중마다 움찔(마지막 칸 포함), 끝나면 그 자리에서 정방향 재생으로 들어가 평소 6초 반복 복귀, 평소 반복 어느 시점에서 시작해도 높이/뚜껑/눈 이음새 없음(내려가는 중이면 되감기), Host 스냅샷 기준 출입, 일시정지 중 정지, Paint 모드만, 설정/프로토콜 변경 없음 | PlayMode(`LabGourdYokaiTests`, `LabGourdPaintTests`)/저장 Scene 솔로/세 실행본 | [검증 기록](VALIDATION.md) |
 | V-41 | #236/PR #248 북 AUTO: 기본 Drum Count=0·DEV AUTO/1~5 선택, 솔로·2~3인1개/4~5인2개를 Host가 판 시작 때 배치, 고정 개수 유지·인원 이하 서로 다른 소유자·북 전달 뒤 생성·Retry 재배치 | Model/Config EditMode·DEV PlayMode와 실제 앱 실행을 구분 | 현재165개/5651 통합본은 새 검증 대기. #248 당시170개/5650 자동 검사 결과와 구분. [검증 기록](VALIDATION.md) |
 | V-43 | #254 조합판 결합 구슬 꼬리: 던진 구슬과 같은 오행 꼬리를 판 크기 비율(× 0.6)로, 화면 이동 속도에 따라 0~0.55 진하기(멈추면 없음), 음양·아이템·북 제외, 오행 변경 시 다시 그림, 공유 원본 불변, DEV `Board Orb Trail`(166번째, 기본 ON, 코드·asset), 설정 166개/프로토콜 5652, 물리·판정·통신 변경 없음 | EditMode(`LabDeveloperConfigTests`)/PlayMode(`LabOrbBoardTrailTests`)/저장 Scene 솔로/세 실행본 | [검증 기록](VALIDATION.md) |
+| V-44 | #257 콤보 SMALL/BIG 표시와 시간 기본값: 이 기기 플레이어의 SMALL/BIG 동안 조합판 음양·결합 구슬 그림 0.6배/1.4배(부드럽게, 연출 위에 곱함, 물리·통신 불변, 꼬리·소멸 번쩍임 따라감), SMALL 배지에서 남은 초 제거(게이지만), BIG 배지 대신 결과 문구 뒤부터 별이 쏟아지고 남은 시간만큼 줄어듦(조합판 위쪽까지, 터치 통과), 콤보 간격 15 → 40초·제한 10 → 15초(코드·asset), 설정/프로토콜 변경 없음 | EditMode(`LabDeveloperConfigTests`, `LabGourdComboTests`)/PlayMode(`LabComboEffectLookTests`)/저장 Scene 솔로/세 실행본 | [검증 기록](VALIDATION.md) |
 
 검증에 필요한 자료는 이 새 코드와 관련 검사에 한정한다. 과거 프로토타입의 통과 기록은 새 Unity 버전 또는 새 코드의 통과 증거로 승계하지 않는다.
 
