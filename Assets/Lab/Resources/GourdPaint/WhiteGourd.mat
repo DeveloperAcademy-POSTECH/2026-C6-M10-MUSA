@@ -15,17 +15,45 @@ Material:
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
+  m_DoubleSidedGI: 1
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs: []
+    m_TexEnvs:
+    - _PaintMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _PainterMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _PaperTex:
+        m_Texture: {fileID: 2800000, guid: 35b15acfe93d492ba7bc02f831ec670d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
-    m_Floats: []
+    m_Floats:
+    - _PaintGrainEnabled: 0
+    - _PaintGrainSize: 1
+    - _PaintGrainStrength: 0.3
+    - _PaintMapReady: 0
+    - _PaintMottleStrength: 0.18
+    - _PaperBrightness: 1.12
+    - _PaperBump: 0.004
+    - _PaperContrast: 1.15
+    - _PaperLightContrast: 0.78
+    - _PaperRotation: 0.06
+    - _PaperSaturation: 0.85
+    - _PaperScale: 0.85
+    - _PaperSmoothness: 0.015
+    - _PaperUnderPaint: 0.3
+    - _PlayerPaintPatternsEnabled: 1
     m_Colors:
-    - _BaseColor: {r: 0.96, g: 0.94, b: 0.86, a: 1}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _PaperLightDirection: {r: -0.65, g: 0.8, b: 0.6, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
