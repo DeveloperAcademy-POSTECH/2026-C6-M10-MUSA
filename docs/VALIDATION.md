@@ -1546,3 +1546,19 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 | 솔로 화면: 17초쯤 요괴가 올라와 콤보 끝까지 머묾, 칸 명중 시 움찔, 끝나면 들어감 | NOT_RUN | 기본값으로 솔로 시작 후 확인한다. |
 | 3인 실행: 모든 화면에서 같은 때 나오고 들어감 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
 | iOS 실기기 | NOT_RUN | |
+
+## 박 폭탄 때 요괴가 톡 튀어나오기 — 2026-10-21, 이슈 #250
+
+기준은 `feat/#244-combo-yokai`(`5d2f2384`)에서 분기한 `feat/#250-bomb-yokai`다. Unity는 실행하지 않았다.
+
+- **신호**: 박이 폭탄을 떨어뜨리면 Host가 모든 참가자에게 보내는 기존 `LabNetwork.GourdBombDropped`(박 옆 "!" 말풍선과 같은 신호)를 `LabGourdYokai.Bind`가 듣는다. 새 패킷이나 스냅샷 필드는 없다.
+- **동작**: 신호가 오면 `bombShowSeconds`(1.4초, 말풍선 `LabGourdAlert.showSeconds`와 같게) 동안 요괴를 붙잡는다. 콤보 구간이 아니면 올라오기/되감기를 `bombRiseSpeed`(3배)로 빠르게 해 닫힌 상태에서도 약 0.4초에 다 올라오고, 다 올라온 순간 0.3초 동안 커지며(최대 약 22%) 위로 튀었다 돌아온다. 콤보 중이면 이미 나와 있으므로 바로 튀고, 콤보와 폭탄 시간이 둘 다 끝나야 들어간다. 남은 시간은 전투 중 프레임 시간으로만 줄어 일시정지 중에는 멈추고, 전투가 아니면 바로 0이 된다.
+- **범위**: DEV 설정·프로토콜·프리팹·애니메이션 파일 변경 없음. 넘기기 막기(#215)와 평소 6초 반복은 그대로다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. |
+| PlayMode 실제 실행 | NOT_RUN | `LabGourdYokaiTests` 새 3개(`ABombDropBringsTheYokaiOutQuicklyWithAPopForAsLongAsTheBubble`, `ABombDuringAComboOnlyPopsAndBothMustEndBeforeItGoesIn`, `TheNetworksGourdBombSignalReachesTheYokaiAndPausesHoldIt`)와 #244 기존 4개. |
+| 솔로 화면: 박 폭탄(20~30초) 때 요괴가 쏙 나와 톡 튀고 말풍선과 함께 들어감, 콤보 중 폭탄 | NOT_RUN | 기본값으로 솔로 시작 후 확인한다. |
+| 3인 실행: 모든 화면에서 같이 나옴 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | |
