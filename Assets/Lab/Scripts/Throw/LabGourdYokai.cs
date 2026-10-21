@@ -114,8 +114,10 @@ namespace C6Lab
             if (snapshot.comboCount != seenComboCount)
             {
                 seenComboCount = snapshot.comboCount;
-                seenProgress = snapshot.comboProgress;
-                return;
+                // A coalesced snapshot may already include the first hit of this combo.
+                // Compare it with a fresh combo's zero progress, while the window/holding
+                // check below keeps an old completed combo from replaying on late arrival.
+                seenProgress = 0;
             }
             // 칸을 맞혀 진행이 늘면 움찔. 마지막 칸(성공)은 콤보가 끝나도 움찔한 뒤 들어간다.
             if (snapshot.comboProgress > seenProgress && (want || holding)) flinchElapsed = 0f;
@@ -208,6 +210,10 @@ namespace C6Lab
         private void ApplyFlinch(float deltaTime)
         {
             if (flinchElapsed < 0f) return;
+            // Held poses were sampled by Advance. After Release, sample the ordinary
+            // animation's current pose too: a paused Animation does not overwrite the
+            // previous frame's hop, so adding to that transform would otherwise drift.
+            if (!holding) clipPlayer.Sample();
             flinchElapsed += deltaTime;
             float u = flinchElapsed / FlinchSeconds;
             if (u >= 1f)
@@ -219,7 +225,7 @@ namespace C6Lab
             // 먼저 움츠러들었다가(작아짐) 톡 튀어나오며 원래 크기로. 위로 살짝 들썩인다.
             float wave = Mathf.Sin(u * Mathf.PI * 2f) * (1f - u);
             yokai.localScale = yokaiScale * (1f - FlinchSquash * wave);
-            // 위치는 애니메이션이 매 프레임 다시 쓰므로 더하기만 해도 쌓이지 않는다.
+            // Every frame adds the hop to the sampled animation pose, including paused frames.
             yokai.localPosition += new Vector3(0f, 0f, FlinchHop * Mathf.Sin(u * Mathf.PI));
         }
 
@@ -238,6 +244,7 @@ namespace C6Lab
         {
             if (!ready) return;
             if (holding) Release();
+            if (flinchElapsed >= 0f) clipPlayer.Sample();
             flinchElapsed = -1f;
             if (yokai != null) yokai.localScale = yokaiScale;
         }
