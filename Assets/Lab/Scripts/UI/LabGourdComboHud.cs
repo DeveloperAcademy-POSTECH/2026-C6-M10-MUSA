@@ -29,7 +29,7 @@ namespace C6Lab
         public const string WarningText = "COMBO!";
         /// <summary>야광귀 셈법 (#271): 야광귀는 넷까지만 센다. 넷 다음은 다시 하나.</summary>
         public static readonly string[] CountWords = { "하나", "둘", "셋", "넷" };
-        /// <summary>n번째(1부터) 수를 야광귀식으로. 넷을 넘으면 처음부터 다시 센다.</summary>
+        /// <summary>수 n(1부터)을 야광귀식으로. 넷을 넘으면 넷까지밖에 몰라 다시 하나·둘…로 돈다(예고에서는 넷 → 하나로 거꾸로 센다).</summary>
         public static string CountWord(int n) => CountWords[(Mathf.Max(1, n) - 1) % CountWords.Length];
 
         private const int TextureSize = 96;
@@ -173,9 +173,7 @@ namespace C6Lab
             int count = Mathf.Max(1, Mathf.CeilToInt((float)(snapshot.comboNextAt - serverNow)));
             if (yaguang != warningYaguang) shownWarningCount = -1;
             warningYaguang = yaguang;
-            // 말풍선은 거꾸로 못 세고 하나·둘·셋·넷으로 앞으로 센다(넷 다음은 다시 하나).
-            int total = Mathf.Max(1, Mathf.RoundToInt((float)(snapshot.comboNextAt - snapshot.comboWarningAt)));
-            int step = Mathf.Clamp(total - count + 1, 1, total);
+            // 말풍선은 남은 초를 야광귀식으로 넷 → 셋 → 둘 → 하나 센다(넷까지밖에 몰라서 더 길면 다시 넷부터).
             if (count != shownWarningCount)
             {
                 shownWarningCount = count;
@@ -187,7 +185,7 @@ namespace C6Lab
                     LabGourdAlert alert = GetComponent<LabGourdAlert>();
                     // 말풍선 하나가 4칸이 나올 때까지 떠 있고 글자만 바뀐다.
                     if (alert != null)
-                        alert.ShowWord(network.target, CountWord(step) + "!", Mathf.Max(.3f, (float)(snapshot.comboNextAt - serverNow)));
+                        alert.ShowWord(network.target, CountWord(count) + "!", Mathf.Max(.3f, (float)(snapshot.comboNextAt - serverNow)));
                 }
             }
             if (yaguang) return;
@@ -264,8 +262,8 @@ namespace C6Lab
             int kind = LocalEffect(snapshot, serverNow, out double until);
             double totalTime = until - snapshot.comboResultAt;
             float remaining = kind != 0 && totalTime > 0d ? Mathf.Clamp01((float)((until - serverNow) / totalTime)) : 0f;
-            // 보상은 배지 대신 별로 보여준다. 결과 문구가 끝난 뒤부터.
-            DrawStars(kind > 0 && resultElapsed < 0f, remaining);
+            // 보상은 배지 대신 부적 비로 보여준다. CLEAR!가 뜨는 순간부터 바로 쏟아진다 (#271).
+            DrawStars(kind > 0, remaining);
             // 결과 문구나 다음 콤보 예고(#241)가 떠 있는 동안에는 숨겨 두었다가, 끝나면 톡 튀어나온다.
             if (kind >= 0 || resultElapsed >= 0f || warningActive)
             {

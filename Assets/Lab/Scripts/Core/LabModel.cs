@@ -194,7 +194,7 @@ namespace C6Lab
         private bool flashWarned;
         // 야광귀 모드의 이벤트 차례 (#271): 콤보 예고가 실제로 시작됐는지, 다른 이벤트 때문에 미뤘는지
         private bool comboWarned, comboHeld, comboWasHeld;
-        private bool gourdBombWasHeld, swipeBlockWasHeld, sabotageWasHeld;
+        private bool gourdBombWasHeld, swipeBlockWasHeld;
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -314,7 +314,7 @@ namespace C6Lab
             flashWasHeld = false;
             flashWarned = false;
             comboWarned = comboHeld = comboWasHeld = false;
-            gourdBombWasHeld = swipeBlockWasHeld = sabotageWasHeld = false;
+            gourdBombWasHeld = swipeBlockWasHeld = false;
             nextFlashAt = rules.FlashEnabled ? now + rules.FlashFirstStartSeconds : double.PositiveInfinity;
             nextFlashTarget = DrawFlashTarget(0u);
             lastTime = now;
@@ -635,7 +635,7 @@ namespace C6Lab
                     // 야광귀 모드 (#271): 다른 이벤트(폭탄·넘기기 막기·섬광·방해공작)가 열려 있으면 예고를 시작하지 않고,
                     // 그것이 닫히면 예고부터 처음 다시 보여준다.
                     if (nextComboAt - rules.ComboWarningSeconds > until) return;
-                    if (EventOpenBesides(LabYaguangEvent.Combo, until))
+                    if (AnyScreenOpen(LabYaguangEvent.Combo, until))
                     {
                         comboHeld = comboWasHeld = true;
                         nextComboAt = Math.Max(nextComboAt, until + rules.ComboWarningSeconds);
@@ -691,6 +691,7 @@ namespace C6Lab
                         flashWasHeld = false;
                         nextFlashAt = Math.Max(nextFlashAt, until + rules.FlashWarningSeconds);
                     }
+                    SettleFlashTarget(until);
                     flashWarned = true;
                 }
                 if (nextFlashAt > until) return; // 예고 중
@@ -707,22 +708,26 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 콤보 한 판이 섬광을 막는지 (#271): 콤보가 진행 중이거나, 예고 중이거나, 누군가 그 결과인 페널티(SMALL)나
-        /// 보상(BIG) 효과를 받고 있거나, 지금 섬광을 시작하면 끝나기(예고 + 눈부심 + 회복) 전에 다음 콤보 예고가 시작될 때.
+        /// 콤보 한 판이 섬광을 막는지 (#271): 콤보가 진행 중이거나 예고 중이거나, 지금 섬광을 시작하면 끝나기
+        /// (예고 + 눈부심 + 회복) 전에 다음 콤보 예고가 시작될 때. 콤보 뒤 페널티/보상은 받은 사람 화면에서 막는다.
         /// </summary>
         private bool ComboHoldsFlash(double at)
         {
             if (!rules.ComboEnabled) return false;
-            if (combo.Active) return true;
-            if (players.Values.Any(player => player.comboPenaltyUntil > at || player.comboRewardUntil > at)) return true;
+            if (combo.Active || comboWarned) return true;
+            // 페널티/보상 효과는 받은 사람 화면만 막는다(ScreenOpen). 섬광이 모두(ALL)면 그중 한 화면만 있어도 막힌다.
             if (!ComboWaiting) return false;
             double comboWarningAt = nextComboAt - rules.ComboWarningSeconds;
             double flashEndsAt = at + rules.FlashWarningSeconds + rules.FlashGlareSeconds + rules.FlashRecoverySeconds;
             return at >= comboWarningAt || flashEndsAt > comboWarningAt;
         }
 
-        /// <summary>섬광 예고를 지금 시작하면 안 되는지: 콤보 한 판(직전 포함)이나 다른 이벤트가 열려 있을 때 (#271).</summary>
-        private bool FlashBlocked(double at) => ComboHoldsFlash(at) || EventOpenBesides(LabYaguangEvent.Flash, at);
+        /// <summary>
+        /// 섬광 예고를 지금 시작하면 안 되는지 (#271): 콤보 한 판(직전 포함) 중이거나, 맞을 화면에 다른 이벤트가 열려 있을 때.
+        /// 모두(ALL)면 한 화면이라도 열려 있으면 막히고, 한 명(ONE)이면 비어 있는 화면이 하나도 없을 때만 막힌다.
+        /// </summary>
+        private bool FlashBlocked(double at) => ComboHoldsFlash(at)
+            || (ExclusiveEvents && (rules.FlashTargetOne ? FreeFlashTargets(at).Count == 0 : AnyScreenOpen(LabYaguangEvent.Flash, at)));
 
         // 미룰 섬광은 예고 시각도 알리지 않는다(#271): 지금 막혀 있거나, 예정된 예고 시작 시각에 지금 상태 그대로라면
         // 미뤄질 섬광이면 -1을 보내, 어느 기기에서도 요괴·눈 말풍선이 미리 나오지 않게 한다. 이미 시작한 예고는 그대로 알린다.
@@ -730,36 +735,94 @@ namespace C6Lab
             && (flashWarned || (!FlashBlocked(lastTime)
                 && !FlashBlocked(Math.Max(lastTime, nextFlashAt - rules.FlashWarningSeconds))));
 
-        /// <summary>야광귀 모드 (#271): 콤보나 섬광이 켜져 있으면 폭탄·넘기기 막기·섬광·콤보·방해공작이 한 번에 하나만 열린다.</summary>
+        /// <summary>
+        /// 야광귀 모드 (#271): 콤보나 섬광이 켜져 있으면 <b>각자의 화면에서</b> 이벤트가 한 번에 하나만 열린다.
+        /// 박 폭탄·넘기기 막기·섬광·콤보·방해공작(여우불·매혹)이 그 화면에 열려 있으면 그 화면에 새 이벤트를 걸지 않는다.
+        /// </summary>
         private bool ExclusiveEvents => rules != null && (rules.ComboEnabled || rules.FlashEnabled);
 
-        /// <summary>박이 떨어뜨린 폭탄이 아직 누군가의 판에 있는지 (터지거나 쓰여 없어질 때까지 열린 이벤트)</summary>
-        private bool GourdBombOpen => orbs.Values.Any(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd);
-
-        /// <summary>콤보 한 판이 열려 있는지: 예고가 시작됐거나, 진행 중이거나, 그 결과인 페널티/보상 효과가 남아 있을 때</summary>
-        private bool ComboOpen(double at) => rules.ComboEnabled && (comboWarned || combo.Active
-            || players.Values.Any(player => player.comboPenaltyUntil > at || player.comboRewardUntil > at));
-
-        /// <summary>섬광이 열려 있는지: 예고가 시작됐거나, 번쩍인 뒤 눈부심·회복이 끝나지 않았을 때</summary>
-        private bool FlashOpen(double at) => rules.FlashEnabled && (flashWarned
-            || (flashCount > 0 && at < lastFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds));
-
-        /// <summary>방해공작 묶음(#251)의 여우불·매혹이 열려 있는지</summary>
-        private bool SabotageOpen(double at) => CharmOn(at) || orbs.Values.Any(orb => orb.kind == LabOrbKind.FoxFire);
-
         /// <summary>
-        /// 야광귀 모드에서, 이 이벤트 말고 다른 이벤트가 지금 열려 있는지 (#271). 열려 있으면 이 이벤트는 시작하지 않고
-        /// 기다린다. 시각을 미리 계산해 비켜 가는 것이 아니라, 매 순간 무엇이 열려 있는지를 보고 막는다.
-        /// 같은 종류끼리: 폭탄은 앞 폭탄이 남아 있으면, 넘기기 막기는 앞 막기가 끝나지 않았으면 기다린다.
+        /// 이 사람 화면에 지금 열린 이벤트가 있는지 (#271). 시각을 미리 계산하는 것이 아니라 지금 상태를 본다.
+        /// self 종류의 열림은 빼고 보되, 박 폭탄과 넘기기 막기는 같은 종류도 본다(한 화면에 폭탄 하나, 막기는 한 번에 하나).
+        /// - 콤보: 예고가 시작됐거나 진행 중이면 모든 화면, 그 뒤 페널티/보상 효과는 받은 사람 화면
+        /// - 섬광: 예고 ~ 회복 동안 맞을 사람 화면(모두면 모든 화면)
+        /// - 박 폭탄: 그 폭탄을 지금 가진 사람 화면(터지거나 쓰여 없어질 때까지)
+        /// - 넘기기 막기 · 매혹 · 여우구슬: 걸린 사람 화면
         /// </summary>
-        private bool EventOpenBesides(LabYaguangEvent self, double at)
+        private bool ScreenOpen(ulong player, double at, LabYaguangEvent self)
         {
             if (!ExclusiveEvents) return false;
-            return (self != LabYaguangEvent.Combo && ComboOpen(at))
-                || (self != LabYaguangEvent.Flash && FlashOpen(at))
-                || GourdBombOpen
-                || BlockOn(at)
-                || (self != LabYaguangEvent.Sabotage && SabotageOpen(at));
+            if (self != LabYaguangEvent.Combo && rules.ComboEnabled)
+            {
+                if (comboWarned || combo.Active) return true;
+                if (players.TryGetValue(player, out LabPlayerState state)
+                    && (state.comboPenaltyUntil > at || state.comboRewardUntil > at)) return true;
+            }
+            if (self != LabYaguangEvent.Flash && FlashOpenOn(player, at)) return true;
+            if (BlockOn(at) && swipeBlockedPlayer == player) return true;
+            if (self != LabYaguangEvent.Sabotage && CharmOn(at) && charmedPlayer == player) return true;
+            foreach (LabOrbState orb in orbs.Values)
+            {
+                if (orb.owner != player) continue;
+                if (orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd) return true;
+                if (self != LabYaguangEvent.Sabotage && orb.kind == LabOrbKind.FoxFire) return true;
+            }
+            return false;
+        }
+
+        /// <summary>이 사람이 지금 섬광(예고 ~ 회복) 중인지</summary>
+        private bool FlashOpenOn(ulong player, double at)
+        {
+            if (!rules.FlashEnabled) return false;
+            ulong target;
+            if (flashWarned) target = nextFlashTarget;
+            else if (flashCount > 0 && at < lastFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds) target = lastFlashTarget;
+            else return false;
+            return target == 0 || target == player;
+        }
+
+        private bool AnyScreenOpen(LabYaguangEvent self, double at)
+        {
+            for (int i = 0; i < activeSeatCount; i++)
+                if (ScreenOpen(seats[i], at, self)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// 뽑힌 사람 화면이 비어 있으면 그 사람, 아니면 비어 있는 화면들 중에서 같은 뽑기 값으로 다시 고른다 (#271).
+        /// 비어 있는 화면이 없으면 found가 false다. 모든 기기가 같은 결과를 받는다.
+        /// </summary>
+        private ulong FreeTarget(ulong drawn, ulong draw, LabYaguangEvent self, double at, out bool found)
+        {
+            found = true;
+            if (!ScreenOpen(drawn, at, self)) return drawn;
+            var free = new List<ulong>();
+            for (int i = 0; i < activeSeatCount; i++)
+                if (!ScreenOpen(seats[i], at, self)) free.Add(seats[i]);
+            found = free.Count > 0;
+            return found ? free[(int)(draw % (ulong)free.Count)] : 0;
+        }
+
+        /// <summary>한 명(ONE) 섬광을 받을 수 있는 화면: 바로 앞에 맞은 사람(두 명 이상일 때)과 이벤트 중인 화면을 뺀다.</summary>
+        private List<ulong> FreeFlashTargets(double at)
+        {
+            var free = new List<ulong>();
+            for (int i = 0; i < activeSeatCount; i++)
+            {
+                ulong player = seats[i];
+                if (activeSeatCount > 1 && player == lastFlashTarget) continue;
+                if (!ScreenOpen(player, at, LabYaguangEvent.Flash)) free.Add(player);
+            }
+            return free;
+        }
+
+        /// <summary>한 명 섬광의 예고를 시작할 때, 미리 뽑아 둔 사람 화면이 이벤트 중이면 비어 있는 화면에서 다시 고른다.</summary>
+        private void SettleFlashTarget(double at)
+        {
+            if (!rules.FlashTargetOne || !ExclusiveEvents || !ScreenOpen(nextFlashTarget, at, LabYaguangEvent.Flash)) return;
+            List<ulong> free = FreeFlashTargets(at);
+            if (free.Count == 0) return;
+            nextFlashTarget = free[(int)(DrawFor(seed ^ FlashTargetSalt, FlashDrawKey, flashCount + 0x10000u) % (ulong)free.Count)];
         }
 
         /// <summary>
@@ -780,7 +843,7 @@ namespace C6Lab
 
         // 다른 이벤트 때문에 미룰 콤보 예고는 알리지 않는다 (#271). 이미 시작한 예고는 그대로 알린다.
         private bool ComboAnnounced => ComboWaiting && !comboHeld
-            && (comboWarned || !EventOpenBesides(LabYaguangEvent.Combo, lastTime));
+            && (comboWarned || !AnyScreenOpen(LabYaguangEvent.Combo, lastTime));
 
         /// <summary>
         /// 콤보가 끝난 뒤 처리. 성공은 팀 전체에 보상을 주고, 실패는 페널티를 건다.
@@ -1131,16 +1194,18 @@ namespace C6Lab
             while (nextGourdBombAt <= until)
             {
                 double at = nextGourdBombAt;
-                // 야광귀 모드 (#271): 다른 이벤트가 열려 있으면 떨어뜨리지 않고 기다렸다가, 닫힌 순간 떨어뜨린다.
-                if (EventOpenBesides(LabYaguangEvent.GourdBomb, until))
+                ulong draw = DrawFor(seed ^ GourdTargetSalt, GourdDrawKey, gourdBombCount);
+                // 야광귀 모드 (#271): 뽑힌 사람 화면에 다른 이벤트가 열려 있으면 비어 있는 화면에 떨어뜨리고,
+                // 비어 있는 화면이 없으면 기다렸다가 생기는 순간 떨어뜨린다.
+                ulong target = FreeTarget(seats[(int)(draw % (ulong)activeSeatCount)], draw, LabYaguangEvent.GourdBomb, until, out bool found);
+                if (!found)
                 {
                     gourdBombWasHeld = true;
                     nextGourdBombAt = until;
                     return;
                 }
                 if (gourdBombWasHeld) { gourdBombWasHeld = false; at = until; }
-                DropGourdBomb(seats[(int)(DrawFor(seed ^ GourdTargetSalt, GourdDrawKey, gourdBombCount)
-                    % (ulong)activeSeatCount)], at);
+                DropGourdBomb(target, at);
                 nextGourdBombAt = at + GourdBombDelay(gourdBombCount);
             }
         }
@@ -1224,8 +1289,10 @@ namespace C6Lab
             while (nextSwipeBlockAt <= until)
             {
                 double at = nextSwipeBlockAt;
-                // 야광귀 모드 (#271): 다른 이벤트가 열려 있으면 막기를 걸지 않고 기다렸다가, 닫힌 순간 건다.
-                if (EventOpenBesides(LabYaguangEvent.SwipeBlock, until))
+                ulong draw = DrawFor(seed ^ SwipeBlockTargetSalt, SwipeBlockDrawKey, swipeBlockCount);
+                // 야광귀 모드 (#271): 뽑힌 사람 화면이 이벤트 중이면 비어 있는 화면에 걸고, 없으면 생길 때까지 기다린다.
+                ulong target = FreeTarget(seats[(int)(draw % (ulong)activeSeatCount)], draw, LabYaguangEvent.SwipeBlock, until, out bool found);
+                if (!found)
                 {
                     swipeBlockWasHeld = true;
                     nextSwipeBlockAt = until;
@@ -1238,8 +1305,7 @@ namespace C6Lab
                     nextSwipeBlockAt = clear;
                     continue;
                 }
-                StartSwipeBlock(seats[(int)(DrawFor(seed ^ SwipeBlockTargetSalt, SwipeBlockDrawKey, swipeBlockCount)
-                    % (ulong)activeSeatCount)], at);
+                StartSwipeBlock(target, at);
                 nextSwipeBlockAt = Math.Max(at + rules.SwipeBlockInterval, swipeBlockedUntil);
             }
         }
@@ -1300,14 +1366,6 @@ namespace C6Lab
             while (nextSabotageAt <= until)
             {
                 double at = nextSabotageAt;
-                // 야광귀 모드 (#271): 다른 이벤트가 열려 있으면 이번 차례를 미뤘다가, 닫힌 순간 건다.
-                if (EventOpenBesides(LabYaguangEvent.Sabotage, until))
-                {
-                    sabotageWasHeld = true;
-                    nextSabotageAt = until;
-                    return;
-                }
-                if (sabotageWasHeld) { sabotageWasHeld = false; at = until; }
                 uint index = sabotageCount++;
                 nextSabotageAt = at + SabotageDelay(sabotageCount);
                 if (!TryDrawSabotage(at, index, out LabSabotageKind kind, out ulong target)) continue;
@@ -1362,6 +1420,8 @@ namespace C6Lab
                 if (blocking && player == swipeBlockedPlayer) continue;
                 if (charming && player == charmedPlayer) continue;
                 if (kind == LabSabotageKind.FoxFire && CountStored(player, at) >= rules.OrbStorageLimit) continue;
+                // 야광귀 모드 (#271): 다른 이벤트가 열려 있는 화면에는 걸지 않는다.
+                if (ScreenOpen(player, at, LabYaguangEvent.Sabotage)) continue;
                 targets.Add(player);
             }
             return targets;

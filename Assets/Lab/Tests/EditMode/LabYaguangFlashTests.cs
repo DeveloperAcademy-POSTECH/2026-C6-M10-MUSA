@@ -211,16 +211,16 @@ namespace C6Lab.Tests
         public void AFlashWaitsWhileTheGourdsBombIsStillOnABoard()
         {
             var model = new LabModel();
-            // The bomb drops at 10 s and blasts at the end of its 15 s fuse (25 s). The flash is due at 20 s.
-            model.Begin("bomb-then-flash", Three, 0d, Config(flash: true, first: 20f, bombEvery: 10f));
-            Assert.That(GourdBombs(model.Snapshot(10d)), Is.EqualTo(1));
-            LabSnapshot held = model.Snapshot(18.6d);
-            Assert.That(held.flashAt, Is.EqualTo(-1d), "No eyes while the bomb is out.");
-            Assert.That(model.Snapshot(24.9d).flashCount, Is.Zero);
-            model.Snapshot(25d);
-            LabSnapshot after = model.Snapshot(26d);
+            // The bomb drops at 30 s and blasts at the end of its 15 s fuse (45 s). The everyone-flash is due at 40 s.
+            model.Begin("bomb-then-flash", Three, 0d, Config(flash: true, first: 40f, bombEvery: 30f));
+            Assert.That(GourdBombs(model.Snapshot(30d)), Is.EqualTo(1));
+            LabSnapshot held = model.Snapshot(38.6d);
+            Assert.That(held.flashAt, Is.EqualTo(-1d), "No eyes while the bomb is out on one of the screens.");
+            Assert.That(model.Snapshot(44.9d).flashCount, Is.Zero);
+            model.Snapshot(45d);
+            LabSnapshot after = model.Snapshot(46d);
             Assert.That(GourdBombs(after), Is.Zero);
-            Assert.That(new[] { after.flashWarningAt, after.flashAt }, Is.EqualTo(new[] { 26d, 27.5d }),
+            Assert.That(new[] { after.flashWarningAt, after.flashAt }, Is.EqualTo(new[] { 46d, 47.5d }),
                 "Once the bomb is gone, the full warning, then the flash.");
         }
 
@@ -228,16 +228,49 @@ namespace C6Lab.Tests
         public void AComboWaitsWhileTheGourdsBombIsStillOnABoard()
         {
             var model = new LabModel();
-            // The bomb drops at 10 s and is gone at 25 s. The combo's warning is due at 17 s.
-            model.Begin("bomb-then-combo", Three, 0d, Config(combo: true, bombEvery: 10f));
-            Assert.That(model.Snapshot(10d).comboNextAt, Is.EqualTo(-1d), "Not announced while the bomb is out.");
-            LabSnapshot held = model.Snapshot(20d);
+            // The bomb drops at 20 s and is gone at 35 s. The combo (on every screen) is due to warn at 27 s.
+            model.Begin("bomb-then-combo", Three, 0d, Config(combo: true, bombEvery: 20f));
+            Assert.That(model.Snapshot(20d).comboNextAt, Is.EqualTo(-1d), "Not announced while the bomb is out.");
+            LabSnapshot held = model.Snapshot(30d);
             Assert.That(held.comboActive, Is.False, "No combo over the bomb (#271).");
-            Assert.That(held.ComboWarningOn(20d), Is.False);
-            model.Snapshot(25d);
-            LabSnapshot warned = model.Snapshot(25.5d);
-            Assert.That(new[] { warned.comboWarningAt, warned.comboNextAt }, Is.EqualTo(new[] { 25.5d, 28.5d }));
-            Assert.That(model.Snapshot(28.5d).comboActive, Is.True);
+            Assert.That(held.ComboWarningOn(30d), Is.False);
+            model.Snapshot(35d);
+            LabSnapshot warned = model.Snapshot(35.5d);
+            Assert.That(new[] { warned.comboWarningAt, warned.comboNextAt }, Is.EqualTo(new[] { 35.5d, 38.5d }));
+            Assert.That(model.Snapshot(38.5d).comboActive, Is.True);
+        }
+
+        [Test]
+        public void EachScreenHoldsOneEventSoASecondBombGoesToAFreeScreen()
+        {
+            var model = new LabModel();
+            // Bombs every 5 s with a 15 s fuse: the first is still out when the second comes (#271, one event per screen).
+            model.Begin("bomb-per-screen", Three, 0d, Config(flash: true, first: 90f, bombEvery: 5f));
+            Assert.That(GourdBombs(model.Snapshot(5d)), Is.EqualTo(1));
+            LabSnapshot two = model.Snapshot(10d);
+            LabOrbState[] bombs = two.orbs.Where(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd).ToArray();
+            Assert.That(bombs.Length, Is.EqualTo(2), "Another screen is free, so the second bomb still drops.");
+            Assert.That(bombs[0].owner, Is.Not.EqualTo(bombs[1].owner), "Never two bombs on one screen.");
+            Assert.That(GourdBombs(model.Snapshot(15d)), Is.EqualTo(3));
+            // At 20 s every screen still has a bomb when the fourth is due, so it waits; the first then blasts.
+            Assert.That(GourdBombs(model.Snapshot(20d)), Is.EqualTo(2), "The fourth waited; the first one is gone.");
+            LabSnapshot freed = model.Snapshot(20.1d);
+            Assert.That(GourdBombs(freed), Is.EqualTo(3), "It drops as soon as a screen is free.");
+            Assert.That(freed.orbs.Where(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd)
+                .Max(orb => orb.createdAt), Is.EqualTo(20.1d));
+        }
+
+        [Test]
+        public void AOnePlayerFlashPicksAScreenWithoutAnEvent()
+        {
+            var model = new LabModel();
+            // A bomb sits on one screen from 10 s to 25 s; a one-player flash warns from 13.5 s.
+            model.Begin("one-flash-free-screen", Three, 0d, Config(flash: true, one: true, first: 15f, bombEvery: 10f));
+            ulong holder = model.Snapshot(10d).orbs.Single(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd).owner;
+            LabSnapshot warned = model.Snapshot(13.6d);
+            Assert.That(warned.FlashWarningOn(13.6d), Is.True, "Other screens are free, so the flash goes ahead.");
+            Assert.That(warned.flashTarget, Is.Not.EqualTo(holder), "Not on the screen that has the bomb.");
+            Assert.That(model.Snapshot(15d).flashLastTarget, Is.EqualTo(warned.flashTarget));
         }
 
         private static int GourdBombs(LabSnapshot snapshot) =>

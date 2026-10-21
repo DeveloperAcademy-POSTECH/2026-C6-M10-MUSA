@@ -2112,3 +2112,15 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. `LabModel`은 원본과 같은 mcs 한계 오류만 남는다. |
 | EditMode 실제 실행 | NOT_RUN | 새 `ABombDueDuringAFlashWaitsUntilTheFlashIsOver`, `AFlashWaitsWhileTheGourdsBombIsStillOnABoard`, `AComboWaitsWhileTheGourdsBombIsStillOnABoard`, 기존 콤보·섬광·폭탄·넘기기 막기 전체. |
 | 에디터 확인 | 부분 (Jess) | 눈 말풍선 중 폭탄이 나와 눈이 사라진 것을 봄(이번에 고침). 수정 뒤 화면은 아직. |
+
+### #271 피드백 반영: 화면별 한 이벤트, 넷→하나 세기, CLEAR!와 동시에 부적
+
+- **화면별 한 이벤트**: "한 번에 한 이벤트"는 판 전체가 아니라 **각자의 화면** 기준이었다. 그래서 막는 단위를 화면으로 바꿨다(`LabModel.ScreenOpen`). 폭탄은 가진 사람 화면, 넘기기 막기·매혹·여우구슬은 걸린 사람 화면, 섬광은 맞을 사람 화면(모두면 전부), 콤보는 예고·4칸 동안 모든 화면이고 효과는 받은 사람 화면만 열린 상태다. 폭탄·넘기기 막기·한 명 섬광·방해공작은 뽑힌 화면이 이벤트 중이면 비어 있는 화면에서 같은 뽑기 값으로 다시 고르고(`FreeTarget`, `SettleFlashTarget`), 없으면 기다린다. 콤보와 모두 섬광은 모든 화면이 비어야 시작한다. 그래서 한 사람 화면에 폭탄이 있어도 다른 사람에게는 폭탄이 떨어질 수 있다(한 화면에 두 개는 아님).
+- **셈**: 예고 말풍선이 남은 초를 `넷!` → `셋!` → `둘!` → `하나!`로 센다(넷까지밖에 몰라 예고가 4초보다 길면 다시 넷부터).
+- **부적**: `CLEAR!` 문구가 끝나길 기다리지 않고 성공하는 순간 바로 쏟아진다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. `LabModel`은 원본과 같은 mcs 한계 오류만 남는다. |
+| EditMode 실제 실행 | NOT_RUN | 새 `EachScreenHoldsOneEventSoASecondBombGoesToAFreeScreen`, `AOnePlayerFlashPicksAScreenWithoutAnEvent`, 시각을 옮긴 폭탄·섬광·콤보 대기 검사 3건, 기존 전체. |
+| 에디터·3인 확인 | NOT_RUN | 한 사람 화면에 폭탄이 있는 동안 다른 사람에게만 폭탄·막기가 가는지, 모두 섬광·콤보는 기다리는지. |
