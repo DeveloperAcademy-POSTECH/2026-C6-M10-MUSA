@@ -521,21 +521,29 @@ namespace C6Lab
             warningNumber.rectTransform.offsetMin = warningNumber.rectTransform.offsetMax = Vector2.zero;
             warningPanel.gameObject.SetActive(false);
 
-            // 페널티/보상 배지: 패널 아래 가장자리에 반쯤 걸친 알약 모양. 패널이 숨어도 같은 자리에 남는다.
+            // 페널티 배지: 패널 아래 가장자리에 반쯤 걸친 알약 모양. 패널이 숨어도 같은 자리에 남는다.
+            // 왼쪽은 공 아이콘 + SMALL, 오른쪽은 남은 시간 bar (#257: 숫자 대신 bar라 글자와 겹치지 않게 나눈다).
+            badgeHeight = 40f * u;
             effectBadge = NewRect("Combo Effect Badge", layer);
             effectBadge.anchorMin = effectBadge.anchorMax = panelAnchor;
-            effectBadge.sizeDelta = new Vector2(slotSize * 2.6f, badgeHeight);
+            effectBadge.sizeDelta = new Vector2(slotSize * 4.2f, badgeHeight);
             effectBadge.anchoredPosition = new Vector2(0f, -panel.sizeDelta.y * .5f);
             effectBack = effectBadge.gameObject.AddComponent<Image>();
             effectBack.sprite = PillSprite();
             effectBack.type = Image.Type.Sliced;
             effectBack.raycastTarget = false;
 
-            RectTransform gaugeArea = NewRect("Gauge Area", effectBadge);
-            gaugeArea.anchorMin = Vector2.zero;
+            // bar 홈: 배지 오른쪽 절반의 진한 알약. 그 안에서 테두리 있는 흰 bar가 오른쪽에서 왼쪽으로 줄어든다.
+            RectTransform gaugeArea = NewRect("Gauge Track", effectBadge);
+            gaugeArea.anchorMin = new Vector2(.5f, 0f);
             gaugeArea.anchorMax = Vector2.one;
-            gaugeArea.offsetMin = new Vector2(badgeHeight * .5f, badgeHeight * .22f);
-            gaugeArea.offsetMax = new Vector2(-badgeHeight * .5f, -badgeHeight * .22f);
+            gaugeArea.offsetMin = new Vector2(0f, badgeHeight * .26f);
+            gaugeArea.offsetMax = new Vector2(-badgeHeight * .42f, -badgeHeight * .26f);
+            Image track = gaugeArea.gameObject.AddComponent<Image>();
+            track.sprite = PillSprite();
+            track.type = Image.Type.Sliced;
+            track.color = new Color(.25f, .06f, .05f, .55f);
+            track.raycastTarget = false;
             effectGauge = NewRect("Gauge", gaugeArea);
             effectGauge.anchorMin = Vector2.zero;
             effectGauge.anchorMax = Vector2.one;
@@ -543,7 +551,7 @@ namespace C6Lab
             Image gauge = effectGauge.gameObject.AddComponent<Image>();
             gauge.sprite = PillSprite();
             gauge.type = Image.Type.Sliced;
-            gauge.color = new Color(1f, 1f, 1f, .28f);
+            gauge.color = Color.white;
             gauge.raycastTarget = false;
 
             effectIcon = NewRect("Ball Icon", effectBadge);
@@ -554,11 +562,11 @@ namespace C6Lab
             icon.sprite = DiscSprite();
             icon.raycastTarget = false;
 
-            effectText = NewText("Effect Time", effectBadge, Mathf.Max(10, Mathf.RoundToInt(20f * u)), TextAnchor.MiddleCenter);
+            effectText = NewText("Effect Label", effectBadge, Mathf.Max(10, Mathf.RoundToInt(20f * u)), TextAnchor.MiddleCenter);
             effectText.rectTransform.anchorMin = Vector2.zero;
-            effectText.rectTransform.anchorMax = Vector2.one;
+            effectText.rectTransform.anchorMax = new Vector2(.5f, 1f);
             effectText.rectTransform.offsetMin = new Vector2(badgeHeight * 1.05f, 0f);
-            effectText.rectTransform.offsetMax = new Vector2(-badgeHeight * .35f, 0f);
+            effectText.rectTransform.offsetMax = new Vector2(-badgeHeight * .12f, 0f);
             effectText.color = Color.white;
             Outline effectOutline = effectText.gameObject.AddComponent<Outline>();
             effectOutline.effectColor = new Color32(43, 36, 32, 160);
