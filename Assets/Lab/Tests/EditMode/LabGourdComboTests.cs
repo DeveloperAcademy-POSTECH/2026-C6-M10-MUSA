@@ -14,7 +14,9 @@ namespace C6Lab.Tests
 
         private readonly List<LabConfig> created = new List<LabConfig>();
         /// <summary>DEV 기본 페널티 배율 (Combo Penalty Size)</summary>
-        private const float PenaltyScale = .3f;
+        private const float PenaltyScale = .1f;
+        /// <summary>DEV 기본 보상 배율 (Combo Reward Size)</summary>
+        private const float RewardScale = 2.5f;
 
         [TearDown]
         public void TearDown()
@@ -98,6 +100,9 @@ namespace C6Lab.Tests
             Assert.That(snapshot.comboCount, Is.EqualTo(0u));
             Assert.That(snapshot.comboActive, Is.False);
             Assert.That(snapshot.comboColors, Is.Empty);
+            Assert.That(new[] { snapshot.comboNextAt, snapshot.comboWarningAt }, Is.All.EqualTo(-1d),
+                "No combo, so no warning either (#241).");
+            Assert.That(snapshot.ComboWarningOn(17d), Is.False);
             Assert.That(snapshot.comboResult, Is.EqualTo(LabComboResult.None));
             Assert.That(snapshot.players.All(player => player.comboPenaltyUntil <= 0d), Is.True);
             Assert.That(model.ThrowScaleFor(10, 170d), Is.EqualTo(1f));
@@ -138,9 +143,9 @@ namespace C6Lab.Tests
             Assert.That(received.comboResultCount, Is.EqualTo(1u));
             Assert.That(received.players.Select(player => player.comboPenaltyUntil), Is.All.EqualTo(40d));
 
-            Assert.That(model.Snapshot(49.9d).comboCount, Is.EqualTo(1u));
-            LabSnapshot second = model.Snapshot(50d);
-            Assert.That(second.comboActive, Is.True, "The next combo comes 30 seconds after the first appeared.");
+            Assert.That(model.Snapshot(34.9d).comboCount, Is.EqualTo(1u));
+            LabSnapshot second = model.Snapshot(35d);
+            Assert.That(second.comboActive, Is.True, "The next combo comes 15 seconds after the first appeared.");
             Assert.That(second.comboCount, Is.EqualTo(2u));
         }
 
@@ -254,14 +259,14 @@ namespace C6Lab.Tests
             Assert.That(snapshot.players.Select(player => player.comboRewardUntil), Is.All.EqualTo(12d),
                 "Everyone filled the combo together, so the whole team gets 10 seconds of big balls.");
             foreach (ulong id in new ulong[] { 10, 20, 30 })
-                Assert.That(model.ThrowScaleFor(id, 5d), Is.EqualTo(1.5f));
+                Assert.That(model.ThrowScaleFor(id, 5d), Is.EqualTo(RewardScale));
             Assert.That(model.ThrowScaleFor(10, 12d), Is.EqualTo(1f), "The reward ends on time.");
         }
 
         [Test]
         public void ASuccessEndsARunningPenalty()
         {
-            LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f);
+            LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f, warning: 0f);
             float[] values = config.CaptureDeveloperValues();
             values[162] = 3f; // a new combo every 3 seconds
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
@@ -277,7 +282,7 @@ namespace C6Lab.Tests
             Assert.That(snapshot.comboResult, Is.EqualTo(LabComboResult.Success));
             Assert.That(snapshot.players.Select(player => player.comboPenaltyUntil), Is.All.EqualTo(4d),
                 "The latest result wins: success ends the penalty right away.");
-            Assert.That(model.ThrowScaleFor(10, 5d), Is.EqualTo(1.5f));
+            Assert.That(model.ThrowScaleFor(10, 5d), Is.EqualTo(RewardScale));
         }
 
         [Test]
@@ -297,6 +302,92 @@ namespace C6Lab.Tests
             big.Advance(5d);
             Assert.That(big.CoveredCount, Is.InRange(full.CoveredCount * 14 / 10, full.CoveredCount * 16 / 10),
                 "A 1.5x reward hit paints about one and a half times the area.");
+        }
+
+        [Test]
+        public void TheWarningCountsDownBeforeTheFourSlotsAppearOnTime()
+        {
+            LabConfig config = Config(enabled: true);
+            var model = new LabModel();
+            model.Begin("combo-warning", new ulong[] { 10, 20, 30 }, 0d, config);
+
+            LabSnapshot calm = model.Snapshot(16.9d);
+            Assert.That(calm.comboNextAt, Is.EqualTo(20d), "The four slots still appear at First Start (20 s).");
+            Assert.That(calm.comboWarningAt, Is.EqualTo(17d), "COMBO! 3, 2, 1 comes in the 3 seconds before.");
+            Assert.That(calm.ComboWarningOn(16.9d), Is.False);
+
+            LabSnapshot warning = model.Snapshot(17d);
+            Assert.That(warning.ComboWarningOn(17d), Is.True);
+            Assert.That(warning.ComboWarningOn(19.99d), Is.True);
+            Assert.That(warning.comboActive, Is.False, "During the warning there is no combo yet.");
+            Assert.That(warning.comboCount, Is.EqualTo(0u));
+
+            LabSnapshot received = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(warning));
+            Assert.That(new[] { received.comboWarningAt, received.comboNextAt }, Is.EqualTo(new[] { 17d, 20d }),
+                "Every device counts down from the same Host times.");
+
+            // A colored orb that lands during the warning is not judged.
+            var pool = new List<LabOrbState>();
+            int requests = 0;
+            LabOrbState early = Combine(model, 10, pool, ref requests, 18d);
+            Assert.That(model.TryLaunch(10, early.id, "warning-launch", 18d, out _, out string reason), Is.True, reason);
+            Assert.That(model.ConfirmHit(early.id, 18d), Is.True);
+            LabSnapshot afterHit = model.Snapshot(18d);
+            Assert.That(afterHit.comboResult, Is.EqualTo(LabComboResult.None));
+            Assert.That(afterHit.players.All(player => player.comboPenaltyUntil <= 0d), Is.True);
+
+            LabSnapshot started = model.Snapshot(20d);
+            Assert.That(started.comboActive, Is.True);
+            Assert.That(started.comboProgress, Is.Zero, "The hit during the warning did not fill a slot.");
+            Assert.That(started.comboStartedAt, Is.EqualTo(20d));
+            Assert.That(started.comboEndsAt, Is.EqualTo(30d), "The 10-second limit starts when the slots appear.");
+            Assert.That(new[] { started.comboNextAt, started.comboWarningAt }, Is.All.EqualTo(-1d));
+            Assert.That(started.ComboWarningOn(20d), Is.False);
+
+            LabSnapshot next = model.Snapshot(31d);
+            Assert.That(next.comboResult, Is.EqualTo(LabComboResult.Timeout));
+            Assert.That(next.comboNextAt, Is.EqualTo(35d), "The next combo still follows the 15-second interval.");
+            Assert.That(next.comboWarningAt, Is.EqualTo(32d));
+        }
+
+        [Test]
+        public void ALateFinishStillLeavesTheWholeWarningBeforeTheNextCombo()
+        {
+            LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f);
+            float[] values = config.CaptureDeveloperValues();
+            values[162] = 1.5f; // the next combo would be due before this one even ends
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var model = new LabModel();
+            model.Begin("combo-late-warning", new ulong[] { 10, 20 }, 0d, config);
+
+            Assert.That(model.Snapshot(1d).comboActive, Is.True);
+            LabSnapshot ended = model.Snapshot(2.1d);
+            Assert.That(ended.comboResult, Is.EqualTo(LabComboResult.Timeout));
+            Assert.That(ended.comboResultAt, Is.EqualTo(2d));
+            Assert.That(ended.comboNextAt, Is.EqualTo(5d), "Ended at 2 s, so the next waits for the full 3-second warning.");
+            Assert.That(ended.ComboWarningOn(2.1d), Is.True);
+            Assert.That(model.Snapshot(4.99d).comboActive, Is.False);
+            Assert.That(model.Snapshot(5d).comboActive, Is.True);
+            Assert.That(model.Snapshot(5d).comboCount, Is.EqualTo(2u));
+        }
+
+        [Test]
+        public void AZeroWarningMeansTheComboAppearsWithoutOne()
+        {
+            LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f, warning: 0f);
+            float[] values = config.CaptureDeveloperValues();
+            values[162] = 1f; // due exactly when the first one times out at 2 s
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var model = new LabModel();
+            model.Begin("combo-no-warning", new ulong[] { 10, 20 }, 0d, config);
+
+            LabSnapshot before = model.Snapshot(.5d);
+            Assert.That(before.comboWarningAt, Is.EqualTo(before.comboNextAt));
+            Assert.That(before.ComboWarningOn(.5d), Is.False);
+            LabSnapshot second = model.Snapshot(2.1d);
+            Assert.That(second.comboActive, Is.True,
+                "Without a warning the next combo comes right when the last one ends, as before.");
+            Assert.That(second.comboStartedAt, Is.EqualTo(2d));
         }
 
         /// <summary>진행 중인 콤보의 색을 차례로 만들어 맞힌다. 다른 색은 던지지 않고 남겨 둔다.</summary>
@@ -346,7 +437,8 @@ namespace C6Lab.Tests
             return null;
         }
 
-        private LabConfig Config(bool enabled, float firstStart = 20f, float timeLimit = 10f, bool throwerOnly = false)
+        private LabConfig Config(bool enabled, float firstStart = 20f, float timeLimit = 10f, bool throwerOnly = false,
+            float warning = 3f)
         {
             var config = ScriptableObject.CreateInstance<LabConfig>();
             created.Add(config);
@@ -363,6 +455,7 @@ namespace C6Lab.Tests
             values[161] = firstStart;
             values[163] = timeLimit;
             values[166] = throwerOnly ? 1f : 0f;
+            values[169] = warning;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return config;
         }

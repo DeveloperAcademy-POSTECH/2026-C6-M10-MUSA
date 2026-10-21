@@ -43,6 +43,14 @@ namespace C6Lab
         /// </summary>
         public static bool CanThrow(this LabOrbKind kind, int lockSwipes) =>
             kind == LabOrbKind.Combined || ((kind == LabOrbKind.Relay || kind == LabOrbKind.Bomb) && lockSwipes == 0);
+
+        /// <summary>
+        /// How long an orb lasts on the boards, the same on the Host and every screen (#235): items the
+        /// item lifetime, which is a locked bomb's fuse; everything else, an unlocked bomb included, the
+        /// orb lifetime.
+        /// </summary>
+        public static float LifetimeFor(this LabOrbKind kind, int lockSwipes, float orbLifetime, float itemLifetime) =>
+            kind.IsItem() && !(kind == LabOrbKind.Bomb && lockSwipes == 0) ? itemLifetime : orbLifetime;
     }
 
     /// <summary>
@@ -100,6 +108,10 @@ namespace C6Lab
 
         public bool JustArrived(double serverTime) =>
             arrival != LabDrumArrival.None && arrivedAt >= 0d && serverTime - arrivedAt <= ArrivalWindowSeconds;
+
+        /// <summary>Seconds left in this orb's lifetime at the given Host time (#235); never below 0.</summary>
+        public float LifeSecondsLeft(double serverTime, float orbLifetime, float itemLifetime) =>
+            (float)Math.Max(0d, createdAt + kind.LifetimeFor(lockSwipes, orbLifetime, itemLifetime) - serverTime);
 
         /// <summary>Seconds this orb still burns at the given Host time; 0 once out, or when it never burned.</summary>
         public float BurnSecondsLeft(double serverTime, float burnSeconds) =>
@@ -207,5 +219,15 @@ namespace C6Lab
         public uint comboResultCount;
         public double comboResultAt = -1d;
         public ulong comboFailedBy;
+        /// <summary>
+        /// 다음 콤보 4칸이 나오는 시각과 그 예고(COMBO! 3, 2, 1)가 시작되는 시각 (#241). 둘 다 전투 시계 기준이고,
+        /// 콤보가 진행 중이거나 꺼져 있으면 -1이다. 예고 시간이 0이면 두 시각이 같다(예고 없음).
+        /// 예고 시작 시각은 전투 시작보다 이를 수 있다(첫 시작 시각이 예고 시간보다 짧을 때).
+        /// </summary>
+        public double comboNextAt = -1d;
+        public double comboWarningAt = -1d;
+
+        /// <summary>이 시각에 콤보 예고 중인지 (#241). 예고 중에는 콤보가 없으므로 맞힌 구슬도 판정하지 않는다.</summary>
+        public bool ComboWarningOn(double now) => comboNextAt > comboWarningAt && now >= comboWarningAt && now < comboNextAt;
     }
 }

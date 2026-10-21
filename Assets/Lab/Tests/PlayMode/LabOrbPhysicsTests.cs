@@ -838,6 +838,105 @@ namespace C6Lab.Tests
             Assert.That(kinds["held"], Is.EqualTo(LabEdgeCrossingKind.Swipe));
         }
 
+        [Test]
+        public void VanishingAnOrbTakesItOffTheBoardAndSaysSoUnlikeRemovingIt()
+        {
+            var vanished = new System.Collections.Generic.List<string>();
+            board.OrbVanished += id => vanished.Add(id);
+            var old = board.UpsertOrb("old", LabOrbKind.Yin, new Vector2(.5f, .5f));
+            var passed = board.UpsertOrb("passed", LabOrbKind.Yang, new Vector2(.2f, .5f));
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(old), 1d), Is.True, "Held as its time runs out.");
+
+            Assert.That(board.Vanish("old"), Is.True);
+            Assert.That(board.TryGetMotion("old", out _, out _), Is.False, "Its lifetime ran out, so it is gone (#235).");
+            Assert.That(vanished, Is.EqualTo(new[] { "old" }), "The board says it expired.");
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(passed), 2d), Is.True, "No gesture is left stuck on it.");
+            board.CancelDrag();
+
+            Assert.That(board.RemoveOrb("passed"), Is.True);
+            Assert.That(vanished, Is.EqualTo(new[] { "old" }), "An orb handed on or combined just leaves; it did not expire.");
+            Assert.That(board.Vanish("never"), Is.False);
+            Assert.That(board.Vanish(null), Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator AnOrbFlashesWhiteInItsLastSecondsThenGoesUpInSmoke()
+        {
+            var fresh = board.UpsertOrb("fresh", LabOrbKind.Yin, new Vector2(.5f, .5f), lifeSeconds: 6f);
+            Assert.That(fresh.LifeSecondsLeft, Is.EqualTo(6f).Within(1e-4f));
+            Assert.That(fresh.ExpiryWarning, Is.False, "Not yet in its last three seconds.");
+            Assert.That(fresh.ExpiryFlash, Is.Zero);
+            board.UpsertOrb("fresh", LabOrbKind.Yin, new Vector2(.5f, .5f), lifeSeconds: 5.9f);
+            Assert.That(fresh.LifeSecondsLeft, Is.EqualTo(6f).Within(1e-4f),
+                "A later snapshot a moment apart does not nudge the countdown.");
+
+            var dying = board.UpsertOrb("dying", LabOrbKind.Yang, new Vector2(.3f, .5f), lifeSeconds: 2.5f);
+            Assert.That(dying.ExpiryWarning, Is.True, "In its last three seconds it warns (#235)...");
+            Assert.That(dying.ExpiryFlash, Is.GreaterThan(.8f), "...jumping to white at once...");
+            Assert.That(dying.ExpiryFlashRadius, Is.EqualTo(dying.HitSphere.radius).Within(1e-4f), "...over the whole ball.");
+
+            int jumps = 0;
+            float last = dying.ExpiryFlash;
+            float until = Time.time + 1.5f;
+            while (Time.time < until)
+            {
+                yield return null;
+                float now = dying.ExpiryFlash;
+                if (now > last + .2f) jumps++;
+                last = now;
+            }
+            Assert.That(jumps, Is.GreaterThanOrEqualTo(2), "It flashes again and again.");
+            Assert.That(dying.LifeSecondsLeft, Is.LessThan(1.1f), "And counts its own seconds down.");
+
+            Vector3 at = dying.transform.position;
+            Assert.That(board.Vanish("dying"), Is.True);
+            var smoke = Object.FindFirstObjectByType<LabOrbVanishSmoke>();
+            Assert.That(smoke, Is.Not.Null, "When it goes, it goes up in smoke...");
+            Assert.That(smoke.transform.position.x, Is.EqualTo(at.x).Within(1e-4f), "...where it was...");
+            Assert.That(smoke.transform.position.z, Is.LessThan(at.z - dying.HitSphere.radius), "...in front of the orbs.");
+            until = Time.time + 2f;
+            while (Time.time < until && smoke != null) yield return null;
+            Assert.That(smoke == null, Is.True, "The smoke clears by itself.");
+
+            board.UpsertOrb("fresh", LabOrbKind.Yin, new Vector2(.5f, .5f), lifeSeconds: -1f);
+            Assert.That(fresh.LifeSecondsLeft, Is.LessThan(0f), "No lifetime given: nothing to warn about.");
+            Assert.That(fresh.ExpiryWarning, Is.False);
+            var drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.7f, .2f), lifeSeconds: 1f);
+            Assert.That(drum.ExpiryWarning, Is.False, "A drum never runs out.");
+            Assert.That(drum.ExpiryFlash, Is.Zero);
+        }
+
+        [Test]
+        public void TheExpiryWarningSecondsComeFromTheAppearanceInspector()
+        {
+            var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            SetSerializedField(appearance, "expiryWarningSeconds", 1f);
+            SetSerializedField(config, "orbAppearance", appearance);
+            try
+            {
+                board.Configure(config, inputCamera, Bounds);
+                Assert.That(appearance.ExpiryWarningSeconds, Is.EqualTo(1f));
+                var orb = board.UpsertOrb("orb", LabOrbKind.Combined, new Vector2(.5f, .5f), element: LabOrbElement.Fire,
+                    lifeSeconds: 1.5f);
+                Assert.That(orb.ExpiryWarning, Is.False, "With one second set, 1.5 seconds left is not yet the warning.");
+                board.UpsertOrb("orb", LabOrbKind.Combined, new Vector2(.5f, .5f), element: LabOrbElement.Fire,
+                    lifeSeconds: .9f);
+                Assert.That(orb.ExpiryWarning, Is.True);
+                Assert.That(orb.ExpiryFlash, Is.GreaterThan(.8f));
+
+                SetSerializedField(appearance, "expiryWarningSeconds", 0f);
+                board.UpsertOrb("orb", LabOrbKind.Combined, new Vector2(.5f, .5f), element: LabOrbElement.Fire,
+                    lifeSeconds: .5f);
+                Assert.That(orb.ExpiryWarning, Is.False, "Zero turns the flash off.");
+                Assert.That(orb.ExpiryFlash, Is.Zero);
+            }
+            finally
+            {
+                SetSerializedField(config, "orbAppearance", null);
+                Object.Destroy(appearance);
+            }
+        }
+
         [UnityTest]
         public IEnumerator AnOrbAndADrumFlungPastASideEdgeGoToTheNeighbour()
         {

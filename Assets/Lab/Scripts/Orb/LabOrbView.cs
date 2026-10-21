@@ -25,6 +25,16 @@ namespace C6Lab
         private GameObject contactShadow;
         private LabOrbItemMarker itemMarker;
         private LabOrbBurn burn;
+        private SpriteRenderer expiryFlash;
+        private SpriteRenderer expiryHalo;
+        private float lifeLeft = -1f;
+        private float flashPhase;
+        private static Sprite expiryDiscSprite;
+        private static Sprite expiryHaloSprite;
+        /// <summary>In front of the orb's art, its icons and its fire's licks.</summary>
+        private const int ExpiryOrder = 12;
+        /// <summary>The board keeps its own lifetime countdown unless the Host's differs by more than this.</summary>
+        private const float LifeResyncSeconds = .3f;
         private SpriteRenderer drumArt;
         private LabOrbSpriteArt orbSpriteArt;
         private GameObject replacementPrefab;
@@ -59,6 +69,15 @@ namespace C6Lab
         /// <summary>The yellow fire of an orb a bomb blast flung (#213); null until it first burns.</summary>
         public LabOrbBurn Burn => burn;
         public bool Burning => burn != null && burn.Burning;
+        /// <summary>Seconds this screen counts down to the end of the orb's lifetime (#235); negative when not shown.</summary>
+        public float LifeSecondsLeft => lifeLeft;
+        /// <summary>In its last seconds, flashing white before it goes.</summary>
+        public bool ExpiryWarning => !kind.IsDrum() && lifeLeft >= 0f && lifeLeft <= ExpiryLook.ExpiryWarningSeconds
+            && ExpiryLook.ExpiryWarningSeconds > 0f;
+        /// <summary>How white the flash is now, 0 to 1 times the flash colour's alpha.</summary>
+        public float ExpiryFlash => expiryFlash != null && expiryFlash.gameObject.activeSelf ? expiryFlash.color.a : 0f;
+        /// <summary>The flash's radius, to cover the orb's art.</summary>
+        public float ExpiryFlashRadius => expiryFlash != null ? expiryFlash.transform.localScale.x * .5f : 0f;
         /// <summary>The art squeezing down to a size a blast just shrank the orb to (#213).</summary>
         public bool IsShrinking => shrinkRoutine != null;
         /// <summary>The drum art's spin about the view axis, in degrees per second.</summary>
@@ -101,6 +120,11 @@ namespace C6Lab
         private void Update()
         {
             if (Body == null || visual == null || visualRadius <= 0f) return;
+            if (lifeLeft >= 0f)
+            {
+                lifeLeft = Mathf.Max(0f, lifeLeft - Time.deltaTime);
+                PoseExpiry(Time.deltaTime);
+            }
             if (kind.IsDrum())
             {
                 // The flat art keeps facing the camera and turns about the view axis instead of rolling.
@@ -176,6 +200,118 @@ namespace C6Lab
             EnsureVisual();
             UpdateVisual();
             if (burn != null) burn.SetRadius(radius);
+        }
+
+        /// <summary>
+        /// Seconds left in this orb's lifetime, by the Host clock (#235); negative shows none (a locked bomb
+        /// has its own red warning, a drum never ends). In its last seconds the orb flashes white, faster as
+        /// the end nears, so a player reaching for it knows it is about to go. The view counts down by itself
+        /// and only takes the Host's seconds when they differ by more than a moment.
+        /// </summary>
+        public void SetLife(float secondsLeft)
+        {
+            if (!(secondsLeft >= 0f) || float.IsInfinity(secondsLeft))
+            {
+                lifeLeft = -1f;
+                PoseExpiry(0f);
+                return;
+            }
+            if (lifeLeft < 0f || Mathf.Abs(lifeLeft - secondsLeft) > LifeResyncSeconds) lifeLeft = secondsLeft;
+            PoseExpiry(0f);
+        }
+
+        private LabOrbAppearance ExpiryLook => appearance != null ? appearance : LabOrbAppearance.Defaults;
+
+        private void PoseExpiry(float step)
+        {
+            LabOrbAppearance look = ExpiryLook;
+            float warning = look.ExpiryWarningSeconds;
+            if (lifeLeft < 0f || warning <= 0f || lifeLeft > warning || kind.IsDrum())
+            {
+                flashPhase = 0f;
+                if (expiryFlash != null) expiryFlash.gameObject.SetActive(false);
+                if (expiryHalo != null) expiryHalo.gameObject.SetActive(false);
+                return;
+            }
+            EnsureExpiryParts();
+            // Each blink jumps to white and fades; they come faster as the end nears.
+            float urgency = 1f - lifeLeft / warning;
+            flashPhase += Mathf.Lerp(look.ExpiryFlashStartHz, look.ExpiryFlashFastHz, urgency) * step;
+            float blink = flashPhase - Mathf.Floor(flashPhase);
+            float flash = (1f - blink) * (1f - blink);
+            Color tint = look.ExpiryFlashColor;
+            // Cover the art as drawn: a combined orb's picture is drawn larger, a bomb's art larger still.
+            float art = HasBombArt ? visualRadius * look.BombBodySize
+                : orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf ? visualRadius * LabOrbSpriteArt.SizeScaleFor(kind)
+                : visualRadius;
+            expiryFlash.gameObject.SetActive(true);
+            expiryHalo.gameObject.SetActive(true);
+            expiryFlash.transform.localPosition = new Vector3(0f, 0f, -1.05f * art);
+            expiryFlash.transform.localScale = Vector3.one * (2f * art);
+            expiryFlash.color = new Color(tint.r, tint.g, tint.b, tint.a * flash);
+            expiryHalo.transform.localPosition = new Vector3(0f, 0f, -1.05f * art);
+            expiryHalo.transform.localScale = Vector3.one * (2f * 1.45f * art);
+            expiryHalo.color = new Color(tint.r, tint.g, tint.b, .55f * tint.a * flash);
+        }
+
+        private void EnsureExpiryParts()
+        {
+            if (expiryFlash != null) return;
+            expiryFlash = CreateExpiryPart("Expiry Flash", ExpiryDisc());
+            expiryHalo = CreateExpiryPart("Expiry Halo", ExpiryHalo());
+        }
+
+        private SpriteRenderer CreateExpiryPart(string label, Sprite sprite)
+        {
+            var part = new GameObject(label);
+            part.layer = gameObject.layer;
+            // On the root, not the rolling art, so it never turns with the ball.
+            part.transform.SetParent(transform, false);
+            var renderer = part.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.sortingOrder = ExpiryOrder;
+            return renderer;
+        }
+
+        /// <summary>A disc 1 unit across with a soft rim, laid over the art to whiten it.</summary>
+        private static Sprite ExpiryDisc() =>
+            expiryDiscSprite != null ? expiryDiscSprite : expiryDiscSprite = ExpirySprite("Lab orb expiry flash", false);
+
+        /// <summary>A soft glow ring 1 unit across that starts at the orb's edge (radius 1/1.45 of it).</summary>
+        private static Sprite ExpiryHalo() =>
+            expiryHaloSprite != null ? expiryHaloSprite : expiryHaloSprite = ExpirySprite("Lab orb expiry halo", true);
+
+        private static Sprite ExpirySprite(string label, bool halo)
+        {
+            const int size = 64;
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + .5f) / size * 2f - 1f, dy = (y + .5f) / size * 2f - 1f;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float alpha;
+                    if (!halo) alpha = Mathf.Clamp01((1f - d) * size * .5f);
+                    else
+                    {
+                        float edge = 1f / 1.45f;
+                        alpha = d < edge ? 0f : Mathf.Clamp01((1f - d) / (1f - edge)) * Mathf.Clamp01((d - edge) * size * .5f);
+                    }
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
+                }
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = label,
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), size);
+            sprite.name = label;
+            sprite.hideFlags = HideFlags.DontSave;
+            return sprite;
         }
 
         /// <summary>Seconds the Host says this orb still burns after a blast flung it (#213); 0 or less lets the fire die.</summary>

@@ -5,12 +5,14 @@ namespace C6Lab
 {
     /// <summary>
     /// 박 색상 콤보 실험 (#222)의 전투 화면 표시. 모든 기기가 Host 스냅샷만 읽어서 같은 콤보를 보여준다.
+    /// - 예고 (#241): 4칸이 나오기 직전 같은 자리에 COMBO! 와 3, 2, 1 카운트다운. 색은 아직 숨긴다.
     /// - 진행 중: 4칸 색 (맞힌 칸은 체크, 다음 칸은 통통 튐), 줄어드는 남은 시간 막대 (숫자 없음)
     /// - 끝남: 콤보 패널이 바로 사라지고 같은 자리에 CLEAR! (성공) / WRONG COLOR, TIME UP (실패) 문구가
     ///   튀어나옴. 실패는 크게 튀고 흔들리며 화면이 빨갛게 번쩍인다.
     /// - 페널티/보상 중: 결과 문구가 끝난 뒤에 알약 배지 (빨강 SMALL / 노랑 BIG, 공 아이콘,
     ///   줄어드는 게이지, 남은 초)가 나온다. 이 기기 플레이어 기준이다.
-    /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음).
+    /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
+    /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
     /// 일시정지 중이거나 전투가 끝나면 숨는다.
     /// </summary>
@@ -22,6 +24,7 @@ namespace C6Lab
         public const string TimeUpText = "TIME UP";
         public const string PenaltyLabel = "SMALL";
         public const string RewardLabel = "BIG";
+        public const string WarningText = "COMBO!";
 
         private const int TextureSize = 96;
         private const float ResultSeconds = 1.6f;
@@ -55,6 +58,10 @@ namespace C6Lab
         private int effectKind; // 0 없음, -1 페널티, 1 보상
         private float effectPopElapsed = -1f;
         private Font font;
+        private RectTransform warningPanel;
+        private Text warningLabel, warningNumber;
+        private int shownWarningCount = -1;
+        private float warningPopElapsed = -1f;
 
         private LabSnapshot seenSnapshot;
         private double seenAtRealtime;
@@ -70,6 +77,10 @@ namespace C6Lab
         public bool EffectVisible => effectBadge != null && effectBadge.gameObject.activeSelf;
         public string EffectLabel => effectText != null ? effectText.text : string.Empty;
         public bool ResultVisible => resultText != null && resultText.gameObject.activeSelf;
+        /// <summary>COMBO! 카운트다운 예고가 보이는지 (#241)</summary>
+        public bool WarningVisible => warningPanel != null && warningPanel.gameObject.activeSelf;
+        /// <summary>예고에 보이는 남은 초 (3, 2, 1). 예고가 없으면 빈 문자열.</summary>
+        public string WarningCount => WarningVisible ? warningNumber.text : string.Empty;
         public string ResultLabel => resultText != null ? resultText.text : string.Empty;
         public bool SlotChecked(int index) => slotChecks[index] != null && slotChecks[index].gameObject.activeSelf;
         public Color SlotColor(int index) => slotFills[index] != null ? slotFills[index].color : Color.clear;
@@ -85,8 +96,10 @@ namespace C6Lab
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool battle = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused;
-            bool anyCombo = snapshot != null && snapshot.comboCount > 0;
             double serverNow = battle ? EstimateServerNow(snapshot) : 0d;
+            // 첫 콤보 예고 (#241)는 아직 콤보가 한 번도 안 나왔을 때 시작하므로 따로 본다.
+            bool warning = battle && snapshot.ComboWarningOn(serverNow);
+            bool anyCombo = snapshot != null && (snapshot.comboCount > 0 || warning);
             if (!battle || !anyCombo)
             {
                 if (layer != null) layer.gameObject.SetActive(false);
@@ -101,7 +114,47 @@ namespace C6Lab
             DetectChanges(snapshot);
             DrawCombo(snapshot, serverNow);
             DrawResult();
+            DrawWarning(snapshot, serverNow, warning);
             DrawEffect(snapshot, serverNow);
+        }
+
+        /// <summary>
+        /// 콤보 예고 (#241): 패널 자리에 COMBO! 와 남은 초(3 → 2 → 1). 숫자가 바뀔 때마다 톡 튀어나오고,
+        /// 0이 되는 순간(4칸이 나오는 시각) Host 스냅샷의 새 콤보로 바뀐다. 색은 예고 중에 보여주지 않는다.
+        /// 앞 콤보의 결과 문구가 떠 있으면 그것부터 보여준다.
+        /// </summary>
+        private void DrawWarning(LabSnapshot snapshot, double serverNow, bool warning)
+        {
+            bool show = warning && resultElapsed < 0f;
+            warningPanel.gameObject.SetActive(show);
+            if (!show)
+            {
+                shownWarningCount = -1;
+                warningPopElapsed = -1f;
+                return;
+            }
+            int count = Mathf.Max(1, Mathf.CeilToInt((float)(snapshot.comboNextAt - serverNow)));
+            if (count != shownWarningCount)
+            {
+                shownWarningCount = count;
+                warningPopElapsed = 0f;
+                warningNumber.text = count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+            // 숫자: 1.7배로 쾅 나왔다가 1배로. 마지막 1은 빨갛다.
+            float pop = 1f;
+            if (warningPopElapsed >= 0f)
+            {
+                warningPopElapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(warningPopElapsed / .25f);
+                pop = Mathf.Lerp(1.7f, 1f, 1f - (1f - t) * (1f - t));
+                if (warningPopElapsed >= .25f) warningPopElapsed = -1f;
+            }
+            warningNumber.rectTransform.localScale = Vector3.one * pop;
+            warningNumber.color = count <= 1 ? FailColor : (Color)InkColor;
+            // COMBO! 글자는 살짝 기울며 들썩인다. 남은 시간이 줄수록 빨라진다.
+            float speed = 6f + 4f * (3 - Mathf.Min(count, 3));
+            warningLabel.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 4f * Mathf.Sin(Time.unscaledTime * speed));
+            warningPanel.localScale = Vector3.one * (1f + .04f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * speed * .5f)));
         }
 
         /// <summary>
@@ -119,8 +172,8 @@ namespace C6Lab
                     if (player.comboPenaltyUntil > serverNow) { kind = -1; until = player.comboPenaltyUntil; }
                     else if (player.comboRewardUntil > serverNow) { kind = 1; until = player.comboRewardUntil; }
                 }
-            // 결과 문구가 떠 있는 동안에는 숨겨 두었다가, 문구가 끝나면 톡 튀어나온다.
-            if (kind == 0 || resultElapsed >= 0f)
+            // 결과 문구나 다음 콤보 예고(#241)가 떠 있는 동안에는 숨겨 두었다가, 끝나면 톡 튀어나온다.
+            if (kind == 0 || resultElapsed >= 0f || warningPanel.gameObject.activeSelf)
             {
                 effectKind = 0;
                 effectBadge.gameObject.SetActive(false);
@@ -284,6 +337,8 @@ namespace C6Lab
             popSlot = -1;
             effectKind = 0;
             effectPopElapsed = -1f;
+            shownWarningCount = -1;
+            warningPopElapsed = -1f;
         }
 
         private bool EnsureLayer()
@@ -379,6 +434,30 @@ namespace C6Lab
             resultOutline.effectColor = InkColor;
             resultOutline.effectDistance = new Vector2(3f, -3f) * Mathf.Max(.5f, u);
             resultText.gameObject.SetActive(false);
+
+            // 콤보 예고 (#241): 패널과 같은 자리·크기에 COMBO! (왼쪽)와 남은 초 (오른쪽).
+            warningPanel = NewRect("Combo Warning", layer);
+            warningPanel.anchorMin = warningPanel.anchorMax = panelAnchor;
+            warningPanel.sizeDelta = panel.sizeDelta;
+            Image warningBack = warningPanel.gameObject.AddComponent<Image>();
+            warningBack.sprite = RoundedSprite();
+            warningBack.type = Image.Type.Sliced;
+            warningBack.color = PanelColor;
+            warningBack.raycastTarget = false;
+            warningLabel = NewText("Warning Label", warningPanel, Mathf.Max(12, Mathf.RoundToInt(44f * u)), TextAnchor.MiddleCenter);
+            warningLabel.rectTransform.anchorMin = Vector2.zero;
+            warningLabel.rectTransform.anchorMax = new Vector2(.68f, 1f);
+            warningLabel.rectTransform.offsetMin = warningLabel.rectTransform.offsetMax = Vector2.zero;
+            warningLabel.text = WarningText;
+            warningLabel.color = ClearColor;
+            Outline warningOutline = warningLabel.gameObject.AddComponent<Outline>();
+            warningOutline.effectColor = InkColor;
+            warningOutline.effectDistance = new Vector2(2f, -2f) * Mathf.Max(.5f, u);
+            warningNumber = NewText("Warning Count", warningPanel, Mathf.Max(14, Mathf.RoundToInt(64f * u)), TextAnchor.MiddleCenter);
+            warningNumber.rectTransform.anchorMin = new Vector2(.68f, 0f);
+            warningNumber.rectTransform.anchorMax = Vector2.one;
+            warningNumber.rectTransform.offsetMin = warningNumber.rectTransform.offsetMax = Vector2.zero;
+            warningPanel.gameObject.SetActive(false);
 
             // 페널티/보상 배지: 패널 아래 가장자리에 반쯤 걸친 알약 모양. 패널이 숨어도 같은 자리에 남는다.
             effectBadge = NewRect("Combo Effect Badge", layer);

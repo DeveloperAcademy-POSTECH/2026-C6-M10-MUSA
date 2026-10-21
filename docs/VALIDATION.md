@@ -1468,13 +1468,53 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 
 최종 검사부터 두 빌드까지 게임 런타임/검사/Shader/Config/Scene/패키지/설정 **191개 파일의 SHA256이 일치**했다. 세로 검사 도구는 빌드 전에 제거했고 글로벌 GameView 설정 파일도 기존 바이트와 같음을 확인했다. Scene/에셋/검사 임계값을 변경해 GPU 통과를 맞추지 않았다.
 
+## 구슬 소멸 예고 — 2026-10-20, 이슈 #235
+
+기준은 Unity **6000.6.5f1**, main(`63a587da`, #233 PR #234 포함)에서 분기한 `feat/#235-orb-expiry-warning`이다.
+
+- **Host 만료 보고**: 수명이 끝난 구슬을 Host가 기록해 지금 가진 사람에게만 스냅샷보다 먼저 `orbExpired`로 알린다. 조합·넘김·던지기·사용으로 사라진 구슬, 날아가는 구슬, 터지는 잠긴 폭탄은 보고하지 않는다. 수명 규칙(아이템 15초·잠긴 폭탄 도화선 15초·그 밖에 해금 폭탄 포함 8초)을 `LabOrbKindRules.LifetimeFor` 하나로 모아 Host와 모든 화면이 같이 쓴다.
+- **표시**: 마지막 3초 동안 구슬 그림 전체(먹선 테두리 포함)를 흰 막과 옅은 빛으로 덮었다 걷는 번쩍임이 초당 1.5번에서 7번까지 빨라진다(결합 구슬 1.2배·폭탄 그림 크기에 맞춤, 북·잠긴 폭탄 제외). 사라질 때 따뜻한 회색 연기 6덩이가 0.6초 동안 퍼졌다 걷힌다. 판 종이가 크림색 한지이고 양 구슬이 흰색이라, 흰 빛만이 아니라 그림 전체를 하얗게 덮어 보이게 했다.
+- **값**: 번쩍임 시작 시간·빠르기·색, 연기 크기·시간·색은 `LabOrbAppearance` Inspector의 Orb expiry 칸이다(DEV 없음, 설정 169개 유지). 통신 버전 `5646` → `5647`.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 단계마다 컴파일했다. 오류 0. 새 파일 `LabOrbVanishSmoke.cs`가 Runtime에 포함된 것을 확인했다. |
+| 모양 미리보기 | 확인 (Unity 밖) | 실제 `BoardPlate.png`와 음·양·화 구슬 그림으로 Python 렌더링해 번쩍임·연기 모양을 정했다. 실제 Unity 화면이 아니다. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN | 이번 변경의 Test Runner 결과는 기록하지 않았다. |
+| 솔로 화면: 번쩍임이 잘 보이는지·산만하지 않은지, 연기 | NOT_RUN | 구슬 하나를 만들고 8초를 기다려 5초쯤부터 번쩍이고 8초에 연기와 함께 사라지는지 본다. |
+| 3인 실행: 넘겨받은 구슬의 번쩍임, 넘김·조합 시 연기 없음 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 휴대폰 화면 밝기에서 번쩍임 가독성 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `AnOrbWhoseLifetimeRunsOutIsReportedToItsHolderOnceButNotOneThatLeftAnotherWay`, `ExpiredItemsAndUnlockedBombsAreReportedButALockedBombBlastsInstead`, `EveryScreenCountsAnOrbsLifeDownByTheSameRule`; 프로토콜을 고정한 팀원 검사 7개를 5647로 갱신
+- **PlayMode** `LabOrbPhysicsTests`: `VanishingAnOrbTakesItOffTheBoardAndSaysSoUnlikeRemovingIt`, `AnOrbFlashesWhiteInItsLastSecondsThenGoesUpInSmoke`, `TheExpiryWarningSecondsComeFromTheAppearanceInspector`
+
+
+## 콤보 예고와 콤보 기본값 — 2026-10-21, 이슈 #241
+
+기준은 main `63a587da`(#232 콤보, #234 축소 투사체 판정 포함)에서 분기한 `feat/#241-combo-warning`이다. Unity는 실행하지 않았다.
+
+- **DEV**: `Combo Warning (seconds)`를 170번째(인덱스 169)에 추가했다. 범위 0~10초, 기본 3초, 0이면 예고 없음. `Combo` 묶음에서는 `Combo First Start` 바로 아래에 보인다(표시 순서 160, 161, 169, 162~168). 설정 169 → **170개**, 프로토콜 `5646` → **`5647`**. 이후 main에 #235(PR #238, 프로토콜 5647)가 먼저 머지되어 main 통합 시 프로토콜을 **`5648`**로 한 칸 올렸다.
+- **기본값 변경**: `Gourd Color Combo` OFF → **ON**, `Combo Repeat Interval` 30 → **15초**, `Combo Penalty Size (x)` 0.3 → **0.1**, `Combo Reward Size (x)` 1.5 → **2.5**. 첫 시작 20초/제한 10초는 그대로다. 이전에는 `LabConfig.asset`에 콤보 필드가 없어 코드 기본값에 기댔는데, 열려 있던 Unity 에디터가 메모리의 옛 값을 유지해 DEV/DEFAULTS에 옛 값이 보였다. 그래서 콤보 10개 값을 `LabConfig.asset`에도 같은 값으로 저장했다.
+- **Host 모델**: 콤보를 기다리는 동안 스냅샷에 `comboNextAt`(4칸 등장 시각)과 `comboWarningAt`(= 등장 시각 − 예고 시간)을 싣고, 진행 중이거나 꺼져 있으면 -1이다. `LabSnapshot.ComboWarningOn(now)`로 예고 중인지 판단한다. 콤보가 끝나면 다음 콤보 시각을 최소 "끝난 시각 + 예고 시간"으로 미뤄 예고를 끝까지 보여준다(기본값 20/15/10/3에서는 해당 없음, 예고 0이면 이전과 같음). 예고 중에는 콤보가 없으므로 맞힌 구슬을 판정하지 않는다.
+- **화면**: `LabGourdComboHud`가 예고 중 패널 자리에 같은 크기의 `COMBO!`(노랑, 진한 테두리) + 남은 초를 그린다. 숫자는 바뀔 때마다 1.7배에서 1배로 튀고 마지막 1은 빨강이며, 글자와 패널은 0에 가까울수록 빠르게 들썩인다. 예고 중 색 4칸과 SMALL/BIG 배지는 숨기고, 앞 콤보의 결과 문구가 떠 있으면 그것이 끝난 뒤 남은 카운트다운을 보인다. 첫 콤보 예고(콤보 수 0)에서도 보인다. 터치를 막지 않는다. 예고 소리는 이번 범위가 아니다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. `LabModel.cs`의 기존 CS0136(`blast`)은 main 원본에서도 나는 mcs 한계라 제외했다. |
+| EditMode 실제 실행 | NOT_RUN | `LabGourdComboTests` 새 3건(`TheWarningCountsDownBeforeTheFourSlotsAppearOnTime`, `ALateFinishStillLeavesTheWholeWarningBeforeTheNextCombo`, `AZeroWarningMeansTheComboAppearsWithoutOne`)과 기본값 갱신분, `LabDeveloperConfigTests.GourdColorComboFieldsFormTheComboGroupAndStartOn`, 개수/프로토콜 고정 검사 170/5648, 기존 전체 EditMode. 콤보가 기본 ON이 되어 전투 20초를 넘기는 기존 검사가 콤보를 만나는지도 이 실행으로 확인한다. |
+| PlayMode 실제 실행 | NOT_RUN | 새 `LabComboProjectileIntegrationTests.TheWarningCountsDownWithoutColorsOrBadgeThenTheComboAppears`, 개수 고정 Developer PlayMode 검사, 기존 전체 PlayMode. |
+| 솔로 화면: 17~20초 `COMBO!` 3/2/1, 20초에 4칸 등장, 예고 중 색/배지 숨김, 글자 크기·위치 | NOT_RUN | 기본값 그대로 솔로 시작 후 17초부터 확인한다. |
+| 3인 실행: 모든 화면에서 같은 카운트다운과 같은 시각의 4칸 등장 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 예고 패널이 위쪽 HUD/노치와 겹치지 않는지 확인 필요. |
+
 ## 폭탄 가장자리 전달 — 2026-10-20, 이슈 #237
 
 기준은 Unity **6000.6.5f1**, main(`63a587da`, #233 PR #234 포함)에서 분기한 `feat/#237-bomb-edge-pass`다. 열린 #235 PR(#238)과 독립적으로 진행했다(통신 버전·설정 개수 변경 없음).
 
 - **원인**: #212의 무거운 폭탄 기본값(놓기 0.5배 × 감속 2배)으로 미끄러지는 거리가 구슬의 12.5%였고, 느려지면 떠돌기로 바뀌어 가장자리에서 밀려나거나, 느리게 닿으면(드리프트 속도의 1.5배 미만) 되돌아왔다.
 - **규칙**: 플레이어가 스와이프하거나 끌어서 놓은 폭탄은 "내가 보냄" 표시가 붙어 멈출 때까지 미끄러지고, 바깥쪽으로 가장자리에 닿으면 속도와 상관없이 넘어간다(미끄럼이 끝나는 바로 그 단계에 닿아도). 넘김 이유는 "스와이프"라 넘기기 막기(#215)는 그대로 튕긴다. 멈추거나 다시 잡히거나 폭발에 밀리면 풀린다. 혼자 떠도는 폭탄과 북은 바꾸지 않았다.
-- **기본값**: 코드와 저장 `LabConfig.asset` 모두 `Bomb Release Speed` 0.75·`Bomb Slide Deceleration` 1.3(사용자가 Inspector에서 저장). 미끄러지는 거리는 구슬의 약 43%다. Unity가 이 에셋을 저장하면서 #222 콤보 설정 9개를 코드 기본값 그대로(콤보 꺼짐, 시작 20초·간격 30초·제한 10초, 벌칙 10초·0.3배·TEAM, 보상 10초·1.5배) 기록했으며 동작은 바뀌지 않는다.
+- **기본값**: 코드와 저장 `LabConfig.asset` 모두 `Bomb Release Speed` 0.75·`Bomb Slide Deceleration` 1.3(사용자가 Inspector에서 저장). 미끄러지는 거리는 구슬의 약 43%다. Unity가 이 에셋을 저장하면서 #222 콤보 설정 9개를 코드 기본값 그대로(콤보 꺼짐, 시작 20초·간격 30초·제한 10초, 벌칙 10초·0.3배·TEAM, 보상 10초·1.5배) 기록했으며 동작은 바뀌지 않는다. main 통합(2026-10-21) 때 이 에셋의 콤보 값은 #241에서 정한 main 쪽 값(ON/15초/0.1/2.5/예고 3초, 10개)을 유지했다.
 
 | 항목 | 상태 | 실행 결과·남은 확인 |
 | --- | --- | --- |
