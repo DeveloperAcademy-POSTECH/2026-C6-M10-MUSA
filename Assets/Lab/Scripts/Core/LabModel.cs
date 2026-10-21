@@ -185,6 +185,8 @@ namespace C6Lab
         private double lastFlashAt;
         private ulong lastFlashTarget;
         private bool flashHeld;
+        // 콤보 때문에 섬광 예고를 미뤘었는지. 콤보가 끝난 첫 순간 예고를 처음부터 다시 시작한다.
+        private bool flashWasHeld;
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -301,6 +303,7 @@ namespace C6Lab
             lastFlashAt = -1d;
             lastFlashTarget = 0;
             flashHeld = false;
+            flashWasHeld = false;
             nextFlashAt = rules.FlashEnabled ? now + rules.FlashFirstStartSeconds : double.PositiveInfinity;
             nextFlashTarget = DrawFlashTarget(0u);
             lastTime = now;
@@ -642,9 +645,16 @@ namespace C6Lab
                 if (ComboHoldsFlash(until))
                 {
                     // 예고가 시작될 때가 됐는데 콤보 중이면, 콤보가 끝난 뒤 예고를 처음부터 다시 보여준다.
-                    flashHeld = true;
+                    flashHeld = flashWasHeld = true;
                     nextFlashAt = Math.Max(nextFlashAt, until + rules.FlashWarningSeconds);
                     return;
+                }
+                if (flashWasHeld)
+                {
+                    // 콤보가 방금 끝났다: 미룬 섬광을 지난 시각에 바로 터뜨리지 않고, 지금부터 예고를 다 보여준다.
+                    flashWasHeld = false;
+                    nextFlashAt = Math.Max(nextFlashAt, until + rules.FlashWarningSeconds);
+                    continue;
                 }
                 if (nextFlashAt > until) return; // 예고 중
                 double at = nextFlashAt;
