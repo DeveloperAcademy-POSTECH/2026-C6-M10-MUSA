@@ -51,7 +51,7 @@ MonoBehaviour:
   gourdColorComboEnabled: 1
   comboFirstStartSeconds: 20
   comboRepeatIntervalSeconds: 40
-  comboTimeLimitSeconds: 10
+  comboTimeLimitSeconds: 15
   comboPenaltyDurationSeconds: 10
   comboPenaltySizeScale: 0.1
   comboPenaltyThrowerOnly: 0

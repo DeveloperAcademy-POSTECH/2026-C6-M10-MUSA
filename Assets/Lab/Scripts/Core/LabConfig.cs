@@ -352,7 +352,7 @@ namespace C6Lab
         [Tooltip("콤보가 나오는 간격 (초). 앞 콤보가 나온 시각부터 잰다. 앞 콤보가 아직 진행 중이면 끝난 직후에 나온다.")]
         [SerializeField, Range(1f, 3600f)] private float comboRepeatIntervalSeconds = 40f;
         [Tooltip("콤보 4칸을 모두 맞혀야 하는 제한 시간 (초)")]
-        [SerializeField, Range(1f, 600f)] private float comboTimeLimitSeconds = 10f;
+        [SerializeField, Range(1f, 600f)] private float comboTimeLimitSeconds = 15f;
         [Tooltip("콤보 실패 후 공 크기·칠 면적이 줄어드는 시간 (초). 0이면 페널티 없음.")]
         [SerializeField, Range(0f, 600f)] private float comboPenaltyDurationSeconds = 10f;
         [Tooltip("페널티 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
@@ -657,7 +657,7 @@ namespace C6Lab
         public bool GourdColorComboEnabled => gourdColorComboEnabled;
         public float ComboFirstStartSeconds => Mathf.Clamp(Finite(comboFirstStartSeconds, 20f), 1f, 3600f);
         public float ComboRepeatIntervalSeconds => Mathf.Clamp(Finite(comboRepeatIntervalSeconds, 40f), 1f, 3600f);
-        public float ComboTimeLimitSeconds => Mathf.Clamp(Finite(comboTimeLimitSeconds, 10f), 1f, 600f);
+        public float ComboTimeLimitSeconds => Mathf.Clamp(Finite(comboTimeLimitSeconds, 15f), 1f, 600f);
         public float ComboPenaltyDurationSeconds => Mathf.Clamp(Finite(comboPenaltyDurationSeconds, 10f), 0f, 600f);
         public float ComboPenaltySizeScale => Mathf.Clamp(Finite(comboPenaltySizeScale, .1f), .01f, 1f);
         public bool ComboPenaltyThrowerOnly => comboPenaltyThrowerOnly;
