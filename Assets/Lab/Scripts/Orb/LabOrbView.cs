@@ -54,6 +54,9 @@ namespace C6Lab
         private Coroutine dropRoutine;
         private Action dropLanded;
         private Coroutine shrinkRoutine;
+        // 콤보 SMALL/BIG 동안 그림만 작아지거나 커진다 (#257). 물리 반지름은 그대로다.
+        private float comboScale = 1f, comboTarget = 1f;
+        private Vector3 visualWritten = Vector3.one, visualBase = Vector3.one;
 
         public string OrbId => orbId;
         public LabOrbKind Kind => kind;
@@ -87,6 +90,30 @@ namespace C6Lab
         /// <summary>A bomb shows its flat cartoon art instead of the sphere once the appearance provides it.</summary>
         public bool BombArtVisible => itemMarker != null && itemMarker.BombArtVisible;
         public Transform Visual => visual;
+        /// <summary>콤보 SMALL/BIG 때문에 지금 그림에 곱하고 있는 배율 (#257). 1이면 원래 크기.</summary>
+        public float ComboScale => comboScale;
+        /// <summary>콤보 배율이 향하는 값 (#257). 꼬리(#254)는 이 값으로 크기를 정한다.</summary>
+        public float ComboScaleTarget => comboTarget;
+
+        /// <summary>콤보 SMALL/BIG에 맞춘 그림 배율 목표 (#257). 판이 매 프레임 정한다.</summary>
+        public void SetComboScaleTarget(float target) =>
+            comboTarget = float.IsNaN(target) || float.IsInfinity(target) || target <= 0f ? 1f : target;
+
+        /// <summary>
+        /// 콤보 배율을 목표 쪽으로 부드럽게 옮기고 그림에 곱한다 (#257). 생성·낙하·결합 연출이 그림 크기를
+        /// 직접 바꾸면 그 값을 새 기준으로 삼아 그 위에 곱하므로 연출과 겹치지 않는다. 물리는 바꾸지 않는다.
+        /// </summary>
+        public void StepComboScale(float deltaTime, float easeSeconds)
+        {
+            if (visual == null) return;
+            float rate = easeSeconds > 0f ? 1f - Mathf.Exp(-Mathf.Max(0f, deltaTime) * 4f / easeSeconds) : 1f;
+            comboScale = Mathf.Lerp(comboScale, comboTarget, rate);
+            if (Mathf.Abs(comboScale - comboTarget) < .002f) comboScale = comboTarget;
+            Vector3 current = visual.localScale;
+            if ((current - visualWritten).sqrMagnitude > 1e-10f) visualBase = current;
+            visualWritten = visualBase * comboScale;
+            visual.localScale = visualWritten;
+        }
         public bool IsSpawning { get; private set; }
         /// <summary>How long a bomb's whole fuse is (the item lifetime), so its rope burns at the right pace.</summary>
         public float FuseTotalSeconds { get; set; } = 15f;
@@ -241,9 +268,10 @@ namespace C6Lab
             float flash = (1f - blink) * (1f - blink);
             Color tint = look.ExpiryFlashColor;
             // Cover the art as drawn: a combined orb's picture is drawn larger, a bomb's art larger still.
-            float art = HasBombArt ? visualRadius * look.BombBodySize
+            // The combo SMALL/BIG scale (#257) shrinks or grows the art, so the flash follows it.
+            float art = (HasBombArt ? visualRadius * look.BombBodySize
                 : orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf ? visualRadius * LabOrbSpriteArt.SizeScaleFor(kind)
-                : visualRadius;
+                : visualRadius) * comboScale;
             expiryFlash.gameObject.SetActive(true);
             expiryHalo.gameObject.SetActive(true);
             expiryFlash.transform.localPosition = new Vector3(0f, 0f, -1.05f * art);

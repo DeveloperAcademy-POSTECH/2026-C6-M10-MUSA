@@ -150,6 +150,14 @@ namespace C6Lab
         private readonly List<PointerSample> samples = new List<PointerSample>();
         private readonly List<Entry> updateEntries = new List<Entry>();
         private LabConfig config;
+        [Header("Combo SMALL/BIG on the board (#257) - art only, physics unchanged")]
+        [Tooltip("콤보 실패(SMALL) 동안 판 구슬 그림 배율. 던지는 공(0.1배)보다 완화한다.")]
+        [SerializeField, Range(.2f, 1f)] private float comboSmallScale = .6f;
+        [Tooltip("콤보 성공(BIG) 동안 판 구슬 그림 배율. 던지는 공(2.5배)보다 완화한다.")]
+        [SerializeField, Range(1f, 2.5f)] private float comboBigScale = 1.4f;
+        [Tooltip("크기가 바뀌는 데 걸리는 시간 (초, 대략)")]
+        [SerializeField, Min(0f)] private float comboScaleSeconds = .25f;
+        private int comboLook;
         private Camera inputCamera;
         private Rect bounds;
         private int blockedSide;
@@ -317,6 +325,13 @@ namespace C6Lab
         /// Limit only where a new pointer gesture may begin. A gesture already holding an orb
         /// continues outside this rectangle so it can still pass an edge or release a throw.
         /// </summary>
+        /// <summary>조합판의 화면 영역(픽셀). 콤보 보상 별(#257)이 이 위쪽 가장자리까지 떨어진다.</summary>
+        public bool TryGetInputScreenRect(out Rect screenRect)
+        {
+            screenRect = inputScreenRect;
+            return hasInputScreenRect;
+        }
+
         public void SetInputScreenRect(Rect screenRect)
         {
             if (screenRect.width <= 0f || screenRect.height <= 0f
@@ -550,12 +565,35 @@ namespace C6Lab
 
         private void LateUpdate()
         {
+            ApplyComboLook();
             SyncBoardTrails();
             if (blockedSide == 0) return;
             blockSecondsLeft -= Time.deltaTime;
             if (blockSecondsLeft <= 0f) LiftSwipeBlock();
             // Follows the board if its area was resized.
             else ShowSwipeBlock();
+        }
+
+        /// <summary>
+        /// 이 기기 플레이어의 콤보 효과 (#257): -1 SMALL(페널티), 1 BIG(보상), 0 없음. 콤보 HUD가 매 프레임 정한다.
+        /// 판의 음양·결합 구슬 그림이 이 동안 작아지거나 커진다(물리 크기는 그대로).
+        /// </summary>
+        public void SetComboLook(int look) => comboLook = Math.Sign(look);
+        public int ComboLook => comboLook;
+        /// <summary>판 구슬이 지금 콤보 효과로 향하는 그림 배율 (#257)</summary>
+        public float ComboLookScale => comboLook < 0 ? comboSmallScale : comboLook > 0 ? comboBigScale : 1f;
+
+        private void ApplyComboLook()
+        {
+            float target = ComboLookScale;
+            foreach (var entry in entries.Values)
+            {
+                LabOrbView view = entry.View;
+                if (view == null) continue;
+                bool sized = view.Kind.IsRaw() || view.Kind == LabOrbKind.Combined;
+                view.SetComboScaleTarget(sized ? target : 1f);
+                view.StepComboScale(Time.deltaTime, comboScaleSeconds);
+            }
         }
 
         /// <summary>
@@ -578,7 +616,7 @@ namespace C6Lab
                     if (!wanted) continue;
                     trail = view.gameObject.AddComponent<LabOrbBoardTrail>();
                 }
-                trail.Sync(view, config.OrbAppearance, on, scale);
+                trail.Sync(view, config.OrbAppearance, on, scale * view.ComboScaleTarget);
             }
         }
 
