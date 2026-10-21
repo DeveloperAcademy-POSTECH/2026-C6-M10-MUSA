@@ -531,8 +531,8 @@ namespace C6Lab
         [SerializeField, Range(0, 10)] private int charmRescueTaps = 3;
 
         [Header("Yaguang flash (#268)")]
-        [Tooltip("야광귀 섬광. 박에서 요괴가 빼꼼 나와 눈이 밝아진 뒤(예고) 화면이 하얗게 번쩍이고, 눈부신 동안 판 위 음양·결합 구슬과 아이템이 하얗게 보인다(북·박 색칠·HUD는 그대로). 화면 표시만 바뀌고 조작·판정은 그대로다. 방해공작 묶음(#251)과 따로 돈다. 기본 켬.")]
-        [SerializeField] private bool yaguangFlashEnabled = true;
+        [Tooltip("야광귀 섬광. 박에서 요괴가 빼꼼 나와 눈이 밝아진 뒤(예고) 화면이 하얗게 번쩍이고, 눈부신 동안 판 위 음양·결합 구슬과 아이템이 하얗게 보인다(북·박 색칠·HUD는 그대로). 화면 표시만 바뀌고 조작·판정은 그대로다. 방해공작 묶음(#251)과 따로 돈다. 야광귀 전용이라 기본은 끔(DEV `Yaguang Flash`로 켠다).")]
+        [SerializeField] private bool yaguangFlashEnabled;
         [Tooltip("섬광 대상. 끄면(ALL) 모두에게 동시에, 켜면(ONE) 매번 무작위 한 명에게만.")]
         [SerializeField] private bool yaguangFlashTargetOne;
         [Tooltip("전투 시작 후 첫 섬광(번쩍이는 순간)까지의 시간 (초, 일시정지 제외). 예고는 그 직전에 온다.")]

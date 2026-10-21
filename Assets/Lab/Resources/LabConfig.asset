@@ -179,7 +179,7 @@ MonoBehaviour:
   straightPitchOffsetDegrees: 3
   straightLoftScale: 0.1
   straightGravityScale: 0.1
-  yaguangFlashEnabled: 1
+  yaguangFlashEnabled: 0
   yaguangFlashTargetOne: 0
   yaguangFlashFirstStartSeconds: 30
   yaguangFlashIntervalSeconds: 40
