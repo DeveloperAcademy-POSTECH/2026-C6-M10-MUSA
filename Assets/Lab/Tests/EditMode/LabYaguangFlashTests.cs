@@ -31,6 +31,10 @@ namespace C6Lab.Tests
             Assert.That(new[] { flash[0].OffText, flash[0].OnText }, Is.EqualTo(new[] { "끔", "켬" }));
             Assert.That(new[] { flash[1].OffText, flash[1].OnText }, Is.EqualTo(new[] { "모두", "한 명" }));
             Assert.That(flash.Skip(2).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
+            float[] defaults = { 28f, 60f, 2f, 7f, 2f };
+            for (int i = 0; i < defaults.Length; i++)
+                Assert.That((flash[i + 2].Min + flash[i + 2].Max) * .5f, Is.EqualTo(defaults[i]),
+                    flash[i + 2].Label + ": every slider starts in the middle of its range.");
 
             Assert.That(LabConfig.DeveloperCategories.Any(category => category.Title == "Combo"), Is.False,
                 "The combo moved into the 야광귀 group.");
@@ -47,19 +51,23 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(178), Is.EqualTo(new[] { 0f, 0f, 30f, 60f, 1.5f, 3f, 1.5f }),
-                    "Off by default; once on, everyone flashes at 30 s and every 60 s, 20 s before each combo.");
+                Assert.That(source.CaptureDeveloperValues().Skip(178), Is.EqualTo(new[] { 0f, 0f, 28f, 60f, 2f, 7f, 2f }),
+                    "Off by default; once on, everyone flashes at 28 s and every 60 s, 22 s before each combo, "
+                    + "with a 2 s warning, 7 s of glare and 2 s to recover.");
 
             float[] values = config.CaptureDeveloperValues();
-            values[178] = 1f; values[179] = 1f; values[180] = 5f; values[181] = 12f;
+            values[178] = 1f; values[179] = 1f; values[180] = 5f; values[181] = 24f;
             values[182] = 0f; values[183] = 2f; values[184] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(new[] { config.YaguangFlashEnabled, config.YaguangFlashTargetOne }, Is.All.True);
             Assert.That(new[] { config.YaguangFlashFirstStartSeconds, config.YaguangFlashIntervalSeconds,
                 config.YaguangFlashWarningSeconds, config.YaguangFlashGlareSeconds, config.YaguangFlashRecoverySeconds },
-                Is.EqualTo(new[] { 5f, 12f, 0f, 2f, 0f }));
+                Is.EqualTo(new[] { 5f, 24f, 0f, 2f, 0f }));
             values[183] = 0f;
-            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "A glare needs some length.");
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "A glare lasts at least 1 s.");
+            values[183] = 2f;
+            values[181] = 12f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Flashes come at least 20 s apart.");
         }
 
         [Test]
@@ -133,9 +141,19 @@ namespace C6Lab.Tests
         public void AShortIntervalStillLeavesTheGlareRecoveryAndNextWarningApart()
         {
             var model = new LabModel();
-            model.Begin("flash-gap", Three, 0d, Config(flash: true, interval: 1f));
+            model.Begin("flash-gap", Three, 0d, Config(flash: true, interval: 20f, warning: 4f, glare: 13f, recovery: 4f));
             LabSnapshot flashed = model.Snapshot(30d);
-            Assert.That(flashed.flashAt, Is.EqualTo(36d), "1.5 warning + 3 glare + 1.5 recovery.");
+            Assert.That(flashed.flashAt, Is.EqualTo(51d), "4 warning + 13 glare + 4 recovery is longer than 20 s.");
+        }
+
+        [Test]
+        public void TheEyesStayPlainThenLightUpSuddenlyBeforeTheFlash()
+        {
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(0f), Is.Zero);
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(.45f), Is.Zero, "Plain eyes for the first part of the warning.");
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(.575f), Is.EqualTo(.5f).Within(1e-4f));
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(.7f), Is.EqualTo(1f), "Fully lit quickly...");
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(1f), Is.EqualTo(1f), "...and held until the flash.");
         }
 
         [Test]
@@ -157,11 +175,11 @@ namespace C6Lab.Tests
 
         private List<ulong> Targets(LabModel model)
         {
-            model.Begin("flash-one", Three, 0d, Config(flash: true, one: true, interval: 10f));
+            model.Begin("flash-one", Three, 0d, Config(flash: true, one: true, interval: 20f));
             var targets = new List<ulong>();
             for (int i = 0; i < 8; i++)
             {
-                double at = 30d + 10d * i;
+                double at = 30d + 20d * i;
                 LabSnapshot before = model.Snapshot(at - .1d);
                 LabSnapshot after = model.Snapshot(at);
                 Assert.That(after.flashCount, Is.EqualTo((uint)(i + 1)));
@@ -175,7 +193,7 @@ namespace C6Lab.Tests
         }
 
         private LabConfig Config(bool flash = false, bool one = false, float first = 30f, float interval = 60f,
-            bool combo = false)
+            bool combo = false, float warning = 1.5f, float glare = 3f, float recovery = 1.5f)
         {
             var config = ScriptableObject.CreateInstance<LabConfig>();
             created.Add(config);
@@ -191,9 +209,9 @@ namespace C6Lab.Tests
             values[179] = one ? 1f : 0f;
             values[180] = first;
             values[181] = interval;
-            values[182] = 1.5f;
-            values[183] = 3f;
-            values[184] = 1.5f;
+            values[182] = warning;
+            values[183] = glare;
+            values[184] = recovery;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return config;
         }

@@ -5,7 +5,8 @@ namespace C6Lab
 {
     /// <summary>
     /// 야광귀 섬광 (#268)의 화면. 섬광을 맞을 사람 자신의 화면에만 그린다(DEV 대상 ALL이면 모두, ONE이면 한 명).
-    /// - 예고: 화면 가장자리부터 노란 빛이 차오른다 (박 속 요괴가 빼꼼 나와 눈이 밝아지는 동안).
+    /// - 예고: 모든 기기의 박 옆 말풍선에 야광귀의 두 눈이 뜨고(`LabGourdAlert.ShowEyes`), 예고 후반에 눈이 갑자기
+    ///   노랗게 빛난다. 맞을 사람 화면은 눈이 빛나는 만큼 가장자리부터 노란 빛이 차오른다.
     /// - 섬광: 화면 전체가 하얗게 번쩍했다가 빠르게 빠지고, 진동이 한 번 온다.
     /// - 눈부심·회복: 판의 음양·결합 구슬과 아이템을 하얗게 덮고(북 제외), 회복 동안 색을 천천히 돌려준다.
     /// 시각은 Host 스냅샷(flashWarningAt/flashAt/flashLastAt)을, 길이는 DEV 값을 쓴다. 화면 표시만 하며 터치를 막지 않는다.
@@ -34,6 +35,19 @@ namespace C6Lab
         private uint seenFlashCount;
         private double seenServerTime = -1d;
         private float seenAt;
+        private double eyesShownFor = -1d;
+
+        /// <summary>예고 중 눈이 빛나기 시작하는 지점과 다 빛나는 지점 (예고 길이 비율). 그 전에는 보통 눈이다.</summary>
+        public const float EyesLightFrom = .45f, EyesLitAt = .7f;
+
+        /// <summary>
+        /// 예고 진행(0~1)에 따른 눈 빛 (0~1). 앞 절반쯤은 보통 눈으로 보여 주고, 그 뒤 짧게 확 빛난 다음 번쩍일 때까지 유지한다.
+        /// </summary>
+        public static float EyeGlowAt(float progress)
+        {
+            float u = Mathf.Clamp01((progress - EyesLightFrom) / (EyesLitAt - EyesLightFrom));
+            return u * u * (3f - 2f * u);
+        }
 
         /// <summary>예고 빛의 지금 불투명도 (0이면 안 보임)</summary>
         public float EdgeAlpha => edge != null && edge.gameObject.activeInHierarchy ? edge.color.a : 0f;
@@ -65,7 +79,8 @@ namespace C6Lab
             if (network.board != null) network.board.SetFlashGlare(glare);
             CheckNewFlash(snapshot, now, me, config);
 
-            float warning = LabYaguangFlash.WarningAmount(snapshot, now, me);
+            float progress = DriveEyes(snapshot, now);
+            float warning = LabYaguangFlash.WarningAmount(snapshot, now, me) > 0f ? EyeGlowAt(progress) : 0f;
             float burstAlpha = 0f;
             if (snapshot.LastFlashHit(me) && snapshot.flashLastAt >= 0d)
             {
@@ -85,11 +100,31 @@ namespace C6Lab
             if (!EnsureLayer()) return;
             layer.gameObject.SetActive(true);
             layer.SetAsLastSibling();
-            // 처음엔 천천히, 번쩍이기 직전에 확 밝아진다.
-            edge.color = new Color(EdgeColor.r, EdgeColor.g, EdgeColor.b, edgeMaxAlpha * warning * warning);
+            // 말풍선의 눈이 빛나는 만큼 가장자리 빛도 차오른다.
+            edge.color = new Color(EdgeColor.r, EdgeColor.g, EdgeColor.b, edgeMaxAlpha * warning);
             edge.gameObject.SetActive(warning > 0f);
             burst.color = new Color(BurstColor.r, BurstColor.g, BurstColor.b, burstAlpha);
             burst.gameObject.SetActive(burstAlpha > 0f);
+        }
+
+        /// <summary>
+        /// 예고가 시작되면 박 옆 말풍선에 야광귀 눈을 한 번 띄우고, 매 프레임 눈 빛을 맞춘다. 모든 기기에서 한다.
+        /// 예고 진행(0~1)을 돌려준다. 예고가 아니면 -1.
+        /// </summary>
+        private float DriveEyes(LabSnapshot snapshot, double now)
+        {
+            if (!snapshot.FlashWarningOn(now)) return -1f;
+            double length = snapshot.flashAt - snapshot.flashWarningAt;
+            float progress = length > 0d ? Mathf.Clamp01((float)((now - snapshot.flashWarningAt) / length)) : 1f;
+            LabGourdAlert alert = GetComponent<LabGourdAlert>();
+            if (alert == null || network.target == null) return progress;
+            if (eyesShownFor != snapshot.flashAt || !alert.ShowingEyes)
+            {
+                if (eyesShownFor != snapshot.flashAt) alert.ShowEyes(network.target, (float)(snapshot.flashAt - now));
+                eyesShownFor = snapshot.flashAt;
+            }
+            if (alert.ShowingEyes) alert.SetEyeGlow(EyeGlowAt(progress));
+            return progress;
         }
 
         /// <summary>

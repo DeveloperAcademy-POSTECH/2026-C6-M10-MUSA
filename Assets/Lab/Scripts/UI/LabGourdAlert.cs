@@ -11,6 +11,8 @@ namespace C6Lab
     /// 박이 내 한쪽 넘기기를 막을 때(#215)는 같은 말풍선에 "← 🚫" 또는 "→ 🚫"(먹색 화살표와 빨간 금지
     /// 표시를 직접 그림)가 떠, 막힌 사람 화면에만 보인다.
     /// 요괴가 통합 추첨으로 매혹을 걸 때(#251)는 같은 말풍선에 하트(직접 그림)가 떠, 매혹된 사람 화면에만 보인다.
+    /// 야광귀 섬광 예고(#268)에는 같은 말풍선에 야광귀의 튀어나온 두 눈(직접 그림)이 떠 모든 기기에서 보이고,
+    /// 섬광 직전에 눈이 갑자기 노랗게 빛난다(`SetEyeGlow`). 번쩍이는 순간 말풍선은 들어간다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabGourdAlert : MonoBehaviour
@@ -40,6 +42,14 @@ namespace C6Lab
         private static Sprite blockLeftSprite;
         private static Sprite blockRightSprite;
         private static Sprite heartSprite;
+        private static Sprite eyesSprite;
+        private static Sprite eyesLitSprite;
+        private static Sprite eyesHaloSprite;
+        // 야광귀 눈 그림 (#268): 가로로 긴 그림에 튀어나온 두 눈. 픽셀 크기와 두 눈의 중심·반지름.
+        private const int EyesWidth = 128, EyesHeight = 64;
+        private static readonly Vector2 LeftEye = new Vector2(38f, 32f), RightEye = new Vector2(90f, 32f);
+        private const float EyeRadius = 23f;
+        private static readonly Color32 EyeLitColor = new Color32(255, 214, 64, 255);
         // 매혹 하트 그림 (#251): 정사각형 픽셀 크기와, 먹색 테두리 안쪽 하트의 크기 비율.
         private const int HeartSize = 96;
         private const float HeartInner = .8f;
@@ -60,6 +70,11 @@ namespace C6Lab
         private Image blockMark;
         private Image heartMark;
         private bool showingHeart;
+        private RectTransform eyesRect;
+        private Image eyesHalo;
+        private Image eyesLit;
+        private bool showingEyes;
+        private float eyeGlow;
         private float elapsed = -1f;
         private float duration;
         private bool showingBlock;
@@ -72,7 +87,11 @@ namespace C6Lab
         public RectTransform Bubble => bubble;
         /// <summary>말풍선의 내용: 폭탄이면 "!", 넘기기 막기면 "← 🚫" 또는 "→ 🚫", 매혹이면 "♥".</summary>
         public string Label => showingBlock ? (blockRight ? "→ 🚫" : "← 🚫") : showingHeart ? "♥"
-            : mark != null ? mark.text : string.Empty;
+            : showingEyes ? "👀" : mark != null ? mark.text : string.Empty;
+        /// <summary>지금 야광귀 눈 말풍선을 보여 주는 중인지 (#268).</summary>
+        public bool ShowingEyes => Active && showingEyes;
+        /// <summary>야광귀 눈이 빛나는 정도 (0 보통 눈 ~ 1 완전히 빛남, #268).</summary>
+        public float EyeGlow => eyeGlow;
         /// <summary>지금 매혹 하트 말풍선을 보여 주는 중인지 (#251).</summary>
         public bool ShowingHeart => Active && showingHeart;
         public float ShowSeconds => showSeconds;
@@ -126,9 +145,7 @@ namespace C6Lab
         {
             if (gourd == null || !EnsureBubble()) return;
             showingBlock = showingHeart = false;
-            mark.gameObject.SetActive(true);
-            blockMark.gameObject.SetActive(false);
-            heartMark.gameObject.SetActive(false);
+            ShowOnly(mark.gameObject);
             Begin(gourd, showSeconds);
         }
 
@@ -138,9 +155,7 @@ namespace C6Lab
             if (gourd == null || !EnsureBubble()) return;
             showingBlock = false;
             showingHeart = true;
-            mark.gameObject.SetActive(false);
-            blockMark.gameObject.SetActive(false);
-            heartMark.gameObject.SetActive(true);
+            ShowOnly(heartMark.gameObject);
             Begin(gourd, showSeconds);
         }
 
@@ -153,11 +168,43 @@ namespace C6Lab
             showingBlock = true;
             showingHeart = false;
             blockRight = right;
-            mark.gameObject.SetActive(false);
-            heartMark.gameObject.SetActive(false);
             blockMark.sprite = right ? BlockRightSprite() : BlockLeftSprite();
-            blockMark.gameObject.SetActive(true);
+            ShowOnly(blockMark.gameObject);
             Begin(gourd, BlockShowSeconds);
+        }
+
+        /// <summary>
+        /// 야광귀 섬광 예고 (#268): 박 옆 말풍선에 야광귀의 두 눈을 seconds 동안 띄운다(번쩍이는 순간까지). 모든 기기에서 부른다.
+        /// 눈은 처음엔 보통 눈이고, <see cref="SetEyeGlow"/>로 섬광 직전에 노랗게 빛나게 한다.
+        /// </summary>
+        public void ShowEyes(LabTarget gourd, float seconds)
+        {
+            if (gourd == null || !EnsureBubble()) return;
+            showingBlock = showingHeart = false;
+            showingEyes = true;
+            ShowOnly(eyesRect.gameObject);
+            SetEyeGlow(0f);
+            Begin(gourd, Mathf.Max(.2f, seconds));
+        }
+
+        /// <summary>야광귀 눈이 빛나는 정도 (0~1). 노란 눈동자가 겹쳐 나오고 둘레 빛이 커진다.</summary>
+        public void SetEyeGlow(float glow)
+        {
+            eyeGlow = float.IsNaN(glow) ? 0f : Mathf.Clamp01(glow);
+            if (eyesLit == null) return;
+            eyesLit.color = new Color(1f, 1f, 1f, eyeGlow);
+            eyesHalo.color = new Color(1f, 1f, 1f, .85f * eyeGlow);
+            eyesHalo.rectTransform.localScale = Vector3.one * (1f + .3f * eyeGlow);
+        }
+
+        // 말풍선 안 표시는 한 번에 하나만 보인다.
+        private void ShowOnly(GameObject shown)
+        {
+            if (shown != eyesRect.gameObject) showingEyes = false;
+            mark.gameObject.SetActive(shown == mark.gameObject);
+            blockMark.gameObject.SetActive(shown == blockMark.gameObject);
+            heartMark.gameObject.SetActive(shown == heartMark.gameObject);
+            eyesRect.gameObject.SetActive(shown == eyesRect.gameObject);
         }
 
         private void Begin(LabTarget gourd, float seconds)
@@ -172,6 +219,7 @@ namespace C6Lab
         public void Hide()
         {
             elapsed = -1f;
+            showingEyes = false;
             target = null;
             if (bubble != null) bubble.gameObject.SetActive(false);
         }
@@ -291,8 +339,119 @@ namespace C6Lab
             heartMark.preserveAspect = true;
             heartMark.raycastTarget = false;
             heartRect.gameObject.SetActive(false);
+
+            // 야광귀 눈 (#268): 둘레 빛 → 보통 눈 → 빛나는 눈 순서로 겹친다.
+            eyesRect = NewRect("Gourd Alert Eyes", bubble);
+            eyesRect.anchorMin = eyesRect.anchorMax = center;
+            eyesRect.sizeDelta = new Vector2(bubbleSize * .74f, bubbleSize * .37f);
+            eyesHalo = EyesLayer("Gourd Alert Eyes Halo", EyesHaloSprite());
+            EyesLayer("Gourd Alert Eyes Plain", EyesSprite(false));
+            eyesLit = EyesLayer("Gourd Alert Eyes Lit", EyesSprite(true));
+            eyesRect.gameObject.SetActive(false);
             bubble.gameObject.SetActive(false);
             return true;
+        }
+
+        private Image EyesLayer(string name, Sprite sprite)
+        {
+            RectTransform rect = NewRect(name, eyesRect);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            var image = rect.gameObject.AddComponent<Image>();
+            image.sprite = sprite;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        /// <summary>
+        /// 야광귀의 튀어나온 두 눈 (#268). 보통 눈은 먹색 테두리·흰자·검은 눈동자와 작은 하이라이트, 빛나는 눈은
+        /// 흰자가 노랗게, 눈동자가 작고 밝은 심지로 바뀐다. 글꼴 이모지 대신 직접 그린다.
+        /// </summary>
+        private static Sprite EyesSprite(bool lit)
+        {
+            if (lit && eyesLitSprite != null) return eyesLitSprite;
+            if (!lit && eyesSprite != null) return eyesSprite;
+            const int samples = 3;
+            var pixels = new Color32[EyesWidth * EyesHeight];
+            for (int y = 0; y < EyesHeight; y++)
+                for (int x = 0; x < EyesWidth; x++)
+                {
+                    Color sum = Color.clear;
+                    for (int sy = 0; sy < samples; sy++)
+                        for (int sx = 0; sx < samples; sx++)
+                        {
+                            var p = new Vector2(x + (sx + .5f) / samples, y + (sy + .5f) / samples);
+                            sum += EyeColor(p, lit);
+                        }
+                    Color average = sum / (samples * samples);
+                    // Premultiplied sum: divide colour back by alpha so edges keep the ink colour.
+                    if (average.a > 0f) average = new Color(average.r / average.a, average.g / average.a, average.b / average.a, average.a);
+                    pixels[y * EyesWidth + x] = average;
+                }
+            Sprite sprite = SpriteFrom(pixels, EyesWidth, EyesHeight, lit ? "Lab yaguang eyes lit" : "Lab yaguang eyes");
+            if (lit) eyesLitSprite = sprite; else eyesSprite = sprite;
+            return sprite;
+        }
+
+        // One sample of the eyes, premultiplied by its coverage.
+        private static Color EyeColor(Vector2 p, bool lit)
+        {
+            foreach (Vector2 eye in new[] { LeftEye, RightEye })
+            {
+                float d = Vector2.Distance(p, eye);
+                if (d > EyeRadius) continue;
+                Color ink = InkColor;
+                if (d > EyeRadius - 4f) return ink;
+                Color color = lit ? (Color)EyeLitColor : Color.white;
+                // 눈동자: 보통은 크고 검게, 빛나면 작고 거의 흰 심지로.
+                Vector2 pupil = eye + new Vector2(2f, -1f);
+                float pd = Vector2.Distance(p, pupil);
+                if (lit)
+                {
+                    if (pd < 7f) color = Color.Lerp(Color.white, color, pd / 7f);
+                }
+                else if (pd < 10f) color = ink;
+                if (!lit && Vector2.Distance(p, pupil + new Vector2(3f, 4f)) < 3f) color = Color.white;
+                return color;
+            }
+            return Color.clear;
+        }
+
+        /// <summary>두 눈 둘레의 부드러운 노란 빛 (#268). 눈이 빛날 때만 보인다.</summary>
+        private static Sprite EyesHaloSprite()
+        {
+            if (eyesHaloSprite != null) return eyesHaloSprite;
+            var pixels = new Color32[EyesWidth * EyesHeight];
+            for (int y = 0; y < EyesHeight; y++)
+                for (int x = 0; x < EyesWidth; x++)
+                {
+                    var p = new Vector2(x + .5f, y + .5f);
+                    float d = Mathf.Min(Vector2.Distance(p, LeftEye), Vector2.Distance(p, RightEye));
+                    float alpha = Mathf.Clamp01(1f - (d - EyeRadius * .6f) / (EyeRadius * .8f));
+                    Color32 color = EyeLitColor;
+                    color.a = (byte)Mathf.RoundToInt(alpha * alpha * 255f);
+                    pixels[y * EyesWidth + x] = color;
+                }
+            return eyesHaloSprite = SpriteFrom(pixels, EyesWidth, EyesHeight, "Lab yaguang eyes halo");
+        }
+
+        private static Sprite SpriteFrom(Color32[] pixels, int width, int height, string name)
+        {
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = name,
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(.5f, .5f), 100f);
+            sprite.name = name;
+            sprite.hideFlags = HideFlags.DontSave;
+            return sprite;
         }
 
         /// <summary>

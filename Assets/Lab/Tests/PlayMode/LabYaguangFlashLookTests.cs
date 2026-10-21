@@ -90,9 +90,12 @@ namespace C6Lab.Tests
             Assert.That(latest, Is.Not.Null);
             try
             {
-                latest.SetValue(network, Snapshot(20d, warningAt: 19.5d, flashAt: 21d));
+                latest.SetValue(network, Snapshot(19.7d, warningAt: 19.5d, flashAt: 21d));
                 yield return null;
-                Assert.That(hud.EdgeAlpha, Is.GreaterThan(0f), "The edge glows during the warning.");
+                Assert.That(hud.EdgeAlpha, Is.Zero, "Early in the warning the eyes are still plain.");
+                latest.SetValue(network, Snapshot(20.8d, warningAt: 19.5d, flashAt: 21d));
+                yield return null;
+                Assert.That(hud.EdgeAlpha, Is.GreaterThan(.5f), "Once the eyes light up, the edge glows.");
                 Assert.That(hud.BurstAlpha, Is.Zero);
 
                 LabSnapshot flashed = Snapshot(21.05d, warningAt: -1d, flashAt: -1d);
@@ -109,7 +112,7 @@ namespace C6Lab.Tests
                 dazzled.flashLastAt = 21d;
                 latest.SetValue(network, dazzled);
                 yield return null;
-                Assert.That(hud.BurstAlpha, Is.EqualTo(.12f).Within(.01f), "Only a faint veil stays while dazzled.");
+                Assert.That(hud.BurstAlpha, Is.EqualTo(.12f).Within(.01f), "Only a faint veil stays while dazzled (7 s).");
                 Assert.That(hud.HapticCount, Is.EqualTo(1), "The same flash does not buzz again.");
 
                 foreach (Graphic graphic in canvasRoot.GetComponentsInChildren<Graphic>(true))
