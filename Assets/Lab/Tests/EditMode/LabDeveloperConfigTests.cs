@@ -1144,7 +1144,7 @@ namespace C6Lab.Tests
         {
             var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
             Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
-                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns", "Paint Drying", "Gourd Color Combo", "Combo Penalty Target" }));
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns", "Paint Drying", "Gourd Color Combo", "Combo Penalty Target", "Board Orb Trail" }));
             Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
                 "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
             var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");
@@ -1159,6 +1159,9 @@ namespace C6Lab.Tests
             Assert.That(new[] { combo.OffText, combo.OnText }, Is.EqualTo(new[] { "OFF", "ON" }));
             var comboTarget = toggles.Single(field => field.DisplayLabel == "Combo Penalty Target");
             Assert.That(new[] { comboTarget.OffText, comboTarget.OnText }, Is.EqualTo(new[] { "TEAM", "THROWER" }));
+            var boardTrail = toggles.Single(field => field.DisplayLabel == "Board Orb Trail");
+            Assert.That(boardTrail.Label, Is.EqualTo("Board Orb Trail (0 off, 1 on)"));
+            Assert.That(new[] { boardTrail.OffText, boardTrail.OnText }, Is.EqualTo(new[] { "OFF", "ON" }));
             Assert.That(LabConfig.DeveloperFields.Single(field => field.Label.StartsWith("Minimap Size")).IsToggle, Is.False);
         }
 
