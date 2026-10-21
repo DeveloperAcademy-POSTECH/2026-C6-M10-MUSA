@@ -1527,3 +1527,22 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 추가·변경한 검사:
 - **PlayMode** `LabOrbPhysicsTests`: `ABombThePlayerSendsOnPassesAtTheEdgeEvenSlowlyButADriftingOneTurnsBack`(끌기 지연 0으로 가장자리에 놓고 예전 규칙이라면 되돌아왔을 속도로 놓기, 막힌 쪽 튕김, 혼자 떠도는 폭탄 되돌아옴); 변경 `AHeavyBombLeavesTheFingerSlowerAndSlidesToAStopSoonerThanAnOrb`(놓기 속도 비교를 설정값 0.75로)
 - **EditMode** `LabDeveloperConfigTests`: `HeavyBombFieldsJoinTheItemOrbsGroupWithTheirDefaultsAndApply`의 코드·저장 원본 기본값을 0.12·0.75·1.3·4로
+
+## 콤보 동안 박 속 요괴 — 2026-10-21, 이슈 #244
+
+기준은 main `f36678b3`(#237 PR #239까지 포함)를 합친 `feat/#244-combo-yokai`다. Unity는 실행하지 않았다.
+
+- **이전 동작**: 박 프리팹(`WhiteGourd`)의 `GourdYokai_Details`에 붙은 Legacy `Animation`이 6초짜리 `Gourd_Demo`를 계속 반복했다(0.5~1.2초 뚜껑 열림, 1.1~1.8초 요괴 올라옴, 2~3.5초 두리번, 3.8~4.5초 들어감, 4.5~5.3초 뚜껑 닫힘). 제어 코드가 없어 기기마다 따로 돌았다.
+- **새 `LabGourdYokai`**: `LabGourdPaint`가 Paint 박을 붙일 때 함께 붙인다. 스냅샷이 예고 중(`ComboWarningOn`)이거나 콤보 진행 중(`comboActive`)이면 애니메이션 속도를 0으로 두고 시각을 직접 정해 `Sample()`한다. 올라온 뒤에는 2.0~2.8초(눈 +24°↔-24°) 구간을 오가며 두리번거린다. 콤보가 끝나면 그 시각부터 속도 1로 다시 틀어 평소처럼 들어가고 6초 반복으로 돌아간다.
+- **이음새**: 애니메이션 키가 모두 기울기 0이라 키 사이가 S자(smoothstep)다. 평소 반복의 시각 t에서 시작할 때 t≤2.8은 그대로, 2.8~3.5(눈이 가운데로 돌아옴)는 같은 눈 각도의 두리번 시각(S자 역함수), 3.5~3.8은 2.4초, 3.8~5.3(들어감·뚜껑 닫힘)은 그 자리에서 거꾸로 되감아 3.8초에서 같은 모습의 2.4초로, 5.3초 이후(닫힘)는 0.5초로 잇는다. 곡선 계산상 높이/뚜껑/눈 차이는 0이고, 가장 늦어도 1.5초 안에 다 올라온다(예고 3초 안).
+- **움찔**: 콤보 진행 칸이 늘면 0.35초 동안 크기가 먼저 줄었다 커지며(최대 약 16%) 위로 살짝 들썩인다. 마지막 칸(성공)도 움찔한 뒤 들어간다.
+- **범위**: DEV 설정·프로토콜·프리팹·애니메이션 파일 변경 없음. Crack 모드와 콤보 OFF는 이전과 같다. 일시정지 중에는 멈춰 있다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. |
+| 곡선 이음새 계산 | 확인 (Unity 밖) | `Gourd_Demo.anim`의 키를 smoothstep으로 계산해, 0~6초 0.1초 간격 시작 시 높이/뚜껑/눈 차이 0을 확인했다. 실제 Unity 샘플링 결과가 아니다. |
+| PlayMode 실제 실행 | NOT_RUN | 새 `LabGourdYokaiTests` 4개(`TheYokaiComesOutForTheWarningStaysForTheComboAndGoesBackAfter`, `HittingASlotMakesTheYokaiFlinchOnce`, `AComboStartingAnywhereInTheOrdinaryLoopDoesNotJump`, `NoComboOrAPausedWarningKeepsTheOrdinaryLoopOrHoldsStill`), `LabGourdPaintTests` Scene 연결 확인 추가분. |
+| 솔로 화면: 17초쯤 요괴가 올라와 콤보 끝까지 머묾, 칸 명중 시 움찔, 끝나면 들어감 | NOT_RUN | 기본값으로 솔로 시작 후 확인한다. |
+| 3인 실행: 모든 화면에서 같은 때 나오고 들어감 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | |
