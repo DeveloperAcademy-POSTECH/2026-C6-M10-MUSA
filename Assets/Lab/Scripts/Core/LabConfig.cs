@@ -278,10 +278,10 @@ namespace C6Lab
             new LabDeveloperField("Combo First Start (seconds)", 1f, 3600f),
             new LabDeveloperField("Combo Repeat Interval (seconds)", 1f, 3600f),
             new LabDeveloperField("Combo Time Limit (seconds)", 1f, 600f),
-            new LabDeveloperField("Combo Penalty Duration (seconds)", 0f, 600f),
+            new LabDeveloperField("Combo Penalty Duration (seconds)", 0f, 30f),
             new LabDeveloperField("Combo Penalty Size (x)", .01f, 1f),
             LabDeveloperField.Toggle("Combo Penalty Target (0 team, 1 thrower)", "TEAM", "THROWER"),
-            new LabDeveloperField("Combo Reward Duration (seconds)", 0f, 600f),
+            new LabDeveloperField("Combo Reward Duration (seconds)", 0f, 30f),
             new LabDeveloperField("Combo Reward Size (x)", 1f, 3f),
             new LabDeveloperField("Combo Warning (seconds)", 0f, 10f),
             LabDeveloperField.Toggle("Board Orb Trail (0 off, 1 on)"),
@@ -303,7 +303,7 @@ namespace C6Lab
             LabDeveloperField.Toggle("야광귀 섬광 (0 off, 1 on)", "끔", "켬"),
             LabDeveloperField.Toggle("섬광 대상 (0 모두, 1 한 명)", "모두", "한 명"),
             // Each range is centred on its default, so every slider starts in the middle.
-            new LabDeveloperField("섬광 첫 시작 (초)", 1f, 55f),
+            new LabDeveloperField("섬광 첫 시작 (초)", 1f, 61f),
             new LabDeveloperField("섬광 간격 (초)", 20f, 100f),
             new LabDeveloperField("섬광 예고 (초)", 0f, 4f),
             new LabDeveloperField("섬광 눈부심 (초)", 1f, 13f),
@@ -414,13 +414,13 @@ namespace C6Lab
         [Tooltip("콤보 4칸을 모두 맞혀야 하는 제한 시간 (초)")]
         [SerializeField, Range(1f, 600f)] private float comboTimeLimitSeconds = 15f;
         [Tooltip("콤보 실패 후 공 크기·칠 면적이 줄어드는 시간 (초). 0이면 페널티 없음.")]
-        [SerializeField, Range(0f, 600f)] private float comboPenaltyDurationSeconds = 10f;
+        [SerializeField, Range(0f, 30f)] private float comboPenaltyDurationSeconds = 15f;
         [Tooltip("페널티 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
         [SerializeField, Range(.01f, 1f)] private float comboPenaltySizeScale = .1f;
         [Tooltip("페널티 대상. 팀 전체, 또는 틀린 색을 맞힌 사람만 (시간 초과는 언제나 팀 전체).")]
         [SerializeField] private bool comboPenaltyThrowerOnly;
         [Tooltip("콤보 성공 후 팀 전체의 공 크기/칠 면적이 커지는 시간 (초). 0이면 보상 없음.")]
-        [SerializeField, Range(0f, 600f)] private float comboRewardDurationSeconds = 10f;
+        [SerializeField, Range(0f, 30f)] private float comboRewardDurationSeconds = 15f;
         [Tooltip("보상 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
         [SerializeField, Range(1f, 3f)] private float comboRewardSizeScale = 2.5f;
         [Tooltip("콤보 4칸이 나오기 전 COMBO! 3, 2, 1 예고를 보여주는 시간 (초, #241). 0이면 예고 없이 바로 나온다.")]
@@ -573,8 +573,8 @@ namespace C6Lab
         [Tooltip("섬광 대상. 끄면(ALL) 모두에게 동시에, 켜면(ONE) 매번 무작위 한 명에게만.")]
         [SerializeField] private bool yaguangFlashTargetOne;
         [Tooltip("전투 시작 후 첫 섬광(번쩍이는 순간)까지의 시간 (초, 일시정지 제외). 예고는 그 직전에 온다. 범위의 가운데가 기본값.")]
-        [SerializeField, Range(1f, 55f)] private float yaguangFlashFirstStartSeconds = 28f;
-        [Tooltip("섬광과 다음 섬광 사이 간격 (초). 콤보 예고·진행 중이면 콤보가 끝날 때까지 미룬다. 기본 28·60초는 콤보(50초 시작·60초 간격)와 같은 박자로 콤보 22초 전마다 터져, 섬광(예고~회복 11초)이 콤보(예고~효과 끝 약 30초) 사이 30초 틈의 가운데에 놓이고 앞뒤로 9~10초씩 평소 플레이가 남는다.")]
+        [SerializeField, Range(1f, 61f)] private float yaguangFlashFirstStartSeconds = 31f;
+        [Tooltip("섬광과 다음 섬광 사이 간격 (초). 콤보 예고·진행 중이면 콤보가 끝날 때까지 미룬다. 기본 31·60초는 콤보(50초 시작·60초 간격)와 같은 박자로 콤보 19초 전마다 터져, 섬광(예고~회복 11초)이 콤보(예고 3 + 제한 15 + 결과 + 효과 15 ≈ 35초) 사이 약 25초 틈의 가운데에 놓이고 앞뒤로 약 7초씩 평소 플레이가 남는다.")]
         [SerializeField, Range(20f, 100f)] private float yaguangFlashIntervalSeconds = 60f;
         [Tooltip("번쩍이기 전 예고 시간 (초). 요괴가 빼꼼 나오고 박 옆 말풍선에 눈이 떴다가, 후반에 눈이 갑자기 빛난다. 0이면 예고 없이 번쩍인다.")]
         [SerializeField, Range(0f, 4f)] private float yaguangFlashWarningSeconds = 2f;
@@ -755,10 +755,10 @@ namespace C6Lab
         public float ComboFirstStartSeconds => Mathf.Clamp(Finite(comboFirstStartSeconds, 50f), 1f, 3600f);
         public float ComboRepeatIntervalSeconds => Mathf.Clamp(Finite(comboRepeatIntervalSeconds, 60f), 1f, 3600f);
         public float ComboTimeLimitSeconds => Mathf.Clamp(Finite(comboTimeLimitSeconds, 15f), 1f, 600f);
-        public float ComboPenaltyDurationSeconds => Mathf.Clamp(Finite(comboPenaltyDurationSeconds, 10f), 0f, 600f);
+        public float ComboPenaltyDurationSeconds => Mathf.Clamp(Finite(comboPenaltyDurationSeconds, 15f), 0f, 30f);
         public float ComboPenaltySizeScale => Mathf.Clamp(Finite(comboPenaltySizeScale, .1f), .01f, 1f);
         public bool ComboPenaltyThrowerOnly => comboPenaltyThrowerOnly;
-        public float ComboRewardDurationSeconds => Mathf.Clamp(Finite(comboRewardDurationSeconds, 10f), 0f, 600f);
+        public float ComboRewardDurationSeconds => Mathf.Clamp(Finite(comboRewardDurationSeconds, 15f), 0f, 30f);
         public float ComboRewardSizeScale => Mathf.Clamp(Finite(comboRewardSizeScale, 2.5f), 1f, 3f);
         public float ComboWarningSeconds => Mathf.Clamp(Finite(comboWarningSeconds, 3f), 0f, 10f);
         public bool BoardOrbTrailEnabled => boardOrbTrailEnabled;
@@ -906,7 +906,7 @@ namespace C6Lab
         public bool YaguangFlashEnabled => yaguangFlashEnabled;
         /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
         public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
-        public float YaguangFlashFirstStartSeconds => Mathf.Clamp(Finite(yaguangFlashFirstStartSeconds, 28f), 1f, 55f);
+        public float YaguangFlashFirstStartSeconds => Mathf.Clamp(Finite(yaguangFlashFirstStartSeconds, 31f), 1f, 61f);
         public float YaguangFlashIntervalSeconds => Mathf.Clamp(Finite(yaguangFlashIntervalSeconds, 60f), 20f, 100f);
         public float YaguangFlashWarningSeconds => Mathf.Clamp(Finite(yaguangFlashWarningSeconds, 2f), 0f, 4f);
         public float YaguangFlashGlareSeconds => Mathf.Clamp(Finite(yaguangFlashGlareSeconds, 7f), 1f, 13f);

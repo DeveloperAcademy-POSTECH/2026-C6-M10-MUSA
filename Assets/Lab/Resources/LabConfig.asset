@@ -52,10 +52,10 @@ MonoBehaviour:
   comboFirstStartSeconds: 50
   comboRepeatIntervalSeconds: 60
   comboTimeLimitSeconds: 15
-  comboPenaltyDurationSeconds: 10
+  comboPenaltyDurationSeconds: 15
   comboPenaltySizeScale: 0.1
   comboPenaltyThrowerOnly: 0
-  comboRewardDurationSeconds: 10
+  comboRewardDurationSeconds: 15
   comboRewardSizeScale: 2.5
   comboWarningSeconds: 3
   orbLifetimeSeconds: 8
@@ -181,7 +181,7 @@ MonoBehaviour:
   straightGravityScale: 0.1
   yaguangFlashEnabled: 0
   yaguangFlashTargetOne: 0
-  yaguangFlashFirstStartSeconds: 28
+  yaguangFlashFirstStartSeconds: 31
   yaguangFlashIntervalSeconds: 60
   yaguangFlashWarningSeconds: 2
   yaguangFlashGlareSeconds: 7

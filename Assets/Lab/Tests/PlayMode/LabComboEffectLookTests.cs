@@ -84,6 +84,8 @@ namespace C6Lab.Tests
                 Assert.That(first.sprite.texture.name, Is.EqualTo("Bujeok"));
                 Assert.That(first.color, Is.EqualTo(Color.white), "Its own colours, not tinted yellow.");
                 Assert.That(first.raycastTarget, Is.False);
+                Assert.That(LabComboRewardStars.BujeokSizeScale, Is.EqualTo(2.7f), "1.5x the first talisman size.");
+                Assert.That(LabComboRewardStars.BujeokCountScale, Is.EqualTo(.5f), "Half as many as the stars.");
             }
             finally
             {

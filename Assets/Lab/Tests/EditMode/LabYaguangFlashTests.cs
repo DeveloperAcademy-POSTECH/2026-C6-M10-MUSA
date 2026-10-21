@@ -31,7 +31,7 @@ namespace C6Lab.Tests
             Assert.That(new[] { flash[0].OffText, flash[0].OnText }, Is.EqualTo(new[] { "끔", "켬" }));
             Assert.That(new[] { flash[1].OffText, flash[1].OnText }, Is.EqualTo(new[] { "모두", "한 명" }));
             Assert.That(flash.Skip(2).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
-            float[] defaults = { 28f, 60f, 2f, 7f, 2f };
+            float[] defaults = { 31f, 60f, 2f, 7f, 2f };
             for (int i = 0; i < defaults.Length; i++)
                 Assert.That((flash[i + 2].Min + flash[i + 2].Max) * .5f, Is.EqualTo(defaults[i]),
                     flash[i + 2].Label + ": every slider starts in the middle of its range.");
@@ -44,6 +44,9 @@ namespace C6Lab.Tests
             Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 178 }), "One switch turns the combo and the flash on together.");
             Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 10 }));
             Assert.That(yaguang.DividerLabels, Is.EqualTo(new[] { "── 콤보 ──", "── 섬광 ──" }));
+            foreach (int index in new[] { 159, 162 })
+                Assert.That((LabConfig.DeveloperFields[index].Min + LabConfig.DeveloperFields[index].Max) * .5f, Is.EqualTo(15f),
+                    LabConfig.DeveloperFields[index].Label + ": the 15 s penalty/reward slider starts in the middle.");
             Assert.That(LabConfig.DeveloperCategories.Where(category => category.Title != "야광귀")
                 .All(category => category.SwitchFields == null && category.DividerAt == null), Is.True);
 
@@ -51,8 +54,8 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(178), Is.EqualTo(new[] { 0f, 0f, 28f, 60f, 2f, 7f, 2f }),
-                    "Off by default; once on, everyone flashes at 28 s and every 60 s, 22 s before each combo, "
+                Assert.That(source.CaptureDeveloperValues().Skip(178), Is.EqualTo(new[] { 0f, 0f, 31f, 60f, 2f, 7f, 2f }),
+                    "Off by default; once on, everyone flashes at 31 s and every 60 s, 19 s before each combo, "
                     + "with a 2 s warning, 7 s of glare and 2 s to recover.");
 
             float[] values = config.CaptureDeveloperValues();

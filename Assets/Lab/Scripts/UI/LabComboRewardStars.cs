@@ -22,6 +22,10 @@ namespace C6Lab
         private Sprite fallingSprite;
         private bool bujeok;
         private Color baseColor = StarColor;
+        /// <summary>부적은 별보다 크게 그리는 대신 이 비율만큼만 떨어뜨린다 (#268).</summary>
+        public const float BujeokCountScale = .5f;
+        /// <summary>부적 크기 = 별 크기 × 이 값 (#268). 세로 기준이고 폭은 그 절반이다.</summary>
+        public const float BujeokSizeScale = 2.7f;
 
         [Tooltip("보상이 막 시작됐을 때 초당 떨어지는 별 수. 남은 시간 비율만큼 줄어든다.")]
         [SerializeField, Min(0f)] private float starsPerSecond = 16f;
@@ -83,7 +87,8 @@ namespace C6Lab
         public RectTransform Area => area;
 
         /// <summary>보상이 막 시작됐다: 별이 한꺼번에 쏟아진다.</summary>
-        public void Burst(float bottomY) => Burst(startBurst, bottomY);
+        public void Burst(float bottomY) =>
+            Burst(bujeok ? Mathf.RoundToInt(startBurst * BujeokCountScale) : startBurst, bottomY);
 
         private void Burst(int count, float bottomY)
         {
@@ -99,8 +104,9 @@ namespace C6Lab
             if (area == null) return;
             Emitting = emitting;
             deltaTime = Mathf.Max(0f, deltaTime);
+            float countScale = bujeok ? BujeokCountScale : 1f;
             StarsPerSecondNow = emitting
-                ? Mathf.Max(minimumStarsPerSecond, starsPerSecond * Mathf.Clamp01(fraction)) : 0f;
+                ? Mathf.Max(minimumStarsPerSecond, starsPerSecond * Mathf.Clamp01(fraction)) * countScale : 0f;
             pending += StarsPerSecondNow * deltaTime;
             while (pending >= 1f)
             {
@@ -158,7 +164,7 @@ namespace C6Lab
             RectTransform star = stars[slot].rectTransform;
             float size = Mathf.Lerp(18f, 34f, Next()) * unit;
             // 부적은 세로로 긴 종이라 별보다 조금 크게, 폭은 높이의 절반으로 그린다.
-            if (bujeok) size *= 1.8f;
+            if (bujeok) size *= BujeokSizeScale;
             star.sizeDelta = bujeok ? new Vector2(size * .5f, size) : new Vector2(size, size);
             float x = Mathf.Lerp(rect.xMin + size, rect.xMax - size, Next());
             // 한꺼번에 쏟아질 때는 위쪽 띠 여러 높이에서 시작해 비처럼 보이게 한다.
