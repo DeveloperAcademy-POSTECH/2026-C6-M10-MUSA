@@ -1,0 +1,231 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace C6Lab
+{
+    /// <summary>
+    /// 매혹 (#251): 구미호에게 홀린 사람 자신의 화면. 남은 시간을 북 미니맵 바로 위의 세로 게이지(임시)로 보여 주고,
+    /// 풀리면 "정신 차림!"을 잠깐 띄운다. 매혹 울음소리가 Resources/Sabotage/CharmHowl에 있으면 매혹이 걸릴 때 모든
+    /// 기기에서 한 번 낸다. 화면 표시만 하며 터치를 막지 않는다.
+    /// </summary>
+    [DisallowMultipleComponent]
+    public sealed class LabCharmHud : MonoBehaviour
+    {
+        public const string HowlPath = "Sabotage/CharmHowl";
+        public const string AwakeText = "정신 차림!";
+        private const float AwakeSeconds = 1.2f;
+        private static readonly Color GaugeBackColor = new Color(.17f, .14f, .12f, .55f);
+
+        [Tooltip("게이지 크기 (Canvas 기준 픽셀)")]
+        [SerializeField] private Vector2 gaugeSize = new Vector2(16f, 140f);
+        [Tooltip("게이지 맨 아래와 북 미니맵 맨 위 사이 (Canvas 기준 픽셀)")]
+        [SerializeField, Min(0f)] private float gaugeGap = 10f;
+        [Tooltip("미니맵이 없을 때 게이지의 자리 (Canvas 비율)와 화면 오른쪽 끝에서 떨어진 거리 (픽셀)")]
+        [SerializeField] private Vector2 fallbackAnchor = new Vector2(1f, .5f);
+        [SerializeField, Min(0f)] private float fallbackMargin = 18f;
+        [Tooltip("\"정신 차림!\"이 뜨는 곳 (Canvas 비율)")]
+        [SerializeField] private Vector2 awakeAnchor = new Vector2(.5f, .6f);
+        [Tooltip("\"정신 차림!\" 글자 크기 (Canvas 기준 픽셀)")]
+        [SerializeField, Min(10f)] private float awakeSize = 40f;
+
+        private static readonly Vector3[] Corners = new Vector3[4];
+        private LabNetwork network;
+        private LabDrumMinimap minimap;
+        private Canvas canvas;
+        private Font font;
+        private RectTransform layer;
+        private RectTransform gauge;
+        private RectTransform gaugeFill;
+        private Text awake;
+        private AudioSource howlSource;
+        private AudioClip howl;
+        private bool howlLoaded;
+        private float awakeLeft = -1f;
+        private bool wasCharmed;
+        private double seenServerTime = -1d;
+        private float seenAt;
+
+        /// <summary>The charm's time-left gauge is showing on this screen.</summary>
+        public bool GaugeVisible => gauge != null && gauge.gameObject.activeInHierarchy;
+        public RectTransform Gauge => gauge;
+        /// <summary>How full the gauge is, 1 as the charm begins and 0 as it ends.</summary>
+        public float GaugeFill => gaugeFill != null ? gaugeFill.anchorMax.y : 0f;
+        public bool AwakeShowing => awake != null && awake.gameObject.activeInHierarchy;
+
+        /// <summary>스냅샷을 읽을 네트워크와, 게이지를 그릴 Canvas를 연결한다.</summary>
+        public void Bind(LabNetwork target, Canvas uiCanvas)
+        {
+            if (network != null) network.SabotageCast -= OnSabotageCast;
+            network = target;
+            canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
+            if (network != null) network.SabotageCast += OnSabotageCast;
+        }
+
+        // 울음소리는 모든 기기에서 낸다. 파일이 없으면 소리 없이 넘어간다.
+        private void OnSabotageCast(LabSabotageKind kind, ulong targetPlayer)
+        {
+            if (kind != LabSabotageKind.Charm) return;
+            if (!howlLoaded)
+            {
+                howl = Resources.Load<AudioClip>(HowlPath);
+                howlLoaded = true;
+            }
+            if (howl == null) return;
+            if (howlSource == null)
+            {
+                howlSource = gameObject.AddComponent<AudioSource>();
+                howlSource.playOnAwake = false;
+                howlSource.spatialBlend = 0f;
+            }
+            howlSource.PlayOneShot(howl, LabAudioSettings.SfxVolume);
+        }
+
+        private void LateUpdate()
+        {
+            LabSnapshot snapshot = network != null ? network.Snapshot : null;
+            if (snapshot == null || snapshot.phase != LabPhase.Playing)
+            {
+                wasCharmed = false;
+                awakeLeft = -1f;
+                if (layer != null) layer.gameObject.SetActive(false);
+                return;
+            }
+            if (snapshot.paused)
+            {
+                if (layer != null) layer.gameObject.SetActive(false);
+                return;
+            }
+            double now = ServerNow(snapshot);
+            bool charmed = snapshot.charmedPlayer == network.LocalPlayerId
+                && snapshot.charmUntil > now && now >= snapshot.charmStartedAt;
+            if (wasCharmed && !charmed) awakeLeft = AwakeSeconds;
+            wasCharmed = charmed;
+            if (awakeLeft >= 0f) awakeLeft -= Time.deltaTime;
+            if (!charmed && awakeLeft < 0f)
+            {
+                if (layer != null) layer.gameObject.SetActive(false);
+                return;
+            }
+            if (!EnsureLayer()) return;
+            layer.gameObject.SetActive(true);
+            layer.SetAsLastSibling();
+
+            gauge.gameObject.SetActive(charmed);
+            if (charmed)
+            {
+                PlaceGauge();
+                double total = snapshot.charmUntil - snapshot.charmStartedAt;
+                float left = total > 0d ? Mathf.Clamp01((float)((snapshot.charmUntil - now) / total)) : 0f;
+                gaugeFill.anchorMax = new Vector2(1f, left);
+            }
+            DrawAwake();
+        }
+
+        // 게이지 맨 아래를 북 미니맵 바로 위에 둔다. 미니맵은 움직일 수 있으니 매번 맞춘다.
+        private void PlaceGauge()
+        {
+            if (minimap == null) minimap = GetComponent<LabDrumMinimap>();
+            RectTransform below = minimap != null && minimap.IsShowing ? minimap.Panel : null;
+            if (below == null)
+            {
+                gauge.anchorMin = gauge.anchorMax = fallbackAnchor;
+                gauge.pivot = new Vector2(1f, .5f);
+                gauge.anchoredPosition = new Vector2(-fallbackMargin, 0f);
+                return;
+            }
+            below.GetWorldCorners(Corners);
+            Vector3 top = layer.InverseTransformPoint((Corners[1] + Corners[2]) * .5f);
+            gauge.anchorMin = gauge.anchorMax = new Vector2(.5f, .5f);
+            gauge.pivot = new Vector2(.5f, 0f);
+            gauge.anchoredPosition = new Vector2(top.x, top.y + gaugeGap);
+        }
+
+        private double ServerNow(LabSnapshot snapshot)
+        {
+            float realtime = Time.realtimeSinceStartup;
+            if (snapshot.serverTime != seenServerTime)
+            {
+                seenServerTime = snapshot.serverTime;
+                seenAt = realtime;
+            }
+            return snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
+        }
+
+        // "정신 차림!"이 톡 튀어나왔다가 사라진다.
+        private void DrawAwake()
+        {
+            bool showing = awakeLeft >= 0f;
+            awake.gameObject.SetActive(showing);
+            if (!showing) return;
+            float t = 1f - awakeLeft / AwakeSeconds;
+            float pop = t < .15f ? Mathf.Lerp(.4f, 1.2f, t / .15f) : Mathf.Lerp(1.2f, 1f, Mathf.Clamp01((t - .15f) / .15f));
+            awake.rectTransform.localScale = Vector3.one * pop;
+            awake.color = new Color(.18f, .14f, .12f, Mathf.Clamp01((1f - t) * 4f));
+        }
+
+        private bool EnsureLayer()
+        {
+            if (layer != null) return true;
+            if (canvas == null)
+            {
+                Canvas found = GetComponentInParent<Canvas>();
+                canvas = found != null ? found.rootCanvas : null;
+            }
+            RectTransform canvasRect = canvas != null ? canvas.GetComponent<RectTransform>() : null;
+            if (canvasRect == null) return false;
+            Text[] existing = canvas.GetComponentsInChildren<Text>(true);
+            for (int i = 0; i < existing.Length && font == null; i++) font = existing[i].font;
+            if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            layer = NewRect("Charm", canvasRect);
+            layer.anchorMin = Vector2.zero;
+            layer.anchorMax = Vector2.one;
+            layer.offsetMin = layer.offsetMax = Vector2.zero;
+
+            // 임시 게이지: 어두운 바탕 위에 하트색이 위에서부터 줄어든다.
+            gauge = NewRect("Charm Gauge", layer);
+            gauge.sizeDelta = gaugeSize;
+            var back = gauge.gameObject.AddComponent<Image>();
+            back.color = GaugeBackColor;
+            back.raycastTarget = false;
+            gaugeFill = NewRect("Charm Gauge Fill", gauge);
+            gaugeFill.anchorMin = Vector2.zero;
+            gaugeFill.anchorMax = Vector2.one;
+            gaugeFill.offsetMin = new Vector2(3f, 3f);
+            gaugeFill.offsetMax = new Vector2(-3f, -3f);
+            var fill = gaugeFill.gameObject.AddComponent<Image>();
+            fill.color = LabCharmEdgeFlash.HeartColor;
+            fill.raycastTarget = false;
+
+            RectTransform awakeRect = NewRect("Charm Awake", layer);
+            awakeRect.anchorMin = awakeRect.anchorMax = awakeAnchor;
+            awakeRect.sizeDelta = new Vector2(awakeSize * 8f, awakeSize * 1.6f);
+            awake = awakeRect.gameObject.AddComponent<Text>();
+            awake.font = font;
+            awake.fontSize = Mathf.RoundToInt(awakeSize);
+            awake.fontStyle = FontStyle.Bold;
+            awake.alignment = TextAnchor.MiddleCenter;
+            awake.raycastTarget = false;
+            awake.text = AwakeText;
+            var outline = awakeRect.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(1f, 1f, 1f, .9f);
+            outline.effectDistance = new Vector2(2f, -2f);
+            return true;
+        }
+
+        private static RectTransform NewRect(string name, Transform parent)
+        {
+            var rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+            rect.gameObject.layer = parent.gameObject.layer;
+            rect.SetParent(parent, false);
+            rect.localScale = Vector3.one;
+            return rect;
+        }
+
+        private void OnDestroy()
+        {
+            if (network != null) network.SabotageCast -= OnSabotageCast;
+            if (layer != null) Destroy(layer.gameObject);
+        }
+    }
+}

@@ -644,6 +644,178 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavedSceneSoloFoxFireDropsGlowingFoxOrbsOntoTheOnePlayersBoard()
+        {
+            yield return fixture.Load();
+
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabOrbBoard board = network.board;
+            LabConfig savedConfig = network.config;
+            LabConfig foxy = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = foxy.CaptureDeveloperValues();
+            tuning[166] = 1f; // the sabotage mix (#251), one second in
+            tuning[167] = 1f;
+            tuning[168] = 1f;
+            tuning[169] = 0f; // only the fox fire
+            tuning[170] = 0f;
+            tuning[172] = 0f;
+            Assert.That(foxy.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            network.config = foxy;
+            fixture.UseAvailablePort(network);
+            try
+            {
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                float until = Time.realtimeSinceStartup + 3f;
+                LabOrbState[] foxes = System.Array.Empty<LabOrbState>();
+                while (foxes.Length == 0 && Time.realtimeSinceStartup < until)
+                {
+                    yield return null;
+                    foxes = (network.Snapshot?.orbs ?? System.Array.Empty<LabOrbState>())
+                        .Where(orb => orb.kind == LabOrbKind.FoxFire).ToArray();
+                }
+                yield return null; // the board takes the snapshot that holds them
+                Assert.That(foxes.Length, Is.InRange(2, 5), "The fox fire drops two to five fox orbs.");
+                Assert.That(foxes.All(orb => orb.owner == network.LocalPlayerId), Is.True, "Solo, on the one player.");
+                Assert.That(foxes.Any(orb => board.IsDropping(orb.id)), Is.True,
+                    "The drop signal reaches the board before the snapshot holding them, so they fall in.");
+                Assert.That(network.Notice, Does.Contain("Fox fire"));
+                var alert = UnityEngine.Object.FindAnyObjectByType<LabGourdAlert>();
+                Assert.That(alert, Is.Not.Null);
+                Assert.That(alert.Active, Is.True, "Every player sees the gourd's \"!\" bubble.");
+                LabOrbView view = board.GetComponentsInChildren<LabOrbView>().First(candidate => candidate.OrbId == foxes[0].id);
+                Assert.That(view.FoxGlowVisible, Is.True);
+                Assert.That(view.GetComponentInChildren<LabOrbSpriteArt>(), Is.Not.Null, "It shows the fox orb art.");
+            }
+            finally
+            {
+                network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(foxy);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator SavedSceneSoloCharmShowsOnTheOnePlayersScreenAndWearsOff()
+        {
+            yield return fixture.Load();
+
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabOrbBoard board = network.board;
+            LabConfig savedConfig = network.config;
+            LabConfig charming = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = charming.CaptureDeveloperValues();
+            tuning[166] = 1f; // the sabotage mix (#251), every two seconds
+            tuning[167] = 2f;
+            tuning[168] = 2f;
+            tuning[169] = 0f; // only the charm
+            tuning[170] = 0f;
+            tuning[171] = 0f;
+            tuning[176] = 1f; // for one second
+            Assert.That(charming.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            network.config = charming;
+            fixture.UseAvailablePort(network);
+            try
+            {
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                var hud = UnityEngine.Object.FindAnyObjectByType<LabCharmHud>();
+                Assert.That(hud, Is.Not.Null, "The saved scene adds the charmed player's own display.");
+                float until = Time.realtimeSinceStartup + 4f;
+                while (!board.Charmed && Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(board.Charmed, Is.True, "Solo, to try it out, the charm falls on the one player.");
+                Assert.That(board.CharmEdge.Visible, Is.True);
+                var alert = UnityEngine.Object.FindAnyObjectByType<LabGourdAlert>();
+                Assert.That(alert, Is.Not.Null);
+                Assert.That(alert.ShowingHeart, Is.True, "The gourd's bubble shows a heart to the charmed player.");
+                Assert.That(alert.Label, Is.EqualTo("♥"));
+                yield return null;
+                Assert.That(hud.GaugeVisible, Is.True, "The time left shows on the gauge.");
+                Assert.That(hud.GaugeFill, Is.InRange(.01f, 1f));
+                var minimap = UnityEngine.Object.FindAnyObjectByType<LabDrumMinimap>();
+                if (minimap != null && minimap.IsShowing)
+                {
+                    var gaugeCorners = new Vector3[4];
+                    var minimapCorners = new Vector3[4];
+                    hud.Gauge.GetWorldCorners(gaugeCorners);
+                    minimap.Panel.GetWorldCorners(minimapCorners);
+                    Assert.That(gaugeCorners[0].y, Is.GreaterThanOrEqualTo(minimapCorners[1].y),
+                        "The gauge stands just above the drum minimap.");
+                }
+
+                until = Time.realtimeSinceStartup + 2f;
+                while (board.Charmed && Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(board.Charmed, Is.False, "Solo there is no one to wake them: it wears off after its second.");
+                yield return null;
+                Assert.That(hud.AwakeShowing, Is.True, "\"정신 차림!\" as it ends.");
+                Assert.That(hud.GaugeVisible, Is.False);
+            }
+            finally
+            {
+                network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(charming);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator SavedSceneSoloSabotageMixAnnouncesEachCastOnTheOnePlayer()
+        {
+            yield return fixture.Load();
+
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabConfig savedConfig = network.config;
+            LabConfig mixing = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = mixing.CaptureDeveloperValues();
+            tuning[166] = 1f; // the yokai's sabotage mix (#251), every second
+            tuning[167] = 1f;
+            tuning[168] = 1f;
+            tuning[169] = 0f; // only the swipe block
+            tuning[171] = 0f;
+            tuning[172] = 0f;
+            Assert.That(mixing.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            network.config = mixing;
+            fixture.UseAvailablePort(network);
+            // Record only: an assertion thrown inside the event would interrupt the Host's snapshot.
+            var kinds = new List<LabSabotageKind>();
+            var targets = new List<ulong>();
+            var blocks = new List<bool>();
+            System.Action<LabSabotageKind, ulong> onCast = (kind, target) =>
+            {
+                kinds.Add(kind);
+                targets.Add(target);
+            };
+            System.Action<bool, float> onBlock = (right, seconds) => blocks.Add(right);
+            network.SabotageCast += onCast;
+            network.SwipeBlockStarted += onBlock;
+            try
+            {
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                float until = Time.realtimeSinceStartup + 3f;
+                while ((kinds.Count == 0 || blocks.Count == 0) && Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(kinds, Is.Not.Empty, "The mix casts after its interval.");
+                Assert.That(kinds, Is.All.EqualTo(LabSabotageKind.SwipeBlock));
+                Assert.That(targets, Is.All.EqualTo(network.LocalPlayerId), "Solo, it falls on the one player.");
+                Assert.That(blocks, Is.Not.Empty, "What it cast is the gourd's ordinary swipe block.");
+                Assert.That(network.Snapshot.SwipeBlockOn(network.LocalPlayerId), Is.True);
+
+                until = Time.realtimeSinceStartup + .5f;
+                while (Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(kinds.Count, Is.EqualTo(1),
+                    "Each cast is announced once, and no second block comes while the first still holds.");
+            }
+            finally
+            {
+                network.SabotageCast -= onCast;
+                network.SwipeBlockStarted -= onBlock;
+                network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(mixing);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator SavedSceneSoloSwipeBlockBouncesAndShowsOnTheBlockedPlayersOwnScreen()
         {
             yield return fixture.Load();

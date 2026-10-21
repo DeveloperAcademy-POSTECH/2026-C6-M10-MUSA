@@ -29,8 +29,9 @@ namespace C6Lab
         public float Progress => seconds > 0f ? Mathf.Clamp01(age / seconds) : 1f;
         public int PuffCount => puffs.Length;
 
-        /// <summary>Lets an orb of this radius go up in smoke at this world position.</summary>
-        public static LabOrbVanishSmoke Play(Transform parent, Vector3 worldPosition, float orbRadius, LabOrbAppearance look)
+        /// <summary>Lets an orb of this radius go up in smoke at this world position, in the look's colour unless one is given.</summary>
+        public static LabOrbVanishSmoke Play(Transform parent, Vector3 worldPosition, float orbRadius, LabOrbAppearance look,
+            Color? tint = null)
         {
             look = look != null ? look : LabOrbAppearance.Defaults;
             var root = new GameObject("Orb Vanish Smoke");
@@ -44,7 +45,7 @@ namespace C6Lab
             smoke.radius = Mathf.Max(.01f, orbRadius);
             smoke.size = look.ExpirySmokeSize;
             smoke.seconds = look.ExpirySmokeSeconds;
-            smoke.color = look.ExpirySmokeColor;
+            smoke.color = tint ?? look.ExpirySmokeColor;
             for (int i = 0; i < smoke.puffs.Length; i++)
             {
                 var part = new GameObject("Puff " + i);
@@ -86,7 +87,7 @@ namespace C6Lab
         }
 
         /// <summary>A soft round puff, 1 unit across, thickest in the middle.</summary>
-        private static Sprite PuffSprite()
+        internal static Sprite PuffSprite()
         {
             if (puffSprite != null) return puffSprite;
             const int size = 64;

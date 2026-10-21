@@ -24,6 +24,10 @@ namespace C6Lab
         public ulong swipeBlockedPlayer;
         public bool swipeBlockedRight;
         public double swipeBlockStartedAt = -1d, swipeBlockedUntil = -1d;
+        /// <summary>The charm (#251) travels with the board header so the charmed player and those beside see it at once.</summary>
+        public ulong charmedPlayer;
+        public double charmStartedAt = -1d, charmUntil = -1d;
+        public int charmTaps;
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
         public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
 
@@ -91,6 +95,8 @@ namespace C6Lab
                 remaining = snapshot.remaining, playedSeconds = snapshot.playedSeconds,
                 swipeBlockedPlayer = snapshot.swipeBlockedPlayer, swipeBlockedRight = snapshot.swipeBlockedRight,
                 swipeBlockStartedAt = snapshot.swipeBlockStartedAt, swipeBlockedUntil = snapshot.swipeBlockedUntil,
+                charmedPlayer = snapshot.charmedPlayer, charmStartedAt = snapshot.charmStartedAt,
+                charmUntil = snapshot.charmUntil, charmTaps = snapshot.charmTaps,
                 targetYawDegrees = snapshot.targetYawDegrees,
                 targetYawSpeedDegreesPerSecond = snapshot.targetYawSpeedDegreesPerSecond,
                 targetRopeCycleElapsed = snapshot.targetRopeCycleElapsed,
@@ -241,6 +247,8 @@ namespace C6Lab
                 copy.remaining = header.remaining; copy.playedSeconds = header.playedSeconds;
                 copy.swipeBlockedPlayer = header.swipeBlockedPlayer; copy.swipeBlockedRight = header.swipeBlockedRight;
                 copy.swipeBlockStartedAt = header.swipeBlockStartedAt; copy.swipeBlockedUntil = header.swipeBlockedUntil;
+                copy.charmedPlayer = header.charmedPlayer; copy.charmStartedAt = header.charmStartedAt;
+                copy.charmUntil = header.charmUntil; copy.charmTaps = header.charmTaps;
                 copy.targetYawDegrees = header.targetYawDegrees;
                 copy.targetYawSpeedDegreesPerSecond = header.targetYawSpeedDegreesPerSecond;
                 copy.targetRopeCycleElapsed = header.targetRopeCycleElapsed;
@@ -296,6 +304,7 @@ namespace C6Lab
             && Finite(frame.remaining) && frame.remaining >= 0d && Finite(frame.playedSeconds) && frame.playedSeconds >= 0d
             && frame.phase >= LabPhase.Idle && frame.phase <= LabPhase.Defeat
             && Finite(frame.swipeBlockStartedAt) && Finite(frame.swipeBlockedUntil)
+            && Finite(frame.charmStartedAt) && Finite(frame.charmUntil) && frame.charmTaps >= 0
             && Finite(frame.targetYawDegrees) && Finite(frame.targetYawSpeedDegreesPerSecond)
             && Finite(frame.targetRopeCycleElapsed) && Finite(frame.targetRopeHitOffset) && Finite(frame.targetRopeHitVelocity)
             && ValidStates(frame.states, true) && ValidRemoved(frame.removedIds) && ValidPlayers(frame.players);
@@ -308,7 +317,7 @@ namespace C6Lab
             foreach (LabOrbState state in values)
             {
                 if (state == null || !ValidId(state.id) || !ids.Add(state.id) || state.ownershipVersion == 0
-                    || state.kind < LabOrbKind.Yin || state.kind > LabOrbKind.Drum
+                    || state.kind < LabOrbKind.Yin || state.kind > LabOrbKind.FoxFire
                     || state.element < LabOrbElement.None || state.element > LabOrbElement.Earth
                     || state.lockSwipes < 0 || state.relayStage < 0 || state.relayStage > 3
                     || !Unit(state.x) || !Unit(state.y) || !Finite(state.vx) || !Finite(state.vy)
@@ -356,7 +365,9 @@ namespace C6Lab
             targetRopeHitVelocity = source.targetRopeHitVelocity, players = LabBoardPublisher.CopyPlayers(source.players),
             orbs = source.orbs, drums = source.drums, swipeBlockedPlayer = source.swipeBlockedPlayer,
             swipeBlockedRight = source.swipeBlockedRight, swipeBlockStartedAt = source.swipeBlockStartedAt,
-            swipeBlockedUntil = source.swipeBlockedUntil, comboActive = source.comboActive,
+            swipeBlockedUntil = source.swipeBlockedUntil, charmedPlayer = source.charmedPlayer,
+            charmStartedAt = source.charmStartedAt, charmUntil = source.charmUntil, charmTaps = source.charmTaps,
+            comboActive = source.comboActive,
             comboColors = source.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboColors.Clone(),
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,
             comboCount = source.comboCount, comboResult = source.comboResult, comboResultCount = source.comboResultCount,

@@ -33,8 +33,10 @@ namespace C6Lab
         public long ActionReplayedResults { get; private set; }
         public long ReceivedBoardFrames { get; private set; }
 
+        // "fox": a fox orb touched a Yin or Yang orb and takes it away (#251).
         private static bool IsBoardAction(string type) => type == "generate" || type == "combine"
-            || type == "transfer" || type == "launch" || type == "use";
+            || type == "transfer" || type == "launch" || type == "use" || type == "fox";
+        private static bool TakesTwoOrbs(string type) => type == "combine" || type == "fox";
 
         private void EnsureActionRound()
         {
@@ -87,7 +89,7 @@ namespace C6Lab
             packet.configRevision = configRevision;
             packet.configFingerprint = configFingerprint;
             string[] inputs = packet.type == "generate" ? new[] { packet.secondId }
-                : packet.type == "combine" ? new[] { packet.firstId, packet.secondId } : new[] { packet.firstId };
+                : TakesTwoOrbs(packet.type) ? new[] { packet.firstId, packet.secondId } : new[] { packet.firstId };
             if (!IsHost && (packet.type == "combine" || packet.type == "generate"))
                 packet.provisionalId = TemporaryOutput(packet.requestId);
             double now = Time.realtimeSinceStartupAsDouble;
@@ -135,11 +137,11 @@ namespace C6Lab
                         else
                         {
                             wire.firstId = inputs[0];
-                            if (wire.type == "combine") wire.secondId = inputs[1];
+                            if (TakesTwoOrbs(wire.type)) wire.secondId = inputs[1];
                         }
                         string ownerId = wire.type == "generate" ? wire.secondId : wire.firstId;
                         if (TryKnownState(ownerId, out var first)) wire.ownershipVersion = first.ownershipVersion;
-                        if (wire.type == "combine" && TryKnownState(wire.secondId, out var second))
+                        if (TakesTwoOrbs(wire.type) && TryKnownState(wire.secondId, out var second))
                             wire.secondOwnershipVersion = second.ownershipVersion;
                         // Freeze every field once sent. A retry must not recapture a different pose/version.
                         actionWireRequests.Add(id, wire);
@@ -230,7 +232,7 @@ namespace C6Lab
             else if (!model.TryGetMovableState(entityId, out var input)) reason = "ORB_NOT_FOUND";
             else if (!LabActionValidation.Ownership(input.owner, input.ownershipVersion, sender,
                 packet.ownershipVersion, out reason)) { }
-            else if (packet.type == "combine" && (!model.TryGetMovableState(packet.secondId, out var partner)
+            else if (TakesTwoOrbs(packet.type) && (!model.TryGetMovableState(packet.secondId, out var partner)
                 || !LabActionValidation.Ownership(partner.owner, partner.ownershipVersion, sender,
                     packet.secondOwnershipVersion, out reason))) reason = reason ?? "ORB_NOT_FOUND";
             else
@@ -245,6 +247,9 @@ namespace C6Lab
                     case "combine":
                         accepted = model.TryCombineAt(sender, packet.firstId, packet.secondId, unique, now,
                             new Vector2(packet.x, packet.y), new Vector2(packet.vx, packet.vy), out output, out reason);
+                        break;
+                    case "fox":
+                        accepted = model.TryFoxFireAt(sender, packet.firstId, packet.secondId, unique, now, out reason);
                         break;
                     case "use":
                         accepted = model.TryUseItemAt(sender, packet.firstId, unique, now,
@@ -311,8 +316,10 @@ namespace C6Lab
                         LabOrbState result = receipt.states.FirstOrDefault(item => item.id == receipt.outputId);
                         if (result != null) board.CommitCombinePreview(request.provisionalId, result);
                     }
-                    if (request.type == "launch" || request.type == "transfer" || request.type == "use")
+                    if (request.type == "launch" || request.type == "transfer" || request.type == "use"
+                        || request.type == "fox")
                         board.CommitPendingLaunch(ResolveLocalId(request.firstId));
+                    if (request.type == "fox") board.CommitPendingLaunch(ResolveLocalId(request.secondId));
                 }
                 else
                 {
@@ -352,6 +359,12 @@ namespace C6Lab
                 string id = ResolveLocalId(request.firstId);
                 board.RejectPendingLaunch(id);
                 board.RejectEdge(id);
+                if (request.type == "fox")
+                {
+                    string partner = ResolveLocalId(request.secondId);
+                    board.RejectPendingLaunch(partner);
+                    board.RejectEdge(partner);
+                }
             }
         }
 

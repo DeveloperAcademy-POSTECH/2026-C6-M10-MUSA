@@ -4,9 +4,12 @@ namespace C6Lab
 {
     public enum LabPhase { Idle, Playing, Victory, Defeat }
     // Items and the drum are appended so the serialized numbers of existing kinds stay unchanged.
-    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum }
+    // FoxFire is the nine-tailed fox's fake orb (#251).
+    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum, FoxFire }
     // Gourd is appended for bombs the gourd drops as sabotage (#177).
     public enum LabOrbOrigin { Unknown, Generated, Combined, Gourd }
+    // The yokai's sabotages the sabotage mix draws from (#251), in the order of their DEV weights. Numbers are serialized.
+    public enum LabSabotageKind { GourdBomb, SwipeBlock, FoxFire, Charm }
 
     /// <summary>
     /// How a drum handed to a neighbour arrives on its new board (#178). Stop eases it to rest at a
@@ -205,6 +208,18 @@ namespace C6Lab
 
         /// <summary>Whether a swipe block is on this player at this snapshot.</summary>
         public bool SwipeBlockOn(ulong player) => swipeBlockedUntil > serverTime && swipeBlockedPlayer == player;
+
+        /// <summary>
+        /// The nine-tailed fox's charm (#251): the player too dazed to attack (throw upward), the Host times it
+        /// started and ends, and how many times the players beside them have tapped to wake them. charmUntil is
+        /// -1 while no one is charmed.
+        /// </summary>
+        public ulong charmedPlayer;
+        public double charmStartedAt = -1d, charmUntil = -1d;
+        public int charmTaps;
+
+        /// <summary>Whether this player is charmed at this snapshot.</summary>
+        public bool CharmOn(ulong player) => charmUntil > serverTime && serverTime >= charmStartedAt && charmedPlayer == player;
 
         // 박 색상 콤보 실험 (#222). DEV에서 끄면 모두 기본값(콤보 없음)이다.
         // 시각은 serverTime과 같은 전투 시계 기준이다.
