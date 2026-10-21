@@ -146,7 +146,26 @@ namespace C6Lab
             if (gourd == null || !EnsureBubble()) return;
             showingBlock = showingHeart = false;
             ShowOnly(mark.gameObject);
+            mark.text = Text;
+            mark.fontSize = Mathf.RoundToInt(bubbleSize * .5f);
+            mark.color = MarkColor;
             Begin(gourd, showSeconds);
+        }
+
+        /// <summary>
+        /// 야광귀 셈법 (#271): 박 옆 말풍선에 짧은 말("하나!", "다섯?" 등)을 seconds 동안 띄운다. 모든 기기에서 부른다.
+        /// 글자가 길수록 작게 쓰고, 먹색으로 쓴다.
+        /// </summary>
+        public void ShowWord(LabTarget gourd, string word, float seconds)
+        {
+            if (gourd == null || string.IsNullOrEmpty(word) || !EnsureBubble()) return;
+            showingBlock = showingHeart = false;
+            ShowOnly(mark.gameObject);
+            mark.text = word;
+            float share = word.Length <= 1 ? .5f : word.Length <= 2 ? .34f : .26f;
+            mark.fontSize = Mathf.RoundToInt(bubbleSize * share);
+            mark.color = InkColor;
+            Begin(gourd, Mathf.Max(.3f, seconds));
         }
 
         /// <summary>요괴가 이 사람에게 매혹을 걸었다고(#251) 박 옆에 하트 말풍선을 띄운다. 매혹된 사람 화면에서만 부른다.</summary>
