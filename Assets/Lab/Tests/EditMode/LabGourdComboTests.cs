@@ -454,8 +454,9 @@ namespace C6Lab.Tests
             values[39] = 50; values[40] = 50; values[41] = 0; values[42] = 0; values[43] = 0; values[44] = 0;
             values[155] = enabled ? 1f : 0f;
             values[156] = firstStart;
-            values[158] = timeLimit;
-            values[159] = 10f; // the rule tests below count a 10-second penalty and reward, whatever the default
+            values[157] = 40f; // the rule tests below count a 40-second interval and a 10-second penalty
+            values[158] = timeLimit; // and reward, whatever the defaults are
+            values[159] = 10f;
             values[161] = throwerOnly ? 1f : 0f;
             values[162] = 10f;
             values[164] = warning;
