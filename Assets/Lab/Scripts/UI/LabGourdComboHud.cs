@@ -29,8 +29,6 @@ namespace C6Lab
         public const string WarningText = "COMBO!";
         /// <summary>야광귀 셈법 (#271): 야광귀는 넷까지만 센다. 넷 다음은 다시 하나.</summary>
         public static readonly string[] CountWords = { "하나", "둘", "셋", "넷" };
-        /// <summary>야광귀 셈법 성공 문구: 다섯을 세려다 헷갈린다.</summary>
-        public const string ConfusedFirst = "넷… 다섯?", ConfusedSecond = "…하나?";
         /// <summary>n번째(1부터) 수를 야광귀식으로. 넷을 넘으면 처음부터 다시 센다.</summary>
         public static string CountWord(int n) => CountWords[(Mathf.Max(1, n) - 1) % CountWords.Length];
 
@@ -187,7 +185,9 @@ namespace C6Lab
                 if (yaguang && network != null)
                 {
                     LabGourdAlert alert = GetComponent<LabGourdAlert>();
-                    if (alert != null) alert.ShowWord(network.target, CountWord(step) + "!", .9f);
+                    // 말풍선 하나가 4칸이 나올 때까지 떠 있고 글자만 바뀐다.
+                    if (alert != null)
+                        alert.ShowWord(network.target, CountWord(step) + "!", Mathf.Max(.3f, (float)(snapshot.comboNextAt - serverNow)));
                 }
             }
             if (yaguang) return;
@@ -324,12 +324,6 @@ namespace C6Lab
                 shownResultCount = snapshot.comboResultCount;
                 shownResult = snapshot.comboResult;
                 resultElapsed = 0f;
-                // 야광귀 셈법 (#271): 성공하면 박 옆에서도 다섯을 세려다 헷갈린다.
-                if (shownResult == LabComboResult.Success && YaguangCount)
-                {
-                    LabGourdAlert alert = GetComponent<LabGourdAlert>();
-                    if (alert != null) alert.ShowWord(network.target, "다섯?", ResultSeconds);
-                }
             }
             if (snapshot.comboCount != lastComboCount)
             {
@@ -414,9 +408,7 @@ namespace C6Lab
             }
             resultText.gameObject.SetActive(true);
             bool clear = shownResult == LabComboResult.Success;
-            bool confused = clear && YaguangCount;
-            resultText.text = confused ? (resultElapsed < ResultSeconds * .5f ? ConfusedFirst : ConfusedSecond)
-                : clear ? ClearText : shownResult == LabComboResult.Timeout ? TimeUpText : WrongColorText;
+            resultText.text = clear ? ClearText : shownResult == LabComboResult.Timeout ? TimeUpText : WrongColorText;
             resultText.color = clear ? ClearColor : FailColor;
             float t = resultElapsed;
             float leave = Mathf.Clamp01((t - (ResultSeconds - .2f)) / .2f);
@@ -424,9 +416,7 @@ namespace C6Lab
             {
                 float pop = t < .18f ? 1.3f * (1f - Mathf.Pow(1f - t / .18f, 3f)) : Mathf.Lerp(1.3f, 1f, Mathf.Clamp01((t - .18f) / .15f));
                 resultText.rectTransform.localScale = Vector3.one * pop * (1f - leave);
-                // 야광귀 셈법: 다섯을 세려다 헷갈려 글자가 갸우뚱 흔들린다.
-                resultText.rectTransform.localRotation = confused
-                    ? Quaternion.Euler(0f, 0f, 9f * Mathf.Sin(t * 7f)) : Quaternion.identity;
+                resultText.rectTransform.localRotation = Quaternion.identity;
                 resultText.rectTransform.anchoredPosition = Vector2.zero;
                 flash.gameObject.SetActive(false);
                 return;

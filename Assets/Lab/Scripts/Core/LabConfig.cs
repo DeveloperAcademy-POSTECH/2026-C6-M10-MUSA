@@ -409,7 +409,7 @@ namespace C6Lab
         [Header("Experiment: gourd color combo (#222)")]
         [Tooltip("켜면 전투 중 박이 4칸 색 콤보를 낸다. 끄면 기존 플레이와 같다. 기본 OFF (#266). DEV `Gourd Color Combo`로도 켤 수 있다.")]
         [SerializeField] private bool gourdColorComboEnabled;
-        [Tooltip("야광귀 셈법 (#271): 콤보 예고를 하나·둘·셋·넷으로 세고, 칸을 맞힐 때마다 그 칸 위에 수를 띄우며, 넷 다음 칸은 흐린 ?로 둔다. 성공하면 '넷… 다섯? …하나?' 하고 헷갈린다. 화면 표시만 바뀐다. 기본 켬.")]
+        [Tooltip("야광귀 셈법 (#271): 콤보 예고를 하나·둘·셋·넷으로 세고, 칸을 맞힐 때마다 그 칸 위에 수를 띄우며, 넷 다음 칸은 흐린 ?로 둔다. 화면 표시만 바뀐다. 기본 켬.")]
         [SerializeField] private bool comboYaguangCountEnabled = true;
         // 아래 콤보 숫자 칸들의 DEV 범위는 기본값이 슬라이더 가운데에 오도록 정했다 (#271). Inspector에서도 같은 범위다.
         [Tooltip("전투 시작 후 첫 콤보가 나오는 시각 (초, 일시정지 시간 제외)")]

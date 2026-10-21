@@ -6,14 +6,14 @@ using UnityEngine.TestTools;
 
 namespace C6Lab.Tests
 {
-    /// <summary>야광귀 셈법 콤보 화면 (#271): 패널엔 COMBO!만, 칸 위의 수, ? 칸, "넷… 다섯?" 헷갈림.</summary>
+    /// <summary>야광귀 셈법 콤보 화면 (#271): 패널 예고 없이 말풍선만 세기, 칸 위의 수, ? 칸, 성공은 그대로 CLEAR!.</summary>
     public sealed class LabYaguangCountLookTests
     {
         private static readonly LabOrbElement[] Colors =
             { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Earth };
 
         [UnityTest]
-        public IEnumerator TheYaguangCountsTheSlotsAndGetsConfusedPastFour()
+        public IEnumerator TheYaguangCountsTheSlotsAndAClearStaysPlain()
         {
             var root = new GameObject("Yaguang count fixture");
             var network = root.AddComponent<LabNetwork>();
@@ -47,9 +47,9 @@ namespace C6Lab.Tests
                 cleared.comboResultAt = 40d;
                 latest.SetValue(network, cleared);
                 yield return null;
-                Assert.That(hud.ResultLabel, Is.EqualTo(LabGourdComboHud.ConfusedFirst));
+                Assert.That(hud.ResultLabel, Is.EqualTo(LabGourdComboHud.ClearText), "No counting riddle on a clear.");
                 yield return new WaitForSecondsRealtime(.9f);
-                Assert.That(hud.ResultLabel, Is.EqualTo(LabGourdComboHud.ConfusedSecond));
+                Assert.That(hud.ResultLabel, Is.EqualTo(LabGourdComboHud.ClearText));
 
                 // Off: the old look.
                 float[] values = config.CaptureDeveloperValues();

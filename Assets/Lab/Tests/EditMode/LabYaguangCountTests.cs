@@ -13,8 +13,6 @@ namespace C6Lab.Tests
             Assert.That(Enumerable.Range(1, 6).Select(LabGourdComboHud.CountWord),
                 Is.EqualTo(new[] { "하나", "둘", "셋", "넷", "하나", "둘" }), "Past four it starts again from one.");
             Assert.That(LabGourdComboHud.CountWord(0), Is.EqualTo("하나"));
-            Assert.That(new[] { LabGourdComboHud.ConfusedFirst, LabGourdComboHud.ConfusedSecond },
-                Is.EqualTo(new[] { "넷… 다섯?", "…하나?" }));
         }
 
         [Test]
