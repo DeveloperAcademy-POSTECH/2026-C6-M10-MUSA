@@ -27,7 +27,7 @@ namespace C6Lab.Tests
                 Assert.That(source.PlayerPaintPatternsEnabled, Is.True);
                 Assert.That(source.CompletedGourdViewerEnabled, Is.True);
                 float[] values = source.CaptureDeveloperValues();
-                Assert.That(values.Length, Is.EqualTo(169));
+                Assert.That(values.Length, Is.EqualTo(170));
                 Assert.That(values[111], Is.EqualTo(1f));
                 Assert.That(values[142], Is.EqualTo(1f));
             }

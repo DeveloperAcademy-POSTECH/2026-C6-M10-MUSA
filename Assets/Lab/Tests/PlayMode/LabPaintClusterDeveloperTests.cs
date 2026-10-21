@@ -31,8 +31,8 @@ namespace C6Lab.Tests
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceValues = ui.sourceConfig.CaptureDeveloperValues();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(169));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(169));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(170));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(170));
         }
 
         [UnityTearDown]
