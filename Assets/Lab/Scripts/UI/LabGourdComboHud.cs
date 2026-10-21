@@ -70,6 +70,7 @@ namespace C6Lab
         private Text warningLabel, warningNumber;
         private int shownWarningCount = -1;
         private bool warningYaguang;
+        private bool warningActive;
         // 야광귀 셈법 (#271): 칸 위의 수, 넷 다음의 흐린 ? 칸
         private readonly Text[] slotWords = new Text[LabGourdCombo.Length];
         private RectTransform questionSlot;
@@ -103,7 +104,9 @@ namespace C6Lab
         public bool WarningVisible => warningPanel != null && warningPanel.gameObject.activeSelf;
         /// <summary>예고에 보이는 남은 초 (3, 2, 1). 예고가 없으면 빈 문자열.</summary>
         /// <summary>패널의 예고 남은 초. 야광귀 셈법이면 수는 말풍선에만 있으므로 빈 문자열.</summary>
-        public string WarningCount => !WarningVisible || warningYaguang ? string.Empty : warningNumber.text;
+        public string WarningCount => WarningVisible ? warningNumber.text : string.Empty;
+        /// <summary>콤보 예고 중인지 (야광귀 셈법이면 패널 없이 말풍선만 센다, #271).</summary>
+        public bool WarningCounting => warningActive;
         /// <summary>칸 위에 뜬 야광귀의 수 (#271). 안 떠 있으면 빈 문자열.</summary>
         public string SlotWord(int index) =>
             slotWords[index] != null && slotWords[index].gameObject.activeInHierarchy ? slotWords[index].text : string.Empty;
@@ -159,7 +162,10 @@ namespace C6Lab
         private void DrawWarning(LabSnapshot snapshot, double serverNow, bool warning)
         {
             bool show = warning && resultElapsed < 0f;
-            warningPanel.gameObject.SetActive(show);
+            bool yaguang = YaguangCount;
+            warningActive = show;
+            // 야광귀 셈법 (#271): 박 옆 말풍선만 하나·둘·셋·넷으로 세고, 패널 자리의 COMBO! 예고는 띄우지 않는다.
+            warningPanel.gameObject.SetActive(show && !yaguang);
             if (!show)
             {
                 shownWarningCount = -1;
@@ -167,11 +173,9 @@ namespace C6Lab
                 return;
             }
             int count = Mathf.Max(1, Mathf.CeilToInt((float)(snapshot.comboNextAt - serverNow)));
-            bool yaguang = YaguangCount;
             if (yaguang != warningYaguang) shownWarningCount = -1;
             warningYaguang = yaguang;
-            // 야광귀 셈법 (#271): 박 옆 말풍선이 거꾸로 못 세고 하나·둘·셋·넷으로 앞으로 센다(넷 다음은 다시 하나).
-            // 수는 말풍선에만 띄워 세는 것이 두 군데서 겹쳐 보이지 않게 하고, 패널 자리에는 COMBO!만 둔다.
+            // 말풍선은 거꾸로 못 세고 하나·둘·셋·넷으로 앞으로 센다(넷 다음은 다시 하나).
             int total = Mathf.Max(1, Mathf.RoundToInt((float)(snapshot.comboNextAt - snapshot.comboWarningAt)));
             int step = Mathf.Clamp(total - count + 1, 1, total);
             if (count != shownWarningCount)
@@ -186,9 +190,7 @@ namespace C6Lab
                     if (alert != null) alert.ShowWord(network.target, CountWord(step) + "!", .9f);
                 }
             }
-            // 셈법: 패널 가운데에 COMBO!만. 아니면 COMBO!(왼쪽)와 남은 초(오른쪽).
-            warningLabel.rectTransform.anchorMax = new Vector2(yaguang ? 1f : .68f, 1f);
-            warningNumber.gameObject.SetActive(!yaguang);
+            if (yaguang) return;
             // 숫자: 1.7배로 쾅 나왔다가 1배로. 마지막 1은 빨갛다.
             float pop = 1f;
             if (warningPopElapsed >= 0f)
@@ -265,7 +267,7 @@ namespace C6Lab
             // 보상은 배지 대신 별로 보여준다. 결과 문구가 끝난 뒤부터.
             DrawStars(kind > 0 && resultElapsed < 0f, remaining);
             // 결과 문구나 다음 콤보 예고(#241)가 떠 있는 동안에는 숨겨 두었다가, 끝나면 톡 튀어나온다.
-            if (kind >= 0 || resultElapsed >= 0f || warningPanel.gameObject.activeSelf)
+            if (kind >= 0 || resultElapsed >= 0f || warningActive)
             {
                 effectKind = 0;
                 effectBadge.gameObject.SetActive(false);

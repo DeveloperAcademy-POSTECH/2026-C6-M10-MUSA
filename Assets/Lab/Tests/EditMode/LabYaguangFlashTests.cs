@@ -124,21 +124,26 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheFlashWaitsOutTheComboThenWarnsAgainInFull()
+        public void TheFlashWaitsOutTheComboAndItsPenaltyThenWarnsAgainInFull()
         {
             var model = new LabModel();
             // The combo's warning starts at 27 s and its slots stay up until 40 s; the flash is due at 31 s.
+            // Nobody clears it, so everyone is SMALL for 15 s after the 40 s timeout.
             model.Begin("flash-combo", Three, 0d, Config(flash: true, first: 31f, combo: true));
             Assert.That(model.Snapshot(26d).flashAt, Is.EqualTo(31d));
             LabSnapshot held = model.Snapshot(29.6d);
             Assert.That(held.flashAt, Is.EqualTo(-1d), "No flash warning over the combo warning.");
             Assert.That(model.Snapshot(35d).flashCount, Is.Zero, "Nor during the combo.");
-            LabSnapshot after = model.Snapshot(40.5d);
-            Assert.That(after.comboActive, Is.False);
+            LabSnapshot penalty = model.Snapshot(40.5d);
+            Assert.That(penalty.comboActive, Is.False);
+            Assert.That(penalty.players.All(player => player.comboPenaltyUntil == 55d), Is.True);
+            Assert.That(penalty.flashAt, Is.EqualTo(-1d), "Nor over the combo penalty (#271).");
+            Assert.That(model.Snapshot(54.9d).flashCount, Is.Zero);
+            LabSnapshot after = model.Snapshot(55.5d);
             Assert.That(after.flashCount, Is.Zero, "It does not go off late, without a warning.");
-            Assert.That(new[] { after.flashWarningAt, after.flashAt }, Is.EqualTo(new[] { 40.5d, 42d }),
-                "The full 1.5 s warning starts once the combo is over.");
-            Assert.That(model.Snapshot(42d).flashCount, Is.EqualTo(1u));
+            Assert.That(new[] { after.flashWarningAt, after.flashAt }, Is.EqualTo(new[] { 55.5d, 57d }),
+                "The full 1.5 s warning starts once the penalty is over.");
+            Assert.That(model.Snapshot(57d).flashCount, Is.EqualTo(1u));
         }
 
         [Test]

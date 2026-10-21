@@ -633,7 +633,8 @@ namespace C6Lab
 
         /// <summary>
         /// 야광귀 섬광 (#268): 정해 둔 시각마다 번쩍인다. 화면 표시(하얗게 보이기)만 하므로 Host는 시각과 대상만 정한다.
-        /// 콤보 예고나 콤보가 진행 중이면 섬광 예고를 시작하지 않고 기다렸다가, 콤보가 끝나면 예고부터 다시 보여준다.
+        /// 콤보 예고나 콤보가 진행 중이거나 콤보 실패 페널티가 걸려 있으면(#271) 섬광 예고를 시작하지 않고 기다렸다가,
+        /// 그것이 끝나면 예고부터 다시 보여준다.
         /// 간격은 번쩍인 시각부터 재고, 눈부심·회복·다음 예고가 겹치지 않을 만큼은 언제나 띄운다.
         /// </summary>
         private void AdvanceFlash(double until)
@@ -668,8 +669,10 @@ namespace C6Lab
             }
         }
 
+        // 콤보 예고·진행 중이거나, 누군가 콤보 실패 페널티(SMALL)를 받고 있는 동안에는 섬광을 미룬다 (#271).
         private bool ComboHoldsFlash(double at) => rules.ComboEnabled
-            && (combo.Active || (ComboWaiting && at >= nextComboAt - rules.ComboWarningSeconds));
+            && (combo.Active || (ComboWaiting && at >= nextComboAt - rules.ComboWarningSeconds)
+                || players.Values.Any(player => player.comboPenaltyUntil > at));
 
         private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled && !flashHeld;
 

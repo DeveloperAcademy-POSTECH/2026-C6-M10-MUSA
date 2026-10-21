@@ -33,8 +33,8 @@ namespace C6Lab.Tests
                 warning.comboNextAt = 34d;
                 latest.SetValue(network, warning);
                 yield return null;
-                Assert.That(hud.WarningVisible, Is.True);
-                Assert.That(hud.WarningCount, Is.Empty, "The count is only in the gourd's bubble, not twice.");
+                Assert.That(hud.WarningCounting, Is.True);
+                Assert.That(hud.WarningVisible, Is.False, "No COMBO! panel: only the gourd's bubble counts.");
 
                 latest.SetValue(network, Snapshot(35d, progress: 2, active: true));
                 yield return null;
