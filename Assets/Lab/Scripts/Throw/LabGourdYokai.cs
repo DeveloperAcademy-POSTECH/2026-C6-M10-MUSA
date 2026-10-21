@@ -9,6 +9,9 @@ namespace C6Lab
     /// 애니메이션을 이어서 틀어 들어가고, 다시 평소 반복으로 돌아간다.
     /// 콤보 구간은 Host 스냅샷(`comboWarningAt`/`comboNextAt`/`comboActive`)으로 정하므로 모든 기기에서 같은
     /// 때 나오고 들어간다. 평소 반복은 기기마다 따로 돈다(이전과 같음). 화면 표시만 하며 판정에 관여하지 않는다.
+    /// 박이 폭탄을 떨어뜨리면(#250, 모든 기기에 같은 순간 오는 `GourdBombDropped`) "!" 말풍선이 떠 있는 동안
+    /// 평소보다 빠르게 쏙 올라와 톡 튀고 두리번거린다. 콤보 중이면 들어가지 않고 톡 튀기만 하며, 콤보와 폭탄이
+    /// 둘 다 끝나야 들어간다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabGourdYokai : MonoBehaviour
@@ -26,8 +29,17 @@ namespace C6Lab
         /// <summary>움찔하는 시간 (초)</summary>
         public const float FlinchSeconds = .35f;
 
+        /// <summary>폭탄을 떨어뜨릴 때 톡 튀는 시간 (초)</summary>
+        public const float PopSeconds = .3f;
+
+        [Tooltip("박이 폭탄을 떨어뜨릴 때 요괴가 나와 있는 시간 (초). \"!\" 말풍선(LabGourdAlert.showSeconds)과 맞춘다.")]
+        [SerializeField, Min(.3f)] private float bombShowSeconds = 1.4f;
+        [Tooltip("폭탄 때 올라오는 빠르기 (평소 = 1). 클수록 쏙 올라온다.")]
+        [SerializeField, Min(1f)] private float bombRiseSpeed = 3f;
+
         private const float EyeAngle = 24f;
         private const float FlinchSquash = .16f;
+        private const float PopStretch = .22f;
         private const float FlinchHop = .0006f; // YokaiRoot 기준 (부모가 162배라 화면에서는 약 0.1)
 
         private LabNetwork network;
@@ -42,6 +54,10 @@ namespace C6Lab
         private float lookDirection = 1f;
         private bool rewinding;
         private float flinchElapsed = -1f;
+        private float effectSeconds = FlinchSeconds;
+        private float effectSign = -1f; // -1 움찔(먼저 작아짐), +1 톡 튐(먼저 커짐)
+        private float bombLeft;
+        private bool popPending;
         private uint seenComboCount;
         private int seenProgress;
 
@@ -51,12 +67,32 @@ namespace C6Lab
         /// <summary>콤보 때문에 요괴를 붙잡아 두고 있는지 (예고 ~ 콤보 끝)</summary>
         public bool Holding => holding;
         /// <summary>움찔하는 중인지</summary>
-        public bool Flinching => flinchElapsed >= 0f;
+        public bool Flinching => flinchElapsed >= 0f && effectSign < 0f;
+        /// <summary>폭탄 때 톡 튀는 중인지 (아직 올라오는 중이면 다 올라온 뒤 튄다)</summary>
+        public bool Popping => flinchElapsed >= 0f && effectSign > 0f;
+        /// <summary>폭탄 때문에 남은 나와 있는 시간 (초)</summary>
+        public float BombSecondsLeft => bombLeft;
+        public float BombShowSeconds => bombShowSeconds;
         /// <summary>지금 애니메이션 시각 (0~6초)</summary>
         public float ClipTime => state != null ? Mathf.Repeat(state.time, ClipLength) : 0f;
         public bool Ready => ready;
 
-        public void Bind(LabNetwork target) => network = target;
+        public void Bind(LabNetwork target)
+        {
+            if (network == target) return;
+            if (network != null) network.GourdBombDropped -= OnGourdBombDropped;
+            network = target;
+            if (network != null) network.GourdBombDropped += OnGourdBombDropped;
+        }
+
+        private void OnGourdBombDropped(ulong targetPlayer, string bombId, Vector2 landing) => BombDropped();
+
+        /// <summary>박이 폭탄을 떨어뜨렸다: 말풍선이 떠 있는 동안 나와 있고, 다 올라오면 톡 튄다.</summary>
+        public void BombDropped()
+        {
+            bombLeft = bombShowSeconds;
+            popPending = true;
+        }
 
         private void Awake() => EnsureReady();
 
@@ -88,19 +124,31 @@ namespace C6Lab
         public void Advance(LabSnapshot snapshot, double serverNow, float deltaTime)
         {
             if (!EnsureReady()) return;
-            bool want = InComboWindow(snapshot, serverNow);
-            DetectHits(snapshot, want);
+            deltaTime = Mathf.Max(0f, deltaTime);
+            bool combo = InComboWindow(snapshot, serverNow);
+            // 폭탄 때 나와 있는 시간은 전투 중에만 흐른다(일시정지 중에는 deltaTime이 0). 전투가 아니면 바로 끝.
+            if (snapshot == null || snapshot.phase != LabPhase.Playing) { bombLeft = 0f; popPending = false; }
+            else bombLeft = Mathf.Max(0f, bombLeft - deltaTime);
+            bool want = combo || bombLeft > 0f;
+            DetectHits(snapshot, combo);
 
             if (want && !holding) Hold();
             else if (!want && holding) Release();
 
             if (holding)
             {
-                StepHeld(Mathf.Max(0f, deltaTime));
+                // 폭탄만으로 나올 때는 말풍선이 짧으니 쏙 올라온다. 콤보 예고는 3초라 평소 빠르기.
+                StepHeld(deltaTime * (combo ? 1f : bombRiseSpeed), deltaTime);
                 state.time = cursor;
                 clipPlayer.Sample();
+                if (popPending && !rewinding && cursor >= RisenAt)
+                {
+                    popPending = false;
+                    StartEffect(1f, PopSeconds);
+                }
             }
-            ApplyFlinch(Mathf.Max(0f, deltaTime));
+            else popPending = false;
+            ApplyFlinch(deltaTime);
         }
 
         /// <summary>예고 중이거나 콤보가 진행 중이면 true (전투 중일 때만)</summary>
@@ -118,7 +166,7 @@ namespace C6Lab
                 return;
             }
             // 칸을 맞혀 진행이 늘면 움찔. 마지막 칸(성공)은 콤보가 끝나도 움찔한 뒤 들어간다.
-            if (snapshot.comboProgress > seenProgress && (want || holding)) flinchElapsed = 0f;
+            if (snapshot.comboProgress > seenProgress && (want || holding)) StartEffect(-1f, FlinchSeconds);
             seenProgress = snapshot.comboProgress;
         }
 
@@ -169,8 +217,17 @@ namespace C6Lab
         public static float InverseSmooth(float y) =>
             .5f - Mathf.Sin(Mathf.Asin(1f - 2f * Mathf.Clamp01(y)) / 3f);
 
-        private void StepHeld(float deltaTime)
+        private void StartEffect(float sign, float seconds)
         {
+            effectSign = sign;
+            effectSeconds = seconds;
+            flinchElapsed = 0f;
+        }
+
+        /// <summary>올라오는(되감는) 동안은 riseTime, 다 올라와 두리번거리는 동안은 lookTime만큼 진행한다.</summary>
+        private void StepHeld(float riseTime, float lookTime)
+        {
+            float deltaTime = riseTime;
             if (rewinding)
             {
                 cursor -= deltaTime;
@@ -185,6 +242,7 @@ namespace C6Lab
                 cursor = Mathf.Min(LookFrom, cursor + deltaTime);
                 return;
             }
+            deltaTime = lookTime;
             cursor += deltaTime * lookDirection;
             if (cursor >= LookTo) { cursor = LookTo - (cursor - LookTo); lookDirection = -1f; }
             if (cursor <= LookFrom) { cursor = LookFrom + (LookFrom - cursor); lookDirection = 1f; }
@@ -209,18 +267,20 @@ namespace C6Lab
         {
             if (flinchElapsed < 0f) return;
             flinchElapsed += deltaTime;
-            float u = flinchElapsed / FlinchSeconds;
+            float u = flinchElapsed / effectSeconds;
             if (u >= 1f)
             {
                 flinchElapsed = -1f;
                 yokai.localScale = yokaiScale;
                 return;
             }
-            // 먼저 움츠러들었다가(작아짐) 톡 튀어나오며 원래 크기로. 위로 살짝 들썩인다.
+            // 움찔: 먼저 움츠러들었다가(작아짐) 톡 튀어나오며 원래 크기로.
+            // 톡 튐(폭탄): 먼저 커지며 위로 튀었다가 원래 크기로. 둘 다 위로 들썩인다.
             float wave = Mathf.Sin(u * Mathf.PI * 2f) * (1f - u);
-            yokai.localScale = yokaiScale * (1f - FlinchSquash * wave);
+            bool pop = effectSign > 0f;
+            yokai.localScale = yokaiScale * (pop ? 1f + PopStretch * wave : 1f - FlinchSquash * wave);
             // 위치는 애니메이션이 매 프레임 다시 쓰므로 더하기만 해도 쌓이지 않는다.
-            yokai.localPosition += new Vector3(0f, 0f, FlinchHop * Mathf.Sin(u * Mathf.PI));
+            yokai.localPosition += new Vector3(0f, 0f, (pop ? 2f : 1f) * FlinchHop * Mathf.Sin(u * Mathf.PI));
         }
 
         private double EstimateServerNow(LabSnapshot snapshot)
@@ -234,8 +294,15 @@ namespace C6Lab
             return snapshot.serverTime + System.Math.Min(1d, realtime - seenAtRealtime);
         }
 
+        private void OnDestroy()
+        {
+            if (network != null) network.GourdBombDropped -= OnGourdBombDropped;
+        }
+
         private void OnDisable()
         {
+            bombLeft = 0f;
+            popPending = false;
             if (!ready) return;
             if (holding) Release();
             flinchElapsed = -1f;
