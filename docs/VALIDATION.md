@@ -1934,3 +1934,16 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | 솔로 화면: 판 구슬 크기 변화, SMALL bar, BIG 별 | NOT_RUN | DEV `Combo First Start`를 5초로 두면 빠르게 확인할 수 있다. |
 | 3인 실행: THROWER 모드에서 틀린 사람 판만 작아짐, 각자 화면의 별 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
 | iOS 실기기: 별 성능·가독성 | NOT_RUN | |
+
+## 콤보 기본값 OFF — 2026-10-21, 이슈 #266
+
+기준은 main `a30dafda`(#257·#264 머지 뒤, 설정 166개·프로토콜 5653)에서 분기한 `fix/#266combo-default-off`이다. 설정 개수와 프로토콜은 바꾸지 않았다.
+
+- **기본값**: `Gourd Color Combo` ON → **OFF**. 코드 기본값과 저장 `LabConfig.asset`(Inspector의 `Experiment: gourd color combo (#222)` 묶음 첫 칸) 모두 OFF다. 콤보 시간 값(첫 시작 50·간격 60·제한 15·페널티/보상 10·예고 3초, 0.1/2.5배)은 그대로라 DEV나 Inspector에서 켜면 이전과 같이 동작한다.
+- **테스트**: `GourdColorComboFieldsFormTheComboGroupAndStartOff`가 코드·저장 기본값 첫 칸 0을 확인하고, DEV 값으로 켜지는지 확인한다. 콤보 규칙 검사(`LabGourdComboTests`)는 원래 직접 켜서 쓰므로 그대로다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. |
+| EditMode 실제 실행 | NOT_RUN | `GourdColorComboFieldsFormTheComboGroupAndStartOff`, 기존 전체. |
+| 에디터 확인 | NOT_RUN | Inspector에서 `Gourd Color Combo Enabled`가 꺼져 있는지, 전투 중 콤보가 안 나오는지, DEV에서 켜면 50초에 나오는지. |
