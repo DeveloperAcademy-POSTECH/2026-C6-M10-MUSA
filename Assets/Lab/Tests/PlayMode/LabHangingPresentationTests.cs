@@ -97,13 +97,18 @@ namespace C6Lab.Tests
             var target = LabTarget.CreateCylinder(null, Vector3.zero, .6f, 2.7f);
             var hanging = target.gameObject.AddComponent<LabHangingTarget>();
             Vector3 centre = target.Hitbox.transform.position;
+            Bounds meshBounds = target.Hitbox.sharedMesh.bounds;
+            Vector3 localTop = meshBounds.center + Vector3.up * meshBounds.extents.y;
+            float topInMount = target.VisualMount.InverseTransformPoint(
+                target.Hitbox.transform.TransformPoint(localTop)).y;
             Set(hanging, "ropeLength", 2f);
             Set(hanging, "suspensionVisualExtension", 4f);
             yield return new WaitForFixedUpdate();
             Transform pivot = target.transform.Find("Suspension Pivot");
             Transform rope = pivot.Find("Rope");
             Assert.That(rope.localScale.y * 2f, Is.EqualTo(2f).Within(.001f));
-            Assert.That(pivot.localPosition.y, Is.EqualTo(2.9f).Within(.001f));
+            Assert.That(pivot.localPosition.y, Is.EqualTo(hanging.RopeLength + topInMount).Within(.001f),
+                "The suspension must use the actual mesh top, without shortening the collider.");
             Transform upper = target.transform.Find("Upper Rope");
             Assert.That(upper.gameObject.activeSelf, Is.True);
             Assert.That(upper.localScale.y * 2f, Is.EqualTo(4f).Within(.001f));
@@ -112,12 +117,12 @@ namespace C6Lab.Tests
                 "The visible extension must not add a projectile collider.");
             Assert.That(Vector3.Distance(centre, target.Hitbox.transform.position), Is.LessThan(.001f));
             Vector3 ropeBottom = rope.TransformPoint(Vector3.down);
-            Vector3 bodyTop = target.Hitbox.transform.TransformPoint(Vector3.up);
+            Vector3 bodyTop = target.Hitbox.transform.TransformPoint(localTop);
             Assert.That(Vector3.Distance(ropeBottom, bodyTop), Is.LessThan(.001f));
             hanging.Kick(new Vector3(0, 0, -9));
             for (int i = 0; i < 10; i++) yield return new WaitForFixedUpdate();
             Assert.That(Vector3.Distance(rope.TransformPoint(Vector3.down),
-                target.Hitbox.transform.TransformPoint(Vector3.up)), Is.LessThan(.001f));
+                target.Hitbox.transform.TransformPoint(localTop)), Is.LessThan(.001f));
             hanging.ResetSwing();
             Assert.That(Vector3.Distance(centre, target.Hitbox.transform.position), Is.LessThan(.001f));
             Object.Destroy(target.gameObject);
@@ -247,6 +252,9 @@ namespace C6Lab.Tests
             var hanging = target.gameObject.AddComponent<LabHangingTarget>();
             hanging.ConfigureSpin(80f, 1.2f, 720f);
             Vector3 centre = target.Hitbox.transform.position;
+            Vector3 localBodyPosition = target.Hitbox.transform.localPosition;
+            Quaternion localBodyRotation = target.Hitbox.transform.localRotation;
+            Vector3 localBodyScale = target.Hitbox.transform.localScale;
             Vector3 incoming = Vector3.forward * 12.5f;
             float impulse = hanging.ApplyHostImpact(centre + Vector3.right * .6f, incoming);
             Assert.That(Mathf.Abs(impulse), Is.EqualTo(600f).Within(.01f));
@@ -255,7 +263,7 @@ namespace C6Lab.Tests
             Assert.That(Mathf.Abs(hanging.YawAngleDegrees), Is.GreaterThan(360f));
             Assert.That(Mathf.Abs(hanging.YawSpeedDegreesPerSecond), Is.LessThan(initialSpeed * .1f));
             Transform twist = target.transform.Find("Suspension Pivot/Body Twist Pivot");
-            Assert.That(target.Hitbox.transform.parent, Is.SameAs(twist));
+            Assert.That(target.Hitbox.transform.parent, Is.SameAs(target.VisualMount));
             Assert.That(target.VisualMount.parent, Is.SameAs(twist));
             Assert.That(target.transform.Find("Suspension Pivot/Rope").parent,
                 Is.SameAs(twist.parent), "The rope must not rotate with the body.");
@@ -265,6 +273,10 @@ namespace C6Lab.Tests
             Assert.That(hanging.YawSpeedDegreesPerSecond, Is.EqualTo(0f));
             Assert.That(twist.localRotation, Is.EqualTo(Quaternion.identity));
             Assert.That(Vector3.Distance(target.Hitbox.transform.position, centre), Is.LessThan(.001f));
+            Assert.That(Vector3.Distance(target.Hitbox.transform.localPosition, localBodyPosition), Is.LessThan(.0001f));
+            Assert.That(Quaternion.Angle(target.Hitbox.transform.localRotation, localBodyRotation), Is.LessThan(.001f));
+            Assert.That(Vector3.Distance(target.Hitbox.transform.localScale, localBodyScale), Is.LessThan(.0001f),
+                "Spin/reset must preserve the shell-to-collider alignment and its original size.");
             Object.Destroy(target.gameObject);
         }
 

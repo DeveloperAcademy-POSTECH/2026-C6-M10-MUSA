@@ -1877,3 +1877,31 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 원본 Desktop 프로젝트의 사용자 Scene·Target2 Material2개·기존 미추적meta는 수정하거나 커밋하지 않는다. 별도 검증 폴더에서 Unity가 Target2 Material2개의 `_Color`를 약3e-8 범위로 재직렬화한 것은 private 사본에 보존하고 PR에서 제외한다. Runtime·Config·검사·패키지의 해시와 별도 사용자4파일 해시를 대조한다. 원시XML·로그·앱·임시 helper·개인 경로는 공개 저장소에 넣지 않는다.
 
 최종 Mac `final-preservation.json`: 검증 소스887개·원본 Desktop 사용자4파일 변경0, 임시 helper 제거, 검증 프로세스 종료, managed/runtime/shader 오류0을 확인했다. Mac loopback의 실제2앱 시험이며 DEV 북2개·자연 폭탄/콤보/건조OFF 등 통제된 fixture를 사용했다. AUTO 기본 북 배분·실기기LAN/핫스팟·3~5인·외형 만족도·모바일 성능을 검증한 것은 아니다. 소스 해시에는 검증 폴더의 Unity Material 재직렬화2건을 별도로 기록했으며 최종 PR에서는 제외한다.
+
+
+## #258 구형 원통 제거·실제 박 메시 피격 — 2026-10-21
+
+기준 main `1ec8581a`에서 분기한 `fix/#258-gourd-mesh-hitbox`다. 솔로에서도 보이는 박 외곽을 공이 통과한다는 보고에 따라 소스·저장 Scene·실제 메시를 비교했다. 기존 외형은 기본 폭 약2.493·높이2.390인데 숨겨진 Cylinder 판정은 폭1.2·높이1.8이었다. `LabGourdPaint.ApplyVisualSize`만 외형을 이동/확대하고 `LabHangingTarget`은 원통 높이를0.9로 덮어쓰던 구조가 불일치의 근거다. 원통에만 쏘던 기존 물리 검사는 이 차이를 다루지 않았다.
+
+### 변경
+
+- 저장 Scene의 같은 객체/컴포넌트 ID를 보존하며 `Hitbox Cylinder`를 `Gourd Body Hitbox`로 교체했다. Collider·기본 MeshFilter가 `PaintBody` 메시를 사용하고, 실제 White Gourd shell과 같은 위치·회전·크기를 따른다. 정상 전투에서 예전 원통을 다시 생성하지 않는다. 명시적 `CreateCylinder`는 독립 물리 검사 fixture API로만 유지한다.
+- `LabTarget.BindHitboxMesh/BindHitboxMeshes/RefreshBoundHitbox`는 같은 MeshCollider 객체를 유지한다. Paint는 실제 몸체 메시를 직접 공유하며, Crack은 선택된 실제 Shell 메시를 연결한다. 현재 Crack FBX는 Shell Renderer1개이고 Inner/Fracture도 같은 몸체에 속한다. 줄·Binding·장식은 판정에서 제외된다. 기존 Read/Write 설정을 변경하지 않았다.
+- 줄·회전은 공통 VisualMount 프레임을 움직인다. 몸체 Collider의 상대 pose/scale을 덮어쓰지 않으며 로프 부착 높이는 실제 메시로 계산한다. Crack은 이전 모드의 편심된 bounds 대신 안정된 매달림 프레임에 정렬한다.
+- Host 명중 도색 방향은 몸체 메시 로컬 hitPoint를 정규화해, 셰이더 `normalize(positionOS)`와 일치한다. 피격 이벤트의 Hitbox 로컬 좌표와 기존 물리/투척/보상 규칙을 유지한다.
+- 좌표 의미가 바뀌어 **프로토콜5653·연결 토큰 `C6PhysicsLab/16`**, 공유 설정은 기존166개다. 모든 참가자가 새 빌드를 사용해야 한다. Source Config·패키지·사용자 Scene/머터리얼을 덮어쓰지 않았다.
+
+### 실행 근거
+
+| 검사 | 결과 | 범위 |
+| --- | --- | --- |
+| Editor API Scene 변경·컴파일 | **PASS** | `GOURD258_SCENE_MIGRATED mesh=PaintBody size=1.4`, savedScene의 참조 ID 보존. 임시 마이그레이션 코드는 제거했다. |
+| 최초 집중 PlayMode | **FAIL46/51** | `c6-gourd258-focused-play.xml`,39.692초. 새 기하6건은 통과. 원통 기반 부모/높이를 가정한 기존3건, 이전 모드 bounds로 정렬한 Crack 투척1건, 원자적 생성 확률 적용이 필요했던 새 fixture1건을 보완했다. 실패 기록을 보존했다. |
+| 보완 후 집중 PlayMode | **PASS39/39** | `c6-gourd258-focused-play-2.xml`,34.711초. Paint/Crack·실제 솔로/새 기하7건·매달림 포함. 최초 실행의 Contact/Rope12건과 선택 범위가 다르므로51건 재실행으로 표현하지 않는다. |
+| 최종 전체 PlayMode | **PASS273/273** | `c6-gourd258-all-play.xml`,110.234초,03:26:06Z~03:27:56Z. 실패·생략·inconclusive0. |
+| 최종 전체 EditMode | **PASS796/796** | `c6-gourd258-all-edit.xml`,28.032초,03:28:49Z~03:29:17Z. 실패·생략·inconclusive0. |
+| Mac 다중 앱·iOS·핫스팟 실기기 | **NOT_RUN** | 이번 변경에서는 별도 앱 빌드·실기기 설치/수동 조작을 수행하지 않았다. 자동 검사 결과와 구분한다. |
+
+새 `LabGourdHitboxTests`7건은 (1)원통 부재·단일 몸체 판정, (2)크기0.5/1.4/3과 축소 시 실제 범위, (3)옛 원통 밖 좌우X±0.9·하단Y−1.2 명중, (4)240m/s·축소 공 명중 및 실제 바깥 빗나감, (5)흔들림·회전 동행, (6)Paint→Crack→Paint 전환, (7)저장 Scene 솔로 생성/상자 해금/드래그 투척 후 Host 명중·실제 접촉 위치의 도색 셀/텍스처를 확인한다. 모델 명중을 직접 주입하지 않는다. 기존 검사의 숨겨진 원통 부모/높이 가정은 실제 메시·공통 프레임 기준으로 바꾸되 동일 좌표 도색·Reset·명중/승리 검증은 유지했다.
+
+구현 위치: `LabTarget`, `LabGourdPaint`, `LabGourdCrack`, `LabHangingTarget`, `LabNetwork.OnProjectileResolved`, 저장 `Lab.unity`. 새 테스트의 구슬 크기/속도 설정은 실행 복사본에만 적용했다. 원시 XML·로그는 프로젝트 밖에 보관하고 공개 저장소에 넣지 않는다.
