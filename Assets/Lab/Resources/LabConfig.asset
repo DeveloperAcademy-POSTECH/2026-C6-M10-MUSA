@@ -42,8 +42,8 @@ MonoBehaviour:
   bombBlastRadius: 0.4
   bombBlastStrength: 9
   bombDragLag: 0.12
-  bombReleaseSpeed: 0.5
-  bombSlideDeceleration: 2
+  bombReleaseSpeed: 0.75
+  bombSlideDeceleration: 1.3
   bombMass: 4
   blastBurnSeconds: 4
   blastShrinkScale: 0.5
