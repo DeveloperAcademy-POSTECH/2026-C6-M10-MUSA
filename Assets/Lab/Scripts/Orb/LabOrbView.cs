@@ -27,12 +27,19 @@ namespace C6Lab
         private LabOrbBurn burn;
         private SpriteRenderer expiryFlash;
         private SpriteRenderer expiryHalo;
+        // 야광귀 섬광 (#268): 눈부신 동안 그림 위에 덮는 하얀 원. 북에는 쓰지 않는다.
+        private SpriteRenderer glareCover;
+        private float glare;
         private float lifeLeft = -1f;
         private float flashPhase;
         private static Sprite expiryDiscSprite;
         private static Sprite expiryHaloSprite;
         /// <summary>In front of the orb's art, its icons and its fire's licks.</summary>
         private const int ExpiryOrder = 12;
+        /// <summary>Above even the expiry flash, so a glared orb shows no colour at all (#268).</summary>
+        private const int GlareOrder = 13;
+        /// <summary>섬광 덮개 색. 아주 살짝 따뜻한 흰색이라 빛에 바랜 느낌이 난다 (#268).</summary>
+        private static readonly Color GlareColor = new Color(1f, .985f, .94f, 1f);
         /// <summary>The board keeps its own lifetime countdown unless the Host's differs by more than this.</summary>
         private const float LifeResyncSeconds = .3f;
         private SpriteRenderer drumArt;
@@ -98,6 +105,41 @@ namespace C6Lab
         public float ComboScale => comboScale;
         /// <summary>콤보 배율이 향하는 값 (#257). 꼬리(#254)는 이 값으로 크기를 정한다.</summary>
         public float ComboScaleTarget => comboTarget;
+
+        /// <summary>섬광 때문에 지금 그림을 하얗게 덮은 정도 (#268). 0이면 원래 색.</summary>
+        public float Glare => glare;
+
+        /// <summary>
+        /// 야광귀 섬광 (#268): 그림 위에 하얀 원을 amount만큼 덮어 색(음양·오행·아이템 표시)이 안 보이게 한다.
+        /// 모양과 크기(콤보 배율 포함)는 그대로 따라가고, 물리·판정은 바꾸지 않는다. 북은 언제나 원래대로 둔다.
+        /// 판이 매 프레임 부른다.
+        /// </summary>
+        public void SetGlare(float amount)
+        {
+            glare = kind.IsDrum() || float.IsNaN(amount) ? 0f : Mathf.Clamp01(amount);
+            if (glare <= 0f)
+            {
+                if (glareCover != null && glareCover.gameObject.activeSelf) glareCover.gameObject.SetActive(false);
+                return;
+            }
+            if (glareCover == null)
+            {
+                glareCover = CreateExpiryPart("Glare Cover", ExpiryDisc());
+                glareCover.sortingOrder = GlareOrder;
+            }
+            float art = ArtRadius(ExpiryLook);
+            glareCover.gameObject.SetActive(true);
+            // 그림 가장자리까지 덮도록 아주 조금 크게, 소멸 번쩍임보다 조금 앞에 둔다.
+            glareCover.transform.localPosition = new Vector3(0f, 0f, -1.1f * art);
+            glareCover.transform.localScale = Vector3.one * (2f * 1.04f * art);
+            glareCover.color = new Color(GlareColor.r, GlareColor.g, GlareColor.b, glare);
+        }
+
+        /// <summary>그려진 그림의 반지름: 결합 구슬 그림은 조금 크게, 폭탄 그림은 더 크게, 콤보 배율(#257)을 곱한다.</summary>
+        private float ArtRadius(LabOrbAppearance look) =>
+            (HasBombArt ? visualRadius * look.BombBodySize
+                : orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf ? visualRadius * LabOrbSpriteArt.SizeScaleFor(kind)
+                : visualRadius) * comboScale;
 
         /// <summary>콤보 SMALL/BIG에 맞춘 그림 배율 목표 (#257). 판이 매 프레임 정한다.</summary>
         public void SetComboScaleTarget(float target) =>
@@ -274,9 +316,7 @@ namespace C6Lab
             Color tint = look.ExpiryFlashColor;
             // Cover the art as drawn: a combined orb's picture is drawn larger, a bomb's art larger still.
             // The combo SMALL/BIG scale (#257) shrinks or grows the art, so the flash follows it.
-            float art = (HasBombArt ? visualRadius * look.BombBodySize
-                : orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf ? visualRadius * LabOrbSpriteArt.SizeScaleFor(kind)
-                : visualRadius) * comboScale;
+            float art = ArtRadius(look);
             expiryFlash.gameObject.SetActive(true);
             expiryHalo.gameObject.SetActive(true);
             expiryFlash.transform.localPosition = new Vector3(0f, 0f, -1.05f * art);
