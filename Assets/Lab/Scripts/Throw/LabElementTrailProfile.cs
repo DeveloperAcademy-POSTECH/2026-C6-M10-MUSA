@@ -42,6 +42,23 @@ namespace C6Lab
         public Texture2D ParticleTexture => particleTexture;
         public Material Material => material;
 
+        /// <summary>
+        /// A runtime copy with every length (width, stamp size and spacing, retained length) multiplied by
+        /// <paramref name="size"/>. Used by the orb board's shallow trail (#254); the caller destroys it.
+        /// </summary>
+        public LabElementTrailProfile CreateScaled(float size)
+        {
+            size = Clamp(size, .01f, 100f, 1f);
+            LabElementTrailProfile copy = Instantiate(this);
+            copy.name = name + " (scaled)";
+            copy.hideFlags = HideFlags.DontSave;
+            copy.width = Width * size;
+            copy.particleSize = ParticleSize * size;
+            copy.particleSpacing = ParticleSpacing * size;
+            copy.maxLength = MaxLength * size;
+            return copy;
+        }
+
         private static float Finite(float value, float fallback)
             => float.IsNaN(value) || float.IsInfinity(value) ? fallback : value;
         private static float Clamp(float value, float min, float max, float fallback)

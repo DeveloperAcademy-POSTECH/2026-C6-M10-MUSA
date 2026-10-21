@@ -47,6 +47,16 @@ namespace C6Lab
         public LabElementTrailProfile Profile => profile;
         public LabOrbElement Element => profile != null ? profile.Element : LabOrbElement.None;
         public bool IsEmitting => emitting;
+        /// <summary>
+        /// Opacity multiplier (0-1) for everything drawn from now on: the whole ribbon each frame and each new
+        /// stamp as it is emitted. 1 for thrown orbs; the orb board's shallow trail (#254) lowers it by speed.
+        /// </summary>
+        public float Intensity
+        {
+            get => intensity;
+            set => intensity = float.IsNaN(value) ? 0f : Mathf.Clamp01(value);
+        }
+        private float intensity = 1f;
         public int PathCount => path.Count;
         public float PathLength => path.Length;
         public int StrandCount => profile == null ? 0 : profile.Shape switch
@@ -214,7 +224,7 @@ namespace C6Lab
                         Position = position, Tangent = tangent, Rotation = rotation, SideOffset = sideOffset
                     };
                     Color tint = profile.Color;
-                    tint.a *= profile.Shape == LabElementTrailShape.Flame ? .9f : 1f;
+                    tint.a *= (profile.Shape == LabElementTrailShape.Flame ? .9f : 1f) * intensity;
                     // Metal's small three-line brush footprints keep its silhouette readable
                     // when perspective compresses the travelled centreline to a few pixels.
                     // Their group centre is still a real passed point, never a point projected
@@ -376,7 +386,7 @@ namespace C6Lab
                     uvs[vertex + 1] = new Vector2(u, 1f);
                     Color tint = profile.Color;
                     float life = Mathf.Clamp01(1f - (Time.time - path.GetTime(i)) / profile.Lifetime);
-                    tint.a *= life * life * .94f;
+                    tint.a *= life * life * .94f * intensity;
                     colors[vertex] = colors[vertex + 1] = tint;
                 }
                 int vertexCount = count * 2;
