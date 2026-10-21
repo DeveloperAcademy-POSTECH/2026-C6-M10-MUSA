@@ -123,6 +123,7 @@ namespace C6Lab.Tests
             LabDeveloperMode developerUi = roots.SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true))
                 .FirstOrDefault();
             LabNetwork network = hud == null ? null : hud.network;
+            network.fixedHostPosition = false; // Legacy chooser fixture; product lobby has dedicated tests.
             Assert.That(network, Is.Not.Null);
             Assert.That(hud, Is.Not.Null);
             Assert.That(developerUi, Is.Not.Null);

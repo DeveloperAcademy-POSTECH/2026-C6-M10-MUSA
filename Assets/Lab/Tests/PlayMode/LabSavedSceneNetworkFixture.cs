@@ -28,6 +28,7 @@ namespace C6Lab.Tests
             // Scene-root lookup avoids stale NetworkManagers retained by other fixtures.
             LabDeveloperMode developer = ownedScene.GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
+            developer.allowOfflineEditorTuning = true; // Explicit offline physics fixture, not the product lobby.
             ownedNetwork = developer.network;
             Assert.That(ownedNetwork, Is.Not.Null, "The saved DEV UI must own its network reference.");
         }

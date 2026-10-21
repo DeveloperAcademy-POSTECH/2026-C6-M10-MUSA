@@ -28,6 +28,8 @@ namespace C6Lab.Tests
             hud = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabHud>(true)).Single();
             network = hud.network;
+            // Explicitly exercise the retained legacy, freely chosen Host-slot path.
+            network.fixedHostPosition = false;
             network.port = 18204;
         }
 

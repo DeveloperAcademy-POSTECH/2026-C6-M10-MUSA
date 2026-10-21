@@ -1,7 +1,7 @@
 {
     "name": "C6Lab.PlayModeTests",
     "rootNamespace": "C6Lab.Tests",
-    "references": ["C6Lab.Runtime"],
+    "references": ["C6Lab.Runtime", "Unity.InputSystem"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

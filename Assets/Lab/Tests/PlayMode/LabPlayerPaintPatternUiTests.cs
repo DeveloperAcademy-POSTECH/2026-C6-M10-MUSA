@@ -23,7 +23,10 @@ namespace C6Lab.Tests
             yield return null;
             hud = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabHud>(true)).Single();
+            hud.GetComponent<LabDeveloperMode>().allowOfflineEditorTuning = true;
             network = hud.network;
+            // Explicitly exercise the retained legacy, freely chosen Host-slot path.
+            network.fixedHostPosition = false;
             network.port = 18260;
         }
 

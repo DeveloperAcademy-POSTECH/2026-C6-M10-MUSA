@@ -24,6 +24,7 @@ namespace C6Lab.Tests
             yield return null;
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
+            ui.allowOfflineEditorTuning = true; // Offline Editor fixture.
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
             Assert.That(ui.valueInputs.Length, Is.EqualTo(166), "The live DEV panel includes all appended settings, including nearby-hit drying.");
             Assert.That(ui.valueSliders.Length, Is.EqualTo(166), "Every DEV field keeps its corresponding control slot.");
