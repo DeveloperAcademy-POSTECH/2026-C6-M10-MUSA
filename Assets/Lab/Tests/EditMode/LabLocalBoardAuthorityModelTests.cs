@@ -45,13 +45,12 @@ namespace C6Lab.Tests
             Assert.That(drum.ownershipVersion, Is.EqualTo(1ul));
             Assert.That(model.TryGenerate(owner, "generate", 0d, out var raw, out _), Is.True);
             Assert.That(raw.ownershipVersion, Is.EqualTo(1ul));
-            Assert.That(model.TryUpdateMotion(owner, raw.id, new Vector2(.6f, .4f), Vector2.right, 0d), Is.True);
             Assert.That(model.TryGetMovableState(raw.id, out var read), Is.True);
             Assert.That(read.ownershipVersion, Is.EqualTo(1ul));
             read.ownershipVersion = 99;
             read.x = .1f;
             Assert.That(model.TryGetMovableState(raw.id, out var unchanged), Is.True);
-            Assert.That(unchanged.x, Is.EqualTo(.6f));
+            Assert.That(unchanged.x, Is.EqualTo(raw.x));
             Assert.That(unchanged.ownershipVersion, Is.EqualTo(1ul));
 
             Assert.That(model.TryTransferAt(owner, raw.id, true, new Vector2(1f, .4f),
@@ -111,8 +110,8 @@ namespace C6Lab.Tests
             Assert.That(model.Snapshot(0d).players.Single().combinedTotal, Is.Zero);
             Assert.That(model.TryCombineAt(10ul, pair.yin.id, pair.yang.id, "good", 0d,
                 new Vector2(.3f, .7f), Vector2.zero, out var combined, out _), Is.True);
-            Assert.That(control.TryCombine(10ul, controlPair.yin.id, controlPair.yang.id, "control", 0d,
-                out var expected, out _), Is.True);
+            Assert.That(control.TryCombineAt(10ul, controlPair.yin.id, controlPair.yang.id, "control", 0d,
+                new Vector2(.5f, .5f), Vector2.zero, out var expected, out _), Is.True);
             Assert.That(combined.element, Is.EqualTo(expected.element));
         }
 

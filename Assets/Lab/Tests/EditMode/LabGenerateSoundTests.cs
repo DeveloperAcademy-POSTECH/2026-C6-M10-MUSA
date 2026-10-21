@@ -29,16 +29,16 @@ namespace C6Lab.Tests
             try
             {
                 float[] values = config.CaptureDeveloperValues();
-                Assert.That(values.Length, Is.EqualTo(171));
-                Assert.That(new[] { values[140], values[141] }, Is.EqualTo(new[] { 15f, 5f }));
-                Assert.That(LabConfig.DeveloperFields[140].Label, Is.EqualTo("Chuimsae Chance (%)"));
-                Assert.That(LabConfig.DeveloperFields[141].Label, Is.EqualTo("Chuimsae Min Gap (generates)"));
-                values[140] = 30f;
-                values[141] = 2f;
+                Assert.That(values.Length, Is.EqualTo(166));
+                Assert.That(new[] { values[135], values[136] }, Is.EqualTo(new[] { 15f, 5f }));
+                Assert.That(LabConfig.DeveloperFields[135].Label, Is.EqualTo("Chuimsae Chance (%)"));
+                Assert.That(LabConfig.DeveloperFields[136].Label, Is.EqualTo("Chuimsae Min Gap (generates)"));
+                values[135] = 30f;
+                values[136] = 2f;
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 Assert.That(config.ChuimsaeChancePercent, Is.EqualTo(30));
                 Assert.That(config.ChuimsaeMinGap, Is.EqualTo(2));
-                values[141] = 2.5f;
+                values[136] = 2.5f;
                 Assert.That(config.TryApplyDeveloperValues(values, out _), Is.False, "Gap must be a whole number.");
             }
             finally

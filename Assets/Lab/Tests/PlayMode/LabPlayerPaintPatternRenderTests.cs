@@ -253,7 +253,7 @@ namespace C6Lab.Tests
                 foreach (bool patternsEnabled in new[] { false, true })
                 {
                     float[] toggleValues = config.CaptureDeveloperValues();
-                    toggleValues[142] = patternsEnabled ? 1f : 0f;
+                    toggleValues[137] = patternsEnabled ? 1f : 0f;
                     Assert.That(config.TryApplyDeveloperValues(toggleValues, out configError), Is.True, configError);
                     paint.RefreshCommittedMap();
                     liveRenderer.SetPropertyBlock(ReadBlock(liveRenderer), 0);

@@ -72,12 +72,12 @@ namespace C6Lab.Tests
             room.Begin("two-player", new ulong[] { 10, 20 }, 0d, config);
             Assert.That(room.TryGenerate(10, "left-orb", 0d, out var left, out _), Is.True);
             Assert.That(room.TryGenerate(10, "right-orb", 0d, out var right, out _), Is.True);
-            Assert.That(room.TryUpdateMotion(10, left.id, new Vector2(.01f, .3f), Vector2.left, .1d), Is.True);
-            Assert.That(room.TryUpdateMotion(10, right.id, new Vector2(.99f, .7f), Vector2.right, .1d), Is.True);
-            Assert.That(room.TryTransfer(10, left.id, false, .3f, Vector2.left, "to-left", .1d,
-                out var receivedLeft, out _), Is.True);
-            Assert.That(room.TryTransfer(10, right.id, true, .7f, Vector2.right, "to-right", .1d,
-                out var receivedRight, out _), Is.True);
+
+
+            Assert.That(room.TryTransferAt(10, left.id, false, new Vector2(.01f, .3f), Vector2.left, "to-left", .1d,
+                LabEdgeCrossingKind.Swipe, out var receivedLeft, out _), Is.True);
+            Assert.That(room.TryTransferAt(10, right.id, true, new Vector2(.99f, .7f), Vector2.right, "to-right", .1d,
+                LabEdgeCrossingKind.Swipe, out var receivedRight, out _), Is.True);
             Assert.That(receivedLeft.owner, Is.EqualTo(20ul));
             Assert.That(receivedLeft.x, Is.EqualTo(1f));
             Assert.That(receivedRight.owner, Is.EqualTo(20ul));
@@ -98,12 +98,12 @@ namespace C6Lab.Tests
 
             Assert.That(room.TryGenerate(10ul, "right", 0d, out var right, out _), Is.True);
             Assert.That(room.TryGenerate(10ul, "left", 0d, out var left, out _), Is.True);
-            Assert.That(room.TryUpdateMotion(10ul, right.id, new Vector2(.99f, .5f), Vector2.right, .1d), Is.True);
-            Assert.That(room.TryUpdateMotion(10ul, left.id, new Vector2(.01f, .5f), Vector2.left, .1d), Is.True);
-            Assert.That(room.TryTransfer(10ul, right.id, true, .5f, Vector2.right, "p3-right", .1d,
-                out var atP1, out _), Is.True);
-            Assert.That(room.TryTransfer(10ul, left.id, false, .5f, Vector2.left, "p3-left", .1d,
-                out var atP2, out _), Is.True);
+
+
+            Assert.That(room.TryTransferAt(10ul, right.id, true, new Vector2(.99f, .5f), Vector2.right, "p3-right", .1d,
+                LabEdgeCrossingKind.Swipe, out var atP1, out _), Is.True);
+            Assert.That(room.TryTransferAt(10ul, left.id, false, new Vector2(.01f, .5f), Vector2.left, "p3-left", .1d,
+                LabEdgeCrossingKind.Swipe, out var atP2, out _), Is.True);
             Assert.That(atP1.owner, Is.EqualTo(20ul));
             Assert.That(atP2.owner, Is.EqualTo(30ul));
 
@@ -125,14 +125,14 @@ namespace C6Lab.Tests
             room.Begin("ring-" + count, ids, 0d, config);
             ulong last = ids[count - 1];
             Assert.That(room.TryGenerate(last, "ring-orb", 0d, out var orb, out _), Is.True);
-            Assert.That(room.TryUpdateMotion(last, orb.id, new Vector2(.99f, .4f), Vector2.right, .1d), Is.True);
-            Assert.That(room.TryTransfer(last, orb.id, true, .4f, Vector2.right, "wrap-right", .1d,
-                out var atFirst, out _), Is.True);
+
+            Assert.That(room.TryTransferAt(last, orb.id, true, new Vector2(.99f, .4f), Vector2.right, "wrap-right", .1d,
+                LabEdgeCrossingKind.Swipe, out var atFirst, out _), Is.True);
             Assert.That(atFirst.owner, Is.EqualTo(ids[0]));
             Assert.That(atFirst.id, Is.EqualTo(orb.id));
-            Assert.That(room.TryUpdateMotion(ids[0], orb.id, new Vector2(.01f, .4f), Vector2.left, .2d), Is.True);
-            Assert.That(room.TryTransfer(ids[0], orb.id, false, .4f, Vector2.left, "wrap-left", .2d,
-                out var atLast, out _), Is.True);
+
+            Assert.That(room.TryTransferAt(ids[0], orb.id, false, new Vector2(.01f, .4f), Vector2.left, "wrap-left", .2d,
+                LabEdgeCrossingKind.Swipe, out var atLast, out _), Is.True);
             Assert.That(atLast.owner, Is.EqualTo(last));
             Assert.That(atLast.id, Is.EqualTo(orb.id));
         }
@@ -164,14 +164,14 @@ namespace C6Lab.Tests
             }
             Assert.That(yin, Is.Not.Null);
             Assert.That(yang, Is.Not.Null);
-            Assert.That(solo.TryUpdateMotion(42ul, yin.id, new Vector2(.99f, .5f), Vector2.right, .1d), Is.True);
-            Assert.That(solo.TryTransfer(42ul, yin.id, true, .5f, Vector2.right, "solo-edge", .1d,
-                out _, out var transferReason), Is.False);
+
+            Assert.That(solo.TryTransferAt(42ul, yin.id, true, new Vector2(.99f, .5f), Vector2.right, "solo-edge", .1d,
+                LabEdgeCrossingKind.Swipe, out _, out var transferReason), Is.False);
             Assert.That(transferReason, Is.EqualTo("NO_NEIGHBOR"));
             Assert.That(solo.Snapshot(.1d).orbs.Single(orb => orb.id == yin.id).owner, Is.EqualTo(42ul));
 
-            Assert.That(solo.TryCombine(42ul, yin.id, yang.id, "solo-combine", 1d,
-                out var combined, out _), Is.True);
+            Assert.That(solo.TryCombineAt(42ul, yin.id, yang.id, "solo-combine", 1d,
+                new Vector2(.5f, .5f), Vector2.zero, out var combined, out _), Is.True);
             Assert.That(solo.TryLaunch(42ul, combined.id, "solo-launch", 1d, out _, out _), Is.True);
             Assert.That(solo.ConfirmHit(combined.id, 1d), Is.True);
             var hit = solo.Snapshot(1d);
@@ -196,7 +196,8 @@ namespace C6Lab.Tests
                     if (raw.kind == LabOrbKind.Yin && yin == null) yin = raw;
                     if (raw.kind == LabOrbKind.Yang && yang == null) yang = raw;
                 }
-                Assert.That(room.TryCombine(10, yin.id, yang.id, "c", 0d, out var combined, out _), Is.True);
+                Assert.That(room.TryCombineAt(10, yin.id, yang.id, "c", 0d,
+                    new Vector2(.5f, .5f), Vector2.zero, out var combined, out _), Is.True);
                 Assert.That(combined.element, Is.Not.EqualTo(LabOrbElement.None));
                 // JSON is the network format; the element must survive it.
                 var copy = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(room.Snapshot(0d)));
@@ -255,7 +256,8 @@ namespace C6Lab.Tests
             Assert.That(yang, Is.Not.Null);
 
             var requested = new Vector2(.6f, -.4f);
-            Assert.That(model.TryCombine(10, yin.id, yang.id, "keep", 1d, requested, out var combined, out _), Is.True);
+            Assert.That(model.TryCombineAt(10, yin.id, yang.id, "keep", 1d,
+                new Vector2(.5f, .5f), requested, out var combined, out _), Is.True);
             Assert.That(combined.vx, Is.EqualTo(requested.x).Within(.0001f));
             Assert.That(combined.vy, Is.EqualTo(requested.y).Within(.0001f));
             var stored = model.Snapshot(1d).orbs.Single(orb => orb.id == combined.id);
@@ -271,7 +273,8 @@ namespace C6Lab.Tests
             }
             Assert.That(a, Is.Not.Null);
             Assert.That(b, Is.Not.Null);
-            Assert.That(model.TryCombine(20, a.id, b.id, "huge", 1d, new Vector2(1e6f, 0f), out var fast, out _), Is.True);
+            Assert.That(model.TryCombineAt(20, a.id, b.id, "huge", 1d,
+                new Vector2(.5f, .5f), new Vector2(1e6f, 0f), out var fast, out _), Is.True);
             Assert.That(new Vector2(fast.vx, fast.vy).magnitude, Is.LessThan(1e6f));
             Assert.That(float.IsNaN(fast.vx) || float.IsInfinity(fast.vx), Is.False);
         }
@@ -290,11 +293,14 @@ namespace C6Lab.Tests
             var yang = raw.First(orb => orb.kind == LabOrbKind.Yang);
             var samePair = raw.GroupBy(orb => orb.kind).First(group => group.Count() >= 2).Take(2).ToArray();
 
-            Assert.That(model.TryCombine(20, yin.id, yang.id, "foreign", 1d, out _, out var foreignReason), Is.False);
+            Assert.That(model.TryCombineAt(20, yin.id, yang.id, "foreign", 1d,
+                new Vector2(.5f, .5f), Vector2.zero, out _, out var foreignReason), Is.False);
             Assert.That(foreignReason, Is.EqualTo("NOT_OWNED_IDLE"));
-            Assert.That(model.TryCombine(10, samePair[0].id, samePair[1].id, "same", 1d, out _, out var sameReason), Is.False);
+            Assert.That(model.TryCombineAt(10, samePair[0].id, samePair[1].id, "same", 1d,
+                new Vector2(.5f, .5f), Vector2.zero, out _, out var sameReason), Is.False);
             Assert.That(sameReason, Is.EqualTo("POLARITY_MISMATCH"));
-            Assert.That(model.TryCombine(10, yin.id, yang.id, "valid", 1d, out var combined, out _), Is.True);
+            Assert.That(model.TryCombineAt(10, yin.id, yang.id, "valid", 1d,
+                new Vector2(.5f, .5f), Vector2.zero, out var combined, out _), Is.True);
             Assert.That(combined.kind, Is.EqualTo(LabOrbKind.Combined));
             Assert.That(combined.origin, Is.EqualTo(LabOrbOrigin.Combined));
             Assert.That(combined.createdAt, Is.EqualTo(1d));
@@ -304,7 +310,8 @@ namespace C6Lab.Tests
             Assert.That(model.Snapshot(1d).orbs.Single(orb => orb.id == combined.id).element,
                 Is.EqualTo(combined.element));
             Assert.That(model.Snapshot(1d).orbs.Any(orb => orb.id == yin.id || orb.id == yang.id), Is.False);
-            Assert.That(model.TryCombine(10, yin.id, yang.id, "valid", 1d, out _, out var duplicateReason), Is.False);
+            Assert.That(model.TryCombineAt(10, yin.id, yang.id, "valid", 1d,
+                new Vector2(.5f, .5f), Vector2.zero, out _, out var duplicateReason), Is.False);
             Assert.That(duplicateReason, Is.EqualTo("DUPLICATE_REQUEST"));
 
             // The two unused Raw orbs expire at t=8; the new Combined remains until t=9.
@@ -316,9 +323,9 @@ namespace C6Lab.Tests
         public void ThreeSeatHandoffKeepsIdentityAgeAndMomentumAndChecksOwnership()
         {
             Assert.That(model.TryGenerate(10, "g", 0d, out var born, out _), Is.True);
-            Assert.That(model.TryUpdateMotion(10, born.id, new Vector2(.99f, .4f), new Vector2(1.1f, .2f), .2d), Is.True);
-            Assert.That(model.TryTransfer(10, born.id, true, .4f, new Vector2(1.1f, .2f), "right", .2d,
-                out var atSecond, out _), Is.True);
+
+            Assert.That(model.TryTransferAt(10, born.id, true, new Vector2(.99f, .4f), new Vector2(1.1f, .2f), "right", .2d,
+                LabEdgeCrossingKind.Swipe, out var atSecond, out _), Is.True);
             Assert.That(atSecond.owner, Is.EqualTo(20ul));
             Assert.That(atSecond.id, Is.EqualTo(born.id));
             Assert.That(atSecond.createdAt, Is.EqualTo(born.createdAt));
@@ -328,14 +335,13 @@ namespace C6Lab.Tests
             Assert.That(atSecond.y, Is.EqualTo(.4f));
             Assert.That(atSecond.vx, Is.EqualTo(1.1f));
             Assert.That(atSecond.vy, Is.EqualTo(.2f));
-            Assert.That(model.TryUpdateMotion(10, born.id, new Vector2(.5f, .5f), Vector2.zero, .2d), Is.False);
-            Assert.That(model.TryTransfer(10, born.id, true, .4f, new Vector2(1.1f, .2f), "again", .2d,
-                out _, out var rejected), Is.False);
+
+            Assert.That(model.TryTransferAt(10, born.id, true, new Vector2(.99f, .4f), new Vector2(1.1f, .2f), "again", .2d,
+                LabEdgeCrossingKind.Swipe, out _, out var rejected), Is.False);
             Assert.That(rejected, Is.EqualTo("NOT_OWNED_IDLE"));
 
-            Assert.That(model.TryUpdateMotion(20, born.id, new Vector2(.99f, .4f), new Vector2(1f, 0f), .3d), Is.True);
-            Assert.That(model.TryTransfer(20, born.id, true, .4f, new Vector2(1f, 0f), "right-again", .3d,
-                out var atThird, out _), Is.True);
+            Assert.That(model.TryTransferAt(20, born.id, true, new Vector2(.99f, .4f), new Vector2(1f, 0f), "right-again", .3d,
+                LabEdgeCrossingKind.Swipe, out var atThird, out _), Is.True);
             Assert.That(atThird.owner, Is.EqualTo(30ul));
             Assert.That(atThird.id, Is.EqualTo(born.id));
         }
@@ -346,7 +352,8 @@ namespace C6Lab.Tests
             var pair = GeneratePair(10);
             Assert.That(model.TryLaunch(10, pair.yin.id, "raw-throw", 1d, out _, out var rawReason), Is.False);
             Assert.That(rawReason, Is.EqualTo("RAW_CANNOT_ATTACK"));
-            Assert.That(model.TryCombine(10, pair.yin.id, pair.yang.id, "combine", 1d, out var combined, out _), Is.True);
+            Assert.That(model.TryCombineAt(10, pair.yin.id, pair.yang.id, "combine", 1d,
+                new Vector2(.5f, .5f), Vector2.zero, out var combined, out _), Is.True);
             Assert.That(model.TryLaunch(10, combined.id, "launch", 1d, out var flying, out _), Is.True);
             Assert.That(flying.inFlight, Is.True);
             var beforeHit = model.Snapshot(1d);
@@ -368,14 +375,14 @@ namespace C6Lab.Tests
         public void ExpiredIdleOrbCannotTransferButProjectileMissNeverDamages()
         {
             Assert.That(model.TryGenerate(10, "old", 0d, out var old, out _), Is.True);
-            Assert.That(model.TryUpdateMotion(10, old.id, new Vector2(.99f, .5f), Vector2.right, 1d), Is.True);
-            Assert.That(model.TryTransfer(10, old.id, true, .5f, Vector2.right, "late", 8d,
-                out _, out var reason), Is.False);
+
+            Assert.That(model.TryTransferAt(10, old.id, true, new Vector2(.99f, .5f), Vector2.right, "late", 8d,
+                LabEdgeCrossingKind.Swipe, out _, out var reason), Is.False);
             Assert.That(reason, Is.EqualTo("ORB_NOT_FOUND"));
 
             var pair = GeneratePair(20, 8.1d);
-            Assert.That(model.TryCombine(20, pair.yin.id, pair.yang.id, "new-combine", 8.1d,
-                out var combined, out _), Is.True);
+            Assert.That(model.TryCombineAt(20, pair.yin.id, pair.yang.id, "new-combine", 8.1d,
+                new Vector2(.5f, .5f), Vector2.zero, out var combined, out _), Is.True);
             Assert.That(model.TryLaunch(20, combined.id, "new-launch", 8.1d, out _, out _), Is.True);
             int hpBefore = model.Hp;
             Assert.That(model.ConfirmMiss(combined.id, 9d), Is.True);
@@ -596,7 +603,7 @@ namespace C6Lab.Tests
                 Assert.That(room.TryGenerate(10, "beside-drum", 0d, out _, out reason), Is.True,
                     "A drum does not take a storage slot. " + reason);
                 Assert.That(room.TryLaunch(10, drum.id, "throw-drum", 0d, out _, out _), Is.False, "A drum is never thrown.");
-                Assert.That(room.TryUseItem(10, drum.id, "use-drum", 0d, out _, out _), Is.False);
+                Assert.That(room.TryUseItemAt(10, drum.id, "use-drum", 0d, new Vector2(.5f, .5f), out _, out _), Is.False);
 
                 Assert.That(PassRight(room, drum.id, 10, .1d).owner, Is.EqualTo(20ul), "A full board still receives the drum.");
                 Assert.That(room.TryGenerate(10, "no-drum", .2d, out _, out reason), Is.False);
@@ -642,13 +649,19 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void NonFiniteAndBackwardMotionCannotChangeTheHostOrb()
+        public void NonFiniteAndBackwardTransferCannotChangeTheHostOrb()
         {
             Assert.That(model.TryGenerate(10, "g", 0d, out var orb, out _), Is.True);
             var before = model.Snapshot(0d).orbs.Single().Copy();
-            Assert.That(model.TryUpdateMotion(10, orb.id, new Vector2(float.NaN, .5f), Vector2.right, 1d), Is.False);
-            Assert.That(model.TryUpdateMotion(10, orb.id, new Vector2(.5f, .5f), new Vector2(float.PositiveInfinity, 0f), 1d), Is.False);
-            Assert.That(model.TryUpdateMotion(10, orb.id, new Vector2(.5f, .5f), Vector2.right, .5d), Is.False);
+            Assert.That(model.TryTransferAt(10, orb.id, true, new Vector2(float.NaN, .5f), Vector2.right,
+                "nan-position", 1d, LabEdgeCrossingKind.Swipe, out _, out var reason), Is.False);
+            Assert.That(reason, Is.EqualTo("INVALID_MOTION"));
+            Assert.That(model.TryTransferAt(10, orb.id, true, new Vector2(.99f, .5f),
+                new Vector2(float.PositiveInfinity, 0f), "infinite-speed", 1d, LabEdgeCrossingKind.Swipe, out _, out reason), Is.False);
+            Assert.That(reason, Is.EqualTo("INVALID_MOTION"));
+            Assert.That(model.TryTransferAt(10, orb.id, true, new Vector2(.99f, .5f), Vector2.right,
+                "backward-time", .5d, LabEdgeCrossingKind.Swipe, out _, out reason), Is.False);
+            Assert.That(reason, Is.EqualTo("INVALID_TIME"));
             var after = model.Snapshot(1d).orbs.Single();
             Assert.That(after.x, Is.EqualTo(before.x));
             Assert.That(after.y, Is.EqualTo(before.y));
@@ -762,7 +775,8 @@ namespace C6Lab.Tests
                 Assert.That(yin, Is.Not.Null);
                 Assert.That(bomb, Is.Not.Null);
 
-                Assert.That(room.TryCombine(10, yin.id, bomb.id, "yin-bomb", .1d, out _, out var combineReason), Is.False);
+                Assert.That(room.TryCombineAt(10, yin.id, bomb.id, "yin-bomb", .1d,
+                    new Vector2(.5f, .5f), Vector2.zero, out _, out var combineReason), Is.False);
                 Assert.That(combineReason, Is.EqualTo("POLARITY_MISMATCH"));
                 Assert.That(room.TryLaunch(10, bomb.id, "bomb-throw", .1d, out _, out var launchReason), Is.False);
                 Assert.That(launchReason, Is.EqualTo("RAW_CANNOT_ATTACK"));
@@ -789,9 +803,9 @@ namespace C6Lab.Tests
                 {
                     ulong holder = ring[(pass - 1) % ring.Length];
                     double at = pass * .1d;
-                    Assert.That(room.TryUpdateMotion(holder, potion.id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
-                    Assert.That(room.TryTransfer(holder, potion.id, true, .5f, Vector2.right, "pass-" + pass, at,
-                        out var passed, out var reason), Is.True, reason);
+
+                    Assert.That(room.TryTransferAt(holder, potion.id, true, new Vector2(.99f, .5f), Vector2.right, "pass-" + pass, at,
+                LabEdgeCrossingKind.Swipe, out var passed, out var reason), Is.True, reason);
                     Assert.That(passed.owner, Is.EqualTo(ring[pass % ring.Length]));
                     Assert.That(passed.lockSwipes, Is.EqualTo(Math.Max(0, locks - pass)));
                     Assert.That(room.Snapshot(at).orbs.Single(orb => orb.id == potion.id).lockSwipes,
@@ -801,9 +815,9 @@ namespace C6Lab.Tests
                 var solo = new LabModel();
                 solo.BeginSolo("unlock-solo", 7ul, 0d, potionsOnly);
                 Assert.That(solo.TryGenerate(7ul, "solo-potion", 0d, out var soloPotion, out _), Is.True);
-                Assert.That(solo.TryUpdateMotion(7ul, soloPotion.id, new Vector2(.99f, .5f), Vector2.right, .1d), Is.True);
-                Assert.That(solo.TryTransfer(7ul, soloPotion.id, true, .5f, Vector2.right, "solo-pass", .1d,
-                    out _, out var soloReason), Is.False);
+
+                Assert.That(solo.TryTransferAt(7ul, soloPotion.id, true, new Vector2(.99f, .5f), Vector2.right, "solo-pass", .1d,
+                LabEdgeCrossingKind.Swipe, out _, out var soloReason), Is.False);
                 Assert.That(soloReason, Is.EqualTo("NO_NEIGHBOR"));
                 Assert.That(solo.Snapshot(.1d).orbs.Single().lockSwipes, Is.EqualTo(soloPotion.lockSwipes),
                     "Solo play has no neighbor, so items stay locked.");
@@ -863,8 +877,8 @@ namespace C6Lab.Tests
                     }
                     for (int i = 0; i < Math.Min(yins.Count, yangs.Count); i++)
                     {
-                        Assert.That(room.TryCombine(player, yins[i].id, yangs[i].id, "combine-" + player + "-" + i, 0d,
-                            out var combined, out var reason), Is.True, reason);
+                        Assert.That(room.TryCombineAt(player, yins[i].id, yangs[i].id, "combine-" + player + "-" + i, 0d,
+                new Vector2(.5f, .5f), Vector2.zero, out var combined, out var reason), Is.True, reason);
                         Assert.That(combined.element, Is.Not.EqualTo(LabOrbElement.None));
                         Assert.That(room.Snapshot(0d).orbs.Single(orb => orb.id == combined.id).element,
                             Is.EqualTo(combined.element), "Clients receive the element through the snapshot.");
@@ -890,7 +904,8 @@ namespace C6Lab.Tests
                 locked.Begin("potion-locked", new ulong[] { 10, 20, 30 }, 0d, potions);
                 Assert.That(locked.TryGenerate(10, "locked", 0d, out var lockedPotion, out _), Is.True);
                 Assert.That(lockedPotion.lockSwipes, Is.GreaterThan(0));
-                Assert.That(locked.TryUseItem(10, lockedPotion.id, "use-locked", 0d, out _, out var lockedReason), Is.False);
+                Assert.That(locked.TryUseItemAt(10, lockedPotion.id, "use-locked", 0d,
+                    new Vector2(.5f, .5f), out _, out var lockedReason), Is.False);
                 Assert.That(lockedReason, Is.EqualTo("ITEM_LOCKED"));
 
                 float[] values = potions.CaptureDeveloperValues();
@@ -903,14 +918,15 @@ namespace C6Lab.Tests
                 Assert.That(potion.kind, Is.EqualTo(LabOrbKind.Potion));
                 Assert.That(potion.lockSwipes, Is.Zero);
 
-                Assert.That(room.TryUseItem(10, potion.id, "full", .1d, out _, out var fullReason), Is.False);
+                Assert.That(room.TryUseItemAt(10, potion.id, "full", .1d, new Vector2(.5f, .5f), out _, out var fullReason), Is.False);
                 Assert.That(fullReason, Is.EqualTo("HP_FULL"));
                 Assert.That(room.Snapshot(.1d).orbs.Any(orb => orb.id == potion.id), Is.True, "A refused potion is kept.");
 
                 Assert.That(room.TryApplyPlayerDamage(10, 25, .2d), Is.True);
-                Assert.That(room.TryUseItem(20, potion.id, "foreign", .3d, out _, out var foreignReason), Is.False);
+                Assert.That(room.TryUseItemAt(20, potion.id, "foreign", .3d,
+                    new Vector2(.5f, .5f), out _, out var foreignReason), Is.False);
                 Assert.That(foreignReason, Is.EqualTo("NOT_OWNED_IDLE"));
-                Assert.That(room.TryUseItem(10, potion.id, "heal", .3d, out _, out var healReason), Is.True);
+                Assert.That(room.TryUseItemAt(10, potion.id, "heal", .3d, new Vector2(.5f, .5f), out _, out var healReason), Is.True);
                 Assert.That(healReason, Is.EqualTo("ITEM_USED"));
                 var healed = room.Snapshot(.3d);
                 Assert.That(healed.players.Single(player => player.id == 10).personalHp, Is.EqualTo(285));
@@ -918,22 +934,23 @@ namespace C6Lab.Tests
                 Assert.That(healed.orbs.Any(orb => orb.id == potion.id), Is.False, "A used potion is consumed.");
 
                 Assert.That(room.TryGenerate(10, "second", .4d, out var second, out _), Is.True);
-                Assert.That(room.TryUseItem(10, second.id, "cap", .5d, out _, out _), Is.True);
+                Assert.That(room.TryUseItemAt(10, second.id, "cap", .5d, new Vector2(.5f, .5f), out _, out _), Is.True);
                 Assert.That(room.Snapshot(.5d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(295));
                 Assert.That(room.TryGenerate(10, "third", .6d, out var third, out _), Is.True);
-                Assert.That(room.TryUseItem(10, third.id, "capped", .7d, out _, out _), Is.True);
+                Assert.That(room.TryUseItemAt(10, third.id, "capped", .7d, new Vector2(.5f, .5f), out _, out _), Is.True);
                 Assert.That(room.Snapshot(.7d).players.Single(player => player.id == 10).personalHp, Is.EqualTo(300),
                     "Healing never exceeds Player Max HP.");
 
                 Assert.That(room.TryApplyPlayerDamage(20, 300, .8d), Is.True);
                 Assert.That(room.Snapshot(.8d).phase, Is.EqualTo(LabPhase.Playing), "Others are still standing.");
                 Assert.That(room.TryGenerate(20, "downed", .8d, out var downedPotion, out _), Is.True);
-                Assert.That(room.TryUseItem(20, downedPotion.id, "revive", .9d, out _, out var downReason), Is.False);
+                Assert.That(room.TryUseItemAt(20, downedPotion.id, "revive", .9d,
+                    new Vector2(.5f, .5f), out _, out var downReason), Is.False);
                 Assert.That(downReason, Is.EqualTo("PLAYER_DOWN"), "A potion cannot revive a player at 0 HP.");
                 Assert.That(room.Snapshot(.9d).players.Single(player => player.id == 20).personalHp, Is.Zero);
 
                 Assert.That(model.TryGenerate(10, "raw", 0d, out var raw, out _), Is.True);
-                Assert.That(model.TryUseItem(10, raw.id, "raw-use", 0d, out _, out var rawReason), Is.False);
+                Assert.That(model.TryUseItemAt(10, raw.id, "raw-use", 0d, new Vector2(.5f, .5f), out _, out var rawReason), Is.False);
                 Assert.That(rawReason, Is.EqualTo("NOT_USABLE"));
             }
             finally { UnityEngine.Object.DestroyImmediate(potions); }
@@ -955,7 +972,7 @@ namespace C6Lab.Tests
                 Assert.That(room.TryGenerate(10, "box", 0d, out var box, out _), Is.True);
                 Assert.That(box.kind, Is.EqualTo(LabOrbKind.SecretBox));
 
-                Assert.That(room.TryUseItem(10, box.id, "open", .5d, out _, out var openReason), Is.True);
+                Assert.That(room.TryUseItemAt(10, box.id, "open", .5d, new Vector2(.5f, .5f), out _, out var openReason), Is.True);
                 Assert.That(openReason, Is.EqualTo("ITEM_USED"));
                 var opened = room.Snapshot(.5d).orbs.Where(orb => orb.owner == 10).OrderBy(orb => orb.x).ToArray();
                 Assert.That(opened.Length, Is.EqualTo(2), "The box is replaced by exactly two orbs.");
@@ -974,7 +991,7 @@ namespace C6Lab.Tests
                 for (int i = 0; i < 3; i++)
                     Assert.That(room.TryGenerate(20, "full-" + i, .7d, out _, out _), Is.True);
                 var fullBox = room.Snapshot(.7d).orbs.First(orb => orb.owner == 20);
-                Assert.That(room.TryUseItem(20, fullBox.id, "no-room", .8d, out _, out var fullReason), Is.False);
+                Assert.That(room.TryUseItemAt(20, fullBox.id, "no-room", .8d, new Vector2(.5f, .5f), out _, out var fullReason), Is.False);
                 Assert.That(fullReason, Is.EqualTo("STORAGE_FULL"));
                 Assert.That(room.Snapshot(.8d).orbs.Any(orb => orb.id == fullBox.id), Is.True, "A box without room is kept.");
 
@@ -1033,7 +1050,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void UnthrownBombBlastsWhereItsHolderLastHadItWithoutRemovingAnyOrb()
+        public void UnthrownBombCueUsesLastConfirmedHandoffWithoutRemovingAnyOrb()
         {
             var mixed = ConfigWith(1f, 50, 0, 0, 0, 0, 50);
             try
@@ -1056,7 +1073,7 @@ namespace C6Lab.Tests
                     Assert.That(room.TryGenerate(20, "near-" + i, 10d, out var orb, out _), Is.True);
                     near.Add(orb.id);
                 }
-                Assert.That(room.TryUpdateMotion(20, bomb.id, new Vector2(.3f, .6f), Vector2.zero, 12d), Is.True);
+
                 Assert.That(room.Snapshot(14.9d).orbs.Count(orb => orb.owner == 20), Is.EqualTo(3));
                 Assert.That(room.DrainBombExplosions(), Is.Empty);
 
@@ -1069,8 +1086,8 @@ namespace C6Lab.Tests
                 Assert.That(blasts.Length, Is.EqualTo(1));
                 Assert.That(blasts[0].Owner, Is.EqualTo(20ul), "The current holder's board takes the blast.");
                 Assert.That(blasts[0].BombId, Is.EqualTo(bomb.id));
-                Assert.That(blasts[0].Position, Is.EqualTo(new Vector2(.3f, .6f)),
-                    "It blasts where the holder's screen last had the bomb.");
+                Assert.That(blasts[0].Position, Is.EqualTo(new Vector2(0f, .5f)),
+                    "The Host cue carries the confirmed handoff pose; the owning board supplies its live blast position.");
                 Assert.That(room.DrainBombExplosions(), Is.Empty, "Each explosion is reported once.");
             }
             finally { UnityEngine.Object.DestroyImmediate(mixed); }
@@ -1179,14 +1196,14 @@ namespace C6Lab.Tests
                 Assert.That(room.DrainBombExplosions().Select(blast => blast.BombId), Does.Contain(bomb.id));
                 Assert.That(room.MarkBlasted(10, bomb.id, new[] { burnt.yin.id }, 15.1d), Is.EqualTo(1));
 
-                Assert.That(room.TryCombine(10, burnt.yin.id, burnt.yang.id, "combine-burnt", 15.5d,
-                    out var combined, out var reason), Is.True, reason);
+                Assert.That(room.TryCombineAt(10, burnt.yin.id, burnt.yang.id, "combine-burnt", 15.5d,
+                new Vector2(.5f, .5f), Vector2.zero, out var combined, out var reason), Is.True, reason);
                 Assert.That(combined.small, Is.True, "One small half makes the combined orb small.");
                 Assert.That(combined.burnedAt, Is.EqualTo(15.1d), "It burns on for the rest of that fire.");
 
                 var plain = Pair("plain-", 16d);
-                Assert.That(room.TryCombine(10, plain.yin.id, plain.yang.id, "combine-plain", 16.5d,
-                    out var whole, out reason), Is.True, reason);
+                Assert.That(room.TryCombineAt(10, plain.yin.id, plain.yang.id, "combine-plain", 16.5d,
+                new Vector2(.5f, .5f), Vector2.zero, out var whole, out reason), Is.True, reason);
                 Assert.That(whole.small, Is.False, "Two whole halves make a whole orb.");
                 Assert.That(whole.burnedAt, Is.EqualTo(-1d));
             }
@@ -1222,7 +1239,8 @@ namespace C6Lab.Tests
                     room.Snapshot(15d);
                     Assert.That(room.DrainBombExplosions().Select(blast => blast.BombId), Does.Contain(bomb.id));
                     if (shrink) Assert.That(room.MarkBlasted(10, bomb.id, new[] { yin.id }, 15.1d), Is.EqualTo(1));
-                    Assert.That(room.TryCombine(10, yin.id, yang.id, "combine", 15.5d, out var combined, out var reason),
+                    Assert.That(room.TryCombineAt(10, yin.id, yang.id, "combine", 15.5d,
+                new Vector2(.5f, .5f), Vector2.zero, out var combined, out var reason),
                         Is.True, reason);
                     Assert.That(combined.small, Is.EqualTo(shrink));
                     Assert.That(room.TryLaunch(10, combined.id, "throw", 15.6d, out _, out reason), Is.True, reason);
@@ -1284,8 +1302,8 @@ namespace C6Lab.Tests
             try
             {
                 float[] tuning = blocking.CaptureDeveloperValues();
-                tuning[95] = tuning[96] = tuning[97] = 0f;
-                tuning[98] = 100f; // Every ordinary drum handoff arrives as a pass.
+                tuning[94] = tuning[95] = tuning[96] = 0f;
+                tuning[97] = 100f; // Every ordinary drum handoff arrives as a pass.
                 Assert.That(blocking.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
                 var room = new LabModel();
                 ulong[] ring = { 10, 20, 30 };
@@ -1488,7 +1506,8 @@ namespace C6Lab.Tests
                 Assert.That(spare.Count, Is.GreaterThanOrEqualTo(2));
                 string passed = spare[0], kept = spare[1];
                 Assert.That(PassRight(room, passed, 10, 1d).owner, Is.EqualTo(20ul));
-                Assert.That(room.TryCombine(10, yin.id, yang.id, "combine", 2d, out var combined, out var reason),
+                Assert.That(room.TryCombineAt(10, yin.id, yang.id, "combine", 2d,
+                    new Vector2(.5f, .5f), Vector2.zero, out var combined, out var reason),
                     Is.True, reason);
 
                 room.Snapshot(7.9d);
@@ -1774,7 +1793,7 @@ namespace C6Lab.Tests
             try
             {
                 float[] values = passes.CaptureDeveloperValues();
-                values[95] = 0f; values[96] = 0f; values[97] = 0f; values[98] = 100f; // every swipe passes through
+                values[94] = 0f; values[95] = 0f; values[96] = 0f; values[97] = 100f; // every swipe passes through
                 Assert.That(passes.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var room = new LabModel();
                 room.Begin("drum-pass", new ulong[] { 10, 20, 30 }, 0d, passes);
@@ -1811,17 +1830,15 @@ namespace C6Lab.Tests
 
         private static LabOrbState Cross(LabModel room, string id, ulong holder, double at, LabEdgeCrossingKind crossing)
         {
-            Assert.That(room.TryUpdateMotion(holder, id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
-            Assert.That(room.TryTransfer(holder, id, true, .5f, Vector2.right, "cross-" + id + "-" + at, at, crossing,
-                out var passed, out var reason), Is.True, reason);
+            Assert.That(room.TryTransferAt(holder, id, true, new Vector2(.99f, .5f), Vector2.right, "cross-" + id + "-" + at, at,
+                crossing, out var passed, out var reason), Is.True, reason);
             return passed;
         }
 
         private static LabOrbState PassRight(LabModel room, string id, ulong holder, double at)
         {
-            Assert.That(room.TryUpdateMotion(holder, id, new Vector2(.99f, .5f), Vector2.right, at), Is.True);
-            Assert.That(room.TryTransfer(holder, id, true, .5f, Vector2.right, "pass-" + id + "-" + at, at,
-                out var passed, out var reason), Is.True, reason);
+            Assert.That(room.TryTransferAt(holder, id, true, new Vector2(.99f, .5f), Vector2.right, "pass-" + id + "-" + at, at,
+                LabEdgeCrossingKind.Swipe, out var passed, out var reason), Is.True, reason);
             return passed;
         }
 
@@ -1844,13 +1861,15 @@ namespace C6Lab.Tests
             int generated = model.Snapshot(0d).orbs.Count(orb => orb.owner == 10);
             Assert.That(Me(0d).generatedTotal, Is.EqualTo(generated));
 
-            Assert.That(model.TryCombine(10, yin.id, yin.id, "bad-combine", 0d, out _, out _), Is.False);
+            Assert.That(model.TryCombineAt(10, yin.id, yin.id, "bad-combine", 0d,
+                new Vector2(.5f, .5f), Vector2.zero, out _, out _), Is.False);
             Assert.That(Me(0d).combinedTotal, Is.Zero, "A rejected combine is not counted.");
-            Assert.That(model.TryCombine(10, yin.id, yang.id, "combine", .1d, out var combined, out _), Is.True);
+            Assert.That(model.TryCombineAt(10, yin.id, yang.id, "combine", .1d,
+                new Vector2(.5f, .5f), Vector2.zero, out var combined, out _), Is.True);
             Assert.That(Me(.1d).combinedTotal, Is.EqualTo(1));
 
-            Assert.That(model.TryUpdateMotion(10, combined.id, new Vector2(.99f, .5f), Vector2.right, .2d), Is.True);
-            Assert.That(model.TryTransfer(10, combined.id, true, .5f, Vector2.right, "pass", .2d, out _, out var reason),
+            Assert.That(model.TryTransferAt(10, combined.id, true, new Vector2(.99f, .5f), Vector2.right, "pass", .2d,
+                LabEdgeCrossingKind.Swipe, out _, out var reason),
                 Is.True, reason);
             Assert.That(Me(.2d).passedTotal, Is.EqualTo(1));
             Assert.That(model.Snapshot(.2d).players.Where(p => p.id != 10).All(p => p.passedTotal == 0), Is.True);
@@ -1890,12 +1909,12 @@ namespace C6Lab.Tests
 
             Check(new[] { 0, 0, 100, 0, 0, 0 }, (room, id) => room.TryLaunch(10, id, "relay", .5d, out _, out _),
                 p => p.relayUsed, 1);
-            Check(new[] { 0, 0, 0, 100, 0, 0 }, (room, id) => room.TryUseItem(10, id, "box", .5d, out _, out _),
+            Check(new[] { 0, 0, 0, 100, 0, 0 }, (room, id) => room.TryUseItemAt(10, id, "box", .5d, new Vector2(.5f, .5f), out _, out _),
                 p => p.secretBoxUsed, 1);
             Check(new[] { 0, 0, 0, 0, 0, 100 }, (room, id) => room.TryLaunch(10, id, "bomb", .5d, out _, out _),
                 p => p.bombUsed, 1);
             // A potion at full HP is refused and kept, so it is not counted.
-            Check(new[] { 0, 0, 0, 0, 100, 0 }, (room, id) => room.TryUseItem(10, id, "potion", .5d, out _, out _),
+            Check(new[] { 0, 0, 0, 0, 100, 0 }, (room, id) => room.TryUseItemAt(10, id, "potion", .5d, new Vector2(.5f, .5f), out _, out _),
                 p => p.potionUsed, 0);
         }
 
@@ -2353,8 +2372,8 @@ namespace C6Lab.Tests
                 Assert.That(room.PaintColorFor(LabOrbElement.None), Is.EqualTo(Color.clear));
                 material.SetColor("_BaseColor", Color.magenta);
                 float[] values = paintConfig.CaptureDeveloperValues();
-                values[106] = 100f;
-                values[105] = 2f;
+                values[105] = 100f;
+                values[104] = 2f;
                 Assert.That(paintConfig.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 int request = 0;
                 LabOrbState shot = LaunchElementShot(room, ref request, 0d);
@@ -2393,13 +2412,13 @@ namespace C6Lab.Tests
             values[9] = 100f;
             values[46] = 0f; values[47] = 0f;
             values[79] = 0f;
-            values[87] = 100f;
-            values[105] = 0f; // The small real map keeps model rule fixtures fast.
-            values[106] = initialPercent;
-            values[107] = repeatPercent;
-            values[108] = growthPercentPerSecond;
-            values[109] = 100f; // No random holes in exact-time model fixtures.
-            values[110] = 1f;
+
+            values[104] = 0f; // The small real map keeps model rule fixtures fast.
+            values[105] = initialPercent;
+            values[106] = repeatPercent;
+            values[107] = growthPercentPerSecond;
+            values[108] = 100f; // No random holes in exact-time model fixtures.
+            values[109] = 1f;
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
         }
@@ -2411,7 +2430,8 @@ namespace C6Lab.Tests
             {
                 Assert.That(room.TryGenerate(owner, "paint-box-" + request++, now, out var box, out string error), Is.True, error);
                 Assert.That(box.kind, Is.EqualTo(LabOrbKind.SecretBox));
-                Assert.That(room.TryUseItem(owner, box.id, "paint-open-" + request++, now, out _, out error), Is.True, error);
+                Assert.That(room.TryUseItemAt(owner, box.id, "paint-open-" + request++, now,
+                    new Vector2(.5f, .5f), out _, out error), Is.True, error);
                 shot = room.Snapshot(now).orbs.First(orb => orb.owner == owner && orb.kind == LabOrbKind.Combined && !orb.inFlight);
             }
             Assert.That(room.TryLaunch(owner, shot.id, "paint-launch-" + request++, now, out _, out string reason), Is.True, reason);
@@ -2433,7 +2453,8 @@ namespace C6Lab.Tests
                 model.Begin("hit-records", new ulong[] { 10, 20, 30 }, 0d, shortFight);
 
                 var first = GeneratePair(10);
-                Assert.That(model.TryCombine(10, first.yin.id, first.yang.id, "c1", 0d, out var a, out _), Is.True);
+                Assert.That(model.TryCombineAt(10, first.yin.id, first.yang.id, "c1", 0d,
+                    new Vector2(.5f, .5f), Vector2.zero, out var a, out _), Is.True);
                 Assert.That(ThrowAndHit(model, a.id, 10, .1d), Is.EqualTo(20));
                 var afterFirst = model.Snapshot(.1d).players.Single(p => p.id == 10);
                 Assert.That(afterFirst.hitTotal, Is.EqualTo(1));
@@ -2441,7 +2462,8 @@ namespace C6Lab.Tests
                 Assert.That(afterFirst.lastHit, Is.False);
 
                 var second = GeneratePair(20, .2d);
-                Assert.That(model.TryCombine(20, second.yin.id, second.yang.id, "c2", .2d, out var b, out _), Is.True);
+                Assert.That(model.TryCombineAt(20, second.yin.id, second.yang.id, "c2", .2d,
+                    new Vector2(.5f, .5f), Vector2.zero, out var b, out _), Is.True);
                 ThrowAndHit(model, b.id, 20, .3d);
                 var done = model.Snapshot(.3d);
                 Assert.That(done.phase, Is.EqualTo(LabPhase.Victory));
@@ -2458,7 +2480,8 @@ namespace C6Lab.Tests
         public void DefeatHasNoLastHitAndANewRoundClearsHitRecords()
         {
             var pair = GeneratePair(10);
-            Assert.That(model.TryCombine(10, pair.yin.id, pair.yang.id, "c", 0d, out var combined, out _), Is.True);
+            Assert.That(model.TryCombineAt(10, pair.yin.id, pair.yang.id, "c", 0d,
+                new Vector2(.5f, .5f), Vector2.zero, out var combined, out _), Is.True);
             ThrowAndHit(model, combined.id, 10, .1d);
             model.Tick(180d);
             var lost = model.Snapshot(180d);
@@ -2486,9 +2509,9 @@ namespace C6Lab.Tests
                 ulong first = drum.owner;
 
                 model.Tick(10d);
-                Assert.That(model.TryUpdateMotion(first, drum.id, new Vector2(.99f, .5f), Vector2.right, 10d), Is.True);
-                Assert.That(model.TryTransfer(first, drum.id, true, .5f, Vector2.right, "drum-pass", 10d,
-                    out var passed, out var reason), Is.True, reason);
+
+                Assert.That(model.TryTransferAt(first, drum.id, true, new Vector2(.99f, .5f), Vector2.right, "drum-pass", 10d,
+                LabEdgeCrossingKind.Swipe, out var passed, out var reason), Is.True, reason);
                 ulong second = passed.owner;
                 Assert.That(second, Is.Not.EqualTo(first));
                 var afterPass = model.Snapshot(10d).players.Single(p => p.id == first);
@@ -2649,11 +2672,11 @@ namespace C6Lab.Tests
         {
             LabConfig created = ConfigWith(1f, 50, 50, 0, 0, 0, 0);
             float[] values = created.CaptureDeveloperValues();
-            values[88] = bombMin;
-            values[89] = bombMax;
-            values[157] = interval;
-            values[158] = seconds;
-            values[159] = bombGap;
+            values[87] = bombMin;
+            values[88] = bombMax;
+            values[152] = interval;
+            values[153] = seconds;
+            values[154] = bombGap;
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
         }
@@ -2661,10 +2684,10 @@ namespace C6Lab.Tests
         private static (bool passed, string reason, LabOrbState orb) Pass(LabModel room, string id, ulong holder,
             bool right, double at, LabEdgeCrossingKind crossing = LabEdgeCrossingKind.Swipe)
         {
-            Assert.That(room.TryUpdateMotion(holder, id, new Vector2(right ? .99f : .01f, .5f),
-                right ? Vector2.right : Vector2.left, at), Is.True);
-            bool passed = room.TryTransfer(holder, id, right, .5f, right ? Vector2.right : Vector2.left,
-                "pass-" + id + "-" + at, at, crossing, out var orb, out var reason);
+
+            bool passed = room.TryTransferAt(holder, id, right,
+                new Vector2((right ? .99f : .01f), .5f), right ? Vector2.right : Vector2.left, "pass-" + id + "-" + at, at,
+                crossing, out var orb, out var reason);
             return (passed, reason, orb);
         }
 
@@ -2678,8 +2701,8 @@ namespace C6Lab.Tests
         {
             LabConfig created = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
             float[] values = created.CaptureDeveloperValues();
-            values[88] = minimumSeconds;
-            values[89] = maximumSeconds;
+            values[87] = minimumSeconds;
+            values[88] = maximumSeconds;
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
         }
@@ -2691,10 +2714,10 @@ namespace C6Lab.Tests
             values[5] = generateCost;
             values[74] = LabModel.MaximumParticipants;
             // The gourd's sabotage bombs are off here; GourdConfig turns them on for their own tests.
+            values[87] = 0f;
             values[88] = 0f;
-            values[89] = 0f;
             // The gourd's swipe block is off too; BlockConfig turns it on for its own tests (#215).
-            values[157] = 0f;
+            values[152] = 0f;
             for (int i = 0; i < chances.Length; i++) values[39 + i] = chances[i];
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;

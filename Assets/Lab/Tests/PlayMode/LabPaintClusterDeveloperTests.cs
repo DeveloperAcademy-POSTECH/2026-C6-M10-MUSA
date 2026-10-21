@@ -15,8 +15,8 @@ namespace C6Lab.Tests
     /// <summary>Saved DEV controls and actual local Solo/Host boundaries; no remote Client ACK claim.</summary>
     public sealed class LabPaintClusterDeveloperTests
     {
-        private const int CompactnessField = 143;
-        private const int IrregularityField = 144;
+        private const int CompactnessField = 138;
+        private const int IrregularityField = 139;
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
         private LabDeveloperMode ui;
         private float[] sourceValues;
@@ -31,8 +31,8 @@ namespace C6Lab.Tests
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceValues = ui.sourceConfig.CaptureDeveloperValues();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(171));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(171));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(166));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(166));
         }
 
         [UnityTearDown]
@@ -62,7 +62,7 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields[CompactnessField].Label, Is.EqualTo("Paint Cluster Compactness"));
             Assert.That(LabConfig.DeveloperFields[IrregularityField].Label, Is.EqualTo("Paint Cluster Irregularity"));
             Assert.That(ui.valueInputs[CompactnessField].transform.parent.GetSiblingIndex(),
-                Is.EqualTo(ui.valueInputs[107].transform.parent.GetSiblingIndex() + 1),
+                Is.EqualTo(ui.valueInputs[106].transform.parent.GetSiblingIndex() + 1),
                 "Cluster controls belong beside the initial/repeat paint area controls.");
             Assert.That(ui.valueInputs[IrregularityField].transform.parent.GetSiblingIndex(),
                 Is.EqualTo(ui.valueInputs[CompactnessField].transform.parent.GetSiblingIndex() + 1));
@@ -191,20 +191,20 @@ namespace C6Lab.Tests
             Assert.That(ui.applyHostLabel.text, Is.EqualTo("APPLY TO ROOM"));
             AssertDraft(.25f, .75f);
             SetDraft(.9f, .1f);
-            ui.valueInputs[144].text = "1.01";
+            ui.valueInputs[139].text = "1.01";
             ui.applyHostButton.onClick.Invoke();
             Assert.That(ui.feedbackText.text, Does.Contain("Paint Cluster Irregularity"));
             AssertRuntime(.25f, .75f);
             Assert.That(NetworkField<int>("configRevision"), Is.EqualTo(revision));
             Assert.That(NetworkField<string>("configFingerprint"), Is.EqualTo(fingerprint));
-            ui.valueInputs[144].text = "0.1";
+            ui.valueInputs[139].text = "0.1";
             ui.applyHostButton.onClick.Invoke();
             yield return null;
             AssertRuntime(.9f, .1f);
             Assert.That(NetworkField<int>("configRevision"), Is.EqualTo(revision + 1));
             Assert.That(NetworkField<string>("configFingerprint"), Is.Not.EqualTo(fingerprint));
             Assert.That(NetworkField<string>("configFingerprint"), Is.EqualTo(
-                LabSessionSettings.Fingerprint(ui.network.config.CaptureDeveloperValues(), 2, 5651)));
+                LabSessionSettings.Fingerprint(ui.network.config.CaptureDeveloperValues(), 2, 5652)));
             Assert.That(ui.network.CanStartBattle, Is.False);
             ui.network.StartBattle();
             Assert.That(ui.network.Snapshot, Is.Null,

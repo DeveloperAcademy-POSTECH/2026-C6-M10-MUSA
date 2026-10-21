@@ -152,8 +152,8 @@ namespace C6Lab.Tests
         {
             config = ScriptableObject.CreateInstance<LabConfig>();
             float[] values = config.CaptureDeveloperValues();
-            values[2] = 20f; values[79] = 0f; values[105] = 0f; values[106] = initial;
-            values[139] = 0f; values[153] = 1f; values[154] = 5f; values[155] = .2f; values[156] = 20f;
+            values[2] = 20f; values[79] = 0f; values[104] = 0f; values[105] = initial;
+            values[134] = 0f; values[148] = 1f; values[149] = 5f; values[150] = .2f; values[151] = 20f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var model = new LabModel(); model.BeginSolo("drying-model", 1ul, 0d, config);
             ResetSurfaceWithoutGrowth(model);

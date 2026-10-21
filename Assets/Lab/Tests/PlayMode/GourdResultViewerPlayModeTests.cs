@@ -75,7 +75,7 @@ namespace C6Lab.Tests
                 // Apply through the ordinary DEV form, including both independent shared Config toggles.
                 developer.Open();
                 float[] tuning = fixture.CaptureDeveloperValues();
-                Assert.That(tuning.Length, Is.EqualTo(171), "Both shared feature toggles must survive the ordinary DEV form.");
+                Assert.That(tuning.Length, Is.EqualTo(166), "Both shared feature toggles must survive the ordinary DEV form.");
                 for (int i = 0; i < tuning.Length; i++)
                     developer.valueInputs[i].text = tuning[i].ToString("R", CultureInfo.InvariantCulture);
                 developer.ApplyAndStart();
@@ -190,7 +190,7 @@ namespace C6Lab.Tests
 
                 // OFF uses the ordinary DEV form and a fresh round, not a private controller flag.
                 developer.Open();
-                developer.valueInputs[111].text = "0";
+                developer.valueInputs[110].text = "0";
                 developer.ApplyAndStart();
                 yield return null;
                 Assert.That(network.config.CompletedGourdViewerEnabled, Is.False, developer.feedbackText.text);
@@ -252,8 +252,8 @@ namespace C6Lab.Tests
                     string previousSession = network.Snapshot == null ? null : network.Snapshot.sessionId;
                     developer.Open();
                     float[] values = fixture.CaptureDeveloperValues();
-                    values[111] = viewerEnabled ? 1f : 0f;
-                    values[142] = patternsEnabled ? 1f : 0f;
+                    values[110] = viewerEnabled ? 1f : 0f;
+                    values[137] = patternsEnabled ? 1f : 0f;
                     for (int i = 0; i < values.Length; i++)
                         developer.valueInputs[i].text = values[i].ToString("R", CultureInfo.InvariantCulture);
                     developer.applyStartButton.onClick.Invoke();
@@ -411,10 +411,9 @@ namespace C6Lab.Tests
         {
             LabConfig result = Object.Instantiate(source);
             float[] values = result.CaptureDeveloperValues();
-            values[105] = 0; values[106] = 100; values[107] = 4; values[108] = 6;
-            values[111] = 1; values[142] = 1;
+            values[104] = 0; values[105] = 100; values[106] = 4; values[107] = 6;
+            values[110] = 1; values[137] = 1;
             Set(values, "Gourd Mode (0 paint, 1 crack)", 0);
-            Set(values, "Paint Victory Coverage (%)", 100);
             Set(values, "Monster Max HP", 40);
             Set(values, "Damage per Hit", 20);
             Set(values, "Battle Duration (seconds)", 30);

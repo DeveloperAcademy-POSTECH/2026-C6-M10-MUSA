@@ -159,6 +159,10 @@ namespace C6Lab
                 return FailInitialization("The target did not mount a usable white gourd shell.");
             foreach (var animator in VisualInstance.GetComponentsInChildren<Animator>(true))
                 animator.enabled = false;
+            // 콤보 동안 요괴가 나와 있게 하는 표시 (#244). 박 표시와 함께 만들어지고 함께 사라진다.
+            LabGourdYokai yokai = VisualInstance.GetComponent<LabGourdYokai>();
+            if (yokai == null) yokai = VisualInstance.AddComponent<LabGourdYokai>();
+            yokai.Bind(network);
             shell.sharedMaterial = paintMaterial;
             block = new MaterialPropertyBlock();
             EnsureTexture(Surface);

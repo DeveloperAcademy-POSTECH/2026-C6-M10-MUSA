@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.IO;
-using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -14,7 +13,6 @@ namespace C6Lab.Tests
     /// <summary>Saved shell/shader comparison fixtures, separate from real projectile/network validation.</summary>
     public sealed class LabPaintClusterRenderTests
     {
-        private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
         private static readonly Color Earlier = new Color(32f / 255f, 49f / 255f, 79f / 255f);
         private static readonly Color Latest = new Color(43f / 255f, 95f / 255f, 174f / 255f);
 
@@ -28,7 +26,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedGourdRendersTheSameAreaAsAFocusedBlobInsteadOfGlobalBoundaryGrowth()
+        public IEnumerator SavedShellDisplaysCurrentClustersWithoutRecoloringEarlierCells()
         {
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 Assert.Ignore("A real graphics device is required; no shader or image verification was performed.");
@@ -38,61 +36,43 @@ namespace C6Lab.Tests
             Assert.That(paint.IsReady, Is.True, paint.InitializationError);
             foreach (LabPaintPattern pattern in new[] { LabPaintPattern.Legacy, LabPaintPattern.Splatter })
             {
-                string name = pattern == LabPaintPattern.Legacy ? "compact-fixture" : "default-splatter";
-                var settings = new LabPaintGrowthSettings {
-                    Resolution = 2, Pattern = pattern, Style = 1, Raggedness = 0, FlowRatio = 0,
+                var surface = new LabPaintSurface(new LabPaintGrowthSettings {
+                    Resolution = 2, Pattern = pattern, Style = 1, Raggedness = 0,
                     InitialPercent = pattern == LabPaintPattern.Legacy ? 6.25f : 2f,
                     RepeatPercent = pattern == LabPaintPattern.Legacy ? 3.125f : 4f,
                     GrowthPercentPerSecond = 100f, ClusterCompactness = .85f, ClusterIrregularity = .25f
-                };
-                var baseline = new LabPaintSurface(settings, 123);
-                var cluster = new LabPaintSurface(settings, 123);
-                baseline.RegisterHit(Vector3.forward, Earlier, 1, 1);
-                cluster.RegisterHit(Vector3.forward, Earlier, 1, 1);
-                Assert.That(Pixels(cluster), Is.EqualTo(Pixels(baseline)));
+                }, 123);
+                Assert.That(surface.RegisterHit(Vector3.forward, Earlier, 1, 1), Is.True);
+                Color32[] initial = Pixels(surface);
+                int covered = surface.CoveredCount;
                 using (var rig = new SavedShellRig(paint))
                 {
-                    Color32[] previous = null;
+                    Color32[] firstImage = rig.Capture(surface, pattern + "-initial.png");
+                    Color32[] grownImage = firstImage;
                     for (int hit = 1; hit <= 3; hit++)
                     {
-                        Color color = hit == 3 ? Latest : Earlier;
-                        // This baseline invokes the preserved pre-change cell selector directly.
-                        // Restore its RNG after repeat registration, which now captures an anchor.
-                        FieldInfo random = typeof(LabPaintSurface).GetField("randomState", Private);
-                        object state = random.GetValue(baseline);
-                        baseline.RegisterHit(Vector3.forward, color, (ulong)(hit + 1), hit + 1);
-                        random.SetValue(baseline, state);
-                        GrowWithPreservedGlobalSelector(baseline, pattern, settings.Style);
-                        cluster.RegisterHit(Vector3.forward, color, (ulong)(hit + 1), hit + 1);
-                        cluster.Advance(1d);
-                        Assert.That(cluster.CoveredCount, Is.EqualTo(baseline.CoveredCount));
-                        Assert.That(cluster.PendingCoverage, Is.EqualTo(baseline.PendingCoverage));
-                        string imageName = hit == 3 ? name + "-cluster-after3.png" : name + "-cluster-after" + hit + ".png";
-                        previous = rig.Capture(cluster, imageName);
+                        Assert.That(surface.RegisterHit(Vector3.forward, hit == 3 ? Latest : Earlier,
+                            (ulong)(hit + 1), hit + 1), Is.True);
+                        surface.Advance(1d);
+                        Assert.That(surface.CoveredCount, Is.GreaterThan(covered));
+                        covered = surface.CoveredCount;
+                        Color32[] current = Pixels(surface);
+                        for (int i = 0; i < initial.Length; i++)
+                            if (initial[i].a != 0) Assert.That(current[i], Is.EqualTo(initial[i]));
+                        Assert.That(surface.PendingCoverage, Is.LessThan(1d / surface.CellCount));
+                        grownImage = rig.Capture(surface, pattern + "-cluster-after" + hit + ".png");
                     }
-                    Color32[] oldImage = rig.Capture(baseline, name + "-global-after3.png");
+                    Assert.That(Pixels(surface), Is.Not.EqualTo(initial));
                     int changed = 0;
-                    for (int i = 0; i < oldImage.Length; i++) if (!oldImage[i].Equals(previous[i])) changed++;
-                    Assert.That(changed, Is.GreaterThan(1000), "The changed selection must be visible on the saved gourd.");
-                    Assert.That(Pixels(cluster), Is.Not.EqualTo(Pixels(baseline)));
+                    for (int i = 0; i < firstImage.Length; i++)
+                        if (!firstImage[i].Equals(grownImage[i])) changed++;
+                    Assert.That(changed, Is.GreaterThan(200), "The production shader must display the added cluster.");
+                    var owners = new byte[surface.CellCount]; surface.CopyPainterSlots(owners);
+                    Assert.That(owners, Does.Contain((byte)4));
                 }
             }
         }
 
-        private static void GrowWithPreservedGlobalSelector(LabPaintSurface surface, LabPaintPattern pattern, int style)
-        {
-            MethodInfo next = typeof(LabPaintSurface).GetMethod("NextRegion", Private);
-            MethodInfo choose = typeof(LabPaintSurface).GetMethod(pattern == LabPaintPattern.Legacy
-                ? style == 1 ? "ChooseSpreadFlowCell" : "ChooseCell" : "ChoosePatternCell", Private);
-            MethodInfo paint = typeof(LabPaintSurface).GetMethod("PaintCell", Private);
-            int due = (int)Math.Floor(surface.PendingCoverage * surface.CellCount + .0000001d);
-            for (int i = 0; i < due; i++)
-            {
-                object region = next.Invoke(surface, null);
-                int cell = (int)choose.Invoke(surface, new[] { region });
-                paint.Invoke(surface, new[] { region, (object)cell });
-            }
-        }
         private static Color32[] Pixels(LabPaintSurface surface)
         {
             var pixels = new Color32[surface.CellCount]; surface.CopyPixels(pixels);return pixels;

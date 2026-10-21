@@ -723,7 +723,7 @@ namespace C6Lab.Tests
 
             // The DEV form sets how small.
             float[] values = config.CaptureDeveloperValues();
-            values[151] = .25f;
+            values[146] = .25f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var smaller = board.UpsertOrb("smaller", LabOrbKind.Yang, new Vector2(.5f, .8f), small: true);
             Assert.That(smaller.HitSphere.radius, Is.EqualTo(.25f * radius).Within(1e-5f));
@@ -1230,8 +1230,8 @@ namespace C6Lab.Tests
 
             // From the DEV form: no lag sticks the bomb to the finger like an orb; a new mass applies to new bombs.
             float[] values = config.CaptureDeveloperValues();
-            values[146] = 0f;
-            values[149] = 10f;
+            values[141] = 0f;
+            values[144] = 10f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             start = BoardPoint(bomb);
             Assert.That(board.TryBeginDragAtWorld(start, 4d), Is.True);
@@ -1247,7 +1247,7 @@ namespace C6Lab.Tests
         {
             // No drag lag here, so the dragged bomb sits exactly on the edge when it is let go.
             float[] values = config.CaptureDeveloperValues();
-            values[146] = 0f;
+            values[141] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var crossed = new System.Collections.Generic.Dictionary<string, LabOrbEdgeCrossing>();
             board.EdgeCrossed += crossing => crossed[crossing.OrbId] = crossing;
@@ -1307,7 +1307,7 @@ namespace C6Lab.Tests
             Assert.That(orbRelease.x, Is.GreaterThan(.2f * Width), "The flick sends the orb on.");
             Assert.That(config.BombReleaseSpeed, Is.EqualTo(.75f), "Since #237, three quarters of an orb's release.");
             Assert.That(bombRelease.x, Is.EqualTo(config.BombReleaseSpeed * orbRelease.x).Within(.001f * Width),
-                "A bomb leaves the finger at half an orb's speed, so passing it takes a harder swipe (#212).");
+                "A bomb leaves the finger at three quarters of an orb's speed; it stays heavier than an orb (#237).");
             Assert.That(Mathf.Abs(bombRelease.y), Is.LessThan(.001f));
 
             // Then each slides on the floor: the bomb loses speed twice as fast.
