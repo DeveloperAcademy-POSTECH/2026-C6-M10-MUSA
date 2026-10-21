@@ -2023,4 +2023,4 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 
 중간 검사에서 발견한 이전 설정 개수178/프로토콜5654 단정은 현재184/5655에 맞춰 수정했다. 거절 시 자유 partner의 수동 물리를 멈추던 경로는 pending인 둘째 입력만 복원하도록 수정했다. 최종 결과는 이 수정 및 과열 자연 접촉 구분 이후의 전체 검사다.
 
-실행 방법·기본 조정값·소각 예외·관련 코드는 [JIGWI_PATTERNS](JIGWI_PATTERNS.md)를 따른다. 이번 요청에서는 PR/main 병합을 수행하지 않는다.
+실행 방법·기본 조정값·소각 예외·관련 코드는 [JIGWI_PATTERNS](JIGWI_PATTERNS.md)를 따른다. 위 실행 결과는 병합 전 기능 브랜치의 게임 코드 `8cfc7f18`을 대상으로 한다. 후속 병합은 [PR #273](https://github.com/DeveloperAcademy-POSTECH/2026-C6-M10-MUSA/pull/273)에서 관리하며, 병합 상태는 해당 PR에서 확인한다.
