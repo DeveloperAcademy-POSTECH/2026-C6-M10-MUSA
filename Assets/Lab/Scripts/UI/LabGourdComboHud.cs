@@ -102,7 +102,8 @@ namespace C6Lab
         /// <summary>COMBO! 카운트다운 예고가 보이는지 (#241)</summary>
         public bool WarningVisible => warningPanel != null && warningPanel.gameObject.activeSelf;
         /// <summary>예고에 보이는 남은 초 (3, 2, 1). 예고가 없으면 빈 문자열.</summary>
-        public string WarningCount => !WarningVisible ? string.Empty : warningYaguang ? warningLabel.text : warningNumber.text;
+        /// <summary>패널의 예고 남은 초. 야광귀 셈법이면 수는 말풍선에만 있으므로 빈 문자열.</summary>
+        public string WarningCount => !WarningVisible || warningYaguang ? string.Empty : warningNumber.text;
         /// <summary>칸 위에 뜬 야광귀의 수 (#271). 안 떠 있으면 빈 문자열.</summary>
         public string SlotWord(int index) =>
             slotWords[index] != null && slotWords[index].gameObject.activeInHierarchy ? slotWords[index].text : string.Empty;
@@ -169,7 +170,8 @@ namespace C6Lab
             bool yaguang = YaguangCount;
             if (yaguang != warningYaguang) shownWarningCount = -1;
             warningYaguang = yaguang;
-            // 야광귀 셈법 (#271): 거꾸로 못 세고 하나·둘·셋·넷으로 앞으로 센다. 넷 다음은 다시 하나.
+            // 야광귀 셈법 (#271): 박 옆 말풍선이 거꾸로 못 세고 하나·둘·셋·넷으로 앞으로 센다(넷 다음은 다시 하나).
+            // 수는 말풍선에만 띄워 세는 것이 두 군데서 겹쳐 보이지 않게 하고, 패널 자리에는 COMBO!만 둔다.
             int total = Mathf.Max(1, Mathf.RoundToInt((float)(snapshot.comboNextAt - snapshot.comboWarningAt)));
             int step = Mathf.Clamp(total - count + 1, 1, total);
             if (count != shownWarningCount)
@@ -177,14 +179,14 @@ namespace C6Lab
                 shownWarningCount = count;
                 warningPopElapsed = 0f;
                 warningNumber.text = count.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                warningLabel.text = yaguang ? CountWord(step) + "!" : WarningText;
+                warningLabel.text = WarningText;
                 if (yaguang && network != null)
                 {
                     LabGourdAlert alert = GetComponent<LabGourdAlert>();
                     if (alert != null) alert.ShowWord(network.target, CountWord(step) + "!", .9f);
                 }
             }
-            // 셈법: 수 하나만 패널 가운데 크게. 아니면 COMBO!(왼쪽)와 남은 초(오른쪽).
+            // 셈법: 패널 가운데에 COMBO!만. 아니면 COMBO!(왼쪽)와 남은 초(오른쪽).
             warningLabel.rectTransform.anchorMax = new Vector2(yaguang ? 1f : .68f, 1f);
             warningNumber.gameObject.SetActive(!yaguang);
             // 숫자: 1.7배로 쾅 나왔다가 1배로. 마지막 1은 빨갛다.
@@ -198,16 +200,8 @@ namespace C6Lab
             }
             warningNumber.rectTransform.localScale = Vector3.one * pop;
             warningNumber.color = count <= 1 ? FailColor : (Color)InkColor;
-            if (yaguang)
-            {
-                warningLabel.rectTransform.localScale = Vector3.one * pop;
-                warningLabel.color = count <= 1 ? FailColor : ClearColor;
-            }
-            else
-            {
-                warningLabel.rectTransform.localScale = Vector3.one;
-                warningLabel.color = ClearColor;
-            }
+            warningLabel.rectTransform.localScale = Vector3.one;
+            warningLabel.color = ClearColor;
             // COMBO! 글자는 살짝 기울며 들썩인다. 남은 시간이 줄수록 빨라진다.
             float speed = 6f + 4f * (3 - Mathf.Min(count, 3));
             warningLabel.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 4f * Mathf.Sin(Time.unscaledTime * speed));
