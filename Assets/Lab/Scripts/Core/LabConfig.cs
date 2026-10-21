@@ -303,7 +303,7 @@ namespace C6Lab
             LabDeveloperField.Toggle("야광귀 섬광 (0 off, 1 on)", "끔", "켬"),
             LabDeveloperField.Toggle("섬광 대상 (0 모두, 1 한 명)", "모두", "한 명"),
             // Each range is centred on its default, so every slider starts in the middle.
-            new LabDeveloperField("섬광 첫 시작 (초)", 1f, 61f),
+            new LabDeveloperField("섬광 첫 시작 (초)", 1f, 19f),
             new LabDeveloperField("섬광 간격 (초)", 20f, 100f),
             new LabDeveloperField("섬광 예고 (초)", 0f, 6f),
             new LabDeveloperField("섬광 눈부심 (초)", 1f, 13f),
@@ -578,7 +578,7 @@ namespace C6Lab
         [Tooltip("섬광 대상. 끄면(ALL) 모두에게 동시에, 켜면(ONE) 매번 무작위 한 명에게만.")]
         [SerializeField] private bool yaguangFlashTargetOne;
         [Tooltip("전투 시작 후 첫 섬광(번쩍이는 순간)까지의 시간 (초, 일시정지 제외). 예고는 그 직전에 온다. 범위의 가운데가 기본값.")]
-        [SerializeField, Range(1f, 61f)] private float yaguangFlashFirstStartSeconds = 31f;
+        [SerializeField, Range(1f, 19f)] private float yaguangFlashFirstStartSeconds = 10f;
         [Tooltip("섬광과 다음 섬광 사이 간격 (초). 콤보 예고·진행 중이면 콤보가 끝날 때까지 미룬다. 기본 31·60초는 콤보(50초 시작·60초 간격)와 같은 박자로 콤보 19초 전마다 터져, 섬광(예고~회복 12초)이 콤보(예고 3 + 제한 15 + 결과 + 효과 15 ≈ 35초) 사이 약 25초 틈의 가운데에 놓이고 앞뒤로 약 7초씩 평소 플레이가 남는다.")]
         [SerializeField, Range(20f, 100f)] private float yaguangFlashIntervalSeconds = 60f;
         [Tooltip("번쩍이기 전 예고 시간 (초). 요괴가 빼꼼 나오고 박 옆 말풍선에 눈이 떴다가(앞 30%), 갑자기 노랗게 빛나고(15%), 빛나는 노란 눈을 두근거리며 보여 준 뒤(55%) 번쩍인다. 기본 3초. 0이면 예고 없이 번쩍인다.")]
@@ -911,7 +911,7 @@ namespace C6Lab
         public bool YaguangFlashEnabled => yaguangFlashEnabled;
         /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
         public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
-        public float YaguangFlashFirstStartSeconds => Mathf.Clamp(Finite(yaguangFlashFirstStartSeconds, 31f), 1f, 61f);
+        public float YaguangFlashFirstStartSeconds => Mathf.Clamp(Finite(yaguangFlashFirstStartSeconds, 10f), 1f, 61f);
         public float YaguangFlashIntervalSeconds => Mathf.Clamp(Finite(yaguangFlashIntervalSeconds, 60f), 20f, 100f);
         public float YaguangFlashWarningSeconds => Mathf.Clamp(Finite(yaguangFlashWarningSeconds, 3f), 0f, 6f);
         public float YaguangFlashGlareSeconds => Mathf.Clamp(Finite(yaguangFlashGlareSeconds, 7f), 1f, 13f);

@@ -181,7 +181,7 @@ MonoBehaviour:
   straightGravityScale: 0.1
   yaguangFlashEnabled: 0
   yaguangFlashTargetOne: 0
-  yaguangFlashFirstStartSeconds: 31
+  yaguangFlashFirstStartSeconds: 10
   yaguangFlashIntervalSeconds: 60
   yaguangFlashWarningSeconds: 3
   yaguangFlashGlareSeconds: 7

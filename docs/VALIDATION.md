@@ -2148,3 +2148,28 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | EditMode 검사 실행 | PASS (Mono, NUnit 흉내) | `LabYaguangFlashTests`·`LabGourdComboTests` 중 Core만 쓰는 34건 통과. `Resources.Load`가 필요한 1건과 HUD·복제 검사는 실행하지 않았다. 새 `AFlashThatStartsFirstTakesItsTurnAndTheComboWaitsForIt`, `AWaitingFlashKeepsNewBombsOffSoItIsNotPushedBackAgainAndAgain`, `WithTheDefaultsFlashesComeAboutAsOftenAsCombos`(3 seed). 앞 커밋의 `EachScreenHoldsOneEventSoASecondBombGoesToAFreeScreen`이 섬광 첫 시작 90초(범위 1~61 밖)를 써서 설정 적용에서 실패하던 것을 61초로 고쳤다. |
 | Unity EditMode 실제 실행 | NOT_RUN | 위 검사와 기존 전체. |
 | 에디터·3인 확인 | NOT_RUN | 기본값으로 한 판에 섬광이 콤보만큼 나오는지, 섬광을 기다리는 동안 폭탄이 잠시 멈췄다가 다시 오는지. |
+
+### #271 피드백 반영: 첫머리가 비지 않게, 이벤트 사이 3초 쉬기
+
+**피드백**: (1) 방해공작들의 시작 시간 때문에 초반에 너무 오래 아무 일도 일어나지 않는다. (2) 한 방해공작이 끝나면 적어도 3초쯤 텀을 두고 다음 것이 나와야 한다.
+
+**고친 것**
+- **섬광 첫 시작 31 → 10초**(DEV 범위 1–61 → 1–19, 기본값이 가운데, 코드·`LabConfig.asset`). 야광귀 모드에서만 쓰는 값이라 다른 요괴의 폭탄·넘기기 막기 시작 시각은 그대로다. 7초에 예고가 시작되어 판이 야광귀 등장으로 열린다.
+- **화면별 쉬는 시간 3초**(`LabModel.EventGapSeconds`, `MarkBusyScreens`): 한 화면의 이벤트가 닫히면 그 화면은 3초 동안 열린 것으로 본다. 콤보·섬광·그 밖(폭탄·막기·매혹·여우구슬)을 따로 적어 두어, 콤보·섬광은 자기 종류의 쉬는 시간은 보지 않는다(자기 간격 규칙이 따로 있음). 끝 시각을 아는 이벤트는 그 시각부터 잰다.
+- 규칙 검사(`LabYaguangFlashTests`의 `Config`)는 DEV 범위 밖 첫 시작 시각(15~61초)을 쓰므로 DEV 적용 뒤 `JsonUtility.FromJsonOverwrite`로 넣는다(모델은 1–61을 그대로 받는다).
+
+**모의 실행** (기본값 3인 180초, seed 200개)
+
+| | 고치기 전 | 고친 뒤 |
+| --- | ---: | ---: |
+| 판 첫 이벤트 | 평균 24.5초 | **7.1초** |
+| 한 화면에서 이벤트 사이 3초 미만 | 1031번 | **0번**(가장 짧은 틈 3.0초) |
+| 섬광 / 콤보 | 3.00 / 2.66번 | 3.00 / 2.00번 |
+
+쉬는 시간만큼 콤보 한 판(약 34초)과 섬광이 밀려, 세 번째 콤보가 180초 안에 들지 않는다. 콤보 간격을 60 → 50초로 줄이면 2.85번이 된다(모의 실행).
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| EditMode 검사 실행 | PASS (Mono, NUnit 흉내) | Core만 쓰는 34건 통과(`Resources.Load` 1건 제외). 쉬는 시간 3초를 반영해 폭탄·섬광·콤보 대기 검사 7건의 시각을 옮겼고, 기본값 한 판 검사가 첫 이벤트 5~9초·화면별 쉬는 시간 2.85초 초과를 함께 본다(쉬는 시간을 0으로 바꾸면 실패함을 확인). |
+| Unity EditMode 실제 실행 | NOT_RUN | 위 검사와 기존 전체(`LabDeveloperConfigTests` 포함). |
+| 에디터·3인 확인 | NOT_RUN | 7초쯤 야광귀가 먼저 나오는지, 폭탄이 터진 뒤 같은 화면에 3초 안에 다음 이벤트가 오지 않는지. |

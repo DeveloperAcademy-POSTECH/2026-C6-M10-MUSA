@@ -198,6 +198,11 @@ namespace C6Lab
         // 차례를 기다리는 콤보·섬광 (#271): 예고를 시작할 때가 됐는데 다른 이벤트 때문에 미루기 시작한 시각, 없으면 -1.
         // 기다리는 동안 새 폭탄·넘기기 막기·방해공작을 걸지 않아 화면이 곧 비고, 둘 다 기다리면 먼저 기다린 쪽이 먼저 한다.
         private double comboQueuedAt = -1d, flashQueuedAt = -1d;
+        // 화면마다 콤보·섬광·그 밖의 이벤트(폭탄·넘기기 막기·여우불·매혹)가 마지막으로 열려 있던 시각 (#271).
+        // 이벤트가 닫힌 뒤 EventGapSeconds 동안은 그 화면을 쉬게 한다.
+        private readonly Dictionary<ulong, double[]> screenBusyAt = new Dictionary<ulong, double[]>();
+        /// <summary>야광귀 모드에서 한 화면의 이벤트가 끝나고 다음 이벤트가 시작되기까지 쉬는 시간 (#271)</summary>
+        internal const double EventGapSeconds = 3d;
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -319,6 +324,7 @@ namespace C6Lab
             comboWarned = comboHeld = comboWasHeld = false;
             gourdBombWasHeld = swipeBlockWasHeld = false;
             comboQueuedAt = flashQueuedAt = -1d;
+            screenBusyAt.Clear();
             nextFlashAt = rules.FlashEnabled ? now + rules.FlashFirstStartSeconds : double.PositiveInfinity;
             nextFlashTarget = DrawFlashTarget(0u);
             lastTime = now;
@@ -782,13 +788,33 @@ namespace C6Lab
             // 그래야 화면이 곧 비어 콤보·섬광이 밀리지 않고 정해 둔 간격 가까이 나온다.
             if (self != LabYaguangEvent.Combo && self != LabYaguangEvent.Flash
                 && ((rules.ComboEnabled && comboQueuedAt >= 0d) || (rules.FlashEnabled && flashQueuedAt >= 0d))) return true;
-            if (self != LabYaguangEvent.Combo && rules.ComboEnabled)
-            {
-                if (comboWarned || combo.Active) return true;
-                if (players.TryGetValue(player, out LabPlayerState state)
-                    && (state.comboPenaltyUntil > at || state.comboRewardUntil > at)) return true;
-            }
+            // 앞 이벤트가 닫힌 지 EventGapSeconds가 안 됐으면 아직 쉬는 중이다. 콤보·섬광은 자기 다음 차례와의 간격을
+            // 따로 지키므로(간격·예고) 자기 종류의 쉬는 시간은 보지 않는다.
+            if (screenBusyAt.TryGetValue(player, out double[] busy))
+                for (int kind = 0; kind < busy.Length; kind++)
+                {
+                    if ((kind == BusyCombo && self == LabYaguangEvent.Combo) || (kind == BusyFlash && self == LabYaguangEvent.Flash)) continue;
+                    if (at < busy[kind] + EventGapSeconds) return true;
+                }
+            if (self != LabYaguangEvent.Combo && ComboOpenOn(player, at)) return true;
             if (self != LabYaguangEvent.Flash && FlashOpenOn(player, at)) return true;
+            return OtherOpenOn(player, at, self);
+        }
+
+        private const int BusyCombo = 0, BusyFlash = 1, BusyOther = 2;
+
+        /// <summary>콤보 한 판이 이 화면에 열려 있는지: 예고·4칸 동안은 모든 화면, 페널티/보상 효과는 받은 사람 화면</summary>
+        private bool ComboOpenOn(ulong player, double at)
+        {
+            if (!rules.ComboEnabled) return false;
+            if (comboWarned || combo.Active) return true;
+            return players.TryGetValue(player, out LabPlayerState state)
+                && (state.comboPenaltyUntil > at || state.comboRewardUntil > at);
+        }
+
+        /// <summary>폭탄·넘기기 막기·매혹·여우구슬이 이 화면에 열려 있는지. 방해공작은 자기 매혹·여우불은 보지 않는다.</summary>
+        private bool OtherOpenOn(ulong player, double at, LabYaguangEvent self)
+        {
             if (BlockOn(at) && swipeBlockedPlayer == player) return true;
             if (self != LabYaguangEvent.Sabotage && CharmOn(at) && charmedPlayer == player) return true;
             foreach (LabOrbState orb in orbs.Values)
@@ -809,6 +835,47 @@ namespace C6Lab
             else if (flashCount > 0 && at < lastFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds) target = lastFlashTarget;
             else return false;
             return target == 0 || target == player;
+        }
+
+        /// <summary>
+        /// 직전 시각에 이벤트가 열려 있던 화면에 지금 시각을 적어 둔다 (#271). 이벤트가 닫히면 그 뒤 EventGapSeconds 동안
+        /// ScreenOpen이 그 화면을 계속 열린 것으로 봐, 다음 이벤트가 숨 돌릴 틈 없이 바로 이어지지 않는다.
+        /// </summary>
+        private void MarkBusyScreens(double before, double now)
+        {
+            if (!ExclusiveEvents) return;
+            for (int i = 0; i < activeSeatCount; i++)
+            {
+                ulong player = seats[i];
+                if (!screenBusyAt.TryGetValue(player, out double[] busy))
+                    screenBusyAt[player] = busy = new[] { double.NegativeInfinity, double.NegativeInfinity, double.NegativeInfinity };
+                // 직전 시각에 열려 있었으면 닫힌 시각부터 쉰다. 끝 시각을 아는 것(섬광 회복, 콤보 효과, 넘기기 막기, 매혹)은
+                // 그 시각을, 모르는 것(폭탄·여우구슬이 없어진 때)은 지금을 쓴다. 그래서 쉬는 시간이 3초보다 짧아지지 않는다.
+                if (ComboOpenOn(player, before))
+                    busy[BusyCombo] = ComboOpenOn(player, now) ? now : ClosedAt(before, now, ComboEffectEnd(player));
+                if (FlashOpenOn(player, before))
+                    busy[BusyFlash] = FlashOpenOn(player, now) ? now
+                        : ClosedAt(before, now, lastFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds);
+                if (OtherOpenOn(player, before, LabYaguangEvent.GourdBomb))
+                    busy[BusyOther] = OtherOpenOn(player, now, LabYaguangEvent.GourdBomb) ? now : ClosedAt(before, now, OtherEnd(player, before));
+            }
+        }
+
+        private static double ClosedAt(double before, double now, double end) => Math.Max(before, Math.Min(now, end));
+
+        private double ComboEffectEnd(ulong player) =>
+            players.TryGetValue(player, out LabPlayerState state) ? Math.Max(state.comboPenaltyUntil, state.comboRewardUntil) : lastTime;
+
+        /// <summary>직전 시각에 이 화면에 열려 있던 폭탄 밖 이벤트의 끝 시각. 폭탄·여우구슬이 있었으면 알 수 없어 무한대.</summary>
+        private double OtherEnd(ulong player, double before)
+        {
+            foreach (LabOrbState orb in orbs.Values)
+                if (orb.owner == player && ((orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd) || orb.kind == LabOrbKind.FoxFire))
+                    return double.PositiveInfinity;
+            double end = before;
+            if (BlockOn(before) && swipeBlockedPlayer == player) end = Math.Max(end, swipeBlockedUntil);
+            if (CharmOn(before) && charmedPlayer == player) end = Math.Max(end, charmUntil);
+            return end;
         }
 
         private bool AnyScreenOpen(LabYaguangEvent self, double at)
@@ -1181,6 +1248,7 @@ namespace C6Lab
                     foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())
                         if (players.TryGetValue(holder, out var drummer)) drummer.drumSeconds += elapsed;
                 }
+                MarkBusyScreens(lastTime, effectiveNow);
                 DropGourdBombs(effectiveNow);
                 StartSwipeBlocks(effectiveNow);
                 CastSabotages(effectiveNow);
