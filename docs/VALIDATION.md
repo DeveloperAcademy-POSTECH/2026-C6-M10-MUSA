@@ -1507,3 +1507,25 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 | 솔로 화면: 17~20초 `COMBO!` 3/2/1, 20초에 4칸 등장, 예고 중 색/배지 숨김, 글자 크기·위치 | NOT_RUN | 기본값 그대로 솔로 시작 후 17초부터 확인한다. |
 | 3인 실행: 모든 화면에서 같은 카운트다운과 같은 시각의 4칸 등장 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
 | iOS 실기기 | NOT_RUN | 예고 패널이 위쪽 HUD/노치와 겹치지 않는지 확인 필요. |
+
+## 북 개수 AUTO — 2026-10-21, 이슈 #236
+
+기준은 Unity **6000.6.5f1**, main `5d8ab6e8`(#235 PR #238 포함)에서 분기한 `feat/#236-drum-count-auto`다. 이후 main `ae13b4f1`(#241 PR #242·#245, 설정 170개·프로토콜 5648)을 합쳤다.
+
+- **규칙**: `Drum Count`(인덱스 74)에 AUTO(값 0)를 더하고 코드와 저장 `LabConfig.asset`의 기본을 AUTO로 바꿨다(사용자가 Inspector에서 저장). AUTO는 판을 시작할 때 그 판 인원으로 개수를 정한다: 솔로·2·3명 1개, 4·5명 2개(`LabConfig.DrumsForPlayers`). AUTO에서는 북이 늘 인원 이하라 기존 배치 규칙대로 서로 다른 사람이 받는다. 1~5를 고르면 인원과 상관없이 그 개수다. 다른 설정의 AUTO는 이번 범위가 아니다.
+- **DEV**: 숫자 칸 대신 `AUTO` `1` `2` `3` `4` `5` 버튼 6개(한 줄에 3개, 두 줄)로 고른다. 선택지가 4개 이하인 칸(Paint Pattern)은 예전처럼 2×2다. 설정 개수는 170개 그대로다.
+- **통신**: 이전 앱은 0을 범위 밖으로 거절하므로 프로토콜을 `5647` → `5648`로 올렸으나, main 통합 때 #241이 5648을 먼저 써서 **`5649`**로 한 칸 더 올렸다. 버전을 고정한 팀원 검사 7개도 5649로 맞췄다.
+
+| 항목 | 상태 | 실행 결과·남은 확인 |
+| --- | --- | --- |
+| C# 오프라인 컴파일 | PASS (컴파일만) | main 통합 후 Unity 6000.6.5f1 내장 Roslyn으로 Runtime·EditMode·PlayMode·Editor를 컴파일했다. 오류 0. |
+| EditMode·PlayMode 실제 실행 | NOT_RUN | Inspector 저장 전 실행에서 `DrumCountIsAutoOrAWholeNumberFromOneToFive`가 저장 원본 1 때문에 실패하는 것(예상된 실패)만 확인했다. 저장·main 통합 뒤의 결과는 기록하지 않았다. |
+| 솔로: DEV `Drum Count` 버튼 6개의 배치·글자, AUTO로 북 1개 | NOT_RUN | Editor Play → DEV → Drum에서 확인한다. |
+| 2~5인 실행: 2·3명 1개, 4·5명 2개(서로 다른 사람), 고정값 1~5 | NOT_RUN | Mac 앱을 인원 수만큼 실행해 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | 좁은 화면에서 버튼 6개의 글자가 읽히는지 확인 필요. |
+
+추가·변경한 검사:
+- **EditMode** `LabModelTests`: `AutoDrumCountPlacesOneDrumUpToThreePlayersAndTwoOnDifferentBoardsForFourOrFive`(솔로·2~5명 AUTO 개수와 서로 다른 보유자, 고정 3개는 2명에서도 3개)
+- **EditMode** `LabDeveloperConfigTests`: `DrumCountIsAutoOrAWholeNumberFromOneToFive`(이전 `DrumCountIsAWholeNumberFromOneToFive`; 선택지 이름, 0 허용·−1/6/2.5 거절, 저장 원본 AUTO, 인원별 개수, 고정값), 코드 기본값 확인 1 → 0
+- **PlayMode** `LabDeveloperSoloIntegrationTests`: `SavedDeveloperPanelPicksDrumCountFromAutoAndOneToFiveThreeToARow`(저장 Scene의 버튼 6개 글자·3열 2줄 배치·누르면 입력값만 바뀌고 APPLY 전에는 설정 유지)
+- 프로토콜 고정 검사 7개(`LabPaint*ConfigTests` 5개, `LabPlayerPaintPatternConfigTests`, `LabPaintClusterDeveloperTests`)를 5649로 갱신
