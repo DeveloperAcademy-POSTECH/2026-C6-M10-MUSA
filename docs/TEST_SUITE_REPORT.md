@@ -1,10 +1,12 @@
 # C6 테스트 구성과 검증 범위 보고서
 
-작성일: 2026-10-21 KST. 현행 정리 작업 `refactor/#246-legacy-variable-test-cleanup`, 기준 커밋 `2272d25a` 이후 작업 파일을 분석했다. 기준은 #240 개인 조합판 개편과 main의 #235 소멸·#241 콤보 예고·프로토콜 검사 수정을 통합한 코드다. Unity 6000.6.5f1, 실행 Scene `Assets/Lab/Scenes/Lab.unity`, 현재 공유 설정165개·프로토콜5650·연결 토큰 `C6PhysicsLab/14`다.
+작성일: 2026-10-21 KST. 현행 정리 작업 `refactor/#246-legacy-variable-test-cleanup`, 기준 커밋 `2272d25a` 이후 작업 파일을 분석했다. 기준은 #240 개인 조합판 개편과 main의 #235 소멸·#241 콤보 예고·프로토콜 검사 수정을 통합한 코드다. Unity 6000.6.5f1, 실행 Scene `Assets/Lab/Scenes/Lab.unity`, 현재 공유 설정165개·프로토콜5650·연결 토큰 `C6PhysicsLab/14`다. #246 정리 커밋은 `13c051c3`이며, 현재는 선행 PR #247의 `c00b34e4`(main `f36678b3`·#237/PR #239 폭탄 전달 포함)를 추가 통합 중이다.
 
-현재 자동 검사는 **88개 C# 파일, EditMode794개 + PlayMode243개 = 1,037개 케이스**다. 여러 값·해상도의 매개변수 검사는 각각 한 케이스로 센다. 게임 전체를1,037번 실행한다는 뜻은 아니다. 코드 존재, 실제 자동 실행, 실제 기기 연결은 구분한다. 정리 내역은 [LEGACY_VARIABLE_TEST_CLEANUP](LEGACY_VARIABLE_TEST_CLEANUP.md)을 따른다.
+추가 통합 전 #246 정리 커밋의 자동 검사는 **88개 C# 파일, EditMode794개 + PlayMode243개 = 1,037개 케이스**다. 여러 값·해상도의 매개변수 검사는 각각 한 케이스로 센다. 게임 전체를1,037번 실행한다는 뜻은 아니다. 코드 존재, 실제 자동 실행, 실제 기기 연결은 구분한다. 정리 내역은 [LEGACY_VARIABLE_TEST_CLEANUP](LEGACY_VARIABLE_TEST_CLEANUP.md)을 따른다.
 
-## 현재 실행 결과
+> **추가 통합 검증 대기:** 아래 분류표와794/243·Mac24의 PASS는 `13c051c3`의 실행 근거다. #239의 폭탄 전달 PlayMode1건이 추가되어 새 전체 검사 수는 EditMode794·PlayMode244(총1,038)가 예상되며, 실제 발견 수와 통과 여부는 새 실행 XML로 확정한다. 이전 선행 `c00b34e4`/`f36678b3` 통합의 전체 PlayMode는239/244(서버 bind3·오디오2 실패)였다. 현재 추가 통합본을 전체 PASS로 표시하지 않으며 새 결과는 [VALIDATION](VALIDATION.md)에 별도로 기록한다.
+
+## 추가 통합 전 #246 정리 커밋의 실행 결과
 
 | 종류 | 코드 규모 | 실제 결과 | 범위 |
 | --- | ---: | --- | --- |
@@ -15,7 +17,7 @@
 
 EditMode는 `edit-01.xml`, PlayMode는 단독 실행 `play-02.xml`에서 확인했다. 시간은 XML의 검사 수행 시간으로 Unity 시작·불러오기·컴파일·빌드 시간과 다르다. 첫 PlayMode의238개 통과·5개 실패와 수정/환경 원인은 VALIDATION에 보존했다. 앞선 버전의 Mac3/5인·모바일 결과를 이번 버전의 통과로 승계하지 않는다.
 
-## EditMode 구성
+## 추가 통합 전 EditMode 구성
 
 | 주된 책임 | 파일 | 케이스 | 확인 범위 |
 | --- | ---: | ---: | --- |
@@ -33,7 +35,7 @@ EditMode도 Unity API를 사용한다. 일부는 ScriptableObject·GameObject를
 
 `LabSharedSettingsSchemaTests`는 잘못된 길이4종과 현재 버전1종을 공통으로 검사한다. 기능별 검사에서는 각 설정의 기본값·경계값·NaN/Infinity·정수 조건·왕복을 계속 검사한다. `LabActionTransactionTests`는 중복 요청/재전송, `LabBoardReplicationTests`는 순번/체크포인트, `LabBulkChannelTests`는 손실/재정렬/ACK를 통제된 입력으로 검사한다. 실제 핫스팟 품질 측정은 아니다.
 
-## PlayMode 구성
+## 추가 통합 전 PlayMode 구성
 
 | 주된 책임 | 파일 | 케이스 | 확인 범위 |
 | --- | ---: | ---: | --- |

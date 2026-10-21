@@ -72,6 +72,11 @@ namespace C6Lab
             public bool Blasted;
             /// <summary>A bomb blast shrank this orb for the rest of its life (#213).</summary>
             public bool Small;
+            /// <summary>
+            /// A bomb the player swiped or dragged on (#237): it slides until it stops, and passes at a side
+            /// edge however slowly. Once it stops it drifts by itself again and this is cleared.
+            /// </summary>
+            public bool PlayerSent;
             /// <summary>When the held body last followed the finger, for a heavy bomb's lag (#212).</summary>
             public double LastDragAt;
             public string PendingPartnerId;
@@ -492,6 +497,7 @@ namespace C6Lab
                 if (distance > reach) continue;
                 if (entry.Held) CancelDrag();
                 entry.Arrival = LabDrumArrival.None;
+                entry.PlayerSent = false;
                 // Anything flung tells the Host it was pushed if it crosses: a drum then stops inside the
                 // next board (#178), and the gourd's swipe block never stops it (#215).
                 entry.Blasted = true;
@@ -1036,6 +1042,7 @@ namespace C6Lab
             if (nearest == null) return false;
             heldId = nearest.View.OrbId;
             nearest.Held = true;
+            nearest.PlayerSent = false;
             nearest.LastDragAt = now;
             nearest.Arrival = LabDrumArrival.None;
             nearest.Blasted = false;
@@ -1142,6 +1149,8 @@ namespace C6Lab
             Vector2 worldVelocity = inputVelocity * bounds.width * heft;
             entry.View.Body.linearVelocity = OnPlane(Vector2.ClampMagnitude(worldVelocity,
                 config.OrbMaxReleaseSpeed * bounds.width * heft));
+            // A bomb the player lets go of is on its way to the neighbour until it stops (#237).
+            entry.PlayerSent = entry.View.Kind == LabOrbKind.Bomb && worldVelocity.sqrMagnitude > 0f;
             return true;
         }
 
@@ -1237,6 +1246,9 @@ namespace C6Lab
                 Vector2 velocity = XY(body.linearVelocity);
                 Vector2 position = XY(body.position);
                 float speed = velocity.magnitude;
+                // Taken before this step's slide, which may stop it right at the edge (#237).
+                bool sent = entry.PlayerSent && entry.View.Kind == LabOrbKind.Bomb;
+                Vector2 incoming = velocity;
                 // Config motion is expressed in board widths, while Rigidbody uses world units.
                 // Convert at this boundary so different camera/board sizes retain the same feel.
                 if (entry.Arrival != LabDrumArrival.None) velocity = Arrive(entry, velocity, position);
@@ -1250,11 +1262,14 @@ namespace C6Lab
                 else velocity = velocity.normalized * Mathf.Max(0f,
                     speed - config.OrbFloorDeceleration * bounds.width * Time.fixedDeltaTime);
                 body.linearVelocity = OnPlane(velocity);
+                // A bomb the player sent on that reaches a side edge going outward passes however slowly,
+                // even on the step its slide runs out (#237).
+                if (sent) velocity = incoming;
                 if (velocity.x == 0f) continue;
                 bool left = position.x <= bounds.xMin && velocity.x < 0f;
                 bool right = position.x >= bounds.xMax && velocity.x > 0f;
                 if (!left && !right) continue;
-                if (drifts && Mathf.Abs(velocity.x) < DrumPassSpeedFactor * config.DrumDriftSpeed * bounds.width)
+                if (drifts && !sent && Mathf.Abs(velocity.x) < DrumPassSpeedFactor * config.DrumDriftSpeed * bounds.width)
                 {
                     // A drum or bomb never drifts onto a neighbour's screen by itself; only a push or
                     // a swipe passes it. A gentle drift that reaches the edge turns back instead.
@@ -1297,6 +1312,17 @@ namespace C6Lab
             float driftSpeed = config.DrumDriftSpeed * bounds.width;
             float step = Time.fixedDeltaTime;
             float speed = velocity.magnitude;
+            if (entry.PlayerSent)
+            {
+                // A bomb the player sent on slides like an orb until it stops (#237), rather than slowing
+                // into a drift that would ease it back from the edge; only then does it drift again.
+                entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
+                entry.HasDriftHeading = false;
+                float next = speed - config.OrbFloorDeceleration * config.BombSlideDeceleration * bounds.width * step;
+                if (next > config.OrbStopSpeed * bounds.width) return velocity.normalized * next;
+                entry.PlayerSent = false;
+                return Vector2.zero;
+            }
             if (speed > driftSpeed * 1.05f + .0001f)
             {
                 entry.View.DriveDrumSpin(0f, config.DrumSpinStrength);
