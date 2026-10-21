@@ -1,16 +1,37 @@
-## 한지 머티리얼 조절
+## 한지 머티리얼 조절 — PR #255
 
-Project에서 `Assets/Lab/Resources/GourdPaint/WhiteGourd.mat`를 선택해 Inspector의 **Hanji Paper**를 조정한다. Play 모드 밖에서 편집하면 다음 실행과 빌드에도 유지된다.
+현재 실행 외형은 `Resources/GourdPaint/WhiteGourd.mat`를 `LabGourdPaint.InitializePresentation()`이 박의 `White Gourd` Renderer에 연결한다. Project에서 이 Material을 선택해 **Hanji Paper**를 조정한다. Play 모드 밖에서 저장한 값이 다음 실행과 빌드에 적용되며 DEV 공유 설정에는 추가하지 않는다.
 
-- **Hanji PNG (Color and Height)**: PNG를 드래그한다. 같은 이미지의 밝기에서 요철을 계산하므로 별도 노멀 맵이 필요 없다. 기본은 사용자 제공 Hanji.png 원본이다.
-- **Paper Tint**: 바탕 색상.
-- **Texture Repeat**: 클수록 섬유 무늬가 작고 촘촘해진다. 기본 3.
-- **Fiber Contrast**: 이미지의 어두운 섬유 무늬 강도. 0이면 단색, 기본 1.
-- **Surface Relief**: 빛에 반응하는 요철 강도. 0이면 매끈하며 기본 0.012. 실제 메시 윤곽은 바꾸지 않는다.
-- **Relief Under Paint**: 칠해진 부분에 남는 요철 비율. 기본 0.5.
-- **Smoothness (0 = Matte)**: 기본 0.05. 낮을수록 무광이다.
+**셰이더 선언 기본값과 저장 Material의 실제 적용값은 다르다.** 기존 Material을 사용하는 현재 게임에는 오른쪽 열을 적용한다.
 
-이미지는 Texture Type=Default, Wrap Mode=Mirror (기본 이미지) 또는 Repeat (타일 이미지), mipmaps 활성화를 권장한다. 반복 경계가 맞는 이미지를 사용하면 패턴 경계가 줄어든다. 입체 투영으로 구면 UV의 극점 늘어짐을 피하지만 원본 이미지 자체의 반복 경계를 제거하지는 않는다. 조명 방향은 기존 전용 셰이더의 고정 방향을 유지한다. 물감 판정 맵·네트워크·색칠 면적에는 영향을 주지 않는다.
+| Inspector 항목 | 셰이더 선언 기본값 | 저장된 `WhiteGourd.mat` 값 |
+| --- | --- | --- |
+| Hanji PNG (Color and Height) | white | `Textures/Hanji.png` (1254×1254) |
+| Paper Tint | (0.96, 0.94, 0.86, 1) | (1, 1, 1, 1) |
+| Texture Repeat | 3 | 0.85 |
+| Fiber Direction Variation | 0.06 | 0.06 |
+| Paper Color Saturation | 0.6 | 0.85 |
+| Paper Light Direction | (-0.65, 0.8, 0.6) | (-0.65, 0.8, 0.6) |
+| Fiber Contrast | 1 | 1.15 |
+| Surface Relief | 0.012 | 0.004 |
+| Relief Under Paint | 0.5 | 0.3 |
+| Paper Shape Shading | 0.55 | 0.78 |
+| Paper Brightness | 1.08 | 1.12 |
+| Smoothness (0 = Matte) | 0.05 | 0.015 |
+
+Texture Repeat가 클수록 섬유 무늬가 촘촘해진다. Fiber Direction Variation은 투영 샘플의 무작위 회전량이고 0이면 그 회전을 끈다. Fiber Contrast는 어두운 섬유 강도, Surface Relief는 같은 PNG의 밝기로 계산한 요철 강도다. 요철은 메시 윤곽이나 충돌체를 바꾸지 않는다. Relief Under Paint는 칠해진 부분의 요철 비율이고 Smoothness는 정반사 강도를 조절한다. Paper Shape Shading·Brightness·Light Direction은 종이 바탕의 고정 조명을 조절하며 물감에는 기존 고정 광원 방향을 유지한다.
+
+`Hanji.png`는 Texture Type=Default, sRGB ON, Wrap Mode=Repeat, mipmaps ON, Trilinear로 저장한다. 박 로컬 좌표의 삼중 투영과 투영면별 세 회전·오프셋 샘플의 연속 블렌딩으로 극점 늘어짐과 규칙적인 반복을 줄인다. 텍스처는 박의 회전과 함께 움직이며 시간 애니메이션은 없다. 이는 표현 변경이며 도색 맵·소유권·네트워크·피복률의 판정을 바꾸지 않는다. 종이 텍스처 샘플링과 요철 계산의 iOS 성능은 별도 실기기 검증 대상이다.
+
+### Scene·그림자 연결 범위
+
+PR 원본 Scene에는 `LabPaperStage` 컴포넌트와 `paperShader` 참조가 추가돼 있었지만, 대응하는 스크립트와 셰이더 원본이 저장소 및 확인한 로컬 작업 폴더에서 발견되지 않았다. Missing Script를 새로 추가하지 않도록 **해당 Scene 추가와 공백 직렬화 변경을 제외하고 `Lab.unity`를 현재 main과 동일하게 유지**한다. 기존 Scene·메타 GUID를 유지하며 새 스테이지 기능을 대체 구현하지 않는다.
+
+`Art/UI/LabPaperShadow.shader`는 에셋만 보존한 **미연결 셰이더**다. 현재 Scene·Prefab·런타임 코드에서 사용하는 Material이나 컴포넌트가 없으므로 그림자가 게임에 적용됐다고 간주하지 않는다. 한지 Material 적용은 이 그림자 셰이더나 제외한 컴포넌트에 의존하지 않는다.
+
+### 과거 튜닝 기록과 검증 범위
+
+초기 시안 값(Repeat 0.65, Contrast 1.15, Relief 0.006, Shape Shading 0.8, Brightness 1.04)은 과거 튜닝 기록이며 현재 기본값이 아니다. 2026-10-21 조정 후 저장된 실제 값은 위 Material 열을 따른다. 아래 #187~#208 설명은 당시 구조·검증 이력이며, 당시 설정 개수·통신 버전·성장 수치를 현재 값으로 사용하지 않는다. 현행 수치와 실행 증거는 루트 문서·`LabConfig.asset`·`docs/VALIDATION.md`를 확인한다. 이 문서만으로 이번 브랜치의 실행·실기기 PASS를 부여하지 않는다.
 
 # 기본 전투의 100% 공동 색칠·인접 성장·완성 박 관람 — #187·#191
 
@@ -125,9 +146,3 @@ DEV → Gourd → Paint Pattern의 LEGACY/BROAD/SPLATTER/FLOW를 새 판에 적�
 ## 재타격 군집 (#208)
 
 최초4종 마스크와 셰이더는 유지한다. 이미 칠한 곳의 성장 선택은 `LabPaintSurface.Clusters.cs`의 공급별 지역 heap을 사용해 경계 옆 한 군집에 집중한다. 실제 새 셀만 예산/진행도에 반영하고 같은 연결 칠을 통과해 마지막 빈칸까지 찾는다. 모양은 고정된 구면 거리·낮은 주파수 굴곡·접촉/빈틈 선호로 정하며 수직 우대는 시작점 선택에만 적용한다. DEV `Paint Cluster Compactness`143번(0.85), `Paint Cluster Irregularity`144번(0.25), 범위0~1이며 기존 초기2%·반복4%·전역6%/초는 유지한다. 옛 흐름 꼬리 관련 설정은 새 재타격에 적용하지 않는다. 새 Source/Config145개·프로토콜5640과 현재 검증 범위는 루트 문서를 따른다.
-
-한지의 규칙적인 격자 반복을 줄이기 위해 각 투영면에서 무작위 회전·오프셋의 세 샘플을 연속 블렌딩한다. 패턴은 박 로컬 좌표에 고정되며 시간에 따라 움직이지 않는다.
-
-실제 Game 카메라의 박 표현은 **Paper Shape Shading**(바탕 입체 명암)과 **Paper Brightness**(바탕 밝기)로 조정한다. 물감 RGB에는 기존 조명을 유지한다. 새 시안 기반 한지의 기본 튜닝은 Repeat 0.65, Contrast 1.15, Relief 0.006, Shape Shading 0.8, Brightness 1.04다. 생성한 타일 텍스처는 Mirror 대신 Repeat로 가져와 대칭 무늬를 피한다.
-
-2026-10-21 참고 이미지 재조정: 길게 이어지는 종이 섬유로 텍스처를 교체했다. **Fiber Direction Variation**은 무작위 회전량(0은 세로 결 유지), **Paper Color Saturation**은 종이 채도, **Paper Light Direction**은 박 바탕의 고정 광원 방향이다. Game 카메라 확인값: Repeat 0.85, Contrast 1.15, Relief 0.004, Direction Variation 0.06, Saturation 0.85, Shape Shading 0.78, Brightness 1.12, Light Direction (-0.65,0.8,0.6). 앞의 초기 튜닝값보다 이 값이 최신이다.
