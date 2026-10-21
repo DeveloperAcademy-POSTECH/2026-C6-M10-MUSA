@@ -633,8 +633,9 @@ namespace C6Lab
 
         /// <summary>
         /// 야광귀 섬광 (#268): 정해 둔 시각마다 번쩍인다. 화면 표시(하얗게 보이기)만 하므로 Host는 시각과 대상만 정한다.
-        /// 콤보 예고나 콤보가 진행 중이거나 콤보 실패 페널티가 걸려 있으면(#271) 섬광 예고를 시작하지 않고 기다렸다가,
-        /// 그것이 끝나면 예고부터 다시 보여준다.
+        /// 콤보 한 판(예고 → 4칸 → 결과 → 페널티/보상 효과)이 진행 중인 동안에는 섬광을 시작하지 않고 기다렸다가,
+        /// 그 판이 완전히 끝나면 예고부터 다시 보여준다(#271). 다음 콤보가 섬광이 끝나기 전에 시작될 차례여도 시작하지
+        /// 않는다. 그래서 섬광과 콤보 한 판은 상태로 서로를 피하고, DEV에서 시각을 어떻게 당겨도 겹치지 않는다.
         /// 간격은 번쩍인 시각부터 재고, 눈부심·회복·다음 예고가 겹치지 않을 만큼은 언제나 띄운다.
         /// </summary>
         private void AdvanceFlash(double until)
@@ -669,10 +670,20 @@ namespace C6Lab
             }
         }
 
-        // 콤보 예고·진행 중이거나, 누군가 콤보 실패 페널티(SMALL)를 받고 있는 동안에는 섬광을 미룬다 (#271).
-        private bool ComboHoldsFlash(double at) => rules.ComboEnabled
-            && (combo.Active || (ComboWaiting && at >= nextComboAt - rules.ComboWarningSeconds)
-                || players.Values.Any(player => player.comboPenaltyUntil > at));
+        /// <summary>
+        /// 콤보 한 판이 섬광을 막는지 (#271): 콤보가 진행 중이거나, 예고 중이거나, 누군가 그 결과인 페널티(SMALL)나
+        /// 보상(BIG) 효과를 받고 있거나, 지금 섬광을 시작하면 끝나기(예고 + 눈부심 + 회복) 전에 다음 콤보 예고가 시작될 때.
+        /// </summary>
+        private bool ComboHoldsFlash(double at)
+        {
+            if (!rules.ComboEnabled) return false;
+            if (combo.Active) return true;
+            if (players.Values.Any(player => player.comboPenaltyUntil > at || player.comboRewardUntil > at)) return true;
+            if (!ComboWaiting) return false;
+            double comboWarningAt = nextComboAt - rules.ComboWarningSeconds;
+            double flashEndsAt = at + rules.FlashWarningSeconds + rules.FlashGlareSeconds + rules.FlashRecoverySeconds;
+            return at >= comboWarningAt || flashEndsAt > comboWarningAt;
+        }
 
         private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled && !flashHeld;
 

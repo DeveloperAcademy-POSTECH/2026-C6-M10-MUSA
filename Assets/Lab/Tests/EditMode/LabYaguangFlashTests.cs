@@ -130,7 +130,7 @@ namespace C6Lab.Tests
             // The combo's warning starts at 27 s and its slots stay up until 40 s; the flash is due at 31 s.
             // Nobody clears it, so everyone is SMALL for 15 s after the 40 s timeout.
             model.Begin("flash-combo", Three, 0d, Config(flash: true, first: 31f, combo: true));
-            Assert.That(model.Snapshot(26d).flashAt, Is.EqualTo(31d));
+            Assert.That(model.Snapshot(26d).flashAt, Is.EqualTo(31d), "Only planned so far.");
             LabSnapshot held = model.Snapshot(29.6d);
             Assert.That(held.flashAt, Is.EqualTo(-1d), "No flash warning over the combo warning.");
             Assert.That(model.Snapshot(35d).flashCount, Is.Zero, "Nor during the combo.");
@@ -144,6 +144,33 @@ namespace C6Lab.Tests
             Assert.That(new[] { after.flashWarningAt, after.flashAt }, Is.EqualTo(new[] { 55.5d, 57d }),
                 "The full 1.5 s warning starts once the penalty is over.");
             Assert.That(model.Snapshot(57d).flashCount, Is.EqualTo(1u));
+        }
+
+        [Test]
+        public void AFlashThatEndsBeforeTheComboWarningGoesAheadAsPlanned()
+        {
+            var model = new LabModel();
+            // Warning 18.5 s, flash 20 s, glare and recovery over at 24.5 s: before the combo warning at 27 s.
+            model.Begin("flash-before-combo", Three, 0d, Config(flash: true, first: 20f, combo: true));
+            Assert.That(model.Snapshot(18.6d).FlashWarningOn(18.6d), Is.True);
+            LabSnapshot flashed = model.Snapshot(20d);
+            Assert.That(flashed.flashCount, Is.EqualTo(1u));
+            Assert.That(flashed.flashLastAt, Is.EqualTo(20d));
+            Assert.That(model.Snapshot(30d).comboActive, Is.True, "The combo still comes on time.");
+        }
+
+        [Test]
+        public void AFlashThatWouldRunIntoTheComboWarningWaitsForTheWholeCombo()
+        {
+            var model = new LabModel();
+            // Due at 25 s, its warning would start at 23.5 s and its recovery end at 29.5 s, after the combo warning at 27 s.
+            model.Begin("flash-into-combo", Three, 0d, Config(flash: true, first: 25f, combo: true));
+            LabSnapshot due = model.Snapshot(23.6d);
+            Assert.That(due.flashAt, Is.EqualTo(-1d), "It does not start: it would not finish before the combo.");
+            Assert.That(due.FlashWarningOn(23.6d), Is.False);
+            Assert.That(model.Snapshot(30d).comboActive, Is.True, "The combo comes on time.");
+            Assert.That(model.Snapshot(54.9d).flashCount, Is.Zero, "Still waiting through the combo and its penalty.");
+            Assert.That(model.Snapshot(55.5d).flashAt, Is.EqualTo(57d));
         }
 
         [Test]

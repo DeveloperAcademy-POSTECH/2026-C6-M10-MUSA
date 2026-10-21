@@ -2068,12 +2068,12 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 
 ### #271 피드백 반영: 페널티 중 섬광 미루기, COMBO! 예고 없애기
 
-- **섬광**: 콤보 예고·진행 중에 더해, 누군가 콤보 실패 페널티(SMALL)를 받고 있는 동안에도 섬광 예고를 시작하지 않고 기다린다. 페널티가 끝나면 예고(2초)부터 다시 보여준 뒤 번쩍인다(`LabModel.ComboHoldsFlash`). 기본 시간표에서는 원래 겹치지 않지만, DEV로 시각을 당기면 겹칠 수 있었다.
+- **섬광**: 시각 계산만이 아니라 상태로 피한다. 콤보 한 판(예고 → 4칸 → 결과 → 페널티/보상 효과)이 진행 중이면 섬광을 시작하지 않고, 지금 시작하면 섬광이 끝나기(예고 + 눈부심 + 회복) 전에 다음 콤보 예고가 올 때도 시작하지 않는다. 그 판이 완전히 끝나면 예고(2초)부터 다시 보여준 뒤 번쩍인다(`LabModel.ComboHoldsFlash`). 콤보는 섬광 때문에 미루지 않으므로 콤보 시간표는 그대로다. DEV로 시각을 어떻게 당겨도 섬광과 콤보 한 판이 겹치지 않는다.
 - **예고**: 야광귀 셈법이 켜져 있으면 패널 자리의 `COMBO!` 예고 판을 띄우지 않고 박 옆 말풍선만 하나·둘·셋·넷을 센다. 예고 동안 SMALL 배지를 숨기는 동작은 그대로다(`WarningCounting`). 셈법을 끄면 예전 `COMBO! 4 3 2 1`.
 
 | 항목 | 상태 | 실행 결과/남은 확인 |
 | --- | --- | --- |
 | C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. |
-| EditMode 실제 실행 | NOT_RUN | `TheFlashWaitsOutTheComboAndItsPenaltyThenWarnsAgainInFull`(40초 시간 초과 → 55초까지 페널티 → 55.5초부터 예고 → 57초 섬광). |
+| EditMode 실제 실행 | NOT_RUN | `TheFlashWaitsOutTheComboAndItsPenaltyThenWarnsAgainInFull`(40초 시간 초과 → 55초까지 페널티 → 55.5초부터 예고 → 57초 섬광), 새 `AFlashThatEndsBeforeTheComboWarningGoesAheadAsPlanned`·`AFlashThatWouldRunIntoTheComboWarningWaitsForTheWholeCombo`. |
 | PlayMode 실제 실행 | NOT_RUN | `LabYaguangCountLookTests`(예고 중 `COMBO!` 판 없음, 말풍선 세기 중). |
 | 에디터 확인 | NOT_RUN | 페널티 중 섬광이 오지 않는지, 예고 때 패널 자리가 비어 있고 말풍선만 세는지. |
