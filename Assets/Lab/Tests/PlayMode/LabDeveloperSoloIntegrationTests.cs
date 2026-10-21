@@ -256,6 +256,39 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavedDeveloperPanelPicksDrumCountFromAutoAndOneToFiveThreeToARow()
+        {
+            yield return fixture.Load();
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            developerUi.Open();
+            developerUi.panel.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                .Single(button => button.name == "Category Drum").onClick.Invoke();
+            Transform row = developerUi.valueInputs[74].transform.parent;
+            Assert.That(row.gameObject.activeInHierarchy, Is.True);
+            Assert.That(developerUi.valueInputs[74].gameObject.activeSelf, Is.False, "Drum Count is picked with buttons (#236).");
+            UnityEngine.UI.Button[] choices = Enumerable.Range(0, 6).Select(option =>
+                row.Find("SettingSlider/SettingChoices/Choice" + option).GetComponent<UnityEngine.UI.Button>()).ToArray();
+            Assert.That(choices.Select(button => button.GetComponentInChildren<UnityEngine.UI.Text>().text),
+                Is.EqualTo(new[] { "AUTO", "1", "2", "3", "4", "5" }));
+            Assert.That(developerUi.valueInputs[74].text, Is.EqualTo("0"), "The saved config starts on AUTO.");
+            for (int option = 0; option < choices.Length; option++)
+            {
+                var rect = (RectTransform)choices[option].transform;
+                Assert.That(rect.anchorMin.x, Is.EqualTo(option % 3 / 3f).Within(1e-4f), "Three to a row.");
+                Assert.That(rect.anchorMax.x, Is.EqualTo((option % 3 + 1) / 3f).Within(1e-4f));
+                Assert.That(rect.anchorMin.y, Is.EqualTo(option < 3 ? .5f : 0f).Within(1e-4f), "Two rows.");
+            }
+            int savedCount = developerUi.network.config.DrumCount;
+            for (int option = choices.Length - 1; option >= 0; option--)
+            {
+                choices[option].onClick.Invoke();
+                Assert.That(developerUi.valueInputs[74].text, Is.EqualTo(option.ToString()));
+                Assert.That(developerUi.network.config.DrumCount, Is.EqualTo(savedCount), "A button selection is not APPLY.");
+            }
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator SavedDeveloperPanelCreatesAndRetunesTwoPlayerHostLobby()
         {
             yield return fixture.Load();
