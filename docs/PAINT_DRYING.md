@@ -4,7 +4,7 @@
 
 Unity 6000.6.5f1의 `Assets/Lab/Scenes/Lab.unity`에 연결된 Paint 모델·공유 설정·DEV 조작을 설명한다. 이 문서에서 “건조”는 색의 명암 변화가 아니라 **시간이 지나면 실제 도색 셀이 빈 표면 경계부터 사라지는 규칙**이다. 새 게임·도색 마스크·물리 판정을 설계하는 문서가 아니다.
 
-현재 공유 설정은 **165개, 프로토콜5650, 연결 토큰 `C6PhysicsLab/14`**다. 건조4개는 인덱스148~151, 넘기기 막기3개는152~154다. #246에서100% 고정 목표 행과 미사용 Flow4값을 제거했으며 건조 규칙·기본값은 유지한다. 다른 버전 앱을 섞지 않는다. 검증 결과는 [VALIDATION](VALIDATION.md)의 해당 변경 기록을 따른다. 아래 시나리오와 코드 설명 자체는 실행 증거가 아니다.
+현재 공유 설정은 **165개, 프로토콜5651, 연결 토큰 `C6PhysicsLab/15`**다. 건조4개는 인덱스148~151, 넘기기 막기3개는152~154다. #246에서100% 고정 목표 행과 미사용 Flow4값을 제거했으며 건조 규칙·기본값은 유지한다. 다른 버전 앱을 섞지 않는다. 검증 결과는 [VALIDATION](VALIDATION.md)의 해당 변경 기록을 따른다. 아래 시나리오와 코드 설명 자체는 실행 증거가 아니다.
 
 ## 기본값과 변경 위치
 
@@ -80,7 +80,7 @@ Host 모델만 건조를 계산한다. Host 표시 캐시와 Client는 기존 `p
 | `Assets/Lab/Scripts/Core/LabPaintSurface.Drying.cs` | 보호/노출 시각, 고정 tick, 경계 heap 침식, 실제 셀 삭제, 성분 재구성·공급 귀속 |
 | `Assets/Lab/Scripts/Core/LabPaintSurface.Clusters.cs` | 분리 후 기존 군집 형상을 유지하는 `GrowthCluster.Rebase` |
 | `Assets/Lab/Scripts/Core/LabModel.cs` | 기존 `ConfirmHit`·`TryAdvance`를 통한 유효 명중·전투 시간·pause/deadline/결과 경계 |
-| `Assets/Lab/Scripts/Session/LabNetwork.cs` | 프로토콜5650, 기존 Host 설정 승인과 맵/Snapshot 공개 경로 |
+| `Assets/Lab/Scripts/Session/LabNetwork.cs` | 프로토콜5651, 기존 Host 설정 승인과 맵/Snapshot 공개 경로 |
 | `Assets/Lab/Scripts/Session/LabPaintReplication.cs` | 기존 RGBA/P번호 delta·체크포인트의 빈 셀 수신 경로. 새 wire 형식을 만들지 않음 |
 
 과거 #225의 `LabConfig.asset` 재저장은 Unity API로 당시 새 건조4값을 기록했다. 코드 기본값으로 이미 사용하던 무거운 폭탄4값·폭발 패널티3값도 직렬화되므로 에셋 diff에 함께 나타난다. 해당 기존153개 유효값·인덱스를 바꾸는 기획 변경과 구별한다. Scene·Prefab·마스크·구슬 재질·패키지는 이 기능의 변경 대상이 아니다.
