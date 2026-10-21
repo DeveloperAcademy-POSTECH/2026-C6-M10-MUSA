@@ -135,6 +135,7 @@ Inspector의 `Completed Gourd Viewer Enabled`와 `LabConfig.CompletedGourdViewer
 | V-37 | #235 구슬 소멸 예고: Host의 수명 만료 보고(지금 주인에게 한 번, 조합·넘김·날아가는 구슬·잠긴 폭탄 제외, 아이템 15초·해금 폭탄 8초), 종류별 수명 규칙의 화면 공유, `Vanish`의 연기와 일반 제거 구분, 마지막 3초 하얀 번쩍임(점점 빠르게, 북·잠긴 폭탄 제외)과 Inspector 값(0이면 끔), 통신 버전 5650 | Core EditMode·Orb PlayMode·저장 Scene 솔로·세 실행본 | [검증 기록](VALIDATION.md) |
 | V-38 | #241 콤보 예고와 기본값: 4칸 등장 3초 전 패널 자리 `COMBO!` + 3/2/1(색 숨김, SMALL/BIG 배지 숨김, 결과 문구 다음 순서), 4칸 등장 시각 유지/제한 시간은 등장 뒤부터/예고 중 명중 판정 없음, Host 시각(`comboWarningAt`/`comboNextAt`) 공유로 모든 기기 같은 카운트다운, 늦게 끝난 콤보 뒤에도 예고 전체 보장, `Combo Warning` 0이면 예고 없음; 기본값 ON/20초/15초 간격/10초 제한/페널티 0.1배/보상 2.5배를 코드와 `LabConfig.asset`에 저장, 설정 170개/프로토콜 5650 | Core EditMode(`LabGourdComboTests`, `LabDeveloperConfigTests`)/PlayMode(`LabComboProjectileIntegrationTests`)/저장 Scene 솔로/세 실행본 | [검증 기록](VALIDATION.md) |
 | V-39 | #237 폭탄 가장자리 전달: 플레이어가 놓은 폭탄은 멈출 때까지 미끄러지고 바깥쪽 가장자리에서 느려도 "스와이프"로 넘어감, 막힌 쪽(#215)은 튕김, 혼자 떠도는 폭탄은 되돌아옴, 무거운 폭탄 기본값 놓기 0.75배·감속 1.3배(끌기 지연 0.12초·질량 4 유지) | Orb PlayMode·Config EditMode·저장 Scene 솔로·세 실행본 | [검증 기록](VALIDATION.md) |
+| V-40 | #244 콤보 동안 박 속 요괴: 예고 시작에 올라와 콤보 끝까지 머묾(두리번 반복), 칸 명중마다 움찔(마지막 칸 포함), 끝나면 그 자리에서 정방향 재생으로 들어가 평소 6초 반복 복귀, 평소 반복 어느 시점에서 시작해도 높이/뚜껑/눈 이음새 없음(내려가는 중이면 되감기), Host 스냅샷 기준 출입, 일시정지 중 정지, Paint 모드만, 설정/프로토콜 변경 없음 | PlayMode(`LabGourdYokaiTests`, `LabGourdPaintTests`)/저장 Scene 솔로/세 실행본 | [검증 기록](VALIDATION.md) |
 
 검증에 필요한 자료는 이 새 코드와 관련 검사에 한정한다. 과거 프로토타입의 통과 기록은 새 Unity 버전 또는 새 코드의 통과 증거로 승계하지 않는다.
 

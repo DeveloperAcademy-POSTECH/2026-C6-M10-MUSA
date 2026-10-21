@@ -1671,3 +1671,45 @@ Runtime/Config/EditMode 소스는 EditMode 통과부터 최종 PlayMode·빌드�
 | Mac 실제 앱·iOS·LAN/핫스팟 | **NOT_RUN** | 위 자동 검사를 실제 다중 앱/환경의 실행으로 간주하지 않는다. |
 
 README·현행 DEV 명세·범위/도색 연결 문서의 통신 규약도5650/14로 맞췄다. 기존 검증 이력의 버전·실패 기록은 바꾸지 않는다. Scene·Prefab·패키지 및 사용자 로컬 머터리얼은 변경하지 않았다.
+
+## 콤보 동안 박 속 요괴 — 2026-10-21, 이슈 #244
+
+기준은 main `f36678b3`(#237 PR #239까지 포함)를 합친 `feat/#244-combo-yokai`다. Unity는 실행하지 않았다.
+
+- **이전 동작**: 박 프리팹(`WhiteGourd`)의 `GourdYokai_Details`에 붙은 Legacy `Animation`이 6초짜리 `Gourd_Demo`를 계속 반복했다(0.5~1.2초 뚜껑 열림, 1.1~1.8초 요괴 올라옴, 2~3.5초 두리번, 3.8~4.5초 들어감, 4.5~5.3초 뚜껑 닫힘). 제어 코드가 없어 기기마다 따로 돌았다.
+- **새 `LabGourdYokai`**: `LabGourdPaint`가 Paint 박을 붙일 때 함께 붙인다. 스냅샷이 예고 중(`ComboWarningOn`)이거나 콤보 진행 중(`comboActive`)이면 애니메이션 속도를 0으로 두고 시각을 직접 정해 `Sample()`한다. 올라온 뒤에는 2.0~2.8초(눈 +24°↔-24°) 구간을 오가며 두리번거린다. 콤보가 끝나면 그 시각부터 속도 1로 다시 틀어 평소처럼 들어가고 6초 반복으로 돌아간다.
+- **이음새**: 애니메이션 키가 모두 기울기 0이라 키 사이가 S자(smoothstep)다. 평소 반복의 시각 t에서 시작할 때 t≤2.8은 그대로, 2.8~3.5(눈이 가운데로 돌아옴)는 같은 눈 각도의 두리번 시각(S자 역함수), 3.5~3.8은 2.4초, 3.8~5.3(들어감·뚜껑 닫힘)은 그 자리에서 거꾸로 되감아 3.8초에서 같은 모습의 2.4초로, 5.3초 이후(닫힘)는 0.5초로 잇는다. 곡선 계산상 높이/뚜껑/눈 차이는 0이고, 가장 늦어도 1.5초 안에 다 올라온다(예고 3초 안).
+- **움찔**: 콤보 진행 칸이 늘면 0.35초 동안 크기가 먼저 줄었다 커지며(최대 약 16%) 위로 살짝 들썩인다. 마지막 칸(성공)도 움찔한 뒤 들어간다.
+- **범위**: DEV 설정·프로토콜·프리팹·애니메이션 파일 변경 없음. Crack 모드와 콤보 OFF는 이전과 같다. 일시정지 중에는 멈춰 있다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. |
+| 곡선 이음새 계산 | 확인 (Unity 밖) | `Gourd_Demo.anim`의 키를 smoothstep으로 계산해, 0~6초 0.1초 간격 시작 시 높이/뚜껑/눈 차이 0을 확인했다. 실제 Unity 샘플링 결과가 아니다. |
+| PlayMode 실제 실행 | NOT_RUN | 새 `LabGourdYokaiTests` 4개(`TheYokaiComesOutForTheWarningStaysForTheComboAndGoesBackAfter`, `HittingASlotMakesTheYokaiFlinchOnce`, `AComboStartingAnywhereInTheOrdinaryLoopDoesNotJump`, `NoComboOrAPausedWarningKeepsTheOrdinaryLoopOrHoldsStill`), `LabGourdPaintTests` Scene 연결 확인 추가분. |
+| 솔로 화면: 17초쯤 요괴가 올라와 콤보 끝까지 머묾, 칸 명중 시 움찔, 끝나면 들어감 | NOT_RUN | 기본값으로 솔로 시작 후 확인한다. |
+| 3인 실행: 모든 화면에서 같은 때 나오고 들어감 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기 | NOT_RUN | |
+
+
+## PR #249 요괴 연출 보완 + #247·#248 최종 통합 — 2026-10-21
+
+기준은 main `05e2dab6`(#247·#248 병합)을 합친 `9d70768` 소스다. 연결 규약5650/`C6PhysicsLab/14`·공유170개 설정과 AUTO 북 기본값을 유지하며, #249 자체는 Scene·Prefab·설정·통신 데이터 형식을 추가로 변경하지 않는다. 위 #244 최초 작성 시 미실행 기록과 아래 새 실행 결과를 구분한다.
+
+### 리뷰에서 보완한 실제 연출 결함
+
+- 마지막 콤보 성공 직후 일반 애니메이션으로 돌아가면서 움찔이 남아 있는 때, 일시정지로 애니메이션이 멈추면 기존 `localPosition += hop`이 매 프레임 누적될 수 있었다. 매 프레임 현재 애니메이션 pose를 샘플링한 뒤 오프셋을 적용하고, 움찔 종료·컴포넌트 비활성화 때 자세/크기를 복원한다.
+- 새 콤보의 최초 수신 스냅샷이 이미 progress1 이상이면 첫 명중 반응을 놓쳤다. 새 콤보는 progress0을 비교 기준으로 삼되 활성/기존 유지 상태일 때만 반응한다. 늦게 처음 받은 이미 끝난 콤보로 가짜 명중 효과를 만들지 않는다.
+
+| 검증 | 결과 | 실제 범위 |
+| --- | --- | --- |
+| 최종 전체 EditMode | **PASS845/845** | `pr249-integrated-edit.xml`,28.039초,02:00:10Z~02:00:38Z, 실패·생략·inconclusive0. |
+| 최종 전체 PlayMode | **PASS256/256** | `pr249-integrated-play.xml`,115.826초,01:57:52Z~01:59:47Z, 실패·생략·inconclusive0. 기존 실패5건, #247 회귀3건, AUTO UI, 요괴8건과 저장 Scene 연결 포함. |
+| 요괴 추가 회귀4건 | **PASS4/4** | 첫/다음 콤보의 progress0 생략 수신, 늦은 완료 스냅샷 무반응, 마지막 성공 후 정지120프레임의 위치/크기/애니메이션 시각 유지 및 재개 복원, 비활성화 복원. 실제 저장 WhiteGourd/Animation을 샘플링한다. |
+| 최종 Mac Development 검증 앱 빌드 | **PASS** | `AUTHORITY_PROBE_BUILD_OK`, BuildReport347,313,513bytes. 로컬 검증 helper를 포함한 별도 앱이며 일반 배포 빌드와 구분한다. 빌드 후 helper 제거, 게임 C#·Scene·Config 보존 확인. |
+| 실제 Mac2앱 직접 연결 | **PASS22항목** |5650·170개 공유, 실제 드래그 조합/시각 투척, Host 실제 충돌·소비·HP·RGB/P맵 일치, 구슬/북 동일ID 전달, 공동 pause/resume·DEV재시작. |
+| 실제 Mac2앱 지연·손실 | **PASS22항목** | 실제UDP 프록시 편도60ms·지터±10ms·손실확률1%, 같은22항목. 조합/투척 시각 객체는 입력 호출 안에서 보였고 Host 승인은 별도로 기다렸다. 이 관찰을 화면/터치 지연0ms로 해석하지 않는다. |
+| 요괴 연출의 다기기 시각 동시성·수동 외형 평가 | **NOT_RUN** | Mac 통신 probe는 요괴 포즈 동시성을 관찰하는 도구가 아니다. 위8개 PlayMode의 실제Transform/Animation 검사와 구분한다. |
+| iOS·실기기 LAN/핫스팟·모바일 성능 | **NOT_RUN** | Mac loopback 결과를 기기/네트워크 환경 호환성으로 확대하지 않는다. |
+
+Mac 자동 조작은 양쪽의 생성·전달을 검사하기 위해 실행 복사본의 북 수를 고정2개로 설정한다. 따라서 AUTO 기본 개수의 실제 다중 앱 검사로 주장하지 않는다. AUTO2~5인·Retry·전달 후 생성 규칙은 전체 EditMode의 모델 검사에서 확인했다. 검증 전후 C#·Scene·Config·패키지는 동일하며 Unity import가 재직렬화한 Target2 머터리얼2개는 커밋하지 않았다. 원래 사용자 작업 폴더의 Scene·머터리얼·기존 미추적 메타 해시는 유지했다. 원시XML/로그/앱은 로컬에 보관한다.
