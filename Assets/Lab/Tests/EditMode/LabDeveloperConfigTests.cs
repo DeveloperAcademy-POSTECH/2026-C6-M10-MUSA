@@ -41,7 +41,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(170));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(171));
             Assert.That(values[90], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[91], values[92], values[93], values[94] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -750,7 +750,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(112));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(170));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(171));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             LabDeveloperField field = LabConfig.DeveloperFields[87];
@@ -1049,7 +1049,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOnAtItsPreservedIndexWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(170));
+            Assert.That(values.Length, Is.EqualTo(171));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
             Assert.That(values[111], Is.EqualTo(1f));
             LabDeveloperField field = LabConfig.DeveloperFields[111];
@@ -1149,7 +1149,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(170));
+            Assert.That(received.Length, Is.EqualTo(171));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1378,7 +1378,7 @@ namespace C6Lab.Tests
         [Test]
         public void GourdColorComboFieldsFormTheComboGroupAndStartOn()
         {
-            LabDeveloperField[] combo = LabConfig.DeveloperFields.Skip(160).ToArray();
+            LabDeveloperField[] combo = LabConfig.DeveloperFields.Skip(160).Take(10).ToArray();
             Assert.That(combo.Select(field => field.Label), Is.EqualTo(new[]
             {
                 "Gourd Color Combo (0 off, 1 on)", "Combo First Start (seconds)",
@@ -1401,7 +1401,7 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(160),
+                Assert.That(source.CaptureDeveloperValues().Skip(160).Take(10),
                     Is.EqualTo(new[] { 1f, 20f, 15f, 10f, 10f, .1f, 0f, 10f, 2.5f, 3f }),
                     "By default the combo is on: first at 20 s, every 15 s, 10 s to clear, the whole team shrinks "
                     + "to 0.1x or grows to 2.5x for 10 seconds, and a 3-second warning comes first.");
@@ -1440,6 +1440,32 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
             Assert.That(error, Does.Contain("Combo Warning"));
             Assert.That(config.ComboWarningSeconds, Is.EqualTo(5f), "A rejected form changes nothing.");
+        }
+
+        [Test]
+        public void BoardOrbTrailIsAnOnToggleInTheFlatOrbBoardGroup()
+        {
+            LabDeveloperField field = LabConfig.DeveloperFields[170];
+            Assert.That(field.Label, Is.EqualTo("Board Orb Trail (0 off, 1 on)"));
+            Assert.That(field.IsToggle, Is.True);
+            Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Flat orb board").FieldIndices,
+                Is.EqualTo(new[] { 11, 12, 13, 14, 15, 16, 170 }), "The shallow trail sits with the board it draws on (#254).");
+
+            LabConfig authored = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(authored, Is.Not.Null);
+            foreach (LabConfig source in new[] { config, authored })
+            {
+                Assert.That(source.BoardOrbTrailEnabled, Is.True, "On by default, in code and in the saved asset.");
+                Assert.That(source.CaptureDeveloperValues()[170], Is.EqualTo(1f));
+            }
+
+            float[] values = config.CaptureDeveloperValues();
+            float[] before = (float[])values.Clone();
+            values[170] = 0f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.BoardOrbTrailEnabled, Is.False);
+            Assert.That(config.CaptureDeveloperValues().Take(170), Is.EqualTo(before.Take(170)),
+                "Earlier settings keep their places and values.");
         }
     }
 }

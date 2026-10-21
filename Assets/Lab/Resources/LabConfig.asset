@@ -65,6 +65,7 @@ MonoBehaviour:
   orbMaxReleaseSpeed: 3
   orbRadius: 0.32
   boardHeight: 5
+  boardOrbTrailEnabled: 1
   combineSpeed: 0
   dropCombineEnabled: 1
   contactCombineEnabled: 1
