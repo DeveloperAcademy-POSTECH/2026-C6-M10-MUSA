@@ -168,6 +168,15 @@ namespace C6Lab.Tests
             Assert.That(alert.Active, Is.False, "Gone by the flash.");
             Assert.That(alert.ShowingEyes, Is.False);
 
+            alert.ShowWord(gourd, "셋!", 1f);
+            Text word = alert.Bubble.Find("Gourd Alert Mark").GetComponent<Text>();
+            Assert.That(alert.ShowingWord, Is.True);
+            Assert.That(word.text, Is.EqualTo("셋!"));
+            Assert.That(word.GetComponent<Outline>().enabled, Is.False, "No offset outline doubling the ink strokes (#271).");
+            alert.ShowWord(gourd, "넷!", 1f);
+            Assert.That(word.text, Is.EqualTo("넷!"), "The same bubble just changes its word.");
+            alert.Show(gourd);
+            Assert.That(word.GetComponent<Outline>().enabled, Is.True, "The bomb's red \"!\" keeps its outline.");
             alert.ShowEyes(gourd, 2f);
             alert.Show(gourd);
             Assert.That(alert.ShowingEyes, Is.False, "A bomb's \"!\" replaces the eyes.");

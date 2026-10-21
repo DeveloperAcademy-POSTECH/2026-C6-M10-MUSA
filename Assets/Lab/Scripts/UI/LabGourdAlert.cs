@@ -76,6 +76,7 @@ namespace C6Lab
         private bool showingEyes;
         private float eyeGlow;
         private bool showingWord;
+        private Outline markOutline;
         private float wordPopElapsed = -1f;
         private float elapsed = -1f;
         private float duration;
@@ -151,6 +152,7 @@ namespace C6Lab
             mark.text = Text;
             mark.fontSize = Mathf.RoundToInt(bubbleSize * .5f);
             mark.color = MarkColor;
+            markOutline.enabled = true;
             Begin(gourd, showSeconds);
         }
 
@@ -171,6 +173,8 @@ namespace C6Lab
             float share = word.Length <= 1 ? .5f : word.Length <= 2 ? .34f : .26f;
             mark.fontSize = Mathf.RoundToInt(bubbleSize * share);
             mark.color = InkColor;
+            // 먹색 글자에 먹색 테두리를 어긋나게 두르면 획이 두 번 겹쳐 보인다. 말은 테두리 없이 쓴다.
+            markOutline.enabled = false;
             if (continuing)
             {
                 duration = elapsed + Mathf.Max(.3f, seconds);
@@ -364,9 +368,9 @@ namespace C6Lab
             mark.verticalOverflow = VerticalWrapMode.Overflow;
             mark.color = MarkColor;
             mark.raycastTarget = false;
-            var outline = markRect.gameObject.AddComponent<Outline>();
-            outline.effectColor = InkColor;
-            outline.effectDistance = new Vector2(2.5f, -2.5f);
+            markOutline = markRect.gameObject.AddComponent<Outline>();
+            markOutline.effectColor = InkColor;
+            markOutline.effectDistance = new Vector2(2.5f, -2.5f);
 
             RectTransform blockRect = NewRect("Gourd Alert Block Mark", bubble);
             blockRect.anchorMin = blockRect.anchorMax = center;
