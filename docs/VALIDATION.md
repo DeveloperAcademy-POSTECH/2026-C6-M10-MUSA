@@ -1794,6 +1794,22 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 
 재개 최종 Mac의 `gameplay-preservation.json`에서 사용자4파일·원본Config·패키지·런타임 코드 변경0, 임시 helper 제거, 두 앱 오류0을 확인했고 검증 프로세스는 종료했다. 북2개 지정 시험이므로 AUTO 기본 배분 실앱 검증으로 쓰지 않는다. 요괴 코드는 원본대로 포함했으나 외형별도 수동 평가/다기기 시각 동시성은 미실행이다.
 
+## 조합판 결합 구슬 꼬리 — 2026-10-21, 이슈 #254
+
+처음에는 main `05e2dab6`(#248, 프로토콜 5650·170개)에서 분기해 171번째/5651로 만들었으나, 그 사이 main에 #244(PR #249)와 #246 정리(PR #252, 안 쓰는 설정 제거로 165개·프로토콜 5651)가 머지되어 main 통합 시 **166번째(인덱스 165)·설정 166개·프로토콜 5652**로 다시 맞췄다. Unity 테스트 실행은 하지 않았다(Jess가 에디터에서 화면을 확인함).
+
+- **DEV**: `Flat orb board` 묶음에 `Board Orb Trail (0 off, 1 on)`을 166번째(인덱스 165)로 추가했다. 기본 ON이며 `LabConfig.asset`에도 `boardOrbTrailEnabled: 1`로 저장했다.
+- **표시**: 새 `LabOrbBoardTrail`이 결합(오행) 구슬마다 기존 `LabElementFlightTrail`을 붙인다. 그림은 `LabOrbAppearance.ElementTrailFor`의 던진 구슬 꼬리와 같고, `LabElementTrailProfile.CreateScaled`로 만든 복사본에서 너비·도장 크기·간격·길이를 (Orb Radius / Throw Radius) × `size`(0.6)로 줄인다. 진하기는 화면 위 위치 변화로 잰 속도(초당 반지름 1.5개 → 0, 10개 → 최대 `strength` 0.55, smoothstep)로 `LabElementFlightTrail.Intensity`에 넣는다. 던진 구슬은 `Intensity` 1 그대로다.
+- **연결**: `LabOrbBoard.LateUpdate`가 매 프레임 DEV 값을 보고 결합 구슬에 붙이거나(오행이 바뀌면 다시 그림) 지운다. 음양·아이템·북은 제외. 물리·판정·통신은 바꾸지 않는다.
+
+| 항목 | 상태 | 실행 결과/남은 확인 |
+| --- | --- | --- |
+| C# 문법 검사 | PASS (문법만) | 변경 파일을 Mono `mcs --parse`로 검사했다. `LabOrbBoard`/`LabElementFlightTrail`은 main 원본과 같은 mcs 한계 오류만 남는다(switch 식 등). |
+| 에디터 화면 확인 | 확인 (Jess) | 결합 구슬을 밀었을 때 꼬리가 얕게 보이는 것을 에디터에서 봤다(main 통합 전 171번째 판). |
+| EditMode·PlayMode 실제 실행 | NOT_RUN | `LabDeveloperConfigTests.BoardOrbTrailIsAnOnToggleInTheFlatOrbBoardGroup`, 개수/프로토콜 고정 검사 166/5652, 새 `LabOrbBoardTrailTests` 3개, 기존 전체. |
+| 3인 실행: 넘겨받은 결합 구슬에도 꼬리, DEV OFF 공유 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
+| iOS 실기기: 성능(구슬 많을 때)·가독성 | NOT_RUN | 결합 구슬이 많을 때 프레임을 확인해야 한다. |
+
 ## 박 폭탄 때 요괴가 톡 튀어나오기 — 2026-10-21, 이슈 #250
 
 기준은 `feat/#244-combo-yokai`(`5d2f2384`)에서 분기한 `feat/#250-bomb-yokai`다. Unity는 실행하지 않았다.
@@ -1837,3 +1853,27 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 마지막 전체 검사 전후 Runtime·Config·테스트·패키지 해시를 대조했다. 원시 XML·로그·검증 앱·임시 helper는 저장소에 포함하지 않는다. 예전 #250 단독 NOT_RUN 자료는 이 통합 결과와 구분해 보존했다.
 
 최종 Mac 검사의 `gameplay-preservation.json`에서 사용자4파일·원본Config·패키지·런타임과 최종 소스/메타521파일의 해시 일치, 임시 helper 제거, 양쪽 실행 오류0을 확인했다. 검증 프로세스는 종료했다. Mac loopback 독립 앱2개이며 DEV 북 수2개 지정으로 기존 양방향 생성/전달을 검사했다. 이번 결과를 AUTO 기본 북 배분·다기기 동시 수신·실제LAN/핫스팟·모바일 성능 검증으로 확대하지 않는다.
+
+## PR #255·#256 통합 검증 — 2026-10-21 KST
+
+기준은 main `166d1ab3`에 한지 PR #255(#243)와 조합판 잔상 PR #256(#254)을 함께 반영한 소스 `cff0cf9`다. Unity6000.6.5f1·macOS ARM64에서 별도 작업 폴더로 검사했다. 설정166개·프로토콜5652·연결 토큰 `C6PhysicsLab/15`를 사용하며 구버전 앱과 혼용하지 않는다. 기존 main의 요괴 코드·검사12개와 Scene은 바이트 단위로 유지한다.
+
+### 검토 중 보완한 내용
+
+- **#255**: 한지 PNG → `WhiteGourd.mat._PaperTex` → 기존 셸 Material 연결을 확인했다. 추가 Scene 컴포넌트 `LabPaperStage`와 참조 `paperShader` 원본은 저장소에서 찾지 못했다. 이 컴포넌트와 의미 없는 Scene 공백 변경을 제외하여 Missing Script를 방지했다. `LabPaperShadow.shader`는 보존하되 **박 움직임에 따른 그림자는 미연결**로 남기며 #243 전체 완료로 처리하지 않는다. 원본 없는 동작을 새로 설계하지 않았다.
+- **#256**: 숨긴 요청 대기 구슬을 다음 보드 프레임에서 다시 잔상 발행하던 경로와, 축소 구슬에도 원래 폭·길이를 사용하던 경로를 회귀 검사로 재현했다. 숨김/비활성 상태를 제외하고 실제 Collider 반지름으로 크기를 계산한다. ID·Rigidbody·입력·소비·물리·명중 규칙은 유지한다.
+- DEV 토글 목록 기대값에 새 `Board Orb Trail`이 누락돼 실패한 기존 검사1개를 보완했다. 항목과 OFF/ON 계약을 추가했으며 검사나 기존 기대값은 삭제하지 않았다.
+- 저장 Scene의 Missing Script·실제 Material/Texture GUID·Import·Shader 연결 검사1개, 실제 보드 pending 숨김/복원과 축소/복원 검사2개를 추가했다. PR 원래 잔상 검사3개와 기존 전체 검사를 함께 실행했다.
+
+| 확인 | 결과 | 실제 근거·범위 |
+| --- | --- | --- |
+| 원래 잔상 구현 + 새 회귀 | **3/5 통과·2실패 재현** | `repro.xml`. pending의 On이 true로 재시작, 축소 폭0.34909 기대에0.69818 관측 |
+| 첫 통합 EditMode | **795/796 통과·1실패** | `edit.xml`. 새 DEV 토글이 기존 표시 목록 기대값에 없던 검사 |
+| 보완 후 전체 EditMode | **PASS796/796** | `final-edit.xml`, 실패·생략0, 25.067초. UTC 2026-10-21 02:46:02Z~2026-10-21 02:46:27Z |
+| 보완 후 전체 PlayMode | **PASS266/266** | `final-play.xml`, 실패·생략0, 108.872초. UTC 2026-10-21 02:46:31Z~2026-10-21 02:48:20Z. 한지 실제 연결·기존 GPU/P무늬/관람·요괴12개·보드 잔상5개 포함 |
+| 실제 Mac2앱 | **PASS35/35** | `network-regression/direct-two-player/n2/summary.json`:166/5652/token15, 공유DEV ON/OFF재시작, 실제 Raw제외·직접 조합·동일ID전달·수신자 오행 잔상·실이동 진하기 증가, 정지 중 위치/진하기0/경로증가없음·재개, 실제 명중·HP/색/P맵·인벤토리·pending·기존 북 전달 확인 |
+| iOS·실제LAN/핫스팟·3~5인·가독성/모바일 성능 | **NOT_RUN** | 같은 Mac 결과로 확대하지 않음. 한지의 추가 텍스처 샘플링과 구슬 다수 잔상 비용은 기기별 미확인 |
+
+원본 Desktop 프로젝트의 사용자 Scene·Target2 Material2개·기존 미추적meta는 수정하거나 커밋하지 않는다. 별도 검증 폴더에서 Unity가 Target2 Material2개의 `_Color`를 약3e-8 범위로 재직렬화한 것은 private 사본에 보존하고 PR에서 제외한다. Runtime·Config·검사·패키지의 해시와 별도 사용자4파일 해시를 대조한다. 원시XML·로그·앱·임시 helper·개인 경로는 공개 저장소에 넣지 않는다.
+
+최종 Mac `final-preservation.json`: 검증 소스887개·원본 Desktop 사용자4파일 변경0, 임시 helper 제거, 검증 프로세스 종료, managed/runtime/shader 오류0을 확인했다. Mac loopback의 실제2앱 시험이며 DEV 북2개·자연 폭탄/콤보/건조OFF 등 통제된 fixture를 사용했다. AUTO 기본 북 배분·실기기LAN/핫스팟·3~5인·외형 만족도·모바일 성능을 검증한 것은 아니다. 소스 해시에는 검증 폴더의 Unity Material 재직렬화2건을 별도로 기록했으며 최종 PR에서는 제외한다.

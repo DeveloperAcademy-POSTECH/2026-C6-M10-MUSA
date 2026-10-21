@@ -550,11 +550,37 @@ namespace C6Lab
 
         private void LateUpdate()
         {
+            SyncBoardTrails();
             if (blockedSide == 0) return;
             blockSecondsLeft -= Time.deltaTime;
             if (blockSecondsLeft <= 0f) LiftSwipeBlock();
             // Follows the board if its area was resized.
             else ShowSwipeBlock();
+        }
+
+        /// <summary>
+        /// 결합(오행) 구슬의 얕은 꼬리 (#254). DEV `Board Orb Trail`이 켜져 있으면 결합 구슬마다 꼬리를 붙이고,
+        /// 던진 공 대비 실제 판 구슬 반지름(축소 상태 포함)으로 줄인다. 숨긴 요청 대기 구슬에는 남기지 않는다.
+        /// </summary>
+        private void SyncBoardTrails()
+        {
+            if (!configured || config == null) return;
+            bool on = config.BoardOrbTrailEnabled;
+            foreach (var entry in entries.Values)
+            {
+                LabOrbView view = entry.View;
+                if (view == null) continue;
+                var trail = view.GetComponent<LabOrbBoardTrail>();
+                bool wanted = on && !entry.HiddenForPending && view.gameObject.activeInHierarchy
+                    && view.Kind == LabOrbKind.Combined && view.Element != LabOrbElement.None;
+                if (trail == null)
+                {
+                    if (!wanted) continue;
+                    trail = view.gameObject.AddComponent<LabOrbBoardTrail>();
+                }
+                float radius = view.HitSphere != null ? view.HitSphere.radius : config.OrbRadius;
+                trail.Sync(view, config.OrbAppearance, wanted, radius / Mathf.Max(.001f, config.ThrowRadius));
+            }
         }
 
         /// <summary>The fewest seconds left on a burning bomb fuse on this screen; negative when none burns.</summary>

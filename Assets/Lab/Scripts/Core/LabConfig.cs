@@ -251,7 +251,8 @@ namespace C6Lab
             LabDeveloperField.Toggle("Combo Penalty Target (0 team, 1 thrower)", "TEAM", "THROWER"),
             new LabDeveloperField("Combo Reward Duration (seconds)", 0f, 600f),
             new LabDeveloperField("Combo Reward Size (x)", 1f, 3f),
-            new LabDeveloperField("Combo Warning (seconds)", 0f, 10f)
+            new LabDeveloperField("Combo Warning (seconds)", 0f, 10f),
+            LabDeveloperField.Toggle("Board Orb Trail (0 off, 1 on)")
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -269,7 +270,7 @@ namespace C6Lab
             new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44),
             new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 141, 142, 143, 144, 145, 146, 147),
             new LabDeveloperCategory("Orb lifetime", 10),
-            new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16),
+            new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16, 165),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
             new LabDeveloperCategory("Spawn presentation", 17, 18, 60, 61, 62),
             new LabDeveloperCategory("Camera and throw origin", 19, 20, 21, 22, 23, 56),
@@ -375,6 +376,8 @@ namespace C6Lab
         [SerializeField, Min(.001f)] private float orbMaxReleaseSpeed = 3f;
         [SerializeField, Min(.001f)] private float orbRadius = .32f;
         [SerializeField, Min(.1f)] private float boardHeight = 5f;
+        [Tooltip("조합판의 결합(오행) 구슬이 움직일 때 던진 구슬처럼 오행 꼬리를 얕게 남긴다 (#254). 크기/진하기는 LabOrbBoardTrail Inspector.")]
+        [SerializeField] private bool boardOrbTrailEnabled = true;
 
         [Header("Orb combine")]
         [Tooltip("두 구슬이 서로 다가간 속도 (보드 너비/초)가 이 값 이상이면 결합. 0 = 스쳐도 결합")]
@@ -661,6 +664,7 @@ namespace C6Lab
         public float ComboRewardDurationSeconds => Mathf.Clamp(Finite(comboRewardDurationSeconds, 10f), 0f, 600f);
         public float ComboRewardSizeScale => Mathf.Clamp(Finite(comboRewardSizeScale, 2.5f), 1f, 3f);
         public float ComboWarningSeconds => Mathf.Clamp(Finite(comboWarningSeconds, 3f), 0f, 10f);
+        public bool BoardOrbTrailEnabled => boardOrbTrailEnabled;
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
         public float OrbStopSpeed => Mathf.Clamp(Finite(orbStopSpeed, .065f), 0f, OrbMaxReleaseSpeed);
@@ -910,7 +914,8 @@ namespace C6Lab
                 GourdColorComboEnabled ? 1f : 0f, ComboFirstStartSeconds, ComboRepeatIntervalSeconds,
                 ComboTimeLimitSeconds, ComboPenaltyDurationSeconds, ComboPenaltySizeScale,
                 ComboPenaltyThrowerOnly ? 1f : 0f, ComboRewardDurationSeconds, ComboRewardSizeScale,
-                ComboWarningSeconds
+                ComboWarningSeconds,
+                BoardOrbTrailEnabled ? 1f : 0f
             };
         }
 
@@ -1113,6 +1118,7 @@ namespace C6Lab
             comboRewardDurationSeconds = values[162];
             comboRewardSizeScale = values[163];
             comboWarningSeconds = values[164];
+            boardOrbTrailEnabled = values[165] >= .5f;
             error = string.Empty;
             return true;
         }
