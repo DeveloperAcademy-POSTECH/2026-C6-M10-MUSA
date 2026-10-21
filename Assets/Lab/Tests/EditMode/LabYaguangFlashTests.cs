@@ -21,7 +21,7 @@ namespace C6Lab.Tests
         [Test]
         public void FlashFieldsAreKoreanStartOffAndShareTheYaguangGroupWithTheCombo()
         {
-            LabDeveloperField[] flash = LabConfig.DeveloperFields.Skip(178).Take(7).ToArray();
+            LabDeveloperField[] flash = LabConfig.DeveloperFields.Skip(184).Take(7).ToArray();
             Assert.That(flash.Select(field => field.Label), Is.EqualTo(new[]
             {
                 "야광귀 섬광 (0 off, 1 on)", "섬광 대상 (0 모두, 1 한 명)", "섬광 첫 시작 (초)", "섬광 간격 (초)",
@@ -40,9 +40,9 @@ namespace C6Lab.Tests
                 "The combo moved into the 야광귀 group.");
             LabDeveloperCategory yaguang = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀");
             Assert.That(yaguang.FieldIndices, Is.EqualTo(new[]
-                { 155, 185, 156, 164, 157, 158, 159, 160, 161, 162, 163, 178, 179, 180, 181, 182, 183, 184 }),
+                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190 }),
                 "The yaguang counting toggle (#271) sits right under the combo switch.");
-            Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 178 }), "One switch turns the combo and the flash on together.");
+            Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 184 }), "One switch turns the combo and the flash on together.");
             Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 11 }));
             Assert.That(yaguang.DividerLabels, Is.EqualTo(new[] { "── 콤보 ──", "── 섬광 ──" }));
             foreach (int index in new[] { 159, 162 })
@@ -55,22 +55,22 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(178).Take(7), Is.EqualTo(new[] { 0f, 0f, 10f, 60f, 3f, 7f, 2f }),
+                Assert.That(source.CaptureDeveloperValues().Skip(184).Take(7), Is.EqualTo(new[] { 0f, 0f, 10f, 60f, 3f, 7f, 2f }),
                     "Off by default; once on, everyone flashes at 10 s (so the round does not open empty, #271) and every 60 s, "
                     + "with a 3 s warning (yellow eyes for most of it), 7 s of glare and 2 s to recover.");
 
             float[] values = config.CaptureDeveloperValues();
-            values[178] = 1f; values[179] = 1f; values[180] = 5f; values[181] = 24f;
-            values[182] = 0f; values[183] = 2f; values[184] = 0f;
+            values[184] = 1f; values[185] = 1f; values[186] = 5f; values[187] = 24f;
+            values[188] = 0f; values[189] = 2f; values[190] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(new[] { config.YaguangFlashEnabled, config.YaguangFlashTargetOne }, Is.All.True);
             Assert.That(new[] { config.YaguangFlashFirstStartSeconds, config.YaguangFlashIntervalSeconds,
                 config.YaguangFlashWarningSeconds, config.YaguangFlashGlareSeconds, config.YaguangFlashRecoverySeconds },
                 Is.EqualTo(new[] { 5f, 24f, 0f, 2f, 0f }));
-            values[183] = 0f;
+            values[189] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "A glare lasts at least 1 s.");
-            values[183] = 2f;
-            values[181] = 12f;
+            values[189] = 2f;
+            values[187] = 12f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Flashes come at least 20 s apart.");
         }
 
@@ -223,7 +223,7 @@ namespace C6Lab.Tests
             created.Add(config);
             float[] values = config.CaptureDeveloperValues();
             values[155] = 1f; // 야광귀 on: combo and flash with the default gourd bombs and swipe blocks
-            values[178] = 1f;
+            values[184] = 1f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var model = new LabModel();
             model.Begin(id, Three, 0d, config);
@@ -438,13 +438,13 @@ namespace C6Lab.Tests
             values[157] = 60f;
             values[158] = 10f;
             values[164] = 3f;
-            values[178] = flash ? 1f : 0f;
-            values[179] = one ? 1f : 0f;
-            values[180] = 10f; // DEV slider 1–19; the rule tests below set other times directly
-            values[181] = interval;
-            values[182] = warning;
-            values[183] = glare;
-            values[184] = recovery;
+            values[184] = flash ? 1f : 0f;
+            values[185] = one ? 1f : 0f;
+            values[186] = 10f; // DEV slider 1–19; the rule tests below set other times directly
+            values[187] = interval;
+            values[188] = warning;
+            values[189] = glare;
+            values[190] = recovery;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             JsonUtility.FromJsonOverwrite("{\"yaguangFlashFirstStartSeconds\":"
                 + first.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}", config);

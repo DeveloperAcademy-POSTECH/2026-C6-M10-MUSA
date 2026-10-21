@@ -119,6 +119,24 @@ MonoBehaviour:
   swipeBlockInterval: 40
   swipeBlockSeconds: 10
   swipeBlockBombGap: 4
+  sabotageMixEnabled: 0
+  sabotageIntervalMin: 20
+  sabotageIntervalMax: 30
+  sabotageWeightGourdBomb: 1
+  sabotageWeightSwipeBlock: 1
+  sabotageWeightFoxFire: 1
+  sabotageWeightCharm: 1
+  foxFireCountMin: 2
+  foxFireCountMax: 5
+  foxFireSafeSeconds: 1
+  charmSeconds: 10
+  charmRescueTaps: 3
+  jigwiFireTargetCount: 1
+  jigwiFireSeconds: 15
+  jigwiOverheatSeconds: 4
+  jigwiGenerationBurnSeconds: 10
+  jigwiRawRadiusScale: 0.65
+  jigwiRawLifeScale: 0.5
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9
