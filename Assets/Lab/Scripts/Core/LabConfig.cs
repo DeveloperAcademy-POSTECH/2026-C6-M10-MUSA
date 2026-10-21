@@ -267,13 +267,14 @@ namespace C6Lab
             new LabDeveloperField("Charm Seconds", 1f, 30f),
             new LabDeveloperField("Charm Rescue Taps (0 = none)", 0f, 10f, true),
             // The yaguang-gwi's flash (#268): its own schedule, separate from the sabotage mix.
-            LabDeveloperField.Toggle("Yaguang Flash (0 off, 1 on)"),
-            LabDeveloperField.Toggle("Yaguang Flash Target (0 all, 1 one)", "ALL", "ONE"),
-            new LabDeveloperField("Yaguang Flash First Start (seconds)", 1f, 3600f),
-            new LabDeveloperField("Yaguang Flash Interval (seconds)", 1f, 3600f),
-            new LabDeveloperField("Yaguang Flash Warning (seconds)", 0f, 10f),
-            new LabDeveloperField("Yaguang Flash Glare (seconds)", .1f, 30f),
-            new LabDeveloperField("Yaguang Flash Recovery (seconds)", 0f, 10f)
+            // Shown in Korean in the 야광귀 DEV group together with the combo.
+            LabDeveloperField.Toggle("야광귀 섬광 (0 off, 1 on)", "끔", "켬"),
+            LabDeveloperField.Toggle("섬광 대상 (0 모두, 1 한 명)", "모두", "한 명"),
+            new LabDeveloperField("섬광 첫 시작 (초)", 1f, 3600f),
+            new LabDeveloperField("섬광 간격 (초)", 1f, 3600f),
+            new LabDeveloperField("섬광 예고 (초)", 0f, 10f),
+            new LabDeveloperField("섬광 눈부심 (초)", .1f, 30f),
+            new LabDeveloperField("섬광 회복 (초)", 0f, 10f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -305,9 +306,10 @@ namespace C6Lab
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
                 134, 132, 133, 148, 149, 150, 151),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
-            new LabDeveloperCategory("Combo", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163),
             new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
-            new LabDeveloperCategory("Yaguang flash", 178, 179, 180, 181, 182, 183, 184)
+            // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광을 함께 켜고 끈다.
+            new LabDeveloperCategory("야광귀", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163,
+                178, 179, 180, 181, 182, 183, 184)
         });
 
 
