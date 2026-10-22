@@ -12,6 +12,8 @@ namespace Hapio
     public sealed class GameScreen : MonoBehaviour
     {
         public GameScreenKind kind;
+        [Tooltip("The saved Figma view owns Home/Lobby navigation; this component keeps the scoped DEV panel.")]
+        public bool externalNavigation;
         public UnityEngine.UI.Text title, status, details, playerCount, developerFeedback;
         public UnityEngine.UI.Button hostButton, searchButton, cancelButton, joinDirectButton, soloButton;
         public UnityEngine.UI.Button fewerPlayersButton, morePlayersButton, startButton, homeButton, nextButton;
@@ -31,19 +33,23 @@ namespace Hapio
         private string[] roomKeys = Array.Empty<string>();
         private bool syncingDeveloper;
         private string localError;
+        private bool UsesExternalNavigation => externalNavigation && (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby);
 
         private void Awake()
         {
             session = GameSession.EnsureExists();
-            Click(hostButton, () => { if (ApplyPort()) session.Host(); });
-            Click(searchButton, () => { if (ApplyPort()) session.Network.StartRoomSearch(); });
-            Click(cancelButton, () => { session.Network.CancelJoin(); session.Network.CancelRoomSearch(); });
-            Click(joinDirectButton, () => { if (ApplyPort()) session.JoinDirect(addressInput.text); });
-            Click(soloButton, () => session.StartSolo());
-            Click(fewerPlayersButton, () => ChangePlayers(-1));
-            Click(morePlayersButton, () => ChangePlayers(1));
-            Click(startButton, () => session.StartGame());
-            Click(homeButton, () => session.GoHome());
+            if (!UsesExternalNavigation)
+            {
+                Click(hostButton, () => { if (ApplyPort()) session.Host(); });
+                Click(searchButton, () => { if (ApplyPort()) session.Network.StartRoomSearch(); });
+                Click(cancelButton, () => { session.Network.CancelJoin(); session.Network.CancelRoomSearch(); });
+                Click(joinDirectButton, () => { if (ApplyPort()) session.JoinDirect(addressInput.text); });
+                Click(soloButton, () => session.StartSolo());
+                Click(fewerPlayersButton, () => ChangePlayers(-1));
+                Click(morePlayersButton, () => ChangePlayers(1));
+                Click(startButton, () => session.StartGame());
+                Click(homeButton, () => session.GoHome());
+            }
             Click(nextButton, () => session.NextStage());
             Click(viewerButton, () => session.OpenGourdViewer());
             Click(closeViewerButton, () => session.CloseGourdViewer());
@@ -56,7 +62,7 @@ namespace Hapio
             }
             Click(closeDeveloperButton, () => Show(developerPanel, false));
             Click(applyDeveloperButton, ApplyDeveloper);
-            if (roomButtons != null)
+            if (!UsesExternalNavigation && roomButtons != null)
             {
                 roomKeys = new string[roomButtons.Length];
                 for (int i = 0; i < roomButtons.Length; i++)
@@ -65,7 +71,7 @@ namespace Hapio
                     Click(roomButtons[i], () => { if (roomKeys[index] != null) session.JoinRoom(roomKeys[index]); });
                 }
             }
-            if (slotButtons != null)
+            if (!UsesExternalNavigation && slotButtons != null)
                 for (int i = 0; i < slotButtons.Length; i++)
                 {
                     int slot = i + 1;
@@ -89,8 +95,8 @@ namespace Hapio
             LabNetwork net = session.Network;
             switch (kind)
             {
-                case GameScreenKind.Home: RefreshHome(net); break;
-                case GameScreenKind.Lobby: RefreshLobby(net); break;
+                case GameScreenKind.Home: if (!UsesExternalNavigation) RefreshHome(net); break;
+                case GameScreenKind.Lobby: if (!UsesExternalNavigation) RefreshLobby(net); break;
                 case GameScreenKind.StageResult: RefreshResult(net); break;
                 case GameScreenKind.GameOver:
                     Text(title, "GAME OVER");
@@ -211,7 +217,7 @@ namespace Hapio
             return false;
         }
 
-        private void OpenDeveloper()
+        public void OpenDeveloper()
         {
             SelectDeveloperScope(0);
             Text(developerFeedback, "공통 설정과 요괴별 설정은 각각 APPLY로 적용합니다. 저장된 LabConfig는 유지됩니다.");

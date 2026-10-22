@@ -5,6 +5,7 @@ namespace C6Lab.Tests
     public sealed class LabRoomNamesTests
     {
         [TestCase("C6Lab-Room",1)] [TestCase("C6Lab-Room (2)",2)] [TestCase("C6Lab-Room (10)",10)]
+        [TestCase("Hapio-Room",1)] [TestCase("Hapio-Room (2)",2)] [TestCase("Hapio-Room (10)",10)]
         public void ConfirmedBonjourNamesHaveTheSameNumberOnEveryScreen(string name,int number)
         {
             Assert.That(LabRoomNames.TryNumber(name,out int actual),Is.True);
@@ -12,6 +13,8 @@ namespace C6Lab.Tests
         }
         [TestCase("C6Lab-Room (0)")] [TestCase("C6Lab-Room (-2)")] [TestCase("C6Lab-Room (1)")]
         [TestCase("C6Lab-Room (2) trailing")] [TestCase("C6Lab-Room (999999999999999999999)")]
+        [TestCase("Hapio-Room (0)")] [TestCase("Hapio-Room (-2)")] [TestCase("Hapio-Room (1)")]
+        [TestCase("Hapio-Room (2) trailing")]
         public void InvalidSuffixCannotAliasAnotherRoomsNumber(string name)
         {Assert.That(LabRoomNames.TryNumber(name,out _),Is.False);}
         [Test]

@@ -7,9 +7,15 @@ namespace C6Lab
     public static class LabRoomNames
     {
         public const string ServiceBase = "C6Lab-Room";
+        public const string GameServiceBase = "Hapio-Room";
 
-        public static bool TryNumber(string name, out int number, string serviceBase = ServiceBase)
+        public static string ServiceBaseFor(LabRoomFamily family) => family == LabRoomFamily.Lab ? ServiceBase
+            : family == LabRoomFamily.Game ? GameServiceBase : throw new ArgumentOutOfRangeException(nameof(family));
+
+        public static bool TryNumber(string name, out int number, string serviceBase = null)
         {
+            if (serviceBase == null)
+                return TryNumber(name, out number, ServiceBase) || TryNumber(name, out number, GameServiceBase);
             number = 0;
             if (name == serviceBase) { number = 1; return true; }
             string prefix = serviceBase + " (";
@@ -30,6 +36,7 @@ namespace C6Lab
             if (string.IsNullOrWhiteSpace(name)) return "방 이름 확인 중";
             // Preserve compatibility with already-running versions on the same LAN.
             if (name.StartsWith("C6Lab-", StringComparison.Ordinal)) return "수장고-" + name.Substring(6);
+            if (name.StartsWith("Hapio-", StringComparison.Ordinal)) return "수장고-" + name.Substring(6);
             return name;
         }
     }

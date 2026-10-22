@@ -25,6 +25,8 @@ namespace Hapio
         private readonly GameFlowReplica replica = new GameFlowReplica();
         private readonly Queue<Control> controls = new Queue<Control>();
         private readonly HashSet<ulong> resultReady = new HashSet<ulong>();
+        private readonly GamePendingRoomRegistry pendingRooms = new GamePendingRoomRegistry();
+        private bool roomBrowserVisible;
         private GameFlowState state = new GameFlowState();
         private Coroutine sceneRoutine;
         private string wantedScene;
@@ -57,6 +59,8 @@ namespace Hapio
         public Texture PreviewTexture => preview != null && !preview.IsDisposed ? preview.Texture : null;
         public bool IsViewerOpen { get; private set; }
         public string UiNotice { get; private set; } = string.Empty;
+        public bool RoomBrowserVisible => roomBrowserVisible;
+        public IReadOnlyList<GamePendingRoomInfo> PendingRooms => pendingRooms.Rooms;
         public bool IsLoadingScene => sceneRoutine != null || state.phase == GameFlowPhase.LoadingBattle;
         public bool PendingSettingsApply => network != null && network.IsConnected && !network.SessionConfigReady;
         public bool CanAdvanceStage => network != null && network.IsHost && !IsLoadingScene && AllResultsReady;
@@ -119,6 +123,8 @@ namespace Hapio
         private void Update()
         {
             if (Instance != this || network == null) return;
+            pendingRooms.Tick(out string pendingError);
+            if (!string.IsNullOrEmpty(pendingError)) { UiNotice = pendingError; Changed?.Invoke(); }
             while (controls.Count > 0) ApplyControl(controls.Dequeue());
             if (restartPending)
             {
@@ -415,25 +421,58 @@ namespace Hapio
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode _)
         {
-            if (scene.path == GameScenePaths.Home && !network.IsConnected && network.CanChooseConnection)
+            if (scene.path == GameScenePaths.Home && roomBrowserVisible
+                && !network.IsConnected && network.CanChooseConnection)
                 network.StartRoomSearch();
+        }
+
+        public void EnterRoomBrowser()
+        {
+            if (state.phase != GameFlowPhase.Home) return;
+            roomBrowserVisible = true;
+            if (network.CanChooseConnection && !network.IsSearchingRooms) network.StartRoomSearch();
+            Changed?.Invoke();
+        }
+
+        public bool CreatePendingRoom(int capacity)
+        {
+            if (state.phase != GameFlowPhase.Home || !network.CanChooseConnection) return false;
+            roomBrowserVisible = true;
+            bool created = pendingRooms.TryCreate(capacity, out string error);
+            UiNotice = error;
+            Changed?.Invoke();
+            return created;
+        }
+
+        public bool EnterPendingRoom(string key)
+        {
+            if (state.phase != GameFlowPhase.Home || !network.CanChooseConnection || !pendingRooms.CanEnter(key)) return false;
+            ResetRoomFlow();
+            bool entered = pendingRooms.TryEnter(key, network, out string error);
+            roomBrowserVisible = true;
+            UiNotice = error;
+            Changed?.Invoke();
+            return entered;
         }
 
         public void Host()
         {
             if (!network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
+            roomBrowserVisible = true;
             ResetRoomFlow(); network.Host();
         }
 
         public void JoinRoom(string roomKey)
         {
             if (!network.CanJoinDiscoveredRoom(roomKey) || state.phase != GameFlowPhase.Home) return;
+            roomBrowserVisible = true;
             ResetRoomFlow(); network.JoinDiscoveredRoom(roomKey);
         }
 
         public void JoinDirect(string address)
         {
             if (!network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
+            roomBrowserVisible = true;
             ResetRoomFlow(); network.Join(address);
         }
 
@@ -600,12 +639,19 @@ namespace Hapio
         {
             if (state.IsRunActive) { ExitRun(); return; }
             if (!CanReturnHome) return;
+            roomBrowserVisible = state.phase == GameFlowPhase.Lobby;
             goingHome = true;
             network.Stop();
             network.UnbindBattleReferences();
             ResetRoomFlow();
             SetLocalState(new GameFlowState());
             goingHome = false;
+        }
+
+        public void GoHomeToRoomBrowser()
+        {
+            if (state.phase == GameFlowPhase.Lobby) GoHome();
+            else if (state.phase == GameFlowPhase.Home) EnterRoomBrowser();
         }
 
         private void ResetRoomFlow()
@@ -633,6 +679,7 @@ namespace Hapio
                 network.GameFlowDeveloperConfigValidation = null;
             }
             stageSettings?.Dispose();
+            pendingRooms.Dispose();
             ReleaseResult(); Instance = null;
         }
     }

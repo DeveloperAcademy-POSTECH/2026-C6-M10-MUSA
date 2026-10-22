@@ -13,24 +13,30 @@ namespace C6Lab
         private bool registrationStarted;
         private int candidateNumber = 1, registrationAttempts;
         public int Capacity { get; private set; }
+        public LabRoomFamily Family { get; }
         public ushort Port { get; private set; }
         public string Name => advertisement?.RegisteredServiceName ?? string.Empty;
         public string Key => LabRoomCatalog.Key(Name, Port);
         public bool Ready => advertisement != null && advertisement.IsAdvertising && advertisement.AdvertisingConfirmed;
         public bool Failed => registrationStarted && (advertisement == null || !advertisement.IsAdvertising);
 
-        private LabPendingRoom() { }
+        private LabPendingRoom() { Family = LabRoomFamily.Lab; }
+        private LabPendingRoom(LabRoomFamily family) { Family = family; }
 
         public static bool TryCreate(int capacity, out LabPendingRoom room, out string error)
+            => TryCreate(capacity, LabRoomFamily.Lab, out room, out error);
+
+        public static bool TryCreate(int capacity, LabRoomFamily family, out LabPendingRoom room, out string error)
         {
             room = null; error = string.Empty;
             if (capacity < 2 || capacity > 5) { error = "함께할 인원을 골라주시오."; return false; }
+            if (!Enum.IsDefined(typeof(LabRoomFamily), family)) { error = "방 종류를 확인해주시오."; return false; }
             if (!LabBonjourDiscovery.IsSupported) { error = "이 기기에서는 방을 만들 수 없소."; return false; }
-            var pending = new LabPendingRoom { Capacity = capacity };
+            var pending = new LabPendingRoom(family) { Capacity = capacity };
             try
             {
                 pending.ReservePort();
-                pending.advertisement = new LabBonjourDiscovery();
+                pending.advertisement = new LabBonjourDiscovery(family);
                 room = pending;
                 return true;
             }
@@ -86,7 +92,7 @@ namespace C6Lab
             {
                 registrationStarted = true;
                 candidateNumber = Math.Max(candidateNumber, firstNumber);
-                string requestedName = LabRoomNames.ServiceBase + (candidateNumber == 1 ? string.Empty
+                string requestedName = LabRoomNames.ServiceBaseFor(Family) + (candidateNumber == 1 ? string.Empty
                     : " (" + candidateNumber.ToString(CultureInfo.InvariantCulture) + ")");
                 registrationAttempts++;
                 if (!advertisement.StartAdvertise(requestedName, Port, ipv4 != null, ipv6 != null, 1, Capacity, false, true, false)
@@ -107,7 +113,7 @@ namespace C6Lab
 
         public bool EnterAsCreator(LabNetwork network)
         {
-            if (!Ready || network == null || !network.CanChooseConnection) return false;
+            if (network == null || Family != network.RoomFamily || !Ready || !network.CanChooseConnection) return false;
             ReleasePort();
             if (!network.HostRegisteredRoom(advertisement, Port, Capacity)) { Dispose(); return false; }
             // Transfer the original registration, preserving its confirmed name and join key.
