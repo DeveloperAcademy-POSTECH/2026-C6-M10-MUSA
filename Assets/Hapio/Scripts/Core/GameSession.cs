@@ -64,6 +64,12 @@ namespace Hapio
         public bool IsLoadingScene => sceneRoutine != null || state.phase == GameFlowPhase.LoadingBattle;
         public bool PendingSettingsApply => network != null && network.IsConnected && !network.SessionConfigReady;
         public bool CanAdvanceStage => network != null && network.IsHost && !IsLoadingScene && AllResultsReady;
+        public bool CanDeveloperAdvanceStage => network != null && network.DeveloperBuildAvailable
+            && network.IsConnected && network.IsHost && !goingHome && !IsLoadingScene && !restartPending
+            && state.phase == GameFlowPhase.Playing && state.stageIndex >= 1
+            && state.stageIndex < GameRunFlow.StageCount && network.IsBattlePaused
+            && network.Snapshot != null && network.Snapshot.phase == LabPhase.Playing
+            && MatchesBattle(network.Snapshot);
         public bool CanReturnHome => state.phase == GameFlowPhase.GameOver
             || state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
             || (state.phase == GameFlowPhase.Completed && (!network.IsHost || AllResultsReady));
@@ -495,6 +501,18 @@ namespace Hapio
         {
             if (!CanAdvanceStage) return;
             if (hostFlow.NextStage(state.runId, state.stageIndex, state.revision)) PrepareStage();
+        }
+
+        /// <summary>
+        /// Skip a paused Host battle without claiming a clear. Uses accepted profiles only;
+        /// unsaved DEV form inputs are deliberately not applied by this action.
+        /// </summary>
+        public bool DeveloperNextStage()
+        {
+            if (!CanDeveloperAdvanceStage
+                || !hostFlow.DeveloperNextStage(state.runId, state.stageIndex, state.revision)) return false;
+            PrepareStage();
+            return true;
         }
 
         private void PrepareStage()

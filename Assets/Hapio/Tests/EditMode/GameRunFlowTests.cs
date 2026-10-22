@@ -104,6 +104,90 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void DeveloperNextLoadsOneStageWithoutVictoryAndRequiresFreshParticipantAcks()
+        {
+            var flow = Run(0, 42);
+            var firstLoad = flow.State;
+            var first = Play(flow, "first", 11);
+            Assert.That(flow.NextStage(first.runId, 1, first.revision), Is.False,
+                "The ordinary result-only action must remain unavailable during battle.");
+            Assert.That(flow.DeveloperNextStage(first.runId, 1, first.revision), Is.True);
+            var loading = flow.State;
+            Assert.That(loading.runId, Is.EqualTo(first.runId));
+            Assert.That(loading.stageIndex, Is.EqualTo(2));
+            Assert.That(loading.phase, Is.EqualTo(GameFlowPhase.LoadingBattle));
+            Assert.That(loading.revision, Is.GreaterThan(first.revision));
+            Assert.That(loading.battleSessionId, Is.Empty);
+            Assert.That(loading.battleRound, Is.Zero);
+            Assert.That(flow.ParticipantIds, Is.EquivalentTo(new ulong[] { 0, 42 }));
+            Assert.That(flow.ReadyCount, Is.Zero);
+            Assert.That(GameFlowSnapshot.TryAccept(first, loading, false, out _), Is.True);
+            Assert.That(flow.DeveloperNextStage(first.runId, 1, first.revision), Is.False);
+            Assert.That(flow.MarkBattleReady(42, firstLoad.runId, 1, firstLoad.revision), Is.False);
+            Assert.That(flow.MarkVictory(first.battleSessionId, first.battleRound), Is.False);
+            Assert.That(flow.MarkBattleReady(0, loading.runId, 2, loading.revision), Is.True);
+            Assert.That(flow.MarkPlaying(loading.runId, 2, loading.revision, "second", 12), Is.False);
+            Assert.That(flow.MarkBattleReady(42, loading.runId, 2, loading.revision), Is.True);
+            Assert.That(flow.MarkPlaying(loading.runId, 2, loading.revision, "second", 12), Is.True);
+            var second = flow.State;
+            Assert.That(flow.DeveloperNextStage(second.runId, 2, second.revision), Is.True);
+            var third = Play(flow, "third", 13);
+            Assert.That(flow.DeveloperNextStage(third.runId, 3, third.revision), Is.False);
+            Assert.That(flow.State.phase, Is.EqualTo(GameFlowPhase.Playing));
+            Assert.That(flow.State.revision, Is.EqualTo(third.revision));
+            Assert.That(flow.MarkVictory(third.battleSessionId, third.battleRound), Is.True);
+            Assert.That(flow.State.phase, Is.EqualTo(GameFlowPhase.Completed));
+        }
+
+        [Test]
+        public void DeveloperNextRejectsWrongRunStageAndRevisionWithoutChangingBattle()
+        {
+            var flow = Run(0);
+            var playing = Play(flow, "battle");
+            Assert.That(flow.DeveloperNextStage("another-run", 1, playing.revision), Is.False);
+            Assert.That(flow.DeveloperNextStage(playing.runId, 2, playing.revision), Is.False);
+            Assert.That(flow.DeveloperNextStage(playing.runId, 1, playing.revision - 1), Is.False);
+            Assert.That(flow.DeveloperNextStage(playing.runId, 1, playing.revision + 1), Is.False);
+            Assert.That(flow.State.phase, Is.EqualTo(GameFlowPhase.Playing));
+            Assert.That(flow.State.stageIndex, Is.EqualTo(1));
+            Assert.That(flow.State.revision, Is.EqualTo(playing.revision));
+            Assert.That(flow.State.battleSessionId, Is.EqualTo(playing.battleSessionId));
+        }
+
+        [TestCase(GameFlowPhase.Home)]
+        [TestCase(GameFlowPhase.Lobby)]
+        [TestCase(GameFlowPhase.LoadingBattle)]
+        [TestCase(GameFlowPhase.StageResult)]
+        [TestCase(GameFlowPhase.Completed)]
+        [TestCase(GameFlowPhase.GameOver)]
+        public void DeveloperNextRejectsEveryNonPlayingPhase(GameFlowPhase phase)
+        {
+            var flow = new GameRunFlow();
+            if (phase != GameFlowPhase.Home) Assert.That(flow.EnterLobby(), Is.True);
+            if (phase != GameFlowPhase.Home && phase != GameFlowPhase.Lobby)
+                Assert.That(flow.BeginRun(new ulong[] { 0 }), Is.True);
+            if (phase == GameFlowPhase.StageResult || phase == GameFlowPhase.Completed)
+            {
+                int count = phase == GameFlowPhase.Completed ? 3 : 1;
+                for (int stage = 1; stage <= count; stage++)
+                {
+                    var playing = Play(flow, "battle-" + stage);
+                    Assert.That(flow.MarkVictory(playing.battleSessionId, playing.battleRound), Is.True);
+                    var result = flow.State;
+                    if (stage < count)
+                        Assert.That(flow.NextStage(result.runId, result.stageIndex, result.revision), Is.True);
+                }
+            }
+            if (phase == GameFlowPhase.GameOver) Assert.That(flow.Abort("disconnected"), Is.True);
+            var before = flow.State;
+            Assert.That(before.phase, Is.EqualTo(phase));
+            Assert.That(flow.DeveloperNextStage(before.runId, before.stageIndex, before.revision), Is.False);
+            Assert.That(flow.State.phase, Is.EqualTo(before.phase));
+            Assert.That(flow.State.stageIndex, Is.EqualTo(before.stageIndex));
+            Assert.That(flow.State.revision, Is.EqualTo(before.revision));
+        }
+
+        [Test]
         public void OldRunAckAndStartCannotMutateAnotherRun()
         {
             var flow = Run(0);
