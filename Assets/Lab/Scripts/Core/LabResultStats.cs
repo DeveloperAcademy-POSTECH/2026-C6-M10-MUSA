@@ -6,10 +6,10 @@ namespace C6Lab
 {
     /// <summary>
     /// 결과 대시보드의 칭호 종류 (화면에 붙는 순서).
-    /// 딜왕: 요괴에게 준 피해 최다 · 구슬 패스왕: 구슬 전달 최다 · 북 패스왕: 북 전달 최다 ·
+    /// 딜왕: 요괴에게 준 피해 최다 · 명중왕: 던진 공 중 맞힌 비율 최고 · 구슬 패스왕: 구슬 전달 최다 · 북 패스왕: 북 전달 최다 ·
     /// 막타: 요괴를 쓰러뜨린 한 방(승리 시에만) · 북 독점: 북 점유율 최고 (점유 시간으로 비교)
     /// </summary>
-    public enum LabResultTitle { MostDamage, MostPassed, MostDrumPassed, LastHit, MostDrum }
+    public enum LabResultTitle { MostDamage, MostAccurate, MostPassed, MostDrumPassed, LastHit, MostDrum }
 
     /// <summary>한 칭호의 결과. 동점이면 Winners에 여러 명이 들어간다.</summary>
     public readonly struct LabResultAward
@@ -37,6 +37,7 @@ namespace C6Lab
             switch (title)
             {
                 case LabResultTitle.MostDamage: return player.damageTotal;
+                case LabResultTitle.MostAccurate: return AccuracyPercent(player);
                 case LabResultTitle.MostPassed: return player.passedTotal;
                 case LabResultTitle.MostDrumPassed: return player.drumPassedTotal;
                 case LabResultTitle.LastHit: return player.lastHit ? 1 : 0;
@@ -49,6 +50,7 @@ namespace C6Lab
         /// <summary>
         /// 항목별 1등. 동점이면 모두 받는다. 아무도 기록이 없는(0) 항목은 칭호를 주지 않는다.
         /// 막타는 승리했을 때만 준다. 좌석 순서(P1, P2…)로 정렬해 돌려준다.
+        /// 명중왕은 화면에 보이는 정수 %가 같으면 맞힌 수가 많은 사람이 받고, 그것도 같으면 공동이다.
         /// </summary>
         public static IReadOnlyList<LabResultAward> Awards(IEnumerable<LabPlayerState> players, bool victory = false)
         {
@@ -60,7 +62,13 @@ namespace C6Lab
                 if (title == LabResultTitle.LastHit && !victory) continue;
                 int best = list.Max(p => ValueOf(p, title));
                 if (best <= 0) continue;
-                awards.Add(new LabResultAward(title, best, list.Where(p => ValueOf(p, title) == best).ToArray()));
+                LabPlayerState[] winners = list.Where(p => ValueOf(p, title) == best).ToArray();
+                if (title == LabResultTitle.MostAccurate)
+                {
+                    int mostHits = winners.Max(p => p.hitTotal);
+                    winners = winners.Where(p => p.hitTotal == mostHits).ToArray();
+                }
+                awards.Add(new LabResultAward(title, best, winners));
             }
             return awards;
         }
@@ -70,12 +78,23 @@ namespace C6Lab
             switch (title)
             {
                 case LabResultTitle.MostDamage: return "딜왕";
+                case LabResultTitle.MostAccurate: return "명중왕";
                 case LabResultTitle.MostPassed: return "구슬 패스왕";
                 case LabResultTitle.MostDrumPassed: return "북 패스왕";
                 case LabResultTitle.LastHit: return "막타";
                 case LabResultTitle.MostDrum: return "북 독점";
                 default: return title.ToString();
             }
+        }
+
+        /// <summary>
+        /// 명중률: 던진 공(throwTotal) 중 요괴에 맞힌 공(hitTotal)의 비율(0~100, 반올림). 던진 공이 없으면 0.
+        /// </summary>
+        public static int AccuracyPercent(LabPlayerState player)
+        {
+            if (player == null || player.throwTotal <= 0 || player.hitTotal <= 0) return 0;
+            double rate = Math.Min(1d, (double)player.hitTotal / player.throwTotal);
+            return (int)Math.Round(rate * 100d, MidpointRounding.AwayFromZero);
         }
 
         /// <summary>북 점유율: 플레이 시간 중 북을 점유한 비율(0~100, 반올림). 플레이 시간이 0이면 0.</summary>
@@ -96,7 +115,7 @@ namespace C6Lab
 
         /// <summary>
         /// 칭호 줄의 기록 칸. 딜왕 "40 (2회 타격)" (동점이면 "60 (2·3회 타격)", 이름 순서와 같음) ·
-        /// 구슬 패스왕·북 패스왕 "5회" · 북 독점 "12초 · 40%" · 막타는 빈칸.
+        /// 명중왕 "60%" · 구슬 패스왕·북 패스왕 "5회" · 북 독점 "12초 · 40%" · 막타는 빈칸.
         /// </summary>
         public static string Record(LabResultAward award, double playedSeconds)
         {
@@ -105,6 +124,7 @@ namespace C6Lab
             {
                 case LabResultTitle.MostDamage:
                     return award.Value + " (" + string.Join("·", award.Winners.Select(p => p.hitTotal)) + "회 타격)";
+                case LabResultTitle.MostAccurate: return award.Value + "%";
                 case LabResultTitle.MostPassed:
                 case LabResultTitle.MostDrumPassed: return award.Value + "회";
                 case LabResultTitle.MostDrum: return DrumText(award.Winners[0], playedSeconds);

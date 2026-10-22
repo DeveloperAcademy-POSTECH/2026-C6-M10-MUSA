@@ -2004,6 +2004,32 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void MostAccurateTitleFollowsDamageAndBreaksPercentTiesByHits()
+        {
+            LabPlayerState P(ulong id, int seat, int hits, int throws) =>
+                new LabPlayerState { id = id, seat = seat, hitTotal = hits, throwTotal = throws, damageTotal = hits * 20 };
+            LabResultAward Accurate(params LabPlayerState[] players) =>
+                LabResultStats.Awards(players, false).Single(a => a.Title == LabResultTitle.MostAccurate);
+
+            Assert.That(LabResultStats.AccuracyPercent(P(1, 0, 3, 10)), Is.EqualTo(30));
+            Assert.That(LabResultStats.AccuracyPercent(P(1, 0, 2, 3)), Is.EqualTo(67), "Rounded to a whole percent.");
+            Assert.That(LabResultStats.AccuracyPercent(P(1, 0, 0, 0)), Is.Zero, "No throws is 0%, not an error.");
+
+            var awards = LabResultStats.Awards(new[] { P(10, 0, 3, 10), P(20, 1, 1, 3), P(30, 2, 0, 0) }, false);
+            Assert.That(awards.Select(a => LabResultStats.Label(a.Title)).Take(2), Is.EqualTo(new[] { "딜왕", "명중왕" }),
+                "The accuracy title sits right after the damage title.");
+            Assert.That(LabResultStats.WinnerNames(awards[1]), Is.EqualTo("P2"), "33% beats 30%; one throw is enough.");
+            Assert.That(LabResultStats.Record(awards[1], 100d), Is.EqualTo("33%"));
+
+            Assert.That(LabResultStats.WinnerNames(Accurate(P(10, 0, 2, 3), P(20, 1, 4, 6))), Is.EqualTo("P2"),
+                "Same shown percent: more hits wins.");
+            Assert.That(LabResultStats.WinnerNames(Accurate(P(10, 0, 3, 6), P(20, 1, 3, 6))), Is.EqualTo("P1, P2"),
+                "Same percent and hits: shared.");
+            Assert.That(LabResultStats.Awards(new[] { P(10, 0, 0, 4), P(20, 1, 0, 0) }, false)
+                .Any(a => a.Title == LabResultTitle.MostAccurate), Is.False, "Nobody hit anything: no title.");
+        }
+
+        [Test]
         public void ResultTableRowsMarkEveryTitleTheLocalPlayerShares()
         {
             var players = new[]
