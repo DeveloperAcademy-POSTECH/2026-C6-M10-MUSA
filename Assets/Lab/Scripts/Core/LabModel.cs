@@ -610,6 +610,7 @@ namespace C6Lab
             impactValue = paintRound ? attackValue : actualDamage;
             attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
             attacker.hitTotal++;
+            attacker.throwTotal++;
             // Paint keeps the existing attack-score statistic; Crack records actual HP removed.
             // Long paint rounds can outlive diagnostic HP, so prevent the integer score wrapping.
             attacker.damageTotal = (int)Math.Min(int.MaxValue,
@@ -1148,10 +1149,16 @@ namespace C6Lab
             return cast;
         }
 
-        /// <summary>Remove an expired or missed projectile without damage or a hit reward.</summary>
-        public bool ConfirmMiss(string id, double now)
+        /// <summary>
+        /// Remove an expired or missed projectile without damage or a hit reward.
+        /// countThrow: 빗나간 투척으로 던진 공 수(명중률 분모)에 넣을지. 지귀 불을 노린 투척은 false.
+        /// 라운드가 진행 중일 때만 센다.
+        /// </summary>
+        public bool ConfirmMiss(string id, double now, bool countThrow = true)
         {
             if (!TryAdvance(now, out _) || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight) return false;
+            if (countThrow && phase == LabPhase.Playing && players.TryGetValue(orb.owner, out var thrower))
+                thrower.throwTotal++;
             launchScales.Remove(id);
             return orbs.Remove(id);
         }

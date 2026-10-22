@@ -391,6 +391,37 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ThrowTotalCountsResolvedHitsAndMissesButNotFireShotsOrFlyingOrbs()
+        {
+            LabOrbState Shot(ulong owner, double at)
+            {
+                var pair = GeneratePair(owner, at);
+                Assert.That(model.TryCombineAt(owner, pair.yin.id, pair.yang.id, "throw-c-" + owner + "-" + at, at,
+                    new Vector2(.5f, .5f), Vector2.zero, out var combined, out _), Is.True);
+                Assert.That(model.TryLaunch(owner, combined.id, "throw-l-" + owner + "-" + at, at, out _, out _), Is.True);
+                return combined;
+            }
+            int Thrown(ulong id, double at) => model.Snapshot(at).players.Single(p => p.id == id).throwTotal;
+
+            var hit = Shot(10, 1d);
+            var miss = Shot(20, 1d);
+            var fire = Shot(30, 1d);
+            Assert.That(Thrown(10, 1d) + Thrown(20, 1d) + Thrown(30, 1d), Is.Zero, "A flying orb is not counted yet.");
+
+            Assert.That(model.ConfirmHit(hit.id, 2d), Is.True);
+            Assert.That(model.ConfirmMiss(miss.id, 2d), Is.True);
+            Assert.That(model.ConfirmMiss(fire.id, 2d, countThrow: false), Is.True);
+            Assert.That(Thrown(10, 2d), Is.EqualTo(1), "A hit is a throw.");
+            Assert.That(model.Snapshot(2d).players.Single(p => p.id == 10).hitTotal, Is.EqualTo(1));
+            Assert.That(Thrown(20, 2d), Is.EqualTo(1), "A miss is a throw.");
+            Assert.That(Thrown(30, 2d), Is.Zero, "A shot at a Jigwi fire is left out.");
+
+            Assert.That(model.ConfirmMiss(miss.id, 3d), Is.False);
+            Assert.That(model.ConfirmHit(hit.id, 3d), Is.False);
+            Assert.That(Thrown(10, 3d) + Thrown(20, 3d), Is.EqualTo(2), "One orb is confirmed only once.");
+        }
+
+        [Test]
         public void ClockEndsAtDeadlineAndRetryResetsRoundWithoutMovingOldResult()
         {
             model.Tick(179.9d);
@@ -1970,6 +2001,79 @@ namespace C6Lab.Tests
             Assert.That(LabResultStats.Awards(players, false).Any(a => a.Title == LabResultTitle.LastHit), Is.False,
                 "The last hit title is only for a victory.");
             Assert.That(LabResultStats.Awards(new LabPlayerState[0], true), Is.Empty);
+        }
+
+        [Test]
+        public void MostAccurateTitleFollowsDamageAndBreaksPercentTiesByHits()
+        {
+            LabPlayerState P(ulong id, int seat, int hits, int throws) =>
+                new LabPlayerState { id = id, seat = seat, hitTotal = hits, throwTotal = throws, damageTotal = hits * 20 };
+            LabResultAward Accurate(params LabPlayerState[] players) =>
+                LabResultStats.Awards(players, false).Single(a => a.Title == LabResultTitle.MostAccurate);
+
+            Assert.That(LabResultStats.AccuracyPercent(P(1, 0, 3, 10)), Is.EqualTo(30));
+            Assert.That(LabResultStats.AccuracyPercent(P(1, 0, 2, 3)), Is.EqualTo(67), "Rounded to a whole percent.");
+            Assert.That(LabResultStats.AccuracyPercent(P(1, 0, 0, 0)), Is.Zero, "No throws is 0%, not an error.");
+
+            var awards = LabResultStats.Awards(new[] { P(10, 0, 3, 10), P(20, 1, 1, 3), P(30, 2, 0, 0) }, false);
+            Assert.That(awards.Select(a => LabResultStats.Label(a.Title)).Take(2), Is.EqualTo(new[] { "딜왕", "명중왕" }),
+                "The accuracy title sits right after the damage title.");
+            Assert.That(LabResultStats.WinnerNames(awards[1]), Is.EqualTo("P2"), "33% beats 30%; one throw is enough.");
+            Assert.That(LabResultStats.Record(awards[1], 100d), Is.EqualTo("33%"));
+
+            Assert.That(LabResultStats.WinnerNames(Accurate(P(10, 0, 2, 3), P(20, 1, 4, 6))), Is.EqualTo("P2"),
+                "Same shown percent: more hits wins.");
+            Assert.That(LabResultStats.WinnerNames(Accurate(P(10, 0, 3, 6), P(20, 1, 3, 6))), Is.EqualTo("P1, P2"),
+                "Same percent and hits: shared.");
+            Assert.That(LabResultStats.Awards(new[] { P(10, 0, 0, 4), P(20, 1, 0, 0) }, false)
+                .Any(a => a.Title == LabResultTitle.MostAccurate), Is.False, "Nobody hit anything: no title.");
+        }
+
+        [Test]
+        public void OverallDashboardAveragesStagesAndCountsLastHits()
+        {
+            LabPlayerState A(int damage, int hits, int throws, int passed, bool last = false) => new LabPlayerState
+                { id = 10, seat = 0, damageTotal = damage, hitTotal = hits, throwTotal = throws, passedTotal = passed, lastHit = last };
+            LabPlayerState B(int damage, int hits, int throws, double drum, bool last = false) => new LabPlayerState
+                { id = 20, seat = 1, damageTotal = damage, hitTotal = hits, throwTotal = throws, drumSeconds = drum, lastHit = last };
+            var stages = new[]
+            {
+                new LabResultStage(new[] { A(40, 2, 4, 3, true), B(20, 1, 1, 20d) }, 60d),
+                new LabResultStage(new[] { A(20, 1, 4, 3), B(60, 3, 3, 30d, true) }, 60d),
+                new LabResultStage(new[] { A(60, 3, 2, 3, true), B(10, 1, 6, 10d) }, 60d)
+            };
+
+            var rows = LabResultTable.OverallRowsFor(stages, 20ul);
+            Assert.That(rows.Select(r => r.Title), Is.EqualTo(new[] { "딜왕", "명중왕", "구슬 패스왕", "막타", "북 독점" }));
+            Assert.That(rows.Select(r => r.Who), Is.EqualTo(new[] { "P1", "P1", "P1", "P1", "P2" }));
+            Assert.That(rows.Select(r => r.Record), Is.EqualTo(new[]
+                { "40 (2회 타격)", "60%", "3회", "2회", "20초 · 33%" }),
+                "Averages per stage; accuracy is 6/10 overall; last hits are a count; drum share is 60s of 180s.");
+            Assert.That(rows.Select(r => r.Mine), Is.EqualTo(new[] { false, false, false, false, true }));
+
+            var source = new[] { A(40, 2, 4, 3) };
+            var stage = new LabResultStage(source, 60d);
+            source[0].damageTotal = 999;
+            Assert.That(stage.Players[0].damageTotal, Is.EqualTo(40), "A stage keeps its own copy of the records.");
+            Assert.That(LabResultStats.Overall(null).StageCount, Is.Zero);
+            Assert.That(LabResultTable.OverallRowsFor(new LabResultStage[0], 10ul), Is.Empty);
+        }
+
+        [Test]
+        public void ResultTableRowsMarkEveryTitleTheLocalPlayerShares()
+        {
+            var players = new[]
+            {
+                new LabPlayerState { id = 10, seat = 0, damageTotal = 60, hitTotal = 2, passedTotal = 1 },
+                new LabPlayerState { id = 20, seat = 1, damageTotal = 60, hitTotal = 3, passedTotal = 4 }
+            };
+            var rows = LabResultTable.RowsFor(LabResultStats.Awards(players, false), 10ul, 100d);
+            Assert.That(rows.Select(r => r.Title), Is.EqualTo(new[] { "딜왕", "구슬 패스왕" }));
+            Assert.That(rows[0].Who, Is.EqualTo("P1, P2"));
+            Assert.That(rows[0].Record, Is.EqualTo("60 (2·3회 타격)"));
+            Assert.That(rows.Select(r => r.Mine), Is.EqualTo(new[] { true, false }),
+                "A shared title is mine too; a title only someone else holds is not.");
+            Assert.That(LabResultTable.RowsFor(null, 10ul, 100d), Is.Empty);
         }
 
         [Test]
