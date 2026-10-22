@@ -28,6 +28,9 @@ namespace C6Lab
         public ulong charmedPlayer;
         public double charmStartedAt = -1d, charmUntil = -1d;
         public int charmTaps;
+        /// <summary>2:2 땅따먹기 (#281)의 팀 피버도 헤더로 보내 피버가 모든 화면에서 바로 시작되게 한다.</summary>
+        public int blueFeverHits, redFeverHits;
+        public double blueFeverStartedAt = -1d, blueFeverUntil = -1d, redFeverStartedAt = -1d, redFeverUntil = -1d;
         public LabJigwiState[] jigwi = Array.Empty<LabJigwiState>();
         public double flashWarningAt = -1d, flashAt = -1d, flashLastAt = -1d;
         public ulong flashTarget, flashLastTarget;
@@ -114,6 +117,9 @@ namespace C6Lab
                 swipeBlockStartedAt = snapshot.swipeBlockStartedAt, swipeBlockedUntil = snapshot.swipeBlockedUntil,
                 charmedPlayer = snapshot.charmedPlayer, charmStartedAt = snapshot.charmStartedAt,
                 charmUntil = snapshot.charmUntil, charmTaps = snapshot.charmTaps,
+                blueFeverHits = snapshot.blueFeverHits, redFeverHits = snapshot.redFeverHits,
+                blueFeverStartedAt = snapshot.blueFeverStartedAt, blueFeverUntil = snapshot.blueFeverUntil,
+                redFeverStartedAt = snapshot.redFeverStartedAt, redFeverUntil = snapshot.redFeverUntil,
                 jigwi = LabJigwiNetworkValidation.Copy(snapshot.jigwi),
                 flashWarningAt = snapshot.flashWarningAt, flashAt = snapshot.flashAt,
                 flashTarget = snapshot.flashTarget, flashTargetAll = snapshot.flashTargetAll,
@@ -281,6 +287,9 @@ namespace C6Lab
                 copy.swipeBlockStartedAt = header.swipeBlockStartedAt; copy.swipeBlockedUntil = header.swipeBlockedUntil;
                 copy.charmedPlayer = header.charmedPlayer; copy.charmStartedAt = header.charmStartedAt;
                 copy.charmUntil = header.charmUntil; copy.charmTaps = header.charmTaps;
+                copy.blueFeverHits = header.blueFeverHits; copy.redFeverHits = header.redFeverHits;
+                copy.blueFeverStartedAt = header.blueFeverStartedAt; copy.blueFeverUntil = header.blueFeverUntil;
+                copy.redFeverStartedAt = header.redFeverStartedAt; copy.redFeverUntil = header.redFeverUntil;
                 copy.jigwi = LabJigwiNetworkValidation.Copy(header.jigwi);
                 copy.flashWarningAt = header.flashWarningAt; copy.flashAt = header.flashAt;
                 copy.flashTarget = header.flashTarget; copy.flashTargetAll = header.flashTargetAll;
@@ -353,6 +362,9 @@ namespace C6Lab
             && frame.phase >= LabPhase.Idle && frame.phase <= LabPhase.Defeat
             && Finite(frame.swipeBlockStartedAt) && Finite(frame.swipeBlockedUntil)
             && Finite(frame.charmStartedAt) && Finite(frame.charmUntil) && frame.charmTaps >= 0
+            && frame.blueFeverHits >= 0 && frame.redFeverHits >= 0
+            && Finite(frame.blueFeverStartedAt) && Finite(frame.blueFeverUntil)
+            && Finite(frame.redFeverStartedAt) && Finite(frame.redFeverUntil)
             && Finite(frame.targetYawDegrees) && Finite(frame.targetYawSpeedDegreesPerSecond)
             && Finite(frame.targetRopeCycleElapsed) && Finite(frame.targetRopeHitOffset) && Finite(frame.targetRopeHitVelocity)
             && LabComboNetworkValidation.Valid(frame)
@@ -420,6 +432,10 @@ namespace C6Lab
             swipeBlockedRight = source.swipeBlockedRight, swipeBlockStartedAt = source.swipeBlockStartedAt,
             swipeBlockedUntil = source.swipeBlockedUntil, charmedPlayer = source.charmedPlayer,
             charmStartedAt = source.charmStartedAt, charmUntil = source.charmUntil, charmTaps = source.charmTaps,
+            teamTerritory = source.teamTerritory, blueCells = source.blueCells, redCells = source.redCells,
+            teamWinner = source.teamWinner, blueFeverHits = source.blueFeverHits, redFeverHits = source.redFeverHits,
+            blueFeverStartedAt = source.blueFeverStartedAt, blueFeverUntil = source.blueFeverUntil,
+            redFeverStartedAt = source.redFeverStartedAt, redFeverUntil = source.redFeverUntil,
             jigwi = LabJigwiNetworkValidation.Copy(source.jigwi),
             comboActive = source.comboActive,
             comboColors = source.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboColors.Clone(),

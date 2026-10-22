@@ -25,7 +25,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(196));
+                    Assert.That(values.Length, Is.EqualTo(200));
                     Assert.That(values[87], Is.EqualTo(before[87]), "Common bomb interval preserved");
                     Assert.That(values[152], Is.EqualTo(before[152]), "Common transfer block interval preserved");
                 }

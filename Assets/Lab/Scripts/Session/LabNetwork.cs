@@ -200,13 +200,15 @@ namespace C6Lab
         // 5659: #276 stage-selected scheduler, four Jigwi policy values and game stage settings barrier.
         // 5660: #263 bounded live room presence and creator-owned pending-room registrations.
         // 5661: #278 immutable Lab/Game Bonjour identity before pending-room activation.
-        internal const ushort LabProtocolVersion = 5661;
+        // 5662: #281 2:2 team territory (DEV 196-199, 200 shared values): team cells, winner and fever in the
+        //       snapshot, fever in the board header, team-edge handoffs and territory overwrite paint.
+        internal const ushort LabProtocolVersion = 5662;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/22");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/23");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

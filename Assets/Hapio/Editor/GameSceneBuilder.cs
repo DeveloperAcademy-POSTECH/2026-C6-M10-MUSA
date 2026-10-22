@@ -141,6 +141,18 @@ namespace Hapio.Editor
             UpgradeScene(GameScenePaths.Battle, ConfigureBattle);
         }
 
+        /// <summary>
+        /// Append only the new DEV rows (#281: 2:2 territory 196-199) to Home and Lobby. Unlike the Lab upgrade
+        /// above, this never copies Battle again, so Battle-only edits and the lobby layout stay as they are.
+        /// </summary>
+        [MenuItem("Hapio/Upgrade Menu DEV Rows")]
+        public static void UpgradeMenuDeveloperRows()
+        {
+            UpgradeMenuDeveloperSchema();
+            AssetDatabase.SaveAssets();
+            Debug.Log("HAPIO_MENU_DEV_ROWS_READY: " + LabConfig.DeveloperFields.Count + " rows in Home and Lobby.");
+        }
+
         /// <summary>Append new DEV fields without regenerating either menu or its existing rows and layout.</summary>
         public static void UpgradeMenuDeveloperSchema()
         {

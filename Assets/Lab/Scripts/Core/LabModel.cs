@@ -269,7 +269,10 @@ namespace C6Lab
             if (sessionId == id && round == uint.MaxValue) throw new InvalidOperationException("The round number is exhausted.");
             if (stageYokai < LabStageYokai.None || stageYokai > LabStageYokai.Jigwi)
                 throw new ArgumentOutOfRangeException(nameof(stageYokai));
-            var nextRules = new Rules(config, stageYokai);
+            // 2:2 땅따먹기 (#281)는 요괴 없이 진행한다.
+            bool nextTeamMode = TeamModeFor(config, ids.Length);
+            if (nextTeamMode) stageYokai = LabStageYokai.None;
+            var nextRules = new Rules(config, stageYokai, nextTeamMode);
             double nextDeadline = now + nextRules.BattleDurationSeconds;
             if (!Finite(nextDeadline) || nextDeadline <= now)
                 throw new ArgumentOutOfRangeException(nameof(now), "The battle deadline is not representable.");
@@ -277,6 +280,8 @@ namespace C6Lab
             round = sessionId == id ? round + 1u : 1u;
             sessionId = id;
             rules = nextRules;
+            teamMode = nextTeamMode;
+            ResetTeam();
             activeSeatCount = ids.Length;
             Array.Clear(seats, 0, seats.Length);
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
@@ -408,6 +413,7 @@ namespace C6Lab
                 x = position.x, y = position.y,
                 vx = launch.x, vy = launch.y, createdAt = now, revision = ++revision, inFlight = false
             };
+            if (teamMode) ApplyFeverGeneration(orb, sender, now);
             ApplyJigwiGenerationBurn(orb, now);
             orbs.Add(orb.id, orb);
             reason = "GENERATED";
@@ -443,7 +449,7 @@ namespace C6Lab
             }
 
             orbs.Remove(firstId); orbs.Remove(secondId);
-            var element = ElementFor(seed, combinedCount++);
+            var element = CombinedElementFor(sender);
             Vector2 velocity = Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed);
             orb = new LabOrbState
             {
@@ -506,6 +512,9 @@ namespace C6Lab
                 && current.kind.IsDrum() && current.arrival == LabDrumArrival.Pass;
             if (crossing != LabEdgeCrossingKind.Pushed && !passingDrum && SwipeBlocked(sender, right, now))
                 return Reject("SWIPE_BLOCKED", out reason);
+            // 2:2 땅따먹기 (#281): 바깥쪽 가장자리는 막혀 있고 안쪽 가장자리로만 팀원에게 넘긴다. 밀려 넘어가도 같다.
+            if (teamMode && current.kind != LabOrbKind.FoxFire && !LabTeams.EdgeOpen(players[sender].seat, right))
+                return Reject("TEAM_EDGE", out reason);
             if (current.kind == LabOrbKind.FoxFire)
             {
                 // A fox orb never reaches a neighbour (#251): over a side edge, even solo, it goes up in blue smoke.
@@ -513,7 +522,8 @@ namespace C6Lab
                 reason = "FOX_FIRE_GONE";
                 return true;
             }
-            int receiverSeat = (players[sender].seat + (right ? 1 : activeSeatCount - 1)) % activeSeatCount;
+            int receiverSeat = teamMode ? LabTeams.TeammateSeat(players[sender].seat)
+                : (players[sender].seat + (right ? 1 : activeSeatCount - 1)) % activeSeatCount;
             ulong receiver = seats[receiverSeat];
             // A drum is not a stored orb, so a full board still receives it.
             if (!current.kind.IsDrum() && CountStored(receiver) >= rules.OrbStorageLimit)
@@ -615,7 +625,9 @@ namespace C6Lab
             attacker.damageTotal = (int)Math.Min(int.MaxValue,
                 (long)attacker.damageTotal + (paintRound ? attackValue : actualDamage));
 
-            if (paintRound)
+            if (teamMode)
+                ConfirmTeamHit(attacker, element, paintDirection, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale, now);
+            else if (paintRound)
             {
                 if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
                     && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1,
@@ -1053,7 +1065,7 @@ namespace C6Lab
                 {
                     var opened = new LabOrbState
                     {
-                        id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = ElementFor(seed, combinedCount++),
+                        id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = CombinedElementFor(sender),
                         origin = LabOrbOrigin.Combined, originOwner = sender,
                         x = Mathf.Clamp01(normalizedPosition.x + side * SecretBoxSpread),
                         y = normalizedPosition.y,
@@ -1190,7 +1202,7 @@ namespace C6Lab
                 return new LabSnapshot { sessionId = string.Empty, serverTime = now, phase = LabPhase.Idle };
             }
             Tick(now);
-            return new LabSnapshot
+            LabSnapshot snapshot = new LabSnapshot
             {
                 sessionId = sessionId ?? string.Empty,
                 round = round,
@@ -1240,6 +1252,8 @@ namespace C6Lab
                 flashLastTarget = lastFlashTarget,
                 flashLastTargetAll = !rules.FlashTargetOne
             };
+            FillTeamSnapshot(snapshot);
+            return snapshot;
         }
 
         private bool BeginRequest(ulong sender, string requestId, double now, out string reason)
@@ -1284,7 +1298,8 @@ namespace C6Lab
                     // A late frame still resolves growth that was due before the deadline.
                     // Growth due exactly at the deadline cannot outrun the existing timeout rule.
                     double completionOffset = paintSurface.Advance(elapsed, now < deadline);
-                    if (completionOffset >= 0d)
+                    // 2:2 (#281): 박이 두 색으로 다 차도 끝나지 않는다. 한 팀이 모두 차지했는지는 아래에서 본다.
+                    if (completionOffset >= 0d && !teamMode)
                     {
                         effectiveNow = lastTime + completionOffset;
                         elapsed = completionOffset;
@@ -1317,7 +1332,12 @@ namespace C6Lab
                 AdvanceFlash(effectiveNow);
                 ExpireOrbs(effectiveNow);
                 remaining = Math.Max(0d, deadline - effectiveNow);
-                if (paintCompleted)
+                if (teamMode)
+                {
+                    SettleTeamSweep();
+                    if (phase == LabPhase.Playing && now >= deadline) EndTeamBattleAtDeadline();
+                }
+                else if (paintCompleted)
                 {
                     phase = LabPhase.Victory;
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
@@ -1390,6 +1410,8 @@ namespace C6Lab
             // Only a drum that really arrived as a pass may claim to be passing on.
             else if (crossing == LabEdgeCrossingKind.Passing && drum.arrival == LabDrumArrival.Pass) zone = 0;
             else zone = DrumZoneFor(DrawFor(seed ^ DrumZoneSalt, DrumHandoffKey, index), rules.DrumStopChances);
+            // 2:2 (#281): 팀원의 바깥쪽 가장자리는 막혀 있으므로 지나가는 대신 가장 먼 구역에 멈춘다.
+            if (teamMode && zone >= 3) zone = 2;
 
             drum.arrivedAt = now;
             if (zone < 0)
@@ -1649,6 +1671,7 @@ namespace C6Lab
         /// </summary>
         private void PlaceDrums(double now)
         {
+            if (teamMode) { PlaceTeamDrums(now); return; }
             int[] shuffled = Enumerable.Range(0, activeSeatCount)
                 .OrderBy(seat => DrawFor(seed ^ DrumSeatSalt, (ulong)seat, 0u)).ToArray();
             var perBoard = new int[activeSeatCount];
@@ -1772,6 +1795,9 @@ namespace C6Lab
         private sealed class Rules
         {
             public readonly LabStageYokai StageYokai;
+            /// <summary>2:2 땅따먹기 (#281): 피버에 필요한 팀 명중 수(0이면 피버 없음)와 피버 시간.</summary>
+            public readonly int TeamFeverHits;
+            public readonly float TeamFeverSeconds;
             public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
             public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
             /// <summary>How much a blast-shrunk orb paints, against a whole one (#213).</summary>
@@ -1809,7 +1835,7 @@ namespace C6Lab
             public readonly float FlashFirstStartSeconds, FlashIntervalSeconds, FlashWarningSeconds,
                 FlashGlareSeconds, FlashRecoverySeconds;
 
-            public Rules(LabConfig config, LabStageYokai stageYokai)
+            public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode)
             {
                 StageYokai = stageYokai;
                 GenerationChances = config.GenerationChances();
@@ -1880,6 +1906,19 @@ namespace C6Lab
                 FlashWarningSeconds = config.YaguangFlashWarningSeconds;
                 FlashGlareSeconds = config.YaguangFlashGlareSeconds;
                 FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
+                TeamFeverHits = teamMode ? config.TeamFeverHits : 0;
+                TeamFeverSeconds = config.TeamFeverSeconds;
+                if (!teamMode) return;
+                // 2:2 땅따먹기 (#281): 요괴·방해공작·콤보·섬광·마르기를 끄고, 도색으로만 겨룬다.
+                BattleDurationSeconds = config.TeamBattleSeconds;
+                GourdMode = LabGourdMode.Paint;
+                SabotageMix = false;
+                GourdBombIntervalMin = GourdBombIntervalMax = 0f;
+                SwipeBlockInterval = 0f;
+                ComboEnabled = FlashEnabled = false;
+                PaintGrowthSettings.DryingEnabled = false;
+                // 덮어쓰기는 얼룩 모양이 있어야 하므로 옛 둥근 붓은 흩뿌림 무늬로 바꾼다.
+                if (PaintGrowthSettings.Pattern == LabPaintPattern.Legacy) PaintGrowthSettings.Pattern = LabPaintPattern.Splatter;
             }
         }
     }

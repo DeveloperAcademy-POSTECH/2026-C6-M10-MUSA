@@ -42,7 +42,9 @@ namespace Hapio
             bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191;
             bool gumiho = index >= 166 && index <= 177;
             bool jigwi = index >= 178 && index <= 183 || index >= 192 && index <= 195;
-            if (scope == 0) return !yaguang && !gumiho && !jigwi;
+            // 2:2 땅따먹기 (#281)의 켜기/끄기·시간·피버는 3요괴 스테이지 설정에 넣지 않는다.
+            bool team = index >= 196 && index <= 199;
+            if (scope == 0) return !yaguang && !gumiho && !jigwi && !team;
             // Legacy bomb/block weights are masked by the stage policy and never presented as useful controls.
             if (scope == 1) return gumiho && index != 169 && index != 170;
             return scope == 2 ? yaguang : jigwi;

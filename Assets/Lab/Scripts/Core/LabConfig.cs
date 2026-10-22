@@ -319,7 +319,12 @@ namespace C6Lab
             new LabDeveloperField("Jigwi Auto Interval Min (seconds)", 1f, 600f),
             new LabDeveloperField("Jigwi Auto Interval Max (seconds)", 1f, 600f),
             new LabDeveloperField("Jigwi Auto Fire Weight", 0f, 10f, true),
-            new LabDeveloperField("Jigwi Auto Generation Burn Weight", 0f, 10f, true)
+            new LabDeveloperField("Jigwi Auto Generation Burn Weight", 0f, 10f, true),
+            // 2:2 청홍 땅따먹기 (#281). Hapio에서는 켜기/끄기를 방 모드가 정하고, Lab DEV에서는 4명 또는 솔로일 때만 켜진다.
+            LabDeveloperField.Toggle("2:2 땅따먹기 (0 off, 1 on)", "끔", "켬"),
+            new LabDeveloperField("2:2 제한 시간 (초)", 30f, 600f),
+            new LabDeveloperField("피버 필요 명중 수 (0 = 피버 없음)", 0f, 50f, true),
+            new LabDeveloperField("피버 시간 (초)", 1f, 30f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -358,7 +363,8 @@ namespace C6Lab
             new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
                 184, 185, 186, 187, 188, 189, 190)
                 .WithSwitch(155, 184)
-                .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──"))
+                .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
+            new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
         });
 
 
@@ -595,6 +601,15 @@ namespace C6Lab
         [SerializeField, Range(1f, 600f)] private float jigwiAutoIntervalMax = 30f;
         [SerializeField, Range(0, 10)] private int jigwiAutoFireWeight = 1;
         [SerializeField, Range(0, 10)] private int jigwiAutoGenerationBurnWeight = 1;
+        [Header("2:2 team territory (#281)")]
+        [Tooltip("2:2 청홍 땅따먹기. 4명(또는 DEV 솔로)일 때만 켜진다. 요괴·방해공작·콤보·섬광·마르기를 끄고, 맞힌 얼룩 모양만 상대 색을 덮어쓰며, 제한 시간이 끝나면 박 전체 칸 대비 팀 비율로 승패를 정한다. Hapio에서는 방 모드가 정한다.")]
+        [SerializeField] private bool teamTerritoryEnabled;
+        [Tooltip("2:2 한 판의 제한 시간 (초)")]
+        [SerializeField, Range(30f, 600f)] private float teamBattleSeconds = 180f;
+        [Tooltip("팀이 이만큼 맞히면 피버가 시작된다. 0이면 피버 없음.")]
+        [SerializeField, Range(0, 50)] private int teamFeverHits = 15;
+        [Tooltip("피버 시간 (초). 그동안 팀 판의 모든 구슬이 팀 색 결합 구슬이 되고, 생성해도 팀 색 결합 구슬이 나온다.")]
+        [SerializeField, Range(1f, 30f)] private float teamFeverSeconds = 8f;
         [Header("Yaguang flash (#268)")]
         [Tooltip("야광귀 섬광. 박에서 요괴가 빼꼼 나와 눈이 밝아진 뒤(예고) 화면이 하얗게 번쩍이고, 눈부신 동안 판 위 음양·결합 구슬과 아이템이 하얗게 보인다(북·박 색칠·HUD는 그대로). 화면 표시만 바뀌고 조작·판정은 그대로다. 방해공작 묶음(#251)과 따로 돈다. 야광귀 전용이라 기본은 끔(DEV `Yaguang Flash`로 켠다).")]
         [SerializeField] private bool yaguangFlashEnabled;
@@ -941,6 +956,10 @@ namespace C6Lab
         public float JigwiAutoIntervalMax => Mathf.Clamp(Finite(jigwiAutoIntervalMax, 30f), JigwiAutoIntervalMin, 600f);
         public int JigwiAutoFireWeight => Mathf.Clamp(jigwiAutoFireWeight, 0, 10);
         public int JigwiAutoGenerationBurnWeight => Mathf.Clamp(jigwiAutoGenerationBurnWeight, 0, 10);
+        public bool TeamTerritoryEnabled => teamTerritoryEnabled;
+        public float TeamBattleSeconds => Mathf.Clamp(Finite(teamBattleSeconds, 180f), 30f, 600f);
+        public int TeamFeverHits => Mathf.Clamp(teamFeverHits, 0, 50);
+        public float TeamFeverSeconds => Mathf.Clamp(Finite(teamFeverSeconds, 8f), 1f, 30f);
         public bool YaguangFlashEnabled => yaguangFlashEnabled;
         /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
         public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
@@ -1085,7 +1104,8 @@ namespace C6Lab
                 YaguangFlashIntervalSeconds, YaguangFlashWarningSeconds, YaguangFlashGlareSeconds,
                 YaguangFlashRecoverySeconds,
                 ComboYaguangCountEnabled ? 1f : 0f,
-                JigwiAutoIntervalMin, JigwiAutoIntervalMax, JigwiAutoFireWeight, JigwiAutoGenerationBurnWeight
+                JigwiAutoIntervalMin, JigwiAutoIntervalMax, JigwiAutoFireWeight, JigwiAutoGenerationBurnWeight,
+                TeamTerritoryEnabled ? 1f : 0f, TeamBattleSeconds, TeamFeverHits, TeamFeverSeconds
             };
         }
 
@@ -1322,6 +1342,10 @@ namespace C6Lab
             jigwiAutoIntervalMax = values[193];
             jigwiAutoFireWeight = (int)values[194];
             jigwiAutoGenerationBurnWeight = (int)values[195];
+            teamTerritoryEnabled = values[196] >= .5f;
+            teamBattleSeconds = values[197];
+            teamFeverHits = (int)values[198];
+            teamFeverSeconds = values[199];
             error = string.Empty;
             return true;
         }

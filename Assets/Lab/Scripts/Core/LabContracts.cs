@@ -208,6 +208,12 @@ namespace C6Lab
         /// </summary>
         public double comboRewardUntil;
 
+        // 2:2 청홍 땅따먹기 (#281) 결과 기록. 팀전이 아니면 0이다.
+        /// <summary>지금 박에 남아 있는 이 사람이 칠한 칸 수 (빼앗긴 칸은 빠진다)</summary>
+        public int paintedCells;
+        /// <summary>상대 색을 덮어써 빼앗은 칸 수 (누적)</summary>
+        public int stolenCells;
+
         public int ItemsUsed => relayUsed + secretBoxUsed + potionUsed + bombUsed;
 
         public LabPlayerState Copy() => (LabPlayerState)MemberwiseClone();
@@ -270,6 +276,21 @@ namespace C6Lab
 
         /// <summary>Whether this player is charmed at this snapshot.</summary>
         public bool CharmOn(ulong player) => charmUntil > serverTime && serverTime >= charmStartedAt && charmedPlayer == player;
+
+        // 2:2 청홍 땅따먹기 (#281). teamTerritory가 false면 아래 값은 모두 기본값이다. 시각은 serverTime과 같은 전투 시계다.
+        public bool teamTerritory;
+        /// <summary>박 전체 칸(paintCellCount) 가운데 청·홍 색 칸 수</summary>
+        public int blueCells, redCells;
+        /// <summary>끝났을 때 이긴 팀. 판이 끝났는데(phase Victory) None이면 무승부다.</summary>
+        public LabTeam teamWinner;
+        /// <summary>팀별 피버 게이지(맞힌 수)와 피버가 시작·끝나는 시각. 피버가 아니면 시각은 -1이다.</summary>
+        public int blueFeverHits, redFeverHits;
+        public double blueFeverStartedAt = -1d, blueFeverUntil = -1d, redFeverStartedAt = -1d, redFeverUntil = -1d;
+
+        public bool FeverOn(LabTeam team) => team == LabTeam.Blue ? blueFeverUntil > serverTime
+            : team == LabTeam.Red && redFeverUntil > serverTime;
+        public int FeverHits(LabTeam team) => team == LabTeam.Blue ? blueFeverHits : team == LabTeam.Red ? redFeverHits : 0;
+        public int TeamCells(LabTeam team) => team == LabTeam.Blue ? blueCells : team == LabTeam.Red ? redCells : 0;
 
         // 박 색상 콤보 실험 (#222). DEV에서 끄면 모두 기본값(콤보 없음)이다.
         // 시각은 serverTime과 같은 전투 시계 기준이다.
