@@ -267,8 +267,8 @@ namespace C6Lab.Tests
                     Assert.That(LabPendingRoom.TryCreate(3,out registrations[index],out string error),Is.True,error);
                     Assert.That(registrations[index].Family,Is.EqualTo(LabRoomFamily.Lab));
                     double readyDeadline=Time.realtimeSinceStartupAsDouble+20;
-                    // Every real pending room requests N. NoAutoRename must reject the occupied
-                    // names and the product's Tick retry must reach N+1 / N+2, without fixture renaming.
+                    // Every real pending room requests N. The product's local DNS lease and
+                    // native conflict retry must reach N+1 / N+2, without fixture renaming.
                     while(!registrations[index].Ready&&Time.realtimeSinceStartupAsDouble<readyDeadline)
                     {
                         for(int existing=0;existing<=index;existing++)registrations[existing].Tick(true,firstNumber);
@@ -308,6 +308,52 @@ namespace C6Lab.Tests
                 }
             }
             finally{foreach(var registration in registrations)registration?.Dispose();browser.Dispose();}
+        }
+        [UnityTest]
+        public IEnumerator ExplicitNameLeaseFollowsTheNativeAdvertisementIntoHostAndReturnsAfterStop()
+        {
+            if(!LabBonjourDiscovery.IsSupported)Assert.Ignore("Bonjour is macOS/iOS only.");
+            int firstNumber=100000+(int)(System.BitConverter.ToUInt32(System.Guid.NewGuid().ToByteArray(),0)%900001u);
+            Assert.That(LabPendingRoom.TryCreate(3,out var pending,out string error),Is.True,error);
+            using(var contender=new LabBonjourDiscovery())
+            {
+                try
+                {
+                    double deadline=Time.realtimeSinceStartupAsDouble+20;
+                    while(!pending.Ready&&!pending.Failed&&Time.realtimeSinceStartupAsDouble<deadline)
+                    {pending.Tick(true,firstNumber);yield return null;}
+                    Assert.That(pending.Ready,Is.True);
+                    string name=pending.Name,key=pending.Key;
+                    ushort alternatePort=(ushort)(pending.Port==ushort.MaxValue?pending.Port-1:pending.Port+1);
+                    var advertisement=(LabBonjourDiscovery)typeof(LabPendingRoom).GetField("advertisement",BindingFlags.NonPublic|BindingFlags.Instance).GetValue(pending);
+                    Assert.That(contender.StartAdvertise(name,alternatePort,true,true,1,3,false,true,false),Is.False);
+                    Assert.That(contender.RegistrationNameConflict,Is.True);
+                    Assert.That(contender.ActiveNativeOperations,Is.Zero,"A local collision must not allocate a native registration.");
+                    Assert.That(pending.EnterAsCreator(network),Is.True);
+                    pending.Dispose();
+                    yield return null;
+                    Assert.That(network.IsHost,Is.True);
+                    Assert.That(Field<LabBonjourDiscovery>("discovery"),Is.SameAs(advertisement));
+                    Assert.That(network.ConnectedRoomName,Is.EqualTo(name));
+                    Assert.That(LabRoomCatalog.Key(network.ConnectedRoomName,network.port),Is.EqualTo(key));
+                    Assert.That(advertisement.IsAdvertising&&advertisement.AdvertisingConfirmed,Is.True);
+                    Assert.That(contender.StartAdvertise(name,alternatePort,true,true,1,3,false,true,false),Is.False,
+                        "Disposing the transferred card must not return the live Host's name.");
+                    Assert.That(contender.RegistrationNameConflict,Is.True);
+                    network.Stop();
+                    Assert.That(contender.StartAdvertise(name,alternatePort,true,true,1,3,false,true,false),Is.True,
+                        "Host Stop deallocates the old registration before returning its name.");
+                    Assert.That(contender.StartAdvertise(name,alternatePort,true,true,1,3,false,true,false),Is.True,
+                        "Replacing one's own registration must clean up the old native operation and lease first.");
+                    Assert.That(contender.ActiveNativeOperations,Is.EqualTo(1));
+                    deadline=Time.realtimeSinceStartupAsDouble+20;
+                    while(!contender.AdvertisingConfirmed&&contender.IsAdvertising&&Time.realtimeSinceStartupAsDouble<deadline)
+                    {contender.Tick();yield return null;}
+                    Assert.That(contender.AdvertisingConfirmed,Is.True,contender.LastError);
+                    Assert.That(contender.RegisteredServiceName,Is.EqualTo(name));
+                }
+                finally{pending.Dispose();}
+            }
         }
         private void Set(string name,object value)=>typeof(LabNetwork).GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).SetValue(network,value);
         private T Field<T>(string name)=>(T)typeof(LabNetwork).GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).GetValue(network);

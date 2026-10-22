@@ -99,9 +99,10 @@ namespace C6Lab
                 candidateNumber = Math.Max(candidateNumber, firstNumber);
                 string requestedName = LabRoomNames.ServiceBaseFor(Family) + (candidateNumber == 1 ? string.Empty
                     : " (" + candidateNumber.ToString(CultureInfo.InvariantCulture) + ")");
-                registrationAttempts++;
-                if (!advertisement.StartAdvertise(requestedName, Port, ipv4 != null, ipv6 != null, 1, Capacity, false, true, false)
-                    && !RetryNameConflict()) { Dispose(); return; }
+                bool accepted = advertisement.StartAdvertise(requestedName, Port, ipv4 != null, ipv6 != null, 1, Capacity, false, true, false);
+                // Local owners are known immediately and did not spend a native conflict attempt.
+                if (!advertisement.LocalRegistrationNameConflict) registrationAttempts++;
+                if (!accepted && !RetryNameConflict()) { Dispose(); return; }
             }
             advertisement?.Tick();
             RetryNameConflict();
@@ -110,7 +111,7 @@ namespace C6Lab
         private bool RetryNameConflict()
         {
             if (!registrationStarted || advertisement == null || !advertisement.RegistrationNameConflict
-                || registrationAttempts >= LabBonjourDiscovery.MaximumServices) return false;
+                || registrationAttempts >= LabBonjourDiscovery.MaximumServices || candidateNumber == int.MaxValue) return false;
             registrationStarted = false;
             candidateNumber++;
             return true;
