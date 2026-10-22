@@ -103,6 +103,24 @@ namespace Hapio.Tests
                     "The shared Battle scene must create the selected stage's Host policy, not the legacy Lab mix.");
                 Assert.That(session.CurrentStageDefinition.stageIndex, Is.EqualTo(stage));
 
+                var jigwiHud = SceneManager.GetActiveScene().GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<LabJigwiHud>(true)).Single();
+                yield return null; // The saved HUD evaluates the real stage policy in LateUpdate.
+                Assert.That(network.JigwiManualControlsAllowed, Is.EqualTo(stage == 3));
+                Assert.That(jigwiHud.testToggle.gameObject.activeInHierarchy, Is.EqualTo(stage == 3),
+                    "The standalone Lab manual panel must not appear in Gumiho or Yaguang game stages.");
+                if (stage == 3)
+                {
+                    session.Pause();
+                    yield return null;
+                    Assert.That(jigwiHud.testToggle.gameObject.activeInHierarchy, Is.True,
+                        "Pausing Jigwi keeps the developer entry visible, as in the standalone Lab.");
+                    Assert.That(jigwiHud.fireButton.interactable, Is.False);
+                    Assert.That(jigwiHud.generationButton.interactable, Is.False);
+                    session.Resume();
+                    yield return null;
+                }
+
                 LabOrbBoard thisBoard = network.board;
                 network.Generate();
                 yield return Until(() => network.Snapshot.players.Single().generatedTotal == 1,

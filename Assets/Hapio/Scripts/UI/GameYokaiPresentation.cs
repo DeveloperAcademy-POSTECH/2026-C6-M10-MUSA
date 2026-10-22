@@ -75,14 +75,45 @@ namespace Hapio
             Status = definition.displayName + ": decorative stage model applied.";
         }
 
-        private static void StripGameplayComponents(GameObject root)
+        private void StripGameplayComponents(GameObject root)
         {
+            // Imported FBX files can carry authoring cameras/lights. Disable them before the
+            // end-of-frame destruction so a decorative model cannot replace the seat view.
+            var authoringViews = new List<Behaviour>();
+            foreach (Camera camera in root.GetComponentsInChildren<Camera>(true))
+            { camera.enabled = false; authoringViews.Add(camera); }
+            foreach (Light light in root.GetComponentsInChildren<Light>(true))
+            { light.enabled = false; authoringViews.Add(light); }
+            foreach (AudioListener listener in root.GetComponentsInChildren<AudioListener>(true))
+            { listener.enabled = false; authoringViews.Add(listener); }
+            bool deferredDependencies = false;
+            foreach (MonoBehaviour component in root.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                if (component == null || !IsAuthoringRenderData(component)) continue;
+                component.enabled = false;
+                Remove(component);
+                deferredDependencies = Application.isPlaying;
+            }
+            // URP data requires its Camera/Light. Destroy is deferred in play mode, so removing
+            // both in the same frame would leave the base component after a dependency error.
+            if (deferredDependencies) StartCoroutine(RemoveAuthoringViewsNextFrame(authoringViews));
+            else foreach (Behaviour component in authoringViews) Remove(component);
             foreach (Collider collider in root.GetComponentsInChildren<Collider>(true))
             { collider.enabled = false; Remove(collider); }
             foreach (Rigidbody body in root.GetComponentsInChildren<Rigidbody>(true))
             { body.useGravity = false; body.isKinematic = true; Remove(body); }
             foreach (Animator animator in root.GetComponentsInChildren<Animator>(true)) animator.enabled = false;
             foreach (Animation animation in root.GetComponentsInChildren<Animation>(true)) animation.enabled = false;
+        }
+
+        private static bool IsAuthoringRenderData(MonoBehaviour component) =>
+            component.GetType().FullName == "UnityEngine.Rendering.Universal.UniversalAdditionalCameraData"
+            || component.GetType().FullName == "UnityEngine.Rendering.Universal.UniversalAdditionalLightData";
+
+        private static System.Collections.IEnumerator RemoveAuthoringViewsNextFrame(List<Behaviour> components)
+        {
+            yield return null;
+            foreach (Behaviour component in components) if (component != null) Remove(component);
         }
 
         private static void SetLayer(Transform root, int layer)

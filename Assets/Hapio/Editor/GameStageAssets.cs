@@ -53,7 +53,17 @@ namespace Hapio.Editor
         private static GameObject EnsureGumihoVisual()
         {
             var saved = AssetDatabase.LoadAssetAtPath<GameObject>(VisualPath);
-            if (saved != null) return saved;
+            if (saved != null)
+            {
+                // Clean an existing wrapper in place; its GUID and references must survive an upgrade.
+                GameObject contents = PrefabUtility.LoadPrefabContents(VisualPath);
+                try
+                {
+                    if (RemoveAuthoringViewComponents(contents)) PrefabUtility.SaveAsPrefabAsset(contents, VisualPath);
+                }
+                finally { PrefabUtility.UnloadPrefabContents(contents); }
+                return AssetDatabase.LoadAssetAtPath<GameObject>(VisualPath);
+            }
             var model = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Lab/Art/Monster/ninetailedfox.fbx");
             var material = AssetDatabase.LoadAssetAtPath<Material>("Assets/Lab/Art/Monster/Gumiho_Mat.Mat");
             if (model == null || material == null) throw new InvalidOperationException("The saved Gumiho model/material is missing.");
@@ -73,9 +83,42 @@ namespace Hapio.Editor
                 foreach (Rigidbody body in wrapper.GetComponentsInChildren<Rigidbody>(true)) UnityEngine.Object.DestroyImmediate(body);
                 foreach (Animator animation in wrapper.GetComponentsInChildren<Animator>(true)) animation.enabled = false;
                 foreach (Animation animation in wrapper.GetComponentsInChildren<Animation>(true)) animation.enabled = false;
+                RemoveAuthoringViewComponents(wrapper);
                 return PrefabUtility.SaveAsPrefabAsset(wrapper, VisualPath);
             }
             finally { UnityEngine.Object.DestroyImmediate(wrapper); }
+        }
+
+        private static bool RemoveAuthoringViewComponents(GameObject root)
+        {
+            bool changed = false;
+            // A removed component on a nested imported FBX is not reliably persisted as an
+            // override. Unpack only this wrapper's instances, keeping mesh/material references
+            // to the source assets, before saving the sanitized wrapper at the same path.
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child == root.transform || !PrefabUtility.IsAnyPrefabInstanceRoot(child.gameObject)) continue;
+                PrefabUtility.UnpackPrefabInstance(child.gameObject, PrefabUnpackMode.Completely,
+                    InteractionMode.AutomatedAction);
+                changed = true;
+            }
+            foreach (MonoBehaviour component in root.GetComponentsInChildren<MonoBehaviour>(true))
+            {
+                if (component == null) continue;
+                string type = component.GetType().FullName;
+                if (type != "UnityEngine.Rendering.Universal.UniversalAdditionalCameraData"
+                    && type != "UnityEngine.Rendering.Universal.UniversalAdditionalLightData") continue;
+                component.enabled = false;
+                UnityEngine.Object.DestroyImmediate(component);
+                changed = true;
+            }
+            foreach (Camera camera in root.GetComponentsInChildren<Camera>(true))
+            { camera.enabled = false; UnityEngine.Object.DestroyImmediate(camera); changed = true; }
+            foreach (Light light in root.GetComponentsInChildren<Light>(true))
+            { light.enabled = false; UnityEngine.Object.DestroyImmediate(light); changed = true; }
+            foreach (AudioListener listener in root.GetComponentsInChildren<AudioListener>(true))
+            { listener.enabled = false; UnityEngine.Object.DestroyImmediate(listener); changed = true; }
+            return changed;
         }
         private static void Folder(string path)
         {

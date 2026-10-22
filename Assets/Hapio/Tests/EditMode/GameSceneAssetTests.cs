@@ -56,6 +56,18 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void GumihoDecorativeWrapper_DoesNotImportItsOwnCameraLightingOrAudioListener()
+        {
+            GameObject prefab = GameStageCatalog.RequireDefault().Get(1).yokaiVisual;
+            Assert.That(prefab, Is.Not.Null);
+            Assert.That(prefab.GetComponentsInChildren<Renderer>(true).Length, Is.GreaterThan(0));
+            Assert.That(prefab.GetComponentsInChildren<Camera>(true), Is.Empty,
+                "An FBX authoring camera must never draw over the player's assigned seat camera.");
+            Assert.That(prefab.GetComponentsInChildren<Light>(true), Is.Empty);
+            Assert.That(prefab.GetComponentsInChildren<AudioListener>(true), Is.Empty);
+        }
+
+        [Test]
         public void BattleCopy_BindsSavedBoardTargetHudWithoutAnotherStandaloneNetwork()
         {
             WithScene(GameScenePaths.Battle, scene =>
