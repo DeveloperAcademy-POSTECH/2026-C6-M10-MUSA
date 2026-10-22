@@ -13,6 +13,8 @@ namespace C6Lab
         private bool registrationStarted;
         private int candidateNumber = 1, registrationAttempts;
         public int Capacity { get; private set; }
+        /// <summary>A 2:2 team territory room (#281), advertised before its creator enters.</summary>
+        public bool Team { get; private set; }
         public LabRoomFamily Family { get; }
         public ushort Port { get; private set; }
         public string Name => advertisement?.RegisteredServiceName ?? string.Empty;
@@ -27,16 +29,19 @@ namespace C6Lab
             => TryCreate(capacity, LabRoomFamily.Lab, out room, out error);
 
         public static bool TryCreate(int capacity, LabRoomFamily family, out LabPendingRoom room, out string error)
+            => TryCreate(capacity, family, false, out room, out error);
+
+        public static bool TryCreate(int capacity, LabRoomFamily family, bool team, out LabPendingRoom room, out string error)
         {
             room = null; error = string.Empty;
             if (capacity < 2 || capacity > 5) { error = "함께할 인원을 골라주시오."; return false; }
             if (!Enum.IsDefined(typeof(LabRoomFamily), family)) { error = "방 종류를 확인해주시오."; return false; }
             if (!LabBonjourDiscovery.IsSupported) { error = "이 기기에서는 방을 만들 수 없소."; return false; }
-            var pending = new LabPendingRoom(family) { Capacity = capacity };
+            var pending = new LabPendingRoom(family) { Capacity = capacity, Team = team };
             try
             {
                 pending.ReservePort();
-                pending.advertisement = new LabBonjourDiscovery(family);
+                pending.advertisement = new LabBonjourDiscovery(family) { Team = team };
                 room = pending;
                 return true;
             }

@@ -14,11 +14,13 @@ namespace Hapio
         public int Capacity { get; }
         public bool Ready { get; }
         public bool Failed { get; }
+        /// <summary>The 2:2 team territory mode (#281) or the three-yokai story.</summary>
+        public GameMode Mode { get; }
 
         internal GamePendingRoomInfo(LabPendingRoom room)
         {
             Key = room.Key; Name = room.Name; Port = room.Port; Capacity = room.Capacity;
-            Ready = room.Ready; Failed = room.Failed;
+            Ready = room.Ready; Failed = room.Failed; Mode = room.Team ? GameMode.Territory : GameMode.Story;
         }
     }
 
@@ -29,13 +31,18 @@ namespace Hapio
         private bool disposed;
         public IReadOnlyList<GamePendingRoomInfo> Rooms => rooms.Select(room => new GamePendingRoomInfo(room)).ToArray();
 
-        public bool TryCreate(int capacity, out string error)
+        public bool TryCreate(int capacity, out string error) => TryCreate(capacity, GameMode.Story, out error);
+
+        /// <summary>A 2:2 room (#281) always waits for exactly four players.</summary>
+        public bool TryCreate(int capacity, GameMode mode, out string error)
         {
             error = string.Empty;
             if (disposed) { error = "방 목록이 닫혔소."; return false; }
             if (rooms.Count >= LabBonjourDiscovery.MaximumServices)
             { error = "열린 방이 너무 많소. 만든 방에 먼저 입장해주시오."; return false; }
-            if (!LabPendingRoom.TryCreate(capacity, LabRoomFamily.Game, out var room, out error)) return false;
+            if (mode == GameMode.Territory) capacity = LabTeams.Players;
+            if (!LabPendingRoom.TryCreate(capacity, LabRoomFamily.Game, mode == GameMode.Territory,
+                out var room, out error)) return false;
             rooms.Add(room);
             return true;
         }

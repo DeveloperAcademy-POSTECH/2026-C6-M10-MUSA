@@ -20,11 +20,14 @@ namespace C6Lab
         public int TargetParticipants { get; }
         public bool Playing { get; }
         public bool WaitingForHost { get; }
+        /// <summary>A 2:2 team territory room (#281).</summary>
+        public bool Team { get; }
         public string Key => ServiceName + "|" + InterfaceIndex + "|" + Address + "|" + Port;
         public LabBonjourTarget(string address, ushort port, uint interfaceIndex, string serviceName,
-            int participants = 0, int targetParticipants = 0, bool playing = false, bool waitingForHost = false)
+            int participants = 0, int targetParticipants = 0, bool playing = false, bool waitingForHost = false, bool team = false)
         { Address = address; Port = port; InterfaceIndex = interfaceIndex; ServiceName = serviceName;
-          Participants = participants; TargetParticipants = targetParticipants; Playing = playing; WaitingForHost = waitingForHost; }
+          Participants = participants; TargetParticipants = targetParticipants; Playing = playing; WaitingForHost = waitingForHost;
+          Team = team; }
     }
 
     /// <summary>One visible room, possibly reachable through several network interfaces and IP families.</summary>
@@ -38,10 +41,14 @@ namespace C6Lab
         public int TargetParticipants { get; }
         public bool Playing { get; }
         public bool WaitingForHost { get; }
+        /// <summary>A 2:2 team territory room (#281).</summary>
+        public bool Team { get; }
         public bool IsFull => TargetParticipants > 0 && Participants >= TargetParticipants;
-        internal LabDiscoveredRoom(string name, ushort port, int participants = 0, int capacity = 0, bool playing = false, bool waitingForHost = false)
+        internal LabDiscoveredRoom(string name, ushort port, int participants = 0, int capacity = 0, bool playing = false,
+            bool waitingForHost = false, bool team = false)
         { Name = name; Port = port; Key = LabRoomCatalog.Key(name, port);
-          Participants = participants; TargetParticipants = capacity; Playing = playing; WaitingForHost = waitingForHost; }
+          Participants = participants; TargetParticipants = capacity; Playing = playing; WaitingForHost = waitingForHost;
+          Team = team; }
     }
 
     /// <summary>Keep the room picker independent of the number of Bonjour A/AAAA records.</summary>
@@ -55,7 +62,8 @@ namespace C6Lab
             return targets.Where(Usable).GroupBy(target => Key(target.ServiceName, target.Port),
                     StringComparer.OrdinalIgnoreCase)
                 .Select(group => new LabDiscoveredRoom(group.First().ServiceName, group.First().Port,
-                    group.First().Participants, group.First().TargetParticipants, group.First().Playing, group.First().WaitingForHost))
+                    group.First().Participants, group.First().TargetParticipants, group.First().Playing, group.First().WaitingForHost,
+                    group.First().Team))
                 .OrderBy(room => LabRoomNames.SortNumber(room.Name))
                 .ThenBy(room => room.Name, StringComparer.OrdinalIgnoreCase).ThenBy(room => room.Port)
                 .ToArray();
@@ -130,9 +138,12 @@ namespace C6Lab
         public int ActiveNativeOperations => operations.Count(x => !x.Done);
         public IReadOnlyList<LabBonjourTarget> Targets => Array.AsReadOnly(services.Values.SelectMany(s => s.Addresses.Values.Select(x =>
             new LabBonjourTarget(x.Target.Address, x.Target.Port, x.Target.InterfaceIndex, x.Target.ServiceName,
-                s.Participants, s.Capacity, s.Playing, s.WaitingForHost))).OrderBy(x => x.ServiceName, StringComparer.Ordinal).ThenBy(x => x.InterfaceIndex)
+                s.Participants, s.Capacity, s.Playing, s.WaitingForHost, s.Team))).OrderBy(x => x.ServiceName, StringComparer.Ordinal).ThenBy(x => x.InterfaceIndex)
             .ThenBy(x => x.Address, StringComparer.Ordinal).ToArray());
         public static bool IsSupported => Application.platform == RuntimePlatform.OSXEditor || Application.platform == RuntimePlatform.OSXPlayer || Application.platform == RuntimePlatform.IPhonePlayer;
+
+        /// <summary>Advertise this room as a 2:2 team territory room (#281). Kept when a pending room is handed to its Host.</summary>
+        public bool Team { get; set; }
 
         public bool UpdatePresence(int participants, int capacity, bool playing, bool waitingForHost = false)
             => UpdatePresence(advertisedIpv4, advertisedIpv6, participants, capacity, playing, waitingForHost);
@@ -142,7 +153,7 @@ namespace C6Lab
         {
             CheckOwner();
             if (!IsAdvertising) return false;
-            byte[] record = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost);
+            byte[] record = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost, Team);
             if (advertisedPresence != null && record.SequenceEqual(advertisedPresence)) return true;
             int error = Native(() => LabBonjourNative.DNSServiceUpdateRecord(advertisement.Reference, IntPtr.Zero, 0,
                 (ushort)record.Length, record, 0));
@@ -166,7 +177,7 @@ namespace C6Lab
             var operation = Create("register");
             advertisement = operation;
             advertisedIpv4 = ipv4; advertisedIpv6 = ipv6;
-            byte[] txt = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost);
+            byte[] txt = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost, Team);
             advertisedPresence = txt;
             // dns_sd.h: kDNSServiceFlagsNoAutoRename=0x8, kDNSServiceErr_NameConflict=-65548.
             int error = Native(() => LabBonjourNative.DNSServiceRegister(out operation.Reference, autoRename ? 0u : 0x8u, 0, serviceName,
@@ -409,7 +420,7 @@ namespace C6Lab
                 { owner.Fail(operation, "Bonjour room metadata invalid."); return; }
                 var record = new byte[length]; Marshal.Copy(txt, record, 0, length);
                 if (!LabRoomPresence.TryDecode(record, owner.ExpectedProtocol, out service.Ipv4, out service.Ipv6,
-                    out service.Participants, out service.Capacity, out service.Playing, out service.WaitingForHost))
+                    out service.Participants, out service.Capacity, out service.Playing, out service.WaitingForHost, out service.Team))
                 {
                     // The shared service type deliberately includes the other room family.
                     // Ignore an incompatible record without turning a healthy browse into an error.
@@ -465,7 +476,7 @@ namespace C6Lab
                 if (length < 2 || length > 128 || bytes == IntPtr.Zero) return;
                 var record = new byte[length]; Marshal.Copy(bytes, record, 0, length);
                 if (!LabRoomPresence.TryDecode(record, owner.ExpectedProtocol, out bool ipv4, out bool ipv6,
-                    out int count, out int capacity, out bool playing, out bool waitingForHost))
+                    out int count, out int capacity, out bool playing, out bool waitingForHost, out bool team))
                 { owner.Remove(operation.Service.Key); return; }
                 var service = operation.Service;
                 if (service.Ipv4 != ipv4 || service.Ipv6 != ipv6)
@@ -477,6 +488,7 @@ namespace C6Lab
                         service.Addresses.Remove(key);
                 }
                 service.Participants = count; service.Capacity = capacity; service.Playing = playing; service.WaitingForHost = waitingForHost;
+                service.Team = team;
                 operation.HasAddressOrReply = true; owner.changed = true;
             });
         }
@@ -492,7 +504,7 @@ namespace C6Lab
 
         private sealed class Service
         {
-            internal string Key, Name; internal uint InterfaceIndex; internal ushort Port; internal bool Ipv4, Ipv6, Playing, WaitingForHost; internal int Participants, Capacity; internal Operation Resolve, Address, Presence;
+            internal string Key, Name; internal uint InterfaceIndex; internal ushort Port; internal bool Ipv4, Ipv6, Playing, WaitingForHost, Team; internal int Participants, Capacity; internal Operation Resolve, Address, Presence;
             internal readonly Dictionary<string, AddressRecord> Addresses = new Dictionary<string, AddressRecord>(StringComparer.Ordinal);
         }
         private sealed class AddressRecord

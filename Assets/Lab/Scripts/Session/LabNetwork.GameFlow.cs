@@ -65,6 +65,30 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// 2:2 땅따먹기 (#281)는 한 판이 끝나거나 한 명이 나가면 같은 방의 로비로 돌아간다. 그때만 GameSession이 잠금을 푼다.
+        /// </summary>
+        public void UnlockGameRoster()
+        {
+            if (!gameFlowEnabled || !gameRosterLocked) return;
+            gameRosterLocked = false;
+            Changed?.Invoke();
+        }
+
+        /// <summary>
+        /// 2:2 땅따먹기 (#281): 전투를 정리하고 연결·P번호·설정은 그대로 둔 채 로비로 돌아간다. 새 참가와 자리 바꾸기가 다시 열린다.
+        /// </summary>
+        public bool ReturnGameToLobby()
+        {
+            if (!gameFlowEnabled || !IsHost) return false;
+            gameBattleFrozen = false;
+            gameStageIndex = 0; gameStageId = null; gameStageYokai = LabStageYokai.None;
+            EndBattleToLobby();
+            UnlockGameRoster();
+            if (!developerSolo) BroadcastLobby();
+            return true;
+        }
+
+        /// <summary>
         /// Attach the loaded Battle Scene after its board has been configured. No Scene object
         /// becomes persistent: only this transport and the authoritative data survive a load.
         /// </summary>
@@ -216,7 +240,8 @@ namespace C6Lab
         /// <summary>Install one Host-authored effective profile and invalidate old settings ACKs.</summary>
         public bool PrepareGameStage(LabConfig stageConfig, int stageIndex, string stageId, LabStageYokai yokai)
         {
-            if (!gameFlowEnabled || !IsHost || !ValidGameStage(stageIndex, stageId, yokai)
+            if (!gameFlowEnabled || !IsHost || stageConfig == null
+                || !ValidGameStage(stageIndex, stageId, yokai, stageConfig.TeamTerritoryEnabled)
                 || !TryInstallSessionConfig(stageConfig, out _)) return false;
             if (!PrepareGameStage()) return false;
             gameStageIndex = stageIndex;
@@ -226,10 +251,12 @@ namespace C6Lab
             return true;
         }
 
-        private static bool ValidGameStage(int stageIndex, string stageId, LabStageYokai yokai) =>
+        /// <summary>The three yokai stages, or the single yokai-free 2:2 territory battle (#281).</summary>
+        private static bool ValidGameStage(int stageIndex, string stageId, LabStageYokai yokai, bool territory) =>
             stageIndex >= 1 && stageIndex <= 3 && !string.IsNullOrWhiteSpace(stageId)
             && stageId.Length <= 64 && !System.Linq.Enumerable.Any(stageId, char.IsControl)
-            && Enum.IsDefined(typeof(LabStageYokai), yokai) && (int)yokai == stageIndex;
+            && Enum.IsDefined(typeof(LabStageYokai), yokai)
+            && (territory ? stageIndex == 1 && yokai == LabStageYokai.None : (int)yokai == stageIndex);
 
         /// <summary>Both the Scene-ready receipt and start command name the exact settings generation.</summary>
         public bool MatchesGameStageConfig(int revision, string fingerprint) =>
@@ -239,7 +266,7 @@ namespace C6Lab
         public bool StartCurrentGameStage(int stageIndex, string stageId, LabStageYokai yokai,
             int settingsRevision, string settingsFingerprint)
         {
-            if (!ValidGameStage(stageIndex, stageId, yokai) || stageIndex != gameStageIndex
+            if (config == null || !ValidGameStage(stageIndex, stageId, yokai, config.TeamTerritoryEnabled) || stageIndex != gameStageIndex
                 || stageId != gameStageId || yokai != gameStageYokai
                 || !MatchesGameStageConfig(settingsRevision, settingsFingerprint)) return false;
             return StartCurrentGameStage();

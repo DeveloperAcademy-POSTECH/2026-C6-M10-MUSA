@@ -206,11 +206,11 @@ namespace Hapio.Tests
                     Assert.That(screen.developerInputs.All(value => value != null), Is.True);
                     Assert.That(screen.developerSliders.All(value => value != null), Is.True);
                     Assert.That(screen.developerPanel.activeSelf, Is.False);
-                    Assert.That(screen.developerScopeButtons, Has.Length.EqualTo(4));
+                    Assert.That(screen.developerScopeButtons, Has.Length.EqualTo(5));
                     Assert.That(screen.developerScopeButtons.All(button => button != null), Is.True);
                     Assert.That(screen.developerScopeLabel, Is.Not.Null);
                     Assert.That(screen.developerScopeButtons.Select(button => button.GetComponentInChildren<UnityEngine.UI.Text>().text),
-                        Is.EqualTo(new[] { "공통", "구미호", "야광귀", "지귀" }));
+                        Is.EqualTo(new[] { "공통", "구미호", "야광귀", "지귀", "2:2" }));
                     Font sharedFont = AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/ShillaCultureBold.otf");
                     Assert.That(sharedFont, Is.Not.Null);
                     foreach (UnityEngine.UI.Text text in screen.developerPanel.GetComponentsInChildren<UnityEngine.UI.Text>(true))

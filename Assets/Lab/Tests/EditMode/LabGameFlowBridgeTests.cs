@@ -304,7 +304,16 @@ namespace C6Lab.Tests
             LabStageYokai yokai, bool expected)
         {
             MethodInfo valid = typeof(LabNetwork).GetMethod("ValidGameStage", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.That(valid.Invoke(null, new object[] { index, id, yokai }), Is.EqualTo(expected));
+            Assert.That(valid.Invoke(null, new object[] { index, id, yokai, false }), Is.EqualTo(expected));
+        }
+
+        [TestCase(1, "territory", LabStageYokai.None, true)]
+        [TestCase(2, "territory", LabStageYokai.None, false)]
+        [TestCase(1, "territory", LabStageYokai.Gumiho, false)]
+        public void TerritoryStageIsOneYokaiFreeBattle(int index, string id, LabStageYokai yokai, bool expected)
+        {
+            MethodInfo valid = typeof(LabNetwork).GetMethod("ValidGameStage", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(valid.Invoke(null, new object[] { index, id, yokai, true }), Is.EqualTo(expected));
         }
 
         /// <summary>

@@ -15,6 +15,8 @@ namespace Hapio
     public sealed class GameSession : MonoBehaviour
     {
         public const string ResourcePath = "Hapio/GameSession";
+        /// <summary>The single 2:2 team territory battle (#281) has no yokai stage definition.</summary>
+        public const string TerritoryStageId = "territory";
         [SerializeField] private LabNetwork network;
         [SerializeField] private GameStageCatalog stageCatalog;
         private GameStageSettings stageSettings;
@@ -34,6 +36,8 @@ namespace Hapio
         private bool restartPending;
         private double loadStartedAt, nextStateAt, nextReadyAt, nextResultReadyAt;
         private LabGourdResultPreview preview;
+        // 2:2 (#281): the Host's room mode, and the mode a client expects from the room card it joined.
+        private GameMode hostMode, joiningMode;
 
         [Serializable]
         private sealed class Control
@@ -53,8 +57,10 @@ namespace Hapio
         public static GameSession Instance { get; private set; }
         public LabNetwork Network => network;
         public GameFlowState State => state;
-        public GameStageDefinition CurrentStageDefinition => state.stageIndex >= 1 && state.stageIndex <= 3
-            ? stageCatalog.Get(state.stageIndex) : null;
+        /// <summary>2:2 team territory room (#281): one battle, then back to this room's lobby.</summary>
+        public bool IsTerritory => state.mode == GameMode.Territory;
+        public GameStageDefinition CurrentStageDefinition => state.mode == GameMode.Story
+            && state.stageIndex >= 1 && state.stageIndex <= 3 ? stageCatalog.Get(state.stageIndex) : null;
         public LabSnapshot ResultSnapshot { get; private set; }
         public Texture PreviewTexture => preview != null && !preview.IsDisposed ? preview.Texture : null;
         public bool IsViewerOpen { get; private set; }
@@ -63,7 +69,8 @@ namespace Hapio
         public IReadOnlyList<GamePendingRoomInfo> PendingRooms => pendingRooms.Rooms;
         public bool IsLoadingScene => sceneRoutine != null || state.phase == GameFlowPhase.LoadingBattle;
         public bool PendingSettingsApply => network != null && network.IsConnected && !network.SessionConfigReady;
-        public bool CanAdvanceStage => network != null && network.IsHost && !IsLoadingScene && AllResultsReady;
+        public bool CanAdvanceStage => network != null && network.IsHost && !IsLoadingScene && AllResultsReady
+            && (!IsTerritory || !network.IsDeveloperSolo);
         public bool CanReturnHome => state.phase == GameFlowPhase.GameOver
             || state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
             || (state.phase == GameFlowPhase.Completed && (!network.IsHost || AllResultsReady));
@@ -136,8 +143,9 @@ namespace Hapio
             if (goingHome) return;
             if (state.phase == GameFlowPhase.Home && network.IsConnected)
             {
-                if (network.IsHost) { hostFlow.EnterLobby(); SetHostState(); }
-                else SetLocalState(new GameFlowState { phase = GameFlowPhase.Lobby });
+                if (network.IsHost) { hostFlow.EnterLobby(hostMode); SetHostState(); }
+                else SetLocalState(new GameFlowState
+                    { phase = GameFlowPhase.Lobby, mode = joiningMode, totalStages = GameRunFlow.StagesFor(joiningMode) });
             }
             if (state.phase == GameFlowPhase.Lobby && !network.IsConnected && !network.IsJoiningRoom)
                 SetLocalState(new GameFlowState());
@@ -156,14 +164,15 @@ namespace Hapio
                     && (network.IsDeveloperSolo || network.SessionConfigReady))
                 {
                     GameFlowState loading = hostFlow.State;
-                    if (network.StartCurrentGameStage(loading.stageIndex, CurrentStageDefinition.stageId,
-                        CurrentStageDefinition.yokai, expectedSettingsRevision, expectedSettingsFingerprint)
+                    Identity(loading, out string stageId, out LabStageYokai yokai);
+                    if (network.StartCurrentGameStage(loading.stageIndex, stageId,
+                        yokai, expectedSettingsRevision, expectedSettingsFingerprint)
                         && network.Snapshot != null
                         && hostFlow.MarkPlaying(loading.runId, loading.stageIndex, loading.revision,
                             network.Snapshot.sessionId, network.Snapshot.round)) SetHostState();
                 }
                 if (network.IsHost && now - loadStartedAt > loadingTimeoutSeconds)
-                    AbortHost("A player could not finish loading the stage.");
+                    AbortHost("A player could not finish loading the stage.", "누군가 판을 불러오지 못해 로비로 돌아왔소.");
             }
             if (network.IsHost && network.IsConnected && now >= nextStateAt)
             {
@@ -218,12 +227,13 @@ namespace Hapio
                     resultReady.Add(control.sender);
                 else if (control.kind == "exit" && state.IsRunActive && control.runId == state.runId
                     && control.stageIndex == state.stageIndex)
-                    AbortHost("A player left the game.");
+                    AbortHost("A player left the game.", "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
                 return;
             }
             if (control.kind != "state" || control.state == null || !ValidStateControl(control)) return;
             if (state.phase == GameFlowPhase.GameOver && control.state.phase != GameFlowPhase.GameOver) return;
-            bool newRun = state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby;
+            bool newRun = state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
+                || BackToLobby(control.state);
             if (replica.Apply(control.state, newRun, out _))
             {
                 expectedSettingsRevision = control.settingsRevision;
@@ -244,12 +254,30 @@ namespace Hapio
                 network.BroadcastGameFlow(JsonUtility.ToJson(MakeControl("state", hostFlow.State)));
         }
 
+        /// <summary>
+        /// 2:2 (#281): the Host ends the battle or its result and keeps the room. Only a lobby state newer than this
+        /// run is taken, so an old pre-battle lobby state can never pull a peer out of a later battle.
+        /// </summary>
+        private bool BackToLobby(GameFlowState incoming) => incoming.phase == GameFlowPhase.Lobby
+            && state.mode == GameMode.Territory && incoming.mode == GameMode.Territory
+            && (state.IsRunActive || state.phase == GameFlowPhase.Completed) && incoming.revision > state.revision;
+
         private void SetLocalState(GameFlowState value)
         {
             GameFlowState previous = state;
             state = value.Copy();
             if (state.phase != GameFlowPhase.Home && state.phase != GameFlowPhase.Lobby)
                 network.LockGameRoster();
+            if (state.phase == GameFlowPhase.Lobby && previous.phase != GameFlowPhase.Home
+                && previous.phase != GameFlowPhase.Lobby)
+            {
+                // 2:2 (#281): the same room opens again for seat changes and a replacement player.
+                network.UnlockGameRoster();
+                ReleaseResult();
+                UiNotice = state.notice;
+            }
+            else if (state.phase == GameFlowPhase.LoadingBattle && previous.phase == GameFlowPhase.Lobby)
+                UiNotice = string.Empty;
             if (previous.runId != state.runId || previous.stageIndex != state.stageIndex
                 || previous.phase != state.phase) resultReady.Clear();
             if (state.phase == GameFlowPhase.LoadingBattle
@@ -360,14 +388,13 @@ namespace Hapio
         private Control MakeControl(string kind, GameFlowState value = null)
         {
             GameFlowState current = value ?? state;
-            GameStageDefinition definition = current.stageIndex >= 1 && current.stageIndex <= 3
-                ? stageCatalog.Get(current.stageIndex) : null;
+            Identity(current, out string stageId, out LabStageYokai yokai);
             return new Control
             {
                 kind = kind, state = kind == "state" ? current : null,
                 runId = current.runId, stageIndex = current.stageIndex, revision = current.revision,
-                stageId = definition != null ? definition.stageId : string.Empty,
-                yokai = definition != null ? definition.yokai : LabStageYokai.None,
+                stageId = stageId,
+                yokai = yokai,
                 settingsRevision = network.IsHost ? network.SessionConfigRevision : expectedSettingsRevision,
                 settingsFingerprint = network.IsHost ? network.SessionConfigFingerprint : expectedSettingsFingerprint
             };
@@ -381,23 +408,50 @@ namespace Hapio
                 || control.revision != incoming.revision) return false;
             if (incoming.stageIndex == 0)
                 return string.IsNullOrEmpty(control.stageId) && control.yokai == LabStageYokai.None;
-            GameStageDefinition definition = stageCatalog.Get(incoming.stageIndex);
-            return control.stageId == definition.stageId && control.yokai == definition.yokai
+            Identity(incoming, out string stageId, out LabStageYokai yokai);
+            return control.stageId == stageId && control.yokai == yokai
                 && control.settingsRevision > 0 && !string.IsNullOrEmpty(control.settingsFingerprint)
                 && control.settingsFingerprint.Length <= 128;
         }
 
         private bool MatchesControlIdentity(Control control, bool allowPreviousRevision = false)
         {
-            if (state.stageIndex < 1 || state.stageIndex > 3) return false;
-            GameStageDefinition definition = CurrentStageDefinition;
+            if (state.stageIndex < 1 || state.stageIndex > state.totalStages) return false;
+            Identity(state, out string stageId, out LabStageYokai yokai);
             return control.runId == state.runId && control.stageIndex == state.stageIndex
                 && (control.revision == state.revision || allowPreviousRevision
                     && control.revision > 0 && control.revision < state.revision)
-                && control.stageId == definition.stageId
-                && control.yokai == definition.yokai && control.settingsRevision == expectedSettingsRevision
+                && control.stageId == stageId
+                && control.yokai == yokai && control.settingsRevision == expectedSettingsRevision
                 && control.settingsFingerprint == expectedSettingsFingerprint;
         }
+
+        /// <summary>A yokai stage from the catalog, or the yokai-free 2:2 battle (#281).</summary>
+        private void Identity(GameFlowState value, out string stageId, out LabStageYokai yokai)
+        {
+            stageId = string.Empty; yokai = LabStageYokai.None;
+            if (value == null || value.stageIndex < 1) return;
+            if (value.mode == GameMode.Territory) { stageId = TerritoryStageId; return; }
+            GameStageDefinition definition = stageCatalog.Get(value.stageIndex);
+            stageId = definition.stageId; yokai = definition.yokai;
+        }
+
+        /// <summary>The room's settings for its mode: one yokai stage, or the 2:2 profile (#281).</summary>
+        private LabConfig CreateModeConfig(GameMode mode, int stage) => mode == GameMode.Territory
+            ? stageSettings.CreateTerritoryConfig() : stageSettings.CreateStageConfig(stage >= 1 ? stage : 1);
+
+        /// <summary>Install the room's mode before hosting; a previous 2:2 room must not leak into a story room.</summary>
+        private bool ConfigureRoomMode(GameMode mode, int capacity)
+        {
+            LabConfig candidate = CreateModeConfig(mode, 1);
+            try { if (!network.ConfigureHostSession(candidate, capacity)) return false; }
+            finally { Destroy(candidate); }
+            hostMode = mode;
+            return true;
+        }
+
+        private int SettingsScope => IsTerritory ? GameStageSettings.TerritoryScope
+            : state.stageIndex >= 1 ? state.stageIndex : 1;
 
         public void NotifyBattleBound(LabOrbBoard board)
         {
@@ -434,11 +488,14 @@ namespace Hapio
             Changed?.Invoke();
         }
 
-        public bool CreatePendingRoom(int capacity)
+        public bool CreatePendingRoom(int capacity) => CreatePendingRoom(capacity, GameMode.Story);
+
+        /// <summary>A 2:2 room (#281) always waits for exactly four players.</summary>
+        public bool CreatePendingRoom(int capacity, GameMode mode)
         {
             if (state.phase != GameFlowPhase.Home || !network.CanChooseConnection) return false;
             roomBrowserVisible = true;
-            bool created = pendingRooms.TryCreate(capacity, out string error);
+            bool created = pendingRooms.TryCreate(capacity, mode, out string error);
             UiNotice = error;
             Changed?.Invoke();
             return created;
@@ -448,6 +505,14 @@ namespace Hapio
         {
             if (state.phase != GameFlowPhase.Home || !network.CanChooseConnection || !pendingRooms.CanEnter(key)) return false;
             ResetRoomFlow();
+            GamePendingRoomInfo room = null;
+            foreach (GamePendingRoomInfo item in pendingRooms.Rooms) if (item.Key == key) room = item;
+            if (room == null || !ConfigureRoomMode(room.Mode, room.Capacity))
+            {
+                UiNotice = "방 설정을 준비하지 못했소. 다시 눌러주시오.";
+                Changed?.Invoke();
+                return false;
+            }
             bool entered = pendingRooms.TryEnter(key, network, out string error);
             roomBrowserVisible = true;
             UiNotice = error;
@@ -459,14 +524,19 @@ namespace Hapio
         {
             if (!network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
             roomBrowserVisible = true;
-            ResetRoomFlow(); network.Host();
+            ResetRoomFlow();
+            if (!ConfigureRoomMode(GameMode.Story, network.TargetParticipantCount)) return;
+            network.Host();
         }
 
         public void JoinRoom(string roomKey)
         {
             if (!network.CanJoinDiscoveredRoom(roomKey) || state.phase != GameFlowPhase.Home) return;
             roomBrowserVisible = true;
-            ResetRoomFlow(); network.JoinDiscoveredRoom(roomKey);
+            ResetRoomFlow();
+            foreach (LabDiscoveredRoom room in network.DiscoveredRooms)
+                if (room.Key == roomKey) joiningMode = room.Team ? GameMode.Territory : GameMode.Story;
+            network.JoinDiscoveredRoom(roomKey);
         }
 
         public void JoinDirect(string address)
@@ -484,28 +554,38 @@ namespace Hapio
             if (hostFlow.BeginRun(network.ConnectedPlayerIds)) PrepareStage();
         }
 
-        public void StartSolo()
+        public void StartSolo() => StartSolo(GameMode.Story);
+
+        /// <summary>DEV 2:2 solo check (#281): alone on the Blue team, with combined colors alternating Blue and Red.</summary>
+        public void StartSolo(GameMode mode)
         {
             if (state.phase != GameFlowPhase.Home || !network.PrepareDeveloperSoloGame()) return;
-            hostFlow.EnterLobby();
+            hostMode = mode;
+            hostFlow.EnterLobby(mode);
             if (hostFlow.BeginRun(network.ConnectedPlayerIds)) PrepareStage();
         }
 
         public void NextStage()
         {
             if (!CanAdvanceStage) return;
+            // 2:2 (#281) plays one battle; its result leads everyone back to the same room's lobby.
+            if (IsTerritory)
+            {
+                if (state.phase == GameFlowPhase.Completed) ReturnTerritoryToLobby("한 판이 끝났소. 다시 자리를 고르시오.");
+                return;
+            }
             if (hostFlow.NextStage(state.runId, state.stageIndex, state.revision)) PrepareStage();
         }
 
         private void PrepareStage()
         {
             GameFlowState loading = hostFlow.State;
-            GameStageDefinition definition = stageCatalog.Get(loading.stageIndex);
-            LabConfig candidate = stageSettings.CreateStageConfig(loading.stageIndex);
+            Identity(loading, out string stageId, out LabStageYokai yokai);
+            LabConfig candidate = CreateModeConfig(loading.mode, loading.stageIndex);
             try
             {
-                if (!network.PrepareGameStage(candidate, loading.stageIndex, definition.stageId, definition.yokai))
-                { AbortHost("The stage configuration could not be prepared."); return; }
+                if (!network.PrepareGameStage(candidate, loading.stageIndex, stageId, yokai))
+                { AbortHost("The stage configuration could not be prepared.", "판 설정을 준비하지 못해 로비로 돌아왔소."); return; }
             }
             finally { Destroy(candidate); }
             expectedSettingsRevision = network.SessionConfigRevision;
@@ -539,9 +619,8 @@ namespace Hapio
         {
             error = "Only the Host can change settings in Home, the lobby or a paused battle.";
             if (!CanEditDeveloperSettings) return false;
-            int stage = state.stageIndex >= 1 ? state.stageIndex : 1;
             float[][] before = CaptureProfiles();
-            if (!stageSettings.TryApplyBattle(stage, values, out error)) return false;
+            if (!stageSettings.TryApplyBattle(SettingsScope, values, out error)) return false;
             if (InstallEditedProfile(out error)) return true;
             RestoreProfiles(before);
             return false;
@@ -554,8 +633,7 @@ namespace Hapio
 
         private bool InstallEditedProfile(out string error)
         {
-            int stage = state.stageIndex >= 1 ? state.stageIndex : 1;
-            LabConfig candidate = stageSettings.CreateStageConfig(stage);
+            LabConfig candidate = CreateModeConfig(state.mode, state.stageIndex);
             try
             {
                 bool applied = state.phase == GameFlowPhase.Home
@@ -573,27 +651,28 @@ namespace Hapio
 
         private float[][] CaptureProfiles() => new[]
         {
-            stageSettings.Capture(0), stageSettings.Capture(1), stageSettings.Capture(2), stageSettings.Capture(3)
+            stageSettings.Capture(0), stageSettings.Capture(1), stageSettings.Capture(2), stageSettings.Capture(3),
+            stageSettings.Capture(GameStageSettings.TerritoryScope)
         };
 
         private void RestoreProfiles(float[][] before)
         {
             // Restore Common first: it updates the common fields embedded in all three effective profiles.
             stageSettings.TryApply(0, before[0], out _);
-            for (int stage = 1; stage <= 3; stage++) stageSettings.TryApply(stage, before[stage], out _);
+            for (int stage = 1; stage <= GameStageSettings.TerritoryScope; stage++) stageSettings.TryApply(stage, before[stage], out _);
         }
 
         private bool ValidateBattleDeveloperConfig(LabConfig candidate, out string error)
         {
             error = "Only this paused Host stage may change battle settings.";
             if (!CanEditDeveloperSettings || state.phase != GameFlowPhase.Playing || candidate == null) return false;
-            return stageSettings.TryApplyBattle(state.stageIndex, candidate.CaptureDeveloperValues(), out error, commit: false);
+            return stageSettings.TryApplyBattle(SettingsScope, candidate.CaptureDeveloperValues(), out error, commit: false);
         }
 
         private void OnDeveloperRestart()
         {
             if (!network.IsHost || state.phase != GameFlowPhase.Playing) return;
-            if (!stageSettings.TryApplyBattle(state.stageIndex, network.config.CaptureDeveloperValues(), out string error))
+            if (!stageSettings.TryApplyBattle(SettingsScope, network.config.CaptureDeveloperValues(), out string error))
             { UiNotice = error; AbortHost("The stage settings could not be retained."); return; }
             restartPending = true;
         }
@@ -608,23 +687,34 @@ namespace Hapio
 
         private void ExitWithLocalReason(string reason)
         {
-            if (network.IsHost) { AbortHost(reason); return; }
+            // The Host leaving ends the room for everyone, also in 2:2.
+            if (network.IsHost) { if (hostFlow.Abort(reason)) SetHostState(); return; }
             network.SendGameFlowToHost(JsonUtility.ToJson(MakeControl("exit")));
             GameFlowState failed = state.Copy();
             failed.phase = GameFlowPhase.GameOver; failed.endReason = reason; failed.revision++;
             SetLocalState(failed);
         }
 
-        private void AbortHost(string reason)
+        /// <summary>2:2 (#281): another player leaving or failing only stops the battle; the room returns to its lobby.</summary>
+        private void AbortHost(string reason, string territoryNotice = "판을 멈추고 로비로 돌아왔소.")
         {
+            if (IsTerritory && !network.IsDeveloperSolo && ReturnTerritoryToLobby(territoryNotice)) return;
             if (hostFlow.Abort(reason)) SetHostState();
+        }
+
+        private bool ReturnTerritoryToLobby(string notice)
+        {
+            if (!network.IsHost || !hostFlow.ReturnToLobby(notice)) return false;
+            network.ReturnGameToLobby();
+            SetHostState();
+            return true;
         }
 
         private void OnPeerDisconnected(ulong _, bool lostHost)
         {
             if (state.phase == GameFlowPhase.Completed) { CacheResultSnapshot(); return; }
             if (goingHome || !state.IsRunActive) return;
-            if (network.IsHost) AbortHost("A player disconnected.");
+            if (network.IsHost) AbortHost("A player disconnected.", "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
             else
             {
                 GameFlowState failed = state.Copy();
@@ -659,6 +749,7 @@ namespace Hapio
             hostFlow.ReturnHome(); replica.ResetForNewRoom(); controls.Clear();
             restartPending = battleReadyPending = localBattleReady = false; resultReady.Clear();
             expectedSettingsRevision = 0; expectedSettingsFingerprint = null;
+            hostMode = joiningMode = GameMode.Story;
             ReleaseResult(); UiNotice = string.Empty;
         }
 

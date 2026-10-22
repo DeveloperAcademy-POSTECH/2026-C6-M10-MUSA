@@ -160,6 +160,7 @@ namespace Hapio
 
         private void RefreshResult(LabNetwork net)
         {
+            if (session.IsTerritory) { RefreshTerritoryResult(net); return; }
             bool complete = session.State.phase == GameFlowPhase.Completed;
             GameStageDefinition stage = session.CurrentStageDefinition;
             string stageName = stage != null ? stage.displayName : string.Empty;
@@ -202,6 +203,46 @@ namespace Hapio
             if (viewerImage != null) viewerImage.texture = texture;
         }
 
+        /// <summary>2:2 (#281) result: the winning team or a draw, each team's share of the whole gourd, then back to the lobby.</summary>
+        private void RefreshTerritoryResult(LabNetwork net)
+        {
+            LabSnapshot result = session.ResultSnapshot;
+            LabTeam winner = result != null ? result.teamWinner : LabTeam.None;
+            Text(title, result == null ? "결과를 정리하고 있소" : winner == LabTeam.Blue ? "청팀 승리!"
+                : winner == LabTeam.Red ? "홍팀 승리!" : "무승부");
+            int cells = result != null ? Math.Max(1, result.paintCellCount) : 1;
+            Text(status, result == null ? string.Empty
+                : "청 " + Percent(result.blueCells, cells) + "   ·   홍 " + Percent(result.redCells, cells)
+                    + "   ·   빈 칸 " + Percent(Math.Max(0, cells - result.blueCells - result.redCells), cells));
+            var text = new StringBuilder();
+            if (result != null && result.players != null)
+                foreach (LabPlayerState player in result.players)
+                    if (player != null)
+                        text.Append("P").Append(player.seat + 1)
+                            .Append(LabTeams.TeamOfSeat(player.seat) == LabTeam.Red ? " 홍" : " 청")
+                            .Append("   칠한 넓이 ").Append(Percent(player.paintedCells, cells))
+                            .Append("  ·  빼앗은 넓이 ").Append(Percent(player.stolenCells, cells)).Append('\n');
+            bool solo = net.IsDeveloperSolo;
+            text.Append('\n').Append(solo ? "혼자 확인을 마쳤소. HOME으로 돌아가시오."
+                : net.IsHost ? (session.CanAdvanceStage ? "모두 준비되면 로비로 돌아가시오." : "모두가 결과를 받기를 기다리고 있소…")
+                : "방장이 로비로 돌아가기를 기다리시오.");
+            if (!string.IsNullOrEmpty(session.UiNotice)) text.Append("\n\n").Append(session.UiNotice);
+            Text(details, text.ToString());
+            Show(nextButton == null ? null : nextButton.gameObject, net.IsHost && !solo);
+            Interactable(nextButton, session.CanAdvanceStage);
+            Label(nextButton, "로비로");
+            Show(homeButton == null ? null : homeButton.gameObject, true);
+            Interactable(homeButton, !net.IsHost || session.CanReturnHome);
+            Label(homeButton, "HOME");
+            Show(viewerButton == null ? null : viewerButton.gameObject, session.PreviewTexture != null);
+            Texture texture = session.PreviewTexture;
+            Show(viewerPanel, session.IsViewerOpen && texture != null);
+            if (viewerImage != null) viewerImage.texture = texture;
+        }
+
+        private static string Percent(int count, int cells) =>
+            (count * 100f / cells).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+
         private void ChangePlayers(int delta)
         {
             localError = null;
@@ -219,7 +260,8 @@ namespace Hapio
 
         public void OpenDeveloper()
         {
-            SelectDeveloperScope(0);
+            // A 2:2 room (#281) opens on its own tab; story rooms keep Common first.
+            SelectDeveloperScope(session.IsTerritory ? GameStageSettings.TerritoryScope : 0);
             Text(developerFeedback, "공통 설정과 요괴별 설정은 각각 APPLY로 적용합니다. 저장된 LabConfig는 유지됩니다.");
             Show(developerPanel, true);
         }
@@ -227,7 +269,7 @@ namespace Hapio
         /// <summary>Display only the selected settings scope. Switching tabs discards unapplied form edits.</summary>
         public void SelectDeveloperScope(int scope)
         {
-            if (session == null || scope < 0 || scope > 3) return;
+            if (session == null || scope < 0 || scope > GameStageSettings.TerritoryScope) return;
             float[] values = session.CaptureDeveloperSettings(scope);
             if (developerInputs == null || developerSliders == null
                 || developerInputs.Length != values.Length || developerSliders.Length != values.Length)
@@ -244,7 +286,8 @@ namespace Hapio
                 Show(developerInputs[i].transform.parent.gameObject, GameStageSettings.IsFieldVisible(scope, i));
             }
             syncingDeveloper = false;
-            string name = scope == 0 ? "공통" : GameStageCatalog.RequireDefault().Get(scope).displayName;
+            string name = scope == 0 ? "공통" : scope == GameStageSettings.TerritoryScope ? "2:2 땅따먹기"
+                : GameStageCatalog.RequireDefault().Get(scope).displayName;
             Text(developerScopeLabel, name + " 설정");
             for (int i = 0; developerScopeButtons != null && i < developerScopeButtons.Length; i++)
                 if (developerScopeButtons[i] != null && developerScopeButtons[i].targetGraphic != null)

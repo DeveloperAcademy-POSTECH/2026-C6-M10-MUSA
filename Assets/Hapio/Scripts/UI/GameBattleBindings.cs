@@ -94,8 +94,9 @@ namespace Hapio
             GameStageDefinition stage = session.CurrentStageDefinition;
             if (yokaiPresentation != null) yokaiPresentation.Bind(target, stage);
             if (stageLabel != null)
-                stageLabel.text = "STAGE " + session.State.stageIndex + " / " + session.State.totalStages
-                    + (stage != null ? " · " + stage.displayName : string.Empty)
+                stageLabel.text = (session.IsTerritory ? "2:2 땅따먹기"
+                        : "STAGE " + session.State.stageIndex + " / " + session.State.totalStages
+                            + (stage != null ? " · " + stage.displayName : string.Empty))
                     + (session.State.phase == GameFlowPhase.LoadingBattle ? " · WAITING" : string.Empty);
         }
         private void OnDestroy()
