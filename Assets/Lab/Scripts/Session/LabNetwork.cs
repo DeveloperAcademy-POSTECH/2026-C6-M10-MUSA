@@ -1800,6 +1800,8 @@ namespace C6Lab
                 ? Array.Find(latest.players, p => p.id == orb.owner)?.seat ?? selectedSeat : selectedSeat;
             int seatCount = latest?.players?.Length ?? targetParticipantCount;
             if (seat < 0 || seat >= seatCount) return;
+            // 2:2 (#281): the throw starts from the same alternating spot as the thrower's camera.
+            seat = LabTeams.RingSeatFor(latest, seat);
             Vector3 targetCenter = target.transform.position;
             Vector3 seatAnchor = LabThrowMath.SeatPosition(seat, seatCount, targetCenter,
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
@@ -1956,6 +1958,8 @@ namespace C6Lab
             bool blockedHere = latest.SwipeBlockOn(LocalPlayerId);
             board.SetSwipeBlock(blockedHere ? (latest.swipeBlockedRight ? 1 : -1) : 0,
                 blockedHere ? (float)(latest.swipeBlockedUntil - latest.serverTime) : 0f);
+            // 2:2 (#281): the outer edge of this player's board is closed; only the teammate's side passes.
+            board.SetTeamWall(LabTeams.ClosedSide(latest, LocalPlayerId));
             // The fox's charm (#251) stops throws and shows its haze only on the charmed player's own board.
             bool charmedHere = latest.CharmOn(LocalPlayerId);
             board.SetCharm(charmedHere ? (float)(latest.charmUntil - latest.serverTime) : 0f);

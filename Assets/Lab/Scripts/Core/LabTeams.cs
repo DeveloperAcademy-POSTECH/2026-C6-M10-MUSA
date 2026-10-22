@@ -33,5 +33,38 @@ namespace C6Lab
 
         /// <summary>박 둘레에서 서는 순서. 청·홍·청·홍이 되도록 P2와 P3만 자리를 바꾼다.</summary>
         public static int RingSeat(int seat) => seat == 1 ? 2 : seat == 2 ? 1 : seat;
+
+        /// <summary>4명 팀전 스냅샷인지. 화면·카메라·던지는 위치는 이때만 팀 자리 규칙을 쓴다.</summary>
+        public static bool FourPlayerTeams(LabSnapshot snapshot) =>
+            snapshot != null && snapshot.teamTerritory && snapshot.players != null && snapshot.players.Length == Players;
+
+        /// <summary>박 둘레의 자리 번호. 4명 팀전이면 청·홍이 엇갈리고, 그 밖에는 P번호 순서 그대로다.</summary>
+        public static int RingSeatFor(LabSnapshot snapshot, int seat) => FourPlayerTeams(snapshot) ? RingSeat(seat) : seat;
+
+        /// <summary>이 사람 판의 막힌 가장자리: 오른쪽 1, 왼쪽 -1, 없으면 0 (팀전이 아니거나 솔로).</summary>
+        public static int ClosedSide(LabSnapshot snapshot, ulong player)
+        {
+            if (!FourPlayerTeams(snapshot)) return 0;
+            LabPlayerState state = System.Array.Find(snapshot.players, item => item != null && item.id == player);
+            if (state == null || state.seat < 0 || state.seat >= Players) return 0;
+            return EdgeOpen(state.seat, true) ? -1 : 1;
+        }
+
+        /// <summary>이 사람의 팀. 팀전 솔로는 혼자 청팀이다.</summary>
+        public static LabTeam TeamOf(LabSnapshot snapshot, ulong player)
+        {
+            if (snapshot == null || !snapshot.teamTerritory || snapshot.players == null) return LabTeam.None;
+            if (snapshot.players.Length == 1) return LabTeam.Blue;
+            LabPlayerState state = System.Array.Find(snapshot.players, item => item != null && item.id == player);
+            return state != null ? TeamOfSeat(state.seat) : LabTeam.None;
+        }
+
+        /// <summary>미니맵에 보일 사람: 4명 팀전이면 우리 팀 두 명만, 그 밖에는 모두.</summary>
+        public static LabPlayerState[] VisibleTeammates(LabSnapshot snapshot, ulong player)
+        {
+            if (!FourPlayerTeams(snapshot)) return snapshot?.players;
+            LabTeam team = TeamOf(snapshot, player);
+            return System.Array.FindAll(snapshot.players, item => item != null && TeamOfSeat(item.seat) == team);
+        }
     }
 }

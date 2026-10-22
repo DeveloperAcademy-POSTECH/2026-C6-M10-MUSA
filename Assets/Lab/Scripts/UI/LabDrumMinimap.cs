@@ -111,7 +111,8 @@ namespace C6Lab
             if (!Mathf.Approximately(panel.localScale.x, scale)) panel.localScale = new Vector3(scale, scale, 1f);
             Vector2 move = network != null && network.config != null ? network.config.MinimapMove : Vector2.zero;
             if (panel.anchoredPosition != homePosition + move) panel.anchoredPosition = homePosition + move;
-            Rebuild(snapshot.players, network.LocalPlayerId);
+            // 2:2 (#281): only my team shares boards, so only its two players and its drum are shown.
+            Rebuild(LabTeams.VisibleTeammates(snapshot, network.LocalPlayerId), network.LocalPlayerId);
             SyncDrums(snapshot.drums);
             Advance(Time.unscaledDeltaTime);
         }
