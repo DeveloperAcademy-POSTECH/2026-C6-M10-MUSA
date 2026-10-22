@@ -74,6 +74,7 @@ namespace Hapio.Tests
             {
                 Assert.That(All<LabNetwork>(scene), Is.Empty);
                 Assert.That(All<NetworkManager>(scene), Is.Empty);
+                Assert.That(All<LabLobbyView>(scene), Is.Empty, "Standalone Lab navigation must never be copied into the game Battle.");
                 GameBattleBindings bindings = All<GameBattleBindings>(scene).Single();
                 Assert.That(bindings.board, Is.Not.Null);
                 Assert.That(bindings.target, Is.Not.Null);

@@ -198,13 +198,14 @@ namespace C6Lab
         //       shared schema 191. 5656 is reserved by the parallel #271 branch.
         // 5658: #271 counting presentation appended at DEV 191 (192 values); fast combo control metadata.
         // 5659: #276 stage-selected scheduler, four Jigwi policy values and game stage settings barrier.
-        internal const ushort LabProtocolVersion = 5659;
+        // 5660: #263 bounded live room presence and creator-owned pending-room registrations.
+        internal const ushort LabProtocolVersion = 5660;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/20");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/21");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -340,6 +341,10 @@ namespace C6Lab
         public string Notice { get; private set; } = string.Empty;
         public string LastShotReport { get; private set; } = string.Empty;
         public int ParticipantCount => order.Count;
+        // Retained solely so older saved Scenes/Editor utilities deserialize without losing references.
+        // Host authority and the chosen P number are independent in every current room.
+        [HideInInspector] public bool fixedHostPosition;
+        public int SelectedParticipantCount => playerSlots?.SelectedCount ?? 0;
         public int TargetParticipantCount => targetParticipantCount;
         public int LocalSlotNumber => IsConnected && playerSlots != null ? playerSlots.GetSlot(LocalPlayerId) : 0;
         public bool SlotSelectionPending => slotSelectionPending;
@@ -616,9 +621,21 @@ namespace C6Lab
                 config.GourdSwingReturnStrength, config.GourdSwingDamping);
         }
 
-        public void Host()
+        public void Host() => HostInternal(null);
+
+        internal bool HostRegisteredRoom(LabBonjourDiscovery registeredRoom, ushort roomPort, int capacity)
         {
-            if (!CanChooseConnection || manager == null || transport == null || config == null) return;
+            if (!CanChooseConnection || registeredRoom == null || !registeredRoom.IsAdvertising
+                || !registeredRoom.AdvertisingConfirmed || !ValidRoomName(registeredRoom.RegisteredServiceName)
+                || roomPort == 0 || capacity < 2 || capacity > 5) return false;
+            port = roomPort;
+            targetParticipantCount = capacity;
+            return HostInternal(registeredRoom);
+        }
+
+        private bool HostInternal(LabBonjourDiscovery registeredRoom)
+        {
+            if (!CanChooseConnection || manager == null || transport == null || config == null) return false;
             resumeRoomSearchAfterStop = false;
             ClearRoomSearchMessage();
             DisposeDiscovery();
@@ -636,23 +653,24 @@ namespace C6Lab
             catch (Exception e)
             {
                 SetRoomSearchMessage("Host endpoint failed: " + e.Message, true);
-                return;
+                return false;
             }
             if (!manager.StartHost())
             {
                 string code = transport is LabDualStackTransport failed ? failed.LastFailureCode : string.Empty;
                 SetRoomSearchMessage("Host failed: "
                     + (string.IsNullOrEmpty(code) ? "check port and network" : code) + ".", true);
-                return;
+                return false;
             }
             RegisterHandler();
             if (!order.Contains(manager.LocalClientId)) order.Add(manager.LocalClientId);
             AssignAutomaticTestSlot(manager.LocalClientId);
             configAcknowledgements.Add(manager.LocalClientId);
-            StartAdvertising();
+            StartAdvertising(registeredRoom);
             SetStatus("HOST listening on port " + port + "; waiting for " + (targetParticipantCount - 1) + " peers.");
             Debug.Log("C6_LAB_HOST port=" + port + " protocol=" + LabProtocolVersion);
             BroadcastLobby();
+            return true;
         }
 
         public void Join(string address)
@@ -729,7 +747,7 @@ namespace C6Lab
         public bool CanJoinDiscoveredRoom(string roomKey)
         {
             return IsSearchingRooms && CanBeginConnection && !string.IsNullOrEmpty(roomKey)
-                && discoveredRooms.Any(item => string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase))
+                && discoveredRooms.Any(item => string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase) && !item.Playing && !item.IsFull && !item.WaitingForHost)
                 && LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey).Length > 0;
         }
 
@@ -740,7 +758,7 @@ namespace C6Lab
             LabDiscoveredRoom room = discoveredRooms.FirstOrDefault(item =>
                 string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase));
             LabBonjourTarget[] targets = LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey);
-            if (room == null || targets.Length == 0)
+            if (room == null || room.Playing || room.IsFull || room.WaitingForHost || targets.Length == 0)
             {
                 RefreshDiscoveredRooms();
                 SetRoomSearchMessage("That room is no longer available. Choose another room or refresh.", true);
@@ -1204,6 +1222,14 @@ namespace C6Lab
             {
                 // A resumed browse may have been created later in this Update.
                 // Sample native discovery time now so its monotonic clock never moves backwards.
+                if (IsHost && !developerSolo)
+                {
+                    // Retry the actual listener families too if activation's native TXT update failed.
+                    bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
+                    bool ipv6 = transport is LabDualStackTransport second && second.HasIpv6Listener;
+                    if (ipv4 || ipv6)
+                        activeDiscovery.UpdatePresence(ipv4, ipv6, order.Count, targetParticipantCount, RoomPresenceBusy);
+                }
                 activeDiscovery.Tick();
                 if (discovery == activeDiscovery && roomSearchActive && !activeDiscovery.IsBrowsing)
                 {
@@ -2543,17 +2569,30 @@ namespace C6Lab
             Changed?.Invoke();
         }
 
-        private void StartAdvertising()
+        private bool RoomPresenceBusy => model != null || gameFlowEnabled && gameRosterLocked;
+
+        private void StartAdvertising(LabBonjourDiscovery registeredRoom = null)
         {
             DisposeDiscovery();
             if (!LabBonjourDiscovery.IsSupported) return;
-            discovery = new LabBonjourDiscovery();
+            discovery = registeredRoom ?? new LabBonjourDiscovery();
             discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
             discovery.Changed += OnDiscoveryChanged;
-            advertisedName = (gameFlowEnabled ? "Hapio-" : "C6Lab-") + Guid.NewGuid().ToString("N").Substring(0, 8);
             bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
             bool ipv6 = transport is LabDualStackTransport second && second.HasIpv6Listener;
-            if (!discovery.StartAdvertise(advertisedName, port, ipv4, ipv6))
+            if (registeredRoom != null)
+            {
+                connectedRoomName = registeredRoom.RegisteredServiceName;
+                advertisedName = connectedRoomName;
+                // The reserved socket family is only a preparation hint. Publish the real Host listeners.
+                if (!discovery.UpdatePresence(ipv4, ipv6, order.Count, targetParticipantCount, RoomPresenceBusy))
+                    Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);
+                return;
+            }
+            // Lab keeps sequential room cards; separate game rooms retain their existing name family.
+            advertisedName = gameFlowEnabled ? "Hapio-" + Guid.NewGuid().ToString("N").Substring(0, 8)
+                : LabRoomNames.ServiceBase;
+            if (!discovery.StartAdvertise(advertisedName, port, ipv4, ipv6, order.Count, targetParticipantCount))
             {
                 Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);
                 DisposeDiscovery();
@@ -2608,7 +2647,8 @@ namespace C6Lab
             {
                 discoveredRooms = fresh.Concat(discoveredRooms)
                     .GroupBy(room => room.Key, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => group.First()).OrderBy(room => room.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First()).OrderBy(room => LabRoomNames.SortNumber(room.Name))
+                    .ThenBy(room => room.Name, StringComparer.OrdinalIgnoreCase)
                     .ThenBy(room => room.Port).ToArray();
             }
             else discoveredRooms = fresh;

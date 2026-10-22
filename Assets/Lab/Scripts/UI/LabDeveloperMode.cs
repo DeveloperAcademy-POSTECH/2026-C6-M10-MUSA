@@ -36,6 +36,13 @@ namespace C6Lab
         private bool soloTuningActive;
         private float[] defaultValues;
 
+        // Retained for old Editor fixtures. Development apps use the same offline tuning path.
+        [NonSerialized] public bool allowOfflineEditorTuning;
+        private bool HasTuningAuthority => network != null && (network.CanChooseConnection
+            || network.IsConnected && network.IsHost);
+        public bool CanOpen => available && HasTuningAuthority && (network.CanChooseConnection
+            || network.IsDeveloperSolo || HostLobby || HostPausedBattle);
+
         private bool HostLobby => network != null && network.IsHost && !network.IsDeveloperSolo
             && network.Snapshot == null;
         private bool HostPausedBattle => network != null && network.CanRestartSharedBattle;
@@ -43,7 +50,7 @@ namespace C6Lab
         private void Awake()
         {
             available = Application.isEditor || Debug.isDebugBuild;
-            if (toggleButton != null) toggleButton.gameObject.SetActive(available);
+            if (toggleButton != null) toggleButton.gameObject.SetActive(available && HasTuningAuthority);
             if (panel != null) panel.SetActive(false);
             // Client room configuration must reach board/camera in ordinary builds too.
             if (network != null) network.ConfigApplied += OnConfigApplied;
@@ -115,10 +122,11 @@ namespace C6Lab
 
             // The legacy toggle belongs to the room setup screen; battle settings
             // are opened from the shared pause menu instead.
-            bool showToggle = network.Snapshot == null;
+            bool showToggle = HasTuningAuthority && network.Snapshot == null;
+            if (!HasTuningAuthority && panel != null && panel.activeSelf) Close();
             if (toggleButton != null && toggleButton.gameObject.activeSelf != showToggle)
                 toggleButton.gameObject.SetActive(showToggle);
-            bool canOpen = network.CanChooseConnection || network.IsDeveloperSolo || HostLobby || HostPausedBattle;
+            bool canOpen = CanOpen;
             if (toggleButton != null) toggleButton.interactable = canOpen;
             if (endSoloButton != null) endSoloButton.interactable = network.IsDeveloperSolo;
             if (applyHostButton != null) applyHostButton.interactable = network.CanChooseConnection || HostLobby || HostPausedBattle;
@@ -132,8 +140,7 @@ namespace C6Lab
 
         public void Open()
         {
-            if (!available || network == null ||
-                (!network.CanChooseConnection && !network.IsDeveloperSolo && !HostLobby && !HostPausedBattle)) return;
+            if (!CanOpen) return;
             Fill(network.IsConnected && network.config != null ? network.config : runtimeConfig);
             if (targetParticipantsSlider != null)
                 targetParticipantsSlider.SetValueWithoutNotify(network.TargetParticipantCount);
@@ -157,7 +164,7 @@ namespace C6Lab
 
         public void ShowDefaults()
         {
-            if (!available) return;
+            if (!available || !HasTuningAuthority) return;
             Fill(sourceConfig);
             // Fill suppresses input callbacks; update the visible toggle state in this
             // button action rather than leaving the previous label until the next frame.
@@ -175,7 +182,7 @@ namespace C6Lab
 
         public void ApplyAndStart()
         {
-            if (!available || network == null || runtimeConfig == null) return;
+            if (!available || !HasTuningAuthority || runtimeConfig == null) return;
             if (network.IsConnected && !network.IsDeveloperSolo)
             {
                 SetFeedback("Leave the shared room before starting Developer Solo.");
@@ -206,7 +213,7 @@ namespace C6Lab
         /// <summary>Create a tuned shared room or update the Host's existing pre-battle lobby.</summary>
         public void ApplyAndHost()
         {
-            if (!available || network == null || runtimeConfig == null) return;
+            if (!available || !HasTuningAuthority || runtimeConfig == null) return;
             bool lobby = HostLobby;
             bool restart = HostPausedBattle;
             if (!lobby && !restart && !network.CanChooseConnection)

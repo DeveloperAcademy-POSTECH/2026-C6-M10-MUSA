@@ -59,7 +59,7 @@
 
 새 코드: `Assets/Hapio/Scripts/Core/{GameSession,GameRunFlow,GameFlowState,GameFlowSnapshot,GameScenePaths}.cs`, `Scripts/UI`, `Editor/GameSceneBuilder.cs`, `Editor/GameBuild.cs`.
 
-기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **196개·프로토콜5659**다. 기존0~191 인덱스는 유지하고 지귀 자동 패턴4칸을192~195에 추가한다. 새 게임 연결 토큰 `C6HapioGame/2`와 단일 Lab의 `C6PhysicsLab/20`은 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
+기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **196개·프로토콜5660**다. 기존0~191 인덱스는 유지하고 지귀 자동 패턴4칸을192~195에 추가한다. 새 게임 연결 토큰 `C6HapioGame/3`와 단일 Lab의 `C6PhysicsLab/21`은 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
 
 검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 실제 실행 결과는 `VALIDATION.md`의 #262 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
 

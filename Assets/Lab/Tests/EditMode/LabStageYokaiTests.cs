@@ -84,6 +84,50 @@ namespace C6Lab.Tests
             Assert.That(model.DrainSabotages(), Is.Empty, "The Lab's legacy mix must not add duplicate common casts.");
         }
 
+        [TestCase(LabStageYokai.Gumiho)]
+        [TestCase(LabStageYokai.Yaguang)]
+        [TestCase(LabStageYokai.Jigwi)]
+        public void TwoPlayerStagesKeepTheSelectedOrderWhenHostZeroOccupiesP2WithoutMutatingSharedSettings(
+            LabStageYokai kind)
+        {
+            var values = config.CaptureDeveloperValues();
+            values[155] = values[166] = values[184] = 1f;
+            Apply(values);
+            float[] approvedSettings = config.CaptureDeveloperValues();
+            var model = new LabModel();
+            model.Begin("two-player-host-p2-" + kind, new ulong[] { 20, 0 }, 0d, config, kind);
+            var snapshot = model.Snapshot(60d);
+
+            Assert.That(snapshot.players.Select(player => (player.id, player.seat)),
+                Is.EqualTo(new[] { (20UL, 0), (0UL, 1) }), "P order must not silently move transport Host 0 to P1.");
+            Assert.That(model.StageYokai, Is.EqualTo(kind));
+            Assert.That(model.DrainGourdBombs().Length, Is.GreaterThan(0), "Common events remain active in a two-player stage.");
+            Assert.That(snapshot.orbs.All(orb => orb.owner == 20 || orb.owner == 0), Is.True);
+            var sabotages = model.DrainSabotages();
+            if (kind == LabStageYokai.Gumiho)
+            {
+                Assert.That(sabotages.Length, Is.GreaterThan(0));
+                Assert.That(sabotages.All(cast => cast.Kind == LabSabotageKind.FoxFire || cast.Kind == LabSabotageKind.Charm), Is.True);
+            }
+            else Assert.That(sabotages, Is.Empty);
+            if (kind == LabStageYokai.Yaguang)
+                Assert.That(snapshot.comboCount + snapshot.flashCount, Is.GreaterThan(0u));
+            else
+            {
+                Assert.That(snapshot.comboCount, Is.Zero);
+                Assert.That(snapshot.flashCount, Is.Zero);
+            }
+            if (kind == LabStageYokai.Jigwi)
+            {
+                Assert.That(snapshot.jigwi.Length, Is.GreaterThan(0));
+                Assert.That(snapshot.jigwi.All(state => state.playerId == 20 || state.playerId == 0), Is.True);
+            }
+            else Assert.That(snapshot.jigwi, Is.Empty);
+            Assert.That(approvedSettings.Length, Is.EqualTo(196));
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(approvedSettings),
+                "Applying a stage's runtime mask must not rewrite the shared DEV values or Lab source Config.");
+        }
+
         [Test]
         public void NoneRetainsTheLegacyMixInsteadOfAlsoStartingTheIndependentCommonTimers()
         {

@@ -102,6 +102,19 @@ namespace Hapio.Tests
                 Assert.That(Model().StageYokai, Is.EqualTo((LabStageYokai)stage),
                     "The shared Battle scene must create the selected stage's Host policy, not the legacy Lab mix.");
                 Assert.That(session.CurrentStageDefinition.stageIndex, Is.EqualTo(stage));
+                if (stage == 1)
+                {
+                    var staleRoot = new GameObject("Stale copied Lab lobby fixture");
+                    staleRoot.SetActive(false);
+                    var staleLobby = staleRoot.AddComponent<LabLobbyView>();
+                    staleLobby.hud = network.board.gameObject.scene.GetRootGameObjects()
+                        .SelectMany(root => root.GetComponentsInChildren<LabHud>(true)).Single();
+                    staleRoot.SetActive(true);
+                    Assert.That(staleRoot.activeSelf, Is.False,
+                        "Even a stale copied standalone view must refuse game-flow activation before touching widgets or advertising rooms.");
+                    Object.Destroy(staleRoot);
+                }
+
 
                 var jigwiHud = SceneManager.GetActiveScene().GetRootGameObjects()
                     .SelectMany(root => root.GetComponentsInChildren<LabJigwiHud>(true)).Single();

@@ -20,14 +20,14 @@ namespace C6Lab.Tests
             {
                 var network = root.AddComponent<LabNetwork>();
                 Assert.That(network.GameFlowEnabled, Is.False);
-                Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/20"));
+                Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/21"));
                 Assert.That(typeof(LabNetwork).GetField("LabProtocolVersion",
-                    BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue(), Is.EqualTo((ushort)5659));
+                    BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue(), Is.EqualTo((ushort)5660));
                 Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(196));
                 Assert.That(network.SetGameFlowEnabled(true), Is.True);
-                Assert.That(Token(network), Is.EqualTo("C6HapioGame/2"));
+                Assert.That(Token(network), Is.EqualTo("C6HapioGame/3"));
                 Assert.That(network.SetGameFlowEnabled(false), Is.True);
-                Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/20"));
+                Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/21"));
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }
@@ -238,6 +238,40 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void RoomPresenceStaysClosedDuringModelNullGameLoadsAndResetsForANewRoom()
+        {
+            using (var fixture = new HostGateFixture(true, 2))
+            {
+                fixture.AddPlayer(0, 2);
+                PropertyInfo busy = typeof(LabNetwork).GetProperty("RoomPresenceBusy", Private);
+                Assert.That(busy.GetValue(fixture.Network), Is.EqualTo(false));
+                fixture.Network.LockGameRoster();
+                Assert.That(busy.GetValue(fixture.Network), Is.EqualTo(true),
+                    "Loading/results remain closed even while their battle model is absent.");
+                fixture.ResetRoom();
+                Assert.That(busy.GetValue(fixture.Network), Is.EqualTo(false));
+            }
+        }
+
+        [Test]
+        public void OldSerializedFixedHostFlagCannotReserveP1OrStopTheHostFromClearing()
+        {
+            using (var fixture = new HostGateFixture(false, 2))
+            {
+                fixture.Network.fixedHostPosition = true;
+                fixture.AddPlayer(0, 1);
+                Assert.That(fixture.Network.RequestPlayerSlot(0), Is.True);
+                Assert.That(fixture.Network.GetSlotOwner(1), Is.EqualTo(ulong.MaxValue));
+                Assert.That(fixture.Network.RequestPlayerSlot(2), Is.True);
+                Assert.That(fixture.Network.GetSlotOwner(2), Is.EqualTo(0ul));
+                fixture.AddPlayer(23, 0);
+                fixture.DeliverSlot(23, 1);
+                Assert.That(fixture.Network.GetSlotOwner(1), Is.EqualTo(23ul),
+                    "The real Host packet gate must let a non-Host claim P1.");
+            }
+        }
+
+        [Test]
         public void StageLoadRequiresTheExactSettingsGenerationAndEveryParticipantAck()
         {
             using (var fixture = new HostGateFixture(true, 2))
@@ -312,12 +346,14 @@ namespace C6Lab.Tests
                 acks.Add(id);
             }
 
-            public void DeliverLateClear(ulong sender)
+            public void DeliverLateClear(ulong sender) => DeliverSlot(sender, 0);
+
+            public void DeliverSlot(ulong sender, int slot)
             {
                 Type type = typeof(LabNetwork).Assembly.GetType("C6Lab.LabNetworkPacket");
                 object packet = Activator.CreateInstance(type);
                 type.GetField("type").SetValue(packet, "slot_select");
-                type.GetField("slotNumber").SetValue(packet, 0);
+                type.GetField("slotNumber").SetValue(packet, slot);
                 type.GetField("requestId").SetValue(packet, 100L);
                 typeof(LabNetwork).GetMethod("HandleSlotSelectionRequest", Private)
                     .Invoke(Network, new[] { (object)sender, packet });

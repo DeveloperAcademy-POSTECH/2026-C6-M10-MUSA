@@ -24,6 +24,11 @@ namespace Hapio
 
         private void Awake()
         {
+            // A Battle refreshed from Lab may contain its authored standalone lobby. The
+            // persistent game session has separate Home/Lobby Scenes and never runs this view.
+            foreach (GameObject root in gameObject.scene.GetRootGameObjects())
+                foreach (LabLobbyView standaloneLobby in root.GetComponentsInChildren<LabLobbyView>(true))
+                    standaloneLobby.gameObject.SetActive(false);
             session = GameSession.EnsureExists();
             LabNetwork network = session.Network;
             network.BindBattleReferences(board, target, battleCamera, battleFloor, impactFeedback, projectileRoot);

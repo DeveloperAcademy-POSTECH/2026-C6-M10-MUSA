@@ -19,6 +19,7 @@ namespace C6Lab.Tests
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
         private LabNetwork network;
         private LabHud hud;
+        private LabLobbyView view;
 
         [UnitySetUp]
         public IEnumerator SetUp()
@@ -28,6 +29,8 @@ namespace C6Lab.Tests
             hud = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabHud>(true)).Single();
             network = hud.network;
+            view = hud.GetComponentInParent<Canvas>().GetComponentInChildren<LabLobbyView>(true);
+            Assert.That(view, Is.Not.Null);
             network.port = 18204;
         }
 
@@ -102,9 +105,9 @@ namespace C6Lab.Tests
             HostWithoutNetworkUpdate();
             BeginPending(41, 2);
             yield return null;
-            Assert.That(hud.playerSlotPanel.activeSelf, Is.True);
-            Assert.That(hud.playerSlotStatusText.text, Does.Contain("WAITING FOR HOST APPROVAL"));
-            foreach (Button button in hud.playerSlotButtons.Where(button => button.gameObject.activeSelf))
+            Assert.That(view.positionPage.activeSelf, Is.True);
+            Assert.That(view.subheading.text, Does.Contain("자리 선택을 확인"));
+            foreach (Button button in view.slotButtons.Where(button => button.gameObject.activeSelf))
                 Assert.That(button.interactable, Is.False);
             Assert.That(network.RequestPlayerSlot(3), Is.False,
                 "Repeated requests must be blocked while approval and state are incomplete.");
@@ -120,8 +123,9 @@ namespace C6Lab.Tests
             Assert.That(network.SlotSelectionPending, Is.False);
             yield return null;
             Assert.That(network.LocalSlotNumber, Is.EqualTo(2));
-            Assert.That(hud.playerSlotButtons[1].interactable, Is.True);
-            Assert.That(hud.playerSlotButtons[1].GetComponentInChildren<Text>().text, Does.Contain("YOU/CLEAR"));
+            Assert.That(view.slotButtons[1].interactable, Is.True);
+            Assert.That(view.localLabels[1].text, Does.Contain("나"));
+            Assert.That(view.localLabels[1].text, Does.Contain("취소"));
         }
 
         [UnityTest]
@@ -145,8 +149,8 @@ namespace C6Lab.Tests
             Assert.That(network.LocalSlotNumber, Is.EqualTo(2));
             Assert.That(network.Notice, Does.Contain("already selected"));
             yield return null;
-            Assert.That(hud.playerSlotPanel.activeSelf, Is.True);
-            Assert.That(hud.playerSlotButtons[1].interactable, Is.True);
+            Assert.That(view.positionPage.activeSelf, Is.True);
+            Assert.That(view.slotButtons[1].interactable, Is.True);
         }
 
         [UnityTest]
@@ -160,16 +164,16 @@ namespace C6Lab.Tests
             Assert.That(network.CanSelectPlayerSlot, Is.False);
             Assert.That(network.RequestPlayerSlot(1), Is.False);
             Assert.That(network.LocalSlotNumber, Is.EqualTo(3));
-            Assert.That(hud.playerSlotPanel.activeSelf, Is.True);
-            Assert.That(hud.playerSlotStatusText.text, Does.Contain("RESTARTING"));
-            foreach (Button button in hud.playerSlotButtons.Where(button => button.gameObject.activeSelf))
+            Assert.That(view.positionPage.activeSelf, Is.True);
+            Assert.That(view.subheading.text, Does.Contain("설정을 적용"));
+            foreach (Button button in view.slotButtons.Where(button => button.gameObject.activeSelf))
                 Assert.That(button.interactable, Is.False);
 
             Set("pendingDeveloperRestart", false);
             yield return null;
             Assert.That(network.CanSelectPlayerSlot, Is.True);
             Assert.That(network.LocalSlotNumber, Is.EqualTo(3));
-            Assert.That(hud.playerSlotButtons[2].interactable, Is.True);
+            Assert.That(view.slotButtons[2].interactable, Is.True);
         }
 
         [UnityTest]
@@ -186,8 +190,8 @@ namespace C6Lab.Tests
             Assert.That(network.LocalSlotNumber, Is.EqualTo(2));
             Assert.That(network.GetSlotOwner(1), Is.EqualTo(ulong.MaxValue));
             Assert.That(network.Notice, Does.Contain("timed out"));
-            Assert.That(hud.playerSlotPanel.activeSelf, Is.True);
-            Assert.That(hud.playerSlotButtons[0].interactable, Is.True);
+            Assert.That(view.positionPage.activeSelf, Is.True);
+            Assert.That(view.slotButtons[0].interactable, Is.True);
         }
 
         private void HostWithoutNetworkUpdate()

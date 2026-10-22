@@ -304,6 +304,10 @@ namespace Hapio.Editor
 
         private static void ConfigureBattle(Scene scene)
         {
+            // Copy the current battle/environment, excluding Lab's standalone navigation.
+            foreach (GameObject root in scene.GetRootGameObjects())
+                foreach (LabLobbyView standaloneLobby in root.GetComponentsInChildren<LabLobbyView>(true))
+                    UnityEngine.Object.DestroyImmediate(standaloneLobby.gameObject);
             LabNetwork old = Find<LabNetwork>(scene);
             LabSceneController controller = Find<LabSceneController>(scene);
             if (old == null || controller == null) throw new InvalidOperationException("Battle source references are incomplete.");
