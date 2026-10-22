@@ -145,6 +145,48 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator DirectGameHostKeepsItsGuidNameAndAdvertisesTheGameFamilyBeforeEnteringTheLobby()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            using (var browser = new LabBonjourDiscovery(LabRoomFamily.Game))
+            {
+                Assert.That(browser.StartBrowse(), Is.True, browser.LastError);
+                session.Network.SetTargetParticipantCount(2);
+                session.Host();
+                yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                    && SceneManager.GetActiveScene().path == GameScenePaths.Lobby && session.Network.IsHost
+                    && !session.Network.HostRoomNamePending && !string.IsNullOrEmpty(session.Network.HostRoomName),
+                    "The direct Game Host API's confirmed native registration and lobby Scene", 15f);
+                yield return null;
+                string name = session.Network.HostRoomName;
+                Assert.That(name, Does.Match("^Hapio-[0-9a-f]{8}$"),
+                    "Direct Game Host keeps its existing GUID name; only pending room cards use sequential names.");
+                Assert.That(name.StartsWith(LabRoomNames.GameServiceBase, StringComparison.Ordinal), Is.False);
+                Assert.That(session.Network.RoomFamily, Is.EqualTo(LabRoomFamily.Game));
+                Assert.That(session.Network.GameFlowEnabled, Is.True);
+                Assert.That(session.PendingRooms, Is.Empty);
+                Assert.That(session.Network.LocalSlotNumber, Is.Zero);
+                Assert.That(View().positionPage.activeInHierarchy, Is.True);
+                Assert.That(View().roomName.text, Is.EqualTo(LabRoomNames.Display(name)));
+                double deadline = Time.realtimeSinceStartupAsDouble + 20d;
+                while (Time.realtimeSinceStartupAsDouble < deadline)
+                {
+                    browser.Tick();
+                    if (browser.Targets.Any(target => target.ServiceName == name && target.Port == session.Network.port)) break;
+                    yield return null;
+                }
+                LabDiscoveredRoom found = LabRoomCatalog.GroupTargets(browser.Targets).SingleOrDefault(room => room.Name == name);
+                Assert.That(found, Is.Not.Null, "A real Game-family browser must resolve the direct Host registration.");
+                Assert.That(found.Port, Is.EqualTo(session.Network.port));
+                Assert.That(found.Participants, Is.EqualTo(1));
+                Assert.That(found.TargetParticipants, Is.EqualTo(2));
+                Assert.That(found.WaitingForHost, Is.False);
+                Assert.That(found.Playing, Is.False);
+                Assert.That(LabRoomCatalog.RoutesForRoom(browser.Targets, found.Key), Is.Not.Empty);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator DevelopmentSoloButtonStartsTheThreeStageFlowAndGameOverReturnsToTheTitle()
         {
             GameLobbyView view = View();

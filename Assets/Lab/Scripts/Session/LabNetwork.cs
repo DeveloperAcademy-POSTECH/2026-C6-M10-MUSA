@@ -2590,8 +2590,10 @@ namespace C6Lab
                     Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);
                 return;
             }
-            // Bonjour assigns sequential names independently inside each immutable room family.
-            advertisedName = LabRoomNames.ServiceBaseFor(RoomFamily);
+            // Authored room cards transfer their explicit sequential registration above.
+            // Keep the existing direct Game Host API's unique name; it has no pending-room allocator.
+            advertisedName = gameFlowEnabled ? "Hapio-" + Guid.NewGuid().ToString("N").Substring(0, 8)
+                : LabRoomNames.ServiceBase;
             if (!discovery.StartAdvertise(advertisedName, port, ipv4, ipv6, order.Count, targetParticipantCount))
             {
                 Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);

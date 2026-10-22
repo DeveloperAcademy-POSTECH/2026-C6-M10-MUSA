@@ -2484,3 +2484,21 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 ### 보존 확인
 
 작업 전 파일 해시를 기준으로 Lab Scene/Scene meta·LabConfig·Battle/StageResult/GameOver Scene·Build Settings·패키지 두 파일 등9개 보존 대상의 해시가 모두 동일함을 확인했다. Desktop 기존 checkout과 사용자 미추적 `Assets/_Project/HapioMVP/Scenes.meta`는 별도 보존 기준으로 확인한다. UI·광고·규칙 검사와 실기기 플레이 검증을 구분한다. 원시 XML/로그·진단 빌드·임시 probe는 저장소에 포함하지 않는다.
+
+### PR #279 병합 전 이름 계약·회귀 확인 — 2026-10-22
+
+- 독립 읽기 리뷰에서 새 UI/세션 소유권·Scene 연결·보존 범위의 추가 결함을 찾지 못했다. 리뷰 중 직접 `GameSession.Host()` API가 main의 GUID 이름에서 공통 이름으로 바뀐 것을 확인해 기존 `Hapio-<8자리 GUID>` 방식으로 복원했다. 새 카드의 `Hapio-Room` 순차 이름은 유지하며, Lab 직접 Host의 기존 자동 이름 변경 정책은 바꾸지 않았다.
+- 기존 `ThreeRealBonjourRegistrations...`는 동일 원시 이름을 OS가 자동으로 서로 다른 이름으로 바꾼다고 가정했다. 이를 실제 제품 allocator인 `LabPendingRoom` 세 개로 옮겼다. 외부 방과 겹치지 않도록 높은 임의 번호 N을 선택하고 세 방 모두 같은 N을 요청한다. fixture가 광고 이름·확정 상태를 직접 조작하지 않으며 제품의 NoAutoRename 충돌 재시도가 N/N+1/N+2로 확정해야 한다. 독립 포트·정확한 세 이름/키·native 브라우저 조회·주소·대기 TXT 조건을 모두 검사한다.
+- 별도 회귀는 직접 Game Host가 실제 native Game-family 광고와 기존 GUID 이름으로 로비에 진입하는지 확인한다. 기존 UI 버튼·새 카드 흐름 검사는 유지했다. OS의 원시 자동 이름 변경 원인을 해결한 것으로 표현하지 않으며 Lab 직접 Host에서 해당 OS 동작에 의존하는 경로는 남아 있다.
+
+| 최종 검사 | 실제 결과 | 범위 |
+| --- | --- | --- |
+| 로비·family 집중 PlayMode | **15/15 PASS**,23.50초 | native 번호 충돌 재시도·정확한 세 방 조회·직접 Game Host GUID·기존 Home/Lobby/솔로 UI. 실패/건너뜀0. |
+| 전체 EditMode | **1,034/1,034 PASS**,30.24초 | 후속 GUID 복원/테스트 변경이 반영된 소스. 실패/건너뜀0. |
+| 전체 PlayMode | **346/346 PASS**,171.05초 | 임시 probe 없는 제품 소스의 전체 회귀. 직접 Game Host 회귀1건 추가. 실패/건너뜀0. |
+
+- 첫 집중 실행은 테스트가 Transport의 `NetworkEndpoint` 타입을 직접 참조해 컴파일 단계에서 중단됐으며 테스트 결과가 없다. 주소 검증을 `System.Net.IPAddress.TryParse`로 바꿔 불필요한 테스트 어셈블리 의존성을 제거한 뒤 위 결과를 확인했다. 제품 route catalog의 Transport 기반 주소 검사는 유지한다.
+
+- 후속 Mac Development 빌드 **PASS**. 최종 메뉴 카메라·GUID 복원 소스로 독립 GUI 앱 두 개를 다시 실행해 **Host13.217초/Client13.128초, 모두 PASS·종료0**을 확인했다. native Bonjour/UDP·대기 카드/생성자 입장·196개 설정 확인·HostP2/ClientP1·세 스테이지 고유 패턴/결과/관람 ACK·같은 앱의 두 번째 방·이탈 후 양쪽 게임 오버/타이틀·미입장 대기 방 보존을 재확인했다. 양쪽 Exception/Fatal/컴파일 오류 표식0. 새 Home/Lobby/StageResult 캡처를 직접 확인했다.
+- 이 Mac 진단은 앞 절과 같은 CPU 도색 fixture·Legacy/초기100%·건조OFF·공통 폭탄/막기OFF를 사용한다. 실제 투척·핫스팟·여러 물리 기기 검증은 아니다. 임시 probe는 빌드 후 제거했고 전체 PlayMode 소스와 동일한 제품 코드를 유지했다.
+- Lab Scene/설정·전투/결과 Scene·Build Settings·패키지 보존 대상9개와 Desktop 사용자 미추적 Scene meta의 해시 동일을 확인했다. iOS export/서명·iPhone/iPad·일반 LAN/핫스팟 실기기·3~5대·모바일 성능은 계속 **NOT_RUN**이다.
