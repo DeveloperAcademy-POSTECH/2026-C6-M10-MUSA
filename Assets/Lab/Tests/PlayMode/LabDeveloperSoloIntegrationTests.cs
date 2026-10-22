@@ -414,7 +414,10 @@ namespace C6Lab.Tests
             Assert.That(boardCamera, Is.Not.Null);
             Assert.That(battleCamera, Is.Not.Null);
             Assert.That(board.gameObject.layer, Is.EqualTo(LayerMask.NameToLayer("LabOrbBoard")));
-            Assert.That((boardCamera.cullingMask & (1 << board.gameObject.layer)) != 0, Is.True);
+            var composition = developerUi.GetComponent<LabOrbHudComposition>();
+            Assert.That(composition, Is.Not.Null, "The saved HUD must attach the foreground composition at runtime.");
+            Assert.That(boardCamera.targetTexture, Is.Null, "Input coordinates must remain on the original screen camera.");
+            int savedBoardMask = boardCamera.cullingMask;
             Assert.That((battleCamera.cullingMask & (1 << board.gameObject.layer)) == 0, Is.True,
                 "The new 3D board spheres must not appear in the battle camera.");
             Assert.That(boardCamera.depth, Is.GreaterThan(battleCamera.depth),
@@ -464,6 +467,14 @@ namespace C6Lab.Tests
                 Assert.That(network.ParticipantCount, Is.EqualTo(1));
                 Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
                 Assert.That(network.Snapshot.players.Length, Is.EqualTo(1));
+                yield return WaitForComposition(composition);
+                Assert.That((composition.ForegroundCamera.cullingMask & (1 << board.gameObject.layer)) != 0, Is.True);
+                Assert.That((boardCamera.cullingMask & (1 << board.gameObject.layer)) == 0, Is.True);
+                Assert.That(boardCamera.targetTexture, Is.Null);
+                composition.enabled = false;
+                Assert.That(boardCamera.cullingMask, Is.EqualTo(savedBoardMask), "Disabling composition must restore direct board rendering.");
+                composition.enabled = true;
+                yield return WaitForComposition(composition);
                 int initialHp = network.Snapshot.hp;
 
                 LabOrbState drum = network.Snapshot.drums.Single();
@@ -532,10 +543,40 @@ namespace C6Lab.Tests
                     "ThrowRequested must cause a Host-approved launch.");
                 LabProjectile projectile = UnityEngine.Object.FindFirstObjectByType<LabProjectile>();
                 Assert.That(projectile, Is.Not.Null);
-                Assert.That(projectile.GetComponent<SphereCollider>(), Is.Not.Null);
-                Assert.That(projectile.VisualMount.GetComponentInChildren<SpriteRenderer>().sprite,
-                    Is.SameAs(appearance.SpriteFor(LabOrbKind.Combined, combined.element)),
-                    "The thrown orb keeps the approved element artwork.");
+                SphereCollider projectileCollider = projectile.GetComponent<SphereCollider>();
+                Assert.That(projectileCollider, Is.Not.Null);
+                Assert.That(projectileCollider.isTrigger, Is.False, "The real Host owns physical hit resolution.");
+                Assert.That(projectile.ProjectileId, Is.EqualTo(combined.id));
+                Assert.That(projectile.OwnerPlayerId, Is.EqualTo(network.LocalPlayerId));
+                float blastScale = combined.small ? network.config.BlastShrinkScale : 1f;
+                Assert.That(projectile.SizeScale, Is.EqualTo(blastScale));
+                float projectileRadius = network.config.ThrowRadius * blastScale * projectile.RadiusScale;
+                Assert.That(projectileCollider.radius, Is.EqualTo(projectileRadius).Within(.0001f));
+                Assert.That(projectile.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
+                Assert.That(projectile.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
+                Assert.That(projectile.VisualMount.GetComponentsInChildren<LabOrbSpriteArt>(), Is.Empty);
+                Transform sphere = projectile.VisualMount.Find("Replacement Visual/Sphere");
+                Assert.That(sphere, Is.Not.Null, "The saved appearance supplies the flight sphere prefab.");
+                MeshRenderer sphereRenderer = sphere.GetComponent<MeshRenderer>();
+                Assert.That(sphereRenderer != null && sphereRenderer.gameObject.activeInHierarchy, Is.True);
+                MeshFilter sphereMesh = sphere.GetComponent<MeshFilter>();
+                Assert.That(sphereMesh != null && sphereMesh.sharedMesh != null, Is.True);
+                Assert.That(sphereMesh.sharedMesh.bounds.size.z, Is.GreaterThan(.1f));
+                foreach (float axis in new[] { sphereRenderer.bounds.size.x, sphereRenderer.bounds.size.y, sphereRenderer.bounds.size.z })
+                    Assert.That(axis, Is.EqualTo(2f * projectileRadius).Within(.001f),
+                        "The flight sphere keeps the gameplay scale, including blast and combo effects.");
+                Assert.That(sphereRenderer.sharedMaterial,
+                    Is.SameAs(appearance.MaterialFor(LabOrbKind.Combined, combined.element)));
+                var sphereProperties = new MaterialPropertyBlock();
+                sphereRenderer.GetPropertyBlock(sphereProperties);
+                Color expectedElementColor = appearance.ElementColorFor(combined.element);
+                foreach (string colorProperty in new[] { "_BaseColor", "_Color" })
+                {
+                    Color actualElementColor = sphereProperties.GetColor(colorProperty);
+                    Assert.That(actualElementColor.r, Is.EqualTo(expectedElementColor.r).Within(.0001f));
+                    Assert.That(actualElementColor.g, Is.EqualTo(expectedElementColor.g).Within(.0001f));
+                    Assert.That(actualElementColor.b, Is.EqualTo(expectedElementColor.b).Within(.0001f));
+                }
                 Assert.That(projectile.ElementFlightTrail, Is.Not.Null);
                 Assert.That(projectile.ElementFlightTrail.IsEmitting, Is.True);
                 Assert.That(projectile.ElementFlightTrail.Element, Is.EqualTo(combined.element));
@@ -895,6 +936,20 @@ namespace C6Lab.Tests
                     Assert.DoesNotThrow(() => released.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, hostPort)),
                         "Disposing the owned manager must release the Host socket before the next fixture.");
             }
+        }
+
+        private static IEnumerator WaitForComposition(LabOrbHudComposition composition)
+        {
+            // The test coroutine can resume before HUD.Update and composition.LateUpdate.
+            // Wait only for that bounded presentation hand-off; a real renderer error fails at once.
+            for (int frame = 0; frame < 8 && !composition.IsCompositing; frame++)
+            {
+                Assert.That(composition.InitializationError, Is.Null, composition.InitializationError);
+                yield return null;
+            }
+            Assert.That(composition.InitializationError, Is.Null, composition.InitializationError);
+            Assert.That(composition.GetComponent<LabHud>().battleUi.activeInHierarchy, Is.True);
+            Assert.That(composition.IsCompositing, Is.True, "The active battle HUD did not acquire its foreground renderer within eight frames.");
         }
 
         private static LabDeveloperMode SavedDeveloperUi() =>

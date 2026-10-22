@@ -90,6 +90,10 @@ namespace C6Lab
         private const string Domain = "local.";
         private string TxtPrefix => "p=" + ExpectedProtocol + ";f=";
         private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
+        // mDNSResponder can confirm duplicate local registrations even with NoAutoRename.
+        // The DNS name (not the port or TXT family) stays leased until its native ref is freed.
+        private static readonly HashSet<string> ExplicitNameLeases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly object NameLeaseLock = new object();
         private static readonly LabBonjourNative.RegisterReply RegisterCallback = Registered;
         private static readonly LabBonjourNative.BrowseReply BrowseCallback = Browsed;
         private static readonly LabBonjourNative.ResolveReply ResolveCallback = Resolved;
@@ -125,6 +129,7 @@ namespace C6Lab
         public string RegisteredServiceName { get; private set; }
         public bool AdvertisingConfirmed { get; private set; }
         public bool RegistrationNameConflict { get; private set; }
+        internal bool LocalRegistrationNameConflict { get; private set; }
         public bool IsAdvertising => advertisement != null && !advertisement.Done;
         public bool IsBrowsing => browse != null && !browse.Done;
         public int ActiveNativeOperations => operations.Count(x => !x.Done);
@@ -162,11 +167,19 @@ namespace C6Lab
             if (string.IsNullOrWhiteSpace(serviceName) || Encoding.UTF8.GetByteCount(serviceName) > 63 ||
                 (!LabRoomNames.TryNumber(serviceName, out _, LabRoomNames.ServiceBaseFor(Family)) && serviceName.Any(c => !(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') && c != '-')) || port == 0)
                 throw new ArgumentException("Use an ASCII room service label (letters, digits, hyphens; max63bytes) and a nonzero port.");
-            StopAdvertisingInternal(); LastError = null; RegistrationNameConflict = false;
+            byte[] txt = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost);
+            StopAdvertisingInternal();
+            Cleanup(); // A replacement must retire its old native registration before reusing its name.
+            LastError = null; RegistrationNameConflict = LocalRegistrationNameConflict = false;
             var operation = Create("register");
             advertisement = operation;
+            if (!autoRename && !TryLeaseName(operation, serviceName))
+            {
+                RegistrationNameConflict = LocalRegistrationNameConflict = true;
+                Fail(operation, Error("register", -65548));
+                Report("stage=register result=local_name_conflict"); Flush(); return false;
+            }
             advertisedIpv4 = ipv4; advertisedIpv6 = ipv6;
-            byte[] txt = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost);
             advertisedPresence = txt;
             // dns_sd.h: kDNSServiceFlagsNoAutoRename=0x8, kDNSServiceErr_NameConflict=-65548.
             int error = Native(() => LabBonjourNative.DNSServiceRegister(out operation.Reference, autoRename ? 0u : 0x8u, 0, serviceName,
@@ -302,6 +315,27 @@ namespace C6Lab
         private static void Cancel(Service service)
         { if (service.Presence != null) service.Presence.Done = true; if (service.Resolve != null) service.Resolve.Done = true; if (service.Address != null) service.Address.Done = true; }
 
+        private static bool TryLeaseName(Operation operation, string serviceName)
+        {
+            string key = serviceName + "." + ServiceType + "." + Domain;
+            lock (NameLeaseLock)
+            {
+                if (!ExplicitNameLeases.Add(key)) return false;
+                operation.LeasedName = key;
+                return true;
+            }
+        }
+
+        private static void ReleaseNameLease(Operation operation)
+        {
+            lock (NameLeaseLock)
+            {
+                if (operation.LeasedName == null) return;
+                ExplicitNameLeases.Remove(operation.LeasedName);
+                operation.LeasedName = null;
+            }
+        }
+
         private void Cleanup()
         {
             if (pumping) return;
@@ -309,7 +343,10 @@ namespace C6Lab
             {
                 Operation operation = operations[i]; if (!operation.Done) continue;
                 if (operation.Reference != IntPtr.Zero) LabBonjourNative.DNSServiceRefDeallocate(operation.Reference);
-                operation.Reference = IntPtr.Zero; if (operation.Handle.IsAllocated) operation.Handle.Free(); operations.RemoveAt(i);
+                operation.Reference = IntPtr.Zero;
+                if (operation.Handle.IsAllocated) operation.Handle.Free();
+                ReleaseNameLease(operation);
+                operations.RemoveAt(i);
             }
         }
 
@@ -485,6 +522,7 @@ namespace C6Lab
         {
             internal readonly LabBonjourDiscovery Owner; internal readonly string Stage; internal readonly Service Service;
             internal double Deadline; internal GCHandle Handle; internal IntPtr Reference; internal bool Done, HasAddressOrReply;
+            internal string LeasedName;
             internal IntPtr Context => GCHandle.ToIntPtr(Handle);
             internal Operation(LabBonjourDiscovery owner, string stage, Service service, double deadline)
             { Owner = owner; Stage = stage; Service = service; Deadline = deadline; Handle = GCHandle.Alloc(this); }

@@ -314,13 +314,16 @@ namespace C6Lab
         {
             if (artRoot == null) return;
             Material material = MaterialFor(kind, element);
-            if (material == null) return;
+            // A prefab can supply its own material while the optional Combined slot is empty.
+            if (material == null && kind != LabOrbKind.Combined) return;
             Transform sphere = artRoot.transform.Find("Sphere");
             Renderer surface = sphere != null ? sphere.GetComponent<Renderer>() : null;
             if (surface == null) surface = artRoot.GetComponentInChildren<Renderer>(true);
             if (surface == null) return;
             LabOrbVisualFactory.ApplyAppearanceMaterial(surface, material);
-            if (NeedsTemporaryElementColor(kind, element))
+            if (kind == LabOrbKind.Combined && element == LabOrbElement.None)
+                LabOrbVisualFactory.ApplyKindColor(surface, LabOrbKind.Combined);
+            else if (NeedsTemporaryElementColor(kind, element))
                 LabOrbVisualFactory.ApplyElementColor(surface, element);
         }
     }

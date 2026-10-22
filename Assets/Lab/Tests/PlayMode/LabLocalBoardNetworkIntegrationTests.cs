@@ -73,6 +73,51 @@ namespace C6Lab.Tests
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator DelayedCombinationApprovalShowsNeutralAndPromotesTheSameBodyToTheApprovedSprite()
+        {
+            UseSavedOrbAppearance();
+            object combine = Submit("combine", 1, "yin", "yang");
+            string temporary = PacketField<string>(combine, "provisionalId");
+            LabOrbView pending = FindOrb(temporary);
+            Rigidbody body = pending.Body;
+            SphereCollider collider = pending.HitSphere;
+            body.linearVelocity = new Vector3(.7f, .2f, 0f);
+            for (int frame = 0; frame < 3; frame++)
+            {
+                Assert.That(board.Count, Is.EqualTo(1), "The combination responds before a receipt arrives.");
+                Assert.That(board.IsProvisional(temporary), Is.True);
+                Assert.That(pending.Element, Is.EqualTo(LabOrbElement.None), "The Client must not choose the Host's element.");
+                Assert.That(pending.Visual.GetComponentsInChildren<LabOrbSpriteArt>(), Is.Empty);
+                var surface = pending.Visual.Find("Replacement Visual/Sphere").GetComponent<MeshRenderer>();
+                Assert.That(surface.gameObject.activeInHierarchy, Is.True);
+                var properties = new MaterialPropertyBlock();
+                surface.GetPropertyBlock(properties);
+                Assert.That(properties.GetColor("_BaseColor"),
+                    Is.EqualTo(LabOrbAppearance.DefaultElementColor(LabOrbElement.None)),
+                    "The saved purple Combined material must not appear while waiting for approval.");
+                yield return null;
+            }
+            Vector3 position = body.position, velocity = body.linearVelocity;
+            LabActionReceipt receipt = CombinedReceipt(1, temporary, 1);
+            Invoke("ReceiveActionReceipt", receipt);
+            LabOrbView approved = FindOrb("combined");
+            Assert.That(approved, Is.SameAs(pending));
+            Assert.That(approved.Body, Is.SameAs(body));
+            Assert.That(approved.HitSphere, Is.SameAs(collider));
+            Assert.That(body.position, Is.EqualTo(position));
+            Assert.That(body.linearVelocity, Is.EqualTo(velocity));
+            Assert.That(approved.Element, Is.EqualTo(LabOrbElement.Fire));
+            Assert.That(approved.Visual.GetComponentInChildren<LabOrbSpriteArt>()
+                .GetComponent<SpriteRenderer>().sprite,
+                Is.SameAs(config.OrbAppearance.SpriteFor(LabOrbKind.Combined, LabOrbElement.Fire)));
+            Assert.That(approved.Visual.GetComponentsInChildren<MeshRenderer>(), Is.Empty);
+            Invoke("ReceiveActionReceipt", receipt.Copy());
+            Assert.That(board.Count, Is.EqualTo(1));
+            Assert.That(FindOrb("combined"), Is.SameAs(pending));
+            Assert.That(board.IsProvisional(temporary), Is.False);
+        }
+
         [Test]
         public void CombinationReceiptUpdatesTheBoardWhileANewerPaintSnapshotIsStillWaiting()
         {
@@ -105,6 +150,8 @@ namespace C6Lab.Tests
         [Test]
         public void RejectedCombinationRollsBackItsUnsentDependentLaunchAndRestoresMaterials()
         {
+            UseSavedOrbAppearance();
+            LabOrbView yin = FindOrb("yin"), yang = FindOrb("yang");
             object combine = Submit("combine", 1, "yin", "yang");
             string temporary = PacketField<string>(combine, "provisionalId");
             Submit("launch", 2, temporary);
@@ -125,6 +172,17 @@ namespace C6Lab.Tests
             Assert.That(board.IsSnapshotSuppressed("yin") || board.IsSnapshotSuppressed("yang"), Is.False);
             Assert.That(board.IsProvisional(temporary), Is.False);
             Assert.That(network.Snapshot.orbs.Select(orb => orb.id), Is.EquivalentTo(new[] { "yin", "yang" }));
+            Assert.That(FindOrb("yin"), Is.SameAs(yin));
+            Assert.That(FindOrb("yang"), Is.SameAs(yang));
+            foreach (LabOrbView restored in new[] { yin, yang })
+            {
+                Assert.That(restored.gameObject.activeInHierarchy, Is.True);
+                Assert.That(restored.Visual.GetComponentInChildren<LabOrbSpriteArt>()
+                    .GetComponent<SpriteRenderer>().sprite,
+                    Is.SameAs(config.OrbAppearance.SpriteFor(restored.Kind)));
+                Assert.That(restored.Visual.GetComponentsInChildren<MeshRenderer>(), Is.Empty);
+                Assert.That(restored.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
+            }
         }
 
         [Test]
@@ -467,6 +525,16 @@ namespace C6Lab.Tests
             provisionalId = temporary, outputId = "combined", states = new[] { Combined() },
             removedIds = new[] { "yin", "yang" }, players = initial.players
         };
+
+        private void UseSavedOrbAppearance()
+        {
+            LabConfig saved = Resources.Load<LabConfig>("LabConfig");
+            typeof(LabConfig).GetField("orbAppearance", Private).SetValue(config, saved.OrbAppearance);
+            board.Configure(config, root.GetComponentInChildren<Camera>(), new Rect(-4f, -2f, 8f, 4f));
+        }
+
+        private LabOrbView FindOrb(string id) => board.GetComponentsInChildren<LabOrbView>(true)
+            .Single(view => view.OrbId == id && view.gameObject.activeInHierarchy);
 
         private object Submit(string type, long request, string first, string second = null)
         {
