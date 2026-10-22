@@ -102,3 +102,13 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 - 위치 편집은 공통 Prefab에서 한다. `EditableSeatLayouts/Players2..5/P1..PN`이 각 인원의 저장된 자리 앵커이며 해당 앵커를 움직이면 자리 버튼 배치에 반영된다. 원본 Lab Scene의 UI 위치와는 독립적이다.
 - 명시적 UI 적용 메뉴는 `Hapio/Upgrade Figma Game Lobby`다. 기존 공통 Prefab이 있으면 원본 Lab에서 재생성하지 않고 수동 편집을 보존한다. 이 작업은 Home/Lobby만 갱신하며 Battle·StageResult·GameOver를 복사하거나 저장하지 않는다. 일반 Play/빌드에서는 자동 재생성하지 않는다.
 - 실험 단판은 계속 `Assets/Lab/Scenes/Lab.unity`에서 실행한다. 3스테이지 확인과 전용 빌드 진입점은 Home이다. 실제 실행 결과와 미검증 환경은 `VALIDATION.md`의 #278 절을 따른다.
+
+
+## #288 DEV 다음 스테이지
+
+- 개발 빌드 또는 Editor에서 **Host(개발자 솔로 포함)가 일시정지 → DEV → NEXT STAGE**를 누르면 결과 화면을 거치지 않고 다음 전투를 준비한다. 1→2, 2→3만 허용한다. 3에서는 LAST STAGE로 비활성화한다. 일반 참가자와 비개발 빌드에는 새 버튼을 노출하지 않고 Session API에서도 권한을 검사한다.
+- DEV 폼에서 편집만 한 값은 읽지 않는다. 이미 승인된 공통/스테이지 설정, 같은 방·참가자·P번호를 유지하며 다음 StageDefinition으로 새 전투를 초기화한다. 정상 결과 NEXT와 달리 승리·완성 박·결과 기록을 만들지 않는다.
+- `GameRunFlow.DeveloperNextStage`는 현행 run/stage/revision의 Playing만 다음 LoadingBattle로 전환한다. `GameSession.DeveloperNextStage`는 개발 권한·연결된 Host·일시정지·현재 전투 식별자·전환/재시작 대기·최종 스테이지를 검사한 뒤 기존 PrepareStage를 사용한다. 전원 설정 확인과 새 Scene Ready 장벽, 중복/오래된 ACK 거절, 로딩 실패 시 게임 오버는 기존 경로를 따른다.
+- 새 버튼은 저장된 `DeveloperPanel/DeveloperNextStageButton`이며 스크롤 위 한 줄을 사용한다. 새 버튼 자리만큼 DEV 스크롤 상단을 줄였고, 기존 DEV 하단 버튼은 이동하지 않았다. 단판 Lab에는 추가하지 않는다.
+- 명시적 DEV 버튼 추가 도구는 이 버튼·바인딩·DEV 스크롤 공간만 갱신한다. 기존 버튼이 있으면 다시 배치하지 않아 Inspector 수정값을 유지한다. 현재 저장 Scene에는 이미 적용했으므로 일반 실행·빌드에 별도 업그레이드가 필요하지 않다. Lab 복사/전체 Scene 갱신 도구와는 별개다.
+- 이번 반영 범위는 DEV 다음 스테이지 기능이다. 스테이지 표시 위치·안전 영역 변경은 제외하며, 기존 StageLabel과 전투 UI의 저장 배치를 유지한다.

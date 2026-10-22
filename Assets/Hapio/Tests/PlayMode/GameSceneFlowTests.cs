@@ -416,6 +416,134 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator PausedDeveloperNextStageUsesSavedButtonAndFreshBattlesWithoutApplyingUnsavedFields()
+        {
+            Assert.That(session.CanDeveloperAdvanceStage, Is.False);
+            Assert.That(session.DeveloperNextStage(), Is.False, "Home has no stage to skip.");
+            GameSession persistent = session;
+            LabNetwork persistentNetwork = network;
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            string runId = session.State.runId;
+            ulong playerId = network.LocalPlayerId;
+            int slot = network.LocalSlotNumber;
+            ulong[] participants = network.ConnectedPlayerIds.ToArray();
+            var loadedPaths = new System.Collections.Generic.List<string>();
+            UnityEngine.Events.UnityAction<Scene, LoadSceneMode> recordScene = (scene, _) => loadedPaths.Add(scene.path);
+            SceneManager.sceneLoaded += recordScene;
+            try
+            {
+                for (int stage = 1; stage <= 3; stage++)
+                {
+                    Assert.That(GameSession.Instance, Is.SameAs(persistent));
+                    Assert.That(session.Network, Is.SameAs(persistentNetwork));
+                    Assert.That(session.State.runId, Is.EqualTo(runId));
+                    Assert.That(network.LocalPlayerId, Is.EqualTo(playerId));
+                    Assert.That(network.LocalSlotNumber, Is.EqualTo(slot));
+                    Assert.That(network.ConnectedPlayerIds, Is.EqualTo(participants));
+                    Assert.That(Model().StageYokai, Is.EqualTo((LabStageYokai)stage));
+                    AssertFreshStage();
+                    Assert.That(network.IsBattlePaused, Is.False);
+                    Assert.That(session.CanDeveloperAdvanceStage, Is.False, "DEV skip requires an explicitly paused battle.");
+                    Assert.That(session.DeveloperNextStage(), Is.False);
+                    Assert.That(session.State.stageIndex, Is.EqualTo(stage));
+
+                    network.Generate();
+                    yield return Until(() => network.Snapshot.players.Single().generatedTotal == 1,
+                        "Leave real generated resources in the old Battle to verify next-stage cleanup.");
+                    LabModel model = Model();
+                    Assert.That(model.TryApplyPlayerDamage(playerId, 13, ModelTime(model)), Is.True);
+                    LabOrbBoard oldBoard = network.board;
+                    string oldBattle = session.State.battleSessionId;
+                    session.Pause();
+                    Assert.That(network.IsBattlePaused, Is.True);
+                    yield return null;
+                    GameBattleBindings bindings = SceneManager.GetActiveScene().GetRootGameObjects()
+                        .SelectMany(root => root.GetComponentsInChildren<GameBattleBindings>(true)).Single();
+                    LabDeveloperMode dev = bindings.developerMode;
+                    Assert.That(bindings.developerNextStageButton, Is.Not.Null, "Use the saved editable DEV control.");
+                    Assert.That(bindings.developerNextStageButton.transform.IsChildOf(dev.panel.transform), Is.True);
+                    dev.Open();
+                    yield return null;
+                    Assert.That(dev.panel.activeInHierarchy, Is.True);
+                    Assert.That(bindings.developerNextStageButton.gameObject.activeInHierarchy, Is.True);
+                    Assert.That(bindings.developerNextStageButton.interactable, Is.EqualTo(stage < 3));
+                    float[][] acceptedProfiles = Enumerable.Range(0, 4)
+                        .Select(scope => session.CaptureDeveloperSettings(scope)).ToArray();
+                    int hpField = Enumerable.Range(0, LabConfig.DeveloperFields.Count)
+                        .Single(i => LabConfig.DeveloperFields[i].Label == "Player Max HP");
+                    dev.valueInputs[hpField].text = "299"; // Deliberately do not APPLY or restart.
+                    Assert.That(network.config.PlayerMaxHp, Is.EqualTo(237));
+                    Assert.That(session.CanDeveloperAdvanceStage, Is.EqualTo(stage < 3));
+                    uint revision = session.State.revision;
+                    if (stage == 3)
+                    {
+                        Assert.That(session.DeveloperNextStage(), Is.False, "The last stage cannot create a stage 4 or fake completion.");
+                        yield return null;
+                        Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Playing));
+                        Assert.That(session.State.stageIndex, Is.EqualTo(3));
+                        Assert.That(session.State.revision, Is.EqualTo(revision));
+                        Assert.That(session.State.battleSessionId, Is.EqualTo(oldBattle));
+                        Assert.That(network.IsBattlePaused, Is.True);
+                        Assert.That(session.ResultSnapshot, Is.Null);
+                        Assert.That(session.PreviewTexture, Is.Null);
+                        continue;
+                    }
+
+                    bindings.developerNextStageButton.onClick.Invoke();
+                    Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.LoadingBattle));
+                    Assert.That(session.State.stageIndex, Is.EqualTo(stage + 1));
+                    Assert.That(session.IsLoadingScene, Is.True);
+                    Assert.That(session.CanDeveloperAdvanceStage, Is.False);
+                    uint loadingRevision = session.State.revision;
+                    Assert.That(loadingRevision, Is.GreaterThan(revision));
+                    Assert.That(session.DeveloperNextStage(), Is.False, "Duplicate input cannot skip the new loading generation.");
+                    Assert.That(session.State.revision, Is.EqualTo(loadingRevision));
+                    yield return WaitPlaying(stage + 1);
+                    Assert.That(session.State.battleSessionId, Is.Not.EqualTo(oldBattle));
+                    Assert.That(oldBoard == null, Is.True, "The previous Battle instance must be unloaded.");
+                    AssertDeveloperSettings(acceptedProfiles[stage + 1]);
+                    for (int scope = 0; scope <= 3; scope++)
+                        Assert.That(session.CaptureDeveloperSettings(scope), Is.EqualTo(acceptedProfiles[scope]),
+                            "Skipping must retain approved profiles and discard unapplied form text.");
+                    Assert.That(loadedPaths, Does.Not.Contain(GameScenePaths.StageResult),
+                        "Skipping must not produce a completed paint preview or a victory result.");
+                }
+            }
+            finally { SceneManager.sceneLoaded -= recordScene; }
+        }
+
+        [UnityTest]
+        public IEnumerator DeveloperNextStageCannotOvertakeAQueuedRestartOrLeaveGameOver()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            string battle = session.State.battleSessionId;
+            session.Pause();
+            float[] values = network.config.CaptureDeveloperValues();
+            Set(values, "Player Max HP", 219f);
+            Assert.That(session.ApplyDeveloperSettings(values, out string error), Is.True, error);
+            Assert.That(session.CanDeveloperAdvanceStage, Is.False,
+                "An accepted current-stage restart already owns the transition.");
+            Assert.That(session.DeveloperNextStage(), Is.False);
+            Assert.That(session.State.stageIndex, Is.EqualTo(1));
+            yield return Until(() => session.State.phase == GameFlowPhase.Playing
+                && !session.IsLoadingScene && session.State.battleSessionId != battle,
+                "The already accepted DEV restart must finish on stage 1.");
+            Assert.That(network.Snapshot.players.Single().personalHp, Is.EqualTo(219));
+            session.ExitRun();
+            yield return WaitGameOver();
+            uint revision = session.State.revision;
+            Assert.That(session.CanDeveloperAdvanceStage, Is.False);
+            Assert.That(session.DeveloperNextStage(), Is.False);
+            yield return null;
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.GameOver));
+            Assert.That(session.State.stageIndex, Is.EqualTo(1));
+            Assert.That(session.State.revision, Is.EqualTo(revision));
+            Assert.That(session.ResultSnapshot, Is.Null);
+        }
+
+        [UnityTest]
         public IEnumerator ForeignStageDeveloperEditIsRejectedBeforeTheCurrentBattleEnds()
         {
             session.StartSolo();
