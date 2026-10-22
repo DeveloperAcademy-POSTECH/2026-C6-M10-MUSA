@@ -83,7 +83,7 @@ namespace C6Lab
 
         private void FlushPendingBlastReports(double now)
         {
-            if (pendingBlastReports.Count == 0 || !IsConnected) return;
+            if (pendingBlastReports.Count == 0 || !IsConnected || !CanProcessBattleActions) return;
             foreach (var packet in pendingBlastReports.ToArray())
             {
                 var resolved = new List<string>();

@@ -14,6 +14,7 @@ namespace C6Lab
         private Transform jigwiFireRoot;
 
         public bool CanDevStartJigwi => DeveloperBuildAvailable && IsHost && IsConnected && model != null
+            && (model.StageYokai == LabStageYokai.None || model.StageYokai == LabStageYokai.Jigwi)
             && model.Phase == LabPhase.Playing && !battleClock.IsPaused && SessionConfigReady;
 
         public bool DevStartJigwiFire(ulong player)

@@ -58,7 +58,14 @@ namespace C6Lab
         private bool CanStartJigwi(ulong player, double now, out string reason)
         {
             if (!TryAdvance(now, out reason)) return false;
+            return CanStartJigwiAt(player, now, out reason);
+        }
+
+        private bool CanStartJigwiAt(ulong player, double now, out string reason)
+        {
             if (phase != LabPhase.Playing) return Reject("BATTLE_NOT_PLAYING", out reason);
+            if (StageYokai != LabStageYokai.None && StageYokai != LabStageYokai.Jigwi)
+                return Reject("STAGE_PATTERN_NOT_ALLOWED", out reason);
             if (!players.ContainsKey(player)) return Reject("UNKNOWN_PLAYER", out reason);
             if (Charmed(player, now)) return Reject("CHARMED", out reason);
             if (jigwiStates.TryGetValue(player, out var state)
@@ -68,10 +75,15 @@ namespace C6Lab
             return true;
         }
 
-        /// <summary>Manual DEV experiment only. It never joins the automatic sabotage lottery.</summary>
+        /// <summary>Manual DEV trigger for standalone Lab or Jigwi stages, separate from the automatic timer.</summary>
         public bool TryStartJigwiFire(ulong player, double now, out string reason)
         {
             if (!CanStartJigwi(player, now, out reason)) return false;
+            return StartJigwiFireCore(player, now, out reason);
+        }
+
+        private bool StartJigwiFireCore(ulong player, double now, out string reason)
+        {
             int supplyCount = orbs.Values.Count(orb => orb.owner == player && orb.jigwiSupply);
             if (supplyCount + jigwiFireTargets + 2 > MaximumJigwiSuppliesPerPlayer)
                 return Reject("JIGWI_SUPPLY_LIMIT", out reason);
@@ -113,6 +125,11 @@ namespace C6Lab
         public bool TryStartJigwiGenerationBurn(ulong player, double now, out string reason)
         {
             if (!CanStartJigwi(player, now, out reason)) return false;
+            return StartJigwiGenerationBurnCore(player, now, out reason);
+        }
+
+        private bool StartJigwiGenerationBurnCore(ulong player, double now, out string reason)
+        {
             JigwiStateFor(player).generationBurnUntil = now + jigwiGenerationBurnSeconds;
             revision++;
             reason = "JIGWI_GENERATION_BURN_STARTED";

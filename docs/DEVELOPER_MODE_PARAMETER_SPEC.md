@@ -1,6 +1,6 @@
 # C6 Physics Lab 개발자 모드 조정값 명세
 
-> **현행 설정 기준 (#246 정리·#251 방해공작12개·#272 지귀6개·#268 야광귀 섬광 7개·#271 야광귀 셈법 1개 추가):** Unity 6000.6.5f1, `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig.DeveloperFields`에 연결된 공유 설정은 **192개**, 프로토콜은 **5658**, 연결 토큰은 `C6PhysicsLab/19`다. 사용하지 않는 고정 승리 목표 행과 옛 셀별 Flow 조절 4개를 제거했다. 100% 도색 승리 규칙·현재 4종 패턴·LEGACY 초기 Style/Raggedness·근처 명중 건조·개인 조합판 구조는 유지한다. 아래 인덱스는 정리 후 기준이며 옛 설정 배열과 혼합하지 않는다. 실행 결과는 [VALIDATION](VALIDATION.md)의 #246 기록에서 확인한다.
+> **현행 설정 기준 (#246 정리·#251 방해공작12개·#272 지귀6개·#268 야광귀 섬광 7개·#271 야광귀 셈법 1개 추가):** Unity 6000.6.5f1, `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig.DeveloperFields`에 연결된 공유 설정은 **196개**, 프로토콜은 **5659**, 연결 토큰은 `C6PhysicsLab/20`다. 사용하지 않는 고정 승리 목표 행과 옛 셀별 Flow 조절 4개를 제거했다. 100% 도색 승리 규칙·현재 4종 패턴·LEGACY 초기 Style/Raggedness·근처 명중 건조·개인 조합판 구조는 유지한다. 아래 인덱스는 정리 후 기준이며 옛 설정 배열과 혼합하지 않는다. 실행 결과는 [VALIDATION](VALIDATION.md)의 #246 기록에서 확인한다.
 
 이 문서는 현재 Lab의 DEV에 연결된 값의 기본값·입력 범위·적용 경계·코드 연결을 설명한다. 원본 Inspector와 DEV 입력, 실행 증거는 구분한다.
 
@@ -11,21 +11,21 @@
 - `Paint Edge Raggedness`는 새 성장 경계의 요철 선호도에 관여한다. 사용되지 않는 옛 셀별 Flow 조절 4개는 #246에서 제거했다. 초기 3종 외곽은 원본 마스크로 정하고, 초기/반복 면적·속도·메우기·세로 가중치는 기존 공통 값을 사용한다.
 - DEFAULTS는 원본 Config의 Splatter로 돌아간다. 솔로 시작/재시작·Host 방 생성·로비 적용·공동 일시정지 후 APPLY & RESTART에서만 확정한다. 선택 버튼만 눌러서는 진행 중인 도색을 바꾸지 않는다.
 - 최초 튀김점은 같은 초기 면적 예산을 소비하는 실제 opaque 셀이다. 떨어진 성분은 별도 Region이며 반복 명중은 그 지점의 연결 성분에만 공급한다. 접촉하면 기존 FIFO 규칙으로 병합한다.
-- 실제 물감은 공용 `LabPaintPalette`의 사용자5색이며 구슬 재질과 분리된다. [패턴 구현·검증 안내](PAINT_PATTERN_RUNTIME.md)를 참조한다. 현재 설정192개·프로토콜5658·토큰 `C6PhysicsLab/19`을 사용한다. 다른 길이의 배열과 다른 버전 참가자는 새 설정을 일부만 적용할 수 없다.
+- 실제 물감은 공용 `LabPaintPalette`의 사용자5색이며 구슬 재질과 분리된다. [패턴 구현·검증 안내](PAINT_PATTERN_RUNTIME.md)를 참조한다. 현재 설정196개·프로토콜5659·토큰 `C6PhysicsLab/20`을 사용한다. 다른 길이의 배열과 다른 버전 참가자는 새 설정을 일부만 적용할 수 없다.
 
 > main `f3c7cec4`의 #236/PR #248 북 AUTO와 #244/PR #249 콤보 요괴 연출을 통합했다. `Drum Count`는 기존 인덱스74를 유지하고 기본값0의 의미를 AUTO로 사용한다. 공유 필드는 추가하지 않아166개이며 현재 규약은5653/token15다. 과거5650/token14·170개 #248 실행 결과와 현재 통합 결과는 [VALIDATION](VALIDATION.md)에서 분리한다. 콤보 요괴는 기존 Host 스냅샷으로 구동하며 공유 DEV 필드를 추가하지 않는다.
 
 ## 1. 패널의 적용 방식
 
 1. `Assets/Lab/Scenes/Lab.unity`를 Unity Editor에서 실행하거나 **Development Build**를 실행한다. 일반 배포 빌드에서는 DEV 버튼이 숨겨진다. 참가자는 일반 빌드여도 Host가 확정한 세션 설정을 수신한다.
-2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 총 192개 설정 중 일반 숫자 입력칸과 대응 슬라이더는 서로 값을 반영한다. 도색 승리는 100% 고정 게임 규칙이며 별도 DEV 행은 없다. 단, 0/1 항목 14개(Drop Combine, Contact Combine, Haptics, Gourd Mode, Minimap, Bomb Sound, Completed Gourd Viewer, Throw Form, Paint Grain, Paint Growth Style, Player Paint Patterns, Paint Drying, Gourd Color Combo, Combo Penalty Target)는 입력칸·슬라이더 대신 누를 때마다 바뀌는 토글 버튼(ON/OFF, Gourd Mode는 PAINT/CRACK, Bomb Sound는 BOOM/PPEONG, Throw Form은 ARC/STRAIGHT, Paint Growth Style은 ORIGINAL/SPREAD + FLOW, Combo Penalty Target은 TEAM/THROWER)으로 보이며, 값은 그대로 0/1로 적용·공유된다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
-3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 192개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
+2. 접속 전 또는 **전투 시작 전 Host 로비**에서 **DEV**를 연다. 공유 전투 중에는 Host가 먼저 공동 일시정지한 뒤 DEV를 열어 **APPLY & RESTART**로 적용한다. Client는 설정을 직접 바꾸지 않는다. 총 196개 설정 중 일반 숫자 입력칸과 대응 슬라이더는 서로 값을 반영한다. 도색 승리는 100% 고정 게임 규칙이며 별도 DEV 행은 없다. 단, 0/1 항목 14개(Drop Combine, Contact Combine, Haptics, Gourd Mode, Minimap, Bomb Sound, Completed Gourd Viewer, Throw Form, Paint Grain, Paint Growth Style, Player Paint Patterns, Paint Drying, Gourd Color Combo, Combo Penalty Target)는 입력칸·슬라이더 대신 누를 때마다 바뀌는 토글 버튼(ON/OFF, Gourd Mode는 PAINT/CRACK, Bomb Sound는 BOOM/PPEONG, Throw Form은 ARC/STRAIGHT, Paint Growth Style은 ORIGINAL/SPREAD + FLOW, Combo Penalty Target은 TEAM/THROWER)으로 보이며, 값은 그대로 0/1로 적용·공유된다. 정수 필드는 슬라이더 값도 정수로 표시하며, 매우 넓은 범위는 슬라이더 조작 구간을 비선형으로 배분한다. 숫자 입력으로 허용 범위의 정확한 값을 지정할 수 있다.
+3. 공유 실험을 시작하려면 별도 **ROOM PLAYERS** 슬라이더에서 2~5명(기본 3명)을 정하고 **CREATE ROOM**을 누른다. Host가 검증된 196개 값으로 방을 만든 뒤 참가자에게 전파한다. 기존 **HOST** 버튼을 사용하면 기본 인원과 현재 설정으로 방을 만든다. 방 생성 후 아직 전투 전이라면 **APPLY TO ROOM**으로 다시 조정할 수 있으며 이전 참가자 확인은 무효화된다. 목표 인원이 모이고 각 참가자가 최신 설정을 확인한 뒤에만 Host의 **START**가 활성화된다.
 4. 혼자 시험할 때는 **START SOLO**를 누른다. 이미 솔로 전투 중이면 **RESTART SOLO**가 표시된다. 새 라운드가 시작되므로 요괴/개인 HP·시간·스태미나·구슬이 초기화된다. 진행 중인 네트워크 라운드에 값을 즉시 적용하는 동작은 없다.
 5. **DEFAULTS**는 저장된 `LabConfig.asset`의 숫자를 입력칸과 슬라이더에 불러올 뿐이다. 공유 방이나 솔로에 적용하려면 해당 시작·적용 버튼을 눌러야 한다. **END SOLO**는 솔로를 끝내고 원본 설정으로 복귀한다. 런타임 복사본은 앱이 실행 중인 동안만 유지되며 원본 에셋에는 저장되지 않는다.
 
 패널 열기 자체는 시간을 멈추지 않는다. 공유 전투에서 설정을 바꾸려면 먼저 공동 일시정지를 승인받아야 하며, 이때 시간은 그 일시정지 상태를 따른다. 마지막 `SHOT HIT/MISS` 보고는 솔로를 끝내거나 연결을 끊으면 지워질 수 있으므로 먼저 기록한다. 공유 방에서는 Host의 설정 지문과 확인 응답을 기준으로 시작을 판정한다. 이 절은 코드상 경로 설명이며 실제 기기 동기화 결과는 검증 기록과 구분한다.
 
-입력은 **192개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
+입력은 **196개 전체를 한 번에** 검사한다. 숫자가 아니거나 무한대/NaN, 범위 밖, 정수 전용 필드의 소수 입력이 있으면 아무 값도 적용하지 않는다. 아래 표의 넓은 허용 범위는 “게임플레이에 적합함”을 뜻하지 않는다. 극단적인 카메라·속도·수명 값은 화면 밖 이동이나 빗나감을 일으킬 수 있다.
 
 ## 2. 단위와 공통 판정
 
@@ -68,7 +68,7 @@ Paint의 HP와 결과 대시보드는 구분한다. Paint의 `damageTotal`은 �
 
 `DefaultPaintVictoryPercent`·`PaintVictoryPercent`는 100이고 도색 승리는 마지막 실제 빈 셀을 칠해 `Coverage == 1`이 되면 확정한다. 목표 비율의 직렬화 필드·DEV 행·공유 배열 항목은 #246에서 제거했으며 낮은 비율의 승리를 설정할 수 없다.
 
-192개 전체를 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 검증·적용한다. `LabConfig.PaintGrowthSettings`는 매번 새 설정 복사본을 반환하고 Host Rules는 새 라운드 시작 때 이를 캡처한다. 일반 Retry는 캡처한 설정을 유지한다. `LabSceneController`의 초기 적용/`LabNetwork.ConfigApplied`가 `LabGourdPaint.Attach`·`ApplyMode`를 호출하며 Client는 Host 모드를 받는다.
+196개 전체를 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 검증·적용한다. `LabConfig.PaintGrowthSettings`는 매번 새 설정 복사본을 반환하고 Host Rules는 새 라운드 시작 때 이를 캡처한다. 일반 Retry는 캡처한 설정을 유지한다. `LabSceneController`의 초기 적용/`LabNetwork.ConfigApplied`가 `LabGourdPaint.Attach`·`ApplyMode`를 호출하며 Client는 Host 모드를 받는다.
 
 유효한 오행 명중이 안 칠한 셀에 닿으면 초기 마스크의 빈 부분을 해당 타격의 잉크로 즉시 칠하고 겹침 잔량은 명중점에 고정한 군집으로 넘긴다. 이미 칠한 셀에 닿으면 그 연결 영역에 반복 성장 면적을 공급한다. 이후 Host 전투 시계가 진행될 때 미사용 예산을 가진 영역들이 전체 표면 기준 `%/초` 속도를 나눠 쓰며 빈 인접 셀로 자란다. 시간이 흐르는 동안 공급 예산이 없으면 자라지 않으며, 그 대기 시간의 성장량을 미리 적립하지 않는다. 여러 영역은 차례대로 성장하고 서로 닿으면 하나로 병합된다.
 
@@ -82,11 +82,11 @@ HUD 목표는 항상 100%다. `snapshot.paintCellCount > 0`이면 `paintCoveredC
 
 Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 Host의 전투 시간 진행에서만 한다. Host 화면도 현재 Snapshot과 같은 버전의 `LabNetwork.PaintSurface` 표시 캐시를 사용해 맵과 HUD를 함께 반영한다. Client는 승인 명중 방향을 재생해 성장시키지 않고 Host가 보낸 셀 변경(delta) 또는 전체 체크포인트를 별도 수신 맵에 적용한다. 분할 수신 중에는 기존 공개 표시 캐시를 유지하고, 완성된 맵의 세션·라운드·해상도·Revision·칠한 셀 수·전체 셀 수·명중 수가 Snapshot 메타데이터와 모두 맞을 때 맵과 HUD를 함께 공개한다. 픽셀이 그대로인 반복 명중도 명중 수가 바뀌면 빈 delta를 발행한다.
 
-전송은 프로토콜 **5658**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID·RGBA·투척자 P번호를 담은 delta/전체 체크포인트와 공동 Snapshot은 별도 Bulk 스트림을 사용한다. 도색 논리 조각은 최대2,048자·107개이며 Bulk가 접두부 포함900문자·외부 메시지1,200바이트 이하로 다시 나눈다. 순서·누적 ACK·재전송·통합 해시 검증 후 색상/P맵을 원자적으로 공개하고 행동 승인용 통신과 분리한다. 상세 경계는 [LOCAL_BOARD_AUTHORITY](LOCAL_BOARD_AUTHORITY.md)를 따른다.
+전송은 프로토콜 **5659**의 `paint_cells`·`paint_resync` 경로를 사용한다. 셀 ID·RGBA·투척자 P번호를 담은 delta/전체 체크포인트와 공동 Snapshot은 별도 Bulk 스트림을 사용한다. 도색 논리 조각은 최대2,048자·107개이며 Bulk가 접두부 포함900문자·외부 메시지1,200바이트 이하로 다시 나눈다. 순서·누적 ACK·재전송·통합 해시 검증 후 색상/P맵을 원자적으로 공개하고 행동 승인용 통신과 분리한다. 상세 경계는 [LOCAL_BOARD_AUTHORITY](LOCAL_BOARD_AUTHORITY.md)를 따른다.
 
 이 복구는 **현재 라운드에 계속 연결된 Client의 부분 맵 누락**을 복원하는 기능이다. 연결이 끊어진 뒤 전투에 재접속하는 기능은 포함하지 않는다. 실제 다중 앱·기기에서의 전송과 화면 일치는 자동 패킷 fixture와 구분해 검증한다.
 
-현재 프로토콜은 **5658**, 연결 토큰은 `C6PhysicsLab/19`다. 박 줄·측면 타격 움직임을 포함한 192개 설정을 지문·참가자 확인 응답에 사용하며 현재 192개가 아닌 배열은 거절한다. 이전 모드·폭탄·북·미니맵·소리·성장 설정과 색칠 전송 형식은 유지한다. 모든 참가자가 같은 새 버전을 사용해야 하며 이전 PASS를 이번 통합의 결과로 승계하지 않는다. 실제 실행 결과는 `docs/VALIDATION.md`에서 변경별로 구분한다.
+현재 프로토콜은 **5659**, 연결 토큰은 `C6PhysicsLab/20`다. 박 줄·측면 타격 움직임을 포함한 196개 설정을 지문·참가자 확인 응답에 사용하며 현재 196개가 아닌 배열은 거절한다. 이전 모드·폭탄·북·미니맵·소리·성장 설정과 색칠 전송 형식은 유지한다. 모든 참가자가 같은 새 버전을 사용해야 하며 이전 PASS를 이번 통합의 결과로 승계하지 않는다. 실제 실행 결과는 `docs/VALIDATION.md`에서 변경별로 구분한다.
 
 근거: `LabConfig.PaintGrowthSettings`·`DeveloperFields`·`CaptureDeveloperValues`·`TryApplyDeveloperValues`, `LabPaintSurface.RegisterHit`·`Advance`·`TryReplacePixels`·`CopyPixels`, `LabModel.ConfirmHit`·`TryAdvance`·라운드 Rules, `LabPaintPublisher`·`LabPaintReceiver`, `LabNetwork.PaintSurface`·Snapshot 공개 경로, `LabGourdPaint.Attach`·`ApplyMode`, `LabHud`, `LabGourdCrack`·`LabGourdFinish`.
 
@@ -96,7 +96,7 @@ Host의 권위 상태는 `LabModel.PaintSurface` 하나이며, 성장 계산은 
 | --- | --- | --- | --- | --- |
 | Completed Gourd Viewer (0 off, 1 on) | 111번째 · 인덱스 110 · Gourd | ON(1) | 정수 0–1 | OFF는 관람 진입을 숨긴다. ON은 Host가 모든 참가자에게 Paint 100% 승리 결과의 관람을 허용한다. |
 
-Inspector의 `Completed Gourd Viewer Enabled`와 `LabConfig.CompletedGourdViewerEnabled`를 사용한다. 저장 필드가 없는 에셋도 true가 기본이다. 성장6개와 별개의 기능 허용 토글이다. 도색 승리100%는 별도 DEV 행 없는 고정 게임 규칙이다. 현재192개 전체의 유한값·범위·정수 검사를 먼저 통과해야 하므로 소수·범위 밖 bool이나 길이가 다른 배열은 일부 값도 적용하지 않는다.
+Inspector의 `Completed Gourd Viewer Enabled`와 `LabConfig.CompletedGourdViewerEnabled`를 사용한다. 저장 필드가 없는 에셋도 true가 기본이다. 성장6개와 별개의 기능 허용 토글이다. 도색 승리100%는 별도 DEV 행 없는 고정 게임 규칙이다. 현재196개 전체의 유한값·범위·정수 검사를 먼저 통과해야 하므로 소수·범위 밖 bool이나 길이가 다른 배열은 일부 값도 적용하지 않는다.
 
 **START/RESTART SOLO**, **CREATE ROOM**, Host 로비의 **APPLY TO ROOM**, 공동 일시정지한 Host의 **APPLY & RESTART**에서 기존 공유 설정과 함께 적용한다. Host 설정 지문과 전원 확인 응답이 시작을 제어한다. Client가 로컬로 허용값을 바꾸는 기능은 없으며 진행 중인 판에 즉시 적용하지 않는다. **일반 Release 참가자도 Host 설정을 따른다.** DEV 패널만 Editor·Development Build에 제한하며 관람 자체에는 Debug 빌드·실행 인자·Editor 메뉴 활성화가 필요하지 않다.
 
@@ -288,9 +288,9 @@ Inspector의 `Projectile throw form` 또는 DEV의 **Throw form** 묶음에서 A
 
 `EffectiveThrowGravity`는 Arc일 때 기존 `ThrowGravity`, Straight일 때 `ThrowGravity×StraightGravityScale`다. 공은 발사 순간 중력·수명을 별도로 캡처하며 초기 위치·속도·충돌 반경·감쇠도 발사 시 설정한다. 비행 중 Inspector나 DEV 초안을 바꿔 이미 날아가는 공을 꺾지 않는다. 보이는 구슬과 실제 SphereCollider는 동일한 물리 루트에서 이동하고 기존 궤적·피격·색칠 경로를 재사용한다.
 
-솔로는 START/RESTART SOLO, 공유 방은 Host의 CREATE ROOM/APPLY TO ROOM/공동 일시정지 뒤 APPLY & RESTART로 적용한다. **192개 전체**를 검증·지문화한 설정을 참가자에게 전파하고 확인받은 뒤 시작한다. 프로토콜은 **5658**이며 Host는 확정한 발사 위치·속도를 Client에 보내고 Client는 공유 설정의 같은 중력을 사용한다. Client가 직접 모드를 바꾸지 않는다. Inspector 변경도 새 판 시작 시점에 적용해 비교한다.
+솔로는 START/RESTART SOLO, 공유 방은 Host의 CREATE ROOM/APPLY TO ROOM/공동 일시정지 뒤 APPLY & RESTART로 적용한다. **196개 전체**를 검증·지문화한 설정을 참가자에게 전파하고 확인받은 뒤 시작한다. 프로토콜은 **5659**이며 Host는 확정한 발사 위치·속도를 Client에 보내고 Client는 공유 설정의 같은 중력을 사용한다. Client가 직접 모드를 바꾸지 않는다. Inspector 변경도 새 판 시작 시점에 적용해 비교한다.
 
-Inspector의 비정상 enum은 Arc로 보정하고 오프셋·각도·배율의 유효 Getter는 범위 제한과 유한수 대체값을 사용한다. DEV/네트워크는 잘못된 값 하나라도 있으면 192개 전체 적용을 거절한다. 극단적인 오프셋이나 음수 발사각은 화면 밖 출발·바닥 접촉·빗나감을 만들 수 있으며 자동 보정 대상이 아니다.
+Inspector의 비정상 enum은 Arc로 보정하고 오프셋·각도·배율의 유효 Getter는 범위 제한과 유한수 대체값을 사용한다. DEV/네트워크는 잘못된 값 하나라도 있으면 196개 전체 적용을 거절한다. 극단적인 오프셋이나 음수 발사각은 화면 밖 출발·바닥 접촉·빗나감을 만들 수 있으며 자동 보정 대상이 아니다.
 
 근거: `LabConfig.ThrowForm`·`StraightOriginOffset`·`StraightPitchOffsetDegrees`·`StraightLoftScale`·`StraightGravityScale`·`EffectiveThrowGravity`, DEV 인덱스 111~117, `LabDeveloperMode.RefreshThrowFormInputs`, `LabThrowMath.LaunchPosition`·`LaunchVelocity`·`ArcVelocity`, `LabProjectile.Prepare`·`FixedUpdate`·`Update`, `LabNetwork.SpawnHostProjectile`, `LabSessionSettings.Fingerprint`. 이 절은 코드 연결 설명이며 실제 실행 결과를 단정하지 않는다.
 
@@ -335,7 +335,7 @@ Inspector의 비정상 enum은 Arc로 보정하고 오프셋·각도·배율의 
 
 ### Experiment #196 — 물감 내부 입자·농담 (129~132번째)
 
-사용자 승인으로 main에 반영하는 기본 OFF 선택 표현이다. 현재 질감4개는128~131번이며 다른 게임 수치를 바꾸지 않는 표현 설정이다. 단일 `LabConfig.asset`의 기본은 OFF이며 DEV는 실행 중 복사본만 조정한다. #196 당시 공유 전체는133개·프로토콜5633이었다. 이 문서의 현재 #268·#272 통합본은192개·5658이며 같은 버전끼리 접속한다.
+사용자 승인으로 main에 반영하는 기본 OFF 선택 표현이다. 현재 질감4개는128~131번이며 다른 게임 수치를 바꾸지 않는 표현 설정이다. 단일 `LabConfig.asset`의 기본은 OFF이며 DEV는 실행 중 복사본만 조정한다. #196 당시 공유 전체는133개·프로토콜5633이었다. 이 문서의 현재 #268·#272 통합본은196개·5659이며 같은 버전끼리 접속한다.
 
 | DEV 입력 이름 | 인덱스 | 기본값 | 범위 | 효과 |
 | --- | ---: | ---: | --- | --- |
@@ -456,7 +456,7 @@ BGM·생성·타격·빗나감·결합·도화선 소리 크기 6개(인덱스 6
 
 104번째(인덱스 103) `Bomb Sound (0 boom, 1 ppeong)`는 폭탄 소리 종류를 고르는 토글이다(기본 1 = PPEONG). BOOM은 `Audio/Bomb/Boom`의 일반 폭발음, PPEONG은 `Audio/Bomb/Ppeong`의 뻥튀기 기계 소리를 쓴다. 고른 쪽 파일이 없으면 다른 쪽을 쓴다. 팀 플레이 테스트 뒤 하나로 정할 예정이며, Inspector `Bomb Sound Style`과 같은 값이다.
 
-#201: 현재136·137번째(인덱스135·136) `Chuimsae Chance (%)`·`Chuimsae Min Gap (generates)`는 구슬 생성 소리에 섞이는 추임새(얼쑤·얼씨구)의 빈도를 정한다. 생성할 때마다 Chance(기본 15%) 확률로 장구 대신 추임새가 나고, 한 번 나온 뒤에는 Min Gap(기본 5번)만큼 장구만 나서 연달아 나오지 않는다(기본값이면 평균 약 9~10번에 한 번). 둘 다 정수이고 Chance 0이면 추임새를 끈다. 이전의 "세 번째마다 고정" 방식(`voiceEvery`)을 대체한다. `Sound and haptics` 칸에서 `Generate Sound Volume` 바로 아래에 보이며, Inspector `Chuimsae Chance Percent`·`Chuimsae Min Gap`과 같은 값이다. #201 당시 기존 0~139번을 유지하고 끝에 2개를 추가해 총 142개·프로토콜5636으로 공유했다. 현재는192개·5658/토큰19의 같은 빌드끼리 접속한다. 코드: `LabGenerateSound.ShouldPlayVoice`·`PlayNext`.
+#201: 현재136·137번째(인덱스135·136) `Chuimsae Chance (%)`·`Chuimsae Min Gap (generates)`는 구슬 생성 소리에 섞이는 추임새(얼쑤·얼씨구)의 빈도를 정한다. 생성할 때마다 Chance(기본 15%) 확률로 장구 대신 추임새가 나고, 한 번 나온 뒤에는 Min Gap(기본 5번)만큼 장구만 나서 연달아 나오지 않는다(기본값이면 평균 약 9~10번에 한 번). 둘 다 정수이고 Chance 0이면 추임새를 끈다. 이전의 "세 번째마다 고정" 방식(`voiceEvery`)을 대체한다. `Sound and haptics` 칸에서 `Generate Sound Volume` 바로 아래에 보이며, Inspector `Chuimsae Chance Percent`·`Chuimsae Min Gap`과 같은 값이다. #201 당시 기존 0~139번을 유지하고 끝에 2개를 추가해 총 142개·프로토콜5636으로 공유했다. 현재는196개·5659/토큰20의 같은 빌드끼리 접속한다. 코드: `LabGenerateSound.ShouldPlayVoice`·`PlayNext`.
 
 #172 아이폰 확인 뒤 진동 기본값을 정리했다: 생성 Medium·1, 타격 Heavy·1, 아이템 타격 Heavy·1, 폭탄 Heavy·1, 결합 Light·1. 세기 차이는 진동 종류(Light < Medium < Heavy)로 낸다.
 
@@ -521,7 +521,7 @@ DEV `야광귀` 묶음의 위쪽 `── 콤보 ──` 아래 11줄이다(#271�
 
 ## 10. 이 패널로 조정할 수 없는 것·검증 범위
 
-방의 **목표 인원**은 192개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport, 박 폭탄의 대상·착지 위치 추첨과 낙하·말풍선 연출 시간, 구슬 소멸 예고의 번쩍임·연기(Inspector `LabOrbAppearance` Orb expiry), 폭탄 그림의 밧줄 길이·무지개·연기, 폭발 불의 모양·색과 축소 연출 시간, 북 도착의 감속 상한·최대 도착 시간·통과 속도는 192개 입력칸으로 조정하지 않는다. 색칠 승리 목표는 100% 고정이며 이 패널로 낮출 수 없다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
+방의 **목표 인원**은 196개 설정 필드와 별도의 `ROOM PLAYERS` 슬라이더에서 방 생성 전에 선택한다. 좌석의 입장 순서, 네트워크 주소·포트, 생성 추첨 방식(독립 추첨), 오행 속성 확률(균등), 조합·전달의 승인 규칙, 북을 받을 사람의 무작위 배치, 손동작 샘플 창 **0.12초**, 타깃 Cylinder의 실제 크기·위치, 전투 카메라의 FOV와 화면 내 viewport, 박 폭탄의 대상·착지 위치 추첨과 낙하·말풍선 연출 시간, 구슬 소멸 예고의 번쩍임·연기(Inspector `LabOrbAppearance` Orb expiry), 폭탄 그림의 밧줄 길이·무지개·연기, 폭발 불의 모양·색과 축소 연출 시간, 북 도착의 감속 상한·최대 도착 시간·통과 속도는 196개 입력칸으로 조정하지 않는다. 색칠 승리 목표는 100% 고정이며 이 패널로 낮출 수 없다. DEV 솔로에는 이웃이 없어 화면 간 전달과 아이템 해금을 시험할 수 없다.
 
 기존 PR #76 기준 문서는 해당 코드·Scene·설정 에셋과 당시 `docs/VALIDATION.md`의 증거를 **읽어 확인**해 작성됐다. 그 기록의 EditMode **12/12**, PlayMode **20/20** 및 Mac Development 앱 빌드는 이번 3D 조합판 전환의 통과 증거가 아니다. 이 전환의 Unity 컴파일·EditMode·PlayMode, Mac·iOS 빌드, 실제 조작은 새 실행 기록으로 구분해야 한다. 문서의 물리 용어를 갱신한 것만으로 실행 결과를 PASS로 보지 않는다.
 
@@ -531,7 +531,7 @@ DEV `야광귀` 묶음의 위쪽 `── 콤보 ──` 아래 11줄이다(#271�
 
 - 설정 필드·범위·일괄 검사: `Assets/Lab/Scripts/Core/LabConfig.cs` — `DeveloperFields`, `CaptureDeveloperValues`, `TryApplyDeveloperValues`.
 - 저장 기본값: `Assets/Lab/Resources/LabConfig.asset`.
-- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 192개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
+- 저장된 DEV 버튼·입력칸·슬라이더(39개 행이 저장돼 있고 나머지는 실행 시 마지막 행을 복제해 196개로 늘림)·목표 인원·Host 적용 버튼 연결: `Assets/Lab/Scenes/Lab.unity`의 `LabDeveloperMode` 컴포넌트.
 - 패널 열기·DEFAULTS·SOLO/Host 설정 적용·슬라이더 변환: `Assets/Lab/Scripts/UI/LabDeveloperMode.cs`.
 - Host 전투 수치·개인 HP·전원 0 패배·스태미나·생성 확률·속성·아이템 잠금·구슬 만료: `Assets/Lab/Scripts/Core/LabModel.cs`.
 - 아이템 더블 탭 사용·효과(물약·상자), 릴레이 단계, 폭탄 폭발·피해 배율: `Assets/Lab/Scripts/Core/LabModel.cs`(`TryUseItemAt`·`TryTransferAt`·`TryAdvance`·`ConfirmHit`)와 `LabOrbBoard.EndDragAtWorld`.
@@ -557,12 +557,12 @@ DEV `야광귀` 묶음의 위쪽 `── 콤보 ──` 아래 11줄이다(#271�
 - 카메라·보드 크기 적용: `Assets/Lab/Scripts/UI/LabSeatCamera.cs`와 `LabSceneController.cs`.
 - 과거 검증 기록: `docs/VALIDATION.md`. 투척 비교 절차: `docs/THROW_TUNING_GUIDE.md`.
 
-#190 통합 후의 실제 실행 결과는 `docs/VALIDATION.md`의 후속 통합 기록을 참조한다. 위 #191의 331/116 결과는 관람 통합 당시 기록이며 현재192개 설정 검증으로 승계하지 않는다.
+#190 통합 후의 실제 실행 결과는 `docs/VALIDATION.md`의 후속 통합 기록을 참조한다. 위 #191의 331/116 결과는 관람 통합 당시 기록이며 현재196개 설정 검증으로 승계하지 않는다.
 
 
 ### 실제 투척자 무늬·완성 박 관람의 기본값 — #206
 
-DEV → Gourd의 `Player Paint Patterns`(138번째, 인덱스137)와 `Completed Gourd Viewer`(111번째, 인덱스110)는 **서로 독립적인 ON/OFF 버튼이며 코드·저장 Config 기본값은 모두 ON**이다. `DEFAULTS`는 두 입력을 ON으로 되돌리며, 기존 APPLY/START/RESTART를 눌러 적용한다. 무늬 OFF는 박의 RGB 무늬와 로비·내/좌우 표본만 숨긴다. 투척자 P기록·색상·알파·성장·100% 목표는 유지한다. 관람 ON은 동기화된 Paint 100% Victory에서 결과 관람 버튼을 제공하며 자동 진입하지 않는다. 관람창은 무늬 설정과 색상/투척자 맵을 복사해 회전·확대하므로 무늬 OFF의 완성품도 색상만으로 관람할 수 있다. Host가 192개 값과 지문을 공유하고 참가자 ACK를 받은 뒤 시작한다. 프로토콜5658에서는 이전 설정 개수의 앱을 섞어 접속하지 않는다.
+DEV → Gourd의 `Player Paint Patterns`(138번째, 인덱스137)와 `Completed Gourd Viewer`(111번째, 인덱스110)는 **서로 독립적인 ON/OFF 버튼이며 코드·저장 Config 기본값은 모두 ON**이다. `DEFAULTS`는 두 입력을 ON으로 되돌리며, 기존 APPLY/START/RESTART를 눌러 적용한다. 무늬 OFF는 박의 RGB 무늬와 로비·내/좌우 표본만 숨긴다. 투척자 P기록·색상·알파·성장·100% 목표는 유지한다. 관람 ON은 동기화된 Paint 100% Victory에서 결과 관람 버튼을 제공하며 자동 진입하지 않는다. 관람창은 무늬 설정과 색상/투척자 맵을 복사해 회전·확대하므로 무늬 OFF의 완성품도 색상만으로 관람할 수 있다. Host가 196개 값과 지문을 공유하고 참가자 ACK를 받은 뒤 시작한다. 프로토콜5659에서는 이전 설정 개수의 앱을 섞어 접속하지 않는다.
 
 
 ### 재타격 군집 설정 — #208
@@ -574,7 +574,7 @@ DEV → Gourd의 `Player Paint Patterns`(138번째, 인덱스137)와 `Completed 
 | Paint Cluster Compactness |138|0.85|0~1|군집의 넓은 접촉·빈틈 메우기 선호도.0이어도 지역 군집 탐색은 유지|
 | Paint Cluster Irregularity |139|0.25|0~1|군집별 고정된 완만한 구면 굴곡. 셀별 백색 잡음은 추가하지 않음|
 
-두 새 숫자/슬라이더는 Gourd 묶음의 재타격 성장량 다음에 배치된다. 원본 저장값·DEFAULTS와 Capture/Apply가 같은 값을 사용하며 새 판에만 적용한다. Host는192개와5658 지문을 공유해 참가자 ACK 후 시작한다. #246에서 미사용 항목을 뺀 현행 배열 순서를 사용한다. 수직 우대(109)와 Fill Chance(108)는 한 타격의 경계 시작점 선택에만 작용한다. 셀마다 그 방향을 계속 우대해 군집을 가늘게 늘이지 않는다.
+두 새 숫자/슬라이더는 Gourd 묶음의 재타격 성장량 다음에 배치된다. 원본 저장값·DEFAULTS와 Capture/Apply가 같은 값을 사용하며 새 판에만 적용한다. Host는196개와5659 지문을 공유해 참가자 ACK 후 시작한다. #246에서 미사용 항목을 뺀 현행 배열 순서를 사용한다. 수직 우대(109)와 Fill Chance(108)는 한 타격의 경계 시작점 선택에만 작용한다. 셀마다 그 방향을 계속 우대해 군집을 가늘게 늘이지 않는다.
 
 과거 #198의 셀마다 흐름 시도/아래 방향/꼬리 폭·길이 설명은 과거 구현이다. 현재 최초 명중의 LEGACY Style/Edge Raggedness와4종 마스크 선택은 유지하지만 재타격은 공통 군집 경로다. #246에서 결과에 영향이 없는 옛 Flow 조절4값과 미사용 분기를 제거했다. 구현 근거는 `LabPaintSurface.RegisterHit`·`Supply`·`ChooseClusterCell`·`GrowthCluster.Take/Commit`·`PaintCell/Consume/Merge`와 `LabConfig.PaintGrowthSettings`다.
 
@@ -583,7 +583,7 @@ DEV → Gourd의 `Player Paint Patterns`(138번째, 인덱스137)와 `Completed 
 
 ### Gourd Visual Size
 
-DEV → Gourd → `Gourd Visual Size (x)`는 #214에서 추가한 **141번째/인덱스140** 설정이다. 범위0.5~3.0, 기본1.4이며 Paint 모드의 몸체·뚜껑·요괴·장식을 함께 확대/축소하고 목의 연결 위치를 유지한다. 기존 APPLY/새 판 적용 경계와 Host 공유192개 설정·프로토콜5658를 사용한다. 충돌체 크기는 변경하지 않는다. #211의 재타격 기본값1.5%를 보존한다.
+DEV → Gourd → `Gourd Visual Size (x)`는 #214에서 추가한 **141번째/인덱스140** 설정이다. 범위0.5~3.0, 기본1.4이며 Paint 모드의 몸체·뚜껑·요괴·장식을 함께 확대/축소하고 목의 연결 위치를 유지한다. 기존 APPLY/새 판 적용 경계와 Host 공유196개 설정·프로토콜5659를 사용한다. 충돌체 크기는 변경하지 않는다. #211의 재타격 기본값1.5%를 보존한다.
 
 
 ### 근처 유효 명중으로 유지하는 건조 — 149~152번째 설정 (#225)
@@ -597,7 +597,7 @@ DEV **Gourd**의 마지막 네 행이다. `Paint Drying`이 OFF이면 세 숫자
 | Drying Rate (%/s) | 150 | 0.2 | 0~5%p/초 | 전체 박 표면 기준 총 감소 속도. 0이면 ON이어도 도색을 지우지 않는다. |
 | Nearby Hit Radius (surface degrees) | 151 | 20 | 1~90도 | 실제 피격점의 정규화된 박 로컬 방향에서 주변 도색을 보호하는 구면각도. |
 
-`LabConfig` 공개 속성은 `PaintDryingEnabled`, `PaintDryingDelaySeconds`, `PaintDryingPercentPerSecond`, `PaintNearbyHitRadiusDegrees`다. `PaintGrowthSettings`는 라운드 시작에 이 값을 복사한다. 현재 전체 **192개**를 유한수·범위·정수 조건으로 원자적으로 검사·캡처·적용한다. 네 값 모두 프로토콜 **5658**의 설정 지문과 참가자 확인에 포함한다. 길이가 다른 배열을 부분 적용하지 않는다. Inspector 비정상 수치는 유효 Getter에서 범위 제한 또는 독립 기본값으로 대체하지만 DEV/네트워크 입력은 거절한다.
+`LabConfig` 공개 속성은 `PaintDryingEnabled`, `PaintDryingDelaySeconds`, `PaintDryingPercentPerSecond`, `PaintNearbyHitRadiusDegrees`다. `PaintGrowthSettings`는 라운드 시작에 이 값을 복사한다. 현재 전체 **196개**를 유한수·범위·정수 조건으로 원자적으로 검사·캡처·적용한다. 네 값 모두 프로토콜 **5659**의 설정 지문과 참가자 확인에 포함한다. 길이가 다른 배열을 부분 적용하지 않는다. Inspector 비정상 수치는 유효 Getter에서 범위 제한 또는 독립 기본값으로 대체하지만 DEV/네트워크 입력은 거절한다.
 
 실제 명중점의 주변 기존 칠(다른 색·P번호·분리된 영역 포함)에만 시간을 갱신하며 기존 색/무늬는 유지한다. 빈곳 첫 명중도 주변 보호를 갱신하고, 성장량이 생기지 않는 유효 재타격도 보호한다. 군집의 무작위 성장 시작점은 보호 지점이 아니다. 새 성장 셀만 자체 유예를 받으며 자동 성장은 기존 칠의 시간을 연장하지 않는다. 무효·중복·share 0인 요청은 보호하지 않는다.
 
@@ -607,7 +607,7 @@ Host 전투 시계의 0.1초 고정 tick에서 빈 표면과 맞닿은 경계를
 
 ## 요괴 방해공작 — Sabotage 묶음 (#251)
 
-DEV → **Sabotage**의 12개 칸(167~178번째, 인덱스 166~177)이다. 실험이라 **기본은 꺼짐**이며, 꺼져 있으면 게임은 이전과 완전히 같다. 코드·저장 `LabConfig.asset` 기본값이 같다(저장 원본에 칸이 없으면 코드 기본값을 쓴다). 다른 공유 설정처럼 Host가 192개 전체를 검사·지문화해 참가자 확인 뒤 새 판에 적용한다.
+DEV → **Sabotage**의 12개 칸(167~178번째, 인덱스 166~177)이다. 실험이라 **기본은 꺼짐**이며, 꺼져 있으면 게임은 이전과 완전히 같다. 코드·저장 `LabConfig.asset` 기본값이 같다(저장 원본에 칸이 없으면 코드 기본값을 쓴다). 다른 공유 설정처럼 Host가 196개 전체를 검사·지문화해 참가자 확인 뒤 새 판에 적용한다.
 
 | 이름 | 기본 | 범위 / 단위 | 설명 |
 | --- | --- | --- | --- |
@@ -636,7 +636,7 @@ DEV → **Sabotage**의 12개 칸(167~178번째, 인덱스 166~177)이다. 실�
 
 ## 야광귀 섬광 — 야광귀 묶음 (#268)
 
-DEV → **야광귀**의 아래쪽 `── 섬광 ──` 7칸(185~191번째, 인덱스 184~190, #272 지귀 6칸 뒤)이다. 야광귀 스테이지에서 쓸 방해로, 박 색상 콤보(156~165번째)와 한 묶음에 모았다. 방해공작 묶음(#251)과 따로 돈다. **기본은 꺼짐**이며 코드·저장 `LabConfig.asset` 기본값이 같다. 다른 공유 설정처럼 Host가 192개 전체를 검사·지문화해 참가자 확인 뒤 새 판에 적용한다. 스테이지별 켜고 끄기는 스테이지 작업에서 이 토글들을 쓰면 된다.
+DEV → **야광귀**의 아래쪽 `── 섬광 ──` 7칸(185~191번째, 인덱스 184~190, #272 지귀 6칸 뒤)이다. 야광귀 스테이지에서 쓸 방해로, 박 색상 콤보(156~165번째)와 한 묶음에 모았다. 방해공작 묶음(#251)과 따로 돈다. **기본은 꺼짐**이며 코드·저장 `LabConfig.asset` 기본값이 같다. 다른 공유 설정처럼 Host가 196개 전체를 검사·지문화해 참가자 확인 뒤 새 판에 적용한다. 스테이지별 켜고 끄기는 스테이지 작업에서 이 토글들을 쓰면 된다.
 
 **야광귀 묶음 화면**: 묶음 제목 오른쪽 버튼(`끔`/`켬`/`일부`) 하나로 `Gourd Color Combo`(인덱스 155)와 `야광귀 섬광`(인덱스 184)을 함께 켜고 끈다. 둘 다 켜져 있으면 `켬`이고 누르면 둘 다 끈다. 둘 다 꺼져 있거나(`끔`) 하나만 켜져 있으면(`일부`) 누르면 둘 다 켠다. 새 설정값이 아니라 두 토글의 입력칸을 바꾸는 단축키이므로 APPLY 전에는 적용되지 않고, 묶음이 접혀 있어도 보인다. 묶음 안에는 `── 콤보 ──`, `── 섬광 ──` 구분선이 보인다(`LabDeveloperCategory.WithSwitch`·`WithDividers`, 화면 표시만).
 
@@ -694,3 +694,16 @@ DEV → **야광귀**의 아래쪽 `── 섬광 ──` 7칸(185~191번째, �
 ## 지귀 수동 패턴 (#272)
 
 DEV **Jigwi** 카테고리에 인덱스178~183의6개 슬라이더를 추가했다. 기본값·범위·소화/소각 규칙·Host 전용 수동 발동 방법은 [지귀 패턴 안내](JIGWI_PATTERNS.md)에 정리했다. 생성 화상은 기존 폭탄 축소와 별도이며 기존178개 인덱스를 이동하지 않았다. 자동 방해공작 추첨에는 지귀를 추가하지 않는다.
+
+## #276 별도 3요괴 게임의 지귀 자동 설정
+
+기존0~191은 유지하며 아래4칸을 마지막에 추가한다. Lab의 기본 `None` 정책은 자동 지귀를 실행하지 않아 기존 단일 Scene 실험을 유지한다. 별도 게임의 지귀 단계에서만 자동 추첨에 사용한다.
+
+| 인덱스 | 필드 | 기본값 | DEV 범위 |
+| --- | --- | --- | --- |
+| 192 | Jigwi Auto Interval Min (seconds) | 20초 | 1~600 |
+| 193 | Jigwi Auto Interval Max (seconds) | 30초 | 1~600, min 이상 |
+| 194 | Jigwi Auto Fire Weight | 1 | 정수0~10 |
+| 195 | Jigwi Auto Generation Burn Weight | 1 | 정수0~10 |
+
+별도 Home/Lobby는 공통·구미호·야광귀·지귀 범위 탭을 제공한다. 공통 조정값은 모든 스테이지에, 고유 값은 해당 단계에만 적용한다. Battle의 기존 DEV는 모든 항목을 보여 주지만 현재 단계와 공통 값만 변경할 수 있고 타 단계 수정은 재시작 전에 거절한다. 기본 ON을 다시 강제하지 않으므로 DEV에서 끈 값은 같은 단계 재시작에도 유지한다. 자세한 규칙/외형 연결/종료 조건은 [GAME_FLOW](GAME_FLOW.md), 실제 수행은 [VALIDATION](VALIDATION.md)의 #276 기록을 따른다.

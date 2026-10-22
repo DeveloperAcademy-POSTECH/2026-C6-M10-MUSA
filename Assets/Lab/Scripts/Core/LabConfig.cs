@@ -315,7 +315,11 @@ namespace C6Lab
             new LabDeveloperField("섬광 눈부심 (초)", 1f, 13f),
             new LabDeveloperField("섬광 회복 (초)", 0f, 4f),
             // The yaguang-gwi's counting look for the combo (#271): it counts 하나 둘 셋 넷 and cannot go past four.
-            LabDeveloperField.Toggle("야광귀 셈법 (0 off, 1 on)", "끔", "켬")
+            LabDeveloperField.Toggle("야광귀 셈법 (0 off, 1 on)", "끔", "켬"),
+            new LabDeveloperField("Jigwi Auto Interval Min (seconds)", 1f, 600f),
+            new LabDeveloperField("Jigwi Auto Interval Max (seconds)", 1f, 600f),
+            new LabDeveloperField("Jigwi Auto Fire Weight", 0f, 10f, true),
+            new LabDeveloperField("Jigwi Auto Generation Burn Weight", 0f, 10f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -347,7 +351,7 @@ namespace C6Lab
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
                 134, 132, 133, 148, 149, 150, 151),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
-            new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183),
+            new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
             new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
@@ -587,6 +591,10 @@ namespace C6Lab
         [SerializeField, Range(.1f, 120f)] private float jigwiGenerationBurnSeconds = 10f;
         [SerializeField, Range(.2f, 1f)] private float jigwiRawRadiusScale = .65f;
         [SerializeField, Range(.05f, 1f)] private float jigwiRawLifeScale = .5f;
+        [SerializeField, Range(1f, 600f)] private float jigwiAutoIntervalMin = 20f;
+        [SerializeField, Range(1f, 600f)] private float jigwiAutoIntervalMax = 30f;
+        [SerializeField, Range(0, 10)] private int jigwiAutoFireWeight = 1;
+        [SerializeField, Range(0, 10)] private int jigwiAutoGenerationBurnWeight = 1;
         [Header("Yaguang flash (#268)")]
         [Tooltip("야광귀 섬광. 박에서 요괴가 빼꼼 나와 눈이 밝아진 뒤(예고) 화면이 하얗게 번쩍이고, 눈부신 동안 판 위 음양·결합 구슬과 아이템이 하얗게 보인다(북·박 색칠·HUD는 그대로). 화면 표시만 바뀌고 조작·판정은 그대로다. 방해공작 묶음(#251)과 따로 돈다. 야광귀 전용이라 기본은 끔(DEV `Yaguang Flash`로 켠다).")]
         [SerializeField] private bool yaguangFlashEnabled;
@@ -929,6 +937,10 @@ namespace C6Lab
         public float JigwiGenerationBurnSeconds => Mathf.Clamp(Finite(jigwiGenerationBurnSeconds, 10f), .1f, 120f);
         public float JigwiRawRadiusScale => Mathf.Clamp(Finite(jigwiRawRadiusScale, .65f), .2f, 1f);
         public float JigwiRawLifeScale => Mathf.Clamp(Finite(jigwiRawLifeScale, .5f), .05f, 1f);
+        public float JigwiAutoIntervalMin => Mathf.Clamp(Finite(jigwiAutoIntervalMin, 20f), 1f, 600f);
+        public float JigwiAutoIntervalMax => Mathf.Clamp(Finite(jigwiAutoIntervalMax, 30f), JigwiAutoIntervalMin, 600f);
+        public int JigwiAutoFireWeight => Mathf.Clamp(jigwiAutoFireWeight, 0, 10);
+        public int JigwiAutoGenerationBurnWeight => Mathf.Clamp(jigwiAutoGenerationBurnWeight, 0, 10);
         public bool YaguangFlashEnabled => yaguangFlashEnabled;
         /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
         public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
@@ -1072,7 +1084,8 @@ namespace C6Lab
                 YaguangFlashEnabled ? 1f : 0f, YaguangFlashTargetOne ? 1f : 0f, YaguangFlashFirstStartSeconds,
                 YaguangFlashIntervalSeconds, YaguangFlashWarningSeconds, YaguangFlashGlareSeconds,
                 YaguangFlashRecoverySeconds,
-                ComboYaguangCountEnabled ? 1f : 0f
+                ComboYaguangCountEnabled ? 1f : 0f,
+                JigwiAutoIntervalMin, JigwiAutoIntervalMax, JigwiAutoFireWeight, JigwiAutoGenerationBurnWeight
             };
         }
 
@@ -1119,6 +1132,7 @@ namespace C6Lab
             if (drumStopTotal != 100f) { error = "Drum stop chances must add up to 100 (now " + drumStopTotal + ")."; return false; }
             if (values[167] > values[168]) { error = "Sabotage Interval Min cannot exceed Sabotage Interval Max."; return false; }
             if (values[173] > values[174]) { error = "Fox Fire Count Min cannot exceed Fox Fire Count Max."; return false; }
+            if (values[192] > values[193]) { error = "Jigwi Auto Interval Min cannot exceed Jigwi Auto Interval Max."; return false; }
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
@@ -1304,6 +1318,10 @@ namespace C6Lab
             yaguangFlashGlareSeconds = values[189];
             yaguangFlashRecoverySeconds = values[190];
             comboYaguangCountEnabled = values[191] >= .5f;
+            jigwiAutoIntervalMin = values[192];
+            jigwiAutoIntervalMax = values[193];
+            jigwiAutoFireWeight = (int)values[194];
+            jigwiAutoGenerationBurnWeight = (int)values[195];
             error = string.Empty;
             return true;
         }
