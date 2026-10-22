@@ -43,6 +43,9 @@ namespace Hapio
         private string localError;
         private RectTransform resultTable;
         private string resultTableKey;
+        // ALL STAGES CLEAR: false면 3스테이지 표, true면 전체 게임 대시보드. 새 판이면 3스테이지 표부터.
+        private bool showOverall;
+        private string overallRunId;
         private bool UsesExternalNavigation => externalNavigation && (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby);
 
         private void Awake()
@@ -60,7 +63,7 @@ namespace Hapio
                 Click(startButton, () => session.StartGame());
                 Click(homeButton, () => session.GoHome());
             }
-            Click(nextButton, () => session.NextStage());
+            Click(nextButton, OnNextButton);
             Click(viewerButton, () => session.OpenGourdViewer());
             Click(closeViewerButton, () => session.CloseGourdViewer());
             Click(resetViewerButton, () => session.ResetPreview());
@@ -179,9 +182,13 @@ namespace Hapio
                 ? "PAINT " + (result.paintCoverage * 100f).ToString("0.0", CultureInfo.InvariantCulture) + "%"
                 : "TARGET HP " + result.hp;
             var stages = complete ? session.StageResults : null;
-            bool overall = stages != null && stages.Count > 0;
+            bool hasOverall = stages != null && stages.Count > 0;
+            if (overallRunId != session.State.runId) { overallRunId = session.State.runId; showOverall = false; }
+            // 3스테이지(마지막 스테이지) 표를 먼저 보여주고, 버튼으로 전체 표와 오간다.
+            bool overall = hasOverall && showOverall;
             Text(status, overall ? "전체 " + stages.Count + "스테이지 평균 기록"
-                : result == null ? "Stage result is being prepared." : goal
+                : result == null ? "Stage result is being prepared."
+                : (hasOverall ? session.State.stageIndex + "스테이지 기록   ·   " : string.Empty) + goal
                 + "   ·   TIME LEFT " + Math.Ceiling(result.remaining).ToString(CultureInfo.InvariantCulture) + "s");
             ShowResultTable(net, result, overall ? stages : null);
             var text = new StringBuilder();
@@ -194,12 +201,14 @@ namespace Hapio
                             : "Waiting for the Host to start the next stage.");
             if (!string.IsNullOrEmpty(session.UiNotice)) text.Append("\n\n").Append(session.UiNotice);
             Text(details, text.ToString());
-            Show(nextButton == null ? null : nextButton.gameObject, !complete && net.IsHost);
+            // ALL STAGES CLEAR에서는 NEXT 자리를 "전체 기록 보기 / 3스테이지 기록 보기" 전환 버튼으로 쓴다 (모든 기기).
+            Show(nextButton == null ? null : nextButton.gameObject, complete ? hasOverall : net.IsHost);
             Show(homeButton == null ? null : homeButton.gameObject, true);
-            Interactable(nextButton, session.CanAdvanceStage);
+            Interactable(nextButton, complete ? hasOverall : session.CanAdvanceStage);
             Interactable(homeButton, !complete || session.CanReturnHome);
             Label(homeButton, complete ? "HOME" : "QUIT RUN");
-            Label(nextButton, "NEXT · STAGE " + (session.State.stageIndex + 1));
+            Label(nextButton, complete ? (showOverall ? session.State.stageIndex + "스테이지 기록 보기" : "전체 기록 보기")
+                : "NEXT · STAGE " + (session.State.stageIndex + 1));
             Show(viewerButton == null ? null : viewerButton.gameObject, net.config != null && net.config.CompletedGourdViewerEnabled
                 && net.config.GourdMode == LabGourdMode.Paint && result != null && result.paintCoverage >= 1f);
             Texture texture = session.PreviewTexture;
@@ -252,6 +261,13 @@ namespace Hapio
             area.offsetMax = new Vector2(area.offsetMax.x, -(height + resultTableGap));
             // Details 바로 다음 순서로 둬서, 나중에 그려지는 완성 박 보기 화면이 표를 덮게 한다.
             resultTable.SetSiblingIndex(area.GetSiblingIndex() + 1);
+        }
+
+        /// <summary>NEXT 버튼: 스테이지 결과에서는 다음 스테이지, ALL STAGES CLEAR에서는 표 전환.</summary>
+        private void OnNextButton()
+        {
+            if (session.State.phase == GameFlowPhase.Completed) { showOverall = !showOverall; return; }
+            session.NextStage();
         }
 
         private void ChangePlayers(int delta)
