@@ -108,8 +108,9 @@ namespace Hapio.Editor
             Font brush = view.heading.font;
             RectTransform layout = Child(page, "TeamLayout");
             Stretch(layout);
+            // Behind every seat button. Move it only when it is not already before P1, so running again keeps the order.
             Transform firstSlot = view.slotButtons[0].transform;
-            layout.SetSiblingIndex(firstSlot.GetSiblingIndex());
+            if (layout.GetSiblingIndex() > firstSlot.GetSiblingIndex()) layout.SetSiblingIndex(firstSlot.GetSiblingIndex());
             view.teamLayout = layout.gameObject;
             Text(Child(layout, "ModeTitle"), brush, "< 2:2 땅따먹기 >", 30, Color.black, 28f, 134f, 346f, 38f);
             Box(layout, "BlueBox", Art("TeamBoxBlue"), 49f, 403f);

@@ -38,6 +38,8 @@ namespace Hapio.Tests
             Assert.That(view.basicModeButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("기본 모드"));
             Assert.That(view.teamModeButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("2 : 2 땅따먹기"));
             Assert.That(view.teamLayout != null && view.teamLayout.transform.IsChildOf(view.positionPage.transform), Is.True);
+            Assert.That(view.teamLayout.transform.GetSiblingIndex(), Is.LessThan(view.slotButtons[0].transform.GetSiblingIndex()),
+                "The team boxes stay behind every seat button, also after the upgrade runs again.");
             Assert.That(view.seatsTeam, Has.Length.EqualTo(4));
             Assert.That(view.seatsTeam.All(anchor => anchor != null && anchor.IsChildOf(view.positionPage.transform)), Is.True);
             Assert.That(view.seatsTeam[0].anchoredPosition.x, Is.LessThan(view.seatsTeam[2].anchoredPosition.x), "Blue P1/P2 sit left of Red P3/P4.");
