@@ -8,7 +8,10 @@ namespace Hapio
 {
     public enum GameScreenKind { Home, Lobby, StageResult, GameOver }
 
-    /// <summary>Only binds saved, Inspector-editable Canvas references; never constructs a screen at runtime.</summary>
+    /// <summary>
+    /// Only binds saved, Inspector-editable Canvas references; never constructs a screen at runtime.
+    /// 예외: STAGE CLEAR 화면의 칭호 표는 전투 결과 카드와 같은 생김새를 쓰도록 LabResultTable이 코드로 만든다.
+    /// </summary>
     public sealed class GameScreen : MonoBehaviour
     {
         public GameScreenKind kind;
@@ -28,11 +31,17 @@ namespace Hapio
         public UnityEngine.UI.Button[] developerScopeButtons;
         public UnityEngine.UI.Text developerScopeLabel;
         public int DeveloperScope { get; private set; }
+        /// <summary>STAGE CLEAR 화면 칭호 표 생김새. 기본값은 전투 결과 카드의 표와 같다.</summary>
+        public LabResultTableStyle resultTableStyle = new LabResultTableStyle();
+        /// <summary>칭호 표와 아래 안내 글 사이 간격</summary>
+        public float resultTableGap = 12f;
 
         private GameSession session;
         private string[] roomKeys = Array.Empty<string>();
         private bool syncingDeveloper;
         private string localError;
+        private RectTransform resultTable;
+        private string resultTableKey;
         private bool UsesExternalNavigation => externalNavigation && (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby);
 
         private void Awake()
@@ -170,16 +179,8 @@ namespace Hapio
                 : "TARGET HP " + result.hp;
             Text(status, result == null ? "Stage result is being prepared." : goal
                 + "   ·   TIME LEFT " + Math.Ceiling(result.remaining).ToString(CultureInfo.InvariantCulture) + "s");
+            ShowResultTable(net, result);
             var text = new StringBuilder();
-            if (result != null && result.players != null)
-                foreach (LabPlayerState player in result.players)
-                    if (player != null)
-                    {
-                        text.Append("P").Append(player.seat + 1).Append("   HP ").Append(player.personalHp)
-                            .Append("  ·  HITS ").Append(player.hitTotal).Append('\n')
-                            .Append("GENERATED ").Append(player.generatedTotal).Append("  ·  COMBINED ").Append(player.combinedTotal)
-                            .Append("  ·  PASSED ").Append(player.passedTotal).Append("\n\n");
-                    }
             text.Append(net.IsHost && !session.CanReturnHome && complete
                 ? "Waiting for every player to receive the final result…"
                 : net.IsHost && !complete && !session.CanAdvanceStage
@@ -200,6 +201,44 @@ namespace Hapio
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
+        }
+
+        /// <summary>
+        /// 글자 목록 대신 전투 결과 카드와 같은 칭호 표를 Details 자리 위쪽에 그린다.
+        /// 같은 결과는 한 번만 그리고, 안내 글(Details)은 표 바로 밑으로 내린다.
+        /// </summary>
+        private void ShowResultTable(LabNetwork net, LabSnapshot result)
+        {
+            if (details == null) return;
+            if (result == null || result.players == null)
+            {
+                if (resultTable != null) resultTable.gameObject.SetActive(false);
+                resultTableKey = null;
+                return;
+            }
+            string key = result.sessionId + ":" + result.round + ":" + net.LocalPlayerId;
+            if (key == resultTableKey && resultTable != null && resultTable.gameObject.activeSelf) return;
+            resultTableKey = key;
+            var area = details.rectTransform;
+            if (resultTable == null)
+            {
+                resultTable = LabResultTable.Create(area.parent, "ResultDashboard");
+                // 안내 글은 표 밑에 가운데 맞춤으로 둔다.
+                details.alignment = TextAnchor.UpperCenter;
+            }
+            // Details 자리의 윗변 가운데에 표 윗변을 맞춘다.
+            resultTable.anchorMin = resultTable.anchorMax = new Vector2((area.anchorMin.x + area.anchorMax.x) * .5f, area.anchorMax.y);
+            resultTable.anchoredPosition = Vector2.zero;
+            var players = Array.FindAll(result.players, p => p != null);
+            Array.Sort(players, (a, b) => a.seat.CompareTo(b.seat));
+            float height = LabResultTable.Fill(resultTable,
+                LabResultTable.RowsFor(LabResultStats.Awards(players, result.phase == LabPhase.Victory),
+                    net.LocalPlayerId, result.playedSeconds),
+                resultTableStyle, details.font);
+            // 안내 글이 표 밑에서 시작하도록 Details 윗변을 표 높이만큼 내린다.
+            area.offsetMax = new Vector2(area.offsetMax.x, -(height + resultTableGap));
+            // Details 바로 다음 순서로 둬서, 나중에 그려지는 완성 박 보기 화면이 표를 덮게 한다.
+            resultTable.SetSiblingIndex(area.GetSiblingIndex() + 1);
         }
 
         private void ChangePlayers(int delta)
