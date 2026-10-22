@@ -2030,6 +2030,36 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void OverallDashboardAveragesStagesAndCountsLastHits()
+        {
+            LabPlayerState A(int damage, int hits, int throws, int passed, bool last = false) => new LabPlayerState
+                { id = 10, seat = 0, damageTotal = damage, hitTotal = hits, throwTotal = throws, passedTotal = passed, lastHit = last };
+            LabPlayerState B(int damage, int hits, int throws, double drum, bool last = false) => new LabPlayerState
+                { id = 20, seat = 1, damageTotal = damage, hitTotal = hits, throwTotal = throws, drumSeconds = drum, lastHit = last };
+            var stages = new[]
+            {
+                new LabResultStage(new[] { A(40, 2, 4, 3, true), B(20, 1, 1, 20d) }, 60d),
+                new LabResultStage(new[] { A(20, 1, 4, 3), B(60, 3, 3, 30d, true) }, 60d),
+                new LabResultStage(new[] { A(60, 3, 2, 3, true), B(10, 1, 6, 10d) }, 60d)
+            };
+
+            var rows = LabResultTable.OverallRowsFor(stages, 20ul);
+            Assert.That(rows.Select(r => r.Title), Is.EqualTo(new[] { "딜왕", "명중왕", "구슬 패스왕", "막타", "북 독점" }));
+            Assert.That(rows.Select(r => r.Who), Is.EqualTo(new[] { "P1", "P1", "P1", "P1", "P2" }));
+            Assert.That(rows.Select(r => r.Record), Is.EqualTo(new[]
+                { "40 (2회 타격)", "60%", "3회", "2회", "20초 · 33%" }),
+                "Averages per stage; accuracy is 6/10 overall; last hits are a count; drum share is 60s of 180s.");
+            Assert.That(rows.Select(r => r.Mine), Is.EqualTo(new[] { false, false, false, false, true }));
+
+            var source = new[] { A(40, 2, 4, 3) };
+            var stage = new LabResultStage(source, 60d);
+            source[0].damageTotal = 999;
+            Assert.That(stage.Players[0].damageTotal, Is.EqualTo(40), "A stage keeps its own copy of the records.");
+            Assert.That(LabResultStats.Overall(null).StageCount, Is.Zero);
+            Assert.That(LabResultTable.OverallRowsFor(new LabResultStage[0], 10ul), Is.Empty);
+        }
+
+        [Test]
         public void ResultTableRowsMarkEveryTitleTheLocalPlayerShares()
         {
             var players = new[]

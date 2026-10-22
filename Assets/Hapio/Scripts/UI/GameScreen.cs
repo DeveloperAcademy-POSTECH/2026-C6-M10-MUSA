@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using C6Lab;
@@ -177,9 +178,12 @@ namespace Hapio
             string goal = result == null ? string.Empty : net.config != null && net.config.GourdMode == LabGourdMode.Paint
                 ? "PAINT " + (result.paintCoverage * 100f).ToString("0.0", CultureInfo.InvariantCulture) + "%"
                 : "TARGET HP " + result.hp;
-            Text(status, result == null ? "Stage result is being prepared." : goal
+            var stages = complete ? session.StageResults : null;
+            bool overall = stages != null && stages.Count > 0;
+            Text(status, overall ? "전체 " + stages.Count + "스테이지 평균 기록"
+                : result == null ? "Stage result is being prepared." : goal
                 + "   ·   TIME LEFT " + Math.Ceiling(result.remaining).ToString(CultureInfo.InvariantCulture) + "s");
-            ShowResultTable(net, result);
+            ShowResultTable(net, result, overall ? stages : null);
             var text = new StringBuilder();
             text.Append(net.IsHost && !session.CanReturnHome && complete
                 ? "Waiting for every player to receive the final result…"
@@ -205,18 +209,23 @@ namespace Hapio
 
         /// <summary>
         /// 글자 목록 대신 전투 결과 카드와 같은 칭호 표를 Details 자리 위쪽에 그린다.
+        /// stages가 있으면(ALL STAGES CLEAR) 스테이지 평균으로 매긴 전체 게임 대시보드를 그린다.
         /// 같은 결과는 한 번만 그리고, 안내 글(Details)은 표 바로 밑으로 내린다.
         /// </summary>
-        private void ShowResultTable(LabNetwork net, LabSnapshot result)
+        private void ShowResultTable(LabNetwork net, LabSnapshot result, IReadOnlyList<LabResultStage> stages = null)
         {
             if (details == null) return;
-            if (result == null || result.players == null)
+            bool overall = stages != null && stages.Count > 0;
+            if (!overall && (result == null || result.players == null))
             {
                 if (resultTable != null) resultTable.gameObject.SetActive(false);
                 resultTableKey = null;
                 return;
             }
-            string key = result.sessionId + ":" + result.round + ":" + net.LocalPlayerId;
+            string key = overall
+                ? "overall:" + session.State.runId + ":" + stages.Count + ":" + (result != null ? result.sessionId + ":" + result.round : "")
+                    + ":" + net.LocalPlayerId
+                : result.sessionId + ":" + result.round + ":" + net.LocalPlayerId;
             if (key == resultTableKey && resultTable != null && resultTable.gameObject.activeSelf) return;
             resultTableKey = key;
             var area = details.rectTransform;
@@ -229,12 +238,16 @@ namespace Hapio
             // Details 자리의 윗변 가운데에 표 윗변을 맞춘다.
             resultTable.anchorMin = resultTable.anchorMax = new Vector2((area.anchorMin.x + area.anchorMax.x) * .5f, area.anchorMax.y);
             resultTable.anchoredPosition = Vector2.zero;
-            var players = Array.FindAll(result.players, p => p != null);
-            Array.Sort(players, (a, b) => a.seat.CompareTo(b.seat));
-            float height = LabResultTable.Fill(resultTable,
-                LabResultTable.RowsFor(LabResultStats.Awards(players, result.phase == LabPhase.Victory),
-                    net.LocalPlayerId, result.playedSeconds),
-                resultTableStyle, details.font);
+            List<LabResultRow> rows;
+            if (overall) rows = LabResultTable.OverallRowsFor(stages, net.LocalPlayerId);
+            else
+            {
+                var players = Array.FindAll(result.players, p => p != null);
+                Array.Sort(players, (a, b) => a.seat.CompareTo(b.seat));
+                rows = LabResultTable.RowsFor(LabResultStats.Awards(players, result.phase == LabPhase.Victory),
+                    net.LocalPlayerId, result.playedSeconds);
+            }
+            float height = LabResultTable.Fill(resultTable, rows, resultTableStyle, details.font);
             // 안내 글이 표 밑에서 시작하도록 Details 윗변을 표 높이만큼 내린다.
             area.offsetMax = new Vector2(area.offsetMax.x, -(height + resultTableGap));
             // Details 바로 다음 순서로 둬서, 나중에 그려지는 완성 박 보기 화면이 표를 덮게 한다.

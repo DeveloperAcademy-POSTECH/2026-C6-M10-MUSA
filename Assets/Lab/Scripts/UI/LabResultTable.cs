@@ -76,6 +76,18 @@ namespace C6Lab
             return rows;
         }
 
+        /// <summary>전체 게임 대시보드의 줄. 칭호·누구는 RowsFor와 같고 기록 칸만 평균/횟수로 적는다.</summary>
+        public static List<LabResultRow> OverallRowsFor(IEnumerable<LabResultStage> stages, ulong localPlayerId)
+        {
+            LabResultOverall overall = LabResultStats.Overall(stages);
+            var rows = new List<LabResultRow>();
+            foreach (LabResultAward award in overall.Awards)
+                rows.Add(new LabResultRow(LabResultStats.Label(award.Title), LabResultStats.WinnerNames(award),
+                    LabResultStats.OverallRecord(award, overall),
+                    award.Winners != null && award.Winners.Any(w => w != null && w.id == localPlayerId)));
+            return rows;
+        }
+
         /// <summary>
         /// 빈 표(테두리·안쪽 판·글자 칸)를 parent 아래에 만든다. 기준점은 위 가운데라서
         /// anchoredPosition으로 표 윗변 위치를 정하면 된다. 처음에는 꺼져 있다.
