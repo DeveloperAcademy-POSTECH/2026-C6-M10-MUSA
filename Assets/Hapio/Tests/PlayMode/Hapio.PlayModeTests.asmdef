@@ -1,0 +1,12 @@
+{
+  "name": "Hapio.PlayModeTests",
+  "rootNamespace": "Hapio.Tests",
+  "references": ["Hapio.Runtime", "C6Lab.Runtime"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

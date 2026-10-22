@@ -80,7 +80,7 @@ namespace C6Lab
 
         private void SubmitBoardAction(LabNetworkPacket packet)
         {
-            if (latest == null || latest.phase != LabPhase.Playing || latest.paused)
+            if (!CanProcessBattleActions || latest == null || latest.phase != LabPhase.Playing || latest.paused)
             {
                 RejectBoardActionLocally(packet, "BATTLE_NOT_PLAYING");
                 return;
@@ -147,7 +147,7 @@ namespace C6Lab
 
         private void FlushBoardActions(double now)
         {
-            if (flushingActions || !IsConnected) return;
+            if (flushingActions || !IsConnected || !CanProcessBattleActions) return;
             flushingActions = true;
             try
             {
@@ -191,7 +191,7 @@ namespace C6Lab
 
         private bool ReceiveActionRetry(LabNetworkPacket packet)
         {
-            if (packet == null || packet.sessionId != actionSession || packet.round != actionRound
+            if (!CanProcessBattleActions || packet == null || packet.sessionId != actionSession || packet.round != actionRound
                 || !localActions.TryGetPending(packet.requestId, out var pending)
                 || pending.state != LabPendingActionState.RecoveryRequired
                 || !actionWireRequests.TryGetValue(packet.requestId, out var originalRequest)) return false;
@@ -337,7 +337,7 @@ namespace C6Lab
 
         private void ReceiveActionReceipt(LabActionReceipt receipt)
         {
-            if (receipt == null || !localActions.ApplyReceipt(receipt, out var resolution)
+            if (!CanProcessBattleActions || receipt == null || !localActions.ApplyReceipt(receipt, out var resolution)
                 || !actionRequests.TryGetValue(receipt.requestId, out var request)) return;
             if (actionStartedAt.TryGetValue(receipt.requestId, out double at))
                 LastActionRoundTripMilliseconds = (Time.realtimeSinceStartupAsDouble - at) * 1000d;
@@ -448,7 +448,7 @@ namespace C6Lab
             {
                 ReceivedBoardFrames++;
                 latest = boardReplica.Overlay(latest);
-                ApplyLocalPause(frame.paused && frame.phase == LabPhase.Playing);
+                ApplyLocalPause(CanProcessBattleActions && frame.paused && frame.phase == LabPhase.Playing);
                 ApplyFastTargetPose();
                 SyncBoard();
                 Changed?.Invoke();

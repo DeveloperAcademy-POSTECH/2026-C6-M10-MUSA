@@ -13,7 +13,11 @@ namespace C6Lab
         private readonly HashSet<long> predictedJigwiBurns = new HashSet<long>();
         private Transform jigwiFireRoot;
 
+        /// <summary>The standalone Lab keeps its manual tools; a game run exposes them only in Jigwi's stage.</summary>
+        public bool JigwiManualControlsAllowed => !gameFlowEnabled || gameStageYokai == LabStageYokai.Jigwi;
+
         public bool CanDevStartJigwi => DeveloperBuildAvailable && IsHost && IsConnected && model != null
+            && (model.StageYokai == LabStageYokai.None || model.StageYokai == LabStageYokai.Jigwi)
             && model.Phase == LabPhase.Playing && !battleClock.IsPaused && SessionConfigReady;
 
         public bool DevStartJigwiFire(ulong player)

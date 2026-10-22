@@ -1935,6 +1935,38 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | 3인 실행: THROWER 모드에서 틀린 사람 판만 작아짐, 각자 화면의 별 | NOT_RUN | Mac 앱 3개에서 확인해야 한다. |
 | iOS 실기기: 별 성능·가독성 | NOT_RUN | |
 
+## #262 별도 개발용 3스테이지 게임 흐름 — 2026-10-21
+
+기준 main은 `0664aadf`이며 작업 브랜치는 `feat/#262-three-stage-game-flow`다. Unity **6000.6.5f1**, macOS ARM64에서 기존 Lab과 별도 작업 폴더로 검사했다. 새 `Assets/Hapio`의 Home·Lobby·Battle·StageResult·GameOver와 영속 GameSession Prefab을 사용한다. **1~3스테이지는 모두 같은 Battle Scene**을 로드한다. 기존 Lab Scene과 Lab 첫 Build Settings 항목·빌드 메뉴·원본 Config·패키지는 보존한다. 설정166개·프로토콜5653을 유지하고, 새 게임만 연결 토큰 `C6HapioGame/1`을 사용한다. Lab의 `C6PhysicsLab/16`과 같은 방에서 혼용하지 않는다.
+
+### 구현과 검토 중 보완
+
+- Host가 runId·스테이지·revision·전투 ID/round를 확정한다. 전원 Scene 로딩과 최신 설정 ACK를 확인한 뒤 시작한다. 결과에서도 실제 종료 스냅샷·도색 사본·결과 Scene 준비 ACK를 기다려 다음 단계로 진행한다.
+- 방·P번호·좌우 순서·승인된 설정은 유지하고, 전투 모델·시간·개인 HP·스태미나·구슬·북·도색·투사체·흔들림·콤보·기록은 새 스테이지에서 초기화한다. DEV 적용 재시작은 같은 스테이지 번호로 새 Battle을 로드한다.
+- 시간 초과·전멸·진행 중 나가기/연결 종료는 GameOver를 유지하고 명시적인 HOME 입력을 기다린다. 로비 퇴장과 최종 클리어 후 정상 종료는 제외한다. 지연 로딩/스냅샷이 종료 화면을 다시 전투로 바꾸지 않도록 방어한다.
+- 이미 확정된 최종 클리어에서 관람 사본 동기화가 시간 초과되면 클리어를 유지하고 사본 미확보 안내를 표시한다. 중간 스테이지 동기화 실패는 GameOver다. 이 시간 초과 경로의 추가 다중 앱 장애 주입은 미실행이다.
+- 실제 화면 캡처에서 스테이지 글자의 대비와 중간 결과 NEXT/QUIT 버튼 배치를 보완했다. 저장된 새 Scene만 Unity API로 수정했으며 Lab을 저장하지 않았다.
+- 시작 직전 보낸 P번호 CLEAR가 모델 없는 로딩 구간에 도착하면 P번호가 사라지고, 빈자리 신규 입장도 승인되는 경쟁 조건을 회귀 검사로 먼저 재현했다. 새 게임의 첫 준비부터 방 종료까지 P변경·새 입장을 잠근다. 시작 조건/설정 ACK는 유지하고 새 방에서는 잠금을 해제한다. 일반 Lab은 잠그지 않는다.
+
+### 실행 기록
+
+| 검사 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| Scene 생성·컴파일 | PASS | Unity API로 새 Scene5개·Prefab 생성. 초기 생성의 미저장 Untitled 처리 및 새 검사의 Unity6.6 폐기 API 컴파일 오류를 수정한 뒤 성공했다. 기존 Lab은 기준 커밋과 바이트 동일. |
+| 최초 새 Scene 집중 PlayMode | 4/5 통과·1실패 | `c6-game262-flow-play.xml`. 검사 fixture가 모델 시계를 미래로 보내 Network 시계와 충돌했다. 실제 제한시간1초를 기다리는 검사로 보완했다. 프로덕션 시간 검증은 약화하지 않았다. |
+| 참가자 잠금 수정 전 회귀 | 3/5 통과·2실패 | `c6-game262-roster-repro.xml`. 지연 CLEAR 뒤 P1 owner 유실, 로딩 중 신규 입장 승인 재현. 비활성 NGO 역할 fixture이며 실제 소켓 연결 검사가 아니다. |
+| 최종 전체 EditMode | **PASS826/826** | `c6-game262-final-edit.xml`, 실패·생략·inconclusive0, 24.939초. UTC08:17:39Z~08:18:04Z. 기존796 + 순수 흐름/수신17 + 저장 에셋7 + bridge6. |
+| 전체 PlayMode, 참가자 잠금 보완 전 | **PASS281/281** | `c6-game262-final-play.xml`,113.988초. UTC08:12:37Z~08:14:31Z. 이 결과와 보완 후 최종 결과는 구분한다. |
+| 참가자 잠금 보완 후 최종 전체 PlayMode | **PASS281/281** | `c6-game262-verified-play.xml`, 실패·생략·inconclusive0,114.718초. UTC08:19:49Z~08:21:44Z. 기존276 + 새 실제 Scene 흐름5건. 임시 smoke helper 제거 후 실행. |
+| 최종 Mac 개발 앱 빌드 | **PASS** | `c6-game262-final-smoke-build.log`. 새 Scene5개만 포함하고 Home으로 시작하는 Development Build. 기존 앱 식별자/제품명 등 출시 설정은 변경하지 않았다. |
+| 실제 Mac Host·Client 2프로세스 | **양쪽 PASS** | `c6-game262-final-smoke-host.txt`·`client.txt`. 동일 Mac UDP loopback, Host P2/Client P1. 3스테이지·공통 Battle 재로드·방/P 유지·매 단계 초기화·100% 결과/관람 사본·준비 ACK, 정상 Home, 같은 앱에서 새 방 재입장 후 Client QUIT→양쪽 GameOver→각자 Home 확인. |
+| 저장 UI와 완성 박 관람 | **PASS, Mac 자동 조작** | Home·Lobby·Battle·StageResult·GameOver·GourdViewer 캡처를 확인했다. Host에서 관람 열기·회전/확대/초기화 API·닫기를 실제 저장 UI에 반영했다. 터치 제스처의 iOS 수동 평가는 별도다. |
+| iOS 빌드/설치·실제 LAN/핫스팟·3~5인·기기 잠금/백그라운드·전송망 강제 단절·모바일 성능 | **NOT_RUN** | 같은 Mac 두 앱 및 자동 검사 결과로 확대하지 않는다. 기존 연결 코드를 재사용했다는 사실과 이번 환경 검증을 구분한다. |
+
+새 PlayMode5건은 실제 저장 Scene·Prefab을 실행해 (1)솔로 3스테이지/자원 초기화/관람 사본 보존, (2)중도 종료 유지, (3)실제1초 시간 초과, (4)실제 모델의 개인 HP0 패배, (5)일시정지/재개와 DEV 동일 스테이지 재로드를 확인한다. 승리 유도는 **실제 Host CPU 도색 표면을 완성하는 명시적 fixture**다. Mac2앱도 같은 도색 완료 fixture를 쓰며 실제 투척·명중 판정을 검증했다고 표현하지 않는다. 기존 투척/피격 검사는 전체 PlayMode에 별도로 포함한다.
+
+원본 Desktop의 사용자 Scene·Target2 Material2개·미추적meta는 시작 시 사본과 해시를 보관했고 검사 후 네 파일의 일치를 확인했다. 별도 검증 폴더에서 Unity가 Material2개에 쓴 미세한 float 재직렬화는 최종 변경에서 제외한다. 원시 XML·로그·앱·스크린샷과 임시 smoke helper는 커밋하지 않는다. 검증 앱에는 전용 helper가 있었으며 프로젝트 소스에서는 빌드 직후 제거했다.
+
 ## 요괴 방해공작 통합 추첨·여우불·매혹 — 2026-10-21, 이슈 #251
 
 기준은 Unity **6000.6.5f1**, main `0664aadf`(#257/PR #261 포함)를 합친 `experiment/#251-playtest-tuning`이다. 공유 설정 **166 → 178개**(DEV 166~177), 프로토콜 **5653 → 5654**, 연결 토큰은 그대로 `C6PhysicsLab/16`이다. 실험이라 `Sabotage Mix`는 기본 꺼짐이며, 꺼져 있으면 박 폭탄·넘기기 막기는 이전과 같은 타이머로 나온다.
@@ -2249,6 +2281,33 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 
 원래 열려 있던 Desktop 프로젝트/사용자 파일은 수정하지 않고 별도 검토 worktree에서 검사했다. 원시 로그·XML·진단 빌드는 로컬에만 보관한다.
 
+
+## #262 최신 main 동기화 및 Draft 준비 — 2026-10-21
+
+기존 #262 로컬 커밋 `4f0c82ba`에 최신 main `2adc3e94`(#264 3D 배경·#265 방해공작 보완·#267 콤보 기본 OFF 포함)를 병합한 작업 트리에서 검사했다. Unity **6000.6.5f1**, macOS ARM64 기준이다. 위의 #262 최초 검증(166개/5653)은 당시 버전의 기록이며, **이번 동기화는 공유 설정178개·프로토콜5654**를 사용한다. 새 게임 토큰은 `C6HapioGame/1`, 일반 Lab은 `C6PhysicsLab/16`을 유지한다. 콤보·통합 방해공작 기본값은 모두 OFF이며 DEV에서 켤 수 있다. 이 브랜치는 **Draft로 공유하고 main 병합은 보류**한다.
+
+### 통합 범위와 보존
+
+- `LabNetwork.cs` 충돌은 기존 Lab 경로와 #262의 opt-in 수명 관리를 함께 유지하도록 해결했다. `VALIDATION.md` 충돌은 양쪽의 버전별 과거 검증 기록을 모두 보존했다.
+- `Assets/Lab` 폴더 이동·삭제·이름 변경은 없다. 원본 Lab Scene·에셋·Config·패키지·제품 설정은 이번 기준 main과 동일하다. 기본 Build Settings의 첫 Scene과 기존 Lab 빌드 메뉴도 유지한다. 새 게임 Scene/코드는 계속 `Assets/Hapio`에 분리한다.
+- Unity API로 최신 저장 Lab 전투를 기존 Battle GUID에 복사하고 게임 흐름 어댑터를 다시 연결했다. 3D 배경·환경 카드와 미니맵 간격120을 반영했으며 원본 Lab 파일은 바이트 동일하다. Home/Lobby는 기존 객체 ID를 유지한 채 DEV 행을178개로 확장하고 최신 기본값을 적용했다. 이 동기화 도구는 명시적으로 호출할 때만 동작하며 일반 Play/빌드는 Scene을 자동 재생성하지 않는다.
+- 매 Battle의 FoxFire 입력을 영속 Network에 연결한다. Scene 해제 시 pending 액션/재시도만 폐기하고 결과·도색·참가자 데이터는 유지한다. 동결/해제된 Battle의 늦은 승인·재시도·폭발 보고가 다음 Scene 동작이나 Time.timeScale에 영향을 주지 않도록 막는다. 기존 Lab에서는 opt-in이 꺼져 있어 이 경계 제어를 적용하지 않는다.
+- Desktop의 기존 main checkout은 전환/수정하지 않았다. 이번 요청 시작 시점의 HEAD·브랜치·남아 있던 미추적 파일 해시를 마지막에도 비교해 보존을 확인했다. 최초 #262 기록의 로컬 수정4개는 과거 시점의 기록이며 이번 요청의 상태로 되돌리지 않았다.
+
+| 검사 | 결과 | 실제 근거·범위 |
+| --- | --- | --- |
+| Scene 동기화·컴파일 | **PASS** | `GameSceneBuilder.UpgradeScenesForCurrentLab` 실행 성공. 원본 Lab/main 바이트 일치, 별도 Battle/Home/Lobby GUID와 기존 Home/Lobby 객체 ID 보존. |
+| 신규 저장 Scene 에셋 비교 | **보완 후 PASS8/8** | 최초 전체 EditMode는853/854로, PNG/Material의 Unity-null 래퍼를 NUnit `SameAs`로 비교한 신규 검사1건이 실패했다. Scene 내용은 그대로 두고 Unity 참조 유효성 + 실제 에셋 GUID/localID로 비교하도록 보완. `c6-game262-main-scene-edit.xml`. |
+| 새 Scene 집중 PlayMode | **PASS6/6** | `c6-game262-main-flow-play.xml`, 11.161초. 기본 흐름 외에 실제 저장 Battle의 timed FoxFire 생성/접촉/Host 소비, Charm/HUD 초기화,178개 설정의 DEV 같은 스테이지 재시작/NEXT 경계 보존을 포함한다. 원격 기기 시험은 아니다. |
+| 최종 전체 EditMode | **PASS854/854** | `c6-game262-main-verified-edit.xml`, 실패·생략·inconclusive0,25.375초. UTC12:04:55Z~12:05:21Z. |
+| 최종 전체 PlayMode | **PASS297/297** | `c6-game262-main-verified-play.xml`, 실패·생략·inconclusive0,134.837초. UTC12:05:25Z~12:07:40Z. 기존 Lab 회귀 검사와 새 게임6건을 함께 실행했다. |
+| 최신 Mac Development 빌드 | **PASS** | `Hapio.Editor.GameBuild.Mac` 실행 성공. Home이 첫 진입점인 새 Scene5개를 포함한다. 공유 제품명/식별자는 변경하지 않았다. |
+| 실제 Mac Host·Client2앱 loopback | **PASS 양쪽** | `c6-game262-main-smoke-{host,client}.txt`: Host11.034초, Client10.956초에 각각 PASS. 같은 앱 두 개가 실제 UDP 연결로 3개 스테이지·결과/완성 도색 사본/전원 준비 ACK·관람 열기/회전/줌/복원/닫기·정상 HOME·두 번째 방 재입장·중도 종료→양쪽 GameOver→HOME을 진행했다. HostP2/ClientP1을 유지하고 새 Battle마다 구슬0·HP·스태미나·도색 초기화를 확인했다. 양쪽 Player 로그의 Exception/Fatal/Error 표식0. |
+| 새 배경/결과 화면 캡처 | **제한된 화면 확인** | 위 자동 실행의390×844 Mac 캡처에서 최신 3D 배경·박·STAGE1/3, 결과 기록/관람/NEXT·QUIT RUN 분리를 확인했다. 터치 조작·여러 기기 해상도의 사용자 검증으로 확대하지 않는다. |
+| iOS 내보내기/실기기·실제 LAN/핫스팟·3~5인·물리 망 강제 단절·모바일 성능 | **NOT_RUN** | 기존 전송 계층과 규칙 재사용을 이번 기기/망 검증 완료로 기록하지 않는다. |
+
+Mac 두 앱의 승리는 실제 Host CPU 도색 표면을100% 채우는 **명시적 fixture**로 유도했다. 실제 구슬 투척/충돌/명중 정확도는 이 스모크 검사의 범위가 아니며 기존 전체 회귀 검사와 구분한다. 자동 조작 임시 코드·원시 XML/로그·캡처·빌드 결과물은 커밋하지 않는다. 빌드가 만든 기존 머터리얼의 소수점 직렬화와 TimeManager 형식 변경도 제외했다.
+
 ## PR #274 — 최신 main·지귀/섬광 통합 검증 — 2026-10-22
 
 기준 main `389fbcc9`와 #274를 병합한 코드(공유192개, 프로토콜5658, Lab token19)를 Unity6000.6.5f1/macOS ARM64에서 검증했다. Count191·섬광10초/예고3초·콤보 예고4초/3초 휴식·성공 추임새를 보존했다. Host ID0/ALL 판별과 최초0대상 제외 오류, 도색 Bulk 대기 중 콤보 제어 Header, 이전 HUD의 새 보드 glare 정리 문제를 보완했다.
@@ -2260,3 +2319,27 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | 실제 Mac 다중 앱·iOS·실기기·LAN/핫스팟·모바일 성능 | NOT_RUN | 이번 PR274에 대해 별도 수행하지 않음. PR270의 실제 두 앱 결과는 당시191개 버전 기록이며 승계하지 않는다. |
 
 기존 Desktop 프로젝트와 사용자의 열린 Unity Scene은 변경하지 않았다. 원시XML/로그·빌드 산출물은 커밋하지 않는다. 새3스테이지 흐름은 이 PR에 포함하지 않는다.
+
+## #276 — Lab을 보존한 3요괴 게임 통합 — 2026-10-22
+
+main `f861a3d2`(검증 후 병합한 #270/#274)와 #262 Draft 이력을 통합했다. 새 게임은 구미호→야광귀→지귀 고정 순서로 공통 Battle을 재사용한다. 공유 설정196개·protocol5659·Lab token20/Game token2. 원래 Lab은 `None` 정책이며 기존 단판 흐름을 유지한다.
+
+| 검사 | 결과 | 실제 범위·근거 |
+| --- | --- | --- |
+| Unity API 에셋 갱신 | PASS | 별도 Battle/Home/Lobby/StageResult/GameOver,196행·4범위 DEV, StageCatalog/Definition·구미호 장식 Prefab 저장. 원본 Lab Scene/Config·제품 설정은 변경하지 않음. |
+| 전체 EditMode | 보완 후 PASS967/967 | 약25.8초. 초기3건의 무작위 GUID 비교 오류는 ID를 제외한 전체 상태/개수/이벤트 순서 비교로 보완했다. 이후 FBX 카메라 제거 검사를 추가하고 URP 의존 순서를 보완한 최종 전체 재실행 결과다. 공통 패턴·3요괴 제한·큰 Tick/분할 Tick·지귀 자동/만료·설정/ACK·저장 연결 포함. |
+| 전체 PlayMode | PASS330/330 | 약141.0초, 실패·생략0. 기존 Lab 전체 회귀 + 별도3스테이지/DEV 원자 적용·고유 OFF 유지/외형 복원 검사 포함. |
+| Mac Development 진단 빌드 | PASS | `GameBuild.Mac`, Home 첫 진입·새5Scene. 임시 제어 코드는 빌드 후 소스/메타 제거. |
+| 실제 Mac2앱 UDP loopback | PASS 양쪽 | Host13.998초/Client13.830초·종료0. HostP2/ClientP1,196개 설정을 공유하고3개의 별도 Battle 인스턴스/결과/완성 맵·관람 ACK·정상Home·새방재입장·중도이탈→전원GameOver→Home 확인. 각 단계의 자동 FoxFire/Flash/Jigwi Fire를 양쪽 실제Snapshot에서 확인했다. |
+| iOS 내보내기·실기기·실제 LAN/핫스팟·3~5인·모바일 성능 | NOT_RUN | 기존 전송 계층 재사용을 이번 환경 검증으로 승계하지 않는다. |
+| Desktop 사용자 파일 보존 | PASS | 시작/종료 HEAD·브랜치·status와 미추적파일 해시가 동일. 원래 열린 Unity는 전환/저장하지 않았다. |
+
+두 앱 검사의 **명시적 fixture**: 고유 자동 패턴을 빨리 보기 위해 Host의 해당 간격을1초로 조정했고 공통 폭탄/막기는 이 스모크에서만 DEV로 껐다. 공통 패턴의 전 스테이지 유지는 별도 모델·Scene 검사로 확인한다. 승리는 실제 Host CPU 도색 표면을100% 채워 유도했다. 게임 진행 상태·결과·peer ACK를 만들어내지는 않았으며, 실제 구슬 조작/투척 명중·물리 망 호환성을 이 스모크 PASS로 기록하지 않는다. 원시 로그/XML·진단 코드/이미지·빌드 산출물은 커밋하지 않는다.
+
+#275는2인·Host자유 P번호·Direct IP·일반 Development 솔로 진입을 제한하여 병합 보류 의견을 기록했다. 해당 로비/대기방 구조는 이번 통합에 포함하지 않는다. #269는 기존 Draft의 이력을 보존해 #276으로 계승하며 구형 동일 패턴3단계를 별도로 main에 병합하지 않는다.
+
+### 최종 렌더 안전 보완
+
+최초 Mac 캡처에서 구미호 FBX의 Camera/Light가 전투 카메라 위에 렌더링하는 문제를 발견했다. 별도 장식 wrapper 내부만 unpack하고 URP AdditionalCameraData/AdditionalLightData부터 Camera/Light/AudioListener 순으로 제거했다. 런타임 외부 모델에도 즉시 비활성·의존 순서 제거를 적용한다. 원본 FBX/importer·박 메시/충돌체·카메라 배치는 바꾸지 않았다. 저장 wrapper 검사와 실제 URP 데이터를 넣은 런타임 회귀를 추가했다. 지귀 DEV는 Game1/2에서 숨기고 Game3에서만 표시하며 단일 Lab은 기존 표시를 유지한다.
+
+최종 전체967/330 검사는 위 수정이 포함된 소스에서 수행했다. 동일 소스로 다시 만든 Mac 앱 두 개가 각 자동 고유 패턴(FoxFire/Flash/Jigwi Fire)을 양쪽Snapshot에서 확인하고 세 단계를 완료했다. 최종390×844 캡처에서 기존 전투 구도·1/3 및3/3 이름·지귀 DEV 표시 경계를 확인했다. 양쪽 로그의 Exception/Fatal/의존 제거 실패 표식0. 원시 캡처·진단 빌드는 로컬에만 보관한다.

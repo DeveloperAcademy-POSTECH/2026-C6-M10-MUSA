@@ -220,6 +220,7 @@ namespace C6Lab
         public string SessionId => sessionId;
         public uint Round => round;
         public LabPhase Phase => phase;
+        public LabStageYokai StageYokai => rules != null ? rules.StageYokai : LabStageYokai.None;
         /// <summary>Current ledger revision; reading it does not advance the Host battle clock.</summary>
         public ulong Revision => revision;
 
@@ -244,27 +245,31 @@ namespace C6Lab
             ? rules.PaintColors[(int)element] : Color.clear;
 
         /// <summary>ids must be the Host-approved player IDs in P1..PN order.</summary>
-        public void Begin(string id, ulong[] ids, double now, LabConfig config)
+        public void Begin(string id, ulong[] ids, double now, LabConfig config,
+            LabStageYokai stageYokai = LabStageYokai.None)
         {
             if (ids == null || ids.Length < MinimumParticipants || ids.Length > MaximumParticipants
                 || ids.Distinct().Count() != ids.Length)
                 throw new ArgumentException("Two to five distinct player IDs are required.", nameof(ids));
-            BeginWithSeats(id, ids, now, config);
+            BeginWithSeats(id, ids, now, config, stageYokai);
         }
 
         /// <summary>Development-only battle model with one real player and no transferable neighbor.</summary>
-        public void BeginSolo(string id, ulong playerId, double now, LabConfig config)
+        public void BeginSolo(string id, ulong playerId, double now, LabConfig config,
+            LabStageYokai stageYokai = LabStageYokai.None)
         {
-            BeginWithSeats(id, new[] { playerId }, now, config);
+            BeginWithSeats(id, new[] { playerId }, now, config, stageYokai);
         }
 
-        private void BeginWithSeats(string id, ulong[] ids, double now, LabConfig config)
+        private void BeginWithSeats(string id, ulong[] ids, double now, LabConfig config, LabStageYokai stageYokai)
         {
             if (string.IsNullOrWhiteSpace(id) || id.Length > 128) throw new ArgumentException("A bounded session ID is required.", nameof(id));
             if (!Finite(now) || now < 0d || config == null) throw new ArgumentException("Valid Host time and a Config are required.");
             if (phase == LabPhase.Playing) throw new InvalidOperationException("End the current round before beginning another.");
             if (sessionId == id && round == uint.MaxValue) throw new InvalidOperationException("The round number is exhausted.");
-            var nextRules = new Rules(config);
+            if (stageYokai < LabStageYokai.None || stageYokai > LabStageYokai.Jigwi)
+                throw new ArgumentOutOfRangeException(nameof(stageYokai));
+            var nextRules = new Rules(config, stageYokai);
             double nextDeadline = now + nextRules.BattleDurationSeconds;
             if (!Finite(nextDeadline) || nextDeadline <= now)
                 throw new ArgumentOutOfRangeException(nameof(now), "The battle deadline is not representable.");
@@ -299,19 +304,21 @@ namespace C6Lab
             gourdBombCount = 0;
             drumHandoffCount = 0;
             // With the sabotage mix on (#251) the gourd's bombs and swipe blocks keep no timers of their own.
-            nextGourdBombAt = rules.SabotageMix ? double.PositiveInfinity : now + GourdBombDelay(0u);
+            bool legacyMix = stageYokai == LabStageYokai.None && rules.SabotageMix;
+            nextGourdBombAt = legacyMix ? double.PositiveInfinity : now + GourdBombDelay(0u);
             swipeBlockCount = 0;
             swipeBlockedPlayer = 0;
             swipeBlockedRight = false;
             swipeBlockStartedAt = swipeBlockedUntil = -1d;
-            nextSwipeBlockAt = !rules.SabotageMix && rules.SwipeBlockInterval > 0f
+            nextSwipeBlockAt = !legacyMix && rules.SwipeBlockInterval > 0f
                 ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
             sabotageCount = 0;
             lastSabotageTarget = null;
             charmedPlayer = 0;
             charmStartedAt = charmUntil = -1d;
             charmTaps = 0;
-            nextSabotageAt = rules.SabotageMix ? now + SabotageDelay(0u) : double.PositiveInfinity;
+            nextSabotageAt = legacyMix || stageYokai == LabStageYokai.Gumiho
+                ? now + SabotageDelay(0u) : double.PositiveInfinity;
             combo.Reset();
             launchScales.Clear();
             nextComboAt = now + rules.ComboFirstStartSeconds;
@@ -333,6 +340,7 @@ namespace C6Lab
             played = 0d;
             phase = LabPhase.Playing;
             ResetJigwi(config);
+            ResetStageYokai(config, now);
         }
 
         /// <summary>Advance the absolute Host clock; only Idle orbs expire.</summary>
@@ -1249,6 +1257,20 @@ namespace C6Lab
 
         private bool TryAdvance(double now, out string reason)
         {
+            if (StageYokai == LabStageYokai.None || phase != LabPhase.Playing
+                || !Finite(now) || now < lastTime) return TryAdvanceSlice(now, out reason);
+            bool advanced = false;
+            while (phase == LabPhase.Playing && lastTime < now)
+            {
+                if (!TryAdvanceSlice(NextStageBoundary(now), out reason)) return false;
+                advanced = true;
+            }
+            if (advanced && lastTime == now) { reason = null; return true; }
+            return TryAdvanceSlice(now, out reason);
+        }
+
+        private bool TryAdvanceSlice(double now, out string reason)
+        {
             reason = null;
             if (phase == LabPhase.Idle) return Reject("NO_SESSION", out reason);
             if (!Finite(now) || now < lastTime) return Reject("INVALID_TIME", out reason);
@@ -1281,27 +1303,19 @@ namespace C6Lab
                         if (players.TryGetValue(holder, out var drummer)) drummer.drumSeconds += elapsed;
                 }
                 MarkBusyScreens(lastTime, effectiveNow);
+                if (StageYokai != LabStageYokai.None)
+                {
+                    ExpireOrbs(effectiveNow);
+                    AdvanceJigwi(effectiveNow);
+                }
                 DropGourdBombs(effectiveNow);
                 StartSwipeBlocks(effectiveNow);
                 CastSabotages(effectiveNow);
                 AdvanceJigwi(effectiveNow);
+                AdvanceStageJigwi(effectiveNow);
                 AdvanceCombo(effectiveNow);
                 AdvanceFlash(effectiveNow);
-                foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow >= ExpiresAt(orb))
-                    .ToArray())
-                {
-                    if (!orbs.Remove(expired.id)) continue;
-                    if (expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0)
-                    {
-                        // Its lifetime ran out: its holder's screen sees it go in a puff of smoke (#235).
-                        orbExpiries.Add(new LabOrbExpiry(expired.owner, expired.id));
-                        continue;
-                    }
-                    // A bomb still locked at the end of its fuse blasts on its current holder's board. No
-                    // orb is lost: the holder's screen pushes the ones around it away from where it last was.
-                    bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
-                    unreportedBlasts[expired.id] = new KeyValuePair<ulong, double>(expired.owner, effectiveNow);
-                }
+                ExpireOrbs(effectiveNow);
                 remaining = Math.Max(0d, deadline - effectiveNow);
                 if (paintCompleted)
                 {
@@ -1757,6 +1771,7 @@ namespace C6Lab
 
         private sealed class Rules
         {
+            public readonly LabStageYokai StageYokai;
             public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
             public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
             /// <summary>How much a blast-shrunk orb paints, against a whole one (#213).</summary>
@@ -1794,8 +1809,9 @@ namespace C6Lab
             public readonly float FlashFirstStartSeconds, FlashIntervalSeconds, FlashWarningSeconds,
                 FlashGlareSeconds, FlashRecoverySeconds;
 
-            public Rules(LabConfig config)
+            public Rules(LabConfig config, LabStageYokai stageYokai)
             {
+                StageYokai = stageYokai;
                 GenerationChances = config.GenerationChances();
                 ItemLifetimeSeconds = config.ItemLifetimeSeconds;
                 ItemUnlockSwipesMin = config.ItemUnlockSwipesMin;
@@ -1813,6 +1829,7 @@ namespace C6Lab
                 SabotageIntervalMin = config.SabotageIntervalMin;
                 SabotageIntervalMax = config.SabotageIntervalMax;
                 SabotageWeights = config.SabotageWeights();
+                if (stageYokai == LabStageYokai.Gumiho) SabotageWeights[0] = SabotageWeights[1] = 0;
                 FoxFireCountMin = config.FoxFireCountMin;
                 FoxFireCountMax = config.FoxFireCountMax;
                 FoxFireSafeSeconds = config.FoxFireSafeSeconds;
@@ -1844,7 +1861,8 @@ namespace C6Lab
                 SpawnMaxSpeed = config.SpawnMaxSpeed;
                 FloorDeceleration = config.OrbFloorDeceleration;
                 DrumCount = config.DrumCount;
-                ComboEnabled = config.GourdColorComboEnabled;
+                ComboEnabled = config.GourdColorComboEnabled
+                    && (stageYokai == LabStageYokai.None || stageYokai == LabStageYokai.Yaguang);
                 ComboFirstStartSeconds = config.ComboFirstStartSeconds;
                 ComboRepeatIntervalSeconds = config.ComboRepeatIntervalSeconds;
                 ComboTimeLimitSeconds = config.ComboTimeLimitSeconds;
@@ -1854,7 +1872,8 @@ namespace C6Lab
                 ComboRewardDurationSeconds = config.ComboRewardDurationSeconds;
                 ComboRewardSizeScale = config.ComboRewardSizeScale;
                 ComboWarningSeconds = config.ComboWarningSeconds;
-                FlashEnabled = config.YaguangFlashEnabled;
+                FlashEnabled = config.YaguangFlashEnabled
+                    && (stageYokai == LabStageYokai.None || stageYokai == LabStageYokai.Yaguang);
                 FlashTargetOne = config.YaguangFlashTargetOne;
                 FlashFirstStartSeconds = config.YaguangFlashFirstStartSeconds;
                 FlashIntervalSeconds = config.YaguangFlashIntervalSeconds;

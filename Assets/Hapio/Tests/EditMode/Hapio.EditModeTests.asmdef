@@ -1,0 +1,24 @@
+{
+  "name": "Hapio.EditModeTests",
+  "rootNamespace": "Hapio.Tests",
+  "references": [
+    "Hapio.Runtime",
+    "C6Lab.Runtime",
+    "Unity.Netcode.Runtime",
+    "UnityEngine.UI"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
+}

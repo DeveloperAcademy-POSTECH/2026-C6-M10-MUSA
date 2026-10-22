@@ -120,7 +120,7 @@ namespace C6Lab
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool playing = snapshot != null && snapshot.phase == LabPhase.Playing;
-            bool canTest = playing && network.DeveloperBuildAvailable && network.IsHost;
+            bool canTest = playing && network.DeveloperBuildAvailable && network.IsHost && network.JigwiManualControlsAllowed;
             if (testToggle != null) testToggle.gameObject.SetActive(canTest);
             if (!canTest && testPanel != null && testPanel.activeSelf) SetPanel(false);
             if (!choseTarget && playing) targetSlot = Math.Max(1, network.LocalSlotNumber);
