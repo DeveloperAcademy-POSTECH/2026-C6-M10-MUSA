@@ -7,6 +7,7 @@ using System.Reflection;
 using C6Lab;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
@@ -136,6 +137,70 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavedResultPreviewUsesOneNormalizedGestureHandlerAndClearsHeldDragsOnResetAndReopen()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            CompleteMapInFixture(Model());
+            yield return Until(() => session.State.phase == GameFlowPhase.StageResult && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.StageResult, "The committed result must load its saved UI.");
+            GameScreen screen = SceneManager.GetActiveScene().GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<GameScreen>(true)).Single();
+            screen.viewerButton.onClick.Invoke();
+            yield return null;
+            Assert.That(screen.viewerPanel.activeInHierarchy, Is.True);
+            GameObject image = screen.viewerImage.gameObject;
+            GamePreviewInput adapter = image.GetComponent<GamePreviewInput>();
+            Assert.That(adapter, Is.Not.Null, "Keep the saved Scene's adapter reference.");
+            Assert.That(image.GetComponents<MonoBehaviour>().OfType<IDragHandler>().Count(), Is.EqualTo(1),
+                "The adapter and the shared surface must not dispatch the same drag twice.");
+            Assert.That(image.GetComponents<GourdViewerGestureSurface>(), Has.Length.EqualTo(1));
+            var preview = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+            Quaternion initial = preview.ModelRotation;
+            string paintHash = preview.PaintPixelHash;
+            Color32[] paintPixels = preview.PaintTexture.GetPixels32();
+            string result = JsonUtility.ToJson(session.ResultSnapshot);
+            RectTransform rectangle = screen.viewerImage.rectTransform;
+            Canvas.ForceUpdateCanvases();
+            Vector2 start = PreviewScreenPoint(rectangle, .4f, .5f);
+            var pointer = new PointerEventData(EventSystem.current) { pointerId = 12345, position = start };
+            ExecuteEvents.Execute(image, pointer, ExecuteEvents.pointerDownHandler);
+            pointer.position = PreviewScreenPoint(rectangle, .41f, .5f);
+            pointer.delta = pointer.position - start; // Pixel movement exceeds 1px on the saved layout.
+            ExecuteEvents.Execute(image, pointer, ExecuteEvents.dragHandler);
+            Quaternion expected = Quaternion.AngleAxis(-1.8f, Vector3.up) * initial;
+            Assert.That(Quaternion.Angle(expected, preview.ModelRotation), Is.LessThan(.01f),
+                "One percent of the preview width rotates 1.8 degrees, not a clamped 180 degrees.");
+            screen.resetViewerButton.onClick.Invoke();
+            Assert.That(Quaternion.Angle(initial, preview.ModelRotation), Is.LessThan(.001f));
+            pointer.position = PreviewScreenPoint(rectangle, .6f, .5f);
+            ExecuteEvents.Execute(image, pointer, ExecuteEvents.dragHandler);
+            Assert.That(Quaternion.Angle(initial, preview.ModelRotation), Is.LessThan(.001f),
+                "Reset must discard a held pointer's old baseline.");
+            screen.closeViewerButton.onClick.Invoke();
+            yield return null;
+            Assert.That(screen.viewerPanel.activeSelf, Is.False);
+            screen.viewerButton.onClick.Invoke();
+            yield return null;
+            ExecuteEvents.Execute(image, pointer, ExecuteEvents.dragHandler);
+            Assert.That(Quaternion.Angle(initial, preview.ModelRotation), Is.LessThan(.001f),
+                "Reopening must not adopt an old drag without a fresh pointer down.");
+            Assert.That(image.GetComponents<GourdViewerGestureSurface>(), Has.Length.EqualTo(1));
+            Assert.That(preview.PaintPixelHash, Is.EqualTo(paintHash));
+            Assert.That(preview.PaintTexture.GetPixels32(), Is.EqualTo(paintPixels));
+            Assert.That(JsonUtility.ToJson(session.ResultSnapshot), Is.EqualTo(result),
+                "Local gesture input must not alter the committed gameplay result.");
+        }
+
+        private static Vector2 PreviewScreenPoint(RectTransform rectangle, float x, float y)
+        {
+            Rect local = rectangle.rect;
+            return RectTransformUtility.WorldToScreenPoint(null, rectangle.TransformPoint(new Vector3(
+                local.xMin + local.width * x, local.yMin + local.height * y, 0f)));
+        }
+
+        [UnityTest]
         public IEnumerator SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload()
         {
             GameSession persistent = session;
@@ -176,6 +241,16 @@ namespace Hapio.Tests
                 var jigwiHud = SceneManager.GetActiveScene().GetRootGameObjects()
                     .SelectMany(root => root.GetComponentsInChildren<LabJigwiHud>(true)).Single();
                 yield return null; // The saved HUD evaluates the real stage policy in LateUpdate.
+                LabHud battleHud = SceneManager.GetActiveScene().GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<LabHud>(true)).Single();
+                LabOrbHudComposition composition = battleHud.GetComponent<LabOrbHudComposition>();
+                Assert.That(composition, Is.Not.Null, "Every shared Battle instance must attach the visual-only compositor.");
+                Assert.That(composition.IsCompositing, Is.True, composition.InitializationError);
+                Assert.That(battleHud.orbCamera.targetTexture, Is.Null,
+                    "The saved camera remains the on-screen physics/input projection across all three stages.");
+                Assert.That(composition.Display.transform.parent, Is.SameAs(battleHud.battleUi.transform));
+                Assert.That(composition.Display.raycastTarget, Is.False);
+                Assert.That(composition.ForegroundCamera.cullingMask & (1 << network.board.gameObject.layer), Is.Not.Zero);
                 Assert.That(network.JigwiManualControlsAllowed, Is.EqualTo(stage == 3));
                 Assert.That(jigwiHud.testToggle.gameObject.activeInHierarchy, Is.EqualTo(stage == 3),
                     "The standalone Lab manual panel must not appear in Gumiho or Yaguang game stages.");

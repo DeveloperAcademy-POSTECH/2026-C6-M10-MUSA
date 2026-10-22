@@ -226,7 +226,9 @@ namespace C6Lab.Tests
                 Assert.That(ArtSurface(projectile.VisualMount).sharedMaterial, Is.SameAs(combinedMaterial));
                 Assert.That(ArtColor(yin.Visual, colorProperty), Is.EqualTo(Color.blue));
                 Assert.That(ArtColor(yang.Visual, colorProperty), Is.EqualTo(Color.red));
-                Assert.That(ArtColor(projectile.VisualMount, colorProperty), Is.EqualTo(Color.green));
+                Assert.That(ArtColor(projectile.VisualMount, colorProperty),
+                    Is.EqualTo(LabOrbAppearance.DefaultElementColor(LabOrbElement.None)),
+                    "An unapproved element stays neutral even when the shared Combined material has a color.");
                 Assert.That(ArtSurface(water.Visual).sharedMaterial, Is.SameAs(waterMaterial));
                 Assert.That(ArtColor(water.Visual, colorProperty), Is.EqualTo(Color.cyan),
                     "A Combined orb uses its element material.");

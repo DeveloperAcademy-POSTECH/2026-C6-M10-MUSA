@@ -94,6 +94,7 @@ namespace C6Lab
             LabGourdResultViewer.Attach(boardNetwork);
             // 일시정지 메뉴에 BGM·효과음 크기 슬라이더를 붙인다. 값은 기기마다 따로 저장된다.
             LabHud hud = FindFirstObjectByType<LabHud>();
+            LabOrbHudComposition.Attach(hud, board, orbCamera);
             if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)
                 gameObject.AddComponent<LabAudioSettingsPanel>().Bind(hud.pauseMenu, generateSound);
             // 승리/패배 결과 화면 위에 이번 라운드 기록·MVP 대시보드를 붙인다.

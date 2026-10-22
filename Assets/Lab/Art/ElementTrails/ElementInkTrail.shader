@@ -13,7 +13,8 @@ Shader "C6Lab/Element Ink Trail"
         {
             Name "ElementInk"
             Tags { "LightMode"="UniversalForward" }
-            Blend SrcAlpha OneMinusSrcAlpha
+            // Keep coverage alpha correct when board trails are composited over the HUD.
+            Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha
             ZWrite Off
             ZTest LEqual
             Cull Off
