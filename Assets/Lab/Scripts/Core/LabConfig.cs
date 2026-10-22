@@ -298,6 +298,12 @@ namespace C6Lab
             new LabDeveloperField("Fox Fire Safe Seconds", 0f, 3f),
             new LabDeveloperField("Charm Seconds", 1f, 30f),
             new LabDeveloperField("Charm Rescue Taps (0 = none)", 0f, 10f, true),
+            new LabDeveloperField("Jigwi Fire Target Count", 1f, 5f, true),
+            new LabDeveloperField("Jigwi Fire Seconds", 1f, 120f),
+            new LabDeveloperField("Jigwi Overheat Seconds", .1f, 60f),
+            new LabDeveloperField("Jigwi Generation Burn Seconds", .1f, 120f),
+            new LabDeveloperField("Jigwi Raw Radius Scale", .2f, 1f),
+            new LabDeveloperField("Jigwi Raw Life Scale", .05f, 1f),
             // The yaguang-gwi's flash (#268): its own schedule, separate from the sabotage mix.
             // Shown in Korean in the 야광귀 DEV group together with the combo.
             LabDeveloperField.Toggle("야광귀 섬광 (0 off, 1 on)", "끔", "켬"),
@@ -339,11 +345,12 @@ namespace C6Lab
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
                 134, 132, 133, 148, 149, 150, 151),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
+            new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183),
             new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             new LabDeveloperCategory("야광귀", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163,
-                178, 179, 180, 181, 182, 183, 184)
-                .WithSwitch(155, 178)
+                184, 185, 186, 187, 188, 189, 190)
+                .WithSwitch(155, 184)
                 .WithDividers((0, "── 콤보 ──"), (10, "── 섬광 ──"))
         });
 
@@ -567,6 +574,13 @@ namespace C6Lab
         [Tooltip("매혹: 양옆 사람이 합쳐 이만큼 하트 말풍선을 누르면 바로 풀린다. 0이면 시간으로만 풀린다.")]
         [SerializeField, Range(0, 10)] private int charmRescueTaps = 3;
 
+        [Header("Jigwi fire experiment (#272)")]
+        [SerializeField, Range(1, 5)] private int jigwiFireTargetCount = 1;
+        [SerializeField, Range(1f, 120f)] private float jigwiFireSeconds = 15f;
+        [SerializeField, Range(.1f, 60f)] private float jigwiOverheatSeconds = 4f;
+        [SerializeField, Range(.1f, 120f)] private float jigwiGenerationBurnSeconds = 10f;
+        [SerializeField, Range(.2f, 1f)] private float jigwiRawRadiusScale = .65f;
+        [SerializeField, Range(.05f, 1f)] private float jigwiRawLifeScale = .5f;
         [Header("Yaguang flash (#268)")]
         [Tooltip("야광귀 섬광. 박에서 요괴가 빼꼼 나와 눈이 밝아진 뒤(예고) 화면이 하얗게 번쩍이고, 눈부신 동안 판 위 음양·결합 구슬과 아이템이 하얗게 보인다(북·박 색칠·HUD는 그대로). 화면 표시만 바뀌고 조작·판정은 그대로다. 방해공작 묶음(#251)과 따로 돈다. 야광귀 전용이라 기본은 끔(DEV `Yaguang Flash`로 켠다).")]
         [SerializeField] private bool yaguangFlashEnabled;
@@ -903,6 +917,12 @@ namespace C6Lab
         public float FoxFireSafeSeconds => Mathf.Clamp(Finite(foxFireSafeSeconds, 1f), 0f, 3f);
         public float CharmSeconds => Mathf.Clamp(Finite(charmSeconds, 10f), 1f, 30f);
         public int CharmRescueTaps => Mathf.Clamp(charmRescueTaps, 0, 10);
+        public int JigwiFireTargetCount => Mathf.Clamp(jigwiFireTargetCount, 1, 5);
+        public float JigwiFireSeconds => Mathf.Clamp(Finite(jigwiFireSeconds, 15f), 1f, 120f);
+        public float JigwiOverheatSeconds => Mathf.Clamp(Finite(jigwiOverheatSeconds, 4f), .1f, 60f);
+        public float JigwiGenerationBurnSeconds => Mathf.Clamp(Finite(jigwiGenerationBurnSeconds, 10f), .1f, 120f);
+        public float JigwiRawRadiusScale => Mathf.Clamp(Finite(jigwiRawRadiusScale, .65f), .2f, 1f);
+        public float JigwiRawLifeScale => Mathf.Clamp(Finite(jigwiRawLifeScale, .5f), .05f, 1f);
         public bool YaguangFlashEnabled => yaguangFlashEnabled;
         /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
         public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
@@ -1039,6 +1059,8 @@ namespace C6Lab
                 SabotageMixEnabled ? 1f : 0f, SabotageIntervalMin, SabotageIntervalMax,
                 sabotageWeights[0], sabotageWeights[1], sabotageWeights[2], sabotageWeights[3],
                 FoxFireCountMin, FoxFireCountMax, FoxFireSafeSeconds, CharmSeconds, CharmRescueTaps,
+                JigwiFireTargetCount, JigwiFireSeconds, JigwiOverheatSeconds,
+                JigwiGenerationBurnSeconds, JigwiRawRadiusScale, JigwiRawLifeScale,
                 YaguangFlashEnabled ? 1f : 0f, YaguangFlashTargetOne ? 1f : 0f, YaguangFlashFirstStartSeconds,
                 YaguangFlashIntervalSeconds, YaguangFlashWarningSeconds, YaguangFlashGlareSeconds,
                 YaguangFlashRecoverySeconds
@@ -1259,13 +1281,19 @@ namespace C6Lab
             foxFireSafeSeconds = values[175];
             charmSeconds = values[176];
             charmRescueTaps = (int)values[177];
-            yaguangFlashEnabled = values[178] >= .5f;
-            yaguangFlashTargetOne = values[179] >= .5f;
-            yaguangFlashFirstStartSeconds = values[180];
-            yaguangFlashIntervalSeconds = values[181];
-            yaguangFlashWarningSeconds = values[182];
-            yaguangFlashGlareSeconds = values[183];
-            yaguangFlashRecoverySeconds = values[184];
+            jigwiFireTargetCount = (int)values[178];
+            jigwiFireSeconds = values[179];
+            jigwiOverheatSeconds = values[180];
+            jigwiGenerationBurnSeconds = values[181];
+            jigwiRawRadiusScale = values[182];
+            jigwiRawLifeScale = values[183];
+            yaguangFlashEnabled = values[184] >= .5f;
+            yaguangFlashTargetOne = values[185] >= .5f;
+            yaguangFlashFirstStartSeconds = values[186];
+            yaguangFlashIntervalSeconds = values[187];
+            yaguangFlashWarningSeconds = values[188];
+            yaguangFlashGlareSeconds = values[189];
+            yaguangFlashRecoverySeconds = values[190];
             error = string.Empty;
             return true;
         }

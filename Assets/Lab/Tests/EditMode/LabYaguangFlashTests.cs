@@ -21,7 +21,7 @@ namespace C6Lab.Tests
         [Test]
         public void FlashFieldsAreKoreanStartOffAndShareTheYaguangGroupWithTheCombo()
         {
-            LabDeveloperField[] flash = LabConfig.DeveloperFields.Skip(178).ToArray();
+            LabDeveloperField[] flash = LabConfig.DeveloperFields.Skip(184).ToArray();
             Assert.That(flash.Select(field => field.Label), Is.EqualTo(new[]
             {
                 "야광귀 섬광 (0 off, 1 on)", "섬광 대상 (0 모두, 1 한 명)", "섬광 첫 시작 (초)", "섬광 간격 (초)",
@@ -40,8 +40,8 @@ namespace C6Lab.Tests
                 "The combo moved into the 야광귀 group.");
             LabDeveloperCategory yaguang = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀");
             Assert.That(yaguang.FieldIndices, Is.EqualTo(new[]
-                { 155, 156, 164, 157, 158, 159, 160, 161, 162, 163, 178, 179, 180, 181, 182, 183, 184 }));
-            Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 178 }), "One switch turns the combo and the flash on together.");
+                { 155, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190 }));
+            Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 184 }), "One switch turns the combo and the flash on together.");
             Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 10 }));
             Assert.That(yaguang.DividerLabels, Is.EqualTo(new[] { "── 콤보 ──", "── 섬광 ──" }));
             foreach (int index in new[] { 159, 162 })
@@ -50,26 +50,27 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperCategories.Where(category => category.Title != "야광귀")
                 .All(category => category.SwitchFields == null && category.DividerAt == null), Is.True);
 
-            LabConfig config = Config();
+            LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
+            created.Add(config);
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(178), Is.EqualTo(new[] { 0f, 0f, 31f, 60f, 2f, 7f, 2f }),
+                Assert.That(source.CaptureDeveloperValues().Skip(184), Is.EqualTo(new[] { 0f, 0f, 31f, 60f, 2f, 7f, 2f }),
                     "Off by default; once on, everyone flashes at 31 s and every 60 s, 19 s before each combo, "
                     + "with a 2 s warning, 7 s of glare and 2 s to recover.");
 
             float[] values = config.CaptureDeveloperValues();
-            values[178] = 1f; values[179] = 1f; values[180] = 5f; values[181] = 24f;
-            values[182] = 0f; values[183] = 2f; values[184] = 0f;
+            values[184] = 1f; values[185] = 1f; values[186] = 5f; values[187] = 24f;
+            values[188] = 0f; values[189] = 2f; values[190] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(new[] { config.YaguangFlashEnabled, config.YaguangFlashTargetOne }, Is.All.True);
             Assert.That(new[] { config.YaguangFlashFirstStartSeconds, config.YaguangFlashIntervalSeconds,
                 config.YaguangFlashWarningSeconds, config.YaguangFlashGlareSeconds, config.YaguangFlashRecoverySeconds },
                 Is.EqualTo(new[] { 5f, 24f, 0f, 2f, 0f }));
-            values[183] = 0f;
+            values[189] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "A glare lasts at least 1 s.");
-            values[183] = 2f;
-            values[181] = 12f;
+            values[189] = 2f;
+            values[187] = 12f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Flashes come at least 20 s apart.");
         }
 
@@ -123,6 +124,56 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void HostsZeroIdCanBeTheFirstSingleTargetWithoutFlashingEveryone()
+        {
+            var drawn = new HashSet<ulong>();
+            LabConfig config = Config(flash: true, one: true, first: 1f, warning: 0f);
+            for (int seed = 0; seed < 64 && drawn.Count < 2; seed++)
+            {
+                var model = new LabModel();
+                model.Begin("flash-zero-" + seed, new ulong[] { 0, 20 }, 0d, config);
+                var warning = model.Snapshot(0d);
+                var snapshot = model.Snapshot(1d);
+                drawn.Add(snapshot.flashLastTarget);
+                Assert.That(snapshot.flashLastTargetAll || warning.flashTargetAll, Is.False);
+                Assert.That(new ulong[] { 0, 20 }.Count(snapshot.LastFlashHit), Is.EqualTo(1));
+                Assert.That(snapshot.LastFlashHit(snapshot.flashLastTarget), Is.True);
+            }
+            Assert.That(drawn, Is.EquivalentTo(new ulong[] { 0, 20 }),
+                "The first cast has no previous player, so the Host must remain eligible.");
+        }
+
+        [Test]
+        public void FlashScheduleAndJigwiFireCoexistWithoutChangingFireConsumptionOrExpiry()
+        {
+            LabConfig config = Config(flash: true, first: 5f, warning: 0f);
+            var values = config.CaptureDeveloperValues();
+            values[178] = 2f;
+            values[179] = 30f;
+            Assert.That(config.TryApplyDeveloperValues(values, out var error), Is.True, error);
+            var model = new LabModel();
+            model.BeginSolo("flash-jigwi", 0, 0d, config);
+            Assert.That(model.TryStartJigwiFire(0, 0d, out _), Is.True);
+            var before = model.Snapshot(5d);
+            Assert.That(before.flashCount, Is.EqualTo(1u));
+            Assert.That(before.flashLastTargetAll, Is.True);
+            var fire = before.JigwiFor(0);
+            Assert.That(fire.FireActive(5d), Is.True);
+            Assert.That(fire.targets.Length, Is.EqualTo(2));
+            Assert.That(before.orbs.Length, Is.EqualTo(4));
+            var water = before.orbs[0];
+            Assert.That(water.expiresAt, Is.EqualTo(30d));
+            Assert.That(model.TryLaunch(0, water.id, "water", 5d, out _, out _), Is.True);
+            Assert.That(model.ConfirmJigwiFireHit(water.id, fire.fireId, fire.targets[0].id,
+                6d, out bool extinguished), Is.True);
+            Assert.That(extinguished, Is.True);
+            var after = model.Snapshot(6d);
+            Assert.That(after.hp, Is.EqualTo(before.hp));
+            Assert.That(after.paintCoverage, Is.EqualTo(before.paintCoverage));
+            Assert.That(after.JigwiFor(0).targets.Count(target => target.extinguished), Is.EqualTo(1));
+        }
+
+        [Test]
         public void TheFlashWaitsOutTheComboThenWarnsAgainInFull()
         {
             var model = new LabModel();
@@ -164,7 +215,7 @@ namespace C6Lab.Tests
         {
             var snapshot = new LabSnapshot
             {
-                phase = LabPhase.Playing, flashCount = 1, flashLastAt = 30d, flashLastTarget = 0
+                phase = LabPhase.Playing, flashCount = 1, flashLastAt = 30d, flashLastTarget = 0, flashLastTargetAll = true
             };
             Assert.That(LabYaguangFlash.GlareAmount(snapshot, 29.9d, 10, 3f, 1.5f), Is.Zero);
             Assert.That(LabYaguangFlash.GlareAmount(snapshot, 30d, 10, 3f, 1.5f), Is.EqualTo(1f));
@@ -208,13 +259,13 @@ namespace C6Lab.Tests
             values[157] = 60f;
             values[158] = 10f;
             values[164] = 3f;
-            values[178] = flash ? 1f : 0f;
-            values[179] = one ? 1f : 0f;
-            values[180] = first;
-            values[181] = interval;
-            values[182] = warning;
-            values[183] = glare;
-            values[184] = recovery;
+            values[184] = flash ? 1f : 0f;
+            values[185] = one ? 1f : 0f;
+            values[186] = first;
+            values[187] = interval;
+            values[188] = warning;
+            values[189] = glare;
+            values[190] = recovery;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return config;
         }

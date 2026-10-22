@@ -34,6 +34,8 @@ namespace C6Lab
         private uint seenRound;
         private uint seenFlashCount;
         private double seenServerTime = -1d;
+        private string clockSession;
+        private uint clockRound;
         private float seenAt;
         private double eyesShownFor = -1d;
 
@@ -72,7 +74,7 @@ namespace C6Lab
                 Hide();
                 return;
             }
-            double now = snapshot.paused ? snapshot.serverTime : ServerNow(snapshot);
+            double now = ServerNow(snapshot);
             ulong me = network.LocalPlayerId;
             float glare = LabYaguangFlash.GlareAmount(snapshot, now, me, config.YaguangFlashGlareSeconds,
                 config.YaguangFlashRecoverySeconds);
@@ -117,10 +119,12 @@ namespace C6Lab
             double length = snapshot.flashAt - snapshot.flashWarningAt;
             float progress = length > 0d ? Mathf.Clamp01((float)((now - snapshot.flashWarningAt) / length)) : 1f;
             LabGourdAlert alert = GetComponent<LabGourdAlert>();
-            if (alert == null || network.target == null) return progress;
+            if (snapshot.paused || alert == null || network.target == null) return progress;
             if (eyesShownFor != snapshot.flashAt || !alert.ShowingEyes)
             {
-                if (eyesShownFor != snapshot.flashAt) alert.ShowEyes(network.target, (float)(snapshot.flashAt - now));
+                // Pause and other alerts can hide/replace this bubble without changing flashAt.
+                // Restore the remaining warning when this screen returns to the battle.
+                alert.ShowEyes(network.target, (float)(snapshot.flashAt - now));
                 eyesShownFor = snapshot.flashAt;
             }
             if (alert.ShowingEyes) alert.SetEyeGlow(EyeGlowAt(progress));
@@ -151,17 +155,24 @@ namespace C6Lab
         {
             if (network != null && network.board != null) network.board.SetFlashGlare(0f);
             if (layer != null) layer.gameObject.SetActive(false);
+            LabGourdAlert alert = GetComponent<LabGourdAlert>();
+            if (alert != null && alert.ShowingEyes) alert.Hide();
+            eyesShownFor = -1d;
         }
 
         private double ServerNow(LabSnapshot snapshot)
         {
             float realtime = Time.realtimeSinceStartup;
-            if (snapshot.serverTime != seenServerTime)
+            if (snapshot.paused || snapshot.sessionId != clockSession || snapshot.round != clockRound
+                || snapshot.serverTime != seenServerTime)
             {
+                clockSession = snapshot.sessionId;
+                clockRound = snapshot.round;
                 seenServerTime = snapshot.serverTime;
                 seenAt = realtime;
             }
-            return snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
+            return snapshot.paused ? snapshot.serverTime
+                : snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
         }
 
         private bool EnsureLayer()
@@ -223,6 +234,8 @@ namespace C6Lab
             edgeSprite.hideFlags = HideFlags.DontSave;
             return edgeSprite;
         }
+
+        private void OnDisable() => Hide();
 
         private void OnDestroy()
         {

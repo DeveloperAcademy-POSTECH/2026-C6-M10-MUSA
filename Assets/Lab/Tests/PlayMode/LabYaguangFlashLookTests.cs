@@ -122,6 +122,7 @@ namespace C6Lab.Tests
                 other.flashCount = 1;
                 other.flashLastAt = 21d;
                 other.flashLastTarget = network.LocalPlayerId - 1;
+                other.flashLastTargetAll = false;
                 latest.SetValue(network, other);
                 yield return null;
                 Assert.That(hud.BurstAlpha, Is.Zero, "ONE: someone else's flash leaves this screen alone.");
@@ -134,13 +135,70 @@ namespace C6Lab.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator PauseResumeRestoresWarningEyesAndDisablingTheHudClearsItsGlare()
+        {
+            var root = new GameObject("Flash lifecycle fixture");
+            var network = root.AddComponent<LabNetwork>(); network.enabled = false;
+            var config = ScriptableObject.CreateInstance<LabConfig>(); network.config = config;
+            var boardRoot = new GameObject("Glare board"); boardRoot.transform.SetParent(root.transform, false);
+            network.board = boardRoot.AddComponent<LabOrbBoard>();
+            var cameraRoot = new GameObject("Battle camera"); cameraRoot.transform.SetParent(root.transform, false);
+            cameraRoot.transform.position = Vector3.back * 10f;
+            Camera camera = cameraRoot.AddComponent<Camera>();
+            network.target = LabTarget.CreateCylinder(root.transform, Vector3.zero, .8f, 2f);
+            var canvasRoot = new GameObject("Flash lifecycle canvas", typeof(RectTransform), typeof(Canvas));
+            Canvas canvas = canvasRoot.GetComponent<Canvas>();
+            LabGourdAlert alert = root.AddComponent<LabGourdAlert>(); alert.Bind(network, canvas, camera);
+            LabYaguangFlashHud hud = root.AddComponent<LabYaguangFlashHud>(); hud.Bind(network, canvas);
+            FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
+            try
+            {
+                latest.SetValue(network, Snapshot(20.8d, 19.5d, 21d));
+                yield return null;
+                Assert.That(alert.ShowingEyes, Is.True);
+                LabSnapshot paused = Snapshot(20.8d, 19.5d, 21d); paused.paused = true;
+                latest.SetValue(network, paused);
+                yield return new WaitForSeconds(.35f); // Longer than the warning's remaining 0.2 s.
+                Assert.That(alert.ShowingEyes, Is.False, "The existing alert hides while the pause menu is open.");
+                latest.SetValue(network, Snapshot(20.8d, 19.5d, 21d));
+                yield return null;
+                Assert.That(alert.ShowingEyes, Is.True, "The same warning resumes with its remaining time.");
+                Assert.That(alert.EyeGlow, Is.GreaterThan(.9f));
+
+                LabSnapshot flashed = Snapshot(21.05d, -1d, -1d);
+                flashed.flashCount = 1; flashed.flashLastAt = 21d;
+                latest.SetValue(network, flashed);
+                yield return null;
+                Assert.That(network.board.FlashGlare, Is.EqualTo(1f));
+                hud.enabled = false;
+                Assert.That(network.board.FlashGlare, Is.Zero, "Disabling the effect cannot leave the board white.");
+                Assert.That(hud.BurstAlpha, Is.Zero);
+
+                yield return new WaitForSeconds(.35f);
+                LabSnapshot freshRound = Snapshot(21.05d, -1d, -1d);
+                freshRound.round = 2;
+                freshRound.flashCount = 1; freshRound.flashLastAt = 21.05d;
+                latest.SetValue(network, freshRound);
+                hud.enabled = true;
+                yield return null;
+                Assert.That(hud.BurstAlpha, Is.GreaterThan(.9f),
+                    "An identical numeric server time in a new round must not inherit the previous round's extrapolation.");
+            }
+            finally
+            {
+                Object.Destroy(root); Object.Destroy(canvasRoot); Object.Destroy(config);
+            }
+        }
+
         private static SpriteRenderer Cover(LabOrbView view) =>
             view.GetComponentsInChildren<SpriteRenderer>(true).FirstOrDefault(renderer => renderer.name == "Glare Cover");
 
         private static LabSnapshot Snapshot(double now, double warningAt, double flashAt) => new LabSnapshot
         {
             sessionId = "flash-look", round = 1, phase = LabPhase.Playing, serverTime = now,
-            flashWarningAt = warningAt, flashAt = flashAt
+            flashWarningAt = warningAt, flashAt = flashAt,
+            flashTargetAll = true, flashLastTargetAll = true
         };
     }
 }

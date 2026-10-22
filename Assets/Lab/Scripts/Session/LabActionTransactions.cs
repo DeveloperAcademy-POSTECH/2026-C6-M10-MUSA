@@ -53,6 +53,8 @@ namespace C6Lab
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();
         public string provisionalId;
         public string outputId;
+        /// <summary>Accepted attempt consumed its inputs without producing a provisional output (Jigwi overheat).</summary>
+        public bool consumedWithoutOutput;
 
         public LabActionIdentity Identity => new LabActionIdentity(sessionId, round, sender, requestId);
 
@@ -293,7 +295,8 @@ namespace C6Lab
                 if (string.IsNullOrEmpty(inputs[i]) || inputs[i] == provisionalOutputId)
                     reason = "INVALID_ACTION_INPUT";
                 else if (producers.TryGetValue(inputs[i], out long parent) &&
-                         pending[parent].state == LabPendingActionState.Rejected)
+                         (pending[parent].state == LabPendingActionState.Rejected
+                          || pending[parent].state == LabPendingActionState.Accepted && !mappings.ContainsKey(inputs[i])))
                     reason = "DEPENDENCY_REJECTED";
                 if (reason != null) return false;
             }
@@ -366,11 +369,11 @@ namespace C6Lab
                 return false;
             // A response must match the real transport sender before the caller reaches this method.
             if (!string.IsNullOrEmpty(action.provisional) && receipt.accepted &&
-                (receipt.provisionalId != action.provisional || string.IsNullOrEmpty(receipt.outputId))) return false;
+                (receipt.provisionalId != action.provisional || (!receipt.consumedWithoutOutput && string.IsNullOrEmpty(receipt.outputId)))) return false;
             resolution = new LabLocalActionResolution { requestId = action.id, accepted = receipt.accepted };
             action.reason = receipt.reason;
             action.state = receipt.accepted ? LabPendingActionState.Accepted : LabPendingActionState.Rejected;
-            if (receipt.accepted)
+            if (receipt.accepted && !receipt.consumedWithoutOutput)
             {
                 if (!string.IsNullOrEmpty(action.provisional)) mappings[action.provisional] = receipt.outputId;
             }

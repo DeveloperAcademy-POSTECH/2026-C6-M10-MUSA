@@ -103,6 +103,12 @@ namespace C6Lab
         public double burnedAt = -1d;
         /// <summary>A bomb blast shrank this orb for the rest of its life, and any orb combined from it (#213).</summary>
         public bool small;
+        /// <summary>Jigwi generation curse only: independent of bomb shrink and paint damage.</summary>
+        public float jigwiRadiusScale = 1f;
+        /// <summary>Explicit Host battle-clock expiry; -1 retains the existing kind lifetime.</summary>
+        public double expiresAt = -1d;
+        public bool jigwiSupply;
+        public bool jigwiGenerationBurn;
 
         /// <summary>An unlock older than this, for example seen after a reconnect, shows the item already open.</summary>
         public const double UnlockEffectWindowSeconds = 1d;
@@ -119,11 +125,46 @@ namespace C6Lab
 
         /// <summary>Seconds left in this orb's lifetime at the given Host time (#235); never below 0.</summary>
         public float LifeSecondsLeft(double serverTime, float orbLifetime, float itemLifetime) =>
-            (float)Math.Max(0d, createdAt + kind.LifetimeFor(lockSwipes, orbLifetime, itemLifetime) - serverTime);
+            (float)Math.Max(0d, (expiresAt >= 0d ? expiresAt
+                : createdAt + kind.LifetimeFor(lockSwipes, orbLifetime, itemLifetime)) - serverTime);
 
         /// <summary>Seconds this orb still burns at the given Host time; 0 once out, or when it never burned.</summary>
         public float BurnSecondsLeft(double serverTime, float burnSeconds) =>
             burnedAt < 0d ? 0f : (float)Math.Max(0d, burnedAt + burnSeconds - serverTime);
+    }
+
+    [Serializable]
+    public sealed class LabJigwiFireTarget
+    {
+        public string id;
+        public float x, y;
+        public bool extinguished;
+        public LabJigwiFireTarget Copy() => (LabJigwiFireTarget)MemberwiseClone();
+    }
+
+    /// <summary>Host-approved, per-player Jigwi experiment state. All times use the paused battle clock.</summary>
+    [Serializable]
+    public sealed class LabJigwiState
+    {
+        public ulong playerId;
+        public string fireId;
+        public double fireStartedAt = -1d, fireEndsAt = -1d, overheatUntil = -1d, generationBurnUntil = -1d;
+        public LabJigwiFireTarget[] targets = Array.Empty<LabJigwiFireTarget>();
+        public bool FireActive(double now)
+        {
+            if (fireStartedAt < 0d || now < fireStartedAt || now >= fireEndsAt || targets == null) return false;
+            foreach (var target in targets) if (target != null && !target.extinguished) return true;
+            return false;
+        }
+        public bool Overheated(double now) => overheatUntil > now;
+        public bool GenerationBurnActive(double now) => generationBurnUntil > now;
+        public LabJigwiState Copy()
+        {
+            var copy = (LabJigwiState)MemberwiseClone();
+            copy.targets = targets == null ? Array.Empty<LabJigwiFireTarget>()
+                : Array.ConvertAll(targets, target => target?.Copy());
+            return copy;
+        }
     }
 
     [Serializable]
@@ -195,6 +236,13 @@ namespace C6Lab
         /// <summary>Host rope cycle phase and hit spring state for the moving target collider.</summary>
         public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();
+        public LabJigwiState[] jigwi = Array.Empty<LabJigwiState>();
+        public LabJigwiState JigwiFor(ulong player)
+        {
+            foreach (var state in jigwi ?? Array.Empty<LabJigwiState>())
+                if (state != null && state.playerId == player) return state;
+            return null;
+        }
         public LabOrbState[] orbs = Array.Empty<LabOrbState>();
         /// <summary>Generate drums. Only a player whose board holds one can create orbs.</summary>
         public LabOrbState[] drums = Array.Empty<LabOrbState>();
@@ -256,19 +304,21 @@ namespace C6Lab
         /// 기다리는 중이면 -1이다. 예고 시간이 0이면 두 시각이 같다.
         /// </summary>
         public double flashWarningAt = -1d, flashAt = -1d;
-        /// <summary>다음 섬광을 맞을 사람. 0이면 모두 (DEV `Yaguang Flash Target` ALL).</summary>
+        /// <summary>다음 섬광의 실제 대상 ID. Host의 ID 0도 유효하며 ALL 여부는 별도 필드다.</summary>
         public ulong flashTarget;
+        public bool flashTargetAll;
         /// <summary>이번 라운드에 번쩍인 섬광 수. 바뀌면 새 섬광이 터진 것이다.</summary>
         public uint flashCount;
-        /// <summary>마지막 섬광이 번쩍인 시각과 맞은 사람(0이면 모두)</summary>
+        /// <summary>마지막 섬광이 번쩍인 시각과 실제 대상 ID</summary>
         public double flashLastAt = -1d;
         public ulong flashLastTarget;
+        public bool flashLastTargetAll;
 
         /// <summary>이 시각에 섬광 예고 중인지. 요괴는 모두의 화면에서 빼꼼 나온다.</summary>
         public bool FlashWarningOn(double now) => flashAt > flashWarningAt && now >= flashWarningAt && now < flashAt;
         /// <summary>이 사람이 다음 섬광을 맞는지</summary>
-        public bool FlashTargets(ulong player) => flashTarget == 0 || flashTarget == player;
+        public bool FlashTargets(ulong player) => flashTargetAll || flashTarget == player;
         /// <summary>이 사람이 마지막 섬광을 맞았는지 (한 번도 안 터졌으면 false)</summary>
-        public bool LastFlashHit(ulong player) => flashCount > 0 && (flashLastTarget == 0 || flashLastTarget == player);
+        public bool LastFlashHit(ulong player) => flashCount > 0 && (flashLastTargetAll || flashLastTarget == player);
     }
 }

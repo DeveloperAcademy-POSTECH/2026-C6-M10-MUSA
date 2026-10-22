@@ -119,6 +119,14 @@ namespace C6Lab
             // 매혹 (#251): 홀린 사람 자신의 화면에 "매혹 N초"·하트·헤롱~·정신 차림!
             if (hud != null && boardNetwork != null && GetComponent<LabCharmHud>() == null)
                 gameObject.AddComponent<LabCharmHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
+
+            if (hud != null && boardNetwork != null)
+            {
+                Canvas canvas = hud.GetComponentInParent<Canvas>();
+                LabJigwiHud jigwi = canvas.GetComponentInChildren<LabJigwiHud>(true);
+                if (jigwi == null) jigwi = canvas.gameObject.AddComponent<LabJigwiHud>();
+                jigwi.Bind(boardNetwork, canvas);
+            }
             // 매혹 (#251): 홀린 사람의 양옆 사람 화면에 그 사람 이름표 곁의 하트 말풍선 (누르면 깨우기)
             if (hud != null && boardNetwork != null && GetComponent<LabCharmBubbles>() == null)
                 gameObject.AddComponent<LabCharmBubbles>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>(),

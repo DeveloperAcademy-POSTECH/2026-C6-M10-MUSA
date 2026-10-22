@@ -89,7 +89,7 @@ namespace C6Lab
     /// Plain Host-only battle state. Transport authenticates sender IDs before calling this class;
     /// clients render copies from Snapshot and never decide ownership, damage, or expiry.
     /// </summary>
-    public sealed class LabModel
+    public sealed partial class LabModel
     {
         public const int MinimumParticipants = 2;
         public const int MaximumParticipants = 5;
@@ -311,6 +311,7 @@ namespace C6Lab
             remaining = rules.BattleDurationSeconds;
             played = 0d;
             phase = LabPhase.Playing;
+            ResetJigwi(config);
         }
 
         /// <summary>Advance the absolute Host clock; only Idle orbs expire.</summary>
@@ -353,7 +354,9 @@ namespace C6Lab
             Vector2 position = drumPosition ?? new Vector2(drum.x, drum.y);
             if (!Unit(position.x) || !Unit(position.y)) return Reject("INVALID_MOTION", out reason);
             var player = players[sender];
-            if (CountStored(sender) >= rules.OrbStorageLimit) return Reject("STORAGE_FULL", out reason);
+            // An overheated press still pays for a burnt attempt but creates no stored entity.
+            if (!JigwiOverheated(sender, now) && CountStored(sender) >= rules.OrbStorageLimit)
+                return Reject("STORAGE_FULL", out reason);
             if (player.stamina + .00001f < rules.GenerateCost) return Reject("INSUFFICIENT_STAMINA", out reason);
             uint generated = generatedCounts[sender];
             if (generated == uint.MaxValue) return Reject("GENERATION_LIMIT", out reason);
@@ -363,6 +366,11 @@ namespace C6Lab
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
             player.generatedTotal++;
+            if (JigwiOverheated(sender, now))
+            {
+                reason = "JIGWI_BURNED";
+                return true;
+            }
             Vector2 launch = SpawnVelocityFor(seed, sender, generated, position.x);
             orb = new LabOrbState
             {
@@ -371,6 +379,7 @@ namespace C6Lab
                 x = position.x, y = position.y,
                 vx = launch.x, vy = launch.y, createdAt = now, revision = ++revision, inFlight = false
             };
+            ApplyJigwiGenerationBurn(orb, now);
             orbs.Add(orb.id, orb);
             reason = "GENERATED";
             orb = orb.Copy();
@@ -383,7 +392,7 @@ namespace C6Lab
         /// </summary>
         public bool TryCombineAt(ulong sender, string firstId, string secondId, string requestId,
             double now, Vector2 normalizedCenter, Vector2 normalizedVelocity,
-            out LabOrbState orb, out string reason)
+            out LabOrbState orb, out string reason, bool passiveContact = false)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
@@ -395,6 +404,14 @@ namespace C6Lab
             if (!UsableBy(first, sender) || !UsableBy(second, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (!first.kind.IsRaw() || !second.kind.IsRaw() || first.kind == second.kind)
                 return Reject("POLARITY_MISMATCH", out reason);
+
+            if (!passiveContact && JigwiOverheated(sender, now))
+            {
+                RemoveJigwiBurned(firstId);
+                RemoveJigwiBurned(secondId);
+                reason = "JIGWI_BURNED";
+                return true;
+            }
 
             orbs.Remove(firstId); orbs.Remove(secondId);
             var element = ElementFor(seed, combinedCount++);
@@ -505,6 +522,12 @@ namespace C6Lab
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            if (JigwiOverheated(sender, now))
+            {
+                RemoveJigwiBurned(id);
+                reason = "JIGWI_BURNED";
+                return true;
+            }
             if (!current.kind.CanThrow(current.lockSwipes)) return Reject("RAW_CANNOT_ATTACK", out reason);
             // Charmed (#251): too dazed to attack until it ends or the players beside wake them.
             if (Charmed(sender, now)) return Reject("CHARMED", out reason);
@@ -674,7 +697,7 @@ namespace C6Lab
         private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled && !flashHeld;
 
         /// <summary>
-        /// 섬광 대상. ALL이면 0(모두). ONE이면 자리 순서에서 seed와 순번으로 한 명을 뽑아 모든 기기가 같은 사람을 받는다.
+        /// 섬광 대상. ALL 여부는 별도 bool로 공유한다. ONE이면 실제 ID 0도 포함한 자리 순서에서 한 명을 뽑는다.
         /// 두 명 이상이면 바로 앞 섬광을 맞은 사람은 빼서 같은 사람이 연달아 맞지 않게 한다.
         /// </summary>
         private ulong DrawFlashTarget(uint index)
@@ -682,7 +705,7 @@ namespace C6Lab
             if (!rules.FlashTargetOne || activeSeatCount <= 0) return 0;
             var candidates = new List<ulong>();
             for (int i = 0; i < activeSeatCount; i++)
-                if (activeSeatCount == 1 || seats[i] != lastFlashTarget) candidates.Add(seats[i]);
+                if (index == 0u || activeSeatCount == 1 || seats[i] != lastFlashTarget) candidates.Add(seats[i]);
             return candidates[(int)(DrawFor(seed ^ FlashTargetSalt, FlashDrawKey, index) % (ulong)candidates.Count)];
         }
 
@@ -753,6 +776,12 @@ namespace C6Lab
             if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y)) return Reject("INVALID_MOTION", out reason);
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            if (JigwiOverheated(sender, now))
+            {
+                RemoveJigwiBurned(id);
+                reason = "JIGWI_BURNED";
+                return true;
+            }
             if (!current.kind.IsDoubleTapUsable()) return Reject("NOT_USABLE", out reason);
             if (current.lockSwipes > 0) return Reject("ITEM_LOCKED", out reason);
             if (current.kind == LabOrbKind.SecretBox)
@@ -920,6 +949,7 @@ namespace C6Lab
                 players = players.Values.OrderBy(player => player.seat).Select(player => player.Copy()).ToArray(),
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
                 drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray(),
+                jigwi = CopyJigwiStates(),
                 swipeBlockedPlayer = BlockOn(now) ? swipeBlockedPlayer : 0,
                 swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
                 swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
@@ -943,9 +973,11 @@ namespace C6Lab
                 flashAt = FlashWaiting ? nextFlashAt : -1d,
                 flashWarningAt = FlashWaiting ? nextFlashAt - rules.FlashWarningSeconds : -1d,
                 flashTarget = nextFlashTarget,
+                flashTargetAll = !rules.FlashTargetOne,
                 flashCount = flashCount,
                 flashLastAt = lastFlashAt,
-                flashLastTarget = lastFlashTarget
+                flashLastTarget = lastFlashTarget,
+                flashLastTargetAll = !rules.FlashTargetOne
             };
         }
 
@@ -998,9 +1030,10 @@ namespace C6Lab
                 DropGourdBombs(effectiveNow);
                 StartSwipeBlocks(effectiveNow);
                 CastSabotages(effectiveNow);
+                AdvanceJigwi(effectiveNow);
                 AdvanceCombo(effectiveNow);
                 AdvanceFlash(effectiveNow);
-                foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
+                foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow >= ExpiresAt(orb))
                     .ToArray())
                 {
                     if (!orbs.Remove(expired.id)) continue;
@@ -1244,6 +1277,7 @@ namespace C6Lab
                 if (lastSabotageTarget.HasValue && player == lastSabotageTarget.Value && activeSeatCount > 1) continue;
                 if (blocking && player == swipeBlockedPlayer) continue;
                 if (charming && player == charmedPlayer) continue;
+                if (JigwiBlocksSabotage(player, at)) continue;
                 if (kind == LabSabotageKind.FoxFire && CountStored(player, at) >= rules.OrbStorageLimit) continue;
                 targets.Add(player);
             }
@@ -1295,11 +1329,12 @@ namespace C6Lab
         // ordinary attack orb and keeps the orb lifetime.
         private float LifetimeOf(LabOrbState orb) =>
             orb.kind.LifetimeFor(orb.lockSwipes, rules.OrbLifetimeSeconds, rules.ItemLifetimeSeconds);
-        private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
+        private double ExpiresAt(LabOrbState orb) => orb.expiresAt >= 0d ? orb.expiresAt : orb.createdAt + LifetimeOf(orb);
+        private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight && !orb.jigwiSupply);
 
         /// <summary>A late frame's earlier sabotage draws ignore orbs whose lifetime had already ended at that draw.</summary>
         private int CountStored(ulong owner, double at) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight
-            && at - orb.createdAt < LifetimeOf(orb));
+            && !orb.jigwiSupply && at < ExpiresAt(orb));
 
         /// <summary>Orbs and drums both move between screens; look the ID up in either list.</summary>
         private bool TryFindMovable(string id, out LabOrbState found) =>

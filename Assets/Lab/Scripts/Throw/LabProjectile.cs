@@ -1,14 +1,19 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace C6Lab
 {
+    public enum LabProjectileHitKind { Miss, Monster, Fire }
+
     public readonly struct LabProjectileResult
     {
         public readonly string ProjectileId;
         public readonly ulong OwnerPlayerId;
         public readonly bool Hit;
+        public readonly LabProjectileHitKind Kind;
+        public readonly string FireId, FireTargetId;
         public readonly Vector3 ImpactVelocity;
         public readonly Vector3 HitPoint;
         public readonly float FlightSeconds;
@@ -18,10 +23,19 @@ namespace C6Lab
 
         public LabProjectileResult(string projectileId, ulong ownerPlayerId, bool hit,
             Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance, Vector3 impactVelocity = default)
+            : this(projectileId, ownerPlayerId, hit ? LabProjectileHitKind.Monster : LabProjectileHitKind.Miss,
+                hitPoint, flightSeconds, peakRise, horizontalDistance, impactVelocity) { }
+
+        public LabProjectileResult(string projectileId, ulong ownerPlayerId, LabProjectileHitKind kind,
+            Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance,
+            Vector3 impactVelocity = default, string fireId = null, string fireTargetId = null)
         {
             ProjectileId = projectileId;
             OwnerPlayerId = ownerPlayerId;
-            Hit = hit;
+            Kind = kind;
+            Hit = kind == LabProjectileHitKind.Monster;
+            FireId = kind == LabProjectileHitKind.Fire ? fireId : null;
+            FireTargetId = kind == LabProjectileHitKind.Fire ? fireTargetId : null;
             ImpactVelocity = impactVelocity;
             HitPoint = hitPoint;
             FlightSeconds = flightSeconds;
@@ -61,6 +75,8 @@ namespace C6Lab
         private ulong ownerPlayerId;
         private Vector3 lastPosition;
         private SurfacePose previousTargetPose, previousMissPose;
+        private readonly List<LabJigwiFireSurface> fireSurfaces = new List<LabJigwiFireSurface>();
+        private readonly List<SurfacePose> previousFirePoses = new List<SurfacePose>();
         private const float SurfaceDistanceTolerance = .0001f;
         private const float ActualContactTolerance = .000001f;
 
@@ -79,7 +95,9 @@ namespace C6Lab
 
         private struct ResolutionSurface
         {
-            public bool Found, HitTarget;
+            public bool Found;
+            public LabProjectileHitKind Kind;
+            public LabJigwiFireSurface Fire;
             public float Distance;
             public Vector3 Point;
         }
@@ -137,6 +155,16 @@ namespace C6Lab
         {
             missSurface = floor;
             previousMissPose = new SurfacePose(floor);
+        }
+
+        /// <summary>Owner-specific fire targets; register before launch, identically on Host and visual replicas.</summary>
+        public void SetFireSurfaces(IEnumerable<LabJigwiFireSurface> surfaces)
+        {
+            if (launched) throw new InvalidOperationException("Fire surfaces must be registered before launch.");
+            fireSurfaces.Clear();
+            if (surfaces != null)
+                foreach (LabJigwiFireSurface surface in surfaces)
+                    if (surface != null && !fireSurfaces.Contains(surface)) fireSurfaces.Add(surface);
         }
 
         /// <summary>Replaces the default sphere's presentation; the root SphereCollider stays put.</summary>
@@ -300,7 +328,7 @@ namespace C6Lab
         {
             if (!launched || resolved) return;
             peakHeight = Mathf.Max(peakHeight, body.position.y);
-            if ((target != null && target.Hitbox != null) || missSurface != null)
+            if ((target != null && target.Hitbox != null) || missSurface != null || fireSurfaces.Count > 0)
                 SweepForResolutionSurface();
             if (resolved) return;
 
@@ -329,8 +357,11 @@ namespace C6Lab
 
         private void OnTriggerEnter(Collider other)
         {
-            if (!launched || authoritative || resolved) return;
-            if (IsResolutionSurface(other)) FinishVisual();
+            if (!launched || resolved || !IsResolutionSurface(other)) return;
+            // Fire uses trigger geometry so non-owners never bounce off it. Authoritative hits
+            // still require the same swept/overlap proof as a monster, not the callback alone.
+            if (authoritative) ResolveSurfaceIfFound(null);
+            else FinishVisual();
         }
 
         // The completed physics segment is shared by the FixedUpdate sweep and collision callback.
@@ -341,7 +372,7 @@ namespace C6Lab
         {
             ResolutionSurface nearest = FindResolutionSurface(collision);
             if (!nearest.Found) return;
-            if (authoritative) Resolve(nearest.HitTarget, nearest.Point);
+            if (authoritative) Resolve(nearest.Kind, nearest.Point, nearest.Fire);
             else FinishVisual();
         }
 
@@ -357,6 +388,8 @@ namespace C6Lab
             // A target moving behind the shot must not create an overlap retroactively.
             ConsiderOverlap(previousTargetPose, lastPosition, 0f, radius, ref nearest);
             ConsiderOverlap(previousMissPose, lastPosition, 0f, radius, ref nearest);
+            for (int i = 0; i < previousFirePoses.Count; i++)
+                ConsiderOverlap(previousFirePoses[i], lastPosition, 0f, radius, ref nearest);
 
             ConsiderSweep(displacement, radius, ref nearest);
 
@@ -364,6 +397,9 @@ namespace C6Lab
             ConsiderOverlap(new SurfacePose(target != null ? target.Hitbox : null),
                 position, distance, radius, ref nearest);
             ConsiderOverlap(new SurfacePose(missSurface), position, distance, radius, ref nearest);
+            for (int i = 0; i < fireSurfaces.Count; i++)
+                if (fireSurfaces[i] != null)
+                    ConsiderOverlap(new SurfacePose(fireSurfaces[i].Hitbox), position, distance, radius, ref nearest);
 
             // CCD can stop or slide a real contact within the engine's contact skin.
             // A large positive speculative separation is never accepted. A small positive
@@ -396,7 +432,7 @@ namespace C6Lab
             if (distance <= SurfaceDistanceTolerance) return;
             RaycastHit[] hits = Physics.SphereCastAll(lastPosition, radius,
                 displacement / distance, distance, Physics.DefaultRaycastLayers,
-                QueryTriggerInteraction.Ignore);
+                fireSurfaces.Count > 0 ? QueryTriggerInteraction.Collide : QueryTriggerInteraction.Ignore);
             for (int i = 0; i < hits.Length; i++)
             {
                 if (!IsResolutionSurface(hits[i].collider)) continue;
@@ -429,18 +465,34 @@ namespace C6Lab
         private void ConsiderSurface(Collider collider, Vector3 point, float distance,
             ref ResolutionSurface nearest)
         {
-            bool hitTarget = target != null && collider == target.Hitbox;
+            LabJigwiFireSurface fire = FireFor(collider);
+            LabProjectileHitKind kind = fire != null ? LabProjectileHitKind.Fire
+                : target != null && collider == target.Hitbox ? LabProjectileHitKind.Monster : LabProjectileHitKind.Miss;
             if (nearest.Found && distance > nearest.Distance + SurfaceDistanceTolerance) return;
-            if (nearest.Found && Mathf.Abs(distance - nearest.Distance) <= SurfaceDistanceTolerance && !hitTarget) return;
+            if (nearest.Found && Mathf.Abs(distance - nearest.Distance) <= SurfaceDistanceTolerance
+                && (int)kind <= (int)nearest.Kind) return;
             nearest.Found = true;
-            nearest.HitTarget = hitTarget;
+            nearest.Kind = kind;
+            nearest.Fire = fire;
             nearest.Point = point;
             nearest.Distance = distance;
         }
 
         private bool IsResolutionSurface(Collider collider) => collider != null && collider.enabled
-            && collider.gameObject.activeInHierarchy && !collider.isTrigger
-            && ((target != null && collider == target.Hitbox) || collider == missSurface);
+            && collider.gameObject.activeInHierarchy
+            && ((!collider.isTrigger && ((target != null && collider == target.Hitbox) || collider == missSurface))
+                || FireFor(collider) != null);
+
+        private LabJigwiFireSurface FireFor(Collider collider)
+        {
+            for (int i = 0; i < fireSurfaces.Count; i++)
+            {
+                LabJigwiFireSurface fire = fireSurfaces[i];
+                if (fire != null && fire.Active && fire.Hitbox == collider
+                    && (!authoritative || fire.OwnerPlayerId == ownerPlayerId)) return fire;
+            }
+            return null;
+        }
 
         private float WorldRadius
         {
@@ -455,6 +507,9 @@ namespace C6Lab
         {
             previousTargetPose = new SurfacePose(target != null ? target.Hitbox : null);
             previousMissPose = new SurfacePose(missSurface);
+            previousFirePoses.Clear();
+            for (int i = 0; i < fireSurfaces.Count; i++)
+                if (fireSurfaces[i] != null) previousFirePoses.Add(new SurfacePose(fireSurfaces[i].Hitbox));
         }
 
         private void FinishVisual()
@@ -465,7 +520,10 @@ namespace C6Lab
             Destroy(gameObject);
         }
 
-        private void Resolve(bool hit, Vector3 point)
+        private void Resolve(bool hit, Vector3 point) => Resolve(
+            hit ? LabProjectileHitKind.Monster : LabProjectileHitKind.Miss, point, null);
+
+        private void Resolve(LabProjectileHitKind kind, Vector3 point, LabJigwiFireSurface fire)
         {
             if (resolved) return;
             resolved = true;
@@ -479,8 +537,9 @@ namespace C6Lab
             Vector2 startXZ = new Vector2(launchPosition.x, launchPosition.z);
             Vector2 endXZ = new Vector2(point.x, point.z);
             LabProjectileResult result = new LabProjectileResult(projectileId, ownerPlayerId,
-                hit, point, Mathf.Max(0f, Time.time - launchedAt),
-                Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, endXZ), impactVelocity);
+                kind, point, Mathf.Max(0f, Time.time - launchedAt),
+                Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, endXZ), impactVelocity,
+                fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null);
             // Keep the last visible part of the flight briefly. If the callback ends the
             // round, ClearProjectiles also destroys this detached child of projectileRoot.
             LeaveFadingTrail();
