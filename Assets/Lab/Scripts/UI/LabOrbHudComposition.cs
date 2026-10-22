@@ -112,8 +112,10 @@ namespace C6Lab
                 throw new InvalidOperationException("The input camera must see the orb-board foreground layer.");
             for (int i = 0; i < parent.childCount; i++) originalSiblings.Add(parent.GetChild(i));
             RememberRear(paper);
-            Transform backdrop = source.transform.Find("Temporary Board Background");
-            if (backdrop != null) RememberRear(backdrop);
+            // Everything the board camera carries is a backdrop behind the board, whatever its name: the old
+            // temporary background and the Stage1 3D background's opaque "Board Hanji Backing" (#264). Left in
+            // the foreground it would cover the paper and the rear HUD decorations.
+            foreach (Transform backdrop in source.transform) RememberRear(backdrop);
             captured = true;
 
             material = new Material(shader) { name = "Orb HUD foreground composite", hideFlags = HideFlags.HideAndDontSave };
