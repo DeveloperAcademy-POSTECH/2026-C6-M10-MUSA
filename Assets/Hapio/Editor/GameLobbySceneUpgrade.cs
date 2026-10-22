@@ -111,6 +111,7 @@ namespace Hapio.Editor
                 screen.externalNavigation = true;
                 screen.developerButton = view.developerButton;
                 screen.soloButton = view.soloButton;
+                EnsureMenuCamera(scene);
                 EditorUtility.SetDirty(screen); EditorUtility.SetDirty(view);
                 EditorSceneManager.MarkSceneDirty(scene);
                 if (!EditorSceneManager.SaveScene(scene, path)) throw new InvalidOperationException("Could not save " + path);
@@ -120,6 +121,28 @@ namespace Hapio.Editor
                 if (owned && scene.IsValid() && scene.isLoaded) EditorSceneManager.CloseScene(scene, true);
                 if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
             }
+        }
+
+        private static void EnsureMenuCamera(Scene scene)
+        {
+            // Overlay UI does not need a world camera, but the Editor otherwise draws its
+            // "No cameras rendering" warning over the authored Home/Lobby presentation.
+            if (scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<Camera>(true)).Any()) return;
+            var item = new GameObject("Hapio UI Background Camera");
+            SceneManager.MoveGameObjectToScene(item, scene);
+            item.transform.position = new Vector3(0f, 0f, -10f);
+            Camera camera = item.AddComponent<Camera>();
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = Color.black;
+            camera.cullingMask = 0;
+            camera.orthographic = true;
+            camera.orthographicSize = 5f;
+            camera.nearClipPlane = .1f;
+            camera.farClipPlane = 100f;
+            camera.depth = -100f;
+            camera.allowHDR = false;
+            camera.allowMSAA = false;
+            camera.useOcclusionCulling = false;
         }
 
         private static void HideNavigationSiblings(Transform branch, Transform developerPanel)

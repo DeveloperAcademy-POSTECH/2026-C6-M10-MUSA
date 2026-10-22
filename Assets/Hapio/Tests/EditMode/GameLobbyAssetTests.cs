@@ -73,6 +73,21 @@ namespace Hapio.Tests
                 Assert.That(layer.GetSiblingIndex(), Is.GreaterThan(view.transform.GetSiblingIndex()), "The opaque painting must not cover DEV.");
                 Assert.That(scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<LabLobbyView>(true)), Is.Empty);
                 Assert.That(scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<UnityEngine.EventSystems.EventSystem>(true)).Count(), Is.EqualTo(1));
+                Assert.That(screen.GetComponent<Canvas>().renderMode, Is.EqualTo(RenderMode.ScreenSpaceOverlay));
+                Camera[] cameras = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<Camera>(true)).ToArray();
+                Assert.That(cameras.Any(camera => camera.enabled && camera.gameObject.activeInHierarchy
+                    && camera.targetDisplay == 0 && camera.targetTexture == null), Is.True,
+                    "Direct Home/Lobby Play must render Display 1 without the Editor's no-camera warning.");
+                Camera menuCamera = cameras.SingleOrDefault(camera => camera.name == "Hapio UI Background Camera");
+                if (menuCamera != null)
+                {
+                    Assert.That(menuCamera.cullingMask, Is.Zero);
+                    Assert.That(menuCamera.clearFlags, Is.EqualTo(CameraClearFlags.SolidColor));
+                    Assert.That(menuCamera.orthographic, Is.True);
+                    Assert.That(menuCamera.nearClipPlane, Is.GreaterThan(0f));
+                    Assert.That(menuCamera.farClipPlane, Is.GreaterThan(menuCamera.nearClipPlane));
+                    Assert.That(menuCamera.GetComponent<AudioListener>(), Is.Null);
+                }
             }
             finally
             {

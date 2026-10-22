@@ -2449,13 +2449,15 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 | 항목 | 결과 | 근거와 범위 |
 | --- | --- | --- |
 | Unity 컴파일·Prefab·Home/Lobby 저장 | PASS | `GameLobbySceneUpgrade.Upgrade` 실제 실행. 원본 Lab을 저장하지 않고 UI root만 복사. 최초에는 비활성 Browser의 ScrollRect parent 조회를 수정했고 재실행 성공. |
-| 전체 EditMode | **1,034/1,034 PASS** | 실패/건너뜀0,31.29초(최종 소스). 최초1,030/1,032에서 Home/Lobby DEV sibling 순서2건을 발견, 실제 저장 순서를 고친 뒤 전체 재실행. Family TXT/예약 보존·UI 연결·공통 Prefab·196개 설정·기존 Core 포함. |
+| 전체 EditMode | **1,034/1,034 PASS** | 실패/건너뜀0,25.61초(메뉴 카메라 후속 포함). 최초1,030/1,032에서 Home/Lobby DEV sibling 순서2건을 발견, 실제 저장 순서를 고친 뒤 전체 재실행. Family TXT/예약 보존·UI 연결·공통 Prefab·196개 설정·기존 Core 포함. |
 | 로비/검색 집중 PlayMode | **14/14 PASS** | 실패/건너뜀0,25.83초. 실제 native3방 순차 확정/조회·Lab/Game 검색 분리·Home/방 카드/자리/DEV/솔로 UI. |
-| 전체 PlayMode | **345/345 PASS** | 실패/건너뜀0,167.79초. 임시 probe를 제거한 최종 제품 소스로 새 로비·대기 광고·native 검색 구분·기존 전투와3스테이지 전환 전체 검사. |
+| 전체 PlayMode | **345/345 PASS** | 실패/건너뜀0,167.79초. 메뉴 카메라 후속 전, 임시 probe를 제거한 제품 소스로 새 로비·대기 광고·native 검색 구분·기존 전투와3스테이지 전환 전체 검사. |
 | 독립 Mac 개발 앱 | **Host/Client 모두 PASS** | 두 프로세스 종료0, Host17.23초/Client17.12초. 새 UI 콜백·native Bonjour/UDP·196개 설정 확인·전원 로딩 장벽·3스테이지 결과/관람 ACK·두 번째 방·전원 게임 오버/홈 복귀. |
 | iOS/실기기/일반 LAN/핫스팟 | **NOT_RUN** | 실제 실행 증거 없이 PASS로 기록하지 않는다. |
 
 ### 독립 Mac 앱의 실제 범위
+
+아래 Mac 앱 실행은 메뉴 카메라 후속 전 `a4215fc0` 소스의 진단 빌드다. 카메라 후속은 Home/Lobby의 배경 표시만 추가하며 별도 자동 검사와 기존 프로젝트의 Editor Play로 확인한다.
 
 - 두 일반 GUI 앱을390×844로 실행했다. 새 한지 타이틀의 게임 시작 →2인 방과 별도4인 대기 방 생성 → native Bonjour에서 방장 대기 카드 조회 → 생성자의 카드 입장 → 참가자 카드 입장을 확인했다. Direct IP fallback 없이 실제 검색 결과의 UI 콜백을 사용했다.
 - Host는 P2를 선택·해제·재선택하고 참가자는 P1을 선택했다. 같은 Network 연결과196개 설정 확인을 유지한 채 새 봉인 시작 버튼으로 시작했다. 두 앱 모두 구미호/야광귀/지귀의 실제 시간 기반 고유 패턴 상태·각 단계 결과/도색 동기화·관람 텍스처/전원 결과 ACK를 확인했다.
@@ -2470,6 +2472,14 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 - Apple SDK의 `dns_sd.h` 기준으로 Add 없는 성공 등록 콜백은 실제 등록 제거다. 이를 확정으로 처리하지 않는다. 기존 코드는 최초 Add 뒤 `HasAddressOrReply`가 계속 true여서 제거 후 새 Add가 오지 않아도 timeout이 없었다. 제거 시 재확정 대기를 다시8초로 제한하고, 새 이름 Add는 재확정하도록 보완했다. 두 상황은 합성 native 콜백 회귀 검사로 구분한다.
 - 기존 native3방 시험의 동시 OS 자동 이름 변경에서는 선등록 방의 제거 후 재확정이 오지 않는 상황이 두 차례 관찰됐다. 최종3방 시험은 실제 대기 방 생성과 같이 앞 방 확정 뒤 다음 방을 등록한다. 세 방 동시 유지·서로 다른 확정 이름/포트·순번1/2/3·조회 주소 조건은 유지한다. 동시 OS 자동 이름 변경의 회복을 검증했다고 해석하지 않는다. 새 UI의 대기 방은 기존 `NoAutoRename`과 명시적 번호 충돌 재시도를 사용한다.
 - 연결된 로비의 자리 선택 거절 안내가 기본 방 검색 안내에 가려지는 문제를 고쳤다. 검색 안내는 방 목록에서만 우선하며, 실제2인 Host의 P3 선택 거절을 통해 화면 문구를 검사한다.
+
+### Editor 직접 확인 후 메뉴 카메라 보완
+
+기존 Desktop 프로젝트를 기능 브랜치로 열어 Home Play 시 카메라 없는 Overlay 메뉴 위에 Unity의 `No cameras rendering` 안내가 나타남을 확인했다. Home/Lobby에 cullingMask0·SolidColor·AudioListener 없는 UI 배경 카메라만 Unity API로 추가했다. 기존 카메라가 있는 Scene은 교체하지 않는다. 공통 Prefab/배치·Battle/결과 Scene·게임 규칙은 보존했다. 전체 EditMode와 관련 로비/Scene 전환 PlayMode의 후속 결과는 아래에 구분한다.
+
+- 후속 전체 EditMode **1,034/1,034 PASS**,25.61초. Home/Lobby의 실제 enabled Display1 카메라·Overlay Canvas·기존 UI 연결/보존을 검사한다.
+- 후속 확장 PlayMode는 **25/26**(47.32초). 실패1건은 위 기존 native3방 자동 이름 검사로, 첫/세 번째 등록이 같은 이름으로 확정돼 고유 이름 수2가 관찰됐다. 순차 등록에서도 OS 자동 이름 변경의 간헐 문제가 남아 있음을 명시한다. 검사 기대값은 완화하지 않았다. 이 검사를 안정적으로 해결했다거나 전체 검사가 항상 통과한다고 주장하지 않는다.
+- 카메라 후속의 게임 전용 로비·검색 family·3스테이지 전환 검사는 **16/16 PASS**,17.06초,실패/건너뜀0. 새 UI는 기존 NoAutoRename/명시적 번호 재시도 경로를 쓰며, 자동 이름 변경용 별도 native fixture와 구분한다.
 
 ### 보존 확인
 
