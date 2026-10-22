@@ -14,7 +14,7 @@ namespace C6Lab.Tests
             var config = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
-                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(191));
+                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(192), "The yaguang flash (#268) follows at 184-190 and the counting toggle (#271) at 191.");
                 Assert.That(LabConfig.DeveloperFields[177].Label, Is.EqualTo("Charm Rescue Taps (0 = none)"));
                 Assert.That(LabConfig.DeveloperFields.Skip(178).Take(6).Select(field => field.Label), Is.EqualTo(new[]
                 {
@@ -48,11 +48,11 @@ namespace C6Lab.Tests
                 Assert.That(new[] { client.JigwiFireSeconds, client.JigwiOverheatSeconds,
                     client.JigwiGenerationBurnSeconds, client.JigwiRawRadiusScale, client.JigwiRawLifeScale },
                     Is.EqualTo(tail.Skip(1)));
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5657),
-                    Is.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5657)));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5658),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5658)));
                 values[183] = .75f;
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5657),
-                    Is.Not.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5657)));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5658),
+                    Is.Not.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5658)));
             }
             finally { Object.DestroyImmediate(host); Object.DestroyImmediate(client); }
         }
@@ -74,7 +74,7 @@ namespace C6Lab.Tests
                     new Settings { values = host.CaptureDeveloperValues() })).values;
                 Assert.That(client.TryApplyDeveloperValues(received, out error), Is.True, error);
                 Assert.That(client.CaptureDeveloperValues().Skip(178).Take(6), Is.EqualTo(jigwi));
-                Assert.That(client.CaptureDeveloperValues().Skip(184), Is.EqualTo(flash));
+                Assert.That(client.CaptureDeveloperValues().Skip(184).Take(7), Is.EqualTo(flash));
                 Assert.That(client.JigwiFireTargetCount, Is.EqualTo(5));
                 Assert.That(client.YaguangFlashEnabled && client.YaguangFlashTargetOne, Is.True);
                 Assert.That(client.YaguangFlashFirstStartSeconds, Is.EqualTo(6f));

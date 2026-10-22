@@ -314,8 +314,12 @@ namespace C6Lab
         public ulong flashLastTarget;
         public bool flashLastTargetAll;
 
-        /// <summary>이 시각에 섬광 예고 중인지. 요괴는 모두의 화면에서 빼꼼 나온다.</summary>
-        public bool FlashWarningOn(double now) => flashAt > flashWarningAt && now >= flashWarningAt && now < flashAt;
+        /// <summary>
+        /// 이 시각에 섬광 예고 중인지. 요괴는 모두의 화면에서 빼꼼 나온다. 콤보가 진행 중이거나 콤보 예고 중이면 언제나
+        /// false다(#271): Host는 그때 섬광을 미루므로, 늦게 온 스냅샷 때문에 눈 말풍선이 콤보 위에 뜨지 않게 한다.
+        /// </summary>
+        public bool FlashWarningOn(double now) => flashAt > flashWarningAt && now >= flashWarningAt && now < flashAt
+            && !comboActive && !ComboWarningOn(now);
         /// <summary>이 사람이 다음 섬광을 맞는지</summary>
         public bool FlashTargets(ulong player) => flashTargetAll || flashTarget == player;
         /// <summary>이 사람이 마지막 섬광을 맞았는지 (한 번도 안 터졌으면 false)</summary>

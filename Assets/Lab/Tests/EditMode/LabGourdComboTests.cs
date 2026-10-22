@@ -267,9 +267,7 @@ namespace C6Lab.Tests
         public void ASuccessEndsARunningPenalty()
         {
             LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f, warning: 0f);
-            float[] values = config.CaptureDeveloperValues();
-            values[157] = 3f; // a new combo every 3 seconds
-            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Times(config, interval: 3f); // a new combo every 3 seconds
             var model = new LabModel();
             model.Begin("combo-latest", new ulong[] { 10, 20 }, 0d, config);
 
@@ -354,9 +352,7 @@ namespace C6Lab.Tests
         public void ALateFinishStillLeavesTheWholeWarningBeforeTheNextCombo()
         {
             LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f);
-            float[] values = config.CaptureDeveloperValues();
-            values[157] = 1.5f; // the next combo would be due before this one even ends
-            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Times(config, interval: 1.5f); // the next combo would be due before this one even ends
             var model = new LabModel();
             model.Begin("combo-late-warning", new ulong[] { 10, 20 }, 0d, config);
 
@@ -375,9 +371,7 @@ namespace C6Lab.Tests
         public void AZeroWarningMeansTheComboAppearsWithoutOne()
         {
             LabConfig config = Config(enabled: true, firstStart: 1f, timeLimit: 1f, warning: 0f);
-            float[] values = config.CaptureDeveloperValues();
-            values[157] = 1f; // due exactly when the first one times out at 2 s
-            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Times(config, interval: 1f); // due exactly when the first one times out at 2 s
             var model = new LabModel();
             model.Begin("combo-no-warning", new ulong[] { 10, 20 }, 0d, config);
 
@@ -451,17 +445,30 @@ namespace C6Lab.Tests
             values[74] = LabModel.MaximumParticipants;
             values[87] = 0f;   // no gourd bombs
             values[88] = 0f;
+            values[152] = 0f;  // no swipe blocks: the yaguang mode (#271) would hold the combo while one is on
             values[39] = 50; values[40] = 50; values[41] = 0; values[42] = 0; values[43] = 0; values[44] = 0;
             values[155] = enabled ? 1f : 0f;
-            values[156] = firstStart;
+            values[156] = 20f;
             values[157] = 40f; // the rule tests below count a 40-second interval and a 10-second penalty
-            values[158] = timeLimit; // and reward, whatever the defaults are
+            values[158] = 10f; // and reward, whatever the defaults are
             values[159] = 10f;
             values[161] = throwerOnly ? 1f : 0f;
             values[162] = 10f;
             values[164] = warning;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            // The rules are checked with times outside the DEV sliders (#271 centred them on the defaults),
+            // so these go straight onto the asset fields; the model accepts them as before.
+            Times(config, firstStart: firstStart, timeLimit: timeLimit);
             return config;
+        }
+
+        private static void Times(LabConfig config, float? firstStart = null, float? interval = null, float? timeLimit = null)
+        {
+            var parts = new List<string>();
+            if (firstStart.HasValue) parts.Add("\"comboFirstStartSeconds\":" + firstStart.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (interval.HasValue) parts.Add("\"comboRepeatIntervalSeconds\":" + interval.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (timeLimit.HasValue) parts.Add("\"comboTimeLimitSeconds\":" + timeLimit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            JsonUtility.FromJsonOverwrite("{" + string.Join(",", parts) + "}", config);
         }
     }
 }

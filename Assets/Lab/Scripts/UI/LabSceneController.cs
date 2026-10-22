@@ -79,6 +79,9 @@ namespace C6Lab
             // 폭탄 "뻥이요" (내 판에서 폭탄이 터질 때, 그 판 주인 기기만)
             if (boardNetwork != null && GetComponent<LabBombSound>() == null)
                 gameObject.AddComponent<LabBombSound>().Bind(boardNetwork);
+            // 콤보 성공 추임새 "좋다" (#271, 팀 전체 성공이라 모든 기기)
+            if (boardNetwork != null && GetComponent<LabComboClearSound>() == null)
+                gameObject.AddComponent<LabComboClearSound>().Bind(boardNetwork);
             // 햅틱 (내 구슬 생성, 내가 던진 구슬 타격)
             if (boardNetwork != null && GetComponent<LabHaptics>() == null)
                 gameObject.AddComponent<LabHaptics>().Bind(boardNetwork, board);

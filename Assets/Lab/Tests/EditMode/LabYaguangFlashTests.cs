@@ -21,7 +21,7 @@ namespace C6Lab.Tests
         [Test]
         public void FlashFieldsAreKoreanStartOffAndShareTheYaguangGroupWithTheCombo()
         {
-            LabDeveloperField[] flash = LabConfig.DeveloperFields.Skip(184).ToArray();
+            LabDeveloperField[] flash = LabConfig.DeveloperFields.Skip(184).Take(7).ToArray();
             Assert.That(flash.Select(field => field.Label), Is.EqualTo(new[]
             {
                 "야광귀 섬광 (0 off, 1 on)", "섬광 대상 (0 모두, 1 한 명)", "섬광 첫 시작 (초)", "섬광 간격 (초)",
@@ -31,7 +31,7 @@ namespace C6Lab.Tests
             Assert.That(new[] { flash[0].OffText, flash[0].OnText }, Is.EqualTo(new[] { "끔", "켬" }));
             Assert.That(new[] { flash[1].OffText, flash[1].OnText }, Is.EqualTo(new[] { "모두", "한 명" }));
             Assert.That(flash.Skip(2).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
-            float[] defaults = { 31f, 60f, 2f, 7f, 2f };
+            float[] defaults = { 10f, 60f, 3f, 7f, 2f };
             for (int i = 0; i < defaults.Length; i++)
                 Assert.That((flash[i + 2].Min + flash[i + 2].Max) * .5f, Is.EqualTo(defaults[i]),
                     flash[i + 2].Label + ": every slider starts in the middle of its range.");
@@ -40,9 +40,10 @@ namespace C6Lab.Tests
                 "The combo moved into the 야광귀 group.");
             LabDeveloperCategory yaguang = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀");
             Assert.That(yaguang.FieldIndices, Is.EqualTo(new[]
-                { 155, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190 }));
+                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190 }),
+                "The yaguang counting toggle (#271) sits right under the combo switch.");
             Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 184 }), "One switch turns the combo and the flash on together.");
-            Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 10 }));
+            Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 11 }));
             Assert.That(yaguang.DividerLabels, Is.EqualTo(new[] { "── 콤보 ──", "── 섬광 ──" }));
             foreach (int index in new[] { 159, 162 })
                 Assert.That((LabConfig.DeveloperFields[index].Min + LabConfig.DeveloperFields[index].Max) * .5f, Is.EqualTo(15f),
@@ -55,9 +56,9 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(184), Is.EqualTo(new[] { 0f, 0f, 31f, 60f, 2f, 7f, 2f }),
-                    "Off by default; once on, everyone flashes at 31 s and every 60 s, 19 s before each combo, "
-                    + "with a 2 s warning, 7 s of glare and 2 s to recover.");
+                Assert.That(source.CaptureDeveloperValues().Skip(184).Take(7), Is.EqualTo(new[] { 0f, 0f, 10f, 60f, 3f, 7f, 2f }),
+                    "Off by default; once on, everyone flashes at 10 s (so the round does not open empty, #271) and every 60 s, "
+                    + "with a 3 s warning (yellow eyes for most of it), 7 s of glare and 2 s to recover.");
 
             float[] values = config.CaptureDeveloperValues();
             values[184] = 1f; values[185] = 1f; values[186] = 5f; values[187] = 24f;
@@ -144,6 +145,51 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void AFlashOnHostZeroLeavesTheOtherScreenFreeForItsOwnBomb()
+        {
+            LabConfig config = Config(flash: true, one: true, first: 1f, warning: 0f, bombEvery: 2f);
+            bool checkedHost = false;
+            for (int seed = 0; seed < 64 && !checkedHost; seed++)
+            {
+                var model = new LabModel();
+                model.Begin("flash-zero-screen-" + seed, new ulong[] { 0, 20 }, 0d, config);
+                var flashed = model.Snapshot(1d);
+                if (flashed.flashLastTarget != 0) continue;
+                Assert.That(flashed.flashCount, Is.EqualTo(1u));
+                Assert.That(flashed.flashLastTargetAll, Is.False);
+                var during = model.Snapshot(2d);
+                var bomb = during.orbs.Single(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd);
+                Assert.That(bomb.owner, Is.EqualTo(20ul),
+                    "Host zero is a single busy screen, not an ALL flash that blocks both screens.");
+                checkedHost = true;
+            }
+            Assert.That(checkedHost, Is.True);
+        }
+
+        [Test]
+        public void HostZeroCanReceiveTheFirstFlashWhenItIsTheOnlyFreeScreen()
+        {
+            LabConfig config = Config(flash: true, one: true, first: 15f, bombEvery: 10f);
+            bool checkedHost = false;
+            for (int seed = 0; seed < 64 && !checkedHost; seed++)
+            {
+                var model = new LabModel();
+                model.Begin("flash-zero-only-free-" + seed, new ulong[] { 0, 20 }, 0d, config);
+                var before = model.Snapshot(10d);
+                if (before.orbs.Single(orb => orb.kind == LabOrbKind.Bomb).owner != 20ul) continue;
+                var warning = model.Snapshot(13.6d);
+                Assert.That(warning.FlashWarningOn(13.6d), Is.True);
+                Assert.That(warning.flashTarget, Is.Zero);
+                Assert.That(warning.flashTargetAll, Is.False);
+                var flashed = model.Snapshot(15d);
+                Assert.That(flashed.LastFlashHit(0), Is.True);
+                Assert.That(flashed.LastFlashHit(20), Is.False);
+                checkedHost = true;
+            }
+            Assert.That(checkedHost, Is.True);
+        }
+
+        [Test]
         public void FlashScheduleAndJigwiFireCoexistWithoutChangingFireConsumptionOrExpiry()
         {
             LabConfig config = Config(flash: true, first: 5f, warning: 0f);
@@ -174,22 +220,250 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheFlashWaitsOutTheComboThenWarnsAgainInFull()
+        public void TheFlashWaitsOutTheComboAndItsPenaltyThenWarnsAgainInFull()
         {
             var model = new LabModel();
             // The combo's warning starts at 27 s and its slots stay up until 40 s; the flash is due at 31 s.
+            // Nobody clears it, so everyone is SMALL for 15 s after the 40 s timeout.
             model.Begin("flash-combo", Three, 0d, Config(flash: true, first: 31f, combo: true));
-            Assert.That(model.Snapshot(26d).flashAt, Is.EqualTo(31d));
+            Assert.That(model.Snapshot(20d).flashAt, Is.EqualTo(-1d),
+                "Already known to wait for the combo, so no device is told a time to peek out (#271).");
             LabSnapshot held = model.Snapshot(29.6d);
             Assert.That(held.flashAt, Is.EqualTo(-1d), "No flash warning over the combo warning.");
             Assert.That(model.Snapshot(35d).flashCount, Is.Zero, "Nor during the combo.");
-            LabSnapshot after = model.Snapshot(40.5d);
-            Assert.That(after.comboActive, Is.False);
-            Assert.That(after.flashCount, Is.Zero, "It does not go off late, without a warning.");
-            Assert.That(new[] { after.flashWarningAt, after.flashAt }, Is.EqualTo(new[] { 40.5d, 42d }),
-                "The full 1.5 s warning starts once the combo is over.");
-            Assert.That(model.Snapshot(42d).flashCount, Is.EqualTo(1u));
+            LabSnapshot penalty = model.Snapshot(40.5d);
+            Assert.That(penalty.comboActive, Is.False);
+            Assert.That(penalty.players.All(player => player.comboPenaltyUntil == 55d), Is.True);
+            Assert.That(penalty.flashAt, Is.EqualTo(-1d), "Nor over the combo penalty (#271).");
+            Assert.That(model.Snapshot(54.9d).flashCount, Is.Zero);
+            LabSnapshot resting = model.Snapshot(55.5d);
+            Assert.That(resting.flashCount, Is.Zero, "It does not go off late, without a warning.");
+            Assert.That(resting.flashAt, Is.EqualTo(-1d), "The screens rest 3 s after the penalty (#271).");
+            Assert.That(model.Snapshot(57.9d).flashAt, Is.EqualTo(-1d));
+            LabSnapshot after = model.Snapshot(58d);
+            Assert.That(new[] { after.flashWarningAt, after.flashAt }, Is.EqualTo(new[] { 58d, 59.5d }),
+                "The full 1.5 s warning starts 3 s after the penalty is over.");
+            Assert.That(model.Snapshot(59.5d).flashCount, Is.EqualTo(1u));
         }
+
+        [Test]
+        public void AFlashThatEndsBeforeTheComboWarningGoesAheadAsPlanned()
+        {
+            var model = new LabModel();
+            // Warning 18.5 s, flash 20 s, glare and recovery over at 24.5 s, 3 s rest to 27.5 s: just past the combo warning at 27 s.
+            model.Begin("flash-before-combo", Three, 0d, Config(flash: true, first: 20f, combo: true));
+            Assert.That(model.Snapshot(18.6d).FlashWarningOn(18.6d), Is.True);
+            LabSnapshot flashed = model.Snapshot(20d);
+            Assert.That(flashed.flashCount, Is.EqualTo(1u));
+            Assert.That(flashed.flashLastAt, Is.EqualTo(20d));
+            Assert.That(model.Snapshot(26d).ComboWarningOn(26d), Is.False);
+            Assert.That(model.Snapshot(27d).ComboWarningOn(27d), Is.False, "Still resting at its planned warning time.");
+            LabSnapshot warned = model.Snapshot(27.5d);
+            Assert.That(new[] { warned.comboWarningAt, warned.comboNextAt }, Is.EqualTo(new[] { 27.5d, 30.5d }),
+                "The combo waits only for the 3 s rest after the flash, then warns in full.");
+            Assert.That(model.Snapshot(30.5d).comboActive, Is.True);
+        }
+
+        [Test]
+        public void AFlashThatStartsFirstTakesItsTurnAndTheComboWaitsForIt()
+        {
+            var model = new LabModel();
+            // Flash warning from 23.5 s, flash at 25 s, glare and recovery over at 29.5 s. The combo would warn from 27 s.
+            // Whoever starts first goes first (#271): the flash no longer steps aside for a combo that is merely coming up.
+            model.Begin("flash-into-combo", Three, 0d, Config(flash: true, first: 25f, combo: true));
+            LabSnapshot early = model.Snapshot(10d);
+            Assert.That(early.flashAt, Is.EqualTo(25d), "The flash comes on time.");
+            Assert.That(early.comboNextAt, Is.EqualTo(-1d), "The combo is not announced: it will wait for the flash.");
+            Assert.That(model.Snapshot(23.6d).FlashWarningOn(23.6d), Is.True);
+            Assert.That(model.Snapshot(25d).flashCount, Is.EqualTo(1u));
+            LabSnapshot during = model.Snapshot(27.5d);
+            Assert.That(during.ComboWarningOn(27.5d), Is.False, "No combo warning over the glare.");
+            Assert.That(during.comboActive, Is.False);
+            model.Snapshot(29.4d);
+            Assert.That(model.Snapshot(29.6d).ComboWarningOn(29.6d), Is.False, "3 s rest after the flash (#271).");
+            Assert.That(model.Snapshot(32.4d).ComboWarningOn(32.4d), Is.False);
+            LabSnapshot warned = model.Snapshot(32.6d);
+            Assert.That(new[] { warned.comboWarningAt, warned.comboNextAt }, Is.EqualTo(new[] { 32.6d, 35.6d }),
+                "Once the flash and its rest are over, the combo's full warning, then the combo.");
+            Assert.That(model.Snapshot(35.6d).comboActive, Is.True);
+        }
+
+        [Test]
+        public void AWaitingFlashKeepsNewBombsOffSoItIsNotPushedBackAgainAndAgain()
+        {
+            var model = new LabModel();
+            // Bombs every 10 s, each out for 15 s, so some screen nearly always has one. The flash is due at 15 s.
+            model.Begin("flash-queue", Three, 0d, Config(flash: true, first: 15f, bombEvery: 10f));
+            Assert.That(GourdBombs(model.Snapshot(10d)), Is.EqualTo(1));
+            Assert.That(model.Snapshot(13.6d).flashAt, Is.EqualTo(-1d), "Held by the first bomb.");
+            Assert.That(GourdBombs(model.Snapshot(20d)), Is.EqualTo(1), "The second bomb waits while the flash waits for its turn.");
+            model.Snapshot(25d);
+            LabSnapshot resting = model.Snapshot(25.5d);
+            Assert.That(GourdBombs(resting), Is.Zero);
+            Assert.That(resting.flashAt, Is.EqualTo(-1d), "That screen rests 3 s after its bomb.");
+            LabSnapshot warned = model.Snapshot(28d);
+            Assert.That(new[] { warned.flashWarningAt, warned.flashAt }, Is.EqualTo(new[] { 28d, 29.5d }),
+                "Right after that rest the flash takes its turn.");
+            Assert.That(model.Snapshot(29.5d).flashCount, Is.EqualTo(1u));
+            Assert.That(GourdBombs(model.Snapshot(33d)), Is.Zero, "Nothing new during the glare and recovery (over at 34 s)...");
+            Assert.That(GourdBombs(model.Snapshot(36.9d)), Is.Zero, "...nor during the 3 s rest after it.");
+            Assert.That(GourdBombs(model.Snapshot(37d)), Is.EqualTo(1), "Then the waiting bomb drops.");
+        }
+
+        [TestCase("round-a")]
+        [TestCase("round-b")]
+        [TestCase("round-c")]
+        public void WithTheDefaultsTheRoundOpensEarlyRestsBetweenEventsAndFlashesAsOftenAsCombos(string id)
+        {
+            var config = ScriptableObject.CreateInstance<LabConfig>();
+            created.Add(config);
+            float[] values = config.CaptureDeveloperValues();
+            values[155] = 1f; // 야광귀 on: combo and flash with the default gourd bombs and swipe blocks
+            values[184] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            var model = new LabModel();
+            model.Begin(id, Three, 0d, config);
+            LabSnapshot last = null;
+            var open = new Dictionary<ulong, bool>();
+            var closedAt = new Dictionary<ulong, double>();
+            double firstEvent = -1d, shortestRest = double.PositiveInfinity;
+            for (double at = 0d; at <= 180d; at += .1d)
+            {
+                last = model.Snapshot(at);
+                foreach (ulong player in Three)
+                {
+                    bool now = ScreenBusy(last, player, at);
+                    bool was = open.TryGetValue(player, out bool before) && before;
+                    if (now && firstEvent < 0d) firstEvent = at;
+                    if (now && !was && closedAt.TryGetValue(player, out double closed))
+                        shortestRest = System.Math.Min(shortestRest, at - closed);
+                    if (!now && was) closedAt[player] = at;
+                    open[player] = now;
+                }
+            }
+            Assert.That(firstEvent, Is.InRange(5d, 9d), "The round opens with the yaguang's first flash warning at 7 s (#271).");
+            Assert.That(shortestRest, Is.GreaterThan(2.85d), "Every screen rests about 3 s between two events (#271).");
+            Assert.That(last.flashCount, Is.EqualTo(3u), "A flash about every 60 s, as set.");
+            Assert.That(last.comboCount, Is.InRange(2u, 3u));
+            Assert.That(System.Math.Abs((int)last.flashCount - (int)last.comboCount), Is.InRange(0, 1),
+                "Neither event crowds the other out (#271).");
+        }
+
+        [Test]
+        public void NoWarningShowsWhileTheComboIsUpEvenFromALateSnapshot()
+        {
+            var snapshot = new LabSnapshot
+            {
+                phase = LabPhase.Playing, flashWarningAt = 10d, flashAt = 12d, comboActive = true
+            };
+            Assert.That(snapshot.FlashWarningOn(11d), Is.False, "No eyes over a running combo.");
+            snapshot.comboActive = false;
+            snapshot.comboWarningAt = 10.5d;
+            snapshot.comboNextAt = 13d;
+            Assert.That(snapshot.FlashWarningOn(11d), Is.False, "Nor over the combo warning.");
+            snapshot.comboWarningAt = snapshot.comboNextAt = -1d;
+            Assert.That(snapshot.FlashWarningOn(11d), Is.True);
+        }
+
+        [Test]
+        public void ABombDueDuringAFlashWaitsUntilTheFlashIsOver()
+        {
+            var model = new LabModel();
+            // Flash: warning 22.5 s, flash 24 s, glare and recovery over at 28.5 s. The gourd's bomb is due at 25 s.
+            model.Begin("flash-then-bomb", Three, 0d, Config(flash: true, first: 24f, bombEvery: 25f));
+            Assert.That(model.Snapshot(22.6d).FlashWarningOn(22.6d), Is.True);
+            Assert.That(model.Snapshot(24d).flashCount, Is.EqualTo(1u));
+            Assert.That(GourdBombs(model.Snapshot(25d)), Is.Zero, "No bomb while the flash is open (#271).");
+            Assert.That(GourdBombs(model.Snapshot(28.4d)), Is.Zero);
+            Assert.That(GourdBombs(model.Snapshot(28.6d)), Is.Zero, "The screens rest 3 s after the flash (#271).");
+            Assert.That(GourdBombs(model.Snapshot(31.4d)), Is.Zero);
+            LabSnapshot after = model.Snapshot(31.5d);
+            Assert.That(GourdBombs(after), Is.EqualTo(1), "It drops as soon as that rest is over.");
+            Assert.That(after.orbs.Single(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd).createdAt,
+                Is.EqualTo(31.5d));
+        }
+
+        [Test]
+        public void AFlashWaitsWhileTheGourdsBombIsStillOnABoard()
+        {
+            var model = new LabModel();
+            // The bomb drops at 30 s and blasts at the end of its 15 s fuse (45 s). The everyone-flash is due at 40 s.
+            model.Begin("bomb-then-flash", Three, 0d, Config(flash: true, first: 40f, bombEvery: 30f));
+            Assert.That(GourdBombs(model.Snapshot(30d)), Is.EqualTo(1));
+            LabSnapshot held = model.Snapshot(38.6d);
+            Assert.That(held.flashAt, Is.EqualTo(-1d), "No eyes while the bomb is out on one of the screens.");
+            Assert.That(model.Snapshot(44.9d).flashCount, Is.Zero);
+            model.Snapshot(45d);
+            LabSnapshot resting = model.Snapshot(46d);
+            Assert.That(GourdBombs(resting), Is.Zero);
+            Assert.That(resting.flashAt, Is.EqualTo(-1d), "That screen rests 3 s after its bomb (#271).");
+            LabSnapshot after = model.Snapshot(48d);
+            Assert.That(new[] { after.flashWarningAt, after.flashAt }, Is.EqualTo(new[] { 48d, 49.5d }),
+                "Once the bomb is gone and the screen has rested, the full warning, then the flash.");
+        }
+
+        [Test]
+        public void AComboWaitsWhileTheGourdsBombIsStillOnABoard()
+        {
+            var model = new LabModel();
+            // The bomb drops at 20 s and is gone at 35 s. The combo (on every screen) is due to warn at 27 s.
+            model.Begin("bomb-then-combo", Three, 0d, Config(combo: true, bombEvery: 20f));
+            Assert.That(model.Snapshot(20d).comboNextAt, Is.EqualTo(-1d), "Not announced while the bomb is out.");
+            LabSnapshot held = model.Snapshot(30d);
+            Assert.That(held.comboActive, Is.False, "No combo over the bomb (#271).");
+            Assert.That(held.ComboWarningOn(30d), Is.False);
+            model.Snapshot(35d);
+            Assert.That(model.Snapshot(35.5d).ComboWarningOn(35.5d), Is.False, "3 s rest after the bomb (#271).");
+            LabSnapshot warned = model.Snapshot(38d);
+            Assert.That(new[] { warned.comboWarningAt, warned.comboNextAt }, Is.EqualTo(new[] { 38d, 41d }));
+            Assert.That(model.Snapshot(41d).comboActive, Is.True);
+        }
+
+        [Test]
+        public void EachScreenHoldsOneEventSoASecondBombGoesToAFreeScreen()
+        {
+            var model = new LabModel();
+            // Bombs every 5 s with a 15 s fuse: the first is still out when the second comes (#271, one event per screen).
+            model.Begin("bomb-per-screen", Three, 0d, Config(flash: true, first: 61f, bombEvery: 5f));
+            Assert.That(GourdBombs(model.Snapshot(5d)), Is.EqualTo(1));
+            LabSnapshot two = model.Snapshot(10d);
+            LabOrbState[] bombs = two.orbs.Where(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd).ToArray();
+            Assert.That(bombs.Length, Is.EqualTo(2), "Another screen is free, so the second bomb still drops.");
+            Assert.That(bombs[0].owner, Is.Not.EqualTo(bombs[1].owner), "Never two bombs on one screen.");
+            Assert.That(GourdBombs(model.Snapshot(15d)), Is.EqualTo(3));
+            // At 20 s every screen still has a bomb when the fourth is due, so it waits; the first then blasts.
+            Assert.That(GourdBombs(model.Snapshot(20d)), Is.EqualTo(2), "The fourth waited; the first one is gone.");
+            Assert.That(GourdBombs(model.Snapshot(20.1d)), Is.EqualTo(2), "That screen rests 3 s first (#271).");
+            Assert.That(GourdBombs(model.Snapshot(22.9d)), Is.EqualTo(2));
+            LabSnapshot freed = model.Snapshot(23d);
+            Assert.That(GourdBombs(freed), Is.EqualTo(3), "It drops as soon as a screen is free again.");
+            Assert.That(freed.orbs.Where(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd)
+                .Max(orb => orb.createdAt), Is.EqualTo(23d));
+        }
+
+        [Test]
+        public void AOnePlayerFlashPicksAScreenWithoutAnEvent()
+        {
+            var model = new LabModel();
+            // A bomb sits on one screen from 10 s to 25 s; a one-player flash warns from 13.5 s.
+            model.Begin("one-flash-free-screen", Three, 0d, Config(flash: true, one: true, first: 15f, bombEvery: 10f));
+            ulong holder = model.Snapshot(10d).orbs.Single(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd).owner;
+            LabSnapshot warned = model.Snapshot(13.6d);
+            Assert.That(warned.FlashWarningOn(13.6d), Is.True, "Other screens are free, so the flash goes ahead.");
+            Assert.That(warned.flashTarget, Is.Not.EqualTo(holder), "Not on the screen that has the bomb.");
+            Assert.That(model.Snapshot(15d).flashLastTarget, Is.EqualTo(warned.flashTarget));
+        }
+
+        // 기본값(눈부심 7초 + 회복 2초)으로 이 사람 화면에 이벤트가 열려 있는지
+        private static bool ScreenBusy(LabSnapshot snapshot, ulong player, double at) =>
+            snapshot.orbs.Any(orb => orb.owner == player && orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd)
+            || snapshot.SwipeBlockOn(player) || snapshot.FlashWarningOn(at) || snapshot.ComboWarningOn(at) || snapshot.comboActive
+            || (snapshot.flashLastAt >= 0d && at < snapshot.flashLastAt + 9d
+                && (snapshot.flashLastTargetAll || snapshot.flashLastTarget == player))
+            || snapshot.players.Any(state => state.id == player && (state.comboPenaltyUntil > at || state.comboRewardUntil > at));
+
+        private static int GourdBombs(LabSnapshot snapshot) =>
+            snapshot.orbs.Count(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd);
 
         [Test]
         public void AShortIntervalStillLeavesTheGlareRecoveryAndNextWarningApart()
@@ -204,10 +478,10 @@ namespace C6Lab.Tests
         public void TheEyesStayPlainThenLightUpSuddenlyBeforeTheFlash()
         {
             Assert.That(LabYaguangFlashHud.EyeGlowAt(0f), Is.Zero);
-            Assert.That(LabYaguangFlashHud.EyeGlowAt(.45f), Is.Zero, "Plain eyes for the first part of the warning.");
-            Assert.That(LabYaguangFlashHud.EyeGlowAt(.575f), Is.EqualTo(.5f).Within(1e-4f));
-            Assert.That(LabYaguangFlashHud.EyeGlowAt(.7f), Is.EqualTo(1f), "Fully lit quickly...");
-            Assert.That(LabYaguangFlashHud.EyeGlowAt(1f), Is.EqualTo(1f), "...and held until the flash.");
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(.3f), Is.Zero, "Plain eyes for the first 30% of the warning.");
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(.375f), Is.EqualTo(.5f).Within(1e-4f));
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(.45f), Is.EqualTo(1f), "Fully lit quickly...");
+            Assert.That(LabYaguangFlashHud.EyeGlowAt(1f), Is.EqualTo(1f), "...and held for the last 55% to enjoy.");
         }
 
         [Test]
@@ -247,13 +521,14 @@ namespace C6Lab.Tests
         }
 
         private LabConfig Config(bool flash = false, bool one = false, float first = 30f, float interval = 60f,
-            bool combo = false, float warning = 1.5f, float glare = 3f, float recovery = 1.5f)
+            bool combo = false, float warning = 1.5f, float glare = 3f, float recovery = 1.5f, float bombEvery = 0f)
         {
             var config = ScriptableObject.CreateInstance<LabConfig>();
             created.Add(config);
             float[] values = config.CaptureDeveloperValues();
-            values[87] = 0f; // no gourd bombs
-            values[88] = 0f;
+            values[87] = bombEvery; // 0: no gourd bombs
+            values[88] = bombEvery;
+            values[152] = 0f; // no swipe blocks unless a test turns them on
             values[155] = combo ? 1f : 0f;
             values[156] = 30f; // combo slots at 30 s, warned from 27 s
             values[157] = 60f;
@@ -261,12 +536,14 @@ namespace C6Lab.Tests
             values[164] = 3f;
             values[184] = flash ? 1f : 0f;
             values[185] = one ? 1f : 0f;
-            values[186] = first;
+            values[186] = 10f; // DEV slider 1–19; the rule tests below set other times directly
             values[187] = interval;
             values[188] = warning;
             values[189] = glare;
             values[190] = recovery;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            JsonUtility.FromJsonOverwrite("{\"yaguangFlashFirstStartSeconds\":"
+                + first.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}", config);
             return config;
         }
     }

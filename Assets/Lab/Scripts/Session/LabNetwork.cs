@@ -196,13 +196,14 @@ namespace C6Lab
         // 5655: #272 per-player Jigwi fire targets and independent Raw burn metadata, DEV 178-183.
         // 5657: #268 flash settings appended after Jigwi (DEV 184-190), explicit ALL target flags;
         //       shared schema 191. 5656 is reserved by the parallel #271 branch.
-        internal const ushort LabProtocolVersion = 5657;
+        // 5658: #271 counting presentation appended at DEV 191 (192 values); fast combo control metadata.
+        internal const ushort LabProtocolVersion = 5658;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/18");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/19");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

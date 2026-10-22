@@ -33,6 +33,16 @@ namespace C6Lab
         public ulong flashTarget, flashLastTarget;
         public bool flashTargetAll, flashLastTargetAll;
         public uint flashCount;
+        /// <summary>Explicit presence keeps an omitted header from clearing a matched shared snapshot.</summary>
+        public bool hasComboState;
+        public bool comboActive;
+        public LabOrbElement[] comboColors = Array.Empty<LabOrbElement>();
+        public int comboProgress;
+        public double comboStartedAt = -1d, comboEndsAt = -1d, comboResultAt = -1d;
+        public double comboNextAt = -1d, comboWarningAt = -1d;
+        public uint comboCount, comboResultCount;
+        public LabComboResult comboResult;
+        public ulong comboFailedBy;
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
         public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
 
@@ -43,6 +53,7 @@ namespace C6Lab
             copy.removedIds = Array.Empty<string>();
             copy.players = Array.Empty<LabPlayerState>();
             copy.jigwi = LabJigwiNetworkValidation.Copy(jigwi);
+            copy.comboColors = comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])comboColors.Clone();
             return copy;
         }
     }
@@ -108,6 +119,13 @@ namespace C6Lab
                 flashTarget = snapshot.flashTarget, flashTargetAll = snapshot.flashTargetAll,
                 flashCount = snapshot.flashCount, flashLastAt = snapshot.flashLastAt,
                 flashLastTarget = snapshot.flashLastTarget, flashLastTargetAll = snapshot.flashLastTargetAll,
+                hasComboState = true, comboActive = snapshot.comboActive,
+                comboColors = snapshot.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])snapshot.comboColors.Clone(),
+                comboProgress = snapshot.comboProgress, comboStartedAt = snapshot.comboStartedAt,
+                comboEndsAt = snapshot.comboEndsAt, comboCount = snapshot.comboCount,
+                comboResult = snapshot.comboResult, comboResultCount = snapshot.comboResultCount,
+                comboResultAt = snapshot.comboResultAt, comboFailedBy = snapshot.comboFailedBy,
+                comboNextAt = snapshot.comboNextAt, comboWarningAt = snapshot.comboWarningAt,
                 targetYawDegrees = snapshot.targetYawDegrees,
                 targetYawSpeedDegreesPerSecond = snapshot.targetYawSpeedDegreesPerSecond,
                 targetRopeCycleElapsed = snapshot.targetRopeCycleElapsed,
@@ -230,6 +248,7 @@ namespace C6Lab
         /// <summary>
         /// Copy the shared snapshot and replace only local-board/control data. In particular this
         /// never manufactures paint progress, HP, combo outcomes or a Victory/Defeat transition.
+        /// Combo control metadata is copied only from an explicit authoritative header.
         /// </summary>
         public LabSnapshot Overlay(LabSnapshot snapshot)
         {
@@ -267,6 +286,17 @@ namespace C6Lab
                 copy.flashTarget = header.flashTarget; copy.flashTargetAll = header.flashTargetAll;
                 copy.flashCount = header.flashCount; copy.flashLastAt = header.flashLastAt;
                 copy.flashLastTarget = header.flashLastTarget; copy.flashLastTargetAll = header.flashLastTargetAll;
+                if (header.hasComboState)
+                {
+                    // Copy Host control state, never infer progress from a locally presented hit.
+                    copy.comboActive = header.comboActive;
+                    copy.comboColors = (LabOrbElement[])header.comboColors.Clone();
+                    copy.comboProgress = header.comboProgress; copy.comboCount = header.comboCount;
+                    copy.comboStartedAt = header.comboStartedAt; copy.comboEndsAt = header.comboEndsAt;
+                    copy.comboResult = header.comboResult; copy.comboResultCount = header.comboResultCount;
+                    copy.comboResultAt = header.comboResultAt; copy.comboFailedBy = header.comboFailedBy;
+                    copy.comboNextAt = header.comboNextAt; copy.comboWarningAt = header.comboWarningAt;
+                }
                 copy.targetYawDegrees = header.targetYawDegrees;
                 copy.targetYawSpeedDegreesPerSecond = header.targetYawSpeedDegreesPerSecond;
                 copy.targetRopeCycleElapsed = header.targetRopeCycleElapsed;
@@ -325,6 +355,7 @@ namespace C6Lab
             && Finite(frame.charmStartedAt) && Finite(frame.charmUntil) && frame.charmTaps >= 0
             && Finite(frame.targetYawDegrees) && Finite(frame.targetYawSpeedDegreesPerSecond)
             && Finite(frame.targetRopeCycleElapsed) && Finite(frame.targetRopeHitOffset) && Finite(frame.targetRopeHitVelocity)
+            && LabComboNetworkValidation.Valid(frame)
             && LabFlashNetworkValidation.Valid(frame)
             && LabJigwiNetworkValidation.Valid(frame.jigwi)
             && ValidStates(frame.states, true) && ValidRemoved(frame.removedIds) && ValidPlayers(frame.players);
@@ -410,6 +441,23 @@ namespace C6Lab
             && ValidTimes(value.flashWarningAt, value.flashAt, value.flashLastAt);
         private static bool ValidTimes(double warningAt, double flashAt, double lastAt) =>
             Finite(warningAt) && Finite(flashAt) && Finite(lastAt) && flashAt >= -1d && lastAt >= -1d;
+        private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+    }
+
+    public static class LabComboNetworkValidation
+    {
+        public static bool Valid(LabBoardFrame value)
+        {
+            if (value == null) return false;
+            if (!value.hasComboState) return true;
+            if (value.comboColors == null || (value.comboColors.Length != 0 && value.comboColors.Length != LabGourdCombo.Length)
+                || value.comboActive && value.comboColors.Length != LabGourdCombo.Length
+                || value.comboColors.Any(color => color < LabOrbElement.Fire || color > LabOrbElement.Earth)
+                || value.comboProgress < 0 || value.comboProgress > LabGourdCombo.Length
+                || value.comboResult < LabComboResult.None || value.comboResult > LabComboResult.Timeout) return false;
+            return Finite(value.comboStartedAt) && Finite(value.comboEndsAt) && Finite(value.comboResultAt)
+                && Finite(value.comboNextAt) && Finite(value.comboWarningAt);
+        }
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
     }
 }

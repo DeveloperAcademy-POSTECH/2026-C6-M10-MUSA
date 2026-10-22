@@ -75,6 +75,9 @@ namespace C6Lab
         private Image eyesLit;
         private bool showingEyes;
         private float eyeGlow;
+        private bool showingWord;
+        private Outline markOutline;
+        private float wordPopElapsed = -1f;
         private float elapsed = -1f;
         private float duration;
         private bool showingBlock;
@@ -146,8 +149,42 @@ namespace C6Lab
             if (gourd == null || !EnsureBubble()) return;
             showingBlock = showingHeart = false;
             ShowOnly(mark.gameObject);
+            mark.text = Text;
+            mark.fontSize = Mathf.RoundToInt(bubbleSize * .5f);
+            mark.color = MarkColor;
+            markOutline.enabled = true;
             Begin(gourd, showSeconds);
         }
+
+        /// <summary>
+        /// 야광귀 셈법 (#271): 박 옆 말풍선에 짧은 말("하나!" 등)을 seconds 동안 띄운다. 모든 기기에서 부른다.
+        /// 글자가 길수록 작게 쓰고, 먹색으로 쓴다. 이미 말을 띄우고 있으면 말풍선은 그대로 두고 글자만 바꿔 톡 튀게 해,
+        /// 말풍선이 들어갔다 다시 나오며 겹쳐 보이지 않게 한다.
+        /// </summary>
+        public void ShowWord(LabTarget gourd, string word, float seconds)
+        {
+            if (gourd == null || string.IsNullOrEmpty(word) || !EnsureBubble()) return;
+            bool continuing = Active && showingWord && target == gourd;
+            showingBlock = showingHeart = false;
+            ShowOnly(mark.gameObject);
+            showingWord = true;
+            wordPopElapsed = 0f;
+            mark.text = word;
+            float share = word.Length <= 1 ? .5f : word.Length <= 2 ? .34f : .26f;
+            mark.fontSize = Mathf.RoundToInt(bubbleSize * share);
+            mark.color = InkColor;
+            // 먹색 글자에 먹색 테두리를 어긋나게 두르면 획이 두 번 겹쳐 보인다. 말은 테두리 없이 쓴다.
+            markOutline.enabled = false;
+            if (continuing)
+            {
+                duration = elapsed + Mathf.Max(.3f, seconds);
+                return;
+            }
+            Begin(gourd, Mathf.Max(.3f, seconds));
+        }
+
+        /// <summary>지금 짧은 말(야광귀 셈법)을 보여 주는 중인지 (#271).</summary>
+        public bool ShowingWord => Active && showingWord;
 
         /// <summary>요괴가 이 사람에게 매혹을 걸었다고(#251) 박 옆에 하트 말풍선을 띄운다. 매혹된 사람 화면에서만 부른다.</summary>
         public void ShowHeart(LabTarget gourd)
@@ -194,13 +231,17 @@ namespace C6Lab
             if (eyesLit == null) return;
             eyesLit.color = new Color(1f, 1f, 1f, eyeGlow);
             eyesHalo.color = new Color(1f, 1f, 1f, .85f * eyeGlow);
-            eyesHalo.rectTransform.localScale = Vector3.one * (1f + .3f * eyeGlow);
+            // 다 빛난 뒤에는 둘레 빛이 두근거린다.
+            float beat = eyeGlow >= 1f ? .08f * Mathf.Sin(Time.unscaledTime * 9f) : 0f;
+            eyesHalo.rectTransform.localScale = Vector3.one * (1f + .3f * eyeGlow + beat);
         }
 
         // 말풍선 안 표시는 한 번에 하나만 보인다.
         private void ShowOnly(GameObject shown)
         {
             if (shown != eyesRect.gameObject) showingEyes = false;
+            showingWord = false;
+            if (mark != null) mark.rectTransform.localScale = Vector3.one;
             mark.gameObject.SetActive(shown == mark.gameObject);
             blockMark.gameObject.SetActive(shown == blockMark.gameObject);
             heartMark.gameObject.SetActive(shown == heartMark.gameObject);
@@ -220,6 +261,7 @@ namespace C6Lab
         {
             elapsed = -1f;
             showingEyes = false;
+            showingWord = false;
             target = null;
             if (bubble != null) bubble.gameObject.SetActive(false);
         }
@@ -272,6 +314,14 @@ namespace C6Lab
             bubble.localScale = Vector3.one * (pop * (1f - leave));
             float wiggle = WiggleDegrees * Mathf.Sin(t * WiggleHz * Mathf.PI * 2f) * (1f - t / duration);
             bubble.localRotation = Quaternion.Euler(0f, 0f, wiggle);
+            // 말풍선은 그대로 두고 바뀐 글자만 톡 튄다 (#271).
+            if (showingWord && wordPopElapsed >= 0f)
+            {
+                wordPopElapsed += Time.deltaTime;
+                float u = Mathf.Clamp01(wordPopElapsed / .22f);
+                mark.rectTransform.localScale = Vector3.one * Mathf.Lerp(1.5f, 1f, 1f - (1f - u) * (1f - u));
+                if (u >= 1f) wordPopElapsed = -1f;
+            }
         }
 
         private bool EnsureBubble()
@@ -318,9 +368,9 @@ namespace C6Lab
             mark.verticalOverflow = VerticalWrapMode.Overflow;
             mark.color = MarkColor;
             mark.raycastTarget = false;
-            var outline = markRect.gameObject.AddComponent<Outline>();
-            outline.effectColor = InkColor;
-            outline.effectDistance = new Vector2(2.5f, -2.5f);
+            markOutline = markRect.gameObject.AddComponent<Outline>();
+            markOutline.effectColor = InkColor;
+            markOutline.effectDistance = new Vector2(2.5f, -2.5f);
 
             RectTransform blockRect = NewRect("Gourd Alert Block Mark", bubble);
             blockRect.anchorMin = blockRect.anchorMax = center;

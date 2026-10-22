@@ -27,6 +27,10 @@ namespace C6Lab
         public const string PenaltyLabel = "SMALL";
         public const string RewardLabel = "BIG";
         public const string WarningText = "COMBO!";
+        /// <summary>야광귀 셈법 (#271): 야광귀는 넷까지만 센다. 넷 다음은 다시 하나.</summary>
+        public static readonly string[] CountWords = { "하나", "둘", "셋", "넷" };
+        /// <summary>수 n(1부터)을 야광귀식으로. 넷을 넘으면 넷까지밖에 몰라 다시 하나·둘…로 돈다(예고에서는 넷 → 하나로 거꾸로 센다).</summary>
+        public static string CountWord(int n) => CountWords[(Mathf.Max(1, n) - 1) % CountWords.Length];
 
         private const int TextureSize = 96;
         private const float ResultSeconds = 1.6f;
@@ -63,6 +67,11 @@ namespace C6Lab
         private RectTransform warningPanel;
         private Text warningLabel, warningNumber;
         private int shownWarningCount = -1;
+        private bool warningYaguang;
+        private bool warningActive;
+        // 야광귀 셈법 (#271): 칸 위의 수, 넷 다음의 흐린 ? 칸
+        private readonly Text[] slotWords = new Text[LabGourdCombo.Length];
+        private RectTransform questionSlot;
         private float warningPopElapsed = -1f;
 
         private LabComboRewardStars stars;
@@ -92,7 +101,17 @@ namespace C6Lab
         /// <summary>COMBO! 카운트다운 예고가 보이는지 (#241)</summary>
         public bool WarningVisible => warningPanel != null && warningPanel.gameObject.activeSelf;
         /// <summary>예고에 보이는 남은 초 (3, 2, 1). 예고가 없으면 빈 문자열.</summary>
+        /// <summary>패널의 예고 남은 초. 야광귀 셈법이면 수는 말풍선에만 있으므로 빈 문자열.</summary>
         public string WarningCount => WarningVisible ? warningNumber.text : string.Empty;
+        /// <summary>콤보 예고 중인지 (야광귀 셈법이면 패널 없이 말풍선만 센다, #271).</summary>
+        public bool WarningCounting => warningActive;
+        /// <summary>칸 위에 뜬 야광귀의 수 (#271). 안 떠 있으면 빈 문자열.</summary>
+        public string SlotWord(int index) =>
+            slotWords[index] != null && slotWords[index].gameObject.activeInHierarchy ? slotWords[index].text : string.Empty;
+        /// <summary>넷 다음의 흐린 ? 칸이 보이는지 (#271)</summary>
+        public bool QuestionSlotVisible => questionSlot != null && questionSlot.gameObject.activeInHierarchy;
+        /// <summary>야광귀 셈법으로 보여주는지 (#271, DEV `야광귀 셈법`)</summary>
+        public bool YaguangCount => network != null && network.config != null && network.config.ComboYaguangCountEnabled;
         public string ResultLabel => resultText != null ? resultText.text : string.Empty;
         public bool SlotChecked(int index) => slotChecks[index] != null && slotChecks[index].gameObject.activeSelf;
         public Color SlotColor(int index) => slotFills[index] != null ? slotFills[index].color : Color.clear;
@@ -141,7 +160,10 @@ namespace C6Lab
         private void DrawWarning(LabSnapshot snapshot, double serverNow, bool warning)
         {
             bool show = warning && resultElapsed < 0f;
-            warningPanel.gameObject.SetActive(show);
+            bool yaguang = YaguangCount;
+            warningActive = show;
+            // 야광귀 셈법 (#271): 박 옆 말풍선만 하나·둘·셋·넷으로 세고, 패널 자리의 COMBO! 예고는 띄우지 않는다.
+            warningPanel.gameObject.SetActive(show && !yaguang);
             if (!show)
             {
                 shownWarningCount = -1;
@@ -149,12 +171,24 @@ namespace C6Lab
                 return;
             }
             int count = Mathf.Max(1, Mathf.CeilToInt((float)(snapshot.comboNextAt - serverNow)));
+            if (yaguang != warningYaguang) shownWarningCount = -1;
+            warningYaguang = yaguang;
+            // 말풍선은 남은 초를 야광귀식으로 넷 → 셋 → 둘 → 하나 센다(넷까지밖에 몰라서 더 길면 다시 넷부터).
             if (count != shownWarningCount)
             {
                 shownWarningCount = count;
                 warningPopElapsed = 0f;
                 warningNumber.text = count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                warningLabel.text = WarningText;
+                if (yaguang && network != null)
+                {
+                    LabGourdAlert alert = GetComponent<LabGourdAlert>();
+                    // 말풍선 하나가 4칸이 나올 때까지 떠 있고 글자만 바뀐다.
+                    if (alert != null)
+                        alert.ShowWord(network.target, CountWord(count) + "!", Mathf.Max(.3f, (float)(snapshot.comboNextAt - serverNow)));
+                }
             }
+            if (yaguang) return;
             // 숫자: 1.7배로 쾅 나왔다가 1배로. 마지막 1은 빨갛다.
             float pop = 1f;
             if (warningPopElapsed >= 0f)
@@ -166,6 +200,8 @@ namespace C6Lab
             }
             warningNumber.rectTransform.localScale = Vector3.one * pop;
             warningNumber.color = count <= 1 ? FailColor : (Color)InkColor;
+            warningLabel.rectTransform.localScale = Vector3.one;
+            warningLabel.color = ClearColor;
             // COMBO! 글자는 살짝 기울며 들썩인다. 남은 시간이 줄수록 빨라진다.
             float speed = 6f + 4f * (3 - Mathf.Min(count, 3));
             warningLabel.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 4f * Mathf.Sin(Time.unscaledTime * speed));
@@ -226,10 +262,10 @@ namespace C6Lab
             int kind = LocalEffect(snapshot, serverNow, out double until);
             double totalTime = until - snapshot.comboResultAt;
             float remaining = kind != 0 && totalTime > 0d ? Mathf.Clamp01((float)((until - serverNow) / totalTime)) : 0f;
-            // 보상은 배지 대신 별로 보여준다. 결과 문구가 끝난 뒤부터.
-            DrawStars(kind > 0 && resultElapsed < 0f, remaining);
+            // 보상은 배지 대신 부적 비로 보여준다. CLEAR!가 뜨는 순간부터 바로 쏟아진다 (#271).
+            DrawStars(kind > 0, remaining);
             // 결과 문구나 다음 콤보 예고(#241)가 떠 있는 동안에는 숨겨 두었다가, 끝나면 톡 튀어나온다.
-            if (kind >= 0 || resultElapsed >= 0f || warningPanel.gameObject.activeSelf)
+            if (kind >= 0 || resultElapsed >= 0f || warningActive)
             {
                 effectKind = 0;
                 effectBadge.gameObject.SetActive(false);
@@ -307,6 +343,10 @@ namespace C6Lab
                 && snapshot.comboColors.Length == LabGourdCombo.Length;
             panel.gameObject.SetActive(showPanel);
             if (!showPanel) return;
+            bool yaguang = YaguangCount;
+            questionSlot.gameObject.SetActive(yaguang);
+            if (yaguang)
+                questionSlot.localRotation = Quaternion.Euler(0f, 0f, 8f * Mathf.Sin(Time.unscaledTime * 2.3f));
 
             float bob = Mathf.Sin(Time.unscaledTime * 8f) * .08f;
             if (popElapsed >= 0f) popElapsed += Time.unscaledDeltaTime;
@@ -320,6 +360,20 @@ namespace C6Lab
                 if (i == popSlot && popElapsed >= 0f && popElapsed < .25f)
                     scale += .3f * Mathf.Sin(popElapsed / .25f * Mathf.PI);
                 slots[i].localScale = Vector3.one * scale;
+                // 야광귀 셈법 (#271): 맞힌 칸 위에 그 칸의 수가 톡 튀어나와 남는다.
+                Text word = slotWords[i];
+                word.gameObject.SetActive(yaguang && hit);
+                if (!(yaguang && hit)) continue;
+                word.text = CountWord(i + 1);
+                float rise = 0f, wordScale = 1f;
+                if (i == popSlot && popElapsed >= 0f && popElapsed < .35f)
+                {
+                    float u = popElapsed / .35f;
+                    wordScale = Mathf.Lerp(1.7f, 1f, 1f - (1f - u) * (1f - u));
+                    rise = (1f - u) * 10f * unit;
+                }
+                word.rectTransform.localScale = Vector3.one * wordScale / Mathf.Max(.01f, scale);
+                word.rectTransform.anchoredPosition = new Vector2(0f, 2f * unit + rise);
             }
 
             if (snapshot.comboActive)
@@ -467,7 +521,36 @@ namespace C6Lab
                 slots[i] = slot;
                 slotFills[i] = fill;
                 slotChecks[i] = mark;
+
+                // 야광귀 셈법 (#271): 칸 바로 위에 뜨는 수 (하나·둘·셋·넷)
+                Text word = NewText("Combo Slot Word " + (i + 1), slot, Mathf.Max(10, Mathf.RoundToInt(18f * u)), TextAnchor.LowerCenter);
+                word.rectTransform.anchorMin = word.rectTransform.anchorMax = new Vector2(.5f, 1f);
+                word.rectTransform.pivot = new Vector2(.5f, 0f);
+                word.rectTransform.sizeDelta = new Vector2(slotSize * 1.4f, 22f * u);
+                Outline wordOutline = word.gameObject.AddComponent<Outline>();
+                wordOutline.effectColor = new Color(1f, 1f, 1f, .9f);
+                wordOutline.effectDistance = new Vector2(1.5f, -1.5f);
+                word.gameObject.SetActive(false);
+                slotWords[i] = word;
             }
+
+            // 야광귀 셈법 (#271): 넷 다음 칸. 야광귀가 셀 수 없어 패널 밖에 흐리게 매달린 ?.
+            questionSlot = NewRect("Combo Slot ?", panel);
+            questionSlot.anchorMin = questionSlot.anchorMax = new Vector2(1f, 1f);
+            questionSlot.pivot = new Vector2(.5f, .5f);
+            questionSlot.sizeDelta = new Vector2(slotSize * .72f, slotSize * .72f);
+            questionSlot.anchoredPosition = new Vector2(gap * .4f + slotSize * .36f, -gap - slotSize * .5f);
+            Image questionDisc = questionSlot.gameObject.AddComponent<Image>();
+            questionDisc.sprite = DiscSprite();
+            questionDisc.color = new Color(.6f, .58f, .55f, .38f);
+            questionDisc.raycastTarget = false;
+            Text questionMark = NewText("?", questionSlot, Mathf.Max(10, Mathf.RoundToInt(26f * u)), TextAnchor.MiddleCenter);
+            questionMark.rectTransform.anchorMin = Vector2.zero;
+            questionMark.rectTransform.anchorMax = Vector2.one;
+            questionMark.rectTransform.offsetMin = questionMark.rectTransform.offsetMax = Vector2.zero;
+            questionMark.text = "?";
+            questionMark.color = new Color(.17f, .14f, .12f, .55f);
+            questionSlot.gameObject.SetActive(false);
 
             RectTransform barBack = NewRect("Combo Time Bar", panel);
             barBack.anchorMin = new Vector2(0f, 0f);

@@ -31,8 +31,8 @@ namespace C6Lab.Tests
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceValues = ui.sourceConfig.CaptureDeveloperValues();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(191));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(191));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(192));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(192));
         }
 
         [UnityTearDown]
@@ -204,7 +204,7 @@ namespace C6Lab.Tests
             Assert.That(NetworkField<int>("configRevision"), Is.EqualTo(revision + 1));
             Assert.That(NetworkField<string>("configFingerprint"), Is.Not.EqualTo(fingerprint));
             Assert.That(NetworkField<string>("configFingerprint"), Is.EqualTo(
-                LabSessionSettings.Fingerprint(ui.network.config.CaptureDeveloperValues(), 2, 5657)));
+                LabSessionSettings.Fingerprint(ui.network.config.CaptureDeveloperValues(), 2, 5658)));
             Assert.That(ui.network.CanStartBattle, Is.False);
             ui.network.StartBattle();
             Assert.That(ui.network.Snapshot, Is.Null,
