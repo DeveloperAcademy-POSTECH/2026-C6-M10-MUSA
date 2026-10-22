@@ -258,20 +258,50 @@ namespace C6Lab.Tests
                 while(!one.AdvertisingConfirmed&&Time.realtimeSinceStartupAsDouble<deadline){one.Tick();yield return null;}
                 Assert.That(one.AdvertisingConfirmed,Is.True,one.LastError);
                 Assert.That(two.StartAdvertise(name,19352,true,true),Is.True);
+                // Product pending rooms serialize registrations (and explicitly retry name conflicts).
+                // Do not test the platform's simultaneous automatic rename race as that product flow.
+                deadline=Time.realtimeSinceStartupAsDouble+12;
+                while(!two.AdvertisingConfirmed&&Time.realtimeSinceStartupAsDouble<deadline)
+                {one.Tick();two.Tick();yield return null;}
+                Assert.That(two.AdvertisingConfirmed,Is.True,two.LastError);
                 Assert.That(three.StartAdvertise(name,19353,true,true),Is.True);
+                var registrations=new[]{one,two,three};
+                var ports=new ushort[]{19351,19352,19353};
+                string[] RegisteredKeys()=>registrations.Select((registration,index)=>
+                    LabRoomCatalog.Key(registration.RegisteredServiceName,ports[index])).OrderBy(key=>key).ToArray();
+                LabDiscoveredRoom[] Found()=>LabRoomCatalog.GroupTargets(browser.Targets)
+                    .Where(room=>LabRoomNames.TryNumber(room.Name,out _,name)).ToArray();
+                string Details()=>"Registered: "+string.Join(", ",registrations.Select((registration,index)=>
+                    (registration.RegisteredServiceName??"<none>")+"|"+ports[index]+" confirmed="+
+                    registration.AdvertisingConfirmed+" error="+(registration.LastError??"<none>")))+
+                    "; discovered: "+string.Join(", ",Found().Select(room=>room.Name+"|"+room.Port));
+                // A started registration can still be probing/renaming. Count-only browsing
+                // may observe three transient SRV routes before all three names are confirmed.
+                deadline=Time.realtimeSinceStartupAsDouble+12;
+                while(Time.realtimeSinceStartupAsDouble<deadline)
+                {
+                    one.Tick();two.Tick();three.Tick();
+                    if(registrations.All(registration=>registration.AdvertisingConfirmed)
+                        &&registrations.Select(registration=>registration.RegisteredServiceName).Distinct().Count()==3)break;
+                    yield return null;
+                }
+                Assert.That(registrations.All(registration=>registration.AdvertisingConfirmed),Is.True,Details());
+                Assert.That(registrations.Select(registration=>registration.RegisteredServiceName).Distinct().Count(),Is.EqualTo(3),Details());
                 Assert.That(browser.StartBrowse(),Is.True);
                 deadline=Time.realtimeSinceStartupAsDouble+20;
                 while(Time.realtimeSinceStartupAsDouble<deadline)
                 {
                     one.Tick();two.Tick();three.Tick();browser.Tick();
-                    var rooms=LabRoomCatalog.GroupTargets(browser.Targets).Where(r=>LabRoomNames.TryNumber(r.Name,out _,name)).ToArray();
-                    if(rooms.Length==3)break;
+                    var rooms=Found();
+                    if(registrations.All(registration=>registration.AdvertisingConfirmed)
+                        &&rooms.Length==3&&rooms.Select(room=>room.Key).OrderBy(key=>key).SequenceEqual(RegisteredKeys()))break;
                     yield return null;
                 }
-                var found=LabRoomCatalog.GroupTargets(browser.Targets).Where(r=>LabRoomNames.TryNumber(r.Name,out _,name)).ToArray();
-                Assert.That(found.Length,Is.EqualTo(3));
-                Assert.That(found.Select(r=>{LabRoomNames.TryNumber(r.Name,out int n,name);return n;}).OrderBy(n=>n),Is.EqualTo(new[]{1,2,3}));
-                Assert.That(found.All(r=>LabRoomCatalog.RoutesForRoom(browser.Targets,r.Key).Length>0),Is.True);
+                var found=Found();
+                Assert.That(found.Length,Is.EqualTo(3),Details());
+                Assert.That(found.Select(room=>room.Key).OrderBy(key=>key),Is.EqualTo(RegisteredKeys()),Details());
+                Assert.That(found.Select(r=>{LabRoomNames.TryNumber(r.Name,out int n,name);return n;}).OrderBy(n=>n),Is.EqualTo(new[]{1,2,3}),Details());
+                Assert.That(found.All(r=>LabRoomCatalog.RoutesForRoom(browser.Targets,r.Key).Length>0),Is.True,Details());
             }
         }
         private void Set(string name,object value)=>typeof(LabNetwork).GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).SetValue(network,value);

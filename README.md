@@ -100,4 +100,4 @@ Apple Developer Academy @ POSTECH
 
 ## 개발용 3스테이지 실행
 
-기존 단일 Scene은 `Assets/Lab/Scenes/Lab.unity`로 유지합니다. 별도 게임은 `Hapio > Open Home`으로 실행하며 구미호 → 야광귀 → 지귀 순서로 같은 Battle Scene을 재사용합니다. 공통 폭탄·좌우 전달 막기를 유지하고 Home/Lobby DEV에서 공통/요괴별 값을 조정합니다. 자세한 실행·빌드 경로·현행 제한은 [개발용 게임 흐름](docs/GAME_FLOW.md)을 참고하세요.
+기존 단일 Scene은 `Assets/Lab/Scenes/Lab.unity`로 유지합니다. 별도 게임은 `Hapio > Open Home` → Play → 한지 타이틀의 **게임 시작**에서 시작합니다. 인원 2~5명을 선택해 **새 방 만들기 +**를 누르고 생성된 **수장고-N 카드에 입장**한 뒤 각자 P번호를 고릅니다. Host의 **요괴 봉인 시작 · 3스테이지**로 구미호 → 야광귀 → 지귀 순서의 같은 Battle Scene을 재사용합니다. 혼자 확인할 때는 Home의 **DEV · SOLO**를 사용합니다. 공통 폭탄·좌우 전달 막기를 유지하고 Home/Lobby DEV에서 공통/요괴별 값을 조정합니다. 자세한 실행·빌드 경로·현행 제한은 [개발용 게임 흐름](docs/GAME_FLOW.md)을 참고하세요.

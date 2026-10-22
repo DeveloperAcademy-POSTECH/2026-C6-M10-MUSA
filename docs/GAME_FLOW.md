@@ -5,11 +5,11 @@
 ## 실행과 빌드
 
 1. Unity에서 `Hapio > Open Home`을 선택하거나 `Assets/Hapio/Scenes/Home.unity`를 연다.
-2. Play 후 Home에서 방을 만들거나 발견된 **Hapio-…** 방에 참가한다. 기존과 같이 같은 LAN·핫스팟에서 연결하며 Direct IP도 사용할 수 있다.
-3. 로비에서 각자 고유한 P번호를 선택한다. 목표 인원·자리 선택·설정 확인이 완료되면 Host가 START를 누른다.
+2. Play 후 한지 타이틀의 **게임 시작**을 누른다. 방 목록에서 2~5명을 선택해 **새 방 만들기 +**를 누른 뒤, 생성된 **수장고-N** 카드에 입장한다. 다른 참가자도 같은 게임의 방 카드를 눌러 입장한다. 기존 LAN·핫스팟·Direct IP 연결을 유지한다.
+3. 로비에서 각자 고유한 P번호를 선택한다. 목표 인원·자리 선택·설정 확인이 완료되면 Host가 **요괴 봉인 시작 · 3스테이지**를 누른다.
 4. 1·2스테이지의 결과에서 Host가 NEXT를 눌러 전원이 다음 스테이지로 이동한다. 3스테이지 결과에서는 각자 HOME으로 돌아간다.
 
-빠른 로컬 확인은 Home의 개발자 SOLO 버튼으로 가능하다. 일반 방은 기존 2~5명 연결 규칙을 사용한다. 새 게임과 구형 Lab은 연결 승인 토큰이 다르므로 같은 방에서 섞어 사용할 수 없다. 새 게임 방 이름은 `Hapio-`로 시작한다. Bonjour 서비스 자체는 공유하므로 검색 목록에 구형 Lab 방이 보일 수 있으나 입장은 거절된다.
+빠른 로컬 확인은 Home의 **DEV · SOLO** 버튼으로 가능하다. 일반 방은 기존 2~5명 연결 규칙을 사용한다. 새 게임과 구형 Lab은 연결 승인 토큰이 다르므로 같은 방에서 섞어 사용할 수 없다. 새 게임의 실제 Bonjour 서비스 이름은 `Hapio-Room` 계열이고 화면에는 `수장고-N`으로 표시한다. 서비스 종류는 공유하지만 TXT 규약을 Lab/Game별로 구분하므로 서로의 방은 검색 결과에서 제외한다. 직접 IP로 잘못된 종류나 구버전 방에 접속하면 최종 연결 승인에서 거절한다.
 
 새 게임 빌드는 `Hapio > Development Build > Build Mac App / Export iOS Xcode Project`를 사용한다. 새 Scene 5개만 포함하고 Home이 첫 진입점이다. 결과물은 프로젝트의 `Builds/Hapio/<날짜-고유번호>/`에 생성하며 이전 결과물을 덮어쓰지 않는다. 항상 Development Build다. 기본 Build Settings는 기존 Lab 첫 항목을 유지하고 새 Scene을 뒤에 추가하므로 일반 Unity Build 버튼 대신 위 전용 메뉴를 사용한다. 이번 통합은 #262의 흐름을 계승하되 main의 기본 진입점이나 기존 Lab 파일 경로를 바꾸지 않는다.
 
@@ -59,13 +59,13 @@
 
 새 코드: `Assets/Hapio/Scripts/Core/{GameSession,GameRunFlow,GameFlowState,GameFlowSnapshot,GameScenePaths}.cs`, `Scripts/UI`, `Editor/GameSceneBuilder.cs`, `Editor/GameBuild.cs`.
 
-기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **196개·프로토콜5660**다. 기존0~191 인덱스는 유지하고 지귀 자동 패턴4칸을192~195에 추가한다. 새 게임 연결 토큰 `C6HapioGame/3`와 단일 Lab의 `C6PhysicsLab/21`은 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
+기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **196개·프로토콜5661**다. 기존0~191 인덱스는 유지하고 지귀 자동 패턴4칸을192~195에 추가한다. 새 게임 연결 토큰 `C6HapioGame/4`와 단일 Lab의 `C6PhysicsLab/22`은 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
 
-검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 실제 실행 결과는 `VALIDATION.md`의 #262 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
+검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 현재 통합의 실제 실행 결과는 `VALIDATION.md`의 #278 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
 
 ## 브랜치 운영
 
-#262의 Draft 이력은 #276으로 계승한다. 기존 main/Lab을 유지하며 이 통합은 별도 기능 브랜치에서 검증한다. Lab 폴더 이동·프로젝트 이름 변경·Shared 폴더로의 일괄 이전은 하지 않는다. #275의 로비 UI/방 구조 변경은 호환성 보완 전까지 포함하지 않는다.
+#262의 Draft 이력은 #276으로 계승한다. 기존 main/Lab을 유지하며 이 통합은 별도 기능 브랜치에서 검증한다. Lab 폴더 이동·프로젝트 이름 변경·Shared 폴더로의 일괄 이전은 하지 않는다. #275의 한지 로비는 #278에서 별도 Home/Lobby에 공통 Prefab으로 연결했다. Lab 단판 로비와 게임 세션의 수명·진행 로직은 분리해 보존한다.
 
 ## 스테이지 카탈로그와 DEV 범위
 
@@ -89,4 +89,15 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 
 ## 검증 상태
 
-이번 #276의 실제 실행 결과는 `VALIDATION.md`의 별도 기록을 따른다. #262·#270·#274의 과거 PASS는 새 3요괴 흐름의 검증으로 승계하지 않는다. 실제 iPhone/iPad·LAN·핫스팟은 수행하지 않았다면 NOT_RUN이다.
+3요괴 흐름 #276과 새 로비 통합 #278의 실제 실행 결과는 `VALIDATION.md`의 각 기록을 따른다. #262·#270·#274의 과거 PASS는 새 3요괴 흐름의 검증으로 승계하지 않는다. 실제 iPhone/iPad·LAN·핫스팟은 수행하지 않았다면 NOT_RUN이다.
+
+
+## #278 새 로비와 3스테이지 통합
+
+- `Assets/Hapio/Art/UI/GameLobby.prefab`이 타이틀·방 목록·자리 선택·Direct IP·개발자 솔로 버튼의 공통 저장 UI다. Home/Lobby의 인스턴스가 각 Scene의 `GameScreen`을 참조한다. GameScreen은 기존 공통/구미호/야광귀/지귀 DEV 패널을 유지하고 `externalNavigation`일 때 구형 방/시작 버튼 입력을 연결하지 않는다. `GameLobbyView`는 표시와 입력만 처리하며 소켓·광고·전투 상태를 소유하지 않는다.
+- `GameSession`이 시작부터 하나의 Game-family Network를 유지한다. 생성·카드 입장·검색·직접 IP·자리·시작·홈 동작은 이 세션을 통한다. 시작 버튼은 `StartGame`으로 연결되고 설정 ACK와 전원 로딩 ACK 후 기존 Battle을 시작한다. 시작을 이유로 연결을 다시 만들지 않는다.
+- `GamePendingRoomRegistry`가 미입장 대기 방을 관리한다. 생성 시에는 연결되지 않고, 생성자의 카드 입장 때 확정 광고만 기존 Network로 인계한다. 나머지 대기 방은 Home→Lobby→Battle→결과→Home을 거쳐 유지되며 GameSession 파괴/앱 종료 때 광고·예약 포트를 정리한다.
+- 로비에서 나가면 방 목록으로 돌아간다. 최종 클리어 또는 게임 오버의 HOME은 타이틀로 돌아간다. 방 이름·Host와 P번호의 분리·2~5인·자리 선택 해제와 196개 설정 확인 조건은 유지한다.
+- 위치 편집은 공통 Prefab에서 한다. `EditableSeatLayouts/Players2..5/P1..PN`이 각 인원의 저장된 자리 앵커이며 해당 앵커를 움직이면 자리 버튼 배치에 반영된다. 원본 Lab Scene의 UI 위치와는 독립적이다.
+- 명시적 UI 적용 메뉴는 `Hapio/Upgrade Figma Game Lobby`다. 기존 공통 Prefab이 있으면 원본 Lab에서 재생성하지 않고 수동 편집을 보존한다. 이 작업은 Home/Lobby만 갱신하며 Battle·StageResult·GameOver를 복사하거나 저장하지 않는다. 일반 Play/빌드에서는 자동 재생성하지 않는다.
+- 실험 단판은 계속 `Assets/Lab/Scenes/Lab.unity`에서 실행한다. 3스테이지 확인과 전용 빌드 진입점은 Home이다. 실제 실행 결과와 미검증 환경은 `VALIDATION.md`의 #278 절을 따른다.

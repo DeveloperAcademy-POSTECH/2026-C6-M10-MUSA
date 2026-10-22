@@ -4,7 +4,7 @@
 
 - 현재 동작은 `README.md`, 실험 범위는 `docs/LAB_SCOPE.md`, 검증 범위는 `docs/VALIDATION.md`를 먼저 확인한다. 과거 버전의 문서를 새 코드의 검증 근거로 사용하지 않는다.
 - 기본 네트워크 방은 Host가 목표 인원 2~5명(기본 3명)을 정하고, 연결된 각 참가자가 로비에서 P1~P(목표 인원) 중 고유 번호를 선택한 뒤 시작한다. Host도 번호를 자유롭게 선택하며, 전투 자리와 좌우 이웃은 선택된 P번호의 순환 순서다. Development 빌드의 1인 솔로 모드는 별도 물리 조정 경로다.
-- Lab 로비의 Figma UI는 기존 2~5인·Host 자유 P번호·Direct IP·Development 솔로를 유지한다. 새 방 만들기는 생성자 소유의 대기 광고를 만들고, 생성자가 자기 방 카드에 입장하면 실제 Host로 전환한다. 미입장 대기 방은 앱/Scene 종료 시 정리한다. 별도 Hapio 게임에는 Lab 로비 UI를 중복 실행하지 않는다.
+- Lab 로비의 Figma UI는 기존 2~5인·Host 자유 P번호·Direct IP·Development 솔로를 유지한다. 새 방 만들기는 생성자 소유의 대기 광고를 만들고, 생성자가 자기 방 카드에 입장하면 실제 Host로 전환한다. 미입장 대기 방은 앱/Scene 종료 시 정리한다. 별도 Hapio 게임에서는 공통 GameLobby Prefab과 GameSession에 연결하며 LabLobbyView 자체를 실행하지 않는다.
 - 수치 원본은 `Assets/Lab/Resources/LabConfig.asset` 하나다. 실행 중 DEV 패널은 원본이 아닌 복사본을 조정한다. 일반 방에서는 Host가 로비의 조정값을 참가자에게 전파하고 모두 확인한 뒤 시작하며, 솔로에는 로컬 복사본을 적용한다.
 - Scene과 `.meta`의 참조를 보존한다. Unity에서 화면과 에셋을 변경한 뒤에는 Scene 연결, 컴파일, 해당 EditMode·PlayMode 검사를 별도로 확인한다.
 - 이 저장소는 공개다. 인증 정보, 서명 파일, 개인 경로·기기 식별자, 원시 실행 로그와 빌드 산출물을 커밋하지 않는다.
@@ -18,3 +18,6 @@
 
 - #276 별도 게임의 고정 순서는 구미호→야광귀→지귀다. 공통 폭탄·좌우 전달 막기를 고유 패턴 추첨에 넣거나 끄지 않는다. `LabStageYokai.None`은 기존 Lab 동작을 유지한다.
 - 요괴별 기본값·장식 참조는 `Resources/Hapio/StageCatalog`와 StageDefinition, 실행 중 조정은 GameStageSettings 복사본으로 관리한다. 원본 LabConfig를 자동 저장하지 않는다.
+
+- #278 Home/Lobby는 `Assets/Hapio/Art/UI/GameLobby.prefab`의 한지 로비를 공유한다. GameLobbyView는 UI만 관리하고 GameSession/GamePendingRoomRegistry가 연결·대기 광고를 소유한다. 기존 Lab Scene과 전투/결과 Scene을 로비 적용 목적으로 다시 복사하지 않는다.
+- 게임 방은 Game-family TXT/연결 토큰을 사용한다. Lab과 같은 Bonjour 서비스 종류라도 검색 결과를 섞지 않는다. 로비 나가기는 방 목록, 최종 결과·게임 오버 HOME은 타이틀 복귀다.

@@ -199,13 +199,14 @@ namespace C6Lab
         // 5658: #271 counting presentation appended at DEV 191 (192 values); fast combo control metadata.
         // 5659: #276 stage-selected scheduler, four Jigwi policy values and game stage settings barrier.
         // 5660: #263 bounded live room presence and creator-owned pending-room registrations.
-        internal const ushort LabProtocolVersion = 5660;
+        // 5661: #278 immutable Lab/Game Bonjour identity before pending-room activation.
+        internal const ushort LabProtocolVersion = 5661;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/21");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/22");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -625,7 +626,7 @@ namespace C6Lab
 
         internal bool HostRegisteredRoom(LabBonjourDiscovery registeredRoom, ushort roomPort, int capacity)
         {
-            if (!CanChooseConnection || registeredRoom == null || !registeredRoom.IsAdvertising
+            if (!CanChooseConnection || registeredRoom == null || registeredRoom.Family != RoomFamily || !registeredRoom.IsAdvertising
                 || !registeredRoom.AdvertisingConfirmed || !ValidRoomName(registeredRoom.RegisteredServiceName)
                 || roomPort == 0 || capacity < 2 || capacity > 5) return false;
             port = roomPort;
@@ -719,7 +720,7 @@ namespace C6Lab
                 ReportRoomSearchFailure("Room discovery is available on macOS and iOS. Use direct IP here.", preserveMessage);
                 return false;
             }
-            discovery = new LabBonjourDiscovery();
+            discovery = new LabBonjourDiscovery(RoomFamily);
             discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
             discovery.Changed += OnDiscoveryChanged;
             roomSearchActive = true;
@@ -2575,7 +2576,7 @@ namespace C6Lab
         {
             DisposeDiscovery();
             if (!LabBonjourDiscovery.IsSupported) return;
-            discovery = registeredRoom ?? new LabBonjourDiscovery();
+            discovery = registeredRoom ?? new LabBonjourDiscovery(RoomFamily);
             discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
             discovery.Changed += OnDiscoveryChanged;
             bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
@@ -2589,9 +2590,8 @@ namespace C6Lab
                     Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);
                 return;
             }
-            // Lab keeps sequential room cards; separate game rooms retain their existing name family.
-            advertisedName = gameFlowEnabled ? "Hapio-" + Guid.NewGuid().ToString("N").Substring(0, 8)
-                : LabRoomNames.ServiceBase;
+            // Bonjour assigns sequential names independently inside each immutable room family.
+            advertisedName = LabRoomNames.ServiceBaseFor(RoomFamily);
             if (!discovery.StartAdvertise(advertisedName, port, ipv4, ipv6, order.Count, targetParticipantCount))
             {
                 Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);

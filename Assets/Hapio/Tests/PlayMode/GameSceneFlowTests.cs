@@ -79,6 +79,63 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator PendingGameCardsSurviveBattleGameOverAndHomeWhileLobbyLeaveReturnsToTheBrowser()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Game pending rooms require macOS/iOS Bonjour.");
+            Assert.That(session.RoomBrowserVisible, Is.False, "A cold Home starts on its title page.");
+            session.EnterRoomBrowser();
+            Assert.That(session.RoomBrowserVisible, Is.True);
+            Assert.That(session.CreatePendingRoom(2), Is.True, session.UiNotice);
+            Assert.That(session.CreatePendingRoom(3), Is.True, session.UiNotice);
+            yield return Until(() => session.PendingRooms.Count == 2 && session.PendingRooms.All(room => room.Ready),
+                "The persistent Game session must finish both native room registrations.");
+            var cards = session.PendingRooms.ToArray();
+            Assert.That(cards.All(room => room.Name.StartsWith(LabRoomNames.GameServiceBase, StringComparison.Ordinal)), Is.True);
+            string[] keys = cards.Select(room => room.Key).ToArray();
+            GameSession persistent = session;
+            LabNetwork persistentNetwork = network;
+
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            Assert.That(session.PendingRooms.Select(room => room.Key), Is.EqualTo(keys),
+                "Unloading Home must not dispose another waiting room's advertisement.");
+            CompleteMapInFixture(Model());
+            yield return Until(() => session.State.phase == GameFlowPhase.StageResult && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.StageResult,
+                "A real committed fixture victory must finish loading its result Scene.");
+            Assert.That(session.PendingRooms.Select(room => room.Key), Is.EqualTo(keys));
+            Assert.That(session.PendingRooms.All(room => room.Ready), Is.True,
+                "Waiting-room advertisements remain owned by the session during results.");
+            session.ExitRun();
+            yield return WaitGameOver();
+            Assert.That(session.PendingRooms.All(room => room.Ready), Is.True);
+            session.GoHome();
+            yield return WaitHome();
+            yield return Until(() => network.CanChooseConnection, "The completed shutdown must release the active transport.");
+            Assert.That(session.RoomBrowserVisible, Is.False, "GameOver returns to the title, not an automatic room entry.");
+            Assert.That(session.PendingRooms.Select(room => room.Key), Is.EqualTo(keys));
+
+            session.EnterRoomBrowser();
+            Assert.That(session.EnterPendingRoom(keys[0]), Is.True, session.UiNotice);
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene,
+                "Entering the creator's card must use the existing Game transport and open its lobby.");
+            Assert.That(GameSession.Instance, Is.SameAs(persistent));
+            Assert.That(session.Network, Is.SameAs(persistentNetwork));
+            Assert.That(network.GameFlowEnabled, Is.True);
+            Assert.That(network.IsHost, Is.True);
+            Assert.That(network.TargetParticipantCount, Is.EqualTo(2));
+            Assert.That(network.LocalSlotNumber, Is.Zero, "Entering one's room does not reserve P1 for the Host.");
+            Assert.That(network.ConnectedRoomName, Is.EqualTo(cards[0].Name));
+            Assert.That(network.port, Is.EqualTo(cards[0].Port));
+            Assert.That(session.PendingRooms.Select(room => room.Key), Is.EqualTo(keys.Skip(1)));
+            session.GoHomeToRoomBrowser();
+            yield return WaitHome();
+            Assert.That(session.RoomBrowserVisible, Is.True, "Leaving a pre-battle lobby returns to its room browser.");
+            Assert.That(session.PendingRooms.Single().Key, Is.EqualTo(keys[1]));
+            Assert.That(session.PendingRooms.Single().Ready, Is.True);
+        }
+
+        [UnityTest]
         public IEnumerator SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload()
         {
             GameSession persistent = session;
@@ -182,6 +239,7 @@ namespace Hapio.Tests
             Assert.That(session.ResultSnapshot, Is.Null);
             Assert.That(session.PreviewTexture, Is.Null);
             Assert.That(network.IsConnected, Is.False);
+            Assert.That(session.RoomBrowserVisible, Is.False, "Final clear returns to the title page.");
         }
 
         [UnityTest]

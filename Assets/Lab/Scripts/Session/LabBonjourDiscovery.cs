@@ -88,7 +88,7 @@ namespace C6Lab
         public const int MaximumAddressesPerService = 32;
         public const double ResolveTimeoutSeconds = 8;
         private const string Domain = "local.";
-        private static readonly string TxtPrefix = "p=" + Protocol + ";f=";
+        private string TxtPrefix => "p=" + ExpectedProtocol + ";f=";
         private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
         private static readonly LabBonjourNative.RegisterReply RegisterCallback = Registered;
         private static readonly LabBonjourNative.BrowseReply BrowseCallback = Browsed;
@@ -105,6 +105,19 @@ namespace C6Lab
         private Operation browse;
         private double now;
         private bool pumping, changed, disposed;
+
+        public LabRoomFamily Family { get; }
+        public string ExpectedProtocol { get; }
+
+        public LabBonjourDiscovery(LabRoomFamily family = LabRoomFamily.Lab)
+        {
+            ExpectedProtocol = ProtocolFor(family);
+            Family = family;
+        }
+
+        public static string ProtocolFor(LabRoomFamily family) => family == LabRoomFamily.Lab ? Protocol
+            : family == LabRoomFamily.Game ? "C6-HAPIO-" + LabNetwork.LabProtocolVersion.ToString(CultureInfo.InvariantCulture)
+            : throw new ArgumentOutOfRangeException(nameof(family));
 
         public event Action Changed;
         public event Action<string> Diagnostic;
@@ -129,7 +142,7 @@ namespace C6Lab
         {
             CheckOwner();
             if (!IsAdvertising) return false;
-            byte[] record = LabRoomPresence.Encode(Protocol, ipv4, ipv6, participants, capacity, playing, waitingForHost);
+            byte[] record = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost);
             if (advertisedPresence != null && record.SequenceEqual(advertisedPresence)) return true;
             int error = Native(() => LabBonjourNative.DNSServiceUpdateRecord(advertisement.Reference, IntPtr.Zero, 0,
                 (ushort)record.Length, record, 0));
@@ -147,13 +160,13 @@ namespace C6Lab
             if (!IsSupported) return Unavailable();
             if (!ipv4 && !ipv6) return Unavailable();
             if (string.IsNullOrWhiteSpace(serviceName) || Encoding.UTF8.GetByteCount(serviceName) > 63 ||
-                (!LabRoomNames.TryNumber(serviceName, out _) && serviceName.Any(c => !(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') && c != '-')) || port == 0)
+                (!LabRoomNames.TryNumber(serviceName, out _, LabRoomNames.ServiceBaseFor(Family)) && serviceName.Any(c => !(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') && c != '-')) || port == 0)
                 throw new ArgumentException("Use an ASCII room service label (letters, digits, hyphens; max63bytes) and a nonzero port.");
             StopAdvertisingInternal(); LastError = null; RegistrationNameConflict = false;
             var operation = Create("register");
             advertisement = operation;
             advertisedIpv4 = ipv4; advertisedIpv6 = ipv6;
-            byte[] txt = LabRoomPresence.Encode(Protocol, ipv4, ipv6, participants, capacity, playing, waitingForHost);
+            byte[] txt = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost);
             advertisedPresence = txt;
             // dns_sd.h: kDNSServiceFlagsNoAutoRename=0x8, kDNSServiceErr_NameConflict=-65548.
             int error = Native(() => LabBonjourNative.DNSServiceRegister(out operation.Reference, autoRename ? 0u : 0x8u, 0, serviceName,
@@ -352,7 +365,13 @@ namespace C6Lab
             {
                 var owner = operation.Owner;
                 if (error != 0) { owner.RegistrationNameConflict = error == -65548; owner.Fail(operation, Error("register", error)); return; }
-                operation.HasAddressOrReply = true; owner.RegisteredServiceName = Utf8(name, 256); owner.AdvertisingConfirmed = (flags & LabBonjourNative.Add) != 0;
+                bool confirmed = (flags & LabBonjourNative.Add) != 0;
+                // dns_sd.h: a successful removal can precede automatic rename/re-registration.
+                // It is not an error or a confirmed advertisement. Bound this new reply wait too;
+                // the initial successful registration must not disable its timeout permanently.
+                operation.HasAddressOrReply = confirmed;
+                if (!confirmed) operation.Deadline = owner.now + ResolveTimeoutSeconds;
+                owner.RegisteredServiceName = Utf8(name, 256); owner.AdvertisingConfirmed = confirmed;
                 owner.changed = true; owner.Report("stage=register result=" + (owner.AdvertisingConfirmed ? "confirmed" : "removed"));
             });
         }
@@ -385,13 +404,19 @@ namespace C6Lab
                 var owner = operation.Owner;
                 if (error != 0) { owner.Fail(operation, Error("resolve", error)); return; }
                 string hostName = Utf8(host); Service service = operation.Service;
-                if (string.IsNullOrEmpty(hostName) || txt == IntPtr.Zero || length <= TxtPrefix.Length + 1 || length > 128
+                if (string.IsNullOrEmpty(hostName) || txt == IntPtr.Zero || length <= owner.TxtPrefix.Length + 1 || length > 128
                     || LabBonjourNative.NetworkPort(port) == 0)
                 { owner.Fail(operation, "Bonjour room metadata invalid."); return; }
                 var record = new byte[length]; Marshal.Copy(txt, record, 0, length);
-                if (!LabRoomPresence.TryDecode(record, Protocol, out service.Ipv4, out service.Ipv6,
+                if (!LabRoomPresence.TryDecode(record, owner.ExpectedProtocol, out service.Ipv4, out service.Ipv6,
                     out service.Participants, out service.Capacity, out service.Playing, out service.WaitingForHost))
-                { owner.Fail(operation, "Bonjour room metadata invalid."); return; }
+                {
+                    // The shared service type deliberately includes the other room family.
+                    // Ignore an incompatible record without turning a healthy browse into an error.
+                    owner.Remove(service.Key);
+                    owner.Report("stage=resolve result=incompatible_room_ignored");
+                    return;
+                }
                 service.Port = LabBonjourNative.NetworkPort(port); operation.HasAddressOrReply = true; operation.Done = true;
                 owner.Report("stage=resolve result=completed"); owner.GetAddresses(service, hostName);
                 var presence = owner.Create("presence", service); service.Presence = presence;
@@ -439,7 +464,7 @@ namespace C6Lab
                 if ((flags & LabBonjourNative.Add) == 0 || ttl == 0) return;
                 if (length < 2 || length > 128 || bytes == IntPtr.Zero) return;
                 var record = new byte[length]; Marshal.Copy(bytes, record, 0, length);
-                if (!LabRoomPresence.TryDecode(record, Protocol, out bool ipv4, out bool ipv6,
+                if (!LabRoomPresence.TryDecode(record, owner.ExpectedProtocol, out bool ipv4, out bool ipv6,
                     out int count, out int capacity, out bool playing, out bool waitingForHost))
                 { owner.Remove(operation.Service.Key); return; }
                 var service = operation.Service;
@@ -459,7 +484,7 @@ namespace C6Lab
         private sealed class Operation
         {
             internal readonly LabBonjourDiscovery Owner; internal readonly string Stage; internal readonly Service Service;
-            internal readonly double Deadline; internal GCHandle Handle; internal IntPtr Reference; internal bool Done, HasAddressOrReply;
+            internal double Deadline; internal GCHandle Handle; internal IntPtr Reference; internal bool Done, HasAddressOrReply;
             internal IntPtr Context => GCHandle.ToIntPtr(Handle);
             internal Operation(LabBonjourDiscovery owner, string stage, Service service, double deadline)
             { Owner = owner; Stage = stage; Service = service; Deadline = deadline; Handle = GCHandle.Alloc(this); }

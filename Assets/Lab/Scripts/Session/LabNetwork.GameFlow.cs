@@ -11,7 +11,7 @@ namespace C6Lab
     /// </summary>
     public sealed partial class LabNetwork
     {
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/3");
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/4");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;
@@ -32,6 +32,7 @@ namespace C6Lab
         /// <summary>Accepted DEV settings require the same-stage Scene load barrier before combat restarts.</summary>
         public event Action GameFlowDeveloperRestartRequested;
         public bool GameFlowEnabled => gameFlowEnabled;
+        public LabRoomFamily RoomFamily => gameFlowEnabled ? LabRoomFamily.Game : LabRoomFamily.Lab;
         public int SessionConfigRevision => configRevision;
         public string SessionConfigFingerprint => configFingerprint;
         public bool HasBattleReferences => board != null && target != null && battleFloor != null;
@@ -45,7 +46,10 @@ namespace C6Lab
         public bool SetGameFlowEnabled(bool enabled)
         {
             if (!CanChooseConnection) return false;
+            if (gameFlowEnabled == enabled) return true;
             gameFlowEnabled = enabled;
+            // A discovery instance never changes family. Retire any old browse/cache before switching.
+            DisposeDiscovery();
             return true;
         }
 

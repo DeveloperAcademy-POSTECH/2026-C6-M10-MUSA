@@ -195,7 +195,10 @@ namespace Hapio.Editor
             if (font == null) throw new InvalidOperationException("The existing Shilla font is required for stage and DEV labels.");
             foreach (GameObject root in scene.GetRootGameObjects())
                 foreach (UnityEngine.UI.Text text in root.GetComponentsInChildren<UnityEngine.UI.Text>(true))
-                { text.font = font; EditorUtility.SetDirty(text); }
+                {
+                    if (text.GetComponentInParent<GameLobbyView>(true) != null) continue;
+                    text.font = font; EditorUtility.SetDirty(text);
+                }
         }
 
         private static void ConfigureDeveloperScopes(GameScreen screen)
