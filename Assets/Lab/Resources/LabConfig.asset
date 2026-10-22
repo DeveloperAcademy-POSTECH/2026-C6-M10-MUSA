@@ -48,16 +48,16 @@ MonoBehaviour:
   blastBurnSeconds: 4
   blastShrinkScale: 0.5
   smallOrbPaintShare: 0.5
-  gourdColorComboEnabled: 1
+  gourdColorComboEnabled: 0
   comboFirstStartSeconds: 50
   comboRepeatIntervalSeconds: 60
   comboTimeLimitSeconds: 15
-  comboPenaltyDurationSeconds: 10
+  comboPenaltyDurationSeconds: 15
   comboPenaltySizeScale: 0.1
   comboPenaltyThrowerOnly: 0
-  comboRewardDurationSeconds: 10
+  comboRewardDurationSeconds: 15
   comboRewardSizeScale: 2.5
-  comboWarningSeconds: 3
+  comboWarningSeconds: 4
   orbLifetimeSeconds: 8
   orbRestitution: 0.8
   orbFloorDeceleration: 2
@@ -119,6 +119,24 @@ MonoBehaviour:
   swipeBlockInterval: 40
   swipeBlockSeconds: 10
   swipeBlockBombGap: 4
+  sabotageMixEnabled: 0
+  sabotageIntervalMin: 20
+  sabotageIntervalMax: 30
+  sabotageWeightGourdBomb: 1
+  sabotageWeightSwipeBlock: 1
+  sabotageWeightFoxFire: 1
+  sabotageWeightCharm: 1
+  foxFireCountMin: 2
+  foxFireCountMax: 5
+  foxFireSafeSeconds: 1
+  charmSeconds: 10
+  charmRescueTaps: 3
+  jigwiFireTargetCount: 1
+  jigwiFireSeconds: 15
+  jigwiOverheatSeconds: 4
+  jigwiGenerationBurnSeconds: 10
+  jigwiRawRadiusScale: 0.65
+  jigwiRawLifeScale: 0.5
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9
@@ -179,3 +197,11 @@ MonoBehaviour:
   straightPitchOffsetDegrees: 3
   straightLoftScale: 0.1
   straightGravityScale: 0.1
+  yaguangFlashEnabled: 0
+  yaguangFlashTargetOne: 0
+  yaguangFlashFirstStartSeconds: 10
+  yaguangFlashIntervalSeconds: 60
+  yaguangFlashWarningSeconds: 3
+  yaguangFlashGlareSeconds: 7
+  yaguangFlashRecoverySeconds: 2
+  comboYaguangCountEnabled: 1

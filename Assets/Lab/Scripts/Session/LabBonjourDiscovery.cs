@@ -122,14 +122,19 @@ namespace C6Lab
         public static bool IsSupported => Application.platform == RuntimePlatform.OSXEditor || Application.platform == RuntimePlatform.OSXPlayer || Application.platform == RuntimePlatform.IPhonePlayer;
 
         public bool UpdatePresence(int participants, int capacity, bool playing, bool waitingForHost = false)
+            => UpdatePresence(advertisedIpv4, advertisedIpv6, participants, capacity, playing, waitingForHost);
+
+        /// <summary>When a pending room activates, advertise actual listeners rather than its reserved socket hints.</summary>
+        public bool UpdatePresence(bool ipv4, bool ipv6, int participants, int capacity, bool playing, bool waitingForHost = false)
         {
             CheckOwner();
             if (!IsAdvertising) return false;
-            byte[] record = LabRoomPresence.Encode(Protocol, advertisedIpv4, advertisedIpv6, participants, capacity, playing, waitingForHost);
+            byte[] record = LabRoomPresence.Encode(Protocol, ipv4, ipv6, participants, capacity, playing, waitingForHost);
             if (advertisedPresence != null && record.SequenceEqual(advertisedPresence)) return true;
             int error = Native(() => LabBonjourNative.DNSServiceUpdateRecord(advertisement.Reference, IntPtr.Zero, 0,
                 (ushort)record.Length, record, 0));
             if (error != 0) { LastError = Error("presence", error); return false; }
+            advertisedIpv4 = ipv4; advertisedIpv6 = ipv6;
             advertisedPresence = record; return true;
         }
 
@@ -438,6 +443,14 @@ namespace C6Lab
                     out int count, out int capacity, out bool playing, out bool waitingForHost))
                 { owner.Remove(operation.Service.Key); return; }
                 var service = operation.Service;
+                if (service.Ipv4 != ipv4 || service.Ipv6 != ipv6)
+                {
+                    service.Ipv4 = ipv4; service.Ipv6 = ipv6;
+                    foreach (string key in service.Addresses.Where(pair =>
+                        (!ipv4 && !pair.Value.Target.Address.Contains(":"))
+                        || (!ipv6 && pair.Value.Target.Address.Contains(":"))).Select(pair => pair.Key).ToArray())
+                        service.Addresses.Remove(key);
+                }
                 service.Participants = count; service.Capacity = capacity; service.Playing = playing; service.WaitingForHost = waitingForHost;
                 operation.HasAddressOrReply = true; owner.changed = true;
             });

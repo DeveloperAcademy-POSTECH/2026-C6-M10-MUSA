@@ -15,6 +15,11 @@ namespace C6Lab
         public RawImage background;
         public GameObject titlePage, browserPage, positionPage, emptyRooms;
         public Button enterButton, createButton, refreshButton, cancelButton, leaveButton, sealButton;
+        [Header("Compatibility controls: two-player rooms, free positions and direct LAN join")]
+        public Button clearSlotButton, directConnectionButton, directJoinButton, closeDirectConnectionButton;
+        public GameObject directConnectionPanel;
+        public InputField directAddress, directPort;
+        public Text directFeedback;
         public Button[] countButtons, slotButtons;
         public Text heading, subheading, roomName, joinedCount, selectedCount, message;
         public Text[] slotLabels, localLabels;
@@ -38,15 +43,21 @@ namespace C6Lab
 
         private void Awake()
         {
+            if (Network != null && Network.GameFlowEnabled) { gameObject.SetActive(false); return; }
+            if (emptySlots.Length > 1 && emptySlots[0] == filledSlots[0]) emptySlots[0] = emptySlots[1];
             enterButton.onClick.AddListener(EnterLobby);
             createButton.onClick.AddListener(CreateRoom);
             refreshButton.onClick.AddListener(() => Network?.StartRoomSearch());
             cancelButton.onClick.AddListener(() => Network?.CancelJoin());
             leaveButton.onClick.AddListener(() => Network?.Stop());
             sealButton.onClick.AddListener(() => Network?.StartBattle());
+            clearSlotButton?.onClick.AddListener(() => Network?.RequestPlayerSlot(0));
+            directConnectionButton?.onClick.AddListener(() => SetDirectConnection(true));
+            closeDirectConnectionButton?.onClick.AddListener(() => SetDirectConnection(false));
+            directJoinButton?.onClick.AddListener(JoinDirect);
             for (int i = 0; i < countButtons.Length; i++)
             {
-                int count = i + 3;
+                int count = i + 2;
                 countButtons[i].onClick.AddListener(() =>
                 {
                     if (Network == null || !Network.CanChooseConnection) return;
@@ -64,13 +75,14 @@ namespace C6Lab
 
         public void EnterLobby()
         {
+            if (Network != null && Network.GameFlowEnabled) return;
             entered = true;
             if (Network != null && Network.CanChooseConnection && !Network.IsSearchingRooms) Network.StartRoomSearch();
         }
 
         private void CreateRoom()
         {
-            if (Network == null || !Network.CanChooseConnection || creationCapacity < 3) return;
+            if (Network == null || Network.GameFlowEnabled || !Network.CanChooseConnection || creationCapacity < 2) return;
             if (createdRooms.Count >= LabBonjourDiscovery.MaximumServices)
             { creationError = "열린 방이 너무 많소. 만든 방에 먼저 입장해주시오."; return; }
             if (!LabPendingRoom.TryCreate(creationCapacity, out var room, out creationError)) return;
@@ -99,6 +111,14 @@ namespace C6Lab
         private void LateUpdate()
         {
             if (Network == null || hud == null) return;
+            // Hapio's separate Home/Lobby own game-flow navigation and discovery. A stale
+            // copied Lab view must never register rooms or cover those Scenes.
+            if (Network.GameFlowEnabled)
+            {
+                background.gameObject.SetActive(false);
+                design.gameObject.SetActive(false);
+                return;
+            }
             // Other created rooms remain advertised even while this player is inside a game.
             bool canRegister = true;
             int nextNumber = 1;
@@ -125,6 +145,7 @@ namespace C6Lab
             bool connected = Network.IsConnected && !Network.IsJoiningRoom;
             bool inRoom = connected;
             if (connected || Network.IsJoiningRoom) entered = true;
+            if (connected || Network.IsJoiningRoom) SetDirectConnection(false);
             titlePage.SetActive(!entered);
             browserPage.SetActive(entered && !inRoom);
             positionPage.SetActive(entered && inRoom);
@@ -144,6 +165,37 @@ namespace C6Lab
         {
             foreach (var room in createdRooms) room.Dispose();
             createdRooms.Clear();
+        }
+
+        private void SetDirectConnection(bool visible)
+        {
+            if (directConnectionPanel == null) return;
+            if (visible && (Network == null || Network.GameFlowEnabled || !Network.CanChooseConnection)) return;
+            directConnectionPanel.SetActive(visible);
+            if (!visible) return;
+            directConnectionPanel.transform.SetAsLastSibling();
+            if (directAddress != null) directAddress.SetTextWithoutNotify(Network.hostAddress);
+            if (directPort != null) directPort.SetTextWithoutNotify(Network.port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (directFeedback != null) directFeedback.text = "방장의 IP 주소와 포트를 입력하시오. 같은 Wi-Fi 또는 핫스팟에 연결해야 하오.";
+        }
+
+        private void JoinDirect()
+        {
+            if (Network == null || Network.GameFlowEnabled || !Network.CanChooseConnection) return;
+            string address = directAddress != null ? directAddress.text.Trim() : string.Empty;
+            if (string.IsNullOrEmpty(address) || directPort == null
+                || !ushort.TryParse(directPort.text, out ushort port) || port == 0)
+            {
+                if (directFeedback != null) directFeedback.text = "IP 주소와 1~65535 사이의 포트를 확인하시오.";
+                return;
+            }
+            Network.hostAddress = address;
+            Network.port = port;
+            hud.hostAddress?.SetTextWithoutNotify(address);
+            hud.port?.SetTextWithoutNotify(port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Network.Join(address);
+            if (!Network.IsJoiningRoom && !Network.IsConnected && directFeedback != null)
+                directFeedback.text = Network.Notice;
         }
 
         public static Rect BackgroundUv(bool title, Vector2 size)
@@ -170,7 +222,8 @@ namespace C6Lab
 
         private void RefreshBrowser()
         {
-            createButton.interactable = Network.CanChooseConnection && creationCapacity >= 3;
+            createButton.interactable = Network.CanChooseConnection && creationCapacity >= 2;
+            if (directConnectionButton != null) directConnectionButton.interactable = Network.CanChooseConnection;
             refreshButton.interactable = Network.CanChooseConnection;
             refreshButton.gameObject.SetActive(!Network.IsJoiningRoom);
             cancelButton.gameObject.SetActive(Network.IsJoiningRoom);
@@ -178,7 +231,7 @@ namespace C6Lab
             cancelButton.GetComponentInChildren<Text>().text = "입장 취소";
             for (int i = 0; i < countButtons.Length; i++)
             {
-                bool selected = creationCapacity == i + 3;
+                bool selected = creationCapacity == i + 2;
                 countButtons[i].interactable = Network.CanChooseConnection;
                 countButtons[i].targetGraphic.color = Html(selected ? "3F3D38" : "E8DFCB");
                 countButtons[i].GetComponentInChildren<Text>().color = selected ? Html("F3EBDD") : Ink;
@@ -228,7 +281,8 @@ namespace C6Lab
             int count = Network.TargetParticipantCount;
             bool allChosen = Network.ParticipantCount == count && Network.SelectedParticipantCount == count;
             heading.text = allChosen ? "요괴 봉인 준비 완료!" : "빈 자리를 고르시오.";
-            subheading.text = Network.SlotSelectionPending ? "자리 선택을 확인하고 있소..."
+            subheading.text = Network.IsDeveloperRestartPending ? "설정을 적용하고 있소..."
+                : Network.SlotSelectionPending ? "자리 선택을 확인하고 있소..."
                 : allChosen ? (Network.SessionConfigReady ? "" : "방 설정을 확인하고 있소...")
                 : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
             roomName.text = Network.HostRoomNamePending ? "방을 만들고 있소..." : DisplayRoomName(Network.ConnectedRoomName);
@@ -253,15 +307,21 @@ namespace C6Lab
                 ulong owner = Network.GetSlotOwner(i + 1);
                 bool occupied = owner != ulong.MaxValue;
                 bool mine = occupied && owner == Network.LocalPlayerId;
-                slotImages[i].sprite = occupied ? filledSlots[i] : emptySlots[i];
+                Sprite empty = i == 0 && emptySlots[0] == filledSlots[0] && emptySlots.Length > 1
+                    ? emptySlots[1] : emptySlots[i];
+                slotImages[i].sprite = occupied ? filledSlots[i] : empty;
                 // The original artwork is rotated with the diagram; text remains upright.
                 slotImages[i].rectTransform.localEulerAngles = new Vector3(0, 0, 180);
                 slotLabels[i].text = "P" + (i + 1);
                 slotLabels[i].color = occupied ? Html("F6F6F6") : Color.black;
-                slotButtons[i].interactable = i != 0 && !Network.IsHost && Network.CanSelectPlayerSlot && (!occupied || mine);
-                localLabels[i].text = i == 0 ? (mine ? "방장 · 나" : "방장") : mine ? "나 · 취소" : "";
+                slotButtons[i].interactable = Network.CanSelectPlayerSlot && (!occupied || mine);
+                bool host = occupied && owner == Unity.Netcode.NetworkManager.ServerClientId;
+                localLabels[i].text = (host ? "방장" : string.Empty)
+                    + (mine ? (host ? " · 나 · 취소" : "나 · 취소") : string.Empty);
                 Place(localLabels[i].rectTransform, p.x - 60, p.y + 42, 120, 25);
             }
+            if (clearSlotButton != null)
+                clearSlotButton.interactable = Network.CanSelectPlayerSlot && Network.LocalSlotNumber != 0;
             sealButton.interactable = Network.CanStartBattle;
             sealButton.targetGraphic.color = Html(Network.CanStartBattle ? "AF4738" : "C7C0B0");
             var label = sealButton.GetComponentInChildren<Text>();

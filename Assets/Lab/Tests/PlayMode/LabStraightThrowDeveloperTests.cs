@@ -34,11 +34,10 @@ namespace C6Lab.Tests
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
             LabDeveloperMode ui = SavedDeveloperUi();
-            ui.allowOfflineEditorTuning = true; // Explicit offline physics fixture.
             testedNetwork = ui.network;
             float[] original = ui.sourceConfig.CaptureDeveloperValues();
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(166), "The live DEV panel includes all appended settings, including nearby-hit drying.");
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(166), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(196), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(196), "The live DEV panel includes all appended settings, including nearby-hit drying.");
             Assert.That(ui.sourceConfig.ThrowForm, Is.EqualTo(LabThrowForm.Arc));
             ui.Open();
             Assert.That(ui.panel.activeSelf, Is.True);
@@ -74,7 +73,6 @@ namespace C6Lab.Tests
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
             LabDeveloperMode ui = SavedDeveloperUi();
-            ui.allowOfflineEditorTuning = true; // Explicit offline physics fixture.
             testedNetwork = ui.network;
             LabNetwork network = ui.network;
             float[] original = ui.sourceConfig.CaptureDeveloperValues();

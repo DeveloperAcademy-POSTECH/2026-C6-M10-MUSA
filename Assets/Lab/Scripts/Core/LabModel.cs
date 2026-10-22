@@ -5,6 +5,9 @@ using UnityEngine;
 
 namespace C6Lab
 {
+    /// <summary>야광귀 모드에서 한 번에 하나만 열리는 이벤트 종류 (#271).</summary>
+    internal enum LabYaguangEvent { Combo, Flash, GourdBomb, SwipeBlock, Sabotage }
+
     /// <summary>
     /// A locked bomb that reached its fuse: the board it blasts and where, in 0..1 board units,
     /// its holder last reported it.
@@ -57,11 +60,39 @@ namespace C6Lab
         }
     }
 
+    /// <summary>A sabotage the sabotage mix cast on one player (#251), and the Host time it began.</summary>
+    public readonly struct LabSabotage
+    {
+        public readonly LabSabotageKind Kind;
+        public readonly ulong Target;
+        public readonly double At;
+
+        public LabSabotage(LabSabotageKind kind, ulong target, double at)
+        {
+            Kind = kind;
+            Target = target;
+            At = at;
+        }
+    }
+
+    /// <summary>Fox orbs the fox fire dropped onto one player's board (#251).</summary>
+    public readonly struct LabFoxFireDrop
+    {
+        public readonly ulong Target;
+        public readonly string[] OrbIds;
+
+        public LabFoxFireDrop(ulong target, string[] orbIds)
+        {
+            Target = target;
+            OrbIds = orbIds;
+        }
+    }
+
     /// <summary>
     /// Plain Host-only battle state. Transport authenticates sender IDs before calling this class;
     /// clients render copies from Snapshot and never decide ownership, damage, or expiry.
     /// </summary>
-    public sealed class LabModel
+    public sealed partial class LabModel
     {
         public const int MinimumParticipants = 2;
         public const int MaximumParticipants = 5;
@@ -90,6 +121,19 @@ namespace C6Lab
         private const ulong DrumHandoffKey = ulong.MaxValue - 2UL;
         // 박 폭탄 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (북 자리 뽑기는 ulong.MaxValue).
         private const ulong GourdDrawKey = ulong.MaxValue - 1UL;
+        private const uint SabotageDelaySalt = 0x5AB0DE1Au;
+        private const uint SabotageKindSalt = 0x5AB0C1D5u;
+        private const uint SabotageTargetSalt = 0x5AB07A26u;
+        // 통합 방해공작 추첨도 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (#251).
+        private const ulong SabotageDrawKey = ulong.MaxValue - 4UL;
+        private const uint FlashTargetSalt = 0x7A6F1A5Bu;
+        // 야광귀 섬광 대상 뽑기도 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (#268).
+        private const ulong FlashDrawKey = ulong.MaxValue - 5UL;
+        private const uint FoxCountSalt = 0xF0C5C017u;
+        private const uint FoxLandingXSalt = 0xF0C51A0Du;
+        private const uint FoxLandingYSalt = 0xF0C51A1Du;
+        // 여우구슬이 떨어지는 곳: 판 너비의 15~85%, 높이의 25~80% 사이에서 하나씩 뽑는다.
+        private const float FoxLandingMinX = .15f, FoxLandingMaxX = .85f, FoxLandingMinY = .25f, FoxLandingMaxY = .8f;
         // 박 폭탄이 떨어지는 곳: 판 너비의 20~80% 사이, 판 높이의 이 지점 (보드가 영역 안으로 맞춘다).
         private const float GourdLandingMinX = .2f, GourdLandingMaxX = .8f, GourdLandingY = .6f;
         // DEV에서 간격을 아주 작게 넣어도 한 프레임에 폭탄이 쏟아지지 않도록 하는 최소 간격.
@@ -124,11 +168,41 @@ namespace C6Lab
         private readonly List<LabGourdBomb> gourdBombs = new List<LabGourdBomb>();
         private double nextGourdBombAt;
         private uint gourdBombCount;
+        private readonly List<LabSabotage> sabotages = new List<LabSabotage>();
+        private double nextSabotageAt;
+        private uint sabotageCount;
+        private ulong? lastSabotageTarget;
+        private readonly List<LabFoxFireDrop> foxFires = new List<LabFoxFireDrop>();
+        private ulong charmedPlayer;
+        private double charmStartedAt = -1d, charmUntil = -1d;
+        private int charmTaps;
         private uint drumHandoffCount;
         private readonly LabGourdCombo combo = new LabGourdCombo();
         // 던진 순간의 페널티 배율 (#222). 날아가는 동안 페널티가 끝나도 그 공은 던질 때 크기 그대로 칠한다.
         private readonly Dictionary<string, float> launchScales = new Dictionary<string, float>(StringComparer.Ordinal);
         private double nextComboAt;
+        // 야광귀 섬광 (#268): 다음 번쩍임 시각·대상, 지금까지 번쩍인 수, 마지막 번쩍임, 콤보 때문에 기다리는 중인지
+        private double nextFlashAt;
+        private ulong nextFlashTarget;
+        private uint flashCount;
+        private double lastFlashAt;
+        private ulong lastFlashTarget;
+        private bool flashHeld;
+        // 콤보 때문에 섬광 예고를 미뤘었는지. 콤보가 끝난 첫 순간 예고를 처음부터 다시 시작한다.
+        private bool flashWasHeld;
+        // 섬광 예고가 실제로 시작됐는지 (#271). 시작된 뒤에는 다른 이벤트가 열리지 않는다.
+        private bool flashWarned;
+        // 야광귀 모드의 이벤트 차례 (#271): 콤보 예고가 실제로 시작됐는지, 다른 이벤트 때문에 미뤘는지
+        private bool comboWarned, comboHeld, comboWasHeld;
+        private bool gourdBombWasHeld, swipeBlockWasHeld;
+        // 차례를 기다리는 콤보·섬광 (#271): 예고를 시작할 때가 됐는데 다른 이벤트 때문에 미루기 시작한 시각, 없으면 -1.
+        // 기다리는 동안 새 폭탄·넘기기 막기·방해공작을 걸지 않아 화면이 곧 비고, 둘 다 기다리면 먼저 기다린 쪽이 먼저 한다.
+        private double comboQueuedAt = -1d, flashQueuedAt = -1d;
+        // 화면마다 콤보·섬광·그 밖의 이벤트(폭탄·넘기기 막기·여우불·매혹)가 마지막으로 열려 있던 시각 (#271).
+        // 이벤트가 닫힌 뒤 EventGapSeconds 동안은 그 화면을 쉬게 한다.
+        private readonly Dictionary<ulong, double[]> screenBusyAt = new Dictionary<ulong, double[]>();
+        /// <summary>야광귀 모드에서 한 화면의 이벤트가 끝나고 다음 이벤트가 시작되기까지 쉬는 시간 (#271)</summary>
+        internal const double EventGapSeconds = 3d;
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -146,6 +220,7 @@ namespace C6Lab
         public string SessionId => sessionId;
         public uint Round => round;
         public LabPhase Phase => phase;
+        public LabStageYokai StageYokai => rules != null ? rules.StageYokai : LabStageYokai.None;
         /// <summary>Current ledger revision; reading it does not advance the Host battle clock.</summary>
         public ulong Revision => revision;
 
@@ -170,27 +245,31 @@ namespace C6Lab
             ? rules.PaintColors[(int)element] : Color.clear;
 
         /// <summary>ids must be the Host-approved player IDs in P1..PN order.</summary>
-        public void Begin(string id, ulong[] ids, double now, LabConfig config)
+        public void Begin(string id, ulong[] ids, double now, LabConfig config,
+            LabStageYokai stageYokai = LabStageYokai.None)
         {
             if (ids == null || ids.Length < MinimumParticipants || ids.Length > MaximumParticipants
                 || ids.Distinct().Count() != ids.Length)
                 throw new ArgumentException("Two to five distinct player IDs are required.", nameof(ids));
-            BeginWithSeats(id, ids, now, config);
+            BeginWithSeats(id, ids, now, config, stageYokai);
         }
 
         /// <summary>Development-only battle model with one real player and no transferable neighbor.</summary>
-        public void BeginSolo(string id, ulong playerId, double now, LabConfig config)
+        public void BeginSolo(string id, ulong playerId, double now, LabConfig config,
+            LabStageYokai stageYokai = LabStageYokai.None)
         {
-            BeginWithSeats(id, new[] { playerId }, now, config);
+            BeginWithSeats(id, new[] { playerId }, now, config, stageYokai);
         }
 
-        private void BeginWithSeats(string id, ulong[] ids, double now, LabConfig config)
+        private void BeginWithSeats(string id, ulong[] ids, double now, LabConfig config, LabStageYokai stageYokai)
         {
             if (string.IsNullOrWhiteSpace(id) || id.Length > 128) throw new ArgumentException("A bounded session ID is required.", nameof(id));
             if (!Finite(now) || now < 0d || config == null) throw new ArgumentException("Valid Host time and a Config are required.");
             if (phase == LabPhase.Playing) throw new InvalidOperationException("End the current round before beginning another.");
             if (sessionId == id && round == uint.MaxValue) throw new InvalidOperationException("The round number is exhausted.");
-            var nextRules = new Rules(config);
+            if (stageYokai < LabStageYokai.None || stageYokai > LabStageYokai.Jigwi)
+                throw new ArgumentOutOfRangeException(nameof(stageYokai));
+            var nextRules = new Rules(config, stageYokai);
             double nextDeadline = now + nextRules.BattleDurationSeconds;
             if (!Finite(nextDeadline) || nextDeadline <= now)
                 throw new ArgumentOutOfRangeException(nameof(now), "The battle deadline is not representable.");
@@ -206,6 +285,8 @@ namespace C6Lab
             orbExpiries.Clear();
             gourdBombs.Clear();
             gourdBombTimes.Clear();
+            sabotages.Clear();
+            foxFires.Clear();
             for (int i = 0; i < activeSeatCount; i++)
             {
                 players.Add(ids[i], new LabPlayerState
@@ -222,20 +303,44 @@ namespace C6Lab
             PlaceDrums(now);
             gourdBombCount = 0;
             drumHandoffCount = 0;
-            nextGourdBombAt = now + GourdBombDelay(0u);
+            // With the sabotage mix on (#251) the gourd's bombs and swipe blocks keep no timers of their own.
+            bool legacyMix = stageYokai == LabStageYokai.None && rules.SabotageMix;
+            nextGourdBombAt = legacyMix ? double.PositiveInfinity : now + GourdBombDelay(0u);
             swipeBlockCount = 0;
             swipeBlockedPlayer = 0;
             swipeBlockedRight = false;
             swipeBlockStartedAt = swipeBlockedUntil = -1d;
-            nextSwipeBlockAt = rules.SwipeBlockInterval > 0f ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
+            nextSwipeBlockAt = !legacyMix && rules.SwipeBlockInterval > 0f
+                ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
+            sabotageCount = 0;
+            lastSabotageTarget = null;
+            charmedPlayer = 0;
+            charmStartedAt = charmUntil = -1d;
+            charmTaps = 0;
+            nextSabotageAt = legacyMix || stageYokai == LabStageYokai.Gumiho
+                ? now + SabotageDelay(0u) : double.PositiveInfinity;
             combo.Reset();
             launchScales.Clear();
             nextComboAt = now + rules.ComboFirstStartSeconds;
+            flashCount = 0;
+            lastFlashAt = -1d;
+            lastFlashTarget = 0;
+            flashHeld = false;
+            flashWasHeld = false;
+            flashWarned = false;
+            comboWarned = comboHeld = comboWasHeld = false;
+            gourdBombWasHeld = swipeBlockWasHeld = false;
+            comboQueuedAt = flashQueuedAt = -1d;
+            screenBusyAt.Clear();
+            nextFlashAt = rules.FlashEnabled ? now + rules.FlashFirstStartSeconds : double.PositiveInfinity;
+            nextFlashTarget = DrawFlashTarget(0u);
             lastTime = now;
             deadline = nextDeadline;
             remaining = rules.BattleDurationSeconds;
             played = 0d;
             phase = LabPhase.Playing;
+            ResetJigwi(config);
+            ResetStageYokai(config, now);
         }
 
         /// <summary>Advance the absolute Host clock; only Idle orbs expire.</summary>
@@ -278,7 +383,9 @@ namespace C6Lab
             Vector2 position = drumPosition ?? new Vector2(drum.x, drum.y);
             if (!Unit(position.x) || !Unit(position.y)) return Reject("INVALID_MOTION", out reason);
             var player = players[sender];
-            if (CountStored(sender) >= rules.OrbStorageLimit) return Reject("STORAGE_FULL", out reason);
+            // An overheated press still pays for a burnt attempt but creates no stored entity.
+            if (!JigwiOverheated(sender, now) && CountStored(sender) >= rules.OrbStorageLimit)
+                return Reject("STORAGE_FULL", out reason);
             if (player.stamina + .00001f < rules.GenerateCost) return Reject("INSUFFICIENT_STAMINA", out reason);
             uint generated = generatedCounts[sender];
             if (generated == uint.MaxValue) return Reject("GENERATION_LIMIT", out reason);
@@ -288,6 +395,11 @@ namespace C6Lab
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
             player.generatedTotal++;
+            if (JigwiOverheated(sender, now))
+            {
+                reason = "JIGWI_BURNED";
+                return true;
+            }
             Vector2 launch = SpawnVelocityFor(seed, sender, generated, position.x);
             orb = new LabOrbState
             {
@@ -296,6 +408,7 @@ namespace C6Lab
                 x = position.x, y = position.y,
                 vx = launch.x, vy = launch.y, createdAt = now, revision = ++revision, inFlight = false
             };
+            ApplyJigwiGenerationBurn(orb, now);
             orbs.Add(orb.id, orb);
             reason = "GENERATED";
             orb = orb.Copy();
@@ -308,7 +421,7 @@ namespace C6Lab
         /// </summary>
         public bool TryCombineAt(ulong sender, string firstId, string secondId, string requestId,
             double now, Vector2 normalizedCenter, Vector2 normalizedVelocity,
-            out LabOrbState orb, out string reason)
+            out LabOrbState orb, out string reason, bool passiveContact = false)
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
@@ -320,6 +433,14 @@ namespace C6Lab
             if (!UsableBy(first, sender) || !UsableBy(second, sender)) return Reject("NOT_OWNED_IDLE", out reason);
             if (!first.kind.IsRaw() || !second.kind.IsRaw() || first.kind == second.kind)
                 return Reject("POLARITY_MISMATCH", out reason);
+
+            if (!passiveContact && JigwiOverheated(sender, now))
+            {
+                RemoveJigwiBurned(firstId);
+                RemoveJigwiBurned(secondId);
+                reason = "JIGWI_BURNED";
+                return true;
+            }
 
             orbs.Remove(firstId); orbs.Remove(secondId);
             var element = ElementFor(seed, combinedCount++);
@@ -341,6 +462,25 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// 여우불 (#251): 여우구슬과 음·양 구슬이 닿거나 겹쳐지면 둘 다 사라진다. 떨어진 뒤 보호 시간 동안은 받지 않는다.
+        /// 결합 구슬도, 새 ID도 만들지 않는다.
+        /// </summary>
+        public bool TryFoxFireAt(ulong sender, string foxId, string orbId, string requestId, double now, out string reason)
+        {
+            if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (string.IsNullOrEmpty(foxId) || string.IsNullOrEmpty(orbId) || foxId == orbId
+                || !orbs.TryGetValue(foxId, out var fox) || !orbs.TryGetValue(orbId, out var orb))
+                return Reject("ORB_NOT_FOUND", out reason);
+            if (!UsableBy(fox, sender) || !UsableBy(orb, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            if (fox.kind != LabOrbKind.FoxFire || !orb.kind.IsRaw()) return Reject("NOT_FOX_FIRE", out reason);
+            if (now - fox.createdAt < rules.FoxFireSafeSeconds) return Reject("FOX_FIRE_SAFE", out reason);
+            orbs.Remove(foxId);
+            orbs.Remove(orbId);
+            reason = "FOX_FIRE";
+            return true;
+        }
+
+        /// <summary>
         /// Atomically validate the current boundary position and hand off the orb. No preceding
         /// motion packet is required and rejected geometry never overwrites the stored position.
         /// </summary>
@@ -352,7 +492,7 @@ namespace C6Lab
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!TryFindMovable(id, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
-            if (activeSeatCount == 1) return Reject("NO_NEIGHBOR", out reason);
+            if (activeSeatCount == 1 && current.kind != LabOrbKind.FoxFire) return Reject("NO_NEIGHBOR", out reason);
             if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y) || !Finite(normalizedVelocity) ||
                 normalizedVelocity.sqrMagnitude > rules.MaximumMotionSpeed * rules.MaximumMotionSpeed)
                 return Reject("INVALID_MOTION", out reason);
@@ -366,6 +506,13 @@ namespace C6Lab
                 && current.kind.IsDrum() && current.arrival == LabDrumArrival.Pass;
             if (crossing != LabEdgeCrossingKind.Pushed && !passingDrum && SwipeBlocked(sender, right, now))
                 return Reject("SWIPE_BLOCKED", out reason);
+            if (current.kind == LabOrbKind.FoxFire)
+            {
+                // A fox orb never reaches a neighbour (#251): over a side edge, even solo, it goes up in blue smoke.
+                orbs.Remove(current.id);
+                reason = "FOX_FIRE_GONE";
+                return true;
+            }
             int receiverSeat = (players[sender].seat + (right ? 1 : activeSeatCount - 1)) % activeSeatCount;
             ulong receiver = seats[receiverSeat];
             // A drum is not a stored orb, so a full board still receives it.
@@ -404,7 +551,15 @@ namespace C6Lab
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            if (JigwiOverheated(sender, now))
+            {
+                RemoveJigwiBurned(id);
+                reason = "JIGWI_BURNED";
+                return true;
+            }
             if (!current.kind.CanThrow(current.lockSwipes)) return Reject("RAW_CANNOT_ATTACK", out reason);
+            // Charmed (#251): too dazed to attack until it ends or the players beside wake them.
+            if (Charmed(sender, now)) return Reject("CHARMED", out reason);
             current.inFlight = true;
             current.vx = current.vy = 0f;
             current.revision = ++revision;
@@ -506,7 +661,8 @@ namespace C6Lab
         /// </summary>
         private void AdvanceCombo(double until)
         {
-            if (!rules.ComboEnabled) return;
+            comboHeld = false;
+            if (!rules.ComboEnabled) { comboQueuedAt = -1d; return; }
             while (true)
             {
                 if (combo.Active)
@@ -515,7 +671,28 @@ namespace C6Lab
                     OnComboFinished(LabComboResult.Timeout);
                     continue;
                 }
+                if (!comboWarned)
+                {
+                    // 야광귀 모드 (#271): 다른 이벤트(폭탄·넘기기 막기·섬광·방해공작)가 열려 있으면 예고를 시작하지 않고,
+                    // 그것이 닫히면 예고부터 처음 다시 보여준다.
+                    if (nextComboAt - rules.ComboWarningSeconds > until) return;
+                    if (AnyScreenOpen(LabYaguangEvent.Combo, until) || FlashGoesFirst)
+                    {
+                        if (comboQueuedAt < 0d) comboQueuedAt = until;
+                        comboHeld = comboWasHeld = true;
+                        nextComboAt = Math.Max(nextComboAt, until + rules.ComboWarningSeconds);
+                        return;
+                    }
+                    if (comboWasHeld)
+                    {
+                        comboWasHeld = false;
+                        nextComboAt = Math.Max(nextComboAt, until + rules.ComboWarningSeconds);
+                    }
+                    comboQueuedAt = -1d;
+                    comboWarned = true;
+                }
                 if (nextComboAt > until) return;
+                comboWarned = false;
                 double at = nextComboAt;
                 var colors = new LabOrbElement[LabGourdCombo.Length];
                 for (int i = 0; i < colors.Length; i++)
@@ -528,8 +705,273 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// 야광귀 섬광 (#268): 정해 둔 시각마다 번쩍인다. 화면 표시(하얗게 보이기)만 하므로 Host는 시각과 대상만 정한다.
+        /// 콤보 한 판(예고 → 4칸 → 결과 → 페널티/보상 효과)이 진행 중인 동안에는 섬광을 시작하지 않고 기다렸다가,
+        /// 그 판이 완전히 끝나면 예고부터 다시 보여준다(#271). 섬광이 먼저 시작했으면 콤보가 섬광이 끝나기를 기다린다.
+        /// 차례를 기다리는 동안은 새 폭탄·넘기기 막기를 걸지 않아, 섬광도 콤보처럼 정해 둔 간격 가까이 나온다.
+        /// 그래서 섬광과 콤보 한 판은 상태로 서로를 피하고, DEV에서 시각을 어떻게 당겨도 겹치지 않는다.
+        /// 간격은 번쩍인 시각부터 재고, 눈부심·회복·다음 예고가 겹치지 않을 만큼은 언제나 띄운다.
+        /// </summary>
+        private void AdvanceFlash(double until)
+        {
+            flashHeld = false;
+            if (!rules.FlashEnabled) { flashQueuedAt = -1d; return; }
+            while (true)
+            {
+                if (!flashWarned)
+                {
+                    if (nextFlashAt - rules.FlashWarningSeconds > until) return;
+                    if (FlashBlocked(until))
+                    {
+                        // 예고가 시작될 때가 됐는데 콤보 한 판이나 다른 이벤트가 열려 있으면, 닫힌 뒤 예고를 처음부터 보여준다.
+                        if (flashQueuedAt < 0d) flashQueuedAt = until;
+                        flashHeld = flashWasHeld = true;
+                        nextFlashAt = Math.Max(nextFlashAt, until + rules.FlashWarningSeconds);
+                        return;
+                    }
+                    if (flashWasHeld)
+                    {
+                        // 막던 것이 방금 닫혔다: 미룬 섬광을 지난 시각에 바로 터뜨리지 않고, 지금부터 예고를 다 보여준다.
+                        flashWasHeld = false;
+                        nextFlashAt = Math.Max(nextFlashAt, until + rules.FlashWarningSeconds);
+                    }
+                    SettleFlashTarget(until);
+                    flashQueuedAt = -1d;
+                    flashWarned = true;
+                }
+                if (nextFlashAt > until) return; // 예고 중
+                flashWarned = false;
+                double at = nextFlashAt;
+                flashCount++;
+                lastFlashAt = at;
+                lastFlashTarget = nextFlashTarget;
+                double gap = Math.Max(rules.FlashIntervalSeconds,
+                    rules.FlashGlareSeconds + rules.FlashRecoverySeconds + rules.FlashWarningSeconds);
+                nextFlashAt = at + gap;
+                nextFlashTarget = DrawFlashTarget(flashCount);
+            }
+        }
+
+        /// <summary>
+        /// 콤보 한 판이 섬광을 막는지 (#271): 콤보가 진행 중이거나 예고 중이거나, 섬광보다 먼저 차례를 기다리고 있을 때.
+        /// 다음 콤보가 곧 올 차례라고 섬광이 미리 비켜 주지는 않는다. 먼저 시작한 쪽이 먼저 하고, 다른 쪽은 끝나기를
+        /// 기다렸다가 예고부터 다시 한다. 콤보 뒤 페널티/보상은 받은 사람 화면에서 막는다(ScreenOpen).
+        /// </summary>
+        private bool ComboHoldsFlash(double at) => rules.ComboEnabled && (combo.Active || comboWarned || ComboGoesFirst);
+
+        /// <summary>둘 다 차례를 기다릴 때 콤보가 먼저인지: 콤보가 먼저(같은 순간이면 콤보) 기다리기 시작했을 때.</summary>
+        private bool ComboGoesFirst => rules.ComboEnabled && comboQueuedAt >= 0d
+            && (flashQueuedAt < 0d || comboQueuedAt <= flashQueuedAt);
+
+        /// <summary>섬광이 콤보보다 먼저 차례를 기다리고 있는지</summary>
+        private bool FlashGoesFirst => rules.FlashEnabled && flashQueuedAt >= 0d
+            && (comboQueuedAt < 0d || flashQueuedAt < comboQueuedAt);
+
+        /// <summary>
+        /// 섬광 예고를 지금 시작하면 안 되는지 (#271): 콤보 한 판(직전 포함) 중이거나, 맞을 화면에 다른 이벤트가 열려 있을 때.
+        /// 모두(ALL)면 한 화면이라도 열려 있으면 막히고, 한 명(ONE)이면 비어 있는 화면이 하나도 없을 때만 막힌다.
+        /// </summary>
+        private bool FlashBlocked(double at) => ComboHoldsFlash(at)
+            || (ExclusiveEvents && (rules.FlashTargetOne ? FreeFlashTargets(at).Count == 0 : AnyScreenOpen(LabYaguangEvent.Flash, at)));
+
+        // 미룰 섬광은 예고 시각도 알리지 않는다(#271): 지금 막혀 있거나, 예정된 예고 시작 시각에 지금 상태 그대로라면
+        // 미뤄질 섬광이면 -1을 보내, 어느 기기에서도 요괴·눈 말풍선이 미리 나오지 않게 한다. 이미 시작한 예고는 그대로 알린다.
+        // 콤보 예고가 섬광 예고보다 먼저(같은 순간 포함) 시작될 차례면 섬광은 그 콤보 한 판 뒤로 밀리므로 역시 알리지 않는다.
+        private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled && !flashHeld
+            && (flashWarned || (!FlashBlocked(lastTime) && !ComboWarnsBeforeFlash
+                && !FlashBlocked(Math.Max(lastTime, nextFlashAt - rules.FlashWarningSeconds))));
+
+        private bool ComboWarnsBeforeFlash => ComboWaiting && !comboWarned
+            && nextComboAt - rules.ComboWarningSeconds <= nextFlashAt - rules.FlashWarningSeconds;
+
+        // 섬광 예고가 콤보 예고보다 먼저 시작되고 콤보 예고 시각까지 이어질 차례면, 콤보는 그 섬광 뒤로 밀린다.
+        private bool FlashRunsIntoCombo
+        {
+            get
+            {
+                if (rules == null || !rules.FlashEnabled || flashWarned || phase != LabPhase.Playing) return false;
+                double flashWarningAt = nextFlashAt - rules.FlashWarningSeconds;
+                double comboWarningAt = nextComboAt - rules.ComboWarningSeconds;
+                return flashWarningAt < comboWarningAt
+                    && nextFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds > comboWarningAt;
+            }
+        }
+
+        /// <summary>
+        /// 야광귀 모드 (#271): 콤보나 섬광이 켜져 있으면 <b>각자의 화면에서</b> 이벤트가 한 번에 하나만 열린다.
+        /// 박 폭탄·넘기기 막기·섬광·콤보·방해공작(여우불·매혹)이 그 화면에 열려 있으면 그 화면에 새 이벤트를 걸지 않는다.
+        /// </summary>
+        private bool ExclusiveEvents => rules != null && (rules.ComboEnabled || rules.FlashEnabled);
+
+        /// <summary>
+        /// 이 사람 화면에 지금 열린 이벤트가 있는지 (#271). 시각을 미리 계산하는 것이 아니라 지금 상태를 본다.
+        /// self 종류의 열림은 빼고 보되, 박 폭탄과 넘기기 막기는 같은 종류도 본다(한 화면에 폭탄 하나, 막기는 한 번에 하나).
+        /// - 콤보: 예고가 시작됐거나 진행 중이면 모든 화면, 그 뒤 페널티/보상 효과는 받은 사람 화면
+        /// - 섬광: 예고 ~ 회복 동안 맞을 사람 화면(모두면 모든 화면)
+        /// - 박 폭탄: 그 폭탄을 지금 가진 사람 화면(터지거나 쓰여 없어질 때까지)
+        /// - 넘기기 막기 · 매혹 · 여우구슬: 걸린 사람 화면
+        /// </summary>
+        private bool ScreenOpen(ulong player, double at, LabYaguangEvent self)
+        {
+            if (!ExclusiveEvents) return false;
+            // 콤보·섬광이 차례를 기다리는 동안에는 새 폭탄·넘기기 막기·방해공작을 걸지 않는다(이미 열린 것은 끝까지 간다).
+            // 그래야 화면이 곧 비어 콤보·섬광이 밀리지 않고 정해 둔 간격 가까이 나온다.
+            if (self != LabYaguangEvent.Combo && self != LabYaguangEvent.Flash
+                && ((rules.ComboEnabled && comboQueuedAt >= 0d) || (rules.FlashEnabled && flashQueuedAt >= 0d))) return true;
+            // 앞 이벤트가 닫힌 지 EventGapSeconds가 안 됐으면 아직 쉬는 중이다. 콤보·섬광은 자기 다음 차례와의 간격을
+            // 따로 지키므로(간격·예고) 자기 종류의 쉬는 시간은 보지 않는다.
+            if (screenBusyAt.TryGetValue(player, out double[] busy))
+                for (int kind = 0; kind < busy.Length; kind++)
+                {
+                    if ((kind == BusyCombo && self == LabYaguangEvent.Combo) || (kind == BusyFlash && self == LabYaguangEvent.Flash)) continue;
+                    if (at < busy[kind] + EventGapSeconds) return true;
+                }
+            if (self != LabYaguangEvent.Combo && ComboOpenOn(player, at)) return true;
+            if (self != LabYaguangEvent.Flash && FlashOpenOn(player, at)) return true;
+            return OtherOpenOn(player, at, self);
+        }
+
+        private const int BusyCombo = 0, BusyFlash = 1, BusyOther = 2;
+
+        /// <summary>콤보 한 판이 이 화면에 열려 있는지: 예고·4칸 동안은 모든 화면, 페널티/보상 효과는 받은 사람 화면</summary>
+        private bool ComboOpenOn(ulong player, double at)
+        {
+            if (!rules.ComboEnabled) return false;
+            if (comboWarned || combo.Active) return true;
+            return players.TryGetValue(player, out LabPlayerState state)
+                && (state.comboPenaltyUntil > at || state.comboRewardUntil > at);
+        }
+
+        /// <summary>폭탄·넘기기 막기·매혹·여우구슬이 이 화면에 열려 있는지. 방해공작은 자기 매혹·여우불은 보지 않는다.</summary>
+        private bool OtherOpenOn(ulong player, double at, LabYaguangEvent self)
+        {
+            if (BlockOn(at) && swipeBlockedPlayer == player) return true;
+            if (self != LabYaguangEvent.Sabotage && CharmOn(at) && charmedPlayer == player) return true;
+            foreach (LabOrbState orb in orbs.Values)
+            {
+                if (orb.owner != player) continue;
+                if (orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd) return true;
+                if (self != LabYaguangEvent.Sabotage && orb.kind == LabOrbKind.FoxFire) return true;
+            }
+            return false;
+        }
+
+        /// <summary>이 사람이 지금 섬광(예고 ~ 회복) 중인지</summary>
+        private bool FlashOpenOn(ulong player, double at)
+        {
+            if (!rules.FlashEnabled) return false;
+            ulong target;
+            if (flashWarned) target = nextFlashTarget;
+            else if (flashCount > 0 && at < lastFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds) target = lastFlashTarget;
+            else return false;
+            return !rules.FlashTargetOne || target == player;
+        }
+
+        /// <summary>
+        /// 직전 시각에 이벤트가 열려 있던 화면에 지금 시각을 적어 둔다 (#271). 이벤트가 닫히면 그 뒤 EventGapSeconds 동안
+        /// ScreenOpen이 그 화면을 계속 열린 것으로 봐, 다음 이벤트가 숨 돌릴 틈 없이 바로 이어지지 않는다.
+        /// </summary>
+        private void MarkBusyScreens(double before, double now)
+        {
+            if (!ExclusiveEvents) return;
+            for (int i = 0; i < activeSeatCount; i++)
+            {
+                ulong player = seats[i];
+                if (!screenBusyAt.TryGetValue(player, out double[] busy))
+                    screenBusyAt[player] = busy = new[] { double.NegativeInfinity, double.NegativeInfinity, double.NegativeInfinity };
+                // 직전 시각에 열려 있었으면 닫힌 시각부터 쉰다. 끝 시각을 아는 것(섬광 회복, 콤보 효과, 넘기기 막기, 매혹)은
+                // 그 시각을, 모르는 것(폭탄·여우구슬이 없어진 때)은 지금을 쓴다. 그래서 쉬는 시간이 3초보다 짧아지지 않는다.
+                if (ComboOpenOn(player, before))
+                    busy[BusyCombo] = ComboOpenOn(player, now) ? now : ClosedAt(before, now, ComboEffectEnd(player));
+                if (FlashOpenOn(player, before))
+                    busy[BusyFlash] = FlashOpenOn(player, now) ? now
+                        : ClosedAt(before, now, lastFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds);
+                if (OtherOpenOn(player, before, LabYaguangEvent.GourdBomb))
+                    busy[BusyOther] = OtherOpenOn(player, now, LabYaguangEvent.GourdBomb) ? now : ClosedAt(before, now, OtherEnd(player, before));
+            }
+        }
+
+        private static double ClosedAt(double before, double now, double end) => Math.Max(before, Math.Min(now, end));
+
+        private double ComboEffectEnd(ulong player) =>
+            players.TryGetValue(player, out LabPlayerState state) ? Math.Max(state.comboPenaltyUntil, state.comboRewardUntil) : lastTime;
+
+        /// <summary>직전 시각에 이 화면에 열려 있던 폭탄 밖 이벤트의 끝 시각. 폭탄·여우구슬이 있었으면 알 수 없어 무한대.</summary>
+        private double OtherEnd(ulong player, double before)
+        {
+            foreach (LabOrbState orb in orbs.Values)
+                if (orb.owner == player && ((orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd) || orb.kind == LabOrbKind.FoxFire))
+                    return double.PositiveInfinity;
+            double end = before;
+            if (BlockOn(before) && swipeBlockedPlayer == player) end = Math.Max(end, swipeBlockedUntil);
+            if (CharmOn(before) && charmedPlayer == player) end = Math.Max(end, charmUntil);
+            return end;
+        }
+
+        private bool AnyScreenOpen(LabYaguangEvent self, double at)
+        {
+            for (int i = 0; i < activeSeatCount; i++)
+                if (ScreenOpen(seats[i], at, self)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// 뽑힌 사람 화면이 비어 있으면 그 사람, 아니면 비어 있는 화면들 중에서 같은 뽑기 값으로 다시 고른다 (#271).
+        /// 비어 있는 화면이 없으면 found가 false다. 모든 기기가 같은 결과를 받는다.
+        /// </summary>
+        private ulong FreeTarget(ulong drawn, ulong draw, LabYaguangEvent self, double at, out bool found)
+        {
+            found = true;
+            if (!ScreenOpen(drawn, at, self)) return drawn;
+            var free = new List<ulong>();
+            for (int i = 0; i < activeSeatCount; i++)
+                if (!ScreenOpen(seats[i], at, self)) free.Add(seats[i]);
+            found = free.Count > 0;
+            return found ? free[(int)(draw % (ulong)free.Count)] : 0;
+        }
+
+        /// <summary>한 명(ONE) 섬광을 받을 수 있는 화면: 바로 앞에 맞은 사람(두 명 이상일 때)과 이벤트 중인 화면을 뺀다.</summary>
+        private List<ulong> FreeFlashTargets(double at)
+        {
+            var free = new List<ulong>();
+            for (int i = 0; i < activeSeatCount; i++)
+            {
+                ulong player = seats[i];
+                if (flashCount > 0 && activeSeatCount > 1 && player == lastFlashTarget) continue;
+                if (!ScreenOpen(player, at, LabYaguangEvent.Flash)) free.Add(player);
+            }
+            return free;
+        }
+
+        /// <summary>한 명 섬광의 예고를 시작할 때, 미리 뽑아 둔 사람 화면이 이벤트 중이면 비어 있는 화면에서 다시 고른다.</summary>
+        private void SettleFlashTarget(double at)
+        {
+            if (!rules.FlashTargetOne || !ExclusiveEvents || !ScreenOpen(nextFlashTarget, at, LabYaguangEvent.Flash)) return;
+            List<ulong> free = FreeFlashTargets(at);
+            if (free.Count == 0) return;
+            nextFlashTarget = free[(int)(DrawFor(seed ^ FlashTargetSalt, FlashDrawKey, flashCount + 0x10000u) % (ulong)free.Count)];
+        }
+
+        /// <summary>
+        /// 섬광 대상. ALL 여부는 별도 bool로 공유한다. ONE이면 실제 ID 0도 포함한 자리 순서에서 한 명을 뽑는다.
+        /// 두 명 이상이면 바로 앞 섬광을 맞은 사람은 빼서 같은 사람이 연달아 맞지 않게 한다.
+        /// </summary>
+        private ulong DrawFlashTarget(uint index)
+        {
+            if (!rules.FlashTargetOne || activeSeatCount <= 0) return 0;
+            var candidates = new List<ulong>();
+            for (int i = 0; i < activeSeatCount; i++)
+                if (index == 0u || activeSeatCount == 1 || seats[i] != lastFlashTarget) candidates.Add(seats[i]);
+            return candidates[(int)(DrawFor(seed ^ FlashTargetSalt, FlashDrawKey, index) % (ulong)candidates.Count)];
+        }
+
         /// <summary>전투 중이고 콤보가 켜져 있으며, 진행 중인 콤보 없이 다음 콤보를 기다리는 중인지 (#241)</summary>
         private bool ComboWaiting => phase == LabPhase.Playing && rules != null && rules.ComboEnabled && !combo.Active;
+
+        // 다른 이벤트 때문에 미룰 콤보 예고는 알리지 않는다 (#271). 이미 시작한 예고는 그대로 알린다.
+        private bool ComboAnnounced => ComboWaiting && !comboHeld
+            && (comboWarned || (!AnyScreenOpen(LabYaguangEvent.Combo, lastTime) && !FlashGoesFirst && !FlashRunsIntoCombo));
 
         /// <summary>
         /// 콤보가 끝난 뒤 처리. 성공은 팀 전체에 보상을 주고, 실패는 페널티를 건다.
@@ -595,6 +1037,12 @@ namespace C6Lab
             if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y)) return Reject("INVALID_MOTION", out reason);
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            if (JigwiOverheated(sender, now))
+            {
+                RemoveJigwiBurned(id);
+                reason = "JIGWI_BURNED";
+                return true;
+            }
             if (!current.kind.IsDoubleTapUsable()) return Reject("NOT_USABLE", out reason);
             if (current.lockSwipes > 0) return Reject("ITEM_LOCKED", out reason);
             if (current.kind == LabOrbKind.SecretBox)
@@ -650,7 +1098,7 @@ namespace C6Lab
             foreach (string id in orbIds.Distinct())
             {
                 if (id == null || !orbs.TryGetValue(id, out var orb) || orb.owner != sender || orb.inFlight
-                    || orb.kind == LabOrbKind.Bomb || orb.kind.IsDrum())
+                    || orb.kind == LabOrbKind.Bomb || orb.kind.IsDrum() || orb.kind == LabOrbKind.FoxFire)
                     continue;
                 orb.burnedAt = now;
                 orb.small = true;
@@ -684,6 +1132,22 @@ namespace C6Lab
             return dropped;
         }
 
+        /// <summary>Fox orbs the fox fire dropped since the last call, each drop reported once (#251).</summary>
+        public LabFoxFireDrop[] DrainFoxFires()
+        {
+            LabFoxFireDrop[] dropped = foxFires.ToArray();
+            foxFires.Clear();
+            return dropped;
+        }
+
+        /// <summary>Sabotages the sabotage mix cast since the last call, each reported once (#251).</summary>
+        public LabSabotage[] DrainSabotages()
+        {
+            LabSabotage[] cast = sabotages.ToArray();
+            sabotages.Clear();
+            return cast;
+        }
+
         /// <summary>Remove an expired or missed projectile without damage or a hit reward.</summary>
         public bool ConfirmMiss(string id, double now)
         {
@@ -693,6 +1157,30 @@ namespace C6Lab
         }
 
         private bool BlockOn(double now) => phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt;
+        private bool CharmOn(double now) => phase == LabPhase.Playing && charmUntil > now && now >= charmStartedAt;
+
+        /// <summary>Whether the fox's charm (#251) keeps this player from attacking at this Host time.</summary>
+        public bool Charmed(ulong player, double now) => CharmOn(now) && player == charmedPlayer;
+
+        /// <summary>
+        /// 매혹 (#251): 홀린 사람의 양옆 사람이 하트 말풍선을 누른 한 번. 정해 둔 횟수가 모이면 매혹이 바로 풀린다.
+        /// 양옆이 아닌 사람, 홀린 사람 자신, 매혹이 없을 때, 깨우기가 꺼져 있을 때는 받지 않는다. 이 탭으로 깨어났으면
+        /// woken에 그 사람을, 아니면 null을 돌려준다 (Host의 플레이어 ID도 0이므로 구분한다).
+        /// </summary>
+        public bool TryCharmTap(ulong sender, double now, out ulong? woken)
+        {
+            woken = null;
+            if (!TryAdvance(now, out _) || !CharmOn(now) || rules.CharmRescueTaps <= 0 || sender == charmedPlayer
+                || !players.TryGetValue(sender, out var tapper) || !players.TryGetValue(charmedPlayer, out var charmed))
+                return false;
+            int apart = (tapper.seat - charmed.seat + activeSeatCount) % activeSeatCount;
+            if (apart != 1 && apart != activeSeatCount - 1) return false;
+            charmTaps++;
+            if (charmTaps < rules.CharmRescueTaps) return true;
+            charmUntil = now;
+            woken = charmedPlayer;
+            return true;
+        }
 
         public LabSnapshot Snapshot(double now)
         {
@@ -722,10 +1210,15 @@ namespace C6Lab
                 players = players.Values.OrderBy(player => player.seat).Select(player => player.Copy()).ToArray(),
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
                 drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray(),
+                jigwi = CopyJigwiStates(),
                 swipeBlockedPlayer = BlockOn(now) ? swipeBlockedPlayer : 0,
                 swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
                 swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
                 swipeBlockedUntil = BlockOn(now) ? swipeBlockedUntil : -1d,
+                charmedPlayer = CharmOn(now) ? charmedPlayer : 0,
+                charmStartedAt = CharmOn(now) ? charmStartedAt : -1d,
+                charmUntil = CharmOn(now) ? charmUntil : -1d,
+                charmTaps = CharmOn(now) ? charmTaps : 0,
                 comboActive = combo.Active,
                 comboColors = combo.Count == 0 ? Array.Empty<LabOrbElement>() : combo.Colors,
                 comboProgress = combo.Progress,
@@ -736,8 +1229,16 @@ namespace C6Lab
                 comboResultCount = combo.LastResultCount,
                 comboResultAt = combo.LastResultAt,
                 comboFailedBy = combo.LastFailedBy,
-                comboNextAt = ComboWaiting ? nextComboAt : -1d,
-                comboWarningAt = ComboWaiting ? nextComboAt - rules.ComboWarningSeconds : -1d
+                comboNextAt = ComboAnnounced ? nextComboAt : -1d,
+                comboWarningAt = ComboAnnounced ? nextComboAt - rules.ComboWarningSeconds : -1d,
+                flashAt = FlashWaiting ? nextFlashAt : -1d,
+                flashWarningAt = FlashWaiting ? nextFlashAt - rules.FlashWarningSeconds : -1d,
+                flashTarget = nextFlashTarget,
+                flashTargetAll = !rules.FlashTargetOne,
+                flashCount = flashCount,
+                flashLastAt = lastFlashAt,
+                flashLastTarget = lastFlashTarget,
+                flashLastTargetAll = !rules.FlashTargetOne
             };
         }
 
@@ -755,6 +1256,20 @@ namespace C6Lab
         }
 
         private bool TryAdvance(double now, out string reason)
+        {
+            if (StageYokai == LabStageYokai.None || phase != LabPhase.Playing
+                || !Finite(now) || now < lastTime) return TryAdvanceSlice(now, out reason);
+            bool advanced = false;
+            while (phase == LabPhase.Playing && lastTime < now)
+            {
+                if (!TryAdvanceSlice(NextStageBoundary(now), out reason)) return false;
+                advanced = true;
+            }
+            if (advanced && lastTime == now) { reason = null; return true; }
+            return TryAdvanceSlice(now, out reason);
+        }
+
+        private bool TryAdvanceSlice(double now, out string reason)
         {
             reason = null;
             if (phase == LabPhase.Idle) return Reject("NO_SESSION", out reason);
@@ -787,24 +1302,20 @@ namespace C6Lab
                     foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())
                         if (players.TryGetValue(holder, out var drummer)) drummer.drumSeconds += elapsed;
                 }
+                MarkBusyScreens(lastTime, effectiveNow);
+                if (StageYokai != LabStageYokai.None)
+                {
+                    ExpireOrbs(effectiveNow);
+                    AdvanceJigwi(effectiveNow);
+                }
                 DropGourdBombs(effectiveNow);
                 StartSwipeBlocks(effectiveNow);
+                CastSabotages(effectiveNow);
+                AdvanceJigwi(effectiveNow);
+                AdvanceStageJigwi(effectiveNow);
                 AdvanceCombo(effectiveNow);
-                foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow - orb.createdAt >= LifetimeOf(orb))
-                    .ToArray())
-                {
-                    if (!orbs.Remove(expired.id)) continue;
-                    if (expired.kind != LabOrbKind.Bomb || expired.lockSwipes == 0)
-                    {
-                        // Its lifetime ran out: its holder's screen sees it go in a puff of smoke (#235).
-                        orbExpiries.Add(new LabOrbExpiry(expired.owner, expired.id));
-                        continue;
-                    }
-                    // A bomb still locked at the end of its fuse blasts on its current holder's board. No
-                    // orb is lost: the holder's screen pushes the ones around it away from where it last was.
-                    bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
-                    unreportedBlasts[expired.id] = new KeyValuePair<ulong, double>(expired.owner, effectiveNow);
-                }
+                AdvanceFlash(effectiveNow);
+                ExpireOrbs(effectiveNow);
                 remaining = Math.Max(0d, deadline - effectiveNow);
                 if (paintCompleted)
                 {
@@ -828,23 +1339,39 @@ namespace C6Lab
             while (nextGourdBombAt <= until)
             {
                 double at = nextGourdBombAt;
-                uint index = gourdBombCount++;
-                ulong target = seats[(int)(DrawFor(seed ^ GourdTargetSalt, GourdDrawKey, index) % (ulong)activeSeatCount)];
-                var landing = new Vector2(
-                    Mathf.Lerp(GourdLandingMinX, GourdLandingMaxX, Unit01(DrawFor(seed ^ GourdLandingSalt, GourdDrawKey, index))),
-                    GourdLandingY);
-                var bomb = new LabOrbState
+                ulong draw = DrawFor(seed ^ GourdTargetSalt, GourdDrawKey, gourdBombCount);
+                // 야광귀 모드 (#271): 뽑힌 사람 화면에 다른 이벤트가 열려 있으면 비어 있는 화면에 떨어뜨리고,
+                // 비어 있는 화면이 없으면 기다렸다가 생기는 순간 떨어뜨린다.
+                ulong target = FreeTarget(seats[(int)(draw % (ulong)activeSeatCount)], draw, LabYaguangEvent.GourdBomb, until, out bool found);
+                if (!found)
                 {
-                    id = NewOrbId(), owner = target, kind = LabOrbKind.Bomb,
-                    lockSwipes = LockSwipesFor(seed, GourdDrawKey, index),
-                    origin = LabOrbOrigin.Gourd, originOwner = target,
-                    x = landing.x, y = landing.y, createdAt = at, revision = ++revision, inFlight = false
-                };
-                orbs.Add(bomb.id, bomb);
-                gourdBombs.Add(new LabGourdBomb(target, bomb.id, landing));
-                gourdBombTimes.Add(at);
+                    gourdBombWasHeld = true;
+                    nextGourdBombAt = until;
+                    return;
+                }
+                if (gourdBombWasHeld) { gourdBombWasHeld = false; at = until; }
+                DropGourdBomb(target, at);
                 nextGourdBombAt = at + GourdBombDelay(gourdBombCount);
             }
+        }
+
+        /// <summary>The gourd drops its next locked bomb onto this player's board.</summary>
+        private void DropGourdBomb(ulong target, double at)
+        {
+            uint index = gourdBombCount++;
+            var landing = new Vector2(
+                Mathf.Lerp(GourdLandingMinX, GourdLandingMaxX, Unit01(DrawFor(seed ^ GourdLandingSalt, GourdDrawKey, index))),
+                GourdLandingY);
+            var bomb = new LabOrbState
+            {
+                id = NewOrbId(), owner = target, kind = LabOrbKind.Bomb,
+                lockSwipes = LockSwipesFor(seed, GourdDrawKey, index),
+                origin = LabOrbOrigin.Gourd, originOwner = target,
+                x = landing.x, y = landing.y, createdAt = at, revision = ++revision, inFlight = false
+            };
+            orbs.Add(bomb.id, bomb);
+            gourdBombs.Add(new LabGourdBomb(target, bomb.id, landing));
+            gourdBombTimes.Add(at);
         }
 
         /// <summary>
@@ -907,20 +1434,150 @@ namespace C6Lab
             while (nextSwipeBlockAt <= until)
             {
                 double at = nextSwipeBlockAt;
+                ulong draw = DrawFor(seed ^ SwipeBlockTargetSalt, SwipeBlockDrawKey, swipeBlockCount);
+                // 야광귀 모드 (#271): 뽑힌 사람 화면이 이벤트 중이면 비어 있는 화면에 걸고, 없으면 생길 때까지 기다린다.
+                ulong target = FreeTarget(seats[(int)(draw % (ulong)activeSeatCount)], draw, LabYaguangEvent.SwipeBlock, until, out bool found);
+                if (!found)
+                {
+                    swipeBlockWasHeld = true;
+                    nextSwipeBlockAt = until;
+                    return;
+                }
+                if (swipeBlockWasHeld) { swipeBlockWasHeld = false; at = until; }
                 double clear = ClearOfGourdBombs(at);
                 if (clear > at)
                 {
                     nextSwipeBlockAt = clear;
                     continue;
                 }
-                uint index = swipeBlockCount++;
-                swipeBlockedPlayer = seats[(int)(DrawFor(seed ^ SwipeBlockTargetSalt, SwipeBlockDrawKey, index)
-                    % (ulong)activeSeatCount)];
-                swipeBlockedRight = (DrawFor(seed ^ SwipeBlockSideSalt, SwipeBlockDrawKey, index) & 1UL) == 1UL;
-                swipeBlockStartedAt = at;
-                swipeBlockedUntil = at + rules.SwipeBlockSeconds;
+                StartSwipeBlock(target, at);
                 nextSwipeBlockAt = Math.Max(at + rules.SwipeBlockInterval, swipeBlockedUntil);
             }
+        }
+
+        /// <summary>The gourd blocks one way, drawn at random, of this player's own passes.</summary>
+        private void StartSwipeBlock(ulong target, double at)
+        {
+            uint index = swipeBlockCount++;
+            swipeBlockedPlayer = target;
+            swipeBlockedRight = (DrawFor(seed ^ SwipeBlockSideSalt, SwipeBlockDrawKey, index) & 1UL) == 1UL;
+            swipeBlockStartedAt = at;
+            swipeBlockedUntil = at + rules.SwipeBlockSeconds;
+        }
+
+        /// <summary>매혹 (#251): 이 사람은 정해 둔 시간 동안 헤롱헤롱해 공격(위로 던지기)을 못 한다.</summary>
+        private void StartCharm(ulong target, double at)
+        {
+            charmedPlayer = target;
+            charmStartedAt = at;
+            charmUntil = at + rules.CharmSeconds;
+            charmTaps = 0;
+        }
+
+        /// <summary>
+        /// 여우불 (#251): 이 사람의 판에 푸른 여우구슬을 정해 둔 개수만큼 떨어뜨린다. 판이 거의 차 있으면 빈 칸 수만큼만
+        /// 떨어진다. 떨어질 자리는 판 안쪽에서 seed로 하나씩 뽑는다.
+        /// </summary>
+        private void DropFoxFire(ulong target, double at, uint index)
+        {
+            int span = rules.FoxFireCountMax - rules.FoxFireCountMin + 1;
+            int count = Math.Min(rules.OrbStorageLimit - CountStored(target, at),
+                rules.FoxFireCountMin + (int)(DrawFor(seed ^ FoxCountSalt, SabotageDrawKey, index) % (ulong)span));
+            var ids = new string[count];
+            for (int i = 0; i < count; i++)
+            {
+                uint spot = index * 16u + (uint)i;
+                var fox = new LabOrbState
+                {
+                    id = NewOrbId(), owner = target, kind = LabOrbKind.FoxFire,
+                    origin = LabOrbOrigin.Gourd, originOwner = target,
+                    x = Mathf.Lerp(FoxLandingMinX, FoxLandingMaxX, Unit01(DrawFor(seed ^ FoxLandingXSalt, SabotageDrawKey, spot))),
+                    y = Mathf.Lerp(FoxLandingMinY, FoxLandingMaxY, Unit01(DrawFor(seed ^ FoxLandingYSalt, SabotageDrawKey, spot))),
+                    createdAt = at, revision = ++revision, inFlight = false
+                };
+                orbs.Add(fox.id, fox);
+                ids[i] = fox.id;
+            }
+            foxFires.Add(new LabFoxFireDrop(target, ids));
+        }
+
+        /// <summary>
+        /// 요괴의 통합 방해공작 추첨 (#251): 켜 두면 박 폭탄·넘기기 막기의 각자 타이머 대신, 정해 둔 간격마다 비율이 0보다
+        /// 큰 방해공작 중 하나를 비율대로 골라 무작위 한 명에게 건다. 걸 사람이 없는 방해공작은 이번 후보에서 빠지고,
+        /// 하나도 걸 수 없으면 이번 차례는 건너뛴다. 뽑기는 seed와 순번으로 정해 모든 기기가 같은 결과를 받는다.
+        /// </summary>
+        private void CastSabotages(double until)
+        {
+            while (nextSabotageAt <= until)
+            {
+                double at = nextSabotageAt;
+                uint index = sabotageCount++;
+                nextSabotageAt = at + SabotageDelay(sabotageCount);
+                if (!TryDrawSabotage(at, index, out LabSabotageKind kind, out ulong target)) continue;
+                lastSabotageTarget = target;
+                if (kind == LabSabotageKind.GourdBomb) DropGourdBomb(target, at);
+                else if (kind == LabSabotageKind.SwipeBlock) StartSwipeBlock(target, at);
+                else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index);
+                else if (kind == LabSabotageKind.Charm) StartCharm(target, at);
+                sabotages.Add(new LabSabotage(kind, target, at));
+            }
+        }
+
+        private bool TryDrawSabotage(double at, uint index, out LabSabotageKind kind, out ulong target)
+        {
+            kind = LabSabotageKind.GourdBomb;
+            target = 0;
+            var weights = new int[rules.SabotageWeights.Length];
+            int total = 0;
+            for (int i = 0; i < weights.Length; i++)
+                if (rules.SabotageWeights[i] > 0 && SabotageTargets((LabSabotageKind)i, at).Count > 0)
+                    total += weights[i] = rules.SabotageWeights[i];
+            if (total == 0) return false;
+            int roll = (int)(DrawFor(seed ^ SabotageKindSalt, SabotageDrawKey, index) % (ulong)total);
+            for (int i = 0; i < weights.Length; i++)
+            {
+                roll -= weights[i];
+                if (roll >= 0) continue;
+                kind = (LabSabotageKind)i;
+                List<ulong> targets = SabotageTargets(kind, at);
+                target = targets[(int)(DrawFor(seed ^ SabotageTargetSalt, SabotageDrawKey, index) % (ulong)targets.Count)];
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Who this sabotage may fall on now, in seat order. Not the player the last one fell on (unless solo),
+        /// nor one whose ways are still blocked or who is still charmed. One swipe block and one charm at a time.
+        /// A charm falls in any room: with two players the other one alone wakes them, and solo it only wears off.
+        /// </summary>
+        private List<ulong> SabotageTargets(LabSabotageKind kind, double at)
+        {
+            var targets = new List<ulong>();
+            bool blocking = BlockOn(at);
+            bool charming = CharmOn(at);
+            if (kind == LabSabotageKind.SwipeBlock && blocking) return targets;
+            if (kind == LabSabotageKind.Charm && charming) return targets;
+            for (int i = 0; i < activeSeatCount; i++)
+            {
+                ulong player = seats[i];
+                if (lastSabotageTarget.HasValue && player == lastSabotageTarget.Value && activeSeatCount > 1) continue;
+                if (blocking && player == swipeBlockedPlayer) continue;
+                if (charming && player == charmedPlayer) continue;
+                if (JigwiBlocksSabotage(player, at)) continue;
+                if (kind == LabSabotageKind.FoxFire && CountStored(player, at) >= rules.OrbStorageLimit) continue;
+                // 야광귀 모드 (#271): 다른 이벤트가 열려 있는 화면에는 걸지 않는다.
+                if (ScreenOpen(player, at, LabYaguangEvent.Sabotage)) continue;
+                targets.Add(player);
+            }
+            return targets;
+        }
+
+        private double SabotageDelay(uint index)
+        {
+            float delay = Mathf.Lerp(rules.SabotageIntervalMin, rules.SabotageIntervalMax,
+                Unit01(DrawFor(seed ^ SabotageDelaySalt, SabotageDrawKey, index)));
+            return Math.Max(GourdMinimumDelaySeconds, delay);
         }
 
         /// <summary>The earliest time from at that is at least the bomb gap from the gourd's bombs near it.</summary>
@@ -961,7 +1618,12 @@ namespace C6Lab
         // ordinary attack orb and keeps the orb lifetime.
         private float LifetimeOf(LabOrbState orb) =>
             orb.kind.LifetimeFor(orb.lockSwipes, rules.OrbLifetimeSeconds, rules.ItemLifetimeSeconds);
-        private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight);
+        private double ExpiresAt(LabOrbState orb) => orb.expiresAt >= 0d ? orb.expiresAt : orb.createdAt + LifetimeOf(orb);
+        private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight && !orb.jigwiSupply);
+
+        /// <summary>A late frame's earlier sabotage draws ignore orbs whose lifetime had already ended at that draw.</summary>
+        private int CountStored(ulong owner, double at) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight
+            && !orb.jigwiSupply && at < ExpiresAt(orb));
 
         /// <summary>Orbs and drums both move between screens; look the ID up in either list.</summary>
         private bool TryFindMovable(string id, out LabOrbState found) =>
@@ -1109,6 +1771,7 @@ namespace C6Lab
 
         private sealed class Rules
         {
+            public readonly LabStageYokai StageYokai;
             public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
             public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
             /// <summary>How much a blast-shrunk orb paints, against a whole one (#213).</summary>
@@ -1124,6 +1787,16 @@ namespace C6Lab
             public readonly float GourdBombIntervalMin, GourdBombIntervalMax;
             /// <summary>The gourd's swipe block (#215): every how long, for how long, and how far from its bombs.</summary>
             public readonly float SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap;
+            /// <summary>The yokai's sabotage mix (#251): on, how often, and how likely each sabotage is.</summary>
+            public readonly bool SabotageMix;
+            public readonly float SabotageIntervalMin, SabotageIntervalMax;
+            public readonly int[] SabotageWeights;
+            /// <summary>Fox fire (#251): how many fox orbs fall, and how long after they fall they cannot be touched off.</summary>
+            public readonly int FoxFireCountMin, FoxFireCountMax;
+            public readonly float FoxFireSafeSeconds;
+            /// <summary>Charm (#251): how long it lasts, and how many taps from the players beside wake the charmed one.</summary>
+            public readonly float CharmSeconds;
+            public readonly int CharmRescueTaps;
             public readonly float[] DrumStopBounds;
             public readonly int[] DrumStopChances;
             public readonly Color[] PaintColors;
@@ -1131,9 +1804,14 @@ namespace C6Lab
             public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
                 ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale,
                 ComboWarningSeconds;
+            /// <summary>Yaguang flash (#268): on/off, everyone or one at a time, and its timing.</summary>
+            public readonly bool FlashEnabled, FlashTargetOne;
+            public readonly float FlashFirstStartSeconds, FlashIntervalSeconds, FlashWarningSeconds,
+                FlashGlareSeconds, FlashRecoverySeconds;
 
-            public Rules(LabConfig config)
+            public Rules(LabConfig config, LabStageYokai stageYokai)
             {
+                StageYokai = stageYokai;
                 GenerationChances = config.GenerationChances();
                 ItemLifetimeSeconds = config.ItemLifetimeSeconds;
                 ItemUnlockSwipesMin = config.ItemUnlockSwipesMin;
@@ -1147,6 +1825,16 @@ namespace C6Lab
                 SwipeBlockInterval = config.SwipeBlockInterval;
                 SwipeBlockSeconds = config.SwipeBlockSeconds;
                 SwipeBlockBombGap = config.SwipeBlockBombGap;
+                SabotageMix = config.SabotageMixEnabled;
+                SabotageIntervalMin = config.SabotageIntervalMin;
+                SabotageIntervalMax = config.SabotageIntervalMax;
+                SabotageWeights = config.SabotageWeights();
+                if (stageYokai == LabStageYokai.Gumiho) SabotageWeights[0] = SabotageWeights[1] = 0;
+                FoxFireCountMin = config.FoxFireCountMin;
+                FoxFireCountMax = config.FoxFireCountMax;
+                FoxFireSafeSeconds = config.FoxFireSafeSeconds;
+                CharmSeconds = config.CharmSeconds;
+                CharmRescueTaps = config.CharmRescueTaps;
                 DrumStopBounds = config.DrumStopBounds();
                 DrumStopChances = config.DrumStopChances();
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];
@@ -1173,7 +1861,8 @@ namespace C6Lab
                 SpawnMaxSpeed = config.SpawnMaxSpeed;
                 FloorDeceleration = config.OrbFloorDeceleration;
                 DrumCount = config.DrumCount;
-                ComboEnabled = config.GourdColorComboEnabled;
+                ComboEnabled = config.GourdColorComboEnabled
+                    && (stageYokai == LabStageYokai.None || stageYokai == LabStageYokai.Yaguang);
                 ComboFirstStartSeconds = config.ComboFirstStartSeconds;
                 ComboRepeatIntervalSeconds = config.ComboRepeatIntervalSeconds;
                 ComboTimeLimitSeconds = config.ComboTimeLimitSeconds;
@@ -1183,6 +1872,14 @@ namespace C6Lab
                 ComboRewardDurationSeconds = config.ComboRewardDurationSeconds;
                 ComboRewardSizeScale = config.ComboRewardSizeScale;
                 ComboWarningSeconds = config.ComboWarningSeconds;
+                FlashEnabled = config.YaguangFlashEnabled
+                    && (stageYokai == LabStageYokai.None || stageYokai == LabStageYokai.Yaguang);
+                FlashTargetOne = config.YaguangFlashTargetOne;
+                FlashFirstStartSeconds = config.YaguangFlashFirstStartSeconds;
+                FlashIntervalSeconds = config.YaguangFlashIntervalSeconds;
+                FlashWarningSeconds = config.YaguangFlashWarningSeconds;
+                FlashGlareSeconds = config.YaguangFlashGlareSeconds;
+                FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
             }
         }
     }

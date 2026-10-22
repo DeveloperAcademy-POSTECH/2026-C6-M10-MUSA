@@ -2,11 +2,16 @@ using System;
 
 namespace C6Lab
 {
+    /// <summary>Opt-in game-stage policy. None preserves the standalone Lab experiment.</summary>
+    public enum LabStageYokai { None, Gumiho, Yaguang, Jigwi }
     public enum LabPhase { Idle, Playing, Victory, Defeat }
     // Items and the drum are appended so the serialized numbers of existing kinds stay unchanged.
-    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum }
+    // FoxFire is the nine-tailed fox's fake orb (#251).
+    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum, FoxFire }
     // Gourd is appended for bombs the gourd drops as sabotage (#177).
     public enum LabOrbOrigin { Unknown, Generated, Combined, Gourd }
+    // The yokai's sabotages the sabotage mix draws from (#251), in the order of their DEV weights. Numbers are serialized.
+    public enum LabSabotageKind { GourdBomb, SwipeBlock, FoxFire, Charm }
 
     /// <summary>
     /// How a drum handed to a neighbour arrives on its new board (#178). Stop eases it to rest at a
@@ -100,6 +105,12 @@ namespace C6Lab
         public double burnedAt = -1d;
         /// <summary>A bomb blast shrank this orb for the rest of its life, and any orb combined from it (#213).</summary>
         public bool small;
+        /// <summary>Jigwi generation curse only: independent of bomb shrink and paint damage.</summary>
+        public float jigwiRadiusScale = 1f;
+        /// <summary>Explicit Host battle-clock expiry; -1 retains the existing kind lifetime.</summary>
+        public double expiresAt = -1d;
+        public bool jigwiSupply;
+        public bool jigwiGenerationBurn;
 
         /// <summary>An unlock older than this, for example seen after a reconnect, shows the item already open.</summary>
         public const double UnlockEffectWindowSeconds = 1d;
@@ -116,11 +127,46 @@ namespace C6Lab
 
         /// <summary>Seconds left in this orb's lifetime at the given Host time (#235); never below 0.</summary>
         public float LifeSecondsLeft(double serverTime, float orbLifetime, float itemLifetime) =>
-            (float)Math.Max(0d, createdAt + kind.LifetimeFor(lockSwipes, orbLifetime, itemLifetime) - serverTime);
+            (float)Math.Max(0d, (expiresAt >= 0d ? expiresAt
+                : createdAt + kind.LifetimeFor(lockSwipes, orbLifetime, itemLifetime)) - serverTime);
 
         /// <summary>Seconds this orb still burns at the given Host time; 0 once out, or when it never burned.</summary>
         public float BurnSecondsLeft(double serverTime, float burnSeconds) =>
             burnedAt < 0d ? 0f : (float)Math.Max(0d, burnedAt + burnSeconds - serverTime);
+    }
+
+    [Serializable]
+    public sealed class LabJigwiFireTarget
+    {
+        public string id;
+        public float x, y;
+        public bool extinguished;
+        public LabJigwiFireTarget Copy() => (LabJigwiFireTarget)MemberwiseClone();
+    }
+
+    /// <summary>Host-approved, per-player Jigwi experiment state. All times use the paused battle clock.</summary>
+    [Serializable]
+    public sealed class LabJigwiState
+    {
+        public ulong playerId;
+        public string fireId;
+        public double fireStartedAt = -1d, fireEndsAt = -1d, overheatUntil = -1d, generationBurnUntil = -1d;
+        public LabJigwiFireTarget[] targets = Array.Empty<LabJigwiFireTarget>();
+        public bool FireActive(double now)
+        {
+            if (fireStartedAt < 0d || now < fireStartedAt || now >= fireEndsAt || targets == null) return false;
+            foreach (var target in targets) if (target != null && !target.extinguished) return true;
+            return false;
+        }
+        public bool Overheated(double now) => overheatUntil > now;
+        public bool GenerationBurnActive(double now) => generationBurnUntil > now;
+        public LabJigwiState Copy()
+        {
+            var copy = (LabJigwiState)MemberwiseClone();
+            copy.targets = targets == null ? Array.Empty<LabJigwiFireTarget>()
+                : Array.ConvertAll(targets, target => target?.Copy());
+            return copy;
+        }
     }
 
     [Serializable]
@@ -192,6 +238,13 @@ namespace C6Lab
         /// <summary>Host rope cycle phase and hit spring state for the moving target collider.</summary>
         public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();
+        public LabJigwiState[] jigwi = Array.Empty<LabJigwiState>();
+        public LabJigwiState JigwiFor(ulong player)
+        {
+            foreach (var state in jigwi ?? Array.Empty<LabJigwiState>())
+                if (state != null && state.playerId == player) return state;
+            return null;
+        }
         public LabOrbState[] orbs = Array.Empty<LabOrbState>();
         /// <summary>Generate drums. Only a player whose board holds one can create orbs.</summary>
         public LabOrbState[] drums = Array.Empty<LabOrbState>();
@@ -205,6 +258,18 @@ namespace C6Lab
 
         /// <summary>Whether a swipe block is on this player at this snapshot.</summary>
         public bool SwipeBlockOn(ulong player) => swipeBlockedUntil > serverTime && swipeBlockedPlayer == player;
+
+        /// <summary>
+        /// The nine-tailed fox's charm (#251): the player too dazed to attack (throw upward), the Host times it
+        /// started and ends, and how many times the players beside them have tapped to wake them. charmUntil is
+        /// -1 while no one is charmed.
+        /// </summary>
+        public ulong charmedPlayer;
+        public double charmStartedAt = -1d, charmUntil = -1d;
+        public int charmTaps;
+
+        /// <summary>Whether this player is charmed at this snapshot.</summary>
+        public bool CharmOn(ulong player) => charmUntil > serverTime && serverTime >= charmStartedAt && charmedPlayer == player;
 
         // 박 색상 콤보 실험 (#222). DEV에서 끄면 모두 기본값(콤보 없음)이다.
         // 시각은 serverTime과 같은 전투 시계 기준이다.
@@ -234,5 +299,32 @@ namespace C6Lab
 
         /// <summary>이 시각에 콤보 예고 중인지 (#241). 예고 중에는 콤보가 없으므로 맞힌 구슬도 판정하지 않는다.</summary>
         public bool ComboWarningOn(double now) => comboNextAt > comboWarningAt && now >= comboWarningAt && now < comboNextAt;
+
+        // 야광귀 섬광 (#268). 시각은 serverTime과 같은 전투 시계 기준이다. DEV에서 끄면 모두 기본값(섬광 없음)이다.
+        /// <summary>
+        /// 다음 섬광이 번쩍이는 시각과 그 예고(요괴가 빼꼼 나와 눈이 밝아짐)가 시작되는 시각. 꺼져 있거나 콤보 때문에
+        /// 기다리는 중이면 -1이다. 예고 시간이 0이면 두 시각이 같다.
+        /// </summary>
+        public double flashWarningAt = -1d, flashAt = -1d;
+        /// <summary>다음 섬광의 실제 대상 ID. Host의 ID 0도 유효하며 ALL 여부는 별도 필드다.</summary>
+        public ulong flashTarget;
+        public bool flashTargetAll;
+        /// <summary>이번 라운드에 번쩍인 섬광 수. 바뀌면 새 섬광이 터진 것이다.</summary>
+        public uint flashCount;
+        /// <summary>마지막 섬광이 번쩍인 시각과 실제 대상 ID</summary>
+        public double flashLastAt = -1d;
+        public ulong flashLastTarget;
+        public bool flashLastTargetAll;
+
+        /// <summary>
+        /// 이 시각에 섬광 예고 중인지. 요괴는 모두의 화면에서 빼꼼 나온다. 콤보가 진행 중이거나 콤보 예고 중이면 언제나
+        /// false다(#271): Host는 그때 섬광을 미루므로, 늦게 온 스냅샷 때문에 눈 말풍선이 콤보 위에 뜨지 않게 한다.
+        /// </summary>
+        public bool FlashWarningOn(double now) => flashAt > flashWarningAt && now >= flashWarningAt && now < flashAt
+            && !comboActive && !ComboWarningOn(now);
+        /// <summary>이 사람이 다음 섬광을 맞는지</summary>
+        public bool FlashTargets(ulong player) => flashTargetAll || flashTarget == player;
+        /// <summary>이 사람이 마지막 섬광을 맞았는지 (한 번도 안 터졌으면 false)</summary>
+        public bool LastFlashHit(ulong player) => flashCount > 0 && (flashLastTargetAll || flashLastTarget == player);
     }
 }

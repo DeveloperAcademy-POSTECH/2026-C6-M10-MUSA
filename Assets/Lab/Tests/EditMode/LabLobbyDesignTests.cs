@@ -1,4 +1,9 @@
 using System;
+using System.Linq;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 using NUnit.Framework;
 using UnityEngine;
 namespace C6Lab.Tests
@@ -44,8 +49,8 @@ namespace C6Lab.Tests
             Assert.That(rooms.Count,Is.EqualTo(1));Assert.That(rooms[0].IsFull,Is.True);
             Assert.That(rooms[0].Participants,Is.EqualTo(3));Assert.That(rooms[0].TargetParticipants,Is.EqualTo(3));
         }
-        [TestCase(3)] [TestCase(4)] [TestCase(5)]
-        public void EveryRoomHasDistinctTouchableSlotsAndHostAtTheBottom(int count)
+        [TestCase(2)] [TestCase(3)] [TestCase(4)] [TestCase(5)]
+        public void EveryRoomHasDistinctTouchableSlotsAndP1AtTheBottom(int count)
         {
             for(int slot=1;slot<=count;slot++)
             {
@@ -55,6 +60,42 @@ namespace C6Lab.Tests
             }
             Assert.That(LabLobbyView.SlotCenter(count,1),Is.EqualTo(new Vector2(201,574)));
         }
+        [Test]
+        public void SavedAuthoredRootBindsTheLatestHudAndKeepsAllCompatibilityEntriesReachable()
+        {
+            const string path = "Assets/Lab/Scenes/Lab.unity";
+            Scene previous = SceneManager.GetActiveScene();
+            Scene scene = SceneManager.GetSceneByPath(path);
+            bool owned = !scene.IsValid() || !scene.isLoaded;
+            if (owned) scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+            try
+            {
+                LabHud hud = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<LabHud>(true)).Single();
+                LabLobbyView view = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<LabLobbyView>(true)).Single();
+                Assert.That(view.hud, Is.SameAs(hud), "The imported root must not retain its old source-Scene HUD.");
+                Assert.That(hud.network.gameObject.scene, Is.EqualTo(scene));
+                Assert.That(view.countButtons.Select(button => button.GetComponentInChildren<Text>().text), Is.EqualTo(new[] { "2명", "3명", "4명", "5명" }));
+                Assert.That(view.clearSlotButton, Is.Not.Null);
+                Assert.That(view.directConnectionButton, Is.Not.Null);
+                Assert.That(view.directConnectionPanel.activeSelf, Is.False);
+                Assert.That(view.directAddress, Is.Not.Null); Assert.That(view.directPort, Is.Not.Null);
+                Assert.That(view.directJoinButton, Is.Not.Null); Assert.That(view.closeDirectConnectionButton, Is.Not.Null);
+                Assert.That(view.directAddress, Is.Not.SameAs(hud.hostAddress), "The direct-connect modal has visible controls outside the hidden legacy group.");
+                Assert.That(view.mediumFont, Is.SameAs(AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/Shilla_Culture(M).otf")));
+                foreach (Text text in view.GetComponentsInChildren<Text>(true))
+                    Assert.That(AssetDatabase.GetAssetPath(text.font), Is.Not.EqualTo("Assets/Lab/Art/Fonts/Shilla_Culture(B).otf"));
+                Assert.That(hud.developerMode.toggleButton.transform.GetSiblingIndex(), Is.GreaterThan(view.transform.GetSiblingIndex()),
+                    "The painting must not cover the saved DEV entry.");
+                Assert.That(hud.GetComponentInParent<Canvas>().GetComponentsInChildren<LabJigwiHud>(true), Has.Length.EqualTo(1),
+                    "Importing the old root must retain the current Scene's Jigwi controls.");
+            }
+            finally
+            {
+                if (owned) EditorSceneManager.CloseScene(scene, true);
+                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
+            }
+        }
+
         [Test]
         public void BackgroundUsesOriginalPaintingCropAndRoomDisplayPreservesIdentity()
         {

@@ -92,3 +92,12 @@ Apple Developer Academy @ POSTECH
 | Game Developer & Project Manager  | Game Developer & Art | Game Developer & Sound | Game Developer & Game Director  |  Game Developer & Art | Game Developer & Art |
 
 ---
+
+
+### 개발용 지귀 패턴 시험 (#272)
+
+기존 `Lab.unity` 전투에서 Host 또는 솔로의 **JIGWI DEV** 버튼으로 화재 도전·생성 Raw 화상을 수동 발동할 수 있습니다. 대상 P번호와 **Jigwi** DEV 수치를 조절하는 방법은 [지귀 패턴 안내](docs/JIGWI_PATTERNS.md)를 참고하세요. 실제 기기별 실행 결과는 [검증 기록](docs/VALIDATION.md)에 구분합니다.
+
+## 개발용 3스테이지 실행
+
+기존 단일 Scene은 `Assets/Lab/Scenes/Lab.unity`로 유지합니다. 별도 게임은 `Hapio > Open Home`으로 실행하며 구미호 → 야광귀 → 지귀 순서로 같은 Battle Scene을 재사용합니다. 공통 폭탄·좌우 전달 막기를 유지하고 Home/Lobby DEV에서 공통/요괴별 값을 조정합니다. 자세한 실행·빌드 경로·현행 제한은 [개발용 게임 흐름](docs/GAME_FLOW.md)을 참고하세요.

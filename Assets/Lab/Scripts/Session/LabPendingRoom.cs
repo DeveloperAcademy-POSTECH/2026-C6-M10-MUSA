@@ -24,7 +24,7 @@ namespace C6Lab
         public static bool TryCreate(int capacity, out LabPendingRoom room, out string error)
         {
             room = null; error = string.Empty;
-            if (capacity < 3 || capacity > 5) { error = "함께할 인원을 골라주시오."; return false; }
+            if (capacity < 2 || capacity > 5) { error = "함께할 인원을 골라주시오."; return false; }
             if (!LabBonjourDiscovery.IsSupported) { error = "이 기기에서는 방을 만들 수 없소."; return false; }
             var pending = new LabPendingRoom { Capacity = capacity };
             try
@@ -42,7 +42,7 @@ namespace C6Lab
             }
         }
 
-        private void ReservePort()
+        private void ReservePort(Func<AddressFamily, Socket> createSocket = null)
         {
             // Keep each advertised port exclusively reserved until its creator enters.
             // No game sockets, NetworkManagers or player slots are shared between room cards.
@@ -50,21 +50,34 @@ namespace C6Lab
             {
                 try
                 {
-                    ipv4 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                    ipv4.Bind(new IPEndPoint(IPAddress.Any, 0));
-                    Port = checked((ushort)((IPEndPoint)ipv4.LocalEndPoint).Port);
-                    if (Socket.OSSupportsIPv6)
-                    {
-                        ipv6 = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp);
-                        ipv6.DualMode = false;
-                        ipv6.Bind(new IPEndPoint(IPAddress.IPv6Any, Port));
-                    }
+                    ipv4 = OpenReservation(AddressFamily.InterNetwork, 0, createSocket);
+                    int requestedPort = ipv4 != null ? ((IPEndPoint)ipv4.LocalEndPoint).Port : 0;
+                    ipv6 = OpenReservation(AddressFamily.InterNetworkV6, requestedPort, createSocket);
+                    if (ipv4 == null && ipv6 == null) throw new InvalidOperationException("No supported room address family.");
+                    Port = checked((ushort)((IPEndPoint)(ipv4 ?? ipv6).LocalEndPoint).Port);
                     return;
                 }
                 catch (SocketException e) when (e.SocketErrorCode == SocketError.AddressAlreadyInUse)
                 { ReleasePort(); }
             }
             throw new InvalidOperationException("No free room port.");
+        }
+
+        private static Socket OpenReservation(AddressFamily family, int port, Func<AddressFamily, Socket> createSocket)
+        {
+            Socket socket = null;
+            try
+            {
+                socket = createSocket != null ? createSocket(family)
+                    : new Socket(family, SocketType.Dgram, ProtocolType.Udp);
+                if (family == AddressFamily.InterNetworkV6) socket.DualMode = false;
+                socket.Bind(new IPEndPoint(family == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any, port));
+                return socket;
+            }
+            catch (SocketException error) when (error.SocketErrorCode == SocketError.AddressFamilyNotSupported
+                || error.SocketErrorCode == SocketError.ProtocolNotSupported || error.SocketErrorCode == SocketError.SocketNotSupported)
+            { socket?.Dispose(); return null; }
+            catch { socket?.Dispose(); throw; }
         }
 
         public void Tick(bool allowRegistration = true, int firstNumber = 1)
@@ -76,7 +89,7 @@ namespace C6Lab
                 string requestedName = LabRoomNames.ServiceBase + (candidateNumber == 1 ? string.Empty
                     : " (" + candidateNumber.ToString(CultureInfo.InvariantCulture) + ")");
                 registrationAttempts++;
-                if (!advertisement.StartAdvertise(requestedName, Port, true, ipv6 != null, 1, Capacity, false, true, false)
+                if (!advertisement.StartAdvertise(requestedName, Port, ipv4 != null, ipv6 != null, 1, Capacity, false, true, false)
                     && !RetryNameConflict()) { Dispose(); return; }
             }
             advertisement?.Tick();

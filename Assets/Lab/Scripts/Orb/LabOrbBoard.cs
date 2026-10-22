@@ -72,6 +72,7 @@ namespace C6Lab
             public bool Blasted;
             /// <summary>A bomb blast shrank this orb for the rest of its life (#213).</summary>
             public bool Small;
+            public float JigwiScale = 1f;
             /// <summary>
             /// A bomb the player swiped or dragged on (#237): it slides until it stops, and passes at a side
             /// edge however slowly. Once it stops it drifts by itself again and this is cleared.
@@ -89,6 +90,8 @@ namespace C6Lab
             public bool Provisional;
             public bool HiddenForPending;
             public MotionState? BeforeRequest;
+            /// <summary>A fox orb cannot be touched off until this time (#251): a moment after it lands.</summary>
+            public float FoxSafeUntil;
         }
 
         private readonly struct MotionState
@@ -180,6 +183,8 @@ namespace C6Lab
         private bool interactionEnabled = true;
         private bool uiInputBlocked;
         private bool configured;
+        private bool jigwiOverheat;
+        private bool contactCombineRequest;
 
         public int Count
         {
@@ -216,6 +221,17 @@ namespace C6Lab
         /// 결합 요청. (첫 구슬, 두 번째 구슬, 결합 위치 0..1, 결합 구슬이 이어받을 속도 보드 폭/초)
         /// </summary>
         public event Action<string, string, Vector2, Vector2> CombineRequested;
+        /// <summary>Read inside CombineRequested only: true for passive physical contact, false for manual drop.</summary>
+        public bool IsContactCombineRequest => contactCombineRequest;
+        /// <summary>
+        /// A fox orb touched a Yin or Yang orb (#251): (fox orb, the orb it took). Both already went up in blue smoke
+        /// here and wait hidden for the Host; a rejection brings them back.
+        /// </summary>
+        public event Action<string, string> FoxFireTouched;
+        /// <summary>Manual release during Jigwi overheat; inputs already wait hidden for approval.</summary>
+        public event Action<string, string> JigwiBurnRequested;
+        public bool JigwiOverheated => jigwiOverheat;
+        public void SetJigwiOverheat(bool active) => jigwiOverheat = active;
         /// <summary>The velocity is input displacement divided by board width and seconds.</summary>
         public event Action<LabOrbThrowGesture> ThrowRequested;
         /// <summary>내가 생성한 구슬이 북에서 튀어나오기 시작할 때 한 번 알린다. (구슬 ID)</summary>
@@ -255,7 +271,7 @@ namespace C6Lab
             BuildHorizontalWalls();
             foreach (var entry in entries.Values)
             {
-                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind, entry.Small), entry.View.Element);
+                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind, entry.Small, entry.JigwiScale), entry.View.Element);
                 entry.View.ConfigureAppearance(config.OrbAppearance);
                 SetLayerRecursively(entry.View.transform, gameObject.layer);
                 entry.View.HitSphere.sharedMaterial = contactMaterial;
@@ -361,10 +377,12 @@ namespace C6Lab
             bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
             LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false,
-            float burnSeconds = 0f, float lifeSeconds = -1f)
+            float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f)
         {
             RequireConfigured();
             small &= !kind.IsDrum();
+            jigwiScale = kind.IsRaw() && !float.IsNaN(jigwiScale) && !float.IsInfinity(jigwiScale)
+                ? Mathf.Clamp(jigwiScale, .1f, 1f) : 1f;
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
                 throw new ArgumentException("A finite orb identity, position and velocity are required.");
             if (entries.TryGetValue(id, out var existing))
@@ -374,11 +392,13 @@ namespace C6Lab
                 if (existing.HiddenForPending) return existing.View;
                 existing.LocalOwner = localOwner;
                 existing.View.FuseTotalSeconds = config.ItemLifetimeSeconds;
-                if (existing.View.Kind != kind || existing.View.Element != element || existing.Small != small)
+                if (existing.View.Kind != kind || existing.View.Element != element || existing.Small != small
+                    || !Mathf.Approximately(existing.JigwiScale, jigwiScale))
                 {
                     bool shrinking = small && !existing.Small && existing.View.Kind == kind;
                     existing.Small = small;
-                    existing.View.Configure(id, kind, RadiusFor(kind, small), element);
+                    existing.JigwiScale = jigwiScale;
+                    existing.View.Configure(id, kind, RadiusFor(kind, small, jigwiScale), element);
                     if (shrinking) existing.View.PlayShrink(1f / config.BlastShrinkScale, ShrinkSeconds);
                     existing.View.Body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
@@ -393,16 +413,16 @@ namespace C6Lab
                 return existing.View;
             }
 
-            Vector2 start = ToWorld(normalizedPosition, RadiusFor(kind, small));
+            Vector2 start = ToWorld(normalizedPosition, RadiusFor(kind, small, jigwiScale));
             Vector2 popFrom = start;
             if (playSpawn) start = OutsideDrums(start, velocityInBoardWidthsPerSecond, out popFrom);
-            start = Clamp(start, RadiusFor(kind, small));
+            start = Clamp(start, RadiusFor(kind, small, jigwiScale));
             var gameObject = new GameObject("Orb " + id);
             gameObject.layer = this.gameObject.layer;
             gameObject.transform.SetParent(transform, false);
             gameObject.transform.position = OnPlane(start);
             var view = gameObject.AddComponent<LabOrbView>();
-            view.Configure(id, kind, RadiusFor(kind, small), element);
+            view.Configure(id, kind, RadiusFor(kind, small, jigwiScale), element);
             view.ConfigureAppearance(config.OrbAppearance);
             view.FuseTotalSeconds = config.ItemLifetimeSeconds;
             view.SetItemState(lockSwipes, relayStage, fuseSeconds);
@@ -423,8 +443,15 @@ namespace C6Lab
             body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
             body.position = OnPlane(start);
             var entry = new Entry { View = view, LocalOwner = localOwner, DriftSeed = DriftSeedFor(id),
-                Dropping = expectedDrops.Remove(id), Small = small };
+                Dropping = expectedDrops.Remove(id), Small = small, JigwiScale = jigwiScale };
             entries.Add(id, entry);
+            if (kind == LabOrbKind.FoxFire)
+            {
+                // Safe for a moment after it lands, so one falling among orbs is not an unfair loss (#251).
+                LabOrbAppearance look = config.OrbAppearance != null ? config.OrbAppearance : LabOrbAppearance.Defaults;
+                entry.FoxSafeUntil = Time.time + config.FoxFireSafeSeconds
+                    + (entry.Dropping ? look.DropFallSeconds + look.DropBounceSeconds : 0f);
+            }
             SetBodyMode(entry);
             if (entry.Dropping) PlayDrop(entry, start);
             if (!body.isKinematic)
@@ -532,6 +559,31 @@ namespace C6Lab
         /// coming in. The edge glows red with the seconds left in its middle. The board counts down by
         /// itself and only takes the Host's seconds when they differ by more than a moment.
         /// </summary>
+        private LabCharmEdgeFlash charmEdge;
+        private bool charmed;
+
+        /// <summary>This board's player is charmed (#251): an upward swipe is only a flick that bounces off the top.</summary>
+        public bool Charmed => charmed;
+        public LabCharmEdgeFlash CharmEdge => charmEdge;
+
+        /// <summary>
+        /// 매혹 (#251): 이 판의 주인이 헤롱헤롱해 공격(위로 던지기)을 못 한다. secondsLeft가 0보다 크면 걸린 것이고, 던지는 쪽
+        /// 가장자리(판 위쪽 곡선)가 빨갛게 은은히 빛난다. 풀리면 부드럽게 사라진다.
+        /// </summary>
+        public void SetCharm(float secondsLeft)
+        {
+            if (configured && secondsLeft > 0f && !float.IsInfinity(secondsLeft))
+            {
+                charmed = true;
+                if (charmEdge == null) charmEdge = LabCharmEdgeFlash.Create(transform);
+                charmEdge.Show(areaShape.UpperBoundary, bounds.width);
+                return;
+            }
+            if (!charmed) return;
+            charmed = false;
+            if (charmEdge != null) charmEdge.Release();
+        }
+
         public void SetSwipeBlock(int side, float secondsLeft)
         {
             side = Math.Sign(side);
@@ -566,6 +618,7 @@ namespace C6Lab
         private void LateUpdate()
         {
             ApplyComboLook();
+            ApplyFlashGlare();
             SyncBoardTrails();
             if (blockedSide == 0) return;
             blockSecondsLeft -= Time.deltaTime;
@@ -579,6 +632,22 @@ namespace C6Lab
         /// 판의 음양·결합 구슬 그림이 이 동안 작아지거나 커진다(물리 크기는 그대로).
         /// </summary>
         public void SetComboLook(int look) => comboLook = Math.Sign(look);
+
+        private float flashGlare;
+
+        /// <summary>
+        /// 야광귀 섬광 (#268): 이 기기 플레이어가 눈부신 정도 (0~1). 섬광 화면이 매 프레임 정한다.
+        /// 판의 음양·결합 구슬과 아이템(여우구슬 포함)이 이만큼 하얗게 보이고, 북은 그대로다. 조작·물리는 그대로다.
+        /// </summary>
+        public void SetFlashGlare(float amount) =>
+            flashGlare = float.IsNaN(amount) || float.IsInfinity(amount) ? 0f : Mathf.Clamp01(amount);
+        public float FlashGlare => flashGlare;
+
+        private void ApplyFlashGlare()
+        {
+            foreach (var entry in entries.Values)
+                if (entry.View != null) entry.View.SetGlare(entry.View.Kind.IsDrum() ? 0f : flashGlare);
+        }
         public int ComboLook => comboLook;
         /// <summary>판 구슬이 지금 콤보 효과로 향하는 그림 배율 (#257)</summary>
         public float ComboLookScale => comboLook < 0 ? comboSmallScale : comboLook > 0 ? comboBigScale : 1f;
@@ -904,6 +973,33 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>Reversible immediate burn preview. Repeated snapshot/receipt calls cannot replay it.</summary>
+        public bool PlayJigwiBurnPreview(string firstId, string secondId = null)
+        {
+            bool played = PlayJigwiBurnOne(firstId);
+            if (secondId != null && secondId != firstId) played |= PlayJigwiBurnOne(secondId);
+            return played;
+        }
+
+        private bool PlayJigwiBurnOne(string id)
+        {
+            if (id == null || !entries.TryGetValue(id, out Entry entry) || entry.View == null
+                || entry.View.Kind.IsDrum() || entry.HiddenForPending || !entry.LocalOwner) return false;
+            Vector3 point = entry.View.transform.position;
+            float radius = entry.View.HitSphere.radius;
+            if (!BeginPendingLaunch(id)) return false;
+            LabJigwiBurnEffect.Play(transform, point, radius, config != null ? config.OrbAppearance : null);
+            return true;
+        }
+
+        /// <summary>Failed generation still spends its cost, but burns a presentation instead of hiding the drum.</summary>
+        public void PlayJigwiGenerationBurn(Vector2 position01)
+        {
+            if (!configured || !Finite(position01)) return;
+            LabJigwiBurnEffect.Play(transform, OnPlane(ToWorld(position01, config.OrbRadius)),
+                config.OrbRadius, config.OrbAppearance);
+        }
+
         public bool RejectPendingLaunch(string id)
         {
             if (id == null || !pendingLaunches.TryGetValue(id, out MotionState motion)) return false;
@@ -977,8 +1073,9 @@ namespace C6Lab
         public bool Vanish(string id)
         {
             if (id == null || !entries.TryGetValue(id, out var entry) || entry.View == null) return false;
-            // It goes up in a puff of smoke where this screen shows it (#235).
-            LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius,
+            // It goes up in a puff of smoke where this screen shows it (#235); a fox orb's is blue (#251).
+            if (entry.View.Kind == LabOrbKind.FoxFire) PlayFoxSmoke(entry);
+            else LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius,
                 config != null ? config.OrbAppearance : null);
             RemoveOrb(id);
             OrbVanished?.Invoke(id);
@@ -1007,6 +1104,10 @@ namespace C6Lab
         {
             CancelDrag();
             LiftSwipeBlock();
+            charmed = false;
+            jigwiOverheat = false;
+            flashGlare = 0f;
+            if (charmEdge != null) charmEdge.Hide();
             foreach (var entry in entries.Values)
                 Retire(entry);
             entries.Clear();
@@ -1021,6 +1122,8 @@ namespace C6Lab
                 if (preview.Material != null) Destroy(preview.Material);
             }
             generationPreviews.Clear();
+            foreach (LabJigwiBurnEffect effect in GetComponentsInChildren<LabJigwiBurnEffect>())
+                if (effect != null) Destroy(effect.gameObject);
         }
 
         public void SetInteractionEnabled(bool enabled)
@@ -1156,6 +1259,19 @@ namespace C6Lab
             entry.Held = false;
             entry.View.HitSphere.isTrigger = false;
 
+            // Overheat punishes an intentional release, never holding/cancelling, contact physics or incoming orbs.
+            // A valid manual Yin/Yang overlap consumes both; otherwise only the released non-drum burns.
+            if (jigwiOverheat && !entry.View.Kind.IsDrum())
+            {
+                Entry partner = config.DropCombineEnabled && entry.View.Kind.IsRaw()
+                    ? FindOppositeOverlap(entry) : null;
+                if (partner != null && !partner.View.Kind.IsRaw()) partner = null;
+                string partnerId = partner != null ? partner.View.OrbId : null;
+                PlayJigwiBurnPreview(id, partnerId);
+                JigwiBurnRequested?.Invoke(id, partnerId);
+                return true;
+            }
+
             // A tap is short and nearly still. Two taps on the same unlocked item use it in place.
             bool tapped = now - pressTime <= TapMaxSeconds && (worldPoint - pressPoint).magnitude <= config.OrbRadius * .5f;
             if (tapped && entry.View.Kind.IsDrum())
@@ -1187,7 +1303,8 @@ namespace C6Lab
             // Side exits keep their existing screen-to-screen handoff even on a diagonal flick.
             bool outwardSide = (worldPoint.x <= bounds.xMin && inputVelocity.x < 0f)
                 || (worldPoint.x >= bounds.xMax && inputVelocity.x > 0f);
-            if (entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
+            // Charmed (#251), an upward swipe is no throw: the orb slides up like any flick and bounces off the top.
+            if (!charmed && entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
                 && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
             {
                 entry.BeforeRequest = CaptureMotion(entry);
@@ -1199,12 +1316,14 @@ namespace C6Lab
                 return true;
             }
 
-            if (config.DropCombineEnabled && entry.View.Kind.IsRaw())
+            if (config.DropCombineEnabled && (entry.View.Kind.IsRaw() || FoxReady(entry)))
             {
                 Entry target = FindOppositeOverlap(entry);
                 if (target != null)
                 {
-                    RequestCombine(entry, target);
+                    if (entry.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(entry, target);
+                    else if (target.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(target, entry);
+                    else RequestCombine(entry, target);
                     return true;
                 }
             }
@@ -1363,6 +1482,12 @@ namespace C6Lab
                 body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
                 StopMotion(body);
                 SetBodyMode(entry);
+                if (entry.View.Kind == LabOrbKind.FoxFire)
+                {
+                    // A fox orb never reaches a neighbour (#251): it goes up in blue smoke at the edge it crossed.
+                    PlayFoxSmoke(entry);
+                    BeginPendingLaunch(entry.View.OrbId);
+                }
                 EdgeCrossed?.Invoke(crossing);
             }
         }
@@ -1462,7 +1587,7 @@ namespace C6Lab
         /// 두 구슬을 그 자리에 멈추고 방장에게 결합을 요청한다.
         /// 놓아서 결합과 닿으면 결합이 함께 쓴다.
         /// </summary>
-        private void RequestCombine(Entry first, Entry second)
+        private void RequestCombine(Entry first, Entry second, bool passiveContact = false)
         {
             first.BeforeRequest = CaptureMotion(first);
             second.BeforeRequest = CaptureMotion(second);
@@ -1478,7 +1603,12 @@ namespace C6Lab
             SetBodyMode(first);
             SetBodyMode(second);
             Vector2 middle = ToNormalized((XY(first.View.Body.position) + XY(second.View.Body.position)) * .5f);
-            CombineRequested?.Invoke(first.View.OrbId, second.View.OrbId, middle, velocity);
+            // The event signature stays compatible with existing Scene/Network listeners. The network
+            // copies this synchronous cause into the request, so overheat never burns a passive collision.
+            bool previousCause = contactCombineRequest;
+            contactCombineRequest = passiveContact;
+            try { CombineRequested?.Invoke(first.View.OrbId, second.View.OrbId, middle, velocity); }
+            finally { contactCombineRequest = previousCause; }
         }
 
         /// <summary>
@@ -1503,13 +1633,43 @@ namespace C6Lab
             float speed = worldSpeed / bounds.width;
             if (speed < config.CombineSpeed) return;
 
-            RequestCombine(first, second);
+            if (first.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(first, second);
+            else if (second.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(second, first);
+            else RequestCombine(first, second, true);
         }
 
-        /// <summary>닿으면 결합에 쓸 수 있는 구슬인지 확인한다.</summary>
+        /// <summary>
+        /// 여우불 (#251): 여우구슬과 음·양 구슬이 닿거나 겹쳐지면 둘 다 그 자리에서 푸른 연기로 사라진다.
+        /// 이 화면에서 바로 보여 주고 Host의 확인을 기다린다 (거절되면 둘 다 돌아온다).
+        /// </summary>
+        private void TouchFoxFire(Entry fox, Entry orb)
+        {
+            PlayFoxSmoke(fox);
+            PlayFoxSmoke(orb);
+            BeginPendingLaunch(fox.View.OrbId);
+            BeginPendingLaunch(orb.View.OrbId);
+            FoxFireTouched?.Invoke(fox.View.OrbId, orb.View.OrbId);
+        }
+
+        private void PlayFoxSmoke(Entry entry)
+        {
+            LabOrbAppearance look = config != null && config.OrbAppearance != null ? config.OrbAppearance : LabOrbAppearance.Defaults;
+            LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius, look,
+                look.FoxFireSmokeColor);
+        }
+
+        /// <summary>A fox orb that has landed and is past its safe moment (#251).</summary>
+        private static bool FoxReady(Entry entry) =>
+            entry.View.Kind == LabOrbKind.FoxFire && !entry.Dropping && Time.time >= entry.FoxSafeUntil;
+
+        /// <summary>Whether this board shows the orb as a fox orb (#251).</summary>
+        public bool IsFoxFire(string id) => id != null && entries.TryGetValue(id, out var entry)
+            && entry.View != null && entry.View.Kind == LabOrbKind.FoxFire;
+
+        /// <summary>닿으면 결합에 쓸 수 있는 구슬인지 확인한다. 여우구슬은 보호 시간이 지난 뒤부터 (#251).</summary>
         private static bool CanContactCombine(Entry entry)
         {
-            return entry.View.Kind.IsRaw()
+            return (entry.View.Kind.IsRaw() || FoxReady(entry))
                 && entry.LocalOwner
                 && !entry.Held
                 && !entry.Locked
@@ -1525,8 +1685,10 @@ namespace C6Lab
             float best = Mathf.Pow(config.OrbRadius * 2f, 2f);
             foreach (var candidate in entries.Values)
             {
-                if (candidate == dragged || !candidate.View.Kind.IsRaw()
-                    || candidate.View.Kind == dragged.View.Kind || !candidate.LocalOwner
+                // Yin meets Yang; a fox orb meets either, and either meets a fox orb past its safe moment (#251).
+                bool partner = dragged.View.Kind == LabOrbKind.FoxFire ? candidate.View.Kind.IsRaw()
+                    : candidate.View.Kind.IsRaw() ? candidate.View.Kind != dragged.View.Kind : FoxReady(candidate);
+                if (candidate == dragged || !partner || !candidate.LocalOwner
                     || candidate.Locked || candidate.EdgePending || candidate.Held || candidate.HiddenForPending) continue;
                 float distance = (XY(candidate.View.Body.position) - XY(dragged.View.Body.position)).sqrMagnitude;
                 if (distance <= best) { best = distance; nearest = candidate; }
@@ -1708,8 +1870,9 @@ namespace C6Lab
 
         /// <summary>How long a blast-shrunk orb's art takes to squeeze down to its new size (#213).</summary>
         private const float ShrinkSeconds = .3f;
-        private float RadiusFor(LabOrbKind kind, bool small = false) =>
-            kind.IsDrum() ? config.DrumRadius : config.OrbRadius * (small ? config.BlastShrinkScale : 1f);
+        private float RadiusFor(LabOrbKind kind, bool small = false, float jigwiScale = 1f) =>
+            kind.IsDrum() ? config.DrumRadius : config.OrbRadius * (small ? config.BlastShrinkScale : 1f)
+                * (kind.IsRaw() ? jigwiScale : 1f);
         private static Vector2 XY(Vector3 value) => new Vector2(value.x, value.y);
         private static Vector3 OnPlane(Vector2 value) => new Vector3(value.x, value.y, 0f);
         private static void StopMotion(Rigidbody body)

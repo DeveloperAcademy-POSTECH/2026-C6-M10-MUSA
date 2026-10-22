@@ -29,11 +29,10 @@ namespace C6Lab.Tests
             yield return null;
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
-            ui.allowOfflineEditorTuning = true; // Offline Editor fixture.
             sourceValues = ui.sourceConfig.CaptureDeveloperValues();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(166));
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(166));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(196));
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(196));
         }
 
         [UnityTearDown]
@@ -205,7 +204,7 @@ namespace C6Lab.Tests
             Assert.That(NetworkField<int>("configRevision"), Is.EqualTo(revision + 1));
             Assert.That(NetworkField<string>("configFingerprint"), Is.Not.EqualTo(fingerprint));
             Assert.That(NetworkField<string>("configFingerprint"), Is.EqualTo(
-                LabSessionSettings.Fingerprint(ui.network.config.CaptureDeveloperValues(), 2, 5654)));
+                LabSessionSettings.Fingerprint(ui.network.config.CaptureDeveloperValues(), 2, 5660)));
             Assert.That(ui.network.CanStartBattle, Is.False);
             ui.network.StartBattle();
             Assert.That(ui.network.Snapshot, Is.Null,

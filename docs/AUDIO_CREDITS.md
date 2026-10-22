@@ -14,6 +14,7 @@
 | --- | --- | --- | --- | --- |
 | `Assets/Lab/Resources/Audio/Generate/Janggu_1_1.wav` ~ `Janggu_1_3.wav`, `Janggu_3_1.wav` ~ `Janggu_3_3.wav` (6개) | 구슬 생성 시 장구 소리 | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) | 출처 표시 조건으로 누구나 이용 가능 | 앞 무음 약 0.19초 제거, 길이 0.8초로 자름(끝 0.2초 페이드아웃, 연속 생성 시 소리가 겹쳐 묻히지 않도록). 작게 녹음된 `Janggu_1_3`·`Janggu_3_2`·`Janggu_3_3`은 가장 큰 순간이 -0.5dB가 되도록 음량만 키움(+5.6 / +4.9 / +11.1dB). 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/GenerateVoice/Eolssu_1.wav` ~ `Eolssu_3.wav` (3개) | 구슬 생성 시 세 번째마다 나는 "얼쑤" 추임새 (장구 → 장구 → 얼쑤 순서) | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 추임새: 정회석(`Chu-imsae by JungHoeseok_1`) → Eolssu_1, 강효주(`_5`) → Eolssu_2, 이춘희(`_3`) → Eolssu_3 | 출처 표시 조건으로 누구나 이용 가능 | 앞뒤 무음을 잘라 0.52~0.95초로 맞춤(끝 0.04초 페이드아웃). 작게 녹음되어 가장 큰 순간이 -1dB가 되도록 음량만 키움(+9.5~+12.2dB). 96kHz 스테레오를 44.1kHz 모노 16bit로 저장. 음색 변경 없음 |
+| `Assets/Lab/Resources/Audio/ComboClear/Jota.wav` | 박 색상 콤보 성공(`CLEAR!`) 때 나는 "좋다" 추임새 (#271, 팀 전체 성공이라 모든 기기) | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 추임새: 염경애 "좋타"(`Chu-imsaebyYeomKyeongae_2.wav`) | 출처 표시 조건으로 누구나 이용 가능 (공공누리 제1유형, 상업적 이용·변경 가능) | 앞 숨소리 0.3초를 잘라내고 끝 무음을 정리해 1.97초로 맞춤(앞 0.01초 페이드인, 끝 0.05초 페이드아웃). 96kHz 32bit float 스테레오를 44.1kHz 모노 16bit로 저장하고 가장 큰 순간이 -1dB가 되도록 음량만 맞춤(+1dB). 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/Hit/Splat_1.wav` | 박 모드 Paint에서 내가 던진 구슬이 요괴의 가운데 쪽에 맞았을 때 나는 물감 소리 (던진 사람 기기만, 3개 중 무작위) – 긴 찰싹 | "Squishes and Splats" 팩 by mrickey13, freesound.org (pack 29012), [검색 링크](https://freesound.org/search/?q=Squish+sound+effect&f=license%3A%22Creative+Commons+0%22+pack_grouping%3A%2229012_Squishes+and+Splats%22) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
 | `Assets/Lab/Resources/Audio/Hit/Splat_3.wav` | 박 모드 Paint에서 내가 던진 구슬이 요괴의 가운데 쪽에 맞았을 때 나는 물감 소리 (던진 사람 기기만, 3개 중 무작위) – 짧은 찰싹 | "Squishes and Splats" 팩 by mrickey13, freesound.org (pack 29012), [검색 링크](https://freesound.org/search/?q=Squish+sound+effect&f=license%3A%22Creative+Commons+0%22+pack_grouping%3A%2229012_Squishes+and+Splats%22) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
 | `Assets/Lab/Resources/Audio/Hit/Splat_4.wav` | 박 모드 Paint에서 내가 던진 구슬이 요괴의 가운데 쪽에 맞았을 때 나는 물감 소리 (던진 사람 기기만, 3개 중 무작위) – 중간 길이 찰싹 | "Squishes and Splats" 팩 by mrickey13, freesound.org (pack 29012), [검색 링크](https://freesound.org/search/?q=Squish+sound+effect&f=license%3A%22Creative+Commons+0%22+pack_grouping%3A%2229012_Squishes+and+Splats%22) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
@@ -32,7 +33,7 @@
 
 > 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '장구-덩-강, 장구-덩-중, 장구-덩-약, 장구-쿵-강, 장구-쿵-중, 장구-쿵-약(작성자: 국립국악원)'을 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
 
-> 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '추임새(작성자: 정회석, 강효주, 이춘희)'를 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
+> 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '추임새(작성자: 정회석, 강효주, 이춘희, 염경애)'를 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
 
 | 우리 파일 | 국립국악원 저작물명 |
 | --- | --- |
@@ -40,6 +41,7 @@
 | `Generate/Janggu_1_1.wav`, `Janggu_1_2.wav`, `Janggu_1_3.wav` | 장구-덩-강, 장구-덩-중, 장구-덩-약 |
 | `Generate/Janggu_3_1.wav`, `Janggu_3_2.wav`, `Janggu_3_3.wav` | 장구-쿵-강, 장구-쿵-중, 장구-쿵-약 |
 | `GenerateVoice/Eolssu_1.wav`, `Eolssu_2.wav`, `Eolssu_3.wav` | 추임새 (정회석, 강효주, 이춘희) |
+| `ComboClear/Jota.wav` | 추임새 – 좋타 (염경애) |
 
 **CC BY 소리 (출처 표시 의무 있음)**
 

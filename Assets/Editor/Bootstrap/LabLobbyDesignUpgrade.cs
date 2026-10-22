@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Linq;
 using C6Lab;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -10,6 +12,7 @@ namespace C6Lab.Editor
     /// <summary>Install only the pre-battle presentation, preserving existing battle and DEV bindings.</summary>
     public static class LabLobbyDesignUpgrade
     {
+        private const string LabScene = "Assets/Lab/Scenes/Lab.unity";
         private const string Art = "Assets/Lab/Art/Lobby/";
         private static Font bold, medium;
         private static Color Ink => LabLobbyView.Html("292921");
@@ -22,9 +25,7 @@ namespace C6Lab.Editor
             if (scene.path != "Assets/Lab/Scenes/Lab.unity") scene = EditorSceneManager.OpenScene("Assets/Lab/Scenes/Lab.unity");
             var hud = UnityEngine.Object.FindFirstObjectByType<LabHud>();
             if (hud == null || hud.network == null) throw new InvalidOperationException("Saved HUD/network required.");
-            bold = AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/ShillaCultureBold.otf");
-            medium = AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/Shilla_Culture(M).otf");
-            if (bold == null || medium == null) throw new InvalidOperationException("Both supplied Shilla fonts are required.");
+            LoadFonts();
             foreach (string path in AssetDatabase.FindAssets("t:Texture2D", new[] { Art }))
             {
                 var importer = AssetImporter.GetAtPath(AssetDatabase.GUIDToAssetPath(path)) as TextureImporter;
@@ -46,6 +47,12 @@ namespace C6Lab.Editor
             }
             var canvas = hud.GetComponentInParent<Canvas>();
             var old = canvas.transform.Find("FigmaLobby");
+            if (old != null && old.TryGetComponent(out LabLobbyView authored))
+            {
+                UpgradeCompatibility(authored, hud);
+                EditorSceneManager.MarkSceneDirty(scene); EditorSceneManager.SaveScene(scene);
+                return;
+            }
             if (old != null) UnityEngine.Object.DestroyImmediate(old.gameObject);
             var root = Rect(canvas.transform, "FigmaLobby"); Stretch(root);
             // Draw after legacy panels, before DEV's toggle and modal.
@@ -69,8 +76,8 @@ namespace C6Lab.Editor
             var wifi = TextAt(browser, "Wifi", "같은 와이-파이에 연결해야 입장할 수 있소.", 28, 229, 346, 25, 16, false, TextAnchor.MiddleCenter);
             wifi.color = LabLobbyView.Html("394759");
             TextAt(browser, "People", "함께할 인원", 28, 341, 140, 44, 20);
-            view.countButtons = new Button[3];
-            for (int i=0;i<3;i++) view.countButtons[i] = ButtonAt(browser,"Count"+(i+3),(i+3)+"명",174+i*69,341,62,44,18,false);
+            view.countButtons = new Button[4];
+            for (int i=0;i<4;i++) view.countButtons[i] = ButtonAt(browser,"Count"+(i+2),(i+2)+"명",174+i*50,341,46,44,18,false);
             view.createButton = ButtonAt(browser,"CreateRoom","새 방 만들기 +",28,405,346,44,20);
             TextAt(browser,"OpenRooms","열린 방",28,510,170,28,20);
             view.refreshButton = PlainButton(browser,"Refresh","↻ 다시 찾기",260,503,114,44,14);
@@ -138,10 +145,130 @@ namespace C6Lab.Editor
             }
             ApplyBrowserStyle(view);
             ApplyPositionStyle(view);
-            hud.network.fixedHostPosition=true;
+            UpgradeCompatibility(view, hud);
             EditorUtility.SetDirty(hud.network);EditorUtility.SetDirty(view);
             EditorSceneManager.MarkSceneDirty(scene);EditorSceneManager.SaveScene(scene);
             Debug.Log("C6_LOBBY_DESIGN_SAVED");
+        }
+
+        /// <summary>Copy only the authored Figma root, never the old Scene's battle, model or settings.</summary>
+        public static void IntegrateAuthoredRoot(string sourceScenePath)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Exit Play Mode first.");
+            if (!File.Exists(sourceScenePath)) throw new FileNotFoundException("The preserved PR Scene is required.", sourceScenePath);
+            Scene destination = SceneManager.GetSceneByPath(LabScene);
+            if (!destination.IsValid() || !destination.isLoaded)
+                destination = EditorSceneManager.OpenScene(LabScene, OpenSceneMode.Additive);
+            if (destination.isDirty) throw new InvalidOperationException("Review or save current Lab edits before importing the authored lobby.");
+            LabHud hud = destination.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<LabHud>(true)).Single();
+            string temporary = "Assets/Editor/Bootstrap/_LobbyImport_" + Guid.NewGuid().ToString("N") + ".unity";
+            Scene source = default;
+            try
+            {
+                File.Copy(sourceScenePath, temporary);
+                AssetDatabase.ImportAsset(temporary, ImportAssetOptions.ForceSynchronousImport);
+                source = EditorSceneManager.OpenScene(temporary, OpenSceneMode.Additive);
+                LabLobbyView original = source.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<LabLobbyView>(true)).Single();
+                foreach (LabLobbyView existing in destination.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<LabLobbyView>(true)).ToArray())
+                    UnityEngine.Object.DestroyImmediate(existing.gameObject);
+                GameObject clone = UnityEngine.Object.Instantiate(original.gameObject, hud.GetComponentInParent<Canvas>().transform, false);
+                clone.name = "FigmaLobby";
+                LabLobbyView view = clone.GetComponent<LabLobbyView>();
+                UpgradeCompatibility(view, hud);
+                EditorSceneManager.MarkSceneDirty(destination);
+                EditorSceneManager.SaveScene(destination, LabScene);
+                Debug.Log("C6_LOBBY_AUTHORED_ROOT_INTEGRATED: latest Lab battle/config preserved; authored lobby only.");
+            }
+            finally
+            {
+                if (source.IsValid() && source.isLoaded) EditorSceneManager.CloseScene(source, true);
+                AssetDatabase.DeleteAsset(temporary);
+                if (destination.IsValid() && destination.isLoaded) SceneManager.SetActiveScene(destination);
+            }
+        }
+
+        /// <summary>Extend required controls while retaining the authored layout, sprites and row styling.</summary>
+        public static void UpgradeCompatibility(LabLobbyView view, LabHud hud)
+        {
+            LoadFonts(); view.hud = hud; view.mediumFont = medium;
+            // The source fixed-Host design had no empty P1 art. Reuse an existing dashed
+            // empty seat rather than falsely presenting an unclaimed P1 as filled.
+            if (view.emptySlots.Length > 1 && view.emptySlots[0] == view.filledSlots[0])
+                view.emptySlots[0] = view.emptySlots[1];
+            foreach (Text text in view.GetComponentsInChildren<Text>(true))
+                if (text.font != null && AssetDatabase.GetAssetPath(text.font) == "Assets/Lab/Art/Fonts/Shilla_Culture(B).otf") text.font = bold;
+            foreach (GameObject legacy in new[] { hud.sessionControls, hud.roomListPanel, hud.playerSlotPanel,
+                hud.statusText == null ? null : hud.statusText.gameObject,
+                hud.noticeText == null ? null : hud.noticeText.gameObject,
+                hud.peersText == null ? null : hud.peersText.gameObject })
+            {
+                if (legacy == null) continue;
+                var group = legacy.GetComponent<CanvasGroup>();
+                if (group == null) group = legacy.AddComponent<CanvasGroup>();
+                group.alpha = 0; group.interactable = false; group.blocksRaycasts = false;
+            }
+            Transform browser = view.browserPage.transform;
+            view.countButtons = new Button[4];
+            for (int i = 0; i < 4; i++)
+            {
+                Transform existing = browser.Find("Count" + (i + 2));
+                view.countButtons[i] = existing != null ? existing.GetComponent<Button>()
+                    : ButtonAt(browser, "Count" + (i + 2), (i + 2) + "명", 174 + i * 50, 341, 46, 44, 18, false);
+                LabLobbyView.Place((RectTransform)view.countButtons[i].transform, 174 + i * 50, 341, 46, 44);
+                Text label = view.countButtons[i].GetComponentInChildren<Text>();
+                label.text = (i + 2) + "명"; label.fontSize = 18;
+                LabLobbyView.Place(label.rectTransform, 0, 0, 46, 44);
+            }
+            if (view.clearSlotButton == null)
+                view.clearSlotButton = PlainButton(view.positionPage.transform, "ClearSelection", "자리 선택 해제", 111, 683, 180, 34, 16);
+            if (view.directConnectionButton == null)
+                view.directConnectionButton = PlainButton(browser, "DirectConnection", "방장 IP로 직접 연결", 28, 458, 346, 36, 15);
+            if (view.directConnectionPanel == null)
+            {
+                RectTransform modal = Page(view.design, "DirectConnectionPanel");
+                modal.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, .2f);
+                RectTransform panel = Rect(modal, "Card");
+                LabLobbyView.Place(panel, 20, 270, 362, 330);
+                var paper = panel.gameObject.AddComponent<LabRoundedGraphic>(); paper.radius = 24; paper.color = LabLobbyView.Html("E8DFCB");
+                view.directConnectionPanel = modal.gameObject;
+                TextAt(panel, "Title", "방장 IP로 직접 연결", 20, 18, 322, 35, 22, true, TextAnchor.MiddleCenter);
+                TextAt(panel, "AddressLabel", "방장 IP (IPv4 / IPv6)", 20, 66, 322, 25, 15);
+                view.directAddress = CopyInput(hud.hostAddress, panel, "HostAddress", 20, 95, 322, 42);
+                TextAt(panel, "PortLabel", "포트", 20, 143, 100, 25, 15);
+                view.directPort = CopyInput(hud.port, panel, "Port", 126, 141, 216, 36);
+                view.directFeedback = TextAt(panel, "Feedback", "", 20, 184, 322, 65, 14);
+                view.directJoinButton = ButtonAt(panel, "Join", "연결", 20, 266, 210, 44, 18);
+                view.closeDirectConnectionButton = PlainButton(panel, "Close", "닫기", 240, 266, 102, 44, 18);
+                modal.gameObject.SetActive(false);
+            }
+            // Keep pre-connect DEV/Solo reachable above the authored painting, including in Development players.
+            if (hud.developerMode?.toggleButton != null)
+            {
+                Transform toggle = hud.developerMode.toggleButton.transform;
+                if (toggle.parent == view.transform.parent) view.transform.SetSiblingIndex(toggle.GetSiblingIndex());
+                var rect = (RectTransform)toggle;
+                rect.anchorMin = new Vector2(.82f, .95f); rect.anchorMax = new Vector2(.97f, .99f);
+                rect.offsetMin = rect.offsetMax = Vector2.zero;
+            }
+            EditorUtility.SetDirty(view);
+        }
+
+        private static void LoadFonts()
+        {
+            bold = AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/ShillaCultureBold.otf");
+            medium = AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/Shilla_Culture(M).otf");
+            if (bold == null || medium == null) throw new InvalidOperationException("Both supplied Shilla fonts are required.");
+        }
+
+        private static InputField CopyInput(InputField source, Transform parent, string name, float x, float y, float width, float height)
+        {
+            if (source == null) throw new InvalidOperationException("The current Lab direct-connect input is missing.");
+            InputField input = UnityEngine.Object.Instantiate(source, parent, false);
+            input.name = name; input.gameObject.SetActive(true);
+            LabLobbyView.Place((RectTransform)input.transform, x, y, width, height);
+            foreach (Text text in input.GetComponentsInChildren<Text>(true)) { text.font = medium; text.fontSize = 17; }
+            return input;
         }
         public static void ApplyBrowserStyle(LabLobbyView view)
         {

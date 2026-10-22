@@ -27,15 +27,24 @@ namespace C6Lab
         private LabOrbBurn burn;
         private SpriteRenderer expiryFlash;
         private SpriteRenderer expiryHalo;
+        // 야광귀 섬광 (#268): 눈부신 동안 그림 위에 덮는 하얀 원. 북에는 쓰지 않는다.
+        private SpriteRenderer glareCover;
+        private float glare;
         private float lifeLeft = -1f;
         private float flashPhase;
         private static Sprite expiryDiscSprite;
         private static Sprite expiryHaloSprite;
         /// <summary>In front of the orb's art, its icons and its fire's licks.</summary>
         private const int ExpiryOrder = 12;
+        /// <summary>Above even the expiry flash, so a glared orb shows no colour at all (#268).</summary>
+        private const int GlareOrder = 13;
+        /// <summary>섬광 덮개 색. 아주 살짝 따뜻한 흰색이라 빛에 바랜 느낌이 난다 (#268).</summary>
+        private static readonly Color GlareColor = new Color(1f, .985f, .94f, 1f);
         /// <summary>The board keeps its own lifetime countdown unless the Host's differs by more than this.</summary>
         private const float LifeResyncSeconds = .3f;
         private SpriteRenderer drumArt;
+        private SpriteRenderer foxGlow;
+        private float foxGlowPhase;
         private LabOrbSpriteArt orbSpriteArt;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
@@ -59,6 +68,8 @@ namespace C6Lab
         private Vector3 visualWritten = Vector3.one, visualBase = Vector3.one;
 
         public string OrbId => orbId;
+        /// <summary>The fox orb's flickering blue glow is showing (#251).</summary>
+        public bool FoxGlowVisible => foxGlow != null && foxGlow.gameObject.activeSelf;
         public LabOrbKind Kind => kind;
         public LabOrbElement Element => element;
         /// <summary>Host-approved handoffs still needed before this item can be used.</summary>
@@ -94,6 +105,41 @@ namespace C6Lab
         public float ComboScale => comboScale;
         /// <summary>콤보 배율이 향하는 값 (#257). 꼬리(#254)는 이 값으로 크기를 정한다.</summary>
         public float ComboScaleTarget => comboTarget;
+
+        /// <summary>섬광 때문에 지금 그림을 하얗게 덮은 정도 (#268). 0이면 원래 색.</summary>
+        public float Glare => glare;
+
+        /// <summary>
+        /// 야광귀 섬광 (#268): 그림 위에 하얀 원을 amount만큼 덮어 색(음양·오행·아이템 표시)이 안 보이게 한다.
+        /// 모양과 크기(콤보 배율 포함)는 그대로 따라가고, 물리·판정은 바꾸지 않는다. 북은 언제나 원래대로 둔다.
+        /// 판이 매 프레임 부른다.
+        /// </summary>
+        public void SetGlare(float amount)
+        {
+            glare = kind.IsDrum() || float.IsNaN(amount) ? 0f : Mathf.Clamp01(amount);
+            if (glare <= 0f)
+            {
+                if (glareCover != null && glareCover.gameObject.activeSelf) glareCover.gameObject.SetActive(false);
+                return;
+            }
+            if (glareCover == null)
+            {
+                glareCover = CreateExpiryPart("Glare Cover", ExpiryDisc());
+                glareCover.sortingOrder = GlareOrder;
+            }
+            float art = ArtRadius(ExpiryLook);
+            glareCover.gameObject.SetActive(true);
+            // 그림 가장자리까지 덮도록 아주 조금 크게, 소멸 번쩍임보다 조금 앞에 둔다.
+            glareCover.transform.localPosition = new Vector3(0f, 0f, -1.1f * art);
+            glareCover.transform.localScale = Vector3.one * (2f * 1.04f * art);
+            glareCover.color = new Color(GlareColor.r, GlareColor.g, GlareColor.b, glare);
+        }
+
+        /// <summary>그려진 그림의 반지름: 결합 구슬 그림은 조금 크게, 폭탄 그림은 더 크게, 콤보 배율(#257)을 곱한다.</summary>
+        private float ArtRadius(LabOrbAppearance look) =>
+            (HasBombArt ? visualRadius * look.BombBodySize
+                : orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf ? visualRadius * LabOrbSpriteArt.SizeScaleFor(kind)
+                : visualRadius) * comboScale;
 
         /// <summary>콤보 SMALL/BIG에 맞춘 그림 배율 목표 (#257). 판이 매 프레임 정한다.</summary>
         public void SetComboScaleTarget(float target) =>
@@ -152,6 +198,7 @@ namespace C6Lab
                 lifeLeft = Mathf.Max(0f, lifeLeft - Time.deltaTime);
                 PoseExpiry(Time.deltaTime);
             }
+            if (FoxGlowVisible) PoseFoxGlow(Time.deltaTime);
             if (kind.IsDrum())
             {
                 // The flat art keeps facing the camera and turns about the view axis instead of rolling.
@@ -269,9 +316,7 @@ namespace C6Lab
             Color tint = look.ExpiryFlashColor;
             // Cover the art as drawn: a combined orb's picture is drawn larger, a bomb's art larger still.
             // The combo SMALL/BIG scale (#257) shrinks or grows the art, so the flash follows it.
-            float art = (HasBombArt ? visualRadius * look.BombBodySize
-                : orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf ? visualRadius * LabOrbSpriteArt.SizeScaleFor(kind)
-                : visualRadius) * comboScale;
+            float art = ArtRadius(look);
             expiryFlash.gameObject.SetActive(true);
             expiryHalo.gameObject.SetActive(true);
             expiryFlash.transform.localPosition = new Vector3(0f, 0f, -1.05f * art);
@@ -688,11 +733,50 @@ namespace C6Lab
                     appearance.ApplyKindMaterial(replacementVisual, kind, element);
             }
             UpdateDrumArt(drumSprite);
+            UpdateFoxGlow();
             // Element art is 20% larger; Yin/Yang art and every collider retain their original size.
             float spriteRadius = visualRadius * LabOrbSpriteArt.SizeScaleFor(kind);
             orbSpriteArt = LabOrbSpriteArt.Set(visual, orbSpriteArt, orbSprite, spriteRadius, -visualRadius);
             UpdateContactShadow();
             UpdateItemMarker();
+        }
+
+        /// <summary>
+        /// 여우구슬(#251)은 둘레의 푸른 빛이 은은하게 일렁여, 같은 파란색인 수(水) 결합 구슬과 구분된다.
+        /// 그림 바로 뒤에 놓아 그림을 가리지 않는다.
+        /// </summary>
+        private void UpdateFoxGlow()
+        {
+            if (kind != LabOrbKind.FoxFire)
+            {
+                if (foxGlow != null) foxGlow.gameObject.SetActive(false);
+                return;
+            }
+            if (foxGlow == null)
+            {
+                var glow = new GameObject("Fox Fire Glow");
+                glow.transform.SetParent(visual, false);
+                foxGlow = glow.AddComponent<SpriteRenderer>();
+                foxGlow.sprite = LabOrbVanishSmoke.PuffSprite();
+            }
+            foxGlow.gameObject.layer = visual.gameObject.layer;
+            foxGlow.gameObject.SetActive(true);
+            LabOrbAppearance look = appearance != null ? appearance : LabOrbAppearance.Defaults;
+            foxGlow.transform.localPosition = new Vector3(0f, 0f, -.9f * visualRadius);
+            foxGlow.transform.localRotation = Quaternion.identity;
+            foxGlow.transform.localScale = Vector3.one * (2f * visualRadius * look.FoxFireGlowSize);
+            PoseFoxGlow(0f);
+        }
+
+        private void PoseFoxGlow(float deltaTime)
+        {
+            LabOrbAppearance look = appearance != null ? appearance : LabOrbAppearance.Defaults;
+            foxGlowPhase = Mathf.Repeat(foxGlowPhase + deltaTime * look.FoxFireGlowHz, 1f);
+            // A slow swell with a quicker flicker on top, like a flame.
+            float swell = .5f + .5f * Mathf.Sin(foxGlowPhase * 2f * Mathf.PI);
+            float flicker = .85f + .15f * Mathf.Sin(foxGlowPhase * 6f * Mathf.PI + 1.3f);
+            Color color = look.FoxFireGlowColor;
+            foxGlow.color = new Color(color.r, color.g, color.b, color.a * Mathf.Lerp(.45f, 1f, swell) * flicker);
         }
 
         private void UpdateDrumArt(Sprite sprite)

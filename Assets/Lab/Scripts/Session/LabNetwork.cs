@@ -34,6 +34,8 @@ namespace C6Lab
         public long requestId;
         public string firstId;
         public string secondId;
+        /// <summary>True only for owner-local passive contact combination, not a player release.</summary>
+        public bool passiveCombine;
         /// <summary>The orbs a blast flung, in a holder's blastHit report (#213).</summary>
         public string[] ids;
         /// <summary>A projectile thrown from a blast-shrunk orb (#213).</summary>
@@ -188,11 +190,22 @@ namespace C6Lab
         // 5651: #246 removes unused tuning and legacy payloads, retaining AUTO; 165 shared values.
         // 5652: #254 board orb trail toggle (DEV 165); 166 shared values.
         // 5653: #258 visible gourd mesh collision and mesh-local approved paint coordinates.
-        // 5654: #263 fixed Host P1 product lobby and live Bonjour room presence.
-        internal const ushort LabProtocolVersion = 5654;
+        // 5654: #251 the yokai's sabotage mix announces each sabotage it casts, and fox fire adds the FoxFire orb
+        //       kind with its foxFire drop and fox touch messages, and the charm travels in the snapshot and board
+        //       header with charmTap wake-ups from the players beside and a charmWoken notice; DEV 166-177, 178 shared values.
+        // 5655: #272 per-player Jigwi fire targets and independent Raw burn metadata, DEV 178-183.
+        // 5657: #268 flash settings appended after Jigwi (DEV 184-190), explicit ALL target flags;
+        //       shared schema 191. 5656 is reserved by the parallel #271 branch.
+        // 5658: #271 counting presentation appended at DEV 191 (192 values); fast combo control metadata.
+        // 5659: #276 stage-selected scheduler, four Jigwi policy values and game stage settings barrier.
+        // 5660: #263 bounded live room presence and creator-owned pending-room registrations.
+        internal const ushort LabProtocolVersion = 5660;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/17");
+        private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
+        /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
+        private const int MaximumFoxFireOrbs = 10;
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/21");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -315,6 +328,10 @@ namespace C6Lab
         private double announcedBlockStart = -1d;
         /// <summary>박이 누군가의 판에 폭탄을 떨어뜨렸을 때 모든 기기에서 한 번 알린다. (받는 사람, 폭탄 ID, 떨어질 위치 0..1)</summary>
         public event Action<ulong, string, Vector2> GourdBombDropped;
+        /// <summary>요괴가 통합 추첨으로 방해공작을 걸었을 때 모든 기기에서 한 번 알린다 (#251). (종류, 받는 사람)</summary>
+        public event Action<LabSabotageKind, ulong> SabotageCast;
+        /// <summary>옆 사람들이 깨워 매혹이 풀렸을 때 모든 기기에서 한 번 알린다 (#251). (깨어난 사람) 시간이 다 되어 풀리면 알리지 않는다.</summary>
+        public event Action<ulong> CharmWoken;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
         public event Action LocalThrowMissed;
         /// <summary>내가 요청한 결합을 Host가 승인했을 때, 결합한 사람 기기에서만 한 번 알린다. (거절되면 알리지 않음)</summary>
@@ -324,14 +341,16 @@ namespace C6Lab
         public string Notice { get; private set; } = string.Empty;
         public string LastShotReport { get; private set; } = string.Empty;
         public int ParticipantCount => order.Count;
-        [Tooltip("Normal product rooms reserve P1 for the Host. Legacy fixtures may leave this off.")]
-        public bool fixedHostPosition;
+        // Retained solely so older saved Scenes/Editor utilities deserialize without losing references.
+        // Host authority and the chosen P number are independent in every current room.
+        [HideInInspector] public bool fixedHostPosition;
         public int SelectedParticipantCount => playerSlots?.SelectedCount ?? 0;
         public int TargetParticipantCount => targetParticipantCount;
         public int LocalSlotNumber => IsConnected && playerSlots != null ? playerSlots.GetSlot(LocalPlayerId) : 0;
         public bool SlotSelectionPending => slotSelectionPending;
         public bool IsDeveloperRestartPending => pendingDeveloperRestart;
         public bool CanSelectPlayerSlot => IsConnected && !developerSolo && model == null && latest == null
+            && (!gameFlowEnabled || !gameRosterLocked)
             && playerSlots != null && order.Contains(LocalPlayerId) && !slotSelectionPending && !pendingDeveloperRestart;
         public ulong GetSlotOwner(int slotNumber) => playerSlots?.GetOwner(slotNumber) ?? ulong.MaxValue;
         public bool IsSearchingRooms => roomSearchActive && discovery != null && discovery.IsBrowsing;
@@ -394,18 +413,13 @@ namespace C6Lab
 
         private void Awake()
         {
-            sourceConfig = config;
+            // GameSession (-1000) can prepare its initial runtime profile before this Awake.
+            // Retain the original saved asset if that early installation already captured it.
+            if (sourceConfig == null) sourceConfig = config;
             if (manager == null) manager = GetComponent<NetworkManager>();
             if (transport == null) transport = GetComponent<UnityTransport>();
             if (impactFeedback == null) impactFeedback = FindFirstObjectByType<LabImpactFeedback>();
-            if (board != null)
-            {
-                board.EdgeCrossed += OnEdgeCrossed;
-                board.CombineRequested += OnCombineRequested;
-                board.ThrowRequested += OnThrowRequested;
-                board.UseRequested += OnUseRequested;
-                board.DrumTapped += Generate;
-            }
+            SubscribeBoard(board);
             if (manager != null)
             {
                 manager.OnClientConnectedCallback += OnConnected;
@@ -463,7 +477,6 @@ namespace C6Lab
         /// </summary>
         public bool RequestPlayerSlot(int slotNumber)
         {
-            if (fixedHostPosition && IsHost && !developerSolo) return false;
             if (!CanSelectPlayerSlot || slotNumber < 0 || slotNumber > targetParticipantCount)
             {
                 SetNotice("Choose an available P number in the room lobby.");
@@ -560,6 +573,7 @@ namespace C6Lab
         private bool TryInstallValues(float[] values, out string error)
         {
             error = "A valid session config is required.";
+            if (sourceConfig == null && gameFlowEnabled) sourceConfig = config;
             if (sourceConfig == null) return false;
             LabConfig replacement = Instantiate(sourceConfig);
             replacement.name = sourceConfig.name + " (Session Runtime)";
@@ -613,7 +627,7 @@ namespace C6Lab
         {
             if (!CanChooseConnection || registeredRoom == null || !registeredRoom.IsAdvertising
                 || !registeredRoom.AdvertisingConfirmed || !ValidRoomName(registeredRoom.RegisteredServiceName)
-                || roomPort == 0 || capacity < 3 || capacity > 5) return false;
+                || roomPort == 0 || capacity < 2 || capacity > 5) return false;
             port = roomPort;
             targetParticipantCount = capacity;
             return HostInternal(registeredRoom);
@@ -650,7 +664,6 @@ namespace C6Lab
             }
             RegisterHandler();
             if (!order.Contains(manager.LocalClientId)) order.Add(manager.LocalClientId);
-            if (fixedHostPosition) playerSlots.TrySelect(manager.LocalClientId, 1, out _);
             AssignAutomaticTestSlot(manager.LocalClientId);
             configAcknowledgements.Add(manager.LocalClientId);
             StartAdvertising(registeredRoom);
@@ -907,6 +920,7 @@ namespace C6Lab
 
         public void StartBattle()
         {
+            if (gameFlowEnabled && (!gameStageStarting || !HasBattleReferences || model != null || latest != null)) return;
             if (!CanStartBattle)
             {
                 SetNotice("Wait for " + targetParticipantCount + " selected P numbers and matching settings confirmations.");
@@ -925,7 +939,8 @@ namespace C6Lab
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             ulong[] playersInPOrder = playerSlots.PlayersInSlotOrder();
-            model.Begin(sessionId, playersInPOrder, Time.realtimeSinceStartupAsDouble, config);
+            model.Begin(sessionId, playersInPOrder, Time.realtimeSinceStartupAsDouble, config,
+                stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
@@ -963,6 +978,24 @@ namespace C6Lab
                 SetNotice("Start Developer Solo before applying a new round.");
                 return false;
             }
+            if (gameFlowEnabled)
+            {
+                if (!ValidateGameDeveloperConfig(config, out string validationError))
+                {
+                    config = sessionConfig != null ? sessionConfig : sourceConfig;
+                    SetNotice(validationError);
+                    return false;
+                }
+                // LabDeveloperMode installs its Scene-owned runtime object directly. Own a
+                // validated copy before that Scene unloads and destroys its DEV panel copy.
+                if (!TryInstallSessionConfig(config, out string error))
+                {
+                    SetNotice(error);
+                    return false;
+                }
+                RequestGameSoloRestart();
+                return true;
+            }
             ClearProjectiles();
             battleClock.Reset();
             ApplyLocalPause(false);
@@ -986,7 +1019,8 @@ namespace C6Lab
             ConfigureTargetSpin();
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
-            model.BeginSolo(sessionId, LocalPlayerId, Time.realtimeSinceStartupAsDouble, config);
+            model.BeginSolo(sessionId, LocalPlayerId, Time.realtimeSinceStartupAsDouble, config,
+                stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
@@ -1083,10 +1117,22 @@ namespace C6Lab
                 SetNotice("Pause a Host battle before restarting with DEV settings.");
                 return false;
             }
+            if (!ValidateGameDeveloperConfig(candidate, out string validationError))
+            {
+                SetNotice(validationError);
+                return false;
+            }
             if (!TryInstallSessionConfig(candidate, out string error))
             {
                 SetNotice(error);
                 return false;
+            }
+            if (gameFlowEnabled)
+            {
+                EndBattleToLobby();
+                PublishHostConfigRevision();
+                GameFlowDeveloperRestartRequested?.Invoke();
+                return true;
             }
             EndBattleToLobby();
             pendingDeveloperRestart = true;
@@ -1176,7 +1222,14 @@ namespace C6Lab
             {
                 // A resumed browse may have been created later in this Update.
                 // Sample native discovery time now so its monotonic clock never moves backwards.
-                if (IsHost && !developerSolo) activeDiscovery.UpdatePresence(order.Count, targetParticipantCount, model != null);
+                if (IsHost && !developerSolo)
+                {
+                    // Retry the actual listener families too if activation's native TXT update failed.
+                    bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
+                    bool ipv6 = transport is LabDualStackTransport second && second.HasIpv6Listener;
+                    if (ipv4 || ipv6)
+                        activeDiscovery.UpdatePresence(ipv4, ipv6, order.Count, targetParticipantCount, RoomPresenceBusy);
+                }
                 activeDiscovery.Tick();
                 if (discovery == activeDiscovery && roomSearchActive && !activeDiscovery.IsBrowsing)
                 {
@@ -1217,13 +1270,17 @@ namespace C6Lab
             }
             if (joinInProgress && !joinRetryPending && !joinFinishPending && joinAttemptAt > 0
                 && now - joinAttemptAt >= JoinAttemptSeconds) AdvanceJoinCandidate();
-            if (IsHost && model != null)
+            if (IsHost && model != null && !gameBattleFrozen)
             {
                 SampleHostPaintFlow(battleClock.Now(now));
                 if (now >= nextSnapshotAt) PublishSnapshot(false);
             }
-            FlushPendingBlastReports(now);
-            FlushBoardActions(now);
+            SyncJigwiFireSurfaces();
+            if (!gameBattleFrozen)
+            {
+                FlushPendingBlastReports(now);
+                FlushBoardActions(now);
+            }
             FlushBulkPackets();
             if (!IsHost && (pendingPaintSnapshot != null || PaintReceiver.HasPending)
                 && now >= nextPaintRequestAt) RequestPaintCheckpoint();
@@ -1257,7 +1314,7 @@ namespace C6Lab
             {
                 NetworkTransport = transport,
                 ProtocolVersion = LabProtocolVersion,
-                ConnectionData = (byte[])LabConnectionToken.Clone(),
+                ConnectionData = (byte[])ActiveConnectionToken.Clone(),
                 EnableSceneManagement = false,
                 ConnectionApproval = true,
                 PlayerPrefab = null,
@@ -1270,9 +1327,10 @@ namespace C6Lab
         {
             bool alreadyPending = pendingApprovals.ContainsKey(request.ClientNetworkId);
             string rejection = !manager.IsHost ? "The room is no longer hosted."
-                : request.Payload == null || !request.Payload.SequenceEqual(LabConnectionToken)
+                : request.Payload == null || !request.Payload.SequenceEqual(ActiveConnectionToken)
                     ? "Lab version mismatch. Use the same game version."
-                    : model != null ? "Battle already started. Wait for the Host to return to the lobby."
+                    : model != null || (gameFlowEnabled && gameRosterLocked)
+                        ? "Battle already started. Wait for the Host to return to the lobby."
                         : order.Count + pendingApprovals.Count - (alreadyPending ? 1 : 0) >= targetParticipantCount
                             ? "Room is full. Choose another room." : string.Empty;
             bool allowed = string.IsNullOrEmpty(rejection);
@@ -1344,6 +1402,22 @@ namespace C6Lab
             pendingApprovals.Remove(id);
             if (manager != null && manager.IsHost)
             {
+                if (gameFlowEnabled && order.Contains(id))
+                {
+                    GameFlowDisconnected?.Invoke(id, false);
+                    // GameSession owns the GameOver transition; never clear the result or
+                    // publish a legacy lobby that would erase it on the remaining peers.
+                    if (stopping || manager == null || !manager.IsHost) return;
+                    order.Remove(id);
+                    bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id);
+                    boardSequences.Remove(id);
+                    playerSlots?.Release(id);
+                    slotRequestIds.Remove(id);
+                    configAcknowledgements.Remove(id);
+                    pendingDeveloperRestart = false;
+                    if (model == null && !gameBattleFrozen) BroadcastLobby();
+                    return;
+                }
                 if (!order.Remove(id))
                 {
                     Debug.Log("C6_LAB_JOIN_REJECTED id=" + id);
@@ -1364,6 +1438,15 @@ namespace C6Lab
             {
                 if (joinInProgress) { AdvanceJoinCandidate(); return; }
                 if (!clientSessionConnected) return; // Ignore a retired attempt's late shutdown callback.
+                if (gameFlowEnabled)
+                {
+                    GameFlowDisconnected?.Invoke(id, true);
+                    clientSessionConnected = false;
+                    // Keep the last snapshot until GameSession captures the terminal screen.
+                    // Its Home action performs the eventual transport shutdown.
+                    SetStatus("Connection ended. Return home from Game Over.");
+                    return;
+                }
                 clientSessionConnected = false;
                 stopAfterDisconnect = true;
                 string reason = manager == null ? string.Empty : manager.DisconnectReason;
@@ -1376,6 +1459,8 @@ namespace C6Lab
         {
             if (joinFinishPending) return;
             if (joinInProgress) { AdvanceJoinCandidate(); return; }
+            if (gameFlowEnabled && (IsConnected || clientSessionConnected))
+                GameFlowDisconnected?.Invoke(manager == null ? ulong.MaxValue : manager.LocalClientId, !IsHost);
             SetRoomSearchMessage("Network transport failed. Check IP, port, and same network.", true);
             Debug.LogWarning("C6_LAB_TRANSPORT_FAILURE");
         }
@@ -1401,9 +1486,7 @@ namespace C6Lab
             bool accepted = false;
             bool changed = false;
             string reason;
-            if (fixedHostPosition && (packet.slotNumber == 1 || sender == LocalPlayerId))
-                reason = "SLOT_TAKEN";
-            else if (!CanSelectPlayerSlot || !order.Contains(sender))
+            if (!CanSelectPlayerSlot || !order.Contains(sender))
                 reason = "SLOT_SELECTION_CLOSED";
             else if (packet.requestId <= 0)
                 reason = "INVALID_SLOT_REQUEST";
@@ -1548,6 +1631,49 @@ namespace C6Lab
                 }
                 OnGourdBomb(drop.Target, drop.BombId, drop.Position);
             }
+            AnnounceSabotages();
+        }
+
+        /// <summary>The sabotage mix's casts go out with the gourd's bombs, before the snapshot that shows them (#251).</summary>
+        private void AnnounceSabotages()
+        {
+            foreach (LabFoxFireDrop drop in model.DrainFoxFires())
+            {
+                Debug.Log("C6_LAB_FOX_FIRE target=" + drop.Target + " orbs=" + drop.OrbIds.Length);
+                // Only its holder's board drops the fox orbs in; it reaches them before the snapshot holding them.
+                if (drop.Target == LocalPlayerId) OnFoxFire(drop.OrbIds);
+                else Send(drop.Target, new LabNetworkPacket { type = "foxFire", sessionId = sessionId, round = model.Round,
+                    owner = drop.Target, ids = drop.OrbIds });
+            }
+            foreach (LabSabotage cast in model.DrainSabotages())
+            {
+                Debug.Log("C6_LAB_SABOTAGE kind=" + cast.Kind + " target=" + cast.Target);
+                foreach (ulong id in order)
+                {
+                    if (id == manager.LocalClientId) continue;
+                    Send(id, new LabNetworkPacket { type = "sabotage", sessionId = sessionId, round = model.Round,
+                        owner = cast.Target, element = (int)cast.Kind });
+                }
+                SabotageCast?.Invoke(cast.Kind, cast.Target);
+            }
+        }
+
+        private void AnnounceCharmWoken(ulong player)
+        {
+            Debug.Log("C6_LAB_CHARM_WOKEN player=" + player);
+            foreach (ulong id in order)
+            {
+                if (id == manager.LocalClientId) continue;
+                Send(id, new LabNetworkPacket { type = "charmWoken", sessionId = sessionId, round = model.Round, owner = player });
+            }
+            CharmWoken?.Invoke(player);
+        }
+
+        private void OnFoxFire(string[] orbIds)
+        {
+            SetNotice(FoxFireNotice);
+            if (board == null) return;
+            foreach (string id in orbIds) board.ExpectDrop(id);
         }
 
         private void OnGourdBomb(ulong target, string bombId, Vector2 position)
@@ -1600,6 +1726,13 @@ namespace C6Lab
 
         private void Request(LabNetworkPacket packet)
         {
+            if (!CanProcessBattleActions)
+            {
+                // Release callbacks can have primed one or two owner-local previews already.
+                // Freezing a game must refuse the command without leaving those bodies hidden.
+                if (IsBoardAction(packet.type)) RejectBoardActionLocally(packet, "BATTLE_NOT_PLAYING");
+                return;
+            }
             packet.sessionId = sessionId;
             packet.round = latest?.round ?? model?.Round ?? 0;
             if (IsBoardAction(packet.type)) { SubmitBoardAction(packet); return; }
@@ -1610,7 +1743,7 @@ namespace C6Lab
 
         private void HandleRequest(ulong sender, LabNetworkPacket packet)
         {
-            if (!IsHost || model == null || packet == null || !order.Contains(sender)) return;
+            if (!IsHost || model == null || packet == null || !order.Contains(sender) || !CanProcessBattleActions) return;
             if (IsBoardAction(packet.type)) { HandleBoardAction(sender, packet); return; }
             if (packet.sessionId != sessionId || packet.round != model.Round) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
@@ -1637,6 +1770,15 @@ namespace C6Lab
                     && packet.requestId <= previous)) return;
                 pauseRequestIds[sender] = packet.requestId;
                 PauseAsHost();
+                return;
+            }
+            if (packet.type == "charmTap")
+            {
+                // Only a player beside the charmed one counts; enough taps wake them at once (#251).
+                if (!model.TryCharmTap(sender, now, out var woken)) return;
+                // Sent before the snapshot that no longer holds the charm, so every screen knows it was woken.
+                if (woken.HasValue) AnnounceCharmWoken(woken.Value);
+                PublishSnapshot(true);
                 return;
             }
             if (packet.type == "blastHit")
@@ -1667,6 +1809,8 @@ namespace C6Lab
             float sizeScale = model != null ? model.LaunchScaleOf(orb.id) : 1f;
             projectile.SetRadiusScale(sizeScale);
             projectile.SetMissSurface(battleFloor);
+            SyncJigwiFireSurfaces();
+            projectile.SetFireSurfaces(JigwiFireSurfacesFor(orb.owner));
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 round = model.Round, requestId = actionId,
@@ -1700,7 +1844,13 @@ namespace C6Lab
         {
             if (!IsHost || model == null) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
-            if (result.Hit)
+            if (result.Kind == LabProjectileHitKind.Fire)
+            {
+                if (!model.ConfirmJigwiFireHit(result.ProjectileId, result.FireId, result.FireTargetId, now, out bool extinguished))
+                    model.ConfirmMiss(result.ProjectileId, now);
+                SetNotice(extinguished ? "Water extinguished a flame." : "Only a Water Combined orb extinguishes fire.");
+            }
+            else if (result.Hit)
             {
                 // The paint shader samples normalized mesh-local positions, including the shell's
                 // size and offset. The bound hitbox shares that exact mesh and transform.
@@ -1758,6 +1908,7 @@ namespace C6Lab
 
         private void SyncBoard()
         {
+            SyncJigwiFireSurfaces();
             if (board == null || latest == null) return;
             var current = new HashSet<string>();
             foreach (var orb in latest.orbs ?? Array.Empty<LabOrbState>())
@@ -1774,10 +1925,13 @@ namespace C6Lab
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
                     orb.JustUnlocked(latest.serverTime), small: orb.small,
                     // Every screen counts the blast fire down from the same Host clock (#213).
-                    burnSeconds: config != null ? orb.BurnSecondsLeft(latest.serverTime, config.BlastBurnSeconds) : 0f,
+                    burnSeconds: config != null ? Mathf.Max(orb.BurnSecondsLeft(latest.serverTime, config.BlastBurnSeconds),
+                        orb.jigwiGenerationBurn && orb.kind.IsRaw()
+                            ? orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds) : 0f) : 0f,
                     // The white flash before an orb runs out (#235); a locked bomb shows its own red one.
                     lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
-                        : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds));
+                        : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
+                    jigwiScale: orb.jigwiRadiusScale);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
@@ -1792,13 +1946,18 @@ namespace C6Lab
                 if (!current.Contains(id) && !board.ShouldPreserveFromSnapshot(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
             foreach (string id in current) visibleOrbIds.Add(id);
-            board.SetInteractionEnabled(latest.phase == LabPhase.Playing && !latest.paused
+            board.SetInteractionEnabled(!gameBattleFrozen && latest.phase == LabPhase.Playing && !latest.paused
                 && (IsHost || !boardReplica.NeedsCheckpoint
                     && (boardReplica.LatestSequence == 0 || boardReplica.InteractionAllowed)));
             // The gourd's swipe block (#215) shows and bounces only on the blocked player's own board.
             bool blockedHere = latest.SwipeBlockOn(LocalPlayerId);
             board.SetSwipeBlock(blockedHere ? (latest.swipeBlockedRight ? 1 : -1) : 0,
                 blockedHere ? (float)(latest.swipeBlockedUntil - latest.serverTime) : 0f);
+            // The fox's charm (#251) stops throws and shows its haze only on the charmed player's own board.
+            bool charmedHere = latest.CharmOn(LocalPlayerId);
+            board.SetCharm(charmedHere ? (float)(latest.charmUntil - latest.serverTime) : 0f);
+            board.SetJigwiOverheat(latest.phase == LabPhase.Playing
+                && latest.JigwiFor(LocalPlayerId)?.Overheated(latest.serverTime) == true);
             if (blockedHere && (latest.round != announcedBlockRound || latest.swipeBlockStartedAt != announcedBlockStart))
             {
                 announcedBlockRound = latest.round;
@@ -1811,9 +1970,10 @@ namespace C6Lab
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            if (developerSolo)
+            if (developerSolo && !board.IsFoxFire(edge.OrbId))
             {
                 // The single player has no neighbor. Restore the stopped edge orb immediately.
+                // A fox orb still goes at the edge (#251), so the Host is asked even solo.
                 board.RejectEdge(edge.OrbId);
                 return;
             }
@@ -1825,7 +1985,26 @@ namespace C6Lab
         private void OnCombineRequested(string firstId, string secondId, Vector2 center, Vector2 velocity)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y, vx = velocity.x, vy = velocity.y });
+            Request(new LabNetworkPacket { type = "combine", requestId = ++requestSequence, firstId = firstId, secondId = secondId, x = center.x, y = center.y, vx = velocity.x, vy = velocity.y,
+                passiveCombine = board != null && board.IsContactCombineRequest });
+        }
+
+        /// <summary>매혹 (#251): 하트 말풍선을 눌러 옆 사람을 깨우는 한 번을 Host에 보낸다. 셈은 Host가 한다.</summary>
+        public void TapCharm()
+        {
+            if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
+            Request(new LabNetworkPacket { type = "charmTap", requestId = ++requestSequence });
+        }
+
+        private void OnFoxFireTouched(string foxId, string orbId)
+        {
+            if (latest == null || latest.phase != LabPhase.Playing || latest.paused)
+            {
+                board.RejectPendingLaunch(foxId);
+                board.RejectPendingLaunch(orbId);
+                return;
+            }
+            Request(new LabNetworkPacket { type = "fox", requestId = ++requestSequence, firstId = foxId, secondId = orbId });
         }
 
         private void OnUseRequested(string orbId)
@@ -1848,6 +2027,11 @@ namespace C6Lab
         private void Receive(ulong sender, FastBufferReader reader)
         {
             if (joinFinishPending || !TryRead(reader, out var packet)) return;
+            if (packet.type == "game_flow")
+            {
+                ReceiveGameFlow(sender, packet.reason);
+                return;
+            }
             if (IsHost)
             {
                 if (sender == LocalPlayerId || !order.Contains(sender)) return;
@@ -1971,6 +2155,20 @@ namespace C6Lab
                     if (packet.sessionId == sessionId && Finite(packet.x) && Finite(packet.y))
                         OnBombBlast(packet.firstId, new Vector2(Mathf.Clamp01(packet.x), Mathf.Clamp01(packet.y)));
                     break;
+                case "foxFire":
+                    if (packet.sessionId == sessionId && packet.owner == LocalPlayerId && packet.ids != null
+                        && packet.ids.Length > 0 && packet.ids.Length <= MaximumFoxFireOrbs
+                        && packet.ids.All(id => !string.IsNullOrEmpty(id)))
+                        OnFoxFire(packet.ids);
+                    break;
+                case "charmWoken":
+                    if (packet.sessionId == sessionId) CharmWoken?.Invoke(packet.owner);
+                    break;
+                case "sabotage":
+                    if (packet.sessionId == sessionId && packet.element >= (int)LabSabotageKind.GourdBomb
+                        && packet.element <= (int)LabSabotageKind.Charm)
+                        SabotageCast?.Invoke((LabSabotageKind)packet.element, packet.owner);
+                    break;
                 case "gourdBomb":
                     if (packet.sessionId == sessionId && !string.IsNullOrEmpty(packet.firstId)
                         && Finite(packet.x) && Finite(packet.y))
@@ -2023,6 +2221,8 @@ namespace C6Lab
                             packet.small ? config.BlastShrinkScale : 1f);
                         if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetMissSurface(battleFloor);
+                        SyncJigwiFireSurfaces();
+                        visual.SetFireSurfaces(JigwiFireSurfacesFor(packet.owner));
                         visual.LaunchVisual(velocity, config, target);
                     }
                     break;
@@ -2138,7 +2338,9 @@ namespace C6Lab
             try { snapshot = JsonUtility.FromJson<LabSnapshot>(json); }
             catch (Exception) { return; }
             if (snapshot == null || snapshot.sessionId != packet.sessionId
-                || snapshot.players == null || snapshot.players.Length != targetParticipantCount) return;
+                || snapshot.players == null || snapshot.players.Length != targetParticipantCount
+                || !LabJigwiNetworkValidation.Valid(snapshot.jigwi)
+                || !LabFlashNetworkValidation.Valid(snapshot)) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
             if (!PaintReceiver.Matches(snapshot))
             {
@@ -2175,7 +2377,7 @@ namespace C6Lab
             if (target != null) target.GetComponent<LabGourdPaint>()?.RefreshCommittedMap();
             if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
-            ApplyLocalPause(latest.phase == LabPhase.Playing && latest.paused);
+            ApplyLocalPause(CanProcessBattleActions && latest.phase == LabPhase.Playing && latest.paused);
             bool targetPaused = latest.phase == LabPhase.Playing && latest.paused;
             if (target != null && Finite(latest.targetYawDegrees)
                 && Finite(latest.targetYawSpeedDegreesPerSecond))
@@ -2323,6 +2525,9 @@ namespace C6Lab
         private void ResetLocal()
         {
             clientSessionConnected = false;
+            gameBattleFrozen = false;
+            gameRosterLocked = false;
+            gameStageIndex = 0; gameStageId = null; gameStageYokai = LabStageYokai.None;
             connectedRoomName = string.Empty;
             ResetPaintTransport();
             ApplyLocalPause(false);
@@ -2364,6 +2569,8 @@ namespace C6Lab
             Changed?.Invoke();
         }
 
+        private bool RoomPresenceBusy => model != null || gameFlowEnabled && gameRosterLocked;
+
         private void StartAdvertising(LabBonjourDiscovery registeredRoom = null)
         {
             DisposeDiscovery();
@@ -2371,17 +2578,20 @@ namespace C6Lab
             discovery = registeredRoom ?? new LabBonjourDiscovery();
             discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
             discovery.Changed += OnDiscoveryChanged;
+            bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
+            bool ipv6 = transport is LabDualStackTransport second && second.HasIpv6Listener;
             if (registeredRoom != null)
             {
                 connectedRoomName = registeredRoom.RegisteredServiceName;
                 advertisedName = connectedRoomName;
-                discovery.UpdatePresence(order.Count, targetParticipantCount, false);
+                // The reserved socket family is only a preparation hint. Publish the real Host listeners.
+                if (!discovery.UpdatePresence(ipv4, ipv6, order.Count, targetParticipantCount, RoomPresenceBusy))
+                    Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);
                 return;
             }
-            // The native registrar confirms Room, Room (2), Room (3), ... without a racy local counter.
-            advertisedName = LabRoomNames.ServiceBase;
-            bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
-            bool ipv6 = transport is LabDualStackTransport second && second.HasIpv6Listener;
+            // Lab keeps sequential room cards; separate game rooms retain their existing name family.
+            advertisedName = gameFlowEnabled ? "Hapio-" + Guid.NewGuid().ToString("N").Substring(0, 8)
+                : LabRoomNames.ServiceBase;
             if (!discovery.StartAdvertise(advertisedName, port, ipv4, ipv6, order.Count, targetParticipantCount))
             {
                 Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);
@@ -2486,14 +2696,7 @@ namespace C6Lab
 
         private void OnDestroy()
         {
-            if (board != null)
-            {
-                board.EdgeCrossed -= OnEdgeCrossed;
-                board.CombineRequested -= OnCombineRequested;
-                board.ThrowRequested -= OnThrowRequested;
-                board.UseRequested -= OnUseRequested;
-                board.DrumTapped -= Generate;
-            }
+            UnsubscribeBoard(board);
             if (manager != null)
             {
                 manager.OnClientConnectedCallback -= OnConnected;

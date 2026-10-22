@@ -33,8 +33,11 @@ namespace C6Lab
         public long ActionReplayedResults { get; private set; }
         public long ReceivedBoardFrames { get; private set; }
 
+        // "fox": a fox orb touched a Yin or Yang orb and takes it away (#251).
         private static bool IsBoardAction(string type) => type == "generate" || type == "combine"
-            || type == "transfer" || type == "launch" || type == "use";
+            || type == "transfer" || type == "launch" || type == "use" || type == "fox" || type == "jigwi_burn";
+        private static bool TakesTwoOrbs(LabNetworkPacket packet) => packet.type == "combine" || packet.type == "fox"
+            || packet.type == "jigwi_burn" && !string.IsNullOrEmpty(packet.secondId);
 
         private void EnsureActionRound()
         {
@@ -51,6 +54,8 @@ namespace C6Lab
 
         private void ResetActionTransport()
         {
+            ClearJigwiFireSurfaces();
+            predictedJigwiBurns.Clear();
             foreach (var shot in predictedShots.Values) if (shot != null) Destroy(shot.gameObject);
             predictedShots.Clear(); presentedShots.Clear(); presentedRemoteShots.Clear();
             pendingBlastReports.Clear();
@@ -75,11 +80,15 @@ namespace C6Lab
 
         private void SubmitBoardAction(LabNetworkPacket packet)
         {
-            if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
+            if (!CanProcessBattleActions || latest == null || latest.phase != LabPhase.Playing || latest.paused)
+            {
+                RejectBoardActionLocally(packet, "BATTLE_NOT_PLAYING");
+                return;
+            }
             EnsureActionRound();
             if (!IsHost && boardReplica.NeedsCheckpoint)
             {
-                RejectLocally(packet.firstId, "Restoring board state. Try again in a moment.");
+                RejectBoardActionLocally(packet, "Restoring board state. Try again in a moment.");
                 return;
             }
             packet.sessionId = actionSession;
@@ -87,20 +96,31 @@ namespace C6Lab
             packet.configRevision = configRevision;
             packet.configFingerprint = configFingerprint;
             string[] inputs = packet.type == "generate" ? new[] { packet.secondId }
-                : packet.type == "combine" ? new[] { packet.firstId, packet.secondId } : new[] { packet.firstId };
+                : TakesTwoOrbs(packet) ? new[] { packet.firstId, packet.secondId } : new[] { packet.firstId };
             if (!IsHost && (packet.type == "combine" || packet.type == "generate"))
                 packet.provisionalId = TemporaryOutput(packet.requestId);
             double now = Time.realtimeSinceStartupAsDouble;
             if (!localActions.TryRegister(packet.requestId, inputs, packet.provisionalId, now, out string reason))
             {
-                RejectLocally(packet.firstId, reason);
+                RejectBoardActionLocally(packet, reason);
                 return;
             }
             actionRequests.Add(packet.requestId, packet);
             actionStartedAt[packet.requestId] = now;
             if (!IsHost && board != null)
             {
-                if (packet.type == "combine")
+                bool overheated = latest.JigwiFor(LocalPlayerId)?.Overheated(latest.serverTime) == true;
+                if (packet.type == "jigwi_burn" || overheated && (packet.type == "combine" && !packet.passiveCombine || packet.type == "launch"))
+                {
+                    board.PlayJigwiBurnPreview(packet.firstId, TakesTwoOrbs(packet) ? packet.secondId : null);
+                    predictedJigwiBurns.Add(packet.requestId);
+                }
+                else if (overheated && packet.type == "generate")
+                {
+                    board.PlayJigwiGenerationBurn(new Vector2(packet.x, packet.y));
+                    predictedJigwiBurns.Add(packet.requestId);
+                }
+                else if (packet.type == "combine")
                     board.TryCreateCombinePreview(packet.provisionalId, packet.firstId, packet.secondId,
                         new Vector2(packet.x, packet.y), new Vector2(packet.vx, packet.vy));
                 else if (packet.type == "generate")
@@ -116,9 +136,18 @@ namespace C6Lab
             FlushBoardActions(now);
         }
 
+        private void RejectBoardActionLocally(LabNetworkPacket packet, string reason)
+        {
+            // A Jigwi release can already have hidden both bodies before the request reaches here.
+            // Restore only a primed pending partner. A raw request may name a freely rolling
+            // second orb; RejectEdge would zero that unrelated body's passive velocity.
+            if (TakesTwoOrbs(packet) && board != null) board.RejectPendingLaunch(packet.secondId);
+            RejectLocally(packet.firstId, reason);
+        }
+
         private void FlushBoardActions(double now)
         {
-            if (flushingActions || !IsConnected) return;
+            if (flushingActions || !IsConnected || !CanProcessBattleActions) return;
             flushingActions = true;
             try
             {
@@ -135,11 +164,11 @@ namespace C6Lab
                         else
                         {
                             wire.firstId = inputs[0];
-                            if (wire.type == "combine") wire.secondId = inputs[1];
+                            if (TakesTwoOrbs(wire)) wire.secondId = inputs[1];
                         }
                         string ownerId = wire.type == "generate" ? wire.secondId : wire.firstId;
                         if (TryKnownState(ownerId, out var first)) wire.ownershipVersion = first.ownershipVersion;
-                        if (wire.type == "combine" && TryKnownState(wire.secondId, out var second))
+                        if (TakesTwoOrbs(wire) && TryKnownState(wire.secondId, out var second))
                             wire.secondOwnershipVersion = second.ownershipVersion;
                         // Freeze every field once sent. A retry must not recapture a different pose/version.
                         actionWireRequests.Add(id, wire);
@@ -162,7 +191,7 @@ namespace C6Lab
 
         private bool ReceiveActionRetry(LabNetworkPacket packet)
         {
-            if (packet == null || packet.sessionId != actionSession || packet.round != actionRound
+            if (!CanProcessBattleActions || packet == null || packet.sessionId != actionSession || packet.round != actionRound
                 || !localActions.TryGetPending(packet.requestId, out var pending)
                 || pending.state != LabPendingActionState.RecoveryRequired
                 || !actionWireRequests.TryGetValue(packet.requestId, out var originalRequest)) return false;
@@ -230,7 +259,7 @@ namespace C6Lab
             else if (!model.TryGetMovableState(entityId, out var input)) reason = "ORB_NOT_FOUND";
             else if (!LabActionValidation.Ownership(input.owner, input.ownershipVersion, sender,
                 packet.ownershipVersion, out reason)) { }
-            else if (packet.type == "combine" && (!model.TryGetMovableState(packet.secondId, out var partner)
+            else if (TakesTwoOrbs(packet) && (!model.TryGetMovableState(packet.secondId, out var partner)
                 || !LabActionValidation.Ownership(partner.owner, partner.ownershipVersion, sender,
                     packet.secondOwnershipVersion, out reason))) reason = reason ?? "ORB_NOT_FOUND";
             else
@@ -243,8 +272,18 @@ namespace C6Lab
                             unique, now, out output, out reason);
                         break;
                     case "combine":
+                        if (packet.passiveCombine && !config.ContactCombineEnabled)
+                        { reason = "CONTACT_COMBINE_DISABLED"; break; }
                         accepted = model.TryCombineAt(sender, packet.firstId, packet.secondId, unique, now,
-                            new Vector2(packet.x, packet.y), new Vector2(packet.vx, packet.vy), out output, out reason);
+                            new Vector2(packet.x, packet.y), new Vector2(packet.vx, packet.vy), out output, out reason,
+                            passiveContact: packet.passiveCombine);
+                        break;
+                    case "jigwi_burn":
+                        accepted = model.TryJigwiBurn(sender, packet.firstId,
+                            string.IsNullOrEmpty(packet.secondId) ? null : packet.secondId, unique, now, out reason);
+                        break;
+                    case "fox":
+                        accepted = model.TryFoxFireAt(sender, packet.firstId, packet.secondId, unique, now, out reason);
                         break;
                     case "use":
                         accepted = model.TryUseItemAt(sender, packet.firstId, unique, now,
@@ -265,7 +304,7 @@ namespace C6Lab
                             || !LabThrowMath.IsThrowGesture(swipe, packet.y, config))
                         { reason = "Swipe the Combined orb upward to throw."; break; }
                         accepted = model.TryLaunch(sender, packet.firstId, unique, now, out output, out reason);
-                        if (accepted) SpawnHostProjectile(output, swipe, packet.x, packet.requestId);
+                        if (accepted && output != null) SpawnHostProjectile(output, swipe, packet.x, packet.requestId);
                         break;
                 }
             }
@@ -282,7 +321,8 @@ namespace C6Lab
                 serverTime = now, modelRevision = model.Revision, sequence = NextBoardSequence(sender),
                 removedIds = before.Where(item => !afterIds.Contains(item.id)).Select(item => item.id).ToArray(),
                 states = states.ToArray(), players = model.CopyPlayers(),
-                provisionalId = packet.provisionalId, outputId = accepted ? output?.id : null };
+                provisionalId = packet.provisionalId, outputId = accepted ? output?.id : null,
+                consumedWithoutOutput = accepted && reason == "JIGWI_BURNED" };
             Debug.Log("C6_LAB_ACTION type=" + packet.type + " sender=" + sender + " accepted=" + accepted
                 + " request=" + packet.requestId + " reason=" + reason);
             return receipt;
@@ -297,31 +337,42 @@ namespace C6Lab
 
         private void ReceiveActionReceipt(LabActionReceipt receipt)
         {
-            if (receipt == null || !localActions.ApplyReceipt(receipt, out var resolution)
+            if (!CanProcessBattleActions || receipt == null || !localActions.ApplyReceipt(receipt, out var resolution)
                 || !actionRequests.TryGetValue(receipt.requestId, out var request)) return;
             if (actionStartedAt.TryGetValue(receipt.requestId, out double at))
                 LastActionRoundTripMilliseconds = (Time.realtimeSinceStartupAsDouble - at) * 1000d;
+            foreach (long child in resolution.rejectedDependents) RollBackAction(child);
             if (board != null)
             {
                 if (request.type == "generate") board.RemoveGenerationPreview(request.provisionalId);
-                if (receipt.accepted)
+                if (receipt.accepted && receipt.consumedWithoutOutput)
+                    CommitJigwiBurn(request);
+                else if (receipt.accepted)
                 {
+                    // The local heat display can end a frame before the Host accepts a normal combination.
+                    if (request.type == "combine" && predictedJigwiBurns.Contains(request.requestId))
+                    {
+                        board.RejectPendingLaunch(ResolveLocalId(request.firstId));
+                        board.RejectPendingLaunch(ResolveLocalId(request.secondId));
+                    }
                     if (request.type == "combine" && !string.IsNullOrEmpty(request.provisionalId))
                     {
                         LabOrbState result = receipt.states.FirstOrDefault(item => item.id == receipt.outputId);
                         if (result != null) board.CommitCombinePreview(request.provisionalId, result);
                     }
-                    if (request.type == "launch" || request.type == "transfer" || request.type == "use")
+                    if (request.type == "launch" || request.type == "transfer" || request.type == "use"
+                        || request.type == "fox")
                         board.CommitPendingLaunch(ResolveLocalId(request.firstId));
+                    if (request.type == "fox") board.CommitPendingLaunch(ResolveLocalId(request.secondId));
                 }
                 else
                 {
                     // Restore dependent pending views before removing their provisional parent.
-                    foreach (long child in resolution.rejectedDependents) RollBackAction(child);
                     RollBackAction(receipt.requestId);
                 }
             }
-            if (receipt.accepted && request.type == "combine") LocalCombined?.Invoke();
+            if (receipt.accepted && !receipt.consumedWithoutOutput && request.type == "combine") LocalCombined?.Invoke();
+            predictedJigwiBurns.Remove(receipt.requestId);
             if (!receipt.accepted) SetNotice(receipt.reason ?? "Request rejected.");
             if (!IsHost)
             {
@@ -346,12 +397,25 @@ namespace C6Lab
             predictedShots.Remove(requestId);
             if (board == null) return;
             if (request.type == "generate") board.RemoveGenerationPreview(request.provisionalId);
-            else if (request.type == "combine") board.RejectCombinePreview(request.provisionalId);
+            else if (request.type == "combine")
+            {
+                if (!board.RejectCombinePreview(request.provisionalId))
+                {
+                    board.RejectPendingLaunch(ResolveLocalId(request.firstId));
+                    board.RejectPendingLaunch(ResolveLocalId(request.secondId));
+                }
+            }
             else
             {
                 string id = ResolveLocalId(request.firstId);
                 board.RejectPendingLaunch(id);
                 board.RejectEdge(id);
+                if (TakesTwoOrbs(request))
+                {
+                    string partner = ResolveLocalId(request.secondId);
+                    board.RejectPendingLaunch(partner);
+                    board.RejectEdge(partner);
+                }
             }
         }
 
@@ -384,7 +448,7 @@ namespace C6Lab
             {
                 ReceivedBoardFrames++;
                 latest = boardReplica.Overlay(latest);
-                ApplyLocalPause(frame.paused && frame.phase == LabPhase.Playing);
+                ApplyLocalPause(CanProcessBattleActions && frame.paused && frame.phase == LabPhase.Playing);
                 ApplyFastTargetPose();
                 SyncBoard();
                 Changed?.Invoke();
@@ -419,6 +483,8 @@ namespace C6Lab
                 : player.comboRewardUntil > latest.serverTime ? config.ComboRewardSizeScale : 1f;
             if (config.GourdColorComboEnabled) visual.SetRadiusScale(scale);
             visual.SetMissSurface(battleFloor);
+            SyncJigwiFireSurfaces();
+            visual.SetFireSurfaces(JigwiFireSurfacesFor(LocalPlayerId));
             visual.LaunchVisual(velocity, config, target);
             predictedShots[request.requestId] = visual;
             presentedShots.Add(request.requestId);

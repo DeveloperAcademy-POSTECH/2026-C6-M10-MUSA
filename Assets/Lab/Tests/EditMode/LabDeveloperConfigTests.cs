@@ -41,7 +41,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(166));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(196));
             Assert.That(values[89], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[90], values[91], values[92], values[93] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -746,7 +746,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(111));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(166));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(196));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             Assert.That(LabConfig.DefaultPaintVictoryPercent, Is.EqualTo(100));
@@ -976,7 +976,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOnAtItsPreservedIndexWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(166));
+            Assert.That(values.Length, Is.EqualTo(196));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
             Assert.That(values[110], Is.EqualTo(1f));
             LabDeveloperField field = LabConfig.DeveloperFields[110];
@@ -1071,7 +1071,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(166));
+            Assert.That(received.Length, Is.EqualTo(196));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1144,7 +1144,7 @@ namespace C6Lab.Tests
         {
             var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
             Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
-                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns", "Paint Drying", "Gourd Color Combo", "Combo Penalty Target", "Board Orb Trail" }));
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns", "Paint Drying", "Gourd Color Combo", "Combo Penalty Target", "Board Orb Trail", "Sabotage Mix", "야광귀 섬광", "섬광 대상", "야광귀 셈법" }));
             Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
                 "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
             var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");
@@ -1301,7 +1301,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GourdColorComboFieldsFormTheComboGroupAndStartOn()
+        public void GourdColorComboFieldsFormTheComboGroupAndStartOff()
         {
             LabDeveloperField[] combo = LabConfig.DeveloperFields.Skip(155).Take(10).ToArray();
             Assert.That(combo.Select(field => field.Label), Is.EqualTo(new[]
@@ -1316,38 +1316,40 @@ namespace C6Lab.Tests
             Assert.That(combo[0].IsToggle, Is.True);
             Assert.That(combo[6].IsToggle, Is.True);
             Assert.That(new[] { combo[6].OffText, combo[6].OnText }, Is.EqualTo(new[] { "TEAM", "THROWER" }));
-            int[] comboIndices = LabConfig.DeveloperCategories.Single(category => category.Title == "Combo").FieldIndices;
+            // The combo now sits at the top of the 야광귀 group (#268), the flash below it.
+            int[] comboIndices = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀").FieldIndices
+                .Where(index => index >= 155 && index <= 164).ToArray();
             Assert.That(comboIndices, Is.EqualTo(new[] { 155, 156, 164, 157, 158, 159, 160, 161, 162, 163 }),
                 "The warning (#241) sits right after the first start time it comes before.");
-            Assert.That(new[] { combo[8].Min, combo[8].Max }, Is.EqualTo(new[] { 1f, 3f }));
-            Assert.That(new[] { combo[9].Min, combo[9].Max }, Is.EqualTo(new[] { 0f, 10f }), "0 means no warning.");
+            Assert.That(new[] { combo[8].Min, combo[8].Max }, Is.EqualTo(new[] { 1f, 4f }));
+            Assert.That(new[] { combo[9].Min, combo[9].Max }, Is.EqualTo(new[] { 0f, 8f }), "0 means no warning.");
             Assert.That(combo[9].IsToggle || combo[9].WholeNumber, Is.False);
 
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
                 Assert.That(source.CaptureDeveloperValues().Skip(155).Take(10),
-                    Is.EqualTo(new[] { 1f, 50f, 60f, 15f, 10f, .1f, 0f, 10f, 2.5f, 3f }),
-                    "By default the combo is on: first at 50 s, every 60 s, 15 s to clear, the whole team shrinks "
-                    + "to 0.1x or grows to 2.5x for 10 seconds, and a 3-second warning comes first.");
+                    Is.EqualTo(new[] { 0f, 50f, 60f, 15f, 15f, .1f, 0f, 15f, 2.5f, 4f }),
+                    "By default the combo is off (#266); once turned on it comes first at 50 s, every 60 s, 15 s to clear, the whole team shrinks "
+                    + "to 0.1x or grows to 2.5x for 15 seconds, and a 4-second warning (one yaguang count a second) comes first.");
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();
-            values[155] = 0f;
+            values[155] = 1f;
             values[156] = 5f;
-            values[157] = 15f;
+            values[157] = 25f;
             values[158] = 8f;
             values[159] = 4f;
-            values[160] = .25f;
+            values[160] = .15f;
             values[161] = 1f;
             values[162] = 6f;
             values[163] = 2f;
             values[164] = 5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
-            Assert.That(config.GourdColorComboEnabled, Is.False);
+            Assert.That(config.GourdColorComboEnabled, Is.True, "DEV can still turn the combo on.");
             Assert.That(new[] { config.ComboFirstStartSeconds, config.ComboRepeatIntervalSeconds,
                 config.ComboTimeLimitSeconds, config.ComboPenaltyDurationSeconds, config.ComboPenaltySizeScale },
-                Is.EqualTo(new[] { 5f, 15f, 8f, 4f, .25f }));
+                Is.EqualTo(new[] { 5f, 25f, 8f, 4f, .15f }));
             Assert.That(config.ComboPenaltyThrowerOnly, Is.True);
             Assert.That(new[] { config.ComboRewardDurationSeconds, config.ComboRewardSizeScale },
                 Is.EqualTo(new[] { 6f, 2f }));
@@ -1360,8 +1362,8 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
             Assert.That(error, Does.Contain("Combo Penalty Size"));
 
-            values[160] = .25f;
-            values[164] = 10.5f; // above the 10-second maximum
+            values[160] = .15f;
+            values[164] = 8.5f; // above the 8-second maximum
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
             Assert.That(error, Does.Contain("Combo Warning"));
             Assert.That(config.ComboWarningSeconds, Is.EqualTo(5f), "A rejected form changes nothing.");
@@ -1391,6 +1393,79 @@ namespace C6Lab.Tests
             Assert.That(config.BoardOrbTrailEnabled, Is.False);
             Assert.That(config.CaptureDeveloperValues().Take(165), Is.EqualTo(before.Take(165)),
                 "Earlier settings keep their places and values.");
+        }
+
+        [Test]
+        public void TheFoxOrbDrawsItsOwnBlueArtFromResources()
+        {
+            Sprite art = Resources.Load<Sprite>(LabOrbAppearance.FoxFireSpritePath);
+            Assert.That(art, Is.Not.Null,
+                "Assets/Lab/Resources/Sabotage/FoxOrb.png imports as a Sprite through LabSabotageArtImporter (#251). Reimport it if not.");
+            var look = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            try
+            {
+                Assert.That(look.SpriteFor(LabOrbKind.FoxFire), Is.SameAs(art), "An empty Inspector slot falls back to it.");
+                Assert.That(look.FoxFireSmokeColor.b, Is.GreaterThan(look.FoxFireSmokeColor.r), "Its smoke is blue.");
+            }
+            finally { Object.DestroyImmediate(look); }
+        }
+
+        [Test]
+        public void TheCharmBubblesAndSurprisedBubbleImportAsSprites()
+        {
+            foreach (string path in new[] { LabCharmBubbles.LeftBubblePath, LabCharmBubbles.RightBubblePath,
+                LabCharmBubbles.WokenPath })
+                Assert.That(Resources.Load<Sprite>(path), Is.Not.Null,
+                    "Assets/Lab/Resources/" + path + ".png imports as a Sprite through LabSabotageArtImporter (#251).");
+        }
+
+        [Test]
+        public void SabotageFieldsFormTheSabotageGroupStartOffAndApply()
+        {
+            LabDeveloperField[] sabotage = LabConfig.DeveloperFields.Skip(166).Take(12).ToArray();
+            Assert.That(sabotage.Select(field => field.Label), Is.EqualTo(new[]
+            {
+                "Sabotage Mix (0 off, 1 on)", "Sabotage Interval Min (seconds)", "Sabotage Interval Max (seconds)",
+                "Sabotage Weight Gourd Bomb", "Sabotage Weight Swipe Block", "Sabotage Weight Fox Fire",
+                "Sabotage Weight Charm", "Fox Fire Count Min", "Fox Fire Count Max", "Fox Fire Safe Seconds",
+                "Charm Seconds", "Charm Rescue Taps (0 = none)"
+            }));
+            Assert.That(sabotage[0].IsToggle, Is.True);
+            Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Sabotage").FieldIndices,
+                Is.EqualTo(Enumerable.Range(166, 12)));
+
+            LabConfig authored = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(authored, Is.Not.Null);
+            foreach (LabConfig source in new[] { config, authored })
+                Assert.That(source.CaptureDeveloperValues().Skip(166).Take(12),
+                    Is.EqualTo(new[] { 0f, 20f, 30f, 1f, 1f, 1f, 1f, 2f, 5f, 1f, 10f, 3f }),
+                    "An experiment, off by default (#251): one of four sabotages every 20-30 s, 2-5 fox orbs "
+                    + "safe for 1 s, a 10 s charm that 3 taps wake.");
+
+            float[] values = config.CaptureDeveloperValues();
+            float[] before = (float[])values.Clone();
+            values[166] = 1f; values[167] = 5f; values[168] = 8f;
+            values[169] = 0f; values[170] = 2f; values[171] = 3f; values[172] = 4f;
+            values[173] = 1f; values[174] = 7f; values[175] = .5f; values[176] = 12f; values[177] = 0f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.SabotageMixEnabled, Is.True);
+            Assert.That(new[] { config.SabotageIntervalMin, config.SabotageIntervalMax }, Is.EqualTo(new[] { 5f, 8f }));
+            Assert.That(config.SabotageWeights(), Is.EqualTo(new[] { 0, 2, 3, 4 }));
+            Assert.That(new[] { config.FoxFireCountMin, config.FoxFireCountMax, config.CharmRescueTaps },
+                Is.EqualTo(new[] { 1, 7, 0 }));
+            Assert.That(new[] { config.FoxFireSafeSeconds, config.CharmSeconds }, Is.EqualTo(new[] { .5f, 12f }));
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values));
+            Assert.That(config.CaptureDeveloperValues().Take(166), Is.EqualTo(before.Take(166)),
+                "Earlier settings keep their places and values.");
+
+            foreach (int minimum in new[] { 167, 173 })
+            {
+                float[] backwards = config.CaptureDeveloperValues();
+                backwards[minimum] = backwards[minimum + 1] + 1f;
+                Assert.That(config.TryApplyDeveloperValues(backwards, out error), Is.False, minimum.ToString());
+                Assert.That(error, Does.Contain("cannot exceed"));
+            }
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "A rejected form changes nothing.");
         }
     }
 }

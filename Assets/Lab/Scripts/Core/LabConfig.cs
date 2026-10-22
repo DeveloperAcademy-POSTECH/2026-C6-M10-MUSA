@@ -67,11 +67,43 @@ namespace C6Lab
         public readonly string Title;
         public readonly int[] FieldIndices;
 
+        /// <summary>
+        /// 묶음 안 구분선 (#268). DividerAt[k] 번째 줄(FieldIndices 안 위치) 바로 위에 DividerLabels[k]를 보여준다.
+        /// 화면 표시만 바뀌고 값 번호는 그대로다. 없으면 null.
+        /// </summary>
+        public readonly int[] DividerAt;
+        public readonly string[] DividerLabels;
+        /// <summary>
+        /// 묶음 제목 오른쪽의 한꺼번에 켜기/끄기 버튼이 함께 바꾸는 토글 항목 번호 (#268). 없으면 null.
+        /// 새 설정값이 아니라 아래 토글들을 같은 값으로 맞추는 화면 단축키다.
+        /// </summary>
+        public readonly int[] SwitchFields;
+
         public LabDeveloperCategory(string title, params int[] fieldIndices)
+            : this(title, fieldIndices, null, null, null) { }
+
+        private LabDeveloperCategory(string title, int[] fieldIndices, int[] dividerAt, string[] dividerLabels,
+            int[] switchFields)
         {
             Title = title;
             FieldIndices = fieldIndices;
+            DividerAt = dividerAt;
+            DividerLabels = dividerLabels;
+            SwitchFields = switchFields;
         }
+
+        /// <summary>줄 위치(FieldIndices 안 순서)와 글자를 짝지어 구분선을 붙인다.</summary>
+        public LabDeveloperCategory WithDividers(params (int before, string label)[] dividers)
+        {
+            var at = new int[dividers.Length];
+            var labels = new string[dividers.Length];
+            for (int i = 0; i < dividers.Length; i++) { at[i] = dividers[i].before; labels[i] = dividers[i].label; }
+            return new LabDeveloperCategory(Title, FieldIndices, at, labels, SwitchFields);
+        }
+
+        /// <summary>제목 오른쪽 버튼 하나로 이 토글들을 함께 켜고 끄게 한다.</summary>
+        public LabDeveloperCategory WithSwitch(params int[] toggleFields) =>
+            new LabDeveloperCategory(Title, FieldIndices, DividerAt, DividerLabels, toggleFields);
     }
 
     /// <summary>
@@ -243,16 +275,51 @@ namespace C6Lab
             new LabDeveloperField("Swipe Block Seconds", 1f, 60f),
             new LabDeveloperField("Swipe Block Bomb Gap (seconds)", 0f, 15f),
             LabDeveloperField.Toggle("Gourd Color Combo (0 off, 1 on)"),
-            new LabDeveloperField("Combo First Start (seconds)", 1f, 3600f),
-            new LabDeveloperField("Combo Repeat Interval (seconds)", 1f, 3600f),
-            new LabDeveloperField("Combo Time Limit (seconds)", 1f, 600f),
-            new LabDeveloperField("Combo Penalty Duration (seconds)", 0f, 600f),
-            new LabDeveloperField("Combo Penalty Size (x)", .01f, 1f),
+            new LabDeveloperField("Combo First Start (seconds)", 1f, 99f),
+            new LabDeveloperField("Combo Repeat Interval (seconds)", 20f, 100f),
+            new LabDeveloperField("Combo Time Limit (seconds)", 5f, 25f),
+            new LabDeveloperField("Combo Penalty Duration (seconds)", 0f, 30f),
+            new LabDeveloperField("Combo Penalty Size (x)", .01f, .19f),
             LabDeveloperField.Toggle("Combo Penalty Target (0 team, 1 thrower)", "TEAM", "THROWER"),
-            new LabDeveloperField("Combo Reward Duration (seconds)", 0f, 600f),
-            new LabDeveloperField("Combo Reward Size (x)", 1f, 3f),
-            new LabDeveloperField("Combo Warning (seconds)", 0f, 10f),
-            LabDeveloperField.Toggle("Board Orb Trail (0 off, 1 on)")
+            new LabDeveloperField("Combo Reward Duration (seconds)", 0f, 30f),
+            new LabDeveloperField("Combo Reward Size (x)", 1f, 4f),
+            new LabDeveloperField("Combo Warning (seconds)", 0f, 8f),
+            LabDeveloperField.Toggle("Board Orb Trail (0 off, 1 on)"),
+            // The yokai's sabotage mix and the nine-tailed fox's sabotages (#251). An experiment, off by default.
+            LabDeveloperField.Toggle("Sabotage Mix (0 off, 1 on)"),
+            new LabDeveloperField("Sabotage Interval Min (seconds)", 1f, 600f),
+            new LabDeveloperField("Sabotage Interval Max (seconds)", 1f, 600f),
+            new LabDeveloperField("Sabotage Weight Gourd Bomb", 0f, 10f, true),
+            new LabDeveloperField("Sabotage Weight Swipe Block", 0f, 10f, true),
+            new LabDeveloperField("Sabotage Weight Fox Fire", 0f, 10f, true),
+            new LabDeveloperField("Sabotage Weight Charm", 0f, 10f, true),
+            new LabDeveloperField("Fox Fire Count Min", 1f, 10f, true),
+            new LabDeveloperField("Fox Fire Count Max", 1f, 10f, true),
+            new LabDeveloperField("Fox Fire Safe Seconds", 0f, 3f),
+            new LabDeveloperField("Charm Seconds", 1f, 30f),
+            new LabDeveloperField("Charm Rescue Taps (0 = none)", 0f, 10f, true),
+            new LabDeveloperField("Jigwi Fire Target Count", 1f, 5f, true),
+            new LabDeveloperField("Jigwi Fire Seconds", 1f, 120f),
+            new LabDeveloperField("Jigwi Overheat Seconds", .1f, 60f),
+            new LabDeveloperField("Jigwi Generation Burn Seconds", .1f, 120f),
+            new LabDeveloperField("Jigwi Raw Radius Scale", .2f, 1f),
+            new LabDeveloperField("Jigwi Raw Life Scale", .05f, 1f),
+            // The yaguang-gwi's flash (#268): its own schedule, separate from the sabotage mix.
+            // Shown in Korean in the 야광귀 DEV group together with the combo.
+            LabDeveloperField.Toggle("야광귀 섬광 (0 off, 1 on)", "끔", "켬"),
+            LabDeveloperField.Toggle("섬광 대상 (0 모두, 1 한 명)", "모두", "한 명"),
+            // Each range is centred on its default, so every slider starts in the middle.
+            new LabDeveloperField("섬광 첫 시작 (초)", 1f, 19f),
+            new LabDeveloperField("섬광 간격 (초)", 20f, 100f),
+            new LabDeveloperField("섬광 예고 (초)", 0f, 6f),
+            new LabDeveloperField("섬광 눈부심 (초)", 1f, 13f),
+            new LabDeveloperField("섬광 회복 (초)", 0f, 4f),
+            // The yaguang-gwi's counting look for the combo (#271): it counts 하나 둘 셋 넷 and cannot go past four.
+            LabDeveloperField.Toggle("야광귀 셈법 (0 off, 1 on)", "끔", "켬"),
+            new LabDeveloperField("Jigwi Auto Interval Min (seconds)", 1f, 600f),
+            new LabDeveloperField("Jigwi Auto Interval Max (seconds)", 1f, 600f),
+            new LabDeveloperField("Jigwi Auto Fire Weight", 0f, 10f, true),
+            new LabDeveloperField("Jigwi Auto Generation Burn Weight", 0f, 10f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -284,7 +351,14 @@ namespace C6Lab
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
                 134, 132, 133, 148, 149, 150, 151),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
-            new LabDeveloperCategory("Combo", 155, 156, 164, 157, 158, 159, 160, 161, 162, 163)
+            new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
+            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
+            // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
+            // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
+            new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
+                184, 185, 186, 187, 188, 189, 190)
+                .WithSwitch(155, 184)
+                .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──"))
         });
 
 
@@ -345,26 +419,29 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float smallOrbPaintShare = .5f;
 
         [Header("Experiment: gourd color combo (#222)")]
-        [Tooltip("켜면 전투 중 박이 4칸 색 콤보를 낸다. 끄면 기존 플레이와 같다.")]
-        [SerializeField] private bool gourdColorComboEnabled = true;
+        [Tooltip("켜면 전투 중 박이 4칸 색 콤보를 낸다. 끄면 기존 플레이와 같다. 기본 OFF (#266). DEV `Gourd Color Combo`로도 켤 수 있다.")]
+        [SerializeField] private bool gourdColorComboEnabled;
+        [Tooltip("야광귀 셈법 (#271): 콤보 예고를 하나·둘·셋·넷으로 세고, 칸을 맞힐 때마다 그 칸 위에 수를 띄우며, 넷 다음 칸은 흐린 ?로 둔다. 화면 표시만 바뀐다. 기본 켬.")]
+        [SerializeField] private bool comboYaguangCountEnabled = true;
+        // 아래 콤보 숫자 칸들의 DEV 범위는 기본값이 슬라이더 가운데에 오도록 정했다 (#271). Inspector에서도 같은 범위다.
         [Tooltip("전투 시작 후 첫 콤보가 나오는 시각 (초, 일시정지 시간 제외)")]
-        [SerializeField, Range(1f, 3600f)] private float comboFirstStartSeconds = 50f;
+        [SerializeField, Range(1f, 99f)] private float comboFirstStartSeconds = 50f;
         [Tooltip("콤보가 나오는 간격 (초). 앞 콤보가 나온 시각부터 잰다. 앞 콤보가 아직 진행 중이면 끝난 직후에 나온다.")]
-        [SerializeField, Range(1f, 3600f)] private float comboRepeatIntervalSeconds = 60f;
+        [SerializeField, Range(20f, 100f)] private float comboRepeatIntervalSeconds = 60f;
         [Tooltip("콤보 4칸을 모두 맞혀야 하는 제한 시간 (초)")]
-        [SerializeField, Range(1f, 600f)] private float comboTimeLimitSeconds = 15f;
+        [SerializeField, Range(5f, 25f)] private float comboTimeLimitSeconds = 15f;
         [Tooltip("콤보 실패 후 공 크기·칠 면적이 줄어드는 시간 (초). 0이면 페널티 없음.")]
-        [SerializeField, Range(0f, 600f)] private float comboPenaltyDurationSeconds = 10f;
+        [SerializeField, Range(0f, 30f)] private float comboPenaltyDurationSeconds = 15f;
         [Tooltip("페널티 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
-        [SerializeField, Range(.01f, 1f)] private float comboPenaltySizeScale = .1f;
+        [SerializeField, Range(.01f, .19f)] private float comboPenaltySizeScale = .1f;
         [Tooltip("페널티 대상. 팀 전체, 또는 틀린 색을 맞힌 사람만 (시간 초과는 언제나 팀 전체).")]
         [SerializeField] private bool comboPenaltyThrowerOnly;
         [Tooltip("콤보 성공 후 팀 전체의 공 크기/칠 면적이 커지는 시간 (초). 0이면 보상 없음.")]
-        [SerializeField, Range(0f, 600f)] private float comboRewardDurationSeconds = 10f;
+        [SerializeField, Range(0f, 30f)] private float comboRewardDurationSeconds = 15f;
         [Tooltip("보상 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
-        [SerializeField, Range(1f, 3f)] private float comboRewardSizeScale = 2.5f;
-        [Tooltip("콤보 4칸이 나오기 전 COMBO! 3, 2, 1 예고를 보여주는 시간 (초, #241). 0이면 예고 없이 바로 나온다.")]
-        [SerializeField, Range(0f, 10f)] private float comboWarningSeconds = 3f;
+        [SerializeField, Range(1f, 4f)] private float comboRewardSizeScale = 2.5f;
+        [Tooltip("콤보 4칸이 나오기 전 예고 시간 (초, #241). 야광귀 셈법이면 1초에 한 번 하나·둘·셋·넷으로 세고(#271, 기본 4초), 끄면 COMBO! 4, 3, 2, 1로 센다. 0이면 예고 없이 바로 나온다.")]
+        [SerializeField, Range(0f, 8f)] private float comboWarningSeconds = 4f;
 
         [Header("Orb lifetime")]
         [SerializeField, Min(.1f)] private float orbLifetimeSeconds = 8f;
@@ -485,6 +562,54 @@ namespace C6Lab
         [SerializeField, Range(1f, 60f)] private float swipeBlockSeconds = 10f;
         [Tooltip("넘기기 막기가 박 폭탄과 최소 이만큼 떨어져 시작한다 (초). 가까우면 그 폭탄 뒤로 미룬다.")]
         [SerializeField, Range(0f, 15f)] private float swipeBlockBombGap = 4f;
+
+        [Header("Sabotage mix (#251)")]
+        [Tooltip("요괴의 통합 방해공작 추첨. 켜면 박 폭탄·넘기기 막기의 각자 타이머를 멈추고, 아래 간격마다 켜진 방해공작 중 하나를 비율대로 골라 무작위 한 명에게 건다. 실험이라 기본은 끔.")]
+        [SerializeField] private bool sabotageMixEnabled;
+        [Tooltip("통합 추첨 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다.")]
+        [SerializeField, Range(1f, 600f)] private float sabotageIntervalMin = 20f;
+        [SerializeField, Range(1f, 600f)] private float sabotageIntervalMax = 30f;
+        [Tooltip("방해공작별 비율. 0이면 후보에서 뺀다.")]
+        [SerializeField, Range(0, 10)] private int sabotageWeightGourdBomb = 1;
+        [SerializeField, Range(0, 10)] private int sabotageWeightSwipeBlock = 1;
+        [SerializeField, Range(0, 10)] private int sabotageWeightFoxFire = 1;
+        [SerializeField, Range(0, 10)] private int sabotageWeightCharm = 1;
+        [Tooltip("여우불: 한 번에 떨어지는 여우구슬 개수의 최소·최대. 판이 거의 차 있으면 빈 칸 수만큼만 떨어진다.")]
+        [SerializeField, Range(1, 10)] private int foxFireCountMin = 2;
+        [SerializeField, Range(1, 10)] private int foxFireCountMax = 5;
+        [Tooltip("여우불: 떨어진 뒤 이 시간 (초) 동안은 음·양과 닿아도 조합되지 않는다.")]
+        [SerializeField, Range(0f, 3f)] private float foxFireSafeSeconds = 1f;
+        [Tooltip("매혹: 공격(위로 던지기)을 못 하는 시간 (초).")]
+        [SerializeField, Range(1f, 30f)] private float charmSeconds = 10f;
+        [Tooltip("매혹: 양옆 사람이 합쳐 이만큼 하트 말풍선을 누르면 바로 풀린다. 0이면 시간으로만 풀린다.")]
+        [SerializeField, Range(0, 10)] private int charmRescueTaps = 3;
+
+        [Header("Jigwi fire experiment (#272)")]
+        [SerializeField, Range(1, 5)] private int jigwiFireTargetCount = 1;
+        [SerializeField, Range(1f, 120f)] private float jigwiFireSeconds = 15f;
+        [SerializeField, Range(.1f, 60f)] private float jigwiOverheatSeconds = 4f;
+        [SerializeField, Range(.1f, 120f)] private float jigwiGenerationBurnSeconds = 10f;
+        [SerializeField, Range(.2f, 1f)] private float jigwiRawRadiusScale = .65f;
+        [SerializeField, Range(.05f, 1f)] private float jigwiRawLifeScale = .5f;
+        [SerializeField, Range(1f, 600f)] private float jigwiAutoIntervalMin = 20f;
+        [SerializeField, Range(1f, 600f)] private float jigwiAutoIntervalMax = 30f;
+        [SerializeField, Range(0, 10)] private int jigwiAutoFireWeight = 1;
+        [SerializeField, Range(0, 10)] private int jigwiAutoGenerationBurnWeight = 1;
+        [Header("Yaguang flash (#268)")]
+        [Tooltip("야광귀 섬광. 박에서 요괴가 빼꼼 나와 눈이 밝아진 뒤(예고) 화면이 하얗게 번쩍이고, 눈부신 동안 판 위 음양·결합 구슬과 아이템이 하얗게 보인다(북·박 색칠·HUD는 그대로). 화면 표시만 바뀌고 조작·판정은 그대로다. 방해공작 묶음(#251)과 따로 돈다. 야광귀 전용이라 기본은 끔(DEV `Yaguang Flash`로 켠다).")]
+        [SerializeField] private bool yaguangFlashEnabled;
+        [Tooltip("섬광 대상. 끄면(ALL) 모두에게 동시에, 켜면(ONE) 매번 무작위 한 명에게만.")]
+        [SerializeField] private bool yaguangFlashTargetOne;
+        [Tooltip("전투 시작 후 첫 섬광(번쩍이는 순간)까지의 시간 (초, 일시정지 제외). 예고는 그 직전에 온다. 범위의 가운데가 기본값.")]
+        [SerializeField, Range(1f, 19f)] private float yaguangFlashFirstStartSeconds = 10f;
+        [Tooltip("섬광과 다음 섬광 사이 간격 (초). 콤보 예고·진행 중이면 콤보가 끝날 때까지 미룬다. 기본 31·60초는 콤보(50초 시작·60초 간격)와 같은 박자로 콤보 19초 전마다 터져, 섬광(예고~회복 12초)이 콤보(예고 3 + 제한 15 + 결과 + 효과 15 ≈ 35초) 사이 약 25초 틈의 가운데에 놓이고 앞뒤로 약 7초씩 평소 플레이가 남는다.")]
+        [SerializeField, Range(20f, 100f)] private float yaguangFlashIntervalSeconds = 60f;
+        [Tooltip("번쩍이기 전 예고 시간 (초). 요괴가 빼꼼 나오고 박 옆 말풍선에 눈이 떴다가(앞 30%), 갑자기 노랗게 빛나고(15%), 빛나는 노란 눈을 두근거리며 보여 준 뒤(55%) 번쩍인다. 기본 3초. 0이면 예고 없이 번쩍인다.")]
+        [SerializeField, Range(0f, 6f)] private float yaguangFlashWarningSeconds = 3f;
+        [Tooltip("번쩍인 뒤 구슬·아이템이 완전히 하얗게 보이는 시간 (초)")]
+        [SerializeField, Range(1f, 13f)] private float yaguangFlashGlareSeconds = 7f;
+        [Tooltip("눈부심이 끝난 뒤 색이 천천히 돌아오는 시간 (초). 0이면 바로 돌아온다.")]
+        [SerializeField, Range(0f, 4f)] private float yaguangFlashRecoverySeconds = 2f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -658,12 +783,12 @@ namespace C6Lab
         public float ComboFirstStartSeconds => Mathf.Clamp(Finite(comboFirstStartSeconds, 50f), 1f, 3600f);
         public float ComboRepeatIntervalSeconds => Mathf.Clamp(Finite(comboRepeatIntervalSeconds, 60f), 1f, 3600f);
         public float ComboTimeLimitSeconds => Mathf.Clamp(Finite(comboTimeLimitSeconds, 15f), 1f, 600f);
-        public float ComboPenaltyDurationSeconds => Mathf.Clamp(Finite(comboPenaltyDurationSeconds, 10f), 0f, 600f);
+        public float ComboPenaltyDurationSeconds => Mathf.Clamp(Finite(comboPenaltyDurationSeconds, 15f), 0f, 30f);
         public float ComboPenaltySizeScale => Mathf.Clamp(Finite(comboPenaltySizeScale, .1f), .01f, 1f);
         public bool ComboPenaltyThrowerOnly => comboPenaltyThrowerOnly;
-        public float ComboRewardDurationSeconds => Mathf.Clamp(Finite(comboRewardDurationSeconds, 10f), 0f, 600f);
-        public float ComboRewardSizeScale => Mathf.Clamp(Finite(comboRewardSizeScale, 2.5f), 1f, 3f);
-        public float ComboWarningSeconds => Mathf.Clamp(Finite(comboWarningSeconds, 3f), 0f, 10f);
+        public float ComboRewardDurationSeconds => Mathf.Clamp(Finite(comboRewardDurationSeconds, 15f), 0f, 30f);
+        public float ComboRewardSizeScale => Mathf.Clamp(Finite(comboRewardSizeScale, 2.5f), 1f, 4f);
+        public float ComboWarningSeconds => Mathf.Clamp(Finite(comboWarningSeconds, 4f), 0f, 10f);
         public bool BoardOrbTrailEnabled => boardOrbTrailEnabled;
         public float OrbRestitution => Mathf.Clamp01(Finite(orbRestitution, .8f));
         public float OrbFloorDeceleration => Mathf.Max(0f, Finite(orbFloorDeceleration, 2f));
@@ -792,6 +917,40 @@ namespace C6Lab
         public float SwipeBlockInterval => Mathf.Clamp(Finite(swipeBlockInterval, 40f), 0f, 600f);
         public float SwipeBlockSeconds => Mathf.Clamp(Finite(swipeBlockSeconds, 10f), 1f, 60f);
         public float SwipeBlockBombGap => Mathf.Clamp(Finite(swipeBlockBombGap, 4f), 0f, 15f);
+        public bool SabotageMixEnabled => sabotageMixEnabled;
+        public float SabotageIntervalMin => Mathf.Clamp(Finite(sabotageIntervalMin, 20f), 1f, 600f);
+        public float SabotageIntervalMax => Mathf.Clamp(Finite(sabotageIntervalMax, 30f), SabotageIntervalMin, 600f);
+        /// <summary>How often the sabotage mix draws each sabotage, in <see cref="LabSabotageKind"/> order (#251).</summary>
+        public int[] SabotageWeights() => new[]
+        {
+            Mathf.Clamp(sabotageWeightGourdBomb, 0, 10), Mathf.Clamp(sabotageWeightSwipeBlock, 0, 10),
+            Mathf.Clamp(sabotageWeightFoxFire, 0, 10), Mathf.Clamp(sabotageWeightCharm, 0, 10)
+        };
+        public int FoxFireCountMin => Mathf.Clamp(foxFireCountMin, 1, 10);
+        public int FoxFireCountMax => Mathf.Clamp(foxFireCountMax, FoxFireCountMin, 10);
+        public float FoxFireSafeSeconds => Mathf.Clamp(Finite(foxFireSafeSeconds, 1f), 0f, 3f);
+        public float CharmSeconds => Mathf.Clamp(Finite(charmSeconds, 10f), 1f, 30f);
+        public int CharmRescueTaps => Mathf.Clamp(charmRescueTaps, 0, 10);
+        public int JigwiFireTargetCount => Mathf.Clamp(jigwiFireTargetCount, 1, 5);
+        public float JigwiFireSeconds => Mathf.Clamp(Finite(jigwiFireSeconds, 15f), 1f, 120f);
+        public float JigwiOverheatSeconds => Mathf.Clamp(Finite(jigwiOverheatSeconds, 4f), .1f, 60f);
+        public float JigwiGenerationBurnSeconds => Mathf.Clamp(Finite(jigwiGenerationBurnSeconds, 10f), .1f, 120f);
+        public float JigwiRawRadiusScale => Mathf.Clamp(Finite(jigwiRawRadiusScale, .65f), .2f, 1f);
+        public float JigwiRawLifeScale => Mathf.Clamp(Finite(jigwiRawLifeScale, .5f), .05f, 1f);
+        public float JigwiAutoIntervalMin => Mathf.Clamp(Finite(jigwiAutoIntervalMin, 20f), 1f, 600f);
+        public float JigwiAutoIntervalMax => Mathf.Clamp(Finite(jigwiAutoIntervalMax, 30f), JigwiAutoIntervalMin, 600f);
+        public int JigwiAutoFireWeight => Mathf.Clamp(jigwiAutoFireWeight, 0, 10);
+        public int JigwiAutoGenerationBurnWeight => Mathf.Clamp(jigwiAutoGenerationBurnWeight, 0, 10);
+        public bool YaguangFlashEnabled => yaguangFlashEnabled;
+        /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
+        public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
+        public float YaguangFlashFirstStartSeconds => Mathf.Clamp(Finite(yaguangFlashFirstStartSeconds, 10f), 1f, 61f);
+        public float YaguangFlashIntervalSeconds => Mathf.Clamp(Finite(yaguangFlashIntervalSeconds, 60f), 20f, 100f);
+        public float YaguangFlashWarningSeconds => Mathf.Clamp(Finite(yaguangFlashWarningSeconds, 3f), 0f, 6f);
+        public float YaguangFlashGlareSeconds => Mathf.Clamp(Finite(yaguangFlashGlareSeconds, 7f), 1f, 13f);
+        public float YaguangFlashRecoverySeconds => Mathf.Clamp(Finite(yaguangFlashRecoverySeconds, 2f), 0f, 4f);
+        /// <summary>콤보를 야광귀 셈법(하나 둘 셋 넷)으로 보여주는지 (#271). 화면 표시만 바꾼다.</summary>
+        public bool ComboYaguangCountEnabled => comboYaguangCountEnabled;
         public LabOrbAppearance OrbAppearance => orbAppearance;
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
@@ -852,6 +1011,7 @@ namespace C6Lab
             int[] chances = GenerationChances();
             float[] stopBounds = DrumStopBounds();
             int[] stopChances = DrumStopChances();
+            int[] sabotageWeights = SabotageWeights();
             return new[]
             {
                 (float)MonsterMaxHp, (float)Damage, BattleDurationSeconds,
@@ -915,7 +1075,17 @@ namespace C6Lab
                 ComboTimeLimitSeconds, ComboPenaltyDurationSeconds, ComboPenaltySizeScale,
                 ComboPenaltyThrowerOnly ? 1f : 0f, ComboRewardDurationSeconds, ComboRewardSizeScale,
                 ComboWarningSeconds,
-                BoardOrbTrailEnabled ? 1f : 0f
+                BoardOrbTrailEnabled ? 1f : 0f,
+                SabotageMixEnabled ? 1f : 0f, SabotageIntervalMin, SabotageIntervalMax,
+                sabotageWeights[0], sabotageWeights[1], sabotageWeights[2], sabotageWeights[3],
+                FoxFireCountMin, FoxFireCountMax, FoxFireSafeSeconds, CharmSeconds, CharmRescueTaps,
+                JigwiFireTargetCount, JigwiFireSeconds, JigwiOverheatSeconds,
+                JigwiGenerationBurnSeconds, JigwiRawRadiusScale, JigwiRawLifeScale,
+                YaguangFlashEnabled ? 1f : 0f, YaguangFlashTargetOne ? 1f : 0f, YaguangFlashFirstStartSeconds,
+                YaguangFlashIntervalSeconds, YaguangFlashWarningSeconds, YaguangFlashGlareSeconds,
+                YaguangFlashRecoverySeconds,
+                ComboYaguangCountEnabled ? 1f : 0f,
+                JigwiAutoIntervalMin, JigwiAutoIntervalMax, JigwiAutoFireWeight, JigwiAutoGenerationBurnWeight
             };
         }
 
@@ -960,6 +1130,9 @@ namespace C6Lab
             { error = "Drum stop zone edges must go from near to far (from <= to)."; return false; }
             float drumStopTotal = values[94] + values[95] + values[96] + values[97];
             if (drumStopTotal != 100f) { error = "Drum stop chances must add up to 100 (now " + drumStopTotal + ")."; return false; }
+            if (values[167] > values[168]) { error = "Sabotage Interval Min cannot exceed Sabotage Interval Max."; return false; }
+            if (values[173] > values[174]) { error = "Fox Fire Count Min cannot exceed Fox Fire Count Max."; return false; }
+            if (values[192] > values[193]) { error = "Jigwi Auto Interval Min cannot exceed Jigwi Auto Interval Max."; return false; }
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
@@ -1119,6 +1292,36 @@ namespace C6Lab
             comboRewardSizeScale = values[163];
             comboWarningSeconds = values[164];
             boardOrbTrailEnabled = values[165] >= .5f;
+            sabotageMixEnabled = values[166] >= .5f;
+            sabotageIntervalMin = values[167];
+            sabotageIntervalMax = values[168];
+            sabotageWeightGourdBomb = (int)values[169];
+            sabotageWeightSwipeBlock = (int)values[170];
+            sabotageWeightFoxFire = (int)values[171];
+            sabotageWeightCharm = (int)values[172];
+            foxFireCountMin = (int)values[173];
+            foxFireCountMax = (int)values[174];
+            foxFireSafeSeconds = values[175];
+            charmSeconds = values[176];
+            charmRescueTaps = (int)values[177];
+            jigwiFireTargetCount = (int)values[178];
+            jigwiFireSeconds = values[179];
+            jigwiOverheatSeconds = values[180];
+            jigwiGenerationBurnSeconds = values[181];
+            jigwiRawRadiusScale = values[182];
+            jigwiRawLifeScale = values[183];
+            yaguangFlashEnabled = values[184] >= .5f;
+            yaguangFlashTargetOne = values[185] >= .5f;
+            yaguangFlashFirstStartSeconds = values[186];
+            yaguangFlashIntervalSeconds = values[187];
+            yaguangFlashWarningSeconds = values[188];
+            yaguangFlashGlareSeconds = values[189];
+            yaguangFlashRecoverySeconds = values[190];
+            comboYaguangCountEnabled = values[191] >= .5f;
+            jigwiAutoIntervalMin = values[192];
+            jigwiAutoIntervalMax = values[193];
+            jigwiAutoFireWeight = (int)values[194];
+            jigwiAutoGenerationBurnWeight = (int)values[195];
             error = string.Empty;
             return true;
         }
