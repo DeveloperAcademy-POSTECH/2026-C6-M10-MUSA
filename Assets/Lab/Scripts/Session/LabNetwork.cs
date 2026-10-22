@@ -1848,7 +1848,7 @@ namespace C6Lab
             if (result.Kind == LabProjectileHitKind.Fire)
             {
                 if (!model.ConfirmJigwiFireHit(result.ProjectileId, result.FireId, result.FireTargetId, now, out bool extinguished))
-                    model.ConfirmMiss(result.ProjectileId, now);
+                    model.ConfirmMiss(result.ProjectileId, now, countThrow: false); // 불을 노린 투척은 명중률에서 뺀다
                 SetNotice(extinguished ? "Water extinguished a flame." : "Only a Water Combined orb extinguishes fire.");
             }
             else if (result.Hit)

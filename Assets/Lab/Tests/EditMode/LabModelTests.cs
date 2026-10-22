@@ -391,6 +391,37 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ThrowTotalCountsResolvedHitsAndMissesButNotFireShotsOrFlyingOrbs()
+        {
+            LabOrbState Shot(ulong owner, double at)
+            {
+                var pair = GeneratePair(owner, at);
+                Assert.That(model.TryCombineAt(owner, pair.yin.id, pair.yang.id, "throw-c-" + owner + "-" + at, at,
+                    new Vector2(.5f, .5f), Vector2.zero, out var combined, out _), Is.True);
+                Assert.That(model.TryLaunch(owner, combined.id, "throw-l-" + owner + "-" + at, at, out _, out _), Is.True);
+                return combined;
+            }
+            int Thrown(ulong id, double at) => model.Snapshot(at).players.Single(p => p.id == id).throwTotal;
+
+            var hit = Shot(10, 1d);
+            var miss = Shot(20, 1d);
+            var fire = Shot(30, 1d);
+            Assert.That(Thrown(10, 1d) + Thrown(20, 1d) + Thrown(30, 1d), Is.Zero, "A flying orb is not counted yet.");
+
+            Assert.That(model.ConfirmHit(hit.id, 2d), Is.True);
+            Assert.That(model.ConfirmMiss(miss.id, 2d), Is.True);
+            Assert.That(model.ConfirmMiss(fire.id, 2d, countThrow: false), Is.True);
+            Assert.That(Thrown(10, 2d), Is.EqualTo(1), "A hit is a throw.");
+            Assert.That(model.Snapshot(2d).players.Single(p => p.id == 10).hitTotal, Is.EqualTo(1));
+            Assert.That(Thrown(20, 2d), Is.EqualTo(1), "A miss is a throw.");
+            Assert.That(Thrown(30, 2d), Is.Zero, "A shot at a Jigwi fire is left out.");
+
+            Assert.That(model.ConfirmMiss(miss.id, 3d), Is.False);
+            Assert.That(model.ConfirmHit(hit.id, 3d), Is.False);
+            Assert.That(Thrown(10, 3d) + Thrown(20, 3d), Is.EqualTo(2), "One orb is confirmed only once.");
+        }
+
+        [Test]
         public void ClockEndsAtDeadlineAndRetryResetsRoundWithoutMovingOldResult()
         {
             model.Tick(179.9d);
