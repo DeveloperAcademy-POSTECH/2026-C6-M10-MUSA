@@ -347,8 +347,8 @@ namespace C6Lab
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
                 134, 132, 133, 148, 149, 150, 151),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
-            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183),
+            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
             new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
@@ -587,7 +587,6 @@ namespace C6Lab
         [SerializeField, Range(.1f, 120f)] private float jigwiGenerationBurnSeconds = 10f;
         [SerializeField, Range(.2f, 1f)] private float jigwiRawRadiusScale = .65f;
         [SerializeField, Range(.05f, 1f)] private float jigwiRawLifeScale = .5f;
-
         [Header("Yaguang flash (#268)")]
         [Tooltip("야광귀 섬광. 박에서 요괴가 빼꼼 나와 눈이 밝아진 뒤(예고) 화면이 하얗게 번쩍이고, 눈부신 동안 판 위 음양·결합 구슬과 아이템이 하얗게 보인다(북·박 색칠·HUD는 그대로). 화면 표시만 바뀌고 조작·판정은 그대로다. 방해공작 묶음(#251)과 따로 돈다. 야광귀 전용이라 기본은 끔(DEV `Yaguang Flash`로 켠다).")]
         [SerializeField] private bool yaguangFlashEnabled;

@@ -122,6 +122,7 @@ namespace C6Lab.Tests
                 other.flashCount = 1;
                 other.flashLastAt = 21d;
                 other.flashLastTarget = network.LocalPlayerId - 1;
+                other.flashLastTargetAll = false;
                 latest.SetValue(network, other);
                 yield return null;
                 Assert.That(hud.BurstAlpha, Is.Zero, "ONE: someone else's flash leaves this screen alone.");
@@ -134,13 +135,118 @@ namespace C6Lab.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator PauseResumeRestoresWarningEyesAndDisablingTheHudClearsItsGlare()
+        {
+            var root = new GameObject("Flash lifecycle fixture");
+            var network = root.AddComponent<LabNetwork>(); network.enabled = false;
+            var config = ScriptableObject.CreateInstance<LabConfig>(); network.config = config;
+            var boardRoot = new GameObject("Glare board"); boardRoot.transform.SetParent(root.transform, false);
+            network.board = boardRoot.AddComponent<LabOrbBoard>();
+            var cameraRoot = new GameObject("Battle camera"); cameraRoot.transform.SetParent(root.transform, false);
+            cameraRoot.transform.position = Vector3.back * 10f;
+            Camera camera = cameraRoot.AddComponent<Camera>();
+            network.target = LabTarget.CreateCylinder(root.transform, Vector3.zero, .8f, 2f);
+            var canvasRoot = new GameObject("Flash lifecycle canvas", typeof(RectTransform), typeof(Canvas));
+            Canvas canvas = canvasRoot.GetComponent<Canvas>();
+            LabGourdAlert alert = root.AddComponent<LabGourdAlert>(); alert.Bind(network, canvas, camera);
+            LabYaguangFlashHud hud = root.AddComponent<LabYaguangFlashHud>(); hud.Bind(network, canvas);
+            FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
+            try
+            {
+                latest.SetValue(network, Snapshot(20.8d, 19.5d, 21d));
+                yield return null;
+                Assert.That(alert.ShowingEyes, Is.True);
+                LabSnapshot paused = Snapshot(20.8d, 19.5d, 21d); paused.paused = true;
+                latest.SetValue(network, paused);
+                yield return new WaitForSeconds(.35f); // Longer than the warning's remaining 0.2 s.
+                Assert.That(alert.ShowingEyes, Is.False, "The existing alert hides while the pause menu is open.");
+                latest.SetValue(network, Snapshot(20.8d, 19.5d, 21d));
+                yield return null;
+                Assert.That(alert.ShowingEyes, Is.True, "The same warning resumes with its remaining time.");
+                Assert.That(alert.EyeGlow, Is.GreaterThan(.9f));
+
+                LabSnapshot flashed = Snapshot(21.05d, -1d, -1d);
+                flashed.flashCount = 1; flashed.flashLastAt = 21d;
+                latest.SetValue(network, flashed);
+                yield return null;
+                Assert.That(network.board.FlashGlare, Is.EqualTo(1f));
+                hud.enabled = false;
+                Assert.That(network.board.FlashGlare, Is.Zero, "Disabling the effect cannot leave the board white.");
+                Assert.That(hud.BurstAlpha, Is.Zero);
+
+                yield return new WaitForSeconds(.35f);
+                LabSnapshot freshRound = Snapshot(21.05d, -1d, -1d);
+                freshRound.round = 2;
+                freshRound.flashCount = 1; freshRound.flashLastAt = 21.05d;
+                latest.SetValue(network, freshRound);
+                hud.enabled = true;
+                yield return null;
+                Assert.That(hud.BurstAlpha, Is.GreaterThan(.9f),
+                    "An identical numeric server time in a new round must not inherit the previous round's extrapolation.");
+            }
+            finally
+            {
+                Object.Destroy(root); Object.Destroy(canvasRoot); Object.Destroy(config);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator PreviousStageHudCannotUpdateOrClearTheNextStagesBoard()
+        {
+            var sessionRoot = new GameObject("Persistent flash session");
+            var network = sessionRoot.AddComponent<LabNetwork>(); network.enabled = false;
+            var config = ScriptableObject.CreateInstance<LabConfig>(); network.config = config;
+            var previousStage = new GameObject("Previous flash stage");
+            var nextStage = new GameObject("Next flash stage");
+            var previousCanvas = new GameObject("Previous flash canvas", typeof(RectTransform), typeof(Canvas));
+            var nextCanvas = new GameObject("Next flash canvas", typeof(RectTransform), typeof(Canvas));
+            LabOrbBoard previousBoard = previousStage.AddComponent<LabOrbBoard>();
+            LabOrbBoard nextBoard = nextStage.AddComponent<LabOrbBoard>();
+            network.board = previousBoard;
+            LabYaguangFlashHud previousHud = previousStage.AddComponent<LabYaguangFlashHud>();
+            previousHud.Bind(network, previousCanvas.GetComponent<Canvas>());
+            FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
+            try
+            {
+                LabSnapshot flashed = Snapshot(21.05d, -1d, -1d);
+                flashed.flashCount = 1; flashed.flashLastAt = 21d;
+                flashed.paused = true; // Keep the effect at an exact authoritative time across both frames.
+                latest.SetValue(network, flashed);
+                yield return null;
+                Assert.That(previousBoard.FlashGlare, Is.EqualTo(1f));
+                Assert.That(previousHud.BurstAlpha, Is.GreaterThan(.12f));
+
+                network.board = nextBoard;
+                LabYaguangFlashHud nextHud = nextStage.AddComponent<LabYaguangFlashHud>();
+                nextHud.Bind(network, nextCanvas.GetComponent<Canvas>());
+                yield return null;
+                Assert.That(previousBoard.FlashGlare, Is.Zero, "A detached screen clears only its own board.");
+                Assert.That(previousHud.BurstAlpha, Is.Zero, "The previous screen must stop drawing the persistent session.");
+                Assert.That(nextBoard.FlashGlare, Is.EqualTo(1f));
+                Assert.That(nextHud.BurstAlpha, Is.GreaterThan(.12f));
+
+                previousHud.enabled = false;
+                Assert.That(nextBoard.FlashGlare, Is.EqualTo(1f), "Old-stage OnDisable cannot clear the new board.");
+                Object.DestroyImmediate(previousHud);
+                Assert.That(nextBoard.FlashGlare, Is.EqualTo(1f), "Old-stage OnDestroy cannot clear the new board.");
+                Assert.That(nextHud.BurstAlpha, Is.GreaterThan(.12f));
+            }
+            finally
+            {
+                Object.Destroy(previousStage); Object.Destroy(nextStage); Object.Destroy(sessionRoot);
+                Object.Destroy(previousCanvas); Object.Destroy(nextCanvas); Object.Destroy(config);
+            }
+        }
+
         private static SpriteRenderer Cover(LabOrbView view) =>
             view.GetComponentsInChildren<SpriteRenderer>(true).FirstOrDefault(renderer => renderer.name == "Glare Cover");
 
         private static LabSnapshot Snapshot(double now, double warningAt, double flashAt) => new LabSnapshot
         {
             sessionId = "flash-look", round = 1, phase = LabPhase.Playing, serverTime = now,
-            flashWarningAt = warningAt, flashAt = flashAt
+            flashWarningAt = warningAt, flashAt = flashAt,
+            flashTargetAll = true, flashLastTargetAll = true
         };
     }
 }

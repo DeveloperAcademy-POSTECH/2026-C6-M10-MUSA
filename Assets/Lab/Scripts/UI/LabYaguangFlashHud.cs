@@ -26,6 +26,7 @@ namespace C6Lab
 
         private static Sprite edgeSprite;
         private LabNetwork network;
+        private LabOrbBoard boundBoard;
         private Canvas canvas;
         private RectTransform layer;
         private Image edge;
@@ -34,6 +35,8 @@ namespace C6Lab
         private uint seenRound;
         private uint seenFlashCount;
         private double seenServerTime = -1d;
+        private string clockSession;
+        private uint clockRound;
         private float seenAt;
         private double eyesShownFor = -1d;
 
@@ -60,7 +63,11 @@ namespace C6Lab
         /// <summary>스냅샷을 읽을 네트워크와, 빛을 그릴 Canvas를 연결한다.</summary>
         public void Bind(LabNetwork target, Canvas uiCanvas)
         {
+            Hide();
             network = target;
+            // A persistent session can already point at the next stage when this HUD is torn down.
+            // Only the board captured by this binding belongs to this screen.
+            boundBoard = target != null ? target.board : null;
             canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
         }
 
@@ -68,16 +75,17 @@ namespace C6Lab
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             LabConfig config = network != null ? network.config : null;
-            if (snapshot == null || config == null || snapshot.phase != LabPhase.Playing)
+            if (snapshot == null || config == null || snapshot.phase != LabPhase.Playing
+                || !ReferenceEquals(network.board, boundBoard))
             {
                 Hide();
                 return;
             }
-            double now = snapshot.paused ? snapshot.serverTime : ServerNow(snapshot);
+            double now = ServerNow(snapshot);
             ulong me = network.LocalPlayerId;
             float glare = LabYaguangFlash.GlareAmount(snapshot, now, me, config.YaguangFlashGlareSeconds,
                 config.YaguangFlashRecoverySeconds);
-            if (network.board != null) network.board.SetFlashGlare(glare);
+            if (boundBoard != null) boundBoard.SetFlashGlare(glare);
             CheckNewFlash(snapshot, now, me, config);
 
             float progress = DriveEyes(snapshot, now);
@@ -124,10 +132,12 @@ namespace C6Lab
             double length = snapshot.flashAt - snapshot.flashWarningAt;
             float progress = length > 0d ? Mathf.Clamp01((float)((now - snapshot.flashWarningAt) / length)) : 1f;
             LabGourdAlert alert = GetComponent<LabGourdAlert>();
-            if (alert == null || network.target == null) return progress;
+            if (snapshot.paused || alert == null || network.target == null) return progress;
             if (eyesShownFor != snapshot.flashAt || !alert.ShowingEyes)
             {
-                if (eyesShownFor != snapshot.flashAt) alert.ShowEyes(network.target, (float)(snapshot.flashAt - now));
+                // Pause and other alerts can hide/replace this bubble without changing flashAt.
+                // Restore the remaining warning when this screen returns to the battle.
+                alert.ShowEyes(network.target, (float)(snapshot.flashAt - now));
                 eyesShownFor = snapshot.flashAt;
             }
             if (alert.ShowingEyes) alert.SetEyeGlow(EyeGlowAt(progress));
@@ -156,19 +166,26 @@ namespace C6Lab
 
         private void Hide()
         {
-            if (network != null && network.board != null) network.board.SetFlashGlare(0f);
+            if (boundBoard != null) boundBoard.SetFlashGlare(0f);
             if (layer != null) layer.gameObject.SetActive(false);
+            LabGourdAlert alert = GetComponent<LabGourdAlert>();
+            if (alert != null && alert.ShowingEyes) alert.Hide();
+            eyesShownFor = -1d;
         }
 
         private double ServerNow(LabSnapshot snapshot)
         {
             float realtime = Time.realtimeSinceStartup;
-            if (snapshot.serverTime != seenServerTime)
+            if (snapshot.paused || snapshot.sessionId != clockSession || snapshot.round != clockRound
+                || snapshot.serverTime != seenServerTime)
             {
+                clockSession = snapshot.sessionId;
+                clockRound = snapshot.round;
                 seenServerTime = snapshot.serverTime;
                 seenAt = realtime;
             }
-            return snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
+            return snapshot.paused ? snapshot.serverTime
+                : snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
         }
 
         private bool EnsureLayer()
@@ -231,9 +248,11 @@ namespace C6Lab
             return edgeSprite;
         }
 
+        private void OnDisable() => Hide();
+
         private void OnDestroy()
         {
-            if (network != null && network.board != null) network.board.SetFlashGlare(0f);
+            Hide();
             if (layer != null) Destroy(layer.gameObject);
         }
     }

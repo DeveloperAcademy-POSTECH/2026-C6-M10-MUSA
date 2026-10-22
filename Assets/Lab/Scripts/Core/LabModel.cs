@@ -857,7 +857,7 @@ namespace C6Lab
             if (flashWarned) target = nextFlashTarget;
             else if (flashCount > 0 && at < lastFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds) target = lastFlashTarget;
             else return false;
-            return target == 0 || target == player;
+            return !rules.FlashTargetOne || target == player;
         }
 
         /// <summary>
@@ -930,7 +930,7 @@ namespace C6Lab
             for (int i = 0; i < activeSeatCount; i++)
             {
                 ulong player = seats[i];
-                if (activeSeatCount > 1 && player == lastFlashTarget) continue;
+                if (flashCount > 0 && activeSeatCount > 1 && player == lastFlashTarget) continue;
                 if (!ScreenOpen(player, at, LabYaguangEvent.Flash)) free.Add(player);
             }
             return free;
@@ -946,7 +946,7 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 섬광 대상. ALL이면 0(모두). ONE이면 자리 순서에서 seed와 순번으로 한 명을 뽑아 모든 기기가 같은 사람을 받는다.
+        /// 섬광 대상. ALL 여부는 별도 bool로 공유한다. ONE이면 실제 ID 0도 포함한 자리 순서에서 한 명을 뽑는다.
         /// 두 명 이상이면 바로 앞 섬광을 맞은 사람은 빼서 같은 사람이 연달아 맞지 않게 한다.
         /// </summary>
         private ulong DrawFlashTarget(uint index)
@@ -954,7 +954,7 @@ namespace C6Lab
             if (!rules.FlashTargetOne || activeSeatCount <= 0) return 0;
             var candidates = new List<ulong>();
             for (int i = 0; i < activeSeatCount; i++)
-                if (activeSeatCount == 1 || seats[i] != lastFlashTarget) candidates.Add(seats[i]);
+                if (index == 0u || activeSeatCount == 1 || seats[i] != lastFlashTarget) candidates.Add(seats[i]);
             return candidates[(int)(DrawFor(seed ^ FlashTargetSalt, FlashDrawKey, index) % (ulong)candidates.Count)];
         }
 
@@ -1226,9 +1226,11 @@ namespace C6Lab
                 flashAt = FlashWaiting ? nextFlashAt : -1d,
                 flashWarningAt = FlashWaiting ? nextFlashAt - rules.FlashWarningSeconds : -1d,
                 flashTarget = nextFlashTarget,
+                flashTargetAll = !rules.FlashTargetOne,
                 flashCount = flashCount,
                 flashLastAt = lastFlashAt,
-                flashLastTarget = lastFlashTarget
+                flashLastTarget = lastFlashTarget,
+                flashLastTargetAll = !rules.FlashTargetOne
             };
         }
 

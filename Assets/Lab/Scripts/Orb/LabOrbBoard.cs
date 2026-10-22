@@ -271,7 +271,7 @@ namespace C6Lab
             BuildHorizontalWalls();
             foreach (var entry in entries.Values)
             {
-                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind, entry.Small), entry.View.Element);
+                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind, entry.Small, entry.JigwiScale), entry.View.Element);
                 entry.View.ConfigureAppearance(config.OrbAppearance);
                 SetLayerRecursively(entry.View.transform, gameObject.layer);
                 entry.View.HitSphere.sharedMaterial = contactMaterial;
@@ -1106,6 +1106,7 @@ namespace C6Lab
             LiftSwipeBlock();
             charmed = false;
             jigwiOverheat = false;
+            flashGlare = 0f;
             if (charmEdge != null) charmEdge.Hide();
             foreach (var entry in entries.Values)
                 Retire(entry);

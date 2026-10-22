@@ -2049,6 +2049,7 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | PlayMode 실제 실행 | NOT_RUN | `TheRewardRainsTheBujeokArtInsteadOfStars`(부적 그림·흰색·크기/개수 비율), 기존 별 비 검사. |
 | 에디터 확인 | 부분 (Jess) | 부적이 쏟아지는 것을 에디터에서 봤다(크기를 키우고 개수를 줄여 달라는 피드백 반영). |
 
+
 ## 지귀 수동 패턴 — #272 / 2026-10-21
 
 기준은 `origin/main`의 `2adc3e94`에서 분기한 `feat/#272-jigwi-fire-patterns`, Unity **6000.6.5f1**, 기존 `Assets/Lab/Scenes/Lab.unity` 단일 Scene이다. #262/Draft #269의 3스테이지 코드는 포함하지 않는다. 원시 로그·XML·진단 앱과 임시 제어 스크립트는 저장소에 올리지 않는다.
@@ -2069,17 +2070,17 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 
 실행 방법·기본 조정값·소각 예외·관련 코드는 [JIGWI_PATTERNS](JIGWI_PATTERNS.md)를 따른다. 위 실행 결과는 병합 전 기능 브랜치의 게임 코드 `8cfc7f18`을 대상으로 한다. 후속 병합은 [PR #273](https://github.com/DeveloperAcademy-POSTECH/2026-C6-M10-MUSA/pull/273)에서 관리하며, 병합 상태는 해당 PR에서 확인한다.
 
-## #268 main 병합 — #272 지귀와 설정 번호 맞추기
 
-#268을 연 뒤 main에 #273(#272 지귀 수동 패턴)이 머지되어, 두 작업이 같은 DEV 자리(인덱스 178~)와 같은 프로토콜(5655)을 썼다. main을 #268에 합치며 다음처럼 맞췄다.
+## PR #270 최신 main 통합·병합 전 검증 — 2026-10-22
 
-- **DEV 번호**: 지귀 6칸은 main 그대로 **178~183**, 야광귀 섬광 7칸은 그 뒤 **184~190**으로 옮겼다(`LabConfig.DeveloperFields`·`CaptureDeveloperValues`·`TryApplyDeveloperValues`, `야광귀` 묶음과 한꺼번에 켜기 버튼 155·184). DEV 패널에는 `Jigwi` 묶음과 `야광귀` 묶음이 함께 있고, 콤보는 #268처럼 `야광귀` 묶음 안에 있다(`Combo` 묶음 없음).
-- **설정 개수·프로토콜**: 184/185 → **191개**, 프로토콜 **5656**(`LabNetwork.LabProtocolVersion`). 연결 토큰은 main의 `C6PhysicsLab/17` 그대로다. 모든 참가자가 같은 빌드를 써야 한다.
-- **Host 진행**: main의 아이템 만료 기준(`ExpiresAt`) 앞에 #268의 `AdvanceFlash`를 둔다.
-- **검사 고정값**: 설정 개수 단정 191, 프로토콜 5656(`LabSharedSettingsSchemaTests`, `LabPaintClusterDeveloperTests` 지문), 야광귀 검사 인덱스 +6(`LabYaguangFlashTests`, `LabYaguangDeveloperTests`), 지귀 검사는 뒤에 섬광 칸이 붙으므로 `Take(6)`으로 지귀 6칸만 본다(`LabJigwiConfigTests`).
-- **문서**: DEV 명세 머리말·전체 개수·섬광 표의 인덱스, LAB_SCOPE V-46·V-47, 두 검증 기록을 모두 남겼다.
+기준은 `feat/#268-yaguang-flash`의 `db823fff`와 main `f1fe606b`(#272 지귀) 통합 소스다. 기존 지귀178~183을 유지하고 섬광184~190을 추가해 전체191개·프로토콜5657·Lab 연결 토큰18로 정리했다. #262 게임 흐름과 #271 셈법은 이 PR에 포함하지 않는다.
 
-| 항목 | 상태 | 실행 결과/남은 확인 |
+- Host ID0을 ALL 대상으로 해석하던 충돌을 `flashTargetAll/flashLastTargetAll`로 분리하고, 최초 추첨에서 Host를 잘못 제외하던 조건도 보완했다.
+- 섬광 시각/대상을 큰 도색 수신과 독립적인 보드 Header에 포함해 지귀와 함께 복제·검증한다.
+- 보드 재설정 후 지귀 반지름 배율, 섬광 비활성화/보드 초기화 정리, 공동 일시정지 후 경고/시계 복원을 보완했다.
+- 중간 실패는 기본값 검사에서 시험 도우미가31초를30초로 덮은 문제와 기존 지문 검사의5655 상수였다. 제품 기본값31초를 유지하고 검증 대상을 바로잡았다.
+
+| 항목 | 결과 | 실행 근거/범위 |
 | --- | --- | --- |
 | 충돌 표시 | PASS | 충돌 16개 파일에 표시가 남지 않았다. |
 | Core 컴파일·검사 | 아래 참고 | Mono(Unity 흉내)로 `Core` 컴파일과 `LabYaguangFlashTests`·`LabGourdComboTests` 실행. |
@@ -2237,3 +2238,13 @@ EditMode는 최신main845에서 폐기 계약55개를 제거하고 공통스키�
 | 충돌 표시 | PASS | 충돌 17개 파일에 표시가 남지 않았다. |
 | Core 컴파일·검사 | PASS (Mono, Unity 흉내) | `LabYaguangFlashTests`·`LabGourdComboTests`·`LabJigwiConfigTests` 중 Core만 쓰는 검사 통과(`Resources.Load` 1건 제외). |
 | Unity EditMode/PlayMode 실제 실행 | NOT_RUN | 설정 개수·프로토콜 고정값이 있는 검사 전체, 야광귀·지귀 검사. |
+
+### #270 별도 통합 실행 기록 (191개 기준)
+
+| 전체 EditMode | PASS879/879 | `c6-pr270-final-edit.xml`, 실패·생략0, 약25.1초. |
+| 전체 PlayMode | PASS317/317 | `c6-pr270-verified-play.xml`, 실패·생략0, 약127.3초. 기존 지귀/구슬/도색/방해공작 회귀 포함. |
+| Mac Development 진단 앱 | PASS | 기존 `LabBuild.Mac`·저장 Lab Scene, 임시 제어기는 빌드 후 소스/메타를 제거하고 커밋하지 않음. |
+| 실제 Mac Host/Client UDP | PASS | 양쪽 P1/P2·191개 설정 확인 후 자동 ONE 섬광이 **Host ID0**만 대상으로 공유됨을 확인했다. 이어 Client 화재·무료 수3개·과열 소각 승인·화상 Raw0.65배/수명0.5배·실제 만료·종료 후 정상 생성을 확인. 양쪽 PASS 및 종료0. |
+| iOS·실제 LAN/핫스팟·3~5인·모바일 성능 | NOT_RUN | 이번 검사에서 수행하지 않았으며 기존 기록을 승계하지 않음. |
+
+원래 열려 있던 Desktop 프로젝트/사용자 파일은 수정하지 않고 별도 검토 worktree에서 검사했다. 원시 로그·XML·진단 빌드는 로컬에만 보관한다.

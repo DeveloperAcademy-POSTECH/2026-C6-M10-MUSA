@@ -132,12 +132,17 @@ namespace C6Lab.Tests
             Assert.That(raw.HitSphere.radius, Is.EqualTo(config.OrbRadius * .65f).Within(.00001f));
             board.UpsertOrb("curse", LabOrbKind.Yang, Vector2.one * .5f, small: true, jigwiScale: .65f);
             Assert.That(raw.HitSphere.radius, Is.EqualTo(config.OrbRadius * .65f * config.BlastShrinkScale).Within(.00001f));
+            board.Configure(config, root.GetComponentInChildren<Camera>(), new Rect(-4f, -2f, 8f, 4f));
+            Assert.That(raw.HitSphere.radius, Is.EqualTo(config.OrbRadius * .65f * config.BlastShrinkScale).Within(.00001f),
+                "A layout/config rebind must retain the independent Jigwi scale.");
             LabOrbView drum = board.UpsertOrb("drum", LabOrbKind.Drum, new Vector2(.5f, .8f), jigwiScale: .65f);
             Assert.That(drum.HitSphere.radius, Is.EqualTo(config.DrumRadius));
             board.PlayJigwiGenerationBurn(new Vector2(.5f, .7f));
             Assert.That(drum.gameObject.activeSelf, Is.True);
             Assert.That(board.IsSnapshotSuppressed("drum"), Is.False);
+            board.SetFlashGlare(1f);
             board.Clear(); Assert.That(board.JigwiOverheated, Is.False);
+            Assert.That(board.FlashGlare, Is.Zero, "A cleared board cannot leak flash whitening into the next round.");
         }
 
         [UnityTest]

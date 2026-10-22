@@ -48,11 +48,38 @@ namespace C6Lab.Tests
                 Assert.That(new[] { client.JigwiFireSeconds, client.JigwiOverheatSeconds,
                     client.JigwiGenerationBurnSeconds, client.JigwiRawRadiusScale, client.JigwiRawLifeScale },
                     Is.EqualTo(tail.Skip(1)));
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5655),
-                    Is.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5655)));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5658),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5658)));
                 values[183] = .75f;
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5655),
-                    Is.Not.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5655)));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5658),
+                    Is.Not.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5658)));
+            }
+            finally { Object.DestroyImmediate(host); Object.DestroyImmediate(client); }
+        }
+
+        [Test]
+        public void JigwiAndAppendedFlashSettingsRoundTripIndependentlyInTheSameSharedSchema()
+        {
+            var host = ScriptableObject.CreateInstance<LabConfig>();
+            var client = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                var values = host.CaptureDeveloperValues();
+                var jigwi = new[] { 5f, 30f, 7f, 20f, .8f, .25f };
+                var flash = new[] { 1f, 1f, 6f, 24f, .5f, 2f, 1f };
+                Array.Copy(jigwi, 0, values, 178, jigwi.Length);
+                Array.Copy(flash, 0, values, 184, flash.Length);
+                Assert.That(host.TryApplyDeveloperValues(values, out var error), Is.True, error);
+                var received = JsonUtility.FromJson<Settings>(JsonUtility.ToJson(
+                    new Settings { values = host.CaptureDeveloperValues() })).values;
+                Assert.That(client.TryApplyDeveloperValues(received, out error), Is.True, error);
+                Assert.That(client.CaptureDeveloperValues().Skip(178).Take(6), Is.EqualTo(jigwi));
+                Assert.That(client.CaptureDeveloperValues().Skip(184).Take(7), Is.EqualTo(flash));
+                Assert.That(client.JigwiFireTargetCount, Is.EqualTo(5));
+                Assert.That(client.YaguangFlashEnabled && client.YaguangFlashTargetOne, Is.True);
+                Assert.That(client.YaguangFlashFirstStartSeconds, Is.EqualTo(6f));
+                Assert.That(client.ComboPenaltyDurationSeconds, Is.EqualTo(15f));
+                Assert.That(client.ComboRewardDurationSeconds, Is.EqualTo(15f));
             }
             finally { Object.DestroyImmediate(host); Object.DestroyImmediate(client); }
         }

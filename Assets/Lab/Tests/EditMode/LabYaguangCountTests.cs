@@ -13,6 +13,9 @@ namespace C6Lab.Tests
             Assert.That(Enumerable.Range(1, 6).Select(LabGourdComboHud.CountWord),
                 Is.EqualTo(new[] { "하나", "둘", "셋", "넷", "하나", "둘" }), "Past four it starts again from one.");
             Assert.That(LabGourdComboHud.CountWord(0), Is.EqualTo("하나"));
+            Assert.That(Enumerable.Range(1, 4).Reverse().Select(LabGourdComboHud.CountWord),
+                Is.EqualTo(new[] { "넷", "셋", "둘", "하나" }),
+                "The warning reads the remaining seconds in reverse, while the four slot labels stay ascending.");
         }
 
         [Test]
@@ -38,9 +41,12 @@ namespace C6Lab.Tests
                     Assert.That(source.ComboWarningSeconds, Is.EqualTo(4f), "One count a second: 하나, 둘, 셋, 넷.");
                 }
                 float[] values = config.CaptureDeveloperValues();
+                var original = (float[])values.Clone();
                 values[191] = 0f;
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 Assert.That(config.ComboYaguangCountEnabled, Is.False);
+                Assert.That(config.CaptureDeveloperValues().Take(191), Is.EqualTo(original.Take(191)),
+                    "The appended count-look toggle cannot change Jigwi, flash or the underlying combo rules.");
             }
             finally
             {

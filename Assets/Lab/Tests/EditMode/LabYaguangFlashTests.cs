@@ -51,7 +51,8 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperCategories.Where(category => category.Title != "야광귀")
                 .All(category => category.SwitchFields == null && category.DividerAt == null), Is.True);
 
-            LabConfig config = Config(first: 10f);
+            LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
+            created.Add(config);
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
@@ -121,6 +122,101 @@ namespace C6Lab.Tests
             Assert.That(a, Is.EqualTo(b), "Every device draws the same players.");
             Assert.That(a.All(Three.Contains), Is.True);
             for (int i = 1; i < a.Count; i++) Assert.That(a[i], Is.Not.EqualTo(a[i - 1]), "Not the same player twice in a row.");
+        }
+
+        [Test]
+        public void HostsZeroIdCanBeTheFirstSingleTargetWithoutFlashingEveryone()
+        {
+            var drawn = new HashSet<ulong>();
+            LabConfig config = Config(flash: true, one: true, first: 1f, warning: 0f);
+            for (int seed = 0; seed < 64 && drawn.Count < 2; seed++)
+            {
+                var model = new LabModel();
+                model.Begin("flash-zero-" + seed, new ulong[] { 0, 20 }, 0d, config);
+                var warning = model.Snapshot(0d);
+                var snapshot = model.Snapshot(1d);
+                drawn.Add(snapshot.flashLastTarget);
+                Assert.That(snapshot.flashLastTargetAll || warning.flashTargetAll, Is.False);
+                Assert.That(new ulong[] { 0, 20 }.Count(snapshot.LastFlashHit), Is.EqualTo(1));
+                Assert.That(snapshot.LastFlashHit(snapshot.flashLastTarget), Is.True);
+            }
+            Assert.That(drawn, Is.EquivalentTo(new ulong[] { 0, 20 }),
+                "The first cast has no previous player, so the Host must remain eligible.");
+        }
+
+        [Test]
+        public void AFlashOnHostZeroLeavesTheOtherScreenFreeForItsOwnBomb()
+        {
+            LabConfig config = Config(flash: true, one: true, first: 1f, warning: 0f, bombEvery: 2f);
+            bool checkedHost = false;
+            for (int seed = 0; seed < 64 && !checkedHost; seed++)
+            {
+                var model = new LabModel();
+                model.Begin("flash-zero-screen-" + seed, new ulong[] { 0, 20 }, 0d, config);
+                var flashed = model.Snapshot(1d);
+                if (flashed.flashLastTarget != 0) continue;
+                Assert.That(flashed.flashCount, Is.EqualTo(1u));
+                Assert.That(flashed.flashLastTargetAll, Is.False);
+                var during = model.Snapshot(2d);
+                var bomb = during.orbs.Single(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd);
+                Assert.That(bomb.owner, Is.EqualTo(20ul),
+                    "Host zero is a single busy screen, not an ALL flash that blocks both screens.");
+                checkedHost = true;
+            }
+            Assert.That(checkedHost, Is.True);
+        }
+
+        [Test]
+        public void HostZeroCanReceiveTheFirstFlashWhenItIsTheOnlyFreeScreen()
+        {
+            LabConfig config = Config(flash: true, one: true, first: 15f, bombEvery: 10f);
+            bool checkedHost = false;
+            for (int seed = 0; seed < 64 && !checkedHost; seed++)
+            {
+                var model = new LabModel();
+                model.Begin("flash-zero-only-free-" + seed, new ulong[] { 0, 20 }, 0d, config);
+                var before = model.Snapshot(10d);
+                if (before.orbs.Single(orb => orb.kind == LabOrbKind.Bomb).owner != 20ul) continue;
+                var warning = model.Snapshot(13.6d);
+                Assert.That(warning.FlashWarningOn(13.6d), Is.True);
+                Assert.That(warning.flashTarget, Is.Zero);
+                Assert.That(warning.flashTargetAll, Is.False);
+                var flashed = model.Snapshot(15d);
+                Assert.That(flashed.LastFlashHit(0), Is.True);
+                Assert.That(flashed.LastFlashHit(20), Is.False);
+                checkedHost = true;
+            }
+            Assert.That(checkedHost, Is.True);
+        }
+
+        [Test]
+        public void FlashScheduleAndJigwiFireCoexistWithoutChangingFireConsumptionOrExpiry()
+        {
+            LabConfig config = Config(flash: true, first: 5f, warning: 0f);
+            var values = config.CaptureDeveloperValues();
+            values[178] = 2f;
+            values[179] = 30f;
+            Assert.That(config.TryApplyDeveloperValues(values, out var error), Is.True, error);
+            var model = new LabModel();
+            model.BeginSolo("flash-jigwi", 0, 0d, config);
+            Assert.That(model.TryStartJigwiFire(0, 0d, out _), Is.True);
+            var before = model.Snapshot(5d);
+            Assert.That(before.flashCount, Is.EqualTo(1u));
+            Assert.That(before.flashLastTargetAll, Is.True);
+            var fire = before.JigwiFor(0);
+            Assert.That(fire.FireActive(5d), Is.True);
+            Assert.That(fire.targets.Length, Is.EqualTo(2));
+            Assert.That(before.orbs.Length, Is.EqualTo(4));
+            var water = before.orbs[0];
+            Assert.That(water.expiresAt, Is.EqualTo(30d));
+            Assert.That(model.TryLaunch(0, water.id, "water", 5d, out _, out _), Is.True);
+            Assert.That(model.ConfirmJigwiFireHit(water.id, fire.fireId, fire.targets[0].id,
+                6d, out bool extinguished), Is.True);
+            Assert.That(extinguished, Is.True);
+            var after = model.Snapshot(6d);
+            Assert.That(after.hp, Is.EqualTo(before.hp));
+            Assert.That(after.paintCoverage, Is.EqualTo(before.paintCoverage));
+            Assert.That(after.JigwiFor(0).targets.Count(target => target.extinguished), Is.EqualTo(1));
         }
 
         [Test]
@@ -363,7 +459,7 @@ namespace C6Lab.Tests
             snapshot.orbs.Any(orb => orb.owner == player && orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd)
             || snapshot.SwipeBlockOn(player) || snapshot.FlashWarningOn(at) || snapshot.ComboWarningOn(at) || snapshot.comboActive
             || (snapshot.flashLastAt >= 0d && at < snapshot.flashLastAt + 9d
-                && (snapshot.flashLastTarget == 0 || snapshot.flashLastTarget == player))
+                && (snapshot.flashLastTargetAll || snapshot.flashLastTarget == player))
             || snapshot.players.Any(state => state.id == player && (state.comboPenaltyUntil > at || state.comboRewardUntil > at));
 
         private static int GourdBombs(LabSnapshot snapshot) =>
@@ -393,7 +489,7 @@ namespace C6Lab.Tests
         {
             var snapshot = new LabSnapshot
             {
-                phase = LabPhase.Playing, flashCount = 1, flashLastAt = 30d, flashLastTarget = 0
+                phase = LabPhase.Playing, flashCount = 1, flashLastAt = 30d, flashLastTarget = 0, flashLastTargetAll = true
             };
             Assert.That(LabYaguangFlash.GlareAmount(snapshot, 29.9d, 10, 3f, 1.5f), Is.Zero);
             Assert.That(LabYaguangFlash.GlareAmount(snapshot, 30d, 10, 3f, 1.5f), Is.EqualTo(1f));

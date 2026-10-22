@@ -193,16 +193,17 @@ namespace C6Lab
         // 5654: #251 the yokai's sabotage mix announces each sabotage it casts, and fox fire adds the FoxFire orb
         //       kind with its foxFire drop and fox touch messages, and the charm travels in the snapshot and board
         //       header with charmTap wake-ups from the players beside and a charmWoken notice; DEV 166-177, 178 shared values.
-        // 5655: #272 per-player Jigwi fire targets, overheat consumption and generated Raw burn metadata; DEV 178-183.
-        // 5656: #268 merged after #272; the yaguang-gwi's flash settings move to DEV 184-190; 191 shared values.
-        // 5657: #271 the combo's yaguang counting look toggle (DEV 191); 192 shared values.
-        internal const ushort LabProtocolVersion = 5657;
+        // 5655: #272 per-player Jigwi fire targets and independent Raw burn metadata, DEV 178-183.
+        // 5657: #268 flash settings appended after Jigwi (DEV 184-190), explicit ALL target flags;
+        //       shared schema 191. 5656 is reserved by the parallel #271 branch.
+        // 5658: #271 counting presentation appended at DEV 191 (192 values); fast combo control metadata.
+        internal const ushort LabProtocolVersion = 5658;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/17");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/19");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -2240,7 +2241,8 @@ namespace C6Lab
             catch (Exception) { return; }
             if (snapshot == null || snapshot.sessionId != packet.sessionId
                 || snapshot.players == null || snapshot.players.Length != targetParticipantCount
-                || !LabJigwiNetworkValidation.Valid(snapshot.jigwi)) return;
+                || !LabJigwiNetworkValidation.Valid(snapshot.jigwi)
+                || !LabFlashNetworkValidation.Valid(snapshot)) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
             if (!PaintReceiver.Matches(snapshot))
             {
