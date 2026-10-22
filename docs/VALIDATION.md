@@ -2319,3 +2319,27 @@ Mac 두 앱의 승리는 실제 Host CPU 도색 표면을100% 채우는 **명시
 | 실제 Mac 다중 앱·iOS·실기기·LAN/핫스팟·모바일 성능 | NOT_RUN | 이번 PR274에 대해 별도 수행하지 않음. PR270의 실제 두 앱 결과는 당시191개 버전 기록이며 승계하지 않는다. |
 
 기존 Desktop 프로젝트와 사용자의 열린 Unity Scene은 변경하지 않았다. 원시XML/로그·빌드 산출물은 커밋하지 않는다. 새3스테이지 흐름은 이 PR에 포함하지 않는다.
+
+## #276 — Lab을 보존한 3요괴 게임 통합 — 2026-10-22
+
+main `f861a3d2`(검증 후 병합한 #270/#274)와 #262 Draft 이력을 통합했다. 새 게임은 구미호→야광귀→지귀 고정 순서로 공통 Battle을 재사용한다. 공유 설정196개·protocol5659·Lab token20/Game token2. 원래 Lab은 `None` 정책이며 기존 단판 흐름을 유지한다.
+
+| 검사 | 결과 | 실제 범위·근거 |
+| --- | --- | --- |
+| Unity API 에셋 갱신 | PASS | 별도 Battle/Home/Lobby/StageResult/GameOver,196행·4범위 DEV, StageCatalog/Definition·구미호 장식 Prefab 저장. 원본 Lab Scene/Config·제품 설정은 변경하지 않음. |
+| 전체 EditMode | 보완 후 PASS967/967 | 약25.8초. 초기3건의 무작위 GUID 비교 오류는 ID를 제외한 전체 상태/개수/이벤트 순서 비교로 보완했다. 이후 FBX 카메라 제거 검사를 추가하고 URP 의존 순서를 보완한 최종 전체 재실행 결과다. 공통 패턴·3요괴 제한·큰 Tick/분할 Tick·지귀 자동/만료·설정/ACK·저장 연결 포함. |
+| 전체 PlayMode | PASS330/330 | 약141.0초, 실패·생략0. 기존 Lab 전체 회귀 + 별도3스테이지/DEV 원자 적용·고유 OFF 유지/외형 복원 검사 포함. |
+| Mac Development 진단 빌드 | PASS | `GameBuild.Mac`, Home 첫 진입·새5Scene. 임시 제어 코드는 빌드 후 소스/메타 제거. |
+| 실제 Mac2앱 UDP loopback | PASS 양쪽 | Host13.998초/Client13.830초·종료0. HostP2/ClientP1,196개 설정을 공유하고3개의 별도 Battle 인스턴스/결과/완성 맵·관람 ACK·정상Home·새방재입장·중도이탈→전원GameOver→Home 확인. 각 단계의 자동 FoxFire/Flash/Jigwi Fire를 양쪽 실제Snapshot에서 확인했다. |
+| iOS 내보내기·실기기·실제 LAN/핫스팟·3~5인·모바일 성능 | NOT_RUN | 기존 전송 계층 재사용을 이번 환경 검증으로 승계하지 않는다. |
+| Desktop 사용자 파일 보존 | PASS | 시작/종료 HEAD·브랜치·status와 미추적파일 해시가 동일. 원래 열린 Unity는 전환/저장하지 않았다. |
+
+두 앱 검사의 **명시적 fixture**: 고유 자동 패턴을 빨리 보기 위해 Host의 해당 간격을1초로 조정했고 공통 폭탄/막기는 이 스모크에서만 DEV로 껐다. 공통 패턴의 전 스테이지 유지는 별도 모델·Scene 검사로 확인한다. 승리는 실제 Host CPU 도색 표면을100% 채워 유도했다. 게임 진행 상태·결과·peer ACK를 만들어내지는 않았으며, 실제 구슬 조작/투척 명중·물리 망 호환성을 이 스모크 PASS로 기록하지 않는다. 원시 로그/XML·진단 코드/이미지·빌드 산출물은 커밋하지 않는다.
+
+#275는2인·Host자유 P번호·Direct IP·일반 Development 솔로 진입을 제한하여 병합 보류 의견을 기록했다. 해당 로비/대기방 구조는 이번 통합에 포함하지 않는다. #269는 기존 Draft의 이력을 보존해 #276으로 계승하며 구형 동일 패턴3단계를 별도로 main에 병합하지 않는다.
+
+### 최종 렌더 안전 보완
+
+최초 Mac 캡처에서 구미호 FBX의 Camera/Light가 전투 카메라 위에 렌더링하는 문제를 발견했다. 별도 장식 wrapper 내부만 unpack하고 URP AdditionalCameraData/AdditionalLightData부터 Camera/Light/AudioListener 순으로 제거했다. 런타임 외부 모델에도 즉시 비활성·의존 순서 제거를 적용한다. 원본 FBX/importer·박 메시/충돌체·카메라 배치는 바꾸지 않았다. 저장 wrapper 검사와 실제 URP 데이터를 넣은 런타임 회귀를 추가했다. 지귀 DEV는 Game1/2에서 숨기고 Game3에서만 표시하며 단일 Lab은 기존 표시를 유지한다.
+
+최종 전체967/330 검사는 위 수정이 포함된 소스에서 수행했다. 동일 소스로 다시 만든 Mac 앱 두 개가 각 자동 고유 패턴(FoxFire/Flash/Jigwi Fire)을 양쪽Snapshot에서 확인하고 세 단계를 완료했다. 최종390×844 캡처에서 기존 전투 구도·1/3 및3/3 이름·지귀 DEV 표시 경계를 확인했다. 양쪽 로그의 Exception/Fatal/의존 제거 실패 표식0. 원시 캡처·진단 빌드는 로컬에만 보관한다.

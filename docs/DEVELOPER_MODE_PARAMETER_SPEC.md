@@ -1,6 +1,6 @@
 # C6 Physics Lab 개발자 모드 조정값 명세
 
-> **현행 설정 기준 (#246 정리·#251 방해공작12개·#272 지귀6개·#268 야광귀 섬광 7개·#271 야광귀 셈법 1개 추가):** Unity 6000.6.5f1, `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig.DeveloperFields`에 연결된 공유 설정은 **196개**, 프로토콜은 **5659**, 연결 토큰은 `C6PhysicsLab/20`다. 사용하지 않는 고정 승리 목표 행과 옛 셀별 Flow 조절 4개를 제거했다. 100% 도색 승리 규칙·현재 4종 패턴·LEGACY 초기 Style/Raggedness·근처 명중 건조·개인 조합판 구조는 유지한다. 아래 인덱스는 정리 후 기준이며 옛 설정 배열과 혼합하지 않는다. 실행 결과는 [VALIDATION](VALIDATION.md)의 #246 기록에서 확인한다.
+> **현행 설정 기준 (#246 정리·#251 방해공작12개·#272 지귀6개·#268 야광귀 섬광 7개·#271 야광귀 셈법1개·#276 지귀 자동4개 추가):** Unity 6000.6.5f1, `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig.DeveloperFields`에 연결된 공유 설정은 **196개**, 프로토콜은 **5659**, 연결 토큰은 `C6PhysicsLab/20`다. 사용하지 않는 고정 승리 목표 행과 옛 셀별 Flow 조절 4개를 제거했다. 100% 도색 승리 규칙·현재 4종 패턴·LEGACY 초기 Style/Raggedness·근처 명중 건조·개인 조합판 구조는 유지한다. 아래 인덱스는 정리 후 기준이며 옛 설정 배열과 혼합하지 않는다. 실행 결과는 [VALIDATION](VALIDATION.md)의 #246 기록에서 확인한다.
 
 이 문서는 현재 Lab의 DEV에 연결된 값의 기본값·입력 범위·적용 경계·코드 연결을 설명한다. 원본 Inspector와 DEV 입력, 실행 증거는 구분한다.
 
