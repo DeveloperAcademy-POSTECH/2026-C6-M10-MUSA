@@ -35,14 +35,33 @@ namespace C6Lab.Tests
             return model;
         }
 
+        // Independently started models allocate fresh GUIDs and snapshots sort by those GUIDs.
+        // Compare every gameplay field and its multiplicity, not unrelated entity identities/order.
+        private static LabOrbState[] OrbsWithoutRandomIds(LabOrbState[] orbs) => orbs.Select(orb =>
+        {
+            var copy = orb.Copy();
+            copy.id = string.Empty;
+            return copy;
+        }).OrderBy(orb => JsonUtility.ToJson(orb), StringComparer.Ordinal).ToArray();
+
+        private static string[] OrbValues(LabOrbState[] orbs) => OrbsWithoutRandomIds(orbs)
+            .Select(orb => JsonUtility.ToJson(orb)).ToArray();
+
+        private static string SnapshotValues(LabSnapshot snapshot)
+        {
+            snapshot.orbs = OrbsWithoutRandomIds(snapshot.orbs);
+            snapshot.drums = OrbsWithoutRandomIds(snapshot.drums);
+            return JsonUtility.ToJson(snapshot);
+        }
+
         [Test]
         public void ExplicitNoneMatchesTheExistingLabEntryPointEvenWhenAutoJigwiWeightsAreEnabled()
         {
             var implicitNone = new LabModel();
             implicitNone.Begin("same-lab", new ulong[] { 0, 20, 30 }, 0d, config);
             var explicitNone = Room("same-lab", LabStageYokai.None);
-            Assert.That(JsonUtility.ToJson(explicitNone.Snapshot(90d)),
-                Is.EqualTo(JsonUtility.ToJson(implicitNone.Snapshot(90d))));
+            Assert.That(SnapshotValues(explicitNone.Snapshot(90d)),
+                Is.EqualTo(SnapshotValues(implicitNone.Snapshot(90d))));
             Assert.That(explicitNone.StageYokai, Is.EqualTo(LabStageYokai.None));
             Assert.That(explicitNone.Snapshot(90d).jigwi, Is.Empty);
         }
@@ -111,8 +130,8 @@ namespace C6Lab.Tests
             late.Tick(90d);
             Assert.That(late.DrainSabotages().Select(cast => (cast.Kind, cast.Target, cast.At)),
                 Is.EqualTo(stepped.DrainSabotages().Select(cast => (cast.Kind, cast.Target, cast.At))));
-            Assert.That(late.Snapshot(90d).orbs.Select(orb => (orb.id, orb.owner, orb.kind, orb.createdAt)),
-                Is.EqualTo(stepped.Snapshot(90d).orbs.Select(orb => (orb.id, orb.owner, orb.kind, orb.createdAt))));
+            Assert.That(OrbValues(late.Snapshot(90d).orbs),
+                Is.EqualTo(OrbValues(stepped.Snapshot(90d).orbs)));
         }
 
         [Test]
@@ -147,8 +166,7 @@ namespace C6Lab.Tests
                 Is.EqualTo((expected.flashCount, expected.flashLastAt, expected.flashAt)));
             Assert.That((actual.comboCount, actual.comboStartedAt, actual.comboNextAt),
                 Is.EqualTo((expected.comboCount, expected.comboStartedAt, expected.comboNextAt)));
-            Assert.That(actual.orbs.Select(orb => (orb.id, orb.owner, orb.createdAt)),
-                Is.EqualTo(expected.orbs.Select(orb => (orb.id, orb.owner, orb.createdAt))));
+            Assert.That(OrbValues(actual.orbs), Is.EqualTo(OrbValues(expected.orbs)));
         }
 
         [Test]
@@ -171,7 +189,7 @@ namespace C6Lab.Tests
                 "Expired supplies cannot fill the 64 cap and permanently stall a late Tick.");
             Assert.That(actual.JigwiFor(0).fireId, Does.EndWith("/50"));
             Assert.That(JsonUtility.ToJson(actual.JigwiFor(0)), Is.EqualTo(JsonUtility.ToJson(expected.JigwiFor(0))));
-            Assert.That(actual.orbs.Select(orb => (orb.id, orb.expiresAt)), Is.EqualTo(expected.orbs.Select(orb => (orb.id, orb.expiresAt))));
+            Assert.That(OrbValues(actual.orbs), Is.EqualTo(OrbValues(expected.orbs)));
             Assert.That(actual.players[0].stamina, Is.EqualTo(config.StaminaStart));
             Assert.That(actual.players[0].generatedTotal, Is.Zero);
             Assert.That(actual.comboCount, Is.Zero);
