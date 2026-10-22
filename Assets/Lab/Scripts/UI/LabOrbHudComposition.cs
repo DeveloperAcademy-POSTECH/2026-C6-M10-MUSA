@@ -112,8 +112,10 @@ namespace C6Lab
                 throw new InvalidOperationException("The input camera must see the orb-board foreground layer.");
             for (int i = 0; i < parent.childCount; i++) originalSiblings.Add(parent.GetChild(i));
             RememberRear(paper);
-            Transform backdrop = source.transform.Find("Temporary Board Background");
-            if (backdrop != null) RememberRear(backdrop);
+            // Everything the board camera carries is a backdrop behind the board, whatever its name: the old
+            // temporary background and the Stage1 3D background's opaque "Board Hanji Backing" (#264). Left in
+            // the foreground it would cover the paper and the rear HUD decorations.
+            foreach (Transform backdrop in source.transform) RememberRear(backdrop);
             captured = true;
 
             material = new Material(shader) { name = "Orb HUD foreground composite", hideFlags = HideFlags.HideAndDontSave };
@@ -152,9 +154,10 @@ namespace C6Lab
 
         private void ResizeTarget()
         {
-            Rect rect = source.pixelRect;
-            int width = Mathf.Max(1, Mathf.RoundToInt(rect.width));
-            int height = Mathf.Max(1, Mathf.RoundToInt(rect.height));
+            // The pixels the camera really renders. Rounding the fractional pixelRect size can be one short when
+            // both viewport edges round outward (0.8 x 1284 = 1027.2, but the camera draws 1028), which stretches it.
+            int width = Mathf.Max(1, source.pixelWidth);
+            int height = Mathf.Max(1, source.pixelHeight);
             if (texture != null && texture.width == width && texture.height == height)
             {
                 if (!texture.IsCreated()) throw new InvalidOperationException("The orb foreground render target was lost.");

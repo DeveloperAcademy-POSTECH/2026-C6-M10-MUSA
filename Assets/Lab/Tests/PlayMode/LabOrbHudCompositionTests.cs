@@ -289,7 +289,8 @@ namespace C6Lab.Tests
             camera.rect = new Rect(0f, 0f, 1f, .4771167f);
             camera.cullingMask = 1 << boardObject.layer;
             hud.orbCamera = camera;
-            backdrop = new GameObject("Temporary Board Background", typeof(SpriteRenderer)).transform;
+            // The saved Lab and Battle Scenes name the camera's opaque backing this way (#264), not by the old name.
+            backdrop = new GameObject("Board Hanji Backing", typeof(SpriteRenderer)).transform;
             backdrop.SetParent(camera.transform, false); backdrop.gameObject.layer = boardObject.layer;
             var battleCamera = new GameObject("BattleCamera"); battleCamera.transform.SetParent(root.transform, false);
             hud.battleCamera = battleCamera.AddComponent<Camera>();
