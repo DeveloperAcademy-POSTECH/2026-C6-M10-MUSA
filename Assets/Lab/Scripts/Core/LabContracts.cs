@@ -111,6 +111,8 @@ namespace C6Lab
         public double expiresAt = -1d;
         public bool jigwiSupply;
         public bool jigwiGenerationBurn;
+        /// <summary>2:2 fever (#281): made during a team fever or turned by one; every board rings it with a rainbow.</summary>
+        public bool fever;
 
         /// <summary>An unlock older than this, for example seen after a reconnect, shows the item already open.</summary>
         public const double UnlockEffectWindowSeconds = 1d;

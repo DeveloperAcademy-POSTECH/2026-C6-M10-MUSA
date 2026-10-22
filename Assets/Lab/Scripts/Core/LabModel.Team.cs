@@ -101,6 +101,7 @@ namespace C6Lab
                 if (!orb.kind.IsRaw() && !(orb.kind == LabOrbKind.Combined && orb.element != element)) continue;
                 orb.kind = LabOrbKind.Combined;
                 orb.element = element;
+                orb.fever = true;
                 orb.revision = ++revision;
             }
         }
@@ -112,6 +113,7 @@ namespace C6Lab
             if (!orb.kind.IsRaw() || !FeverActive(team, now)) return;
             orb.kind = LabOrbKind.Combined;
             orb.element = LabTeams.ElementOf(team);
+            orb.fever = true;
         }
 
         private void RefreshTeamCounts()

@@ -103,6 +103,10 @@ namespace C6Lab.Tests
             Assert.That(red.fillOrigin, Is.EqualTo((int)Image.OriginHorizontal.Right));
             Assert.That(blue.fillAmount, Is.EqualTo(.25f).Within(.001f));
             Assert.That(red.fillAmount, Is.EqualTo(.5f).Within(.001f));
+            // The flags stand on each team's edge: Blue a quarter in from the left, Red half in from the right.
+            Assert.That(bar.BlueFlagAt, Is.EqualTo((3f + .25f * 330f) / 336f).Within(.001f));
+            Assert.That(bar.RedFlagAt, Is.EqualTo(1f - (3f + .5f * 330f) / 336f).Within(.001f));
+            Assert.That(bar.BlueFlagAt, Is.LessThan(bar.RedFlagAt));
             Assert.That(bar.transform.Find("Blue Flag/Cloth/Label").GetComponent<Text>().text, Is.EqualTo("청"));
             Assert.That(bar.transform.Find("Red Flag/Cloth/Label").GetComponent<Text>().text, Is.EqualTo("홍"));
             Assert.That(bar.LocalRing, Is.Not.Null);
@@ -114,6 +118,115 @@ namespace C6Lab.Tests
             bar.Hide();
             Assert.That(bar.Visible, Is.False);
             Assert.That(bar.LocalRing.gameObject.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void FeverGaugesCountHitsThenTheFeverTimeAndTheResultShowsFinalNumbers()
+        {
+            RectTransform battle = Battle();
+            LabTeamBar bar = LabTeamBar.Create(battle, null);
+            var snapshot = new LabSnapshot
+            {
+                teamTerritory = true, phase = LabPhase.Playing, serverTime = 20d, paintCellCount = 1000,
+                blueCells = 300, redCells = 200, blueFeverHits = 6, redFeverStartedAt = 16d, redFeverUntil = 24d
+            };
+            bar.Present(snapshot, LabTeam.Blue, null, 15);
+            Assert.That(bar.GaugesShown, Is.True);
+            Assert.That(bar.BlueGauge, Is.EqualTo(6f / 15f).Within(.001f));
+            Assert.That(bar.BlueGaugeText, Is.EqualTo("피버 6/15"));
+            Assert.That(bar.RedGauge, Is.EqualTo(.5f).Within(.001f), "During a fever the gauge runs down its time.");
+            Assert.That(bar.RedGaugeText, Is.EqualTo("피버! 4초"));
+            Assert.That(bar.NumbersText, Is.Empty, "The battle bar shows no numbers.");
+            bar.Present(snapshot, LabTeam.Blue, null, 0);
+            Assert.That(bar.GaugesShown, Is.False, "No fever setting, no gauges.");
+
+            snapshot.phase = LabPhase.Victory;
+            bar.ShowFinal(snapshot, Color.white);
+            Assert.That(bar.BlueShare, Is.EqualTo(.3f).Within(.001f), "The result fills at once, without easing.");
+            Assert.That(bar.RedShare, Is.EqualTo(.2f).Within(.001f));
+            Assert.That(bar.NumbersText, Is.EqualTo("청 30.0% / 빈 칸 50.0% / 홍 20.0%"));
+            Assert.That(bar.BlueFlagAt, Is.EqualTo((3f + .3f * 330f) / 336f).Within(.001f), "The result flags stand at the final edges.");
+            Assert.That(bar.GaugesShown, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator OnlyMyTeamsFeverIsAnnouncedOnceWithTheSameWordsAndGlowsAtTheEdges()
+        {
+            foreach (LabTeam mine in new[] { LabTeam.Blue, LabTeam.Red })
+            {
+                LabTeamFever fever = LabTeamFever.Create(Battle(), null);
+                var snapshot = new LabSnapshot { teamTerritory = true, phase = LabPhase.Playing, serverTime = 10.2d };
+                LabTeam other = mine == LabTeam.Blue ? LabTeam.Red : LabTeam.Blue;
+                SetFever(snapshot, other, 10d, 18d);
+                fever.Present(snapshot, mine);
+                Assert.That(fever.BannerShown, Is.False, "The other team's fever shows only on its gauge.");
+                Assert.That(fever.GlowAlpha, Is.Zero);
+
+                SetFever(snapshot, mine, 10.1d, 18.1d);
+                fever.Present(snapshot, mine);
+                Assert.That(fever.BannerShown, Is.True);
+                Assert.That(fever.BannerText, Is.EqualTo("피버타임!"), "The same words for Blue and Red.");
+                Assert.That(fever.SubtitleText, Is.EqualTo("마구 던져버리자!!"));
+                Assert.That(fever.GlowAlpha, Is.GreaterThanOrEqualTo(.45f), "A clear edge colour, not a faint one.");
+                Color team = mine == LabTeam.Blue ? LabTeamBar.Blue : LabTeamBar.Red;
+                Assert.That(fever.GlowColor.r, Is.EqualTo(team.r).Within(.001f));
+                Assert.That(fever.GlowColor.b, Is.EqualTo(team.b).Within(.001f));
+
+                for (float waited = 0f; waited < 1.8f; waited += Time.unscaledDeltaTime)
+                {
+                    fever.Present(snapshot, mine);
+                    yield return null;
+                }
+                Assert.That(fever.BannerShown, Is.False, "The banner fades away after its moment.");
+                fever.Present(snapshot, mine);
+                Assert.That(fever.BannerShown, Is.False, "The same fever is never announced twice.");
+
+                snapshot.serverTime = 30d;
+                SetFever(snapshot, mine, 12d, 20d);
+                for (float waited = 0f; waited < .7f; waited += Time.unscaledDeltaTime)
+                {
+                    fever.Present(snapshot, mine);
+                    yield return null;
+                }
+                Assert.That(fever.BannerShown, Is.False, "A fever seen long after it began is not announced.");
+                Assert.That(fever.GlowAlpha, Is.Zero, "The edges calm down when the fever ends.");
+                Object.Destroy(fever.gameObject);
+            }
+        }
+
+        private static void SetFever(LabSnapshot snapshot, LabTeam team, double startedAt, double until)
+        {
+            if (team == LabTeam.Blue) { snapshot.blueFeverStartedAt = startedAt; snapshot.blueFeverUntil = until; }
+            else { snapshot.redFeverStartedAt = startedAt; snapshot.redFeverUntil = until; }
+        }
+
+        [UnityTest]
+        public IEnumerator AFeverOrbWearsARainbowAndATurnedOrbSwellsAsItChanges()
+        {
+            LabOrbView yin = board.UpsertOrb("turned", LabOrbKind.Yin, new Vector2(.5f, .5f));
+            Assert.That(yin.FeverShown, Is.False);
+            yield return null;
+            LabOrbView turned = board.UpsertOrb("turned", LabOrbKind.Combined, new Vector2(.5f, .5f),
+                element: LabOrbElement.Water, fever: true);
+            Assert.That(turned.Kind, Is.EqualTo(LabOrbKind.Combined));
+            Assert.That(turned.FeverShown, Is.True);
+            if (turned.Visual != null) Assert.That(turned.Visual.localScale.x, Is.GreaterThan(1f), "It swells, then settles.");
+            yield return new WaitForSeconds(.6f);
+            if (turned.Visual != null) Assert.That(turned.Visual.localScale.x, Is.EqualTo(1f).Within(.001f));
+
+            LabOrbView plain = board.UpsertOrb("plain", LabOrbKind.Combined, new Vector2(.3f, .3f), element: LabOrbElement.Fire);
+            Assert.That(plain.FeverShown, Is.False, "An ordinary combined orb has no rainbow.");
+            board.UpsertOrb("turned", LabOrbKind.Combined, new Vector2(.5f, .5f), element: LabOrbElement.Water, fever: false);
+            Assert.That(turned.FeverShown, Is.False);
+        }
+
+        private RectTransform Battle()
+        {
+            var canvasObject = new GameObject("Canvas", typeof(Canvas));
+            canvasObject.transform.SetParent(root.transform, false);
+            var battle = new GameObject("FigmaBattleUi", typeof(RectTransform));
+            battle.transform.SetParent(canvasObject.transform, false);
+            return (RectTransform)battle.transform;
         }
     }
 }

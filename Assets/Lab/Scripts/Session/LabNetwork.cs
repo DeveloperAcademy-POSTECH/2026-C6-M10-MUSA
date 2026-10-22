@@ -1921,8 +1921,9 @@ namespace C6Lab
                 if (orb.owner != LocalPlayerId || orb.inFlight) continue;
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
+                // A fever (#281) generates team orbs that are already combined; they still pop out of the drum.
                 bool showSpawn = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
-                    && orb.kind != LabOrbKind.Combined;
+                    && (orb.kind != LabOrbKind.Combined || orb.fever);
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
@@ -1936,7 +1937,7 @@ namespace C6Lab
                     // The white flash before an orb runs out (#235); a locked bomb shows its own red one.
                     lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
-                    jigwiScale: orb.jigwiRadiusScale);
+                    jigwiScale: orb.jigwiRadiusScale, fever: orb.fever);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {

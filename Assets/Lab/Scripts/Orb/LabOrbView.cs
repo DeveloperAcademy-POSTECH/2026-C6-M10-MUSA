@@ -25,6 +25,7 @@ namespace C6Lab
         private GameObject contactShadow;
         private LabOrbItemMarker itemMarker;
         private LabOrbBurn burn;
+        private LabOrbRainbow rainbow;
         private SpriteRenderer expiryFlash;
         private SpriteRenderer expiryHalo;
         // 야광귀 섬광 (#268): 눈부신 동안 그림 위에 덮는 하얀 원. 북에는 쓰지 않는다.
@@ -386,6 +387,19 @@ namespace C6Lab
             sprite.hideFlags = HideFlags.DontSave;
             return sprite;
         }
+
+        /// <summary>2:2 fever (#281): a rainbow ring around an orb a team fever made or turned.</summary>
+        public void SetFever(bool shown)
+        {
+            if (rainbow == null)
+            {
+                if (!shown) return;
+                rainbow = LabOrbRainbow.Create(transform);
+            }
+            rainbow.Show(shown, visualRadius);
+        }
+
+        public bool FeverShown => rainbow != null && rainbow.Visible;
 
         /// <summary>Seconds the Host says this orb still burns after a blast flung it (#213); 0 or less lets the fire die.</summary>
         public void SetBurn(float secondsLeft)

@@ -335,11 +335,11 @@ namespace C6Lab.Tests
         public void AutoJigwiSettingsAppendFourRowsAndValidateTheWholeSharedFormAtomically()
         {
             var defaults = ScriptableObject.CreateInstance<LabConfig>();
-            try { Assert.That(defaults.CaptureDeveloperValues().Skip(192), Is.EqualTo(new[] { 20f, 30f, 1f, 1f })); }
+            try { Assert.That(defaults.CaptureDeveloperValues().Skip(192).Take(4), Is.EqualTo(new[] { 20f, 30f, 1f, 1f })); }
             finally { Object.DestroyImmediate(defaults); }
             var baseline = config.CaptureDeveloperValues();
             Assert.That(baseline.Length, Is.EqualTo(200));
-            Assert.That(baseline.Skip(192), Is.EqualTo(new[] { 4f, 4f, 1f, 1f }));
+            Assert.That(baseline.Skip(192).Take(4), Is.EqualTo(new[] { 4f, 4f, 1f, 1f }));
             baseline[192] = 20f; baseline[193] = 30f;
             Apply(baseline);
             var invalid = (float[])baseline.Clone();

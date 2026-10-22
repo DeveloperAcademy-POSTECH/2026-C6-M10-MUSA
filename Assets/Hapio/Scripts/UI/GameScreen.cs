@@ -30,6 +30,9 @@ namespace Hapio
         public int DeveloperScope { get; private set; }
 
         private GameSession session;
+        // 2:2 (#281) result page: the final Blue/Red bar and the saved title colour for a draw.
+        private LabTeamBar resultBar;
+        private Color? resultTitleColor;
         private string[] roomKeys = Array.Empty<string>();
         private bool syncingDeveloper;
         private string localError;
@@ -210,20 +213,36 @@ namespace Hapio
             LabTeam winner = result != null ? result.teamWinner : LabTeam.None;
             Text(title, result == null ? "결과를 정리하고 있소" : winner == LabTeam.Blue ? "청팀 승리!"
                 : winner == LabTeam.Red ? "홍팀 승리!" : "무승부");
+            if (title != null)
+            {
+                if (resultTitleColor == null) resultTitleColor = title.color;
+                title.color = winner == LabTeam.Blue ? LabTeamBar.Blue : winner == LabTeam.Red ? LabTeamBar.Red
+                    : resultTitleColor.Value;
+            }
             int cells = result != null ? Math.Max(1, result.paintCellCount) : 1;
-            Text(status, result == null ? string.Empty
-                : "청 " + Percent(result.blueCells, cells) + "   ·   홍 " + Percent(result.redCells, cells)
-                    + "   ·   빈 칸 " + Percent(Math.Max(0, cells - result.blueCells - result.redCells), cells));
+            // The same Blue/Red bar as the battle, filled with the final shares and their numbers.
+            if (result != null && status != null)
+            {
+                if (resultBar == null)
+                    resultBar = LabTeamBar.Create((RectTransform)status.transform.parent, title != null ? title.font : null,
+                        new Vector2(.5f, .83f));
+                resultBar.ShowFinal(result, status.color);
+            }
+            Text(status, string.Empty);
             var text = new StringBuilder();
             if (result != null && result.players != null)
-                foreach (LabPlayerState player in result.players)
-                    if (player != null)
-                        text.Append("P").Append(player.seat + 1)
-                            .Append(LabTeams.TeamOfSeat(player.seat) == LabTeam.Red ? " 홍" : " 청")
-                            .Append("   칠한 넓이 ").Append(Percent(player.paintedCells, cells))
-                            .Append("  ·  빼앗은 넓이 ").Append(Percent(player.stolenCells, cells)).Append('\n');
+                foreach (LabTeam team in new[] { LabTeam.Blue, LabTeam.Red })
+                {
+                    text.Append(team == LabTeam.Blue ? "청팀" : "홍팀").Append(team == winner ? " · 승리" : string.Empty).Append('\n');
+                    foreach (LabPlayerState player in result.players)
+                        if (player != null && LabTeams.TeamOfSeat(player.seat) == team)
+                            text.Append("   P").Append(player.seat + 1)
+                                .Append("   칠한 넓이 ").Append(Percent(player.paintedCells, cells))
+                                .Append("  ·  빼앗은 넓이 ").Append(Percent(player.stolenCells, cells)).Append('\n');
+                    text.Append('\n');
+                }
             bool solo = net.IsDeveloperSolo;
-            text.Append('\n').Append(solo ? "혼자 확인을 마쳤소. HOME으로 돌아가시오."
+            text.Append(solo ? "혼자 확인을 마쳤소. HOME으로 돌아가시오."
                 : net.IsHost ? (session.CanAdvanceStage ? "모두 준비되면 로비로 돌아가시오." : "모두가 결과를 받기를 기다리고 있소…")
                 : "방장이 로비로 돌아가기를 기다리시오.");
             if (!string.IsNullOrEmpty(session.UiNotice)) text.Append("\n\n").Append(session.UiNotice);
@@ -238,6 +257,8 @@ namespace Hapio
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
+            // The finished gourd viewer covers the whole result; the bar belongs to the result page only.
+            if (resultBar != null) Show(resultBar.gameObject, result != null && !(session.IsViewerOpen && texture != null));
         }
 
         private static string Percent(int count, int cells) =>

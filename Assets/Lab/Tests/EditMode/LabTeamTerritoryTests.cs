@@ -51,8 +51,9 @@ namespace C6Lab.Tests
 
         private static int SeatOf(ulong id) => Array.IndexOf(Ids, id);
 
-        private static ulong DrumHolder(LabModel model, LabTeam team) => model.Snapshot(0d).drums
-            .Single(drum => LabTeams.TeamOfSeat(SeatOf(drum.owner)) == team).owner;
+        // Reads the ledger without a snapshot, so it never asks the model to go back in time.
+        private static ulong DrumHolder(LabModel model, LabTeam team) => Ids.Single(id =>
+            LabTeams.TeamOfSeat(SeatOf(id)) == team && model.CopyOwnedStates(id).Any(state => state.kind.IsDrum()));
 
         private LabOrbState Generate(LabModel model, ulong owner, double at, LabOrbKind? kind = null)
         {
@@ -283,6 +284,8 @@ namespace C6Lab.Tests
             LabOrbState converted = fever.orbs.Single(orb => orb.id == waiting.id);
             Assert.That(converted.kind, Is.EqualTo(LabOrbKind.Combined));
             Assert.That(converted.element, Is.EqualTo(LabOrbElement.Water));
+            Assert.That(converted.fever, Is.True, "Every board rings a turned orb with a rainbow.");
+            Assert.That(fever.orbs.Single(orb => orb.id == redRaw.id).fever, Is.False);
             Assert.That(fever.orbs.Single(orb => orb.id == redRaw.id).kind.IsRaw(), Is.True, "The other team is untouched.");
 
             for (int i = 0; i < 4; i++)
@@ -290,11 +293,14 @@ namespace C6Lab.Tests
                 Assert.That(model.TryGenerate(blue, "fever-" + i, 3d, out var made, out _), Is.True);
                 Assert.That(made.kind, Is.EqualTo(LabOrbKind.Combined));
                 Assert.That(made.element, Is.EqualTo(LabOrbElement.Water));
+                Assert.That(made.fever, Is.True);
             }
             Assert.That(model.TryLaunch(blue, waiting.id, "fever-throw", 3d, out _, out string reason), Is.True, reason);
 
             Assert.That(model.Snapshot(10d).FeverOn(LabTeam.Blue), Is.False);
-            Assert.That(Generate(model, blue, 10.5d).kind.IsRaw(), Is.True, "Generation is ordinary after the fever.");
+            LabOrbState after = Generate(model, blue, 10.5d);
+            Assert.That(after.kind.IsRaw(), Is.True, "Generation is ordinary after the fever.");
+            Assert.That(after.fever, Is.False);
         }
 
         [Test]
@@ -352,11 +358,28 @@ namespace C6Lab.Tests
             LabSnapshot copy = LabBoardReplica.CopySnapshot(source);
             Assert.That(JsonUtility.ToJson(copy), Is.EqualTo(JsonUtility.ToJson(source)));
 
-            LabBoardFrame frame = new LabBoardPublisher().Build(source, Ids[0], 1, 1, true);
+            var publisher = new LabBoardPublisher();
+            LabBoardFrame frame = publisher.Build(source, Ids[0], 1, 1, true);
             Assert.That(frame.redFeverHits, Is.EqualTo(source.redFeverHits));
             Assert.That(frame.redFeverStartedAt, Is.EqualTo(1d));
             Assert.That(frame.redFeverUntil, Is.EqualTo(9d));
             Assert.That(frame.blueFeverUntil, Is.EqualTo(-1d));
+
+            // A fever turning an orb changes only its metadata; the owner's next delta must still carry it.
+            LabOrbState kept = Generate(model, DrumHolder(model, LabTeam.Blue), 2d);
+            ulong owner = kept.owner;
+            LabSnapshot before = model.Snapshot(2d);
+            publisher.Build(before, owner, 2, 2, true);
+            LabSnapshot turned = model.Snapshot(2d);
+            turned.orbs = turned.orbs.Select(orb =>
+            {
+                LabOrbState copy = orb.Copy();
+                if (copy.id == kept.id) copy.fever = true;
+                return copy;
+            }).ToArray();
+            LabBoardFrame delta = publisher.Build(turned, owner, 3, 3);
+            Assert.That(delta.checkpoint, Is.False);
+            Assert.That(delta.states.Any(state => state.id == kept.id && state.fever), Is.True);
         }
     }
 }

@@ -97,6 +97,8 @@ namespace Hapio.Editor
 
             // Development builds only: start alone on the Blue team to check overwriting and the ratio.
             view.teamSoloButton = Pill(panel, "TeamSolo", medium, "DEV · 혼자 2:2 확인", 126f, 562f, 150f, 34f, 13);
+            // Saved closed like the Direct IP panel; "새 방 만들기 +" opens it.
+            panel.gameObject.SetActive(false);
         }
 
         /// <summary>The Figma 2:2 seat screen: mode title, Blue and Red dashed boxes, VS and editable seat anchors.</summary>

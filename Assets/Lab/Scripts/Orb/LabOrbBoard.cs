@@ -166,6 +166,8 @@ namespace C6Lab
         private int blockedSide;
         private float blockSecondsLeft;
         private LabOrbEdgeBlock edgeBlock;
+        /// <summary>2:2 fever (#281): how much bigger a turned orb starts, and how long it takes to settle.</summary>
+        private const float FeverTurnScale = 1.45f, FeverTurnSeconds = .35f;
         // 2:2 (#281): the closed outer edge of this board for the whole battle.
         private int teamWallSide;
         private LabOrbTeamWall teamWall;
@@ -385,7 +387,7 @@ namespace C6Lab
             bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
             LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false,
-            float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f)
+            float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f, bool fever = false)
         {
             RequireConfigured();
             small &= !kind.IsDrum();
@@ -404,10 +406,13 @@ namespace C6Lab
                     || !Mathf.Approximately(existing.JigwiScale, jigwiScale))
                 {
                     bool shrinking = small && !existing.Small && existing.View.Kind == kind;
+                    // 2:2 fever (#281): a Yin or Yang the Host turned into a team orb swells and settles as it changes.
+                    bool feverTurned = existing.View.Kind.IsRaw() && kind == LabOrbKind.Combined;
                     existing.Small = small;
                     existing.JigwiScale = jigwiScale;
                     existing.View.Configure(id, kind, RadiusFor(kind, small, jigwiScale), element);
                     if (shrinking) existing.View.PlayShrink(1f / config.BlastShrinkScale, ShrinkSeconds);
+                    else if (feverTurned) existing.View.PlayShrink(FeverTurnScale, FeverTurnSeconds);
                     existing.View.Body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
@@ -417,6 +422,7 @@ namespace C6Lab
                 if (justUnlocked && unlockEffectIds.Add(id)) existing.View.PlayUnlockEffect();
                 existing.View.SetBurn(burnSeconds);
                 existing.View.SetLife(lifeSeconds);
+                existing.View.SetFever(fever);
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -437,6 +443,7 @@ namespace C6Lab
             if (justUnlocked && unlockEffectIds.Add(id)) view.PlayUnlockEffect();
             view.SetBurn(burnSeconds);
             view.SetLife(lifeSeconds);
+            view.SetFever(fever);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);

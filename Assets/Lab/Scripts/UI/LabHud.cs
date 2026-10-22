@@ -103,6 +103,7 @@ namespace C6Lab
         private UnityEngine.UI.Text goalTitle;
         private bool goalTitleResolved;
         private LabTeamBar teamBar;
+        private LabTeamFever teamFever;
 
         private void Awake()
         {
@@ -340,7 +341,10 @@ namespace C6Lab
         private static string ResultWords(LabSnapshot snapshot) => snapshot.teamTerritory && snapshot.phase == LabPhase.Victory
             ? LabTeamBar.ResultText(snapshot) : snapshot.phase == LabPhase.Victory ? "VICTORY" : "DEFEAT";
 
-        /// <summary>2:2 (#281): the Blue/Red share bar takes the paint bar's place and this player's badge wears the team ring.</summary>
+        /// <summary>
+        /// 2:2 (#281): the Blue/Red share bar takes the paint bar's place, this player's badge wears the team ring,
+        /// the fever gauges sit under the bar, and a fever is announced with a banner and my team's edge glow.
+        /// </summary>
         private void RefreshTeamHud(LabSnapshot snapshot, bool battleVisible)
         {
             bool territory = battleVisible && snapshot != null && snapshot.teamTerritory;
@@ -350,12 +354,20 @@ namespace C6Lab
             if (!territory)
             {
                 if (teamBar != null) teamBar.Hide();
+                if (teamFever != null) teamFever.Hide();
                 return;
             }
-            if (teamBar == null && battleUi != null)
-                teamBar = LabTeamBar.Create((RectTransform)battleUi.transform, hpText != null ? hpText.font : null);
-            if (teamBar != null) teamBar.Present(snapshot, LabTeams.TeamOf(snapshot, network.LocalPlayerId), localPlayerCircle);
+            if (battleUi == null) return;
+            Font font = hpText != null ? hpText.font : null;
+            if (teamBar == null) teamBar = LabTeamBar.Create((RectTransform)battleUi.transform, font);
+            if (teamFever == null) teamFever = LabTeamFever.Create((RectTransform)battleUi.transform, font);
+            LabTeam team = LabTeams.TeamOf(snapshot, network.LocalPlayerId);
+            teamBar.Present(snapshot, team, localPlayerCircle, network.config != null ? network.config.TeamFeverHits : 0);
+            teamFever.Present(snapshot, team);
         }
+
+        /// <summary>The 2:2 fever banner and edge glow (#281), created on the first team battle.</summary>
+        public LabTeamFever TeamFever => teamFever;
 
         /// <summary>The 2:2 share bar (#281), created on the first team battle.</summary>
         public LabTeamBar TeamBar => teamBar;
