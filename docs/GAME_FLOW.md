@@ -59,7 +59,7 @@
 
 새 코드: `Assets/Hapio/Scripts/Core/{GameSession,GameRunFlow,GameFlowState,GameFlowSnapshot,GameScenePaths}.cs`, `Scripts/UI`, `Editor/GameSceneBuilder.cs`, `Editor/GameBuild.cs`.
 
-기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **196개·프로토콜5661**다. 기존0~191 인덱스는 유지하고 지귀 자동 패턴4칸을192~195에 추가한다. 새 게임 연결 토큰 `C6HapioGame/4`와 단일 Lab의 `C6PhysicsLab/22`은 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
+기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **200개·프로토콜5662**다. 기존0~191 인덱스는 유지하고 지귀 자동 패턴4칸을192~195에, #281 2:2 땅따먹기4칸을196~199에 추가한다. 새 게임 연결 토큰 `C6HapioGame/5`와 단일 Lab의 `C6PhysicsLab/23`은 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
 
 검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 현재 통합의 실제 실행 결과는 `VALIDATION.md`의 #278 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
 
@@ -97,7 +97,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 - `Assets/Hapio/Art/UI/GameLobby.prefab`이 타이틀·방 목록·자리 선택·Direct IP·개발자 솔로 버튼의 공통 저장 UI다. Home/Lobby의 인스턴스가 각 Scene의 `GameScreen`을 참조한다. GameScreen은 기존 공통/구미호/야광귀/지귀 DEV 패널을 유지하고 `externalNavigation`일 때 구형 방/시작 버튼 입력을 연결하지 않는다. `GameLobbyView`는 표시와 입력만 처리하며 소켓·광고·전투 상태를 소유하지 않는다.
 - `GameSession`이 시작부터 하나의 Game-family Network를 유지한다. 생성·카드 입장·검색·직접 IP·자리·시작·홈 동작은 이 세션을 통한다. 시작 버튼은 `StartGame`으로 연결되고 설정 ACK와 전원 로딩 ACK 후 기존 Battle을 시작한다. 시작을 이유로 연결을 다시 만들지 않는다.
 - `GamePendingRoomRegistry`가 미입장 대기 방을 관리한다. 생성 시에는 연결되지 않고, 생성자의 카드 입장 때 확정 광고만 기존 Network로 인계한다. 나머지 대기 방은 Home→Lobby→Battle→결과→Home을 거쳐 유지되며 GameSession 파괴/앱 종료 때 광고·예약 포트를 정리한다.
-- 로비에서 나가면 방 목록으로 돌아간다. 최종 클리어 또는 게임 오버의 HOME은 타이틀로 돌아간다. 방 이름·Host와 P번호의 분리·2~5인·자리 선택 해제와 196개 설정 확인 조건은 유지한다.
+- 로비에서 나가면 방 목록으로 돌아간다. 최종 클리어 또는 게임 오버의 HOME은 타이틀로 돌아간다. 방 이름·Host와 P번호의 분리·2~5인·자리 선택 해제와 공유 설정(현재 200개) 확인 조건은 유지한다.
 - Home/Lobby의 `Hapio UI Background Camera`는 3D 오브젝트를 그리지 않고 검은 배경만 지운다. Canvas는 Screen Space Overlay를 유지하며 Editor의 카메라 없음 안내를 방지한다.
 - 위치 편집은 공통 Prefab에서 한다. `EditableSeatLayouts/Players2..5/P1..PN`이 각 인원의 저장된 자리 앵커이며 해당 앵커를 움직이면 자리 버튼 배치에 반영된다. 원본 Lab Scene의 UI 위치와는 독립적이다.
 - 명시적 UI 적용 메뉴는 `Hapio/Upgrade Figma Game Lobby`다. 기존 공통 Prefab이 있으면 원본 Lab에서 재생성하지 않고 수동 편집을 보존한다. 이 작업은 Home/Lobby만 갱신하며 Battle·StageResult·GameOver를 복사하거나 저장하지 않는다. 일반 Play/빌드에서는 자동 재생성하지 않는다.

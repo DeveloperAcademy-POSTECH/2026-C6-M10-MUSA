@@ -2502,3 +2502,37 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 - 후속 Mac Development 빌드 **PASS**. 최종 메뉴 카메라·GUID 복원 소스로 독립 GUI 앱 두 개를 다시 실행해 **Host13.217초/Client13.128초, 모두 PASS·종료0**을 확인했다. native Bonjour/UDP·대기 카드/생성자 입장·196개 설정 확인·HostP2/ClientP1·세 스테이지 고유 패턴/결과/관람 ACK·같은 앱의 두 번째 방·이탈 후 양쪽 게임 오버/타이틀·미입장 대기 방 보존을 재확인했다. 양쪽 Exception/Fatal/컴파일 오류 표식0. 새 Home/Lobby/StageResult 캡처를 직접 확인했다.
 - 이 Mac 진단은 앞 절과 같은 CPU 도색 fixture·Legacy/초기100%·건조OFF·공통 폭탄/막기OFF를 사용한다. 실제 투척·핫스팟·여러 물리 기기 검증은 아니다. 임시 probe는 빌드 후 제거했고 전체 PlayMode 소스와 동일한 제품 코드를 유지했다.
 - Lab Scene/설정·전투/결과 Scene·Build Settings·패키지 보존 대상9개와 Desktop 사용자 미추적 Scene meta의 해시 동일을 확인했다. iOS export/서명·iPhone/iPad·일반 LAN/핫스팟 실기기·3~5대·모바일 성능은 계속 **NOT_RUN**이다.
+
+## #281 2:2 청홍 땅따먹기 (실험) — 2026-10-22
+
+기준 main `f0ddb076`, 브랜치 `experiment/#281-team-territory`. 단계별 커밋은 ① 규칙 핵심 `4d4220b1` → ② 로비·흐름 `dafe8106` → ③ 전투 화면 `70cde3a4` → ④ 피버·결과 `3aae31a5`이다. Unity **6000.6.5f1**, macOS ARM64, 사용자의 Desktop checkout에서 확인했다. 공유 설정 200개(196~199 추가), 통신 5662, 토큰 `C6PhysicsLab/23`·`C6HapioGame/5`.
+
+### 실제 수행 기록
+
+| 항목 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| 오프라인 컴파일 | PASS | Unity 내장 Roslyn으로 C6Lab Runtime·EditMode·PlayMode·Editor와 Hapio Runtime·EditMode·PlayMode·Assembly-CSharp-Editor를 단계마다 다시 묶어 오류 0. 검사를 실행한 것은 아니다. |
+| Unity 메뉴 | PASS | 사용자가 `Hapio > Upgrade Menu DEV Rows`(①)와 `Hapio > Upgrade 2v2 Lobby UI`(②, ④에서 팝업을 닫힌 상태로 저장하도록 고친 뒤 재실행)를 실행했다. 로그 `HAPIO_2V2_LOBBY_READY`. |
+| 전체 EditMode (④ 직후, 사용자 실행) | 1,051/1,064 · 실패 13 | 9건은 검사 쪽 결함이라 고쳤다: 새 검사의 북 주인 조회가 0초 스냅샷을 요청해 `INVALID_TIME`(6), 설정 개수·토글 목록 고정(2), 팝업이 열린 채 저장(1). 4건은 커밋하지 않은 로컬 `LabConfig.asset`의 `sabotageMixEnabled: 1`(플레이테스트 값)이 "기본 꺼짐" 검사와 충돌한 것이다. |
+| Hapio EditMode 재실행 (사용자) | 37/40 · 실패 3 | 로비 Prefab 검사는 메뉴 재실행 후 통과. 남은 3건(홈·로비 장면, 전투 DEV 초안)은 위 로컬 설정 원인과 같다. 원본 설정(0)에서의 통과는 **NOT_RUN**. |
+| Lab EditMode 재실행 (수정 후) | **NOT_RUN** | 고친 9건이 포함된 Lab 전체 재실행 기록이 없다. |
+| 전체 PlayMode | **NOT_RUN** | 새 `LabTeamBattleScreenTests`(벽·막대·게이지·피버 알림·무지개) 포함 실행 기록이 없다. |
+| Editor Play DEV 솔로 2:2 | 부분 확인 | 사용자 화면 2장. 첫 화면에서 위쪽 막대가 빨강으로 가득 찬 결함을 발견해 고쳤다(그림 없는 Filled Image가 전체를 그림, 검사 추가). 피버 화면에서 알림·무지개 고리·게이지·팀 고리를 확인했다. 그 뒤 바꾼 "피버타임!" 문구·경계 깃발 이동·더 선명한 가장자리 빛의 화면 확인은 **NOT_RUN**. |
+| Mac 앱 4개 (4명 팀전) | **NOT_RUN** | 아래 절차로 확인한다. 팀 벽·엇갈린 자리·팀 전달·덮어쓰기는 4명에서만 나타난다. |
+| iOS·실기기·LAN·핫스팟 | **NOT_RUN** | 실제 실행 증거 없이 PASS로 기록하지 않는다. |
+
+### 자동 검사가 다루는 범위
+
+- `LabTeamTerritoryTests`(EditMode): 팀·이웃·박 둘레 자리, 4명/솔로만 켜짐, 팀마다 북 1개, 안쪽 가장자리로만 전달(밀림 포함), 팀 색 결합과 솔로 번갈아 색, 얼룩 모양 안 덮어쓰기와 P번호 이동, 꽉 차도 계속·시간 끝 비교·무승부·100% 즉시 승리, 피버 전환·생성·`fever` 표시와 보드 델타 전달, 끄는 것(요괴·폭탄·막기·방해공작·콤보·섬광·마르기).
+- `LabTeamScreenRulesTests`(EditMode): 엇갈린 자리, 막힌 쪽, 팀원만 보이는 이웃·미니맵, 막대 비율·결과 문구.
+- `GameTerritoryFlowTests`(Hapio EditMode): 한 판 Completed → 같은 방 로비(revision이 판보다 큼), 이탈 시 로비, 스토리는 기존 게임 오버, 상태 검증·모드 변경 거절·은퇴한 판 재진입 거절, DEV 2:2 범위(196 고정·197~199만).
+- `LabRoomPresenceTests`·`LabGameFlowBridgeTests`: 방 광고 `t=1` 왕복·잘못된 표시 거절, 요괴 없는 2:2 스테이지 식별.
+- `LabTeamBattleScreenTests`(PlayMode): 바깥 벽 튕김(밀기·폭발)·안쪽 통과·정리 시 해제, 막대 채움·경계 깃발·팀 고리, 피버 게이지·결과 숫자, 우리 팀 피버만 알림·가장자리 빛, 무지개 고리와 바뀌는 순간 부풀기.
+
+### 4명 Mac 앱 확인 절차
+
+1. Unity 메뉴 `Hapio > Development Build > Build Mac App`. 결과물은 `Builds/Hapio/<날짜-고유번호>/macOS/Hapio-Development.app`이다.
+2. 같은 앱을 `open -n`으로 네 번 실행한다.
+3. 첫 앱: 게임 시작 → 새 방 만들기 + → **2 : 2 땅따먹기** → "2:2 땅따먹기 · 1 / 4명" 카드 입장(방장). 나머지 세 앱은 같은 카드로 입장한다.
+4. 네 앱이 P1~P4를 고르면 방장의 "요괴 봉인 시작"이 켜진다. 빠른 확인은 방장 DEV의 2:2 탭에서 피버 필요 명중 수를 2, 제한 시간을 60초로 낮춘다.
+5. 확인 목록: 청·홍 자리 화면 / 박 둘레 P1·P3·P2·P4 카메라 / 바깥 벽 튕김과 팀원에게만 전달 / 팀 색 결합 / 상대 색 덮어쓰기와 막대·깃발 / 피버 알림·무지개·게이지 / 결과(청팀 승리·홍팀 승리·무승부)와 "로비로" 후 재시작 / 판 중간에 한 앱을 닫으면 나머지가 같은 방 로비로 돌아오고 안내 문구가 보임.
