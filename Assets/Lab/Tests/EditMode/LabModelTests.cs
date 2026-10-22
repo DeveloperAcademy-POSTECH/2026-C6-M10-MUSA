@@ -1973,6 +1973,23 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ResultTableRowsMarkEveryTitleTheLocalPlayerShares()
+        {
+            var players = new[]
+            {
+                new LabPlayerState { id = 10, seat = 0, damageTotal = 60, hitTotal = 2, passedTotal = 1 },
+                new LabPlayerState { id = 20, seat = 1, damageTotal = 60, hitTotal = 3, passedTotal = 4 }
+            };
+            var rows = LabResultTable.RowsFor(LabResultStats.Awards(players, false), 10ul, 100d);
+            Assert.That(rows.Select(r => r.Title), Is.EqualTo(new[] { "딜왕", "구슬 패스왕" }));
+            Assert.That(rows[0].Who, Is.EqualTo("P1, P2"));
+            Assert.That(rows[0].Record, Is.EqualTo("60 (2·3회 타격)"));
+            Assert.That(rows.Select(r => r.Mine), Is.EqualTo(new[] { true, false }),
+                "A shared title is mine too; a title only someone else holds is not.");
+            Assert.That(LabResultTable.RowsFor(null, 10ul, 100d), Is.Empty);
+        }
+
+        [Test]
         public void AtomicElementHitCompletesEveryCellAtTheFixedGoalAndResetsOnNextRound()
         {
             var paintConfig = PaintFixture(100f);
