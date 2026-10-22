@@ -29,6 +29,10 @@ namespace C6Lab
         public double charmStartedAt = -1d, charmUntil = -1d;
         public int charmTaps;
         public LabJigwiState[] jigwi = Array.Empty<LabJigwiState>();
+        public double flashWarningAt = -1d, flashAt = -1d, flashLastAt = -1d;
+        public ulong flashTarget, flashLastTarget;
+        public bool flashTargetAll, flashLastTargetAll;
+        public uint flashCount;
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
         public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
 
@@ -100,6 +104,10 @@ namespace C6Lab
                 charmedPlayer = snapshot.charmedPlayer, charmStartedAt = snapshot.charmStartedAt,
                 charmUntil = snapshot.charmUntil, charmTaps = snapshot.charmTaps,
                 jigwi = LabJigwiNetworkValidation.Copy(snapshot.jigwi),
+                flashWarningAt = snapshot.flashWarningAt, flashAt = snapshot.flashAt,
+                flashTarget = snapshot.flashTarget, flashTargetAll = snapshot.flashTargetAll,
+                flashCount = snapshot.flashCount, flashLastAt = snapshot.flashLastAt,
+                flashLastTarget = snapshot.flashLastTarget, flashLastTargetAll = snapshot.flashLastTargetAll,
                 targetYawDegrees = snapshot.targetYawDegrees,
                 targetYawSpeedDegreesPerSecond = snapshot.targetYawSpeedDegreesPerSecond,
                 targetRopeCycleElapsed = snapshot.targetRopeCycleElapsed,
@@ -255,6 +263,10 @@ namespace C6Lab
                 copy.charmedPlayer = header.charmedPlayer; copy.charmStartedAt = header.charmStartedAt;
                 copy.charmUntil = header.charmUntil; copy.charmTaps = header.charmTaps;
                 copy.jigwi = LabJigwiNetworkValidation.Copy(header.jigwi);
+                copy.flashWarningAt = header.flashWarningAt; copy.flashAt = header.flashAt;
+                copy.flashTarget = header.flashTarget; copy.flashTargetAll = header.flashTargetAll;
+                copy.flashCount = header.flashCount; copy.flashLastAt = header.flashLastAt;
+                copy.flashLastTarget = header.flashLastTarget; copy.flashLastTargetAll = header.flashLastTargetAll;
                 copy.targetYawDegrees = header.targetYawDegrees;
                 copy.targetYawSpeedDegreesPerSecond = header.targetYawSpeedDegreesPerSecond;
                 copy.targetRopeCycleElapsed = header.targetRopeCycleElapsed;
@@ -313,6 +325,7 @@ namespace C6Lab
             && Finite(frame.charmStartedAt) && Finite(frame.charmUntil) && frame.charmTaps >= 0
             && Finite(frame.targetYawDegrees) && Finite(frame.targetYawSpeedDegreesPerSecond)
             && Finite(frame.targetRopeCycleElapsed) && Finite(frame.targetRopeHitOffset) && Finite(frame.targetRopeHitVelocity)
+            && LabFlashNetworkValidation.Valid(frame)
             && LabJigwiNetworkValidation.Valid(frame.jigwi)
             && ValidStates(frame.states, true) && ValidRemoved(frame.removedIds) && ValidPlayers(frame.players);
 
@@ -382,7 +395,21 @@ namespace C6Lab
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,
             comboCount = source.comboCount, comboResult = source.comboResult, comboResultCount = source.comboResultCount,
             comboResultAt = source.comboResultAt, comboFailedBy = source.comboFailedBy,
-            comboNextAt = source.comboNextAt, comboWarningAt = source.comboWarningAt
+            comboNextAt = source.comboNextAt, comboWarningAt = source.comboWarningAt,
+            flashWarningAt = source.flashWarningAt, flashAt = source.flashAt, flashTarget = source.flashTarget,
+            flashTargetAll = source.flashTargetAll, flashCount = source.flashCount, flashLastAt = source.flashLastAt,
+            flashLastTarget = source.flashLastTarget, flashLastTargetAll = source.flashLastTargetAll
         };
+    }
+
+    public static class LabFlashNetworkValidation
+    {
+        public static bool Valid(LabSnapshot value) => value != null
+            && ValidTimes(value.flashWarningAt, value.flashAt, value.flashLastAt);
+        public static bool Valid(LabBoardFrame value) => value != null
+            && ValidTimes(value.flashWarningAt, value.flashAt, value.flashLastAt);
+        private static bool ValidTimes(double warningAt, double flashAt, double lastAt) =>
+            Finite(warningAt) && Finite(flashAt) && Finite(lastAt) && flashAt >= -1d && lastAt >= -1d;
+        private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
     }
 }

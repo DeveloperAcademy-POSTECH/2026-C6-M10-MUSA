@@ -123,6 +123,9 @@ namespace C6Lab
         private const uint SabotageTargetSalt = 0x5AB07A26u;
         // 통합 방해공작 추첨도 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (#251).
         private const ulong SabotageDrawKey = ulong.MaxValue - 4UL;
+        private const uint FlashTargetSalt = 0x7A6F1A5Bu;
+        // 야광귀 섬광 대상 뽑기도 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (#268).
+        private const ulong FlashDrawKey = ulong.MaxValue - 5UL;
         private const uint FoxCountSalt = 0xF0C5C017u;
         private const uint FoxLandingXSalt = 0xF0C51A0Du;
         private const uint FoxLandingYSalt = 0xF0C51A1Du;
@@ -175,6 +178,15 @@ namespace C6Lab
         // 던진 순간의 페널티 배율 (#222). 날아가는 동안 페널티가 끝나도 그 공은 던질 때 크기 그대로 칠한다.
         private readonly Dictionary<string, float> launchScales = new Dictionary<string, float>(StringComparer.Ordinal);
         private double nextComboAt;
+        // 야광귀 섬광 (#268): 다음 번쩍임 시각·대상, 지금까지 번쩍인 수, 마지막 번쩍임, 콤보 때문에 기다리는 중인지
+        private double nextFlashAt;
+        private ulong nextFlashTarget;
+        private uint flashCount;
+        private double lastFlashAt;
+        private ulong lastFlashTarget;
+        private bool flashHeld;
+        // 콤보 때문에 섬광 예고를 미뤘었는지. 콤보가 끝난 첫 순간 예고를 처음부터 다시 시작한다.
+        private bool flashWasHeld;
         private Rules rules;
         private string sessionId;
         private uint round;
@@ -287,6 +299,13 @@ namespace C6Lab
             combo.Reset();
             launchScales.Clear();
             nextComboAt = now + rules.ComboFirstStartSeconds;
+            flashCount = 0;
+            lastFlashAt = -1d;
+            lastFlashTarget = 0;
+            flashHeld = false;
+            flashWasHeld = false;
+            nextFlashAt = rules.FlashEnabled ? now + rules.FlashFirstStartSeconds : double.PositiveInfinity;
+            nextFlashTarget = DrawFlashTarget(0u);
             lastTime = now;
             deadline = nextDeadline;
             remaining = rules.BattleDurationSeconds;
@@ -635,6 +654,61 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// 야광귀 섬광 (#268): 정해 둔 시각마다 번쩍인다. 화면 표시(하얗게 보이기)만 하므로 Host는 시각과 대상만 정한다.
+        /// 콤보 예고나 콤보가 진행 중이면 섬광 예고를 시작하지 않고 기다렸다가, 콤보가 끝나면 예고부터 다시 보여준다.
+        /// 간격은 번쩍인 시각부터 재고, 눈부심·회복·다음 예고가 겹치지 않을 만큼은 언제나 띄운다.
+        /// </summary>
+        private void AdvanceFlash(double until)
+        {
+            flashHeld = false;
+            if (!rules.FlashEnabled) return;
+            while (nextFlashAt <= until || nextFlashAt - rules.FlashWarningSeconds <= until)
+            {
+                if (ComboHoldsFlash(until))
+                {
+                    // 예고가 시작될 때가 됐는데 콤보 중이면, 콤보가 끝난 뒤 예고를 처음부터 다시 보여준다.
+                    flashHeld = flashWasHeld = true;
+                    nextFlashAt = Math.Max(nextFlashAt, until + rules.FlashWarningSeconds);
+                    return;
+                }
+                if (flashWasHeld)
+                {
+                    // 콤보가 방금 끝났다: 미룬 섬광을 지난 시각에 바로 터뜨리지 않고, 지금부터 예고를 다 보여준다.
+                    flashWasHeld = false;
+                    nextFlashAt = Math.Max(nextFlashAt, until + rules.FlashWarningSeconds);
+                    continue;
+                }
+                if (nextFlashAt > until) return; // 예고 중
+                double at = nextFlashAt;
+                flashCount++;
+                lastFlashAt = at;
+                lastFlashTarget = nextFlashTarget;
+                double gap = Math.Max(rules.FlashIntervalSeconds,
+                    rules.FlashGlareSeconds + rules.FlashRecoverySeconds + rules.FlashWarningSeconds);
+                nextFlashAt = at + gap;
+                nextFlashTarget = DrawFlashTarget(flashCount);
+            }
+        }
+
+        private bool ComboHoldsFlash(double at) => rules.ComboEnabled
+            && (combo.Active || (ComboWaiting && at >= nextComboAt - rules.ComboWarningSeconds));
+
+        private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled && !flashHeld;
+
+        /// <summary>
+        /// 섬광 대상. ALL 여부는 별도 bool로 공유한다. ONE이면 실제 ID 0도 포함한 자리 순서에서 한 명을 뽑는다.
+        /// 두 명 이상이면 바로 앞 섬광을 맞은 사람은 빼서 같은 사람이 연달아 맞지 않게 한다.
+        /// </summary>
+        private ulong DrawFlashTarget(uint index)
+        {
+            if (!rules.FlashTargetOne || activeSeatCount <= 0) return 0;
+            var candidates = new List<ulong>();
+            for (int i = 0; i < activeSeatCount; i++)
+                if (index == 0u || activeSeatCount == 1 || seats[i] != lastFlashTarget) candidates.Add(seats[i]);
+            return candidates[(int)(DrawFor(seed ^ FlashTargetSalt, FlashDrawKey, index) % (ulong)candidates.Count)];
+        }
+
         /// <summary>전투 중이고 콤보가 켜져 있으며, 진행 중인 콤보 없이 다음 콤보를 기다리는 중인지 (#241)</summary>
         private bool ComboWaiting => phase == LabPhase.Playing && rules != null && rules.ComboEnabled && !combo.Active;
 
@@ -895,7 +969,15 @@ namespace C6Lab
                 comboResultAt = combo.LastResultAt,
                 comboFailedBy = combo.LastFailedBy,
                 comboNextAt = ComboWaiting ? nextComboAt : -1d,
-                comboWarningAt = ComboWaiting ? nextComboAt - rules.ComboWarningSeconds : -1d
+                comboWarningAt = ComboWaiting ? nextComboAt - rules.ComboWarningSeconds : -1d,
+                flashAt = FlashWaiting ? nextFlashAt : -1d,
+                flashWarningAt = FlashWaiting ? nextFlashAt - rules.FlashWarningSeconds : -1d,
+                flashTarget = nextFlashTarget,
+                flashTargetAll = !rules.FlashTargetOne,
+                flashCount = flashCount,
+                flashLastAt = lastFlashAt,
+                flashLastTarget = lastFlashTarget,
+                flashLastTargetAll = !rules.FlashTargetOne
             };
         }
 
@@ -950,6 +1032,7 @@ namespace C6Lab
                 CastSabotages(effectiveNow);
                 AdvanceJigwi(effectiveNow);
                 AdvanceCombo(effectiveNow);
+                AdvanceFlash(effectiveNow);
                 foreach (var expired in orbs.Values.Where(orb => !orb.inFlight && effectiveNow >= ExpiresAt(orb))
                     .ToArray())
                 {
@@ -1431,6 +1514,10 @@ namespace C6Lab
             public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
                 ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale,
                 ComboWarningSeconds;
+            /// <summary>Yaguang flash (#268): on/off, everyone or one at a time, and its timing.</summary>
+            public readonly bool FlashEnabled, FlashTargetOne;
+            public readonly float FlashFirstStartSeconds, FlashIntervalSeconds, FlashWarningSeconds,
+                FlashGlareSeconds, FlashRecoverySeconds;
 
             public Rules(LabConfig config)
             {
@@ -1492,6 +1579,13 @@ namespace C6Lab
                 ComboRewardDurationSeconds = config.ComboRewardDurationSeconds;
                 ComboRewardSizeScale = config.ComboRewardSizeScale;
                 ComboWarningSeconds = config.ComboWarningSeconds;
+                FlashEnabled = config.YaguangFlashEnabled;
+                FlashTargetOne = config.YaguangFlashTargetOne;
+                FlashFirstStartSeconds = config.YaguangFlashFirstStartSeconds;
+                FlashIntervalSeconds = config.YaguangFlashIntervalSeconds;
+                FlashWarningSeconds = config.YaguangFlashWarningSeconds;
+                FlashGlareSeconds = config.YaguangFlashGlareSeconds;
+                FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
             }
         }
     }

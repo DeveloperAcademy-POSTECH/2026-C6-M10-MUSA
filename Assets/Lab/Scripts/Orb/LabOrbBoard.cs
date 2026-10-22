@@ -271,7 +271,7 @@ namespace C6Lab
             BuildHorizontalWalls();
             foreach (var entry in entries.Values)
             {
-                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind, entry.Small), entry.View.Element);
+                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind, entry.Small, entry.JigwiScale), entry.View.Element);
                 entry.View.ConfigureAppearance(config.OrbAppearance);
                 SetLayerRecursively(entry.View.transform, gameObject.layer);
                 entry.View.HitSphere.sharedMaterial = contactMaterial;
@@ -618,6 +618,7 @@ namespace C6Lab
         private void LateUpdate()
         {
             ApplyComboLook();
+            ApplyFlashGlare();
             SyncBoardTrails();
             if (blockedSide == 0) return;
             blockSecondsLeft -= Time.deltaTime;
@@ -631,6 +632,22 @@ namespace C6Lab
         /// 판의 음양·결합 구슬 그림이 이 동안 작아지거나 커진다(물리 크기는 그대로).
         /// </summary>
         public void SetComboLook(int look) => comboLook = Math.Sign(look);
+
+        private float flashGlare;
+
+        /// <summary>
+        /// 야광귀 섬광 (#268): 이 기기 플레이어가 눈부신 정도 (0~1). 섬광 화면이 매 프레임 정한다.
+        /// 판의 음양·결합 구슬과 아이템(여우구슬 포함)이 이만큼 하얗게 보이고, 북은 그대로다. 조작·물리는 그대로다.
+        /// </summary>
+        public void SetFlashGlare(float amount) =>
+            flashGlare = float.IsNaN(amount) || float.IsInfinity(amount) ? 0f : Mathf.Clamp01(amount);
+        public float FlashGlare => flashGlare;
+
+        private void ApplyFlashGlare()
+        {
+            foreach (var entry in entries.Values)
+                if (entry.View != null) entry.View.SetGlare(entry.View.Kind.IsDrum() ? 0f : flashGlare);
+        }
         public int ComboLook => comboLook;
         /// <summary>판 구슬이 지금 콤보 효과로 향하는 그림 배율 (#257)</summary>
         public float ComboLookScale => comboLook < 0 ? comboSmallScale : comboLook > 0 ? comboBigScale : 1f;
@@ -1089,6 +1106,7 @@ namespace C6Lab
             LiftSwipeBlock();
             charmed = false;
             jigwiOverheat = false;
+            flashGlare = 0f;
             if (charmEdge != null) charmEdge.Hide();
             foreach (var entry in entries.Values)
                 Retire(entry);

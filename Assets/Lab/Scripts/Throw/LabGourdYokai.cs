@@ -13,6 +13,8 @@ namespace C6Lab
     /// 평소보다 빠르게 쏙 올라와 톡 튀고 두리번거린다. 콤보 중이면 들어가지 않고 톡 튀기만 하며, 콤보와 폭탄이
     /// 둘 다 끝나야 들어간다. 통합 방해공작 추첨(#251)이 넘기기 막기·여우불·매혹을 걸 때도 똑같이 나온다
     /// (폭탄은 위의 `GourdBombDropped`로 이미 나온다).
+    /// 야광귀 섬광(#268) 예고가 시작되면 모든 기기에서 폭탄 때처럼 쏙 올라와 두리번거리다가, 번쩍이는 순간 톡 튀고
+    /// 잠시 뒤 들어간다(섬광을 누가 맞든 박은 모두에게 보인다). 시각은 Host 스냅샷(`flashWarningAt`/`flashAt`/`flashLastAt`)이다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabGourdYokai : MonoBehaviour
@@ -37,6 +39,8 @@ namespace C6Lab
         [SerializeField, Min(.3f)] private float bombShowSeconds = 1.4f;
         [Tooltip("폭탄 때 올라오는 빠르기 (평소 = 1). 클수록 쏙 올라온다.")]
         [SerializeField, Min(1f)] private float bombRiseSpeed = 3f;
+        [Tooltip("야광귀 섬광(#268)이 번쩍인 뒤 요괴가 더 나와 있는 시간 (초). 그 뒤 들어간다.")]
+        [SerializeField, Min(0f)] private float flashStaySeconds = .6f;
 
         private const float EyeAngle = 24f;
         private const float FlinchSquash = .16f;
@@ -62,6 +66,7 @@ namespace C6Lab
         private bool popPending;
         private uint seenComboCount;
         private int seenProgress;
+        private uint seenFlashCount;
 
         private LabSnapshot seenSnapshot;
         private double seenAtRealtime;
@@ -144,8 +149,10 @@ namespace C6Lab
             // 폭탄 때 나와 있는 시간은 전투 중에만 흐른다(일시정지 중에는 deltaTime이 0). 전투가 아니면 바로 끝.
             if (snapshot == null || snapshot.phase != LabPhase.Playing) { bombLeft = 0f; popPending = false; }
             else bombLeft = Mathf.Max(0f, bombLeft - deltaTime);
-            bool want = combo || bombLeft > 0f;
+            bool flash = InFlashWindow(snapshot, serverNow, flashStaySeconds);
+            bool want = combo || bombLeft > 0f || flash;
             DetectHits(snapshot, combo);
+            DetectFlash(snapshot, serverNow);
             wasInComboWindow = combo;
 
             if (want && !holding) Hold();
@@ -153,7 +160,7 @@ namespace C6Lab
 
             if (holding)
             {
-                // 폭탄만으로 나올 때는 말풍선이 짧으니 쏙 올라온다. 콤보 예고는 3초라 평소 빠르기.
+                // 폭탄·섬광(예고 1.5초)만으로 나올 때는 짧으니 쏙 올라온다. 콤보 예고는 3초라 평소 빠르기.
                 StepHeld(deltaTime * (combo ? 1f : bombRiseSpeed), deltaTime);
                 state.time = cursor;
                 clipPlayer.Sample();
@@ -171,6 +178,27 @@ namespace C6Lab
         public static bool InComboWindow(LabSnapshot snapshot, double serverNow) =>
             snapshot != null && snapshot.phase == LabPhase.Playing
             && (snapshot.comboActive || snapshot.ComboWarningOn(serverNow));
+
+        /// <summary>
+        /// 야광귀 섬광 예고 중이거나, 번쩍인 뒤 stay초가 지나기 전이면 true (전투 중일 때만, #268).
+        /// 섬광을 누가 맞든 박은 모두의 화면에 있으므로 대상과 상관없이 나온다.
+        /// </summary>
+        public static bool InFlashWindow(LabSnapshot snapshot, double serverNow, float staySeconds) =>
+            snapshot != null && snapshot.phase == LabPhase.Playing
+            && (snapshot.FlashWarningOn(serverNow)
+                || (snapshot.flashCount > 0 && snapshot.flashLastAt >= 0d && serverNow >= snapshot.flashLastAt
+                    && serverNow - snapshot.flashLastAt < staySeconds));
+
+        /// <summary>새 섬광이 번쩍이면 톡 튄다. 새 라운드나 접속 직후 이미 지난 섬광에는 튀지 않는다.</summary>
+        private void DetectFlash(LabSnapshot snapshot, double serverNow)
+        {
+            if (snapshot == null) return;
+            if (snapshot.flashCount < seenFlashCount) seenFlashCount = 0;
+            if (snapshot.flashCount == seenFlashCount) return;
+            bool fresh = seenFlashCount != 0 || snapshot.flashCount == 1;
+            seenFlashCount = snapshot.flashCount;
+            if (fresh && holding && serverNow - snapshot.flashLastAt < flashStaySeconds) StartEffect(1f, PopSeconds);
+        }
 
         private void DetectHits(LabSnapshot snapshot, bool currentCombo)
         {

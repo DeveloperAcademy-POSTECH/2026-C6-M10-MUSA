@@ -297,5 +297,28 @@ namespace C6Lab
 
         /// <summary>이 시각에 콤보 예고 중인지 (#241). 예고 중에는 콤보가 없으므로 맞힌 구슬도 판정하지 않는다.</summary>
         public bool ComboWarningOn(double now) => comboNextAt > comboWarningAt && now >= comboWarningAt && now < comboNextAt;
+
+        // 야광귀 섬광 (#268). 시각은 serverTime과 같은 전투 시계 기준이다. DEV에서 끄면 모두 기본값(섬광 없음)이다.
+        /// <summary>
+        /// 다음 섬광이 번쩍이는 시각과 그 예고(요괴가 빼꼼 나와 눈이 밝아짐)가 시작되는 시각. 꺼져 있거나 콤보 때문에
+        /// 기다리는 중이면 -1이다. 예고 시간이 0이면 두 시각이 같다.
+        /// </summary>
+        public double flashWarningAt = -1d, flashAt = -1d;
+        /// <summary>다음 섬광의 실제 대상 ID. Host의 ID 0도 유효하며 ALL 여부는 별도 필드다.</summary>
+        public ulong flashTarget;
+        public bool flashTargetAll;
+        /// <summary>이번 라운드에 번쩍인 섬광 수. 바뀌면 새 섬광이 터진 것이다.</summary>
+        public uint flashCount;
+        /// <summary>마지막 섬광이 번쩍인 시각과 실제 대상 ID</summary>
+        public double flashLastAt = -1d;
+        public ulong flashLastTarget;
+        public bool flashLastTargetAll;
+
+        /// <summary>이 시각에 섬광 예고 중인지. 요괴는 모두의 화면에서 빼꼼 나온다.</summary>
+        public bool FlashWarningOn(double now) => flashAt > flashWarningAt && now >= flashWarningAt && now < flashAt;
+        /// <summary>이 사람이 다음 섬광을 맞는지</summary>
+        public bool FlashTargets(ulong player) => flashTargetAll || flashTarget == player;
+        /// <summary>이 사람이 마지막 섬광을 맞았는지 (한 번도 안 터졌으면 false)</summary>
+        public bool LastFlashHit(ulong player) => flashCount > 0 && (flashLastTargetAll || flashLastTarget == player);
     }
 }

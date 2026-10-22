@@ -356,13 +356,24 @@ namespace C6Lab
                 titleLayout.flexibleWidth = 1f;
                 header.transform.SetSiblingIndex(sibling++);
 
-                // 이 카테고리의 설정 줄들을 제목 바로 아래로 옮긴다.
-                GameObject[] rows = new GameObject[category.FieldIndices.Length];
-                for (int i = 0; i < rows.Length; i++)
+                // 이 카테고리의 설정 줄들을 제목 바로 아래로 옮긴다. 구분선(#268)이 있으면 그 줄 위에 끼운다.
+                var rowList = new System.Collections.Generic.List<GameObject>();
+                for (int i = 0; i < category.FieldIndices.Length; i++)
                 {
-                    rows[i] = valueInputs[category.FieldIndices[i]].transform.parent.gameObject;
-                    rows[i].transform.SetSiblingIndex(sibling++);
+                    if (category.DividerAt != null)
+                        for (int d = 0; d < category.DividerAt.Length; d++)
+                            if (category.DividerAt[d] == i)
+                            {
+                                GameObject divider = BuildDivider(content, labelStyle, category.DividerLabels[d]);
+                                divider.transform.SetSiblingIndex(sibling++);
+                                rowList.Add(divider);
+                            }
+                    GameObject row = valueInputs[category.FieldIndices[i]].transform.parent.gameObject;
+                    row.transform.SetSiblingIndex(sibling++);
+                    rowList.Add(row);
                 }
+                GameObject[] rows = rowList.ToArray();
+                if (category.SwitchFields != null) BuildCategorySwitch(header, labelStyle, category.SwitchFields);
 
                 // 처음에는 모두 접힌 상태로 시작한다. 제목을 누르면 접고 펼친다.
                 // 숨긴 줄의 값도 APPLY 때 그대로 읽힌다.
@@ -376,6 +387,94 @@ namespace C6Lab
                     expanded = !expanded;
                     SetCategoryExpanded(title, name, rows, expanded);
                 });
+            }
+        }
+
+        /// <summary>묶음 안 구분선 한 줄 (#268). 누를 수 없고, 묶음을 접으면 같이 숨는다.</summary>
+        private static GameObject BuildDivider(Transform content, Text labelStyle, string label)
+        {
+            var go = new GameObject("Divider " + label, typeof(RectTransform), typeof(Text), typeof(LayoutElement));
+            go.layer = content.gameObject.layer;
+            go.transform.SetParent(content, false);
+            Text text = go.GetComponent<Text>();
+            text.font = labelStyle.font;
+            text.fontSize = Mathf.Max(10, labelStyle.fontSize - 1);
+            text.fontStyle = FontStyle.Bold;
+            Color color = labelStyle.color;
+            color.a *= .6f;
+            text.color = color;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.raycastTarget = false;
+            text.text = label;
+            LayoutElement layout = go.GetComponent<LayoutElement>();
+            layout.preferredHeight = 24f;
+            layout.flexibleWidth = 1f;
+            return go;
+        }
+
+        // 묶음 제목 오른쪽 한꺼번에 켜기/끄기 버튼 (#268). 버튼과 글자, 함께 바꾸는 토글 번호.
+        private readonly System.Collections.Generic.List<(Button button, Text label, int[] fields)> categorySwitches =
+            new System.Collections.Generic.List<(Button, Text, int[])>();
+
+        /// <summary>
+        /// 제목 줄 오른쪽에 버튼을 붙인다. 묶음이 접혀 있어도 보인다. 누르면 아래 토글들이 모두 켜져 있을 때는 모두 끄고,
+        /// 그 밖(모두 꺼짐·일부만 켜짐)에는 모두 켠다. 숨긴 입력칸 값만 바꾸므로 APPLY 전에는 적용되지 않는다.
+        /// </summary>
+        private void BuildCategorySwitch(GameObject header, Text labelStyle, int[] fields)
+        {
+            var go = new GameObject("CategorySwitch", typeof(RectTransform), typeof(Image), typeof(Button));
+            go.layer = header.layer;
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(header.transform, false);
+            rect.anchorMin = new Vector2(1f, 0f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, .5f);
+            rect.sizeDelta = new Vector2(76f, -4f);
+            rect.anchoredPosition = new Vector2(-4f, 0f);
+
+            var textGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            textGo.layer = go.layer;
+            var textRect = (RectTransform)textGo.transform;
+            textRect.SetParent(rect, false);
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = textRect.offsetMax = Vector2.zero;
+            Text text = textGo.GetComponent<Text>();
+            text.font = labelStyle.font;
+            text.fontSize = labelStyle.fontSize;
+            text.fontStyle = FontStyle.Bold;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Color.white;
+            text.raycastTarget = false;
+
+            Button button = go.GetComponent<Button>();
+            button.targetGraphic = go.GetComponent<Image>();
+            button.onClick.AddListener(() => FlipCategorySwitch(fields));
+            categorySwitches.Add((button, text, fields));
+        }
+
+        private void FlipCategorySwitch(int[] fields)
+        {
+            bool allOn = true;
+            foreach (int field in fields) allOn &= ToggleIsOn(valueInputs[field]);
+            string value = allOn ? "0" : "1";
+            foreach (int field in fields)
+                if (valueInputs[field] != null) valueInputs[field].text = value;
+            RefreshToggles();
+        }
+
+        /// <summary>아래 토글이 모두 켜짐이면 "켬", 모두 꺼짐이면 "끔", 섞여 있으면 "일부".</summary>
+        private void RefreshCategorySwitches()
+        {
+            foreach (var entry in categorySwitches)
+            {
+                int on = 0;
+                foreach (int field in entry.fields) if (ToggleIsOn(valueInputs[field])) on++;
+                string label = on == entry.fields.Length ? "켬" : on == 0 ? "끔" : "일부";
+                if (entry.label.text != label) entry.label.text = label;
+                var image = (Image)entry.button.targetGraphic;
+                Color color = on > 0 ? ToggleOnColor : ToggleOffColor;
+                if (image.color != color) image.color = color;
             }
         }
 
@@ -673,6 +772,7 @@ namespace C6Lab
             RefreshThrowFormInputs();
             RefreshPaintDryingInputs();
             RefreshChoices();
+            RefreshCategorySwitches();
         }
 
         // Read the uncommitted form value so ARC/STRAIGHT immediately enables its own controls.

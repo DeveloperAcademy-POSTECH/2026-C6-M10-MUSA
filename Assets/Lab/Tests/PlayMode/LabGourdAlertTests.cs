@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -129,6 +130,48 @@ namespace C6Lab.Tests
             Assert.That(alert.Label, Is.EqualTo("!"), "A bomb still shows its \"!\".");
             Assert.That(exclamation.gameObject.activeSelf, Is.True);
             Assert.That(blockMark.gameObject.activeSelf, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator TheYaguangEyesShowPlainThenGlowAndLeaveAtTheFlash()
+        {
+            root = new GameObject("Gourd eyes alert test");
+            var cameraObject = new GameObject("Battle camera");
+            cameraObject.transform.SetParent(root.transform, false);
+            cameraObject.transform.position = new Vector3(0f, 1f, -8f);
+            var battleCamera = cameraObject.AddComponent<Camera>();
+            var canvasObject = new GameObject("Canvas", typeof(RectTransform));
+            canvasObject.transform.SetParent(root.transform, false);
+            var canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            LabTarget gourd = LabTarget.CreateCylinder(root.transform, new Vector3(0f, 1f, 0f), .8f, 2f);
+            var alert = root.AddComponent<LabGourdAlert>();
+            alert.Bind(null, canvas, battleCamera);
+            yield return null;
+
+            alert.ShowEyes(gourd, .6f);
+            Transform eyes = alert.Bubble.Find("Gourd Alert Eyes");
+            Image lit = eyes.Find("Gourd Alert Eyes Lit").GetComponent<Image>();
+            Assert.That(alert.ShowingEyes, Is.True, "The yaguang-gwi's eyes in the bubble (#268).");
+            Assert.That(alert.Label, Is.EqualTo("👀"));
+            Assert.That(eyes.gameObject.activeSelf, Is.True);
+            Assert.That(alert.Bubble.Find("Gourd Alert Mark").gameObject.activeSelf, Is.False);
+            Assert.That(lit.color.a, Is.Zero, "Plain eyes first.");
+            Assert.That(eyes.GetComponentsInChildren<Image>().All(image => !image.raycastTarget), Is.True);
+
+            alert.SetEyeGlow(1f);
+            Assert.That(alert.EyeGlow, Is.EqualTo(1f));
+            Assert.That(lit.color.a, Is.EqualTo(1f), "Then the eyes light up.");
+
+            float until = Time.time + 1.5f;
+            while (alert.Active && Time.time < until) yield return null;
+            Assert.That(alert.Active, Is.False, "Gone by the flash.");
+            Assert.That(alert.ShowingEyes, Is.False);
+
+            alert.ShowEyes(gourd, 2f);
+            alert.Show(gourd);
+            Assert.That(alert.ShowingEyes, Is.False, "A bomb's \"!\" replaces the eyes.");
+            Assert.That(eyes.gameObject.activeSelf, Is.False);
         }
     }
 }

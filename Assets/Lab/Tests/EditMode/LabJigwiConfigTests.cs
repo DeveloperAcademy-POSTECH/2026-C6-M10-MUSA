@@ -14,16 +14,16 @@ namespace C6Lab.Tests
             var config = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
-                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(184));
+                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(191));
                 Assert.That(LabConfig.DeveloperFields[177].Label, Is.EqualTo("Charm Rescue Taps (0 = none)"));
-                Assert.That(LabConfig.DeveloperFields.Skip(178).Select(field => field.Label), Is.EqualTo(new[]
+                Assert.That(LabConfig.DeveloperFields.Skip(178).Take(6).Select(field => field.Label), Is.EqualTo(new[]
                 {
                     "Jigwi Fire Target Count", "Jigwi Fire Seconds", "Jigwi Overheat Seconds",
                     "Jigwi Generation Burn Seconds", "Jigwi Raw Radius Scale", "Jigwi Raw Life Scale"
                 }));
                 Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Jigwi").FieldIndices,
                     Is.EqualTo(Enumerable.Range(178, 6)));
-                Assert.That(config.CaptureDeveloperValues().Skip(178), Is.EqualTo(new[] { 1f, 15f, 4f, 10f, .65f, .5f }));
+                Assert.That(config.CaptureDeveloperValues().Skip(178).Take(6), Is.EqualTo(new[] { 1f, 15f, 4f, 10f, .65f, .5f }));
                 Assert.That(config.SabotageWeights().Length, Is.EqualTo(4),
                     "The manual Jigwi experiment must not silently enter the legacy sabotage lottery.");
             }
@@ -48,11 +48,38 @@ namespace C6Lab.Tests
                 Assert.That(new[] { client.JigwiFireSeconds, client.JigwiOverheatSeconds,
                     client.JigwiGenerationBurnSeconds, client.JigwiRawRadiusScale, client.JigwiRawLifeScale },
                     Is.EqualTo(tail.Skip(1)));
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5655),
-                    Is.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5655)));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5657),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5657)));
                 values[183] = .75f;
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5655),
-                    Is.Not.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5655)));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5657),
+                    Is.Not.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5657)));
+            }
+            finally { Object.DestroyImmediate(host); Object.DestroyImmediate(client); }
+        }
+
+        [Test]
+        public void JigwiAndAppendedFlashSettingsRoundTripIndependentlyInTheSameSharedSchema()
+        {
+            var host = ScriptableObject.CreateInstance<LabConfig>();
+            var client = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                var values = host.CaptureDeveloperValues();
+                var jigwi = new[] { 5f, 30f, 7f, 20f, .8f, .25f };
+                var flash = new[] { 1f, 1f, 6f, 24f, .5f, 2f, 1f };
+                Array.Copy(jigwi, 0, values, 178, jigwi.Length);
+                Array.Copy(flash, 0, values, 184, flash.Length);
+                Assert.That(host.TryApplyDeveloperValues(values, out var error), Is.True, error);
+                var received = JsonUtility.FromJson<Settings>(JsonUtility.ToJson(
+                    new Settings { values = host.CaptureDeveloperValues() })).values;
+                Assert.That(client.TryApplyDeveloperValues(received, out error), Is.True, error);
+                Assert.That(client.CaptureDeveloperValues().Skip(178).Take(6), Is.EqualTo(jigwi));
+                Assert.That(client.CaptureDeveloperValues().Skip(184), Is.EqualTo(flash));
+                Assert.That(client.JigwiFireTargetCount, Is.EqualTo(5));
+                Assert.That(client.YaguangFlashEnabled && client.YaguangFlashTargetOne, Is.True);
+                Assert.That(client.YaguangFlashFirstStartSeconds, Is.EqualTo(6f));
+                Assert.That(client.ComboPenaltyDurationSeconds, Is.EqualTo(15f));
+                Assert.That(client.ComboRewardDurationSeconds, Is.EqualTo(15f));
             }
             finally { Object.DestroyImmediate(host); Object.DestroyImmediate(client); }
         }
