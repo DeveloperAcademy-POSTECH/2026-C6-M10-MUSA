@@ -19,6 +19,7 @@ namespace Hapio
         public LabHud hud;
         public LabDeveloperMode developerMode;
         public UnityEngine.UI.Text stageLabel;
+        public UnityEngine.UI.Button developerNextStageButton;
         public GameYokaiPresentation yokaiPresentation;
         private GameSession session;
 
@@ -75,6 +76,8 @@ namespace Hapio
                 Route(hud.resumeButton, () => session.Resume(), null);
             }
             if (developerMode != null) Route(developerMode.endSoloButton, () => session.ExitRun(), "QUIT RUN");
+            Route(developerNextStageButton, DeveloperNextStage, null);
+            RefreshDeveloperNextStage();
         }
         private void LateUpdate()
         {
@@ -98,7 +101,31 @@ namespace Hapio
                         : "STAGE " + session.State.stageIndex + " / " + session.State.totalStages
                             + (stage != null ? " · " + stage.displayName : string.Empty))
                     + (session.State.phase == GameFlowPhase.LoadingBattle ? " · WAITING" : string.Empty);
+            RefreshDeveloperNextStage();
         }
+        private void DeveloperNextStage()
+        {
+            // Do not read/apply the DEV form: only the room's accepted stage profiles carry forward.
+            if (session != null) session.DeveloperNextStage();
+            RefreshDeveloperNextStage();
+        }
+
+        private void RefreshDeveloperNextStage()
+        {
+            if (developerNextStageButton == null) return;
+            bool visible = session != null && session.Network != null
+                && session.Network.DeveloperBuildAvailable && session.Network.IsHost;
+            developerNextStageButton.gameObject.SetActive(visible);
+            developerNextStageButton.interactable = visible && session.CanDeveloperAdvanceStage;
+            var label = developerNextStageButton.GetComponentInChildren<UnityEngine.UI.Text>(true);
+            if (label == null || session == null) return;
+            bool last = session.State.stageIndex >= session.State.totalStages;
+            string value = last ? "LAST STAGE · " + session.State.totalStages + " / " + session.State.totalStages
+                : "NEXT STAGE · " + (session.State.stageIndex + 1) + " / " + session.State.totalStages
+                    + "\nAPPLIED SETTINGS ONLY";
+            if (label.text != value) label.text = value;
+        }
+
         private void OnDestroy()
         {
             if (session != null && session.Network != null) session.Network.ConfigApplied -= OnConfigApplied;

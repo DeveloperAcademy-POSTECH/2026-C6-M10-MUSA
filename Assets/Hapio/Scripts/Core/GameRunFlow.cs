@@ -95,6 +95,16 @@ namespace Hapio
             return true;
         }
 
+        /// <summary>DEV-only caller authorization belongs to GameSession; this transition never records victory.</summary>
+        public bool DeveloperNextStage(string runId, int stageIndex, uint revision)
+        {
+            if (!Matches(runId, stageIndex, revision) || state.phase != GameFlowPhase.Playing
+                || state.stageIndex >= state.totalStages) return false;
+            state.stageIndex++;
+            BeginLoad();
+            return true;
+        }
+
         public bool RestartCurrentStage(string runId, int stageIndex, uint revision)
         {
             if (!Matches(runId, stageIndex, revision)

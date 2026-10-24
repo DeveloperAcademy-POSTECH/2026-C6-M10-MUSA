@@ -48,11 +48,13 @@ namespace C6Lab.Tests
             Assert.That(board.TeamWall.Visible && board.TeamWall.Right, Is.True);
 
             board.UpsertOrb("swiped", LabOrbKind.Yang, new Vector2(.995f, .65f), new Vector2(.35f, .025f));
-            for (int i = 0; i < 20; i++) yield return new WaitForFixedUpdate();
-            Assert.That(crossed, Is.Empty, "The closed outer edge never hands an orb over.");
+            // Read the motion on the bounce itself: the floor slows the orb to a stop within about ten steps.
+            for (int i = 0; i < 20 && board.TeamWallBounces == 0; i++) yield return new WaitForFixedUpdate();
             Assert.That(board.TeamWallBounces, Is.GreaterThanOrEqualTo(1));
             Assert.That(board.TryGetMotion("swiped", out _, out Vector2 back), Is.True);
             Assert.That(back.x, Is.LessThan(0f), "It comes back in like off the top and bottom walls.");
+            for (int i = 0; i < 20; i++) yield return new WaitForFixedUpdate();
+            Assert.That(crossed, Is.Empty, "The closed outer edge never hands an orb over.");
 
             board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.75f, .3f), lockSwipes: 2);
             board.UpsertOrb("flung", LabOrbKind.Yin, new Vector2(.875f, .3f));

@@ -84,6 +84,38 @@ namespace Hapio.Editor
             });
         }
 
+        /// <summary>Targeted upgrade: retain the authored battle and add only the DEV next-stage action.</summary>
+        [MenuItem("Hapio/Upgrade Battle DEV Next Stage")]
+        public static void UpgradeBattleDeveloperNextStage()
+        {
+            UpgradeScene(GameScenePaths.Battle, scene =>
+            {
+                GameBattleBindings bindings = Find<GameBattleBindings>(scene);
+                if (bindings == null || bindings.developerMode == null || bindings.developerMode.panel == null)
+                    throw new InvalidOperationException("The saved Battle DEV bindings are missing.");
+                ConfigureDeveloperNextStage(bindings);
+                EditorUtility.SetDirty(bindings);
+            });
+        }
+
+        private static void ConfigureDeveloperNextStage(GameBattleBindings bindings)
+        {
+            // Idempotent: subsequent explicit upgrades keep Inspector/manual layout changes.
+            if (bindings.developerNextStageButton == null)
+            {
+                Transform panel = bindings.developerMode.panel.transform;
+                if (panel.Find("DeveloperNextStageButton") != null)
+                    throw new InvalidOperationException("An unbound DEV next-stage button already exists.");
+                Transform scroll = panel.Find("DeveloperScrollView");
+                if (scroll == null) throw new InvalidOperationException("The saved DEV scroll view is missing.");
+                // Reserve a single visible row without moving the battle HUD or existing DEV actions.
+                var scrollRect = (RectTransform)scroll;
+                scrollRect.anchorMax = new Vector2(scrollRect.anchorMax.x, .73f);
+                bindings.developerNextStageButton = Button("DeveloperNextStageButton", panel,
+                    "NEXT STAGE · 2 / 3\nAPPLIED SETTINGS ONLY", .04f, .745f, .96f, .8f);
+            }
+        }
+
         /// <summary>Keep both existing result actions visible without overlapping their saved hit targets.</summary>
         public static void UpgradeStageResultQuitLayout()
         {
@@ -343,6 +375,7 @@ namespace Hapio.Editor
                 bindings.stageLabel = Label("StageLabel", parent, "STAGE 1 / 3", 14);
                 bindings.stageLabel.color = StageInk;
                 Rect(bindings.stageLabel.rectTransform, new Vector2(.32f, .945f), new Vector2(.7f, .98f), Vector2.zero, Vector2.zero);
+                ConfigureDeveloperNextStage(bindings);
             }
             // Only this new copy loses its standalone session. Existing assets and file IDs are preserved.
             bool ownsBattleHierarchy = new Component[] { bindings.board, bindings.target, controller, bindings.hud, bindings.seatCamera, bindings.developerMode }

@@ -56,6 +56,18 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void TheDeveloperNextStageHasNoSecondBattleToSkipTo()
+        {
+            var flow = Territory(0, 10, 20, 30);
+            var playing = Play(flow, "territory-dev-next");
+            Assert.That(flow.DeveloperNextStage(playing.runId, playing.stageIndex, playing.revision), Is.False,
+                "One battle: DEV NEXT STAGE (#288) must not load the story's second stage.");
+            Assert.That(flow.State.phase, Is.EqualTo(GameFlowPhase.Playing));
+            Assert.That(flow.State.stageIndex, Is.EqualTo(1));
+            Assert.That(flow.State.revision, Is.EqualTo(playing.revision));
+        }
+
+        [Test]
         public void APlayerLeavingStopsTheBattleIntoTheLobbyButTheStoryKeepsItsGameOver()
         {
             var flow = Territory(0, 10, 20, 30);
