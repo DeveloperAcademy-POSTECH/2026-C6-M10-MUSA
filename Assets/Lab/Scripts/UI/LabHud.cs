@@ -102,6 +102,8 @@ namespace C6Lab
         private Color lobbyOrbBackgroundColor;
         private UnityEngine.UI.Text goalTitle;
         private bool goalTitleResolved;
+        private LabTeamBar teamBar;
+        private LabTeamFever teamFever;
 
         private void Awake()
         {
@@ -174,12 +176,14 @@ namespace C6Lab
             SetVisible(pauseMenu, paused);
             if (paused) BringPauseLayersForward();
             bool hasNeighbors = battleVisible && (snapshot.players?.Length ?? 0) > 1;
-            SetVisible(leftNeighborBadge, hasNeighbors);
-            SetVisible(rightNeighborBadge, hasNeighbors);
+            // 2:2 (#281): nothing passes the closed outer edge, so its neighbour badge stays hidden.
+            int closedSide = battleVisible ? LabTeams.ClosedSide(snapshot, network.LocalPlayerId) : 0;
+            SetVisible(leftNeighborBadge, hasNeighbors && closedSide != -1);
+            SetVisible(rightNeighborBadge, hasNeighbors && closedSide != 1);
             SetVisible(pauseButton == null ? null : pauseButton.gameObject, playing);
             SetVisible(resultControls, terminal);
             if (terminal)
-                Set(resultStatusText, snapshot.phase == LabPhase.Victory ? "VICTORY" : "DEFEAT");
+                Set(resultStatusText, ResultWords(snapshot));
             bool connected = network.IsConnected;
             bool joining = network.IsJoiningRoom;
             if (wasConnected && !connected && !joining)
@@ -269,7 +273,7 @@ namespace C6Lab
                 resultLeaveButton.interactable = terminal && connected;
             }
             if (terminal && !network.IsHost)
-                Set(resultStatusText, (snapshot.phase == LabPhase.Victory ? "VICTORY" : "DEFEAT") + " · WAITING FOR HOST");
+                Set(resultStatusText, ResultWords(snapshot) + " · WAITING FOR HOST");
             Set(pauseStatusText, network.IsHost ? "PAUSED" : "PAUSED · HOST CONTROLS");
             if (leaveButton != null) leaveButton.interactable = connected || !network.CanChooseConnection;
             Set(statusText, network.Status);
@@ -298,6 +302,7 @@ namespace C6Lab
                 SetPaintPatternSample(localPlayerPatternSample, 0, false);
                 SetPaintPatternSample(leftPlayerPatternSample, 0, false);
                 SetPaintPatternSample(rightPlayerPatternSample, 0, false);
+                RefreshTeamHud(null, false);
                 return;
             }
             Set(hpText, paintGoal
@@ -329,7 +334,43 @@ namespace C6Lab
             SetPaintPatternSample(localPlayerPatternSample, local == null ? 0 : local.seat + 1, battleVisible);
             SetPaintPatternSample(leftPlayerPatternSample, ParsePlayerNumber(left), hasNeighbors);
             SetPaintPatternSample(rightPlayerPatternSample, ParsePlayerNumber(right), hasNeighbors);
+            RefreshTeamHud(snapshot, battleVisible);
         }
+
+        /// <summary>A 2:2 battle (#281) ends with the winning team or a draw; every other battle keeps its words.</summary>
+        private static string ResultWords(LabSnapshot snapshot) => snapshot.teamTerritory && snapshot.phase == LabPhase.Victory
+            ? LabTeamBar.ResultText(snapshot) : snapshot.phase == LabPhase.Victory ? "VICTORY" : "DEFEAT";
+
+        /// <summary>
+        /// 2:2 (#281): the Blue/Red share bar takes the paint bar's place, this player's badge wears the team ring,
+        /// the fever gauges sit under the bar, and a fever is announced with a banner and my team's edge glow.
+        /// </summary>
+        private void RefreshTeamHud(LabSnapshot snapshot, bool battleVisible)
+        {
+            bool territory = battleVisible && snapshot != null && snapshot.teamTerritory;
+            Transform paintBar = hpText != null ? hpText.transform.parent : null;
+            if (paintBar != null && battleUi != null && paintBar != battleUi.transform)
+                SetVisible(paintBar.gameObject, !territory);
+            if (!territory)
+            {
+                if (teamBar != null) teamBar.Hide();
+                if (teamFever != null) teamFever.Hide();
+                return;
+            }
+            if (battleUi == null) return;
+            Font font = hpText != null ? hpText.font : null;
+            if (teamBar == null) teamBar = LabTeamBar.Create((RectTransform)battleUi.transform, font);
+            if (teamFever == null) teamFever = LabTeamFever.Create((RectTransform)battleUi.transform, font);
+            LabTeam team = LabTeams.TeamOf(snapshot, network.LocalPlayerId);
+            teamBar.Present(snapshot, team, localPlayerCircle, network.config != null ? network.config.TeamFeverHits : 0);
+            teamFever.Present(snapshot, team);
+        }
+
+        /// <summary>The 2:2 fever banner and edge glow (#281), created on the first team battle.</summary>
+        public LabTeamFever TeamFever => teamFever;
+
+        /// <summary>The 2:2 share bar (#281), created on the first team battle.</summary>
+        public LabTeamBar TeamBar => teamBar;
 
         private void CacheGoalTitle()
         {
@@ -496,6 +537,13 @@ namespace C6Lab
             LabPlayerState local = Array.Find(players, player => player != null && player.id == localId);
             if (local == null) return;
             int count = players.Length;
+            if (LabTeams.FourPlayerTeams(snapshot))
+            {
+                // 2:2 (#281): only the inner edge leads to the teammate; the outer edge is a wall.
+                string mate = "P" + (LabTeams.TeammateSeat(local.seat) + 1);
+                if (LabTeams.EdgeOpen(local.seat, true)) right = mate; else left = mate;
+                return;
+            }
             LabPlayerState leftPlayer = Array.Find(players, player => player != null && player.seat == (local.seat + count - 1) % count);
             LabPlayerState rightPlayer = Array.Find(players, player => player != null && player.seat == (local.seat + 1) % count);
             if (leftPlayer != null) left = "P" + (leftPlayer.seat + 1);

@@ -11,6 +11,7 @@ namespace Hapio
     public sealed class GameRunFlow
     {
         public const int StageCount = 3;
+        public static int StagesFor(GameMode mode) => mode == GameMode.Territory ? 1 : StageCount;
         private readonly HashSet<ulong> participants = new HashSet<ulong>();
         private readonly HashSet<ulong> ready = new HashSet<ulong>();
         private GameFlowState state = new GameFlowState();
@@ -21,10 +22,10 @@ namespace Hapio
         public bool IsBattleReady => state.phase == GameFlowPhase.LoadingBattle
             && participants.Count > 0 && ready.Count == participants.Count;
 
-        public bool EnterLobby()
+        public bool EnterLobby(GameMode mode = GameMode.Story)
         {
-            if (state.phase != GameFlowPhase.Home) return false;
-            state = new GameFlowState { phase = GameFlowPhase.Lobby };
+            if (state.phase != GameFlowPhase.Home || !Enum.IsDefined(typeof(GameMode), mode)) return false;
+            state = new GameFlowState { phase = GameFlowPhase.Lobby, mode = mode, totalStages = StagesFor(mode) };
             return true;
         }
 
@@ -41,11 +42,14 @@ namespace Hapio
             participants.Clear();
             participants.UnionWith(requested);
             ready.Clear();
+            GameMode mode = state.mode;
             state = new GameFlowState
             {
                 runId = Guid.NewGuid().ToString("N"),
                 revision = 1,
                 stageIndex = 1,
+                mode = mode,
+                totalStages = StagesFor(mode),
                 phase = GameFlowPhase.LoadingBattle
             };
             return true;
@@ -76,7 +80,7 @@ namespace Hapio
             if (state.phase != GameFlowPhase.Playing
                 || state.battleSessionId != battleSessionId || state.battleRound != battleRound)
                 return false;
-            state.phase = state.stageIndex == StageCount
+            state.phase = state.stageIndex == state.totalStages
                 ? GameFlowPhase.Completed : GameFlowPhase.StageResult;
             state.revision++;
             return true;
@@ -85,7 +89,7 @@ namespace Hapio
         public bool NextStage(string runId, int stageIndex, uint revision)
         {
             if (!Matches(runId, stageIndex, revision) || state.phase != GameFlowPhase.StageResult
-                || state.stageIndex >= StageCount) return false;
+                || state.stageIndex >= state.totalStages) return false;
             state.stageIndex++;
             BeginLoad();
             return true;
@@ -95,7 +99,7 @@ namespace Hapio
         public bool DeveloperNextStage(string runId, int stageIndex, uint revision)
         {
             if (!Matches(runId, stageIndex, revision) || state.phase != GameFlowPhase.Playing
-                || state.stageIndex >= StageCount) return false;
+                || state.stageIndex >= state.totalStages) return false;
             state.stageIndex++;
             BeginLoad();
             return true;
@@ -116,6 +120,24 @@ namespace Hapio
             state.phase = GameFlowPhase.GameOver;
             state.endReason = reason;
             state.revision++;
+            ready.Clear();
+            return true;
+        }
+
+        /// <summary>
+        /// 2:2 (#281): end the battle or its result and keep the room. The lobby state's revision follows the run's,
+        /// so a lobby state from before this run can never pull a peer back out of a later battle.
+        /// </summary>
+        public bool ReturnToLobby(string notice)
+        {
+            if (state.mode != GameMode.Territory || notice == null || notice.Length > 128
+                || !(state.IsRunActive || state.phase == GameFlowPhase.Completed)) return false;
+            state = new GameFlowState
+            {
+                phase = GameFlowPhase.Lobby, mode = GameMode.Territory, totalStages = StagesFor(GameMode.Territory),
+                revision = state.revision + 1, notice = notice
+            };
+            participants.Clear();
             ready.Clear();
             return true;
         }

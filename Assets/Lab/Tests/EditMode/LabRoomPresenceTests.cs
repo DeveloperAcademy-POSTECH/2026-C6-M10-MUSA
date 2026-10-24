@@ -43,6 +43,33 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TeamRoomMarkerRoundTripsAndOlderRecordsAreStoryRooms()
+        {
+            string protocol = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game);
+            byte[] team = LabRoomPresence.Encode(protocol, true, true, 1, 4, false, true, true);
+            Assert.That(LabRoomPresence.TryDecode(team, protocol, out _, out _, out int count, out int capacity,
+                out _, out bool waiting, out bool isTeam), Is.True);
+            Assert.That((count, capacity, waiting, isTeam), Is.EqualTo((1, 4, true, true)));
+            byte[] active = LabRoomPresence.Encode(protocol, true, false, 3, 4, false, false, true);
+            Assert.That(LabRoomPresence.TryDecode(active, protocol, out _, out _, out _, out _, out _, out waiting, out isTeam), Is.True);
+            Assert.That(waiting, Is.False); Assert.That(isTeam, Is.True);
+            byte[] story = LabRoomPresence.Encode(protocol, true, true, 2, 3, true);
+            Assert.That(LabRoomPresence.TryDecode(story, protocol, out _, out _, out _, out _, out _, out _, out isTeam), Is.True);
+            Assert.That(isTeam, Is.False);
+        }
+
+        [TestCase("f=46;n=1;c=4;b=0;t=1;t=1")]
+        [TestCase("f=46;n=1;c=4;b=0;t=1;w=1")]
+        [TestCase("f=46;n=1;c=4;b=0;t=0")]
+        [TestCase("f=46;n=2;c=4;b=0;w=1;t=1")]
+        public void MalformedTeamMarkerNeverBecomesAJoinCandidate(string fields)
+        {
+            byte[] record = Record("p=" + LabBonjourDiscovery.Protocol + ";" + fields);
+            Assert.That(LabRoomPresence.TryDecode(record, LabBonjourDiscovery.Protocol,
+                out _, out _, out _, out _, out _, out _, out _), Is.False);
+        }
+
+        [Test]
         public void WrongProtocolTruncatedLengthAndInvalidUtf8AreRejected()
         {
             byte[] record = LabRoomPresence.Encode(LabBonjourDiscovery.Protocol, true, false, 1, 2, false);

@@ -173,6 +173,18 @@ namespace Hapio.Editor
             UpgradeScene(GameScenePaths.Battle, ConfigureBattle);
         }
 
+        /// <summary>
+        /// Append only the new DEV rows (#281: 2:2 territory 196-199) to Home and Lobby. Unlike the Lab upgrade
+        /// above, this never copies Battle again, so Battle-only edits and the lobby layout stay as they are.
+        /// </summary>
+        [MenuItem("Hapio/Upgrade Menu DEV Rows")]
+        public static void UpgradeMenuDeveloperRows()
+        {
+            UpgradeMenuDeveloperSchema();
+            AssetDatabase.SaveAssets();
+            Debug.Log("HAPIO_MENU_DEV_ROWS_READY: " + LabConfig.DeveloperFields.Count + " rows in Home and Lobby.");
+        }
+
         /// <summary>Append new DEV fields without regenerating either menu or its existing rows and layout.</summary>
         public static void UpgradeMenuDeveloperSchema()
         {
@@ -236,23 +248,26 @@ namespace Hapio.Editor
         private static void ConfigureDeveloperScopes(GameScreen screen)
         {
             Transform panel = screen.developerPanel.transform;
-            if (screen.developerScopeButtons != null && screen.developerScopeButtons.Length != 0
-                && screen.developerScopeButtons.Length != 4)
-                throw new InvalidOperationException("The saved DEV scope buttons must have exactly four entries.");
-            if (screen.developerScopeButtons == null || screen.developerScopeButtons.Length == 0)
-                screen.developerScopeButtons = new UnityEngine.UI.Button[4];
-            string[] labels = { "공통", "구미호", "야광귀", "지귀" };
+            // #281 appends the 2:2 tab after the three yokai; an older four-tab panel keeps its buttons.
+            string[] labels = { "공통", "구미호", "야광귀", "지귀", "2:2" };
+            int existing = screen.developerScopeButtons == null ? 0 : screen.developerScopeButtons.Length;
+            if (existing != 0 && existing != 4 && existing != labels.Length)
+                throw new InvalidOperationException("The saved DEV scope buttons must have four or five entries.");
+            if (existing != labels.Length) Array.Resize(ref screen.developerScopeButtons, labels.Length);
             for (int scope = 0; scope < labels.Length; scope++)
             {
                 UnityEngine.UI.Button button = screen.developerScopeButtons[scope];
+                float left = .035f + scope * .186f, right = left + .176f;
                 if (button == null)
                 {
                     Transform saved = panel.Find("Scope" + scope);
                     button = saved != null ? saved.GetComponent<UnityEngine.UI.Button>() : null;
-                    if (button == null) button = Button("Scope" + scope, panel, labels[scope],
-                        .035f + scope * .24f, .835f, .245f + scope * .24f, .89f);
+                    if (button == null) button = Button("Scope" + scope, panel, labels[scope], left, .835f, right, .89f);
                     screen.developerScopeButtons[scope] = button;
                 }
+                // Five tabs share the row the four used.
+                var rect = (RectTransform)button.transform;
+                rect.anchorMin = new Vector2(left, rect.anchorMin.y); rect.anchorMax = new Vector2(right, rect.anchorMax.y);
                 button.GetComponentInChildren<UnityEngine.UI.Text>(true).text = labels[scope];
             }
             Transform title = panel.Find("Title");

@@ -470,9 +470,10 @@ namespace C6Lab
             string id = ResolveLocalId(request.firstId);
             TryKnownState(id, out var orb);
             Vector3 center = target.transform.position;
-            Vector3 anchor = LabThrowMath.SeatPosition(player.seat, latest.players.Length, center,
+            int ring = LabTeams.RingSeatFor(latest, player.seat);
+            Vector3 anchor = LabThrowMath.SeatPosition(ring, latest.players.Length, center,
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
-            Vector3 position = LabThrowMath.LaunchPosition(player.seat, latest.players.Length, center, request.x, config);
+            Vector3 position = LabThrowMath.LaunchPosition(ring, latest.players.Length, center, request.x, config);
             Vector3 velocity = LabThrowMath.LaunchVelocity(new Vector2(request.vx, request.vy), anchor, center, config);
             bool small = orb != null && orb.small;
             LabOrbElement element = orb?.element ?? LabOrbElement.None;

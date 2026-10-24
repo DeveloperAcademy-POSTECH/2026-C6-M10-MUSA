@@ -88,7 +88,12 @@ namespace Hapio.Tests
             yield return Click(view.enterButton);
             yield return Click(view.countButtons[0]);
             yield return Click(view.createButton);
+            Assert.That(view.modePanel.activeInHierarchy, Is.True, "새 방 만들기 first asks which mode to open (#281).");
+            Assert.That(session.PendingRooms, Is.Empty);
+            yield return Click(view.basicModeButton);
+            Assert.That(view.modePanel.activeSelf, Is.False);
             Assert.That(session.PendingRooms.Count, Is.EqualTo(1));
+            Assert.That(session.PendingRooms.Single().Mode, Is.EqualTo(GameMode.Story));
             Assert.That(session.Network.IsConnected, Is.False);
             Assert.That(view.CreationCapacity, Is.Zero);
             yield return Until(() => session.PendingRooms.Single().Ready

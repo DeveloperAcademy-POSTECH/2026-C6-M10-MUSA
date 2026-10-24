@@ -59,14 +59,16 @@ namespace C6Lab
             foreach (LabPlayerState player in snapshot.players)
             {
                 if (player == null || player.id != localId) continue;
-                if (player.seat < 0 || player.seat >= seatCount
-                    || (player.seat == activeSeat && seatCount == activeSeatCount)) return;
+                // 2:2 (#281): around the gourd the teams alternate Blue, Red, Blue, Red.
+                int ring = LabTeams.RingSeatFor(snapshot, player.seat);
+                if (ring < 0 || ring >= seatCount
+                    || (ring == activeSeat && seatCount == activeSeatCount)) return;
 
                 Vector3 center = target.transform.position;
                 battleCamera.transform.position = LabThrowMath.SeatPosition(
-                    player.seat, seatCount, center, config.CameraRadius, config.CameraHeightOffset);
+                    ring, seatCount, center, config.CameraRadius, config.CameraHeightOffset);
                 battleCamera.transform.LookAt(center + Vector3.up * config.CameraLookHeightOffset);
-                activeSeat = player.seat;
+                activeSeat = ring;
                 activeSeatCount = seatCount;
                 Debug.Log("C6_LAB_CAMERA seat=" + activeSeat + " position=" +
                     battleCamera.transform.position.ToString("F2"));

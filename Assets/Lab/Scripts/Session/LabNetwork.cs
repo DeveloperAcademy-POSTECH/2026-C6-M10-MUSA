@@ -200,13 +200,15 @@ namespace C6Lab
         // 5659: #276 stage-selected scheduler, four Jigwi policy values and game stage settings barrier.
         // 5660: #263 bounded live room presence and creator-owned pending-room registrations.
         // 5661: #278 immutable Lab/Game Bonjour identity before pending-room activation.
-        internal const ushort LabProtocolVersion = 5661;
+        // 5662: #281 2:2 team territory (DEV 196-199, 200 shared values): team cells, winner and fever in the
+        //       snapshot, fever in the board header, team-edge handoffs and territory overwrite paint.
+        internal const ushort LabProtocolVersion = 5662;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/22");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/23");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1798,6 +1800,8 @@ namespace C6Lab
                 ? Array.Find(latest.players, p => p.id == orb.owner)?.seat ?? selectedSeat : selectedSeat;
             int seatCount = latest?.players?.Length ?? targetParticipantCount;
             if (seat < 0 || seat >= seatCount) return;
+            // 2:2 (#281): the throw starts from the same alternating spot as the thrower's camera.
+            seat = LabTeams.RingSeatFor(latest, seat);
             Vector3 targetCenter = target.transform.position;
             Vector3 seatAnchor = LabThrowMath.SeatPosition(seat, seatCount, targetCenter,
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
@@ -1917,8 +1921,9 @@ namespace C6Lab
                 if (orb.owner != LocalPlayerId || orb.inFlight) continue;
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
+                // A fever (#281) generates team orbs that are already combined; they still pop out of the drum.
                 bool showSpawn = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
-                    && orb.kind != LabOrbKind.Combined;
+                    && (orb.kind != LabOrbKind.Combined || orb.fever);
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
@@ -1932,7 +1937,7 @@ namespace C6Lab
                     // The white flash before an orb runs out (#235); a locked bomb shows its own red one.
                     lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
-                    jigwiScale: orb.jigwiRadiusScale);
+                    jigwiScale: orb.jigwiRadiusScale, fever: orb.fever);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
@@ -1954,6 +1959,8 @@ namespace C6Lab
             bool blockedHere = latest.SwipeBlockOn(LocalPlayerId);
             board.SetSwipeBlock(blockedHere ? (latest.swipeBlockedRight ? 1 : -1) : 0,
                 blockedHere ? (float)(latest.swipeBlockedUntil - latest.serverTime) : 0f);
+            // 2:2 (#281): the outer edge of this player's board is closed; only the teammate's side passes.
+            board.SetTeamWall(LabTeams.ClosedSide(latest, LocalPlayerId));
             // The fox's charm (#251) stops throws and shows its haze only on the charmed player's own board.
             bool charmedHere = latest.CharmOn(LocalPlayerId);
             board.SetCharm(charmedHere ? (float)(latest.charmUntil - latest.serverTime) : 0f);

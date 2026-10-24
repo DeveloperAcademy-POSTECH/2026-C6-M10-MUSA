@@ -137,9 +137,7 @@ namespace C6Lab
                 patternMask = LabPaintPatternMask.Load(pattern);
             RefreshNearbyPaint(direction.normalized);
             if (PaintCount < int.MaxValue) PaintCount++;
-            var opaque = new Color32((byte)Mathf.RoundToInt(Mathf.Clamp01(color.r) * 255f),
-                (byte)Mathf.RoundToInt(Mathf.Clamp01(color.g) * 255f),
-                (byte)Mathf.RoundToInt(Mathf.Clamp01(color.b) * 255f), 255);
+            Color32 opaque = Opaque(color);
             if (pixels[cell].a != 0)
             {
                 Region existing = Root(cellRegions[cell]);
@@ -457,6 +455,29 @@ namespace C6Lab
             if (destination.Length != CellCount)
                 throw new ArgumentException("A painter map needs exactly Columns * Rows entries.", nameof(destination));
             Array.Copy(painterSlots, destination, CellCount);
+        }
+
+        /// <summary>The opaque cell value a hit with this paint colour writes.</summary>
+        public static Color32 Opaque(Color color) => new Color32((byte)Mathf.RoundToInt(Mathf.Clamp01(color.r) * 255f),
+            (byte)Mathf.RoundToInt(Mathf.Clamp01(color.g) * 255f),
+            (byte)Mathf.RoundToInt(Mathf.Clamp01(color.b) * 255f), 255);
+
+        private static bool SameColor(Color32 a, Color32 b) => a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+
+        /// <summary>2:2 땅따먹기 (#281): 이 색으로 칠해진 칸 수.</summary>
+        public int CountColor(Color32 color)
+        {
+            int count = 0;
+            for (int i = 0; i < pixels.Length; i++) if (SameColor(pixels[i], color)) count++;
+            return count;
+        }
+
+        /// <summary>2:2 땅따먹기 (#281): P1..P5가 지금 칠해 둔 칸 수. 0번 칸은 칠하지 않은 칸이다.</summary>
+        public int[] CountPainterSlots()
+        {
+            var counts = new int[6];
+            for (int i = 0; i < painterSlots.Length; i++) if (pixels[i].a != 0) counts[painterSlots[i]]++;
+            return counts;
         }
 
         public byte GetPainterSlot(int cell)

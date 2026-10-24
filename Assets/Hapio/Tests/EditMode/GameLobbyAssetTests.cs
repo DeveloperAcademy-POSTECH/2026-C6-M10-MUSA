@@ -31,6 +31,22 @@ namespace Hapio.Tests
             Assert.That(view.lineLayouts, Has.Length.EqualTo(3));
             foreach (RectTransform anchor in view.seats2.Concat(view.seats3).Concat(view.seats4).Concat(view.seats5).Concat(view.lineLayouts))
                 Assert.That(anchor != null && anchor.IsChildOf(view.positionPage.transform), Is.True);
+            // 2:2 (#281): the mode popup over the browser and the editable team seat screen are saved objects.
+            Assert.That(view.modePanel, Is.Not.Null); Assert.That(view.modePanel.activeSelf, Is.False);
+            foreach (UnityEngine.UI.Button button in new[] { view.modeDismissButton, view.basicModeButton, view.teamModeButton, view.teamSoloButton })
+                Assert.That(button != null && button.transform.IsChildOf(view.modePanel.transform), Is.True);
+            Assert.That(view.basicModeButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("기본 모드"));
+            Assert.That(view.teamModeButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("2 : 2 땅따먹기"));
+            Assert.That(view.teamLayout != null && view.teamLayout.transform.IsChildOf(view.positionPage.transform), Is.True);
+            Assert.That(view.teamLayout.transform.GetSiblingIndex(), Is.LessThan(view.slotButtons[0].transform.GetSiblingIndex()),
+                "The team boxes stay behind every seat button, also after the upgrade runs again.");
+            Assert.That(view.seatsTeam, Has.Length.EqualTo(4));
+            Assert.That(view.seatsTeam.All(anchor => anchor != null && anchor.IsChildOf(view.positionPage.transform)), Is.True);
+            Assert.That(view.seatsTeam[0].anchoredPosition.x, Is.LessThan(view.seatsTeam[2].anchoredPosition.x), "Blue P1/P2 sit left of Red P3/P4.");
+            Assert.That(view.seatsTeam[0].anchoredPosition.y, Is.GreaterThan(view.seatsTeam[1].anchoredPosition.y), "P1 sits above P2.");
+            Assert.That(view.teamShifted, Has.Length.EqualTo(7)); Assert.That(view.teamShiftAnchors, Has.Length.EqualTo(7));
+            for (int i = 0; i < view.teamShifted.Length; i++)
+                Assert.That(view.teamShifted[i].name, Is.EqualTo(view.teamShiftAnchors[i].name));
             var scroll = view.roomContent.GetComponentInParent<UnityEngine.UI.ScrollRect>(true);
             Assert.That(scroll.content, Is.SameAs(view.roomContent));
             Assert.That(scroll.viewport.parent, Is.SameAs(scroll.transform));
@@ -65,9 +81,9 @@ namespace Hapio.Tests
                 Assert.That(screen.developerButton, Is.SameAs(view.developerButton));
                 Assert.That(screen.soloButton, Is.SameAs(view.soloButton));
                 Assert.That(screen.developerPanel.transform.IsChildOf(view.transform), Is.False);
-                Assert.That(screen.developerInputs, Has.Length.EqualTo(196));
-                Assert.That(screen.developerSliders, Has.Length.EqualTo(196));
-                Assert.That(screen.developerScopeButtons, Has.Length.EqualTo(4));
+                Assert.That(screen.developerInputs, Has.Length.EqualTo(200));
+                Assert.That(screen.developerSliders, Has.Length.EqualTo(200));
+                Assert.That(screen.developerScopeButtons, Has.Length.EqualTo(5));
                 Transform layer = screen.developerPanel.transform;
                 while (layer.parent != screen.transform) layer = layer.parent;
                 Assert.That(layer.GetSiblingIndex(), Is.GreaterThan(view.transform.GetSiblingIndex()), "The opaque painting must not cover DEV.");
