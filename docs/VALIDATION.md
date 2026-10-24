@@ -2562,7 +2562,7 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 
 ## #281 2:2 청홍 땅따먹기 (실험) — 2026-10-22
 
-기준 main `f0ddb076`, 브랜치 `experiment/#281-team-territory`. 단계별 커밋은 ① 규칙 핵심 `4d4220b1` → ② 로비·흐름 `dafe8106` → ③ 전투 화면 `70cde3a4` → ④ 피버·결과 `3aae31a5`이다. Unity **6000.6.5f1**, macOS ARM64, 사용자의 Desktop checkout에서 확인했다. 공유 설정 200개(196~199 추가), 통신 5662, 토큰 `C6PhysicsLab/23`·`C6HapioGame/5`.
+기준 main `f0ddb076`, 브랜치 `experiment/#281-team-territory`. 단계별 커밋은 ① 규칙 핵심 `4d4220b1` → ② 로비·흐름 `dafe8106` → ③ 전투 화면 `70cde3a4` → ④ 피버·결과 `3aae31a5` → ⑤ 문서 `36565ac8`이다. 그 뒤 main `86434fe6`(#285)를 합치고(`70fefdd3`), 팀 자리 상자 순서 수정 `b93ca80d`와 #286 구슬 HUD 합성 수정(`400e64bd`·`3e097522`, PR #287)을 합쳤다. Unity **6000.6.5f1**, macOS ARM64, 사용자의 Desktop checkout에서 확인했다. 공유 설정 200개(196~199 추가), 통신 5662, 토큰 `C6PhysicsLab/23`·`C6HapioGame/5`.
 
 ### 실제 수행 기록
 
@@ -2572,8 +2572,8 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 | Unity 메뉴 | PASS | 사용자가 `Hapio > Upgrade Menu DEV Rows`(①)와 `Hapio > Upgrade 2v2 Lobby UI`(②, ④에서 팝업을 닫힌 상태로 저장하도록 고친 뒤 재실행)를 실행했다. 로그 `HAPIO_2V2_LOBBY_READY`. |
 | 전체 EditMode (④ 직후, 사용자 실행) | 1,051/1,064 · 실패 13 | 9건은 검사 쪽 결함이라 고쳤다: 새 검사의 북 주인 조회가 0초 스냅샷을 요청해 `INVALID_TIME`(6), 설정 개수·토글 목록 고정(2), 팝업이 열린 채 저장(1). 4건은 커밋하지 않은 로컬 `LabConfig.asset`의 `sabotageMixEnabled: 1`(플레이테스트 값)이 "기본 꺼짐" 검사와 충돌한 것이다. |
 | Hapio EditMode 재실행 (사용자) | 37/40 · 실패 3 | 로비 Prefab 검사는 메뉴 재실행 후 통과. 남은 3건(홈·로비 장면, 전투 DEV 초안)은 위 로컬 설정 원인과 같다. 원본 설정(0)에서의 통과는 **NOT_RUN**. |
-| Lab EditMode 재실행 (수정 후) | **NOT_RUN** | 고친 9건이 포함된 Lab 전체 재실행 기록이 없다. |
-| 전체 PlayMode | **NOT_RUN** | 새 `LabTeamBattleScreenTests`(벽·막대·게이지·피버 알림·무지개) 포함 실행 기록이 없다. |
+| main 병합 직후 전투 화면 | 결함 발견 → 수정 | 스토리·2:2 모두 판 종이·스태미나가 사라졌다. #285 합성이 #264의 불투명 "Board Hanji Backing"을 앞쪽 구슬 화면에 같이 그린 탓이라 #286으로 분리해 고쳤다. 같은 수정 뒤 `LabOrbHudCompositionTests`의 1픽셀 차이(텍스처 1027, 카메라 1028)도 실제 픽셀 수를 쓰도록 고쳤다. |
+| 전체 EditMode·PlayMode (#286 합친 뒤, 사용자 실행) | PASS | 사용자가 Test Runner에서 실패 0을 보고했다. 위에서 고친 9건과 새 `LabTeamBattleScreenTests`(벽·막대·게이지·피버 알림·무지개)를 포함한다. 개수는 따로 기록하지 않았다. |
 | Editor Play DEV 솔로 2:2 | 부분 확인 | 사용자 화면 2장. 첫 화면에서 위쪽 막대가 빨강으로 가득 찬 결함을 발견해 고쳤다(그림 없는 Filled Image가 전체를 그림, 검사 추가). 피버 화면에서 알림·무지개 고리·게이지·팀 고리를 확인했다. 그 뒤 바꾼 "피버타임!" 문구·경계 깃발 이동·더 선명한 가장자리 빛의 화면 확인은 **NOT_RUN**. |
 | Mac 앱 4개 (4명 팀전) | **NOT_RUN** | 아래 절차로 확인한다. 팀 벽·엇갈린 자리·팀 전달·덮어쓰기는 4명에서만 나타난다. |
 | iOS·실기기·LAN·핫스팟 | **NOT_RUN** | 실제 실행 증거 없이 PASS로 기록하지 않는다. |
