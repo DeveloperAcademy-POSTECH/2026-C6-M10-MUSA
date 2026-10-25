@@ -62,7 +62,6 @@ namespace C6Lab
         private LabElementFlightTrail elementFlightTrail;
         private GameObject replacementVisual;
         private GameObject replacementPrefab;
-        private LabOrbSpriteArt orbSpriteArt;
         private LabOrbAppearance appearance;
         private LabOrbElement element;
         private Rigidbody body;
@@ -676,21 +675,20 @@ namespace C6Lab
                 visualMount = mount.transform;
                 visualMount.SetParent(transform, false);
             }
-            // The board and the projectile share one replaceable 3D sphere presentation.
-            // Physics stays on each object's root, with its own gameplay radius.
-            LabOrbVisualFactory.EnsureSphere(visualMount, "Default Sphere", radius,
+            // Board sprites stay on the board. Flight uses the replaceable 3D sphere;
+            // its root keeps the same gameplay radius, trajectory and collision ownership.
+            MeshRenderer defaultRenderer = LabOrbVisualFactory.EnsureSphere(visualMount, "Default Sphere", radius,
                 LabOrbKind.Combined,
                 appearance != null ? appearance.MaterialFor(LabOrbKind.Combined, element) : null,
                 appearance == null || appearance.NeedsTemporaryElementColor(LabOrbKind.Combined, element)
                     ? element : LabOrbElement.None);
+            if (element == LabOrbElement.None)
+                LabOrbVisualFactory.ApplyKindColor(defaultRenderer, LabOrbKind.Combined);
             Transform defaultSphere = visualMount.Find("Default Sphere");
-            Sprite sprite = appearance != null ? appearance.SpriteFor(LabOrbKind.Combined, element) : null;
-            orbSpriteArt = LabOrbSpriteArt.Set(visualMount, orbSpriteArt, sprite,
-                radius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined));
-            if (defaultSphere != null) defaultSphere.gameObject.SetActive(sprite == null && replacementVisual == null);
+            if (defaultSphere != null) defaultSphere.gameObject.SetActive(replacementVisual == null);
             if (replacementVisual != null)
             {
-                replacementVisual.SetActive(sprite == null);
+                replacementVisual.SetActive(true);
                 replacementVisual.transform.localScale = Vector3.one * (2f * radius);
                 LabOrbVisualFactory.SetLayerRecursively(replacementVisual.transform, gameObject.layer);
                 if (appearance != null && replacementPrefab == appearance.VisualPrefab)

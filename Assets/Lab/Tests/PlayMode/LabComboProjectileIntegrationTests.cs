@@ -11,7 +11,7 @@ namespace C6Lab.Tests
     public sealed class LabComboProjectileIntegrationTests
     {
         [UnityTest]
-        public IEnumerator ComboAndBlastScalesMatchOnHostAndReplicaWithTheAuthoredSpriteArt()
+        public IEnumerator ComboAndBlastScalesMatchOnHostAndReplicaWithTheAuthoredSphereArt()
         {
             LabConfig source = Resources.Load<LabConfig>("LabConfig");
             Assert.That(source, Is.Not.Null);
@@ -44,8 +44,8 @@ namespace C6Lab.Tests
                             config, target, _ => Assert.Fail("The far-away target must not be reached.")), Is.True);
                         Assert.That(replica.LaunchVisual(Vector3.forward, config, target), Is.True);
                         yield return null;
-                        AssertScaledSprite(host, config, radius, false);
-                        AssertScaledSprite(replica, config, radius, true);
+                        AssertScaledSphere(host, config, radius, false);
+                        AssertScaledSphere(replica, config, radius, true);
 
                         // Expired/reconfigured combo settings apply to future throws, not these shots.
                         float[] changed = config.CaptureDeveloperValues();
@@ -55,8 +55,8 @@ namespace C6Lab.Tests
                         changed[33] = gravity * 2f;
                         Assert.That(config.TryApplyDeveloperValues(changed, out string error), Is.True, error);
                         yield return new WaitForFixedUpdate();
-                        AssertScaledSprite(host, config, radius, false);
-                        AssertScaledSprite(replica, config, radius, true);
+                        AssertScaledSphere(host, config, radius, false);
+                        AssertScaledSphere(replica, config, radius, true);
                         Assert.That(host.GravityAcceleration, Is.EqualTo(gravity));
                         Assert.That(replica.GravityAcceleration, Is.EqualTo(gravity));
                     }
@@ -231,18 +231,37 @@ namespace C6Lab.Tests
             }
         }
 
-        private static void AssertScaledSprite(LabProjectile shot, LabConfig config, float radius, bool replica)
+        private static void AssertScaledSphere(LabProjectile shot, LabConfig config, float radius, bool replica)
         {
             SphereCollider collider = shot.GetComponent<SphereCollider>();
             Assert.That(collider.radius, Is.EqualTo(radius).Within(.0001f));
             Assert.That(collider.isTrigger, Is.EqualTo(replica));
             Assert.That(shot.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
-            var art = shot.GetComponentInChildren<LabOrbSpriteArt>();
-            Assert.That(art, Is.Not.Null);
-            SpriteRenderer renderer = art.GetComponent<SpriteRenderer>();
-            Assert.That(renderer.sprite, Is.SameAs(config.OrbAppearance.SpriteFor(LabOrbKind.Combined, LabOrbElement.Fire)));
-            Assert.That(Mathf.Max(renderer.bounds.size.x, renderer.bounds.size.y),
-                Is.EqualTo(2f * radius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined)).Within(.001f));
+            Assert.That(shot.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
+            Assert.That(shot.VisualMount.GetComponentsInChildren<LabOrbSpriteArt>(), Is.Empty,
+                "Flight must keep its 3D presentation while the board retains its sprite art.");
+            Transform surface = shot.VisualMount.Find("Replacement Visual/Sphere");
+            Assert.That(surface, Is.Not.Null, "The saved appearance supplies the flight sphere prefab.");
+            MeshRenderer renderer = surface.GetComponent<MeshRenderer>();
+            Assert.That(renderer != null && renderer.gameObject.activeInHierarchy, Is.True);
+            MeshFilter filter = surface.GetComponent<MeshFilter>();
+            Assert.That(filter != null && filter.sharedMesh != null, Is.True);
+            Assert.That(filter.sharedMesh.bounds.size.z, Is.GreaterThan(.1f), "The authored flight mesh has depth.");
+            foreach (float axis in new[] { renderer.bounds.size.x, renderer.bounds.size.y, renderer.bounds.size.z })
+                Assert.That(axis, Is.EqualTo(2f * radius).Within(.001f),
+                    "Blast and combo scales must agree between the visual sphere and its collision radius.");
+            Assert.That(renderer.sharedMaterial,
+                Is.SameAs(config.OrbAppearance.MaterialFor(LabOrbKind.Combined, LabOrbElement.Fire)));
+            var properties = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(properties);
+            Color expected = config.OrbAppearance.ElementColorFor(LabOrbElement.Fire);
+            foreach (string colorProperty in new[] { "_BaseColor", "_Color" })
+            {
+                Color actual = properties.GetColor(colorProperty);
+                Assert.That(actual.r, Is.EqualTo(expected.r).Within(.0001f));
+                Assert.That(actual.g, Is.EqualTo(expected.g).Within(.0001f));
+                Assert.That(actual.b, Is.EqualTo(expected.b).Within(.0001f));
+            }
             Assert.That(shot.ElementFlightTrail, Is.Not.Null, "The authored elemental trail survives combo sizing.");
         }
     }

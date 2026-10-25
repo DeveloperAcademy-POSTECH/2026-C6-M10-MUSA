@@ -87,6 +87,9 @@ namespace Hapio.Tests
                 Assert.That(bindings.hud, Is.Not.Null);
                 Assert.That(bindings.developerMode, Is.Not.Null);
                 Assert.That(bindings.stageLabel, Is.Not.Null);
+                Assert.That(bindings.developerNextStageButton, Is.Not.Null);
+                Assert.That(bindings.developerNextStageButton.transform.parent, Is.SameAs(bindings.developerMode.panel.transform));
+                Assert.That(bindings.developerNextStageButton.GetComponent<UnityEngine.UI.Image>().raycastTarget, Is.True);
                 Assert.That(bindings.yokaiPresentation, Is.Not.Null);
                 Assert.That(bindings.yokaiPresentation.gameObject.scene, Is.EqualTo(scene));
                 Assert.That(All<LabJigwiHud>(scene).Single().network, Is.Null,

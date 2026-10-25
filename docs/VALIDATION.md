@@ -2504,6 +2504,84 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 - Lab Scene/설정·전투/결과 Scene·Build Settings·패키지 보존 대상9개와 Desktop 사용자 미추적 Scene meta의 해시 동일을 확인했다. iOS export/서명·iPhone/iPad·일반 LAN/핫스팟 실기기·3~5대·모바일 성능은 계속 **NOT_RUN**이다.
 
 
+## #283 전투 HUD·구슬 외형·완성 박 관람 입력 수정 — 2026-10-22
+
+기준은 main `f0ddb076`에서 분기한 `fix/#283-battle-visual-input`의 변경 후 작업 트리이며, Unity **6000.6.5f1 / macOS ARM64 / Metal**에서 검사한다. iPhone·iPad의 관람 오류 제보와 Mac 관람의 기존 증상 확인 불가를 구분한다.
+
+### 변경 범위와 실행 연결
+
+- `LabSceneController.Awake`가 같은 Scene의 `LabHud`에 `LabOrbHudComposition`을 연결한다. 저장된 `Lab.unity`와 게임의 공통 `Battle.unity`를 다시 생성하거나 저장하지 않는다.
+- 기존 스태미나·좌우 이웃 배지의 부모·RectTransform을 유지한다. 실행 중에만 **종이판 → 세 HUD 장식 → 구슬/효과 → 나머지 HUD·메뉴** 순서로 합성한다. 원본 OrbCamera는 화면 입력용 viewport·projection·targetTexture를 유지하며 종이판을 그리고, 별도 카메라가 구슬을 투명 RT로 그린다. `LabBoardPaper`는 후경 표시용 레이어로 물리 오브젝트 레이어는 바꾸지 않는다. 전체 viewport 합성 이미지는 raycast를 받지 않는다.
+- 합성용 Resources 셰이더는 premultiplied RGB를 다시 alpha와 곱하지 않는다. `ElementInkTrail`은 기존 RGB 혼합을 유지하고 alpha 누적만 분리한다. 비활성화·Scene 종료 때 카메라·RT·material을 해제하고 표시 순서와 mask/layer를 복원한다. 초기화 실패 시 기존 직접 렌더링으로 복원한다.
+- `LabOrbView`/`LabOrbAppearance`에서 미확정 `Combined + None`은 중립색으로 표시한다. Host가 승인한 오행이 반영될 때 같은 물리 객체를 확정 외형으로 바꾼다. 조합 요청·ID·소유권·지연 승인·거절 복원 규칙을 바꾸지 않는다.
+- `LabProjectile`은 조합판 스프라이트와 비행 표현을 분리해 기존 3D sphere/prefab·오행 material을 사용한다. 발사점·Rigidbody·충돌 반지름·축소/콤보 배율·트레일·명중·도색 판정은 유지한다.
+- 저장된 `GamePreviewInput`은 공통 `GourdViewerGestureSurface` 하나를 연결하는 adapter다. 픽셀 이동량 대신 미리보기 영역 크기로 나눈 비율을 전달한다. 1% 너비 이동은 기존 감도에서 1.8° 회전이다. 영역에서 시작한 손가락 ID를 추적하고 한 손가락 회전·두 손가락 확대를 분리한다. 손가락 변경·취소·초기화·닫기/재열기·포커스 상실 때 이전 기준을 버린다. 도색 데이터·결과·원본 박 물리는 변경하지 않는다.
+
+### UI·관람 수정 당시 검사 결과 (이름 예약 보완 전)
+
+| 검사 | 결과 | 범위 |
+| --- | --- | --- |
+| 전체 EditMode | **1,034/1,034 PASS**,25.66초 | 실패/건너뜀0. 기존 Scene·Prefab·설정·게임 규칙 참조 검사. |
+| 전체 PlayMode | **355/356**,166.13초; 실패1·건너뜀0 | HUD 위치/부모·입력 투영 보존·실제 RT alpha·자원 복원, 중립 조합/거절, 오행 3D 비행/축소/콤보/실제 명중, 합성 터치·저장 결과 입력·3스테이지 흐름 통과. 남은 native 등록 검사1건은 아래에 별도 기록. |
+| iOS 출력·서명·iPhone/iPad 터치·LAN/핫스팟 | **NOT_RUN** | 개발 연결이 가능한 기기 없이 기존 기기 기록을 승계하지 않는다. |
+| Mac 수동 관람 조작 | **NOT_RUN** | 합성 입력 자동 검사와 구분한다. 기존 Mac 관람 오류 유무는 확인 불가다. |
+
+원시 XML·Editor 로그·기기 목록은 저장소 밖에 보관한다. 자동 검사의 합격은 실기기 터치 감각·모바일 GPU 비용의 합격을 의미하지 않는다.
+
+- 초기 집중 검사에서 꼬리색 .78이 Color32의 199/255로 저장되는 차이를 확인해 해당 색 비교만 반 8비트 단계 오차를 허용했다. 실제 mesh 색 검사 기준은 유지했다. 합성 터치 fixture는 batch Editor의 포커스가 주입 입력을 차단하지 않도록 임시 InputSettings로 격리하며 종료 시 복원한다. UI 갱신은 최대8프레임 안에 초기화되어야 하고 렌더 오류는 즉시 실패한다.
+- 기존 비행 검사 두 곳은 스프라이트를 필수로 요구했다. 이를 3D mesh 깊이·세 축 지름·오행 재질/색·단일 Rigidbody/collider·축소/콤보 배율 검사로 바꿨으며 기존 실제 명중·HP·트레일 검사는 보존했다. 최종 전체 실행에서 모두 통과했다.
+- **추가 보완 전 실패 기록:** `LabFigmaLobbyTests.ThreePendingLabRoomsRetryConfirmedNameConflictsAndExposeSequentialNativeRoutes`. 두 번째/세 번째 등록이 기존 번호와 같은 이름으로 `ready=True, failed=False`가 되어 고유 순차 이름 조건에 실패했다. 초기 전체, 분리1건, 최종 전체 실행에서 재현됐으며 이름 조건을 완화하거나 검사를 제외하지 않았다.
+- 이 검사는 전투/Host를 시작하지 않고 브라우저 시작 전 native 광고 등록 이름을 평가한다. 해당 로비에서 `battleUi`는 비활성이라 새 HUD의 RT·카메라 mask·레이어 변경은 실행되지 않는다. main 기준 네트워크/allocator/해당 검사 소스는 수정하지 않았다. 당시에는 main 별도 실행이나 native 콜백 계측을 하지 않아 원인을 미확정으로 남겼다. 이후 아래 독립 native 재현과 예약 보완으로 이어갔다.
+- 저장된 Scene·Prefab·머터리얼과 기존 로컬 자료는 작업 전 해시로 비교한다. 이번 설정 변경은 후경용 `LabBoardPaper` 레이어 추가이며, 검사 과정의 `TimeManager` 직렬화 변환과 두 머터리얼의 `_Color` 부동소수점 정밀도 차이는 별도 사본을 남기고 작업 전 원본으로 복원했다. 104개 Scene/에셋/설정 보존 기준에서 의도한 TagManager 레이어 외 차이가 없고, 기존 로컬 미추적3개 파일의 해시도 동일하다. 통신 규약·게임 수치·패키지·Build Settings는 변경하지 않는다.
+
+
+### 남은 직접 확인 순서
+
+1. 새 게임은 **Hapio > Open Home → Play → DEV SOLO** 또는 실제 다인 방으로 실행한다. 독립 Lab과 3스테이지 게임 빌드 경로를 혼동하지 않는다.
+2. 구슬을 스태미나·좌우 배지와 겹치는 위치로 옮겨 HUD보다 앞에 보이는지 확인한다. 배지 전체 노출·숫자/스태미나 갱신·미니맵 위치·매혹 말풍선 터치·pause/DEV가 앞에 보이는지도 확인한다.
+3. Client에서 Yin+Yang을 조합해 승인 전 보라색이 보이지 않는지 확인한다. 오행 다섯 종류를 투척해 3D 표면·트레일·명중/색칠을 확인한다. Host/Client의 역할을 바꿔 확인한다.
+4. 완성 박 관람에서 작은 한 손가락 회전 → 두 손가락 확대 → 한 손가락 회전을 반복한다. 화면 밖에서 시작한 터치·손가락 교체·RESET VIEW·닫기/재열기 후 갑자기 뒤집히지 않는지 확인한다. Mac 드래그/휠은 별도 회귀 항목이다.
+
+
+### #283 방 이름 중복 실패의 후속 원인 확인·보완
+
+- Unity와 분리된 macOS native 진단에서 프로젝트와 같은 `DNSServiceRegister`의 **명시 이름·서로 다른 비영(非零) 포트·interface 0·NoAutoRename(0x8)** 조합을 사용했다. 첫 등록의 `Add/error0` 확정 뒤 같은 이름의 두 번째 등록을 시작해도 두 번째가 같은 이름으로 `Add/error0`를 반환했다. 세 번째는 `NameConflict(-65548)`를 반환했다. 진단 등록·소켓은 모두 종료 시 해제했으며 원시 이름·로그는 저장소에 넣지 않는다.
+- 따라서 OS의 성공 콜백을 앱 내부 이름 잠금으로 간주할 수 없었다. 기존 `LabPendingRoom`은 native `NameConflict`를 받을 때만 번호를 올렸고, 프로세스 내부 예약이 없어 둘이 같은 이름으로 Ready가 될 수 있었다. 이는 이번 환경에서 재현한 동작이며 모든 OS 버전이 항상 중복 등록을 허용한다는 뜻이 아니다.
+- [Apple 등록 안내](https://developer.apple.com/library/archive/documentation/Networking/Conceptual/dns_discovery_api/Articles/registering.html)와 [SDK 정의](https://github.com/apple-oss-distributions/mDNSResponder/blob/main/mDNSShared/dns_sd.h)를 확인했다. 기존 Add 플래그·NoAutoRename 값·오류값·P/Invoke 시그니처는 유지한다.
+- `LabBonjourDiscovery`가 자동 이름 변경을 끈 명시 광고의 DNS 이름을 대소문자 구분 없이 원자적으로 예약한다. 포트·TXT family가 아닌 실제 서비스 이름/type/domain이 키다. Lab/Game의 서로 다른 이름 prefix는 그대로다. 로컬 충돌은 기존 번호 재시도로 전달하며 native 충돌 예산과 구분한다. 외부 기기 충돌의 native 처리, 직접 Lab Host 자동 이름 변경, Game Host GUID 이름은 유지한다.
+- 예약은 실제 native operation의 수명에 속한다. 광고를 Host로 넘긴 뒤 카드 객체만 Dispose해도 유지되며, native ref 해제 후 반납한다. 재등록은 이전 native ref와 예약을 먼저 정리한다. 실패·타임아웃·Dispose·재시도와 정수 최댓값을 회귀 검사한다. 기존 세 방 시험의 정확한 순차 이름·고유 포트·실제 browse/주소·대기 TXT 조건은 완화하지 않는다.
+
+| 이름 예약 보완 후 최종 검사 | 실제 결과 | 범위 |
+| --- | --- | --- |
+| 전체 EditMode | **1,039/1,039 PASS**,25.95초 | 실패/건너뜀0. 이름 예약·대소문자/TXT·반복 Dispose·callback 실패·정리 지연·native 예산·정수 한계5건 추가. |
+| 실제 Bonjour 집중 PlayMode | **2/2 PASS**,4.01초 | 원래 세 방의 N/N+1/N+2·주소·포트·TXT 검사와 새 Host 이양/종료/동일 소유자 재등록 검사. |
+| 전체 PlayMode | **357/357 PASS**,161.82초 | 실패/건너뜀0. 이전 실패1건을 포함한 전체 전투·UI·관람·네트워크·3스테이지 회귀. |
+| 독립 읽기 리뷰 | 추가 P1/P2 발견 없음 | HUD/외형/관람과 이름 예약의 operation 수명·재등록·펌핑 중 정리 지연을 별도로 검토. 실행 검사를 대체하지 않는다. |
+| 실기기·독립 앱·실제 LAN/핫스팟 | **NOT_RUN** | iOS 출력/서명·iPhone/iPad 직접 터치·Mac 수동 관람·모바일 GPU 비용은 새로 확인하지 않았다. |
+
+보완 범위는 같은 프로세스 안의 명시 광고다. 같은 Mac의 별도 프로세스나 다른 기기 사이의 충돌은 기존 native 처리에 의존한다. 이 변경으로 모든 네트워크 환경의 이름 충돌·접속을 검증했다고 표현하지 않는다. 최종 실행 후 Scene·Prefab·머터리얼·원본 설정과 기존 로컬 파일을 다시 해시 비교했고, 의도한 후경 레이어 외 변경이 없다. 검사 중 생긴 직렬화 차이는 별도 사본을 남겨 원복했으며 원시 로그·진단 소스·산출물은 커밋하지 않는다.
+
+
+## #288 DEV 다음 스테이지 — 2026-10-22
+
+기준은 main `86434fe6`에서 분기한 `feat/#288-dev-next-stage`의 변경 후 작업 트리다. 사용자 확인에 따라 스테이지 표시 위치·안전 영역 변경을 이번 반영에서 제외했다. Unity 6000.6.5f1 / macOS ARM64 / Metal에서 범위 축소 후 관련 검사를 다시 실행했다. 이전 UI 변경을 포함한 버전의 합격 수치를 승계하지 않았다. 원시 로그·NUnit XML·빌드 산출물은 공개 저장소에 넣지 않는다.
+
+| 항목 | 실제 수행과 결과 | 범위·제한 |
+| --- | --- | --- |
+| 최종 범위 Unity 컴파일·Battle 저장 참조 | **PASS** | StageLabel·기존 전투 UI 배치를 보존한 상태에서 DEV 스크롤 상단·새 버튼·바인딩만 변경함을 저장 Scene 블록 비교로 확인 |
+| 최종 범위 Hapio EditMode | **43/43 PASS**, 실패·skip 0 | DEV 전이 토큰·상태·최종 스테이지 제한, 오래된 ACK/중복 거절, 전원 새 ACK 장벽, 기존 저장 Scene·세션·스냅샷 검사. 제외된 안전 영역 전용 검사는 최종 범위에 포함하지 않음 |
+| 최종 범위 Hapio PlayMode | **19/19 PASS**, 실패·skip 0 | 저장된 Home→Battle 및 기존 정상 3스테이지·결과·관람·재시작/게임오버 흐름 포함 |
+| 저장 DEV 버튼 1→2→3 이동 | **PASS — PlayMode에 포함** | 솔로에서 일시정지→DEV→저장 버튼 클릭, 같은 GameSession/Network/run/참가자/P번호 유지, 새 Battle ID·새 board·다음 요괴, 구슬/HP/도색/통계 초기화, 승인 프로필 유지, 미적용 HP 입력 제외, 결과 Scene/완성 박 미생성 |
+| 전이 경계 | **PASS — PlayMode에 포함** | 비정지·Home·로딩/중복·예약된 DEV 재시작·GameOver 거절. 3에서는 버튼 비활성·API 거절하며 현재 전투/정지 상태 유지 |
+| Scene·로컬 변경 보존 | **PASS** | 작업 전 128개 보호 경로 해시와 비교해 의도한 Battle만 변경. StageLabel 4개 블록은 원본과 완전히 동일하며 기존 객체 삭제 0. 기존 변경은 DEV 패널 자식 목록·DEV 스크롤 높이·버튼 참조 3곳뿐. 다른 Scene/Prefab/Material/설정과 미추적 파일 내용 유지 |
+| Mac 독립 개발 실행본 3개 | **부분 확인 — 범위 축소 전 개발 실행본** | 같은 방 로비에서 3/3·P1/P2/P3, 1스테이지 시작, Host 일시정지까지 실제 확인. NEXT를 통한 다중 실행본의 동시 이동은 아직 수행하지 않음. 최종 범위 자동 재검사나 모바일 기기 검증을 대체하지 않음 |
+| 실제 LAN·핫스팟 Host/참가자 동시 다음 스테이지 | **NOT_RUN** | 기존 전송·설정/로딩 장벽을 재사용한다. 실제 다중 실행본·다중 기기의 NEXT 전환은 아직 수행하지 않음 |
+| 실제 iPhone/iPad | **NOT_RUN** | iOS 출력·서명·설치·터치 검증은 이번 작업에서 수행하지 않음. 노치 표시 수정은 이번 반영 범위에서 제외 |
+| 비개발 Player 빌드 | **NOT_RUN** | 노출/API의 DeveloperBuildAvailable 조건은 코드로 확인. Release 빌드 실행은 수행하지 않음 |
+
+기존 Lab Scene, Home/Lobby/StageResult/GameOver 배치와 설정 스키마·네트워크 연결 규약은 변경하지 않는다. 현재 정상 결과의 NEXT와 DEV의 직접 이동은 별개다. 범위 축소 후 자동 검사는 실제 다중 기기 NEXT 전환과 iOS 기기 검증을 대체하지 않는다.
+
+
 ## 구슬 이미지 교체 (#294) — 2026-10-25
 
 `orgin/feat/#294-orbs-new-asset`에서 사용자 제공 음·양·화·수·목·금·토 PNG7개를 기존 Sprite 경로에 교체했다. 이번 변경 후 Unity **6000.6.5f1**에서 아래 집중 검사를 실행했다. 원시 XML과 임시 검증 코드는 커밋하지 않는다.
@@ -2514,3 +2592,5 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 | 컴파일·EditMode | **7/7 PASS** | `LabOrbSpriteDesignTests`: 저장 Config의7종 Sprite 경로·중앙 피벗·mipmap 없음 확인. |
 | PlayMode | **3/3 PASS** | `LabOrbSpriteTests`:7종 조합판 이미지·표시 크기·충돌체 유지·3D fallback,5종 투사체 이미지·축소 충돌체·궤적, 카메라별 정면 방향 확인. |
 | Mac/iOS 빌드·실기기·육안 플레이 | NOT_RUN | 이번 변경에서 빌드·실기기와 실제 플레이 화면의 시각 품질은 확인하지 않았다. 전체 테스트 실행 결과로 확대 해석하지 않는다. |
+
+- PR 작성 시 최신 main을 통합하면서 검증 기록의 동시 추가 충돌만 양쪽 내용을 보존해 해결했다. 위 Unity 검사는 main 통합 전 `d658b2a1` 변경에서 실행한 기록이다. 통합 후에는 `git diff --check`와 main 대비 변경9개 파일 범위를 확인했으며 Unity 검사는 재실행하지 않았다. 최신 main의 #283은 투사체를3D 구체로 표시하므로 이 PNG 교체는 조합판 Sprite에 적용되고 비행 외형은 그 경로를 유지한다.

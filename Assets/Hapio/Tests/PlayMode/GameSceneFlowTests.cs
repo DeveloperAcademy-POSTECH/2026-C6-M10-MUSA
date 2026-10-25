@@ -7,6 +7,7 @@ using System.Reflection;
 using C6Lab;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
@@ -136,6 +137,70 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavedResultPreviewUsesOneNormalizedGestureHandlerAndClearsHeldDragsOnResetAndReopen()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            CompleteMapInFixture(Model());
+            yield return Until(() => session.State.phase == GameFlowPhase.StageResult && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.StageResult, "The committed result must load its saved UI.");
+            GameScreen screen = SceneManager.GetActiveScene().GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<GameScreen>(true)).Single();
+            screen.viewerButton.onClick.Invoke();
+            yield return null;
+            Assert.That(screen.viewerPanel.activeInHierarchy, Is.True);
+            GameObject image = screen.viewerImage.gameObject;
+            GamePreviewInput adapter = image.GetComponent<GamePreviewInput>();
+            Assert.That(adapter, Is.Not.Null, "Keep the saved Scene's adapter reference.");
+            Assert.That(image.GetComponents<MonoBehaviour>().OfType<IDragHandler>().Count(), Is.EqualTo(1),
+                "The adapter and the shared surface must not dispatch the same drag twice.");
+            Assert.That(image.GetComponents<GourdViewerGestureSurface>(), Has.Length.EqualTo(1));
+            var preview = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+            Quaternion initial = preview.ModelRotation;
+            string paintHash = preview.PaintPixelHash;
+            Color32[] paintPixels = preview.PaintTexture.GetPixels32();
+            string result = JsonUtility.ToJson(session.ResultSnapshot);
+            RectTransform rectangle = screen.viewerImage.rectTransform;
+            Canvas.ForceUpdateCanvases();
+            Vector2 start = PreviewScreenPoint(rectangle, .4f, .5f);
+            var pointer = new PointerEventData(EventSystem.current) { pointerId = 12345, position = start };
+            ExecuteEvents.Execute(image, pointer, ExecuteEvents.pointerDownHandler);
+            pointer.position = PreviewScreenPoint(rectangle, .41f, .5f);
+            pointer.delta = pointer.position - start; // Pixel movement exceeds 1px on the saved layout.
+            ExecuteEvents.Execute(image, pointer, ExecuteEvents.dragHandler);
+            Quaternion expected = Quaternion.AngleAxis(-1.8f, Vector3.up) * initial;
+            Assert.That(Quaternion.Angle(expected, preview.ModelRotation), Is.LessThan(.01f),
+                "One percent of the preview width rotates 1.8 degrees, not a clamped 180 degrees.");
+            screen.resetViewerButton.onClick.Invoke();
+            Assert.That(Quaternion.Angle(initial, preview.ModelRotation), Is.LessThan(.001f));
+            pointer.position = PreviewScreenPoint(rectangle, .6f, .5f);
+            ExecuteEvents.Execute(image, pointer, ExecuteEvents.dragHandler);
+            Assert.That(Quaternion.Angle(initial, preview.ModelRotation), Is.LessThan(.001f),
+                "Reset must discard a held pointer's old baseline.");
+            screen.closeViewerButton.onClick.Invoke();
+            yield return null;
+            Assert.That(screen.viewerPanel.activeSelf, Is.False);
+            screen.viewerButton.onClick.Invoke();
+            yield return null;
+            ExecuteEvents.Execute(image, pointer, ExecuteEvents.dragHandler);
+            Assert.That(Quaternion.Angle(initial, preview.ModelRotation), Is.LessThan(.001f),
+                "Reopening must not adopt an old drag without a fresh pointer down.");
+            Assert.That(image.GetComponents<GourdViewerGestureSurface>(), Has.Length.EqualTo(1));
+            Assert.That(preview.PaintPixelHash, Is.EqualTo(paintHash));
+            Assert.That(preview.PaintTexture.GetPixels32(), Is.EqualTo(paintPixels));
+            Assert.That(JsonUtility.ToJson(session.ResultSnapshot), Is.EqualTo(result),
+                "Local gesture input must not alter the committed gameplay result.");
+        }
+
+        private static Vector2 PreviewScreenPoint(RectTransform rectangle, float x, float y)
+        {
+            Rect local = rectangle.rect;
+            return RectTransformUtility.WorldToScreenPoint(null, rectangle.TransformPoint(new Vector3(
+                local.xMin + local.width * x, local.yMin + local.height * y, 0f)));
+        }
+
+        [UnityTest]
         public IEnumerator SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload()
         {
             GameSession persistent = session;
@@ -176,6 +241,16 @@ namespace Hapio.Tests
                 var jigwiHud = SceneManager.GetActiveScene().GetRootGameObjects()
                     .SelectMany(root => root.GetComponentsInChildren<LabJigwiHud>(true)).Single();
                 yield return null; // The saved HUD evaluates the real stage policy in LateUpdate.
+                LabHud battleHud = SceneManager.GetActiveScene().GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<LabHud>(true)).Single();
+                LabOrbHudComposition composition = battleHud.GetComponent<LabOrbHudComposition>();
+                Assert.That(composition, Is.Not.Null, "Every shared Battle instance must attach the visual-only compositor.");
+                Assert.That(composition.IsCompositing, Is.True, composition.InitializationError);
+                Assert.That(battleHud.orbCamera.targetTexture, Is.Null,
+                    "The saved camera remains the on-screen physics/input projection across all three stages.");
+                Assert.That(composition.Display.transform.parent, Is.SameAs(battleHud.battleUi.transform));
+                Assert.That(composition.Display.raycastTarget, Is.False);
+                Assert.That(composition.ForegroundCamera.cullingMask & (1 << network.board.gameObject.layer), Is.Not.Zero);
                 Assert.That(network.JigwiManualControlsAllowed, Is.EqualTo(stage == 3));
                 Assert.That(jigwiHud.testToggle.gameObject.activeInHierarchy, Is.EqualTo(stage == 3),
                     "The standalone Lab manual panel must not appear in Gumiho or Yaguang game stages.");
@@ -338,6 +413,134 @@ namespace Hapio.Tests
             Assert.That(network.Snapshot.players.Single().stamina, Is.EqualTo(73f).Within(.01f));
             Assert.That(network.config.SabotageMixEnabled, Is.False,
                 "Restart must retain the user's OFF rather than reapply the stage's initial ON default.");
+        }
+
+        [UnityTest]
+        public IEnumerator PausedDeveloperNextStageUsesSavedButtonAndFreshBattlesWithoutApplyingUnsavedFields()
+        {
+            Assert.That(session.CanDeveloperAdvanceStage, Is.False);
+            Assert.That(session.DeveloperNextStage(), Is.False, "Home has no stage to skip.");
+            GameSession persistent = session;
+            LabNetwork persistentNetwork = network;
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            string runId = session.State.runId;
+            ulong playerId = network.LocalPlayerId;
+            int slot = network.LocalSlotNumber;
+            ulong[] participants = network.ConnectedPlayerIds.ToArray();
+            var loadedPaths = new System.Collections.Generic.List<string>();
+            UnityEngine.Events.UnityAction<Scene, LoadSceneMode> recordScene = (scene, _) => loadedPaths.Add(scene.path);
+            SceneManager.sceneLoaded += recordScene;
+            try
+            {
+                for (int stage = 1; stage <= 3; stage++)
+                {
+                    Assert.That(GameSession.Instance, Is.SameAs(persistent));
+                    Assert.That(session.Network, Is.SameAs(persistentNetwork));
+                    Assert.That(session.State.runId, Is.EqualTo(runId));
+                    Assert.That(network.LocalPlayerId, Is.EqualTo(playerId));
+                    Assert.That(network.LocalSlotNumber, Is.EqualTo(slot));
+                    Assert.That(network.ConnectedPlayerIds, Is.EqualTo(participants));
+                    Assert.That(Model().StageYokai, Is.EqualTo((LabStageYokai)stage));
+                    AssertFreshStage();
+                    Assert.That(network.IsBattlePaused, Is.False);
+                    Assert.That(session.CanDeveloperAdvanceStage, Is.False, "DEV skip requires an explicitly paused battle.");
+                    Assert.That(session.DeveloperNextStage(), Is.False);
+                    Assert.That(session.State.stageIndex, Is.EqualTo(stage));
+
+                    network.Generate();
+                    yield return Until(() => network.Snapshot.players.Single().generatedTotal == 1,
+                        "Leave real generated resources in the old Battle to verify next-stage cleanup.");
+                    LabModel model = Model();
+                    Assert.That(model.TryApplyPlayerDamage(playerId, 13, ModelTime(model)), Is.True);
+                    LabOrbBoard oldBoard = network.board;
+                    string oldBattle = session.State.battleSessionId;
+                    session.Pause();
+                    Assert.That(network.IsBattlePaused, Is.True);
+                    yield return null;
+                    GameBattleBindings bindings = SceneManager.GetActiveScene().GetRootGameObjects()
+                        .SelectMany(root => root.GetComponentsInChildren<GameBattleBindings>(true)).Single();
+                    LabDeveloperMode dev = bindings.developerMode;
+                    Assert.That(bindings.developerNextStageButton, Is.Not.Null, "Use the saved editable DEV control.");
+                    Assert.That(bindings.developerNextStageButton.transform.IsChildOf(dev.panel.transform), Is.True);
+                    dev.Open();
+                    yield return null;
+                    Assert.That(dev.panel.activeInHierarchy, Is.True);
+                    Assert.That(bindings.developerNextStageButton.gameObject.activeInHierarchy, Is.True);
+                    Assert.That(bindings.developerNextStageButton.interactable, Is.EqualTo(stage < 3));
+                    float[][] acceptedProfiles = Enumerable.Range(0, 4)
+                        .Select(scope => session.CaptureDeveloperSettings(scope)).ToArray();
+                    int hpField = Enumerable.Range(0, LabConfig.DeveloperFields.Count)
+                        .Single(i => LabConfig.DeveloperFields[i].Label == "Player Max HP");
+                    dev.valueInputs[hpField].text = "299"; // Deliberately do not APPLY or restart.
+                    Assert.That(network.config.PlayerMaxHp, Is.EqualTo(237));
+                    Assert.That(session.CanDeveloperAdvanceStage, Is.EqualTo(stage < 3));
+                    uint revision = session.State.revision;
+                    if (stage == 3)
+                    {
+                        Assert.That(session.DeveloperNextStage(), Is.False, "The last stage cannot create a stage 4 or fake completion.");
+                        yield return null;
+                        Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Playing));
+                        Assert.That(session.State.stageIndex, Is.EqualTo(3));
+                        Assert.That(session.State.revision, Is.EqualTo(revision));
+                        Assert.That(session.State.battleSessionId, Is.EqualTo(oldBattle));
+                        Assert.That(network.IsBattlePaused, Is.True);
+                        Assert.That(session.ResultSnapshot, Is.Null);
+                        Assert.That(session.PreviewTexture, Is.Null);
+                        continue;
+                    }
+
+                    bindings.developerNextStageButton.onClick.Invoke();
+                    Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.LoadingBattle));
+                    Assert.That(session.State.stageIndex, Is.EqualTo(stage + 1));
+                    Assert.That(session.IsLoadingScene, Is.True);
+                    Assert.That(session.CanDeveloperAdvanceStage, Is.False);
+                    uint loadingRevision = session.State.revision;
+                    Assert.That(loadingRevision, Is.GreaterThan(revision));
+                    Assert.That(session.DeveloperNextStage(), Is.False, "Duplicate input cannot skip the new loading generation.");
+                    Assert.That(session.State.revision, Is.EqualTo(loadingRevision));
+                    yield return WaitPlaying(stage + 1);
+                    Assert.That(session.State.battleSessionId, Is.Not.EqualTo(oldBattle));
+                    Assert.That(oldBoard == null, Is.True, "The previous Battle instance must be unloaded.");
+                    AssertDeveloperSettings(acceptedProfiles[stage + 1]);
+                    for (int scope = 0; scope <= 3; scope++)
+                        Assert.That(session.CaptureDeveloperSettings(scope), Is.EqualTo(acceptedProfiles[scope]),
+                            "Skipping must retain approved profiles and discard unapplied form text.");
+                    Assert.That(loadedPaths, Does.Not.Contain(GameScenePaths.StageResult),
+                        "Skipping must not produce a completed paint preview or a victory result.");
+                }
+            }
+            finally { SceneManager.sceneLoaded -= recordScene; }
+        }
+
+        [UnityTest]
+        public IEnumerator DeveloperNextStageCannotOvertakeAQueuedRestartOrLeaveGameOver()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            string battle = session.State.battleSessionId;
+            session.Pause();
+            float[] values = network.config.CaptureDeveloperValues();
+            Set(values, "Player Max HP", 219f);
+            Assert.That(session.ApplyDeveloperSettings(values, out string error), Is.True, error);
+            Assert.That(session.CanDeveloperAdvanceStage, Is.False,
+                "An accepted current-stage restart already owns the transition.");
+            Assert.That(session.DeveloperNextStage(), Is.False);
+            Assert.That(session.State.stageIndex, Is.EqualTo(1));
+            yield return Until(() => session.State.phase == GameFlowPhase.Playing
+                && !session.IsLoadingScene && session.State.battleSessionId != battle,
+                "The already accepted DEV restart must finish on stage 1.");
+            Assert.That(network.Snapshot.players.Single().personalHp, Is.EqualTo(219));
+            session.ExitRun();
+            yield return WaitGameOver();
+            uint revision = session.State.revision;
+            Assert.That(session.CanDeveloperAdvanceStage, Is.False);
+            Assert.That(session.DeveloperNextStage(), Is.False);
+            yield return null;
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.GameOver));
+            Assert.That(session.State.stageIndex, Is.EqualTo(1));
+            Assert.That(session.State.revision, Is.EqualTo(revision));
+            Assert.That(session.ResultSnapshot, Is.Null);
         }
 
         [UnityTest]

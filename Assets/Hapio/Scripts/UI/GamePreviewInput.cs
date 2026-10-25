@@ -1,28 +1,53 @@
+using C6Lab;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
 
 namespace Hapio
 {
-    /// <summary>Input is local to the result preview and never changes the completed shared gourd.</summary>
-    public sealed class GamePreviewInput : MonoBehaviour, IDragHandler, IScrollHandler
+    /// <summary>Keeps the saved Scene reference while sharing the result viewer's gesture ownership.</summary>
+    [DisallowMultipleComponent]
+    public sealed class GamePreviewInput : MonoBehaviour
     {
-        private float previousPinch;
-        public void OnDrag(PointerEventData eventData)
+        private GourdViewerGestureSurface gestures;
+        private UnityEngine.UI.Button resetButton;
+
+        private void Awake()
         {
-            if (Touchscreen.current != null && Touchscreen.current.touches.Count > 1
-                && Touchscreen.current.touches[0].press.isPressed && Touchscreen.current.touches[1].press.isPressed) return;
-            GameSession.Instance?.RotatePreview(eventData.delta);
+            gestures = GetComponent<GourdViewerGestureSurface>();
+            if (gestures == null) gestures = gameObject.AddComponent<GourdViewerGestureSurface>();
+            gestures.Bind(Rotate, Zoom);
+            GameScreen screen = GetComponentInParent<GameScreen>();
+            resetButton = screen != null ? screen.resetViewerButton : null;
+            if (resetButton != null) resetButton.onClick.AddListener(ResetGesture);
         }
-        public void OnScroll(PointerEventData eventData) => GameSession.Instance?.ZoomPreview(eventData.scrollDelta.y);
-        private void Update()
+
+        private void Rotate(Vector2 normalizedDelta)
         {
-            Touchscreen touch = Touchscreen.current;
-            if (touch == null || touch.touches.Count < 2 || !touch.touches[0].press.isPressed || !touch.touches[1].press.isPressed)
-            { previousPinch = 0f; return; }
-            float distance = Vector2.Distance(touch.touches[0].position.ReadValue(), touch.touches[1].position.ReadValue());
-            if (previousPinch > 0f) GameSession.Instance?.ZoomPreview((distance - previousPinch) * .02f);
-            previousPinch = distance;
+            GameSession session = GameSession.Instance;
+            if (isActiveAndEnabled && session != null && session.IsViewerOpen) session.RotatePreview(normalizedDelta);
+        }
+
+        private void Zoom(float normalizedDelta)
+        {
+            GameSession session = GameSession.Instance;
+            if (isActiveAndEnabled && session != null && session.IsViewerOpen) session.ZoomPreview(normalizedDelta);
+        }
+
+        public void ResetGesture() => gestures?.ResetGesture();
+        private void OnEnable()
+        {
+            if (gestures == null) return;
+            gestures.enabled = true;
+            gestures.ResetGesture();
+        }
+        private void OnDisable()
+        {
+            if (gestures == null) return;
+            gestures.ResetGesture();
+            gestures.enabled = false;
+        }
+        private void OnDestroy()
+        {
+            if (resetButton != null) resetButton.onClick.RemoveListener(ResetGesture);
         }
     }
 }

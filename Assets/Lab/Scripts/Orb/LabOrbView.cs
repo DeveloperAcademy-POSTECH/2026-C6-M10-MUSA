@@ -717,6 +717,9 @@ namespace C6Lab
             {
                 if (appearance == null && !tintDefaultByKind)
                     defaultRenderer.SetPropertyBlock(null);
+                // None is an unapproved combination, not a sixth (purple) element.
+                if (kind == LabOrbKind.Combined && element == LabOrbElement.None)
+                    LabOrbVisualFactory.ApplyKindColor(defaultRenderer, LabOrbKind.Combined);
             }
             Sprite drumSprite = kind.IsDrum() && appearance != null ? appearance.DrumSprite : null;
             Sprite orbSprite = appearance != null ? appearance.SpriteFor(kind, element) : null;
@@ -999,7 +1002,7 @@ namespace C6Lab
                 LabOrbElement.Wood => new Color(.20f, .66f, .25f),  // 목 · 초록
                 LabOrbElement.Metal => new Color(.96f, .80f, .15f), // 금 · 노랑
                 LabOrbElement.Earth => new Color(.52f, .33f, .16f), // 토 · 갈색
-                _ => new Color(.53f, .34f, .84f)
+                _ => new Color(.78f, .78f, .74f) // 승인 대기 · 오행을 추측하지 않는 중립색
             };
         }
 
@@ -1021,6 +1024,7 @@ namespace C6Lab
             {
                 LabOrbKind.Yin => new Color(.08f, .08f, .09f),  // 음 · 검정
                 LabOrbKind.Yang => new Color(.95f, .95f, .93f), // 양 · 흰색
+                LabOrbKind.Combined => TemporaryElementColor(LabOrbElement.None),
                 _ => new Color(.53f, .34f, .84f)
             };
             var properties = new MaterialPropertyBlock();

@@ -34,6 +34,9 @@ namespace Hapio
         private bool restartPending;
         private double loadStartedAt, nextStateAt, nextReadyAt, nextResultReadyAt;
         private LabGourdResultPreview preview;
+        // 전체 게임 대시보드용: 이번 판의 스테이지별 결과. 같은 스테이지를 다시 하면 마지막 기록으로 덮어쓴다.
+        private readonly SortedDictionary<int, LabResultStage> stageResults = new SortedDictionary<int, LabResultStage>();
+        private string stageResultsRunId;
 
         [Serializable]
         private sealed class Control
@@ -56,6 +59,8 @@ namespace Hapio
         public GameStageDefinition CurrentStageDefinition => state.stageIndex >= 1 && state.stageIndex <= 3
             ? stageCatalog.Get(state.stageIndex) : null;
         public LabSnapshot ResultSnapshot { get; private set; }
+        /// <summary>이번 판에서 깬 스테이지들의 결과 (스테이지 순서). ALL STAGES CLEAR 화면의 전체 대시보드가 쓴다.</summary>
+        public IReadOnlyList<LabResultStage> StageResults => new List<LabResultStage>(stageResults.Values);
         public Texture PreviewTexture => preview != null && !preview.IsDisposed ? preview.Texture : null;
         public bool IsViewerOpen { get; private set; }
         public string UiNotice { get; private set; } = string.Empty;
@@ -64,6 +69,12 @@ namespace Hapio
         public bool IsLoadingScene => sceneRoutine != null || state.phase == GameFlowPhase.LoadingBattle;
         public bool PendingSettingsApply => network != null && network.IsConnected && !network.SessionConfigReady;
         public bool CanAdvanceStage => network != null && network.IsHost && !IsLoadingScene && AllResultsReady;
+        public bool CanDeveloperAdvanceStage => network != null && network.DeveloperBuildAvailable
+            && network.IsConnected && network.IsHost && !goingHome && !IsLoadingScene && !restartPending
+            && state.phase == GameFlowPhase.Playing && state.stageIndex >= 1
+            && state.stageIndex < GameRunFlow.StageCount && network.IsBattlePaused
+            && network.Snapshot != null && network.Snapshot.phase == LabPhase.Playing
+            && MatchesBattle(network.Snapshot);
         public bool CanReturnHome => state.phase == GameFlowPhase.GameOver
             || state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
             || (state.phase == GameFlowPhase.Completed && (!network.IsHost || AllResultsReady));
@@ -351,7 +362,18 @@ namespace Hapio
             if (ResultSnapshot != null && ResultSnapshot.sessionId == state.battleSessionId
                 && ResultSnapshot.round == state.battleRound) return;
             if (MatchesBattle(network.Snapshot) && network.Snapshot.phase == LabPhase.Victory)
+            {
                 ResultSnapshot = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(network.Snapshot));
+                RecordStageResult(ResultSnapshot);
+            }
+        }
+
+        /// <summary>깬 스테이지의 결과를 이번 판 기록에 넣는다. 새 판이면 이전 판 기록은 버린다.</summary>
+        private void RecordStageResult(LabSnapshot result)
+        {
+            if (result == null || state.stageIndex < 1 || state.stageIndex > 3) return;
+            if (stageResultsRunId != state.runId) { stageResults.Clear(); stageResultsRunId = state.runId; }
+            stageResults[state.stageIndex] = new LabResultStage(result.players, result.playedSeconds);
         }
 
         private bool StageConfigurationReady => network.MatchesGameStageConfig(expectedSettingsRevision,
@@ -495,6 +517,18 @@ namespace Hapio
         {
             if (!CanAdvanceStage) return;
             if (hostFlow.NextStage(state.runId, state.stageIndex, state.revision)) PrepareStage();
+        }
+
+        /// <summary>
+        /// Skip a paused Host battle without claiming a clear. Uses accepted profiles only;
+        /// unsaved DEV form inputs are deliberately not applied by this action.
+        /// </summary>
+        public bool DeveloperNextStage()
+        {
+            if (!CanDeveloperAdvanceStage
+                || !hostFlow.DeveloperNextStage(state.runId, state.stageIndex, state.revision)) return false;
+            PrepareStage();
+            return true;
         }
 
         private void PrepareStage()
@@ -660,6 +694,7 @@ namespace Hapio
             restartPending = battleReadyPending = localBattleReady = false; resultReady.Clear();
             expectedSettingsRevision = 0; expectedSettingsFingerprint = null;
             ReleaseResult(); UiNotice = string.Empty;
+            stageResults.Clear(); stageResultsRunId = null;
         }
 
         private void ReleaseResult()
