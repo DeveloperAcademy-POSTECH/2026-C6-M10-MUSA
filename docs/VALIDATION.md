@@ -2502,3 +2502,15 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 - 후속 Mac Development 빌드 **PASS**. 최종 메뉴 카메라·GUID 복원 소스로 독립 GUI 앱 두 개를 다시 실행해 **Host13.217초/Client13.128초, 모두 PASS·종료0**을 확인했다. native Bonjour/UDP·대기 카드/생성자 입장·196개 설정 확인·HostP2/ClientP1·세 스테이지 고유 패턴/결과/관람 ACK·같은 앱의 두 번째 방·이탈 후 양쪽 게임 오버/타이틀·미입장 대기 방 보존을 재확인했다. 양쪽 Exception/Fatal/컴파일 오류 표식0. 새 Home/Lobby/StageResult 캡처를 직접 확인했다.
 - 이 Mac 진단은 앞 절과 같은 CPU 도색 fixture·Legacy/초기100%·건조OFF·공통 폭탄/막기OFF를 사용한다. 실제 투척·핫스팟·여러 물리 기기 검증은 아니다. 임시 probe는 빌드 후 제거했고 전체 PlayMode 소스와 동일한 제품 코드를 유지했다.
 - Lab Scene/설정·전투/결과 Scene·Build Settings·패키지 보존 대상9개와 Desktop 사용자 미추적 Scene meta의 해시 동일을 확인했다. iOS export/서명·iPhone/iPad·일반 LAN/핫스팟 실기기·3~5대·모바일 성능은 계속 **NOT_RUN**이다.
+
+
+## 구슬 이미지 교체 (#294) — 2026-10-25
+
+`orgin/feat/#294-orbs-new-asset`에서 사용자 제공 음·양·화·수·목·금·토 PNG7개를 기존 Sprite 경로에 교체했다. 이번 변경 후 Unity **6000.6.5f1**에서 아래 집중 검사를 실행했다. 원시 XML과 임시 검증 코드는 커밋하지 않는다.
+
+| 검사 | 결과 | 범위 |
+| --- | --- | --- |
+| 원본·참조 보존 | PASS | PNG7개 모두 사용자 원본과 바이트 일치. 기존 `.meta`, Appearance, LabConfig와 Scene 파일 변경 없음. |
+| 컴파일·EditMode | **7/7 PASS** | `LabOrbSpriteDesignTests`: 저장 Config의7종 Sprite 경로·중앙 피벗·mipmap 없음 확인. |
+| PlayMode | **3/3 PASS** | `LabOrbSpriteTests`:7종 조합판 이미지·표시 크기·충돌체 유지·3D fallback,5종 투사체 이미지·축소 충돌체·궤적, 카메라별 정면 방향 확인. |
+| Mac/iOS 빌드·실기기·육안 플레이 | NOT_RUN | 이번 변경에서 빌드·실기기와 실제 플레이 화면의 시각 품질은 확인하지 않았다. 전체 테스트 실행 결과로 확대 해석하지 않는다. |
