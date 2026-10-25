@@ -2580,3 +2580,17 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 | 비개발 Player 빌드 | **NOT_RUN** | 노출/API의 DeveloperBuildAvailable 조건은 코드로 확인. Release 빌드 실행은 수행하지 않음 |
 
 기존 Lab Scene, Home/Lobby/StageResult/GameOver 배치와 설정 스키마·네트워크 연결 규약은 변경하지 않는다. 현재 정상 결과의 NEXT와 DEV의 직접 이동은 별개다. 범위 축소 후 자동 검사는 실제 다중 기기 NEXT 전환과 iOS 기기 검증을 대체하지 않는다.
+
+
+## 구슬 이미지 교체 (#294) — 2026-10-25
+
+`orgin/feat/#294-orbs-new-asset`에서 사용자 제공 음·양·화·수·목·금·토 PNG7개를 기존 Sprite 경로에 교체했다. 이번 변경 후 Unity **6000.6.5f1**에서 아래 집중 검사를 실행했다. 원시 XML과 임시 검증 코드는 커밋하지 않는다.
+
+| 검사 | 결과 | 범위 |
+| --- | --- | --- |
+| 원본·참조 보존 | PASS | PNG7개 모두 사용자 원본과 바이트 일치. 기존 `.meta`, Appearance, LabConfig와 Scene 파일 변경 없음. |
+| 컴파일·EditMode | **7/7 PASS** | `LabOrbSpriteDesignTests`: 저장 Config의7종 Sprite 경로·중앙 피벗·mipmap 없음 확인. |
+| PlayMode | **3/3 PASS** | `LabOrbSpriteTests`:7종 조합판 이미지·표시 크기·충돌체 유지·3D fallback,5종 투사체 이미지·축소 충돌체·궤적, 카메라별 정면 방향 확인. |
+| Mac/iOS 빌드·실기기·육안 플레이 | NOT_RUN | 이번 변경에서 빌드·실기기와 실제 플레이 화면의 시각 품질은 확인하지 않았다. 전체 테스트 실행 결과로 확대 해석하지 않는다. |
+
+- PR 작성 시 최신 main을 통합하면서 검증 기록의 동시 추가 충돌만 양쪽 내용을 보존해 해결했다. 위 Unity 검사는 main 통합 전 `d658b2a1` 변경에서 실행한 기록이다. 통합 후에는 `git diff --check`와 main 대비 변경9개 파일 범위를 확인했으며 Unity 검사는 재실행하지 않았다. 최신 main의 #283은 투사체를3D 구체로 표시하므로 이 PNG 교체는 조합판 Sprite에 적용되고 비행 외형은 그 경로를 유지한다.
