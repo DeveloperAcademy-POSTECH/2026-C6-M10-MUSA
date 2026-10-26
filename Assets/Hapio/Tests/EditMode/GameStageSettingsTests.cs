@@ -25,10 +25,17 @@ namespace Hapio.Tests
                 Assert.That(settings.Capture(2)[155], Is.EqualTo(1f));
                 Assert.That(settings.Capture(2)[184], Is.EqualTo(1f));
                 Assert.That(settings.Capture(2)[GameStageSettings.FlashTargetOneField], Is.Zero, "The yaguang flash hits everyone (#301).");
+                // 야광귀 시간표 (#314): 야광귀 스테이지만 켜고, 섬광 15초(3 + 11 + 1)·콤보 25초(4 + 13 + 8)에 맞춘다.
+                float[] yaguangStage = settings.Capture(2);
+                Assert.That(new[] { yaguangStage[205], yaguangStage[188], yaguangStage[189], yaguangStage[190] },
+                    Is.EqualTo(new[] { 1f, 3f, 11f, 1f }));
+                Assert.That(new[] { yaguangStage[164], yaguangStage[158], yaguangStage[159], yaguangStage[162] },
+                    Is.EqualTo(new[] { 4f, 13f, 8f, 8f }));
+                Assert.That(settings.Capture(1)[205] + settings.Capture(3)[205], Is.Zero, "Gumiho and Jigwi keep their own schedules.");
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(205));
+                    Assert.That(values.Length, Is.EqualTo(220));
                     Assert.That(values[87], Is.EqualTo(before[87]), "Common bomb interval preserved");
                     Assert.That(values[152], Is.EqualTo(before[152]), "Common transfer block interval preserved");
                 }
@@ -162,6 +169,12 @@ namespace Hapio.Tests
             Assert.That(GameStageSettings.IsFieldVisible(0, 202), Is.False);
             Assert.That(GameStageSettings.IsFieldVisible(2, 200), Is.False, "High resolution paint (#299) stays common.");
             Assert.That(GameStageSettings.IsFieldVisible(3, 192), Is.True);
+            for (int index = 205; index <= 219; index++)
+            {
+                Assert.That(GameStageSettings.IsFieldVisible(2, index), Is.True, "The yaguang timeline (#314) is a yaguang setting: " + index);
+                Assert.That(GameStageSettings.IsFieldVisible(0, index) || GameStageSettings.IsFieldVisible(1, index)
+                    || GameStageSettings.IsFieldVisible(3, index), Is.False);
+            }
         }
         [Test]
         public void FlashShakeAndCharmWarningKeepDistinctStageScopesAfterIntegration()

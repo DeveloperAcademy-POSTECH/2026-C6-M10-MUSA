@@ -81,6 +81,16 @@ namespace C6Lab
             return Progress >= Length ? Finish(LabComboResult.Success, at, 0) : LabComboResult.None;
         }
 
+        /// <summary>
+        /// 결과 없이 지금 콤보를 멈춘다 (#314, 야광귀 시간표의 방해 끝). 성공도 실패도 아니므로 보상·페널티가 없다.
+        /// </summary>
+        public void Stop(double at)
+        {
+            if (!Active) return;
+            Active = false;
+            EndsAt = Math.Min(EndsAt, at);
+        }
+
         /// <summary>제한 시간이 지났으면 시간 초과로 끝내고 true. 끝난 시각은 EndsAt이다.</summary>
         public bool TryExpire(double now)
         {

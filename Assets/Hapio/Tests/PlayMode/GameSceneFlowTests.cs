@@ -812,7 +812,7 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(205), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(220), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
                 "All approved values, including the twelve Sabotage fields, must survive Scene-owned DEV cleanup.");
         }
