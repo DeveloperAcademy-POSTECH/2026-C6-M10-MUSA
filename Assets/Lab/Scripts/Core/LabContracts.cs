@@ -191,6 +191,11 @@ namespace C6Lab
 
         /// <summary>요괴에 맞힌 횟수 (Host가 타격을 확정한 것만)</summary>
         public int hitTotal;
+        /// <summary>
+        /// 요괴(박)를 노려 던진 공 수: Host가 맞힘/빗나감을 확정한 것만 센다 (색 구슬·릴레이·폭탄).
+        /// 지귀 불을 노린 투척과 라운드가 끝날 때 아직 날고 있던 공은 세지 않는다. 명중률 = hitTotal / throwTotal.
+        /// </summary>
+        public int throwTotal;
         /// <summary>요괴에게 준 총 피해 (남은 HP보다 큰 피해는 남은 만큼만)</summary>
         public int damageTotal;
         /// <summary>요괴 HP를 0으로 만든 마지막 한 방(막타)을 쳤는지. 승리했을 때만 한 명이 true.</summary>

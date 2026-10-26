@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using C6Lab;
@@ -8,7 +9,10 @@ namespace Hapio
 {
     public enum GameScreenKind { Home, Lobby, StageResult, GameOver }
 
-    /// <summary>Only binds saved, Inspector-editable Canvas references; never constructs a screen at runtime.</summary>
+    /// <summary>
+    /// Only binds saved, Inspector-editable Canvas references; never constructs a screen at runtime.
+    /// 예외: STAGE CLEAR 화면의 칭호 표는 전투 결과 카드와 같은 생김새를 쓰도록 LabResultTable이 코드로 만든다.
+    /// </summary>
     public sealed class GameScreen : MonoBehaviour
     {
         public GameScreenKind kind;
@@ -28,11 +32,20 @@ namespace Hapio
         public UnityEngine.UI.Button[] developerScopeButtons;
         public UnityEngine.UI.Text developerScopeLabel;
         public int DeveloperScope { get; private set; }
+        /// <summary>STAGE CLEAR 화면 칭호 표 생김새. 기본값은 전투 결과 카드의 표와 같다.</summary>
+        public LabResultTableStyle resultTableStyle = new LabResultTableStyle();
+        /// <summary>칭호 표와 아래 안내 글 사이 간격</summary>
+        public float resultTableGap = 12f;
 
         private GameSession session;
         private string[] roomKeys = Array.Empty<string>();
         private bool syncingDeveloper;
         private string localError;
+        private RectTransform resultTable;
+        private string resultTableKey;
+        // ALL STAGES CLEAR: false면 3스테이지 표, true면 전체 게임 대시보드. 새 판이면 3스테이지 표부터.
+        private bool showOverall;
+        private string overallRunId;
         private bool UsesExternalNavigation => externalNavigation && (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby);
 
         private void Awake()
@@ -50,7 +63,7 @@ namespace Hapio
                 Click(startButton, () => session.StartGame());
                 Click(homeButton, () => session.GoHome());
             }
-            Click(nextButton, () => session.NextStage());
+            Click(nextButton, OnNextButton);
             Click(viewerButton, () => session.OpenGourdViewer());
             Click(closeViewerButton, () => session.CloseGourdViewer());
             Click(resetViewerButton, () => session.ResetPreview());
@@ -168,18 +181,17 @@ namespace Hapio
             string goal = result == null ? string.Empty : net.config != null && net.config.GourdMode == LabGourdMode.Paint
                 ? "PAINT " + (result.paintCoverage * 100f).ToString("0.0", CultureInfo.InvariantCulture) + "%"
                 : "TARGET HP " + result.hp;
-            Text(status, result == null ? "Stage result is being prepared." : goal
+            var stages = complete ? session.StageResults : null;
+            bool hasOverall = stages != null && stages.Count > 0;
+            if (overallRunId != session.State.runId) { overallRunId = session.State.runId; showOverall = false; }
+            // 3스테이지(마지막 스테이지) 표를 먼저 보여주고, 버튼으로 전체 표와 오간다.
+            bool overall = hasOverall && showOverall;
+            Text(status, overall ? "전체 " + stages.Count + "스테이지 평균 기록"
+                : result == null ? "Stage result is being prepared."
+                : (hasOverall ? session.State.stageIndex + "스테이지 기록   ·   " : string.Empty) + goal
                 + "   ·   TIME LEFT " + Math.Ceiling(result.remaining).ToString(CultureInfo.InvariantCulture) + "s");
+            ShowResultTable(net, result, overall ? stages : null);
             var text = new StringBuilder();
-            if (result != null && result.players != null)
-                foreach (LabPlayerState player in result.players)
-                    if (player != null)
-                    {
-                        text.Append("P").Append(player.seat + 1).Append("   HP ").Append(player.personalHp)
-                            .Append("  ·  HITS ").Append(player.hitTotal).Append('\n')
-                            .Append("GENERATED ").Append(player.generatedTotal).Append("  ·  COMBINED ").Append(player.combinedTotal)
-                            .Append("  ·  PASSED ").Append(player.passedTotal).Append("\n\n");
-                    }
             text.Append(net.IsHost && !session.CanReturnHome && complete
                 ? "Waiting for every player to receive the final result…"
                 : net.IsHost && !complete && !session.CanAdvanceStage
@@ -189,17 +201,73 @@ namespace Hapio
                             : "Waiting for the Host to start the next stage.");
             if (!string.IsNullOrEmpty(session.UiNotice)) text.Append("\n\n").Append(session.UiNotice);
             Text(details, text.ToString());
-            Show(nextButton == null ? null : nextButton.gameObject, !complete && net.IsHost);
+            // ALL STAGES CLEAR에서는 NEXT 자리를 "전체 기록 보기 / 3스테이지 기록 보기" 전환 버튼으로 쓴다 (모든 기기).
+            Show(nextButton == null ? null : nextButton.gameObject, complete ? hasOverall : net.IsHost);
             Show(homeButton == null ? null : homeButton.gameObject, true);
-            Interactable(nextButton, session.CanAdvanceStage);
+            Interactable(nextButton, complete ? hasOverall : session.CanAdvanceStage);
             Interactable(homeButton, !complete || session.CanReturnHome);
             Label(homeButton, complete ? "HOME" : "QUIT RUN");
-            Label(nextButton, "NEXT · STAGE " + (session.State.stageIndex + 1));
+            Label(nextButton, complete ? (showOverall ? session.State.stageIndex + "스테이지 기록 보기" : "전체 기록 보기")
+                : "NEXT · STAGE " + (session.State.stageIndex + 1));
             Show(viewerButton == null ? null : viewerButton.gameObject, net.config != null && net.config.CompletedGourdViewerEnabled
                 && net.config.GourdMode == LabGourdMode.Paint && result != null && result.paintCoverage >= 1f);
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
+        }
+
+        /// <summary>
+        /// 글자 목록 대신 전투 결과 카드와 같은 칭호 표를 Details 자리 위쪽에 그린다.
+        /// stages가 있으면(ALL STAGES CLEAR) 스테이지 평균으로 매긴 전체 게임 대시보드를 그린다.
+        /// 같은 결과는 한 번만 그리고, 안내 글(Details)은 표 바로 밑으로 내린다.
+        /// </summary>
+        private void ShowResultTable(LabNetwork net, LabSnapshot result, IReadOnlyList<LabResultStage> stages = null)
+        {
+            if (details == null) return;
+            bool overall = stages != null && stages.Count > 0;
+            if (!overall && (result == null || result.players == null))
+            {
+                if (resultTable != null) resultTable.gameObject.SetActive(false);
+                resultTableKey = null;
+                return;
+            }
+            string key = overall
+                ? "overall:" + session.State.runId + ":" + stages.Count + ":" + (result != null ? result.sessionId + ":" + result.round : "")
+                    + ":" + net.LocalPlayerId
+                : result.sessionId + ":" + result.round + ":" + net.LocalPlayerId;
+            if (key == resultTableKey && resultTable != null && resultTable.gameObject.activeSelf) return;
+            resultTableKey = key;
+            var area = details.rectTransform;
+            if (resultTable == null)
+            {
+                resultTable = LabResultTable.Create(area.parent, "ResultDashboard");
+                // 안내 글은 표 밑에 가운데 맞춤으로 둔다.
+                details.alignment = TextAnchor.UpperCenter;
+            }
+            // Details 자리의 윗변 가운데에 표 윗변을 맞춘다.
+            resultTable.anchorMin = resultTable.anchorMax = new Vector2((area.anchorMin.x + area.anchorMax.x) * .5f, area.anchorMax.y);
+            resultTable.anchoredPosition = Vector2.zero;
+            List<LabResultRow> rows;
+            if (overall) rows = LabResultTable.OverallRowsFor(stages, net.LocalPlayerId);
+            else
+            {
+                var players = Array.FindAll(result.players, p => p != null);
+                Array.Sort(players, (a, b) => a.seat.CompareTo(b.seat));
+                rows = LabResultTable.RowsFor(LabResultStats.Awards(players, result.phase == LabPhase.Victory),
+                    net.LocalPlayerId, result.playedSeconds);
+            }
+            float height = LabResultTable.Fill(resultTable, rows, resultTableStyle, details.font);
+            // 안내 글이 표 밑에서 시작하도록 Details 윗변을 표 높이만큼 내린다.
+            area.offsetMax = new Vector2(area.offsetMax.x, -(height + resultTableGap));
+            // Details 바로 다음 순서로 둬서, 나중에 그려지는 완성 박 보기 화면이 표를 덮게 한다.
+            resultTable.SetSiblingIndex(area.GetSiblingIndex() + 1);
+        }
+
+        /// <summary>NEXT 버튼: 스테이지 결과에서는 다음 스테이지, ALL STAGES CLEAR에서는 표 전환.</summary>
+        private void OnNextButton()
+        {
+            if (session.State.phase == GameFlowPhase.Completed) { showOverall = !showOverall; return; }
+            session.NextStage();
         }
 
         private void ChangePlayers(int delta)
