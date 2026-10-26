@@ -51,7 +51,7 @@ namespace C6Lab
     /// this board never changes Host-owned HP, inventory, or orb identity itself.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class LabOrbBoard : MonoBehaviour
+    public sealed partial class LabOrbBoard : MonoBehaviour
     {
         private sealed class Entry
         {
@@ -94,6 +94,10 @@ namespace C6Lab
             public MotionState? BeforeRequest;
             /// <summary>A fox orb cannot be touched off until this time (#251): a moment after it lands.</summary>
             public float FoxSafeUntil;
+            public float SafetyRestSeconds;
+            public bool SafetyNudging;
+            public float SafetyNudgeSeconds;
+            public float SafetyCombineGuardUntil;
         }
 
         private readonly struct MotionState
@@ -230,6 +234,7 @@ namespace C6Lab
         public Rect CenterBounds => bounds;
         public LabOrbAreaShape AreaShape => areaShape;
         public bool InteractionEnabled => interactionEnabled;
+        public bool UiInputBlocked => uiInputBlocked;
         public event Action<LabOrbEdgeCrossing> EdgeCrossed;
         /// <summary>
         /// 결합 요청. (첫 구슬, 두 번째 구슬, 결합 위치 0..1, 결합 구슬이 이어받을 속도 보드 폭/초)
@@ -276,6 +281,7 @@ namespace C6Lab
             areaShape = shape;
             bounds = shape.CenterBounds;
             configured = true;
+            LabOrbTransferGuide.Ensure(this);
             if (contactMaterial == null)
                 contactMaterial = new PhysicsMaterial("Lab orb contact") { hideFlags = HideFlags.DontSave };
             contactMaterial.bounciness = config.OrbRestitution;
@@ -404,6 +410,7 @@ namespace C6Lab
                 // Old snapshots must not put materials or a locally launched orb back on screen
                 // while the command's explicit result is still outstanding.
                 if (existing.HiddenForPending) return existing.View;
+                if (existing.LocalOwner != localOwner) ResetRecovery(existing);
                 existing.LocalOwner = localOwner;
                 existing.View.FuseTotalSeconds = config.ItemLifetimeSeconds;
                 if (existing.View.Kind != kind || existing.View.Element != element || existing.Small != small
@@ -1177,7 +1184,7 @@ namespace C6Lab
 
         public void SetInteractionEnabled(bool enabled)
         {
-            if (!enabled) CancelDrag();
+            if (!enabled) { CancelDrag(); ResetRestingRecovery(); }
             interactionEnabled = enabled;
         }
 
@@ -1185,7 +1192,7 @@ namespace C6Lab
         public void SetSimulationHeld(bool held)
         {
             if (simulationHeld == held) return;
-            if (held) CancelDrag();
+            if (held) { CancelDrag(); ResetRestingRecovery(); }
             simulationHeld = held;
             foreach (var entry in entries.Values)
                 if (entry.View != null) SetBodyMode(entry);
@@ -1194,7 +1201,7 @@ namespace C6Lab
         /// <summary>Block pointer gestures while a modal UI is open, without pausing orb physics.</summary>
         public void SetUiInputBlocked(bool blocked)
         {
-            if (blocked) CancelDrag();
+            if (blocked) { CancelDrag(); ResetRestingRecovery(); }
             uiInputBlocked = blocked;
         }
 
@@ -1203,7 +1210,7 @@ namespace C6Lab
             if (id == null || !entries.TryGetValue(id, out var entry)) return false;
             if (locked && heldId == id) CancelDrag();
             entry.Locked = locked;
-            if (locked) StopMotion(entry.View.Body);
+            if (locked) { ResetRecovery(entry); StopMotion(entry.View.Body); }
             SetBodyMode(entry);
             return true;
         }
@@ -1255,21 +1262,35 @@ namespace C6Lab
             if (!configured || simulationHeld || !interactionEnabled || heldId != null || !Finite(worldPoint) || !Finite(now)) return false;
             if (areaShape.IsCurved && !areaShape.Contains(worldPoint, 0f)) return false;
             Entry nearest = null;
-            // Compare touches relative to each body's reach so the larger drum is as easy to grab.
+            // A real body under the finger wins over another orb's enlarged accessibility reach.
+            // Within each tier retain the existing radius-relative ordering (including the drum).
+            int bestTier = int.MaxValue;
             float best = 1f;
             foreach (var entry in entries.Values)
             {
                 if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held || entry.Dropping
                     || entry.HiddenForPending) continue;
-                float reach = entry.View.HitSphere.radius * 1.25f;
-                float closeness = (XY(entry.View.Body.position) - worldPoint).sqrMagnitude / (reach * reach);
-                if (closeness > best) continue;
+                float radius = entry.View.HitSphere.radius;
+                float originalReach = radius * 1.25f;
+                float reach = GripReach(entry);
+                float distance = (XY(entry.View.Body.position) - worldPoint).sqrMagnitude;
+                if (distance > reach * reach) continue;
+                int tier = !EdgeControlsActive ? 0 : distance <= radius * radius ? 0
+                    : distance <= originalReach * originalReach ? 1 : 2;
+                if (tier > bestTier) continue;
+                float rankedReach = tier < 2 ? originalReach : reach;
+                float closeness = distance / (rankedReach * rankedReach);
+                if (tier == bestTier && closeness > best) continue;
+                bestTier = tier;
                 best = closeness;
                 nearest = entry;
             }
             if (nearest == null) return false;
             heldId = nearest.View.OrbId;
             nearest.Held = true;
+            ResetRecovery(nearest);
+            nearest.SafetyCombineGuardUntil = 0f;
+            BeginTransferIntent(worldPoint, now);
             nearest.PlayerSent = false;
             nearest.LastDragAt = now;
             nearest.Arrival = LabDrumArrival.None;
@@ -1301,6 +1322,7 @@ namespace C6Lab
                 target = Vector2.Lerp(XY(entry.View.Body.position), target, 1f - Mathf.Exp(-passed / config.BombDragLag));
             }
             entry.LastDragAt = now;
+            UpdateTransferIntent(worldPoint, now);
             entry.View.Body.position = OnPlane(target);
             AddSample(worldPoint, now);
             return true;
@@ -1313,7 +1335,10 @@ namespace C6Lab
             string id = heldId;
             Vector2 inputVelocity = Vector2.ClampMagnitude(
                 ReleaseVelocity(worldPoint, now, out float swipeDistance), config.ThrowMaxSwipeSpeed);
+            int assistedSide = PreparedTransferSide;
+            Vector2 assistedVelocity = assistedTransferVelocity;
             heldId = null;
+            ResetTransferIntent();
             samples.Clear();
             entry.Held = false;
             entry.View.HitSphere.isTrigger = false;
@@ -1359,6 +1384,32 @@ namespace C6Lab
             }
             else lastTapId = null;
 
+            // An intentional raw overlap keeps its existing manual combine before assisted passing.
+            if (config.DropCombineEnabled && (entry.View.Kind.IsRaw() || FoxReady(entry)))
+            {
+                Entry target = FindOppositeOverlap(entry);
+                if (target != null)
+                {
+                    if (entry.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(entry, target);
+                    else if (target.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(target, entry);
+                    else RequestCombine(entry, target);
+                    return true;
+                }
+            }
+
+            // A deliberate manual pass can finish safely inside the screen. It enters the same
+            // Host-validated crossing path as a freely moving body at the actual side plane.
+            if (assistedSide != 0)
+            {
+                SetBodyMode(entry);
+                Vector2 assistedWorldVelocity = TransferReleaseVelocity(entry, assistedSide, inputVelocity, assistedVelocity);
+                Vector2 position = XY(entry.View.Body.position);
+                position.x = assistedSide > 0 ? bounds.xMax : bounds.xMin;
+                position = Clamp(position, entry.View.HitSphere.radius);
+                ProcessEdgeCrossing(entry, assistedSide > 0, position, assistedWorldVelocity, LabEdgeCrossingKind.Swipe);
+                return true;
+            }
+
             // Side exits keep their existing screen-to-screen handoff even on a diagonal flick.
             bool outwardSide = (worldPoint.x <= bounds.xMin && inputVelocity.x < 0f)
                 || (worldPoint.x >= bounds.xMax && inputVelocity.x > 0f);
@@ -1373,18 +1424,6 @@ namespace C6Lab
                 float releaseX01 = Mathf.InverseLerp(bounds.xMin, bounds.xMax, worldPoint.x);
                 ThrowRequested?.Invoke(new LabOrbThrowGesture(id, inputVelocity, releaseX01, swipeDistance));
                 return true;
-            }
-
-            if (config.DropCombineEnabled && (entry.View.Kind.IsRaw() || FoxReady(entry)))
-            {
-                Entry target = FindOppositeOverlap(entry);
-                if (target != null)
-                {
-                    if (entry.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(entry, target);
-                    else if (target.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(target, entry);
-                    else RequestCombine(entry, target);
-                    return true;
-                }
             }
 
             SetBodyMode(entry);
@@ -1408,6 +1447,7 @@ namespace C6Lab
                 SetBodyMode(entry);
             }
             heldId = null;
+            ResetTransferIntent();
             samples.Clear();
         }
 
@@ -1422,7 +1462,8 @@ namespace C6Lab
                     var touch = Touchscreen.current?.primaryTouch;
                     if (touch == null) { CancelDrag(); return; }
                     if (!TryScreenToWorld(touch.position.ReadValue(), out var point)) { CancelDrag(); return; }
-                    if (touch.press.wasReleasedThisFrame) EndDragAtWorld(point, now);
+                    if (touch.phase.ReadValue() == UnityEngine.InputSystem.TouchPhase.Canceled) CancelDrag();
+                    else if (touch.press.wasReleasedThisFrame) EndDragAtWorld(point, now);
                     else if (touch.press.isPressed) DragToWorld(point, now);
                     else CancelDrag();
                 }
@@ -1506,6 +1547,7 @@ namespace C6Lab
                 else velocity = velocity.normalized * Mathf.Max(0f,
                     speed - config.OrbFloorDeceleration * bounds.width * Time.fixedDeltaTime);
                 body.linearVelocity = OnPlane(velocity);
+                ApplyRestingRecovery(entry, position, ref velocity);
                 // A bomb the player sent on that reaches a side edge going outward passes however slowly,
                 // even on the step its slide runs out (#237).
                 if (sent) velocity = incoming;
@@ -1524,39 +1566,7 @@ namespace C6Lab
                 // A drum still passing through tells the Host so it stops on the near side next.
                 LabEdgeCrossingKind kind = entry.Arrival == LabDrumArrival.Pass ? LabEdgeCrossingKind.Passing
                     : entry.Blasted ? LabEdgeCrossingKind.Pushed : LabEdgeCrossingKind.Swipe;
-                if (teamWallSide == (right ? 1 : -1) && entry.View.Kind != LabOrbKind.FoxFire)
-                {
-                    // 2:2 (#281): the outer edge is closed for the whole battle; everything bounces back in.
-                    body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
-                    body.linearVelocity = OnPlane(new Vector2(-velocity.x * config.OrbRestitution, velocity.y));
-                    TeamWallBounces++;
-                    if (teamWall != null) teamWall.Flash();
-                    continue;
-                }
-                if (kind == LabEdgeCrossingKind.Swipe && blockedSide == (right ? 1 : -1))
-                {
-                    // The gourd's swipe block (#215): this player's own pass that way bounces off the edge
-                    // like the top and bottom walls; a blast's push or a drum running on through still crosses.
-                    body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
-                    body.linearVelocity = OnPlane(new Vector2(-velocity.x * config.OrbRestitution, velocity.y));
-                    BlockBounces++;
-                    if (edgeBlock != null) edgeBlock.Flash();
-                    continue;
-                }
-                var crossing = new LabOrbEdgeCrossing(entry.View.OrbId, right,
-                    NormalizeForBody(areaShape, position, entry.View.HitSphere.radius).y, velocity / bounds.width, kind);
-                entry.EdgePending = true;
-                entry.PendingEdge = crossing;
-                body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
-                StopMotion(body);
-                SetBodyMode(entry);
-                if (entry.View.Kind == LabOrbKind.FoxFire)
-                {
-                    // A fox orb never reaches a neighbour (#251): it goes up in blue smoke at the edge it crossed.
-                    PlayFoxSmoke(entry);
-                    BeginPendingLaunch(entry.View.OrbId);
-                }
-                EdgeCrossed?.Invoke(crossing);
+                ProcessEdgeCrossing(entry, right, position, velocity, kind);
             }
         }
 
@@ -1703,7 +1713,12 @@ namespace C6Lab
 
             if (first.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(first, second);
             else if (second.View.Kind == LabOrbKind.FoxFire) TouchFoxFire(second, first);
-            else RequestCombine(first, second, true);
+            else
+            {
+                // Recovery is a convenience movement, not a player's collision-combine input.
+                if (RecoveryContact(first, second)) return;
+                RequestCombine(first, second, true);
+            }
         }
 
         /// <summary>

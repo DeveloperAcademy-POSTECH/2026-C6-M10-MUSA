@@ -63,9 +63,15 @@ namespace C6Lab.Tests
             Assert.That(crossed.Exists(crossing => crossing.ToRight), Is.False, "A blast cannot push it through either.");
 
             board.UpsertOrb("inner", LabOrbKind.Yin, new Vector2(.005f, .4f), new Vector2(-.35f, 0f));
-            for (int i = 0; i < 20 && crossed.Count == 0; i++) yield return new WaitForFixedUpdate();
+            // The earlier blast may already have sent another body through the open left edge.
+            // Wait for this orb, rather than skipping physics as soon as any crossing exists.
+            for (int i = 0; i < 20 && !crossed.Exists(crossing => crossing.OrbId == "inner" && !crossing.ToRight); i++)
+                yield return new WaitForFixedUpdate();
             Assert.That(crossed.Exists(crossing => crossing.OrbId == "inner" && !crossing.ToRight), Is.True,
-                "The teammate's side still passes.");
+                "The teammate's side still passes. Observed: " + string.Join(", ",
+                    crossed.ConvertAll(crossing => crossing.OrbId + (crossing.ToRight ? ":right" : ":left"))));
+            Assert.That(crossed.Exists(crossing => crossing.ToRight), Is.False,
+                "The outer wall stays closed while the teammate-side pass completes.");
 
             board.Clear();
             Assert.That(board.TeamWallSide, Is.Zero, "A new round starts without the wall until the Host says so.");
