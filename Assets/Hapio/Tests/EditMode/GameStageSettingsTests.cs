@@ -27,7 +27,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(200));
+                    Assert.That(values.Length, Is.EqualTo(202));
                     Assert.That(values[87], Is.EqualTo(before[87]), "Common bomb interval preserved");
                     Assert.That(values[152], Is.EqualTo(before[152]), "Common transfer block interval preserved");
                 }
@@ -75,6 +75,40 @@ namespace Hapio.Tests
                 CollectionAssert.AreEqual(before, settings.Capture(2));
             }
         }
+        [Test]
+        public void HighResolutionPresentationIsCommonToAllStagesAndTheTerritoryRoom()
+        {
+            LabConfig source = Resources.Load<LabConfig>("LabConfig");
+            float[] saved = source.CaptureDeveloperValues();
+            using (var settings = new GameStageSettings(source, GameStageCatalog.RequireDefault()))
+            {
+                var before = new float[4][];
+                for (int stage = 1; stage <= GameStageSettings.TerritoryScope; stage++) before[stage - 1] = settings.Capture(stage);
+                Assert.That(GameStageSettings.IsFieldVisible(0, 200), Is.True);
+                Assert.That(GameStageSettings.IsFieldVisible(0, 201), Is.True);
+                float[] common = settings.Capture(0); common[200] = 0f; common[201] = 1f;
+                Assert.That(settings.TryApply(0, common, out string error), Is.True, error);
+                for (int stage = 1; stage <= GameStageSettings.TerritoryScope; stage++)
+                {
+                    var config = settings.CreateStageConfig(stage);
+                    try
+                    {
+                        Assert.That(config.HighResolutionPaintEnabled, Is.False);
+                        Assert.That(config.HighResolutionPaintColumns, Is.EqualTo(2048));
+                        CollectionAssert.AreEqual(System.Linq.Enumerable.Take(before[stage - 1], 200),
+                            System.Linq.Enumerable.Take(settings.Capture(stage), 200));
+                    }
+                    finally { UnityEngine.Object.DestroyImmediate(config); }
+                }
+                float[] battle = settings.Capture(GameStageSettings.TerritoryScope);
+                battle[200] = 1f; battle[201] = 0f;
+                Assert.That(settings.TryApplyBattle(GameStageSettings.TerritoryScope, battle, out error), Is.True, error);
+                for (int stage = 0; stage <= GameStageSettings.TerritoryScope; stage++)
+                    Assert.That(new[] { settings.Capture(stage)[200], settings.Capture(stage)[201] }, Is.EqualTo(new[] { 1f, 0f }));
+            }
+            CollectionAssert.AreEqual(saved, source.CaptureDeveloperValues());
+        }
+
         [Test]
         public void ScopeForgeryAndInvalidInput_AreRejectedAtomically_AndCapturesAreCopies()
         {

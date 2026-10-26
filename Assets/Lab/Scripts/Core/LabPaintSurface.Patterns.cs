@@ -20,6 +20,7 @@ namespace C6Lab
                 ? -flowDirection : Vector3.up, pattern == LabPaintPattern.Flow ? 0f
                 : (StableUnit(salt) - .5f) * Mathf.PI * 2f, salt);
             bool[] footprint = MakePatternFootprint(patch, hitCell, (int)decimal.Floor(initial));
+            RecordVisualStamp(patch, color, painterSlot);
 
             // An impact may seed detached splashes, but those are not one connected region.
             // Each receives only the integer ink it immediately spends. The impact component
@@ -95,6 +96,7 @@ namespace C6Lab
                 ? -flowDirection : Vector3.up, pattern == LabPaintPattern.Flow ? 0f
                 : (StableUnit(salt) - .5f) * Mathf.PI * 2f, salt);
             bool[] footprint = MakePatternFootprint(patch, hitCell, (int)decimal.Floor(initial), true);
+            RecordVisualStamp(patch, opaque, (byte)painterSlot);
             int spent = 0;
             for (int i = 0; i < footprint.Length; i++)
             {
@@ -261,6 +263,15 @@ namespace C6Lab
                 up = tangent.normalized; right = Vector3.Cross(up, center).normalized;
                 cosine = Mathf.Cos(rotation); sine = Mathf.Sin(rotation);
             }
+            public LabPaintVisualStamp VisualStamp(uint sequence, Color32 color, byte painterSlot, LabPaintPattern pattern)
+                => new LabPaintVisualStamp
+                {
+                    sequence = sequence, center = center,
+                    right = right * cosine + up * sine,
+                    radius = Mathf.Clamp(Radius, .000001f, LabPaintVisualStamp.MaximumRadius),
+                    color = color, painterSlot = painterSlot, pattern = pattern, seed = Salt
+                };
+
             public Vector2 Project(Vector3 direction)
             {
                 float dot = Mathf.Clamp(Vector3.Dot(center, direction), -1f, 1f);

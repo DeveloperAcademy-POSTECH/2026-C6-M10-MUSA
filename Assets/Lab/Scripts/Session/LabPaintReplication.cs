@@ -16,6 +16,9 @@ namespace C6Lab
         public int columns, rows, paintCount, coveredCount, part, parts;
         public bool full;
         public string hash, data;
+        // -1 keeps the previous hints for a delta; >=0 is a complete bounded hint checkpoint.
+        public int visualBytes;
+        public string visualHash;
     }
 
     public enum LabPaintReceive { Rejected, Pending, Applied, NeedCheckpoint }
@@ -29,10 +32,14 @@ namespace C6Lab
     {
         public const int FragmentCharacters = 2048;
         /// <summary>Enough fragments for the largest supported full RGBA/P-number checkpoint.</summary>
-        public const int MaximumFragmentCount = (((256 * 128 * 5 + 2) / 3) * 4
+        public const int MaximumFragmentCount = (((256 * 128 * 5 + LabPaintVisualStamp.MaximumBytes + 2) / 3) * 4
             + FragmentCharacters - 1) / FragmentCharacters;
         private Color32[] published;
         private byte[] publishedPainters;
+        private byte[] publishedVisual = Array.Empty<byte>();
+        private LabPaintSurface publishedSource;
+        private uint publishedVisualVersion;
+        private string publishedVisualHash;
         private string session;
         private uint round, revision;
         private int columns, rows, paintCount, covered;
@@ -41,13 +48,24 @@ namespace C6Lab
 
         public LabPaintFrame[] Publish(LabPaintSurface source, string nextSession, uint nextRound, long nextEpoch)
         {
+            bool sameSource = ReferenceEquals(publishedSource, source);
+            if (sameSource && published != null && session == nextSession && round == nextRound
+                && columns == source.Columns && rows == source.Rows && revision == source.Revision
+                && paintCount == source.PaintCount && publishedVisualVersion == source.VisualVersion)
+                return Array.Empty<LabPaintFrame>();
             var current = new Color32[source.CellCount];
             var painters = new byte[source.CellCount];
             source.CopyPixels(current);
             source.CopyPainterSlots(painters);
-            bool fresh = published == null || session != nextSession || round != nextRound
+            byte[] visual = sameSource && publishedVisualVersion == source.VisualVersion
+                ? publishedVisual : LabPaintVisualStamp.Encode(source.CopyVisualStamps());
+            bool visualChanged = !SameBytes(visual, publishedVisual);
+            string visualHash = visual.Length == 0 ? null : sameSource && publishedVisualVersion == source.VisualVersion
+                ? publishedVisualHash : LabPaintVisualStamp.Hash(visual);
+            bool fresh = published == null || !sameSource || session != nextSession || round != nextRound
                 || columns != source.Columns || rows != source.Rows;
-            if (!fresh && revision == source.Revision && paintCount == source.PaintCount) return Array.Empty<LabPaintFrame>();
+            if (!fresh && revision == source.Revision && paintCount == source.PaintCount && !visualChanged)
+                return Array.Empty<LabPaintFrame>();
             var delta = new List<byte>();
             if (!fresh)
                 for (int i = 0; i < current.Length; i++)
@@ -61,8 +79,10 @@ namespace C6Lab
             byte[] payload = full ? CellBytes(current, painters) : delta.ToArray();
             var frames = Frames(nextSession, nextRound, nextEpoch, ++sequence, full,
                 fresh ? 0u : revision, source.Revision, source.Columns, source.Rows,
-                source.PaintCount, source.CoveredCount, Hash(current, painters), payload);
-            published = current; publishedPainters = painters;
+                source.PaintCount, source.CoveredCount, Hash(current, painters), payload,
+                visual, visualHash, full || visualChanged);
+            published = current; publishedPainters = painters; publishedVisual = visual;
+            publishedSource = source; publishedVisualVersion = source.VisualVersion; publishedVisualHash = visualHash;
             session = nextSession; round = nextRound; epoch = nextEpoch;
             columns = source.Columns; rows = source.Rows; revision = source.Revision;
             paintCount = source.PaintCount; covered = source.CoveredCount; hash = frames[0].hash;
@@ -72,19 +92,28 @@ namespace C6Lab
         public LabPaintFrame[] Checkpoint()
             => published == null ? Array.Empty<LabPaintFrame>()
                 : Frames(session, round, epoch, ++sequence, true, 0, revision, columns, rows,
-                    paintCount, covered, hash, CellBytes(published, publishedPainters));
+                    paintCount, covered, hash, CellBytes(published, publishedPainters), publishedVisual, publishedVisualHash, true);
 
         public void Reset()
         {
-            published = null; publishedPainters = null; session = null;
+            published = null; publishedPainters = null; publishedVisual = Array.Empty<byte>(); session = null;
+            publishedSource = null; publishedVisualVersion = 0; publishedVisualHash = null;
             round = revision = 0; columns = rows = paintCount = covered = 0;
             hash = null; epoch = sequence = 0;
         }
 
         private static LabPaintFrame[] Frames(string session, uint round, long epoch, long sequence,
             bool full, uint from, uint revision, int columns, int rows, int paintCount,
-            int coveredCount, string hash, byte[] payload)
+            int coveredCount, string hash, byte[] cellPayload, byte[] visual, string visualHash, bool includeVisual)
         {
+            int visualSize = includeVisual ? visual.Length : visual.Length == 0 ? 0 : -1;
+            byte[] payload = cellPayload;
+            if (visualSize > 0)
+            {
+                payload = new byte[cellPayload.Length + visual.Length];
+                Array.Copy(cellPayload, payload, cellPayload.Length);
+                Array.Copy(visual, 0, payload, cellPayload.Length, visual.Length);
+            }
             string encoded = Convert.ToBase64String(payload);
             int count = Math.Max(1, (encoded.Length + FragmentCharacters - 1) / FragmentCharacters);
             var result = new LabPaintFrame[count];
@@ -94,10 +123,19 @@ namespace C6Lab
                     session = session, round = round, epoch = epoch, sequence = sequence,
                     full = full, fromRevision = from, revision = revision, columns = columns, rows = rows,
                     paintCount = paintCount, coveredCount = coveredCount, hash = hash, part = i, parts = count,
+                    visualBytes = visualSize, visualHash = visualHash,
                     data = encoded.Substring(i * FragmentCharacters,
                         Math.Min(FragmentCharacters, encoded.Length - i * FragmentCharacters))
                 };
             return result;
+        }
+
+        private static bool SameBytes(byte[] a, byte[] b)
+        {
+            if (ReferenceEquals(a, b)) return true;
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++) if (a[i] != b[i]) return false;
+            return true;
         }
 
         internal static bool ValidDimensions(int columns, int rows)
@@ -185,6 +223,23 @@ namespace C6Lab
             byte[] bytes;
             try { bytes = Convert.FromBase64String(encoded); }
             catch (FormatException) { return LabPaintReceive.NeedCheckpoint; }
+            LabPaintVisualStamp[] nextVisual;
+            if (head.visualBytes == -1) nextVisual = surface.CopyVisualStamps();
+            else if (head.visualBytes == 0) nextVisual = Array.Empty<LabPaintVisualStamp>();
+            else
+            {
+                if (bytes.Length < head.visualBytes) return LabPaintReceive.NeedCheckpoint;
+                var visual = new byte[head.visualBytes];
+                Array.Copy(bytes, bytes.Length - visual.Length, visual, 0, visual.Length);
+                if (!LabPaintVisualStamp.TryDecode(visual, out nextVisual)) return LabPaintReceive.NeedCheckpoint;
+                var cells = new byte[bytes.Length - visual.Length];
+                Array.Copy(bytes, cells, cells.Length); bytes = cells;
+            }
+            byte[] checkedVisual = LabPaintVisualStamp.Encode(nextVisual);
+            if (checkedVisual.Length > 0 && LabPaintVisualStamp.Hash(checkedVisual) != head.visualHash)
+                return LabPaintReceive.NeedCheckpoint;
+            if (checkedVisual.Length == 0 && !string.IsNullOrEmpty(head.visualHash))
+                return LabPaintReceive.NeedCheckpoint;
             int size = head.columns * head.rows;
             Color32[] next;
             byte[] nextPainters;
@@ -224,7 +279,7 @@ namespace C6Lab
                 if (pixel.a == 255) covered++;
             }
             if (covered != head.coveredCount || LabPaintPublisher.Hash(next, nextPainters) != head.hash
-                || !surface.TryReplacePixels(head.columns, head.rows, head.revision, next, nextPainters, head.paintCount))
+                || !surface.TryReplacePixels(head.columns, head.rows, head.revision, next, nextPainters, head.paintCount, nextVisual))
                 return LabPaintReceive.NeedCheckpoint;
             session = head.session; round = head.round; epoch = head.epoch; completedSequence = head.sequence;
             return LabPaintReceive.Applied;
@@ -249,11 +304,17 @@ namespace C6Lab
                 && f.paintCount >= 0 && f.coveredCount >= 0 && f.coveredCount <= f.columns * f.rows
                 && f.parts >= 1 && f.parts <= LabPaintPublisher.MaximumFragmentCount && f.part >= 0 && f.part < f.parts
                 && f.data != null && f.data.Length <= LabPaintPublisher.FragmentCharacters
-                && f.hash != null && f.hash.Length == 64;
+                && f.hash != null && f.hash.Length == 64
+                && f.visualBytes >= -1 && f.visualBytes <= LabPaintVisualStamp.MaximumBytes
+                && (!f.full || f.visualBytes >= 0)
+                && (f.visualBytes <= 0 || f.visualBytes % LabPaintVisualStamp.ByteSize == 0)
+                && (f.visualBytes == 0 ? string.IsNullOrEmpty(f.visualHash)
+                    : f.visualHash != null && f.visualHash.Length == 64);
         private static bool SameHeader(LabPaintFrame a, LabPaintFrame b)
             => a.session == b.session && a.round == b.round && a.sequence == b.sequence && a.epoch == b.epoch
                 && a.fromRevision == b.fromRevision && a.revision == b.revision && a.columns == b.columns
                 && a.rows == b.rows && a.parts == b.parts && a.full == b.full && a.paintCount == b.paintCount
-                && a.coveredCount == b.coveredCount && a.hash == b.hash;
+                && a.coveredCount == b.coveredCount && a.hash == b.hash
+                && a.visualBytes == b.visualBytes && (a.visualHash ?? string.Empty) == (b.visualHash ?? string.Empty);
     }
 }

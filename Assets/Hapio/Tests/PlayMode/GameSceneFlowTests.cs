@@ -292,6 +292,16 @@ namespace Hapio.Tests
                 Assert.That(session.ResultSnapshot.paintCoveredCount, Is.EqualTo(session.ResultSnapshot.paintCellCount));
                 Assert.That(session.ResultSnapshot.players.Single().generatedTotal, Is.EqualTo(1));
                 Assert.That(session.PreviewTexture, Is.Not.Null, "The completed paint preview must survive Battle unload.");
+                if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                {
+                    var captured = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
+                        BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+                    Assert.That(captured.VisualPaintTexture, Is.InstanceOf<RenderTexture>());
+                    Assert.That(captured.VisualPaintTexture.width, Is.EqualTo(1024));
+                    Assert.That(captured.VisualPaintTexture.height, Is.EqualTo(512));
+                    Assert.That(((RenderTexture)captured.VisualPaintTexture).IsCreated(), Is.True,
+                        "All three completed-stage GPU maps survive unloading their live Battle.");
+                }
                 previousBoard = thisBoard;
                 if (stage < 3)
                 {
@@ -715,7 +725,7 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(200), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(202), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
                 "All approved values, including the twelve Sabotage fields, must survive Scene-owned DEV cleanup.");
         }

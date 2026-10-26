@@ -88,15 +88,16 @@ namespace C6Lab.Tests
                     Color32[] upload = paint.PainterTexture.GetPixels32();
                     Assert.That(upload.Select(pixel => pixel.r), Is.EqualTo(owners), "P byte must survive linear upload exactly.");
                     MaterialPropertyBlock block = ReadBlock(paint.Shell.GetComponent<Renderer>());
-                    Assert.That(block.GetTexture("_PainterMap"), Is.SameAs(paint.PainterTexture));
+                    Assert.That(block.GetTexture("_PainterMap"), Is.SameAs(paint.VisualPainterTexture));
                     Color32[] current = captures[slot - 1] = rig.Capture(paint, $"painter-P{slot}-{LabPlayerPaintPatterns.NameFor(slot)}.png");
-                    int changed = 0, paperCount = 0;
+                    int changed = 0, paperCount = 0, nearPaperDelta = 0;
                     for (int i = 0; i < current.Length; i++)
                     {
                         if (current[i].a != neutral[i].a) Assert.Fail("Painter pattern changed shell/background alpha at " + i);
                         if (neutral[i].Equals(paper[i]))
                         {
-                            if (!current[i].Equals(neutral[i])) Assert.Fail("A painter pattern changed unpainted paper/background at " + i);
+                            nearPaperDelta = Mathf.Max(nearPaperDelta, Mathf.Abs(current[i].r - neutral[i].r),
+                                Mathf.Abs(current[i].g - neutral[i].g), Mathf.Abs(current[i].b - neutral[i].b));
                             paperCount++;
                         }
                         else
@@ -112,6 +113,8 @@ namespace C6Lab.Tests
                     }
                     Assert.That(changed, Is.GreaterThan(100), $"P{slot} must show actual visible shader ink.");
                     Assert.That(paperCount, Is.GreaterThan(1000));
+                    Assert.That(nearPaperDelta, Is.LessThanOrEqualTo(1),
+                        "Sub-byte translucent edges cannot be classified as unpainted from RGB equality alone.");
                     Assert.That(surface.Coverage, Is.EqualTo(coverage));
                     Assert.That(surface.CoveredCount, Is.EqualTo(covered));
                     for (int other = 0; other < slot - 1; other++)
@@ -265,29 +268,32 @@ namespace C6Lab.Tests
                         Assert.That(ReadBlock(copy).GetFloat("_PlayerPaintPatternsEnabled"), Is.EqualTo(patternsEnabled ? 1f : 0f));
                         var perMaterial = new MaterialPropertyBlock(); copy.GetPropertyBlock(perMaterial, 0);
                         Assert.That(perMaterial.GetFloat("_PlayerPaintPatternsEnabled"), Is.EqualTo(patternsEnabled ? 1f : 0f));
-                        Assert.That(perMaterial.GetTexture("_PainterMap"), Is.SameAs(togglePreview.PainterTexture));
+                        Assert.That(perMaterial.GetTexture("_PainterMap"), Is.SameAs(togglePreview.VisualPainterTexture));
                         Assert.That(togglePreview.PainterTexture.GetPixels32().Select(pixel => pixel.r), Is.EqualTo(owners));
                     }
                 }
                 liveRenderer.SetPropertyBlock(null, 0);
                 Assert.That(LabGourdResultPreview.TryCreate(network, out preview, out string error, 256), Is.True, error);
                 Texture2D owned = preview.PainterTexture;
+                Texture visualOwned = preview.VisualPainterTexture;
+                Assert.That(visualOwned, Is.Not.SameAs(paint.VisualPainterTexture));
                 Assert.That(owned, Is.Not.SameAs(paint.PainterTexture));
                 Assert.That(owned.GetPixels32().Select(pixel => pixel.r), Is.EqualTo(owners));
                 Renderer renderer = preview.ModelRoot.GetComponentsInChildren<Renderer>(true)
                     .Single(item => item.sharedMaterial != null && item.sharedMaterial.shader == paint.paintMaterial.shader);
-                Assert.That(ReadBlock(renderer).GetTexture("_PainterMap"), Is.SameAs(owned));
+                Assert.That(ReadBlock(renderer).GetTexture("_PainterMap"), Is.SameAs(visualOwned));
                 surface.Clear();
                 paint.RefreshCommittedMap();
                 Assert.That(paint.PainterTexture.GetPixels32().All(pixel => pixel.r == 0), Is.True);
                 Assert.That(owned.GetPixels32().Select(pixel => pixel.r), Is.EqualTo(owners));
                 preview.Rotate(new Vector2(.25f, -.3f));
                 preview.Zoom(.2f);
-                Assert.That(ReadBlock(renderer).GetTexture("_PainterMap"), Is.SameAs(owned));
+                Assert.That(ReadBlock(renderer).GetTexture("_PainterMap"), Is.SameAs(visualOwned));
                 Assert.That(owned.GetPixels32().Select(pixel => pixel.r), Is.EqualTo(owners));
                 preview.Dispose();
                 yield return null;
                 Assert.That(owned == null, Is.True, "Closing the viewer must destroy its independent owner texture.");
+                Assert.That(visualOwned == null, Is.True, "Closing also releases the independent high-resolution P map.");
                 Assert.That(preview.PainterTexture, Is.Null);
             }
             finally
