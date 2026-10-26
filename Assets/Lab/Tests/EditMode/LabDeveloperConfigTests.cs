@@ -773,7 +773,7 @@ namespace C6Lab.Tests
             int[] gourdIndices = null;
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
                 if (category.Title == "Gourd") gourdIndices = category.FieldIndices;
-            Assert.That(gourdIndices, Is.EqualTo(new[] { 140, 79, 87, 88, 152, 153, 154, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151 }));
+            Assert.That(gourdIndices, Is.EqualTo(new[] { 140, 79, 87, 88, 152, 153, 154, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151, 200, 201 }));
             Assert.That(config.GourdBombIntervalMin, Is.EqualTo(20f));
             Assert.That(config.GourdBombIntervalMax, Is.EqualTo(30f));
 
@@ -855,7 +855,7 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields[104].WholeNumber, Is.True);
             for (int i = 105; i <= 109; i++) Assert.That(LabConfig.DeveloperFields[i].WholeNumber, Is.False);
             var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
-            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 140, 79, 87, 88, 152, 153, 154, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151 }));
+            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 140, 79, 87, 88, 152, 153, 154, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151, 200, 201 }));
         }
 
         [TestCase(104, 0f, 2f)]
@@ -1144,7 +1144,7 @@ namespace C6Lab.Tests
         {
             var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
             Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
-                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns", "Paint Drying", "Gourd Color Combo", "Combo Penalty Target", "Board Orb Trail", "Sabotage Mix", "야광귀 섬광", "섬광 대상", "야광귀 셈법", "2:2 땅따먹기" }));
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns", "Paint Drying", "Gourd Color Combo", "Combo Penalty Target", "Board Orb Trail", "Sabotage Mix", "야광귀 섬광", "섬광 대상", "야광귀 셈법", "2:2 땅따먹기", "High Resolution Paint" }));
             Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
                 "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
             var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");

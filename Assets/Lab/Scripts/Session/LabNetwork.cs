@@ -202,14 +202,15 @@ namespace C6Lab
         // 5661: #278 immutable Lab/Game Bonjour identity before pending-room activation.
         // 5662: #281 2:2 team territory (DEV 196-199, 200 shared values): team cells, winner and fever in the
         //       snapshot, fever in the board header, team-edge handoffs and territory overwrite paint.
-        // 5663: #301 yaguang flash shake release (DEV 200-201, 202 shared values; glare 12 s in 1-23 s) and flashShake requests.
-        internal const ushort LabProtocolVersion = 5663;
+        // 5663: #299 bounded paint visual descriptors in the same paint commit; DEV200-201 (202 values).
+        // 5664: #301 yaguang flash shake release (DEV 202-203, 204 shared values; glare 10 s / recovery 1 s) and flashShake requests.
+        internal const ushort LabProtocolVersion = 5664;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/24");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/25");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -2410,19 +2411,23 @@ namespace C6Lab
                 + " remaining=" + latest.remaining.ToString("F1") + " orbs=" + (latest.orbs?.Length ?? 0));
         }
 
+        private uint displayedPaintVisualVersion;
+
         private void CopyPaintToDisplay(LabPaintSurface source, LabSnapshot snapshot)
         {
             if (displayedPaintSession == snapshot.sessionId && displayedPaintRound == snapshot.round
                 && displayedPaintRevision == source.Revision && displayedPaintCount == snapshot.paintCount
+                && displayedPaintVisualVersion == source.VisualVersion
                 && clientPaintSurface.Columns == source.Columns && clientPaintSurface.Rows == source.Rows) return;
             var pixels = new Color32[source.CellCount];
             var painters = new byte[source.CellCount];
             source.CopyPixels(pixels);
             source.CopyPainterSlots(painters);
-            if (!clientPaintSurface.TryReplacePixels(source.Columns, source.Rows, source.Revision, pixels, painters, snapshot.paintCount))
+            if (!clientPaintSurface.TryReplacePixels(source.Columns, source.Rows, source.Revision, pixels, painters, snapshot.paintCount, source.CopyVisualStamps()))
                 throw new InvalidOperationException("Invalid authoritative paint display state.");
             displayedPaintSession = snapshot.sessionId; displayedPaintRound = snapshot.round;
             displayedPaintRevision = source.Revision; displayedPaintCount = snapshot.paintCount;
+            displayedPaintVisualVersion = source.VisualVersion;
         }
 
         private bool SendPaintFrames(ulong receiver, LabPaintFrame[] frames)

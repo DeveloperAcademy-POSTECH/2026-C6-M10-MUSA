@@ -90,20 +90,22 @@ namespace C6Lab.Tests
                             TuneGrain(fixture, true);
                             paint.RefreshCommittedMap();
                             Color32[] grain = rig.Capture(paint, "spread-flow-settled-grain-ON.png");
-                            int changedPigment = 0, unchangedPaper = 0;
+                            int changedPigment = 0, unchangedPaper = 0, nearPaperDelta = 0;
                             for (int i = 0; i < grain.Length; i++)
                             {
                                 if (grain[i].a != frames[style, 3][i].a)
                                     Assert.Fail("Grain altered saved shell alpha at pixel " + i + ".");
                                 if (frames[style, 3][i].Equals(paper[i]))
                                 {
-                                    if (!grain[i].Equals(paper[i])) Assert.Fail("Grain altered unpainted paper/background.");
+                                    nearPaperDelta = Mathf.Max(nearPaperDelta, Mathf.Abs(grain[i].r - paper[i].r),
+                                        Mathf.Abs(grain[i].g - paper[i].g), Mathf.Abs(grain[i].b - paper[i].b));
                                     unchangedPaper++;
                                 }
                                 else if (!grain[i].Equals(frames[style, 3][i])) changedPigment++;
                             }
                             Assert.That(changedPigment, Is.GreaterThan(100));
                             Assert.That(unchangedPaper, Is.GreaterThan(1000));
+                            Assert.That(nearPaperDelta, Is.LessThanOrEqualTo(1), "Only sub-byte optical edge rounding is allowed.");
                             Assert.That(surface.Revision, Is.EqualTo(revision));
                             Assert.That(Copy(surface), Is.EqualTo(maps[style]), "Internal grain must not alter growth membership.");
                         }

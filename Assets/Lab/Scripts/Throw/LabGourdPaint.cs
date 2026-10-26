@@ -26,6 +26,10 @@ namespace C6Lab
         private Color32[] uploadPainterPixels;
         private Texture2D paintTexture;
         private Texture2D painterTexture;
+        private LabHighResolutionPaintRuntime highResolution;
+        private bool appliedHighResolutionEnabled;
+        private int appliedHighResolutionColumns;
+        private uint uploadedVisualVersion;
         private LabPaintSurface uploadedSurface;
         private uint uploadedRevision;
         private string uploadedSession;
@@ -49,6 +53,11 @@ namespace C6Lab
         public float Coverage => Surface.Coverage;
         public Texture2D PaintTexture => paintTexture;
         public Texture2D PainterTexture => painterTexture;
+        /// <summary>Actually bound render maps. Authoritative Texture2D observation APIs stay unchanged.</summary>
+        public Texture VisualPaintTexture => HighResolutionActive ? highResolution.PaintTexture : paintTexture;
+        public Texture VisualPainterTexture => HighResolutionActive ? highResolution.PainterTexture : painterTexture;
+        public bool HighResolutionActive => appliedHighResolutionEnabled && highResolution != null && highResolution.Ready;
+        public string HighResolutionError => highResolution != null ? highResolution.Error : null;
         public Transform Shell => shell != null ? shell.transform : null;
         public GameObject VisualInstance { get; private set; }
         public string InitializationError { get; private set; }
@@ -256,7 +265,13 @@ namespace C6Lab
             }
         }
 
-        private void RefreshPaintMap(bool force = false)
+        /// <summary>Finish the bounded brush rebuild before an independent result snapshot takes ownership.</summary>
+        public void PrepareVisualCapture()
+        {
+            if (IsReady) RefreshPaintMap(false, true);
+        }
+
+        private void RefreshPaintMap(bool force = false, bool completeRebuild = false)
         {
             if (shell == null) return;
             LabPaintSurface source = Surface;
@@ -266,6 +281,13 @@ namespace C6Lab
             bool uploadMap = force || !hasUploadedSurface || uploadedSurface != source
                 || uploadedRevision != source.Revision || uploadedSession != currentSession || uploadedRound != currentRound;
             LabConfig config = network != null ? network.config : null;
+            bool highResolutionEnabled = config == null || config.HighResolutionPaintEnabled;
+            int highResolutionColumns = config != null ? config.HighResolutionPaintColumns : LabHighResolutionPaintRuntime.DefaultColumns;
+            bool highResolutionChanged = appliedHighResolutionEnabled != highResolutionEnabled
+                || appliedHighResolutionColumns != highResolutionColumns;
+            bool visualChanged = uploadedVisualVersion != source.VisualVersion;
+            bool pendingVisual = highResolution != null && (highResolution.HasPendingWork
+                || (highResolution.Error == null && !highResolution.Ready));
             bool playerPaintPatternsEnabled = config == null || config.PlayerPaintPatternsEnabled;
             bool grainEnabled = config != null && config.PaintGrainEnabled;
             float grainSize = config != null ? config.PaintGrainSize : 1f;
@@ -275,7 +297,8 @@ namespace C6Lab
                 || appliedGrainSize != grainSize || appliedGrainStrength != grainStrength
                 || appliedMottleStrength != mottleStrength;
             bool patternsChanged = !grainSettingsApplied || appliedPlayerPaintPatternsEnabled != playerPaintPatternsEnabled;
-            if (!uploadMap && !grainChanged && !patternsChanged) return;
+            if (!uploadMap && !grainChanged && !patternsChanged && !highResolutionChanged
+                && !visualChanged && !pendingVisual && !completeRebuild) return;
             if (block == null) block = new MaterialPropertyBlock();
             shell.GetPropertyBlock(block);
             if (uploadMap)
@@ -290,14 +313,26 @@ namespace C6Lab
                 painterTexture.Apply(false, false);
                 // Both maps describe the same committed surface. Bind together only after
                 // both CPU uploads finish; an in-flight network map is never sampled here.
-                block.SetTexture("_PaintMap", paintTexture);
-                block.SetTexture("_PainterMap", painterTexture);
                 block.SetFloat("_PaintMapReady", 1f);
                 uploadedSurface = source;
                 uploadedRevision = source.Revision;
                 uploadedSession = currentSession; uploadedRound = currentRound;
                 hasUploadedSurface = true;
             }
+            if (highResolutionEnabled)
+            {
+                if (highResolution == null) highResolution = new LabHighResolutionPaintRuntime();
+                highResolution.Update(source, paintTexture, painterTexture, highResolutionColumns, completeRebuild);
+            }
+            else if (highResolution != null)
+            {
+                highResolution.Dispose(); highResolution = null;
+            }
+            appliedHighResolutionEnabled = highResolutionEnabled;
+            appliedHighResolutionColumns = highResolutionColumns;
+            uploadedVisualVersion = source.VisualVersion;
+            block.SetTexture("_PaintMap", VisualPaintTexture);
+            block.SetTexture("_PainterMap", VisualPainterTexture);
             block.SetFloat("_PaintGrainEnabled", grainEnabled ? 1f : 0f);
             block.SetFloat("_PaintGrainSize", grainSize);
             block.SetFloat("_PaintGrainStrength", grainStrength);
@@ -343,6 +378,11 @@ namespace C6Lab
             // Never clear Surface here: disabling/rebuilding a renderer cannot erase team progress.
             if (mountedTarget != null && VisualInstance != null && mountedTarget.MountedVisual == VisualInstance)
                 mountedTarget.SetVisualPrefab(null);
+            if (highResolution != null) highResolution.Dispose();
+            highResolution = null;
+            appliedHighResolutionEnabled = false;
+            appliedHighResolutionColumns = 0;
+            uploadedVisualVersion = 0;
             shell = null;
             VisualInstance = null;
             mountedTarget = null;

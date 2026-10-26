@@ -326,6 +326,9 @@ namespace C6Lab
             new LabDeveloperField("2:2 제한 시간 (초)", 30f, 600f),
             new LabDeveloperField("피버 필요 명중 수 (0 = 피버 없음)", 0f, 50f, true),
             new LabDeveloperField("피버 시간 (초)", 1f, 30f),
+            // Presentation-only shared options; never change the Host paint-cell rules (#299).
+            LabDeveloperField.Toggle("High Resolution Paint (0 off, 1 on)"),
+            LabDeveloperField.Choice("Paint Texture Quality", "1024 × 512", "2048 × 1024"),
             // 야광귀 섬광 해제 (#301): 눈부신 사람이 폰을 정해진 횟수만큼 흔들면 자기 눈부심이 풀린다.
             LabDeveloperField.Toggle("섬광 흔들어 풀기 (0 off, 1 on)", "끔", "켬"),
             new LabDeveloperField("섬광 흔들기 횟수", 2f, 10f, true)
@@ -358,15 +361,15 @@ namespace C6Lab
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 90, 91, 92, 93, 94, 95, 96, 97),
             new LabDeveloperCategory("Gourd", 140, 79, 87, 88, 152, 153, 154, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137,
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
-                134, 132, 133, 148, 149, 150, 151),
+                134, 132, 133, 148, 149, 150, 151, 200, 201),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
             new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
-            // 섬광 흔들어 풀기·흔들기 횟수(#301)는 2:2(#281) 뒤 200·201번이며 섬광 칸 맨 아래에 둔다.
+            // 섬광 흔들어 풀기·흔들기 횟수(#301)는 고해상도 도색(#299) 뒤 202·203번이며 섬광 칸 맨 아래에 둔다.
             new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
-                184, 185, 186, 187, 188, 189, 190, 200, 201)
+                184, 185, 186, 187, 188, 189, 190, 202, 203)
                 .WithSwitch(155, 184)
                 .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
             new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
@@ -615,6 +618,11 @@ namespace C6Lab
         [SerializeField, Range(0, 50)] private int teamFeverHits = 15;
         [Tooltip("피버 시간 (초). 그동안 팀 판의 모든 구슬이 팀 색 결합 구슬이 되고, 생성해도 팀 색 결합 구슬이 나온다.")]
         [SerializeField, Range(1f, 30f)] private float teamFeverSeconds = 8f;
+        [Header("High resolution paint presentation (#299)")]
+        [Tooltip("Use the continuous high-resolution paint presentation. Host cell coverage, attribution and battle rules are unchanged.")]
+        [SerializeField] private bool highResolutionPaintEnabled = true;
+        [Tooltip("Visual texture quality only: 0 = 1024 × 512, 1 = 2048 × 1024. Shared with the room at the ordinary settings boundary.")]
+        [SerializeField, Range(0, 1)] private int highResolutionPaintQuality = 0;
         [Header("Yaguang flash (#268)")]
         [Tooltip("야광귀 섬광. 박에서 요괴가 빼꼼 나와 눈이 밝아진 뒤(예고) 화면이 하얗게 번쩍이고, 눈부신 동안 판 위 음양·결합 구슬과 아이템이 하얗게 보인다(북·박 색칠·HUD는 그대로). 화면 표시만 바뀌고 조작·판정은 그대로다. 방해공작 묶음(#251)과 따로 돈다. 야광귀 전용이라 기본은 끔(DEV `Yaguang Flash`로 켠다).")]
         [SerializeField] private bool yaguangFlashEnabled;
@@ -969,6 +977,9 @@ namespace C6Lab
         public float TeamBattleSeconds => Mathf.Clamp(Finite(teamBattleSeconds, 180f), 30f, 600f);
         public int TeamFeverHits => Mathf.Clamp(teamFeverHits, 0, 50);
         public float TeamFeverSeconds => Mathf.Clamp(Finite(teamFeverSeconds, 8f), 1f, 30f);
+        public bool HighResolutionPaintEnabled => highResolutionPaintEnabled;
+        public int HighResolutionPaintQuality => Mathf.Clamp(highResolutionPaintQuality, 0, 1);
+        public int HighResolutionPaintColumns => HighResolutionPaintQuality == 0 ? 1024 : 2048;
         public bool YaguangFlashEnabled => yaguangFlashEnabled;
         /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
         public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
@@ -1119,6 +1130,7 @@ namespace C6Lab
                 ComboYaguangCountEnabled ? 1f : 0f,
                 JigwiAutoIntervalMin, JigwiAutoIntervalMax, JigwiAutoFireWeight, JigwiAutoGenerationBurnWeight,
                 TeamTerritoryEnabled ? 1f : 0f, TeamBattleSeconds, TeamFeverHits, TeamFeverSeconds,
+                HighResolutionPaintEnabled ? 1f : 0f, HighResolutionPaintQuality,
                 YaguangFlashShakeRelease ? 1f : 0f, YaguangFlashShakeCount
             };
         }
@@ -1360,8 +1372,10 @@ namespace C6Lab
             teamBattleSeconds = values[197];
             teamFeverHits = (int)values[198];
             teamFeverSeconds = values[199];
-            yaguangFlashShakeRelease = values[200] >= .5f;
-            yaguangFlashShakeCount = (int)values[201];
+            highResolutionPaintEnabled = values[200] >= .5f;
+            highResolutionPaintQuality = (int)values[201];
+            yaguangFlashShakeRelease = values[202] >= .5f;
+            yaguangFlashShakeCount = (int)values[203];
             error = string.Empty;
             return true;
         }

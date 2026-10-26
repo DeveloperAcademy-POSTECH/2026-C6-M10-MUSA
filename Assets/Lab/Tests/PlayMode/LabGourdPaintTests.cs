@@ -830,7 +830,7 @@ namespace C6Lab.Tests
                 "The renderer must upload exactly the CPU RGBA surface that owns coverage.");
             Assert.That(expected.Count(pixel => pixel.a != 0), Is.EqualTo(surface.CoveredCount));
             Assert.That(surface.Coverage, Is.EqualTo(surface.CoveredCount / (float)surface.CellCount));
-            Assert.That(ReadBlock(paint).GetTexture("_PaintMap"), Is.SameAs(paint.PaintTexture));
+            Assert.That(ReadBlock(paint).GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture));
             Assert.That(ReadBlock(paint).GetFloat("_PaintMapReady"), Is.EqualTo(1f));
         }
 
