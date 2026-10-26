@@ -422,6 +422,7 @@ namespace C6Lab
 
         private void Awake()
         {
+            LabMobilePresentationPolicy.Attach(this);
             // GameSession (-1000) can prepare its initial runtime profile before this Awake.
             // Retain the original saved asset if that early installation already captured it.
             if (sourceConfig == null) sourceConfig = config;

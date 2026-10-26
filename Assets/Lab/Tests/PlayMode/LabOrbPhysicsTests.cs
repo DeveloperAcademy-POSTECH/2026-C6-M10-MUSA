@@ -791,7 +791,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ABlastShrunkOrbIsSmallerToSeeGrabAndBumpAndStaysSmall()
+        public void ABlastShrunkOrbKeepsSmallVisualAndCollisionAndSupportsMinimumTouchReach()
         {
             Assert.That(config.BlastShrinkScale, Is.EqualTo(.5f));
             float radius = config.OrbRadius;
@@ -804,13 +804,29 @@ namespace C6Lab.Tests
                 "It looks half as big.");
             Assert.That(whole.Visual.Find("Default Sphere").localScale.x, Is.EqualTo(2f * radius).Within(1e-4f));
 
-            // A touch just past a small orb's reach misses it, where the same touch grabs a whole one.
+            // The physical reach still shrinks when the optional accessibility minimum is zero.
             Vector2 offset = new Vector2(0f, .9f * radius);
-            Assert.That(board.TryBeginDragAtWorld(BoardPoint(small) + offset, 1d), Is.False, "It is harder to grab.");
+            float minimumReach = board.EdgeControlSettings.MinimumGripRadius;
+            board.EdgeControlSettings.MinimumGripRadius = 0f;
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(small) + offset, 1d), Is.False,
+                "With no accessibility minimum the original small-body reach is preserved.");
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(whole) + offset, 2d), Is.True);
             board.CancelDrag();
             Assert.That(board.TryBeginDragAtWorld(BoardPoint(small), 3d), Is.True, "Right on it, it is still grabbed.");
             board.CancelDrag();
+
+            // #310 deliberately makes that same small body easier to grab. Use explicit screen
+            // geometry so the Editor Game view or batch viewport cannot change this expectation.
+            board.EdgeControlSettings.MinimumGripRadius = minimumReach;
+            var viewport = new Rect(0f, 0f, 390f, 195f);
+            inputCamera.pixelRect = viewport;
+            inputCamera.orthographicSize = Bounds.height * .5f;
+            inputCamera.aspect = Bounds.width / Bounds.height;
+            board.SetEdgeControlScreenGeometry(viewport, viewport);
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(small) + offset, 4d), Is.True,
+                "The configured minimum adds touch reach, not a larger physical body.");
+            board.CancelDrag();
+            Assert.That(small.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f));
 
             board.UpsertOrb("small", LabOrbKind.Yin, new Vector2(.7f, .5f), small: true);
             Assert.That(small.HitSphere.radius, Is.EqualTo(.5f * radius).Within(1e-5f), "Repeated snapshots keep it small.");
@@ -1368,7 +1384,12 @@ namespace C6Lab.Tests
             Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 1.05d), Is.True);
             Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 1.5d), Is.True);
             Assert.That(board.EndDragAtWorld(new Vector2(edge + .45f, start.y), 1.6d), Is.True);
-            Assert.That(sent.Body.linearVelocity.x, Is.InRange(.01f, driftPass), "A gentle push, slower than a drift could ever pass.");
+            // #310 can finish this intentional pass on release, freezing the pending local body.
+            // Measure the outgoing physical velocity carried by that crossing, or the still-live
+            // body when it has yet to cross; the slow-send rule and its threshold are unchanged.
+            float releasedSpeed = crossed.TryGetValue("sent", out LabOrbEdgeCrossing immediate)
+                ? immediate.VelocityInBoardWidthsPerSecond.x * Width : sent.Body.linearVelocity.x;
+            Assert.That(releasedSpeed, Is.InRange(.01f, driftPass), "A gentle push, slower than a drift could ever pass.");
             for (int step = 0; step < 20 && !crossed.ContainsKey("sent"); step++) yield return new WaitForFixedUpdate();
             Assert.That(crossed.ContainsKey("sent"), Is.True, "Sent on by the player, it passes at the edge however slowly (#237).");
             Assert.That(crossed["sent"].ToRight, Is.True);
