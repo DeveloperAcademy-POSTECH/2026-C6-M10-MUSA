@@ -15,6 +15,8 @@ namespace C6Lab
     /// (폭탄은 위의 `GourdBombDropped`로 이미 나온다).
     /// 야광귀 섬광(#268) 예고가 시작되면 모든 기기에서 폭탄 때처럼 쏙 올라와 두리번거리다가, 번쩍이는 순간 톡 튀고
     /// 잠시 뒤 들어간다(섬광을 누가 맞든 박은 모두에게 보인다). 시각은 Host 스냅샷(`flashWarningAt`/`flashAt`/`flashLastAt`)이다.
+    /// 섬광 흔들어 풀기(#301)가 켜져 있으면 한 명이라도 눈부신 동안 계속 나와 두리번거리고(모든 기기, Host 시각 기준),
+    /// 누군가 폰을 흔들어 풀 때마다 어지러운 듯 움찔한다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabGourdYokai : MonoBehaviour
@@ -67,6 +69,8 @@ namespace C6Lab
         private uint seenComboCount;
         private int seenProgress;
         private uint seenFlashCount;
+        private uint releaseFlashCount;
+        private int seenReleases;
 
         private LabSnapshot seenSnapshot;
         private double seenAtRealtime;
@@ -150,9 +154,14 @@ namespace C6Lab
             if (snapshot == null || snapshot.phase != LabPhase.Playing) { bombLeft = 0f; popPending = false; }
             else bombLeft = Mathf.Max(0f, bombLeft - deltaTime);
             bool flash = InFlashWindow(snapshot, serverNow, flashStaySeconds);
-            bool want = combo || bombLeft > 0f || flash;
+            LabConfig config = network != null ? network.config : null;
+            // 섬광 흔들어 풀기 (#301): 한 명이라도 눈부신 동안은 계속 나와 있다.
+            bool glared = config != null && config.YaguangFlashShakeRelease
+                && LabYaguangFlash.AnyGlared(snapshot, serverNow, config.YaguangFlashGlareSeconds);
+            bool want = combo || bombLeft > 0f || flash || glared;
             DetectHits(snapshot, combo);
             DetectFlash(snapshot, serverNow);
+            DetectRelease(snapshot);
             wasInComboWindow = combo;
 
             if (want && !holding) Hold();
@@ -198,6 +207,22 @@ namespace C6Lab
             bool fresh = seenFlashCount != 0 || snapshot.flashCount == 1;
             seenFlashCount = snapshot.flashCount;
             if (fresh && holding && serverNow - snapshot.flashLastAt < flashStaySeconds) StartEffect(1f, PopSeconds);
+        }
+
+        /// <summary>누군가 폰을 흔들어 눈부심을 풀면(#301) 움찔한다. 새 섬광이면 센 수를 처음부터 다시 센다.</summary>
+        private void DetectRelease(LabSnapshot snapshot)
+        {
+            if (snapshot == null || snapshot.players == null) return;
+            if (snapshot.flashCount != releaseFlashCount)
+            {
+                releaseFlashCount = snapshot.flashCount;
+                seenReleases = 0;
+            }
+            int releases = 0;
+            foreach (LabPlayerState player in snapshot.players)
+                if (player != null && snapshot.FlashReleasedAt(player.id) >= 0d) releases++;
+            if (releases > seenReleases && holding) StartEffect(-1f, FlinchSeconds);
+            seenReleases = releases;
         }
 
         private void DetectHits(LabSnapshot snapshot, bool currentCombo)

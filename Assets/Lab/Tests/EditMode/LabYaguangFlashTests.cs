@@ -31,7 +31,8 @@ namespace C6Lab.Tests
             Assert.That(new[] { flash[0].OffText, flash[0].OnText }, Is.EqualTo(new[] { "끔", "켬" }));
             Assert.That(new[] { flash[1].OffText, flash[1].OnText }, Is.EqualTo(new[] { "모두", "한 명" }));
             Assert.That(flash.Skip(2).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
-            float[] defaults = { 10f, 60f, 3f, 7f, 2f };
+            // 눈부심·회복은 #301부터 흔들기에 맞춰 10초(범위 1~19)·1초(범위 0~2), 각각 범위 가운데.
+            float[] defaults = { 10f, 60f, 3f, 10f, 1f };
             for (int i = 0; i < defaults.Length; i++)
                 Assert.That((flash[i + 2].Min + flash[i + 2].Max) * .5f, Is.EqualTo(defaults[i]),
                     flash[i + 2].Label + ": every slider starts in the middle of its range.");
@@ -40,7 +41,7 @@ namespace C6Lab.Tests
                 "The combo moved into the 야광귀 group.");
             LabDeveloperCategory yaguang = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀");
             Assert.That(yaguang.FieldIndices, Is.EqualTo(new[]
-                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190 }),
+                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190, 202, 203 }),
                 "The yaguang counting toggle (#271) sits right under the combo switch.");
             Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 184 }), "One switch turns the combo and the flash on together.");
             Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 11 }));
@@ -56,9 +57,9 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(184).Take(7), Is.EqualTo(new[] { 0f, 0f, 10f, 60f, 3f, 7f, 2f }),
+                Assert.That(source.CaptureDeveloperValues().Skip(184).Take(7), Is.EqualTo(new[] { 0f, 0f, 10f, 60f, 3f, 10f, 1f }),
                     "Off by default; once on, everyone flashes at 10 s (so the round does not open empty, #271) and every 60 s, "
-                    + "with a 3 s warning (yellow eyes for most of it), 7 s of glare and 2 s to recover.");
+                    + "with a 3 s warning (yellow eyes for most of it), up to 10 s of glare and 1 s to recover (#301).");
 
             float[] values = config.CaptureDeveloperValues();
             values[184] = 1f; values[185] = 1f; values[186] = 5f; values[187] = 24f;
@@ -73,6 +74,73 @@ namespace C6Lab.Tests
             values[189] = 2f;
             values[187] = 12f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Flashes come at least 20 s apart.");
+        }
+
+        [Test]
+        public void ShakeReleaseFieldsAreOnByDefaultAtTheBottomOfTheFlashRows()
+        {
+            LabDeveloperField toggle = LabConfig.DeveloperFields[202], count = LabConfig.DeveloperFields[203];
+            Assert.That(toggle.Label, Is.EqualTo("섬광 흔들어 풀기 (0 off, 1 on)"));
+            Assert.That(toggle.IsToggle, Is.True);
+            Assert.That(new[] { toggle.OffText, toggle.OnText }, Is.EqualTo(new[] { "끔", "켬" }));
+            Assert.That(count.Label, Is.EqualTo("섬광 흔들기 횟수"));
+            Assert.That(count.WholeNumber, Is.True);
+            Assert.That(new[] { count.Min, count.Max }, Is.EqualTo(new[] { 2f, 10f }));
+            Assert.That((count.Min + count.Max) * .5f, Is.EqualTo(6f), "6 shakes (about 2 s) is the middle of the slider.");
+
+            LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
+            created.Add(config);
+            LabConfig authored = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(authored, Is.Not.Null);
+            foreach (LabConfig source in new[] { config, authored })
+            {
+                Assert.That(source.YaguangFlashShakeRelease, Is.True, "Shaking the phone releases the glare by default.");
+                Assert.That(source.CaptureDeveloperValues().Skip(202).Take(2), Is.EqualTo(new[] { 1f, 6f }));
+            }
+            float[] values = config.CaptureDeveloperValues();
+            values[202] = 0f; values[203] = 10f; values[189] = 19f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.YaguangFlashShakeRelease, Is.False);
+            Assert.That(config.YaguangFlashShakeCount, Is.EqualTo(10));
+            Assert.That(config.YaguangFlashGlareSeconds, Is.EqualTo(19f));
+            values[203] = 11f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "At most 10 shakes.");
+            values[203] = 6.5f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Shakes are whole numbers.");
+            values[203] = 6f; values[189] = 20f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Glare stays within 19 s.");
+            values[189] = 10f; values[190] = 3f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Recovery stays within 2 s.");
+        }
+
+        [Test]
+        public void TheShakeCounterCountsStrongShakesOnceEachInAnyUnit()
+        {
+            foreach (float unit in new[] { 1f, 9.81f })
+            {
+                // 기준 1배·간격 0.14초로 세는 방식을 확인한다 (기본값은 아래에서 따로 본다).
+                var counter = new LabShakeCounter { Threshold = 1f, MinGap = .14f };
+                Vector3 still = new Vector3(0f, -1f, 0f) * unit;
+                Assert.That(counter.Feed(still, 0f), Is.False, "The first reading only learns gravity.");
+                Assert.That(counter.Feed(still + new Vector3(.4f, 0f, 0f) * unit, .05f), Is.False, "A small wobble is not a shake.");
+                Assert.That(counter.Feed(still + new Vector3(1.6f, 0f, 0f) * unit, .3f), Is.True, "A strong jerk is one shake.");
+                Assert.That(counter.Feed(still + new Vector3(-1.6f, 0f, 0f) * unit, .35f), Is.False, "The same shake is not counted twice.");
+                Assert.That(counter.Feed(still + new Vector3(-1.6f, 0f, 0f) * unit, .6f), Is.True, "The swing back counts again.");
+                Assert.That(counter.Count, Is.EqualTo(2));
+                Assert.That(counter.Feed(new Vector3(float.NaN, 0f, 0f), .9f), Is.False);
+                counter.AddOne();
+                Assert.That(counter.Count, Is.EqualTo(3), "The Editor K key adds one.");
+                counter.Reset();
+                Assert.That(counter.Count, Is.Zero);
+            }
+            var strict = new LabShakeCounter();
+            Assert.That(new[] { strict.Threshold, strict.MinGap }, Is.EqualTo(new[] { 1.6f, .25f }),
+                "Default: a small move is not a shake, and one swing is not counted twice (#301 tuning).");
+            strict.Feed(new Vector3(0f, -1f, 0f), 0f);
+            Assert.That(strict.Feed(new Vector3(1.2f, -1f, 0f), .3f), Is.False, "A light jerk no longer counts.");
+            Assert.That(LabYaguangFlashHud.ShakeProgress(3, 6), Is.EqualTo(.5f), "Half the shakes clear half the glare.");
+            Assert.That(LabYaguangFlashHud.ShakeProgress(9, 6), Is.EqualTo(1f));
+            Assert.That(LabYaguangFlashHud.ShakeProgress(1, 0), Is.Zero);
         }
 
         [Test]
@@ -469,7 +537,7 @@ namespace C6Lab.Tests
         public void AShortIntervalStillLeavesTheGlareRecoveryAndNextWarningApart()
         {
             var model = new LabModel();
-            model.Begin("flash-gap", Three, 0d, Config(flash: true, interval: 20f, warning: 4f, glare: 13f, recovery: 4f));
+            model.Begin("flash-gap", Three, 0d, Config(flash: true, interval: 20f, warning: 6f, glare: 13f, recovery: 2f));
             LabSnapshot flashed = model.Snapshot(30d);
             Assert.That(flashed.flashAt, Is.EqualTo(51d), "4 warning + 13 glare + 4 recovery is longer than 20 s.");
         }
@@ -482,6 +550,73 @@ namespace C6Lab.Tests
             Assert.That(LabYaguangFlashHud.EyeGlowAt(.375f), Is.EqualTo(.5f).Within(1e-4f));
             Assert.That(LabYaguangFlashHud.EyeGlowAt(.45f), Is.EqualTo(1f), "Fully lit quickly...");
             Assert.That(LabYaguangFlashHud.EyeGlowAt(1f), Is.EqualTo(1f), "...and held for the last 55% to enjoy.");
+        }
+
+        [Test]
+        public void TheCountdownShowsTheSecondsLeftOnlyOnTheTargetsScreen()
+        {
+            var snapshot = new LabSnapshot
+            {
+                phase = LabPhase.Playing, flashWarningAt = 27d, flashAt = 30d, flashTarget = 20, flashTargetAll = false
+            };
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 26.9d, 20), Is.Zero, "Not before the warning.");
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 27d, 20), Is.EqualTo(3));
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 27.5d, 20), Is.EqualTo(3));
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 28d, 20), Is.EqualTo(2));
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 29.99d, 20), Is.EqualTo(1));
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 30d, 20), Is.Zero, "Gone when it flashes.");
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 28d, 10), Is.Zero, "Only the target counts down.");
+            snapshot.flashTargetAll = true;
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 28d, 10), Is.EqualTo(2), "Everyone counts when all are hit.");
+            snapshot.phase = LabPhase.Victory;
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 28d, 10), Is.Zero);
+        }
+
+        [Test]
+        public void ShakingFreeEndsOnlyThatPlayersGlareAndStartsTheRecoveryThere()
+        {
+            var snapshot = new LabSnapshot
+            {
+                phase = LabPhase.Playing, flashCount = 2, flashLastAt = 30d, flashLastTargetAll = true,
+                players = new[]
+                {
+                    new LabPlayerState { id = 10, flashReleasedAt = 31d },
+                    new LabPlayerState { id = 20 },
+                    new LabPlayerState { id = 30, flashReleasedAt = 20d }
+                }
+            };
+            Assert.That(snapshot.FlashReleasedAt(10), Is.EqualTo(31d));
+            Assert.That(snapshot.FlashReleasedAt(20), Is.EqualTo(-1d));
+            Assert.That(snapshot.FlashReleasedAt(30), Is.EqualTo(-1d), "A release from an earlier flash does not count.");
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 30.5d, 10, 3f, 1.5f), Is.EqualTo(1f));
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 31d, 10, 3f, 1.5f), Is.EqualTo(1f), "Recovery starts at the hit.");
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 31.75d, 10, 3f, 1.5f), Is.EqualTo(.5f).Within(1e-4f));
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 32.5d, 10, 3f, 1.5f), Is.Zero, "Clear well before the 3 s glare ends.");
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 32.5d, 20, 3f, 1.5f), Is.EqualTo(1f), "Others stay dazzled.");
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 32.5d, 30, 3f, 1.5f), Is.EqualTo(1f));
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 34.5d, 20, 3f, 1.5f), Is.Zero, "Unreleased glare still ends on time.");
+        }
+
+        [Test]
+        public void GlaredMeansHitByTheLastFlashInsideTheGlareAndNotYetReleased()
+        {
+            var snapshot = new LabSnapshot
+            {
+                phase = LabPhase.Playing, flashCount = 1, flashLastAt = 30d, flashLastTarget = 20, flashLastTargetAll = false,
+                players = new[] { new LabPlayerState { id = 10 }, new LabPlayerState { id = 20 } }
+            };
+            Assert.That(LabYaguangFlash.Glared(snapshot, 29.9d, 20, 7f), Is.False, "Not before the flash (nothing to shake off in the warning).");
+            Assert.That(LabYaguangFlash.Glared(snapshot, 30d, 20, 7f), Is.True);
+            Assert.That(LabYaguangFlash.Glared(snapshot, 30d, 10, 7f), Is.False, "Only the flashed player in ONE mode.");
+            Assert.That(LabYaguangFlash.AnyGlared(snapshot, 36.9d, 7f), Is.True, "The yokai stays out while anyone is dazzled.");
+            Assert.That(LabYaguangFlash.Glared(snapshot, 37d, 20, 7f), Is.False, "The glare time is the upper limit.");
+            Assert.That(LabYaguangFlash.AnyGlared(snapshot, 37d, 7f), Is.False);
+            snapshot.players[1].flashReleasedAt = 32d;
+            Assert.That(LabYaguangFlash.Glared(snapshot, 33d, 20, 7f), Is.False, "Released by shaking the phone.");
+            Assert.That(LabYaguangFlash.AnyGlared(snapshot, 33d, 7f), Is.False, "Nobody left: the yokai may go back in.");
+            snapshot.phase = LabPhase.Victory;
+            snapshot.players[1].flashReleasedAt = -1d;
+            Assert.That(LabYaguangFlash.Glared(snapshot, 31d, 20, 7f), Is.False);
         }
 
         [Test]

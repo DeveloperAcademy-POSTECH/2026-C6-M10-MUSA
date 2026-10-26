@@ -410,7 +410,7 @@ namespace C6Lab
             return values.All(player => player != null && ids.Add(player.id) && player.seat >= 0
                 && player.seat < MaximumPlayers && seats.Add(player.seat) && player.personalHp >= 0
                 && Finite(player.stamina) && player.stamina >= 0f && Finite(player.drumSeconds)
-                && Finite(player.comboPenaltyUntil) && Finite(player.comboRewardUntil));
+                && Finite(player.comboPenaltyUntil) && Finite(player.comboRewardUntil) && Finite(player.flashReleasedAt));
         }
 
         private static bool ValidId(string id) => !string.IsNullOrWhiteSpace(id) && id.Length <= 128;

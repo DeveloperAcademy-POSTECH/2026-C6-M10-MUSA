@@ -12,6 +12,8 @@ namespace Hapio
     {
         public const int TerritoryScope = 4;
         private const int TerritorySwitch = 196;
+        /// <summary>섬광 대상 (0 모두, 1 한 명). 게임에서는 모두로 고정한다 (#301).</summary>
+        public const int FlashTargetOneField = 185;
         private readonly LabConfig template;
         private float[] common;
         private readonly float[][] effective = new float[3][];
@@ -31,6 +33,7 @@ namespace Hapio
                     float[] values = (float[])common.Clone();
                     foreach (GameStageValue item in catalog.Get(s).defaultValues ?? Array.Empty<GameStageValue>())
                         values[item.index] = item.value;
+                    values[FlashTargetOneField] = 0f; // 섬광은 언제나 모두에게 (#301)
                     if (!Validate(values, out string error)) throw new InvalidOperationException(error);
                     effective[s - 1] = values;
                 }
@@ -49,7 +52,10 @@ namespace Hapio
         {
             if (scope < 0 || scope > TerritoryScope || index < 0 || index >= LabConfig.DeveloperFields.Count) return false;
             if (scope == TerritoryScope) return index >= 197 && index <= 199;
-            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191;
+            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203;
+            // 게임에서는 섬광이 언제나 모두에게 터진다 (#301). '섬광 대상'(185)은 어느 탭에도 보이지 않아 저장값(0 = 모두)에서
+            // 바뀌지 않는다. Lab DEV에서는 실험용으로 그대로 고를 수 있다.
+            if (index == FlashTargetOneField) return false;
             bool gumiho = index >= 166 && index <= 177;
             bool jigwi = index >= 178 && index <= 183 || index >= 192 && index <= 195;
             // 2:2 땅따먹기 (#281)의 켜기/끄기·시간·피버는 3요괴 스테이지 설정에 넣지 않는다.

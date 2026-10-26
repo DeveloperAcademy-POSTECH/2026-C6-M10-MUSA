@@ -153,8 +153,8 @@ MonoBehaviour:
   yaguangFlashFirstStartSeconds: 10
   yaguangFlashIntervalSeconds: 60
   yaguangFlashWarningSeconds: 3
-  yaguangFlashGlareSeconds: 7
-  yaguangFlashRecoverySeconds: 2
+  yaguangFlashGlareSeconds: 10
+  yaguangFlashRecoverySeconds: 1
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9
