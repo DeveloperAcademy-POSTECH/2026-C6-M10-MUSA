@@ -118,8 +118,9 @@ namespace C6Lab.Tests
                 latest.SetValue(network, Snapshot(network, 51d, rewardUntil: 59d));
                 yield return null;
                 yield return null;
-                Assert.That(hud.EffectVisible, Is.False, "No BIG badge any more.");
-                Assert.That(hud.StarsEmitting, Is.True, "Stars rain instead.");
+                Assert.That(hud.EffectVisible, Is.True, "BIG shows in the same corner mark as SMALL (#301)...");
+                Assert.That(hud.EffectLabel, Is.EqualTo(LabGourdComboHud.RewardLabel));
+                Assert.That(hud.StarsEmitting, Is.True, "...and the talismans still rain.");
                 Assert.That(hud.StarCount, Is.GreaterThan(0), "A burst as the reward starts.");
                 Assert.That(hud.BoardLook, Is.EqualTo(1));
                 float early = hud.StarsPerSecond;

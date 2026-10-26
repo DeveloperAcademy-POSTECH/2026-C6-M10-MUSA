@@ -17,7 +17,7 @@ namespace C6Lab
     ///   다 맞히면 패널 자리에 "4 COMBO!!"가 가장 크게 나온 뒤 CLEAR!가 이어진다. 틀린 색 실패는 누가 틀렸는지
     ///   ("P2 WRONG COLOR", 내가 틀렸으면 "YOU WRONG COLOR")를 모든 기기에 같이 보여준다. SMALL은 게임을 가리지
     ///   않게 공격 영역 왼쪽 아래 구석에 "SMALL" 글자와 그 밑 세로 사각형으로만 보이고, 사각형 안 빨간 칸이 위에서
-    ///   아래로 줄어든다.
+    ///   아래로 줄어든다. BIG 보상도 같은 자리에 금색 "BIG" 글자와 금색 칸으로 보인다(부적 비는 그대로).
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
     /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
@@ -50,6 +50,8 @@ namespace C6Lab
         // 배지 배경: 결과 문구보다 살짝 차분한 빨강/노랑 (흰 글자가 잘 읽히도록)
         private static readonly Color PenaltyBadgeColor = new Color(.84f, .25f, .2f, 1f);
         private static readonly Color RewardBadgeColor = new Color(.95f, .69f, .13f, 1f);
+        // BIG 글자: 밝은 바탕에서도 읽히게 사각형보다 진한 금색 (#301)
+        private static readonly Color RewardLabelColor = new Color(.82f, .5f, .04f, 1f);
         private static Sprite discSprite, checkSprite, roundedSprite, pillSprite;
 
         [Tooltip("화면에서 콤보 패널 가운데 위치 (0~1, 왼쪽 아래가 0)")]
@@ -86,6 +88,7 @@ namespace C6Lab
         private Image flash;
         private float unit = 1f;
         private RectTransform effectBadge, effectGauge, effectIcon;
+        private Image effectGaugeFill;
         private Image effectBack;
         private Text effectText;
         private int effectKind; // 0 없음, -1 페널티, 1 보상
@@ -340,10 +343,11 @@ namespace C6Lab
             int kind = LocalEffect(snapshot, serverNow, out double until);
             double totalTime = until - snapshot.comboResultAt;
             float remaining = kind != 0 && totalTime > 0d ? Mathf.Clamp01((float)((until - serverNow) / totalTime)) : 0f;
-            // 보상은 배지 대신 부적 비로 보여준다. CLEAR!가 뜨는 순간부터 바로 쏟아진다 (#271).
+            // 보상은 부적 비로도 보여준다. CLEAR!가 뜨는 순간부터 바로 쏟아진다 (#271).
             DrawStars(kind > 0, remaining);
+            // SMALL과 BIG 모두 왼쪽 아래 구석의 글자 + 세로 사각형으로 남은 시간을 보여준다 (#301).
             // 결과 문구나 다음 콤보 예고(#241)가 떠 있는 동안에는 숨겨 두었다가, 끝나면 톡 튀어나온다.
-            if (kind >= 0 || resultElapsed >= 0f || warningActive)
+            if (kind == 0 || resultElapsed >= 0f || warningActive)
             {
                 effectKind = 0;
                 effectBadge.gameObject.SetActive(false);
@@ -361,8 +365,10 @@ namespace C6Lab
             effectGauge.anchorMax = new Vector2(1f, fraction); // 세로 사각형: 위에서 아래로 줄어든다 (#301)
             bool reward = kind > 0;
             effectBack.color = Color.clear;
-            // 남은 시간은 숫자 없이 게이지로만 (#257).
+            // 남은 시간은 숫자 없이 게이지로만 (#257). SMALL은 빨강, BIG은 금색 (#301).
             effectText.text = reward ? RewardLabel : PenaltyLabel;
+            effectText.color = reward ? RewardLabelColor : PenaltyBadgeColor;
+            effectGaugeFill.color = reward ? RewardBadgeColor : PenaltyBadgeColor;
 
             float scale = 1f;
             if (effectPopElapsed >= 0f)
@@ -798,6 +804,7 @@ namespace C6Lab
             Image gauge = effectGauge.gameObject.AddComponent<Image>();
             gauge.color = PenaltyBadgeColor;
             gauge.raycastTarget = false;
+            effectGaugeFill = gauge;
 
             // 공 아이콘은 더 쓰지 않는다 (글자와 사각형만).
             effectIcon = NewRect("Ball Icon", effectBadge);
