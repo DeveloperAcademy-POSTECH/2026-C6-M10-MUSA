@@ -1,0 +1,28 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="LabHighResolutionPaint.uss" />
+    <ui:VisualElement class="hires-root">
+        <ui:Label text="High Resolution Paint · First Hit + 3 Re-hits" class="hires-title" />
+        <ui:Label text="EXPERIMENT · Saved gourd / same input / isolated fixture. High-res pigment is visual only; it is not the Host coverage mask. No game, Scene or network state is changed." class="hires-note" />
+        <ui:VisualElement name="controls" class="hires-controls" />
+        <ui:VisualElement class="hires-actions">
+            <ui:Button name="nextHit" text="Next re-hit" class="hires-action" />
+            <ui:Button name="resetView" text="Reset view" class="hires-action" />
+            <ui:Button name="exportPng" text="Export this comparison" class="hires-action" />
+        </ui:VisualElement>
+        <ui:VisualElement class="hires-panels">
+            <ui:VisualElement class="hires-panel">
+                <ui:Label text="CURRENT · 256 × 128 · Point" class="hires-heading" />
+                <ui:Image name="nativeImage" class="hires-image" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hires-panel">
+                <ui:Label text="VISUAL · 1024 × 512" class="hires-heading" />
+                <ui:Image name="mediumImage" class="hires-image" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hires-panel">
+                <ui:Label text="VISUAL · 2048 × 1024" class="hires-heading" />
+                <ui:Image name="largeImage" class="hires-image" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:Label name="status" class="hires-status" />
+    </ui:VisualElement>
+</ui:UXML>
