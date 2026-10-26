@@ -20378,7 +20378,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 1
+  m_Text: 0
 --- !u!222 &311882993
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -40230,6 +40230,19 @@ MonoBehaviour:
   - {fileID: 1973789812}
   - {fileID: 1857555562}
   developerScopeLabel: {fileID: 355598142}
+  resultTableStyle:
+    width: 284
+    headerHeight: 24
+    rowHeight: 27
+    fontSize: 14
+    borderColor: {r: 0.867, g: 0.733, b: 0.565, a: 0.98}
+    innerColor: {r: 0.973, g: 0.914, b: 0.804, a: 1}
+    headerColor: {r: 0.925, g: 0.855, b: 0.725, a: 1}
+    myRowColor: {r: 0.565, g: 0.337, b: 0.247, a: 1}
+    myRowTextColor: {r: 1, g: 1, b: 1, a: 1}
+    lineColor: {r: 0.867, g: 0.733, b: 0.565, a: 0.7}
+    textColor: {r: 0.169, g: 0.137, b: 0.153, a: 1}
+  resultTableGap: 12
 --- !u!114 &615858790
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -53596,7 +53609,7 @@ MonoBehaviour:
   m_CaretColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
   m_CustomCaretColor: 0
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
-  m_Text: 1
+  m_Text: 0
   m_CaretBlinkRate: 0.85
   m_CaretWidth: 1
   m_ReadOnly: 0
@@ -70436,7 +70449,7 @@ MonoBehaviour:
   m_MinValue: 0
   m_MaxValue: 1
   m_WholeNumbers: 1
-  m_Value: 1
+  m_Value: 0
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []

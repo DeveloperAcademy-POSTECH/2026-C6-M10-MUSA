@@ -98,7 +98,7 @@ namespace C6Lab
             foreach (var orb in orbs.Values)
             {
                 if (orb.inFlight || orb.jigwiSupply || TeamOf(orb.owner) != team) continue;
-                if (!orb.kind.IsRaw() && !(orb.kind == LabOrbKind.Combined && orb.element != element)) continue;
+                if (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined) continue;
                 orb.kind = LabOrbKind.Combined;
                 orb.element = element;
                 orb.fever = true;

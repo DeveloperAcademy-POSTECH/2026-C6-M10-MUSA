@@ -271,6 +271,9 @@ namespace C6Lab.Tests
             LabModel model = Team("fever");
             ulong blue = DrumHolder(model, LabTeam.Blue), red = DrumHolder(model, LabTeam.Red);
             LabOrbState waiting = Generate(model, blue, 1d);
+            LabOrbState waitingCombined = Combine(model, blue, 1d);
+            ulong combinedRevision = waitingCombined.revision;
+            LabOrbState redCombined = Combine(model, red, 1d);
             LabOrbState redRaw = Generate(model, red, 1d);
             Assert.That(waiting.kind.IsRaw(), Is.True);
             Hit(model, blue, 2d, Vector3.forward);
@@ -285,6 +288,13 @@ namespace C6Lab.Tests
             Assert.That(converted.kind, Is.EqualTo(LabOrbKind.Combined));
             Assert.That(converted.element, Is.EqualTo(LabOrbElement.Water));
             Assert.That(converted.fever, Is.True, "Every board rings a turned orb with a rainbow.");
+            LabOrbState keptCombined = fever.orbs.Single(orb => orb.id == waitingCombined.id);
+            Assert.That(keptCombined.kind, Is.EqualTo(LabOrbKind.Combined));
+            Assert.That(keptCombined.element, Is.EqualTo(LabOrbElement.Water));
+            Assert.That(keptCombined.fever, Is.True, "An already combined team orb also receives the fever ring.");
+            Assert.That(keptCombined.revision, Is.GreaterThan(combinedRevision), "Peers must receive the metadata change.");
+            Assert.That(fever.orbs.Single(orb => orb.id == redCombined.id).fever, Is.False,
+                "The opposing team's Combined is not changed.");
             Assert.That(fever.orbs.Single(orb => orb.id == redRaw.id).fever, Is.False);
             Assert.That(fever.orbs.Single(orb => orb.id == redRaw.id).kind.IsRaw(), Is.True, "The other team is untouched.");
 
