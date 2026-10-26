@@ -214,6 +214,11 @@ namespace C6Lab
         /// 칠 면적이 커진다. 페널티와 보상은 마지막 결과 하나만 남는다(하나를 걸면 다른 하나는 끝난다).
         /// </summary>
         public double comboRewardUntil;
+        /// <summary>
+        /// 야광귀 섬광 해제 (#301): 이 사람이 눈부신 동안 요괴 얼굴을 맞혀 자기 눈부심을 푼 전투 시각. 마지막 섬광
+        /// (flashLastAt) 이후 값만 뜻이 있고, 그 전 값이거나 -1이면 아직 풀지 않았다. 이 시각부터 회복이 시작된다.
+        /// </summary>
+        public double flashReleasedAt = -1d;
 
         // 2:2 청홍 땅따먹기 (#281) 결과 기록. 팀전이 아니면 0이다.
         /// <summary>지금 박에 남아 있는 이 사람이 칠한 칸 수 (빼앗긴 칸은 빠진다)</summary>
@@ -354,5 +359,17 @@ namespace C6Lab
         public bool FlashTargets(ulong player) => flashTargetAll || flashTarget == player;
         /// <summary>이 사람이 마지막 섬광을 맞았는지 (한 번도 안 터졌으면 false)</summary>
         public bool LastFlashHit(ulong player) => flashCount > 0 && (flashLastTargetAll || flashLastTarget == player);
+
+        /// <summary>
+        /// 이 사람이 마지막 섬광의 눈부심을 요괴 얼굴을 맞혀 푼 시각 (#301). 마지막 섬광 뒤에 풀었을 때만 그 시각, 아니면 -1.
+        /// </summary>
+        public double FlashReleasedAt(ulong player)
+        {
+            if (flashCount == 0 || flashLastAt < 0d || players == null) return -1d;
+            foreach (LabPlayerState state in players)
+                if (state != null && state.id == player)
+                    return state.flashReleasedAt >= flashLastAt ? state.flashReleasedAt : -1d;
+            return -1d;
+        }
     }
 }

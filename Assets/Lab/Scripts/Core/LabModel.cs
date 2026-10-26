@@ -1162,6 +1162,30 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// 이 사람이 지금 섬광에 눈부신지 (#301): 마지막 섬광을 맞았고, 눈부심 시간이 아직 지나지 않았고,
+        /// 그 뒤 폰을 흔들어 풀지 않았다. 회복 중은 눈부신 것으로 치지 않는다.
+        /// </summary>
+        public bool FlashGlared(ulong player, double now)
+        {
+            if (!rules.FlashEnabled || phase != LabPhase.Playing || flashCount == 0 || lastFlashAt < 0d) return false;
+            if (rules.FlashTargetOne && lastFlashTarget != player) return false;
+            if (!players.TryGetValue(player, out var state)) return false;
+            if (now < lastFlashAt || now >= lastFlashAt + rules.FlashGlareSeconds) return false;
+            return state.flashReleasedAt < lastFlashAt;
+        }
+
+        /// <summary>
+        /// 야광귀 섬광 해제 (#301): 눈부신 사람이 폰을 다 흔들었다. 그 사람의 눈부심만 풀고 이 시각을 남긴다.
+        /// 흔들어 풀기가 꺼져 있거나, 보낸 사람이 지금 눈부시지 않으면(이미 풀었거나 시간이 지났으면) false.
+        /// </summary>
+        public bool TryFlashShakeRelease(ulong sender, double now)
+        {
+            if (!rules.FlashShakeRelease || !TryAdvance(now, out _) || !FlashGlared(sender, now)) return false;
+            players[sender].flashReleasedAt = now;
+            return true;
+        }
+
+        /// <summary>
         /// Remove an expired or missed projectile without damage or a hit reward.
         /// countThrow: 빗나간 투척으로 던진 공 수(명중률 분모)에 넣을지. 지귀 불을 노린 투척은 false.
         /// 라운드가 진행 중일 때만 센다.
@@ -1841,6 +1865,8 @@ namespace C6Lab
             public readonly bool FlashEnabled, FlashTargetOne;
             public readonly float FlashFirstStartSeconds, FlashIntervalSeconds, FlashWarningSeconds,
                 FlashGlareSeconds, FlashRecoverySeconds;
+            /// <summary>Yaguang flash release (#301): a dazzled player shakes their phone to clear their own glare.</summary>
+            public readonly bool FlashShakeRelease;
 
             public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode)
             {
@@ -1913,6 +1939,7 @@ namespace C6Lab
                 FlashWarningSeconds = config.YaguangFlashWarningSeconds;
                 FlashGlareSeconds = config.YaguangFlashGlareSeconds;
                 FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
+                FlashShakeRelease = config.YaguangFlashShakeRelease;
                 TeamFeverHits = teamMode ? config.TeamFeverHits : 0;
                 TeamFeverSeconds = config.TeamFeverSeconds;
                 if (!teamMode) return;

@@ -312,8 +312,9 @@ namespace C6Lab
             new LabDeveloperField("섬광 첫 시작 (초)", 1f, 19f),
             new LabDeveloperField("섬광 간격 (초)", 20f, 100f),
             new LabDeveloperField("섬광 예고 (초)", 0f, 6f),
-            new LabDeveloperField("섬광 눈부심 (초)", 1f, 13f),
-            new LabDeveloperField("섬광 회복 (초)", 0f, 4f),
+            // 눈부심은 #301부터 폰을 흔들어 풀 수 있는 시간의 상한이다. 흔들기(약 2초)에 맞춰 기본 10초·회복 1초(각 범위 가운데).
+            new LabDeveloperField("섬광 눈부심 (초)", 1f, 19f),
+            new LabDeveloperField("섬광 회복 (초)", 0f, 2f),
             // The yaguang-gwi's counting look for the combo (#271): it counts 하나 둘 셋 넷 and cannot go past four.
             LabDeveloperField.Toggle("야광귀 셈법 (0 off, 1 on)", "끔", "켬"),
             new LabDeveloperField("Jigwi Auto Interval Min (seconds)", 1f, 600f),
@@ -327,7 +328,10 @@ namespace C6Lab
             new LabDeveloperField("피버 시간 (초)", 1f, 30f),
             // Presentation-only shared options; never change the Host paint-cell rules (#299).
             LabDeveloperField.Toggle("High Resolution Paint (0 off, 1 on)"),
-            LabDeveloperField.Choice("Paint Texture Quality", "1024 × 512", "2048 × 1024")
+            LabDeveloperField.Choice("Paint Texture Quality", "1024 × 512", "2048 × 1024"),
+            // 야광귀 섬광 해제 (#301): 눈부신 사람이 폰을 정해진 횟수만큼 흔들면 자기 눈부심이 풀린다.
+            LabDeveloperField.Toggle("섬광 흔들어 풀기 (0 off, 1 on)", "끔", "켬"),
+            new LabDeveloperField("섬광 흔들기 횟수", 2f, 10f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -363,8 +367,9 @@ namespace C6Lab
             new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
+            // 섬광 흔들어 풀기·흔들기 횟수(#301)는 고해상도 도색(#299) 뒤 202·203번이며 섬광 칸 맨 아래에 둔다.
             new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
-                184, 185, 186, 187, 188, 189, 190)
+                184, 185, 186, 187, 188, 189, 190, 202, 203)
                 .WithSwitch(155, 184)
                 .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
             new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
@@ -630,9 +635,13 @@ namespace C6Lab
         [Tooltip("번쩍이기 전 예고 시간 (초). 요괴가 빼꼼 나오고 박 옆 말풍선에 눈이 떴다가(앞 30%), 갑자기 노랗게 빛나고(15%), 빛나는 노란 눈을 두근거리며 보여 준 뒤(55%) 번쩍인다. 기본 3초. 0이면 예고 없이 번쩍인다.")]
         [SerializeField, Range(0f, 6f)] private float yaguangFlashWarningSeconds = 3f;
         [Tooltip("번쩍인 뒤 구슬·아이템이 완전히 하얗게 보이는 시간 (초)")]
-        [SerializeField, Range(1f, 13f)] private float yaguangFlashGlareSeconds = 7f;
+        [SerializeField, Range(1f, 19f)] private float yaguangFlashGlareSeconds = 10f;
         [Tooltip("눈부심이 끝난 뒤 색이 천천히 돌아오는 시간 (초). 0이면 바로 돌아온다.")]
-        [SerializeField, Range(0f, 4f)] private float yaguangFlashRecoverySeconds = 2f;
+        [SerializeField, Range(0f, 2f)] private float yaguangFlashRecoverySeconds = 1f;
+        [Tooltip("켜면(#301) 눈부신 사람이 폰을 흔들어 자기 눈부심을 푼다. 흔들 때마다 하얀 막이 조금씩 걷히고 정해진 횟수면 완전히 풀린다. 못 흔들면 눈부심 시간이 지나 저절로 풀린다. 끄면 이전처럼 시간으로만 풀린다.")]
+        [SerializeField] private bool yaguangFlashShakeRelease = true;
+        [Tooltip("눈부심을 풀려면 세게 흔들어야 하는 횟수 (#301). 기본 6번이면 보통 약 2초.")]
+        [SerializeField, Range(2, 10)] private int yaguangFlashShakeCount = 6;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -977,8 +986,12 @@ namespace C6Lab
         public float YaguangFlashFirstStartSeconds => Mathf.Clamp(Finite(yaguangFlashFirstStartSeconds, 10f), 1f, 61f);
         public float YaguangFlashIntervalSeconds => Mathf.Clamp(Finite(yaguangFlashIntervalSeconds, 60f), 20f, 100f);
         public float YaguangFlashWarningSeconds => Mathf.Clamp(Finite(yaguangFlashWarningSeconds, 3f), 0f, 6f);
-        public float YaguangFlashGlareSeconds => Mathf.Clamp(Finite(yaguangFlashGlareSeconds, 7f), 1f, 13f);
-        public float YaguangFlashRecoverySeconds => Mathf.Clamp(Finite(yaguangFlashRecoverySeconds, 2f), 0f, 4f);
+        public float YaguangFlashGlareSeconds => Mathf.Clamp(Finite(yaguangFlashGlareSeconds, 10f), 1f, 19f);
+        public float YaguangFlashRecoverySeconds => Mathf.Clamp(Finite(yaguangFlashRecoverySeconds, 1f), 0f, 2f);
+        /// <summary>true면 눈부신 사람이 폰을 흔들어 자기 눈부심을 풀 수 있다 (#301)</summary>
+        public bool YaguangFlashShakeRelease => yaguangFlashShakeRelease;
+        /// <summary>눈부심을 풀려면 흔들어야 하는 횟수 (#301)</summary>
+        public int YaguangFlashShakeCount => Mathf.Clamp(yaguangFlashShakeCount, 2, 10);
         /// <summary>콤보를 야광귀 셈법(하나 둘 셋 넷)으로 보여주는지 (#271). 화면 표시만 바꾼다.</summary>
         public bool ComboYaguangCountEnabled => comboYaguangCountEnabled;
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -1117,7 +1130,8 @@ namespace C6Lab
                 ComboYaguangCountEnabled ? 1f : 0f,
                 JigwiAutoIntervalMin, JigwiAutoIntervalMax, JigwiAutoFireWeight, JigwiAutoGenerationBurnWeight,
                 TeamTerritoryEnabled ? 1f : 0f, TeamBattleSeconds, TeamFeverHits, TeamFeverSeconds,
-                HighResolutionPaintEnabled ? 1f : 0f, HighResolutionPaintQuality
+                HighResolutionPaintEnabled ? 1f : 0f, HighResolutionPaintQuality,
+                YaguangFlashShakeRelease ? 1f : 0f, YaguangFlashShakeCount
             };
         }
 
@@ -1360,6 +1374,8 @@ namespace C6Lab
             teamFeverSeconds = values[199];
             highResolutionPaintEnabled = values[200] >= .5f;
             highResolutionPaintQuality = (int)values[201];
+            yaguangFlashShakeRelease = values[202] >= .5f;
+            yaguangFlashShakeCount = (int)values[203];
             error = string.Empty;
             return true;
         }

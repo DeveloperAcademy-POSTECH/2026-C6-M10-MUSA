@@ -422,6 +422,39 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void FlashShakeReleasesOnlyTheShakerWhileDazzled()
+        {
+            // 야광귀 섬광 (#301): 모두에게 5초에 번쩍, 예고 없음, 눈부심 12초.
+            JsonUtility.FromJsonOverwrite("{\"yaguangFlashEnabled\":true,\"yaguangFlashTargetOne\":false,"
+                + "\"yaguangFlashFirstStartSeconds\":5,\"yaguangFlashWarningSeconds\":0,\"yaguangFlashGlareSeconds\":12,"
+                + "\"yaguangFlashRecoverySeconds\":2,\"gourdColorComboEnabled\":false}", config);
+            model = new LabModel();
+            model.Begin("flash-shake", new ulong[] { 10, 20, 30 }, 0d, config);
+
+            Assert.That(model.FlashGlared(10, 4.5d), Is.False);
+            Assert.That(model.TryFlashShakeRelease(10, 4.5d), Is.False, "Shaking before the flash does nothing.");
+
+            Assert.That(model.TryFlashShakeRelease(10, 6d), Is.True);
+            LabSnapshot after = model.Snapshot(6d);
+            Assert.That(after.players.Single(p => p.id == 10).flashReleasedAt, Is.EqualTo(6d));
+            Assert.That(after.FlashReleasedAt(10), Is.EqualTo(6d));
+            Assert.That(model.FlashGlared(10, 6d), Is.False, "Only the shaker is released...");
+            Assert.That(model.FlashGlared(20, 6d), Is.True, "...the others are still dazzled.");
+            Assert.That(model.TryFlashShakeRelease(10, 6.5d), Is.False, "Already released.");
+
+            Assert.That(model.FlashGlared(20, 16.9d), Is.True);
+            Assert.That(model.TryFlashShakeRelease(20, 17.5d), Is.False, "After the 12 s glare it has already worn off.");
+            Assert.That(model.FlashGlared(20, 17.5d), Is.False);
+
+            JsonUtility.FromJsonOverwrite("{\"yaguangFlashShakeRelease\":false}", config);
+            model = new LabModel();
+            model.Begin("flash-shake-off", new ulong[] { 10, 20, 30 }, 0d, config);
+            model.Tick(6d); // 섬광은 시간이 흘러야(Tick) 터진다.
+            Assert.That(model.FlashGlared(10, 6d), Is.True);
+            Assert.That(model.TryFlashShakeRelease(10, 6d), Is.False, "With the release off only time clears the glare.");
+        }
+
+        [Test]
         public void ClockEndsAtDeadlineAndRetryResetsRoundWithoutMovingOldResult()
         {
             model.Tick(179.9d);

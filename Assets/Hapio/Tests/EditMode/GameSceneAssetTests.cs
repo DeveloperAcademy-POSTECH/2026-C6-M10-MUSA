@@ -234,7 +234,7 @@ namespace Hapio.Tests
                     Assert.That(sharedFont, Is.Not.Null);
                     foreach (UnityEngine.UI.Text text in screen.developerPanel.GetComponentsInChildren<UnityEngine.UI.Text>(true))
                         Assert.That(text.font, Is.SameAs(sharedFont), "Korean stage/DEV labels use the existing project font.");
-                    Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(202), "The current Lab schema includes Flash, counting and Jigwi stage scheduling.");
+                    Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(204), "The current Lab schema includes Flash, counting and Jigwi stage scheduling.");
                     Assert.That(SavedConfig().GourdColorComboEnabled, Is.False);
                     Assert.That(SavedConfig().SabotageMixEnabled, Is.False);
                     float[] defaults = SavedConfig().CaptureDeveloperValues();

@@ -22,7 +22,7 @@ namespace C6Lab.Tests
                 Assert.That(source.HighResolutionPaintEnabled, Is.True);
                 Assert.That(source.HighResolutionPaintQuality, Is.Zero);
                 Assert.That(source.HighResolutionPaintColumns, Is.EqualTo(1024));
-                Assert.That(source.CaptureDeveloperValues().Skip(200), Is.EqualTo(new[] { 1f, 0f }));
+                Assert.That(source.CaptureDeveloperValues().Skip(200).Take(2), Is.EqualTo(new[] { 1f, 0f }));
             }
             Assert.That(LabConfig.DeveloperFields[200].IsToggle, Is.True);
             Assert.That(LabConfig.DeveloperFields[201].Choices,
@@ -48,9 +48,9 @@ namespace C6Lab.Tests
                 Assert.That(peer.TryApplyDeveloperValues(config.CaptureDeveloperValues(), out error), Is.True, error);
                 Assert.That(peer.HighResolutionPaintEnabled, Is.False);
                 Assert.That(peer.HighResolutionPaintColumns, Is.EqualTo(2048));
-                string applied = LabSessionSettings.Fingerprint(values, 4, 5663);
-                Assert.That(applied, Is.EqualTo(LabSessionSettings.Fingerprint(peer.CaptureDeveloperValues(), 4, 5663)));
-                Assert.That(applied, Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 4, 5663)));
+                string applied = LabSessionSettings.Fingerprint(values, 4, 5664);
+                Assert.That(applied, Is.EqualTo(LabSessionSettings.Fingerprint(peer.CaptureDeveloperValues(), 4, 5664)));
+                Assert.That(applied, Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 4, 5664)));
             }
             finally { Object.DestroyImmediate(peer); }
         }

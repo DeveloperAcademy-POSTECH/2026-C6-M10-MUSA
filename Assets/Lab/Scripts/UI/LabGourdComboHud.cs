@@ -13,6 +13,11 @@ namespace C6Lab
     ///   나온다. 남은 초 숫자는 없다(#257). 이 기기 플레이어 기준이다.
     /// - 보상 중: 배지 대신 전투 화면 위에서 노란 별이 쏟아지고, 남은 시간이 줄수록 별이 줄어든다(#257).
     /// - 이 기기 플레이어의 SMALL/BIG을 조합판에도 알려 판 구슬 그림이 작아지거나 커지게 한다(#257).
+    /// - #301: 칸을 맞힐 때마다 패널 아래에 "N COMBO!"(주황 숫자 + 흰 테두리 + 분홍 COMBO!)가 튀어나오고, 4칸을
+    ///   다 맞히면 패널 자리에 "4 COMBO!!"가 가장 크게 나온 뒤 CLEAR!가 이어진다. 틀린 색 실패는 누가 틀렸는지
+    ///   ("P2 WRONG COLOR", 내가 틀렸으면 "YOU WRONG COLOR")를 모든 기기에 같이 보여준다. SMALL은 게임을 가리지
+    ///   않게 공격 영역 왼쪽 아래 구석에 "SMALL" 글자와 그 밑 세로 사각형으로만 보이고, 사각형 안 빨간 칸이 위에서
+    ///   아래로 줄어든다. BIG 보상도 같은 자리에 금색 "BIG" 글자와 금색 칸으로 보인다(부적 비는 그대로).
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
     /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
@@ -27,6 +32,10 @@ namespace C6Lab
         public const string PenaltyLabel = "SMALL";
         public const string RewardLabel = "BIG";
         public const string WarningText = "COMBO!";
+        /// <summary>칸을 맞힐 때 숫자 옆 글자, 다 맞혔을 때 글자 (#301)</summary>
+        public const string ComboHitText = "COMBO!", ComboClearText = "COMBO!!";
+        /// <summary>틀린 색 실패에서 내가 틀렸을 때 이름 자리 (#301)</summary>
+        public const string YouText = "YOU";
         /// <summary>야광귀 셈법 (#271): 야광귀는 넷까지만 센다. 넷 다음은 다시 하나.</summary>
         public static readonly string[] CountWords = { "하나", "둘", "셋", "넷" };
         /// <summary>수 n(1부터)을 야광귀식으로. 넷을 넘으면 넷까지밖에 몰라 다시 하나·둘…로 돈다(예고에서는 넷 → 하나로 거꾸로 센다).</summary>
@@ -41,12 +50,32 @@ namespace C6Lab
         // 배지 배경: 결과 문구보다 살짝 차분한 빨강/노랑 (흰 글자가 잘 읽히도록)
         private static readonly Color PenaltyBadgeColor = new Color(.84f, .25f, .2f, 1f);
         private static readonly Color RewardBadgeColor = new Color(.95f, .69f, .13f, 1f);
+        // BIG 글자: 밝은 바탕에서도 읽히게 사각형보다 진한 금색 (#301)
+        private static readonly Color RewardLabelColor = new Color(.82f, .5f, .04f, 1f);
         private static Sprite discSprite, checkSprite, roundedSprite, pillSprite;
 
         [Tooltip("화면에서 콤보 패널 가운데 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 panelAnchor = new Vector2(.5f, .8f);
         [Tooltip("색 칸 하나의 크기 (Canvas 기준 픽셀). 패널/글자/막대가 모두 이 크기에 비례한다.")]
         [SerializeField, Min(16f)] private float slotSize = 40f;
+        [Header("N COMBO! 피드백 (#301)")]
+        [Tooltip("콤보 숫자 색 (참고 이미지의 주황)")]
+        [SerializeField] private Color comboNumberColor = new Color(1f, .55f, .08f, 1f);
+        [Tooltip("COMBO! 글자 색")]
+        [SerializeField] private Color comboWordColor = new Color(1f, .42f, .62f, 1f);
+        [Tooltip("콤보 숫자 크기 (칸 크기의 배수). 다 맞혔을 때는 이것의 1.5배.")]
+        [SerializeField, Range(.5f, 4f)] private float comboNumberSize = 1.6f;
+        [Tooltip("칸을 맞혔을 때 N COMBO!가 떠 있는 시간 (초)")]
+        [SerializeField, Range(.2f, 3f)] private float comboHitSeconds = .8f;
+        [Tooltip("다 맞혔을 때 4 COMBO!!가 떠 있는 시간 (초). 그 뒤 CLEAR!가 나온다.")]
+        [SerializeField, Range(.2f, 3f)] private float comboClearSeconds = 1f;
+        [Header("SMALL 세로 사각형 (#301)")]
+        [Tooltip("SMALL 남은 시간 세로 사각형의 폭과 높이 (기준 40px × 칸 크기 비율의 배수)")]
+        [SerializeField] private Vector2 penaltyBarSize = new Vector2(1.1f, 2.4f);
+        [Tooltip("SMALL 글자와 사각형 사이 간격 (같은 기준의 배수)")]
+        [SerializeField, Range(0f, 2f)] private float penaltyBarGap = .15f;
+        [Tooltip("공격 영역 왼쪽 아래 구석에서 띄우는 거리 (Canvas 기준 픽셀: 왼쪽, 조합판 위)")]
+        [SerializeField] private Vector2 penaltyCornerMargin = new Vector2(16f, 16f);
 
         private LabNetwork network;
         private Canvas canvas;
@@ -59,6 +88,7 @@ namespace C6Lab
         private Image flash;
         private float unit = 1f;
         private RectTransform effectBadge, effectGauge, effectIcon;
+        private Image effectGaugeFill;
         private Image effectBack;
         private Text effectText;
         private int effectKind; // 0 없음, -1 페널티, 1 보상
@@ -87,6 +117,16 @@ namespace C6Lab
         private uint lastComboCount;
         private float popElapsed = -1f;
         private int popSlot = -1;
+        private ulong shownFailedBy;
+        private bool shownFailedKnown;
+        private int shownFailedSeat = -1;
+        private RectTransform comboPop;
+        private Text comboPopNumber, comboPopWord;
+        private float comboPopElapsed = -1f;
+        private int comboPopCount;
+        private bool comboPopFinal;
+        private uint comboPopCombo;
+        private float resultDelay;
 
         public bool PanelVisible => panel != null && panel.gameObject.activeSelf;
         public bool EffectVisible => effectBadge != null && effectBadge.gameObject.activeSelf;
@@ -113,6 +153,30 @@ namespace C6Lab
         /// <summary>야광귀 셈법으로 보여주는지 (#271, DEV `야광귀 셈법`)</summary>
         public bool YaguangCount => network != null && network.config != null && network.config.ComboYaguangCountEnabled;
         public string ResultLabel => resultText != null ? resultText.text : string.Empty;
+        /// <summary>지금 떠 있는 N COMBO! 숫자 (#301). 안 떠 있으면 0.</summary>
+        public int ComboPopCount => comboPop != null && comboPop.gameObject.activeSelf ? comboPopCount : 0;
+        /// <summary>지금 떠 있는 것이 다 맞힌 "4 COMBO!!"인지 (#301)</summary>
+        public bool ComboPopFinal => ComboPopCount > 0 && comboPopFinal;
+        /// <summary>SMALL 세로 막대의 남은 비율 (0~1, #301)</summary>
+        public float PenaltyBarFill => effectGauge != null ? effectGauge.anchorMax.y : 0f;
+        /// <summary>SMALL 남은 시간 세로 사각형 (테두리 포함, #301)</summary>
+        public RectTransform PenaltyBar => effectGauge != null && effectGauge.parent != null
+            ? effectGauge.parent.parent as RectTransform : null;
+        /// <summary>SMALL 표시 전체 (글자 + 사각형, #301). 왼쪽 아래 모서리가 기준점이다.</summary>
+        public RectTransform EffectBadge => effectBadge;
+
+        /// <summary>
+        /// 콤보 결과 문구 (#301). 성공은 CLEAR!, 시간 초과는 TIME UP. 틀린 색은 틀린 사람을 앞에 붙인다:
+        /// 이 기기 플레이어면 "YOU WRONG COLOR", 아니면 좌석 번호로 "P2 WRONG COLOR". 누군지 모르면 이름 없이.
+        /// </summary>
+        public static string ResultTextFor(LabComboResult result, bool failedKnown, bool failedIsMe, int failedSeat)
+        {
+            if (result == LabComboResult.Success) return ClearText;
+            if (result == LabComboResult.Timeout) return TimeUpText;
+            if (!failedKnown) return WrongColorText;
+            if (failedIsMe) return YouText + " " + WrongColorText;
+            return failedSeat >= 0 ? "P" + (failedSeat + 1) + " " + WrongColorText : WrongColorText;
+        }
         public bool SlotChecked(int index) => slotChecks[index] != null && slotChecks[index].gameObject.activeSelf;
         public Color SlotColor(int index) => slotFills[index] != null ? slotFills[index].color : Color.clear;
 
@@ -245,6 +309,23 @@ namespace C6Lab
             stars.Step(on, fraction, Time.unscaledDeltaTime, bottom);
         }
 
+        /// <summary>
+        /// SMALL 표시의 왼쪽 아래 모서리 위치 (#301): 화면 왼쪽 가장자리, 조합판 위쪽 가장자리 바로 위(공격 영역의 왼쪽 아래).
+        /// 조합판 위치를 모르면 화면 높이의 45% 지점. 레이어 가운데 기준 좌표.
+        /// </summary>
+        private Vector2 PenaltyCorner()
+        {
+            Rect area = layer.rect;
+            float bottom = Mathf.Lerp(area.yMin, area.yMax, .45f);
+            if (network != null && network.board != null && network.board.TryGetInputScreenRect(out Rect screen))
+            {
+                Camera uiCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(layer, new Vector2(screen.xMin, screen.yMax),
+                    uiCamera, out Vector2 local)) bottom = local.y;
+            }
+            return new Vector2(area.xMin + penaltyCornerMargin.x, bottom + penaltyCornerMargin.y);
+        }
+
         /// <summary>별이 사라지는 높이: 조합판 위쪽 가장자리(레이어 로컬 y). 모르면 화면 높이의 45% 지점.</summary>
         private float StarsBottom()
         {
@@ -262,18 +343,18 @@ namespace C6Lab
             int kind = LocalEffect(snapshot, serverNow, out double until);
             double totalTime = until - snapshot.comboResultAt;
             float remaining = kind != 0 && totalTime > 0d ? Mathf.Clamp01((float)((until - serverNow) / totalTime)) : 0f;
-            // 보상은 배지 대신 부적 비로 보여준다. CLEAR!가 뜨는 순간부터 바로 쏟아진다 (#271).
+            // 보상은 부적 비로도 보여준다. CLEAR!가 뜨는 순간부터 바로 쏟아진다 (#271).
             DrawStars(kind > 0, remaining);
+            // SMALL과 BIG 모두 왼쪽 아래 구석의 글자 + 세로 사각형으로 남은 시간을 보여준다 (#301).
             // 결과 문구나 다음 콤보 예고(#241)가 떠 있는 동안에는 숨겨 두었다가, 끝나면 톡 튀어나온다.
-            if (kind >= 0 || resultElapsed >= 0f || warningActive)
+            if (kind == 0 || resultElapsed >= 0f || warningActive)
             {
                 effectKind = 0;
                 effectBadge.gameObject.SetActive(false);
                 return;
             }
-            // 콤보 패널이 있으면 패널 아래 가장자리에, 없으면 패널 자리 가운데에 놓는다.
-            effectBadge.anchoredPosition = panel.gameObject.activeSelf
-                ? new Vector2(0f, -panel.sizeDelta.y * .5f) : Vector2.zero;
+            // 게임을 가리지 않게 공격 영역(조합판 위 전투 화면)의 왼쪽 아래 구석에 둔다 (#301).
+            effectBadge.anchoredPosition = PenaltyCorner();
             if (kind != effectKind) effectPopElapsed = 0f;
             effectKind = kind;
             effectBadge.gameObject.SetActive(true);
@@ -281,12 +362,13 @@ namespace C6Lab
             double left = until - serverNow;
             double total = until - snapshot.comboResultAt;
             float fraction = total > 0d ? Mathf.Clamp01((float)(left / total)) : 1f;
-            effectGauge.anchorMax = new Vector2(fraction, 1f);
+            effectGauge.anchorMax = new Vector2(1f, fraction); // 세로 사각형: 위에서 아래로 줄어든다 (#301)
             bool reward = kind > 0;
-            effectBack.color = reward ? RewardBadgeColor : PenaltyBadgeColor;
-            effectIcon.localScale = Vector3.one * (reward ? 1f : .55f);
-            // 남은 시간은 숫자 없이 게이지로만 (#257).
+            effectBack.color = Color.clear;
+            // 남은 시간은 숫자 없이 게이지로만 (#257). SMALL은 빨강, BIG은 금색 (#301).
             effectText.text = reward ? RewardLabel : PenaltyLabel;
+            effectText.color = reward ? RewardLabelColor : PenaltyBadgeColor;
+            effectGaugeFill.color = reward ? RewardBadgeColor : PenaltyBadgeColor;
 
             float scale = 1f;
             if (effectPopElapsed >= 0f)
@@ -322,6 +404,16 @@ namespace C6Lab
                 shownResultCount = snapshot.comboResultCount;
                 shownResult = snapshot.comboResult;
                 resultElapsed = 0f;
+                RememberFailer(snapshot);
+                resultText.text = ResultTextFor(shownResult, shownFailedKnown,
+                    network != null && shownFailedBy == network.LocalPlayerId, shownFailedSeat);
+                // 다 맞혔으면(#301) 4 COMBO!!를 먼저 크게 보여준 다음 CLEAR!.
+                resultDelay = 0f;
+                if (shownResult == LabComboResult.Success)
+                {
+                    ShowComboPop(LabGourdCombo.Length, true, snapshot.comboCount);
+                    resultDelay = comboClearSeconds;
+                }
             }
             if (snapshot.comboCount != lastComboCount)
             {
@@ -332,6 +424,9 @@ namespace C6Lab
             {
                 popSlot = snapshot.comboProgress - 1;
                 popElapsed = 0f;
+                // 칸을 맞힐 때마다 N COMBO! (#301). 마지막 칸은 성공 결과에서 크게 보여준다.
+                if (snapshot.comboProgress < LabGourdCombo.Length)
+                    ShowComboPop(snapshot.comboProgress, false, snapshot.comboCount);
             }
             lastProgress = snapshot.comboProgress;
         }
@@ -390,8 +485,17 @@ namespace C6Lab
 
         private void DrawResult()
         {
+            DrawComboPop();
             if (resultElapsed < 0f)
             {
+                resultText.gameObject.SetActive(false);
+                flash.gameObject.SetActive(false);
+                return;
+            }
+            if (resultDelay > 0f)
+            {
+                // 4 COMBO!!가 떠 있는 동안 CLEAR!는 기다린다. 패널·배지는 결과 중이라 숨어 있다.
+                resultDelay -= Time.unscaledDeltaTime;
                 resultText.gameObject.SetActive(false);
                 flash.gameObject.SetActive(false);
                 return;
@@ -406,7 +510,6 @@ namespace C6Lab
             }
             resultText.gameObject.SetActive(true);
             bool clear = shownResult == LabComboResult.Success;
-            resultText.text = clear ? ClearText : shownResult == LabComboResult.Timeout ? TimeUpText : WrongColorText;
             resultText.color = clear ? ClearColor : FailColor;
             float t = resultElapsed;
             float leave = Mathf.Clamp01((t - (ResultSeconds - .2f)) / .2f);
@@ -451,6 +554,64 @@ namespace C6Lab
             if (stars != null) stars.Clear();
             shownWarningCount = -1;
             warningPopElapsed = -1f;
+            resultDelay = 0f;
+            comboPopElapsed = -1f;
+            comboPopCombo = 0;
+            if (comboPop != null) comboPop.gameObject.SetActive(false);
+        }
+
+        /// <summary>틀린 색 실패면 누가 틀렸는지 기억한다 (#301). Host의 ID 0도 유효하므로 좌석 목록에서 찾는다.</summary>
+        private void RememberFailer(LabSnapshot snapshot)
+        {
+            shownFailedKnown = false;
+            shownFailedSeat = -1;
+            shownFailedBy = snapshot.comboFailedBy;
+            if (snapshot.comboResult != LabComboResult.WrongColor || snapshot.players == null) return;
+            foreach (LabPlayerState player in snapshot.players)
+                if (player != null && player.id == snapshot.comboFailedBy)
+                {
+                    shownFailedKnown = true;
+                    shownFailedSeat = player.seat;
+                    return;
+                }
+        }
+
+        /// <summary>N COMBO!를 띄운다 (#301). 같은 콤보에서 더 작은 수로 돌아가지 않는다.</summary>
+        private void ShowComboPop(int count, bool final, uint comboCount)
+        {
+            if (comboPop == null) return;
+            if (comboCount == comboPopCombo && count < comboPopCount && comboPopElapsed >= 0f) return;
+            comboPopCombo = comboCount;
+            comboPopCount = count;
+            comboPopFinal = final;
+            comboPopElapsed = 0f;
+            comboPopNumber.text = count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            comboPopWord.text = final ? ComboClearText : ComboHitText;
+        }
+
+        /// <summary>
+        /// N COMBO!: 1.7배로 쾅 나왔다가 제자리, 살짝 기울어 들썩이다 마지막에 사라진다. 칸을 맞혔을 때는 패널 아래,
+        /// 다 맞혔을 때는 사라진 패널 자리 가운데에 1.5배 크기로.
+        /// </summary>
+        private void DrawComboPop()
+        {
+            if (comboPop == null) return;
+            if (comboPopElapsed < 0f) { comboPop.gameObject.SetActive(false); return; }
+            comboPopElapsed += Time.unscaledDeltaTime;
+            float life = comboPopFinal ? comboClearSeconds : comboHitSeconds;
+            if (comboPopElapsed >= life) { comboPopElapsed = -1f; comboPop.gameObject.SetActive(false); return; }
+            comboPop.gameObject.SetActive(true);
+            comboPop.SetAsLastSibling();
+            float t = comboPopElapsed;
+            float pop = t < .14f ? Mathf.Lerp(.3f, 1.7f, t / .14f) : Mathf.Lerp(1.7f, 1f, Mathf.Clamp01((t - .14f) / .16f));
+            float leave = Mathf.Clamp01((t - (life - .2f)) / .2f);
+            float size = comboPopFinal ? 1.5f : 1f;
+            comboPop.localScale = Vector3.one * pop * size * (1f - leave);
+            comboPop.localRotation = Quaternion.Euler(0f, 0f, -6f + 3f * Mathf.Sin(t * 14f));
+            comboPop.anchoredPosition = comboPopFinal ? Vector2.zero
+                : new Vector2(0f, -panel.sizeDelta.y * 1.05f + (1f - Mathf.Clamp01(t / .3f)) * 8f * unit);
+            comboPopNumber.color = comboNumberColor;
+            comboPopWord.color = comboWordColor;
         }
 
         private bool EnsureLayer()
@@ -607,54 +768,81 @@ namespace C6Lab
             // 페널티 배지: 패널 아래 가장자리에 반쯤 걸친 알약 모양. 패널이 숨어도 같은 자리에 남는다.
             // 왼쪽은 공 아이콘 + SMALL, 오른쪽은 남은 시간 bar (#257: 숫자 대신 bar라 글자와 겹치지 않게 나눈다).
             badgeHeight = 40f * u;
+            // SMALL (#301): 전투 화면(공격 영역) 왼쪽 아래 구석에, "SMALL" 글자 밑에 세운 세로 사각형 하나.
+            // 먹색 테두리 안의 빨간 칸이 남은 시간만큼 아래부터 차 있고 위에서 아래로 줄어든다. 위치는 DrawEffect가 정한다.
+            float barWidth = badgeHeight * penaltyBarSize.x, barHeight = badgeHeight * penaltyBarSize.y;
+            float labelHeight = badgeHeight * .7f, labelGap = badgeHeight * penaltyBarGap;
             effectBadge = NewRect("Combo Effect Badge", layer);
-            effectBadge.anchorMin = effectBadge.anchorMax = panelAnchor;
-            effectBadge.sizeDelta = new Vector2(slotSize * 4.2f, badgeHeight);
-            effectBadge.anchoredPosition = new Vector2(0f, -panel.sizeDelta.y * .5f);
+            effectBadge.anchorMin = effectBadge.anchorMax = new Vector2(.5f, .5f);
+            effectBadge.pivot = Vector2.zero;
+            effectBadge.sizeDelta = new Vector2(Mathf.Max(barWidth, badgeHeight * 2.4f), barHeight + labelGap + labelHeight);
             effectBack = effectBadge.gameObject.AddComponent<Image>();
-            effectBack.sprite = PillSprite();
-            effectBack.type = Image.Type.Sliced;
+            effectBack.color = Color.clear;
             effectBack.raycastTarget = false;
 
-            // bar 홈: 배지 오른쪽 절반의 진한 알약. 그 안에서 테두리 있는 흰 bar가 오른쪽에서 왼쪽으로 줄어든다.
             RectTransform gaugeArea = NewRect("Gauge Track", effectBadge);
-            gaugeArea.anchorMin = new Vector2(.5f, 0f);
-            gaugeArea.anchorMax = Vector2.one;
-            gaugeArea.offsetMin = new Vector2(0f, badgeHeight * .26f);
-            gaugeArea.offsetMax = new Vector2(-badgeHeight * .42f, -badgeHeight * .26f);
+            gaugeArea.anchorMin = gaugeArea.anchorMax = Vector2.zero;
+            gaugeArea.pivot = Vector2.zero;
+            gaugeArea.sizeDelta = new Vector2(barWidth, barHeight);
+            gaugeArea.anchoredPosition = Vector2.zero;
             Image track = gaugeArea.gameObject.AddComponent<Image>();
-            track.sprite = PillSprite();
-            track.type = Image.Type.Sliced;
-            track.color = new Color(.25f, .06f, .05f, .55f);
+            track.color = InkColor;
             track.raycastTarget = false;
-            effectGauge = NewRect("Gauge", gaugeArea);
+            float border = Mathf.Max(2f, 3f * u);
+            RectTransform gaugeInner = NewRect("Gauge Inside", gaugeArea);
+            gaugeInner.anchorMin = Vector2.zero;
+            gaugeInner.anchorMax = Vector2.one;
+            gaugeInner.offsetMin = new Vector2(border, border);
+            gaugeInner.offsetMax = new Vector2(-border, -border);
+            Image inside = gaugeInner.gameObject.AddComponent<Image>();
+            inside.color = PanelColor;
+            inside.raycastTarget = false;
+            effectGauge = NewRect("Gauge", gaugeInner);
             effectGauge.anchorMin = Vector2.zero;
             effectGauge.anchorMax = Vector2.one;
             effectGauge.offsetMin = effectGauge.offsetMax = Vector2.zero;
             Image gauge = effectGauge.gameObject.AddComponent<Image>();
-            gauge.sprite = PillSprite();
-            gauge.type = Image.Type.Sliced;
-            gauge.color = Color.white;
+            gauge.color = PenaltyBadgeColor;
             gauge.raycastTarget = false;
+            effectGaugeFill = gauge;
 
+            // 공 아이콘은 더 쓰지 않는다 (글자와 사각형만).
             effectIcon = NewRect("Ball Icon", effectBadge);
-            effectIcon.anchorMin = effectIcon.anchorMax = new Vector2(0f, .5f);
-            effectIcon.sizeDelta = new Vector2(badgeHeight * .7f, badgeHeight * .7f);
-            effectIcon.anchoredPosition = new Vector2(badgeHeight * .62f, 0f);
-            Image icon = effectIcon.gameObject.AddComponent<Image>();
-            icon.sprite = DiscSprite();
-            icon.raycastTarget = false;
+            effectIcon.gameObject.SetActive(false);
 
-            effectText = NewText("Effect Label", effectBadge, Mathf.Max(10, Mathf.RoundToInt(20f * u)), TextAnchor.MiddleCenter);
-            effectText.rectTransform.anchorMin = Vector2.zero;
-            effectText.rectTransform.anchorMax = new Vector2(.5f, 1f);
-            effectText.rectTransform.offsetMin = new Vector2(badgeHeight * 1.05f, 0f);
-            effectText.rectTransform.offsetMax = new Vector2(-badgeHeight * .12f, 0f);
-            effectText.color = Color.white;
+            // 사각형 바로 위 가운데에 SMALL 글자만.
+            effectText = NewText("Effect Label", effectBadge, Mathf.Max(10, Mathf.RoundToInt(20f * u)), TextAnchor.LowerCenter);
+            effectText.rectTransform.anchorMin = effectText.rectTransform.anchorMax = Vector2.zero;
+            effectText.rectTransform.pivot = new Vector2(.5f, 0f);
+            effectText.rectTransform.sizeDelta = new Vector2(badgeHeight * 2.4f, labelHeight);
+            effectText.rectTransform.anchoredPosition = new Vector2(barWidth * .5f, barHeight + labelGap);
+            effectText.color = PenaltyBadgeColor;
             Outline effectOutline = effectText.gameObject.AddComponent<Outline>();
-            effectOutline.effectColor = new Color32(43, 36, 32, 160);
-            effectOutline.effectDistance = new Vector2(1.5f, -1.5f);
+            effectOutline.effectColor = Color.white;
+            effectOutline.effectDistance = new Vector2(2f, -2f) * Mathf.Max(.5f, u);
             effectBadge.gameObject.SetActive(false);
+
+            // N COMBO! (#301): 주황 숫자 + 두꺼운 흰 테두리 + 진한 그림자, 오른쪽 아래에 분홍 COMBO!.
+            comboPop = NewRect("Combo Count Pop", layer);
+            comboPop.anchorMin = comboPop.anchorMax = panelAnchor;
+            float numberSize = slotSize * comboNumberSize;
+            comboPop.sizeDelta = new Vector2(numberSize * 2.4f, numberSize * 1.3f);
+            comboPopNumber = NewText("Combo Count", comboPop, Mathf.Max(14, Mathf.RoundToInt(numberSize)), TextAnchor.MiddleCenter);
+            comboPopNumber.rectTransform.anchorMin = comboPopNumber.rectTransform.anchorMax = new Vector2(.5f, .6f);
+            comboPopNumber.rectTransform.sizeDelta = new Vector2(numberSize * 2.4f, numberSize * 1.2f);
+            Shadow numberShadow = comboPopNumber.gameObject.AddComponent<Shadow>();
+            numberShadow.effectColor = new Color32(120, 30, 10, 200);
+            numberShadow.effectDistance = new Vector2(3f, -4f) * Mathf.Max(.5f, u);
+            Outline numberOutline = comboPopNumber.gameObject.AddComponent<Outline>();
+            numberOutline.effectColor = Color.white;
+            numberOutline.effectDistance = new Vector2(4f, -4f) * Mathf.Max(.5f, u);
+            comboPopWord = NewText("Combo Word", comboPop, Mathf.Max(10, Mathf.RoundToInt(numberSize * .36f)), TextAnchor.MiddleCenter);
+            comboPopWord.rectTransform.anchorMin = comboPopWord.rectTransform.anchorMax = new Vector2(.62f, .12f);
+            comboPopWord.rectTransform.sizeDelta = new Vector2(numberSize * 2f, numberSize * .5f);
+            Outline wordOutlineWhite = comboPopWord.gameObject.AddComponent<Outline>();
+            wordOutlineWhite.effectColor = Color.white;
+            wordOutlineWhite.effectDistance = new Vector2(2.5f, -2.5f) * Mathf.Max(.5f, u);
+            comboPop.gameObject.SetActive(false);
 
             panel.gameObject.SetActive(false);
             return true;

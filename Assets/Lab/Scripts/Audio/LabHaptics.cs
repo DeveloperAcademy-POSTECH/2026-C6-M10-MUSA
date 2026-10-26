@@ -26,11 +26,11 @@ namespace C6Lab
     {
         [Header("박 색상 콤보 (#222)")]
         [Tooltip("콤보 성공 때 울리는 횟수")]
-        [SerializeField, Range(1, 6)] private int comboClearPulses = 3;
+        [SerializeField, Range(1, 8)] private int comboClearPulses = 5;
         [Tooltip("콤보 성공 진동 사이 간격 (초)")]
-        [SerializeField, Range(.05f, .5f)] private float comboClearGapSeconds = .14f;
+        [SerializeField, Range(.05f, .5f)] private float comboClearGapSeconds = .1f;
         [Tooltip("콤보 실패 때 이어지는 진동 길이 (초)")]
-        [SerializeField, Range(.2f, 5f)] private float comboFailSeconds = 2f;
+        [SerializeField, Range(.2f, 5f)] private float comboFailSeconds = 1.5f;
 
         private LabNetwork network;
         private LabOrbBoard board;
@@ -98,7 +98,7 @@ namespace C6Lab
         public int ComboClearPulses => comboClearPulses;
         public float ComboClearGapSeconds => comboClearGapSeconds;
 
-        /// <summary>콤보 성공: 센(Heavy) 진동을 짧은 간격으로 3번.</summary>
+        /// <summary>콤보 성공: 센(Heavy) 진동을 짧은 간격으로 5번 (#301에서 3 → 5번, 간격 0.14 → 0.1초로 더 세게).</summary>
         public bool PlayForComboClear(LabConfig config)
         {
             if (config == null || !config.HapticsEnabled) return false;
@@ -110,7 +110,7 @@ namespace C6Lab
             return true;
         }
 
-        /// <summary>콤보 실패(틀린 색 / 시간 초과): 약 2초 동안 크게 이어지는 진동.</summary>
+        /// <summary>콤보 실패(틀린 색 / 시간 초과): 약 1.5초 동안 크게 이어지는 진동 (#301에서 2 → 1.5초).</summary>
         public bool PlayForComboFail(LabConfig config)
         {
             if (config == null || !config.HapticsEnabled) return false;
