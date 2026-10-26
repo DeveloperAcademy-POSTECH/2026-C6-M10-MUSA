@@ -24,7 +24,7 @@ namespace C6Lab.Tests
             values[74] = 2f;
             values[39] = values[40] = 50f;
             for (int i = 41; i <= 44; i++) values[i] = 0f;
-            values[87] = values[88] = values[152] = 0f;
+            values[205] = 0f; // no common gimmicks (#311)
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             model = new LabModel();
             model.Begin("jigwi-core-tests", new ulong[] { 0, 20 }, 0d, config);
@@ -348,9 +348,8 @@ namespace C6Lab.Tests
         {
             var values = config.CaptureDeveloperValues();
             values[166] = 1f;
-            values[167] = values[168] = 2f;
-            values[169] = values[170] = values[171] = 0f;
-            values[172] = 1f;
+            values[206] = 2f; // the borrowed unique group (#311), charm only
+            values[171] = 0f; values[172] = 100f;
             Assert.That(config.TryApplyDeveloperValues(values, out _), Is.True);
             var room = new LabModel();
             room.BeginSolo("jigwi-block-charm", 0, 0d, config);
@@ -368,9 +367,8 @@ namespace C6Lab.Tests
         {
             var values = config.CaptureDeveloperValues();
             values[166] = 1f;
-            values[167] = values[168] = 2f;
-            values[169] = values[170] = values[171] = 0f;
-            values[172] = 1f;
+            values[206] = 2f; // the borrowed unique group (#311), charm only
+            values[171] = 0f; values[172] = 100f;
             Assert.That(config.TryApplyDeveloperValues(values, out _), Is.True);
             var room = new LabModel();
             room.BeginSolo("jigwi-burn-charm", 0, 0d, config);

@@ -15,9 +15,9 @@ namespace C6Lab.Tests
         {
             config = ScriptableObject.CreateInstance<LabConfig>();
             var values = config.CaptureDeveloperValues();
-            values[87] = values[88] = 5f;
-            values[152] = 12f; values[153] = 2f; values[154] = 0f;
-            values[167] = values[168] = 3f;
+            // Gimmick groups (#311): a common gimmick (bomb or 2 s block) every 5 s, a unique one every 3 s.
+            values[205] = 5f; values[153] = 2f;
+            values[206] = 3f;
             values[192] = values[193] = 4f;
             Apply(values);
         }
@@ -69,19 +69,20 @@ namespace C6Lab.Tests
         [TestCase(LabStageYokai.Gumiho)]
         [TestCase(LabStageYokai.Yaguang)]
         [TestCase(LabStageYokai.Jigwi)]
-        public void EveryStageKeepsCommonBombAndSwipeBlockTimersEvenWhenLegacyMixIsOn(LabStageYokai kind)
+        public void EveryStageCastsItsCommonGimmicksEveryIntervalWhateverTheLabSwitchSays(LabStageYokai kind)
         {
             var values = config.CaptureDeveloperValues();
             values[166] = 1f;
-            values[171] = values[172] = values[194] = values[195] = 0f;
+            values[209] = values[210] = 0f; // the fox's own switched off, so only the common group casts here
+            values[194] = values[195] = 0f;
             Apply(values);
             var model = Room("common-" + kind, kind);
-            var blocked = model.Snapshot(12d);
-            Assert.That(blocked.swipeBlockStartedAt, Is.EqualTo(12d));
-            Assert.That(blocked.swipeBlockedUntil, Is.EqualTo(14d));
             model.Tick(20d);
-            Assert.That(model.DrainGourdBombs().Length, Is.EqualTo(4), "The independent 5 s bomb timer remains active.");
-            Assert.That(model.DrainSabotages(), Is.Empty, "The Lab's legacy mix must not add duplicate common casts.");
+            var casts = model.DrainSabotages();
+            Assert.That(casts.Select(cast => cast.At), Is.EqualTo(new[] { 5d, 10d, 15d, 20d }),
+                "One common gimmick every 5 s from 5 s in (#311).");
+            Assert.That(casts.All(cast => cast.Kind == LabSabotageKind.GourdBomb || cast.Kind == LabSabotageKind.SwipeBlock),
+                Is.True);
         }
 
         [TestCase(LabStageYokai.Gumiho)]
@@ -103,13 +104,10 @@ namespace C6Lab.Tests
             Assert.That(model.StageYokai, Is.EqualTo(kind));
             Assert.That(model.DrainGourdBombs().Length, Is.GreaterThan(0), "Common events remain active in a two-player stage.");
             Assert.That(snapshot.orbs.All(orb => orb.owner == 20 || orb.owner == 0), Is.True);
-            var sabotages = model.DrainSabotages();
-            if (kind == LabStageYokai.Gumiho)
-            {
-                Assert.That(sabotages.Length, Is.GreaterThan(0));
-                Assert.That(sabotages.All(cast => cast.Kind == LabSabotageKind.FoxFire || cast.Kind == LabSabotageKind.Charm), Is.True);
-            }
-            else Assert.That(sabotages, Is.Empty);
+            var unique = model.DrainSabotages()
+                .Where(cast => cast.Kind == LabSabotageKind.FoxFire || cast.Kind == LabSabotageKind.Charm).ToArray();
+            if (kind == LabStageYokai.Gumiho) Assert.That(unique.Length, Is.GreaterThan(0), "The fox's own gimmicks (#311).");
+            else Assert.That(unique, Is.Empty, "Only the fox has unique gimmicks so far, whatever the Lab's switch says.");
             if (kind == LabStageYokai.Yaguang)
                 Assert.That(snapshot.comboCount + snapshot.flashCount, Is.GreaterThan(0u));
             else
@@ -123,28 +121,36 @@ namespace C6Lab.Tests
                 Assert.That(snapshot.jigwi.All(state => state.playerId == 20 || state.playerId == 0), Is.True);
             }
             else Assert.That(snapshot.jigwi, Is.Empty);
-            Assert.That(approvedSettings.Length, Is.EqualTo(205));
+            Assert.That(approvedSettings.Length, Is.EqualTo(211));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(approvedSettings),
                 "Applying a stage's runtime mask must not rewrite the shared DEV values or Lab source Config.");
         }
 
         [Test]
-        public void NoneRetainsTheLegacyMixInsteadOfAlsoStartingTheIndependentCommonTimers()
+        public void TheLabSceneBorrowsTheFoxsGimmicksOnlyWhenItsSwitchIsOn()
         {
             var values = config.CaptureDeveloperValues();
-            values[166] = 1f;
-            values[169] = 1f; values[170] = values[171] = values[172] = 0f;
+            values[205] = 0f;
+            values[171] = 100f; values[172] = 0f;
             Apply(values);
-            var model = Room("legacy-mix", LabStageYokai.None);
-            var snapshot = model.Snapshot(12d);
-            Assert.That(model.DrainGourdBombs().Length, Is.EqualTo(4), "The mix casts at 3/6/9/12, not the 5 s common timer.");
-            Assert.That(model.DrainSabotages().Select(cast => cast.At), Is.EqualTo(new[] { 3d, 6d, 9d, 12d }));
-            Assert.That(snapshot.swipeBlockedUntil, Is.EqualTo(-1d));
+            var plain = Room("lab-plain", LabStageYokai.None);
+            plain.Tick(12d);
+            Assert.That(plain.DrainSabotages(), Is.Empty, "Off by default: the Lab scene has no yokai of its own.");
+
+            values[166] = 1f;
+            Apply(values);
+            var borrowing = Room("lab-borrowing", LabStageYokai.None);
+            var snapshot = borrowing.Snapshot(12d);
+            Assert.That(borrowing.DrainSabotages().Select(cast => (cast.Kind, cast.At)), Is.EqualTo(new[]
+            {
+                (LabSabotageKind.FoxFire, 3d), (LabSabotageKind.FoxFire, 6d), (LabSabotageKind.FoxFire, 9d),
+                (LabSabotageKind.FoxFire, 12d)
+            }), "The unique group every 3 s (#311).");
             Assert.That(snapshot.jigwi, Is.Empty);
         }
 
         [Test]
-        public void GumihoAutomaticallyUsesOnlyFoxFireAndCharmWhileOtherYokaiFlagsCannotLeakIn()
+        public void GumihoCastsItsOwnFoxFireAndCharmBesideTheCommonGimmicksWhileOtherYokaiFlagsCannotLeakIn()
         {
             var values = config.CaptureDeveloperValues();
             values[155] = values[184] = 1f;
@@ -152,12 +158,14 @@ namespace C6Lab.Tests
             var model = Room("gumiho-only", LabStageYokai.Gumiho);
             var snapshot = model.Snapshot(60d);
             var casts = model.DrainSabotages();
-            Assert.That(casts.Length, Is.GreaterThan(0));
-            Assert.That(casts.All(cast => cast.Kind == LabSabotageKind.FoxFire || cast.Kind == LabSabotageKind.Charm), Is.True);
+            Assert.That(casts.Any(cast => cast.Kind == LabSabotageKind.FoxFire || cast.Kind == LabSabotageKind.Charm), Is.True);
+            Assert.That(casts.Any(cast => cast.Kind == LabSabotageKind.GourdBomb || cast.Kind == LabSabotageKind.SwipeBlock),
+                Is.True, "Common gimmicks fall in every stage (#311).");
+            Assert.That(casts.Where(cast => cast.Kind == LabSabotageKind.FoxFire || cast.Kind == LabSabotageKind.Charm)
+                .All(cast => Math.Abs(cast.At / 3d - Math.Round(cast.At / 3d)) < 1e-9), Is.True, "On the unique interval.");
             Assert.That(snapshot.comboCount, Is.Zero);
             Assert.That(snapshot.flashCount, Is.Zero);
             Assert.That(snapshot.jigwi, Is.Empty);
-            Assert.That(model.DrainGourdBombs().Length, Is.EqualTo(12));
         }
 
         [Test]
@@ -165,7 +173,7 @@ namespace C6Lab.Tests
         {
             var values = config.CaptureDeveloperValues();
             values[9] = 5f;
-            values[171] = 1f; values[172] = 0f;
+            values[171] = 100f; values[172] = 0f;
             values[173] = values[174] = 3f;
             Apply(values);
             var late = Room("stage-clock-gumiho", LabStageYokai.Gumiho);
@@ -182,7 +190,7 @@ namespace C6Lab.Tests
         public void YaguangRunsTheConfiguredComboAndFlashButNeverTheGumihoMixOrAutomaticJigwi()
         {
             var values = config.CaptureDeveloperValues();
-            values[87] = values[88] = values[152] = 0f;
+            values[205] = 0f; // no common gimmicks (#311)
             values[166] = values[155] = values[184] = 1f;
             Apply(values);
             var model = Room("yaguang-only", LabStageYokai.Yaguang);
@@ -217,7 +225,7 @@ namespace C6Lab.Tests
         public void JigwiAutoFireUsesTheSameFreeSupplyAndTimeoutRulesWithoutRecursiveTimeAdvance()
         {
             var values = config.CaptureDeveloperValues();
-            values[87] = values[88] = values[152] = 0f;
+            values[205] = 0f; // no common gimmicks (#311)
             values[155] = values[184] = 1f;
             values[192] = values[193] = 1f;
             values[194] = 1f; values[195] = 0f;
@@ -244,7 +252,7 @@ namespace C6Lab.Tests
         public void ActiveJigwiChallengeIsNotRepeatedOrRefreshedByLaterAutoTicks()
         {
             var values = config.CaptureDeveloperValues();
-            values[87] = values[88] = values[152] = 0f;
+            values[205] = 0f; // no common gimmicks (#311)
             values[192] = values[193] = 2f;
             values[194] = 1f; values[195] = 0f;
             values[179] = 60f;
@@ -296,6 +304,7 @@ namespace C6Lab.Tests
         {
             var values = config.CaptureDeveloperValues();
             values[194] = 0f; values[195] = 1f;
+            values[208] = 0f; // the common group drops only bombs here (#311)
             Apply(values);
             var model = Room("auto-generation-burn", LabStageYokai.Jigwi);
             var snapshot = model.Snapshot(4d);
@@ -338,7 +347,7 @@ namespace C6Lab.Tests
             try { Assert.That(defaults.CaptureDeveloperValues().Skip(192).Take(4), Is.EqualTo(new[] { 20f, 30f, 1f, 1f })); }
             finally { Object.DestroyImmediate(defaults); }
             var baseline = config.CaptureDeveloperValues();
-            Assert.That(baseline.Length, Is.EqualTo(205));
+            Assert.That(baseline.Length, Is.EqualTo(211));
             Assert.That(baseline.Skip(192).Take(4), Is.EqualTo(new[] { 4f, 4f, 1f, 1f }));
             baseline[192] = 20f; baseline[193] = 30f;
             Apply(baseline);
@@ -348,7 +357,8 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(invalid, out _), Is.False);
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
             Assert.That(LabConfig.DeveloperCategories.SelectMany(category => category.FieldIndices).OrderBy(index => index),
-                Is.EqualTo(Enumerable.Range(0, 205)));
+                Is.EqualTo(Enumerable.Range(0, 211).Except(LabConfig.RetiredDeveloperFields)),
+                "Every live row has a category; retired rows (#311) keep their index but no row.");
         }
     }
 }

@@ -395,6 +395,9 @@ namespace C6Lab
                     SetCategoryExpanded(title, name, rows, expanded);
                 });
             }
+            // Settings the gimmick groups replaced (#311) keep their rows for the shared form but are never shown.
+            foreach (int retired in LabConfig.RetiredDeveloperFields)
+                valueInputs[retired].transform.parent.gameObject.SetActive(false);
         }
 
         /// <summary>묶음 안 구분선 한 줄 (#268). 누를 수 없고, 묶음을 접으면 같이 숨는다.</summary>

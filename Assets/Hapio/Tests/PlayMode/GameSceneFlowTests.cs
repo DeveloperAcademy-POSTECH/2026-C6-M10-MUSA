@@ -496,7 +496,7 @@ namespace Hapio.Tests
             float[] values = network.config.CaptureDeveloperValues();
             Set(values, "Player Max HP", 219f);
             Set(values, "Starting Stamina", 73f);
-            Set(values, "Sabotage Mix (0 off, 1 on)", 0f);
+            Set(values, "Gimmick Charm (0 off, 1 on)", 0f);
             Assert.That(session.ApplyDeveloperSettings(values, out string error), Is.True, error);
             yield return Until(() => session.State.phase == GameFlowPhase.Playing
                 && session.State.battleSessionId != battleId && !session.IsLoadingScene,
@@ -508,7 +508,7 @@ namespace Hapio.Tests
             AssertFreshStage();
             Assert.That(network.Snapshot.players.Single().personalHp, Is.EqualTo(219));
             Assert.That(network.Snapshot.players.Single().stamina, Is.EqualTo(73f).Within(.01f));
-            Assert.That(network.config.SabotageMixEnabled, Is.False,
+            Assert.That(network.config.GimmickSwitches()[(int)LabSabotageKind.Charm], Is.False,
                 "Restart must retain the user's OFF rather than reapply the stage's initial ON default.");
         }
 
@@ -702,11 +702,10 @@ namespace Hapio.Tests
             LabNetwork persistentNetwork = network;
             float[] foxSettings = network.config.CaptureDeveloperValues();
             Set(foxSettings, "Drop Combine (0 off, 1 on)", 1f);
-            Set(foxSettings, "Sabotage Mix (0 off, 1 on)", 1f);
-            Set(foxSettings, "Sabotage Interval Min (seconds)", 2f);
-            Set(foxSettings, "Sabotage Interval Max (seconds)", 2f);
-            Set(foxSettings, "Sabotage Weight Fox Fire", 3f);
-            Set(foxSettings, "Sabotage Weight Charm", 0f);
+            Set(foxSettings, "Common Gimmick Interval (seconds, 0 = none)", 0f);
+            Set(foxSettings, "Unique Gimmick Interval (seconds, 0 = none)", 2f);
+            Set(foxSettings, "Gimmick Chance Fox Fire (%)", 100f);
+            Set(foxSettings, "Gimmick Chance Charm (%)", 0f);
             Set(foxSettings, "Fox Fire Count Min", 2f);
             Set(foxSettings, "Fox Fire Count Max", 2f);
             Set(foxSettings, "Fox Fire Safe Seconds", .25f);
@@ -757,10 +756,9 @@ namespace Hapio.Tests
             session.Pause();
             Assert.That(network.IsBattlePaused, Is.True);
             float[] charmSettings = network.config.CaptureDeveloperValues();
-            Set(charmSettings, "Sabotage Interval Min (seconds)", 3f);
-            Set(charmSettings, "Sabotage Interval Max (seconds)", 3f);
-            Set(charmSettings, "Sabotage Weight Fox Fire", 0f);
-            Set(charmSettings, "Sabotage Weight Charm", 4f);
+            Set(charmSettings, "Unique Gimmick Interval (seconds, 0 = none)", 3f);
+            Set(charmSettings, "Gimmick Chance Fox Fire (%)", 0f);
+            Set(charmSettings, "Gimmick Chance Charm (%)", 100f);
             Set(charmSettings, "Fox Fire Count Min", 3f);
             Set(charmSettings, "Fox Fire Count Max", 4f);
             Set(charmSettings, "Fox Fire Safe Seconds", .75f);
@@ -769,7 +767,7 @@ namespace Hapio.Tests
             Assert.That(session.ApplyDeveloperSettings(charmSettings, out error), Is.True, error);
             yield return Until(() => session.State.phase == GameFlowPhase.Playing
                 && session.State.battleSessionId != firstBattleId && !session.IsLoadingScene,
-                "The new Sabotage settings must restart the current stage through a fresh saved Battle.");
+                "The new gimmick settings must restart the current stage through a fresh saved Battle.");
             Assert.That(GameSession.Instance, Is.SameAs(persistent));
             Assert.That(session.Network, Is.SameAs(persistentNetwork));
             Assert.That(session.State.runId, Is.EqualTo(runId));
@@ -812,9 +810,9 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(205), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(211), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
-                "All approved values, including the twelve Sabotage fields, must survive Scene-owned DEV cleanup.");
+                "All approved values, including the gimmick group fields (#311), must survive Scene-owned DEV cleanup.");
         }
 
         private void AssertFreshSabotagePresentation()

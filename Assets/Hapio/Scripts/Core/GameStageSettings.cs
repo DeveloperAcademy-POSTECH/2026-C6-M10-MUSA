@@ -55,21 +55,30 @@ namespace Hapio
         /// three stages and never reach the territory room, and the territory room's never reach Common.
         /// </summary>
         public static bool IsTerritoryOwned(int index) => index >= 3 && index <= 8 || index == 10;
+        private const int LabUniqueGimmicksField = 166;
+        private static readonly int[] RetiredFields = System.Linq.Enumerable.ToArray(LabConfig.RetiredDeveloperFields);
+        /// <summary>The common gimmick group's settings (#311), which each of the three stages keeps for itself.</summary>
+        public static bool IsStageCommonGimmick(int index) => index == 169 || index == 170 || index == 205 || index == 207 || index == 208;
         public static bool IsFieldVisible(int scope, int index)
         {
             if (scope < 0 || scope > TerritoryScope || index < 0 || index >= LabConfig.DeveloperFields.Count) return false;
+            // The gimmick groups (#311) replaced these timers; they stay in the form but are never shown.
+            if (Array.IndexOf(RetiredFields, index) >= 0) return false;
             if (scope == TerritoryScope) return index >= 197 && index <= 199 || IsTerritoryOwned(index);
             bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203;
             // The game always flashes everyone (#301); Lab alone can select a single target.
             if (index == FlashTargetOneField) return false;
-            // #305 is appended after both #301 fields in the combined schema.
-            bool gumiho = index >= 166 && index <= 177 || index == 204;
+            // Lab's own switch for borrowing the fox's gimmicks (#311); a game stage's yokai decides them instead.
+            if (index == LabUniqueGimmicksField) return false;
+            // Every stage sets its own common gimmicks (#311): interval, bomb and block switches and chances.
+            if (IsStageCommonGimmick(index)) return scope >= 1 && scope <= 3;
+            // The fox's own gimmicks (#311): interval, switches and chances, with fox fire and charm details (#251, #305).
+            bool gumiho = index >= 171 && index <= 177 || index == 204 || index == 206 || index == 209 || index == 210;
             bool jigwi = index >= 178 && index <= 183 || index >= 192 && index <= 195;
             // 2:2 땅따먹기 (#281)의 켜기/끄기·시간·피버는 3요괴 스테이지 설정에 넣지 않는다.
             bool team = index >= 196 && index <= 199;
             if (scope == 0) return !yaguang && !gumiho && !jigwi && !team;
-            // Legacy bomb/block weights are masked by the stage policy and never presented as useful controls.
-            if (scope == 1) return gumiho && index != 169 && index != 170;
+            if (scope == 1) return gumiho;
             return scope == 2 ? yaguang : jigwi;
         }
         public bool TryApply(int scope, float[] values, out string error)

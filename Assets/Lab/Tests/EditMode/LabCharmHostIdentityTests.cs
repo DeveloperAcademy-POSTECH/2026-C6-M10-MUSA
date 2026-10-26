@@ -14,9 +14,8 @@ namespace C6Lab.Tests
             {
                 float[] values = config.CaptureDeveloperValues();
                 values[166] = 1f;
-                values[167] = values[168] = 5f;
-                values[169] = values[170] = values[171] = 0f;
-                values[172] = 1f;
+                values[205] = 0f; values[206] = 5f; // a charm every 5 s and nothing else (#311)
+                values[171] = 0f; values[172] = 100f;
                 values[177] = 3f;
                 values[204] = 0f; // no warning (#305): the charm starts as it is cast
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);

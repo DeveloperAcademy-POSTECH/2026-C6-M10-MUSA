@@ -105,10 +105,7 @@ namespace C6Lab
         private const uint SpawnAngleSalt = 0x5A4E0A11u;
         private const uint SpawnSpeedSalt = 0x5A4E05EDu;
         private const uint DrumSeatSalt = 0xD2D2D2D2u;
-        private const uint GourdDelaySalt = 0x60BDDE1Au;
-        private const uint GourdTargetSalt = 0x60BD7A26u;
         private const uint GourdLandingSalt = 0x60BD1A4Du;
-        private const uint SwipeBlockTargetSalt = 0x5B10C7A6u;
         private const uint SwipeBlockSideSalt = 0x5B105D1Eu;
         // 박의 넘기기 막기 뽑기도 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (#215).
         private const ulong SwipeBlockDrawKey = ulong.MaxValue - 3UL;
@@ -121,9 +118,11 @@ namespace C6Lab
         private const ulong DrumHandoffKey = ulong.MaxValue - 2UL;
         // 박 폭탄 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (북 자리 뽑기는 ulong.MaxValue).
         private const ulong GourdDrawKey = ulong.MaxValue - 1UL;
-        private const uint SabotageDelaySalt = 0x5AB0DE1Au;
         private const uint SabotageKindSalt = 0x5AB0C1D5u;
         private const uint SabotageTargetSalt = 0x5AB07A26u;
+        // 기믹 묶음 (#311): 공용 묶음은 위 두 소금을, 고유 묶음은 아래 두 소금을 써 서로 다른 뽑기가 나온다.
+        private const uint UniqueGimmickKindSalt = 0x5AB0C1E6u;
+        private const uint UniqueGimmickTargetSalt = 0x5AB07A37u;
         // 통합 방해공작 추첨도 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다 (#251).
         private const ulong SabotageDrawKey = ulong.MaxValue - 4UL;
         private const uint FlashTargetSalt = 0x7A6F1A5Bu;
@@ -151,9 +150,6 @@ namespace C6Lab
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
         private readonly List<LabOrbExpiry> orbExpiries = new List<LabOrbExpiry>();
-        /// <summary>Bomb times for this round, retained so a late frame schedules the same swipe blocks as small steps (#215).</summary>
-        private readonly List<double> gourdBombTimes = new List<double>();
-        private double nextSwipeBlockAt;
         private uint swipeBlockCount;
         private ulong swipeBlockedPlayer;
         private bool swipeBlockedRight;
@@ -166,12 +162,12 @@ namespace C6Lab
         /// <summary>More orb IDs than any board holds; a longer report is dropped.</summary>
         public const int MaximumBlastReportOrbs = 64;
         private readonly List<LabGourdBomb> gourdBombs = new List<LabGourdBomb>();
-        private double nextGourdBombAt;
         private uint gourdBombCount;
         private readonly List<LabSabotage> sabotages = new List<LabSabotage>();
-        private double nextSabotageAt;
-        private uint sabotageCount;
-        private ulong? lastSabotageTarget;
+        // 기믹 묶음 (#311): 공용·고유 묶음마다 다음 발동 시각, 지금까지 뽑은 수, 바로 앞에 건 사람.
+        private double nextCommonGimmickAt, nextUniqueGimmickAt;
+        private uint commonGimmickCount, uniqueGimmickCount;
+        private ulong? lastCommonTarget, lastUniqueTarget;
         private readonly List<LabFoxFireDrop> foxFires = new List<LabFoxFireDrop>();
         private ulong charmedPlayer;
         private double charmStartedAt = -1d, charmUntil = -1d;
@@ -198,7 +194,6 @@ namespace C6Lab
         private bool flashWarned;
         // 야광귀 모드의 이벤트 차례 (#271): 콤보 예고가 실제로 시작됐는지, 다른 이벤트 때문에 미뤘는지
         private bool comboWarned, comboHeld, comboWasHeld;
-        private bool gourdBombWasHeld, swipeBlockWasHeld;
         // 차례를 기다리는 콤보·섬광 (#271): 예고를 시작할 때가 됐는데 다른 이벤트 때문에 미루기 시작한 시각, 없으면 -1.
         // 기다리는 동안 새 폭탄·넘기기 막기·방해공작을 걸지 않아 화면이 곧 비고, 둘 다 기다리면 먼저 기다린 쪽이 먼저 한다.
         private double comboQueuedAt = -1d, flashQueuedAt = -1d;
@@ -293,7 +288,6 @@ namespace C6Lab
             unreportedBlasts.Clear();
             orbExpiries.Clear();
             gourdBombs.Clear();
-            gourdBombTimes.Clear();
             sabotages.Clear();
             foxFires.Clear();
             for (int i = 0; i < activeSeatCount; i++)
@@ -312,23 +306,19 @@ namespace C6Lab
             PlaceDrums(now);
             gourdBombCount = 0;
             drumHandoffCount = 0;
-            // With the sabotage mix on (#251) the gourd's bombs and swipe blocks keep no timers of their own.
-            bool legacyMix = stageYokai == LabStageYokai.None && rules.SabotageMix;
-            nextGourdBombAt = legacyMix ? double.PositiveInfinity : now + GourdBombDelay(0u);
             swipeBlockCount = 0;
             swipeBlockedPlayer = 0;
             swipeBlockedRight = false;
             swipeBlockStartedAt = swipeBlockedUntil = -1d;
-            nextSwipeBlockAt = !legacyMix && rules.SwipeBlockInterval > 0f
-                ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
-            sabotageCount = 0;
-            lastSabotageTarget = null;
             charmedPlayer = 0;
             charmStartedAt = charmUntil = charmWarnedAt = -1d;
             charmTaps = 0;
             charmHelperTaps.Clear();
-            nextSabotageAt = legacyMix || stageYokai == LabStageYokai.Gumiho
-                ? now + SabotageDelay(0u) : double.PositiveInfinity;
+            // 기믹 묶음 (#311): 각 묶음은 전투 시작 뒤 자기 간격만큼 지나 처음 발동한다.
+            commonGimmickCount = uniqueGimmickCount = 0;
+            lastCommonTarget = lastUniqueTarget = null;
+            nextCommonGimmickAt = FirstGimmickAt(now, rules.CommonGimmickInterval, rules.CommonGimmicks);
+            nextUniqueGimmickAt = FirstGimmickAt(now, rules.UniqueGimmickInterval, rules.UniqueGimmicks);
             combo.Reset();
             launchScales.Clear();
             nextComboAt = now + rules.ComboFirstStartSeconds;
@@ -339,7 +329,6 @@ namespace C6Lab
             flashWasHeld = false;
             flashWarned = false;
             comboWarned = comboHeld = comboWasHeld = false;
-            gourdBombWasHeld = swipeBlockWasHeld = false;
             comboQueuedAt = flashQueuedAt = -1d;
             screenBusyAt.Clear();
             nextFlashAt = rules.FlashEnabled ? now + rules.FlashFirstStartSeconds : double.PositiveInfinity;
@@ -934,21 +923,6 @@ namespace C6Lab
             return false;
         }
 
-        /// <summary>
-        /// 뽑힌 사람 화면이 비어 있으면 그 사람, 아니면 비어 있는 화면들 중에서 같은 뽑기 값으로 다시 고른다 (#271).
-        /// 비어 있는 화면이 없으면 found가 false다. 모든 기기가 같은 결과를 받는다.
-        /// </summary>
-        private ulong FreeTarget(ulong drawn, ulong draw, LabYaguangEvent self, double at, out bool found)
-        {
-            found = true;
-            if (!ScreenOpen(drawn, at, self)) return drawn;
-            var free = new List<ulong>();
-            for (int i = 0; i < activeSeatCount; i++)
-                if (!ScreenOpen(seats[i], at, self)) free.Add(seats[i]);
-            found = free.Count > 0;
-            return found ? free[(int)(draw % (ulong)free.Count)] : 0;
-        }
-
         /// <summary>한 명(ONE) 섬광을 받을 수 있는 화면: 바로 앞에 맞은 사람(두 명 이상일 때)과 이벤트 중인 화면을 뺀다.</summary>
         private List<ulong> FreeFlashTargets(double at)
         {
@@ -1388,9 +1362,7 @@ namespace C6Lab
                     ExpireOrbs(effectiveNow);
                     AdvanceJigwi(effectiveNow);
                 }
-                DropGourdBombs(effectiveNow);
-                StartSwipeBlocks(effectiveNow);
-                CastSabotages(effectiveNow);
+                CastGimmicks(effectiveNow);
                 AdvanceJigwi(effectiveNow);
                 AdvanceStageJigwi(effectiveNow);
                 AdvanceCombo(effectiveNow);
@@ -1414,33 +1386,10 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 박의 방해공작 (#177): 정해 둔 시각마다 무작위 한 명의 판에 잠긴 폭탄을 떨어뜨린다.
-        /// 구슬이 가득 찬 판에도 떨어지고, 같은 사람이 연달아 받을 수도 있으며, 스태미나는 쓰지 않는다.
-        /// 잠금 횟수·도화선은 북에서 나온 폭탄과 같다: 잠긴 채 도화선(아이템 수명)이 끝나면 그때 들고 있는 사람 판에서 터진다. 시간을 한 번에 많이 건너뛰어도 그 사이
-        /// 떨어졌어야 할 폭탄을 정해 둔 시각 그대로 차례대로 만든다.
+        /// 박 폭탄 (#177): 공용 기믹(#311)으로 뽑히면 이 사람 판에 잠긴 폭탄을 떨어뜨린다. 구슬이 가득 찬 판에도 떨어지고
+        /// 스태미나는 쓰지 않는다. 잠금 횟수·도화선은 북에서 나온 폭탄과 같다: 잠긴 채 도화선(아이템 수명)이 끝나면 그때
+        /// 들고 있는 사람 판에서 터진다.
         /// </summary>
-        private void DropGourdBombs(double until)
-        {
-            while (nextGourdBombAt <= until)
-            {
-                double at = nextGourdBombAt;
-                ulong draw = DrawFor(seed ^ GourdTargetSalt, GourdDrawKey, gourdBombCount);
-                // 야광귀 모드 (#271): 뽑힌 사람 화면에 다른 이벤트가 열려 있으면 비어 있는 화면에 떨어뜨리고,
-                // 비어 있는 화면이 없으면 기다렸다가 생기는 순간 떨어뜨린다.
-                ulong target = FreeTarget(seats[(int)(draw % (ulong)activeSeatCount)], draw, LabYaguangEvent.GourdBomb, until, out bool found);
-                if (!found)
-                {
-                    gourdBombWasHeld = true;
-                    nextGourdBombAt = until;
-                    return;
-                }
-                if (gourdBombWasHeld) { gourdBombWasHeld = false; at = until; }
-                DropGourdBomb(target, at);
-                nextGourdBombAt = at + GourdBombDelay(gourdBombCount);
-            }
-        }
-
-        /// <summary>The gourd drops its next locked bomb onto this player's board.</summary>
         private void DropGourdBomb(ulong target, double at)
         {
             uint index = gourdBombCount++;
@@ -1456,7 +1405,6 @@ namespace C6Lab
             };
             orbs.Add(bomb.id, bomb);
             gourdBombs.Add(new LabGourdBomb(target, bomb.id, landing));
-            gourdBombTimes.Add(at);
         }
 
         /// <summary>
@@ -1507,39 +1455,6 @@ namespace C6Lab
                 if (roll < 0) return i;
             }
             return 0;
-        }
-
-        /// <summary>다음 박 폭탄까지의 시간. 최대 간격이 0이면 떨어뜨리지 않는다.</summary>
-        /// <summary>
-        /// 박의 방해공작 (#215): 정해 둔 간격마다 무작위 한 명과 무작위 방향(왼쪽·오른쪽)을 골라, 그 사람이
-        /// 그쪽으로 스스로 넘기는 것을 정해 둔 시간 동안 막는다. 박 폭탄과 연출이 겹치지 않도록 폭탄이
-        /// 떨어졌거나 떨어질 시각과 최소 간격 안이면 그 폭탄 뒤로 미룬다. 한 번에 하나만 걸리고, 다음 막기는
-        /// 지금 것이 끝난 뒤에 온다. 뽑기는 seed와 순번으로 정해 모든 기기가 같은 결과를 받는다.
-        /// </summary>
-        private void StartSwipeBlocks(double until)
-        {
-            while (nextSwipeBlockAt <= until)
-            {
-                double at = nextSwipeBlockAt;
-                ulong draw = DrawFor(seed ^ SwipeBlockTargetSalt, SwipeBlockDrawKey, swipeBlockCount);
-                // 야광귀 모드 (#271): 뽑힌 사람 화면이 이벤트 중이면 비어 있는 화면에 걸고, 없으면 생길 때까지 기다린다.
-                ulong target = FreeTarget(seats[(int)(draw % (ulong)activeSeatCount)], draw, LabYaguangEvent.SwipeBlock, until, out bool found);
-                if (!found)
-                {
-                    swipeBlockWasHeld = true;
-                    nextSwipeBlockAt = until;
-                    return;
-                }
-                if (swipeBlockWasHeld) { swipeBlockWasHeld = false; at = until; }
-                double clear = ClearOfGourdBombs(at);
-                if (clear > at)
-                {
-                    nextSwipeBlockAt = clear;
-                    continue;
-                }
-                StartSwipeBlock(target, at);
-                nextSwipeBlockAt = Math.Max(at + rules.SwipeBlockInterval, swipeBlockedUntil);
-            }
         }
 
         /// <summary>The gourd blocks one way, drawn at random, of this player's own passes.</summary>
@@ -1594,108 +1509,106 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 요괴의 통합 방해공작 추첨 (#251): 켜 두면 박 폭탄·넘기기 막기의 각자 타이머 대신, 정해 둔 간격마다 비율이 0보다
-        /// 큰 방해공작 중 하나를 비율대로 골라 무작위 한 명에게 건다. 걸 사람이 없는 방해공작은 이번 후보에서 빠지고,
-        /// 하나도 걸 수 없으면 이번 차례는 건너뛴다. 뽑기는 seed와 순번으로 정해 모든 기기가 같은 결과를 받는다.
+        /// 기믹 묶음 (#311): 공용 기믹(폭탄·넘기기 막기)과 요괴 고유 기믹(구미호: 여우불·매혹)을 각자 고정 간격마다 하나씩
+        /// 건다. 두 묶음이 같은 시각이면 공용 → 고유 순서로 둘 다 건다. 시간을 한 번에 많이 건너뛰어도 그 사이 걸렸어야 할
+        /// 기믹을 정해 둔 시각 그대로 차례대로 건다. 뽑기는 seed와 묶음별 순번으로 정해 모든 기기가 같은 결과를 받는다.
         /// </summary>
-        private void CastSabotages(double until)
+        private void CastGimmicks(double until)
         {
-            while (nextSabotageAt <= until)
+            while (nextCommonGimmickAt <= until || nextUniqueGimmickAt <= until)
             {
-                double at = nextSabotageAt;
-                uint index = sabotageCount++;
-                nextSabotageAt = at + SabotageDelay(sabotageCount);
-                if (!TryDrawSabotage(at, index, out LabSabotageKind kind, out ulong target)) continue;
-                lastSabotageTarget = target;
+                if (nextCommonGimmickAt <= nextUniqueGimmickAt)
+                {
+                    double at = nextCommonGimmickAt;
+                    nextCommonGimmickAt = at + GimmickInterval(rules.CommonGimmickInterval);
+                    CastGimmick(rules.CommonGimmicks, at, commonGimmickCount++, SabotageKindSalt, SabotageTargetSalt,
+                        ref lastCommonTarget);
+                }
+                else
+                {
+                    double at = nextUniqueGimmickAt;
+                    nextUniqueGimmickAt = at + GimmickInterval(rules.UniqueGimmickInterval);
+                    CastGimmick(rules.UniqueGimmicks, at, uniqueGimmickCount++, UniqueGimmickKindSalt, UniqueGimmickTargetSalt,
+                        ref lastUniqueTarget);
+                }
+            }
+        }
+
+        /// <summary>A group's first cast: its interval after the start, or never when it is 0 or has no gimmicks (#311).</summary>
+        private static double FirstGimmickAt(double now, float interval, LabSabotageKind[] kinds) =>
+            interval > 0f && kinds.Length > 0 ? now + GimmickInterval(interval) : double.PositiveInfinity;
+
+        private static double GimmickInterval(float interval) => Math.Max(GourdMinimumDelaySeconds, interval);
+
+        /// <summary>
+        /// 이 묶음에서 켜져 있고 지금 걸 사람이 있는 기믹 중 하나를 비율(%)대로 골라, 걸 수 있는 사람 중 무작위 한 명에게 건다
+        /// (#311). 어떤 사람에게 걸 수 없는 기믹은 그 사람을 빼고 고르므로 다른 사람에게 가고, 아무에게도 걸 수 없는 기믹은
+        /// 후보에서 빠진다. 남은 기믹이 없으면 이번 차례는 건너뛴다.
+        /// </summary>
+        private void CastGimmick(LabSabotageKind[] kinds, double at, uint index, uint kindSalt, uint targetSalt, ref ulong? last)
+        {
+            var targets = new List<ulong>[kinds.Length];
+            var weights = new int[kinds.Length];
+            int total = 0;
+            for (int i = 0; i < kinds.Length; i++)
+            {
+                int kind = (int)kinds[i];
+                if (!rules.GimmickEnabled[kind] || rules.GimmickChances[kind] <= 0) continue;
+                targets[i] = GimmickTargets(kinds[i], at, last);
+                if (targets[i].Count > 0) total += weights[i] = rules.GimmickChances[kind];
+            }
+            if (total == 0) return;
+            int roll = (int)(DrawFor(seed ^ kindSalt, SabotageDrawKey, index) % (ulong)total);
+            for (int i = 0; i < kinds.Length; i++)
+            {
+                roll -= weights[i];
+                if (roll >= 0) continue;
+                ulong target = targets[i][(int)(DrawFor(seed ^ targetSalt, SabotageDrawKey, index) % (ulong)targets[i].Count)];
+                last = target;
+                LabSabotageKind kind = kinds[i];
                 if (kind == LabSabotageKind.GourdBomb) DropGourdBomb(target, at);
                 else if (kind == LabSabotageKind.SwipeBlock) StartSwipeBlock(target, at);
                 else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index);
                 else if (kind == LabSabotageKind.Charm) StartCharm(target, at);
                 sabotages.Add(new LabSabotage(kind, target, at));
+                return;
             }
-        }
-
-        private bool TryDrawSabotage(double at, uint index, out LabSabotageKind kind, out ulong target)
-        {
-            kind = LabSabotageKind.GourdBomb;
-            target = 0;
-            var weights = new int[rules.SabotageWeights.Length];
-            int total = 0;
-            for (int i = 0; i < weights.Length; i++)
-                if (rules.SabotageWeights[i] > 0 && SabotageTargets((LabSabotageKind)i, at).Count > 0)
-                    total += weights[i] = rules.SabotageWeights[i];
-            if (total == 0) return false;
-            int roll = (int)(DrawFor(seed ^ SabotageKindSalt, SabotageDrawKey, index) % (ulong)total);
-            for (int i = 0; i < weights.Length; i++)
-            {
-                roll -= weights[i];
-                if (roll >= 0) continue;
-                kind = (LabSabotageKind)i;
-                List<ulong> targets = SabotageTargets(kind, at);
-                target = targets[(int)(DrawFor(seed ^ SabotageTargetSalt, SabotageDrawKey, index) % (ulong)targets.Count)];
-                return true;
-            }
-            return false;
         }
 
         /// <summary>
-        /// Who this sabotage may fall on now, in seat order. Not the player the last one fell on (unless solo),
-        /// nor one whose ways are still blocked or who is still charmed. One swipe block and one charm at a time.
-        /// A charm falls in any room: with two players the other one alone wakes them, and solo it only wears off.
+        /// Who this gimmick may fall on now, in seat order. Not the player this group's last one fell on (unless solo),
+        /// nor one whose ways are still blocked or who is still charmed or warned of a charm. One swipe block and one charm
+        /// at a time. A charm falls in any room: with two players the other one alone wakes them, and solo it only wears off.
         /// </summary>
-        private List<ulong> SabotageTargets(LabSabotageKind kind, double at)
+        private List<ulong> GimmickTargets(LabSabotageKind kind, double at, ulong? last)
         {
             var targets = new List<ulong>();
             bool blocking = BlockOn(at);
             bool charming = CharmComingOrOn(at);
             if (kind == LabSabotageKind.SwipeBlock && blocking) return targets;
             if (kind == LabSabotageKind.Charm && charming) return targets;
+            // 야광귀 모드 (#271): 폭탄·넘기기 막기는 자기 종류도 보고(한 화면에 폭탄 하나), 여우불·매혹은 방해공작으로 본다.
+            LabYaguangEvent self = kind == LabSabotageKind.GourdBomb ? LabYaguangEvent.GourdBomb
+                : kind == LabSabotageKind.SwipeBlock ? LabYaguangEvent.SwipeBlock : LabYaguangEvent.Sabotage;
             for (int i = 0; i < activeSeatCount; i++)
             {
                 ulong player = seats[i];
-                if (lastSabotageTarget.HasValue && player == lastSabotageTarget.Value && activeSeatCount > 1) continue;
+                if (last.HasValue && player == last.Value && activeSeatCount > 1) continue;
                 if (blocking && player == swipeBlockedPlayer) continue;
                 if (charming && player == charmedPlayer) continue;
                 if (JigwiBlocksSabotage(player, at)) continue;
                 if (kind == LabSabotageKind.FoxFire && CountStored(player, at) >= rules.OrbStorageLimit) continue;
                 // 야광귀 모드 (#271): 다른 이벤트가 열려 있는 화면에는 걸지 않는다.
-                if (ScreenOpen(player, at, LabYaguangEvent.Sabotage)) continue;
+                if (ScreenOpen(player, at, self)) continue;
                 targets.Add(player);
             }
             return targets;
-        }
-
-        private double SabotageDelay(uint index)
-        {
-            float delay = Mathf.Lerp(rules.SabotageIntervalMin, rules.SabotageIntervalMax,
-                Unit01(DrawFor(seed ^ SabotageDelaySalt, SabotageDrawKey, index)));
-            return Math.Max(GourdMinimumDelaySeconds, delay);
-        }
-
-        /// <summary>The earliest time from at that is at least the bomb gap from the gourd's bombs near it.</summary>
-        private double ClearOfGourdBombs(double at)
-        {
-            double gap = rules.SwipeBlockBombGap;
-            if (gap <= 0d) return at;
-            double clear = at;
-            foreach (double bomb in gourdBombTimes)
-                if (Math.Abs(clear - bomb) < gap) clear = Math.Max(clear, bomb + gap);
-            if (Math.Abs(clear - nextGourdBombAt) < gap) clear = Math.Max(clear, nextGourdBombAt + gap);
-            return clear;
         }
 
         /// <summary>Whether the gourd's swipe block (#215) stops this player's own passes that way at this Host time.</summary>
         public bool SwipeBlocked(ulong player, bool right, double now) =>
             phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt
             && player == swipeBlockedPlayer && right == swipeBlockedRight;
-
-        private double GourdBombDelay(uint index)
-        {
-            if (rules.GourdBombIntervalMax <= 0f) return double.PositiveInfinity;
-            float delay = Mathf.Lerp(rules.GourdBombIntervalMin, rules.GourdBombIntervalMax,
-                Unit01(DrawFor(seed ^ GourdDelaySalt, GourdDrawKey, index)));
-            return Math.Max(GourdMinimumDelaySeconds, delay);
-        }
 
         private int DamageFor(LabOrbState orb)
         {
@@ -1880,13 +1793,17 @@ namespace C6Lab
             public readonly LabGourdMode GourdMode;
             public readonly int PaintVictoryPercent;
             public readonly LabPaintGrowthSettings PaintGrowthSettings;
-            public readonly float GourdBombIntervalMin, GourdBombIntervalMax;
-            /// <summary>The gourd's swipe block (#215): every how long, for how long, and how far from its bombs.</summary>
-            public readonly float SwipeBlockInterval, SwipeBlockSeconds, SwipeBlockBombGap;
-            /// <summary>The yokai's sabotage mix (#251): on, how often, and how likely each sabotage is.</summary>
-            public readonly bool SabotageMix;
-            public readonly float SabotageIntervalMin, SabotageIntervalMax;
-            public readonly int[] SabotageWeights;
+            /// <summary>The gourd's swipe block (#215): how long it lasts.</summary>
+            public readonly float SwipeBlockSeconds;
+            /// <summary>
+            /// Gimmick groups (#311): the common gimmicks (gourd bomb, swipe block) and this yokai's own (the nine-tailed fox:
+            /// fox fire, charm), each group cast one at a time every its interval; which may be drawn and each one's percent
+            /// chance within its group, in <see cref="LabSabotageKind"/> order.
+            /// </summary>
+            public readonly float CommonGimmickInterval, UniqueGimmickInterval;
+            public readonly LabSabotageKind[] CommonGimmicks, UniqueGimmicks;
+            public readonly bool[] GimmickEnabled;
+            public readonly int[] GimmickChances;
             /// <summary>Fox fire (#251): how many fox orbs fall, and how long after they fall they cannot be touched off.</summary>
             public readonly int FoxFireCountMin, FoxFireCountMax;
             public readonly float FoxFireSafeSeconds;
@@ -1921,16 +1838,16 @@ namespace C6Lab
                 GourdMode = config.GourdMode;
                 PaintVictoryPercent = config.PaintVictoryPercent;
                 PaintGrowthSettings = config.PaintGrowthSettings;
-                GourdBombIntervalMin = config.GourdBombIntervalMin;
-                GourdBombIntervalMax = config.GourdBombIntervalMax;
-                SwipeBlockInterval = config.SwipeBlockInterval;
                 SwipeBlockSeconds = config.SwipeBlockSeconds;
-                SwipeBlockBombGap = config.SwipeBlockBombGap;
-                SabotageMix = config.SabotageMixEnabled;
-                SabotageIntervalMin = config.SabotageIntervalMin;
-                SabotageIntervalMax = config.SabotageIntervalMax;
-                SabotageWeights = config.SabotageWeights();
-                if (stageYokai == LabStageYokai.Gumiho) SabotageWeights[0] = SabotageWeights[1] = 0;
+                CommonGimmickInterval = config.CommonGimmickInterval;
+                UniqueGimmickInterval = config.UniqueGimmickInterval;
+                CommonGimmicks = new[] { LabSabotageKind.GourdBomb, LabSabotageKind.SwipeBlock };
+                // Only the nine-tailed fox has its own gimmicks so far; the Lab's single scene borrows them when asked to.
+                UniqueGimmicks = stageYokai == LabStageYokai.Gumiho
+                    || (stageYokai == LabStageYokai.None && config.LabUniqueGimmicksEnabled)
+                    ? new[] { LabSabotageKind.FoxFire, LabSabotageKind.Charm } : Array.Empty<LabSabotageKind>();
+                GimmickEnabled = config.GimmickSwitches();
+                GimmickChances = config.GimmickChances();
                 FoxFireCountMin = config.FoxFireCountMin;
                 FoxFireCountMax = config.FoxFireCountMax;
                 FoxFireSafeSeconds = config.FoxFireSafeSeconds;
@@ -1989,9 +1906,7 @@ namespace C6Lab
                 // 2:2 땅따먹기 (#281): 요괴·방해공작·콤보·섬광·마르기를 끄고, 도색으로만 겨룬다.
                 BattleDurationSeconds = config.TeamBattleSeconds;
                 GourdMode = LabGourdMode.Paint;
-                SabotageMix = false;
-                GourdBombIntervalMin = GourdBombIntervalMax = 0f;
-                SwipeBlockInterval = 0f;
+                CommonGimmicks = UniqueGimmicks = Array.Empty<LabSabotageKind>();
                 ComboEnabled = FlashEnabled = false;
                 PaintGrowthSettings.DryingEnabled = false;
                 // 덮어쓰기는 얼룩 모양이 있어야 하므로 옛 둥근 붓은 흩뿌림 무늬로 바꾼다.

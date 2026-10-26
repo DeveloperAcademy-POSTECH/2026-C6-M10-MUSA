@@ -17,6 +17,4 @@ MonoBehaviour:
   displayName: "\uAD6C\uBBF8\uD638"
   yokai: 1
   yokaiVisual: {fileID: 0}
-  defaultValues:
-  - index: 166
-    value: 1
+  defaultValues: []

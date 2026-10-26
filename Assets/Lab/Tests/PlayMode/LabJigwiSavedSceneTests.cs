@@ -46,10 +46,8 @@ namespace C6Lab.Tests
             Set(values, "Secret Box Chance (%)", 0f);
             Set(values, "Potion Chance (%)", 0f);
             Set(values, "Bomb Chance (%)", 0f);
-            Set(values, "Sabotage Mix (0 off, 1 on)", 0f);
-            Set(values, "Gourd Bomb Interval Min (seconds, 0 = off)", 0f);
-            Set(values, "Gourd Bomb Interval Max (seconds, 0 = off)", 0f);
-            Set(values, "Swipe Block Interval (seconds, 0 = off)", 0f);
+            Set(values, "Lab Unique Gimmicks (0 off, 1 on)", 0f);
+            Set(values, "Common Gimmick Interval (seconds, 0 = none)", 0f);
             Set(values, "Stamina Recovery Amount", 0f);
             Assert.That(tuning.TryApplyDeveloperValues(values, out string error), Is.True, error);
             network.config = tuning;

@@ -78,9 +78,8 @@ namespace C6Lab
         {
             double next = Math.Min(requested, deadline);
             void Include(double at) { if (Finite(at) && at > lastTime && at < next) next = at; }
-            Include(nextGourdBombAt);
-            Include(nextSwipeBlockAt);
-            Include(nextSabotageAt);
+            Include(nextCommonGimmickAt);
+            Include(nextUniqueGimmickAt);
             Include(nextStageJigwiAt);
             Include(swipeBlockedUntil);
             Include(charmUntil);

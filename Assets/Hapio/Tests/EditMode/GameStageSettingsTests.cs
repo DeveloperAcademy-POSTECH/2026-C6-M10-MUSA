@@ -21,16 +21,16 @@ namespace Hapio.Tests
                     "Every default stage uses the original black yokai already inside the shared gourd.");
             using (var settings = new GameStageSettings(source, catalog))
             {
-                Assert.That(settings.Capture(1)[166], Is.EqualTo(1f));
+                Assert.That(GameStageSettings.IsFieldVisible(1, 166), Is.False, "A game stage's yokai decides its own gimmicks (#311).");
                 Assert.That(settings.Capture(2)[155], Is.EqualTo(1f));
                 Assert.That(settings.Capture(2)[184], Is.EqualTo(1f));
                 Assert.That(settings.Capture(2)[GameStageSettings.FlashTargetOneField], Is.Zero, "The yaguang flash hits everyone (#301).");
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(205));
-                    Assert.That(values[87], Is.EqualTo(before[87]), "Common bomb interval preserved");
-                    Assert.That(values[152], Is.EqualTo(before[152]), "Common transfer block interval preserved");
+                    Assert.That(values.Length, Is.EqualTo(211));
+                    Assert.That(values[205], Is.EqualTo(before[205]), "Common gimmick interval preserved (#311)");
+                    Assert.That(values[206], Is.EqualTo(before[206]), "Unique gimmick interval preserved (#311)");
                 }
             }
             CollectionAssert.AreEqual(before, source.CaptureDeveloperValues());
@@ -70,10 +70,43 @@ namespace Hapio.Tests
                 Assert.That(settings.Capture(0)[2], Is.EqualTo(240f));
                 Assert.That(settings.Capture(1)[2], Is.EqualTo(240f));
                 Assert.That(settings.Capture(2)[184], Is.EqualTo(0f));
-                Assert.That(settings.Capture(1)[166], Is.EqualTo(first[166]));
-                float[] before = settings.Capture(2), foreign = settings.Capture(2); foreign[166] = 1f;
+                Assert.That(settings.Capture(1)[206], Is.EqualTo(first[206]));
+                float[] before = settings.Capture(2), foreign = settings.Capture(2); foreign[206] = first[206] + 1f;
                 Assert.That(settings.TryApplyBattle(2, foreign, out _), Is.False);
                 CollectionAssert.AreEqual(before, settings.Capture(2));
+            }
+        }
+        [Test]
+        public void EachStageKeepsItsOwnCommonGimmicksAndOnlyTheFoxHasUniqueOnes()
+        {
+            foreach (int index in new[] { 169, 170, 205, 207, 208 })
+            {
+                Assert.That(GameStageSettings.IsFieldVisible(0, index), Is.False, "Not a Common field: " + index);
+                for (int stage = 1; stage <= 3; stage++)
+                    Assert.That(GameStageSettings.IsFieldVisible(stage, index), Is.True, "Stage " + stage + ": " + index);
+                Assert.That(GameStageSettings.IsFieldVisible(GameStageSettings.TerritoryScope, index), Is.False);
+            }
+            foreach (int index in new[] { 171, 172, 206, 209, 210 })
+            {
+                Assert.That(GameStageSettings.IsFieldVisible(1, index), Is.True, "The fox's own gimmick field: " + index);
+                Assert.That(GameStageSettings.IsFieldVisible(2, index) || GameStageSettings.IsFieldVisible(3, index), Is.False);
+            }
+            foreach (int retired in LabConfig.RetiredDeveloperFields)
+                for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                    Assert.That(GameStageSettings.IsFieldVisible(scope, retired), Is.False, "Retired (#311): " + retired);
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                float[] yaguang = settings.Capture(2);
+                yaguang[205] = 7f; yaguang[169] = 30f; yaguang[170] = 70f;
+                Assert.That(settings.TryApply(2, yaguang, out string error), Is.True, error);
+                Assert.That(new[] { settings.Capture(2)[205], settings.Capture(2)[169] }, Is.EqualTo(new[] { 7f, 30f }));
+                Assert.That(settings.Capture(1)[205], Is.EqualTo(settings.Capture(0)[205]), "The other stages keep theirs.");
+                Assert.That(settings.Capture(3)[169], Is.EqualTo(settings.Capture(0)[169]));
+                float[] uneven = settings.Capture(3); uneven[169] = 30f;
+                Assert.That(settings.TryApply(3, uneven, out error), Is.False, "The common chances must add up to 100.");
+                var config = settings.CreateStageConfig(2);
+                try { Assert.That(config.CommonGimmickInterval, Is.EqualTo(7f)); }
+                finally { UnityEngine.Object.DestroyImmediate(config); }
             }
         }
         [Test]
@@ -151,8 +184,10 @@ namespace Hapio.Tests
                 before[2] = -123;
                 Assert.That(settings.Capture(0)[2], Is.GreaterThan(0));
             }
-            Assert.That(GameStageSettings.IsFieldVisible(0, 152), Is.True);
-            Assert.That(GameStageSettings.IsFieldVisible(1, 169), Is.False);
+            Assert.That(GameStageSettings.IsFieldVisible(0, 152), Is.False, "Retired by the gimmick groups (#311).");
+            Assert.That(GameStageSettings.IsFieldVisible(0, 153), Is.True, "How long a swipe block lasts stays common.");
+            Assert.That(GameStageSettings.IsFieldVisible(1, 169), Is.True, "Each stage sets its own common gimmick chances (#311).");
+            Assert.That(GameStageSettings.IsFieldVisible(0, 169), Is.False);
             Assert.That(GameStageSettings.IsFieldVisible(2, 184), Is.True);
             for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
                 Assert.That(GameStageSettings.IsFieldVisible(scope, GameStageSettings.FlashTargetOneField), Is.False,

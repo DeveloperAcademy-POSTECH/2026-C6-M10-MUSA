@@ -41,14 +41,14 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(205));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(211));
             Assert.That(values[89], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[90], values[91], values[92], values[93] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
             Assert.That(new[] { values[94], values[95], values[96], values[97] }, Is.EqualTo(new[] { 40f, 35f, 15f, 10f }),
                 "Near, middle, far and pass-through chances.");
-            Assert.That(new[] { values[87], values[88] }, Is.EqualTo(new[] { 20f, 30f }),
-                "The gourd drops a bomb every 20 to 30 seconds by default.");
+            Assert.That(new[] { values[205], values[206] }, Is.EqualTo(new[] { 10f, 20f }),
+                "A common gimmick every 10 seconds and the yokai's own every 20 seconds by default (#311).");
             Assert.That(values[79], Is.EqualTo(0f), "The gourd starts in paint mode.");
             Assert.That(values[98], Is.EqualTo(1f), "The minimap is on by default.");
             Assert.That(values[99], Is.EqualTo(50f), "The minimap starts at half of its drawn size.");
@@ -136,8 +136,6 @@ namespace C6Lab.Tests
             values[84] = 0f; // combine sound off
             values[85] = 3f; // Soft
             values[86] = .1f;
-            values[87] = 15f;
-            values[88] = 25f;
             values[89] = 100f; // fuse sizzle twice the Inspector volume
             values[90] = 10f; values[91] = 30f; values[92] = 50f; values[93] = 90f; // drum stop zone edges
             values[94] = 25f; values[95] = 25f; values[96] = 25f; values[97] = 25f; // drum stop chances
@@ -174,8 +172,6 @@ namespace C6Lab.Tests
             Assert.That(config.FuseSoundVolume, Is.EqualTo(1f).Within(1e-5f), "100 doubles the Inspector fuse volume (0.5).");
             Assert.That(config.DrumStopBounds(), Is.EqualTo(new[] { .1f, .3f, .5f, .9f }).Within(1e-6f));
             Assert.That(config.DrumStopChances(), Is.EqualTo(new[] { 25, 25, 25, 25 }));
-            Assert.That(config.GourdBombIntervalMin, Is.EqualTo(15f));
-            Assert.That(config.GourdBombIntervalMax, Is.EqualTo(25f));
             Assert.That(config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
             Assert.That(config.CombineSoundVolume, Is.EqualTo(0f));
             Assert.That(config.CombineHapticStyle, Is.EqualTo(LabHapticStyle.Soft));
@@ -342,8 +338,8 @@ namespace C6Lab.Tests
             Assert.That(saved, Is.Not.Null);
             Assert.That(saved.GenerationChances(), Is.EqualTo(new[] { 50, 50, 0, 0, 0, 0 }),
                 "Set Yin 50, Yang 50 and every item 0 in the LabConfig Inspector.");
-            Assert.That(saved.GourdBombIntervalMin, Is.EqualTo(20f));
-            Assert.That(saved.GourdBombIntervalMax, Is.EqualTo(30f));
+            Assert.That(saved.CommonGimmickInterval, Is.EqualTo(10f), "A common gimmick every 10 s (#311)...");
+            Assert.That(saved.GimmickSwitches()[(int)LabSabotageKind.GourdBomb], Is.True, "...which may be the gourd's bomb.");
         }
 
         [Test]
@@ -550,9 +546,10 @@ namespace C6Lab.Tests
                 }
             }
 
+            // Retired rows (#311) keep their index in the shared form but have no row.
             for (int i = 0; i < fieldCount; i++)
-                Assert.That(seen[i], Is.EqualTo(1),
-                    LabConfig.DeveloperFields[i].Label + " (" + i + ") must be in exactly one category.");
+                Assert.That(seen[i], Is.EqualTo(LabConfig.RetiredDeveloperFields.Contains(i) ? 0 : 1),
+                    LabConfig.DeveloperFields[i].Label + " (" + i + ") must be in exactly one category unless retired.");
         }
 
 
@@ -780,7 +777,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(111));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(205));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(211));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             Assert.That(LabConfig.DefaultPaintVictoryPercent, Is.EqualTo(100));
@@ -795,34 +792,26 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GourdBombIntervalIsAppendedToTheGourdCategoryAndMinCannotExceedMax()
+        public void RetiredGimmickTimersKeepTheirIndicesButNoRowAndNothingReadsThem()
         {
-            Assert.That(LabConfig.DeveloperFields[87].Label, Is.EqualTo("Gourd Bomb Interval Min (seconds, 0 = off)"));
-            Assert.That(LabConfig.DeveloperFields[88].Label, Is.EqualTo("Gourd Bomb Interval Max (seconds, 0 = off)"));
-            foreach (int index in new[] { 87, 88 })
+            // The gimmick groups (#311) replaced the gourd's bomb and block timers and the sabotage interval.
+            Assert.That(LabConfig.RetiredDeveloperFields, Is.EqualTo(new[] { 87, 88, 152, 154, 167, 168 }));
+            Assert.That(LabConfig.RetiredDeveloperFields.Select(index => LabConfig.DeveloperFields[index].Label), Is.EqualTo(new[]
             {
-                Assert.That(LabConfig.DeveloperFields[index].Min, Is.EqualTo(0f));
-                Assert.That(LabConfig.DeveloperFields[index].Max, Is.EqualTo(600f));
-            }
-            int[] gourdIndices = null;
+                "Gourd Bomb Interval Min (seconds, 0 = off)", "Gourd Bomb Interval Max (seconds, 0 = off)",
+                "Swipe Block Interval (seconds, 0 = off)", "Swipe Block Bomb Gap (seconds)",
+                "Sabotage Interval Min (seconds)", "Sabotage Interval Max (seconds)"
+            }), "They keep their indices so the shared form and every later field keep their places.");
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
-                if (category.Title == "Gourd") gourdIndices = category.FieldIndices;
-            Assert.That(gourdIndices, Is.EqualTo(new[] { 140, 79, 87, 88, 152, 153, 154, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151, 200, 201 }));
-            Assert.That(config.GourdBombIntervalMin, Is.EqualTo(20f));
-            Assert.That(config.GourdBombIntervalMax, Is.EqualTo(30f));
+                Assert.That(category.FieldIndices.Intersect(LabConfig.RetiredDeveloperFields), Is.Empty, category.Title);
+            Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd").FieldIndices,
+                Is.EqualTo(new[] { 140, 79, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151, 200, 201 }));
 
             float[] values = config.CaptureDeveloperValues();
-            values[0] = 777f;
-            values[87] = 31f;
-            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.False);
-            Assert.That(error, Does.Contain("Gourd Bomb Interval"));
-            Assert.That(config.MonsterMaxHp, Is.EqualTo(1000), "A rejected form must not partially apply.");
-            Assert.That(config.GourdBombIntervalMin, Is.EqualTo(20f));
-
-            values[87] = 0f;
-            values[88] = 0f;
-            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.True, error);
-            Assert.That(config.GourdBombIntervalMax, Is.Zero, "A maximum of 0 turns the gourd's bombs off.");
+            values[87] = 5f; values[88] = 6f; values[152] = 0f; values[154] = 1f; values[167] = 2f; values[168] = 3f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "Carried unchanged, so every peer agrees on the form.");
+            Assert.That(new[] { config.CommonGimmickInterval, config.UniqueGimmickInterval }, Is.EqualTo(new[] { 10f, 20f }));
         }
 
         [Test]
@@ -889,7 +878,7 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields[104].WholeNumber, Is.True);
             for (int i = 105; i <= 109; i++) Assert.That(LabConfig.DeveloperFields[i].WholeNumber, Is.False);
             var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
-            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 140, 79, 87, 88, 152, 153, 154, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151, 200, 201 }));
+            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 140, 79, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151, 200, 201 }));
         }
 
         [TestCase(104, 0f, 2f)]
@@ -1010,7 +999,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOnAtItsPreservedIndexWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(205));
+            Assert.That(values.Length, Is.EqualTo(211));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
             Assert.That(values[110], Is.EqualTo(1f));
             LabDeveloperField field = LabConfig.DeveloperFields[110];
@@ -1105,7 +1094,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(205));
+            Assert.That(received.Length, Is.EqualTo(211));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1178,7 +1167,7 @@ namespace C6Lab.Tests
         {
             var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
             Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
-                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns", "Paint Drying", "Gourd Color Combo", "Combo Penalty Target", "Board Orb Trail", "Sabotage Mix", "야광귀 섬광", "섬광 대상", "야광귀 셈법", "2:2 땅따먹기", "High Resolution Paint", "섬광 흔들어 풀기" }));
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns", "Paint Drying", "Gourd Color Combo", "Combo Penalty Target", "Board Orb Trail", "Lab Unique Gimmicks", "야광귀 섬광", "섬광 대상", "야광귀 셈법", "2:2 땅따먹기", "High Resolution Paint", "섬광 흔들어 풀기", "Gimmick Gourd Bomb", "Gimmick Swipe Block", "Gimmick Fox Fire", "Gimmick Charm" }));
             Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
                 "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
             var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");
@@ -1291,47 +1280,35 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SwipeBlockFieldsJoinTheGourdGroupBesideItsBombIntervalsAndApply()
+        public void SwipeBlockSecondsSitWithTheCommonGimmicksAndApply()
         {
-            LabDeveloperField[] block = LabConfig.DeveloperFields.Skip(152).Take(3).ToArray();
-            Assert.That(block.Select(field => field.Label), Is.EqualTo(new[]
-            {
-                "Swipe Block Interval (seconds, 0 = off)", "Swipe Block Seconds", "Swipe Block Bomb Gap (seconds)"
-            }));
-            Assert.That(block.Select(field => field.Min), Is.EqualTo(new[] { 0f, 1f, 0f }));
-            Assert.That(block.Select(field => field.Max), Is.EqualTo(new[] { 600f, 60f, 15f }));
-            Assert.That(block.Any(field => field.WholeNumber || field.IsToggle || field.IsChoice), Is.False);
-            int[] gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd").FieldIndices;
-            Assert.That(gourd.SkipWhile(index => index != 87).Take(5), Is.EqualTo(new[] { 87, 88, 152, 153, 154 }),
-                "They sit right after the gourd's bomb intervals (#215).");
-            Assert.That(LabConfig.DeveloperCategories.Sum(category => category.FieldIndices.Count(index => index >= 152 && index <= 154)),
-                Is.EqualTo(3), "Each shows once.");
+            LabDeveloperField seconds = LabConfig.DeveloperFields[153];
+            Assert.That((seconds.Label, seconds.Min, seconds.Max), Is.EqualTo(("Swipe Block Seconds", 1f, 60f)));
+            Assert.That(seconds.WholeNumber || seconds.IsToggle || seconds.IsChoice, Is.False);
+            int[] gimmicks = LabConfig.DeveloperCategories.Single(category => category.Title == "Gimmicks").FieldIndices;
+            Assert.That(gimmicks.Take(6), Is.EqualTo(new[] { 205, 207, 169, 208, 170, 153 }),
+                "How long a block lasts sits right after the block's switch and chance (#311).");
+            Assert.That(LabConfig.DeveloperCategories.Sum(category => category.FieldIndices.Count(index => index == 153)),
+                Is.EqualTo(1), "It shows once.");
 
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(152).Take(3), Is.EqualTo(new[] { 40f, 10f, 4f }));
+                Assert.That(source.CaptureDeveloperValues()[153], Is.EqualTo(10f));
 
             float[] values = config.CaptureDeveloperValues();
-            float[] before = (float[])values.Clone();
-            values[152] = 0f;
             values[153] = 25f;
-            values[154] = 12.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
-            Assert.That(new[] { config.SwipeBlockInterval, config.SwipeBlockSeconds, config.SwipeBlockBombGap },
-                Is.EqualTo(new[] { 0f, 25f, 12.5f }));
+            Assert.That(config.SwipeBlockSeconds, Is.EqualTo(25f));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values));
-            Assert.That(config.CaptureDeveloperValues().Take(152), Is.EqualTo(before.Take(152)),
-                "Earlier settings keep their places and values.");
 
             values[153] = .5f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False);
             Assert.That(error, Does.Contain("Swipe Block Seconds"));
             Assert.That(config.SwipeBlockSeconds, Is.EqualTo(25f), "A rejected form changes nothing.");
 
-            JsonUtility.FromJsonOverwrite("{\"swipeBlockInterval\":-5,\"swipeBlockSeconds\":99,\"swipeBlockBombGap\":40}", config);
-            Assert.That(new[] { config.SwipeBlockInterval, config.SwipeBlockSeconds, config.SwipeBlockBombGap },
-                Is.EqualTo(new[] { 0f, 60f, 15f }), "Inspector values outside the ranges are clamped.");
+            JsonUtility.FromJsonOverwrite("{\"swipeBlockSeconds\":99}", config);
+            Assert.That(config.SwipeBlockSeconds, Is.EqualTo(60f), "Inspector values outside the range are clamped.");
         }
 
         [Test]
@@ -1454,43 +1431,57 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SabotageFieldsFormTheSabotageGroupStartOffAndApply()
+        public void GimmickGroupFieldsFormTheGimmicksGroupWithPercentChancesAndApply()
         {
-            LabDeveloperField[] sabotage = LabConfig.DeveloperFields.Skip(166).Take(12).ToArray();
-            Assert.That(sabotage.Select(field => field.Label), Is.EqualTo(new[]
+            Assert.That(LabConfig.DeveloperFields.Skip(205).Take(6).Select(field => field.Label), Is.EqualTo(new[]
             {
-                "Sabotage Mix (0 off, 1 on)", "Sabotage Interval Min (seconds)", "Sabotage Interval Max (seconds)",
-                "Sabotage Weight Gourd Bomb", "Sabotage Weight Swipe Block", "Sabotage Weight Fox Fire",
-                "Sabotage Weight Charm", "Fox Fire Count Min", "Fox Fire Count Max", "Fox Fire Safe Seconds",
+                "Common Gimmick Interval (seconds, 0 = none)", "Unique Gimmick Interval (seconds, 0 = none)",
+                "Gimmick Gourd Bomb (0 off, 1 on)", "Gimmick Swipe Block (0 off, 1 on)",
+                "Gimmick Fox Fire (0 off, 1 on)", "Gimmick Charm (0 off, 1 on)"
+            }), "The gimmick groups (#311) are appended at the end.");
+            Assert.That(LabConfig.DeveloperFields.Skip(207).Take(4).All(field => field.IsToggle), Is.True);
+            Assert.That(LabConfig.DeveloperFields.Skip(166).Take(12).Select(field => field.Label), Is.EqualTo(new[]
+            {
+                "Lab Unique Gimmicks (0 off, 1 on)", "Sabotage Interval Min (seconds)", "Sabotage Interval Max (seconds)",
+                "Gimmick Chance Gourd Bomb (%)", "Gimmick Chance Swipe Block (%)", "Gimmick Chance Fox Fire (%)",
+                "Gimmick Chance Charm (%)", "Fox Fire Count Min", "Fox Fire Count Max", "Fox Fire Safe Seconds",
                 "Charm Seconds", "Charm Rescue Taps per Neighbor (0 = none)"
             }));
-            Assert.That(sabotage[0].IsToggle, Is.True);
-            Assert.That(LabConfig.DeveloperFields[204].Label, Is.EqualTo("Charm Warning Seconds (0 = none)"),
-                "The charm warning (#305) is appended at the end and shown with the charm.");
-            Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Sabotage").FieldIndices,
-                Is.EqualTo(Enumerable.Range(166, 11).Concat(new[] { 204, 177 })));
+            Assert.That(LabConfig.DeveloperFields.Skip(169).Take(4)
+                .All(field => field.WholeNumber && field.Min == 0f && field.Max == 100f), Is.True, "Chances are whole percents.");
+            Assert.That(LabConfig.DeveloperFields[204].Label, Is.EqualTo("Charm Warning Seconds (0 = none)"));
+            Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Gimmicks").FieldIndices,
+                Is.EqualTo(new[] { 205, 207, 169, 208, 170, 153, 166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177 }),
+                "Common first (interval, then each gimmick's switch and chance), then the fox's own.");
+            Assert.That(LabConfig.DeveloperCategories.Any(category => category.Title == "Sabotage"), Is.False);
 
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
             {
-                Assert.That(source.CaptureDeveloperValues().Skip(166).Take(12),
-                    Is.EqualTo(new[] { 0f, 20f, 30f, 1f, 1f, 1f, 1f, 2f, 5f, 1f, 10f, 10f }),
-                    "An experiment, off by default (#251): one of four sabotages every 20-30 s, 2-5 fox orbs "
-                    + "safe for 1 s, a 10 s charm that each player beside taps 10 times to wake (#305).");
-                Assert.That(source.CaptureDeveloperValues()[204], Is.EqualTo(3f), "Warned three seconds ahead (#305).");
+                float[] defaults = source.CaptureDeveloperValues();
+                Assert.That(new[] { defaults[205], defaults[206] }, Is.EqualTo(new[] { 10f, 20f }),
+                    "A common gimmick every 10 s and the yokai's own every 20 s, each first after one interval (#311).");
+                Assert.That(defaults.Skip(207).Take(4), Is.EqualTo(new[] { 1f, 1f, 1f, 1f }), "Every gimmick on.");
+                Assert.That(defaults.Skip(169).Take(4), Is.EqualTo(new[] { 50f, 50f, 50f, 50f }), "Half and half in each group.");
+                Assert.That(defaults[166], Is.Zero, "The Lab scene borrows no unique gimmicks by default.");
+                Assert.That(defaults.Skip(173).Take(5), Is.EqualTo(new[] { 2f, 5f, 1f, 10f, 10f }),
+                    "2-5 fox orbs safe for 1 s, a 10 s charm that each player beside taps 10 times to wake (#305).");
+                Assert.That(defaults[204], Is.EqualTo(3f), "Warned three seconds ahead (#305).");
             }
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();
-            values[166] = 1f; values[167] = 5f; values[168] = 8f;
-            values[169] = 0f; values[170] = 2f; values[171] = 3f; values[172] = 4f;
+            values[166] = 1f;
+            values[169] = 25f; values[170] = 75f; values[171] = 100f; values[172] = 0f;
             values[173] = 1f; values[174] = 7f; values[175] = .5f; values[176] = 12f; values[177] = 0f; values[204] = 4.5f;
+            values[205] = 7f; values[206] = 0f; values[207] = 0f; values[210] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.LabUniqueGimmicksEnabled, Is.True);
+            Assert.That(new[] { config.CommonGimmickInterval, config.UniqueGimmickInterval }, Is.EqualTo(new[] { 7f, 0f }));
+            Assert.That(config.GimmickSwitches(), Is.EqualTo(new[] { false, true, true, false }));
+            Assert.That(config.GimmickChances(), Is.EqualTo(new[] { 25, 75, 100, 0 }));
             Assert.That(config.CharmWarningSeconds, Is.EqualTo(4.5f));
-            Assert.That(config.SabotageMixEnabled, Is.True);
-            Assert.That(new[] { config.SabotageIntervalMin, config.SabotageIntervalMax }, Is.EqualTo(new[] { 5f, 8f }));
-            Assert.That(config.SabotageWeights(), Is.EqualTo(new[] { 0, 2, 3, 4 }));
             Assert.That(new[] { config.FoxFireCountMin, config.FoxFireCountMax, config.CharmRescueTaps },
                 Is.EqualTo(new[] { 1, 7, 0 }));
             Assert.That(new[] { config.FoxFireSafeSeconds, config.CharmSeconds }, Is.EqualTo(new[] { .5f, 12f }));
@@ -1498,13 +1489,17 @@ namespace C6Lab.Tests
             Assert.That(config.CaptureDeveloperValues().Take(166), Is.EqualTo(before.Take(166)),
                 "Earlier settings keep their places and values.");
 
-            foreach (int minimum in new[] { 167, 173 })
+            foreach (int chance in new[] { 169, 171 })
             {
-                float[] backwards = config.CaptureDeveloperValues();
-                backwards[minimum] = backwards[minimum + 1] + 1f;
-                Assert.That(config.TryApplyDeveloperValues(backwards, out error), Is.False, minimum.ToString());
-                Assert.That(error, Does.Contain("cannot exceed"));
+                float[] uneven = config.CaptureDeveloperValues();
+                uneven[chance] = uneven[chance] == 0f ? 1f : uneven[chance] - 1f;
+                Assert.That(config.TryApplyDeveloperValues(uneven, out error), Is.False, chance.ToString());
+                Assert.That(error, Does.Contain("must add up to 100"));
             }
+            float[] backwards = config.CaptureDeveloperValues();
+            backwards[173] = backwards[174] + 1f;
+            Assert.That(config.TryApplyDeveloperValues(backwards, out error), Is.False);
+            Assert.That(error, Does.Contain("cannot exceed"));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "A rejected form changes nothing.");
         }
         [Test]
@@ -1512,7 +1507,7 @@ namespace C6Lab.Tests
         {
             float[] before = config.CaptureDeveloperValues();
             float[] values = (float[])before.Clone();
-            Assert.That(values, Has.Length.EqualTo(205));
+            Assert.That(values, Has.Length.EqualTo(211));
             values[202] = 0f; values[203] = 10f; values[204] = 4.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.YaguangFlashShakeRelease, Is.False);

@@ -443,9 +443,7 @@ namespace C6Lab.Tests
             values[5] = 1f;    // cheap generation
             values[9] = 100f;  // room for leftover raw orbs
             values[74] = LabModel.MaximumParticipants;
-            values[87] = 0f;   // no gourd bombs
-            values[88] = 0f;
-            values[152] = 0f;  // no swipe blocks: the yaguang mode (#271) would hold the combo while one is on
+            values[205] = 0f;  // no common gimmicks (#311): the yaguang mode (#271) would hold the combo while one is on
             values[39] = 50; values[40] = 50; values[41] = 0; values[42] = 0; values[43] = 0; values[44] = 0;
             values[155] = enabled ? 1f : 0f;
             values[156] = 20f;

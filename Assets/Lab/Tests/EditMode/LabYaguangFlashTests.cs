@@ -49,8 +49,13 @@ namespace C6Lab.Tests
             foreach (int index in new[] { 159, 162 })
                 Assert.That((LabConfig.DeveloperFields[index].Min + LabConfig.DeveloperFields[index].Max) * .5f, Is.EqualTo(15f),
                     LabConfig.DeveloperFields[index].Label + ": the 15 s penalty/reward slider starts in the middle.");
-            Assert.That(LabConfig.DeveloperCategories.Where(category => category.Title != "야광귀")
-                .All(category => category.SwitchFields == null && category.DividerAt == null), Is.True);
+            Assert.That(LabConfig.DeveloperCategories.All(category => category.Title == "야광귀" || category.SwitchFields == null),
+                Is.True, "Only the yaguang group has a title switch.");
+            Assert.That(LabConfig.DeveloperCategories.Where(category => category.DividerAt != null).Select(category => category.Title),
+                Is.EquivalentTo(new[] { "Gimmicks", "야광귀" }), "Dividers split the yaguang group and the gimmick groups (#311) only.");
+            LabDeveloperCategory gimmicks = LabConfig.DeveloperCategories.Single(category => category.Title == "Gimmicks");
+            Assert.That(gimmicks.DividerAt, Is.EqualTo(new[] { 0, 6 }));
+            Assert.That(gimmicks.DividerLabels, Is.EqualTo(new[] { "── 공용 기믹 ──", "── 고유 기믹 (구미호) ──" }));
 
             LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
             created.Add(config);
@@ -364,7 +369,7 @@ namespace C6Lab.Tests
             model.Begin("flash-queue", Three, 0d, Config(flash: true, first: 15f, bombEvery: 10f));
             Assert.That(GourdBombs(model.Snapshot(10d)), Is.EqualTo(1));
             Assert.That(model.Snapshot(13.6d).flashAt, Is.EqualTo(-1d), "Held by the first bomb.");
-            Assert.That(GourdBombs(model.Snapshot(20d)), Is.EqualTo(1), "The second bomb waits while the flash waits for its turn.");
+            Assert.That(GourdBombs(model.Snapshot(20d)), Is.EqualTo(1), "The second bomb is skipped while the flash waits for its turn.");
             model.Snapshot(25d);
             LabSnapshot resting = model.Snapshot(25.5d);
             Assert.That(GourdBombs(resting), Is.Zero);
@@ -375,7 +380,8 @@ namespace C6Lab.Tests
             Assert.That(model.Snapshot(29.5d).flashCount, Is.EqualTo(1u));
             Assert.That(GourdBombs(model.Snapshot(33d)), Is.Zero, "Nothing new during the glare and recovery (over at 34 s)...");
             Assert.That(GourdBombs(model.Snapshot(36.9d)), Is.Zero, "...nor during the 3 s rest after it.");
-            Assert.That(GourdBombs(model.Snapshot(37d)), Is.EqualTo(1), "Then the waiting bomb drops.");
+            Assert.That(GourdBombs(model.Snapshot(39.9d)), Is.Zero, "The bombs due at 20 s and 30 s were skipped, not kept (#311).");
+            Assert.That(GourdBombs(model.Snapshot(40d)), Is.EqualTo(1), "Then the next one drops on its own beat.");
         }
 
         [TestCase("round-a")]
@@ -434,7 +440,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ABombDueDuringAFlashWaitsUntilTheFlashIsOver()
+        public void ABombDueDuringAFlashIsSkippedAndTheNextFallsOnItsOwnBeat()
         {
             var model = new LabModel();
             // Flash: warning 22.5 s, flash 24 s, glare and recovery over at 28.5 s. The gourd's bomb is due at 25 s.
@@ -444,11 +450,12 @@ namespace C6Lab.Tests
             Assert.That(GourdBombs(model.Snapshot(25d)), Is.Zero, "No bomb while the flash is open (#271).");
             Assert.That(GourdBombs(model.Snapshot(28.4d)), Is.Zero);
             Assert.That(GourdBombs(model.Snapshot(28.6d)), Is.Zero, "The screens rest 3 s after the flash (#271).");
-            Assert.That(GourdBombs(model.Snapshot(31.4d)), Is.Zero);
-            LabSnapshot after = model.Snapshot(31.5d);
-            Assert.That(GourdBombs(after), Is.EqualTo(1), "It drops as soon as that rest is over.");
+            Assert.That(GourdBombs(model.Snapshot(31.5d)), Is.Zero, "A gimmick nobody can take is skipped, not kept (#311).");
+            Assert.That(GourdBombs(model.Snapshot(49.9d)), Is.Zero);
+            LabSnapshot after = model.Snapshot(50d);
+            Assert.That(GourdBombs(after), Is.EqualTo(1), "The next one drops on its own beat.");
             Assert.That(after.orbs.Single(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd).createdAt,
-                Is.EqualTo(31.5d));
+                Is.EqualTo(50d));
         }
 
         [Test]
@@ -493,20 +500,20 @@ namespace C6Lab.Tests
             var model = new LabModel();
             // Bombs every 5 s with a 15 s fuse: the first is still out when the second comes (#271, one event per screen).
             model.Begin("bomb-per-screen", Three, 0d, Config(flash: true, first: 61f, bombEvery: 5f));
-            Assert.That(GourdBombs(model.Snapshot(5d)), Is.EqualTo(1));
+            ulong firstScreen = model.Snapshot(5d).orbs
+                .Single(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd).owner;
             LabSnapshot two = model.Snapshot(10d);
             LabOrbState[] bombs = two.orbs.Where(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd).ToArray();
             Assert.That(bombs.Length, Is.EqualTo(2), "Another screen is free, so the second bomb still drops.");
             Assert.That(bombs[0].owner, Is.Not.EqualTo(bombs[1].owner), "Never two bombs on one screen.");
             Assert.That(GourdBombs(model.Snapshot(15d)), Is.EqualTo(3));
-            // At 20 s every screen still has a bomb when the fourth is due, so it waits; the first then blasts.
-            Assert.That(GourdBombs(model.Snapshot(20d)), Is.EqualTo(2), "The fourth waited; the first one is gone.");
-            Assert.That(GourdBombs(model.Snapshot(20.1d)), Is.EqualTo(2), "That screen rests 3 s first (#271).");
-            Assert.That(GourdBombs(model.Snapshot(22.9d)), Is.EqualTo(2));
-            LabSnapshot freed = model.Snapshot(23d);
-            Assert.That(GourdBombs(freed), Is.EqualTo(3), "It drops as soon as a screen is free again.");
-            Assert.That(freed.orbs.Where(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd)
-                .Max(orb => orb.createdAt), Is.EqualTo(23d));
+            // At 20 s every screen still has a bomb when the fourth is due, so it is skipped (#311); the first then blasts.
+            Assert.That(GourdBombs(model.Snapshot(20d)), Is.EqualTo(2), "The fourth was skipped; the first one is gone.");
+            Assert.That(GourdBombs(model.Snapshot(23d)), Is.EqualTo(2), "A skipped bomb does not wait for a free screen (#311).");
+            LabOrbState fifth = model.Snapshot(25d).orbs.Where(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd)
+                .OrderBy(orb => orb.createdAt).Last();
+            Assert.That((fifth.createdAt, fifth.owner), Is.EqualTo((25d, firstScreen)),
+                "The fifth drops on its own beat on the screen that has rested since its bomb blasted.");
         }
 
         [Test]
@@ -683,9 +690,8 @@ namespace C6Lab.Tests
             var config = ScriptableObject.CreateInstance<LabConfig>();
             created.Add(config);
             float[] values = config.CaptureDeveloperValues();
-            values[87] = bombEvery; // 0: no gourd bombs
-            values[88] = bombEvery;
-            values[152] = 0f; // no swipe blocks unless a test turns them on
+            values[205] = bombEvery; // the common group (#311) every bombEvery s; 0: no gourd bombs
+            values[208] = 0f; // and only bombs, no swipe blocks
             values[155] = combo ? 1f : 0f;
             values[156] = 30f; // combo slots at 30 s, warned from 27 s
             values[157] = 60f;

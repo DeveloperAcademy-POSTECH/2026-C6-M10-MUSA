@@ -21,10 +21,9 @@ namespace C6Lab.Tests
             values[5] = 1f;                       // 생성 비용을 낮춰 한 사람이 여러 번 만든다
             values[104] = 0f; values[105] = 5f;   // 작은 박, 한 번에 5%
             values[134] = (float)LabPaintPattern.Splatter;
-            values[87] = values[88] = 5f;         // 박 폭탄, 막기, 방해공작, 콤보, 섬광을 켜 두어도 팀전에서는 꺼져야 한다
-            values[152] = 12f; values[153] = 2f; values[154] = 0f;
+            values[205] = 5f; values[153] = 2f;  // 공용·고유 기믹(#311), 콤보, 섬광을 켜 두어도 팀전에서는 꺼져야 한다
             values[155] = 1f; values[156] = 1f;
-            values[166] = 1f; values[167] = values[168] = 3f;
+            values[166] = 1f; values[206] = 3f;
             values[184] = 1f; values[186] = 1f;
             values[196] = 1f; values[197] = 30f; values[198] = 0f; values[199] = 8f;
             Apply(values);
