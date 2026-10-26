@@ -16,7 +16,7 @@ namespace C6Lab
     /// - #301: 칸을 맞힐 때마다 패널 아래에 "N COMBO!"(주황 숫자 + 흰 테두리 + 분홍 COMBO!)가 튀어나오고, 4칸을
     ///   다 맞히면 패널 자리에 "4 COMBO!!"가 가장 크게 나온 뒤 CLEAR!가 이어진다. 틀린 색 실패는 누가 틀렸는지
     ///   ("P2 WRONG COLOR", 내가 틀렸으면 "YOU WRONG COLOR")를 모든 기기에 같이 보여준다. SMALL 남은 시간은 배지
-    ///   옆의 세로 막대가 위에서 아래로 줄어든다.
+    ///   바로 밑의 세로 사각형 안 빨간 칸이 위에서 아래로 줄어든다.
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
     /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
@@ -66,9 +66,11 @@ namespace C6Lab
         [SerializeField, Range(.2f, 3f)] private float comboHitSeconds = .8f;
         [Tooltip("다 맞혔을 때 4 COMBO!!가 떠 있는 시간 (초). 그 뒤 CLEAR!가 나온다.")]
         [SerializeField, Range(.2f, 3f)] private float comboClearSeconds = 1f;
-        [Header("SMALL 세로 막대 (#301)")]
-        [Tooltip("SMALL 남은 시간 세로 막대의 폭과 높이 (배지 높이의 배수)")]
-        [SerializeField] private Vector2 penaltyBarSize = new Vector2(.42f, 1.9f);
+        [Header("SMALL 세로 사각형 (#301)")]
+        [Tooltip("SMALL 배지 밑에 세운 남은 시간 사각형의 폭과 높이 (배지 높이의 배수)")]
+        [SerializeField] private Vector2 penaltyBarSize = new Vector2(1.1f, 2.4f);
+        [Tooltip("SMALL 배지와 사각형 사이 간격 (배지 높이의 배수)")]
+        [SerializeField, Range(0f, 2f)] private float penaltyBarGap = .2f;
 
         private LabNetwork network;
         private Canvas canvas;
@@ -151,6 +153,9 @@ namespace C6Lab
         public bool ComboPopFinal => ComboPopCount > 0 && comboPopFinal;
         /// <summary>SMALL 세로 막대의 남은 비율 (0~1, #301)</summary>
         public float PenaltyBarFill => effectGauge != null ? effectGauge.anchorMax.y : 0f;
+        /// <summary>SMALL 남은 시간 세로 사각형 (테두리 포함, #301)</summary>
+        public RectTransform PenaltyBar => effectGauge != null && effectGauge.parent != null
+            ? effectGauge.parent.parent as RectTransform : null;
 
         /// <summary>
         /// 콤보 결과 문구 (#301). 성공은 CLEAR!, 시간 초과는 TIME UP. 틀린 색은 틀린 사람을 앞에 붙인다:
@@ -332,7 +337,7 @@ namespace C6Lab
             double left = until - serverNow;
             double total = until - snapshot.comboResultAt;
             float fraction = total > 0d ? Mathf.Clamp01((float)(left / total)) : 1f;
-            effectGauge.anchorMax = new Vector2(1f, fraction); // 세로 막대: 위에서 아래로 줄어든다 (#301)
+            effectGauge.anchorMax = new Vector2(1f, fraction); // 세로 사각형: 위에서 아래로 줄어든다 (#301)
             bool reward = kind > 0;
             effectBack.color = reward ? RewardBadgeColor : PenaltyBadgeColor;
             effectIcon.localScale = Vector3.one * (reward ? 1f : .55f);
@@ -746,26 +751,32 @@ namespace C6Lab
             effectBack.type = Image.Type.Sliced;
             effectBack.raycastTarget = false;
 
-            // 세로 막대 (#301): 배지 오른쪽 바깥에 세운 진한 알약 홈. 그 안의 흰 막대가 위에서 아래로 줄어든다.
+            // 세로 사각형 (#301): SMALL 배지 바로 밑에 세운 먹색 테두리 사각형. 안의 빨간 칸이 남은 시간만큼
+            // 아래에서부터 차 있고, 시간이 지나면 위에서 아래로 줄어든다.
             effectBadge.sizeDelta = new Vector2(slotSize * 2.7f, badgeHeight);
             RectTransform gaugeArea = NewRect("Gauge Track", effectBadge);
-            gaugeArea.anchorMin = gaugeArea.anchorMax = new Vector2(1f, .5f);
-            gaugeArea.pivot = new Vector2(0f, .5f);
+            gaugeArea.anchorMin = gaugeArea.anchorMax = new Vector2(.5f, 0f);
+            gaugeArea.pivot = new Vector2(.5f, 1f);
             gaugeArea.sizeDelta = new Vector2(badgeHeight * penaltyBarSize.x, badgeHeight * penaltyBarSize.y);
-            gaugeArea.anchoredPosition = new Vector2(badgeHeight * .18f, 0f);
+            gaugeArea.anchoredPosition = new Vector2(0f, -badgeHeight * penaltyBarGap);
             Image track = gaugeArea.gameObject.AddComponent<Image>();
-            track.sprite = PillSprite();
-            track.type = Image.Type.Sliced;
-            track.color = new Color(.25f, .06f, .05f, .55f);
+            track.color = InkColor;
             track.raycastTarget = false;
-            effectGauge = NewRect("Gauge", gaugeArea);
+            float border = Mathf.Max(2f, 3f * u);
+            RectTransform gaugeInner = NewRect("Gauge Inside", gaugeArea);
+            gaugeInner.anchorMin = Vector2.zero;
+            gaugeInner.anchorMax = Vector2.one;
+            gaugeInner.offsetMin = new Vector2(border, border);
+            gaugeInner.offsetMax = new Vector2(-border, -border);
+            Image inside = gaugeInner.gameObject.AddComponent<Image>();
+            inside.color = PanelColor;
+            inside.raycastTarget = false;
+            effectGauge = NewRect("Gauge", gaugeInner);
             effectGauge.anchorMin = Vector2.zero;
             effectGauge.anchorMax = Vector2.one;
             effectGauge.offsetMin = effectGauge.offsetMax = Vector2.zero;
             Image gauge = effectGauge.gameObject.AddComponent<Image>();
-            gauge.sprite = PillSprite();
-            gauge.type = Image.Type.Sliced;
-            gauge.color = Color.white;
+            gauge.color = PenaltyBadgeColor;
             gauge.raycastTarget = false;
 
             effectIcon = NewRect("Ball Icon", effectBadge);

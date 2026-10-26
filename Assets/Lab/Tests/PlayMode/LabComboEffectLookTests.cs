@@ -216,6 +216,12 @@ namespace C6Lab.Tests
                 yield return null;
                 Assert.That(hud.EffectVisible, Is.True);
                 Assert.That(hud.PenaltyBarFill, Is.EqualTo(.9f).Within(.05f), "9 of 10 s left (started at 49 s).");
+                RectTransform bar = hud.PenaltyBar;
+                Assert.That(bar, Is.Not.Null);
+                Assert.That(bar.anchorMin, Is.EqualTo(new Vector2(.5f, 0f)), "Hangs from the bottom middle of the SMALL tag.");
+                Assert.That(bar.pivot.y, Is.EqualTo(1f), "Its top sits under the tag.");
+                Assert.That(bar.anchoredPosition.y, Is.LessThanOrEqualTo(0f));
+                Assert.That(bar.sizeDelta.y, Is.GreaterThan(bar.sizeDelta.x), "A standing rectangle.");
                 latest.SetValue(network, Snapshot(network, 54d, penaltyUntil: 59d));
                 yield return null;
                 Assert.That(hud.PenaltyBarFill, Is.EqualTo(.5f).Within(.05f), "Half the bar left.");
