@@ -297,7 +297,7 @@ namespace C6Lab
             new LabDeveloperField("Fox Fire Count Max", 1f, 10f, true),
             new LabDeveloperField("Fox Fire Safe Seconds", 0f, 3f),
             new LabDeveloperField("Charm Seconds", 1f, 30f),
-            new LabDeveloperField("Charm Rescue Taps (0 = none)", 0f, 10f, true),
+            new LabDeveloperField("Charm Rescue Taps per Neighbor (0 = none)", 0f, 10f, true),
             new LabDeveloperField("Jigwi Fire Target Count", 1f, 5f, true),
             new LabDeveloperField("Jigwi Fire Seconds", 1f, 120f),
             new LabDeveloperField("Jigwi Overheat Seconds", .1f, 60f),
@@ -327,7 +327,9 @@ namespace C6Lab
             new LabDeveloperField("피버 시간 (초)", 1f, 30f),
             // Presentation-only shared options; never change the Host paint-cell rules (#299).
             LabDeveloperField.Toggle("High Resolution Paint (0 off, 1 on)"),
-            LabDeveloperField.Choice("Paint Texture Quality", "1024 × 512", "2048 × 1024")
+            LabDeveloperField.Choice("Paint Texture Quality", "1024 × 512", "2048 × 1024"),
+            // 매혹 예고 (#305): 구미호 묶음(166~177)의 맨 뒤에 붙인다.
+            new LabDeveloperField("Charm Warning Seconds (0 = none)", 0f, 10f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -360,7 +362,7 @@ namespace C6Lab
                 134, 132, 133, 148, 149, 150, 151, 200, 201),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
-            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
+            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 202, 177),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
             new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
@@ -590,8 +592,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 3f)] private float foxFireSafeSeconds = 1f;
         [Tooltip("매혹: 공격(위로 던지기)을 못 하는 시간 (초).")]
         [SerializeField, Range(1f, 30f)] private float charmSeconds = 10f;
-        [Tooltip("매혹: 양옆 사람이 합쳐 이만큼 하트 말풍선을 누르면 바로 풀린다. 0이면 시간으로만 풀린다.")]
-        [SerializeField, Range(0, 10)] private int charmRescueTaps = 3;
+        [Tooltip("매혹: 양옆 사람이 각자 이만큼 하트 말풍선을 눌러야 풀린다 (#305, 두 사람 모두. 둘이 하는 판은 한 사람). 0이면 시간으로만 풀린다.")]
+        [SerializeField, Range(0, 10)] private int charmRescueTaps = 10;
+        [Tooltip("매혹 예고 (#305): 매혹이 걸리기 이 시간 (초) 전부터 모두에게 \"구미호가 P2에게 매혹을 걸려고 한다!\"를 보여 준다. 0이면 예고 없이 바로 걸린다.")]
+        [SerializeField, Range(0f, 10f)] private float charmWarningSeconds = 3f;
 
         [Header("Jigwi fire experiment (#272)")]
         [SerializeField, Range(1, 5)] private int jigwiFireTargetCount = 1;
@@ -954,6 +958,7 @@ namespace C6Lab
         public float FoxFireSafeSeconds => Mathf.Clamp(Finite(foxFireSafeSeconds, 1f), 0f, 3f);
         public float CharmSeconds => Mathf.Clamp(Finite(charmSeconds, 10f), 1f, 30f);
         public int CharmRescueTaps => Mathf.Clamp(charmRescueTaps, 0, 10);
+        public float CharmWarningSeconds => Mathf.Clamp(Finite(charmWarningSeconds, 3f), 0f, 10f);
         public int JigwiFireTargetCount => Mathf.Clamp(jigwiFireTargetCount, 1, 5);
         public float JigwiFireSeconds => Mathf.Clamp(Finite(jigwiFireSeconds, 15f), 1f, 120f);
         public float JigwiOverheatSeconds => Mathf.Clamp(Finite(jigwiOverheatSeconds, 4f), .1f, 60f);
@@ -1117,7 +1122,8 @@ namespace C6Lab
                 ComboYaguangCountEnabled ? 1f : 0f,
                 JigwiAutoIntervalMin, JigwiAutoIntervalMax, JigwiAutoFireWeight, JigwiAutoGenerationBurnWeight,
                 TeamTerritoryEnabled ? 1f : 0f, TeamBattleSeconds, TeamFeverHits, TeamFeverSeconds,
-                HighResolutionPaintEnabled ? 1f : 0f, HighResolutionPaintQuality
+                HighResolutionPaintEnabled ? 1f : 0f, HighResolutionPaintQuality,
+                CharmWarningSeconds
             };
         }
 
@@ -1360,6 +1366,7 @@ namespace C6Lab
             teamFeverSeconds = values[199];
             highResolutionPaintEnabled = values[200] >= .5f;
             highResolutionPaintQuality = (int)values[201];
+            charmWarningSeconds = values[202];
             error = string.Empty;
             return true;
         }

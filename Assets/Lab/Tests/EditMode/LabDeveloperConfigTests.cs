@@ -41,7 +41,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(202));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(203));
             Assert.That(values[89], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[90], values[91], values[92], values[93] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -780,7 +780,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(111));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(202));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(203));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             Assert.That(LabConfig.DefaultPaintVictoryPercent, Is.EqualTo(100));
@@ -1010,7 +1010,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOnAtItsPreservedIndexWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(202));
+            Assert.That(values.Length, Is.EqualTo(203));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
             Assert.That(values[110], Is.EqualTo(1f));
             LabDeveloperField field = LabConfig.DeveloperFields[110];
@@ -1105,7 +1105,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(202));
+            Assert.That(received.Length, Is.EqualTo(203));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1448,7 +1448,7 @@ namespace C6Lab.Tests
         public void TheCharmBubblesAndSurprisedBubbleImportAsSprites()
         {
             foreach (string path in new[] { LabCharmBubbles.LeftBubblePath, LabCharmBubbles.RightBubblePath,
-                LabCharmBubbles.WokenPath })
+                LabCharmBubbles.WokenPath, LabCharmBubbles.FacePath, LabCharmBubbles.CheckPath })
                 Assert.That(Resources.Load<Sprite>(path), Is.Not.Null,
                     "Assets/Lab/Resources/" + path + ".png imports as a Sprite through LabSabotageArtImporter (#251).");
         }
@@ -1462,26 +1462,32 @@ namespace C6Lab.Tests
                 "Sabotage Mix (0 off, 1 on)", "Sabotage Interval Min (seconds)", "Sabotage Interval Max (seconds)",
                 "Sabotage Weight Gourd Bomb", "Sabotage Weight Swipe Block", "Sabotage Weight Fox Fire",
                 "Sabotage Weight Charm", "Fox Fire Count Min", "Fox Fire Count Max", "Fox Fire Safe Seconds",
-                "Charm Seconds", "Charm Rescue Taps (0 = none)"
+                "Charm Seconds", "Charm Rescue Taps per Neighbor (0 = none)"
             }));
             Assert.That(sabotage[0].IsToggle, Is.True);
+            Assert.That(LabConfig.DeveloperFields[202].Label, Is.EqualTo("Charm Warning Seconds (0 = none)"),
+                "The charm warning (#305) is appended at the end and shown with the charm.");
             Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Sabotage").FieldIndices,
-                Is.EqualTo(Enumerable.Range(166, 12)));
+                Is.EqualTo(Enumerable.Range(166, 11).Concat(new[] { 202, 177 })));
 
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
+            {
                 Assert.That(source.CaptureDeveloperValues().Skip(166).Take(12),
-                    Is.EqualTo(new[] { 0f, 20f, 30f, 1f, 1f, 1f, 1f, 2f, 5f, 1f, 10f, 3f }),
+                    Is.EqualTo(new[] { 0f, 20f, 30f, 1f, 1f, 1f, 1f, 2f, 5f, 1f, 10f, 10f }),
                     "An experiment, off by default (#251): one of four sabotages every 20-30 s, 2-5 fox orbs "
-                    + "safe for 1 s, a 10 s charm that 3 taps wake.");
+                    + "safe for 1 s, a 10 s charm that each player beside taps 10 times to wake (#305).");
+                Assert.That(source.CaptureDeveloperValues()[202], Is.EqualTo(3f), "Warned three seconds ahead (#305).");
+            }
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();
             values[166] = 1f; values[167] = 5f; values[168] = 8f;
             values[169] = 0f; values[170] = 2f; values[171] = 3f; values[172] = 4f;
-            values[173] = 1f; values[174] = 7f; values[175] = .5f; values[176] = 12f; values[177] = 0f;
+            values[173] = 1f; values[174] = 7f; values[175] = .5f; values[176] = 12f; values[177] = 0f; values[202] = 4.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.CharmWarningSeconds, Is.EqualTo(4.5f));
             Assert.That(config.SabotageMixEnabled, Is.True);
             Assert.That(new[] { config.SabotageIntervalMin, config.SabotageIntervalMax }, Is.EqualTo(new[] { 5f, 8f }));
             Assert.That(config.SabotageWeights(), Is.EqualTo(new[] { 0, 2, 3, 4 }));

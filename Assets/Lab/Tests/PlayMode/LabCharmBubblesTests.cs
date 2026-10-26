@@ -42,17 +42,29 @@ namespace C6Lab.Tests
             return badge;
         }
 
-        /// <summary>Players 10, 20, 30... in seats 0, 1, 2...; a charm on one of them until the given time, or none.</summary>
-        private static LabSnapshot Charm(ulong charmed, double until, int players = 3, int taps = 0)
+        /// <summary>
+        /// Players 10, 20, 30... in seats 0, 1, 2...; a charm on one of them until the given time, or none. taps is how
+        /// often player 10 has tapped as one of the two beside (#305), other how often the other player beside has.
+        /// </summary>
+        private static LabSnapshot Charm(ulong charmed, double until, int players = 3, int taps = 0, int other = 0)
         {
             var seats = new LabPlayerState[players];
             for (int i = 0; i < players; i++) seats[i] = new LabPlayerState { id = (ulong)(10 * (i + 1)), seat = i };
-            return new LabSnapshot
+            var snapshot = new LabSnapshot
             {
                 sessionId = "charm-bubbles", round = 1, phase = LabPhase.Playing, serverTime = 1d, players = seats,
                 charmedPlayer = until > 0d ? charmed : 0, charmStartedAt = until > 0d ? 0d : -1d, charmUntil = until,
-                charmTaps = until > 0d ? taps : 0
+                charmWarnedAt = until > 0d ? 0d : -1d
             };
+            int seat = (int)(charmed / 10) - 1;
+            if (until > 0d && seat >= 0 && seat < players)
+            {
+                ulong before = (ulong)(10 * ((seat + players - 1) % players + 1)), after = (ulong)(10 * ((seat + 1) % players + 1));
+                snapshot.charmHelpers = before == after ? new[] { before } : new[] { before, after };
+                snapshot.charmHelperTaps = System.Array.ConvertAll(snapshot.charmHelpers, id => id == 10 ? taps : other);
+                snapshot.charmTaps = taps + other;
+            }
+            return snapshot;
         }
 
         [UnityTest]
@@ -138,8 +150,10 @@ namespace C6Lab.Tests
             bubbles.Present(Charm(20, 10d), 10, 1.01d, 3);
             Assert.That(bubbles.RightWakeFill, Is.EqualTo(1f / 3f).Within(1e-5f), "This screen's own tap shows at once.");
             bubbles.Present(Charm(20, 10d, taps: 2), 10, 1.1d, 3);
+            Assert.That(bubbles.RightWakeFill, Is.EqualTo(2f / 3f).Within(1e-5f), "The Host's count of this screen's taps.");
+            bubbles.Present(Charm(20, 10d, taps: 2, other: 3), 10, 1.1d, 3);
             Assert.That(bubbles.RightWakeFill, Is.EqualTo(2f / 3f).Within(1e-5f),
-                "The Host's count adds the other neighbour's tap.");
+                "Each player beside fills their own gauge; the other one's taps are not added (#305).");
             RectTransform fill = bubbles.RightBubble.Find("Charm Wake Fill") as RectTransform;
             Assert.That(fill, Is.Not.Null);
             Assert.That(fill.GetComponent<Image>().color.b, Is.LessThan(fill.GetComponent<Image>().color.g), "A light yellow.");
@@ -155,6 +169,66 @@ namespace C6Lab.Tests
             }
             Assert.That(fill.gameObject.activeSelf, Is.True);
             Assert.That(lastTop, Is.GreaterThan(.5f), "Two thirds of the way up the cloud.");
+        }
+
+        [UnityTest]
+        public IEnumerator TheFaceStaysAboveTheGaugeAndACheckWaitsForTheOtherSide()
+        {
+            bubbles.Present(Charm(20, 10d), 10, 1d, 3);
+            Transform fill = bubbles.RightBubble.Find("Charm Wake Fill"), face = bubbles.RightBubble.Find("Charm Face");
+            Assert.That(face, Is.Not.Null, "The heart-eyed face is its own picture (#305)...");
+            Assert.That(face.GetSiblingIndex(), Is.GreaterThan(fill.GetSiblingIndex()), "...drawn over the yellow gauge.");
+            Assert.That(face.GetComponent<Image>().sprite, Is.SameAs(Resources.Load<Sprite>(LabCharmBubbles.FacePath)));
+            Assert.That(bubbles.RightCheckShowing, Is.False);
+
+            for (int i = 0; i < 3; i++) bubbles.RightBubble.GetComponent<Button>().onClick.Invoke();
+            yield return null;
+            bubbles.Present(Charm(20, 10d, taps: 3), 10, 1.2d, 3);
+            Assert.That(bubbles.RightWakeFill, Is.EqualTo(1f));
+            Assert.That(bubbles.RightCheckShowing, Is.True, "Done: a check over the bubble while the other side taps.");
+            Assert.That(bubbles.RightShowing, Is.True, "Still charmed until both are done.");
+            Assert.That(bubbles.RightBubble.GetComponent<Image>().raycastTarget, Is.False, "More taps would not count.");
+            // The check pops in from small; measure where it settles.
+            float settle = Time.time + .4f;
+            while (Time.time < settle)
+            {
+                yield return null;
+                bubbles.Present(Charm(20, 10d, taps: 3), 10, 1.3d, 3);
+            }
+            var check = new Vector3[4];
+            var cloud = new Vector3[4];
+            GameObject.Find("Charm Check Right").GetComponent<RectTransform>().GetWorldCorners(check);
+            bubbles.RightBubble.GetWorldCorners(cloud);
+            Assert.That(check[1].y, Is.GreaterThan(cloud[1].y), "It sits on top of the bubble...");
+            Assert.That(check[0].y, Is.LessThan(cloud[1].y), "...overlapping its top a little.");
+
+            // The other side finished too: both of them see the surprised bubble at once.
+            bubbles.ShowWoken(20);
+            bubbles.Present(Charm(0, -1d), 10, 1.3d, 3);
+            Assert.That(bubbles.RightWokenShowing, Is.True);
+            Assert.That(bubbles.RightCheckShowing, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator TheCharmedPlayerSeesEachSideFillAndCheckButNoSurprise()
+        {
+            // Player 10 is charmed: 30 beside on the left, 20 on the right.
+            var snapshot = Charm(10, 10d);
+            snapshot.charmHelperTaps = new[] { 1, 3 };
+            bubbles.Present(snapshot, 10, 1d, 3);
+            float until = Time.time + 1f;
+            while (Time.time < until && bubbles.LeftWakeFill < 1f / 3f) { yield return null; bubbles.Present(snapshot, 10, 1.1d, 3); }
+            Assert.That(bubbles.LeftWakeFill, Is.EqualTo(1f / 3f).Within(1e-5f), "Player 30's own share...");
+            Assert.That(bubbles.RightWakeFill, Is.EqualTo(1f), "...and player 20's, each by their badge.");
+            Assert.That(bubbles.RightCheckShowing, Is.True, "Player 20 is done.");
+            Assert.That(bubbles.LeftCheckShowing, Is.False);
+            bubbles.RightBubble.GetComponent<Button>().onClick.Invoke();
+            Assert.That(bubbles.TapsSent, Is.Zero, "The charmed player cannot tap themselves awake.");
+
+            bubbles.ShowWoken(10);
+            bubbles.Present(Charm(0, -1d), 10, 2d, 3);
+            Assert.That(bubbles.LeftWokenShowing || bubbles.RightWokenShowing, Is.False, "Their own screen says 정신 차림! instead.");
+            Assert.That(bubbles.LeftFading && bubbles.RightFading, Is.True, "The progress bubbles just fade.");
         }
 
         [Test]
@@ -183,11 +257,16 @@ namespace C6Lab.Tests
             bubbles.Present(Charm(30, 10d, 5), 10, 1d, 3);
             Assert.That(bubbles.LeftShowing || bubbles.RightShowing, Is.False, "Two seats away: not beside.");
             bubbles.Present(Charm(10, 10d, 5), 10, 1d, 3);
-            Assert.That(bubbles.LeftShowing || bubbles.RightShowing, Is.False, "The charmed player sees no bubble of their own.");
+            Assert.That(bubbles.LeftShowing && bubbles.RightShowing, Is.True,
+                "The charmed player sees how far each player beside has come (#305)...");
+            Assert.That(bubbles.OwnView(false) && bubbles.OwnView(true), Is.True);
+            Assert.That(bubbles.LeftBubble.GetComponent<Image>().raycastTarget, Is.False, "...but cannot tap them.");
+            bubbles.Present(Charm(0, -1d, 5), 10, 1d, 3);
 
             bubbles.Present(Charm(20, 10d, 2), 10, 1d, 3);
             Assert.That(bubbles.LeftShowing && bubbles.RightShowing, Is.True,
                 "Two players: the other is beside on both sides, so both badges get a bubble.");
+            bubbles.Present(Charm(0, -1d, 2), 10, 1d, 3);
 
             bubbles.Present(Charm(20, 10d), 10, 1d, 0);
             Assert.That(bubbles.RightShowing, Is.True);

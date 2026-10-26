@@ -624,7 +624,7 @@ namespace Hapio.Tests
             Set(foxSettings, "Fox Fire Count Max", 2f);
             Set(foxSettings, "Fox Fire Safe Seconds", .25f);
             Set(foxSettings, "Charm Seconds", 9f);
-            Set(foxSettings, "Charm Rescue Taps (0 = none)", 5f);
+            Set(foxSettings, "Charm Rescue Taps per Neighbor (0 = none)", 5f);
             Assert.That(session.ApplyDeveloperSettings(foxSettings, out string error), Is.True, error);
             session.StartSolo();
             yield return WaitPlaying(1);
@@ -678,7 +678,7 @@ namespace Hapio.Tests
             Set(charmSettings, "Fox Fire Count Max", 4f);
             Set(charmSettings, "Fox Fire Safe Seconds", .75f);
             Set(charmSettings, "Charm Seconds", 11f);
-            Set(charmSettings, "Charm Rescue Taps (0 = none)", 6f);
+            Set(charmSettings, "Charm Rescue Taps per Neighbor (0 = none)", 6f);
             Assert.That(session.ApplyDeveloperSettings(charmSettings, out error), Is.True, error);
             yield return Until(() => session.State.phase == GameFlowPhase.Playing
                 && session.State.battleSessionId != firstBattleId && !session.IsLoadingScene,
@@ -725,7 +725,7 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(202), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(203), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
                 "All approved values, including the twelve Sabotage fields, must survive Scene-owned DEV cleanup.");
         }

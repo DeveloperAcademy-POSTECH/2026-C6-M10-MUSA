@@ -5,11 +5,13 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>
-    /// 매혹 (#251): 홀린 사람의 양옆 사람 화면. 내 화면에서 그 사람 이름표 곁에 하트 눈 말풍선이 떠 살랑거리고,
-    /// 누를 때마다 살짝 커졌다 줄어들며 Host에 깨우기 한 번을 보낸다. 말풍선 안쪽은 양옆 사람이 함께 누른 만큼 연한 노란색이
-    /// 아래부터 차오르고, 다 차면 풀린다. 옆 사람들이 깨워서 풀리면 말풍선 자리에 놀란 얼굴의
-    /// 뾰족 말풍선이 톡 튀어나왔다 사라지고, 시간이 다 되어 풀리면 하트 말풍선이 서서히 사라진다. 두 말풍선은 이름표 위에
-    /// 좌우 대칭으로 뜬다 (북 미니맵은 그 위로 올려 두었다). 둘이 하는 판에서는 상대가 양쪽 이웃이라 양쪽 이름표에 다 뜨고
+    /// 매혹 (#251, #305): 홀린 사람의 양옆 사람 화면. 내 화면에서 그 사람 이름표 곁에 말풍선이 떠 살랑거리고, 누를 때마다
+    /// 살짝 커졌다 줄어들며 Host에 깨우기 한 번을 보낸다. 말풍선은 빈 말풍선 → 노란 게이지 → 하트 눈 얼굴 순서로 겹쳐
+    /// 게이지가 차도 얼굴이 보인다. 게이지는 내가 누른 만큼만 아래부터 차오르고, 내가 먼저 다 채우면 말풍선 위에 체크가
+    /// 뜬 채 다른 한 사람을 기다린다. 양옆이 모두 채워 풀리면 두 사람 화면에서 함께 놀란 얼굴의 뾰족 말풍선이 톡
+    /// 튀어나왔다 사라지고, 시간이 다 되어 풀리면 말풍선이 서서히 사라진다. 홀린 사람 자신의 화면에는 양옆 이름표 곁에
+    /// 그 사람이 얼마나 채웠는지가 같은 말풍선(누를 수 없음)과 체크로 실시간으로 보인다. 두 말풍선은 이름표 위에 좌우
+    /// 대칭으로 뜬다 (북 미니맵은 그 위로 올려 두었다). 둘이 하는 판에서는 상대가 양쪽 이웃이라 양쪽 이름표에 다 뜨고
     /// 어느 쪽을 눌러도 된다. 말풍선 밖의 터치는 막지 않는다.
     /// </summary>
     [DisallowMultipleComponent]
@@ -18,6 +20,14 @@ namespace C6Lab
         public const string LeftBubblePath = "Sabotage/CharmBubbleLeft";
         public const string RightBubblePath = "Sabotage/CharmBubbleRight";
         public const string WokenPath = "Sabotage/CharmWoken";
+        public const string FacePath = "Sabotage/CharmFace";
+        public const string CheckPath = "Sabotage/CharmCheck";
+        // 하트 눈 얼굴이 빈 말풍선 안에 앉는 자리 (말풍선 크기 비율, 아래가 0). 오른쪽 말풍선은 좌우 반전 그림이다.
+        private static readonly Vector2 LeftFaceMin = new Vector2(.267f, .216f), LeftFaceMax = new Vector2(.736f, .683f);
+        private static readonly Vector2 RightFaceMin = new Vector2(.264f, .216f), RightFaceMax = new Vector2(.733f, .683f);
+        // 체크는 구름 위쪽 가운데에서 붉은 표시의 반대쪽으로 조금 비켜 살짝 걸친다 (말풍선 크기 비율, 가운데 기준).
+        private static readonly Vector2 CheckOffset = new Vector2(.12f, .42f);
+        private const float CheckScale = .38f, CheckPopSeconds = .25f;
         // 말풍선 그림에서 꼬리 끝의 자리 (그림 크기 비율, 아래가 0).
         private static readonly Vector2 LeftTail = new Vector2(.36f, .08f);
         private static readonly Vector2 RightTail = new Vector2(.64f, .08f);
@@ -51,6 +61,12 @@ namespace C6Lab
             public float FillTarget, FillShown;
             public RectTransform Woken;
             public Image WokenImage;
+            public Image FaceImage;
+            public RectTransform Check;
+            public Image CheckImage;
+            public float CheckAge = -1f;
+            /// <summary>The charmed player's own screen: this side shows how far the player beside has tapped (#305).</summary>
+            public bool OwnView;
             /// <summary>The charmed player this side shows, while showing or ending.</summary>
             public ulong Player;
             public bool Showing;
@@ -70,6 +86,9 @@ namespace C6Lab
         private float seenAt;
         private ulong wokenPlayer;
         private float wokenAt = float.NegativeInfinity;
+        // This screen's own taps on the current charm (#305): shown at once, before the Host's count catches up.
+        private int localTaps;
+        private double localTapsCharmAt = double.NaN;
 
         /// <summary>A charm is on the player beside this screen's player on that side.</summary>
         public bool LeftShowing => left.Showing && Visible(left.Bubble);
@@ -86,6 +105,11 @@ namespace C6Lab
         /// <summary>How full the wake-up fill is heading on that side, 0 to 1.</summary>
         public float LeftWakeFill => left.FillTarget;
         public float RightWakeFill => right.FillTarget;
+        /// <summary>The check above that side's bubble: that player beside has tapped enough and waits for the other (#305).</summary>
+        public bool LeftCheckShowing => Visible(left.Check);
+        public bool RightCheckShowing => Visible(right.Check);
+        /// <summary>That side shows the charmed player's own screen: the progress of the player beside, not to be tapped.</summary>
+        public bool OwnView(bool rightSide) => (rightSide ? right : left).OwnView;
         /// <summary>Wake-up taps this screen sent.</summary>
         public int TapsSent { get; private set; }
 
@@ -121,10 +145,16 @@ namespace C6Lab
                 return;
             }
             if (!EnsureLayer()) return;
-            CharmedSides(snapshot, localId, now, out bool onLeft, out bool onRight);
+            if (!snapshot.charmStartedAt.Equals(localTapsCharmAt))
+            {
+                localTapsCharmAt = snapshot.charmStartedAt;
+                localTaps = 0;
+            }
+            CharmedSides(snapshot, localId, now, out bool onLeft, out bool onRight, out bool ownView,
+                out ulong leftHelper, out ulong rightHelper);
             bobPhase = Mathf.Repeat(bobPhase + Time.deltaTime * BobHz, 1f);
-            Step(left, onLeft, snapshot.charmedPlayer, snapshot.charmTaps, rescueTaps);
-            Step(right, onRight, snapshot.charmedPlayer, snapshot.charmTaps, rescueTaps);
+            Step(left, onLeft, snapshot.charmedPlayer, ownView, snapshot.CharmTapsBy(leftHelper), rescueTaps);
+            Step(right, onRight, snapshot.charmedPlayer, ownView, snapshot.CharmTapsBy(rightHelper), rescueTaps);
             layer.SetAsLastSibling();
         }
 
@@ -144,52 +174,74 @@ namespace C6Lab
                 }
         }
 
-        private static void CharmedSides(LabSnapshot snapshot, ulong localId, double now, out bool onLeft, out bool onRight)
+        /// <summary>
+        /// Which badges show a bubble, and whose taps each one shows: this screen's own beside the charmed player, or,
+        /// on the charmed player's own screen, each player beside them (#305).
+        /// </summary>
+        private static void CharmedSides(LabSnapshot snapshot, ulong localId, double now, out bool onLeft, out bool onRight,
+            out bool ownView, out ulong leftHelper, out ulong rightHelper)
         {
-            onLeft = onRight = false;
+            onLeft = onRight = ownView = false;
+            leftHelper = rightHelper = localId;
             LabPlayerState[] players = snapshot.players;
-            if (players == null || players.Length < 2 || snapshot.charmedPlayer == localId
-                || !(snapshot.charmUntil > now && now >= snapshot.charmStartedAt)) return;
+            if (players == null || players.Length < 2 || !(snapshot.charmUntil > now && now >= snapshot.charmStartedAt)) return;
             LabPlayerState me = Array.Find(players, player => player != null && player.id == localId);
             LabPlayerState charmed = Array.Find(players, player => player != null && player.id == snapshot.charmedPlayer);
             if (me == null || charmed == null) return;
             int count = players.Length;
+            if (charmed == me)
+            {
+                LabPlayerState before = Array.Find(players, player => player != null && player.seat == (me.seat + count - 1) % count);
+                LabPlayerState after = Array.Find(players, player => player != null && player.seat == (me.seat + 1) % count);
+                ownView = true;
+                onLeft = before != null;
+                onRight = after != null;
+                if (before != null) leftHelper = before.id;
+                if (after != null) rightHelper = after.id;
+                return;
+            }
             onLeft = charmed.seat == (me.seat + count - 1) % count;
             onRight = charmed.seat == (me.seat + 1) % count;
         }
 
-        private void Step(Side side, bool charmedHere, ulong charmed, int taps, int rescueTaps)
+        private void Step(Side side, bool charmedHere, ulong charmed, bool ownView, int hostTaps, int rescueTaps)
         {
-            bool tappable = rescueTaps > 0;
-            if (charmedHere && !side.Showing)
+            if (charmedHere && (!side.Showing || side.Player != charmed || side.OwnView != ownView))
             {
                 side.Showing = true;
                 side.Player = charmed;
+                side.OwnView = ownView;
                 side.WokenEnd = false;
-                side.PulseAge = side.ReleaseAge = -1f;
+                side.PulseAge = side.ReleaseAge = side.CheckAge = -1f;
                 side.Taps = 0;
                 side.FillShown = 0f;
             }
             else if (!charmedHere && side.Showing)
             {
-                // The charm ended: woken by the players beside, or run out by itself.
+                // The charm ended: woken by the players beside, or run out by itself. The charmed player's own
+                // progress bubbles only fade; "정신 차림!" tells them.
                 side.Showing = false;
                 side.ReleaseAge = 0f;
-                side.WokenEnd = side.Player == wokenPlayer && Time.time - wokenAt <= WokenWindowSeconds;
+                side.WokenEnd = !side.OwnView && side.Player == wokenPlayer && Time.time - wokenAt <= WokenWindowSeconds;
+                side.CheckAge = -1f;
+                side.Check.gameObject.SetActive(false);
             }
+            bool tappable = rescueTaps > 0 && !side.OwnView;
             bool badge = side.Badge != null && side.Badge.gameObject.activeInHierarchy && side.BubbleImage.sprite != null;
             if (side.Showing && badge)
             {
                 Place(side);
                 side.Bubble.gameObject.SetActive(true);
                 side.Woken.gameObject.SetActive(false);
-                side.BubbleImage.raycastTarget = tappable;
-                side.BubbleImage.color = Color.white;
-                // Both neighbours' taps count together (the Host's count); this screen's own tap shows at once.
-                side.Taps = Mathf.Max(side.Taps, taps);
-                side.FillTarget = tappable ? Mathf.Clamp01(side.Taps / (float)rescueTaps) : 0f;
+                side.BubbleImage.color = side.FaceImage.color = Color.white;
+                // Each player beside fills their own gauge (#305): the Host's count, and this screen's own taps at once.
+                side.Taps = side.OwnView ? hostTaps : Mathf.Max(localTaps, hostTaps);
+                bool done = rescueTaps > 0 && side.Taps >= rescueTaps;
+                side.BubbleImage.raycastTarget = tappable && !done;
+                side.FillTarget = rescueTaps > 0 ? Mathf.Clamp01(side.Taps / (float)rescueTaps) : 0f;
                 side.FillShown = Mathf.MoveTowards(side.FillShown, side.FillTarget, FillRisePerSecond * Time.deltaTime);
-                side.Fill.gameObject.SetActive(tappable && side.FillShown > 0f);
+                side.Fill.gameObject.SetActive(rescueTaps > 0 && side.FillShown > 0f);
+                DrawCheck(side, done);
                 side.Fill.anchorMax = new Vector2(1f, Mathf.Lerp(FillBottom, FillTop, side.FillShown));
                 side.FillImage.color = WakeFillColor;
                 float pulse = 1f;
@@ -226,7 +278,7 @@ namespace C6Lab
                     side.Bubble.gameObject.SetActive(true);
                     side.Woken.gameObject.SetActive(false);
                     side.Bubble.localScale = Vector3.one;
-                    side.BubbleImage.color = new Color(1f, 1f, 1f, 1f - age / FadeSeconds);
+                    side.BubbleImage.color = side.FaceImage.color = new Color(1f, 1f, 1f, 1f - age / FadeSeconds);
                     side.FillImage.color = new Color(WakeFillColor.r, WakeFillColor.g, WakeFillColor.b,
                         WakeFillColor.a * (1f - age / FadeSeconds));
                     return;
@@ -269,11 +321,32 @@ namespace C6Lab
 
         private void OnTap(Side side)
         {
-            if (!side.Showing) return;
+            if (!side.Showing || side.OwnView) return;
             side.PulseAge = 0f;
-            side.Taps++;
+            localTaps++;
             TapsSent++;
             if (network != null) network.TapCharm();
+        }
+
+        // 내가 다 채웠다 (#305): 말풍선 위에 체크가 톡 튀어나와 다른 한 사람을 기다린다.
+        private void DrawCheck(Side side, bool done)
+        {
+            bool shown = done && side.Check != null && side.CheckImage.sprite != null;
+            if (!shown)
+            {
+                side.CheckAge = -1f;
+                if (side.Check != null) side.Check.gameObject.SetActive(false);
+                return;
+            }
+            if (side.CheckAge < 0f) side.CheckAge = 0f;
+            else side.CheckAge += Time.deltaTime;
+            side.Check.gameObject.SetActive(true);
+            float size = bubbleSize * CheckScale, half = size * .5f;
+            var offset = new Vector2((side.Right ? -CheckOffset.x : CheckOffset.x) * bubbleSize, CheckOffset.y * bubbleSize);
+            side.Check.anchoredPosition = KeepOnScreen(side.BubbleCenter + offset, new Vector2(-half, -half), new Vector2(half, half));
+            float t = Mathf.Clamp01(side.CheckAge / CheckPopSeconds);
+            float pop = t < .6f ? Mathf.Lerp(.3f, 1.15f, t / .6f) : Mathf.Lerp(1.15f, 1f, (t - .6f) / .4f);
+            side.Check.localScale = Vector3.one * pop;
         }
 
         private void Reset(Side side)
@@ -282,6 +355,8 @@ namespace C6Lab
             side.PulseAge = side.ReleaseAge = -1f;
             if (side.Bubble != null) side.Bubble.gameObject.SetActive(false);
             if (side.Woken != null) side.Woken.gameObject.SetActive(false);
+            side.CheckAge = -1f;
+            if (side.Check != null) side.Check.gameObject.SetActive(false);
         }
 
         private double ServerNow(LabSnapshot snapshot)
@@ -337,7 +412,25 @@ namespace C6Lab
             side.FillImage.color = WakeFillColor;
             side.FillImage.raycastTarget = false;
             side.Fill.gameObject.SetActive(false);
+            // The heart-eyed face sits over the fill (#305), so the gauge never hides it.
+            RectTransform face = NewRect("Charm Face", side.Bubble);
+            face.anchorMin = side.Right ? RightFaceMin : LeftFaceMin;
+            face.anchorMax = side.Right ? RightFaceMax : LeftFaceMax;
+            face.offsetMin = face.offsetMax = Vector2.zero;
+            side.FaceImage = face.gameObject.AddComponent<Image>();
+            side.FaceImage.sprite = Resources.Load<Sprite>(FacePath);
+            side.FaceImage.preserveAspect = true;
+            side.FaceImage.raycastTarget = false;
             side.Bubble.gameObject.SetActive(false);
+
+            // The check stands just above the cloud, so it is not inside the bubble's mask.
+            side.Check = NewRect(side.Right ? "Charm Check Right" : "Charm Check Left", layer);
+            side.Check.sizeDelta = new Vector2(bubbleSize * CheckScale, bubbleSize * CheckScale);
+            side.CheckImage = side.Check.gameObject.AddComponent<Image>();
+            side.CheckImage.sprite = Resources.Load<Sprite>(CheckPath);
+            side.CheckImage.preserveAspect = true;
+            side.CheckImage.raycastTarget = false;
+            side.Check.gameObject.SetActive(false);
 
             side.Woken = NewRect(side.Right ? "Charm Woken Right" : "Charm Woken Left", layer);
             side.Woken.sizeDelta = new Vector2(bubbleSize * WokenScale, bubbleSize * WokenScale);

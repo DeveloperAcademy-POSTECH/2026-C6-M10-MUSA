@@ -131,7 +131,8 @@ MonoBehaviour:
   foxFireCountMax: 5
   foxFireSafeSeconds: 1
   charmSeconds: 10
-  charmRescueTaps: 3
+  charmRescueTaps: 10
+  charmWarningSeconds: 3
   jigwiFireTargetCount: 1
   jigwiFireSeconds: 15
   jigwiOverheatSeconds: 4

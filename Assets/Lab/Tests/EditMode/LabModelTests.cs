@@ -2751,7 +2751,7 @@ namespace C6Lab.Tests
         [Test]
         public void SabotageMixCharmsInAnyRoomAndSolo()
         {
-            var mix = MixConfig(11f, bomb: 0, block: 0, fox: 0, charm: 1);
+            var mix = MixConfig(11f, bomb: 0, block: 0, fox: 0, charm: 1, rescueTaps: 3);
             try
             {
                 var pair = new LabModel();
@@ -2968,9 +2968,9 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ThePlayersBesideACharmedOneTapItAwayButNoOneElseCan()
+        public void BothPlayersBesideMustEachTapTheirShareToWakeACharmedOne()
         {
-            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1, rescueTaps: 3);
             try
             {
                 var room = new LabModel();
@@ -2980,20 +2980,85 @@ namespace C6Lab.Tests
                 LabPlayerState charmed = on.players.Single(player => player.id == on.charmedPlayer);
                 ulong BySeat(int offset) => on.players.Single(player => player.seat == (charmed.seat + offset + 5) % 5).id;
                 ulong leftOf = BySeat(-1), rightOf = BySeat(1), far = BySeat(2);
+                Assert.That(on.charmHelpers, Is.EquivalentTo(new[] { leftOf, rightOf }), "The two beside, each with a gauge (#305).");
+                Assert.That(on.charmHelperTaps, Is.EqualTo(new[] { 0, 0 }));
 
                 Assert.That(room.TryCharmTap(far, 5.1d, out _), Is.False, "Only the two beside can wake them.");
                 Assert.That(room.TryCharmTap(charmed.id, 5.1d, out _), Is.False, "Nor can they wake themselves.");
-                Assert.That(room.TryCharmTap(leftOf, 5.2d, out var woken), Is.True);
-                Assert.That(woken, Is.Null, "Not yet.");
-                Assert.That(room.TryCharmTap(rightOf, 5.3d, out _), Is.True);
-                LabSnapshot tapped = room.Snapshot(5.3d);
-                Assert.That(tapped.charmTaps, Is.EqualTo(2), "Their taps count together.");
-                Assert.That(tapped.CharmOn(charmed.id), Is.True);
-                Assert.That(room.TryCharmTap(leftOf, 5.4d, out woken), Is.True);
-                Assert.That(woken, Is.EqualTo(charmed.id), "The third tap says whom it woke.");
-                Assert.That(room.Snapshot(5.4d).CharmOn(charmed.id), Is.False, "Three taps wake the charmed player at once.");
+                for (int i = 0; i < 3; i++)
+                {
+                    Assert.That(room.TryCharmTap(leftOf, 5.2d + i * .01d, out var early), Is.True);
+                    Assert.That(early, Is.Null, "One side alone never wakes them.");
+                }
+                Assert.That(room.TryCharmTap(leftOf, 5.25d, out var extra), Is.True);
+                Assert.That(extra, Is.Null);
+                LabSnapshot half = room.Snapshot(5.25d);
+                Assert.That(half.CharmTapsBy(leftOf), Is.EqualTo(3), "A finished side waits; more taps do not count.");
+                Assert.That(half.CharmTapsBy(rightOf), Is.Zero);
+                Assert.That(half.CharmOn(charmed.id), Is.True, "Still charmed until the other side finishes too.");
+
+                Assert.That(room.TryCharmTap(rightOf, 5.3d, out var woken), Is.True);
+                Assert.That(room.TryCharmTap(rightOf, 5.31d, out woken), Is.True);
+                Assert.That(woken, Is.Null);
+                Assert.That(room.TryCharmTap(rightOf, 5.4d, out woken), Is.True);
+                Assert.That(woken, Is.EqualTo(charmed.id), "The last tap of the second side says whom it woke.");
+                Assert.That(room.Snapshot(5.4d).CharmOn(charmed.id), Is.False, "Both sides done: awake at once.");
                 Assert.That(room.Charmed(charmed.id, 5.4d), Is.False);
                 Assert.That(room.TryCharmTap(rightOf, 5.5d, out _), Is.False, "Nothing left to wake.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void InATwoPlayerRoomTheOtherPlayerAloneWakesTheCharmedOne()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1, rescueTaps: 3);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("charm-pair", new ulong[] { 10, 20 }, 0d, mix);
+                room.Tick(5d);
+                LabSnapshot on = room.Snapshot(5d);
+                ulong other = on.charmedPlayer == 10 ? 20ul : 10ul;
+                Assert.That(on.charmHelpers, Is.EqualTo(new[] { other }), "One player beside, on both sides.");
+                ulong? woken = null;
+                for (int i = 0; i < 3; i++) Assert.That(room.TryCharmTap(other, 5.1d + i * .01d, out woken), Is.True);
+                Assert.That(woken, Is.EqualTo(on.charmedPlayer));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void ACharmIsWarnedBeforeItStartsAndOnlyThenStopsThrows()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1, charmWarning: 3f, rescueTaps: 3);
+            try
+            {
+                var ids = new ulong[] { 10, 20, 30 };
+                var room = new LabModel();
+                room.Begin("charm-warning", ids, 0d, mix);
+                room.Tick(5d);
+                LabSabotage cast = room.DrainSabotages().Single();
+                Assert.That(cast.Kind, Is.EqualTo(LabSabotageKind.Charm));
+                Assert.That(cast.At, Is.EqualTo(5d), "Every screen is told when the target is chosen.");
+                LabSnapshot warned = room.Snapshot(6d);
+                Assert.That(warned.charmedPlayer, Is.EqualTo(cast.Target));
+                Assert.That(warned.CharmWarningAt(warned.serverTime), Is.True, "Warned for three seconds (#305)...");
+                Assert.That(warned.charmWarnedAt, Is.EqualTo(5d));
+                Assert.That(warned.charmStartedAt, Is.EqualTo(8d));
+                Assert.That(warned.charmUntil, Is.EqualTo(18d), "...then the ten seconds of the charm itself.");
+                Assert.That(warned.CharmOn(cast.Target), Is.False);
+                Assert.That(warned.charmHelpers, Is.Empty, "No gauges before it starts.");
+
+                ulong beside = ids.First(id => id != cast.Target);
+                Assert.That(room.TryCharmTap(beside, 6d, out _), Is.False, "Nothing to wake yet.");
+                Assert.That(room.Charmed(cast.Target, 7.9d), Is.False, "The warned player may still throw.");
+                string orb = CombinedFor(room, cast.Target, 6.5d);
+                LabSnapshot on = room.Snapshot(8.1d);
+                Assert.That(on.CharmWarningAt(on.serverTime), Is.False);
+                Assert.That(on.CharmOn(cast.Target), Is.True);
+                Assert.That(room.TryLaunch(cast.Target, orb, "charmed-throw", 8.3d, out _, out string reason), Is.False);
+                Assert.That(reason, Is.EqualTo("CHARMED"), "Only once the warning is over.");
             }
             finally { UnityEngine.Object.DestroyImmediate(mix); }
         }
@@ -3181,7 +3246,8 @@ namespace C6Lab.Tests
             return combined.id;
         }
 
-        private static LabConfig MixConfig(float interval, int bomb, int block, int fox, int charm)
+        private static LabConfig MixConfig(float interval, int bomb, int block, int fox, int charm, float charmWarning = 0f,
+            int rescueTaps = 10)
         {
             LabConfig created = ConfigWith(1f, 50, 50, 0, 0, 0, 0);
             float[] values = created.CaptureDeveloperValues();
@@ -3196,6 +3262,9 @@ namespace C6Lab.Tests
             values[170] = block;
             values[171] = fox;
             values[172] = charm;
+            values[177] = rescueTaps;
+            // These checks time the charm itself; the warning before it (#305) has its own tests.
+            values[202] = charmWarning;
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
         }

@@ -57,7 +57,8 @@ namespace Hapio
             if (scope < 0 || scope > TerritoryScope || index < 0 || index >= LabConfig.DeveloperFields.Count) return false;
             if (scope == TerritoryScope) return index >= 197 && index <= 199 || IsTerritoryOwned(index);
             bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191;
-            bool gumiho = index >= 166 && index <= 177;
+            // 매혹 예고 (#305) 202번도 구미호 칸이다.
+            bool gumiho = index >= 166 && index <= 177 || index == 202;
             bool jigwi = index >= 178 && index <= 183 || index >= 192 && index <= 195;
             // 2:2 땅따먹기 (#281)의 켜기/끄기·시간·피버는 3요괴 스테이지 설정에 넣지 않는다.
             bool team = index >= 196 && index <= 199;

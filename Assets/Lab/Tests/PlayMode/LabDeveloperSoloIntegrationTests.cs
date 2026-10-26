@@ -757,6 +757,7 @@ namespace C6Lab.Tests
             tuning[170] = 0f;
             tuning[171] = 0f;
             tuning[176] = 1f; // for one second
+            tuning[202] = 1f; // after a one-second warning (#305)
             Assert.That(charming.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = charming;
             fixture.UseAvailablePort(network);
@@ -766,14 +767,23 @@ namespace C6Lab.Tests
                 var hud = UnityEngine.Object.FindAnyObjectByType<LabCharmHud>();
                 Assert.That(hud, Is.Not.Null, "The saved scene adds the charmed player's own display.");
                 float until = Time.realtimeSinceStartup + 4f;
+                while (!hud.WarningShowing && Time.realtimeSinceStartup < until) yield return null;
+                Assert.That(hud.WarningShowing, Is.True, "A warning comes first (#305)...");
+                Assert.That(hud.WarningShown, Is.EqualTo(LabCharmHud.WarningText("나")), "...naming me on my own screen.");
+                Assert.That(board.Charmed, Is.False, "Not charmed during the warning.");
+                until = Time.realtimeSinceStartup + 3f;
                 while (!board.Charmed && Time.realtimeSinceStartup < until) yield return null;
                 Assert.That(board.Charmed, Is.True, "Solo, to try it out, the charm falls on the one player.");
                 Assert.That(board.CharmEdge.Visible, Is.True);
                 var alert = UnityEngine.Object.FindAnyObjectByType<LabGourdAlert>();
                 Assert.That(alert, Is.Not.Null);
+                // The heart comes as the charm itself starts (#305), seen in the alert's own frame.
+                float heartBy = Time.realtimeSinceStartup + .5f;
+                while (!alert.ShowingHeart && Time.realtimeSinceStartup < heartBy) yield return null;
                 Assert.That(alert.ShowingHeart, Is.True, "The gourd's bubble shows a heart to the charmed player.");
                 Assert.That(alert.Label, Is.EqualTo("♥"));
                 yield return null;
+                Assert.That(hud.WarningShowing, Is.False, "The warning goes when the charm starts.");
                 Assert.That(hud.GaugeVisible, Is.True, "The time left shows on the gauge.");
                 Assert.That(hud.GaugeFill, Is.InRange(.01f, 1f));
                 var minimap = UnityEngine.Object.FindAnyObjectByType<LabDrumMinimap>();

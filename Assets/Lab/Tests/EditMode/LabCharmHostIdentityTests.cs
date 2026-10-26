@@ -18,6 +18,7 @@ namespace C6Lab.Tests
                 values[169] = values[170] = values[171] = 0f;
                 values[172] = 1f;
                 values[177] = 3f;
+                values[202] = 0f; // no warning (#305): the charm starts as it is cast
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
 
                 var room = new LabModel();

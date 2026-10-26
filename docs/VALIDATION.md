@@ -2725,3 +2725,19 @@ Host 판정 지도는 그대로 두고 최초 얼룩/실제 군집 성장의 제
 | 전체 PlayMode | **Lab 347/347 · Hapio 19/19 PASS** | Editor에서 비동기 실행. |
 | 사용자 Play 확인 → 수정 | 결함 발견 → 수정 | 사용자가 "구슬 하나에 막대 1.5칸"을 보고했다. Editor Play로 확인하니 스토리는 최대 160(1칸)이었으나 2:2(DEV 혼자 2:2 포함)는 처음 분리 값인 최대 100이라 8칸 막대에서 구슬 하나가 1.6칸이었다. 막대 그림을 모든 모드가 함께 쓰므로 2:2도 최대·시작 160으로 맞추고, 모든 스테이지·2:2에서 최대 ÷ 비용 = 막대 칸 수(8)와 시작 = 가득을 확인하는 검사를 추가했다. |
 | 막대 실제 화면·Mac 실행본·iOS | **NOT_RUN** | 수정 뒤 8칸 막대의 실제 플레이 화면과 생성 빈도 체감은 아직 사용자가 다시 보지 않았다. |
+
+## #305 구미호 매혹 예고·양옆 각자 풀기·말풍선 그림 (2단계) — 2026-10-26
+
+같은 브랜치의 1단계 커밋 `9f38ccb9` 위 작업 트리. 공유 설정 203개(202번 `Charm Warning Seconds` 추가), 통신 **5664**, 토큰 `C6PhysicsLab/25`·`C6HapioGame/7`. 설정 에셋·홈·로비 DEV 줄은 열린 Editor에서 Editor API(`unity command eval`)로 바꿨고, 사용자 요청으로 이 단계 중간부터 Test Runner는 사용자가 실행한다.
+
+| 항목 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| Host 규칙 | 변경 | 매혹은 대상을 정한 시각(`charmWarnedAt`)부터 예고 시간 뒤에 시작한다. 예고 중에는 던지기 가능·깨우기 탭 거절·같은 사람에게 다른 방해공작 금지. 풀기는 양옆(2명 판은 1명)이 각자 `Charm Rescue Taps per Neighbor`를 채워야 하고 먼저 채운 쪽의 추가 탭은 세지 않는다. 스냅샷과 보드 헤더에 `charmWarnedAt`·`charmHelpers`·`charmHelperTaps`. 매혹 중 누가 나가면 판 자체가 끝나므로(스토리 게임 오버, Lab·2:2 로비) 따로 처리하지 않는다. |
+| 화면 | 변경 | 박 위 "정신 차림!" 자리의 두 줄 예고 문구(본인은 "나에게"). 말풍선은 빈 말풍선(오른쪽은 좌우 반전 파일) → 노란 게이지 → 얼굴(예전 그림의 얼굴 자리·크기에 맞춤) 순서, 게이지는 내가 누른 만큼, 먼저 채우면 말풍선 위 체크 그림, 둘 다 채우면 두 화면에 동시에 놀란 말풍선. 매혹된 사람 화면에는 양옆 이름표 곁에 각자의 진행 말풍선(누를 수 없음)과 체크, 풀리면 말풍선은 사라지고 "정신 차림!". |
+| 그림 | 추가·교체 | 사용자 제공 투명 PNG: `Sabotage/CharmBubbleLeft`(빈 말풍선)·`CharmBubbleRight`(같은 그림 좌우 반전)·`CharmFace`, 체크는 WebP를 PNG 256px로 바꿔 `CharmCheck`. 놀란 얼굴 `CharmWoken`은 그대로. |
+| 저장 값 | 변경 | `LabConfig.asset` 풀기 3 → 10, 예고 3초(새 칸). 홈·로비 DEV에 202번 줄 추가(새 오브젝트 31개, 지운 것 0), 177번 줄 이름·값만 갱신. |
+| 컴파일 | PASS | 오프라인 Roslyn 7개 어셈블리 오류 0, 열린 Editor `compilationFailed: false`. |
+| EditMode (수정 전 1회, Claude 실행) | Lab 1,067/1,072 · Hapio 54/54 | 실패 5건은 모두 검사 쪽 고정값이었다: 예고 기본 3초를 모르는 매혹 검사 1, 177번 이름 1, 202번까지의 칸 목록 1, 200번 뒤 2칸 비교 1, 2명 판 3번 풀기 1. 고친 뒤 재실행은 사용자 요청으로 취소해 **NOT_RUN**. |
+| 사용자 실행 검사 | 실패 2 → 고침 | `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset`: DEV 칸을 옛 이름("Charm Rescue Taps (0 = none)")으로 찾음 → 새 이름으로(2곳). `LabCharmBubblesTests.TheFaceStaysAboveTheGaugeAndACheckWaitsForTheOtherSide`: 체크가 작게 튀어나오는 첫 프레임에 위치를 잼 → 자리잡은 뒤 재도록. 같이 고친 것: 박 옆 하트 말풍선(약 1.4초)이 예고 시작에 떠 매혹이 실제로 걸릴 때는 사라져 있었다 → 걸린 사람 화면에서 매혹이 시작되는 순간 뜨도록 옮김(`LabGourdAlert`). 고친 뒤 재실행은 **NOT_RUN**. |
+| PlayMode 나머지 | 사용자 보고 기준 통과 | 사용자가 위 2건 외 실패를 보고하지 않았다. 개수 기록 없음. |
+| Mac 3앱·iOS | **NOT_RUN** | 양옆 두 사람이 실제로 함께 푸는 장면과 예고 문구 위치는 아직 보지 않았다. |

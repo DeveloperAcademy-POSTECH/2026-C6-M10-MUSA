@@ -5,7 +5,8 @@ namespace C6Lab
 {
     /// <summary>
     /// 매혹 (#251): 구미호에게 홀린 사람 자신의 화면. 남은 시간을 북 미니맵 바로 위의 세로 게이지(임시)로 보여 주고,
-    /// 풀리면 "정신 차림!"을 잠깐 띄운다. 매혹 울음소리가 Resources/Sabotage/CharmHowl에 있으면 매혹이 걸릴 때 모든
+    /// 풀리면 "정신 차림!"을 잠깐 띄운다. 매혹 예고 (#305): 걸리기 전 예고 동안에는 모든 화면의 같은 자리에
+    /// "구미호가 P2에게 매혹을 걸려고 한다!"(걸릴 사람 자신에게는 "나에게")를 띄운다. 매혹 울음소리가 Resources/Sabotage/CharmHowl에 있으면 매혹이 걸릴 때 모든
     /// 기기에서 한 번 낸다. 화면 표시만 하며 터치를 막지 않는다.
     /// </summary>
     [DisallowMultipleComponent]
@@ -13,6 +14,8 @@ namespace C6Lab
     {
         public const string HowlPath = "Sabotage/CharmHowl";
         public const string AwakeText = "정신 차림!";
+        public static string WarningText(string who) => "구미호가 " + who + "에게\n매혹을 걸려고 한다!";
+        private const float WarningPopSeconds = .2f, WarningPulseHz = 2f;
         private const float AwakeSeconds = 1.2f;
         private static readonly Color GaugeBackColor = new Color(.17f, .14f, .12f, .55f);
 
@@ -27,6 +30,8 @@ namespace C6Lab
         [SerializeField] private Vector2 awakeAnchor = new Vector2(.5f, .6f);
         [Tooltip("\"정신 차림!\" 글자 크기 (Canvas 기준 픽셀)")]
         [SerializeField, Min(10f)] private float awakeSize = 40f;
+        [Tooltip("매혹 예고 문구 글자 크기 (Canvas 기준 픽셀). \"정신 차림!\"과 같은 자리에 두 줄로 뜬다 (#305).")]
+        [SerializeField, Min(10f)] private float warningSize = 26f;
 
         private static readonly Vector3[] Corners = new Vector3[4];
         private LabNetwork network;
@@ -37,6 +42,8 @@ namespace C6Lab
         private RectTransform gauge;
         private RectTransform gaugeFill;
         private Text awake;
+        private Text warning;
+        private float warningAge = -1f;
         private AudioSource howlSource;
         private AudioClip howl;
         private bool howlLoaded;
@@ -51,6 +58,9 @@ namespace C6Lab
         /// <summary>How full the gauge is, 1 as the charm begins and 0 as it ends.</summary>
         public float GaugeFill => gaugeFill != null ? gaugeFill.anchorMax.y : 0f;
         public bool AwakeShowing => awake != null && awake.gameObject.activeInHierarchy;
+        /// <summary>The charm warning showing on this screen (#305), and what it says.</summary>
+        public bool WarningShowing => warning != null && warning.gameObject.activeInHierarchy;
+        public string WarningShown => warning != null ? warning.text : string.Empty;
 
         /// <summary>스냅샷을 읽을 네트워크와, 게이지를 그릴 Canvas를 연결한다.</summary>
         public void Bind(LabNetwork target, Canvas uiCanvas)
@@ -98,11 +108,13 @@ namespace C6Lab
             double now = ServerNow(snapshot);
             bool charmed = snapshot.charmedPlayer == network.LocalPlayerId
                 && snapshot.charmUntil > now && now >= snapshot.charmStartedAt;
+            bool warned = snapshot.CharmWarningAt(now);
             if (wasCharmed && !charmed) awakeLeft = AwakeSeconds;
             wasCharmed = charmed;
             if (awakeLeft >= 0f) awakeLeft -= Time.deltaTime;
-            if (!charmed && awakeLeft < 0f)
+            if (!charmed && awakeLeft < 0f && !warned)
             {
+                warningAge = -1f;
                 if (layer != null) layer.gameObject.SetActive(false);
                 return;
             }
@@ -119,6 +131,25 @@ namespace C6Lab
                 gaugeFill.anchorMax = new Vector2(1f, left);
             }
             DrawAwake();
+            DrawWarning(snapshot, warned);
+        }
+
+        // 매혹 예고 (#305): 걸릴 사람이 정해지면 모두에게 알린다. 톡 튀어나와 살짝 두근거리다가 매혹이 시작되면 사라진다.
+        private void DrawWarning(LabSnapshot snapshot, bool warned)
+        {
+            warning.gameObject.SetActive(warned);
+            if (!warned)
+            {
+                warningAge = -1f;
+                return;
+            }
+            warningAge = warningAge < 0f ? 0f : warningAge + Time.deltaTime;
+            LabPlayerState target = System.Array.Find(snapshot.players ?? new LabPlayerState[0],
+                player => player != null && player.id == snapshot.charmedPlayer);
+            warning.text = WarningText(snapshot.charmedPlayer == network.LocalPlayerId ? "나" : LabResultStats.PlayerName(target));
+            float pop = warningAge < WarningPopSeconds ? Mathf.Lerp(.5f, 1f, warningAge / WarningPopSeconds)
+                : 1f + .04f * Mathf.Sin((warningAge - WarningPopSeconds) * WarningPulseHz * 2f * Mathf.PI);
+            warning.rectTransform.localScale = Vector3.one * pop;
         }
 
         // 게이지 맨 아래를 북 미니맵 바로 위에 둔다. 미니맵은 움직일 수 있으니 매번 맞춘다.
@@ -210,6 +241,23 @@ namespace C6Lab
             var outline = awakeRect.gameObject.AddComponent<Outline>();
             outline.effectColor = new Color(1f, 1f, 1f, .9f);
             outline.effectDistance = new Vector2(2f, -2f);
+
+            // The warning shares the awake spot above the gourd, in two lines so it fits a phone's width.
+            RectTransform warningRect = NewRect("Charm Warning", layer);
+            warningRect.anchorMin = warningRect.anchorMax = awakeAnchor;
+            warningRect.sizeDelta = new Vector2(warningSize * 14f, warningSize * 3f);
+            warning = warningRect.gameObject.AddComponent<Text>();
+            warning.font = font;
+            warning.fontSize = Mathf.RoundToInt(warningSize);
+            warning.fontStyle = FontStyle.Bold;
+            warning.alignment = TextAnchor.MiddleCenter;
+            warning.lineSpacing = 1.1f;
+            warning.raycastTarget = false;
+            warning.color = new Color(.55f, .1f, .16f);
+            var warningOutline = warningRect.gameObject.AddComponent<Outline>();
+            warningOutline.effectColor = new Color(1f, 1f, 1f, .95f);
+            warningOutline.effectDistance = new Vector2(2f, -2f);
+            warningRect.gameObject.SetActive(false);
             return true;
         }
 
