@@ -168,6 +168,9 @@ namespace C6Lab
         private double nextCommonGimmickAt, nextUniqueGimmickAt;
         private uint commonGimmickCount, uniqueGimmickCount;
         private ulong? lastCommonTarget, lastUniqueTarget;
+        // 판별 기믹 기록 (#311, UT용)과 동시 발동을 세기 위한 이번 판의 마지막 공용 기믹 시각.
+        private LabGimmickStats gimmickStats = new LabGimmickStats();
+        private double lastCommonCastAt = double.NegativeInfinity;
         private readonly List<LabFoxFireDrop> foxFires = new List<LabFoxFireDrop>();
         private ulong charmedPlayer;
         private double charmStartedAt = -1d, charmUntil = -1d;
@@ -317,6 +320,8 @@ namespace C6Lab
             // 기믹 묶음 (#311): 각 묶음은 전투 시작 뒤 자기 간격만큼 지나 처음 발동한다.
             commonGimmickCount = uniqueGimmickCount = 0;
             lastCommonTarget = lastUniqueTarget = null;
+            gimmickStats = new LabGimmickStats();
+            lastCommonCastAt = double.NegativeInfinity;
             nextCommonGimmickAt = FirstGimmickAt(now, rules.CommonGimmickInterval, rules.CommonGimmicks);
             nextUniqueGimmickAt = FirstGimmickAt(now, rules.UniqueGimmickInterval, rules.UniqueGimmicks);
             combo.Reset();
@@ -1521,15 +1526,15 @@ namespace C6Lab
                 {
                     double at = nextCommonGimmickAt;
                     nextCommonGimmickAt = at + GimmickInterval(rules.CommonGimmickInterval);
-                    CastGimmick(rules.CommonGimmicks, at, commonGimmickCount++, SabotageKindSalt, SabotageTargetSalt,
-                        ref lastCommonTarget);
+                    if (CastGimmick(rules.CommonGimmicks, at, commonGimmickCount++, SabotageKindSalt, SabotageTargetSalt,
+                        ref lastCommonTarget)) lastCommonCastAt = at;
                 }
                 else
                 {
                     double at = nextUniqueGimmickAt;
                     nextUniqueGimmickAt = at + GimmickInterval(rules.UniqueGimmickInterval);
-                    CastGimmick(rules.UniqueGimmicks, at, uniqueGimmickCount++, UniqueGimmickKindSalt, UniqueGimmickTargetSalt,
-                        ref lastUniqueTarget);
+                    if (CastGimmick(rules.UniqueGimmicks, at, uniqueGimmickCount++, UniqueGimmickKindSalt, UniqueGimmickTargetSalt,
+                        ref lastUniqueTarget) && lastCommonCastAt == at) gimmickStats.simultaneous++;
                 }
             }
         }
@@ -1543,9 +1548,9 @@ namespace C6Lab
         /// <summary>
         /// 이 묶음에서 켜져 있고 지금 걸 사람이 있는 기믹 중 하나를 비율(%)대로 골라, 걸 수 있는 사람 중 무작위 한 명에게 건다
         /// (#311). 어떤 사람에게 걸 수 없는 기믹은 그 사람을 빼고 고르므로 다른 사람에게 가고, 아무에게도 걸 수 없는 기믹은
-        /// 후보에서 빠진다. 남은 기믹이 없으면 이번 차례는 건너뛴다.
+        /// 후보에서 빠진다. 남은 기믹이 없으면 이번 차례는 건너뛰고 false를 돌려준다.
         /// </summary>
-        private void CastGimmick(LabSabotageKind[] kinds, double at, uint index, uint kindSalt, uint targetSalt, ref ulong? last)
+        private bool CastGimmick(LabSabotageKind[] kinds, double at, uint index, uint kindSalt, uint targetSalt, ref ulong? last)
         {
             var targets = new List<ulong>[kinds.Length];
             var weights = new int[kinds.Length];
@@ -1557,7 +1562,7 @@ namespace C6Lab
                 targets[i] = GimmickTargets(kinds[i], at, last);
                 if (targets[i].Count > 0) total += weights[i] = rules.GimmickChances[kind];
             }
-            if (total == 0) return;
+            if (total == 0) return false;
             int roll = (int)(DrawFor(seed ^ kindSalt, SabotageDrawKey, index) % (ulong)total);
             for (int i = 0; i < kinds.Length; i++)
             {
@@ -1571,8 +1576,29 @@ namespace C6Lab
                 else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index);
                 else if (kind == LabSabotageKind.Charm) StartCharm(target, at);
                 sabotages.Add(new LabSabotage(kind, target, at));
-                return;
+                gimmickStats.Add(kind);
+                return true;
             }
+            return false;
+        }
+
+        /// <summary>
+        /// 이번 판의 기믹 기록 (#311, UT용) 복사본. 센 값에 판 정보·결과·전투가 이어진 시간을 지금 상태로 채운다.
+        /// 시간은 판이 끝난 순간에 멈춘 남은 시간으로 재므로 끝난 뒤에 읽어도 늘어나지 않는다.
+        /// </summary>
+        public LabGimmickStats GimmickStats()
+        {
+            LabGimmickStats stats = gimmickStats.Copy();
+            stats.sessionId = sessionId ?? string.Empty;
+            stats.round = round;
+            stats.stage = teamMode ? "Territory" : StageYokai.ToString();
+            stats.players = activeSeatCount;
+            stats.result = phase.ToString();
+            if (rules == null) return stats;
+            stats.seconds = Math.Max(0d, rules.BattleDurationSeconds - remaining);
+            stats.commonInterval = rules.CommonGimmicks.Length > 0 ? rules.CommonGimmickInterval : 0f;
+            stats.uniqueInterval = rules.UniqueGimmicks.Length > 0 ? rules.UniqueGimmickInterval : 0f;
+            return stats;
         }
 
         /// <summary>

@@ -617,6 +617,9 @@ namespace C6Lab
         [SerializeField] private bool gimmickSwipeBlock = true;
         [SerializeField] private bool gimmickFoxFire = true;
         [SerializeField] private bool gimmickCharm = true;
+        [Tooltip("UT용 기믹 기록 (#311). 켜면 Host가 판이 끝날 때마다 그 판의 기믹 수(전체·종류별·공용과 고유가 동시에 걸린 수)를 "
+            + "콘솔(C6_LAB_GIMMICK_STATS)과 기기의 gimmick-stats.jsonl에 한 줄씩 남긴다. DEV·공유 설정이 아니며 기본은 끔.")]
+        [SerializeField] private bool recordGimmickStats;
         [Tooltip("여우불: 한 번에 떨어지는 여우구슬 개수의 최소·최대. 판이 거의 차 있으면 빈 칸 수만큼만 떨어진다.")]
         [SerializeField, Range(1, 10)] private int foxFireCountMin = 2;
         [SerializeField, Range(1, 10)] private int foxFireCountMax = 5;
@@ -995,6 +998,8 @@ namespace C6Lab
         public float UniqueGimmickInterval => Mathf.Clamp(Finite(uniqueGimmickInterval, 20f), 0f, 600f);
         /// <summary>Which gimmicks may be drawn, in <see cref="LabSabotageKind"/> order (#311).</summary>
         public bool[] GimmickSwitches() => new[] { gimmickGourdBomb, gimmickSwipeBlock, gimmickFoxFire, gimmickCharm };
+        /// <summary>Whether the Host writes each finished round's gimmick stats (#311, for UT). Not a DEV or shared value.</summary>
+        public bool RecordGimmickStats => recordGimmickStats;
         public int FoxFireCountMin => Mathf.Clamp(foxFireCountMin, 1, 10);
         public int FoxFireCountMax => Mathf.Clamp(foxFireCountMax, FoxFireCountMin, 10);
         public float FoxFireSafeSeconds => Mathf.Clamp(Finite(foxFireSafeSeconds, 1f), 0f, 3f);

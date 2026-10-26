@@ -2831,3 +2831,16 @@ main `e0c072f2`(#306)를 합쳤다. 충돌은 이 문서의 절 추가뿐이었�
 | 검사 코드 | 수정 | 기믹 묶음 규칙(간격·첫 발동·동시 발동·건너뛰기·켜기/끄기·% 합 100·은퇴 칸·스테이지별 설정)을 확인하도록 Lab·Hapio EditMode/PlayMode 검사를 고쳤다. 야광귀 검사 4개는 "기다렸다 떨어짐" 대신 "건너뛰고 다음 박자에 떨어짐"을 확인한다. |
 | 전체 EditMode·PlayMode | **NOT_RUN** | 사용자가 Test Runner로 실행한다. |
 | 실제 플레이·Mac 3앱·iOS | **NOT_RUN** | 10초·20초 기본 간격의 체감과 판별 기록 통계(이후 단계)는 아직 확인하지 않았다. |
+
+## #311 판별 기믹 기록 — UT용, 기본 꺼짐 (2단계) — 2026-10-27
+
+기준 `32c33fea`(#311 1단계), 같은 브랜치. Unity **6000.6.5f1**, 열린 Editor에 Pipeline 연결로 컴파일을 실행했다. 공유 설정(211개)·통신 5666·토큰은 바꾸지 않았다.
+
+| 항목 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| 기록 | 추가 | Host 모델이 기믹을 걸 때마다 전체·종류별 수를 세고, 공용과 고유가 같은 시각에 둘 다 걸리면 동시 발동으로 센다. 건너뛴 차례는 세지 않는다. 새 판마다 0부터 센다(`LabGimmickStats`, `LabModel.GimmickStats`). |
+| 남기기 | 추가 · 기본 꺼짐 | `LabConfig` Inspector `Record Gimmick Stats`(DEV 칸 아님)를 켠 Host만, 판이 끝난 뒤 처음 내보내는 스냅샷에서 한 번 콘솔 `C6_LAB_GIMMICK_STATS`와 `persistentDataPath/gimmick-stats.jsonl`에 한 줄을 남긴다. 파일을 못 쓰면 경고만 남기고 게임은 그대로 간다. 저장 `LabConfig.asset`은 꺼짐(값을 저장하지 않아 코드 기본값 false). |
+| 모델 값 확인 | 확인 | Editor에서 모델만 돌려(Play·Test Runner 아님) 새 검사의 기대값과 같은지 봤다: 3명·공용 10초(폭탄)·고유 20초(여우불), 41초 → 전체 6·폭탄 4·여우불 2·동시 2. 막기만 5초 간격·7초 막기, 25초 → 전체 3(건너뛴 2번 제외), 180초 끝 → `Defeat`·18번·180초에서 멈춤. |
+| 컴파일 | PASS | 오프라인 Roslyn 7개 어셈블리 오류 0, 열린 Editor 재컴파일 `compilationFailed: false`. |
+| 새 검사 | **NOT_RUN** | EditMode `LabModelTests.GimmickStatsCountEachCastByKindAndBothGroupsAtTheSameMoment`·`GimmickStatsLeaveOutSkippedTurnsStopWithTheRoundAndStartAfreshNextRound`, `LabDeveloperConfigTests.GimmickStatsRecordingIsOffByDefaultAndNeverPartOfTheSharedForm`; PlayMode `LabDeveloperSoloIntegrationTests.SavedSceneSoloRecordsEachFinishedRoundsGimmickStatsOnceWhenTurnedOn`(임시 파일에 기록). 사용자가 실행한다. |
+| 실기기 파일 꺼내기 | **NOT_RUN** | iPhone에서 `gimmick-stats.jsonl`을 Xcode의 Download Container로 꺼내는 절차는 UT 전에 확인한다. |

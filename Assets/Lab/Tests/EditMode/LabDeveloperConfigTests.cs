@@ -1503,6 +1503,34 @@ namespace C6Lab.Tests
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "A rejected form changes nothing.");
         }
         [Test]
+        public void GimmickStatsRecordingIsOffByDefaultAndNeverPartOfTheSharedForm()
+        {
+            Assert.That(config.RecordGimmickStats, Is.False, "UT recording (#311) stays off until someone turns it on.");
+            LabConfig authored = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(authored, Is.Not.Null);
+            Assert.That(authored.RecordGimmickStats, Is.False, "The saved Config does not record either.");
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(211), "The switch adds no DEV row and no shared value.");
+            Assert.That(LabConfig.DeveloperFields.Any(field => field.Label.IndexOf("stat", System.StringComparison.OrdinalIgnoreCase) >= 0),
+                Is.False);
+
+            JsonUtility.FromJsonOverwrite("{\"recordGimmickStats\":true}", config);
+            float[] values = config.CaptureDeveloperValues();
+            var peer = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                Assert.That(peer.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                Assert.That(peer.RecordGimmickStats, Is.False, "Applying a shared form never turns it on elsewhere.");
+                Assert.That(LabSessionSettings.Fingerprint(values, 3, 1),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(peer.CaptureDeveloperValues(), 3, 1)),
+                    "Rooms agree on the settings whether or not the Host records.");
+                LabConfig copy = Object.Instantiate(config);
+                try { Assert.That(copy.RecordGimmickStats, Is.True, "Runtime copies of a recording Config keep recording."); }
+                finally { Object.DestroyImmediate(copy); }
+            }
+            finally { Object.DestroyImmediate(peer); }
+        }
+
+        [Test]
         public void CombinedFlashAndCharmSettingsRoundTripWithoutOverwritingEarlierFields()
         {
             float[] before = config.CaptureDeveloperValues();

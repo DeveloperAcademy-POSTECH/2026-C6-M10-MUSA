@@ -448,8 +448,7 @@ namespace C6Lab.Tests
             // that bump while scattering cannot merge before the test drags Yin onto Yang.
             tuning[51] = 0f;
             tuning[79] = 1f; // Crack keeps the damage-number presentation checked below.
-            tuning[87] = 0f; // no gourd bombs: this test counts the orbs on the board
-            tuning[88] = 0f;
+            tuning[205] = 0f; // no common gimmicks (#311): this test counts the orbs on the board
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
             network.config = rawOnly;
             // The board reads contact combining from its own config, so it needs the same tuning.
@@ -634,8 +633,8 @@ namespace C6Lab.Tests
             LabConfig savedConfig = network.config;
             LabConfig gourd = UnityEngine.Object.Instantiate(savedConfig);
             float[] tuning = gourd.CaptureDeveloperValues();
-            tuning[87] = 1f; // a gourd bomb every second
-            tuning[88] = 1f;
+            tuning[205] = 1f; // the common group (#311) every second...
+            tuning[208] = 0f; // ...with only the gourd bomb
             Assert.That(gourd.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = gourd;
             fixture.UseAvailablePort(network);
@@ -698,11 +697,10 @@ namespace C6Lab.Tests
             LabConfig savedConfig = network.config;
             LabConfig foxy = UnityEngine.Object.Instantiate(savedConfig);
             float[] tuning = foxy.CaptureDeveloperValues();
-            tuning[166] = 1f; // the sabotage mix (#251), one second in
-            tuning[167] = 1f;
-            tuning[168] = 1f;
-            tuning[169] = 0f; // only the fox fire
-            tuning[170] = 0f;
+            tuning[166] = 1f; // the Lab borrows the fox's own gimmicks (#311), every second
+            tuning[205] = 0f;
+            tuning[206] = 1f;
+            tuning[171] = 100f; // only the fox fire
             tuning[172] = 0f;
             Assert.That(foxy.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = foxy;
@@ -750,12 +748,11 @@ namespace C6Lab.Tests
             LabConfig savedConfig = network.config;
             LabConfig charming = UnityEngine.Object.Instantiate(savedConfig);
             float[] tuning = charming.CaptureDeveloperValues();
-            tuning[166] = 1f; // the sabotage mix (#251), every two seconds
-            tuning[167] = 2f;
-            tuning[168] = 2f;
-            tuning[169] = 0f; // only the charm
-            tuning[170] = 0f;
-            tuning[171] = 0f;
+            tuning[166] = 1f; // the Lab borrows the fox's own gimmicks (#311), every two seconds
+            tuning[205] = 0f;
+            tuning[206] = 2f;
+            tuning[171] = 0f; // only the charm
+            tuning[172] = 100f;
             tuning[176] = 1f; // for one second
             tuning[204] = 1f; // after a one-second warning (#305)
             Assert.That(charming.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
@@ -813,7 +810,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedSceneSoloSabotageMixAnnouncesEachCastOnTheOnePlayer()
+        public IEnumerator SavedSceneSoloGimmickGroupAnnouncesEachCastOnTheOnePlayer()
         {
             yield return fixture.Load();
 
@@ -822,12 +819,8 @@ namespace C6Lab.Tests
             LabConfig savedConfig = network.config;
             LabConfig mixing = UnityEngine.Object.Instantiate(savedConfig);
             float[] tuning = mixing.CaptureDeveloperValues();
-            tuning[166] = 1f; // the yokai's sabotage mix (#251), every second
-            tuning[167] = 1f;
-            tuning[168] = 1f;
-            tuning[169] = 0f; // only the swipe block
-            tuning[171] = 0f;
-            tuning[172] = 0f;
+            tuning[205] = 1f; // the common group (#311), every second...
+            tuning[207] = 0f; // ...with only the swipe block
             Assert.That(mixing.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = mixing;
             fixture.UseAvailablePort(network);
@@ -848,7 +841,7 @@ namespace C6Lab.Tests
                 Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
                 float until = Time.realtimeSinceStartup + 3f;
                 while ((kinds.Count == 0 || blocks.Count == 0) && Time.realtimeSinceStartup < until) yield return null;
-                Assert.That(kinds, Is.Not.Empty, "The mix casts after its interval.");
+                Assert.That(kinds, Is.Not.Empty, "The group casts after its interval.");
                 Assert.That(kinds, Is.All.EqualTo(LabSabotageKind.SwipeBlock));
                 Assert.That(targets, Is.All.EqualTo(network.LocalPlayerId), "Solo, it falls on the one player.");
                 Assert.That(blocks, Is.Not.Empty, "What it cast is the gourd's ordinary swipe block.");
@@ -880,11 +873,9 @@ namespace C6Lab.Tests
             LabConfig savedConfig = network.config;
             LabConfig blocking = UnityEngine.Object.Instantiate(savedConfig);
             float[] tuning = blocking.CaptureDeveloperValues();
-            tuning[87] = 0f; // no gourd bombs
-            tuning[88] = 0f;
-            tuning[152] = 1f; // a swipe block one second in
+            tuning[205] = 1f; // the common group (#311) one second in, with only the swipe block
+            tuning[207] = 0f;
             tuning[153] = 3f;
-            tuning[154] = 0f;
             Assert.That(blocking.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = blocking;
             fixture.UseAvailablePort(network);
@@ -922,6 +913,59 @@ namespace C6Lab.Tests
                 network.Stop();
                 network.config = savedConfig;
                 UnityEngine.Object.Destroy(blocking);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator SavedSceneSoloRecordsEachFinishedRoundsGimmickStatsOnceWhenTurnedOn()
+        {
+            yield return fixture.Load();
+
+            LabDeveloperMode developerUi = SavedDeveloperUi();
+            LabNetwork network = developerUi.network;
+            LabConfig savedConfig = network.config;
+            LabConfig recording = UnityEngine.Object.Instantiate(savedConfig);
+            float[] tuning = recording.CaptureDeveloperValues();
+            tuning[2] = 3f;   // a three-second round
+            tuning[205] = 1f; // the common group (#311) every second...
+            tuning[208] = 0f; // ...with only the gourd bomb
+            Assert.That(recording.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
+            JsonUtility.FromJsonOverwrite("{\"recordGimmickStats\":true}", recording); // the Inspector-only UT switch
+            network.config = recording;
+            fixture.UseAvailablePort(network);
+            // The test writes to its own file, never to the player's gimmick-stats.jsonl.
+            string path = System.IO.Path.Combine(Application.temporaryCachePath,
+                "gimmick-stats-" + System.Guid.NewGuid().ToString("N") + ".jsonl");
+            var pathField = typeof(LabNetwork).GetField("gimmickStatsPath",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(pathField, Is.Not.Null);
+            pathField.SetValue(network, path);
+            try
+            {
+                Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                float until = Time.realtimeSinceStartup + 8f;
+                while ((network.Snapshot == null || network.Snapshot.phase == LabPhase.Playing) && Time.realtimeSinceStartup < until)
+                    yield return null;
+                Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Defeat), "The three-second round runs out.");
+                until = Time.realtimeSinceStartup + .4f;
+                while (Time.realtimeSinceStartup < until) yield return null; // several more snapshots go out meanwhile
+
+                Assert.That(System.IO.File.Exists(path), Is.True, "The Host writes the finished round's record.");
+                string[] lines = System.IO.File.ReadAllLines(path);
+                Assert.That(lines.Length, Is.EqualTo(1), "One line per finished round, however many snapshots follow it.");
+                var stats = JsonUtility.FromJson<LabGimmickStats>(lines[0]);
+                Assert.That((stats.result, stats.players, stats.round, stats.stage), Is.EqualTo(("Defeat", 1, 1u, "None")));
+                Assert.That((stats.total, stats.gourdBomb, stats.simultaneous), Is.EqualTo((3, 3, 0)),
+                    "A bomb at 1, 2 and 3 s of battle time, however the frames fell.");
+                Assert.That(stats.seconds, Is.EqualTo(3d).Within(1e-6d));
+                Assert.That(stats.commonInterval, Is.EqualTo(1f));
+            }
+            finally
+            {
+                network.Stop();
+                network.config = savedConfig;
+                UnityEngine.Object.Destroy(recording);
+                if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
             }
         }
 

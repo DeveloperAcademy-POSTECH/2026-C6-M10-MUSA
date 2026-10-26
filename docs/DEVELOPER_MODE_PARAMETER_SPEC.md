@@ -642,6 +642,8 @@ DEV → **Gimmicks** 묶음(`── 공용 기믹 ──`, `── 고유 기믹
 
 **은퇴한 칸 (#311)**: `Gourd Bomb Interval Min·Max`(87·88), `Swipe Block Interval`(152), `Swipe Block Bomb Gap`(154), `Sabotage Interval Min·Max`(167·168)는 공유 설정의 자리만 지키고(뒤 칸의 번호가 밀리지 않게) DEV 화면에는 나오지 않으며 게임이 읽지 않는다(`LabConfig.RetiredDeveloperFields`).
 
+**기믹 기록 (UT용, 기본 꺼짐)**: `LabConfig` Inspector의 `Record Gimmick Stats`를 켜면 Host가 판이 끝날 때마다(승리·패배) 그 판의 기록을 한 줄 남긴다. DEV 칸·공유 설정이 아니어서 DEV 화면에 없고, 켜도 통신 형식과 방 설정 지문은 그대로다. 끝까지 가지 않고 다시 시작하거나 나간 판은 남기지 않는다. 남기는 곳은 콘솔(`C6_LAB_GIMMICK_STATS {…}`, iPhone은 Xcode·Mac 콘솔)과 기기의 `Application.persistentDataPath/gimmick-stats.jsonl`(판마다 한 줄 추가)이다. 기록 항목: `sessionId`·`round`·`stage`(None·Gumiho·Yaguang·Jigwi·Territory)·`players`·`result`·`seconds`(전투가 이어진 시간)·`commonInterval`·`uniqueInterval`·`total`(건 기믹 수)·`gourdBomb`·`swipeBlock`·`foxFire`·`charm`·`simultaneous`(공용과 고유가 같은 시각에 둘 다 걸린 수). 걸 사람이 없어 건너뛴 차례는 세지 않는다. 근거: `LabGimmickStats`, `LabModel.GimmickStats`, `LabNetwork.ReportGimmickStats`.
+
 **비율 계산**: 확률 = 그 기믹의 비율 ÷ 지금 걸 수 있는 같은 묶음 기믹 비율의 합이다. 기본 50·50이면 둘 다 걸 수 있을 때 반반이고, 하나가 꺼졌거나 걸 수 없으면 남은 하나가 100%다. 입력은 묶음마다 합 100이어야 적용된다.
 
 **여우불**: 받은 사람 판에 푸른 여우구슬이 떨어진다(박 폭탄 낙하 재사용). 음·양 구슬과 닿거나 끌어서 겹치면(접촉·드롭 조합 경로) 둘 다 푸른 연기로 사라지고, 결합 구슬은 생기지 않는다. 옆 가장자리를 넘으면(스와이프·폭발 모두, 솔로 포함) 푸른 연기로 사라져 이웃에게 가지 않는다. 넘기기 막기가 걸린 쪽에서는 튕긴다. 폭발에 밀리지만 불붙음·축소(#213)는 없다. 보유 한도 20에 들고, 수명은 일반 구슬과 같으며(15초), 위로 던질 수 없다. 그림은 `Resources/Sabotage/FoxOrb.png`이고 둘레의 푸른 빛·연기 색은 `LabOrbAppearance`의 Fox fire 칸에서 바꾼다.

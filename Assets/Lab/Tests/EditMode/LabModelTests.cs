@@ -2780,6 +2780,65 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void GimmickStatsCountEachCastByKindAndBothGroupsAtTheSameMoment()
+        {
+            var mix = MixConfig(10f, bomb: 1, block: 0, fox: 1, charm: 0);
+            try
+            {
+                float[] values = mix.CaptureDeveloperValues();
+                values[206] = 20f;
+                Assert.That(mix.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                Assert.That(room.GimmickStats().total, Is.Zero, "Nothing before a round.");
+                room.Begin("stats", new ulong[] { 10, 20, 30 }, 0d, mix);
+                room.Tick(41d);
+                LabGimmickStats stats = room.GimmickStats();
+                Assert.That((stats.total, stats.gourdBomb, stats.swipeBlock, stats.foxFire, stats.charm, stats.simultaneous),
+                    Is.EqualTo((6, 4, 0, 2, 0, 2)), "Bombs at 10-40 s, fox fire at 20 and 40 s, both together twice (#311).");
+                Assert.That(stats.total, Is.EqualTo(room.DrainSabotages().Length), "Every cast is counted once.");
+                Assert.That(stats.CountOf(LabSabotageKind.FoxFire), Is.EqualTo(2));
+                Assert.That((stats.sessionId, stats.round, stats.stage, stats.players, stats.result),
+                    Is.EqualTo(("stats", 1u, "None", 3, "Playing")));
+                Assert.That((stats.commonInterval, stats.uniqueInterval), Is.EqualTo((10f, 20f)));
+                Assert.That(stats.seconds, Is.EqualTo(41d).Within(1e-9));
+                stats.total = 99;
+                Assert.That(room.GimmickStats().total, Is.EqualTo(6), "Callers get a copy.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void GimmickStatsLeaveOutSkippedTurnsStopWithTheRoundAndStartAfreshNextRound()
+        {
+            var block = BlockConfig(5f, 7f);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("stats-rounds", new ulong[] { 10, 20, 30 }, 0d, block);
+                room.Tick(25d);
+                LabGimmickStats stats = room.GimmickStats();
+                Assert.That((stats.total, stats.swipeBlock, stats.simultaneous), Is.EqualTo((3, 3, 0)),
+                    "A 7 s block cast at 5 s still holds at 10 s and blocks come one at a time: that turn is skipped, not counted (#311).");
+                Assert.That(stats.uniqueInterval, Is.Zero, "The Lab scene borrows no unique gimmicks here.");
+
+                double duration = block.BattleDurationSeconds;
+                room.Tick(duration + 20d);
+                LabGimmickStats ended = room.GimmickStats();
+                Assert.That(ended.result, Is.EqualTo("Defeat"));
+                Assert.That(ended.seconds, Is.EqualTo(duration).Within(1e-9), "The time stops with the round.");
+                Assert.That(ended.total, Is.EqualTo(room.DrainSabotages().Length));
+                room.Tick(duration + 120d);
+                Assert.That(JsonUtility.ToJson(room.GimmickStats()), Is.EqualTo(JsonUtility.ToJson(ended)),
+                    "Reading it again after the round changes nothing.");
+
+                room.Begin("stats-rounds", new ulong[] { 10, 20, 30 }, duration + 120d, block);
+                LabGimmickStats fresh = room.GimmickStats();
+                Assert.That((fresh.round, fresh.total, fresh.swipeBlock, fresh.result), Is.EqualTo((2u, 0, 0, "Playing")));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(block); }
+        }
+
+        [Test]
         public void CommonGimmicksWaitOutASwipeBlockAndNeverAddToTheBlockedPlayer()
         {
             var mix = MixConfig(3f, bomb: 1, block: 1, fox: 0, charm: 0);
