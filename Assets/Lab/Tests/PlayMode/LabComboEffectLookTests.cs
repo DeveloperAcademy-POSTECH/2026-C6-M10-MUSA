@@ -144,6 +144,89 @@ namespace C6Lab.Tests
             }
         }
 
+        [Test]
+        public void TheWrongColorResultNamesWhoMissed()
+        {
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, true, false, 1), Is.EqualTo("P2 WRONG COLOR"));
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, true, true, 1), Is.EqualTo("YOU WRONG COLOR"));
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, false, false, -1), Is.EqualTo("WRONG COLOR"),
+                "Unknown thrower: no name.");
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.Timeout, true, true, 0), Is.EqualTo("TIME UP"),
+                "A time out is nobody's miss.");
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.Success, true, true, 0), Is.EqualTo("CLEAR!"));
+        }
+
+        [UnityTest]
+        public IEnumerator EachHitPopsNComboAndAClearPopsFourComboBeforeClear()
+        {
+            var root = new GameObject("Combo pop HUD fixture");
+            var network = root.AddComponent<LabNetwork>();
+            network.enabled = false;
+            var canvasRoot = new GameObject("Combo pop canvas", typeof(RectTransform), typeof(Canvas));
+            var hud = root.AddComponent<LabGourdComboHud>();
+            hud.Bind(network, canvasRoot.GetComponent<Canvas>());
+            FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
+            try
+            {
+                LabSnapshot playing = Snapshot(network, 50d);
+                playing.comboActive = true; playing.comboStartedAt = 49d; playing.comboEndsAt = 59d; playing.comboProgress = 0;
+                latest.SetValue(network, playing);
+                yield return null;
+                Assert.That(hud.ComboPopCount, Is.Zero);
+
+                LabSnapshot one = Snapshot(network, 51d);
+                one.comboActive = true; one.comboStartedAt = 49d; one.comboEndsAt = 59d; one.comboProgress = 1;
+                latest.SetValue(network, one);
+                yield return null;
+                Assert.That(hud.ComboPopCount, Is.EqualTo(1), "1 COMBO! on the first slot.");
+                Assert.That(hud.ComboPopFinal, Is.False);
+
+                LabSnapshot clear = Snapshot(network, 53d);
+                clear.comboProgress = 4; clear.comboResult = LabComboResult.Success; clear.comboResultCount = 1; clear.comboResultAt = 53d;
+                latest.SetValue(network, clear);
+                yield return null;
+                Assert.That(hud.ComboPopCount, Is.EqualTo(4));
+                Assert.That(hud.ComboPopFinal, Is.True, "4 COMBO!! first...");
+                Assert.That(hud.ResultVisible, Is.False, "...CLEAR! waits for it.");
+                Assert.That(hud.ResultLabel, Is.EqualTo(LabGourdComboHud.ClearText));
+                yield return new WaitForSecondsRealtime(1.2f);
+                Assert.That(hud.ResultVisible, Is.True, "Then CLEAR!.");
+            }
+            finally
+            {
+                Object.Destroy(root);
+                Object.Destroy(canvasRoot);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator TheSmallBarStandsUpAndShrinksDownward()
+        {
+            var root = new GameObject("Combo bar HUD fixture");
+            var network = root.AddComponent<LabNetwork>();
+            network.enabled = false;
+            var canvasRoot = new GameObject("Combo bar canvas", typeof(RectTransform), typeof(Canvas));
+            var hud = root.AddComponent<LabGourdComboHud>();
+            hud.Bind(network, canvasRoot.GetComponent<Canvas>());
+            FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
+            try
+            {
+                latest.SetValue(network, Snapshot(network, 50d, penaltyUntil: 59d));
+                yield return null;
+                yield return null;
+                Assert.That(hud.EffectVisible, Is.True);
+                Assert.That(hud.PenaltyBarFill, Is.EqualTo(.9f).Within(.05f), "9 of 10 s left (started at 49 s).");
+                latest.SetValue(network, Snapshot(network, 54d, penaltyUntil: 59d));
+                yield return null;
+                Assert.That(hud.PenaltyBarFill, Is.EqualTo(.5f).Within(.05f), "Half the bar left.");
+            }
+            finally
+            {
+                Object.Destroy(root);
+                Object.Destroy(canvasRoot);
+            }
+        }
+
         private static LabSnapshot Snapshot(LabNetwork network, double now, double penaltyUntil = 0d, double rewardUntil = 0d)
         {
             return new LabSnapshot
