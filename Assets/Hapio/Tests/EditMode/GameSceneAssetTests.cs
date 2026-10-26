@@ -56,13 +56,29 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void GumihoDecorativeWrapper_DoesNotImportItsOwnCameraLightingOrAudioListener()
+        public void SharedGourd_KeepsItsOriginalAnimatedYokaiWithoutAuthoringViews()
         {
-            GameObject prefab = GameStageCatalog.RequireDefault().Get(1).yokaiVisual;
+            GameObject prefab = Resources.Load<GameObject>("GourdPaint/WhiteGourd");
             Assert.That(prefab, Is.Not.Null);
-            Assert.That(prefab.GetComponentsInChildren<Renderer>(true).Length, Is.GreaterThan(0));
+            Transform slot = prefab.transform.Find(GameYokaiPresentation.SlotPath);
+            Assert.That(slot, Is.Not.Null);
+            Transform body = slot.Find("Yokai");
+            Assert.That(body, Is.Not.Null);
+            Assert.That(body.gameObject.activeSelf, Is.True);
+            Assert.That(body.GetComponent<Renderer>(), Is.Not.Null);
+            Assert.That(body.GetComponent<Renderer>().enabled, Is.True);
+            foreach (string eye in new[] { "EyePivot_L", "EyePivot_R" })
+            {
+                Transform pivot = slot.Find(eye);
+                Assert.That(pivot, Is.Not.Null, eye);
+                Assert.That(pivot.gameObject.activeSelf, Is.True, eye);
+                Assert.That(pivot.GetComponentsInChildren<Renderer>(true).Length, Is.GreaterThan(0), eye);
+            }
+            Animation animation = prefab.GetComponentInChildren<Animation>(true);
+            Assert.That(animation, Is.Not.Null);
+            Assert.That(animation.clip, Is.Not.Null, "The original lid, rise/hide and eye animation stays connected.");
             Assert.That(prefab.GetComponentsInChildren<Camera>(true), Is.Empty,
-                "An FBX authoring camera must never draw over the player's assigned seat camera.");
+                "The common yokai must not replace the player's assigned seat camera.");
             Assert.That(prefab.GetComponentsInChildren<Light>(true), Is.Empty);
             Assert.That(prefab.GetComponentsInChildren<AudioListener>(true), Is.Empty);
         }

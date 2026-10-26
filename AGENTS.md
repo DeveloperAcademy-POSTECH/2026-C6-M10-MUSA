@@ -17,7 +17,7 @@
 - 새 빌드는 `Hapio/Development Build` 메뉴를 사용한다. Lab 첫 Build Settings 항목과 기존 개발용 빌드는 바꾸지 않는다. 상세 책임·실행법·종료 조건은 `docs/GAME_FLOW.md`를 따른다.
 
 - #276 별도 게임의 고정 순서는 구미호→야광귀→지귀다. 공통 폭탄·좌우 전달 막기를 고유 패턴 추첨에 넣거나 끄지 않는다. `LabStageYokai.None`은 기존 Lab 동작을 유지한다.
-- 요괴별 기본값·장식 참조는 `Resources/Hapio/StageCatalog`와 StageDefinition, 실행 중 조정은 GameStageSettings 복사본으로 관리한다. 원본 LabConfig를 자동 저장하지 않는다.
+- 요괴별 기본값·규칙은 `Resources/Hapio/StageCatalog`와 StageDefinition, 실행 중 조정은 GameStageSettings 복사본으로 관리한다. #297 모든 스테이지의 표시 모델은 WhiteGourd 내부의 공통 검은 요괴이며, StageDefinition의 모델 override를 비워 두고 갱신 도구에서 구미호를 다시 연결하지 않는다. 원본 LabConfig를 자동 저장하지 않는다.
 
 - #281 2:2 청홍 땅따먹기는 Hapio의 독자 모드(4명, 한 판, 끝나면 같은 방 로비)다. 규칙은 `LabTeams`·`LabModel.Team`과 공유 설정196~199에 있고 Lab DEV에서도 4명·솔로로 켤 수 있다. Hapio에서 196 켜기는 방 모드가 정하며 DEV 탭에서 바꾸지 않는다. 전투 화면 요소(점유율 막대·피버·벽·무지개)는 실행 중에 만들고, 로비 팝업·팀 자리 화면은 `Hapio > Upgrade 2v2 Lobby UI`로만 저장한다.
 - #278 Home/Lobby는 `Assets/Hapio/Art/UI/GameLobby.prefab`의 한지 로비를 공유한다. GameLobbyView는 UI만 관리하고 GameSession/GamePendingRoomRegistry가 연결·대기 광고를 소유한다. 기존 Lab Scene과 전투/결과 Scene을 로비 적용 목적으로 다시 복사하지 않는다.

@@ -16,7 +16,7 @@ MonoBehaviour:
   stageId: gumiho
   displayName: "\uAD6C\uBBF8\uD638"
   yokai: 1
-  yokaiVisual: {fileID: 770893501220891427, guid: ee2ced34c395e4149b006630c63dd321, type: 3}
+  yokaiVisual: {fileID: 0}
   defaultValues:
   - index: 166
     value: 1
