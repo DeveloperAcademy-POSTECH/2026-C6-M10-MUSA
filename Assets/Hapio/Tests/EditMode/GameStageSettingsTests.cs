@@ -16,7 +16,9 @@ namespace Hapio.Tests
             Assert.That(catalog.Get(1).yokai, Is.EqualTo(LabStageYokai.Gumiho));
             Assert.That(catalog.Get(2).yokai, Is.EqualTo(LabStageYokai.Yaguang));
             Assert.That(catalog.Get(3).yokai, Is.EqualTo(LabStageYokai.Jigwi));
-            Assert.That(catalog.Get(1).yokaiVisual, Is.Not.Null);
+            foreach (int stage in new[] { 1, 2, 3 })
+                Assert.That(catalog.Get(stage).yokaiVisual, Is.Null,
+                    "Every default stage uses the original black yokai already inside the shared gourd.");
             using (var settings = new GameStageSettings(source, catalog))
             {
                 Assert.That(settings.Capture(1)[166], Is.EqualTo(1f));

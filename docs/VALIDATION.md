@@ -2661,3 +2661,23 @@ Unity **6000.6.5f1**, macOS ARM64, 기존 Desktop checkout과 분리된 작업 �
 | iOS 출력·서명·실기기·실제 LAN/핫스팟 | **NOT_RUN** | 이전 버전의 통과 기록을 승계하지 않는다. 통신 버전이 바뀌므로 참여 앱을 같은 버전으로 맞춰야 한다. |
 
 검사 중 Unity가 갱신한 `TimeManager.asset` 직렬화와 Target2 머터리얼의 미세한 부동소수점 차이는 원래 상태로 복원했다. 기존 미추적 파일은 보존하고 PR에 포함하지 않았다.
+
+
+## 전 스테이지 공통 검은 요괴 복원 (#297) — 2026-10-26
+
+기준은 main `1279129b`에서 분기한 `fix/#297-common-gourd-yokai`다. Unity **6000.6.5f1 / macOS ARM64 / Metal**, 연결된 Editor에서 실제 실행했다. 기존 미추적 파일과 Scene 배치를 보존했다. 원시 CLI 결과·개별 검사 결과·임시 렌더는 로컬 검증 공간에만 두었다.
+
+### 변경과 보존
+
+- `Stage01_gumiho.asset`의 모델 override만 해제했다. 2·3스테이지는 원래 비어 있었다. 세 스테이지 모두 WhiteGourd의 `GourdYokai_Details/YokaiRoot` 안에 있던 검은 `Yokai`와 양쪽 눈을 사용한다.
+- `GameStageAssets.EnsureAssets`는 모든 기본 스테이지의 외형 override를 비우며, 구미호 자동 생성/연결 경로를 제거했다. 이 함수는 정의·카탈로그 등 소유 에셋만 저장한다. 상위 `Upgrade Three Yokai Stages` 메뉴에는 기존의 Scene 갱신 과정이 남아 있으므로 이번 확인에서는 전체 메뉴를 실행하지 않았다.
+- 구미호 원본 모델·프리팹, 박 프리팹·도색·충돌·줄·회전·애니메이션, Scene·배치, 요괴별 정체성·패턴·DEV 수치와 통신 규약은 변경하지 않았다. 선택 모델의 기존 가져오기 안전 검사는 유지했다.
+
+| 항목 | 실제 결과 | 근거·범위 |
+| --- | --- | --- |
+| 실제 Editor에서 에셋 갱신 2회 | **PASS** | 1회차에서 GumihoVisual 참조 제거, 1~3의 stageId/yokai 유지·모델 override 없음 확인. 2회차 뒤 카탈로그·StageDefinition 파일 내용이 1회차와 동일했다. Scene 저장은 요청하지 않았다. |
+| 전체 EditMode | **1088/1088 PASS**, 실패·skip·inconclusive 0 | 연결된 Editor Test Runner, 33.44초. 저장 공통 몸체·눈·클립, 기본 스테이지 참조·고유 규칙·공통 설정 검사를 포함한다. |
+| 전체 PlayMode | **364/364 PASS**, 실패·skip·inconclusive 0 | 같은 Test Runner, 201.93초. `EveryStageKeepsTheOriginalAnimatedYokaiAndRebindingDoesNotChangeTheTarget`에서 1→2→3→1·중복 Bind·비활성/재활성 후 같은 원본 자식/렌더러/클립·박·hitbox·pose 보존 확인. 기존 등장/숨기기·콤보 움찔·폭탄/섬광·게임 흐름·완성 박 관람 검사 포함. |
+| 실제 GPU 격리 미리보기 | **PASS — Editor 표현 확인** | 저장 WhiteGourd를 기존 `LabPaintStudyRenderer`의 PreviewScene에서 렌더했다. 등장 시점 1.8초에 검은 몸체·양쪽 눈·열린 뚜껑을 512×512 이미지로 확인했다. 활성 Scene dirty는 전후 false이며 이미지·재질 복사본을 정리했다. 실제 플레이 화면의 실기기 확인과 구분한다. |
+| 기존 파일 보존 | **PASS** | 작업 전 에셋·설정 961개 해시와 비교. 검사 후 TimeManager 자동 직렬화 차이를 복원하면 변경 에셋은 Stage01 모델 참조 한 줄뿐이다. 모든 Scene·Prefab·Material·기존 미추적 파일은 동일하다. |
+| 새 Mac/iOS 빌드·실기기·실제 다중 연결 | **NOT_RUN** | 이번 변경에서 실행하지 않았으며 이전 빌드/핫스팟 결과를 승계하지 않는다. |

@@ -11,9 +11,9 @@ namespace Hapio.Tests
     public sealed class GameYokaiPresentationTests
     {
         [UnityTest]
-        public IEnumerator GumihoUsesTheSavedArtAndOtherStagesRestoreTheExistingYokaiWithoutChangingTheTarget()
+        public IEnumerator EveryStageKeepsTheOriginalAnimatedYokaiAndRebindingDoesNotChangeTheTarget()
         {
-            var root = new GameObject("Stage decorative presentation fixture");
+            var root = new GameObject("Common yokai presentation fixture");
             LabTarget target = LabTarget.CreateCylinder(root.transform, new Vector3(0f, 1101f, 0f), .8f, 2f);
             var presentation = root.AddComponent<GameYokaiPresentation>();
             GameObject unsupported = null;
@@ -26,36 +26,67 @@ namespace Hapio.Tests
                 Transform slot = gourd.transform.Find(GameYokaiPresentation.SlotPath);
                 Assert.That(slot, Is.Not.Null);
                 Transform originalBody = slot.Find("Yokai");
+                Assert.That(originalBody, Is.Not.Null);
                 Assert.That(originalBody.gameObject.activeSelf, Is.True);
+                Renderer originalBodyRenderer = originalBody.GetComponent<Renderer>();
+                Assert.That(originalBodyRenderer, Is.Not.Null);
+                Transform[] originalChildren = slot.Cast<Transform>().ToArray();
+                bool[] originalActive = originalChildren.Select(child => child.gameObject.activeSelf).ToArray();
+                Renderer[] originalRenderers = slot.GetComponentsInChildren<Renderer>(true);
+                Animation animation = gourd.GetComponentInChildren<Animation>(true);
+                Assert.That(animation, Is.Not.Null);
+                AnimationClip originalClip = animation.clip;
+                Assert.That(originalClip, Is.Not.Null);
+                // Freeze the authored animation at the risen pose so legitimate animation
+                // motion cannot be mistaken for a transform change caused by stage binding.
+                animation.Stop();
+                originalClip.SampleAnimation(animation.gameObject, LabGourdYokai.RisenAt);
+                Transform shell = gourd.transform.Find("White Gourd");
+                Assert.That(shell, Is.Not.Null);
+                Matrix4x4 shellPose = shell.localToWorldMatrix;
+                Matrix4x4 targetPose = target.transform.localToWorldMatrix;
+                Matrix4x4 bodyPose = originalBody.localToWorldMatrix;
                 GameStageCatalog catalog = GameStageCatalog.RequireDefault();
-                Assert.That(catalog.Get(1).yokaiVisual, Is.Not.Null);
-                presentation.Bind(target, catalog.Get(1));
-                GameObject model = presentation.DecorativeInstance;
-                Assert.That(model, Is.Not.Null);
-                Assert.That(model.transform.parent, Is.SameAs(slot));
-                Assert.That(originalBody.gameObject.activeSelf, Is.False);
-                Assert.That(model.GetComponentsInChildren<Renderer>(true).Length, Is.GreaterThan(0));
-                Assert.That(model.GetComponentsInChildren<Collider>(true).All(collider => !collider.enabled), Is.True);
-                Assert.That(model.GetComponentsInChildren<Camera>(true), Is.Empty);
-                Assert.That(model.GetComponentsInChildren<Light>(true), Is.Empty);
-                Assert.That(model.GetComponentsInChildren<AudioListener>(true), Is.Empty);
-                Assert.That(target.Hitbox, Is.SameAs(hitbox)); Assert.That(hitbox.sharedMesh, Is.SameAs(physicalMesh));
-                Assert.That(target.MountedVisual, Is.SameAs(gourd), "The paint presentation must not be replaced with the fox model.");
-                presentation.Bind(target, catalog.Get(1));
-                Assert.That(presentation.DecorativeInstance, Is.SameAs(model), "Repeated binding must not instantiate another fox.");
-                yield return null;
-                Assert.That(model.GetComponentsInChildren<Collider>(true), Is.Empty);
 
-                foreach (int stage in new[] { 2, 3 })
+                foreach (int stage in new[] { 1, 2, 3, 1 })
                 {
-                    presentation.Bind(target, catalog.Get(stage));
+                    GameStageDefinition definition = catalog.Get(stage);
+                    Assert.That(definition.yokaiVisual, Is.Null,
+                        "All default stages must use the same original black yokai.");
+                    presentation.Bind(target, definition);
+                    presentation.Bind(target, definition);
+                    yield return null;
                     Assert.That(presentation.UsingExistingVisual, Is.True);
-                    Assert.That(originalBody.gameObject.activeSelf, Is.True);
-                    Assert.That(presentation.Status, Does.Contain(catalog.Get(stage).displayName));
-                    Assert.That(target.Hitbox, Is.SameAs(hitbox)); Assert.That(hitbox.sharedMesh, Is.SameAs(physicalMesh));
+                    Assert.That(presentation.DecorativeInstance, Is.Null);
+                    Assert.That(presentation.DecorativeSlot, Is.SameAs(slot));
+                    Assert.That(presentation.Status, Does.Contain(definition.displayName));
+                    CollectionAssert.AreEqual(originalChildren, slot.Cast<Transform>().ToArray(),
+                        "Changing stage or binding twice must not add, replace or remove the original model.");
+                    CollectionAssert.AreEqual(originalActive,
+                        originalChildren.Select(child => child.gameObject.activeSelf).ToArray());
+                    CollectionAssert.AreEqual(originalRenderers, slot.GetComponentsInChildren<Renderer>(true));
+                    Assert.That(originalBodyRenderer.enabled, Is.True);
+                    foreach (string eye in new[] { "EyePivot_L", "EyePivot_R" })
+                        Assert.That(slot.Find(eye).gameObject.activeInHierarchy, Is.True, eye);
+                    Assert.That(animation.clip, Is.SameAs(originalClip));
+                    Assert.That(target.Hitbox, Is.SameAs(hitbox));
+                    Assert.That(hitbox.sharedMesh, Is.SameAs(physicalMesh));
+                    Assert.That(target.MountedVisual, Is.SameAs(gourd));
+                    Assert.That(shell.localToWorldMatrix, Is.EqualTo(shellPose));
+                    Assert.That(target.transform.localToWorldMatrix, Is.EqualTo(targetPose));
+                    Assert.That(originalBody.localToWorldMatrix, Is.EqualTo(bodyPose));
                 }
+                presentation.enabled = false;
+                presentation.enabled = true;
+                presentation.Bind(target, catalog.Get(1));
                 yield return null;
-                Assert.That(model == null, Is.True);
+                Assert.That(presentation.DecorativeInstance, Is.Null);
+                Assert.That(presentation.DecorativeSlot, Is.SameAs(slot));
+                CollectionAssert.AreEqual(originalChildren, slot.Cast<Transform>().ToArray());
+                CollectionAssert.AreEqual(originalActive,
+                    originalChildren.Select(child => child.gameObject.activeSelf).ToArray());
+                Assert.That(originalBodyRenderer.enabled, Is.True);
+
                 unsupported = new GameObject("Custom or Crack-like presentation without a yokai slot");
                 target.SetVisualPrefab(unsupported);
                 presentation.Bind(target, catalog.Get(1));
