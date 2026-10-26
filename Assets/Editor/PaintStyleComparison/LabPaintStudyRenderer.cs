@@ -33,9 +33,12 @@ namespace C6Lab.Experiments.Editor
         private readonly Dictionary<LabPaintStudyMap, Texture2D> mapTextures = new Dictionary<LabPaintStudyMap, Texture2D>();
         private readonly List<Material> materialCopies = new List<Material>();
         private bool disposed;
+        private readonly bool frameSavedGourd;
+        private Renderer body;
 
-        public LabPaintStudyRenderer()
+        public LabPaintStudyRenderer(bool frameSavedGourd = false)
         {
+            this.frameSavedGourd = frameSavedGourd;
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 throw new InvalidOperationException("The paint comparison requires a real graphics device.");
             try
@@ -65,6 +68,7 @@ namespace C6Lab.Experiments.Editor
                             if (paintMaterial != null)
                                 throw new InvalidOperationException("The saved prefab has more than one paint shell material.");
                             paintMaterial = copy;
+                            body = renderer;
                         }
                         materials[i] = copy;
                     }
@@ -134,7 +138,7 @@ namespace C6Lab.Experiments.Editor
         }
 
         /// <summary>Render genuine Host-rule bytes at their native resolution and Point sampling.</summary>
-        public Texture2D RenderSurface(LabPaintSurface surface, bool grain, float yaw = 0f, float zoom = 1f)
+        public Texture2D RenderSurface(LabPaintSurface surface, bool grain, float yaw = 0f, float zoom = 1f, float pitch = 0f)
         {
             if (disposed) throw new ObjectDisposedException(nameof(LabPaintStudyRenderer));
             if (surface == null) throw new ArgumentNullException(nameof(surface));
@@ -154,20 +158,41 @@ namespace C6Lab.Experiments.Editor
             surface.CopyPixels(pixels);
             runtimeMapTexture.SetPixels32(pixels);
             runtimeMapTexture.Apply(false, false);
-            return RenderMap(runtimeMapTexture, grain, yaw, zoom);
+            return RenderMap(runtimeMapTexture, grain, yaw, zoom, pitch);
         }
 
-        private Texture2D RenderMap(Texture2D mapTexture, bool grain, float yaw, float zoom)
+        /// <summary>Caller owns the continuous visual texture; the preview never uploads it into a game surface.</summary>
+        public Texture2D RenderVisual(Texture map, float yaw = 0f, float zoom = 1f, float pitch = 0f)
+        {
+            if (disposed) throw new ObjectDisposedException(nameof(LabPaintStudyRenderer));
+            if (map == null) throw new ArgumentNullException(nameof(map));
+            return RenderMap(map, false, yaw, zoom, pitch);
+        }
+
+        private Texture2D RenderMap(Texture mapTexture, bool grain, float yaw, float zoom, float pitch = 0f)
         {
             paintMaterial.SetTexture("_PaintMap", mapTexture);
             paintMaterial.SetFloat("_PaintMapReady", 1f);
+            paintMaterial.SetTexture("_PainterMap", Texture2D.blackTexture);
+            paintMaterial.SetFloat("_PlayerPaintPatternsEnabled", 0f);
             paintMaterial.SetFloat("_PaintGrainEnabled", grain ? 1f : 0f);
             paintMaterial.SetFloat("_PaintGrainSize", 1f);
             paintMaterial.SetFloat("_PaintGrainStrength", .3f);
             paintMaterial.SetFloat("_PaintMottleStrength", .18f);
-            instance.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            instance.transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
             camera.transform.SetPositionAndRotation(new Vector3(0f, .035f, 4f), Quaternion.Euler(0f, 180f, 0f));
-            camera.orthographicSize = 1.08f / Mathf.Clamp(zoom, .65f, 1.55f);
+            camera.orthographicSize = 1.08f / Mathf.Clamp(zoom, .65f, 3f);
+            if (frameSavedGourd)
+            {
+                // New study only: pivot/scale come from the actual saved prefab, rather than
+                // assuming its shell is a unit sphere at the prefab root.
+                instance.transform.position -= body.bounds.center;
+                Bounds bounds = body.bounds;
+                foreach (Renderer part in instance.GetComponentsInChildren<Renderer>())
+                    if (part.enabled) bounds.Encapsulate(part.bounds);
+                camera.transform.position = bounds.center + Vector3.forward * 4f;
+                camera.orthographicSize = Mathf.Max(bounds.extents.x, bounds.extents.y) * 1.12f / Mathf.Clamp(zoom, .65f, 3f);
+            }
             RenderTexture previous = RenderTexture.active;
             Texture2D image = null;
             try
