@@ -15,8 +15,9 @@ namespace C6Lab
     /// - 이 기기 플레이어의 SMALL/BIG을 조합판에도 알려 판 구슬 그림이 작아지거나 커지게 한다(#257).
     /// - #301: 칸을 맞힐 때마다 패널 아래에 "N COMBO!"(주황 숫자 + 흰 테두리 + 분홍 COMBO!)가 튀어나오고, 4칸을
     ///   다 맞히면 패널 자리에 "4 COMBO!!"가 가장 크게 나온 뒤 CLEAR!가 이어진다. 틀린 색 실패는 누가 틀렸는지
-    ///   ("P2 WRONG COLOR", 내가 틀렸으면 "YOU WRONG COLOR")를 모든 기기에 같이 보여준다. SMALL 남은 시간은 배지
-    ///   바로 밑의 세로 사각형 안 빨간 칸이 위에서 아래로 줄어든다.
+    ///   ("P2 WRONG COLOR", 내가 틀렸으면 "YOU WRONG COLOR")를 모든 기기에 같이 보여준다. SMALL은 게임을 가리지
+    ///   않게 공격 영역 왼쪽 아래 구석에 "SMALL" 글자와 그 밑 세로 사각형으로만 보이고, 사각형 안 빨간 칸이 위에서
+    ///   아래로 줄어든다.
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
     /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
@@ -67,10 +68,12 @@ namespace C6Lab
         [Tooltip("다 맞혔을 때 4 COMBO!!가 떠 있는 시간 (초). 그 뒤 CLEAR!가 나온다.")]
         [SerializeField, Range(.2f, 3f)] private float comboClearSeconds = 1f;
         [Header("SMALL 세로 사각형 (#301)")]
-        [Tooltip("SMALL 배지 밑에 세운 남은 시간 사각형의 폭과 높이 (배지 높이의 배수)")]
+        [Tooltip("SMALL 남은 시간 세로 사각형의 폭과 높이 (기준 40px × 칸 크기 비율의 배수)")]
         [SerializeField] private Vector2 penaltyBarSize = new Vector2(1.1f, 2.4f);
-        [Tooltip("SMALL 배지와 사각형 사이 간격 (배지 높이의 배수)")]
-        [SerializeField, Range(0f, 2f)] private float penaltyBarGap = .2f;
+        [Tooltip("SMALL 글자와 사각형 사이 간격 (같은 기준의 배수)")]
+        [SerializeField, Range(0f, 2f)] private float penaltyBarGap = .15f;
+        [Tooltip("공격 영역 왼쪽 아래 구석에서 띄우는 거리 (Canvas 기준 픽셀: 왼쪽, 조합판 위)")]
+        [SerializeField] private Vector2 penaltyCornerMargin = new Vector2(16f, 16f);
 
         private LabNetwork network;
         private Canvas canvas;
@@ -156,6 +159,8 @@ namespace C6Lab
         /// <summary>SMALL 남은 시간 세로 사각형 (테두리 포함, #301)</summary>
         public RectTransform PenaltyBar => effectGauge != null && effectGauge.parent != null
             ? effectGauge.parent.parent as RectTransform : null;
+        /// <summary>SMALL 표시 전체 (글자 + 사각형, #301). 왼쪽 아래 모서리가 기준점이다.</summary>
+        public RectTransform EffectBadge => effectBadge;
 
         /// <summary>
         /// 콤보 결과 문구 (#301). 성공은 CLEAR!, 시간 초과는 TIME UP. 틀린 색은 틀린 사람을 앞에 붙인다:
@@ -301,6 +306,23 @@ namespace C6Lab
             stars.Step(on, fraction, Time.unscaledDeltaTime, bottom);
         }
 
+        /// <summary>
+        /// SMALL 표시의 왼쪽 아래 모서리 위치 (#301): 화면 왼쪽 가장자리, 조합판 위쪽 가장자리 바로 위(공격 영역의 왼쪽 아래).
+        /// 조합판 위치를 모르면 화면 높이의 45% 지점. 레이어 가운데 기준 좌표.
+        /// </summary>
+        private Vector2 PenaltyCorner()
+        {
+            Rect area = layer.rect;
+            float bottom = Mathf.Lerp(area.yMin, area.yMax, .45f);
+            if (network != null && network.board != null && network.board.TryGetInputScreenRect(out Rect screen))
+            {
+                Camera uiCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(layer, new Vector2(screen.xMin, screen.yMax),
+                    uiCamera, out Vector2 local)) bottom = local.y;
+            }
+            return new Vector2(area.xMin + penaltyCornerMargin.x, bottom + penaltyCornerMargin.y);
+        }
+
         /// <summary>별이 사라지는 높이: 조합판 위쪽 가장자리(레이어 로컬 y). 모르면 화면 높이의 45% 지점.</summary>
         private float StarsBottom()
         {
@@ -327,9 +349,8 @@ namespace C6Lab
                 effectBadge.gameObject.SetActive(false);
                 return;
             }
-            // 콤보 패널이 있으면 패널 아래 가장자리에, 없으면 패널 자리 가운데에 놓는다.
-            effectBadge.anchoredPosition = panel.gameObject.activeSelf
-                ? new Vector2(0f, -panel.sizeDelta.y * .5f) : Vector2.zero;
+            // 게임을 가리지 않게 공격 영역(조합판 위 전투 화면)의 왼쪽 아래 구석에 둔다 (#301).
+            effectBadge.anchoredPosition = PenaltyCorner();
             if (kind != effectKind) effectPopElapsed = 0f;
             effectKind = kind;
             effectBadge.gameObject.SetActive(true);
@@ -339,8 +360,7 @@ namespace C6Lab
             float fraction = total > 0d ? Mathf.Clamp01((float)(left / total)) : 1f;
             effectGauge.anchorMax = new Vector2(1f, fraction); // 세로 사각형: 위에서 아래로 줄어든다 (#301)
             bool reward = kind > 0;
-            effectBack.color = reward ? RewardBadgeColor : PenaltyBadgeColor;
-            effectIcon.localScale = Vector3.one * (reward ? 1f : .55f);
+            effectBack.color = Color.clear;
             // 남은 시간은 숫자 없이 게이지로만 (#257).
             effectText.text = reward ? RewardLabel : PenaltyLabel;
 
@@ -742,23 +762,23 @@ namespace C6Lab
             // 페널티 배지: 패널 아래 가장자리에 반쯤 걸친 알약 모양. 패널이 숨어도 같은 자리에 남는다.
             // 왼쪽은 공 아이콘 + SMALL, 오른쪽은 남은 시간 bar (#257: 숫자 대신 bar라 글자와 겹치지 않게 나눈다).
             badgeHeight = 40f * u;
+            // SMALL (#301): 전투 화면(공격 영역) 왼쪽 아래 구석에, "SMALL" 글자 밑에 세운 세로 사각형 하나.
+            // 먹색 테두리 안의 빨간 칸이 남은 시간만큼 아래부터 차 있고 위에서 아래로 줄어든다. 위치는 DrawEffect가 정한다.
+            float barWidth = badgeHeight * penaltyBarSize.x, barHeight = badgeHeight * penaltyBarSize.y;
+            float labelHeight = badgeHeight * .7f, labelGap = badgeHeight * penaltyBarGap;
             effectBadge = NewRect("Combo Effect Badge", layer);
-            effectBadge.anchorMin = effectBadge.anchorMax = panelAnchor;
-            effectBadge.sizeDelta = new Vector2(slotSize * 4.2f, badgeHeight);
-            effectBadge.anchoredPosition = new Vector2(0f, -panel.sizeDelta.y * .5f);
+            effectBadge.anchorMin = effectBadge.anchorMax = new Vector2(.5f, .5f);
+            effectBadge.pivot = Vector2.zero;
+            effectBadge.sizeDelta = new Vector2(Mathf.Max(barWidth, badgeHeight * 2.4f), barHeight + labelGap + labelHeight);
             effectBack = effectBadge.gameObject.AddComponent<Image>();
-            effectBack.sprite = PillSprite();
-            effectBack.type = Image.Type.Sliced;
+            effectBack.color = Color.clear;
             effectBack.raycastTarget = false;
 
-            // 세로 사각형 (#301): SMALL 배지 바로 밑에 세운 먹색 테두리 사각형. 안의 빨간 칸이 남은 시간만큼
-            // 아래에서부터 차 있고, 시간이 지나면 위에서 아래로 줄어든다.
-            effectBadge.sizeDelta = new Vector2(slotSize * 2.7f, badgeHeight);
             RectTransform gaugeArea = NewRect("Gauge Track", effectBadge);
-            gaugeArea.anchorMin = gaugeArea.anchorMax = new Vector2(.5f, 0f);
-            gaugeArea.pivot = new Vector2(.5f, 1f);
-            gaugeArea.sizeDelta = new Vector2(badgeHeight * penaltyBarSize.x, badgeHeight * penaltyBarSize.y);
-            gaugeArea.anchoredPosition = new Vector2(0f, -badgeHeight * penaltyBarGap);
+            gaugeArea.anchorMin = gaugeArea.anchorMax = Vector2.zero;
+            gaugeArea.pivot = Vector2.zero;
+            gaugeArea.sizeDelta = new Vector2(barWidth, barHeight);
+            gaugeArea.anchoredPosition = Vector2.zero;
             Image track = gaugeArea.gameObject.AddComponent<Image>();
             track.color = InkColor;
             track.raycastTarget = false;
@@ -779,23 +799,20 @@ namespace C6Lab
             gauge.color = PenaltyBadgeColor;
             gauge.raycastTarget = false;
 
+            // 공 아이콘은 더 쓰지 않는다 (글자와 사각형만).
             effectIcon = NewRect("Ball Icon", effectBadge);
-            effectIcon.anchorMin = effectIcon.anchorMax = new Vector2(0f, .5f);
-            effectIcon.sizeDelta = new Vector2(badgeHeight * .7f, badgeHeight * .7f);
-            effectIcon.anchoredPosition = new Vector2(badgeHeight * .62f, 0f);
-            Image icon = effectIcon.gameObject.AddComponent<Image>();
-            icon.sprite = DiscSprite();
-            icon.raycastTarget = false;
+            effectIcon.gameObject.SetActive(false);
 
-            effectText = NewText("Effect Label", effectBadge, Mathf.Max(10, Mathf.RoundToInt(20f * u)), TextAnchor.MiddleCenter);
-            effectText.rectTransform.anchorMin = Vector2.zero;
-            effectText.rectTransform.anchorMax = Vector2.one;
-            effectText.rectTransform.offsetMin = new Vector2(badgeHeight * 1.05f, 0f);
-            effectText.rectTransform.offsetMax = new Vector2(-badgeHeight * .12f, 0f);
-            effectText.color = Color.white;
+            // 사각형 바로 위 가운데에 SMALL 글자만.
+            effectText = NewText("Effect Label", effectBadge, Mathf.Max(10, Mathf.RoundToInt(20f * u)), TextAnchor.LowerCenter);
+            effectText.rectTransform.anchorMin = effectText.rectTransform.anchorMax = Vector2.zero;
+            effectText.rectTransform.pivot = new Vector2(.5f, 0f);
+            effectText.rectTransform.sizeDelta = new Vector2(badgeHeight * 2.4f, labelHeight);
+            effectText.rectTransform.anchoredPosition = new Vector2(barWidth * .5f, barHeight + labelGap);
+            effectText.color = PenaltyBadgeColor;
             Outline effectOutline = effectText.gameObject.AddComponent<Outline>();
-            effectOutline.effectColor = new Color32(43, 36, 32, 160);
-            effectOutline.effectDistance = new Vector2(1.5f, -1.5f);
+            effectOutline.effectColor = Color.white;
+            effectOutline.effectDistance = new Vector2(2f, -2f) * Mathf.Max(.5f, u);
             effectBadge.gameObject.SetActive(false);
 
             // N COMBO! (#301): 주황 숫자 + 두꺼운 흰 테두리 + 진한 그림자, 오른쪽 아래에 분홍 COMBO!.

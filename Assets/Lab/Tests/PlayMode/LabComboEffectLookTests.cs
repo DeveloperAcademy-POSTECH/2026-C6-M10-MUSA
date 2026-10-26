@@ -218,10 +218,10 @@ namespace C6Lab.Tests
                 Assert.That(hud.PenaltyBarFill, Is.EqualTo(.9f).Within(.05f), "9 of 10 s left (started at 49 s).");
                 RectTransform bar = hud.PenaltyBar;
                 Assert.That(bar, Is.Not.Null);
-                Assert.That(bar.anchorMin, Is.EqualTo(new Vector2(.5f, 0f)), "Hangs from the bottom middle of the SMALL tag.");
-                Assert.That(bar.pivot.y, Is.EqualTo(1f), "Its top sits under the tag.");
-                Assert.That(bar.anchoredPosition.y, Is.LessThanOrEqualTo(0f));
                 Assert.That(bar.sizeDelta.y, Is.GreaterThan(bar.sizeDelta.x), "A standing rectangle.");
+                Assert.That(bar.anchoredPosition, Is.EqualTo(Vector2.zero), "The rectangle is the bottom of the SMALL mark...");
+                Assert.That(hud.EffectLabel, Is.EqualTo(LabGourdComboHud.PenaltyLabel), "...with only the word SMALL above it.");
+                Assert.That(hud.EffectBadge.anchoredPosition.x, Is.LessThan(0f), "It sits in the left part of the screen, out of the way.");
                 latest.SetValue(network, Snapshot(network, 54d, penaltyUntil: 59d));
                 yield return null;
                 Assert.That(hud.PenaltyBarFill, Is.EqualTo(.5f).Within(.05f), "Half the bar left.");
