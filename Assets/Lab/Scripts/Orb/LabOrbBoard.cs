@@ -84,6 +84,8 @@ namespace C6Lab
             public LabOrbEdgeCrossing PendingEdge;
             public Vector2 PressVelocity;
             public Vector2 GrabOffset;
+            public bool SimulationHoldCaptured;
+            public Vector3 SimulationHoldVelocity, SimulationHoldAngularVelocity;
             public float DriftSeed;
             public float DriftHeading;
             public bool HasDriftHeading;
@@ -186,6 +188,8 @@ namespace C6Lab
         private double lastTapTime;
         private bool heldByTouch;
         private bool interactionEnabled = true;
+        private bool simulationHeld;
+        public bool SimulationHeld => simulationHeld;
         private bool uiInputBlocked;
         private bool configured;
         private bool jigwiOverheat;
@@ -469,9 +473,15 @@ namespace C6Lab
             }
             SetBodyMode(entry);
             if (entry.Dropping) PlayDrop(entry, start);
-            if (!body.isKinematic)
-                body.linearVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
-                    config.OrbMaxReleaseSpeed * bounds.width));
+            Vector3 initialVelocity = OnPlane(Vector2.ClampMagnitude(velocityInBoardWidthsPerSecond * bounds.width,
+                config.OrbMaxReleaseSpeed * bounds.width));
+            if (!body.isKinematic) body.linearVelocity = initialVelocity;
+            else if (simulationHeld && localOwner)
+            {
+                entry.SimulationHoldCaptured = true;
+                entry.SimulationHoldVelocity = initialVelocity;
+                entry.SimulationHoldAngularVelocity = Vector3.zero;
+            }
             // Starts from the speed it came in with, set just above.
             if (arrival != LabDrumArrival.None && kind.IsDrum() && !body.isKinematic)
                 StartArrival(entry, arrival, stopAt, normalizedPosition.x);
@@ -1171,6 +1181,16 @@ namespace C6Lab
             interactionEnabled = enabled;
         }
 
+        /// <summary>Opt-in start barrier: pin only this board's physics while the loading Canvas keeps updating.</summary>
+        public void SetSimulationHeld(bool held)
+        {
+            if (simulationHeld == held) return;
+            if (held) CancelDrag();
+            simulationHeld = held;
+            foreach (var entry in entries.Values)
+                if (entry.View != null) SetBodyMode(entry);
+        }
+
         /// <summary>Block pointer gestures while a modal UI is open, without pausing orb physics.</summary>
         public void SetUiInputBlocked(bool blocked)
         {
@@ -1232,7 +1252,7 @@ namespace C6Lab
 
         public bool TryBeginDragAtWorld(Vector2 worldPoint, double now)
         {
-            if (!configured || !interactionEnabled || heldId != null || !Finite(worldPoint) || !Finite(now)) return false;
+            if (!configured || simulationHeld || !interactionEnabled || heldId != null || !Finite(worldPoint) || !Finite(now)) return false;
             if (areaShape.IsCurved && !areaShape.Contains(worldPoint, 0f)) return false;
             Entry nearest = null;
             // Compare touches relative to each body's reach so the larger drum is as easy to grab.
@@ -1393,7 +1413,7 @@ namespace C6Lab
 
         private void Update()
         {
-            if (!configured || !interactionEnabled || uiInputBlocked) return;
+            if (!configured || simulationHeld || !interactionEnabled || uiInputBlocked) return;
             double now = Time.realtimeSinceStartupAsDouble;
             if (heldId != null)
             {
@@ -1451,7 +1471,7 @@ namespace C6Lab
 
         private void FixedUpdate()
         {
-            if (!configured) return;
+            if (!configured || simulationHeld) return;
             updateEntries.Clear();
             updateEntries.AddRange(entries.Values);
             foreach (var entry in updateEntries)
@@ -1828,7 +1848,13 @@ namespace C6Lab
         private void SetBodyMode(Entry entry)
         {
             var body = entry.View.Body;
-            bool movable = entry.LocalOwner && !entry.Held && !entry.Locked && !entry.EdgePending && !entry.Dropping
+            if (simulationHeld && !body.isKinematic && !entry.SimulationHoldCaptured)
+            {
+                entry.SimulationHoldCaptured = true;
+                entry.SimulationHoldVelocity = body.linearVelocity;
+                entry.SimulationHoldAngularVelocity = body.angularVelocity;
+            }
+            bool movable = !simulationHeld && entry.LocalOwner && !entry.Held && !entry.Locked && !entry.EdgePending && !entry.Dropping
                 && !entry.HiddenForPending;
             bool desiredKinematic = !movable;
             if (body.isKinematic != desiredKinematic)
@@ -1836,6 +1862,12 @@ namespace C6Lab
                 StopMotion(body);
                 body.isKinematic = desiredKinematic;
                 if (movable) body.linearVelocity = Vector3.zero;
+            }
+            if (!simulationHeld && !body.isKinematic && entry.SimulationHoldCaptured)
+            {
+                body.linearVelocity = entry.SimulationHoldVelocity;
+                body.angularVelocity = entry.SimulationHoldAngularVelocity;
+                entry.SimulationHoldCaptured = false;
             }
             // A falling gourd bomb is still in the air: nothing bumps into it until it lands.
             body.detectCollisions = !entry.Dropping && !entry.HiddenForPending;

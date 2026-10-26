@@ -105,7 +105,7 @@ namespace C6Lab
         private void CaptureTargetPose(LabSnapshot snapshot)
         {
             if (snapshot == null) return;
-            snapshot.paused = battleClock.IsPaused && snapshot.phase == LabPhase.Playing;
+            snapshot.paused = battleClock.IsPaused && !GameStartHeld && snapshot.phase == LabPhase.Playing;
             var hanging = target != null ? target.GetComponent<LabHangingTarget>() : null;
             if (hanging == null) return;
             snapshot.targetYawDegrees = hanging.YawAngleDegrees;
