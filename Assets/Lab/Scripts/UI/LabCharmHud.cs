@@ -14,7 +14,7 @@ namespace C6Lab
     {
         public const string HowlPath = "Sabotage/CharmHowl";
         public const string AwakeText = "정신 차림!";
-        public static string WarningText(string who) => "구미호가 " + who + "에게\n매혹을 걸려고 한다!";
+        public static string WarningText(string who) => "요괴가 " + who + "에게\n매혹을 걸려고 한다!";
         private const float WarningPopSeconds = .2f, WarningPulseHz = 2f;
         private const float AwakeSeconds = 1.2f;
         private static readonly Color GaugeBackColor = new Color(.17f, .14f, .12f, .55f);
@@ -29,9 +29,11 @@ namespace C6Lab
         [Tooltip("\"정신 차림!\"이 뜨는 곳 (Canvas 비율)")]
         [SerializeField] private Vector2 awakeAnchor = new Vector2(.5f, .6f);
         [Tooltip("\"정신 차림!\" 글자 크기 (Canvas 기준 픽셀)")]
-        [SerializeField, Min(10f)] private float awakeSize = 40f;
-        [Tooltip("매혹 예고 문구 글자 크기 (Canvas 기준 픽셀). \"정신 차림!\"과 같은 자리에 두 줄로 뜬다 (#305).")]
-        [SerializeField, Min(10f)] private float warningSize = 26f;
+        [SerializeField, Min(10f)] private float awakeSize = 30f;
+        [Tooltip("매혹 예고 문구가 뜨는 곳 (Canvas 비율: x는 왼쪽 0 ~ 오른쪽 1, y는 아래 0 ~ 위 1). 기본은 \"정신 차림!\" 자리 (#305).")]
+        [SerializeField] private Vector2 warningAnchor = new Vector2(.5f, .6f);
+        [Tooltip("매혹 예고 문구 글자 크기 (Canvas 기준 픽셀). 두 줄로 뜬다 (#305). Play 중에 바꾸면 바로 보인다.")]
+        [SerializeField, Min(10f)] private float warningSize = 20f;
 
         private static readonly Vector3[] Corners = new Vector3[4];
         private LabNetwork network;
@@ -147,6 +149,7 @@ namespace C6Lab
             LabPlayerState target = System.Array.Find(snapshot.players ?? new LabPlayerState[0],
                 player => player != null && player.id == snapshot.charmedPlayer);
             warning.text = WarningText(snapshot.charmedPlayer == network.LocalPlayerId ? "나" : LabResultStats.PlayerName(target));
+            PlaceWarning();
             float pop = warningAge < WarningPopSeconds ? Mathf.Lerp(.5f, 1f, warningAge / WarningPopSeconds)
                 : 1f + .04f * Mathf.Sin((warningAge - WarningPopSeconds) * WarningPulseHz * 2f * Mathf.PI);
             warning.rectTransform.localScale = Vector3.one * pop;
@@ -242,13 +245,11 @@ namespace C6Lab
             outline.effectColor = new Color(1f, 1f, 1f, .9f);
             outline.effectDistance = new Vector2(2f, -2f);
 
-            // The warning shares the awake spot above the gourd, in two lines so it fits a phone's width.
+            // The warning sits above the gourd (the awake spot by default), in two lines so it fits a phone's width.
             RectTransform warningRect = NewRect("Charm Warning", layer);
-            warningRect.anchorMin = warningRect.anchorMax = awakeAnchor;
-            warningRect.sizeDelta = new Vector2(warningSize * 14f, warningSize * 3f);
             warning = warningRect.gameObject.AddComponent<Text>();
             warning.font = font;
-            warning.fontSize = Mathf.RoundToInt(warningSize);
+            PlaceWarning();
             warning.fontStyle = FontStyle.Bold;
             warning.alignment = TextAnchor.MiddleCenter;
             warning.lineSpacing = 1.1f;
@@ -259,6 +260,15 @@ namespace C6Lab
             warningOutline.effectDistance = new Vector2(2f, -2f);
             warningRect.gameObject.SetActive(false);
             return true;
+        }
+
+        // Read every frame it shows, so the Inspector's place and size can be tried out during Play.
+        private void PlaceWarning()
+        {
+            RectTransform rect = warning.rectTransform;
+            rect.anchorMin = rect.anchorMax = warningAnchor;
+            rect.sizeDelta = new Vector2(warningSize * 14f, warningSize * 3f);
+            warning.fontSize = Mathf.RoundToInt(warningSize);
         }
 
         private static RectTransform NewRect(string name, Transform parent)

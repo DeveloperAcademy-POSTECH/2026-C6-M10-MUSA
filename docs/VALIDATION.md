@@ -2741,3 +2741,15 @@ Host 판정 지도는 그대로 두고 최초 얼룩/실제 군집 성장의 제
 | 사용자 실행 검사 | 실패 2 → 고침 | `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset`: DEV 칸을 옛 이름("Charm Rescue Taps (0 = none)")으로 찾음 → 새 이름으로(2곳). `LabCharmBubblesTests.TheFaceStaysAboveTheGaugeAndACheckWaitsForTheOtherSide`: 체크가 작게 튀어나오는 첫 프레임에 위치를 잼 → 자리잡은 뒤 재도록. 같이 고친 것: 박 옆 하트 말풍선(약 1.4초)이 예고 시작에 떠 매혹이 실제로 걸릴 때는 사라져 있었다 → 걸린 사람 화면에서 매혹이 시작되는 순간 뜨도록 옮김(`LabGourdAlert`). 고친 뒤 재실행은 **NOT_RUN**. |
 | PlayMode 나머지 | 사용자 보고 기준 통과 | 사용자가 위 2건 외 실패를 보고하지 않았다. 개수 기록 없음. |
 | Mac 3앱·iOS | **NOT_RUN** | 양옆 두 사람이 실제로 함께 푸는 장면과 예고 문구 위치는 아직 보지 않았다. |
+
+## #305 폭탄 "뻥이요!" 연출 (3단계) — 2026-10-26
+
+같은 브랜치의 2단계 커밋 `e731d2e3` 위 작업 트리. 공유 설정·통신·토큰은 바꾸지 않았다(화면 표시만).
+
+| 항목 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| 연출 | 변경 | `LabBombBlastEffect`의 "BOMB!" 글자(TextMesh)를 사용자 제공 손글씨 "뻥이요!" 그림으로 바꿨다. 크기는 폭발 반경의 0.45배 높이, 튀어나왔다 떠오르며 사라지는 움직임·시간(0.9초)은 그대로. |
+| 그림 | 추가 | `Resources/Bomb/BombPpeong.png`(원본 341×122를 사방 8px 여백으로 357×138)과 같은 크기의 `BombPpeongOutline.png`(글자 모양을 6px 넓힌 종이색). 검은 글씨는 색 곱하기로 바꿀 수 없어 테두리를 따로 만들었고, 빨강·주황·노랑 위 미리보기에서 모두 읽혔다. Editor API로 Sprite 가져오기. |
+| 컴파일 | PASS | 오프라인 Roslyn 7개 어셈블리 오류 0, 열린 Editor `compilationFailed: false`. |
+| PlayMode `LabOrbPhysicsTests.ABlastShowsACartoonBurstWithPpeongThatClearsItself` | **NOT_RUN** | 글자 대신 그림·테두리·그리는 순서를 확인하도록 고쳤다. 사용자가 실행한다. |
+| 폭탄 무게 | 기록만 | 끌 때 묵직함은 `Bomb Drag Lag`(141번, 지금 0.12초)를 DEV에서 조금씩 올려 비교한 뒤 정한다. 이번 단계에서 값은 바꾸지 않았다. |
