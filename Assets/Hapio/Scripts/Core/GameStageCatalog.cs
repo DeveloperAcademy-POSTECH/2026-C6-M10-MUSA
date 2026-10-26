@@ -9,6 +9,8 @@ namespace Hapio
     {
         public const string ResourcePath = "Hapio/StageCatalog";
         public GameStageDefinition[] stages = Array.Empty<GameStageDefinition>();
+        [Tooltip("2:2 땅따먹기 (#305)가 Common 대신 쓰는 값. 스태미나·생성·구슬 수명과 2:2 시간·피버만 넣을 수 있다.")]
+        public GameStageValue[] territoryDefaultValues = Array.Empty<GameStageValue>();
         public static GameStageCatalog RequireDefault()
         {
             var catalog = Resources.Load<GameStageCatalog>(ResourcePath);
@@ -38,6 +40,10 @@ namespace Hapio
                     if (!GameStageSettings.IsFieldVisible(i + 1, value.index) || !seen.Add(value.index))
                         throw new InvalidOperationException("Stage defaults may only override their own unique fields once.");
             }
+            var territorySeen = new System.Collections.Generic.HashSet<int>();
+            foreach (GameStageValue value in territoryDefaultValues ?? Array.Empty<GameStageValue>())
+                if (!GameStageSettings.IsFieldVisible(GameStageSettings.TerritoryScope, value.index) || !territorySeen.Add(value.index))
+                    throw new InvalidOperationException("2:2 defaults may only override the territory room's own unique fields once.");
         }
     }
 }

@@ -2710,7 +2710,6 @@ Host 판정 지도는 그대로 두고 최초 얼룩/실제 군집 성장의 제
 
 원시 결과 JSON·Editor 로그·빌드·임시 렌더는 공개 저장소에 넣지 않는다. 고해상도 농담/미세 경계는 승인된 시각적 차이이며 진행률을 그림 alpha 합계로 바꾸지 않는다. 1024의3장 RT6MiB·관람복사4MiB는 픽셀 저장량 계산으로, 프레임 속도나 모바일 메모리 실측 통과를 의미하지 않는다.
 
-
 ## 전원 초기 동기화와 공통 전투 시작 (#306) — 2026-10-26
 
 main `66f759da`에서 분기한 `feat/#306-synchronized-battle-start`, Unity **6000.6.5f1 / macOS ARM64 / Metal** 기준이다. 기존 Lab·저장 Scene·프로젝트 설정·사용자 미추적 파일을 보존하며 실제 결과와 미실행 환경을 구분한다.
@@ -2736,3 +2735,51 @@ main `66f759da`에서 분기한 `feat/#306-synchronized-battle-start`, Unity **6
 | 실제 iPhone/iPad·다중 실기기·LAN/핫스팟 | **NOT_RUN** | 이번에는 실기기를 설치·실행하지 않았다. loopback 통과를 LAN/핫스팟·기기 성능 통과로 확대하지 않는다. |
 
 원시 JSON·실행 로그·런타임 연결 파일·검증 앱은 공개 저장소에 넣지 않는다.
+
+## #305 스태미나 8칸·빠른 생성·구슬 15초, 2:2 수치 분리 (1단계) — 2026-10-26
+
+기준 main `66f759da`, 브랜치 `feat/#305-stamina-charm-warning`. Unity **6000.6.5f1**, macOS ARM64, 사용자의 Desktop checkout에서 열린 Editor에 Pipeline 연결(`unity` CLI)로 컴파일·에셋 변경·검사를 실행했다. 공유 설정 개수(202)·통신 5663·토큰은 바꾸지 않았다.
+
+| 항목 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| 저장 값 | 변경 | `LabConfig.asset`(Editor API): 최대·시작 스태미나 100 → 160, 회복 간격 1.7 → 1초, 구슬 수명 8 → 15초. 생성 비용 20·회복량 20·명중 보상 10은 그대로. 다른 줄 변경 0. |
+| 2:2 분리 | 변경 | `GameStageSettings.IsTerritoryOwned`(3~8, 10번)를 2:2가 따로 가진다. 기본값은 `StageCatalog.asset`의 `territoryDefaultValues`(Editor API 7개: 최대·시작 160, 비용 20, 1.7초당 20, 명중 10, 수명 8초). 공통 → 스토리만, 2:2 → 2:2만, 전투 DEV도 같은 규칙. |
+| 막대 그림 | 변경 | `Art/UI/StaminaBarFillMask.png`를 같은 크기(374×50)·간격 6px로 8칸(41~42px)으로 다시 만들었다. 원래 칸의 둥근 양끝 12px와 가운데 질감을 잘라 이었다. `StaminaBarConcept.png`도 8칸으로 맞춰 `C6 Lab/Apply New Stamina Bar`를 다시 실행해도 8칸이 나온다. 바깥 틀·.meta·장면 참조는 그대로. |
+| 홈·로비 DEV 표시값 | 변경 | 저장된 DEV 칸 3·4·7·10번의 처음 표시값을 새 설정과 맞췄다(Editor API). 바뀐 것은 그 4칸의 값 글자·슬라이더 값과 슬라이더가 스스로 다시 맞추는 채움·손잡이 앵커뿐이다. |
+| Editor 컴파일 | PASS | 오프라인 Roslyn 7개 어셈블리 오류 0, 열린 Editor 재컴파일 `compilationFailed: false`. |
+| 전체 EditMode | **Lab 1,070/1,070 · Hapio 53/53 PASS** | 새 검사: 2:2와 스토리 값 분리(공통·2:2·전투 DEV·카탈로그 검증), 저장 막대 칸 수 = 가득 찬 막대로 만드는 구슬 수이고 구슬 하나 몫의 경계가 칸 사이에 오는지. Hapio 첫 실행의 2건(홈·로비 DEV 표시값 100 ≠ 160)은 위 표시값 동기화로 해결. |
+| 전체 PlayMode | **Lab 347/347 · Hapio 19/19 PASS** | Editor에서 비동기 실행. |
+| 사용자 Play 확인 → 수정 | 결함 발견 → 수정 | 사용자가 "구슬 하나에 막대 1.5칸"을 보고했다. Editor Play로 확인하니 스토리는 최대 160(1칸)이었으나 2:2(DEV 혼자 2:2 포함)는 처음 분리 값인 최대 100이라 8칸 막대에서 구슬 하나가 1.6칸이었다. 막대 그림을 모든 모드가 함께 쓰므로 2:2도 최대·시작 160으로 맞추고, 모든 스테이지·2:2에서 최대 ÷ 비용 = 막대 칸 수(8)와 시작 = 가득을 확인하는 검사를 추가했다. |
+| 막대 실제 화면·Mac 실행본·iOS | **NOT_RUN** | 수정 뒤 8칸 막대의 실제 플레이 화면과 생성 빈도 체감은 아직 사용자가 다시 보지 않았다. |
+
+## #305 구미호 매혹 예고·양옆 각자 풀기·말풍선 그림 (2단계) — 2026-10-26
+
+같은 브랜치의 1단계 커밋 `9f38ccb9` 위 작업 트리. 공유 설정 203개(202번 `Charm Warning Seconds` 추가), 통신 **5664**, 토큰 `C6PhysicsLab/25`·`C6HapioGame/7`(main #306도 같은 7을 써서 병합 뒤 `8`로 올림, 아래 병합 기록). 설정 에셋·홈·로비 DEV 줄은 열린 Editor에서 Editor API(`unity command eval`)로 바꿨고, 사용자 요청으로 이 단계 중간부터 Test Runner는 사용자가 실행한다.
+
+| 항목 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| Host 규칙 | 변경 | 매혹은 대상을 정한 시각(`charmWarnedAt`)부터 예고 시간 뒤에 시작한다. 예고 중에는 던지기 가능·깨우기 탭 거절·같은 사람에게 다른 방해공작 금지. 풀기는 양옆(2명 판은 1명)이 각자 `Charm Rescue Taps per Neighbor`를 채워야 하고 먼저 채운 쪽의 추가 탭은 세지 않는다. 스냅샷과 보드 헤더에 `charmWarnedAt`·`charmHelpers`·`charmHelperTaps`. 매혹 중 누가 나가면 판 자체가 끝나므로(스토리 게임 오버, Lab·2:2 로비) 따로 처리하지 않는다. |
+| 화면 | 변경 | 박 위 "정신 차림!" 자리의 두 줄 예고 문구(본인은 "나에게"). 말풍선은 빈 말풍선(오른쪽은 좌우 반전 파일) → 노란 게이지 → 얼굴(예전 그림의 얼굴 자리·크기에 맞춤) 순서, 게이지는 내가 누른 만큼, 먼저 채우면 말풍선 위 체크 그림, 둘 다 채우면 두 화면에 동시에 놀란 말풍선. 매혹된 사람 화면에는 양옆 이름표 곁에 각자의 진행 말풍선(누를 수 없음)과 체크, 풀리면 말풍선은 사라지고 "정신 차림!". |
+| 그림 | 추가·교체 | 사용자 제공 투명 PNG: `Sabotage/CharmBubbleLeft`(빈 말풍선)·`CharmBubbleRight`(같은 그림 좌우 반전)·`CharmFace`, 체크는 WebP를 PNG 256px로 바꿔 `CharmCheck`. 놀란 얼굴 `CharmWoken`은 그대로. |
+| 저장 값 | 변경 | `LabConfig.asset` 풀기 3 → 10, 예고 3초(새 칸). 홈·로비 DEV에 202번 줄 추가(새 오브젝트 31개, 지운 것 0), 177번 줄 이름·값만 갱신. |
+| 컴파일 | PASS | 오프라인 Roslyn 7개 어셈블리 오류 0, 열린 Editor `compilationFailed: false`. |
+| EditMode (수정 전 1회, Claude 실행) | Lab 1,067/1,072 · Hapio 54/54 | 실패 5건은 모두 검사 쪽 고정값이었다: 예고 기본 3초를 모르는 매혹 검사 1, 177번 이름 1, 202번까지의 칸 목록 1, 200번 뒤 2칸 비교 1, 2명 판 3번 풀기 1. 고친 뒤 재실행은 사용자 요청으로 취소해 **NOT_RUN**. |
+| 사용자 실행 검사 | 실패 2 → 고침 | `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset`: DEV 칸을 옛 이름("Charm Rescue Taps (0 = none)")으로 찾음 → 새 이름으로(2곳). `LabCharmBubblesTests.TheFaceStaysAboveTheGaugeAndACheckWaitsForTheOtherSide`: 체크가 작게 튀어나오는 첫 프레임에 위치를 잼 → 자리잡은 뒤 재도록. 같이 고친 것: 박 옆 하트 말풍선(약 1.4초)이 예고 시작에 떠 매혹이 실제로 걸릴 때는 사라져 있었다 → 걸린 사람 화면에서 매혹이 시작되는 순간 뜨도록 옮김(`LabGourdAlert`). 고친 뒤 재실행은 **NOT_RUN**. |
+| PlayMode 나머지 | 사용자 보고 기준 통과 | 사용자가 위 2건 외 실패를 보고하지 않았다. 개수 기록 없음. |
+| Mac 3앱·iOS | **NOT_RUN** | 양옆 두 사람이 실제로 함께 푸는 장면과 예고 문구 위치는 아직 보지 않았다. |
+
+## #305 폭탄 "뻥이요!" 연출 (3단계) — 2026-10-26
+
+같은 브랜치의 2단계 커밋 `e731d2e3` 위 작업 트리. 공유 설정·통신·토큰은 바꾸지 않았다(화면 표시만).
+
+| 항목 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| 연출 | 변경 | `LabBombBlastEffect`의 "BOMB!" 글자(TextMesh)를 사용자 제공 손글씨 "뻥이요!" 그림으로 바꿨다. 크기는 폭발 반경의 0.45배 높이, 튀어나왔다 떠오르며 사라지는 움직임·시간(0.9초)은 그대로. |
+| 그림 | 추가 | `Resources/Bomb/BombPpeong.png`(원본 341×122를 사방 8px 여백으로 357×138)과 같은 크기의 `BombPpeongOutline.png`(글자 모양을 6px 넓힌 종이색). 검은 글씨는 색 곱하기로 바꿀 수 없어 테두리를 따로 만들었고, 빨강·주황·노랑 위 미리보기에서 모두 읽혔다. Editor API로 Sprite 가져오기. |
+| 컴파일 | PASS | 오프라인 Roslyn 7개 어셈블리 오류 0, 열린 Editor `compilationFailed: false`. |
+| PlayMode `LabOrbPhysicsTests.ABlastShowsACartoonBurstWithPpeongThatClearsItself` | **NOT_RUN** | 글자 대신 그림·테두리·그리는 순서를 확인하도록 고쳤다. 사용자가 실행한다. |
+| 폭탄 무게 | 기록만 | 끌 때 묵직함은 `Bomb Drag Lag`(141번, 지금 0.12초)를 DEV에서 조금씩 올려 비교한 뒤 정한다. 이번 단계에서 값은 바꾸지 않았다. |
+
+### #305 main 병합 (#306 전원 동기화 시작) — 2026-10-26
+
+main `e0c072f2`(#306)를 합쳤다. 충돌은 이 문서의 절 추가뿐이었다(#306 절 → #305 절 순서로 둘 다 유지). #306도 Hapio 게임 토큰을 6 → 7로 올려 #305와 같은 줄을 같은 값으로 바꿨기 때문에 git이 충돌 없이 합쳤다. #306만 들어간 빌드와 #305까지 들어간 빌드가 같은 7을 쓰지 않도록 병합 결과를 `C6HapioGame/8`로 올렸다(Lab 통신 5664·`C6PhysicsLab/25`는 #306이 바꾸지 않았다). 매혹 예고 문구는 사용자가 "요괴가 P2에게 / 매혹을 걸려고 한다!"·글자 크기 20으로 바꾼 것을 문서에 맞췄다. 병합 후 오프라인 컴파일 결과는 아래 사용자 검사와 함께 기록하며, Test Runner 재실행은 **NOT_RUN**.

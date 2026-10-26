@@ -38,6 +38,7 @@ namespace C6Lab.Tests
             float[] values = controlledConfig.CaptureDeveloperValues();
             values[166] = 0f;
             values[177] = 3f;
+            values[204] = 0f; // No warning (#305): the charm starts the moment StartCharm runs.
             Assert.That(controlledConfig.TryApplyDeveloperValues(values, out string error), Is.True, error);
             network.config = controlledConfig;
 

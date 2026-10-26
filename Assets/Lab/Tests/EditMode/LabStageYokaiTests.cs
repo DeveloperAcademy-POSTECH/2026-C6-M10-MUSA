@@ -123,7 +123,7 @@ namespace C6Lab.Tests
                 Assert.That(snapshot.jigwi.All(state => state.playerId == 20 || state.playerId == 0), Is.True);
             }
             else Assert.That(snapshot.jigwi, Is.Empty);
-            Assert.That(approvedSettings.Length, Is.EqualTo(204));
+            Assert.That(approvedSettings.Length, Is.EqualTo(205));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(approvedSettings),
                 "Applying a stage's runtime mask must not rewrite the shared DEV values or Lab source Config.");
         }
@@ -338,7 +338,7 @@ namespace C6Lab.Tests
             try { Assert.That(defaults.CaptureDeveloperValues().Skip(192).Take(4), Is.EqualTo(new[] { 20f, 30f, 1f, 1f })); }
             finally { Object.DestroyImmediate(defaults); }
             var baseline = config.CaptureDeveloperValues();
-            Assert.That(baseline.Length, Is.EqualTo(204));
+            Assert.That(baseline.Length, Is.EqualTo(205));
             Assert.That(baseline.Skip(192).Take(4), Is.EqualTo(new[] { 4f, 4f, 1f, 1f }));
             baseline[192] = 20f; baseline[193] = 30f;
             Apply(baseline);
@@ -348,7 +348,7 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(invalid, out _), Is.False);
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
             Assert.That(LabConfig.DeveloperCategories.SelectMany(category => category.FieldIndices).OrderBy(index => index),
-                Is.EqualTo(Enumerable.Range(0, 204)));
+                Is.EqualTo(Enumerable.Range(0, 205)));
         }
     }
 }

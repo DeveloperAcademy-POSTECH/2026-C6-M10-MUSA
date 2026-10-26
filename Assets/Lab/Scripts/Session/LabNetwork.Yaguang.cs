@@ -13,10 +13,13 @@ namespace C6Lab
         public const string FlashShakePacket = "flashShake";
 
         /// <summary>이 기기 플레이어가 폰을 다 흔들었다고 Host에 알린다. 전투 중이 아니면 보내지 않는다.</summary>
-        public void RequestFlashShakeRelease()
+        public bool RequestFlashShakeRelease()
         {
-            if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            Request(new LabNetworkPacket { type = FlashShakePacket, requestId = ++requestSequence });
+            if (!IsConnected || !CanProcessBattleActions || latest == null
+                || latest.phase != LabPhase.Playing || latest.paused || latest.flashCount == 0) return false;
+            Request(new LabNetworkPacket { type = FlashShakePacket, requestId = ++requestSequence,
+                flashGeneration = latest.flashCount });
+            return true;
         }
     }
 }

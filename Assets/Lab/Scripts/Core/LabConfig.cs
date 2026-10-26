@@ -297,7 +297,7 @@ namespace C6Lab
             new LabDeveloperField("Fox Fire Count Max", 1f, 10f, true),
             new LabDeveloperField("Fox Fire Safe Seconds", 0f, 3f),
             new LabDeveloperField("Charm Seconds", 1f, 30f),
-            new LabDeveloperField("Charm Rescue Taps (0 = none)", 0f, 10f, true),
+            new LabDeveloperField("Charm Rescue Taps per Neighbor (0 = none)", 0f, 10f, true),
             new LabDeveloperField("Jigwi Fire Target Count", 1f, 5f, true),
             new LabDeveloperField("Jigwi Fire Seconds", 1f, 120f),
             new LabDeveloperField("Jigwi Overheat Seconds", .1f, 60f),
@@ -329,9 +329,10 @@ namespace C6Lab
             // Presentation-only shared options; never change the Host paint-cell rules (#299).
             LabDeveloperField.Toggle("High Resolution Paint (0 off, 1 on)"),
             LabDeveloperField.Choice("Paint Texture Quality", "1024 × 512", "2048 × 1024"),
-            // 야광귀 섬광 해제 (#301): 눈부신 사람이 폰을 정해진 횟수만큼 흔들면 자기 눈부심이 풀린다.
+            // #301 owns the two flash fields at 202 and 203; #305 appends its distinct warning at 204.
             LabDeveloperField.Toggle("섬광 흔들어 풀기 (0 off, 1 on)", "끔", "켬"),
-            new LabDeveloperField("섬광 흔들기 횟수", 2f, 10f, true)
+            new LabDeveloperField("섬광 흔들기 횟수", 2f, 10f, true),
+            new LabDeveloperField("Charm Warning Seconds (0 = none)", 0f, 10f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -364,7 +365,7 @@ namespace C6Lab
                 134, 132, 133, 148, 149, 150, 151, 200, 201),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
-            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
+            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 204, 177),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
             // 섬광 흔들어 풀기·흔들기 횟수(#301)는 고해상도 도색(#299) 뒤 202·203번이며 섬광 칸 맨 아래에 둔다.
@@ -595,8 +596,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 3f)] private float foxFireSafeSeconds = 1f;
         [Tooltip("매혹: 공격(위로 던지기)을 못 하는 시간 (초).")]
         [SerializeField, Range(1f, 30f)] private float charmSeconds = 10f;
-        [Tooltip("매혹: 양옆 사람이 합쳐 이만큼 하트 말풍선을 누르면 바로 풀린다. 0이면 시간으로만 풀린다.")]
-        [SerializeField, Range(0, 10)] private int charmRescueTaps = 3;
+        [Tooltip("매혹: 양옆 사람이 각자 이만큼 하트 말풍선을 눌러야 풀린다 (#305, 두 사람 모두. 둘이 하는 판은 한 사람). 0이면 시간으로만 풀린다.")]
+        [SerializeField, Range(0, 10)] private int charmRescueTaps = 10;
+        [Tooltip("매혹 예고 (#305): 매혹이 걸리기 이 시간 (초) 전부터 모두에게 \"구미호가 P2에게 매혹을 걸려고 한다!\"를 보여 준다. 0이면 예고 없이 바로 걸린다.")]
+        [SerializeField, Range(0f, 10f)] private float charmWarningSeconds = 3f;
 
         [Header("Jigwi fire experiment (#272)")]
         [SerializeField, Range(1, 5)] private int jigwiFireTargetCount = 1;
@@ -963,6 +966,7 @@ namespace C6Lab
         public float FoxFireSafeSeconds => Mathf.Clamp(Finite(foxFireSafeSeconds, 1f), 0f, 3f);
         public float CharmSeconds => Mathf.Clamp(Finite(charmSeconds, 10f), 1f, 30f);
         public int CharmRescueTaps => Mathf.Clamp(charmRescueTaps, 0, 10);
+        public float CharmWarningSeconds => Mathf.Clamp(Finite(charmWarningSeconds, 3f), 0f, 10f);
         public int JigwiFireTargetCount => Mathf.Clamp(jigwiFireTargetCount, 1, 5);
         public float JigwiFireSeconds => Mathf.Clamp(Finite(jigwiFireSeconds, 15f), 1f, 120f);
         public float JigwiOverheatSeconds => Mathf.Clamp(Finite(jigwiOverheatSeconds, 4f), .1f, 60f);
@@ -1131,7 +1135,8 @@ namespace C6Lab
                 JigwiAutoIntervalMin, JigwiAutoIntervalMax, JigwiAutoFireWeight, JigwiAutoGenerationBurnWeight,
                 TeamTerritoryEnabled ? 1f : 0f, TeamBattleSeconds, TeamFeverHits, TeamFeverSeconds,
                 HighResolutionPaintEnabled ? 1f : 0f, HighResolutionPaintQuality,
-                YaguangFlashShakeRelease ? 1f : 0f, YaguangFlashShakeCount
+                YaguangFlashShakeRelease ? 1f : 0f, YaguangFlashShakeCount,
+                CharmWarningSeconds
             };
         }
 
@@ -1376,6 +1381,7 @@ namespace C6Lab
             highResolutionPaintQuality = (int)values[201];
             yaguangFlashShakeRelease = values[202] >= .5f;
             yaguangFlashShakeCount = (int)values[203];
+            charmWarningSeconds = values[204];
             error = string.Empty;
             return true;
         }

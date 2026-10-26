@@ -20,7 +20,7 @@ namespace C6Lab.Tests
             yield return null;
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(204));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(205));
         }
 
         [UnityTearDown]

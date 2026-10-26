@@ -60,7 +60,7 @@
 
 새 코드: `Assets/Hapio/Scripts/Core/{GameSession,GameRunFlow,GameFlowState,GameFlowSnapshot,GameScenePaths}.cs`, `Scripts/UI`, `Editor/GameSceneBuilder.cs`, `Editor/GameBuild.cs`.
 
-기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **202개·프로토콜5663**다. 기존0~199를 유지하고 #299 고해상도 설정은200~201에 있다. #306 시작 동기화의 게임 연결 토큰은 `C6HapioGame/7`이며 단일 Lab의 `C6PhysicsLab/24`와 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
+기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **205개·프로토콜5665**다. 기존0~199와 #299 고해상도 설정200~201을 유지하고, #301 섬광 흔들어 풀기202~203과 #305 매혹 예고204를 함께 사용한다. 단독 PR이 같은 번호를 다른 필드에 사용하므로 통합 게임 연결 토큰은 `C6HapioGame/9`이며 단일 Lab의 `C6PhysicsLab/26`과 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
 
 검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 현재 통합의 실제 실행 결과는 `VALIDATION.md`의 #278 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
 
@@ -138,6 +138,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 - 판 중간에 다른 사람이 나가거나 불러오지 못하면 판을 멈추고 같은 방 로비로 돌아간다(안내 문구 표시). 방장이 나가면 기존처럼 모두 게임 오버다.
 - 한 판이라 결과가 곧 `Completed`다. 결과의 NEXT 자리는 스토리의 "전체 기록 보기" 전환(#284)이 아니라 **로비로**이고, DEV NEXT STAGE(#288)는 `totalStages` 기준이라 2:2에서는 꺼진다. 스토리의 3스테이지 칭호 표와 전체 대시보드는 2:2 결과에 그리지 않는다.
 - 홈·로비 DEV에 다섯 번째 **2:2** 탭(197~199)이 있다. 196 켜기는 방 모드가 정하므로 어느 탭에서도 바꿀 수 없다.
+- #305부터 2:2는 스태미나·생성·구슬 수명(3~8, 10번)을 스토리와 따로 가진다. 2:2 탭에 그 칸이 함께 보이고, 공통 탭의 값은 3요괴 스테이지에만 간다. 2:2 기본값은 `Hapio/StageCatalog`의 `Territory Default Values`(`GameStageSettings.IsTerritoryOwned`)에서 오며 지금은 최대·시작 160(8칸 막대와 맞춤)·1.7초당 20·수명 8초다.
 
 ### 전투 화면 (Lab 공용 HUD·판)
 
