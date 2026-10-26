@@ -103,6 +103,49 @@ namespace C6Lab.Tests
             }
         }
 
+        [Test]
+        public void TheStartBarrierHidesExistingFlashUiAndFreezesItsCountersUntilRelease()
+        {
+            using (var f = new Fixture())
+            {
+                var canvasObject = new GameObject("Start barrier flash Canvas", typeof(RectTransform), typeof(Canvas));
+                try
+                {
+                    Canvas canvas = canvasObject.GetComponent<Canvas>();
+                    var hud = canvasObject.AddComponent<LabYaguangFlashHud>();
+                    hud.Bind(f.Network, canvas);
+                    f.Initial.flashCount = 0u;
+                    f.Initial.flashLastAt = -1d;
+                    f.Initial.flashTargetAll = true;
+                    f.Initial.flashWarningAt = f.Initial.serverTime;
+                    f.Initial.flashAt = f.Initial.serverTime + 3d;
+                    Action update = () => typeof(LabYaguangFlashHud).GetMethod("LateUpdate", Private).Invoke(hud, null);
+                    update();
+                    Assert.That(hud.CountdownShown, Is.EqualTo(3), "Legacy/unheld Playing still shows the real warning UI.");
+                    Set(f.Network, "gameFlowEnabled", true);
+                    f.Network.SetGameStartHeld(true);
+                    f.Initial.flashCount = 1u;
+                    f.Initial.flashLastTargetAll = true;
+                    f.Initial.flashLastAt = f.Initial.serverTime;
+                    Get<LabShakeCounter>(hud, "shakeCounter").AddOne();
+                    update();
+                    Assert.That(hud.CountdownShown, Is.Zero);
+                    Assert.That(hud.BurstAlpha, Is.Zero);
+                    Assert.That(hud.EdgeAlpha, Is.Zero);
+                    Assert.That(hud.HapticCount, Is.Zero);
+                    Assert.That(hud.ShakeCount, Is.EqualTo(1), "A held start must not process or reset shake state.");
+                    Assert.That(f.Sequence, Is.Zero);
+                    Assert.That(canvasObject.transform.Find("Yaguang Flash").gameObject.activeSelf, Is.False);
+                    f.Network.SetGameStartHeld(false);
+                    f.Initial.flashCount = 0u;
+                    f.Initial.flashLastAt = -1d;
+                    update();
+                    Assert.That(hud.CountdownShown, Is.EqualTo(3), "The warning resumes once the common start opens.");
+                }
+                finally { UnityEngine.Object.DestroyImmediate(canvasObject); }
+            }
+        }
+
         private sealed class Fixture : IDisposable
         {
             private readonly GameObject root;
