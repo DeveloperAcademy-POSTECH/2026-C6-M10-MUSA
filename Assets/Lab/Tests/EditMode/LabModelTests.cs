@@ -422,6 +422,56 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void FlashFaceHitReleasesOnlyTheDazzledThrowerAndConsumesTheOrb()
+        {
+            // 야광귀 섬광 (#301): 모두에게 5초에 번쩍, 예고 없음, 눈부심 7초.
+            JsonUtility.FromJsonOverwrite("{\"yaguangFlashEnabled\":true,\"yaguangFlashTargetOne\":false,"
+                + "\"yaguangFlashFirstStartSeconds\":5,\"yaguangFlashWarningSeconds\":0,\"yaguangFlashGlareSeconds\":7,"
+                + "\"yaguangFlashRecoverySeconds\":2,\"gourdColorComboEnabled\":false}", config);
+            model = new LabModel();
+            model.Begin("flash-face", new ulong[] { 10, 20, 30 }, 0d, config);
+            LabOrbState Shot(ulong owner, double at)
+            {
+                var pair = GeneratePair(owner, at);
+                Assert.That(model.TryCombineAt(owner, pair.yin.id, pair.yang.id, "face-c-" + owner + "-" + at, at,
+                    new Vector2(.5f, .5f), Vector2.zero, out var combined, out _), Is.True);
+                Assert.That(model.TryLaunch(owner, combined.id, "face-l-" + owner + "-" + at, at, out _, out _), Is.True);
+                return combined;
+            }
+
+            var early = Shot(30, 4d);
+            Assert.That(model.FlashGlared(30, 4.5d), Is.False);
+            Assert.That(model.ConfirmFlashFaceHit(early.id, 4.5d), Is.False, "Hitting the face before the flash does nothing.");
+            Assert.That(model.ConfirmMiss(early.id, 4.5d), Is.True);
+
+            var a = Shot(10, 5.5d);
+            var b = Shot(20, 5.5d);
+            Assert.That(model.FlashFaceTargets(6d), Is.EquivalentTo(new ulong[] { 10, 20, 30 }));
+            int hp = model.Hp;
+            Assert.That(model.ConfirmFlashFaceHit(a.id, 6d), Is.True);
+            Assert.That(model.Hp, Is.EqualTo(hp), "The face is not the gourd: no damage.");
+            Assert.That(model.ConfirmHit(a.id, 6d), Is.False, "The orb is used up by the face.");
+            LabSnapshot after = model.Snapshot(6d);
+            Assert.That(after.players.Single(p => p.id == 10).flashReleasedAt, Is.EqualTo(6d));
+            Assert.That(after.FlashReleasedAt(10), Is.EqualTo(6d));
+            Assert.That(after.players.Single(p => p.id == 10).hitTotal, Is.Zero, "No hit reward for the face.");
+            Assert.That(model.FlashGlared(10, 6d), Is.False, "Only the thrower is released...");
+            Assert.That(model.FlashGlared(20, 6d), Is.True, "...the others are still dazzled.");
+            Assert.That(model.FlashFaceTargets(6d), Is.EquivalentTo(new ulong[] { 20, 30 }));
+
+            Assert.That(model.ConfirmFlashFaceHit(b.id, 12.5d), Is.False, "After the glare time the face cannot be hit.");
+            Assert.That(model.FlashGlared(20, 12.5d), Is.False);
+
+            JsonUtility.FromJsonOverwrite("{\"yaguangFlashFaceRelease\":false}", config);
+            model = new LabModel();
+            model.Begin("flash-face-off", new ulong[] { 10, 20, 30 }, 0d, config);
+            var off = Shot(10, 5.5d);
+            Assert.That(model.FlashGlared(10, 6d), Is.True);
+            Assert.That(model.FlashFaceTargets(6d), Is.Empty, "With the release off there is no face to hit.");
+            Assert.That(model.ConfirmFlashFaceHit(off.id, 6d), Is.False);
+        }
+
+        [Test]
         public void ClockEndsAtDeadlineAndRetryResetsRoundWithoutMovingOldResult()
         {
             model.Tick(179.9d);

@@ -542,6 +542,31 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void HittingTheFaceEndsOnlyThatPlayersGlareAndStartsTheRecoveryThere()
+        {
+            var snapshot = new LabSnapshot
+            {
+                phase = LabPhase.Playing, flashCount = 2, flashLastAt = 30d, flashLastTargetAll = true,
+                players = new[]
+                {
+                    new LabPlayerState { id = 10, flashReleasedAt = 31d },
+                    new LabPlayerState { id = 20 },
+                    new LabPlayerState { id = 30, flashReleasedAt = 20d }
+                }
+            };
+            Assert.That(snapshot.FlashReleasedAt(10), Is.EqualTo(31d));
+            Assert.That(snapshot.FlashReleasedAt(20), Is.EqualTo(-1d));
+            Assert.That(snapshot.FlashReleasedAt(30), Is.EqualTo(-1d), "A release from an earlier flash does not count.");
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 30.5d, 10, 3f, 1.5f), Is.EqualTo(1f));
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 31d, 10, 3f, 1.5f), Is.EqualTo(1f), "Recovery starts at the hit.");
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 31.75d, 10, 3f, 1.5f), Is.EqualTo(.5f).Within(1e-4f));
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 32.5d, 10, 3f, 1.5f), Is.Zero, "Clear well before the 3 s glare ends.");
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 32.5d, 20, 3f, 1.5f), Is.EqualTo(1f), "Others stay dazzled.");
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 32.5d, 30, 3f, 1.5f), Is.EqualTo(1f));
+            Assert.That(LabYaguangFlash.GlareAmount(snapshot, 34.5d, 20, 3f, 1.5f), Is.Zero, "Unreleased glare still ends on time.");
+        }
+
+        [Test]
         public void TheGlareIsFullThenFadesSmoothlyBack()
         {
             var snapshot = new LabSnapshot

@@ -1162,6 +1162,43 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// 이 사람이 지금 섬광에 눈부신지 (#301): 마지막 섬광을 맞았고, 눈부심 시간이 아직 지나지 않았고,
+        /// 그 뒤 요괴 얼굴을 맞혀 풀지 않았다. 회복 중은 눈부신 것으로 치지 않는다(얼굴 판정 없음).
+        /// </summary>
+        public bool FlashGlared(ulong player, double now)
+        {
+            if (!rules.FlashEnabled || phase != LabPhase.Playing || flashCount == 0 || lastFlashAt < 0d) return false;
+            if (rules.FlashTargetOne && lastFlashTarget != player) return false;
+            if (!players.TryGetValue(player, out var state)) return false;
+            if (now < lastFlashAt || now >= lastFlashAt + rules.FlashGlareSeconds) return false;
+            return state.flashReleasedAt < lastFlashAt;
+        }
+
+        /// <summary>지금 눈부신 사람들 (#301). 이 사람들의 공에만 요괴 얼굴 판정이 있다. 얼굴 맞혀 풀기가 꺼져 있으면 비어 있다.</summary>
+        public List<ulong> FlashFaceTargets(double now)
+        {
+            var glared = new List<ulong>();
+            if (!rules.FlashFaceRelease) return glared;
+            foreach (ulong player in players.Keys) if (FlashGlared(player, now)) glared.Add(player);
+            return glared;
+        }
+
+        /// <summary>
+        /// 야광귀 섬광 해제 (#301): 눈부신 사람의 공이 요괴 얼굴에 맞았다. 그 사람의 눈부심만 풀고(이 시각부터 회복),
+        /// 공은 피해·칠·명중 보상 없이 사라진다(던진 공 수에도 넣지 않는다). 얼굴 맞혀 풀기가 꺼져 있거나,
+        /// 던진 사람이 지금 눈부시지 않거나, 날아가는 공이 아니면 아무것도 하지 않고 false.
+        /// </summary>
+        public bool ConfirmFlashFaceHit(string id, double now)
+        {
+            if (!rules.FlashFaceRelease || !TryAdvance(now, out _) || !orbs.TryGetValue(id ?? string.Empty, out var orb)
+                || !orb.inFlight || !FlashGlared(orb.owner, now)) return false;
+            orbs.Remove(id);
+            launchScales.Remove(id);
+            players[orb.owner].flashReleasedAt = now;
+            return true;
+        }
+
+        /// <summary>
         /// Remove an expired or missed projectile without damage or a hit reward.
         /// countThrow: 빗나간 투척으로 던진 공 수(명중률 분모)에 넣을지. 지귀 불을 노린 투척은 false.
         /// 라운드가 진행 중일 때만 센다.
@@ -1841,6 +1878,8 @@ namespace C6Lab
             public readonly bool FlashEnabled, FlashTargetOne;
             public readonly float FlashFirstStartSeconds, FlashIntervalSeconds, FlashWarningSeconds,
                 FlashGlareSeconds, FlashRecoverySeconds;
+            /// <summary>Yaguang flash release (#301): a dazzled player hits the yokai's face to clear their own glare.</summary>
+            public readonly bool FlashFaceRelease;
 
             public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode)
             {
@@ -1913,6 +1952,7 @@ namespace C6Lab
                 FlashWarningSeconds = config.YaguangFlashWarningSeconds;
                 FlashGlareSeconds = config.YaguangFlashGlareSeconds;
                 FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
+                FlashFaceRelease = config.YaguangFlashFaceRelease;
                 TeamFeverHits = teamMode ? config.TeamFeverHits : 0;
                 TeamFeverSeconds = config.TeamFeverSeconds;
                 if (!teamMode) return;

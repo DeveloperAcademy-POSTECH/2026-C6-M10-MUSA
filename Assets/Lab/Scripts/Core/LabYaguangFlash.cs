@@ -11,6 +11,7 @@ namespace C6Lab
         /// <summary>
         /// 판 구슬·아이템이 하얗게 보이는 정도. 섬광을 맞은 사람만 번쩍인 순간부터 눈부심 동안 1이고,
         /// 회복 동안 부드럽게 0으로 돌아온다. 전투 중이 아니거나 섬광이 없었으면 0.
+        /// 눈부신 동안 요괴 얼굴을 맞혀 풀었으면(#301) 그 시각에 눈부심이 끝나고 거기서부터 회복한다.
         /// </summary>
         public static float GlareAmount(LabSnapshot snapshot, double now, ulong player, float glareSeconds,
             float recoverySeconds)
@@ -19,9 +20,12 @@ namespace C6Lab
                 || snapshot.flashLastAt < 0d) return 0f;
             double since = now - snapshot.flashLastAt;
             if (since < 0d) return 0f;
-            if (since < glareSeconds) return 1f;
+            double glareEnds = snapshot.flashLastAt + glareSeconds;
+            double released = snapshot.FlashReleasedAt(player);
+            if (released >= 0d && released < glareEnds) glareEnds = released;
+            if (now < glareEnds) return 1f;
             if (recoverySeconds <= 0f) return 0f;
-            float u = (float)((since - glareSeconds) / recoverySeconds);
+            float u = (float)((now - glareEnds) / recoverySeconds);
             if (u >= 1f) return 0f;
             return 1f - u * u * (3f - 2f * u);
         }
