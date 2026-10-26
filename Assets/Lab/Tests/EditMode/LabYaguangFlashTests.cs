@@ -41,12 +41,11 @@ namespace C6Lab.Tests
                 "The combo moved into the 야광귀 group.");
             LabDeveloperCategory yaguang = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀");
             Assert.That(yaguang.FieldIndices, Is.EqualTo(new[]
-                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190, 202, 203,
-                  205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219 }),
+                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190, 202, 203 }),
                 "The yaguang counting toggle (#271) sits right under the combo switch.");
             Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 184 }), "One switch turns the combo and the flash on together.");
-            Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 11, 20 }));
-            Assert.That(yaguang.DividerLabels, Is.EqualTo(new[] { "── 콤보 ──", "── 섬광 ──", "── 시간표 ──" }));
+            Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 11 }));
+            Assert.That(yaguang.DividerLabels, Is.EqualTo(new[] { "── 콤보 ──", "── 섬광 ──" }));
             foreach (int index in new[] { 159, 162 })
                 Assert.That((LabConfig.DeveloperFields[index].Min + LabConfig.DeveloperFields[index].Max) * .5f, Is.EqualTo(15f),
                     LabConfig.DeveloperFields[index].Label + ": the 15 s penalty/reward slider starts in the middle.");

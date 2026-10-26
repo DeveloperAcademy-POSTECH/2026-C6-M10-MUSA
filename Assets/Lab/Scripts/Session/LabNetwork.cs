@@ -208,14 +208,13 @@ namespace C6Lab
         // 5664: standalone #301/#305 used different shared layouts with the same version.
         // 5665: combined flash shake DEV202-203 + charm warning DEV204 (205 values),
         //       flash release state and each neighbor's charm rescue progress.
-        // 5666: #314 yaguang timeline DEV205-219 (220 values): on/off, battle 120 s, sabotage end, four unique and four common slots.
-        internal const ushort LabProtocolVersion = 5666;
+        internal const ushort LabProtocolVersion = 5665;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/27");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/26");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

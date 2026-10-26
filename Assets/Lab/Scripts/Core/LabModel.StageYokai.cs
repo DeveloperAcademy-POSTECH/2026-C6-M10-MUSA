@@ -84,7 +84,6 @@ namespace C6Lab
             Include(nextStageJigwiAt);
             Include(swipeBlockedUntil);
             Include(charmUntil);
-            if (rules.Timeline && !timelineEnded) Include(timelineEndAt);
             if (rules.ComboEnabled)
             {
                 if (combo.Active) Include(combo.EndsAt);

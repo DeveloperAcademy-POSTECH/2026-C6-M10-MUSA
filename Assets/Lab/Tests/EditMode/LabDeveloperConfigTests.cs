@@ -41,7 +41,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(220));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(205));
             Assert.That(values[89], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[90], values[91], values[92], values[93] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -780,7 +780,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(111));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(220));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(205));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             Assert.That(LabConfig.DefaultPaintVictoryPercent, Is.EqualTo(100));
@@ -1010,7 +1010,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOnAtItsPreservedIndexWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(220));
+            Assert.That(values.Length, Is.EqualTo(205));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
             Assert.That(values[110], Is.EqualTo(1f));
             LabDeveloperField field = LabConfig.DeveloperFields[110];
@@ -1105,7 +1105,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(220));
+            Assert.That(received.Length, Is.EqualTo(205));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1178,7 +1178,7 @@ namespace C6Lab.Tests
         {
             var toggles = LabConfig.DeveloperFields.Where(field => field.IsToggle).ToArray();
             Assert.That(toggles.Select(field => field.DisplayLabel), Is.EqualTo(new[]
-                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns", "Paint Drying", "Gourd Color Combo", "Combo Penalty Target", "Board Orb Trail", "Sabotage Mix", "야광귀 섬광", "섬광 대상", "야광귀 셈법", "2:2 땅따먹기", "High Resolution Paint", "섬광 흔들어 풀기", "야광귀 시간표" }));
+                { "Drop Combine", "Contact Combine", "Haptics", "Gourd Mode", "Minimap", "Bomb Sound", "Completed Gourd Viewer", "Throw Form", "Paint Grain", "Paint Growth Style", "Player Paint Patterns", "Paint Drying", "Gourd Color Combo", "Combo Penalty Target", "Board Orb Trail", "Sabotage Mix", "야광귀 섬광", "섬광 대상", "야광귀 셈법", "2:2 땅따먹기", "High Resolution Paint", "섬광 흔들어 풀기" }));
             Assert.That(toggles.All(field => field.Min == 0f && field.Max == 1f && field.WholeNumber), Is.True,
                 "A toggle is still a whole-number 0/1 value, so APPLY and room sharing are unchanged.");
             var gourd = toggles.Single(field => field.DisplayLabel == "Gourd Mode");
@@ -1512,7 +1512,7 @@ namespace C6Lab.Tests
         {
             float[] before = config.CaptureDeveloperValues();
             float[] values = (float[])before.Clone();
-            Assert.That(values, Has.Length.EqualTo(220));
+            Assert.That(values, Has.Length.EqualTo(205));
             values[202] = 0f; values[203] = 10f; values[204] = 4.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.YaguangFlashShakeRelease, Is.False);
