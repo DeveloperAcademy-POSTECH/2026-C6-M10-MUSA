@@ -14,8 +14,11 @@ namespace Hapio
             if (value.runId == null || value.runId.Length > 64 || value.battleSessionId == null
                 || value.battleSessionId.Length > 128 || value.endReason == null || value.endReason.Length > 256)
                 return Reject("invalid text fields", out reason);
-            if (value.totalStages != GameRunFlow.StageCount)
+            if (!Enum.IsDefined(typeof(GameMode), value.mode) || value.totalStages != GameRunFlow.StagesFor(value.mode))
                 return Reject("unsupported stage count", out reason);
+            if (value.notice == null || value.notice.Length > 128
+                || value.phase != GameFlowPhase.Lobby && value.notice.Length != 0)
+                return Reject("invalid notice", out reason);
             if (value.phase == GameFlowPhase.Home || value.phase == GameFlowPhase.Lobby)
             {
                 if (value.stageIndex != 0 || !string.IsNullOrEmpty(value.runId)
@@ -24,11 +27,11 @@ namespace Hapio
                 return true;
             }
             if (string.IsNullOrEmpty(value.runId) || value.revision == 0
-                || value.stageIndex < 1 || value.stageIndex > GameRunFlow.StageCount)
+                || value.stageIndex < 1 || value.stageIndex > value.totalStages)
                 return Reject("invalid run generation", out reason);
-            if (value.phase == GameFlowPhase.Completed && value.stageIndex != GameRunFlow.StageCount)
+            if (value.phase == GameFlowPhase.Completed && value.stageIndex != value.totalStages)
                 return Reject("completed before final stage", out reason);
-            if (value.phase == GameFlowPhase.StageResult && value.stageIndex >= GameRunFlow.StageCount)
+            if (value.phase == GameFlowPhase.StageResult && value.stageIndex >= value.totalStages)
                 return Reject("final stage is not an intermediate result", out reason);
             if (value.phase == GameFlowPhase.LoadingBattle
                 && (!string.IsNullOrEmpty(value.battleSessionId) || value.battleRound != 0))
@@ -61,6 +64,8 @@ namespace Hapio
                     return Reject("new run requires lobby", out reason);
                 return true;
             }
+            if (!string.IsNullOrEmpty(current.runId) && incoming.mode != current.mode)
+                return Reject("mode changed during a run", out reason);
             if (string.IsNullOrEmpty(current.runId) && allowNewRun
                 && incoming.phase != current.phase) return true;
             if (incoming.revision <= current.revision)

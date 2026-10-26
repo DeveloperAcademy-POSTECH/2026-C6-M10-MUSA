@@ -536,6 +536,9 @@ namespace C6Lab.Tests
                 Vector2 combinedWorld = ToWorld(bounds, combined01);
                 Vector2 launchFrom = ToWorld(bounds, new Vector2(.5f, .25f));
                 Assert.That(board.TryBeginDragAtWorld(combinedWorld, 2d), Is.True);
+                // Arrive before the release window (.12 s) opens: otherwise the window starts partway along
+                // the move from wherever the combine happened, and that random leg bends and weakens the flick.
+                Assert.That(board.DragToWorld(launchFrom, 2.5d), Is.True);
                 Assert.That(board.DragToWorld(launchFrom, 3d), Is.True);
                 Vector2 release = launchFrom + Vector2.up * (bounds.width * .2f);
                 Assert.That(board.EndDragAtWorld(release, 3.04d), Is.True);

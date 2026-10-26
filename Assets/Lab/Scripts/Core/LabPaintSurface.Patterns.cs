@@ -73,7 +73,65 @@ namespace C6Lab
             for (int i = 0; i < component.Count; i++) region = PaintFundedCell(region, component[i], immediateInk);
         }
 
-        private bool[] MakePatternFootprint(PatternPatch patch, int hitCell, int requested)
+        /// <summary>
+        /// 2:2 청홍 땅따먹기 (#281): 맞힌 얼룩 모양 안의 다른 색 칸을 이 색으로 덮어쓰고 그 칸의 P번호도 바꾼다.
+        /// 같은 색 칸은 그대로 두고, 빈 칸은 평소처럼 바로 칠한다. 남는 양은 평소처럼 빈 칸으로만 번진다.
+        /// 덮어쓴 칸은 칠해진 채로 같은 덩어리에 남으므로 CoveredCount는 바뀌지 않는다. 박이 다 찼어도 덮어쓴다.
+        /// painted는 바로 새로 칠한 빈 칸 수, stolen은 덮어쓴 칸 수다.
+        /// </summary>
+        public bool RegisterTerritoryHit(Vector3 direction, Color color, ulong attackerId, int painterSlot, float share,
+            out int painted, out int stolen)
+        {
+            painted = stolen = 0;
+            if (painterSlot < 0 || painterSlot > 5 || !Finite(share) || share <= 0f || share > 3f) return false;
+            if (preview || replica || pattern == LabPaintPattern.Legacy || !ValidHit(direction, color)) return false;
+            if (patternMask == null) patternMask = LabPaintPatternMask.Load(pattern);
+            decimal initial = initialCells * (decimal)share;
+            int hitCell = CellFor(direction);
+            if (PaintCount < int.MaxValue) PaintCount++;
+            Color32 opaque = Opaque(color);
+            uint salt = initialSeed ^ unchecked((uint)PaintCount * 0x9E3779B9u);
+            var patch = new PatternPatch(patternMask, direction.normalized, pattern == LabPaintPattern.Flow
+                ? -flowDirection : Vector3.up, pattern == LabPaintPattern.Flow ? 0f
+                : (StableUnit(salt) - .5f) * Mathf.PI * 2f, salt);
+            bool[] footprint = MakePatternFootprint(patch, hitCell, (int)decimal.Floor(initial), true);
+            int spent = 0;
+            for (int i = 0; i < footprint.Length; i++)
+            {
+                if (!footprint[i] || pixels[i].a == 0) continue;
+                footprint[i] = false;
+                spent++;
+                if (SameColor(pixels[i], opaque)) continue;
+                pixels[i] = opaque;
+                painterSlots[i] = (byte)painterSlot;
+                stolen++;
+                LastPainter = attackerId;
+                unchecked { Revision++; }
+            }
+            int requested = (int)Math.Min(decimal.Floor(initial), CellCount - CoveredCount);
+            decimal fraction = requested == decimal.Floor(initial) ? initial - requested : 0m;
+            var visited = new bool[CellCount];
+            var queue = new Queue<int>();
+            var component = new List<int>();
+            if (footprint[hitCell])
+                PaintPatternComponent(hitCell, footprint, visited, queue, component, opaque, attackerId,
+                    (byte)painterSlot, fraction);
+            for (int i = 0; i < footprint.Length; i++)
+                if (footprint[i] && !visited[i])
+                    PaintPatternComponent(i, footprint, visited, queue, component, opaque, attackerId, (byte)painterSlot, 0m);
+            for (int i = 0; i < footprint.Length; i++) if (footprint[i]) painted++;
+            // Same-colour overlap keeps its credit as ordinary timed growth into nearby empty cells.
+            int shortfall = (int)Math.Min(decimal.Floor(initial), int.MaxValue) - painted - stolen;
+            if (shortfall > 0 && !IsComplete)
+            {
+                Region root = Root(cellRegions[hitCell]);
+                Supply(root, shortfall, opaque, attackerId, (byte)painterSlot, true, hitCell);
+                RefreshActive(root);
+            }
+            return true;
+        }
+
+        private bool[] MakePatternFootprint(PatternPatch patch, int hitCell, int requested, bool keepPainted = false)
         {
             var planar = new Vector2[CellCount];
             for (int i = 0; i < planar.Length; i++) planar[i] = patch.Project(CellDirection(i));
@@ -132,7 +190,8 @@ namespace C6Lab
                     }
                 }
             }
-            for (int i = 0; i < footprint.Length; i++) if (pixels[i].a != 0) footprint[i] = false;
+            if (!keepPainted)
+                for (int i = 0; i < footprint.Length; i++) if (pixels[i].a != 0) footprint[i] = false;
             return footprint;
         }
 

@@ -32,8 +32,17 @@ namespace Hapio
         [Header("Editable seat layout anchors, one array for each room capacity")]
         public RectTransform[] seats2, seats3, seats4, seats5;
         public RectTransform[] lineLayouts;
+        [Header("2:2 team territory (#281), added by Hapio > Upgrade 2v2 Lobby UI")]
+        public GameObject modePanel;
+        public UnityEngine.UI.Button modeDismissButton, basicModeButton, teamModeButton, teamSoloButton;
+        public GameObject teamLayout;
+        [Tooltip("Editable P1..P4 anchors of the 2:2 seat screen: Blue P1/P2 on the left, Red P3/P4 on the right.")]
+        public RectTransform[] seatsTeam;
+        [Tooltip("Heading, hint, room paper, room name, joined, selected and start button. In a 2:2 room each moves to the matching anchor below.")]
+        public RectTransform[] teamShifted, teamShiftAnchors;
 
         private GameSession session;
+        private RectTransform[] storyShifted;
         private int creationCapacity = 3;
         private string localError = string.Empty;
         private readonly List<UnityEngine.UI.Button> rows = new List<UnityEngine.UI.Button>();
@@ -46,7 +55,7 @@ namespace Hapio
             public string key, name;
             public ushort port;
             public int participants, capacity;
-            public bool pending, ready, waiting, playing, full;
+            public bool pending, ready, waiting, playing, full, team;
         }
 
         private void Awake()
@@ -56,7 +65,29 @@ namespace Hapio
             if (screen == null || !screen.externalNavigation)
                 throw new InvalidOperationException("The saved game lobby needs its external-navigation GameScreen.");
             enterButton.onClick.AddListener(() => session.EnterRoomBrowser());
-            createButton.onClick.AddListener(CreateRoom);
+            // 2:2 (#281): "새 방 만들기 +" first asks which mode. A prefab without the mode panel keeps the old story flow.
+            createButton.onClick.AddListener(() => { if (modePanel != null) SetModes(true); else CreateRoom(GameMode.Story); });
+            if (modePanel != null)
+            {
+                modeDismissButton.onClick.AddListener(() => SetModes(false));
+                basicModeButton.onClick.AddListener(() => CreateRoom(GameMode.Story));
+                teamModeButton.onClick.AddListener(() => CreateRoom(GameMode.Territory));
+                teamSoloButton.onClick.AddListener(() => { SetModes(false); session.StartSolo(GameMode.Territory); });
+                modePanel.SetActive(false);
+            }
+            if (teamShifted != null && teamShiftAnchors != null && teamShifted.Length == teamShiftAnchors.Length)
+            {
+                // Keep each story position in a hidden copy, so leaving a 2:2 room restores the authored layout.
+                storyShifted = new RectTransform[teamShifted.Length];
+                for (int i = 0; i < teamShifted.Length; i++)
+                {
+                    var copy = new GameObject(teamShifted[i].name + " Story Position", typeof(RectTransform));
+                    copy.transform.SetParent(teamShifted[i].parent, false);
+                    copy.SetActive(false);
+                    storyShifted[i] = (RectTransform)copy.transform;
+                    CopyRect(teamShifted[i], storyShifted[i]);
+                }
+            }
             refreshButton.onClick.AddListener(() => Network.StartRoomSearch());
             cancelButton.onClick.AddListener(() => { Network.CancelJoin(); Network.CancelRoomSearch(); });
             leaveButton.onClick.AddListener(() => session.GoHomeToRoomBrowser());
@@ -86,11 +117,23 @@ namespace Hapio
             directConnectionPanel.SetActive(false);
         }
 
-        private void CreateRoom()
+        private void CreateRoom(GameMode mode)
         {
-            if (creationCapacity < 2 || creationCapacity > 5) return;
+            SetModes(false);
             localError = string.Empty;
-            if (session.CreatePendingRoom(creationCapacity)) creationCapacity = 0;
+            if (mode == GameMode.Territory) { session.CreatePendingRoom(LabTeams.Players, GameMode.Territory); return; }
+            if (creationCapacity < 2 || creationCapacity > 5) { localError = "기본 모드는 먼저 함께할 인원을 고르시오."; return; }
+            if (session.CreatePendingRoom(creationCapacity, GameMode.Story)) creationCapacity = 0;
+        }
+
+        private void SetModes(bool visible)
+        {
+            if (modePanel == null) return;
+            if (visible && (session.State.phase != GameFlowPhase.Home || !Network.CanChooseConnection)) return;
+            modePanel.SetActive(visible);
+            if (!visible) return;
+            modePanel.transform.SetAsLastSibling();
+            teamSoloButton.gameObject.SetActive(Network.DeveloperBuildAvailable);
         }
 
         private void EnterRoom(int index)
@@ -119,6 +162,7 @@ namespace Hapio
             soloButton.gameObject.SetActive(home && Network.DeveloperBuildAvailable);
             soloButton.interactable = home && Network.CanChooseConnection;
             if (Network.IsConnected || Network.IsJoiningRoom) SetDirectConnection(false);
+            if (modePanel != null && modePanel.activeSelf && (!browser || !Network.CanChooseConnection)) SetModes(false);
             if (browser) RefreshBrowser();
             else if (lobby) RefreshPositions();
             string notice = Network.IsJoiningRoom ? (Network.IsCancelingJoin ? "연결을 취소하고 있소..." : "방에 입장하고 있소...")
@@ -141,7 +185,7 @@ namespace Hapio
         private void RefreshBrowser()
         {
             bool canChoose = Network.CanChooseConnection;
-            createButton.interactable = canChoose && creationCapacity >= 2;
+            createButton.interactable = canChoose && (modePanel != null || creationCapacity >= 2);
             directConnectionButton.interactable = canChoose;
             refreshButton.interactable = canChoose;
             refreshButton.gameObject.SetActive(!Network.IsJoiningRoom);
@@ -156,10 +200,11 @@ namespace Hapio
             }
             RoomRow[] rooms = session.PendingRooms.Select(room => new RoomRow
                 { key = room.Key, name = room.Name, port = room.Port, participants = 1, capacity = room.Capacity,
-                    pending = true, ready = room.Ready, waiting = true })
+                    pending = true, ready = room.Ready, waiting = true, team = room.Mode == GameMode.Territory })
                 .Concat(Network.DiscoveredRooms.Select(room => new RoomRow
                 { key = room.Key, name = room.Name, port = room.Port, participants = room.Participants,
-                    capacity = room.TargetParticipants, waiting = room.WaitingForHost, playing = room.Playing, full = room.IsFull }))
+                    capacity = room.TargetParticipants, waiting = room.WaitingForHost, playing = room.Playing, full = room.IsFull,
+                    team = room.Team }))
                 .GroupBy(room => room.key, StringComparer.OrdinalIgnoreCase).Select(group => group.First())
                 .OrderBy(room => LabRoomNames.SortNumber(room.name)).ThenBy(room => room.name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(room => room.port).ToArray();
@@ -180,8 +225,8 @@ namespace Hapio
                 rows[i].targetGraphic.color = ColorOf(i % 2 == 0 ? "E9DFCA" : "EEE6D6");
                 rows[i].transform.Find("Name").GetComponent<UnityEngine.UI.Text>().text = room.pending && string.IsNullOrEmpty(room.name)
                     ? "새 방 준비 중" : LabRoomNames.Display(room.name);
-                rows[i].transform.Find("Count").GetComponent<UnityEngine.UI.Text>().text = room.capacity >= 2
-                    ? room.participants + " / " + room.capacity + "명 모였소" : "인원 확인 중";
+                rows[i].transform.Find("Count").GetComponent<UnityEngine.UI.Text>().text = (room.team ? "2:2 땅따먹기 · " : "")
+                    + (room.capacity >= 2 ? room.participants + " / " + room.capacity + "명 모였소" : "인원 확인 중");
                 bool connecting = Network.IsJoiningRoom && Network.JoiningRoomKey == room.key;
                 string action = room.pending && !room.ready ? "준비 중..." : connecting ? "입장 중..."
                     : !room.pending && room.waiting ? "방장 대기" : room.playing ? "봉인 중" : room.full ? "정원 마감" : "입장 →";
@@ -196,19 +241,26 @@ namespace Hapio
         {
             int count = Network.TargetParticipantCount;
             bool allChosen = Network.ParticipantCount == count && Network.SelectedParticipantCount == count;
-            heading.text = allChosen ? "요괴 봉인 준비 완료!" : "빈 자리를 고르시오.";
+            // 2:2 (#281): Blue P1/P2 and Red P3/P4 in their own boxes; the saved anchors move the shared texts down.
+            bool team = session.IsTerritory && count == LabTeams.Players && teamLayout != null && seatsTeam != null
+                && seatsTeam.Length == LabTeams.Players;
+            teamLayout?.SetActive(team);
+            if (storyShifted != null)
+                for (int i = 0; i < teamShifted.Length; i++) CopyRect(team ? teamShiftAnchors[i] : storyShifted[i], teamShifted[i]);
+            heading.text = allChosen ? (team ? "준비 완료!" : "요괴 봉인 준비 완료!") : "빈 자리를 고르시오.";
             subheading.text = Network.SlotSelectionPending ? "자리 선택을 확인하고 있소..."
-                : allChosen ? (Network.SessionConfigReady ? "" : "방 설정을 확인하고 있소...") : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
+                : allChosen ? (Network.SessionConfigReady ? "" : "방 설정을 확인하고 있소...")
+                : team ? "2명씩 함께 앉아, 준비하시오." : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
             roomName.text = Network.HostRoomNamePending ? "방을 만들고 있소..." : LabRoomNames.Display(Network.ConnectedRoomName);
             joinedCount.text = Network.ParticipantCount + " / " + count + "명 입장";
             selectedCount.text = Network.SelectedParticipantCount + " / " + count + "명 자리 확정";
-            connectionLines.gameObject.SetActive(count >= 3);
-            if (count >= 3)
+            connectionLines.gameObject.SetActive(count >= 3 && !team);
+            if (count >= 3 && !team)
             {
                 connectionLines.sprite = lines[count - 3];
                 CopyRect(lineLayouts[count - 3], connectionLines.rectTransform);
             }
-            RectTransform[] anchors = count == 2 ? seats2 : count == 3 ? seats3 : count == 4 ? seats4 : seats5;
+            RectTransform[] anchors = team ? seatsTeam : count == 2 ? seats2 : count == 3 ? seats3 : count == 4 ? seats4 : seats5;
             for (int i = 0; i < slotButtons.Length; i++)
             {
                 bool active = i < count;
@@ -225,14 +277,19 @@ namespace Hapio
                 bool host = occupied && owner == Unity.Netcode.NetworkManager.ServerClientId;
                 localLabels[i].text = (host ? "방장" : string.Empty) + (mine ? (host ? " · 나 · 취소" : "나 · 취소") : string.Empty);
                 Vector2 center = anchors[i].anchoredPosition;
-                LabLobbyView.Place(localLabels[i].rectTransform, center.x - 60f, -center.y + 42f, 120f, 25f);
+                // In the 2:2 boxes the upper seats (P1, P3) show their label above, clear of the connecting line.
+                bool above = team && i % 2 == 0;
+                LabLobbyView.Place(localLabels[i].rectTransform, center.x - 60f, -center.y + (above ? -67f : 42f), 120f, 25f);
             }
+            clearSlotButton.gameObject.SetActive(!team);
             clearSlotButton.interactable = Network.CanSelectPlayerSlot && Network.LocalSlotNumber != 0;
             bool start = Network.IsHost && Network.CanStartBattle;
             sealButton.interactable = start;
             sealButton.targetGraphic.color = ColorOf(start ? "AF4738" : "C7C0B0");
             var text = sealButton.GetComponentInChildren<UnityEngine.UI.Text>();
-            text.text = start ? "요괴 봉인 시작 · 3스테이지" : allChosen && !Network.IsHost ? "방장의 봉인을 기다리시오" : "요괴 봉인 대기";
+            text.text = team
+                ? start ? "요괴 봉인 시작" : allChosen && !Network.IsHost ? "방장의 시작을 기다리시오" : "땅따먹기 대기 중"
+                : start ? "요괴 봉인 시작 · 3스테이지" : allChosen && !Network.IsHost ? "방장의 봉인을 기다리시오" : "요괴 봉인 대기";
             text.color = ColorOf(start ? "FFF7E5" : "575750");
         }
 

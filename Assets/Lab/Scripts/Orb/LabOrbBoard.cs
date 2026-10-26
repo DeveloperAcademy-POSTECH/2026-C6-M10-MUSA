@@ -166,6 +166,11 @@ namespace C6Lab
         private int blockedSide;
         private float blockSecondsLeft;
         private LabOrbEdgeBlock edgeBlock;
+        /// <summary>2:2 fever (#281): how much bigger a turned orb starts, and how long it takes to settle.</summary>
+        private const float FeverTurnScale = 1.45f, FeverTurnSeconds = .35f;
+        // 2:2 (#281): the closed outer edge of this board for the whole battle.
+        private int teamWallSide;
+        private LabOrbTeamWall teamWall;
         /// <summary>The board keeps its own swipe-block countdown unless the Host's differs by more than this.</summary>
         private const float BlockResyncSeconds = .3f;
         private LabOrbAreaShape areaShape;
@@ -212,6 +217,11 @@ namespace C6Lab
         /// <summary>How many of this board's own passes have bounced off a blocked edge.</summary>
         public int BlockBounces { get; private set; }
         public LabOrbEdgeBlock EdgeBlock => edgeBlock;
+        /// <summary>2:2 (#281): the closed outer edge: -1 left, +1 right, 0 none.</summary>
+        public int TeamWallSide => teamWallSide;
+        /// <summary>How many crossings have bounced off the 2:2 outer wall.</summary>
+        public int TeamWallBounces { get; private set; }
+        public LabOrbTeamWall TeamWall => teamWall;
         /// <summary>World-space limits for orb centres; the visual extends by OrbRadius.</summary>
         public Rect CenterBounds => bounds;
         public LabOrbAreaShape AreaShape => areaShape;
@@ -377,7 +387,7 @@ namespace C6Lab
             bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
             LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false,
-            float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f)
+            float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f, bool fever = false)
         {
             RequireConfigured();
             small &= !kind.IsDrum();
@@ -396,10 +406,13 @@ namespace C6Lab
                     || !Mathf.Approximately(existing.JigwiScale, jigwiScale))
                 {
                     bool shrinking = small && !existing.Small && existing.View.Kind == kind;
+                    // 2:2 fever (#281): a Yin or Yang the Host turned into a team orb swells and settles as it changes.
+                    bool feverTurned = existing.View.Kind.IsRaw() && kind == LabOrbKind.Combined;
                     existing.Small = small;
                     existing.JigwiScale = jigwiScale;
                     existing.View.Configure(id, kind, RadiusFor(kind, small, jigwiScale), element);
                     if (shrinking) existing.View.PlayShrink(1f / config.BlastShrinkScale, ShrinkSeconds);
+                    else if (feverTurned) existing.View.PlayShrink(FeverTurnScale, FeverTurnSeconds);
                     existing.View.Body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
@@ -409,6 +422,7 @@ namespace C6Lab
                 if (justUnlocked && unlockEffectIds.Add(id)) existing.View.PlayUnlockEffect();
                 existing.View.SetBurn(burnSeconds);
                 existing.View.SetLife(lifeSeconds);
+                existing.View.SetFever(fever);
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -429,6 +443,7 @@ namespace C6Lab
             if (justUnlocked && unlockEffectIds.Add(id)) view.PlayUnlockEffect();
             view.SetBurn(burnSeconds);
             view.SetLife(lifeSeconds);
+            view.SetFever(fever);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
@@ -584,6 +599,27 @@ namespace C6Lab
             if (charmEdge != null) charmEdge.Release();
         }
 
+        /// <summary>
+        /// 2:2 (#281): close one side for the whole battle. Swipes, flicks, blast pushes and drums passing on all
+        /// bounce off it like the top and bottom walls; only the teammate's side passes.
+        /// </summary>
+        public void SetTeamWall(int side)
+        {
+            side = configured ? Math.Sign(side) : 0;
+            if (side == teamWallSide && (side == 0 || teamWall != null && teamWall.Visible)) return;
+            teamWallSide = side;
+            if (side != 0) ShowTeamWall();
+            else if (teamWall != null) teamWall.Hide();
+        }
+
+        private void ShowTeamWall()
+        {
+            if (teamWall == null) teamWall = LabOrbTeamWall.Create(transform);
+            float edgeX = teamWallSide > 0 ? bounds.xMax : bounds.xMin;
+            Vector2 range = areaShape.VerticalRange(edgeX, 0f);
+            teamWall.Show(teamWallSide > 0, edgeX, range.x, range.y, bounds.width);
+        }
+
         public void SetSwipeBlock(int side, float secondsLeft)
         {
             side = Math.Sign(side);
@@ -620,6 +656,8 @@ namespace C6Lab
             ApplyComboLook();
             ApplyFlashGlare();
             SyncBoardTrails();
+            // Follows the board if its area was resized.
+            if (teamWallSide != 0) ShowTeamWall();
             if (blockedSide == 0) return;
             blockSecondsLeft -= Time.deltaTime;
             if (blockSecondsLeft <= 0f) LiftSwipeBlock();
@@ -1104,6 +1142,7 @@ namespace C6Lab
         {
             CancelDrag();
             LiftSwipeBlock();
+            SetTeamWall(0);
             charmed = false;
             jigwiOverheat = false;
             flashGlare = 0f;
@@ -1465,6 +1504,15 @@ namespace C6Lab
                 // A drum still passing through tells the Host so it stops on the near side next.
                 LabEdgeCrossingKind kind = entry.Arrival == LabDrumArrival.Pass ? LabEdgeCrossingKind.Passing
                     : entry.Blasted ? LabEdgeCrossingKind.Pushed : LabEdgeCrossingKind.Swipe;
+                if (teamWallSide == (right ? 1 : -1) && entry.View.Kind != LabOrbKind.FoxFire)
+                {
+                    // 2:2 (#281): the outer edge is closed for the whole battle; everything bounces back in.
+                    body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
+                    body.linearVelocity = OnPlane(new Vector2(-velocity.x * config.OrbRestitution, velocity.y));
+                    TeamWallBounces++;
+                    if (teamWall != null) teamWall.Flash();
+                    continue;
+                }
                 if (kind == LabEdgeCrossingKind.Swipe && blockedSide == (right ? 1 : -1))
                 {
                     // The gourd's swipe block (#215): this player's own pass that way bounces off the edge

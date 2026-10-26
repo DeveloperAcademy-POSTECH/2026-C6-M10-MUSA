@@ -183,6 +183,13 @@ namespace C6Lab.Tests
                     yield return null;
                 }
                 Assert.That(browser.Targets.Any(room=>LabRoomNames.Display(room.ServiceName)==names[1]&&!room.WaitingForHost),Is.True);
+                // The Host's record can arrive before the removal of the retired pending one on its old port.
+                deadline=Time.realtimeSinceStartupAsDouble+10;
+                while(Time.realtimeSinceStartupAsDouble<deadline&&LabRoomCatalog.GroupTargets(browser.Targets).Count(room=>names.Contains(LabRoomNames.Display(room.Name))&&room.WaitingForHost)!=2)
+                {
+                    browser.Tick();
+                    yield return null;
+                }
                 Assert.That(LabRoomCatalog.GroupTargets(browser.Targets).Count(room=>names.Contains(LabRoomNames.Display(room.Name))&&room.WaitingForHost),Is.EqualTo(2));
             }
             network.Stop();yield return null;yield return null;
