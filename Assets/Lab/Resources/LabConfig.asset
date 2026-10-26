@@ -202,6 +202,6 @@ MonoBehaviour:
   yaguangFlashFirstStartSeconds: 10
   yaguangFlashIntervalSeconds: 60
   yaguangFlashWarningSeconds: 3
-  yaguangFlashGlareSeconds: 12
-  yaguangFlashRecoverySeconds: 2
+  yaguangFlashGlareSeconds: 10
+  yaguangFlashRecoverySeconds: 1
   comboYaguangCountEnabled: 1

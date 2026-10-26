@@ -10,10 +10,10 @@ namespace C6Lab
     /// </summary>
     public sealed class LabShakeCounter
     {
-        /// <summary>흔들림이 중력의 몇 배를 넘으면 한 번으로 칠지 (기본 1배)</summary>
-        public float Threshold = 1f;
-        /// <summary>한 번 센 뒤 다시 세기까지 기다리는 시간 (초)</summary>
-        public float MinGap = .14f;
+        /// <summary>흔들림이 중력의 몇 배를 넘으면 한 번으로 칠지 (기본 1.6배: 살짝 움직이는 건 세지 않는다)</summary>
+        public float Threshold = 1.6f;
+        /// <summary>한 번 센 뒤 다시 세기까지 기다리는 시간 (초). 한 번 왕복하는 흔들기가 두 번으로 세지지 않게.</summary>
+        public float MinGap = .25f;
         /// <summary>중력을 따라가는 빠르기 (0~1, 클수록 빨리 따라감)</summary>
         public float GravityFollow = .08f;
 

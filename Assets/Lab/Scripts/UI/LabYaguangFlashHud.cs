@@ -52,9 +52,11 @@ namespace C6Lab
         [SerializeField, Range(.3f, 6f)] private float caughtSeconds = 1.5f;
         [Header("흔들어 풀기 (#301)")]
         [Tooltip("흔들림이 중력의 몇 배를 넘으면 한 번 흔든 것으로 칠지. 작을수록 살살 흔들어도 센다.")]
-        [SerializeField, Range(.3f, 3f)] private float shakeThreshold = 1f;
+        [SerializeField, Range(.3f, 3f)] private float shakeThreshold = 1.6f;
         [Tooltip("한 번 센 뒤 다시 세기까지 기다리는 시간 (초)")]
-        [SerializeField, Range(.05f, .5f)] private float shakeMinGap = .14f;
+        [SerializeField, Range(.05f, .5f)] private float shakeMinGap = .25f;
+        [Tooltip("흔들 때 하얀 막이 걷히는 빠르기 (초당 비율). 한 번에 툭 바뀌지 않고 이 빠르기로 부드럽게 따라간다.")]
+        [SerializeField, Range(.5f, 10f)] private float shakeClearSpeed = 2.5f;
         [Tooltip("흔들라는 안내 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 shakeCueAnchor = new Vector2(.5f, .42f);
         [Tooltip("흔들라는 안내의 폰 그림 높이 (Canvas 기준 픽셀)")]
@@ -79,6 +81,7 @@ namespace C6Lab
         private readonly LabShakeCounter shakeCounter = new LabShakeCounter();
         private uint shakeFlash;
         private bool shakeSent;
+        private float shownShake;
         private RectTransform shakeCue, shakeGaugeFill, shakePhone;
         private Text shakeLabel;
         /// <summary>이번 섬광에 이 화면에서 센 흔들기 수 (#301)</summary>
@@ -165,7 +168,9 @@ namespace C6Lab
             bool shakeRelease = config.YaguangFlashShakeRelease;
             bool myGlare = shakeRelease && LabYaguangFlash.Glared(snapshot, now, me, config.YaguangFlashGlareSeconds);
             float shakeProgress = DriveShake(snapshot, myGlare, config.YaguangFlashShakeCount);
-            if (shakeRelease) glare = Mathf.Min(glare, 1f - shakeProgress);
+            // 흔든 만큼 걷히되, 한 번 흔들 때마다 툭 바뀌지 않게 부드럽게 따라간다 (#301).
+            shownShake = Mathf.MoveTowards(shownShake, shakeProgress, shakeClearSpeed * Time.unscaledDeltaTime);
+            if (shakeRelease) glare = Mathf.Min(glare, 1f - shownShake);
             if (boundBoard != null) boundBoard.SetFlashGlare(glare);
             CheckNewFlash(snapshot, now, me, config);
             CheckCaught(snapshot, now, me);
@@ -214,6 +219,7 @@ namespace C6Lab
                 shakeFlash = snapshot.flashCount;
                 shakeCounter.Reset();
                 shakeSent = false;
+                shownShake = 0f;
             }
             shakeCounter.Threshold = shakeThreshold;
             shakeCounter.MinGap = shakeMinGap;

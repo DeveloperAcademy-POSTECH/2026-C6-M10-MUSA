@@ -100,7 +100,7 @@ namespace C6Lab.Tests
         {
             Assert.That(haptics.ComboClearPulses, Is.EqualTo(5), "Stronger since #301: five quick heavy pulses.");
             Assert.That(haptics.ComboClearGapSeconds, Is.EqualTo(.1f));
-            Assert.That(haptics.ComboFailSeconds, Is.EqualTo(2.5f), "Stronger since #301: a 2.5 s buzz.");
+            Assert.That(haptics.ComboFailSeconds, Is.EqualTo(1.5f), "Shortened in #301: a 1.5 s buzz.");
             Assert.That(haptics.PlayForComboClear(config), Is.True);
             Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.ComboClear));
             Assert.That(haptics.PlayForComboFail(config), Is.True);

@@ -31,8 +31,8 @@ namespace C6Lab.Tests
             Assert.That(new[] { flash[0].OffText, flash[0].OnText }, Is.EqualTo(new[] { "끔", "켬" }));
             Assert.That(new[] { flash[1].OffText, flash[1].OnText }, Is.EqualTo(new[] { "모두", "한 명" }));
             Assert.That(flash.Skip(2).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
-            // 눈부심은 #301부터 폰을 흔들어 풀 수 있는 시간의 상한이라 7초 → 12초(범위 1~23의 가운데)로 늘렸다.
-            float[] defaults = { 10f, 60f, 3f, 12f, 2f };
+            // 눈부심·회복은 #301부터 흔들기에 맞춰 10초(범위 1~19)·1초(범위 0~2), 각각 범위 가운데.
+            float[] defaults = { 10f, 60f, 3f, 10f, 1f };
             for (int i = 0; i < defaults.Length; i++)
                 Assert.That((flash[i + 2].Min + flash[i + 2].Max) * .5f, Is.EqualTo(defaults[i]),
                     flash[i + 2].Label + ": every slider starts in the middle of its range.");
@@ -57,9 +57,9 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(184).Take(7), Is.EqualTo(new[] { 0f, 0f, 10f, 60f, 3f, 12f, 2f }),
+                Assert.That(source.CaptureDeveloperValues().Skip(184).Take(7), Is.EqualTo(new[] { 0f, 0f, 10f, 60f, 3f, 10f, 1f }),
                     "Off by default; once on, everyone flashes at 10 s (so the round does not open empty, #271) and every 60 s, "
-                    + "with a 3 s warning (yellow eyes for most of it), up to 12 s of glare (#301) and 2 s to recover.");
+                    + "with a 3 s warning (yellow eyes for most of it), up to 10 s of glare and 1 s to recover (#301).");
 
             float[] values = config.CaptureDeveloperValues();
             values[184] = 1f; values[185] = 1f; values[186] = 5f; values[187] = 24f;
@@ -98,17 +98,19 @@ namespace C6Lab.Tests
                 Assert.That(source.CaptureDeveloperValues().Skip(200).Take(2), Is.EqualTo(new[] { 1f, 6f }));
             }
             float[] values = config.CaptureDeveloperValues();
-            values[200] = 0f; values[201] = 10f; values[189] = 23f;
+            values[200] = 0f; values[201] = 10f; values[189] = 19f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.YaguangFlashShakeRelease, Is.False);
             Assert.That(config.YaguangFlashShakeCount, Is.EqualTo(10));
-            Assert.That(config.YaguangFlashGlareSeconds, Is.EqualTo(23f));
+            Assert.That(config.YaguangFlashGlareSeconds, Is.EqualTo(19f));
             values[201] = 11f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "At most 10 shakes.");
             values[201] = 6.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Shakes are whole numbers.");
-            values[201] = 6f; values[189] = 24f;
-            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Glare stays within 23 s.");
+            values[201] = 6f; values[189] = 20f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Glare stays within 19 s.");
+            values[189] = 10f; values[190] = 3f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Recovery stays within 2 s.");
         }
 
         [Test]
@@ -116,7 +118,8 @@ namespace C6Lab.Tests
         {
             foreach (float unit in new[] { 1f, 9.81f })
             {
-                var counter = new LabShakeCounter();
+                // 기준 1배·간격 0.14초로 세는 방식을 확인한다 (기본값은 아래에서 따로 본다).
+                var counter = new LabShakeCounter { Threshold = 1f, MinGap = .14f };
                 Vector3 still = new Vector3(0f, -1f, 0f) * unit;
                 Assert.That(counter.Feed(still, 0f), Is.False, "The first reading only learns gravity.");
                 Assert.That(counter.Feed(still + new Vector3(.4f, 0f, 0f) * unit, .05f), Is.False, "A small wobble is not a shake.");
@@ -130,6 +133,11 @@ namespace C6Lab.Tests
                 counter.Reset();
                 Assert.That(counter.Count, Is.Zero);
             }
+            var strict = new LabShakeCounter();
+            Assert.That(new[] { strict.Threshold, strict.MinGap }, Is.EqualTo(new[] { 1.6f, .25f }),
+                "Default: a small move is not a shake, and one swing is not counted twice (#301 tuning).");
+            strict.Feed(new Vector3(0f, -1f, 0f), 0f);
+            Assert.That(strict.Feed(new Vector3(1.2f, -1f, 0f), .3f), Is.False, "A light jerk no longer counts.");
             Assert.That(LabYaguangFlashHud.ShakeProgress(3, 6), Is.EqualTo(.5f), "Half the shakes clear half the glare.");
             Assert.That(LabYaguangFlashHud.ShakeProgress(9, 6), Is.EqualTo(1f));
             Assert.That(LabYaguangFlashHud.ShakeProgress(1, 0), Is.Zero);
@@ -529,7 +537,7 @@ namespace C6Lab.Tests
         public void AShortIntervalStillLeavesTheGlareRecoveryAndNextWarningApart()
         {
             var model = new LabModel();
-            model.Begin("flash-gap", Three, 0d, Config(flash: true, interval: 20f, warning: 4f, glare: 13f, recovery: 4f));
+            model.Begin("flash-gap", Three, 0d, Config(flash: true, interval: 20f, warning: 6f, glare: 13f, recovery: 2f));
             LabSnapshot flashed = model.Snapshot(30d);
             Assert.That(flashed.flashAt, Is.EqualTo(51d), "4 warning + 13 glare + 4 recovery is longer than 20 s.");
         }
