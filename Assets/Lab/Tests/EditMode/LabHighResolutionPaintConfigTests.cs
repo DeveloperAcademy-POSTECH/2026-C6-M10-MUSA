@@ -48,9 +48,9 @@ namespace C6Lab.Tests
                 Assert.That(peer.TryApplyDeveloperValues(config.CaptureDeveloperValues(), out error), Is.True, error);
                 Assert.That(peer.HighResolutionPaintEnabled, Is.False);
                 Assert.That(peer.HighResolutionPaintColumns, Is.EqualTo(2048));
-                string applied = LabSessionSettings.Fingerprint(values, 4, 5665);
-                Assert.That(applied, Is.EqualTo(LabSessionSettings.Fingerprint(peer.CaptureDeveloperValues(), 4, 5665)));
-                Assert.That(applied, Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 4, 5665)));
+                string applied = LabSessionSettings.Fingerprint(values, 4, 5666);
+                Assert.That(applied, Is.EqualTo(LabSessionSettings.Fingerprint(peer.CaptureDeveloperValues(), 4, 5666)));
+                Assert.That(applied, Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 4, 5666)));
             }
             finally { Object.DestroyImmediate(peer); }
         }

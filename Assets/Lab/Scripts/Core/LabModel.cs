@@ -314,13 +314,15 @@ namespace C6Lab
             drumHandoffCount = 0;
             // With the sabotage mix on (#251) the gourd's bombs and swipe blocks keep no timers of their own.
             bool legacyMix = stageYokai == LabStageYokai.None && rules.SabotageMix;
-            nextGourdBombAt = legacyMix ? double.PositiveInfinity : now + GourdBombDelay(0u);
+            ResetTimeline(now);
+            nextGourdBombAt = rules.Timeline ? NextTimelineBomb()
+                : legacyMix ? double.PositiveInfinity : now + GourdBombDelay(0u);
             swipeBlockCount = 0;
             swipeBlockedPlayer = 0;
             swipeBlockedRight = false;
             swipeBlockStartedAt = swipeBlockedUntil = -1d;
-            nextSwipeBlockAt = !legacyMix && rules.SwipeBlockInterval > 0f
-                ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
+            nextSwipeBlockAt = rules.Timeline ? NextTimelineSwipe()
+                : !legacyMix && rules.SwipeBlockInterval > 0f ? now + rules.SwipeBlockInterval : double.PositiveInfinity;
             sabotageCount = 0;
             lastSabotageTarget = null;
             charmedPlayer = 0;
@@ -331,7 +333,7 @@ namespace C6Lab
                 ? now + SabotageDelay(0u) : double.PositiveInfinity;
             combo.Reset();
             launchScales.Clear();
-            nextComboAt = now + rules.ComboFirstStartSeconds;
+            nextComboAt = rules.Timeline ? NextTimelineCombo() : now + rules.ComboFirstStartSeconds;
             flashCount = 0;
             lastFlashAt = -1d;
             lastFlashTarget = 0;
@@ -342,7 +344,8 @@ namespace C6Lab
             gourdBombWasHeld = swipeBlockWasHeld = false;
             comboQueuedAt = flashQueuedAt = -1d;
             screenBusyAt.Clear();
-            nextFlashAt = rules.FlashEnabled ? now + rules.FlashFirstStartSeconds : double.PositiveInfinity;
+            nextFlashAt = !rules.FlashEnabled ? double.PositiveInfinity
+                : rules.Timeline ? NextTimelineFlash() : now + rules.FlashFirstStartSeconds;
             nextFlashTarget = DrawFlashTarget(0u);
             lastTime = now;
             deadline = nextDeadline;
@@ -719,7 +722,7 @@ namespace C6Lab
                     colors[i] = (LabOrbElement)(1 + (int)(DrawFor(seed ^ ComboColorSalt, ComboDrawKey, index) % 5UL));
                 }
                 combo.Start(colors, at, rules.ComboTimeLimitSeconds);
-                nextComboAt = at + rules.ComboRepeatIntervalSeconds;
+                nextComboAt = rules.Timeline ? NextTimelineCombo() : at + rules.ComboRepeatIntervalSeconds;
             }
         }
 
@@ -766,7 +769,7 @@ namespace C6Lab
                 lastFlashTarget = nextFlashTarget;
                 double gap = Math.Max(rules.FlashIntervalSeconds,
                     rules.FlashGlareSeconds + rules.FlashRecoverySeconds + rules.FlashWarningSeconds);
-                nextFlashAt = at + gap;
+                nextFlashAt = rules.Timeline ? NextTimelineFlash() : at + gap;
                 nextFlashTarget = DrawFlashTarget(flashCount);
             }
         }
@@ -797,6 +800,7 @@ namespace C6Lab
         // 미뤄질 섬광이면 -1을 보내, 어느 기기에서도 요괴·눈 말풍선이 미리 나오지 않게 한다. 이미 시작한 예고는 그대로 알린다.
         // 콤보 예고가 섬광 예고보다 먼저(같은 순간 포함) 시작될 차례면 섬광은 그 콤보 한 판 뒤로 밀리므로 역시 알리지 않는다.
         private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled && !flashHeld
+            && Finite(nextFlashAt)
             && (flashWarned || (!FlashBlocked(lastTime) && !ComboWarnsBeforeFlash
                 && !FlashBlocked(Math.Max(lastTime, nextFlashAt - rules.FlashWarningSeconds))));
 
@@ -820,7 +824,7 @@ namespace C6Lab
         /// 야광귀 모드 (#271): 콤보나 섬광이 켜져 있으면 <b>각자의 화면에서</b> 이벤트가 한 번에 하나만 열린다.
         /// 박 폭탄·넘기기 막기·섬광·콤보·방해공작(여우불·매혹)이 그 화면에 열려 있으면 그 화면에 새 이벤트를 걸지 않는다.
         /// </summary>
-        private bool ExclusiveEvents => rules != null && (rules.ComboEnabled || rules.FlashEnabled);
+        private bool ExclusiveEvents => rules != null && !rules.Timeline && (rules.ComboEnabled || rules.FlashEnabled);
 
         /// <summary>
         /// 이 사람 화면에 지금 열린 이벤트가 있는지 (#271). 시각을 미리 계산하는 것이 아니라 지금 상태를 본다.
@@ -988,7 +992,7 @@ namespace C6Lab
         private bool ComboWaiting => phase == LabPhase.Playing && rules != null && rules.ComboEnabled && !combo.Active;
 
         // 다른 이벤트 때문에 미룰 콤보 예고는 알리지 않는다 (#271). 이미 시작한 예고는 그대로 알린다.
-        private bool ComboAnnounced => ComboWaiting && !comboHeld
+        private bool ComboAnnounced => ComboWaiting && !comboHeld && Finite(nextComboAt)
             && (comboWarned || (!AnyScreenOpen(LabYaguangEvent.Combo, lastTime) && !FlashGoesFirst && !FlashRunsIntoCombo));
 
         /// <summary>
@@ -1395,6 +1399,7 @@ namespace C6Lab
                 AdvanceStageJigwi(effectiveNow);
                 AdvanceCombo(effectiveNow);
                 AdvanceFlash(effectiveNow);
+                EndTimelineSabotage(effectiveNow);
                 ExpireOrbs(effectiveNow);
                 remaining = Math.Max(0d, deadline - effectiveNow);
                 if (teamMode)
@@ -1436,7 +1441,7 @@ namespace C6Lab
                 }
                 if (gourdBombWasHeld) { gourdBombWasHeld = false; at = until; }
                 DropGourdBomb(target, at);
-                nextGourdBombAt = at + GourdBombDelay(gourdBombCount);
+                nextGourdBombAt = rules.Timeline ? NextTimelineBomb() : at + GourdBombDelay(gourdBombCount);
             }
         }
 
@@ -1538,7 +1543,8 @@ namespace C6Lab
                     continue;
                 }
                 StartSwipeBlock(target, at);
-                nextSwipeBlockAt = Math.Max(at + rules.SwipeBlockInterval, swipeBlockedUntil);
+                nextSwipeBlockAt = rules.Timeline ? NextTimelineSwipe()
+                    : Math.Max(at + rules.SwipeBlockInterval, swipeBlockedUntil);
             }
         }
 
@@ -1909,6 +1915,13 @@ namespace C6Lab
                 FlashGlareSeconds, FlashRecoverySeconds;
             /// <summary>Yaguang flash release (#301): a dazzled player shakes their phone to clear their own glare.</summary>
             public readonly bool FlashShakeRelease;
+            /// <summary>
+            /// 야광귀 시간표 (#314): 방해가 정해 둔 시각(전투 시작부터 잰 초)에만 나온다. 고유(섬광·콤보) 시각은 예고가
+            /// 시작하는 시각이다. 꺼져 있으면 빈 배열이다.
+            /// </summary>
+            public readonly bool Timeline;
+            public readonly double TimelineSabotageEndSeconds;
+            public readonly double[] TimelineFlashSeconds, TimelineComboSeconds, TimelineCommonSeconds;
 
             public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode)
             {
@@ -1983,6 +1996,29 @@ namespace C6Lab
                 FlashGlareSeconds = config.YaguangFlashGlareSeconds;
                 FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
                 FlashShakeRelease = config.YaguangFlashShakeRelease;
+                Timeline = config.YaguangTimelineEnabled && !teamMode
+                    && (stageYokai == LabStageYokai.None || stageYokai == LabStageYokai.Yaguang);
+                var flashes = new List<double>();
+                var combos = new List<double>();
+                var commons = new List<double>();
+                if (Timeline)
+                {
+                    BattleDurationSeconds = config.YaguangTimelineBattleSeconds;
+                    // 시간표가 원래의 랜덤 주기·방해공작 추첨을 대신한다.
+                    SabotageMix = false;
+                    for (int i = 0; i < LabConfig.YaguangTimelineSlots; i++)
+                    {
+                        float unique = config.YaguangTimelineUniqueSeconds(i);
+                        if (unique > 0f) (config.YaguangTimelineUniqueIsCombo(i) ? combos : flashes).Add(unique);
+                        float common = config.YaguangTimelineCommonSeconds(i);
+                        if (common > 0f) commons.Add(common);
+                    }
+                    flashes.Sort(); combos.Sort(); commons.Sort();
+                }
+                TimelineSabotageEndSeconds = Timeline ? config.YaguangTimelineSabotageEndSeconds : 0d;
+                TimelineFlashSeconds = flashes.ToArray();
+                TimelineComboSeconds = combos.ToArray();
+                TimelineCommonSeconds = commons.ToArray();
                 TeamFeverHits = teamMode ? config.TeamFeverHits : 0;
                 TeamFeverSeconds = config.TeamFeverSeconds;
                 if (!teamMode) return;
