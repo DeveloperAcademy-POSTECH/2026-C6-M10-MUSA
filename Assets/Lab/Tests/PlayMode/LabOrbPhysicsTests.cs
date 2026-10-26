@@ -1064,13 +1064,19 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator ABlastShowsACartoonBurstWithBombThatClearsItself()
+        public IEnumerator ABlastShowsACartoonBurstWithPpeongThatClearsItself()
         {
             board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.5f, .5f), lockSwipes: 2);
             board.Blast("bomb", new Vector2(.5f, .5f));
             var effect = board.GetComponentInChildren<LabBombBlastEffect>();
             Assert.That(effect, Is.Not.Null, "A blast draws a burst where the bomb was.");
-            Assert.That(effect.Label, Is.EqualTo("BOMB!"));
+            Assert.That(effect.Label, Is.EqualTo("뻥이요!"), "The hand-lettered blast word (#305)...");
+            SpriteRenderer word = effect.transform.Find("뻥이요").GetComponent<SpriteRenderer>();
+            SpriteRenderer outline = effect.transform.Find("뻥이요 Outline").GetComponent<SpriteRenderer>();
+            Assert.That(word.sprite, Is.SameAs(Resources.Load<Sprite>(LabBombBlastEffect.ArtPath)));
+            Assert.That(outline.sprite, Is.SameAs(Resources.Load<Sprite>(LabBombBlastEffect.OutlinePath)));
+            Assert.That(word.sortingOrder, Is.GreaterThan(outline.sortingOrder), "...in ink over its cream outline...");
+            Assert.That(outline.sortingOrder, Is.GreaterThan(32), "...above the burst.");
             Assert.That(effect.gameObject.layer, Is.EqualTo(board.gameObject.layer), "It shows on the board camera only.");
             Assert.That(effect.GetComponentsInChildren<Collider>(), Is.Empty, "The burst never touches physics.");
             Vector3 at = effect.transform.position;

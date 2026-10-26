@@ -234,7 +234,7 @@ namespace C6Lab
             if (execution == LabActionExecution.Executed)
             {
                 latest = model.Snapshot(battleClock.Now(Time.realtimeSinceStartupAsDouble));
-                latest.paused = battleClock.IsPaused && latest.phase == LabPhase.Playing;
+                latest.paused = battleClock.IsPaused && !GameStartHeld && latest.phase == LabPhase.Playing;
                 AnnounceBombExplosions();
                 AnnounceOrbExpiries();
                 AnnounceGourdBombs();

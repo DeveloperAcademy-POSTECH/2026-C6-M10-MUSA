@@ -80,6 +80,93 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay()
+        {
+            session.StartSolo();
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.LoadingBattle));
+            Assert.That(session.StartOverlay.Visible && session.StartOverlay.BlocksInput, Is.True,
+                "The loading caption must exist before the asynchronous Scene load starts.");
+            yield return Until(() => session.State.phase == GameFlowPhase.Countdown
+                && session.StartOverlay.DisplayText == "3", "Prepared participants must enter the shared countdown.");
+            Assert.That(network.IsGameInitialStateReady(session.State.battleSessionId, session.State.battleRound), Is.True);
+            Assert.That(UnityEngine.Object.FindFirstObjectByType<GameBattleBindings>().IsPresentationReady, Is.True);
+            LabSnapshot before = network.Snapshot;
+            double remaining = before.remaining;
+            float stamina = before.players.Single(player => player.id == network.LocalPlayerId).stamina;
+            var digits = new System.Collections.Generic.HashSet<string>();
+            LabOrbState drum = before.drums.Single(orb => orb.owner == network.LocalPlayerId);
+            Assert.That(network.board.TryGetMotion(drum.id, out Vector2 initialPosition, out _), Is.True);
+            LabHangingTarget hanging = network.target.GetComponent<LabHangingTarget>();
+            float ropeElapsed = hanging.CycleElapsed;
+            while (session.State.phase == GameFlowPhase.Countdown)
+            {
+                digits.Add(session.StartOverlay.DisplayText);
+                Assert.That(network.GameStartHeld, Is.True);
+                Assert.That(network.IsBattlePaused, Is.False);
+                Assert.That(Time.timeScale, Is.EqualTo(1f));
+                Assert.That(network.CanPauseBattle || network.CanResumeBattle || session.CanDeveloperAdvanceStage, Is.False);
+                Assert.That(network.PauseBattle(), Is.False);
+                Assert.That(network.ResumeBattle(), Is.False);
+                network.Generate();
+                Assert.That(network.Snapshot.remaining, Is.EqualTo(remaining));
+                Assert.That(network.Snapshot.playedSeconds, Is.Zero);
+                Assert.That(network.Snapshot.orbs, Is.Empty);
+                Assert.That(network.Snapshot.players.Single(player => player.id == network.LocalPlayerId).stamina,
+                    Is.EqualTo(stamina));
+                Assert.That(network.Snapshot.paintRevision, Is.EqualTo(before.paintRevision));
+                Assert.That(network.board.TryGetMotion(drum.id, out Vector2 heldPosition, out _), Is.True);
+                Assert.That(Vector2.Distance(heldPosition, initialPosition), Is.LessThan(.00001f));
+                Assert.That(hanging.CycleElapsed, Is.EqualTo(ropeElapsed));
+                yield return null;
+            }
+            Assert.That(digits, Is.SupersetOf(new[] { "3", "2", "1" }));
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Playing));
+            Assert.That(network.TryGetGameServerTime(out double serverNow), Is.True);
+            Assert.That(serverNow, Is.GreaterThanOrEqualTo(session.State.battleStartsAt));
+            Assert.That(network.GameStartHeld, Is.False);
+            Assert.That(session.StartOverlay.DisplayText, Is.EqualTo("시작!"));
+            Assert.That(session.StartOverlay.BlocksInput, Is.False);
+            network.Generate();
+            yield return Until(() => network.Snapshot.orbs.Length == 1, "Generation opens after the shared deadline.");
+            yield return Until(() => network.Snapshot.remaining < remaining && !session.StartOverlay.Visible,
+                "The started caption fades while the normal battle clock advances.");
+        }
+
+        [UnityTest]
+        public IEnumerator PreparationTimeoutUsesTheOriginalLoadBudgetDuringReservationToo()
+        {
+            session.StartSolo();
+            yield return Until(() => session.State.phase == GameFlowPhase.Countdown, "Reserve the shared start.");
+            // Simulate a reservation without its final commit arriving after an already spent load budget.
+            typeof(GameSession).GetField("countdownCommitted", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(session, false);
+            typeof(GameSession).GetField("loadStartedAt", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(session, Time.realtimeSinceStartupAsDouble - 31d);
+            yield return WaitGameOver();
+            Assert.That(session.State.endReason, Does.Contain("preparing"));
+            Assert.That(session.StartOverlay.Visible, Is.False);
+            Assert.That(network.Snapshot.playedSeconds, Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator LeavingDuringCountdownCancelsThePreparedRoundAndClearsTheOverlay()
+        {
+            session.StartSolo();
+            yield return Until(() => session.State.phase == GameFlowPhase.Countdown,
+                "A solo stage must also reserve a countdown.");
+            session.ExitRun();
+            yield return WaitGameOver();
+            Assert.That(session.StartOverlay.Visible, Is.False);
+            Assert.That(network.GameStartHeld, Is.False);
+            network.Generate();
+            Assert.That(network.Snapshot.orbs, Is.Empty);
+            session.GoHome();
+            yield return WaitHome();
+            Assert.That(session.StartOverlay.Visible, Is.False);
+            Assert.That(network.GameStartHeld, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator PendingGameCardsSurviveBattleGameOverAndHomeWhileLobbyLeaveReturnsToTheBrowser()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Game pending rooms require macOS/iOS Bonjour.");
@@ -624,7 +711,7 @@ namespace Hapio.Tests
             Set(foxSettings, "Fox Fire Count Max", 2f);
             Set(foxSettings, "Fox Fire Safe Seconds", .25f);
             Set(foxSettings, "Charm Seconds", 9f);
-            Set(foxSettings, "Charm Rescue Taps (0 = none)", 5f);
+            Set(foxSettings, "Charm Rescue Taps per Neighbor (0 = none)", 5f);
             Assert.That(session.ApplyDeveloperSettings(foxSettings, out string error), Is.True, error);
             session.StartSolo();
             yield return WaitPlaying(1);
@@ -678,7 +765,7 @@ namespace Hapio.Tests
             Set(charmSettings, "Fox Fire Count Max", 4f);
             Set(charmSettings, "Fox Fire Safe Seconds", .75f);
             Set(charmSettings, "Charm Seconds", 11f);
-            Set(charmSettings, "Charm Rescue Taps (0 = none)", 6f);
+            Set(charmSettings, "Charm Rescue Taps per Neighbor (0 = none)", 6f);
             Assert.That(session.ApplyDeveloperSettings(charmSettings, out error), Is.True, error);
             yield return Until(() => session.State.phase == GameFlowPhase.Playing
                 && session.State.battleSessionId != firstBattleId && !session.IsLoadingScene,
@@ -725,7 +812,7 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(204), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(205), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
                 "All approved values, including the twelve Sabotage fields, must survive Scene-owned DEV cleanup.");
         }

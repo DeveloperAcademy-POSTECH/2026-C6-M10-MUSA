@@ -80,7 +80,10 @@ namespace C6Lab
         private uint caughtShownFor;
         private readonly LabShakeCounter shakeCounter = new LabShakeCounter();
         private uint shakeFlash;
-        private bool shakeSent;
+        private string shakeSession;
+        private uint shakeRound;
+        private float shakeSentAt = float.NegativeInfinity;
+        public const float ShakeRetrySeconds = .5f;
         private float shownShake;
         private RectTransform shakeCue, shakeGaugeFill, shakePhone;
         private Text shakeLabel;
@@ -214,23 +217,25 @@ namespace C6Lab
         /// </summary>
         private float DriveShake(LabSnapshot snapshot, bool myGlare, int needed)
         {
-            if (snapshot.flashCount != shakeFlash)
+            if (snapshot.sessionId != shakeSession || snapshot.round != shakeRound || snapshot.flashCount != shakeFlash)
             {
+                shakeSession = snapshot.sessionId;
+                shakeRound = snapshot.round;
                 shakeFlash = snapshot.flashCount;
                 shakeCounter.Reset();
-                shakeSent = false;
+                shakeSentAt = float.NegativeInfinity;
                 shownShake = 0f;
             }
             shakeCounter.Threshold = shakeThreshold;
             shakeCounter.MinGap = shakeMinGap;
-            if (myGlare && !snapshot.paused && shakeCounter.Count < needed)
+            if (myGlare && !snapshot.paused && network != null && !network.GameStartHeld && network.IsConnected)
             {
-                if (ReadShake()) HapticTick();
-                if (shakeCounter.Count >= needed && !shakeSent)
-                {
-                    shakeSent = true;
-                    network.RequestFlashShakeRelease();
-                }
+                if (shakeCounter.Count < needed && ReadShake()) HapticTick();
+                // A report can arrive while the Host is paused. Retain this generation's shakes and
+                // retry at a bounded rate until the authoritative snapshot confirms release.
+                if (shakeCounter.Count >= needed && Time.unscaledTime - shakeSentAt >= ShakeRetrySeconds
+                    && network.RequestFlashShakeRelease())
+                    shakeSentAt = Time.unscaledTime;
             }
             return ShakeProgress(shakeCounter.Count, needed);
         }

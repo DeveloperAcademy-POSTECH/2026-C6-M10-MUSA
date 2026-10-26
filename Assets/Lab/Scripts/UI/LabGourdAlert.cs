@@ -72,6 +72,7 @@ namespace C6Lab
         private Image blockMark;
         private Image heartMark;
         private bool showingHeart;
+        private bool wasCharmed;
         private RectTransform eyesRect;
         private Image eyesHalo;
         private Image eyesLit;
@@ -125,13 +126,22 @@ namespace C6Lab
             }
         }
 
-        // 통합 추첨의 여우불은 모든 기기에서 박 옆에 "!"를, 매혹은 걸린 사람 화면에만 하트를 띄운다 (#251).
-        // 폭탄과 넘기기 막기는 위에서 따로 띄운다.
+        // 통합 추첨의 여우불은 모든 기기에서 박 옆에 "!"를 띄운다 (#251). 매혹의 하트는 예고(#305)가 끝나
+        // 실제로 홀리는 순간에 띄운다 (아래 LateUpdate). 폭탄과 넘기기 막기는 위에서 따로 띄운다.
         private void OnSabotageCast(LabSabotageKind kind, ulong targetPlayer)
         {
             if (network == null) return;
             if (kind == LabSabotageKind.FoxFire) Show(network.target);
-            else if (kind == LabSabotageKind.Charm && targetPlayer == network.LocalPlayerId) ShowHeart(network.target);
+        }
+
+        // 매혹 (#251, #305): 걸린 사람 화면에만, 매혹이 시작되는 순간 박 옆에 하트를 띄운다.
+        private void WatchCharm()
+        {
+            LabSnapshot snapshot = network != null ? network.Snapshot : null;
+            bool charmed = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused
+                && snapshot.CharmOn(network.LocalPlayerId);
+            if (charmed && !wasCharmed) ShowHeart(network.target);
+            wasCharmed = charmed;
         }
 
         private void OnGourdBombDropped(ulong targetPlayer, string bombId, Vector2 landing)
@@ -293,6 +303,7 @@ namespace C6Lab
 
         private void LateUpdate()
         {
+            WatchCharm();
             if (!Active) return;
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool battle = network == null

@@ -23,4 +23,8 @@
 - #278 Home/Lobby는 `Assets/Hapio/Art/UI/GameLobby.prefab`의 한지 로비를 공유한다. GameLobbyView는 UI만 관리하고 GameSession/GamePendingRoomRegistry가 연결·대기 광고를 소유한다. 기존 Lab Scene과 전투/결과 Scene을 로비 적용 목적으로 다시 복사하지 않는다.
 - 게임 방은 Game-family TXT/연결 토큰을 사용한다. Lab과 같은 Bonjour 서비스 종류라도 검색 결과를 섞지 않는다. 로비 나가기는 방 목록, 최종 결과·게임 오버 HOME은 타이틀 복귀다.
 
-- #299 고해상도 도색은 기본 ON·1024×512(DEV200/201, 총202개)이며 기존 Host 셀 판정과 분리한다. `LabPaintVisualStamp`의 제한된 기록과 확정 색/P 지도를 같은 도색 트랜잭션으로 복원하고 GPU 이미지를 통신하지 않는다. 전투·관람은 실제 표시 텍스처를 쓰며 판정 해시·100% 승리·마르기·소유권 규칙은 유지한다. 자세한 연결과 한계는 `docs/RUNTIME_HIGH_RESOLUTION_PAINT.md`를 따른다.
+- #299 고해상도 도색은 기본 ON·1024×512(DEV200/201, 현재 총205개)이며 기존 Host 셀 판정과 분리한다. `LabPaintVisualStamp`의 제한된 기록과 확정 색/P 지도를 같은 도색 트랜잭션으로 복원하고 GPU 이미지를 통신하지 않는다. 전투·관람은 실제 표시 텍스처를 쓰며 판정 해시·100% 승리·마르기·소유권 규칙은 유지한다. 자세한 연결과 한계는 `docs/RUNTIME_HIGH_RESOLUTION_PAINT.md`를 따른다.
+
+- #306 실제 게임 시작은 Scene/설정 → 초기 snapshot·도색·owner-board/표현 준비 → 공통 시각 예약·확정 → 3/2/1 → Playing 순서다. `GameStartHeld`는 사용자 Pause와 구분하며 게임 시계·입력·물리만 고정한다. 현재 게임 토큰은 `C6HapioGame/9`, Lab 단판과 기존 Scene 배치는 유지한다. 세대별 ACK·재예약·시간 제한을 우회해 조작을 먼저 열지 않는다.
+
+- #308/#309 통합: 기존0~201을 유지하고 섬광 흔들기202·203, 매혹 예고204를 사용한다. 공유 설정205개·프로토콜5665·Lab26/Game9를 한 세트로 관리한다. 스토리와2:2의 독립 스태미나/수명을 보존하며 과거 단독 PR의 설정 배열을 혼용하지 않는다. 섬광 해제는 동일 회차와 Host 정지 상태를 검증하고 확인 전 같은 회차만 제한적으로 재시도한다.

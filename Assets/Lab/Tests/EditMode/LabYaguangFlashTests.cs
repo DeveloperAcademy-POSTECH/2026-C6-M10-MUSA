@@ -620,6 +620,28 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ShakeReportsMatchOneExactFlashAndCannotReleaseAnotherGeneration()
+        {
+            var model = new LabModel();
+            model.Begin("generation", Three, 0d, Config(flash: true, first: 5f,
+                interval: 20f, warning: 0f, glare: 10f, recovery: 1f));
+            Assert.That(model.Snapshot(6d).flashCount, Is.EqualTo(1u));
+            Assert.That(model.TryFlashShakeRelease(10, 0u, 6d), Is.False, "Missing generation is rejected.");
+            Assert.That(model.TryFlashShakeRelease(10, 2u, 6d), Is.False, "A future flash is not an approval.");
+            Assert.That(model.TryFlashShakeRelease(999, 1u, 6d), Is.False, "Only a participant may release their own glare.");
+            Assert.That(model.TryFlashShakeRelease(10, 1u, 6d), Is.True);
+            Assert.That(model.TryFlashShakeRelease(10, 1u, 6d), Is.False, "A duplicate cannot release twice.");
+            Assert.That(model.Snapshot(6d).FlashReleasedAt(20), Is.EqualTo(-1d), "Another participant is still glared.");
+            Assert.That(model.TryFlashShakeRelease(20, 1u, 6d), Is.True);
+            Assert.That(model.Snapshot(26d).flashCount, Is.EqualTo(2u));
+            Assert.That(model.TryFlashShakeRelease(10, 1u, 26d), Is.False,
+                "A delayed first-flash report cannot clear the second flash in the same round.");
+            Assert.That(model.TryFlashShakeRelease(10, 3u, 26d), Is.False);
+            Assert.That(model.Snapshot(26d).FlashReleasedAt(10), Is.EqualTo(-1d));
+            Assert.That(model.TryFlashShakeRelease(10, 2u, 26d), Is.True);
+        }
+
+        [Test]
         public void TheGlareIsFullThenFadesSmoothlyBack()
         {
             var snapshot = new LabSnapshot
