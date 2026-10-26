@@ -158,7 +158,7 @@ namespace C6Lab
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             LabConfig config = network != null ? network.config : null;
             if (snapshot == null || config == null || snapshot.phase != LabPhase.Playing
-                || !ReferenceEquals(network.board, boundBoard))
+                || network.GameStartHeld || !ReferenceEquals(network.board, boundBoard))
             {
                 Hide();
                 return;
