@@ -40,9 +40,13 @@ namespace Hapio
         public RectTransform[] seatsTeam;
         [Tooltip("Heading, hint, room paper, room name, joined, selected and start button. In a 2:2 room each moves to the matching anchor below.")]
         public RectTransform[] teamShifted, teamShiftAnchors;
+        public int teamHeadingFontSize = 29, teamLocalLabelFontSize = 20, teamStartFontSize = 25;
+        [HideInInspector] public int teamLobbyDesignRevision;
 
         private GameSession session;
         private RectTransform[] storyShifted;
+        private int storyHeadingFontSize, storySealFontSize;
+        private int[] storyLocalLabelFontSizes;
         private int creationCapacity = 3;
         private string localError = string.Empty;
         private readonly List<UnityEngine.UI.Button> rows = new List<UnityEngine.UI.Button>();
@@ -64,6 +68,9 @@ namespace Hapio
             if (screen == null) screen = GetComponentInParent<GameScreen>();
             if (screen == null || !screen.externalNavigation)
                 throw new InvalidOperationException("The saved game lobby needs its external-navigation GameScreen.");
+            storyHeadingFontSize = heading.fontSize;
+            storySealFontSize = sealButton.GetComponentInChildren<UnityEngine.UI.Text>().fontSize;
+            storyLocalLabelFontSizes = localLabels.Select(label => label.fontSize).ToArray();
             enterButton.onClick.AddListener(() => session.EnterRoomBrowser());
             // 2:2 (#281): "새 방 만들기 +" first asks which mode. A prefab without the mode panel keeps the old story flow.
             createButton.onClick.AddListener(() => { if (modePanel != null) SetModes(true); else CreateRoom(GameMode.Story); });
@@ -154,7 +161,7 @@ namespace Hapio
             bool visible = (home || lobby) && !developerOpen;
             background.gameObject.SetActive(visible); design.gameObject.SetActive(visible);
             if (!visible) return;
-            FitSafeArea();
+            FitScreen();
             bool browser = home && session.RoomBrowserVisible;
             titlePage.SetActive(home && !browser);
             browserPage.SetActive(browser); positionPage.SetActive(lobby);
@@ -173,13 +180,13 @@ namespace Hapio
             message.gameObject.SetActive((browser || lobby) && !string.IsNullOrEmpty(notice));
         }
 
-        private void FitSafeArea()
+        private void FitScreen()
         {
             Canvas canvas = GetComponentInParent<Canvas>();
             float factor = canvas != null ? canvas.scaleFactor : 1f;
-            Rect safe = Screen.safeArea;
-            design.localScale = Vector3.one * Mathf.Min(safe.width / factor / 402f, safe.height / factor / 874f);
-            design.anchoredPosition = (safe.center - new Vector2(Screen.width, Screen.height) * .5f) / factor;
+            // The authored design already includes device insets; fit it to the full screen once.
+            design.localScale = Vector3.one * Mathf.Min(Screen.width / factor / 402f, Screen.height / factor / 874f);
+            design.anchoredPosition = Vector2.zero;
         }
 
         private void RefreshBrowser()
@@ -196,7 +203,7 @@ namespace Hapio
                 bool selected = creationCapacity == i + 2;
                 countButtons[i].interactable = canChoose;
                 countButtons[i].targetGraphic.color = ColorOf(selected ? "3F3D38" : "E8DFCB");
-                countButtons[i].GetComponentInChildren<UnityEngine.UI.Text>().color = ColorOf(selected ? "F3EBDD" : "292921");
+                countButtons[i].GetComponentInChildren<UnityEngine.UI.Text>().color = ColorOf(selected ? "F3EBDD" : "3F3D38");
             }
             RoomRow[] rooms = session.PendingRooms.Select(room => new RoomRow
                 { key = room.Key, name = room.Name, port = room.Port, participants = 1, capacity = room.Capacity,
@@ -247,10 +254,11 @@ namespace Hapio
             teamLayout?.SetActive(team);
             if (storyShifted != null)
                 for (int i = 0; i < teamShifted.Length; i++) CopyRect(team ? teamShiftAnchors[i] : storyShifted[i], teamShifted[i]);
+            heading.fontSize = team ? teamHeadingFontSize : storyHeadingFontSize;
             heading.text = allChosen ? (team ? "준비 완료!" : "요괴 봉인 준비 완료!") : "빈 자리를 고르시오.";
             subheading.text = Network.SlotSelectionPending ? "자리 선택을 확인하고 있소..."
                 : allChosen ? (Network.SessionConfigReady ? "" : "방 설정을 확인하고 있소...")
-                : team ? "2명씩 함께 앉아, 준비하시오." : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
+                : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
             roomName.text = Network.HostRoomNamePending ? "방을 만들고 있소..." : LabRoomNames.Display(Network.ConnectedRoomName);
             joinedCount.text = Network.ParticipantCount + " / " + count + "명 입장";
             selectedCount.text = Network.SelectedParticipantCount + " / " + count + "명 자리 확정";
@@ -272,9 +280,10 @@ namespace Hapio
                 slotImages[i].sprite = occupied ? filledSlots[i] : emptySlots[i];
                 slotImages[i].rectTransform.localEulerAngles = new Vector3(0, 0, 180);
                 slotLabels[i].text = "P" + (i + 1);
-                slotLabels[i].color = occupied ? ColorOf("F6F6F6") : Color.black;
+                slotLabels[i].color = ColorOf(occupied ? "F6F6F6" : "3F3D38");
                 slotButtons[i].interactable = Network.CanSelectPlayerSlot && (!occupied || mine);
                 bool host = occupied && owner == Unity.Netcode.NetworkManager.ServerClientId;
+                localLabels[i].fontSize = team ? teamLocalLabelFontSize : storyLocalLabelFontSizes[i];
                 localLabels[i].text = (host ? "방장" : string.Empty) + (mine ? (host ? " · 나 · 취소" : "나 · 취소") : string.Empty);
                 Vector2 center = anchors[i].anchoredPosition;
                 // In the 2:2 boxes the upper seats (P1, P3) show their label above, clear of the connecting line.
@@ -287,8 +296,9 @@ namespace Hapio
             sealButton.interactable = start;
             sealButton.targetGraphic.color = ColorOf(start ? "AF4738" : "C7C0B0");
             var text = sealButton.GetComponentInChildren<UnityEngine.UI.Text>();
+            text.fontSize = team && start ? teamStartFontSize : storySealFontSize;
             text.text = team
-                ? start ? "요괴 봉인 시작" : allChosen && !Network.IsHost ? "방장의 시작을 기다리시오" : "땅따먹기 대기 중"
+                ? start ? "땅따먹기 시작" : allChosen && !Network.IsHost ? "방장의 시작을 기다리시오" : "땅따먹기 대기"
                 : start ? "요괴 봉인 시작 · 3스테이지" : allChosen && !Network.IsHost ? "방장의 봉인을 기다리시오" : "요괴 봉인 대기";
             text.color = ColorOf(start ? "FFF7E5" : "575750");
         }
