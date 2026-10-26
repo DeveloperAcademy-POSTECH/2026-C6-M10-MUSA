@@ -1368,7 +1368,12 @@ namespace C6Lab.Tests
             Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 1.05d), Is.True);
             Assert.That(board.DragToWorld(new Vector2(edge + .3f, start.y), 1.5d), Is.True);
             Assert.That(board.EndDragAtWorld(new Vector2(edge + .45f, start.y), 1.6d), Is.True);
-            Assert.That(sent.Body.linearVelocity.x, Is.InRange(.01f, driftPass), "A gentle push, slower than a drift could ever pass.");
+            // #310 can finish this intentional pass on release, freezing the pending local body.
+            // Measure the outgoing physical velocity carried by that crossing, or the still-live
+            // body when it has yet to cross; the slow-send rule and its threshold are unchanged.
+            float releasedSpeed = crossed.TryGetValue("sent", out LabOrbEdgeCrossing immediate)
+                ? immediate.VelocityInBoardWidthsPerSecond.x * Width : sent.Body.linearVelocity.x;
+            Assert.That(releasedSpeed, Is.InRange(.01f, driftPass), "A gentle push, slower than a drift could ever pass.");
             for (int step = 0; step < 20 && !crossed.ContainsKey("sent"); step++) yield return new WaitForFixedUpdate();
             Assert.That(crossed.ContainsKey("sent"), Is.True, "Sent on by the player, it passes at the edge however slowly (#237).");
             Assert.That(crossed["sent"].ToRight, Is.True);
