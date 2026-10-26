@@ -106,3 +106,8 @@ Apple Developer Academy @ POSTECH
 ## 개발용 고해상도 도색 실험
 
 `C6 Lab > Experiments > High Resolution Paint`에서 실제 박에 최초 명중1회와 재타격3회를 적용한 현행 도색·고해상도 두 표현을 비교합니다. 기존 게임 판정은 유지합니다. 실행법과 한계는 [고해상도 도색 실험](docs/HIGH_RESOLUTION_PAINT_EXPERIMENT.md)을 참고하세요.
+
+
+## 실제 전투 고해상도 도색
+
+Paint 모드의 기본 표현은 **고해상도 ON / 1024×512**입니다. DEV의 Gourd에서 기존 표현으로 전환하거나 2048×1024를 선택할 수 있습니다. 판정·성장·건조·승리 규칙은 기존 Host 지도를 사용하고, 완성 박 관람에도 고해상도 그림을 독립 보존합니다. 자세한 연결·비교·한계는 [실제 게임 고해상도 도색](docs/RUNTIME_HIGH_RESOLUTION_PAINT.md)을 참고하세요.

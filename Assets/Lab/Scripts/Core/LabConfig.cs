@@ -324,7 +324,10 @@ namespace C6Lab
             LabDeveloperField.Toggle("2:2 땅따먹기 (0 off, 1 on)", "끔", "켬"),
             new LabDeveloperField("2:2 제한 시간 (초)", 30f, 600f),
             new LabDeveloperField("피버 필요 명중 수 (0 = 피버 없음)", 0f, 50f, true),
-            new LabDeveloperField("피버 시간 (초)", 1f, 30f)
+            new LabDeveloperField("피버 시간 (초)", 1f, 30f),
+            // Presentation-only shared options; never change the Host paint-cell rules (#299).
+            LabDeveloperField.Toggle("High Resolution Paint (0 off, 1 on)"),
+            LabDeveloperField.Choice("Paint Texture Quality", "1024 × 512", "2048 × 1024")
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -354,7 +357,7 @@ namespace C6Lab
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 90, 91, 92, 93, 94, 95, 96, 97),
             new LabDeveloperCategory("Gourd", 140, 79, 87, 88, 152, 153, 154, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137,
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
-                134, 132, 133, 148, 149, 150, 151),
+                134, 132, 133, 148, 149, 150, 151, 200, 201),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
             new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
@@ -610,6 +613,11 @@ namespace C6Lab
         [SerializeField, Range(0, 50)] private int teamFeverHits = 15;
         [Tooltip("피버 시간 (초). 그동안 팀 판의 모든 구슬이 팀 색 결합 구슬이 되고, 생성해도 팀 색 결합 구슬이 나온다.")]
         [SerializeField, Range(1f, 30f)] private float teamFeverSeconds = 8f;
+        [Header("High resolution paint presentation (#299)")]
+        [Tooltip("Use the continuous high-resolution paint presentation. Host cell coverage, attribution and battle rules are unchanged.")]
+        [SerializeField] private bool highResolutionPaintEnabled = true;
+        [Tooltip("Visual texture quality only: 0 = 1024 × 512, 1 = 2048 × 1024. Shared with the room at the ordinary settings boundary.")]
+        [SerializeField, Range(0, 1)] private int highResolutionPaintQuality = 0;
         [Header("Yaguang flash (#268)")]
         [Tooltip("야광귀 섬광. 박에서 요괴가 빼꼼 나와 눈이 밝아진 뒤(예고) 화면이 하얗게 번쩍이고, 눈부신 동안 판 위 음양·결합 구슬과 아이템이 하얗게 보인다(북·박 색칠·HUD는 그대로). 화면 표시만 바뀌고 조작·판정은 그대로다. 방해공작 묶음(#251)과 따로 돈다. 야광귀 전용이라 기본은 끔(DEV `Yaguang Flash`로 켠다).")]
         [SerializeField] private bool yaguangFlashEnabled;
@@ -960,6 +968,9 @@ namespace C6Lab
         public float TeamBattleSeconds => Mathf.Clamp(Finite(teamBattleSeconds, 180f), 30f, 600f);
         public int TeamFeverHits => Mathf.Clamp(teamFeverHits, 0, 50);
         public float TeamFeverSeconds => Mathf.Clamp(Finite(teamFeverSeconds, 8f), 1f, 30f);
+        public bool HighResolutionPaintEnabled => highResolutionPaintEnabled;
+        public int HighResolutionPaintQuality => Mathf.Clamp(highResolutionPaintQuality, 0, 1);
+        public int HighResolutionPaintColumns => HighResolutionPaintQuality == 0 ? 1024 : 2048;
         public bool YaguangFlashEnabled => yaguangFlashEnabled;
         /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
         public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
@@ -1105,7 +1116,8 @@ namespace C6Lab
                 YaguangFlashRecoverySeconds,
                 ComboYaguangCountEnabled ? 1f : 0f,
                 JigwiAutoIntervalMin, JigwiAutoIntervalMax, JigwiAutoFireWeight, JigwiAutoGenerationBurnWeight,
-                TeamTerritoryEnabled ? 1f : 0f, TeamBattleSeconds, TeamFeverHits, TeamFeverSeconds
+                TeamTerritoryEnabled ? 1f : 0f, TeamBattleSeconds, TeamFeverHits, TeamFeverSeconds,
+                HighResolutionPaintEnabled ? 1f : 0f, HighResolutionPaintQuality
             };
         }
 
@@ -1346,6 +1358,8 @@ namespace C6Lab
             teamBattleSeconds = values[197];
             teamFeverHits = (int)values[198];
             teamFeverSeconds = values[199];
+            highResolutionPaintEnabled = values[200] >= .5f;
+            highResolutionPaintQuality = (int)values[201];
             error = string.Empty;
             return true;
         }

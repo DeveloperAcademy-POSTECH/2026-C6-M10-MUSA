@@ -49,6 +49,7 @@ MonoBehaviour:
   blastShrinkScale: 0.5
   smallOrbPaintShare: 0.5
   gourdColorComboEnabled: 0
+  comboYaguangCountEnabled: 1
   comboFirstStartSeconds: 50
   comboRepeatIntervalSeconds: 60
   comboTimeLimitSeconds: 15
@@ -137,6 +138,23 @@ MonoBehaviour:
   jigwiGenerationBurnSeconds: 10
   jigwiRawRadiusScale: 0.65
   jigwiRawLifeScale: 0.5
+  jigwiAutoIntervalMin: 20
+  jigwiAutoIntervalMax: 30
+  jigwiAutoFireWeight: 1
+  jigwiAutoGenerationBurnWeight: 1
+  teamTerritoryEnabled: 0
+  teamBattleSeconds: 180
+  teamFeverHits: 15
+  teamFeverSeconds: 8
+  highResolutionPaintEnabled: 1
+  highResolutionPaintQuality: 0
+  yaguangFlashEnabled: 0
+  yaguangFlashTargetOne: 0
+  yaguangFlashFirstStartSeconds: 10
+  yaguangFlashIntervalSeconds: 60
+  yaguangFlashWarningSeconds: 3
+  yaguangFlashGlareSeconds: 7
+  yaguangFlashRecoverySeconds: 2
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9
@@ -197,11 +215,3 @@ MonoBehaviour:
   straightPitchOffsetDegrees: 3
   straightLoftScale: 0.1
   straightGravityScale: 0.1
-  yaguangFlashEnabled: 0
-  yaguangFlashTargetOne: 0
-  yaguangFlashFirstStartSeconds: 10
-  yaguangFlashIntervalSeconds: 60
-  yaguangFlashWarningSeconds: 3
-  yaguangFlashGlareSeconds: 7
-  yaguangFlashRecoverySeconds: 2
-  comboYaguangCountEnabled: 1

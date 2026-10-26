@@ -36,7 +36,7 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields.Skip(149).Take(3).Select(field => field.Max), Is.EqualTo(new[] { 60f, 5f, 90f }));
             Assert.That(LabConfig.DeveloperFields.Skip(149).Take(3).All(field => !field.IsToggle && !field.IsChoice && !field.WholeNumber), Is.True);
             int[] gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd").FieldIndices;
-            Assert.That(gourd.Skip(gourd.Length - 4), Is.EqualTo(new[] { 148, 149, 150, 151 }));
+            Assert.That(gourd.Where(index => index >= 148 && index <= 151), Is.EqualTo(new[] { 148, 149, 150, 151 }));
             foreach (int field in Enumerable.Range(148, 4))
                 Assert.That(LabConfig.DeveloperCategories.SelectMany(category => category.FieldIndices).Count(index => index == field), Is.EqualTo(1));
             Assert.That(LabConfig.DeveloperFields[147].Label, Is.EqualTo("Small Orb Paint Share (x paint)"));

@@ -22,3 +22,5 @@
 - #281 2:2 청홍 땅따먹기는 Hapio의 독자 모드(4명, 한 판, 끝나면 같은 방 로비)다. 규칙은 `LabTeams`·`LabModel.Team`과 공유 설정196~199에 있고 Lab DEV에서도 4명·솔로로 켤 수 있다. Hapio에서 196 켜기는 방 모드가 정하며 DEV 탭에서 바꾸지 않는다. 전투 화면 요소(점유율 막대·피버·벽·무지개)는 실행 중에 만들고, 로비 팝업·팀 자리 화면은 `Hapio > Upgrade 2v2 Lobby UI`로만 저장한다.
 - #278 Home/Lobby는 `Assets/Hapio/Art/UI/GameLobby.prefab`의 한지 로비를 공유한다. GameLobbyView는 UI만 관리하고 GameSession/GamePendingRoomRegistry가 연결·대기 광고를 소유한다. 기존 Lab Scene과 전투/결과 Scene을 로비 적용 목적으로 다시 복사하지 않는다.
 - 게임 방은 Game-family TXT/연결 토큰을 사용한다. Lab과 같은 Bonjour 서비스 종류라도 검색 결과를 섞지 않는다. 로비 나가기는 방 목록, 최종 결과·게임 오버 HOME은 타이틀 복귀다.
+
+- #299 고해상도 도색은 기본 ON·1024×512(DEV200/201, 총202개)이며 기존 Host 셀 판정과 분리한다. `LabPaintVisualStamp`의 제한된 기록과 확정 색/P 지도를 같은 도색 트랜잭션으로 복원하고 GPU 이미지를 통신하지 않는다. 전투·관람은 실제 표시 텍스처를 쓰며 판정 해시·100% 승리·마르기·소유권 규칙은 유지한다. 자세한 연결과 한계는 `docs/RUNTIME_HIGH_RESOLUTION_PAINT.md`를 따른다.

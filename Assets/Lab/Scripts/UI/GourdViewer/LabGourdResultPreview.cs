@@ -29,6 +29,7 @@ namespace C6Lab
         private RenderTexture texture;
         private Texture2D paintTexture;
         private Texture2D painterTexture;
+        private RenderTexture visualPaintCopy, visualPainterCopy;
         private float zoomNormalized = DefaultZoom;
         private float fitDistance;
         private int previewSlot = -1;
@@ -37,6 +38,8 @@ namespace C6Lab
         public RenderTexture Texture => texture;
         public Texture2D PaintTexture => paintTexture;
         public Texture2D PainterTexture => painterTexture;
+        public Texture VisualPaintTexture => visualPaintCopy != null ? (Texture)visualPaintCopy : paintTexture;
+        public Texture VisualPainterTexture => visualPainterCopy != null ? (Texture)visualPainterCopy : painterTexture;
         public Quaternion ModelRotation => modelPivot != null ? modelPivot.localRotation : Quaternion.identity;
         public float ZoomNormalized => zoomNormalized;
         public bool IsDisposed => disposed;
@@ -161,6 +164,15 @@ namespace C6Lab
             painterTexture.SetPixels32(painterPixels);
             painterTexture.Apply(false, false);
 
+            // Freeze a private copy before Battle unload/Retry can dispose the live GPU maps.
+            // Authoritative CPU copies and eligibility/hash above remain unchanged.
+            source.PrepareVisualCapture();
+            if (source.HighResolutionActive)
+            {
+                visualPaintCopy = CopyVisualMap(source.VisualPaintTexture, false, "Completed high-resolution pigment copy");
+                visualPainterCopy = CopyVisualMap(source.VisualPainterTexture, true, "Completed high-resolution P-number copy");
+            }
+
             root = NewObject("Completed gourd preview", null);
             root.SetActive(false);
             modelPivot = NewObject("Local model rotation", root.transform).transform;
@@ -218,6 +230,29 @@ namespace C6Lab
             previewCamera.enabled = true;
         }
 
+        private static RenderTexture CopyVisualMap(Texture source, bool categorical, string name)
+        {
+            if (source == null || source.width < 1 || source.height < 1)
+                throw new InvalidOperationException("The accepted visual map is unavailable.");
+            var copy = new RenderTexture(source.width, source.height, 0, RenderTextureFormat.ARGB32,
+                RenderTextureReadWrite.Linear)
+            {
+                name = name, hideFlags = HideFlags.HideAndDontSave,
+                filterMode = categorical ? FilterMode.Point : FilterMode.Bilinear,
+                wrapModeU = TextureWrapMode.Repeat, wrapModeV = TextureWrapMode.Clamp,
+                useMipMap = false, autoGenerateMips = false
+            };
+            RenderTexture previous = RenderTexture.active;
+            try
+            {
+                if (!copy.Create()) throw new InvalidOperationException("Could not copy the completed visual map.");
+                Graphics.Blit(source, copy);
+                return copy;
+            }
+            catch { copy.Release(); DestroyOwned(copy); throw; }
+            finally { RenderTexture.active = previous; }
+        }
+
         private void CopyHierarchy(Transform source, Transform parent, Dictionary<Material, Material> materialCopies,
             List<MeshRenderer> renderers, ref int paintedRenderers)
         {
@@ -262,8 +297,8 @@ namespace C6Lab
                 originalRenderer.GetPropertyBlock(block);
                 if (painted)
                 {
-                    block.SetTexture(PaintMapId, paintTexture);
-                    block.SetTexture(PainterMapId, painterTexture);
+                    block.SetTexture(PaintMapId, VisualPaintTexture);
+                    block.SetTexture(PainterMapId, VisualPainterTexture);
                     block.SetFloat(PaintReadyId, 1f);
                     paintedRenderers++;
                 }
@@ -277,8 +312,8 @@ namespace C6Lab
                     if (materials[i] != null && materials[i].HasProperty(PaintMapId)
                         && materials[i].HasProperty(PaintReadyId))
                     {
-                        block.SetTexture(PaintMapId, paintTexture);
-                        block.SetTexture(PainterMapId, painterTexture);
+                        block.SetTexture(PaintMapId, VisualPaintTexture);
+                        block.SetTexture(PainterMapId, VisualPainterTexture);
                         block.SetFloat(PaintReadyId, 1f);
                     }
                     renderer.SetPropertyBlock(block, i);
@@ -371,6 +406,11 @@ namespace C6Lab
             DestroyOwned(texture);
             DestroyOwned(paintTexture);
             DestroyOwned(painterTexture);
+            if (visualPaintCopy != null) visualPaintCopy.Release();
+            if (visualPainterCopy != null) visualPainterCopy.Release();
+            DestroyOwned(visualPaintCopy);
+            DestroyOwned(visualPainterCopy);
+            visualPaintCopy = visualPainterCopy = null;
             root = null;
             modelPivot = null;
             previewCamera = null;

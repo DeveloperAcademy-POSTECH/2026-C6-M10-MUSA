@@ -89,3 +89,8 @@ C6Lab.Experiments.Editor.LabHighResolutionPaintValidation.Export(outputDirectory
 - 새 메타데이터의 줄끝 공백만 정리했으며 GUID를 유지했다. 기존 미추적 파일은 커밋에서 제외하고 보존했다.
 
 위 결과는 Editor 회귀/fixture 검사다. iOS·실기기·네트워크 실제 플레이·모바일 성능·고해상도 표현의 게임 판정 통합은 여전히 미검증/범위 밖이다.
+
+
+## #299 실제 게임 연결
+
+이 문서의 도구는 기존4회 Editor 비교 시제품으로 유지한다. 실제 전투·건조·동기화·완성 박 관람 연결은 별도 런타임 모듈에서 처리하며 [실전 고해상도 도색](RUNTIME_HIGH_RESOLUTION_PAINT.md)을 참고한다. 두 모듈의 확인 기록과 적용 범위를 구분한다.

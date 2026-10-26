@@ -49,7 +49,8 @@ namespace C6Lab.Tests
         {
             var source = NewSurface(2);
             LabPaintFrame[] frames = new LabPaintPublisher().Publish(source, new string('s', 128), uint.MaxValue, long.MaxValue);
-            Assert.That(frames.Length, Is.EqualTo(LabPaintPublisher.MaximumFragmentCount));
+            Assert.That(frames.Length, Is.LessThanOrEqualTo(LabPaintPublisher.MaximumFragmentCount),
+                "The bound also reserves room for the maximum optional visual descriptor checkpoint.");
             // Exercise the real compact runtime DTOs, without creating a NetworkManager or socket.
             var assembly = typeof(LabNetwork).Assembly;
             Type bodyType = assembly.GetType("C6Lab.LabBulkPayload", true);
