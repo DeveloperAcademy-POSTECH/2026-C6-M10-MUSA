@@ -2705,6 +2705,7 @@ Host 판정 지도는 그대로 두고 최초 얼룩/실제 군집 성장의 제
 | 최종 소스 Mac Development Player 빌드 | **PASS** | GameBuild.Mac 성공, 앱 실행 파일 존재. GPU 오류 가드까지 포함했다. 앱의 실제 다중 실행은 수행하지 않았다. |
 | 최종 소스 iOS Xcode 프로젝트 내보내기 | **PASS** | GameBuild.Ios 성공, Unity-iPhone.xcodeproj와 C6Lab IL2CPP 출력 존재. Xcode 네이티브 빌드·서명·설치·기기 실행과 구분한다. |
 | 원본 배치·값 보존 | **PASS** | 기존 저장 Config 필드 값의 변경0. Home/Lobby는 DEV2행 추가만 수행했고 기존 오브젝트 삭제0·기존 Transform 위치/크기 변경0. 보호 에셋·설정961개 중 두 메뉴 Scene과Config만 의도대로 변경. Lab/Battle/StageResult·Prefab·기존 Material·미추적 파일은 보존했다. 검사 직렬화 오차는 복원했다. |
+| 최신 main 통합 후 집중 검사 | **이미지7/7·GPU2/2 PASS** | main `58ddfe7b`의 PR #302는 구슬 PNG7개와 README뿐이며 #299와 겹친 파일 없이 통합했다. 통합 후 `LabOrbSpriteDesignTests`7건(0.34초)과 `LabHighResolutionPaintRuntimeTests`2건(0.28초)을 다시 실행했다. 해당 main 이미지가 그대로 보존됐고 기존 미추적 파일도 유지했다. 위 전체 검사·빌드는 #302 이미지 통합 전 결과이며 기능 소스는 같다. |
 | 실제 LAN/핫스팟·iPhone/iPad·모바일 성능 | **NOT_RUN** | 이번 실행 증거가 없으므로 이전 버전 결과를 승계하지 않는다. 모든 참여 앱은 같은 새 규약 버전을 사용해야 한다. |
 
 원시 결과 JSON·Editor 로그·빌드·임시 렌더는 공개 저장소에 넣지 않는다. 고해상도 농담/미세 경계는 승인된 시각적 차이이며 진행률을 그림 alpha 합계로 바꾸지 않는다. 1024의3장 RT6MiB·관람복사4MiB는 픽셀 저장량 계산으로, 프레임 속도나 모바일 메모리 실측 통과를 의미하지 않는다.
