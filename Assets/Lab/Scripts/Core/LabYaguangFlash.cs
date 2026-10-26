@@ -31,6 +31,24 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// 이 사람이 지금 눈부신지 (#301): 마지막 섬광을 맞았고, 눈부심 시간 안이고, 그 뒤 요괴 얼굴을 맞혀 풀지 않았다.
+        /// 회복 중은 눈부신 것으로 치지 않는다. Host의 `LabModel.FlashGlared`와 같은 규칙을 스냅샷으로 계산한다.
+        /// </summary>
+        public static bool Glared(LabSnapshot snapshot, double now, ulong player, float glareSeconds) =>
+            snapshot != null && snapshot.phase == LabPhase.Playing && snapshot.LastFlashHit(player)
+            && snapshot.flashLastAt >= 0d && now >= snapshot.flashLastAt && now < snapshot.flashLastAt + glareSeconds
+            && snapshot.FlashReleasedAt(player) < 0d;
+
+        /// <summary>한 명이라도 지금 눈부신지 (#301). 이동안 박 속 요괴가 모든 기기에서 나와 있다.</summary>
+        public static bool AnyGlared(LabSnapshot snapshot, double now, float glareSeconds)
+        {
+            if (snapshot == null || snapshot.players == null) return false;
+            foreach (LabPlayerState player in snapshot.players)
+                if (player != null && Glared(snapshot, now, player.id, glareSeconds)) return true;
+            return false;
+        }
+
+        /// <summary>
         /// 예고가 차오른 정도. 이 사람이 다음 섬광 대상이고 예고 중이면 0에서 1로 오르고, 아니면 0.
         /// </summary>
         public static float WarningAmount(LabSnapshot snapshot, double now, ulong player)

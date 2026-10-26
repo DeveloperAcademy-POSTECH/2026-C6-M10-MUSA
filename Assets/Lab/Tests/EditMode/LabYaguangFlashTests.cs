@@ -567,6 +567,28 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void GlaredMeansHitByTheLastFlashInsideTheGlareAndNotYetReleased()
+        {
+            var snapshot = new LabSnapshot
+            {
+                phase = LabPhase.Playing, flashCount = 1, flashLastAt = 30d, flashLastTarget = 20, flashLastTargetAll = false,
+                players = new[] { new LabPlayerState { id = 10 }, new LabPlayerState { id = 20 } }
+            };
+            Assert.That(LabYaguangFlash.Glared(snapshot, 29.9d, 20, 7f), Is.False, "Not before the flash (no face to hit in the warning).");
+            Assert.That(LabYaguangFlash.Glared(snapshot, 30d, 20, 7f), Is.True);
+            Assert.That(LabYaguangFlash.Glared(snapshot, 30d, 10, 7f), Is.False, "Only the flashed player in ONE mode.");
+            Assert.That(LabYaguangFlash.AnyGlared(snapshot, 36.9d, 7f), Is.True, "The yokai stays out while anyone is dazzled.");
+            Assert.That(LabYaguangFlash.Glared(snapshot, 37d, 20, 7f), Is.False, "The glare time is the upper limit.");
+            Assert.That(LabYaguangFlash.AnyGlared(snapshot, 37d, 7f), Is.False);
+            snapshot.players[1].flashReleasedAt = 32d;
+            Assert.That(LabYaguangFlash.Glared(snapshot, 33d, 20, 7f), Is.False, "Released by hitting the face.");
+            Assert.That(LabYaguangFlash.AnyGlared(snapshot, 33d, 7f), Is.False, "Nobody left: the yokai may go back in.");
+            snapshot.phase = LabPhase.Victory;
+            snapshot.players[1].flashReleasedAt = -1d;
+            Assert.That(LabYaguangFlash.Glared(snapshot, 31d, 20, 7f), Is.False);
+        }
+
+        [Test]
         public void TheGlareIsFullThenFadesSmoothlyBack()
         {
             var snapshot = new LabSnapshot

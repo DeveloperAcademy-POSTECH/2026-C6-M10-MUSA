@@ -1850,7 +1850,9 @@ namespace C6Lab
         {
             if (!IsHost || model == null) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
-            if (result.Kind == LabProjectileHitKind.Fire)
+            if (result.Kind == LabProjectileHitKind.Fire && result.FireId == YaguangFaceFireId)
+                ResolveYaguangFaceHit(result, now); // 야광귀 얼굴 (#301)
+            else if (result.Kind == LabProjectileHitKind.Fire)
             {
                 if (!model.ConfirmJigwiFireHit(result.ProjectileId, result.FireId, result.FireTargetId, now, out bool extinguished))
                     model.ConfirmMiss(result.ProjectileId, now, countThrow: false); // 불을 노린 투척은 명중률에서 뺀다

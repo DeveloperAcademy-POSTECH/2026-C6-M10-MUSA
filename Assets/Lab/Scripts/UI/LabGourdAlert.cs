@@ -170,7 +170,8 @@ namespace C6Lab
             showingWord = true;
             wordPopElapsed = 0f;
             mark.text = word;
-            float share = word.Length <= 1 ? .5f : word.Length <= 2 ? .34f : .26f;
+            // 긴 말("안보이지롱~", "앗 들켰다!" #301)은 말풍선 안에 들어가게 더 작게 쓴다.
+            float share = word.Length <= 1 ? .5f : word.Length <= 2 ? .34f : word.Length <= 4 ? .26f : .17f;
             mark.fontSize = Mathf.RoundToInt(bubbleSize * share);
             mark.color = InkColor;
             // 먹색 글자에 먹색 테두리를 어긋나게 두르면 획이 두 번 겹쳐 보인다. 말은 테두리 없이 쓴다.

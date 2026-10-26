@@ -8,7 +8,9 @@ namespace C6Lab
     /// - 예고: 모든 기기의 박 옆 말풍선에 야광귀의 두 눈이 뜨고(`LabGourdAlert.ShowEyes`), 예고 후반에 눈이 갑자기
     ///   노랗게 빛난다. 맞을 사람 화면은 눈이 빛나는 만큼 가장자리부터 노란 빛이 차오르고, 화면 가운데에
     ///   남은 초가 3 → 2 → 1 숫자로 크게 톡톡 튀어나온다 (#301).
-    /// - 섬광: 화면 전체가 하얗게 번쩍했다가 빠르게 빠지고, 진동이 한 번 온다.
+    /// - 섬광: 화면 전체가 하얗게 번쩍했다가 빠르게 빠지고, 진동이 한 번 온다. 맞은 사람 화면의 박 옆 말풍선에
+    ///   야광귀가 "안보이지롱~" 하고 놀린다 (#301).
+    /// - 해제 (#301): 눈부신 사람이 요괴 얼굴을 맞혀 풀면 그 사람 화면 말풍선에 "앗 들켰다!"가 뜬다.
     /// - 눈부심·회복: 판의 음양·결합 구슬과 아이템을 하얗게 덮고(북 제외), 회복 동안 색을 천천히 돌려준다.
     /// 시각은 Host 스냅샷(flashWarningAt/flashAt/flashLastAt)을, 길이는 DEV 값을 쓴다. 화면 표시만 하며 터치를 막지 않는다.
     /// </summary>
@@ -36,6 +38,15 @@ namespace C6Lab
         [Tooltip("숫자가 바뀔 때 톡 튀어나오는 시간 (초)")]
         [SerializeField, Range(.05f, .8f)] private float countdownPopSeconds = .25f;
         private static readonly Color CountdownInk = new Color32(43, 36, 32, 255);
+        [Header("섬광 말풍선 (#301)")]
+        [Tooltip("섬광을 맞은 직후 박 옆 말풍선에 야광귀가 하는 말 (맞은 사람 화면만). 비우면 안 띄운다.")]
+        [SerializeField] private string tauntText = "안보이지롱~";
+        [Tooltip("놀리는 말풍선이 떠 있는 시간 (초)")]
+        [SerializeField, Range(.3f, 6f)] private float tauntSeconds = 2f;
+        [Tooltip("요괴 얼굴을 맞혀 눈부심을 풀었을 때 말풍선 (푼 사람 화면만). 비우면 안 띄운다.")]
+        [SerializeField] private string caughtText = "앗 들켰다!";
+        [Tooltip("들킨 말풍선이 떠 있는 시간 (초)")]
+        [SerializeField, Range(.3f, 6f)] private float caughtSeconds = 1.5f;
 
         private static Sprite edgeSprite;
         private LabNetwork network;
@@ -46,6 +57,10 @@ namespace C6Lab
         private Image burst;
         private Text countdown;
         private int shownCount;
+        private uint caughtShownFor;
+        /// <summary>이 화면이 띄운 섬광 말풍선 수 (테스트용): 놀림, 들킴</summary>
+        public int TauntCount { get; private set; }
+        public int CaughtCount { get; private set; }
         private float countChangedAt;
         private string seenSession;
         private uint seenRound;
@@ -117,6 +132,7 @@ namespace C6Lab
                 config.YaguangFlashRecoverySeconds);
             if (boundBoard != null) boundBoard.SetFlashGlare(glare);
             CheckNewFlash(snapshot, now, me, config);
+            CheckCaught(snapshot, now, me);
 
             float progress = DriveEyes(snapshot, now);
             float warning = LabYaguangFlash.WarningAmount(snapshot, now, me) > 0f ? EyeGlowAt(progress) : 0f;
@@ -216,6 +232,7 @@ namespace C6Lab
                 seenSession = snapshot.sessionId;
                 seenRound = snapshot.round;
                 seenFlashCount = snapshot.flashCount;
+                caughtShownFor = snapshot.flashCount;
                 return;
             }
             if (snapshot.flashCount == seenFlashCount) return;
@@ -224,6 +241,28 @@ namespace C6Lab
             HapticCount++;
             LabHaptics haptics = GetComponent<LabHaptics>();
             if (haptics != null) haptics.PlayForFlash(config);
+            if (Say(tauntText, tauntSeconds)) TauntCount++;
+        }
+
+        /// <summary>내가 요괴 얼굴을 맞혀 이번 섬광의 눈부심을 풀었으면(#301) "앗 들켰다!"를 한 번 띄운다.</summary>
+        private void CheckCaught(LabSnapshot snapshot, double now, ulong me)
+        {
+            double released = snapshot.FlashReleasedAt(me);
+            if (released < 0d || caughtShownFor == snapshot.flashCount) return;
+            caughtShownFor = snapshot.flashCount;
+            // 접속 직후 이미 오래전에 푼 기록에는 띄우지 않는다.
+            if (now - released > 1d) return;
+            if (Say(caughtText, caughtSeconds)) CaughtCount++;
+        }
+
+        /// <summary>박 옆 말풍선에 짧은 말을 띄운다. 말풍선이나 박이 없으면 false.</summary>
+        private bool Say(string text, float seconds)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            LabGourdAlert alert = GetComponent<LabGourdAlert>();
+            if (alert == null || network == null || network.target == null) return false;
+            alert.ShowWord(network.target, text, seconds);
+            return true;
         }
 
         private void Hide()
