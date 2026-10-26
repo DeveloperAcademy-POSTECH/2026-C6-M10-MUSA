@@ -88,9 +88,36 @@ namespace C6Lab.Tests
                     if (seatCount > 2)
                     {
                         Vector3 screenRight = Quaternion.LookRotation(center - camera) * Vector3.right;
-                        Assert.That(Vector3.Dot(next - camera, screenRight), Is.GreaterThan(0f),
-                            "P+1 must be on the player's visible right, where a rightward orb is transferred.");
+                        Assert.That(Vector3.Dot(next - camera, screenRight), Is.LessThan(0f),
+                            "Clockwise P+1 must be on the player's visible left, where a leftward orb is transferred.");
                     }
+                }
+            }
+            finally { Object.DestroyImmediate(config); }
+        }
+
+        [Test]
+        public void TeamTerritoryRetainsItsExistingAlternatingCameraAndThrowGeometry()
+        {
+            LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                float[] values = config.CaptureDeveloperValues();
+                values[196] = 1f;
+                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                Vector3 center = new Vector3(0f, 1.35f, 0f);
+                for (int seat = 0; seat < LabTeams.Players; seat++)
+                {
+                    int ring = LabTeams.RingSeat(seat);
+                    float angle = -2f * Mathf.PI * ring / LabTeams.Players;
+                    Vector3 expected = center + new Vector3(Mathf.Sin(angle) * config.ThrowOriginRadius,
+                        config.ThrowOriginHeightOffset, Mathf.Cos(angle) * config.ThrowOriginRadius);
+                    Vector3 launch = LabThrowMath.LaunchPosition(ring, LabTeams.Players, center, .5f, config);
+                    Assert.That(Vector3.Distance(launch, expected), Is.LessThan(.0001f));
+                    Vector3 camera = LabThrowMath.SeatPosition(ring, LabTeams.Players, center,
+                        config.CameraRadius, config.CameraHeightOffset, clockwise: false);
+                    Assert.That(Vector3.Dot(Vector3.ProjectOnPlane(camera - center, Vector3.up),
+                        Vector3.ProjectOnPlane(launch - center, Vector3.up)), Is.GreaterThan(0f));
                 }
             }
             finally { Object.DestroyImmediate(config); }

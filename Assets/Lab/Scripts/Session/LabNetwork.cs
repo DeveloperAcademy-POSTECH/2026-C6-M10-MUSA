@@ -208,13 +208,13 @@ namespace C6Lab
         // 5664: standalone #301/#305 used different shared layouts with the same version.
         // 5665: combined flash shake DEV202-203 + charm warning DEV204 (205 values),
         //       flash release state and each neighbor's charm rescue progress.
-        internal const ushort LabProtocolVersion = 5665;
+        internal const ushort LabProtocolVersion = 5666;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/26");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/27");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -315,7 +315,7 @@ namespace C6Lab
 
         public event Action Changed;
         public event Action<LabConfig> ConfigApplied;
-        /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (승인 명중값: Paint 명목 공격 점수 / Crack 실제 피해량)</summary>
+        /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (승인 명중값: 페인트 명목 공격 점수)</summary>
         public event Action<int> LocalThrowHit;
         /// <summary>
         /// 마지막으로 내 구슬이 맞은 자리가 박 중심에서 얼마나 옆으로 벗어났는지 (0 = 정중앙, 1 = 가장자리를 스침).
@@ -1826,7 +1826,7 @@ namespace C6Lab
             seat = LabTeams.RingSeatFor(latest, seat);
             Vector3 targetCenter = target.transform.position;
             Vector3 seatAnchor = LabThrowMath.SeatPosition(seat, seatCount, targetCenter,
-                config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
+                config.ThrowOriginRadius, config.ThrowOriginHeightOffset, !LabTeams.FourPlayerTeams(latest));
             Vector3 launchPosition = LabThrowMath.LaunchPosition(seat, seatCount, targetCenter, releaseX01, config);
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
             // A blast-shrunk orb flies small and so has less reach on the gourd (#213).
@@ -1892,7 +1892,7 @@ namespace C6Lab
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
                     target.NotifyApprovedHit(targetLocalPoint, element);
                     impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
-                        result.ImpactVelocity, config == null || config.GourdMode == LabGourdMode.Crack);
+                        result.ImpactVelocity, false);
                     if (result.OwnerPlayerId == LocalPlayerId)
                     {
                         LastLocalHitOffset = LabThrowSound.HitOffset(targetLocalPoint,
@@ -2220,7 +2220,7 @@ namespace C6Lab
                         impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
                             (LabOrbElement)packet.element, packet.damage,
                             new Vector3(packet.wx, packet.wy, packet.wz),
-                            config == null || config.GourdMode == LabGourdMode.Crack);
+                            false);
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
                         if (packet.owner == LocalPlayerId)
                         {

@@ -31,9 +31,7 @@ namespace Hapio
                     || target == null || battleCamera == null || !battleCamera.isActiveAndEnabled
                     || hud == null || !hud.isActiveAndEnabled || target.Hitbox == null) return false;
                 var paint = target.GetComponent<LabGourdPaint>();
-                if (session.Network.config.GourdMode == LabGourdMode.Paint) return paint != null && paint.IsReady;
-                var crack = target.GetComponent<LabGourdCrack>();
-                return crack != null && crack.IsReady;
+                return paint != null && paint.IsReady;
             }
         }
 

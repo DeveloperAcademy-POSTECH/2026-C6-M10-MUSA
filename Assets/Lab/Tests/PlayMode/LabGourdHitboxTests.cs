@@ -166,33 +166,23 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator PaintCrackAndPaintRemountsReplaceGeometryWithoutStaleCylinderOrCollider()
+        public IEnumerator PaintReinitializationKeepsTheVisibleShellCollisionIdentity()
         {
             MeshCollider identity = target.Hitbox;
-            Mesh paintMesh = target.Hitbox.sharedMesh;
-            SetTuning("Gourd Mode (0 paint, 1 crack)", 1f);
-            Assert.That(paint.ApplyMode(), Is.True, paint.InitializationError);
+            paint.enabled = false;
             yield return null;
-            Physics.SyncTransforms();
-            LabGourdCrack crack = target.GetComponent<LabGourdCrack>();
-            Assert.That(crack.IsReady, Is.True, crack.InitializationError);
-            Assert.That(target.Hitbox, Is.SameAs(identity));
-            Assert.That(target.Hitbox.sharedMesh, Is.Not.SameAs(paintMesh));
-            Assert.That(target.Hitbox.enabled, Is.True);
-            Assert.That(target.Hitbox.bounds.size.sqrMagnitude, Is.GreaterThan(.1f));
-            var receipt = new Receipt();
-            Vector3 front = FrontPoint(target.Hitbox.bounds.center.x, target.Hitbox.bounds.center.y);
-            Launch(front + Vector3.forward * 2f, Vector3.back * 30f, receipt);
-            yield return Await(receipt);
-            Assert.That(receipt.Result.Hit, Is.True, "Crack mode must bind the active shell pieces, not retain the departed paint body's geometry.");
-            SetTuning("Gourd Mode (0 paint, 1 crack)", 0f);
-            Assert.That(paint.ApplyMode(), Is.True, paint.InitializationError);
+            paint.enabled = true;
             yield return null;
+            Assert.That(paint.ApplyMode(), Is.True, paint.InitializationError);
             Physics.SyncTransforms();
             Assert.That(target.Hitbox, Is.SameAs(identity));
             AssertPaintMeshAndWorldPose();
-            Assert.That(target.Hitbox.sharedMesh, Is.SameAs(paintMesh));
             Assert.That(target.GetComponentsInChildren<Collider>(true).Count(collider => collider.enabled), Is.EqualTo(1));
+            Vector3 front = FrontPoint(target.Hitbox.bounds.center.x, target.Hitbox.bounds.center.y);
+            var receipt = new Receipt();
+            Launch(front + Vector3.forward * 2f, Vector3.back * 30f, receipt);
+            yield return Await(receipt);
+            Assert.That(receipt.Result.Hit, Is.True);
         }
 
         [UnityTest]

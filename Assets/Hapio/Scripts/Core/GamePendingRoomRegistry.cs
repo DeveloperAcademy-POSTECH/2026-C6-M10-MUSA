@@ -24,6 +24,13 @@ namespace Hapio
         }
     }
 
+    /// <summary>Opaque identity that stays valid while Bonjour assigns or changes the room name.</summary>
+    public sealed class GamePendingRoomHandle
+    {
+        internal readonly LabPendingRoom Room;
+        internal GamePendingRoomHandle(LabPendingRoom room) { Room = room; }
+    }
+
     /// <summary>Game-session-owned advertisements, independent of disposable menu and Battle Scenes.</summary>
     public sealed class GamePendingRoomRegistry : IDisposable
     {
@@ -35,7 +42,11 @@ namespace Hapio
 
         /// <summary>A 2:2 room (#281) always waits for exactly four players.</summary>
         public bool TryCreate(int capacity, GameMode mode, out string error)
+            => TryCreate(capacity, mode, out _, out error);
+
+        public bool TryCreate(int capacity, GameMode mode, out GamePendingRoomHandle handle, out string error)
         {
+            handle = null;
             error = string.Empty;
             if (disposed) { error = "방 목록이 닫혔소."; return false; }
             if (rooms.Count >= LabBonjourDiscovery.MaximumServices)
@@ -44,6 +55,22 @@ namespace Hapio
             if (!LabPendingRoom.TryCreate(capacity, LabRoomFamily.Game, mode == GameMode.Territory,
                 out var room, out error)) return false;
             rooms.Add(room);
+            handle = new GamePendingRoomHandle(room);
+            return true;
+        }
+
+        public bool TryGet(GamePendingRoomHandle handle, out GamePendingRoomInfo info)
+        {
+            bool found = !disposed && handle != null && rooms.Contains(handle.Room);
+            info = found ? new GamePendingRoomInfo(handle.Room) : null;
+            return found;
+        }
+
+        /// <summary>Cancel only this creation; other saved waiting-room cards remain registered.</summary>
+        public bool Cancel(GamePendingRoomHandle handle)
+        {
+            if (disposed || handle == null || !rooms.Remove(handle.Room)) return false;
+            handle.Room.Dispose();
             return true;
         }
 

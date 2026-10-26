@@ -24,6 +24,7 @@ namespace C6Lab
         private RenderTexture texture;
         private Material material;
         private readonly List<Transform> originalSiblings = new List<Transform>();
+        private readonly List<Transform> rearDecorations = new List<Transform>();
         private readonly Dictionary<GameObject, int> rearLayers = new Dictionary<GameObject, int>();
         private int sourceMask, battleMask, foregroundMask;
         private Camera capturedBattleCamera;
@@ -69,6 +70,7 @@ namespace C6Lab
                 if (!captured) Initialize();
                 ResizeTarget();
                 SyncCamera();
+                EnsureDisplayOrder();
                 PlaceDisplay();
             }
             catch (Exception error)
@@ -132,10 +134,9 @@ namespace C6Lab
             display.material = material;
             display.color = Color.white;
 
-            var rear = new List<Transform> { stamina, left, right };
-            rear.Sort((a, b) => a.GetSiblingIndex().CompareTo(b.GetSiblingIndex()));
-            for (int i = 0; i < rear.Count; i++) rear[i].SetSiblingIndex(i);
-            display.transform.SetSiblingIndex(rear.Count);
+            rearDecorations.AddRange(new[] { stamina, left, right });
+            rearDecorations.Sort((a, b) => a.GetSiblingIndex().CompareTo(b.GetSiblingIndex()));
+            EnsureDisplayOrder();
             ResizeTarget();
             SyncCamera();
             PlaceDisplay();
@@ -150,6 +151,18 @@ namespace C6Lab
             foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
                 if (!rearLayers.ContainsKey(renderer.gameObject))
                     rearLayers.Add(renderer.gameObject, renderer.gameObject.layer);
+        }
+
+        private void EnsureDisplayOrder()
+        {
+            // Runtime HUD effects can insert/reorder siblings after initialization. Keep
+            // only the three rear decorations below the orb image; never move their Rects
+            // or promote the image above gameplay controls, pause or result overlays.
+            for (int i = 0; i < rearDecorations.Count; i++)
+                if (rearDecorations[i] != null && rearDecorations[i].GetSiblingIndex() != i)
+                    rearDecorations[i].SetSiblingIndex(i);
+            if (display != null && display.transform.GetSiblingIndex() != rearDecorations.Count)
+                display.transform.SetSiblingIndex(rearDecorations.Count);
         }
 
         private void ResizeTarget()
@@ -253,6 +266,7 @@ namespace C6Lab
             capturedBattleCamera = null;
             rearLayers.Clear();
             originalSiblings.Clear();
+            rearDecorations.Clear();
         }
 
         private static void DestroyOwned(UnityEngine.Object value)
