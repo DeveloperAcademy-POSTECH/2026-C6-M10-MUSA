@@ -202,13 +202,14 @@ namespace C6Lab
         // 5661: #278 immutable Lab/Game Bonjour identity before pending-room activation.
         // 5662: #281 2:2 team territory (DEV 196-199, 200 shared values): team cells, winner and fever in the
         //       snapshot, fever in the board header, team-edge handoffs and territory overwrite paint.
-        internal const ushort LabProtocolVersion = 5662;
+        // 5663: #301 yaguang flash face release (DEV 200-201, 202 shared values; glare range 1-20 s).
+        internal const ushort LabProtocolVersion = 5663;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/23");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/24");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

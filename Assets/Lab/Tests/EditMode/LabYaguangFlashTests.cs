@@ -33,14 +33,19 @@ namespace C6Lab.Tests
             Assert.That(flash.Skip(2).All(field => !field.IsToggle && !field.WholeNumber), Is.True);
             float[] defaults = { 10f, 60f, 3f, 7f, 2f };
             for (int i = 0; i < defaults.Length; i++)
+            {
+                // 눈부심(#301)은 "맞힐 수 있는 시간"의 상한이라 기본 7초를 두고 20초까지 늘려 볼 수 있게 했다.
+                if (flash[i + 2].Label == "섬광 눈부심 (초)") continue;
                 Assert.That((flash[i + 2].Min + flash[i + 2].Max) * .5f, Is.EqualTo(defaults[i]),
                     flash[i + 2].Label + ": every slider starts in the middle of its range.");
+            }
+            Assert.That(new[] { flash[5].Min, flash[5].Max }, Is.EqualTo(new[] { 1f, 20f }), "Glare can be tried up to 20 s (#301).");
 
             Assert.That(LabConfig.DeveloperCategories.Any(category => category.Title == "Combo"), Is.False,
                 "The combo moved into the 야광귀 group.");
             LabDeveloperCategory yaguang = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀");
             Assert.That(yaguang.FieldIndices, Is.EqualTo(new[]
-                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190 }),
+                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190, 200, 201 }),
                 "The yaguang counting toggle (#271) sits right under the combo switch.");
             Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 184 }), "One switch turns the combo and the flash on together.");
             Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 11 }));
@@ -73,6 +78,38 @@ namespace C6Lab.Tests
             values[189] = 2f;
             values[187] = 12f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Flashes come at least 20 s apart.");
+        }
+
+        [Test]
+        public void FaceReleaseFieldsAreOnByDefaultAtTheBottomOfTheFlashRows()
+        {
+            LabDeveloperField toggle = LabConfig.DeveloperFields[200], size = LabConfig.DeveloperFields[201];
+            Assert.That(toggle.Label, Is.EqualTo("섬광 얼굴 맞혀 풀기 (0 off, 1 on)"));
+            Assert.That(toggle.IsToggle, Is.True);
+            Assert.That(new[] { toggle.OffText, toggle.OnText }, Is.EqualTo(new[] { "끔", "켬" }));
+            Assert.That(size.Label, Is.EqualTo("섬광 얼굴 판정 크기 (배)"));
+            Assert.That(new[] { size.Min, size.Max }, Is.EqualTo(new[] { .5f, 2.5f }));
+            Assert.That((size.Min + size.Max) * .5f, Is.EqualTo(1.5f), "The size slider starts in the middle.");
+
+            LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
+            created.Add(config);
+            LabConfig authored = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(authored, Is.Not.Null);
+            foreach (LabConfig source in new[] { config, authored })
+            {
+                Assert.That(source.YaguangFlashFaceRelease, Is.True, "Hitting the face releases the glare by default.");
+                Assert.That(source.CaptureDeveloperValues().Skip(200).Take(2), Is.EqualTo(new[] { 1f, 1.5f }));
+            }
+            float[] values = config.CaptureDeveloperValues();
+            values[200] = 0f; values[201] = 2.5f; values[189] = 20f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.YaguangFlashFaceRelease, Is.False);
+            Assert.That(config.YaguangFlashFaceSize, Is.EqualTo(2.5f));
+            Assert.That(config.YaguangFlashGlareSeconds, Is.EqualTo(20f));
+            values[201] = 3f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "The face size stays within 0.5-2.5.");
+            values[201] = 1.5f; values[189] = 21f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Glare stays within 20 s.");
         }
 
         [Test]
