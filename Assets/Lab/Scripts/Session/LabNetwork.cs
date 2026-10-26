@@ -43,6 +43,8 @@ namespace C6Lab
         /// <summary>Why a transferred body crossed its edge (LabEdgeCrossingKind).</summary>
         public int crossing;
         public uint round;
+        /// <summary>Exact flash generation for a shake-release request; zero is not a valid request.</summary>
+        public uint flashGeneration;
         public int damage;
         public int impactValue;
         public float paintX, paintY, paintZ;
@@ -203,14 +205,16 @@ namespace C6Lab
         // 5662: #281 2:2 team territory (DEV 196-199, 200 shared values): team cells, winner and fever in the
         //       snapshot, fever in the board header, team-edge handoffs and territory overwrite paint.
         // 5663: #299 bounded paint visual descriptors in the same paint commit; DEV200-201 (202 values).
-        // 5664: #301 yaguang flash shake release (DEV 202-203, 204 shared values; glare 10 s / recovery 1 s) and flashShake requests.
-        internal const ushort LabProtocolVersion = 5664;
+        // 5664: standalone #301/#305 used different shared layouts with the same version.
+        // 5665: combined flash shake DEV202-203 + charm warning DEV204 (205 values),
+        //       flash release state and each neighbor's charm rescue progress.
+        internal const ushort LabProtocolVersion = 5665;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/25");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/26");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -418,6 +422,7 @@ namespace C6Lab
 
         private void Awake()
         {
+            LabMobilePresentationPolicy.Attach(this);
             // GameSession (-1000) can prepare its initial runtime profile before this Awake.
             // Retain the original saved asset if that early installation already captured it.
             if (sourceConfig == null) sourceConfig = config;
@@ -1788,7 +1793,8 @@ namespace C6Lab
             if (packet.type == FlashShakePacket)
             {
                 // 야광귀 섬광 (#301): 폰을 다 흔든 사람의 눈부심만 푼다. 눈부시지 않으면 무시한다.
-                if (model.TryFlashShakeRelease(sender, now)) PublishSnapshot(true);
+                if (battleClock.IsPaused || packet.requestId < 1) return;
+                if (model.TryFlashShakeRelease(sender, packet.flashGeneration, now)) PublishSnapshot(true);
                 return;
             }
             if (packet.type == "charmTap")

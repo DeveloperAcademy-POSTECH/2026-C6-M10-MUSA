@@ -28,7 +28,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(204));
+                    Assert.That(values.Length, Is.EqualTo(205));
                     Assert.That(values[87], Is.EqualTo(before[87]), "Common bomb interval preserved");
                     Assert.That(values[152], Is.EqualTo(before[152]), "Common transfer block interval preserved");
                 }
@@ -111,6 +111,34 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void EveryStageAndTheTerritoryRoomFillOneBarCellPerOrb()
+        {
+            // The battle's stamina bar art is shared by every mode (#305), so a full bar must make as many orbs as it
+            // has cells: otherwise one orb empties more or less than one cell.
+            var mask = new Texture2D(2, 2);
+            int cells = 0;
+            try
+            {
+                Assert.That(mask.LoadImage(System.IO.File.ReadAllBytes("Assets/Lab/Art/UI/StaminaBarFillMask.png")), Is.True);
+                for (int x = 0, row = mask.height / 2; x < mask.width; x++)
+                    if (mask.GetPixel(x, row).a > .5f && (x == 0 || mask.GetPixel(x - 1, row).a <= .5f)) cells++;
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mask); }
+            Assert.That(cells, Is.EqualTo(8));
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+                for (int scope = 1; scope <= GameStageSettings.TerritoryScope; scope++)
+                {
+                    var config = settings.CreateStageConfig(scope);
+                    try
+                    {
+                        Assert.That(config.StaminaMax / config.GenerateCost, Is.EqualTo((float)cells), "Scope " + scope);
+                        Assert.That(config.StaminaStart, Is.EqualTo(config.StaminaMax), "Scope " + scope + " starts full");
+                    }
+                    finally { UnityEngine.Object.DestroyImmediate(config); }
+                }
+        }
+
+        [Test]
         public void ScopeForgeryAndInvalidInput_AreRejectedAtomically_AndCapturesAreCopies()
         {
             using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
@@ -134,6 +162,29 @@ namespace Hapio.Tests
             Assert.That(GameStageSettings.IsFieldVisible(0, 202), Is.False);
             Assert.That(GameStageSettings.IsFieldVisible(2, 200), Is.False, "High resolution paint (#299) stays common.");
             Assert.That(GameStageSettings.IsFieldVisible(3, 192), Is.True);
+        }
+        [Test]
+        public void FlashShakeAndCharmWarningKeepDistinctStageScopesAfterIntegration()
+        {
+            Assert.That(GameStageSettings.IsFieldVisible(1, 204), Is.True);
+            Assert.That(GameStageSettings.IsFieldVisible(2, 204), Is.False);
+            Assert.That(GameStageSettings.IsFieldVisible(0, 204), Is.False);
+            Assert.That(GameStageSettings.IsFieldVisible(GameStageSettings.TerritoryScope, 204), Is.False);
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                float[] charm = settings.Capture(1);
+                float[] flash = settings.Capture(2);
+                charm[204] = 4.5f;
+                Assert.That(settings.TryApply(1, charm, out string error), Is.True, error);
+                flash[202] = 0f; flash[203] = 10f;
+                Assert.That(settings.TryApply(2, flash, out error), Is.True, error);
+                Assert.That(settings.Capture(1)[204], Is.EqualTo(4.5f));
+                Assert.That(settings.Capture(1)[202], Is.EqualTo(charm[202]));
+                Assert.That(settings.Capture(1)[203], Is.EqualTo(charm[203]));
+                Assert.That(settings.Capture(2)[204], Is.EqualTo(flash[204]));
+                Assert.That(settings.Capture(2)[202], Is.Zero);
+                Assert.That(settings.Capture(2)[203], Is.EqualTo(10f));
+            }
         }
     }
 }

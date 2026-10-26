@@ -5,17 +5,20 @@ namespace C6Lab
     /// <summary>
     /// A cartoon blast drawn on the orb board where a locked bomb went off: a jagged star burst in
     /// red, orange and yellow, a ring racing out to the blast reach, puffs of smoke, and a big
-    /// "BOMB!" that pops and floats away. Presentation only: it owns no collider, never touches
-    /// physics, and removes itself when done.
+    /// hand-lettered "뻥이요!" (#305, a cream outline behind the ink keeps it readable on the burst) that pops
+    /// and floats away. Presentation only: it owns no collider, never touches physics, and removes itself when done.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabBombBlastEffect : MonoBehaviour
     {
-        public const string Text = "BOMB!";
+        public const string Text = "뻥이요!";
+        public const string ArtPath = "Bomb/BombPpeong";
+        public const string OutlinePath = "Bomb/BombPpeongOutline";
         public const float Seconds = .9f;
         // In front of every orb, drum and item marker on the board plane (z = 0), facing its camera.
         private const float FrontZ = -1.5f;
-        private const int FontSize = 96;
+        // The lettering's height, in blast reaches.
+        private const float LabelHeight = .45f;
         private const int PuffCount = 7;
         private static readonly Color[] BurstColors =
         {
@@ -25,8 +28,6 @@ namespace C6Lab
         private static readonly float[] BurstTurns = { 0f, 9f, 21f };
         private static readonly Color RingColor = new Color(1f, .97f, .85f);
         private static readonly Color PuffColor = new Color(.42f, .38f, .36f);
-        private static readonly Color TextColor = new Color(1f, .93f, .2f);
-        private static readonly Color TextShadowColor = new Color(.45f, .05f, .03f);
         private static Sprite starSprite;
         private static Sprite ringSprite;
         private static Sprite puffSprite;
@@ -35,12 +36,13 @@ namespace C6Lab
         private readonly SpriteRenderer[] puffs = new SpriteRenderer[PuffCount];
         private readonly Vector2[] puffDirections = new Vector2[PuffCount];
         private SpriteRenderer ring;
-        private TextMesh label;
-        private TextMesh labelShadow;
+        private SpriteRenderer label;
+        private SpriteRenderer labelOutline;
+        private float labelScale;
         private float reach;
         private float elapsed;
 
-        public string Label => label != null ? label.text : string.Empty;
+        public string Label => label != null && label.sprite != null ? Text : string.Empty;
 
         /// <summary>Starts a blast at a board point (world XY); reach is the shockwave radius in world units.</summary>
         public static LabBombBlastEffect Play(Transform board, Vector2 center, float reach)
@@ -69,11 +71,12 @@ namespace C6Lab
                 bursts[i] = CreateSprite("Burst", Star(), BurstColors[i], 30 + i);
                 bursts[i].transform.localRotation = Quaternion.Euler(0f, 0f, BurstTurns[i]);
             }
-            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (font != null)
+            Sprite art = Resources.Load<Sprite>(ArtPath), outline = Resources.Load<Sprite>(OutlinePath);
+            if (art != null)
             {
-                labelShadow = CreateText("BOMB! Shadow", font, TextShadowColor, 33);
-                label = CreateText("BOMB!", font, TextColor, 34);
+                if (outline != null) labelOutline = CreateSprite("뻥이요 Outline", outline, Color.white, 33);
+                label = CreateSprite("뻥이요", art, Color.white, 34);
+                labelScale = LabelHeight * reach / Mathf.Max(.0001f, art.bounds.size.y);
             }
             Animate();
         }
@@ -114,15 +117,17 @@ namespace C6Lab
             }
 
             if (label == null) return;
-            // "BOMB!" pops in, holds, then floats up and fades.
+            // "뻥이요!" pops in, holds, then floats up and fades.
             float textPop = t < .15f ? EaseOut(t / .15f) * 1.25f : Mathf.Lerp(1.25f, 1f, Mathf.Clamp01((t - .15f) / .1f));
             float leave = Mathf.Clamp01((t - .6f) / .3f);
             float rise = reach * (.1f + .25f * leave);
-            label.transform.localScale = labelShadow.transform.localScale = Vector3.one * textPop;
+            label.transform.localScale = Vector3.one * (labelScale * textPop);
             label.transform.localPosition = new Vector3(0f, rise, -.02f);
-            labelShadow.transform.localPosition = new Vector3(.05f * reach, rise - .05f * reach, -.01f);
-            label.color = WithAlpha(TextColor, 1f - leave);
-            labelShadow.color = WithAlpha(TextShadowColor, 1f - leave);
+            label.color = WithAlpha(Color.white, 1f - leave);
+            if (labelOutline == null) return;
+            labelOutline.transform.localScale = label.transform.localScale;
+            labelOutline.transform.localPosition = new Vector3(0f, rise, -.01f);
+            labelOutline.color = WithAlpha(Color.white, 1f - leave);
         }
 
         private SpriteRenderer CreateSprite(string partName, Sprite sprite, Color color, int order)
@@ -135,27 +140,6 @@ namespace C6Lab
             renderer.color = color;
             renderer.sortingOrder = order;
             return renderer;
-        }
-
-        private TextMesh CreateText(string partName, Font font, Color color, int order)
-        {
-            var part = new GameObject(partName);
-            part.layer = gameObject.layer;
-            part.transform.SetParent(transform, false);
-            var text = part.AddComponent<TextMesh>();
-            text.font = font;
-            text.text = Text;
-            text.fontSize = FontSize;
-            text.fontStyle = FontStyle.Bold;
-            text.anchor = TextAnchor.MiddleCenter;
-            text.alignment = TextAlignment.Center;
-            text.color = color;
-            // About a third of the reach tall.
-            text.characterSize = .32f * reach / (FontSize * .1f);
-            var renderer = part.GetComponent<MeshRenderer>();
-            renderer.sharedMaterial = font.material;
-            renderer.sortingOrder = order;
-            return text;
         }
 
         private static float EaseOut(float t) => 1f - (1f - t) * (1f - t) * (1f - t);

@@ -81,7 +81,7 @@ namespace Hapio.Tests
         private static void AssertScope(GameScreen screen, int scope)
         {
             Assert.That(screen.DeveloperScope, Is.EqualTo(scope));
-            Assert.That(screen.developerInputs, Has.Length.EqualTo(204));
+            Assert.That(screen.developerInputs, Has.Length.EqualTo(205));
             for (int i = 0; i < screen.developerInputs.Length; i++)
                 Assert.That(screen.developerInputs[i].transform.parent.gameObject.activeSelf,
                     Is.EqualTo(GameStageSettings.IsFieldVisible(scope, i)), "Field " + i + " in scope " + scope);
