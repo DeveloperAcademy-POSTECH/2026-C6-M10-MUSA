@@ -1,11 +1,7 @@
-# 구슬 이미지 (#229, #294)
+# 구슬 이미지 (#300)
 
-사용자 제공 PNG를 바이트 변경 없이 보존한다. Yin=음, Yang=양, Fire=화, Water=수, Wood=목, Metal=금, Earth=토다.
+사용자 제공 원본 PNG를 변형 없이 사용한다. Yin=음, Yang=양, Fire=화, Water=수, Wood=목, Metal=금, Earth=토다. 음·양은 76×78, 오행은 96×98이며 기존 파일명과 `.meta` GUID를 유지한다.
 
-`C6 Lab/Apply Yin Yang And Element Orb Sprites`는 중앙 피벗·무압축·mipmap 없음의 Sprite로 가져오고 기존 LabOrbAppearance.asset에 연결한다. Config와 Scene 참조는 유지한다.
+`C6 Lab/Apply Yin Yang And Element Orb Sprites`는 중앙 피벗·무압축·mipmap 없음으로 가져와 기존 LabOrbAppearance에 연결한다.
 
-조합판은 기존 구슬 지름에 맞춰 표시한다. 최신 main의 #283에 따라 투척 중에는 기존 3D 구체를 사용한다. PNG에 포함된 색·질감·하이라이트를 사용한다. Collider/Rigidbody·조합·피해·색칠 RGB·축소 비율·궤적은 기존 경로다. 이미지가 없는 종류와 아이템은 기존 3D 표현을 사용한다. 각 Sprite 슬롯을 비우면 해당 종류는 기존 머터리얼/프리팹 경로로 돌아간다.
-
-음·양의 표시 지름은 원래 크기를 유지하고, 오행 이미지 지름은 원래 크기의120%로 표시한다. 투척 중 3D 구체의 기존 확대 비율은 유지한다. 원본 PNG와 기존 충돌/잡기/조합 반지름은 유지한다.
-
-#294에서 사용자 제공 새 음·양·화·수·목·금·토 PNG로 교체했다. 원본 바이트를 그대로 사용하며 음·양은90×86, 오행은92×92다. 기존 파일명과 `.meta` GUID, Appearance·Config·Scene 연결을 유지한다.
+음·양은 기존 구슬 지름에 맞추고 오행의 기존 120% 확대를 유지한다. 콤보 배율과 충돌·잡기·조합 반지름도 유지한다. 투척은 #283의 기존 3D 구체 경로를 사용한다. 아이템 및 Sprite가 없는 종류의 기존 표현도 유지한다.
