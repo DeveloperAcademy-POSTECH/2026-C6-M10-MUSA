@@ -1,0 +1,13 @@
+.hires-root { flex-grow: 1; padding: 12px; background-color: #20262d; color: #f1eee5; }
+.hires-title { font-size: 19px; -unity-font-style: bold; margin-bottom: 6px; }
+.hires-note { white-space: normal; color: #d3cbb7; margin-bottom: 8px; }
+.hires-controls { flex-direction: row; flex-wrap: wrap; margin-bottom: 8px; }
+.hires-control { min-width: 200px; flex-grow: 1; margin-right: 12px; margin-bottom: 5px; }
+.hires-actions { flex-direction: row; margin-bottom: 8px; }
+.hires-action { min-width: 120px; margin-right: 8px; }
+.hires-panels { flex-direction: row; flex-grow: 1; min-height: 280px; }
+.hires-panel { flex-grow: 1; flex-basis: 0; margin: 4px; padding: 6px; background-color: #12181e; }
+.hires-heading { font-size: 15px; -unity-font-style: bold; -unity-text-align: middle-center; margin-bottom: 4px; }
+.hires-image { flex-grow: 1; min-height: 250px; }
+.hires-status { white-space: normal; margin-top: 8px; }
+.hires-error { color: #ffb2a1; }
