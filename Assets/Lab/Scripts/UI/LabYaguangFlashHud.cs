@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace C6Lab
@@ -10,7 +11,9 @@ namespace C6Lab
     ///   남은 초가 3 → 2 → 1 숫자로 크게 톡톡 튀어나온다 (#301).
     /// - 섬광: 화면 전체가 하얗게 번쩍했다가 빠르게 빠지고, 진동이 한 번 온다. 맞은 사람 화면의 박 옆 말풍선에
     ///   야광귀가 "안보이지롱~" 하고 놀린다 (#301).
-    /// - 해제 (#301): 눈부신 사람이 요괴 얼굴을 맞혀 풀면 그 사람 화면 말풍선에 "앗 들켰다!"가 뜬다.
+    /// - 해제 (#301): 눈부신 사람 화면 가운데에 좌우로 흔들리는 폰 그림 + "흔들어!" + 게이지가 뜬다. 폰을 세게 흔들
+    ///   때마다 하얀 막이 조금씩 걷히고, DEV 횟수(기본 6번)를 채우면 Host에 알려 그 사람 눈부심만 풀린다. 풀리면
+    ///   말풍선에 "으악 어지러워~"가 뜬다. Editor·DEV 빌드에서는 K 키 한 번이 한 번 흔들기다.
     /// - 눈부심·회복: 판의 음양·결합 구슬과 아이템을 하얗게 덮고(북 제외), 회복 동안 색을 천천히 돌려준다.
     /// 시각은 Host 스냅샷(flashWarningAt/flashAt/flashLastAt)을, 길이는 DEV 값을 쓴다. 화면 표시만 하며 터치를 막지 않는다.
     /// </summary>
@@ -43,10 +46,25 @@ namespace C6Lab
         [SerializeField] private string tauntText = "안보이지롱~";
         [Tooltip("놀리는 말풍선이 떠 있는 시간 (초)")]
         [SerializeField, Range(.3f, 6f)] private float tauntSeconds = 2f;
-        [Tooltip("요괴 얼굴을 맞혀 눈부심을 풀었을 때 말풍선 (푼 사람 화면만). 비우면 안 띄운다.")]
-        [SerializeField] private string caughtText = "앗 들켰다!";
-        [Tooltip("들킨 말풍선이 떠 있는 시간 (초)")]
+        [Tooltip("폰을 흔들어 눈부심을 풀었을 때 말풍선 (푼 사람 화면만). 비우면 안 띄운다.")]
+        [SerializeField] private string caughtText = "으악 어지러워~";
+        [Tooltip("풀린 말풍선이 떠 있는 시간 (초)")]
         [SerializeField, Range(.3f, 6f)] private float caughtSeconds = 1.5f;
+        [Header("흔들어 풀기 (#301)")]
+        [Tooltip("흔들림이 중력의 몇 배를 넘으면 한 번 흔든 것으로 칠지. 작을수록 살살 흔들어도 센다.")]
+        [SerializeField, Range(.3f, 3f)] private float shakeThreshold = 1f;
+        [Tooltip("한 번 센 뒤 다시 세기까지 기다리는 시간 (초)")]
+        [SerializeField, Range(.05f, .5f)] private float shakeMinGap = .14f;
+        [Tooltip("흔들라는 안내 위치 (0~1, 왼쪽 아래가 0)")]
+        [SerializeField] private Vector2 shakeCueAnchor = new Vector2(.5f, .42f);
+        [Tooltip("흔들라는 안내의 폰 그림 높이 (Canvas 기준 픽셀)")]
+        [SerializeField, Range(30f, 300f)] private float shakeCueSize = 110f;
+        [Tooltip("흔들라는 안내 문구")]
+        [SerializeField] private string shakeText = "흔들어!";
+        [Tooltip("폰 그림이 좌우로 흔들리는 빠르기 (초당 횟수)")]
+        [SerializeField, Range(1f, 12f)] private float shakeCueWiggleHz = 5f;
+        private static readonly Color ShakeGaugeColor = new Color(1f, .78f, .16f, 1f);
+        private static Sprite phoneSprite;
 
         private static Sprite edgeSprite;
         private LabNetwork network;
@@ -58,6 +76,19 @@ namespace C6Lab
         private Text countdown;
         private int shownCount;
         private uint caughtShownFor;
+        private readonly LabShakeCounter shakeCounter = new LabShakeCounter();
+        private uint shakeFlash;
+        private bool shakeSent;
+        private RectTransform shakeCue, shakeGaugeFill, shakePhone;
+        private Text shakeLabel;
+        /// <summary>이번 섬광에 이 화면에서 센 흔들기 수 (#301)</summary>
+        public int ShakeCount => shakeCounter.Count;
+        /// <summary>흔들라는 안내가 보이는지 (#301)</summary>
+        public bool ShakeCueVisible => shakeCue != null && shakeCue.gameObject.activeInHierarchy;
+        /// <summary>
+        /// 흔든 만큼 하얀 막이 걷힌 정도 (#301): 흔든 수 / 필요한 수 (0~1). 이 값만큼 눈부심을 덜어 낸다.
+        /// </summary>
+        public static float ShakeProgress(int shakes, int needed) => needed <= 0 ? 0f : Mathf.Clamp01((float)shakes / needed);
         /// <summary>이 화면이 띄운 섬광 말풍선 수 (테스트용): 놀림, 들킴</summary>
         public int TauntCount { get; private set; }
         public int CaughtCount { get; private set; }
@@ -130,6 +161,11 @@ namespace C6Lab
             ulong me = network.LocalPlayerId;
             float glare = LabYaguangFlash.GlareAmount(snapshot, now, me, config.YaguangFlashGlareSeconds,
                 config.YaguangFlashRecoverySeconds);
+            // 흔들어 풀기 (#301): 흔든 만큼 이 화면의 하얀 막을 덜어 낸다. 다 흔들면 Host가 풀기 전에도 바로 맑다.
+            bool shakeRelease = config.YaguangFlashShakeRelease;
+            bool myGlare = shakeRelease && LabYaguangFlash.Glared(snapshot, now, me, config.YaguangFlashGlareSeconds);
+            float shakeProgress = DriveShake(snapshot, myGlare, config.YaguangFlashShakeCount);
+            if (shakeRelease) glare = Mathf.Min(glare, 1f - shakeProgress);
             if (boundBoard != null) boundBoard.SetFlashGlare(glare);
             CheckNewFlash(snapshot, now, me, config);
             CheckCaught(snapshot, now, me);
@@ -148,7 +184,8 @@ namespace C6Lab
             }
             burstAlpha = Mathf.Max(burstAlpha, veilAlpha * glare);
             int count = showCountdown && !snapshot.paused ? CountdownAt(snapshot, now, me) : 0;
-            if (warning <= 0f && burstAlpha <= 0f && count <= 0)
+            bool cue = myGlare && shakeProgress < 1f && !snapshot.paused;
+            if (warning <= 0f && burstAlpha <= 0f && count <= 0 && !cue)
             {
                 if (layer != null) layer.gameObject.SetActive(false);
                 shownCount = 0;
@@ -163,6 +200,84 @@ namespace C6Lab
             burst.color = new Color(BurstColor.r, BurstColor.g, BurstColor.b, burstAlpha);
             burst.gameObject.SetActive(burstAlpha > 0f);
             DriveCountdown(count);
+            DriveShakeCue(cue, shakeProgress);
+        }
+
+        /// <summary>
+        /// 이번 섬광에서 흔든 수를 세고, 필요한 수를 채우면 Host에 한 번 알린다. 흔든 만큼의 비율(0~1)을 돌려준다.
+        /// 새 섬광이면 처음부터 다시 센다. 눈부시지 않으면(이미 풀렸거나 시간이 지났으면) 세지 않는다.
+        /// </summary>
+        private float DriveShake(LabSnapshot snapshot, bool myGlare, int needed)
+        {
+            if (snapshot.flashCount != shakeFlash)
+            {
+                shakeFlash = snapshot.flashCount;
+                shakeCounter.Reset();
+                shakeSent = false;
+            }
+            shakeCounter.Threshold = shakeThreshold;
+            shakeCounter.MinGap = shakeMinGap;
+            if (myGlare && !snapshot.paused && shakeCounter.Count < needed)
+            {
+                if (ReadShake()) HapticTick();
+                if (shakeCounter.Count >= needed && !shakeSent)
+                {
+                    shakeSent = true;
+                    network.RequestFlashShakeRelease();
+                }
+            }
+            return ShakeProgress(shakeCounter.Count, needed);
+        }
+
+        /// <summary>이번 프레임에 한 번 흔들었는지. 가속도계(폰)가 있으면 그것으로, Editor·DEV 빌드에서는 K 키로도.</summary>
+        private bool ReadShake()
+        {
+            bool shaken = false;
+            Accelerometer sensor = Accelerometer.current;
+            if (sensor != null)
+            {
+                if (!sensor.enabled) InputSystem.EnableDevice(sensor);
+                shaken = shakeCounter.Feed(sensor.acceleration.ReadValue(), Time.unscaledTime);
+            }
+            if (!shaken && (Application.isEditor || Debug.isDebugBuild) && Keyboard.current != null
+                && Keyboard.current.kKey.wasPressedThisFrame)
+            {
+                shakeCounter.AddOne();
+                shaken = true;
+            }
+            return shaken;
+        }
+
+        /// <summary>한 번 흔들 때마다 아주 짧게 진동한다 (흔든 게 세졌다는 손맛).</summary>
+        private void HapticTick()
+        {
+            LabHaptics haptics = GetComponent<LabHaptics>();
+            // 구슬 생성과 같은 가벼운 진동 (섬광의 센 진동과 구분).
+            if (haptics != null && network != null && network.config != null) haptics.PlayForGenerate(network.config);
+        }
+
+        /// <summary>흔들라는 안내: 좌우로 흔들리는 폰 그림 + 문구 + 흔든 만큼 차오르는 게이지.</summary>
+        private void DriveShakeCue(bool show, float progress)
+        {
+            if (shakeCue == null) return;
+            shakeCue.gameObject.SetActive(show);
+            if (!show) return;
+            shakeCue.anchorMin = shakeCue.anchorMax = shakeCueAnchor;
+            shakeCue.SetAsLastSibling();
+            float size = shakeCueSize;
+            shakePhone.sizeDelta = new Vector2(size * .58f, size);
+            shakePhone.anchoredPosition = new Vector2(0f, size * .55f);
+            float wiggle = Mathf.Sin(Time.unscaledTime * shakeCueWiggleHz * Mathf.PI * 2f);
+            shakePhone.localRotation = Quaternion.Euler(0f, 0f, 18f * wiggle);
+            shakePhone.anchoredPosition += new Vector2(size * .12f * wiggle, 0f);
+            shakeLabel.text = shakeText;
+            shakeLabel.fontSize = Mathf.RoundToInt(size * .4f);
+            shakeLabel.rectTransform.sizeDelta = new Vector2(size * 3f, size * .55f);
+            shakeLabel.rectTransform.anchoredPosition = new Vector2(0f, -size * .12f);
+            var track = (RectTransform)shakeGaugeFill.parent;
+            track.sizeDelta = new Vector2(size * 1.8f, size * .14f);
+            track.anchoredPosition = new Vector2(0f, -size * .5f);
+            shakeGaugeFill.anchorMax = new Vector2(Mathf.Clamp01(progress), 1f);
         }
 
         /// <summary>카운트다운 숫자를 맞추고, 숫자가 바뀔 때마다 크게 나왔다가 제자리로 톡 줄어든다.</summary>
@@ -306,7 +421,86 @@ namespace C6Lab
             burst = FullScreen("Yaguang Flash Burst", layer).gameObject.AddComponent<Image>();
             burst.raycastTarget = false;
             countdown = CreateCountdown(layer);
+            CreateShakeCue(layer);
             return true;
+        }
+
+        private void CreateShakeCue(RectTransform parent)
+        {
+            shakeCue = new GameObject("Yaguang Shake Cue", typeof(RectTransform)).GetComponent<RectTransform>();
+            shakeCue.gameObject.layer = parent.gameObject.layer;
+            shakeCue.SetParent(parent, false);
+            shakeCue.sizeDelta = Vector2.zero;
+
+            shakePhone = new GameObject("Phone", typeof(RectTransform)).GetComponent<RectTransform>();
+            shakePhone.SetParent(shakeCue, false);
+            Image phone = shakePhone.gameObject.AddComponent<Image>();
+            phone.sprite = PhoneSprite();
+            phone.raycastTarget = false;
+
+            Font font = null;
+            Text[] existing = canvas != null ? canvas.GetComponentsInChildren<Text>(true) : new Text[0];
+            for (int i = 0; i < existing.Length && font == null; i++) font = existing[i].font;
+            shakeLabel = new GameObject("Shake Label", typeof(RectTransform)).AddComponent<Text>();
+            shakeLabel.rectTransform.SetParent(shakeCue, false);
+            shakeLabel.font = font != null ? font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            shakeLabel.fontStyle = FontStyle.Bold;
+            shakeLabel.alignment = TextAnchor.MiddleCenter;
+            shakeLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+            shakeLabel.verticalOverflow = VerticalWrapMode.Overflow;
+            shakeLabel.color = countdownColor;
+            shakeLabel.raycastTarget = false;
+            Outline outline = shakeLabel.gameObject.AddComponent<Outline>();
+            outline.effectColor = CountdownInk;
+            outline.effectDistance = new Vector2(3f, -3f);
+
+            var track = new GameObject("Shake Gauge", typeof(RectTransform)).GetComponent<RectTransform>();
+            track.SetParent(shakeCue, false);
+            Image trackImage = track.gameObject.AddComponent<Image>();
+            trackImage.color = new Color(CountdownInk.r, CountdownInk.g, CountdownInk.b, .55f);
+            trackImage.raycastTarget = false;
+            shakeGaugeFill = new GameObject("Fill", typeof(RectTransform)).GetComponent<RectTransform>();
+            shakeGaugeFill.SetParent(track, false);
+            shakeGaugeFill.anchorMin = Vector2.zero;
+            shakeGaugeFill.anchorMax = new Vector2(0f, 1f);
+            shakeGaugeFill.offsetMin = shakeGaugeFill.offsetMax = Vector2.zero;
+            Image fill = shakeGaugeFill.gameObject.AddComponent<Image>();
+            fill.color = ShakeGaugeColor;
+            fill.raycastTarget = false;
+            shakeCue.gameObject.SetActive(false);
+        }
+
+        /// <summary>폰 그림: 먹색 테두리의 둥근 직사각형, 흰 화면, 아래 버튼 점.</summary>
+        private static Sprite PhoneSprite()
+        {
+            if (phoneSprite != null) return phoneSprite;
+            const int w = 58, h = 100;
+            var pixels = new Color32[w * h];
+            Color32 ink = new Color32(43, 36, 32, 255), screen = new Color32(255, 252, 240, 255), clear = new Color32(0, 0, 0, 0);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float r = 12f;
+                    float dx = Mathf.Max(0f, Mathf.Max(r - x, x - (w - 1 - r)));
+                    float dy = Mathf.Max(0f, Mathf.Max(r - y, y - (h - 1 - r)));
+                    float outside = Mathf.Sqrt(dx * dx + dy * dy) - r;
+                    Color32 c = outside > 0f ? clear : ink;
+                    bool inScreen = x >= 7 && x < w - 7 && y >= 16 && y < h - 12;
+                    if (outside <= 0f && inScreen) c = screen;
+                    float bx = x - w * .5f, by = y - 8f;
+                    if (bx * bx + by * by < 9f) c = screen;
+                    pixels[y * w + x] = c;
+                }
+            var texture = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            {
+                name = "Yaguang shake phone", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            phoneSprite = Sprite.Create(texture, new Rect(0f, 0f, w, h), new Vector2(.5f, .5f), h);
+            phoneSprite.hideFlags = HideFlags.DontSave;
+            return phoneSprite;
         }
 
         private Text CreateCountdown(RectTransform parent)

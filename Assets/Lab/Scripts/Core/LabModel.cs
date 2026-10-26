@@ -1163,7 +1163,7 @@ namespace C6Lab
 
         /// <summary>
         /// 이 사람이 지금 섬광에 눈부신지 (#301): 마지막 섬광을 맞았고, 눈부심 시간이 아직 지나지 않았고,
-        /// 그 뒤 요괴 얼굴을 맞혀 풀지 않았다. 회복 중은 눈부신 것으로 치지 않는다(얼굴 판정 없음).
+        /// 그 뒤 폰을 흔들어 풀지 않았다. 회복 중은 눈부신 것으로 치지 않는다.
         /// </summary>
         public bool FlashGlared(ulong player, double now)
         {
@@ -1174,27 +1174,14 @@ namespace C6Lab
             return state.flashReleasedAt < lastFlashAt;
         }
 
-        /// <summary>지금 눈부신 사람들 (#301). 이 사람들의 공에만 요괴 얼굴 판정이 있다. 얼굴 맞혀 풀기가 꺼져 있으면 비어 있다.</summary>
-        public List<ulong> FlashFaceTargets(double now)
-        {
-            var glared = new List<ulong>();
-            if (!rules.FlashFaceRelease) return glared;
-            foreach (ulong player in players.Keys) if (FlashGlared(player, now)) glared.Add(player);
-            return glared;
-        }
-
         /// <summary>
-        /// 야광귀 섬광 해제 (#301): 눈부신 사람의 공이 요괴 얼굴에 맞았다. 그 사람의 눈부심만 풀고(이 시각부터 회복),
-        /// 공은 피해·칠·명중 보상 없이 사라진다(던진 공 수에도 넣지 않는다). 얼굴 맞혀 풀기가 꺼져 있거나,
-        /// 던진 사람이 지금 눈부시지 않거나, 날아가는 공이 아니면 아무것도 하지 않고 false.
+        /// 야광귀 섬광 해제 (#301): 눈부신 사람이 폰을 다 흔들었다. 그 사람의 눈부심만 풀고 이 시각을 남긴다.
+        /// 흔들어 풀기가 꺼져 있거나, 보낸 사람이 지금 눈부시지 않으면(이미 풀었거나 시간이 지났으면) false.
         /// </summary>
-        public bool ConfirmFlashFaceHit(string id, double now)
+        public bool TryFlashShakeRelease(ulong sender, double now)
         {
-            if (!rules.FlashFaceRelease || !TryAdvance(now, out _) || !orbs.TryGetValue(id ?? string.Empty, out var orb)
-                || !orb.inFlight || !FlashGlared(orb.owner, now)) return false;
-            orbs.Remove(id);
-            launchScales.Remove(id);
-            players[orb.owner].flashReleasedAt = now;
+            if (!rules.FlashShakeRelease || !TryAdvance(now, out _) || !FlashGlared(sender, now)) return false;
+            players[sender].flashReleasedAt = now;
             return true;
         }
 
@@ -1878,8 +1865,8 @@ namespace C6Lab
             public readonly bool FlashEnabled, FlashTargetOne;
             public readonly float FlashFirstStartSeconds, FlashIntervalSeconds, FlashWarningSeconds,
                 FlashGlareSeconds, FlashRecoverySeconds;
-            /// <summary>Yaguang flash release (#301): a dazzled player hits the yokai's face to clear their own glare.</summary>
-            public readonly bool FlashFaceRelease;
+            /// <summary>Yaguang flash release (#301): a dazzled player shakes their phone to clear their own glare.</summary>
+            public readonly bool FlashShakeRelease;
 
             public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode)
             {
@@ -1952,7 +1939,7 @@ namespace C6Lab
                 FlashWarningSeconds = config.YaguangFlashWarningSeconds;
                 FlashGlareSeconds = config.YaguangFlashGlareSeconds;
                 FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
-                FlashFaceRelease = config.YaguangFlashFaceRelease;
+                FlashShakeRelease = config.YaguangFlashShakeRelease;
                 TeamFeverHits = teamMode ? config.TeamFeverHits : 0;
                 TeamFeverSeconds = config.TeamFeverSeconds;
                 if (!teamMode) return;

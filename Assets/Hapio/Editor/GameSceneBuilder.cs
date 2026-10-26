@@ -174,7 +174,7 @@ namespace Hapio.Editor
         }
 
         /// <summary>
-        /// Append only the new DEV rows (#281: 2:2 territory 196-199, #301: flash face release 200-201) to Home and Lobby. Unlike the Lab upgrade
+        /// Append only the new DEV rows (#281: 2:2 territory 196-199, #301: flash shake release 200-201) to Home and Lobby. Unlike the Lab upgrade
         /// above, this never copies Battle again, so Battle-only edits and the lobby layout stay as they are.
         /// </summary>
         [MenuItem("Hapio/Upgrade Menu DEV Rows")]

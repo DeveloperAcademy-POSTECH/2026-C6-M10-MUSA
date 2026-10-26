@@ -202,7 +202,7 @@ namespace C6Lab
         // 5661: #278 immutable Lab/Game Bonjour identity before pending-room activation.
         // 5662: #281 2:2 team territory (DEV 196-199, 200 shared values): team cells, winner and fever in the
         //       snapshot, fever in the board header, team-edge handoffs and territory overwrite paint.
-        // 5663: #301 yaguang flash face release (DEV 200-201, 202 shared values; glare range 1-20 s).
+        // 5663: #301 yaguang flash shake release (DEV 200-201, 202 shared values; glare 12 s in 1-23 s) and flashShake requests.
         internal const ushort LabProtocolVersion = 5663;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
@@ -1776,6 +1776,12 @@ namespace C6Lab
                 PauseAsHost();
                 return;
             }
+            if (packet.type == FlashShakePacket)
+            {
+                // 야광귀 섬광 (#301): 폰을 다 흔든 사람의 눈부심만 푼다. 눈부시지 않으면 무시한다.
+                if (model.TryFlashShakeRelease(sender, now)) PublishSnapshot(true);
+                return;
+            }
             if (packet.type == "charmTap")
             {
                 // Only a player beside the charmed one counts; enough taps wake them at once (#251).
@@ -1850,9 +1856,7 @@ namespace C6Lab
         {
             if (!IsHost || model == null) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
-            if (result.Kind == LabProjectileHitKind.Fire && result.FireId == YaguangFaceFireId)
-                ResolveYaguangFaceHit(result, now); // 야광귀 얼굴 (#301)
-            else if (result.Kind == LabProjectileHitKind.Fire)
+            if (result.Kind == LabProjectileHitKind.Fire)
             {
                 if (!model.ConfirmJigwiFireHit(result.ProjectileId, result.FireId, result.FireTargetId, now, out bool extinguished))
                     model.ConfirmMiss(result.ProjectileId, now, countThrow: false); // 불을 노린 투척은 명중률에서 뺀다

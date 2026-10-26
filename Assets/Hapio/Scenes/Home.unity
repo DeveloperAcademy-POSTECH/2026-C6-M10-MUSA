@@ -977,10 +977,10 @@ MonoBehaviour:
   m_FillRect: {fileID: 532867866}
   m_HandleRect: {fileID: 1246371563}
   m_Direction: 0
-  m_MinValue: 0.5
-  m_MaxValue: 2.5
-  m_WholeNumbers: 0
-  m_Value: 1.5
+  m_MinValue: 2
+  m_MaxValue: 10
+  m_WholeNumbers: 1
+  m_Value: 6
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -1850,9 +1850,9 @@ MonoBehaviour:
   m_HandleRect: {fileID: 1417565197}
   m_Direction: 0
   m_MinValue: 1
-  m_MaxValue: 20
+  m_MaxValue: 23
   m_WholeNumbers: 0
-  m_Value: 7
+  m_Value: 12
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -18222,7 +18222,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC12C\uAD11 \uC5BC\uAD74 \uB9DE\uD600 \uD480\uAE30 (0 off, 1 on)"
+  m_Text: "\uC12C\uAD11 \uD754\uB4E4\uC5B4 \uD480\uAE30 (0 off, 1 on)"
 --- !u!222 &237325584
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -106881,7 +106881,7 @@ MonoBehaviour:
   m_CaretColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
   m_CustomCaretColor: 0
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
-  m_Text: 7
+  m_Text: 12
   m_CaretBlinkRate: 0.85
   m_CaretWidth: 1
   m_ReadOnly: 0
@@ -130322,7 +130322,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 1.5
+  m_Text: 6
 --- !u!222 &1838092879
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -141964,7 +141964,7 @@ MonoBehaviour:
   m_CaretColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
   m_CustomCaretColor: 0
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
-  m_Text: 1.5
+  m_Text: 6
   m_CaretBlinkRate: 0.85
   m_CaretWidth: 1
   m_ReadOnly: 0
@@ -150372,7 +150372,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 7
+  m_Text: 12
 --- !u!222 &2116310812
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -151651,7 +151651,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC12C\uAD11 \uC5BC\uAD74 \uD310\uC815 \uD06C\uAE30 (\uBC30)"
+  m_Text: "\uC12C\uAD11 \uD754\uB4E4\uAE30 \uD69F\uC218"
 --- !u!222 &2142915481
 CanvasRenderer:
   m_ObjectHideFlags: 0

@@ -1,6 +1,4 @@
 using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.SceneManagement;
 
 namespace C6Lab
 {
@@ -17,9 +15,8 @@ namespace C6Lab
     /// (폭탄은 위의 `GourdBombDropped`로 이미 나온다).
     /// 야광귀 섬광(#268) 예고가 시작되면 모든 기기에서 폭탄 때처럼 쏙 올라와 두리번거리다가, 번쩍이는 순간 톡 튀고
     /// 잠시 뒤 들어간다(섬광을 누가 맞든 박은 모두에게 보인다). 시각은 Host 스냅샷(`flashWarningAt`/`flashAt`/`flashLastAt`)이다.
-    /// 섬광 해제(#301)가 켜져 있으면 한 명이라도 눈부신 동안 계속 나와 두리번거린다(모든 기기, Host 시각 기준). 눈부신 사람
-    /// 화면에서만 얼굴 둘레에 노란 반짝이가 번쩍번쩍 돌아 "여기를 맞혀라"를 알리고, 누군가 얼굴을 맞혀 풀면 움찔한다.
-    /// 얼굴 위치·크기(`TryGetFace`)는 Host의 얼굴 판정에도 쓴다.
+    /// 섬광 흔들어 풀기(#301)가 켜져 있으면 한 명이라도 눈부신 동안 계속 나와 두리번거리고(모든 기기, Host 시각 기준),
+    /// 누군가 폰을 흔들어 풀 때마다 어지러운 듯 움찔한다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabGourdYokai : MonoBehaviour
@@ -46,19 +43,6 @@ namespace C6Lab
         [SerializeField, Min(1f)] private float bombRiseSpeed = 3f;
         [Tooltip("야광귀 섬광(#268)이 번쩍인 뒤 요괴가 더 나와 있는 시간 (초). 그 뒤 들어간다.")]
         [SerializeField, Min(0f)] private float flashStaySeconds = .6f;
-        [Header("섬광 해제 얼굴 표시 (#301)")]
-        [Tooltip("눈부신 사람 화면에서 요괴 얼굴 둘레에 도는 반짝이 색")]
-        [SerializeField] private Color faceCueColor = new Color(1f, .86f, .2f, 1f);
-        [Tooltip("반짝이가 번쩍이는 빠르기 (초당 횟수)")]
-        [SerializeField, Range(.5f, 12f)] private float faceCueBlinkHz = 4f;
-        [Tooltip("반짝이 수")]
-        [SerializeField, Range(3, 16)] private int faceCueSparkCount = 8;
-        [Tooltip("반짝이가 도는 고리 크기 (얼굴 크기의 배수)")]
-        [SerializeField, Range(.8f, 4f)] private float faceCueRingScale = 1.7f;
-        [Tooltip("반짝이 하나의 크기 (얼굴 크기의 배수)")]
-        [SerializeField, Range(.05f, 1f)] private float faceCueSparkSize = .28f;
-        [Tooltip("반짝이 고리가 도는 빠르기 (초당 도)")]
-        [SerializeField, Range(0f, 360f)] private float faceCueSpinDegrees = 90f;
 
         private const float EyeAngle = 24f;
         private const float FlinchSquash = .16f;
@@ -87,11 +71,6 @@ namespace C6Lab
         private uint seenFlashCount;
         private uint releaseFlashCount;
         private int seenReleases;
-        private Renderer[] faceRenderers;
-        private Transform faceCue;
-        private Transform[] faceSparks;
-        private MaterialPropertyBlock faceCueBlock;
-        private float faceCueSpin;
 
         private LabSnapshot seenSnapshot;
         private double seenAtRealtime;
@@ -105,33 +84,6 @@ namespace C6Lab
         /// <summary>폭탄 때문에 남은 나와 있는 시간 (초)</summary>
         public float BombSecondsLeft => bombLeft;
         public float BombShowSeconds => bombShowSeconds;
-        /// <summary>눈부신 사람 화면에 얼굴 반짝이가 보이는 중인지 (#301)</summary>
-        public bool FaceCueVisible => faceCue != null && faceCue.gameObject.activeSelf;
-
-        /// <summary>
-        /// 요괴 얼굴(YokaiRoot 아래 렌더러들)의 월드 중심과 반지름 (#301). 요괴가 나와 있지 않아도 지금 자세의 값을 준다.
-        /// 렌더러가 없거나 모두 꺼져 있으면 false.
-        /// </summary>
-        public bool TryGetFace(out Vector3 center, out float radius)
-        {
-            center = default;
-            radius = 0f;
-            if (!EnsureReady()) return false;
-            if (faceRenderers == null) faceRenderers = yokai.GetComponentsInChildren<Renderer>(true);
-            bool any = false;
-            Bounds bounds = default;
-            foreach (Renderer face in faceRenderers)
-            {
-                if (face == null || !face.enabled || !face.gameObject.activeInHierarchy) continue;
-                if (!any) { bounds = face.bounds; any = true; }
-                else bounds.Encapsulate(face.bounds);
-            }
-            if (!any) return false;
-            center = bounds.center;
-            radius = Mathf.Max(bounds.extents.x, Mathf.Max(bounds.extents.y, bounds.extents.z));
-            return radius > 0f;
-        }
-
         /// <summary>지금 애니메이션 시각 (0~6초)</summary>
         public float ClipTime => state != null ? Mathf.Repeat(state.time, ClipLength) : 0f;
         public bool Ready => ready;
@@ -203,9 +155,9 @@ namespace C6Lab
             else bombLeft = Mathf.Max(0f, bombLeft - deltaTime);
             bool flash = InFlashWindow(snapshot, serverNow, flashStaySeconds);
             LabConfig config = network != null ? network.config : null;
-            bool faceRelease = config != null && config.YaguangFlashFaceRelease;
-            // 섬광 해제 (#301): 한 명이라도 눈부신 동안은 얼굴을 맞힐 수 있게 계속 나와 있다.
-            bool glared = faceRelease && LabYaguangFlash.AnyGlared(snapshot, serverNow, config.YaguangFlashGlareSeconds);
+            // 섬광 흔들어 풀기 (#301): 한 명이라도 눈부신 동안은 계속 나와 있다.
+            bool glared = config != null && config.YaguangFlashShakeRelease
+                && LabYaguangFlash.AnyGlared(snapshot, serverNow, config.YaguangFlashGlareSeconds);
             bool want = combo || bombLeft > 0f || flash || glared;
             DetectHits(snapshot, combo);
             DetectFlash(snapshot, serverNow);
@@ -229,95 +181,6 @@ namespace C6Lab
             }
             else popPending = false;
             ApplyFlinch(deltaTime);
-            bool myGlare = glared && network != null
-                && LabYaguangFlash.Glared(snapshot, serverNow, network.LocalPlayerId, config.YaguangFlashGlareSeconds);
-            DriveFaceCue(myGlare && (snapshot == null || !snapshot.paused), deltaTime);
-        }
-
-        /// <summary>누군가 얼굴을 맞혀 눈부심을 풀면(#301) 움찔한다. 새 섬광이면 센 수를 처음부터 다시 센다.</summary>
-        private void DetectRelease(LabSnapshot snapshot)
-        {
-            if (snapshot == null || snapshot.players == null) return;
-            if (snapshot.flashCount != releaseFlashCount)
-            {
-                releaseFlashCount = snapshot.flashCount;
-                seenReleases = 0;
-            }
-            int releases = 0;
-            foreach (LabPlayerState player in snapshot.players)
-                if (player != null && snapshot.FlashReleasedAt(player.id) >= 0d) releases++;
-            if (releases > seenReleases && holding) StartEffect(-1f, FlinchSeconds);
-            seenReleases = releases;
-        }
-
-        /// <summary>
-        /// 눈부신 사람 화면에서만: 요괴 얼굴 둘레를 노란 반짝이 고리가 돌며 번쩍번쩍(켜졌다 꺼졌다 + 커졌다 작아졌다)한다.
-        /// 반짝이는 작은 공 몇 개라 얼굴을 가리지 않는다. 카메라를 향한 평면에 고리를 둔다.
-        /// </summary>
-        private void DriveFaceCue(bool show, float deltaTime)
-        {
-            if (!show || !TryGetFace(out Vector3 center, out float radius))
-            {
-                if (faceCue != null && faceCue.gameObject.activeSelf) faceCue.gameObject.SetActive(false);
-                return;
-            }
-            EnsureFaceCue();
-            Camera view = network != null && network.BattleCamera != null ? network.BattleCamera : Camera.main;
-            faceCue.gameObject.SetActive(true);
-            faceCue.position = center;
-            if (view != null) faceCue.rotation = view.transform.rotation;
-            faceCueSpin = Mathf.Repeat(faceCueSpin + faceCueSpinDegrees * deltaTime, 360f);
-            float phase = Time.time * faceCueBlinkHz * Mathf.PI * 2f;
-            float pulse = .5f + .5f * Mathf.Sin(phase);
-            bool lit = pulse > .25f;
-            float ring = radius * faceCueRingScale;
-            float spark = radius * faceCueSparkSize * Mathf.Lerp(.7f, 1.3f, pulse);
-            for (int i = 0; i < faceSparks.Length; i++)
-            {
-                float angle = (faceCueSpin + 360f * i / faceSparks.Length) * Mathf.Deg2Rad;
-                Transform s = faceSparks[i];
-                s.localPosition = new Vector3(Mathf.Cos(angle) * ring, Mathf.Sin(angle) * ring, 0f);
-                s.localScale = Vector3.one * spark;
-                s.gameObject.SetActive(lit);
-            }
-        }
-
-        private void EnsureFaceCue()
-        {
-            int count = Mathf.Clamp(faceCueSparkCount, 3, 16);
-            if (faceCue != null && faceSparks != null && faceSparks.Length == count)
-            {
-                ApplyFaceCueColor();
-                return;
-            }
-            if (faceCue != null) Destroy(faceCue.gameObject);
-            // 박 프리팹은 크게 줄여 둔 부모 아래라, 반짝이는 장면 맨 위에 두고 월드 크기로 맞춘다.
-            var root = new GameObject("Yaguang Face Cue");
-            if (gameObject.scene.IsValid()) SceneManager.MoveGameObjectToScene(root, gameObject.scene);
-            faceCue = root.transform;
-            faceSparks = new Transform[count];
-            Mesh sphere = Resources.GetBuiltinResource<Mesh>("Sphere.fbx");
-            for (int i = 0; i < count; i++)
-            {
-                var spark = new GameObject("Spark " + i);
-                spark.transform.SetParent(faceCue, false);
-                spark.AddComponent<MeshFilter>().sharedMesh = sphere;
-                var renderer = spark.AddComponent<MeshRenderer>();
-                renderer.sharedMaterial = LabJigwiBurnEffect.Material;
-                renderer.shadowCastingMode = ShadowCastingMode.Off;
-                renderer.receiveShadows = false;
-                faceSparks[i] = spark.transform;
-            }
-            ApplyFaceCueColor();
-        }
-
-        private void ApplyFaceCueColor()
-        {
-            if (faceCueBlock == null) faceCueBlock = new MaterialPropertyBlock();
-            faceCueBlock.SetColor("_BaseColor", faceCueColor);
-            faceCueBlock.SetColor("_Color", faceCueColor);
-            foreach (Transform spark in faceSparks)
-                if (spark != null) spark.GetComponent<MeshRenderer>().SetPropertyBlock(faceCueBlock);
         }
 
         /// <summary>예고 중이거나 콤보가 진행 중이면 true (전투 중일 때만)</summary>
@@ -344,6 +207,22 @@ namespace C6Lab
             bool fresh = seenFlashCount != 0 || snapshot.flashCount == 1;
             seenFlashCount = snapshot.flashCount;
             if (fresh && holding && serverNow - snapshot.flashLastAt < flashStaySeconds) StartEffect(1f, PopSeconds);
+        }
+
+        /// <summary>누군가 폰을 흔들어 눈부심을 풀면(#301) 움찔한다. 새 섬광이면 센 수를 처음부터 다시 센다.</summary>
+        private void DetectRelease(LabSnapshot snapshot)
+        {
+            if (snapshot == null || snapshot.players == null) return;
+            if (snapshot.flashCount != releaseFlashCount)
+            {
+                releaseFlashCount = snapshot.flashCount;
+                seenReleases = 0;
+            }
+            int releases = 0;
+            foreach (LabPlayerState player in snapshot.players)
+                if (player != null && snapshot.FlashReleasedAt(player.id) >= 0d) releases++;
+            if (releases > seenReleases && holding) StartEffect(-1f, FlinchSeconds);
+            seenReleases = releases;
         }
 
         private void DetectHits(LabSnapshot snapshot, bool currentCombo)
@@ -492,7 +371,6 @@ namespace C6Lab
 
         private void OnDestroy()
         {
-            if (faceCue != null) Destroy(faceCue.gameObject);
             if (network == null) return;
             network.GourdBombDropped -= OnGourdBombDropped;
             network.SabotageCast -= OnSabotageCast;
@@ -500,7 +378,6 @@ namespace C6Lab
 
         private void OnDisable()
         {
-            if (faceCue != null) faceCue.gameObject.SetActive(false);
             wasInComboWindow = false;
             bombLeft = 0f;
             popPending = false;

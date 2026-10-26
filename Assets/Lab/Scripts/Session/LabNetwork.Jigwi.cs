@@ -70,14 +70,11 @@ namespace C6Lab
             if (second != null) board.CommitPendingLaunch(second);
         }
 
-        // 야광귀 얼굴 판정(#301)도 같은 "주인이 정해진 판정"이라 함께 넘긴다.
         private IEnumerable<LabJigwiFireSurface> JigwiFireSurfacesFor(ulong player) =>
-            jigwiFireSurfaces.Values.Where(surface => surface != null && surface.OwnerPlayerId == player)
-                .Concat(YaguangFaceSurfacesFor(player)).ToArray();
+            jigwiFireSurfaces.Values.Where(surface => surface != null && surface.OwnerPlayerId == player);
 
         private void SyncJigwiFireSurfaces()
         {
-            SyncYaguangFaceSurfaces();
             if (latest == null || latest.phase != LabPhase.Playing || target == null || config == null)
             {
                 ClearJigwiFireSurfaces();
@@ -122,7 +119,6 @@ namespace C6Lab
 
         private void ClearJigwiFireSurfaces()
         {
-            ClearYaguangFaceSurfaces();
             jigwiFireSurfaces.Clear();
             if (jigwiFireRoot == null) return;
             jigwiFireRoot.gameObject.SetActive(false);

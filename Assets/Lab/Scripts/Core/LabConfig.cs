@@ -312,8 +312,8 @@ namespace C6Lab
             new LabDeveloperField("섬광 첫 시작 (초)", 1f, 19f),
             new LabDeveloperField("섬광 간격 (초)", 20f, 100f),
             new LabDeveloperField("섬광 예고 (초)", 0f, 6f),
-            // 눈부심은 #301부터 "맞힐 수 있는 시간"의 상한이라 20초까지 늘려 볼 수 있다 (기본 7초는 그대로).
-            new LabDeveloperField("섬광 눈부심 (초)", 1f, 20f),
+            // 눈부심은 #301부터 폰을 흔들어 풀 수 있는 시간의 상한이라 기본 12초(범위 가운데)로 늘렸다.
+            new LabDeveloperField("섬광 눈부심 (초)", 1f, 23f),
             new LabDeveloperField("섬광 회복 (초)", 0f, 4f),
             // The yaguang-gwi's counting look for the combo (#271): it counts 하나 둘 셋 넷 and cannot go past four.
             LabDeveloperField.Toggle("야광귀 셈법 (0 off, 1 on)", "끔", "켬"),
@@ -326,9 +326,9 @@ namespace C6Lab
             new LabDeveloperField("2:2 제한 시간 (초)", 30f, 600f),
             new LabDeveloperField("피버 필요 명중 수 (0 = 피버 없음)", 0f, 50f, true),
             new LabDeveloperField("피버 시간 (초)", 1f, 30f),
-            // 야광귀 섬광 해제 (#301): 눈부신 사람이 박 위로 나온 요괴 얼굴을 맞히면 자기 눈부심이 풀린다.
-            LabDeveloperField.Toggle("섬광 얼굴 맞혀 풀기 (0 off, 1 on)", "끔", "켬"),
-            new LabDeveloperField("섬광 얼굴 판정 크기 (배)", .5f, 2.5f)
+            // 야광귀 섬광 해제 (#301): 눈부신 사람이 폰을 정해진 횟수만큼 흔들면 자기 눈부심이 풀린다.
+            LabDeveloperField.Toggle("섬광 흔들어 풀기 (0 off, 1 on)", "끔", "켬"),
+            new LabDeveloperField("섬광 흔들기 횟수", 2f, 10f, true)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -364,7 +364,7 @@ namespace C6Lab
             new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
-            // 섬광 얼굴 맞혀 풀기·판정 크기(#301)는 2:2(#281) 뒤 200·201번이며 섬광 칸 맨 아래에 둔다.
+            // 섬광 흔들어 풀기·흔들기 횟수(#301)는 2:2(#281) 뒤 200·201번이며 섬광 칸 맨 아래에 둔다.
             new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
                 184, 185, 186, 187, 188, 189, 190, 200, 201)
                 .WithSwitch(155, 184)
@@ -627,13 +627,13 @@ namespace C6Lab
         [Tooltip("번쩍이기 전 예고 시간 (초). 요괴가 빼꼼 나오고 박 옆 말풍선에 눈이 떴다가(앞 30%), 갑자기 노랗게 빛나고(15%), 빛나는 노란 눈을 두근거리며 보여 준 뒤(55%) 번쩍인다. 기본 3초. 0이면 예고 없이 번쩍인다.")]
         [SerializeField, Range(0f, 6f)] private float yaguangFlashWarningSeconds = 3f;
         [Tooltip("번쩍인 뒤 구슬·아이템이 완전히 하얗게 보이는 시간 (초)")]
-        [SerializeField, Range(1f, 20f)] private float yaguangFlashGlareSeconds = 7f;
+        [SerializeField, Range(1f, 23f)] private float yaguangFlashGlareSeconds = 12f;
         [Tooltip("눈부심이 끝난 뒤 색이 천천히 돌아오는 시간 (초). 0이면 바로 돌아온다.")]
         [SerializeField, Range(0f, 4f)] private float yaguangFlashRecoverySeconds = 2f;
-        [Tooltip("켜면(#301) 눈부신 사람이 박 위로 나온 야광귀 얼굴을 맞혀야 자기 눈부심이 풀린다(맞힌 순간부터 회복). 못 맞히면 눈부심 시간이 지나 저절로 풀린다. 얼굴 판정은 섬광이 터진 뒤 눈부신 사람의 공에만 있다. 끄면 이전처럼 시간으로만 풀린다.")]
-        [SerializeField] private bool yaguangFlashFaceRelease = true;
-        [Tooltip("야광귀 얼굴 판정 크기 (요괴 얼굴 크기의 배수, #301). 클수록 맞히기 쉽다.")]
-        [SerializeField, Range(.5f, 2.5f)] private float yaguangFlashFaceSize = 1.5f;
+        [Tooltip("켜면(#301) 눈부신 사람이 폰을 흔들어 자기 눈부심을 푼다. 흔들 때마다 하얀 막이 조금씩 걷히고 정해진 횟수면 완전히 풀린다. 못 흔들면 눈부심 시간이 지나 저절로 풀린다. 끄면 이전처럼 시간으로만 풀린다.")]
+        [SerializeField] private bool yaguangFlashShakeRelease = true;
+        [Tooltip("눈부심을 풀려면 세게 흔들어야 하는 횟수 (#301). 기본 6번이면 보통 약 2초.")]
+        [SerializeField, Range(2, 10)] private int yaguangFlashShakeCount = 6;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -975,12 +975,12 @@ namespace C6Lab
         public float YaguangFlashFirstStartSeconds => Mathf.Clamp(Finite(yaguangFlashFirstStartSeconds, 10f), 1f, 61f);
         public float YaguangFlashIntervalSeconds => Mathf.Clamp(Finite(yaguangFlashIntervalSeconds, 60f), 20f, 100f);
         public float YaguangFlashWarningSeconds => Mathf.Clamp(Finite(yaguangFlashWarningSeconds, 3f), 0f, 6f);
-        public float YaguangFlashGlareSeconds => Mathf.Clamp(Finite(yaguangFlashGlareSeconds, 7f), 1f, 20f);
+        public float YaguangFlashGlareSeconds => Mathf.Clamp(Finite(yaguangFlashGlareSeconds, 12f), 1f, 23f);
         public float YaguangFlashRecoverySeconds => Mathf.Clamp(Finite(yaguangFlashRecoverySeconds, 2f), 0f, 4f);
-        /// <summary>true면 눈부신 사람이 야광귀 얼굴을 맞혀 자기 눈부심을 풀 수 있다 (#301)</summary>
-        public bool YaguangFlashFaceRelease => yaguangFlashFaceRelease;
-        /// <summary>야광귀 얼굴 판정 크기 배수 (#301)</summary>
-        public float YaguangFlashFaceSize => Mathf.Clamp(Finite(yaguangFlashFaceSize, 1.5f), .5f, 2.5f);
+        /// <summary>true면 눈부신 사람이 폰을 흔들어 자기 눈부심을 풀 수 있다 (#301)</summary>
+        public bool YaguangFlashShakeRelease => yaguangFlashShakeRelease;
+        /// <summary>눈부심을 풀려면 흔들어야 하는 횟수 (#301)</summary>
+        public int YaguangFlashShakeCount => Mathf.Clamp(yaguangFlashShakeCount, 2, 10);
         /// <summary>콤보를 야광귀 셈법(하나 둘 셋 넷)으로 보여주는지 (#271). 화면 표시만 바꾼다.</summary>
         public bool ComboYaguangCountEnabled => comboYaguangCountEnabled;
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -1119,7 +1119,7 @@ namespace C6Lab
                 ComboYaguangCountEnabled ? 1f : 0f,
                 JigwiAutoIntervalMin, JigwiAutoIntervalMax, JigwiAutoFireWeight, JigwiAutoGenerationBurnWeight,
                 TeamTerritoryEnabled ? 1f : 0f, TeamBattleSeconds, TeamFeverHits, TeamFeverSeconds,
-                YaguangFlashFaceRelease ? 1f : 0f, YaguangFlashFaceSize
+                YaguangFlashShakeRelease ? 1f : 0f, YaguangFlashShakeCount
             };
         }
 
@@ -1360,8 +1360,8 @@ namespace C6Lab
             teamBattleSeconds = values[197];
             teamFeverHits = (int)values[198];
             teamFeverSeconds = values[199];
-            yaguangFlashFaceRelease = values[200] >= .5f;
-            yaguangFlashFaceSize = values[201];
+            yaguangFlashShakeRelease = values[200] >= .5f;
+            yaguangFlashShakeCount = (int)values[201];
             error = string.Empty;
             return true;
         }
