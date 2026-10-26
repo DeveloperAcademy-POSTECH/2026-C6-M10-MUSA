@@ -24,6 +24,7 @@ namespace Hapio.Tests
                 Assert.That(settings.Capture(1)[166], Is.EqualTo(1f));
                 Assert.That(settings.Capture(2)[155], Is.EqualTo(1f));
                 Assert.That(settings.Capture(2)[184], Is.EqualTo(1f));
+                Assert.That(settings.Capture(2)[GameStageSettings.FlashTargetOneField], Is.Zero, "The yaguang flash hits everyone (#301).");
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
@@ -91,6 +92,9 @@ namespace Hapio.Tests
             Assert.That(GameStageSettings.IsFieldVisible(0, 152), Is.True);
             Assert.That(GameStageSettings.IsFieldVisible(1, 169), Is.False);
             Assert.That(GameStageSettings.IsFieldVisible(2, 184), Is.True);
+            for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                Assert.That(GameStageSettings.IsFieldVisible(scope, GameStageSettings.FlashTargetOneField), Is.False,
+                    "In the game the flash always hits everyone (#301): the one-player target is never offered.");
             Assert.That(GameStageSettings.IsFieldVisible(2, 200), Is.True, "Flash face release (#301) is a yaguang setting.");
             Assert.That(GameStageSettings.IsFieldVisible(2, 201), Is.True);
             Assert.That(GameStageSettings.IsFieldVisible(0, 200), Is.False);
