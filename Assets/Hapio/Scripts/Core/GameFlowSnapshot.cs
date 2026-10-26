@@ -19,6 +19,15 @@ namespace Hapio
             if (value.notice == null || value.notice.Length > 128
                 || value.phase != GameFlowPhase.Lobby && value.notice.Length != 0)
                 return Reject("invalid notice", out reason);
+            if (double.IsNaN(value.battleStartsAt) || double.IsInfinity(value.battleStartsAt)
+                || value.battleStartsAt < 0d || value.battleStartsAt > 1e12d)
+                return Reject("invalid battle start time", out reason);
+            if ((value.phase == GameFlowPhase.Home || value.phase == GameFlowPhase.Lobby
+                || value.phase == GameFlowPhase.LoadingBattle || value.phase == GameFlowPhase.SynchronizingBattle)
+                && value.battleStartsAt != 0d)
+                return Reject("unexpected battle start time", out reason);
+            if (value.phase == GameFlowPhase.Countdown && value.battleStartsAt <= 0d)
+                return Reject("countdown needs a start time", out reason);
             if (value.phase == GameFlowPhase.Home || value.phase == GameFlowPhase.Lobby)
             {
                 if (value.stageIndex != 0 || !string.IsNullOrEmpty(value.runId)
@@ -36,7 +45,8 @@ namespace Hapio
             if (value.phase == GameFlowPhase.LoadingBattle
                 && (!string.IsNullOrEmpty(value.battleSessionId) || value.battleRound != 0))
                 return Reject("load contains a previous battle", out reason);
-            if ((value.phase == GameFlowPhase.Playing || value.phase == GameFlowPhase.StageResult
+            if ((value.phase == GameFlowPhase.SynchronizingBattle || value.phase == GameFlowPhase.Countdown
+                || value.phase == GameFlowPhase.Playing || value.phase == GameFlowPhase.StageResult
                 || value.phase == GameFlowPhase.Completed)
                 && (string.IsNullOrEmpty(value.battleSessionId) || value.battleRound == 0))
                 return Reject("missing battle identity", out reason);
@@ -76,6 +86,26 @@ namespace Hapio
                 return Reject("terminal run", out reason);
             if (incoming.stageIndex > current.stageIndex + 1)
                 return Reject("skipped stage", out reason);
+            if (current.stageIndex == incoming.stageIndex)
+            {
+                bool preparing = current.phase == GameFlowPhase.SynchronizingBattle || current.phase == GameFlowPhase.Countdown;
+                if (preparing && incoming.phase == GameFlowPhase.LoadingBattle)
+                    return Reject("preparation cannot return to scene loading", out reason);
+                if ((current.phase == GameFlowPhase.Countdown || current.phase == GameFlowPhase.Playing)
+                    && incoming.phase == GameFlowPhase.SynchronizingBattle)
+                    return Reject("initial synchronization already finished", out reason);
+                if (current.phase == GameFlowPhase.Playing && incoming.phase == GameFlowPhase.Countdown)
+                    return Reject("battle already started", out reason);
+                if (incoming.phase != GameFlowPhase.LoadingBattle && !string.IsNullOrEmpty(current.battleSessionId)
+                    && (current.battleSessionId != incoming.battleSessionId || current.battleRound != incoming.battleRound))
+                    return Reject("different prepared battle", out reason);
+                if (current.phase == GameFlowPhase.Countdown && incoming.phase == GameFlowPhase.Countdown
+                    && incoming.battleStartsAt <= current.battleStartsAt)
+                    return Reject("countdown deadline did not advance", out reason);
+                if (current.phase == GameFlowPhase.Countdown && incoming.phase == GameFlowPhase.Playing
+                    && incoming.battleStartsAt != current.battleStartsAt)
+                    return Reject("different start schedule", out reason);
+            }
             if (incoming.phase == GameFlowPhase.StageResult || incoming.phase == GameFlowPhase.Completed)
             {
                 if (!string.IsNullOrEmpty(current.battleSessionId)
