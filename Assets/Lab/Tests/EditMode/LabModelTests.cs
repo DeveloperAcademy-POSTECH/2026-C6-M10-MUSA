@@ -449,6 +449,7 @@ namespace C6Lab.Tests
             JsonUtility.FromJsonOverwrite("{\"yaguangFlashShakeRelease\":false}", config);
             model = new LabModel();
             model.Begin("flash-shake-off", new ulong[] { 10, 20, 30 }, 0d, config);
+            model.Tick(6d); // 섬광은 시간이 흘러야(Tick) 터진다.
             Assert.That(model.FlashGlared(10, 6d), Is.True);
             Assert.That(model.TryFlashShakeRelease(10, 6d), Is.False, "With the release off only time clears the glare.");
         }
