@@ -11,7 +11,7 @@ namespace C6Lab
     ///   남은 초가 3 → 2 → 1 숫자로 크게 톡톡 튀어나온다 (#301).
     /// - 섬광: 화면 전체가 하얗게 번쩍했다가 빠르게 빠지고, 진동이 한 번 온다. 맞은 사람 화면의 박 옆 말풍선에
     ///   야광귀가 "안보이지롱~" 하고 놀린다 (#301).
-    /// - 해제 (#301): 눈부신 사람 화면 가운데에 좌우로 흔들리는 폰 그림 + "흔들어!" + 게이지가 뜬다. 폰을 세게 흔들
+    /// - 해제 (#301): 눈부신 사람 화면 가운데에 좌우로 흔들리는 폰 그림 + 게이지가 뜬다(문구는 Inspector에서 넣을 수 있다). 폰을 세게 흔들
     ///   때마다 하얀 막이 조금씩 걷히고, DEV 횟수(기본 6번)를 채우면 Host에 알려 그 사람 눈부심만 풀린다. 풀리면
     ///   말풍선에 "으악 어지러워~"가 뜬다. Editor·DEV 빌드에서는 K 키 한 번이 한 번 흔들기다.
     /// - 눈부심·회복: 판의 음양·결합 구슬과 아이템을 하얗게 덮고(북 제외), 회복 동안 색을 천천히 돌려준다.
@@ -59,8 +59,8 @@ namespace C6Lab
         [SerializeField] private Vector2 shakeCueAnchor = new Vector2(.5f, .42f);
         [Tooltip("흔들라는 안내의 폰 그림 높이 (Canvas 기준 픽셀)")]
         [SerializeField, Range(30f, 300f)] private float shakeCueSize = 110f;
-        [Tooltip("흔들라는 안내 문구")]
-        [SerializeField] private string shakeText = "흔들어!";
+        [Tooltip("흔들라는 안내 문구. 비우면(기본) 글자 없이 폰 그림과 게이지만 보인다.")]
+        [SerializeField] private string shakeText = "";
         [Tooltip("폰 그림이 좌우로 흔들리는 빠르기 (초당 횟수)")]
         [SerializeField, Range(1f, 12f)] private float shakeCueWiggleHz = 5f;
         private static readonly Color ShakeGaugeColor = new Color(1f, .78f, .16f, 1f);
@@ -270,13 +270,16 @@ namespace C6Lab
             float wiggle = Mathf.Sin(Time.unscaledTime * shakeCueWiggleHz * Mathf.PI * 2f);
             shakePhone.localRotation = Quaternion.Euler(0f, 0f, 18f * wiggle);
             shakePhone.anchoredPosition += new Vector2(size * .12f * wiggle, 0f);
+            bool hasText = !string.IsNullOrEmpty(shakeText);
+            shakeLabel.gameObject.SetActive(hasText);
             shakeLabel.text = shakeText;
             shakeLabel.fontSize = Mathf.RoundToInt(size * .4f);
             shakeLabel.rectTransform.sizeDelta = new Vector2(size * 3f, size * .55f);
             shakeLabel.rectTransform.anchoredPosition = new Vector2(0f, -size * .12f);
             var track = (RectTransform)shakeGaugeFill.parent;
             track.sizeDelta = new Vector2(size * 1.8f, size * .14f);
-            track.anchoredPosition = new Vector2(0f, -size * .5f);
+            // 문구가 없으면 게이지를 폰 그림 바로 밑으로 올린다.
+            track.anchoredPosition = new Vector2(0f, hasText ? -size * .5f : -size * .08f);
             shakeGaugeFill.anchorMax = new Vector2(Mathf.Clamp01(progress), 1f);
         }
 

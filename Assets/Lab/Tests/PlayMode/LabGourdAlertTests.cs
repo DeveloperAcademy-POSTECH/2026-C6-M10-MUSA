@@ -175,6 +175,15 @@ namespace C6Lab.Tests
             Assert.That(word.GetComponent<Outline>().enabled, Is.False, "No offset outline doubling the ink strokes (#271).");
             alert.ShowWord(gourd, "넷!", 1f);
             Assert.That(word.text, Is.EqualTo("넷!"), "The same bubble just changes its word.");
+            Assert.That(word.resizeTextForBestFit, Is.False, "Short words keep their big size.");
+            alert.ShowWord(gourd, "안보이지롱~", 1f);
+            RectTransform bubbleRect = alert.Bubble;
+            Assert.That(word.resizeTextForBestFit, Is.True, "A long word (#301) shrinks to fit...");
+            Assert.That(word.horizontalOverflow, Is.EqualTo(HorizontalWrapMode.Wrap));
+            Assert.That(word.rectTransform.sizeDelta.x, Is.LessThan(bubbleRect.sizeDelta.x), "...inside the bubble.");
+            Assert.That(word.rectTransform.sizeDelta.y, Is.LessThan(bubbleRect.sizeDelta.y));
+            alert.ShowWord(gourd, "넷!", 1f);
+            Assert.That(word.resizeTextForBestFit, Is.False);
             alert.Show(gourd);
             Assert.That(word.GetComponent<Outline>().enabled, Is.True, "The bomb's red \"!\" keeps its outline.");
             alert.ShowEyes(gourd, 2f);

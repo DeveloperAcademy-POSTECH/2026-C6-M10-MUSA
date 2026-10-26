@@ -56,6 +56,8 @@ namespace C6Lab
 
         [Tooltip("말풍선 크기 (Canvas 기준 픽셀)")]
         [SerializeField, Min(10f)] private float bubbleSize = 110f;
+        [Tooltip("긴 말(5글자 이상)을 쓰는 말풍선 안쪽 칸의 폭과 높이 (말풍선 크기의 배수, #301). 글자는 이 칸에 맞춰 줄어든다.")]
+        [SerializeField] private Vector2 longWordArea = new Vector2(.66f, .5f);
         [Tooltip("말풍선이 떠 있는 시간 (초)")]
         [SerializeField, Min(.3f)] private float showSeconds = 1.4f;
 
@@ -170,9 +172,10 @@ namespace C6Lab
             showingWord = true;
             wordPopElapsed = 0f;
             mark.text = word;
-            // 긴 말("안보이지롱~", "앗 들켰다!" #301)은 말풍선 안에 들어가게 더 작게 쓴다.
-            float share = word.Length <= 1 ? .5f : word.Length <= 2 ? .34f : word.Length <= 4 ? .26f : .17f;
+            float share = word.Length <= 1 ? .5f : word.Length <= 2 ? .34f : .26f;
             mark.fontSize = Mathf.RoundToInt(bubbleSize * share);
+            // 긴 말("안보이지롱~", "으악 어지러워~" #301)은 말풍선 안쪽 칸에 맞춰 글자 크기를 줄이고, 필요하면 두 줄로 쓴다.
+            FitLongWord(word.Length > 4);
             mark.color = InkColor;
             // 먹색 글자에 먹색 테두리를 어긋나게 두르면 획이 두 번 겹쳐 보인다. 말은 테두리 없이 쓴다.
             markOutline.enabled = false;
@@ -237,12 +240,33 @@ namespace C6Lab
             eyesHalo.rectTransform.localScale = Vector3.one * (1f + .3f * eyeGlow + beat);
         }
 
+        /// <summary>
+        /// 긴 말을 말풍선 안쪽(폭 longWordArea.x, 높이 longWordArea.y, 말풍선 크기 배수)에 맞춘다 (#301).
+        /// 끄면 원래처럼 말풍선 크기 칸에 한 줄로 쓴다("!" 등).
+        /// </summary>
+        private void FitLongWord(bool fit)
+        {
+            mark.resizeTextForBestFit = fit;
+            mark.resizeTextMinSize = Mathf.Max(6, Mathf.RoundToInt(bubbleSize * .08f));
+            mark.resizeTextMaxSize = Mathf.RoundToInt(bubbleSize * .26f);
+            mark.horizontalOverflow = fit ? HorizontalWrapMode.Wrap : HorizontalWrapMode.Overflow;
+            mark.verticalOverflow = fit ? VerticalWrapMode.Truncate : VerticalWrapMode.Overflow;
+            mark.lineSpacing = fit ? .85f : 1f;
+            mark.rectTransform.sizeDelta = fit
+                ? new Vector2(bubbleSize * longWordArea.x, bubbleSize * longWordArea.y)
+                : new Vector2(bubbleSize, bubbleSize);
+        }
+
         // 말풍선 안 표시는 한 번에 하나만 보인다.
         private void ShowOnly(GameObject shown)
         {
             if (shown != eyesRect.gameObject) showingEyes = false;
             showingWord = false;
-            if (mark != null) mark.rectTransform.localScale = Vector3.one;
+            if (mark != null)
+            {
+                mark.rectTransform.localScale = Vector3.one;
+                FitLongWord(false);
+            }
             mark.gameObject.SetActive(shown == mark.gameObject);
             blockMark.gameObject.SetActive(shown == blockMark.gameObject);
             heartMark.gameObject.SetActive(shown == heartMark.gameObject);
