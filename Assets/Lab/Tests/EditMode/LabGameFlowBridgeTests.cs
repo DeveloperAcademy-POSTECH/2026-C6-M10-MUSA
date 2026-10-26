@@ -25,7 +25,7 @@ namespace C6Lab.Tests
                     BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue(), Is.EqualTo((ushort)5664));
                 Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(203));
                 Assert.That(network.SetGameFlowEnabled(true), Is.True);
-                Assert.That(Token(network), Is.EqualTo("C6HapioGame/7"));
+                Assert.That(Token(network), Is.EqualTo("C6HapioGame/8"));
                 Assert.That(network.SetGameFlowEnabled(false), Is.True);
                 Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/25"));
             }

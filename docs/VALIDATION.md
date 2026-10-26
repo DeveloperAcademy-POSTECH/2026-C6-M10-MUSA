@@ -2710,6 +2710,32 @@ Host 판정 지도는 그대로 두고 최초 얼룩/실제 군집 성장의 제
 
 원시 결과 JSON·Editor 로그·빌드·임시 렌더는 공개 저장소에 넣지 않는다. 고해상도 농담/미세 경계는 승인된 시각적 차이이며 진행률을 그림 alpha 합계로 바꾸지 않는다. 1024의3장 RT6MiB·관람복사4MiB는 픽셀 저장량 계산으로, 프레임 속도나 모바일 메모리 실측 통과를 의미하지 않는다.
 
+## 전원 초기 동기화와 공통 전투 시작 (#306) — 2026-10-26
+
+main `66f759da`에서 분기한 `feat/#306-synchronized-battle-start`, Unity **6000.6.5f1 / macOS ARM64 / Metal** 기준이다. 기존 Lab·저장 Scene·프로젝트 설정·사용자 미추적 파일을 보존하며 실제 결과와 미실행 환경을 구분한다.
+
+### 구현과 검토 보완
+
+- 기존 Scene·설정 ACK 뒤에 첫 snapshot·확정 도색·자기 owner-board checkpoint·UI/카메라/박 표현 준비 ACK를 추가했다. 첫 화면 설치에 한 프레임을 둔다. Host는 준비 라운드를 먼저 배포하되 내부 `GameStartHeld`로 게임 시계·모든 입력·북/구슬 및 박 물리를 고정한다. UI·네트워크 시계와 사용자 Pause 상태는 별도로 유지한다.
+- 전원 준비 후 NGO 서버 시계 기준 미래 시각을 예약하고 전원 수신 ACK 후 확정한다. 3/2/1은 각1초, 시작!은 조작을 막지 않고0.5초 표시한다. 미확정 예약은 준비 화면을 유지하고 여유 시간을 늘려 재예약한다. 준비부터 예약 확정까지 기존30초를 한 번 적용하고, 이전 판·이전 예약·다른 설정 ACK를 거부한다.
+- 실제 Editor/Player 통신 관찰에서 시각의 마지막 소수점 차이가 보였다. 시각은 밀리초로 정규화하고 응답 식별은 이미 검증한 판·설정·정수 revision만 사용한다. 최종2프로세스 재검증에서는 예약1회로 완료했다. 과거 예약의 ACK는 revision 때문에 새 예약을 해제하지 못한다.
+- 새 UI는 영속 GameSession 소유의 `GameStartOverlay.prefab`이다. Unity API의 격리 PreviewScene으로 이 새 프리팹만 생성했다. 기존 Scene을 다시 저장하거나 재배치하지 않았다. 새 게임 토큰7, 공통 설정202개·프로토콜5663·Lab token24는 유지한다.
+
+| 항목 | 실제 결과 | 범위·근거 |
+| --- | --- | --- |
+| 최초 전체 EditMode | **1141/1145, 실패4** | 새 비활성 EditMode fixture가 Player용 지연 삭제를 호출해 정리 오류가 났다. 분리된 투사체 자식과 명시적 시험 객체 정리로 보완했다. 물리 고정 검사1개 추가 후 같은 정리 잔여 오류4건도 수정했다. 제품의 삭제 동작·검사 기대값은 완화하지 않았다. |
+| 새 준비·물리 집중 검사 | **5/5 PASS** | 정확한 라운드 준비/1회 해제, 첫 snapshot만으로 준비 금지, 실제 paint/owner checkpoint와 gap 확인, 게임 수치 고정, 물리/운동량 복원, Lab opt-in/정리 검사. |
+| 실제 Scene 집중 검사 | **1/1 PASS** | 저장 Home→Battle에서 초기 준비→3/2/1→시작, 초기180초·스태미나·도색·북 위치·박 줄 주기 고정과 시작 후 생성·시간 진행 확인. |
+| 첫 전체 PlayMode | **369/370, 실패1** | 기존 `LabElementTrailRenderTests`의 view0이 현재 Editor 화면 비율을 받아 676px 중 약130px만 표시되는 letterbox 상태로 금의 가는 세 줄을1px 이하로 축소했다. 전용 임시 카메라를 실제 FOV/pose/viewport와390×844 기준 비율로 고정했다. 게임 카메라·트레일·색 픽셀8개 기준은 유지했다. |
+| 최종 Mac Development 검증 앱 빌드 | **PASS** | 최종 시각 메시지 보완 소스로 Player 빌드 성공. 이 검증 앱에만 extraScriptingDefines로 개발용 Pipeline을 포함했으며 프로젝트 define·출시 빌드 설정은 바꾸지 않았다. |
+| 실제 Editor Host + Mac Player 2인 UDP | **PASS** | loopback의 별도2프로세스. 참가자 GameSession 처리를 지연시킨5회 관측 동안 Host LoadingBattle·게임 시계 미개시 확인. 이후37회 관측에서 양쪽3/2/1/시작!, 예약1회·같은 시작 시각, 준비 중180초/played0, 마지막 Playing·조작 해제·동일 남은 시간 확인. 검사 후 자체 Player와 Editor Play를 종료했다. |
+| 최종 전체 EditMode | **1146/1146 PASS**, 실패·skip·inconclusive0 | 최종 시각 메시지 보완 소스에서35.86초. 준비/예약 세대·손상/구세대·설정·Scene 에셋 연결·기존 게임 규칙을 포함한다. |
+| 최종 전체 PlayMode | **371/371 PASS**, 실패·skip·inconclusive0 | 299.26초. 초기 준비·3/2/1·물리/수치 고정·예약 중 원래 준비 제한 적용·이탈, 전체1~3스테이지/DEV 재시작·일시정지·2:2·결과/관람과 기존 트레일 GPU 검사 포함. |
+| 기존 파일 보존 | **PASS** | 작업 전 보호 에셋·설정1116개 해시와 비교하여 전부 동일함을 확인했다. 검사 중 생긴 TimeManager 직렬화와 Target2 재질의 미세 색상 오차는 원복했다. 기존 모든 Scene·Prefab·Config·Material·Package 및 미추적 Scenes.meta를 보존했다. 새 표시 프리팹과 소스·검사·문서만 추가/수정한다. |
+| 실제 iPhone/iPad·다중 실기기·LAN/핫스팟 | **NOT_RUN** | 이번에는 실기기를 설치·실행하지 않았다. loopback 통과를 LAN/핫스팟·기기 성능 통과로 확대하지 않는다. |
+
+원시 JSON·실행 로그·런타임 연결 파일·검증 앱은 공개 저장소에 넣지 않는다.
+
 ## #305 스태미나 8칸·빠른 생성·구슬 15초, 2:2 수치 분리 (1단계) — 2026-10-26
 
 기준 main `66f759da`, 브랜치 `feat/#305-stamina-charm-warning`. Unity **6000.6.5f1**, macOS ARM64, 사용자의 Desktop checkout에서 열린 Editor에 Pipeline 연결(`unity` CLI)로 컴파일·에셋 변경·검사를 실행했다. 공유 설정 개수(202)·통신 5663·토큰은 바꾸지 않았다.
@@ -2728,7 +2754,7 @@ Host 판정 지도는 그대로 두고 최초 얼룩/실제 군집 성장의 제
 
 ## #305 구미호 매혹 예고·양옆 각자 풀기·말풍선 그림 (2단계) — 2026-10-26
 
-같은 브랜치의 1단계 커밋 `9f38ccb9` 위 작업 트리. 공유 설정 203개(202번 `Charm Warning Seconds` 추가), 통신 **5664**, 토큰 `C6PhysicsLab/25`·`C6HapioGame/7`. 설정 에셋·홈·로비 DEV 줄은 열린 Editor에서 Editor API(`unity command eval`)로 바꿨고, 사용자 요청으로 이 단계 중간부터 Test Runner는 사용자가 실행한다.
+같은 브랜치의 1단계 커밋 `9f38ccb9` 위 작업 트리. 공유 설정 203개(202번 `Charm Warning Seconds` 추가), 통신 **5664**, 토큰 `C6PhysicsLab/25`·`C6HapioGame/7`(main #306도 같은 7을 써서 병합 뒤 `8`로 올림, 아래 병합 기록). 설정 에셋·홈·로비 DEV 줄은 열린 Editor에서 Editor API(`unity command eval`)로 바꿨고, 사용자 요청으로 이 단계 중간부터 Test Runner는 사용자가 실행한다.
 
 | 항목 | 결과 | 근거와 범위 |
 | --- | --- | --- |
@@ -2753,3 +2779,7 @@ Host 판정 지도는 그대로 두고 최초 얼룩/실제 군집 성장의 제
 | 컴파일 | PASS | 오프라인 Roslyn 7개 어셈블리 오류 0, 열린 Editor `compilationFailed: false`. |
 | PlayMode `LabOrbPhysicsTests.ABlastShowsACartoonBurstWithPpeongThatClearsItself` | **NOT_RUN** | 글자 대신 그림·테두리·그리는 순서를 확인하도록 고쳤다. 사용자가 실행한다. |
 | 폭탄 무게 | 기록만 | 끌 때 묵직함은 `Bomb Drag Lag`(141번, 지금 0.12초)를 DEV에서 조금씩 올려 비교한 뒤 정한다. 이번 단계에서 값은 바꾸지 않았다. |
+
+### #305 main 병합 (#306 전원 동기화 시작) — 2026-10-26
+
+main `e0c072f2`(#306)를 합쳤다. 충돌은 이 문서의 절 추가뿐이었다(#306 절 → #305 절 순서로 둘 다 유지). #306도 Hapio 게임 토큰을 6 → 7로 올려 #305와 같은 줄을 같은 값으로 바꿨기 때문에 git이 충돌 없이 합쳤다. #306만 들어간 빌드와 #305까지 들어간 빌드가 같은 7을 쓰지 않도록 병합 결과를 `C6HapioGame/8`로 올렸다(Lab 통신 5664·`C6PhysicsLab/25`는 #306이 바꾸지 않았다). 매혹 예고 문구는 사용자가 "요괴가 P2에게 / 매혹을 걸려고 한다!"·글자 크기 20으로 바꾼 것을 문서에 맞췄다. 병합 후 오프라인 컴파일 결과는 아래 사용자 검사와 함께 기록하며, Test Runner 재실행은 **NOT_RUN**.

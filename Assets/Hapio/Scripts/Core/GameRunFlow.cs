@@ -14,11 +14,19 @@ namespace Hapio
         public static int StagesFor(GameMode mode) => mode == GameMode.Territory ? 1 : StageCount;
         private readonly HashSet<ulong> participants = new HashSet<ulong>();
         private readonly HashSet<ulong> ready = new HashSet<ulong>();
+        private readonly HashSet<ulong> initialStateReady = new HashSet<ulong>();
+        private readonly HashSet<ulong> countdownReady = new HashSet<ulong>();
         private GameFlowState state = new GameFlowState();
 
         public GameFlowState State => state.Copy();
         public IReadOnlyCollection<ulong> ParticipantIds => new List<ulong>(participants).AsReadOnly();
         public int ReadyCount => ready.Count;
+        public int ParticipantCount => participants.Count;
+        public int InitialStateReadyCount => initialStateReady.Count;
+        public int CountdownReadyCount => countdownReady.Count;
+        public bool IsInitialStateReady => state.phase == GameFlowPhase.SynchronizingBattle
+            && Everyone(initialStateReady);
+        public bool IsCountdownReady => state.phase == GameFlowPhase.Countdown && Everyone(countdownReady);
         public bool IsBattleReady => state.phase == GameFlowPhase.LoadingBattle
             && participants.Count > 0 && ready.Count == participants.Count;
 
@@ -41,7 +49,7 @@ namespace Hapio
 
             participants.Clear();
             participants.UnionWith(requested);
-            ready.Clear();
+            ClearReadiness();
             GameMode mode = state.mode;
             state = new GameFlowState
             {
@@ -62,15 +70,61 @@ namespace Hapio
                 && participants.Contains(playerId) && ready.Add(playerId);
         }
 
-        public bool MarkPlaying(string runId, int stageIndex, uint revision,
+        /// <summary>The Scene barrier is complete; the new round exists but its gameplay is held.</summary>
+        public bool MarkSynchronizing(string runId, int stageIndex, uint revision,
             string battleSessionId, uint battleRound)
         {
             if (!Matches(runId, stageIndex, revision) || !IsBattleReady
                 || string.IsNullOrEmpty(battleSessionId) || battleSessionId.Length > 128
                 || battleRound == 0) return false;
-            state.phase = GameFlowPhase.Playing;
+            state.phase = GameFlowPhase.SynchronizingBattle;
             state.battleSessionId = battleSessionId;
             state.battleRound = battleRound;
+            state.battleStartsAt = 0d;
+            state.revision++;
+            initialStateReady.Clear();
+            countdownReady.Clear();
+            return true;
+        }
+
+        public bool MarkInitialStateReady(ulong playerId, string runId, int stageIndex, uint revision) =>
+            Matches(runId, stageIndex, revision) && state.phase == GameFlowPhase.SynchronizingBattle
+            && participants.Contains(playerId) && initialStateReady.Add(playerId);
+
+        public bool BeginCountdown(string runId, int stageIndex, uint revision, double battleStartsAt)
+        {
+            if (!Matches(runId, stageIndex, revision) || !IsInitialStateReady || !ValidDeadline(battleStartsAt))
+                return false;
+            state.phase = GameFlowPhase.Countdown;
+            state.battleStartsAt = battleStartsAt;
+            state.revision++;
+            countdownReady.Clear();
+            return true;
+        }
+
+        /// <summary>Confirms receipt of this particular schedule, separately from initial-state readiness.</summary>
+        public bool MarkCountdownReady(ulong playerId, string runId, int stageIndex, uint revision) =>
+            Matches(runId, stageIndex, revision) && state.phase == GameFlowPhase.Countdown
+            && participants.Contains(playerId) && countdownReady.Add(playerId);
+
+        /// <summary>A late schedule ACK cannot release a later schedule after its start was deferred.</summary>
+        public bool RescheduleCountdown(string runId, int stageIndex, uint revision, double battleStartsAt)
+        {
+            if (!Matches(runId, stageIndex, revision) || state.phase != GameFlowPhase.Countdown
+                || !ValidDeadline(battleStartsAt) || battleStartsAt <= state.battleStartsAt) return false;
+            state.battleStartsAt = battleStartsAt;
+            state.revision++;
+            countdownReady.Clear();
+            return true;
+        }
+
+        /// <summary>GameSession additionally checks that the common server-time deadline has arrived.</summary>
+        public bool MarkPlaying(string runId, int stageIndex, uint revision,
+            string battleSessionId, uint battleRound)
+        {
+            if (!Matches(runId, stageIndex, revision) || !IsCountdownReady
+                || state.battleSessionId != battleSessionId || state.battleRound != battleRound) return false;
+            state.phase = GameFlowPhase.Playing;
             state.revision++;
             return true;
         }
@@ -120,7 +174,7 @@ namespace Hapio
             state.phase = GameFlowPhase.GameOver;
             state.endReason = reason;
             state.revision++;
-            ready.Clear();
+            ClearReadiness();
             return true;
         }
 
@@ -138,7 +192,7 @@ namespace Hapio
                 revision = state.revision + 1, notice = notice
             };
             participants.Clear();
-            ready.Clear();
+            ClearReadiness();
             return true;
         }
 
@@ -147,8 +201,21 @@ namespace Hapio
             if (state.phase == GameFlowPhase.Home) return false;
             state = new GameFlowState();
             participants.Clear();
-            ready.Clear();
+            ClearReadiness();
             return true;
+        }
+
+        private bool Everyone(HashSet<ulong> acknowledgements) =>
+            participants.Count > 0 && acknowledgements.Count == participants.Count;
+
+        private static bool ValidDeadline(double value) =>
+            !double.IsNaN(value) && !double.IsInfinity(value) && value > 0d && value <= 1e12d;
+
+        private void ClearReadiness()
+        {
+            ready.Clear();
+            initialStateReady.Clear();
+            countdownReady.Clear();
         }
 
         private bool Matches(string runId, int stageIndex, uint revision)
@@ -162,9 +229,10 @@ namespace Hapio
             state.phase = GameFlowPhase.LoadingBattle;
             state.battleSessionId = string.Empty;
             state.battleRound = 0;
+            state.battleStartsAt = 0d;
             state.endReason = string.Empty;
             state.revision++;
-            ready.Clear();
+            ClearReadiness();
         }
     }
 }

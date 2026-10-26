@@ -22,7 +22,15 @@ namespace Hapio.Tests
             var loading = flow.State;
             foreach (ulong id in flow.ParticipantIds)
                 Assert.That(flow.MarkBattleReady(id, loading.runId, loading.stageIndex, loading.revision), Is.True);
-            Assert.That(flow.MarkPlaying(loading.runId, loading.stageIndex, loading.revision, session, 1), Is.True);
+            Assert.That(flow.MarkSynchronizing(loading.runId, loading.stageIndex, loading.revision, session, 1), Is.True);
+            var sync = flow.State;
+            foreach (ulong id in flow.ParticipantIds)
+                Assert.That(flow.MarkInitialStateReady(id, sync.runId, sync.stageIndex, sync.revision), Is.True);
+            Assert.That(flow.BeginCountdown(sync.runId, sync.stageIndex, sync.revision, 10d), Is.True);
+            var countdown = flow.State;
+            foreach (ulong id in flow.ParticipantIds)
+                Assert.That(flow.MarkCountdownReady(id, countdown.runId, countdown.stageIndex, countdown.revision), Is.True);
+            Assert.That(flow.MarkPlaying(countdown.runId, countdown.stageIndex, countdown.revision, session, 1), Is.True);
             return flow.State;
         }
 

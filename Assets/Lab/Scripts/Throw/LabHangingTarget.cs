@@ -58,6 +58,10 @@ namespace C6Lab
         private LabTarget mountedTarget;
         private Color bodyBaseColor;
         private float flash;
+        private bool simulationHeld;
+        public bool SimulationHeld => simulationHeld;
+        /// <summary>Freeze physical swing, rope cycle and spin without changing global UI time.</summary>
+        public void SetSimulationHeld(bool held) => simulationHeld = held;
         public Vector2 SwingAngles => angle;
         // Deliberately unwrapped: a value greater than 360 confirms a complete revolution.
         public float YawAngleDegrees => yawAngleDegrees;
@@ -257,6 +261,7 @@ namespace C6Lab
 
         private void FixedUpdate()
         {
+            if (simulationHeld) return;
             // A snapshot can pause during NetworkEarlyUpdate after this frame's fixed ticks
             // were queued. Do not integrate that last queued callback after the pose is pinned.
             if (pivot == null || Time.timeScale <= 0f) return;

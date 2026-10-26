@@ -11,10 +11,13 @@ namespace C6Lab
     /// </summary>
     public sealed partial class LabNetwork
     {
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/7");
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/8");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;
+        private bool gameStartHeld;
+        private string preparedGameSession;
+        private uint preparedGameRound;
         private bool gameStageStarting;
         private bool gameRosterLocked;
         private LabStageYokai gameStageYokai;
@@ -36,7 +39,8 @@ namespace C6Lab
         public int SessionConfigRevision => configRevision;
         public string SessionConfigFingerprint => configFingerprint;
         public bool HasBattleReferences => board != null && target != null && battleFloor != null;
-        private bool CanProcessBattleActions => !gameBattleFrozen && (!gameFlowEnabled || HasBattleReferences);
+        public bool GameStartHeld => gameFlowEnabled && gameStartHeld;
+        private bool CanProcessBattleActions => !gameBattleFrozen && !GameStartHeld && (!gameFlowEnabled || HasBattleReferences);
         /// <summary>A copy of confirmed transport members, independent of chosen P numbers.</summary>
         public ulong[] ConnectedPlayerIds => order.ToArray();
         public Camera BattleCamera { get; private set; }
@@ -98,7 +102,9 @@ namespace C6Lab
             if (!gameFlowEnabled) throw new InvalidOperationException("Enable game flow before binding a Battle Scene.");
             if (battleBoard == null || battleTarget == null || floor == null)
                 throw new ArgumentException("A configured board, target and floor are required.");
+            bool preserveStartHold = gameStartHeld;
             UnbindBattleReferences();
+            gameStartHeld = preserveStartHold;
             gameBattleFrozen = false;
             board = battleBoard;
             target = battleTarget;
@@ -122,6 +128,7 @@ namespace C6Lab
         public void UnbindBattleReferences()
         {
             if (!gameFlowEnabled) return;
+            ResetGameStartHold();
             ClearProjectiles();
             // Scene-owned previews and their dependent retries cannot survive the board
             // that produced them. Keep the committed result, paint and room separately.
@@ -290,11 +297,99 @@ namespace C6Lab
             return latest != null && latest.phase == LabPhase.Playing;
         }
 
+        /// <summary>NGO's synchronized server clock; unrelated to the paused gameplay clock.</summary>
+        public bool TryGetGameServerTime(out double now)
+        {
+            now = 0d;
+            if (!gameFlowEnabled || !IsConnected || manager.NetworkTimeSystem == null
+                || manager.NetworkTickSystem == null) return false;
+            now = manager.ServerTime.Time;
+            return !double.IsNaN(now) && !double.IsInfinity(now) && now >= 0d;
+        }
+
+        /// <summary>Internal start barrier. It never exposes a user pause or freezes the loading Canvas.</summary>
+        public void SetGameStartHeld(bool held)
+        {
+            if (!gameFlowEnabled || gameStartHeld == held) return;
+            gameStartHeld = held;
+            if (IsHost && model != null && model.Phase == LabPhase.Playing)
+            {
+                if (held) battleClock.Pause(Time.realtimeSinceStartupAsDouble);
+                else if (!gameBattleFrozen) battleClock.Resume(Time.realtimeSinceStartupAsDouble);
+            }
+            if (held) ApplyLocalPause(false);
+            ApplyGameStartSimulationHold();
+            SyncBoard();
+            Changed?.Invoke();
+        }
+
+        /// <summary>Create and publish a round without allowing its rules or actions to run.</summary>
+        public bool PrepareCurrentGameStage(int stageIndex, string stageId, LabStageYokai yokai,
+            int settingsRevision, string settingsFingerprint)
+        {
+            if (!gameFlowEnabled || !IsHost || model != null || latest != null) return false;
+            SetGameStartHeld(true);
+            if (!StartCurrentGameStage(stageIndex, stageId, yokai, settingsRevision, settingsFingerprint)) return false;
+            preparedGameSession = latest.sessionId;
+            preparedGameRound = latest.round;
+            return IsGameInitialStateReady(preparedGameSession, preparedGameRound);
+        }
+
+        /// <summary>Snapshot, paint and the owner checkpoint must belong to this exact prepared round.</summary>
+        public bool IsGameInitialStateReady(string battleSessionId, uint battleRound)
+        {
+            if (!gameFlowEnabled || !IsConnected || !HasBattleReferences || !SessionConfigReady
+                || string.IsNullOrEmpty(battleSessionId) || battleRound == 0 || latest == null
+                || latest.sessionId != battleSessionId || latest.round != battleRound
+                || latest.phase != LabPhase.Playing || latest.players == null
+                || Array.Find(latest.players, player => player != null && player.id == LocalPlayerId) == null
+                || displayedPaintSession != battleSessionId || displayedPaintRound != battleRound
+                || displayedPaintRevision != latest.paintRevision || displayedPaintCount != latest.paintCount
+                || clientPaintSurface.Columns != latest.paintColumns || clientPaintSurface.Rows != latest.paintRows)
+                return false;
+            if (!IsHost && (actionSession != battleSessionId || actionRound != battleRound
+                || boardReplica.LatestSequence <= 0 || boardReplica.NeedsCheckpoint || !PaintReceiver.Matches(latest)))
+                return false;
+            // An empty local board is valid: some participants do not initially hold a drum.
+            var shown = new System.Collections.Generic.HashSet<string>(board.OrbIds, StringComparer.Ordinal);
+            foreach (LabOrbState orb in latest.orbs ?? Array.Empty<LabOrbState>())
+                if (orb != null && orb.owner == LocalPlayerId && !orb.inFlight && !shown.Contains(orb.id)) return false;
+            foreach (LabOrbState drum in latest.drums ?? Array.Empty<LabOrbState>())
+                if (drum != null && drum.owner == LocalPlayerId && !shown.Contains(drum.id)) return false;
+            return true;
+        }
+
+        /// <summary>Only the Host releases the exact prepared identity after the shared countdown.</summary>
+        public bool ReleasePreparedGameStage(string battleSessionId, uint battleRound)
+        {
+            if (!IsHost || !GameStartHeld || gameBattleFrozen || preparedGameSession != battleSessionId
+                || preparedGameRound != battleRound || !IsGameInitialStateReady(battleSessionId, battleRound)) return false;
+            SetGameStartHeld(false);
+            preparedGameSession = null;
+            preparedGameRound = 0;
+            PublishSnapshot(true);
+            return true;
+        }
+
+        private void ResetGameStartHold()
+        {
+            gameStartHeld = false;
+            preparedGameSession = null;
+            preparedGameRound = 0;
+            ApplyGameStartSimulationHold();
+        }
+
+        private void ApplyGameStartSimulationHold()
+        {
+            if (board != null) board.SetSimulationHeld(GameStartHeld);
+            if (target != null) target.GetComponent<LabHangingTarget>()?.SetSimulationHeld(GameStartHeld);
+        }
+
         /// <summary>Apply a Scene-independent copy of DEV Solo settings before its same-stage restart.</summary>
         public bool RestartGameSoloWithConfig(LabConfig candidate)
         {
             if (!gameFlowEnabled || !DeveloperBuildAvailable || !developerSolo || !IsHost
-                || order.Count != 1 || latest == null || latest.phase != LabPhase.Playing || !latest.paused)
+                || GameStartHeld || order.Count != 1 || latest == null || latest.phase != LabPhase.Playing || !latest.paused)
                 return false;
             if (!ValidateGameDeveloperConfig(candidate, out string validationError))
             {

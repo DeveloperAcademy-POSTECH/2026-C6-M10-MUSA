@@ -111,3 +111,10 @@ Apple Developer Academy @ POSTECH
 ## 실제 전투 고해상도 도색
 
 Paint 모드의 기본 표현은 **고해상도 ON / 1024×512**입니다. DEV의 Gourd에서 기존 표현으로 전환하거나 2048×1024를 선택할 수 있습니다. 판정·성장·건조·승리 규칙은 기존 Host 지도를 사용하고, 완성 박 관람에도 고해상도 그림을 독립 보존합니다. 자세한 연결·비교·한계는 [실제 게임 고해상도 도색](docs/RUNTIME_HIGH_RESOLUTION_PAINT.md)을 참고하세요.
+
+
+### 실제 게임 시작 준비와 카운트다운 (#306)
+
+Hapio의 Story·2:2·DEV Solo/재시작은 전원 Scene·설정·첫 전투 상태와 화면 준비를 확인한 뒤 공통 시각에 맞춰 **3 → 2 → 1 → 시작!**을 표시한다. 대기 중에는 시간·회복·건조·패턴·입력·전투 물리가 진행하지 않는다. 기존 Lab 단판은 기존 흐름을 유지한다.
+
+대기 화면은 `Assets/Hapio/Resources/Hapio/GameStartOverlay.prefab`의 실제 Canvas 객체로 수정한다. 현재 게임 참가 앱은 모두 `C6HapioGame/8`이어야 한다(#306 시작 동기화 7 + #305 매혹 예고·양옆 풀기). 구조·제한은 [게임 흐름](docs/GAME_FLOW.md)의 #306, 실제 확인 범위는 [검증 기록](docs/VALIDATION.md)을 참조한다.

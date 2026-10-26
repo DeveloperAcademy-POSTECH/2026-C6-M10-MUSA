@@ -10,7 +10,10 @@ namespace Hapio
         Playing,
         StageResult,
         Completed,
-        GameOver
+        GameOver,
+        // Appended: existing phase numbers are serialized in saved/transport data.
+        SynchronizingBattle,
+        Countdown
     }
 
     /// <summary>Story is the three-yokai run; Territory is one 2:2 team territory battle (#281). Numbers are serialized.</summary>
@@ -29,6 +32,8 @@ namespace Hapio
         public string endReason = string.Empty;
         public string battleSessionId = string.Empty;
         public uint battleRound;
+        /// <summary>Shared NGO server-time deadline; never a per-device realtime value.</summary>
+        public double battleStartsAt;
         /// <summary>2:2 (#281): why everyone came back to the lobby, shown there. Empty in every other phase.</summary>
         public string notice = string.Empty;
 
@@ -38,6 +43,7 @@ namespace Hapio
         }
 
         public bool IsRunActive => phase == GameFlowPhase.LoadingBattle
+            || phase == GameFlowPhase.SynchronizingBattle || phase == GameFlowPhase.Countdown
             || phase == GameFlowPhase.Playing || phase == GameFlowPhase.StageResult;
     }
 }
