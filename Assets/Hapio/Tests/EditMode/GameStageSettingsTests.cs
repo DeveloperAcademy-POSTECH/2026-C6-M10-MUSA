@@ -110,6 +110,34 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void EveryStageAndTheTerritoryRoomFillOneBarCellPerOrb()
+        {
+            // The battle's stamina bar art is shared by every mode (#305), so a full bar must make as many orbs as it
+            // has cells: otherwise one orb empties more or less than one cell.
+            var mask = new Texture2D(2, 2);
+            int cells = 0;
+            try
+            {
+                Assert.That(mask.LoadImage(System.IO.File.ReadAllBytes("Assets/Lab/Art/UI/StaminaBarFillMask.png")), Is.True);
+                for (int x = 0, row = mask.height / 2; x < mask.width; x++)
+                    if (mask.GetPixel(x, row).a > .5f && (x == 0 || mask.GetPixel(x - 1, row).a <= .5f)) cells++;
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mask); }
+            Assert.That(cells, Is.EqualTo(8));
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+                for (int scope = 1; scope <= GameStageSettings.TerritoryScope; scope++)
+                {
+                    var config = settings.CreateStageConfig(scope);
+                    try
+                    {
+                        Assert.That(config.StaminaMax / config.GenerateCost, Is.EqualTo((float)cells), "Scope " + scope);
+                        Assert.That(config.StaminaStart, Is.EqualTo(config.StaminaMax), "Scope " + scope + " starts full");
+                    }
+                    finally { UnityEngine.Object.DestroyImmediate(config); }
+                }
+        }
+
+        [Test]
         public void ScopeForgeryAndInvalidInput_AreRejectedAtomically_AndCapturesAreCopies()
         {
             using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))

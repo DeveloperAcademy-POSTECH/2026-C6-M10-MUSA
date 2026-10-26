@@ -19,11 +19,11 @@ MonoBehaviour:
   targetSpinStrength: 80
   targetSpinDamping: 1.2
   targetSpinMaximumSpeed: 720
-  staminaMax: 100
-  staminaStart: 100
+  staminaMax: 160
+  staminaStart: 160
   generateCost: 20
   staminaRecoveryAmount: 20
-  staminaRecoverySeconds: 1.7
+  staminaRecoverySeconds: 1
   hitRecovery: 10
   orbStorageLimit: 20
   yinChance: 50
@@ -59,7 +59,7 @@ MonoBehaviour:
   comboRewardDurationSeconds: 15
   comboRewardSizeScale: 2.5
   comboWarningSeconds: 4
-  orbLifetimeSeconds: 8
+  orbLifetimeSeconds: 15
   orbRestitution: 0.8
   orbFloorDeceleration: 2
   orbStopSpeed: 0.065

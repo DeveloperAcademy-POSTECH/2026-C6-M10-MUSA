@@ -246,10 +246,44 @@ namespace C6Lab.Tests
             var saved = Resources.Load<LabConfig>("LabConfig");
             Assert.That(saved, Is.Not.Null);
             Assert.That(saved.SpawnFanAngle, Is.EqualTo(180f), "Orbs leave the drum in every direction.");
+            // #305: a full bar makes eight orbs and one orb's worth comes back every second, so a player
+            // waiting for orbs or the drum keeps something to do.
+            Assert.That(saved.StaminaMax, Is.EqualTo(160f));
+            Assert.That(saved.StaminaStart, Is.EqualTo(160f));
+            Assert.That(saved.GenerateCost, Is.EqualTo(20f));
             Assert.That(saved.StaminaRecoveryAmount, Is.EqualTo(20f));
-            Assert.That(saved.StaminaRecoverySeconds, Is.EqualTo(1.7f),
-                "A drained bar refills in about one lap of the drum around three players.");
+            Assert.That(saved.StaminaRecoverySeconds, Is.EqualTo(1f));
             Assert.That(saved.HitRecovery, Is.EqualTo(10f), "A hit returns half an orb.");
+            Assert.That(saved.OrbLifetimeSeconds, Is.EqualTo(15f));
+        }
+
+        [Test]
+        public void SavedStaminaBarDrawsOneCellPerOrbAndEachOrbEndsInAGap()
+        {
+            var saved = Resources.Load<LabConfig>("LabConfig");
+            int orbs = Mathf.RoundToInt(saved.StaminaMax / saved.GenerateCost);
+            var mask = new Texture2D(2, 2);
+            try
+            {
+                Assert.That(mask.LoadImage(System.IO.File.ReadAllBytes("Assets/Lab/Art/UI/StaminaBarFillMask.png")), Is.True);
+                // Opaque spans across the cells' middle row: one per cell.
+                int row = mask.height / 2;
+                var cells = new System.Collections.Generic.List<Vector2Int>();
+                for (int x = 0, start = -1; x <= mask.width; x++)
+                {
+                    bool opaque = x < mask.width && mask.GetPixel(x, row).a > .5f;
+                    if (opaque && start < 0) start = x;
+                    if (!opaque && start >= 0) { cells.Add(new Vector2Int(start, x - 1)); start = -1; }
+                }
+                Assert.That(cells.Count, Is.EqualTo(orbs), "The bar shows as many cells as a full bar makes orbs (#305).");
+                // The fill grows left to right, so each whole orb's share must stop between two cells.
+                for (int k = 1; k < orbs; k++)
+                {
+                    float edge = mask.width * k / (float)orbs;
+                    Assert.That(edge, Is.GreaterThan(cells[k - 1].y).And.LessThan(cells[k].x), "Orb " + k);
+                }
+            }
+            finally { Object.DestroyImmediate(mask); }
         }
 
         [Test]
