@@ -6,7 +6,8 @@ namespace C6Lab
     /// <summary>
     /// 야광귀 섬광 (#268)의 화면. 섬광을 맞을 사람 자신의 화면에만 그린다(DEV 대상 ALL이면 모두, ONE이면 한 명).
     /// - 예고: 모든 기기의 박 옆 말풍선에 야광귀의 두 눈이 뜨고(`LabGourdAlert.ShowEyes`), 예고 후반에 눈이 갑자기
-    ///   노랗게 빛난다. 맞을 사람 화면은 눈이 빛나는 만큼 가장자리부터 노란 빛이 차오른다.
+    ///   노랗게 빛난다. 맞을 사람 화면은 눈이 빛나는 만큼 가장자리부터 노란 빛이 차오르고, 화면 가운데에
+    ///   남은 초가 3 → 2 → 1 숫자로 크게 톡톡 튀어나온다 (#301).
     /// - 섬광: 화면 전체가 하얗게 번쩍했다가 빠르게 빠지고, 진동이 한 번 온다.
     /// - 눈부심·회복: 판의 음양·결합 구슬과 아이템을 하얗게 덮고(북 제외), 회복 동안 색을 천천히 돌려준다.
     /// 시각은 Host 스냅샷(flashWarningAt/flashAt/flashLastAt)을, 길이는 DEV 값을 쓴다. 화면 표시만 하며 터치를 막지 않는다.
@@ -23,6 +24,18 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float edgeMaxAlpha = .75f;
         [Tooltip("눈부신 동안 화면 전체에 남는 옅은 하얀 막의 불투명도")]
         [SerializeField, Range(0f, .5f)] private float veilAlpha = .12f;
+        [Header("예고 카운트다운 (#301)")]
+        [Tooltip("섬광 예고 동안 맞을 사람 화면에 남은 초(3 → 2 → 1)를 보여줄지")]
+        [SerializeField] private bool showCountdown = true;
+        [Tooltip("카운트다운 숫자 위치 (0~1, 왼쪽 아래가 0)")]
+        [SerializeField] private Vector2 countdownAnchor = new Vector2(.5f, .58f);
+        [Tooltip("카운트다운 숫자 크기 (Canvas 기준 픽셀)")]
+        [SerializeField, Range(24, 240)] private int countdownSize = 120;
+        [Tooltip("카운트다운 숫자 색")]
+        [SerializeField] private Color countdownColor = new Color(1f, .86f, .25f, 1f);
+        [Tooltip("숫자가 바뀔 때 톡 튀어나오는 시간 (초)")]
+        [SerializeField, Range(.05f, .8f)] private float countdownPopSeconds = .25f;
+        private static readonly Color CountdownInk = new Color32(43, 36, 32, 255);
 
         private static Sprite edgeSprite;
         private LabNetwork network;
@@ -31,6 +44,9 @@ namespace C6Lab
         private RectTransform layer;
         private Image edge;
         private Image burst;
+        private Text countdown;
+        private int shownCount;
+        private float countChangedAt;
         private string seenSession;
         private uint seenRound;
         private uint seenFlashCount;
@@ -57,6 +73,20 @@ namespace C6Lab
         public float EdgeAlpha => edge != null && edge.gameObject.activeInHierarchy ? edge.color.a : 0f;
         /// <summary>하얀 화면의 지금 불투명도 (번쩍임 + 눈부심 막)</summary>
         public float BurstAlpha => burst != null && burst.gameObject.activeInHierarchy ? burst.color.a : 0f;
+        /// <summary>지금 화면에 보이는 카운트다운 숫자 (안 보이면 0)</summary>
+        public int CountdownShown => countdown != null && countdown.gameObject.activeInHierarchy ? shownCount : 0;
+
+        /// <summary>
+        /// 이 사람 화면의 섬광 예고 카운트다운 숫자 (#301): 이 사람이 다음 섬광 대상이고 예고 중이면 번쩍일 때까지
+        /// 남은 초를 올림한 값(3 → 2 → 1), 아니면 0. 전투 중이 아니면 0.
+        /// </summary>
+        public static int CountdownAt(LabSnapshot snapshot, double now, ulong player)
+        {
+            if (snapshot == null || snapshot.phase != LabPhase.Playing || !snapshot.FlashWarningOn(now)
+                || !snapshot.FlashTargets(player)) return 0;
+            return Mathf.Max(1, Mathf.CeilToInt((float)(snapshot.flashAt - now) - 1e-4f));
+        }
+
         /// <summary>이 화면이 진동을 낸 섬광 수 (테스트용)</summary>
         public int HapticCount { get; private set; }
 
@@ -101,9 +131,11 @@ namespace C6Lab
                 }
             }
             burstAlpha = Mathf.Max(burstAlpha, veilAlpha * glare);
-            if (warning <= 0f && burstAlpha <= 0f)
+            int count = showCountdown && !snapshot.paused ? CountdownAt(snapshot, now, me) : 0;
+            if (warning <= 0f && burstAlpha <= 0f && count <= 0)
             {
                 if (layer != null) layer.gameObject.SetActive(false);
+                shownCount = 0;
                 return;
             }
             if (!EnsureLayer()) return;
@@ -114,6 +146,36 @@ namespace C6Lab
             edge.gameObject.SetActive(warning > 0f);
             burst.color = new Color(BurstColor.r, BurstColor.g, BurstColor.b, burstAlpha);
             burst.gameObject.SetActive(burstAlpha > 0f);
+            DriveCountdown(count);
+        }
+
+        /// <summary>카운트다운 숫자를 맞추고, 숫자가 바뀔 때마다 크게 나왔다가 제자리로 톡 줄어든다.</summary>
+        private void DriveCountdown(int count)
+        {
+            if (countdown == null) return;
+            if (count <= 0)
+            {
+                countdown.gameObject.SetActive(false);
+                shownCount = 0;
+                return;
+            }
+            if (count != shownCount)
+            {
+                shownCount = count;
+                countChangedAt = Time.unscaledTime;
+                countdown.text = count.ToString();
+            }
+            var rect = countdown.rectTransform;
+            rect.anchorMin = rect.anchorMax = countdownAnchor;
+            rect.sizeDelta = new Vector2(countdownSize * 1.6f, countdownSize * 1.4f);
+            countdown.fontSize = countdownSize;
+            float u = countdownPopSeconds > 0f ? Mathf.Clamp01((Time.unscaledTime - countChangedAt) / countdownPopSeconds) : 1f;
+            // 1.45배로 튀어나와 1배로 내려앉는다.
+            float scale = Mathf.Lerp(1.45f, 1f, 1f - (1f - u) * (1f - u));
+            rect.localScale = new Vector3(scale, scale, 1f);
+            countdown.color = new Color(countdownColor.r, countdownColor.g, countdownColor.b, countdownColor.a * Mathf.Lerp(.4f, 1f, u));
+            countdown.gameObject.SetActive(true);
+            countdown.transform.SetAsLastSibling();
         }
 
         /// <summary>
@@ -204,7 +266,31 @@ namespace C6Lab
             edge.raycastTarget = false;
             burst = FullScreen("Yaguang Flash Burst", layer).gameObject.AddComponent<Image>();
             burst.raycastTarget = false;
+            countdown = CreateCountdown(layer);
             return true;
+        }
+
+        private Text CreateCountdown(RectTransform parent)
+        {
+            var rect = new GameObject("Yaguang Flash Countdown", typeof(RectTransform)).GetComponent<RectTransform>();
+            rect.gameObject.layer = parent.gameObject.layer;
+            rect.SetParent(parent, false);
+            rect.pivot = new Vector2(.5f, .5f);
+            var text = rect.gameObject.AddComponent<Text>();
+            Font font = null;
+            Text[] existing = canvas != null ? canvas.GetComponentsInChildren<Text>(true) : new Text[0];
+            for (int i = 0; i < existing.Length && font == null; i++) font = existing[i].font;
+            text.font = font != null ? font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontStyle = FontStyle.Bold;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.raycastTarget = false;
+            Outline outline = rect.gameObject.AddComponent<Outline>();
+            outline.effectColor = CountdownInk;
+            outline.effectDistance = new Vector2(4f, -4f);
+            rect.gameObject.SetActive(false);
+            return text;
         }
 
         private static RectTransform FullScreen(string name, Transform parent)

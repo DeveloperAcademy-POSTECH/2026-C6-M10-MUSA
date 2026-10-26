@@ -485,6 +485,26 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheCountdownShowsTheSecondsLeftOnlyOnTheTargetsScreen()
+        {
+            var snapshot = new LabSnapshot
+            {
+                phase = LabPhase.Playing, flashWarningAt = 27d, flashAt = 30d, flashTarget = 20, flashTargetAll = false
+            };
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 26.9d, 20), Is.Zero, "Not before the warning.");
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 27d, 20), Is.EqualTo(3));
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 27.5d, 20), Is.EqualTo(3));
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 28d, 20), Is.EqualTo(2));
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 29.99d, 20), Is.EqualTo(1));
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 30d, 20), Is.Zero, "Gone when it flashes.");
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 28d, 10), Is.Zero, "Only the target counts down.");
+            snapshot.flashTargetAll = true;
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 28d, 10), Is.EqualTo(2), "Everyone counts when all are hit.");
+            snapshot.phase = LabPhase.Victory;
+            Assert.That(LabYaguangFlashHud.CountdownAt(snapshot, 28d, 10), Is.Zero);
+        }
+
+        [Test]
         public void TheGlareIsFullThenFadesSmoothlyBack()
         {
             var snapshot = new LabSnapshot
