@@ -76,3 +76,16 @@ C6Lab.Experiments.Editor.LabHighResolutionPaintValidation.Export(outputDirectory
 ```
 
 배치 실행은 `C6_HIRES_EVIDENCE_DIR` 환경 변수에 절대 경로를 지정하고 `C6Lab.Experiments.Editor.LabHighResolutionPaintValidation.RunFromCommandLine`을 실행한다. 실제 그래픽 장치가 필요하며 `-nographics`에서는 통과시키지 않는다.
+
+
+## 최신 main 통합 검증
+
+2026-10-26, main `470dc344`의 결과 대시보드와 새 구슬 에셋을 충돌 없이 반영한 통합본에서 실행했다.
+
+- 전체 EditMode **1,057/1,057**, PlayMode **359/359** 통과. 실패·건너뜀0.
+- 실제 저장 박의6개 비교 화면을 Metal에서 다시 생성하고 정면 최종 이미지를 직접 확인했다.
+- GPU 투영·색상 비율·premultiplied RGB·경계 alpha·Scene/Config 보존·preview 자원 해제 검사를 다시 통과했다.
+- 기존 게임 코드·Scene·Prefab·Art·Resources·프로젝트 설정은 최신 main과 동일하다. 테스트 과정의 기존 설정/머티리얼 재저장은 원래 상태로 복원했다.
+- 새 메타데이터의 줄끝 공백만 정리했으며 GUID를 유지했다. 기존 미추적 파일은 커밋에서 제외하고 보존했다.
+
+위 결과는 Editor 회귀/fixture 검사다. iOS·실기기·네트워크 실제 플레이·모바일 성능·고해상도 표현의 게임 판정 통합은 여전히 미검증/범위 밖이다.
