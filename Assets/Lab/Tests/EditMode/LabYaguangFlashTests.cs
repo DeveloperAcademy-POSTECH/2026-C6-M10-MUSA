@@ -41,7 +41,7 @@ namespace C6Lab.Tests
                 "The combo moved into the 야광귀 group.");
             LabDeveloperCategory yaguang = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀");
             Assert.That(yaguang.FieldIndices, Is.EqualTo(new[]
-                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190, 200, 201 }),
+                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190, 202, 203 }),
                 "The yaguang counting toggle (#271) sits right under the combo switch.");
             Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 184 }), "One switch turns the combo and the flash on together.");
             Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 11 }));
@@ -79,7 +79,7 @@ namespace C6Lab.Tests
         [Test]
         public void ShakeReleaseFieldsAreOnByDefaultAtTheBottomOfTheFlashRows()
         {
-            LabDeveloperField toggle = LabConfig.DeveloperFields[200], count = LabConfig.DeveloperFields[201];
+            LabDeveloperField toggle = LabConfig.DeveloperFields[202], count = LabConfig.DeveloperFields[203];
             Assert.That(toggle.Label, Is.EqualTo("섬광 흔들어 풀기 (0 off, 1 on)"));
             Assert.That(toggle.IsToggle, Is.True);
             Assert.That(new[] { toggle.OffText, toggle.OnText }, Is.EqualTo(new[] { "끔", "켬" }));
@@ -95,19 +95,19 @@ namespace C6Lab.Tests
             foreach (LabConfig source in new[] { config, authored })
             {
                 Assert.That(source.YaguangFlashShakeRelease, Is.True, "Shaking the phone releases the glare by default.");
-                Assert.That(source.CaptureDeveloperValues().Skip(200).Take(2), Is.EqualTo(new[] { 1f, 6f }));
+                Assert.That(source.CaptureDeveloperValues().Skip(202).Take(2), Is.EqualTo(new[] { 1f, 6f }));
             }
             float[] values = config.CaptureDeveloperValues();
-            values[200] = 0f; values[201] = 10f; values[189] = 19f;
+            values[202] = 0f; values[203] = 10f; values[189] = 19f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.YaguangFlashShakeRelease, Is.False);
             Assert.That(config.YaguangFlashShakeCount, Is.EqualTo(10));
             Assert.That(config.YaguangFlashGlareSeconds, Is.EqualTo(19f));
-            values[201] = 11f;
+            values[203] = 11f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "At most 10 shakes.");
-            values[201] = 6.5f;
+            values[203] = 6.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Shakes are whole numbers.");
-            values[201] = 6f; values[189] = 20f;
+            values[203] = 6f; values[189] = 20f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Glare stays within 19 s.");
             values[189] = 10f; values[190] = 3f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Recovery stays within 2 s.");

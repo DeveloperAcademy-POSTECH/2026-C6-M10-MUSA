@@ -28,7 +28,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(202));
+                    Assert.That(values.Length, Is.EqualTo(204));
                     Assert.That(values[87], Is.EqualTo(before[87]), "Common bomb interval preserved");
                     Assert.That(values[152], Is.EqualTo(before[152]), "Common transfer block interval preserved");
                 }
@@ -129,9 +129,10 @@ namespace Hapio.Tests
             for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
                 Assert.That(GameStageSettings.IsFieldVisible(scope, GameStageSettings.FlashTargetOneField), Is.False,
                     "In the game the flash always hits everyone (#301): the one-player target is never offered.");
-            Assert.That(GameStageSettings.IsFieldVisible(2, 200), Is.True, "Flash face release (#301) is a yaguang setting.");
-            Assert.That(GameStageSettings.IsFieldVisible(2, 201), Is.True);
-            Assert.That(GameStageSettings.IsFieldVisible(0, 200), Is.False);
+            Assert.That(GameStageSettings.IsFieldVisible(2, 202), Is.True, "Flash shake release (#301) is a yaguang setting.");
+            Assert.That(GameStageSettings.IsFieldVisible(2, 203), Is.True);
+            Assert.That(GameStageSettings.IsFieldVisible(0, 202), Is.False);
+            Assert.That(GameStageSettings.IsFieldVisible(2, 200), Is.False, "High resolution paint (#299) stays common.");
             Assert.That(GameStageSettings.IsFieldVisible(3, 192), Is.True);
         }
     }

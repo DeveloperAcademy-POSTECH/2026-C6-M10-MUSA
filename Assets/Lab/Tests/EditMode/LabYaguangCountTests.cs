@@ -21,7 +21,7 @@ namespace C6Lab.Tests
         [Test]
         public void TheCountingLookIsAnOnToggleUnderTheComboSwitch()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(202));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(204));
             LabDeveloperField field = LabConfig.DeveloperFields[191];
             Assert.That(field.Label, Is.EqualTo("야광귀 셈법 (0 off, 1 on)"));
             Assert.That(field.DisplayLabel, Is.EqualTo("야광귀 셈법"));

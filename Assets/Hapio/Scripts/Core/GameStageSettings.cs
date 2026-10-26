@@ -52,7 +52,7 @@ namespace Hapio
         {
             if (scope < 0 || scope > TerritoryScope || index < 0 || index >= LabConfig.DeveloperFields.Count) return false;
             if (scope == TerritoryScope) return index >= 197 && index <= 199;
-            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 200 && index <= 201;
+            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203;
             // 게임에서는 섬광이 언제나 모두에게 터진다 (#301). '섬광 대상'(185)은 어느 탭에도 보이지 않아 저장값(0 = 모두)에서
             // 바뀌지 않는다. Lab DEV에서는 실험용으로 그대로 고를 수 있다.
             if (index == FlashTargetOneField) return false;
