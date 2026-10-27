@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -701,7 +702,46 @@ namespace C6Lab
         private void ApplyFlashGlare()
         {
             foreach (var entry in entries.Values)
-                if (entry.View != null) entry.View.SetGlare(entry.View.Kind.IsDrum() ? 0f : flashGlare);
+                if (entry.View != null)
+                    entry.View.SetGlare(entry.View.Kind.IsDrum() || flashRevealed.Contains(entry.View.OrbId) ? 0f : flashGlare);
+        }
+
+        // 흔들어 풀기 (#330): 이번 섬광에서 색을 되찾은 구슬. 이 구슬들만 하얗지 않고, 나중에 생긴 구슬은 하얗게 나온다.
+        private readonly HashSet<string> flashRevealed = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>아직 하얗게 덮여 색을 되찾지 못한 판 구슬 수 (북 제외, 아이템 포함)</summary>
+        public int FlashWhiteCount => entries.Values.Count(entry => entry.View != null && !entry.View.Kind.IsDrum()
+            && !flashRevealed.Contains(entry.View.OrbId));
+        /// <summary>이번 섬광에서 색을 되찾은 구슬 수</summary>
+        public int FlashRevealedCount => flashRevealed.Count;
+        /// <summary>이 구슬이 이번 섬광에서 색을 되찾았는지</summary>
+        public bool FlashRevealed(string orbId) => orbId != null && flashRevealed.Contains(orbId);
+
+        /// <summary>새 섬광: 모든 구슬을 다시 하얗게 덮을 수 있게 되찾은 목록을 비운다.</summary>
+        public void ResetFlashReveal() => flashRevealed.Clear();
+
+        /// <summary>
+        /// 한 번 흔들 때마다 (#330): 아직 하얀 구슬 하나를 무작위로 골라 색을 돌려주고 톡 튀게 한다. 돌려준 구슬 ID, 없으면 null.
+        /// 화면 표시만 바꾸며 규칙·물리는 그대로다.
+        /// </summary>
+        public string RevealFlashOrb(float popScale, float popSeconds)
+        {
+            Entry[] white = entries.Values.Where(entry => entry.View != null && !entry.View.Kind.IsDrum()
+                && !flashRevealed.Contains(entry.View.OrbId)).ToArray();
+            if (white.Length == 0) return null;
+            Entry pick = white[UnityEngine.Random.Range(0, white.Length)];
+            flashRevealed.Add(pick.View.OrbId);
+            pick.View.SetGlare(0f);
+            if (popScale > 0f && popSeconds > 0f && pick.View.isActiveAndEnabled)
+                pick.View.PlaySpawnPop(Vector3.zero, popScale, popSeconds);
+            return pick.View.OrbId;
+        }
+
+        /// <summary>다 흔들었다: 남은 하얀 구슬을 한꺼번에 돌려준다 (#330, 최대 횟수를 채웠을 때).</summary>
+        public void RevealAllFlashOrbs()
+        {
+            foreach (var entry in entries.Values)
+                if (entry.View != null && !entry.View.Kind.IsDrum()) flashRevealed.Add(entry.View.OrbId);
         }
         public int ComboLook => comboLook;
         /// <summary>판 구슬이 지금 콤보 효과로 향하는 그림 배율 (#257)</summary>
@@ -1163,6 +1203,7 @@ namespace C6Lab
             charmed = false;
             jigwiOverheat = false;
             flashGlare = 0f;
+            flashRevealed.Clear();
             if (charmEdge != null) charmEdge.Hide();
             foreach (var entry in entries.Values)
                 Retire(entry);

@@ -331,7 +331,7 @@ namespace C6Lab
             LabDeveloperField.Choice("Paint Texture Quality", "1024 × 512", "2048 × 1024"),
             // #301 owns the two flash fields at 202 and 203; #305 appends its distinct warning at 204.
             LabDeveloperField.Toggle("섬광 흔들어 풀기 (0 off, 1 on)", "끔", "켬"),
-            new LabDeveloperField("섬광 흔들기 횟수", 2f, 10f, true),
+            new LabDeveloperField("섬광 최대 흔들기 횟수", 2f, 18f, true),
             new LabDeveloperField("Charm Warning Seconds (0 = none)", 0f, 10f),
             // 기믹 묶음 (#311): 공용 기믹(폭탄·넘기기 막기)과 요괴 고유 기믹(구미호: 여우불·매혹)을 각자 고정 간격마다
             // 켜진 것 중 하나씩 비율(169~172번, 묶음별 합 100)대로 발동한다. Hapio에서는 스테이지마다 따로 정한다.
@@ -712,10 +712,10 @@ namespace C6Lab
         [SerializeField, Range(1f, 19f)] private float yaguangFlashGlareSeconds = 10f;
         [Tooltip("눈부심이 끝난 뒤 색이 천천히 돌아오는 시간 (초). 0이면 바로 돌아온다.")]
         [SerializeField, Range(0f, 2f)] private float yaguangFlashRecoverySeconds = 1f;
-        [Tooltip("켜면(#301) 눈부신 사람이 폰을 흔들어 자기 눈부심을 푼다. 흔들 때마다 하얀 막이 조금씩 걷히고 정해진 횟수면 완전히 풀린다. 못 흔들면 눈부심 시간이 지나 저절로 풀린다. 끄면 이전처럼 시간으로만 풀린다.")]
+        [Tooltip("켜면(#301) 눈부신 사람이 폰을 흔들어 자기 눈부심을 푼다. 흔들 때마다 판의 하얀 구슬 하나씩 색이 돌아오고(#330), 다 돌아오면(최대 횟수) 완전히 풀린다. 못 흔들면 눈부심 시간이 지나 저절로 풀린다. 끄면 이전처럼 시간으로만 풀린다.")]
         [SerializeField] private bool yaguangFlashShakeRelease = true;
-        [Tooltip("눈부심을 풀려면 세게 흔들어야 하는 횟수 (#301). 기본 6번이면 보통 약 2초.")]
-        [SerializeField, Range(2, 10)] private int yaguangFlashShakeCount = 6;
+        [Tooltip("눈부심을 풀려면 세게 흔들어야 하는 최대 횟수 (#330). 판의 구슬이 이보다 적으면 구슬 수만큼만 흔들면 된다. 기본 10번(범위 가운데).")]
+        [SerializeField, Range(2, 18)] private int yaguangFlashShakeCount = 10;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -1092,7 +1092,7 @@ namespace C6Lab
         /// <summary>true면 눈부신 사람이 폰을 흔들어 자기 눈부심을 풀 수 있다 (#301)</summary>
         public bool YaguangFlashShakeRelease => yaguangFlashShakeRelease;
         /// <summary>눈부심을 풀려면 흔들어야 하는 횟수 (#301)</summary>
-        public int YaguangFlashShakeCount => Mathf.Clamp(yaguangFlashShakeCount, 2, 10);
+        public int YaguangFlashShakeCount => Mathf.Clamp(yaguangFlashShakeCount, 2, 18);
         /// <summary>콤보를 야광귀 셈법(하나 둘 셋 넷)으로 보여주는지 (#271). 화면 표시만 바꾼다.</summary>
         public bool ComboYaguangCountEnabled => comboYaguangCountEnabled;
         public LabOrbAppearance OrbAppearance => orbAppearance;
