@@ -3060,3 +3060,11 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - 현재main과 DEV 외 RectTransform576개가 같고 Lab/Battle/결과Scene·Prefab·패키지·빌드 설정은 바꾸지 않았다. 별도 GourdExport/PNG문서·사용자 Scene.meta·구조 정리 보고서는 PR에서 제외했다.
 - 검사용 Editor만 종료하고 TimeManager의 검사 부수 직렬화는 원복했다. 다른 프로젝트의 Editor는 종료하지 않았다. 새 실행 로그나 개인 경로·기기 식별자는 저장소에 추가하지 않았다.
 - **미실행:** 실제기기·다중기기LAN/핫스팟·네이티브빌드/성능·실제음성/SFX·사람의 조준·재미. 음성 미할당과 별도 소모 감소 미정은 기존 제한을 유지한다.
+
+
+## 2026-10-27 · #340 새 지귀 먹선 불꽃 표현
+
+- main `45c800fd` 기준의 `fix/#340-jigwi-flame-visual`에서 새 투명 이미지·전용 셰이더/머티리얼과 `LabJigwiStagePresentation`의 표현만 변경했다. 모델/네트워크/판정·크기 각도·시간표·Scene/Prefab 배치는 변경하지 않았다.
+- Unity6000.6.5f1 macOS/Metal에서 지귀 관련 PlayMode **9/9 통과(13.34초)**, 실패·Skipped·Inconclusive0. GPU alpha·실제 saved Stage03 카메라의 warm색 픽셀·Pause/Resume·기존 역할/해제/100초 정리를 확인했다.
+- 실제 렌더와 생성 프롬프트·Inspector 조절점은 [새 불꽃 표현 기록](JIGWI_FIRE_VISUAL.md)을 따른다. 기존 BlastFire 이미지는 재사용하거나 수정하지 않았다. 기존 사용자 Editor를 닫지 않고 Home/재생중지 상태로 돌려두었다.
+- 실제 기기·네이티브 빌드·사람의 그림/조작 평가는 미실행이다. 자동 렌더 검사를 미술 만족도로 표현하지 않는다.

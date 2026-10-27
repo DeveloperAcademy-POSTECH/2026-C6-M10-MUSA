@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -129,6 +130,8 @@ namespace Hapio.Tests
             Assert.That(hud.stageNotice.text, Does.Contain("큰 불씨"));
             Assert.That(hud.stageNotice.raycastTarget, Is.False);
 
+            CaptureActualFlamePixels(binding.battleCamera, target);
+
             Vector2 initialOffset = ScreenOffset(binding.battleCamera, target, point);
             // Resume at the same synthetic real-time sample, then immediately pause at the
             // next sample. No Update can observe the temporary unpaused/backward clock.
@@ -182,6 +185,76 @@ namespace Hapio.Tests
             Assert.That(Field("model").GetValue(network), Is.SameAs(model));
             Assert.That(clock.IsPaused, Is.True);
             Assert.That(clock.Now(Time.realtimeSinceStartupAsDouble), Is.EqualTo(desired).Within(.00001d));
+        }
+
+        /// <summary>Render the actual bound battle camera synchronously: no GameView screenshot or end-of-frame wait.</summary>
+        private static void CaptureActualFlamePixels(Camera camera, LabTarget target)
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+                Assert.Ignore("GPU unavailable: saved Stage03 flame pixels were not rendered.");
+            Material source = Resources.Load<Material>("Jigwi/SurfaceFlame");
+            Assert.That(source, Is.Not.Null);
+            Assert.That(source.shader.name, Is.EqualTo("C6Lab/Jigwi Ink Flame"));
+            Assert.That(source.shader.isSupported, Is.True);
+            MeshRenderer[] flames = target.GetComponentsInChildren<MeshRenderer>(true)
+                .Where(renderer => renderer.enabled && renderer.gameObject.activeInHierarchy
+                    && renderer.sharedMaterial != null && renderer.sharedMaterial.shader.name == source.shader.name).ToArray();
+            Assert.That(flames, Is.Not.Empty, "The saved WhiteGourd must carry the new flame meshes before sampling pixels.");
+            Assert.That(flames.All(renderer => renderer.sharedMaterial.GetTexture("_BaseMap")
+                == Resources.Load<Texture2D>("Jigwi/SurfaceFlameWash")), Is.True);
+
+            const int width = 390;
+            Rect previousRect = camera.rect;
+            // Match the authored portrait battle viewport, with no unused black lower half.
+            float portraitAspect = (390f / 844f) * previousRect.width / previousRect.height;
+            int height = Mathf.Max(1, Mathf.RoundToInt(width / portraitAspect));
+            var capture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
+            var image = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            RenderTexture previousActive = RenderTexture.active, previousTarget = camera.targetTexture;
+            float previousAspect = camera.aspect;
+            try
+            {
+                camera.targetTexture = capture;
+                // Render exactly the battle viewport, preserving the original portrait projection
+                // and real pose/FOV; the saved scene camera is restored in finally.
+                camera.rect = new Rect(0f, 0f, 1f, 1f);
+                camera.aspect = portraitAspect;
+                foreach (MeshRenderer flame in flames) flame.enabled = false;
+                camera.Render();
+                RenderTexture.active = capture;
+                image.ReadPixels(new Rect(0, 0, width, height), 0, 0); image.Apply(false, false);
+                Color32[] before = image.GetPixels32();
+                foreach (MeshRenderer flame in flames) flame.enabled = true;
+                camera.Render();
+                RenderTexture.active = capture;
+                image.ReadPixels(new Rect(0, 0, width, height), 0, 0); image.Apply(false, false);
+                Color32[] after = image.GetPixels32();
+                int changed = 0, warm = 0;
+                for (int i = 0; i < after.Length; i++)
+                {
+                    Color32 a = after[i], b = before[i];
+                    if (Math.Abs(a.r - b.r) + Math.Abs(a.g - b.g) + Math.Abs(a.b - b.b) < 45) continue;
+                    changed++;
+                    if (a.r > 80 && a.r > a.g * 1.1f && a.r > a.b * 1.4f) warm++;
+                }
+                string evidence = Directory.Exists("/private/tmp") ? "/private/tmp/jigwi340-stage3-render.png"
+                    : Path.Combine(Path.GetTempPath(), "jigwi340-stage3-render.png");
+                File.WriteAllBytes(evidence, image.EncodeToPNG());
+                TestContext.WriteLine("JIGWI_FLAME_RENDER changed=" + changed + " warm=" + warm + " evidence=" + evidence);
+                Assert.That(changed, Is.GreaterThan(24), "Flame meshes must change actual saved-shell camera pixels, rather than merely exist in the hierarchy.");
+                Assert.That(warm, Is.GreaterThan(16), "The visible change must contain the new warm ink/flame art, not only a dark circular marker.");
+            }
+            finally
+            {
+                foreach (MeshRenderer flame in flames) if (flame != null) flame.enabled = true;
+                camera.targetTexture = previousTarget;
+                camera.rect = previousRect;
+                camera.aspect = previousAspect;
+                RenderTexture.active = previousActive;
+                capture.Release();
+                Object.DestroyImmediate(capture);
+                Object.DestroyImmediate(image);
+            }
         }
 
         private Vector2 CalibratedCurtainOffset(LabModel geometryModel, Camera camera, LabTarget target,
