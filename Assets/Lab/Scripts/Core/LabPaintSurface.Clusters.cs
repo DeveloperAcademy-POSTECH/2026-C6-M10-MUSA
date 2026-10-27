@@ -40,6 +40,7 @@ namespace C6Lab
             private readonly List<Entry> heap = new List<Entry>();
             private readonly Dictionary<int, Entry> queued = new Dictionary<int, Entry>();
             private readonly HashSet<int> seen = new HashSet<int>();
+            private readonly List<Entry> deferred = new List<Entry>();
             private int nextVersion, pendingCell = -1;
             private bool started;
 
@@ -78,13 +79,22 @@ namespace C6Lab
                 }
             }
 
-            public int Take(Region region)
+            public int Take(Region region, ulong? allowedOwner = null)
             {
                 if (!started)
                 {
                     started = true;
                     Queue(region, anchor);
+                    // A temporarily blocked anchor must not hide the existing painted
+                    // root through which this frozen cluster can reach another frontier.
+                    if (allowedOwner.HasValue)
+                        for (int side = 0; side < 4; side++)
+                        {
+                            int neighbor = surface.Neighbor(anchor, side);
+                            if (neighbor >= 0 && surface.pixels[neighbor].a != 0) Queue(region, neighbor);
+                        }
                 }
+                deferred.Clear();
                 while (heap.Count > 0)
                 {
                     Entry entry = Pop();
@@ -98,12 +108,23 @@ namespace C6Lab
                         continue;
                     }
                     if (!surface.Touches(region, entry.Cell)) continue;
+                    if (allowedOwner.HasValue && surface.PaintCellBlocked(allowedOwner.Value, entry.Cell))
+                    { deferred.Add(entry); continue; }
+                    RestoreDeferred();
                     pendingCell = entry.Cell;
                     return entry.Cell;
                 }
+                if (allowedOwner.HasValue) { RestoreDeferred(); return -1; }
                 // The heap can traverse the entire connected painted root; an incomplete
                 // root with a funded frontier must always expose an adjacent blank cell.
                 throw new InvalidOperationException("A paint cluster lost its reachable frontier.");
+            }
+
+            private void RestoreDeferred()
+            {
+                foreach (Entry entry in deferred)
+                { queued[entry.Cell] = entry; Push(entry); }
+                deferred.Clear();
             }
 
             public void Commit(Region region, int cell)

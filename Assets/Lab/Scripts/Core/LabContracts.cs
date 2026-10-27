@@ -107,6 +107,9 @@ namespace C6Lab
         public double burnedAt = -1d;
         /// <summary>A bomb blast shrank this orb for the rest of its life, and any orb combined from it (#213).</summary>
         public bool small;
+        /// <summary>True when only scheduled gourd blasts caused this shrink (#332).</summary>
+        public bool gourdBlastOnlySmall;
+        public double gourdBlastBurnedAt = -1d, ordinaryBlastBurnedAt = -1d;
         /// <summary>Jigwi generation curse only: independent of bomb shrink and paint damage.</summary>
         public float jigwiRadiusScale = 1f;
         /// <summary>Explicit Host battle-clock expiry; -1 retains the existing kind lifetime.</summary>
@@ -259,6 +262,7 @@ namespace C6Lab
         public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();
         public LabJigwiState[] jigwi = Array.Empty<LabJigwiState>();
+        public LabJigwiStageSnapshot jigwiStage = new LabJigwiStageSnapshot();
         public LabJigwiState JigwiFor(ulong player)
         {
             foreach (var state in jigwi ?? Array.Empty<LabJigwiState>())

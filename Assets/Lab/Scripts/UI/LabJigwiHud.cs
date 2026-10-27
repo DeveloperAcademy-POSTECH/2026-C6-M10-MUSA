@@ -11,6 +11,7 @@ namespace C6Lab
         public Canvas canvas;
         public UnityEngine.UI.Image heat;
         public UnityEngine.UI.Text effectText, feedback;
+        public UnityEngine.UI.Text stageNotice;
         public UnityEngine.UI.Button testToggle, fireButton, generationButton, closeButton;
         public UnityEngine.UI.Button[] playerButtons;
         public GameObject testPanel;
@@ -19,6 +20,7 @@ namespace C6Lab
         private double lastServerTime = -1d;
         private float receivedAt;
         private bool wired;
+        private float blockedUntilRealtime = -1f;
 
         public void Bind(LabNetwork source, Canvas targetCanvas)
         {
@@ -120,7 +122,8 @@ namespace C6Lab
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool playing = snapshot != null && snapshot.phase == LabPhase.Playing;
-            bool canTest = playing && network.DeveloperBuildAvailable && network.IsHost && network.JigwiManualControlsAllowed;
+            bool canTest = playing && snapshot.jigwiStage?.enabled != true
+                && network.DeveloperBuildAvailable && network.IsHost && network.JigwiManualControlsAllowed;
             if (testToggle != null) testToggle.gameObject.SetActive(canTest);
             if (!canTest && testPanel != null && testPanel.activeSelf) SetPanel(false);
             if (!choseTarget && playing) targetSlot = Math.Max(1, network.LocalSlotNumber);
@@ -138,6 +141,7 @@ namespace C6Lab
                 feedback.text = "Resume the battle before manually triggering a pattern.";
             if (!playing)
             {
+                if (stageNotice != null) stageNotice.gameObject.SetActive(false);
                 if (heat != null) heat.gameObject.SetActive(false);
                 if (effectText != null) effectText.gameObject.SetActive(false);
                 lastServerTime = -1d;
@@ -146,6 +150,12 @@ namespace C6Lab
             if (snapshot.serverTime != lastServerTime)
             { lastServerTime = snapshot.serverTime; receivedAt = Time.unscaledTime; }
             double now = snapshot.serverTime + (snapshot.paused ? 0d : Time.unscaledTime - receivedAt);
+            if (snapshot.jigwiStage?.enabled == true)
+            {
+                ApplyStageSnapshot(snapshot, network.LocalPlayerId, now);
+                return;
+            }
+            if (stageNotice != null) stageNotice.gameObject.SetActive(false);
             LabJigwiState state = snapshot.JigwiFor(network.LocalPlayerId);
             bool fireActive = state != null && state.FireActive(now);
             bool overheat = state != null && state.Overheated(now);
@@ -170,7 +180,105 @@ namespace C6Lab
             }
         }
 
-        private void OnDisable() { if (network != null && network.board != null) network.board.SetUiInputBlocked(false); }
+        /// <summary>Passive stage guidance: never adds a full-screen raycast/input blocker.</summary>
+        public void ApplyStageSnapshot(LabSnapshot snapshot, ulong localPlayer, double now)
+        {
+            bool active = snapshot != null && snapshot.phase == LabPhase.Playing && snapshot.jigwiStage?.enabled == true;
+            if (!active)
+            {
+                if (stageNotice != null) stageNotice.gameObject.SetActive(false);
+                return;
+            }
+            if (heat != null) heat.gameObject.SetActive(false);
+            if (effectText != null) effectText.gameObject.SetActive(false);
+            if (testToggle != null) testToggle.gameObject.SetActive(false);
+            if (testPanel != null && testPanel.activeSelf) SetPanel(false);
+            EnsureStageNotice();
+            if (stageNotice == null) return;
+            string message = DescribeStage(snapshot.jigwiStage, snapshot, localPlayer, now);
+            if (snapshot.jigwiStage.fever) blockedUntilRealtime = -1f;
+            if (Time.unscaledTime < blockedUntilRealtime) message = "불에 막힘\n" + message;
+            stageNotice.text = message;
+            stageNotice.gameObject.SetActive(message.Length > 0);
+        }
+
+        public void ShowStageBlocked()
+        {
+            blockedUntilRealtime = Time.unscaledTime + .65f;
+            if (network?.Snapshot != null)
+                ApplyStageSnapshot(network.Snapshot, network.LocalPlayerId, network.Snapshot.serverTime);
+        }
+
+        public static string DescribeStage(LabJigwiStageSnapshot stage, LabSnapshot snapshot, ulong localPlayer, double now)
+        {
+            if (stage == null || !stage.enabled || snapshot == null || snapshot.phase != LabPhase.Playing) return string.Empty;
+            if (stage.fever) return "피버 · 스태미나 자동 회복 2배";
+            LabJigwiStageGroup[] live = (stage.groups ?? Array.Empty<LabJigwiStageGroup>())
+                .Where(group => group != null && (group.Warning(now) || group.Active(now)))
+                .ToArray();
+            LabJigwiStageGroup[] mine = live.Where(group => group.affectedPlayer == localPlayer).ToArray();
+            LabJigwiStageGroup[] help = live.Where(group => group.helperPlayer == localPlayer).ToArray();
+            string instruction;
+            if (mine.Any(group => group.pattern == LabJigwiStagePattern.Curtain)
+                && help.Any(group => group.pattern == LabJigwiStagePattern.Curtain))
+            {
+                var incoming = mine.First(group => group.pattern == LabJigwiStagePattern.Curtain);
+                var outgoing = help.First(group => group.pattern == LabJigwiStagePattern.Curtain);
+                instruction = PlayerLabel(snapshot, incoming.helperPlayer) + "가 내 불을 끌 수 있어요\n"
+                    + "근원을 맞혀 " + PlayerLabel(snapshot, outgoing.affectedPlayer) + "를 도와주세요";
+            }
+            else if (help.Length > 0)
+            {
+                var group = help[0];
+                instruction = group.pattern == LabJigwiStagePattern.Curtain
+                    ? PlayerLabel(snapshot, group.affectedPlayer) + "의 불장막 · 근원을 맞혀 도와주세요"
+                    : (help.Length > 1 ? "근원 " + help.Length + "개 · " : string.Empty) + "큰 불씨를 맞혀 불을 끄세요";
+            }
+            else if (mine.Length > 0)
+                instruction = PlayerLabel(snapshot, mine[0].helperPlayer) + "가 도와줄 수 있어요 · 열린 곳은 칠할 수 있어요";
+            else
+            {
+                LabJigwiStageGroup recent = (stage.groups ?? Array.Empty<LabJigwiStageGroup>())
+                    .Where(group => group != null && group.resolution == LabJigwiStageResolution.Extinguished
+                        && group.resolvedAt >= 0d && now >= group.resolvedAt && now - group.resolvedAt < .8d
+                        && (group.affectedPlayer == localPlayer || group.helperPlayer == localPlayer))
+                    .OrderByDescending(group => group.resolvedAt).FirstOrDefault();
+                if (recent == null) return string.Empty;
+                if (recent.affectedPlayer == recent.helperPlayer) return "불을 껐어요 · 다시 칠하세요";
+                return recent.affectedPlayer == localPlayer
+                    ? PlayerLabel(snapshot, recent.helperPlayer) + "가 불을 꺼줬어요"
+                    : PlayerLabel(snapshot, recent.affectedPlayer) + "의 불장막을 껐어요";
+            }
+            bool warning = live.Any(group => (group.affectedPlayer == localPlayer || group.helperPlayer == localPlayer) && group.Warning(now));
+            return warning ? "선덕여왕 사랑해요!!!\n" + instruction : instruction;
+        }
+
+        private static string PlayerLabel(LabSnapshot snapshot, ulong owner)
+        {
+            LabPlayerState player = snapshot.players?.FirstOrDefault(value => value != null && value.id == owner);
+            return player != null ? "P" + (player.seat + 1) : "동료";
+        }
+
+        private void EnsureStageNotice()
+        {
+            if (stageNotice != null || canvas == null) return;
+            stageNotice = Label("Jigwi Stage Notice", canvas.transform, 18);
+            Rect(stageNotice.rectTransform, new Vector2(.1f, .68f), new Vector2(.9f, .79f), Vector2.zero, Vector2.zero);
+            foreach (var text in canvas.GetComponentsInChildren<UnityEngine.UI.Text>(true))
+                if (text != stageNotice && text.font != null && text.font.HasCharacter('선'))
+                { stageNotice.font = text.font; break; }
+            stageNotice.color = new Color(1f, .96f, .78f);
+            stageNotice.raycastTarget = false;
+            var outline = stageNotice.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            outline.effectColor = new Color(.08f, .04f, .02f, .95f);
+            outline.effectDistance = new Vector2(1.2f, -1.2f);
+        }
+
+        private void OnDisable()
+        {
+            if (stageNotice != null) stageNotice.gameObject.SetActive(false);
+            if (network != null && network.board != null) network.board.SetUiInputBlocked(false);
+        }
         private void OnDestroy() { if (network != null && network.board != null) network.board.SetUiInputBlocked(false); }
 
         private static void Rect(RectTransform target, Vector2 min, Vector2 max, Vector2 offsetMin, Vector2 offsetMax)

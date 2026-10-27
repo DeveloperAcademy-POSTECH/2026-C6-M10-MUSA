@@ -352,6 +352,7 @@ namespace C6Lab
             ResetJigwi(config);
             ResetStageYokai(config, now);
             ResetYaguangTimeline(now);
+            ResetJigwiStage(config, now);
         }
 
         /// <summary>Advance the absolute Host clock; only Idle orbs expire.</summary>
@@ -466,7 +467,11 @@ namespace C6Lab
                 x = normalizedCenter.x, y = normalizedCenter.y,
                 vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false,
                 // One blast-shrunk half makes the whole orb small, and its fire burns on (#213).
-                small = first.small || second.small, burnedAt = Math.Max(first.burnedAt, second.burnedAt)
+                small = first.small || second.small, burnedAt = Math.Max(first.burnedAt, second.burnedAt),
+                gourdBlastOnlySmall = (first.small || second.small)
+                    && (!first.small || first.gourdBlastOnlySmall) && (!second.small || second.gourdBlastOnlySmall),
+                gourdBlastBurnedAt = Math.Max(first.gourdBlastBurnedAt, second.gourdBlastBurnedAt),
+                ordinaryBlastBurnedAt = Math.Max(first.ordinaryBlastBurnedAt, second.ordinaryBlastBurnedAt)
             };
             orbs.Add(orb.id, orb);
             players[sender].combinedTotal++;
@@ -613,6 +618,8 @@ namespace C6Lab
                 || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight
                 || !players.TryGetValue(orb.owner, out var attacker)) return false;
             element = orb.element;
+            if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth)
+                TryExtinguishJigwiStageRoot(orb.owner, paintDirection, now, out _);
             orbs.Remove(id);
             float areaScale = LaunchScaleOf(id);
             launchScales.Remove(id);
@@ -640,6 +647,7 @@ namespace C6Lab
                 {
                     phase = LabPhase.Victory;
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
+                    AdvanceJigwiStage(now);
                 }
             }
             if (rules.ComboEnabled && combo.Active)
@@ -1125,6 +1133,16 @@ namespace C6Lab
                 if (id == null || !orbs.TryGetValue(id, out var orb) || orb.owner != sender || orb.inFlight
                     || orb.kind == LabOrbKind.Bomb || orb.kind.IsDrum() || orb.kind == LabOrbKind.FoxFire)
                     continue;
+                if (JigwiStageEnabled && jigwiGourdBlastIds.Contains(bombId))
+                {
+                    if (!orb.small) orb.gourdBlastOnlySmall = true;
+                    orb.gourdBlastBurnedAt = now;
+                }
+                else
+                {
+                    orb.ordinaryBlastBurnedAt = now;
+                    orb.gourdBlastOnlySmall = false;
+                }
                 orb.burnedAt = now;
                 orb.small = true;
                 orb.revision = ++revision;
@@ -1291,6 +1309,7 @@ namespace C6Lab
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
                 drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray(),
                 jigwi = CopyJigwiStates(),
+                jigwiStage = CopyJigwiStageSnapshot(now),
                 swipeBlockedPlayer = BlockOn(now) ? swipeBlockedPlayer : 0,
                 swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
                 swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
@@ -1383,7 +1402,7 @@ namespace C6Lab
                     played += elapsed;
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
-                            (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond));
+                            (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond * JigwiStageRecoveryMultiplier(lastTime)));
                     // 결과 대시보드 기록: 이 사이에 북을 점유한 사람의 점유 시간 (북 점유율 계산용)
                     // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)
                     foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())
@@ -1392,6 +1411,7 @@ namespace C6Lab
                 MarkBusyScreens(lastTime, effectiveNow);
                 // The schedule cutoff cancels before same-time bomb expiry or combo timeout can award a penalty.
                 EndYaguangTimeline(effectiveNow);
+                AdvanceJigwiStage(effectiveNow);
                 if (StageYokai != LabStageYokai.None)
                 {
                     ExpireOrbs(effectiveNow);
@@ -1415,6 +1435,7 @@ namespace C6Lab
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
                 }
                 else if (now >= deadline) phase = LabPhase.Defeat;
+                if (phase != LabPhase.Playing) AdvanceJigwiStage(effectiveNow);
             }
             lastTime = now;
             return true;
@@ -1576,7 +1597,8 @@ namespace C6Lab
                 {
                     double at = nextCommonGimmickAt;
                     uint index = commonGimmickCount++;
-                    nextCommonGimmickAt = rules.YaguangTimeline ? NextYaguangCommonAt(commonGimmickCount)
+                    nextCommonGimmickAt = JigwiStageEnabled ? NextJigwiStageCommonAt(commonGimmickCount)
+                        : rules.YaguangTimeline ? NextYaguangCommonAt(commonGimmickCount)
                         : at + GimmickInterval(rules.CommonGimmickInterval);
                     bool cast = rules.YaguangTimeline ? CastYaguangCommon(at, index)
                         : CastGimmick(rules.CommonGimmicks, at, index, SabotageKindSalt, SabotageTargetSalt,
@@ -1964,7 +1986,8 @@ namespace C6Lab
                 SmallOrbPaintShare = config.SmallOrbPaintShare;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
-                BattleDurationSeconds = config.BattleDurationSeconds;
+                BattleDurationSeconds = stageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled
+                    ? 120f : config.BattleDurationSeconds;
                 StaminaMax = config.StaminaMax;
                 StaminaStart = config.StaminaStart;
                 GenerateCost = config.GenerateCost;

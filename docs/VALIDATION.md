@@ -3013,6 +3013,19 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - 별도10만회수식재현:음50,032·양49,968,최대연속3,평균연속1.62546. 같은bit연산·salt·규칙의오프라인계산이며Unity10만개엔티티/실기기시험이나장기분포의증명으로취급하지않는다. 설계상50:50의음양대칭이고정확한반반개수를보장하는셔플백은아니다.
 - **미실행:** 실기기iPhone/iPad·독립Mac게임앱·실제LAN/핫스팟·네이티브빌드/성능. 사용자요청에따라제외했다. 검사전용Editor는종료하고TimeManager자동직렬화는원복했다. 원시로그·기기정보·빌드산출물은커밋하지않는다.
 
+
+## 2026-10-27 · #332 지귀 120초 발화·불장막 통합
+
+- 기준 main `4ee330a6`에서 `feat/#332-jigwi-120s-fire-stage`로 작업했다. 기획서 승인과 사용자 결정(자동 회복 2배·공통 무작위/기존 수명/중첩·개인 칠 차단 초안)을 반영했다. 미정인 소모 감소는 구현하지 않았다.
+- 실제 박 MeshCollider 명중 → helper 근원 확인 → 연결 불 해제 → 통상 칠 1회. 초기 무배치 geometry의 보이지 않는 판정과 None 속성 Relay/Bomb의 근원 해제를 거절한다. A2/B2 위치 변주는 Host 교정 후에도 유지되며, 회전 시 근원만 재배치한다.
+- 셀별 대상 P 차단·기존 건조·초기 독립 튀김점·성장 소수 귀속/보류/다른 P 진행을 보존한다. GPU도 확정 지도와 일치한다. 100초에는 기믹 폭탄 파생 화상/축소를 출처별로 정리하고 일반 폭탄/이미 비행 중인 구슬은 유지한다.
+- 새 DEV 8개는 228~235, 총 236개다. 5671/Lab32/Game15로 이전 앱 혼용을 차단한다. Unity API로 원본 새 8개 값을 저장하고, Home/Lobby의 새 8행과 기존 DEV 캐시·예약 행을 동기화했다. 이전 228개 유효 값·6개 Scene의 DEV 외 RectTransform 576개·사용자 미추적 meta/별도 보고서를 보존했다.
+- Unity 6000.6.5f1 macOS/Metal 검사 전용 Editor에서 전체 EditMode **1407/1407 통과(32.38초)**, 전체 PlayMode **421/421 통과(455.65초)**. 실패/Skipped/Inconclusive 0. 신규 모델·스키마·header·블라스트·셀 차단과 기존 회귀를 포함한다.
+- 지귀 집중 PlayMode **7/7 통과(13.26초)**: 실제 저장 Home/세션 → Solo → 3/2/1 → Pause/DEV Skip 두 번 → Stage3 Battle, 실제 WhiteGourd/Collider/표면 교정·근원·HUD·위치 변주. 별도 2인 모델 기하 샘플은 실제 2기기 전송 시험이 아니다.
+- 고해상도 차단 집중 PlayMode **1/1 통과(0.18초)**. 초기 도색 집중 Edit 14/14 이후 셀 중심 피격 조회 경계 1건을 더해 최종 전체에 15건을 포함했다.
+- 초기 새 검사에서 없는 enum을 사용한 컴파일 오류와 북 보유 입력이 없는 fixture 2개를 보완했다. 수정 전 캐시 어셈블리 결과를 최종으로 취급하지 않고 AssetDatabase.Refresh/재컴파일 준비를 확인한 뒤 최종 검사를 실행했다. 첫 전체 PlayMode에서 드러난 지귀의 구형 시간·수동 패널 기대값도 현행 정책에 맞춰 분리했다. 원시 로그/기기 식별자/빌드는 저장소에 추가하지 않는다.
+- **미실행:** 실제 iPhone/iPad·2~5인 다중 기기·LAN/핫스팟·네이티브 빌드/성능·사람의 조준/도움 인지/재미·실제 샤우팅/SFX. 음성 클립은 선택형 연결점만 준비하고 미할당이다. 검사 Editor는 종료하고 검사 부수 TimeManager 직렬화는 원복한다.
+
 ## 2026-10-27 · #328 QA 반영: 해금 폭탄·여우구슬 두 번 누르기·매혹 안내·전투 2분·스태미나 6칸
 
 - 기준 main `4ee330a6`, 기능 브랜치 `feat/#328-qa-bomb-guide-stamina`. QA에서 "매혹·여우구슬을 어떻게 푸는지 모르겠다", "폭탄을 받은 건지 공격 구슬을 받은 건지 모르겠다"는 의견을 반영했다. 피버 타임(마지막 20초)은 별도 이슈로 뺐고, 매혹이 한 번도 안 걸렸다는 보고는 조사에서 제외했다(아래 참고).
@@ -3036,3 +3049,14 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - **발견한 결함(수정)**: 211을 은퇴시킨 뒤에도 `Stage02_yaguang.asset`의 `defaultValues`에 211이 남아 `GameStageCatalog.Validate`가 실패했고, Hapio 혼자 시작이 `GameSession.CreateModeConfig` NullReferenceException으로 멈췄다(사용자 Play에서 발견). Editor API로 그 항목만 지웠고, 스테이지 설정 생성·야광귀 전투 120초/방해 끝 100초를 eval로 확인했다. DEV 칸을 숨길 때는 스테이지 기본값 파일도 함께 확인해야 한다.
 - **사용자 검사 1차 실패 3건(수정)**: ① ② `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`(Home·Lobby): 장면에 저장된 DEV 칸 기본값이 원본과 달랐다(전투 180·스태미나 160, #326의 폭발 불 4초·최대 5도 미반영). 기존 Editor 도구 `Hapio/Upgrade Menu DEV Rows`를 Editor API로 실행해 값·범위를 원본에 맞췄고, 은퇴 칸 줄(55·87·88·152·154)은 공통 탭에서 숨겨졌다. ③ `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset`: 생성 한 번이 음일 거라고 가정해 양이 먼저 나오거나 음이 둘이면 실패하는 검사였다. 음이 나올 때까지(최대 5번) 생성하고 첫 음을 쓰도록 고쳤다. 런타임 규칙은 바꾸지 않았다.
 - 바뀐/추가된 검사: `LabModelTests`(해금 폭탄 열림·가득 찬 판·던지기/넘기기 거절, 잠긴 폭탄 열기 거절, 여우구슬 가장자리 거절·두 번 누르기, 아이템 사용 수), `LabDeveloperConfigTests`(은퇴 8칸, 저장 원본 120초·120 스태미나, 시간표가 짧은 전투를 막지 않음, 손가락 Sprite), `LabGimmickTimelineIntegrationTests`(모든 스테이지 공용 전투 시간), `LabYaguangFlashTests`, `LabOrbPhysicsTests`(여우구슬 튕김·두 번 누르기 연기, 해금 폭탄 미끄러짐·잡기 불가·열기 요청), `LabCharmBubblesTests`(손가락·안내 문구), `LabDeveloperSoloIntegrationTests`(여우 안내·솔로 매혹 대기 문구 없음), Hapio `GameStageSettingsTests`·`GameTerritoryFlowTests`·`GameStageUiTests`·`GameSceneFlowTests`, 프로토콜·토큰 고정값.
+
+
+## 2026-10-27 · #332 PR#337 최신 main 통합 재검사
+
+- main `6022eb9f`(#333/#331)와 지귀 기능을 통합한 `7575fd7c` 소스에서 검사했다. 최초 구현 `aa52a086`의1407/421건과 분리한 재검증이다.
+- Unity6000.6.5f1·macOS/Metal 검사 전용 Editor에서 통합 EditMode **1409/1409 통과(29.24초)**, 통합 PlayMode **423/423 통과(477.27초)**. 실패·Skipped·Inconclusive0.
+- main의 스태미나120/6칸·공용 전투 기본120초·폭탄 개봉→공격 구슬2개·여우불2탭/안내·구슬별 섬광 복구와 지귀 타임라인을 함께 유지했다. 폭탄 직접 투척 거절→use개봉→새 공격구슬로 근원 해제 검사를 보완했다.
+- 설정236개, 최종규약5672/Lab33/Game16. 이전5671 두 계열과 혼용하지 않으며 퇴역55/211의 기존 캡처값과 비노출을 보존한다.
+- 현재main과 DEV 외 RectTransform576개가 같고 Lab/Battle/결과Scene·Prefab·패키지·빌드 설정은 바꾸지 않았다. 별도 GourdExport/PNG문서·사용자 Scene.meta·구조 정리 보고서는 PR에서 제외했다.
+- 검사용 Editor만 종료하고 TimeManager의 검사 부수 직렬화는 원복했다. 다른 프로젝트의 Editor는 종료하지 않았다. 새 실행 로그나 개인 경로·기기 식별자는 저장소에 추가하지 않았다.
+- **미실행:** 실제기기·다중기기LAN/핫스팟·네이티브빌드/성능·실제음성/SFX·사람의 조준·재미. 음성 미할당과 별도 소모 감소 미정은 기존 제한을 유지한다.
