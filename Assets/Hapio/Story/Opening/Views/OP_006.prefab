@@ -987,11 +987,11 @@ MonoBehaviour:
   sourceFigmaNumber: 6
   sourceFigmaNodeId: 3182:12221
   overrideDialogueLayout: 1
-  dialogueFontSize: 20.69
+  dialogueFontSize: 18
   dialogueRect:
     serializedVersion: 2
     x: 84
-    y: 715
+    y: 720
     width: 270
     height: 100
   speakerRect:

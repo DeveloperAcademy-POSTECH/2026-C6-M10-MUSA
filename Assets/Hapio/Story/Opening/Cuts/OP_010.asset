@@ -16,11 +16,11 @@ MonoBehaviour:
   viewPrefab: {fileID: 5853198394908299789, guid: 713aa537d7509437daa35b1b59e72440, type: 3}
   pages:
   - speaker: "\uBD88\uC774"
-    dialogue: "\uC5D0\uC774, \uAD1C\uCC2E\uC544 \uAD1C\uCC2E\uC544~\n\uC790, \uAE68\uB057\uD574\uC838\uB77C~! \uCCAD! \uC815! \uBB34! \uC9C4!"
-    autoReadSeconds: 5.35
+    dialogue: "\uC624\uC624! \uC774\uAC83\uBD10 \uC5B4\uB54C?! \uC798 \uB418\uC9C0?!\n\uC5ED\uC2DC \uB098\uB9CC \uBBFF\uC73C\uB77C\uB2C8\uAE4C!"
+    autoReadSeconds: 4
     voice: {fileID: 0}
   direction: 
   speaker: "\uBD88\uC774"
-  dialogue: "\uC5D0\uC774, \uAD1C\uCC2E\uC544 \uAD1C\uCC2E\uC544~\n\uC790, \uAE68\uB057\uD574\uC838\uB77C~! \uCCAD! \uC815! \uBB34! \uC9C4!"
+  dialogue: "\uC624\uC624! \uC774\uAC83\uBD10 \uC5B4\uB54C?! \uC798 \uB418\uC9C0?!\n\uC5ED\uC2DC \uB098\uB9CC \uBBFF\uC73C\uB77C\uB2C8\uAE4C!"
   autoReadSeconds: 4
   voice: {fileID: 0}
