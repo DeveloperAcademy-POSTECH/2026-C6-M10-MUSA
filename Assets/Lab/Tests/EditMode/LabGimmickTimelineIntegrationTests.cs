@@ -89,7 +89,8 @@ namespace C6Lab.Tests
             At(room, 13d);
             Assert.That(Players.All(player => room.FlashGlared(player, 13d)), Is.True);
             At(room, 25d);
-            Assert.That(Players.Any(player => room.FlashGlared(player, 25d)), Is.False);
+            Assert.That(Players.All(player => room.FlashGlared(player, 25d)), Is.True,
+                "#329: the flash is used up by shaking, not by time; nobody shook, so everyone is still dazzled.");
 
             LabSnapshot warning = At(room, 35d);
             Assert.That(warning.comboWarningAt, Is.EqualTo(35d));

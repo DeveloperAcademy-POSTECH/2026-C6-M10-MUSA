@@ -49,6 +49,8 @@ namespace C6Lab
             if (network != null) network.LocalThrowHit += OnLocalThrowHit;
             if (network != null) network.BombBlasted += OnBombBlasted;
             if (network != null) network.LocalCombined += OnLocalCombined;
+            if (network != null) network.FiveColorOrbsReceived += OnFiveColorOrbsReceived;
+            if (network != null) network.LocalFiveColorHit += OnLocalFiveColorHit;
             if (board != null) board.SpawnStarted += OnSpawnStarted;
         }
 
@@ -58,6 +60,9 @@ namespace C6Lab
         private void OnSpawnStarted(string orbId) => PlayForGenerate(Config);
         private void OnBombBlasted(string bombId, Vector2 position) => PlayForBomb(Config);
         private void OnLocalCombined() => PlayForCombine(Config);
+        // 섬광 파훼 보상 (#329): 오색구슬을 받았을 때와 오색구슬이 박에 맞았을 때, 콤보 성공과 같은 짧은 연속 진동.
+        private void OnFiveColorOrbsReceived(int count) => PlayForComboClear(Config);
+        private void OnLocalFiveColorHit() => PlayForComboClear(Config);
 
         /// <summary>기본 피해(Damage per Hit)보다 크면 아이템 타격 진동, 아니면 타격 진동.</summary>
         public bool PlayForHit(int damage, LabConfig config)
@@ -180,6 +185,8 @@ namespace C6Lab
             if (network != null) network.LocalThrowHit -= OnLocalThrowHit;
             if (network != null) network.BombBlasted -= OnBombBlasted;
             if (network != null) network.LocalCombined -= OnLocalCombined;
+            if (network != null) network.FiveColorOrbsReceived -= OnFiveColorOrbsReceived;
+            if (network != null) network.LocalFiveColorHit -= OnLocalFiveColorHit;
             if (board != null) board.SpawnStarted -= OnSpawnStarted;
         }
 

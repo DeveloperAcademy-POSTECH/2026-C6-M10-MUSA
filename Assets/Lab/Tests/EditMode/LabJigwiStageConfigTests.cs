@@ -17,10 +17,10 @@ namespace C6Lab.Tests
         [Test]
         public void DefaultsAppendEightFieldsWithoutChangingRawOrRetiredPositions()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(236));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(238));
             Assert.That(LabConfig.JigwiStageFirstField, Is.EqualTo(228));
             Assert.That(LabConfig.JigwiStageLastField, Is.EqualTo(235));
-            Assert.That(config.CaptureDeveloperValues().Skip(228), Is.EqualTo(new[] { 1f, 1f, 7f, 18f, 30f, 1f, 3f, 2f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(228).Take(8), Is.EqualTo(new[] { 1f, 1f, 7f, 18f, 30f, 1f, 3f, 2f }));
             Assert.That(config.CaptureDeveloperValues().Skip(225).Take(3), Is.EqualTo(new[] { 1f, 75f, 3f }));
             Assert.That(config.CaptureDeveloperValues()[79], Is.Zero);
             Assert.That(LabConfig.DeveloperFields[228].IsToggle, Is.True);
@@ -47,8 +47,8 @@ namespace C6Lab.Tests
                 Assert.That(peer.CaptureDeveloperValues(), Is.EqualTo(requested));
                 Assert.That(runtime.CaptureDeveloperValues(), Is.EqualTo(requested));
                 Assert.That(peer.CaptureDeveloperValues().Take(228), Is.EqualTo(before.Take(228)));
-                Assert.That(LabSessionSettings.Fingerprint(received, 3, 5672),
-                    Is.EqualTo(LabSessionSettings.Fingerprint(requested, 3, 5672)));
+                Assert.That(LabSessionSettings.Fingerprint(received, 3, 5673),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(requested, 3, 5673)));
                 float[] runtimeValues = runtime.CaptureDeveloperValues(); runtimeValues[230] = 15f;
                 Assert.That(runtime.TryApplyDeveloperValues(runtimeValues, out error), Is.True, error);
                 Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(requested));
@@ -79,8 +79,8 @@ namespace C6Lab.Tests
             float[] before = config.CaptureDeveloperValues();
             float[] requested = (float[])before.Clone(); requested[index] = changed;
             Assert.That(config.TryApplyDeveloperValues(requested, out string error), Is.True, error);
-            Assert.That(LabSessionSettings.Fingerprint(requested, 3, 5672),
-                Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 3, 5672)));
+            Assert.That(LabSessionSettings.Fingerprint(requested, 3, 5673),
+                Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 3, 5673)));
             LabDeveloperField field = LabConfig.DeveloperFields[index];
             foreach (float endpoint in new[] { field.Min, field.Max, before[index] })
             {
@@ -97,16 +97,16 @@ namespace C6Lab.Tests
             float[] old = before.Take(228).ToArray(); old[0] = 777f;
             Assert.That(config.TryApplyDeveloperValues(old, out _), Is.False);
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(before));
-            Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(old, 3, 5672));
+            Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(old, 3, 5673));
         }
 
         [Test]
         public void MissingSerializedValuesKeepDefaultsAndInspectorValuesClampAtTheirOwnBounds()
         {
             JsonUtility.FromJsonOverwrite("{\"yinChance\":40,\"yangChance\":60}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(228), Is.EqualTo(new[] { 1f, 1f, 7f, 18f, 30f, 1f, 3f, 2f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(228).Take(8), Is.EqualTo(new[] { 1f, 1f, 7f, 18f, 30f, 1f, 3f, 2f }));
             JsonUtility.FromJsonOverwrite("{\"jigwiStageTimelineEnabled\":false,\"jigwiStageWarningSeconds\":-1,\"jigwiStageActiveSeconds\":30,\"jigwiStageRootAngleDegrees\":0,\"jigwiStageFireAngleDegrees\":70,\"jigwiStageSpreadSeconds\":0,\"jigwiStageSpreadPatches\":8,\"jigwiStageFeverMultiplier\":0}", config);
-            Assert.That(config.CaptureDeveloperValues().Skip(228), Is.EqualTo(new[] { 0f, 0f, 20f, 5f, 45f, .1f, 3f, 1f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(228).Take(8), Is.EqualTo(new[] { 0f, 0f, 20f, 5f, 45f, .1f, 3f, 1f }));
         }
     }
 }

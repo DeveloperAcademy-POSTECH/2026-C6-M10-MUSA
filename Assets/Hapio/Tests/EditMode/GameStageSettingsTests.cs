@@ -63,7 +63,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(236));
+                    Assert.That(values.Length, Is.EqualTo(238));
                     Assert.That(values[205], Is.EqualTo(before[205]), "Common gimmick interval preserved (#311)");
                     Assert.That(values[206], Is.EqualTo(before[206]), "Unique gimmick interval preserved (#311)");
                 }

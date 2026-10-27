@@ -122,7 +122,7 @@ namespace C6Lab
             comboQueuedAt = flashQueuedAt = -1d;
             combo.Stop(at);
             bool flashOn = rules.FlashEnabled && flashCount > 0
-                && at < lastFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds;
+                && at < lastFlashAt + rules.FlashGlareLimitSeconds + rules.FlashRecoverySeconds;
             foreach (LabPlayerState player in players.Values)
             {
                 player.comboPenaltyUntil = Math.Min(player.comboPenaltyUntil, at);

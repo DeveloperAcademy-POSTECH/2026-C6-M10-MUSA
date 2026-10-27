@@ -61,6 +61,8 @@ namespace C6Lab
         [SerializeField, Range(1f, 2f)] private float revealPopScale = 1.3f;
         [Tooltip("색을 되찾은 구슬이 제 크기로 돌아오는 시간 (초)")]
         [SerializeField, Range(.05f, .6f)] private float revealPopSeconds = .18f;
+        [Tooltip("섬광 파훼 보상 (#329): 풀린 뒤 오색구슬을 노리고 이어서 흔들 때, 다음 흔들기까지 이 초가 넘으면 끊긴 것으로 보고 기회가 끝난다.")]
+        [SerializeField, Range(.5f, 4f)] private float bonusGapSeconds = 1.5f;
         [Tooltip("흔들라는 안내 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 shakeCueAnchor = new Vector2(.5f, .42f);
         [Tooltip("흔들라는 안내의 폰 그림 높이 (Canvas 기준 픽셀)")]
@@ -90,6 +92,13 @@ namespace C6Lab
         public const float ShakeRetrySeconds = .5f;
         private float shownShake;
         private int revealedShakes;
+        // 섬광 파훼 보상 (#329): 풀린 뒤에도 이어서 흔드는 중인지, 끊겼는지, 마지막으로 흔든 시각, 보상 요청 시각.
+        private bool bonusLost, bonusShowing;
+        private float lastShakeAt = float.NegativeInfinity, bonusSentAt = float.NegativeInfinity;
+        /// <summary>풀린 뒤 오색구슬을 노리고 이어서 흔드는 중이라 안내가 계속 보이는지 (#329)</summary>
+        public bool BonusShakeActive => bonusShowing;
+        /// <summary>이어서 흔들기가 끊겨 이번 섬광의 오색구슬 기회가 끝났는지 (#329)</summary>
+        public bool BonusLost => bonusLost;
         private RectTransform shakeCue, shakeGaugeFill, shakePhone;
         private Text shakeLabel;
         /// <summary>이번 섬광에 이 화면에서 센 흔들기 수 (#301)</summary>
@@ -170,11 +179,12 @@ namespace C6Lab
             }
             double now = ServerNow(snapshot);
             ulong me = network.LocalPlayerId;
-            float glare = LabYaguangFlash.GlareAmount(snapshot, now, me, config.YaguangFlashGlareSeconds,
+            // #329: 흔들어 풀기가 켜져 있으면 섬광은 흔들어야만 풀린다(시간으로 풀리지 않음).
+            float glare = LabYaguangFlash.GlareAmount(snapshot, now, me, config.YaguangFlashGlareLimitSeconds,
                 config.YaguangFlashRecoverySeconds);
             // 흔들어 풀기 (#301): 흔든 만큼 이 화면의 하얀 막을 덜어 낸다. 다 흔들면 Host가 풀기 전에도 바로 맑다.
             bool shakeRelease = config.YaguangFlashShakeRelease;
-            bool myGlare = shakeRelease && LabYaguangFlash.Glared(snapshot, now, me, config.YaguangFlashGlareSeconds);
+            bool myGlare = shakeRelease && LabYaguangFlash.Glared(snapshot, now, me, config.YaguangFlashGlareLimitSeconds);
             float shakeProgress = DriveShake(snapshot, myGlare, config.YaguangFlashShakeCount);
             // 흔들 때마다 구슬 하나씩 색이 돌아온다 (#330, 판이 정한다). 다 흔들었으면 Host가 풀기 전에도 바로 맑다.
             // 화면 전체의 옅은 막은 돌아온 비율만큼 부드럽게 옅어진다.
@@ -199,7 +209,8 @@ namespace C6Lab
             }
             burstAlpha = Mathf.Max(burstAlpha, veilAlpha * veilGlare);
             int count = showCountdown && !snapshot.paused ? CountdownAt(snapshot, now, me) : 0;
-            bool cue = myGlare && shakeProgress < 1f && !snapshot.paused;
+            // 풀린 뒤에도 오색구슬을 노리고 이어서 흔드는 동안은 안내(폰·게이지·횟수)를 계속 보인다 (#329).
+            bool cue = (myGlare && shakeProgress < 1f || bonusShowing) && !snapshot.paused;
             if (warning <= 0f && burstAlpha <= 0f && count <= 0 && !cue)
             {
                 if (layer != null) layer.gameObject.SetActive(false);
@@ -215,7 +226,7 @@ namespace C6Lab
             burst.color = new Color(BurstColor.r, BurstColor.g, BurstColor.b, burstAlpha);
             burst.gameObject.SetActive(burstAlpha > 0f);
             DriveCountdown(count);
-            DriveShakeCue(cue, shakeProgress);
+            DriveShakeCue(cue, config.YaguangFlashShakeCount);
         }
 
         /// <summary>
@@ -237,24 +248,51 @@ namespace C6Lab
                 shownShake = 0f;
                 revealedShakes = 0;
                 if (boundBoard != null) boundBoard.ResetFlashReveal();
+                bonusLost = bonusShowing = false;
+                lastShakeAt = bonusSentAt = float.NegativeInfinity;
             }
             shakeCounter.Threshold = shakeThreshold;
             shakeCounter.MinGap = shakeMinGap;
-            if (myGlare && !snapshot.paused && network != null && !network.GameStartHeld && network.IsConnected)
+            bool live = !snapshot.paused && network != null && !network.GameStartHeld && network.IsConnected;
+            bool released = !myGlare && network != null && snapshot.FlashReleasedAt(network.LocalPlayerId) >= 0d;
+            bool fiveColor = network != null && network.config != null && network.config.YaguangFiveColorOrbCount > 0;
+            // #329: 풀린 뒤에는 끊기지 않고 이어서 흔드는 동안만 계속 센다. 다음 흔들기까지 bonusGapSeconds를 넘기면 끝.
+            if (released && !bonusLost && (!fiveColor || shakeCounter.Count >= maxShakes
+                || Time.unscaledTime - lastShakeAt > bonusGapSeconds)) bonusLost = shakeCounter.Count < maxShakes;
+            bonusShowing = released && fiveColor && !bonusLost && shakeCounter.Count < maxShakes;
+            if (live && (myGlare || bonusShowing))
             {
-                if (!ShakesDone(maxShakes) && ReadShake()) HapticTick();
+                if (shakeCounter.Count < maxShakes && ReadShake())
+                {
+                    HapticTick();
+                    lastShakeAt = Time.unscaledTime;
+                }
                 RevealShaken(maxShakes);
                 // A report can arrive while the Host is paused. Retain this generation's shakes and
                 // retry at a bounded rate until the authoritative snapshot confirms release.
-                if (ShakesDone(maxShakes) && Time.unscaledTime - shakeSentAt >= ShakeRetrySeconds
+                if (myGlare && ShakesDone(maxShakes) && Time.unscaledTime - shakeSentAt >= ShakeRetrySeconds
                     && network.RequestFlashShakeRelease())
                     shakeSentAt = Time.unscaledTime;
             }
             else RevealShaken(maxShakes);
+            // 최대 횟수까지 이어서 흔들었다: 오색구슬을 받을 때까지 같은 간격으로 다시 알린다 (#329).
+            if (live && fiveColor && !bonusLost && shakeCounter.Count >= maxShakes && (myGlare || released)
+                && !BonusConfirmed(snapshot) && Time.unscaledTime - bonusSentAt >= ShakeRetrySeconds
+                && network.RequestFlashFiveColorBonus())
+                bonusSentAt = Time.unscaledTime;
             if (ShakesDone(maxShakes)) return 1f;
             if (boundBoard == null) return ShakeProgress(shakeCounter.Count, maxShakes);
             int count = shakeCounter.Count;
             return ShakeProgress(count, count + Mathf.Min(boundBoard.FlashWhiteCount, maxShakes - count));
+        }
+
+        /// <summary>이번 섬광의 오색구슬을 Host가 이미 줬는지 (#329)</summary>
+        private bool BonusConfirmed(LabSnapshot snapshot)
+        {
+            if (snapshot.players == null || network == null) return false;
+            foreach (LabPlayerState player in snapshot.players)
+                if (player != null && player.id == network.LocalPlayerId) return player.flashBonusFlash == snapshot.flashCount;
+            return false;
         }
 
         /// <summary>다 흔들었는지 (#330): 최대 횟수를 채웠거나, 한 번 이상 흔들었고 판에 하얀 구슬이 남지 않았다.</summary>
@@ -305,7 +343,7 @@ namespace C6Lab
         }
 
         /// <summary>흔들라는 안내: 좌우로 흔들리는 폰 그림 + 문구 + 흔든 만큼 차오르는 게이지.</summary>
-        private void DriveShakeCue(bool show, float progress)
+        private void DriveShakeCue(bool show, int maxShakes)
         {
             if (shakeCue == null) return;
             shakeCue.gameObject.SetActive(show);
@@ -318,18 +356,23 @@ namespace C6Lab
             float wiggle = Mathf.Sin(Time.unscaledTime * shakeCueWiggleHz * Mathf.PI * 2f);
             shakePhone.localRotation = Quaternion.Euler(0f, 0f, 18f * wiggle);
             shakePhone.anchoredPosition += new Vector2(size * .12f * wiggle, 0f);
-            bool hasText = !string.IsNullOrEmpty(shakeText);
-            shakeLabel.gameObject.SetActive(hasText);
-            shakeLabel.text = shakeText;
-            shakeLabel.fontSize = Mathf.RoundToInt(size * .4f);
-            shakeLabel.rectTransform.sizeDelta = new Vector2(size * 3f, size * .55f);
-            shakeLabel.rectTransform.anchoredPosition = new Vector2(0f, -size * .12f);
             var track = (RectTransform)shakeGaugeFill.parent;
             track.sizeDelta = new Vector2(size * 1.8f, size * .14f);
-            // 문구가 없으면 게이지를 폰 그림 바로 밑으로 올린다.
-            track.anchoredPosition = new Vector2(0f, hasText ? -size * .5f : -size * .08f);
-            shakeGaugeFill.anchorMax = new Vector2(Mathf.Clamp01(progress), 1f);
+            track.anchoredPosition = new Vector2(0f, -size * .08f);
+            // #329: 게이지는 흔든 수 / 최대 횟수, 그 밑에 "3/10"처럼 횟수를 적는다. 파훼 뒤에도 최대까지 이어진다.
+            int count = Mathf.Min(shakeCounter.Count, Mathf.Max(1, maxShakes));
+            shakeGaugeFill.anchorMax = new Vector2(ShakeProgress(count, maxShakes), 1f);
+            ShakeCountText = count + "/" + Mathf.Max(1, maxShakes);
+            string text = string.IsNullOrEmpty(shakeText) ? ShakeCountText : shakeText + " " + ShakeCountText;
+            shakeLabel.gameObject.SetActive(true);
+            shakeLabel.text = text;
+            shakeLabel.fontSize = Mathf.RoundToInt(size * .26f);
+            shakeLabel.rectTransform.sizeDelta = new Vector2(size * 3f, size * .4f);
+            shakeLabel.rectTransform.anchoredPosition = new Vector2(0f, -size * .34f);
         }
+
+        /// <summary>흔들기 안내에 보이는 횟수 문구 (예: "3/10", #329)</summary>
+        public string ShakeCountText { get; private set; } = string.Empty;
 
         /// <summary>카운트다운 숫자를 맞추고, 숫자가 바뀔 때마다 크게 나왔다가 제자리로 톡 줄어든다.</summary>
         private void DriveCountdown(int count)

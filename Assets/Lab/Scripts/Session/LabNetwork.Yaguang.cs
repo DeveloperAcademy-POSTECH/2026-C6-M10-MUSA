@@ -21,5 +21,48 @@ namespace C6Lab
                 flashGeneration = latest.flashCount });
             return true;
         }
+
+        /// <summary>섬광 파훼 보상 요청 패킷 종류 (#329)</summary>
+        public const string FlashBonusPacket = "flashBonus";
+
+        /// <summary>
+        /// 이 기기 플레이어가 풀린 뒤에도 끊기지 않고 최대 횟수까지 흔들었다고 Host에 알린다 (#329). Host가 이번 섬광에서
+        /// 한 번만 오색구슬을 준다. 전투 중이 아니면 보내지 않는다.
+        /// </summary>
+        public bool RequestFlashFiveColorBonus()
+        {
+            if (!IsConnected || !CanProcessBattleActions || latest == null
+                || latest.phase != LabPhase.Playing || latest.paused || latest.flashCount == 0) return false;
+            Request(new LabNetworkPacket { type = FlashBonusPacket, requestId = ++requestSequence,
+                flashGeneration = latest.flashCount });
+            return true;
+        }
+
+        /// <summary>내 판에 오색구슬이 새로 생겼다 (#329). 받은 개수. 진동·소리가 듣는다.</summary>
+        public event System.Action<int> FiveColorOrbsReceived;
+        /// <summary>내가 던진 오색구슬이 박에 맞았다 (#329)</summary>
+        public event System.Action LocalFiveColorHit;
+        private readonly System.Collections.Generic.HashSet<string> knownFiveColorOrbs =
+            new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
+
+        /// <summary>스냅샷의 내 판에서 처음 보는 오색구슬 수를 세어, 있으면 한 번 알린다.</summary>
+        private void NoticeFiveColorOrbs(LabSnapshot snapshot)
+        {
+            if (snapshot?.orbs == null) return;
+            int fresh = 0;
+            foreach (LabOrbState orb in snapshot.orbs)
+                if (orb != null && orb.fiveColor && orb.owner == LocalPlayerId && knownFiveColorOrbs.Add(orb.id)
+                    && orb.originOwner == LocalPlayerId && snapshot.serverTime - orb.createdAt < 2d) fresh++;
+            if (fresh > 0) FiveColorOrbsReceived?.Invoke(fresh);
+        }
+
+        /// <summary>오색구슬 명중 (#329): 맞은 자리에 다섯 색 별가루를 터뜨리고, 던진 사람이면 진동한다.</summary>
+        private void PresentFiveColorHit(Vector3 targetLocalPoint, ulong owner)
+        {
+            if (target == null) return;
+            Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
+            LabFiveColorSparkle.Burst(hitbox.TransformPoint(targetLocalPoint), config != null ? config.OrbRadius : .3f);
+            if (owner == LocalPlayerId) LocalFiveColorHit?.Invoke();
+        }
     }
 }

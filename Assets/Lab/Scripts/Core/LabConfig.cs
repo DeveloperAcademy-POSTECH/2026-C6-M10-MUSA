@@ -368,7 +368,10 @@ namespace C6Lab
             new LabDeveloperField("지귀 불 패치 반경 (표면 각도)", 10f, 45f),
             new LabDeveloperField("지귀 번짐 간격 (초)", .1f, 3f),
             new LabDeveloperField("지귀 그룹 패치 수", 1f, 3f, true),
-            new LabDeveloperField("지귀 피버 자동 회복 배율", 1f, 4f)
+            new LabDeveloperField("지귀 피버 자동 회복 배율", 1f, 4f),
+            // 섬광 파훼 보상 (#329): 최대 횟수까지 이어서 흔든 사람 판에 오색구슬. 칠 면적은 도색 한 번의 상한(3배) 안이다.
+            new LabDeveloperField("섬광 오색구슬 수 (0 = 없음)", 0f, 6f, true),
+            new LabDeveloperField("오색구슬 칠 면적 (배)", 1f, 3f)
         });
 
         public const int JigwiStageFirstField = 228;
@@ -430,7 +433,7 @@ namespace C6Lab
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
             // 섬광 흔들어 풀기·흔들기 횟수(#301)는 고해상도 도색(#299) 뒤 202·203번이며 섬광 칸 맨 아래에 둔다.
             new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
-                184, 185, 186, 187, 188, 189, 190, 202, 203)
+                184, 185, 186, 187, 188, 189, 190, 202, 203, 236, 237)
                 .WithSwitch(155, 184)
                 .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
             // 전투 시간(211)은 은퇴 (#328): 야광귀도 공용 전투 시간 안에서 이 시간표를 따른다.
@@ -743,6 +746,10 @@ namespace C6Lab
         [SerializeField] private bool yaguangFlashShakeRelease = true;
         [Tooltip("눈부심을 풀려면 세게 흔들어야 하는 최대 횟수 (#330). 판의 구슬이 이보다 적으면 구슬 수만큼만 흔들면 된다. 기본 10번(범위 가운데).")]
         [SerializeField, Range(2, 18)] private int yaguangFlashShakeCount = 10;
+        [Tooltip("섬광 파훼 보상 (#329): 최대 흔들기 횟수까지 끊기지 않고 이어서 흔든 사람 판에 떨어지는 오색구슬 수. 0이면 보상 없음.")]
+        [SerializeField, Range(0, 6)] private int yaguangFiveColorOrbCount = 3;
+        [Tooltip("오색구슬로 박을 맞혔을 때 칠 면적 배율 (보통 구슬 = 1). 다섯 원소 색 얼룩을 합친 넓이다. 도색 한 번은 최대 3배까지라 다른 배율과 곱해도 3을 넘지 않는다.")]
+        [SerializeField, Range(1f, 3f)] private float yaguangFiveColorOrbPaintScale = 2f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -889,6 +896,13 @@ namespace C6Lab
         public float JigwiStageSpreadSeconds => Mathf.Clamp(Finite(jigwiStageSpreadSeconds, 1f), .1f, 3f);
         public int JigwiStageSpreadPatches => Mathf.Clamp(jigwiStageSpreadPatches, 1, 3);
         public float JigwiStageFeverMultiplier => Mathf.Clamp(Finite(jigwiStageFeverMultiplier, 2f), 1f, 4f);
+        public int YaguangFiveColorOrbCount => Mathf.Clamp(yaguangFiveColorOrbCount, 0, 6);
+        public float YaguangFiveColorOrbPaintScale => Mathf.Clamp(Finite(yaguangFiveColorOrbPaintScale, 2f), 1f, 3f);
+        /// <summary>
+        /// 섬광이 시간으로 풀리기까지의 초 (#329). 흔들어 풀기가 켜져 있으면 섬광은 소모성 방해라 시간으로 풀리지 않는다(무한).
+        /// 꺼져 있으면 `섬광 눈부심 (초)`. 다음 섬광 예약 같은 일정 계산은 언제나 `YaguangFlashGlareSeconds`를 쓴다.
+        /// </summary>
+        public float YaguangFlashGlareLimitSeconds => YaguangFlashShakeRelease ? float.PositiveInfinity : YaguangFlashGlareSeconds;
 
         /// <summary>
         /// Percent weights in GeneratedKinds order. An Inspector total of zero falls back to
@@ -1281,7 +1295,8 @@ namespace C6Lab
                 RawStreakCorrectionEnabled ? 1f : 0f, RawStreakOppositeChancePercent, RawStreakMaximum,
                 JigwiStageTimelineEnabled ? 1f : 0f, JigwiStageWarningSeconds, JigwiStageActiveSeconds,
                 JigwiStageRootAngleDegrees, JigwiStageFireAngleDegrees, JigwiStageSpreadSeconds,
-                JigwiStageSpreadPatches, JigwiStageFeverMultiplier
+                JigwiStageSpreadPatches, JigwiStageFeverMultiplier,
+                YaguangFiveColorOrbCount, YaguangFiveColorOrbPaintScale
             };
         }
 
@@ -1556,6 +1571,8 @@ namespace C6Lab
             jigwiStageSpreadSeconds = values[233];
             jigwiStageSpreadPatches = (int)values[234];
             jigwiStageFeverMultiplier = values[235];
+            yaguangFiveColorOrbCount = (int)values[236];
+            yaguangFiveColorOrbPaintScale = values[237];
             error = string.Empty;
             return true;
         }

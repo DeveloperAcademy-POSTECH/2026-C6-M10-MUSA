@@ -65,7 +65,7 @@ namespace Hapio.Tests
                 .Select(session.CaptureDeveloperSettings).ToArray();
             screen.developerScopeButtons[2].onClick.Invoke();
             AssertScope(screen, 2);
-            Assert.That(screen.developerSliders, Has.Length.EqualTo(236));
+            Assert.That(screen.developerSliders, Has.Length.EqualTo(238));
             // Its own battle time (211) is retired (#328); the schedule's end (212) is the first timetable value.
             Assert.That(screen.developerInputs[211].transform.parent.gameObject.activeSelf, Is.False);
             Assert.That(screen.developerSliders[212].minValue, Is.EqualTo(0f));
@@ -183,7 +183,7 @@ namespace Hapio.Tests
         private static void AssertScope(GameScreen screen, int scope)
         {
             Assert.That(screen.DeveloperScope, Is.EqualTo(scope));
-            Assert.That(screen.developerInputs, Has.Length.EqualTo(236));
+            Assert.That(screen.developerInputs, Has.Length.EqualTo(238));
             for (int i = 0; i < screen.developerInputs.Length; i++)
                 Assert.That(screen.developerInputs[i].transform.parent.gameObject.activeSelf,
                     Is.EqualTo(GameStageSettings.IsFieldVisible(scope, i)), "Field " + i + " in scope " + scope);
