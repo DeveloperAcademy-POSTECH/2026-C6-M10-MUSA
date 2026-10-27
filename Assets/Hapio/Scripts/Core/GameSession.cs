@@ -31,6 +31,10 @@ namespace Hapio
         private bool roomBrowserVisible;
         private GameFlowState state = new GameFlowState();
         private Coroutine sceneRoutine;
+        // 에디터에서 Play를 멈추거나 앱이 끝나는 중이면 씬을 바꾸지 않는다. 이때 연결이 끊기며 GameOver로 넘어가도
+        // Unity가 씬을 불러 주지 않아(LoadSceneAsync = null) 예외만 남던 것을 막는다.
+        private bool quitting;
+        private void OnApplicationQuit() => quitting = true;
         private string wantedScene;
         private bool forceBattleReload, goingHome, battleReadyPending, localBattleReady;
         private bool restartPending;
@@ -340,6 +344,7 @@ namespace Hapio
 
         private void QueueScene(string path)
         {
+            if (quitting) return;
             wantedScene = path;
             if (sceneRoutine == null && (SceneManager.GetActiveScene().path != path || forceBattleReload))
                 sceneRoutine = StartCoroutine(ChangeScene());
@@ -371,7 +376,11 @@ namespace Hapio
                 network.UnbindBattleReferences();
                 forceBattleReload = false;
                 AsyncOperation load = SceneManager.LoadSceneAsync(destination, LoadSceneMode.Single);
-                if (load == null) throw new InvalidOperationException("Could not load " + destination);
+                if (load == null)
+                {
+                    if (quitting) break;
+                    throw new InvalidOperationException("Could not load " + destination);
+                }
                 yield return load;
                 yield return null;
             }

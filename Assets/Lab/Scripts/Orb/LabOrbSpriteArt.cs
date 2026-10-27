@@ -32,9 +32,32 @@ namespace C6Lab
             return existing;
         }
 
+        private LabOrbBoard board;
+        private bool boardLooked;
+
+        /// <summary>
+        /// 판 구슬 그림은 판을 비추는 카메라(판의 입력 카메라) 쪽만 본다. 예전처럼 "지금 그리는 카메라" 쪽으로 돌리면,
+        /// 같은 구슬을 다른 카메라(전투 3D 카메라, 에디터 Scene 창 등)도 그릴 때 그쪽으로 돌아간 채 남아
+        /// 판에서 옆으로 선 종이처럼 길쭉하게 보였다. 판 카메라를 모를 때만 예전 방식을 쓴다.
+        /// </summary>
+        private Camera BoardCamera
+        {
+            get
+            {
+                if (!boardLooked) { board = GetComponentInParent<LabOrbBoard>(); boardLooked = true; }
+                return board != null ? board.ViewCamera : null;
+            }
+        }
+
+        private void LateUpdate()
+        {
+            Camera view = BoardCamera;
+            if (view != null) transform.rotation = view.transform.rotation;
+        }
+
         private void OnWillRenderObject()
         {
-            // Each device views the same physical projectile from its own battle camera.
+            if (BoardCamera != null) return;
             if (Camera.current != null) transform.rotation = Camera.current.transform.rotation;
         }
     }

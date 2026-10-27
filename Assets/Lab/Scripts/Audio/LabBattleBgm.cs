@@ -12,6 +12,8 @@ namespace C6Lab
     /// - 야광귀 피버타임 (#343): 피버가 시작되면 Resources/Audio/Fever 폴더의 첫 파일(휘모리처럼 점점 빨라지는 꽹과리 +
     ///   태평소 능게, 피버 20초에 맞춘 곡)로 바꿔 처음부터 튼다. 늦게 들어온 기기는 피버가 흐른 만큼 건너뛰어 맞춘다.
     ///   전투 BGM은 그동안 줄여 둔다. 일시정지·승리/패배·새 라운드는 전투 BGM과 똑같이 다룬다.
+    ///   피버가 시작되는 순간에는 콤보 성공 추임새 "좋다"(Resources/Audio/ComboClear)를 한 번 낸다. 늦게 들어와 이미 한참 지난
+    ///   피버에서는 내지 않는다. 크기는 cueVolume × 일시정지 메뉴 효과음 설정.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabBattleBgm : MonoBehaviour
@@ -26,8 +28,15 @@ namespace C6Lab
         [Range(0f, 2f)] public float feverVolume = 1f;
         [Tooltip("피버가 시작될 때 전투 BGM에서 피버 곡으로 넘어가는 시간 (초)")]
         [Min(0f)] public float feverCrossfadeSeconds = .25f;
+        [Tooltip("피버가 시작될 때 내는 추임새(콤보 성공과 같은 파일) 크기")]
+        [Range(0f, 1f)] public float cueVolume = 1f;
+        // 피버가 시작된 지 이 초 안에 알아챈 기기만 추임새를 낸다 (다시 접속한 기기가 뒤늦게 내지 않게).
+        private const double CueWindowSeconds = 1d;
 
-        private AudioSource source, feverSource;
+        private AudioSource source, feverSource, cueSource;
+        private AudioClip[] cueClips;
+        /// <summary>피버 시작 추임새를 낸 횟수 (테스트·확인용)</summary>
+        public int FeverCueCount { get; private set; }
         private LabNetwork network;
         private string playingRound;
         private bool fading, feverOn;
@@ -60,6 +69,10 @@ namespace C6Lab
             feverSource.spatialBlend = 0f;
             feverSource.volume = 0f;
             if (fever.Length > 0) feverSource.clip = fever[0];
+            cueClips = Resources.LoadAll<AudioClip>(LabComboClearSound.ClipFolder);
+            cueSource = gameObject.AddComponent<AudioSource>();
+            cueSource.playOnAwake = false;
+            cueSource.spatialBlend = 0f;
         }
 
         /// <summary>
@@ -75,6 +88,7 @@ namespace C6Lab
                 feverSource.Stop();
                 feverSource.time = Mathf.Clamp((float)elapsed, 0f, Mathf.Max(0f, feverSource.clip.length - .05f));
                 if (!snapshot.paused) feverSource.Play();
+                if (elapsed < CueWindowSeconds) PlayFeverCue();
             }
             else if (!fever && feverOn) StopFever();
             float step = feverCrossfadeSeconds <= 0f ? 1f : Time.unscaledDeltaTime / feverCrossfadeSeconds;
@@ -84,6 +98,14 @@ namespace C6Lab
             if (!feverOn) return;
             if (snapshot.paused) { if (feverSource.isPlaying) feverSource.Pause(); }
             else if (!feverSource.isPlaying) { feverSource.UnPause(); if (!feverSource.isPlaying) feverSource.Play(); }
+        }
+
+        /// <summary>피버 시작 추임새 "좋다"를 한 번 낸다 (콤보 성공과 같은 파일).</summary>
+        private void PlayFeverCue()
+        {
+            FeverCueCount++;
+            if (cueClips == null || cueClips.Length == 0 || cueSource == null) return;
+            cueSource.PlayOneShot(cueClips[Random.Range(0, cueClips.Length)], cueVolume * LabAudioSettings.SfxVolume);
         }
 
         private void StopFever()
