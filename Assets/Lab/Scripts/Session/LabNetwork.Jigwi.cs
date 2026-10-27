@@ -14,9 +14,10 @@ namespace C6Lab
         private Transform jigwiFireRoot;
 
         /// <summary>The standalone Lab keeps its manual tools; a game run exposes them only in Jigwi's stage.</summary>
-        public bool JigwiManualControlsAllowed => !gameFlowEnabled || gameStageYokai == LabStageYokai.Jigwi;
+        public bool JigwiManualControlsAllowed => (!gameFlowEnabled || gameStageYokai == LabStageYokai.Jigwi)
+            && !(gameFlowEnabled && gameStageYokai == LabStageYokai.Jigwi && config != null && config.JigwiStageTimelineEnabled);
 
-        public bool CanDevStartJigwi => DeveloperBuildAvailable && IsHost && IsConnected && model != null
+        public bool CanDevStartJigwi => JigwiManualControlsAllowed && DeveloperBuildAvailable && IsHost && IsConnected && model != null
             && (model.StageYokai == LabStageYokai.None || model.StageYokai == LabStageYokai.Jigwi)
             && model.Phase == LabPhase.Playing && !battleClock.IsPaused && SessionConfigReady;
 

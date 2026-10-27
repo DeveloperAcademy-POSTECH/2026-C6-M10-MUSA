@@ -49,8 +49,8 @@ namespace C6Lab.Tests
         [TestCase(LabStageYokai.None, 180d)]
         [TestCase(LabStageYokai.Gumiho, 180d)]
         [TestCase(LabStageYokai.Yaguang, 120d)]
-        [TestCase(LabStageYokai.Jigwi, 180d)]
-        public void OnlyYaguangUsesItsOwnBattleDuration(LabStageYokai stage, double expected)
+        [TestCase(LabStageYokai.Jigwi, 120d)]
+        public void ScheduledStagesUseTheirOwnBattleDuration(LabStageYokai stage, double expected)
         {
             Assert.That(Room(stage: stage).Snapshot(0d).remaining, Is.EqualTo(expected));
         }

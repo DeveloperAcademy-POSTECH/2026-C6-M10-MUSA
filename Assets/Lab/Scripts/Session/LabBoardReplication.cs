@@ -36,6 +36,7 @@ namespace C6Lab
         public int blueFeverHits, redFeverHits;
         public double blueFeverStartedAt = -1d, blueFeverUntil = -1d, redFeverStartedAt = -1d, redFeverUntil = -1d;
         public LabJigwiState[] jigwi = Array.Empty<LabJigwiState>();
+        public LabJigwiStageSnapshot jigwiStage = new LabJigwiStageSnapshot();
         public double flashWarningAt = -1d, flashAt = -1d, flashLastAt = -1d;
         public ulong flashTarget, flashLastTarget;
         public bool flashTargetAll, flashLastTargetAll;
@@ -60,6 +61,7 @@ namespace C6Lab
             copy.removedIds = Array.Empty<string>();
             copy.players = Array.Empty<LabPlayerState>();
             copy.jigwi = LabJigwiNetworkValidation.Copy(jigwi);
+            copy.jigwiStage = LabJigwiStageNetworkValidation.Copy(jigwiStage);
             copy.comboColors = comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])comboColors.Clone();
             return copy;
         }
@@ -126,6 +128,7 @@ namespace C6Lab
                 blueFeverStartedAt = snapshot.blueFeverStartedAt, blueFeverUntil = snapshot.blueFeverUntil,
                 redFeverStartedAt = snapshot.redFeverStartedAt, redFeverUntil = snapshot.redFeverUntil,
                 jigwi = LabJigwiNetworkValidation.Copy(snapshot.jigwi),
+                jigwiStage = LabJigwiStageNetworkValidation.Copy(snapshot.jigwiStage),
                 flashWarningAt = snapshot.flashWarningAt, flashAt = snapshot.flashAt,
                 flashTarget = snapshot.flashTarget, flashTargetAll = snapshot.flashTargetAll,
                 flashCount = snapshot.flashCount, flashLastAt = snapshot.flashLastAt,
@@ -157,6 +160,8 @@ namespace C6Lab
             && a.originOwner == b.originOwner && a.createdAt == b.createdAt && a.unlockedAt == b.unlockedAt
             && a.inFlight == b.inFlight && a.arrival == b.arrival && a.stopAt == b.stopAt
             && a.arrivedAt == b.arrivedAt && a.burnedAt == b.burnedAt && a.small == b.small
+            && a.gourdBlastOnlySmall == b.gourdBlastOnlySmall && a.gourdBlastBurnedAt == b.gourdBlastBurnedAt
+            && a.ordinaryBlastBurnedAt == b.ordinaryBlastBurnedAt
             && a.jigwiRadiusScale == b.jigwiRadiusScale && a.expiresAt == b.expiresAt
             && a.jigwiSupply == b.jigwiSupply && a.jigwiGenerationBurn == b.jigwiGenerationBurn && a.fever == b.fever;
 
@@ -300,6 +305,7 @@ namespace C6Lab
                 copy.blueFeverStartedAt = header.blueFeverStartedAt; copy.blueFeverUntil = header.blueFeverUntil;
                 copy.redFeverStartedAt = header.redFeverStartedAt; copy.redFeverUntil = header.redFeverUntil;
                 copy.jigwi = LabJigwiNetworkValidation.Copy(header.jigwi);
+                copy.jigwiStage = LabJigwiStageNetworkValidation.Copy(header.jigwiStage);
                 copy.flashWarningAt = header.flashWarningAt; copy.flashAt = header.flashAt;
                 copy.flashTarget = header.flashTarget; copy.flashTargetAll = header.flashTargetAll;
                 copy.flashCount = header.flashCount; copy.flashLastAt = header.flashLastAt;
@@ -380,6 +386,7 @@ namespace C6Lab
             && LabComboNetworkValidation.Valid(frame)
             && LabFlashNetworkValidation.Valid(frame)
             && LabJigwiNetworkValidation.Valid(frame.jigwi)
+            && LabJigwiStageNetworkValidation.Valid(frame.jigwiStage, frame.players)
             && ValidStates(frame.states, true) && ValidRemoved(frame.removedIds) && ValidPlayers(frame.players);
 
         private bool ValidStates(LabOrbState[] values, bool forThisOwner)
@@ -396,6 +403,9 @@ namespace C6Lab
                     || !Unit(state.x) || !Unit(state.y) || !Finite(state.vx) || !Finite(state.vy)
                     || !Finite(state.createdAt) || state.createdAt < 0d || !Finite(state.unlockedAt)
                     || !Finite(state.arrivedAt) || !Finite(state.burnedAt) || !Finite(state.stopAt)
+                    || !Finite(state.gourdBlastBurnedAt) || !Finite(state.ordinaryBlastBurnedAt)
+                    || state.gourdBlastBurnedAt < -1d || state.ordinaryBlastBurnedAt < -1d
+                    || state.gourdBlastOnlySmall && !state.small
                     || !Finite(state.jigwiRadiusScale) || state.jigwiRadiusScale <= 0f || state.jigwiRadiusScale > 1f
                     || !Finite(state.expiresAt) || state.expiresAt < -1d
                     || state.arrival < LabDrumArrival.None || state.arrival > LabDrumArrival.Coast
@@ -452,6 +462,7 @@ namespace C6Lab
             blueFeverStartedAt = source.blueFeverStartedAt, blueFeverUntil = source.blueFeverUntil,
             redFeverStartedAt = source.redFeverStartedAt, redFeverUntil = source.redFeverUntil,
             jigwi = LabJigwiNetworkValidation.Copy(source.jigwi),
+            jigwiStage = LabJigwiStageNetworkValidation.Copy(source.jigwiStage),
             comboActive = source.comboActive,
             comboColors = source.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboColors.Clone(),
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,

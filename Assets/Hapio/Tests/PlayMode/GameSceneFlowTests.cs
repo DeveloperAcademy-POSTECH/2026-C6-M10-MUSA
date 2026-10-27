@@ -353,15 +353,16 @@ namespace Hapio.Tests
                 Assert.That(composition.Display.transform.parent, Is.SameAs(battleHud.battleUi.transform));
                 Assert.That(composition.Display.raycastTarget, Is.False);
                 Assert.That(composition.ForegroundCamera.cullingMask & (1 << network.board.gameObject.layer), Is.Not.Zero);
-                Assert.That(network.JigwiManualControlsAllowed, Is.EqualTo(stage == 3));
-                Assert.That(jigwiHud.testToggle.gameObject.activeInHierarchy, Is.EqualTo(stage == 3),
-                    "The standalone Lab manual panel must not appear in Gumiho or Yaguang game stages.");
+                bool legacyJigwiManual = stage == 3 && !network.config.JigwiStageTimelineEnabled;
+                Assert.That(network.JigwiManualControlsAllowed, Is.EqualTo(legacyJigwiManual));
+                Assert.That(jigwiHud.testToggle.gameObject.activeInHierarchy, Is.EqualTo(legacyJigwiManual),
+                    "Only an explicitly selected legacy Jigwi policy may expose the standalone manual panel; the stage timeline owns its own A/B patterns.");
                 if (stage == 3)
                 {
                     session.Pause();
                     yield return null;
-                    Assert.That(jigwiHud.testToggle.gameObject.activeInHierarchy, Is.True,
-                        "Pausing Jigwi keeps the developer entry visible, as in the standalone Lab.");
+                    Assert.That(jigwiHud.testToggle.gameObject.activeInHierarchy, Is.EqualTo(legacyJigwiManual),
+                        "Pause preserves the selected policy: the timeline hides legacy controls, while the legacy fallback keeps its entry visible.");
                     Assert.That(jigwiHud.fireButton.interactable, Is.False);
                     Assert.That(jigwiHud.generationButton.interactable, Is.False);
                     session.Resume();
@@ -981,7 +982,7 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(228), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(236), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
                 "All approved values, including the gimmick group fields (#311), must survive Scene-owned DEV cleanup.");
         }
@@ -1018,11 +1019,13 @@ namespace Hapio.Tests
             Assert.That(snapshot.drums.All(drum => drum.owner == network.LocalPlayerId), Is.True);
             Assert.That(player.personalHp, Is.EqualTo(network.config.PlayerMaxHp));
             Assert.That(player.stamina, Is.EqualTo(network.config.StaminaStart).Within(.01f));
-            double duration = Model().StageYokai == LabStageYokai.Yaguang
-                ? network.config.YaguangTimelineBattleSeconds : network.config.BattleDurationSeconds;
+            LabStageYokai stage = Model().StageYokai;
+            double duration = stage == LabStageYokai.Yaguang ? network.config.YaguangTimelineBattleSeconds
+                : stage == LabStageYokai.Jigwi && network.config.JigwiStageTimelineEnabled ? 120d
+                : network.config.BattleDurationSeconds;
             Assert.That(snapshot.remaining, Is.GreaterThan(duration - 10d));
             Assert.That(snapshot.remaining, Is.LessThanOrEqualTo(duration),
-                "Fresh stage time follows its actual policy; Yaguang has a separate approved duration.");
+                "Fresh stage time follows its accepted policy: Jigwi timeline uses120 seconds, Yaguang uses its own duration, and other/legacy policies preserve the accepted common duration.");
             Assert.That(snapshot.paintCoveredCount, Is.Zero);
             Assert.That(snapshot.paintCount, Is.Zero);
             Assert.That(network.PaintSurface.CoveredCount, Is.Zero);

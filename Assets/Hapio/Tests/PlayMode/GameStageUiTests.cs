@@ -65,7 +65,7 @@ namespace Hapio.Tests
                 .Select(session.CaptureDeveloperSettings).ToArray();
             screen.developerScopeButtons[2].onClick.Invoke();
             AssertScope(screen, 2);
-            Assert.That(screen.developerSliders, Has.Length.EqualTo(228));
+            Assert.That(screen.developerSliders, Has.Length.EqualTo(236));
             Assert.That(screen.developerSliders[211].minValue, Is.EqualTo(60f));
             Assert.That(screen.developerSliders[211].maxValue, Is.EqualTo(180f));
             foreach (int index in new[] { 205, 169, 170 })
@@ -140,7 +140,7 @@ namespace Hapio.Tests
             Assert.That(session.CaptureDeveloperSettings(0)[225], Is.EqualTo(1f), "Moving controls only edits the draft.");
             screen.applyDeveloperButton.onClick.Invoke();
             for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
-                Assert.That(session.CaptureDeveloperSettings(scope).Skip(225).ToArray(), Is.EqualTo(new[] { 0f, 100f, 10f }),
+                Assert.That(session.CaptureDeveloperSettings(scope).Skip(225).Take(3).ToArray(), Is.EqualTo(new[] { 0f, 100f, 10f }),
                     "Common generation policy reaches scope " + scope);
             screen.closeDeveloperButton.onClick.Invoke();
             screen.developerButton.onClick.Invoke();
@@ -156,7 +156,7 @@ namespace Hapio.Tests
                 screen.developerInputs[226].text = "1";
                 screen.developerInputs[227].text = "1";
                 screen.applyDeveloperButton.onClick.Invoke();
-                Assert.That(session.CaptureDeveloperSettings(scope).Skip(225).ToArray(), Is.EqualTo(new[] { 0f, 100f, 10f }),
+                Assert.That(session.CaptureDeveloperSettings(scope).Skip(225).Take(3).ToArray(), Is.EqualTo(new[] { 0f, 100f, 10f }),
                     "A stage form cannot apply hidden raw-policy values.");
             }
             screen.developerScopeButtons[0].onClick.Invoke();
@@ -171,7 +171,7 @@ namespace Hapio.Tests
             Assert.That(new[] { screen.developerInputs[225].text, screen.developerInputs[226].text,
                 screen.developerInputs[227].text }, Is.EqualTo(new[] { "1", "0", "1" }));
             for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
-                Assert.That(session.CaptureDeveloperSettings(scope).Skip(225).ToArray(), Is.EqualTo(new[] { 1f, 0f, 1f }));
+                Assert.That(session.CaptureDeveloperSettings(scope).Skip(225).Take(3).ToArray(), Is.EqualTo(new[] { 1f, 0f, 1f }));
             Assert.That(JsonUtility.ToJson(source), Is.EqualTo(sourceJson));
             yield return null;
         }
@@ -181,7 +181,7 @@ namespace Hapio.Tests
         private static void AssertScope(GameScreen screen, int scope)
         {
             Assert.That(screen.DeveloperScope, Is.EqualTo(scope));
-            Assert.That(screen.developerInputs, Has.Length.EqualTo(228));
+            Assert.That(screen.developerInputs, Has.Length.EqualTo(236));
             for (int i = 0; i < screen.developerInputs.Length; i++)
                 Assert.That(screen.developerInputs[i].transform.parent.gameObject.activeSelf,
                     Is.EqualTo(GameStageSettings.IsFieldVisible(scope, i)), "Field " + i + " in scope " + scope);
