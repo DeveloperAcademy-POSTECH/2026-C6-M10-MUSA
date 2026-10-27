@@ -11,7 +11,7 @@ namespace C6Lab
     /// </summary>
     public sealed partial class LabNetwork
     {
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/14");
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/15");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;
