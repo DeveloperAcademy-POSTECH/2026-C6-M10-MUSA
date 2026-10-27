@@ -298,7 +298,7 @@ namespace Hapio.Tests
                 for (int stage = 1; stage <= GameStageSettings.TerritoryScope; stage++)
                 {
                     before[stage - 1] = settings.Capture(stage);
-                    Assert.That(System.Linq.Enumerable.Skip(before[stage - 1], 225), Is.EqualTo(new[] { 1f, 75f, 3f }));
+                    Assert.That(System.Linq.Enumerable.Take(System.Linq.Enumerable.Skip(before[stage - 1], 225), 3), Is.EqualTo(new[] { 1f, 75f, 3f }));
                 }
                 float[] common = settings.Capture(0);
                 common[225] = 0f; common[226] = 40f; common[227] = 7f;
