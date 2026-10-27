@@ -4,7 +4,8 @@ namespace C6Lab
 {
     /// <summary>
     /// 야광귀 섬광 효과음 (#338).
-    /// - 섬광 해결: 내가 흔들어서 내 눈부심을 다 풀어낸 순간, 내 기기에서만 (LabYaguangFlashHud.LocalShakeCleared).
+    /// - 섬광 해결: 이번 섬광에서 내가 흔든 횟수가 DEV 최대 횟수(기본 10번, 오색구슬 보상까지)를 채운 순간, 내 기기에서만
+    ///   (LabYaguangFlashHud.ShakeCount). 눈부심이 먼저 풀려도 이어서 끝까지 흔들어야 난다.
     ///   다음 섬광·방해 종료·라운드 종료로 풀릴 때는 나지 않는다.
     /// - 오색구슬 피격: 내가 던진 오색구슬(#329)이 박에 맞았을 때, 던진 사람 기기에서만 (LabNetwork.LocalFiveColorHit, 진동과 같은 때).
     /// 소리 파일은 Resources/Audio/FlashClear(여러 개면 무작위), Resources/Audio/FiveColorHit(여러 개면 이름 순서대로
@@ -25,6 +26,8 @@ namespace C6Lab
         private AudioSource source;
         private LabNetwork network;
         private int fiveColorHitNext;
+        private LabYaguangFlashHud flashHud;
+        private int seenShakes;
 
         public int FlashClearClipCount => flashClearClips == null ? 0 : flashClearClips.Length;
         public int FiveColorHitClipCount => fiveColorHitClips == null ? 0 : fiveColorHitClips.Length;
@@ -53,17 +56,33 @@ namespace C6Lab
 
         private void OnEnable()
         {
-            LabYaguangFlashHud.LocalShakeCleared += HandleFlashCleared;
             if (network != null) network.LocalFiveColorHit += HandleFiveColorHit;
         }
 
         private void OnDisable()
         {
-            LabYaguangFlashHud.LocalShakeCleared -= HandleFlashCleared;
             if (network != null) network.LocalFiveColorHit -= HandleFiveColorHit;
         }
 
-        /// <summary>내가 흔들어 섬광을 풀었다. 소리를 냈으면 true.</summary>
+        private void Update()
+        {
+            if (flashHud == null) flashHud = GetComponent<LabYaguangFlashHud>();
+            if (flashHud == null || network == null || network.config == null) return;
+            if (ObserveShakes(flashHud.ShakeCount, network.config.YaguangFlashShakeCount)) OnFlashCleared();
+        }
+
+        /// <summary>
+        /// 이번 섬광에서 흔든 수(count)가 최대 횟수(needed)에 막 닿았으면 true (한 번만). 새 섬광이라 수가 0으로
+        /// 돌아가면 다시 셀 수 있다.
+        /// </summary>
+        public bool ObserveShakes(int count, int needed)
+        {
+            bool reached = needed > 0 && seenShakes < needed && count >= needed;
+            seenShakes = count;
+            return reached;
+        }
+
+        /// <summary>이번 섬광에서 최대 횟수까지 흔들었다. 소리를 냈으면 true.</summary>
         public bool OnFlashCleared()
         {
             FlashClearCount++;
@@ -85,7 +104,6 @@ namespace C6Lab
             return true;
         }
 
-        private void HandleFlashCleared() => OnFlashCleared();
         private void HandleFiveColorHit() => OnFiveColorHit();
 
         private bool Play(AudioClip[] clips, float volume)
