@@ -216,8 +216,8 @@ namespace C6Lab
         // 5671: #330 flash shake count range 2-10 -> 2-18 (default 6 -> 10, now a maximum: one orb regains colour per shake).
         //       #328 merged on the same number: an unlocked bomb glides in and opens into two attack orbs through "use"
         //       (never thrown), a double tap clears a fox orb through "use" and the side edges stop it; DEV 55/211 retired.
-        // 5672: #334 gumiho fever time (DEV 228-229, 230 shared values); it also separates builds holding only one
-        //       of #330/#328 from those holding both.
+        // 5672: #334 gumiho fever time (DEV 228-229, 230 shared values) and feverTimeAt in the snapshot; it also
+        //       separates builds holding only one of #330/#328 from those holding both.
         internal const ushort LabProtocolVersion = 5672;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";

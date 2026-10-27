@@ -81,6 +81,7 @@ namespace C6Lab
             Include(nextCommonGimmickAt);
             Include(nextUniqueGimmickAt);
             if (rules.YaguangTimeline && !yaguangTimelineEnded) Include(yaguangTimelineEndAt);
+            if (!feverTimeStarted) Include(feverTimeAt);
             Include(nextStageJigwiAt);
             Include(swipeBlockedUntil);
             Include(charmUntil);
