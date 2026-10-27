@@ -185,19 +185,19 @@ namespace Hapio.Tests
             const int scope = GameStageSettings.TerritoryScope;
             using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
             {
-                // Saved defaults (#305): both make eight orbs on a full bar (the bar art has eight cells); the story
+                // Saved defaults (#305, #328): both make six orbs on a full bar (the bar art has six cells); the story
                 // refills faster and its orbs last longer, while 2:2 keeps its old refill and lifetime.
                 float[] team = settings.Capture(scope), story = settings.Capture(1);
                 Assert.That(new[] { team[3], team[4], team[5], team[6], team[7], team[8], team[10] },
-                    Is.EqualTo(new[] { 160f, 160f, 20f, 20f, 1.7f, 10f, 8f }));
+                    Is.EqualTo(new[] { 120f, 120f, 20f, 20f, 1.7f, 10f, 8f }));
                 Assert.That(new[] { story[3], story[4], story[5], story[7], story[10] },
-                    Is.EqualTo(new[] { 160f, 160f, 20f, 1f, 15f }));
-                Assert.That(story[3] / story[5], Is.EqualTo(8f), "A full story bar makes eight orbs.");
+                    Is.EqualTo(new[] { 120f, 120f, 20f, 1f, 15f }));
+                Assert.That(story[3] / story[5], Is.EqualTo(6f), "A full story bar makes six orbs.");
 
                 float[] common = settings.Capture(0); common[3] = 200f; common[4] = 200f; common[10] = 20f;
                 Assert.That(settings.TryApply(0, common, out string error), Is.True, error);
                 foreach (int stage in new[] { 1, 2, 3 }) Assert.That(settings.Capture(stage)[3], Is.EqualTo(200f));
-                Assert.That(settings.Capture(scope)[3], Is.EqualTo(160f), "Common stamina stops at the story stages.");
+                Assert.That(settings.Capture(scope)[3], Is.EqualTo(120f), "Common stamina stops at the story stages.");
                 Assert.That(settings.Capture(scope)[10], Is.EqualTo(8f));
 
                 float[] room = settings.Capture(scope); room[3] = 240f; room[7] = 1.2f;

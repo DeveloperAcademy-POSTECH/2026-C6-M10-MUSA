@@ -190,7 +190,7 @@ namespace Hapio.Tests
                     if (mask.GetPixel(x, row).a > .5f && (x == 0 || mask.GetPixel(x - 1, row).a <= .5f)) cells++;
             }
             finally { UnityEngine.Object.DestroyImmediate(mask); }
-            Assert.That(cells, Is.EqualTo(8));
+            Assert.That(cells, Is.EqualTo(6), "Six cells, one per orb (#328).");
             using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
                 for (int scope = 1; scope <= GameStageSettings.TerritoryScope; scope++)
                 {

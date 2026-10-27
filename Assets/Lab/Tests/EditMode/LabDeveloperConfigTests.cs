@@ -240,11 +240,11 @@ namespace C6Lab.Tests
             var saved = Resources.Load<LabConfig>("LabConfig");
             Assert.That(saved, Is.Not.Null);
             Assert.That(saved.SpawnFanAngle, Is.EqualTo(180f), "Orbs leave the drum in every direction.");
-            // #305: a full bar makes eight orbs and one orb's worth comes back every second, so a player
-            // waiting for orbs or the drum keeps something to do.
-            Assert.That(saved.StaminaMax, Is.EqualTo(160f));
-            Assert.That(saved.StaminaStart, Is.EqualTo(160f));
-            Assert.That(saved.BattleDurationSeconds, Is.EqualTo(120f), "#328: every stage battles for two minutes.");
+            // #305: one orb's worth comes back every second, so a player waiting for orbs or the drum keeps
+            // something to do. #328: a full bar makes six orbs, and every stage battles for two minutes.
+            Assert.That(saved.StaminaMax, Is.EqualTo(120f));
+            Assert.That(saved.StaminaStart, Is.EqualTo(120f));
+            Assert.That(saved.BattleDurationSeconds, Is.EqualTo(120f));
             Assert.That(saved.GenerateCost, Is.EqualTo(20f));
             Assert.That(saved.StaminaRecoveryAmount, Is.EqualTo(20f));
             Assert.That(saved.StaminaRecoverySeconds, Is.EqualTo(1f));
