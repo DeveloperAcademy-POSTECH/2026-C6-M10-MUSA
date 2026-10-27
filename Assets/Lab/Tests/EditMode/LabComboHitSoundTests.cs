@@ -28,6 +28,13 @@ namespace C6Lab.Tests
             new LabSnapshot { phase = phase, sessionId = session, round = round, comboCount = count, comboProgress = progress };
 
         [Test]
+        public void TheComboHitClipIsInResources()
+        {
+            Assert.That(Resources.LoadAll<AudioClip>(LabComboHitSound.ClipFolder), Has.Length.EqualTo(1),
+                "Resources/Audio/ComboHit/ComboHit.wav, one note the code raises step by step");
+        }
+
+        [Test]
         public void EachNewStepPlaysOnceAndClimbs()
         {
             LabComboHitSound sound = Create();
