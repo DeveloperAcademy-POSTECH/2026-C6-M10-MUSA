@@ -1,0 +1,3457 @@
+{
+  "frames": [
+    {
+      "number": 3,
+      "nodeId": "3182:12147",
+      "items": [
+        {
+          "nodeId": "3182:12148",
+          "name": "image 1145",
+          "key": "37f73.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.800000011920929,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3244:12387",
+          "name": "image 1307",
+          "key": "0ce22.png",
+          "rect": {
+            "x": -58,
+            "y": 192,
+            "width": 412,
+            "height": 608
+          },
+          "width": 412,
+          "height": 608,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "특히 안쪽 선반은 절대로 건드리지 말고.",
+      "speaker": "스승님",
+      "dialogueRect": {
+        "x": 76,
+        "y": 751,
+        "width": 283,
+        "height": 23
+      },
+      "dialogueFontSize": 19,
+      "speakerRect": {
+        "x": 84,
+        "y": 720,
+        "width": 36,
+        "height": 18
+      },
+      "paperRect": {
+        "x": 11,
+        "y": 680,
+        "width": 379,
+        "height": 176
+      },
+      "paperKey": "e33cd.png",
+      "badgeRect": {
+        "x": 57,
+        "y": 713,
+        "width": 91,
+        "height": 33
+      },
+      "badgeKey": "9769e.png"
+    },
+    {
+      "number": 4,
+      "nodeId": "3182:12149",
+      "items": [
+        {
+          "nodeId": "3182:12150",
+          "name": "image 1146",
+          "key": "37f73.png",
+          "rect": {
+            "x": -37,
+            "y": -160,
+            "width": 476,
+            "height": 1034
+          },
+          "width": 476,
+          "height": 1034,
+          "rotation": 0,
+          "alpha": 0.800000011920929,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12256",
+          "name": "image 1286",
+          "key": "35ec4.png",
+          "rect": {
+            "x": 197,
+            "y": 347,
+            "width": 258,
+            "height": 350
+          },
+          "width": 258,
+          "height": 350,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12244",
+          "name": "image 1284",
+          "key": "2e4a3.png",
+          "rect": {
+            "x": -14,
+            "y": 288,
+            "width": 319,
+            "height": 433
+          },
+          "width": 319,
+          "height": 433,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "어휴~ 걱정 마세요~",
+      "speaker": "불이",
+      "dialogueRect": {
+        "x": 94,
+        "y": 757,
+        "width": 259,
+        "height": 24
+      },
+      "dialogueFontSize": 20.696460723876953,
+      "speakerRect": {
+        "x": 89,
+        "y": 721,
+        "width": 23,
+        "height": 18
+      },
+      "paperRect": {
+        "x": 11,
+        "y": 680,
+        "width": 379,
+        "height": 176
+      },
+      "paperKey": "e33cd.png",
+      "badgeRect": {
+        "x": 57,
+        "y": 713,
+        "width": 91,
+        "height": 33
+      },
+      "badgeKey": "9769e.png"
+    },
+    {
+      "number": 5,
+      "nodeId": "3182:12159",
+      "items": [
+        {
+          "nodeId": "3182:12160",
+          "name": "image 1153",
+          "key": "2af85.png",
+          "rect": {
+            "x": -90,
+            "y": 0,
+            "width": 492,
+            "height": 874
+          },
+          "width": 492,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12162",
+          "name": "image 1147",
+          "key": "ee32d.png",
+          "rect": {
+            "x": 146,
+            "y": 410,
+            "width": 265,
+            "height": 279
+          },
+          "width": 265,
+          "height": 279,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "hPercent": 1.6888999999999998,
+          "topPercent": -0.46869999999999995
+        },
+        {
+          "nodeId": "3182:12284",
+          "name": "image 1292",
+          "key": "a3f16.png",
+          "rect": {
+            "x": 285,
+            "y": 546,
+            "width": 141,
+            "height": 196
+          },
+          "width": 141,
+          "height": 196,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12293",
+          "name": "image 1293",
+          "key": "09b72.png",
+          "rect": {
+            "x": 225,
+            "y": 599,
+            "width": 128,
+            "height": 187
+          },
+          "width": 128,
+          "height": 187,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12303",
+          "name": "image 1294",
+          "key": "2c5f7.png",
+          "rect": {
+            "x": -27,
+            "y": 486,
+            "width": 151,
+            "height": 226
+          },
+          "width": 151,
+          "height": 226,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12306",
+          "name": "image 1295",
+          "key": "3769e.png",
+          "rect": {
+            "x": 53,
+            "y": 546,
+            "width": 123,
+            "height": 205
+          },
+          "width": 123,
+          "height": 205,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12281",
+          "name": "image 1291",
+          "key": "d1bcf.png",
+          "rect": {
+            "x": 104,
+            "y": 555,
+            "width": 158,
+            "height": 239
+          },
+          "width": 158,
+          "height": 239,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12384",
+          "name": "image 1306",
+          "key": "edc34.png",
+          "rect": {
+            "x": 181,
+            "y": 117,
+            "width": 207,
+            "height": 138
+          },
+          "width": 207,
+          "height": 138,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3247:12395",
+          "name": "image 1305",
+          "key": "efee4.png",
+          "rect": {
+            "x": 18,
+            "y": 105,
+            "width": 276,
+            "height": 184
+          },
+          "width": 276,
+          "height": 184,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 6,
+      "nodeId": "3182:12221",
+      "items": [
+        {
+          "nodeId": "3182:12222",
+          "name": "image 1155",
+          "key": "d27a9.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8500000238418579,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 1.2927000000000002,
+          "hPercent": 1.2912000000000001,
+          "leftPercent": -0.2051,
+          "topPercent": -0.17620000000000002
+        },
+        {
+          "nodeId": "3182:12223",
+          "name": "image 1276",
+          "key": "1fbbf.png",
+          "rect": {
+            "x": 101,
+            "y": 88,
+            "width": 156,
+            "height": 234
+          },
+          "width": 156,
+          "height": 234,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12224",
+          "name": "image 1280",
+          "key": "7d9ec.png",
+          "rect": {
+            "x": 240,
+            "y": 88,
+            "width": 146,
+            "height": 212
+          },
+          "width": 146,
+          "height": 212,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12225",
+          "name": "image 1279",
+          "key": "744a9.png",
+          "rect": {
+            "x": -29,
+            "y": 214,
+            "width": 208,
+            "height": 253
+          },
+          "width": 208,
+          "height": 253,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12226",
+          "name": "image 1278",
+          "key": "42202.png",
+          "rect": {
+            "x": 174,
+            "y": 244,
+            "width": 265,
+            "height": 360
+          },
+          "width": 265,
+          "height": 360,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12227",
+          "name": "image 1277",
+          "key": "0162d.png",
+          "rect": {
+            "x": 0,
+            "y": 341,
+            "width": 276,
+            "height": 413
+          },
+          "width": 276,
+          "height": 413,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 7,
+      "nodeId": "3182:12011",
+      "items": [
+        {
+          "nodeId": "3182:12011",
+          "name": "7",
+          "key": "d27a9.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8500000238418579,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12012",
+          "name": "image 1164",
+          "key": "cceba.png",
+          "rect": {
+            "x": 0,
+            "y": 173,
+            "width": 368,
+            "height": 528
+          },
+          "width": 368,
+          "height": 528,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 8,
+      "nodeId": "3182:11971",
+      "items": [
+        {
+          "nodeId": "3182:11971",
+          "name": "8",
+          "key": "d27a9.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8500000238418579,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12238",
+          "name": "image 1283",
+          "key": "b9edc.png",
+          "rect": {
+            "x": -35,
+            "y": 269,
+            "width": 250,
+            "height": 343
+          },
+          "width": 250,
+          "height": 343,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12247",
+          "name": "image 1285",
+          "key": "312d8.png",
+          "rect": {
+            "x": 90,
+            "y": 204,
+            "width": 344,
+            "height": 473
+          },
+          "width": 344,
+          "height": 473,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 9,
+      "nodeId": "3182:11973",
+      "items": [
+        {
+          "nodeId": "3182:11973",
+          "name": "9",
+          "key": "d27a9.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8500000238418579,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11974",
+          "name": "image 1172",
+          "key": "cf799.png",
+          "rect": {
+            "x": 164,
+            "y": 92,
+            "width": 222,
+            "height": 394
+          },
+          "width": 222,
+          "height": 394,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11975",
+          "name": "image 1173",
+          "key": "cf799.png",
+          "rect": {
+            "x": 9,
+            "y": 306,
+            "width": 222,
+            "height": 394
+          },
+          "width": 222,
+          "height": 394,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11976",
+          "name": "image 1246",
+          "key": "63938.png",
+          "rect": {
+            "x": 27,
+            "y": 152,
+            "width": 348,
+            "height": 458
+          },
+          "width": 348,
+          "height": 458,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 10,
+      "nodeId": "3182:11977",
+      "items": [
+        {
+          "nodeId": "3182:11977",
+          "name": "10",
+          "key": "d27a9.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8500000238418579,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11978",
+          "name": "image 1247",
+          "key": "44e2c.png",
+          "rect": {
+            "x": 20,
+            "y": 157,
+            "width": 343,
+            "height": 477
+          },
+          "width": 343,
+          "height": 477,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11980",
+          "name": "image 1171",
+          "key": "cf799.png",
+          "rect": {
+            "x": 20,
+            "y": 97,
+            "width": 383,
+            "height": 680
+          },
+          "width": 383,
+          "height": 680,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12346",
+          "name": "image 1263",
+          "key": "ee6f0.png",
+          "rect": {
+            "x": 257.0000005744896,
+            "y": 136,
+            "width": 165.1966808657844,
+            "height": 157.82145766528902
+          },
+          "width": 117.59892272949219,
+          "height": 130.85227966308594,
+          "rotation": -68.17186480693135,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 11,
+      "nodeId": "3182:11981",
+      "items": [
+        {
+          "nodeId": "3182:11981",
+          "name": "11",
+          "key": "d27a9.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8500000238418579,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 1.1395,
+          "hPercent": 1.1381999999999999,
+          "leftPercent": -0.071,
+          "topPercent": -0.0197
+        },
+        {
+          "nodeId": "3182:11982",
+          "name": "image 1177",
+          "key": "bb530.png",
+          "rect": {
+            "x": 147,
+            "y": 122.99996680021286,
+            "width": 241.2234075665474,
+            "height": 217.67855209112167
+          },
+          "width": 201,
+          "height": 134,
+          "rotation": 30.611915277537822,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11983",
+          "name": "image 1255",
+          "key": "d7273.png",
+          "rect": {
+            "x": -17.874595642089844,
+            "y": 143.2021665647626,
+            "width": 221.74918551929295,
+            "height": 242.59570138901472
+          },
+          "width": 220,
+          "height": 241,
+          "rotation": 0.4172455402628014,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11984",
+          "name": "image 1176",
+          "key": "58a93.png",
+          "rect": {
+            "x": -67,
+            "y": -36,
+            "width": 249,
+            "height": 166
+          },
+          "width": 249,
+          "height": 166,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11985",
+          "name": "image 1252",
+          "key": "76f64.png",
+          "rect": {
+            "x": 222,
+            "y": 260,
+            "width": 187,
+            "height": 280
+          },
+          "width": 187,
+          "height": 280,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11986",
+          "name": "image 1168",
+          "key": "ee6f0.png",
+          "rect": {
+            "x": -1,
+            "y": 408.00000833484904,
+            "width": 118.6283861500175,
+            "height": 131.77668955458245
+          },
+          "width": 117.59892272949219,
+          "height": 130.85227966308594,
+          "rotation": 0.4523770419463144,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11987",
+          "name": "image 1262",
+          "key": "ee6f0.png",
+          "rect": {
+            "x": 204.0000005744896,
+            "y": 0,
+            "width": 165.1966808657844,
+            "height": 157.82145766528902
+          },
+          "width": 117.59892272949219,
+          "height": 130.85227966308594,
+          "rotation": -68.17186480693135,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11988",
+          "name": "image 1260",
+          "key": "ae6ef.png",
+          "rect": {
+            "x": -80.0000001357254,
+            "y": 521,
+            "width": 283.6525283342195,
+            "height": 247.57022147265616
+          },
+          "width": 281.3623046875,
+          "height": 244.93594360351562,
+          "rotation": -0.5386473651690921,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11989",
+          "name": "image 1261",
+          "key": "34981.png",
+          "rect": {
+            "x": 165,
+            "y": 553,
+            "width": 237,
+            "height": 257
+          },
+          "width": 237,
+          "height": 257,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11990",
+          "name": "image 1259",
+          "key": "6acbe.png",
+          "rect": {
+            "x": 23,
+            "y": 282,
+            "width": 281,
+            "height": 329
+          },
+          "width": 281,
+          "height": 329,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 12,
+      "nodeId": "3182:11992",
+      "items": [
+        {
+          "nodeId": "3182:11993",
+          "name": "image 1202",
+          "key": "81152.png",
+          "rect": {
+            "x": -89,
+            "y": 0,
+            "width": 491,
+            "height": 874
+          },
+          "width": 491,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8500000238418579,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 1.0018,
+          "leftPercent": -0.0022
+        },
+        {
+          "nodeId": "3182:11994",
+          "name": "image 1167",
+          "key": "55a4a.png",
+          "rect": {
+            "x": 150,
+            "y": 137,
+            "width": 177,
+            "height": 217
+          },
+          "width": 177,
+          "height": 217,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11995",
+          "name": "image 1204",
+          "key": "df90c.png",
+          "rect": {
+            "x": -24,
+            "y": 335,
+            "width": 283,
+            "height": 424
+          },
+          "width": 283,
+          "height": 424,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 13,
+      "nodeId": "3182:11996",
+      "items": [
+        {
+          "nodeId": "3182:11997",
+          "name": "image 1156",
+          "key": "68bab.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8500000238418579,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11998",
+          "name": "image 1158",
+          "key": "955c7.png",
+          "rect": {
+            "x": 58,
+            "y": 333,
+            "width": 277,
+            "height": 395
+          },
+          "width": 277,
+          "height": 395,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "hPercent": 1.5209000000000001,
+          "topPercent": -0.5196999999999999
+        },
+        {
+          "nodeId": "3182:11999",
+          "name": "image 1161",
+          "key": "c6aa3.png",
+          "rect": {
+            "x": 97,
+            "y": 110,
+            "width": 184,
+            "height": 398
+          },
+          "width": 184,
+          "height": 398,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12000",
+          "name": "image 1162",
+          "key": "c6aa3.png",
+          "rect": {
+            "x": 40,
+            "y": 218.00072598457336,
+            "width": 149.22370563447475,
+            "height": 257.7204234600067
+          },
+          "width": 112,
+          "height": 243,
+          "rotation": 9.151824934047378,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12001",
+          "name": "image 1163",
+          "key": "c6aa3.png",
+          "rect": {
+            "x": 176.44383763253882,
+            "y": 374.390869140625,
+            "width": 145.14829321758498,
+            "height": 203.93782941790278
+          },
+          "width": 85.87952423095703,
+          "height": 185.65281677246094,
+          "rotation": -20.376771726286304,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 14,
+      "nodeId": "3182:12013",
+      "items": [
+        {
+          "nodeId": "3182:12014",
+          "name": "image 1156",
+          "key": "80f07.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8500000238418579,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12015",
+          "name": "image 1172",
+          "key": "a0403.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 388,
+            "height": 689
+          },
+          "width": 388,
+          "height": 689,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12016",
+          "name": "image 1173",
+          "key": "abdc1.png",
+          "rect": {
+            "x": 33,
+            "y": 221,
+            "width": 335,
+            "height": 596
+          },
+          "width": 335,
+          "height": 596,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 15,
+      "nodeId": "3182:12017",
+      "items": [
+        {
+          "nodeId": "3182:12019",
+          "name": "image 1179",
+          "key": "9ad44.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12232",
+          "name": "image 1281",
+          "key": "ea107.png",
+          "rect": {
+            "x": 100,
+            "y": 158,
+            "width": 370,
+            "height": 451
+          },
+          "width": 370,
+          "height": 451,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12235",
+          "name": "image 1282",
+          "key": "05ba4.png",
+          "rect": {
+            "x": -10,
+            "y": 250,
+            "width": 294,
+            "height": 359
+          },
+          "width": 294,
+          "height": 359,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3273:13",
+          "name": "image 1308",
+          "key": "4a78f.png",
+          "rect": {
+            "x": 53,
+            "y": 580,
+            "width": 323,
+            "height": 147
+          },
+          "width": 323,
+          "height": 147,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12028",
+          "name": "image 1164",
+          "key": "c6aa3.png",
+          "rect": {
+            "x": 165.00004029837623,
+            "y": 515,
+            "width": 83.63265290794038,
+            "height": 138.453757201901
+          },
+          "width": 59.83479309082031,
+          "height": 129.3497772216797,
+          "rotation": -11.107216756981197,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "“우리 이제 어떡해 ㅠㅠㅠ”",
+      "speaker": "만복",
+      "dialogueRect": {
+        "x": 94,
+        "y": 757,
+        "width": 259,
+        "height": 24
+      },
+      "speakerRect": {
+        "x": 89,
+        "y": 721,
+        "width": 26,
+        "height": 18
+      },
+      "paperRect": {
+        "x": 11,
+        "y": 680,
+        "width": 379,
+        "height": 176
+      },
+      "paperKey": "e33cd.png",
+      "badgeRect": {
+        "x": 57,
+        "y": 713,
+        "width": 91,
+        "height": 33
+      },
+      "badgeKey": "9769e.png"
+    },
+    {
+      "number": 16,
+      "nodeId": "3182:12029",
+      "items": [
+        {
+          "nodeId": "3182:12030",
+          "name": "image 1179",
+          "key": "4e6ab.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12031",
+          "name": "image 1266",
+          "key": "ee4fb.png",
+          "rect": {
+            "x": -32,
+            "y": 120,
+            "width": 349,
+            "height": 425
+          },
+          "width": 349,
+          "height": 425,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12032",
+          "name": "image 1267",
+          "key": "e15b9.png",
+          "rect": {
+            "x": 147,
+            "y": 158,
+            "width": 287,
+            "height": 350
+          },
+          "width": 287,
+          "height": 350,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12033",
+          "name": "image 1265",
+          "key": "05b1b.png",
+          "rect": {
+            "x": 204,
+            "y": 311,
+            "width": 189,
+            "height": 283
+          },
+          "width": 189,
+          "height": 283,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12034",
+          "name": "image 1269",
+          "key": "67c1f.png",
+          "rect": {
+            "x": -77,
+            "y": 229,
+            "width": 291,
+            "height": 355
+          },
+          "width": 291,
+          "height": 355,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12035",
+          "name": "image 1268",
+          "key": "c7632.png",
+          "rect": {
+            "x": 88,
+            "y": 276,
+            "width": 211,
+            "height": 322
+          },
+          "width": 211,
+          "height": 322,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3273:18",
+          "name": "image 1308",
+          "key": "4a78f.png",
+          "rect": {
+            "x": 53,
+            "y": 580,
+            "width": 323,
+            "height": 147
+          },
+          "width": 323,
+          "height": 147,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3273:20",
+          "name": "image 1165",
+          "key": "c6aa3.png",
+          "rect": {
+            "x": 169.99989023564922,
+            "y": 560,
+            "width": 67.96557908019349,
+            "height": 112.51693640520483
+          },
+          "width": 48.62582015991211,
+          "height": 105.11842346191406,
+          "rotation": -11.107216756981197,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 17,
+      "nodeId": "3182:12036",
+      "items": [
+        {
+          "nodeId": "3182:12037",
+          "name": "image 1189",
+          "key": "15140.png",
+          "rect": {
+            "x": -454,
+            "y": 0,
+            "width": 1311,
+            "height": 874
+          },
+          "width": 1311,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12038",
+          "name": "image 1188",
+          "key": "e273d.png",
+          "rect": {
+            "x": 28,
+            "y": 239,
+            "width": 346,
+            "height": 476
+          },
+          "width": 346,
+          "height": 476,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "그냥 붙이면 안될까...?",
+      "speaker": "불이",
+      "dialogueRect": {
+        "x": 94,
+        "y": 757,
+        "width": 259,
+        "height": 24
+      },
+      "speakerRect": {
+        "x": 89,
+        "y": 721,
+        "width": 23,
+        "height": 18
+      },
+      "paperRect": {
+        "x": 11,
+        "y": 680,
+        "width": 379,
+        "height": 176
+      },
+      "paperKey": "e33cd.png",
+      "badgeRect": {
+        "x": 57,
+        "y": 713,
+        "width": 91,
+        "height": 33
+      },
+      "badgeKey": "9769e.png"
+    },
+    {
+      "number": 18,
+      "nodeId": "3182:12050",
+      "items": [
+        {
+          "nodeId": "3182:12051",
+          "name": "image 1192",
+          "key": "b520c.png",
+          "rect": {
+            "x": -641,
+            "y": 0,
+            "width": 1317,
+            "height": 878
+          },
+          "width": 1317,
+          "height": 878,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12053",
+          "name": "image 1240",
+          "key": "a59f5.png",
+          "rect": {
+            "x": -16,
+            "y": 157,
+            "width": 435,
+            "height": 573
+          },
+          "width": 435,
+          "height": 573,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "얘들아! 여기 좀 봐바.",
+      "speaker": "묵이",
+      "dialogueRect": {
+        "x": 94,
+        "y": 757,
+        "width": 259,
+        "height": 24
+      },
+      "speakerRect": {
+        "x": 89,
+        "y": 721,
+        "width": 23,
+        "height": 18
+      },
+      "paperRect": {
+        "x": 11,
+        "y": 680,
+        "width": 379,
+        "height": 176
+      },
+      "paperKey": "e33cd.png",
+      "badgeRect": {
+        "x": 57,
+        "y": 713,
+        "width": 91,
+        "height": 33
+      },
+      "badgeKey": "9769e.png"
+    },
+    {
+      "number": 19,
+      "nodeId": "3182:12166",
+      "items": [
+        {
+          "nodeId": "3182:12167",
+          "name": "image 1190",
+          "key": "cbc06.png",
+          "rect": {
+            "x": -485,
+            "y": -1,
+            "width": 1312,
+            "height": 875
+          },
+          "width": 1312,
+          "height": 875,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12265",
+          "name": "image 1288",
+          "key": "cad35.png",
+          "rect": {
+            "x": 116,
+            "y": 214,
+            "width": 338,
+            "height": 507
+          },
+          "width": 338,
+          "height": 507,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12268",
+          "name": "image 1289",
+          "key": "b5a43.png",
+          "rect": {
+            "x": -20,
+            "y": 300,
+            "width": 286,
+            "height": 430
+          },
+          "width": 286,
+          "height": 430,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "여기 봉인박 사용법이 적혀있어!",
+      "speaker": "금옥",
+      "dialogueRect": {
+        "x": 94,
+        "y": 757,
+        "width": 259,
+        "height": 24
+      },
+      "speakerRect": {
+        "x": 89,
+        "y": 721,
+        "width": 27,
+        "height": 18
+      },
+      "paperRect": {
+        "x": 11,
+        "y": 680,
+        "width": 379,
+        "height": 176
+      },
+      "paperKey": "e33cd.png",
+      "badgeRect": {
+        "x": 57,
+        "y": 713,
+        "width": 91,
+        "height": 33
+      },
+      "badgeKey": "9769e.png"
+    },
+    {
+      "number": 20,
+      "nodeId": "3182:12059",
+      "items": [
+        {
+          "nodeId": "3182:12060",
+          "name": "image 1195",
+          "key": "15e68.png",
+          "rect": {
+            "x": -282,
+            "y": 0,
+            "width": 1311,
+            "height": 874
+          },
+          "width": 1311,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": false,
+          "bottom": true,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12066",
+          "name": "image 1241",
+          "key": "08676.png",
+          "rect": {
+            "x": 40,
+            "y": 328,
+            "width": 265,
+            "height": 352
+          },
+          "width": 265,
+          "height": 352,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12067",
+          "name": "image 1198",
+          "key": "8c964.png",
+          "rect": {
+            "x": 238,
+            "y": 619,
+            "width": 146,
+            "height": 97
+          },
+          "width": 146,
+          "height": 97,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12068",
+          "name": "image 1197",
+          "key": "f0be8.png",
+          "rect": {
+            "x": 40,
+            "y": 623,
+            "width": 135,
+            "height": 90
+          },
+          "width": 135,
+          "height": 90,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "어? 이 구슬들은 뭐지..?",
+      "speaker": "만복",
+      "dialogueRect": {
+        "x": 94,
+        "y": 757,
+        "width": 259,
+        "height": 24
+      },
+      "speakerRect": {
+        "x": 89,
+        "y": 721,
+        "width": 26,
+        "height": 18
+      },
+      "paperRect": {
+        "x": 11,
+        "y": 680,
+        "width": 379,
+        "height": 176
+      },
+      "paperKey": "e33cd.png",
+      "badgeRect": {
+        "x": 57,
+        "y": 713,
+        "width": 91,
+        "height": 33
+      },
+      "badgeKey": "9769e.png"
+    },
+    {
+      "number": 21,
+      "nodeId": "3182:12069",
+      "items": [
+        {
+          "nodeId": "3182:12071",
+          "name": "image 1185",
+          "key": "32e7e.png",
+          "rect": {
+            "x": -643,
+            "y": 0,
+            "width": 1311,
+            "height": 874
+          },
+          "width": 1311,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": false,
+          "bottom": true,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12072",
+          "name": "Vector 395",
+          "key": "Vector_3182_12072.png",
+          "rect": {
+            "x": 92.87197875976562,
+            "y": 712.5309448242188,
+            "width": 11.1173095703125,
+            "height": 4.8968505859375
+          },
+          "width": 11.1173095703125,
+          "height": 4.8968505859375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12073",
+          "name": "Vector 396",
+          "key": "Vector_3182_12073.png",
+          "rect": {
+            "x": 72.62310791015625,
+            "y": 708.580078125,
+            "width": 30.56488037109375,
+            "height": 10.82794189453125
+          },
+          "width": 30.56488037109375,
+          "height": 10.82794189453125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12074",
+          "name": "Vector 397",
+          "key": "Vector_3182_12074.png",
+          "rect": {
+            "x": 99.09725952148438,
+            "y": 697.489990234375,
+            "width": 16.059661865234375,
+            "height": 18.138671875
+          },
+          "width": 16.059661865234375,
+          "height": 18.138671875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12075",
+          "name": "Vector 398",
+          "key": "Vector_3182_12075.png",
+          "rect": {
+            "x": 113.03475952148438,
+            "y": 693.6487426757812,
+            "width": 2.85943603515625,
+            "height": 6.7315673828125
+          },
+          "width": 2.85943603515625,
+          "height": 6.7315673828125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12076",
+          "name": "Vector 399",
+          "key": "Vector_3182_12076.png",
+          "rect": {
+            "x": 70.98312377929688,
+            "y": 707.526123046875,
+            "width": 28.231048583984375,
+            "height": 10.35101318359375
+          },
+          "width": 28.231048583984375,
+          "height": 10.35101318359375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12077",
+          "name": "Vector 400",
+          "key": "Vector_3182_12077.png",
+          "rect": {
+            "x": 85.28619384765625,
+            "y": 712.775146484375,
+            "width": 9.1072998046875,
+            "height": 5.9735107421875
+          },
+          "width": 9.1072998046875,
+          "height": 5.9735107421875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12078",
+          "name": "Vector 401",
+          "key": "Vector_3182_12078.png",
+          "rect": {
+            "x": 102.5455322265625,
+            "y": 707.8614501953125,
+            "width": 9.075531005859375,
+            "height": 8.59967041015625
+          },
+          "width": 9.075531005859375,
+          "height": 8.59967041015625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12079",
+          "name": "Vector 402",
+          "key": "Vector_3182_12079.png",
+          "rect": {
+            "x": 151.46621704101562,
+            "y": 685.8428955078125,
+            "width": 6.515838623046875,
+            "height": 3.7899169921875
+          },
+          "width": 6.515838623046875,
+          "height": 3.7899169921875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12080",
+          "name": "Vector 403",
+          "key": "Vector_3182_12080.png",
+          "rect": {
+            "x": 155.08935546875,
+            "y": 687.611328125,
+            "width": 10.375335693359375,
+            "height": 2.0213623046875
+          },
+          "width": 10.375335693359375,
+          "height": 2.0213623046875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12081",
+          "name": "Vector 404",
+          "key": "Vector_3182_12081.png",
+          "rect": {
+            "x": 178.5982666015625,
+            "y": 709.9176025390625,
+            "width": 43.2645263671875,
+            "height": 9.79095458984375
+          },
+          "width": 43.2645263671875,
+          "height": 9.79095458984375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12082",
+          "name": "Vector 404",
+          "key": "Vector_3182_12082.png",
+          "rect": {
+            "x": 156.431396484375,
+            "y": 685.7649536132812,
+            "width": 12.970306396484375,
+            "height": 3.0919189453125
+          },
+          "width": 12.970306396484375,
+          "height": 3.0919189453125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12083",
+          "name": "Vector 406",
+          "key": "Vector_3182_12083.png",
+          "rect": {
+            "x": 163.74676513671875,
+            "y": 687.4938354492188,
+            "width": 16.62725830078125,
+            "height": 3.14312744140625
+          },
+          "width": 16.62725830078125,
+          "height": 3.14312744140625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12084",
+          "name": "Vector 407",
+          "key": "Vector_3182_12084.png",
+          "rect": {
+            "x": 166.82156372070312,
+            "y": 686.0228881835938,
+            "width": 13.3880615234375,
+            "height": 2.958740234375
+          },
+          "width": 13.3880615234375,
+          "height": 2.958740234375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12085",
+          "name": "Vector 408",
+          "key": "Vector_3182_12085.png",
+          "rect": {
+            "x": 158.126220703125,
+            "y": 686.1785278320312,
+            "width": 23.189971923828125,
+            "height": 3.3465576171875
+          },
+          "width": 23.189971923828125,
+          "height": 3.3465576171875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12086",
+          "name": "Vector 409",
+          "key": "Vector_3182_12086.png",
+          "rect": {
+            "x": 178.5841064453125,
+            "y": 685.4221801757812,
+            "width": 8.926239013671875,
+            "height": 5.8004150390625
+          },
+          "width": 8.926239013671875,
+          "height": 5.8004150390625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12087",
+          "name": "Vector 410",
+          "key": "Vector_3182_12087.png",
+          "rect": {
+            "x": 177.8709716796875,
+            "y": 685.4435424804688,
+            "width": 8.179931640625,
+            "height": 3.1573486328125
+          },
+          "width": 8.179931640625,
+          "height": 3.1573486328125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12088",
+          "name": "Vector 411",
+          "key": "Vector_3182_12088.png",
+          "rect": {
+            "x": 199.60076904296875,
+            "y": 708.4013061523438,
+            "width": 31.779953002929688,
+            "height": 11.78692626953125
+          },
+          "width": 31.779953002929688,
+          "height": 11.78692626953125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12089",
+          "name": "Vector 412",
+          "key": "Vector_3182_12089.png",
+          "rect": {
+            "x": 179.02969360351562,
+            "y": 686.7001953125,
+            "width": 7.5474853515625,
+            "height": 3.5404052734375
+          },
+          "width": 7.5474853515625,
+          "height": 3.5404052734375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12090",
+          "name": "Vector 413",
+          "key": "Vector_3182_12090.png",
+          "rect": {
+            "x": 178.73861694335938,
+            "y": 684.0392456054688,
+            "width": 8.246856689453125,
+            "height": 4.563720703125
+          },
+          "width": 8.246856689453125,
+          "height": 4.563720703125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12091",
+          "name": "Vector 414",
+          "key": "Vector_3182_12091.png",
+          "rect": {
+            "x": 185.99359130859375,
+            "y": 682.1318359375,
+            "width": 4.4984130859375,
+            "height": 4.4808349609375
+          },
+          "width": 4.4984130859375,
+          "height": 4.4808349609375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12092",
+          "name": "Vector 415",
+          "key": "Vector_3182_12092.png",
+          "rect": {
+            "x": 186.64126586914062,
+            "y": 684.6124267578125,
+            "width": 3.423187255859375,
+            "height": 2.89825439453125
+          },
+          "width": 3.423187255859375,
+          "height": 2.89825439453125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12093",
+          "name": "Vector 416",
+          "key": "Vector_3182_12093.png",
+          "rect": {
+            "x": 223.485107421875,
+            "y": 702.71142578125,
+            "width": 15.632476806640625,
+            "height": 11.8719482421875
+          },
+          "width": 15.632476806640625,
+          "height": 11.8719482421875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12094",
+          "name": "Vector 416",
+          "key": "Vector_3182_12094.png",
+          "rect": {
+            "x": 185.80691528320312,
+            "y": 685.1253662109375,
+            "width": 3.797698974609375,
+            "height": 2.31719970703125
+          },
+          "width": 3.797698974609375,
+          "height": 2.31719970703125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12095",
+          "name": "Vector 417",
+          "key": "Vector_3182_12095.png",
+          "rect": {
+            "x": 183.51541137695312,
+            "y": 686.5684814453125,
+            "width": 5.91168212890625,
+            "height": 4.08184814453125
+          },
+          "width": 5.91168212890625,
+          "height": 4.08184814453125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12096",
+          "name": "Vector 418",
+          "key": "Vector_3182_12096.png",
+          "rect": {
+            "x": 127.55068969726562,
+            "y": 681.0892944335938,
+            "width": 26.040618896484375,
+            "height": 4.3046875
+          },
+          "width": 26.040618896484375,
+          "height": 4.3046875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12097",
+          "name": "Vector 419",
+          "key": "Vector_3182_12097.png",
+          "rect": {
+            "x": 180.167236328125,
+            "y": 708.9247436523438,
+            "width": 6.66546630859375,
+            "height": 6.6920166015625
+          },
+          "width": 6.66546630859375,
+          "height": 6.6920166015625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12098",
+          "name": "Vector 420",
+          "key": "Vector_3182_12098.png",
+          "rect": {
+            "x": 127.75485229492188,
+            "y": 682.5570678710938,
+            "width": 21.903533935546875,
+            "height": 5.283203125
+          },
+          "width": 21.903533935546875,
+          "height": 5.283203125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12099",
+          "name": "Vector 421",
+          "key": "Vector_3182_12099.png",
+          "rect": {
+            "x": 133.27044677734375,
+            "y": 682.4374389648438,
+            "width": 22.33416748046875,
+            "height": 4.4642333984375
+          },
+          "width": 22.33416748046875,
+          "height": 4.4642333984375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12100",
+          "name": "Vector 422",
+          "key": "Vector_3182_12100.png",
+          "rect": {
+            "x": 135.84326171875,
+            "y": 683.6661376953125,
+            "width": 17.57415771484375,
+            "height": 2.86578369140625
+          },
+          "width": 17.57415771484375,
+          "height": 2.86578369140625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12101",
+          "name": "Vector 423",
+          "key": "Vector_3182_12101.png",
+          "rect": {
+            "x": 146.393310546875,
+            "y": 686.129150390625,
+            "width": 9.990478515625,
+            "height": 2.0496826171875
+          },
+          "width": 9.990478515625,
+          "height": 2.0496826171875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12102",
+          "name": "Vector 424",
+          "key": "Vector_3182_12102.png",
+          "rect": {
+            "x": 147.6051025390625,
+            "y": 686.3773803710938,
+            "width": 18.873443603515625,
+            "height": 4.449951171875
+          },
+          "width": 18.873443603515625,
+          "height": 4.449951171875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12103",
+          "name": "Vector 426",
+          "key": "Vector_3182_12103.png",
+          "rect": {
+            "x": 141.0877685546875,
+            "y": 686.903564453125,
+            "width": 11.996337890625,
+            "height": 2.41033935546875
+          },
+          "width": 11.996337890625,
+          "height": 2.41033935546875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12104",
+          "name": "Vector 427",
+          "key": "Vector_3182_12104.png",
+          "rect": {
+            "x": 136.01416015625,
+            "y": 685.8502807617188,
+            "width": 6.8338623046875,
+            "height": 2.291259765625
+          },
+          "width": 6.8338623046875,
+          "height": 2.291259765625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12105",
+          "name": "Vector 427",
+          "key": "Vector_3182_12105.png",
+          "rect": {
+            "x": 127.67489624023438,
+            "y": 682.494873046875,
+            "width": 17.84014892578125,
+            "height": 6.31573486328125
+          },
+          "width": 17.84014892578125,
+          "height": 6.31573486328125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12106",
+          "name": "Vector 428",
+          "key": "Vector_3182_12106.png",
+          "rect": {
+            "x": 134.6759033203125,
+            "y": 685.3389282226562,
+            "width": 16.66015625,
+            "height": 3.964111328125
+          },
+          "width": 16.66015625,
+          "height": 3.964111328125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12107",
+          "name": "Vector 429",
+          "key": "Vector_3182_12107.png",
+          "rect": {
+            "x": 299.2928771972656,
+            "y": 703.5846557617188,
+            "width": 36.23670959472656,
+            "height": 18.30865478515625
+          },
+          "width": 36.23670959472656,
+          "height": 18.30865478515625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12108",
+          "name": "Vector 429",
+          "key": "Vector_3182_12108.png",
+          "rect": {
+            "x": 164.58148193359375,
+            "y": 688.1713256835938,
+            "width": 16.096343994140625,
+            "height": 3.55426025390625
+          },
+          "width": 16.096343994140625,
+          "height": 3.55426025390625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12109",
+          "name": "Vector 430",
+          "key": "Vector_3182_12109.png",
+          "rect": {
+            "x": 164.58367919921875,
+            "y": 685.3995361328125,
+            "width": 12.573883056640625,
+            "height": 2.39495849609375
+          },
+          "width": 12.573883056640625,
+          "height": 2.39495849609375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12110",
+          "name": "Vector 431",
+          "key": "Vector_3182_12110.png",
+          "rect": {
+            "x": 310.5052947998047,
+            "y": 712.397705078125,
+            "width": 36.87422180175781,
+            "height": 12.2125244140625
+          },
+          "width": 36.87422180175781,
+          "height": 12.2125244140625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12111",
+          "name": "Vector 433",
+          "key": "Vector_3182_12111.png",
+          "rect": {
+            "x": 200.360107421875,
+            "y": 714.4478759765625,
+            "width": 12.710845947265625,
+            "height": 4.68487548828125
+          },
+          "width": 12.710845947265625,
+          "height": 4.68487548828125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12112",
+          "name": "Vector 434",
+          "key": "Vector_3182_12112.png",
+          "rect": {
+            "x": 227.68991088867188,
+            "y": 708.3291015625,
+            "width": 2.050201416015625,
+            "height": 2.01751708984375
+          },
+          "width": 2.050201416015625,
+          "height": 2.01751708984375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12113",
+          "name": "Vector 435",
+          "key": "Vector_3182_12113.png",
+          "rect": {
+            "x": 222.18551635742188,
+            "y": 703.5089111328125,
+            "width": 13.076934814453125,
+            "height": 11.28155517578125
+          },
+          "width": 13.076934814453125,
+          "height": 11.28155517578125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12114",
+          "name": "Vector 436",
+          "key": "Vector_3182_12114.png",
+          "rect": {
+            "x": 185.3671875,
+            "y": 713.7158813476562,
+            "width": 16.80718994140625,
+            "height": 6.06927490234375
+          },
+          "width": 16.80718994140625,
+          "height": 6.06927490234375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12115",
+          "name": "Vector 437",
+          "key": "Vector_3182_12115.png",
+          "rect": {
+            "x": 180.22207641601562,
+            "y": 709.565673828125,
+            "width": 11.52313232421875,
+            "height": 8.08966064453125
+          },
+          "width": 11.52313232421875,
+          "height": 8.08966064453125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12116",
+          "name": "Vector 438",
+          "key": "Vector_3182_12116.png",
+          "rect": {
+            "x": 303.6151885986328,
+            "y": 705.9246826171875,
+            "width": 26.513534545898438,
+            "height": 16.93194580078125
+          },
+          "width": 26.513534545898438,
+          "height": 16.93194580078125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12117",
+          "name": "Vector 439",
+          "key": "Vector_3182_12117.png",
+          "rect": {
+            "x": 178.80755615234375,
+            "y": 706.3942260742188,
+            "width": 11.5340576171875,
+            "height": 12.14892578125
+          },
+          "width": 11.5340576171875,
+          "height": 12.14892578125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12118",
+          "name": "Vector 440",
+          "key": "Vector_3182_12118.png",
+          "rect": {
+            "x": 181.50885009765625,
+            "y": 707.375244140625,
+            "width": 14.99853515625,
+            "height": 5.33984375
+          },
+          "width": 14.99853515625,
+          "height": 5.33984375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12119",
+          "name": "Vector 441",
+          "key": "Vector_3182_12119.png",
+          "rect": {
+            "x": 326.4912109375,
+            "y": 714.8152465820312,
+            "width": 19.386383056640625,
+            "height": 5.33306884765625
+          },
+          "width": 19.386383056640625,
+          "height": 5.33306884765625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12120",
+          "name": "Vector 441",
+          "key": "Vector_3182_12120.png",
+          "rect": {
+            "x": 192.89450073242188,
+            "y": 709.222900390625,
+            "width": 24.4517822265625,
+            "height": 4.69342041015625
+          },
+          "width": 24.4517822265625,
+          "height": 4.69342041015625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12121",
+          "name": "Vector 442",
+          "key": "Vector_3182_12121.png",
+          "rect": {
+            "x": 211.14059448242188,
+            "y": 706.3434448242188,
+            "width": 17.625244140625,
+            "height": 7.19378662109375
+          },
+          "width": 17.625244140625,
+          "height": 7.19378662109375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12122",
+          "name": "Vector 443",
+          "key": "Vector_3182_12122.png",
+          "rect": {
+            "x": 315.8815460205078,
+            "y": 717.0850830078125,
+            "width": 28.637466430664062,
+            "height": 7.870361328125
+          },
+          "width": 28.637466430664062,
+          "height": 7.870361328125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12123",
+          "name": "Vector 444",
+          "key": "Vector_3182_12123.png",
+          "rect": {
+            "x": 298.74761962890625,
+            "y": 702.0073852539062,
+            "width": 4.6685791015625,
+            "height": 6.232177734375
+          },
+          "width": 4.6685791015625,
+          "height": 6.232177734375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12124",
+          "name": "Vector 445",
+          "key": "Vector_3182_12124.png",
+          "rect": {
+            "x": 299.3651123046875,
+            "y": 704.3028564453125,
+            "width": 11.30621337890625,
+            "height": 9.18707275390625
+          },
+          "width": 11.30621337890625,
+          "height": 9.18707275390625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12125",
+          "name": "Vector 446",
+          "key": "Vector_3182_12125.png",
+          "rect": {
+            "x": 298.87481689453125,
+            "y": 704.6749877929688,
+            "width": 14.030548095703125,
+            "height": 11.42529296875
+          },
+          "width": 14.030548095703125,
+          "height": 11.42529296875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12126",
+          "name": "Vector 447",
+          "key": "Vector_3182_12126.png",
+          "rect": {
+            "x": 305.70787048339844,
+            "y": 711.1270751953125,
+            "width": 17.9837646484375,
+            "height": 11.027587890625
+          },
+          "width": 17.9837646484375,
+          "height": 11.027587890625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12259",
+          "name": "image 1287",
+          "key": "c2a17.png",
+          "rect": {
+            "x": 44,
+            "y": 245,
+            "width": 323,
+            "height": 484
+          },
+          "width": 323,
+          "height": 484,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "음과 양을 합쳐~~~~~~~~",
+      "speaker": "솔이",
+      "dialogueRect": {
+        "x": 94,
+        "y": 757,
+        "width": 259,
+        "height": 24
+      },
+      "speakerRect": {
+        "x": 89,
+        "y": 721,
+        "width": 24,
+        "height": 18
+      },
+      "paperRect": {
+        "x": 11,
+        "y": 680,
+        "width": 379,
+        "height": 176
+      },
+      "paperKey": "e33cd.png",
+      "badgeRect": {
+        "x": 57,
+        "y": 713,
+        "width": 91,
+        "height": 33
+      },
+      "badgeKey": "9769e.png"
+    },
+    {
+      "number": 22,
+      "nodeId": "3182:11928",
+      "items": [
+        {
+          "nodeId": "3182:11929",
+          "name": "image 1195",
+          "key": "462b7.png",
+          "rect": {
+            "x": -330,
+            "y": 0,
+            "width": 1311,
+            "height": 874
+          },
+          "width": 1311,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": false,
+          "bottom": true,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11930",
+          "name": "image 1248",
+          "key": "43a56.png",
+          "rect": {
+            "x": -16,
+            "y": 218,
+            "width": 351,
+            "height": 460
+          },
+          "width": 351,
+          "height": 460,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12322",
+          "name": "Vector 4576",
+          "key": "Vector_3182_12322.png",
+          "rect": {
+            "x": 140.69458770751953,
+            "y": 327.21923828125,
+            "width": 9.705848693847656,
+            "height": 8.81793212890625
+          },
+          "width": 9.705848693847656,
+          "height": 8.81793212890625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12323",
+          "name": "Vector 4577",
+          "key": "Vector_3182_12323.png",
+          "rect": {
+            "x": 129.99303436279297,
+            "y": 332.7801513671875,
+            "width": 9.744712829589844,
+            "height": 9.86138916015625
+          },
+          "width": 9.744712829589844,
+          "height": 9.86138916015625,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12324",
+          "name": "Vector 4578",
+          "key": "Vector_3182_12324.png",
+          "rect": {
+            "x": 107.85702514648438,
+            "y": 343.81097412109375,
+            "width": 11.272933959960938,
+            "height": 10.00091552734375
+          },
+          "width": 11.272933959960938,
+          "height": 10.00091552734375,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12325",
+          "name": "Vector 4579",
+          "key": "Vector_3182_12325.png",
+          "rect": {
+            "x": 98.104736328125,
+            "y": 351.69384765625,
+            "width": 8.891006469726562,
+            "height": 9.0223388671875
+          },
+          "width": 8.891006469726562,
+          "height": 9.0223388671875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12326",
+          "name": "Vector 4580",
+          "key": "Vector_3182_12326.png",
+          "rect": {
+            "x": 90.38199234008789,
+            "y": 356.328125,
+            "width": 8.24606704711914,
+            "height": 7.2684326171875
+          },
+          "width": 8.24606704711914,
+          "height": 7.2684326171875,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": true,
+          "cover": false,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11931",
+          "name": "image 1212",
+          "key": "a221f.png",
+          "rect": {
+            "x": 143,
+            "y": 549,
+            "width": 123,
+            "height": 129
+          },
+          "width": 123,
+          "height": 129,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:11933",
+          "name": "image 1217",
+          "key": "00783.png",
+          "rect": {
+            "x": 324.9333190917969,
+            "y": 594.9999716858638,
+            "width": 72.49474165277411,
+            "height": 78.92664105229505
+          },
+          "width": 71.71907043457031,
+          "height": 78.21601867675781,
+          "rotation": 0.5708223455375853,
+          "alpha": 1,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 5.1057,
+          "hPercent": 1.5641,
+          "leftPercent": -2.0629,
+          "topPercent": -0.244
+        },
+        {
+          "nodeId": "3182:11934",
+          "name": "image 1214",
+          "key": "00783.png",
+          "rect": {
+            "x": 225.5659637451172,
+            "y": 655.9254300728825,
+            "width": 76.85012764988255,
+            "height": 83.06513488911025
+          },
+          "width": 76.03386688232422,
+          "height": 82.31172943115234,
+          "rotation": 0.5708223455375853,
+          "alpha": 1,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 5.0623000000000005,
+          "hPercent": 1.5622999999999998,
+          "leftPercent": -1.0791,
+          "topPercent": -0.2692
+        },
+        {
+          "nodeId": "3182:11935",
+          "name": "image 1213",
+          "key": "00783.png",
+          "rect": {
+            "x": 105,
+            "y": 656.7627884039784,
+            "width": 75.86245131928081,
+            "height": 89.23784552107054
+          },
+          "width": 74.98453521728516,
+          "height": 88.49520111083984,
+          "rotation": 0.5708223455375853,
+          "alpha": 1,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 5.1221000000000005,
+          "hPercent": 1.45,
+          "leftPercent": -0.1081,
+          "topPercent": -0.32420000000000004
+        },
+        {
+          "nodeId": "3182:11936",
+          "name": "image 1216",
+          "key": "00783.png",
+          "rect": {
+            "x": 299.9333190917969,
+            "y": 666.9027181956621,
+            "width": 84.52761541768541,
+            "height": 93.66833294158823
+          },
+          "width": 83.60684204101562,
+          "height": 92.84000396728516,
+          "rotation": 0.5708223455375853,
+          "alpha": 1,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 5.000299999999999,
+          "hPercent": 1.5045,
+          "leftPercent": -3.9335000000000004,
+          "topPercent": -0.3482
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 23,
+      "nodeId": "3182:12133",
+      "items": [
+        {
+          "nodeId": "3182:12136",
+          "name": "image 1185",
+          "key": "da8af.png",
+          "rect": {
+            "x": -643,
+            "y": 0,
+            "width": 1311,
+            "height": 874
+          },
+          "width": 1311,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": false,
+          "bottom": true,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12137",
+          "name": "image 1243",
+          "key": "80d8d.png",
+          "rect": {
+            "x": 0,
+            "y": 182,
+            "width": 402,
+            "height": 565
+          },
+          "width": 402,
+          "height": 565,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12139",
+          "name": "image 1217",
+          "key": "00783.png",
+          "rect": {
+            "x": 309,
+            "y": 637.9735156902307,
+            "width": 66.01379168426843,
+            "height": 71.87068818397847
+          },
+          "width": 65.30746459960938,
+          "height": 71.22359466552734,
+          "rotation": 0.5708223455375853,
+          "alpha": 1,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 5.1057,
+          "hPercent": 1.5641,
+          "leftPercent": -2.0629,
+          "topPercent": -0.244
+        },
+        {
+          "nodeId": "3182:12140",
+          "name": "image 1214",
+          "key": "00783.png",
+          "rect": {
+            "x": 145,
+            "y": 613.9999826565406,
+            "width": 64.20889747660533,
+            "height": 69.40158628269114
+          },
+          "width": 63.52690505981445,
+          "height": 68.77210998535156,
+          "rotation": 0.5708223455375853,
+          "alpha": 1,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 5.0623000000000005,
+          "hPercent": 1.5622999999999998,
+          "leftPercent": -1.0791,
+          "topPercent": -0.2692
+        },
+        {
+          "nodeId": "3182:12141",
+          "name": "image 1213",
+          "key": "00783.png",
+          "rect": {
+            "x": 26,
+            "y": 658.8969726989078,
+            "width": 73.64675441054294,
+            "height": 86.63149951696664
+          },
+          "width": 72.79447937011719,
+          "height": 85.9105453491211,
+          "rotation": 0.5708223455375853,
+          "alpha": 1,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 5.1221000000000005,
+          "hPercent": 1.45,
+          "leftPercent": -0.1081,
+          "topPercent": -0.32420000000000004
+        },
+        {
+          "nodeId": "3182:12142",
+          "name": "image 1216",
+          "key": "00783.png",
+          "rect": {
+            "x": 227,
+            "y": 656.9456100612103,
+            "width": 70.81588093545088,
+            "height": 78.47382981302485
+          },
+          "width": 70.04447174072266,
+          "height": 77.77986907958984,
+          "rotation": 0.5708223455375853,
+          "alpha": 1,
+          "vector": false,
+          "cover": false,
+          "bottom": false,
+          "crop": true,
+          "wPercent": 5.000299999999999,
+          "hPercent": 1.5045,
+          "leftPercent": -3.9335000000000004,
+          "topPercent": -0.3482
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    },
+    {
+      "number": 24,
+      "nodeId": "3182:12367",
+      "items": [
+        {
+          "nodeId": "3182:12370",
+          "name": "image 1209",
+          "key": "72eb0.png",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 402,
+            "height": 874
+          },
+          "width": 402,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12371",
+          "name": "image 1301",
+          "key": "b47e3.png",
+          "rect": {
+            "x": 95,
+            "y": 294,
+            "width": 197,
+            "height": 214
+          },
+          "width": 197,
+          "height": 214,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12372",
+          "name": "image 1304",
+          "key": "f0936.png",
+          "rect": {
+            "x": 220,
+            "y": 545,
+            "width": 164,
+            "height": 218
+          },
+          "width": 164,
+          "height": 218,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12373",
+          "name": "image 1302",
+          "key": "12060.png",
+          "rect": {
+            "x": 236,
+            "y": 384,
+            "width": 185,
+            "height": 187
+          },
+          "width": 185,
+          "height": 187,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12374",
+          "name": "image 1303",
+          "key": "ab56d.png",
+          "rect": {
+            "x": 0,
+            "y": 416,
+            "width": 157,
+            "height": 231
+          },
+          "width": 157,
+          "height": 231,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3182:12375",
+          "name": "image 1300",
+          "key": "9d90e.png",
+          "rect": {
+            "x": 94,
+            "y": 469,
+            "width": 160,
+            "height": 271
+          },
+          "width": 160,
+          "height": 271,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": ""
+    }
+  ]
+}

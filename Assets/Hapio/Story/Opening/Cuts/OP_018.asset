@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4485ab5ed52da49dd8b525f3743f1721, type: 3}
+  m_Name: OP_018
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryCutDefinition
+  cutId: OP_018
+  viewPrefab: {fileID: 4498835523489449100, guid: 4d04945e4204144438c951cd9cf65055, type: 3}
+  pages:
+  - speaker: "\uBB35\uC774"
+    dialogue: "\uC598\uB4E4\uC544.\n\uC7A0\uAE50, \uC5EC\uAE30 \uC880 \uBD10."
+    autoReadSeconds: 3.1
+    voice: {fileID: 0}
+  direction: 
+  speaker: "\uBB35\uC774"
+  dialogue: "\uC598\uB4E4\uC544.\n\uC7A0\uAE50, \uC5EC\uAE30 \uC880 \uBD10."
+  autoReadSeconds: 4
+  voice: {fileID: 0}
