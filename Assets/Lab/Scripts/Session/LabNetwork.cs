@@ -213,13 +213,15 @@ namespace C6Lab
         //       retired bomb/block/sabotage timers.
         // 5669: #324 per-player Yin/Yang streak control (DEV 225-227, 228 shared values).
         // 5670: #326 Blast Burn Seconds range 3-5 -> 3-9 (default 4 -> 6); an older peer would reject the new value.
-        internal const ushort LabProtocolVersion = 5670;
+        // 5671: #328 an unlocked bomb glides in and opens into two attack orbs through "use" (never thrown), a double
+        //       tap clears a fox orb through "use" and the side edges stop it; DEV 55 and 211 retired (228 values kept).
+        internal const ushort LabProtocolVersion = 5671;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/31");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/32");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

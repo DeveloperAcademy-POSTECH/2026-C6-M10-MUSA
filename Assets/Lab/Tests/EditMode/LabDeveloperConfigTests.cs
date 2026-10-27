@@ -1673,8 +1673,8 @@ namespace C6Lab.Tests
                     Assert.That(copy.RawStreakMaximum, Is.EqualTo((int)maximum));
                     Assert.That(copy.CaptureDeveloperValues(), Is.EqualTo(values));
                 }
-                Assert.That(LabSessionSettings.Fingerprint(received, 3, 5670),
-                    Is.EqualTo(LabSessionSettings.Fingerprint(values, 3, 5670)));
+                Assert.That(LabSessionSettings.Fingerprint(received, 3, 5671),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(values, 3, 5671)));
             }
             finally { Object.DestroyImmediate(peer); Object.DestroyImmediate(runtime); }
         }
@@ -1712,8 +1712,8 @@ namespace C6Lab.Tests
             float[] before = config.CaptureDeveloperValues();
             float[] values = (float[])before.Clone(); values[index] = changed;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
-            Assert.That(LabSessionSettings.Fingerprint(values, 3, 5670),
-                Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 3, 5670)));
+            Assert.That(LabSessionSettings.Fingerprint(values, 3, 5671),
+                Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 3, 5671)));
             LabDeveloperField field = LabConfig.DeveloperFields[index];
             foreach (float endpoint in new[] { field.Min, field.Max, before[index] })
             {
