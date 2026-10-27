@@ -8,12 +8,14 @@ namespace C6Lab
     /// 풀리면 "정신 차림!"을 잠깐 띄운다. 매혹 예고 (#305): 걸리기 전 예고 동안에는 모든 화면의 같은 자리에
     /// "구미호가 P2에게 매혹을 걸려고 한다!"(걸릴 사람 자신에게는 "나에게")를 띄운다. 매혹 울음소리가 Resources/Sabotage/CharmHowl에 있으면 매혹이 걸릴 때 모든
     /// 기기에서 한 번 낸다. 화면 표시만 하며 터치를 막지 않는다.
+    /// 안내 (#328): 홀린 동안에는 같은 자리에 "옆 사람이 풀어 줄 때까지 기다려야 한다..."를 띄운다 (풀어 줄 옆 사람이 있을 때).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabCharmHud : MonoBehaviour
     {
         public const string HowlPath = "Sabotage/CharmHowl";
         public const string AwakeText = "정신 차림!";
+        public const string WaitText = "옆 사람이 풀어 줄 때까지\n기다려야 한다...";
         public static string WarningText(string who) => "요괴가 " + who + "에게\n매혹을 걸려고 한다!";
         private const float WarningPopSeconds = .2f, WarningPulseHz = 2f;
         private const float AwakeSeconds = 1.2f;
@@ -46,6 +48,7 @@ namespace C6Lab
         private Text awake;
         private Text warning;
         private float warningAge = -1f;
+        private LabGuideText waitGuide;
         private AudioSource howlSource;
         private AudioClip howl;
         private bool howlLoaded;
@@ -63,6 +66,9 @@ namespace C6Lab
         /// <summary>The charm warning showing on this screen (#305), and what it says.</summary>
         public bool WarningShowing => warning != null && warning.gameObject.activeInHierarchy;
         public string WarningShown => warning != null ? warning.text : string.Empty;
+        /// <summary>The charmed player's own guide (#328): wait for the players beside.</summary>
+        public bool WaitShowing => waitGuide != null && waitGuide.Showing;
+        public string WaitShown => waitGuide != null ? waitGuide.Shown : string.Empty;
 
         /// <summary>스냅샷을 읽을 네트워크와, 게이지를 그릴 Canvas를 연결한다.</summary>
         public void Bind(LabNetwork target, Canvas uiCanvas)
@@ -134,6 +140,10 @@ namespace C6Lab
             }
             DrawAwake();
             DrawWarning(snapshot, warned);
+            // Only when someone beside can wake them: solo, or with rescue taps off, the charm just wears off.
+            bool rescuable = network.config != null && network.config.CharmRescueTaps > 0
+                && snapshot.charmHelpers != null && snapshot.charmHelpers.Length > 0;
+            waitGuide.Draw(charmed && rescuable, WaitText);
         }
 
         // 매혹 예고 (#305): 걸릴 사람이 정해지면 모두에게 알린다. 톡 튀어나와 살짝 두근거리다가 매혹이 시작되면 사라진다.
@@ -259,6 +269,7 @@ namespace C6Lab
             warningOutline.effectColor = new Color(1f, 1f, 1f, .95f);
             warningOutline.effectDistance = new Vector2(2f, -2f);
             warningRect.gameObject.SetActive(false);
+            waitGuide = LabGuideText.Create(layer, font, "Charm Wait Guide");
             return true;
         }
 

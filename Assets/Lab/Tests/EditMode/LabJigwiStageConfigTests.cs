@@ -47,8 +47,8 @@ namespace C6Lab.Tests
                 Assert.That(peer.CaptureDeveloperValues(), Is.EqualTo(requested));
                 Assert.That(runtime.CaptureDeveloperValues(), Is.EqualTo(requested));
                 Assert.That(peer.CaptureDeveloperValues().Take(228), Is.EqualTo(before.Take(228)));
-                Assert.That(LabSessionSettings.Fingerprint(received, 3, 5671),
-                    Is.EqualTo(LabSessionSettings.Fingerprint(requested, 3, 5671)));
+                Assert.That(LabSessionSettings.Fingerprint(received, 3, 5672),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(requested, 3, 5672)));
                 float[] runtimeValues = runtime.CaptureDeveloperValues(); runtimeValues[230] = 15f;
                 Assert.That(runtime.TryApplyDeveloperValues(runtimeValues, out error), Is.True, error);
                 Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(requested));
@@ -79,8 +79,8 @@ namespace C6Lab.Tests
             float[] before = config.CaptureDeveloperValues();
             float[] requested = (float[])before.Clone(); requested[index] = changed;
             Assert.That(config.TryApplyDeveloperValues(requested, out string error), Is.True, error);
-            Assert.That(LabSessionSettings.Fingerprint(requested, 3, 5671),
-                Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 3, 5671)));
+            Assert.That(LabSessionSettings.Fingerprint(requested, 3, 5672),
+                Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 3, 5672)));
             LabDeveloperField field = LabConfig.DeveloperFields[index];
             foreach (float endpoint in new[] { field.Min, field.Max, before[index] })
             {
@@ -97,7 +97,7 @@ namespace C6Lab.Tests
             float[] old = before.Take(228).ToArray(); old[0] = 777f;
             Assert.That(config.TryApplyDeveloperValues(old, out _), Is.False);
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(before));
-            Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(old, 3, 5671));
+            Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(old, 3, 5672));
         }
 
         [Test]

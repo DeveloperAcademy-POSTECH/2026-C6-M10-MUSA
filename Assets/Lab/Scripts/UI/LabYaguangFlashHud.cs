@@ -55,8 +55,12 @@ namespace C6Lab
         [SerializeField, Range(.3f, 3f)] private float shakeThreshold = 1.6f;
         [Tooltip("한 번 센 뒤 다시 세기까지 기다리는 시간 (초)")]
         [SerializeField, Range(.05f, .5f)] private float shakeMinGap = .25f;
-        [Tooltip("흔들 때 하얀 막이 걷히는 빠르기 (초당 비율). 한 번에 툭 바뀌지 않고 이 빠르기로 부드럽게 따라간다.")]
+        [Tooltip("화면 전체의 옅은 하얀 막이 돌아온 구슬 비율만큼 옅어지는 빠르기 (초당 비율). 한 번에 툭 바뀌지 않고 부드럽게 따라간다.")]
         [SerializeField, Range(.5f, 10f)] private float shakeClearSpeed = 2.5f;
+        [Tooltip("흔들어 색을 되찾은 구슬이 톡 튀는 크기 (#330, 처음 크기 배). 1이면 튀지 않는다.")]
+        [SerializeField, Range(1f, 2f)] private float revealPopScale = 1.3f;
+        [Tooltip("색을 되찾은 구슬이 제 크기로 돌아오는 시간 (초)")]
+        [SerializeField, Range(.05f, .6f)] private float revealPopSeconds = .18f;
         [Tooltip("흔들라는 안내 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 shakeCueAnchor = new Vector2(.5f, .42f);
         [Tooltip("흔들라는 안내의 폰 그림 높이 (Canvas 기준 픽셀)")]
@@ -85,6 +89,7 @@ namespace C6Lab
         private float shakeSentAt = float.NegativeInfinity;
         public const float ShakeRetrySeconds = .5f;
         private float shownShake;
+        private int revealedShakes;
         private RectTransform shakeCue, shakeGaugeFill, shakePhone;
         private Text shakeLabel;
         /// <summary>이번 섬광에 이 화면에서 센 흔들기 수 (#301)</summary>
@@ -171,10 +176,12 @@ namespace C6Lab
             bool shakeRelease = config.YaguangFlashShakeRelease;
             bool myGlare = shakeRelease && LabYaguangFlash.Glared(snapshot, now, me, config.YaguangFlashGlareSeconds);
             float shakeProgress = DriveShake(snapshot, myGlare, config.YaguangFlashShakeCount);
-            // 흔든 만큼 걷히되, 한 번 흔들 때마다 툭 바뀌지 않게 부드럽게 따라간다 (#301).
+            // 흔들 때마다 구슬 하나씩 색이 돌아온다 (#330, 판이 정한다). 다 흔들었으면 Host가 풀기 전에도 바로 맑다.
+            // 화면 전체의 옅은 막은 돌아온 비율만큼 부드럽게 옅어진다.
             shownShake = Mathf.MoveTowards(shownShake, shakeProgress, shakeClearSpeed * Time.unscaledDeltaTime);
-            if (shakeRelease) glare = Mathf.Min(glare, 1f - shownShake);
+            if (shakeRelease && shakeProgress >= 1f) glare = 0f;
             if (boundBoard != null) boundBoard.SetFlashGlare(glare);
+            float veilGlare = shakeRelease ? glare * (1f - shownShake) : glare;
             CheckNewFlash(snapshot, now, me, config);
             CheckCaught(snapshot, now, me);
 
@@ -190,7 +197,7 @@ namespace C6Lab
                     burstAlpha = (1f - u) * (1f - u);
                 }
             }
-            burstAlpha = Mathf.Max(burstAlpha, veilAlpha * glare);
+            burstAlpha = Mathf.Max(burstAlpha, veilAlpha * veilGlare);
             int count = showCountdown && !snapshot.paused ? CountdownAt(snapshot, now, me) : 0;
             bool cue = myGlare && shakeProgress < 1f && !snapshot.paused;
             if (warning <= 0f && burstAlpha <= 0f && count <= 0 && !cue)
@@ -212,10 +219,13 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 이번 섬광에서 흔든 수를 세고, 필요한 수를 채우면 Host에 한 번 알린다. 흔든 만큼의 비율(0~1)을 돌려준다.
+        /// 이번 섬광에서 흔든 수를 세고, 다 흔들면 Host에 한 번 알린다. 흔든 만큼의 비율(0~1)을 돌려준다.
         /// 새 섬광이면 처음부터 다시 센다. 눈부시지 않으면(이미 풀렸거나 시간이 지났으면) 세지 않는다.
+        /// #330: 한 번 흔들 때마다 판의 하얀 구슬 하나가 무작위로 색을 되찾는다. 판에 하얀 구슬이 남지 않으면(적어도
+        /// 한 번 흔든 뒤) 다 흔든 것이고, 아무리 구슬이 많아도 maxShakes번이면 나머지가 한꺼번에 돌아온다.
+        /// 판이 없으면(테스트 등) maxShakes번을 채워야 한다.
         /// </summary>
-        private float DriveShake(LabSnapshot snapshot, bool myGlare, int needed)
+        private float DriveShake(LabSnapshot snapshot, bool myGlare, int maxShakes)
         {
             if (snapshot.sessionId != shakeSession || snapshot.round != shakeRound || snapshot.flashCount != shakeFlash)
             {
@@ -225,19 +235,46 @@ namespace C6Lab
                 shakeCounter.Reset();
                 shakeSentAt = float.NegativeInfinity;
                 shownShake = 0f;
+                revealedShakes = 0;
+                if (boundBoard != null) boundBoard.ResetFlashReveal();
             }
             shakeCounter.Threshold = shakeThreshold;
             shakeCounter.MinGap = shakeMinGap;
             if (myGlare && !snapshot.paused && network != null && !network.GameStartHeld && network.IsConnected)
             {
-                if (shakeCounter.Count < needed && ReadShake()) HapticTick();
+                if (!ShakesDone(maxShakes) && ReadShake()) HapticTick();
+                RevealShaken(maxShakes);
                 // A report can arrive while the Host is paused. Retain this generation's shakes and
                 // retry at a bounded rate until the authoritative snapshot confirms release.
-                if (shakeCounter.Count >= needed && Time.unscaledTime - shakeSentAt >= ShakeRetrySeconds
+                if (ShakesDone(maxShakes) && Time.unscaledTime - shakeSentAt >= ShakeRetrySeconds
                     && network.RequestFlashShakeRelease())
                     shakeSentAt = Time.unscaledTime;
             }
-            return ShakeProgress(shakeCounter.Count, needed);
+            else RevealShaken(maxShakes);
+            if (ShakesDone(maxShakes)) return 1f;
+            if (boundBoard == null) return ShakeProgress(shakeCounter.Count, maxShakes);
+            int count = shakeCounter.Count;
+            return ShakeProgress(count, count + Mathf.Min(boundBoard.FlashWhiteCount, maxShakes - count));
+        }
+
+        /// <summary>다 흔들었는지 (#330): 최대 횟수를 채웠거나, 한 번 이상 흔들었고 판에 하얀 구슬이 남지 않았다.</summary>
+        private bool ShakesDone(int maxShakes)
+        {
+            int count = shakeCounter.Count;
+            if (count >= Mathf.Max(1, maxShakes)) return true;
+            return boundBoard != null && count >= 1 && boundBoard.FlashWhiteCount == 0;
+        }
+
+        /// <summary>새로 센 흔들기마다 판의 하얀 구슬 하나씩 색을 돌려준다. 다 흔들었으면 남은 구슬도 모두 돌려준다.</summary>
+        private void RevealShaken(int maxShakes)
+        {
+            if (boundBoard == null) { revealedShakes = shakeCounter.Count; return; }
+            while (revealedShakes < shakeCounter.Count)
+            {
+                revealedShakes++;
+                boundBoard.RevealFlashOrb(revealPopScale, revealPopSeconds);
+            }
+            if (shakeCounter.Count >= Mathf.Max(1, maxShakes)) boundBoard.RevealAllFlashOrbs();
         }
 
         /// <summary>이번 프레임에 한 번 흔들었는지. 가속도계(폰)가 있으면 그것으로, Editor·DEV 빌드에서는 K 키로도.</summary>

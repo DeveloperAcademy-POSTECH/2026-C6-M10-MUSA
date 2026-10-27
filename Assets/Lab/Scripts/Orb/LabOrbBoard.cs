@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -94,6 +95,12 @@ namespace C6Lab
             public MotionState? BeforeRequest;
             /// <summary>A fox orb cannot be touched off until this time (#251): a moment after it lands.</summary>
             public float FoxSafeUntil;
+            /// <summary>
+            /// An unlocked bomb (#328): when it came to rest here, -1 while it is still moving in, and the earliest time
+            /// this board may ask again to open it after the Host turned a request down.
+            /// </summary>
+            public float BombRestingSince = -1f;
+            public float BombNextOpenAt;
             public float SafetyRestSeconds;
             public bool SafetyNudging;
             public float SafetyNudgeSeconds;
@@ -149,6 +156,12 @@ namespace C6Lab
         private const float ArrivalRestSpeed = .02f;
         // A drum passing through runs on to the next player at no less than this (board widths/s).
         private const float PassMinSpeed = .9f;
+        // An unlocked bomb (#328) rests this long where it stopped, so it is seen to arrive, then opens; a request
+        // the Host turned down is asked again after the retry time.
+        private const float BombOpenPauseSeconds = .2f;
+        private const float BombOpenRetrySeconds = 1f;
+        // The opening bomb's puff is this many times its size, so the change into two attack orbs is plain to see.
+        private const float BombOpenSmokeScale = 2.2f;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly HashSet<string> spawnedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
@@ -489,8 +502,8 @@ namespace C6Lab
                 entry.SimulationHoldVelocity = initialVelocity;
                 entry.SimulationHoldAngularVelocity = Vector3.zero;
             }
-            // Starts from the speed it came in with, set just above.
-            if (arrival != LabDrumArrival.None && kind.IsDrum() && !body.isKinematic)
+            // Starts from the speed it came in with, set just above. An unlocked bomb (#328) glides in like a drum.
+            if (arrival != LabDrumArrival.None && (kind.IsDrum() || kind == LabOrbKind.Bomb) && !body.isKinematic)
                 StartArrival(entry, arrival, stopAt, normalizedPosition.x);
             if (playSpawn && spawnedIds.Add(id))
             {
@@ -701,7 +714,46 @@ namespace C6Lab
         private void ApplyFlashGlare()
         {
             foreach (var entry in entries.Values)
-                if (entry.View != null) entry.View.SetGlare(entry.View.Kind.IsDrum() ? 0f : flashGlare);
+                if (entry.View != null)
+                    entry.View.SetGlare(entry.View.Kind.IsDrum() || flashRevealed.Contains(entry.View.OrbId) ? 0f : flashGlare);
+        }
+
+        // 흔들어 풀기 (#330): 이번 섬광에서 색을 되찾은 구슬. 이 구슬들만 하얗지 않고, 나중에 생긴 구슬은 하얗게 나온다.
+        private readonly HashSet<string> flashRevealed = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>아직 하얗게 덮여 색을 되찾지 못한 판 구슬 수 (북 제외, 아이템 포함)</summary>
+        public int FlashWhiteCount => entries.Values.Count(entry => entry.View != null && !entry.View.Kind.IsDrum()
+            && !flashRevealed.Contains(entry.View.OrbId));
+        /// <summary>이번 섬광에서 색을 되찾은 구슬 수</summary>
+        public int FlashRevealedCount => flashRevealed.Count;
+        /// <summary>이 구슬이 이번 섬광에서 색을 되찾았는지</summary>
+        public bool FlashRevealed(string orbId) => orbId != null && flashRevealed.Contains(orbId);
+
+        /// <summary>새 섬광: 모든 구슬을 다시 하얗게 덮을 수 있게 되찾은 목록을 비운다.</summary>
+        public void ResetFlashReveal() => flashRevealed.Clear();
+
+        /// <summary>
+        /// 한 번 흔들 때마다 (#330): 아직 하얀 구슬 하나를 무작위로 골라 색을 돌려주고 톡 튀게 한다. 돌려준 구슬 ID, 없으면 null.
+        /// 화면 표시만 바꾸며 규칙·물리는 그대로다.
+        /// </summary>
+        public string RevealFlashOrb(float popScale, float popSeconds)
+        {
+            Entry[] white = entries.Values.Where(entry => entry.View != null && !entry.View.Kind.IsDrum()
+                && !flashRevealed.Contains(entry.View.OrbId)).ToArray();
+            if (white.Length == 0) return null;
+            Entry pick = white[UnityEngine.Random.Range(0, white.Length)];
+            flashRevealed.Add(pick.View.OrbId);
+            pick.View.SetGlare(0f);
+            if (popScale > 0f && popSeconds > 0f && pick.View.isActiveAndEnabled)
+                pick.View.PlaySpawnPop(Vector3.zero, popScale, popSeconds);
+            return pick.View.OrbId;
+        }
+
+        /// <summary>다 흔들었다: 남은 하얀 구슬을 한꺼번에 돌려준다 (#330, 최대 횟수를 채웠을 때).</summary>
+        public void RevealAllFlashOrbs()
+        {
+            foreach (var entry in entries.Values)
+                if (entry.View != null && !entry.View.Kind.IsDrum()) flashRevealed.Add(entry.View.OrbId);
         }
         public int ComboLook => comboLook;
         /// <summary>판 구슬이 지금 콤보 효과로 향하는 그림 배율 (#257)</summary>
@@ -1163,6 +1215,7 @@ namespace C6Lab
             charmed = false;
             jigwiOverheat = false;
             flashGlare = 0f;
+            flashRevealed.Clear();
             if (charmEdge != null) charmEdge.Hide();
             foreach (var entry in entries.Values)
                 Retire(entry);
@@ -1269,7 +1322,7 @@ namespace C6Lab
             foreach (var entry in entries.Values)
             {
                 if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held || entry.Dropping
-                    || entry.HiddenForPending) continue;
+                    || entry.HiddenForPending || UnlockedBomb(entry)) continue;
                 float radius = entry.View.HitSphere.radius;
                 float originalReach = radius * 1.25f;
                 float reach = GripReach(entry);
@@ -1373,6 +1426,8 @@ namespace C6Lab
                 if (lastTapId == id && now - lastTapTime <= DoubleTapWindow)
                 {
                     lastTapId = null;
+                    // A double tap clears a fox orb (#328): it goes up in its blue smoke at once.
+                    if (entry.View.Kind == LabOrbKind.FoxFire) PlayFoxSmoke(entry);
                     entry.Locked = true;
                     StopMotion(entry.View.Body);
                     SetBodyMode(entry);
@@ -1399,7 +1454,8 @@ namespace C6Lab
 
             // A deliberate manual pass can finish safely inside the screen. It enters the same
             // Host-validated crossing path as a freely moving body at the actual side plane.
-            if (assistedSide != 0)
+            // A fox orb is never passed (#328), so it only slides like any flick.
+            if (assistedSide != 0 && entry.View.Kind != LabOrbKind.FoxFire)
             {
                 SetBodyMode(entry);
                 Vector2 assistedWorldVelocity = TransferReleaseVelocity(entry, assistedSide, inputVelocity, assistedVelocity);
@@ -1513,6 +1569,7 @@ namespace C6Lab
         private void FixedUpdate()
         {
             if (!configured || simulationHeld) return;
+            OpenRestingBombs();
             updateEntries.Clear();
             updateEntries.AddRange(entries.Values);
             foreach (var entry in updateEntries)
@@ -1567,6 +1624,40 @@ namespace C6Lab
                 LabEdgeCrossingKind kind = entry.Arrival == LabDrumArrival.Pass ? LabEdgeCrossingKind.Passing
                     : entry.Blasted ? LabEdgeCrossingKind.Pushed : LabEdgeCrossingKind.Swipe;
                 ProcessEdgeCrossing(entry, right, position, velocity, kind);
+            }
+        }
+
+        private static bool UnlockedBomb(Entry entry) => entry.View != null && entry.View.Kind == LabOrbKind.Bomb
+            && entry.View.LockSwipes == 0;
+
+        /// <summary>
+        /// 해금 폭탄 (#328): 잠금이 풀린 폭탄이 이 판에 미끄러져 들어와 멈추면 잠깐 뒤 연기와 함께 사라지고, 그 자리를 Host에
+        /// 알려 공격 구슬 두 개로 연다. 열 수 없다는 답이 오면 잠시 뒤 다시 묻는다. 잠금이 풀린 폭탄은 잡을 수 없다.
+        /// </summary>
+        private void OpenRestingBombs()
+        {
+            if (!interactionEnabled) return;
+            updateEntries.Clear();
+            updateEntries.AddRange(entries.Values);
+            foreach (Entry entry in updateEntries)
+            {
+                if (!UnlockedBomb(entry) || !entry.LocalOwner || entry.Provisional) continue;
+                if (entry.Arrival != LabDrumArrival.None || entry.Dropping || entry.Held || entry.Locked
+                    || entry.EdgePending || entry.HiddenForPending)
+                {
+                    entry.BombRestingSince = -1f;
+                    continue;
+                }
+                if (entry.BombRestingSince < 0f) entry.BombRestingSince = Time.time;
+                if (Time.time - entry.BombRestingSince < BombOpenPauseSeconds || Time.time < entry.BombNextOpenAt) continue;
+                entry.BombRestingSince = -1f;
+                entry.BombNextOpenAt = Time.time + BombOpenRetrySeconds;
+                LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius * BombOpenSmokeScale,
+                    config != null ? config.OrbAppearance : null);
+                entry.Locked = true;
+                StopMotion(entry.View.Body);
+                SetBodyMode(entry);
+                UseRequested?.Invoke(entry.View.OrbId);
             }
         }
 

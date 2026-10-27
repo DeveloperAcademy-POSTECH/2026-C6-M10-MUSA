@@ -902,10 +902,18 @@ namespace Hapio.Tests
             yield return Until(() => !foxBoard.IsDropping(foxes[0].id), "The fox must land before it can consume Yin.");
             yield return new WaitForSeconds(network.config.FoxFireSafeSeconds + .1f);
 
-            network.Generate();
-            yield return Until(() => network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.Yin),
+            // The drum draws Yin or Yang by the session's seed (#324 caps a run of one kind at three), so generate
+            // until a Yin comes; any Yang only rests on the board, and the first Yin is the one that meets the fox.
+            for (int tries = 0; tries < 5 && !network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.Yin); tries++)
+            {
+                int generated = network.Snapshot.players.Single().generatedTotal;
+                network.Generate();
+                yield return Until(() => network.Snapshot.players.Single().generatedTotal > generated,
+                    "The actual Generate path must create an orb.");
+            }
+            Assert.That(network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.Yin), Is.True,
                 "The actual Generate path must create a Yin for Fox Fire contact.");
-            string yinId = network.Snapshot.orbs.Single(orb => orb.kind == LabOrbKind.Yin).id;
+            string yinId = network.Snapshot.orbs.First(orb => orb.kind == LabOrbKind.Yin).id;
             yield return Until(() => foxBoard.GetComponentsInChildren<LabOrbView>().Any(view => view.OrbId == yinId),
                 "The generated Yin must reach the saved board.");
             LabOrbView yinView = foxBoard.GetComponentsInChildren<LabOrbView>().Single(view => view.OrbId == yinId);
@@ -1019,13 +1027,11 @@ namespace Hapio.Tests
             Assert.That(snapshot.drums.All(drum => drum.owner == network.LocalPlayerId), Is.True);
             Assert.That(player.personalHp, Is.EqualTo(network.config.PlayerMaxHp));
             Assert.That(player.stamina, Is.EqualTo(network.config.StaminaStart).Within(.01f));
-            LabStageYokai stage = Model().StageYokai;
-            double duration = stage == LabStageYokai.Yaguang ? network.config.YaguangTimelineBattleSeconds
-                : stage == LabStageYokai.Jigwi && network.config.JigwiStageTimelineEnabled ? 120d
-                : network.config.BattleDurationSeconds;
+            double duration = Model().StageYokai == LabStageYokai.Jigwi
+                && network.config.JigwiStageTimelineEnabled ? 120d : network.config.BattleDurationSeconds;
             Assert.That(snapshot.remaining, Is.GreaterThan(duration - 10d));
             Assert.That(snapshot.remaining, Is.LessThanOrEqualTo(duration),
-                "Fresh stage time follows its accepted policy: Jigwi timeline uses120 seconds, Yaguang uses its own duration, and other/legacy policies preserve the accepted common duration.");
+                "Fresh Jigwi timeline uses120 seconds; other and legacy policies preserve the common battle time (#328/#332).");
             Assert.That(snapshot.paintCoveredCount, Is.Zero);
             Assert.That(snapshot.paintCount, Is.Zero);
             Assert.That(network.PaintSurface.CoveredCount, Is.Zero);

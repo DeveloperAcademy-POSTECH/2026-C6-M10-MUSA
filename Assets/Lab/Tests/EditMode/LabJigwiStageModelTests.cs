@@ -165,7 +165,6 @@ namespace C6Lab.Tests
         }
 
         [TestCase(LabOrbKind.Relay, 41)]
-        [TestCase(LabOrbKind.Bomb, 44)]
         public void NonPaintableUnlockedItemsCannotExtinguishTheSurfaceRoot(LabOrbKind kind, int chanceField)
         {
             float[] values = config.CaptureDeveloperValues();
@@ -188,6 +187,45 @@ namespace C6Lab.Tests
             Assert.That(room.JigwiStagePaintBlocked(fire.affectedPlayer, fire.patchDirections[0]), Is.True);
             Assert.That(room.PaintSurface.PaintCount, Is.Zero);
             Assert.That(room.PaintSurface.CoveredCount, Is.Zero);
+        }
+
+
+        [Test]
+        public void UnlockedBombMustOpenIntoElementAttackOrbsBeforeItCanSupplyASurfaceRootHit()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            for (int i = 39; i <= 44; i++) values[i] = 0f;
+            values[44] = 100f;
+            values[46] = values[47] = 0f;
+            Apply(values);
+            var room = Room();
+            var fire = State(room, 11d).groups.Single();
+            Bind(room, fire, 11d);
+            Assert.That(room.TryGenerate(fire.helperPlayer, NextRequest(), 11d, out var bomb, out string reason), Is.True, reason);
+            Assert.That(bomb.kind, Is.EqualTo(LabOrbKind.Bomb));
+            Assert.That(bomb.lockSwipes, Is.Zero);
+            Assert.That(room.TryLaunch(fire.helperPlayer, bomb.id, NextRequest(), 11d, out _, out reason), Is.False);
+            Assert.That(reason, Is.EqualTo("RAW_CANNOT_ATTACK"));
+            Assert.That(room.ConfirmHit(bomb.id, 11d, fire.rootDirection, out _, out _, out _), Is.False);
+            LabSnapshot snapshot = room.Snapshot(11d);
+            LabOrbState idle = snapshot.orbs.Single(orb => orb.id == bomb.id);
+            Assert.That(idle.inFlight, Is.False);
+            Assert.That(idle.owner, Is.EqualTo(fire.helperPlayer));
+            Assert.That(snapshot.jigwiStage.groups.Single().resolution, Is.EqualTo(LabJigwiStageResolution.None));
+            Assert.That(room.JigwiStagePaintBlocked(fire.affectedPlayer, fire.patchDirections[0]), Is.True);
+            Assert.That(room.PaintSurface.CoveredCount, Is.Zero);
+
+            Assert.That(room.TryUseItemAt(fire.helperPlayer, bomb.id, NextRequest(), 11d,
+                new Vector2(.5f, .5f), out _, out reason), Is.True, reason);
+            Assert.That(reason, Is.EqualTo("BOMB_OPENED"));
+            LabOrbState[] attacks = room.Snapshot(11d).orbs.Where(orb => orb.owner == fire.helperPlayer
+                && orb.kind == LabOrbKind.Combined).ToArray();
+            Assert.That(attacks, Has.Length.EqualTo(2));
+            Assert.That(attacks.All(orb => orb.element >= LabOrbElement.Fire && orb.element <= LabOrbElement.Earth), Is.True);
+            Launch(room, fire.helperPlayer, attacks[0], 11d);
+            Assert.That(room.ConfirmHit(attacks[0].id, 11d, fire.rootDirection, out _, out _, out _), Is.True);
+            Assert.That(State(room, 11d).groups.Single().resolution, Is.EqualTo(LabJigwiStageResolution.Extinguished));
+            Assert.That(room.PaintSurface.CoveredCount, Is.GreaterThan(0));
         }
 
         [Test]

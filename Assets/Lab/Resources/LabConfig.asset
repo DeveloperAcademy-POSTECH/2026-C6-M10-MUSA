@@ -14,13 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabConfig
   monsterMaxHp: 1000
   damage: 20
-  battleDurationSeconds: 180
+  battleDurationSeconds: 120
   playerMaxHp: 300
   targetSpinStrength: 80
   targetSpinDamping: 1.2
   targetSpinMaximumSpeed: 720
-  staminaMax: 160
-  staminaStart: 160
+  staminaMax: 120
+  staminaStart: 120
   generateCost: 20
   staminaRecoveryAmount: 20
   staminaRecoverySeconds: 1
@@ -187,7 +187,7 @@ MonoBehaviour:
   yaguangFlashGlareSeconds: 10
   yaguangFlashRecoverySeconds: 1
   yaguangFlashShakeRelease: 1
-  yaguangFlashShakeCount: 6
+  yaguangFlashShakeCount: 10
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9

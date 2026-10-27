@@ -57,7 +57,7 @@ namespace C6Lab.Tests
                 Is.EquivalentTo(new[] { "Gimmicks", "야광귀", "야광귀 시간표 (Hapio 전용)" }),
                 "The appended schedule is a separate Hapio-only group, while Lab keeps its periodic groups.");
             LabDeveloperCategory timeline = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀 시간표 (Hapio 전용)");
-            Assert.That(timeline.FieldIndices, Is.EqualTo(Enumerable.Range(211, 14)));
+            Assert.That(timeline.FieldIndices, Is.EqualTo(Enumerable.Range(212, 13)), "Its battle time (211) is retired (#328).");
             Assert.That(timeline.FieldIndices.All(LabConfig.IsYaguangTimelineField), Is.True);
             AssertSavedLabHidesTimelineCategory(timeline);
             LabDeveloperCategory gimmicks = LabConfig.DeveloperCategories.Single(category => category.Title == "Gimmicks");
@@ -122,10 +122,10 @@ namespace C6Lab.Tests
             Assert.That(toggle.Label, Is.EqualTo("섬광 흔들어 풀기 (0 off, 1 on)"));
             Assert.That(toggle.IsToggle, Is.True);
             Assert.That(new[] { toggle.OffText, toggle.OnText }, Is.EqualTo(new[] { "끔", "켬" }));
-            Assert.That(count.Label, Is.EqualTo("섬광 흔들기 횟수"));
+            Assert.That(count.Label, Is.EqualTo("섬광 최대 흔들기 횟수"));
             Assert.That(count.WholeNumber, Is.True);
-            Assert.That(new[] { count.Min, count.Max }, Is.EqualTo(new[] { 2f, 10f }));
-            Assert.That((count.Min + count.Max) * .5f, Is.EqualTo(6f), "6 shakes (about 2 s) is the middle of the slider.");
+            Assert.That(new[] { count.Min, count.Max }, Is.EqualTo(new[] { 2f, 18f }));
+            Assert.That((count.Min + count.Max) * .5f, Is.EqualTo(10f), "At most 10 shakes (#330) is the middle of the slider.");
 
             LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
             created.Add(config);
@@ -134,7 +134,7 @@ namespace C6Lab.Tests
             foreach (LabConfig source in new[] { config, authored })
             {
                 Assert.That(source.YaguangFlashShakeRelease, Is.True, "Shaking the phone releases the glare by default.");
-                Assert.That(source.CaptureDeveloperValues().Skip(202).Take(2), Is.EqualTo(new[] { 1f, 6f }));
+                Assert.That(source.CaptureDeveloperValues().Skip(202).Take(2), Is.EqualTo(new[] { 1f, 10f }));
             }
             float[] values = config.CaptureDeveloperValues();
             values[202] = 0f; values[203] = 10f; values[189] = 19f;
@@ -142,8 +142,8 @@ namespace C6Lab.Tests
             Assert.That(config.YaguangFlashShakeRelease, Is.False);
             Assert.That(config.YaguangFlashShakeCount, Is.EqualTo(10));
             Assert.That(config.YaguangFlashGlareSeconds, Is.EqualTo(19f));
-            values[203] = 11f;
-            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "At most 10 shakes.");
+            values[203] = 19f;
+            Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "At most 18 shakes.");
             values[203] = 6.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Shakes are whole numbers.");
             values[203] = 6f; values[189] = 20f;

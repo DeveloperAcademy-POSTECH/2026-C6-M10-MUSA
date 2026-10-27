@@ -24,6 +24,7 @@ namespace C6Lab.Tests
             values[158] = 13f; values[159] = values[162] = 8f; values[164] = 4f;
             values[188] = 3f; values[189] = 11f; values[190] = 1f;
             values[153] = 2f;
+            values[2] = 120f; // The authored two-minute battle every stage now shares (#328).
             Apply(values);
         }
 
@@ -46,13 +47,34 @@ namespace C6Lab.Tests
         private static int GourdBombs(LabSnapshot snapshot) =>
             snapshot.orbs.Count(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd);
 
-        [TestCase(LabStageYokai.None, 180d)]
-        [TestCase(LabStageYokai.Gumiho, 180d)]
-        [TestCase(LabStageYokai.Yaguang, 120d)]
-        [TestCase(LabStageYokai.Jigwi, 120d)]
-        public void ScheduledStagesUseTheirOwnBattleDuration(LabStageYokai stage, double expected)
+        [TestCase(LabStageYokai.None)]
+        [TestCase(LabStageYokai.Gumiho)]
+        [TestCase(LabStageYokai.Yaguang)]
+        [TestCase(LabStageYokai.Jigwi)]
+        public void EveryStageUsesTheCommonBattleDurationWhenJigwiTimelineIsOff(LabStageYokai stage)
         {
-            Assert.That(Room(stage: stage).Snapshot(0d).remaining, Is.EqualTo(expected));
+            float[] off = config.CaptureDeveloperValues();
+            off[228] = 0f;
+            Apply(off);
+            Assert.That(Room(stage: stage).Snapshot(0d).remaining, Is.EqualTo(120d));
+            float[] values = config.CaptureDeveloperValues();
+            values[2] = 150f;
+            values[211] = 90f; // The Yaguang's own battle time is retired (#328); nothing reads it.
+            Apply(values);
+            Assert.That(Room(stage: stage).Snapshot(0d).remaining, Is.EqualTo(150d));
+        }
+
+
+        [Test]
+        public void EnabledJigwiTimelineKeepsItsOwn120SecondBoundaryWhileOtherStagesInheritCommonTime()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[2] = 150f;
+            values[228] = 1f;
+            Apply(values);
+            Assert.That(Room(stage: LabStageYokai.Jigwi).Snapshot(0d).remaining, Is.EqualTo(120d));
+            foreach (LabStageYokai stage in new[] { LabStageYokai.None, LabStageYokai.Gumiho, LabStageYokai.Yaguang })
+                Assert.That(Room(stage: stage).Snapshot(0d).remaining, Is.EqualTo(150d));
         }
 
         [Test]

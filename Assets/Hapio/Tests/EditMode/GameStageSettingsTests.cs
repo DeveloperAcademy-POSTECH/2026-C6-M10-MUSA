@@ -147,9 +147,10 @@ namespace Hapio.Tests
         [Test]
         public void YaguangScheduleIsIsolatedAndCannotEditUnusedPeriodicControls()
         {
+            // Its own battle time (211) is retired (#328): the Yaguang runs its schedule inside the common battle time.
             foreach (int index in System.Linq.Enumerable.Range(211, 14))
                 for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
-                    Assert.That(GameStageSettings.IsFieldVisible(scope, index), Is.EqualTo(scope == 2),
+                    Assert.That(GameStageSettings.IsFieldVisible(scope, index), Is.EqualTo(scope == 2 && index != 211),
                         "Schedule field " + index + " in scope " + scope);
             foreach (int index in new[] { 169, 170, 205, 156, 157, 186, 187 })
                 Assert.That(GameStageSettings.IsFieldVisible(2, index), Is.False, "Unused periodic field: " + index);
@@ -158,14 +159,14 @@ namespace Hapio.Tests
             using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
             {
                 float[] first = settings.Capture(1), third = settings.Capture(3), yaguang = settings.Capture(2);
-                yaguang[211] = 150f; yaguang[212] = 110f; yaguang[213] = 12f;
+                yaguang[212] = 110f; yaguang[213] = 12f;
                 Assert.That(settings.TryApply(2, yaguang, out string error), Is.True, error);
                 CollectionAssert.AreEqual(first, settings.Capture(1));
                 CollectionAssert.AreEqual(third, settings.Capture(3));
                 var config = settings.CreateStageConfig(2);
                 try
                 {
-                    Assert.That(config.YaguangTimelineBattleSeconds, Is.EqualTo(150f));
+                    Assert.That(config.BattleDurationSeconds, Is.EqualTo(settings.Capture(0)[2]), "The common battle time (#328).");
                     Assert.That(config.YaguangTimelineSabotageEndSeconds, Is.EqualTo(110f));
                     Assert.That(config.YaguangTimelineUniqueSeconds(0), Is.EqualTo(12f));
                 }
@@ -224,7 +225,7 @@ namespace Hapio.Tests
                     if (mask.GetPixel(x, row).a > .5f && (x == 0 || mask.GetPixel(x - 1, row).a <= .5f)) cells++;
             }
             finally { UnityEngine.Object.DestroyImmediate(mask); }
-            Assert.That(cells, Is.EqualTo(8));
+            Assert.That(cells, Is.EqualTo(6), "Six cells, one per orb (#328).");
             using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
                 for (int scope = 1; scope <= GameStageSettings.TerritoryScope; scope++)
                 {

@@ -24,6 +24,7 @@ namespace C6Lab.Tests
             host.transform.SetParent(root.transform, false);
             bubbles = host.AddComponent<LabCharmBubbles>();
             bubbles.Bind(null, root.GetComponent<Canvas>(), leftBadge.gameObject, rightBadge.gameObject);
+            LabGuideText.ForgetShownOnce(); // Each test starts as a fresh app would.
         }
 
         [UnityTearDown]
@@ -229,6 +230,57 @@ namespace C6Lab.Tests
             bubbles.Present(Charm(0, -1d), 10, 2d, 3);
             Assert.That(bubbles.RightWokenShowing || bubbles.LeftWokenShowing, Is.False, "Their own screen says 정신 차림! instead.");
             Assert.That(bubbles.RightFading && bubbles.LeftFading, Is.True, "The progress bubbles just fade.");
+        }
+
+        [UnityTest]
+        public IEnumerator AHandPokesAtTheBubbleEveryTimeButTheGuideShowsOnlyOnTheFirstCharm()
+        {
+            // Player 10 beside the charmed 20 (on the left) still has to tap (#328).
+            bubbles.Present(Charm(20, 10d), 10, 1d, 3);
+            Assert.That(bubbles.LeftHandShowing, Is.True, "A hand points at the bubble to tap...");
+            Assert.That(bubbles.RightHandShowing, Is.False);
+            Image hand = bubbles.LeftHand.GetComponent<Image>();
+            Assert.That(hand.sprite, Is.SameAs(Resources.Load<Sprite>(LabCharmBubbles.LeftHandPath)), "...pointing left at it...");
+            Assert.That(hand.raycastTarget, Is.False, "...without catching the taps.");
+            Assert.That(bubbles.LeftHand.position.x, Is.GreaterThan(bubbles.LeftBubble.position.x),
+                "It stands on the bubble's inner side.");
+            Assert.That(bubbles.LeftHand.sizeDelta.x, Is.EqualTo(bubbles.LeftBubble.sizeDelta.x * .675f).Within(.01f),
+                "Three quarters of its first size.");
+            Assert.That(bubbles.LeftHand.localEulerAngles.z, Is.EqualTo(20f).Within(.01f),
+                "Tilted counterclockwise, so the left-pointing finger points down at the bubble...");
+            Assert.That(bubbles.RightHand.localEulerAngles.z, Is.EqualTo(340f).Within(.01f), "...and the right one mirrors it.");
+            Assert.That(bubbles.GuideShowing, Is.True);
+            Assert.That(bubbles.GuideShown, Is.EqualTo(LabCharmBubbles.HelperGuideText));
+
+            float least = float.MaxValue, most = float.MinValue, until = Time.time + 1f;
+            while (Time.time < until)
+            {
+                yield return null;
+                bubbles.Present(Charm(20, 10d), 10, 1.1d, 3);
+                least = Mathf.Min(least, bubbles.LeftHand.anchoredPosition.x);
+                most = Mathf.Max(most, bubbles.LeftHand.anchoredPosition.x);
+            }
+            Assert.That(most - least, Is.GreaterThan(3f), "It pokes at the bubble.");
+
+            for (int i = 0; i < 3; i++) bubbles.LeftBubble.GetComponent<Button>().onClick.Invoke();
+            yield return null;
+            bubbles.Present(Charm(20, 10d, taps: 3), 10, 1.2d, 3);
+            Assert.That(bubbles.LeftCheckShowing, Is.True);
+            Assert.That(bubbles.LeftHandShowing, Is.False, "Done: the hand goes as the check comes...");
+            Assert.That(bubbles.GuideShowing, Is.False, "...and so does the guide.");
+
+            // The next charm beside this player: the hand pokes again, but the guide is not repeated.
+            LabSnapshot next = Charm(20, 30d);
+            next.charmStartedAt = 15d;
+            bubbles.Present(next, 10, 16d, 3);
+            Assert.That(bubbles.LeftHandShowing, Is.True, "The hand shows on every charm...");
+            Assert.That(bubbles.GuideShowing, Is.False, "...the guide only on the first (#328).");
+            Assert.That(LabGuideText.ShownOnce(LabCharmBubbles.HelperGuideOnceKey), Is.True);
+
+            // The charmed player's own screen only shows each side's progress: no hand, no guide.
+            bubbles.Present(Charm(10, 10d), 10, 1.3d, 3);
+            Assert.That(bubbles.LeftHandShowing || bubbles.RightHandShowing, Is.False);
+            Assert.That(bubbles.GuideShowing, Is.False);
         }
 
         [Test]

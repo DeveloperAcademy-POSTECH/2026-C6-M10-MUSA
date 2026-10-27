@@ -331,7 +331,7 @@ namespace C6Lab
             LabDeveloperField.Choice("Paint Texture Quality", "1024 × 512", "2048 × 1024"),
             // #301 owns the two flash fields at 202 and 203; #305 appends its distinct warning at 204.
             LabDeveloperField.Toggle("섬광 흔들어 풀기 (0 off, 1 on)", "끔", "켬"),
-            new LabDeveloperField("섬광 흔들기 횟수", 2f, 10f, true),
+            new LabDeveloperField("섬광 최대 흔들기 횟수", 2f, 18f, true),
             new LabDeveloperField("Charm Warning Seconds (0 = none)", 0f, 10f),
             // 기믹 묶음 (#311): 공용 기믹(폭탄·넘기기 막기)과 요괴 고유 기믹(구미호: 여우불·매혹)을 각자 고정 간격마다
             // 켜진 것 중 하나씩 비율(169~172번, 묶음별 합 100)대로 발동한다. Hapio에서는 스테이지마다 따로 정한다.
@@ -383,11 +383,13 @@ namespace C6Lab
 
         /// <summary>
         /// Settings the gimmick groups (#311) replaced: the gourd bomb's and the sabotage mix's random min/max intervals,
-        /// the swipe block's own interval and its gap from bombs. They keep their places in the shared form so every other
-        /// index stays put, but nothing reads them and DEV never shows them.
+        /// the swipe block's own interval and its gap from bombs. #328 adds the bomb damage multiplier (an unlocked bomb
+        /// opens into two attack orbs instead of being thrown) and the Yaguang's own battle time (every stage uses the
+        /// common battle time). They keep their places in the shared form so every other index stays put, but nothing
+        /// reads them and DEV never shows them.
         /// </summary>
         public static IReadOnlyCollection<int> RetiredDeveloperFields { get; } =
-            Array.AsReadOnly(new[] { 87, 88, 152, 154, 167, 168 });
+            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168, 211 });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
         public static IReadOnlyList<LabOrbKind> GeneratedKinds { get; } = Array.AsReadOnly(new[]
@@ -402,7 +404,7 @@ namespace C6Lab
             new LabDeveloperCategory("Battle", 0, 1, 2, 48),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
             new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44, 225, 226, 227),
-            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 141, 142, 143, 144, 145, 146, 147),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 80, 81, 141, 142, 143, 144, 145, 146, 147),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16, 165),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
@@ -431,9 +433,10 @@ namespace C6Lab
                 184, 185, 186, 187, 188, 189, 190, 202, 203)
                 .WithSwitch(155, 184)
                 .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
-            new LabDeveloperCategory("야광귀 시간표 (Hapio 전용)", 211, 212, 213, 214, 215, 216, 217, 218, 219, 220,
+            // 전투 시간(211)은 은퇴 (#328): 야광귀도 공용 전투 시간 안에서 이 시간표를 따른다.
+            new LabDeveloperCategory("야광귀 시간표 (Hapio 전용)", 212, 213, 214, 215, 216, 217, 218, 219, 220,
                 221, 222, 223, 224)
-                .WithDividers((0, "── 야광귀 전용 일정 · 일반 주기/비율 대신 사용 ──"), (2, "── 고유 예고 ──"), (10, "── 공용 ──")),
+                .WithDividers((0, "── 야광귀 전용 일정 · 일반 주기/비율 대신 사용 ──"), (1, "── 고유 예고 ──"), (9, "── 공용 ──")),
             new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
         });
 
@@ -686,7 +689,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 10f)] private float charmWarningSeconds = 3f;
 
         [Header("Yaguang stage schedule (#314 integrated into #311)")]
-        [Tooltip("Hapio 야광귀 스테이지에서만 적용한다. Lab 기본 주기와 다른 요괴 스테이지에는 영향을 주지 않는다.")]
+        [Tooltip("은퇴 (#328): 야광귀도 공용 전투 시간을 쓴다. 공유 설정의 자리만 지킨다.")]
         [SerializeField, Range(60f, 180f)] private float yaguangTimelineBattleSeconds = 120f;
         [Tooltip("방해 정리 시각. 0은 정리 없이 전투 끝까지 유지한다.")]
         [SerializeField, Range(0f, 180f)] private float yaguangTimelineSabotageEndSeconds = 100f;
@@ -736,10 +739,10 @@ namespace C6Lab
         [SerializeField, Range(1f, 19f)] private float yaguangFlashGlareSeconds = 10f;
         [Tooltip("눈부심이 끝난 뒤 색이 천천히 돌아오는 시간 (초). 0이면 바로 돌아온다.")]
         [SerializeField, Range(0f, 2f)] private float yaguangFlashRecoverySeconds = 1f;
-        [Tooltip("켜면(#301) 눈부신 사람이 폰을 흔들어 자기 눈부심을 푼다. 흔들 때마다 하얀 막이 조금씩 걷히고 정해진 횟수면 완전히 풀린다. 못 흔들면 눈부심 시간이 지나 저절로 풀린다. 끄면 이전처럼 시간으로만 풀린다.")]
+        [Tooltip("켜면(#301) 눈부신 사람이 폰을 흔들어 자기 눈부심을 푼다. 흔들 때마다 판의 하얀 구슬 하나씩 색이 돌아오고(#330), 다 돌아오면(최대 횟수) 완전히 풀린다. 못 흔들면 눈부심 시간이 지나 저절로 풀린다. 끄면 이전처럼 시간으로만 풀린다.")]
         [SerializeField] private bool yaguangFlashShakeRelease = true;
-        [Tooltip("눈부심을 풀려면 세게 흔들어야 하는 횟수 (#301). 기본 6번이면 보통 약 2초.")]
-        [SerializeField, Range(2, 10)] private int yaguangFlashShakeCount = 6;
+        [Tooltip("눈부심을 풀려면 세게 흔들어야 하는 최대 횟수 (#330). 판의 구슬이 이보다 적으면 구슬 수만큼만 흔들면 된다. 기본 10번(범위 가운데).")]
+        [SerializeField, Range(2, 18)] private int yaguangFlashShakeCount = 10;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -911,7 +914,6 @@ namespace C6Lab
         public int PotionHeal => Mathf.Clamp(potionHeal, 0, 300);
         public float RelayDoubleMultiplier => Mathf.Clamp(Finite(relayDoubleMultiplier, 2f), 1f, 20f);
         public float RelayMaxMultiplier => Mathf.Clamp(Finite(relayMaxMultiplier, 4f), 1f, 20f);
-        public float BombMultiplier => Mathf.Clamp(Finite(bombMultiplier, 3f), 1f, 20f);
         public float BombBlastRadius => Mathf.Clamp(Finite(bombBlastRadius, .4f), 0f, 2f);
         public float BombBlastStrength => Mathf.Clamp(Finite(bombBlastStrength, 9f), 0f, 20f);
         public float BombDragLag => Mathf.Clamp(Finite(bombDragLag, .12f), 0f, 1f);
@@ -1055,7 +1057,9 @@ namespace C6Lab
         public LabPaintPattern PaintPattern => paintPattern >= LabPaintPattern.Legacy && paintPattern <= LabPaintPattern.Flow
             ? paintPattern : LabPaintPattern.Splatter;
         public float PaintEdgeRaggedness => Mathf.Clamp01(Finite(paintEdgeRaggedness, .55f));
-        // Retired by the gimmick groups (#311): still captured and applied so the form keeps its indices, never read.
+        // Retired by the gimmick groups (#311) and #328: still captured and applied so the form keeps its indices, never read.
+        private float BombMultiplier => Mathf.Clamp(Finite(bombMultiplier, 3f), 1f, 20f);
+        private float YaguangTimelineBattleSeconds => Mathf.Clamp(Finite(yaguangTimelineBattleSeconds, 120f), 60f, 180f);
         private float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         private float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
         private float SwipeBlockInterval => Mathf.Clamp(Finite(swipeBlockInterval, 40f), 0f, 600f);
@@ -1103,7 +1107,6 @@ namespace C6Lab
         private static readonly float[] DefaultTimelineUniqueSeconds = { 10f, 35f, 60f, 75f };
         private static readonly int[] DefaultTimelineUniqueKinds = { 0, 1, 0, 1 };
         private static readonly float[] DefaultTimelineCommonSeconds = { 25f, 40f, 60f, 80f };
-        public float YaguangTimelineBattleSeconds => Mathf.Clamp(Finite(yaguangTimelineBattleSeconds, 120f), 60f, 180f);
         public float YaguangTimelineSabotageEndSeconds => Mathf.Clamp(Finite(yaguangTimelineSabotageEndSeconds, 100f), 0f, 180f);
         public float YaguangTimelineUniqueSeconds(int slot) => TimelineSeconds(yaguangTimelineUniqueSeconds, slot, DefaultTimelineUniqueSeconds);
         public bool YaguangTimelineUniqueIsCombo(int slot) => slot >= 0 && slot < YaguangTimelineSlots
@@ -1124,7 +1127,7 @@ namespace C6Lab
         /// <summary>true면 눈부신 사람이 폰을 흔들어 자기 눈부심을 풀 수 있다 (#301)</summary>
         public bool YaguangFlashShakeRelease => yaguangFlashShakeRelease;
         /// <summary>눈부심을 풀려면 흔들어야 하는 횟수 (#301)</summary>
-        public int YaguangFlashShakeCount => Mathf.Clamp(yaguangFlashShakeCount, 2, 10);
+        public int YaguangFlashShakeCount => Mathf.Clamp(yaguangFlashShakeCount, 2, 18);
         /// <summary>콤보를 야광귀 셈법(하나 둘 셋 넷)으로 보여주는지 (#271). 화면 표시만 바꾼다.</summary>
         public bool ComboYaguangCountEnabled => comboYaguangCountEnabled;
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -1332,11 +1335,7 @@ namespace C6Lab
             if (values[173] > values[174]) { error = "Fox Fire Count Min cannot exceed Fox Fire Count Max."; return false; }
             if (values[192] > values[193]) { error = "Jigwi Auto Interval Min cannot exceed Jigwi Auto Interval Max."; return false; }
 
-            if (values[212] > values[211])
-            { error = "Yaguang schedule end cannot exceed its battle duration."; return false; }
-            foreach (int index in new[] { 213, 215, 217, 219, 221, 222, 223, 224 })
-                if (values[index] > values[211])
-                { error = "Yaguang schedule slot cannot exceed its battle duration."; return false; }
+            // The Yaguang's timetable runs inside the common battle time (#328); a slot past the battle's end never comes.
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
