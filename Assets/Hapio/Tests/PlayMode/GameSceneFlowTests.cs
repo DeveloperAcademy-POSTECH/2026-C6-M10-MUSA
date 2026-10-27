@@ -901,10 +901,18 @@ namespace Hapio.Tests
             yield return Until(() => !foxBoard.IsDropping(foxes[0].id), "The fox must land before it can consume Yin.");
             yield return new WaitForSeconds(network.config.FoxFireSafeSeconds + .1f);
 
-            network.Generate();
-            yield return Until(() => network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.Yin),
+            // The drum draws Yin or Yang by the session's seed (#324 caps a run of one kind at three), so generate
+            // until a Yin comes; any Yang only rests on the board, and the first Yin is the one that meets the fox.
+            for (int tries = 0; tries < 5 && !network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.Yin); tries++)
+            {
+                int generated = network.Snapshot.players.Single().generatedTotal;
+                network.Generate();
+                yield return Until(() => network.Snapshot.players.Single().generatedTotal > generated,
+                    "The actual Generate path must create an orb.");
+            }
+            Assert.That(network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.Yin), Is.True,
                 "The actual Generate path must create a Yin for Fox Fire contact.");
-            string yinId = network.Snapshot.orbs.Single(orb => orb.kind == LabOrbKind.Yin).id;
+            string yinId = network.Snapshot.orbs.First(orb => orb.kind == LabOrbKind.Yin).id;
             yield return Until(() => foxBoard.GetComponentsInChildren<LabOrbView>().Any(view => view.OrbId == yinId),
                 "The generated Yin must reach the saved board.");
             LabOrbView yinView = foxBoard.GetComponentsInChildren<LabOrbView>().Single(view => view.OrbId == yinId);
