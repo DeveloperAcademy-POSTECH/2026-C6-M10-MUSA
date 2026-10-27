@@ -48,7 +48,7 @@ MonoBehaviour:
   bombReleaseSpeed: 0.75
   bombSlideDeceleration: 1.3
   bombMass: 4
-  blastBurnSeconds: 4
+  blastBurnSeconds: 6
   blastShrinkScale: 0.5
   smallOrbPaintShare: 0.5
   gourdColorComboEnabled: 0

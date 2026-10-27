@@ -264,7 +264,7 @@ namespace C6Lab
             new LabDeveloperField("Bomb Release Speed (x orb)", .05f, 1f),
             new LabDeveloperField("Bomb Slide Deceleration (x orb)", 1f, 5f),
             new LabDeveloperField("Bomb Mass (x orb)", 1f, 20f),
-            new LabDeveloperField("Blast Burn Seconds", 3f, 5f),
+            new LabDeveloperField("Blast Burn Seconds", 3f, 9f),
             new LabDeveloperField("Blast Shrink Scale (x radius)", .2f, 1f),
             new LabDeveloperField("Small Orb Paint Share (x paint)", 0f, 1f),
             LabDeveloperField.Toggle("Paint Drying (0 off, 1 on)"),
@@ -476,8 +476,8 @@ namespace C6Lab
         [SerializeField, Range(1f, 5f)] private float bombSlideDeceleration = 1.3f;
         [Tooltip("무거운 폭탄: 질량 배율 (구슬 = 1). 클수록 구슬과 부딪혀도 덜 밀린다.")]
         [SerializeField, Range(1f, 20f)] private float bombMass = 4f;
-        [Tooltip("폭발 패널티 (#213): 폭탄 충격파에 맞은 구슬에 노란 불이 붙어 있는 시간 (초).")]
-        [SerializeField, Range(3f, 5f)] private float blastBurnSeconds = 4f;
+        [Tooltip("폭발 패널티 (#213): 폭탄 충격파에 맞은 구슬에 불이 붙어 있는 시간 (초). #326에서 4 → 6초.")]
+        [SerializeField, Range(3f, 9f)] private float blastBurnSeconds = 6f;
         [Tooltip("폭발 패널티: 충격파에 맞은 구슬의 반지름 배율. 보이는 크기·충돌·잡기·던졌을 때 박 판정에 모두 쓰고, 사라질 때까지 유지한다.")]
         [SerializeField, Range(.2f, 1f)] private float blastShrinkScale = .5f;
         [Tooltip("폭발 패널티: 작아진 구슬이 박에 맞았을 때 칠하는 양의 배율 (보통 구슬 = 1).")]
@@ -886,7 +886,7 @@ namespace C6Lab
         public float BombReleaseSpeed => Mathf.Clamp(Finite(bombReleaseSpeed, .75f), .05f, 1f);
         public float BombSlideDeceleration => Mathf.Clamp(Finite(bombSlideDeceleration, 1.3f), 1f, 5f);
         public float BombMass => Mathf.Clamp(Finite(bombMass, 4f), 1f, 20f);
-        public float BlastBurnSeconds => Mathf.Clamp(Finite(blastBurnSeconds, 4f), 3f, 5f);
+        public float BlastBurnSeconds => Mathf.Clamp(Finite(blastBurnSeconds, 6f), 3f, 9f);
         public float BlastShrinkScale => Mathf.Clamp(Finite(blastShrinkScale, .5f), .2f, 1f);
         public float SmallOrbPaintShare => Mathf.Clamp(Finite(smallOrbPaintShare, .5f), 0f, 1f);
         public bool GourdColorComboEnabled => gourdColorComboEnabled;
