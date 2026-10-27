@@ -133,6 +133,7 @@ namespace C6Lab
             decimal initial = initialCells * (decimal)share, repeat = repeatCells * (decimal)share;
             if (preview || replica || IsComplete || !ValidHit(direction, color)) return false;
             int cell = CellFor(direction);
+            if (WouldBlockHit(attackerId, direction)) return false;
             if (pattern != LabPaintPattern.Legacy && patternMask == null)
                 patternMask = LabPaintPatternMask.Load(pattern);
             RefreshNearbyPaint(direction.normalized);
@@ -148,6 +149,11 @@ namespace C6Lab
             if (pattern != LabPaintPattern.Legacy)
             {
                 RegisterPatternHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot, initial);
+                return true;
+            }
+            if (paintBlocker != null)
+            {
+                RegisterBlockedLegacyHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot, initial);
                 return true;
             }
             var region = new Region(regions.Count);
@@ -173,6 +179,7 @@ namespace C6Lab
                 throw new ArgumentOutOfRangeException(nameof(elapsedSeconds));
             if (IsComplete) return 0d;
             if (preview || replica || cellsPerSecond == 0m || activeRegions.Count == 0) return -1d;
+            if (paintBlocker != null) return AdvanceBlockedGrowth(elapsedSeconds, includeEnd);
             decimal duration = (decimal)elapsedSeconds;
             decimal segmentStart = dryingClock;
             decimal startCredit = speedCredit;
@@ -225,7 +232,7 @@ namespace C6Lab
             return ink;
         }
 
-        private Ink Consume(Region region, Ink immediateInk = null)
+        private Ink Consume(Region region, Ink immediateInk = null, List<ulong> funding = null)
         {
             // Immediate impact geometry belongs to that impact, even if painting its first
             // cell merges it into a component with older pending timed supplies. Timed growth
@@ -240,6 +247,7 @@ namespace C6Lab
                 totalBudget -= 1m;
                 return immediateInk;
             }
+            if (funding != null) return ConsumeSelected(region, funding);
             decimal needed = 1m;
             Ink final = null;
             while (needed > 0m)
@@ -267,12 +275,12 @@ namespace C6Lab
 
         private Region PaintCell(Region region, int cell) => PaintFundedCell(region, cell, null);
 
-        private Region PaintFundedCell(Region region, int cell, Ink immediateInk)
+        private Region PaintFundedCell(Region region, int cell, Ink immediateInk, List<ulong> funding = null)
         {
             region = Root(region.Id);
             if (pixels[cell].a != 0 || region.Budget < 1m)
                 throw new InvalidOperationException("Growth must fund a new surface cell.");
-            Ink ink = Consume(region, immediateInk);
+            Ink ink = Consume(region, immediateInk, funding);
             if (ink.Anchor < 0) ink.Anchor = cell;
             // Read the frozen job only. Recording a visual hint never draws gameplay RNG.
             if (immediateInk == null) RecordGrowthVisual(ink, cell);
@@ -424,6 +432,8 @@ namespace C6Lab
 
         public void Clear()
         {
+            paintBlocker = null;
+            blockSupplies.Clear(); blockFunding.Clear();
             Array.Clear(pixels, 0, pixels.Length);
             if (painterSlots == null || painterSlots.Length != pixels.Length) painterSlots = new byte[pixels.Length];
             else Array.Clear(painterSlots, 0, painterSlots.Length);

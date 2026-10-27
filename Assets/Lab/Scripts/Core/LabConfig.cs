@@ -360,10 +360,23 @@ namespace C6Lab
             LabDeveloperField.Toggle("Raw Streak Correction (0 off, 1 on)"),
             new LabDeveloperField("Opposite Chance After 2 Raw (%)", 0f, 100f, true),
             new LabDeveloperField("Maximum Consecutive Raw", 1f, 10f, true),
+            // Jigwi's surface fire timeline (#332); standalone Lab keeps its manual experiments.
+            LabDeveloperField.Toggle("지귀 120초 발화·불장막 (0 off, 1 on)"),
+            new LabDeveloperField("지귀 불 예고 (초)", 0f, 3f),
+            new LabDeveloperField("지귀 불 활성 수명 (초)", 1f, 20f),
+            new LabDeveloperField("지귀 근원 반경 (표면 각도)", 5f, 30f),
+            new LabDeveloperField("지귀 불 패치 반경 (표면 각도)", 10f, 45f),
+            new LabDeveloperField("지귀 번짐 간격 (초)", .1f, 3f),
+            new LabDeveloperField("지귀 그룹 패치 수", 1f, 3f, true),
+            new LabDeveloperField("지귀 피버 자동 회복 배율", 1f, 4f),
             // 섬광 파훼 보상 (#329): 최대 횟수까지 이어서 흔든 사람 판에 오색구슬. 칠 면적은 도색 한 번의 상한(3배) 안이다.
             new LabDeveloperField("섬광 오색구슬 수 (0 = 없음)", 0f, 6f, true),
             new LabDeveloperField("오색구슬 칠 면적 (배)", 1f, 3f)
         });
+
+        public const int JigwiStageFirstField = 228;
+        public const int JigwiStageLastField = 235;
+        public static bool IsJigwiStageField(int index) => index >= JigwiStageFirstField && index <= JigwiStageLastField;
 
         public const int YaguangTimelineFirstField = 211;
         public const int YaguangTimelineLastField = 224;
@@ -411,6 +424,7 @@ namespace C6Lab
                 134, 132, 133, 148, 149, 150, 151, 200, 201),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
+            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 229, 230, 231, 232, 233, 234, 235),
             // 기믹 묶음 (#311): 공용(폭탄·넘기기 막기)과 고유(구미호: 여우불·매혹)를 나눠 간격·켜기·비율·세부값을 모은다.
             new LabDeveloperCategory("Gimmicks", 205, 207, 169, 208, 170, 153,
                 166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177)
@@ -419,7 +433,7 @@ namespace C6Lab
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
             // 섬광 흔들어 풀기·흔들기 횟수(#301)는 고해상도 도색(#299) 뒤 202·203번이며 섬광 칸 맨 아래에 둔다.
             new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
-                184, 185, 186, 187, 188, 189, 190, 202, 203, 228, 229)
+                184, 185, 186, 187, 188, 189, 190, 202, 203, 236, 237)
                 .WithSwitch(155, 184)
                 .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
             // 전투 시간(211)은 은퇴 (#328): 야광귀도 공용 전투 시간 안에서 이 시간표를 따른다.
@@ -461,6 +475,16 @@ namespace C6Lab
         [SerializeField] private bool rawStreakCorrectionEnabled = true;
         [SerializeField, Range(0, 100)] private int rawStreakOppositeChancePercent = 75;
         [SerializeField, Range(1, 10)] private int rawStreakMaximum = 3;
+
+        [Header("Jigwi surface fire timeline (#332)")]
+        [SerializeField] private bool jigwiStageTimelineEnabled = true;
+        [SerializeField, Range(0f, 3f)] private float jigwiStageWarningSeconds = 1f;
+        [SerializeField, Range(1f, 20f)] private float jigwiStageActiveSeconds = 7f;
+        [SerializeField, Range(5f, 30f)] private float jigwiStageRootAngleDegrees = 18f;
+        [SerializeField, Range(10f, 45f)] private float jigwiStageFireAngleDegrees = 30f;
+        [SerializeField, Range(.1f, 3f)] private float jigwiStageSpreadSeconds = 1f;
+        [SerializeField, Range(1, 3)] private int jigwiStageSpreadPatches = 3;
+        [SerializeField, Range(1f, 4f)] private float jigwiStageFeverMultiplier = 2f;
 
         [Header("Item orbs")]
         [SerializeField, Min(.1f)] private float itemLifetimeSeconds = 15f;
@@ -864,6 +888,14 @@ namespace C6Lab
         public bool RawStreakCorrectionEnabled => rawStreakCorrectionEnabled;
         public int RawStreakOppositeChancePercent => Mathf.Clamp(rawStreakOppositeChancePercent, 0, 100);
         public int RawStreakMaximum => Mathf.Clamp(rawStreakMaximum, 1, 10);
+        public bool JigwiStageTimelineEnabled => jigwiStageTimelineEnabled;
+        public float JigwiStageWarningSeconds => Mathf.Clamp(Finite(jigwiStageWarningSeconds, 1f), 0f, 3f);
+        public float JigwiStageActiveSeconds => Mathf.Clamp(Finite(jigwiStageActiveSeconds, 7f), 1f, 20f);
+        public float JigwiStageRootAngleDegrees => Mathf.Clamp(Finite(jigwiStageRootAngleDegrees, 18f), 5f, 30f);
+        public float JigwiStageFireAngleDegrees => Mathf.Clamp(Finite(jigwiStageFireAngleDegrees, 30f), 10f, 45f);
+        public float JigwiStageSpreadSeconds => Mathf.Clamp(Finite(jigwiStageSpreadSeconds, 1f), .1f, 3f);
+        public int JigwiStageSpreadPatches => Mathf.Clamp(jigwiStageSpreadPatches, 1, 3);
+        public float JigwiStageFeverMultiplier => Mathf.Clamp(Finite(jigwiStageFeverMultiplier, 2f), 1f, 4f);
         public int YaguangFiveColorOrbCount => Mathf.Clamp(yaguangFiveColorOrbCount, 0, 6);
         public float YaguangFiveColorOrbPaintScale => Mathf.Clamp(Finite(yaguangFiveColorOrbPaintScale, 2f), 1f, 3f);
         /// <summary>
@@ -1261,6 +1293,9 @@ namespace C6Lab
                 YaguangTimelineCommonSeconds(0), YaguangTimelineCommonSeconds(1),
                 YaguangTimelineCommonSeconds(2), YaguangTimelineCommonSeconds(3),
                 RawStreakCorrectionEnabled ? 1f : 0f, RawStreakOppositeChancePercent, RawStreakMaximum,
+                JigwiStageTimelineEnabled ? 1f : 0f, JigwiStageWarningSeconds, JigwiStageActiveSeconds,
+                JigwiStageRootAngleDegrees, JigwiStageFireAngleDegrees, JigwiStageSpreadSeconds,
+                JigwiStageSpreadPatches, JigwiStageFeverMultiplier,
                 YaguangFiveColorOrbCount, YaguangFiveColorOrbPaintScale
             };
         }
@@ -1528,8 +1563,16 @@ namespace C6Lab
             rawStreakCorrectionEnabled = values[225] >= .5f;
             rawStreakOppositeChancePercent = (int)values[226];
             rawStreakMaximum = (int)values[227];
-            yaguangFiveColorOrbCount = (int)values[228];
-            yaguangFiveColorOrbPaintScale = values[229];
+            jigwiStageTimelineEnabled = values[228] >= .5f;
+            jigwiStageWarningSeconds = values[229];
+            jigwiStageActiveSeconds = values[230];
+            jigwiStageRootAngleDegrees = values[231];
+            jigwiStageFireAngleDegrees = values[232];
+            jigwiStageSpreadSeconds = values[233];
+            jigwiStageSpreadPatches = (int)values[234];
+            jigwiStageFeverMultiplier = values[235];
+            yaguangFiveColorOrbCount = (int)values[236];
+            yaguangFiveColorOrbPaintScale = values[237];
             error = string.Empty;
             return true;
         }

@@ -35,6 +35,14 @@ MonoBehaviour:
   rawStreakCorrectionEnabled: 1
   rawStreakOppositeChancePercent: 75
   rawStreakMaximum: 3
+  jigwiStageTimelineEnabled: 1
+  jigwiStageWarningSeconds: 1
+  jigwiStageActiveSeconds: 7
+  jigwiStageRootAngleDegrees: 18
+  jigwiStageFireAngleDegrees: 30
+  jigwiStageSpreadSeconds: 1
+  jigwiStageSpreadPatches: 3
+  jigwiStageFeverMultiplier: 2
   itemLifetimeSeconds: 15
   itemUnlockSwipesMin: 2
   itemUnlockSwipesMax: 4

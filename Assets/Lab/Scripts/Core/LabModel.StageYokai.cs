@@ -24,7 +24,7 @@ namespace C6Lab
             stageJigwiBurnWeight = config.JigwiAutoGenerationBurnWeight;
             stageJigwiCount = 0;
             lastStageJigwiTarget = null;
-            nextStageJigwiAt = StageYokai == LabStageYokai.Jigwi
+            nextStageJigwiAt = StageYokai == LabStageYokai.Jigwi && !config.JigwiStageTimelineEnabled
                 ? now + StageJigwiDelay(0u) : double.PositiveInfinity;
         }
 
@@ -48,7 +48,7 @@ namespace C6Lab
 
         private void AdvanceStageJigwi(double until)
         {
-            if (StageYokai != LabStageYokai.Jigwi) return;
+            if (StageYokai != LabStageYokai.Jigwi || JigwiStageEnabled) return;
             while (nextStageJigwiAt <= until)
             {
                 double at = nextStageJigwiAt;
@@ -76,7 +76,7 @@ namespace C6Lab
         /// </summary>
         private double NextStageBoundary(double requested)
         {
-            double next = Math.Min(requested, deadline);
+            double next = NextJigwiStageBoundary(Math.Min(requested, deadline));
             void Include(double at) { if (Finite(at) && at > lastTime && at < next) next = at; }
             Include(nextCommonGimmickAt);
             Include(nextUniqueGimmickAt);
@@ -122,6 +122,7 @@ namespace C6Lab
                     orbExpiries.Add(new LabOrbExpiry(expired.owner, expired.id));
                     continue;
                 }
+                TrackJigwiGourdBlast(expired);
                 bombExplosions.Add(new LabBombBlast(expired.owner, expired.id, new Vector2(expired.x, expired.y)));
                 unreportedBlasts[expired.id] = new KeyValuePair<ulong, double>(expired.owner, at);
             }

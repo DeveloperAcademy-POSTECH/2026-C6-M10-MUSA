@@ -342,7 +342,8 @@ namespace C6Lab
 
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
             {
-                if (System.Array.Exists(category.FieldIndices, LabConfig.IsYaguangTimelineField))
+                if (System.Array.Exists(category.FieldIndices, LabConfig.IsYaguangTimelineField)
+                    || System.Array.Exists(category.FieldIndices, LabConfig.IsJigwiStageField))
                 {
                     // Lab uses its ordinary periodic profile; these fields are edited in Hapio's Yaguang scope only.
                     foreach (int index in category.FieldIndices)

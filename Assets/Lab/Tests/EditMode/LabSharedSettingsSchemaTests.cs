@@ -32,6 +32,7 @@ namespace C6Lab.Tests
             yield return new TestCaseData(211).SetName("SharedSchema_SeparateGroupBuildRejectedAtomically");
             yield return new TestCaseData(220).SetName("SharedSchema_SeparateTimelineBuildRejectedAtomically");
             yield return new TestCaseData(225).SetName("SharedSchema_BeforeRawStreakCorrectionRejectedAtomically");
+            yield return new TestCaseData(228).SetName("SharedSchema_BeforeJigwiSurfaceFireRejectedAtomically");
             yield return new TestCaseData(current - 1).SetName("SharedSchema_MissingTailRejectedAtomically");
             yield return new TestCaseData(current + 1).SetName("SharedSchema_UnknownTailRejectedAtomically");
         }
@@ -52,8 +53,8 @@ namespace C6Lab.Tests
         [Test]
         public void CurrentSchemaHasTheCurrentProtocolAndCanBeAppliedAndFingerprinted()
         {
-            Assert.That(Protocol, Is.EqualTo(5672));
-            Assert.That(baseline.Length, Is.EqualTo(230));
+            Assert.That(Protocol, Is.EqualTo(5673));
+            Assert.That(baseline.Length, Is.EqualTo(238));
             Assert.That(baseline.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(config.TryApplyDeveloperValues(baseline, out string error), Is.True, error);
             Assert.That(LabSessionSettings.Fingerprint(baseline, 3, Protocol), Is.Not.Empty);

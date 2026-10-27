@@ -20,6 +20,10 @@ namespace C6Lab
                 ? -flowDirection : Vector3.up, pattern == LabPaintPattern.Flow ? 0f
                 : (StableUnit(salt) - .5f) * Mathf.PI * 2f, salt);
             bool[] footprint = MakePatternFootprint(patch, hitCell, (int)decimal.Floor(initial));
+            // Keep the original disconnected splashes; clipping does not invent replacement seeds.
+            if (paintBlocker != null)
+                for (int i = 0; i < footprint.Length; i++)
+                    if (footprint[i] && PaintCellBlocked(owner, i)) footprint[i] = false;
             RecordVisualStamp(patch, color, painterSlot);
 
             // An impact may seed detached splashes, but those are not one connected region.
