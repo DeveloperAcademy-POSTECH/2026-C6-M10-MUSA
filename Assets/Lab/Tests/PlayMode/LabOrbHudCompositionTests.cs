@@ -74,6 +74,16 @@ namespace C6Lab.Tests
             Assert.That(composition.ForegroundCamera.cullingMask & (1 << rear), Is.Zero);
             Assert.That(hud.battleCamera.cullingMask & (1 << rear), Is.Zero);
 
+            // A later HUD update must not lift stamina over the actual orb image.
+            hud.staminaFill.transform.parent.SetAsLastSibling();
+            yield return null;
+            Assert.That(hud.staminaFill.transform.parent.GetSiblingIndex(),
+                Is.LessThan(composition.Display.transform.GetSiblingIndex()));
+            Assert.That(Corners(hud.staminaFill.transform.parent), Is.EqualTo(corners[0]),
+                "Repairing draw order must retain the authored stamina position and size.");
+            Assert.That(hud.battleUi.transform.Find("ForegroundControl").GetSiblingIndex(),
+                Is.GreaterThan(composition.Display.transform.GetSiblingIndex()));
+
             // Resizing only the display viewport must update its target without reconfiguring the board.
             RenderTexture previous = composition.Texture;
             camera.rect = new Rect(.1f, .05f, .8f, .65f);

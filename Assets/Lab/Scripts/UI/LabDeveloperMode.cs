@@ -367,6 +367,11 @@ namespace C6Lab
                 var rowList = new System.Collections.Generic.List<GameObject>();
                 for (int i = 0; i < category.FieldIndices.Length; i++)
                 {
+                    if (category.FieldIndices[i] == 79)
+                    {
+                        valueInputs[79].transform.parent.gameObject.SetActive(false);
+                        continue; // Retired crack selection; preserve the shared array slot.
+                    }
                     if (category.DividerAt != null)
                         for (int d = 0; d < category.DividerAt.Length; d++)
                             if (category.DividerAt[d] == i)

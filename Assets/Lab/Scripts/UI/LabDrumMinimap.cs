@@ -118,13 +118,13 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 나를 기준으로 몇 번째 자리인지(0 = 나, 1 = 오른쪽 이웃, n-1 = 왼쪽 이웃)에 따른 정다각형 위치.
-        /// 반지름 1 기준이며, 나는 항상 아래(270°)이고 오른쪽 이웃부터 반시계 방향(오른쪽 위 → 위 → 왼쪽 위)으로 돈다.
+        /// 나를 기준으로 몇 번째 P자리인지(0 = 나, 1 = 왼쪽 이웃, n-1 = 오른쪽 이웃)에 따른 정다각형 위치.
+        /// 반지름 1 기준이며, 나는 항상 아래(270°)이고 다음 P번호부터 시계 방향(왼쪽 위 → 위 → 오른쪽 위)으로 돈다.
         /// </summary>
         public static Vector2 UnitPosition(int offsetFromMe, int count)
         {
             if (count <= 1) return Vector2.zero;
-            float degrees = -90f + 360f * offsetFromMe / count;
+            float degrees = -90f - 360f * offsetFromMe / count;
             float radians = degrees * Mathf.Deg2Rad;
             return new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
         }
@@ -257,7 +257,7 @@ namespace C6Lab
 
         /// <summary>
         /// from에서 to까지 둘레를 따라 지나는 자리들 (from 제외, to 포함). 가까운 쪽으로 돌고,
-        /// 같으면 오른쪽(다음 번호) 방향. 3인은 언제나 한 칸이다.
+        /// 같으면 시계(다음 번호) 방향. 3인은 언제나 한 칸이다.
         /// </summary>
         private IEnumerable<ulong> RingSteps(ulong from, ulong to)
         {

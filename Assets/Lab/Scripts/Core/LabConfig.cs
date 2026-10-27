@@ -198,7 +198,7 @@ namespace C6Lab
             new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
             new LabDeveloperField("Drum Drift Turning (per second)", 0f, 2f),
             new LabDeveloperField("Drum Spin Strength", 0f, 3f),
-            LabDeveloperField.Toggle("Gourd Mode (0 paint, 1 crack)", "PAINT", "CRACK"),
+            new LabDeveloperField("Reserved Gourd Mode (paint only)", 0f, 0f, true),
             new LabDeveloperField("Bomb Blast Radius (board widths)", 0f, 2f),
             new LabDeveloperField("Bomb Blast Strength (board widths/s)", 0f, 20f),
             new LabDeveloperField("Bomb Haptic Style (0-4)", 0f, 4f, true),
@@ -526,8 +526,6 @@ namespace C6Lab
         [SerializeField] private int[] drumStopChances = { 40, 35, 15, 10 };
 
         [Header("Gourd (요괴 박)")]
-        [Tooltip("Paint: 흰 박에 구슬 속성 색을 칠한다 (#153). Crack: 박 모델에 금이 가고 처치 연출이 나온다 (#163).")]
-        [SerializeField] private LabGourdMode gourdMode = LabGourdMode.Paint;
         // DEMO_TUNING_VALUE: growth settings are captured when a round starts and may be tuned in DEV.
         [SerializeField, Range(0, 2)] private int paintSurfaceResolution = 2;
         [SerializeField, Range(.1f, 100f)] private float paintInitialPercent = 2f;
@@ -924,7 +922,8 @@ namespace C6Lab
             }
             return total == 100;
         }
-        public LabGourdMode GourdMode => gourdMode == LabGourdMode.Crack ? LabGourdMode.Crack : LabGourdMode.Paint;
+        // Slot 79 is a retired, fixed-zero wire slot; later settings retain their indices.
+        public LabGourdMode GourdMode => LabGourdMode.Paint;
         public const int DefaultPaintVictoryPercent = 100;
         // Paint victory requires the entire target surface; it is not a DEV tuning value.
         public int PaintVictoryPercent => DefaultPaintVictoryPercent;
@@ -1310,7 +1309,7 @@ namespace C6Lab
             drumDriftSpeed = values[76];
             drumDriftTurning = values[77];
             drumSpinStrength = values[78];
-            gourdMode = values[79] >= .5f ? LabGourdMode.Crack : LabGourdMode.Paint;
+            // Retired gourd mode (79) is validated as zero before any setting is applied.
             bombBlastRadius = values[80];
             bombBlastStrength = values[81];
             bombHapticStyle = (LabHapticStyle)(int)values[82];

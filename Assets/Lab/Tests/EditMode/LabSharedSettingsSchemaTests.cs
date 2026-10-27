@@ -49,7 +49,7 @@ namespace C6Lab.Tests
         [Test]
         public void CurrentSchemaHasTheCurrentProtocolAndCanBeAppliedAndFingerprinted()
         {
-            Assert.That(Protocol, Is.EqualTo(5666));
+            Assert.That(Protocol, Is.EqualTo(5667));
             Assert.That(baseline.Length, Is.EqualTo(211));
             Assert.That(baseline.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(config.TryApplyDeveloperValues(baseline, out string error), Is.True, error);

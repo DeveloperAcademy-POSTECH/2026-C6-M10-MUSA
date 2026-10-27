@@ -189,10 +189,16 @@ namespace C6Lab
             LabPlayerState charmed = Array.Find(players, player => player != null && player.id == snapshot.charmedPlayer);
             if (me == null || charmed == null) return;
             int count = players.Length;
+            if (me.seat < 0 || me.seat >= count || charmed.seat < 0 || charmed.seat >= count) return;
+            // Preserve the separate team-seat presentation; story rooms use the same
+            // clockwise neighbours as the lobby, HUD and actual Host handoff.
+            bool team = LabTeams.FourPlayerTeams(snapshot);
+            int leftSeat = team ? (me.seat + count - 1) % count : LabPlayerSlots.NeighborSeat(me.seat, count, false);
+            int rightSeat = team ? (me.seat + 1) % count : LabPlayerSlots.NeighborSeat(me.seat, count, true);
             if (charmed == me)
             {
-                LabPlayerState before = Array.Find(players, player => player != null && player.seat == (me.seat + count - 1) % count);
-                LabPlayerState after = Array.Find(players, player => player != null && player.seat == (me.seat + 1) % count);
+                LabPlayerState before = Array.Find(players, player => player != null && player.seat == leftSeat);
+                LabPlayerState after = Array.Find(players, player => player != null && player.seat == rightSeat);
                 ownView = true;
                 onLeft = before != null;
                 onRight = after != null;
@@ -200,8 +206,8 @@ namespace C6Lab
                 if (after != null) rightHelper = after.id;
                 return;
             }
-            onLeft = charmed.seat == (me.seat + count - 1) % count;
-            onRight = charmed.seat == (me.seat + 1) % count;
+            onLeft = charmed.seat == leftSeat;
+            onRight = charmed.seat == rightSeat;
         }
 
         private void Step(Side side, bool charmedHere, ulong charmed, bool ownView, int hostTaps, int rescueTaps)

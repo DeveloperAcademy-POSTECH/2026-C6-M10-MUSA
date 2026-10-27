@@ -48,7 +48,8 @@ namespace C6Lab
         {
             if (network == null || !network.IsConnected || network.config == null
                 || !network.config.CompletedGourdViewerEnabled || network.config.GourdMode != LabGourdMode.Paint
-                || !IsEligible(network.Snapshot, network.PaintSurface)) return false;
+                || !IsEligible(network.Snapshot, network.PaintSurface)
+                || LabPaintFinishPresentation.DelayResult(network, network.Snapshot)) return false;
             var source = network.target == null ? null : network.target.GetComponent<LabGourdPaint>();
             return source != null && source.IsReady;
         }

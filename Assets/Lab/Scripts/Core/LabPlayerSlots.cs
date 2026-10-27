@@ -18,6 +18,17 @@ namespace C6Lab
     /// </summary>
     public sealed class LabPlayerSlots
     {
+        /// <summary>
+        /// P numbers run clockwise when viewed from above. Looking in toward the target,
+        /// the next P number is on the left; the previous one is on the right.
+        /// Two-player rooms therefore have the same neighbour on both sides.
+        /// </summary>
+        public static int NeighborSeat(int seat, int count, bool right)
+        {
+            if (count < 1 || seat < 0 || seat >= count) throw new ArgumentOutOfRangeException(nameof(seat));
+            return (seat + (right ? count - 1 : 1)) % count;
+        }
+
         private readonly Dictionary<ulong, int> slotsByPlayer = new Dictionary<ulong, int>();
         private readonly Dictionary<int, ulong> playersBySlot = new Dictionary<int, ulong>();
 

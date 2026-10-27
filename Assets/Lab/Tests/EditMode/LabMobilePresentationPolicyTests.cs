@@ -3,7 +3,7 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.iOS;
+using SystemGestureDeferMode = C6Lab.LabSystemGestureEdges;
 
 namespace C6Lab.Tests
 {
@@ -63,7 +63,7 @@ namespace C6Lab.Tests
             Assert.That(PlayerSettings.allowedAutorotateToLandscapeRight, Is.False);
             Assert.That(PlayerSettings.iOS.requiresFullScreen, Is.True);
             Assert.That(PlayerSettings.iOS.hideHomeButton, Is.False);
-            Assert.That(PlayerSettings.iOS.deferSystemGesturesMode, Is.EqualTo(SystemGestureDeferMode.None));
+            Assert.That(PlayerSettings.iOS.deferSystemGesturesMode, Is.EqualTo(UnityEngine.iOS.SystemGestureDeferMode.None));
         }
 
         [TestCase(null)]

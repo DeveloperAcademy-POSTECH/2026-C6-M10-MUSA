@@ -5,7 +5,7 @@
 ## 실행과 빌드
 
 1. Unity에서 `Hapio > Open Home`을 선택하거나 `Assets/Hapio/Scenes/Home.unity`를 연다.
-2. Play 후 한지 타이틀의 **게임 시작**을 누른다. 방 목록에서 2~5명을 선택해 **새 방 만들기 +**를 누른 뒤, 생성된 **수장고-N** 카드에 입장한다. 다른 참가자도 같은 게임의 방 카드를 눌러 입장한다. 기존 LAN·핫스팟·Direct IP 연결을 유지한다.
+2. Play 후 한지 타이틀의 **게임 시작**을 누른다. 방 목록에서 2~5명을 선택해 **새 방 만들기 +**를 누르면 광고 등록 완료 후 Host 로비에 자동 입장한다. 다른 참가자도 같은 게임의 방 카드를 눌러 입장한다. 기존 LAN·핫스팟·Direct IP 연결을 유지한다.
 3. 로비에서 각자 고유한 P번호를 선택한다. 목표 인원·자리 선택·설정 확인이 완료되면 Host가 **요괴 봉인 시작 · 3스테이지**를 누른다.
 4. 전환 중 준비 인원이 표시되고 전원 첫 상태 수신·화면 준비 후 `3 → 2 → 1 → 시작!`과 함께 전투가 시작된다(#306).
 5. 1·2스테이지의 결과에서 Host가 NEXT를 눌러 전원이 다음 스테이지로 이동한다. 3스테이지 결과에서는 각자 HOME으로 돌아간다.
@@ -60,7 +60,7 @@
 
 새 코드: `Assets/Hapio/Scripts/Core/{GameSession,GameRunFlow,GameFlowState,GameFlowSnapshot,GameScenePaths}.cs`, `Scripts/UI`, `Editor/GameSceneBuilder.cs`, `Editor/GameBuild.cs`.
 
-기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **211개·프로토콜5666**다. 기존0~199와 #299 고해상도 설정200~201을 유지하고, #301 섬광 흔들어 풀기202~203과 #305 매혹 예고204, #311 기믹 묶음205~210을 함께 사용한다. 단독 PR이 같은 번호를 다른 필드에 사용하므로 통합 게임 연결 토큰은 `C6HapioGame/10`이며 단일 Lab의 `C6PhysicsLab/27`과 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
+기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **211개·프로토콜5667**다. 기존0~199와 #299 고해상도 설정200~201을 유지하고, #301 섬광 흔들어 풀기202~203과 #305 매혹 예고204, #311 기믹 묶음205~210을 함께 사용한다. 단독 PR이 같은 번호를 다른 필드에 사용하므로 통합 게임 연결 토큰은 `C6HapioGame/11`이며 단일 Lab의 `C6PhysicsLab/28`과 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
 
 검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 현재 통합의 실제 실행 결과는 `VALIDATION.md`의 #278 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
 
@@ -97,7 +97,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 
 - `Assets/Hapio/Art/UI/GameLobby.prefab`이 타이틀·방 목록·자리 선택·Direct IP·개발자 솔로 버튼의 공통 저장 UI다. Home/Lobby의 인스턴스가 각 Scene의 `GameScreen`을 참조한다. GameScreen은 기존 공통/구미호/야광귀/지귀 DEV 패널을 유지하고 `externalNavigation`일 때 구형 방/시작 버튼 입력을 연결하지 않는다. `GameLobbyView`는 표시와 입력만 처리하며 소켓·광고·전투 상태를 소유하지 않는다.
 - `GameSession`이 시작부터 하나의 Game-family Network를 유지한다. 생성·카드 입장·검색·직접 IP·자리·시작·홈 동작은 이 세션을 통한다. 시작 버튼은 `StartGame`으로 연결되고 설정 ACK와 전원 로딩 ACK 후 기존 Battle을 시작한다. 시작을 이유로 연결을 다시 만들지 않는다.
-- `GamePendingRoomRegistry`가 미입장 대기 방을 관리한다. 생성 시에는 연결되지 않고, 생성자의 카드 입장 때 확정 광고만 기존 Network로 인계한다. 나머지 대기 방은 Home→Lobby→Battle→결과→Home을 거쳐 유지되며 GameSession 파괴/앱 종료 때 광고·예약 포트를 정리한다.
+- `GamePendingRoomRegistry`가 미입장 대기 방을 관리한다. 광고 준비 시에는 연결되지 않으며, Hapio의 실제 생성 버튼은 등록 완료 뒤 확정 광고를 같은 이름·포트로 자동 인계한다. 기존 별도 대기방 API는 명시적 카드 입장도 지원한다. 나머지 대기 방은 Home→Lobby→Battle→결과→Home을 거쳐 유지되며 GameSession 파괴/앱 종료 때 광고·예약 포트를 정리한다.
 - 로비에서 나가면 방 목록으로 돌아간다. 최종 클리어 또는 게임 오버의 HOME은 타이틀로 돌아간다. 방 이름·Host와 P번호의 분리·2~5인·자리 선택 해제와 공유 설정(현재 200개) 확인 조건은 유지한다.
 - Home/Lobby의 `Hapio UI Background Camera`는 3D 오브젝트를 그리지 않고 검은 배경만 지운다. Canvas는 Screen Space Overlay를 유지하며 Editor의 카메라 없음 안내를 방지한다.
 - 위치 편집은 공통 Prefab에서 한다. `EditableSeatLayouts/Players2..5/P1..PN`이 각 인원의 저장된 자리 앵커이며 해당 앵커를 움직이면 자리 버튼 배치에 반영된다. 원본 Lab Scene의 UI 위치와는 독립적이다.
@@ -178,3 +178,9 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 - 전환 UI는 `Resources/Hapio/GameStartOverlay.prefab`의 실제 Canvas·Background·SafeArea·Caption 객체다. 영속 GameSession이 소유하므로 Scene 언로드 중에도 남는다. 기존 Scene 배치를 다시 생성하지 않는다. `Hapio/Create Missing Battle Start Overlay`는 이 새 프리팹이 없을 때만 생성한다.
 
 연결은 `GameSession.Start.cs`(준비·예약·표시), `GameRunFlow`/`GameFlowSnapshot`(세대·전환 검증), `LabNetwork.GameFlow`(초기 상태·내부 hold·시계·해제), `GameBattleBindings.IsPresentationReady`, `GameStartOverlay`다. 현재 작업의 실행 결과와 미실행 환경은 `VALIDATION.md`의 #306 절에 기록한다.
+
+## #315 페인트 완료와 UI 일관성
+
+크랙 모드는 제거하고 페인트만 사용한다. DEV79는 숨긴 고정0 예약 슬롯이며 다른 설정은205개 순서를 유지한다. 일반 협동 자리는 위에서 내려다본 시계방향으로 로비/전투/미니맵/카메라/전달을 통일한다. 스태미나 위치는 유지하고 구슬이 앞에 그려지도록 기존 합성을 복구한다. 결과 관람 이미지는 저장된 viewport 안에서 원본 비율에 맞춘다.
+
+100% 승리는 최종 지도와 고해상도 표현 준비 → 전원 준비 → 공통 시각 예약/확인 →1.2초·표현0.2배의 시각 전용 완료 연출 → 전원 완료 → 결과 전환 순서다. 판정·기여도·원본 물리·Time.timeScale을 재실행하지 않는다. 준비12초 실패에는 승리를 취소하지 않고 연출만 건너뛴다. 세부 구현·예외·확인 순서는 [#315 안내](SESSION_FINISH_UI.md)를 참조한다.
