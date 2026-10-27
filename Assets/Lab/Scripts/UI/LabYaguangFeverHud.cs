@@ -39,6 +39,11 @@ namespace C6Lab
         [SerializeField, Range(1, 8)] private int flashCount = 3;
         [Tooltip("가장 밝을 때 불투명도")]
         [SerializeField, Range(0f, 1f)] private float flashAlpha = .55f;
+        [Header("피버 내내 번쩍임")]
+        [Tooltip("피버 동안 화면 전체가 한 번 번쩍이는 간격 (초)")]
+        [SerializeField, Range(.2f, 3f)] private float loopFlashSeconds = .6f;
+        [Tooltip("피버 동안 번쩍임이 가장 밝을 때 불투명도. 던지기를 가리지 않게 옅게 둔다. 0이면 끈다.")]
+        [SerializeField, Range(0f, .6f)] private float loopFlashAlpha = .2f;
         [Header("부적 (공격 영역에서만, 피버 내내)")]
         [Tooltip("피버 동안 초당 떨어지는 수 (부적은 이 값의 절반). 던지기를 가리지 않게 적게 둔다.")]
         [SerializeField, Min(0f)] private float pourPerSecond = 5f;
@@ -126,13 +131,26 @@ namespace C6Lab
             float time = Time.unscaledTime;
             // 번쩍임: 하양과 오색을 번갈아 몇 번 번쩍이고 점점 약해진다.
             float flashAmount = FlashAmount(since, flashSeconds, flashCount);
-            flash.gameObject.SetActive(flashAmount > 0f);
-            if (flashAmount > 0f)
+            // 시작 번쩍임이 끝난 뒤에도 피버 내내 오색으로 옅게 번쩍 번쩍 한다.
+            float loop = LoopFlashAmount(time, loopFlashSeconds) * loopFlashAlpha;
+            float alpha = Mathf.Max(flashAlpha * flashAmount, loop);
+            flash.gameObject.SetActive(alpha > 0f);
+            if (alpha > 0f)
             {
-                int beat = Mathf.FloorToInt(since / Mathf.Max(.01f, flashSeconds) * flashCount);
-                Color color = beat % 2 == 0 ? Color.white
-                    : Color.Lerp(LabFiveColorSparkle.ColorAt(time), Color.white, .35f);
-                color.a = flashAlpha * flashAmount;
+                Color color;
+                if (flashAmount > 0f)
+                {
+                    int beat = Mathf.FloorToInt(since / Mathf.Max(.01f, flashSeconds) * flashCount);
+                    color = beat % 2 == 0 ? Color.white
+                        : Color.Lerp(LabFiveColorSparkle.ColorAt(time), Color.white, .35f);
+                }
+                else
+                {
+                    // 번쩍일 때마다 다음 색: 노랑 → 초록 → 파랑 → 빨강 → 갈색.
+                    int beat = Mathf.FloorToInt(time / Mathf.Max(.05f, loopFlashSeconds));
+                    color = Color.Lerp(LabFiveColorSparkle.ColorAt((beat % 5) * .9f + .45f), Color.white, .45f);
+                }
+                color.a = alpha;
                 flash.color = color;
             }
             // 문구: 크게 튀어나왔다가 제 크기로 돌아와 살짝 두근거리고, 끝에 흐려진다.
@@ -158,6 +176,14 @@ namespace C6Lab
             float u = t / seconds;
             float pulse = Mathf.Abs(Mathf.Sin(Mathf.PI * u * Mathf.Max(1, count)));
             return pulse * (1f - u);
+        }
+
+        /// <summary>피버 내내 번쩍이는 세기 (0~1): seconds초마다 확 밝아졌다가 빠르게 빠진다.</summary>
+        public static float LoopFlashAmount(float time, float seconds)
+        {
+            if (seconds <= 0f || time < 0f) return 0f;
+            float u = Mathf.Repeat(time, seconds) / seconds;
+            return u < .1f ? u / .1f : Mathf.Pow(1f - (u - .1f) / .9f, 3f);
         }
 
         /// <summary>시작한 지 t초의 문구 크기 배율: 작게 시작해 1.25배까지 튀었다가 1배로 돌아와 살짝 두근거린다.</summary>
