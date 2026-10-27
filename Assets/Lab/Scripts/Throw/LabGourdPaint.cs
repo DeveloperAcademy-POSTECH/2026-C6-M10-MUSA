@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace C6Lab
 {
-    public enum LabGourdMode { Paint = 0, Crack = 1 }
+    public enum LabGourdMode { Paint = 0 }
 
     /// <summary>
     /// Display the Host-owned cumulative paint surface on the white sphere. Network/model
@@ -58,6 +58,12 @@ namespace C6Lab
         public Texture VisualPainterTexture => HighResolutionActive ? highResolution.PainterTexture : painterTexture;
         public bool HighResolutionActive => appliedHighResolutionEnabled && highResolution != null && highResolution.Ready;
         public string HighResolutionError => highResolution != null ? highResolution.Error : null;
+        /// <summary>True only after the final authoritative map and all bounded high-resolution batches are installed.</summary>
+        public bool CompletionVisualReady => IsReady && hasUploadedSurface && uploadedSurface == Surface
+            && uploadedRevision == Surface.Revision && uploadedVisualVersion == Surface.VisualVersion
+            && uploadedSession == network.Snapshot?.sessionId && uploadedRound == network.Snapshot?.round
+            && (network.config == null || !network.config.HighResolutionPaintEnabled
+                || highResolution != null && highResolution.Ready && !highResolution.HasPendingWork && highResolution.Error == null);
         public Transform Shell => shell != null ? shell.transform : null;
         public GameObject VisualInstance { get; private set; }
         public string InitializationError { get; private set; }
@@ -80,6 +86,7 @@ namespace C6Lab
             if (paint.paintMaterial == null)
                 paint.paintMaterial = Resources.Load<Material>(ResourceFolder + "WhiteGourd");
             paint.ApplyMode();
+            LabPaintFinishPresentation.Attach(network);
             return paint;
         }
 
@@ -88,29 +95,8 @@ namespace C6Lab
         {
             if (network == null || target == null || network.target != target)
                 return FailInitialization("The gourd mode needs its network and target.");
-            bool usePaint = network.config == null || network.config.GourdMode == LabGourdMode.Paint;
-            var cracks = target.GetComponents<LabGourdCrack>();
-            var finishes = target.GetComponents<LabGourdFinish>();
-            if (usePaint)
-            {
-                foreach (var finish in finishes) finish.enabled = false;
-                foreach (var crack in cracks)
-                {
-                    crack.enabled = false;
-                    crack.ReleasePresentation();
-                }
-                enabled = true;
-                return InitializePresentation();
-            }
-            enabled = false;
-            if (cracks.Length != 1 || finishes.Length != 1)
-                return FailInitialization("Crack mode needs one crack and finish component on the target.");
-            var selected = cracks[0];
-            selected.enabled = true;
-            bool ready = selected.Initialize();
-            finishes[0].enabled = ready;
-            InitializationError = ready ? null : selected.InitializationError;
-            return ready;
+            enabled = true;
+            return InitializePresentation();
         }
 
         private void Start()
@@ -148,14 +134,6 @@ namespace C6Lab
             if (!visualPrefab.activeSelf || prefabShell == null || !prefabShell.gameObject.activeSelf
                 || prefabRenderer == null || !prefabRenderer.enabled || mesh == null || mesh.sharedMesh == null)
                 return FailInitialization("The white gourd prefab needs an active 'White Gourd' mesh renderer.");
-            // Both presentations replace the same mount. A misconfigured Scene must not silently
-            // race the crack/finish Start methods or destroy somebody else's active visual.
-            foreach (var crack in target.GetComponents<LabGourdCrack>())
-                if (crack.isActiveAndEnabled)
-                    return FailInitialization("Disable the crack presentation before using the paint gourd.");
-            foreach (var finish in target.GetComponents<LabGourdFinish>())
-                if (finish.isActiveAndEnabled)
-                    return FailInitialization("Disable the finish presentation before using the paint gourd.");
             if (target.MountedVisual != null)
                 return FailInitialization("The target already owns another mounted visual.");
 

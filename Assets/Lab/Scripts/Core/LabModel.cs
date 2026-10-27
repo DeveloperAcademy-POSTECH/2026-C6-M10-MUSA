@@ -528,7 +528,7 @@ namespace C6Lab
                 return true;
             }
             int receiverSeat = teamMode ? LabTeams.TeammateSeat(players[sender].seat)
-                : (players[sender].seat + (right ? 1 : activeSeatCount - 1)) % activeSeatCount;
+                : LabPlayerSlots.NeighborSeat(players[sender].seat, activeSeatCount, right);
             ulong receiver = seats[receiverSeat];
             // A drum is not a stored orb, so a full board still receives it.
             if (!current.kind.IsDrum() && CountStored(receiver) >= rules.OrbStorageLimit)
@@ -602,7 +602,7 @@ namespace C6Lab
         /// <summary>
         /// Atomically confirm one Host-owned projectile collision, rewards, CPU paint and victory.
         /// actualDamage is the HP really removed. impactValue is the positive presentation/attack
-        /// value in Paint (even after its diagnostic HP reaches zero), and actualDamage in Crack.
+        /// value even after the diagnostic HP reaches zero.
         /// </summary>
         public bool ConfirmHit(string id, double now, Vector3 paintDirection,
             out LabOrbElement element, out int actualDamage, out int impactValue)
@@ -621,19 +621,18 @@ namespace C6Lab
             int previousHp = hp;
             hp = Math.Max(0, hp - attackValue);
             actualDamage = previousHp - hp;
-            bool paintRound = rules.GourdMode == LabGourdMode.Paint;
-            impactValue = paintRound ? attackValue : actualDamage;
+            impactValue = attackValue;
             attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
             attacker.hitTotal++;
             attacker.throwTotal++;
-            // Paint keeps the existing attack-score statistic; Crack records actual HP removed.
+            // Keep the attack-score statistic even after diagnostic HP reaches zero.
             // Long paint rounds can outlive diagnostic HP, so prevent the integer score wrapping.
             attacker.damageTotal = (int)Math.Min(int.MaxValue,
-                (long)attacker.damageTotal + (paintRound ? attackValue : actualDamage));
+                (long)attacker.damageTotal + attackValue);
 
             if (teamMode)
                 ConfirmTeamHit(attacker, element, paintDirection, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale, now);
-            else if (paintRound)
+            else
             {
                 if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
                     && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1,
@@ -643,11 +642,6 @@ namespace C6Lab
                     phase = LabPhase.Victory;
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
                 }
-            }
-            else if (hp == 0)
-            {
-                phase = LabPhase.Victory;
-                attacker.lastHit = true;
             }
             if (rules.ComboEnabled && combo.Active)
             {
@@ -1358,7 +1352,7 @@ namespace C6Lab
                 double effectiveNow = Math.Min(now, deadline);
                 double elapsed = effectiveNow - lastTime;
                 bool paintCompleted = false;
-                if (rules.GourdMode == LabGourdMode.Paint && elapsed > 0d)
+                if (elapsed > 0d)
                 {
                     // A late frame still resolves growth that was due before the deadline.
                     // Growth due exactly at the deadline cannot outrun the existing timeout rule.

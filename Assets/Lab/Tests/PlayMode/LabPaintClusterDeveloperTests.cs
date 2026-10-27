@@ -203,8 +203,12 @@ namespace C6Lab.Tests
             AssertRuntime(.9f, .1f);
             Assert.That(NetworkField<int>("configRevision"), Is.EqualTo(revision + 1));
             Assert.That(NetworkField<string>("configFingerprint"), Is.Not.EqualTo(fingerprint));
+            // Hash the running wire version instead of pinning the unrelated old protocol in this UI fixture.
+            var protocolField = typeof(LabNetwork).GetField("LabProtocolVersion", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(protocolField, Is.Not.Null);
+            ushort protocol = (ushort)protocolField.GetRawConstantValue();
             Assert.That(NetworkField<string>("configFingerprint"), Is.EqualTo(
-                LabSessionSettings.Fingerprint(ui.network.config.CaptureDeveloperValues(), 2, 5665)));
+                LabSessionSettings.Fingerprint(ui.network.config.CaptureDeveloperValues(), 2, protocol)));
             Assert.That(ui.network.CanStartBattle, Is.False);
             ui.network.StartBattle();
             Assert.That(ui.network.Snapshot, Is.Null,

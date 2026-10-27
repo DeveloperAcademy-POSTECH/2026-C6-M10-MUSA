@@ -86,10 +86,10 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void PaintAndCrackUseDistinctTitles()
+        public void TheOnlySupportedGourdModeShowsThePaintGoalRatherThanDiagnosticHp()
         {
+            Assert.That(System.Enum.GetValues(typeof(LabGourdMode)), Is.EqualTo(new[] { LabGourdMode.Paint }));
             Assert.That(LabHud.GourdGoalTitle(LabGourdMode.Paint), Is.EqualTo("GOAL"));
-            Assert.That(LabHud.GourdGoalTitle(LabGourdMode.Crack), Is.EqualTo("YOKAI HP"));
         }
     }
 }

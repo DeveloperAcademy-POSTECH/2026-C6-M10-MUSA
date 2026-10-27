@@ -377,7 +377,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedSceneSoloCanGenerateCombineAndHitTheCylinder()
+        public IEnumerator SavedSceneSoloCanGenerateCombineAndPhysicallyPaintTheGourd()
         {
             yield return fixture.Load();
 
@@ -447,7 +447,7 @@ namespace C6Lab.Tests
             // Orbs scatter from the drum in every direction. Turn off contact combining so orbs
             // that bump while scattering cannot merge before the test drags Yin onto Yang.
             tuning[51] = 0f;
-            tuning[79] = 1f; // Crack keeps the damage-number presentation checked below.
+            tuning[79] = 0f; // Paint-only reserved slot; check approved paint and particles below.
             tuning[87] = 0f; // no gourd bombs: this test counts the orbs on the board
             tuning[88] = 0f;
             Assert.That(rawOnly.TryApplyDeveloperValues(tuning, out string tuningError), Is.True, tuningError);
@@ -587,23 +587,36 @@ namespace C6Lab.Tests
                     Is.SameAs(appearance.ElementTrailFor(combined.element)));
                 Assert.That(projectile.FlightTrail, Is.Null,
                     "Configured elemental effects replace, rather than overlap, the legacy trail.");
-                Color expectedDamageColor = (Color32)LabOrbAppearance.DefaultElementColor(combined.element);
+                Color expectedFeedbackColor = (Color32)LabOrbAppearance.DefaultElementColor(combined.element);
 
                 for (int step = 0; step < 150 && network.Snapshot.hp == initialHp; step++)
                     yield return new WaitForFixedUpdate();
                 Assert.That(network.Snapshot.hp, Is.EqualTo(initialHp - network.config.Damage),
-                    "Only an actual cylinder collision should lower Host HP.");
+                    "Only a real Host-resolved gourd collision should lower diagnostic HP.");
+                Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing),
+                    "One partial paint hit must not end the round.");
+                Assert.That(network.Snapshot.paintCount, Is.EqualTo(1));
+                Assert.That(network.PaintSurface.CoveredCount, Is.GreaterThan(0).And.LessThan(network.PaintSurface.CellCount),
+                    "The real mesh collision must commit paint as well as nominal hit credit.");
+                Assert.That(network.Snapshot.players.Single().hitTotal, Is.EqualTo(1));
+                Assert.That(network.Snapshot.players.Single().damageTotal, Is.EqualTo(network.config.Damage));
+                var particles = UnityEngine.Object.FindFirstObjectByType<LabImpactParticleVfx>();
+                Assert.That(particles, Is.Not.Null, "The saved target must bind its approved world-space impact effect.");
+                Assert.That(particles.ActiveBurstCount, Is.EqualTo(1));
+                LabImpactParticleBurst activeBurst = particles.GetComponentsInChildren<LabImpactParticleBurst>()
+                    .Single(burst => burst.gameObject.activeInHierarchy);
+                ParticleSystem[] systems = activeBurst.GetComponentsInChildren<ParticleSystem>();
+                Assert.That(systems.Length, Is.GreaterThanOrEqualTo(3), "Core, sparks and ring must remain connected.");
+                foreach (ParticleSystem system in systems)
+                {
+                    Color actualColor = (Color32)system.main.startColor.color;
+                    Assert.That(actualColor.r, Is.EqualTo(expectedFeedbackColor.r).Within(.001f));
+                    Assert.That(actualColor.g, Is.EqualTo(expectedFeedbackColor.g).Within(.001f));
+                    Assert.That(actualColor.b, Is.EqualTo(expectedFeedbackColor.b).Within(.001f));
+                }
                 Transform impactLayer = network.impactFeedback.transform.Find("Impact Feedback");
-                Assert.That(impactLayer, Is.Not.Null,
-                    "A Host-confirmed cylinder hit must place feedback on the saved Canvas.");
-                var damageLabel = impactLayer.GetComponentInChildren<UnityEngine.UI.Text>();
-                Assert.That(damageLabel, Is.Not.Null);
-                Assert.That(damageLabel.text, Is.EqualTo("-" + network.config.Damage));
-                // Trail art has its own palette; approved damage labels retain the gameplay palette.
-                Color damageColor = (Color32)damageLabel.color;
-                Assert.That(damageColor.r, Is.EqualTo(expectedDamageColor.r).Within(.001f));
-                Assert.That(damageColor.g, Is.EqualTo(expectedDamageColor.g).Within(.001f));
-                Assert.That(damageColor.b, Is.EqualTo(expectedDamageColor.b).Within(.001f));
+                Assert.That(impactLayer == null || impactLayer.GetComponentInChildren<UnityEngine.UI.Text>() == null, Is.True,
+                    "Paint mode retains its approved hit effect without restoring the retired HP damage labels.");
                 var hanging = network.target.GetComponent<LabHangingTarget>();
                 Assert.That(hanging, Is.Not.Null, "The saved scene must expose Pinata tuning.");
                 for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();

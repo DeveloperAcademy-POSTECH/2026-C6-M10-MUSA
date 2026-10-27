@@ -165,10 +165,10 @@ namespace C6Lab
             var snapshot = network.Snapshot;
             bool paintGoal = network.config == null || network.config.GourdMode == LabGourdMode.Paint;
             CacheGoalTitle();
-            Set(goalTitle, GourdGoalTitle(paintGoal ? LabGourdMode.Paint : LabGourdMode.Crack));
+            Set(goalTitle, GourdGoalTitle(LabGourdMode.Paint));
             bool playing = snapshot != null && snapshot.phase == LabPhase.Playing;
             bool terminal = snapshot != null && (snapshot.phase == LabPhase.Victory || snapshot.phase == LabPhase.Defeat);
-            terminal = terminal && !LabGourdFinish.DelayVictory(network, snapshot);
+            terminal = terminal && !LabPaintFinishPresentation.DelayResult(network, snapshot);
             bool battleVisible = snapshot != null && snapshot.phase != LabPhase.Idle;
             bool paused = playing && network.IsBattlePaused;
             UpdateBattleBackground(battleVisible);
@@ -389,7 +389,7 @@ namespace C6Lab
             => LabConfig.DefaultPaintVictoryPercent;
 
         public static string GourdGoalTitle(LabGourdMode mode)
-            => mode == LabGourdMode.Crack ? "YOKAI HP" : "GOAL";
+            => "GOAL";
 
         /// <summary>Floor to one decimal so an unfinished near-goal value never rounds up.</summary>
         public static string FormatPaintGoalProgress(float coverage, int goalPercent)
@@ -535,7 +535,7 @@ namespace C6Lab
             LabPlayerState[] players = snapshot?.players;
             if (players == null || players.Length < 2) return;
             LabPlayerState local = Array.Find(players, player => player != null && player.id == localId);
-            if (local == null) return;
+            if (local == null || local.seat < 0 || local.seat >= players.Length) return;
             int count = players.Length;
             if (LabTeams.FourPlayerTeams(snapshot))
             {
@@ -544,8 +544,8 @@ namespace C6Lab
                 if (LabTeams.EdgeOpen(local.seat, true)) right = mate; else left = mate;
                 return;
             }
-            LabPlayerState leftPlayer = Array.Find(players, player => player != null && player.seat == (local.seat + count - 1) % count);
-            LabPlayerState rightPlayer = Array.Find(players, player => player != null && player.seat == (local.seat + 1) % count);
+            LabPlayerState leftPlayer = Array.Find(players, player => player != null && player.seat == LabPlayerSlots.NeighborSeat(local.seat, count, false));
+            LabPlayerState rightPlayer = Array.Find(players, player => player != null && player.seat == LabPlayerSlots.NeighborSeat(local.seat, count, true));
             if (leftPlayer != null) left = "P" + (leftPlayer.seat + 1);
             if (rightPlayer != null) right = "P" + (rightPlayer.seat + 1);
         }

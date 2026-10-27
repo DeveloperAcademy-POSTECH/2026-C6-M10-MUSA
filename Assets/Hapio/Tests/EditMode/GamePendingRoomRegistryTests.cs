@@ -27,6 +27,52 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void CreationHandleCanCancelOnlyItsOwnUnconfirmedRoomAndReleasesItsPort()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Game pending rooms require macOS/iOS Bonjour.");
+            using (var registry = new GamePendingRoomRegistry())
+            using (var other = new GamePendingRoomRegistry())
+            {
+                Assert.That(registry.TryCreate(2, GameMode.Story, out GamePendingRoomHandle first, out string error), Is.True, error);
+                Assert.That(registry.TryCreate(5, GameMode.Story, out GamePendingRoomHandle second, out error), Is.True, error);
+                Assert.That(registry.TryGet(first, out GamePendingRoomInfo original), Is.True);
+                Assert.That(original.Ready, Is.False, "A creation handle is usable before a discovery name exists.");
+                Assert.That(original.Name, Is.Empty);
+                Assert.That(other.TryGet(first, out _), Is.False);
+                Assert.That(other.Cancel(first), Is.False, "A different registry cannot dispose this request.");
+                Assert.That(registry.Cancel(first), Is.True);
+                Assert.That(registry.TryGet(first, out _), Is.False);
+                Assert.That(registry.Cancel(first), Is.False);
+                Assert.That(registry.TryGet(second, out GamePendingRoomInfo retained), Is.True);
+                Assert.That(retained.Capacity, Is.EqualTo(5));
+                Assert.That(registry.Rooms.Count, Is.EqualTo(1));
+                using (var released = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+                    Assert.DoesNotThrow(() => released.Bind(new IPEndPoint(IPAddress.Any, original.Port)));
+                using (var reserved = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+                    Assert.Throws<SocketException>(() => reserved.Bind(new IPEndPoint(IPAddress.Any, retained.Port)));
+                registry.Dispose();
+                Assert.That(registry.TryGet(second, out _), Is.False);
+                Assert.That(registry.Cancel(second), Is.False);
+            }
+        }
+
+        [Test]
+        public void TerritoryCreationHandleKeepsFourPlayerCapacityAndInvalidCreationHasNoHandle()
+        {
+            using (var registry = new GamePendingRoomRegistry())
+            {
+                Assert.That(registry.TryCreate(1, GameMode.Story, out GamePendingRoomHandle invalid, out string error), Is.False);
+                Assert.That(invalid, Is.Null);
+                Assert.That(error, Is.Not.Empty);
+                if (!LabBonjourDiscovery.IsSupported) return;
+                Assert.That(registry.TryCreate(2, GameMode.Territory, out GamePendingRoomHandle handle, out error), Is.True, error);
+                Assert.That(registry.TryGet(handle, out GamePendingRoomInfo room), Is.True);
+                Assert.That(room.Capacity, Is.EqualTo(LabTeams.Players));
+                Assert.That(room.Mode, Is.EqualTo(GameMode.Territory));
+            }
+        }
+
+        [Test]
         public void PendingCardsReserveIndependentPortsAndDisposeReleasesEveryReservation()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Game pending rooms require macOS/iOS Bonjour.");

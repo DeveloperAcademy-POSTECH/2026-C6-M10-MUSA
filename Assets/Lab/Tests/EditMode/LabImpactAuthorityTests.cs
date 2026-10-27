@@ -5,8 +5,9 @@ namespace C6Lab.Tests
 {
     public sealed class LabImpactAuthorityTests
     {
-        [Test]
-        public void ConfirmedFinishingHitReturnsActualDamageAndConsumedElementOnlyOnce()
+        [TestCase(2f, false)]
+        [TestCase(100f, true)]
+        public void ConfirmedPaintHitReportsActualHpAndNominalImpactOnlyOnce(float initialPaintPercent, bool completesPaint)
         {
             var config = ScriptableObject.CreateInstance<LabConfig>();
             try
@@ -14,7 +15,9 @@ namespace C6Lab.Tests
                 float[] values = config.CaptureDeveloperValues();
                 values[0] = 7f; // Monster HP is lower than the configured 20-point hit.
                 values[1] = 20f;
-                values[79] = 1f; // Legacy HP victory applies to Crack mode.
+                values[79] = 0f; // Reserved paint-only slot; HP alone never decides victory.
+                values[104] = 0f;
+                values[105] = initialPaintPercent;
                 values[5] = .001f;
                 values[9] = 100f;
                 values[39] = 50f;
@@ -40,14 +43,30 @@ namespace C6Lab.Tests
                 Assert.That(model.TryLaunch(1ul, combined.id, "launch", 0d,
                     out _, out error), Is.True, error);
 
-                Assert.That(model.ConfirmHit(combined.id, 0d, out var element, out int damage), Is.True);
+                Assert.That(model.ConfirmHit(combined.id, 0d, Vector3.forward,
+                    out var element, out int damage, out int impact), Is.True);
                 Assert.That(element, Is.EqualTo(combined.element));
                 Assert.That(damage, Is.EqualTo(7));
-                Assert.That(model.Snapshot(0d).hp, Is.Zero);
-                Assert.That(model.Snapshot(0d).phase, Is.EqualTo(LabPhase.Victory));
-                Assert.That(model.ConfirmHit(combined.id, 0d, out element, out damage), Is.False);
+                Assert.That(impact, Is.EqualTo(20), "Feedback and attack score retain the nominal hit value.");
+                LabSnapshot accepted = model.Snapshot(0d);
+                Assert.That(accepted.hp, Is.Zero);
+                Assert.That(accepted.phase, Is.EqualTo(completesPaint ? LabPhase.Victory : LabPhase.Playing));
+                Assert.That(accepted.paintCoveredCount == accepted.paintCellCount, Is.EqualTo(completesPaint));
+                Assert.That(accepted.paintCoveredCount, Is.GreaterThan(0));
+                Assert.That(accepted.players[0].hitTotal, Is.EqualTo(1));
+                Assert.That(accepted.players[0].damageTotal, Is.EqualTo(20));
+                Assert.That(accepted.players[0].lastHit, Is.EqualTo(completesPaint));
+                float stamina = accepted.players[0].stamina;
+                Assert.That(model.ConfirmHit(combined.id, 0d, Vector3.forward, out element, out damage, out impact), Is.False);
                 Assert.That(element, Is.EqualTo(LabOrbElement.None));
                 Assert.That(damage, Is.Zero);
+                Assert.That(impact, Is.Zero);
+                LabSnapshot duplicate = model.Snapshot(0d);
+                Assert.That(duplicate.players[0].hitTotal, Is.EqualTo(1));
+                Assert.That(duplicate.players[0].damageTotal, Is.EqualTo(20));
+                Assert.That(duplicate.players[0].stamina, Is.EqualTo(stamina));
+                Assert.That(duplicate.paintCount, Is.EqualTo(accepted.paintCount));
+                Assert.That(duplicate.paintRevision, Is.EqualTo(accepted.paintRevision));
             }
             finally { Object.DestroyImmediate(config); }
         }
