@@ -58,19 +58,22 @@ namespace C6Lab.Tests
                     Tune(fixture, true, 1f, .3f, .18f);
                     paint.RefreshCommittedMap();
                     Color32[] on = rig.Capture(paint, "grain-partial-ON-default.png");
-                    int changed = 0, unchangedPaper = 0;
+                    int changed = 0, unchangedPaper = 0, nearPaperDelta = 0;
                     for (int i = 0; i < off.Length; i++)
                     {
                         if (on[i].a != off[i].a) Assert.Fail("Grain changed opaque shell alpha at pixel " + i);
                         if (off[i].Equals(paper[i]))
                         {
-                            if (!on[i].Equals(off[i])) Assert.Fail("Grain changed unpainted paper/background at pixel " + i);
+                            nearPaperDelta = Mathf.Max(nearPaperDelta, Mathf.Abs(on[i].r - off[i].r),
+                                Mathf.Abs(on[i].g - off[i].g), Mathf.Abs(on[i].b - off[i].b));
                             unchangedPaper++;
                         }
                         else if (!on[i].Equals(off[i])) changed++;
                     }
                     Assert.That(changed, Is.GreaterThan(100), "The actual shader must show pigment variation.");
                     Assert.That(unchangedPaper, Is.GreaterThan(1000));
+                    Assert.That(nearPaperDelta, Is.LessThanOrEqualTo(1),
+                        "Sub-byte watercolor edges may cross one RGB quantization step; paper cannot change visibly.");
                     yield return null;
                     Assert.That(rig.Capture(paint, null), Is.EqualTo(on), "Grain is object-local and does not animate over time.");
                     Tune(fixture, true, 3f, .3f, .18f);
@@ -125,7 +128,7 @@ namespace C6Lab.Tests
                 block = Block(paint.Shell.GetComponent<Renderer>());
                 AssertGrain(block, 1f, 3f, .8f, .6f);
                 Assert.That(block.GetFloat("_UnrelatedOverride"), Is.EqualTo(.37f));
-                Assert.That(block.GetTexture("_PaintMap"), Is.SameAs(paint.PaintTexture));
+                Assert.That(block.GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture));
                 Assert.That(paint.Surface.Revision, Is.EqualTo(revision));
                 Assert.That(paint.PaintTexture.GetPixels32(), Is.EqualTo(before));
 
@@ -151,7 +154,7 @@ namespace C6Lab.Tests
                 MaterialPropertyBlock copyBlock = Block(copy);
                 AssertGrain(copyBlock, 1f, 3f, .8f, .6f);
                 Assert.That(copyBlock.GetFloat("_UnrelatedOverride"), Is.EqualTo(.37f));
-                Assert.That(copyBlock.GetTexture("_PaintMap"), Is.SameAs(preview.PaintTexture));
+                Assert.That(copyBlock.GetTexture("_PaintMap"), Is.SameAs(preview.VisualPaintTexture));
                 Assert.That(preview.PaintTexture, Is.Not.SameAs(paint.PaintTexture));
                 Assert.That(preview.PaintTexture.GetPixels32(), Is.EqualTo(paint.PaintTexture.GetPixels32()));
                 Assert.That(copy.sharedMaterial, Is.Not.SameAs(paint.paintMaterial));

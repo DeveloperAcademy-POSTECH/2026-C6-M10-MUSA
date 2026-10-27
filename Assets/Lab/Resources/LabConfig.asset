@@ -19,11 +19,11 @@ MonoBehaviour:
   targetSpinStrength: 80
   targetSpinDamping: 1.2
   targetSpinMaximumSpeed: 720
-  staminaMax: 100
-  staminaStart: 100
+  staminaMax: 160
+  staminaStart: 160
   generateCost: 20
   staminaRecoveryAmount: 20
-  staminaRecoverySeconds: 1.7
+  staminaRecoverySeconds: 1
   hitRecovery: 10
   orbStorageLimit: 20
   yinChance: 50
@@ -49,6 +49,7 @@ MonoBehaviour:
   blastShrinkScale: 0.5
   smallOrbPaintShare: 0.5
   gourdColorComboEnabled: 0
+  comboYaguangCountEnabled: 1
   comboFirstStartSeconds: 50
   comboRepeatIntervalSeconds: 60
   comboTimeLimitSeconds: 15
@@ -58,7 +59,7 @@ MonoBehaviour:
   comboRewardDurationSeconds: 15
   comboRewardSizeScale: 2.5
   comboWarningSeconds: 4
-  orbLifetimeSeconds: 8
+  orbLifetimeSeconds: 15
   orbRestitution: 0.8
   orbFloorDeceleration: 2
   orbStopSpeed: 0.065
@@ -130,13 +131,31 @@ MonoBehaviour:
   foxFireCountMax: 5
   foxFireSafeSeconds: 1
   charmSeconds: 10
-  charmRescueTaps: 3
+  charmRescueTaps: 10
+  charmWarningSeconds: 3
   jigwiFireTargetCount: 1
   jigwiFireSeconds: 15
   jigwiOverheatSeconds: 4
   jigwiGenerationBurnSeconds: 10
   jigwiRawRadiusScale: 0.65
   jigwiRawLifeScale: 0.5
+  jigwiAutoIntervalMin: 20
+  jigwiAutoIntervalMax: 30
+  jigwiAutoFireWeight: 1
+  jigwiAutoGenerationBurnWeight: 1
+  teamTerritoryEnabled: 0
+  teamBattleSeconds: 180
+  teamFeverHits: 15
+  teamFeverSeconds: 8
+  highResolutionPaintEnabled: 1
+  highResolutionPaintQuality: 0
+  yaguangFlashEnabled: 0
+  yaguangFlashTargetOne: 0
+  yaguangFlashFirstStartSeconds: 10
+  yaguangFlashIntervalSeconds: 60
+  yaguangFlashWarningSeconds: 3
+  yaguangFlashGlareSeconds: 10
+  yaguangFlashRecoverySeconds: 1
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9
@@ -197,11 +216,3 @@ MonoBehaviour:
   straightPitchOffsetDegrees: 3
   straightLoftScale: 0.1
   straightGravityScale: 0.1
-  yaguangFlashEnabled: 0
-  yaguangFlashTargetOne: 0
-  yaguangFlashFirstStartSeconds: 10
-  yaguangFlashIntervalSeconds: 60
-  yaguangFlashWarningSeconds: 3
-  yaguangFlashGlareSeconds: 7
-  yaguangFlashRecoverySeconds: 2
-  comboYaguangCountEnabled: 1

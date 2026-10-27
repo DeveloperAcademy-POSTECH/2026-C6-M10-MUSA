@@ -56,6 +56,8 @@ namespace C6Lab
 
         [Tooltip("말풍선 크기 (Canvas 기준 픽셀)")]
         [SerializeField, Min(10f)] private float bubbleSize = 110f;
+        [Tooltip("긴 말(5글자 이상)을 쓰는 말풍선 안쪽 칸의 폭과 높이 (말풍선 크기의 배수, #301). 글자는 이 칸에 맞춰 줄어든다.")]
+        [SerializeField] private Vector2 longWordArea = new Vector2(.66f, .5f);
         [Tooltip("말풍선이 떠 있는 시간 (초)")]
         [SerializeField, Min(.3f)] private float showSeconds = 1.4f;
 
@@ -70,6 +72,7 @@ namespace C6Lab
         private Image blockMark;
         private Image heartMark;
         private bool showingHeart;
+        private bool wasCharmed;
         private RectTransform eyesRect;
         private Image eyesHalo;
         private Image eyesLit;
@@ -123,13 +126,22 @@ namespace C6Lab
             }
         }
 
-        // 통합 추첨의 여우불은 모든 기기에서 박 옆에 "!"를, 매혹은 걸린 사람 화면에만 하트를 띄운다 (#251).
-        // 폭탄과 넘기기 막기는 위에서 따로 띄운다.
+        // 통합 추첨의 여우불은 모든 기기에서 박 옆에 "!"를 띄운다 (#251). 매혹의 하트는 예고(#305)가 끝나
+        // 실제로 홀리는 순간에 띄운다 (아래 LateUpdate). 폭탄과 넘기기 막기는 위에서 따로 띄운다.
         private void OnSabotageCast(LabSabotageKind kind, ulong targetPlayer)
         {
             if (network == null) return;
             if (kind == LabSabotageKind.FoxFire) Show(network.target);
-            else if (kind == LabSabotageKind.Charm && targetPlayer == network.LocalPlayerId) ShowHeart(network.target);
+        }
+
+        // 매혹 (#251, #305): 걸린 사람 화면에만, 매혹이 시작되는 순간 박 옆에 하트를 띄운다.
+        private void WatchCharm()
+        {
+            LabSnapshot snapshot = network != null ? network.Snapshot : null;
+            bool charmed = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused
+                && snapshot.CharmOn(network.LocalPlayerId);
+            if (charmed && !wasCharmed) ShowHeart(network.target);
+            wasCharmed = charmed;
         }
 
         private void OnGourdBombDropped(ulong targetPlayer, string bombId, Vector2 landing)
@@ -172,6 +184,8 @@ namespace C6Lab
             mark.text = word;
             float share = word.Length <= 1 ? .5f : word.Length <= 2 ? .34f : .26f;
             mark.fontSize = Mathf.RoundToInt(bubbleSize * share);
+            // 긴 말("안보이지롱~", "으악 어지러워~" #301)은 말풍선 안쪽 칸에 맞춰 글자 크기를 줄이고, 필요하면 두 줄로 쓴다.
+            FitLongWord(word.Length > 4);
             mark.color = InkColor;
             // 먹색 글자에 먹색 테두리를 어긋나게 두르면 획이 두 번 겹쳐 보인다. 말은 테두리 없이 쓴다.
             markOutline.enabled = false;
@@ -236,12 +250,33 @@ namespace C6Lab
             eyesHalo.rectTransform.localScale = Vector3.one * (1f + .3f * eyeGlow + beat);
         }
 
+        /// <summary>
+        /// 긴 말을 말풍선 안쪽(폭 longWordArea.x, 높이 longWordArea.y, 말풍선 크기 배수)에 맞춘다 (#301).
+        /// 끄면 원래처럼 말풍선 크기 칸에 한 줄로 쓴다("!" 등).
+        /// </summary>
+        private void FitLongWord(bool fit)
+        {
+            mark.resizeTextForBestFit = fit;
+            mark.resizeTextMinSize = Mathf.Max(6, Mathf.RoundToInt(bubbleSize * .08f));
+            mark.resizeTextMaxSize = Mathf.RoundToInt(bubbleSize * .26f);
+            mark.horizontalOverflow = fit ? HorizontalWrapMode.Wrap : HorizontalWrapMode.Overflow;
+            mark.verticalOverflow = fit ? VerticalWrapMode.Truncate : VerticalWrapMode.Overflow;
+            mark.lineSpacing = fit ? .85f : 1f;
+            mark.rectTransform.sizeDelta = fit
+                ? new Vector2(bubbleSize * longWordArea.x, bubbleSize * longWordArea.y)
+                : new Vector2(bubbleSize, bubbleSize);
+        }
+
         // 말풍선 안 표시는 한 번에 하나만 보인다.
         private void ShowOnly(GameObject shown)
         {
             if (shown != eyesRect.gameObject) showingEyes = false;
             showingWord = false;
-            if (mark != null) mark.rectTransform.localScale = Vector3.one;
+            if (mark != null)
+            {
+                mark.rectTransform.localScale = Vector3.one;
+                FitLongWord(false);
+            }
             mark.gameObject.SetActive(shown == mark.gameObject);
             blockMark.gameObject.SetActive(shown == blockMark.gameObject);
             heartMark.gameObject.SetActive(shown == heartMark.gameObject);
@@ -268,6 +303,7 @@ namespace C6Lab
 
         private void LateUpdate()
         {
+            WatchCharm();
             if (!Active) return;
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool battle = network == null

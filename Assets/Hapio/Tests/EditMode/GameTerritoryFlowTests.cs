@@ -22,7 +22,15 @@ namespace Hapio.Tests
             var loading = flow.State;
             foreach (ulong id in flow.ParticipantIds)
                 Assert.That(flow.MarkBattleReady(id, loading.runId, loading.stageIndex, loading.revision), Is.True);
-            Assert.That(flow.MarkPlaying(loading.runId, loading.stageIndex, loading.revision, session, 1), Is.True);
+            Assert.That(flow.MarkSynchronizing(loading.runId, loading.stageIndex, loading.revision, session, 1), Is.True);
+            var sync = flow.State;
+            foreach (ulong id in flow.ParticipantIds)
+                Assert.That(flow.MarkInitialStateReady(id, sync.runId, sync.stageIndex, sync.revision), Is.True);
+            Assert.That(flow.BeginCountdown(sync.runId, sync.stageIndex, sync.revision, 10d), Is.True);
+            var countdown = flow.State;
+            foreach (ulong id in flow.ParticipantIds)
+                Assert.That(flow.MarkCountdownReady(id, countdown.runId, countdown.stageIndex, countdown.revision), Is.True);
+            Assert.That(flow.MarkPlaying(countdown.runId, countdown.stageIndex, countdown.revision, session, 1), Is.True);
             return flow.State;
         }
 
@@ -131,7 +139,7 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void TheTerritoryScopeKeepsItsSwitchOnAndEditsOnlyTimeAndFever()
+        public void TheTerritoryScopeKeepsItsSwitchOnAndEditsOnlyItsOwnFields()
         {
             using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
             {
@@ -140,6 +148,8 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 }) Assert.That(settings.Capture(stage)[196], Is.Zero);
                 Assert.That(Enumerable.Range(196, 4).Select(i => GameStageSettings.IsFieldVisible(scope, i)),
                     Is.EqualTo(new[] { false, true, true, true }), "The switch belongs to the room mode, not to DEV.");
+                Assert.That(Enumerable.Range(0, 12).Where(i => GameStageSettings.IsFieldVisible(scope, i)),
+                    Is.EqualTo(new[] { 3, 4, 5, 6, 7, 8, 10 }), "Stamina, generation and orb lifetime (#305).");
                 Assert.That(Enumerable.Range(196, 4).Any(i => Enumerable.Range(0, 4).Any(s => GameStageSettings.IsFieldVisible(s, i))),
                     Is.False);
 
@@ -167,6 +177,64 @@ namespace Hapio.Tests
                 Assert.That(settings.Capture(scope)[199], Is.EqualTo(9f));
                 Assert.That(settings.Capture(1)[199], Is.Not.EqualTo(9f));
             }
+        }
+
+        [Test]
+        public void TheTerritoryRoomKeepsItsOwnStaminaAndOrbLifetimeApartFromTheStory()
+        {
+            const int scope = GameStageSettings.TerritoryScope;
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                // Saved defaults (#305): both make eight orbs on a full bar (the bar art has eight cells); the story
+                // refills faster and its orbs last longer, while 2:2 keeps its old refill and lifetime.
+                float[] team = settings.Capture(scope), story = settings.Capture(1);
+                Assert.That(new[] { team[3], team[4], team[5], team[6], team[7], team[8], team[10] },
+                    Is.EqualTo(new[] { 160f, 160f, 20f, 20f, 1.7f, 10f, 8f }));
+                Assert.That(new[] { story[3], story[4], story[5], story[7], story[10] },
+                    Is.EqualTo(new[] { 160f, 160f, 20f, 1f, 15f }));
+                Assert.That(story[3] / story[5], Is.EqualTo(8f), "A full story bar makes eight orbs.");
+
+                float[] common = settings.Capture(0); common[3] = 200f; common[4] = 200f; common[10] = 20f;
+                Assert.That(settings.TryApply(0, common, out string error), Is.True, error);
+                foreach (int stage in new[] { 1, 2, 3 }) Assert.That(settings.Capture(stage)[3], Is.EqualTo(200f));
+                Assert.That(settings.Capture(scope)[3], Is.EqualTo(160f), "Common stamina stops at the story stages.");
+                Assert.That(settings.Capture(scope)[10], Is.EqualTo(8f));
+
+                float[] room = settings.Capture(scope); room[3] = 240f; room[7] = 1.2f;
+                Assert.That(settings.TryApply(scope, room, out error), Is.True, error);
+                Assert.That(settings.Capture(0)[3], Is.EqualTo(200f), "The room's stamina never reaches Common.");
+                Assert.That(settings.Capture(1)[7], Is.EqualTo(1f));
+
+                // A paused battle's DEV writes stamina to its own side only.
+                float[] teamBattle = settings.Capture(scope); teamBattle[5] = 25f;
+                Assert.That(settings.TryApplyBattle(scope, teamBattle, out error), Is.True, error);
+                Assert.That(settings.Capture(0)[5], Is.EqualTo(20f));
+                Assert.That(settings.Capture(scope)[5], Is.EqualTo(25f));
+                float[] storyBattle = settings.Capture(2); storyBattle[5] = 10f;
+                Assert.That(settings.TryApplyBattle(2, storyBattle, out error), Is.True, error);
+                Assert.That(settings.Capture(1)[5], Is.EqualTo(10f));
+                Assert.That(settings.Capture(scope)[5], Is.EqualTo(25f));
+
+                LabConfig teamConfig = settings.CreateTerritoryConfig(), storyConfig = settings.CreateStageConfig(1);
+                try
+                {
+                    Assert.That(teamConfig.StaminaMax, Is.EqualTo(240f));
+                    Assert.That(teamConfig.OrbLifetimeSeconds, Is.EqualTo(8f));
+                    Assert.That(storyConfig.StaminaMax, Is.EqualTo(200f));
+                    Assert.That(storyConfig.OrbLifetimeSeconds, Is.EqualTo(20f));
+                }
+                finally { Object.DestroyImmediate(teamConfig); Object.DestroyImmediate(storyConfig); }
+            }
+
+            var forged = Object.Instantiate(GameStageCatalog.RequireDefault());
+            try
+            {
+                forged.territoryDefaultValues = new[] { new GameStageValue(2, 60f) };
+                Assert.Throws<System.InvalidOperationException>(forged.Validate, "Battle time is Common, not a 2:2 default.");
+                forged.territoryDefaultValues = new[] { new GameStageValue(3, 90f), new GameStageValue(3, 80f) };
+                Assert.Throws<System.InvalidOperationException>(forged.Validate);
+            }
+            finally { Object.DestroyImmediate(forged); }
         }
     }
 }

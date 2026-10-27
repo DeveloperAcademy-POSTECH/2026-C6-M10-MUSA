@@ -118,8 +118,9 @@ namespace C6Lab.Tests
                 latest.SetValue(network, Snapshot(network, 51d, rewardUntil: 59d));
                 yield return null;
                 yield return null;
-                Assert.That(hud.EffectVisible, Is.False, "No BIG badge any more.");
-                Assert.That(hud.StarsEmitting, Is.True, "Stars rain instead.");
+                Assert.That(hud.EffectVisible, Is.True, "BIG shows in the same corner mark as SMALL (#301)...");
+                Assert.That(hud.EffectLabel, Is.EqualTo(LabGourdComboHud.RewardLabel));
+                Assert.That(hud.StarsEmitting, Is.True, "...and the talismans still rain.");
                 Assert.That(hud.StarCount, Is.GreaterThan(0), "A burst as the reward starts.");
                 Assert.That(hud.BoardLook, Is.EqualTo(1));
                 float early = hud.StarsPerSecond;
@@ -136,6 +137,95 @@ namespace C6Lab.Tests
                 yield return null;
                 Assert.That(hud.StarsEmitting, Is.False, "Reward over: no new stars.");
                 Assert.That(hud.BoardLook, Is.Zero, "The board's orbs go back to their size.");
+            }
+            finally
+            {
+                Object.Destroy(root);
+                Object.Destroy(canvasRoot);
+            }
+        }
+
+        [Test]
+        public void TheWrongColorResultNamesWhoMissed()
+        {
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, true, false, 1), Is.EqualTo("P2 WRONG COLOR"));
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, true, true, 1), Is.EqualTo("YOU WRONG COLOR"));
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, false, false, -1), Is.EqualTo("WRONG COLOR"),
+                "Unknown thrower: no name.");
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.Timeout, true, true, 0), Is.EqualTo("TIME UP"),
+                "A time out is nobody's miss.");
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.Success, true, true, 0), Is.EqualTo("CLEAR!"));
+        }
+
+        [UnityTest]
+        public IEnumerator EachHitPopsNComboAndAClearPopsFourComboBeforeClear()
+        {
+            var root = new GameObject("Combo pop HUD fixture");
+            var network = root.AddComponent<LabNetwork>();
+            network.enabled = false;
+            var canvasRoot = new GameObject("Combo pop canvas", typeof(RectTransform), typeof(Canvas));
+            var hud = root.AddComponent<LabGourdComboHud>();
+            hud.Bind(network, canvasRoot.GetComponent<Canvas>());
+            FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
+            try
+            {
+                LabSnapshot playing = Snapshot(network, 50d);
+                playing.comboActive = true; playing.comboStartedAt = 49d; playing.comboEndsAt = 59d; playing.comboProgress = 0;
+                latest.SetValue(network, playing);
+                yield return null;
+                Assert.That(hud.ComboPopCount, Is.Zero);
+
+                LabSnapshot one = Snapshot(network, 51d);
+                one.comboActive = true; one.comboStartedAt = 49d; one.comboEndsAt = 59d; one.comboProgress = 1;
+                latest.SetValue(network, one);
+                yield return null;
+                Assert.That(hud.ComboPopCount, Is.EqualTo(1), "1 COMBO! on the first slot.");
+                Assert.That(hud.ComboPopFinal, Is.False);
+
+                LabSnapshot clear = Snapshot(network, 53d);
+                clear.comboProgress = 4; clear.comboResult = LabComboResult.Success; clear.comboResultCount = 1; clear.comboResultAt = 53d;
+                latest.SetValue(network, clear);
+                yield return null;
+                Assert.That(hud.ComboPopCount, Is.EqualTo(4));
+                Assert.That(hud.ComboPopFinal, Is.True, "4 COMBO!! first...");
+                Assert.That(hud.ResultVisible, Is.False, "...CLEAR! waits for it.");
+                Assert.That(hud.ResultLabel, Is.EqualTo(LabGourdComboHud.ClearText));
+                yield return new WaitForSecondsRealtime(1.2f);
+                Assert.That(hud.ResultVisible, Is.True, "Then CLEAR!.");
+            }
+            finally
+            {
+                Object.Destroy(root);
+                Object.Destroy(canvasRoot);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator TheSmallBarStandsUpAndShrinksDownward()
+        {
+            var root = new GameObject("Combo bar HUD fixture");
+            var network = root.AddComponent<LabNetwork>();
+            network.enabled = false;
+            var canvasRoot = new GameObject("Combo bar canvas", typeof(RectTransform), typeof(Canvas));
+            var hud = root.AddComponent<LabGourdComboHud>();
+            hud.Bind(network, canvasRoot.GetComponent<Canvas>());
+            FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
+            try
+            {
+                latest.SetValue(network, Snapshot(network, 50d, penaltyUntil: 59d));
+                yield return null;
+                yield return null;
+                Assert.That(hud.EffectVisible, Is.True);
+                Assert.That(hud.PenaltyBarFill, Is.EqualTo(.9f).Within(.05f), "9 of 10 s left (started at 49 s).");
+                RectTransform bar = hud.PenaltyBar;
+                Assert.That(bar, Is.Not.Null);
+                Assert.That(bar.sizeDelta.y, Is.GreaterThan(bar.sizeDelta.x), "A standing rectangle.");
+                Assert.That(bar.anchoredPosition, Is.EqualTo(Vector2.zero), "The rectangle is the bottom of the SMALL mark...");
+                Assert.That(hud.EffectLabel, Is.EqualTo(LabGourdComboHud.PenaltyLabel), "...with only the word SMALL above it.");
+                Assert.That(hud.EffectBadge.anchoredPosition.x, Is.LessThan(0f), "It sits in the left part of the screen, out of the way.");
+                latest.SetValue(network, Snapshot(network, 54d, penaltyUntil: 59d));
+                yield return null;
+                Assert.That(hud.PenaltyBarFill, Is.EqualTo(.5f).Within(.05f), "Half the bar left.");
             }
             finally
             {

@@ -19,7 +19,21 @@ namespace Hapio.Tests
             foreach (ulong id in flow.ParticipantIds)
                 Assert.That(flow.MarkBattleReady(id, loading.runId, loading.stageIndex, loading.revision), Is.True);
             Assert.That(flow.IsBattleReady, Is.True);
-            Assert.That(flow.MarkPlaying(loading.runId, loading.stageIndex, loading.revision, session, round), Is.True);
+            return FinishPreparation(flow, session, round);
+        }
+
+        private static GameFlowState FinishPreparation(GameRunFlow flow, string session, uint round = 1)
+        {
+            var load = flow.State;
+            Assert.That(flow.MarkSynchronizing(load.runId, load.stageIndex, load.revision, session, round), Is.True);
+            var sync = flow.State;
+            foreach (ulong id in flow.ParticipantIds)
+                Assert.That(flow.MarkInitialStateReady(id, sync.runId, sync.stageIndex, sync.revision), Is.True);
+            Assert.That(flow.BeginCountdown(sync.runId, sync.stageIndex, sync.revision, 103.5d), Is.True);
+            var countdown = flow.State;
+            foreach (ulong id in flow.ParticipantIds)
+                Assert.That(flow.MarkCountdownReady(id, countdown.runId, countdown.stageIndex, countdown.revision), Is.True);
+            Assert.That(flow.MarkPlaying(countdown.runId, countdown.stageIndex, countdown.revision, session, round), Is.True);
             return flow.State;
         }
 
@@ -63,7 +77,9 @@ namespace Hapio.Tests
             Assert.That(flow.ReadyCount, Is.EqualTo(1));
             Assert.That(flow.MarkPlaying(load.runId, 1, load.revision, "battle", 1), Is.False);
             Assert.That(flow.MarkBattleReady(42, load.runId, 1, load.revision), Is.True);
-            Assert.That(flow.MarkPlaying(load.runId, 1, load.revision, "battle", 1), Is.True);
+            Assert.That(flow.MarkPlaying(load.runId, 1, load.revision, "battle", 1), Is.False,
+                "Scene readiness alone never bypasses initial state and countdown delivery.");
+            FinishPreparation(flow, "battle");
             Assert.That(flow.MarkPlaying(load.runId, 1, load.revision, "battle", 1), Is.False);
         }
 
@@ -128,8 +144,7 @@ namespace Hapio.Tests
             Assert.That(flow.MarkBattleReady(0, loading.runId, 2, loading.revision), Is.True);
             Assert.That(flow.MarkPlaying(loading.runId, 2, loading.revision, "second", 12), Is.False);
             Assert.That(flow.MarkBattleReady(42, loading.runId, 2, loading.revision), Is.True);
-            Assert.That(flow.MarkPlaying(loading.runId, 2, loading.revision, "second", 12), Is.True);
-            var second = flow.State;
+            var second = FinishPreparation(flow, "second", 12);
             Assert.That(flow.DeveloperNextStage(second.runId, 2, second.revision), Is.True);
             var third = Play(flow, "third", 13);
             Assert.That(flow.DeveloperNextStage(third.runId, 3, third.revision), Is.False);
@@ -246,6 +261,118 @@ namespace Hapio.Tests
             Assert.That(flow.ParticipantIds, Is.EquivalentTo(new ulong[] { 3 }));
         }
 
+        private static GameFlowState Synchronize(GameRunFlow flow)
+        {
+            var loading = flow.State;
+            foreach (ulong id in flow.ParticipantIds)
+                flow.MarkBattleReady(id, loading.runId, loading.stageIndex, loading.revision);
+            Assert.That(flow.MarkSynchronizing(loading.runId, loading.stageIndex, loading.revision, "prepared", 7), Is.True);
+            return flow.State;
+        }
+
+        private static GameFlowState Schedule(GameRunFlow flow)
+        {
+            var sync = Synchronize(flow);
+            foreach (ulong id in flow.ParticipantIds)
+                flow.MarkInitialStateReady(id, sync.runId, sync.stageIndex, sync.revision);
+            Assert.That(flow.BeginCountdown(sync.runId, sync.stageIndex, sync.revision, 103.5d), Is.True);
+            return flow.State;
+        }
+
+        [Test]
+        public void InitialStateBarrierNeedsEveryMemberIncludingHostAndRejectsOldOrForeignAcks()
+        {
+            var flow = Run(0, 42);
+            var load = flow.State;
+            Assert.That(flow.MarkSynchronizing(load.runId, 1, load.revision, "b", 7), Is.False);
+            var sync = Synchronize(flow);
+            Assert.That(flow.ParticipantCount, Is.EqualTo(2));
+            Assert.That(flow.MarkInitialStateReady(42, load.runId, 1, load.revision), Is.False);
+            Assert.That(flow.MarkInitialStateReady(999, sync.runId, 1, sync.revision), Is.False);
+            Assert.That(flow.MarkInitialStateReady(42, sync.runId, 1, sync.revision), Is.True);
+            Assert.That(flow.MarkInitialStateReady(42, sync.runId, 1, sync.revision), Is.False);
+            Assert.That(flow.InitialStateReadyCount, Is.EqualTo(1));
+            Assert.That(flow.State.revision, Is.EqualTo(sync.revision), "Individual ACKs do not invalidate other members' requests.");
+            Assert.That(flow.IsInitialStateReady, Is.False, "The Host must confirm its own initial state too.");
+            Assert.That(flow.BeginCountdown(sync.runId, 1, sync.revision, 103.5d), Is.False);
+            Assert.That(flow.MarkInitialStateReady(0, sync.runId, 1, sync.revision), Is.True);
+            Assert.That(flow.BeginCountdown(sync.runId, 1, sync.revision, 103.5d), Is.True);
+            Assert.That(flow.MarkInitialStateReady(0, sync.runId, 1, sync.revision), Is.False);
+        }
+
+        [Test]
+        public void CountdownDeliveryAndRescheduleCannotBeReleasedByAnEarlierSchedule()
+        {
+            var flow = Run(0, 42);
+            var countdown = Schedule(flow);
+            Assert.That(flow.MarkPlaying(countdown.runId, 1, countdown.revision, "prepared", 7), Is.False);
+            Assert.That(flow.MarkCountdownReady(99, countdown.runId, 1, countdown.revision), Is.False);
+            Assert.That(flow.MarkCountdownReady(42, countdown.runId, 1, countdown.revision), Is.True);
+            Assert.That(flow.MarkCountdownReady(42, countdown.runId, 1, countdown.revision), Is.False);
+            Assert.That(flow.CountdownReadyCount, Is.EqualTo(1));
+            Assert.That(flow.MarkPlaying(countdown.runId, 1, countdown.revision, "prepared", 7), Is.False);
+            Assert.That(flow.RescheduleCountdown(countdown.runId, 1, countdown.revision, 103.5d), Is.False);
+            Assert.That(flow.RescheduleCountdown(countdown.runId, 1, countdown.revision, 102d), Is.False);
+            Assert.That(flow.RescheduleCountdown(countdown.runId, 1, countdown.revision, 107d), Is.True);
+            var delayed = flow.State;
+            Assert.That(delayed.battleStartsAt, Is.EqualTo(107d));
+            Assert.That(flow.CountdownReadyCount, Is.Zero);
+            Assert.That(flow.MarkCountdownReady(0, countdown.runId, 1, countdown.revision), Is.False);
+            Assert.That(flow.MarkCountdownReady(0, delayed.runId, 1, delayed.revision), Is.True);
+            Assert.That(flow.MarkCountdownReady(42, delayed.runId, 1, delayed.revision), Is.True);
+            Assert.That(flow.MarkPlaying(delayed.runId, 1, delayed.revision, "another", 7), Is.False);
+            Assert.That(flow.MarkPlaying(delayed.runId, 1, delayed.revision, "prepared", 8), Is.False);
+            Assert.That(flow.MarkPlaying(delayed.runId, 1, delayed.revision, "prepared", 7), Is.True);
+            Assert.That(flow.MarkPlaying(delayed.runId, 1, delayed.revision, "prepared", 7), Is.False);
+            var playing = flow.State;
+            Assert.That(playing.battleStartsAt, Is.EqualTo(107d));
+            Assert.That(flow.RestartCurrentStage(playing.runId, 1, playing.revision), Is.True);
+            Assert.That(flow.State.battleStartsAt, Is.Zero);
+            Assert.That(flow.ReadyCount + flow.InitialStateReadyCount + flow.CountdownReadyCount, Is.Zero);
+            Assert.That(flow.MarkCountdownReady(0, delayed.runId, 1, delayed.revision), Is.False);
+        }
+
+        [TestCase(0d)]
+        [TestCase(-1d)]
+        [TestCase(double.NaN)]
+        [TestCase(double.PositiveInfinity)]
+        [TestCase(double.NegativeInfinity)]
+        [TestCase(1e13d)]
+        public void InvalidDeadlineDoesNotMutatePreparedState(double invalid)
+        {
+            var flow = Run(0);
+            var sync = Synchronize(flow);
+            flow.MarkInitialStateReady(0, sync.runId, 1, sync.revision);
+            Assert.That(flow.BeginCountdown(sync.runId, 1, sync.revision, invalid), Is.False);
+            Assert.That(flow.State.phase, Is.EqualTo(GameFlowPhase.SynchronizingBattle));
+            Assert.That(flow.State.revision, Is.EqualTo(sync.revision));
+            Assert.That(flow.State.battleStartsAt, Is.Zero);
+        }
+
+        [TestCase(GameFlowPhase.SynchronizingBattle)]
+        [TestCase(GameFlowPhase.Countdown)]
+        public void DisconnectDuringPreparationIsActiveAndClearsEveryReadinessSet(GameFlowPhase phase)
+        {
+            var flow = Run(0, 42);
+            if (phase == GameFlowPhase.SynchronizingBattle) Synchronize(flow); else Schedule(flow);
+            Assert.That(flow.State.IsRunActive, Is.True);
+            Assert.That(flow.Abort("participant left while preparing"), Is.True);
+            Assert.That(flow.State.phase, Is.EqualTo(GameFlowPhase.GameOver));
+            Assert.That(flow.ReadyCount + flow.InitialStateReadyCount + flow.CountdownReadyCount, Is.Zero);
+            Assert.That(flow.IsInitialStateReady || flow.IsCountdownReady, Is.False);
+        }
+
+        [Test]
+        public void AppendedPreparationPhasesKeepAllExistingSerializedNumbers()
+        {
+            Assert.That((int)GameFlowPhase.Home, Is.EqualTo(0));
+            Assert.That((int)GameFlowPhase.LoadingBattle, Is.EqualTo(2));
+            Assert.That((int)GameFlowPhase.Playing, Is.EqualTo(3));
+            Assert.That((int)GameFlowPhase.GameOver, Is.EqualTo(6));
+            Assert.That((int)GameFlowPhase.SynchronizingBattle, Is.EqualTo(7));
+            Assert.That((int)GameFlowPhase.Countdown, Is.EqualTo(8));
+        }
+
         [Test]
         public void AuthorityCannotProduceOversizedNetworkTextFields()
         {
@@ -253,7 +380,7 @@ namespace Hapio.Tests
             var load = flow.State;
             Assert.That(flow.Abort(new string('x', 257)), Is.False);
             Assert.That(flow.MarkBattleReady(0, load.runId, 1, load.revision), Is.True);
-            Assert.That(flow.MarkPlaying(load.runId, 1, load.revision, new string('b', 129), 1), Is.False);
+            Assert.That(flow.MarkSynchronizing(load.runId, 1, load.revision, new string('b', 129), 1), Is.False);
             Assert.That(GameFlowSnapshot.IsValid(flow.State, out _), Is.True);
         }
     }

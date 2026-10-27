@@ -75,7 +75,7 @@ namespace C6Lab.Tests
                 // Apply through the ordinary DEV form, including both independent shared Config toggles.
                 developer.Open();
                 float[] tuning = fixture.CaptureDeveloperValues();
-                Assert.That(tuning.Length, Is.EqualTo(200), "Both shared feature toggles must survive the ordinary DEV form.");
+                Assert.That(tuning.Length, Is.EqualTo(205), "Both shared feature toggles must survive the ordinary DEV form.");
                 for (int i = 0; i < tuning.Length; i++)
                     developer.valueInputs[i].text = tuning[i].ToString("R", CultureInfo.InvariantCulture);
                 developer.ApplyAndStart();
@@ -118,6 +118,17 @@ namespace C6Lab.Tests
                 LabGourdResultPreview preview = viewer.Preview;
                 RenderTexture firstTexture = preview.Texture;
                 Texture2D firstPaint = preview.PaintTexture;
+                Texture firstVisualPaint = preview.VisualPaintTexture, firstVisualPainter = preview.VisualPainterTexture;
+                if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+                {
+                    Assert.That(network.config.HighResolutionPaintEnabled, Is.True);
+                    Assert.That(paint.HighResolutionActive, Is.True, "Default GPU paint must remain active for result capture.");
+                    Assert.That(firstVisualPaint, Is.InstanceOf<RenderTexture>());
+                    Assert.That(firstVisualPaint.width, Is.EqualTo(1024));
+                    Assert.That(firstVisualPaint.height, Is.EqualTo(512));
+                    Assert.That(firstVisualPaint, Is.Not.SameAs(paint.VisualPaintTexture));
+                    Assert.That(firstVisualPainter, Is.Not.SameAs(paint.VisualPainterTexture));
+                }
                 Assert.That(viewer.Ui.previewImage.texture, Is.SameAs(firstTexture));
                 Assert.That(firstTexture.IsCreated(), Is.True);
                 Assert.That(preview.PaintTexture, Is.Not.SameAs(paint.PaintTexture));
@@ -148,6 +159,17 @@ namespace C6Lab.Tests
                     AssertRenderedModel(firstTexture);
                 AssertUnchangedResult(network, originalPixels, revision, paintCount, completed);
                 Assert.That(savedNetwork.CaptureDeveloperValues(), Is.EqualTo(savedTuning));
+                if (firstVisualPaint is RenderTexture frozenVisual)
+                {
+                    // A live-presentation loss intentionally closes the observer-owned viewer.
+                    // Compare the independent snapshot bytes here; actual Battle-unload
+                    // lifetime is exercised by GameSceneFlowTests across all three stages.
+                    Assert.That(ReadVisualPixels(frozenVisual),
+                        Is.EqualTo(ReadVisualPixels((RenderTexture)paint.VisualPaintTexture)),
+                        "The completed copy must preserve the actual GPU pigment map.");
+                    Assert.That(ReadVisualPixels((RenderTexture)firstVisualPainter),
+                        Is.EqualTo(ReadVisualPixels((RenderTexture)paint.VisualPainterTexture)));
+                }
 
                 viewer.Ui.closeButton.onClick.Invoke();
                 Assert.That(viewer.IsOpen, Is.False);
@@ -159,6 +181,8 @@ namespace C6Lab.Tests
                 Assert.That(viewer.Ui.entryButton.gameObject.activeSelf, Is.True);
                 Assert.That(firstTexture == null, Is.True, "Close releases the owned render texture.");
                 Assert.That(firstPaint == null, Is.True, "Close releases the copied paint texture.");
+                Assert.That(firstVisualPaint == null, Is.True, "Close releases the independent pigment GPU copy.");
+                Assert.That(firstVisualPainter == null, Is.True, "Close releases the independent owner GPU copy.");
                 Assert.That(SceneCameraCount(), Is.EqualTo(cameraCount));
 
                 for (int iteration = 0; iteration < 2; iteration++)
@@ -343,6 +367,10 @@ namespace C6Lab.Tests
                 yield return null;
             Assert.That(network.LastShotReport, Does.StartWith("SHOT HIT"), "The result comes from a real Host collision.");
             Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
+            double finishDeadline = Time.realtimeSinceStartupAsDouble + 3d;
+            while (LabPaintFinishPresentation.DelayResult(network, network.Snapshot)
+                && Time.realtimeSinceStartupAsDouble < finishDeadline) yield return null;
+            Assert.That(LabPaintFinishPresentation.DelayResult(network, network.Snapshot), Is.False);
         }
 
         private static void AssertUnchangedResult(LabNetwork network, Color32[] pixels, uint revision,
@@ -358,6 +386,20 @@ namespace C6Lab.Tests
             Assert.That(network.Snapshot.playedSeconds, Is.EqualTo(result.playedSeconds));
             Assert.That(network.Snapshot.players.Select(player => player.hitTotal),
                 Is.EqualTo(result.players.Select(player => player.hitTotal)));
+        }
+
+        private static Color32[] ReadVisualPixels(RenderTexture texture)
+        {
+            RenderTexture previous = RenderTexture.active;
+            var image = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false, true);
+            try
+            {
+                RenderTexture.active = texture;
+                image.ReadPixels(new Rect(0, 0, texture.width, texture.height), 0, 0);
+                image.Apply(false, false);
+                return image.GetPixels32();
+            }
+            finally { RenderTexture.active = previous; Object.Destroy(image); }
         }
 
         private static void AssertRenderedModel(RenderTexture texture)
@@ -413,7 +455,6 @@ namespace C6Lab.Tests
             float[] values = result.CaptureDeveloperValues();
             values[104] = 0; values[105] = 100; values[106] = 4; values[107] = 6;
             values[110] = 1; values[137] = 1;
-            Set(values, "Gourd Mode (0 paint, 1 crack)", 0);
             Set(values, "Monster Max HP", 40);
             Set(values, "Damage per Hit", 20);
             Set(values, "Battle Duration (seconds)", 30);

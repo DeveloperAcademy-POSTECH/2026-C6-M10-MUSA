@@ -8,7 +8,7 @@ namespace C6Lab.Tests
     public sealed class LabDrumMinimapTests
     {
         [Test]
-        public void MeIsAtTheBottomAndTheRightNeighbourIsUpRightForEveryRoomSize()
+        public void MeIsAtTheBottomAndTheNextPIsUpLeftForEveryRoomSize()
         {
             for (int n = 2; n <= LabModel.MaximumParticipants; n++)
             {
@@ -16,8 +16,8 @@ namespace C6Lab.Tests
                 Assert.That(me.x, Is.EqualTo(0f).Within(1e-5f), n + " players: I am centred.");
                 Assert.That(me.y, Is.EqualTo(-1f).Within(1e-5f), n + " players: I am at the bottom.");
                 if (n < 3) continue;
-                Assert.That(LabDrumMinimap.UnitPosition(1, n).x, Is.GreaterThan(0f), n + " players: right neighbour is on the right.");
-                Assert.That(LabDrumMinimap.UnitPosition(n - 1, n).x, Is.LessThan(0f), n + " players: left neighbour is on the left.");
+                Assert.That(LabDrumMinimap.UnitPosition(1, n).x, Is.LessThan(0f), n + " players: the next P is on the left.");
+                Assert.That(LabDrumMinimap.UnitPosition(n - 1, n).x, Is.GreaterThan(0f), n + " players: the previous P is on the right.");
             }
             // 3인은 정삼각형: 위쪽 두 자리가 30°, 150°
             Assert.That(LabDrumMinimap.UnitPosition(1, 3).y, Is.EqualTo(.5f).Within(1e-5f));
@@ -42,8 +42,8 @@ namespace C6Lab.Tests
                 };
                 minimap.Rebuild(players, 20); // 나는 P2
                 Vector2 me = minimap.SeatPositions[20];
-                Vector2 right = minimap.SeatPositions[30]; // 다음 번호 = 오른쪽 이웃
-                Vector2 left = minimap.SeatPositions[10];  // 이전 번호 = 왼쪽 이웃
+                Vector2 right = minimap.SeatPositions[10]; // 이전 번호 = 오른쪽 이웃
+                Vector2 left = minimap.SeatPositions[30];  // 다음 번호 = 왼쪽 이웃
                 Assert.That(me.x, Is.EqualTo(0f).Within(.01f));
                 Assert.That(me.y, Is.LessThan(right.y));
                 Assert.That(right.x, Is.GreaterThan(0f));
@@ -161,7 +161,7 @@ namespace C6Lab.Tests
                 }
                 Assert.That(panel.Find("Content/Labels").childCount, Is.Zero,
                     "The supplied badges contain the number; a second label must not cover the drum.");
-                Assert.That(minimap.SeatPositions[50].x, Is.GreaterThan(minimap.SeatPositions[40].x));
+                Assert.That(minimap.SeatPositions[50].x, Is.LessThan(minimap.SeatPositions[40].x));
                 minimap.SyncDrums(new[] {
                     new LabOrbState { id = "a", owner = 20, kind = LabOrbKind.Drum },
                     new LabOrbState { id = "b", owner = 50, kind = LabOrbKind.Drum }

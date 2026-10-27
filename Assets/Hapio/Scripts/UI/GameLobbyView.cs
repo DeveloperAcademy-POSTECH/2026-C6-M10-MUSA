@@ -96,7 +96,11 @@ namespace Hapio
                 }
             }
             refreshButton.onClick.AddListener(() => Network.StartRoomSearch());
-            cancelButton.onClick.AddListener(() => { Network.CancelJoin(); Network.CancelRoomSearch(); });
+            cancelButton.onClick.AddListener(() =>
+            {
+                if (!session.CancelRoomCreation()) Network.CancelJoin();
+                Network.CancelRoomSearch();
+            });
             leaveButton.onClick.AddListener(() => session.GoHomeToRoomBrowser());
             sealButton.onClick.AddListener(() => session.StartGame());
             clearSlotButton.onClick.AddListener(() => session.SelectSlot(0));
@@ -110,7 +114,7 @@ namespace Hapio
                 int count = i + 2;
                 countButtons[i].onClick.AddListener(() =>
                 {
-                    if (!Network.CanChooseConnection || session.State.phase != GameFlowPhase.Home) return;
+                    if (session.IsCreatingRoom || !Network.CanChooseConnection || session.State.phase != GameFlowPhase.Home) return;
                     creationCapacity = count; localError = string.Empty;
                     Network.SetTargetParticipantCount(count);
                 });
@@ -128,15 +132,15 @@ namespace Hapio
         {
             SetModes(false);
             localError = string.Empty;
-            if (mode == GameMode.Territory) { session.CreatePendingRoom(LabTeams.Players, GameMode.Territory); return; }
+            if (mode == GameMode.Territory) { session.CreateAndEnterRoom(LabTeams.Players, GameMode.Territory); return; }
             if (creationCapacity < 2 || creationCapacity > 5) { localError = "기본 모드는 먼저 함께할 인원을 고르시오."; return; }
-            if (session.CreatePendingRoom(creationCapacity, GameMode.Story)) creationCapacity = 0;
+            if (session.CreateAndEnterRoom(creationCapacity, GameMode.Story)) creationCapacity = 0;
         }
 
         private void SetModes(bool visible)
         {
             if (modePanel == null) return;
-            if (visible && (session.State.phase != GameFlowPhase.Home || !Network.CanChooseConnection)) return;
+            if (visible && (session.IsCreatingRoom || session.State.phase != GameFlowPhase.Home || !Network.CanChooseConnection)) return;
             modePanel.SetActive(visible);
             if (!visible) return;
             modePanel.transform.SetAsLastSibling();
@@ -145,7 +149,7 @@ namespace Hapio
 
         private void EnterRoom(int index)
         {
-            if (index < 0 || index >= keys.Count) return;
+            if (session.IsCreatingRoom || index < 0 || index >= keys.Count) return;
             localError = string.Empty;
             string key = keys[index];
             if (session.PendingRooms.Any(room => room.Key == key)) session.EnterPendingRoom(key);
@@ -167,9 +171,11 @@ namespace Hapio
             browserPage.SetActive(browser); positionPage.SetActive(lobby);
             background.uvRect = LabLobbyView.BackgroundUv(home && !browser, background.rectTransform.rect.size);
             soloButton.gameObject.SetActive(home && Network.DeveloperBuildAvailable);
-            soloButton.interactable = home && Network.CanChooseConnection;
-            if (Network.IsConnected || Network.IsJoiningRoom) SetDirectConnection(false);
-            if (modePanel != null && modePanel.activeSelf && (!browser || !Network.CanChooseConnection)) SetModes(false);
+            soloButton.interactable = home && Network.CanChooseConnection && !session.IsCreatingRoom;
+            developerButton.interactable = !session.IsCreatingRoom
+                && (Network.CanChooseConnection || (Network.IsHost && Network.Snapshot == null));
+            if (Network.IsConnected || Network.IsJoiningRoom || session.IsCreatingRoom) SetDirectConnection(false);
+            if (modePanel != null && modePanel.activeSelf && (!browser || !Network.CanChooseConnection || session.IsCreatingRoom)) SetModes(false);
             if (browser) RefreshBrowser();
             else if (lobby) RefreshPositions();
             string notice = Network.IsJoiningRoom ? (Network.IsCancelingJoin ? "연결을 취소하고 있소..." : "방에 입장하고 있소...")
@@ -191,12 +197,12 @@ namespace Hapio
 
         private void RefreshBrowser()
         {
-            bool canChoose = Network.CanChooseConnection;
+            bool canChoose = Network.CanChooseConnection && !session.IsCreatingRoom;
             createButton.interactable = canChoose && (modePanel != null || creationCapacity >= 2);
             directConnectionButton.interactable = canChoose;
             refreshButton.interactable = canChoose;
-            refreshButton.gameObject.SetActive(!Network.IsJoiningRoom);
-            cancelButton.gameObject.SetActive(Network.IsJoiningRoom);
+            refreshButton.gameObject.SetActive(!Network.IsJoiningRoom && !session.IsCreatingRoom);
+            cancelButton.gameObject.SetActive(Network.IsJoiningRoom || session.IsCreatingRoom);
             cancelButton.interactable = !Network.IsCancelingJoin;
             for (int i = 0; i < countButtons.Length; i++)
             {
@@ -239,7 +245,7 @@ namespace Hapio
                     : !room.pending && room.waiting ? "방장 대기" : room.playing ? "봉인 중" : room.full ? "정원 마감" : "입장 →";
                 var label = rows[i].transform.Find("Action").GetComponent<UnityEngine.UI.Text>();
                 label.text = action; label.fontSize = action == "입장 →" ? 20 : 14;
-                rows[i].interactable = room.pending ? room.ready && canChoose : Network.CanJoinDiscoveredRoom(room.key);
+                rows[i].interactable = canChoose && (room.pending ? room.ready : Network.CanJoinDiscoveredRoom(room.key));
             }
             roomTemplate.gameObject.SetActive(false);
         }
@@ -305,7 +311,7 @@ namespace Hapio
 
         private void SetDirectConnection(bool visible)
         {
-            if (visible && (session.State.phase != GameFlowPhase.Home || !Network.CanChooseConnection)) return;
+            if (visible && (session.IsCreatingRoom || session.State.phase != GameFlowPhase.Home || !Network.CanChooseConnection)) return;
             directConnectionPanel.SetActive(visible);
             if (!visible) return;
             directConnectionPanel.transform.SetAsLastSibling();
@@ -316,7 +322,7 @@ namespace Hapio
 
         private void JoinDirect()
         {
-            if (session.State.phase != GameFlowPhase.Home || !Network.CanChooseConnection) return;
+            if (session.IsCreatingRoom || session.State.phase != GameFlowPhase.Home || !Network.CanChooseConnection) return;
             string address = directAddress.text.Trim();
             if (string.IsNullOrEmpty(address) || !ushort.TryParse(directPort.text, NumberStyles.Integer,
                 CultureInfo.InvariantCulture, out ushort port) || port == 0)

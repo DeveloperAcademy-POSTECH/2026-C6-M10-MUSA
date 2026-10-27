@@ -39,6 +39,22 @@ namespace C6Lab.Tests
             yield return null;
             LabSeatCamera seat = Object.FindFirstObjectByType<LabSeatCamera>();
             Assert.That(seat != null && seat.battleCamera != null, Is.True);
+            Rect viewport = seat.battleCamera.rect;
+            Assert.That(viewport.width, Is.GreaterThan(0f));
+            Assert.That(viewport.height, Is.GreaterThan(0f));
+            Assert.That(viewport.xMin, Is.GreaterThanOrEqualTo(0f));
+            Assert.That(viewport.yMin, Is.GreaterThanOrEqualTo(0f));
+            Assert.That(viewport.xMax, Is.LessThanOrEqualTo(1f));
+            Assert.That(viewport.yMax, Is.LessThanOrEqualTo(1f));
+            // The original-view comparison inherits its source camera's aspect. Editor GameView
+            // resizing otherwise letterboxes this 312x676 capture down to a few rows, turning the
+            // narrow Metal strands into sub-pixels. Use the actual authored battle viewport in a
+            // fixed portrait screen for this GPU test only; the live camera and comparison tool
+            // still keep the user's current aspect, field of view, layout and projectile physics.
+            float referenceAspect = (390f / 844f) * viewport.width / viewport.height;
+            Assert.That(float.IsNaN(referenceAspect) || float.IsInfinity(referenceAspect), Is.False);
+            Assert.That(referenceAspect, Is.GreaterThan(0f));
+            TestContext.WriteLine($"ELEMENT_TRAIL_REFERENCE sourceAspect={seat.battleCamera.aspect:F4} referenceAspect={referenceAspect:F4} viewport={viewport}");
             foreach (int view in new[] { 0, 1, 2, 3 })
             {
                 bool side = view == 1;
@@ -46,10 +62,22 @@ namespace C6Lab.Tests
                 bool closeUp = view >= 2;
                 IDisposable session = null;
                 Texture2D sheet = null, ink = null;
+                GameObject referenceCameraObject = null;
                 try
                 {
+                    referenceCameraObject = new GameObject("Element trail GPU reference camera")
+                        { hideFlags = HideFlags.HideAndDontSave };
+                    Camera referenceCamera = referenceCameraObject.AddComponent<Camera>();
+                    referenceCamera.CopyFrom(seat.battleCamera);
+                    referenceCamera.transform.SetPositionAndRotation(seat.battleCamera.transform.position,
+                        seat.battleCamera.transform.rotation);
+                    referenceCamera.enabled = false;
+                    referenceCamera.tag = "Untagged";
+                    referenceCamera.aspect = referenceAspect;
+                    Assert.That(referenceCamera.rect, Is.EqualTo(viewport));
+                    Assert.That(referenceCamera.fieldOfView, Is.EqualTo(seat.battleCamera.fieldOfView));
                     session = (IDisposable)Activator.CreateInstance(type,
-                        new object[] { seat.config, seat.battleCamera, side, shortFlight, closeUp });
+                        new object[] { seat.config, referenceCamera, side, shortFlight, closeUp });
                     start.Invoke(session, null);
                     float began = Time.time;
                     while (Time.time - began < (shortFlight ? .14f : .34f)) yield return null;
@@ -97,6 +125,7 @@ namespace C6Lab.Tests
                     if (sheet != null) Object.Destroy(sheet);
                     if (ink != null) Object.Destroy(ink);
                     session?.Dispose();
+                    if (referenceCameraObject != null) Object.Destroy(referenceCameraObject);
                 }
                 yield return null;
                 Assert.That(Object.FindObjectsByType<LabProjectile>(FindObjectsSortMode.None)

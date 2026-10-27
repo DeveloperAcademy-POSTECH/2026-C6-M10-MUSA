@@ -174,7 +174,7 @@ namespace Hapio.Editor
         }
 
         /// <summary>
-        /// Append only the new DEV rows (#281: 2:2 territory 196-199) to Home and Lobby. Unlike the Lab upgrade
+        /// Append only the new DEV rows (#281: 2:2 territory 196-199, #301: flash shake release 202-203; #305: charm warning 204) to Home and Lobby. Unlike the Lab upgrade
         /// above, this never copies Battle again, so Battle-only edits and the lobby layout stay as they are.
         /// </summary>
         [MenuItem("Hapio/Upgrade Menu DEV Rows")]
@@ -190,6 +190,48 @@ namespace Hapio.Editor
         {
             UpgradeScene(GameScenePaths.Home, UpgradeDeveloperRows);
             UpgradeScene(GameScenePaths.Lobby, UpgradeDeveloperRows);
+        }
+
+        /// <summary>
+        /// Append newly introduced settings only. Existing input values, labels, fonts and
+        /// RectTransforms are left untouched; useful when upgrading an authored lobby (#299).
+        /// </summary>
+        public static void AppendMenuDeveloperRows()
+        {
+            UpgradeScene(GameScenePaths.Home, AppendDeveloperRows);
+            UpgradeScene(GameScenePaths.Lobby, AppendDeveloperRows);
+        }
+
+        private static void AppendDeveloperRows(Scene scene)
+        {
+            GameScreen screen = Find<GameScreen>(scene);
+            if (screen == null || screen.developerPanel == null)
+                throw new InvalidOperationException("The saved menu DEV panel is missing.");
+            var scroll = screen.developerPanel.GetComponentInChildren<UnityEngine.UI.ScrollRect>(true);
+            if (scroll == null || scroll.content == null)
+                throw new InvalidOperationException("The saved menu DEV settings scroll is missing.");
+            int count = LabConfig.DeveloperFields.Count;
+            int existing = screen.developerInputs == null ? 0 : screen.developerInputs.Length;
+            if (existing == 0 || existing > count || screen.developerSliders == null
+                || screen.developerSliders.Length != existing)
+                throw new InvalidOperationException("The saved DEV controls have an incompatible schema.");
+            for (int i = 0; i < existing; i++)
+                if (screen.developerInputs[i] == null || screen.developerSliders[i] == null
+                    || screen.developerInputs[i].transform.parent != screen.developerSliders[i].transform.parent
+                    || screen.developerInputs[i].transform.parent.parent != scroll.content)
+                    throw new InvalidOperationException("The saved DEV row is incomplete: " + i);
+            if (existing == count) return;
+            var source = AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset");
+            if (source == null) throw new InvalidOperationException("The saved LabConfig is missing.");
+            float[] values = source.CaptureDeveloperValues();
+            Array.Resize(ref screen.developerInputs, count);
+            Array.Resize(ref screen.developerSliders, count);
+            for (int i = existing; i < count; i++)
+            {
+                CreateDeveloperRow(screen, scroll.content, i, values[i]);
+                screen.developerInputs[i].transform.parent.gameObject.SetActive(GameStageSettings.IsFieldVisible(0, i));
+            }
+            EditorUtility.SetDirty(screen);
         }
 
         private static void UpgradeDeveloperRows(Scene scene)

@@ -28,6 +28,10 @@ namespace C6Lab
         public ulong charmedPlayer;
         public double charmStartedAt = -1d, charmUntil = -1d;
         public int charmTaps;
+        /// <summary>The charm warning and each neighbour's rescue taps (#305).</summary>
+        public double charmWarnedAt = -1d;
+        public ulong[] charmHelpers = Array.Empty<ulong>();
+        public int[] charmHelperTaps = Array.Empty<int>();
         /// <summary>2:2 땅따먹기 (#281)의 팀 피버도 헤더로 보내 피버가 모든 화면에서 바로 시작되게 한다.</summary>
         public int blueFeverHits, redFeverHits;
         public double blueFeverStartedAt = -1d, blueFeverUntil = -1d, redFeverStartedAt = -1d, redFeverUntil = -1d;
@@ -116,7 +120,8 @@ namespace C6Lab
                 swipeBlockedPlayer = snapshot.swipeBlockedPlayer, swipeBlockedRight = snapshot.swipeBlockedRight,
                 swipeBlockStartedAt = snapshot.swipeBlockStartedAt, swipeBlockedUntil = snapshot.swipeBlockedUntil,
                 charmedPlayer = snapshot.charmedPlayer, charmStartedAt = snapshot.charmStartedAt,
-                charmUntil = snapshot.charmUntil, charmTaps = snapshot.charmTaps,
+                charmUntil = snapshot.charmUntil, charmTaps = snapshot.charmTaps, charmWarnedAt = snapshot.charmWarnedAt,
+                charmHelpers = CopyArray(snapshot.charmHelpers), charmHelperTaps = CopyArray(snapshot.charmHelperTaps),
                 blueFeverHits = snapshot.blueFeverHits, redFeverHits = snapshot.redFeverHits,
                 blueFeverStartedAt = snapshot.blueFeverStartedAt, blueFeverUntil = snapshot.blueFeverUntil,
                 redFeverStartedAt = snapshot.redFeverStartedAt, redFeverUntil = snapshot.redFeverUntil,
@@ -157,6 +162,7 @@ namespace C6Lab
 
         internal static LabPlayerState[] CopyPlayers(LabPlayerState[] players) =>
             (players ?? Array.Empty<LabPlayerState>()).Select(player => player?.Copy()).ToArray();
+        internal static T[] CopyArray<T>(T[] values) => values == null ? Array.Empty<T>() : (T[])values.Clone();
     }
 
     /// <summary>
@@ -287,6 +293,9 @@ namespace C6Lab
                 copy.swipeBlockStartedAt = header.swipeBlockStartedAt; copy.swipeBlockedUntil = header.swipeBlockedUntil;
                 copy.charmedPlayer = header.charmedPlayer; copy.charmStartedAt = header.charmStartedAt;
                 copy.charmUntil = header.charmUntil; copy.charmTaps = header.charmTaps;
+                copy.charmWarnedAt = header.charmWarnedAt;
+                copy.charmHelpers = LabBoardPublisher.CopyArray(header.charmHelpers);
+                copy.charmHelperTaps = LabBoardPublisher.CopyArray(header.charmHelperTaps);
                 copy.blueFeverHits = header.blueFeverHits; copy.redFeverHits = header.redFeverHits;
                 copy.blueFeverStartedAt = header.blueFeverStartedAt; copy.blueFeverUntil = header.blueFeverUntil;
                 copy.redFeverStartedAt = header.redFeverStartedAt; copy.redFeverUntil = header.redFeverUntil;
@@ -362,6 +371,7 @@ namespace C6Lab
             && frame.phase >= LabPhase.Idle && frame.phase <= LabPhase.Defeat
             && Finite(frame.swipeBlockStartedAt) && Finite(frame.swipeBlockedUntil)
             && Finite(frame.charmStartedAt) && Finite(frame.charmUntil) && frame.charmTaps >= 0
+            && Finite(frame.charmWarnedAt) && ValidCharmHelpers(frame.charmHelpers, frame.charmHelperTaps)
             && frame.blueFeverHits >= 0 && frame.redFeverHits >= 0
             && Finite(frame.blueFeverStartedAt) && Finite(frame.blueFeverUntil)
             && Finite(frame.redFeverStartedAt) && Finite(frame.redFeverUntil)
@@ -410,13 +420,16 @@ namespace C6Lab
             return values.All(player => player != null && ids.Add(player.id) && player.seat >= 0
                 && player.seat < MaximumPlayers && seats.Add(player.seat) && player.personalHp >= 0
                 && Finite(player.stamina) && player.stamina >= 0f && Finite(player.drumSeconds)
-                && Finite(player.comboPenaltyUntil) && Finite(player.comboRewardUntil));
+                && Finite(player.comboPenaltyUntil) && Finite(player.comboRewardUntil) && Finite(player.flashReleasedAt));
         }
 
         private static bool ValidId(string id) => !string.IsNullOrWhiteSpace(id) && id.Length <= 128;
         private static bool Unit(float value) => Finite(value) && value >= 0f && value <= 1f;
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
         private static bool Reject(string value, out string reason) { reason = value; return false; }
+        // At most the two players beside the charmed one, each with a tap count of its own (#305).
+        private static bool ValidCharmHelpers(ulong[] helpers, int[] taps) => (helpers?.Length ?? 0) == (taps?.Length ?? 0)
+            && (helpers?.Length ?? 0) <= 2 && (taps ?? Array.Empty<int>()).All(count => count >= 0);
 
         public static LabSnapshot CopySnapshot(LabSnapshot source) => new LabSnapshot
         {
@@ -432,6 +445,8 @@ namespace C6Lab
             swipeBlockedRight = source.swipeBlockedRight, swipeBlockStartedAt = source.swipeBlockStartedAt,
             swipeBlockedUntil = source.swipeBlockedUntil, charmedPlayer = source.charmedPlayer,
             charmStartedAt = source.charmStartedAt, charmUntil = source.charmUntil, charmTaps = source.charmTaps,
+            charmWarnedAt = source.charmWarnedAt, charmHelpers = LabBoardPublisher.CopyArray(source.charmHelpers),
+            charmHelperTaps = LabBoardPublisher.CopyArray(source.charmHelperTaps),
             teamTerritory = source.teamTerritory, blueCells = source.blueCells, redCells = source.redCells,
             teamWinner = source.teamWinner, blueFeverHits = source.blueFeverHits, redFeverHits = source.redFeverHits,
             blueFeverStartedAt = source.blueFeverStartedAt, blueFeverUntil = source.blueFeverUntil,

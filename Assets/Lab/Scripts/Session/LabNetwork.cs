@@ -43,6 +43,8 @@ namespace C6Lab
         /// <summary>Why a transferred body crossed its edge (LabEdgeCrossingKind).</summary>
         public int crossing;
         public uint round;
+        /// <summary>Exact flash generation for a shake-release request; zero is not a valid request.</summary>
+        public uint flashGeneration;
         public int damage;
         public int impactValue;
         public float paintX, paintY, paintZ;
@@ -202,13 +204,17 @@ namespace C6Lab
         // 5661: #278 immutable Lab/Game Bonjour identity before pending-room activation.
         // 5662: #281 2:2 team territory (DEV 196-199, 200 shared values): team cells, winner and fever in the
         //       snapshot, fever in the board header, team-edge handoffs and territory overwrite paint.
-        internal const ushort LabProtocolVersion = 5662;
+        // 5663: #299 bounded paint visual descriptors in the same paint commit; DEV200-201 (202 values).
+        // 5664: standalone #301/#305 used different shared layouts with the same version.
+        // 5665: combined flash shake DEV202-203 + charm warning DEV204 (205 values),
+        //       flash release state and each neighbor's charm rescue progress.
+        internal const ushort LabProtocolVersion = 5666;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/23");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/27");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -309,7 +315,7 @@ namespace C6Lab
 
         public event Action Changed;
         public event Action<LabConfig> ConfigApplied;
-        /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (승인 명중값: Paint 명목 공격 점수 / Crack 실제 피해량)</summary>
+        /// <summary>내가 던진 구슬이 요괴에 맞았다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다. (승인 명중값: 페인트 명목 공격 점수)</summary>
         public event Action<int> LocalThrowHit;
         /// <summary>
         /// 마지막으로 내 구슬이 맞은 자리가 박 중심에서 얼마나 옆으로 벗어났는지 (0 = 정중앙, 1 = 가장자리를 스침).
@@ -405,17 +411,18 @@ namespace C6Lab
             && playerSlots != null && playerSlots.IsComplete(order) && SessionConfigReady
             && (latest == null || latest.phase != LabPhase.Playing);
         public bool IsBattlePaused => latest != null && latest.phase == LabPhase.Playing && latest.paused;
-        public bool CanPauseBattle => IsConnected && latest != null && latest.phase == LabPhase.Playing
+        public bool CanPauseBattle => !GameStartHeld && IsConnected && latest != null && latest.phase == LabPhase.Playing
             && !latest.paused && !pauseRequestPending
             && (IsHost ? model != null && !battleClock.IsPaused : clientConfigReady);
-        public bool CanResumeBattle => IsHost && model != null && model.Phase == LabPhase.Playing
+        public bool CanResumeBattle => !GameStartHeld && IsHost && model != null && model.Phase == LabPhase.Playing
             && battleClock.IsPaused;
         public bool CanReturnAllToLobby => IsHost && !developerSolo && model != null;
-        public bool CanRestartSharedBattle => DeveloperBuildAvailable && CanReturnAllToLobby
+        public bool CanRestartSharedBattle => !GameStartHeld && DeveloperBuildAvailable && CanReturnAllToLobby
             && model.Phase == LabPhase.Playing && battleClock.IsPaused;
 
         private void Awake()
         {
+            LabMobilePresentationPolicy.Attach(this);
             // GameSession (-1000) can prepare its initial runtime profile before this Awake.
             // Retain the original saved asset if that early installation already captured it.
             if (sourceConfig == null) sourceConfig = config;
@@ -942,8 +949,10 @@ namespace C6Lab
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             ulong[] playersInPOrder = playerSlots.PlayersInSlotOrder();
-            model.Begin(sessionId, playersInPOrder, Time.realtimeSinceStartupAsDouble, config,
+            double beginAt = Time.realtimeSinceStartupAsDouble;
+            model.Begin(sessionId, playersInPOrder, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
+            if (GameStartHeld) battleClock.Pause(beginAt);
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
@@ -1022,8 +1031,10 @@ namespace C6Lab
             ConfigureTargetSpin();
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
-            model.BeginSolo(sessionId, LocalPlayerId, Time.realtimeSinceStartupAsDouble, config,
+            double beginAt = Time.realtimeSinceStartupAsDouble;
+            model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
+            if (GameStartHeld) battleClock.Pause(beginAt);
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
@@ -1042,7 +1053,7 @@ namespace C6Lab
         /// <summary>Ask the Host to generate from this drum at the position this screen shows now.</summary>
         public void Generate(string drumId)
         {
-            if (!IsConnected || latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
+            if (!CanProcessBattleActions || !IsConnected || latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
             LabOrbState drum = Array.Find(latest.drums ?? Array.Empty<LabOrbState>(),
                 candidate => candidate.id == drumId && candidate.owner == LocalPlayerId);
             if (drum == null) return;
@@ -1152,6 +1163,7 @@ namespace C6Lab
 
         private void EndBattleToLobby()
         {
+            ResetGameStartHold();
             pendingDeveloperRestart = false;
             ResetActionTransport();
             pauseRequestIds.Clear();
@@ -1273,6 +1285,7 @@ namespace C6Lab
             }
             if (joinInProgress && !joinRetryPending && !joinFinishPending && joinAttemptAt > 0
                 && now - joinAttemptAt >= JoinAttemptSeconds) AdvanceJoinCandidate();
+            ApplyGameStartSimulationHold();
             if (IsHost && model != null && !gameBattleFrozen)
             {
                 SampleHostPaintFlow(battleClock.Now(now));
@@ -1288,7 +1301,7 @@ namespace C6Lab
             if (!IsHost && (pendingPaintSnapshot != null || PaintReceiver.HasPending)
                 && now >= nextPaintRequestAt) RequestPaintCheckpoint();
             // Command-line smoke mode is intentionally separate from ordinary UI play.
-            if (IsConnected && latest != null && latest.phase == LabPhase.Playing && !latest.paused)
+            if (CanProcessBattleActions && IsConnected && latest != null && latest.phase == LabPhase.Playing && !latest.paused)
             {
                 if (autoGenerate && autoGeneratedSession != latest.sessionId)
                 {
@@ -1542,7 +1555,7 @@ namespace C6Lab
                 latest.targetRopeHitOffset = hanging.VerticalOffset;
                 latest.targetRopeHitVelocity = hanging.VerticalVelocity;
             }
-            latest.paused = battleClock.IsPaused && latest.phase == LabPhase.Playing;
+            latest.paused = battleClock.IsPaused && !GameStartHeld && latest.phase == LabPhase.Playing;
             AnnounceBombExplosions();
             AnnounceOrbExpiries();
             AnnounceGourdBombs();
@@ -1746,7 +1759,9 @@ namespace C6Lab
 
         private void HandleRequest(ulong sender, LabNetworkPacket packet)
         {
-            if (!IsHost || model == null || packet == null || !order.Contains(sender) || !CanProcessBattleActions) return;
+            if (!IsHost || model == null || packet == null || !order.Contains(sender)) return;
+            // Recovery remains legal during start synchronization; game actions do not.
+            if (!CanProcessBattleActions && !(GameStartHeld && packet.type == "board_checkpoint")) return;
             if (IsBoardAction(packet.type)) { HandleBoardAction(sender, packet); return; }
             if (packet.sessionId != sessionId || packet.round != model.Round) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
@@ -1773,6 +1788,13 @@ namespace C6Lab
                     && packet.requestId <= previous)) return;
                 pauseRequestIds[sender] = packet.requestId;
                 PauseAsHost();
+                return;
+            }
+            if (packet.type == FlashShakePacket)
+            {
+                // 야광귀 섬광 (#301): 폰을 다 흔든 사람의 눈부심만 푼다. 눈부시지 않으면 무시한다.
+                if (battleClock.IsPaused || packet.requestId < 1) return;
+                if (model.TryFlashShakeRelease(sender, packet.flashGeneration, now)) PublishSnapshot(true);
                 return;
             }
             if (packet.type == "charmTap")
@@ -1804,7 +1826,7 @@ namespace C6Lab
             seat = LabTeams.RingSeatFor(latest, seat);
             Vector3 targetCenter = target.transform.position;
             Vector3 seatAnchor = LabThrowMath.SeatPosition(seat, seatCount, targetCenter,
-                config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
+                config.ThrowOriginRadius, config.ThrowOriginHeightOffset, !LabTeams.FourPlayerTeams(latest));
             Vector3 launchPosition = LabThrowMath.LaunchPosition(seat, seatCount, targetCenter, releaseX01, config);
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
             // A blast-shrunk orb flies small and so has less reach on the gourd (#213).
@@ -1870,7 +1892,7 @@ namespace C6Lab
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
                     target.NotifyApprovedHit(targetLocalPoint, element);
                     impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
-                        result.ImpactVelocity, config == null || config.GourdMode == LabGourdMode.Crack);
+                        result.ImpactVelocity, false);
                     if (result.OwnerPlayerId == LocalPlayerId)
                     {
                         LastLocalHitOffset = LabThrowSound.HitOffset(targetLocalPoint,
@@ -1913,6 +1935,7 @@ namespace C6Lab
 
         private void SyncBoard()
         {
+            ApplyGameStartSimulationHold();
             SyncJigwiFireSurfaces();
             if (board == null || latest == null) return;
             var current = new HashSet<string>();
@@ -1952,7 +1975,7 @@ namespace C6Lab
                 if (!current.Contains(id) && !board.ShouldPreserveFromSnapshot(id)) board.RemoveOrb(id);
             visibleOrbIds.Clear();
             foreach (string id in current) visibleOrbIds.Add(id);
-            board.SetInteractionEnabled(!gameBattleFrozen && latest.phase == LabPhase.Playing && !latest.paused
+            board.SetInteractionEnabled(CanProcessBattleActions && latest.phase == LabPhase.Playing && !latest.paused
                 && (IsHost || !boardReplica.NeedsCheckpoint
                     && (boardReplica.LatestSequence == 0 || boardReplica.InteractionAllowed)));
             // The gourd's swipe block (#215) shows and bounces only on the blocked player's own board.
@@ -2197,7 +2220,7 @@ namespace C6Lab
                         impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
                             (LabOrbElement)packet.element, packet.damage,
                             new Vector3(packet.wx, packet.wy, packet.wz),
-                            config == null || config.GourdMode == LabGourdMode.Crack);
+                            false);
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
                         if (packet.owner == LocalPlayerId)
                         {
@@ -2365,7 +2388,6 @@ namespace C6Lab
         {
             // A newer matched transaction supersedes any older snapshot waiting for recovery.
             pendingPaintSnapshot = null;
-            CopyPaintToDisplay(receivedPaintSurface, snapshot);
             bool logTransition = latest == null || latest.sessionId != snapshot.sessionId
                 || latest.phase != snapshot.phase || latest.paused != snapshot.paused;
             if (sessionId != snapshot.sessionId || latest == null || latest.round != snapshot.round)
@@ -2377,6 +2399,8 @@ namespace C6Lab
             latest = snapshot;
             LabBoardFrame deferred = deferredBoardFrame;
             EnsureActionRound();
+            // EnsureActionRound retires old display identity: install this atomic map afterwards.
+            CopyPaintToDisplay(receivedPaintSurface, snapshot);
             if (!IsHost) latest = boardReplica.Overlay(latest);
             if (deferred != null && deferred.sessionId == snapshot.sessionId && deferred.round == snapshot.round)
                 ReceiveBoardFrame(deferred);
@@ -2403,19 +2427,23 @@ namespace C6Lab
                 + " remaining=" + latest.remaining.ToString("F1") + " orbs=" + (latest.orbs?.Length ?? 0));
         }
 
+        private uint displayedPaintVisualVersion;
+
         private void CopyPaintToDisplay(LabPaintSurface source, LabSnapshot snapshot)
         {
             if (displayedPaintSession == snapshot.sessionId && displayedPaintRound == snapshot.round
                 && displayedPaintRevision == source.Revision && displayedPaintCount == snapshot.paintCount
+                && displayedPaintVisualVersion == source.VisualVersion
                 && clientPaintSurface.Columns == source.Columns && clientPaintSurface.Rows == source.Rows) return;
             var pixels = new Color32[source.CellCount];
             var painters = new byte[source.CellCount];
             source.CopyPixels(pixels);
             source.CopyPainterSlots(painters);
-            if (!clientPaintSurface.TryReplacePixels(source.Columns, source.Rows, source.Revision, pixels, painters, snapshot.paintCount))
+            if (!clientPaintSurface.TryReplacePixels(source.Columns, source.Rows, source.Revision, pixels, painters, snapshot.paintCount, source.CopyVisualStamps()))
                 throw new InvalidOperationException("Invalid authoritative paint display state.");
             displayedPaintSession = snapshot.sessionId; displayedPaintRound = snapshot.round;
             displayedPaintRevision = source.Revision; displayedPaintCount = snapshot.paintCount;
+            displayedPaintVisualVersion = source.VisualVersion;
         }
 
         private bool SendPaintFrames(ulong receiver, LabPaintFrame[] frames)
@@ -2533,6 +2561,7 @@ namespace C6Lab
         private void ResetLocal()
         {
             clientSessionConnected = false;
+            ResetGameStartHold();
             gameBattleFrozen = false;
             gameRosterLocked = false;
             gameStageIndex = 0; gameStageId = null; gameStageYokai = LabStageYokai.None;

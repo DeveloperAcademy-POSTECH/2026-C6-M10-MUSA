@@ -78,10 +78,7 @@ namespace C6Lab.Tests
             Assert.That(paint.target.Hitbox.GetComponent<MeshRenderer>().enabled, Is.False);
             Assert.That(paint.VisualInstance.GetComponentsInChildren<Collider>(true), Is.Empty);
             Assert.That(paint.VisualInstance.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
-            Assert.That(paint.target.GetComponent<LabGourdCrack>().enabled, Is.False);
-            Assert.That(paint.target.GetComponent<LabGourdFinish>().enabled, Is.False);
-            Assert.That(LabGourdFinish.DelayVictory(paint.network,
-                new LabSnapshot { sessionId = "paint", round = 1, phase = LabPhase.Victory }), Is.False);
+            Assert.That(paint.target.GetComponent<LabPaintFinishPresentation>(), Is.Not.Null);
             Assert.That(paint.PaintCount, Is.Zero);
             Assert.That(paint.PaintTexture.width, Is.EqualTo(LabPaintSurface.Width));
             Assert.That(paint.PaintTexture.height, Is.EqualTo(LabPaintSurface.Height));
@@ -306,7 +303,7 @@ namespace C6Lab.Tests
                 Assert.That(network.Snapshot.paintCoverage, Is.GreaterThan(0f));
                 Assert.That(network.Snapshot.paintGoalPercent, Is.EqualTo(100));
                 Assert.That(network.Snapshot.paintCoverage, Is.LessThan(1f));
-                Assert.That(LabGourdFinish.DelayVictory(network, network.Snapshot), Is.False);
+                Assert.That(LabPaintFinishPresentation.DelayResult(network, network.Snapshot), Is.False);
                 Assert.That(hud.resultControls.activeSelf, Is.False);
                 Assert.That(paint.VisualInstance.activeSelf, Is.True);
                 Assert.That(network.target.VisualMount.Find("Gourd Left Half"), Is.Null);
@@ -479,11 +476,26 @@ namespace C6Lab.Tests
                     Assert.That(network.Snapshot.players.Single().lastHit, Is.True);
                     yield return null;
                     AssertTextureMatches(network.PaintSurface, paint);
+                    var finish = paint.target.GetComponent<LabPaintFinishPresentation>();
+                    Assert.That(finish, Is.Not.Null);
+                    Assert.That(hud.resultControls.activeInHierarchy, Is.False, "The result waits for the bounded paint-complete presentation.");
+                    float scaleBefore = Time.timeScale;
+                    Mesh colliderBefore = network.target.Hitbox.sharedMesh;
+                    int hitsBefore = network.Snapshot.players.Single().hitTotal;
+                    uint paintBefore = network.PaintSurface.Revision;
+                    double finishDeadline = Time.realtimeSinceStartupAsDouble + 3d;
+                    while (!finish.Complete && Time.realtimeSinceStartupAsDouble < finishDeadline) yield return null;
+                    yield return null;
+                    Assert.That(finish.Complete, Is.True);
+                    Assert.That(Time.timeScale, Is.EqualTo(scaleBefore));
+                    Assert.That(network.target.Hitbox.sharedMesh, Is.SameAs(colliderBefore));
+                    Assert.That(network.PaintSurface.Revision, Is.EqualTo(paintBefore));
+                    Assert.That(network.Snapshot.players.Single().hitTotal, Is.EqualTo(hitsBefore));
                     Assert.That(hud.resultControls.activeInHierarchy, Is.True);
                     Assert.That(hud.resultStatusText.text, Is.EqualTo("VICTORY"));
                     Assert.That(hud.hpText.text, Is.EqualTo(LabHud.FormatPaintPercentage(network.Snapshot)));
                     Assert.That(hud.yokaiHpFill.fillAmount, Is.EqualTo(1f));
-                    Assert.That(LabGourdFinish.DelayVictory(network, network.Snapshot), Is.False);
+                    Assert.That(LabPaintFinishPresentation.DelayResult(network, network.Snapshot), Is.False);
                     CaptureBattle(network, "growth-hundred-percent-victory.png");
                     network.LocalThrowHit -= onHit;
                     onHit = null;
@@ -569,203 +581,32 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator DeveloperSliderAppliesModesToFreshSoloRoundsAndDoesNotRemountUnchangedMode()
+        public IEnumerator ReservedGourdSlotCannotDisablePaintOrChangeSourceSettings()
         {
-            yield return this.fixture.Load();
+            yield return fixture.Load();
             LabDeveloperMode ui = SavedDeveloperUi();
             LabNetwork network = ui.network;
             LabGourdPaint paint = network.target.GetComponent<LabGourdPaint>();
-            LabGourdCrack crack = network.target.GetComponent<LabGourdCrack>();
-            LabGourdFinish finish = network.target.GetComponent<LabGourdFinish>();
-            float[] savedValues = ui.sourceConfig.CaptureDeveloperValues();
-            this.fixture.UseAvailablePort(network);
-            int modeIndex = FieldIndex("Gourd Mode (0 paint, 1 crack)");
+            float[] saved = ui.sourceConfig.CaptureDeveloperValues();
+            fixture.UseAvailablePort(network);
             try
             {
-                Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
-                Assert.That(paint.IsReady, Is.True, paint.InitializationError);
-                LabHud savedHud = Object.FindFirstObjectByType<LabHud>();
-                UnityEngine.UI.Text title = savedHud.hpText.transform.parent.Find("TitleMask/Title")
-                    .GetComponent<UnityEngine.UI.Text>();
-                Assert.That(title.text, Is.EqualTo("GOAL"));
-                GameObject initialWhite = paint.VisualInstance;
-                Assert.That(LabGourdPaint.Attach(network), Is.SameAs(paint));
-                paint.ApplyMode();
-                Assert.That(paint.VisualInstance, Is.SameAs(initialWhite), "Repeated attachment cannot duplicate a ready visual.");
-                Assert.That(network.target.GetComponents<LabGourdPaint>().Length, Is.EqualTo(1));
-
                 ui.Open();
-                Assert.That(ui.valueInputs.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
-                Assert.That(ui.valueSliders.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
-                Assert.That(ui.valueSliders[modeIndex], Is.Not.Null);
-                ui.valueSliders[modeIndex].value = 1f;
-                Assert.That(ui.valueInputs[modeIndex].text, Is.EqualTo("1"));
-                Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Paint), "Changing a form control alone cannot change the running config.");
-                Assert.That(paint.VisualInstance, Is.SameAs(initialWhite));
+                Assert.That(ui.valueInputs[79].transform.parent.gameObject.activeSelf, Is.False);
+                ui.valueInputs[79].text = "1";
                 ui.ApplyAndStart();
                 yield return null;
+                Assert.That(network.IsConnected, Is.False, "A retired mode value is rejected before the session changes.");
+                ui.valueInputs[79].text = "0";
+                ui.ApplyAndStart();
                 yield return null;
                 Assert.That(network.IsDeveloperSolo, Is.True, ui.feedbackText.text);
-                Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
-                Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
-                Assert.That(crack.IsReady, Is.True, crack.InitializationError);
-                Assert.That(crack.enabled && finish.enabled, Is.True);
-                Assert.That(title.text, Is.EqualTo("YOKAI HP"));
-                Assert.That(paint.enabled, Is.False);
-                Assert.That(paint.Shell, Is.Null);
-                Assert.That(paint.PaintCount, Is.Zero);
-                Assert.That(initialWhite == null, Is.True, "The previous owned white visual is removed after the frame.");
-                GameObject intact = crack.VisualInstance;
-                paint.ApplyMode();
-                paint.ApplyMode();
-                Assert.That(crack.VisualInstance, Is.SameAs(intact), "Reapplying an unchanged crack mode must not mount another model.");
-                network.target.NotifyApprovedHit(Vector3.forward, LabOrbElement.Fire);
-                Assert.That(paint.PaintCount, Is.Zero, "The disabled paint presentation must not listen in crack mode.");
-                CaptureBattle(network, "dev-crack-mode.png");
-
-                string crackSession = network.Snapshot.sessionId;
-                float runningTimeScale = Time.timeScale;
-                Assert.That(network.PauseBattle(), Is.True);
-                Assert.That(network.IsBattlePaused, Is.True);
-                ui.Open();
-                SetInput(ui, "Gourd Mode (0 paint, 1 crack)", "0");
-                Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
-                ui.ApplyAndStart();
-                yield return null;
-                yield return null;
-                Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
-                Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(crackSession));
-                Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
-                Assert.That(network.IsBattlePaused, Is.False);
-                Assert.That(Time.timeScale, Is.EqualTo(runningTimeScale));
+                Assert.That(network.config.CaptureDeveloperValues()[79], Is.Zero);
                 Assert.That(paint.IsReady, Is.True, paint.InitializationError);
-                Assert.That(crack.enabled || finish.enabled, Is.False);
-                Assert.That(title.text, Is.EqualTo("GOAL"));
-                Assert.That(intact == null, Is.True, "Crack's owned model must be released before paint mounts.");
-                Assert.That(paint.PaintCount, Is.Zero);
-                network.target.NotifyApprovedHit(Vector3.forward, LabOrbElement.Water);
-                Assert.That(paint.PaintCount, Is.Zero, "Connected direct events only refresh the accepted map.");
-                GameObject newWhite = paint.VisualInstance;
-                paint.ApplyMode();
-                Assert.That(paint.InitializePresentation(), Is.True);
-                Assert.That(paint.VisualInstance, Is.SameAs(newWhite));
-                Assert.That(paint.PaintCount, Is.Zero, "Idempotent initialization cannot inject a mark into the round.");
-
-                // Same-mode DEV restart is a new round and must erase its old marks.
-                string paintSession = network.Snapshot.sessionId;
-                ui.Open();
-                ui.ApplyAndStart();
-                yield return null;
-                Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(paintSession));
-                Assert.That(paint.PaintCount, Is.Zero);
-                Assert.That(network.target.VisualMount.Find("Gourd Left Half"), Is.Null);
-                Assert.That(network.target.VisualMount.Find("Small Yokai Spirit"), Is.Null);
-                Assert.That(ui.sourceConfig.CaptureDeveloperValues(), Is.EqualTo(savedValues), "DEV mode changes must leave the saved config asset untouched.");
-            }
-            finally
-            {
-                if (network.IsConnected) network.Stop();
-            }
-        }
-
-        [UnityTest]
-        public IEnumerator DeveloperRoomCreationAndLobbyRetuningApplyTheHostGourdMode()
-        {
-            yield return this.fixture.Load();
-            LabDeveloperMode ui = SavedDeveloperUi();
-            LabNetwork network = ui.network;
-            LabGourdPaint paint = network.target.GetComponent<LabGourdPaint>();
-            LabGourdCrack crack = network.target.GetComponent<LabGourdCrack>();
-            float[] savedValues = ui.sourceConfig.CaptureDeveloperValues();
-            this.fixture.UseAvailablePort(network);
-            try
-            {
-                ui.Open();
-                ui.targetParticipantsSlider.value = 2f;
-                SetInput(ui, "Gourd Mode (0 paint, 1 crack)", "1");
-                ui.ApplyAndHost();
-                yield return null;
-                Assert.That(network.IsHost, Is.True, ui.feedbackText.text);
-                Assert.That(network.IsDeveloperSolo, Is.False);
-                Assert.That(network.TargetParticipantCount, Is.EqualTo(2));
-                Assert.That(network.Snapshot, Is.Null, "This test waits in the real Host lobby; it does not emulate a connected client.");
-                Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
-                Assert.That(crack.IsReady, Is.True, crack.InitializationError);
-                Assert.That(paint.enabled, Is.False);
-                Assert.That(ui.sceneController.config, Is.SameAs(network.config));
-                Assert.That(ui.seatCamera.config, Is.SameAs(network.config));
-
-                ui.Open();
-                Assert.That(ui.applyHostLabel.text, Is.EqualTo("APPLY TO ROOM"));
-                SetInput(ui, "Gourd Mode (0 paint, 1 crack)", "0");
-                Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
-                ui.ApplyAndHost();
-                yield return null;
-                Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
-                Assert.That(paint.IsReady, Is.True, paint.InitializationError);
-                Assert.That(crack.enabled, Is.False);
-                Assert.That(network.CanStartBattle, Is.False, "A mode change cannot bypass the remaining participant/config confirmation gates.");
-                Assert.That(ui.sceneController.config, Is.SameAs(network.config));
-                Assert.That(ui.seatCamera.config, Is.SameAs(network.config));
-                Assert.That(ui.sourceConfig.CaptureDeveloperValues(), Is.EqualTo(savedValues));
+                Assert.That(paint.ApplyMode(), Is.True);
+                Assert.That(ui.sourceConfig.CaptureDeveloperValues(), Is.EqualTo(saved));
             }
             finally { if (network.IsConnected) network.Stop(); }
-            yield return null;
-            Assert.That(network.config, Is.SameAs(ui.sourceConfig));
-            Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Paint));
-            Assert.That(paint.IsReady, Is.True, paint.InitializationError);
-        }
-
-        [UnityTest]
-        public IEnumerator BrokenModeReferencesFallBackWithoutHoldingVictoryAndCanBeRetried()
-        {
-            yield return this.fixture.Load();
-            LabDeveloperMode ui = SavedDeveloperUi();
-            LabNetwork network = ui.network;
-            LabGourdPaint paint = network.target.GetComponent<LabGourdPaint>();
-            LabGourdCrack crack = network.target.GetComponent<LabGourdCrack>();
-            GameObject savedWhite = paint.visualPrefab;
-            GameObject savedCrack = crack.gourdPrefab;
-            var victory = new LabSnapshot { sessionId = "invalid-mode", round = 1, phase = LabPhase.Victory, hp = 0 };
-            this.fixture.UseAvailablePort(network);
-            try
-            {
-                paint.enabled = false;
-                paint.visualPrefab = null;
-                paint.enabled = true;
-                yield return null;
-                Assert.That(paint.IsReady, Is.False);
-                Assert.That(paint.InitializationError, Is.Not.Empty);
-                Assert.That(network.target.Hitbox.GetComponent<MeshRenderer>().enabled, Is.True);
-                Assert.That(LabGourdFinish.DelayVictory(network, victory), Is.False);
-                paint.visualPrefab = savedWhite;
-                paint.ApplyMode();
-                yield return null;
-                Assert.That(paint.IsReady, Is.True, paint.InitializationError);
-
-                crack.gourdPrefab = null;
-                ui.Open();
-                SetInput(ui, "Gourd Mode (0 paint, 1 crack)", "1");
-                ui.ApplyAndStart();
-                yield return null;
-                Assert.That(network.config.GourdMode, Is.EqualTo(LabGourdMode.Crack));
-                Assert.That(crack.IsReady, Is.False);
-                Assert.That(crack.InitializationError, Is.Not.Empty);
-                Assert.That(network.target.Hitbox.GetComponent<MeshRenderer>().enabled, Is.True);
-                Assert.That(network.target.Hitbox.enabled, Is.True);
-                Assert.That(LabGourdFinish.DelayVictory(network, victory), Is.False);
-                crack.gourdPrefab = savedCrack;
-                paint.ApplyMode();
-                yield return null;
-                Assert.That(crack.IsReady, Is.True, crack.InitializationError);
-                Assert.That(paint.enabled, Is.False);
-            }
-            finally
-            {
-                paint.visualPrefab = savedWhite;
-                crack.gourdPrefab = savedCrack;
-                if (network.IsConnected) network.Stop();
-            }
         }
 
         static LabConfig CollisionFixture(LabConfig source, float initialPercent = 2f)
@@ -830,7 +671,7 @@ namespace C6Lab.Tests
                 "The renderer must upload exactly the CPU RGBA surface that owns coverage.");
             Assert.That(expected.Count(pixel => pixel.a != 0), Is.EqualTo(surface.CoveredCount));
             Assert.That(surface.Coverage, Is.EqualTo(surface.CoveredCount / (float)surface.CellCount));
-            Assert.That(ReadBlock(paint).GetTexture("_PaintMap"), Is.SameAs(paint.PaintTexture));
+            Assert.That(ReadBlock(paint).GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture));
             Assert.That(ReadBlock(paint).GetFloat("_PaintMapReady"), Is.EqualTo(1f));
         }
 

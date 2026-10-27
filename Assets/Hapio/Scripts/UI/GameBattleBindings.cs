@@ -23,6 +23,18 @@ namespace Hapio
         public GameYokaiPresentation yokaiPresentation;
         private GameSession session;
 
+        public bool IsPresentationReady
+        {
+            get
+            {
+                if (!isActiveAndEnabled || session == null || board == null || !board.isActiveAndEnabled
+                    || target == null || battleCamera == null || !battleCamera.isActiveAndEnabled
+                    || hud == null || !hud.isActiveAndEnabled || target.Hitbox == null) return false;
+                var paint = target.GetComponent<LabGourdPaint>();
+                return paint != null && paint.IsReady;
+            }
+        }
+
         private void Awake()
         {
             // A Battle refreshed from Lab may contain its authored standalone lobby. The
@@ -100,7 +112,7 @@ namespace Hapio
                 stageLabel.text = (session.IsTerritory ? "2:2 땅따먹기"
                         : "STAGE " + session.State.stageIndex + " / " + session.State.totalStages
                             + (stage != null ? " · " + stage.displayName : string.Empty))
-                    + (session.State.phase == GameFlowPhase.LoadingBattle ? " · WAITING" : string.Empty);
+                    + (session.IsPreparingBattle ? " · WAITING" : string.Empty);
             RefreshDeveloperNextStage();
         }
         private void DeveloperNextStage()

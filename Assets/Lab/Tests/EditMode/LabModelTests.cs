@@ -101,9 +101,9 @@ namespace C6Lab.Tests
 
 
             Assert.That(room.TryTransferAt(10ul, right.id, true, new Vector2(.99f, .5f), Vector2.right, "p3-right", .1d,
-                LabEdgeCrossingKind.Swipe, out var atP1, out _), Is.True);
-            Assert.That(room.TryTransferAt(10ul, left.id, false, new Vector2(.01f, .5f), Vector2.left, "p3-left", .1d,
                 LabEdgeCrossingKind.Swipe, out var atP2, out _), Is.True);
+            Assert.That(room.TryTransferAt(10ul, left.id, false, new Vector2(.01f, .5f), Vector2.left, "p3-left", .1d,
+                LabEdgeCrossingKind.Swipe, out var atP1, out _), Is.True);
             Assert.That(atP1.owner, Is.EqualTo(20ul));
             Assert.That(atP2.owner, Is.EqualTo(30ul));
 
@@ -126,15 +126,48 @@ namespace C6Lab.Tests
             ulong last = ids[count - 1];
             Assert.That(room.TryGenerate(last, "ring-orb", 0d, out var orb, out _), Is.True);
 
-            Assert.That(room.TryTransferAt(last, orb.id, true, new Vector2(.99f, .4f), Vector2.right, "wrap-right", .1d,
+            Assert.That(room.TryTransferAt(last, orb.id, false, new Vector2(.01f, .4f), Vector2.left, "wrap-left", .1d,
                 LabEdgeCrossingKind.Swipe, out var atFirst, out _), Is.True);
             Assert.That(atFirst.owner, Is.EqualTo(ids[0]));
             Assert.That(atFirst.id, Is.EqualTo(orb.id));
 
-            Assert.That(room.TryTransferAt(ids[0], orb.id, false, new Vector2(.01f, .4f), Vector2.left, "wrap-left", .2d,
+            Assert.That(room.TryTransferAt(ids[0], orb.id, true, new Vector2(.99f, .4f), Vector2.right, "wrap-right", .2d,
                 LabEdgeCrossingKind.Swipe, out var atLast, out _), Is.True);
             Assert.That(atLast.owner, Is.EqualTo(last));
             Assert.That(atLast.id, Is.EqualTo(orb.id));
+        }
+
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        public void ClockwiseLobbyOrderMatchesBothHudAndActualHandoffsForEverySeat(int count)
+        {
+            ulong[] ids = Enumerable.Range(1, count).Select(p => (ulong)(p * 10)).ToArray();
+            var room = new LabModel();
+            room.Begin("clockwise-" + count, ids, 0d, config);
+            for (int seat = 0; seat < count; seat++)
+            {
+                double now = .1d + seat * .2d;
+                LabHud.GetNeighborLabels(room.Snapshot(now), ids[seat], out string left, out string right);
+                Assert.That(left, Is.EqualTo("P" + ((seat + 1) % count + 1)));
+                Assert.That(right, Is.EqualTo("P" + ((seat + count - 1) % count + 1)));
+                foreach (bool toRight in new[] { false, true })
+                {
+                    string request = seat + "-" + toRight;
+                    Assert.That(room.TryGenerate(ids[seat], "create-" + request, now, out var orb, out string error), Is.True, error);
+                    Vector2 velocity = new Vector2(toRight ? 1.2f : -1.2f, .15f);
+                    Assert.That(room.TryTransferAt(ids[seat], orb.id, toRight,
+                        new Vector2(toRight ? .99f : .01f, .5f), velocity, "send-" + request, now,
+                        LabEdgeCrossingKind.Swipe, out var received, out error), Is.True, error);
+                    int expected = (seat + (toRight ? count - 1 : 1)) % count;
+                    Assert.That(received.owner, Is.EqualTo(ids[expected]));
+                    Assert.That(received.id, Is.EqualTo(orb.id));
+                    Assert.That(received.createdAt, Is.EqualTo(orb.createdAt));
+                    Assert.That(received.x, Is.EqualTo(toRight ? 0f : 1f));
+                    Assert.That(new Vector2(received.vx, received.vy), Is.EqualTo(velocity));
+                }
+            }
         }
 
         [Test]
@@ -326,7 +359,7 @@ namespace C6Lab.Tests
 
             Assert.That(model.TryTransferAt(10, born.id, true, new Vector2(.99f, .4f), new Vector2(1.1f, .2f), "right", .2d,
                 LabEdgeCrossingKind.Swipe, out var atSecond, out _), Is.True);
-            Assert.That(atSecond.owner, Is.EqualTo(20ul));
+            Assert.That(atSecond.owner, Is.EqualTo(30ul));
             Assert.That(atSecond.id, Is.EqualTo(born.id));
             Assert.That(atSecond.createdAt, Is.EqualTo(born.createdAt));
             Assert.That(atSecond.origin, Is.EqualTo(LabOrbOrigin.Generated));
@@ -340,9 +373,9 @@ namespace C6Lab.Tests
                 LabEdgeCrossingKind.Swipe, out _, out var rejected), Is.False);
             Assert.That(rejected, Is.EqualTo("NOT_OWNED_IDLE"));
 
-            Assert.That(model.TryTransferAt(20, born.id, true, new Vector2(.99f, .4f), new Vector2(1f, 0f), "right-again", .3d,
+            Assert.That(model.TryTransferAt(30, born.id, true, new Vector2(.99f, .4f), new Vector2(1f, 0f), "right-again", .3d,
                 LabEdgeCrossingKind.Swipe, out var atThird, out _), Is.True);
-            Assert.That(atThird.owner, Is.EqualTo(30ul));
+            Assert.That(atThird.owner, Is.EqualTo(20ul));
             Assert.That(atThird.id, Is.EqualTo(born.id));
         }
 
@@ -419,6 +452,39 @@ namespace C6Lab.Tests
             Assert.That(model.ConfirmMiss(miss.id, 3d), Is.False);
             Assert.That(model.ConfirmHit(hit.id, 3d), Is.False);
             Assert.That(Thrown(10, 3d) + Thrown(20, 3d), Is.EqualTo(2), "One orb is confirmed only once.");
+        }
+
+        [Test]
+        public void FlashShakeReleasesOnlyTheShakerWhileDazzled()
+        {
+            // 야광귀 섬광 (#301): 모두에게 5초에 번쩍, 예고 없음, 눈부심 12초.
+            JsonUtility.FromJsonOverwrite("{\"yaguangFlashEnabled\":true,\"yaguangFlashTargetOne\":false,"
+                + "\"yaguangFlashFirstStartSeconds\":5,\"yaguangFlashWarningSeconds\":0,\"yaguangFlashGlareSeconds\":12,"
+                + "\"yaguangFlashRecoverySeconds\":2,\"gourdColorComboEnabled\":false}", config);
+            model = new LabModel();
+            model.Begin("flash-shake", new ulong[] { 10, 20, 30 }, 0d, config);
+
+            Assert.That(model.FlashGlared(10, 4.5d), Is.False);
+            Assert.That(model.TryFlashShakeRelease(10, 4.5d), Is.False, "Shaking before the flash does nothing.");
+
+            Assert.That(model.TryFlashShakeRelease(10, 6d), Is.True);
+            LabSnapshot after = model.Snapshot(6d);
+            Assert.That(after.players.Single(p => p.id == 10).flashReleasedAt, Is.EqualTo(6d));
+            Assert.That(after.FlashReleasedAt(10), Is.EqualTo(6d));
+            Assert.That(model.FlashGlared(10, 6d), Is.False, "Only the shaker is released...");
+            Assert.That(model.FlashGlared(20, 6d), Is.True, "...the others are still dazzled.");
+            Assert.That(model.TryFlashShakeRelease(10, 6.5d), Is.False, "Already released.");
+
+            Assert.That(model.FlashGlared(20, 16.9d), Is.True);
+            Assert.That(model.TryFlashShakeRelease(20, 17.5d), Is.False, "After the 12 s glare it has already worn off.");
+            Assert.That(model.FlashGlared(20, 17.5d), Is.False);
+
+            JsonUtility.FromJsonOverwrite("{\"yaguangFlashShakeRelease\":false}", config);
+            model = new LabModel();
+            model.Begin("flash-shake-off", new ulong[] { 10, 20, 30 }, 0d, config);
+            model.Tick(6d); // 섬광은 시간이 흘러야(Tick) 터진다.
+            Assert.That(model.FlashGlared(10, 6d), Is.True);
+            Assert.That(model.TryFlashShakeRelease(10, 6d), Is.False, "With the release off only time clears the glare.");
         }
 
         [Test]
@@ -636,7 +702,7 @@ namespace C6Lab.Tests
                 Assert.That(room.TryLaunch(10, drum.id, "throw-drum", 0d, out _, out _), Is.False, "A drum is never thrown.");
                 Assert.That(room.TryUseItemAt(10, drum.id, "use-drum", 0d, new Vector2(.5f, .5f), out _, out _), Is.False);
 
-                Assert.That(PassRight(room, drum.id, 10, .1d).owner, Is.EqualTo(20ul), "A full board still receives the drum.");
+                Assert.That(PassClockwise(room, drum.id, 10, .1d).owner, Is.EqualTo(20ul), "A full board still receives the drum.");
                 Assert.That(room.TryGenerate(10, "no-drum", .2d, out _, out reason), Is.False);
                 Assert.That(reason, Is.EqualTo("NO_DRUM"), "Passing the drum away stops its old holder generating.");
 
@@ -828,14 +894,14 @@ namespace C6Lab.Tests
                 int locks = potion.lockSwipes;
                 Assert.That(locks, Is.InRange(2, 4));
 
-                // Pass the potion rightward around the ring; one extra pass shows the count stops at zero.
+                // Pass the potion clockwise (left) around the ring; one extra pass shows the count stops at zero.
                 ulong[] ring = { 10, 20, 30 };
                 for (int pass = 1; pass <= locks + 1; pass++)
                 {
                     ulong holder = ring[(pass - 1) % ring.Length];
                     double at = pass * .1d;
 
-                    Assert.That(room.TryTransferAt(holder, potion.id, true, new Vector2(.99f, .5f), Vector2.right, "pass-" + pass, at,
+                    Assert.That(room.TryTransferAt(holder, potion.id, false, new Vector2(.01f, .5f), Vector2.left, "pass-" + pass, at,
                 LabEdgeCrossingKind.Swipe, out var passed, out var reason), Is.True, reason);
                     Assert.That(passed.owner, Is.EqualTo(ring[pass % ring.Length]));
                     Assert.That(passed.lockSwipes, Is.EqualTo(Math.Max(0, locks - pass)));
@@ -1051,7 +1117,7 @@ namespace C6Lab.Tests
                 ulong[] ring = { 10, 20, 30 };
                 for (int pass = 1; pass <= locks + 3; pass++)
                 {
-                    var passed = PassRight(room, relay.id, ring[(pass - 1) % ring.Length], pass * .1d);
+                    var passed = PassClockwise(room, relay.id, ring[(pass - 1) % ring.Length], pass * .1d);
                     int expected = pass < locks ? 0 : Math.Min(3, pass - locks + 1);
                     Assert.That(passed.relayStage, Is.EqualTo(expected), "after handoff " + pass);
                 }
@@ -1068,12 +1134,12 @@ namespace C6Lab.Tests
                 Assert.That(ThrowAndHit(hits, x1.id, 10, .1d), Is.EqualTo(20));
 
                 Assert.That(hits.TryGenerate(10, "x2", .2d, out var x2, out _), Is.True);
-                Assert.That(PassRight(hits, x2.id, 10, .3d).relayStage, Is.EqualTo(2));
+                Assert.That(PassClockwise(hits, x2.id, 10, .3d).relayStage, Is.EqualTo(2));
                 Assert.That(ThrowAndHit(hits, x2.id, 20, .4d), Is.EqualTo(40));
 
                 Assert.That(hits.TryGenerate(10, "max", .5d, out var max, out _), Is.True);
-                PassRight(hits, max.id, 10, .6d);
-                Assert.That(PassRight(hits, max.id, 20, .7d).relayStage, Is.EqualTo(3));
+                PassClockwise(hits, max.id, 10, .6d);
+                Assert.That(PassClockwise(hits, max.id, 20, .7d).relayStage, Is.EqualTo(3));
                 Assert.That(ThrowAndHit(hits, max.id, 30, .8d), Is.EqualTo(80));
                 Assert.That(hits.Hp, Is.EqualTo(1000 - 20 - 40 - 80));
             }
@@ -1095,7 +1161,7 @@ namespace C6Lab.Tests
                     if (orb.kind == LabOrbKind.Bomb) bomb = orb;
                 }
                 Assert.That(bomb, Is.Not.Null);
-                Assert.That(PassRight(room, bomb.id, 10, 1d).owner, Is.EqualTo(20ul), "The bomb moves to the next holder.");
+                Assert.That(PassClockwise(room, bomb.id, 10, 1d).owner, Is.EqualTo(20ul), "The bomb moves to the next holder.");
 
                 Assert.That(room.TryGenerate(10, "keep", 10d, out var kept, out _), Is.True);
                 var near = new List<string>();
@@ -1117,8 +1183,8 @@ namespace C6Lab.Tests
                 Assert.That(blasts.Length, Is.EqualTo(1));
                 Assert.That(blasts[0].Owner, Is.EqualTo(20ul), "The current holder's board takes the blast.");
                 Assert.That(blasts[0].BombId, Is.EqualTo(bomb.id));
-                Assert.That(blasts[0].Position, Is.EqualTo(new Vector2(0f, .5f)),
-                    "The Host cue carries the confirmed handoff pose; the owning board supplies its live blast position.");
+                Assert.That(blasts[0].Position, Is.EqualTo(new Vector2(1f, .5f)),
+                    "A clockwise leftward handoff enters the receiver at its right edge; the owning board supplies its live blast position.");
                 Assert.That(room.DrainBombExplosions(), Is.Empty, "Each explosion is reported once.");
             }
             finally { UnityEngine.Object.DestroyImmediate(mixed); }
@@ -1178,7 +1244,7 @@ namespace C6Lab.Tests
                 }
                 Assert.That(after.drums.Single(state => state.id == drum).small, Is.False, "Drums never burn.");
 
-                LabOrbState passed = PassRight(room, yins[0], 10, 16d);
+                LabOrbState passed = PassClockwise(room, yins[0], 10, 16d);
                 Assert.That(passed.owner, Is.EqualTo(20ul));
                 Assert.That(passed.small, Is.True, "...but the orb stays small, and carries its fire to the next board.");
                 Assert.That(passed.burnedAt, Is.EqualTo(15.2d));
@@ -1352,7 +1418,7 @@ namespace C6Lab.Tests
                 int seat = Array.IndexOf(ring, blocked);
                 ulong other = ring[(seat + 1) % 3];
                 // The neighbour that passes this way hands its orb to the blocked player.
-                ulong toBlocked = ring[(seat + (way ? 2 : 1)) % 3];
+                ulong toBlocked = ring[(seat + (way ? 1 : 2)) % 3];
 
                 // Every orb is made first: the Host clock never runs backwards between requests.
                 string own = OrbOf(room, blocked, "own", 40.1d);
@@ -1536,7 +1602,7 @@ namespace C6Lab.Tests
                 }
                 Assert.That(spare.Count, Is.GreaterThanOrEqualTo(2));
                 string passed = spare[0], kept = spare[1];
-                Assert.That(PassRight(room, passed, 10, 1d).owner, Is.EqualTo(20ul));
+                Assert.That(PassClockwise(room, passed, 10, 1d).owner, Is.EqualTo(20ul));
                 Assert.That(room.TryCombineAt(10, yin.id, yang.id, "combine", 2d,
                     new Vector2(.5f, .5f), Vector2.zero, out var combined, out var reason),
                     Is.True, reason);
@@ -1584,7 +1650,7 @@ namespace C6Lab.Tests
                 Assert.That(room.TryGenerate(10, "locked", 0d, out var locked, out _), Is.True);
                 Assert.That(room.TryGenerate(10, "opened", 0d, out var opened, out _), Is.True);
                 int locks = opened.lockSwipes;
-                for (int pass = 1; pass <= locks; pass++) PassRight(room, opened.id, ring[(pass - 1) % ring.Length], pass);
+                for (int pass = 1; pass <= locks; pass++) PassClockwise(room, opened.id, ring[(pass - 1) % ring.Length], pass);
                 room.Snapshot(locks + 7.9d);
                 Assert.That(room.DrainOrbExpiries(), Is.Empty);
                 room.Snapshot(locks + 8d);
@@ -1635,7 +1701,7 @@ namespace C6Lab.Tests
                 LabOrbState passed = null;
                 for (int pass = 1; pass <= locks; pass++)
                 {
-                    passed = PassRight(room, relay.id, ring[(pass - 1) % ring.Length], pass);
+                    passed = PassClockwise(room, relay.id, ring[(pass - 1) % ring.Length], pass);
                     if (pass < locks)
                         Assert.That(passed.unlockedAt, Is.EqualTo(-1d), "A handoff that leaves it locked is not an unlock.");
                 }
@@ -1646,7 +1712,7 @@ namespace C6Lab.Tests
                 Assert.That(seen.JustUnlocked(locks + LabOrbState.UnlockEffectWindowSeconds + .1d), Is.False,
                     "A screen that sees the unlock late shows the item already open.");
 
-                passed = PassRight(room, relay.id, passed.owner, locks + .6d);
+                passed = PassClockwise(room, relay.id, passed.owner, locks + .6d);
                 Assert.That(passed.unlockedAt, Is.EqualTo(-1d), "The next holder receives it already open.");
                 Assert.That(passed.JustUnlocked(locks + .6d), Is.False);
             }
@@ -1671,7 +1737,7 @@ namespace C6Lab.Tests
                 LabOrbState unlocked = null;
                 for (int pass = 1; pass <= locks; pass++)
                 {
-                    unlocked = PassRight(room, bomb.id, ring[(pass - 1) % ring.Length], pass);
+                    unlocked = PassClockwise(room, bomb.id, ring[(pass - 1) % ring.Length], pass);
                     if (pass < locks) Assert.That(unlocked.createdAt, Is.Zero, "Passing a locked bomb never resets its fuse.");
                 }
                 Assert.That(unlocked.lockSwipes, Is.Zero);
@@ -1746,7 +1812,7 @@ namespace C6Lab.Tests
                     Assert.That(drums.Select(drum => drum.owner).Distinct().Count(), Is.EqualTo(drums.Length),
                         "Two drums start with two different players.");
 
-                    LabOrbState passed = PassRight(room, drums[0].id, drums[0].owner, .1d);
+                    LabOrbState passed = PassClockwise(room, drums[0].id, drums[0].owner, .1d);
                     Assert.That(passed.owner, Is.Not.EqualTo(drums[0].owner));
                     Assert.That(room.TryGenerate(passed.owner, "auto-after-pass", .2d,
                         out _, out string generateError), Is.True, generateError);
@@ -1784,7 +1850,7 @@ namespace C6Lab.Tests
             for (int pass = 1; pass <= 400; pass++)
             {
                 double at = pass * .01d;
-                LabOrbState passed = PassRight(room, drum.id, ids[(pass - 1) % ids.Length], at);
+                LabOrbState passed = PassClockwise(room, drum.id, ids[(pass - 1) % ids.Length], at);
                 arrivals.Add(passed.arrival);
                 Assert.That(passed.arrivedAt, Is.EqualTo(at), "The arrival is stamped with the handoff time.");
                 if (passed.arrival == LabDrumArrival.Pass)
@@ -1795,6 +1861,7 @@ namespace C6Lab.Tests
                 }
                 Assert.That(passed.arrival, Is.EqualTo(LabDrumArrival.Stop));
                 Assert.That(passed.stopAt, Is.InRange(.2f, .8f), "It stops 20-80% of the board in from its entry edge.");
+                // stopAt is measured from the entry edge for either physical direction.
                 zones[passed.stopAt < .4f ? 0 : passed.stopAt < .6f ? 1 : 2]++;
             }
             // 400 handoffs at 40/35/15/10 percent: expected 160, 140, 60 and 40.
@@ -1813,7 +1880,7 @@ namespace C6Lab.Tests
             again.Begin("drum-zones", ids, 0d, config);
             LabOrbState twin = again.Snapshot(0d).drums.First(candidate => candidate.owner == 10);
             for (int pass = 1; pass <= 50; pass++)
-                Assert.That(PassRight(again, twin.id, ids[(pass - 1) % ids.Length], pass * .01d).arrival,
+                Assert.That(PassClockwise(again, twin.id, ids[(pass - 1) % ids.Length], pass * .01d).arrival,
                     Is.EqualTo(arrivals[pass - 1]), "Handoff " + pass);
         }
 
@@ -1830,7 +1897,7 @@ namespace C6Lab.Tests
                 room.Begin("drum-pass", new ulong[] { 10, 20, 30 }, 0d, passes);
                 LabOrbState drum = room.Snapshot(0d).drums.First(candidate => candidate.owner == 10);
 
-                LabOrbState first = PassRight(room, drum.id, 10, .1d);
+                LabOrbState first = PassClockwise(room, drum.id, 10, .1d);
                 Assert.That(first.arrival, Is.EqualTo(LabDrumArrival.Pass));
                 Assert.That(first.stopAt, Is.EqualTo(-1f));
 
@@ -1851,7 +1918,7 @@ namespace C6Lab.Tests
 
                 // Orbs keep their old handoff and never get an arrival.
                 Assert.That(room.TryGenerate(20, "orb", .5d, out var orb, out string reason), Is.True, reason);
-                LabOrbState sent = PassRight(room, orb.id, 20, .6d);
+                LabOrbState sent = PassClockwise(room, orb.id, 20, .6d);
                 Assert.That(sent.arrival, Is.EqualTo(LabDrumArrival.None));
                 Assert.That(sent.stopAt, Is.EqualTo(-1f));
                 Assert.That(sent.arrivedAt, Is.EqualTo(-1d));
@@ -1861,14 +1928,14 @@ namespace C6Lab.Tests
 
         private static LabOrbState Cross(LabModel room, string id, ulong holder, double at, LabEdgeCrossingKind crossing)
         {
-            Assert.That(room.TryTransferAt(holder, id, true, new Vector2(.99f, .5f), Vector2.right, "cross-" + id + "-" + at, at,
+            Assert.That(room.TryTransferAt(holder, id, false, new Vector2(.01f, .5f), Vector2.left, "cross-" + id + "-" + at, at,
                 crossing, out var passed, out var reason), Is.True, reason);
             return passed;
         }
 
-        private static LabOrbState PassRight(LabModel room, string id, ulong holder, double at)
+        private static LabOrbState PassClockwise(LabModel room, string id, ulong holder, double at)
         {
-            Assert.That(room.TryTransferAt(holder, id, true, new Vector2(.99f, .5f), Vector2.right, "pass-" + id + "-" + at, at,
+            Assert.That(room.TryTransferAt(holder, id, false, new Vector2(.01f, .5f), Vector2.left, "pass-" + id + "-" + at, at,
                 LabEdgeCrossingKind.Swipe, out var passed, out var reason), Is.True, reason);
             return passed;
         }
@@ -2432,28 +2499,41 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void CrackModeKeepsActualHpVictoryAndNeverPaintsItsHitDirection()
+        public void DiagnosticHpZeroDoesNotFinishAPartiallyPaintedRoundOrLoseNominalHitCredit()
         {
-            var crackConfig = PaintFixture(100f);
+            var paintConfig = PaintFixture(2f);
             try
             {
-                float[] values = crackConfig.CaptureDeveloperValues();
-                values[79] = 1f;
-                Assert.That(crackConfig.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var room = new LabModel();
-                room.BeginSolo("crack-atomic", 10, 0d, crackConfig);
+                room.BeginSolo("paint-hp-zero", 10, 0d, paintConfig);
                 int request = 0;
-                LabOrbState shot = LaunchElementShot(room, ref request, 0d);
-                Assert.That(room.ConfirmHit(shot.id, 0d, Vector3.forward,
+                LabOrbState first = LaunchElementShot(room, ref request, 0d);
+                Assert.That(room.ConfirmHit(first.id, 0d, Vector3.forward,
                     out _, out int actual, out int impact), Is.True);
                 Assert.That(actual, Is.EqualTo(1));
-                Assert.That(impact, Is.EqualTo(1));
-                Assert.That(room.Snapshot(0d).players.Single().damageTotal, Is.EqualTo(1));
-                Assert.That(room.Phase, Is.EqualTo(LabPhase.Victory));
-                Assert.That(room.PaintSurface.Coverage, Is.Zero);
-                Assert.That(room.PaintSurface.PaintCount, Is.Zero);
+                Assert.That(impact, Is.EqualTo(20));
+                LabSnapshot afterFirst = room.Snapshot(0d);
+                Assert.That(afterFirst.hp, Is.Zero);
+                Assert.That(afterFirst.phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(afterFirst.paintCoveredCount, Is.GreaterThan(0).And.LessThan(afterFirst.paintCellCount));
+                Assert.That(afterFirst.players.Single().damageTotal, Is.EqualTo(20));
+                Assert.That(afterFirst.players.Single().lastHit, Is.False);
+
+                LabOrbState next = LaunchElementShot(room, ref request, 0d);
+                Assert.That(room.ConfirmHit(next.id, 0d, Vector3.back,
+                    out _, out actual, out impact), Is.True);
+                Assert.That(actual, Is.Zero);
+                Assert.That(impact, Is.EqualTo(20));
+                Assert.That(room.ConfirmHit(next.id, 0d, Vector3.back, out _, out _, out _), Is.False);
+                LabSnapshot continued = room.Snapshot(0d);
+                Assert.That(continued.phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(continued.players.Single().hitTotal, Is.EqualTo(2));
+                Assert.That(continued.players.Single().damageTotal, Is.EqualTo(40));
+                Assert.That(continued.players.Single().lastHit, Is.False);
+                Assert.That(continued.paintCount, Is.EqualTo(2));
+                Assert.That(continued.paintCoveredCount, Is.GreaterThan(afterFirst.paintCoveredCount));
             }
-            finally { UnityEngine.Object.DestroyImmediate(crackConfig); }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
         }
 
         [Test]
@@ -2543,41 +2623,50 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void HitsAndDamageAreRecordedAndOnlyTheKillingBlowIsTheLastHit()
+        public void NominalHitScoresPersistPastHpZeroAndOnlyTheFinalPainterReceivesLastHitCredit()
         {
-            var shortFight = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
+            var paintConfig = PaintFixture(50f, 10f, 50f, 25f);
             try
             {
-                float[] values = shortFight.CaptureDeveloperValues();
-                values[0] = 30f; // Monster Max HP
-                values[1] = 20f; // Damage per Hit
-                values[79] = 1f; // Crack keeps the legacy HP finish.
-                Assert.That(shortFight.TryApplyDeveloperValues(values, out string error), Is.True, error);
-                model = new LabModel();
-                model.Begin("hit-records", new ulong[] { 10, 20, 30 }, 0d, shortFight);
+                float[] values = paintConfig.CaptureDeveloperValues();
+                values[0] = 7f; // The first hit exhausts diagnostic HP while half the paint target remains.
+                Assert.That(paintConfig.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                room.Begin("paint-hit-records", new ulong[] { 10, 20, 30 }, 0d, paintConfig);
+                int request = 0;
+                LabOrbState first = LaunchElementShot(room, ref request, 0d, 10ul);
+                Assert.That(room.ConfirmHit(first.id, 0d, Vector3.forward, out _, out int actual, out int impact), Is.True);
+                Assert.That(actual, Is.EqualTo(7));
+                Assert.That(impact, Is.EqualTo(20));
+                LabSnapshot afterFirst = room.Snapshot(0d);
+                Assert.That(afterFirst.hp, Is.Zero);
+                Assert.That(afterFirst.phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(afterFirst.players.Single(player => player.id == 10ul).hitTotal, Is.EqualTo(1));
+                Assert.That(afterFirst.players.Single(player => player.id == 10ul).damageTotal, Is.EqualTo(20));
+                Assert.That(afterFirst.players.Any(player => player.lastHit), Is.False);
 
-                var first = GeneratePair(10);
-                Assert.That(model.TryCombineAt(10, first.yin.id, first.yang.id, "c1", 0d,
-                    new Vector2(.5f, .5f), Vector2.zero, out var a, out _), Is.True);
-                Assert.That(ThrowAndHit(model, a.id, 10, .1d), Is.EqualTo(20));
-                var afterFirst = model.Snapshot(.1d).players.Single(p => p.id == 10);
-                Assert.That(afterFirst.hitTotal, Is.EqualTo(1));
-                Assert.That(afterFirst.damageTotal, Is.EqualTo(20));
-                Assert.That(afterFirst.lastHit, Is.False);
+                LabOrbState repeated = LaunchElementShot(room, ref request, 0d, 20ul);
+                Assert.That(room.ConfirmHit(repeated.id, 0d, Vector3.forward, out _, out actual, out impact), Is.True);
+                Assert.That(actual, Is.Zero);
+                Assert.That(impact, Is.EqualTo(20));
+                Assert.That(room.ConfirmHit(repeated.id, 0d, Vector3.forward, out _, out _, out _), Is.False,
+                    "Duplicate collision callbacks cannot award another hit or growth budget.");
+                LabSnapshot growing = room.Snapshot(0d);
+                Assert.That(growing.phase, Is.EqualTo(LabPhase.Playing));
+                Assert.That(growing.players.Any(player => player.lastHit), Is.False,
+                    "Supplying the final budget does not finish the round before the real cells are painted.");
 
-                var second = GeneratePair(20, .2d);
-                Assert.That(model.TryCombineAt(20, second.yin.id, second.yang.id, "c2", .2d,
-                    new Vector2(.5f, .5f), Vector2.zero, out var b, out _), Is.True);
-                ThrowAndHit(model, b.id, 20, .3d);
-                var done = model.Snapshot(.3d);
+                LabSnapshot done = room.Snapshot(2d);
                 Assert.That(done.phase, Is.EqualTo(LabPhase.Victory));
-                var killer = done.players.Single(p => p.id == 20);
-                Assert.That(killer.hitTotal, Is.EqualTo(1));
-                Assert.That(killer.damageTotal, Is.EqualTo(10), "Only the HP that was left counts as damage.");
-                Assert.That(done.players.Where(p => p.lastHit).Select(p => p.id), Is.EqualTo(new ulong[] { 20 }));
-                Assert.That(done.players.Single(p => p.id == 30).hitTotal, Is.EqualTo(0));
+                Assert.That(done.paintCoveredCount, Is.EqualTo(done.paintCellCount));
+                Assert.That(done.players.Select(player => player.hitTotal), Is.EqualTo(new[] { 1, 1, 0 }));
+                Assert.That(done.players.Select(player => player.damageTotal), Is.EqualTo(new[] { 20, 20, 0 }));
+                Assert.That(done.players.Where(player => player.lastHit).Select(player => player.id), Is.EqualTo(new ulong[] { 20 }));
+                Assert.That(done.players.Single(player => player.id == 10ul).lastHit, Is.False,
+                    "The player who exhausted diagnostic HP is not the player who completed the paint.");
+                Assert.That(done.paintCount, Is.EqualTo(2));
             }
-            finally { UnityEngine.Object.DestroyImmediate(shortFight); }
+            finally { UnityEngine.Object.DestroyImmediate(paintConfig); }
         }
 
         [Test]
@@ -2751,7 +2840,7 @@ namespace C6Lab.Tests
         [Test]
         public void SabotageMixCharmsInAnyRoomAndSolo()
         {
-            var mix = MixConfig(11f, bomb: 0, block: 0, fox: 0, charm: 1);
+            var mix = MixConfig(11f, bomb: 0, block: 0, fox: 0, charm: 1, rescueTaps: 3);
             try
             {
                 var pair = new LabModel();
@@ -2968,9 +3057,9 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ThePlayersBesideACharmedOneTapItAwayButNoOneElseCan()
+        public void BothPlayersBesideMustEachTapTheirShareToWakeACharmedOne()
         {
-            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1, rescueTaps: 3);
             try
             {
                 var room = new LabModel();
@@ -2980,20 +3069,85 @@ namespace C6Lab.Tests
                 LabPlayerState charmed = on.players.Single(player => player.id == on.charmedPlayer);
                 ulong BySeat(int offset) => on.players.Single(player => player.seat == (charmed.seat + offset + 5) % 5).id;
                 ulong leftOf = BySeat(-1), rightOf = BySeat(1), far = BySeat(2);
+                Assert.That(on.charmHelpers, Is.EquivalentTo(new[] { leftOf, rightOf }), "The two beside, each with a gauge (#305).");
+                Assert.That(on.charmHelperTaps, Is.EqualTo(new[] { 0, 0 }));
 
                 Assert.That(room.TryCharmTap(far, 5.1d, out _), Is.False, "Only the two beside can wake them.");
                 Assert.That(room.TryCharmTap(charmed.id, 5.1d, out _), Is.False, "Nor can they wake themselves.");
-                Assert.That(room.TryCharmTap(leftOf, 5.2d, out var woken), Is.True);
-                Assert.That(woken, Is.Null, "Not yet.");
-                Assert.That(room.TryCharmTap(rightOf, 5.3d, out _), Is.True);
-                LabSnapshot tapped = room.Snapshot(5.3d);
-                Assert.That(tapped.charmTaps, Is.EqualTo(2), "Their taps count together.");
-                Assert.That(tapped.CharmOn(charmed.id), Is.True);
-                Assert.That(room.TryCharmTap(leftOf, 5.4d, out woken), Is.True);
-                Assert.That(woken, Is.EqualTo(charmed.id), "The third tap says whom it woke.");
-                Assert.That(room.Snapshot(5.4d).CharmOn(charmed.id), Is.False, "Three taps wake the charmed player at once.");
+                for (int i = 0; i < 3; i++)
+                {
+                    Assert.That(room.TryCharmTap(leftOf, 5.2d + i * .01d, out var early), Is.True);
+                    Assert.That(early, Is.Null, "One side alone never wakes them.");
+                }
+                Assert.That(room.TryCharmTap(leftOf, 5.25d, out var extra), Is.True);
+                Assert.That(extra, Is.Null);
+                LabSnapshot half = room.Snapshot(5.25d);
+                Assert.That(half.CharmTapsBy(leftOf), Is.EqualTo(3), "A finished side waits; more taps do not count.");
+                Assert.That(half.CharmTapsBy(rightOf), Is.Zero);
+                Assert.That(half.CharmOn(charmed.id), Is.True, "Still charmed until the other side finishes too.");
+
+                Assert.That(room.TryCharmTap(rightOf, 5.3d, out var woken), Is.True);
+                Assert.That(room.TryCharmTap(rightOf, 5.31d, out woken), Is.True);
+                Assert.That(woken, Is.Null);
+                Assert.That(room.TryCharmTap(rightOf, 5.4d, out woken), Is.True);
+                Assert.That(woken, Is.EqualTo(charmed.id), "The last tap of the second side says whom it woke.");
+                Assert.That(room.Snapshot(5.4d).CharmOn(charmed.id), Is.False, "Both sides done: awake at once.");
                 Assert.That(room.Charmed(charmed.id, 5.4d), Is.False);
                 Assert.That(room.TryCharmTap(rightOf, 5.5d, out _), Is.False, "Nothing left to wake.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void InATwoPlayerRoomTheOtherPlayerAloneWakesTheCharmedOne()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1, rescueTaps: 3);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("charm-pair", new ulong[] { 10, 20 }, 0d, mix);
+                room.Tick(5d);
+                LabSnapshot on = room.Snapshot(5d);
+                ulong other = on.charmedPlayer == 10 ? 20ul : 10ul;
+                Assert.That(on.charmHelpers, Is.EqualTo(new[] { other }), "One player beside, on both sides.");
+                ulong? woken = null;
+                for (int i = 0; i < 3; i++) Assert.That(room.TryCharmTap(other, 5.1d + i * .01d, out woken), Is.True);
+                Assert.That(woken, Is.EqualTo(on.charmedPlayer));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void ACharmIsWarnedBeforeItStartsAndOnlyThenStopsThrows()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1, charmWarning: 3f, rescueTaps: 3);
+            try
+            {
+                var ids = new ulong[] { 10, 20, 30 };
+                var room = new LabModel();
+                room.Begin("charm-warning", ids, 0d, mix);
+                room.Tick(5d);
+                LabSabotage cast = room.DrainSabotages().Single();
+                Assert.That(cast.Kind, Is.EqualTo(LabSabotageKind.Charm));
+                Assert.That(cast.At, Is.EqualTo(5d), "Every screen is told when the target is chosen.");
+                LabSnapshot warned = room.Snapshot(6d);
+                Assert.That(warned.charmedPlayer, Is.EqualTo(cast.Target));
+                Assert.That(warned.CharmWarningAt(warned.serverTime), Is.True, "Warned for three seconds (#305)...");
+                Assert.That(warned.charmWarnedAt, Is.EqualTo(5d));
+                Assert.That(warned.charmStartedAt, Is.EqualTo(8d));
+                Assert.That(warned.charmUntil, Is.EqualTo(18d), "...then the ten seconds of the charm itself.");
+                Assert.That(warned.CharmOn(cast.Target), Is.False);
+                Assert.That(warned.charmHelpers, Is.Empty, "No gauges before it starts.");
+
+                ulong beside = ids.First(id => id != cast.Target);
+                Assert.That(room.TryCharmTap(beside, 6d, out _), Is.False, "Nothing to wake yet.");
+                Assert.That(room.Charmed(cast.Target, 7.9d), Is.False, "The warned player may still throw.");
+                string orb = CombinedFor(room, cast.Target, 6.5d);
+                LabSnapshot on = room.Snapshot(8.1d);
+                Assert.That(on.CharmWarningAt(on.serverTime), Is.False);
+                Assert.That(on.CharmOn(cast.Target), Is.True);
+                Assert.That(room.TryLaunch(cast.Target, orb, "charmed-throw", 8.3d, out _, out string reason), Is.False);
+                Assert.That(reason, Is.EqualTo("CHARMED"), "Only once the warning is over.");
             }
             finally { UnityEngine.Object.DestroyImmediate(mix); }
         }
@@ -3181,7 +3335,8 @@ namespace C6Lab.Tests
             return combined.id;
         }
 
-        private static LabConfig MixConfig(float interval, int bomb, int block, int fox, int charm)
+        private static LabConfig MixConfig(float interval, int bomb, int block, int fox, int charm, float charmWarning = 0f,
+            int rescueTaps = 10)
         {
             LabConfig created = ConfigWith(1f, 50, 50, 0, 0, 0, 0);
             float[] values = created.CaptureDeveloperValues();
@@ -3196,6 +3351,9 @@ namespace C6Lab.Tests
             values[170] = block;
             values[171] = fox;
             values[172] = charm;
+            values[177] = rescueTaps;
+            // These checks time the charm itself; the warning before it (#305) has its own tests.
+            values[204] = charmWarning;
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
         }

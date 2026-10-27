@@ -234,7 +234,7 @@ namespace C6Lab
             if (execution == LabActionExecution.Executed)
             {
                 latest = model.Snapshot(battleClock.Now(Time.realtimeSinceStartupAsDouble));
-                latest.paused = battleClock.IsPaused && latest.phase == LabPhase.Playing;
+                latest.paused = battleClock.IsPaused && !GameStartHeld && latest.phase == LabPhase.Playing;
                 AnnounceBombExplosions();
                 AnnounceOrbExpiries();
                 AnnounceGourdBombs();
@@ -472,7 +472,7 @@ namespace C6Lab
             Vector3 center = target.transform.position;
             int ring = LabTeams.RingSeatFor(latest, player.seat);
             Vector3 anchor = LabThrowMath.SeatPosition(ring, latest.players.Length, center,
-                config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
+                config.ThrowOriginRadius, config.ThrowOriginHeightOffset, !LabTeams.FourPlayerTeams(latest));
             Vector3 position = LabThrowMath.LaunchPosition(ring, latest.players.Length, center, request.x, config);
             Vector3 velocity = LabThrowMath.LaunchVelocity(new Vector2(request.vx, request.vy), anchor, center, config);
             bool small = orb != null && orb.small;

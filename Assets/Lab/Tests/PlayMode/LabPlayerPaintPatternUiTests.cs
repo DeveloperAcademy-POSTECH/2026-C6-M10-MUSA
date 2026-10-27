@@ -137,7 +137,8 @@ namespace C6Lab.Tests
             string battleState = JsonUtility.ToJson(battle);
             Image[] circles = { hud.localPlayerCircle, hud.leftPlayerCircle, hud.rightPlayerCircle };
             Image[] battleSamples = { hud.localPlayerPatternSample, hud.leftPlayerPatternSample, hud.rightPlayerPatternSample };
-            int[] numbers = { 4, 3, 5 };
+            // Clockwise lobby order: from P4, P5 is on the left and P3 is on the right.
+            int[] numbers = { 4, 5, 3 };
             Vector2[] battlePositions = null, battleSizes = null;
 
             // The settings use the ordinary Host lobby form. Battle ownership below is
@@ -172,8 +173,8 @@ namespace C6Lab.Tests
                 RefreshHud();
                 Canvas.ForceUpdateCanvases();
                 Assert.That(hud.seatText.text, Is.EqualTo("P4"));
-                Assert.That(hud.leftNeighborText.text, Is.EqualTo("P3"));
-                Assert.That(hud.rightNeighborText.text, Is.EqualTo("P5"));
+                Assert.That(hud.leftNeighborText.text, Is.EqualTo("P5"));
+                Assert.That(hud.rightNeighborText.text, Is.EqualTo("P3"));
                 for (int i = 0; i < battleSamples.Length; i++)
                 {
                     Assert.That(battleSamples[i].gameObject.activeInHierarchy, Is.EqualTo(enabled));
@@ -215,9 +216,14 @@ namespace C6Lab.Tests
                 }
             });
             RefreshHud();
+            Assert.That(hud.seatText.text, Is.EqualTo("P3"));
+            Assert.That(hud.leftNeighborText.text, Is.EqualTo("P1"));
+            Assert.That(hud.rightNeighborText.text, Is.EqualTo("P2"));
             AssertSample(hud.localPlayerPatternSample, 3);
-            AssertSample(hud.leftPlayerPatternSample, 2);
-            AssertSample(hud.rightPlayerPatternSample, 1);
+            AssertSample(hud.leftPlayerPatternSample, 1);
+            AssertSample(hud.rightPlayerPatternSample, 2);
+            Assert.That(hud.leftPlayerCircle.sprite, Is.SameAs(hud.playerCircleSprites[0]));
+            Assert.That(hud.rightPlayerCircle.sprite, Is.SameAs(hud.playerCircleSprites[1]));
             Assert.That(hud.playerSlotPatternSamples.All(sample => !sample.gameObject.activeInHierarchy), Is.True);
 
             SetSnapshot(new LabSnapshot {

@@ -176,6 +176,10 @@ namespace C6Lab
         private ulong charmedPlayer;
         private double charmStartedAt = -1d, charmUntil = -1d;
         private int charmTaps;
+        // 매혹 예고와 양옆 풀기 (#305): the Host picks the charmed player charmWarnedAt, the charm starts after the
+        // warning, and each player beside keeps their own tap count.
+        private double charmWarnedAt = -1d;
+        private readonly Dictionary<ulong, int> charmHelperTaps = new Dictionary<ulong, int>();
         private uint drumHandoffCount;
         private readonly LabGourdCombo combo = new LabGourdCombo();
         // 던진 순간의 페널티 배율 (#222). 날아가는 동안 페널티가 끝나도 그 공은 던질 때 크기 그대로 칠한다.
@@ -320,8 +324,9 @@ namespace C6Lab
             sabotageCount = 0;
             lastSabotageTarget = null;
             charmedPlayer = 0;
-            charmStartedAt = charmUntil = -1d;
+            charmStartedAt = charmUntil = charmWarnedAt = -1d;
             charmTaps = 0;
+            charmHelperTaps.Clear();
             nextSabotageAt = legacyMix || stageYokai == LabStageYokai.Gumiho
                 ? now + SabotageDelay(0u) : double.PositiveInfinity;
             combo.Reset();
@@ -523,7 +528,7 @@ namespace C6Lab
                 return true;
             }
             int receiverSeat = teamMode ? LabTeams.TeammateSeat(players[sender].seat)
-                : (players[sender].seat + (right ? 1 : activeSeatCount - 1)) % activeSeatCount;
+                : LabPlayerSlots.NeighborSeat(players[sender].seat, activeSeatCount, right);
             ulong receiver = seats[receiverSeat];
             // A drum is not a stored orb, so a full board still receives it.
             if (!current.kind.IsDrum() && CountStored(receiver) >= rules.OrbStorageLimit)
@@ -597,7 +602,7 @@ namespace C6Lab
         /// <summary>
         /// Atomically confirm one Host-owned projectile collision, rewards, CPU paint and victory.
         /// actualDamage is the HP really removed. impactValue is the positive presentation/attack
-        /// value in Paint (even after its diagnostic HP reaches zero), and actualDamage in Crack.
+        /// value even after the diagnostic HP reaches zero.
         /// </summary>
         public bool ConfirmHit(string id, double now, Vector3 paintDirection,
             out LabOrbElement element, out int actualDamage, out int impactValue)
@@ -616,19 +621,18 @@ namespace C6Lab
             int previousHp = hp;
             hp = Math.Max(0, hp - attackValue);
             actualDamage = previousHp - hp;
-            bool paintRound = rules.GourdMode == LabGourdMode.Paint;
-            impactValue = paintRound ? attackValue : actualDamage;
+            impactValue = attackValue;
             attacker.stamina = Mathf.Min(rules.StaminaMax, attacker.stamina + rules.HitRecovery);
             attacker.hitTotal++;
             attacker.throwTotal++;
-            // Paint keeps the existing attack-score statistic; Crack records actual HP removed.
+            // Keep the attack-score statistic even after diagnostic HP reaches zero.
             // Long paint rounds can outlive diagnostic HP, so prevent the integer score wrapping.
             attacker.damageTotal = (int)Math.Min(int.MaxValue,
-                (long)attacker.damageTotal + (paintRound ? attackValue : actualDamage));
+                (long)attacker.damageTotal + attackValue);
 
             if (teamMode)
                 ConfirmTeamHit(attacker, element, paintDirection, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale, now);
-            else if (paintRound)
+            else
             {
                 if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
                     && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1,
@@ -638,11 +642,6 @@ namespace C6Lab
                     phase = LabPhase.Victory;
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
                 }
-            }
-            else if (hp == 0)
-            {
-                phase = LabPhase.Victory;
-                attacker.lastHit = true;
             }
             if (rules.ComboEnabled && combo.Active)
             {
@@ -860,7 +859,7 @@ namespace C6Lab
         private bool OtherOpenOn(ulong player, double at, LabYaguangEvent self)
         {
             if (BlockOn(at) && swipeBlockedPlayer == player) return true;
-            if (self != LabYaguangEvent.Sabotage && CharmOn(at) && charmedPlayer == player) return true;
+            if (self != LabYaguangEvent.Sabotage && CharmComingOrOn(at) && charmedPlayer == player) return true;
             foreach (LabOrbState orb in orbs.Values)
             {
                 if (orb.owner != player) continue;
@@ -918,7 +917,7 @@ namespace C6Lab
                     return double.PositiveInfinity;
             double end = before;
             if (BlockOn(before) && swipeBlockedPlayer == player) end = Math.Max(end, swipeBlockedUntil);
-            if (CharmOn(before) && charmedPlayer == player) end = Math.Max(end, charmUntil);
+            if (CharmComingOrOn(before) && charmedPlayer == player) end = Math.Max(end, charmUntil);
             return end;
         }
 
@@ -1162,6 +1161,38 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// 이 사람이 지금 섬광에 눈부신지 (#301): 마지막 섬광을 맞았고, 눈부심 시간이 아직 지나지 않았고,
+        /// 그 뒤 폰을 흔들어 풀지 않았다. 회복 중은 눈부신 것으로 치지 않는다.
+        /// </summary>
+        public bool FlashGlared(ulong player, double now)
+        {
+            if (!rules.FlashEnabled || phase != LabPhase.Playing || flashCount == 0 || lastFlashAt < 0d) return false;
+            if (rules.FlashTargetOne && lastFlashTarget != player) return false;
+            if (!players.TryGetValue(player, out var state)) return false;
+            if (now < lastFlashAt || now >= lastFlashAt + rules.FlashGlareSeconds) return false;
+            return state.flashReleasedAt < lastFlashAt;
+        }
+
+        /// <summary>
+        /// 야광귀 섬광 해제 (#301): 눈부신 사람이 폰을 다 흔들었다. 그 사람의 눈부심만 풀고 이 시각을 남긴다.
+        /// 흔들어 풀기가 꺼져 있거나, 보낸 사람이 지금 눈부시지 않으면(이미 풀었거나 시간이 지났으면) false.
+        /// </summary>
+        public bool TryFlashShakeRelease(ulong sender, double now)
+        {
+            if (!rules.FlashShakeRelease || !TryAdvance(now, out _) || !FlashGlared(sender, now)) return false;
+            players[sender].flashReleasedAt = now;
+            return true;
+        }
+
+        /// <summary>A wire request belongs to exactly one flash; late reports cannot clear a later flash.</summary>
+        public bool TryFlashShakeRelease(ulong sender, uint generation, double now)
+        {
+            if (!rules.FlashShakeRelease || generation == 0 || !TryAdvance(now, out _)
+                || generation != flashCount) return false;
+            return TryFlashShakeRelease(sender, now);
+        }
+
+        /// <summary>
         /// Remove an expired or missed projectile without damage or a hit reward.
         /// countThrow: 빗나간 투척으로 던진 공 수(명중률 분모)에 넣을지. 지귀 불을 노린 투척은 false.
         /// 라운드가 진행 중일 때만 센다.
@@ -1177,28 +1208,45 @@ namespace C6Lab
 
         private bool BlockOn(double now) => phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt;
         private bool CharmOn(double now) => phase == LabPhase.Playing && charmUntil > now && now >= charmStartedAt;
+        /// <summary>The charm warning (#305): the charmed player is chosen and every screen is told, but they can still throw.</summary>
+        private bool CharmWarning(double now) => phase == LabPhase.Playing && charmWarnedAt >= 0d && now >= charmWarnedAt
+            && now < charmStartedAt;
+        private bool CharmComingOrOn(double now) => CharmWarning(now) || CharmOn(now);
 
         /// <summary>Whether the fox's charm (#251) keeps this player from attacking at this Host time.</summary>
         public bool Charmed(ulong player, double now) => CharmOn(now) && player == charmedPlayer;
 
         /// <summary>
-        /// 매혹 (#251): 홀린 사람의 양옆 사람이 하트 말풍선을 누른 한 번. 정해 둔 횟수가 모이면 매혹이 바로 풀린다.
-        /// 양옆이 아닌 사람, 홀린 사람 자신, 매혹이 없을 때, 깨우기가 꺼져 있을 때는 받지 않는다. 이 탭으로 깨어났으면
+        /// 매혹 (#251, #305): 홀린 사람의 양옆 사람이 하트 말풍선을 누른 한 번. 양옆 사람이 각자 정해 둔 횟수를 채워야
+        /// 매혹이 풀린다 (둘이 하는 판은 상대 한 사람). 먼저 다 채운 사람의 더 누르기는 세지 않는다. 양옆이 아닌 사람,
+        /// 홀린 사람 자신, 예고 중이거나 매혹이 없을 때, 깨우기가 꺼져 있을 때는 받지 않는다. 이 탭으로 깨어났으면
         /// woken에 그 사람을, 아니면 null을 돌려준다 (Host의 플레이어 ID도 0이므로 구분한다).
         /// </summary>
         public bool TryCharmTap(ulong sender, double now, out ulong? woken)
         {
             woken = null;
             if (!TryAdvance(now, out _) || !CharmOn(now) || rules.CharmRescueTaps <= 0 || sender == charmedPlayer
-                || !players.TryGetValue(sender, out var tapper) || !players.TryGetValue(charmedPlayer, out var charmed))
+                || Array.IndexOf(CharmHelpers(), sender) < 0)
                 return false;
-            int apart = (tapper.seat - charmed.seat + activeSeatCount) % activeSeatCount;
-            if (apart != 1 && apart != activeSeatCount - 1) return false;
+            charmHelperTaps.TryGetValue(sender, out int taps);
+            if (taps >= rules.CharmRescueTaps) return true;
+            charmHelperTaps[sender] = taps + 1;
             charmTaps++;
-            if (charmTaps < rules.CharmRescueTaps) return true;
+            foreach (ulong helper in CharmHelpers())
+                if (!charmHelperTaps.TryGetValue(helper, out int done) || done < rules.CharmRescueTaps) return true;
             charmUntil = now;
             woken = charmedPlayer;
             return true;
+        }
+
+        /// <summary>The players beside the charmed one, in seat order: two, or one in a two-player room, or none solo (#305).</summary>
+        private ulong[] CharmHelpers()
+        {
+            if (!players.TryGetValue(charmedPlayer, out var charmed) || activeSeatCount < 2) return Array.Empty<ulong>();
+            int seat = charmed.seat;
+            ulong before = seats[(seat + activeSeatCount - 1) % activeSeatCount];
+            ulong after = seats[(seat + 1) % activeSeatCount];
+            return before == after ? new[] { before } : new[] { before, after };
         }
 
         public LabSnapshot Snapshot(double now)
@@ -1234,10 +1282,14 @@ namespace C6Lab
                 swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
                 swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
                 swipeBlockedUntil = BlockOn(now) ? swipeBlockedUntil : -1d,
-                charmedPlayer = CharmOn(now) ? charmedPlayer : 0,
-                charmStartedAt = CharmOn(now) ? charmStartedAt : -1d,
-                charmUntil = CharmOn(now) ? charmUntil : -1d,
+                charmedPlayer = CharmComingOrOn(now) ? charmedPlayer : 0,
+                charmStartedAt = CharmComingOrOn(now) ? charmStartedAt : -1d,
+                charmUntil = CharmComingOrOn(now) ? charmUntil : -1d,
                 charmTaps = CharmOn(now) ? charmTaps : 0,
+                charmWarnedAt = CharmComingOrOn(now) ? charmWarnedAt : -1d,
+                charmHelpers = CharmOn(now) ? CharmHelpers() : Array.Empty<ulong>(),
+                charmHelperTaps = CharmOn(now) ? CharmHelpers().Select(helper =>
+                    charmHelperTaps.TryGetValue(helper, out int taps) ? taps : 0).ToArray() : Array.Empty<int>(),
                 comboActive = combo.Active,
                 comboColors = combo.Count == 0 ? Array.Empty<LabOrbElement>() : combo.Colors,
                 comboProgress = combo.Progress,
@@ -1300,7 +1352,7 @@ namespace C6Lab
                 double effectiveNow = Math.Min(now, deadline);
                 double elapsed = effectiveNow - lastTime;
                 bool paintCompleted = false;
-                if (rules.GourdMode == LabGourdMode.Paint && elapsed > 0d)
+                if (elapsed > 0d)
                 {
                     // A late frame still resolves growth that was due before the deadline.
                     // Growth due exactly at the deadline cannot outrun the existing timeout rule.
@@ -1494,13 +1546,18 @@ namespace C6Lab
             swipeBlockedUntil = at + rules.SwipeBlockSeconds;
         }
 
-        /// <summary>매혹 (#251): 이 사람은 정해 둔 시간 동안 헤롱헤롱해 공격(위로 던지기)을 못 한다.</summary>
+        /// <summary>
+        /// 매혹 (#251): 이 사람은 정해 둔 시간 동안 헤롱헤롱해 공격(위로 던지기)을 못 한다. #305: 예고 시간만큼 먼저 모두에게
+        /// 알리고 그 뒤에 걸린다 (예고 0이면 바로).
+        /// </summary>
         private void StartCharm(ulong target, double at)
         {
             charmedPlayer = target;
-            charmStartedAt = at;
-            charmUntil = at + rules.CharmSeconds;
+            charmWarnedAt = at;
+            charmStartedAt = at + rules.CharmWarningSeconds;
+            charmUntil = charmStartedAt + rules.CharmSeconds;
             charmTaps = 0;
+            charmHelperTaps.Clear();
         }
 
         /// <summary>
@@ -1584,7 +1641,7 @@ namespace C6Lab
         {
             var targets = new List<ulong>();
             bool blocking = BlockOn(at);
-            bool charming = CharmOn(at);
+            bool charming = CharmComingOrOn(at);
             if (kind == LabSabotageKind.SwipeBlock && blocking) return targets;
             if (kind == LabSabotageKind.Charm && charming) return targets;
             for (int i = 0; i < activeSeatCount; i++)
@@ -1827,8 +1884,11 @@ namespace C6Lab
             /// <summary>Fox fire (#251): how many fox orbs fall, and how long after they fall they cannot be touched off.</summary>
             public readonly int FoxFireCountMin, FoxFireCountMax;
             public readonly float FoxFireSafeSeconds;
-            /// <summary>Charm (#251): how long it lasts, and how many taps from the players beside wake the charmed one.</summary>
-            public readonly float CharmSeconds;
+            /// <summary>
+            /// Charm (#251): how long it lasts, and how many taps each player beside must give to wake the charmed one
+            /// (#305); the warning before it starts.
+            /// </summary>
+            public readonly float CharmSeconds, CharmWarningSeconds;
             public readonly int CharmRescueTaps;
             public readonly float[] DrumStopBounds;
             public readonly int[] DrumStopChances;
@@ -1841,6 +1901,8 @@ namespace C6Lab
             public readonly bool FlashEnabled, FlashTargetOne;
             public readonly float FlashFirstStartSeconds, FlashIntervalSeconds, FlashWarningSeconds,
                 FlashGlareSeconds, FlashRecoverySeconds;
+            /// <summary>Yaguang flash release (#301): a dazzled player shakes their phone to clear their own glare.</summary>
+            public readonly bool FlashShakeRelease;
 
             public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode)
             {
@@ -1867,6 +1929,7 @@ namespace C6Lab
                 FoxFireCountMax = config.FoxFireCountMax;
                 FoxFireSafeSeconds = config.FoxFireSafeSeconds;
                 CharmSeconds = config.CharmSeconds;
+                CharmWarningSeconds = config.CharmWarningSeconds;
                 CharmRescueTaps = config.CharmRescueTaps;
                 DrumStopBounds = config.DrumStopBounds();
                 DrumStopChances = config.DrumStopChances();
@@ -1913,6 +1976,7 @@ namespace C6Lab
                 FlashWarningSeconds = config.YaguangFlashWarningSeconds;
                 FlashGlareSeconds = config.YaguangFlashGlareSeconds;
                 FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
+                FlashShakeRelease = config.YaguangFlashShakeRelease;
                 TeamFeverHits = teamMode ? config.TeamFeverHits : 0;
                 TeamFeverSeconds = config.TeamFeverSeconds;
                 if (!teamMode) return;

@@ -25,8 +25,8 @@ namespace C6Lab.Tests
 
             LabHud.GetNeighborLabels(snapshot, 17, out string left, out string right);
 
-            Assert.That(left, Is.EqualTo("P2"));
-            Assert.That(right, Is.EqualTo("P4"));
+            Assert.That(left, Is.EqualTo("P4"));
+            Assert.That(right, Is.EqualTo("P2"));
         }
 
         [Test]

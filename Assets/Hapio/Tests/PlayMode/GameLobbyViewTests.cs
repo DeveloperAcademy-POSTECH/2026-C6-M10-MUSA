@@ -81,7 +81,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator CreatedTwoPlayerCardEntersTheGameLobbyAndHostCanChooseClearAndReturnToTheBrowser()
+        public IEnumerator CreatingARoomAutomaticallyEntersTheGameLobbyAndHostCanChooseClearAndCreateAnotherRoom()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
             GameLobbyView view = View();
@@ -90,25 +90,30 @@ namespace Hapio.Tests
             yield return Click(view.createButton);
             Assert.That(view.modePanel.activeInHierarchy, Is.True, "새 방 만들기 first asks which mode to open (#281).");
             Assert.That(session.PendingRooms, Is.Empty);
-            yield return Click(view.basicModeButton);
+            DispatchClick(view.basicModeButton);
             Assert.That(view.modePanel.activeSelf, Is.False);
             Assert.That(session.PendingRooms.Count, Is.EqualTo(1));
             Assert.That(session.PendingRooms.Single().Mode, Is.EqualTo(GameMode.Story));
+            ushort reservedPort = session.PendingRooms.Single().Port;
+            Assert.That(session.IsCreatingRoom, Is.True);
             Assert.That(session.Network.IsConnected, Is.False);
             Assert.That(view.CreationCapacity, Is.Zero);
-            yield return Until(() => session.PendingRooms.Single().Ready
-                && view.roomContent.GetComponentsInChildren<UnityEngine.UI.Button>()
-                    .Any(button => button.name == "CreatedRoom" && button.interactable), "A confirmed pending game-room card", 15f);
-            string name = session.PendingRooms.Single().Name;
-            var row = view.roomContent.GetComponentsInChildren<UnityEngine.UI.Button>().Single(button => button.name == "CreatedRoom");
-            Assert.That(row.transform.Find("Name").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo(LabRoomNames.Display(name)));
-            yield return Click(row);
+            Assert.That(session.CreateAndEnterRoom(5), Is.False, "A second request must not create another advertised room.");
+            session.Host(); session.StartSolo(); session.JoinDirect("127.0.0.1");
+            Assert.That(session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False,
+                "Another connection path cannot race the pending automatic entry.");
+            Assert.That(session.PendingRooms.Count, Is.EqualTo(1));
+            // No room-card click: native registration and the session update must perform the handover.
             yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
                 && SceneManager.GetActiveScene().path == GameScenePaths.Lobby, "The authoritative game lobby Scene");
             yield return null;
             view = View();
             Assert.That(session.Network.GameFlowEnabled, Is.True);
             Assert.That(session.Network.IsHost, Is.True);
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.Network.port, Is.EqualTo(reservedPort), "Automatic entry must retain the reserved advertised port.");
+            Assert.That(session.Network.ConnectedRoomName, Does.StartWith(LabRoomNames.GameServiceBase));
+            Assert.That(view.roomName.text, Is.EqualTo(LabRoomNames.Display(session.Network.ConnectedRoomName)));
             Assert.That(session.Network.LocalSlotNumber, Is.Zero);
             Assert.That(session.PendingRooms, Is.Empty);
             Assert.That(view.positionPage.activeInHierarchy, Is.True);
@@ -147,6 +152,68 @@ namespace Hapio.Tests
             view = View();
             Assert.That(view.browserPage.activeInHierarchy, Is.True);
             Assert.That(view.titlePage.activeSelf, Is.False);
+            yield return Click(view.countButtons[3]);
+            yield return Click(view.createButton);
+            DispatchClick(view.basicModeButton);
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && session.Network.IsHost, "A second automatically entered room after leaving the first", 15f);
+            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(5));
+            Assert.That(session.Network.LocalSlotNumber, Is.Zero);
+            Assert.That(session.PendingRooms, Is.Empty);
+        }
+
+        [UnityTest]
+        public IEnumerator PendingAutomaticCreationCanBeCanceledOrTimedOutWithoutLeavingAnAdvertisedRoom()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            session.EnterRoomBrowser();
+            Assert.That(session.CreateAndEnterRoom(2), Is.True, session.UiNotice);
+            ushort canceledPort = session.PendingRooms.Single().Port;
+            Assert.That(session.CancelRoomCreation(), Is.True);
+            Assert.That(session.CancelRoomCreation(), Is.False);
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.Network.IsConnected, Is.False);
+            using (var released = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+                Assert.DoesNotThrow(() => released.Bind(new IPEndPoint(IPAddress.Any, canceledPort)));
+
+            Assert.That(session.CreateAndEnterRoom(3), Is.True, session.UiNotice);
+            ushort timedOutPort = session.PendingRooms.Single().Port;
+            // Expire the real request before the next native registration tick without a 30-second test wait.
+            typeof(GameSession).GetField("roomCreationDeadline", System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic).SetValue(session, Time.realtimeSinceStartupAsDouble - 1d);
+            yield return null;
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.Network.IsConnected, Is.False);
+            Assert.That(session.UiNotice, Does.Contain("초과"));
+            using (var released = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+                Assert.DoesNotThrow(() => released.Bind(new IPEndPoint(IPAddress.Any, timedOutPort)));
+            Assert.That(session.CreateAndEnterRoom(2), Is.True, "A timed-out request must not prevent a new one.");
+            session.GoHome();
+            Assert.That(session.IsCreatingRoom, Is.False, "Returning Home must cancel an unfinished creation.");
+            Assert.That(session.PendingRooms, Is.Empty);
+        }
+
+        [UnityTest]
+        public IEnumerator TerritoryCreateButtonAlsoEntersItsFourPlayerLobbyAutomatically()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            GameLobbyView view = View();
+            yield return Click(view.enterButton);
+            yield return Click(view.createButton);
+            DispatchClick(view.teamModeButton);
+            Assert.That(session.IsCreatingRoom, Is.True);
+            Assert.That(session.PendingRooms.Single().Mode, Is.EqualTo(GameMode.Territory));
+            Assert.That(session.PendingRooms.Single().Capacity, Is.EqualTo(LabTeams.Players));
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && session.Network.IsHost, "Four-player territory lobby without clicking a pending card", 15f);
+            Assert.That(session.IsTerritory, Is.True);
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(LabTeams.Players));
+            Assert.That(session.Network.LocalSlotNumber, Is.Zero);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(View().teamLayout.activeInHierarchy, Is.True);
         }
 
         [UnityTest]
@@ -280,11 +347,16 @@ namespace Hapio.Tests
             Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject), Is.SameAs(button.gameObject), button.name);
         }
 
-        private static IEnumerator Click(UnityEngine.UI.Button button)
+        private static void DispatchClick(UnityEngine.UI.Button button)
         {
             AssertTouchable(button);
             var data = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
             ExecuteEvents.Execute(button.gameObject, data, ExecuteEvents.pointerClickHandler);
+        }
+
+        private static IEnumerator Click(UnityEngine.UI.Button button)
+        {
+            DispatchClick(button);
             yield return null; yield return null;
         }
 

@@ -212,7 +212,8 @@ namespace C6Lab
             amount = Math.Max(0m, Math.Min(amount, CellCount - CoveredCount - region.Budget));
             if (amount == 0m) return null;
             ulong sequence = ++supplySequence;
-            var ink = new Ink { Sequence = sequence, Remaining = amount, Color = color, Owner = owner, PainterSlot = painterSlot };
+            var ink = new Ink { Sequence = sequence, Remaining = amount, Color = color, Owner = owner,
+                PainterSlot = painterSlot, VisualBudget = amount };
             // Existing fill/vertical weights choose a boundary once per accepted repeat hit.
             // Overlap credit instead stays centered on its own initial impact. Subsequent
             // cells use the frozen job's geometry rather than another global boundary draw.
@@ -273,6 +274,8 @@ namespace C6Lab
                 throw new InvalidOperationException("Growth must fund a new surface cell.");
             Ink ink = Consume(region, immediateInk);
             if (ink.Anchor < 0) ink.Anchor = cell;
+            // Read the frozen job only. Recording a visual hint never draws gameplay RNG.
+            if (immediateInk == null) RecordGrowthVisual(ink, cell);
             pixels[cell] = ink.Color;
             painterSlots[cell] = ink.PainterSlot;
             cellRegions[cell] = region.Id;
@@ -436,6 +439,7 @@ namespace C6Lab
             preview = replica = false;
             flowDirection = Vector3.down;
             ClearDrying();
+            ClearVisualStamps();
             unchecked { Revision++; }
         }
 
@@ -490,8 +494,11 @@ namespace C6Lab
         /// Atomically install a validated Client replica. It has no reconstructed growth
         /// authority. Reset/Clear is needed before the instance can paint a fresh local map.
         /// </summary>
-        public bool TryReplacePixels(int columns, int rows, uint revision, Color32[] source, byte[] painterSlots, int paintCount)
+        public bool TryReplacePixels(int columns, int rows, uint revision, Color32[] source, byte[] painterSlots, int paintCount,
+            LabPaintVisualStamp[] visualStamps = null)
         {
+            var nextVisualStamps = visualStamps ?? Array.Empty<LabPaintVisualStamp>();
+            if (!LabPaintVisualStamp.Valid(nextVisualStamps)) return false;
             if (!((columns == 64 && rows == 32) || (columns == 128 && rows == 64)
                 || (columns == Width && rows == Height)) || source == null
                 || source.Length != columns * rows || painterSlots == null
@@ -521,6 +528,7 @@ namespace C6Lab
             LastPainter = 0; speedCredit = totalBudget = 0m;
             preview = false; replica = true;
             ClearDryingReplica();
+            ReplaceVisualStamps(nextVisualStamps);
             return true;
         }
 
@@ -583,6 +591,8 @@ namespace C6Lab
             public int Anchor = -1;
             public ulong Sequence;
             public decimal Remaining;
+            public decimal VisualBudget;
+            public bool VisualRecorded;
             public Color32 Color;
             public ulong Owner;
             public byte PainterSlot;

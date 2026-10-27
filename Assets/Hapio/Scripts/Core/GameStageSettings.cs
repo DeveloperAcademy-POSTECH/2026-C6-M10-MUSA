@@ -12,6 +12,8 @@ namespace Hapio
     {
         public const int TerritoryScope = 4;
         private const int TerritorySwitch = 196;
+        /// <summary>섬광 대상 (0 모두, 1 한 명). 게임에서는 모두로 고정한다 (#301).</summary>
+        public const int FlashTargetOneField = 185;
         private readonly LabConfig template;
         private float[] common;
         private readonly float[][] effective = new float[3][];
@@ -31,11 +33,14 @@ namespace Hapio
                     float[] values = (float[])common.Clone();
                     foreach (GameStageValue item in catalog.Get(s).defaultValues ?? Array.Empty<GameStageValue>())
                         values[item.index] = item.value;
+                    values[FlashTargetOneField] = 0f; // 섬광은 언제나 모두에게 (#301)
                     if (!Validate(values, out string error)) throw new InvalidOperationException(error);
                     effective[s - 1] = values;
                 }
                 territory = (float[])common.Clone();
                 territory[TerritorySwitch] = 1f;
+                foreach (GameStageValue item in catalog.territoryDefaultValues ?? Array.Empty<GameStageValue>())
+                    territory[item.index] = item.value;
                 if (!Validate(territory, out string territoryError)) throw new InvalidOperationException(territoryError);
             }
             catch { Dispose(); throw; }
@@ -45,12 +50,21 @@ namespace Hapio
             CheckScope(scope);
             return (float[])(scope == 0 ? common : scope == TerritoryScope ? territory : effective[scope - 1]).Clone();
         }
+        /// <summary>
+        /// 2:2 (#305) keeps its own stamina, generation and orb lifetime: the story's values (Common) stop at the
+        /// three stages and never reach the territory room, and the territory room's never reach Common.
+        /// </summary>
+        public static bool IsTerritoryOwned(int index) => index >= 3 && index <= 8 || index == 10;
         public static bool IsFieldVisible(int scope, int index)
         {
             if (scope < 0 || scope > TerritoryScope || index < 0 || index >= LabConfig.DeveloperFields.Count) return false;
-            if (scope == TerritoryScope) return index >= 197 && index <= 199;
-            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191;
-            bool gumiho = index >= 166 && index <= 177;
+            if (index == 79) return false; // Retired crack-mode selector; numeric slot stays reserved.
+            if (scope == TerritoryScope) return index >= 197 && index <= 199 || IsTerritoryOwned(index);
+            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203;
+            // The game always flashes everyone (#301); Lab alone can select a single target.
+            if (index == FlashTargetOneField) return false;
+            // #305 is appended after both #301 fields in the combined schema.
+            bool gumiho = index >= 166 && index <= 177 || index == 204;
             bool jigwi = index >= 178 && index <= 183 || index >= 192 && index <= 195;
             // 2:2 땅따먹기 (#281)의 켜기/끄기·시간·피버는 3요괴 스테이지 설정에 넣지 않는다.
             bool team = index >= 196 && index <= 199;
@@ -75,7 +89,8 @@ namespace Hapio
             for (int s = 0; s < 4; s++)
             {
                 candidates[s] = (float[])(s < 3 ? effective[s] : territory).Clone();
-                for (int i = 0; i < values.Length; i++) if (IsFieldVisible(0, i)) candidates[s][i] = values[i];
+                for (int i = 0; i < values.Length; i++)
+                    if (IsFieldVisible(0, i) && !(s == 3 && IsTerritoryOwned(i))) candidates[s][i] = values[i];
                 if (!Validate(candidates[s], out error)) return false;
             }
             common = (float[])values.Clone();
@@ -111,12 +126,12 @@ namespace Hapio
             float[] nextCommon = (float[])common.Clone();
             var nextStages = new float[4][];
             for (int i = 0; i < values.Length; i++)
-                if (IsFieldVisible(0, i)) nextCommon[i] = values[i];
+                if (SharesCommon(stage, i)) nextCommon[i] = values[i];
             for (int s = 1; s <= TerritoryScope; s++)
             {
                 nextStages[s - 1] = Capture(s);
                 for (int i = 0; i < values.Length; i++)
-                    if (IsFieldVisible(0, i) || s == stage && IsFieldVisible(stage, i))
+                    if (SharesCommon(stage, i) && SharesCommon(s, i) || s == stage && IsFieldVisible(stage, i))
                         nextStages[s - 1][i] = values[i];
                 if (!Validate(nextStages[s - 1], out error)) return false;
             }
@@ -129,6 +144,9 @@ namespace Hapio
             error = string.Empty;
             return true;
         }
+        /// <summary>A Common field this scope takes from (and gives to) Common; the territory room keeps its own.</summary>
+        private static bool SharesCommon(int scope, int index) =>
+            IsFieldVisible(0, index) && !(scope == TerritoryScope && IsTerritoryOwned(index));
         private bool Validate(float[] values, out string error)
         {
             var candidate = UnityEngine.Object.Instantiate(template);

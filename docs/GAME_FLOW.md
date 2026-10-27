@@ -5,9 +5,10 @@
 ## 실행과 빌드
 
 1. Unity에서 `Hapio > Open Home`을 선택하거나 `Assets/Hapio/Scenes/Home.unity`를 연다.
-2. Play 후 한지 타이틀의 **게임 시작**을 누른다. 방 목록에서 2~5명을 선택해 **새 방 만들기 +**를 누른 뒤, 생성된 **수장고-N** 카드에 입장한다. 다른 참가자도 같은 게임의 방 카드를 눌러 입장한다. 기존 LAN·핫스팟·Direct IP 연결을 유지한다.
+2. Play 후 한지 타이틀의 **게임 시작**을 누른다. 방 목록에서 2~5명을 선택해 **새 방 만들기 +**를 누르면 광고 등록 완료 후 Host 로비에 자동 입장한다. 다른 참가자도 같은 게임의 방 카드를 눌러 입장한다. 기존 LAN·핫스팟·Direct IP 연결을 유지한다.
 3. 로비에서 각자 고유한 P번호를 선택한다. 목표 인원·자리 선택·설정 확인이 완료되면 Host가 **요괴 봉인 시작 · 3스테이지**를 누른다.
-4. 1·2스테이지의 결과에서 Host가 NEXT를 눌러 전원이 다음 스테이지로 이동한다. 3스테이지 결과에서는 각자 HOME으로 돌아간다.
+4. 전환 중 준비 인원이 표시되고 전원 첫 상태 수신·화면 준비 후 `3 → 2 → 1 → 시작!`과 함께 전투가 시작된다(#306).
+5. 1·2스테이지의 결과에서 Host가 NEXT를 눌러 전원이 다음 스테이지로 이동한다. 3스테이지 결과에서는 각자 HOME으로 돌아간다.
 
 빠른 로컬 확인은 Home의 **DEV · SOLO** 버튼으로 가능하다. 일반 방은 기존 2~5명 연결 규칙을 사용한다. 새 게임과 구형 Lab은 연결 승인 토큰이 다르므로 같은 방에서 섞어 사용할 수 없다. 새 로비 카드로 만든 게임의 실제 Bonjour 서비스 이름은 `Hapio-Room` 계열이고 화면에는 `수장고-N`으로 표시한다. 화면에서 쓰지 않는 기존 직접 `GameSession.Host()` API는 호환성을 위해 `Hapio-<8자리 GUID>` 이름을 유지한다. 서비스 종류는 공유하지만 TXT 규약을 Lab/Game별로 구분하므로 서로의 방은 검색 결과에서 제외한다. 직접 IP로 잘못된 종류나 구버전 방에 접속하면 최종 연결 승인에서 거절한다.
 
@@ -34,7 +35,7 @@
 - `GameRunFlow`가 `runId`, `stageIndex`(1~3), 상태, revision, 종료 사유를 관리한다.
 - 기존 전투의 `sessionId/round`는 별개다. 매 스테이지 새 전투 ID로 이전 판의 구슬·전달·투척 요청을 차단한다.
 - `GameBattleBindings`가 새 Battle의 객체를 영속 Network에 연결한다. 이 연결은 기존 전투 초기화 코드보다 먼저 이뤄진다. Scene을 떠날 때 해당 참조·입력 구독·투사체를 정리한다.
-- 전원 Battle 로딩 완료 + 최신 설정 확인 후 Host가 전투를 시작한다. 이전 스테이지의 로딩 ACK는 다음 스테이지에 사용할 수 없다.
+- 전원 Battle 로딩·최신 설정·첫 상태와 화면 준비 확인 후 공통 카운트다운을 거쳐 Host가 전투를 시작한다. 이전 스테이지의 로딩 ACK는 다음 스테이지에 사용할 수 없다.
 - 첫 스테이지 준비부터 홈 복귀 전까지 P번호 변경과 새 참가 승인을 잠근다. Scene 로딩 중 전투 모델이 잠시 없어도 이 잠금은 유지하며, 새 방에서는 해제한다.
 - 결과도 각 기기가 실제 결과·완성 도색 사본을 보관하고 StageResult를 로드한 뒤 ACK한다. Host NEXT와 최종 HOME은 이 준비를 기다린다.
 - 로딩/결과 동기화 대기 한도는 `GameSession.loadingTimeoutSeconds`(Prefab Inspector, 기본 30초)다. 중간 단계 동기화 실패는 게임 오버로 종료한다. 이미 확정된 최종 클리어는 유지하며 관람 사본을 확보하지 못했다는 안내와 함께 최종 결과로 이동한다. 없는 도색을 만들어내지 않는다.
@@ -59,7 +60,7 @@
 
 새 코드: `Assets/Hapio/Scripts/Core/{GameSession,GameRunFlow,GameFlowState,GameFlowSnapshot,GameScenePaths}.cs`, `Scripts/UI`, `Editor/GameSceneBuilder.cs`, `Editor/GameBuild.cs`.
 
-기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **200개·프로토콜5662**다. 기존0~191 인덱스는 유지하고 지귀 자동 패턴4칸을192~195에, #281 2:2 땅따먹기4칸을196~199에 추가한다. 새 게임 연결 토큰 `C6HapioGame/5`와 단일 Lab의 `C6PhysicsLab/23`은 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
+기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **205개·프로토콜5666**다. 기존0~199와 #299 고해상도 설정200~201을 유지하고, #301 섬광 흔들어 풀기202~203과 #305 매혹 예고204를 함께 사용한다. 단독 PR이 같은 번호를 다른 필드에 사용하므로 통합 게임 연결 토큰은 `C6HapioGame/10`이며 단일 Lab의 `C6PhysicsLab/27`과 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
 
 검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 현재 통합의 실제 실행 결과는 `VALIDATION.md`의 #278 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
 
@@ -96,7 +97,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 
 - `Assets/Hapio/Art/UI/GameLobby.prefab`이 타이틀·방 목록·자리 선택·Direct IP·개발자 솔로 버튼의 공통 저장 UI다. Home/Lobby의 인스턴스가 각 Scene의 `GameScreen`을 참조한다. GameScreen은 기존 공통/구미호/야광귀/지귀 DEV 패널을 유지하고 `externalNavigation`일 때 구형 방/시작 버튼 입력을 연결하지 않는다. `GameLobbyView`는 표시와 입력만 처리하며 소켓·광고·전투 상태를 소유하지 않는다.
 - `GameSession`이 시작부터 하나의 Game-family Network를 유지한다. 생성·카드 입장·검색·직접 IP·자리·시작·홈 동작은 이 세션을 통한다. 시작 버튼은 `StartGame`으로 연결되고 설정 ACK와 전원 로딩 ACK 후 기존 Battle을 시작한다. 시작을 이유로 연결을 다시 만들지 않는다.
-- `GamePendingRoomRegistry`가 미입장 대기 방을 관리한다. 생성 시에는 연결되지 않고, 생성자의 카드 입장 때 확정 광고만 기존 Network로 인계한다. 나머지 대기 방은 Home→Lobby→Battle→결과→Home을 거쳐 유지되며 GameSession 파괴/앱 종료 때 광고·예약 포트를 정리한다.
+- `GamePendingRoomRegistry`가 미입장 대기 방을 관리한다. 광고 준비 시에는 연결되지 않으며, Hapio의 실제 생성 버튼은 등록 완료 뒤 확정 광고를 같은 이름·포트로 자동 인계한다. 기존 별도 대기방 API는 명시적 카드 입장도 지원한다. 나머지 대기 방은 Home→Lobby→Battle→결과→Home을 거쳐 유지되며 GameSession 파괴/앱 종료 때 광고·예약 포트를 정리한다.
 - 로비에서 나가면 방 목록으로 돌아간다. 최종 클리어 또는 게임 오버의 HOME은 타이틀로 돌아간다. 방 이름·Host와 P번호의 분리·2~5인·자리 선택 해제와 공유 설정(현재 200개) 확인 조건은 유지한다.
 - Home/Lobby의 `Hapio UI Background Camera`는 3D 오브젝트를 그리지 않고 검은 배경만 지운다. Canvas는 Screen Space Overlay를 유지하며 Editor의 카메라 없음 안내를 방지한다.
 - 위치 편집은 공통 Prefab에서 한다. `EditableSeatLayouts/Players2..5/P1..PN`이 각 인원의 저장된 자리 앵커이며 해당 앵커를 움직이면 자리 버튼 배치에 반영된다. 원본 Lab Scene의 UI 위치와는 독립적이다.
@@ -137,6 +138,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 - 판 중간에 다른 사람이 나가거나 불러오지 못하면 판을 멈추고 같은 방 로비로 돌아간다(안내 문구 표시). 방장이 나가면 기존처럼 모두 게임 오버다.
 - 한 판이라 결과가 곧 `Completed`다. 결과의 NEXT 자리는 스토리의 "전체 기록 보기" 전환(#284)이 아니라 **로비로**이고, DEV NEXT STAGE(#288)는 `totalStages` 기준이라 2:2에서는 꺼진다. 스토리의 3스테이지 칭호 표와 전체 대시보드는 2:2 결과에 그리지 않는다.
 - 홈·로비 DEV에 다섯 번째 **2:2** 탭(197~199)이 있다. 196 켜기는 방 모드가 정하므로 어느 탭에서도 바꿀 수 없다.
+- #305부터 2:2는 스태미나·생성·구슬 수명(3~8, 10번)을 스토리와 따로 가진다. 2:2 탭에 그 칸이 함께 보이고, 공통 탭의 값은 3요괴 스테이지에만 간다. 2:2 기본값은 `Hapio/StageCatalog`의 `Territory Default Values`(`GameStageSettings.IsTerritoryOwned`)에서 오며 지금은 최대·시작 160(8칸 막대와 맞춤)·1.7초당 20·수명 8초다.
 
 ### 전투 화면 (Lab 공용 HUD·판)
 
@@ -162,3 +164,23 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 ### 아직 없는 것
 
 깃발과 피버 게이지 위치는 그림을 받으면 교체한다. 피버 시작 소리·진동은 아직 없다. 실제 검사·Mac 4앱·iPhone 결과는 `VALIDATION.md`에 따로 기록하며, 기록이 없으면 NOT_RUN이다.
+
+
+## 전원 초기 동기화와 공통 카운트다운 (#306)
+
+시작 버튼 → `LoadingBattle`(Scene·설정 준비) → `SynchronizingBattle`(초기 라운드 상태 반영) → `Countdown` → `Playing` 순서다. 새 상태는 기존 enum 번호 뒤에 추가한다. 첫 라운드·각 NEXT·DEV 같은 스테이지 재시작·솔로·2:2 시작이 같은 절차를 사용하며 Lab 단판은 기존 흐름을 유지한다.
+
+- Host는 전원 Scene·설정 세대 확인 후 새 라운드를 초기화하되 `GameStartHeld`로 게임 시계·조합판/박 물리·모든 전투 입력을 고정한다. 사용자 Pause와 구분하므로 화면 UI·네트워크·공통 서버 시계는 계속 동작한다.
+- 각 기기는 정확한 session/round의 snapshot·확정 도색·자기 owner-board checkpoint·실제 표시 객체·설정·카메라/HUD·박 표현을 확인한다. 표시 초기화에 한 프레임을 준 뒤 `initial_ready`를 보낸다. snapshot만 받은 상태는 완료가 아니다.
+- 전원 완료 후 NGO `ServerTime.Time` 기준 미래 시각을 예약한다. 예약 수신 ACK가 모두 오면 작은 game-flow control의 `countdown_commit`으로 확정한다. 시작 시각은 밀리초로 정규화하고 ACK/확정의 식별은 판·설정·정수 revision으로 검증한다. JSON 왕복 소수점 값을 응답 식별자로 직접 비교하지 않는다. 숫자 표시 전에 예약이 확정되지 않으면 준비 화면을 유지하고 여유 시간을 늘려 다시 예약한다. 각 기기의 기동 시각이나 멈춘 전투 시계로 카운트다운하지 않는다.
+- 공통 시작 시각의 3초 전부터 3/2/1, 해당 시각에 시작!을 표시한다. Host만 실제 판정 시계를 해제하고 참가자는 확정된 예약/Playing과 초기 상태가 맞을 때 조작을 연다. 시작! 표시는 0.5초 후 사라지며 그동안 터치를 가로막지 않는다.
+- Scene 로딩·초기 동기화·예약 확정까지 합쳐 기존 30초 한도를 적용하고 확정된 3초 표시는 별도로 마친다. 구세대·중복 ACK는 판/설정/revision으로 거부하며 재예약하면 이전 예약 ACK를 지운다. 실패·이탈은 기존 Story GameOver와 2:2 같은 방 로비 복귀 정책을 따른다.
+- 전환 UI는 `Resources/Hapio/GameStartOverlay.prefab`의 실제 Canvas·Background·SafeArea·Caption 객체다. 영속 GameSession이 소유하므로 Scene 언로드 중에도 남는다. 기존 Scene 배치를 다시 생성하지 않는다. `Hapio/Create Missing Battle Start Overlay`는 이 새 프리팹이 없을 때만 생성한다.
+
+연결은 `GameSession.Start.cs`(준비·예약·표시), `GameRunFlow`/`GameFlowSnapshot`(세대·전환 검증), `LabNetwork.GameFlow`(초기 상태·내부 hold·시계·해제), `GameBattleBindings.IsPresentationReady`, `GameStartOverlay`다. 현재 작업의 실행 결과와 미실행 환경은 `VALIDATION.md`의 #306 절에 기록한다.
+
+## #315 페인트 완료와 UI 일관성
+
+크랙 모드는 제거하고 페인트만 사용한다. DEV79는 숨긴 고정0 예약 슬롯이며 다른 설정은205개 순서를 유지한다. 일반 협동 자리는 위에서 내려다본 시계방향으로 로비/전투/미니맵/카메라/전달을 통일한다. 스태미나 위치는 유지하고 구슬이 앞에 그려지도록 기존 합성을 복구한다. 결과 관람 이미지는 저장된 viewport 안에서 원본 비율에 맞춘다.
+
+100% 승리는 최종 지도와 고해상도 표현 준비 → 전원 준비 → 공통 시각 예약/확인 →1.2초·표현0.2배의 시각 전용 완료 연출 → 전원 완료 → 결과 전환 순서다. 판정·기여도·원본 물리·Time.timeScale을 재실행하지 않는다. 준비12초 실패에는 승리를 취소하지 않고 연출만 건너뛴다. 세부 구현·예외·확인 순서는 [#315 안내](SESSION_FINISH_UI.md)를 참조한다.
