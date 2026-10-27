@@ -25,6 +25,8 @@ namespace C6Lab
         private Color color;
         private float age;
 
+        /// <summary>The radius it was sized for, in world units.</summary>
+        public float Radius => radius;
         /// <summary>How far through its puff it is, 0 to 1.</summary>
         public float Progress => seconds > 0f ? Mathf.Clamp01(age / seconds) : 1f;
         public int PuffCount => puffs.Length;

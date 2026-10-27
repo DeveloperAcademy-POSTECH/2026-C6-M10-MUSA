@@ -163,7 +163,7 @@ namespace C6Lab
             worldPosition = default;
             right = false;
             int side = PreparedTransferSide;
-            if (side == 0 || !entries.TryGetValue(heldId, out Entry entry)
+            if (side == 0 || !entries.TryGetValue(heldId, out Entry entry) || entry.View.Kind == LabOrbKind.FoxFire
                 || entry.Locked || entry.EdgePending || jigwiOverheat || teamWallSide == side || blockedSide == side) return false;
             if (config.DropCombineEnabled && (entry.View.Kind.IsRaw() || FoxReady(entry)) && FindOppositeOverlap(entry) != null)
                 return false;
@@ -189,7 +189,14 @@ namespace C6Lab
             if (entry.EdgePending || entry.Locked || entry.HiddenForPending) return;
             ResetRecovery(entry);
             Rigidbody body = entry.View.Body;
-            if (teamWallSide == (right ? 1 : -1) && entry.View.Kind != LabOrbKind.FoxFire)
+            // A fox orb never leaves its board (#328): both side edges stop it like walls; a double tap clears it.
+            if (entry.View.Kind == LabOrbKind.FoxFire)
+            {
+                body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
+                body.linearVelocity = OnPlane(new Vector2(-velocity.x * config.OrbRestitution, velocity.y));
+                return;
+            }
+            if (teamWallSide == (right ? 1 : -1))
             {
                 body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
                 body.linearVelocity = OnPlane(new Vector2(-velocity.x * config.OrbRestitution, velocity.y));
@@ -212,11 +219,6 @@ namespace C6Lab
             body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
             StopMotion(body);
             SetBodyMode(entry);
-            if (entry.View.Kind == LabOrbKind.FoxFire)
-            {
-                PlayFoxSmoke(entry);
-                BeginPendingLaunch(entry.View.OrbId);
-            }
             EdgeCrossed?.Invoke(crossing);
         }
 

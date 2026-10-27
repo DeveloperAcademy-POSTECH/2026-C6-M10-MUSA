@@ -123,6 +123,9 @@ namespace C6Lab
             // 매혹 (#251): 홀린 사람 자신의 화면에 "매혹 N초"·하트·헤롱~·정신 차림!
             if (hud != null && boardNetwork != null && GetComponent<LabCharmHud>() == null)
                 gameObject.AddComponent<LabCharmHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
+            // 여우 구슬 안내 (#328): 판마다 내 판에 처음 떨어지면 "빠르게 두 번 눌러서…"
+            if (hud != null && boardNetwork != null && GetComponent<LabFoxFireGuide>() == null)
+                gameObject.AddComponent<LabFoxFireGuide>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
 
             if (hud != null && boardNetwork != null)
             {

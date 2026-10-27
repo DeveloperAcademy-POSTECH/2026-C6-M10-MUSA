@@ -111,6 +111,9 @@ namespace C6Lab
         private const ulong SwipeBlockDrawKey = ulong.MaxValue - 3UL;
         private const uint DrumZoneSalt = 0xD2017E5Au;
         private const uint DrumSpotSalt = 0xD2051075u;
+        // 해금 폭탄이 멈출 자리 (#328)는 북 도착과 다른 고정 키로 뽑는다.
+        private const uint BombSpotSalt = 0xB0B5B07Au;
+        private const ulong BombOpenKey = ulong.MaxValue - 8UL;
         private const uint ComboColorSalt = 0xC0B0C010u;
         // 박 색상 콤보 뽑기는 실제 플레이어 ID와 겹치지 않는 고정 키를 쓴다.
         private const ulong ComboDrawKey = ulong.MaxValue - 3UL;
@@ -180,6 +183,7 @@ namespace C6Lab
         private double charmWarnedAt = -1d;
         private readonly Dictionary<ulong, int> charmHelperTaps = new Dictionary<ulong, int>();
         private uint drumHandoffCount;
+        private uint bombOpenCount;
         private readonly LabGourdCombo combo = new LabGourdCombo();
         // 던진 순간의 페널티 배율 (#222). 날아가는 동안 페널티가 끝나도 그 공은 던질 때 크기 그대로 칠한다.
         private readonly Dictionary<string, float> launchScales = new Dictionary<string, float>(StringComparer.Ordinal);
@@ -310,6 +314,7 @@ namespace C6Lab
             PlaceDrums(now);
             gourdBombCount = 0;
             drumHandoffCount = 0;
+            bombOpenCount = 0;
             swipeBlockCount = 0;
             swipeBlockedPlayer = 0;
             swipeBlockedRight = false;
@@ -501,7 +506,11 @@ namespace C6Lab
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!TryFindMovable(id, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
-            if (activeSeatCount == 1 && current.kind != LabOrbKind.FoxFire) return Reject("NO_NEIGHBOR", out reason);
+            // A fox orb never reaches a neighbour (#251); since #328 the side edges stop it and a double tap clears it.
+            if (current.kind == LabOrbKind.FoxFire) return Reject("FOX_FIRE_BLOCKED", out reason);
+            // An unlocked bomb opens where it lands (#328); it is not passed on again.
+            if (current.kind == LabOrbKind.Bomb && current.lockSwipes == 0) return Reject("BOMB_OPENING", out reason);
+            if (activeSeatCount == 1) return Reject("NO_NEIGHBOR", out reason);
             if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y) || !Finite(normalizedVelocity) ||
                 normalizedVelocity.sqrMagnitude > rules.MaximumMotionSpeed * rules.MaximumMotionSpeed)
                 return Reject("INVALID_MOTION", out reason);
@@ -516,15 +525,8 @@ namespace C6Lab
             if (crossing != LabEdgeCrossingKind.Pushed && !passingDrum && SwipeBlocked(sender, right, now))
                 return Reject("SWIPE_BLOCKED", out reason);
             // 2:2 땅따먹기 (#281): 바깥쪽 가장자리는 막혀 있고 안쪽 가장자리로만 팀원에게 넘긴다. 밀려 넘어가도 같다.
-            if (teamMode && current.kind != LabOrbKind.FoxFire && !LabTeams.EdgeOpen(players[sender].seat, right))
+            if (teamMode && !LabTeams.EdgeOpen(players[sender].seat, right))
                 return Reject("TEAM_EDGE", out reason);
-            if (current.kind == LabOrbKind.FoxFire)
-            {
-                // A fox orb never reaches a neighbour (#251): over a side edge, even solo, it goes up in blue smoke.
-                orbs.Remove(current.id);
-                reason = "FOX_FIRE_GONE";
-                return true;
-            }
             int receiverSeat = teamMode ? LabTeams.TeammateSeat(players[sender].seat)
                 : LabPlayerSlots.NeighborSeat(players[sender].seat, activeSeatCount, right);
             ulong receiver = seats[receiverSeat];
@@ -545,7 +547,7 @@ namespace C6Lab
                 current.lockSwipes--;
                 if (current.lockSwipes == 0) current.unlockedAt = now;
                 if (current.lockSwipes == 0 && current.kind == LabOrbKind.Relay) current.relayStage = 1;
-                if (current.lockSwipes == 0 && current.kind == LabOrbKind.Bomb) current.createdAt = now;
+                if (current.lockSwipes == 0 && current.kind == LabOrbKind.Bomb) ArriveUnlockedBomb(current, now);
             }
             else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
             if (current.kind.IsDrum()) ArriveDrum(current, crossing, now);
@@ -576,9 +578,8 @@ namespace C6Lab
             current.inFlight = true;
             current.vx = current.vy = 0f;
             current.revision = ++revision;
-            // 릴레이·폭탄은 던지는 것이 곧 아이템 사용이다.
+            // 릴레이는 던지는 것이 곧 아이템 사용이다. 폭탄은 던지지 않고 열린다 (#328).
             if (current.kind == LabOrbKind.Relay) players[sender].relayUsed++;
-            else if (current.kind == LabOrbKind.Bomb) players[sender].bombUsed++;
             float launchScale = ThrowScaleFor(sender, now);
             if (launchScale != 1f) launchScales[current.id] = launchScale;
             reason = "LAUNCHED";
@@ -1030,6 +1031,8 @@ namespace C6Lab
         /// orbs beside it, which needs one more free storage slot. A potion heals its user's personal
         /// HP up to the maximum; at full HP it is refused and kept so it can still be passed to a
         /// neighbor. A player already at 0 HP cannot be revived by a potion.
+        /// #328: an unlocked bomb's board asks this by itself once the bomb has come to rest, and it opens
+        /// into two attack orbs even on a full board; a double tap on a fox orb clears that one orb.
         /// The owner supplies its actual local position without a motion pre-update.
         /// </summary>
         public bool TryUseItemAt(ulong sender, string id, string requestId, double now,
@@ -1040,6 +1043,24 @@ namespace C6Lab
             if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y)) return Reject("INVALID_MOTION", out reason);
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            // Neither is a choice to punish while overheated: the bomb opens by itself, the fox orb is the yokai's.
+            if (current.kind == LabOrbKind.FoxFire)
+            {
+                orbs.Remove(current.id);
+                reason = "FOX_FIRE_CLEARED";
+                orb = current.Copy();
+                return true;
+            }
+            if (current.kind == LabOrbKind.Bomb)
+            {
+                if (current.lockSwipes > 0) return Reject("ITEM_LOCKED", out reason);
+                orbs.Remove(current.id);
+                OpenTwoAttackOrbs(sender, normalizedPosition, now);
+                players[sender].bombUsed++;
+                reason = "BOMB_OPENED";
+                orb = current.Copy();
+                return true;
+            }
             if (JigwiOverheated(sender, now))
             {
                 RemoveJigwiBurned(id);
@@ -1052,18 +1073,7 @@ namespace C6Lab
             {
                 if (CountStored(sender) + 1 > rules.OrbStorageLimit) return Reject("STORAGE_FULL", out reason);
                 orbs.Remove(current.id);
-                foreach (float side in new[] { -1f, 1f })
-                {
-                    var opened = new LabOrbState
-                    {
-                        id = NewOrbId(), owner = sender, kind = LabOrbKind.Combined, element = CombinedElementFor(sender),
-                        origin = LabOrbOrigin.Combined, originOwner = sender,
-                        x = Mathf.Clamp01(normalizedPosition.x + side * SecretBoxSpread),
-                        y = normalizedPosition.y,
-                        vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
-                    };
-                    orbs.Add(opened.id, opened);
-                }
+                OpenTwoAttackOrbs(sender, normalizedPosition, now);
                 players[sender].secretBoxUsed++;
                 reason = "ITEM_USED";
                 orb = current.Copy();
@@ -1078,6 +1088,23 @@ namespace C6Lab
             reason = "ITEM_USED";
             orb = current.Copy();
             return true;
+        }
+
+        /// <summary>Two attack orbs side by side where a secret box or an unlocked bomb (#328) opened, each its own element.</summary>
+        private void OpenTwoAttackOrbs(ulong owner, Vector2 normalizedPosition, double now)
+        {
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var opened = new LabOrbState
+                {
+                    id = NewOrbId(), owner = owner, kind = LabOrbKind.Combined, element = CombinedElementFor(owner),
+                    origin = LabOrbOrigin.Combined, originOwner = owner,
+                    x = Mathf.Clamp01(normalizedPosition.x + side * SecretBoxSpread),
+                    y = normalizedPosition.y,
+                    vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
+                };
+                orbs.Add(opened.id, opened);
+            }
         }
 
         /// <summary>
@@ -1459,6 +1486,19 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// 해금 폭탄 (#328): 마지막 잠금이 풀린 폭탄은 받은 사람 판으로 미끄러져 들어와, 북이 가까운 쪽에 멈추는 구간의 한
+        /// 자리에 멈춘다. 그 판이 멈춘 자리를 알려 열기를 요청하면 공격 구슬 두 개로 바뀐다. 그때까지는 구슬 수명을 따른다.
+        /// </summary>
+        private void ArriveUnlockedBomb(LabOrbState bomb, double now)
+        {
+            float[] bounds = rules.DrumStopBounds;
+            bomb.createdAt = now;
+            bomb.arrival = LabDrumArrival.Stop;
+            bomb.arrivedAt = now;
+            bomb.stopAt = Mathf.Lerp(bounds[0], bounds[1], Unit01(DrawFor(seed ^ BombSpotSalt, BombOpenKey, bombOpenCount++)));
+        }
+
         /// <summary>0 near, 1 middle, 2 far, 3 pass, by the configured percentages.</summary>
         private static int DrumZoneFor(ulong draw, int[] chances)
         {
@@ -1668,7 +1708,6 @@ namespace C6Lab
 
         private int DamageFor(LabOrbState orb)
         {
-            if (orb.kind == LabOrbKind.Bomb) return Math.Max(1, (int)Math.Round(rules.Damage * rules.BombMultiplier));
             if (orb.kind != LabOrbKind.Relay) return rules.Damage;
             float multiplier = orb.relayStage >= RelayMaxStage ? rules.RelayMaxMultiplier
                 : orb.relayStage == 2 ? rules.RelayDoubleMultiplier : 1f;
@@ -1838,7 +1877,7 @@ namespace C6Lab
             public readonly int TeamFeverHits;
             public readonly float TeamFeverSeconds;
             public readonly int MonsterMaxHp, PlayerMaxHp, PotionHeal, Damage, OrbStorageLimit;
-            public readonly float RelayDoubleMultiplier, RelayMaxMultiplier, BombMultiplier;
+            public readonly float RelayDoubleMultiplier, RelayMaxMultiplier;
             /// <summary>How much a blast-shrunk orb paints, against a whole one (#213).</summary>
             public readonly float SmallOrbPaintShare;
             public readonly float BattleDurationSeconds, StaminaMax, StaminaStart, GenerateCost,
@@ -1933,7 +1972,6 @@ namespace C6Lab
                 PotionHeal = config.PotionHeal;
                 RelayDoubleMultiplier = config.RelayDoubleMultiplier;
                 RelayMaxMultiplier = config.RelayMaxMultiplier;
-                BombMultiplier = config.BombMultiplier;
                 SmallOrbPaintShare = config.SmallOrbPaintShare;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
@@ -1978,7 +2016,6 @@ namespace C6Lab
                 YaguangTimelineEndSeconds = YaguangTimeline ? config.YaguangTimelineSabotageEndSeconds : 0d;
                 if (YaguangTimeline)
                 {
-                    BattleDurationSeconds = config.YaguangTimelineBattleSeconds;
                     var commons = new List<double>();
                     var unique = new List<YaguangUniqueSlot>();
                     for (int i = 0; i < LabConfig.YaguangTimelineSlots; i++)

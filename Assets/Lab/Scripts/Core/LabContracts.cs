@@ -40,19 +40,21 @@ namespace C6Lab
         /// own snapshot list so orb rules (lifetime, storage, combining, throwing, bombs) never apply.
         /// </summary>
         public static bool IsDrum(this LabOrbKind kind) => kind == LabOrbKind.Drum;
-        /// <summary>Items used in place by a double tap once unlocked.</summary>
-        public static bool IsDoubleTapUsable(this LabOrbKind kind) => kind == LabOrbKind.Potion || kind == LabOrbKind.SecretBox;
+        /// <summary>Items used in place by a double tap once unlocked, and the fox orb a double tap clears (#328).</summary>
+        public static bool IsDoubleTapUsable(this LabOrbKind kind) => kind == LabOrbKind.Potion || kind == LabOrbKind.SecretBox
+            || kind == LabOrbKind.FoxFire;
         /// <summary>
-        /// Orbs that an upward flick may throw at the target: Combined, and a relay orb or bomb once
-        /// handoffs have opened its lock (#212). A locked bomb can only be passed on.
+        /// Orbs that an upward flick may throw at the target: Combined, and a relay orb once handoffs have opened
+        /// its lock (#212). A bomb is never thrown: locked it can only be passed on, unlocked it opens into two
+        /// attack orbs (#328).
         /// </summary>
         public static bool CanThrow(this LabOrbKind kind, int lockSwipes) =>
-            kind == LabOrbKind.Combined || ((kind == LabOrbKind.Relay || kind == LabOrbKind.Bomb) && lockSwipes == 0);
+            kind == LabOrbKind.Combined || (kind == LabOrbKind.Relay && lockSwipes == 0);
 
         /// <summary>
         /// How long an orb lasts on the boards, the same on the Host and every screen (#235): items the
-        /// item lifetime, which is a locked bomb's fuse; everything else, an unlocked bomb included, the
-        /// orb lifetime.
+        /// item lifetime, which is a locked bomb's fuse; everything else, an unlocked bomb waiting to open
+        /// (#328) included, the orb lifetime.
         /// </summary>
         public static float LifetimeFor(this LabOrbKind kind, int lockSwipes, float orbLifetime, float itemLifetime) =>
             kind.IsItem() && !(kind == LabOrbKind.Bomb && lockSwipes == 0) ? itemLifetime : orbLifetime;

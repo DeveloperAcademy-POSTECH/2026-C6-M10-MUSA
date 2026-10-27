@@ -57,7 +57,7 @@ namespace C6Lab.Tests
                 Is.EquivalentTo(new[] { "Gimmicks", "야광귀", "야광귀 시간표 (Hapio 전용)" }),
                 "The appended schedule is a separate Hapio-only group, while Lab keeps its periodic groups.");
             LabDeveloperCategory timeline = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀 시간표 (Hapio 전용)");
-            Assert.That(timeline.FieldIndices, Is.EqualTo(Enumerable.Range(211, 14)));
+            Assert.That(timeline.FieldIndices, Is.EqualTo(Enumerable.Range(212, 13)), "Its battle time (211) is retired (#328).");
             Assert.That(timeline.FieldIndices.All(LabConfig.IsYaguangTimelineField), Is.True);
             AssertSavedLabHidesTimelineCategory(timeline);
             LabDeveloperCategory gimmicks = LabConfig.DeveloperCategories.Single(category => category.Title == "Gimmicks");

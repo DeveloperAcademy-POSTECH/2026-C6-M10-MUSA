@@ -221,7 +221,7 @@ namespace C6Lab
         internal const ushort LabProtocolVersion = 5672;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
-        private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
+        private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/33");
@@ -2012,7 +2012,10 @@ namespace C6Lab
                     // The white flash before an orb runs out (#235); a locked bomb shows its own red one.
                     lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
-                    jigwiScale: orb.jigwiRadiusScale, fever: orb.fever, fiveColor: orb.fiveColor);
+                    jigwiScale: orb.jigwiRadiusScale, fever: orb.fever, fiveColor: orb.fiveColor,
+                    // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
+                    arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
+                    stopAt: orb.stopAt);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
@@ -2053,10 +2056,9 @@ namespace C6Lab
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            if (developerSolo && !board.IsFoxFire(edge.OrbId))
+            if (developerSolo)
             {
                 // The single player has no neighbor. Restore the stopped edge orb immediately.
-                // A fox orb still goes at the edge (#251), so the Host is asked even solo.
                 board.RejectEdge(edge.OrbId);
                 return;
             }

@@ -777,6 +777,7 @@ namespace C6Lab.Tests
             Assert.That(foxy.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = foxy;
             fixture.UseAvailablePort(network);
+            LabGuideText.ForgetShownOnce(); // As on a fresh app, so this is the player's first fox fire (#328).
             try
             {
                 Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
@@ -800,6 +801,11 @@ namespace C6Lab.Tests
                 LabOrbView view = board.GetComponentsInChildren<LabOrbView>().First(candidate => candidate.OrbId == foxes[0].id);
                 Assert.That(view.FoxGlowVisible, Is.True);
                 Assert.That(view.GetComponentInChildren<LabOrbSpriteArt>(), Is.Not.Null, "It shows the fox orb art.");
+                var guide = UnityEngine.Object.FindAnyObjectByType<LabFoxFireGuide>();
+                Assert.That(guide, Is.Not.Null, "The saved scene adds the fox orb guide (#328).");
+                Assert.That(guide.Showing, Is.True, "The player's first fox fire tells them how to clear it.");
+                Assert.That(guide.Shown, Is.EqualTo(LabFoxFireGuide.GuideText));
+                Assert.That(LabGuideText.ShownOnce(LabFoxFireGuide.OnceKey), Is.True, "Never again while the app runs.");
             }
             finally
             {
@@ -853,6 +859,7 @@ namespace C6Lab.Tests
                 Assert.That(alert.Label, Is.EqualTo("♥"));
                 yield return null;
                 Assert.That(hud.WarningShowing, Is.False, "The warning goes when the charm starts.");
+                Assert.That(hud.WaitShowing, Is.False, "Solo no one beside can wake them, so they are not told to wait (#328).");
                 Assert.That(hud.GaugeVisible, Is.True, "The time left shows on the gauge.");
                 Assert.That(hud.GaugeFill, Is.InRange(.01f, 1f));
                 var minimap = UnityEngine.Object.FindAnyObjectByType<LabDrumMinimap>();
