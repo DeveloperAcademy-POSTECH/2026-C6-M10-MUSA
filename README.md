@@ -117,7 +117,7 @@ Paint 모드의 기본 표현은 **고해상도 ON / 1024×512**입니다. DEV�
 
 Hapio의 Story·2:2·DEV Solo/재시작은 전원 Scene·설정·첫 전투 상태와 화면 준비를 확인한 뒤 공통 시각에 맞춰 **3 → 2 → 1 → 시작!**을 표시한다. 대기 중에는 시간·회복·건조·패턴·입력·전투 물리가 진행하지 않는다. 기존 Lab 단판은 기존 흐름을 유지한다.
 
-대기 화면은 `Assets/Hapio/Resources/Hapio/GameStartOverlay.prefab`의 실제 Canvas 객체로 수정한다. 현재 게임 참가 앱은 모두 `C6HapioGame/10`이어야 한다(#306 시작 동기화와 #301 섬광 흔들기·#305 매혹 예고를 통합한 설정205개; #315부터 프로토콜5666). 구조·제한은 [게임 흐름](docs/GAME_FLOW.md)의 #306, 실제 확인 범위는 [검증 기록](docs/VALIDATION.md)을 참조한다.
+대기 화면은 `Assets/Hapio/Resources/Hapio/GameStartOverlay.prefab`의 실제 Canvas 객체로 수정한다. 현재 게임 참가 앱은 모두 `C6HapioGame/11`이어야 한다(#306 시작 동기화와 #301 섬광 흔들기·#305 매혹 예고를 통합한 설정205개; #315부터 프로토콜5666). 구조·제한은 [게임 흐름](docs/GAME_FLOW.md)의 #306, 실제 확인 범위는 [검증 기록](docs/VALIDATION.md)을 참조한다.
 
 ## 모바일 구슬 조작과 화면 방향 (#310)
 

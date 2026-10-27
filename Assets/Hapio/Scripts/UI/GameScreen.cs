@@ -11,11 +11,13 @@ namespace Hapio
 
     /// <summary>
     /// Only binds saved, Inspector-editable Canvas references; never constructs a screen at runtime.
-    /// 예외: STAGE CLEAR 화면의 칭호 표는 전투 결과 카드와 같은 생김새를 쓰도록 LabResultTable이 코드로 만든다.
+    /// The saved Figma result view reuses LabResultStats; the legacy territory result retains LabResultTable.
     /// </summary>
     public sealed class GameScreen : MonoBehaviour
     {
         public GameScreenKind kind;
+        public GameStageResultView resultView;
+        public GameObject legacyResultContent;
         [Tooltip("The saved Figma view owns Home/Lobby navigation; this component keeps the scoped DEV panel.")]
         public bool externalNavigation;
         public UnityEngine.UI.Text title, status, details, playerCount, developerFeedback;
@@ -65,6 +67,12 @@ namespace Hapio
                 Click(morePlayersButton, () => ChangePlayers(1));
                 Click(startButton, () => session.StartGame());
                 Click(homeButton, () => session.GoHome());
+            }
+            if (resultView != null)
+            {
+                Click(resultView.nextButton, OnNextButton);
+                Click(resultView.viewerButton, () => session.OpenGourdViewer());
+                Click(resultView.homeButton, () => session.GoHome());
             }
             Click(nextButton, OnNextButton);
             Click(viewerButton, () => session.OpenGourdViewer());
@@ -116,6 +124,7 @@ namespace Hapio
                 case GameScreenKind.Lobby: if (!UsesExternalNavigation) RefreshLobby(net); break;
                 case GameScreenKind.StageResult: RefreshResult(net); break;
                 case GameScreenKind.GameOver:
+                    if (resultView != null) { RefreshDesignedResult(net, false); break; }
                     Text(title, "GAME OVER");
                     Text(status, session.State.endReason);
                     Text(details, "The run has ended for everyone. Tap HOME to return.");
@@ -177,6 +186,13 @@ namespace Hapio
 
         private void RefreshResult(LabNetwork net)
         {
+            if (resultView != null)
+            {
+                Show(resultView.gameObject, !session.IsTerritory);
+                Show(resultView.background.gameObject, !session.IsTerritory);
+                Show(legacyResultContent, session.IsTerritory);
+                if (!session.IsTerritory) { RefreshDesignedResult(net, true); return; }
+            }
             if (session.IsTerritory) { RefreshTerritoryResult(net); return; }
             bool complete = session.State.phase == GameFlowPhase.Completed;
             GameStageDefinition stage = session.CurrentStageDefinition;
@@ -216,6 +232,48 @@ namespace Hapio
                 : "NEXT · STAGE " + (session.State.stageIndex + 1));
             Show(viewerButton == null ? null : viewerButton.gameObject, net.config != null && net.config.CompletedGourdViewerEnabled
                 && net.config.GourdMode == LabGourdMode.Paint && result != null && result.paintCoverage >= 1f);
+            Texture texture = session.PreviewTexture;
+            Show(viewerPanel, session.IsViewerOpen && texture != null);
+            if (viewerImage != null) viewerImage.texture = texture;
+        }
+
+        private void RefreshDesignedResult(LabNetwork net, bool victory)
+        {
+            Show(legacyResultContent, false);
+            bool complete = victory && session.State.phase == GameFlowPhase.Completed;
+            if (overallRunId != session.State.runId) { overallRunId = session.State.runId; showOverall = complete; }
+            bool hasOverall = complete && session.StageResults.Count > 0;
+            bool overall = hasOverall && showOverall;
+            // Defeat is presentation-only: never promote a failed run into the committed victory cache.
+            LabSnapshot result = victory ? session.ResultSnapshot : net.Snapshot;
+            if (!victory && (result == null || result.phase != LabPhase.Defeat
+                || result.sessionId != session.State.battleSessionId || result.round != session.State.battleRound)) result = null;
+            var rows = overall ? LabResultTable.OverallRowsFor(session.StageResults, net.LocalPlayerId)
+                : result == null ? new List<LabResultRow>() : LabResultTable.RowsFor(
+                    LabResultStats.Awards(result.players, victory), net.LocalPlayerId, result.playedSeconds);
+            int seat = result != null && result.players != null
+                ? Array.FindIndex(result.players, player => player != null && player.id == net.LocalPlayerId) : -1;
+            string localName = seat < 0 ? null : LabResultStats.PlayerName(result.players[seat]);
+            for (int i = 0; i < rows.Count; i++)
+            {
+                LabResultRow row = rows[i];
+                string who = localName != null ? row.Who.Replace(localName, localName + "(나)") : row.Who;
+                rows[i] = new LabResultRow(row.Title == "북 독점" ? "북 독점왕" : row.Title, who, row.Record, row.Mine);
+            }
+            string guidance = !victory ? "요괴를 다시 봉인하고싶다면\n게임을 새로 시작하시오"
+                : complete ? "모든 요괴의 봉인을 마쳤소\n견습생 여러분, 수고하셨소"
+                : "다음 스테이지가 시작될 동안\n잠시만 기다리시오";
+            if (!string.IsNullOrEmpty(session.UiNotice)) guidance = session.UiNotice;
+            resultView.Present(victory, session.State.stageIndex,
+                session.CurrentStageDefinition != null ? session.CurrentStageDefinition.displayName : "요괴",
+                result, rows, guidance, overall, complete);
+            Show(resultView.nextButton.gameObject, complete && hasOverall);
+            Interactable(resultView.nextButton, complete ? hasOverall : session.CanAdvanceStage);
+            GameStageResultView.Label(resultView.nextButton, complete
+                ? (overall ? session.State.stageIndex + "스테이지 기록 보기" : "전체 기록 보기") : "다음 스테이지");
+            Interactable(resultView.homeButton, !complete || session.CanReturnHome);
+            GameStageResultView.Label(resultView.homeButton, "나가기");
+            Interactable(resultView.viewerButton, victory && session.PreviewTexture != null);
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
