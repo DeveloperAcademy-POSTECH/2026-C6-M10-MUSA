@@ -2002,7 +2002,6 @@ namespace C6Lab
                 YaguangTimelineEndSeconds = YaguangTimeline ? config.YaguangTimelineSabotageEndSeconds : 0d;
                 if (YaguangTimeline)
                 {
-                    BattleDurationSeconds = config.YaguangTimelineBattleSeconds;
                     var commons = new List<double>();
                     var unique = new List<YaguangUniqueSlot>();
                     for (int i = 0; i < LabConfig.YaguangTimelineSlots; i++)

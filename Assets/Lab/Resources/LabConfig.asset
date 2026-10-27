@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabConfig
   monsterMaxHp: 1000
   damage: 20
-  battleDurationSeconds: 180
+  battleDurationSeconds: 120
   playerMaxHp: 300
   targetSpinStrength: 80
   targetSpinDamping: 1.2

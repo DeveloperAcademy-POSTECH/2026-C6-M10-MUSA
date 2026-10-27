@@ -371,11 +371,12 @@ namespace C6Lab
         /// <summary>
         /// Settings the gimmick groups (#311) replaced: the gourd bomb's and the sabotage mix's random min/max intervals,
         /// the swipe block's own interval and its gap from bombs. #328 adds the bomb damage multiplier (an unlocked bomb
-        /// opens into two attack orbs instead of being thrown). They keep their places in the shared form so every other index stays put, but nothing
+        /// opens into two attack orbs instead of being thrown) and the Yaguang's own battle time (every stage uses the
+        /// common battle time). They keep their places in the shared form so every other index stays put, but nothing
         /// reads them and DEV never shows them.
         /// </summary>
         public static IReadOnlyCollection<int> RetiredDeveloperFields { get; } =
-            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168 });
+            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168, 211 });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
         public static IReadOnlyList<LabOrbKind> GeneratedKinds { get; } = Array.AsReadOnly(new[]
@@ -418,9 +419,10 @@ namespace C6Lab
                 184, 185, 186, 187, 188, 189, 190, 202, 203)
                 .WithSwitch(155, 184)
                 .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
-            new LabDeveloperCategory("야광귀 시간표 (Hapio 전용)", 211, 212, 213, 214, 215, 216, 217, 218, 219, 220,
+            // 전투 시간(211)은 은퇴 (#328): 야광귀도 공용 전투 시간 안에서 이 시간표를 따른다.
+            new LabDeveloperCategory("야광귀 시간표 (Hapio 전용)", 212, 213, 214, 215, 216, 217, 218, 219, 220,
                 221, 222, 223, 224)
-                .WithDividers((0, "── 야광귀 전용 일정 · 일반 주기/비율 대신 사용 ──"), (2, "── 고유 예고 ──"), (10, "── 공용 ──")),
+                .WithDividers((0, "── 야광귀 전용 일정 · 일반 주기/비율 대신 사용 ──"), (1, "── 고유 예고 ──"), (9, "── 공용 ──")),
             new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
         });
 
@@ -663,7 +665,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 10f)] private float charmWarningSeconds = 3f;
 
         [Header("Yaguang stage schedule (#314 integrated into #311)")]
-        [Tooltip("Hapio 야광귀 스테이지에서만 적용한다. Lab 기본 주기와 다른 요괴 스테이지에는 영향을 주지 않는다.")]
+        [Tooltip("은퇴 (#328): 야광귀도 공용 전투 시간을 쓴다. 공유 설정의 자리만 지킨다.")]
         [SerializeField, Range(60f, 180f)] private float yaguangTimelineBattleSeconds = 120f;
         [Tooltip("방해 정리 시각. 0은 정리 없이 전투 끝까지 유지한다.")]
         [SerializeField, Range(0f, 180f)] private float yaguangTimelineSabotageEndSeconds = 100f;
@@ -1025,6 +1027,7 @@ namespace C6Lab
         public float PaintEdgeRaggedness => Mathf.Clamp01(Finite(paintEdgeRaggedness, .55f));
         // Retired by the gimmick groups (#311) and #328: still captured and applied so the form keeps its indices, never read.
         private float BombMultiplier => Mathf.Clamp(Finite(bombMultiplier, 3f), 1f, 20f);
+        private float YaguangTimelineBattleSeconds => Mathf.Clamp(Finite(yaguangTimelineBattleSeconds, 120f), 60f, 180f);
         private float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         private float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
         private float SwipeBlockInterval => Mathf.Clamp(Finite(swipeBlockInterval, 40f), 0f, 600f);
@@ -1072,7 +1075,6 @@ namespace C6Lab
         private static readonly float[] DefaultTimelineUniqueSeconds = { 10f, 35f, 60f, 75f };
         private static readonly int[] DefaultTimelineUniqueKinds = { 0, 1, 0, 1 };
         private static readonly float[] DefaultTimelineCommonSeconds = { 25f, 40f, 60f, 80f };
-        public float YaguangTimelineBattleSeconds => Mathf.Clamp(Finite(yaguangTimelineBattleSeconds, 120f), 60f, 180f);
         public float YaguangTimelineSabotageEndSeconds => Mathf.Clamp(Finite(yaguangTimelineSabotageEndSeconds, 100f), 0f, 180f);
         public float YaguangTimelineUniqueSeconds(int slot) => TimelineSeconds(yaguangTimelineUniqueSeconds, slot, DefaultTimelineUniqueSeconds);
         public bool YaguangTimelineUniqueIsCombo(int slot) => slot >= 0 && slot < YaguangTimelineSlots
@@ -1298,11 +1300,7 @@ namespace C6Lab
             if (values[173] > values[174]) { error = "Fox Fire Count Min cannot exceed Fox Fire Count Max."; return false; }
             if (values[192] > values[193]) { error = "Jigwi Auto Interval Min cannot exceed Jigwi Auto Interval Max."; return false; }
 
-            if (values[212] > values[211])
-            { error = "Yaguang schedule end cannot exceed its battle duration."; return false; }
-            foreach (int index in new[] { 213, 215, 217, 219, 221, 222, 223, 224 })
-                if (values[index] > values[211])
-                { error = "Yaguang schedule slot cannot exceed its battle duration."; return false; }
+            // The Yaguang's timetable runs inside the common battle time (#328); a slot past the battle's end never comes.
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];

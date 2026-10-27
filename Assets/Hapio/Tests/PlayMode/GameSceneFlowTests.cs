@@ -1018,11 +1018,10 @@ namespace Hapio.Tests
             Assert.That(snapshot.drums.All(drum => drum.owner == network.LocalPlayerId), Is.True);
             Assert.That(player.personalHp, Is.EqualTo(network.config.PlayerMaxHp));
             Assert.That(player.stamina, Is.EqualTo(network.config.StaminaStart).Within(.01f));
-            double duration = Model().StageYokai == LabStageYokai.Yaguang
-                ? network.config.YaguangTimelineBattleSeconds : network.config.BattleDurationSeconds;
+            double duration = network.config.BattleDurationSeconds;
             Assert.That(snapshot.remaining, Is.GreaterThan(duration - 10d));
             Assert.That(snapshot.remaining, Is.LessThanOrEqualTo(duration),
-                "Fresh stage time follows its actual policy; Yaguang has a separate approved duration.");
+                "Fresh stage time follows the common battle time; every stage shares it (#328).");
             Assert.That(snapshot.paintCoveredCount, Is.Zero);
             Assert.That(snapshot.paintCount, Is.Zero);
             Assert.That(network.PaintSurface.CoveredCount, Is.Zero);
