@@ -271,7 +271,7 @@ namespace C6Lab
             EnsureDefaultVisual(ScaledRadius);
             EnsureFlightTrail(ScaledRadius);
             if (changed && elementFlightTrail != null && appearance != null)
-                elementFlightTrail.Begin(transform, appearance.ElementTrailFor(element));
+                elementFlightTrail.Begin(transform, ScaledTrailProfile());
         }
 
         private void Awake()
@@ -315,7 +315,7 @@ namespace C6Lab
             EnsureDefaultVisual(ScaledRadius);
             EnsureFlightTrail(ScaledRadius);
             if (elementFlightTrail != null)
-                elementFlightTrail.Begin(transform, appearance.ElementTrailFor(element));
+                elementFlightTrail.Begin(transform, ScaledTrailProfile());
             if (flightTrail != null)
             {
                 flightTrail.Clear();
@@ -610,6 +610,31 @@ namespace C6Lab
             flightTrail.startColor = color;
             color.a = 0f;
             flightTrail.endColor = color;
+        }
+
+        // 콤보 SMALL/BIG(#222)·폭발 축소(#213)로 공이 작아지거나 커지면 3D 꼬리도 같은 배율로 줄이고 늘린다.
+        // 줄인 꼬리 설정은 배율(0.05 단위)마다 한 번만 만들어 함께 쓴다. 공이 사라진 뒤 남아 흐려지는 꼬리도 이 설정을 쓰므로 지우지 않는다.
+        private static readonly System.Collections.Generic.Dictionary<(LabElementTrailProfile, int), LabElementTrailProfile>
+            scaledTrailProfiles = new System.Collections.Generic.Dictionary<(LabElementTrailProfile, int), LabElementTrailProfile>();
+
+        /// <summary>지금 공 크기 배율(폭발 축소 × 콤보 배율)에 맞춘 원소 꼬리 설정. 배율이 1이면 원래 설정 그대로다.</summary>
+        private LabElementTrailProfile ScaledTrailProfile()
+        {
+            LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(element) : null;
+            return ScaledTrailProfile(profile, sizeScale * radiusScale);
+        }
+
+        /// <summary>profile을 scale배 굵기·길이로 줄인 설정 (0.05 단위로 맞춰 만든 것을 다시 쓴다). 1에 가까우면 그대로.</summary>
+        public static LabElementTrailProfile ScaledTrailProfile(LabElementTrailProfile profile, float scale)
+        {
+            if (profile == null || float.IsNaN(scale) || float.IsInfinity(scale)) return profile;
+            int step = Mathf.RoundToInt(Mathf.Clamp(scale, .05f, 3f) * 20f);
+            if (step == 20) return profile;
+            var key = (profile, step);
+            if (scaledTrailProfiles.TryGetValue(key, out LabElementTrailProfile scaled) && scaled != null) return scaled;
+            scaled = profile.CreateScaled(step / 20f);
+            scaledTrailProfiles[key] = scaled;
+            return scaled;
         }
 
         private void LeaveFadingTrail()
