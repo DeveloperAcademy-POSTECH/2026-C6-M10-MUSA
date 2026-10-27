@@ -49,7 +49,7 @@ namespace C6Lab
         [Tooltip("폰을 흔들어 눈부심을 풀었을 때 말풍선 (푼 사람 화면만). 비우면 안 띄운다.")]
         [SerializeField] private string caughtText = "으악 어지러워~";
         [Tooltip("풀린 말풍선이 떠 있는 시간 (초)")]
-        [SerializeField, Range(.3f, 6f)] private float caughtSeconds = 1.5f;
+        [SerializeField, Range(.3f, 6f)] private float caughtSeconds = 3f;
         [Header("흔들어 풀기 (#301)")]
         [Tooltip("흔들림이 중력의 몇 배를 넘으면 한 번 흔든 것으로 칠지. 작을수록 살살 흔들어도 센다.")]
         [SerializeField, Range(.3f, 3f)] private float shakeThreshold = 1.6f;
@@ -99,7 +99,7 @@ namespace C6Lab
 
         /// <summary>
         /// 내가 흔들어서 이번 섬광의 눈부심을 다 풀어낸 순간 한 번 (#338). 이 기기의 흔들기로만 나고,
-        /// 다음 섬광·방해 종료·라운드 종료로 풀리면 나지 않는다. 섬광 해결 효과음(LabFlashRewardSound)이 듣는다.
+        /// 다음 섬광·방해 종료·라운드 종료로 풀리면 나지 않는다. (섬광 해결 효과음은 최대 횟수를 채울 때 나서 이것 대신 ShakeCount를 본다.)
         /// </summary>
         public static event System.Action LocalShakeCleared;
         private float lastShakeAt = float.NegativeInfinity, bonusSentAt = float.NegativeInfinity;
