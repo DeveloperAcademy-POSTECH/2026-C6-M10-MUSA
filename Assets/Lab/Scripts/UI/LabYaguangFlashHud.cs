@@ -94,6 +94,14 @@ namespace C6Lab
         private int revealedShakes;
         // 섬광 파훼 보상 (#329): 풀린 뒤에도 이어서 흔드는 중인지, 끊겼는지, 마지막으로 흔든 시각, 보상 요청 시각.
         private bool bonusLost, bonusShowing;
+        // #338: 이번 섬광에서 내가 흔들어 다 풀었다고 이미 알렸는지
+        private bool clearAnnounced;
+
+        /// <summary>
+        /// 내가 흔들어서 이번 섬광의 눈부심을 다 풀어낸 순간 한 번 (#338). 이 기기의 흔들기로만 나고,
+        /// 다음 섬광·방해 종료·라운드 종료로 풀리면 나지 않는다. 섬광 해결 효과음(LabFlashRewardSound)이 듣는다.
+        /// </summary>
+        public static event System.Action LocalShakeCleared;
         private float lastShakeAt = float.NegativeInfinity, bonusSentAt = float.NegativeInfinity;
         /// <summary>풀린 뒤 오색구슬을 노리고 이어서 흔드는 중이라 안내가 계속 보이는지 (#329)</summary>
         public bool BonusShakeActive => bonusShowing;
@@ -250,6 +258,7 @@ namespace C6Lab
                 if (boundBoard != null) boundBoard.ResetFlashReveal();
                 bonusLost = bonusShowing = false;
                 lastShakeAt = bonusSentAt = float.NegativeInfinity;
+                clearAnnounced = false;
             }
             shakeCounter.Threshold = shakeThreshold;
             shakeCounter.MinGap = shakeMinGap;
@@ -268,6 +277,11 @@ namespace C6Lab
                     lastShakeAt = Time.unscaledTime;
                 }
                 RevealShaken(maxShakes);
+                if (myGlare && !clearAnnounced && ShakesDone(maxShakes))
+                {
+                    clearAnnounced = true;
+                    LocalShakeCleared?.Invoke();
+                }
                 // A report can arrive while the Host is paused. Retain this generation's shakes and
                 // retry at a bounded rate until the authoritative snapshot confirms release.
                 if (myGlare && ShakesDone(maxShakes) && Time.unscaledTime - shakeSentAt >= ShakeRetrySeconds

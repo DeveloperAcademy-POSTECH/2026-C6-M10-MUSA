@@ -82,6 +82,12 @@ namespace C6Lab
             // 콤보 성공 추임새 "좋다" (#271, 팀 전체 성공이라 모든 기기)
             if (boardNetwork != null && GetComponent<LabComboClearSound>() == null)
                 gameObject.AddComponent<LabComboClearSound>().Bind(boardNetwork);
+            // 콤보 히트 소리 (#338, 맞는 칸마다 점점 높게, 팀 전체가 채우는 콤보라 모든 기기)
+            if (boardNetwork != null && GetComponent<LabComboHitSound>() == null)
+                gameObject.AddComponent<LabComboHitSound>().Bind(boardNetwork);
+            // 섬광 해결 소리(내가 흔들어 풀었을 때)와 오색구슬 피격 소리(던진 사람) (#338, 내 기기만)
+            if (boardNetwork != null && GetComponent<LabFlashRewardSound>() == null)
+                gameObject.AddComponent<LabFlashRewardSound>().Bind(boardNetwork);
             // 햅틱 (내 구슬 생성, 내가 던진 구슬 타격)
             if (boardNetwork != null && GetComponent<LabHaptics>() == null)
                 gameObject.AddComponent<LabHaptics>().Bind(boardNetwork, board);
