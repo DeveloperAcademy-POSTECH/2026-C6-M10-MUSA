@@ -88,8 +88,7 @@ namespace C6Lab.Tests
             Assert.That(new[] { values[53], values[54] }, Is.EqualTo(new[] { 2f, 4f }), "Relay x2 and MAX multipliers.");
             values[53] = 1.5f;
             values[54] = 3f;
-            Assert.That(values[55], Is.EqualTo(3f), "Bomb damage multiplier.");
-            values[55] = 2.5f;
+            Assert.That(values[55], Is.EqualTo(3f), "The retired bomb damage multiplier keeps its slot (#328).");
             Assert.That(values[56], Is.EqualTo(.8f), "The camera looks 0.8 units above the target centre in the new UI composition.");
             values[56] = -1.5f;
             Assert.That(new[] { values[57], values[58], values[59] },
@@ -209,7 +208,6 @@ namespace C6Lab.Tests
             Assert.That(config.PotionHeal, Is.EqualTo(25));
             Assert.That(config.RelayDoubleMultiplier, Is.EqualTo(1.5f));
             Assert.That(config.RelayMaxMultiplier, Is.EqualTo(3f));
-            Assert.That(config.BombMultiplier, Is.EqualTo(2.5f));
             Assert.That(config.CameraLookHeightOffset, Is.EqualTo(-1.5f));
             Assert.That(config.TargetSpinStrength, Is.EqualTo(120f));
             Assert.That(config.TargetSpinDamping, Is.EqualTo(.8f));
@@ -242,10 +240,11 @@ namespace C6Lab.Tests
             var saved = Resources.Load<LabConfig>("LabConfig");
             Assert.That(saved, Is.Not.Null);
             Assert.That(saved.SpawnFanAngle, Is.EqualTo(180f), "Orbs leave the drum in every direction.");
-            // #305: a full bar makes eight orbs and one orb's worth comes back every second, so a player
-            // waiting for orbs or the drum keeps something to do.
-            Assert.That(saved.StaminaMax, Is.EqualTo(160f));
-            Assert.That(saved.StaminaStart, Is.EqualTo(160f));
+            // #305: one orb's worth comes back every second, so a player waiting for orbs or the drum keeps
+            // something to do. #328: a full bar makes six orbs, and every stage battles for two minutes.
+            Assert.That(saved.StaminaMax, Is.EqualTo(120f));
+            Assert.That(saved.StaminaStart, Is.EqualTo(120f));
+            Assert.That(saved.BattleDurationSeconds, Is.EqualTo(120f));
             Assert.That(saved.GenerateCost, Is.EqualTo(20f));
             Assert.That(saved.StaminaRecoveryAmount, Is.EqualTo(20f));
             Assert.That(saved.StaminaRecoverySeconds, Is.EqualTo(1f));
@@ -787,12 +786,15 @@ namespace C6Lab.Tests
         public void RetiredGimmickTimersKeepTheirIndicesButNoRowAndNothingReadsThem()
         {
             // The gimmick groups (#311) replaced the gourd's bomb and block timers and the sabotage interval.
-            Assert.That(LabConfig.RetiredDeveloperFields, Is.EqualTo(new[] { 87, 88, 152, 154, 167, 168 }));
+            // #328 adds the bomb damage multiplier (bombs open instead of being thrown) and the Yaguang's own battle time.
+            Assert.That(LabConfig.RetiredDeveloperFields, Is.EqualTo(new[] { 55, 87, 88, 152, 154, 167, 168, 211 }));
             Assert.That(LabConfig.RetiredDeveloperFields.Select(index => LabConfig.DeveloperFields[index].Label), Is.EqualTo(new[]
             {
+                "Bomb Damage Multiplier",
                 "Gourd Bomb Interval Min (seconds, 0 = off)", "Gourd Bomb Interval Max (seconds, 0 = off)",
                 "Swipe Block Interval (seconds, 0 = off)", "Swipe Block Bomb Gap (seconds)",
-                "Sabotage Interval Min (seconds)", "Sabotage Interval Max (seconds)"
+                "Sabotage Interval Min (seconds)", "Sabotage Interval Max (seconds)",
+                "야광귀 시간표 전투 시간 (초)"
             }), "They keep their indices so the shared form and every later field keep their places.");
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
                 Assert.That(category.FieldIndices.Intersect(LabConfig.RetiredDeveloperFields), Is.Empty, category.Title);
@@ -1417,7 +1419,8 @@ namespace C6Lab.Tests
         public void TheCharmBubblesAndSurprisedBubbleImportAsSprites()
         {
             foreach (string path in new[] { LabCharmBubbles.LeftBubblePath, LabCharmBubbles.RightBubblePath,
-                LabCharmBubbles.WokenPath, LabCharmBubbles.FacePath, LabCharmBubbles.CheckPath })
+                LabCharmBubbles.WokenPath, LabCharmBubbles.FacePath, LabCharmBubbles.CheckPath,
+                LabCharmBubbles.LeftHandPath, LabCharmBubbles.RightHandPath })
                 Assert.That(Resources.Load<Sprite>(path), Is.Not.Null,
                     "Assets/Lab/Resources/" + path + ".png imports as a Sprite through LabSabotageArtImporter (#251).");
         }
@@ -1431,9 +1434,9 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields.Skip(211).Take(14).Any(field => field.IsToggle), Is.False,
                 "Stage identity chooses this policy; no parallel timeline engine switch exists.");
             Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀 시간표 (Hapio 전용)").FieldIndices,
-                Is.EqualTo(Enumerable.Range(211, 14)));
+                Is.EqualTo(Enumerable.Range(212, 13)), "Its own battle time (211) is retired: every stage uses the common one (#328).");
             float[] values = (float[])before.Clone();
-            values[211] = 180f; values[212] = 0f;
+            values[211] = 180f; values[212] = 0f; // The retired slot still round-trips; nothing reads it.
             for (int i = 0; i < 4; i++)
             {
                 values[213 + i * 2] = 15f + i * 20f;
@@ -1449,19 +1452,20 @@ namespace C6Lab.Tests
                 Assert.That(config.YaguangTimelineUniqueIsCombo(i), Is.EqualTo(i % 2 == 1));
                 Assert.That(config.YaguangTimelineCommonSeconds(i), Is.EqualTo(20f + i * 25f));
             }
-            Assert.That(config.YaguangTimelineBattleSeconds, Is.EqualTo(180f));
+            Assert.That(config.BattleDurationSeconds, Is.EqualTo(before[2]), "The retired slot does not change the battle time.");
             Assert.That(config.YaguangTimelineSabotageEndSeconds, Is.Zero);
         }
 
         [TestCase(212)] [TestCase(213)] [TestCase(215)] [TestCase(217)] [TestCase(219)]
         [TestCase(221)] [TestCase(222)] [TestCase(223)] [TestCase(224)]
-        public void YaguangScheduleRejectsEventsBeyondItsDurationAtomically(int index)
+        public void YaguangScheduleNeverHoldsBackAShortBattleTime(int index)
         {
-            float[] before = config.CaptureDeveloperValues(), invalid = (float[])before.Clone();
-            invalid[0] = 777f; invalid[index] = 121f;
-            Assert.That(config.TryApplyDeveloperValues(invalid, out string error), Is.False);
-            Assert.That(error, Does.Contain("Yaguang schedule"));
-            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(before));
+            // The timetable runs inside the common battle time (#328): a slot past a short battle's end simply never comes.
+            float[] values = config.CaptureDeveloperValues();
+            values[2] = 30f; values[index] = 121f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.BattleDurationSeconds, Is.EqualTo(30f));
+            Assert.That(config.CaptureDeveloperValues()[index], Is.EqualTo(121f));
         }
 
         [Test]

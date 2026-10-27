@@ -3012,3 +3012,27 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - **최종 전체PlayMode 412/412 통과(503.02초)**, 실패/Skipped/Inconclusive0. 기존구슬·보드·전투·도색·야광귀시간표·공동완료연출·1~3단계·결과/관람·DEV/네트워크회귀를포함한다.
 - 별도10만회수식재현:음50,032·양49,968,최대연속3,평균연속1.62546. 같은bit연산·salt·규칙의오프라인계산이며Unity10만개엔티티/실기기시험이나장기분포의증명으로취급하지않는다. 설계상50:50의음양대칭이고정확한반반개수를보장하는셔플백은아니다.
 - **미실행:** 실기기iPhone/iPad·독립Mac게임앱·실제LAN/핫스팟·네이티브빌드/성능. 사용자요청에따라제외했다. 검사전용Editor는종료하고TimeManager자동직렬화는원복했다. 원시로그·기기정보·빌드산출물은커밋하지않는다.
+
+## 2026-10-27 · #328 QA 반영: 해금 폭탄·여우구슬 두 번 누르기·매혹 안내·전투 2분·스태미나 6칸
+
+- 기준 main `4ee330a6`, 기능 브랜치 `feat/#328-qa-bomb-guide-stamina`. QA에서 "매혹·여우구슬을 어떻게 푸는지 모르겠다", "폭탄을 받은 건지 공격 구슬을 받은 건지 모르겠다"는 의견을 반영했다. 피버 타임(마지막 20초)은 별도 이슈로 뺐고, 매혹이 한 번도 안 걸렸다는 보고는 조사에서 제외했다(아래 참고).
+- **해금 폭탄**: `TryTransferAt`가 마지막 잠금을 푸는 넘기기에서 폭탄에 `arrival=Stop`·`stopAt`(북이 가까운 쪽에 멈추는 구간 `DrumStopBounds[0..1]`에서 seed 추첨)·`arrivedAt`을 기록한다. 받은 판은 북 도착과 같은 `StartArrival`로 미끄러져 멈추고, 0.2초 쉰 뒤 폭탄의 2.2배 크기 연기(`LabOrbVanishSmoke`)와 함께 스스로 `use`를 요청한다. Host `TryUseItemAt`이 `OpenTwoAttackOrbs`(비밀상자와 같은 함수)로 무작위 색 공격 구슬 2개를 만든다(판이 가득 차도 2개, `bombUsed` 증가). 폭탄은 `CanThrow`에서 빠졌고(던지기 `RAW_CANNOT_ATTACK`), 잠금이 풀린 폭탄은 다시 넘기기 `BOMB_OPENING`·판에서 잡기 불가. 거절되면 1초 뒤 다시 묻는다. 잠긴 채 도화선이 끝나면 터지는 규칙은 그대로다. DEV55 `Bomb Damage Multiplier`는 은퇴(자리 유지, 화면·묶음에서 제외).
+- **여우구슬**: `IsDoubleTapUsable`에 포함. 두 번 누르면 판이 푸른 연기를 내고 `use` → Host `FOX_FIRE_CLEARED`로 그 하나만 지운다(보호 시간·지귀 과열과 무관). 옆 가장자리는 여우구슬을 벽처럼 튕겨 넘기기 요청을 보내지 않으며 Host도 `FOX_FIRE_BLOCKED`로 거절한다(예전: 가장자리에서 연기로 사라짐 `FOX_FIRE_GONE`). `LabFoxFireGuide`가 이 플레이어(기기)의 첫 낙하(`SabotageCast` FoxFire, 대상=나, `LabGuideText.TryShowOnce`)에만 박 위 안내 문구를 띄우고 내 판의 여우구슬이 모두 사라지면 내린다. 앱을 켤 때(Play 시작 포함) 다시 처음부터 센다.
+- **매혹 안내**: `LabCharmBubbles`가 아직 다 누르지 않은 양옆 화면에 매번 말풍선 안쪽 위 손가락(`Resources/Sabotage/CharmHandLeft·Right.png`, 사용자 제공 그림을 투명 여백을 잘라 256px PNG로 변환, 말풍선 너비의 0.675배, 20° 기울여 비스듬히)을 콕콕 누르는 애니메이션으로 띄우고, 박 위의 "옆 사람이 매혹에 걸렸다! / 말풍선을 빠르게 눌러서 풀어주자!"는 이 플레이어가 처음 옆 사람을 풀어 줄 매혹에서 한 번만 띄운다. 내 탭 수가 다 차서 체크가 뜨면 둘 다 숨긴다. 걸린 사람의 기다리라는 문구는 매번이다. `LabCharmHud`는 걸린 사람 화면에 풀어 줄 옆 사람이 있을 때만 "옆 사람이 풀어 줄 때까지 / 기다려야 한다..."를 띄운다. 세 문구는 매혹 예고와 같은 자리·글꼴·색의 `LabGuideText`를 쓴다.
+- **전투 2분**: `LabConfig.asset` 공용 전투 시간 180 → 120(Editor API). 야광귀 전용 전투 시간 DEV211을 은퇴시키고 야광귀도 공용 값을 쓴다. 시간표 칸이 전투 시간보다 늦어도 설정을 거절하지 않고 그 칸이 오지 않을 뿐이다(짧은 전투 시험을 막지 않기 위해 교차 검증을 없앰). 2:2는 `TeamBattleSeconds`를 그대로 쓴다.
+- **스태미나 6칸**: 스토리 최대·시작 160 → 120(비용 20, 1초당 20 회복, 명중 +10 유지). `StageCatalog` 2:2 값도 최대·시작 120(1.7초·수명 8초 유지). 막대는 `StaminaBarFillMask.png` 한 장을 비율로 채우므로 **그림 교체(사용자)**가 필요하다.
+- 공유 설정 228개 그대로, 프로토콜 5670 → **5671**, `C6PhysicsLab/32`·`C6HapioGame/15`.
+- 매혹 미발동 확인(조사 제외 근거): 당시 수치(180초, 고유 20초, 여우불:매혹 50:50)로 Editor에서 모델만 모의 실행하면 3인 200판 중 매혹 0번은 1판(판당 평균 4.6번), 2인은 200판 중 6판이었다. 실기기 판의 길이·인원은 확인하지 않았다.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 오프라인 컴파일 7개 어셈블리 | PASS | Runtime·Editor·Lab/Hapio EditMode·PlayMode 오류 0. 커밋을 기능별로 나눈 6개 중간 상태도 각각 저장소 사본에서 컴파일해 모두 오류 0 |
+| 열린 Editor 재컴파일 | PASS | `scriptCompilationFailed=false`, 새 스크립트 `.meta` 생성, 손가락 Sprite 로드, 프로토콜 5671 |
+| 모델 확인(Editor eval) | PASS | 잠금 4번 해제 → `arrival=Stop`·`stopAt=0.26`, 다시 넘기기 `BOMB_OPENING`, 열기 `BOMB_OPENED`·공격 구슬 2개. Test Runner가 아니다 |
+| EditMode·PlayMode 전체 | NOT_RUN | 사용자가 Test Runner로 실행한다. 스태미나 막대 그림이 8칸인 동안 `SavedStaminaBarDrawsOneCellPerOrbAndEachOrbEndsInAGap`·`EveryStageAndTheTerritoryRoomFillOneBarCellPerOrb` 두 검사는 실패가 예상된다(그림 교체 후 통과 대상) |
+| Mac 3앱·실기기 | NOT_RUN | 폭탄 미끄러짐/열림, 손가락 위치, 문구 크기, 2:2 6칸 표시는 실제 화면 확인이 필요하다 |
+
+- **커밋 나눔**: 해금 폭탄 → 매혹 안내 → 여우구슬 → 전투 120초 → (수정) 야광귀 스테이지 기본값의 211 제거 → 스태미나 6칸 → 안내 문구 1회·손가락·폭탄 연기 → 접속 버전·문서 순서다.
+- **발견한 결함(수정)**: 211을 은퇴시킨 뒤에도 `Stage02_yaguang.asset`의 `defaultValues`에 211이 남아 `GameStageCatalog.Validate`가 실패했고, Hapio 혼자 시작이 `GameSession.CreateModeConfig` NullReferenceException으로 멈췄다(사용자 Play에서 발견). Editor API로 그 항목만 지웠고, 스테이지 설정 생성·야광귀 전투 120초/방해 끝 100초를 eval로 확인했다. DEV 칸을 숨길 때는 스테이지 기본값 파일도 함께 확인해야 한다.
+- **사용자 검사 1차 실패 3건(수정)**: ① ② `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`(Home·Lobby): 장면에 저장된 DEV 칸 기본값이 원본과 달랐다(전투 180·스태미나 160, #326의 폭발 불 4초·최대 5도 미반영). 기존 Editor 도구 `Hapio/Upgrade Menu DEV Rows`를 Editor API로 실행해 값·범위를 원본에 맞췄고, 은퇴 칸 줄(55·87·88·152·154)은 공통 탭에서 숨겨졌다. ③ `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset`: 생성 한 번이 음일 거라고 가정해 양이 먼저 나오거나 음이 둘이면 실패하는 검사였다. 음이 나올 때까지(최대 5번) 생성하고 첫 음을 쓰도록 고쳤다. 런타임 규칙은 바꾸지 않았다.
+- 바뀐/추가된 검사: `LabModelTests`(해금 폭탄 열림·가득 찬 판·던지기/넘기기 거절, 잠긴 폭탄 열기 거절, 여우구슬 가장자리 거절·두 번 누르기, 아이템 사용 수), `LabDeveloperConfigTests`(은퇴 8칸, 저장 원본 120초·120 스태미나, 시간표가 짧은 전투를 막지 않음, 손가락 Sprite), `LabGimmickTimelineIntegrationTests`(모든 스테이지 공용 전투 시간), `LabYaguangFlashTests`, `LabOrbPhysicsTests`(여우구슬 튕김·두 번 누르기 연기, 해금 폭탄 미끄러짐·잡기 불가·열기 요청), `LabCharmBubblesTests`(손가락·안내 문구), `LabDeveloperSoloIntegrationTests`(여우 안내·솔로 매혹 대기 문구 없음), Hapio `GameStageSettingsTests`·`GameTerritoryFlowTests`·`GameStageUiTests`·`GameSceneFlowTests`, 프로토콜·토큰 고정값.
