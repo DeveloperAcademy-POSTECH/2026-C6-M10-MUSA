@@ -48,12 +48,18 @@ namespace C6Lab.Tests
             Assert.That(room.Snapshot(101d).players[0].stamina, Is.EqualTo(102f).Within(.0001f));
             Assert.That(room.YaguangFeverRecoveryMultiplier(99.99d), Is.EqualTo(1f));
             Assert.That(room.YaguangFeverRecoveryMultiplier(100d), Is.EqualTo(2f));
+            Assert.That(room.Snapshot(101d).feverTimeAt, Is.EqualTo(-1d),
+                "The fox's fever time (#334) stays the fox's: the yaguang runs its own fever (#343).");
         }
 
         [TestCase(LabStageYokai.None)]
         [TestCase(LabStageYokai.Gumiho)]
         public void OtherStagesKeepTheirRecovery(LabStageYokai stage)
         {
+            // 구미호의 피버 타임(#334)은 따로 있는 기능이라 여기서는 꺼 두고, 야광귀 피버가 끼어들지 않는지만 본다.
+            float[] values = config.CaptureDeveloperValues();
+            values[LabConfig.FeverTimeSecondsField] = 0f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             LabModel room = Room(stage);
             Assert.That(room.YaguangFeverStartsAt, Is.EqualTo(-1d));
             Assert.That(room.Snapshot(101d).players[0].stamina, Is.EqualTo(101f).Within(.0001f));
