@@ -750,6 +750,8 @@ namespace C6Lab
         [SerializeField, Range(0, 6)] private int yaguangFiveColorOrbCount = 3;
         [Tooltip("오색구슬로 박을 맞혔을 때 칠 면적 배율 (보통 구슬 = 1). 다섯 원소 색 얼룩을 합친 넓이다. 도색 한 번은 최대 3배까지라 다른 배율과 곱해도 3을 넘지 않는다.")]
         [SerializeField, Range(1f, 3f)] private float yaguangFiveColorOrbPaintScale = 2f;
+        [Tooltip("야광귀 피버타임 (#343): 방해가 끝난 뒤(시간표 방해 종료, 기본 100초)부터 전투가 끝날 때까지 스태미나 자동 회복에 곱하는 배율. 1이면 피버 없음. Inspector 전용(DEV 칸 없음).")]
+        [SerializeField, Range(1f, 4f)] private float yaguangFeverStaminaMultiplier = 2f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -1121,6 +1123,8 @@ namespace C6Lab
         private static readonly float[] DefaultTimelineUniqueSeconds = { 10f, 35f, 60f, 75f };
         private static readonly int[] DefaultTimelineUniqueKinds = { 0, 1, 0, 1 };
         private static readonly float[] DefaultTimelineCommonSeconds = { 25f, 40f, 60f, 80f };
+        /// <summary>야광귀 피버타임 (#343) 스태미나 자동 회복 배율 (1~4, 기본 2)</summary>
+        public float YaguangFeverStaminaMultiplier => Mathf.Clamp(Finite(yaguangFeverStaminaMultiplier, 2f), 1f, 4f);
         public float YaguangTimelineSabotageEndSeconds => Mathf.Clamp(Finite(yaguangTimelineSabotageEndSeconds, 100f), 0f, 180f);
         public float YaguangTimelineUniqueSeconds(int slot) => TimelineSeconds(yaguangTimelineUniqueSeconds, slot, DefaultTimelineUniqueSeconds);
         public bool YaguangTimelineUniqueIsCombo(int slot) => slot >= 0 && slot < YaguangTimelineSlots

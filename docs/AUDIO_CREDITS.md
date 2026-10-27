@@ -7,6 +7,7 @@
 | 파일 | 용도 | 출처 | 이용 조건 | 가공 |
 | --- | --- | --- | --- | --- |
 | `Assets/Lab/Resources/Audio/BGM/Kkwaenggwari_13.wav` | 전투 BGM (반복 재생) | 국립국악원, [국악 디지털 음원](https://www.gugak.go.kr/digitaleum) | 출처 표시 조건으로 누구나 이용 가능 | 반복 재생을 위해 앞 무음 약 0.34초, 끝 무음 약 0.22초 제거. 소리 자체는 변경 없음 |
+| `Assets/Lab/Resources/Audio/Fever/Fever_Whimori.wav` | 야광귀 피버타임 (#343, 방해가 끝난 뒤 20초, 모든 기기). 전투 BGM 대신 처음부터 한 번 튼다 | 국립국악원, [국악 디지털 음원](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) — 전투 BGM의 "동살풀이"(꽹과리)와 태평소 "연주 - 능게" | 공공누리 제1유형 (출처표시, 상업적 이용·변경 가능) | 꽹과리: 20초 동안 빠르기 1.4배 → 1.9배로 점점 빨라지게(음 높이 유지). 태평소: +3반음 올리고 빠르기 1.25배 → 1.7배로 점점 빨라지게. 두 소리를 섞어(태평소 0.6) 압축·리미터로 크기를 맞추고 앞 0.2초/끝 0.8초를 줄임. 44.1kHz 스테레오 16bit wav, 20초. 만든 방법: ffmpeg rubberband(`asendcmd`로 빠르기 변화) |
 
 ## 효과음
 
@@ -39,6 +40,8 @@
 
 > 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '추임새(작성자: 정회석, 강효주, 이춘희, 염경애)'를 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
 
+> 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '연주 - 능게(태평소, 작성자: 국립국악원)'를 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
+
 | 우리 파일 | 국립국악원 저작물명 |
 | --- | --- |
 | `BGM/Kkwaenggwari_13.wav` | 동살풀이 |
@@ -46,6 +49,7 @@
 | `Generate/Janggu_3_1.wav`, `Janggu_3_2.wav`, `Janggu_3_3.wav` | 장구-쿵-강, 장구-쿵-중, 장구-쿵-약 |
 | `GenerateVoice/Eolssu_1.wav`, `Eolssu_2.wav`, `Eolssu_3.wav` | 추임새 (정회석, 강효주, 이춘희) |
 | `ComboClear/Jota.wav` | 추임새 – 좋타 (염경애) |
+| `Fever/Fever_Whimori.wav` | 동살풀이 (꽹과리), 연주 - 능게 (태평소) |
 
 **CC BY 소리 (출처 표시 의무 있음)**
 

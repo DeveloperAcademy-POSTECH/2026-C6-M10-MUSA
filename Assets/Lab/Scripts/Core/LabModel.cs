@@ -1408,7 +1408,8 @@ namespace C6Lab
                     played += elapsed;
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
-                            (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond * JigwiStageRecoveryMultiplier(lastTime)));
+                            (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond * JigwiStageRecoveryMultiplier(lastTime)
+                                * YaguangFeverRecoveryMultiplier(lastTime)));
                     // 결과 대시보드 기록: 이 사이에 북을 점유한 사람의 점유 시간 (북 점유율 계산용)
                     // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)
                     foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())
@@ -1925,6 +1926,8 @@ namespace C6Lab
             public readonly int[] GimmickChances;
             public readonly bool YaguangTimeline;
             public readonly double YaguangTimelineEndSeconds;
+            /// <summary>야광귀 피버타임 (#343): 방해가 끝난 뒤 스태미나 자동 회복 배율</summary>
+            public readonly float YaguangFeverStaminaMultiplier;
             public readonly double[] YaguangTimelineCommonSeconds;
             public readonly YaguangUniqueSlot[] YaguangTimelineUniqueSchedule;
             /// <summary>Fox fire (#251): how many fox orbs fall, and how long after they fall they cannot be touched off.</summary>
@@ -2037,6 +2040,7 @@ namespace C6Lab
                 // One stage policy feeds the shared scheduler; there is no second timeline execution loop.
                 YaguangTimeline = stageYokai == LabStageYokai.Yaguang && !teamMode;
                 YaguangTimelineEndSeconds = YaguangTimeline ? config.YaguangTimelineSabotageEndSeconds : 0d;
+                YaguangFeverStaminaMultiplier = config.YaguangFeverStaminaMultiplier;
                 if (YaguangTimeline)
                 {
                     var commons = new List<double>();
