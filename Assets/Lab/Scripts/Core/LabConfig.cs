@@ -359,7 +359,10 @@ namespace C6Lab
             // Raw-only streak correction (#324); item generation keeps its original chance.
             LabDeveloperField.Toggle("Raw Streak Correction (0 off, 1 on)"),
             new LabDeveloperField("Opposite Chance After 2 Raw (%)", 0f, 100f, true),
-            new LabDeveloperField("Maximum Consecutive Raw", 1f, 10f, true)
+            new LabDeveloperField("Maximum Consecutive Raw", 1f, 10f, true),
+            // 섬광 파훼 보상 (#329): 최대 횟수까지 이어서 흔든 사람 판에 황금알 구슬. 칠 면적은 도색 한 번의 상한(3배) 안이다.
+            new LabDeveloperField("섬광 황금알 수 (0 = 없음)", 0f, 6f, true),
+            new LabDeveloperField("황금알 칠 면적 (배)", 1f, 3f)
         });
 
         public const int YaguangTimelineFirstField = 211;
@@ -414,7 +417,7 @@ namespace C6Lab
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
             // 섬광 흔들어 풀기·흔들기 횟수(#301)는 고해상도 도색(#299) 뒤 202·203번이며 섬광 칸 맨 아래에 둔다.
             new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
-                184, 185, 186, 187, 188, 189, 190, 202, 203)
+                184, 185, 186, 187, 188, 189, 190, 202, 203, 228, 229)
                 .WithSwitch(155, 184)
                 .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
             new LabDeveloperCategory("야광귀 시간표 (Hapio 전용)", 211, 212, 213, 214, 215, 216, 217, 218, 219, 220,
@@ -716,6 +719,12 @@ namespace C6Lab
         [SerializeField] private bool yaguangFlashShakeRelease = true;
         [Tooltip("눈부심을 풀려면 세게 흔들어야 하는 최대 횟수 (#330). 판의 구슬이 이보다 적으면 구슬 수만큼만 흔들면 된다. 기본 10번(범위 가운데).")]
         [SerializeField, Range(2, 18)] private int yaguangFlashShakeCount = 10;
+        [Tooltip("섬광 파훼 보상 (#329): 최대 흔들기 횟수까지 끊기지 않고 이어서 흔든 사람 판에 떨어지는 황금알 구슬 수. 0이면 보상 없음.")]
+        [SerializeField, Range(0, 6)] private int yaguangGoldenEggCount = 3;
+        [Tooltip("황금알로 박을 맞혔을 때 칠 면적 배율 (보통 구슬 = 1). 도색 한 번은 최대 3배까지라 다른 배율과 곱해도 3을 넘지 않는다.")]
+        [SerializeField, Range(1f, 3f)] private float yaguangGoldenEggPaintScale = 2f;
+        [Tooltip("황금알이 박에 칠하는 금빛")]
+        [SerializeField] private Color yaguangGoldenEggColor = new Color(1f, .78f, .16f, 1f);
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -854,6 +863,14 @@ namespace C6Lab
         public bool RawStreakCorrectionEnabled => rawStreakCorrectionEnabled;
         public int RawStreakOppositeChancePercent => Mathf.Clamp(rawStreakOppositeChancePercent, 0, 100);
         public int RawStreakMaximum => Mathf.Clamp(rawStreakMaximum, 1, 10);
+        public int YaguangGoldenEggCount => Mathf.Clamp(yaguangGoldenEggCount, 0, 6);
+        public float YaguangGoldenEggPaintScale => Mathf.Clamp(Finite(yaguangGoldenEggPaintScale, 2f), 1f, 3f);
+        public Color YaguangGoldenEggColor => new Color(yaguangGoldenEggColor.r, yaguangGoldenEggColor.g, yaguangGoldenEggColor.b, 1f);
+        /// <summary>
+        /// 섬광이 시간으로 풀리기까지의 초 (#329). 흔들어 풀기가 켜져 있으면 섬광은 소모성 방해라 시간으로 풀리지 않는다(무한).
+        /// 꺼져 있으면 `섬광 눈부심 (초)`. 다음 섬광 예약 같은 일정 계산은 언제나 `YaguangFlashGlareSeconds`를 쓴다.
+        /// </summary>
+        public float YaguangFlashGlareLimitSeconds => YaguangFlashShakeRelease ? float.PositiveInfinity : YaguangFlashGlareSeconds;
 
         /// <summary>
         /// Percent weights in GeneratedKinds order. An Inspector total of zero falls back to
@@ -1243,7 +1260,8 @@ namespace C6Lab
                 YaguangTimelineUniqueSeconds(3), YaguangTimelineUniqueIsCombo(3) ? 1f : 0f,
                 YaguangTimelineCommonSeconds(0), YaguangTimelineCommonSeconds(1),
                 YaguangTimelineCommonSeconds(2), YaguangTimelineCommonSeconds(3),
-                RawStreakCorrectionEnabled ? 1f : 0f, RawStreakOppositeChancePercent, RawStreakMaximum
+                RawStreakCorrectionEnabled ? 1f : 0f, RawStreakOppositeChancePercent, RawStreakMaximum,
+                YaguangGoldenEggCount, YaguangGoldenEggPaintScale
             };
         }
 
@@ -1514,6 +1532,8 @@ namespace C6Lab
             rawStreakCorrectionEnabled = values[225] >= .5f;
             rawStreakOppositeChancePercent = (int)values[226];
             rawStreakMaximum = (int)values[227];
+            yaguangGoldenEggCount = (int)values[228];
+            yaguangGoldenEggPaintScale = values[229];
             error = string.Empty;
             return true;
         }

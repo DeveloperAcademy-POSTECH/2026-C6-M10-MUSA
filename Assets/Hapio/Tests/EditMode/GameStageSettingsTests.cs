@@ -28,7 +28,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(228));
+                    Assert.That(values.Length, Is.EqualTo(230));
                     Assert.That(values[205], Is.EqualTo(before[205]), "Common gimmick interval preserved (#311)");
                     Assert.That(values[206], Is.EqualTo(before[206]), "Unique gimmick interval preserved (#311)");
                 }
@@ -272,7 +272,7 @@ namespace Hapio.Tests
                 for (int stage = 1; stage <= GameStageSettings.TerritoryScope; stage++)
                 {
                     before[stage - 1] = settings.Capture(stage);
-                    Assert.That(System.Linq.Enumerable.Skip(before[stage - 1], 225), Is.EqualTo(new[] { 1f, 75f, 3f }));
+                    Assert.That(System.Linq.Enumerable.Take(System.Linq.Enumerable.Skip(before[stage - 1], 225), 3), Is.EqualTo(new[] { 1f, 75f, 3f }));
                 }
                 float[] common = settings.Capture(0);
                 common[225] = 0f; common[226] = 40f; common[227] = 7f;
@@ -299,7 +299,7 @@ namespace Hapio.Tests
                 Assert.That(settings.Capture(0), Is.EqualTo(common), "A battle draft must not commit its shared settings.");
                 Assert.That(settings.TryApplyBattle(GameStageSettings.TerritoryScope, battle, out error), Is.True, error);
                 for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
-                    Assert.That(System.Linq.Enumerable.Skip(settings.Capture(scope), 225), Is.EqualTo(new[] { 1f, 100f, 1f }));
+                    Assert.That(System.Linq.Enumerable.Take(System.Linq.Enumerable.Skip(settings.Capture(scope), 225), 3), Is.EqualTo(new[] { 1f, 100f, 1f }));
             }
             CollectionAssert.AreEqual(saved, source.CaptureDeveloperValues());
         }

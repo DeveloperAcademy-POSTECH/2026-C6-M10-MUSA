@@ -158,7 +158,8 @@ namespace C6Lab
             && a.inFlight == b.inFlight && a.arrival == b.arrival && a.stopAt == b.stopAt
             && a.arrivedAt == b.arrivedAt && a.burnedAt == b.burnedAt && a.small == b.small
             && a.jigwiRadiusScale == b.jigwiRadiusScale && a.expiresAt == b.expiresAt
-            && a.jigwiSupply == b.jigwiSupply && a.jigwiGenerationBurn == b.jigwiGenerationBurn && a.fever == b.fever;
+            && a.jigwiSupply == b.jigwiSupply && a.jigwiGenerationBurn == b.jigwiGenerationBurn && a.fever == b.fever
+            && a.golden == b.golden;
 
         internal static LabPlayerState[] CopyPlayers(LabPlayerState[] players) =>
             (players ?? Array.Empty<LabPlayerState>()).Select(player => player?.Copy()).ToArray();

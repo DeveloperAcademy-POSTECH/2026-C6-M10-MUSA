@@ -113,6 +113,11 @@ namespace C6Lab
         public bool jigwiGenerationBurn;
         /// <summary>2:2 fever (#281): made during a team fever or turned by one; every board rings it with a rainbow.</summary>
         public bool fever;
+        /// <summary>
+        /// 섬광 파훼 보상 황금알 (#329): 색(속성) 없는 결합 구슬처럼 던지며, 박을 금빛으로 넓게 칠한다. 합쳐지지 않고
+        /// 수명이 없어 던질 때까지 남는다(만들 때 expiresAt을 아주 멀리 둔다). 옆 사람에게 넘길 수 있다.
+        /// </summary>
+        public bool golden;
 
         /// <summary>An unlock older than this, for example seen after a reconnect, shows the item already open.</summary>
         public const double UnlockEffectWindowSeconds = 1d;
@@ -219,6 +224,8 @@ namespace C6Lab
         /// (flashLastAt) 이후 값만 뜻이 있고, 그 전 값이거나 -1이면 아직 풀지 않았다. 이 시각부터 회복이 시작된다.
         /// </summary>
         public double flashReleasedAt = -1d;
+        /// <summary>황금알을 받은 섬광 번호 (#329). 한 섬광에 한 번만 받는다. 0이면 아직 없음.</summary>
+        public uint flashBonusFlash;
 
         // 2:2 청홍 땅따먹기 (#281) 결과 기록. 팀전이 아니면 0이다.
         /// <summary>지금 박에 남아 있는 이 사람이 칠한 칸 수 (빼앗긴 칸은 빠진다)</summary>

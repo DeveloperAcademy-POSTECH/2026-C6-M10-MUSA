@@ -401,6 +401,24 @@ namespace C6Lab
 
         public bool FeverShown => rainbow != null && rainbow.Visible;
 
+        private LabGoldenSparkle golden;
+
+        /// <summary>섬광 파훼 보상 황금알 (#329): 반짝이는 황금알 그림을 얹는다. 표시만 바뀐다.</summary>
+        public void SetGolden(bool shown)
+        {
+            if (golden == null)
+            {
+                if (!shown) return;
+                golden = LabGoldenSparkle.AttachEgg(transform, visualRadius, false);
+                return;
+            }
+            golden.SetRadius(visualRadius);
+            golden.Show(shown);
+        }
+
+        /// <summary>황금알 그림이 보이는지 (#329)</summary>
+        public bool GoldenShown => golden != null && golden.Shown;
+
         /// <summary>Seconds the Host says this orb still burns after a blast flung it (#213); 0 or less lets the fire die.</summary>
         public void SetBurn(float secondsLeft)
         {

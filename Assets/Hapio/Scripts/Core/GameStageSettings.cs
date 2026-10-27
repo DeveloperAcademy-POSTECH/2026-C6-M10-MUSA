@@ -70,7 +70,7 @@ namespace Hapio
                 || index == 186 || index == 187)) return false;
             if (index == 79) return false; // Retired crack-mode selector; numeric slot stays reserved.
             if (scope == TerritoryScope) return index >= 197 && index <= 199 || IsTerritoryOwned(index);
-            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203;
+            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203 || index >= 228 && index <= 229;
             // The game always flashes everyone (#301); Lab alone can select a single target.
             if (index == FlashTargetOneField) return false;
             // Lab's own switch for borrowing the fox's gimmicks (#311); a game stage's yokai decides them instead.

@@ -480,6 +480,8 @@ namespace C6Lab
             if (orb == null && board != null) board.TryGetLocalAppearance(request.firstId, out element, out small);
             LabProjectile visual = LabProjectile.Create(position, config, projectileRoot,
                 element, small ? config.BlastShrinkScale : 1f);
+            bool golden = orb != null ? orb.golden : board != null && board.IsGolden(request.firstId);
+            if (golden) LabGoldenSparkle.AttachEgg(visual.transform, config.OrbRadius, true);
             float scale = player.comboPenaltyUntil > latest.serverTime ? config.ComboPenaltySizeScale
                 : player.comboRewardUntil > latest.serverTime ? config.ComboRewardSizeScale : 1f;
             if (config.GourdColorComboEnabled) visual.SetRadiusScale(scale);

@@ -628,13 +628,17 @@ namespace C6Lab
             attacker.damageTotal = (int)Math.Min(int.MaxValue,
                 (long)attacker.damageTotal + attackValue);
 
+            LastHitGolden = orb.golden;
             if (teamMode)
                 ConfirmTeamHit(attacker, element, paintDirection, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale, now);
             else
             {
-                if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
-                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1,
-                        (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale)
+                float share = (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale;
+                // 황금알 (#329): 금빛으로, 정해 둔 배율만큼 넓게 칠한다. 도색 한 번은 최대 3배다.
+                if (orb.golden) share = Mathf.Min(3f, share * rules.GoldenEggPaintScale);
+                bool paints = orb.golden || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
+                if (paints && paintSurface.RegisterHit(paintDirection, orb.golden ? rules.GoldenEggColor : PaintColorFor(element),
+                        attacker.id, attacker.seat + 1, share)
                     && paintSurface.IsComplete)
                 {
                     phase = LabPhase.Victory;
@@ -1155,7 +1159,8 @@ namespace C6Lab
             if (!rules.FlashEnabled || phase != LabPhase.Playing || flashCount == 0 || lastFlashAt < 0d) return false;
             if (rules.FlashTargetOne && lastFlashTarget != player) return false;
             if (!players.TryGetValue(player, out var state)) return false;
-            if (now < lastFlashAt || now >= lastFlashAt + rules.FlashGlareSeconds) return false;
+            // #329: 흔들어 풀기가 켜져 있으면 시간으로 풀리지 않는다(다음 섬광·방해 끝·판이 끝날 때까지).
+            if (now < lastFlashAt || now >= lastFlashAt + rules.FlashGlareLimitSeconds) return false;
             return state.flashReleasedAt < lastFlashAt;
         }
 
@@ -1882,6 +1887,12 @@ namespace C6Lab
                 FlashGlareSeconds, FlashRecoverySeconds;
             /// <summary>Yaguang flash release (#301): a dazzled player shakes their phone to clear their own glare.</summary>
             public readonly bool FlashShakeRelease;
+            /// <summary>섬광이 시간으로 풀리는 초 (#329). 흔들어 풀기가 켜져 있으면 무한(소모성 방해).</summary>
+            public readonly float FlashGlareLimitSeconds;
+            /// <summary>섬광 파훼 보상 (#329): 황금알 수와 칠 면적·색</summary>
+            public readonly int GoldenEggCount;
+            public readonly float GoldenEggPaintScale;
+            public readonly Color GoldenEggColor;
 
             public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode)
             {
@@ -1959,6 +1970,10 @@ namespace C6Lab
                 FlashGlareSeconds = config.YaguangFlashGlareSeconds;
                 FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
                 FlashShakeRelease = config.YaguangFlashShakeRelease;
+                FlashGlareLimitSeconds = config.YaguangFlashGlareLimitSeconds;
+                GoldenEggCount = config.YaguangGoldenEggCount;
+                GoldenEggPaintScale = config.YaguangGoldenEggPaintScale;
+                GoldenEggColor = config.YaguangGoldenEggColor;
                 // One stage policy feeds the shared scheduler; there is no second timeline execution loop.
                 YaguangTimeline = stageYokai == LabStageYokai.Yaguang && !teamMode;
                 YaguangTimelineEndSeconds = YaguangTimeline ? config.YaguangTimelineSabotageEndSeconds : 0d;

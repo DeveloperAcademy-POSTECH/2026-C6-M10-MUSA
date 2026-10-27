@@ -476,8 +476,9 @@ namespace C6Lab.Tests
             Assert.That(model.TryFlashShakeRelease(10, 6.5d), Is.False, "Already released.");
 
             Assert.That(model.FlashGlared(20, 16.9d), Is.True);
-            Assert.That(model.TryFlashShakeRelease(20, 17.5d), Is.False, "After the 12 s glare it has already worn off.");
-            Assert.That(model.FlashGlared(20, 17.5d), Is.False);
+            Assert.That(model.FlashGlared(20, 60d), Is.True, "#329: with the release on, time never clears the glare...");
+            Assert.That(model.TryFlashShakeRelease(20, 60d), Is.True, "...only a shake does, however late.");
+            Assert.That(model.FlashGlared(20, 60d), Is.False);
 
             JsonUtility.FromJsonOverwrite("{\"yaguangFlashShakeRelease\":false}", config);
             model = new LabModel();

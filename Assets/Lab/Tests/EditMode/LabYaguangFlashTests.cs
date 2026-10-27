@@ -43,7 +43,7 @@ namespace C6Lab.Tests
                 "The combo moved into the 야광귀 group.");
             LabDeveloperCategory yaguang = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀");
             Assert.That(yaguang.FieldIndices, Is.EqualTo(new[]
-                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190, 202, 203 }),
+                { 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163, 184, 185, 186, 187, 188, 189, 190, 202, 203, 228, 229 }),
                 "The yaguang counting toggle (#271) sits right under the combo switch.");
             Assert.That(yaguang.SwitchFields, Is.EqualTo(new[] { 155, 184 }), "One switch turns the combo and the flash on together.");
             Assert.That(yaguang.DividerAt, Is.EqualTo(new[] { 0, 11 }));
@@ -97,7 +97,7 @@ namespace C6Lab.Tests
                     .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
                 Assert.That(ui.EnsureValueInputs(), Is.True,
                     "The saved Lab expands its legacy setting rows through the same public startup path as runtime.");
-                Assert.That(ui.valueInputs, Has.Length.EqualTo(228));
+                Assert.That(ui.valueInputs, Has.Length.EqualTo(230));
                 typeof(LabDeveloperMode).GetMethod("BuildCategoryLayout", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(ui, null);
                 Transform content = ui.valueInputs[0].transform.parent.parent;
