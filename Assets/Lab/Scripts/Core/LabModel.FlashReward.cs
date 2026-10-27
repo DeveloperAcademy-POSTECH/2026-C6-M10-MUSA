@@ -55,8 +55,11 @@ namespace C6Lab
         /// <summary>오색구슬이 칠하는 다섯 원소 색, 시계 방향 (목 → 화 → 토 → 금 → 수).</summary>
         public static readonly LabOrbElement[] FiveColorPaintOrder =
             { LabOrbElement.Wood, LabOrbElement.Fire, LabOrbElement.Earth, LabOrbElement.Metal, LabOrbElement.Water };
-        /// <summary>다섯 얼룩이 맞은 자리에서 벌어지는 각도</summary>
-        private const float FiveColorSpreadDegrees = 8f;
+        /// <summary>
+        /// 다섯 얼룩이 맞은 자리에서 벌어지는 각도. 얼룩 하나의 첫 칠(약 10°)보다 이웃 얼룩까지가 멀어야
+        /// 뒤 얼룩이 앞 얼룩 위에 떨어져 제 색을 잃지 않는다 (16°면 이웃 사이 약 19°).
+        /// </summary>
+        private const float FiveColorSpreadDegrees = 16f;
 
         /// <summary>
         /// 오색구슬 명중 (#329): 맞은 자리 둘레에 다섯 원소 색 얼룩을 하나씩 칠한다. 다섯 얼룩의 칠 면적을 합치면 share다.

@@ -112,6 +112,9 @@ namespace C6Lab.Tests
             Assert.That(model.LastHitFiveColor, Is.True);
             Assert.That(element, Is.EqualTo(LabOrbElement.None), "It has no element, so a combo never counts it.");
             foreach (Color32 colour in colours)
+                Assert.That(model.PaintSurface.CountColor(colour), Is.GreaterThan(0), "Each of the five element colours lands at once.");
+            model.Tick(9d);
+            foreach (Color32 colour in colours)
                 Assert.That(model.PaintSurface.CountColor(colour), Is.GreaterThan(0), "Each of the five element colours is painted.");
         }
     }
