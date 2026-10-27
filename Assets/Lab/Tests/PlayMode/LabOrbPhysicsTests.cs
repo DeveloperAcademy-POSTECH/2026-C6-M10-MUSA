@@ -879,6 +879,44 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator EachShakeGivesOneWhiteOrbItsColourBackAndNewOrbsComeWhite()
+        {
+            var yin = board.UpsertOrb("shake-yin", LabOrbKind.Yin, new Vector2(.2f, .5f));
+            var yang = board.UpsertOrb("shake-yang", LabOrbKind.Yang, new Vector2(.5f, .5f));
+            var bomb = board.UpsertOrb("shake-bomb", LabOrbKind.Bomb, new Vector2(.8f, .5f), lockSwipes: 1);
+            var drum = board.UpsertOrb("shake-drum", LabOrbKind.Drum, new Vector2(.5f, .2f));
+            board.SetFlashGlare(1f);
+            yield return null;
+            Assert.That(new[] { yin.Glare, yang.Glare, bomb.Glare }, Is.All.EqualTo(1f));
+            Assert.That(drum.Glare, Is.Zero, "The drum keeps its colour.");
+            Assert.That(board.FlashWhiteCount, Is.EqualTo(3), "Orbs and items count; the drum does not.");
+
+            string first = board.RevealFlashOrb(1.3f, .18f);
+            yield return null;
+            Assert.That(first, Is.Not.Null);
+            Assert.That(board.FlashWhiteCount, Is.EqualTo(2), "One shake, one orb (#330).");
+            Assert.That(new[] { yin, yang, bomb }.Count(view => view.Glare == 0f), Is.EqualTo(1));
+            Assert.That(new[] { yin, yang, bomb }.Single(view => view.Glare == 0f).OrbId, Is.EqualTo(first));
+
+            var late = board.UpsertOrb("shake-late", LabOrbKind.Yin, new Vector2(.3f, .7f));
+            yield return null;
+            Assert.That(late.Glare, Is.EqualTo(1f), "An orb that arrives while dazzled comes in white.");
+            Assert.That(board.FlashWhiteCount, Is.EqualTo(3));
+
+            board.RevealAllFlashOrbs();
+            yield return null;
+            Assert.That(board.FlashWhiteCount, Is.Zero);
+            Assert.That(new[] { yin.Glare, yang.Glare, bomb.Glare, late.Glare }, Is.All.Zero);
+            Assert.That(board.RevealFlashOrb(1.3f, .18f), Is.Null, "Nothing left to reveal.");
+
+            board.ResetFlashReveal();
+            yield return null;
+            Assert.That(board.FlashWhiteCount, Is.EqualTo(4), "A new flash whitens every orb again.");
+            Assert.That(late.Glare, Is.EqualTo(1f));
+            board.SetFlashGlare(0f);
+        }
+
+        [UnityTest]
         public IEnumerator ABlastFlungOrbBurnsForTheHostsSecondsThenGoesOut()
         {
             var cold = board.UpsertOrb("cold", LabOrbKind.Yang, new Vector2(.2f, .5f));

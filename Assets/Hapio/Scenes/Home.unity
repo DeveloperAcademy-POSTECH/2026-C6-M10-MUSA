@@ -25609,9 +25609,9 @@ MonoBehaviour:
   m_HandleRect: {fileID: 1977900865}
   m_Direction: 0
   m_MinValue: 2
-  m_MaxValue: 10
+  m_MaxValue: 18
   m_WholeNumbers: 1
-  m_Value: 6
+  m_Value: 10
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -41920,7 +41920,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC12C\uAD11 \uD754\uB4E4\uAE30 \uD69F\uC218"
+  m_Text: "\uC12C\uAD11 \uCD5C\uB300 \uD754\uB4E4\uAE30 \uD69F\uC218"
 --- !u!222 &510571639
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -43917,7 +43917,7 @@ MonoBehaviour:
   m_CaretColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
   m_CustomCaretColor: 0
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
-  m_Text: 6
+  m_Text: 10
   m_CaretBlinkRate: 0.85
   m_CaretWidth: 1
   m_ReadOnly: 0
@@ -97740,7 +97740,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 6
+  m_Text: 10
 --- !u!222 &1213972474
 CanvasRenderer:
   m_ObjectHideFlags: 0

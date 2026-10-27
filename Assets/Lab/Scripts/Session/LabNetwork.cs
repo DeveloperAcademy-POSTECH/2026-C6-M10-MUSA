@@ -213,8 +213,7 @@ namespace C6Lab
         //       retired bomb/block/sabotage timers.
         // 5669: #324 per-player Yin/Yang streak control (DEV 225-227, 228 shared values).
         // 5670: #326 Blast Burn Seconds range 3-5 -> 3-9 (default 4 -> 6); an older peer would reject the new value.
-        // 5671: #328 an unlocked bomb glides in and opens into two attack orbs through "use" (never thrown), a double
-        //       tap clears a fox orb through "use" and the side edges stop it; DEV 55 and 211 retired (228 values kept).
+        // 5671: #330 flash shake count range 2-10 -> 2-18 (default 6 -> 10, now a maximum: one orb regains colour per shake).
         internal const ushort LabProtocolVersion = 5671;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";

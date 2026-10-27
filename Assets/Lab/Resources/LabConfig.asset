@@ -179,7 +179,7 @@ MonoBehaviour:
   yaguangFlashGlareSeconds: 10
   yaguangFlashRecoverySeconds: 1
   yaguangFlashShakeRelease: 1
-  yaguangFlashShakeCount: 6
+  yaguangFlashShakeCount: 10
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9
