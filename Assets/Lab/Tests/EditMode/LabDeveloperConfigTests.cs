@@ -1236,7 +1236,7 @@ namespace C6Lab.Tests
                 "Blast Burn Seconds", "Blast Shrink Scale (x radius)", "Small Orb Paint Share (x paint)"
             }));
             Assert.That(penalty.Select(field => field.Min), Is.EqualTo(new[] { 3f, .2f, 0f }));
-            Assert.That(penalty.Select(field => field.Max), Is.EqualTo(new[] { 5f, 1f, 1f }));
+            Assert.That(penalty.Select(field => field.Max), Is.EqualTo(new[] { 9f, 1f, 1f }), "#326: the fire burns 6 s, in the middle of 3–9.");
             Assert.That(penalty.Any(field => field.WholeNumber || field.IsToggle || field.IsChoice), Is.False);
             int[] items = LabConfig.DeveloperCategories.Single(category => category.Title == "Item orbs").FieldIndices;
             Assert.That(items.Skip(items.Length - 3), Is.EqualTo(new[] { 145, 146, 147 }),
@@ -1247,7 +1247,7 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
-                Assert.That(source.CaptureDeveloperValues().Skip(145).Take(3), Is.EqualTo(new[] { 4f, .5f, .5f }));
+                Assert.That(source.CaptureDeveloperValues().Skip(145).Take(3), Is.EqualTo(new[] { 6f, .5f, .5f }));
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();
@@ -1266,9 +1266,9 @@ namespace C6Lab.Tests
             Assert.That(error, Does.Contain("Blast Burn Seconds"));
             Assert.That(config.BlastBurnSeconds, Is.EqualTo(3.5f), "A rejected form changes nothing.");
 
-            JsonUtility.FromJsonOverwrite("{\"blastBurnSeconds\":9,\"blastShrinkScale\":0,\"smallOrbPaintShare\":-1}", config);
+            JsonUtility.FromJsonOverwrite("{\"blastBurnSeconds\":12,\"blastShrinkScale\":0,\"smallOrbPaintShare\":-1}", config);
             Assert.That(new[] { config.BlastBurnSeconds, config.BlastShrinkScale, config.SmallOrbPaintShare },
-                Is.EqualTo(new[] { 5f, .2f, 0f }), "Inspector values outside the ranges are clamped.");
+                Is.EqualTo(new[] { 9f, .2f, 0f }), "Inspector values outside the ranges are clamped.");
         }
 
         [Test]
@@ -1669,8 +1669,8 @@ namespace C6Lab.Tests
                     Assert.That(copy.RawStreakMaximum, Is.EqualTo((int)maximum));
                     Assert.That(copy.CaptureDeveloperValues(), Is.EqualTo(values));
                 }
-                Assert.That(LabSessionSettings.Fingerprint(received, 3, 5669),
-                    Is.EqualTo(LabSessionSettings.Fingerprint(values, 3, 5669)));
+                Assert.That(LabSessionSettings.Fingerprint(received, 3, 5670),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(values, 3, 5670)));
             }
             finally { Object.DestroyImmediate(peer); Object.DestroyImmediate(runtime); }
         }
@@ -1708,8 +1708,8 @@ namespace C6Lab.Tests
             float[] before = config.CaptureDeveloperValues();
             float[] values = (float[])before.Clone(); values[index] = changed;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
-            Assert.That(LabSessionSettings.Fingerprint(values, 3, 5669),
-                Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 3, 5669)));
+            Assert.That(LabSessionSettings.Fingerprint(values, 3, 5670),
+                Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 3, 5670)));
             LabDeveloperField field = LabConfig.DeveloperFields[index];
             foreach (float endpoint in new[] { field.Min, field.Max, before[index] })
             {

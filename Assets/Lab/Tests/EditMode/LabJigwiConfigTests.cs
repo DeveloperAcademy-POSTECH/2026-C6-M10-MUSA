@@ -48,11 +48,11 @@ namespace C6Lab.Tests
                 Assert.That(new[] { client.JigwiFireSeconds, client.JigwiOverheatSeconds,
                     client.JigwiGenerationBurnSeconds, client.JigwiRawRadiusScale, client.JigwiRawLifeScale },
                     Is.EqualTo(tail.Skip(1)));
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5669),
-                    Is.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5669)));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5670),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5670)));
                 values[183] = .75f;
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5669),
-                    Is.Not.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5669)));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5670),
+                    Is.Not.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5670)));
             }
             finally { Object.DestroyImmediate(host); Object.DestroyImmediate(client); }
         }

@@ -1,6 +1,6 @@
 # C6 Physics Lab 개발자 모드 조정값 명세
 
-> **현행 설정 기준 (#246 정리·#251 방해공작12개·#272 지귀6개·#268 야광귀 섬광 7개·#271 야광귀 셈법1개·#276 지귀 자동4개·#281 2:2 땅따먹기4개·#299 고해상도 도색2개·#301 섬광 흔들어 풀기2개·#305 매혹 예고1개·#311 기믹 묶음6개·#314 시간표14개·#324 음양 보정3개 추가):** Unity 6000.6.5f1, `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig.DeveloperFields`에 연결된 공유 설정은 **228개**(그중 #311이 은퇴시킨 6개는 자리만 남고 화면에 없음), 프로토콜은 **5669**, 연결 토큰은 `C6PhysicsLab/30`(게임 `C6HapioGame/13`)다. 사용하지 않는 고정 승리 목표 행과 옛 셀별 Flow 조절 4개를 제거했다. 100% 도색 승리 규칙·현재 4종 패턴·LEGACY 초기 Style/Raggedness·근처 명중 건조·개인 조합판 구조는 유지한다. 아래 인덱스는 정리 후 기준이며 옛 설정 배열과 혼합하지 않는다. 실행 결과는 [VALIDATION](VALIDATION.md)의 #246 기록에서 확인한다.
+> **현행 설정 기준 (#246 정리·#251 방해공작12개·#272 지귀6개·#268 야광귀 섬광 7개·#271 야광귀 셈법1개·#276 지귀 자동4개·#281 2:2 땅따먹기4개·#299 고해상도 도색2개·#301 섬광 흔들어 풀기2개·#305 매혹 예고1개·#311 기믹 묶음6개·#314 시간표14개·#324 음양 보정3개 추가):** Unity 6000.6.5f1, `Assets/Lab/Resources/LabConfig.asset`과 `LabConfig.DeveloperFields`에 연결된 공유 설정은 **228개**(그중 #311이 은퇴시킨 6개는 자리만 남고 화면에 없음), 프로토콜은 **5670**, 연결 토큰은 `C6PhysicsLab/31`(게임 `C6HapioGame/14`)다. 사용하지 않는 고정 승리 목표 행과 옛 셀별 Flow 조절 4개를 제거했다. 100% 도색 승리 규칙·현재 4종 패턴·LEGACY 초기 Style/Raggedness·근처 명중 건조·개인 조합판 구조는 유지한다. 아래 인덱스는 정리 후 기준이며 옛 설정 배열과 혼합하지 않는다. 실행 결과는 [VALIDATION](VALIDATION.md)의 #246 기록에서 확인한다.
 
 이 문서는 현재 Lab의 DEV에 연결된 값의 기본값·입력 범위·적용 경계·코드 연결을 설명한다. 원본 Inspector와 DEV 입력, 실행 증거는 구분한다.
 
@@ -11,7 +11,7 @@
 - `Paint Edge Raggedness`는 새 성장 경계의 요철 선호도에 관여한다. 사용되지 않는 옛 셀별 Flow 조절 4개는 #246에서 제거했다. 초기 3종 외곽은 원본 마스크로 정하고, 초기/반복 면적·속도·메우기·세로 가중치는 기존 공통 값을 사용한다.
 - DEFAULTS는 원본 Config의 Splatter로 돌아간다. 솔로 시작/재시작·Host 방 생성·로비 적용·공동 일시정지 후 APPLY & RESTART에서만 확정한다. 선택 버튼만 눌러서는 진행 중인 도색을 바꾸지 않는다.
 - 최초 튀김점은 같은 초기 면적 예산을 소비하는 실제 opaque 셀이다. 떨어진 성분은 별도 Region이며 반복 명중은 그 지점의 연결 성분에만 공급한다. 접촉하면 기존 FIFO 규칙으로 병합한다.
-- 실제 물감은 공용 `LabPaintPalette`의 사용자5색이며 구슬 재질과 분리된다. [패턴 구현·검증 안내](PAINT_PATTERN_RUNTIME.md)를 참조한다. 현재 설정228개·프로토콜5669·토큰 `C6PhysicsLab/30`을 사용한다. 다른 길이의 배열과 다른 버전 참가자는 새 설정을 일부만 적용할 수 없다.
+- 실제 물감은 공용 `LabPaintPalette`의 사용자5색이며 구슬 재질과 분리된다. [패턴 구현·검증 안내](PAINT_PATTERN_RUNTIME.md)를 참조한다. 현재 설정228개·프로토콜5669·토큰 `C6PhysicsLab/31`을 사용한다. 다른 길이의 배열과 다른 버전 참가자는 새 설정을 일부만 적용할 수 없다.
 
 > main `f3c7cec4`의 #236/PR #248 북 AUTO와 #244/PR #249 콤보 요괴 연출을 통합했다. `Drum Count`는 기존 인덱스74를 유지하고 기본값0의 의미를 AUTO로 사용한다. 공유 필드는 추가하지 않아166개이며 현재 규약은5653/token15다. 과거5650/token14·170개 #248 실행 결과와 현재 통합 결과는 [VALIDATION](VALIDATION.md)에서 분리한다. 콤보 요괴는 기존 Host 스냅샷으로 구동하며 공유 DEV 필드를 추가하지 않는다.
 
@@ -426,15 +426,15 @@ DEV의 `Item orbs` 묶음 끝, 무거운 폭탄 다음에 있다. 폭탄 충격�
 
 | DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
 | --- | ---: | --- | --- |
-| Blast Burn Seconds | 4 | 3–5 / 초 | 146번째(인덱스 145). 밀린 구슬에 노란 불이 붙어 있는 시간. Host가 불붙인 시각부터 Host 시계로 세므로, 옆 사람에게 넘어간 구슬도 받은 화면에서 남은 만큼만 탄다. 불은 표시일 뿐 규칙에 영향이 없다. |
+| Blast Burn Seconds | 6 | 3–9 / 초 | 146번째(인덱스 145). 밀린 구슬에 불이 붙어 있는 시간. #326에서 4 → 6초(범위 3–5 → 3–9, 기본값이 가운데). Host가 불붙인 시각부터 Host 시계로 세므로, 옆 사람에게 넘어간 구슬도 받은 화면에서 남은 만큼만 탄다. 불은 표시일 뿐 규칙에 영향이 없다. |
 | Blast Shrink Scale (x radius) | 0.5 | 0.2–1 / 배 | 147번째(인덱스 146). 밀린 구슬의 반지름 배율. 사라질 때까지 유지되며 보이는 크기, 다른 구슬과 부딪히는 범위, 잡히는 범위(반지름의 1.25배), 던졌을 때 투사체의 몸체·그림(박에 맞는 범위)에 모두 쓰인다. 1이면 줄지 않는다. 새로 작아지는 구슬부터 적용된다. |
 | Small Orb Paint Share (x paint) | 0.5 | 0–1 / 배 | 148번째(인덱스 147). 작아진 구슬(또는 그것으로 만든 결합 구슬)이 박에 맞았을 때 처음 튀는 양과 다시 맞혔을 때 퍼지는 양에 곱한다. 0이면 칠하지 않는다. Crack 모드의 피해량은 바꾸지 않는다. |
 
 어떤 구슬이 맞았는지는 폭탄이 터진 판만 정확히 안다(기기마다 판 비율이 다름). 그래서 그 판이 밀어낸 구슬 ID를 `blastHit`로 Host에 보내고, Host가 3초 안에 그 사람에게 보낸 폭발인지·그 사람 판에 있는 날아가지 않은 구슬인지 확인해 `burnedAt`(불붙은 Host 시각)과 `small`을 기록한다. 폭발마다 보고는 한 번만 받는다. Host 자신의 판에서 터지면 스냅샷을 만드는 도중이므로 바로 기록하고 다음 정기 스냅샷(0.1초 안)에 실어 보낸다. 작은 구슬이 하나라도 들어간 결합 구슬은 작고 남은 불을 이어받는다.
 
-불 모양(뒤에서 솟는 불길 5개·윗가장자리 불꽃 3개·빛무리·불티 5개, 공 크기에 비례)과 작아질 때 0.3초 동안 줄어드는 연출은 코드에 고정돼 있으며 DEV로 조정하지 않는다. 불길은 구슬 중심 평면에 있어 불투명한 공이 뿌리를 가리므로 구슬 색은 그대로 보인다.
+불 모양 (#326): 빨강·주황·노랑 평면 불길에 먹선을 두른 만화 불 그림 6장(`Resources/Bomb/BlastFire`, 256×320px)을 구슬 **위에** 얹고 초당 12장으로 번갈아 보여 날름거리게 한다. 불 뒤 노란 빛무리와 위로 튀는 불티 5개는 그대로이며, 붙는 순간 확 커졌다 끝에 줄어드는 연출, 공 크기에 비례하는 크기, 작아질 때 0.3초 동안 줄어드는 연출도 같다. DEV로는 조정하지 않고 Inspector `LabOrbAppearance`의 Blast fire 칸(그림·초당 장 수·폭·그림 속 구슬 중심·위치·빛무리/불티 켜기)에서 바꾼다. Inspector 그림이 비면 Resources 그림을, 그것도 없으면 예전 코드 불(뒤에서 솟는 불길 5개·윗가장자리 불꽃 3개)을 쓴다. 그림은 `tools/generate_blast_fire_frames.py`로 다시 만들 수 있다.
 
-근거: `LabConfig.BlastBurnSeconds`·`BlastShrinkScale`·`SmallOrbPaintShare`, `LabOrbBoard.Blast`·`RadiusFor`, `LabNetwork.ReportBlast`, `LabModel.MarkBlasted`·`TryCombineAt`, `LabOrbState.BurnSecondsLeft`, `LabProjectile.Create`, `LabPaintSurface.RegisterHit`, `LabOrbBurn`, `LabOrbView.SetBurn`·`PlayShrink`.
+근거: `LabConfig.BlastBurnSeconds`·`BlastShrinkScale`·`SmallOrbPaintShare`, `LabOrbBoard.Blast`·`RadiusFor`, `LabNetwork.ReportBlast`, `LabModel.MarkBlasted`·`TryCombineAt`, `LabOrbState.BurnSecondsLeft`, `LabProjectile.Create`, `LabPaintSurface.RegisterHit`, `LabOrbBurn`, `LabOrbView.SetBurn`, `LabOrbAppearance.BlastFireFrames`·`PlayShrink`.
 
 ### 결합 소리·햅틱 — 85~87번째 설정
 

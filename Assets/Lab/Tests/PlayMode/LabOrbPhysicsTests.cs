@@ -858,11 +858,10 @@ namespace C6Lab.Tests
             Assert.That(hot.Burning, Is.True, "An orb a blast flung burns (#213).");
             Assert.That(fire.SecondsLeft, Is.EqualTo(.8f).Within(1e-4f), "For the seconds the Host gives.");
             Assert.That(fire.Life, Is.LessThan(.1f), "It catches from nothing...");
-            Assert.That(fire.PartsShown, Is.GreaterThan(10), "Tongues of flame, a halo and embers.");
+            Assert.That(fire.UsesArt, Is.True, "Since #326 the fire is the ink-outlined cartoon pictures from Resources/Bomb/BlastFire.");
+            Assert.That(fire.PartsShown, Is.EqualTo(7), "The picture, the warm halo and five embers.");
             Assert.That(fire.FullHeight, Is.GreaterThan(2f * hot.HitSphere.radius), "Its flames rise well above the ball.");
-            Assert.That(fire.BackDepth, Is.EqualTo(0f),
-                "The big flames stand in the ball's middle, so the ball hides their roots and keeps its colour,");
-            Assert.That(fire.FrontDepth, Is.LessThan(-hot.HitSphere.radius), "and only short licks come over its front.");
+            Assert.That(fire.ArtDepth, Is.LessThan(-hot.HitSphere.radius), "The picture sits on the ball, in front of it.");
 
             var whole = board.UpsertOrb("whole", LabOrbKind.Yin, new Vector2(.8f, .5f), burnSeconds: .8f);
             Assert.That(whole.Burn.FullHeight, Is.EqualTo(2f * fire.FullHeight).Within(1e-4f),
@@ -873,6 +872,11 @@ namespace C6Lab.Tests
             float until = Time.time + .6f;
             while (Time.time < until && fire.Life < .9f) yield return null;
             Assert.That(fire.Life, Is.GreaterThan(.9f), "...and is soon at full size.");
+
+            int firstFrame = fire.ArtFrame;
+            until = Time.time + .5f;
+            while (Time.time < until && fire.ArtFrame == firstFrame) yield return null;
+            Assert.That(fire.ArtFrame, Is.Not.EqualTo(firstFrame), "It flips through its pictures, so it licks.");
 
             float left = fire.SecondsLeft;
             board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: left + .1f);
@@ -886,6 +890,43 @@ namespace C6Lab.Tests
             Assert.That(hot.HitSphere.radius, Is.EqualTo(.5f * config.OrbRadius).Within(1e-5f), "The orb stays small.");
             board.UpsertOrb("hot", LabOrbKind.Yin, new Vector2(.5f, .5f), small: true, burnSeconds: 0f);
             Assert.That(hot.Burning, Is.False, "A snapshot after the fire does not relight it.");
+        }
+
+        [UnityTest]
+        public IEnumerator BlastFirePicturesAndGlowComeFromTheAppearance()
+        {
+            var appearance = ScriptableObject.CreateInstance<LabOrbAppearance>();
+            var texture = new Texture2D(16, 20);
+            var frames = new[]
+            {
+                Sprite.Create(texture, new Rect(0f, 0f, 16f, 20f), new Vector2(.5f, .5f), 16f),
+                Sprite.Create(texture, new Rect(0f, 0f, 16f, 20f), new Vector2(.5f, .5f), 16f)
+            };
+            SetSerializedField(appearance, "blastFireFrames", frames);
+            SetSerializedField(appearance, "blastFireHalo", false);
+            SetSerializedField(appearance, "blastFireEmbers", false);
+            SetSerializedField(appearance, "blastFireWidth", 2f);
+            SetSerializedField(config, "orbAppearance", appearance);
+            try
+            {
+                board.Configure(config, inputCamera, Bounds);
+                var hot = board.UpsertOrb("styled-hot", LabOrbKind.Yin, new Vector2(.5f, .5f), burnSeconds: 2f);
+                LabOrbBurn fire = hot.Burn;
+                float until = Time.time + .6f;
+                while (Time.time < until && fire.Life < .9f) yield return null;
+                Assert.That(fire.UsesArt, Is.True);
+                Assert.That(fire.PartsShown, Is.EqualTo(1), "Halo and embers can be turned off in the Inspector.");
+                Assert.That(frames, Does.Contain(fire.GetComponentInChildren<SpriteRenderer>().sprite),
+                    "The Inspector's pictures replace the Resources ones.");
+                Assert.That(fire.FullHeight, Is.EqualTo((1f - .0625f) * 2f * 1.25f * hot.HitSphere.radius).Within(1e-3f),
+                    "Width 2 radii and the picture's 4:5 shape, measured from the ball's centre.");
+            }
+            finally
+            {
+                SetSerializedField(config, "orbAppearance", null);
+                Object.Destroy(appearance);
+                Object.Destroy(texture);
+            }
         }
 
         [UnityTest]

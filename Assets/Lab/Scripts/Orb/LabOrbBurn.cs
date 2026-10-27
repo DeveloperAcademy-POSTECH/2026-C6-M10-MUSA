@@ -3,7 +3,11 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
-    /// The yellow fire on an orb a bomb blast flung (#213). Tongues of flame rise from behind the orb,
+    /// The fire on an orb a bomb blast flung (#213). Since #326 it is drawn from the appearance's fire pictures
+    /// (red, orange and yellow cartoon flames with an ink outline) sitting on top of the ball, flipping through
+    /// the frames so it licks, with the warm halo and rising embers around it. Without pictures it falls back to
+    /// the original code-drawn yellow fire described below.
+    /// The code-drawn fallback: Tongues of flame rise from behind the orb,
     /// where the ball hides their roots so its colour stays readable, with small licks over its top
     /// edge, a warm halo and rising embers. It burns for the seconds the Host gives, flares up as it
     /// catches and dies down at the end; a paused battle (time scale 0) pauses it. It sits on the
@@ -64,6 +68,12 @@ namespace C6Lab
         private static Sprite emberSprite;
 
         private Flame[] flames;
+        // #326: the picture fire. art is null while the code-drawn fallback is used.
+        private SpriteRenderer art;
+        private Sprite[] artFrames;
+        private float artFps = 12f, artWidth = 3.2f;
+        private Vector2 artCentre = new Vector2(.5f, .0625f), artOffset;
+        private bool artHalo = true, artEmbers = true;
         private SpriteRenderer halo;
         private readonly SpriteRenderer[] embers = new SpriteRenderer[EmberCount];
         private float radius = .32f;
@@ -79,7 +89,23 @@ namespace C6Lab
         /// <summary>How big the fire is now: 0 out, about 1 at full, briefly above as it catches.</summary>
         public float Life => burning ? life : 0f;
         /// <summary>How high the tallest flame's tip reaches above the orb centre at full size, in world units.</summary>
-        public float FullHeight => (Tongues[0].Base.y + Tongues[0].Height) * radius;
+        public float FullHeight => art != null && artFrames.Length > 0
+            ? ((1f - artCentre.y) * artWidth * ArtAspect + artOffset.y) * radius
+            : (Tongues[0].Base.y + Tongues[0].Height) * radius;
+        /// <summary>The fire is drawn from pictures (#326) rather than the code-drawn fallback.</summary>
+        public bool UsesArt => art != null;
+        /// <summary>The picture shown now, as an index into the frames; -1 without pictures.</summary>
+        public int ArtFrame { get; private set; } = -1;
+        /// <summary>Depth of the picture fire: in front of the ball, so it sits on it.</summary>
+        public float ArtDepth => art != null ? art.transform.localPosition.z : 0f;
+        private float ArtAspect
+        {
+            get
+            {
+                Vector2 size = artFrames[0].bounds.size;
+                return size.x > 0f ? size.y / size.x : 1f;
+            }
+        }
         /// <summary>Flame, halo and ember sprites shown now.</summary>
         public int PartsShown
         {
@@ -91,7 +117,7 @@ namespace C6Lab
             }
         }
         /// <summary>Depth of the flames behind the ball's front (the ball hides their roots) and of the licks over it.</summary>
-        public float BackDepth => flames != null ? flames[0].Renderer.transform.localPosition.z : 0f;
+        public float BackDepth => flames != null && flames.Length > 0 ? flames[0].Renderer.transform.localPosition.z : 0f;
         public float FrontDepth
         {
             get
@@ -115,8 +141,9 @@ namespace C6Lab
         /// Burns for the Host's seconds. A fire already burning keeps its own countdown unless the
         /// Host's differs by more than a moment; zero or less lets it die down.
         /// </summary>
-        public void Burn(float seconds, float orbRadius)
+        public void Burn(float seconds, float orbRadius, LabOrbAppearance look = null)
         {
+            if (flames == null && look != null) UseLook(look);
             SetRadius(orbRadius);
             if (!(seconds > 0f) || float.IsInfinity(seconds))
             {
@@ -157,12 +184,27 @@ namespace C6Lab
             Pose();
         }
 
+        /// <summary>Takes the fire pictures and their settings from the appearance, once, before the fire is built.</summary>
+        private void UseLook(LabOrbAppearance look)
+        {
+            Sprite[] frames = look.BlastFireFrames;
+            artFrames = frames != null && frames.Length > 0 ? frames : null;
+            artFps = look.BlastFireFramesPerSecond;
+            artWidth = look.BlastFireWidth;
+            artCentre = look.BlastFireOrbCentre;
+            artOffset = look.BlastFireOffset;
+            artHalo = look.BlastFireHalo;
+            artEmbers = look.BlastFireEmbers;
+        }
+
         private void Pose()
         {
             float caught = Mathf.Clamp01(age / CatchSeconds);
             // Catches with a short flare past full size, then dies down over its last moments.
             float flare = 1f + 2.2f * Mathf.Pow(caught - 1f, 3f) + 1.2f * Mathf.Pow(caught - 1f, 2f);
             life = Mathf.Max(0f, flare) * Mathf.Clamp01(secondsLeft / DieSeconds);
+
+            if (art != null) PoseArt();
 
             foreach (Flame flame in flames)
             {
@@ -182,6 +224,27 @@ namespace C6Lab
                 flame.Renderer.color = color;
             }
 
+            PoseGlow();
+        }
+
+        /// <summary>The picture fire: flips frames, grows with the fire's life and sits on top of the ball.</summary>
+        private void PoseArt()
+        {
+            ArtFrame = Mathf.FloorToInt(age * artFps) % artFrames.Length;
+            Sprite frame = artFrames[ArtFrame];
+            art.sprite = frame;
+            Bounds bounds = frame.bounds;
+            float scale = bounds.size.x > 0f ? artWidth * radius * life / bounds.size.x : 0f;
+            // The picture's orb-centre point lands on the ball's centre (plus the offset), so it grows out of the ball.
+            Vector2 centre = new Vector2(bounds.min.x + artCentre.x * bounds.size.x, bounds.min.y + artCentre.y * bounds.size.y);
+            Transform part = art.transform;
+            part.localScale = new Vector3(scale, scale, 1f);
+            part.localPosition = new Vector3(artOffset.x * radius - centre.x * scale, artOffset.y * radius - centre.y * scale,
+                -1.05f * radius);
+        }
+
+        private void PoseGlow()
+        {
             halo.transform.localPosition = new Vector3(0f, .25f * radius, 0f);
             halo.transform.localScale = Vector3.one * (4.4f * radius * Mathf.Min(1f, life));
 
@@ -204,6 +267,15 @@ namespace C6Lab
         {
             if (flames != null) return;
             halo = CreatePart("Fire Halo", Halo(), HaloColor, HaloOrder);
+            if (artFrames != null)
+            {
+                // #326: one picture in front of the ball instead of the code-drawn tongues.
+                art = CreatePart("Fire Art", artFrames[0], Color.white, FrontOrder + 4);
+                flames = System.Array.Empty<Flame>();
+                for (int i = 0; i < EmberCount; i++) embers[i] = CreatePart("Fire Ember " + i, Ember(), EmberColor, EmberOrder);
+                SetShown(false);
+                return;
+            }
             var made = new System.Collections.Generic.List<Flame>();
             // Outer and middle layers on every tongue, a pale core on the three biggest behind.
             AddLayer(made, Outer, 1f, 0f, .95f, 1, 5);
@@ -233,8 +305,9 @@ namespace C6Lab
         {
             if (flames == null) return;
             foreach (Flame flame in flames) flame.Renderer.gameObject.SetActive(shown);
-            halo.gameObject.SetActive(shown);
-            foreach (SpriteRenderer ember in embers) ember.gameObject.SetActive(shown);
+            if (art != null) art.gameObject.SetActive(shown);
+            halo.gameObject.SetActive(shown && (art == null || artHalo));
+            foreach (SpriteRenderer ember in embers) ember.gameObject.SetActive(shown && (art == null || artEmbers));
         }
 
         private SpriteRenderer CreatePart(string label, Sprite sprite, Color color, int order)

@@ -409,7 +409,7 @@ namespace C6Lab
                 if (!(secondsLeft > 0f)) return;
                 burn = LabOrbBurn.Create(transform);
             }
-            burn.Burn(secondsLeft, visualRadius);
+            burn.Burn(secondsLeft, visualRadius, ExpiryLook);
         }
 
         /// <summary>
