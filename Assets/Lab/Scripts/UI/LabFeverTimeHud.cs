@@ -4,9 +4,11 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>
-    /// 피버 타임 (#334) "두배" 말풍선: 피버 타임이 시작되면 스태미나 막대 오른쪽 끝 위에서 연기가 퍼지고, 그 안에서 말풍선이 톡
-    /// 튀어나온다. 피버 동안 커졌다 작아졌다를 되풀이하고, 전투가 끝나면 사라진다. 늦게 들어와 이미 한참 지난 피버는 연기 없이
-    /// 바로 보인다. 화면 표시만 하며 터치를 막지 않는다.
+    /// 피버 타임 (#334) 연출. "두배" 말풍선: 피버 타임이 시작되면 스태미나 막대 오른쪽 끝 위에서 연기가 퍼지고, 그 안에서
+    /// 말풍선이 톡 튀어나온다. 피버 동안 커졌다 작아졌다를 되풀이하고, 전투가 끝나면 사라진다. 늦게 들어와 이미 한참 지난 피버는
+    /// 연기 없이 바로 보인다. 긴박함: 시작할 때 화면 가운데에 "피버타임!" / "시간이 없어! 마구 던져버리자!!"가 크게 튀어나왔다
+    /// 사라지고, 피버 동안 화면 가장자리가 진한 분홍빛 빨강으로 숨 쉬며 남은 시간 숫자가 빨개진다. 가장자리 빛은 2:2 피버
+    /// (<see cref="LabTeamFever"/>)와 같은 그림을 쓰고, 다른 전투 표시 아래에 깔린다. 화면 표시만 하며 터치를 막지 않는다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabFeverTimeHud : MonoBehaviour
@@ -28,10 +30,26 @@ namespace C6Lab
             new Vector3(-.3f, .35f, .7f), new Vector3(.3f, .4f, .7f), new Vector3(0f, -.35f, .75f)
         };
         private static readonly Color SmokeColor = new Color(.96f, .93f, .86f, .95f);
+        /// <summary>The fever's colour: the edge glow, the banner and the time left.</summary>
+        public static readonly Color FeverColor = new Color(.9f, .14f, .3f);
+        public const string BannerTitle = "피버타임!", BannerLine = "시간이 없어! 마구 던져버리자!!";
+        // 시작 문구는 이만큼 떠 있고, 처음에 튀어나오며 끝에 흐려진다. 늦게 본 피버에는 띄우지 않는다.
+        private const float BannerSeconds = 2f, BannerPopSeconds = .3f, BannerFadeSeconds = .4f;
+        private const double BannerWindowSeconds = 1.5d;
+        // 가장자리 빛: 이 사이를 1초에 두 번 오가며 숨 쉬고, 켜지고 꺼질 때는 이만큼에 걸쳐 바뀐다.
+        private const float GlowLow = .45f, GlowHigh = .85f, GlowHz = 2f, GlowFadeSeconds = .4f;
 
         private LabNetwork network;
         private Canvas canvas;
         private RectTransform staminaBar;
+        private RectTransform battleUi;
+        private Text timer;
+        private Color timerColor;
+        private Image glow;
+        private float glowAlpha;
+        private RectTransform banner;
+        private Text title, subtitle;
+        private float bannerAge = float.PositiveInfinity;
         private RectTransform layer;
         private RectTransform bubble;
         private Image bubbleImage;
@@ -48,13 +66,26 @@ namespace C6Lab
         /// <summary>The puff it appears in is still drifting.</summary>
         public bool SmokeShowing => puffs[0] != null && puffs[0].gameObject.activeInHierarchy;
         public float Scale => bubble != null ? bubble.localScale.x : 0f;
+        /// <summary>The start banner is up, and what it says.</summary>
+        public bool BannerShowing => banner != null && banner.gameObject.activeInHierarchy;
+        public string BannerShown => title != null ? title.text + "\n" + subtitle.text : string.Empty;
+        /// <summary>The edge glow's opacity now; above zero only around fever time.</summary>
+        public float GlowAlpha => glow != null && glow.gameObject.activeInHierarchy ? glow.color.a : 0f;
+        public Color GlowColor => glow != null ? glow.color : Color.clear;
 
-        /// <summary>스냅샷을 읽을 네트워크, 말풍선을 그릴 Canvas, 말풍선이 붙을 스태미나 막대를 연결한다.</summary>
-        public void Bind(LabNetwork target, Canvas uiCanvas, RectTransform bar)
+        /// <summary>
+        /// 스냅샷을 읽을 네트워크, 말풍선·문구를 그릴 Canvas, 말풍선이 붙을 스태미나 막대, 가장자리 빛을 깔 전투 화면, 빨갛게 바꿀
+        /// 남은 시간 글자를 연결한다.
+        /// </summary>
+        public void Bind(LabNetwork target, Canvas uiCanvas, RectTransform bar, RectTransform battle = null, Text time = null)
         {
             network = target;
             canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
             staminaBar = bar;
+            battleUi = battle;
+            if (timer != null) timer.color = timerColor;
+            timer = time;
+            if (timer != null) timerColor = timer.color;
         }
 
         private void LateUpdate()
@@ -68,10 +99,13 @@ namespace C6Lab
         public void Present(LabSnapshot snapshot, double now)
         {
             bool on = snapshot != null && snapshot.FeverTimeOn(now) && !snapshot.paused;
+            DrawGlow(on);
+            if (timer != null) timer.color = on ? FeverColor : timerColor;
             if (!on)
             {
                 // A pause keeps the fever's place; the bubble comes back as it was without another puff.
                 if (snapshot == null || snapshot.phase != LabPhase.Playing || !snapshot.FeverTimeOn(now)) age = -1f;
+                bannerAge = float.PositiveInfinity;
                 if (layer != null) layer.gameObject.SetActive(false);
                 return;
             }
@@ -82,11 +116,59 @@ namespace C6Lab
             {
                 age = 0f;
                 puffing = now - snapshot.feverTimeAt <= LateSeconds;
+                bannerAge = now - snapshot.feverTimeAt <= BannerWindowSeconds ? 0f : float.PositiveInfinity;
             }
-            else age += Time.deltaTime;
+            else
+            {
+                age += Time.deltaTime;
+                bannerAge += Time.deltaTime;
+            }
             Vector2 center = Place();
             DrawSmoke(center);
             DrawBubble(center);
+            DrawBanner();
+        }
+
+        // 가장자리 빛: 피버 동안 숨 쉬고, 끝나면 서서히 꺼진다. 다른 전투 표시 아래(전투 화면 맨 뒤)에 깔린다.
+        private void DrawGlow(bool on)
+        {
+            if (glow == null)
+            {
+                if (!on || battleUi == null) return;
+                var item = new GameObject("Fever Time Edge Glow", typeof(RectTransform));
+                item.layer = battleUi.gameObject.layer;
+                RectTransform rect = (RectTransform)item.transform;
+                rect.SetParent(battleUi, false);
+                rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+                rect.offsetMin = rect.offsetMax = Vector2.zero;
+                glow = item.AddComponent<Image>();
+                glow.sprite = LabTeamFever.GlowSprite();
+                glow.raycastTarget = false;
+                glow.color = new Color(FeverColor.r, FeverColor.g, FeverColor.b, 0f);
+            }
+            float breathe = GlowLow + (GlowHigh - GlowLow) * (.5f + .5f * Mathf.Sin(Time.unscaledTime * GlowHz * 2f * Mathf.PI));
+            float step = Time.unscaledDeltaTime * GlowHigh / GlowFadeSeconds;
+            // It fades in to its breathing range, breathes, and fades out once fever time is over.
+            if (on) glowAlpha = glowAlpha < GlowLow ? Mathf.MoveTowards(glowAlpha, breathe, step) : breathe;
+            else glowAlpha = Mathf.MoveTowards(glowAlpha, 0f, step);
+            glow.color = new Color(FeverColor.r, FeverColor.g, FeverColor.b, glowAlpha);
+            if (glow.gameObject.activeSelf != glowAlpha > 0f) glow.gameObject.SetActive(glowAlpha > 0f);
+            if (glowAlpha > 0f) glow.transform.SetAsFirstSibling();
+        }
+
+        // 시작 문구: 튀어나왔다가 자리를 잡고, 끝에 흐려진다.
+        private void DrawBanner()
+        {
+            bool shown = bannerAge < BannerSeconds;
+            banner.gameObject.SetActive(shown);
+            if (!shown) return;
+            float pop = Mathf.Clamp01(bannerAge / BannerPopSeconds);
+            float scale = pop < 1f ? Mathf.Lerp(.6f, 1.15f, pop)
+                : Mathf.Lerp(1.15f, 1f, Mathf.Clamp01((bannerAge - BannerPopSeconds) / .15f));
+            banner.localScale = Vector3.one * scale;
+            float alpha = Mathf.Clamp01((BannerSeconds - bannerAge) / BannerFadeSeconds);
+            title.color = subtitle.color = new Color(FeverColor.r, FeverColor.g, FeverColor.b, alpha);
+            banner.SetAsLastSibling();
         }
 
         // 말풍선 가운데를 막대 오른쪽 위 모서리 근처에 둔다. 막대는 움직일 수 있으니 매번 맞춘다.
@@ -181,6 +263,14 @@ namespace C6Lab
             bubbleImage.preserveAspect = true;
             bubbleImage.raycastTarget = false;
             bubble.gameObject.SetActive(false);
+            // The start banner sits above the gourd, where the other battle announcements appear.
+            Font font = LabGuideText.FontOf(canvas);
+            banner = NewRect("Fever Time Banner", layer);
+            banner.anchorMin = banner.anchorMax = new Vector2(.5f, .62f);
+            banner.sizeDelta = new Vector2(370f, 110f);
+            title = Words("Title", font, 46, new Vector2(0f, 16f), BannerTitle);
+            subtitle = Words("Subtitle", font, 20, new Vector2(0f, -28f), BannerLine);
+            banner.gameObject.SetActive(false);
             // The puff is drawn over the bubble, so the bubble seems to come out of it as it thins.
             Sprite puffSprite = LabOrbVanishSmoke.PuffSprite();
             for (int i = 0; i < puffs.Length; i++)
@@ -192,6 +282,24 @@ namespace C6Lab
                 rect.gameObject.SetActive(false);
             }
             return true;
+        }
+
+        private Text Words(string name, Font font, int size, Vector2 offset, string words)
+        {
+            RectTransform rect = NewRect(name, banner);
+            rect.sizeDelta = new Vector2(370f, size + 12f);
+            rect.anchoredPosition = offset;
+            Text text = rect.gameObject.AddComponent<Text>();
+            text.font = font; text.fontSize = size; text.fontStyle = FontStyle.Bold;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.raycastTarget = false;
+            text.text = words;
+            Outline outline = rect.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(1f, .98f, .93f, .95f);
+            outline.effectDistance = new Vector2(2f, -2f);
+            return text;
         }
 
         // Children of a full-screen layer are placed from its centre, as anchoredPosition in its local space.
@@ -207,7 +315,9 @@ namespace C6Lab
 
         private void OnDestroy()
         {
+            if (timer != null) timer.color = timerColor;
             if (layer != null) Destroy(layer.gameObject);
+            if (glow != null) Destroy(glow.gameObject);
         }
     }
 }

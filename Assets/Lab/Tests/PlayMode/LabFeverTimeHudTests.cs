@@ -6,11 +6,15 @@ using UnityEngine.UI;
 
 namespace C6Lab.Tests
 {
-    /// <summary>The "두배" bubble fever time (#334) brings out of a puff above the stamina bar's right end.</summary>
+    /// <summary>
+    /// Fever time (#334) on screen: the "두배" bubble out of a puff above the stamina bar's right end, the start banner,
+    /// the red breathing screen edges and the time left in red.
+    /// </summary>
     public sealed class LabFeverTimeHudTests
     {
         private GameObject root;
-        private RectTransform bar;
+        private RectTransform bar, battle;
+        private Text timer;
         private LabFeverTimeHud hud;
         private readonly Vector3[] corners = new Vector3[4];
 
@@ -23,10 +27,16 @@ namespace C6Lab.Tests
             bar.SetParent(root.transform, false);
             bar.sizeDelta = new Vector2(223f, 44f);
             bar.anchoredPosition = new Vector2(0f, -200f);
+            battle = new GameObject("Battle UI", typeof(RectTransform)).GetComponent<RectTransform>();
+            battle.SetParent(root.transform, false);
+            bar.SetParent(battle, false);
+            timer = new GameObject("Time", typeof(RectTransform)).AddComponent<Text>();
+            timer.transform.SetParent(battle, false);
+            timer.color = Color.white;
             var host = new GameObject("Fever HUD");
             host.transform.SetParent(root.transform, false);
             hud = host.AddComponent<LabFeverTimeHud>();
-            hud.Bind(null, root.GetComponent<Canvas>(), bar);
+            hud.Bind(null, root.GetComponent<Canvas>(), bar, battle, timer);
         }
 
         [UnityTearDown]
@@ -80,6 +90,49 @@ namespace C6Lab.Tests
             Assert.That(hud.Showing, Is.False, "Gone once the battle is over.");
         }
 
+        [UnityTest]
+        public IEnumerator TheStartBannerPopsAndTheEdgesGlowRedWithTheTimeLeftInRed()
+        {
+            hud.Present(Battle(10d), 9.9d);
+            Assert.That(hud.BannerShowing, Is.False);
+            Assert.That(hud.GlowAlpha, Is.Zero);
+            Assert.That(timer.color, Is.EqualTo(Color.white));
+
+            hud.Present(Battle(10d), 10d);
+            Assert.That(hud.BannerShowing, Is.True, "The start is announced...");
+            Assert.That(hud.BannerShown, Is.EqualTo(LabFeverTimeHud.BannerTitle + "\n" + LabFeverTimeHud.BannerLine));
+            Assert.That(LabFeverTimeHud.BannerLine, Is.EqualTo("시간이 없어! 마구 던져버리자!!"));
+            Assert.That(timer.color, Is.EqualTo(LabFeverTimeHud.FeverColor), "...the time left turns red...");
+
+            float least = float.MaxValue, most = 0f;
+            float until = Time.time + 1.2f;
+            while (Time.time < until)
+            {
+                yield return null;
+                hud.Present(Battle(10d), 10.5d);
+                if (Time.time > until - .8f) { least = Mathf.Min(least, hud.GlowAlpha); most = Mathf.Max(most, hud.GlowAlpha); }
+            }
+            Assert.That(least, Is.GreaterThan(.3f), "...and the screen edges glow...");
+            Assert.That(most - least, Is.GreaterThan(.1f), "...breathing in and out...");
+            Color glow = hud.GlowColor;
+            Assert.That(glow.r, Is.GreaterThan(glow.g + .5f), "...in a deep pinkish red.");
+            Transform edge = battle.Find("Fever Time Edge Glow");
+            Assert.That(edge, Is.Not.Null);
+            Assert.That(edge.GetSiblingIndex(), Is.Zero, "It lies under every other battle display.");
+            Assert.That(edge.GetComponent<Image>().raycastTarget, Is.False);
+
+            until = Time.time + 1.2f;
+            while (hud.BannerShowing && Time.time < until) { yield return null; hud.Present(Battle(10d), 11d); }
+            Assert.That(hud.BannerShowing, Is.False, "The banner goes after about two seconds; the glow stays.");
+            Assert.That(hud.GlowAlpha, Is.GreaterThan(.3f));
+
+            hud.Present(Battle(10d, LabPhase.Victory), 12d);
+            Assert.That(timer.color, Is.EqualTo(Color.white), "The time left goes back to its colour after the battle.");
+            until = Time.time + 1f;
+            while (hud.GlowAlpha > 0f && Time.time < until) { yield return null; hud.Present(Battle(10d, LabPhase.Victory), 12d); }
+            Assert.That(hud.GlowAlpha, Is.Zero, "The glow fades away.");
+        }
+
         [Test]
         public void ALateViewSkipsThePuffAndOnlyAFeverRoundShowsIt()
         {
@@ -88,7 +141,8 @@ namespace C6Lab.Tests
 
             hud.Present(Battle(10d), 15d);
             Assert.That(hud.Showing, Is.True, "Seen five seconds late (a reconnect), it is simply there...");
-            Assert.That(hud.SmokeShowing, Is.False, "...with no puff.");
+            Assert.That(hud.SmokeShowing, Is.False, "...with no puff...");
+            Assert.That(hud.BannerShowing, Is.False, "...and no start banner.");
 
             hud.Present(Battle(10d, paused: true), 16d);
             Assert.That(hud.Showing, Is.False, "Hidden while the battle is paused.");

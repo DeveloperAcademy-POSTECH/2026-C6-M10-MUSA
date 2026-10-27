@@ -126,10 +126,11 @@ namespace C6Lab
             // 여우 구슬 안내 (#328): 판마다 내 판에 처음 떨어지면 "빠르게 두 번 눌러서…"
             if (hud != null && boardNetwork != null && GetComponent<LabFoxFireGuide>() == null)
                 gameObject.AddComponent<LabFoxFireGuide>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
-            // 피버 타임 (#334): 스태미나 막대 오른쪽 위에 연기와 함께 "두배" 말풍선
+            // 피버 타임 (#334): 연기와 함께 뜨는 "두배" 말풍선, 시작 문구, 붉게 숨 쉬는 가장자리, 빨간 남은 시간
             if (hud != null && boardNetwork != null && GetComponent<LabFeverTimeHud>() == null)
                 gameObject.AddComponent<LabFeverTimeHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>(),
-                    hud.staminaFill != null ? hud.staminaFill.transform.parent as RectTransform : null);
+                    hud.staminaFill != null ? hud.staminaFill.transform.parent as RectTransform : null,
+                    hud.battleUi != null ? hud.battleUi.transform as RectTransform : null, hud.timeText);
 
             if (hud != null && boardNetwork != null)
             {
