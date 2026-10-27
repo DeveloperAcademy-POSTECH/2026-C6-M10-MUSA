@@ -17,6 +17,7 @@ namespace Hapio
         public Text dialogueText;
         public Text progressText;
         public Button nextButton;
+        public Button previousButton;
         public Button skipButton;
         public Button autoButton;
         public Text autoLabel;
@@ -49,6 +50,8 @@ namespace Hapio
         private void OnEnable()
         {
             if (nextButton != null) nextButton.onClick.AddListener(Next);
+            if (previousButton != null) previousButton.onClick.AddListener(Previous);
+            UpdatePreviousButton();
             if (skipButton != null) skipButton.onClick.AddListener(Skip);
             if (autoButton != null) autoButton.onClick.AddListener(ToggleAuto);
         }
@@ -61,6 +64,7 @@ namespace Hapio
         private void OnDisable()
         {
             if (nextButton != null) nextButton.onClick.RemoveListener(Next);
+            if (previousButton != null) previousButton.onClick.RemoveListener(Previous);
             if (skipButton != null) skipButton.onClick.RemoveListener(Skip);
             if (autoButton != null) autoButton.onClick.RemoveListener(ToggleAuto);
             Cancel();
@@ -127,6 +131,24 @@ namespace Hapio
             else ShowCut(next);
         }
 
+        /// <summary>Return to the previous picture's first page and pause automatic advance.</summary>
+        public void Previous()
+        {
+            if (!IsPlaying || CurrentCutIndex <= 0) return;
+            AutoAdvance = false;
+            UpdateAutoLabel();
+            ShowCut(CurrentCutIndex - 1);
+            // Reviewing a previous picture should not require waiting for its entrance again.
+            elapsed = currentView.EntranceDuration;
+            currentView.Sample(elapsed);
+            BeginReading();
+        }
+
+        private void UpdatePreviousButton()
+        {
+            if (previousButton != null) previousButton.interactable = IsPlaying && CurrentCutIndex > 0;
+        }
+
         public void Skip()
         {
             if (IsPlaying) Finish(StoryExitReason.Skipped);
@@ -160,6 +182,7 @@ namespace Hapio
             UpdatePageText();
             SetDialogueVisible(false);
             currentView.Sample(0f);
+            UpdatePreviousButton();
         }
 
         private void BeginReading()
@@ -289,6 +312,7 @@ namespace Hapio
         {
             // Clear state before invoking callbacks, so repeated clicks cannot finish twice.
             IsPlaying = false;
+            UpdatePreviousButton();
             if (voiceSource != null) voiceSource.Stop();
             if (reason == StoryExitReason.Completed) onCompleted.Invoke();
             else onSkipped.Invoke();
@@ -298,6 +322,7 @@ namespace Hapio
         public void Cancel()
         {
             IsPlaying = IsReading = false;
+            UpdatePreviousButton();
             ReleaseView();
             SetDialogueVisible(false);
         }

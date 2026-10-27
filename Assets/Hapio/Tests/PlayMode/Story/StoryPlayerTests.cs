@@ -38,6 +38,49 @@ namespace Hapio.Tests
             return player;
         }
 
+        [UnityTest]
+        public IEnumerator PreviousButtonReturnsToThePreviousPictureFirstPageAndPausesAuto()
+        {
+            var player = CreatePlayer();
+            player.gameObject.SetActive(false);
+            var buttonObject = new GameObject("Previous", typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.Button));
+            buttonObject.transform.SetParent(player.transform, false);
+            player.previousButton = buttonObject.GetComponent<UnityEngine.UI.Button>();
+            foreach (var cut in player.sequence.cuts)
+            {
+                cut.pages.Add(new StoryDialoguePage { dialogue = "First page" });
+                cut.pages.Add(new StoryDialoguePage { dialogue = "Second page" });
+            }
+            int completions = 0;
+            player.Finished += reason => completions++;
+            player.gameObject.SetActive(true);
+            player.Replay();
+            Assert.That(player.previousButton.interactable, Is.False);
+            player.Previous();
+            Assert.That(player.CurrentCutIndex, Is.Zero);
+            player.Next(); player.Next(); player.Next(); player.Next(); player.Next();
+            Assert.That(player.CurrentCutIndex, Is.EqualTo(1));
+            Assert.That(player.CurrentPageIndex, Is.EqualTo(1));
+            Assert.That(player.previousButton.interactable, Is.True);
+            var oldPicture = player.CurrentView;
+            player.ToggleAuto();
+            player.previousButton.onClick.Invoke();
+            Assert.That(player.CurrentCutIndex, Is.Zero);
+            Assert.That(player.CurrentPageIndex, Is.Zero);
+            Assert.That(player.IsReading, Is.True);
+            Assert.That(player.AutoAdvance, Is.False);
+            Assert.That(player.CurrentView, Is.Not.SameAs(oldPicture));
+            Assert.That(player.previousButton.interactable, Is.False);
+            Assert.That(completions, Is.Zero);
+            yield return null;
+            Assert.That(player.cutHost.GetComponentsInChildren<StoryCutView>().Length, Is.EqualTo(1));
+            player.Skip();
+            Assert.That(player.previousButton.interactable, Is.False);
+            player.Previous();
+            Assert.That(completions, Is.EqualTo(1));
+            Assert.That(player.IsPlaying, Is.False);
+        }
+
 #if UNITY_EDITOR
         [UnityTest]
         public IEnumerator TextAddedToAnOldSilentCutUsesReadableFallbackRects()
