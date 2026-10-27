@@ -3036,3 +3036,22 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - **발견한 결함(수정)**: 211을 은퇴시킨 뒤에도 `Stage02_yaguang.asset`의 `defaultValues`에 211이 남아 `GameStageCatalog.Validate`가 실패했고, Hapio 혼자 시작이 `GameSession.CreateModeConfig` NullReferenceException으로 멈췄다(사용자 Play에서 발견). Editor API로 그 항목만 지웠고, 스테이지 설정 생성·야광귀 전투 120초/방해 끝 100초를 eval로 확인했다. DEV 칸을 숨길 때는 스테이지 기본값 파일도 함께 확인해야 한다.
 - **사용자 검사 1차 실패 3건(수정)**: ① ② `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`(Home·Lobby): 장면에 저장된 DEV 칸 기본값이 원본과 달랐다(전투 180·스태미나 160, #326의 폭발 불 4초·최대 5도 미반영). 기존 Editor 도구 `Hapio/Upgrade Menu DEV Rows`를 Editor API로 실행해 값·범위를 원본에 맞췄고, 은퇴 칸 줄(55·87·88·152·154)은 공통 탭에서 숨겨졌다. ③ `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset`: 생성 한 번이 음일 거라고 가정해 양이 먼저 나오거나 음이 둘이면 실패하는 검사였다. 음이 나올 때까지(최대 5번) 생성하고 첫 음을 쓰도록 고쳤다. 런타임 규칙은 바꾸지 않았다.
 - 바뀐/추가된 검사: `LabModelTests`(해금 폭탄 열림·가득 찬 판·던지기/넘기기 거절, 잠긴 폭탄 열기 거절, 여우구슬 가장자리 거절·두 번 누르기, 아이템 사용 수), `LabDeveloperConfigTests`(은퇴 8칸, 저장 원본 120초·120 스태미나, 시간표가 짧은 전투를 막지 않음, 손가락 Sprite), `LabGimmickTimelineIntegrationTests`(모든 스테이지 공용 전투 시간), `LabYaguangFlashTests`, `LabOrbPhysicsTests`(여우구슬 튕김·두 번 누르기 연기, 해금 폭탄 미끄러짐·잡기 불가·열기 요청), `LabCharmBubblesTests`(손가락·안내 문구), `LabDeveloperSoloIntegrationTests`(여우 안내·솔로 매혹 대기 문구 없음), Hapio `GameStageSettingsTests`·`GameTerritoryFlowTests`·`GameStageUiTests`·`GameSceneFlowTests`, 프로토콜·토큰 고정값.
+
+## 2026-10-27 · #334 구미호 피버 타임
+
+- 기준 main `6022eb9f`(#333 병합), 기능 브랜치 `feat/#334-gumiho-fever-time`. 커밋은 DEV 값·접속 버전 → 규칙 → 두배 말풍선 → 문구·가장자리·빨간 시간 → 문서 순서로 나눴다.
+- **규칙**: 구미호 스테이지(2:2 제외)에서 `feverTimeAt = max(시작, 마감 − DEV228)`. 요괴 판의 시간 진행은 사건 시각에서 잘리므로(`NextStageBoundary`) 그 시각에 정확히 `StartFeverTime`이 기믹 예약을 무한대로 돌리고(같은 시각 예정분 포함 취소), 넘기기 막기 해제·매혹과 예고 취소·여우 구슬과 잠긴 박 폭탄 제거(`orbExpiries`로 연기)를 한다. 잠금이 풀린 폭탄은 남긴다. 충전은 `elapsed + 피버 구간 × (배율 − 1)`로 계산해 긴 한 번의 진행도 정확히 나눈다. 명중 보상·구슬 한도는 그대로다.
+- **화면**: `LabFeverTimeHud`가 스냅샷의 `feverTimeAt`과 Host 시계로 판단하므로 별도 통신이 없다. 두배 말풍선(연기 0.7초, 0.12초 뒤 등장, 0.9~1.1배·2Hz), 시작 문구 2초, 가장자리 빛(0.45~0.85·2Hz, `LabTeamFever.GlowSprite` 공유, 전투 표시 맨 뒤), 남은 시간 빨강. 늦게 본 피버(1초·문구 1.5초 초과)는 연기·문구 없이 보인다. 일시정지 중에는 숨긴다.
+- **DEV**: 228·229 추가로 공유 설정 230개, 프로토콜 5672·`C6PhysicsLab/33`·`C6HapioGame/16`. #330과 #328이 병합 때 같은 5671을 쓰게 되어 이번에 함께 구분했다. `LabConfig.asset` 기본값과 Home·Lobby DEV 칸 2줄은 Editor API(`Hapio/Upgrade Menu DEV Rows`)로 저장했다. 장면 변경은 새 칸 오브젝트 62개(장면마다)와 칸 목록 2곳뿐임을 확인했다.
+- 작업 중 열린 Editor가 우리 코드와 무관한 컴파일러 내부 오류("Method not found: GetMaxCharCountOrThrowIfHuge")로 멈춰, Unity의 컴파일 서버 프로세스를 종료하고 빌드 캐시를 비운 뒤 다시 컴파일해 해결했다(코드 변경 없음).
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 오프라인 컴파일 7개 어셈블리 | PASS | 커밋 단계마다 오류 0 |
+| 열린 Editor 재컴파일 | PASS | 커밋 단계마다 `scriptCompilationFailed=false` |
+| 모델 확인(Editor eval) | PASS | 120초 구미호 판 `feverTimeAt=100`, 마지막 기믹 90초(100·110초 예정분 없음), 119.9초 피버 중. Test Runner가 아니다 |
+| EditMode·PlayMode 전체 | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| 실제 화면·3인·실기기 | NOT_RUN | 말풍선 위치·크기, 문구, 가장자리 빛 세기, 2배 충전 체감 확인 필요 |
+
+- 추가 검사: `LabFeverTimeTests`(DEV 칸, 시작 시각, 다른 스테이지 없음, 0이면 끔·전투보다 긴 피버, 충전 2배와 긴 한 번의 진행, 시작 시각 예정 기믹 취소, 방해 4종 정리), `LabFeverTimeHudTests`(말풍선 등장·위치·숨쉬기·끝, 늦게 본 피버·일시정지, 문구·가장자리 빛·빨간 시간), Hapio `GameStageSettingsTests.FeverTimeIsTunedOnTheFoxsTabAloneAndReachesItsStage`, Lab DEV에서 피버 칸 숨김, 설정 230개·프로토콜 고정값.
+
