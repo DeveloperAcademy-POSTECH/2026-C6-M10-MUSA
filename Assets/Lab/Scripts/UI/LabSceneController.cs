@@ -137,6 +137,9 @@ namespace C6Lab
                 gameObject.AddComponent<LabFeverTimeHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>(),
                     hud.staminaFill != null ? hud.staminaFill.transform.parent as RectTransform : null,
                     hud.battleUi != null ? hud.battleUi.transform as RectTransform : null, hud.timeText);
+            // 야광귀 피버타임 (#343): 피버 동안 스태미나 칸이 다섯 색으로 물결치고, 시작할 때 막대가 한 번 번쩍인다
+            if (hud != null && boardNetwork != null && hud.staminaFill != null && GetComponent<LabYaguangFeverStaminaGlow>() == null)
+                gameObject.AddComponent<LabYaguangFeverStaminaGlow>().Bind(boardNetwork, hud.staminaFill);
 
             if (hud != null && boardNetwork != null)
             {
