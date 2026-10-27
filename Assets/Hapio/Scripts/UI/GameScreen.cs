@@ -445,7 +445,8 @@ namespace Hapio
                 if (developerScopeButtons[i] != null && developerScopeButtons[i].targetGraphic != null)
                     developerScopeButtons[i].targetGraphic.color = i == scope
                         ? new Color(.18f, .43f, .47f, 1f) : new Color(.12f, .18f, .21f, 1f);
-            Text(developerFeedback, name + " 설정 · 탭을 바꾸기 전에 APPLY로 적용해주세요.");
+            Text(developerFeedback, name + " 설정 · 탭을 바꾸기 전에 APPLY로 적용해주세요."
+                + (scope == 2 ? "\n야광귀는 시간표로 발동하며 일반 기믹 간격·확률은 사용하지 않습니다." : string.Empty));
             var scroll = developerPanel != null ? developerPanel.GetComponentInChildren<UnityEngine.UI.ScrollRect>(true) : null;
             if (scroll != null) scroll.verticalNormalizedPosition = 1f;
         }

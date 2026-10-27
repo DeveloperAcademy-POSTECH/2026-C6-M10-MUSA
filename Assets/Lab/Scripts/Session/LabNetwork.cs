@@ -208,13 +208,16 @@ namespace C6Lab
         // 5664: standalone #301/#305 used different shared layouts with the same version.
         // 5665: combined flash shake DEV202-203 + charm warning DEV204 (205 values),
         //       flash release state and each neighbor's charm rescue progress.
-        internal const ushort LabProtocolVersion = 5666;
+        // 5666: #315 paint-only finish (DEV 79 a fixed-zero slot, 205 values), shared paint finish barrier.
+        // 5668: #311/#314 unified gimmick scheduler and Yaguang timetable (DEV 205-224, 225 values), percent chances,
+        //       retired bomb/block/sabotage timers.
+        internal const ushort LabProtocolVersion = 5668;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/27");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/29");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1540,6 +1543,36 @@ namespace C6Lab
                 tuning = config.CaptureDeveloperValues() });
         }
 
+        /// <summary>UT용 기믹 기록 파일 이름 (#311). 기기의 Application.persistentDataPath 아래에 판마다 한 줄씩 붙는다.</summary>
+        public const string GimmickStatsFileName = "gimmick-stats.jsonl";
+        private string gimmickStatsPath;
+        private string gimmickStatsReportedRound;
+
+        /// <summary>
+        /// 기믹 기록 (#311, UT용): <see cref="LabConfig.RecordGimmickStats"/>가 켜져 있으면 판이 끝난 뒤 Host가 처음 내보내는
+        /// 스냅샷에서 그 판의 기록을 한 번 남긴다. 기본은 꺼져 있어 아무것도 쓰지 않는다. 파일을 못 써도 게임은 그대로 간다.
+        /// 끝까지 가지 않고 다시 시작하거나 나간 판은 남기지 않는다.
+        /// </summary>
+        private void ReportGimmickStats()
+        {
+            if (config == null || !config.RecordGimmickStats || latest == null
+                || latest.phase == LabPhase.Playing || latest.phase == LabPhase.Idle) return;
+            string roundKey = latest.sessionId + "/" + latest.round;
+            if (gimmickStatsReportedRound == roundKey) return;
+            gimmickStatsReportedRound = roundKey;
+            string line = JsonUtility.ToJson(model.GimmickStats());
+            Debug.Log("C6_LAB_GIMMICK_STATS " + line);
+            try
+            {
+                string path = gimmickStatsPath ?? System.IO.Path.Combine(Application.persistentDataPath, GimmickStatsFileName);
+                System.IO.File.AppendAllText(path, line + "\n");
+            }
+            catch (Exception exception) when (exception is System.IO.IOException || exception is UnauthorizedAccessException)
+            {
+                Debug.LogWarning("C6_LAB_GIMMICK_STATS_NOT_SAVED " + exception.Message);
+            }
+        }
+
         private void PublishSnapshot(bool immediate)
         {
             if (!IsHost || model == null) return;
@@ -1556,6 +1589,7 @@ namespace C6Lab
                 latest.targetRopeHitVelocity = hanging.VerticalVelocity;
             }
             latest.paused = battleClock.IsPaused && !GameStartHeld && latest.phase == LabPhase.Playing;
+            ReportGimmickStats();
             AnnounceBombExplosions();
             AnnounceOrbExpiries();
             AnnounceGourdBombs();

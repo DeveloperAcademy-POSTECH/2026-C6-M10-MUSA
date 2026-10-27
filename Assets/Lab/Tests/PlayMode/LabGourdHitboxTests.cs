@@ -200,8 +200,7 @@ namespace C6Lab.Tests
             SetTuning("Spawn Minimum Speed (board widths/s)", 0f);
             SetTuning("Spawn Maximum Speed (board widths/s)", 0f);
             SetTuning("Drum Drift Speed (board widths/s)", 0f);
-            SetTuning("Gourd Bomb Interval Min (seconds, 0 = off)", 0f);
-            SetTuning("Gourd Bomb Interval Max (seconds, 0 = off)", 0f);
+            SetTuning("Common Gimmick Interval (seconds, 0 = none)", 0f);
             SetTuning("Gourd Color Combo (0 off, 1 on)", 0f);
             SetTuning("Paint Drying (0 off, 1 on)", 0f);
             SetTuning("Paint Initial Coverage (%)", .1f);

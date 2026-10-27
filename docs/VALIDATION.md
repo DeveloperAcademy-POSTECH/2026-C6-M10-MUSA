@@ -2930,6 +2930,45 @@ Unity6000.6.5f1/macOS/Metal PlayMode **2/2 PASS**, 실패·건너뜀0(약29초).
 - Unity6000.6.5f1 macOS/Metal 검사 전용 배치 Editor에서 로비 PlayMode **7/7 통과(15.26초)**, Hapio EditMode **85/85 통과(0.51초)**. 오프라인 C# 컴파일7개 어셈블리도 오류0이다.
 - 전체 프로젝트 검사를 이번 PR에서 재실행하지는 않았다. 실제 iPhone/iPad의 노치·폰트 크기·터치 감각과 LAN/핫스팟 연결은 미실행이다. 기기 빌드·Mac 게임 앱은 실행하지 않았고 검사 Editor는 종료했다.
 
+## #311 기믹 묶음: 공용·고유 고정 간격, 비율(%)·켜기/끄기, 스테이지별 설정 (1단계) — 2026-10-26
+
+기준 main `dc45c4da`, 브랜치 `feat/#311-gimmick-groups`. Unity **6000.6.5f1**, macOS ARM64, 사용자의 Desktop checkout에서 열린 Editor에 Pipeline 연결(`unity` CLI)로 컴파일·에셋 변경을 실행했다. 검사(Test Runner)는 사용자가 실행한다. 공유 설정 205 → **211개**(205~210 추가), 통신 5665 → **5666**, 토큰 `C6PhysicsLab/27`·`C6HapioGame/10`. 이전 빌드(205개)와 섞어 쓸 수 없다.
+
+| 항목 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| 규칙 | 변경 | 박 폭탄·넘기기 막기·통합 방해공작의 최소~최대 간격 추첨 3개를 없애고, 공용(폭탄·막기)·고유(구미호: 여우불·매혹) 두 묶음이 각자 고정 간격(기본 10초·20초)마다 하나씩 건다. 첫 발동은 시작 뒤 간격만큼, 같은 시각이면 둘 다(공용 → 고유). 묶음 안 비율은 %(합 100), 기믹별 켜기/끄기. `LabModel.CastGimmicks`·`CastGimmick`·`GimmickTargets`. |
+| 못 거는 경우 | 변경 | 걸 수 없는 사람은 빼고 고르고, 아무에게도 못 거는 기믹은 후보에서 빠지며, 남은 게 없으면 그 차례를 **건너뛴다**. #271 야광귀 모드에서 막힌 폭탄을 "빈 화면이 생길 때까지 기다렸다 떨어뜨리던" 동작도 건너뛰기로 바뀌었다(`FreeTarget` 삭제). |
+| 설정 칸 | 변경 | 은퇴 6칸(87·88·152·154·167·168)은 자리·값만 유지하고 Lab·Hapio DEV 어디에도 보이지 않는다(`LabConfig.RetiredDeveloperFields`). 166은 Lab 전용 `Lab Unique Gimmicks`(Hapio에는 없음), 169~172는 `Gimmick Chance … (%)` 0–100. Lab DEV는 `Sabotage` 묶음 대신 `Gimmicks` 묶음(공용/고유 구분선). Hapio는 공용 묶음 칸(205·207·208·169·170)을 세 스테이지 탭이 각자 갖고, 고유 묶음 칸(206·209·210·171·172)은 구미호 탭에 있다. |
+| 저장 값 | 변경 | `LabConfig.asset`(Editor API): 비율 1·1·1·1 → 50·50·50·50, 새 칸 10·20초와 켜기 4개 직렬화. 다시 저장하면서 #301에서 코드 기본값으로 읽던 `yaguangFlashShakeRelease`(켬)·`yaguangFlashShakeCount`(6)도 같은 값으로 직렬화됐다(동작 변화 없음). `Stage01_gumiho.asset`의 166 덮어쓰기 삭제(구미호는 언제나 고유 묶음). 저장 값 전체 검증·`GameStageCatalog.RequireDefault` 통과. |
+| 홈·로비 DEV | 변경 | Editor API로 205~210 6줄을 붙이고(`AppendMenuDeveloperRows`), 166·169~172 5줄의 이름·슬라이더 범위·값을 새 설정과 맞췄다. 기믹 줄들은 목록 끝에 공용(205·207·169·208·170) → 고유(206·209·171·210·172~176·204·177) 순서로 모았다. 다른 줄과 화면 배치는 건드리지 않았다. Lab 장면 DEV는 실행 중에 모자란 줄을 만들므로 장면 수정 없음. |
+| 컴파일 | PASS | 오프라인 Roslyn 7개 어셈블리 오류 0, 열린 Editor 재컴파일 `compilationFailed: false`. |
+| 검사 코드 | 수정 | 기믹 묶음 규칙(간격·첫 발동·동시 발동·건너뛰기·켜기/끄기·% 합 100·은퇴 칸·스테이지별 설정)을 확인하도록 Lab·Hapio EditMode/PlayMode 검사를 고쳤다. 야광귀 검사 4개는 "기다렸다 떨어짐" 대신 "건너뛰고 다음 박자에 떨어짐"을 확인한다. |
+| 전체 EditMode·PlayMode | **NOT_RUN** | 사용자가 Test Runner로 실행한다. |
+| 실제 플레이·Mac 3앱·iOS | **NOT_RUN** | 10초·20초 기본 간격의 체감과 판별 기록 통계(이후 단계)는 아직 확인하지 않았다. |
+
+## #311 판별 기믹 기록 — UT용, 기본 꺼짐 (2단계) — 2026-10-27
+
+기준 `32c33fea`(#311 1단계), 같은 브랜치. Unity **6000.6.5f1**, 열린 Editor에 Pipeline 연결로 컴파일을 실행했다. 공유 설정(211개)·통신 5666·토큰은 바꾸지 않았다.
+
+| 항목 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| 기록 | 추가 | Host 모델이 기믹을 걸 때마다 전체·종류별 수를 세고, 공용과 고유가 같은 시각에 둘 다 걸리면 동시 발동으로 센다. 건너뛴 차례는 세지 않는다. 새 판마다 0부터 센다(`LabGimmickStats`, `LabModel.GimmickStats`). |
+| 남기기 | 추가 · 기본 꺼짐 | `LabConfig` Inspector `Record Gimmick Stats`(DEV 칸 아님)를 켠 Host만, 판이 끝난 뒤 처음 내보내는 스냅샷에서 한 번 콘솔 `C6_LAB_GIMMICK_STATS`와 `persistentDataPath/gimmick-stats.jsonl`에 한 줄을 남긴다. 파일을 못 쓰면 경고만 남기고 게임은 그대로 간다. 저장 `LabConfig.asset`은 꺼짐(값을 저장하지 않아 코드 기본값 false). |
+| 모델 값 확인 | 확인 | Editor에서 모델만 돌려(Play·Test Runner 아님) 새 검사의 기대값과 같은지 봤다: 3명·공용 10초(폭탄)·고유 20초(여우불), 41초 → 전체 6·폭탄 4·여우불 2·동시 2. 막기만 5초 간격·7초 막기, 25초 → 전체 3(건너뛴 2번 제외), 180초 끝 → `Defeat`·18번·180초에서 멈춤. |
+| 컴파일 | PASS | 오프라인 Roslyn 7개 어셈블리 오류 0, 열린 Editor 재컴파일 `compilationFailed: false`. |
+| 새 검사 | **NOT_RUN** | EditMode `LabModelTests.GimmickStatsCountEachCastByKindAndBothGroupsAtTheSameMoment`·`GimmickStatsLeaveOutSkippedTurnsStopWithTheRoundAndStartAfreshNextRound`, `LabDeveloperConfigTests.GimmickStatsRecordingIsOffByDefaultAndNeverPartOfTheSharedForm`; PlayMode `LabDeveloperSoloIntegrationTests.SavedSceneSoloRecordsEachFinishedRoundsGimmickStatsOnceWhenTurnedOn`(임시 파일에 기록). 사용자가 실행한다. |
+| 실기기 파일 꺼내기 | **NOT_RUN** | iPhone에서 `gimmick-stats.jsonl`을 Xcode의 Download Container로 꺼내는 절차는 UT 전에 확인한다. |
+
+### #311 main 병합 (#315 페인트 전용·#318 로비) — 2026-10-27
+
+main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합쳤다. #315가 통신을 5665 → 5666, 토큰을 Lab27·Game10으로 올리고 DEV79를 고정 0 슬롯으로 은퇴시켜 **205개 그대로**인 설정을 같은 번호로 쓰게 됐다. #311의 211개 설정과 섞이지 않도록 **통신 5667·`C6PhysicsLab/28`·`C6HapioGame/11`**로 올렸다. 79번 숨김(#315)과 87·88·152·154·167·168 숨김(#311)은 둘 다 유지한다(`GameStageSettings.IsFieldVisible`). 충돌은 프로토콜 주석, 스테이지 칸 숨김 두 줄, 설정 수·통신 번호를 확인하는 검사 5개, 문서 2개였고, main이 지운 `LabGourdCrackTests.cs`(#311은 라벨 한 줄만 바꿨음)는 지웠다. 병합 뒤 오프라인 Roslyn 7개 어셈블리 컴파일 결과와 검사 결과는 아래 줄에 따로 적는다.
+
+| 항목 | 결과 | 근거와 범위 |
+| --- | --- | --- |
+| 병합 후 컴파일 | PASS | 오프라인 Roslyn 7개 어셈블리 오류 0, 열린 Editor 재컴파일 `compilationFailed: false`. |
+| 병합 후 저장 값·DEV 줄 | 확인 | Editor에서 저장 `LabConfig.asset` 211개 값 검증·`GameStageCatalog.RequireDefault` 통과. Home·Lobby 저장 DEV 211줄의 이름·슬라이더 범위·값이 설정과 모두 같다(79번은 #315의 고정 0 줄 그대로). 장면은 git 자동 병합 결과를 그대로 두고 다시 저장하지 않았다. |
+| 병합 후 EditMode·PlayMode | **NOT_RUN** | 사용자가 Test Runner로 실행한다. main에서 온 #315·#318 검사도 함께 돈다. |
+
 
 ## 2026-10-27 · #322 결과 UI main 통합 검증
 
@@ -2940,3 +2979,18 @@ Unity6000.6.5f1/macOS/Metal PlayMode **2/2 PASS**, 실패·건너뜀0(약29초).
 - 실제 저장 Scene을 쓰는 1→2→3스테이지, 일반 결과10초 자동 진행·관람 중 대기, 최종 전체/현재 기록 전환, 스테이지별 패배, 기존 완료 gate·박 관람 비율과 제스처, 방 자동 입장, 기존 2:2·구슬·전투 회귀를 포함한다. 단일 Editor 자동 검사를 여러 물리 기기 검증으로 표현하지 않는다.
 - main과 비교해 Lab/Battle/Home/Lobby Scene·LabConfig는 바이트 단위 동일하다. 사용자 미추적 Scene meta 해시도 동일하다. 검사 부수 TimeManager 직렬화는 원복했다.
 - iPhone/iPad·실제 여러 기기 Host/Client 관람 전달·LAN/핫스팟·기기 빌드·Mac 게임 앱 실행은 사용자 요청에 따라 미실행이다. 검사 전용 Editor는 종료했다.
+
+
+## 2026-10-27 · #321에 #319 야광귀 시간표 통합
+
+- 기준 main `cbb4e80f`, 원 #321 head `30dca569`, 원 #319 head `c7548a71`. 승인한 계획대로 #321의 CastGimmicks에 야광귀 예약 정책을 편입했다. 별도 Timeline 엔진·옛 개별 폭탄/막기 반복 타이머를 복원하지 않았다.
+- 기본 야광귀120초/방해종료100초, 고유예고10Flash/35Combo/60Flash/75Combo·15/25초효과, 공용25/40/60/80·seed교대. 공용/고유겹침·고유대기/동률콤보우선, 대상없으면공용slot건너뜀, 기믹OFF와100초무결과정리. 일반스테이지/지귀고유·LabNone·2:2규칙과 #315공동완료gate·#320결과 흐름을 보존한다.
+- 설정:0~210보존+211~224시간표14개=225개. 프로토콜5668/Lab29/Game12로이전205/211/220개배열과혼용을차단한다. DEV79고정0와은퇴timer슬롯은유지한다. 실제Hapio야광귀DEV에는미사용간격/확률을숨기고시간표를표시한다.
+- Unity API로Stage02프로필과Home/Lobby225행을연결했다. Lab/Battle원본Scene·로비Prefab·머터리얼·패키지설정은유지했다.6개Scene의DEV외RectTransform576개의위치/크기/회전/anchor/부모가main과동일하다. 사용자미추적Scene.meta해시도동일하다.
+- 소스컴파일:오프라인Roslyn7개어셈블리오류0,Editor에서도실제Refresh/재컴파일후검사했다. Unity6000.6.5f1 macOS/Metal 검사전용배치Editor,기기나독립Mac게임앱을실행하지않았다.
+- 시간표집중EditMode22/22통과. 최초전체EditMode는1240중1239통과/1실패였다. 새Hapio시간표category를구형분류검사가누락한문제였다. 보완중집중검사1건은저장Lab의39행을런타임과달리확장하지않아실패했다. 공개EnsureValueInputs경로를통한225행확장후숨김을검사하도록수정했다. 게임규칙/Scene을통과목적으로바꾸지않았다.
+- **최종전체EditMode 1240/1240통과, 28.96초**, 실패/Skipped/Inconclusive0. 시간표·공용교대·60초동시·toggles·대상불가skip·100초무결과취소/섬광해제/폭발없는제거·빈slot·큰Tick동일성·Pause/Retry·스테이지격리·통계중복방지·구schema원자거절을포함한다.
+- 실제저장Hapio DEV집중PlayMode1/1통과(0.57초). 구미호209/210OFF·탭격리,야광귀225행·211슬라이더60~180·150초입력반영→Apply→재열기보존,미사용필드숨김과실제스위치표시를확인했다. Lab은모든category를펼쳐도Hapio시간표14행/헤더가숨겨지는지별도검사했다.
+- **최종전체PlayMode 409/409통과, 501.09초**, 실패/Skipped/Inconclusive0. 기존전투·구슬/보드·도색·완료연출·1~3스테이지·결과10초/관람대기·네트워크및DEV회귀를포함한다. 단일Editor자동검사를다중실기기검증으로표현하지않는다.
+- 기록schemaVersion2:기존4종필드를유지하며flash/combo를추가,total은6종실제발동합이다. 고유는실제예고진입에1회,공용동시발동도중복없이집계한다. Inspector기록기본OFF·Host완료판1회·중간이탈미기록과파일실패시게임유지를보존한다.
+- **미실행:** 실제iPhone/iPad·독립Mac다중앱·LAN/핫스팟·네이티브빌드/성능. 사용자가실기기검증을제외했다. 검사Editor는종료하고TimeManager자동직렬화는원복했다. 원시로그·기기정보·빌드산출물은커밋하지않는다.

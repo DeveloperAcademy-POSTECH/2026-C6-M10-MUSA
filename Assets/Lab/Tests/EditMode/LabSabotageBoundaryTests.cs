@@ -65,10 +65,11 @@ namespace C6Lab.Tests
             values[9] = 3f;
             values[10] = 8f;
             values[166] = 1f;
-            values[167] = values[168] = interval;
-            values[169] = foxOnly ? 0f : 1f;
-            values[170] = values[172] = 0f;
-            values[171] = foxOnly ? 1f : 0f;
+            // Gimmick groups (#311): bombs alone in the common group, or fox fire alone in the unique one.
+            values[205] = foxOnly ? 0f : interval;
+            values[206] = foxOnly ? interval : 0f;
+            values[208] = 0f;
+            values[171] = 100f; values[172] = 0f;
             values[173] = values[174] = 3f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return config;

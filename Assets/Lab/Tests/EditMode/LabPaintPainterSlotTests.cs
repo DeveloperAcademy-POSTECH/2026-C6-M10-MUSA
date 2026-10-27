@@ -343,7 +343,7 @@ namespace C6Lab.Tests
             for (int i = 39; i <= 44; i++) values[i] = 0f;
             values[42] = 100f; // A secret box supplies deterministic element orbs for the model fixture.
             values[46] = values[47] = 0f;
-            values[79] = 0f; values[87] = values[88] = 0f;
+            values[79] = 0f; values[205] = 0f;
             values[104] = 0f; values[105] = .1f; values[134] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return config;

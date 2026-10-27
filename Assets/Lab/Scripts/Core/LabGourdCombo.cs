@@ -81,6 +81,14 @@ namespace C6Lab
             return Progress >= Length ? Finish(LabComboResult.Success, at, 0) : LabComboResult.None;
         }
 
+        /// <summary>Cancel a scheduled pattern without a success/failure result or a new reward/penalty.</summary>
+        public void Stop(double at)
+        {
+            if (!Active) return;
+            Active = false;
+            EndsAt = Math.Min(EndsAt, at);
+        }
+
         /// <summary>제한 시간이 지났으면 시간 초과로 끝내고 true. 끝난 시각은 EndsAt이다.</summary>
         public bool TryExpire(double now)
         {

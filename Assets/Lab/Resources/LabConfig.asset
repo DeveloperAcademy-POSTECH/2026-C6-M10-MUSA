@@ -82,7 +82,6 @@ MonoBehaviour:
   drumSpinStrength: 1
   drumStopBounds: 14000000280000003c00000050000000i
   drumStopChances: 28000000230000000f0000000a000000i
-  gourdMode: 0
   paintSurfaceResolution: 2
   paintInitialPercent: 2
   paintRepeatPercent: 1.5
@@ -123,16 +122,36 @@ MonoBehaviour:
   sabotageMixEnabled: 0
   sabotageIntervalMin: 20
   sabotageIntervalMax: 30
-  sabotageWeightGourdBomb: 1
-  sabotageWeightSwipeBlock: 1
-  sabotageWeightFoxFire: 1
-  sabotageWeightCharm: 1
+  sabotageWeightGourdBomb: 50
+  sabotageWeightSwipeBlock: 50
+  sabotageWeightFoxFire: 50
+  sabotageWeightCharm: 50
+  commonGimmickInterval: 10
+  uniqueGimmickInterval: 20
+  gimmickGourdBomb: 1
+  gimmickSwipeBlock: 1
+  gimmickFoxFire: 1
+  gimmickCharm: 1
+  recordGimmickStats: 0
   foxFireCountMin: 2
   foxFireCountMax: 5
   foxFireSafeSeconds: 1
   charmSeconds: 10
   charmRescueTaps: 10
   charmWarningSeconds: 3
+  yaguangTimelineBattleSeconds: 120
+  yaguangTimelineSabotageEndSeconds: 100
+  yaguangTimelineUniqueSeconds:
+  - 10
+  - 35
+  - 60
+  - 75
+  yaguangTimelineUniqueKinds: 00000000010000000000000001000000i
+  yaguangTimelineCommonSeconds:
+  - 25
+  - 40
+  - 60
+  - 80
   jigwiFireTargetCount: 1
   jigwiFireSeconds: 15
   jigwiOverheatSeconds: 4
@@ -156,6 +175,8 @@ MonoBehaviour:
   yaguangFlashWarningSeconds: 3
   yaguangFlashGlareSeconds: 10
   yaguangFlashRecoverySeconds: 1
+  yaguangFlashShakeRelease: 1
+  yaguangFlashShakeCount: 6
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9

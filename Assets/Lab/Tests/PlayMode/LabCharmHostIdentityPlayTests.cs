@@ -37,6 +37,7 @@ namespace C6Lab.Tests
             controlledConfig = UnityEngine.Object.Instantiate(network.config);
             float[] values = controlledConfig.CaptureDeveloperValues();
             values[166] = 0f;
+            values[205] = 0f; // no common gimmicks (#311) either
             values[177] = 3f;
             values[204] = 0f; // No warning (#305): the charm starts the moment StartCharm runs.
             Assert.That(controlledConfig.TryApplyDeveloperValues(values, out string error), Is.True, error);

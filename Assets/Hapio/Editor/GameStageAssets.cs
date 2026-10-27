@@ -36,8 +36,7 @@ namespace Hapio.Editor
                     definition = ScriptableObject.CreateInstance<GameStageDefinition>();
                     definition.stageIndex = i + 1; definition.stageId = ids[i]; definition.displayName = names[i];
                     definition.yokai = (LabStageYokai)(i + 1);
-                    definition.defaultValues = i == 0 ? new[] { new GameStageValue(166, 1f) }
-                        : i == 1 ? new[] { new GameStageValue(155, 1f), new GameStageValue(184, 1f), new GameStageValue(191, 1f) }
+                    definition.defaultValues = i == 1 ? YaguangDefaults()
                         : Array.Empty<GameStageValue>();
                     AssetDatabase.CreateAsset(definition, path);
                 }
@@ -56,6 +55,20 @@ namespace Hapio.Editor
             AssetDatabase.SaveAssetIfDirty(catalog);
             // Existing session assets retain GUIDs and all transport fields; catalog is loaded by its explicit resource path.
         }
+        private static GameStageValue[] YaguangDefaults() => new[]
+        {
+            new GameStageValue(155, 1f), new GameStageValue(184, 1f), new GameStageValue(191, 1f),
+            new GameStageValue(164, 4f), new GameStageValue(158, 13f),
+            new GameStageValue(159, 8f), new GameStageValue(162, 8f),
+            new GameStageValue(188, 3f), new GameStageValue(189, 11f), new GameStageValue(190, 1f),
+            new GameStageValue(211, 120f), new GameStageValue(212, 100f),
+            new GameStageValue(213, 10f), new GameStageValue(214, 0f),
+            new GameStageValue(215, 35f), new GameStageValue(216, 1f),
+            new GameStageValue(217, 60f), new GameStageValue(218, 0f),
+            new GameStageValue(219, 75f), new GameStageValue(220, 1f),
+            new GameStageValue(221, 25f), new GameStageValue(222, 40f),
+            new GameStageValue(223, 60f), new GameStageValue(224, 80f)
+        };
         private static void Folder(string path)
         {
             if (AssetDatabase.IsValidFolder(path)) return;

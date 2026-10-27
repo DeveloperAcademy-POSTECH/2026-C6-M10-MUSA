@@ -286,13 +286,13 @@ namespace C6Lab
             new LabDeveloperField("Combo Warning (seconds)", 0f, 8f),
             LabDeveloperField.Toggle("Board Orb Trail (0 off, 1 on)"),
             // The yokai's sabotage mix and the nine-tailed fox's sabotages (#251). An experiment, off by default.
-            LabDeveloperField.Toggle("Sabotage Mix (0 off, 1 on)"),
+            LabDeveloperField.Toggle("Lab Unique Gimmicks (0 off, 1 on)"),
             new LabDeveloperField("Sabotage Interval Min (seconds)", 1f, 600f),
             new LabDeveloperField("Sabotage Interval Max (seconds)", 1f, 600f),
-            new LabDeveloperField("Sabotage Weight Gourd Bomb", 0f, 10f, true),
-            new LabDeveloperField("Sabotage Weight Swipe Block", 0f, 10f, true),
-            new LabDeveloperField("Sabotage Weight Fox Fire", 0f, 10f, true),
-            new LabDeveloperField("Sabotage Weight Charm", 0f, 10f, true),
+            new LabDeveloperField("Gimmick Chance Gourd Bomb (%)", 0f, 100f, true),
+            new LabDeveloperField("Gimmick Chance Swipe Block (%)", 0f, 100f, true),
+            new LabDeveloperField("Gimmick Chance Fox Fire (%)", 0f, 100f, true),
+            new LabDeveloperField("Gimmick Chance Charm (%)", 0f, 100f, true),
             new LabDeveloperField("Fox Fire Count Min", 1f, 10f, true),
             new LabDeveloperField("Fox Fire Count Max", 1f, 10f, true),
             new LabDeveloperField("Fox Fire Safe Seconds", 0f, 3f),
@@ -332,8 +332,45 @@ namespace C6Lab
             // #301 owns the two flash fields at 202 and 203; #305 appends its distinct warning at 204.
             LabDeveloperField.Toggle("섬광 흔들어 풀기 (0 off, 1 on)", "끔", "켬"),
             new LabDeveloperField("섬광 흔들기 횟수", 2f, 10f, true),
-            new LabDeveloperField("Charm Warning Seconds (0 = none)", 0f, 10f)
+            new LabDeveloperField("Charm Warning Seconds (0 = none)", 0f, 10f),
+            // 기믹 묶음 (#311): 공용 기믹(폭탄·넘기기 막기)과 요괴 고유 기믹(구미호: 여우불·매혹)을 각자 고정 간격마다
+            // 켜진 것 중 하나씩 비율(169~172번, 묶음별 합 100)대로 발동한다. Hapio에서는 스테이지마다 따로 정한다.
+            new LabDeveloperField("Common Gimmick Interval (seconds, 0 = none)", 0f, 600f),
+            new LabDeveloperField("Unique Gimmick Interval (seconds, 0 = none)", 0f, 600f),
+            LabDeveloperField.Toggle("Gimmick Gourd Bomb (0 off, 1 on)"),
+            LabDeveloperField.Toggle("Gimmick Swipe Block (0 off, 1 on)"),
+            LabDeveloperField.Toggle("Gimmick Fox Fire (0 off, 1 on)"),
+            LabDeveloperField.Toggle("Gimmick Charm (0 off, 1 on)"),
+            // #314 is a stage policy inside the #311 scheduler, not a second independently enabled engine.
+            new LabDeveloperField("야광귀 시간표 전투 시간 (초)", 60f, 180f),
+            new LabDeveloperField("야광귀 시간표 방해 끝 (초, 0 = 없음)", 0f, 180f),
+            new LabDeveloperField("야광귀 고유 1 예고 시각 (초, 0 = 없음)", 0f, 180f),
+            LabDeveloperField.Choice("야광귀 고유 1 종류", "섬광", "콤보"),
+            new LabDeveloperField("야광귀 고유 2 예고 시각 (초, 0 = 없음)", 0f, 180f),
+            LabDeveloperField.Choice("야광귀 고유 2 종류", "섬광", "콤보"),
+            new LabDeveloperField("야광귀 고유 3 예고 시각 (초, 0 = 없음)", 0f, 180f),
+            LabDeveloperField.Choice("야광귀 고유 3 종류", "섬광", "콤보"),
+            new LabDeveloperField("야광귀 고유 4 예고 시각 (초, 0 = 없음)", 0f, 180f),
+            LabDeveloperField.Choice("야광귀 고유 4 종류", "섬광", "콤보"),
+            new LabDeveloperField("야광귀 공용 1 시각 (초, 0 = 없음)", 0f, 180f),
+            new LabDeveloperField("야광귀 공용 2 시각 (초, 0 = 없음)", 0f, 180f),
+            new LabDeveloperField("야광귀 공용 3 시각 (초, 0 = 없음)", 0f, 180f),
+            new LabDeveloperField("야광귀 공용 4 시각 (초, 0 = 없음)", 0f, 180f)
         });
+
+        public const int YaguangTimelineFirstField = 211;
+        public const int YaguangTimelineLastField = 224;
+        public const int YaguangTimelineSlots = 4;
+        public static bool IsYaguangTimelineField(int index) =>
+            index >= YaguangTimelineFirstField && index <= YaguangTimelineLastField;
+
+        /// <summary>
+        /// Settings the gimmick groups (#311) replaced: the gourd bomb's and the sabotage mix's random min/max intervals,
+        /// the swipe block's own interval and its gap from bombs. They keep their places in the shared form so every other
+        /// index stays put, but nothing reads them and DEV never shows them.
+        /// </summary>
+        public static IReadOnlyCollection<int> RetiredDeveloperFields { get; } =
+            Array.AsReadOnly(new[] { 87, 88, 152, 154, 167, 168 });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
         public static IReadOnlyList<LabOrbKind> GeneratedKinds { get; } = Array.AsReadOnly(new[]
@@ -360,12 +397,15 @@ namespace C6Lab
             new LabDeveloperCategory("Target spin", 57, 58, 59),
             new LabDeveloperCategory("Sound and haptics", 63, 64, 135, 136, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 89, 102, 103),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 90, 91, 92, 93, 94, 95, 96, 97),
-            new LabDeveloperCategory("Gourd", 140, 79, 87, 88, 152, 153, 154, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137,
+            new LabDeveloperCategory("Gourd", 140, 79, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137,
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
                 134, 132, 133, 148, 149, 150, 151, 200, 201),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
-            new LabDeveloperCategory("Sabotage", 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 204, 177),
+            // 기믹 묶음 (#311): 공용(폭탄·넘기기 막기)과 고유(구미호: 여우불·매혹)를 나눠 간격·켜기·비율·세부값을 모은다.
+            new LabDeveloperCategory("Gimmicks", 205, 207, 169, 208, 170, 153,
+                166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177)
+                .WithDividers((0, "── 공용 기믹 ──"), (6, "── 고유 기믹 (구미호) ──")),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
             // 섬광 흔들어 풀기·흔들기 횟수(#301)는 고해상도 도색(#299) 뒤 202·203번이며 섬광 칸 맨 아래에 둔다.
@@ -373,6 +413,9 @@ namespace C6Lab
                 184, 185, 186, 187, 188, 189, 190, 202, 203)
                 .WithSwitch(155, 184)
                 .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
+            new LabDeveloperCategory("야광귀 시간표 (Hapio 전용)", 211, 212, 213, 214, 215, 216, 217, 218, 219, 220,
+                221, 222, 223, 224)
+                .WithDividers((0, "── 야광귀 전용 일정 · 일반 주기/비율 대신 사용 ──"), (2, "── 고유 예고 ──"), (10, "── 공용 ──")),
             new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
         });
 
@@ -566,27 +609,39 @@ namespace C6Lab
         [SerializeField] private LabPaintPattern paintPattern = LabPaintPattern.Splatter;
         [Tooltip("퍼짐 경계의 불규칙한 정도. 도색 면적 예산과는 별개다.")]
         [SerializeField, Range(0f, 1f)] private float paintEdgeRaggedness = .55f;
-        [Tooltip("박이 무작위 한 명에게 폭탄을 떨어뜨리는 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다. 최대가 0이면 떨어뜨리지 않는다 (#177).")]
+        [Tooltip("#311부터 쓰지 않는다 (공용 기믹 간격이 대신한다). 예전: 박 폭탄 간격의 최소·최대 (초).")]
         [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
         [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
-        [Tooltip("박의 넘기기 막기 (#215): 무작위 한 명의 한쪽 방향 넘기기를 막는 간격 (초). 0이면 막지 않는다.")]
+        [Tooltip("#311부터 쓰지 않는다 (공용 기믹 간격이 대신한다). 예전: 넘기기 막기 간격 (초).")]
         [SerializeField, Range(0f, 600f)] private float swipeBlockInterval = 40f;
         [Tooltip("넘기기 막기가 이어지는 시간 (초).")]
         [SerializeField, Range(1f, 60f)] private float swipeBlockSeconds = 10f;
-        [Tooltip("넘기기 막기가 박 폭탄과 최소 이만큼 떨어져 시작한다 (초). 가까우면 그 폭탄 뒤로 미룬다.")]
+        [Tooltip("#311부터 쓰지 않는다 (폭탄과 막기가 한 타이머에서 나온다). 예전: 막기와 폭탄 사이 최소 간격 (초).")]
         [SerializeField, Range(0f, 15f)] private float swipeBlockBombGap = 4f;
 
-        [Header("Sabotage mix (#251)")]
-        [Tooltip("요괴의 통합 방해공작 추첨. 켜면 박 폭탄·넘기기 막기의 각자 타이머를 멈추고, 아래 간격마다 켜진 방해공작 중 하나를 비율대로 골라 무작위 한 명에게 건다. 실험이라 기본은 끔.")]
+        [Header("Gimmick groups (#311, was the sabotage mix #251)")]
+        [Tooltip("Lab 단독 장면(요괴 없음)에서도 고유 기믹(구미호: 여우불·매혹)을 쓸지. Hapio 스테이지는 요괴가 정한다. 기본은 끔.")]
         [SerializeField] private bool sabotageMixEnabled;
-        [Tooltip("통합 추첨 간격의 최소·최대 (초). 매번 이 사이에서 새로 뽑는다.")]
+        [Tooltip("#311부터 쓰지 않는다 (공용·고유 기믹 간격이 대신한다). 예전: 통합 추첨 간격의 최소·최대 (초).")]
         [SerializeField, Range(1f, 600f)] private float sabotageIntervalMin = 20f;
         [SerializeField, Range(1f, 600f)] private float sabotageIntervalMax = 30f;
-        [Tooltip("방해공작별 비율. 0이면 후보에서 뺀다.")]
-        [SerializeField, Range(0, 10)] private int sabotageWeightGourdBomb = 1;
-        [SerializeField, Range(0, 10)] private int sabotageWeightSwipeBlock = 1;
-        [SerializeField, Range(0, 10)] private int sabotageWeightFoxFire = 1;
-        [SerializeField, Range(0, 10)] private int sabotageWeightCharm = 1;
+        [Tooltip("기믹 비율 (%): 공용(폭탄·넘기기 막기)끼리 합 100, 고유(여우불·매혹)끼리 합 100. 꺼졌거나 걸 수 없는 기믹은 빼고 남은 것끼리 이 비율로 뽑는다.")]
+        [SerializeField, Range(0, 100)] private int sabotageWeightGourdBomb = 50;
+        [SerializeField, Range(0, 100)] private int sabotageWeightSwipeBlock = 50;
+        [SerializeField, Range(0, 100)] private int sabotageWeightFoxFire = 50;
+        [SerializeField, Range(0, 100)] private int sabotageWeightCharm = 50;
+        [Tooltip("공용 기믹(폭탄·넘기기 막기) 간격 (초). 전투 시작 뒤 이만큼 지나 처음 발동하고, 그 뒤 이 간격마다 하나씩. 0이면 없음.")]
+        [SerializeField, Range(0f, 600f)] private float commonGimmickInterval = 10f;
+        [Tooltip("고유 기믹(구미호: 여우불·매혹) 간격 (초). 공용과 같은 시각이면 둘 다 발동한다. 0이면 없음.")]
+        [SerializeField, Range(0f, 600f)] private float uniqueGimmickInterval = 20f;
+        [Tooltip("기믹별 켜기/끄기. 끈 기믹은 그 묶음의 후보에서 빠진다.")]
+        [SerializeField] private bool gimmickGourdBomb = true;
+        [SerializeField] private bool gimmickSwipeBlock = true;
+        [SerializeField] private bool gimmickFoxFire = true;
+        [SerializeField] private bool gimmickCharm = true;
+        [Tooltip("UT용 기믹 기록 (#311). 켜면 Host가 판이 끝날 때마다 그 판의 기믹 수(전체·종류별·공용과 고유가 동시에 걸린 수)를 "
+            + "콘솔(C6_LAB_GIMMICK_STATS)과 기기의 gimmick-stats.jsonl에 한 줄씩 남긴다. DEV·공유 설정이 아니며 기본은 끔.")]
+        [SerializeField] private bool recordGimmickStats;
         [Tooltip("여우불: 한 번에 떨어지는 여우구슬 개수의 최소·최대. 판이 거의 차 있으면 빈 칸 수만큼만 떨어진다.")]
         [SerializeField, Range(1, 10)] private int foxFireCountMin = 2;
         [SerializeField, Range(1, 10)] private int foxFireCountMax = 5;
@@ -598,6 +653,17 @@ namespace C6Lab
         [SerializeField, Range(0, 10)] private int charmRescueTaps = 10;
         [Tooltip("매혹 예고 (#305): 매혹이 걸리기 이 시간 (초) 전부터 모두에게 \"구미호가 P2에게 매혹을 걸려고 한다!\"를 보여 준다. 0이면 예고 없이 바로 걸린다.")]
         [SerializeField, Range(0f, 10f)] private float charmWarningSeconds = 3f;
+
+        [Header("Yaguang stage schedule (#314 integrated into #311)")]
+        [Tooltip("Hapio 야광귀 스테이지에서만 적용한다. Lab 기본 주기와 다른 요괴 스테이지에는 영향을 주지 않는다.")]
+        [SerializeField, Range(60f, 180f)] private float yaguangTimelineBattleSeconds = 120f;
+        [Tooltip("방해 정리 시각. 0은 정리 없이 전투 끝까지 유지한다.")]
+        [SerializeField, Range(0f, 180f)] private float yaguangTimelineSabotageEndSeconds = 100f;
+        [Tooltip("고유 기믹 예고 시작 시각. 0인 칸은 비운다. 종류 0=섬광, 1=콤보.")]
+        [SerializeField] private float[] yaguangTimelineUniqueSeconds = { 10f, 35f, 60f, 75f };
+        [SerializeField] private int[] yaguangTimelineUniqueKinds = { 0, 1, 0, 1 };
+        [Tooltip("공용 기믹 시작 시각. 0인 칸은 비운다. 켜진 폭탄·넘기기 막기를 교대한다.")]
+        [SerializeField] private float[] yaguangTimelineCommonSeconds = { 25f, 40f, 60f, 80f };
 
         [Header("Jigwi fire experiment (#272)")]
         [SerializeField, Range(1, 5)] private int jigwiFireTargetCount = 1;
@@ -946,20 +1012,28 @@ namespace C6Lab
         public LabPaintPattern PaintPattern => paintPattern >= LabPaintPattern.Legacy && paintPattern <= LabPaintPattern.Flow
             ? paintPattern : LabPaintPattern.Splatter;
         public float PaintEdgeRaggedness => Mathf.Clamp01(Finite(paintEdgeRaggedness, .55f));
-        public float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
-        public float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
-        public float SwipeBlockInterval => Mathf.Clamp(Finite(swipeBlockInterval, 40f), 0f, 600f);
+        // Retired by the gimmick groups (#311): still captured and applied so the form keeps its indices, never read.
+        private float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
+        private float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
+        private float SwipeBlockInterval => Mathf.Clamp(Finite(swipeBlockInterval, 40f), 0f, 600f);
+        private float SwipeBlockBombGap => Mathf.Clamp(Finite(swipeBlockBombGap, 4f), 0f, 15f);
+        private float SabotageIntervalMin => Mathf.Clamp(Finite(sabotageIntervalMin, 20f), 1f, 600f);
+        private float SabotageIntervalMax => Mathf.Clamp(Finite(sabotageIntervalMax, 30f), SabotageIntervalMin, 600f);
         public float SwipeBlockSeconds => Mathf.Clamp(Finite(swipeBlockSeconds, 10f), 1f, 60f);
-        public float SwipeBlockBombGap => Mathf.Clamp(Finite(swipeBlockBombGap, 4f), 0f, 15f);
-        public bool SabotageMixEnabled => sabotageMixEnabled;
-        public float SabotageIntervalMin => Mathf.Clamp(Finite(sabotageIntervalMin, 20f), 1f, 600f);
-        public float SabotageIntervalMax => Mathf.Clamp(Finite(sabotageIntervalMax, 30f), SabotageIntervalMin, 600f);
-        /// <summary>How often the sabotage mix draws each sabotage, in <see cref="LabSabotageKind"/> order (#251).</summary>
-        public int[] SabotageWeights() => new[]
+        /// <summary>Whether the Lab scene (no yokai) borrows the fox's unique gimmicks (#311). Game stages ignore it.</summary>
+        public bool LabUniqueGimmicksEnabled => sabotageMixEnabled;
+        /// <summary>Each gimmick's chance within its group in percent, in <see cref="LabSabotageKind"/> order (#311).</summary>
+        public int[] GimmickChances() => new[]
         {
-            Mathf.Clamp(sabotageWeightGourdBomb, 0, 10), Mathf.Clamp(sabotageWeightSwipeBlock, 0, 10),
-            Mathf.Clamp(sabotageWeightFoxFire, 0, 10), Mathf.Clamp(sabotageWeightCharm, 0, 10)
+            Mathf.Clamp(sabotageWeightGourdBomb, 0, 100), Mathf.Clamp(sabotageWeightSwipeBlock, 0, 100),
+            Mathf.Clamp(sabotageWeightFoxFire, 0, 100), Mathf.Clamp(sabotageWeightCharm, 0, 100)
         };
+        public float CommonGimmickInterval => Mathf.Clamp(Finite(commonGimmickInterval, 10f), 0f, 600f);
+        public float UniqueGimmickInterval => Mathf.Clamp(Finite(uniqueGimmickInterval, 20f), 0f, 600f);
+        /// <summary>Which gimmicks may be drawn, in <see cref="LabSabotageKind"/> order (#311).</summary>
+        public bool[] GimmickSwitches() => new[] { gimmickGourdBomb, gimmickSwipeBlock, gimmickFoxFire, gimmickCharm };
+        /// <summary>Whether the Host writes each finished round's gimmick stats (#311, for UT). Not a DEV or shared value.</summary>
+        public bool RecordGimmickStats => recordGimmickStats;
         public int FoxFireCountMin => Mathf.Clamp(foxFireCountMin, 1, 10);
         public int FoxFireCountMax => Mathf.Clamp(foxFireCountMax, FoxFireCountMin, 10);
         public float FoxFireSafeSeconds => Mathf.Clamp(Finite(foxFireSafeSeconds, 1f), 0f, 3f);
@@ -983,6 +1057,19 @@ namespace C6Lab
         public bool HighResolutionPaintEnabled => highResolutionPaintEnabled;
         public int HighResolutionPaintQuality => Mathf.Clamp(highResolutionPaintQuality, 0, 1);
         public int HighResolutionPaintColumns => HighResolutionPaintQuality == 0 ? 1024 : 2048;
+        private static readonly float[] DefaultTimelineUniqueSeconds = { 10f, 35f, 60f, 75f };
+        private static readonly int[] DefaultTimelineUniqueKinds = { 0, 1, 0, 1 };
+        private static readonly float[] DefaultTimelineCommonSeconds = { 25f, 40f, 60f, 80f };
+        public float YaguangTimelineBattleSeconds => Mathf.Clamp(Finite(yaguangTimelineBattleSeconds, 120f), 60f, 180f);
+        public float YaguangTimelineSabotageEndSeconds => Mathf.Clamp(Finite(yaguangTimelineSabotageEndSeconds, 100f), 0f, 180f);
+        public float YaguangTimelineUniqueSeconds(int slot) => TimelineSeconds(yaguangTimelineUniqueSeconds, slot, DefaultTimelineUniqueSeconds);
+        public bool YaguangTimelineUniqueIsCombo(int slot) => slot >= 0 && slot < YaguangTimelineSlots
+            && (yaguangTimelineUniqueKinds != null && slot < yaguangTimelineUniqueKinds.Length
+                ? yaguangTimelineUniqueKinds[slot] : DefaultTimelineUniqueKinds[slot]) == 1;
+        public float YaguangTimelineCommonSeconds(int slot) => TimelineSeconds(yaguangTimelineCommonSeconds, slot, DefaultTimelineCommonSeconds);
+        private static float TimelineSeconds(float[] values, int slot, float[] fallback) => slot >= 0 && slot < YaguangTimelineSlots
+            ? Mathf.Clamp(Finite(values != null && slot < values.Length ? values[slot] : fallback[slot], fallback[slot]), 0f, 180f) : 0f;
+
         public bool YaguangFlashEnabled => yaguangFlashEnabled;
         /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
         public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
@@ -1057,7 +1144,7 @@ namespace C6Lab
             int[] chances = GenerationChances();
             float[] stopBounds = DrumStopBounds();
             int[] stopChances = DrumStopChances();
-            int[] sabotageWeights = SabotageWeights();
+            int[] sabotageWeights = GimmickChances();
             return new[]
             {
                 (float)MonsterMaxHp, (float)Damage, BattleDurationSeconds,
@@ -1122,7 +1209,7 @@ namespace C6Lab
                 ComboPenaltyThrowerOnly ? 1f : 0f, ComboRewardDurationSeconds, ComboRewardSizeScale,
                 ComboWarningSeconds,
                 BoardOrbTrailEnabled ? 1f : 0f,
-                SabotageMixEnabled ? 1f : 0f, SabotageIntervalMin, SabotageIntervalMax,
+                LabUniqueGimmicksEnabled ? 1f : 0f, SabotageIntervalMin, SabotageIntervalMax,
                 sabotageWeights[0], sabotageWeights[1], sabotageWeights[2], sabotageWeights[3],
                 FoxFireCountMin, FoxFireCountMax, FoxFireSafeSeconds, CharmSeconds, CharmRescueTaps,
                 JigwiFireTargetCount, JigwiFireSeconds, JigwiOverheatSeconds,
@@ -1135,7 +1222,16 @@ namespace C6Lab
                 TeamTerritoryEnabled ? 1f : 0f, TeamBattleSeconds, TeamFeverHits, TeamFeverSeconds,
                 HighResolutionPaintEnabled ? 1f : 0f, HighResolutionPaintQuality,
                 YaguangFlashShakeRelease ? 1f : 0f, YaguangFlashShakeCount,
-                CharmWarningSeconds
+                CharmWarningSeconds,
+                CommonGimmickInterval, UniqueGimmickInterval,
+                gimmickGourdBomb ? 1f : 0f, gimmickSwipeBlock ? 1f : 0f, gimmickFoxFire ? 1f : 0f, gimmickCharm ? 1f : 0f,
+                YaguangTimelineBattleSeconds, YaguangTimelineSabotageEndSeconds,
+                YaguangTimelineUniqueSeconds(0), YaguangTimelineUniqueIsCombo(0) ? 1f : 0f,
+                YaguangTimelineUniqueSeconds(1), YaguangTimelineUniqueIsCombo(1) ? 1f : 0f,
+                YaguangTimelineUniqueSeconds(2), YaguangTimelineUniqueIsCombo(2) ? 1f : 0f,
+                YaguangTimelineUniqueSeconds(3), YaguangTimelineUniqueIsCombo(3) ? 1f : 0f,
+                YaguangTimelineCommonSeconds(0), YaguangTimelineCommonSeconds(1),
+                YaguangTimelineCommonSeconds(2), YaguangTimelineCommonSeconds(3)
             };
         }
 
@@ -1181,8 +1277,19 @@ namespace C6Lab
             float drumStopTotal = values[94] + values[95] + values[96] + values[97];
             if (drumStopTotal != 100f) { error = "Drum stop chances must add up to 100 (now " + drumStopTotal + ")."; return false; }
             if (values[167] > values[168]) { error = "Sabotage Interval Min cannot exceed Sabotage Interval Max."; return false; }
+            float commonChances = values[169] + values[170], uniqueChances = values[171] + values[172];
+            if (commonChances != 100f)
+            { error = "Common gimmick chances (Gourd Bomb + Swipe Block) must add up to 100 (now " + commonChances + ")."; return false; }
+            if (uniqueChances != 100f)
+            { error = "Unique gimmick chances (Fox Fire + Charm) must add up to 100 (now " + uniqueChances + ")."; return false; }
             if (values[173] > values[174]) { error = "Fox Fire Count Min cannot exceed Fox Fire Count Max."; return false; }
             if (values[192] > values[193]) { error = "Jigwi Auto Interval Min cannot exceed Jigwi Auto Interval Max."; return false; }
+
+            if (values[212] > values[211])
+            { error = "Yaguang schedule end cannot exceed its battle duration."; return false; }
+            foreach (int index in new[] { 213, 215, 217, 219, 221, 222, 223, 224 })
+                if (values[index] > values[211])
+                { error = "Yaguang schedule slot cannot exceed its battle duration."; return false; }
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
@@ -1381,6 +1488,17 @@ namespace C6Lab
             yaguangFlashShakeRelease = values[202] >= .5f;
             yaguangFlashShakeCount = (int)values[203];
             charmWarningSeconds = values[204];
+            commonGimmickInterval = values[205];
+            uniqueGimmickInterval = values[206];
+            gimmickGourdBomb = values[207] >= .5f;
+            gimmickSwipeBlock = values[208] >= .5f;
+            gimmickFoxFire = values[209] >= .5f;
+            gimmickCharm = values[210] >= .5f;
+            yaguangTimelineBattleSeconds = values[211];
+            yaguangTimelineSabotageEndSeconds = values[212];
+            yaguangTimelineUniqueSeconds = new[] { values[213], values[215], values[217], values[219] };
+            yaguangTimelineUniqueKinds = new[] { (int)values[214], (int)values[216], (int)values[218], (int)values[220] };
+            yaguangTimelineCommonSeconds = new[] { values[221], values[222], values[223], values[224] };
             error = string.Empty;
             return true;
         }

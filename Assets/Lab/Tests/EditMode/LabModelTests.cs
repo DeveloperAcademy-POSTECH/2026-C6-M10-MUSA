@@ -1395,7 +1395,7 @@ namespace C6Lab.Tests
         [Test]
         public void TheGourdBlocksOnePlayersOwnPassesOneWayForTheBlockSeconds()
         {
-            var blocking = BlockConfig(40f, 10f, 4f);
+            var blocking = BlockConfig(40f, 10f);
             try
             {
                 float[] tuning = blocking.CaptureDeveloperValues();
@@ -1458,7 +1458,7 @@ namespace C6Lab.Tests
         [Test]
         public void SwipeBlocksFallOnEveryPlayerBothWaysAndAreTheSameOnEveryScreen()
         {
-            var blocking = BlockConfig(5f, 2f, 0f);
+            var blocking = BlockConfig(5f, 2f);
             try
             {
                 List<(double start, double until, ulong player, bool right)> Blocks()
@@ -1493,38 +1493,34 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ASwipeBlockKeepsItsGapFromTheGourdsBombsAndIntervalZeroTurnsItOff()
+        public void ACommonTickCastsABombOrABlockAndIntervalZeroTurnsBothOff()
         {
-            var blocking = BlockConfig(40f, 10f, 8f, 20f, 30f);
-            var off = BlockConfig(0f, 10f, 4f, 20f, 30f);
+            var common = MixConfig(5f, bomb: 1, block: 1, fox: 0, charm: 0);
+            var off = MixConfig(5f, bomb: 1, block: 1, fox: 0, charm: 0);
             try
             {
                 var room = new LabModel();
-                room.Begin("block-gap", new ulong[] { 10, 20, 30 }, 0d, blocking);
-                var bombs = new SortedSet<double>();
-                var starts = new SortedSet<double>();
-                for (double at = 0d; at < 179.9d; at += .1d)
-                {
-                    LabSnapshot snapshot = room.Snapshot(at);
-                    foreach (LabOrbState orb in snapshot.orbs)
-                        if (orb.origin == LabOrbOrigin.Gourd) bombs.Add(orb.createdAt);
-                    if (snapshot.swipeBlockedUntil > 0d) starts.Add(snapshot.swipeBlockStartedAt);
-                }
-                Assert.That(bombs.Count, Is.GreaterThanOrEqualTo(5), "The gourd drops its bombs through the round.");
-                Assert.That(starts.Count, Is.GreaterThanOrEqualTo(2), "And blocks swipes too.");
-                foreach (double start in starts)
-                    foreach (double bomb in bombs)
-                        Assert.That(Math.Abs(start - bomb), Is.GreaterThanOrEqualTo(8d - 1e-9),
-                            "A block never starts within the gap of a gourd bomb (#215).");
+                room.Begin("common-ticks", new ulong[] { 10, 20, 30 }, 0d, common);
+                room.Tick(179d);
+                LabSabotage[] cast = room.DrainSabotages();
+                Assert.That(cast.Select(item => item.At).Distinct().Count(), Is.EqualTo(cast.Length),
+                    "One common gimmick per tick: the gourd's bomb and its swipe block share one timer now (#311).");
+                Assert.That(cast.Any(item => item.Kind == LabSabotageKind.GourdBomb), Is.True);
+                Assert.That(cast.Any(item => item.Kind == LabSabotageKind.SwipeBlock), Is.True);
+                Assert.That(cast.All(item => Math.Abs(item.At / 5d - Math.Round(item.At / 5d)) < 1e-9), Is.True, "On the interval.");
 
+                float[] values = off.CaptureDeveloperValues();
+                values[205] = 0f;
+                Assert.That(off.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var quiet = new LabModel();
-                quiet.Begin("block-off", new ulong[] { 10, 20, 30 }, 0d, off);
+                quiet.Begin("common-off", new ulong[] { 10, 20, 30 }, 0d, off);
                 for (double at = 0d; at < 179.9d; at += .5d)
-                    Assert.That(quiet.Snapshot(at).swipeBlockedUntil, Is.EqualTo(-1d), "An interval of 0 turns the block off.");
+                    Assert.That(quiet.Snapshot(at).swipeBlockedUntil, Is.EqualTo(-1d), "An interval of 0 turns them off.");
+                Assert.That(quiet.DrainGourdBombs(), Is.Empty);
             }
             finally
             {
-                UnityEngine.Object.DestroyImmediate(blocking);
+                UnityEngine.Object.DestroyImmediate(common);
                 UnityEngine.Object.DestroyImmediate(off);
             }
         }
@@ -1532,7 +1528,7 @@ namespace C6Lab.Tests
         [Test]
         public void ASwipeBlockCannotBeBypassedByCallingAnOrdinaryOrbOrRestingDrumPassing()
         {
-            var blocking = BlockConfig(40f, 10f, 0f);
+            var blocking = BlockConfig(40f, 10f);
             try
             {
                 var room = new LabModel();
@@ -1555,32 +1551,31 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SwipeBlockCatchUpKeepsTheSameBombGapAndDrawsAfterMoreThanEightBombs()
+        public void AFarJumpCastsTheSameGimmicksAsSmallSteps()
         {
-            var blocking = BlockConfig(20f, 10f, 3f, 7f, 7f);
+            var mix = MixConfig(7f, bomb: 1, block: 1, fox: 1, charm: 1);
             try
             {
                 var stepped = new LabModel();
                 var late = new LabModel();
                 ulong[] ring = { 10, 20, 30 };
-                stepped.Begin("late-blocks", ring, 0d, blocking);
-                late.Begin("late-blocks", ring, 0d, blocking);
+                stepped.Begin("late-gimmicks", ring, 0d, mix);
+                late.Begin("late-gimmicks", ring, 0d, mix);
                 for (int step = 1; step < 1799; step++) stepped.Snapshot(step / 10d);
                 LabSnapshot expected = stepped.Snapshot(179.9d);
                 LabSnapshot actual = late.Snapshot(179.9d);
 
-                Assert.That(expected.swipeBlockStartedAt, Is.EqualTo(171d));
+                LabSabotage[] steppedCast = stepped.DrainSabotages(), lateCast = late.DrainSabotages();
+                Assert.That(lateCast.Length, Is.GreaterThan(20), "Both groups cast through the round.");
+                Assert.That(lateCast.Select(item => (item.Kind, item.Target, item.At)),
+                    Is.EqualTo(steppedCast.Select(item => (item.Kind, item.Target, item.At))),
+                    "Catch-up casts each gimmick at its own time, in the same order, on the same players.");
                 Assert.That(actual.swipeBlockStartedAt, Is.EqualTo(expected.swipeBlockStartedAt));
-                Assert.That(actual.swipeBlockedUntil, Is.EqualTo(expected.swipeBlockedUntil));
-                Assert.That(actual.swipeBlockedPlayer, Is.EqualTo(expected.swipeBlockedPlayer), "Catch-up consumes the same draws.");
+                Assert.That(actual.swipeBlockedPlayer, Is.EqualTo(expected.swipeBlockedPlayer));
                 Assert.That(actual.swipeBlockedRight, Is.EqualTo(expected.swipeBlockedRight));
-                Assert.That(actual.SwipeBlockOn(actual.swipeBlockedPlayer), Is.True);
-                LabGourdBomb[] bombs = late.DrainGourdBombs();
-                Assert.That(bombs.Length, Is.EqualTo(25), "This catch-up exceeds the former eight-bomb history limit.");
-                for (int i = 0; i < bombs.Length; i++)
-                    Assert.That(Math.Abs(actual.swipeBlockStartedAt - (i + 1) * 7d), Is.GreaterThanOrEqualTo(3d));
+                Assert.That(actual.charmWarnedAt, Is.EqualTo(expected.charmWarnedAt));
             }
-            finally { UnityEngine.Object.DestroyImmediate(blocking); }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
         }
 
         [Test]
@@ -2732,20 +2727,21 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GourdDropsABombOnOnePlayerEveryTwentyToThirtySeconds()
+        public void TheCommonGroupDropsAGourdBombEveryIntervalFromItsFirstInterval()
         {
-            var gourd = GourdConfig(20f, 30f);
+            var gourd = GourdConfig(20f);
             try
             {
                 var ids = new ulong[] { 10, 20, 30 };
                 var room = new LabModel();
                 room.Begin("gourd-test", ids, 0d, gourd);
                 room.Tick(19.9d);
-                Assert.That(room.DrainGourdBombs(), Is.Empty, "No bomb falls before the minimum interval.");
+                Assert.That(room.DrainGourdBombs(), Is.Empty, "Nothing before the first interval (#311).");
 
                 // Check every second so each new bomb is read well before its fuse.
+                var drops = new List<LabGourdBomb>();
                 var dropTimes = new List<double>();
-                for (int second = 20; second <= 180; second++)
+                for (int second = 20; second <= 175; second++)
                 {
                     LabSnapshot snapshot = room.Snapshot(second);
                     foreach (LabGourdBomb drop in room.DrainGourdBombs())
@@ -2760,16 +2756,17 @@ namespace C6Lab.Tests
                         Assert.That(bomb.lockSwipes, Is.InRange(2, 4), "A gourd bomb keeps the item unlock rule.");
                         Assert.That(bomb.inFlight, Is.False);
                         Assert.That(new Vector2(bomb.x, bomb.y), Is.EqualTo(drop.Position));
+                        drops.Add(drop);
                         dropTimes.Add(bomb.createdAt);
                     }
                     Assert.That(room.DrainGourdBombs(), Is.Empty, "Each drop is reported once.");
                 }
 
-                Assert.That(dropTimes.Count, Is.InRange(6, 9), "A 180 second round has 6 to 9 gourd bombs.");
-                Assert.That(dropTimes[0], Is.InRange(20d, 30d));
-                for (int i = 1; i < dropTimes.Count; i++)
-                    Assert.That(dropTimes[i] - dropTimes[i - 1], Is.InRange(20d - 1e-6, 30d + 1e-6));
-                LabSnapshot end = room.Snapshot(180d);
+                Assert.That(dropTimes, Is.EqualTo(new[] { 20d, 40d, 60d, 80d, 100d, 120d, 140d, 160d }),
+                    "Every 20 seconds exactly, not a random 20-30 any more.");
+                Assert.That(drops.Zip(drops.Skip(1), (a, b) => a.Target != b.Target).All(differs => differs), Is.True,
+                    "No one gets two of the group's gimmicks in a row.");
+                LabSnapshot end = room.Snapshot(176d);
                 Assert.That(end.players.All(player => player.generatedTotal == 0), Is.True,
                     "Gourd bombs are not anyone's generation.");
             }
@@ -2777,44 +2774,128 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SabotageMixOffKeepsTheGourdsOwnTimersAndCastsNothing()
+        public void AGroupWithIntervalZeroOrEveryGimmickSwitchedOffCastsNothing()
         {
-            var gourd = GourdConfig(5f, 5f);
+            var off = MixConfig(5f, bomb: 1, block: 1, fox: 1, charm: 1);
+            var plain = ConfigWith(1f, 50, 50, 0, 0, 0, 0);
             try
             {
-                Assert.That(gourd.SabotageMixEnabled, Is.False, "The mix is an experiment, off by default (#251).");
+                float[] values = off.CaptureDeveloperValues();
+                values[205] = 0f;               // the common group, off by its interval
+                values[209] = values[210] = 0f; // the unique group, off by its switches
+                Assert.That(off.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var room = new LabModel();
-                room.Begin("mix-off", new ulong[] { 10, 20, 30 }, 0d, gourd);
-                room.Tick(21d);
-                Assert.That(room.DrainGourdBombs().Length, Is.EqualTo(4), "Bombs keep their own 5 s timer.");
+                room.Begin("groups-off", new ulong[] { 10, 20, 30 }, 0d, off);
+                room.Tick(41d);
                 Assert.That(room.DrainSabotages(), Is.Empty);
+                Assert.That(room.DrainGourdBombs(), Is.Empty);
+                Assert.That(room.Snapshot(41d).swipeBlockedUntil, Is.EqualTo(-1d));
+
+                // Without a yokai the Lab scene casts the fox's gimmicks only when asked (#311).
+                values = plain.CaptureDeveloperValues();
+                Assert.That(plain.LabUniqueGimmicksEnabled, Is.False);
+                values[206] = 5f;
+                Assert.That(plain.TryApplyDeveloperValues(values, out error), Is.True, error);
+                var lab = new LabModel();
+                lab.Begin("lab-unique-off", new ulong[] { 10, 20, 30 }, 0d, plain);
+                lab.Tick(41d);
+                Assert.That(lab.DrainSabotages(), Is.Empty);
             }
-            finally { UnityEngine.Object.DestroyImmediate(gourd); }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(off);
+                UnityEngine.Object.DestroyImmediate(plain);
+            }
         }
 
         [Test]
-        public void SabotageMixCastsOneSabotageEachIntervalInsteadOfTheBombAndBlockTimers()
+        public void EachGroupCastsOneGimmickEveryIntervalAndBothAtTheSameMoment()
         {
-            var mix = MixConfig(5f, bomb: 1, block: 0, fox: 0, charm: 0);
+            var mix = MixConfig(10f, bomb: 1, block: 0, fox: 1, charm: 0);
             try
             {
+                float[] values = mix.CaptureDeveloperValues();
+                values[206] = 20f; // the fox's own gimmicks every 20 seconds, the common ones every 10
+                Assert.That(mix.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 var room = new LabModel();
-                room.Begin("mix-bombs", new ulong[] { 10, 20, 30 }, 0d, mix);
-                room.Tick(21d);
+                room.Begin("groups", new ulong[] { 10, 20, 30 }, 0d, mix);
+                room.Tick(41d);
                 LabSabotage[] cast = room.DrainSabotages();
-                Assert.That(cast.Select(item => item.At), Is.EqualTo(new[] { 5d, 10d, 15d, 20d }));
-                Assert.That(cast.All(item => item.Kind == LabSabotageKind.GourdBomb), Is.True);
-                Assert.That(room.DrainGourdBombs().Select(drop => drop.Target), Is.EqualTo(cast.Select(item => item.Target)),
-                    "Each bomb the mix casts is the gourd's ordinary bomb, and their own 1 s timer is stopped.");
-                Assert.That(room.Snapshot(21d).swipeBlockedPlayer, Is.Zero, "The swipe block's own timer is stopped too.");
-                Assert.That(cast.Zip(cast.Skip(1), (a, b) => a.Target != b.Target).All(differs => differs), Is.True,
-                    "No one gets two sabotages in a row.");
+                Assert.That(cast.Select(item => (item.Kind, item.At)), Is.EqualTo(new[]
+                {
+                    (LabSabotageKind.GourdBomb, 10d), (LabSabotageKind.GourdBomb, 20d), (LabSabotageKind.FoxFire, 20d),
+                    (LabSabotageKind.GourdBomb, 30d), (LabSabotageKind.GourdBomb, 40d), (LabSabotageKind.FoxFire, 40d)
+                }), "Every 10 s a common gimmick, every 20 s the fox's own, and both together when their times meet (#311).");
+                LabSabotage[] bombs = cast.Where(item => item.Kind == LabSabotageKind.GourdBomb).ToArray();
+                Assert.That(room.DrainGourdBombs().Select(drop => drop.Target), Is.EqualTo(bombs.Select(item => item.Target)),
+                    "Each bomb the group casts is the gourd's ordinary bomb.");
+                Assert.That(bombs.Zip(bombs.Skip(1), (a, b) => a.Target != b.Target).All(differs => differs), Is.True,
+                    "No one gets two of a group's gimmicks in a row.");
             }
             finally { UnityEngine.Object.DestroyImmediate(mix); }
         }
 
         [Test]
-        public void SabotageMixWaitsOutASwipeBlockAndNeverAddsToTheBlockedPlayer()
+        public void GimmickStatsCountEachCastByKindAndBothGroupsAtTheSameMoment()
+        {
+            var mix = MixConfig(10f, bomb: 1, block: 0, fox: 1, charm: 0);
+            try
+            {
+                float[] values = mix.CaptureDeveloperValues();
+                values[206] = 20f;
+                Assert.That(mix.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                var room = new LabModel();
+                Assert.That(room.GimmickStats().total, Is.Zero, "Nothing before a round.");
+                room.Begin("stats", new ulong[] { 10, 20, 30 }, 0d, mix);
+                room.Tick(41d);
+                LabGimmickStats stats = room.GimmickStats();
+                Assert.That((stats.total, stats.gourdBomb, stats.swipeBlock, stats.foxFire, stats.charm, stats.simultaneous),
+                    Is.EqualTo((6, 4, 0, 2, 0, 2)), "Bombs at 10-40 s, fox fire at 20 and 40 s, both together twice (#311).");
+                Assert.That(stats.total, Is.EqualTo(room.DrainSabotages().Length), "Every cast is counted once.");
+                Assert.That(stats.CountOf(LabSabotageKind.FoxFire), Is.EqualTo(2));
+                Assert.That((stats.sessionId, stats.round, stats.stage, stats.players, stats.result),
+                    Is.EqualTo(("stats", 1u, "None", 3, "Playing")));
+                Assert.That((stats.commonInterval, stats.uniqueInterval), Is.EqualTo((10f, 20f)));
+                Assert.That(stats.seconds, Is.EqualTo(41d).Within(1e-9));
+                stats.total = 99;
+                Assert.That(room.GimmickStats().total, Is.EqualTo(6), "Callers get a copy.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        [Test]
+        public void GimmickStatsLeaveOutSkippedTurnsStopWithTheRoundAndStartAfreshNextRound()
+        {
+            var block = BlockConfig(5f, 7f);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("stats-rounds", new ulong[] { 10, 20, 30 }, 0d, block);
+                room.Tick(25d);
+                LabGimmickStats stats = room.GimmickStats();
+                Assert.That((stats.total, stats.swipeBlock, stats.simultaneous), Is.EqualTo((3, 3, 0)),
+                    "A 7 s block cast at 5 s still holds at 10 s and blocks come one at a time: that turn is skipped, not counted (#311).");
+                Assert.That(stats.uniqueInterval, Is.Zero, "The Lab scene borrows no unique gimmicks here.");
+
+                double duration = block.BattleDurationSeconds;
+                room.Tick(duration + 20d);
+                LabGimmickStats ended = room.GimmickStats();
+                Assert.That(ended.result, Is.EqualTo("Defeat"));
+                Assert.That(ended.seconds, Is.EqualTo(duration).Within(1e-9), "The time stops with the round.");
+                Assert.That(ended.total, Is.EqualTo(room.DrainSabotages().Length));
+                room.Tick(duration + 120d);
+                Assert.That(JsonUtility.ToJson(room.GimmickStats()), Is.EqualTo(JsonUtility.ToJson(ended)),
+                    "Reading it again after the round changes nothing.");
+
+                room.Begin("stats-rounds", new ulong[] { 10, 20, 30 }, duration + 120d, block);
+                LabGimmickStats fresh = room.GimmickStats();
+                Assert.That((fresh.round, fresh.total, fresh.swipeBlock, fresh.result), Is.EqualTo((2u, 0, 0, "Playing")));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(block); }
+        }
+
+        [Test]
+        public void CommonGimmicksWaitOutASwipeBlockAndNeverAddToTheBlockedPlayer()
         {
             var mix = MixConfig(3f, bomb: 1, block: 1, fox: 0, charm: 0);
             try
@@ -2838,7 +2919,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SabotageMixCharmsInAnyRoomAndSolo()
+        public void TheCharmFallsInAnyRoomAndSolo()
         {
             var mix = MixConfig(11f, bomb: 0, block: 0, fox: 0, charm: 1, rescueTaps: 3);
             try
@@ -2873,7 +2954,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SabotageMixDrawsTheSameSabotagesOnEveryScreenAndSkipsWeightZero()
+        public void GimmicksDrawTheSameOnEveryScreenAndSkipAChanceOfZero()
         {
             var mix = MixConfig(2f, bomb: 1, block: 1, fox: 1, charm: 0);
             try
@@ -2885,7 +2966,7 @@ namespace C6Lab.Tests
                 LabSabotage[] cast = room.DrainSabotages();
                 Assert.That(cast.Select(item => item.Kind).Distinct(), Is.EquivalentTo(new[]
                     { LabSabotageKind.GourdBomb, LabSabotageKind.SwipeBlock, LabSabotageKind.FoxFire }),
-                    "Every weighted sabotage comes up; the charm, weighted 0, never does.");
+                    "Every gimmick with a chance comes up; the charm, at 0%, never does.");
 
                 var again = new LabModel();
                 again.Begin("mix-same", ids, 0d, mix);
@@ -3173,7 +3254,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SabotageMixCharmsOneAtATimeAndNeverAddsToTheCharmedPlayer()
+        public void CharmsComeOneAtATimeAndNothingMoreFallsOnTheCharmedPlayer()
         {
             var mix = MixConfig(3f, bomb: 1, block: 0, fox: 0, charm: 1);
             try
@@ -3195,10 +3276,10 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GourdBombsReachEveryPlayerAndCanRepeatOnTheSamePlayer()
+        public void GourdBombsReachEveryPlayerButNeverTheSameOneTwiceInARow()
         {
             // The shortest interval (1 s) drops 180 bombs in a round, enough to see the spread.
-            var gourd = GourdConfig(1f, 1f);
+            var gourd = GourdConfig(1f);
             try
             {
                 var ids = new ulong[] { 10, 20, 30 };
@@ -3209,8 +3290,8 @@ namespace C6Lab.Tests
                 Assert.That(drops.Length, Is.EqualTo(180));
                 foreach (ulong id in ids)
                     Assert.That(drops.Count(drop => drop.Target == id), Is.InRange(35, 85), id.ToString());
-                Assert.That(drops.Zip(drops.Skip(1), (a, b) => a.Target == b.Target).Any(same => same), Is.True,
-                    "The same player may receive two bombs in a row.");
+                Assert.That(drops.Zip(drops.Skip(1), (a, b) => a.Target != b.Target).All(differs => differs), Is.True,
+                    "As with every gimmick group (#311), no one gets two in a row.");
                 Assert.That(drops.Min(drop => drop.Position.x), Is.LessThan(.35f));
                 Assert.That(drops.Max(drop => drop.Position.x), Is.GreaterThan(.65f));
                 Assert.That(drops.Select(drop => drop.BombId).Distinct().Count(), Is.EqualTo(180));
@@ -3227,7 +3308,7 @@ namespace C6Lab.Tests
         [Test]
         public void GourdBombLandsOnAFullBoardWithoutSpendingStamina()
         {
-            var gourd = GourdConfig(5f, 5f);
+            var gourd = GourdConfig(5f);
             try
             {
                 float[] values = gourd.CaptureDeveloperValues();
@@ -3251,10 +3332,10 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GourdBombsStopWhenTheMaximumIntervalIsZeroOrTheRoundIsOver()
+        public void GourdBombsStopWhenTheIntervalIsZeroOrTheRoundIsOver()
         {
             var off = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
-            var gourd = GourdConfig(20f, 30f);
+            var gourd = GourdConfig(20f);
             try
             {
                 var quiet = new LabModel();
@@ -3278,16 +3359,14 @@ namespace C6Lab.Tests
             }
         }
 
-        /// <summary>The gourd's swipe block every interval seconds for seconds long; bombs at bombMin..bombMax (0 = off).</summary>
-        private static LabConfig BlockConfig(float interval, float seconds, float bombGap, float bombMin = 0f, float bombMax = 0f)
+        /// <summary>Only the common group's swipe block (#311): every interval seconds, for seconds long.</summary>
+        private static LabConfig BlockConfig(float interval, float seconds)
         {
             LabConfig created = ConfigWith(1f, 50, 50, 0, 0, 0, 0);
             float[] values = created.CaptureDeveloperValues();
-            values[87] = bombMin;
-            values[88] = bombMax;
-            values[152] = interval;
             values[153] = seconds;
-            values[154] = bombGap;
+            values[205] = interval;
+            values[207] = 0f; // no gourd bombs
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
         }
@@ -3308,12 +3387,13 @@ namespace C6Lab.Tests
             return orb.id;
         }
 
-        private static LabConfig GourdConfig(float minimumSeconds, float maximumSeconds)
+        /// <summary>Only the common group's gourd bomb (#311), every interval seconds.</summary>
+        private static LabConfig GourdConfig(float interval)
         {
             LabConfig created = ConfigWith(10f, 50, 50, 0, 0, 0, 0);
             float[] values = created.CaptureDeveloperValues();
-            values[87] = minimumSeconds;
-            values[88] = maximumSeconds;
+            values[205] = interval;
+            values[208] = 0f; // no swipe blocks
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;
         }
@@ -3335,22 +3415,23 @@ namespace C6Lab.Tests
             return combined.id;
         }
 
+        /// <summary>
+        /// Both gimmick groups every interval seconds (#311): the common group draws a bomb against a swipe block, and the
+        /// unique group (the fox's, which the Lab scene borrows here) fox fire against a charm, by these weights turned into
+        /// percent; a group whose two weights are 0 is off.
+        /// </summary>
         private static LabConfig MixConfig(float interval, int bomb, int block, int fox, int charm, float charmWarning = 0f,
             int rescueTaps = 10)
         {
             LabConfig created = ConfigWith(1f, 50, 50, 0, 0, 0, 0);
             float[] values = created.CaptureDeveloperValues();
-            // Their own timers would drop a bomb and block a way every second; the mix stops both (#251).
-            values[87] = 1f;
-            values[88] = 1f;
-            values[152] = 1f;
             values[166] = 1f;
-            values[167] = interval;
-            values[168] = interval;
-            values[169] = bomb;
-            values[170] = block;
-            values[171] = fox;
-            values[172] = charm;
+            values[205] = bomb + block > 0 ? interval : 0f;
+            values[206] = fox + charm > 0 ? interval : 0f;
+            values[169] = Percent(bomb, block);
+            values[170] = 100f - values[169];
+            values[171] = Percent(fox, charm);
+            values[172] = 100f - values[171];
             values[177] = rescueTaps;
             // These checks time the charm itself; the warning before it (#305) has its own tests.
             values[204] = charmWarning;
@@ -3358,17 +3439,16 @@ namespace C6Lab.Tests
             return created;
         }
 
+        private static float Percent(int part, int other) => part + other > 0 ? Mathf.Round(100f * part / (part + other)) : 50f;
+
         private static LabConfig ConfigWith(float generateCost, params int[] chances)
         {
             var created = ScriptableObject.CreateInstance<LabConfig>();
             float[] values = created.CaptureDeveloperValues();
             values[5] = generateCost;
             values[74] = LabModel.MaximumParticipants;
-            // The gourd's sabotage bombs are off here; GourdConfig turns them on for their own tests.
-            values[87] = 0f;
-            values[88] = 0f;
-            // The gourd's swipe block is off too; BlockConfig turns it on for its own tests (#215).
-            values[152] = 0f;
+            // The gimmick groups (#311) are off here; GourdConfig, BlockConfig and MixConfig turn them on for their own tests.
+            values[205] = values[206] = 0f;
             for (int i = 0; i < chances.Length; i++) values[39 + i] = chances[i];
             Assert.That(created.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return created;

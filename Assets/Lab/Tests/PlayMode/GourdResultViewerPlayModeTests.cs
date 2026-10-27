@@ -75,7 +75,7 @@ namespace C6Lab.Tests
                 // Apply through the ordinary DEV form, including both independent shared Config toggles.
                 developer.Open();
                 float[] tuning = fixture.CaptureDeveloperValues();
-                Assert.That(tuning.Length, Is.EqualTo(205), "Both shared feature toggles must survive the ordinary DEV form.");
+                Assert.That(tuning.Length, Is.EqualTo(225), "Both shared feature toggles must survive the ordinary DEV form.");
                 for (int i = 0; i < tuning.Length; i++)
                     developer.valueInputs[i].text = tuning[i].ToString("R", CultureInfo.InvariantCulture);
                 developer.ApplyAndStart();
@@ -475,8 +475,7 @@ namespace C6Lab.Tests
             Set(values, "Throw Maximum World Speed", 18); Set(values, "Throw Gravity", 9.81f);
             Set(values, "Throw Power Exponent", 1); Set(values, "Throw Loft Offset (degrees)", 0);
             Set(values, "Throw Air Damping", 0);
-            Set(values, "Gourd Bomb Interval Min (seconds, 0 = off)", 0);
-            Set(values, "Gourd Bomb Interval Max (seconds, 0 = off)", 0);
+            Set(values, "Common Gimmick Interval (seconds, 0 = none)", 0);
             Assert.That(result.TryApplyDeveloperValues(values, out string error), Is.True, error);
             return result;
         }

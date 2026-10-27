@@ -75,7 +75,7 @@ namespace C6Lab.Tests
             values[39] = values[40] = 50f;
             for (int i = 41; i <= 44; i++) values[i] = 0f;
             values[51] = contactEnabled ? 1f : 0f;
-            values[87] = values[88] = values[152] = 0f;
+            values[205] = 0f; // no common gimmicks (#311)
             values[178] = 1f; values[179] = 1f; values[180] = 4f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             double began = Time.realtimeSinceStartupAsDouble - 2d;

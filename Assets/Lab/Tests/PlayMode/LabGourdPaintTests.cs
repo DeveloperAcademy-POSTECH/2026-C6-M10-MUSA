@@ -648,8 +648,7 @@ namespace C6Lab.Tests
             SetTuning(tuning, "Throw Loft Offset (degrees)", 0f);
             SetTuning(tuning, "Throw Air Damping", 0f);
             // The gourd's sabotage bombs would add unplanned orbs to the boards checked here.
-            SetTuning(tuning, "Gourd Bomb Interval Min (seconds, 0 = off)", 0f);
-            SetTuning(tuning, "Gourd Bomb Interval Max (seconds, 0 = off)", 0f);
+            SetTuning(tuning, "Common Gimmick Interval (seconds, 0 = none)", 0f);
             Assert.That(fixture.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             return fixture;
         }

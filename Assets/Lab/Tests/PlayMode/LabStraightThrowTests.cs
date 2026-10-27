@@ -271,8 +271,7 @@ namespace C6Lab.Tests
             SetTuning(tuning, "Spawn Minimum Speed (board widths/s)", 0f);
             SetTuning(tuning, "Spawn Maximum Speed (board widths/s)", 0f);
             SetTuning(tuning, "Drum Drift Speed (board widths/s)", 0f);
-            SetTuning(tuning, "Gourd Bomb Interval Min (seconds, 0 = off)", 0f);
-            SetTuning(tuning, "Gourd Bomb Interval Max (seconds, 0 = off)", 0f);
+            SetTuning(tuning, "Common Gimmick Interval (seconds, 0 = none)", 0f);
             tuning[104] = 0f;
             Assert.That(fixture.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             return fixture;
