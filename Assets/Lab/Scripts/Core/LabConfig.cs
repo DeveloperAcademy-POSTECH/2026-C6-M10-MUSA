@@ -360,9 +360,9 @@ namespace C6Lab
             LabDeveloperField.Toggle("Raw Streak Correction (0 off, 1 on)"),
             new LabDeveloperField("Opposite Chance After 2 Raw (%)", 0f, 100f, true),
             new LabDeveloperField("Maximum Consecutive Raw", 1f, 10f, true),
-            // 섬광 파훼 보상 (#329): 최대 횟수까지 이어서 흔든 사람 판에 황금알 구슬. 칠 면적은 도색 한 번의 상한(3배) 안이다.
-            new LabDeveloperField("섬광 황금알 수 (0 = 없음)", 0f, 6f, true),
-            new LabDeveloperField("황금알 칠 면적 (배)", 1f, 3f)
+            // 섬광 파훼 보상 (#329): 최대 횟수까지 이어서 흔든 사람 판에 오색구슬. 칠 면적은 도색 한 번의 상한(3배) 안이다.
+            new LabDeveloperField("섬광 오색구슬 수 (0 = 없음)", 0f, 6f, true),
+            new LabDeveloperField("오색구슬 칠 면적 (배)", 1f, 3f)
         });
 
         public const int YaguangTimelineFirstField = 211;
@@ -719,12 +719,10 @@ namespace C6Lab
         [SerializeField] private bool yaguangFlashShakeRelease = true;
         [Tooltip("눈부심을 풀려면 세게 흔들어야 하는 최대 횟수 (#330). 판의 구슬이 이보다 적으면 구슬 수만큼만 흔들면 된다. 기본 10번(범위 가운데).")]
         [SerializeField, Range(2, 18)] private int yaguangFlashShakeCount = 10;
-        [Tooltip("섬광 파훼 보상 (#329): 최대 흔들기 횟수까지 끊기지 않고 이어서 흔든 사람 판에 떨어지는 황금알 구슬 수. 0이면 보상 없음.")]
-        [SerializeField, Range(0, 6)] private int yaguangGoldenEggCount = 3;
-        [Tooltip("황금알로 박을 맞혔을 때 칠 면적 배율 (보통 구슬 = 1). 도색 한 번은 최대 3배까지라 다른 배율과 곱해도 3을 넘지 않는다.")]
-        [SerializeField, Range(1f, 3f)] private float yaguangGoldenEggPaintScale = 2f;
-        [Tooltip("황금알이 박에 칠하는 금빛")]
-        [SerializeField] private Color yaguangGoldenEggColor = new Color(1f, .78f, .16f, 1f);
+        [Tooltip("섬광 파훼 보상 (#329): 최대 흔들기 횟수까지 끊기지 않고 이어서 흔든 사람 판에 떨어지는 오색구슬 수. 0이면 보상 없음.")]
+        [SerializeField, Range(0, 6)] private int yaguangFiveColorOrbCount = 3;
+        [Tooltip("오색구슬로 박을 맞혔을 때 칠 면적 배율 (보통 구슬 = 1). 다섯 원소 색 얼룩을 합친 넓이다. 도색 한 번은 최대 3배까지라 다른 배율과 곱해도 3을 넘지 않는다.")]
+        [SerializeField, Range(1f, 3f)] private float yaguangFiveColorOrbPaintScale = 2f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -863,9 +861,8 @@ namespace C6Lab
         public bool RawStreakCorrectionEnabled => rawStreakCorrectionEnabled;
         public int RawStreakOppositeChancePercent => Mathf.Clamp(rawStreakOppositeChancePercent, 0, 100);
         public int RawStreakMaximum => Mathf.Clamp(rawStreakMaximum, 1, 10);
-        public int YaguangGoldenEggCount => Mathf.Clamp(yaguangGoldenEggCount, 0, 6);
-        public float YaguangGoldenEggPaintScale => Mathf.Clamp(Finite(yaguangGoldenEggPaintScale, 2f), 1f, 3f);
-        public Color YaguangGoldenEggColor => new Color(yaguangGoldenEggColor.r, yaguangGoldenEggColor.g, yaguangGoldenEggColor.b, 1f);
+        public int YaguangFiveColorOrbCount => Mathf.Clamp(yaguangFiveColorOrbCount, 0, 6);
+        public float YaguangFiveColorOrbPaintScale => Mathf.Clamp(Finite(yaguangFiveColorOrbPaintScale, 2f), 1f, 3f);
         /// <summary>
         /// 섬광이 시간으로 풀리기까지의 초 (#329). 흔들어 풀기가 켜져 있으면 섬광은 소모성 방해라 시간으로 풀리지 않는다(무한).
         /// 꺼져 있으면 `섬광 눈부심 (초)`. 다음 섬광 예약 같은 일정 계산은 언제나 `YaguangFlashGlareSeconds`를 쓴다.
@@ -1261,7 +1258,7 @@ namespace C6Lab
                 YaguangTimelineCommonSeconds(0), YaguangTimelineCommonSeconds(1),
                 YaguangTimelineCommonSeconds(2), YaguangTimelineCommonSeconds(3),
                 RawStreakCorrectionEnabled ? 1f : 0f, RawStreakOppositeChancePercent, RawStreakMaximum,
-                YaguangGoldenEggCount, YaguangGoldenEggPaintScale
+                YaguangFiveColorOrbCount, YaguangFiveColorOrbPaintScale
             };
         }
 
@@ -1532,8 +1529,8 @@ namespace C6Lab
             rawStreakCorrectionEnabled = values[225] >= .5f;
             rawStreakOppositeChancePercent = (int)values[226];
             rawStreakMaximum = (int)values[227];
-            yaguangGoldenEggCount = (int)values[228];
-            yaguangGoldenEggPaintScale = values[229];
+            yaguangFiveColorOrbCount = (int)values[228];
+            yaguangFiveColorOrbPaintScale = values[229];
             error = string.Empty;
             return true;
         }

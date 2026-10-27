@@ -61,7 +61,7 @@ namespace C6Lab
         [SerializeField, Range(1f, 2f)] private float revealPopScale = 1.3f;
         [Tooltip("색을 되찾은 구슬이 제 크기로 돌아오는 시간 (초)")]
         [SerializeField, Range(.05f, .6f)] private float revealPopSeconds = .18f;
-        [Tooltip("섬광 파훼 보상 (#329): 풀린 뒤 황금알을 노리고 이어서 흔들 때, 다음 흔들기까지 이 초가 넘으면 끊긴 것으로 보고 기회가 끝난다.")]
+        [Tooltip("섬광 파훼 보상 (#329): 풀린 뒤 오색구슬을 노리고 이어서 흔들 때, 다음 흔들기까지 이 초가 넘으면 끊긴 것으로 보고 기회가 끝난다.")]
         [SerializeField, Range(.5f, 4f)] private float bonusGapSeconds = 1.5f;
         [Tooltip("흔들라는 안내 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 shakeCueAnchor = new Vector2(.5f, .42f);
@@ -95,9 +95,9 @@ namespace C6Lab
         // 섬광 파훼 보상 (#329): 풀린 뒤에도 이어서 흔드는 중인지, 끊겼는지, 마지막으로 흔든 시각, 보상 요청 시각.
         private bool bonusLost, bonusShowing;
         private float lastShakeAt = float.NegativeInfinity, bonusSentAt = float.NegativeInfinity;
-        /// <summary>풀린 뒤 황금알을 노리고 이어서 흔드는 중이라 안내가 계속 보이는지 (#329)</summary>
+        /// <summary>풀린 뒤 오색구슬을 노리고 이어서 흔드는 중이라 안내가 계속 보이는지 (#329)</summary>
         public bool BonusShakeActive => bonusShowing;
-        /// <summary>이어서 흔들기가 끊겨 이번 섬광의 황금알 기회가 끝났는지 (#329)</summary>
+        /// <summary>이어서 흔들기가 끊겨 이번 섬광의 오색구슬 기회가 끝났는지 (#329)</summary>
         public bool BonusLost => bonusLost;
         private RectTransform shakeCue, shakeGaugeFill, shakePhone;
         private Text shakeLabel;
@@ -209,7 +209,7 @@ namespace C6Lab
             }
             burstAlpha = Mathf.Max(burstAlpha, veilAlpha * veilGlare);
             int count = showCountdown && !snapshot.paused ? CountdownAt(snapshot, now, me) : 0;
-            // 풀린 뒤에도 황금알을 노리고 이어서 흔드는 동안은 안내(폰·게이지·횟수)를 계속 보인다 (#329).
+            // 풀린 뒤에도 오색구슬을 노리고 이어서 흔드는 동안은 안내(폰·게이지·횟수)를 계속 보인다 (#329).
             bool cue = (myGlare && shakeProgress < 1f || bonusShowing) && !snapshot.paused;
             if (warning <= 0f && burstAlpha <= 0f && count <= 0 && !cue)
             {
@@ -255,11 +255,11 @@ namespace C6Lab
             shakeCounter.MinGap = shakeMinGap;
             bool live = !snapshot.paused && network != null && !network.GameStartHeld && network.IsConnected;
             bool released = !myGlare && network != null && snapshot.FlashReleasedAt(network.LocalPlayerId) >= 0d;
-            bool golden = network != null && network.config != null && network.config.YaguangGoldenEggCount > 0;
+            bool fiveColor = network != null && network.config != null && network.config.YaguangFiveColorOrbCount > 0;
             // #329: 풀린 뒤에는 끊기지 않고 이어서 흔드는 동안만 계속 센다. 다음 흔들기까지 bonusGapSeconds를 넘기면 끝.
-            if (released && !bonusLost && (!golden || shakeCounter.Count >= maxShakes
+            if (released && !bonusLost && (!fiveColor || shakeCounter.Count >= maxShakes
                 || Time.unscaledTime - lastShakeAt > bonusGapSeconds)) bonusLost = shakeCounter.Count < maxShakes;
-            bonusShowing = released && golden && !bonusLost && shakeCounter.Count < maxShakes;
+            bonusShowing = released && fiveColor && !bonusLost && shakeCounter.Count < maxShakes;
             if (live && (myGlare || bonusShowing))
             {
                 if (shakeCounter.Count < maxShakes && ReadShake())
@@ -275,10 +275,10 @@ namespace C6Lab
                     shakeSentAt = Time.unscaledTime;
             }
             else RevealShaken(maxShakes);
-            // 최대 횟수까지 이어서 흔들었다: 황금알을 받을 때까지 같은 간격으로 다시 알린다 (#329).
-            if (live && golden && !bonusLost && shakeCounter.Count >= maxShakes && (myGlare || released)
+            // 최대 횟수까지 이어서 흔들었다: 오색구슬을 받을 때까지 같은 간격으로 다시 알린다 (#329).
+            if (live && fiveColor && !bonusLost && shakeCounter.Count >= maxShakes && (myGlare || released)
                 && !BonusConfirmed(snapshot) && Time.unscaledTime - bonusSentAt >= ShakeRetrySeconds
-                && network.RequestFlashGoldenBonus())
+                && network.RequestFlashFiveColorBonus())
                 bonusSentAt = Time.unscaledTime;
             if (ShakesDone(maxShakes)) return 1f;
             if (boundBoard == null) return ShakeProgress(shakeCounter.Count, maxShakes);
@@ -286,7 +286,7 @@ namespace C6Lab
             return ShakeProgress(count, count + Mathf.Min(boundBoard.FlashWhiteCount, maxShakes - count));
         }
 
-        /// <summary>이번 섬광의 황금알을 Host가 이미 줬는지 (#329)</summary>
+        /// <summary>이번 섬광의 오색구슬을 Host가 이미 줬는지 (#329)</summary>
         private bool BonusConfirmed(LabSnapshot snapshot)
         {
             if (snapshot.players == null || network == null) return false;

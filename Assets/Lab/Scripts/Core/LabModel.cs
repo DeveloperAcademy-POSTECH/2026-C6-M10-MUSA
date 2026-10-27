@@ -628,18 +628,19 @@ namespace C6Lab
             attacker.damageTotal = (int)Math.Min(int.MaxValue,
                 (long)attacker.damageTotal + attackValue);
 
-            LastHitGolden = orb.golden;
+            LastHitFiveColor = orb.fiveColor;
             if (teamMode)
                 ConfirmTeamHit(attacker, element, paintDirection, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale, now);
             else
             {
                 float share = (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale;
-                // 황금알 (#329): 금빛으로, 정해 둔 배율만큼 넓게 칠한다. 도색 한 번은 최대 3배다.
-                if (orb.golden) share = Mathf.Min(3f, share * rules.GoldenEggPaintScale);
-                bool paints = orb.golden || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
-                if (paints && paintSurface.RegisterHit(paintDirection, orb.golden ? rules.GoldenEggColor : PaintColorFor(element),
-                        attacker.id, attacker.seat + 1, share)
-                    && paintSurface.IsComplete)
+                // 오색구슬 (#329): 다섯 원소 색 얼룩으로, 정해 둔 배율만큼 넓게 칠한다. 도색 한 번은 최대 3배다.
+                if (orb.fiveColor) share = Mathf.Min(3f, share * rules.FiveColorOrbPaintScale);
+                bool paints = orb.fiveColor || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
+                bool painted = paints && (orb.fiveColor
+                    ? PaintFiveColors(paintDirection, attacker, share)
+                    : paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, share));
+                if (painted && paintSurface.IsComplete)
                 {
                     phase = LabPhase.Victory;
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
@@ -1889,10 +1890,9 @@ namespace C6Lab
             public readonly bool FlashShakeRelease;
             /// <summary>섬광이 시간으로 풀리는 초 (#329). 흔들어 풀기가 켜져 있으면 무한(소모성 방해).</summary>
             public readonly float FlashGlareLimitSeconds;
-            /// <summary>섬광 파훼 보상 (#329): 황금알 수와 칠 면적·색</summary>
-            public readonly int GoldenEggCount;
-            public readonly float GoldenEggPaintScale;
-            public readonly Color GoldenEggColor;
+            /// <summary>섬광 파훼 보상 (#329): 오색구슬 수와 칠 면적</summary>
+            public readonly int FiveColorOrbCount;
+            public readonly float FiveColorOrbPaintScale;
 
             public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode)
             {
@@ -1971,9 +1971,8 @@ namespace C6Lab
                 FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
                 FlashShakeRelease = config.YaguangFlashShakeRelease;
                 FlashGlareLimitSeconds = config.YaguangFlashGlareLimitSeconds;
-                GoldenEggCount = config.YaguangGoldenEggCount;
-                GoldenEggPaintScale = config.YaguangGoldenEggPaintScale;
-                GoldenEggColor = config.YaguangGoldenEggColor;
+                FiveColorOrbCount = config.YaguangFiveColorOrbCount;
+                FiveColorOrbPaintScale = config.YaguangFiveColorOrbPaintScale;
                 // One stage policy feeds the shared scheduler; there is no second timeline execution loop.
                 YaguangTimeline = stageYokai == LabStageYokai.Yaguang && !teamMode;
                 YaguangTimelineEndSeconds = YaguangTimeline ? config.YaguangTimelineSabotageEndSeconds : 0d;

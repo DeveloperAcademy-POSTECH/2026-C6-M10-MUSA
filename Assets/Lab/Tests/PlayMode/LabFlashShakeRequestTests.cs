@@ -168,7 +168,7 @@ namespace C6Lab.Tests
                 JsonUtility.FromJsonOverwrite("{\"yaguangFlashEnabled\":true,\"yaguangFlashTargetOne\":false,"
                     + "\"yaguangFlashFirstStartSeconds\":5,\"yaguangFlashWarningSeconds\":0,\"yaguangFlashGlareSeconds\":12,"
                     + "\"yaguangFlashRecoverySeconds\":1,\"yaguangFlashShakeRelease\":true,\"gourdColorComboEnabled\":false,"
-                    + "\"yaguangGoldenEggCount\":0}", config);
+                    + "\"yaguangFiveColorOrbCount\":0}", config);
                 managerType = typeof(LabNetwork).GetField("manager").FieldType;
                 manager = root.AddComponent(managerType);
                 Network = root.AddComponent<LabNetwork>();

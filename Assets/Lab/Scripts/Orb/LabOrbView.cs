@@ -118,6 +118,11 @@ namespace C6Lab
         public void SetGlare(float amount)
         {
             glare = kind.IsDrum() || float.IsNaN(amount) ? 0f : Mathf.Clamp01(amount);
+            if (fiveColor != null && fiveColor.Shown)
+            {
+                fiveColor.SetRadius(FiveColorArtRadius);
+                fiveColor.SetGlare(glare);
+            }
             if (glare <= 0f)
             {
                 if (glareCover != null && glareCover.gameObject.activeSelf) glareCover.gameObject.SetActive(false);
@@ -401,23 +406,28 @@ namespace C6Lab
 
         public bool FeverShown => rainbow != null && rainbow.Visible;
 
-        private LabGoldenSparkle golden;
+        private LabFiveColorSparkle fiveColor;
 
-        /// <summary>섬광 파훼 보상 황금알 (#329): 반짝이는 황금알 그림을 얹는다. 표시만 바뀐다.</summary>
-        public void SetGolden(bool shown)
+        /// <summary>
+        /// 섬광 파훼 보상 오색구슬 (#329): 다섯 색 조각 그림을 얹는다. 표시만 바뀐다.
+        /// 크기는 결합 구슬 그림과 같고 콤보 배율(#257)도 따라간다(판이 매 프레임 부르는 SetGlare에서 맞춘다).
+        /// </summary>
+        public void SetFiveColor(bool shown)
         {
-            if (golden == null)
+            if (fiveColor == null)
             {
                 if (!shown) return;
-                golden = LabGoldenSparkle.AttachEgg(transform, visualRadius, false);
+                fiveColor = LabFiveColorSparkle.AttachArt(transform, FiveColorArtRadius, false);
                 return;
             }
-            golden.SetRadius(visualRadius);
-            golden.Show(shown);
+            fiveColor.SetRadius(FiveColorArtRadius);
+            fiveColor.Show(shown);
         }
 
-        /// <summary>황금알 그림이 보이는지 (#329)</summary>
-        public bool GoldenShown => golden != null && golden.Shown;
+        private float FiveColorArtRadius => visualRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * comboScale;
+
+        /// <summary>오색구슬 그림이 보이는지 (#329)</summary>
+        public bool FiveColorShown => fiveColor != null && fiveColor.Shown;
 
         /// <summary>Seconds the Host says this orb still burns after a blast flung it (#213); 0 or less lets the fire die.</summary>
         public void SetBurn(float secondsLeft)

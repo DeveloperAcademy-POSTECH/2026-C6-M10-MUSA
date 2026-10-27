@@ -27,9 +27,9 @@ namespace C6Lab
 
         /// <summary>
         /// 이 기기 플레이어가 풀린 뒤에도 끊기지 않고 최대 횟수까지 흔들었다고 Host에 알린다 (#329). Host가 이번 섬광에서
-        /// 한 번만 황금알을 준다. 전투 중이 아니면 보내지 않는다.
+        /// 한 번만 오색구슬을 준다. 전투 중이 아니면 보내지 않는다.
         /// </summary>
-        public bool RequestFlashGoldenBonus()
+        public bool RequestFlashFiveColorBonus()
         {
             if (!IsConnected || !CanProcessBattleActions || latest == null
                 || latest.phase != LabPhase.Playing || latest.paused || latest.flashCount == 0) return false;
@@ -38,32 +38,31 @@ namespace C6Lab
             return true;
         }
 
-        /// <summary>내 판에 황금알이 새로 생겼다 (#329). 받은 개수. 진동·소리가 듣는다.</summary>
-        public event System.Action<int> GoldenEggsReceived;
-        /// <summary>내가 던진 황금알이 박에 맞았다 (#329)</summary>
-        public event System.Action LocalGoldenHit;
-        private readonly System.Collections.Generic.HashSet<string> knownGoldenEggs =
+        /// <summary>내 판에 오색구슬이 새로 생겼다 (#329). 받은 개수. 진동·소리가 듣는다.</summary>
+        public event System.Action<int> FiveColorOrbsReceived;
+        /// <summary>내가 던진 오색구슬이 박에 맞았다 (#329)</summary>
+        public event System.Action LocalFiveColorHit;
+        private readonly System.Collections.Generic.HashSet<string> knownFiveColorOrbs =
             new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
 
-        /// <summary>스냅샷의 내 판에서 처음 보는 황금알 수를 세어, 있으면 한 번 알린다.</summary>
-        private void NoticeGoldenEggs(LabSnapshot snapshot)
+        /// <summary>스냅샷의 내 판에서 처음 보는 오색구슬 수를 세어, 있으면 한 번 알린다.</summary>
+        private void NoticeFiveColorOrbs(LabSnapshot snapshot)
         {
             if (snapshot?.orbs == null) return;
             int fresh = 0;
             foreach (LabOrbState orb in snapshot.orbs)
-                if (orb != null && orb.golden && orb.owner == LocalPlayerId && knownGoldenEggs.Add(orb.id)
+                if (orb != null && orb.fiveColor && orb.owner == LocalPlayerId && knownFiveColorOrbs.Add(orb.id)
                     && orb.originOwner == LocalPlayerId && snapshot.serverTime - orb.createdAt < 2d) fresh++;
-            if (fresh > 0) GoldenEggsReceived?.Invoke(fresh);
+            if (fresh > 0) FiveColorOrbsReceived?.Invoke(fresh);
         }
 
-        /// <summary>황금알 명중 (#329): 맞은 자리에 금빛 반짝이를 터뜨리고, 던진 사람이면 진동한다.</summary>
-        private void PresentGoldenHit(Vector3 targetLocalPoint, ulong owner)
+        /// <summary>오색구슬 명중 (#329): 맞은 자리에 다섯 색 별가루를 터뜨리고, 던진 사람이면 진동한다.</summary>
+        private void PresentFiveColorHit(Vector3 targetLocalPoint, ulong owner)
         {
             if (target == null) return;
             Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
-            LabGoldenSparkle.Burst(hitbox.TransformPoint(targetLocalPoint), config != null ? config.OrbRadius : .3f,
-                config != null ? config.YaguangGoldenEggColor : new Color(1f, .78f, .16f));
-            if (owner == LocalPlayerId) LocalGoldenHit?.Invoke();
+            LabFiveColorSparkle.Burst(hitbox.TransformPoint(targetLocalPoint), config != null ? config.OrbRadius : .3f);
+            if (owner == LocalPlayerId) LocalFiveColorHit?.Invoke();
         }
     }
 }
