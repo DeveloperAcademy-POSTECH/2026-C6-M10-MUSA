@@ -13,6 +13,8 @@ namespace C6Lab
     /// 그 사람이 얼마나 채웠는지가 같은 말풍선(누를 수 없음)과 체크로 실시간으로 보인다. 두 말풍선은 이름표 위에 좌우
     /// 대칭으로 뜬다 (북 미니맵은 그 위로 올려 두었다). 둘이 하는 판에서는 상대가 양쪽 이웃이라 양쪽 이름표에 다 뜨고
     /// 어느 쪽을 눌러도 된다. 말풍선 밖의 터치는 막지 않는다.
+    /// 안내 (#328): 아직 다 누르지 않은 양옆 사람 화면에는 말풍선 옆에서 손가락이 말풍선을 콕콕 누르고, 박 위에
+    /// "옆 사람이 매혹에 걸렸다! 말풍선을 빠르게 눌러서 풀어주자!"가 뜬다. 내가 다 눌러 체크가 뜨면 둘 다 사라진다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabCharmBubbles : MonoBehaviour
@@ -22,6 +24,12 @@ namespace C6Lab
         public const string WokenPath = "Sabotage/CharmWoken";
         public const string FacePath = "Sabotage/CharmFace";
         public const string CheckPath = "Sabotage/CharmCheck";
+        public const string LeftHandPath = "Sabotage/CharmHandLeft";
+        public const string RightHandPath = "Sabotage/CharmHandRight";
+        public const string HelperGuideText = "옆 사람이 매혹에 걸렸다!\n말풍선을 빠르게 눌러서 풀어주자!";
+        // 손가락 (#328): 말풍선 안쪽 옆에서 말풍선을 가리키고, 한 번에 두 번씩 콕콕 누른다 (말풍선 크기 비율·초·픽셀).
+        private const float HandWidthScale = .9f, HandOverlap = .12f, HandDrop = .05f;
+        private const float PokeCycleSeconds = .9f, PokeSeconds = .2f, PokeGap = .27f, PokePixels = 9f;
         // 하트 눈 얼굴이 빈 말풍선 안에 앉는 자리 (말풍선 크기 비율, 아래가 0). 오른쪽 말풍선은 좌우 반전 그림이다.
         private static readonly Vector2 LeftFaceMin = new Vector2(.267f, .216f), LeftFaceMax = new Vector2(.736f, .683f);
         private static readonly Vector2 RightFaceMin = new Vector2(.264f, .216f), RightFaceMax = new Vector2(.733f, .683f);
@@ -64,6 +72,8 @@ namespace C6Lab
             public Image FaceImage;
             public RectTransform Check;
             public Image CheckImage;
+            public RectTransform Hand;
+            public Image HandImage;
             public float CheckAge = -1f;
             /// <summary>The charmed player's own screen: this side shows how far the player beside has tapped (#305).</summary>
             public bool OwnView;
@@ -89,6 +99,9 @@ namespace C6Lab
         // This screen's own taps on the current charm (#305): shown at once, before the Host's count catches up.
         private int localTaps;
         private double localTapsCharmAt = double.NaN;
+        private LabGuideText guide;
+        // This screen still has to tap a bubble beside it (#328): the hand and the guide show.
+        private bool helperWaiting;
 
         /// <summary>A charm is on the player beside this screen's player on that side.</summary>
         public bool LeftShowing => left.Showing && Visible(left.Bubble);
@@ -110,6 +123,14 @@ namespace C6Lab
         public bool RightCheckShowing => Visible(right.Check);
         /// <summary>That side shows the charmed player's own screen: the progress of the player beside, not to be tapped.</summary>
         public bool OwnView(bool rightSide) => (rightSide ? right : left).OwnView;
+        /// <summary>The poking hand beside that side's bubble (#328).</summary>
+        public bool LeftHandShowing => Visible(left.Hand);
+        public bool RightHandShowing => Visible(right.Hand);
+        public RectTransform LeftHand => left.Hand;
+        public RectTransform RightHand => right.Hand;
+        /// <summary>The guide above the gourd telling the players beside to tap (#328).</summary>
+        public bool GuideShowing => guide != null && guide.Showing;
+        public string GuideShown => guide != null ? guide.Shown : string.Empty;
         /// <summary>Wake-up taps this screen sent.</summary>
         public int TapsSent { get; private set; }
 
@@ -142,6 +163,7 @@ namespace C6Lab
             {
                 Reset(left);
                 Reset(right);
+                guide?.Draw(false, null);
                 return;
             }
             if (!EnsureLayer()) return;
@@ -153,8 +175,10 @@ namespace C6Lab
             CharmedSides(snapshot, localId, now, out bool onLeft, out bool onRight, out bool ownView,
                 out ulong leftHelper, out ulong rightHelper);
             bobPhase = Mathf.Repeat(bobPhase + Time.deltaTime * BobHz, 1f);
+            helperWaiting = false;
             Step(left, onLeft, snapshot.charmedPlayer, ownView, snapshot.CharmTapsBy(leftHelper), rescueTaps);
             Step(right, onRight, snapshot.charmedPlayer, ownView, snapshot.CharmTapsBy(rightHelper), rescueTaps);
+            guide.Draw(helperWaiting, HelperGuideText);
             layer.SetAsLastSibling();
         }
 
@@ -248,6 +272,8 @@ namespace C6Lab
                 side.FillShown = Mathf.MoveTowards(side.FillShown, side.FillTarget, FillRisePerSecond * Time.deltaTime);
                 side.Fill.gameObject.SetActive(rescueTaps > 0 && side.FillShown > 0f);
                 DrawCheck(side, done);
+                DrawHand(side, tappable && !done);
+                helperWaiting |= tappable && !done;
                 side.Fill.anchorMax = new Vector2(1f, Mathf.Lerp(FillBottom, FillTop, side.FillShown));
                 side.FillImage.color = WakeFillColor;
                 float pulse = 1f;
@@ -260,6 +286,7 @@ namespace C6Lab
                 side.Bubble.localScale = Vector3.one * pulse;
                 return;
             }
+            DrawHand(side, false);
             if (side.ReleaseAge >= 0f && badge)
             {
                 side.ReleaseAge += Time.deltaTime;
@@ -355,8 +382,33 @@ namespace C6Lab
             side.Check.localScale = Vector3.one * pop;
         }
 
+        // 손가락 (#328): 말풍선 안쪽 옆에서 말풍선을 가리키며 콕콕 두 번씩 누른다. 말풍선과 함께 살랑거린다.
+        private void DrawHand(Side side, bool shown)
+        {
+            shown &= side.Hand != null && side.HandImage.sprite != null;
+            if (side.Hand == null) return;
+            side.Hand.gameObject.SetActive(shown);
+            if (!shown) return;
+            Vector2 size = side.Hand.sizeDelta;
+            // The hand stands on the bubble's inner side and points at it: rightward toward a bubble on the right.
+            float toward = side.Right ? 1f : -1f;
+            float t = Mathf.Repeat(Time.time / PokeCycleSeconds, 1f);
+            float poke = Poke(t, 0f) + Poke(t, PokeGap);
+            float reach = bubbleSize * .5f + size.x * (.5f - HandOverlap);
+            Vector2 center = side.BubbleCenter + new Vector2(-toward * reach, -HandDrop * bubbleSize);
+            center = KeepOnScreen(center, -size * .5f, size * .5f);
+            side.Hand.anchoredPosition = center + new Vector2(toward * PokePixels * poke, 0f);
+        }
+
+        private static float Poke(float t, float start)
+        {
+            float u = (t - start) / PokeSeconds;
+            return u > 0f && u < 1f ? Mathf.Sin(u * Mathf.PI) : 0f;
+        }
+
         private void Reset(Side side)
         {
+            if (side.Hand != null) side.Hand.gameObject.SetActive(false);
             side.Showing = side.WokenEnd = false;
             side.PulseAge = side.ReleaseAge = -1f;
             if (side.Bubble != null) side.Bubble.gameObject.SetActive(false);
@@ -392,6 +444,7 @@ namespace C6Lab
             layer.offsetMin = layer.offsetMax = Vector2.zero;
             Build(left, Resources.Load<Sprite>(LeftBubblePath), LeftTail);
             Build(right, Resources.Load<Sprite>(RightBubblePath), RightTail);
+            guide = LabGuideText.Create(layer, LabGuideText.FontOf(canvas), "Charm Helper Guide");
             return true;
         }
 
@@ -445,6 +498,18 @@ namespace C6Lab
             side.WokenImage.preserveAspect = true;
             side.WokenImage.raycastTarget = false;
             side.Woken.gameObject.SetActive(false);
+
+            // The hand points at the bubble from its inner side (#328): left-pointing beside the left bubble.
+            Sprite hand = Resources.Load<Sprite>(side.Right ? RightHandPath : LeftHandPath);
+            side.Hand = NewRect(side.Right ? "Charm Hand Right" : "Charm Hand Left", layer);
+            float handWidth = bubbleSize * HandWidthScale;
+            float aspect = hand != null && hand.rect.width > 0f ? hand.rect.height / hand.rect.width : .5f;
+            side.Hand.sizeDelta = new Vector2(handWidth, handWidth * aspect);
+            side.HandImage = side.Hand.gameObject.AddComponent<Image>();
+            side.HandImage.sprite = hand;
+            side.HandImage.preserveAspect = true;
+            side.HandImage.raycastTarget = false;
+            side.Hand.gameObject.SetActive(false);
         }
 
         private static bool Visible(RectTransform rect) => rect != null && rect.gameObject.activeInHierarchy;

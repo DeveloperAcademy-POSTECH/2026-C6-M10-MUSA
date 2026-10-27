@@ -853,6 +853,7 @@ namespace C6Lab.Tests
                 Assert.That(alert.Label, Is.EqualTo("♥"));
                 yield return null;
                 Assert.That(hud.WarningShowing, Is.False, "The warning goes when the charm starts.");
+                Assert.That(hud.WaitShowing, Is.False, "Solo no one beside can wake them, so they are not told to wait (#328).");
                 Assert.That(hud.GaugeVisible, Is.True, "The time left shows on the gauge.");
                 Assert.That(hud.GaugeFill, Is.InRange(.01f, 1f));
                 var minimap = UnityEngine.Object.FindAnyObjectByType<LabDrumMinimap>();

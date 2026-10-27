@@ -1417,7 +1417,8 @@ namespace C6Lab.Tests
         public void TheCharmBubblesAndSurprisedBubbleImportAsSprites()
         {
             foreach (string path in new[] { LabCharmBubbles.LeftBubblePath, LabCharmBubbles.RightBubblePath,
-                LabCharmBubbles.WokenPath, LabCharmBubbles.FacePath, LabCharmBubbles.CheckPath })
+                LabCharmBubbles.WokenPath, LabCharmBubbles.FacePath, LabCharmBubbles.CheckPath,
+                LabCharmBubbles.LeftHandPath, LabCharmBubbles.RightHandPath })
                 Assert.That(Resources.Load<Sprite>(path), Is.Not.Null,
                     "Assets/Lab/Resources/" + path + ".png imports as a Sprite through LabSabotageArtImporter (#251).");
         }
