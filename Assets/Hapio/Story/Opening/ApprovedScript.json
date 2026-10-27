@@ -1,0 +1,273 @@
+{
+  "frames": [
+    {
+      "number": 1,
+      "pages": [
+        {
+          "speaker": "",
+          "dialogue": "백 년에 한 번 열리는 대제사.\n이제 일주일밖에 남지 않았다.",
+          "seconds": 5.05
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 2,
+      "pages": [
+        {
+          "speaker": "사부님",
+          "dialogue": "이레 뒤에 돌아올 테니,\n수장고를 깨끗이 청소해 놓거라!",
+          "seconds": 4.8999999999999995
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 3,
+      "pages": [
+        {
+          "speaker": "사부님",
+          "dialogue": "특히 안쪽 선반에 있는 물건은\n절대로 건드리지 말거라.",
+          "seconds": 4.75
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 4,
+      "pages": [
+        {
+          "speaker": "불이",
+          "dialogue": "어휴~ 걱정 마세요!\n청소쯤이야 금방 끝내죠!",
+          "seconds": 4.3
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 5,
+      "pages": [
+        {
+          "speaker": "",
+          "dialogue": "그렇게 사부님들은\n구름을 타고 떠나셨다.",
+          "seconds": 4.0
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 6,
+      "pages": [
+        {
+          "speaker": "만복이",
+          "dialogue": "휴우… 이제 이 많은 걸\n우리끼리 다 치워야 하는 거야?",
+          "seconds": 4.6
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 7,
+      "pages": [
+        {
+          "speaker": "만복이",
+          "dialogue": "치워도 치워도 끝이 없잖아…\n벌써 배고픈데…",
+          "seconds": 4.15
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 8,
+      "pages": [
+        {
+          "speaker": "불이",
+          "dialogue": "으으 귀찮아... 얘들아 그냥\n도술로 한 번에 치워버릴까?",
+          "seconds": 5.05
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 9,
+      "pages": [
+        {
+          "speaker": "금옥이",
+          "dialogue": "그 주문 아직 안 배웠잖아!\n멋대로 쓰면 안 돼!",
+          "seconds": 4.15
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 10,
+      "pages": [
+        {
+          "speaker": "불이",
+          "dialogue": "에이, 괜찮아 괜찮아~\n자, 깨끗해져라~! 청! 정! 무! 진!",
+          "seconds": 5.35
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 11,
+      "pages": [
+        {
+          "speaker": "불이",
+          "dialogue": "오오! 봤지?\n역시 나만 믿으라니까!",
+          "seconds": 3.7
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 12,
+      "pages": [
+        {
+          "speaker": "불이",
+          "dialogue": "어… 어라?\n왜 멈추질 않는 거야?!",
+          "seconds": 3.55
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 13,
+      "pages": [
+        {
+          "speaker": "",
+          "dialogue": "",
+          "seconds": 2.7
+        }
+      ],
+      "direction": "효과음: 덜컹… 덜컹… (음원 미연결, 대사창 없음)"
+    },
+    {
+      "number": 14,
+      "pages": [
+        {
+          "speaker": "",
+          "dialogue": "",
+          "seconds": 2.7
+        }
+      ],
+      "direction": "화면 효과음: 와장창!! (대사창 없음)"
+    },
+    {
+      "number": 15,
+      "pages": [
+        {
+          "speaker": "만복이",
+          "dialogue": "으아아아!!\n우리 이제 어떡해?!",
+          "seconds": 3.55
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 16,
+      "pages": [
+        {
+          "speaker": "금옥이",
+          "dialogue": "설마… 저게 요괴를 봉인해 둔 박이야?\n그럼 요괴들이 풀려난 거잖아!",
+          "seconds": 5.6499999999999995
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 17,
+      "pages": [
+        {
+          "speaker": "불이",
+          "dialogue": "그냥… 다시 붙이면 안 될까…?",
+          "seconds": 3.25
+        },
+        {
+          "speaker": "금옥이",
+          "dialogue": "되겠냐.",
+          "seconds": 1.3
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 18,
+      "pages": [
+        {
+          "speaker": "묵이",
+          "dialogue": "얘들아.\n잠깐, 여기 좀 봐.",
+          "seconds": 3.0999999999999996
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 19,
+      "pages": [
+        {
+          "speaker": "금옥이",
+          "dialogue": "여기 임시 봉인박 사용법이 적혀 있어!\n이 사태를 해결할 방법이 있을지도 몰라!",
+          "seconds": 6.25
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 20,
+      "pages": [
+        {
+          "speaker": "만복이",
+          "dialogue": "어? 이 구슬들은 뭐지?\n검은 것도 있고, 하얀 것도 있네?",
+          "seconds": 4.8999999999999995
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 21,
+      "pages": [
+        {
+          "speaker": "솔이",
+          "dialogue": "잠깐! 음구슬과 양구슬을 합치면…\n오행구슬을 만들 수 있겠어!",
+          "seconds": 5.35
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 22,
+      "pages": [
+        {
+          "speaker": "솔이",
+          "dialogue": "됐다!\n이게 바로 오행구슬이구나!",
+          "seconds": 3.55
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 23,
+      "pages": [
+        {
+          "speaker": "금옥이",
+          "dialogue": "이 구슬로 봉인박 전체에\n오행의 기운을 고르게 입히면 돼!",
+          "seconds": 4.8999999999999995
+        }
+      ],
+      "direction": ""
+    },
+    {
+      "number": 24,
+      "pages": [
+        {
+          "speaker": "솔이",
+          "dialogue": "얼른 요괴 잡으러 가자! 사부님들이 돌아오기 전에...",
+          "seconds": 4.8999999999999995
+        }
+      ],
+      "direction": ""
+    }
+  ]
+}
