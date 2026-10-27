@@ -22,7 +22,8 @@ namespace C6Lab
 
         [Header("문구")]
         [SerializeField] private string titleText = "피버타임!";
-        [SerializeField] private string subtitleText = "스태미나 두 배!";
+        [Tooltip("문구 밑 작은 줄. 비우면(기본) 안 띄운다.")]
+        [SerializeField] private string subtitleText = "";
         [Tooltip("문구 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 bannerAnchor = new Vector2(.5f, .6f);
         [SerializeField, Range(24, 200)] private int titleSize = 96;
@@ -198,15 +199,31 @@ namespace C6Lab
             float unit = Mathf.Clamp(canvasRect.rect.height / 1000f, .6f, 2.5f);
             talismans.Initialize(layer, unit);
 
-            Font font = LabGuideText.FontOf(canvas);
+            Font font = ShillaFont(canvas);
             banner = NewRect("Banner", layer);
             banner.anchorMin = banner.anchorMax = bannerAnchor;
             banner.sizeDelta = new Vector2(800f, titleSize + subtitleSize + 40f);
-            title = Words("Title", font, titleSize, new Vector2(0f, subtitleSize * .6f), titleText);
+            bool sub = !string.IsNullOrEmpty(subtitleText);
+            title = Words("Title", font, titleSize, new Vector2(0f, sub ? subtitleSize * .6f : 0f), titleText);
             subtitle = Words("Subtitle", font, subtitleSize, new Vector2(0f, -titleSize * .55f), subtitleText);
+            subtitle.gameObject.SetActive(sub);
             banner.gameObject.SetActive(false);
             layer.gameObject.SetActive(false);
             return true;
+        }
+
+        /// <summary>전투 화면이 쓰는 신라문화체(ShillaCulture, 굵은 것 먼저). 화면에 없으면 화면의 첫 글꼴.</summary>
+        public static Font ShillaFont(Canvas canvas)
+        {
+            Text[] texts = canvas != null ? canvas.GetComponentsInChildren<Text>(true) : new Text[0];
+            Font found = null;
+            foreach (Text text in texts)
+            {
+                if (text.font == null || text.font.name.IndexOf("Shilla", System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (text.font.name.IndexOf("Bold", System.StringComparison.OrdinalIgnoreCase) >= 0) return text.font;
+                if (found == null) found = text.font;
+            }
+            return found != null ? found : LabGuideText.FontOf(canvas);
         }
 
         private Text Words(string name, Font font, int size, Vector2 offset, string words)

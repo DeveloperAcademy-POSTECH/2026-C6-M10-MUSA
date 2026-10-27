@@ -270,8 +270,10 @@ namespace C6Lab
             SetRadiusScale(approvedRadius > 0f ? approvedRadius : 1f);
             EnsureDefaultVisual(ScaledRadius);
             EnsureFlightTrail(ScaledRadius);
-            if (changed && elementFlightTrail != null && appearance != null)
-                elementFlightTrail.Begin(transform, ScaledTrailProfile());
+            // 예측한 크기와 Host가 정한 크기(콤보 SMALL/BIG)가 다르면 꼬리도 새 크기로 다시 그린다.
+            LabElementTrailProfile trailProfile = ScaledTrailProfile();
+            if (elementFlightTrail != null && appearance != null && (changed || elementFlightTrail.Profile != trailProfile))
+                elementFlightTrail.Begin(transform, trailProfile);
         }
 
         private void Awake()
