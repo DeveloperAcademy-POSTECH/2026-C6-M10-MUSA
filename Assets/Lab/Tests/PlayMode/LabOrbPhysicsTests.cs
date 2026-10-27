@@ -724,7 +724,9 @@ namespace C6Lab.Tests
             Assert.That(board.ArrivalOf("opening"), Is.EqualTo(LabDrumArrival.None));
             Assert.That(BoardPoint(opening).x, Is.EqualTo(Bounds.xMin + .3f * Bounds.width).Within(.1f * Bounds.width),
                 "On the Host's spot, inside the board.");
-            Assert.That(board.GetComponentsInChildren<LabOrbVanishSmoke>(), Is.Not.Empty, "It goes up in smoke.");
+            LabOrbVanishSmoke[] puff = board.GetComponentsInChildren<LabOrbVanishSmoke>();
+            Assert.That(puff, Is.Not.Empty, "It goes up in smoke...");
+            Assert.That(puff[0].Radius, Is.GreaterThan(opening.HitSphere.radius * 2f), "...a big puff, plain to see.");
             for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();
             Assert.That(uses.Count, Is.EqualTo(1), "Asked once while the answer is pending.");
             Assert.That(throws, Is.Zero);

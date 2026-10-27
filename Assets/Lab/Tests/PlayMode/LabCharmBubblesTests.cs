@@ -24,6 +24,7 @@ namespace C6Lab.Tests
             host.transform.SetParent(root.transform, false);
             bubbles = host.AddComponent<LabCharmBubbles>();
             bubbles.Bind(null, root.GetComponent<Canvas>(), leftBadge.gameObject, rightBadge.gameObject);
+            LabGuideText.ForgetShownOnce(); // Each test starts as a fresh app would.
         }
 
         [UnityTearDown]
@@ -232,7 +233,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator AHandPokesAtTheBubbleWithAGuideUntilMyTapsAreDone()
+        public IEnumerator AHandPokesAtTheBubbleEveryTimeButTheGuideShowsOnlyOnTheFirstCharm()
         {
             // Player 10 beside the charmed 20 (on the left) still has to tap (#328).
             bubbles.Present(Charm(20, 10d), 10, 1d, 3);
@@ -243,6 +244,11 @@ namespace C6Lab.Tests
             Assert.That(hand.raycastTarget, Is.False, "...without catching the taps.");
             Assert.That(bubbles.LeftHand.position.x, Is.GreaterThan(bubbles.LeftBubble.position.x),
                 "It stands on the bubble's inner side.");
+            Assert.That(bubbles.LeftHand.sizeDelta.x, Is.EqualTo(bubbles.LeftBubble.sizeDelta.x * .675f).Within(.01f),
+                "Three quarters of its first size.");
+            Assert.That(bubbles.LeftHand.localEulerAngles.z, Is.EqualTo(20f).Within(.01f),
+                "Tilted counterclockwise, so the left-pointing finger points down at the bubble...");
+            Assert.That(bubbles.RightHand.localEulerAngles.z, Is.EqualTo(340f).Within(.01f), "...and the right one mirrors it.");
             Assert.That(bubbles.GuideShowing, Is.True);
             Assert.That(bubbles.GuideShown, Is.EqualTo(LabCharmBubbles.HelperGuideText));
 
@@ -262,6 +268,14 @@ namespace C6Lab.Tests
             Assert.That(bubbles.LeftCheckShowing, Is.True);
             Assert.That(bubbles.LeftHandShowing, Is.False, "Done: the hand goes as the check comes...");
             Assert.That(bubbles.GuideShowing, Is.False, "...and so does the guide.");
+
+            // The next charm beside this player: the hand pokes again, but the guide is not repeated.
+            LabSnapshot next = Charm(20, 30d);
+            next.charmStartedAt = 15d;
+            bubbles.Present(next, 10, 16d, 3);
+            Assert.That(bubbles.LeftHandShowing, Is.True, "The hand shows on every charm...");
+            Assert.That(bubbles.GuideShowing, Is.False, "...the guide only on the first (#328).");
+            Assert.That(LabGuideText.ShownOnce(LabCharmBubbles.HelperGuideOnceKey), Is.True);
 
             // The charmed player's own screen only shows each side's progress: no hand, no guide.
             bubbles.Present(Charm(10, 10d), 10, 1.3d, 3);

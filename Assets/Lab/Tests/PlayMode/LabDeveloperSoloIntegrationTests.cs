@@ -777,6 +777,7 @@ namespace C6Lab.Tests
             Assert.That(foxy.TryApplyDeveloperValues(tuning, out string error), Is.True, error);
             network.config = foxy;
             fixture.UseAvailablePort(network);
+            LabGuideText.ForgetShownOnce(); // As on a fresh app, so this is the player's first fox fire (#328).
             try
             {
                 Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
@@ -802,8 +803,9 @@ namespace C6Lab.Tests
                 Assert.That(view.GetComponentInChildren<LabOrbSpriteArt>(), Is.Not.Null, "It shows the fox orb art.");
                 var guide = UnityEngine.Object.FindAnyObjectByType<LabFoxFireGuide>();
                 Assert.That(guide, Is.Not.Null, "The saved scene adds the fox orb guide (#328).");
-                Assert.That(guide.Showing, Is.True, "The round's first fox fire on my board tells me how to clear it.");
+                Assert.That(guide.Showing, Is.True, "The player's first fox fire tells them how to clear it.");
                 Assert.That(guide.Shown, Is.EqualTo(LabFoxFireGuide.GuideText));
+                Assert.That(LabGuideText.ShownOnce(LabFoxFireGuide.OnceKey), Is.True, "Never again while the app runs.");
             }
             finally
             {

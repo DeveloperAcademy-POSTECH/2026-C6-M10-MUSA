@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,6 +8,7 @@ namespace C6Lab
     /// <summary>
     /// 기믹 안내 문구 (#328): 매혹·여우 구슬을 어떻게 풀지 알려 주는 두 줄 글자. 매혹 예고 (#305)와 같은 자리·글꼴·색으로
     /// 뜨고, 처음 보일 때 톡 튀어나와 살짝 두근거린다. 화면 표시만 하며 터치를 막지 않는다.
+    /// 고유 기믹을 처음 겪는 사람을 위한 안내는 한 플레이어(기기)에 앱을 켠 동안 처음 한 번만 보여 준다(<see cref="TryShowOnce"/>).
     /// </summary>
     public sealed class LabGuideText
     {
@@ -15,6 +18,7 @@ namespace C6Lab
         private const float PopSeconds = .2f, PulseHz = 2f;
         private static readonly Color TextColor = new Color(.55f, .1f, .16f);
 
+        private static readonly HashSet<string> shownOnce = new HashSet<string>(StringComparer.Ordinal);
         private readonly Text text;
         private float age = -1f;
 
@@ -60,6 +64,19 @@ namespace C6Lab
                 if (existing[i].font != null) return existing[i].font;
             return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         }
+
+        /// <summary>Whether this device already showed that once-only guide since the app started.</summary>
+        public static bool ShownOnce(string key) => shownOnce.Contains(key);
+
+        /// <summary>Claims a once-only guide's single showing; false when it was shown already.</summary>
+        public static bool TryShowOnce(string key) => shownOnce.Add(key);
+
+        /// <summary>Forgets every once-only guide, as a fresh app start does.</summary>
+        public static void ForgetShownOnce() => shownOnce.Clear();
+
+        // Every Play starts afresh, even with domain reload turned off.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ForgetOnStart() => shownOnce.Clear();
 
         /// <summary>Shows or hides the words this frame; a new showing pops in, then it beats gently.</summary>
         public void Draw(bool shown, string words)

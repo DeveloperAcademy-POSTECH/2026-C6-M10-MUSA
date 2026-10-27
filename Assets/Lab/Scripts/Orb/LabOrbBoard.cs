@@ -159,6 +159,8 @@ namespace C6Lab
         // the Host turned down is asked again after the retry time.
         private const float BombOpenPauseSeconds = .2f;
         private const float BombOpenRetrySeconds = 1f;
+        // The opening bomb's puff is this many times its size, so the change into two attack orbs is plain to see.
+        private const float BombOpenSmokeScale = 2.2f;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly HashSet<string> spawnedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
@@ -1609,7 +1611,7 @@ namespace C6Lab
                 if (Time.time - entry.BombRestingSince < BombOpenPauseSeconds || Time.time < entry.BombNextOpenAt) continue;
                 entry.BombRestingSince = -1f;
                 entry.BombNextOpenAt = Time.time + BombOpenRetrySeconds;
-                LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius,
+                LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius * BombOpenSmokeScale,
                     config != null ? config.OrbAppearance : null);
                 entry.Locked = true;
                 StopMotion(entry.View.Body);
