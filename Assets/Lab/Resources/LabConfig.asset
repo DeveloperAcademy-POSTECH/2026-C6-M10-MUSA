@@ -32,6 +32,9 @@ MonoBehaviour:
   secretBoxChance: 0
   potionChance: 0
   bombChance: 0
+  rawStreakCorrectionEnabled: 1
+  rawStreakOppositeChancePercent: 75
+  rawStreakMaximum: 3
   itemLifetimeSeconds: 15
   itemUnlockSwipesMin: 2
   itemUnlockSwipesMax: 4

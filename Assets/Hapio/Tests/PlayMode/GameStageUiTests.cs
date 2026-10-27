@@ -65,7 +65,7 @@ namespace Hapio.Tests
                 .Select(session.CaptureDeveloperSettings).ToArray();
             screen.developerScopeButtons[2].onClick.Invoke();
             AssertScope(screen, 2);
-            Assert.That(screen.developerSliders, Has.Length.EqualTo(225));
+            Assert.That(screen.developerSliders, Has.Length.EqualTo(228));
             Assert.That(screen.developerSliders[211].minValue, Is.EqualTo(60f));
             Assert.That(screen.developerSliders[211].maxValue, Is.EqualTo(180f));
             foreach (int index in new[] { 205, 169, 170 })
@@ -109,12 +109,79 @@ namespace Hapio.Tests
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator SavedRawCorrectionControlsApplyReopenAndRemainCommonAcrossScopes()
+        {
+            GameScreen screen = SceneManager.GetActiveScene().GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<GameScreen>(true)).Single();
+            LabConfig source = Resources.Load<LabConfig>("LabConfig");
+            string sourceJson = JsonUtility.ToJson(source);
+            screen.developerButton.onClick.Invoke();
+            AssertScope(screen, 0);
+            foreach (int index in new[] { 225, 226, 227 })
+            {
+                Assert.That(screen.developerInputs[index].gameObject.activeInHierarchy, Is.True);
+                Assert.That(screen.developerSliders[index].gameObject.activeInHierarchy, Is.True);
+                Assert.That(screen.developerSliders[index].wholeNumbers, Is.True);
+                Assert.That(screen.developerSliders[index].minValue, Is.EqualTo(LabConfig.DeveloperFields[index].Min));
+                Assert.That(screen.developerSliders[index].maxValue, Is.EqualTo(LabConfig.DeveloperFields[index].Max));
+            }
+            Assert.That(screen.developerInputs[225].text, Is.EqualTo("1"));
+            // Hapio's saved form uses a whole-number 0/1 slider for ON/OFF.
+            screen.developerSliders[225].value = 0f;
+            screen.developerSliders[226].value = 0f;
+            screen.developerSliders[227].value = 1f;
+            Assert.That(new[] { screen.developerInputs[225].text, screen.developerInputs[226].text,
+                screen.developerInputs[227].text }, Is.EqualTo(new[] { "0", "0", "1" }));
+            screen.developerSliders[226].value = 100f;
+            screen.developerSliders[227].value = 10f;
+            Assert.That(new[] { screen.developerInputs[226].text, screen.developerInputs[227].text },
+                Is.EqualTo(new[] { "100", "10" }));
+            Assert.That(session.CaptureDeveloperSettings(0)[225], Is.EqualTo(1f), "Moving controls only edits the draft.");
+            screen.applyDeveloperButton.onClick.Invoke();
+            for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                Assert.That(session.CaptureDeveloperSettings(scope).Skip(225).ToArray(), Is.EqualTo(new[] { 0f, 100f, 10f }),
+                    "Common generation policy reaches scope " + scope);
+            screen.closeDeveloperButton.onClick.Invoke();
+            screen.developerButton.onClick.Invoke();
+            Assert.That(new[] { screen.developerInputs[225].text, screen.developerInputs[226].text,
+                screen.developerInputs[227].text }, Is.EqualTo(new[] { "0", "100", "10" }));
+            foreach (int scope in new[] { 1, 2, 3, GameStageSettings.TerritoryScope })
+            {
+                screen.developerScopeButtons[scope].onClick.Invoke();
+                foreach (int index in new[] { 225, 226, 227 })
+                    Assert.That(screen.developerInputs[index].transform.parent.gameObject.activeSelf, Is.False,
+                        "Common raw policy is hidden in scope " + scope);
+                screen.developerInputs[225].text = "1";
+                screen.developerInputs[226].text = "1";
+                screen.developerInputs[227].text = "1";
+                screen.applyDeveloperButton.onClick.Invoke();
+                Assert.That(session.CaptureDeveloperSettings(scope).Skip(225).ToArray(), Is.EqualTo(new[] { 0f, 100f, 10f }),
+                    "A stage form cannot apply hidden raw-policy values.");
+            }
+            screen.developerScopeButtons[0].onClick.Invoke();
+            screen.developerSliders[225].value = 1f;
+            screen.developerInputs[226].text = "0";
+            screen.developerInputs[227].text = "1";
+            Assert.That(screen.developerSliders[226].value, Is.EqualTo(0f));
+            Assert.That(screen.developerSliders[227].value, Is.EqualTo(1f));
+            screen.applyDeveloperButton.onClick.Invoke();
+            screen.closeDeveloperButton.onClick.Invoke();
+            screen.developerButton.onClick.Invoke();
+            Assert.That(new[] { screen.developerInputs[225].text, screen.developerInputs[226].text,
+                screen.developerInputs[227].text }, Is.EqualTo(new[] { "1", "0", "1" }));
+            for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                Assert.That(session.CaptureDeveloperSettings(scope).Skip(225).ToArray(), Is.EqualTo(new[] { 1f, 0f, 1f }));
+            Assert.That(JsonUtility.ToJson(source), Is.EqualTo(sourceJson));
+            yield return null;
+        }
+
         private static int Field(string label) => Enumerable.Range(0, LabConfig.DeveloperFields.Count)
             .Single(i => LabConfig.DeveloperFields[i].Label == label);
         private static void AssertScope(GameScreen screen, int scope)
         {
             Assert.That(screen.DeveloperScope, Is.EqualTo(scope));
-            Assert.That(screen.developerInputs, Has.Length.EqualTo(225));
+            Assert.That(screen.developerInputs, Has.Length.EqualTo(228));
             for (int i = 0; i < screen.developerInputs.Length; i++)
                 Assert.That(screen.developerInputs[i].transform.parent.gameObject.activeSelf,
                     Is.EqualTo(GameStageSettings.IsFieldVisible(scope, i)), "Field " + i + " in scope " + scope);

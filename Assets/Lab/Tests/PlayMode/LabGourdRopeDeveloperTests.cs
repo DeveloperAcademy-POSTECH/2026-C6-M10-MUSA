@@ -34,8 +34,8 @@ namespace C6Lab.Tests
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             testedNetwork = ui.network;
             Assert.That(testedNetwork, Is.Not.Null);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(225), "The live DEV panel includes all appended settings, including nearby-hit drying.");
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(225), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(228), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(228), "The live DEV panel includes all appended settings, including nearby-hit drying.");
             savedValues = ui.sourceConfig.CaptureDeveloperValues();
             savedJson = JsonUtility.ToJson(ui.sourceConfig);
         }

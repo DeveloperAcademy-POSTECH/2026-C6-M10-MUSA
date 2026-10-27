@@ -222,7 +222,7 @@ namespace C6Lab.Tests
                 var room = new LabModel();
                 room.Begin("element-" + session, new ulong[] { 10, 20 }, 0d, config);
                 LabOrbState yin = null, yang = null;
-                // Draws are independent now, so allow more than five tries to see both polarities.
+                // Generation correction keeps long raw runs bounded; keep the pair search explicit.
                 for (int i = 0; i < 10 && (yin == null || yang == null); i++)
                 {
                     Assert.That(room.TryGenerate(10, "g" + i, 0d, out var raw, out _), Is.True);

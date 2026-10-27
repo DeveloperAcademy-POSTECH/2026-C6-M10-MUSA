@@ -362,6 +362,58 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator GenerationPreviewWaitsForTheHostsCorrectedRawReceipt()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[5] = 1f; values[51] = 0f;
+            values[225] = 1f; values[226] = 0f; values[227] = 1f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            double began = Time.realtimeSinceStartupAsDouble;
+            var model = new LabModel();
+            model.BeginSolo(Session, owner, began, config);
+            initial = model.Snapshot(began);
+            Set("model", model);
+            Set("latest", initial);
+            Invoke("SyncBoard");
+            LabOrbState drum = initial.drums.First();
+            LabOrbKind previous = LabOrbKind.Combined;
+            for (int i = 0; i < 8; i++)
+            {
+                long requestId = 700 + i;
+                object packet = Submit("generate", requestId, null, drum.id);
+                packet.GetType().GetField("ownershipVersion").SetValue(packet, drum.ownershipVersion);
+                Assert.That(model.CopyPlayers().Single().generatedTotal, Is.EqualTo(i),
+                    "A Client preview must not decide or record the next raw polarity.");
+                if (i == 3)
+                {
+                    packet.GetType().GetField("ownershipVersion").SetValue(packet, drum.ownershipVersion + 1ul);
+                    var rejected = (LabActionReceipt)Invoke("ExecuteBoardAction", owner, packet);
+                    Assert.That(rejected.accepted, Is.False, "The Host checks drum authority before generation.");
+                    Assert.That(model.CopyPlayers().Single().generatedTotal, Is.EqualTo(i));
+                    rejected.sessionId = Session; rejected.round = 1u;
+                    rejected.sender = owner; rejected.requestId = requestId;
+                    Invoke("ReceiveActionReceipt", rejected);
+                    requestId += 1000;
+                    packet = Submit("generate", requestId, null, drum.id);
+                    packet.GetType().GetField("ownershipVersion").SetValue(packet, drum.ownershipVersion);
+                }
+                var receipt = (LabActionReceipt)Invoke("ExecuteBoardAction", owner, packet);
+                Assert.That(receipt.accepted, Is.True, receipt.reason);
+                LabOrbState generated = receipt.states.Single(state => state.id == receipt.outputId);
+                Assert.That(generated.kind.IsRaw(), Is.True);
+                Assert.That(generated.kind, Is.Not.EqualTo(previous), "Maximum one is enforced by the Host rule path.");
+                previous = generated.kind;
+                receipt.sessionId = Session; receipt.round = 1u;
+                receipt.sender = owner; receipt.requestId = requestId;
+                Invoke("ReceiveActionReceipt", receipt);
+                Assert.That(FindOrb(generated.id).Kind, Is.EqualTo(generated.kind),
+                    "The real receipt promotes the preview to the Host's exact raw result.");
+                Assert.That(network.Snapshot.orbs.Single(state => state.id == generated.id).kind, Is.EqualTo(generated.kind));
+            }
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator AnActionTriggeredExpiryVanishesBeforeItsReceiptRemovesTheSourceBody()
         {
             float[] values = config.CaptureDeveloperValues();

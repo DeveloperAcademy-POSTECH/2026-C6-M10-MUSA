@@ -288,6 +288,7 @@ namespace C6Lab
             Array.Clear(seats, 0, seats.Length);
             for (int i = 0; i < activeSeatCount; i++) seats[i] = ids[i];
             players.Clear(); orbs.Clear(); drums.Clear(); requests.Clear(); generatedCounts.Clear(); bombExplosions.Clear();
+            rawGenerationStreaks.Clear();
             unreportedBlasts.Clear();
             orbExpiries.Clear();
             gourdBombs.Clear();
@@ -396,6 +397,7 @@ namespace C6Lab
             if (generated == uint.MaxValue) return Reject("GENERATION_LIMIT", out reason);
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
             var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
+            kind = CorrectRawGenerationKind(kind, sender, generated);
             int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
@@ -416,6 +418,7 @@ namespace C6Lab
             if (teamMode) ApplyFeverGeneration(orb, sender, now);
             ApplyJigwiGenerationBurn(orb, now);
             orbs.Add(orb.id, orb);
+            RecordRawGeneration(sender, orb.kind);
             reason = "GENERATED";
             orb = orb.Copy();
             return true;
@@ -1836,6 +1839,8 @@ namespace C6Lab
                 StaminaRecoveryPerSecond, HitRecovery, OrbLifetimeSeconds, MaximumMotionSpeed, ItemLifetimeSeconds;
             public readonly float SpawnFanAngle, SpawnMinSpeed, SpawnMaxSpeed, FloorDeceleration;
             public readonly int[] GenerationChances;
+            public readonly bool RawStreakCorrectionEnabled;
+            public readonly int RawStreakOppositeChancePercent, RawStreakMaximum;
             public readonly int ItemUnlockSwipesMin, ItemUnlockSwipesMax, DrumCount;
             public readonly LabGourdMode GourdMode;
             public readonly int PaintVictoryPercent;
@@ -1882,6 +1887,9 @@ namespace C6Lab
             {
                 StageYokai = stageYokai;
                 GenerationChances = config.GenerationChances();
+                RawStreakCorrectionEnabled = config.RawStreakCorrectionEnabled;
+                RawStreakOppositeChancePercent = config.RawStreakOppositeChancePercent;
+                RawStreakMaximum = config.RawStreakMaximum;
                 ItemLifetimeSeconds = config.ItemLifetimeSeconds;
                 ItemUnlockSwipesMin = config.ItemUnlockSwipesMin;
                 ItemUnlockSwipesMax = config.ItemUnlockSwipesMax;
