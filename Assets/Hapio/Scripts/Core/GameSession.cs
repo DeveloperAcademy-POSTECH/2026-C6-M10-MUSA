@@ -31,6 +31,35 @@ namespace Hapio
         private bool roomBrowserVisible;
         private GameFlowState state = new GameFlowState();
         private Coroutine sceneRoutine;
+        // 에디터에서 Play를 멈추거나 앱이 끝나는 중이면 씬을 바꾸지 않는다. 이때 연결이 끊기며 GameOver로 넘어가도
+        // Unity가 씬을 불러 주지 않아(LoadSceneAsync = null) 예외만 남던 것을 막는다.
+        // 끝나는 신호는 여러 군데서 온다: Play 멈춤(에디터, 가장 먼저), Application.quitting, OnApplicationQuit.
+        // 연결을 끊는 쪽(NGO)이 먼저 끝나며 GameOver를 부를 수 있어, 가장 이른 신호부터 막는다.
+        private static bool appQuitting;
+        private bool quitting => appQuitting;
+        private void OnApplicationQuit() => appQuitting = true;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetQuitting()
+        {
+            appQuitting = false;
+            Application.quitting -= MarkQuitting;
+            Application.quitting += MarkQuitting;
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+            UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeChanged;
+#endif
+        }
+
+        private static void MarkQuitting() => appQuitting = true;
+
+#if UNITY_EDITOR
+        private static void OnPlayModeChanged(UnityEditor.PlayModeStateChange change)
+        {
+            if (change == UnityEditor.PlayModeStateChange.ExitingPlayMode) appQuitting = true;
+            else if (change == UnityEditor.PlayModeStateChange.EnteredPlayMode) appQuitting = false;
+        }
+#endif
         private string wantedScene;
         private bool forceBattleReload, goingHome, battleReadyPending, localBattleReady;
         private bool restartPending;
@@ -340,6 +369,7 @@ namespace Hapio
 
         private void QueueScene(string path)
         {
+            if (quitting) return;
             wantedScene = path;
             if (sceneRoutine == null && (SceneManager.GetActiveScene().path != path || forceBattleReload))
                 sceneRoutine = StartCoroutine(ChangeScene());
@@ -349,6 +379,7 @@ namespace Hapio
         {
             // Never unload a terminal Battle before its actual committed paint map is copied.
             yield return null;
+            if (quitting) { sceneRoutine = null; yield break; }
             while (SceneManager.GetActiveScene().path != wantedScene || forceBattleReload)
             {
                 string destination = wantedScene;
@@ -371,7 +402,12 @@ namespace Hapio
                 network.UnbindBattleReferences();
                 forceBattleReload = false;
                 AsyncOperation load = SceneManager.LoadSceneAsync(destination, LoadSceneMode.Single);
-                if (load == null) throw new InvalidOperationException("Could not load " + destination);
+                if (load == null)
+                {
+                    // 끝나는 중이라 Unity가 씬을 불러 주지 않았다. 조용히 멈춘다.
+                    if (quitting) break;
+                    throw new InvalidOperationException("Could not load " + destination);
+                }
                 yield return load;
                 yield return null;
             }

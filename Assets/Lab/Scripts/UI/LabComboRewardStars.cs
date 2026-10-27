@@ -86,6 +86,16 @@ namespace C6Lab
 
         public RectTransform Area => area;
 
+        /// <summary>
+        /// 쏟아지는 양을 바꾼다 (야광귀 피버 시작 #343처럼 더 많이 쏟아야 할 때). 초당 수는 부적이면 절반만 떨어진다.
+        /// </summary>
+        public void SetRates(float perSecond, float minimumPerSecond, int burst)
+        {
+            starsPerSecond = Mathf.Max(0f, perSecond);
+            minimumStarsPerSecond = Mathf.Max(0f, minimumPerSecond);
+            startBurst = Mathf.Clamp(burst, 0, MaximumStars);
+        }
+
         /// <summary>보상이 막 시작됐다: 별이 한꺼번에 쏟아진다.</summary>
         public void Burst(float bottomY) =>
             Burst(bujeok ? Mathf.RoundToInt(startBurst * BujeokCountScale) : startBurst, bottomY);

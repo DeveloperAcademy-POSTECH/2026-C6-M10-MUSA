@@ -423,6 +423,7 @@ namespace C6Lab
                 vx = launch.x, vy = launch.y, createdAt = now, revision = ++revision, inFlight = false
             };
             if (teamMode) ApplyFeverGeneration(orb, sender, now);
+            ApplyYaguangFeverGeneration(orb, now);
             ApplyJigwiGenerationBurn(orb, now);
             orbs.Add(orb.id, orb);
             RecordRawGeneration(sender, orb.kind);
@@ -1408,10 +1409,12 @@ namespace C6Lab
                 if (elapsed > 0d)
                 {
                     played += elapsed;
-                    // The Jigwi stage's fever (#332) and fever time (#334) refill faster by themselves; hit rewards and the
+                    // The Jigwi stage's fever (#332), fever time (#334, the fox) and the yaguang's fever (#343) refill faster by themselves; hit rewards and the
                     // storage limit stay as they are. Each belongs to its own stage, so they never stack.
                     double refill = elapsed * JigwiStageRecoveryMultiplier(lastTime)
-                        + FeverSecondsBetween(lastTime, effectiveNow) * (rules.FeverTimeRecoveryMultiplier - 1d);
+                        + FeverSecondsBetween(lastTime, effectiveNow) * (rules.FeverTimeRecoveryMultiplier - 1d)
+                        // 야광귀 피버타임 (#343)은 야광귀 스테이지만의 것이라 구미호의 피버 타임과 겹치지 않는다.
+                        + YaguangFeverSecondsBetween(lastTime, effectiveNow) * (rules.YaguangFeverStaminaMultiplier - 1d);
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + refill * rules.StaminaRecoveryPerSecond));
@@ -1933,6 +1936,8 @@ namespace C6Lab
             public readonly int[] GimmickChances;
             public readonly bool YaguangTimeline;
             public readonly double YaguangTimelineEndSeconds;
+            /// <summary>야광귀 피버타임 (#343): 방해가 끝난 뒤 스태미나 자동 회복 배율</summary>
+            public readonly float YaguangFeverStaminaMultiplier;
             /// <summary>Fever time (#334): seconds left when it starts (0 = none) and its refill multiplier.</summary>
             public readonly double FeverTimeSeconds;
             public readonly double FeverTimeRecoveryMultiplier;
@@ -2048,6 +2053,7 @@ namespace C6Lab
                 // One stage policy feeds the shared scheduler; there is no second timeline execution loop.
                 YaguangTimeline = stageYokai == LabStageYokai.Yaguang && !teamMode;
                 YaguangTimelineEndSeconds = YaguangTimeline ? config.YaguangTimelineSabotageEndSeconds : 0d;
+                YaguangFeverStaminaMultiplier = config.YaguangFeverStaminaMultiplier;
                 // Fever time (#334) is the fox's stage alone for now, never the 2:2 battle.
                 FeverTimeSeconds = stageYokai == LabStageYokai.Gumiho && !teamMode ? config.FeverTimeSeconds : 0d;
                 FeverTimeRecoveryMultiplier = config.FeverTimeRecoveryMultiplier;

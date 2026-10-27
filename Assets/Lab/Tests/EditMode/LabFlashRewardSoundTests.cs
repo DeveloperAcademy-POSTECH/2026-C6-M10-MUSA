@@ -53,6 +53,21 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheFlashClearSoundWaitsForTheFullShakeCount()
+        {
+            host = new GameObject("flash-reward-sound");
+            LabFlashRewardSound sound = host.AddComponent<LabFlashRewardSound>();
+            // 눈부심이 먼저 풀려도(예: 6번) 소리는 10번을 채운 순간 한 번만 난다.
+            for (int count = 1; count < 10; count++)
+                Assert.That(sound.ObserveShakes(count, 10), Is.False, count + " shakes");
+            Assert.That(sound.ObserveShakes(10, 10), Is.True);
+            Assert.That(sound.ObserveShakes(10, 10), Is.False, "Only once per flash.");
+            // 다음 섬광: 수가 0으로 돌아가면 다시 센다.
+            Assert.That(sound.ObserveShakes(0, 10), Is.False);
+            Assert.That(sound.ObserveShakes(10, 10), Is.True);
+        }
+
+        [Test]
         public void TheClipFoldersAreUnderResourcesAudio()
         {
             Assert.That(LabFlashRewardSound.FlashClearFolder, Is.EqualTo("Audio/FlashClear"));
