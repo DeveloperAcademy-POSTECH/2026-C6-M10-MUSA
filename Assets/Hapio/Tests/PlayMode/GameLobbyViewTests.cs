@@ -217,6 +217,61 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator TerritoryLobbyKeepsFourPlayerReadinessAndRestoresStoryTypography()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            GameLobbyView view = View();
+            int storyHeadingSize = view.heading.fontSize;
+            int storySealSize = view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().fontSize;
+            yield return Click(view.enterButton);
+            yield return Click(view.countButtons[0]);
+            yield return Click(view.createButton);
+            DispatchClick(view.teamModeButton);
+            Assert.That(session.IsCreatingRoom, Is.True);
+            Assert.That(session.PendingRooms.Single().Mode, Is.EqualTo(GameMode.Territory));
+            Assert.That(session.PendingRooms.Single().Capacity, Is.EqualTo(LabTeams.Players));
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && session.Network.IsHost && SceneManager.GetActiveScene().path == GameScenePaths.Lobby,
+                "Territory lobby entered automatically without a room-card click", 15f);
+            yield return null;
+            view = View();
+            Assert.That(session.IsTerritory, Is.True);
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(4), "Territory ignores the browser's two-player story selection.");
+            Assert.That(view.heading.fontSize, Is.EqualTo(view.teamHeadingFontSize));
+            Assert.That(view.sealButton.interactable, Is.False);
+            Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기"));
+            yield return Click(view.slotButtons[2]);
+            Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(3), "Host may freely choose the red team's P3.");
+            Assert.That(view.localLabels[2].text, Does.Contain("방장"));
+            view.sealButton.onClick.Invoke();
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Lobby), "Visual start styling must not bypass readiness.");
+            yield return Click(view.leaveButton);
+            yield return Until(() => !session.IsLoadingScene && session.Network.CanChooseConnection
+                && SceneManager.GetActiveScene().path == GameScenePaths.Home, "Browser after territory");
+            yield return null;
+            view = View();
+            yield return Click(view.countButtons[0]);
+            yield return Click(view.createButton);
+            DispatchClick(view.basicModeButton);
+            Assert.That(session.IsCreatingRoom, Is.True);
+            Assert.That(session.PendingRooms.Single().Mode, Is.EqualTo(GameMode.Story));
+            Assert.That(session.PendingRooms.Single().Capacity, Is.EqualTo(2));
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && session.Network.IsHost && SceneManager.GetActiveScene().path == GameScenePaths.Lobby,
+                "Story lobby after territory entered automatically", 15f);
+            yield return null;
+            view = View();
+            Assert.That(session.IsTerritory, Is.False);
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(2));
+            Assert.That(view.heading.fontSize, Is.EqualTo(storyHeadingSize), "Team typography must not leak into story rooms.");
+            Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().fontSize, Is.EqualTo(storySealSize));
+        }
+
+        [UnityTest]
         public IEnumerator DirectGameHostKeepsItsGuidNameAndAdvertisesTheGameFamilyBeforeEnteringTheLobby()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");

@@ -1,7 +1,10 @@
 using System;
+using System.Linq;
 using C6Lab;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Hapio.Editor
 {
@@ -13,7 +16,7 @@ namespace Hapio.Editor
     public static class GameTeamLobbyUpgrade
     {
         private const string ArtFolder = "Assets/Hapio/Art/UI/Team/";
-        private static readonly Color Ink = LabLobbyView.Html("292921"), Dark = LabLobbyView.Html("3F3D38"),
+        private static readonly Color Ink = LabLobbyView.Html("3F3D38"), Dark = LabLobbyView.Html("3F3D38"),
             Light = LabLobbyView.Html("F3EBDD"), Blue = LabLobbyView.Html("2F62A2"), Red = LabLobbyView.Html("D85836"),
             Line = LabLobbyView.Html("545454");
         private static readonly string[] Shifted = { "Heading", "Hint", "RoomPaper", "RoomName", "Joined", "Selected", "Seal" };
@@ -32,19 +35,21 @@ namespace Hapio.Editor
                 if (view == null) throw new InvalidOperationException("The shared lobby prefab has no GameLobbyView.");
                 BuildModePanel(view);
                 BuildTeamScreen(view);
+                if (view.teamLobbyDesignRevision < 2) ApplyFigma303(view);
+                if (view.teamLobbyDesignRevision < 3) ApplyInk303(view);
                 EditorUtility.SetDirty(view);
                 PrefabUtility.SaveAsPrefabAsset(root, GameLobbySceneUpgrade.PrefabPath);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
             // The DEV panel gains its "2:2" tab in the same pass; Battle is never copied again here.
-            GameSceneBuilder.UpgradeMenuDeveloperSchema();
+            if (!MenuDeveloperSchemaIsCurrent()) GameSceneBuilder.UpgradeMenuDeveloperSchema();
             AssetDatabase.SaveAssets();
             Debug.Log("HAPIO_2V2_LOBBY_READY: mode popup, team seats and the 2:2 DEV tab are saved.");
         }
 
         private static void ImportSprites()
         {
-            foreach (string name in new[] { "TeamBoxBlue", "TeamBoxRed", "ModeCard", "ModePill" })
+            foreach (string name in new[] { "TeamBoxBlue", "TeamBoxRed", "ModeCard", "ModePill", "TeamLineBlue", "TeamLineRed" })
             {
                 string path = ArtFolder + name + ".png";
                 AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
@@ -56,9 +61,20 @@ namespace Hapio.Editor
                 importer.mipmapEnabled = false;
                 importer.alphaIsTransparency = true;
                 importer.wrapMode = TextureWrapMode.Clamp;
-                // The card and the pill are nine-sliced; the dashed team boxes are drawn at their exact 2x size.
-                importer.spriteBorder = name == "ModeCard" ? new Vector4(30, 30, 30, 30)
+                // Card/boxes/lines use the original SVGs at 4x; the existing pill stays at 2x.
+                importer.spriteBorder = name == "ModeCard" ? new Vector4(120, 120, 120, 120)
                     : name == "ModePill" ? new Vector4(45, 45, 45, 45) : Vector4.zero;
+                if (name != "ModePill")
+                {
+                    importer.textureCompression = TextureImporterCompression.Uncompressed;
+                    foreach (string platform in new[] { "Standalone", "iPhone" })
+                    {
+                        var settings = importer.GetPlatformTextureSettings(platform);
+                        settings.overridden = true; settings.maxTextureSize = 2048;
+                        settings.format = TextureImporterFormat.RGBA32;
+                        importer.SetPlatformTextureSettings(settings);
+                    }
+                }
                 importer.SaveAndReimport();
             }
         }
@@ -68,6 +84,98 @@ namespace Hapio.Editor
             Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(ArtFolder + name + ".png");
             if (sprite == null) throw new InvalidOperationException("The 2:2 sprite was not imported: " + name);
             return sprite;
+        }
+
+        // A presentation-only update must not resave current DEV drafts or unrelated Scene data.
+        private static bool MenuDeveloperSchemaIsCurrent()
+        {
+            Scene previous = SceneManager.GetActiveScene();
+            bool current = true;
+            foreach (string path in new[] { GameScenePaths.Home, GameScenePaths.Lobby })
+            {
+                Scene scene = SceneManager.GetSceneByPath(path);
+                bool owned = !scene.IsValid() || !scene.isLoaded;
+                if (owned) scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+                try
+                {
+                    GameScreen screen = scene.GetRootGameObjects()
+                        .SelectMany(root => root.GetComponentsInChildren<GameScreen>(true)).SingleOrDefault();
+                    current &= screen != null && screen.developerInputs?.Length == LabConfig.DeveloperFields.Count
+                        && screen.developerSliders?.Length == LabConfig.DeveloperFields.Count
+                        && screen.developerScopeButtons?.Length == 5
+                        && screen.developerInputs.All(input => input != null)
+                        && screen.developerSliders.All(slider => slider != null)
+                        && screen.developerScopeButtons.All(button => button != null);
+                }
+                finally { if (owned) EditorSceneManager.CloseScene(scene, true); }
+            }
+            if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
+            return current;
+        }
+
+        // One-time migration; repeated menu runs retain subsequent authored edits.
+        private static void ApplyFigma303(GameLobbyView view)
+        {
+            Transform card = view.modePanel.transform.Find("Card");
+            Place(card, 28, 298, 345, 253);
+            Place(card.Find("Title"), 0, 32, 345, 38);
+            card.Find("Title").GetComponent<UnityEngine.UI.Text>().fontSize = 24;
+            Place(card.Find("Hint"), 0, 72.5f, 345, 30);
+            card.Find("Hint").GetComponent<UnityEngine.UI.Text>().fontSize = 18;
+            Place(card.Find("BasicMode"), 21, 123, 303, 48);
+            Place(card.Find("TeamMode"), 21, 180, 303, 48);
+
+            Transform layout = view.teamLayout.transform;
+            var title = layout.Find("ModeTitle").GetComponent<UnityEngine.UI.Text>();
+            Place(title.transform, 28, 120, 346, 38);
+            title.fontSize = 27; title.supportRichText = true;
+            title.text = "< 2:2 <size=19>땅따먹기</size> >";
+            // Exported SVG bounds include the 1.5-unit outer half of the dashed stroke.
+            Place(layout.Find("BlueBox"), 45.56f, 365.5f, 118, 270);
+            Place(layout.Find("RedBox"), 239.03f, 369.5f, 118, 270);
+            foreach (string side in new[] { "Blue", "Red" })
+            {
+                Transform line = layout.Find(side + "Line");
+                Place(line, side == "Blue" ? 63.53f : 257.53f, 510, 82, 16);
+                line.localEulerAngles = new Vector3(0, 0, 90);
+                var image = line.GetComponent<UnityEngine.UI.Image>();
+                image.sprite = Art("TeamLine" + side); image.color = Color.white;
+                Place(layout.Find(side + "Team"), side == "Blue" ? 52.06f : 251.06f, 646.5f, 100, 26);
+                layout.Find(side + "Team").GetComponent<UnityEngine.UI.Text>().font = view.mediumFont;
+            }
+            layout.Find("Versus").gameObject.SetActive(false);
+            Vector2[] centers = { new Vector2(103.03f,447.5f), new Vector2(103.03f,585.5f),
+                new Vector2(298.03f,447.5f), new Vector2(298.03f,585.5f) };
+            for (int i = 0; i < centers.Length; i++)
+                view.seatsTeam[i].anchoredPosition = new Vector2(centers[i].x, -centers[i].y);
+            Transform anchors = view.teamShiftAnchors[0].parent;
+            Place(anchors.Find("Heading"), 70.5f, 154, 261, 50);
+            Place(anchors.Find("Hint"), 61, 204.5f, 280, 28);
+            Place(anchors.Find("RoomPaper"), 28, 271, 346, 418);
+            Place(anchors.Find("RoomName"), 45.5f, 285.5f, 313, 32);
+            Place(anchors.Find("Joined"), 45.5f, 316.5f, 160, 25);
+            Place(anchors.Find("Selected"), 200.5f, 316.5f, 158, 25);
+            Place(anchors.Find("Seal"), 28, 730, 346, 58);
+            view.teamHeadingFontSize = 29; view.teamLocalLabelFontSize = 20; view.teamStartFontSize = 25;
+            view.teamLobbyDesignRevision = 2;
+        }
+
+        private static void Place(Transform rect, float x, float y, float width, float height)
+            => LabLobbyView.Place((RectTransform)rect, x, y, width, height);
+
+        private static void ApplyInk303(GameLobbyView view)
+        {
+            foreach (var text in view.GetComponentsInChildren<UnityEngine.UI.Text>(true))
+            {
+                string color = ColorUtility.ToHtmlStringRGB(text.color);
+                if (color == "000000" || color == "020202" || color == "292921" || color == "373737")
+                    text.color = new Color(Ink.r, Ink.g, Ink.b, text.color.a);
+            }
+            // These secondary browser labels also changed to primary ink in the latest references.
+            view.emptyRooms.transform.Find("Hint").GetComponent<UnityEngine.UI.Text>().color = Ink;
+            view.roomTemplate.transform.Find("Count").GetComponent<UnityEngine.UI.Text>().color = Ink;
+            view.modePanel.transform.Find("Card/Hint").GetComponent<UnityEngine.UI.Text>().color = LabLobbyView.Html("394759");
+            view.teamLobbyDesignRevision = 3;
         }
 
         /// <summary>"어떤 걸로 동지를 부르겠소?" over the dimmed room browser, opened by "새 방 만들기 +".</summary>
@@ -112,14 +220,14 @@ namespace Hapio.Editor
             Transform firstSlot = view.slotButtons[0].transform;
             if (layout.GetSiblingIndex() > firstSlot.GetSiblingIndex()) layout.SetSiblingIndex(firstSlot.GetSiblingIndex());
             view.teamLayout = layout.gameObject;
-            Text(Child(layout, "ModeTitle"), brush, "< 2:2 땅따먹기 >", 30, Color.black, 28f, 134f, 346f, 38f);
+            Text(Child(layout, "ModeTitle"), brush, "< 2:2 땅따먹기 >", 30, Ink, 28f, 134f, 346f, 38f);
             Box(layout, "BlueBox", Art("TeamBoxBlue"), 49f, 403f);
             Box(layout, "RedBox", Art("TeamBoxRed"), 242f, 403f);
             Bar(layout, "BlueLine", 104f);
             Bar(layout, "RedLine", 298f);
-            Text(Child(layout, "Versus"), brush, "VS", 22, Color.black, 172f, 520f, 70f, 30f);
-            Text(Child(layout, "BlueTeam"), brush, "청팀", 20, Blue, 53f, 671f, 100f, 26f);
-            Text(Child(layout, "RedTeam"), brush, "홍팀", 20, Red, 247f, 671f, 100f, 26f);
+            Text(Child(layout, "Versus"), brush, "VS", 22, Ink, 172f, 520f, 70f, 30f);
+            Text(Child(layout, "BlueTeam"), view.mediumFont, "청팀", 20, Blue, 53f, 671f, 100f, 26f);
+            Text(Child(layout, "RedTeam"), view.mediumFont, "홍팀", 20, Red, 247f, 671f, 100f, 26f);
 
             Transform layouts = page.Find("EditableSeatLayouts")
                 ?? throw new InvalidOperationException("The authored EditableSeatLayouts group is missing.");
@@ -168,7 +276,8 @@ namespace Hapio.Editor
             RectTransform rect = Child(parent, name, out bool created);
             if (created) LabLobbyView.Place(rect, x, 511f, 3f, 63f);
             var image = Component<UnityEngine.UI.Image>(rect);
-            image.sprite = null; image.color = Line; image.raycastTarget = false;
+            if (created) { image.sprite = null; image.color = Line; }
+            image.raycastTarget = false;
         }
 
         private static UnityEngine.UI.Button Pill(Transform parent, string name, Font font, string label,
@@ -180,6 +289,16 @@ namespace Hapio.Editor
             Sliced(image, Art("ModePill"), Dark);
             var button = Component<UnityEngine.UI.Button>(rect);
             button.targetGraphic = image;
+            if (name == "BasicMode" || name == "TeamMode")
+            {
+                // A native solid pill keeps its edge in the same ink; the old sprite baked in a black outline.
+                image.enabled = false;
+                RectTransform solid = Child(rect, "SolidInk");
+                Stretch(solid); solid.SetAsFirstSibling();
+                var rounded = Component<LabRoundedGraphic>(solid);
+                rounded.radius = 27f; rounded.color = Dark;
+                button.targetGraphic = rounded;
+            }
             RectTransform text = Child(rect, "Label");
             Stretch(text);
             UnityEngine.UI.Text value = Component<UnityEngine.UI.Text>(text);
@@ -191,7 +310,8 @@ namespace Hapio.Editor
         private static void Sliced(UnityEngine.UI.Image image, Sprite sprite, Color color)
         {
             image.sprite = sprite; image.type = UnityEngine.UI.Image.Type.Sliced; image.fillCenter = true;
-            image.pixelsPerUnitMultiplier = 2f; image.color = color;
+            image.pixelsPerUnitMultiplier = sprite.name.StartsWith("ModeCard", StringComparison.Ordinal) ? 4f : 2f;
+            image.color = color;
         }
 
         private static void Text(RectTransform rect, Font font, string value, int size, Color color,
