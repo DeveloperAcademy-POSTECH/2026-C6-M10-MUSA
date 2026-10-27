@@ -40,8 +40,9 @@ namespace C6Lab
         /// own snapshot list so orb rules (lifetime, storage, combining, throwing, bombs) never apply.
         /// </summary>
         public static bool IsDrum(this LabOrbKind kind) => kind == LabOrbKind.Drum;
-        /// <summary>Items used in place by a double tap once unlocked.</summary>
-        public static bool IsDoubleTapUsable(this LabOrbKind kind) => kind == LabOrbKind.Potion || kind == LabOrbKind.SecretBox;
+        /// <summary>Items used in place by a double tap once unlocked, and the fox orb a double tap clears (#328).</summary>
+        public static bool IsDoubleTapUsable(this LabOrbKind kind) => kind == LabOrbKind.Potion || kind == LabOrbKind.SecretBox
+            || kind == LabOrbKind.FoxFire;
         /// <summary>
         /// Orbs that an upward flick may throw at the target: Combined, and a relay orb once handoffs have opened
         /// its lock (#212). A bomb is never thrown: locked it can only be passed on, unlocked it opens into two

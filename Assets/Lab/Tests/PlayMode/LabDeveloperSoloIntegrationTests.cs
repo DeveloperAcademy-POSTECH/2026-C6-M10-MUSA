@@ -800,6 +800,10 @@ namespace C6Lab.Tests
                 LabOrbView view = board.GetComponentsInChildren<LabOrbView>().First(candidate => candidate.OrbId == foxes[0].id);
                 Assert.That(view.FoxGlowVisible, Is.True);
                 Assert.That(view.GetComponentInChildren<LabOrbSpriteArt>(), Is.Not.Null, "It shows the fox orb art.");
+                var guide = UnityEngine.Object.FindAnyObjectByType<LabFoxFireGuide>();
+                Assert.That(guide, Is.Not.Null, "The saved scene adds the fox orb guide (#328).");
+                Assert.That(guide.Showing, Is.True, "The round's first fox fire on my board tells me how to clear it.");
+                Assert.That(guide.Shown, Is.EqualTo(LabFoxFireGuide.GuideText));
             }
             finally
             {

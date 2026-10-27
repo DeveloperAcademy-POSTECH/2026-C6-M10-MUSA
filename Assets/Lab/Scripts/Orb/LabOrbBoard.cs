@@ -1383,6 +1383,8 @@ namespace C6Lab
                 if (lastTapId == id && now - lastTapTime <= DoubleTapWindow)
                 {
                     lastTapId = null;
+                    // A double tap clears a fox orb (#328): it goes up in its blue smoke at once.
+                    if (entry.View.Kind == LabOrbKind.FoxFire) PlayFoxSmoke(entry);
                     entry.Locked = true;
                     StopMotion(entry.View.Body);
                     SetBodyMode(entry);
@@ -1409,7 +1411,8 @@ namespace C6Lab
 
             // A deliberate manual pass can finish safely inside the screen. It enters the same
             // Host-validated crossing path as a freely moving body at the actual side plane.
-            if (assistedSide != 0)
+            // A fox orb is never passed (#328), so it only slides like any flick.
+            if (assistedSide != 0 && entry.View.Kind != LabOrbKind.FoxFire)
             {
                 SetBodyMode(entry);
                 Vector2 assistedWorldVelocity = TransferReleaseVelocity(entry, assistedSide, inputVelocity, assistedVelocity);

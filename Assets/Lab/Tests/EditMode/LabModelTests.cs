@@ -3104,7 +3104,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void AFoxOrbOverASideEdgeGoesEvenSoloAndNeverReachesANeighbour()
+        public void AFoxOrbStaysAtASideEdgeAndADoubleTapClearsOnlyThatOne()
         {
             var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
             try
@@ -3115,20 +3115,35 @@ namespace C6Lab.Tests
                 LabFoxFireDrop drop = room.DrainFoxFires().Single();
                 string fox = drop.OrbIds[0];
                 Assert.That(room.TryTransferAt(drop.Target, fox, true, new Vector2(.99f, .5f), Vector2.right, "fox-edge", 5.2d,
-                    LabEdgeCrossingKind.Swipe, out var passed, out string reason), Is.True, reason);
-                Assert.That(reason, Is.EqualTo("FOX_FIRE_GONE"));
+                    LabEdgeCrossingKind.Swipe, out var passed, out string reason), Is.False);
+                Assert.That(reason, Is.EqualTo("FOX_FIRE_BLOCKED"), "The side edges stop a fox orb (#328).");
                 Assert.That(passed, Is.Null, "Nothing is handed on.");
-                LabSnapshot after = room.Snapshot(5.2d);
-                Assert.That(after.orbs.Any(orb => orb.id == fox), Is.False);
-                Assert.That(after.players.All(player => player.passedTotal == 0), Is.True, "It does not count as a pass.");
+                Assert.That(room.TryTransferAt(drop.Target, fox, false, new Vector2(.01f, .5f), Vector2.left, "fox-pushed", 5.3d,
+                    LabEdgeCrossingKind.Pushed, out _, out reason), Is.False, "Not even a blast's push takes it over.");
+                LabSnapshot after = room.Snapshot(5.3d);
+                Assert.That(after.orbs.Any(orb => orb.id == fox && orb.owner == drop.Target), Is.True, "It stays on its board.");
+                Assert.That(after.players.All(player => player.passedTotal == 0), Is.True);
+
+                // A double tap clears the one tapped, at once (the landing's safe second only guards touching).
+                Assert.That(room.TryUseItemAt(drop.Target, fox, "fox-tap", 5.4d, new Vector2(.5f, .5f), out var cleared, out reason),
+                    Is.True, reason);
+                Assert.That(reason, Is.EqualTo("FOX_FIRE_CLEARED"));
+                Assert.That(cleared.id, Is.EqualTo(fox));
+                LabSnapshot tapped = room.Snapshot(5.4d);
+                Assert.That(tapped.orbs.Any(orb => orb.id == fox), Is.False);
+                Assert.That(tapped.orbs.Count(orb => orb.kind == LabOrbKind.FoxFire), Is.EqualTo(drop.OrbIds.Length - 1),
+                    "Only the tapped fox orb goes.");
+                Assert.That(room.TryUseItemAt(drop.Target == 10ul ? 20ul : 10ul, drop.OrbIds[1], "fox-other", 5.5d,
+                    new Vector2(.5f, .5f), out _, out reason), Is.False, "Only its holder clears it.");
 
                 var solo = new LabModel();
                 solo.BeginSolo("fox-edge-solo", 42ul, 0d, mix);
                 solo.Tick(5d);
                 string alone = solo.DrainFoxFires().Single().OrbIds[0];
                 Assert.That(solo.TryTransferAt(42ul, alone, false, new Vector2(.01f, .5f), Vector2.left, "fox-edge-solo", 5.2d,
-                    LabEdgeCrossingKind.Pushed, out _, out reason), Is.True, reason);
-                Assert.That(solo.Snapshot(5.2d).orbs.Any(orb => orb.id == alone), Is.False, "Even solo, with no one beside.");
+                    LabEdgeCrossingKind.Pushed, out _, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("FOX_FIRE_BLOCKED"), "Even solo.");
+                Assert.That(solo.Snapshot(5.2d).orbs.Any(orb => orb.id == alone), Is.True);
             }
             finally { UnityEngine.Object.DestroyImmediate(mix); }
         }

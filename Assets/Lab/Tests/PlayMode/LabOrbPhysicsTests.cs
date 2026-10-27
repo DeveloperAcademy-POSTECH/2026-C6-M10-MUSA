@@ -128,16 +128,35 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator AFoxOrbOverASideEdgeGoesUpInBlueSmokeInsteadOfPassing()
+        public IEnumerator AFoxOrbBouncesOffASideEdgeAndADoubleTapPuffsItAwayInBlueSmoke()
         {
             var crossed = new System.Collections.Generic.List<LabOrbEdgeCrossing>();
+            var uses = new System.Collections.Generic.List<string>();
             board.EdgeCrossed += crossing => crossed.Add(crossing);
-            board.UpsertOrb("fox-edge", LabOrbKind.FoxFire, new Vector2(.9f, .5f), new Vector2(1.5f, 0f));
-            for (int step = 0; step < 30 && crossed.Count == 0; step++) yield return new WaitForFixedUpdate();
-            Assert.That(crossed.Select(crossing => crossing.OrbId), Is.EqualTo(new[] { "fox-edge" }));
-            Assert.That(board.IsSnapshotSuppressed("fox-edge"), Is.True, "It leaves this screen at once...");
-            Assert.That(board.GetComponentsInChildren<LabOrbVanishSmoke>(), Is.Not.Empty, "...in blue smoke, never to a neighbour.");
-            Assert.That(board.CommitPendingLaunch("fox-edge"), Is.True);
+            board.UseRequested += id => uses.Add(id);
+            var fox = board.UpsertOrb("fox-edge", LabOrbKind.FoxFire, new Vector2(.9f, .5f), new Vector2(1.5f, 0f));
+            bool turned = false;
+            for (int step = 0; step < 40 && !turned; step++)
+            {
+                yield return new WaitForFixedUpdate();
+                turned = fox.Body.linearVelocity.x < 0f;
+            }
+            Assert.That(turned, Is.True, "The side edge stops a fox orb like a wall (#328)...");
+            Assert.That(crossed, Is.Empty, "...so it is never handed on...");
+            Assert.That(board.IsSnapshotSuppressed("fox-edge"), Is.False, "...and stays on this screen.");
+            Assert.That(board.GetComponentsInChildren<LabOrbVanishSmoke>(), Is.Empty);
+
+            float until = Time.time + 3f;
+            while (fox.Body.linearVelocity.sqrMagnitude > 0f && Time.time < until) yield return new WaitForFixedUpdate();
+            Vector2 at = BoardPoint(fox);
+            Tap(at, 10d);
+            Assert.That(uses, Is.Empty, "One tap does nothing.");
+            Tap(at, 10.2d);
+            Assert.That(uses, Is.EqualTo(new[] { "fox-edge" }), "A quick double tap asks the Host to clear it.");
+            LabOrbVanishSmoke[] smoke = board.GetComponentsInChildren<LabOrbVanishSmoke>();
+            Assert.That(smoke.Length, Is.EqualTo(1), "It goes up in a puff at once...");
+            Color puff = smoke[0].GetComponentInChildren<SpriteRenderer>().color;
+            Assert.That(puff.b, Is.GreaterThan(puff.r), "...a blue one.");
         }
 
         [Test]

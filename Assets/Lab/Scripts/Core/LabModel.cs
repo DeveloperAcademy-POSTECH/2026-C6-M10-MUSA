@@ -506,9 +506,11 @@ namespace C6Lab
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!TryFindMovable(id, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            // A fox orb never reaches a neighbour (#251); since #328 the side edges stop it and a double tap clears it.
+            if (current.kind == LabOrbKind.FoxFire) return Reject("FOX_FIRE_BLOCKED", out reason);
             // An unlocked bomb opens where it lands (#328); it is not passed on again.
             if (current.kind == LabOrbKind.Bomb && current.lockSwipes == 0) return Reject("BOMB_OPENING", out reason);
-            if (activeSeatCount == 1 && current.kind != LabOrbKind.FoxFire) return Reject("NO_NEIGHBOR", out reason);
+            if (activeSeatCount == 1) return Reject("NO_NEIGHBOR", out reason);
             if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y) || !Finite(normalizedVelocity) ||
                 normalizedVelocity.sqrMagnitude > rules.MaximumMotionSpeed * rules.MaximumMotionSpeed)
                 return Reject("INVALID_MOTION", out reason);
@@ -523,15 +525,8 @@ namespace C6Lab
             if (crossing != LabEdgeCrossingKind.Pushed && !passingDrum && SwipeBlocked(sender, right, now))
                 return Reject("SWIPE_BLOCKED", out reason);
             // 2:2 땅따먹기 (#281): 바깥쪽 가장자리는 막혀 있고 안쪽 가장자리로만 팀원에게 넘긴다. 밀려 넘어가도 같다.
-            if (teamMode && current.kind != LabOrbKind.FoxFire && !LabTeams.EdgeOpen(players[sender].seat, right))
+            if (teamMode && !LabTeams.EdgeOpen(players[sender].seat, right))
                 return Reject("TEAM_EDGE", out reason);
-            if (current.kind == LabOrbKind.FoxFire)
-            {
-                // A fox orb never reaches a neighbour (#251): over a side edge, even solo, it goes up in blue smoke.
-                orbs.Remove(current.id);
-                reason = "FOX_FIRE_GONE";
-                return true;
-            }
             int receiverSeat = teamMode ? LabTeams.TeammateSeat(players[sender].seat)
                 : LabPlayerSlots.NeighborSeat(players[sender].seat, activeSeatCount, right);
             ulong receiver = seats[receiverSeat];
@@ -1032,7 +1027,7 @@ namespace C6Lab
         /// HP up to the maximum; at full HP it is refused and kept so it can still be passed to a
         /// neighbor. A player already at 0 HP cannot be revived by a potion.
         /// #328: an unlocked bomb's board asks this by itself once the bomb has come to rest, and it opens
-        /// into two attack orbs even on a full board.
+        /// into two attack orbs even on a full board; a double tap on a fox orb clears that one orb.
         /// The owner supplies its actual local position without a motion pre-update.
         /// </summary>
         public bool TryUseItemAt(ulong sender, string id, string requestId, double now,
@@ -1043,7 +1038,14 @@ namespace C6Lab
             if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y)) return Reject("INVALID_MOTION", out reason);
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
-            // Not a choice to punish while overheated: the bomb opens by itself.
+            // Neither is a choice to punish while overheated: the bomb opens by itself, the fox orb is the yokai's.
+            if (current.kind == LabOrbKind.FoxFire)
+            {
+                orbs.Remove(current.id);
+                reason = "FOX_FIRE_CLEARED";
+                orb = current.Copy();
+                return true;
+            }
             if (current.kind == LabOrbKind.Bomb)
             {
                 if (current.lockSwipes > 0) return Reject("ITEM_LOCKED", out reason);
