@@ -359,8 +359,15 @@ namespace C6Lab
             // Raw-only streak correction (#324); item generation keeps its original chance.
             LabDeveloperField.Toggle("Raw Streak Correction (0 off, 1 on)"),
             new LabDeveloperField("Opposite Chance After 2 Raw (%)", 0f, 100f, true),
-            new LabDeveloperField("Maximum Consecutive Raw", 1f, 10f, true)
+            new LabDeveloperField("Maximum Consecutive Raw", 1f, 10f, true),
+            // 피버 타임 (#334): 남은 시간이 이만큼이 되면 요괴 방해가 멈추고 자동 충전이 빨라진다. 지금은 구미호 스테이지만.
+            new LabDeveloperField("피버 타임 시작 (남은 초, 0 = 끔)", 0f, 60f),
+            new LabDeveloperField("피버 타임 충전 배율", 1f, 5f)
         });
+
+        /// <summary>Fever time (#334) DEV slots: when it starts (seconds left) and how much faster stamina refills.</summary>
+        public const int FeverTimeSecondsField = 228;
+        public const int FeverTimeRecoveryField = 229;
 
         public const int YaguangTimelineFirstField = 211;
         public const int YaguangTimelineLastField = 224;
@@ -423,7 +430,8 @@ namespace C6Lab
             new LabDeveloperCategory("야광귀 시간표 (Hapio 전용)", 212, 213, 214, 215, 216, 217, 218, 219, 220,
                 221, 222, 223, 224)
                 .WithDividers((0, "── 야광귀 전용 일정 · 일반 주기/비율 대신 사용 ──"), (1, "── 고유 예고 ──"), (9, "── 공용 ──")),
-            new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
+            new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199),
+            new LabDeveloperCategory("피버 타임 (Hapio 구미호 전용)", FeverTimeSecondsField, FeverTimeRecoveryField)
         });
 
 
@@ -458,6 +466,10 @@ namespace C6Lab
         [SerializeField] private bool rawStreakCorrectionEnabled = true;
         [SerializeField, Range(0, 100)] private int rawStreakOppositeChancePercent = 75;
         [SerializeField, Range(1, 10)] private int rawStreakMaximum = 3;
+        [Tooltip("피버 타임 (#334): 남은 시간이 이 초가 되면 구미호의 방해가 멈추고 정리되며 자동 충전이 빨라진다. 0이면 끈다.")]
+        [SerializeField, Range(0f, 60f)] private float feverTimeSeconds = 20f;
+        [Tooltip("피버 타임 동안 스태미나 자동 충전 속도에 곱하는 값. 명중 보상과 구슬 보유 한도는 그대로다.")]
+        [SerializeField, Range(1f, 5f)] private float feverTimeRecoveryMultiplier = 2f;
 
         [Header("Item orbs")]
         [SerializeField, Min(.1f)] private float itemLifetimeSeconds = 15f;
@@ -857,6 +869,10 @@ namespace C6Lab
         public bool RawStreakCorrectionEnabled => rawStreakCorrectionEnabled;
         public int RawStreakOppositeChancePercent => Mathf.Clamp(rawStreakOppositeChancePercent, 0, 100);
         public int RawStreakMaximum => Mathf.Clamp(rawStreakMaximum, 1, 10);
+        /// <summary>Fever time (#334): it starts when this many seconds are left; 0 turns it off.</summary>
+        public float FeverTimeSeconds => Mathf.Clamp(Finite(feverTimeSeconds, 20f), 0f, 60f);
+        /// <summary>How many times faster stamina refills by itself during fever time (#334).</summary>
+        public float FeverTimeRecoveryMultiplier => Mathf.Clamp(Finite(feverTimeRecoveryMultiplier, 2f), 1f, 5f);
 
         /// <summary>
         /// Percent weights in GeneratedKinds order. An Inspector total of zero falls back to
@@ -1246,7 +1262,8 @@ namespace C6Lab
                 YaguangTimelineUniqueSeconds(3), YaguangTimelineUniqueIsCombo(3) ? 1f : 0f,
                 YaguangTimelineCommonSeconds(0), YaguangTimelineCommonSeconds(1),
                 YaguangTimelineCommonSeconds(2), YaguangTimelineCommonSeconds(3),
-                RawStreakCorrectionEnabled ? 1f : 0f, RawStreakOppositeChancePercent, RawStreakMaximum
+                RawStreakCorrectionEnabled ? 1f : 0f, RawStreakOppositeChancePercent, RawStreakMaximum,
+                FeverTimeSeconds, FeverTimeRecoveryMultiplier
             };
         }
 
@@ -1513,6 +1530,8 @@ namespace C6Lab
             rawStreakCorrectionEnabled = values[225] >= .5f;
             rawStreakOppositeChancePercent = (int)values[226];
             rawStreakMaximum = (int)values[227];
+            feverTimeSeconds = values[FeverTimeSecondsField];
+            feverTimeRecoveryMultiplier = values[FeverTimeRecoveryField];
             error = string.Empty;
             return true;
         }

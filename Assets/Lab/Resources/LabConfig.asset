@@ -35,6 +35,8 @@ MonoBehaviour:
   rawStreakCorrectionEnabled: 1
   rawStreakOppositeChancePercent: 75
   rawStreakMaximum: 3
+  feverTimeSeconds: 20
+  feverTimeRecoveryMultiplier: 2
   itemLifetimeSeconds: 15
   itemUnlockSwipesMin: 2
   itemUnlockSwipesMax: 4

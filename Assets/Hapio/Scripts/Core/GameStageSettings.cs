@@ -78,7 +78,9 @@ namespace Hapio
             // Every stage sets its own common gimmicks (#311): interval, bomb and block switches and chances.
             if (IsStageCommonGimmick(index)) return scope >= 1 && scope <= 3;
             // The fox's own gimmicks (#311): interval, switches and chances, with fox fire and charm details (#251, #305).
-            bool gumiho = index >= 171 && index <= 177 || index == 204 || index == 206 || index == 209 || index == 210;
+            bool gumiho = index >= 171 && index <= 177 || index == 204 || index == 206 || index == 209 || index == 210
+                // Fever time (#334) is the fox's alone for now; the other yokai keep their own endings.
+                || index == LabConfig.FeverTimeSecondsField || index == LabConfig.FeverTimeRecoveryField;
             bool jigwi = index >= 178 && index <= 183 || index >= 192 && index <= 195;
             // 2:2 땅따먹기 (#281)의 켜기/끄기·시간·피버는 3요괴 스테이지 설정에 넣지 않는다.
             bool team = index >= 196 && index <= 199;

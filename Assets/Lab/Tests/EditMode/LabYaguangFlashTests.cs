@@ -97,12 +97,14 @@ namespace C6Lab.Tests
                     .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
                 Assert.That(ui.EnsureValueInputs(), Is.True,
                     "The saved Lab expands its legacy setting rows through the same public startup path as runtime.");
-                Assert.That(ui.valueInputs, Has.Length.EqualTo(228));
+                Assert.That(ui.valueInputs, Has.Length.EqualTo(230));
                 typeof(LabDeveloperMode).GetMethod("BuildCategoryLayout", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(ui, null);
                 Transform content = ui.valueInputs[0].transform.parent.parent;
                 Assert.That(content.Find("Category " + timeline.Title), Is.Null,
                     "The standalone Lab must not offer a header for Hapio's stage-only scheduling policy.");
+                Assert.That(content.Find("Category 피버 타임 (Hapio 구미호 전용)"), Is.Null,
+                    "Fever time (#334) is tuned in Hapio's fox tab alone, too.");
                 foreach (var header in content.GetComponentsInChildren<UnityEngine.UI.Button>(true)
                     .Where(button => button.name.StartsWith("Category ")).ToArray())
                     header.onClick.Invoke();
@@ -111,6 +113,9 @@ namespace C6Lab.Tests
                 foreach (int index in timeline.FieldIndices)
                     Assert.That(ui.valueInputs[index].transform.parent.gameObject.activeSelf, Is.False,
                         "Expanding every Lab group cannot reveal the Hapio-only schedule field " + index);
+                foreach (int index in new[] { LabConfig.FeverTimeSecondsField, LabConfig.FeverTimeRecoveryField })
+                    Assert.That(ui.valueInputs[index].transform.parent.gameObject.activeSelf, Is.False,
+                        "Expanding every Lab group cannot reveal the Hapio-only fever field " + index);
             }
             finally { EditorSceneManager.CloseScene(scene, true); }
         }
