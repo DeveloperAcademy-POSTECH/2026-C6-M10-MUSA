@@ -423,6 +423,7 @@ namespace C6Lab
                 vx = launch.x, vy = launch.y, createdAt = now, revision = ++revision, inFlight = false
             };
             if (teamMode) ApplyFeverGeneration(orb, sender, now);
+            ApplyYaguangFeverGeneration(orb, now);
             ApplyJigwiGenerationBurn(orb, now);
             orbs.Add(orb.id, orb);
             RecordRawGeneration(sender, orb.kind);

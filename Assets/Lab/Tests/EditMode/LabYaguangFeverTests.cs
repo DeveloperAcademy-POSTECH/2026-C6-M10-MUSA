@@ -52,6 +52,32 @@ namespace C6Lab.Tests
                 "The fox's fever time (#334) stays the fox's: the yaguang runs its own fever (#343).");
         }
 
+        [Test]
+        public void EverythingFromTheDrumIsAFiveColorOrbInTheFever()
+        {
+            LabModel room = Room(LabStageYokai.Yaguang);
+            Assert.That(room.TryGenerate(0ul, "before", 60d, out LabOrbState before, out string reason), Is.True, reason);
+            Assert.That(before.fiveColor, Is.False, "Before the fever the drum gives its usual orbs.");
+            for (int i = 0; i < 4; i++)
+            {
+                Assert.That(room.TryGenerate(0ul, "fever-" + i, 101d + i, out LabOrbState orb, out reason), Is.True, reason);
+                Assert.That(orb.fiveColor, Is.True);
+                Assert.That(orb.kind, Is.EqualTo(LabOrbKind.Combined), "A five-color orb can be thrown at once.");
+                Assert.That(orb.lockSwipes, Is.Zero);
+            }
+        }
+
+        [Test]
+        public void OtherStagesDrumsGiveNoFiveColorOrbs()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[LabConfig.FeverTimeSecondsField] = 0f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            LabModel room = Room(LabStageYokai.Gumiho);
+            Assert.That(room.TryGenerate(0ul, "late", 101d, out LabOrbState orb, out string reason), Is.True, reason);
+            Assert.That(orb.fiveColor, Is.False);
+        }
+
         [TestCase(LabStageYokai.None)]
         [TestCase(LabStageYokai.Gumiho)]
         public void OtherStagesKeepTheirRecovery(LabStageYokai stage)
