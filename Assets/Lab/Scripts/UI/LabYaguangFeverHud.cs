@@ -7,8 +7,10 @@ namespace C6Lab
     /// 야광귀 피버타임 (#343) 시작 연출. 피버가 시작되는 순간 모든 기기 화면에
     /// - 화면 전체가 하양·오색으로 몇 번 번쩍이고,
     /// - 가운데에 "피버타임!" 문구가 크게 튀어나와 오색구슬(#329)처럼 색이 바뀌며 잠시 머물고,
-    /// - 화면 위에서 부적(`Resources/Combo/Bujeok`, 콤보 보상과 같은 그림)이 마구 쏟아진다.
-    /// 피버 시작 뒤 조금 지나 들어온 기기(StartWindowSeconds 넘음)에는 띄우지 않는다. 화면 표시만 하며 터치를 막지 않는다.
+    /// - 부적(`Resources/Combo/Bujeok`, 콤보 보상과 같은 그림)이 한 번 쏟아지고,
+    /// 그 뒤로도 피버 내내 부적이 공격 영역(조합판 위)에서만 조금씩 흘러내린다. 던지기를 가리지 않게 양은 적다.
+    /// 번쩍임·문구는 피버 시작 뒤 조금 지나 들어온 기기(StartWindowSeconds 넘음)에는 띄우지 않고, 흐르는 부적만 보인다.
+    /// 화면 표시만 하며 터치를 막지 않는다.
     /// 구미호 피버 타임(#334)과는 따로 돌아가고, 야광귀 스테이지에서만 켜진다.
     /// </summary>
     [DisallowMultipleComponent]
@@ -36,15 +38,11 @@ namespace C6Lab
         [SerializeField, Range(1, 8)] private int flashCount = 3;
         [Tooltip("가장 밝을 때 불투명도")]
         [SerializeField, Range(0f, 1f)] private float flashAlpha = .55f;
-        [Header("부적")]
-        [Tooltip("부적이 쏟아지는 시간 (초). 갈수록 줄어든다.")]
-        [SerializeField, Range(.5f, 8f)] private float pourSeconds = 3f;
-        [Tooltip("막 시작했을 때 초당 떨어지는 수 (부적은 이 값의 절반)")]
-        [SerializeField, Min(0f)] private float pourPerSecond = 60f;
-        [Tooltip("끝나기 직전에도 떨어지는 초당 수 (부적은 이 값의 절반)")]
-        [SerializeField, Min(0f)] private float pourMinimumPerSecond = 16f;
-        [Tooltip("시작할 때 한꺼번에 쏟아지는 수 (부적은 이 값의 절반)")]
-        [SerializeField, Range(0, 112)] private int pourBurst = 80;
+        [Header("부적 (공격 영역에서만, 피버 내내)")]
+        [Tooltip("피버 동안 초당 떨어지는 수 (부적은 이 값의 절반). 던지기를 가리지 않게 적게 둔다.")]
+        [SerializeField, Min(0f)] private float pourPerSecond = 5f;
+        [Tooltip("피버가 시작될 때 한꺼번에 쏟아지는 수 (부적은 이 값의 절반)")]
+        [SerializeField, Range(0, 112)] private int pourBurst = 16;
 
         private LabNetwork network;
         private Canvas canvas;
@@ -73,10 +71,10 @@ namespace C6Lab
             if (now != fever)
             {
                 fever = now;
-                if (fever && ShouldShow(elapsed)) Begin((float)elapsed);
-                else if (!fever) Stop();
+                if (fever) Begin((float)elapsed, ShouldShow(elapsed));
+                else Stop();
             }
-            if (showing) Step(Time.unscaledDeltaTime);
+            if (fever && layer != null && layer.gameObject.activeSelf) Step(Time.unscaledDeltaTime);
         }
 
         private void OnDisable() => Stop();
@@ -84,17 +82,34 @@ namespace C6Lab
         /// <summary>피버가 시작된 지 elapsed초 지난 때 처음 봤다면 시작 연출을 띄울지 (늦게 들어온 기기는 안 띄운다).</summary>
         public static bool ShouldShow(double elapsed) => elapsed >= 0d && elapsed < StartWindowSeconds;
 
-        private void Begin(float elapsed)
+        /// <summary>피버가 켜졌다. 처음부터 본 기기면(show) 번쩍임·문구·한꺼번에 쏟아지는 부적까지, 아니면 흐르는 부적만.</summary>
+        private void Begin(float elapsed, bool show)
         {
             if (!EnsureLayer()) return;
-            showing = true;
-            since = Mathf.Max(0f, elapsed);
-            ShowCount++;
+            showing = show;
+            since = show ? Mathf.Max(0f, elapsed) : float.MaxValue;
             layer.gameObject.SetActive(true);
             layer.SetAsLastSibling();
             talismans.Clear();
-            talismans.SetRates(pourPerSecond, pourMinimumPerSecond, pourBurst);
-            talismans.Burst(layer.rect.yMin);
+            talismans.SetRates(pourPerSecond, pourPerSecond, pourBurst);
+            if (!show) return;
+            ShowCount++;
+            talismans.Burst(TalismanBottom());
+        }
+
+        /// <summary>
+        /// 부적이 사라지는 높이: 조합판 위쪽 가장자리 (콤보 보상 부적과 같다). 그래서 부적은 공격 영역에서만 보인다.
+        /// 판을 못 찾으면 화면 가운데쯤.
+        /// </summary>
+        private float TalismanBottom()
+        {
+            Rect area = layer.rect;
+            float fallback = Mathf.Lerp(area.yMin, area.yMax, .45f);
+            if (network == null || network.board == null || !network.board.TryGetInputScreenRect(out Rect screen))
+                return fallback;
+            Camera uiCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+            return RectTransformUtility.ScreenPointToLocalPointInRectangle(talismans.Area,
+                new Vector2(screen.center.x, screen.yMax), uiCamera, out Vector2 local) ? local.y : fallback;
         }
 
         private void Stop()
@@ -130,10 +145,9 @@ namespace C6Lab
                 title.color = titleColor;
                 subtitle.color = new Color(1f, .97f, .88f, bannerAlpha);
             }
-            // 부적: 위에서 마구 쏟아지다 점점 줄어든다. 멈춰도 이미 떨어지던 부적은 끝까지 떨어진다.
-            bool pouring = since < pourSeconds;
-            talismans.Step(pouring, pouring ? 1f - since / Mathf.Max(.01f, pourSeconds) : 0f, deltaTime, layer.rect.yMin);
-            if (!pouring && bannerAlpha <= 0f && flashAmount <= 0f && talismans.ActiveCount == 0) Stop();
+            // 부적: 피버 내내 공격 영역에서 같은 양으로 조금씩 흘러내린다.
+            talismans.Step(true, 1f, deltaTime, TalismanBottom());
+            if (bannerAlpha <= 0f && flashAmount <= 0f) showing = false;
         }
 
         /// <summary>시작한 지 t초에 번쩍이는 세기 (0~1): count번 번쩍이며 seconds초 동안 점점 약해진다.</summary>
