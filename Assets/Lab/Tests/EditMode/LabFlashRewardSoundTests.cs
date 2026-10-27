@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -25,6 +26,30 @@ namespace C6Lab.Tests
             Assert.That(sound.OnFiveColorHit(), Is.EqualTo(sound.FiveColorHitClipCount > 0));
             Assert.That(sound.FlashClearCount, Is.EqualTo(1));
             Assert.That(sound.FiveColorHitCount, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void TheFiveColorHitClipsAreInResourcesAndTakeTurns()
+        {
+            AudioClip[] clips = Resources.LoadAll<AudioClip>(LabFlashRewardSound.FiveColorHitFolder);
+            Assert.That(clips.Select(clip => clip.name), Is.EquivalentTo(new[] { "FiveColorHit_1", "FiveColorHit_2" }));
+            Assert.That(Resources.LoadAll<AudioClip>(LabFlashRewardSound.FlashClearFolder).Select(clip => clip.name),
+                Is.EqualTo(new[] { "FlashClear" }));
+
+            host = new GameObject("flash-reward-sound");
+            LabFlashRewardSound sound = host.AddComponent<LabFlashRewardSound>();
+            // 에디터 테스트에서는 Awake가 저절로 불리지 않을 수 있어 직접 불러 소리 파일을 읽힌다.
+            if (sound.FiveColorHitClipCount == 0)
+                typeof(LabFlashRewardSound).GetMethod("Awake", System.Reflection.BindingFlags.Instance
+                    | System.Reflection.BindingFlags.NonPublic).Invoke(sound, null);
+            Assert.That(sound.FiveColorHitClipCount, Is.EqualTo(2));
+            var turns = new System.Collections.Generic.List<int>();
+            for (int i = 0; i < 4; i++)
+            {
+                turns.Add(sound.NextFiveColorHitIndex);
+                sound.OnFiveColorHit();
+            }
+            Assert.That(turns, Is.EqualTo(new[] { 0, 1, 0, 1 }), "The two hit sounds take turns.");
         }
 
         [Test]

@@ -24,6 +24,8 @@
 | `Assets/Lab/Resources/Audio/Bomb/Boom/Boom.wav` | 내 판에서 폭탄이 터질 때 (Bomb Sound = BOOM, 그 판 주인 기기만) | "rubble_explode" by canberries4, [freesound.org](https://freesound.org/people/canberries4/) | CC0 (출처 표시 의무 없음) | 앞 무음 약 0.035초 제거, 끝 0.06초 페이드아웃, 가장 큰 순간이 -1dB가 되도록 음량만 키움(+7dB). mp3를 44.1kHz 16bit wav로 저장. 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/Bomb/Ppeong/Ppeong.wav` | 내 판에서 폭탄이 터질 때 (Bomb Sound = PPEONG, 그 판 주인 기기만) | "뻥튀기 뻥2" by 김용배, [공유마당 (한국저작권위원회)](https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020) | **CC BY (저작자 표시)** – 출처 표시 의무 있음 | 끝 0.06초 페이드아웃, 스테레오를 모노로 합치고 가장 큰 순간이 -1dB가 되도록 맞춤. 44.1kHz 16bit로 저장. 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/Miss/Miss.wav` | 내가 던진 구슬이 요괴를 빗나갔을 때 (던진 사람 기기만) | "Woosh_Whip 3" by CAT-FOX_ALEX, [freesound.org](https://freesound.org/people/CAT-FOX_ALEX/sounds/870096/) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
+| `Assets/Lab/Resources/Audio/FlashClear/FlashClear.wav` | 야광귀 섬광을 흔들어 다 풀었을 때 (#338, 푼 사람 기기만) | 팀 제공 CC0 소리 (원본 이름 미확인, 파일 정보 "Melody Assistant 7.4.7c, 2010") | CC0 | 원본 .ogg(4초, 스테레오 48kHz)에서 소리 있는 앞 0.9초만 남겨 1.1초로 자르고 끝 0.25초를 줄임, 44.1kHz 모노 16bit wav |
+| `Assets/Lab/Resources/Audio/FiveColorHit/FiveColorHit_1.wav`, `FiveColorHit_2.wav` (2개) | 내가 던진 오색구슬(#329)이 박에 맞았을 때 (#338, 던진 사람 기기만, 맞을 때마다 1 → 2 → 1 번갈아) | 팀 제공 CC0 소리 (원본 이름 미확인) | CC0 | 원본 .mp3(1.06초, 스테레오 48kHz)의 뒤 무음을 잘라 0.96초, 44.1kHz 모노 16bit wav |
 
 **출처 표시 문구 (공공누리 제1유형)**
 
@@ -47,7 +49,7 @@
 
 > 김용배의 "뻥튀기 뻥2"(공유마당, https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020)은 CC BY 라이선스로 제공됩니다.
 
-CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom)는 표시 의무가 없지만, 크레딧 화면이 생기면 아래처럼 함께 적는 것을 권장한다.
+CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, FlashClear, FiveColorHit)는 표시 의무가 없지만, 크레딧 화면이 생기면 아래처럼 함께 적는 것을 권장한다.
 
 > 타격음 "Cartoon Punch Cassette E" by modusmogulus, 페인트 타격음 "Squishes and Splats" by mrickey13, 스친 타격음 "SFX_SQUELCH_slayer_215" by MrFossy, 결합 소리 "chimes" by _bliind, 빗나감 소리 "Woosh_Whip 3" by CAT-FOX_ALEX, 폭발음 "rubble_explode" by canberries4 (freesound.org, CC0)
 
