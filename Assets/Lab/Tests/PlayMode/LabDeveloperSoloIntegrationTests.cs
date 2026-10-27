@@ -289,6 +289,65 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavedRawCorrectionToggleAndSlidersApplyToSoloRuntimeCopies()
+        {
+            yield return fixture.Load();
+            LabDeveloperMode ui = SavedDeveloperUi();
+            fixture.UseAvailablePort(ui.network);
+            string sourceJson = JsonUtility.ToJson(ui.sourceConfig);
+            ui.Open();
+            Assert.That(ui.valueInputs, Has.Length.EqualTo(228));
+            Assert.That(ui.valueSliders, Has.Length.EqualTo(228));
+            ui.panel.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                .Single(button => button.name == "Category Generation chances").onClick.Invoke();
+            Transform row = ui.valueInputs[225].transform.parent;
+            var toggle = row.Find("SettingSlider/SettingToggle").GetComponent<UnityEngine.UI.Button>();
+            Assert.That(row.gameObject.activeInHierarchy, Is.True);
+            Assert.That(ui.valueInputs[225].gameObject.activeSelf, Is.False);
+            Assert.That(toggle.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("ON"));
+            toggle.onClick.Invoke();
+            Assert.That(ui.valueInputs[225].text, Is.EqualTo("0"));
+            Assert.That(toggle.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("OFF"));
+            foreach (int index in new[] { 226, 227 })
+            {
+                Assert.That(ui.valueInputs[index].gameObject.activeInHierarchy, Is.True);
+                Assert.That(ui.valueSliders[index].interactable, Is.True);
+                ui.valueSliders[index].value = 0f;
+                Assert.That(ui.valueInputs[index].text, Is.EqualTo(index == 226 ? "0" : "1"));
+                ui.valueSliders[index].value = 1f;
+                Assert.That(ui.valueInputs[index].text, Is.EqualTo(index == 226 ? "100" : "10"));
+            }
+            Assert.That(ui.network.config.RawStreakCorrectionEnabled, Is.True, "Unapplied edits are only draft settings.");
+            ui.applyStartButton.onClick.Invoke();
+            yield return null;
+            Assert.That(ui.network.IsDeveloperSolo, Is.True, ui.feedbackText.text);
+            Assert.That(ui.network.config, Is.Not.SameAs(ui.sourceConfig));
+            Assert.That(ui.network.config.RawStreakCorrectionEnabled, Is.False);
+            Assert.That(ui.network.config.RawStreakOppositeChancePercent, Is.EqualTo(100));
+            Assert.That(ui.network.config.RawStreakMaximum, Is.EqualTo(10));
+            string firstSession = ui.network.Snapshot.sessionId;
+            ui.Open();
+            Assert.That(new[] { ui.valueInputs[225].text, ui.valueInputs[226].text, ui.valueInputs[227].text },
+                Is.EqualTo(new[] { "0", "100", "10" }));
+            toggle.onClick.Invoke();
+            ui.valueInputs[226].text = "0";
+            ui.valueInputs[227].text = "1";
+            Assert.That(ui.valueSliders[226].value, Is.EqualTo(0f));
+            Assert.That(ui.valueSliders[227].value, Is.EqualTo(0f));
+            ui.applyStartButton.onClick.Invoke();
+            yield return null;
+            Assert.That(ui.network.Snapshot.sessionId, Is.Not.EqualTo(firstSession));
+            Assert.That(ui.network.config.RawStreakCorrectionEnabled, Is.True);
+            Assert.That(ui.network.config.RawStreakOppositeChancePercent, Is.EqualTo(0));
+            Assert.That(ui.network.config.RawStreakMaximum, Is.EqualTo(1));
+            ui.Open();
+            Assert.That(new[] { ui.valueInputs[225].text, ui.valueInputs[226].text, ui.valueInputs[227].text },
+                Is.EqualTo(new[] { "1", "0", "1" }));
+            Assert.That(toggle.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("ON"));
+            Assert.That(JsonUtility.ToJson(ui.sourceConfig), Is.EqualTo(sourceJson));
+        }
+
+        [UnityTest]
         public IEnumerator SavedDeveloperPanelCreatesAndRetunesTwoPlayerHostLobby()
         {
             yield return fixture.Load();
@@ -423,7 +482,7 @@ namespace C6Lab.Tests
             Assert.That(boardCamera.depth, Is.GreaterThan(battleCamera.depth),
                 "The board camera must render after the battle camera on mobile devices.");
 
-            // Each solo round has a random session seed and draws are independent, so use
+            // Each solo round has a random session seed, so use
             // Yin/Yang-only chances and a cheap cost: up to 20 draws find both polarities.
             LabConfig savedConfig = network.config;
             LabConfig rawOnly = UnityEngine.Object.Instantiate(savedConfig);

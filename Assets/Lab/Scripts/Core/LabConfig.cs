@@ -355,7 +355,11 @@ namespace C6Lab
             new LabDeveloperField("야광귀 공용 1 시각 (초, 0 = 없음)", 0f, 180f),
             new LabDeveloperField("야광귀 공용 2 시각 (초, 0 = 없음)", 0f, 180f),
             new LabDeveloperField("야광귀 공용 3 시각 (초, 0 = 없음)", 0f, 180f),
-            new LabDeveloperField("야광귀 공용 4 시각 (초, 0 = 없음)", 0f, 180f)
+            new LabDeveloperField("야광귀 공용 4 시각 (초, 0 = 없음)", 0f, 180f),
+            // Raw-only streak correction (#324); item generation keeps its original chance.
+            LabDeveloperField.Toggle("Raw Streak Correction (0 off, 1 on)"),
+            new LabDeveloperField("Opposite Chance After 2 Raw (%)", 0f, 100f, true),
+            new LabDeveloperField("Maximum Consecutive Raw", 1f, 10f, true)
         });
 
         public const int YaguangTimelineFirstField = 211;
@@ -384,7 +388,7 @@ namespace C6Lab
         {
             new LabDeveloperCategory("Battle", 0, 1, 2, 48),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
-            new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44),
+            new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44, 225, 226, 227),
             new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 141, 142, 143, 144, 145, 146, 147),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16, 165),
@@ -448,6 +452,9 @@ namespace C6Lab
         [SerializeField, Range(0, 100)] private int secretBoxChance = 0;
         [SerializeField, Range(0, 100)] private int potionChance = 0;
         [SerializeField, Range(0, 100)] private int bombChance = 0;
+        [SerializeField] private bool rawStreakCorrectionEnabled = true;
+        [SerializeField, Range(0, 100)] private int rawStreakOppositeChancePercent = 75;
+        [SerializeField, Range(1, 10)] private int rawStreakMaximum = 3;
 
         [Header("Item orbs")]
         [SerializeField, Min(.1f)] private float itemLifetimeSeconds = 15f;
@@ -844,6 +851,10 @@ namespace C6Lab
         public float HitRecovery => Mathf.Clamp(Finite(hitRecovery, 10f), 0f, StaminaMax);
         public int OrbStorageLimit => Mathf.Clamp(orbStorageLimit, 1, 100);
 
+        public bool RawStreakCorrectionEnabled => rawStreakCorrectionEnabled;
+        public int RawStreakOppositeChancePercent => Mathf.Clamp(rawStreakOppositeChancePercent, 0, 100);
+        public int RawStreakMaximum => Mathf.Clamp(rawStreakMaximum, 1, 10);
+
         /// <summary>
         /// Percent weights in GeneratedKinds order. An Inspector total of zero falls back to
         /// an even Yin/Yang split so GENERATE always creates something.
@@ -1231,7 +1242,8 @@ namespace C6Lab
                 YaguangTimelineUniqueSeconds(2), YaguangTimelineUniqueIsCombo(2) ? 1f : 0f,
                 YaguangTimelineUniqueSeconds(3), YaguangTimelineUniqueIsCombo(3) ? 1f : 0f,
                 YaguangTimelineCommonSeconds(0), YaguangTimelineCommonSeconds(1),
-                YaguangTimelineCommonSeconds(2), YaguangTimelineCommonSeconds(3)
+                YaguangTimelineCommonSeconds(2), YaguangTimelineCommonSeconds(3),
+                RawStreakCorrectionEnabled ? 1f : 0f, RawStreakOppositeChancePercent, RawStreakMaximum
             };
         }
 
@@ -1499,6 +1511,9 @@ namespace C6Lab
             yaguangTimelineUniqueSeconds = new[] { values[213], values[215], values[217], values[219] };
             yaguangTimelineUniqueKinds = new[] { (int)values[214], (int)values[216], (int)values[218], (int)values[220] };
             yaguangTimelineCommonSeconds = new[] { values[221], values[222], values[223], values[224] };
+            rawStreakCorrectionEnabled = values[225] >= .5f;
+            rawStreakOppositeChancePercent = (int)values[226];
+            rawStreakMaximum = (int)values[227];
             error = string.Empty;
             return true;
         }

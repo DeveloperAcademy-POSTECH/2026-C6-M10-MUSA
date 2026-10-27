@@ -28,7 +28,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(225));
+                    Assert.That(values.Length, Is.EqualTo(228));
                     Assert.That(values[205], Is.EqualTo(before[205]), "Common gimmick interval preserved (#311)");
                     Assert.That(values[206], Is.EqualTo(before[206]), "Unique gimmick interval preserved (#311)");
                 }
@@ -252,6 +252,56 @@ namespace Hapio.Tests
                 Assert.That(settings.Capture(2)[202], Is.Zero);
                 Assert.That(settings.Capture(2)[203], Is.EqualTo(10f));
             }
+        }
+
+        [Test]
+        public void RawStreakCorrectionIsCommonToEveryStageAndTheTerritoryRoom()
+        {
+            LabConfig source = Resources.Load<LabConfig>("LabConfig");
+            float[] saved = source.CaptureDeveloperValues();
+            foreach (int index in new[] { 225, 226, 227 })
+            {
+                Assert.That(GameStageSettings.IsTerritoryOwned(index), Is.False);
+                for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                    Assert.That(GameStageSettings.IsFieldVisible(scope, index), Is.EqualTo(scope == 0),
+                        "Generation field " + index + " belongs only in Common.");
+            }
+            using (var settings = new GameStageSettings(source, GameStageCatalog.RequireDefault()))
+            {
+                var before = new float[4][];
+                for (int stage = 1; stage <= GameStageSettings.TerritoryScope; stage++)
+                {
+                    before[stage - 1] = settings.Capture(stage);
+                    Assert.That(System.Linq.Enumerable.Skip(before[stage - 1], 225), Is.EqualTo(new[] { 1f, 75f, 3f }));
+                }
+                float[] common = settings.Capture(0);
+                common[225] = 0f; common[226] = 40f; common[227] = 7f;
+                Assert.That(settings.TryApply(0, common, out string error), Is.True, error);
+                for (int stage = 1; stage <= GameStageSettings.TerritoryScope; stage++)
+                {
+                    var config = settings.CreateStageConfig(stage);
+                    try
+                    {
+                        Assert.That(config.RawStreakCorrectionEnabled, Is.False);
+                        Assert.That(config.RawStreakOppositeChancePercent, Is.EqualTo(40));
+                        Assert.That(config.RawStreakMaximum, Is.EqualTo(7));
+                        CollectionAssert.AreEqual(System.Linq.Enumerable.Take(before[stage - 1], 225),
+                            System.Linq.Enumerable.Take(settings.Capture(stage), 225));
+                    }
+                    finally { UnityEngine.Object.DestroyImmediate(config); }
+                    float[] forged = settings.Capture(stage); forged[226] = 41f;
+                    Assert.That(settings.TryApply(stage, forged, out _), Is.False,
+                        "Per-stage and territory tabs cannot replace the Common generation correction.");
+                }
+                float[] battle = settings.Capture(GameStageSettings.TerritoryScope);
+                battle[225] = 1f; battle[226] = 100f; battle[227] = 1f;
+                Assert.That(settings.TryApplyBattle(GameStageSettings.TerritoryScope, battle, out error, false), Is.True, error);
+                Assert.That(settings.Capture(0), Is.EqualTo(common), "A battle draft must not commit its shared settings.");
+                Assert.That(settings.TryApplyBattle(GameStageSettings.TerritoryScope, battle, out error), Is.True, error);
+                for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                    Assert.That(System.Linq.Enumerable.Skip(settings.Capture(scope), 225), Is.EqualTo(new[] { 1f, 100f, 1f }));
+            }
+            CollectionAssert.AreEqual(saved, source.CaptureDeveloperValues());
         }
     }
 }

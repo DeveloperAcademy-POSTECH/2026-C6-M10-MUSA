@@ -211,13 +211,14 @@ namespace C6Lab
         // 5666: #315 paint-only finish (DEV 79 a fixed-zero slot, 205 values), shared paint finish barrier.
         // 5668: #311/#314 unified gimmick scheduler and Yaguang timetable (DEV 205-224, 225 values), percent chances,
         //       retired bomb/block/sabotage timers.
-        internal const ushort LabProtocolVersion = 5668;
+        // 5669: #324 per-player Yin/Yang streak control (DEV 225-227, 228 shared values).
+        internal const ushort LabProtocolVersion = 5669;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/29");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/30");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
