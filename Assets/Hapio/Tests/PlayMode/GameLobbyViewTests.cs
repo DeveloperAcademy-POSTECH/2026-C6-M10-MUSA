@@ -226,17 +226,18 @@ namespace Hapio.Tests
             yield return Click(view.enterButton);
             yield return Click(view.countButtons[0]);
             yield return Click(view.createButton);
-            yield return Click(view.teamModeButton);
-            yield return Until(() => session.PendingRooms.Any(room => room.Ready)
-                && view.roomContent.GetComponentsInChildren<UnityEngine.UI.Button>()
-                    .Any(button => button.name == "CreatedRoom" && button.interactable), "Ready territory card", 15f);
-            yield return Click(view.roomContent.GetComponentsInChildren<UnityEngine.UI.Button>()
-                .Single(button => button.name == "CreatedRoom" && button.interactable));
-            yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.Lobby,
-                "Territory lobby");
+            DispatchClick(view.teamModeButton);
+            Assert.That(session.IsCreatingRoom, Is.True);
+            Assert.That(session.PendingRooms.Single().Mode, Is.EqualTo(GameMode.Territory));
+            Assert.That(session.PendingRooms.Single().Capacity, Is.EqualTo(LabTeams.Players));
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && session.Network.IsHost && SceneManager.GetActiveScene().path == GameScenePaths.Lobby,
+                "Territory lobby entered automatically without a room-card click", 15f);
             yield return null;
             view = View();
             Assert.That(session.IsTerritory, Is.True);
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
             Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(4), "Territory ignores the browser's two-player story selection.");
             Assert.That(view.heading.fontSize, Is.EqualTo(view.teamHeadingFontSize));
             Assert.That(view.sealButton.interactable, Is.False);
@@ -253,17 +254,18 @@ namespace Hapio.Tests
             view = View();
             yield return Click(view.countButtons[0]);
             yield return Click(view.createButton);
-            yield return Click(view.basicModeButton);
-            yield return Until(() => session.PendingRooms.Any(room => room.Ready)
-                && view.roomContent.GetComponentsInChildren<UnityEngine.UI.Button>()
-                    .Any(button => button.name == "CreatedRoom" && button.interactable), "Ready story card", 15f);
-            yield return Click(view.roomContent.GetComponentsInChildren<UnityEngine.UI.Button>()
-                .Single(button => button.name == "CreatedRoom" && button.interactable));
-            yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.Lobby,
-                "Story lobby after territory");
+            DispatchClick(view.basicModeButton);
+            Assert.That(session.IsCreatingRoom, Is.True);
+            Assert.That(session.PendingRooms.Single().Mode, Is.EqualTo(GameMode.Story));
+            Assert.That(session.PendingRooms.Single().Capacity, Is.EqualTo(2));
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && session.Network.IsHost && SceneManager.GetActiveScene().path == GameScenePaths.Lobby,
+                "Story lobby after territory entered automatically", 15f);
             yield return null;
             view = View();
             Assert.That(session.IsTerritory, Is.False);
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
             Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(2));
             Assert.That(view.heading.fontSize, Is.EqualTo(storyHeadingSize), "Team typography must not leak into story rooms.");
             Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().fontSize, Is.EqualTo(storySealSize));
