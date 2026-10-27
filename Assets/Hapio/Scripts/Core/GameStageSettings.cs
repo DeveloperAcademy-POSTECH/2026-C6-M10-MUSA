@@ -58,8 +58,9 @@ namespace Hapio
         public static bool IsFieldVisible(int scope, int index)
         {
             if (scope < 0 || scope > TerritoryScope || index < 0 || index >= LabConfig.DeveloperFields.Count) return false;
+            if (index == 79) return false; // Retired crack-mode selector; numeric slot stays reserved.
             if (scope == TerritoryScope) return index >= 197 && index <= 199 || IsTerritoryOwned(index);
-            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203 || index >= 205 && index <= 219;
+            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203;
             // The game always flashes everyone (#301); Lab alone can select a single target.
             if (index == FlashTargetOneField) return false;
             // #305 is appended after both #301 fields in the combined schema.

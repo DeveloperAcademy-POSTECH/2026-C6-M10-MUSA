@@ -8,17 +8,17 @@ namespace C6Lab
     {
         // At exponent 1 the mapping is identical to the previous linear launch model.
         private const float PowerReferenceSwipeSpeed = 1.5f;
-        /// <summary>Seat zero is at +Z; increasing P numbers advance to that player's screen-right.</summary>
+        /// <summary>Seat zero is at +Z; clockwise P numbers advance to that player's screen-left.</summary>
         public static Vector3 SeatPosition(int seatIndex, int seatCount, Vector3 arenaCenter,
-            float ringRadius, float heightOffset)
+            float ringRadius, float heightOffset, bool clockwise = true)
         {
             if (seatCount < 1) throw new ArgumentOutOfRangeException(nameof(seatCount));
             if (seatIndex < 0 || seatIndex >= seatCount)
                 throw new ArgumentOutOfRangeException(nameof(seatIndex));
 
-            // At +Z the camera faces -Z, so its screen-right is world -X. A negative
-            // angle keeps the room's P+1 transfer direction aligned with that side.
-            float angle = -2f * Mathf.PI * seatIndex / seatCount;
+            // At +Z the camera faces -Z, so its screen-left is world +X. Keep the
+            // 2:2 team's existing alternating camera geometry through clockwise=false.
+            float angle = (clockwise ? 2f : -2f) * Mathf.PI * seatIndex / seatCount;
             float radius = Mathf.Max(0f, ringRadius);
             return arenaCenter + new Vector3(Mathf.Sin(angle) * radius,
                 heightOffset, Mathf.Cos(angle) * radius);
@@ -35,7 +35,8 @@ namespace C6Lab
             if (!IsFinite(releaseX01) || releaseX01 < 0f || releaseX01 > 1f)
                 throw new ArgumentOutOfRangeException(nameof(releaseX01));
             Vector3 anchor = SeatPosition(seatIndex, seatCount, targetCenter,
-                config.ThrowOriginRadius, config.ThrowOriginHeightOffset);
+                config.ThrowOriginRadius, config.ThrowOriginHeightOffset,
+                !(config.TeamTerritoryEnabled && seatCount == LabTeams.Players));
             Vector3 right = ScreenRight(anchor, targetCenter);
             Vector3 position = anchor + right * ((releaseX01 * 2f - 1f) * config.ThrowOriginLateralRange);
             if (config.ThrowForm == LabThrowForm.Straight)

@@ -78,6 +78,7 @@ namespace Hapio
             Click(viewerButton, () => session.OpenGourdViewer());
             Click(closeViewerButton, () => session.CloseGourdViewer());
             Click(resetViewerButton, () => session.ResetPreview());
+            GamePreviewAspect.Attach(viewerImage);
             Click(developerButton, OpenDeveloper);
             for (int i = 0; developerScopeButtons != null && i < developerScopeButtons.Length; i++)
             {
@@ -410,6 +411,7 @@ namespace Hapio
 
         public void OpenDeveloper()
         {
+            if (session == null || session.IsCreatingRoom) return;
             // A 2:2 room (#281) opens on its own tab; story rooms keep Common first.
             SelectDeveloperScope(session.IsTerritory ? GameStageSettings.TerritoryScope : 0);
             Text(developerFeedback, "공통 설정과 요괴별 설정은 각각 APPLY로 적용합니다. 저장된 LabConfig는 유지됩니다.");

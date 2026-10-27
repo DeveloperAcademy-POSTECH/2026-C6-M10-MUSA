@@ -148,6 +148,7 @@ namespace Hapio
             if (Instance != this || network == null) return;
             pendingRooms.Tick(out string pendingError);
             if (!string.IsNullOrEmpty(pendingError)) { UiNotice = pendingError; Changed?.Invoke(); }
+            UpdateRoomCreation();
             while (controls.Count > 0) ApplyControl(controls.Dequeue());
             if (restartPending)
             {
@@ -174,6 +175,7 @@ namespace Hapio
             }
             double now = Time.realtimeSinceStartupAsDouble;
             UpdateBattleStart(now);
+            UpdatePaintFinish(now);
             if (network.IsHost && network.IsConnected && now >= nextStateAt)
             {
                 BroadcastState();
@@ -193,7 +195,7 @@ namespace Hapio
             {
                 if (snapshot.phase == LabPhase.Defeat)
                     AbortHost(snapshot.remaining <= 0d ? "Time ran out." : "All players are down.");
-                else if (snapshot.phase == LabPhase.Victory && !LabGourdFinish.DelayVictory(network, snapshot)
+                else if (snapshot.phase == LabPhase.Victory && CanLeavePaintFinish(snapshot)
                     && hostFlow.MarkVictory(snapshot.sessionId, snapshot.round)) SetHostState();
             }
         }
@@ -203,6 +205,7 @@ namespace Hapio
 
         private void ReceiveControl(ulong sender, string json)
         {
+            if (ReceivePaintFinishControl(sender, json)) return;
             if (goingHome || controls.Count >= 128) return;
             try
             {
@@ -533,7 +536,7 @@ namespace Hapio
         /// <summary>A 2:2 room (#281) always waits for exactly four players.</summary>
         public bool CreatePendingRoom(int capacity, GameMode mode)
         {
-            if (state.phase != GameFlowPhase.Home || !network.CanChooseConnection) return false;
+            if (IsCreatingRoom || state.phase != GameFlowPhase.Home || !network.CanChooseConnection) return false;
             roomBrowserVisible = true;
             bool created = pendingRooms.TryCreate(capacity, mode, out string error);
             UiNotice = error;
@@ -543,7 +546,7 @@ namespace Hapio
 
         public bool EnterPendingRoom(string key)
         {
-            if (state.phase != GameFlowPhase.Home || !network.CanChooseConnection || !pendingRooms.CanEnter(key)) return false;
+            if (IsCreatingRoom || state.phase != GameFlowPhase.Home || !network.CanChooseConnection || !pendingRooms.CanEnter(key)) return false;
             ResetRoomFlow();
             GamePendingRoomInfo room = null;
             foreach (GamePendingRoomInfo item in pendingRooms.Rooms) if (item.Key == key) room = item;
@@ -562,7 +565,7 @@ namespace Hapio
 
         public void Host()
         {
-            if (!network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
+            if (IsCreatingRoom || !network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
             roomBrowserVisible = true;
             ResetRoomFlow();
             if (!ConfigureRoomMode(GameMode.Story, network.TargetParticipantCount)) return;
@@ -571,7 +574,7 @@ namespace Hapio
 
         public void JoinRoom(string roomKey)
         {
-            if (!network.CanJoinDiscoveredRoom(roomKey) || state.phase != GameFlowPhase.Home) return;
+            if (IsCreatingRoom || !network.CanJoinDiscoveredRoom(roomKey) || state.phase != GameFlowPhase.Home) return;
             roomBrowserVisible = true;
             ResetRoomFlow();
             foreach (LabDiscoveredRoom room in network.DiscoveredRooms)
@@ -581,7 +584,7 @@ namespace Hapio
 
         public void JoinDirect(string address)
         {
-            if (!network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
+            if (IsCreatingRoom || !network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
             roomBrowserVisible = true;
             ResetRoomFlow(); network.Join(address);
         }
@@ -599,7 +602,7 @@ namespace Hapio
         /// <summary>DEV 2:2 solo check (#281): alone on the Blue team, with combined colors alternating Blue and Red.</summary>
         public void StartSolo(GameMode mode)
         {
-            if (state.phase != GameFlowPhase.Home || !network.PrepareDeveloperSoloGame()) return;
+            if (IsCreatingRoom || state.phase != GameFlowPhase.Home || !network.PrepareDeveloperSoloGame()) return;
             hostMode = mode;
             hostFlow.EnterLobby(mode);
             if (hostFlow.BeginRun(network.ConnectedPlayerIds)) PrepareStage();
@@ -678,7 +681,7 @@ namespace Hapio
             return false;
         }
 
-        private bool CanEditDeveloperSettings => network != null && network.DeveloperBuildAvailable
+        private bool CanEditDeveloperSettings => !IsCreatingRoom && network != null && network.DeveloperBuildAvailable
             && network.config != null && (state.phase == GameFlowPhase.Home && network.CanChooseConnection
                 || state.phase == GameFlowPhase.Lobby && network.IsHost
                 || state.phase == GameFlowPhase.Playing && network.IsHost && network.IsBattlePaused);
@@ -798,6 +801,7 @@ namespace Hapio
 
         private void ResetRoomFlow()
         {
+            CancelRoomCreation(false);
             hostFlow.ReturnHome(); replica.ResetForNewRoom(); controls.Clear();
             restartPending = battleReadyPending = localBattleReady = false; resultReady.Clear();
             ResetBattleStart();
@@ -809,6 +813,7 @@ namespace Hapio
 
         private void ReleaseResult()
         {
+            ResetPaintFinish();
             preview?.Dispose(); preview = null; ResultSnapshot = null; IsViewerOpen = false;
             ResetResultAdvance();
         }
@@ -825,6 +830,7 @@ namespace Hapio
                 network.GameFlowDeveloperConfigValidation = null;
             }
             stageSettings?.Dispose();
+            CancelRoomCreation(false);
             pendingRooms.Dispose();
             ReleaseResult(); Instance = null;
         }

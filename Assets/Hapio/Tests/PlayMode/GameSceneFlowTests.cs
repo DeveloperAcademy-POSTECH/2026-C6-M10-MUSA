@@ -51,7 +51,6 @@ namespace Hapio.Tests
             Set(values, "Potion Chance (%)", 0f);
             Set(values, "Bomb Chance (%)", 0f);
             Set(values, "Paint Surface Resolution (0 low 1 medium 2 high)", 0f);
-            Set(values, "Gourd Mode (0 paint, 1 crack)", 0f);
             Set(values, "Paint Initial Coverage (%)", 100f);
             Set(values, "Paint Pattern", 0f);
             Set(values, "Paint Drying (0 off, 1 on)", 0f);
@@ -237,6 +236,8 @@ namespace Hapio.Tests
             yield return null;
             Assert.That(screen.viewerPanel.activeInHierarchy, Is.True);
             GameObject image = screen.viewerImage.gameObject;
+            Assert.That(image.GetComponent<GamePreviewAspect>(), Is.Not.Null,
+                "The saved StageResult's GameScreen must attach aspect fitting in its actual startup path.");
             GamePreviewInput adapter = image.GetComponent<GamePreviewInput>();
             Assert.That(adapter, Is.Not.Null, "Keep the saved Scene's adapter reference.");
             Assert.That(image.GetComponents<MonoBehaviour>().OfType<IDragHandler>().Count(), Is.EqualTo(1),
@@ -250,6 +251,20 @@ namespace Hapio.Tests
             string result = JsonUtility.ToJson(session.ResultSnapshot);
             RectTransform rectangle = screen.viewerImage.rectTransform;
             Canvas.ForceUpdateCanvases();
+            RectTransform viewport = rectangle.parent as RectTransform;
+            Assert.That(viewport, Is.Not.Null);
+            Assert.That(viewport.name, Is.EqualTo("Gourd preview aspect viewport"));
+            Assert.That(rectangle.rect.width / rectangle.rect.height,
+                Is.EqualTo(screen.viewerImage.texture.width / (float)screen.viewerImage.texture.height).Within(.001f),
+                "The real captured gourd must keep its aspect on the actual portrait result Scene.");
+            var imageCorners = new Vector3[4];
+            rectangle.GetWorldCorners(imageCorners);
+            foreach (Vector3 corner in imageCorners)
+            {
+                Vector3 local = viewport.InverseTransformPoint(corner);
+                Assert.That(local.x, Is.InRange(viewport.rect.xMin - .01f, viewport.rect.xMax + .01f));
+                Assert.That(local.y, Is.InRange(viewport.rect.yMin - .01f, viewport.rect.yMax + .01f));
+            }
             Vector2 start = PreviewScreenPoint(rectangle, .4f, .5f);
             var pointer = new PointerEventData(EventSystem.current) { pointerId = 12345, position = start };
             ExecuteEvents.Execute(image, pointer, ExecuteEvents.pointerDownHandler);
@@ -968,7 +983,7 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(220), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(205), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
                 "All approved values, including the twelve Sabotage fields, must survive Scene-owned DEV cleanup.");
         }

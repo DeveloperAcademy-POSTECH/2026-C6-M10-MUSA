@@ -94,20 +94,19 @@ namespace C6Lab
         private static bool IsFinite(Vector2 v) =>
             !float.IsNaN(v.x) && !float.IsInfinity(v.x) && !float.IsNaN(v.y) && !float.IsInfinity(v.y);
 
-        /// <summary>박 모드에 맞는 타격음: Paint는 물감 소리(옆을 스치면 스친 소리), Crack은 기존 타격음.</summary>
+        /// <summary>페인트 타격음. 옆을 스치면 스친 소리를 사용한다.</summary>
         public void PlayHit(float offset = 0f)
         {
-            bool crack = Config != null && Config.GourdMode == LabGourdMode.Crack;
             float threshold = Config != null ? Config.GlancingHitOffset : .7f;
-            LastHitWasGlance = !crack && glanceHitClips != null && glanceHitClips.Length > 0
+            LastHitWasGlance = glanceHitClips != null && glanceHitClips.Length > 0
                 && IsGlancing(offset, threshold);
             if (LastHitWasGlance)
             {
                 PlayRandom(glanceHitClips, ref lastGlanceIndex, HitBase);
                 return;
             }
-            AudioClip[] clips = crack ? crackHitClips : hitClips;
-            if (clips == null || clips.Length == 0) clips = crack ? hitClips : crackHitClips;
+            AudioClip[] clips = hitClips;
+            if (clips == null || clips.Length == 0) clips = crackHitClips;
             if (clips != lastHitClips) lastHitIndex = -1;
             lastHitClips = clips;
             PlayRandom(clips, ref lastHitIndex, HitBase);

@@ -61,8 +61,8 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator GourdToggleAndThreeSlidersApplyToSoloRestartWithoutEditingTheSource()
         {
-            Assert.That(developer.valueInputs.Length, Is.EqualTo(220));
-            Assert.That(developer.valueSliders.Length, Is.EqualTo(220));
+            Assert.That(developer.valueInputs.Length, Is.EqualTo(205));
+            Assert.That(developer.valueSliders.Length, Is.EqualTo(205));
             Assert.That(network.config.PaintDryingEnabled, Is.True, "Fresh game sessions enable drying by default.");
             developer.Open();
             developer.panel.GetComponentsInChildren<Button>(true)
@@ -173,12 +173,39 @@ namespace C6Lab.Tests
             CommitDisplay(model, 0d);
             Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
             var viewer = LabGourdResultViewer.Attach(network);
-            viewer.RefreshState();
-            Assert.That(viewer.OpenViewer(), Is.True, viewer.LastError);
-            Assert.That(viewer.IsOpen, Is.True);
-            Color32[] frozen = viewer.Preview.PaintTexture.GetPixels32();
+            var finish = network.target.GetComponent<LabPaintFinishPresentation>();
+            Assert.That(finish, Is.Not.Null);
+            Color32[] frozen = Pixels(model.PaintSurface);
             byte[] owners = Slots(model.PaintSurface);
             uint revision = model.PaintSurface.Revision;
+            int hits = network.Snapshot.players.Single().hitTotal;
+            float originalTimeScale = Time.timeScale;
+            viewer.RefreshState();
+            Assert.That(LabGourdResultViewer.CanInspect(network), Is.False,
+                "A completed map is committed before its finishing presentation releases the viewer.");
+            Assert.That(viewer.OpenViewer(), Is.False);
+            Assert.That(viewer.Preview, Is.Null);
+
+            // A terminal victory freezes drying even while the result presentation is still playing.
+            model.Tick(500d);
+            CommitDisplay(model, 500d);
+            Assert.That(model.PaintSurface.Revision, Is.EqualTo(revision));
+            Assert.That(paint.PaintTexture.GetPixels32(), Is.EqualTo(frozen));
+            Assert.That(Slots(model.PaintSurface), Is.EqualTo(owners));
+            double finishDeadline = Time.realtimeSinceStartupAsDouble + 3d;
+            while (!finish.Complete && Time.realtimeSinceStartupAsDouble < finishDeadline) yield return null;
+            Assert.That(finish.Complete, Is.True, "The real-time completion presentation must finish within its bounded budget.");
+            Assert.That(LabPaintFinishPresentation.DelayResult(network, network.Snapshot), Is.False);
+            Assert.That(Time.timeScale, Is.EqualTo(originalTimeScale));
+            Assert.That(network.Snapshot.players.Single().hitTotal, Is.EqualTo(hits));
+            Assert.That(model.PaintSurface.Revision, Is.EqualTo(revision));
+            Assert.That(Pixels(network.PaintSurface), Is.EqualTo(frozen));
+            Assert.That(Slots(model.PaintSurface), Is.EqualTo(owners));
+            viewer.RefreshState();
+            Assert.That(LabGourdResultViewer.CanInspect(network), Is.True);
+            Assert.That(viewer.OpenViewer(), Is.True, viewer.LastError);
+            Assert.That(viewer.IsOpen, Is.True);
+            Assert.That(viewer.Preview.PaintTexture.GetPixels32(), Is.EqualTo(frozen));
             model.Tick(1000d);
             CommitDisplay(model, 1000d);
             viewer.RefreshState();

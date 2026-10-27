@@ -16606,6 +16606,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3492e4b4afd984fa59291e57c9876897, type: 3}
   m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabOrbBoard
+  edgeControls:
+    Enabled: 1
+    TransferInset: 36
+    MinimumDrag: 12
+    TurnBackTolerance: 4
+    MinimumGripRadius: 22
+    RestDelay: 0.3
+    RestSpeed: 0.035
+    NudgeSpeed: 0.18
+    TargetPadding: 4
+    BottomPadding: 16
   comboSmallScale: 0.6
   comboBigScale: 1.4
   comboScaleSeconds: 0.25
@@ -28556,8 +28567,6 @@ GameObject:
   - component: {fileID: 821114678}
   - component: {fileID: 821114679}
   - component: {fileID: 1973402101}
-  - component: {fileID: 1973402103}
-  - component: {fileID: 1973402102}
   m_Layer: 0
   m_Name: Gourd Target
   m_TagString: Untagged
@@ -69044,34 +69053,6 @@ MonoBehaviour:
   maximumExtension: 0.5
   cycleAmplitude: 0
   cyclePeriod: 3
---- !u!114 &1973402102
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 821114677}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0053514c65e394114bc71179b9f4b9d6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabGourdFinish
---- !u!114 &1973402103
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 821114677}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9922afc13b7da4282b1304ca93a02526, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabGourdCrack
-  network: {fileID: 1262056752}
-  target: {fileID: 821114679}
-  gourdPrefab: {fileID: 3733535120980706465, guid: f2aa607be0f834674b7d681afc5f0f8f, type: 3}
-  crackMaterial: {fileID: 2100000, guid: 7c962a22bb667483e97676f268388789, type: 2}
 --- !u!1 &1974429206
 GameObject:
   m_ObjectHideFlags: 0

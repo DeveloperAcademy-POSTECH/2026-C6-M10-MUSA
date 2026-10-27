@@ -75,7 +75,7 @@ namespace C6Lab.Tests
                 // Apply through the ordinary DEV form, including both independent shared Config toggles.
                 developer.Open();
                 float[] tuning = fixture.CaptureDeveloperValues();
-                Assert.That(tuning.Length, Is.EqualTo(220), "Both shared feature toggles must survive the ordinary DEV form.");
+                Assert.That(tuning.Length, Is.EqualTo(205), "Both shared feature toggles must survive the ordinary DEV form.");
                 for (int i = 0; i < tuning.Length; i++)
                     developer.valueInputs[i].text = tuning[i].ToString("R", CultureInfo.InvariantCulture);
                 developer.ApplyAndStart();
@@ -367,6 +367,10 @@ namespace C6Lab.Tests
                 yield return null;
             Assert.That(network.LastShotReport, Does.StartWith("SHOT HIT"), "The result comes from a real Host collision.");
             Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
+            double finishDeadline = Time.realtimeSinceStartupAsDouble + 3d;
+            while (LabPaintFinishPresentation.DelayResult(network, network.Snapshot)
+                && Time.realtimeSinceStartupAsDouble < finishDeadline) yield return null;
+            Assert.That(LabPaintFinishPresentation.DelayResult(network, network.Snapshot), Is.False);
         }
 
         private static void AssertUnchangedResult(LabNetwork network, Color32[] pixels, uint revision,
@@ -451,7 +455,6 @@ namespace C6Lab.Tests
             float[] values = result.CaptureDeveloperValues();
             values[104] = 0; values[105] = 100; values[106] = 4; values[107] = 6;
             values[110] = 1; values[137] = 1;
-            Set(values, "Gourd Mode (0 paint, 1 crack)", 0);
             Set(values, "Monster Max HP", 40);
             Set(values, "Damage per Hit", 20);
             Set(values, "Battle Duration (seconds)", 30);

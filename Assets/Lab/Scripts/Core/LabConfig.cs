@@ -198,7 +198,7 @@ namespace C6Lab
             new LabDeveloperField("Drum Drift Speed (board widths/s)", 0f, 1f),
             new LabDeveloperField("Drum Drift Turning (per second)", 0f, 2f),
             new LabDeveloperField("Drum Spin Strength", 0f, 3f),
-            LabDeveloperField.Toggle("Gourd Mode (0 paint, 1 crack)", "PAINT", "CRACK"),
+            new LabDeveloperField("Reserved Gourd Mode (paint only)", 0f, 0f, true),
             new LabDeveloperField("Bomb Blast Radius (board widths)", 0f, 2f),
             new LabDeveloperField("Bomb Blast Strength (board widths/s)", 0f, 20f),
             new LabDeveloperField("Bomb Haptic Style (0-4)", 0f, 4f, true),
@@ -332,24 +332,7 @@ namespace C6Lab
             // #301 owns the two flash fields at 202 and 203; #305 appends its distinct warning at 204.
             LabDeveloperField.Toggle("섬광 흔들어 풀기 (0 off, 1 on)", "끔", "켬"),
             new LabDeveloperField("섬광 흔들기 횟수", 2f, 10f, true),
-            new LabDeveloperField("Charm Warning Seconds (0 = none)", 0f, 10f),
-            // 야광귀 시간표 (#314): 켜면 방해가 아래 시각에만 나온다. 시각은 전투 시작부터 잰 초이고 0이면 그 칸은 없다.
-            // #305 매혹 예고(204) 뒤 205~219번. 시간표 값이라 "기본값을 범위 가운데에" 규칙의 예외다.
-            LabDeveloperField.Toggle("야광귀 시간표 (0 off, 1 on)", "끔", "켬"),
-            new LabDeveloperField("시간표 전투 시간 (초)", 60f, 180f),
-            new LabDeveloperField("시간표 방해 끝 (초)", 0f, 180f),
-            new LabDeveloperField("고유1 시각 (초)", 0f, 180f),
-            LabDeveloperField.Choice("고유1 종류", "섬광", "콤보"),
-            new LabDeveloperField("고유2 시각 (초)", 0f, 180f),
-            LabDeveloperField.Choice("고유2 종류", "섬광", "콤보"),
-            new LabDeveloperField("고유3 시각 (초)", 0f, 180f),
-            LabDeveloperField.Choice("고유3 종류", "섬광", "콤보"),
-            new LabDeveloperField("고유4 시각 (초)", 0f, 180f),
-            LabDeveloperField.Choice("고유4 종류", "섬광", "콤보"),
-            new LabDeveloperField("공용1 시각 (초)", 0f, 180f),
-            new LabDeveloperField("공용2 시각 (초)", 0f, 180f),
-            new LabDeveloperField("공용3 시각 (초)", 0f, 180f),
-            new LabDeveloperField("공용4 시각 (초)", 0f, 180f)
+            new LabDeveloperField("Charm Warning Seconds (0 = none)", 0f, 10f)
         });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
@@ -386,12 +369,10 @@ namespace C6Lab
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
             // 섬광 흔들어 풀기·흔들기 횟수(#301)는 고해상도 도색(#299) 뒤 202·203번이며 섬광 칸 맨 아래에 둔다.
-            // 야광귀 시간표(#314)는 205~219번이며 섬광 칸 아래 따로 묶는다.
             new LabDeveloperCategory("야광귀", 155, 191, 156, 164, 157, 158, 159, 160, 161, 162, 163,
-                184, 185, 186, 187, 188, 189, 190, 202, 203,
-                205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219)
+                184, 185, 186, 187, 188, 189, 190, 202, 203)
                 .WithSwitch(155, 184)
-                .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──"), (20, "── 시간표 ──")),
+                .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
             new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
         });
 
@@ -526,8 +507,6 @@ namespace C6Lab
         [SerializeField] private int[] drumStopChances = { 40, 35, 15, 10 };
 
         [Header("Gourd (요괴 박)")]
-        [Tooltip("Paint: 흰 박에 구슬 속성 색을 칠한다 (#153). Crack: 박 모델에 금이 가고 처치 연출이 나온다 (#163).")]
-        [SerializeField] private LabGourdMode gourdMode = LabGourdMode.Paint;
         // DEMO_TUNING_VALUE: growth settings are captured when a round starts and may be tuned in DEV.
         [SerializeField, Range(0, 2)] private int paintSurfaceResolution = 2;
         [SerializeField, Range(.1f, 100f)] private float paintInitialPercent = 2f;
@@ -664,20 +643,6 @@ namespace C6Lab
         [SerializeField] private bool yaguangFlashShakeRelease = true;
         [Tooltip("눈부심을 풀려면 세게 흔들어야 하는 횟수 (#301). 기본 6번이면 보통 약 2초.")]
         [SerializeField, Range(2, 10)] private int yaguangFlashShakeCount = 6;
-
-        [Header("Experiment: yaguang timeline (#314)")]
-        [Tooltip("켜면 야광귀 방해(섬광·콤보·폭탄·스와이프 금지)가 아래 시각에만 나온다. 원래의 간격·랜덤 주기와 화면별 차례 기다리기는 쓰지 않는다. 야광귀 스테이지와 Lab에서만 쓴다.")]
-        [SerializeField] private bool yaguangTimelineEnabled;
-        [Tooltip("시간표가 켜져 있을 때의 전투 시간 (초). 공통 전투 시간은 그대로 둔다.")]
-        [SerializeField, Range(60f, 180f)] private float yaguangTimelineBattleSeconds = 120f;
-        [Tooltip("이 시각(초)이 되면 남은 방해 효과(SMALL/BIG·섬광·스와이프 금지·박 폭탄)를 모두 끝낸다. 그 뒤는 피버 자리다. 0이면 끝내지 않는다.")]
-        [SerializeField, Range(0f, 180f)] private float yaguangTimelineSabotageEndSeconds = 100f;
-        [Tooltip("고유 패턴 1~4가 시작하는(예고가 뜨는) 시각 (초). 0이면 그 칸은 없다.")]
-        [SerializeField] private float[] yaguangTimelineUniqueSeconds = { 10f, 35f, 60f, 75f };
-        [Tooltip("고유 패턴 1~4의 종류. 0 섬광, 1 콤보.")]
-        [SerializeField] private int[] yaguangTimelineUniqueKinds = { 0, 1, 0, 1 };
-        [Tooltip("공용 패턴 1~4(폭탄·스와이프 금지 중 하나)가 나오는 시각 (초). 0이면 그 칸은 없다. 첫 칸만 랜덤이고, 같은 것이 연달아 나오지 않으므로 그 뒤는 번갈아 나온다.")]
-        [SerializeField] private float[] yaguangTimelineCommonSeconds = { 25f, 40f, 60f, 80f };
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -926,7 +891,8 @@ namespace C6Lab
             }
             return total == 100;
         }
-        public LabGourdMode GourdMode => gourdMode == LabGourdMode.Crack ? LabGourdMode.Crack : LabGourdMode.Paint;
+        // Slot 79 is a retired, fixed-zero wire slot; later settings retain their indices.
+        public LabGourdMode GourdMode => LabGourdMode.Paint;
         public const int DefaultPaintVictoryPercent = 100;
         // Paint victory requires the entire target surface; it is not a DEV tuning value.
         public int PaintVictoryPercent => DefaultPaintVictoryPercent;
@@ -1029,24 +995,6 @@ namespace C6Lab
         public bool YaguangFlashShakeRelease => yaguangFlashShakeRelease;
         /// <summary>눈부심을 풀려면 흔들어야 하는 횟수 (#301)</summary>
         public int YaguangFlashShakeCount => Mathf.Clamp(yaguangFlashShakeCount, 2, 10);
-        /// <summary>야광귀 시간표 칸 수 (#314): 고유 4칸, 공용 4칸</summary>
-        public const int YaguangTimelineSlots = 4;
-        public bool YaguangTimelineEnabled => yaguangTimelineEnabled;
-        public float YaguangTimelineBattleSeconds => Mathf.Clamp(Finite(yaguangTimelineBattleSeconds, 120f), 60f, 180f);
-        public float YaguangTimelineSabotageEndSeconds => Mathf.Clamp(Finite(yaguangTimelineSabotageEndSeconds, 100f), 0f, 180f);
-        /// <summary>고유 칸 i의 시작 시각 (0 = 없음)</summary>
-        public float YaguangTimelineUniqueSeconds(int slot) => TimelineSeconds(yaguangTimelineUniqueSeconds, slot, DefaultUniqueSeconds);
-        /// <summary>고유 칸 i가 콤보인지 (아니면 섬광)</summary>
-        public bool YaguangTimelineUniqueIsCombo(int slot) =>
-            (yaguangTimelineUniqueKinds != null && slot < yaguangTimelineUniqueKinds.Length
-                ? yaguangTimelineUniqueKinds[slot] : DefaultUniqueKinds[slot]) == 1;
-        /// <summary>공용 칸 i의 시각 (0 = 없음)</summary>
-        public float YaguangTimelineCommonSeconds(int slot) => TimelineSeconds(yaguangTimelineCommonSeconds, slot, DefaultCommonSeconds);
-        private static readonly float[] DefaultUniqueSeconds = { 10f, 35f, 60f, 75f };
-        private static readonly int[] DefaultUniqueKinds = { 0, 1, 0, 1 };
-        private static readonly float[] DefaultCommonSeconds = { 25f, 40f, 60f, 80f };
-        private static float TimelineSeconds(float[] values, int slot, float[] fallback) =>
-            Mathf.Clamp(Finite(values != null && slot < values.Length ? values[slot] : fallback[slot], fallback[slot]), 0f, 180f);
         /// <summary>콤보를 야광귀 셈법(하나 둘 셋 넷)으로 보여주는지 (#271). 화면 표시만 바꾼다.</summary>
         public bool ComboYaguangCountEnabled => comboYaguangCountEnabled;
         public LabOrbAppearance OrbAppearance => orbAppearance;
@@ -1187,14 +1135,7 @@ namespace C6Lab
                 TeamTerritoryEnabled ? 1f : 0f, TeamBattleSeconds, TeamFeverHits, TeamFeverSeconds,
                 HighResolutionPaintEnabled ? 1f : 0f, HighResolutionPaintQuality,
                 YaguangFlashShakeRelease ? 1f : 0f, YaguangFlashShakeCount,
-                CharmWarningSeconds,
-                YaguangTimelineEnabled ? 1f : 0f, YaguangTimelineBattleSeconds, YaguangTimelineSabotageEndSeconds,
-                YaguangTimelineUniqueSeconds(0), YaguangTimelineUniqueIsCombo(0) ? 1f : 0f,
-                YaguangTimelineUniqueSeconds(1), YaguangTimelineUniqueIsCombo(1) ? 1f : 0f,
-                YaguangTimelineUniqueSeconds(2), YaguangTimelineUniqueIsCombo(2) ? 1f : 0f,
-                YaguangTimelineUniqueSeconds(3), YaguangTimelineUniqueIsCombo(3) ? 1f : 0f,
-                YaguangTimelineCommonSeconds(0), YaguangTimelineCommonSeconds(1),
-                YaguangTimelineCommonSeconds(2), YaguangTimelineCommonSeconds(3)
+                CharmWarningSeconds
             };
         }
 
@@ -1242,11 +1183,6 @@ namespace C6Lab
             if (values[167] > values[168]) { error = "Sabotage Interval Min cannot exceed Sabotage Interval Max."; return false; }
             if (values[173] > values[174]) { error = "Fox Fire Count Min cannot exceed Fox Fire Count Max."; return false; }
             if (values[192] > values[193]) { error = "Jigwi Auto Interval Min cannot exceed Jigwi Auto Interval Max."; return false; }
-            // 야광귀 시간표 (#314): 방해 끝과 모든 칸은 전투 시간 안이어야 한다(0 = 없음).
-            if (values[207] > values[206]) { error = "시간표 방해 끝은 시간표 전투 시간보다 늦을 수 없습니다."; return false; }
-            foreach (int slot in new[] { 208, 210, 212, 214, 216, 217, 218, 219 })
-                if (values[slot] > values[206])
-                { error = DeveloperFields[slot].Label + "은 시간표 전투 시간보다 늦을 수 없습니다."; return false; }
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
@@ -1327,7 +1263,7 @@ namespace C6Lab
             drumDriftSpeed = values[76];
             drumDriftTurning = values[77];
             drumSpinStrength = values[78];
-            gourdMode = values[79] >= .5f ? LabGourdMode.Crack : LabGourdMode.Paint;
+            // Retired gourd mode (79) is validated as zero before any setting is applied.
             bombBlastRadius = values[80];
             bombBlastStrength = values[81];
             bombHapticStyle = (LabHapticStyle)(int)values[82];
@@ -1445,12 +1381,6 @@ namespace C6Lab
             yaguangFlashShakeRelease = values[202] >= .5f;
             yaguangFlashShakeCount = (int)values[203];
             charmWarningSeconds = values[204];
-            yaguangTimelineEnabled = values[205] >= .5f;
-            yaguangTimelineBattleSeconds = values[206];
-            yaguangTimelineSabotageEndSeconds = values[207];
-            yaguangTimelineUniqueSeconds = new[] { values[208], values[210], values[212], values[214] };
-            yaguangTimelineUniqueKinds = new[] { (int)values[209], (int)values[211], (int)values[213], (int)values[215] };
-            yaguangTimelineCommonSeconds = new[] { values[216], values[217], values[218], values[219] };
             error = string.Empty;
             return true;
         }
