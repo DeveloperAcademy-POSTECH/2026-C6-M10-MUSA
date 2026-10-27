@@ -63,7 +63,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(238));
+                    Assert.That(values.Length, Is.EqualTo(240));
                     Assert.That(values[205], Is.EqualTo(before[205]), "Common gimmick interval preserved (#311)");
                     Assert.That(values[206], Is.EqualTo(before[206]), "Unique gimmick interval preserved (#311)");
                 }
@@ -111,6 +111,31 @@ namespace Hapio.Tests
                 CollectionAssert.AreEqual(before, settings.Capture(2));
             }
         }
+        [Test]
+        public void FeverTimeIsTunedOnTheFoxsTabAloneAndReachesItsStage()
+        {
+            // Fever time (#334) is the fox's alone for now: not Common, not the other yokai, not 2:2.
+            foreach (int index in new[] { LabConfig.FeverTimeSecondsField, LabConfig.FeverTimeRecoveryField })
+                for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                    Assert.That(GameStageSettings.IsFieldVisible(scope, index), Is.EqualTo(scope == 1), "Scope " + scope + ": " + index);
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                float[] fox = settings.Capture(1);
+                Assert.That(new[] { fox[LabConfig.FeverTimeSecondsField], fox[LabConfig.FeverTimeRecoveryField] },
+                    Is.EqualTo(new[] { 20f, 2f }), "Saved defaults: the last 20 s, twice the refill.");
+                fox[LabConfig.FeverTimeSecondsField] = 30f; fox[LabConfig.FeverTimeRecoveryField] = 3f;
+                Assert.That(settings.TryApply(1, fox, out string error), Is.True, error);
+                Assert.That(settings.Capture(3)[LabConfig.FeverTimeSecondsField], Is.EqualTo(20f), "The fox's tab stays its own.");
+                var config = settings.CreateStageConfig(1);
+                try
+                {
+                    Assert.That(config.FeverTimeSeconds, Is.EqualTo(30f));
+                    Assert.That(config.FeverTimeRecoveryMultiplier, Is.EqualTo(3f));
+                }
+                finally { UnityEngine.Object.DestroyImmediate(config); }
+            }
+        }
+
         [Test]
         public void EachStageKeepsItsOwnCommonGimmicksAndOnlyTheFoxHasUniqueOnes()
         {

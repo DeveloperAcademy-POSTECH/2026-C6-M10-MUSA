@@ -175,8 +175,8 @@ namespace C6Lab
             rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
 
-        /// <summary>White at the screen's edges, fading to clear well before its middle.</summary>
-        private static Sprite GlowSprite()
+        /// <summary>White at the screen's edges, fading to clear well before its middle. Fever time (#334) shares it.</summary>
+        internal static Sprite GlowSprite()
         {
             if (glowSprite != null) return glowSprite;
             const int size = 64;

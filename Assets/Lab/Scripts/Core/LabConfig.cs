@@ -371,12 +371,19 @@ namespace C6Lab
             new LabDeveloperField("지귀 피버 자동 회복 배율", 1f, 4f),
             // 섬광 파훼 보상 (#329): 최대 횟수까지 이어서 흔든 사람 판에 오색구슬. 칠 면적은 도색 한 번의 상한(3배) 안이다.
             new LabDeveloperField("섬광 오색구슬 수 (0 = 없음)", 0f, 6f, true),
-            new LabDeveloperField("오색구슬 칠 면적 (배)", 1f, 3f)
+            new LabDeveloperField("오색구슬 칠 면적 (배)", 1f, 3f),
+            // 피버 타임 (#334): 남은 시간이 이만큼이 되면 요괴 방해가 멈추고 자동 충전이 빨라진다. 지금은 구미호 스테이지만.
+            new LabDeveloperField("피버 타임 시작 (남은 초, 0 = 끔)", 0f, 60f),
+            new LabDeveloperField("피버 타임 충전 배율", 1f, 5f)
         });
 
         public const int JigwiStageFirstField = 228;
         public const int JigwiStageLastField = 235;
         public static bool IsJigwiStageField(int index) => index >= JigwiStageFirstField && index <= JigwiStageLastField;
+
+        /// <summary>Fever time (#334) DEV slots: when it starts (seconds left) and how much faster stamina refills.</summary>
+        public const int FeverTimeSecondsField = 238;
+        public const int FeverTimeRecoveryField = 239;
 
         public const int YaguangTimelineFirstField = 211;
         public const int YaguangTimelineLastField = 224;
@@ -440,7 +447,8 @@ namespace C6Lab
             new LabDeveloperCategory("야광귀 시간표 (Hapio 전용)", 212, 213, 214, 215, 216, 217, 218, 219, 220,
                 221, 222, 223, 224)
                 .WithDividers((0, "── 야광귀 전용 일정 · 일반 주기/비율 대신 사용 ──"), (1, "── 고유 예고 ──"), (9, "── 공용 ──")),
-            new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
+            new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199),
+            new LabDeveloperCategory("피버 타임 (Hapio 구미호 전용)", FeverTimeSecondsField, FeverTimeRecoveryField)
         });
 
 
@@ -475,6 +483,10 @@ namespace C6Lab
         [SerializeField] private bool rawStreakCorrectionEnabled = true;
         [SerializeField, Range(0, 100)] private int rawStreakOppositeChancePercent = 75;
         [SerializeField, Range(1, 10)] private int rawStreakMaximum = 3;
+        [Tooltip("피버 타임 (#334): 남은 시간이 이 초가 되면 구미호의 방해가 멈추고 정리되며 자동 충전이 빨라진다. 0이면 끈다.")]
+        [SerializeField, Range(0f, 60f)] private float feverTimeSeconds = 20f;
+        [Tooltip("피버 타임 동안 스태미나 자동 충전 속도에 곱하는 값. 명중 보상과 구슬 보유 한도는 그대로다.")]
+        [SerializeField, Range(1f, 5f)] private float feverTimeRecoveryMultiplier = 2f;
 
         [Header("Jigwi surface fire timeline (#332)")]
         [SerializeField] private bool jigwiStageTimelineEnabled = true;
@@ -903,6 +915,10 @@ namespace C6Lab
         /// 꺼져 있으면 `섬광 눈부심 (초)`. 다음 섬광 예약 같은 일정 계산은 언제나 `YaguangFlashGlareSeconds`를 쓴다.
         /// </summary>
         public float YaguangFlashGlareLimitSeconds => YaguangFlashShakeRelease ? float.PositiveInfinity : YaguangFlashGlareSeconds;
+        /// <summary>Fever time (#334): it starts when this many seconds are left; 0 turns it off.</summary>
+        public float FeverTimeSeconds => Mathf.Clamp(Finite(feverTimeSeconds, 20f), 0f, 60f);
+        /// <summary>How many times faster stamina refills by itself during fever time (#334).</summary>
+        public float FeverTimeRecoveryMultiplier => Mathf.Clamp(Finite(feverTimeRecoveryMultiplier, 2f), 1f, 5f);
 
         /// <summary>
         /// Percent weights in GeneratedKinds order. An Inspector total of zero falls back to
@@ -1296,7 +1312,8 @@ namespace C6Lab
                 JigwiStageTimelineEnabled ? 1f : 0f, JigwiStageWarningSeconds, JigwiStageActiveSeconds,
                 JigwiStageRootAngleDegrees, JigwiStageFireAngleDegrees, JigwiStageSpreadSeconds,
                 JigwiStageSpreadPatches, JigwiStageFeverMultiplier,
-                YaguangFiveColorOrbCount, YaguangFiveColorOrbPaintScale
+                YaguangFiveColorOrbCount, YaguangFiveColorOrbPaintScale,
+                FeverTimeSeconds, FeverTimeRecoveryMultiplier
             };
         }
 
@@ -1573,6 +1590,8 @@ namespace C6Lab
             jigwiStageFeverMultiplier = values[235];
             yaguangFiveColorOrbCount = (int)values[236];
             yaguangFiveColorOrbPaintScale = values[237];
+            feverTimeSeconds = values[FeverTimeSecondsField];
+            feverTimeRecoveryMultiplier = values[FeverTimeRecoveryField];
             error = string.Empty;
             return true;
         }

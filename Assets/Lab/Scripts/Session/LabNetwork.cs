@@ -221,13 +221,15 @@ namespace C6Lab
         // 5672: #328/#330 QA rules plus #332 Jigwi surface fire snapshot and shared DEV228..235 (236 values).
         // 5673: #329 flash five-colour orb reward (DEV 236-237, 238 shared values), fiveColor orb/projectile/impact flags,
         //       flash bonus request, glare that only a shake clears.
-        internal const ushort LabProtocolVersion = 5673;
+        // 5674: #334 gumiho fever time (DEV 238-239, 240 shared values) and feverTimeAt in the snapshot. It also
+        //       separates the builds that briefly used 5672 for #334 alone.
+        internal const ushort LabProtocolVersion = 5674;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/34");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/35");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
