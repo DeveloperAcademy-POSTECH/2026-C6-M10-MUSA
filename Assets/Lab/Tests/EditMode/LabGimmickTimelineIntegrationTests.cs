@@ -51,14 +51,30 @@ namespace C6Lab.Tests
         [TestCase(LabStageYokai.Gumiho)]
         [TestCase(LabStageYokai.Yaguang)]
         [TestCase(LabStageYokai.Jigwi)]
-        public void EveryStageUsesTheCommonBattleDuration(LabStageYokai stage)
+        public void EveryStageUsesTheCommonBattleDurationWhenJigwiTimelineIsOff(LabStageYokai stage)
         {
+            float[] off = config.CaptureDeveloperValues();
+            off[228] = 0f;
+            Apply(off);
             Assert.That(Room(stage: stage).Snapshot(0d).remaining, Is.EqualTo(120d));
             float[] values = config.CaptureDeveloperValues();
             values[2] = 150f;
             values[211] = 90f; // The Yaguang's own battle time is retired (#328); nothing reads it.
             Apply(values);
             Assert.That(Room(stage: stage).Snapshot(0d).remaining, Is.EqualTo(150d));
+        }
+
+
+        [Test]
+        public void EnabledJigwiTimelineKeepsItsOwn120SecondBoundaryWhileOtherStagesInheritCommonTime()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[2] = 150f;
+            values[228] = 1f;
+            Apply(values);
+            Assert.That(Room(stage: LabStageYokai.Jigwi).Snapshot(0d).remaining, Is.EqualTo(120d));
+            foreach (LabStageYokai stage in new[] { LabStageYokai.None, LabStageYokai.Gumiho, LabStageYokai.Yaguang })
+                Assert.That(Room(stage: stage).Snapshot(0d).remaining, Is.EqualTo(150d));
         }
 
         [Test]
@@ -73,7 +89,8 @@ namespace C6Lab.Tests
             At(room, 13d);
             Assert.That(Players.All(player => room.FlashGlared(player, 13d)), Is.True);
             At(room, 25d);
-            Assert.That(Players.Any(player => room.FlashGlared(player, 25d)), Is.False);
+            Assert.That(Players.All(player => room.FlashGlared(player, 25d)), Is.True,
+                "#329: the flash is used up by shaking, not by time; nobody shook, so everyone is still dazzled.");
 
             LabSnapshot warning = At(room, 35d);
             Assert.That(warning.comboWarningAt, Is.EqualTo(35d));

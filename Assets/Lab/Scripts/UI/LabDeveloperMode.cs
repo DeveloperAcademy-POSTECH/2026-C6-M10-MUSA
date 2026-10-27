@@ -343,9 +343,10 @@ namespace C6Lab
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
             {
                 if (System.Array.Exists(category.FieldIndices, LabConfig.IsYaguangTimelineField)
+                    || System.Array.Exists(category.FieldIndices, LabConfig.IsJigwiStageField)
                     || System.Array.IndexOf(category.FieldIndices, LabConfig.FeverTimeSecondsField) >= 0)
                 {
-                    // Lab uses its ordinary periodic profile; these fields are edited in Hapio's Yaguang scope only,
+                    // Lab uses its ordinary periodic profile; these fields are edited in Hapio's Yaguang or Jigwi scope only,
                     // and fever time (#334) in its fox scope only.
                     foreach (int index in category.FieldIndices)
                         valueInputs[index].transform.parent.gameObject.SetActive(false);

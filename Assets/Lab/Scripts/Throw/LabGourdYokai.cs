@@ -157,7 +157,7 @@ namespace C6Lab
             LabConfig config = network != null ? network.config : null;
             // 섬광 흔들어 풀기 (#301): 한 명이라도 눈부신 동안은 계속 나와 있다.
             bool glared = config != null && config.YaguangFlashShakeRelease
-                && LabYaguangFlash.AnyGlared(snapshot, serverNow, config.YaguangFlashGlareSeconds);
+                && LabYaguangFlash.AnyGlared(snapshot, serverNow, config.YaguangFlashGlareLimitSeconds);
             bool want = combo || bombLeft > 0f || flash || glared;
             DetectHits(snapshot, combo);
             DetectFlash(snapshot, serverNow);

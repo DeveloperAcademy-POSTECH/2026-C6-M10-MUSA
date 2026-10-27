@@ -75,7 +75,7 @@ namespace C6Lab.Tests
                 // Apply through the ordinary DEV form, including both independent shared Config toggles.
                 developer.Open();
                 float[] tuning = fixture.CaptureDeveloperValues();
-                Assert.That(tuning.Length, Is.EqualTo(230), "Both shared feature toggles must survive the ordinary DEV form.");
+                Assert.That(tuning.Length, Is.EqualTo(240), "Both shared feature toggles must survive the ordinary DEV form.");
                 for (int i = 0; i < tuning.Length; i++)
                     developer.valueInputs[i].text = tuning[i].ToString("R", CultureInfo.InvariantCulture);
                 developer.ApplyAndStart();

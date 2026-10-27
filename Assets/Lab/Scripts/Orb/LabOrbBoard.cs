@@ -410,7 +410,7 @@ namespace C6Lab
             bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
             LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false,
-            float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f, bool fever = false)
+            float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f, bool fever = false, bool fiveColor = false)
         {
             RequireConfigured();
             small &= !kind.IsDrum();
@@ -447,6 +447,8 @@ namespace C6Lab
                 existing.View.SetBurn(burnSeconds);
                 existing.View.SetLife(lifeSeconds);
                 existing.View.SetFever(fever);
+                existing.View.SetFiveColor(fiveColor);
+                if (fiveColor) fiveColorIds.Add(id); else fiveColorIds.Remove(id);
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -468,6 +470,8 @@ namespace C6Lab
             view.SetBurn(burnSeconds);
             view.SetLife(lifeSeconds);
             view.SetFever(fever);
+            view.SetFiveColor(fiveColor);
+            if (fiveColor) fiveColorIds.Add(id);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
@@ -1125,6 +1129,11 @@ namespace C6Lab
             && ((entries.TryGetValue(id, out Entry entry) && entry.Provisional) || generationPreviews.ContainsKey(id));
 
         /// <summary>Appearance already known locally, including a provisional combination's inherited size.</summary>
+        private readonly HashSet<string> fiveColorIds = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>이 판 구슬이 섬광 파훼 보상 오색구슬인지 (#329). 던질 때 투사체도 오색구슬 모습이 된다.</summary>
+        public bool IsFiveColor(string id) => id != null && fiveColorIds.Contains(id);
+
         public bool TryGetLocalAppearance(string id, out LabOrbElement element, out bool small)
         {
             element = LabOrbElement.None;

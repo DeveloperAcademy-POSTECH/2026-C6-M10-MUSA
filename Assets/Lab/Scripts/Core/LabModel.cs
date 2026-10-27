@@ -352,6 +352,7 @@ namespace C6Lab
             ResetJigwi(config);
             ResetStageYokai(config, now);
             ResetYaguangTimeline(now);
+            ResetJigwiStage(config, now);
             ResetFeverTime(now);
         }
 
@@ -467,7 +468,11 @@ namespace C6Lab
                 x = normalizedCenter.x, y = normalizedCenter.y,
                 vx = velocity.x, vy = velocity.y, createdAt = now, revision = ++revision, inFlight = false,
                 // One blast-shrunk half makes the whole orb small, and its fire burns on (#213).
-                small = first.small || second.small, burnedAt = Math.Max(first.burnedAt, second.burnedAt)
+                small = first.small || second.small, burnedAt = Math.Max(first.burnedAt, second.burnedAt),
+                gourdBlastOnlySmall = (first.small || second.small)
+                    && (!first.small || first.gourdBlastOnlySmall) && (!second.small || second.gourdBlastOnlySmall),
+                gourdBlastBurnedAt = Math.Max(first.gourdBlastBurnedAt, second.gourdBlastBurnedAt),
+                ordinaryBlastBurnedAt = Math.Max(first.ordinaryBlastBurnedAt, second.ordinaryBlastBurnedAt)
             };
             orbs.Add(orb.id, orb);
             players[sender].combinedTotal++;
@@ -614,6 +619,8 @@ namespace C6Lab
                 || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight
                 || !players.TryGetValue(orb.owner, out var attacker)) return false;
             element = orb.element;
+            if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth)
+                TryExtinguishJigwiStageRoot(orb.owner, paintDirection, now, out _);
             orbs.Remove(id);
             float areaScale = LaunchScaleOf(id);
             launchScales.Remove(id);
@@ -630,17 +637,23 @@ namespace C6Lab
             attacker.damageTotal = (int)Math.Min(int.MaxValue,
                 (long)attacker.damageTotal + attackValue);
 
+            LastHitFiveColor = orb.fiveColor;
             if (teamMode)
                 ConfirmTeamHit(attacker, element, paintDirection, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale, now);
             else
             {
-                if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
-                    && paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1,
-                        (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale)
-                    && paintSurface.IsComplete)
+                float share = (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale;
+                // 오색구슬 (#329): 다섯 원소 색 얼룩으로, 정해 둔 배율만큼 넓게 칠한다. 도색 한 번은 최대 3배다.
+                if (orb.fiveColor) share = Mathf.Min(3f, share * rules.FiveColorOrbPaintScale);
+                bool paints = orb.fiveColor || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
+                bool painted = paints && (orb.fiveColor
+                    ? PaintFiveColors(paintDirection, attacker, share)
+                    : paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, share));
+                if (painted && paintSurface.IsComplete)
                 {
                     phase = LabPhase.Victory;
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
+                    AdvanceJigwiStage(now);
                 }
             }
             if (rules.ComboEnabled && combo.Active)
@@ -1126,6 +1139,16 @@ namespace C6Lab
                 if (id == null || !orbs.TryGetValue(id, out var orb) || orb.owner != sender || orb.inFlight
                     || orb.kind == LabOrbKind.Bomb || orb.kind.IsDrum() || orb.kind == LabOrbKind.FoxFire)
                     continue;
+                if (JigwiStageEnabled && jigwiGourdBlastIds.Contains(bombId))
+                {
+                    if (!orb.small) orb.gourdBlastOnlySmall = true;
+                    orb.gourdBlastBurnedAt = now;
+                }
+                else
+                {
+                    orb.ordinaryBlastBurnedAt = now;
+                    orb.gourdBlastOnlySmall = false;
+                }
                 orb.burnedAt = now;
                 orb.small = true;
                 orb.revision = ++revision;
@@ -1183,7 +1206,8 @@ namespace C6Lab
             if (!rules.FlashEnabled || phase != LabPhase.Playing || flashCount == 0 || lastFlashAt < 0d) return false;
             if (rules.FlashTargetOne && lastFlashTarget != player) return false;
             if (!players.TryGetValue(player, out var state)) return false;
-            if (now < lastFlashAt || now >= lastFlashAt + rules.FlashGlareSeconds) return false;
+            // #329: 흔들어 풀기가 켜져 있으면 시간으로 풀리지 않는다(다음 섬광·방해 끝·판이 끝날 때까지).
+            if (now < lastFlashAt || now >= lastFlashAt + rules.FlashGlareLimitSeconds) return false;
             return state.flashReleasedAt < lastFlashAt;
         }
 
@@ -1292,6 +1316,7 @@ namespace C6Lab
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
                 drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray(),
                 jigwi = CopyJigwiStates(),
+                jigwiStage = CopyJigwiStageSnapshot(now),
                 swipeBlockedPlayer = BlockOn(now) ? swipeBlockedPlayer : 0,
                 swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
                 swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
@@ -1383,8 +1408,10 @@ namespace C6Lab
                 if (elapsed > 0d)
                 {
                     played += elapsed;
-                    // Fever time (#334) refills faster by itself; hit rewards and the storage limit stay as they are.
-                    double refill = elapsed + FeverSecondsBetween(lastTime, effectiveNow) * (rules.FeverTimeRecoveryMultiplier - 1d);
+                    // The Jigwi stage's fever (#332) and fever time (#334) refill faster by themselves; hit rewards and the
+                    // storage limit stay as they are. Each belongs to its own stage, so they never stack.
+                    double refill = elapsed * JigwiStageRecoveryMultiplier(lastTime)
+                        + FeverSecondsBetween(lastTime, effectiveNow) * (rules.FeverTimeRecoveryMultiplier - 1d);
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + refill * rules.StaminaRecoveryPerSecond));
@@ -1396,6 +1423,7 @@ namespace C6Lab
                 MarkBusyScreens(lastTime, effectiveNow);
                 // The schedule cutoff cancels before same-time bomb expiry or combo timeout can award a penalty.
                 EndYaguangTimeline(effectiveNow);
+                AdvanceJigwiStage(effectiveNow);
                 // Fever time (#334) stops the yokai before any gimmick due at the same moment is cast.
                 StartFeverTime(effectiveNow);
                 if (StageYokai != LabStageYokai.None)
@@ -1421,6 +1449,7 @@ namespace C6Lab
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
                 }
                 else if (now >= deadline) phase = LabPhase.Defeat;
+                if (phase != LabPhase.Playing) AdvanceJigwiStage(effectiveNow);
             }
             lastTime = now;
             return true;
@@ -1582,7 +1611,8 @@ namespace C6Lab
                 {
                     double at = nextCommonGimmickAt;
                     uint index = commonGimmickCount++;
-                    nextCommonGimmickAt = rules.YaguangTimeline ? NextYaguangCommonAt(commonGimmickCount)
+                    nextCommonGimmickAt = JigwiStageEnabled ? NextJigwiStageCommonAt(commonGimmickCount)
+                        : rules.YaguangTimeline ? NextYaguangCommonAt(commonGimmickCount)
                         : at + GimmickInterval(rules.CommonGimmickInterval);
                     bool cast = rules.YaguangTimeline ? CastYaguangCommon(at, index)
                         : CastGimmick(rules.CommonGimmicks, at, index, SabotageKindSalt, SabotageTargetSalt,
@@ -1930,6 +1960,11 @@ namespace C6Lab
                 FlashGlareSeconds, FlashRecoverySeconds;
             /// <summary>Yaguang flash release (#301): a dazzled player shakes their phone to clear their own glare.</summary>
             public readonly bool FlashShakeRelease;
+            /// <summary>섬광이 시간으로 풀리는 초 (#329). 흔들어 풀기가 켜져 있으면 무한(소모성 방해).</summary>
+            public readonly float FlashGlareLimitSeconds;
+            /// <summary>섬광 파훼 보상 (#329): 오색구슬 수와 칠 면적</summary>
+            public readonly int FiveColorOrbCount;
+            public readonly float FiveColorOrbPaintScale;
 
             public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode)
             {
@@ -1973,7 +2008,8 @@ namespace C6Lab
                 SmallOrbPaintShare = config.SmallOrbPaintShare;
                 Damage = config.Damage;
                 OrbStorageLimit = config.OrbStorageLimit;
-                BattleDurationSeconds = config.BattleDurationSeconds;
+                BattleDurationSeconds = stageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled
+                    ? 120f : config.BattleDurationSeconds;
                 StaminaMax = config.StaminaMax;
                 StaminaStart = config.StaminaStart;
                 GenerateCost = config.GenerateCost;
@@ -2006,6 +2042,9 @@ namespace C6Lab
                 FlashGlareSeconds = config.YaguangFlashGlareSeconds;
                 FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
                 FlashShakeRelease = config.YaguangFlashShakeRelease;
+                FlashGlareLimitSeconds = config.YaguangFlashGlareLimitSeconds;
+                FiveColorOrbCount = config.YaguangFiveColorOrbCount;
+                FiveColorOrbPaintScale = config.YaguangFiveColorOrbPaintScale;
                 // One stage policy feeds the shared scheduler; there is no second timeline execution loop.
                 YaguangTimeline = stageYokai == LabStageYokai.Yaguang && !teamMode;
                 YaguangTimelineEndSeconds = YaguangTimeline ? config.YaguangTimelineSabotageEndSeconds : 0d;

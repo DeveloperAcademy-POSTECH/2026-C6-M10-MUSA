@@ -40,6 +40,9 @@ namespace C6Lab
         public string[] ids;
         /// <summary>A projectile thrown from a blast-shrunk orb (#213).</summary>
         public bool small;
+        public bool paintBlocked;
+        /// <summary>A five-colour orb projectile or hit (#329).</summary>
+        public bool fiveColor;
         /// <summary>Why a transferred body crossed its edge (LabEdgeCrossingKind).</summary>
         public int crossing;
         public uint round;
@@ -213,18 +216,20 @@ namespace C6Lab
         //       retired bomb/block/sabotage timers.
         // 5669: #324 per-player Yin/Yang streak control (DEV 225-227, 228 shared values).
         // 5670: #326 Blast Burn Seconds range 3-5 -> 3-9 (default 4 -> 6); an older peer would reject the new value.
-        // 5671: #330 flash shake count range 2-10 -> 2-18 (default 6 -> 10, now a maximum: one orb regains colour per shake).
-        //       #328 merged on the same number: an unlocked bomb glides in and opens into two attack orbs through "use"
-        //       (never thrown), a double tap clears a fox orb through "use" and the side edges stop it; DEV 55/211 retired.
-        // 5672: #334 gumiho fever time (DEV 228-229, 230 shared values) and feverTimeAt in the snapshot; it also
-        //       separates builds holding only one of #330/#328 from those holding both.
-        internal const ushort LabProtocolVersion = 5672;
+        // 5671: standalone #330 expanded flash shake count 2-10 -> 2-18 (default 6 -> 10,
+        //       one orb regains colour per shake); standalone #332 used the same version for a different layout.
+        // 5672: #328/#330 QA rules plus #332 Jigwi surface fire snapshot and shared DEV228..235 (236 values).
+        // 5673: #329 flash five-colour orb reward (DEV 236-237, 238 shared values), fiveColor orb/projectile/impact flags,
+        //       flash bonus request, glare that only a shake clears.
+        // 5674: #334 gumiho fever time (DEV 238-239, 240 shared values) and feverTimeAt in the snapshot. It also
+        //       separates the builds that briefly used 5672 for #334 alone.
+        internal const ushort LabProtocolVersion = 5674;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/33");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/35");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1302,6 +1307,7 @@ namespace C6Lab
                 if (now >= nextSnapshotAt) PublishSnapshot(false);
             }
             SyncJigwiFireSurfaces();
+            SyncJigwiStagePresentation();
             if (!gameBattleFrozen)
             {
                 FlushPendingBlastReports(now);
@@ -1585,6 +1591,8 @@ namespace C6Lab
             if (!IsHost || model == null) return;
             double now = Time.realtimeSinceStartupAsDouble;
             latest = model.Snapshot(battleClock.Now(now));
+            if (CalibrateJigwiStageGeometry(latest, battleClock.Now(now)))
+                latest = model.Snapshot(battleClock.Now(now));
             EnsureActionRound();
             LabHangingTarget hanging = target == null ? null : target.GetComponent<LabHangingTarget>();
             if (hanging != null)
@@ -1831,6 +1839,13 @@ namespace C6Lab
                 PauseAsHost();
                 return;
             }
+            if (packet.type == FlashBonusPacket)
+            {
+                // 섬광 파훼 보상 (#329): 이번 섬광에서 끝까지 흔든 사람 판에 오색구슬. 한 섬광에 한 번만.
+                if (battleClock.IsPaused || packet.requestId < 1) return;
+                if (model.TryFlashFiveColorBonus(sender, packet.flashGeneration, now, out _)) PublishSnapshot(true);
+                return;
+            }
             if (packet.type == FlashShakePacket)
             {
                 // 야광귀 섬광 (#301): 폰을 다 흔든 사람의 눈부심만 푼다. 눈부시지 않으면 무시한다.
@@ -1873,6 +1888,7 @@ namespace C6Lab
             // A blast-shrunk orb flies small and so has less reach on the gourd (#213).
             var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element,
                 orb.small ? config.BlastShrinkScale : 1f);
+            if (orb.fiveColor) LabFiveColorSparkle.AttachArt(projectile.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
             projectile.name = "Projectile " + orb.id;
             float sizeScale = model != null ? model.LaunchScaleOf(orb.id) : 1f;
             projectile.SetRadiusScale(sizeScale);
@@ -1882,7 +1898,7 @@ namespace C6Lab
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 round = model.Round, requestId = actionId,
-                firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small,
+                firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small, fiveColor = orb.fiveColor,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
                 wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
@@ -1931,25 +1947,37 @@ namespace C6Lab
                     Vector3 targetLocalPoint = hitbox.InverseTransformPoint(result.HitPoint);
                     float signedYawImpulse = target.GetComponent<LabHangingTarget>()
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
-                    target.NotifyApprovedHit(targetLocalPoint, element);
-                    impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
-                        result.ImpactVelocity, false);
-                    if (result.OwnerPlayerId == LocalPlayerId)
+                    bool paintBlocked = element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
+                        && model.PaintSurface.WouldBlockHit(result.OwnerPlayerId, paintDirection);
+                    if (paintBlocked)
+                    {
+                        jigwiStagePresentation?.PlayBlocked(targetLocalPoint);
+                        if (result.OwnerPlayerId == LocalPlayerId) SetNotice("불에 막힘");
+                    }
+                    else
+                    {
+                        target.NotifyApprovedHit(targetLocalPoint, element);
+                        impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
+                            result.ImpactVelocity, false);
+                    }
+                    bool fiveColor = model.LastHitFiveColor;
+                    if (fiveColor && !paintBlocked) PresentFiveColorHit(targetLocalPoint, result.OwnerPlayerId);
+                    if (!paintBlocked && result.OwnerPlayerId == LocalPlayerId)
                     {
                         LastLocalHitOffset = LabThrowSound.HitOffset(targetLocalPoint,
                             hitbox.InverseTransformDirection(result.ImpactVelocity));
                         LocalThrowHit?.Invoke(impactValue);
                     }
-                    Color paintColor = model.PaintColorFor(element);
+                    Color paintColor = fiveColor ? model.PaintColorFor(LabOrbElement.Wood) : model.PaintColorFor(element); // 표시용, 오색구슬은 다섯 색을 칠한다
                     var impact = new LabNetworkPacket { type = "targetImpact", sessionId = sessionId,
                         round = model.Round, firstId = result.ProjectileId, owner = result.OwnerPlayerId,
-                        element = (int)element, damage = actualDamage, impactValue = impactValue,
+                        element = (int)element, damage = actualDamage, impactValue = impactValue, paintBlocked = paintBlocked,
                         paintX = paintDirection.x, paintY = paintDirection.y, paintZ = paintDirection.z,
                         paintR = Mathf.Clamp01(paintColor.r), paintG = Mathf.Clamp01(paintColor.g),
                         paintB = Mathf.Clamp01(paintColor.b), paintA = Mathf.Clamp01(paintColor.a),
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
-                        spinImpulse = signedYawImpulse };
+                        spinImpulse = signedYawImpulse, fiveColor = fiveColor };
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
             }
@@ -1978,7 +2006,9 @@ namespace C6Lab
         {
             ApplyGameStartSimulationHold();
             SyncJigwiFireSurfaces();
+            SyncJigwiStagePresentation();
             if (board == null || latest == null) return;
+            NoticeFiveColorOrbs(latest);
             var current = new HashSet<string>();
             foreach (var orb in latest.orbs ?? Array.Empty<LabOrbState>())
             {
@@ -2001,7 +2031,7 @@ namespace C6Lab
                     // The white flash before an orb runs out (#235); a locked bomb shows its own red one.
                     lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
-                    jigwiScale: orb.jigwiRadiusScale, fever: orb.fever,
+                    jigwiScale: orb.jigwiRadiusScale, fever: orb.fever, fiveColor: orb.fiveColor,
                     // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
@@ -2259,13 +2289,21 @@ namespace C6Lab
                         // Cell state arrives separately from feedback; never rerun a local Stamp.
                         target.GetComponent<LabHangingTarget>()?.ApplyRemoteImpact(
                             new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse);
-                        target.NotifyApprovedHit(new Vector3(packet.x, packet.y, packet.z), (LabOrbElement)packet.element);
-                        impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
-                            (LabOrbElement)packet.element, packet.damage,
-                            new Vector3(packet.wx, packet.wy, packet.wz),
-                            false);
+                        if (packet.paintBlocked)
+                        {
+                            jigwiStagePresentation?.PlayBlocked(new Vector3(packet.x, packet.y, packet.z));
+                            if (packet.owner == LocalPlayerId) SetNotice("불에 막힘");
+                        }
+                        else
+                        {
+                            target.NotifyApprovedHit(new Vector3(packet.x, packet.y, packet.z), (LabOrbElement)packet.element);
+                            impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
+                                (LabOrbElement)packet.element, packet.damage,
+                                new Vector3(packet.wx, packet.wy, packet.wz), false);
+                            if (packet.fiveColor) PresentFiveColorHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
+                        }
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
-                        if (packet.owner == LocalPlayerId)
+                        if (!packet.paintBlocked && packet.owner == LocalPlayerId)
                         {
                             Transform localHitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
                             LastLocalHitOffset = LabThrowSound.HitOffset(new Vector3(packet.x, packet.y, packet.z),
@@ -2293,6 +2331,7 @@ namespace C6Lab
                             ? (LabOrbElement)packet.element : LabOrbElement.None;
                         LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element,
                             packet.small ? config.BlastShrinkScale : 1f);
+                        if (packet.fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
                         if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetMissSurface(battleFloor);
                         SyncJigwiFireSurfaces();
@@ -2414,6 +2453,7 @@ namespace C6Lab
             if (snapshot == null || snapshot.sessionId != packet.sessionId
                 || snapshot.players == null || snapshot.players.Length != targetParticipantCount
                 || !LabJigwiNetworkValidation.Valid(snapshot.jigwi)
+                || !LabJigwiStageNetworkValidation.Valid(snapshot.jigwiStage, snapshot.players)
                 || !LabFlashNetworkValidation.Valid(snapshot)) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
             if (!PaintReceiver.Matches(snapshot))

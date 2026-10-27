@@ -37,6 +37,14 @@ MonoBehaviour:
   rawStreakMaximum: 3
   feverTimeSeconds: 20
   feverTimeRecoveryMultiplier: 2
+  jigwiStageTimelineEnabled: 1
+  jigwiStageWarningSeconds: 1
+  jigwiStageActiveSeconds: 7
+  jigwiStageRootAngleDegrees: 18
+  jigwiStageFireAngleDegrees: 30
+  jigwiStageSpreadSeconds: 1
+  jigwiStageSpreadPatches: 3
+  jigwiStageFeverMultiplier: 2
   itemLifetimeSeconds: 15
   itemUnlockSwipesMin: 2
   itemUnlockSwipesMax: 4
@@ -182,6 +190,8 @@ MonoBehaviour:
   yaguangFlashRecoverySeconds: 1
   yaguangFlashShakeRelease: 1
   yaguangFlashShakeCount: 10
+  yaguangFiveColorOrbCount: 3
+  yaguangFiveColorOrbPaintScale: 2
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9

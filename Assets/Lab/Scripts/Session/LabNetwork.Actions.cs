@@ -480,6 +480,8 @@ namespace C6Lab
             if (orb == null && board != null) board.TryGetLocalAppearance(request.firstId, out element, out small);
             LabProjectile visual = LabProjectile.Create(position, config, projectileRoot,
                 element, small ? config.BlastShrinkScale : 1f);
+            bool fiveColor = orb != null ? orb.fiveColor : board != null && board.IsFiveColor(request.firstId);
+            if (fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
             float scale = player.comboPenaltyUntil > latest.serverTime ? config.ComboPenaltySizeScale
                 : player.comboRewardUntil > latest.serverTime ? config.ComboRewardSizeScale : 1f;
             if (config.GourdColorComboEnabled) visual.SetRadiusScale(scale);

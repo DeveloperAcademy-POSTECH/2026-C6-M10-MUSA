@@ -3013,6 +3013,19 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - 별도10만회수식재현:음50,032·양49,968,최대연속3,평균연속1.62546. 같은bit연산·salt·규칙의오프라인계산이며Unity10만개엔티티/실기기시험이나장기분포의증명으로취급하지않는다. 설계상50:50의음양대칭이고정확한반반개수를보장하는셔플백은아니다.
 - **미실행:** 실기기iPhone/iPad·독립Mac게임앱·실제LAN/핫스팟·네이티브빌드/성능. 사용자요청에따라제외했다. 검사전용Editor는종료하고TimeManager자동직렬화는원복했다. 원시로그·기기정보·빌드산출물은커밋하지않는다.
 
+
+## 2026-10-27 · #332 지귀 120초 발화·불장막 통합
+
+- 기준 main `4ee330a6`에서 `feat/#332-jigwi-120s-fire-stage`로 작업했다. 기획서 승인과 사용자 결정(자동 회복 2배·공통 무작위/기존 수명/중첩·개인 칠 차단 초안)을 반영했다. 미정인 소모 감소는 구현하지 않았다.
+- 실제 박 MeshCollider 명중 → helper 근원 확인 → 연결 불 해제 → 통상 칠 1회. 초기 무배치 geometry의 보이지 않는 판정과 None 속성 Relay/Bomb의 근원 해제를 거절한다. A2/B2 위치 변주는 Host 교정 후에도 유지되며, 회전 시 근원만 재배치한다.
+- 셀별 대상 P 차단·기존 건조·초기 독립 튀김점·성장 소수 귀속/보류/다른 P 진행을 보존한다. GPU도 확정 지도와 일치한다. 100초에는 기믹 폭탄 파생 화상/축소를 출처별로 정리하고 일반 폭탄/이미 비행 중인 구슬은 유지한다.
+- 새 DEV 8개는 228~235, 총 236개다. 5671/Lab32/Game15로 이전 앱 혼용을 차단한다. Unity API로 원본 새 8개 값을 저장하고, Home/Lobby의 새 8행과 기존 DEV 캐시·예약 행을 동기화했다. 이전 228개 유효 값·6개 Scene의 DEV 외 RectTransform 576개·사용자 미추적 meta/별도 보고서를 보존했다.
+- Unity 6000.6.5f1 macOS/Metal 검사 전용 Editor에서 전체 EditMode **1407/1407 통과(32.38초)**, 전체 PlayMode **421/421 통과(455.65초)**. 실패/Skipped/Inconclusive 0. 신규 모델·스키마·header·블라스트·셀 차단과 기존 회귀를 포함한다.
+- 지귀 집중 PlayMode **7/7 통과(13.26초)**: 실제 저장 Home/세션 → Solo → 3/2/1 → Pause/DEV Skip 두 번 → Stage3 Battle, 실제 WhiteGourd/Collider/표면 교정·근원·HUD·위치 변주. 별도 2인 모델 기하 샘플은 실제 2기기 전송 시험이 아니다.
+- 고해상도 차단 집중 PlayMode **1/1 통과(0.18초)**. 초기 도색 집중 Edit 14/14 이후 셀 중심 피격 조회 경계 1건을 더해 최종 전체에 15건을 포함했다.
+- 초기 새 검사에서 없는 enum을 사용한 컴파일 오류와 북 보유 입력이 없는 fixture 2개를 보완했다. 수정 전 캐시 어셈블리 결과를 최종으로 취급하지 않고 AssetDatabase.Refresh/재컴파일 준비를 확인한 뒤 최종 검사를 실행했다. 첫 전체 PlayMode에서 드러난 지귀의 구형 시간·수동 패널 기대값도 현행 정책에 맞춰 분리했다. 원시 로그/기기 식별자/빌드는 저장소에 추가하지 않는다.
+- **미실행:** 실제 iPhone/iPad·2~5인 다중 기기·LAN/핫스팟·네이티브 빌드/성능·사람의 조준/도움 인지/재미·실제 샤우팅/SFX. 음성 클립은 선택형 연결점만 준비하고 미할당이다. 검사 Editor는 종료하고 검사 부수 TimeManager 직렬화는 원복한다.
+
 ## 2026-10-27 · #328 QA 반영: 해금 폭탄·여우구슬 두 번 누르기·매혹 안내·전투 2분·스태미나 6칸
 
 - 기준 main `4ee330a6`, 기능 브랜치 `feat/#328-qa-bomb-guide-stamina`. QA에서 "매혹·여우구슬을 어떻게 푸는지 모르겠다", "폭탄을 받은 건지 공격 구슬을 받은 건지 모르겠다"는 의견을 반영했다. 피버 타임(마지막 20초)은 별도 이슈로 뺐고, 매혹이 한 번도 안 걸렸다는 보고는 조사에서 제외했다(아래 참고).
@@ -3037,12 +3050,23 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - **사용자 검사 1차 실패 3건(수정)**: ① ② `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`(Home·Lobby): 장면에 저장된 DEV 칸 기본값이 원본과 달랐다(전투 180·스태미나 160, #326의 폭발 불 4초·최대 5도 미반영). 기존 Editor 도구 `Hapio/Upgrade Menu DEV Rows`를 Editor API로 실행해 값·범위를 원본에 맞췄고, 은퇴 칸 줄(55·87·88·152·154)은 공통 탭에서 숨겨졌다. ③ `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset`: 생성 한 번이 음일 거라고 가정해 양이 먼저 나오거나 음이 둘이면 실패하는 검사였다. 음이 나올 때까지(최대 5번) 생성하고 첫 음을 쓰도록 고쳤다. 런타임 규칙은 바꾸지 않았다.
 - 바뀐/추가된 검사: `LabModelTests`(해금 폭탄 열림·가득 찬 판·던지기/넘기기 거절, 잠긴 폭탄 열기 거절, 여우구슬 가장자리 거절·두 번 누르기, 아이템 사용 수), `LabDeveloperConfigTests`(은퇴 8칸, 저장 원본 120초·120 스태미나, 시간표가 짧은 전투를 막지 않음, 손가락 Sprite), `LabGimmickTimelineIntegrationTests`(모든 스테이지 공용 전투 시간), `LabYaguangFlashTests`, `LabOrbPhysicsTests`(여우구슬 튕김·두 번 누르기 연기, 해금 폭탄 미끄러짐·잡기 불가·열기 요청), `LabCharmBubblesTests`(손가락·안내 문구), `LabDeveloperSoloIntegrationTests`(여우 안내·솔로 매혹 대기 문구 없음), Hapio `GameStageSettingsTests`·`GameTerritoryFlowTests`·`GameStageUiTests`·`GameSceneFlowTests`, 프로토콜·토큰 고정값.
 
+
+## 2026-10-27 · #332 PR#337 최신 main 통합 재검사
+
+- main `6022eb9f`(#333/#331)와 지귀 기능을 통합한 `7575fd7c` 소스에서 검사했다. 최초 구현 `aa52a086`의1407/421건과 분리한 재검증이다.
+- Unity6000.6.5f1·macOS/Metal 검사 전용 Editor에서 통합 EditMode **1409/1409 통과(29.24초)**, 통합 PlayMode **423/423 통과(477.27초)**. 실패·Skipped·Inconclusive0.
+- main의 스태미나120/6칸·공용 전투 기본120초·폭탄 개봉→공격 구슬2개·여우불2탭/안내·구슬별 섬광 복구와 지귀 타임라인을 함께 유지했다. 폭탄 직접 투척 거절→use개봉→새 공격구슬로 근원 해제 검사를 보완했다.
+- 설정236개, 최종규약5672/Lab33/Game16. 이전5671 두 계열과 혼용하지 않으며 퇴역55/211의 기존 캡처값과 비노출을 보존한다.
+- 현재main과 DEV 외 RectTransform576개가 같고 Lab/Battle/결과Scene·Prefab·패키지·빌드 설정은 바꾸지 않았다. 별도 GourdExport/PNG문서·사용자 Scene.meta·구조 정리 보고서는 PR에서 제외했다.
+- 검사용 Editor만 종료하고 TimeManager의 검사 부수 직렬화는 원복했다. 다른 프로젝트의 Editor는 종료하지 않았다. 새 실행 로그나 개인 경로·기기 식별자는 저장소에 추가하지 않았다.
+- **미실행:** 실제기기·다중기기LAN/핫스팟·네이티브빌드/성능·실제음성/SFX·사람의 조준·재미. 음성 미할당과 별도 소모 감소 미정은 기존 제한을 유지한다.
+
 ## 2026-10-27 · #334 구미호 피버 타임
 
 - 기준 main `6022eb9f`(#333 병합), 기능 브랜치 `feat/#334-gumiho-fever-time`. 커밋은 DEV 값·접속 버전 → 규칙 → 두배 말풍선 → 문구·가장자리·빨간 시간 → 문서 순서로 나눴다.
-- **규칙**: 구미호 스테이지(2:2 제외)에서 `feverTimeAt = max(시작, 마감 − DEV228)`. 요괴 판의 시간 진행은 사건 시각에서 잘리므로(`NextStageBoundary`) 그 시각에 정확히 `StartFeverTime`이 기믹 예약을 무한대로 돌리고(같은 시각 예정분 포함 취소), 넘기기 막기 해제·매혹과 예고 취소·여우 구슬과 잠긴 박 폭탄 제거(`orbExpiries`로 연기)를 한다. 잠금이 풀린 폭탄은 남긴다. 충전은 `elapsed + 피버 구간 × (배율 − 1)`로 계산해 긴 한 번의 진행도 정확히 나눈다. 명중 보상·구슬 한도는 그대로다.
+- **규칙**: 구미호 스테이지(2:2 제외)에서 `feverTimeAt = max(시작, 마감 − DEV238)`. 요괴 판의 시간 진행은 사건 시각에서 잘리므로(`NextStageBoundary`) 그 시각에 정확히 `StartFeverTime`이 기믹 예약을 무한대로 돌리고(같은 시각 예정분 포함 취소), 넘기기 막기 해제·매혹과 예고 취소·여우 구슬과 잠긴 박 폭탄 제거(`orbExpiries`로 연기)를 한다. 잠금이 풀린 폭탄은 남긴다. 충전은 `elapsed + 피버 구간 × (배율 − 1)`로 계산해 긴 한 번의 진행도 정확히 나눈다. 명중 보상·구슬 한도는 그대로다.
 - **화면**: `LabFeverTimeHud`가 스냅샷의 `feverTimeAt`과 Host 시계로 판단하므로 별도 통신이 없다. 두배 말풍선(연기 0.7초, 0.12초 뒤 등장, 0.9~1.1배·2Hz), 시작 문구 2초, 가장자리 빛(0.45~0.85·2Hz, `LabTeamFever.GlowSprite` 공유, 전투 표시 맨 뒤), 남은 시간 빨강. 늦게 본 피버(1초·문구 1.5초 초과)는 연기·문구 없이 보인다. 일시정지 중에는 숨긴다.
-- **DEV**: 228·229 추가로 공유 설정 230개, 프로토콜 5672·`C6PhysicsLab/33`·`C6HapioGame/16`. #330과 #328이 병합 때 같은 5671을 쓰게 되어 이번에 함께 구분했다. `LabConfig.asset` 기본값과 Home·Lobby DEV 칸 2줄은 Editor API(`Hapio/Upgrade Menu DEV Rows`)로 저장했다. 장면 변경은 새 칸 오브젝트 62개(장면마다)와 칸 목록 2곳뿐임을 확인했다.
+- **DEV**: 처음 228·229(공유 설정 230개, 5672·`C6PhysicsLab/33`·`C6HapioGame/16`)로 만들었으나, 그 사이 main에 #332(지귀 228~235)·#329(섬광 보상 236~237)가 들어와 병합하며 **238·239(공유 설정 240개), 프로토콜 5674·`C6PhysicsLab/35`·`C6HapioGame/18`**로 옮겼다(5672는 #332도 썼던 번호다). #330과 #328이 병합 때 같은 5671을 쓰게 되어 이번에 함께 구분했다. `LabConfig.asset` 기본값과 Home·Lobby DEV 칸 2줄은 Editor API(`Hapio/Upgrade Menu DEV Rows`)로 저장했다. 장면 변경은 새 칸 오브젝트 62개(장면마다)와 칸 목록 2곳뿐임을 확인했다.
 - 작업 중 열린 Editor가 우리 코드와 무관한 컴파일러 내부 오류("Method not found: GetMaxCharCountOrThrowIfHuge")로 멈춰, Unity의 컴파일 서버 프로세스를 종료하고 빌드 캐시를 비운 뒤 다시 컴파일해 해결했다(코드 변경 없음).
 
 | 항목 | 결과 | 근거 |
@@ -3054,4 +3078,5 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 | 실제 화면·3인·실기기 | NOT_RUN | 말풍선 위치·크기, 문구, 가장자리 빛 세기, 2배 충전 체감 확인 필요 |
 
 - 추가 검사: `LabFeverTimeTests`(DEV 칸, 시작 시각, 다른 스테이지 없음, 0이면 끔·전투보다 긴 피버, 충전 2배와 긴 한 번의 진행, 시작 시각 예정 기믹 취소, 방해 4종 정리), `LabFeverTimeHudTests`(말풍선 등장·위치·숨쉬기·끝, 늦게 본 피버·일시정지, 문구·가장자리 빛·빨간 시간), Hapio `GameStageSettingsTests.FeverTimeIsTunedOnTheFoxsTabAloneAndReachesItsStage`, Lab DEV에서 피버 칸 숨김, 설정 230개·프로토콜 고정값.
+- **main 병합(#332·#329·#335)**: 충돌 30여 파일 중 검사 고정값은 main 쪽을 받아 240/5674로 올렸다. `LabConfig` 칸·접근자·저장/적용은 main 뒤에 피버 2칸을 붙였고, 스태미나 충전은 지귀 피버 배율(`JigwiStageRecoveryMultiplier`)과 피버 타임 구간 배율을 함께 적용하도록 합쳤다(두 피버는 다른 스테이지). `LabConfig.asset`·Home·Lobby는 main 쪽을 받은 뒤 Editor API로 피버 기본값과 DEV 칸 2줄을 다시 넣었다(YAML 수동 병합 없음). Lab DEV는 지귀·피버 칸을 모두 숨긴다.
 

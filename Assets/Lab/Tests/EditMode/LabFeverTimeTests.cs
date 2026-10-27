@@ -45,19 +45,19 @@ namespace C6Lab.Tests
         [Test]
         public void FeverTimeAppendsTwoDevRowsInItsOwnGroup()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(230));
-            Assert.That(LabConfig.DeveloperFields.Skip(228).Select(field => field.Label), Is.EqualTo(new[]
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(240));
+            Assert.That(LabConfig.DeveloperFields.Skip(238).Select(field => field.Label), Is.EqualTo(new[]
             {
                 "피버 타임 시작 (남은 초, 0 = 끔)", "피버 타임 충전 배율"
             }));
-            Assert.That(LabConfig.DeveloperFields.Skip(228).Select(field => field.Min), Is.EqualTo(new[] { 0f, 1f }));
-            Assert.That(LabConfig.DeveloperFields.Skip(228).Select(field => field.Max), Is.EqualTo(new[] { 60f, 5f }));
+            Assert.That(LabConfig.DeveloperFields.Skip(238).Select(field => field.Min), Is.EqualTo(new[] { 0f, 1f }));
+            Assert.That(LabConfig.DeveloperFields.Skip(238).Select(field => field.Max), Is.EqualTo(new[] { 60f, 5f }));
             Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "피버 타임 (Hapio 구미호 전용)").FieldIndices,
-                Is.EqualTo(new[] { 228, 229 }));
+                Is.EqualTo(new[] { 238, 239 }));
             LabConfig saved = Resources.Load<LabConfig>("LabConfig");
-            Assert.That(saved.CaptureDeveloperValues().Skip(228), Is.EqualTo(new[] { 20f, 2f }), "Saved: the last 20 s, twice the refill.");
+            Assert.That(saved.CaptureDeveloperValues().Skip(238), Is.EqualTo(new[] { 20f, 2f }), "Saved: the last 20 s, twice the refill.");
             float[] values = config.CaptureDeveloperValues();
-            values[228] = 25f; values[229] = 3f;
+            values[238] = 25f; values[239] = 3f;
             Apply(values);
             Assert.That(config.FeverTimeSeconds, Is.EqualTo(25f));
             Assert.That(config.FeverTimeRecoveryMultiplier, Is.EqualTo(3f));

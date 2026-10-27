@@ -60,7 +60,7 @@
 
 새 코드: `Assets/Hapio/Scripts/Core/{GameSession,GameRunFlow,GameFlowState,GameFlowSnapshot,GameScenePaths}.cs`, `Scripts/UI`, `Editor/GameSceneBuilder.cs`, `Editor/GameBuild.cs`.
 
-기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **228개·프로토콜5669**다. 기존0~199와 #299 고해상도 설정200~201을 유지하고, #301 섬광 흔들어 풀기202~203과 #305 매혹 예고204를 함께 사용한다. 단독 PR이 같은 번호를 다른 필드에 사용하므로 통합 게임 연결 토큰은 `C6HapioGame/15`이며 단일 Lab의 `C6PhysicsLab/32`과 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
+기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **228개·프로토콜5669**다. 기존0~199와 #299 고해상도 설정200~201을 유지하고, #301 섬광 흔들어 풀기202~203과 #305 매혹 예고204를 함께 사용한다. 단독 PR이 같은 번호를 다른 필드에 사용하므로 통합 게임 연결 토큰은 `C6HapioGame/18`이며(#334 기준, #329 당시 17) 단일 Lab의 `C6PhysicsLab/35`과 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
 
 검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 현재 통합의 실제 실행 결과는 `VALIDATION.md`의 #278 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
 
@@ -204,3 +204,7 @@ UT 기믹 기록은 기존 Inspector 스위치 기본OFF를 유지한다. schema
 `LabNetwork.Generate` → Host 요청/세대·소유권 검증 → `LabModel.TryGenerate`의 기존 종류 추첨 → `LabModel.RawGeneration`의 Raw 한정 보정 → 기존 생성 처리 → 실제Raw 기록 순서다. per-player 기록은 Host 모델 내부에만 두며 최종kind를 기존 확정 receipt/board 경로로 공유한다. 예측 Client가 임의로 다른 종류를 만들거나 새 투척/소유권 판정을 추가하지 않는다.
 
 기본2연속 뒤 반대75%·최대3, 별도salt 난수, 실제 생성Raw만 기록하고 Begin에서 초기화한다. 아이템·0% 극성·과열/피버·OFF·Pause의 세부 경계는DEVELOPER_MODE_PARAMETER_SPEC의 #324를 따른다. 설정225~227을 추가한228개·프로토콜5669/Lab30/Game13으로 구형225개 앱과 혼용을 차단한다. LAN·핫스팟 연결 방식, 기믹·도색·공동 완료·스테이지 결과는 보존한다.
+
+## #332 지귀 120초 표면 불 통합
+
+Stage03에서 새 시간표 ON일 때만 120초를 적용합니다. A 10/40/60/80·B 30/50/70/90·공통 20/40/60/80, 100초 방해 무벌점 정리 뒤 자동 회복 속도 2배입니다. 일반 공통 반복 타이머나 구형 지귀 자동 추첨은 함께 켜지 않습니다. 기존 Home/Lobby/Battle/결과 흐름과 조기 100% 승리·기한 Defeat·완료 연출은 보존합니다. Settings 236개·5672/Lab33/Game16이며 지귀 DEV 228~235는 scope 3에서만 편집합니다. 다른 요괴/2:2와 별도 Lab 수동 시험은 기존 정책을 유지합니다. 소모 감소·실제 음성·기기 행동 검증 상태는 [상세 문서 11~12절](JIGWI_LEVEL_DESIGN_120S.md)을 따릅니다.
