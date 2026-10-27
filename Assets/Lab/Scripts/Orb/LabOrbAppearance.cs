@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -118,6 +119,21 @@ namespace C6Lab
         [SerializeField, Min(.1f)] private float foxFireGlowHz = 1.5f;
         [Tooltip("여우구슬과, 그와 닿아 함께 사라지는 구슬의 연기 색.")]
         [SerializeField] private Color foxFireSmokeColor = new Color(.35f, .62f, 1f, .8f);
+        [Header("Blast fire (#326, presentation only)")]
+        [Tooltip("폭발에 맞은 구슬에 붙는 불 그림(프레임 순서대로 번갈아 보인다). 비우면 Resources/Bomb/BlastFire의 그림을 이름 순서로 쓰고, 그것도 없으면 예전처럼 코드로 그린 노란 불을 쓴다.")]
+        [SerializeField] private Sprite[] blastFireFrames;
+        [Tooltip("불 그림이 바뀌는 빠르기 (초당 장 수).")]
+        [SerializeField, Range(1f, 30f)] private float blastFireFramesPerSecond = 12f;
+        [Tooltip("불 그림의 폭 (구슬 반지름 배). 기본 그림은 반지름 80px 구슬 기준 256px 폭이라 3.2.")]
+        [SerializeField, Range(1f, 6f)] private float blastFireWidth = 3.2f;
+        [Tooltip("그림 안에서 구슬 중심이 있는 곳 (0~1, 왼쪽 아래가 0). 기본 그림은 가운데 아래쪽(0.5, 0.0625).")]
+        [SerializeField] private Vector2 blastFireOrbCentre = new Vector2(.5f, .0625f);
+        [Tooltip("불을 구슬 중심에서 더 옮기는 양 (구슬 반지름 배). 위로 올리려면 y를 키운다.")]
+        [SerializeField] private Vector2 blastFireOffset = Vector2.zero;
+        [Tooltip("불 뒤의 노란 번짐을 함께 보일지.")]
+        [SerializeField] private bool blastFireHalo = true;
+        [Tooltip("위로 튀는 불똥을 함께 보일지.")]
+        [SerializeField] private bool blastFireEmbers = true;
         [Header("Gourd bomb drop (presentation only)")]
         [Tooltip("Seconds the bomb takes to fall from above the orb area onto its landing spot.")]
         [SerializeField, Min(.01f)] private float dropFallSeconds = .45f;
@@ -170,6 +186,28 @@ namespace C6Lab
         public float FoxFireGlowSize => Mathf.Max(1f, foxFireGlowSize);
         public float FoxFireGlowHz => foxFireGlowHz > 0f ? foxFireGlowHz : 1.5f;
         public Color FoxFireSmokeColor => foxFireSmokeColor;
+        /// <summary>
+        /// 폭발 불 그림 (#326). Inspector가 비어 있으면 Resources 그림을 이름 순서로 쓴다. 둘 다 없으면 빈 배열이라
+        /// 불은 예전처럼 코드로 그린다.
+        /// </summary>
+        public Sprite[] BlastFireFrames
+        {
+            get
+            {
+                if (blastFireFrames != null && blastFireFrames.Length > 0 && blastFireFrames.All(frame => frame != null))
+                    return blastFireFrames;
+                return defaultBlastFireFrames ??= Resources.LoadAll<Sprite>(BlastFireFramesPath)
+                    .OrderBy(frame => frame.name, System.StringComparer.Ordinal).ToArray();
+            }
+        }
+        public const string BlastFireFramesPath = "Bomb/BlastFire";
+        private static Sprite[] defaultBlastFireFrames;
+        public float BlastFireFramesPerSecond => blastFireFramesPerSecond > 0f ? blastFireFramesPerSecond : 12f;
+        public float BlastFireWidth => blastFireWidth > 0f ? blastFireWidth : 3.2f;
+        public Vector2 BlastFireOrbCentre => blastFireOrbCentre;
+        public Vector2 BlastFireOffset => blastFireOffset;
+        public bool BlastFireHalo => blastFireHalo;
+        public bool BlastFireEmbers => blastFireEmbers;
         public Texture2D BombArt => bombArt;
         public Texture2D BombFuseArt => bombFuseArt;
         public float BombBodySize => bombBodySize > 0f ? bombBodySize : 1.2f;

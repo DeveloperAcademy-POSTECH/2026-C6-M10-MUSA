@@ -426,15 +426,15 @@ DEV의 `Item orbs` 묶음 끝, 무거운 폭탄 다음에 있다. 폭탄 충격�
 
 | DEV 입력 이름 | 현재 기본값 | DEV 범위 / 단위 | 실제 동작과 조정 효과 |
 | --- | ---: | --- | --- |
-| Blast Burn Seconds | 4 | 3–5 / 초 | 146번째(인덱스 145). 밀린 구슬에 노란 불이 붙어 있는 시간. Host가 불붙인 시각부터 Host 시계로 세므로, 옆 사람에게 넘어간 구슬도 받은 화면에서 남은 만큼만 탄다. 불은 표시일 뿐 규칙에 영향이 없다. |
+| Blast Burn Seconds | 4 | 3–5 / 초 | 146번째(인덱스 145). 밀린 구슬에 불이 붙어 있는 시간. Host가 불붙인 시각부터 Host 시계로 세므로, 옆 사람에게 넘어간 구슬도 받은 화면에서 남은 만큼만 탄다. 불은 표시일 뿐 규칙에 영향이 없다. |
 | Blast Shrink Scale (x radius) | 0.5 | 0.2–1 / 배 | 147번째(인덱스 146). 밀린 구슬의 반지름 배율. 사라질 때까지 유지되며 보이는 크기, 다른 구슬과 부딪히는 범위, 잡히는 범위(반지름의 1.25배), 던졌을 때 투사체의 몸체·그림(박에 맞는 범위)에 모두 쓰인다. 1이면 줄지 않는다. 새로 작아지는 구슬부터 적용된다. |
 | Small Orb Paint Share (x paint) | 0.5 | 0–1 / 배 | 148번째(인덱스 147). 작아진 구슬(또는 그것으로 만든 결합 구슬)이 박에 맞았을 때 처음 튀는 양과 다시 맞혔을 때 퍼지는 양에 곱한다. 0이면 칠하지 않는다. Crack 모드의 피해량은 바꾸지 않는다. |
 
 어떤 구슬이 맞았는지는 폭탄이 터진 판만 정확히 안다(기기마다 판 비율이 다름). 그래서 그 판이 밀어낸 구슬 ID를 `blastHit`로 Host에 보내고, Host가 3초 안에 그 사람에게 보낸 폭발인지·그 사람 판에 있는 날아가지 않은 구슬인지 확인해 `burnedAt`(불붙은 Host 시각)과 `small`을 기록한다. 폭발마다 보고는 한 번만 받는다. Host 자신의 판에서 터지면 스냅샷을 만드는 도중이므로 바로 기록하고 다음 정기 스냅샷(0.1초 안)에 실어 보낸다. 작은 구슬이 하나라도 들어간 결합 구슬은 작고 남은 불을 이어받는다.
 
-불 모양(뒤에서 솟는 불길 5개·윗가장자리 불꽃 3개·빛무리·불티 5개, 공 크기에 비례)과 작아질 때 0.3초 동안 줄어드는 연출은 코드에 고정돼 있으며 DEV로 조정하지 않는다. 불길은 구슬 중심 평면에 있어 불투명한 공이 뿌리를 가리므로 구슬 색은 그대로 보인다.
+불 모양 (#326): 빨강·주황·노랑 평면 불길에 먹선을 두른 만화 불 그림 6장(`Resources/Bomb/BlastFire`, 256×320px)을 구슬 **위에** 얹고 초당 12장으로 번갈아 보여 날름거리게 한다. 불 뒤 노란 빛무리와 위로 튀는 불티 5개는 그대로이며, 붙는 순간 확 커졌다 끝에 줄어드는 연출, 공 크기에 비례하는 크기, 작아질 때 0.3초 동안 줄어드는 연출도 같다. DEV로는 조정하지 않고 Inspector `LabOrbAppearance`의 Blast fire 칸(그림·초당 장 수·폭·그림 속 구슬 중심·위치·빛무리/불티 켜기)에서 바꾼다. Inspector 그림이 비면 Resources 그림을, 그것도 없으면 예전 코드 불(뒤에서 솟는 불길 5개·윗가장자리 불꽃 3개)을 쓴다. 그림은 `tools/generate_blast_fire_frames.py`로 다시 만들 수 있다.
 
-근거: `LabConfig.BlastBurnSeconds`·`BlastShrinkScale`·`SmallOrbPaintShare`, `LabOrbBoard.Blast`·`RadiusFor`, `LabNetwork.ReportBlast`, `LabModel.MarkBlasted`·`TryCombineAt`, `LabOrbState.BurnSecondsLeft`, `LabProjectile.Create`, `LabPaintSurface.RegisterHit`, `LabOrbBurn`, `LabOrbView.SetBurn`·`PlayShrink`.
+근거: `LabConfig.BlastBurnSeconds`·`BlastShrinkScale`·`SmallOrbPaintShare`, `LabOrbBoard.Blast`·`RadiusFor`, `LabNetwork.ReportBlast`, `LabModel.MarkBlasted`·`TryCombineAt`, `LabOrbState.BurnSecondsLeft`, `LabProjectile.Create`, `LabPaintSurface.RegisterHit`, `LabOrbBurn`, `LabOrbView.SetBurn`, `LabOrbAppearance.BlastFireFrames`·`PlayShrink`.
 
 ### 결합 소리·햅틱 — 85~87번째 설정
 
