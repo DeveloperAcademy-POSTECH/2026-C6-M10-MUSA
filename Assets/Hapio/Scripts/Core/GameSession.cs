@@ -56,6 +56,7 @@ namespace Hapio
             public string settingsFingerprint;
             public int readyCount;
             public int participantCount;
+            public bool resultViewerOpen;
             [NonSerialized] public ulong sender;
         }
 
@@ -185,9 +186,10 @@ namespace Hapio
                 && now >= nextResultReadyAt)
             {
                 nextResultReadyAt = now + .5d;
-                if (network.IsHost) resultReady.Add(network.LocalPlayerId);
+                if (network.IsHost) { resultReady.Add(network.LocalPlayerId); SetResultViewer(network.LocalPlayerId, IsViewerOpen); }
                 else network.SendGameFlowToHost(JsonUtility.ToJson(MakeControl("result_ready")));
             }
+            UpdateResultAdvance(now);
             LabSnapshot snapshot = network.Snapshot;
             if (network.IsHost && state.phase == GameFlowPhase.Playing && MatchesBattle(snapshot))
             {
@@ -230,7 +232,12 @@ namespace Hapio
                 else if (control.kind == "result_ready" && control.runId == state.runId
                     && control.stageIndex == state.stageIndex && control.revision == state.revision
                     && (state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed))
+                {
                     resultReady.Add(control.sender);
+                    SetResultViewer(control.sender, control.resultViewerOpen);
+                }
+                else if (control.kind == "result_viewer" && state.phase == GameFlowPhase.StageResult)
+                    SetResultViewer(control.sender, control.resultViewerOpen);
                 else if (control.kind == "exit" && state.IsRunActive && control.runId == state.runId
                     && control.stageIndex == state.stageIndex)
                     AbortHost("A player left the game.", "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
@@ -295,7 +302,11 @@ namespace Hapio
             else if (state.phase == GameFlowPhase.LoadingBattle && previous.phase == GameFlowPhase.Lobby)
                 UiNotice = string.Empty;
             if (previous.runId != state.runId || previous.stageIndex != state.stageIndex
-                || previous.phase != state.phase) resultReady.Clear();
+                || previous.phase != state.phase)
+            {
+                resultReady.Clear();
+                ResetResultAdvance();
+            }
             if (state.phase == GameFlowPhase.LoadingBattle
                 && (previous.runId != state.runId || previous.revision != state.revision))
             {
@@ -426,7 +437,8 @@ namespace Hapio
                 yokai = yokai,
                 settingsRevision = network.IsHost ? network.SessionConfigRevision : expectedSettingsRevision,
                 settingsFingerprint = network.IsHost ? network.SessionConfigFingerprint : expectedSettingsFingerprint,
-                readyCount = StartReadyCount, participantCount = StartParticipantCount
+                readyCount = StartReadyCount, participantCount = StartParticipantCount,
+                resultViewerOpen = IsViewerOpen
             };
         }
 
@@ -638,8 +650,8 @@ namespace Hapio
 
         public void Pause() => network.PauseBattle();
         public void Resume() => network.ResumeBattle();
-        public void OpenGourdViewer() { IsViewerOpen = PreviewTexture != null; Changed?.Invoke(); }
-        public void CloseGourdViewer() { IsViewerOpen = false; Changed?.Invoke(); }
+        public void OpenGourdViewer() { IsViewerOpen = PreviewTexture != null; NotifyResultViewer(); Changed?.Invoke(); }
+        public void CloseGourdViewer() { IsViewerOpen = false; NotifyResultViewer(); Changed?.Invoke(); }
         public void RotatePreview(Vector2 delta) { preview?.Rotate(delta); }
         public void ZoomPreview(float delta) { preview?.Zoom(delta); }
         public void ResetPreview() { preview?.ResetView(); }
@@ -803,6 +815,7 @@ namespace Hapio
         {
             ResetPaintFinish();
             preview?.Dispose(); preview = null; ResultSnapshot = null; IsViewerOpen = false;
+            ResetResultAdvance();
         }
 
         private void OnDestroy()

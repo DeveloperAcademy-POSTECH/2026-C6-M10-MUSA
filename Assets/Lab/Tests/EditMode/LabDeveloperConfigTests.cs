@@ -41,7 +41,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(211));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(225));
             Assert.That(values[89], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[90], values[91], values[92], values[93] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -562,7 +562,7 @@ namespace C6Lab.Tests
         [Test]
         public void RetiredGourdModeKeepsIndex79FixedWithoutShiftingAnyTuningValue()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(211));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(225));
             Assert.That(LabConfig.DeveloperFields[78].Label, Is.EqualTo("Drum Spin Strength"));
             Assert.That(LabConfig.DeveloperFields[80].Label, Is.EqualTo("Bomb Blast Radius (board widths)"));
             LabDeveloperField field = LabConfig.DeveloperFields[79];
@@ -622,7 +622,7 @@ namespace C6Lab.Tests
             string acceptedFingerprint = LabSessionSettings.Fingerprint(values, 3, protocol);
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(211));
+            Assert.That(received.Length, Is.EqualTo(225));
             Assert.That(received[79], Is.Zero);
             Assert.That(LabSessionSettings.Fingerprint(received, 3, protocol), Is.EqualTo(acceptedFingerprint));
             var clientConfig = ScriptableObject.CreateInstance<LabConfig>();
@@ -769,7 +769,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(111));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(211));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(225));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             Assert.That(LabConfig.DefaultPaintVictoryPercent, Is.EqualTo(100));
@@ -991,7 +991,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOnAtItsPreservedIndexWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(211));
+            Assert.That(values.Length, Is.EqualTo(225));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
             Assert.That(values[110], Is.EqualTo(1f));
             LabDeveloperField field = LabConfig.DeveloperFields[110];
@@ -1086,7 +1086,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(211));
+            Assert.That(received.Length, Is.EqualTo(225));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1423,6 +1423,59 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void YaguangScheduleAppendsWithoutAnEngineSwitchAndRoundTripsEverySlot()
+        {
+            float[] before = config.CaptureDeveloperValues();
+            Assert.That(before.Length, Is.EqualTo(225));
+            Assert.That(before.Skip(211), Is.EqualTo(new[] { 120f, 100f, 10f, 0f, 35f, 1f, 60f, 0f, 75f, 1f, 25f, 40f, 60f, 80f }));
+            Assert.That(LabConfig.DeveloperFields.Skip(211).Any(field => field.IsToggle), Is.False,
+                "Stage identity chooses this policy; no parallel timeline engine switch exists.");
+            Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀 시간표 (Hapio 전용)").FieldIndices,
+                Is.EqualTo(Enumerable.Range(211, 14)));
+            float[] values = (float[])before.Clone();
+            values[211] = 180f; values[212] = 0f;
+            for (int i = 0; i < 4; i++)
+            {
+                values[213 + i * 2] = 15f + i * 20f;
+                values[214 + i * 2] = i % 2;
+                values[221 + i] = 20f + i * 25f;
+            }
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values));
+            Assert.That(config.CaptureDeveloperValues().Take(211), Is.EqualTo(before.Take(211)));
+            for (int i = 0; i < 4; i++)
+            {
+                Assert.That(config.YaguangTimelineUniqueSeconds(i), Is.EqualTo(15f + i * 20f));
+                Assert.That(config.YaguangTimelineUniqueIsCombo(i), Is.EqualTo(i % 2 == 1));
+                Assert.That(config.YaguangTimelineCommonSeconds(i), Is.EqualTo(20f + i * 25f));
+            }
+            Assert.That(config.YaguangTimelineBattleSeconds, Is.EqualTo(180f));
+            Assert.That(config.YaguangTimelineSabotageEndSeconds, Is.Zero);
+        }
+
+        [TestCase(212)] [TestCase(213)] [TestCase(215)] [TestCase(217)] [TestCase(219)]
+        [TestCase(221)] [TestCase(222)] [TestCase(223)] [TestCase(224)]
+        public void YaguangScheduleRejectsEventsBeyondItsDurationAtomically(int index)
+        {
+            float[] before = config.CaptureDeveloperValues(), invalid = (float[])before.Clone();
+            invalid[0] = 777f; invalid[index] = 121f;
+            Assert.That(config.TryApplyDeveloperValues(invalid, out string error), Is.False);
+            Assert.That(error, Does.Contain("Yaguang schedule"));
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(before));
+        }
+
+        [Test]
+        public void YaguangScheduleAllowsEmptySlotsAndDisabledStopWithoutChangingTheGenericProfile()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            foreach (int index in new[] { 212, 213, 215, 217, 219, 221, 222, 223, 224 }) values[index] = 0f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.CommonGimmickInterval, Is.EqualTo(10f));
+            Assert.That(config.UniqueGimmickInterval, Is.EqualTo(20f));
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values));
+        }
+
+        [Test]
         public void GimmickGroupFieldsFormTheGimmicksGroupWithPercentChancesAndApply()
         {
             Assert.That(LabConfig.DeveloperFields.Skip(205).Take(6).Select(field => field.Label), Is.EqualTo(new[]
@@ -1501,7 +1554,7 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             Assert.That(authored.RecordGimmickStats, Is.False, "The saved Config does not record either.");
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(211), "The switch adds no DEV row and no shared value.");
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(225), "The switch adds no DEV row and no shared value.");
             Assert.That(LabConfig.DeveloperFields.Any(field => field.Label.IndexOf("stat", System.StringComparison.OrdinalIgnoreCase) >= 0),
                 Is.False);
 
@@ -1527,7 +1580,7 @@ namespace C6Lab.Tests
         {
             float[] before = config.CaptureDeveloperValues();
             float[] values = (float[])before.Clone();
-            Assert.That(values, Has.Length.EqualTo(211));
+            Assert.That(values, Has.Length.EqualTo(225));
             values[202] = 0f; values[203] = 10f; values[204] = 4.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.YaguangFlashShakeRelease, Is.False);

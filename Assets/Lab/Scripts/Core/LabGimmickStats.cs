@@ -10,6 +10,10 @@ namespace C6Lab
     [Serializable]
     public sealed class LabGimmickStats
     {
+        /// <summary>Version 2 includes the Yaguang flash/combo casts in total.</summary>
+        public int schemaVersion = 2;
+        public string schedulePolicy = "periodic";
+        public float timetableEndSeconds;
         public string sessionId = string.Empty;
         public uint round;
         /// <summary>요괴 스테이지(None·Gumiho·Yaguang·Jigwi) 또는 2:2 땅따먹기면 Territory.</summary>
@@ -23,6 +27,7 @@ namespace C6Lab
         /// <summary>이 판에 건 기믹 수(모든 종류 합).</summary>
         public int total;
         public int gourdBomb, swipeBlock, foxFire, charm;
+        public int flash, combo;
         /// <summary>공용 기믹과 고유 기믹이 같은 시각에 둘 다 걸린 횟수.</summary>
         public int simultaneous;
 
@@ -39,6 +44,13 @@ namespace C6Lab
             else if (kind == LabSabotageKind.SwipeBlock) swipeBlock++;
             else if (kind == LabSabotageKind.FoxFire) foxFire++;
             else if (kind == LabSabotageKind.Charm) charm++;
+        }
+
+        /// <summary>Count a unique pattern once when its warning actually begins, including a zero-warning start.</summary>
+        internal void AddYaguang(bool isCombo)
+        {
+            total++;
+            if (isCombo) combo++; else flash++;
         }
 
         public LabGimmickStats Copy() => (LabGimmickStats)MemberwiseClone();

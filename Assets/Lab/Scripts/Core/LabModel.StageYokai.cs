@@ -80,6 +80,7 @@ namespace C6Lab
             void Include(double at) { if (Finite(at) && at > lastTime && at < next) next = at; }
             Include(nextCommonGimmickAt);
             Include(nextUniqueGimmickAt);
+            if (rules.YaguangTimeline && !yaguangTimelineEnded) Include(yaguangTimelineEndAt);
             Include(nextStageJigwiAt);
             Include(swipeBlockedUntil);
             Include(charmUntil);

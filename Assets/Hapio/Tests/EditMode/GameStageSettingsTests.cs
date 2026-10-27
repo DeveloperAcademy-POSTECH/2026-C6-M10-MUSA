@@ -28,7 +28,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(211));
+                    Assert.That(values.Length, Is.EqualTo(225));
                     Assert.That(values[205], Is.EqualTo(before[205]), "Common gimmick interval preserved (#311)");
                     Assert.That(values[206], Is.EqualTo(before[206]), "Unique gimmick interval preserved (#311)");
                 }
@@ -83,7 +83,7 @@ namespace Hapio.Tests
             {
                 Assert.That(GameStageSettings.IsFieldVisible(0, index), Is.False, "Not a Common field: " + index);
                 for (int stage = 1; stage <= 3; stage++)
-                    Assert.That(GameStageSettings.IsFieldVisible(stage, index), Is.True, "Stage " + stage + ": " + index);
+                    Assert.That(GameStageSettings.IsFieldVisible(stage, index), Is.EqualTo(stage != 2 || index == 207 || index == 208), "Stage " + stage + ": " + index);
                 Assert.That(GameStageSettings.IsFieldVisible(GameStageSettings.TerritoryScope, index), Is.False);
             }
             foreach (int index in new[] { 171, 172, 206, 209, 210 })
@@ -96,19 +96,51 @@ namespace Hapio.Tests
                     Assert.That(GameStageSettings.IsFieldVisible(scope, retired), Is.False, "Retired (#311): " + retired);
             using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
             {
-                float[] yaguang = settings.Capture(2);
-                yaguang[205] = 7f; yaguang[169] = 30f; yaguang[170] = 70f;
-                Assert.That(settings.TryApply(2, yaguang, out string error), Is.True, error);
-                Assert.That(new[] { settings.Capture(2)[205], settings.Capture(2)[169] }, Is.EqualTo(new[] { 7f, 30f }));
-                Assert.That(settings.Capture(1)[205], Is.EqualTo(settings.Capture(0)[205]), "The other stages keep theirs.");
+                float[] fox = settings.Capture(1);
+                fox[205] = 7f; fox[169] = 30f; fox[170] = 70f;
+                Assert.That(settings.TryApply(1, fox, out string error), Is.True, error);
+                Assert.That(new[] { settings.Capture(1)[205], settings.Capture(1)[169] }, Is.EqualTo(new[] { 7f, 30f }));
+                Assert.That(settings.Capture(2)[205], Is.EqualTo(settings.Capture(0)[205]), "The yaguang keeps its schedule instead.");
                 Assert.That(settings.Capture(3)[169], Is.EqualTo(settings.Capture(0)[169]));
                 float[] uneven = settings.Capture(3); uneven[169] = 30f;
                 Assert.That(settings.TryApply(3, uneven, out error), Is.False, "The common chances must add up to 100.");
-                var config = settings.CreateStageConfig(2);
+                var config = settings.CreateStageConfig(1);
                 try { Assert.That(config.CommonGimmickInterval, Is.EqualTo(7f)); }
                 finally { UnityEngine.Object.DestroyImmediate(config); }
             }
         }
+        [Test]
+        public void YaguangScheduleIsIsolatedAndCannotEditUnusedPeriodicControls()
+        {
+            foreach (int index in System.Linq.Enumerable.Range(211, 14))
+                for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                    Assert.That(GameStageSettings.IsFieldVisible(scope, index), Is.EqualTo(scope == 2),
+                        "Schedule field " + index + " in scope " + scope);
+            foreach (int index in new[] { 169, 170, 205, 156, 157, 186, 187 })
+                Assert.That(GameStageSettings.IsFieldVisible(2, index), Is.False, "Unused periodic field: " + index);
+            foreach (int index in new[] { 155, 184, 207, 208 })
+                Assert.That(GameStageSettings.IsFieldVisible(2, index), Is.True, "Actual scheduled gimmick switch: " + index);
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                float[] first = settings.Capture(1), third = settings.Capture(3), yaguang = settings.Capture(2);
+                yaguang[211] = 150f; yaguang[212] = 110f; yaguang[213] = 12f;
+                Assert.That(settings.TryApply(2, yaguang, out string error), Is.True, error);
+                CollectionAssert.AreEqual(first, settings.Capture(1));
+                CollectionAssert.AreEqual(third, settings.Capture(3));
+                var config = settings.CreateStageConfig(2);
+                try
+                {
+                    Assert.That(config.YaguangTimelineBattleSeconds, Is.EqualTo(150f));
+                    Assert.That(config.YaguangTimelineSabotageEndSeconds, Is.EqualTo(110f));
+                    Assert.That(config.YaguangTimelineUniqueSeconds(0), Is.EqualTo(12f));
+                }
+                finally { UnityEngine.Object.DestroyImmediate(config); }
+                float[] unused = settings.Capture(2); unused[205] += 1f;
+                Assert.That(settings.TryApply(2, unused, out _), Is.False);
+                CollectionAssert.AreEqual(yaguang, settings.Capture(2));
+            }
+        }
+
         [Test]
         public void HighResolutionPresentationIsCommonToAllStagesAndTheTerritoryRoom()
         {

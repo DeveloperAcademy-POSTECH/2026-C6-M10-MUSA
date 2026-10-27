@@ -340,8 +340,29 @@ namespace C6Lab
             LabDeveloperField.Toggle("Gimmick Gourd Bomb (0 off, 1 on)"),
             LabDeveloperField.Toggle("Gimmick Swipe Block (0 off, 1 on)"),
             LabDeveloperField.Toggle("Gimmick Fox Fire (0 off, 1 on)"),
-            LabDeveloperField.Toggle("Gimmick Charm (0 off, 1 on)")
+            LabDeveloperField.Toggle("Gimmick Charm (0 off, 1 on)"),
+            // #314 is a stage policy inside the #311 scheduler, not a second independently enabled engine.
+            new LabDeveloperField("야광귀 시간표 전투 시간 (초)", 60f, 180f),
+            new LabDeveloperField("야광귀 시간표 방해 끝 (초, 0 = 없음)", 0f, 180f),
+            new LabDeveloperField("야광귀 고유 1 예고 시각 (초, 0 = 없음)", 0f, 180f),
+            LabDeveloperField.Choice("야광귀 고유 1 종류", "섬광", "콤보"),
+            new LabDeveloperField("야광귀 고유 2 예고 시각 (초, 0 = 없음)", 0f, 180f),
+            LabDeveloperField.Choice("야광귀 고유 2 종류", "섬광", "콤보"),
+            new LabDeveloperField("야광귀 고유 3 예고 시각 (초, 0 = 없음)", 0f, 180f),
+            LabDeveloperField.Choice("야광귀 고유 3 종류", "섬광", "콤보"),
+            new LabDeveloperField("야광귀 고유 4 예고 시각 (초, 0 = 없음)", 0f, 180f),
+            LabDeveloperField.Choice("야광귀 고유 4 종류", "섬광", "콤보"),
+            new LabDeveloperField("야광귀 공용 1 시각 (초, 0 = 없음)", 0f, 180f),
+            new LabDeveloperField("야광귀 공용 2 시각 (초, 0 = 없음)", 0f, 180f),
+            new LabDeveloperField("야광귀 공용 3 시각 (초, 0 = 없음)", 0f, 180f),
+            new LabDeveloperField("야광귀 공용 4 시각 (초, 0 = 없음)", 0f, 180f)
         });
+
+        public const int YaguangTimelineFirstField = 211;
+        public const int YaguangTimelineLastField = 224;
+        public const int YaguangTimelineSlots = 4;
+        public static bool IsYaguangTimelineField(int index) =>
+            index >= YaguangTimelineFirstField && index <= YaguangTimelineLastField;
 
         /// <summary>
         /// Settings the gimmick groups (#311) replaced: the gourd bomb's and the sabotage mix's random min/max intervals,
@@ -392,6 +413,9 @@ namespace C6Lab
                 184, 185, 186, 187, 188, 189, 190, 202, 203)
                 .WithSwitch(155, 184)
                 .WithDividers((0, "── 콤보 ──"), (11, "── 섬광 ──")),
+            new LabDeveloperCategory("야광귀 시간표 (Hapio 전용)", 211, 212, 213, 214, 215, 216, 217, 218, 219, 220,
+                221, 222, 223, 224)
+                .WithDividers((0, "── 야광귀 전용 일정 · 일반 주기/비율 대신 사용 ──"), (2, "── 고유 예고 ──"), (10, "── 공용 ──")),
             new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
         });
 
@@ -629,6 +653,17 @@ namespace C6Lab
         [SerializeField, Range(0, 10)] private int charmRescueTaps = 10;
         [Tooltip("매혹 예고 (#305): 매혹이 걸리기 이 시간 (초) 전부터 모두에게 \"구미호가 P2에게 매혹을 걸려고 한다!\"를 보여 준다. 0이면 예고 없이 바로 걸린다.")]
         [SerializeField, Range(0f, 10f)] private float charmWarningSeconds = 3f;
+
+        [Header("Yaguang stage schedule (#314 integrated into #311)")]
+        [Tooltip("Hapio 야광귀 스테이지에서만 적용한다. Lab 기본 주기와 다른 요괴 스테이지에는 영향을 주지 않는다.")]
+        [SerializeField, Range(60f, 180f)] private float yaguangTimelineBattleSeconds = 120f;
+        [Tooltip("방해 정리 시각. 0은 정리 없이 전투 끝까지 유지한다.")]
+        [SerializeField, Range(0f, 180f)] private float yaguangTimelineSabotageEndSeconds = 100f;
+        [Tooltip("고유 기믹 예고 시작 시각. 0인 칸은 비운다. 종류 0=섬광, 1=콤보.")]
+        [SerializeField] private float[] yaguangTimelineUniqueSeconds = { 10f, 35f, 60f, 75f };
+        [SerializeField] private int[] yaguangTimelineUniqueKinds = { 0, 1, 0, 1 };
+        [Tooltip("공용 기믹 시작 시각. 0인 칸은 비운다. 켜진 폭탄·넘기기 막기를 교대한다.")]
+        [SerializeField] private float[] yaguangTimelineCommonSeconds = { 25f, 40f, 60f, 80f };
 
         [Header("Jigwi fire experiment (#272)")]
         [SerializeField, Range(1, 5)] private int jigwiFireTargetCount = 1;
@@ -1022,6 +1057,19 @@ namespace C6Lab
         public bool HighResolutionPaintEnabled => highResolutionPaintEnabled;
         public int HighResolutionPaintQuality => Mathf.Clamp(highResolutionPaintQuality, 0, 1);
         public int HighResolutionPaintColumns => HighResolutionPaintQuality == 0 ? 1024 : 2048;
+        private static readonly float[] DefaultTimelineUniqueSeconds = { 10f, 35f, 60f, 75f };
+        private static readonly int[] DefaultTimelineUniqueKinds = { 0, 1, 0, 1 };
+        private static readonly float[] DefaultTimelineCommonSeconds = { 25f, 40f, 60f, 80f };
+        public float YaguangTimelineBattleSeconds => Mathf.Clamp(Finite(yaguangTimelineBattleSeconds, 120f), 60f, 180f);
+        public float YaguangTimelineSabotageEndSeconds => Mathf.Clamp(Finite(yaguangTimelineSabotageEndSeconds, 100f), 0f, 180f);
+        public float YaguangTimelineUniqueSeconds(int slot) => TimelineSeconds(yaguangTimelineUniqueSeconds, slot, DefaultTimelineUniqueSeconds);
+        public bool YaguangTimelineUniqueIsCombo(int slot) => slot >= 0 && slot < YaguangTimelineSlots
+            && (yaguangTimelineUniqueKinds != null && slot < yaguangTimelineUniqueKinds.Length
+                ? yaguangTimelineUniqueKinds[slot] : DefaultTimelineUniqueKinds[slot]) == 1;
+        public float YaguangTimelineCommonSeconds(int slot) => TimelineSeconds(yaguangTimelineCommonSeconds, slot, DefaultTimelineCommonSeconds);
+        private static float TimelineSeconds(float[] values, int slot, float[] fallback) => slot >= 0 && slot < YaguangTimelineSlots
+            ? Mathf.Clamp(Finite(values != null && slot < values.Length ? values[slot] : fallback[slot], fallback[slot]), 0f, 180f) : 0f;
+
         public bool YaguangFlashEnabled => yaguangFlashEnabled;
         /// <summary>true면 섬광이 매번 무작위 한 명에게만, false면 모두에게 동시에 (#268)</summary>
         public bool YaguangFlashTargetOne => yaguangFlashTargetOne;
@@ -1176,7 +1224,14 @@ namespace C6Lab
                 YaguangFlashShakeRelease ? 1f : 0f, YaguangFlashShakeCount,
                 CharmWarningSeconds,
                 CommonGimmickInterval, UniqueGimmickInterval,
-                gimmickGourdBomb ? 1f : 0f, gimmickSwipeBlock ? 1f : 0f, gimmickFoxFire ? 1f : 0f, gimmickCharm ? 1f : 0f
+                gimmickGourdBomb ? 1f : 0f, gimmickSwipeBlock ? 1f : 0f, gimmickFoxFire ? 1f : 0f, gimmickCharm ? 1f : 0f,
+                YaguangTimelineBattleSeconds, YaguangTimelineSabotageEndSeconds,
+                YaguangTimelineUniqueSeconds(0), YaguangTimelineUniqueIsCombo(0) ? 1f : 0f,
+                YaguangTimelineUniqueSeconds(1), YaguangTimelineUniqueIsCombo(1) ? 1f : 0f,
+                YaguangTimelineUniqueSeconds(2), YaguangTimelineUniqueIsCombo(2) ? 1f : 0f,
+                YaguangTimelineUniqueSeconds(3), YaguangTimelineUniqueIsCombo(3) ? 1f : 0f,
+                YaguangTimelineCommonSeconds(0), YaguangTimelineCommonSeconds(1),
+                YaguangTimelineCommonSeconds(2), YaguangTimelineCommonSeconds(3)
             };
         }
 
@@ -1229,6 +1284,12 @@ namespace C6Lab
             { error = "Unique gimmick chances (Fox Fire + Charm) must add up to 100 (now " + uniqueChances + ")."; return false; }
             if (values[173] > values[174]) { error = "Fox Fire Count Min cannot exceed Fox Fire Count Max."; return false; }
             if (values[192] > values[193]) { error = "Jigwi Auto Interval Min cannot exceed Jigwi Auto Interval Max."; return false; }
+
+            if (values[212] > values[211])
+            { error = "Yaguang schedule end cannot exceed its battle duration."; return false; }
+            foreach (int index in new[] { 213, 215, 217, 219, 221, 222, 223, 224 })
+                if (values[index] > values[211])
+                { error = "Yaguang schedule slot cannot exceed its battle duration."; return false; }
 
             monsterMaxHp = (int)values[0];
             damage = (int)values[1];
@@ -1433,6 +1494,11 @@ namespace C6Lab
             gimmickSwipeBlock = values[208] >= .5f;
             gimmickFoxFire = values[209] >= .5f;
             gimmickCharm = values[210] >= .5f;
+            yaguangTimelineBattleSeconds = values[211];
+            yaguangTimelineSabotageEndSeconds = values[212];
+            yaguangTimelineUniqueSeconds = new[] { values[213], values[215], values[217], values[219] };
+            yaguangTimelineUniqueKinds = new[] { (int)values[214], (int)values[216], (int)values[218], (int)values[220] };
+            yaguangTimelineCommonSeconds = new[] { values[221], values[222], values[223], values[224] };
             error = string.Empty;
             return true;
         }

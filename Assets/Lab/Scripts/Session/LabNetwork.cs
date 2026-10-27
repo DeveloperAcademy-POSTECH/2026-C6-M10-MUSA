@@ -209,15 +209,15 @@ namespace C6Lab
         // 5665: combined flash shake DEV202-203 + charm warning DEV204 (205 values),
         //       flash release state and each neighbor's charm rescue progress.
         // 5666: #315 paint-only finish (DEV 79 a fixed-zero slot, 205 values), shared paint finish barrier.
-        // 5667: #311 gimmick groups: common/unique intervals and switches (DEV 205-210, 211 values), percent chances,
+        // 5668: #311/#314 unified gimmick scheduler and Yaguang timetable (DEV 205-224, 225 values), percent chances,
         //       retired bomb/block/sabotage timers.
-        internal const ushort LabProtocolVersion = 5667;
+        internal const ushort LabProtocolVersion = 5668;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Keep your Yin and Yang away from the blue fox orbs, or swipe them off.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/28");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/29");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

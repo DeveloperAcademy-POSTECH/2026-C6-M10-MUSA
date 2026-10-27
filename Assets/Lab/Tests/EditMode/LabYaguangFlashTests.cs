@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using UnityEditor.SceneManagement;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -52,7 +54,12 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperCategories.All(category => category.Title == "야광귀" || category.SwitchFields == null),
                 Is.True, "Only the yaguang group has a title switch.");
             Assert.That(LabConfig.DeveloperCategories.Where(category => category.DividerAt != null).Select(category => category.Title),
-                Is.EquivalentTo(new[] { "Gimmicks", "야광귀" }), "Dividers split the yaguang group and the gimmick groups (#311) only.");
+                Is.EquivalentTo(new[] { "Gimmicks", "야광귀", "야광귀 시간표 (Hapio 전용)" }),
+                "The appended schedule is a separate Hapio-only group, while Lab keeps its periodic groups.");
+            LabDeveloperCategory timeline = LabConfig.DeveloperCategories.Single(category => category.Title == "야광귀 시간표 (Hapio 전용)");
+            Assert.That(timeline.FieldIndices, Is.EqualTo(Enumerable.Range(211, 14)));
+            Assert.That(timeline.FieldIndices.All(LabConfig.IsYaguangTimelineField), Is.True);
+            AssertSavedLabHidesTimelineCategory(timeline);
             LabDeveloperCategory gimmicks = LabConfig.DeveloperCategories.Single(category => category.Title == "Gimmicks");
             Assert.That(gimmicks.DividerAt, Is.EqualTo(new[] { 0, 6 }));
             Assert.That(gimmicks.DividerLabels, Is.EqualTo(new[] { "── 공용 기믹 ──", "── 고유 기믹 (구미호) ──" }));
@@ -79,6 +86,33 @@ namespace C6Lab.Tests
             values[189] = 2f;
             values[187] = 12f;
             Assert.That(config.TryApplyDeveloperValues(values, out error), Is.False, "Flashes come at least 20 s apart.");
+        }
+
+        private static void AssertSavedLabHidesTimelineCategory(LabDeveloperCategory timeline)
+        {
+            var scene = EditorSceneManager.OpenScene("Assets/Lab/Scenes/Lab.unity", OpenSceneMode.Additive);
+            try
+            {
+                LabDeveloperMode ui = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
+                Assert.That(ui.EnsureValueInputs(), Is.True,
+                    "The saved Lab expands its legacy setting rows through the same public startup path as runtime.");
+                Assert.That(ui.valueInputs, Has.Length.EqualTo(225));
+                typeof(LabDeveloperMode).GetMethod("BuildCategoryLayout", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(ui, null);
+                Transform content = ui.valueInputs[0].transform.parent.parent;
+                Assert.That(content.Find("Category " + timeline.Title), Is.Null,
+                    "The standalone Lab must not offer a header for Hapio's stage-only scheduling policy.");
+                foreach (var header in content.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                    .Where(button => button.name.StartsWith("Category ")).ToArray())
+                    header.onClick.Invoke();
+                Assert.That(ui.valueInputs[184].transform.parent.gameObject.activeSelf, Is.True,
+                    "The ordinary Lab flash controls really expanded, so this is not an all-folded check.");
+                foreach (int index in timeline.FieldIndices)
+                    Assert.That(ui.valueInputs[index].transform.parent.gameObject.activeSelf, Is.False,
+                        "Expanding every Lab group cannot reveal the Hapio-only schedule field " + index);
+            }
+            finally { EditorSceneManager.CloseScene(scene, true); }
         }
 
         [Test]

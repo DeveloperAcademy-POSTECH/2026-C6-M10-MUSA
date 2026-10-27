@@ -342,6 +342,13 @@ namespace C6Lab
 
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
             {
+                if (System.Array.Exists(category.FieldIndices, LabConfig.IsYaguangTimelineField))
+                {
+                    // Lab uses its ordinary periodic profile; these fields are edited in Hapio's Yaguang scope only.
+                    foreach (int index in category.FieldIndices)
+                        valueInputs[index].transform.parent.gameObject.SetActive(false);
+                    continue;
+                }
                 // 제목 줄은 글자 + 버튼만 가진 한 겹짜리 오브젝트로 새로 만든다.
                 // 설정 줄들과 같은 위계(Content 바로 아래)에 놓인다.
                 GameObject header = new GameObject("Category " + category.Title,

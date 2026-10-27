@@ -67,9 +67,8 @@ namespace C6Lab.Tests
         }
 
         [TestCase(LabStageYokai.Gumiho)]
-        [TestCase(LabStageYokai.Yaguang)]
         [TestCase(LabStageYokai.Jigwi)]
-        public void EveryStageCastsItsCommonGimmicksEveryIntervalWhateverTheLabSwitchSays(LabStageYokai kind)
+        public void NonScheduledStagesCastCommonGimmicksEveryIntervalWhateverTheLabSwitchSays(LabStageYokai kind)
         {
             var values = config.CaptureDeveloperValues();
             values[166] = 1f;
@@ -121,7 +120,7 @@ namespace C6Lab.Tests
                 Assert.That(snapshot.jigwi.All(state => state.playerId == 20 || state.playerId == 0), Is.True);
             }
             else Assert.That(snapshot.jigwi, Is.Empty);
-            Assert.That(approvedSettings.Length, Is.EqualTo(211));
+            Assert.That(approvedSettings.Length, Is.EqualTo(225));
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(approvedSettings),
                 "Applying a stage's runtime mask must not rewrite the shared DEV values or Lab source Config.");
         }
@@ -190,7 +189,7 @@ namespace C6Lab.Tests
         public void YaguangRunsTheConfiguredComboAndFlashButNeverTheGumihoMixOrAutomaticJigwi()
         {
             var values = config.CaptureDeveloperValues();
-            values[205] = 0f; // no common gimmicks (#311)
+            values[207] = values[208] = 0f; // Explicit switches also gate the Yaguang common schedule.
             values[166] = values[155] = values[184] = 1f;
             Apply(values);
             var model = Room("yaguang-only", LabStageYokai.Yaguang);
@@ -347,7 +346,7 @@ namespace C6Lab.Tests
             try { Assert.That(defaults.CaptureDeveloperValues().Skip(192).Take(4), Is.EqualTo(new[] { 20f, 30f, 1f, 1f })); }
             finally { Object.DestroyImmediate(defaults); }
             var baseline = config.CaptureDeveloperValues();
-            Assert.That(baseline.Length, Is.EqualTo(211));
+            Assert.That(baseline.Length, Is.EqualTo(225));
             Assert.That(baseline.Skip(192).Take(4), Is.EqualTo(new[] { 4f, 4f, 1f, 1f }));
             baseline[192] = 20f; baseline[193] = 30f;
             Apply(baseline);
@@ -357,7 +356,7 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(invalid, out _), Is.False);
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
             Assert.That(LabConfig.DeveloperCategories.SelectMany(category => category.FieldIndices).OrderBy(index => index),
-                Is.EqualTo(Enumerable.Range(0, 211).Except(LabConfig.RetiredDeveloperFields)),
+                Is.EqualTo(Enumerable.Range(0, 225).Except(LabConfig.RetiredDeveloperFields)),
                 "Every live row has a category; retired rows (#311) keep their index but no row.");
         }
     }

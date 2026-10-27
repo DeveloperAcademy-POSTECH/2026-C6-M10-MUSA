@@ -345,6 +345,7 @@ namespace C6Lab
             phase = LabPhase.Playing;
             ResetJigwi(config);
             ResetStageYokai(config, now);
+            ResetYaguangTimeline(now);
         }
 
         /// <summary>Advance the absolute Host clock; only Idle orbs expire.</summary>
@@ -707,7 +708,8 @@ namespace C6Lab
                     colors[i] = (LabOrbElement)(1 + (int)(DrawFor(seed ^ ComboColorSalt, ComboDrawKey, index) % 5UL));
                 }
                 combo.Start(colors, at, rules.ComboTimeLimitSeconds);
-                nextComboAt = at + rules.ComboRepeatIntervalSeconds;
+                // Scheduled stages receive the next occurrence from CastGimmicks, never from this effect.
+                nextComboAt = rules.YaguangTimeline ? double.PositiveInfinity : at + rules.ComboRepeatIntervalSeconds;
             }
         }
 
@@ -754,7 +756,7 @@ namespace C6Lab
                 lastFlashTarget = nextFlashTarget;
                 double gap = Math.Max(rules.FlashIntervalSeconds,
                     rules.FlashGlareSeconds + rules.FlashRecoverySeconds + rules.FlashWarningSeconds);
-                nextFlashAt = at + gap;
+                nextFlashAt = rules.YaguangTimeline ? double.PositiveInfinity : at + gap;
                 nextFlashTarget = DrawFlashTarget(flashCount);
             }
         }
@@ -784,7 +786,8 @@ namespace C6Lab
         // 미룰 섬광은 예고 시각도 알리지 않는다(#271): 지금 막혀 있거나, 예정된 예고 시작 시각에 지금 상태 그대로라면
         // 미뤄질 섬광이면 -1을 보내, 어느 기기에서도 요괴·눈 말풍선이 미리 나오지 않게 한다. 이미 시작한 예고는 그대로 알린다.
         // 콤보 예고가 섬광 예고보다 먼저(같은 순간 포함) 시작될 차례면 섬광은 그 콤보 한 판 뒤로 밀리므로 역시 알리지 않는다.
-        private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled && !flashHeld
+        private bool FlashWaiting => phase == LabPhase.Playing && rules != null && rules.FlashEnabled
+            && Finite(nextFlashAt) && !flashHeld
             && (flashWarned || (!FlashBlocked(lastTime) && !ComboWarnsBeforeFlash
                 && !FlashBlocked(Math.Max(lastTime, nextFlashAt - rules.FlashWarningSeconds))));
 
@@ -808,7 +811,7 @@ namespace C6Lab
         /// 야광귀 모드 (#271): 콤보나 섬광이 켜져 있으면 <b>각자의 화면에서</b> 이벤트가 한 번에 하나만 열린다.
         /// 박 폭탄·넘기기 막기·섬광·콤보·방해공작(여우불·매혹)이 그 화면에 열려 있으면 그 화면에 새 이벤트를 걸지 않는다.
         /// </summary>
-        private bool ExclusiveEvents => rules != null && (rules.ComboEnabled || rules.FlashEnabled);
+        private bool ExclusiveEvents => rules != null && !rules.YaguangTimeline && (rules.ComboEnabled || rules.FlashEnabled);
 
         /// <summary>
         /// 이 사람 화면에 지금 열린 이벤트가 있는지 (#271). 시각을 미리 계산하는 것이 아니라 지금 상태를 본다.
@@ -958,7 +961,8 @@ namespace C6Lab
         }
 
         /// <summary>전투 중이고 콤보가 켜져 있으며, 진행 중인 콤보 없이 다음 콤보를 기다리는 중인지 (#241)</summary>
-        private bool ComboWaiting => phase == LabPhase.Playing && rules != null && rules.ComboEnabled && !combo.Active;
+        private bool ComboWaiting => phase == LabPhase.Playing && rules != null && rules.ComboEnabled
+            && Finite(nextComboAt) && !combo.Active;
 
         // 다른 이벤트 때문에 미룰 콤보 예고는 알리지 않는다 (#271). 이미 시작한 예고는 그대로 알린다.
         private bool ComboAnnounced => ComboWaiting && !comboHeld
@@ -1356,6 +1360,8 @@ namespace C6Lab
                         if (players.TryGetValue(holder, out var drummer)) drummer.drumSeconds += elapsed;
                 }
                 MarkBusyScreens(lastTime, effectiveNow);
+                // The schedule cutoff cancels before same-time bomb expiry or combo timeout can award a penalty.
+                EndYaguangTimeline(effectiveNow);
                 if (StageYokai != LabStageYokai.None)
                 {
                     ExpireOrbs(effectiveNow);
@@ -1514,23 +1520,38 @@ namespace C6Lab
         /// </summary>
         private void CastGimmicks(double until)
         {
+            if (rules.YaguangTimeline)
+            {
+                if (yaguangTimelineEnded) return;
+                // Finish the previous unique effect at this gameplay boundary before admitting a waiting one.
+                AdvanceCombo(until);
+                AdvanceFlash(until);
+            }
             while (nextCommonGimmickAt <= until || nextUniqueGimmickAt <= until)
             {
                 if (nextCommonGimmickAt <= nextUniqueGimmickAt)
                 {
                     double at = nextCommonGimmickAt;
-                    nextCommonGimmickAt = at + GimmickInterval(rules.CommonGimmickInterval);
-                    if (CastGimmick(rules.CommonGimmicks, at, commonGimmickCount++, SabotageKindSalt, SabotageTargetSalt,
-                        ref lastCommonTarget)) lastCommonCastAt = at;
+                    uint index = commonGimmickCount++;
+                    nextCommonGimmickAt = rules.YaguangTimeline ? NextYaguangCommonAt(commonGimmickCount)
+                        : at + GimmickInterval(rules.CommonGimmickInterval);
+                    bool cast = rules.YaguangTimeline ? CastYaguangCommon(at, index)
+                        : CastGimmick(rules.CommonGimmicks, at, index, SabotageKindSalt, SabotageTargetSalt,
+                            ref lastCommonTarget);
+                    if (cast) lastCommonCastAt = at;
                 }
                 else
                 {
                     double at = nextUniqueGimmickAt;
-                    nextUniqueGimmickAt = at + GimmickInterval(rules.UniqueGimmickInterval);
-                    if (CastGimmick(rules.UniqueGimmicks, at, uniqueGimmickCount++, UniqueGimmickKindSalt, UniqueGimmickTargetSalt,
+                    uint index = uniqueGimmickCount++;
+                    nextUniqueGimmickAt = rules.YaguangTimeline ? NextYaguangUniqueAt(uniqueGimmickCount)
+                        : at + GimmickInterval(rules.UniqueGimmickInterval);
+                    if (rules.YaguangTimeline) yaguangUniquePending.Enqueue(rules.YaguangTimelineUniqueSchedule[index]);
+                    else if (CastGimmick(rules.UniqueGimmicks, at, index, UniqueGimmickKindSalt, UniqueGimmickTargetSalt,
                         ref lastUniqueTarget) && lastCommonCastAt == at) gimmickStats.simultaneous++;
                 }
             }
+            if (rules.YaguangTimeline) StartWaitingYaguangUnique(until);
         }
 
         /// <summary>A group's first cast: its interval after the start, or never when it is 0 or has no gimmicks (#311).</summary>
@@ -1564,16 +1585,21 @@ namespace C6Lab
                 if (roll >= 0) continue;
                 ulong target = targets[i][(int)(DrawFor(seed ^ targetSalt, SabotageDrawKey, index) % (ulong)targets[i].Count)];
                 last = target;
-                LabSabotageKind kind = kinds[i];
-                if (kind == LabSabotageKind.GourdBomb) DropGourdBomb(target, at);
-                else if (kind == LabSabotageKind.SwipeBlock) StartSwipeBlock(target, at);
-                else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index);
-                else if (kind == LabSabotageKind.Charm) StartCharm(target, at);
-                sabotages.Add(new LabSabotage(kind, target, at));
-                gimmickStats.Add(kind);
+                DispatchGimmick(kinds[i], target, at, index);
                 return true;
             }
             return false;
+        }
+
+        /// <summary>The one effect/notification/statistics path for periodic and scheduled common gimmicks.</summary>
+        private void DispatchGimmick(LabSabotageKind kind, ulong target, double at, uint index)
+        {
+            if (kind == LabSabotageKind.GourdBomb) DropGourdBomb(target, at);
+            else if (kind == LabSabotageKind.SwipeBlock) StartSwipeBlock(target, at);
+            else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index);
+            else if (kind == LabSabotageKind.Charm) StartCharm(target, at);
+            sabotages.Add(new LabSabotage(kind, target, at));
+            gimmickStats.Add(kind);
         }
 
         /// <summary>
@@ -1592,6 +1618,7 @@ namespace C6Lab
             stats.seconds = Math.Max(0d, rules.BattleDurationSeconds - remaining);
             stats.commonInterval = rules.CommonGimmicks.Length > 0 ? rules.CommonGimmickInterval : 0f;
             stats.uniqueInterval = rules.UniqueGimmicks.Length > 0 ? rules.UniqueGimmickInterval : 0f;
+            PopulateYaguangStats(stats);
             return stats;
         }
 
@@ -1824,6 +1851,10 @@ namespace C6Lab
             public readonly LabSabotageKind[] CommonGimmicks, UniqueGimmicks;
             public readonly bool[] GimmickEnabled;
             public readonly int[] GimmickChances;
+            public readonly bool YaguangTimeline;
+            public readonly double YaguangTimelineEndSeconds;
+            public readonly double[] YaguangTimelineCommonSeconds;
+            public readonly YaguangUniqueSlot[] YaguangTimelineUniqueSchedule;
             /// <summary>Fox fire (#251): how many fox orbs fall, and how long after they fall they cannot be touched off.</summary>
             public readonly int FoxFireCountMin, FoxFireCountMax;
             public readonly float FoxFireSafeSeconds;
@@ -1920,6 +1951,32 @@ namespace C6Lab
                 FlashGlareSeconds = config.YaguangFlashGlareSeconds;
                 FlashRecoverySeconds = config.YaguangFlashRecoverySeconds;
                 FlashShakeRelease = config.YaguangFlashShakeRelease;
+                // One stage policy feeds the shared scheduler; there is no second timeline execution loop.
+                YaguangTimeline = stageYokai == LabStageYokai.Yaguang && !teamMode;
+                YaguangTimelineEndSeconds = YaguangTimeline ? config.YaguangTimelineSabotageEndSeconds : 0d;
+                if (YaguangTimeline)
+                {
+                    BattleDurationSeconds = config.YaguangTimelineBattleSeconds;
+                    var commons = new List<double>();
+                    var unique = new List<YaguangUniqueSlot>();
+                    for (int i = 0; i < LabConfig.YaguangTimelineSlots; i++)
+                    {
+                        double common = config.YaguangTimelineCommonSeconds(i);
+                        if (common > 0d) commons.Add(common);
+                        double seconds = config.YaguangTimelineUniqueSeconds(i);
+                        bool isCombo = config.YaguangTimelineUniqueIsCombo(i);
+                        if (seconds > 0d && (isCombo ? ComboEnabled : FlashEnabled))
+                            unique.Add(new YaguangUniqueSlot(seconds, isCombo));
+                    }
+                    YaguangTimelineCommonSeconds = commons.OrderBy(value => value).ToArray();
+                    YaguangTimelineUniqueSchedule = unique.OrderBy(value => value.Seconds)
+                        .ThenBy(value => value.IsCombo ? 0 : 1).ToArray();
+                }
+                else
+                {
+                    YaguangTimelineCommonSeconds = Array.Empty<double>();
+                    YaguangTimelineUniqueSchedule = Array.Empty<YaguangUniqueSlot>();
+                }
                 TeamFeverHits = teamMode ? config.TeamFeverHits : 0;
                 TeamFeverSeconds = config.TeamFeverSeconds;
                 if (!teamMode) return;

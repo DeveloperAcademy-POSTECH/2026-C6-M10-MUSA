@@ -232,7 +232,7 @@ namespace Hapio.Tests
                 && SceneManager.GetActiveScene().path == GameScenePaths.StageResult, "The committed result must load its saved UI.");
             GameScreen screen = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<GameScreen>(true)).Single();
-            screen.viewerButton.onClick.Invoke();
+            screen.resultView.viewerButton.onClick.Invoke();
             yield return null;
             Assert.That(screen.viewerPanel.activeInHierarchy, Is.True);
             GameObject image = screen.viewerImage.gameObject;
@@ -283,7 +283,7 @@ namespace Hapio.Tests
             screen.closeViewerButton.onClick.Invoke();
             yield return null;
             Assert.That(screen.viewerPanel.activeSelf, Is.False);
-            screen.viewerButton.onClick.Invoke();
+            screen.resultView.viewerButton.onClick.Invoke();
             yield return null;
             ExecuteEvents.Execute(image, pointer, ExecuteEvents.dragHandler);
             Assert.That(Quaternion.Angle(initial, preview.ModelRotation), Is.LessThan(.001f),
@@ -450,6 +450,154 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator FigmaResultsAutomaticallyAdvanceAndShowEachYokaiThenKeepFinalOverallAndHomeNavigation()
+        {
+            session.StartSolo();
+            string[] names = { "구미호", "야광귀", "지귀" };
+            for (int stage = 1; stage <= 3; stage++)
+            {
+                yield return WaitPlaying(stage);
+                CompleteMapInFixture(Model());
+                yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.StageResult,
+                    "The completed battle must show its saved Figma result.");
+                yield return null;
+                GameStageResultView view = Object.FindFirstObjectByType<GameStageResultView>();
+                Assert.That(view.judgment.text, Is.EqualTo(stage == 3 ? "최종 승리 !" : "봉인 성공 !"));
+                Assert.That(view.stage.text, Is.EqualTo(stage == 3 ? "ALL STAGES CLEAR" : "STAGE " + stage));
+                Assert.That(view.yokai.text, Is.EqualTo(stage == 3 ? "모든 요괴" : names[stage - 1]));
+                Assert.That(view.viewerButton.GetComponentInChildren<UnityEngine.UI.Text>().text,
+                    Is.EqualTo(names[stage - 1] + " 봉인 박 확인"));
+                if (stage < 3)
+                {
+                    Assert.That(view.nextButton.gameObject.activeSelf, Is.False);
+                    if (stage == 1)
+                    {
+                        yield return Until(() => view.viewerButton.interactable, "The committed map must be available to view.");
+                        view.viewerButton.onClick.Invoke();
+                        yield return new WaitForSecondsRealtime(10.5f);
+                        Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult), "Gourd viewing pauses automatic advance.");
+                        Assert.That(session.State.stageIndex, Is.EqualTo(1));
+                        session.CloseGourdViewer();
+                    }
+                    yield return Until(() => session.State.stageIndex == stage + 1, "After ten result-display seconds the Host advances automatically.");
+                    continue;
+                }
+                yield return Until(() => view.nextButton.interactable, "The final overall-record control waits for readiness.");
+                Assert.That(view.paint.text, Is.EqualTo("전체 스테이지 기록"));
+                view.nextButton.onClick.Invoke();
+                yield return null;
+                Assert.That(view.paint.text, Is.EqualTo("PAINT 100.0%"));
+                view.nextButton.onClick.Invoke();
+                yield return null;
+                Assert.That(view.paint.text, Is.EqualTo("전체 스테이지 기록"));
+                yield return Until(() => view.homeButton.interactable, "The final result must allow Home only when ready.");
+                view.homeButton.onClick.Invoke();
+                yield return WaitHome();
+                Assert.That(network.IsConnected, Is.False);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator StageTwoDefeatShowsYaguangAndItsOwnRecordsWithoutGourdInspection()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            CompleteMapInFixture(Model());
+            yield return Until(() => !session.IsLoadingScene && session.CanAdvanceStage
+                && session.State.phase == GameFlowPhase.StageResult, "Stage one result must be ready.");
+            session.NextStage();
+            yield return WaitPlaying(2);
+            LabModel model = Model();
+            Assert.That(model.TryApplyPlayerDamage(network.LocalPlayerId, network.config.PlayerMaxHp,
+                ModelTime(model)), Is.True);
+            yield return WaitGameOver();
+            yield return null;
+            GameStageResultView view = Object.FindFirstObjectByType<GameStageResultView>();
+            Assert.That(view.stage.text, Is.EqualTo("STAGE 2"));
+            Assert.That(view.yokai.text, Is.EqualTo("야광귀"));
+            Assert.That(view.judgment.text, Is.EqualTo("봉인 실패..."));
+            Assert.That(view.viewerButton, Is.Null);
+            Assert.That(view.design.Find("InspectSealedGourd"), Is.Null);
+            Assert.That(session.ResultSnapshot, Is.Null, "Stage-one victory must not leak into the stage-two defeat.");
+            view.homeButton.onClick.Invoke();
+            yield return WaitHome();
+        }
+
+        [UnityTest]
+        public IEnumerator StageThreeVictoryShowsFinalVictoryAndOverallRecords()
+            => CheckStageThreeJudgment(true);
+
+        [UnityTest]
+        public IEnumerator StageThreeDefeatShowsJigwiAndOnlyTheCurrentBattleRecords()
+            => CheckStageThreeJudgment(false);
+
+        private IEnumerator CheckStageThreeJudgment(bool victory)
+        {
+            session.StartSolo();
+            for (int stage = 1; stage < 3; stage++)
+            {
+                yield return WaitPlaying(stage);
+                CompleteMapInFixture(Model());
+                yield return Until(() => !session.IsLoadingScene && session.CanAdvanceStage
+                    && session.State.phase == GameFlowPhase.StageResult, "The preceding result must finish loading.");
+                session.NextStage();
+            }
+            yield return WaitPlaying(3);
+            if (victory)
+            {
+                CompleteMapInFixture(Model());
+                yield return Until(() => session.State.phase == GameFlowPhase.Completed && !session.IsLoadingScene
+                    && SceneManager.GetActiveScene().path == GameScenePaths.StageResult, "Jigwi victory must show its final-stage result.");
+            }
+            else
+            {
+                LabModel model = Model();
+                Assert.That(model.TryApplyPlayerDamage(network.LocalPlayerId, network.config.PlayerMaxHp,
+                    ModelTime(model)), Is.True);
+                yield return WaitGameOver();
+            }
+            yield return null;
+            GameStageResultView view = Object.FindFirstObjectByType<GameStageResultView>();
+            Assert.That(view.stage.text, Is.EqualTo(victory ? "ALL STAGES CLEAR" : "STAGE 3"));
+            Assert.That(view.yokai.text, Is.EqualTo(victory ? "모든 요괴" : "지귀"));
+            Assert.That(view.judgment.text, Is.EqualTo(victory ? "최종 승리 !" : "봉인 실패..."));
+            LabSnapshot snapshot = victory ? session.ResultSnapshot : network.Snapshot;
+            Assert.That(snapshot.sessionId, Is.EqualTo(session.State.battleSessionId));
+            Assert.That(snapshot.round, Is.EqualTo(session.State.battleRound));
+            Assert.That(snapshot.phase, Is.EqualTo(victory ? LabPhase.Victory : LabPhase.Defeat));
+            Assert.That(view.paint.text, Is.EqualTo(victory ? "전체 스테이지 기록" : "PAINT "
+                + (snapshot.paintCoverage * 100f).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%"));
+            var expected = victory ? LabResultTable.OverallRowsFor(session.StageResults, network.LocalPlayerId)
+                : LabResultTable.RowsFor(LabResultStats.Awards(snapshot.players, false), network.LocalPlayerId, snapshot.playedSeconds);
+            Transform[] visible = view.rows.Cast<Transform>().Where(row => row.gameObject.activeSelf).ToArray();
+            Assert.That(visible.Length, Is.EqualTo(expected.Count));
+            for (int index = 0; index < expected.Count; index++)
+            {
+                LabResultRow row = expected[index];
+                string title = row.Title == "북 독점" ? "북 독점왕" : row.Title;
+                Assert.That(visible[index].Find("Title").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo(title));
+                Assert.That(visible[index].Find("Record").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo(row.Record));
+                Assert.That(visible[index].Find("Highlight").gameObject.activeSelf, Is.EqualTo(row.Mine));
+            }
+            if (victory)
+            {
+                Assert.That(view.viewerButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("지귀 봉인 박 확인"));
+                view.nextButton.onClick.Invoke();
+                yield return null;
+                Assert.That(view.paint.text, Is.EqualTo("PAINT 100.0%"));
+                Assert.That(view.judgment.text, Is.EqualTo("최종 승리 !"));
+            }
+            else
+            {
+                Assert.That(view.viewerButton, Is.Null);
+                Assert.That(session.ResultSnapshot, Is.Null, "Earlier victories must not replace Jigwi's failed battle.");
+            }
+            yield return Until(() => view.homeButton.interactable, "The result must allow exit after readiness.");
+            view.homeButton.onClick.Invoke();
+            yield return WaitHome();
+        }
+
+        [UnityTest]
         public IEnumerator AuthoritativeTimeoutLoadsGameOverInsteadOfNextStage()
         {
             float[] values = network.config.CaptureDeveloperValues();
@@ -462,10 +610,18 @@ namespace Hapio.Tests
             yield return WaitGameOver();
             Assert.That(session.State.endReason, Is.EqualTo("Time ran out."));
             Assert.That(session.State.stageIndex, Is.EqualTo(1));
+            yield return null;
+            GameStageResultView resultView = UnityEngine.Object.FindFirstObjectByType<GameStageResultView>();
+            Assert.That(resultView, Is.Not.Null);
+            Assert.That(resultView.judgment.text, Is.EqualTo("봉인 실패..."));
+            Assert.That(resultView.paint.text, Is.EqualTo("PAINT " + (network.Snapshot.paintCoverage * 100f)
+                .ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%"));
+            Assert.That(resultView.viewerButton, Is.Null);
+            Assert.That(resultView.nextButton.gameObject.activeSelf, Is.False);
             session.NextStage();
             yield return null;
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.GameOver));
-            session.GoHome();
+            resultView.homeButton.onClick.Invoke();
             yield return WaitHome();
         }
 
@@ -825,7 +981,7 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(211), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(225), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
                 "All approved values, including the gimmick group fields (#311), must survive Scene-owned DEV cleanup.");
         }
@@ -862,7 +1018,11 @@ namespace Hapio.Tests
             Assert.That(snapshot.drums.All(drum => drum.owner == network.LocalPlayerId), Is.True);
             Assert.That(player.personalHp, Is.EqualTo(network.config.PlayerMaxHp));
             Assert.That(player.stamina, Is.EqualTo(network.config.StaminaStart).Within(.01f));
-            Assert.That(snapshot.remaining, Is.GreaterThan(network.config.BattleDurationSeconds - 10f));
+            double duration = Model().StageYokai == LabStageYokai.Yaguang
+                ? network.config.YaguangTimelineBattleSeconds : network.config.BattleDurationSeconds;
+            Assert.That(snapshot.remaining, Is.GreaterThan(duration - 10d));
+            Assert.That(snapshot.remaining, Is.LessThanOrEqualTo(duration),
+                "Fresh stage time follows its actual policy; Yaguang has a separate approved duration.");
             Assert.That(snapshot.paintCoveredCount, Is.Zero);
             Assert.That(snapshot.paintCount, Is.Zero);
             Assert.That(network.PaintSurface.CoveredCount, Is.Zero);

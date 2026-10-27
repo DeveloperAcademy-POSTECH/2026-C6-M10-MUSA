@@ -64,6 +64,10 @@ namespace Hapio
             if (scope < 0 || scope > TerritoryScope || index < 0 || index >= LabConfig.DeveloperFields.Count) return false;
             // The gimmick groups (#311) replaced these timers; they stay in the form but are never shown.
             if (Array.IndexOf(RetiredFields, index) >= 0) return false;
+            if (LabConfig.IsYaguangTimelineField(index)) return scope == 2;
+            // The yaguang profile uses scheduled slots and alternation, so its generic group interval/chances do not apply.
+            if (scope == 2 && (index == 205 || index == 169 || index == 170 || index == 156 || index == 157
+                || index == 186 || index == 187)) return false;
             if (index == 79) return false; // Retired crack-mode selector; numeric slot stays reserved.
             if (scope == TerritoryScope) return index >= 197 && index <= 199 || IsTerritoryOwned(index);
             bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203;
