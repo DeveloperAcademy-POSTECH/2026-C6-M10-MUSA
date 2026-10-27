@@ -353,6 +353,7 @@ namespace C6Lab
             ResetStageYokai(config, now);
             ResetYaguangTimeline(now);
             ResetJigwiStage(config, now);
+            ResetFeverTime(now);
         }
 
         /// <summary>Advance the absolute Host clock; only Idle orbs expire.</summary>
@@ -1347,7 +1348,8 @@ namespace C6Lab
                 flashCount = flashCount,
                 flashLastAt = lastFlashAt,
                 flashLastTarget = lastFlashTarget,
-                flashLastTargetAll = !rules.FlashTargetOne
+                flashLastTargetAll = !rules.FlashTargetOne,
+                feverTimeAt = double.IsInfinity(feverTimeAt) ? -1d : feverTimeAt
             };
             FillTeamSnapshot(snapshot);
             return snapshot;
@@ -1406,10 +1408,15 @@ namespace C6Lab
                 if (elapsed > 0d)
                 {
                     played += elapsed;
+                    // The Jigwi stage's fever (#332), fever time (#334, the fox) and the yaguang's fever (#343) refill faster by themselves; hit rewards and the
+                    // storage limit stay as they are. Each belongs to its own stage, so they never stack.
+                    double refill = elapsed * JigwiStageRecoveryMultiplier(lastTime)
+                        + FeverSecondsBetween(lastTime, effectiveNow) * (rules.FeverTimeRecoveryMultiplier - 1d)
+                        // 야광귀 피버타임 (#343)은 야광귀 스테이지만의 것이라 구미호의 피버 타임과 겹치지 않는다.
+                        + YaguangFeverSecondsBetween(lastTime, effectiveNow) * (rules.YaguangFeverStaminaMultiplier - 1d);
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
-                            (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond * JigwiStageRecoveryMultiplier(lastTime)
-                                * YaguangFeverRecoveryMultiplier(lastTime)));
+                            (float)(player.stamina + refill * rules.StaminaRecoveryPerSecond));
                     // 결과 대시보드 기록: 이 사이에 북을 점유한 사람의 점유 시간 (북 점유율 계산용)
                     // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)
                     foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())
@@ -1419,6 +1426,8 @@ namespace C6Lab
                 // The schedule cutoff cancels before same-time bomb expiry or combo timeout can award a penalty.
                 EndYaguangTimeline(effectiveNow);
                 AdvanceJigwiStage(effectiveNow);
+                // Fever time (#334) stops the yokai before any gimmick due at the same moment is cast.
+                StartFeverTime(effectiveNow);
                 if (StageYokai != LabStageYokai.None)
                 {
                     ExpireOrbs(effectiveNow);
@@ -1928,6 +1937,9 @@ namespace C6Lab
             public readonly double YaguangTimelineEndSeconds;
             /// <summary>야광귀 피버타임 (#343): 방해가 끝난 뒤 스태미나 자동 회복 배율</summary>
             public readonly float YaguangFeverStaminaMultiplier;
+            /// <summary>Fever time (#334): seconds left when it starts (0 = none) and its refill multiplier.</summary>
+            public readonly double FeverTimeSeconds;
+            public readonly double FeverTimeRecoveryMultiplier;
             public readonly double[] YaguangTimelineCommonSeconds;
             public readonly YaguangUniqueSlot[] YaguangTimelineUniqueSchedule;
             /// <summary>Fox fire (#251): how many fox orbs fall, and how long after they fall they cannot be touched off.</summary>
@@ -2041,6 +2053,9 @@ namespace C6Lab
                 YaguangTimeline = stageYokai == LabStageYokai.Yaguang && !teamMode;
                 YaguangTimelineEndSeconds = YaguangTimeline ? config.YaguangTimelineSabotageEndSeconds : 0d;
                 YaguangFeverStaminaMultiplier = config.YaguangFeverStaminaMultiplier;
+                // Fever time (#334) is the fox's stage alone for now, never the 2:2 battle.
+                FeverTimeSeconds = stageYokai == LabStageYokai.Gumiho && !teamMode ? config.FeverTimeSeconds : 0d;
+                FeverTimeRecoveryMultiplier = config.FeverTimeRecoveryMultiplier;
                 if (YaguangTimeline)
                 {
                     var commons = new List<double>();

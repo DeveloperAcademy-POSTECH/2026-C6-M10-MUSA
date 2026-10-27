@@ -81,8 +81,8 @@ namespace Hapio.Tests
                 Assert.That(screen.developerButton, Is.SameAs(view.developerButton));
                 Assert.That(screen.soloButton, Is.SameAs(view.soloButton));
                 Assert.That(screen.developerPanel.transform.IsChildOf(view.transform), Is.False);
-                Assert.That(screen.developerInputs, Has.Length.EqualTo(238));
-                Assert.That(screen.developerSliders, Has.Length.EqualTo(238));
+                Assert.That(screen.developerInputs, Has.Length.EqualTo(240));
+                Assert.That(screen.developerSliders, Has.Length.EqualTo(240));
                 Assert.That(screen.developerScopeButtons, Has.Length.EqualTo(5));
                 Transform layer = screen.developerPanel.transform;
                 while (layer.parent != screen.transform) layer = layer.parent;

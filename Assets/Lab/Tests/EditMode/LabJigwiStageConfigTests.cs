@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         [Test]
         public void DefaultsAppendEightFieldsWithoutChangingRawOrRetiredPositions()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(238));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(240));
             Assert.That(LabConfig.JigwiStageFirstField, Is.EqualTo(228));
             Assert.That(LabConfig.JigwiStageLastField, Is.EqualTo(235));
             Assert.That(config.CaptureDeveloperValues().Skip(228).Take(8), Is.EqualTo(new[] { 1f, 1f, 7f, 18f, 30f, 1f, 3f, 2f }));
@@ -47,8 +47,8 @@ namespace C6Lab.Tests
                 Assert.That(peer.CaptureDeveloperValues(), Is.EqualTo(requested));
                 Assert.That(runtime.CaptureDeveloperValues(), Is.EqualTo(requested));
                 Assert.That(peer.CaptureDeveloperValues().Take(228), Is.EqualTo(before.Take(228)));
-                Assert.That(LabSessionSettings.Fingerprint(received, 3, 5673),
-                    Is.EqualTo(LabSessionSettings.Fingerprint(requested, 3, 5673)));
+                Assert.That(LabSessionSettings.Fingerprint(received, 3, 5674),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(requested, 3, 5674)));
                 float[] runtimeValues = runtime.CaptureDeveloperValues(); runtimeValues[230] = 15f;
                 Assert.That(runtime.TryApplyDeveloperValues(runtimeValues, out error), Is.True, error);
                 Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(requested));
@@ -79,8 +79,8 @@ namespace C6Lab.Tests
             float[] before = config.CaptureDeveloperValues();
             float[] requested = (float[])before.Clone(); requested[index] = changed;
             Assert.That(config.TryApplyDeveloperValues(requested, out string error), Is.True, error);
-            Assert.That(LabSessionSettings.Fingerprint(requested, 3, 5673),
-                Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 3, 5673)));
+            Assert.That(LabSessionSettings.Fingerprint(requested, 3, 5674),
+                Is.Not.EqualTo(LabSessionSettings.Fingerprint(before, 3, 5674)));
             LabDeveloperField field = LabConfig.DeveloperFields[index];
             foreach (float endpoint in new[] { field.Min, field.Max, before[index] })
             {
@@ -97,7 +97,7 @@ namespace C6Lab.Tests
             float[] old = before.Take(228).ToArray(); old[0] = 777f;
             Assert.That(config.TryApplyDeveloperValues(old, out _), Is.False);
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(before));
-            Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(old, 3, 5673));
+            Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(old, 3, 5674));
         }
 
         [Test]

@@ -3060,3 +3060,23 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - 현재main과 DEV 외 RectTransform576개가 같고 Lab/Battle/결과Scene·Prefab·패키지·빌드 설정은 바꾸지 않았다. 별도 GourdExport/PNG문서·사용자 Scene.meta·구조 정리 보고서는 PR에서 제외했다.
 - 검사용 Editor만 종료하고 TimeManager의 검사 부수 직렬화는 원복했다. 다른 프로젝트의 Editor는 종료하지 않았다. 새 실행 로그나 개인 경로·기기 식별자는 저장소에 추가하지 않았다.
 - **미실행:** 실제기기·다중기기LAN/핫스팟·네이티브빌드/성능·실제음성/SFX·사람의 조준·재미. 음성 미할당과 별도 소모 감소 미정은 기존 제한을 유지한다.
+
+## 2026-10-27 · #334 구미호 피버 타임
+
+- 기준 main `6022eb9f`(#333 병합), 기능 브랜치 `feat/#334-gumiho-fever-time`. 커밋은 DEV 값·접속 버전 → 규칙 → 두배 말풍선 → 문구·가장자리·빨간 시간 → 문서 순서로 나눴다.
+- **규칙**: 구미호 스테이지(2:2 제외)에서 `feverTimeAt = max(시작, 마감 − DEV238)`. 요괴 판의 시간 진행은 사건 시각에서 잘리므로(`NextStageBoundary`) 그 시각에 정확히 `StartFeverTime`이 기믹 예약을 무한대로 돌리고(같은 시각 예정분 포함 취소), 넘기기 막기 해제·매혹과 예고 취소·여우 구슬과 잠긴 박 폭탄 제거(`orbExpiries`로 연기)를 한다. 잠금이 풀린 폭탄은 남긴다. 충전은 `elapsed + 피버 구간 × (배율 − 1)`로 계산해 긴 한 번의 진행도 정확히 나눈다. 명중 보상·구슬 한도는 그대로다.
+- **화면**: `LabFeverTimeHud`가 스냅샷의 `feverTimeAt`과 Host 시계로 판단하므로 별도 통신이 없다. 두배 말풍선(연기 0.7초, 0.12초 뒤 등장, 0.9~1.1배·2Hz), 시작 문구 2초, 가장자리 빛(0.45~0.85·2Hz, `LabTeamFever.GlowSprite` 공유, 전투 표시 맨 뒤), 남은 시간 빨강. 늦게 본 피버(1초·문구 1.5초 초과)는 연기·문구 없이 보인다. 일시정지 중에는 숨긴다.
+- **DEV**: 처음 228·229(공유 설정 230개, 5672·`C6PhysicsLab/33`·`C6HapioGame/16`)로 만들었으나, 그 사이 main에 #332(지귀 228~235)·#329(섬광 보상 236~237)가 들어와 병합하며 **238·239(공유 설정 240개), 프로토콜 5674·`C6PhysicsLab/35`·`C6HapioGame/18`**로 옮겼다(5672는 #332도 썼던 번호다). #330과 #328이 병합 때 같은 5671을 쓰게 되어 이번에 함께 구분했다. `LabConfig.asset` 기본값과 Home·Lobby DEV 칸 2줄은 Editor API(`Hapio/Upgrade Menu DEV Rows`)로 저장했다. 장면 변경은 새 칸 오브젝트 62개(장면마다)와 칸 목록 2곳뿐임을 확인했다.
+- 작업 중 열린 Editor가 우리 코드와 무관한 컴파일러 내부 오류("Method not found: GetMaxCharCountOrThrowIfHuge")로 멈춰, Unity의 컴파일 서버 프로세스를 종료하고 빌드 캐시를 비운 뒤 다시 컴파일해 해결했다(코드 변경 없음).
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 오프라인 컴파일 7개 어셈블리 | PASS | 커밋 단계마다 오류 0 |
+| 열린 Editor 재컴파일 | PASS | 커밋 단계마다 `scriptCompilationFailed=false` |
+| 모델 확인(Editor eval) | PASS | 120초 구미호 판 `feverTimeAt=100`, 마지막 기믹 90초(100·110초 예정분 없음), 119.9초 피버 중. Test Runner가 아니다 |
+| EditMode·PlayMode 전체 | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| 실제 화면·3인·실기기 | NOT_RUN | 말풍선 위치·크기, 문구, 가장자리 빛 세기, 2배 충전 체감 확인 필요 |
+
+- 추가 검사: `LabFeverTimeTests`(DEV 칸, 시작 시각, 다른 스테이지 없음, 0이면 끔·전투보다 긴 피버, 충전 2배와 긴 한 번의 진행, 시작 시각 예정 기믹 취소, 방해 4종 정리), `LabFeverTimeHudTests`(말풍선 등장·위치·숨쉬기·끝, 늦게 본 피버·일시정지, 문구·가장자리 빛·빨간 시간), Hapio `GameStageSettingsTests.FeverTimeIsTunedOnTheFoxsTabAloneAndReachesItsStage`, Lab DEV에서 피버 칸 숨김, 설정 230개·프로토콜 고정값.
+- **main 병합(#332·#329·#335)**: 충돌 30여 파일 중 검사 고정값은 main 쪽을 받아 240/5674로 올렸다. `LabConfig` 칸·접근자·저장/적용은 main 뒤에 피버 2칸을 붙였고, 스태미나 충전은 지귀 피버 배율(`JigwiStageRecoveryMultiplier`)과 피버 타임 구간 배율을 함께 적용하도록 합쳤다(두 피버는 다른 스테이지). `LabConfig.asset`·Home·Lobby는 main 쪽을 받은 뒤 Editor API로 피버 기본값과 DEV 칸 2줄을 다시 넣었다(YAML 수동 병합 없음). Lab DEV는 지귀·피버 칸을 모두 숨긴다.
+

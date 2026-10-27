@@ -381,6 +381,11 @@ namespace C6Lab
         public double flashLastAt = -1d;
         public ulong flashLastTarget;
         public bool flashLastTargetAll;
+        /// <summary>피버 타임 (#334)이 시작되는 Host 시각. 없는 판은 -1.</summary>
+        public double feverTimeAt = -1d;
+
+        /// <summary>이 시각에 피버 타임 중인지 (#334). 2:2 팀 피버(<see cref="FeverOn"/>)와는 다른 것이다.</summary>
+        public bool FeverTimeOn(double now) => phase == LabPhase.Playing && feverTimeAt >= 0d && now >= feverTimeAt;
 
         /// <summary>
         /// 이 시각에 섬광 예고 중인지. 요괴는 모두의 화면에서 빼꼼 나온다. 콤보가 진행 중이거나 콤보 예고 중이면 언제나
