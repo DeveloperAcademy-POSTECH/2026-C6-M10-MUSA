@@ -3049,3 +3049,14 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - **발견한 결함(수정)**: 211을 은퇴시킨 뒤에도 `Stage02_yaguang.asset`의 `defaultValues`에 211이 남아 `GameStageCatalog.Validate`가 실패했고, Hapio 혼자 시작이 `GameSession.CreateModeConfig` NullReferenceException으로 멈췄다(사용자 Play에서 발견). Editor API로 그 항목만 지웠고, 스테이지 설정 생성·야광귀 전투 120초/방해 끝 100초를 eval로 확인했다. DEV 칸을 숨길 때는 스테이지 기본값 파일도 함께 확인해야 한다.
 - **사용자 검사 1차 실패 3건(수정)**: ① ② `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`(Home·Lobby): 장면에 저장된 DEV 칸 기본값이 원본과 달랐다(전투 180·스태미나 160, #326의 폭발 불 4초·최대 5도 미반영). 기존 Editor 도구 `Hapio/Upgrade Menu DEV Rows`를 Editor API로 실행해 값·범위를 원본에 맞췄고, 은퇴 칸 줄(55·87·88·152·154)은 공통 탭에서 숨겨졌다. ③ `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset`: 생성 한 번이 음일 거라고 가정해 양이 먼저 나오거나 음이 둘이면 실패하는 검사였다. 음이 나올 때까지(최대 5번) 생성하고 첫 음을 쓰도록 고쳤다. 런타임 규칙은 바꾸지 않았다.
 - 바뀐/추가된 검사: `LabModelTests`(해금 폭탄 열림·가득 찬 판·던지기/넘기기 거절, 잠긴 폭탄 열기 거절, 여우구슬 가장자리 거절·두 번 누르기, 아이템 사용 수), `LabDeveloperConfigTests`(은퇴 8칸, 저장 원본 120초·120 스태미나, 시간표가 짧은 전투를 막지 않음, 손가락 Sprite), `LabGimmickTimelineIntegrationTests`(모든 스테이지 공용 전투 시간), `LabYaguangFlashTests`, `LabOrbPhysicsTests`(여우구슬 튕김·두 번 누르기 연기, 해금 폭탄 미끄러짐·잡기 불가·열기 요청), `LabCharmBubblesTests`(손가락·안내 문구), `LabDeveloperSoloIntegrationTests`(여우 안내·솔로 매혹 대기 문구 없음), Hapio `GameStageSettingsTests`·`GameTerritoryFlowTests`·`GameStageUiTests`·`GameSceneFlowTests`, 프로토콜·토큰 고정값.
+
+
+## 2026-10-27 · #332 PR#337 최신 main 통합 재검사
+
+- main `6022eb9f`(#333/#331)와 지귀 기능을 통합한 `7575fd7c` 소스에서 검사했다. 최초 구현 `aa52a086`의1407/421건과 분리한 재검증이다.
+- Unity6000.6.5f1·macOS/Metal 검사 전용 Editor에서 통합 EditMode **1409/1409 통과(29.24초)**, 통합 PlayMode **423/423 통과(477.27초)**. 실패·Skipped·Inconclusive0.
+- main의 스태미나120/6칸·공용 전투 기본120초·폭탄 개봉→공격 구슬2개·여우불2탭/안내·구슬별 섬광 복구와 지귀 타임라인을 함께 유지했다. 폭탄 직접 투척 거절→use개봉→새 공격구슬로 근원 해제 검사를 보완했다.
+- 설정236개, 최종규약5672/Lab33/Game16. 이전5671 두 계열과 혼용하지 않으며 퇴역55/211의 기존 캡처값과 비노출을 보존한다.
+- 현재main과 DEV 외 RectTransform576개가 같고 Lab/Battle/결과Scene·Prefab·패키지·빌드 설정은 바꾸지 않았다. 별도 GourdExport/PNG문서·사용자 Scene.meta·구조 정리 보고서는 PR에서 제외했다.
+- 검사용 Editor만 종료하고 TimeManager의 검사 부수 직렬화는 원복했다. 다른 프로젝트의 Editor는 종료하지 않았다. 새 실행 로그나 개인 경로·기기 식별자는 저장소에 추가하지 않았다.
+- **미실행:** 실제기기·다중기기LAN/핫스팟·네이티브빌드/성능·실제음성/SFX·사람의 조준·재미. 음성 미할당과 별도 소모 감소 미정은 기존 제한을 유지한다.
