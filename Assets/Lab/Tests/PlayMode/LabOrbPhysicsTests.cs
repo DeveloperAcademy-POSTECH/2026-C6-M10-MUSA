@@ -680,24 +680,35 @@ namespace C6Lab.Tests
             Assert.That(thrown, Is.EqualTo("relay"));
         }
 
-        [Test]
-        public void ALockedBombCannotBeThrownButAnUnlockedOneCanWithAnUpwardFlick()
+        [UnityTest]
+        public IEnumerator ABombIsNeverThrownAndAnUnlockedOneGlidesInRestsThenAsksToOpenInSmoke()
         {
             var bomb = board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), lockSwipes: 2, fuseSeconds: 11.2f);
             int throws = 0;
-            string thrown = null;
-            board.ThrowRequested += gesture => { throws++; thrown = gesture.OrbId; };
+            var uses = new System.Collections.Generic.List<string>();
+            board.ThrowRequested += gesture => throws++;
+            board.UseRequested += id => uses.Add(id);
             Vector2 from = BoardPoint(bomb);
             Assert.That(board.TryBeginDragAtWorld(from, 1d), Is.True);
             Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1f), 1.1d), Is.True);
             Assert.That(throws, Is.Zero, "A locked bomb can only be passed on.");
 
-            board.UpsertOrb("bomb", LabOrbKind.Bomb, new Vector2(.6f, .3f), lockSwipes: 0, fuseSeconds: -1f);
-            from = BoardPoint(bomb);
-            Assert.That(board.TryBeginDragAtWorld(from, 2d), Is.True);
-            Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1f), 2.1d), Is.True);
-            Assert.That(throws, Is.EqualTo(1), "Once handoffs open it, it is thrown like an attack orb (#212).");
-            Assert.That(thrown, Is.EqualTo("bomb"));
+            // The unlocking handoff (#328): it comes in at the left edge, glides to the Host's spot, rests, then opens.
+            var opening = board.UpsertOrb("opening", LabOrbKind.Bomb, new Vector2(0f, .5f), new Vector2(.6f, 0f),
+                lockSwipes: 0, fuseSeconds: -1f, justUnlocked: true, arrival: LabDrumArrival.Stop, stopAt: .3f);
+            Assert.That(board.ArrivalOf("opening"), Is.EqualTo(LabDrumArrival.Stop), "It glides in like a drum.");
+            Assert.That(board.TryBeginDragAtWorld(BoardPoint(opening), 2d), Is.False,
+                "An unlocked bomb cannot be grabbed, so it is never thrown or passed on.");
+            float until = Time.time + 3f;
+            while (uses.Count == 0 && Time.time < until) yield return new WaitForFixedUpdate();
+            Assert.That(uses, Is.EqualTo(new[] { "opening" }), "Once at rest it asks the Host to open it.");
+            Assert.That(board.ArrivalOf("opening"), Is.EqualTo(LabDrumArrival.None));
+            Assert.That(BoardPoint(opening).x, Is.EqualTo(Bounds.xMin + .3f * Bounds.width).Within(.1f * Bounds.width),
+                "On the Host's spot, inside the board.");
+            Assert.That(board.GetComponentsInChildren<LabOrbVanishSmoke>(), Is.Not.Empty, "It goes up in smoke.");
+            for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();
+            Assert.That(uses.Count, Is.EqualTo(1), "Asked once while the answer is pending.");
+            Assert.That(throws, Is.Zero);
         }
 
         [UnityTest]

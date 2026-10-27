@@ -88,8 +88,7 @@ namespace C6Lab.Tests
             Assert.That(new[] { values[53], values[54] }, Is.EqualTo(new[] { 2f, 4f }), "Relay x2 and MAX multipliers.");
             values[53] = 1.5f;
             values[54] = 3f;
-            Assert.That(values[55], Is.EqualTo(3f), "Bomb damage multiplier.");
-            values[55] = 2.5f;
+            Assert.That(values[55], Is.EqualTo(3f), "The retired bomb damage multiplier keeps its slot (#328).");
             Assert.That(values[56], Is.EqualTo(.8f), "The camera looks 0.8 units above the target centre in the new UI composition.");
             values[56] = -1.5f;
             Assert.That(new[] { values[57], values[58], values[59] },
@@ -209,7 +208,6 @@ namespace C6Lab.Tests
             Assert.That(config.PotionHeal, Is.EqualTo(25));
             Assert.That(config.RelayDoubleMultiplier, Is.EqualTo(1.5f));
             Assert.That(config.RelayMaxMultiplier, Is.EqualTo(3f));
-            Assert.That(config.BombMultiplier, Is.EqualTo(2.5f));
             Assert.That(config.CameraLookHeightOffset, Is.EqualTo(-1.5f));
             Assert.That(config.TargetSpinStrength, Is.EqualTo(120f));
             Assert.That(config.TargetSpinDamping, Is.EqualTo(.8f));
@@ -787,9 +785,11 @@ namespace C6Lab.Tests
         public void RetiredGimmickTimersKeepTheirIndicesButNoRowAndNothingReadsThem()
         {
             // The gimmick groups (#311) replaced the gourd's bomb and block timers and the sabotage interval.
-            Assert.That(LabConfig.RetiredDeveloperFields, Is.EqualTo(new[] { 87, 88, 152, 154, 167, 168 }));
+            // #328 adds the bomb damage multiplier (bombs open instead of being thrown).
+            Assert.That(LabConfig.RetiredDeveloperFields, Is.EqualTo(new[] { 55, 87, 88, 152, 154, 167, 168 }));
             Assert.That(LabConfig.RetiredDeveloperFields.Select(index => LabConfig.DeveloperFields[index].Label), Is.EqualTo(new[]
             {
+                "Bomb Damage Multiplier",
                 "Gourd Bomb Interval Min (seconds, 0 = off)", "Gourd Bomb Interval Max (seconds, 0 = off)",
                 "Swipe Block Interval (seconds, 0 = off)", "Swipe Block Bomb Gap (seconds)",
                 "Sabotage Interval Min (seconds)", "Sabotage Interval Max (seconds)"

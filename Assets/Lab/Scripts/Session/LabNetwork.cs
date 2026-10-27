@@ -1996,7 +1996,10 @@ namespace C6Lab
                     // The white flash before an orb runs out (#235); a locked bomb shows its own red one.
                     lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
-                    jigwiScale: orb.jigwiRadiusScale, fever: orb.fever);
+                    jigwiScale: orb.jigwiRadiusScale, fever: orb.fever,
+                    // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
+                    arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
+                    stopAt: orb.stopAt);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {

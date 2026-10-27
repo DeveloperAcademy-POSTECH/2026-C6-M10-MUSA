@@ -94,6 +94,12 @@ namespace C6Lab
             public MotionState? BeforeRequest;
             /// <summary>A fox orb cannot be touched off until this time (#251): a moment after it lands.</summary>
             public float FoxSafeUntil;
+            /// <summary>
+            /// An unlocked bomb (#328): when it came to rest here, -1 while it is still moving in, and the earliest time
+            /// this board may ask again to open it after the Host turned a request down.
+            /// </summary>
+            public float BombRestingSince = -1f;
+            public float BombNextOpenAt;
             public float SafetyRestSeconds;
             public bool SafetyNudging;
             public float SafetyNudgeSeconds;
@@ -149,6 +155,10 @@ namespace C6Lab
         private const float ArrivalRestSpeed = .02f;
         // A drum passing through runs on to the next player at no less than this (board widths/s).
         private const float PassMinSpeed = .9f;
+        // An unlocked bomb (#328) rests this long where it stopped, so it is seen to arrive, then opens; a request
+        // the Host turned down is asked again after the retry time.
+        private const float BombOpenPauseSeconds = .2f;
+        private const float BombOpenRetrySeconds = 1f;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly HashSet<string> spawnedIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
@@ -489,8 +499,8 @@ namespace C6Lab
                 entry.SimulationHoldVelocity = initialVelocity;
                 entry.SimulationHoldAngularVelocity = Vector3.zero;
             }
-            // Starts from the speed it came in with, set just above.
-            if (arrival != LabDrumArrival.None && kind.IsDrum() && !body.isKinematic)
+            // Starts from the speed it came in with, set just above. An unlocked bomb (#328) glides in like a drum.
+            if (arrival != LabDrumArrival.None && (kind.IsDrum() || kind == LabOrbKind.Bomb) && !body.isKinematic)
                 StartArrival(entry, arrival, stopAt, normalizedPosition.x);
             if (playSpawn && spawnedIds.Add(id))
             {
@@ -1269,7 +1279,7 @@ namespace C6Lab
             foreach (var entry in entries.Values)
             {
                 if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held || entry.Dropping
-                    || entry.HiddenForPending) continue;
+                    || entry.HiddenForPending || UnlockedBomb(entry)) continue;
                 float radius = entry.View.HitSphere.radius;
                 float originalReach = radius * 1.25f;
                 float reach = GripReach(entry);
@@ -1513,6 +1523,7 @@ namespace C6Lab
         private void FixedUpdate()
         {
             if (!configured || simulationHeld) return;
+            OpenRestingBombs();
             updateEntries.Clear();
             updateEntries.AddRange(entries.Values);
             foreach (var entry in updateEntries)
@@ -1567,6 +1578,40 @@ namespace C6Lab
                 LabEdgeCrossingKind kind = entry.Arrival == LabDrumArrival.Pass ? LabEdgeCrossingKind.Passing
                     : entry.Blasted ? LabEdgeCrossingKind.Pushed : LabEdgeCrossingKind.Swipe;
                 ProcessEdgeCrossing(entry, right, position, velocity, kind);
+            }
+        }
+
+        private static bool UnlockedBomb(Entry entry) => entry.View != null && entry.View.Kind == LabOrbKind.Bomb
+            && entry.View.LockSwipes == 0;
+
+        /// <summary>
+        /// 해금 폭탄 (#328): 잠금이 풀린 폭탄이 이 판에 미끄러져 들어와 멈추면 잠깐 뒤 연기와 함께 사라지고, 그 자리를 Host에
+        /// 알려 공격 구슬 두 개로 연다. 열 수 없다는 답이 오면 잠시 뒤 다시 묻는다. 잠금이 풀린 폭탄은 잡을 수 없다.
+        /// </summary>
+        private void OpenRestingBombs()
+        {
+            if (!interactionEnabled) return;
+            updateEntries.Clear();
+            updateEntries.AddRange(entries.Values);
+            foreach (Entry entry in updateEntries)
+            {
+                if (!UnlockedBomb(entry) || !entry.LocalOwner || entry.Provisional) continue;
+                if (entry.Arrival != LabDrumArrival.None || entry.Dropping || entry.Held || entry.Locked
+                    || entry.EdgePending || entry.HiddenForPending)
+                {
+                    entry.BombRestingSince = -1f;
+                    continue;
+                }
+                if (entry.BombRestingSince < 0f) entry.BombRestingSince = Time.time;
+                if (Time.time - entry.BombRestingSince < BombOpenPauseSeconds || Time.time < entry.BombNextOpenAt) continue;
+                entry.BombRestingSince = -1f;
+                entry.BombNextOpenAt = Time.time + BombOpenRetrySeconds;
+                LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius,
+                    config != null ? config.OrbAppearance : null);
+                entry.Locked = true;
+                StopMotion(entry.View.Body);
+                SetBodyMode(entry);
+                UseRequested?.Invoke(entry.View.OrbId);
             }
         }
 

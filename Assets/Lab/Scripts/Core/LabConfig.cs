@@ -370,11 +370,12 @@ namespace C6Lab
 
         /// <summary>
         /// Settings the gimmick groups (#311) replaced: the gourd bomb's and the sabotage mix's random min/max intervals,
-        /// the swipe block's own interval and its gap from bombs. They keep their places in the shared form so every other
-        /// index stays put, but nothing reads them and DEV never shows them.
+        /// the swipe block's own interval and its gap from bombs. #328 adds the bomb damage multiplier (an unlocked bomb
+        /// opens into two attack orbs instead of being thrown). They keep their places in the shared form so every other index stays put, but nothing
+        /// reads them and DEV never shows them.
         /// </summary>
         public static IReadOnlyCollection<int> RetiredDeveloperFields { get; } =
-            Array.AsReadOnly(new[] { 87, 88, 152, 154, 167, 168 });
+            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168 });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
         public static IReadOnlyList<LabOrbKind> GeneratedKinds { get; } = Array.AsReadOnly(new[]
@@ -389,7 +390,7 @@ namespace C6Lab
             new LabDeveloperCategory("Battle", 0, 1, 2, 48),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
             new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44, 225, 226, 227),
-            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 55, 80, 81, 141, 142, 143, 144, 145, 146, 147),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 80, 81, 141, 142, 143, 144, 145, 146, 147),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16, 165),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
@@ -879,7 +880,6 @@ namespace C6Lab
         public int PotionHeal => Mathf.Clamp(potionHeal, 0, 300);
         public float RelayDoubleMultiplier => Mathf.Clamp(Finite(relayDoubleMultiplier, 2f), 1f, 20f);
         public float RelayMaxMultiplier => Mathf.Clamp(Finite(relayMaxMultiplier, 4f), 1f, 20f);
-        public float BombMultiplier => Mathf.Clamp(Finite(bombMultiplier, 3f), 1f, 20f);
         public float BombBlastRadius => Mathf.Clamp(Finite(bombBlastRadius, .4f), 0f, 2f);
         public float BombBlastStrength => Mathf.Clamp(Finite(bombBlastStrength, 9f), 0f, 20f);
         public float BombDragLag => Mathf.Clamp(Finite(bombDragLag, .12f), 0f, 1f);
@@ -1023,7 +1023,8 @@ namespace C6Lab
         public LabPaintPattern PaintPattern => paintPattern >= LabPaintPattern.Legacy && paintPattern <= LabPaintPattern.Flow
             ? paintPattern : LabPaintPattern.Splatter;
         public float PaintEdgeRaggedness => Mathf.Clamp01(Finite(paintEdgeRaggedness, .55f));
-        // Retired by the gimmick groups (#311): still captured and applied so the form keeps its indices, never read.
+        // Retired by the gimmick groups (#311) and #328: still captured and applied so the form keeps its indices, never read.
+        private float BombMultiplier => Mathf.Clamp(Finite(bombMultiplier, 3f), 1f, 20f);
         private float GourdBombIntervalMin => Mathf.Clamp(Finite(gourdBombIntervalMin, 20f), 0f, 600f);
         private float GourdBombIntervalMax => Mathf.Clamp(Finite(gourdBombIntervalMax, 30f), GourdBombIntervalMin, 600f);
         private float SwipeBlockInterval => Mathf.Clamp(Finite(swipeBlockInterval, 40f), 0f, 600f);
