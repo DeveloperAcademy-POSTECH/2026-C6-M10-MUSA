@@ -53,6 +53,27 @@ namespace Hapio
         private readonly List<string> keys = new List<string>();
         private LabNetwork Network => session != null ? session.Network : null;
         public int CreationCapacity => creationCapacity;
+        public bool OpeningBlocked { get; private set; }
+
+        /// <summary>Temporarily hide and lock Home while its independent opening is presented.</summary>
+        public void SetOpeningBlocked(bool blocked)
+        {
+            OpeningBlocked = blocked;
+            if (blocked)
+            {
+                if (background != null) background.gameObject.SetActive(false);
+                if (design != null) design.gameObject.SetActive(false);
+                if (directConnectionPanel != null) directConnectionPanel.SetActive(false);
+                if (modePanel != null) modePanel.SetActive(false);
+                if (screen != null && screen.developerPanel != null) screen.developerPanel.SetActive(false);
+            }
+            else if (isActiveAndEnabled) LateUpdate();
+        }
+
+        private void BindNavigation(UnityEngine.UI.Button button, UnityEngine.Events.UnityAction action)
+        {
+            if (button != null) button.onClick.AddListener(() => { if (!OpeningBlocked) action(); });
+        }
 
         private sealed class RoomRow
         {
@@ -71,15 +92,15 @@ namespace Hapio
             storyHeadingFontSize = heading.fontSize;
             storySealFontSize = sealButton.GetComponentInChildren<UnityEngine.UI.Text>().fontSize;
             storyLocalLabelFontSizes = localLabels.Select(label => label.fontSize).ToArray();
-            enterButton.onClick.AddListener(() => session.EnterRoomBrowser());
+            BindNavigation(enterButton, () => session.EnterRoomBrowser());
             // 2:2 (#281): "새 방 만들기 +" first asks which mode. A prefab without the mode panel keeps the old story flow.
-            createButton.onClick.AddListener(() => { if (modePanel != null) SetModes(true); else CreateRoom(GameMode.Story); });
+            BindNavigation(createButton, () => { if (modePanel != null) SetModes(true); else CreateRoom(GameMode.Story); });
             if (modePanel != null)
             {
-                modeDismissButton.onClick.AddListener(() => SetModes(false));
-                basicModeButton.onClick.AddListener(() => CreateRoom(GameMode.Story));
-                teamModeButton.onClick.AddListener(() => CreateRoom(GameMode.Territory));
-                teamSoloButton.onClick.AddListener(() => { SetModes(false); session.StartSolo(GameMode.Territory); });
+                BindNavigation(modeDismissButton, () => SetModes(false));
+                BindNavigation(basicModeButton, () => CreateRoom(GameMode.Story));
+                BindNavigation(teamModeButton, () => CreateRoom(GameMode.Territory));
+                BindNavigation(teamSoloButton, () => { SetModes(false); session.StartSolo(GameMode.Territory); });
                 modePanel.SetActive(false);
             }
             if (teamShifted != null && teamShiftAnchors != null && teamShifted.Length == teamShiftAnchors.Length)
@@ -95,24 +116,24 @@ namespace Hapio
                     CopyRect(teamShifted[i], storyShifted[i]);
                 }
             }
-            refreshButton.onClick.AddListener(() => Network.StartRoomSearch());
-            cancelButton.onClick.AddListener(() =>
+            BindNavigation(refreshButton, () => Network.StartRoomSearch());
+            BindNavigation(cancelButton, () =>
             {
                 if (!session.CancelRoomCreation()) Network.CancelJoin();
                 Network.CancelRoomSearch();
             });
-            leaveButton.onClick.AddListener(() => session.GoHomeToRoomBrowser());
-            sealButton.onClick.AddListener(() => session.StartGame());
-            clearSlotButton.onClick.AddListener(() => session.SelectSlot(0));
-            directConnectionButton.onClick.AddListener(() => SetDirectConnection(true));
-            closeDirectConnectionButton.onClick.AddListener(() => SetDirectConnection(false));
-            directJoinButton.onClick.AddListener(JoinDirect);
-            soloButton.onClick.AddListener(() => session.StartSolo());
+            BindNavigation(leaveButton, () => session.GoHomeToRoomBrowser());
+            BindNavigation(sealButton, () => session.StartGame());
+            BindNavigation(clearSlotButton, () => session.SelectSlot(0));
+            BindNavigation(directConnectionButton, () => SetDirectConnection(true));
+            BindNavigation(closeDirectConnectionButton, () => SetDirectConnection(false));
+            BindNavigation(directJoinButton, JoinDirect);
+            BindNavigation(soloButton, () => session.StartSolo());
             // GameScreen owns the existing scoped DEV panel and wires developerButton once.
             for (int i = 0; i < countButtons.Length; i++)
             {
                 int count = i + 2;
-                countButtons[i].onClick.AddListener(() =>
+                BindNavigation(countButtons[i], () =>
                 {
                     if (session.IsCreatingRoom || !Network.CanChooseConnection || session.State.phase != GameFlowPhase.Home) return;
                     creationCapacity = count; localError = string.Empty;
@@ -122,7 +143,7 @@ namespace Hapio
             for (int i = 0; i < slotButtons.Length; i++)
             {
                 int number = i + 1;
-                slotButtons[i].onClick.AddListener(() => session.SelectSlot(Network.LocalSlotNumber == number ? 0 : number));
+                BindNavigation(slotButtons[i], () => session.SelectSlot(Network.LocalSlotNumber == number ? 0 : number));
             }
             if (emptySlots[0] == filledSlots[0]) emptySlots[0] = emptySlots[1];
             directConnectionPanel.SetActive(false);
@@ -130,6 +151,7 @@ namespace Hapio
 
         private void CreateRoom(GameMode mode)
         {
+            if (OpeningBlocked) return;
             SetModes(false);
             localError = string.Empty;
             if (mode == GameMode.Territory) { session.CreateAndEnterRoom(LabTeams.Players, GameMode.Territory); return; }
@@ -149,7 +171,7 @@ namespace Hapio
 
         private void EnterRoom(int index)
         {
-            if (session.IsCreatingRoom || index < 0 || index >= keys.Count) return;
+            if (OpeningBlocked || session.IsCreatingRoom || index < 0 || index >= keys.Count) return;
             localError = string.Empty;
             string key = keys[index];
             if (session.PendingRooms.Any(room => room.Key == key)) session.EnterPendingRoom(key);
@@ -158,6 +180,7 @@ namespace Hapio
 
         private void LateUpdate()
         {
+            if (OpeningBlocked) return;
             if (session == null || Network == null) return;
             bool home = screen.kind == GameScreenKind.Home && session.State.phase == GameFlowPhase.Home;
             bool lobby = screen.kind == GameScreenKind.Lobby && session.State.phase == GameFlowPhase.Lobby;
@@ -226,7 +249,7 @@ namespace Hapio
             {
                 UnityEngine.UI.Button row = Instantiate(roomTemplate, roomContent);
                 int index = rows.Count;
-                row.onClick.AddListener(() => EnterRoom(index));
+                BindNavigation(row, () => EnterRoom(index));
                 rows.Add(row); keys.Add(string.Empty);
             }
             for (int i = 0; i < rows.Count; i++)

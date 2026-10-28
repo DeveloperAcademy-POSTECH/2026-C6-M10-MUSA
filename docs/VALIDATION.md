@@ -3141,3 +3141,13 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - 피버 시각은 Host의 판 시작 예약값인데 기존 `LabBoardReplica.CopySnapshot`에서 빠져 Client 표현이 꺼질 수 있었다. `feverTimeAt`를 보존하고 빠른 board 갱신이100초 경계를 지날 때 활성화·오래된 header가 새 시각을 되감지 않는 검사를 추가했다. 구미호/야광귀 피버와 지귀 개인/100초 이후 회복을 함께 보존하고, 투사체 몸체와 원소 꼬리의 반경 정책을 맞췄다.
 - 최신 main Home/Lobby에 Editor API로 DEV11행씩만 추가했다. 기존 객체3848개의 Transform·활성 상태 비교에서 차이0, Scene 직렬화 객체 삭제0. 기존 객체 변경은 DEV 배열/부모 행 목록과 지귀 제목 한 곳씩이다. Story24컷·26페이지와 관련 코드/그림/설정은 main과 바이트 동일이며 오프닝 진입 기능을 추가하지 않았다. 소스/문서 `git diff --check`를 통과했고 패키지·빌드/프로젝트 설정은 변경하지 않았다.
 - **미실행:** 이 통합본의 실제 다중 기기 LAN/핫스팟, iOS/독립 Mac 빌드, 사람의 조준·청취·화면 평가는 확인되지 않았다. 위 과거 실행 기록은 당시 버전·환경의 기록으로 그대로 보존한다.
+
+## 2026-10-28 · #354 앱 시작 팝업북 오프닝 연결
+
+- 기준 main `2c92566f`에서 `feat/#354-opening-start-flow`로 작업했다. Home에 독립 `GameOpening.prefab`·`GameOpeningController`를 연결해 앱 실행당 한 번24컷·26페이지를 시작하고 완료/스킵 후 기존 타이틀로 돌아오게 했다. PlayerPrefs·GameSession·네트워크·Lab 코드·빌드 Scene 목록은 변경하지 않았다.
+- Unity6000.6.5f1·macOS/Metal 전용 Editor에서 컴파일 오류0, 전체 EditMode **1527/1527 통과(38.86초)**. 저장 참조·원본 미리보기·Canvas/안전 영역·기존 설정/모델을 포함한다. 이후 잘못된 Home Canvas 연결에서도 메뉴를 함께 끄지 않도록 복구를 보완하고 아래 PlayMode를 실행했다.
+- 실제 저장 Home을 사용하는 새 오프닝 PlayMode **6/6(2.49초)**와, 새6개를 포함한 Hapio PlayMode **52/52(265.46초)** 통과. 실패·Skipped·Inconclusive0. 자동 진입·전체26페이지 완주·중복 종료/스킵·버튼 콜백 직접 호출 차단·Home 재진입·비활성화/참조 누락/잘못된 Canvas 복구를 확인했다. 기존 Home/로비/DEV·3스테이지 흐름·지귀 A/B·독립 StoryPlayer/타이틀 회귀를 포함한다. 전체 Lab PlayMode는 이번에 재실행하지 않았다.
+- Test Runner 밖의 실제 Editor Play에서도 Domain Reload OFF/Scene Reload ON으로2회, 원래 설정인 Domain·Scene Reload 모두 OFF로2회 연속 실행했다. 모두 첫 컷 자동 시작·스킵 후 타이틀을 확인했고 마지막 실행에서는 기존 방 목록 진입도 확인했다. 옵션은 원래 값으로 복원했다. 390×844 GameView의 첫 컷과 복귀 타이틀을 직접 캡처·시각 확인했다. 이 결과는 iPhone 실행 결과가 아니다.
+- 기존 `Hapio.Editor.GameBuild.Mac` 경로의 Development 앱 빌드를 완료했다. 생성된 독립 Mac 앱을 실행해 타이틀 입력 없이 첫 사찰 컷·대사·제어 버튼이 표시되는 것을 화면으로 확인한 뒤 검증 앱을 종료했다. 창 표시명 `C6_Physics_Lab`은 기존 Product Name이며 실제 빌드의 첫 Scene은 Hapio Home이다. 빌드 산출물과 원시 로그는 커밋하지 않는다.
+- Editor 연결 도구를2회 실행해2회차 Home 파일이 바이트 동일함을 확인했다. 기존 Home2037개 객체의 Transform·활성 상태 차이0, 직렬화 객체 삭제0·기존 변경은 Scene root 목록 한 곳뿐이다. 새 오프닝24개 객체와 Prefab을 추가했다. Home 의존성에24개 컷 데이터와24개 그림 Prefab이 모두 포함된다. 기존 컷·그림·대본·StoryPreview·다른 게임 Scene·Packages/ProjectSettings/Lab은 변경하지 않았다. 원래 Desktop 폴더의 미커밋 사용자 변경을 작업에 섞거나 덮어쓰지 않았다.
+- **미실행/제한:** iOS Xcode 내보내기·실기기 설치, 실제 다중 기기 LAN/핫스팟, iPhone/iPad 안전 영역·메모리/성능·백그라운드 동작, 실제 음성 청취/재생 중 중단. 오디오 정리는 현재 미할당 소스의 상태와 기존 Cancel 경로를 검사했으며,13번 컷 효과음은 여전히 미할당이다. 구현·편집 위치는 [앱 시작 오프닝](APP_START_OPENING.md)을 따른다.
