@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -51,6 +52,11 @@ namespace Hapio
         // ALL STAGES CLEAR: false면 3스테이지 표, true면 전체 게임 대시보드. 새 판이면 3스테이지 표부터.
         private bool showOverall;
         private string overallRunId;
+        private bool resultAdvancePending;
+        private bool resultAwaitingPointerRelease;
+        private Coroutine resultEntryRoutine;
+        private bool IsResultScreen => kind == GameScreenKind.StageResult || kind == GameScreenKind.GameOver;
+        private bool ResultActionsBlocked => IsResultScreen && (resultAwaitingPointerRelease || resultAdvancePending);
         private bool UsesExternalNavigation => externalNavigation && (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby);
         private bool OpeningBlocked => kind == GameScreenKind.Home && GameOpeningController.IsPresenting;
 
@@ -67,16 +73,16 @@ namespace Hapio
                 Click(fewerPlayersButton, () => ChangePlayers(-1));
                 Click(morePlayersButton, () => ChangePlayers(1));
                 Click(startButton, () => session.StartGame());
-                Click(homeButton, () => session.GoHome());
+                Click(homeButton, OnHomeButton);
             }
             if (resultView != null)
             {
                 Click(resultView.nextButton, OnNextButton);
-                Click(resultView.viewerButton, () => session.OpenGourdViewer());
-                Click(resultView.homeButton, () => session.GoHome());
+                Click(resultView.viewerButton, OnViewerButton);
+                Click(resultView.homeButton, OnHomeButton);
             }
             Click(nextButton, OnNextButton);
-            Click(viewerButton, () => session.OpenGourdViewer());
+            Click(viewerButton, OnViewerButton);
             Click(closeViewerButton, () => session.CloseGourdViewer());
             Click(resetViewerButton, () => session.ResetPreview());
             GamePreviewAspect.Attach(viewerImage);
@@ -115,6 +121,48 @@ namespace Hapio
             Show(viewerPanel, false);
         }
 
+        private void OnEnable()
+        {
+            resultAdvancePending = false;
+            resultAwaitingPointerRelease = IsResultScreen && Application.isPlaying;
+            if (session == null || session.Network == null) return;
+            if (kind == GameScreenKind.StageResult) RefreshResult(session.Network);
+            else if (kind == GameScreenKind.GameOver) RefreshGameOver(session.Network);
+            ApplyResultInputGate();
+            if (resultAwaitingPointerRelease) resultEntryRoutine = StartCoroutine(ReleaseResultInput());
+        }
+
+        private IEnumerator ReleaseResultInput()
+        {
+            // Shield the transition's release event, as the opening does for Start/Finish.
+            yield return null;
+            while (StoryTapAdvance.HasHeldPointer) yield return null;
+            resultEntryRoutine = null;
+            resultAwaitingPointerRelease = false;
+            if (session == null || session.Network == null) yield break;
+            if (kind == GameScreenKind.StageResult) RefreshResult(session.Network);
+            else if (kind == GameScreenKind.GameOver) RefreshGameOver(session.Network);
+        }
+
+        private void OnDisable()
+        {
+            if (resultEntryRoutine != null) StopCoroutine(resultEntryRoutine);
+            resultEntryRoutine = null;
+            resultAwaitingPointerRelease = false;
+        }
+
+        private void ApplyResultInputGate()
+        {
+            if (!ResultActionsBlocked) return;
+            Interactable(nextButton, false);
+            Interactable(homeButton, false);
+            Interactable(viewerButton, false);
+            if (resultView == null) return;
+            Interactable(resultView.nextButton, false);
+            Interactable(resultView.homeButton, false);
+            Interactable(resultView.viewerButton, false);
+        }
+
         private void Update()
         {
             if (session == null || session.Network == null) return;
@@ -131,17 +179,22 @@ namespace Hapio
                 case GameScreenKind.Home: if (!UsesExternalNavigation) RefreshHome(net); break;
                 case GameScreenKind.Lobby: if (!UsesExternalNavigation) RefreshLobby(net); break;
                 case GameScreenKind.StageResult: RefreshResult(net); break;
-                case GameScreenKind.GameOver:
-                    if (resultView != null) { RefreshDesignedResult(net, false); break; }
-                    Text(title, "GAME OVER");
-                    Text(status, session.State.endReason);
-                    Text(details, "The run has ended for everyone. Tap HOME to return.");
-                    break;
+                case GameScreenKind.GameOver: RefreshGameOver(net); break;
             }
+            ApplyResultInputGate();
             Show(developerButton == null ? null : developerButton.gameObject, net.DeveloperBuildAvailable);
             Interactable(developerButton, net.CanChooseConnection || (net.IsHost && net.Snapshot == null));
             if (developerPanel != null && developerPanel.activeSelf)
                 Interactable(applyDeveloperButton, net.CanChooseConnection || (net.IsHost && net.Snapshot == null));
+        }
+
+        private void RefreshGameOver(LabNetwork net)
+        {
+            if (resultView != null) { RefreshDesignedResult(net, false); return; }
+            Text(title, "GAME OVER");
+            Text(status, session.State.endReason);
+            Text(details, "The run has ended for everyone. Tap HOME to return.");
+            Interactable(homeButton, session.CanReturnHome);
         }
 
         private void RefreshHome(LabNetwork net)
@@ -194,6 +247,8 @@ namespace Hapio
 
         private void RefreshResult(LabNetwork net)
         {
+            // Keep this result intact until the accepted next-stage Scene replaces it.
+            if (resultAdvancePending) return;
             if (resultView != null)
             {
                 Show(resultView.gameObject, !session.IsTerritory);
@@ -223,6 +278,8 @@ namespace Hapio
             var text = new StringBuilder();
             text.Append(net.IsHost && !session.CanReturnHome && complete
                 ? "Waiting for every player to receive the final result…"
+                : net.IsHost && !complete && session.IsAnyResultViewerOpen
+                    ? "A player is viewing the completed gourd. Close the viewer to continue."
                 : net.IsHost && !complete && !session.CanAdvanceStage
                     ? "Waiting for every player to receive the stage result…"
                     : complete ? "The run is complete. Return home when ready."
@@ -240,6 +297,7 @@ namespace Hapio
                 : "NEXT · STAGE " + (session.State.stageIndex + 1));
             Show(viewerButton == null ? null : viewerButton.gameObject, net.config != null && net.config.CompletedGourdViewerEnabled
                 && net.config.GourdMode == LabGourdMode.Paint && result != null && result.paintCoverage >= 1f);
+            Interactable(viewerButton, session.PreviewTexture != null);
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
@@ -270,12 +328,16 @@ namespace Hapio
             }
             string guidance = !victory ? "요괴를 다시 봉인하고싶다면\n게임을 새로 시작하시오"
                 : complete ? "모든 요괴의 봉인을 마쳤소\n견습생 여러분, 수고하셨소"
-                : "다음 스테이지가 시작될 동안\n잠시만 기다리시오";
+                : !net.IsHost ? "방장이 다음 스테이지를\n시작하기를 기다리시오"
+                : session.IsAnyResultViewerOpen ? "봉인 박을 확인하고 있소\n관람을 마치면 다음으로 진행하시오"
+                : !session.CanAdvanceStage ? "모두가 결과를 받기를\n잠시 기다리시오"
+                : "결과를 확인한 뒤\n다음 스테이지를 시작하시오";
             if (!string.IsNullOrEmpty(session.UiNotice)) guidance = session.UiNotice;
+            if (victory && result == null) guidance = "결과 기록을 받고 있소…\n잠시만 기다리시오";
             resultView.Present(victory, session.State.stageIndex,
                 session.CurrentStageDefinition != null ? session.CurrentStageDefinition.displayName : "요괴",
                 result, rows, guidance, overall, complete);
-            Show(resultView.nextButton.gameObject, complete && hasOverall);
+            Show(resultView.nextButton.gameObject, complete ? hasOverall : victory && net.IsHost);
             Interactable(resultView.nextButton, complete ? hasOverall : session.CanAdvanceStage);
             GameStageResultView.Label(resultView.nextButton, complete
                 ? (overall ? session.State.stageIndex + "스테이지 기록 보기" : "전체 기록 보기") : "다음 스테이지");
@@ -335,6 +397,7 @@ namespace Hapio
             Interactable(homeButton, !net.IsHost || session.CanReturnHome);
             Label(homeButton, "HOME");
             Show(viewerButton == null ? null : viewerButton.gameObject, session.PreviewTexture != null);
+            Interactable(viewerButton, session.PreviewTexture != null);
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
@@ -398,8 +461,29 @@ namespace Hapio
         /// </summary>
         private void OnNextButton()
         {
-            if (session.State.phase == GameFlowPhase.Completed && !session.IsTerritory) { showOverall = !showOverall; return; }
+            if (ResultActionsBlocked) return;
+            if (session.State.phase == GameFlowPhase.Completed && !session.IsTerritory)
+            {
+                showOverall = !showOverall;
+                RefreshResult(session.Network);
+                return;
+            }
+            if (resultAdvancePending || !session.CanAdvanceStage) return;
+            uint revision = session.State.revision;
+            resultAdvancePending = true;
+            ApplyResultInputGate();
             session.NextStage();
+            if (session.State.revision == revision) resultAdvancePending = false;
+        }
+
+        private void OnHomeButton()
+        {
+            if (!ResultActionsBlocked) session.GoHome();
+        }
+
+        private void OnViewerButton()
+        {
+            if (!ResultActionsBlocked) session.OpenGourdViewer();
         }
 
         private void ChangePlayers(int delta)

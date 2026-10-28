@@ -167,7 +167,8 @@ namespace C6Lab
             CacheGoalTitle();
             Set(goalTitle, GourdGoalTitle(LabGourdMode.Paint));
             bool playing = snapshot != null && snapshot.phase == LabPhase.Playing;
-            bool terminal = snapshot != null && (snapshot.phase == LabPhase.Victory || snapshot.phase == LabPhase.Defeat);
+            bool terminal = !network.GameFlowEnabled && snapshot != null
+                && (snapshot.phase == LabPhase.Victory || snapshot.phase == LabPhase.Defeat);
             terminal = terminal && !LabPaintFinishPresentation.DelayResult(network, snapshot);
             bool battleVisible = snapshot != null && snapshot.phase != LabPhase.Idle;
             bool paused = playing && network.IsBattlePaused;

@@ -86,6 +86,7 @@ namespace Hapio
             public int readyCount;
             public int participantCount;
             public bool resultViewerOpen;
+            public double finishDeadline;
             [NonSerialized] public ulong sender;
         }
 
@@ -107,7 +108,8 @@ namespace Hapio
         public bool IsLoadingScene => sceneRoutine != null || IsPreparingBattle;
         public bool PendingSettingsApply => network != null && network.IsConnected && !network.SessionConfigReady;
         public bool CanAdvanceStage => network != null && network.IsHost && !IsLoadingScene && AllResultsReady
-            && (!IsTerritory || !network.IsDeveloperSolo);
+            && (!IsTerritory || !network.IsDeveloperSolo)
+            && (IsTerritory || !IsAnyResultViewerOpen);
         // The run's own stage count: 2:2 (#281) plays one battle, so it has no next stage to skip to.
         public bool CanDeveloperAdvanceStage => network != null && network.DeveloperBuildAvailable
             && network.IsConnected && network.IsHost && !goingHome && !IsLoadingScene && !restartPending
@@ -210,7 +212,11 @@ namespace Hapio
                 BroadcastState();
                 nextStateAt = now + 1d;
             }
-            if ((state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed)
+            // A terminal flow state can precede its battle snapshot. Keep recovering the required
+            // record on the result screen even if the optional gourd preview has timed out.
+            bool showingResult = state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed;
+            if (showingResult) CacheResultSnapshot();
+            if (showingResult && HasResultSnapshot
                 && SceneManager.GetActiveScene().path == GameScenePaths.StageResult && sceneRoutine == null
                 && now >= nextResultReadyAt)
             {
@@ -218,7 +224,6 @@ namespace Hapio
                 if (network.IsHost) { resultReady.Add(network.LocalPlayerId); SetResultViewer(network.LocalPlayerId, IsViewerOpen); }
                 else network.SendGameFlowToHost(JsonUtility.ToJson(MakeControl("result_ready")));
             }
-            UpdateResultAdvance(now);
             LabSnapshot snapshot = network.Snapshot;
             if (network.IsHost && state.phase == GameFlowPhase.Playing && MatchesBattle(snapshot))
             {
@@ -280,7 +285,10 @@ namespace Hapio
             if (control.kind != "state" || control.state == null || !ValidStateControl(control)) return;
             if (control.state.runId == state.runId && control.state.revision == state.revision
                 && control.state.stageIndex == state.stageIndex && control.state.phase == state.phase)
+            {
                 ReadStartProgress(control);
+                ReadFinishDeadline(control);
+            }
             if (state.phase == GameFlowPhase.GameOver && control.state.phase != GameFlowPhase.GameOver) return;
             bool newRun = state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
                 || BackToLobby(control.state);
@@ -290,6 +298,7 @@ namespace Hapio
                 expectedSettingsFingerprint = control.settingsFingerprint;
                 SetLocalState(replica.State);
                 ReadStartProgress(control);
+                ReadFinishDeadline(control);
             }
         }
 
@@ -388,7 +397,7 @@ namespace Hapio
                 string destination = wantedScene;
                 if (destination == GameScenePaths.StageResult)
                 {
-                    double waitUntil = Time.realtimeSinceStartupAsDouble + loadingTimeoutSeconds;
+                    double waitUntil = ResultCaptureDeadline(Time.realtimeSinceStartupAsDouble);
                     while (!CanCaptureResult() && wantedScene == destination
                         && network.IsConnected && Time.realtimeSinceStartupAsDouble < waitUntil)
                         yield return null;
@@ -419,6 +428,7 @@ namespace Hapio
 
         private bool CanCaptureResult()
         {
+            if (HasCapturedResult()) return true;
             CacheResultSnapshot();
             // A final committed clear stays a clear even if the Host exits unexpectedly before
             // a slower peer receives its optional preview texture. Never manufacture its map.
@@ -432,14 +442,33 @@ namespace Hapio
         private void CaptureResult()
         {
             CacheResultSnapshot();
-            if (preview != null) return;
+            if (HasCapturedResult()) return;
+            if (ResultSnapshot == null || ResultSnapshot.sessionId != state.battleSessionId
+                || ResultSnapshot.round != state.battleRound) return;
+            bool needsPreview = network.config != null && network.config.CompletedGourdViewerEnabled
+                && network.config.GourdMode == LabGourdMode.Paint;
+            if (!needsPreview && ResultSnapshot != null)
+            {
+                RememberCapturedResult();
+                return;
+            }
             if (network.config != null && network.config.CompletedGourdViewerEnabled
                 && network.config.GourdMode == LabGourdMode.Paint
                 && LabGourdResultPreview.TryCreate(network, out var copy, out string error))
             {
+                preview?.Dispose();
                 preview = copy;
                 DontDestroyOnLoad(preview.PreviewCamera.transform.root.gameObject);
+                RememberCapturedResult();
             }
+        }
+
+        private void RememberCapturedResult()
+        {
+            capturedRunId = state.runId;
+            capturedStage = state.stageIndex;
+            capturedPaintRevision = ResultSnapshot.paintRevision;
+            capturedVisualVersion = network.PaintSurface != null ? network.PaintSurface.VisualVersion : 0;
         }
 
         private void CacheResultSnapshot()
@@ -452,6 +481,10 @@ namespace Hapio
                 RecordStageResult(ResultSnapshot);
             }
         }
+
+        private bool HasResultSnapshot => ResultSnapshot != null
+            && ResultSnapshot.sessionId == state.battleSessionId && ResultSnapshot.round == state.battleRound
+            && ResultSnapshot.phase == LabPhase.Victory;
 
         /// <summary>깬 스테이지의 결과를 이번 판 기록에 넣는다. 새 판이면 이전 판 기록은 버린다.</summary>
         private void RecordStageResult(LabSnapshot result)
@@ -477,7 +510,8 @@ namespace Hapio
                 settingsRevision = network.IsHost ? network.SessionConfigRevision : expectedSettingsRevision,
                 settingsFingerprint = network.IsHost ? network.SessionConfigFingerprint : expectedSettingsFingerprint,
                 readyCount = StartReadyCount, participantCount = StartParticipantCount,
-                resultViewerOpen = IsViewerOpen
+                resultViewerOpen = IsViewerOpen,
+                finishDeadline = finishServerDeadline
             };
         }
 
@@ -485,6 +519,7 @@ namespace Hapio
         {
             GameFlowState incoming = control.state;
             if (!GameFlowSnapshot.IsValid(incoming, out _)) return false;
+            if (!FiniteFinishTime(control.finishDeadline) || control.finishDeadline < 0d) return false;
             if (control.runId != incoming.runId || control.stageIndex != incoming.stageIndex
                 || control.revision != incoming.revision) return false;
             if (incoming.stageIndex == 0)

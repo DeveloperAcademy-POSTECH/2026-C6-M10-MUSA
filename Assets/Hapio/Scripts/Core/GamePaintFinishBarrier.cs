@@ -32,11 +32,19 @@ namespace Hapio
         public bool Prepared(ulong player) => !Released && participants.Contains(player) && prepared.Add(player);
         public bool Scheduled(ulong player, uint generation) => !Released && !Committed && Generation > 0
             && Generation == generation && participants.Contains(player) && scheduled.Add(player);
+        /// <summary>One receipt proves both installation of the final map and this reservation.</summary>
+        public bool ReadyForSchedule(ulong player, uint generation)
+        {
+            if (Released || Committed || Generation == 0 || Generation != generation
+                || !participants.Contains(player)) return false;
+            prepared.Add(player);
+            return scheduled.Add(player);
+        }
         public bool Completed(ulong player, uint generation) => !Released && Committed && Generation == generation
             && participants.Contains(player) && completed.Add(player);
         public bool Schedule(double serverNow)
         {
-            if (Released || Committed || !EveryonePrepared || !Finite(serverNow) || serverNow < 0d) return false;
+            if (Released || Committed || !Finite(serverNow) || serverNow < 0d) return false;
             if (Generation > 0 && (serverNow < StartsAt - .25d
                 || EveryoneScheduled && serverNow < StartsAt)) return false;
             if (Generation == uint.MaxValue) { Skip(); return false; }
@@ -47,7 +55,19 @@ namespace Hapio
         }
         public bool Commit(double serverNow)
         {
-            if (Released || Committed || !EveryoneScheduled || !Finite(serverNow) || serverNow >= StartsAt) return false;
+            if (Released || Committed || !EveryonePrepared || !EveryoneScheduled
+                || !Finite(serverNow) || serverNow >= StartsAt) return false;
+            Committed = true;
+            return true;
+        }
+        /// <summary>No remote clock receipt is needed when the only participant is the local Host.</summary>
+        public bool BeginLocal(ulong player, double serverNow)
+        {
+            if (Released || Committed || participants.Count != 1 || !participants.Contains(player)
+                || !prepared.Contains(player) || !Finite(serverNow) || serverNow < 0d) return false;
+            Generation = 1;
+            StartsAt = serverNow;
+            scheduled.Add(player);
             Committed = true;
             return true;
         }

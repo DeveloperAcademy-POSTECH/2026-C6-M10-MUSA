@@ -8,6 +8,8 @@ using C6Lab;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
@@ -323,6 +325,8 @@ namespace Hapio.Tests
                 Assert.That(network.Snapshot.sessionId, Is.Not.EqualTo(previousBattleId));
                 Assert.That(network.board.gameObject.scene.path, Is.EqualTo(GameScenePaths.Battle));
                 Assert.That(network.target.gameObject.scene.path, Is.EqualTo(GameScenePaths.Battle));
+                Assert.That(Object.FindObjectsByType<LabResultDashboard>(FindObjectsInactive.Include, FindObjectsSortMode.None),
+                    Is.Empty, "Managed Battle must not attach the standalone Lab result dashboard.");
                 if (stage > 1) Assert.That(previousBoard == null, Is.True, "The previous Battle board must be unloaded.");
                 AssertFreshStage();
                 Assert.That(Model().StageYokai, Is.EqualTo((LabStageYokai)stage),
@@ -384,10 +388,29 @@ namespace Hapio.Tests
                 string runId = session.State.runId;
                 previousBattleId = network.Snapshot.sessionId;
                 CompleteMapInFixture(model);
+                double victoryAt = Time.realtimeSinceStartupAsDouble;
+                yield return Until(() => session.IsFinishingBattle && session.PreviewTexture != null,
+                    "Each stage must capture its completed preview while the Battle finish is still running.");
+                var preparedPreview = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
+                    BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+                Texture preparedTexture = session.PreviewTexture;
+                Texture preparedVisualPaint = preparedPreview.VisualPaintTexture;
+                Assert.That(network.HasBattleReferences, Is.True, "Pre-capture uses the live Battle before unlink/unload.");
+                Assert.That(thisBoard != null, Is.True);
+                Assert.That(preparedPreview.SessionId, Is.EqualTo(previousBattleId));
+                Assert.That(preparedPreview.Round, Is.EqualTo(session.State.battleRound));
+                if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                {
+                    Assert.That(preparedVisualPaint, Is.InstanceOf<RenderTexture>());
+                    Assert.That(((RenderTexture)preparedVisualPaint).IsCreated(), Is.True,
+                        "The GPU copy must already exist during the finish rather than being deferred until Scene change.");
+                }
                 GameFlowPhase resultPhase = stage == 3 ? GameFlowPhase.Completed : GameFlowPhase.StageResult;
                 yield return Until(() => session.State.phase == resultPhase && !session.IsLoadingScene
                     && SceneManager.GetActiveScene().path == GameScenePaths.StageResult,
                     "The actual committed victory must load StageResult.");
+                TestContext.WriteLine("Stage " + stage + " Victory to StageResult: "
+                    + (Time.realtimeSinceStartupAsDouble - victoryAt).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + "s");
                 Assert.That(session.State.runId, Is.EqualTo(runId));
                 Assert.That(session.State.stageIndex, Is.EqualTo(stage));
                 Assert.That(network.HasBattleReferences, Is.False);
@@ -397,6 +420,10 @@ namespace Hapio.Tests
                 Assert.That(session.ResultSnapshot.paintCoveredCount, Is.EqualTo(session.ResultSnapshot.paintCellCount));
                 Assert.That(session.ResultSnapshot.players.Single().generatedTotal, Is.EqualTo(1));
                 Assert.That(session.PreviewTexture, Is.Not.Null, "The completed paint preview must survive Battle unload.");
+                Assert.That(session.PreviewTexture, Is.SameAs(preparedTexture), "Scene navigation reuses the pre-captured render target.");
+                Assert.That(typeof(GameSession).GetField("preview", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session),
+                    Is.SameAs(preparedPreview), "Scene navigation reuses the same completed-result copy.");
+                Assert.That(preparedPreview.VisualPaintTexture, Is.SameAs(preparedVisualPaint));
                 if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
                 {
                     var captured = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
@@ -406,6 +433,25 @@ namespace Hapio.Tests
                     Assert.That(captured.VisualPaintTexture.height, Is.EqualTo(512));
                     Assert.That(((RenderTexture)captured.VisualPaintTexture).IsCreated(), Is.True,
                         "All three completed-stage GPU maps survive unloading their live Battle.");
+                }
+                if (stage == 1)
+                {
+                    const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+                    typeof(GameSession).GetProperty("ResultSnapshot").SetValue(session, null);
+                    var received = (System.Collections.Generic.HashSet<ulong>)typeof(GameSession).GetField("resultReady", flags).GetValue(session);
+                    received.Clear();
+                    typeof(GameSession).GetField("nextResultReadyAt", flags).SetValue(session, 0d);
+                    GameScreen screen = Object.FindFirstObjectByType<GameScreen>();
+                    typeof(GameScreen).GetMethod("RefreshDesignedResult", flags).Invoke(screen, new object[] { network, true });
+                    Assert.That(session.ResultSnapshot, Is.Null);
+                    Assert.That(session.CanAdvanceStage, Is.False, "A missing required record cannot count as ready.");
+                    Assert.That(screen.resultView.guidance.text, Does.Contain("결과 기록을 받고 있소"));
+                    yield return Until(() => session.ResultSnapshot != null && session.CanAdvanceStage,
+                        "The result screen must recover the matching latest Victory before acknowledging readiness again.");
+                    Assert.That(session.ResultSnapshot.sessionId, Is.EqualTo(previousBattleId));
+                    Assert.That(session.ResultSnapshot.round, Is.EqualTo(preparedPreview.Round));
+                    Assert.That(received, Does.Contain(network.LocalPlayerId));
+                    Assert.That(session.PreviewTexture, Is.SameAs(preparedTexture), "Record recovery keeps the existing optional preview.");
                 }
                 previousBoard = thisBoard;
                 if (stage < 3)
@@ -453,7 +499,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator FigmaResultsAutomaticallyAdvanceAndShowEachYokaiThenKeepFinalOverallAndHomeNavigation()
+        public IEnumerator FigmaResultsWaitForHostNextAndShowEachYokaiThenKeepFinalOverallAndHomeNavigation()
         {
             session.StartSolo();
             string[] names = { "구미호", "야광귀", "지귀" };
@@ -472,17 +518,51 @@ namespace Hapio.Tests
                     Is.EqualTo(names[stage - 1] + " 봉인 박 확인"));
                 if (stage < 3)
                 {
-                    Assert.That(view.nextButton.gameObject.activeSelf, Is.False);
+                    Assert.That(view.nextButton.gameObject.activeInHierarchy, Is.True);
+                    yield return Until(() => view.nextButton.interactable, "The Host starts the next stage after result readiness.");
+                    Assert.That(view.guidance.text, Does.Contain("다음 스테이지를 시작하시오"));
                     if (stage == 1)
                     {
+                        yield return new WaitForSecondsRealtime(10.5f);
+                        Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult),
+                            "A ready result remains on screen beyond the retired automatic-advance delay.");
+                        Assert.That(session.State.stageIndex, Is.EqualTo(stage));
                         yield return Until(() => view.viewerButton.interactable, "The committed map must be available to view.");
                         view.viewerButton.onClick.Invoke();
-                        yield return new WaitForSecondsRealtime(10.5f);
-                        Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult), "Gourd viewing pauses automatic advance.");
+                        yield return null;
+                        Assert.That(view.nextButton.interactable, Is.False, "The Host must finish gourd inspection before NEXT.");
+                        Assert.That(view.guidance.text, Does.Contain("관람을 마치면"));
+                        view.nextButton.onClick.Invoke();
                         Assert.That(session.State.stageIndex, Is.EqualTo(1));
                         session.CloseGourdViewer();
+                        yield return Until(() => view.nextButton.interactable, "Closing inspection restores manual NEXT.");
+
+                        typeof(GameSession).GetMethod("SetResultViewer", BindingFlags.Instance | BindingFlags.NonPublic)
+                            .Invoke(session, new object[] { 72UL, true });
+                        yield return null;
+                        Assert.That(session.IsAnyResultViewerOpen, Is.True);
+                        Assert.That(view.nextButton.interactable, Is.False, "A peer's inspection also blocks Host NEXT.");
+                        view.nextButton.onClick.Invoke();
+                        Assert.That(session.State.stageIndex, Is.EqualTo(1));
+                        typeof(GameSession).GetMethod("SetResultViewer", BindingFlags.Instance | BindingFlags.NonPublic)
+                            .Invoke(session, new object[] { 72UL, false });
+                        yield return Until(() => view.nextButton.interactable, "A closed peer viewer restores manual NEXT.");
+
+                        GameScreen screen = view.GetComponentInParent<GameScreen>();
+                        screen.gameObject.SetActive(false);
+                        view.judgment.text = "stale saved result";
+                        screen.legacyResultContent.SetActive(true);
+                        screen.gameObject.SetActive(true);
+                        Assert.That(view.judgment.text, Is.EqualTo("봉인 성공 !"),
+                            "Re-enabling a result initializes its content before another Update/render frame.");
+                        Assert.That(screen.legacyResultContent.activeSelf, Is.False);
+                        Assert.That(view.nextButton.interactable, Is.False, "Re-entry shields the transition's pointer release.");
+                        yield return Until(() => view.nextButton.interactable, "Released result re-entry restores manual NEXT.");
                     }
-                    yield return Until(() => session.State.stageIndex == stage + 1, "After ten result-display seconds the Host advances automatically.");
+                    view.nextButton.onClick.Invoke();
+                    Assert.That(view.nextButton.interactable, Is.False, "Accepted NEXT disables the old button immediately.");
+                    view.nextButton.onClick.Invoke();
+                    Assert.That(session.State.stageIndex, Is.EqualTo(stage + 1), "Repeated touches cannot skip a loading generation.");
                     continue;
                 }
                 yield return Until(() => view.nextButton.interactable, "The final overall-record control waits for readiness.");
@@ -498,6 +578,104 @@ namespace Hapio.Tests
                 yield return WaitHome();
                 Assert.That(network.IsConnected, Is.False);
             }
+        }
+
+        [UnityTest]
+        public IEnumerator ResultEntryRequiresEveryHeldMouseAndTouchToReleaseBeforeFreshButtonInput()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            InputSettings original = InputSystem.settings;
+            HideFlags originalFlags = original.hideFlags;
+            // InputSystem destroys replaced HideAndDontSave settings; preserve this exact original instead.
+            original.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            InputSettings fixture = ScriptableObject.CreateInstance<InputSettings>();
+            JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(original), fixture);
+            fixture.hideFlags = HideFlags.HideAndDontSave;
+            fixture.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            fixture.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            InputSystem.settings = fixture;
+            Mouse mouse = InputSystem.AddDevice<Mouse>();
+            Touchscreen touchscreen = InputSystem.AddDevice<Touchscreen>();
+            try
+            {
+                InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Left));
+                InputSystem.QueueStateEvent(touchscreen, new TouchState
+                    { touchId = 91, phase = UnityEngine.InputSystem.TouchPhase.Began, position = Vector2.one * 20f });
+                InputSystem.QueueStateEvent(touchscreen, new TouchState
+                    { touchId = 92, phase = UnityEngine.InputSystem.TouchPhase.Began, position = Vector2.one * 40f });
+                InputSystem.Update();
+                Assert.That(mouse.leftButton.isPressed, Is.True);
+                Assert.That(touchscreen.touches.Count(touch => touch.press.isPressed), Is.EqualTo(2));
+                CompleteMapInFixture(Model());
+                yield return Until(() => !session.IsLoadingScene && session.CanAdvanceStage
+                    && session.State.phase == GameFlowPhase.StageResult, "Victory must load while the old pointers remain held.");
+                GameStageResultView view = Object.FindFirstObjectByType<GameStageResultView>();
+                Assert.That(view.nextButton.interactable || view.homeButton.interactable || view.viewerButton.interactable, Is.False);
+                // These bypass Button.interactable deliberately: the action handlers must also reject inherited input.
+                view.nextButton.onClick.Invoke();
+                view.homeButton.onClick.Invoke();
+                view.viewerButton.onClick.Invoke();
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult));
+                Assert.That(session.State.stageIndex, Is.EqualTo(1));
+                Assert.That(session.IsViewerOpen, Is.False);
+
+                InputSystem.QueueStateEvent(mouse, new MouseState());
+                InputSystem.Update();
+                yield return null;
+                yield return null;
+                Assert.That(view.nextButton.interactable || view.homeButton.interactable || view.viewerButton.interactable, Is.False,
+                    "Releasing the mouse cannot unlock a result while any finger remains held.");
+                InputSystem.QueueStateEvent(touchscreen, new TouchState
+                    { touchId = 91, phase = UnityEngine.InputSystem.TouchPhase.Ended, position = Vector2.one * 20f });
+                InputSystem.Update();
+                yield return null;
+                Assert.That(view.nextButton.interactable || view.homeButton.interactable || view.viewerButton.interactable, Is.False,
+                    "The final held finger still shields all result actions.");
+                InputSystem.QueueStateEvent(touchscreen, new TouchState
+                    { touchId = 92, phase = UnityEngine.InputSystem.TouchPhase.Ended, position = Vector2.one * 40f });
+                InputSystem.Update();
+                yield return Until(() => view.nextButton.interactable && view.homeButton.interactable && view.viewerButton.interactable,
+                    "All released pointers restore actions without a timed countdown.");
+                Assert.That(session.State.stageIndex, Is.EqualTo(1), "Releasing inherited input cannot itself advance.");
+                CompleteButtonPointer(view.nextButton);
+                Assert.That(session.State.stageIndex, Is.EqualTo(2), "A fresh completed pointer gesture starts the next stage.");
+                yield return WaitPlaying(2);
+
+                InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Left));
+                InputSystem.Update();
+                Assert.That(Model().TryApplyPlayerDamage(network.LocalPlayerId, network.config.PlayerMaxHp, ModelTime(Model())), Is.True);
+                yield return WaitGameOver();
+                GameStageResultView defeat = Object.FindFirstObjectByType<GameStageResultView>();
+                Assert.That(defeat.homeButton.interactable, Is.False, "Defeat also shields the inherited battle pointer.");
+                defeat.homeButton.onClick.Invoke();
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.GameOver));
+                InputSystem.QueueStateEvent(mouse, new MouseState());
+                InputSystem.Update();
+                yield return Until(() => defeat.homeButton.interactable, "Released defeat input restores HOME.");
+                CompleteButtonPointer(defeat.homeButton);
+                yield return WaitHome();
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(touchscreen);
+                InputSystem.RemoveDevice(mouse);
+                InputSystem.settings = original;
+                original.hideFlags = originalFlags;
+                if (fixture != null) Object.Destroy(fixture);
+            }
+        }
+
+        private static void CompleteButtonPointer(UnityEngine.UI.Button button)
+        {
+            var canvas = button.GetComponentInParent<Canvas>();
+            var rectangle = (RectTransform)button.transform;
+            Vector2 position = RectTransformUtility.WorldToScreenPoint(canvas.worldCamera, rectangle.TransformPoint(rectangle.rect.center));
+            var pointer = new PointerEventData(EventSystem.current)
+                { pointerId = -1, button = PointerEventData.InputButton.Left, position = position, pressPosition = position };
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerDownHandler);
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerUpHandler);
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerClickHandler);
         }
 
         [UnityTest]
