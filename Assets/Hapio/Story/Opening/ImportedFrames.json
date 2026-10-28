@@ -746,6 +746,25 @@
           "cover": true,
           "bottom": false,
           "crop": false
+        },
+        {
+          "nodeId": "3287:22",
+          "name": "image 1169",
+          "key": "ee6f0.png",
+          "rect": {
+            "x": 96,
+            "y": 452,
+            "width": 244,
+            "height": 271
+          },
+          "width": 244,
+          "height": 271,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
         }
       ],
       "dialogue": "",
@@ -1712,7 +1731,45 @@
         "width": 91,
         "height": 33
       },
-      "badgeKey": "9769e.png"
+      "badgeKey": "9769e.png",
+      "texts": [
+        {
+          "nodeId": "3287:24",
+          "name": "Scroll Instructions",
+          "text": "하나. 요괴를 박 안에 가둔다.\n요괴를 품은 박은 크게 부풀어 오른다.\n\n둘. 음양구슬을 조합하여 오행구슬을 만든다.\n\n셋. 오행구슬로 박 전체에 오행의 기운을 고르게 입힌다.\n\n넷. 오행이 조화를 이루면 봉인이 완성된다!",
+          "parentNodeId": "3182:12268",
+          "fontPath": "Assets/Lab/Art/Fonts/Shilla_Culture(M).otf",
+          "rect": {
+            "x": 112,
+            "y": 477.99990645051,
+            "width": 101.44005757570267,
+            "height": 126.41539344191551
+          },
+          "width": 93,
+          "height": 120,
+          "rotation": 4.149878340520211,
+          "fontSize": 7.929515361785889,
+          "lineHeight": 10
+        },
+        {
+          "nodeId": "3287:25",
+          "name": "Scroll Heading",
+          "text": "「임시 봉인박 사용법」",
+          "parentNodeId": "3182:12268",
+          "fontPath": "Assets/Lab/Art/Fonts/ShillaCultureBold.otf",
+          "rect": {
+            "x": 109,
+            "y": 457.0000054165721,
+            "width": 92.21868155524135,
+            "height": 12.266421385109425
+          },
+          "width": 92,
+          "height": 10,
+          "rotation": 1.4135212043311887,
+          "fontSize": 10,
+          "lineHeight": 10
+        }
+      ]
     },
     {
       "number": 20,

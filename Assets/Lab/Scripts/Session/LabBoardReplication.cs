@@ -37,6 +37,7 @@ namespace C6Lab
         public double blueFeverStartedAt = -1d, blueFeverUntil = -1d, redFeverStartedAt = -1d, redFeverUntil = -1d;
         public LabJigwiState[] jigwi = Array.Empty<LabJigwiState>();
         public LabJigwiStageSnapshot jigwiStage = new LabJigwiStageSnapshot();
+        public LabJigwiABSnapshot jigwiAB = new LabJigwiABSnapshot();
         public double flashWarningAt = -1d, flashAt = -1d, flashLastAt = -1d;
         public ulong flashTarget, flashLastTarget;
         public bool flashTargetAll, flashLastTargetAll;
@@ -62,6 +63,7 @@ namespace C6Lab
             copy.players = Array.Empty<LabPlayerState>();
             copy.jigwi = LabJigwiNetworkValidation.Copy(jigwi);
             copy.jigwiStage = LabJigwiStageNetworkValidation.Copy(jigwiStage);
+            copy.jigwiAB = LabJigwiABNetworkValidation.Copy(jigwiAB);
             copy.comboColors = comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])comboColors.Clone();
             return copy;
         }
@@ -129,6 +131,7 @@ namespace C6Lab
                 redFeverStartedAt = snapshot.redFeverStartedAt, redFeverUntil = snapshot.redFeverUntil,
                 jigwi = LabJigwiNetworkValidation.Copy(snapshot.jigwi),
                 jigwiStage = LabJigwiStageNetworkValidation.Copy(snapshot.jigwiStage),
+                jigwiAB = LabJigwiABNetworkValidation.Copy(snapshot.jigwiAB),
                 flashWarningAt = snapshot.flashWarningAt, flashAt = snapshot.flashAt,
                 flashTarget = snapshot.flashTarget, flashTargetAll = snapshot.flashTargetAll,
                 flashCount = snapshot.flashCount, flashLastAt = snapshot.flashLastAt,
@@ -163,6 +166,8 @@ namespace C6Lab
             && a.gourdBlastOnlySmall == b.gourdBlastOnlySmall && a.gourdBlastBurnedAt == b.gourdBlastBurnedAt
             && a.ordinaryBlastBurnedAt == b.ordinaryBlastBurnedAt
             && a.jigwiRadiusScale == b.jigwiRadiusScale && a.expiresAt == b.expiresAt
+            && a.jigwiABBurnEventId == b.jigwiABBurnEventId && a.jigwiABBurnAt == b.jigwiABBurnAt
+            && a.jigwiABRadiusScale == b.jigwiABRadiusScale
             && a.jigwiSupply == b.jigwiSupply && a.jigwiGenerationBurn == b.jigwiGenerationBurn && a.fever == b.fever
             && a.fiveColor == b.fiveColor;
 
@@ -196,6 +201,14 @@ namespace C6Lab
         public bool IsInitialized => baseline || LatestSequence > 0;
         public bool InteractionAllowed => !NeedsCheckpoint && header != null
             && header.phase == LabPhase.Playing && !header.paused;
+
+        /// <summary>Preserve ledger recovery/terminal guards while using a newer committed snapshot's pause state.</summary>
+        public bool InteractionAllowedFor(LabSnapshot visible)
+        {
+            if (NeedsCheckpoint || header == null || visible == null || !Matches(visible.sessionId, visible.round)
+                || visible.phase != LabPhase.Playing || visible.paused) return false;
+            return header.serverTime < visible.serverTime || header.phase == LabPhase.Playing && !header.paused;
+        }
 
         public void SetActive(string activeSession, uint activeRound, ulong localOwner)
         {
@@ -307,6 +320,7 @@ namespace C6Lab
                 copy.redFeverStartedAt = header.redFeverStartedAt; copy.redFeverUntil = header.redFeverUntil;
                 copy.jigwi = LabJigwiNetworkValidation.Copy(header.jigwi);
                 copy.jigwiStage = LabJigwiStageNetworkValidation.Copy(header.jigwiStage);
+                copy.jigwiAB = LabJigwiABNetworkValidation.Copy(header.jigwiAB);
                 copy.flashWarningAt = header.flashWarningAt; copy.flashAt = header.flashAt;
                 copy.flashTarget = header.flashTarget; copy.flashTargetAll = header.flashTargetAll;
                 copy.flashCount = header.flashCount; copy.flashLastAt = header.flashLastAt;
@@ -388,6 +402,7 @@ namespace C6Lab
             && LabFlashNetworkValidation.Valid(frame)
             && LabJigwiNetworkValidation.Valid(frame.jigwi)
             && LabJigwiStageNetworkValidation.Valid(frame.jigwiStage, frame.players)
+            && LabJigwiABNetworkValidation.Valid(frame.jigwiAB, frame.players)
             && ValidStates(frame.states, true) && ValidRemoved(frame.removedIds) && ValidPlayers(frame.players);
 
         private bool ValidStates(LabOrbState[] values, bool forThisOwner)
@@ -409,6 +424,11 @@ namespace C6Lab
                     || state.gourdBlastOnlySmall && !state.small
                     || !Finite(state.jigwiRadiusScale) || state.jigwiRadiusScale <= 0f || state.jigwiRadiusScale > 1f
                     || !Finite(state.expiresAt) || state.expiresAt < -1d
+                    || !Finite(state.jigwiABBurnAt) || state.jigwiABBurnAt < -1d
+                    || !Finite(state.jigwiABRadiusScale) || state.jigwiABRadiusScale < .2f || state.jigwiABRadiusScale > 1f
+                    || !string.IsNullOrEmpty(state.jigwiABBurnEventId)
+                        && (string.IsNullOrWhiteSpace(state.jigwiABBurnEventId) || state.jigwiABBurnEventId.Length > 256)
+                    || string.IsNullOrEmpty(state.jigwiABBurnEventId) != (state.jigwiABBurnAt < 0d)
                     || state.arrival < LabDrumArrival.None || state.arrival > LabDrumArrival.Coast
                     || (forThisOwner && !state.kind.IsDrum() && state.owner != owner)) return false;
                 if (state.kind.IsDrum() && ++drums > MaximumDrums) return false;
@@ -446,6 +466,8 @@ namespace C6Lab
         {
             sessionId = source.sessionId, round = source.round, phase = source.phase, paused = source.paused,
             serverTime = source.serverTime, remaining = source.remaining, playedSeconds = source.playedSeconds,
+            // This per-round reservation is immutable; faster board headers only advance the visible clock.
+            feverTimeAt = source.feverTimeAt,
             hp = source.hp, paintCoverage = source.paintCoverage, paintGoalPercent = source.paintGoalPercent,
             paintColumns = source.paintColumns, paintRows = source.paintRows, paintRevision = source.paintRevision,
             paintCoveredCount = source.paintCoveredCount, paintCellCount = source.paintCellCount, paintCount = source.paintCount,
@@ -464,6 +486,7 @@ namespace C6Lab
             redFeverStartedAt = source.redFeverStartedAt, redFeverUntil = source.redFeverUntil,
             jigwi = LabJigwiNetworkValidation.Copy(source.jigwi),
             jigwiStage = LabJigwiStageNetworkValidation.Copy(source.jigwiStage),
+            jigwiAB = LabJigwiABNetworkValidation.Copy(source.jigwiAB),
             comboActive = source.comboActive,
             comboColors = source.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboColors.Clone(),
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,

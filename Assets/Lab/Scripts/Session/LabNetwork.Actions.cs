@@ -448,7 +448,8 @@ namespace C6Lab
             {
                 ReceivedBoardFrames++;
                 latest = boardReplica.Overlay(latest);
-                ApplyLocalPause(CanProcessBattleActions && frame.paused && frame.phase == LabPhase.Playing);
+                // A newer bulk snapshot can supersede this header's pause state during Overlay.
+                ApplyLocalPause(CanProcessBattleActions && latest.paused && latest.phase == LabPhase.Playing);
                 ApplyFastTargetPose();
                 SyncBoard();
                 Changed?.Invoke();
@@ -485,6 +486,7 @@ namespace C6Lab
             float scale = player.comboPenaltyUntil > latest.serverTime ? config.ComboPenaltySizeScale
                 : player.comboRewardUntil > latest.serverTime ? config.ComboRewardSizeScale : 1f;
             if (config.GourdColorComboEnabled) visual.SetRadiusScale(scale);
+            visual.SetJigwiABRadiusScale(orb != null ? orb.jigwiABRadiusScale : board != null ? board.JigwiABRadiusScaleFor(request.firstId) : 1f);
             visual.SetMissSurface(battleFloor);
             SyncJigwiFireSurfaces();
             visual.SetFireSurfaces(JigwiFireSurfacesFor(LocalPlayerId));
@@ -500,7 +502,7 @@ namespace C6Lab
             {
                 if (predictedShots.TryGetValue(packet.requestId, out var visual) && visual != null)
                     visual.ReconcileVisual((LabOrbElement)packet.element,
-                        packet.small ? config.BlastShrinkScale : 1f, packet.sizeScale);
+                        packet.small ? config.BlastShrinkScale : 1f, packet.sizeScale, packet.jigwiABRadiusScale);
                 return true;
             }
             return !presentedRemoteShots.Add(packet.firstId ?? string.Empty);

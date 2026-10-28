@@ -25,6 +25,10 @@ namespace Hapio.Tests
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
             yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved Home bootstrap");
             session = GameSession.Instance;
+            // Real menu raycasts begin after the new local app-opening presentation.
+            yield return null;
+            var opening = Object.FindFirstObjectByType<GameOpeningController>();
+            if (opening != null && opening.IsPlaying) opening.player.Skip();
             session.Network.port = AvailablePort();
             yield return null; yield return null;
         }

@@ -22,10 +22,12 @@ namespace C6Lab
         private int jigwiStagePatches;
         private Func<ulong, Vector3, bool> jigwiStageBlocker;
 
-        public bool JigwiStageEnabled => jigwiStageEnabled;
+        public bool JigwiStageEnabled => jigwiABEnabled || jigwiStageEnabled;
 
         private void ResetJigwiStage(LabConfig config, double now)
         {
+            ResetJigwiAB(config, now);
+            if (jigwiABEnabled) return;
             jigwiStageBlocker = JigwiStagePaintBlocked;
             jigwiStageEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
             jigwiStageGroups.Clear();
@@ -55,12 +57,13 @@ namespace C6Lab
             nextUniqueGimmickAt = nextComboAt = nextFlashAt = nextStageJigwiAt = double.PositiveInfinity;
         }
 
-        private double NextJigwiStageCommonAt(uint index) => jigwiStageEnabled && !jigwiStageCutoffReached
+        private double NextJigwiStageCommonAt(uint index) => jigwiABEnabled ? NextJigwiABCommonAt(index) : jigwiStageEnabled && !jigwiStageCutoffReached
             && index < JigwiStageCommonSlots.Length ? jigwiStageStartedAt + JigwiStageCommonSlots[index]
             : double.PositiveInfinity;
 
         private double NextJigwiStageBoundary(double requested)
         {
+            if (jigwiABEnabled) return NextJigwiABBoundary(requested);
             if (!jigwiStageEnabled || phase != LabPhase.Playing) return requested;
             double next = requested;
             void Include(double at) { if (at > lastTime && at < next) next = at; }
@@ -83,6 +86,7 @@ namespace C6Lab
 
         private void AdvanceJigwiStage(double now)
         {
+            if (jigwiABEnabled) { AdvanceJigwiAB(now); return; }
             if (!jigwiStageEnabled) return;
             jigwiStageAt = now;
             if (phase != LabPhase.Playing)
@@ -127,7 +131,7 @@ namespace C6Lab
             return false;
         }
 
-        public float JigwiStageRecoveryMultiplier(double at) => jigwiStageEnabled && phase == LabPhase.Playing
+        public float JigwiStageRecoveryMultiplier(double at) => JigwiStageEnabled && phase == LabPhase.Playing
             && at >= jigwiStageCutoffAt ? jigwiStageFever : 1f;
 
         private LabJigwiStageSnapshot CopyJigwiStageSnapshot(double now)

@@ -16,15 +16,26 @@ namespace C6Lab
         [SerializeField, Range(.1f, 1f)] private float flameOpacity = .76f;
         [SerializeField, Range(.1f, 1f)] private float extinguishSeconds = .45f;
         [SerializeField] private Color ink = new Color(.055f, .035f, .025f, 1f);
-        [SerializeField] private Color flame = new Color(1f, .28f, .035f, .76f);
-        [SerializeField] private Color rootFill = new Color(1f, .72f, .12f, 1f);
+        [SerializeField] private Color flame = new Color(1f, .88f, .7f, .76f);
+        [Header("Surface flame — visual settings only")]
+        [SerializeField] private Material flameMaterial;
+        [SerializeField, Range(0f, 8f)] private float flameAnimationSpeed = 2.4f;
+        [SerializeField, Range(0f, .1f)] private float flameSway = .03f;
+        [SerializeField, Range(.25f, 1f)] private float patchFlameShare = .62f;
+        [SerializeField, Range(0f, .4f)] private float scorchWashOpacity = .13f;
         [Header("Optional audio — missing clips keep subtitle/visual feedback")]
         [SerializeField] private AudioClip shoutVoice;
         [SerializeField] private AudioClip igniteSound, extinguishSound, blockedSound;
         [Tooltip("Optional dedicated source; never assign the background-music source.")]
         [SerializeField] private AudioSource stageAudio;
         [SerializeField, Range(0f, 1f)] private float audioVolume = .85f;
-        private const int Segments = 22;
+        private const int Segments = 48, Rings = 8;
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int ColorId = Shader.PropertyToID("_Color");
+        private static readonly int FlameTimeId = Shader.PropertyToID("_FlameTime");
+        private static readonly int FlameSpeedId = Shader.PropertyToID("_FlameSpeed");
+        private static readonly int SwayId = Shader.PropertyToID("_Sway");
+        private static readonly int SeedId = Shader.PropertyToID("_Seed");
         private readonly Dictionary<string, GroupArt> groups = new Dictionary<string, GroupArt>(StringComparer.Ordinal);
         private readonly HashSet<string> keep = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<string> removeKeys = new List<string>();
@@ -39,7 +50,8 @@ namespace C6Lab
         private double receivedTime, receivedAt, stageStartedAt = -1d;
         private uint round;
         private bool paused;
-        private Material material;
+        private Material material, runtimeFlameMaterial;
+        private bool missingFlameReported;
         private readonly List<BlockedMark> blocked = new List<BlockedMark>();
 
         public int VisibleRoots { get; private set; }
@@ -95,7 +107,8 @@ namespace C6Lab
                 if ((!rootHere && !fireHere) || !live && !release) continue;
                 if (art == null)
                 {
-                    art = new GroupArt(target.Hitbox.transform, group.id, Material, target.VisualMount.gameObject.layer);
+                    art = new GroupArt(target.Hitbox.transform, group.id, Material, FlameMaterial,
+                        target.VisualMount.gameObject.layer);
                     groups.Add(group.id, art);
                 }
                 keep.Add(group.id);
@@ -105,7 +118,7 @@ namespace C6Lab
                 float pulse = paused ? .5f : .5f + .5f * Mathf.Sin((float)now * (warning ? 11f : 6f));
                 int patches = warning ? 1 : group.VisiblePatchCount(now);
                 if (release) patches = group.patchDirections != null ? group.patchDirections.Length : 0;
-                art.Update(this, group, rootHere, fireHere, patches, warning, fade, pulse);
+                art.Update(this, group, rootHere, fireHere, patches, warning, fade, pulse, now);
                 if (live && art.RootVisible) VisibleRoots++;
                 if (live) VisibleFirePatches += art.PatchCount;
             }
@@ -205,30 +218,89 @@ namespace C6Lab
             direction.Normalize();
             Vector3 tangent = Vector3.Cross(Mathf.Abs(direction.y) < .9f ? Vector3.up : Vector3.right, direction).normalized;
             Vector3 bitangent = Vector3.Cross(direction, tangent).normalized;
-            var vertices = new Vector3[Segments + 1];
-            var triangles = new int[Segments * 3];
+            var vertices = new Vector3[1 + Rings * Segments];
+            var uvs = new Vector2[vertices.Length];
+            var triangles = new int[Segments * (1 + (Rings - 1) * 2) * 3];
             if (!TrySurfacePoint(target, direction, out Vector3 center, out Vector3 normal)) return false;
             Transform frame = target.Hitbox.transform;
             vertices[0] = frame.InverseTransformPoint(center + normal * lift);
-            for (int i = 0; i < Segments; i++)
+            uvs[0] = new Vector2(.5f, .5f);
+            int triangle = 0;
+            // Concentric projected rings prevent a large centre fan from cutting through the curved shell.
+            // The mesh is cached by Part; neither this allocation nor the collider rays run every frame.
+            for (int ring = 1; ring <= Rings; ring++)
             {
-                float a = i * Mathf.PI * 2f / Segments;
-                float lobe = rough ? .88f + .12f * Mathf.Sin(a * 3f + .7f) : .98f + .02f * Mathf.Sin(a * 5f);
-                float angle = Mathf.Clamp(degrees, .01f, 89f) * lobe * Mathf.Deg2Rad;
-                Vector3 rayDirection = direction * Mathf.Cos(angle)
-                    + (tangent * Mathf.Cos(a) + bitangent * Mathf.Sin(a)) * Mathf.Sin(angle);
-                if (!TrySurfacePoint(target, rayDirection, out Vector3 point, out Vector3 outward)) return false;
-                vertices[i + 1] = frame.InverseTransformPoint(point + outward * lift);
-                triangles[i * 3] = 0;
-                triangles[i * 3 + 1] = i + 1;
-                triangles[i * 3 + 2] = (i + 1) % Segments + 1;
+                float share = ring / (float)Rings;
+                int first = 1 + (ring - 1) * Segments;
+                int previous = first - Segments;
+                for (int i = 0; i < Segments; i++)
+                {
+                    float a = i * Mathf.PI * 2f / Segments;
+                    float x = Mathf.Cos(a), y = Mathf.Sin(a);
+                    float lobe = rough ? .92f + .08f * Mathf.Sin(a * 3f + .7f) : 1f;
+                    float radial = share * lobe;
+                    float angle = Mathf.Clamp(degrees, .01f, 89f) * radial * Mathf.Deg2Rad;
+                    Vector3 rayDirection = direction * Mathf.Cos(angle)
+                        + (tangent * x + bitangent * y) * Mathf.Sin(angle);
+                    if (!TrySurfacePoint(target, rayDirection, out Vector3 point, out Vector3 outward)) return false;
+                    int index = first + i, next = first + (i + 1) % Segments;
+                    vertices[index] = frame.InverseTransformPoint(point + outward * lift);
+                    uvs[index] = new Vector2(.5f + x * radial * .5f, .5f + y * radial * .5f);
+                    if (ring == 1)
+                    {
+                        triangles[triangle++] = 0;
+                        triangles[triangle++] = index;
+                        triangles[triangle++] = next;
+                    }
+                    else
+                    {
+                        int inner = previous + i, innerNext = previous + (i + 1) % Segments;
+                        triangles[triangle++] = inner;
+                        triangles[triangle++] = index;
+                        triangles[triangle++] = next;
+                        triangles[triangle++] = inner;
+                        triangles[triangle++] = next;
+                        triangles[triangle++] = innerNext;
+                    }
+                }
             }
             mesh.Clear();
             mesh.vertices = vertices;
+            mesh.uv = uvs;
             mesh.triangles = triangles;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return true;
+        }
+
+        private Material FlameMaterial
+        {
+            get
+            {
+                if (runtimeFlameMaterial != null) return runtimeFlameMaterial;
+                Material source = flameMaterial != null ? flameMaterial : Resources.Load<Material>("Jigwi/SurfaceFlame");
+                if (source != null)
+                    runtimeFlameMaterial = new Material(source);
+                else
+                {
+                    if (!missingFlameReported)
+                    {
+                        Debug.LogWarning("Jigwi surface flame material is missing: Resources/Jigwi/SurfaceFlame. "
+                            + "Using the unlit texture fallback; gameplay and surface targets are unchanged.", this);
+                        missingFlameReported = true;
+                    }
+                    runtimeFlameMaterial = new Material(Material);
+                    Texture2D texture = Resources.Load<Texture2D>("Jigwi/SurfaceFlameWash");
+                    if (texture != null)
+                    {
+                        if (runtimeFlameMaterial.HasProperty("_BaseMap")) runtimeFlameMaterial.SetTexture("_BaseMap", texture);
+                        if (runtimeFlameMaterial.HasProperty("_MainTex")) runtimeFlameMaterial.SetTexture("_MainTex", texture);
+                    }
+                }
+                runtimeFlameMaterial.name = "Jigwi surface flame (runtime)";
+                runtimeFlameMaterial.hideFlags = HideFlags.DontSave;
+                return runtimeFlameMaterial;
+            }
         }
 
         private Material Material
@@ -290,6 +362,7 @@ namespace C6Lab
         {
             ClearMarks();
             if (material != null) DisposeObject(material);
+            if (runtimeFlameMaterial != null) DisposeObject(runtimeFlameMaterial);
         }
 
         private static void DisposeObject(UnityEngine.Object value)
@@ -342,10 +415,10 @@ namespace C6Lab
             public readonly GameObject Object;
             public readonly Mesh Mesh;
             public readonly MeshRenderer Renderer;
-            private Vector3 direction;
+            private Vector3 direction, frameScale;
             private float angle, lift;
             private Mesh colliderMesh;
-            private bool hasShape;
+            private bool hasShape, shapeAttempted, roughShape;
             public bool Visible => Object.activeInHierarchy && Renderer.enabled && Mesh.vertexCount > 0;
             private readonly MaterialPropertyBlock tint = new MaterialPropertyBlock();
             public Part(string name, Transform parent, Material material, int layer)
@@ -362,18 +435,27 @@ namespace C6Lab
                 Renderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
             }
             public void Draw(LabJigwiStagePresentation owner, Vector3 axis, float degrees, float surfaceOffset,
-                Color color, bool show, bool rough)
+                Color color, bool show, bool rough, float flameTime = 0f, float seed = 0f)
             {
                 Object.SetActive(show);
                 if (!show) return;
                 Mesh source = owner.target.Hitbox.sharedMesh;
-                if (!hasShape || (direction - axis).sqrMagnitude > .000001f || angle != degrees || lift != surfaceOffset || colliderMesh != source)
+                Vector3 scale = owner.target.Hitbox.transform.lossyScale;
+                if (!shapeAttempted || (direction - axis).sqrMagnitude > .000001f || angle != degrees
+                    || lift != surfaceOffset || colliderMesh != source || frameScale != scale || roughShape != rough)
                 {
                     hasShape = owner.BuildCap(Mesh, axis, degrees, surfaceOffset, rough);
+                    shapeAttempted = true;
                     direction = axis; angle = degrees; lift = surfaceOffset; colliderMesh = source;
+                    frameScale = scale; roughShape = rough;
                 }
                 Renderer.enabled = hasShape;
-                tint.SetColor("_BaseColor", color); tint.SetColor("_Color", color);
+                tint.SetColor(BaseColorId, color); tint.SetColor(ColorId, color);
+                // The paused/held battle clock is supplied by Apply/Render, never shader _Time.
+                tint.SetFloat(FlameTimeId, flameTime);
+                tint.SetFloat(FlameSpeedId, owner.flameAnimationSpeed);
+                tint.SetFloat(SwayId, owner.flameSway);
+                tint.SetFloat(SeedId, seed);
                 Renderer.SetPropertyBlock(tint);
             }
             public void Dispose() => DisposeObject(Mesh);
@@ -382,28 +464,32 @@ namespace C6Lab
         private sealed class GroupArt
         {
             private readonly GameObject root;
-            private readonly Part ink, core, eye;
-            private readonly Part[] patches = new Part[3];
+            private readonly Part source;
+            private readonly Part[] patches = new Part[3], washes = new Part[3];
             private readonly LineRenderer[] links = new LineRenderer[3];
             private readonly MaterialPropertyBlock linkTint = new MaterialPropertyBlock();
             private readonly Vector3[][] linkPoints = { new Vector3[7], new Vector3[7], new Vector3[7] };
+            private readonly Vector3[] linkSourceDirections = new Vector3[3], linkPatchDirections = new Vector3[3];
+            private readonly bool[] linkAttempted = new bool[3], linkValid = new bool[3];
+            private Mesh linkMesh;
+            private Vector3 linkFrameScale;
+            private float linkLift;
             public bool WasLive;
-            public bool RootVisible => ink.Visible;
+            public bool RootVisible => source.Visible;
             public int PatchCount { get; private set; }
-            public GroupArt(Transform parent, string id, Material material, int layer)
+            public GroupArt(Transform parent, string id, Material inkMaterial, Material flameMaterial, int layer)
             {
                 root = new GameObject("Jigwi " + id) { layer = layer };
                 root.transform.SetParent(parent, false);
-                ink = new Part("Source ink outline", root.transform, material, layer);
-                core = new Part("Source gold flame", root.transform, material, layer);
-                eye = new Part("Source central seal", root.transform, material, layer);
+                source = new Part("Source flame", root.transform, flameMaterial, layer);
                 for (int i = 0; i < patches.Length; i++)
                 {
-                    patches[i] = new Part("Fire patch " + (i + 1), root.transform, material, layer);
+                    washes[i] = new Part("Fire scorch wash " + (i + 1), root.transform, inkMaterial, layer);
+                    patches[i] = new Part("Fire patch " + (i + 1), root.transform, flameMaterial, layer);
                     var link = new GameObject("Source connection " + (i + 1)) { layer = layer };
                     link.transform.SetParent(root.transform, false);
                     links[i] = link.AddComponent<LineRenderer>();
-                    links[i].sharedMaterial = material;
+                    links[i].sharedMaterial = inkMaterial;
                     links[i].useWorldSpace = false;
                     links[i].shadowCastingMode = ShadowCastingMode.Off;
                     links[i].receiveShadows = false;
@@ -411,50 +497,75 @@ namespace C6Lab
                 }
             }
             public void Update(LabJigwiStagePresentation owner, LabJigwiStageGroup group, bool rootHere,
-                bool fireHere, int count, bool warning, float fade, float pulse)
+                bool fireHere, int count, bool warning, float fade, float pulse, double now)
             {
                 float offset = owner.surfaceLift;
-                Color black = owner.ink; black.a *= fade;
-                Color gold = owner.rootFill; gold.a = (warning ? .55f + .4f * pulse : 1f) * fade;
-                Color seal = new Color(1f, .98f, .82f, fade);
-                ink.Draw(owner, group.rootDirection, group.rootAngleDegrees, offset * 2f, black, rootHere, false);
-                core.Draw(owner, group.rootDirection, group.rootAngleDegrees * .79f, offset * 2.5f, gold, rootHere, true);
-                eye.Draw(owner, group.rootDirection, group.rootAngleDegrees * .24f, offset * 3f, seal, rootHere, false);
+                float animationTime = (float)Math.Max(0d, now - group.warningAt);
+                float seed = group.slot * 1.618f + .37f;
+                // Preserve the generated ink/wash colours; the source is no longer three opaque discs.
+                Color sourceColor = Color.white;
+                sourceColor.a = (warning ? .55f + .4f * pulse : 1f) * fade;
+                source.Draw(owner, group.rootDirection, group.rootAngleDegrees, offset * 2.5f,
+                    sourceColor, rootHere, false, animationTime, seed);
                 Vector3[] directions = group.patchDirections ?? Array.Empty<Vector3>();
                 PatchCount = 0;
+                Mesh mesh = owner.target.Hitbox.sharedMesh;
+                Vector3 scale = owner.target.Hitbox.transform.lossyScale;
+                bool frameChanged = linkMesh != mesh || linkFrameScale != scale || linkLift != offset;
+                linkMesh = mesh; linkFrameScale = scale; linkLift = offset;
+                if (frameChanged) Array.Clear(linkAttempted, 0, linkAttempted.Length);
                 for (int i = 0; i < patches.Length; i++)
                 {
+                    Vector3 axis = i < directions.Length ? directions[i] : Vector3.up;
+                    bool show = fireHere && i < count && i < directions.Length;
+                    Color wash = owner.ink;
+                    wash.a = owner.scorchWashOpacity * (warning ? .5f + .5f * pulse : 1f) * fade;
+                    // This restrained wash shows the unchanged full blocked cone; the smaller licking
+                    // flame is presentation only, not a newly narrowed collision/paint-blocking region.
+                    washes[i].Draw(owner, axis, group.fireAngleDegrees, offset, wash, show, true);
                     Color fire = owner.flame;
                     fire.a = owner.flameOpacity * (warning ? .2f + .25f * pulse : .88f + .12f * pulse) * fade;
-                    patches[i].Draw(owner, i < directions.Length ? directions[i] : Vector3.up,
-                        group.fireAngleDegrees, offset, fire, fireHere && i < count && i < directions.Length, true);
+                    patches[i].Draw(owner, axis, group.fireAngleDegrees * owner.patchFlameShare, offset * 2f,
+                        fire, show, false, animationTime, seed + (i + 1) * 2.113f);
                     if (patches[i].Visible) PatchCount++;
                     LineRenderer line = links[i];
                     line.enabled = rootHere && fireHere && i < count && i < directions.Length && fade > 0f;
                     if (!line.enabled) continue;
-                    Vector3 axis = directions[i];
-                    Vector3[] points = linkPoints[i];
-                    for (int j = 0; j < points.Length; j++)
+                    if (frameChanged || !linkAttempted[i] || linkSourceDirections[i] != group.rootDirection
+                        || linkPatchDirections[i] != axis)
                     {
-                        Vector3 d = Vector3.Slerp(group.rootDirection, axis, j / (float)(points.Length - 1)).normalized;
-                        if (!TrySurfacePoint(owner.target, d, out Vector3 point, out Vector3 outward))
-                        { line.enabled = false; break; }
-                        points[j] = owner.target.Hitbox.transform.InverseTransformPoint(point + outward * offset * 1.5f);
+                        linkAttempted[i] = true;
+                        linkSourceDirections[i] = group.rootDirection; linkPatchDirections[i] = axis;
+                        Vector3[] points = linkPoints[i];
+                        linkValid[i] = true;
+                        for (int j = 0; j < points.Length; j++)
+                        {
+                            Vector3 d = Vector3.Slerp(group.rootDirection, axis, j / (float)(points.Length - 1)).normalized;
+                            if (!TrySurfacePoint(owner.target, d, out Vector3 point, out Vector3 outward))
+                            { linkValid[i] = false; break; }
+                            points[j] = owner.target.Hitbox.transform.InverseTransformPoint(point + outward * offset * 1.5f);
+                        }
+                        if (linkValid[i])
+                        {
+                            line.positionCount = points.Length;
+                            line.SetPositions(points);
+                        }
                     }
-                    line.positionCount = points.Length;
-                    line.SetPositions(points);
+                    line.enabled = linkValid[i];
+                    if (!line.enabled) continue;
                     line.widthMultiplier = Mathf.Max(.008f, owner.target.Hitbox.bounds.extents.magnitude * .018f);
                     Color linkColor = owner.ink; linkColor.a *= fade * (warning ? .5f : .9f);
                     line.startColor = line.endColor = linkColor;
-                    linkTint.SetColor("_BaseColor", linkColor); linkTint.SetColor("_Color", linkColor);
+                    linkTint.SetColor(BaseColorId, linkColor); linkTint.SetColor(ColorId, linkColor);
                     line.SetPropertyBlock(linkTint);
                 }
             }
             public void Dispose()
             {
                 root.SetActive(false);
-                ink.Dispose(); core.Dispose(); eye.Dispose();
+                source.Dispose();
                 foreach (Part part in patches) part.Dispose();
+                foreach (Part part in washes) part.Dispose();
                 DisposeObject(root);
             }
         }

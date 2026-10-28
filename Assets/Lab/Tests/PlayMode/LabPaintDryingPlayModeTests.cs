@@ -61,8 +61,8 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator GourdToggleAndThreeSlidersApplyToSoloRestartWithoutEditingTheSource()
         {
-            Assert.That(developer.valueInputs.Length, Is.EqualTo(240));
-            Assert.That(developer.valueSliders.Length, Is.EqualTo(240));
+            Assert.That(developer.valueInputs.Length, Is.EqualTo(251));
+            Assert.That(developer.valueSliders.Length, Is.EqualTo(251));
             Assert.That(network.config.PaintDryingEnabled, Is.True, "Fresh game sessions enable drying by default.");
             developer.Open();
             developer.panel.GetComponentsInChildren<Button>(true)

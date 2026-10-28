@@ -7,13 +7,16 @@ namespace C6Lab
     [RequireComponent(typeof(SphereCollider))]
     public sealed class LabJigwiFireSurface : MonoBehaviour
     {
-        private SphereCollider hitbox;
+        private Collider hitbox;
+        private SphereCollider pointHitbox;
+        private BoxCollider curtainHitbox;
         private Transform visual;
         private readonly Transform[] tongues = new Transform[3];
         private float radius;
         public ulong OwnerPlayerId { get; private set; }
         public string FireId { get; private set; }
         public string FireTargetId { get; private set; }
+        public bool IsCurtain { get; private set; }
         public Collider Hitbox => hitbox;
         public bool Active => isActiveAndEnabled && hitbox != null && hitbox.enabled && gameObject.activeInHierarchy;
 
@@ -30,10 +33,23 @@ namespace C6Lab
             return surface;
         }
 
+        /// <summary>Invisible owner-scoped wall. Its full rectangle remains solid while any point is lit.</summary>
+        public static LabJigwiFireSurface CreateCurtain(Transform parent, ulong ownerPlayerId, string fireId,
+            string targetId, Vector3 center, Quaternion rotation, Vector2 halfSize, bool active)
+        {
+            var root = new GameObject("Jigwi Curtain " + ownerPlayerId);
+            root.transform.SetParent(parent, false);
+            var surface = root.AddComponent<LabJigwiFireSurface>();
+            surface.OwnerPlayerId = ownerPlayerId; surface.FireId = fireId; surface.FireTargetId = targetId;
+            surface.ConfigureCurtain(center, rotation, halfSize, active);
+            return surface;
+        }
+
         private void Awake()
         {
-            hitbox = GetComponent<SphereCollider>();
-            hitbox.isTrigger = true;
+            pointHitbox = GetComponent<SphereCollider>();
+            pointHitbox.isTrigger = true;
+            hitbox = pointHitbox;
             var art = new GameObject("Fire visual");
             art.transform.SetParent(transform, false);
             visual = art.transform;
@@ -56,13 +72,32 @@ namespace C6Lab
 
         public void Configure(Vector3 center, float targetRadius, bool active, bool showVisual)
         {
+            IsCurtain = false;
+            if (curtainHitbox != null) curtainHitbox.enabled = false;
+            hitbox = pointHitbox;
             transform.position = center;
             radius = Mathf.Max(.05f, targetRadius);
-            hitbox.radius = radius;
-            hitbox.enabled = active;
+            pointHitbox.radius = radius;
+            pointHitbox.enabled = active;
             visual.gameObject.SetActive(active && showVisual);
             // Collision stays spherical, while the simplified flame points up.
             Pose();
+        }
+
+        public void ConfigureCurtain(Vector3 center, Quaternion rotation, Vector2 halfSize, bool active)
+        {
+            IsCurtain = true;
+            pointHitbox.enabled = false;
+            if (curtainHitbox == null)
+            {
+                curtainHitbox = gameObject.AddComponent<BoxCollider>();
+                curtainHitbox.isTrigger = true;
+            }
+            hitbox = curtainHitbox;
+            transform.SetPositionAndRotation(center, rotation);
+            curtainHitbox.size = new Vector3(Mathf.Max(.05f, halfSize.x * 2f), Mathf.Max(.05f, halfSize.y * 2f), .08f);
+            curtainHitbox.enabled = active;
+            visual.gameObject.SetActive(false);
         }
 
         private void Update() { if (visual.gameObject.activeSelf) Pose(); }

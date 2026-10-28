@@ -14,7 +14,7 @@ namespace C6Lab.Tests
             var config = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
-                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(240), "The yaguang flash (#268) follows at 184-190 and the counting toggle (#271) at 191.");
+                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(251), "The yaguang flash (#268) follows at 184-190 and the counting toggle (#271) at 191.");
                 Assert.That(LabConfig.DeveloperFields[177].Label, Is.EqualTo("Charm Rescue Taps per Neighbor (0 = none)"));
                 Assert.That(LabConfig.DeveloperFields.Skip(178).Take(6).Select(field => field.Label), Is.EqualTo(new[]
                 {
@@ -48,11 +48,11 @@ namespace C6Lab.Tests
                 Assert.That(new[] { client.JigwiFireSeconds, client.JigwiOverheatSeconds,
                     client.JigwiGenerationBurnSeconds, client.JigwiRawRadiusScale, client.JigwiRawLifeScale },
                     Is.EqualTo(tail.Skip(1)));
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5674),
-                    Is.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5674)));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5677),
+                    Is.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5677)));
                 values[183] = .75f;
-                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5674),
-                    Is.Not.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5674)));
+                Assert.That(LabSessionSettings.Fingerprint(values, 2, 5677),
+                    Is.Not.EqualTo(LabSessionSettings.Fingerprint(received, 2, 5677)));
             }
             finally { Object.DestroyImmediate(host); Object.DestroyImmediate(client); }
         }

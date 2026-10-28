@@ -15,12 +15,12 @@ MonoBehaviour:
   cutId: OP_009
   viewPrefab: {fileID: 5552741125823687912, guid: cbac1107efe9744088a67a53c6525f5c, type: 3}
   pages:
-  - speaker: "\uAE08\uC625\uC774"
-    dialogue: "\uADF8 \uC8FC\uBB38 \uC544\uC9C1 \uC548 \uBC30\uC6E0\uC796\uC544!\n\uBA4B\uB300\uB85C \uC4F0\uBA74 \uC548 \uB3FC!"
-    autoReadSeconds: 4.15
+  - speaker: "\uBD88\uC774"
+    dialogue: "\uC790, \uAE68\uB057\uD574\uC838\uB77C~! \uCCAD! \uC815! \uBB34! \uC9C4!"
+    autoReadSeconds: 3.25
     voice: {fileID: 0}
   direction: 
-  speaker: "\uAE08\uC625\uC774"
-  dialogue: "\uADF8 \uC8FC\uBB38 \uC544\uC9C1 \uC548 \uBC30\uC6E0\uC796\uC544!\n\uBA4B\uB300\uB85C \uC4F0\uBA74 \uC548 \uB3FC!"
+  speaker: "\uBD88\uC774"
+  dialogue: "\uC790, \uAE68\uB057\uD574\uC838\uB77C~! \uCCAD! \uC815! \uBB34! \uC9C4!"
   autoReadSeconds: 4
   voice: {fileID: 0}

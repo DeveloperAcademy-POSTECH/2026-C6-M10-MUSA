@@ -65,6 +65,7 @@ namespace C6Lab
         public float spinImpulse;
         /// <summary>던지는 공 크기 배율 (#222 콤보 페널티/보상). 0(옛 패킷)이면 1로 본다.</summary>
         public float sizeScale;
+        public float jigwiABRadiusScale = 1f;
         public string reason;
         public ulong owner;
         public int element;
@@ -223,13 +224,15 @@ namespace C6Lab
         //       flash bonus request, glare that only a shake clears.
         // 5674: #334 gumiho fever time (DEV 238-239, 240 shared values) and feverTimeAt in the snapshot. It also
         //       separates the builds that briefly used 5672 for #334 alone.
-        internal const ushort LabProtocolVersion = 5674;
+        // 5675/5676: standalone #341 screen-space fire curtain and reachable ignition geometry.
+        // 5677: integrate #334/#343 fever and #341 A/B; preserve DEV0..239 and append A/B240..250 (251 values).
+        internal const ushort LabProtocolVersion = 5677;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/35");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/38");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1892,6 +1895,7 @@ namespace C6Lab
             projectile.name = "Projectile " + orb.id;
             float sizeScale = model != null ? model.LaunchScaleOf(orb.id) : 1f;
             projectile.SetRadiusScale(sizeScale);
+            projectile.SetJigwiABRadiusScale(orb.jigwiABRadiusScale);
             projectile.SetMissSurface(battleFloor);
             SyncJigwiFireSurfaces();
             projectile.SetFireSurfaces(JigwiFireSurfacesFor(orb.owner));
@@ -1900,7 +1904,8 @@ namespace C6Lab
                 round = model.Round, requestId = actionId,
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small, fiveColor = orb.fiveColor,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
-                wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale };
+                wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale,
+                jigwiABRadiusScale = orb.jigwiABRadiusScale };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
             Debug.Log("C6_LAB_THROW orb=" + orb.id + " seat=" + seat
                 + " size=" + sizeScale.ToString("F2", CultureInfo.InvariantCulture)
@@ -1928,11 +1933,18 @@ namespace C6Lab
         {
             if (!IsHost || model == null) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
+            bool blockedByCurtain = false;
             if (result.Kind == LabProjectileHitKind.Fire)
             {
-                if (!model.ConfirmJigwiFireHit(result.ProjectileId, result.FireId, result.FireTargetId, now, out bool extinguished))
-                    model.ConfirmMiss(result.ProjectileId, now, countThrow: false); // 불을 노린 투척은 명중률에서 뺀다
-                SetNotice(extinguished ? "Water extinguished a flame." : "Only a Water Combined orb extinguishes fire.");
+                bool extinguished;
+                bool accepted = model.JigwiABEnabled
+                    ? model.ConfirmJigwiABFireHit(result.ProjectileId, result.FireId, result.FireTargetId, now, out extinguished)
+                    : model.ConfirmJigwiFireHit(result.ProjectileId, result.FireId, result.FireTargetId, now, out extinguished);
+                if (!accepted) model.ConfirmMiss(result.ProjectileId, now, countThrow: false);
+                blockedByCurtain = accepted && model.JigwiABEnabled
+                    && result.FireTargetId == LabJigwiABFireMotion.CurtainId(result.FireId, result.OwnerPlayerId);
+                SetNotice(blockedByCurtain ? "불장막에 막힘 · 불씨를 모두 꺼주세요."
+                    : extinguished ? "Water extinguished a flame." : "Only a Water Combined orb extinguishes fire.");
             }
             else if (result.Hit)
             {
@@ -1940,8 +1952,11 @@ namespace C6Lab
                 // size and offset. The bound hitbox shares that exact mesh and transform.
                 Vector3 paintDirection = target != null && target.Hitbox != null
                     ? target.Hitbox.transform.InverseTransformPoint(result.HitPoint).normalized : Vector3.zero;
-                if (model.ConfirmHit(result.ProjectileId, now, paintDirection,
-                    out var element, out int actualDamage, out int impactValue) && target != null)
+                bool approvedHit = model.ConfirmHit(result.ProjectileId, now, paintDirection,
+                    out var element, out int actualDamage, out int impactValue);
+                blockedByCurtain = !approvedHit && model.JigwiABBlocksBoss(result.OwnerPlayerId, now);
+                if (blockedByCurtain) SetNotice("불장막에 막힘 · 불씨를 모두 꺼주세요.");
+                if (approvedHit && target != null)
                 {
                     Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
                     Vector3 targetLocalPoint = hitbox.InverseTransformPoint(result.HitPoint);
@@ -1991,14 +2006,15 @@ namespace C6Lab
             }
             LastShotReport = string.Format(CultureInfo.InvariantCulture,
                 "SHOT {0} | {1:F2}s | peak +{2:F2}m | range {3:F2}m",
-                result.Hit ? "HIT" : "MISS", result.FlightSeconds,
+                blockedByCurtain ? "BLOCKED" : result.Hit ? "HIT" : "MISS", result.FlightSeconds,
                 result.PeakRise, result.HorizontalDistance);
-            Debug.Log("C6_LAB_PROJECTILE id=" + result.ProjectileId + " hit=" + result.Hit
+            Debug.Log("C6_LAB_PROJECTILE id=" + result.ProjectileId + " hit=" + (result.Hit && !blockedByCurtain)
+                + " blocked=" + blockedByCurtain
                 + " flight=" + result.FlightSeconds.ToString("F2", CultureInfo.InvariantCulture)
                 + " peak=" + result.PeakRise.ToString("F2", CultureInfo.InvariantCulture)
                 + " range=" + result.HorizontalDistance.ToString("F2", CultureInfo.InvariantCulture)
                 + " contact=" + result.HitPoint);
-            if (developerSolo) SetNotice(LastShotReport);
+            if (developerSolo) SetNotice(blockedByCurtain ? "불장막에 막힘 · " + LastShotReport : LastShotReport);
             PublishSnapshot(true);
         }
 
@@ -2032,6 +2048,9 @@ namespace C6Lab
                     lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
                     jigwiScale: orb.jigwiRadiusScale, fever: orb.fever, fiveColor: orb.fiveColor,
+                    jigwiABScale: orb.jigwiABRadiusScale,
+                    jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d ? Mathf.Max(0f, (float)(orb.jigwiABBurnAt - latest.serverTime)) : 0f,
+                    jigwiABHeld: latest.paused || GameStartHeld,
                     // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
@@ -2051,7 +2070,7 @@ namespace C6Lab
             foreach (string id in current) visibleOrbIds.Add(id);
             board.SetInteractionEnabled(CanProcessBattleActions && latest.phase == LabPhase.Playing && !latest.paused
                 && (IsHost || !boardReplica.NeedsCheckpoint
-                    && (boardReplica.LatestSequence == 0 || boardReplica.InteractionAllowed)));
+                    && (boardReplica.LatestSequence == 0 || boardReplica.InteractionAllowedFor(latest))));
             // The gourd's swipe block (#215) shows and bounces only on the blocked player's own board.
             bool blockedHere = latest.SwipeBlockOn(LocalPlayerId);
             board.SetSwipeBlock(blockedHere ? (latest.swipeBlockedRight ? 1 : -1) : 0,
@@ -2333,6 +2352,7 @@ namespace C6Lab
                             packet.small ? config.BlastShrinkScale : 1f);
                         if (packet.fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
                         if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
+                        visual.SetJigwiABRadiusScale(packet.jigwiABRadiusScale);
                         visual.SetMissSurface(battleFloor);
                         SyncJigwiFireSurfaces();
                         visual.SetFireSurfaces(JigwiFireSurfacesFor(packet.owner));
@@ -2454,6 +2474,7 @@ namespace C6Lab
                 || snapshot.players == null || snapshot.players.Length != targetParticipantCount
                 || !LabJigwiNetworkValidation.Valid(snapshot.jigwi)
                 || !LabJigwiStageNetworkValidation.Valid(snapshot.jigwiStage, snapshot.players)
+                || !LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players)
                 || !LabFlashNetworkValidation.Valid(snapshot)) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
             if (!PaintReceiver.Matches(snapshot))

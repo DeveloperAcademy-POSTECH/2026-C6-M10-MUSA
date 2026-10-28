@@ -5,7 +5,7 @@
 ## 실행과 빌드
 
 1. Unity에서 `Hapio > Open Home`을 선택하거나 `Assets/Hapio/Scenes/Home.unity`를 연다.
-2. Play 후 한지 타이틀의 **게임 시작**을 누른다. 방 목록에서 2~5명을 선택해 **새 방 만들기 +**를 누르면 광고 등록 완료 후 Host 로비에 자동 입장한다. 다른 참가자도 같은 게임의 방 카드를 눌러 입장한다. 기존 LAN·핫스팟·Direct IP 연결을 유지한다.
+2. Play 후 오프닝24컷·26페이지가 자동 시작한다(#354). 완료·건너뛰기 후 기존 한지 타이틀의 **게임 시작**을 누른다. 앱 실행당 한 번만 재생하며 같은 실행의 Home 복귀에서는 반복하지 않는다. 방 목록에서 2~5명을 선택해 **새 방 만들기 +**를 누르면 광고 등록 완료 후 Host 로비에 자동 입장한다. 다른 참가자도 같은 게임의 방 카드를 눌러 입장한다. 기존 LAN·핫스팟·Direct IP 연결을 유지한다.
 3. 로비에서 각자 고유한 P번호를 선택한다. 목표 인원·자리 선택·설정 확인이 완료되면 Host가 **요괴 봉인 시작 · 3스테이지**를 누른다.
 4. 전환 중 준비 인원이 표시되고 전원 첫 상태 수신·화면 준비 후 `3 → 2 → 1 → 시작!`과 함께 전투가 시작된다(#306).
 5. 1·2스테이지의 결과에서 Host가 NEXT를 눌러 전원이 다음 스테이지로 이동한다. 3스테이지 결과에서는 각자 HOME으로 돌아간다.
@@ -18,13 +18,15 @@
 
 | Scene | 저장된 구성과 역할 |
 | --- | --- |
-| Home | 방 생성·검색·Direct IP, 인원 조정, DEV 설정, 개발자 Solo |
+| Home | 앱 실행당 한 번 로컬 오프닝 → 기존 타이틀, 방 생성·검색·Direct IP, 인원 조정, DEV 설정, 개발자 Solo |
 | Lobby | 방 이름·참가자·P번호 선택, Host START, 로비 나가기, Host DEV 설정 |
 | Battle | 기존 Lab 전투를 복사한 독립 Scene. **1~3스테이지 모두 같은 경로를 로드**한다. 전투 UI·카메라·구슬·박·일시정지·기존 DEV 조작을 재사용한다. |
 | StageResult | 스테이지별 기록, 완성 박 관람, Host NEXT, 중도 QUIT RUN 또는 최종 HOME |
 | GameOver | 종료 사유와 HOME. 자동으로 홈으로 사라지지 않는다. |
 
 모든 새 메뉴의 Canvas·버튼·Text·슬라이더·입력·안전 영역은 저장된 GameObject다. `GameScreen`은 참조를 읽어 값과 버튼 동작만 연결한다. `GameSceneBuilder.CreateMissing`은 없는 에셋만 Unity API로 생성하며 이미 편집한 새 Scene을 재생성하지 않는다. 구형 Lab Scene은 저장하지 않는다.
+
+#354의 `GameOpeningController`는 Home의 독립 `GameOpening.prefab`과 기존 StoryPlayer를 연결한다. 오프닝 중 메뉴·DEV 입력을 막고 완료/스킵 시 정리한 뒤 기존 타이틀을 연다. 게임 진행 상태는 Home을 유지하며 네트워크 상태를 추가하지 않는다. 에셋 편집·실패 복구·실행 내 재생 정책은 [앱 시작 오프닝](APP_START_OPENING.md)을 따른다.
 
 이번 main 동기화에서는 최신 Lab의 3D 배경·미니맵 배치를 별도 Battle에 반영했다. Battle은 저장된 복사본이므로 이후 Lab Scene 수정이 자동으로 전달되지는 않는다. `Hapio > Upgrade Existing Game Scenes From Current Lab`은 명시적인 동기화 도구이며 Battle의 전투 구성을 다시 복사한다. Battle 전용 수정은 먼저 차이를 확인해 반영한다. 같은 도구의 Home/Lobby 설정 확장은 기존 객체와 배치를 유지하면서 새 DEV 행을 추가한다. 일반 Play·빌드는 이 도구를 자동 호출하지 않는다.
 
@@ -60,9 +62,9 @@
 
 새 코드: `Assets/Hapio/Scripts/Core/{GameSession,GameRunFlow,GameFlowState,GameFlowSnapshot,GameScenePaths}.cs`, `Scripts/UI`, `Editor/GameSceneBuilder.cs`, `Editor/GameBuild.cs`.
 
-기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **228개·프로토콜5669**다. 기존0~199와 #299 고해상도 설정200~201을 유지하고, #301 섬광 흔들어 풀기202~203과 #305 매혹 예고204를 함께 사용한다. 단독 PR이 같은 번호를 다른 필드에 사용하므로 통합 게임 연결 토큰은 `C6HapioGame/18`이며(#334 기준, #329 당시 17) 단일 Lab의 `C6PhysicsLab/35`과 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
+기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 별도 연결 토큰·단판 동작을 사용한다. #341 main 통합의 공유 설정은 **251개·프로토콜5677**, 게임 토큰은 `C6HapioGame/21`, 단일 Lab은 `C6PhysicsLab/38`이다. 기존0~239(고해상도·섬광 흔들기·매혹 예고·공통 기믹·오색 보상·구미호 피버 포함)을 유지하고 지귀 A/B240~250을 추가한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
 
-검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 현재 통합의 실제 실행 결과는 `VALIDATION.md`의 #278 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
+검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 각 도입 시점의 실행 결과는 `VALIDATION.md`의 해당 이슈 절을, #341 최신 main 통합의 수행 여부는2026-10-28 통합 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
 
 ## 브랜치 운영
 
@@ -208,3 +210,8 @@ UT 기믹 기록은 기존 Inspector 스위치 기본OFF를 유지한다. schema
 ## #332 지귀 120초 표면 불 통합
 
 Stage03에서 새 시간표 ON일 때만 120초를 적용합니다. A 10/40/60/80·B 30/50/70/90·공통 20/40/60/80, 100초 방해 무벌점 정리 뒤 자동 회복 속도 2배입니다. 일반 공통 반복 타이머나 구형 지귀 자동 추첨은 함께 켜지 않습니다. 기존 Home/Lobby/Battle/결과 흐름과 조기 100% 승리·기한 Defeat·완료 연출은 보존합니다. Settings 236개·5672/Lab33/Game16이며 지귀 DEV 228~235는 scope 3에서만 편집합니다. 다른 요괴/2:2와 별도 Lab 수동 시험은 기존 정책을 유지합니다. 소모 감소·실제 음성·기기 행동 검증 상태는 [상세 문서 11~12절](JIGWI_LEVEL_DESIGN_120S.md)을 따릅니다.
+
+
+## #341 현재 지귀 화면 A/B
+
+위 #332의 시간표 슬롯/120초/100초 정리는 유지하며 표면 근원·도색 차단을 개인 발화/전원 화면 화재로 교체했다. A는 개인 회복4배·5초 소각·실제 박 Combined명중3회 조기 해제, B는 각자 불3개·Raw 조합 Water·개별12초 재점화·전원 동시 소화다. ScreenOverlay 프리팹을 기존 Battle Canvas에 연결하며 Scene을 교체하지 않는다. 최신251개 설정·접속 규약·소유권/소모·화면 투영·실행 확인 범위는 [현재 지귀 A/B](JIGWI_SCREEN_PATTERNS.md)를 따른다. 과거 절의 기존 표면 사양과 검사 횟수는 당시 기록이다.

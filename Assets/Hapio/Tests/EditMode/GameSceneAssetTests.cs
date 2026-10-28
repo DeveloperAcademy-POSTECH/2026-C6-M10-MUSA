@@ -192,7 +192,7 @@ namespace Hapio.Tests
                 Assert.That(canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>(), Is.Not.Null);
                 Assert.That(canvas.GetComponent<UnityEngine.UI.CanvasScaler>().referenceResolution, Is.EqualTo(new Vector2(390, 844)));
                 Assert.That(All<UnityEngine.EventSystems.EventSystem>(scene), Has.Length.EqualTo(1));
-                Assert.That(All<GameSafeArea>(scene), Has.Length.EqualTo(1));
+                Assert.That(screen.GetComponentsInChildren<GameSafeArea>(true), Has.Length.EqualTo(1));
                 Assert.That(All<LabNetwork>(scene), Is.Empty);
                 if (expected == GameScreenKind.Home)
                 {
@@ -234,7 +234,7 @@ namespace Hapio.Tests
                     Assert.That(sharedFont, Is.Not.Null);
                     foreach (UnityEngine.UI.Text text in screen.developerPanel.GetComponentsInChildren<UnityEngine.UI.Text>(true))
                         Assert.That(text.font, Is.SameAs(sharedFont), "Korean stage/DEV labels use the existing project font.");
-                    Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(240), "The current Lab schema includes Flash, counting and Jigwi stage scheduling.");
+                    Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(251), "The current Lab schema includes Flash, counting and Jigwi stage scheduling.");
                     Assert.That(SavedConfig().GourdColorComboEnabled, Is.False);
                     Assert.That(SavedConfig().LabUniqueGimmicksEnabled, Is.False);
                     float[] defaults = SavedConfig().CaptureDeveloperValues();

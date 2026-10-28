@@ -21,6 +21,11 @@ namespace Hapio.Tests
             session = GameSession.Instance;
             Assert.That(session, Is.Not.Null);
             Assert.That(session.IsLoadingScene, Is.False);
+            // DEV controls are tested after the local opening has returned to the title.
+            yield return null;
+            var opening = Object.FindFirstObjectByType<GameOpeningController>();
+            if (opening != null && opening.IsPlaying) opening.player.Skip();
+            yield return null;
         }
         [UnityTearDown]
         public IEnumerator Cleanup()
@@ -65,7 +70,7 @@ namespace Hapio.Tests
                 .Select(session.CaptureDeveloperSettings).ToArray();
             screen.developerScopeButtons[2].onClick.Invoke();
             AssertScope(screen, 2);
-            Assert.That(screen.developerSliders, Has.Length.EqualTo(240));
+            Assert.That(screen.developerSliders, Has.Length.EqualTo(251));
             // Its own battle time (211) is retired (#328); the schedule's end (212) is the first timetable value.
             Assert.That(screen.developerInputs[211].transform.parent.gameObject.activeSelf, Is.False);
             Assert.That(screen.developerSliders[212].minValue, Is.EqualTo(0f));
@@ -183,7 +188,7 @@ namespace Hapio.Tests
         private static void AssertScope(GameScreen screen, int scope)
         {
             Assert.That(screen.DeveloperScope, Is.EqualTo(scope));
-            Assert.That(screen.developerInputs, Has.Length.EqualTo(240));
+            Assert.That(screen.developerInputs, Has.Length.EqualTo(251));
             for (int i = 0; i < screen.developerInputs.Length; i++)
                 Assert.That(screen.developerInputs[i].transform.parent.gameObject.activeSelf,
                     Is.EqualTo(GameStageSettings.IsFieldVisible(scope, i)), "Field " + i + " in scope " + scope);

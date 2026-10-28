@@ -3061,6 +3061,55 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - 검사용 Editor만 종료하고 TimeManager의 검사 부수 직렬화는 원복했다. 다른 프로젝트의 Editor는 종료하지 않았다. 새 실행 로그나 개인 경로·기기 식별자는 저장소에 추가하지 않았다.
 - **미실행:** 실제기기·다중기기LAN/핫스팟·네이티브빌드/성능·실제음성/SFX·사람의 조준·재미. 음성 미할당과 별도 소모 감소 미정은 기존 제한을 유지한다.
 
+
+## 2026-10-27 · #340 새 지귀 먹선 불꽃 표현
+
+- main `45c800fd` 기준의 `fix/#340-jigwi-flame-visual`에서 새 투명 이미지·전용 셰이더/머티리얼과 `LabJigwiStagePresentation`의 표현만 변경했다. 모델/네트워크/판정·크기 각도·시간표·Scene/Prefab 배치는 변경하지 않았다.
+- Unity6000.6.5f1 macOS/Metal에서 지귀 관련 PlayMode **9/9 통과(13.34초)**, 실패·Skipped·Inconclusive0. GPU alpha·실제 saved Stage03 카메라의 warm색 픽셀·Pause/Resume·기존 역할/해제/100초 정리를 확인했다.
+- 실제 렌더와 생성 프롬프트·Inspector 조절점은 [새 불꽃 표현 기록](JIGWI_FIRE_VISUAL.md)을 따른다. 기존 BlastFire 이미지는 재사용하거나 수정하지 않았다. 기존 사용자 Editor를 닫지 않고 Home/재생중지 상태로 돌려두었다.
+- 실제 기기·네이티브 빌드·사람의 그림/조작 평가는 미실행이다. 자동 렌더 검사를 미술 만족도로 표현하지 않는다.
+
+
+## 2026-10-27 · #341 지귀 개인 발화·전원 화면 소화
+
+- 기준: main `d13823ba` + 보존한 #340 표현 `c4e8abec`에서 시작한 `feat/#341-jigwi-screen-patterns`. #332 표면 근원·도색 차단 대신 승인된 화면 A/B를 구현했다. 기존 LAN/핫스팟 경로·owner-local 판·도색/승패·공통 기믹은 유지했다.
+- Unity6000.6.5f1·macOS/Metal Editor에서 전체 EditMode **1459/1459 통과(64.60초)**, 전체 PlayMode **440/440 통과(467.48초)**. 실패·Skipped·Inconclusive0. 물 이미지의 NPOT 원본 비율 보정 뒤 지귀 PlayMode **44/44 통과(35.53초)**.
+- 새 설정249개·5674/Lab35/Game18. 236/237 오색 보상 유지,238~248 추가,230~234 값/인덱스는 보존하고 DEV에서만 숨겼다. Home/Lobby DEV11행만 추가했고6개 Scene의 DEV 외 RectTransform576개를 대조해 차이0, 다른5개 Scene은 바이트 동일이다. 사용자 미추적 파일7개도 시작 해시와 일치한다.
+- 실제 저장 Home→Solo→DEV 다음 스테이지2회→Stage03, WhiteGourd 실제 칠/충돌 mesh 보존, A 개인 회복/소각/3명중·물, B 실제 owner별 화재 충돌/재점화/전원 성공·축소·공통 clock·Canvas 투영을 검사했다. 새 표현은 실제 저장 프리팹/셰이더로 임시 UI카메라에 렌더해 alpha/색상 픽셀을 비교했다. [구현·조절값·생성 프롬프트·렌더 이미지](JIGWI_SCREEN_PATTERNS.md)를 따른다.
+- 기존 StageModel 검사20개 메서드·TestCase 수를 유지해 새 규칙으로 개별 이관했고 실제 저장 Stage3 검사도 새 실행 경로로 옮겼다. 폐기한 규칙의 양성검사를 통과로 남기거나 Ignore로 숨기지 않았다. 초기 실패의 생성 초기화/음수 fixture 시각/미래 구슬 조기 삽입/구형 라벨·토큰을 바로잡았다. 늦은 board header Pause와 최신 snapshot의 불일치 및 예측 승인 반경 보정도 회귀 검사를 추가했다.
+- **미실행:** 실제 기기 설치·사람의 A/B 조작/재미·실제 다중 기기 LAN/핫스팟·네이티브 빌드/성능·전용 음성/SFX. 실제 소켓 없는 모델/투사체 fixture를 기기 공동 플레이 검증으로 기록하지 않는다. standalone Mac 게임 앱은 실행하지 않았다.
+
+
+## 2026-10-27 · #341 B 불장막·발화점 분리 보완
+
+- 위1차1459/440건은 보완 전 규약5674의 결과다. 현재 보완판은 **5675/Lab36/Game19·설정249개**이며 기존 데이터 배열과 A 규칙/표현을 유지했다.
+- 전체 EditMode **1470/1470 통과(39.08초)**, 최종 지귀 PlayMode **51/51 통과(36.41초)**. 실패/Skipped/Inconclusive0. 전체 PlayMode는 재실행하지 않았으며440건을 이 보완판 결과로 사용하지 않는다.
+- 실제 박 앞에 owner별 Box 장막을 두고3개 발화점이 모두 꺼져야 자기 박 공격을 열도록 했다. 물 장막 명중은 승인된 물 효과만, 실제 켜진 발화점 명중만 소화한다. 곡선 비행으로 박에 닿아도 마지막 점이 남으면 Core에서 공 소비/칠·피해·보상·통계0으로 막는다.
+- 외곽 높이1/.88/.76·농도1/.84/.65로단계피드백, 마지막점까지짙은중심부/차단유지, 개별12초재점화복원을확인했다. 실제mesh+모든발화점으로범위를제한하고B전용RectMask2D가전투카메라/요괴HP아래로클립한다. A는마스크밖이며SourceScene·원본config는이번수정전바이트와같다.
+- 실제 저장 Home→Stage03에서3/2/1/0 GameView 캡처, 실제 투사체의 장막 충돌/점 우선/외국 owner 제외/전부 소화 후 박 통과, 다섯자리·폰/태블릿 투영, 헤더 Water 시각 복사/검증, 단계 GPU 픽셀 차이·하단조합영역alpha침범0을 검사했다. 상세이미지와검사fixture범위는 [현재기록10절](JIGWI_SCREEN_PATTERNS.md)을 따른다.
+- 첫 집중 검사에서 격리 좌표6km의 역투영 float 오차1건과 확인 캡처의 Unity null 처리1건을 수정했다. 표시가 화면전체로 커지던 최대 swing/rope 전체포락은 없애 실제 박/발화점에 맞췄다. 최종 통과한 소스/프리팹으로 기록한다.
+- **미실행:** 실제 기기·실제 다중기기 LAN/핫스팟·네이티브빌드/성능·사람의 조준성/재미. 기존 로컬 파일과 자동 검사 임시 Resources는 원래 바이트로 복구했다. 새로운 패키지·빌드 설정·Scene 배치를 적용하지 않았다.
+
+
+## 2026-10-27 · #341 B 발화점 실제 투척 도달 높이·새 단일 불장막
+
+- 규약 **5676/Lab37/Game20·공유 설정249개**. 실제 저장 투척 프로필의 중력30·최대속도12.5에서 닿기 어려웠던 카메라 상단 기준 발화점을 실제 합법 중간 flick의 앞 평면 첫 교차 높이로 옮겼다. 투척 입력·이동 물리·박/소화/도색 판정은 보존했다.
+- 전체 EditMode **1470/1470 통과(200.90초)**, 지귀 PlayMode **53/53 통과(39.15초)**. Unity6000.6.5f1 macOS/Metal Editor, 실패·Skipped·Inconclusive0. 전체 PlayMode는 미재실행이다.
+- 실제 저장 LabConfig 복제·실제 Board가 만든 ThrowRequested를 사용한48회 동적 투사체에서 Arc/Straight·3/5인 전 자리·3점의 정확한 ID 명중을 확인했다. 일반/.65·서로 다른 고정 clock 위상·최대 미동을 교차 샘플했다. 이전 임의 VelocityTo 검사는 물리 질의 근거로만 구분했다.
+- 새 투명 `ScreenFireCurtainWash.png`를 픽셀 변경 없이 가져와 단일 원화+같은 이미지 중앙 크롭으로 표시한다. 붉은 판·9장 반복을 제거하고 비율/3→2→1 외곽 감소·중앙 차폐·B 안내문 비중첩·A 원위치 복원·실제 저장 Stage03 Canvas·GPU를 확인했다. [구현·원문 프롬프트·이미지11절](JIGWI_SCREEN_PATTERNS.md)을 따른다.
+- 첫 검사 실패1건은 saved 프로필로 fixture를 바꾸며 기존 순수 수평 속도가 최대12.5로 제한돼 박 아래로 떨어진 검사 문제였다. 실제 LaunchVelocity의 합법 중간 flick으로 검사만 정정하고 최종53건을 다시 통과했다.
+- 기존7개 Scene·원본 config·A PNG/importer·기존 로컬 파일 해시 불변. 검사 부수 Resources4개를 원래 바이트로 복원했다. 패키지/ProjectSettings/기존 Scene 배치 변경0.
+- **미실행:** 실기기·실제 다중기기 LAN/핫스팟·네이티브 빌드/성능·사람의 조준/미술 평가·극단 DEV 전체 조합. 고정 위상 입력/물리 fixture와 실제 공동 플레이는 구분한다. 독립 Mac 게임 앱은 실행하지 않았다.
+
+
+## 2026-10-28 · #341 불장벽3단계 이미지·실제 물 Canvas 잔상·첨부 반복 소리
+
+- 표현만 추가하며249개·5676/Lab37/Game20을 유지했다. 강한 기존 PNG와 새2/1단계 PNG로 실제 texture를 교체하고 마지막점 중앙 차폐/Host gate를 유지했다. 기존3D WaterStream 뒤에 Canvas가 그려져 안 보이던 물 궤적은 실제 visited position만 Canvas 앞으로 투영했다. 사용자 제공13.5초 stereo WAV를 B 전용 단일2D loop에 연결했다.
+- 지귀 PlayMode **66/66(42.47초)**, 기존 오행 비행 트레일 PlayMode **9/9(3.21초)** 통과. 실패/Skipped/Inconclusive0.7개 어셈블리 컴파일 오류0. 이번 표현 보완에서 전체 EditMode/전체 PlayMode는 미재실행이다.
+- 단계별 main 격리 GPU 차이·소화/재점화/fallback, 실제 물 이력/소유자/예측 승인/종료fade/Pause/정리/불투명Canvas앞 경로·공머리 픽셀, 무음 효과음 source/재시작 방지/소화/Pause/재점화/종료를 확인했다. [원문 프롬프트·Inspector·캡처·범위12절](JIGWI_SCREEN_PATTERNS.md)을 따른다.
+-7개 Scene·원본config·기존A/강한B원화/importer·별도로컬파일 등19개 보호 해시 동일. 자동Resources4개 복원, 새PNG2/WAV는원본바이트동일. Unity 청취 볼륨 복원. Scene·Packages·ProjectSettings 변경0.
+- **미실행:** 실기기·실제 다중기기LAN/핫스팟·네이티브빌드/성능·사람의 미술/조준/청취·기기 루프 품질. 자동검사중 소리는음소거했다. 독립Mac앱 미실행.
+
 ## 2026-10-27 · #334 구미호 피버 타임
 
 - 기준 main `6022eb9f`(#333 병합), 기능 브랜치 `feat/#334-gumiho-fever-time`. 커밋은 DEV 값·접속 버전 → 규칙 → 두배 말풍선 → 문구·가장자리·빨간 시간 → 문서 순서로 나눴다.
@@ -3081,9 +3130,31 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - **main 병합(#332·#329·#335)**: 충돌 30여 파일 중 검사 고정값은 main 쪽을 받아 240/5674로 올렸다. `LabConfig` 칸·접근자·저장/적용은 main 뒤에 피버 2칸을 붙였고, 스태미나 충전은 지귀 피버 배율(`JigwiStageRecoveryMultiplier`)과 피버 타임 구간 배율을 함께 적용하도록 합쳤다(두 피버는 다른 스테이지). `LabConfig.asset`·Home·Lobby는 main 쪽을 받은 뒤 Editor API로 피버 기본값과 DEV 칸 2줄을 다시 넣었다(YAML 수동 병합 없음). Lab DEV는 지귀·피버 칸을 모두 숨긴다.
 
 
+
+## 2026-10-28 · #341 최신 main 통합
+
+- 기준: 지귀 A/B `ea77f3d7`와 main `085edcc1`(#353 포함)의 통합 작업. main의 구미호·야광귀 피버 및 #346/#349 스토리 자료/미리보기 코드를 보존한다. 오프닝을 앱 시작에 자동 연결하는 변경은 이 통합에 포함하지 않는다.
+- 설정 충돌 해결 기준은 main0~239 보존, 지귀 A/B240~250 추가로 총251개이며 접속 규약은5677 / Lab38 / Game21이다. 이전249개 지귀 브랜치와240개 main의 검증 결과를 이 통합의 통과 근거로 재사용하지 않는다.
+- Unity6000.6.5f1·macOS/Metal 전용 Editor에서 컴파일 오류0을 확인했다. 최종 전체 EditMode **1522/1522 통과(42.53초)**, 실패·Skipped·Inconclusive0. 최초 실행은1520/1522였으며 저장 Home/Lobby의 지귀228 제목 두 곳을 현행 라벨로 맞춘 뒤 Scene 검사9/9와 전체 재검사를 수행했다.
+- 전체 PlayMode는 **477개 중475통과·2실패(478.92초)**였다. 북 자동 이동 검사는 구간 끝의 자세가 시작 자세에 가까워지면 회전을 놓치는 조건이었으며 최대 회전각과 매 단계 회전축을 확인하도록 보완했다. 지귀 저장 Scene 검사는 `HoldAt`의 목표 시각과 Pause 시계 재구성 값의 미세한 차이로 `INVALID_TIME`이 발생해, `Tick`과 `PublishSnapshot`이 같은 Pause 시계 표본을 사용하도록 fixture만 수정했다. 런타임의 시간 역행 거부는 유지했다.
+- 보완 후 북 회전 **1/1(2.49초)**, 저장 Home→지귀 A/B 통합 **1/1(13.34초)** 재검사 통과. 지귀 fixture 보완 도중 지역변수 범위를 잘못 참조한 컴파일 오류1건도 수정하고 `scriptCompilationFailed=false`를 확인한 후 재실행했다. **보완 뒤 전체477개를 재실행한 결과로 표기하지 않는다.** 기존 피버·스토리·장벽/발화점·물 잔상·오디오·로비·전투 흐름의 나머지 결과는 위 전체 실행 범위에 해당한다.
+- 피버 시각은 Host의 판 시작 예약값인데 기존 `LabBoardReplica.CopySnapshot`에서 빠져 Client 표현이 꺼질 수 있었다. `feverTimeAt`를 보존하고 빠른 board 갱신이100초 경계를 지날 때 활성화·오래된 header가 새 시각을 되감지 않는 검사를 추가했다. 구미호/야광귀 피버와 지귀 개인/100초 이후 회복을 함께 보존하고, 투사체 몸체와 원소 꼬리의 반경 정책을 맞췄다.
+- 최신 main Home/Lobby에 Editor API로 DEV11행씩만 추가했다. 기존 객체3848개의 Transform·활성 상태 비교에서 차이0, Scene 직렬화 객체 삭제0. 기존 객체 변경은 DEV 배열/부모 행 목록과 지귀 제목 한 곳씩이다. Story24컷·26페이지와 관련 코드/그림/설정은 main과 바이트 동일이며 오프닝 진입 기능을 추가하지 않았다. 소스/문서 `git diff --check`를 통과했고 패키지·빌드/프로젝트 설정은 변경하지 않았다.
+- **미실행:** 이 통합본의 실제 다중 기기 LAN/핫스팟, iOS/독립 Mac 빌드, 사람의 조준·청취·화면 평가는 확인되지 않았다. 위 과거 실행 기록은 당시 버전·환경의 기록으로 그대로 보존한다.
+
+## 2026-10-28 · #354 앱 시작 팝업북 오프닝 연결
+
+- 기준 main `2c92566f`에서 `feat/#354-opening-start-flow`로 작업했다. Home에 독립 `GameOpening.prefab`·`GameOpeningController`를 연결해 앱 실행당 한 번24컷·26페이지를 시작하고 완료/스킵 후 기존 타이틀로 돌아오게 했다. PlayerPrefs·GameSession·네트워크·Lab 코드·빌드 Scene 목록은 변경하지 않았다.
+- Unity6000.6.5f1·macOS/Metal 전용 Editor에서 컴파일 오류0, 전체 EditMode **1527/1527 통과(38.86초)**. 저장 참조·원본 미리보기·Canvas/안전 영역·기존 설정/모델을 포함한다. 이후 잘못된 Home Canvas 연결에서도 메뉴를 함께 끄지 않도록 복구를 보완하고 아래 PlayMode를 실행했다.
+- 실제 저장 Home을 사용하는 새 오프닝 PlayMode **6/6(2.49초)**와, 새6개를 포함한 Hapio PlayMode **52/52(265.46초)** 통과. 실패·Skipped·Inconclusive0. 자동 진입·전체26페이지 완주·중복 종료/스킵·버튼 콜백 직접 호출 차단·Home 재진입·비활성화/참조 누락/잘못된 Canvas 복구를 확인했다. 기존 Home/로비/DEV·3스테이지 흐름·지귀 A/B·독립 StoryPlayer/타이틀 회귀를 포함한다. 전체 Lab PlayMode는 이번에 재실행하지 않았다.
+- Test Runner 밖의 실제 Editor Play에서도 Domain Reload OFF/Scene Reload ON으로2회, 원래 설정인 Domain·Scene Reload 모두 OFF로2회 연속 실행했다. 모두 첫 컷 자동 시작·스킵 후 타이틀을 확인했고 마지막 실행에서는 기존 방 목록 진입도 확인했다. 옵션은 원래 값으로 복원했다. 390×844 GameView의 첫 컷과 복귀 타이틀을 직접 캡처·시각 확인했다. 이 결과는 iPhone 실행 결과가 아니다.
+- 기존 `Hapio.Editor.GameBuild.Mac` 경로의 Development 앱 빌드를 완료했다. 생성된 독립 Mac 앱을 실행해 타이틀 입력 없이 첫 사찰 컷·대사·제어 버튼이 표시되는 것을 화면으로 확인한 뒤 검증 앱을 종료했다. 창 표시명 `C6_Physics_Lab`은 기존 Product Name이며 실제 빌드의 첫 Scene은 Hapio Home이다. 빌드 산출물과 원시 로그는 커밋하지 않는다.
+- Editor 연결 도구를2회 실행해2회차 Home 파일이 바이트 동일함을 확인했다. 기존 Home2037개 객체의 Transform·활성 상태 차이0, 직렬화 객체 삭제0·기존 변경은 Scene root 목록 한 곳뿐이다. 새 오프닝24개 객체와 Prefab을 추가했다. Home 의존성에24개 컷 데이터와24개 그림 Prefab이 모두 포함된다. 기존 컷·그림·대본·StoryPreview·다른 게임 Scene·Packages/ProjectSettings/Lab은 변경하지 않았다. 원래 Desktop 폴더의 미커밋 사용자 변경을 작업에 섞거나 덮어쓰지 않았다.
+- **미실행/제한:** iOS Xcode 내보내기·실기기 설치, 실제 다중 기기 LAN/핫스팟, iPhone/iPad 안전 영역·메모리/성능·백그라운드 동작, 실제 음성 청취/재생 중 중단. 오디오 정리는 현재 미할당 소스의 상태와 기존 Cancel 경로를 검사했으며,13번 컷 효과음은 여전히 미할당이다. 구현·편집 위치는 [앱 시작 오프닝](APP_START_OPENING.md)을 따른다.
+
 ## 2026-10-28 · #351 구미호 스테이지 효과음·BGM
 
-- 기준 main `3b50399f`, 기능 브랜치 `feat/#351-gumiho-stage-sound`. 팀이 고른 소리 6개(매혹 걸림·매혹 풀림·여우 구슬 떨어짐·여우 구슬 소멸·피버 곡·스테이지 BGM)를 넣고, 나머지 2개(체크·폭탄 열림)는 폴더만 정해 두었다(비어 있으면 소리 없음).
+- 기준 main `3b50399f`, 기능 브랜치 `feat/#351-gumiho-stage-sound`. 이후 최신 main `8c37c693`(#341 지귀 A/B·#353·#354)을 병합했다. 충돌은 이 문서 끝의 기록 순서뿐이었다. main의 `LabBoardReplica.CopySnapshot` `feverTimeAt` 보존(#341)과 이 작업의 Guest 스테이지 요괴 기록은 서로 다른 빈틈이라 둘 다 필요하다. 팀이 고른 소리 6개(매혹 걸림·매혹 풀림·여우 구슬 떨어짐·여우 구슬 소멸·피버 곡·스테이지 BGM)를 넣고, 나머지 2개(체크·폭탄 열림)는 폴더만 정해 두었다(비어 있으면 소리 없음).
 - **발견한 결함(수정)**: 스테이지 요괴(`gameStageYokai`)를 Host만 `PrepareGameStage`에서 알고 Guest는 늘 None이었다. 그래서 #343 야광귀 피버 곡·번쩍임·스태미나 물결(`YaguangFeverElapsed`)이 Guest 기기에서는 나오지 않았을 것이다. Guest가 Host의 게임 진행 상태를 받을 때(`GameSession.SetLocalState`) `LabNetwork.ObserveGameStage`로 같은 요괴를 기록하게 했다. 이 값을 쓰는 다른 곳(`JigwiManualControlsAllowed`, 시작 확인)은 Host 전용이라 Guest 동작은 바뀌지 않는다.
 - **BGM**: `LabBattleBgm`이 라운드 시작 때 구미호 스테이지면 `Audio/GumihoBGM`(162초, Streaming)을 튼다. 구미호 피버(`feverTimeAt`, Host 시각)에는 `Audio/GumihoFever`(20초)를 야광귀 피버와 같은 방식(교차 0.25초, "좋다" 추임새, 늦게 온 기기 건너뛰기)으로 튼다. 일시정지 동안에는 피버를 켜거나 끄지 않는다(멈춘 시계를 1초까지 어림하는 동안 흔들리지 않게).
 - **효과음**: 새 `LabGumihoSound`. 매혹 걸림은 SabotageCast가 예고 시작(3초 전)에 오므로 스냅샷의 `charmStartedAt`을 지나는 순간에 낸다(1초 넘게 늦게 본 매혹은 무음). 체크·풀림은 `LabCharmBubbles.OwnCheckShown`·`HelperCharmEnded`와 `LabCharmHud.CharmReleased`, 여우 구슬 소멸·폭탄 열림은 `LabOrbBoard.FoxFireCleared`·`BombOpening`, 여우 구슬 떨어짐은 대상 기기의 SabotageCast. 매혹 한 번에 한 번만 나도록 매혹 시작 시각으로 거른다(스냅샷은 끝난 매혹을 -1로 보내므로 마지막 매혹 시각을 따로 기억한다). 예전 `Resources/Sabotage/CharmHowl` 재생 코드는 지웠다.

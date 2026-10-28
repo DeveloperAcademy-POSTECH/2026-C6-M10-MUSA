@@ -63,6 +63,7 @@ namespace C6Lab
 
         private bool CanStartJigwiAt(ulong player, double now, out string reason)
         {
+            if (JigwiABEnabled) return Reject("STAGE_PATTERN_NOT_ALLOWED", out reason);
             if (phase != LabPhase.Playing) return Reject("BATTLE_NOT_PLAYING", out reason);
             if (StageYokai != LabStageYokai.None && StageYokai != LabStageYokai.Jigwi)
                 return Reject("STAGE_PATTERN_NOT_ALLOWED", out reason);
