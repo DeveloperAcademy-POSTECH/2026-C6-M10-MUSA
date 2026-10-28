@@ -317,6 +317,9 @@ namespace Hapio
         {
             GameFlowState previous = state;
             state = value.Copy();
+            // A Guest's network learns the stage's yokai here (#351); the Host's installed it when preparing the stage.
+            Identity(state, out _, out LabStageYokai yokai);
+            network.ObserveGameStage(yokai);
             OnStartStateChanged(previous);
             if (state.phase != GameFlowPhase.Home && state.phase != GameFlowPhase.Lobby)
                 network.LockGameRoster();
