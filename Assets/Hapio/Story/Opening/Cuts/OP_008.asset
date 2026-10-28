@@ -15,12 +15,16 @@ MonoBehaviour:
   cutId: OP_008
   viewPrefab: {fileID: 4721810889077305941, guid: e285dbe69fc304e5c9505a8120fd7e3d, type: 3}
   pages:
+  - speaker: "\uAE08\uC625\uC774"
+    dialogue: "\uADF8 \uC8FC\uBB38 \uC544\uC9C1 \uC548 \uBC30\uC6E0\uC796\uC544!\n\uBA4B\uB300\uB85C \uC4F0\uBA74 \uC548 \uB3FC!"
+    autoReadSeconds: 3.62
+    voice: {fileID: 0}
   - speaker: "\uBD88\uC774"
-    dialogue: "\uC73C\uC73C \uADC0\uCC2E\uC544... \uC598\uB4E4\uC544 \uADF8\uB0E5\n\uB3C4\uC220\uB85C \uD55C \uBC88\uC5D0 \uCE58\uC6CC\uBC84\uB9B4\uAE4C?"
-    autoReadSeconds: 5.05
+    dialogue: "\uC5D0\uC774, \uAD1C\uCC2E\uC544 \uAD1C\uCC2E\uC544~"
+    autoReadSeconds: 3
     voice: {fileID: 0}
   direction: 
-  speaker: "\uBD88\uC774"
-  dialogue: "\uC73C\uC73C \uADC0\uCC2E\uC544... \uC598\uB4E4\uC544 \uADF8\uB0E5\n\uB3C4\uC220\uB85C \uD55C \uBC88\uC5D0 \uCE58\uC6CC\uBC84\uB9B4\uAE4C?"
+  speaker: "\uAE08\uC625\uC774"
+  dialogue: "\uADF8 \uC8FC\uBB38 \uC544\uC9C1 \uC548 \uBC30\uC6E0\uC796\uC544!\n\uBA4B\uB300\uB85C \uC4F0\uBA74 \uC548 \uB3FC!"
   autoReadSeconds: 4
   voice: {fileID: 0}

@@ -51,9 +51,10 @@ namespace Hapio.Editor
                         view.hideEmptyDialogue = true;
                         // Reapplying the script must preserve layout edited in Unity.
                         if (!view.overrideDialogueLayout)
-                            view.dialogueRect = new Rect(84, 715, 270, 100);
+                            view.dialogueRect = new Rect(84, 720, 270, 100);
                         view.overrideDialogueLayout = true;
-                        float size = 20.696f;
+                        float size = frame.pages.Any(page => !string.IsNullOrEmpty(page.dialogue) &&
+                            page.dialogue.Count(character => character == '\n') >= 2) ? 18f : 20.696f;
                         foreach (var page in frame.pages)
                         {
                             if (string.IsNullOrEmpty(page.dialogue) || !page.dialogue.Contains("\n")) continue;

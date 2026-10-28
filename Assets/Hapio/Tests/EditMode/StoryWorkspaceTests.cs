@@ -21,7 +21,7 @@ namespace Hapio.Tests
                 var cut = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>($"Assets/Hapio/Story/Opening/Cuts/OP_{frame.number:000}.asset");
                 Assert.That(cut.PageCount, Is.EqualTo(frame.pages.Length));
                 Assert.That(cut.viewPrefab.centerSpeakerName, Is.True);
-                Assert.That(cut.viewPrefab.dialogueRect, Is.EqualTo(new Rect(84, 715, 270, 100)), $"Cut {frame.number} body alignment");
+                Assert.That(cut.viewPrefab.dialogueRect, Is.EqualTo(new Rect(84, 720, 270, 100)), $"Cut {frame.number} body alignment");
                 for (int i = 0; i < frame.pages.Length; i++)
                 {
                     Assert.That(cut.GetPage(i).speaker, Is.EqualTo(frame.pages[i].speaker));
@@ -36,7 +36,7 @@ namespace Hapio.Tests
                     Assert.That(cut.direction, Is.Not.Empty);
                 }
             }
-            Assert.That(pages, Is.EqualTo(25));
+            Assert.That(pages, Is.EqualTo(26));
             var seventeen = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>("Assets/Hapio/Story/Opening/Cuts/OP_017.asset");
             Assert.That(seventeen.GetPage(0).speaker, Is.EqualTo("불이"));
             Assert.That(seventeen.GetPage(1).speaker, Is.EqualTo("금옥이"));
@@ -92,7 +92,7 @@ namespace Hapio.Tests
             foreach (var layer in view.layers) Assert.That(layer.artwork.sprite, Is.Not.Null, layer.name);
             Assert.That(view.overrideDialogueLayout, Is.True);
             Assert.That(view.speakerBadge, Is.Not.Null);
-            Assert.That(view.dialogueRect, Is.EqualTo(new Rect(84, 715, 270, 100)));
+            Assert.That(view.dialogueRect, Is.EqualTo(new Rect(84, 720, 270, 100)));
             Assert.That(view.GetComponentsInChildren<UnityEngine.UI.Image>(true).Length, Is.EqualTo(17));
             Assert.That(view.transform.Find("Building Placement/Motion/Artwork").GetComponent<UnityEngine.UI.Image>().color.a,
                 Is.EqualTo(.9f).Within(.001f));
@@ -156,10 +156,10 @@ namespace Hapio.Tests
             Assert.That(three.GetPage(0).speaker, Is.EqualTo("사부님"));
             Assert.That(three.GetPage(0).dialogue, Is.EqualTo("특히 안쪽 선반에 있는 물건은\n절대로 건드리지 말거라."));
             Assert.That(three.viewPrefab.dialogueFontSize, Is.InRange(18f, 20.7f));
-            Assert.That(three.viewPrefab.dialogueRect, Is.EqualTo(new Rect(84, 715, 270, 100)));
+            Assert.That(three.viewPrefab.dialogueRect, Is.EqualTo(new Rect(84, 720, 270, 100)));
             var four = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>(root + "Cuts/OP_004.asset");
             Assert.That(four.GetPage(0).speaker, Is.EqualTo("불이"));
-            Assert.That(four.GetPage(0).dialogue, Is.EqualTo("어휴~ 걱정 마세요!\n청소쯤이야 금방 끝내죠!"));
+            Assert.That(four.GetPage(0).dialogue, Is.EqualTo("어휴~ 걱정 마세요!"));
             var five = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>(root + "Cuts/OP_005.asset");
             Assert.That(five.GetPage(0).dialogue, Is.EqualTo("그렇게 사부님들은\n구름을 타고 떠나셨다."));
             Assert.That(five.viewPrefab.layers.Length, Is.EqualTo(9));

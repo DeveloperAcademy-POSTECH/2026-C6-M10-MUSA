@@ -16,11 +16,11 @@ MonoBehaviour:
   viewPrefab: {fileID: 2882660673009261712, guid: 165eb7be622a64224995baf85c5a1f5f, type: 3}
   pages:
   - speaker: "\uBD88\uC774"
-    dialogue: "\uC5B4\uD734~ \uAC71\uC815 \uB9C8\uC138\uC694!\n\uCCAD\uC18C\uCBE4\uC774\uC57C \uAE08\uBC29 \uB05D\uB0B4\uC8E0!"
-    autoReadSeconds: 4.3
+    dialogue: "\uC5B4\uD734~ \uAC71\uC815 \uB9C8\uC138\uC694!"
+    autoReadSeconds: 3
     voice: {fileID: 0}
   direction: 
   speaker: "\uBD88\uC774"
-  dialogue: "\uC5B4\uD734~ \uAC71\uC815 \uB9C8\uC138\uC694!\n\uCCAD\uC18C\uCBE4\uC774\uC57C \uAE08\uBC29 \uB05D\uB0B4\uC8E0!"
+  dialogue: "\uC5B4\uD734~ \uAC71\uC815 \uB9C8\uC138\uC694!"
   autoReadSeconds: 4
   voice: {fileID: 0}

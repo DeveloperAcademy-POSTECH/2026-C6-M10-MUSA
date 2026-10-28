@@ -32,6 +32,7 @@ namespace Hapio.Editor
             public string nodeId, dialogue, speaker, badgeKey;
             public Box dialogueRect, speakerRect, badgeRect;
             public Item[] items;
+            public ArtText[] texts;
         }
         [Serializable] public class Item
         {
@@ -40,6 +41,54 @@ namespace Hapio.Editor
             public float width, height, rotation, alpha;
             public bool vector, cover, bottom, crop;
             public float wPercent = 1, hPercent = 1, leftPercent, topPercent;
+        }
+
+        [Serializable] public class ArtText
+        {
+            public string nodeId, name, text, parentNodeId, fontPath;
+            public Box rect;
+            public float width, height, rotation, fontSize, lineHeight;
+        }
+
+        private static void AddArtTexts(Transform root, Frame frame)
+        {
+            if (frame.texts == null) return;
+            foreach (var item in frame.texts)
+            {
+                var source = frame.items.Single(image => image.nodeId == item.parentNodeId);
+                var parent = root.Find(source.name + " [" + source.nodeId + "] Placement/Motion");
+                string name = item.name + " [" + item.nodeId + "]";
+                var old = parent.Find(name);
+                if (old != null) Object.DestroyImmediate(old.gameObject);
+                var bounds = item.rect.Rect;
+                var rect = StoryWorkspaceBuilder.Rect(name, parent, new Rect(
+                    bounds.center.x - source.rect.x - item.width * .5f,
+                    bounds.center.y - source.rect.y - item.height * .5f, item.width, item.height));
+                rect.pivot = Vector2.one * .5f;
+                rect.anchoredPosition += new Vector2(item.width * .5f, -item.height * .5f);
+                rect.localRotation = Quaternion.Euler(0, 0, item.rotation);
+                var textRect = StoryWorkspaceBuilder.Rect("Text", rect, new Rect(0, 0, item.width, item.height));
+                var text = textRect.gameObject.AddComponent<Text>();
+                text.font = AssetDatabase.LoadAssetAtPath<Font>(item.fontPath);
+                // Render tiny scroll lettering from a larger glyph atlas for clear strokes.
+                text.fontSize = Mathf.Max(32, Mathf.CeilToInt(item.fontSize));
+                float scale = item.fontSize / text.fontSize;
+                textRect.localScale = new Vector3(scale, scale, 1);
+                textRect.sizeDelta /= scale;
+                text.alignment = TextAnchor.MiddleLeft;
+                text.color = Color.black;
+                text.raycastTarget = false;
+                text.verticalOverflow = VerticalWrapMode.Overflow;
+                // Match Figma's explicit line height while retaining editable native text.
+                var generator = new TextGenerator();
+                generator.Populate("가\n가", text.GetGenerationSettings(new Vector2(1000, 1000)));
+                if (generator.lines.Count > 1)
+                {
+                    float advance = generator.lines[0].topY - generator.lines[1].topY;
+                    if (advance > 0) text.lineSpacing = item.lineHeight / (scale * advance);
+                }
+                text.text = item.text;
+            }
         }
 
         [MenuItem("Hapio/Story/Import Prepared Figma Cuts 6-24")]
@@ -131,6 +180,7 @@ namespace Hapio.Editor
                         layer.artwork = AddImage(layer.transform, item, item.rect.Rect.position);
                     }
                 }
+                AddArtTexts(root.transform, frame);
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
@@ -186,6 +236,7 @@ namespace Hapio.Editor
                 if (frame.badgeRect != null) view.speakerBadgeRect = frame.badgeRect.Rect;
                 view.speakerBadge = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Hapio/Art/Story/Opening/OP_002/SpeakerBadge.png");
                 view.speakerColor = Color.white;
+                AddArtTexts(root.transform, frame);
                 PrefabUtility.SaveAsPrefabAsset(root, viewPath);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }

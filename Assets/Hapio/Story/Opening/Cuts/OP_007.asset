@@ -15,12 +15,12 @@ MonoBehaviour:
   cutId: OP_007
   viewPrefab: {fileID: 6251231625917240425, guid: 19a4ab86a67a54808903b51e2e25b611, type: 3}
   pages:
-  - speaker: "\uB9CC\uBCF5\uC774"
-    dialogue: "\uCE58\uC6CC\uB3C4 \uCE58\uC6CC\uB3C4 \uB05D\uC774 \uC5C6\uC796\uC544\u2026\n\uBC8C\uC368 \uBC30\uACE0\uD508\uB370\u2026"
-    autoReadSeconds: 4.15
+  - speaker: "\uBD88\uC774"
+    dialogue: "\uC73C\uC73C \uADC0\uCC2E\uC544... \uC598\uB4E4\uC544 \uADF8\uB0E5\n\uB3C4\uC220\uB85C \uD55C \uBC88\uC5D0 \uCE58\uC6CC\uBC84\uB9B4\uAE4C?"
+    autoReadSeconds: 4
     voice: {fileID: 0}
   direction: 
-  speaker: "\uB9CC\uBCF5\uC774"
-  dialogue: "\uCE58\uC6CC\uB3C4 \uCE58\uC6CC\uB3C4 \uB05D\uC774 \uC5C6\uC796\uC544\u2026\n\uBC8C\uC368 \uBC30\uACE0\uD508\uB370\u2026"
+  speaker: "\uBD88\uC774"
+  dialogue: "\uC73C\uC73C \uADC0\uCC2E\uC544... \uC598\uB4E4\uC544 \uADF8\uB0E5\n\uB3C4\uC220\uB85C \uD55C \uBC88\uC5D0 \uCE58\uC6CC\uBC84\uB9B4\uAE4C?"
   autoReadSeconds: 4
   voice: {fileID: 0}
