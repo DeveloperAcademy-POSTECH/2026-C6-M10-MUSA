@@ -45,17 +45,17 @@ namespace C6Lab.Tests
         [Test]
         public void FeverTimeAppendsTwoDevRowsInItsOwnGroup()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(240));
-            Assert.That(LabConfig.DeveloperFields.Skip(238).Select(field => field.Label), Is.EqualTo(new[]
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(251));
+            Assert.That(LabConfig.DeveloperFields.Skip(238).Take(2).Select(field => field.Label), Is.EqualTo(new[]
             {
                 "피버 타임 시작 (남은 초, 0 = 끔)", "피버 타임 충전 배율"
             }));
-            Assert.That(LabConfig.DeveloperFields.Skip(238).Select(field => field.Min), Is.EqualTo(new[] { 0f, 1f }));
-            Assert.That(LabConfig.DeveloperFields.Skip(238).Select(field => field.Max), Is.EqualTo(new[] { 60f, 5f }));
+            Assert.That(LabConfig.DeveloperFields.Skip(238).Take(2).Select(field => field.Min), Is.EqualTo(new[] { 0f, 1f }));
+            Assert.That(LabConfig.DeveloperFields.Skip(238).Take(2).Select(field => field.Max), Is.EqualTo(new[] { 60f, 5f }));
             Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "피버 타임 (Hapio 구미호 전용)").FieldIndices,
                 Is.EqualTo(new[] { 238, 239 }));
             LabConfig saved = Resources.Load<LabConfig>("LabConfig");
-            Assert.That(saved.CaptureDeveloperValues().Skip(238), Is.EqualTo(new[] { 20f, 2f }), "Saved: the last 20 s, twice the refill.");
+            Assert.That(saved.CaptureDeveloperValues().Skip(238).Take(2), Is.EqualTo(new[] { 20f, 2f }), "Saved: the last 20 s, twice the refill.");
             float[] values = config.CaptureDeveloperValues();
             values[238] = 25f; values[239] = 3f;
             Apply(values);
@@ -75,6 +75,37 @@ namespace C6Lab.Tests
             Assert.That(model.Snapshot(99.9d).FeverTimeOn(99.9d), Is.False);
             Assert.That(model.FeverTimeOn(100d), Is.True);
             Assert.That(model.Snapshot(100d).FeverTimeOn(100d), Is.True, "Every screen reads the same start time.");
+        }
+
+        [TestCase(99d, false)]
+        [TestCase(100.5d, true)]
+        public void SnapshotCopyAndFastBoardOverlayKeepTheFoxsPerRoundFeverReservation(double headerAt, bool feverOn)
+        {
+            LabModel model = Room();
+            LabSnapshot waitingPaint = model.Snapshot(99d);
+            LabSnapshot copy = LabBoardReplica.CopySnapshot(waitingPaint);
+            Assert.That(copy.feverTimeAt, Is.EqualTo(100d), "Copying cannot turn the scheduled fever into the disabled sentinel.");
+            Assert.That(copy.FeverTimeOn(99d), Is.False);
+            Assert.That(copy.FeverTimeOn(100d), Is.True);
+
+            LabSnapshot current = model.Snapshot(headerAt);
+            var frame = new LabBoardPublisher().Build(current, Players[0], 1, 1);
+            var replica = new LabBoardReplica();
+            replica.SetActive(waitingPaint.sessionId, waitingPaint.round, Players[0]);
+            Assert.That(replica.TryApply(frame, out string reason), Is.True, reason);
+            LabSnapshot overlaid = replica.Overlay(waitingPaint);
+            Assert.That(overlaid.serverTime, Is.EqualTo(headerAt));
+            Assert.That(overlaid.feverTimeAt, Is.EqualTo(100d));
+            Assert.That(overlaid.FeverTimeOn(overlaid.serverTime), Is.EqualTo(feverOn),
+                "A fast board clock must activate the reservation already present in the matched paint snapshot.");
+            Assert.That(waitingPaint.serverTime, Is.EqualTo(99d));
+            Assert.That(waitingPaint.feverTimeAt, Is.EqualTo(100d));
+
+            LabSnapshot newerPaint = model.Snapshot(101d);
+            LabSnapshot withOlderHeader = replica.Overlay(newerPaint);
+            Assert.That(withOlderHeader.serverTime, Is.EqualTo(101d), "An older header cannot rewind the matched snapshot.");
+            Assert.That(withOlderHeader.feverTimeAt, Is.EqualTo(100d));
+            Assert.That(withOlderHeader.FeverTimeOn(101d), Is.True);
         }
 
         [TestCase(LabStageYokai.None)]

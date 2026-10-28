@@ -74,6 +74,7 @@ namespace C6Lab
             /// <summary>A bomb blast shrank this orb for the rest of its life (#213).</summary>
             public bool Small;
             public float JigwiScale = 1f;
+            public float JigwiABScale = 1f;
             /// <summary>
             /// A bomb the player swiped or dragged on (#237): it slides until it stops, and passes at a side
             /// edge however slowly. Once it stops it drifts by itself again and this is cleared.
@@ -306,7 +307,7 @@ namespace C6Lab
             BuildHorizontalWalls();
             foreach (var entry in entries.Values)
             {
-                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind, entry.Small, entry.JigwiScale), entry.View.Element);
+                entry.View.Configure(entry.View.OrbId, entry.View.Kind, RadiusFor(entry.View.Kind, entry.Small, entry.JigwiScale, entry.JigwiABScale), entry.View.Element);
                 entry.View.ConfigureAppearance(config.OrbAppearance);
                 SetLayerRecursively(entry.View.transform, gameObject.layer);
                 entry.View.HitSphere.sharedMaterial = contactMaterial;
@@ -412,12 +413,15 @@ namespace C6Lab
             bool playSpawn = false, LabOrbElement element = LabOrbElement.None, int lockSwipes = 0,
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
             LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false,
-            float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f, bool fever = false, bool fiveColor = false)
+            float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f, bool fever = false, bool fiveColor = false,
+            float jigwiABScale = 1f, float jigwiABBurnSeconds = 0f, bool jigwiABHeld = false)
         {
             RequireConfigured();
             small &= !kind.IsDrum();
             jigwiScale = kind.IsRaw() && !float.IsNaN(jigwiScale) && !float.IsInfinity(jigwiScale)
                 ? Mathf.Clamp(jigwiScale, .1f, 1f) : 1f;
+            jigwiABScale = (kind.IsRaw() || kind == LabOrbKind.Combined) && Finite(jigwiABScale)
+                ? Mathf.Clamp(jigwiABScale, .2f, 1f) : 1f;
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
                 throw new ArgumentException("A finite orb identity, position and velocity are required.");
             if (entries.TryGetValue(id, out var existing))
@@ -429,14 +433,16 @@ namespace C6Lab
                 existing.LocalOwner = localOwner;
                 existing.View.FuseTotalSeconds = config.ItemLifetimeSeconds;
                 if (existing.View.Kind != kind || existing.View.Element != element || existing.Small != small
-                    || !Mathf.Approximately(existing.JigwiScale, jigwiScale))
+                    || !Mathf.Approximately(existing.JigwiScale, jigwiScale)
+                    || !Mathf.Approximately(existing.JigwiABScale, jigwiABScale))
                 {
                     bool shrinking = small && !existing.Small && existing.View.Kind == kind;
                     // 2:2 fever (#281): a Yin or Yang the Host turned into a team orb swells and settles as it changes.
                     bool feverTurned = existing.View.Kind.IsRaw() && kind == LabOrbKind.Combined;
                     existing.Small = small;
                     existing.JigwiScale = jigwiScale;
-                    existing.View.Configure(id, kind, RadiusFor(kind, small, jigwiScale), element);
+                    existing.JigwiABScale = jigwiABScale;
+                    existing.View.Configure(id, kind, RadiusFor(kind, small, jigwiScale, jigwiABScale), element);
                     if (shrinking) existing.View.PlayShrink(1f / config.BlastShrinkScale, ShrinkSeconds);
                     else if (feverTurned) existing.View.PlayShrink(FeverTurnScale, FeverTurnSeconds);
                     existing.View.Body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
@@ -447,6 +453,7 @@ namespace C6Lab
                     existing.View.SetItemState(lockSwipes, relayStage, fuseSeconds);
                 if (justUnlocked && unlockEffectIds.Add(id)) existing.View.PlayUnlockEffect();
                 existing.View.SetBurn(burnSeconds);
+                existing.View.SetJigwiABBurn(jigwiABBurnSeconds, jigwiABHeld);
                 existing.View.SetLife(lifeSeconds);
                 existing.View.SetFever(fever);
                 existing.View.SetFiveColor(fiveColor);
@@ -455,21 +462,22 @@ namespace C6Lab
                 return existing.View;
             }
 
-            Vector2 start = ToWorld(normalizedPosition, RadiusFor(kind, small, jigwiScale));
+            Vector2 start = ToWorld(normalizedPosition, RadiusFor(kind, small, jigwiScale, jigwiABScale));
             Vector2 popFrom = start;
             if (playSpawn) start = OutsideDrums(start, velocityInBoardWidthsPerSecond, out popFrom);
-            start = Clamp(start, RadiusFor(kind, small, jigwiScale));
+            start = Clamp(start, RadiusFor(kind, small, jigwiScale, jigwiABScale));
             var gameObject = new GameObject("Orb " + id);
             gameObject.layer = this.gameObject.layer;
             gameObject.transform.SetParent(transform, false);
             gameObject.transform.position = OnPlane(start);
             var view = gameObject.AddComponent<LabOrbView>();
-            view.Configure(id, kind, RadiusFor(kind, small, jigwiScale), element);
+            view.Configure(id, kind, RadiusFor(kind, small, jigwiScale, jigwiABScale), element);
             view.ConfigureAppearance(config.OrbAppearance);
             view.FuseTotalSeconds = config.ItemLifetimeSeconds;
             view.SetItemState(lockSwipes, relayStage, fuseSeconds);
             if (justUnlocked && unlockEffectIds.Add(id)) view.PlayUnlockEffect();
             view.SetBurn(burnSeconds);
+            view.SetJigwiABBurn(jigwiABBurnSeconds, jigwiABHeld);
             view.SetLife(lifeSeconds);
             view.SetFever(fever);
             view.SetFiveColor(fiveColor);
@@ -488,7 +496,7 @@ namespace C6Lab
             body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
             body.position = OnPlane(start);
             var entry = new Entry { View = view, LocalOwner = localOwner, DriftSeed = DriftSeedFor(id),
-                Dropping = expectedDrops.Remove(id), Small = small, JigwiScale = jigwiScale };
+                Dropping = expectedDrops.Remove(id), Small = small, JigwiScale = jigwiScale, JigwiABScale = jigwiABScale };
             entries.Add(id, entry);
             if (kind == LabOrbKind.FoxFire)
             {
@@ -959,7 +967,8 @@ namespace C6Lab
             HidePending(first);
             HidePending(second);
             LabOrbView view = UpsertOrb(temporaryId, LabOrbKind.Combined, center01, velocity,
-                element: LabOrbElement.None, small: first.Small || second.Small);
+                element: LabOrbElement.None, small: first.Small || second.Small,
+                jigwiABScale: Mathf.Min(first.JigwiABScale, second.JigwiABScale));
             entries[temporaryId].Provisional = true;
             combinePreviews.Add(temporaryId, preview);
             return view != null;
@@ -990,7 +999,10 @@ namespace C6Lab
             entries[approved.id] = entry;
             entry.Provisional = false;
             entry.Small = approved.small;
-            entry.View.Configure(approved.id, approved.kind, RadiusFor(approved.kind, approved.small), approved.element);
+            entry.JigwiScale = approved.jigwiRadiusScale;
+            entry.JigwiABScale = approved.jigwiABRadiusScale;
+            entry.View.Configure(approved.id, approved.kind,
+                RadiusFor(approved.kind, approved.small, approved.jigwiRadiusScale, approved.jigwiABRadiusScale), approved.element);
             entry.View.SetItemState(approved.lockSwipes, approved.relayStage, -1f);
             SetLayerRecursively(entry.View.transform, gameObject.layer);
             entry.View.gameObject.name = "Orb " + approved.id;
@@ -2067,9 +2079,18 @@ namespace C6Lab
 
         /// <summary>How long a blast-shrunk orb's art takes to squeeze down to its new size (#213).</summary>
         private const float ShrinkSeconds = .3f;
-        private float RadiusFor(LabOrbKind kind, bool small = false, float jigwiScale = 1f) =>
-            kind.IsDrum() ? config.DrumRadius : config.OrbRadius * (small ? config.BlastShrinkScale : 1f)
-                * (kind.IsRaw() ? jigwiScale : 1f);
+        private float RadiusFor(LabOrbKind kind, bool small = false, float jigwiScale = 1f, float jigwiABScale = 1f)
+        {
+            if (kind.IsDrum()) return config.DrumRadius;
+            float existing = (small ? config.BlastShrinkScale : 1f) * (kind.IsRaw() ? jigwiScale : 1f);
+            float size = jigwiABScale < 1f && (kind.IsRaw() || kind == LabOrbKind.Combined)
+                ? Mathf.Min(existing, jigwiABScale) : existing;
+            return config.OrbRadius * size;
+        }
+
+        /// <summary>Owner-local prediction captures B size without changing the projectile's paint share.</summary>
+        public float JigwiABRadiusScaleFor(string id) => id != null && entries.TryGetValue(id, out Entry entry)
+            ? entry.JigwiABScale : 1f;
         private static Vector2 XY(Vector3 value) => new Vector2(value.x, value.y);
         private static Vector3 OnPlane(Vector2 value) => new Vector3(value.x, value.y, 0f);
         private static void StopMotion(Rigidbody body)

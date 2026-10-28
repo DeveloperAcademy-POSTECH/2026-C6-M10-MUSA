@@ -45,6 +45,17 @@ MonoBehaviour:
   jigwiStageSpreadSeconds: 1
   jigwiStageSpreadPatches: 3
   jigwiStageFeverMultiplier: 2
+  jigwiABPersonalDurationSeconds: 10
+  jigwiABPersonalRecoveryMultiplier: 4
+  jigwiABPersonalRequiredHits: 3
+  jigwiABPersonalBurnSeconds: 5
+  jigwiABGroupFireCount: 3
+  jigwiABRelightSeconds: 12
+  jigwiABShrinkDelaySeconds: 12
+  jigwiABShrinkScale: 0.65
+  jigwiABFireMoveAmount: 0.03
+  jigwiABFireMovePeriodSeconds: 4
+  jigwiABFireTargetRadius: 0.3
   itemLifetimeSeconds: 15
   itemUnlockSwipesMin: 2
   itemUnlockSwipesMax: 4

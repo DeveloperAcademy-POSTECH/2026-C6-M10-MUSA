@@ -116,6 +116,11 @@ namespace C6Lab
         public double expiresAt = -1d;
         public bool jigwiSupply;
         public bool jigwiGenerationBurn;
+        // A's deadline is independent of the ordinary lifetime and can be cleared without restoring an expired orb.
+        public string jigwiABBurnEventId;
+        public double jigwiABBurnAt = -1d;
+        // B changes physical/visual radius only; it never changes paint share or the bomb small flag.
+        public float jigwiABRadiusScale = 1f;
         /// <summary>2:2 fever (#281): made during a team fever or turned by one; every board rings it with a rainbow.</summary>
         public bool fever;
         /// <summary>
@@ -270,6 +275,7 @@ namespace C6Lab
         public LabPlayerState[] players = Array.Empty<LabPlayerState>();
         public LabJigwiState[] jigwi = Array.Empty<LabJigwiState>();
         public LabJigwiStageSnapshot jigwiStage = new LabJigwiStageSnapshot();
+        public LabJigwiABSnapshot jigwiAB = new LabJigwiABSnapshot();
         public LabJigwiState JigwiFor(ulong player)
         {
             foreach (var state in jigwi ?? Array.Empty<LabJigwiState>())

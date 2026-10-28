@@ -740,7 +740,7 @@ namespace C6Lab.Tests
             int crossings = 0;
             board.EdgeCrossed += crossing => crossings++;
             Vector2 last = BoardPoint(drum);
-            float path = 0f, topSpeed = 0f;
+            float path = 0f, topSpeed = 0f, maximumTurn = 0f;
             // A bounce off a side edge may leave the centre a physics step past the limit.
             var board01 = new Rect(Bounds.xMin - .2f, Bounds.yMin - .2f, Bounds.width + .4f, Bounds.height + .4f);
             for (int step = 0; step < 125; step++) // about 2.5 seconds of physics
@@ -750,13 +750,16 @@ namespace C6Lab.Tests
                 path += Vector2.Distance(now, last);
                 last = now;
                 topSpeed = Mathf.Max(topSpeed, drum.Body.linearVelocity.magnitude);
+                maximumTurn = Mathf.Max(maximumTurn, Quaternion.Angle(drum.Visual.localRotation, Quaternion.identity));
                 Assert.That(board01.Contains(now), Is.True, "It stays on its own board.");
+                Assert.That(Vector3.Angle(drum.Visual.forward, Vector3.forward), Is.LessThan(.01f),
+                    "It turns about the view axis and never rolls over.");
             }
             Assert.That(path, Is.GreaterThan(.5f), "Left alone, the drum moves on its own.");
             Assert.That(topSpeed, Is.LessThanOrEqualTo(config.DrumDriftSpeed * Width * 1.06f), "It drifts gently.");
             Assert.That(crossings, Is.Zero, "It never wanders onto a neighbour's screen by itself.");
-            Assert.That(Quaternion.Angle(drum.Visual.localRotation, Quaternion.identity), Is.GreaterThan(1f),
-                "Its art turns as the drift path curves.");
+            Assert.That(maximumTurn, Is.GreaterThan(1f),
+                "Its art turns during the drift, even if it later returns near its starting angle.");
             Assert.That(Vector3.Angle(drum.Visual.forward, Vector3.forward), Is.LessThan(.01f),
                 "It turns about the view axis and never rolls over.");
         }

@@ -17,6 +17,9 @@ namespace C6Lab.Tests
             var values = config.CaptureDeveloperValues(); values[207] = values[208] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out var error), Is.True, error);
             room = new LabModel(); room.Begin("jigwi-blast-lineage", new ulong[] { 10, 20 }, 0d, config, LabStageYokai.Jigwi);
+            // Add the 90-second fixture orbs only after that time is reached; otherwise
+            // the new A at 11 seconds correctly burns these prematurely inserted objects.
+            room.Tick(90d);
             orbs = (Dictionary<string, LabOrbState>)typeof(LabModel).GetField("orbs", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(room);
         }
         [TearDown] public void TearDown() { Object.DestroyImmediate(config); }

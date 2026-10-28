@@ -81,6 +81,11 @@ namespace C6Lab
                 ClearJigwiFireSurfaces();
                 return;
             }
+            if (latest.jigwiAB?.enabled == true)
+            {
+                SyncJigwiABFireSurfaces();
+                return;
+            }
             var active = new HashSet<string>(StringComparer.Ordinal);
             foreach (LabJigwiState fire in latest.jigwi ?? Array.Empty<LabJigwiState>())
             {

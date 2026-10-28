@@ -25,6 +25,7 @@ namespace C6Lab
         private GameObject contactShadow;
         private LabOrbItemMarker itemMarker;
         private LabOrbBurn burn;
+        private LabJigwiOrbFlame jigwiABFlame;
         private LabOrbRainbow rainbow;
         private SpriteRenderer expiryFlash;
         private SpriteRenderer expiryHalo;
@@ -84,6 +85,8 @@ namespace C6Lab
         /// <summary>The yellow fire of an orb a bomb blast flung (#213); null until it first burns.</summary>
         public LabOrbBurn Burn => burn;
         public bool Burning => burn != null && burn.Burning;
+        /// <summary>A-only fire. Independent from the existing bomb blast flame and its deadline.</summary>
+        public LabJigwiOrbFlame JigwiABFlame => jigwiABFlame;
         /// <summary>Seconds this screen counts down to the end of the orb's lifetime (#235); negative when not shown.</summary>
         public float LifeSecondsLeft => lifeLeft;
         /// <summary>In its last seconds, flashing white before it goes.</summary>
@@ -271,6 +274,7 @@ namespace C6Lab
 
             if (Body == null) Body = GetComponent<Rigidbody>();
             if (HitSphere == null) HitSphere = GetComponent<SphereCollider>();
+            if (orbId != id && jigwiABFlame != null) jigwiABFlame.Clear();
             orbId = id;
             kind = orbKind;
             element = orbKind == LabOrbKind.Combined ? orbElement : LabOrbElement.None;
@@ -280,6 +284,7 @@ namespace C6Lab
             EnsureVisual();
             UpdateVisual();
             if (burn != null) burn.SetRadius(radius);
+            if (jigwiABFlame != null) jigwiABFlame.SetRadius(radius);
         }
 
         /// <summary>
@@ -438,6 +443,18 @@ namespace C6Lab
                 burn = LabOrbBurn.Create(transform);
             }
             burn.Burn(secondsLeft, visualRadius, ExpiryLook);
+        }
+
+        /// <summary>Host-approved A deadline feedback only; held means the battle clock is paused/counting down.</summary>
+        public void SetJigwiABBurn(float secondsLeft, bool held = false)
+        {
+            if (!kind.IsRaw() && kind != LabOrbKind.Combined) secondsLeft = 0f;
+            if (jigwiABFlame == null)
+            {
+                if (!(secondsLeft > 0f)) return;
+                jigwiABFlame = LabJigwiOrbFlame.Create(transform);
+            }
+            jigwiABFlame.Show(secondsLeft, visualRadius, held);
         }
 
         /// <summary>
@@ -686,6 +703,7 @@ namespace C6Lab
 
         private void OnDisable()
         {
+            if (jigwiABFlame != null) jigwiABFlame.Clear();
             CompleteSpawn();
             CompleteDrop();
             if (shrinkRoutine != null)

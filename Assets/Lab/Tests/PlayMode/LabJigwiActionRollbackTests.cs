@@ -78,7 +78,12 @@ namespace C6Lab.Tests
             values[205] = 0f; // no common gimmicks (#311)
             values[178] = 1f; values[179] = 1f; values[180] = 4f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
-            double began = Time.realtimeSinceStartupAsDouble - 2d;
+            // Use an explicit positive Host-clock epoch. A filtered run can start before
+            // realtime reaches two seconds; subtracting two produced an invalid negative Begin.
+            const double began = 100d;
+            var clock = (LabBattleClock)typeof(LabNetwork).GetField("battleClock", Private).GetValue(network);
+            typeof(LabBattleClock).GetField("pausedDuration", Private).SetValue(clock,
+                Time.realtimeSinceStartupAsDouble - (began + 2d));
             var model = new LabModel();
             model.BeginSolo("jigwi", network.LocalPlayerId, began, config);
             LabOrbState yin = null, yang = null;

@@ -20,6 +20,7 @@ namespace C6Lab
         private double lastServerTime = -1d;
         private float receivedAt;
         private bool wired;
+        private LabJigwiScreenPresentation screenPresentation;
         private float blockedUntilRealtime = -1f;
 
         public void Bind(LabNetwork source, Canvas targetCanvas)
@@ -28,6 +29,7 @@ namespace C6Lab
             canvas = targetCanvas != null ? targetCanvas.rootCanvas : null;
             EnsureWidgets();
             Wire();
+            EnsureScreenPresentation();
         }
 
         private void Start()
@@ -36,6 +38,15 @@ namespace C6Lab
             if (canvas == null) canvas = GetComponentInParent<Canvas>();
             EnsureWidgets();
             Wire();
+            EnsureScreenPresentation();
+        }
+
+        private void EnsureScreenPresentation()
+        {
+            if (!Application.isPlaying || canvas == null || network == null) return;
+            LabHud battleHud = canvas.GetComponentInChildren<LabHud>(true);
+            Camera camera = network.BattleCamera != null ? network.BattleCamera : battleHud != null ? battleHud.battleCamera : null;
+            screenPresentation = LabJigwiScreenPresentation.EnsureFor(network, canvas, camera);
         }
 
         /// <summary>Editor creation and a missing-reference fallback share the same small hierarchy.</summary>
@@ -122,7 +133,7 @@ namespace C6Lab
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool playing = snapshot != null && snapshot.phase == LabPhase.Playing;
-            bool canTest = playing && snapshot.jigwiStage?.enabled != true
+            bool canTest = playing && snapshot.jigwiStage?.enabled != true && snapshot.jigwiAB?.enabled != true
                 && network.DeveloperBuildAvailable && network.IsHost && network.JigwiManualControlsAllowed;
             if (testToggle != null) testToggle.gameObject.SetActive(canTest);
             if (!canTest && testPanel != null && testPanel.activeSelf) SetPanel(false);
@@ -150,6 +161,14 @@ namespace C6Lab
             if (snapshot.serverTime != lastServerTime)
             { lastServerTime = snapshot.serverTime; receivedAt = Time.unscaledTime; }
             double now = snapshot.serverTime + (snapshot.paused ? 0d : Time.unscaledTime - receivedAt);
+            if (snapshot.jigwiAB?.enabled == true)
+            {
+                if (screenPresentation == null || screenPresentation.source != network) EnsureScreenPresentation();
+                if (stageNotice != null) stageNotice.gameObject.SetActive(false);
+                if (heat != null) heat.gameObject.SetActive(false);
+                if (effectText != null) effectText.gameObject.SetActive(false);
+                return;
+            }
             if (snapshot.jigwiStage?.enabled == true)
             {
                 ApplyStageSnapshot(snapshot, network.LocalPlayerId, now);
@@ -277,6 +296,7 @@ namespace C6Lab
         private void OnDisable()
         {
             if (stageNotice != null) stageNotice.gameObject.SetActive(false);
+            if (screenPresentation != null) screenPresentation.Hide();
             if (network != null && network.board != null) network.board.SetUiInputBlocked(false);
         }
         private void OnDestroy() { if (network != null && network.board != null) network.board.SetUiInputBlocked(false); }
