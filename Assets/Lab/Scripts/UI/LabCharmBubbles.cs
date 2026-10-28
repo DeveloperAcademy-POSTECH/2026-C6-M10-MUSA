@@ -139,6 +139,16 @@ namespace C6Lab
         public string GuideShown => guide != null ? guide.Shown : string.Empty;
         /// <summary>Wake-up taps this screen sent.</summary>
         public int TapsSent { get; private set; }
+        /// <summary>
+        /// This screen finished its own share of taps and the check popped (#351): once per charm, though a two-player
+        /// room shows the check on both badges and a pause draws it again.
+        /// </summary>
+        public event Action OwnCheckShown;
+        /// <summary>A charm this screen was helping with ended mid-battle (#351): woken, run out, or fever time. Once per charm.</summary>
+        public event Action HelperCharmEnded;
+        // The charms already announced to OwnCheckShown and HelperCharmEnded, each by its start time, and the start of
+        // the latest charm (a snapshot says -1 once a charm is over, so the one that just ended is still known).
+        private double checkCharm = double.NaN, endedCharm = double.NaN, lastCharm = double.NaN;
 
         /// <summary>스냅샷을 읽을 네트워크, 말풍선을 그릴 Canvas, 내 화면의 왼쪽·오른쪽 이웃 이름표를 연결한다.</summary>
         public void Bind(LabNetwork target, Canvas uiCanvas, GameObject leftBadge, GameObject rightBadge)
@@ -178,6 +188,7 @@ namespace C6Lab
                 localTapsCharmAt = snapshot.charmStartedAt;
                 localTaps = 0;
             }
+            if (snapshot.charmStartedAt >= 0d) lastCharm = snapshot.charmStartedAt;
             CharmedSides(snapshot, localId, now, out bool onLeft, out bool onRight, out bool ownView,
                 out ulong leftHelper, out ulong rightHelper);
             bobPhase = Mathf.Repeat(bobPhase + Time.deltaTime * BobHz, 1f);
@@ -264,6 +275,11 @@ namespace C6Lab
                 side.WokenEnd = !side.OwnView && side.Player == wokenPlayer && Time.time - wokenAt <= WokenWindowSeconds;
                 side.CheckAge = -1f;
                 side.Check.gameObject.SetActive(false);
+                if (!side.OwnView && !endedCharm.Equals(lastCharm))
+                {
+                    endedCharm = lastCharm;
+                    HelperCharmEnded?.Invoke();
+                }
             }
             bool tappable = rescueTaps > 0 && !side.OwnView;
             bool badge = side.Badge != null && side.Badge.gameObject.activeInHierarchy && side.BubbleImage.sprite != null;
@@ -380,7 +396,15 @@ namespace C6Lab
                 if (side.Check != null) side.Check.gameObject.SetActive(false);
                 return;
             }
-            if (side.CheckAge < 0f) side.CheckAge = 0f;
+            if (side.CheckAge < 0f)
+            {
+                side.CheckAge = 0f;
+                if (!side.OwnView && !checkCharm.Equals(lastCharm))
+                {
+                    checkCharm = lastCharm;
+                    OwnCheckShown?.Invoke();
+                }
+            }
             else side.CheckAge += Time.deltaTime;
             side.Check.gameObject.SetActive(true);
             float size = bubbleSize * CheckScale, half = size * .5f;

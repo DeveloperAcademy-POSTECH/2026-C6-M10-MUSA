@@ -6,14 +6,13 @@ namespace C6Lab
     /// <summary>
     /// 매혹 (#251): 구미호에게 홀린 사람 자신의 화면. 남은 시간을 북 미니맵 바로 위의 세로 게이지(임시)로 보여 주고,
     /// 풀리면 "정신 차림!"을 잠깐 띄운다. 매혹 예고 (#305): 걸리기 전 예고 동안에는 모든 화면의 같은 자리에
-    /// "구미호가 P2에게 매혹을 걸려고 한다!"(걸릴 사람 자신에게는 "나에게")를 띄운다. 매혹 울음소리가 Resources/Sabotage/CharmHowl에 있으면 매혹이 걸릴 때 모든
-    /// 기기에서 한 번 낸다. 화면 표시만 하며 터치를 막지 않는다.
+    /// "구미호가 P2에게 매혹을 걸려고 한다!"(걸릴 사람 자신에게는 "나에게")를 띄운다. 화면 표시만 하며 터치를 막지 않는다.
+    /// 소리 (#351): 매혹이 걸리고 풀리는 소리는 LabGumihoSound가 낸다. 이 화면은 내 매혹이 풀린 순간만 알린다(CharmReleased).
     /// 안내 (#328): 홀린 동안에는 같은 자리에 "옆 사람이 풀어 줄 때까지 기다려야 한다..."를 띄운다 (풀어 줄 옆 사람이 있을 때).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabCharmHud : MonoBehaviour
     {
-        public const string HowlPath = "Sabotage/CharmHowl";
         public const string AwakeText = "정신 차림!";
         public const string WaitText = "옆 사람이 풀어 줄 때까지\n기다려야 한다...";
         public static string WarningText(string who) => "요괴가 " + who + "에게\n매혹을 걸려고 한다!";
@@ -49,9 +48,6 @@ namespace C6Lab
         private Text warning;
         private float warningAge = -1f;
         private LabGuideText waitGuide;
-        private AudioSource howlSource;
-        private AudioClip howl;
-        private bool howlLoaded;
         private float awakeLeft = -1f;
         private bool wasCharmed;
         private double seenServerTime = -1d;
@@ -69,33 +65,17 @@ namespace C6Lab
         /// <summary>The charmed player's own guide (#328): wait for the players beside.</summary>
         public bool WaitShowing => waitGuide != null && waitGuide.Showing;
         public string WaitShown => waitGuide != null ? waitGuide.Shown : string.Empty;
+        /// <summary>
+        /// 내게 걸린 매혹이 전투 중에 풀렸다 (#351): 양옆이 다 눌렀거나, 시간이 다 되었거나, 피버타임이 시작되었다.
+        /// 라운드가 끝나 사라질 때는 알리지 않는다.
+        /// </summary>
+        public event System.Action CharmReleased;
 
         /// <summary>스냅샷을 읽을 네트워크와, 게이지를 그릴 Canvas를 연결한다.</summary>
         public void Bind(LabNetwork target, Canvas uiCanvas)
         {
-            if (network != null) network.SabotageCast -= OnSabotageCast;
             network = target;
             canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
-            if (network != null) network.SabotageCast += OnSabotageCast;
-        }
-
-        // 울음소리는 모든 기기에서 낸다. 파일이 없으면 소리 없이 넘어간다.
-        private void OnSabotageCast(LabSabotageKind kind, ulong targetPlayer)
-        {
-            if (kind != LabSabotageKind.Charm) return;
-            if (!howlLoaded)
-            {
-                howl = Resources.Load<AudioClip>(HowlPath);
-                howlLoaded = true;
-            }
-            if (howl == null) return;
-            if (howlSource == null)
-            {
-                howlSource = gameObject.AddComponent<AudioSource>();
-                howlSource.playOnAwake = false;
-                howlSource.spatialBlend = 0f;
-            }
-            howlSource.PlayOneShot(howl, LabAudioSettings.SfxVolume);
         }
 
         private void LateUpdate()
@@ -117,7 +97,11 @@ namespace C6Lab
             bool charmed = snapshot.charmedPlayer == network.LocalPlayerId
                 && snapshot.charmUntil > now && now >= snapshot.charmStartedAt;
             bool warned = snapshot.CharmWarningAt(now);
-            if (wasCharmed && !charmed) awakeLeft = AwakeSeconds;
+            if (wasCharmed && !charmed)
+            {
+                awakeLeft = AwakeSeconds;
+                CharmReleased?.Invoke();
+            }
             wasCharmed = charmed;
             if (awakeLeft >= 0f) awakeLeft -= Time.deltaTime;
             if (!charmed && awakeLeft < 0f && !warned)
@@ -293,7 +277,6 @@ namespace C6Lab
 
         private void OnDestroy()
         {
-            if (network != null) network.SabotageCast -= OnSabotageCast;
             if (layer != null) Destroy(layer.gameObject);
         }
     }

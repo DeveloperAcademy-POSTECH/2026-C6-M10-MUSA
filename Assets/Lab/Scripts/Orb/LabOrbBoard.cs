@@ -262,6 +262,13 @@ namespace C6Lab
         /// here and wait hidden for the Host; a rejection brings them back.
         /// </summary>
         public event Action<string, string> FoxFireTouched;
+        /// <summary>
+        /// A fox orb went up in its blue smoke here because a player cleared it (#351): a double tap, or it touched a Yin or
+        /// Yang orb. Not when its lifetime ran out or fever time cleared it (<see cref="OrbVanished"/>). (fox orb ID)
+        /// </summary>
+        public event Action<string> FoxFireCleared;
+        /// <summary>An unlocked bomb that stopped here went up in smoke to open into two attack orbs (#328, #351). (bomb ID)</summary>
+        public event Action<string> BombOpening;
         /// <summary>Manual release during Jigwi overheat; inputs already wait hidden for approval.</summary>
         public event Action<string, string> JigwiBurnRequested;
         public bool JigwiOverheated => jigwiOverheat;
@@ -1438,7 +1445,11 @@ namespace C6Lab
                 {
                     lastTapId = null;
                     // A double tap clears a fox orb (#328): it goes up in its blue smoke at once.
-                    if (entry.View.Kind == LabOrbKind.FoxFire) PlayFoxSmoke(entry);
+                    if (entry.View.Kind == LabOrbKind.FoxFire)
+                    {
+                        PlayFoxSmoke(entry);
+                        FoxFireCleared?.Invoke(id);
+                    }
                     entry.Locked = true;
                     StopMotion(entry.View.Body);
                     SetBodyMode(entry);
@@ -1665,6 +1676,7 @@ namespace C6Lab
                 entry.BombNextOpenAt = Time.time + BombOpenRetrySeconds;
                 LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius * BombOpenSmokeScale,
                     config != null ? config.OrbAppearance : null);
+                BombOpening?.Invoke(entry.View.OrbId);
                 entry.Locked = true;
                 StopMotion(entry.View.Body);
                 SetBodyMode(entry);
@@ -1831,6 +1843,7 @@ namespace C6Lab
         {
             PlayFoxSmoke(fox);
             PlayFoxSmoke(orb);
+            FoxFireCleared?.Invoke(fox.View.OrbId);
             BeginPendingLaunch(fox.View.OrbId);
             BeginPendingLaunch(orb.View.OrbId);
             FoxFireTouched?.Invoke(fox.View.OrbId, orb.View.OrbId);
