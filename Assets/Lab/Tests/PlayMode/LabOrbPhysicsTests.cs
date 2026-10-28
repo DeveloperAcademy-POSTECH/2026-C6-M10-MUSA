@@ -49,6 +49,8 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             var touched = new System.Collections.Generic.List<string>();
             board.FoxFireTouched += (foxId, orbId) => touched.Add(foxId + ">" + orbId);
+            var cleared = new System.Collections.Generic.List<string>();
+            board.FoxFireCleared += id => cleared.Add(id);
             var fox = board.UpsertOrb("fox", LabOrbKind.FoxFire, new Vector2(.5f, .5f));
             Assert.That(fox.FoxGlowVisible, Is.True, "A fox orb glows blue, unlike the blue Water orb.");
 
@@ -57,12 +59,14 @@ namespace C6Lab.Tests
             float until = Time.time + .25f;
             while (Time.time < until) yield return new WaitForFixedUpdate();
             Assert.That(touched, Is.Empty, "Safe while it has just landed.");
+            Assert.That(cleared, Is.Empty);
 
             until = Time.time + .2f;
             while (Time.time < until) yield return new WaitForFixedUpdate();
             var late = board.UpsertOrb("late", LabOrbKind.Yang, new Vector2(.8f, .5f), new Vector2(-1.5f, 0f));
             for (int step = 0; step < 30 && touched.Count == 0; step++) yield return new WaitForFixedUpdate();
             Assert.That(touched, Is.EqualTo(new[] { "fox>late" }), "Past it, a touch takes the Yang away with the fox orb.");
+            Assert.That(cleared, Is.EqualTo(new[] { "fox" }), "One clear sound for the pair (#351).");
             Assert.That(board.IsSnapshotSuppressed("fox"), Is.True, "Both leave this screen at once...");
             Assert.That(board.IsSnapshotSuppressed("late"), Is.True);
             LabOrbVanishSmoke[] smoke = board.GetComponentsInChildren<LabOrbVanishSmoke>();
@@ -134,6 +138,8 @@ namespace C6Lab.Tests
             var uses = new System.Collections.Generic.List<string>();
             board.EdgeCrossed += crossing => crossed.Add(crossing);
             board.UseRequested += id => uses.Add(id);
+            var cleared = new System.Collections.Generic.List<string>();
+            board.FoxFireCleared += id => cleared.Add(id);
             var fox = board.UpsertOrb("fox-edge", LabOrbKind.FoxFire, new Vector2(.9f, .5f), new Vector2(1.5f, 0f));
             bool turned = false;
             for (int step = 0; step < 40 && !turned; step++)
@@ -151,8 +157,10 @@ namespace C6Lab.Tests
             Vector2 at = BoardPoint(fox);
             Tap(at, 10d);
             Assert.That(uses, Is.Empty, "One tap does nothing.");
+            Assert.That(cleared, Is.Empty);
             Tap(at, 10.2d);
             Assert.That(uses, Is.EqualTo(new[] { "fox-edge" }), "A quick double tap asks the Host to clear it.");
+            Assert.That(cleared, Is.EqualTo(new[] { "fox-edge" }), "The clear sound plays with the puff (#351).");
             LabOrbVanishSmoke[] smoke = board.GetComponentsInChildren<LabOrbVanishSmoke>();
             Assert.That(smoke.Length, Is.EqualTo(1), "It goes up in a puff at once...");
             Color puff = smoke[0].GetComponentInChildren<SpriteRenderer>().color;
@@ -707,6 +715,8 @@ namespace C6Lab.Tests
             var uses = new System.Collections.Generic.List<string>();
             board.ThrowRequested += gesture => throws++;
             board.UseRequested += id => uses.Add(id);
+            var opened = new System.Collections.Generic.List<string>();
+            board.BombOpening += id => opened.Add(id);
             Vector2 from = BoardPoint(bomb);
             Assert.That(board.TryBeginDragAtWorld(from, 1d), Is.True);
             Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1f), 1.1d), Is.True);
@@ -721,6 +731,7 @@ namespace C6Lab.Tests
             float until = Time.time + 3f;
             while (uses.Count == 0 && Time.time < until) yield return new WaitForFixedUpdate();
             Assert.That(uses, Is.EqualTo(new[] { "opening" }), "Once at rest it asks the Host to open it.");
+            Assert.That(opened, Is.EqualTo(new[] { "opening" }), "The open sound plays with its smoke, never for the locked bomb (#351).");
             Assert.That(board.ArrivalOf("opening"), Is.EqualTo(LabDrumArrival.None));
             Assert.That(BoardPoint(opening).x, Is.EqualTo(Bounds.xMin + .3f * Bounds.width).Within(.1f * Bounds.width),
                 "On the Host's spot, inside the board.");

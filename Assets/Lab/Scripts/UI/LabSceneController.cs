@@ -155,6 +155,10 @@ namespace C6Lab
             if (hud != null && boardNetwork != null && GetComponent<LabCharmBubbles>() == null)
                 gameObject.AddComponent<LabCharmBubbles>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>(),
                     hud.leftNeighborBadge, hud.rightNeighborBadge);
+            // 구미호 스테이지 효과음 (#351): 매혹 걸림·체크·풀림, 여우 구슬 떨어짐·사라짐, 해금 폭탄이 공격 구슬로 바뀜
+            if (boardNetwork != null && GetComponent<LabGumihoSound>() == null)
+                gameObject.AddComponent<LabGumihoSound>().Bind(boardNetwork, board, GetComponent<LabCharmHud>(),
+                    GetComponent<LabCharmBubbles>());
             ReconfigureBoard();
         }
 

@@ -35,6 +35,11 @@ namespace C6Lab
         /// <summary>Accepted DEV settings require the same-stage Scene load barrier before combat restarts.</summary>
         public event Action GameFlowDeveloperRestartRequested;
         public bool GameFlowEnabled => gameFlowEnabled;
+        /// <summary>
+        /// The yokai of the stage being played, on every device (#351): the Host's from PrepareGameStage, a Guest's from
+        /// the Host's game-flow state (<see cref="ObserveGameStage"/>). None outside the game flow and for the 2:2 battle.
+        /// </summary>
+        public LabStageYokai GameStageYokai => gameFlowEnabled ? gameStageYokai : LabStageYokai.None;
         public LabRoomFamily RoomFamily => gameFlowEnabled ? LabRoomFamily.Game : LabRoomFamily.Lab;
         public int SessionConfigRevision => configRevision;
         public string SessionConfigFingerprint => configFingerprint;
@@ -256,6 +261,16 @@ namespace C6Lab
             gameStageYokai = yokai;
             PublishHostConfigRevision();
             return true;
+        }
+
+        /// <summary>
+        /// A Guest learns the stage's yokai from the Host's game-flow state (#351), so stage-only presentation (the yaguang
+        /// fever, the gumiho BGM) plays on every device and not only the Host's. The Host keeps the one it prepared.
+        /// </summary>
+        public void ObserveGameStage(LabStageYokai yokai)
+        {
+            if (!gameFlowEnabled || IsHost || !Enum.IsDefined(typeof(LabStageYokai), yokai)) return;
+            gameStageYokai = yokai;
         }
 
         /// <summary>The three yokai stages, or the single yokai-free 2:2 territory battle (#281).</summary>
