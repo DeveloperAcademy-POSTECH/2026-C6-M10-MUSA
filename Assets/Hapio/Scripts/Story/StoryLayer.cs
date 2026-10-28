@@ -9,6 +9,8 @@ namespace Hapio
     public sealed class StoryLayer : MonoBehaviour
     {
         public Image artwork;
+        [Tooltip("Keep the authored background fully visible throughout the cut; animate foreground layers separately.")]
+        public bool isBackground;
         [Min(0f)] public float delay;
         [Min(0.01f)] public float enterSeconds = .6f;
         public Vector2 enterOffset = new Vector2(0f, -35f);
@@ -23,7 +25,7 @@ namespace Hapio
         private Vector3 restScale;
         private bool captured;
 
-        public float EntranceDuration => Mathf.Max(0f, delay) + Mathf.Max(.01f, enterSeconds);
+        public float EntranceDuration => isBackground ? 0f : Mathf.Max(0f, delay) + Mathf.Max(.01f, enterSeconds);
 
         private void Capture()
         {
@@ -39,6 +41,11 @@ namespace Hapio
         {
             Capture();
             if (artwork != null) artwork.enabled = artwork.sprite != null;
+            if (isBackground)
+            {
+                Restore();
+                return;
+            }
             float progress = Mathf.Clamp01((elapsed - Mathf.Max(0f, delay)) / Mathf.Max(.01f, enterSeconds));
             float eased = 1f - Mathf.Pow(1f - progress, 3f);
             Vector2 drift = progress < 1f ? Vector2.zero : idleAmplitude *

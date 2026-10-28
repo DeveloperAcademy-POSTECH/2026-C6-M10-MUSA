@@ -3152,9 +3152,34 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - Editor 연결 도구를2회 실행해2회차 Home 파일이 바이트 동일함을 확인했다. 기존 Home2037개 객체의 Transform·활성 상태 차이0, 직렬화 객체 삭제0·기존 변경은 Scene root 목록 한 곳뿐이다. 새 오프닝24개 객체와 Prefab을 추가했다. Home 의존성에24개 컷 데이터와24개 그림 Prefab이 모두 포함된다. 기존 컷·그림·대본·StoryPreview·다른 게임 Scene·Packages/ProjectSettings/Lab은 변경하지 않았다. 원래 Desktop 폴더의 미커밋 사용자 변경을 작업에 섞거나 덮어쓰지 않았다.
 - **미실행/제한:** iOS Xcode 내보내기·실기기 설치, 실제 다중 기기 LAN/핫스팟, iPhone/iPad 안전 영역·메모리/성능·백그라운드 동작, 실제 음성 청취/재생 중 중단. 오디오 정리는 현재 미할당 소스의 상태와 기존 Cancel 경로를 검사했으며,13번 컷 효과음은 여전히 미할당이다. 구현·편집 위치는 [앱 시작 오프닝](APP_START_OPENING.md)을 따른다.
 
+
+## #356 오프닝 컷 전환·화면 터치 — 2026-10-28
+
+기준은 main `8c37c693`에서 분기한 `fix/#356-opening-cut-touch`, Unity6000.6.5f1/macOS/Metal이다. 실제 Scene 이동이 아닌 Home 내부의24컷·26페이지 전환을 수정했다.
+
+- 다음 컷의 배경/초기 UI를 준비한 뒤 이전 컷을 해제한다. 배경 역할은 `StoryLayer.isBackground`로 저장하고 원래 위치·크기·alpha1을 유지한다. 전경의 기존 연출 수치는 유지했다.
+- 게임용 Prefab에 투명한 전체 화면 터치 영역과 수동 진행을 연결했다. 등장 중 터치는 연출 완료, 이후에는 다음 대사·컷이며 빈 대사 컷도 터치로 진행한다. 이전·다음·건너뛰기와 화면 탭의 사용자 입력 제한을 공유한다.
+- AUTO는 게임용에서 숨기고 실행을 막았으며 제작용 미리보기에서는 유지한다. 완료/스킵은 최소 다음 프레임과 입력 해제까지 Home 차단을 유지한 뒤 타이틀을 복원한다.
+
+| 확인 | 이번 브랜치 실행 결과 | 근거·범위 |
+| --- | --- | --- |
+| 컴파일 | PASS — 컴파일 오류0 | 연결 Editor 재컴파일 완료·최종 console error0. 기존 obsolete API 경고는 별도이며 경고0으로 기록하지 않음 |
+| Hapio EditMode | **112/112 PASS** | 배경 역할24개, 실제 Home 연결·터치 영역·수동 모드·미리보기 AUTO·기존 로비/설정/게임 흐름 |
+| Story PlayMode 최종 재검사 | **18/18 PASS** | 기존 페이지·이전·AUTO·재생과 배경 handoff2개, 화면 탭·버튼 raycast·드래그/다중 포인터·중복 제한4개 |
+| 실제 Home 오프닝 PlayMode 최종 재검사 | **7/7 PASS** | 저장 Home 자동 진입·전체 페이지·스킵·재진입·실패 복구와 새 전체 화면 raycast/마지막 release 후 타이틀 복귀 |
+| 나머지 Hapio PlayMode | **34/34 PASS** | 합본 검사에서 기존 로비7·Scene흐름19·스테이지UI2·시작overlay2·요괴표현2·지귀통합1·결과비율1을 수행. 이들 코드는 최종 재검사 사이 변경하지 않음 |
+| 초기 실패와 보완 | 해결 후 재검사 통과 | 최초 합본58개 중 새 입력 검사3개가 Canvas 생성 직후 raycast 미등록으로 실패. 테스트용 Canvas의 첫 프레임을 기다리도록 fixture만 수정한 뒤 Story18개 재실행 통과. 실패를 게임 동작 통과로 간주하지 않음 |
+| 전환 시작 프레임 렌더 | 부분 시각 확인 | 실제 OP001·002·013·024 Prefab을 격리 렌더(402×874)했다. 복사본의 배경 역할을 꺼 이전 alpha0 처리를 재현한 것과 수정본 t=0을 비교해 빈 종이색 대신 배경이 표시됨을 확인. 실제 기기 연속 녹화가 아님 |
+| 기존 파일 보존 | PASS | Hapio Scene5개·StoryPreview·대사24개·기존 컷 GUID24개의 총54개 파일 해시 유지.24개 컷 변경은 isBackground 필드뿐이며 GameOpening의 기존 객체 ID 삭제0 |
+| 갱신 도구 반복 실행 | PASS | 두 번째 실행에서 오프닝 Prefab/컷24개 바이트 변경0, Home dirty=false·Play정지 상태 유지 |
+| iOS 빌드·실기기·실제 손가락/다중터치 | **NOT_RUN** | 이번 변경 후 수행하지 않음. 자동 pointer 이벤트와 Editor 렌더 결과를 실기기 확인으로 승계하지 않음 |
+| 전체 Lab 테스트·LAN/핫스팟·모바일 성능 | **NOT_RUN** | 이번 오프닝 변경에서 실행하지 않음. 네트워크·공유 설정·게임 규칙·Scene목록·패키지는 수정하지 않음 |
+
+원시 검사 JSON·임시 렌더 스크립트·PNG는 저장소 밖에 보관한다. 기존 미추적 프로토타입 폴더는 변경·커밋하지 않았다. 편집·사용법은 [앱 시작 오프닝](APP_START_OPENING.md)의 #356 항목을 따른다.
+
 ## 2026-10-28 · #351 구미호 스테이지 효과음·BGM
 
-- 기준 main `3b50399f`, 기능 브랜치 `feat/#351-gumiho-stage-sound`. 이후 최신 main `8c37c693`(#341 지귀 A/B·#353·#354)을 병합했다. 충돌은 이 문서 끝의 기록 순서뿐이었다. main의 `LabBoardReplica.CopySnapshot` `feverTimeAt` 보존(#341)과 이 작업의 Guest 스테이지 요괴 기록은 서로 다른 빈틈이라 둘 다 필요하다. 팀이 고른 소리 5개(매혹 풀림·여우 구슬 떨어짐·여우 구슬 소멸·피버 곡·스테이지 BGM)를 넣고, 나머지 3개(매혹 걸림·체크·폭탄 열림)는 폴더만 정해 두었다(비어 있으면 소리 없음). 매혹 걸림 파일은 한 번 넣었다가 출처가 확실하지 않아 뺐다(나중에 넣는다).
+- 기준 main `3b50399f`, 기능 브랜치 `feat/#351-gumiho-stage-sound`. 이후 최신 main `8c37c693`(#341 지귀 A/B·#353·#354)과 `b5695c4e`(#357 오프닝 컷 터치)를 병합했다. 충돌은 이 문서 끝의 기록 순서뿐이었다. main의 `LabBoardReplica.CopySnapshot` `feverTimeAt` 보존(#341)과 이 작업의 Guest 스테이지 요괴 기록은 서로 다른 빈틈이라 둘 다 필요하다. 팀이 고른 소리 5개(매혹 풀림·여우 구슬 떨어짐·여우 구슬 소멸·피버 곡·스테이지 BGM)를 넣고, 나머지 3개(매혹 걸림·체크·폭탄 열림)는 폴더만 정해 두었다(비어 있으면 소리 없음). 매혹 걸림 파일은 한 번 넣었다가 출처가 확실하지 않아 뺐다(나중에 넣는다).
 - **발견한 결함(수정)**: 스테이지 요괴(`gameStageYokai`)를 Host만 `PrepareGameStage`에서 알고 Guest는 늘 None이었다. 그래서 #343 야광귀 피버 곡·번쩍임·스태미나 물결(`YaguangFeverElapsed`)이 Guest 기기에서는 나오지 않았을 것이다. Guest가 Host의 게임 진행 상태를 받을 때(`GameSession.SetLocalState`) `LabNetwork.ObserveGameStage`로 같은 요괴를 기록하게 했다. 이 값을 쓰는 다른 곳(`JigwiManualControlsAllowed`, 시작 확인)은 Host 전용이라 Guest 동작은 바뀌지 않는다.
 - **BGM**: `LabBattleBgm`이 라운드 시작 때 구미호 스테이지면 `Audio/GumihoBGM`(162초, Streaming)을 튼다. 구미호 피버(`feverTimeAt`, Host 시각)에는 `Audio/GumihoFever`(20초)를 야광귀 피버와 같은 방식(교차 0.25초, "좋다" 추임새, 늦게 온 기기 건너뛰기)으로 튼다. 일시정지 동안에는 피버를 켜거나 끄지 않는다(멈춘 시계를 1초까지 어림하는 동안 흔들리지 않게).
 - **효과음**: 새 `LabGumihoSound`. 매혹 걸림은 SabotageCast가 예고 시작(3초 전)에 오므로 스냅샷의 `charmStartedAt`을 지나는 순간에 낸다(1초 넘게 늦게 본 매혹은 무음). 체크·풀림은 `LabCharmBubbles.OwnCheckShown`·`HelperCharmEnded`와 `LabCharmHud.CharmReleased`, 여우 구슬 소멸·폭탄 열림은 `LabOrbBoard.FoxFireCleared`·`BombOpening`, 여우 구슬 떨어짐은 대상 기기의 SabotageCast. 매혹 한 번에 한 번만 나도록 매혹 시작 시각으로 거른다(스냅샷은 끝난 매혹을 -1로 보내므로 마지막 매혹 시각을 따로 기억한다). 예전 `Resources/Sabotage/CharmHowl` 재생 코드는 지웠다.

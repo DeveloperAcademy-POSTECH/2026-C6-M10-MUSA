@@ -122,6 +122,46 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavedScreenTapFinishesTheLastPageBeforeRestoringAnUnclickedTitle()
+        {
+            yield return LoadHome();
+            StoryPlayer player = opening.player;
+            while (player.CurrentCutIndex < player.sequence.cuts.Count - 1 ||
+                player.CurrentPageIndex < player.sequence.cuts[player.CurrentCutIndex].PageCount - 1 || !player.IsReading)
+                player.Next();
+            var surface = opening.openingRoot.GetComponentInChildren<StoryTapAdvance>();
+            Assert.That(surface, Is.Not.Null);
+            var events = UnityEngine.EventSystems.EventSystem.current;
+            var pointer = new UnityEngine.EventSystems.PointerEventData(events)
+            {
+                pointerId = -1,
+                position = new Vector2(Screen.width * .5f, Screen.height * .5f),
+                button = UnityEngine.EventSystems.PointerEventData.InputButton.Left
+            };
+            pointer.pressPosition = pointer.position;
+            Canvas.ForceUpdateCanvases();
+            var hits = new System.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult>();
+            events.RaycastAll(pointer, hits);
+            Assert.That(hits, Is.Not.Empty);
+            Assert.That(hits[0].gameObject, Is.SameAs(surface.gameObject));
+            var down = UnityEngine.EventSystems.ExecuteEvents.pointerDownHandler;
+            var up = UnityEngine.EventSystems.ExecuteEvents.pointerUpHandler;
+            var click = UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler;
+            UnityEngine.EventSystems.ExecuteEvents.Execute(surface.gameObject, pointer, down);
+            Assert.That(player.IsPlaying, Is.True);
+            UnityEngine.EventSystems.ExecuteEvents.Execute(surface.gameObject, pointer, up);
+            Assert.That(player.IsPlaying, Is.True);
+            UnityEngine.EventSystems.ExecuteEvents.Execute(surface.gameObject, pointer, click);
+            Assert.That(player.IsPlaying, Is.False);
+            Assert.That(opening.lobbyView.OpeningBlocked, Is.True, "The finishing release still has an input shield.");
+            Assert.That(opening.openingRoot.activeInHierarchy, Is.True);
+            UnityEngine.EventSystems.ExecuteEvents.Execute(surface.gameObject, pointer, click);
+            yield return Until(() => !GameOpeningController.IsPresenting, "Release shield returns to title");
+            AssertAtTitleWithNoOpening();
+            Assert.That(session.RoomBrowserVisible, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator SkipDoubleClicksLeaveTheTitleUsableAndHomeReloadDoesNotReplay()
         {
             yield return LoadHome();
