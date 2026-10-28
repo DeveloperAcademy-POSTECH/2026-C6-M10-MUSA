@@ -233,6 +233,54 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator TheOwnCheckAndTheEndOfACharmAreEachAnnouncedOncePerCharm()
+        {
+            int checks = 0, ended = 0;
+            bubbles.OwnCheckShown += () => checks++;
+            bubbles.HelperCharmEnded += () => ended++;
+            // Two players: the other one is beside on both sides, so both badges show the same charm (#351).
+            bubbles.Present(Charm(20, 10d, players: 2), 10, 1d, 3);
+            Assert.That(bubbles.LeftShowing && bubbles.RightShowing, Is.True);
+            Assert.That(checks + ended, Is.Zero);
+            yield return null;
+            bubbles.Present(Charm(20, 10d, players: 2, taps: 3), 10, 1.1d, 3);
+            Assert.That(bubbles.LeftCheckShowing && bubbles.RightCheckShowing, Is.True);
+            Assert.That(checks, Is.EqualTo(1), "One check sound for this screen's share, though both badges pop a check.");
+
+            // A pause hides the bubbles; coming back draws the check again without another sound.
+            LabSnapshot paused = Charm(20, 10d, players: 2, taps: 3);
+            paused.paused = true;
+            bubbles.Present(paused, 10, 1.2d, 3);
+            yield return null;
+            bubbles.Present(Charm(20, 10d, players: 2, taps: 3), 10, 1.3d, 3);
+            Assert.That(bubbles.LeftCheckShowing, Is.True);
+            Assert.That(checks, Is.EqualTo(1));
+            Assert.That(ended, Is.Zero, "Still charmed.");
+
+            // It ends (a snapshot says -1 once a charm is over): announced once for both badges.
+            bubbles.Present(Charm(0, -1d, players: 2), 10, 1.4d, 3);
+            bubbles.Present(Charm(0, -1d, players: 2), 10, 1.5d, 3);
+            Assert.That(ended, Is.EqualTo(1));
+
+            // The next charm comes later and is announced again.
+            LabSnapshot next = Charm(20, 30d, players: 2, taps: 3);
+            next.charmStartedAt = next.charmWarnedAt = 20d;
+            bubbles.Present(next, 10, 21d, 3);
+            Assert.That(checks, Is.EqualTo(2));
+            bubbles.Present(Charm(0, -1d, players: 2), 10, 31d, 3);
+            Assert.That(ended, Is.EqualTo(2));
+
+            // On the charmed player's own screen the other's check and the end are not this screen's to announce.
+            LabSnapshot own = Charm(10, 50d, players: 2, other: 3);
+            own.charmStartedAt = own.charmWarnedAt = 40d;
+            bubbles.Present(own, 10, 41d, 3);
+            Assert.That(bubbles.LeftCheckShowing, Is.True, "The charmed player sees the other's check...");
+            bubbles.Present(Charm(0, -1d, players: 2), 10, 51d, 3);
+            Assert.That(checks, Is.EqualTo(2), "...but it is not their own share.");
+            Assert.That(ended, Is.EqualTo(2), "Their own charm's end is LabCharmHud's to announce.");
+        }
+
+        [UnityTest]
         public IEnumerator AHandPokesAtTheBubbleEveryTimeButTheGuideShowsOnlyOnTheFirstCharm()
         {
             // Player 10 beside the charmed 20 (on the left) still has to tap (#328).
