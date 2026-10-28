@@ -31,7 +31,6 @@
 | `Assets/Lab/Resources/Audio/FiveColorHit/FiveColorHit_1.wav`, `FiveColorHit_2.wav` (2개) | 내가 던진 오색구슬(#329)이 박에 맞았을 때 (#338, 던진 사람 기기만, 맞을 때마다 1 → 2 → 1 번갈아) | 팀 제공 CC0 소리 (원본 이름 미확인) | CC0 | 원본 .mp3(1.06초, 스테레오 48kHz)의 뒤 무음을 잘라 0.96초, 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/ComboHit/ComboHit.wav` | 박 색상 콤보에서 맞는 칸을 맞힐 때 (#338, 모든 기기). 코드가 1~4칸마다 도·레·미·솔(0·2·4·7반음, 재생 속도 1·1.12·1.26·1.50배)로 높여 낸다 | 팀 제공 CC0 소리 (Freesound, 원본 이름 미확인) | CC0 | 원본 wav(0.46초, 스테레오 44.1kHz, 평균 -29.6dB)를 압축·증폭해 평균 약 -12.5dB(최대 -1.4dB)로 크게 하고 끝 0.1초를 줄임, 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/ComboFail/ComboFail.wav` | 박 색상 콤보 실패(틀린 색·시간 초과) 때 (#338, 팀 전체 실패라 모든 기기) | 팀 제공 CC0 소리 (원본 이름 미확인) | CC0 | 원본 mp3(0.29초, 모노 48kHz)의 앞 무음 0.03초를 잘라 0.26초로 만들고 +3dB(최대 -0.3dB) 키움, 44.1kHz 모노 16bit wav |
-| `Assets/Lab/Resources/Audio/CharmCast/CharmCast.wav` | 매혹이 걸릴 때 (#351, 예고가 끝나 하트가 뜨는 순간, 모든 기기) | AI 생성: [ElevenLabs](https://elevenlabs.io) 효과음 (파일에 ElevenLabs 생성 정보 C2PA 포함). 원본 이름 `매혹.mp3` | ElevenLabs 이용약관: 유료 플랜(Starter 이상)으로 만든 소리는 상업적 이용 가능, 무료 플랜은 비상업적 이용만이고 출처 표시 필요 — **팀 계정 플랜 확인 필요** | 원본 mp3(2.5초, 스테레오 44.1kHz)를 44.1kHz 스테레오 16bit wav로 풀기만 함. 음량·음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/CharmRelease/CharmRelease.wav` | 매혹이 풀릴 때 (#351, 걸린 사람과 양옆 사람 기기) | AI 생성: [Suno](https://suno.com) (2026-10-28 생성, 파일 설명에 "made with suno"). 원본 이름 `매혹 풀렸을 때.wav` | Suno 이용약관: 유료 플랜(Pro·Premier)으로 만든 곡은 만든 사람 소유·상업적 이용 가능, 무료 플랜 곡은 비상업적 이용만 — **팀 계정 플랜 확인 필요** | 2.76초, 스테레오 48kHz 16bit 그대로. 가장 큰 순간이 -1dB가 되도록 음량만 키움(+8dB). 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/FoxFall/FoxFall.wav` | 여우 구슬이 내 판에 떨어질 때 (#351, 한 번 떨어뜨릴 때마다 한 번, 그 판 주인 기기만) | AI 생성: [Suno](https://suno.com) (2026-10-28 생성, 파일 설명에 "made with suno"). 원본 이름 `여우구슬떨어질때.wav` | Suno 이용약관: 유료 플랜(Pro·Premier)으로 만든 곡은 만든 사람 소유·상업적 이용 가능, 무료 플랜 곡은 비상업적 이용만 — **팀 계정 플랜 확인 필요** | 1.15초, 스테레오 48kHz 16bit 그대로. 음량·음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/FoxClear/FoxClear.wav` | 여우 구슬이 사라질 때: 두 번 눌러 없앴거나 음·양 구슬과 닿아 함께 사라질 때 (#351, 그 판 주인 기기만) | AI 생성: [Suno](https://suno.com) (팀 확인 기준. QuickTime으로 잘라 저장해 파일 안 Suno 정보는 없음). 원본 이름 `소멸소리.wav` | Suno 이용약관: 유료 플랜(Pro·Premier)으로 만든 곡은 만든 사람 소유·상업적 이용 가능, 무료 플랜 곡은 비상업적 이용만 — **팀 계정 플랜 확인 필요** | 1.36초, 스테레오 48kHz 16bit 그대로. 가장 큰 순간이 -1dB가 되도록 음량만 키움(+1.5dB). 음색 변경 없음 |
@@ -69,6 +68,6 @@ CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, FlashClear, FiveColorHit,
 
 **AI로 만든 소리 (#351)**
 
-`GumihoBGM/Gumiho_Stage.wav`, `GumihoFever/Gumiho_Fever.wav`, `CharmRelease/CharmRelease.wav`, `FoxFall/FoxFall.wav`, `FoxClear/FoxClear.wav`는 Suno, `CharmCast/CharmCast.wav`는 ElevenLabs로 만들었다. 두 서비스 모두 **만든 계정이 유료 플랜일 때만** 상업적 이용(앱스토어 배포 포함)이 허용되고, 무료 플랜으로 만든 것은 비상업적 이용만 된다(ElevenLabs 무료 플랜은 출처 표시도 필요하다). 출시 전에 만든 계정의 플랜을 확인해 위 표의 "팀 계정 플랜 확인 필요"를 고친다. 무료 플랜이었다면 유료 플랜에서 다시 만들거나 CC0 소리로 바꾼다. 크레딧 화면이 생기면 아래처럼 적는 것을 권장한다.
+`GumihoBGM/Gumiho_Stage.wav`, `GumihoFever/Gumiho_Fever.wav`, `CharmRelease/CharmRelease.wav`, `FoxFall/FoxFall.wav`, `FoxClear/FoxClear.wav`는 Suno로 만들었다. Suno는 **만든 계정이 유료 플랜일 때만** 상업적 이용(앱스토어 배포 포함)이 허용되고, 무료 플랜으로 만든 것은 비상업적 이용만 된다. 매혹이 걸릴 때 소리(`Audio/CharmCast`)는 출처가 확실하지 않아 빼 두었다(폴더가 비어 소리 없음, 나중에 넣는다). 출시 전에 만든 계정의 플랜을 확인해 위 표의 "팀 계정 플랜 확인 필요"를 고친다. 무료 플랜이었다면 유료 플랜에서 다시 만들거나 CC0 소리로 바꾼다. 크레딧 화면이 생기면 아래처럼 적는 것을 권장한다.
 
-> 구미호 스테이지 음악·매혹 풀림·여우 구슬 소리: Suno로 제작 · 매혹 소리: ElevenLabs로 제작
+> 구미호 스테이지 음악·매혹 풀림·여우 구슬 소리: Suno로 제작

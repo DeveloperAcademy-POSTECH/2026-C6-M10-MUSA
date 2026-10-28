@@ -28,7 +28,7 @@ namespace C6Lab.Tests
             host = new GameObject("gumiho-sound");
             LabGumihoSound sound = host.AddComponent<LabGumihoSound>();
             // 에디터 테스트에서는 Awake가 저절로 불리지 않을 수 있어 직접 불러 소리 파일을 읽힌다.
-            if (sound.ClipCount(LabGumihoSfx.CharmCast) == 0)
+            if (sound.ClipCount(LabGumihoSfx.CharmRelease) == 0)
                 typeof(LabGumihoSound).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(sound, null);
             return sound;
         }
@@ -48,8 +48,6 @@ namespace C6Lab.Tests
             Assert.That(LabGumihoSound.Folder(LabGumihoSfx.FoxFall), Is.EqualTo("Audio/FoxFall"));
             Assert.That(LabGumihoSound.Folder(LabGumihoSfx.FoxClear), Is.EqualTo("Audio/FoxClear"));
             Assert.That(LabGumihoSound.Folder(LabGumihoSfx.BombOpen), Is.EqualTo("Audio/BombOpen"));
-            Assert.That(Resources.LoadAll<AudioClip>(LabGumihoSound.CharmCastFolder).Select(clip => clip.name),
-                Is.EqualTo(new[] { "CharmCast" }));
             Assert.That(Resources.LoadAll<AudioClip>(LabGumihoSound.CharmReleaseFolder).Select(clip => clip.name),
                 Is.EqualTo(new[] { "CharmRelease" }));
             Assert.That(Resources.LoadAll<AudioClip>(LabGumihoSound.FoxFallFolder).Select(clip => clip.name),
@@ -62,10 +60,10 @@ namespace C6Lab.Tests
         public void EachSoundCountsAndStaysQuietWithoutAClip()
         {
             LabGumihoSound sound = Sound();
-            Assert.That(sound.ClipCount(LabGumihoSfx.CharmCast), Is.EqualTo(1));
+            Assert.That(sound.ClipCount(LabGumihoSfx.CharmRelease), Is.EqualTo(1));
             foreach (LabGumihoSfx sfx in System.Enum.GetValues(typeof(LabGumihoSfx)))
             {
-                // 체크·폭탄 열림처럼 파일이 아직 없으면 아무것도 내지 않고 넘어간다. 넣으면 낸다.
+                // 매혹 걸림·체크·폭탄 열림처럼 파일이 아직 없으면 아무것도 내지 않고 넘어간다. 넣으면 낸다.
                 Assert.That(sound.Play(sfx), Is.EqualTo(sound.ClipCount(sfx) > 0), sfx.ToString());
                 Assert.That(sound.PlayCount(sfx), Is.EqualTo(1), sfx.ToString());
             }
