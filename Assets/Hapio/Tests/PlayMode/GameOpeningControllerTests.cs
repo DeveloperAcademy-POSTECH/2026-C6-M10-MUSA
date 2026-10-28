@@ -72,8 +72,8 @@ namespace Hapio.Tests
             Assert.That(GameOpeningController.HasPlayedThisRun && GameOpeningController.IsPresenting, Is.True);
             Assert.That(opening.player.CurrentCutIndex, Is.Zero);
             Assert.That(opening.player.AutoAdvance, Is.False, "Button entry keeps screen-tap dialogue advance.");
-            Assert.That(opening.player.sequence.cuts.Count, Is.EqualTo(24));
-            Assert.That(opening.player.sequence.cuts.Sum(cut => cut.PageCount), Is.EqualTo(26));
+            Assert.That(opening.player.sequence.cuts.Count, Is.EqualTo(25));
+            Assert.That(opening.player.sequence.cuts.Sum(cut => cut.PageCount), Is.EqualTo(27));
             Assert.That(opening.openingRoot.activeInHierarchy, Is.True);
             Assert.That(opening.openingRoot.GetComponentsInChildren<GameSafeArea>(true), Has.Length.EqualTo(1));
             Canvas canvas = opening.openingRoot.GetComponentInChildren<Canvas>(true);
@@ -126,7 +126,7 @@ namespace Hapio.Tests
                 }
                 yield return null;
             }
-            Assert.That(pages, Is.EqualTo(26));
+            Assert.That(pages, Is.EqualTo(27));
             player.Next(); player.Skip(); player.Next();
             yield return Until(() => !GameOpeningController.IsPresenting, "Completed story opens the room browser");
             Assert.That(completed, Is.EqualTo(1));

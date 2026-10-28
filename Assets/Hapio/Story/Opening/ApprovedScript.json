@@ -220,6 +220,18 @@
       "direction": ""
     },
     {
+      "number": 19,
+      "cutId": "OP_019_1",
+      "pages": [
+        {
+          "speaker": "",
+          "dialogue": "",
+          "seconds": 14
+        }
+      ],
+      "direction": "봉인박 사용법 확대. 하단 대사창 없이 종이에 적힌 사용법을 읽는 컷."
+    },
+    {
       "number": 20,
       "pages": [
         {

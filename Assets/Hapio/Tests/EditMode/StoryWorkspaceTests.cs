@@ -7,18 +7,19 @@ namespace Hapio.Tests
     public sealed class StoryWorkspaceTests
     {
         [System.Serializable] private class Approved { public Frame[] frames; }
-        [System.Serializable] private class Frame { public int number; public Page[] pages; }
+        [System.Serializable] private class Frame { public int number; public string cutId; public Page[] pages; }
         [System.Serializable] private class Page { public string speaker, dialogue; }
 
         [Test]
         public void EveryPageMatchesTheApprovedScriptIncludingTheTwoSpeakersInCutSeventeen()
         {
             var approved = JsonUtility.FromJson<Approved>(System.IO.File.ReadAllText("Assets/Hapio/Story/Opening/ApprovedScript.json"));
-            Assert.That(approved.frames.Length, Is.EqualTo(24));
+            Assert.That(approved.frames.Length, Is.EqualTo(25));
             int pages = 0;
             foreach (var frame in approved.frames)
             {
-                var cut = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>($"Assets/Hapio/Story/Opening/Cuts/OP_{frame.number:000}.asset");
+                string id = string.IsNullOrEmpty(frame.cutId) ? $"OP_{frame.number:000}" : frame.cutId;
+                var cut = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>($"Assets/Hapio/Story/Opening/Cuts/{id}.asset");
                 Assert.That(cut.PageCount, Is.EqualTo(frame.pages.Length));
                 Assert.That(cut.viewPrefab.centerSpeakerName, Is.True);
                 Assert.That(cut.viewPrefab.dialogueRect, Is.EqualTo(new Rect(84, 720, 270, 100)), $"Cut {frame.number} body alignment");
@@ -36,12 +37,27 @@ namespace Hapio.Tests
                     Assert.That(cut.direction, Is.Not.Empty);
                 }
             }
-            Assert.That(pages, Is.EqualTo(26));
+            Assert.That(pages, Is.EqualTo(27));
             var seventeen = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>("Assets/Hapio/Story/Opening/Cuts/OP_017.asset");
             Assert.That(seventeen.GetPage(0).speaker, Is.EqualTo("불이"));
             Assert.That(seventeen.GetPage(1).speaker, Is.EqualTo("금옥이"));
             Assert.That(seventeen.GetPage(1).dialogue, Is.EqualTo("되겠냐."));
             Assert.That(seventeen.GetPage(1).autoReadSeconds, Is.LessThan(2));
+        }
+
+        [Test]
+        public void EnlargedInstructionsFollowCutNineteenAndUseNativeTextWithoutADialoguePanel()
+        {
+            var story = AssetDatabase.LoadAssetAtPath<StorySequence>("Assets/Hapio/Story/Opening/Opening.asset");
+            var cut = story.cuts[19];
+            Assert.That(story.cuts[18].cutId, Is.EqualTo("OP_019"));
+            Assert.That(cut.cutId, Is.EqualTo("OP_019_1"));
+            Assert.That(story.cuts[20].cutId, Is.EqualTo("OP_020"));
+            Assert.That(cut.GetPage(0).dialogue, Is.Empty);
+            Assert.That(cut.viewPrefab.hideEmptyDialogue, Is.True);
+            Assert.That(cut.viewPrefab.sourceFigmaNodeId, Is.EqualTo("3331:479"));
+            Assert.That(cut.viewPrefab.GetComponentsInChildren<UnityEngine.UI.Text>(true).Length, Is.EqualTo(2));
+            Assert.That(cut.GetPage(0).autoReadSeconds, Is.GreaterThan(10));
         }
 
         [Test]
@@ -104,17 +120,17 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void PreparedPreviewUsesFigmaNumbersAndAllTwentyFourCutsHaveVisibleEditableArtwork()
+        public void PreparedPreviewIncludesTheEnlargedInstructionsWithoutRenumberingExistingCuts()
         {
             const string root = "Assets/Hapio/Story/Opening/";
             var preview = AssetDatabase.LoadAssetAtPath<StorySequence>(root + "BatchPreview.asset");
             Assert.That(preview.Validate(out string error), Is.True, error);
-            Assert.That(preview.cuts.Count, Is.EqualTo(24));
+            Assert.That(preview.cuts.Count, Is.EqualTo(25));
             Assert.That(preview.cuts[0].cutId, Is.EqualTo("OP_001"));
             Assert.That(preview.cuts[1].cutId, Is.EqualTo("OP_002"));
             for (int number = 3; number <= 24; number++)
             {
-                var cut = preview.cuts[number - 1];
+                var cut = preview.cuts[number <= 19 ? number - 1 : number];
                 Assert.That(cut.cutId, Is.EqualTo($"OP_{number:000}"));
                 var view = cut.viewPrefab;
                 Assert.That(view.sourceFigmaNumber, Is.EqualTo(number));
@@ -198,16 +214,17 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void OpeningHas24UniqueEditableCutsAndFirstCutUsesSeparateOriginalSprites()
+        public void OpeningHas25UniqueEditableCutsAndFirstCutUsesSeparateOriginalSprites()
         {
             var story = AssetDatabase.LoadAssetAtPath<StorySequence>("Assets/Hapio/Story/Opening/Opening.asset");
             Assert.That(story, Is.Not.Null);
             Assert.That(story.Validate(out string error), Is.True, error);
-            Assert.That(story.cuts.Count, Is.EqualTo(24));
+            Assert.That(story.cuts.Count, Is.EqualTo(25));
             for (int i = 0; i < 24; i++)
             {
-                Assert.That(story.cuts[i].cutId, Is.EqualTo($"OP_{i + 1:000}"));
-                Assert.That(AssetDatabase.GetAssetPath(story.cuts[i].viewPrefab),
+                var cut = story.cuts[i < 19 ? i : i + 1];
+                Assert.That(cut.cutId, Is.EqualTo($"OP_{i + 1:000}"));
+                Assert.That(AssetDatabase.GetAssetPath(cut.viewPrefab),
                     Is.EqualTo($"Assets/Hapio/Story/Opening/Views/OP_{i + 1:000}.prefab"));
             }
             var layers = story.cuts[0].viewPrefab.layers;

@@ -174,6 +174,7 @@ namespace Hapio.Editor
                 var player = canvas.GetComponent<StoryPlayer>();
                 player.sequence = sequence; player.cutHost = host; player.dialogueGroup = group;
                 player.speakerText = speaker; player.dialogueText = body; player.progressText = progress;
+                player.speakerPalette = AssetDatabase.LoadAssetAtPath<StorySpeakerPalette>(Root + "/Opening/SpeakerPalette.asset");
                 player.nextButton = next; player.previousButton = previousButton; player.skipButton = skip; player.autoButton = auto;
                 player.autoLabel = auto.GetComponentInChildren<Text>();
                 player.voiceSource = canvas.GetComponent<AudioSource>();

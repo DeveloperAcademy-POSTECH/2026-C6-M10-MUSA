@@ -32,8 +32,8 @@ namespace Hapio.Tests
                 Assert.That(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(controller.openingRoot), Is.EqualTo(OpeningPrefab));
                 Assert.That(AssetDatabase.GetAssetPath(controller.player.sequence), Is.EqualTo(OpeningSequence));
                 Assert.That(controller.player.playOnStart, Is.False, "The app-opening controller owns the single start.");
-                Assert.That(controller.player.sequence.cuts.Count, Is.EqualTo(24));
-                Assert.That(controller.player.sequence.cuts.Sum(cut => cut.PageCount), Is.EqualTo(26));
+                Assert.That(controller.player.sequence.cuts.Count, Is.EqualTo(25));
+                Assert.That(controller.player.sequence.cuts.Sum(cut => cut.PageCount), Is.EqualTo(27));
                 Assert.That(All<EventSystem>(scene), Has.Length.EqualTo(1));
                 Assert.That(All<LabNetwork>(scene), Is.Empty, "The opening must reuse the persistent session bootstrap.");
                 Assert.That(All<Camera>(scene), Has.Length.EqualTo(1), "An overlay opening does not need another camera.");
@@ -61,6 +61,7 @@ namespace Hapio.Tests
             Assert.That(player.cutHost, Is.Not.Null);
             Assert.That(player.nextButton, Is.Not.Null); Assert.That(player.previousButton, Is.Not.Null);
             Assert.That(player.skipButton, Is.Not.Null); Assert.That(player.autoButton, Is.Not.Null);
+            Assert.That(player.speakerPalette, Is.SameAs(AssetDatabase.LoadAssetAtPath<StorySpeakerPalette>("Assets/Hapio/Story/Opening/SpeakerPalette.asset")));
             Assert.That(player.touchOnly, Is.True);
             Assert.That(player.autoButton.gameObject.activeSelf, Is.False);
             var tap = prefab.GetComponentsInChildren<StoryTapAdvance>(true).Single();
@@ -82,7 +83,7 @@ namespace Hapio.Tests
         public void EverySavedOpeningCutHasOneStableBackgroundWithoutChangingForegroundRoles()
         {
             var sequence = AssetDatabase.LoadAssetAtPath<StorySequence>(OpeningSequence);
-            Assert.That(sequence.cuts, Has.Count.EqualTo(24));
+            Assert.That(sequence.cuts, Has.Count.EqualTo(25));
             foreach (var cut in sequence.cuts)
             {
                 Assert.That(cut.viewPrefab.layers[0].isBackground, Is.True, cut.cutId);
