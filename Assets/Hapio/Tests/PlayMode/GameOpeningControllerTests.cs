@@ -5,6 +5,8 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
@@ -50,13 +52,26 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedHomeAutomaticallyStartsTheOpeningAndBlocksTheMenusBehindIt()
+        public IEnumerator SavedHomeWaitsAtTheTitleWithoutPlayingOrSearchingUntilStartIsClicked()
         {
             yield return LoadHome();
+            AssertAtTitleWithNoOpening();
+            Assert.That(GameOpeningController.HasPlayedThisRun, Is.False);
+            for (int frame = 0; frame < 5; frame++) yield return null;
+            Assert.That(opening.player.CurrentView, Is.Null);
+            Assert.That(session.Network.IsSearchingRooms, Is.False);
+            Assert.That(GameOpeningController.HasPlayedThisRun, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator FirstStartButtonClickStartsTheOpeningAndBlocksTheMenusBehindIt()
+        {
+            yield return LoadHome();
+            yield return PressStart();
             Assert.That(opening.IsPlaying, Is.True);
             Assert.That(GameOpeningController.HasPlayedThisRun && GameOpeningController.IsPresenting, Is.True);
             Assert.That(opening.player.CurrentCutIndex, Is.Zero);
-            Assert.That(opening.player.AutoAdvance, Is.False, "Automatic entry does not enable automatic dialogue advance.");
+            Assert.That(opening.player.AutoAdvance, Is.False, "Button entry keeps screen-tap dialogue advance.");
             Assert.That(opening.player.sequence.cuts.Count, Is.EqualTo(24));
             Assert.That(opening.player.sequence.cuts.Sum(cut => cut.PageCount), Is.EqualTo(26));
             Assert.That(opening.openingRoot.activeInHierarchy, Is.True);
@@ -87,9 +102,10 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator CompletingAllTwentyFourCutsAndTwentySixPagesReturnsToTheTitleOnce()
+        public IEnumerator CompletingAllTwentyFourCutsAndTwentySixPagesOpensTheBrowserOnce()
         {
             yield return LoadHome();
+            yield return PressStart();
             StoryPlayer player = opening.player;
             int completed = 0, skipped = 0, pages = 0;
             player.Finished += reason => { if (reason == StoryExitReason.Completed) completed++; else skipped++; };
@@ -112,19 +128,20 @@ namespace Hapio.Tests
             }
             Assert.That(pages, Is.EqualTo(26));
             player.Next(); player.Skip(); player.Next();
-            yield return null;
+            yield return Until(() => !GameOpeningController.IsPresenting, "Completed story opens the room browser");
             Assert.That(completed, Is.EqualTo(1));
             Assert.That(skipped, Is.Zero);
-            AssertAtTitleWithNoOpening();
+            AssertAtBrowserWithNoOpening();
             Assert.That(player.CurrentView, Is.Null);
             Assert.That(player.cutHost.GetComponentsInChildren<StoryCutView>(true), Is.Empty);
             Assert.That(player.voiceSource == null || !player.voiceSource.isPlaying && player.voiceSource.clip == null, Is.True);
         }
 
         [UnityTest]
-        public IEnumerator SavedScreenTapFinishesTheLastPageBeforeRestoringAnUnclickedTitle()
+        public IEnumerator SavedScreenTapFinishesTheLastPageBeforeOpeningTheBrowserBehindAReleaseShield()
         {
             yield return LoadHome();
+            yield return PressStart();
             StoryPlayer player = opening.player;
             while (player.CurrentCutIndex < player.sequence.cuts.Count - 1 ||
                 player.CurrentPageIndex < player.sequence.cuts[player.CurrentCutIndex].PageCount - 1 || !player.IsReading)
@@ -156,24 +173,29 @@ namespace Hapio.Tests
             Assert.That(opening.lobbyView.OpeningBlocked, Is.True, "The finishing release still has an input shield.");
             Assert.That(opening.openingRoot.activeInHierarchy, Is.True);
             UnityEngine.EventSystems.ExecuteEvents.Execute(surface.gameObject, pointer, click);
-            yield return Until(() => !GameOpeningController.IsPresenting, "Release shield returns to title");
-            AssertAtTitleWithNoOpening();
-            Assert.That(session.RoomBrowserVisible, Is.False);
+            Assert.That(session.RoomBrowserVisible, Is.False, "Search starts only after the finishing release is shielded.");
+            yield return Until(() => !GameOpeningController.IsPresenting, "Release shield opens the room browser");
+            AssertAtBrowserWithNoOpening();
         }
 
         [UnityTest]
-        public IEnumerator SkipDoubleClicksLeaveTheTitleUsableAndHomeReloadDoesNotReplay()
+        public IEnumerator SkipDoubleClicksOpenTheBrowserAndLaterTitleStartDoesNotReplay()
         {
             yield return LoadHome();
+            yield return PressStart();
             int finishes = 0;
             StoryPlayer player = opening.player;
             player.Finished += reason => { Assert.That(reason, Is.EqualTo(StoryExitReason.Skipped)); finishes++; };
             player.skipButton.onClick.Invoke();
             player.Skip(); player.Next();
-            yield return null;
+            yield return Until(() => !GameOpeningController.IsPresenting, "Skip opens the room browser once");
             Assert.That(finishes, Is.EqualTo(1));
-            AssertAtTitleWithNoOpening();
+            AssertAtBrowserWithNoOpening();
             GameSession persistent = session;
+            session.GoHome();
+            yield return Until(() => !session.IsLoadingScene, "Return to the title in the same app run");
+            yield return null;
+            AssertAtTitleWithNoOpening();
             opening.lobbyView.enterButton.onClick.Invoke();
             yield return null;
             Assert.That(session.RoomBrowserVisible, Is.True);
@@ -193,6 +215,7 @@ namespace Hapio.Tests
         public IEnumerator DisablingTheControllerCancelsItsViewAndAudioAndUnblocksTheTitle()
         {
             yield return LoadHome();
+            yield return PressStart();
             StoryPlayer player = opening.player;
             player.ToggleAuto();
             Assert.That(player.CurrentView, Is.Not.Null);
@@ -210,12 +233,17 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator MissingSequenceWarnsAndFallsBackToTheTitleWithoutRetrying()
+        public IEnumerator MissingSequenceWarnsOnlyOnStartAndFallsBackToTheBrowserWithoutRetrying()
         {
-            LogAssert.Expect(LogType.Warning, new Regex("^HAPIO_OPENING_UNAVAILABLE: "));
             yield return LoadHome(controller => controller.player.sequence = null);
+            Assert.That(GameOpeningController.HasPlayedThisRun, Is.False);
+            Assert.That(opening.lobbyView.titlePage.activeInHierarchy, Is.True);
+            Assert.That(GameOpeningController.IsPresenting, Is.False);
+            LogAssert.Expect(LogType.Warning, new Regex("^HAPIO_OPENING_UNAVAILABLE: "));
+            opening.lobbyView.enterButton.onClick.Invoke();
+            yield return null;
             Assert.That(GameOpeningController.HasPlayedThisRun, Is.True);
-            AssertAtTitleWithNoOpening();
+            AssertAtBrowserWithNoOpening();
             Assert.That(opening.player.CurrentView, Is.Null);
             opening.enabled = false;
             opening.enabled = true;
@@ -229,27 +257,104 @@ namespace Hapio.Tests
         public IEnumerator MistakenHomeCanvasBindingDoesNotHideTheHomeDuringFallback()
         {
             GameObject actualOpeningRoot = null, homeCanvas = null;
-            LogAssert.Expect(LogType.Warning, new Regex("^HAPIO_OPENING_UNAVAILABLE: "));
             yield return LoadHome(controller =>
             {
                 actualOpeningRoot = controller.openingRoot;
                 homeCanvas = controller.lobbyView.screen.gameObject;
                 controller.openingRoot = homeCanvas;
             });
+            Assert.That(opening.lobbyView.titlePage.activeInHierarchy, Is.True);
+            Assert.That(GameOpeningController.IsPresenting, Is.False);
+            LogAssert.Expect(LogType.Warning, new Regex("^HAPIO_OPENING_UNAVAILABLE: "));
+            opening.lobbyView.enterButton.onClick.Invoke();
+            yield return null;
             Assert.That(actualOpeningRoot, Is.Not.Null);
             Assert.That(actualOpeningRoot.activeSelf, Is.False, "Fallback must close the independent opening Canvas.");
             Assert.That(homeCanvas.activeInHierarchy, Is.True, "A bad opening-root reference cannot hide the Home Canvas.");
             Assert.That(GameOpeningController.HasPlayedThisRun, Is.True);
             Assert.That(opening.IsPlaying || GameOpeningController.IsPresenting, Is.False);
             Assert.That(opening.lobbyView.OpeningBlocked, Is.False);
-            Assert.That(opening.lobbyView.titlePage.activeInHierarchy, Is.True);
-            Assert.That(session.RoomBrowserVisible, Is.False);
+            Assert.That(opening.lobbyView.browserPage.activeInHierarchy, Is.True);
+            Assert.That(session.RoomBrowserVisible, Is.True);
             Assert.That(opening.player.CurrentView, Is.Null);
             opening.lobbyView.enterButton.onClick.Invoke();
             yield return null;
             Assert.That(session.RoomBrowserVisible, Is.True);
             Assert.That(opening.lobbyView.browserPage.activeInHierarchy, Is.True);
             Assert.That(homeCanvas.activeInHierarchy, Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator DisablingBeforeStartDoesNotConsumeTheOpeningAndANewAppRunAllowsItAgain()
+        {
+            yield return LoadHome();
+            opening.enabled = false;
+            yield return null;
+            Assert.That(GameOpeningController.HasPlayedThisRun, Is.False);
+            opening.enabled = true;
+            yield return PressStart();
+            opening.player.Skip();
+            yield return Until(() => !GameOpeningController.IsPresenting, "First run finishes");
+            session.Network.Stop();
+            Object.Destroy(session.gameObject);
+            yield return null;
+            session = null;
+            ResetAppRun();
+            yield return LoadHome();
+            AssertAtTitleWithNoOpening();
+            Assert.That(GameOpeningController.HasPlayedThisRun, Is.False);
+            yield return PressStart();
+            Assert.That(opening.player.CurrentCutIndex, Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator HeldPointerDelaysBothTheFirstPageAndTheRoomBrowserUntilRelease()
+        {
+            yield return LoadHome();
+            Mouse mouse = InputSystem.AddDevice<Mouse>();
+            try
+            {
+                InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Left));
+                InputSystem.Update();
+                opening.lobbyView.enterButton.onClick.Invoke();
+                for (int frame = 0; frame < 3; frame++) yield return null;
+                Assert.That(GameOpeningController.IsPresenting, Is.True);
+                Assert.That(opening.IsPlaying, Is.False, "A held Start pointer cannot open or skip the first page.");
+                Assert.That(session.RoomBrowserVisible, Is.False);
+
+                InputSystem.QueueStateEvent(mouse, new MouseState());
+                InputSystem.Update();
+                yield return Until(() => opening.IsPlaying, "Releasing Start opens the first page");
+                Assert.That(opening.player.CurrentCutIndex, Is.Zero);
+                Assert.That(opening.player.CurrentPageIndex, Is.Zero);
+
+                InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Left));
+                InputSystem.Update();
+                opening.player.Skip();
+                for (int frame = 0; frame < 3; frame++) yield return null;
+                Assert.That(opening.lobbyView.OpeningBlocked, Is.True);
+                Assert.That(opening.openingRoot.activeInHierarchy, Is.True);
+                Assert.That(session.RoomBrowserVisible, Is.False, "A held finishing pointer cannot hit a room card.");
+
+                InputSystem.QueueStateEvent(mouse, new MouseState());
+                InputSystem.Update();
+                yield return Until(() => !GameOpeningController.IsPresenting, "Release opens the browser");
+                AssertAtBrowserWithNoOpening();
+            }
+            finally { InputSystem.RemoveDevice(mouse); }
+        }
+
+        private IEnumerator PressStart()
+        {
+            AssertAtTitleWithNoOpening();
+            opening.lobbyView.enterButton.onClick.Invoke();
+            opening.lobbyView.enterButton.onClick.Invoke();
+            Assert.That(GameOpeningController.IsPresenting, Is.True);
+            Assert.That(opening.IsPlaying, Is.False, "The title click is shielded for at least one frame before the first page.");
+            Assert.That(session.RoomBrowserVisible || session.Network.IsSearchingRooms, Is.False);
+            yield return Until(() => opening.IsPlaying, "Released Start opens the first cut exactly once");
+            Assert.That(opening.player.CurrentCutIndex, Is.Zero);
+            Assert.That(opening.player.CurrentPageIndex, Is.Zero);
         }
 
         private IEnumerator LoadHome(Action<GameOpeningController> beforeStart = null)
@@ -279,6 +384,17 @@ namespace Hapio.Tests
             Assert.That(opening.lobbyView.titlePage.activeInHierarchy, Is.True);
             Assert.That(opening.lobbyView.browserPage.activeInHierarchy, Is.False);
             Assert.That(session.RoomBrowserVisible, Is.False);
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home));
+        }
+
+        private void AssertAtBrowserWithNoOpening()
+        {
+            Assert.That(opening.IsPlaying || GameOpeningController.IsPresenting, Is.False);
+            Assert.That(opening.openingRoot.activeSelf, Is.False);
+            Assert.That(opening.lobbyView.OpeningBlocked, Is.False);
+            Assert.That(opening.lobbyView.titlePage.activeInHierarchy, Is.False);
+            Assert.That(opening.lobbyView.browserPage.activeInHierarchy, Is.True);
+            Assert.That(session.RoomBrowserVisible, Is.True);
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home));
         }
 

@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Hapio
 {
-    /// <summary>Local, once-per-app-run opening. Room and battle navigation stay with the existing Home screen.</summary>
+    /// <summary>The title's first Start opens the local story; Home owns the continuation to rooms.</summary>
     [DefaultExecutionOrder(-1000)]
     public sealed class GameOpeningController : MonoBehaviour
     {
@@ -17,7 +17,9 @@ namespace Hapio
         private static GameOpeningController current;
         private bool presenting;
         private bool subscribed;
+        private Coroutine pendingStart;
         private Coroutine pendingReturn;
+        private Action continuation;
 
         public bool IsPlaying => presenting && player != null && player.IsPlaying;
         public static bool HasPlayedThisRun => openingConsumed;
@@ -31,48 +33,44 @@ namespace Hapio
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void BeginLoadedHome()
+        private static void PrepareLoadedHome()
         {
             // Also runs when Editor Play is restarted with both domain and scene reload disabled.
             foreach (GameOpeningController controller in UnityEngine.Object.FindObjectsByType<GameOpeningController>())
-                if (controller.isActiveAndEnabled) controller.BeginOpening();
+                if (controller.isActiveAndEnabled) controller.PrepareHome();
         }
 
-        private void Awake()
+        private void Awake() => PrepareHome();
+
+        private void OnEnable()
+        {
+            if (lobbyView != null) lobbyView.RegisterOpening(this);
+        }
+
+        private void PrepareHome()
         {
             if (player != null) player.playOnStart = false;
-            if (!openingConsumed)
-            {
-                current = this;
-                presenting = true;
-                if (lobbyView != null) lobbyView.SetOpeningBlocked(true);
-            }
-            else HideOpeningRoot();
+            EndPresentation();
+            if (lobbyView != null) lobbyView.RegisterOpening(this);
         }
 
-        private void Start() => BeginOpening();
-
-        private void BeginOpening()
+        /// <summary>True means this click is owned by the opening, including its failure fallback.</summary>
+        public bool TryBeginFromStartButton(Action afterOpening)
         {
-            if (openingConsumed)
-            {
-                if (current != this)
-                {
-                    HideOpeningRoot();
-                    if (lobbyView != null) lobbyView.SetOpeningBlocked(false);
-                }
-                return;
-            }
+            if (!isActiveAndEnabled) return false;
+            if (presenting) return true;
+            if (openingConsumed) return false;
 
             // An interrupted or invalid attempt is still consumed, so Home cannot get stuck in a retry loop.
             openingConsumed = true;
+            continuation = afterOpening;
             current = this;
             presenting = true;
             if (lobbyView != null) lobbyView.SetOpeningBlocked(true);
             if (!ValidateBindings(out string error))
             {
                 Unavailable(error);
-                return;
+                return true;
             }
 
             try
@@ -82,6 +80,23 @@ namespace Hapio
                 // Re-enter the child lifecycle cleanly when Editor scene reload is disabled as well.
                 openingRoot.SetActive(false);
                 openingRoot.SetActive(true);
+                pendingStart = StartCoroutine(StartAfterRelease());
+            }
+            catch (Exception exception)
+            {
+                Unavailable(exception.Message);
+            }
+            return true;
+        }
+
+        private IEnumerator StartAfterRelease()
+        {
+            // The title click cannot also advance the first page, even with a held touch or key submit.
+            yield return null;
+            while (StoryTapAdvance.HasHeldPointer) yield return null;
+            pendingStart = null;
+            try
+            {
                 player.Finished += OnFinished;
                 subscribed = true;
                 if (!player.isActiveAndEnabled || !player.Play(player.sequence))
@@ -113,7 +128,7 @@ namespace Hapio
         private void Unavailable(string error)
         {
             Debug.LogWarning("HAPIO_OPENING_UNAVAILABLE: " + error, this);
-            EndPresentation();
+            EndPresentation(continueToRooms: true);
         }
 
         private void OnFinished(StoryExitReason reason)
@@ -127,18 +142,23 @@ namespace Hapio
             yield return null;
             while (StoryTapAdvance.HasHeldPointer) yield return null;
             pendingReturn = null;
-            EndPresentation();
+            EndPresentation(continueToRooms: true);
         }
 
-        private void EndPresentation()
+        private void EndPresentation(bool continueToRooms = false)
         {
+            if (pendingStart != null) StopCoroutine(pendingStart);
+            pendingStart = null;
             if (pendingReturn != null) StopCoroutine(pendingReturn);
             pendingReturn = null;
+            Action next = continueToRooms ? continuation : null;
+            continuation = null;
             presenting = false;
             if (current == this) current = null;
             Unsubscribe();
             if (player != null) player.Cancel();
             HideOpeningRoot();
+            next?.Invoke();
             if (lobbyView != null) lobbyView.SetOpeningBlocked(false);
         }
 
@@ -165,6 +185,7 @@ namespace Hapio
         {
             if (presenting) openingConsumed = true;
             EndPresentation();
+            if (lobbyView != null) lobbyView.UnregisterOpening(this);
         }
     }
 }

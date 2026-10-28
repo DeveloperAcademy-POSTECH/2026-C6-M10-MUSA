@@ -92,9 +92,12 @@ namespace C6Lab
             Transform stamina = hud.staminaFill != null ? hud.staminaFill.transform.parent : null;
             Transform left = hud.leftNeighborBadge != null ? hud.leftNeighborBadge.transform : null;
             Transform right = hud.rightNeighborBadge != null ? hud.rightNeighborBadge.transform : null;
+            Transform local = hud.localPlayerCircle != null ? hud.localPlayerCircle.transform : null;
             if (stamina == null || left == null || right == null || stamina.parent != parent
                 || left.parent != parent || right.parent != parent)
                 throw new InvalidOperationException("The three rear HUD decorations must retain their saved BattleUi parent.");
+            if (local != null && local.parent != parent)
+                throw new InvalidOperationException("The local player badge must retain its saved BattleUi parent.");
             Transform paper = board.transform.Find("OrbBoardPlate");
             if (paper == null || paper.GetComponent<Renderer>() == null)
                 throw new InvalidOperationException("The saved board paper renderer is missing.");
@@ -135,6 +138,9 @@ namespace C6Lab
             display.color = Color.white;
 
             rearDecorations.AddRange(new[] { stamina, left, right });
+            // The saved badge remains an editable Image, with its paint-pattern child and
+            // the same LabHud binding. Only its draw order changes, below the existing orb image.
+            if (local != null) rearDecorations.Add(local);
             rearDecorations.Sort((a, b) => a.GetSiblingIndex().CompareTo(b.GetSiblingIndex()));
             EnsureDisplayOrder();
             ResizeTarget();
@@ -156,13 +162,27 @@ namespace C6Lab
         private void EnsureDisplayOrder()
         {
             // Runtime HUD effects can insert/reorder siblings after initialization. Keep
-            // only the three rear decorations below the orb image; never move their Rects
-            // or promote the image above gameplay controls, pause or result overlays.
-            for (int i = 0; i < rearDecorations.Count; i++)
-                if (rearDecorations[i] != null && rearDecorations[i].GetSiblingIndex() != i)
-                    rearDecorations[i].SetSiblingIndex(i);
-            if (display != null && display.transform.GetSiblingIndex() != rearDecorations.Count)
-                display.transform.SetSiblingIndex(rearDecorations.Count);
+            // the rear decorations below the orb image; never move their Rects or promote
+            // the image above gameplay controls, pause or result overlays.
+            Transform local = hud.localPlayerCircle != null ? hud.localPlayerCircle.transform : null;
+            Transform ring = hud.TeamBar != null && hud.TeamBar.LocalRing != null
+                ? hud.TeamBar.LocalRing.transform : null;
+            int next = 0;
+            foreach (Transform decoration in rearDecorations)
+            {
+                if (decoration == null) continue;
+                // Team Ring is created on the first 2:2 HUD update, often after Initialize.
+                // Read the existing component each frame, rather than clone or cache that Image.
+                if (decoration == local && ring != null && ring.parent == decoration.parent)
+                    PlaceSibling(ring, next++);
+                PlaceSibling(decoration, next++);
+            }
+            if (display != null) PlaceSibling(display.transform, next);
+        }
+
+        private static void PlaceSibling(Transform item, int index)
+        {
+            if (item.GetSiblingIndex() != index) item.SetSiblingIndex(index);
         }
 
         private void ResizeTarget()

@@ -113,6 +113,105 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator LocalBadgeAndPatternStayEditableBelowOrbsWithoutChangingOtherControls()
+        {
+            RequireGraphics();
+            CreateFixture(out LabHud hud, out LabOrbBoard board, out Camera camera, out _, out _);
+            AddLocalBadge(hud);
+            Canvas.ForceUpdateCanvases();
+            UnityEngine.UI.Image savedBadge = hud.localPlayerCircle, savedPattern = hud.localPlayerPatternSample;
+            Vector3[] corners = Corners(savedBadge.transform), patternCorners = Corners(savedPattern.transform);
+            Transform parent = savedBadge.transform.parent;
+            LabOrbHudComposition.Attach(hud, board, camera);
+            yield return null;
+            LabOrbHudComposition composition = hud.GetComponent<LabOrbHudComposition>();
+            Assert.That(composition.IsCompositing, Is.True, composition.InitializationError);
+            Assert.That(savedBadge.transform.GetSiblingIndex(), Is.LessThan(composition.Display.transform.GetSiblingIndex()),
+                "The existing orb foreground must cover the local P badge.");
+            Assert.That(hud.localPlayerCircle, Is.SameAs(savedBadge));
+            Assert.That(hud.localPlayerPatternSample, Is.SameAs(savedPattern));
+            Assert.That(savedBadge.transform.parent, Is.SameAs(parent));
+            Assert.That(savedPattern.transform.parent, Is.SameAs(savedBadge.transform));
+            Assert.That(Corners(savedBadge.transform), Is.EqualTo(corners));
+            Assert.That(Corners(savedPattern.transform), Is.EqualTo(patternCorners));
+            Assert.That(hud.battleUi.transform.Find("ForegroundControl").GetSiblingIndex(),
+                Is.GreaterThan(composition.Display.transform.GetSiblingIndex()));
+            Assert.That(savedBadge.raycastTarget, Is.False);
+            Assert.That(savedPattern.raycastTarget, Is.False);
+
+            // Inspector-authored Rect changes still control the original Image, not a detached copy.
+            savedBadge.rectTransform.anchoredPosition += new Vector2(13f, 7f);
+            savedBadge.rectTransform.sizeDelta += new Vector2(9f, 3f);
+            Canvas.ForceUpdateCanvases();
+            Vector3[] moved = Corners(savedBadge.transform);
+            savedBadge.transform.SetAsLastSibling();
+            RenderTexture target = composition.Texture;
+            Camera foreground = composition.ForegroundCamera;
+            yield return null;
+            Assert.That(Corners(savedBadge.transform), Is.EqualTo(moved));
+            Assert.That(savedBadge.transform.GetSiblingIndex(), Is.LessThan(composition.Display.transform.GetSiblingIndex()));
+            Assert.That(composition.Texture, Is.SameAs(target));
+            Assert.That(composition.ForegroundCamera, Is.SameAs(foreground), "Badge ordering must reuse the existing composition resources.");
+
+            composition.enabled = false;
+            Canvas.ForceUpdateCanvases();
+            Assert.That(savedBadge.transform.parent, Is.SameAs(parent));
+            Assert.That(savedPattern.transform.parent, Is.SameAs(savedBadge.transform));
+            Assert.That(Corners(savedBadge.transform), Is.EqualTo(moved));
+        }
+
+        [UnityTest]
+        public IEnumerator TeamRingCreatedLaterStaysBehindBadgeAndOrbsAcrossBattleHideAndReturn()
+        {
+            RequireGraphics();
+            CreateFixture(out LabHud hud, out LabOrbBoard board, out Camera camera, out _, out _);
+            AddLocalBadge(hud);
+            int mask = camera.cullingMask;
+            LabOrbHudComposition.Attach(hud, board, camera);
+            yield return null;
+            LabOrbHudComposition composition = hud.GetComponent<LabOrbHudComposition>();
+            Assert.That(composition.IsCompositing, Is.True, composition.InitializationError);
+
+            // LabHud creates this bar only when the first team snapshot arrives. Bind the same
+            // component in the fixture without starting a transport or unrelated room lifecycle.
+            LabTeamBar bar = LabTeamBar.Create((RectTransform)hud.battleUi.transform, null);
+            typeof(LabHud).GetField("teamBar", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .SetValue(hud, bar);
+            var snapshot = new LabSnapshot { paintCellCount = 100, blueCells = 30, redCells = 20 };
+            bar.Present(snapshot, LabTeam.Blue, hud.localPlayerCircle);
+            yield return null;
+            UnityEngine.UI.Image ring = bar.LocalRing;
+            Assert.That(ring, Is.Not.Null);
+            Assert.That(ring.transform.parent, Is.SameAs(hud.localPlayerCircle.transform.parent));
+            Assert.That(ring.transform.GetSiblingIndex(), Is.LessThan(hud.localPlayerCircle.transform.GetSiblingIndex()));
+            Assert.That(hud.localPlayerCircle.transform.GetSiblingIndex(), Is.LessThan(composition.Display.transform.GetSiblingIndex()));
+            Assert.That(bar.transform.GetSiblingIndex(), Is.GreaterThan(composition.Display.transform.GetSiblingIndex()),
+                "The territory bar itself remains foreground UI.");
+
+            ring.transform.SetAsLastSibling();
+            hud.localPlayerCircle.transform.SetAsLastSibling();
+            bar.Present(snapshot, LabTeam.Red, hud.localPlayerCircle);
+            yield return null;
+            Assert.That(bar.LocalRing, Is.SameAs(ring));
+            Assert.That(ring.color, Is.EqualTo(LabTeamBar.Red));
+            Assert.That(ring.transform.GetSiblingIndex(), Is.LessThan(hud.localPlayerCircle.transform.GetSiblingIndex()));
+            Assert.That(hud.localPlayerCircle.transform.GetSiblingIndex(), Is.LessThan(composition.Display.transform.GetSiblingIndex()));
+
+            hud.battleUi.SetActive(false);
+            yield return null;
+            Assert.That(composition.IsCompositing, Is.False);
+            Assert.That(camera.cullingMask, Is.EqualTo(mask));
+            Assert.That(ring.gameObject.activeInHierarchy, Is.False);
+            Assert.That(hud.localPlayerPatternSample.gameObject.activeInHierarchy, Is.False);
+            hud.battleUi.SetActive(true);
+            yield return null;
+            Assert.That(composition.IsCompositing, Is.True, composition.InitializationError);
+            Assert.That(bar.LocalRing, Is.SameAs(ring));
+            Assert.That(ring.transform.GetSiblingIndex(), Is.LessThan(hud.localPlayerCircle.transform.GetSiblingIndex()));
+            Assert.That(hud.localPlayerCircle.transform.GetSiblingIndex(), Is.LessThan(composition.Display.transform.GetSiblingIndex()));
+        }
+
+        [UnityTest]
         public IEnumerator InvalidCompositionKeepsTheNormalCameraAndSavedLayoutUsable()
         {
             RequireGraphics();
@@ -305,6 +404,19 @@ namespace C6Lab.Tests
             var battleCamera = new GameObject("BattleCamera"); battleCamera.transform.SetParent(root.transform, false);
             hud.battleCamera = battleCamera.AddComponent<Camera>();
             hud.battleCamera.cullingMask = ~(1 << boardObject.layer);
+        }
+
+        private static void AddLocalBadge(LabHud hud)
+        {
+            RectTransform badge = NewRect("LocalPlayerCircle", hud.battleUi.transform);
+            badge.anchorMin = badge.anchorMax = new Vector2(.22f, .15f);
+            hud.localPlayerCircle = badge.gameObject.AddComponent<UnityEngine.UI.Image>();
+            hud.localPlayerCircle.raycastTarget = false;
+            RectTransform pattern = NewRect("PaintPatternSample", badge);
+            pattern.anchorMin = pattern.anchorMax = new Vector2(.83f, .17f);
+            pattern.sizeDelta = new Vector2(18f, 18f);
+            hud.localPlayerPatternSample = pattern.gameObject.AddComponent<UnityEngine.UI.Image>();
+            hud.localPlayerPatternSample.raycastTarget = false;
         }
 
         private static RectTransform NewRect(string name, Transform parent)
