@@ -1,0 +1,30 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:Style src="LabWatercolorPaint.uss" />
+    <ui:VisualElement class="watercolor-root">
+        <ui:Label text="Watercolor Paint · Blue Static Study" class="watercolor-title" />
+        <ui:Label text="EXPERIMENT #369 · Actual saved gourd and current paint renderer, isolated from the game. Both views use the same committed surface, camera and lighting. The candidate changes appearance only." class="watercolor-note" />
+        <ui:Label text="Fixture and view" class="watercolor-section" />
+        <ui:VisualElement name="viewControls" class="watercolor-controls" />
+        <ui:Label text="Candidate appearance" class="watercolor-section" />
+        <ui:VisualElement name="pigmentControls" class="watercolor-controls" />
+        <ui:VisualElement class="watercolor-actions">
+            <ui:Button name="nextHit" text="Next re-hit" class="watercolor-action" />
+            <ui:Button name="frontView" text="Front view" class="watercolor-action" />
+            <ui:Button name="seamView" text="Rotate side" class="watercolor-action" />
+            <ui:Button name="poleView" text="Rotate top" class="watercolor-action" />
+            <ui:Button name="refreshComparison" text="Refresh" class="watercolor-action" />
+            <ui:Button name="exportComparison" text="Export comparison PNG" class="watercolor-action" />
+        </ui:VisualElement>
+        <ui:VisualElement class="watercolor-panels">
+            <ui:VisualElement class="watercolor-panel">
+                <ui:Label text="CURRENT · Runtime high resolution" class="watercolor-heading" />
+                <ui:Image name="currentImage" class="watercolor-image" />
+            </ui:VisualElement>
+            <ui:VisualElement class="watercolor-panel">
+                <ui:Label text="CANDIDATE · Layered watercolor" class="watercolor-heading" />
+                <ui:Image name="candidateImage" class="watercolor-image" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:Label name="status" class="watercolor-status" />
+    </ui:VisualElement>
+</ui:UXML>

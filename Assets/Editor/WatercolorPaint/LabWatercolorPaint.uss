@@ -1,0 +1,14 @@
+.watercolor-root { flex-grow: 1; padding: 12px; background-color: #20262d; color: #f1eee5; }
+.watercolor-title { font-size: 19px; -unity-font-style: bold; margin-bottom: 6px; }
+.watercolor-note { white-space: normal; color: #d3cbb7; margin-bottom: 8px; }
+.watercolor-section { -unity-font-style: bold; margin-top: 4px; margin-bottom: 5px; }
+.watercolor-controls { flex-direction: row; flex-wrap: wrap; margin-bottom: 6px; }
+.watercolor-control { min-width: 230px; flex-grow: 1; margin-right: 12px; margin-bottom: 5px; }
+.watercolor-actions { flex-direction: row; flex-wrap: wrap; margin-bottom: 6px; }
+.watercolor-action { min-width: 105px; margin-right: 8px; margin-bottom: 4px; }
+.watercolor-panels { flex-direction: row; flex-grow: 1; min-height: 250px; }
+.watercolor-panel { flex-grow: 1; flex-basis: 0; margin: 4px; padding: 6px; background-color: #12181e; }
+.watercolor-heading { font-size: 15px; -unity-font-style: bold; -unity-text-align: middle-center; margin-bottom: 5px; }
+.watercolor-image { flex-grow: 1; min-height: 220px; }
+.watercolor-status { white-space: normal; margin-top: 8px; }
+.watercolor-error { color: #ffb2a1; }

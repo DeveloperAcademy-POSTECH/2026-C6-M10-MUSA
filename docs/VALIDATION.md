@@ -3306,3 +3306,16 @@ PR #365의 `b85904b2`에 최신 main `23217127`(#368, 결과 수동 진행)을 �
 초기 작업 공간 생성 도구의24개 기본 슬롯은 현재 저장된25컷 목록과 구분한다. 기존 Opening.asset은 보존하지만 목록을 삭제한 뒤 `CreateMissing`으로 복구하는 경우19-1이 빠질 수 있는 기존 도구 제약은 `POPUP_STORY_WORKFLOW.md`에 남겼다. 이번 검사에서는 에셋 삭제·재생성을 수행하지 않았다.
 
 Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟·전체 EditMode·전체 PlayMode·모바일 성능: **NOT_RUN**. 앞선 작성자의 렌더 확인과 이번 Shader/API·자동 검사 범위를 구분한다.
+
+## 2026-10-28 — #369 파란 수채 질감 정적 비교 1단계
+
+- 기준: main `f6effa2c`에서 분기한 `experiment/#369-gourd-watercolor`, Unity 6000.6.5f1 / macOS / Metal의 기존 Editor 1개. 새 기능은 Assets/Editor/WatercolorPaint 아래의 비교 도구에만 있으며 실제 전투에는 연결하지 않았다.
+- 컴파일: 신규 Study/Window/Validation 타입 로드, `EditorUtility.scriptCompilationFailed=false`, 수채 Shader 지원 및 ShaderUtil 메시지 0개를 확인했다.
+- 실제 GPU 검증: `LabWatercolorPaintValidation.Export`의 정면 최초·재명중1/3회·이음새/극 재명중3회, 총 **5개 fixture 검사 통과**. 현재 기준은 실제 LabHighResolutionPaintRuntime 1024×512이며 후보와 같은 지도·카메라·저장 박을 사용했다. 전체 EditMode/PlayMode 테스트 모음 통과를 의미하지 않는다.
+- 판정 보존: 반복 Prepare/렌더·슬라이더 설정 변경 전후 RGBA/P 해시·revision·VisualVersion·진행 셀 수·PaintCount·성장 잔량·VisualStamp 바이트가 동일했다. 정면 covered cell은 최초655·재명중1회1146·3회2129/32768이었다. 격리된 fixture의 별도 설정에서만 Drying OFF이며 실제 원본은 그대로다.
+- 후보 GPU 지도: 기존 지원 영역과 alpha>0 영역 일치, 바깥 pigment 없음, premultiplied RGB·파란 hue 유지·동일 입력 반복 재생 byte 동일을 확인했다. 정면 재명중3회에서 227개 alpha 단계와 가장자리 강도 OFF 대비21127개 픽셀 변화가 있었다. 이는 시각 품질 승인이나 모든 경계가 보기 좋다는 판정이 아니다.
+- 원본 보존/수명: Config JSON·원본 Config/박 Prefab/재질/패턴/표면 Shader/Battle Scene 파일 해시·활성 Scene/dirty·loaded Scene 수가 동일했다. 격리 Study 종료 후 전용 Texture/Material/Preview root와 현재 high-resolution RT 개수는 시작 값으로 돌아왔다.
+- 화면: 실제 Watercolor Paint 창에서 좌우 이미지와8개 표현 슬라이더, 시점·위치·재명중 조절 UI 표시를 확인했다. Pigment density UI 값 이벤트 .62→.7에서 후보 이미지가 바뀌고 .62로 복원되는 것을 확인했다. 실제 손/마우스 드래그 플레이 검증은 아니다. Home Scene은 Edit 상태·dirty=false를 유지했다.
+- 저장 이미지: `docs/images/paint-watercolor-369-first.png`, `paint-watercolor-369-repeat3.png` — **왼쪽 기존 / 오른쪽 후보**, 실제 저장 박의 격리 Editor 렌더. 생성형 합성 이미지나 실제 플레이 캡처가 아니다.
+- **검토 대기:** 수채 질감의 미술 품질과 농도·가장자리 강도 승인.
+- **미실행/미구현:** 실제 전투 설치, 짧은 번짐, 다색/P무늬/2:2/건조의 새 표현 회귀, LAN/핫스팟 실기기, iOS export·서명·설치, iPhone CPU/GPU·메모리·발열 실측. 기존 게임/네트워크 코드는 변경하지 않았다.

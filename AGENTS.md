@@ -72,3 +72,7 @@
 - 일반 중간 결과는 전원 결과 수신 ACK 후 누구도 박을 관람하지 않을 때 Host가 다음 스테이지 버튼으로 진행한다. 별도 Ready 입력과10초 자동 진행은 없다. OnEnable에서 결과를 초기화하며 최소 다음 프레임·모든 마우스/터치 해제 전에는 NEXT/HOME/관람 버튼과 콜백을 차단한다. 이후 새 입력을 받으며 고정 초 대기는 없다. Hapio Battle에는 독립 Lab 결과 카드·대시보드를 표시하지 않으며 공유 통계·관람, 독립 Lab 단판과2:2 결과·로비 복귀는 유지한다.
 - 완료 연출1.2초/.2배는 유지한다. 예약을 포함한 prepare에 최종 지도 준비·예약 수신을 한 ACK로 확인하고, Host 최초 Victory의12초 서버 deadline을 prepare/상태로 공유한다. 연출 중 확보한 결과·관람 캐시를 재사용하며 Story 결과에서 추가30초를 기다리지 않는다. 솔로의 예약 여유0.75초만 생략하고 멀티는 유지한다. 한도에서 연출을 생략해도 최종 지도 불일치가 남은 중간 StageResult는 GameOver가 되며, 최종 Completed만 클리어를 보존하고 지도 미동기화 안내를 표시한다. CPU 지도가 일치해도 GPU 관람 사본 생성 실패 시 별도 오류 안내 없이 관람이 비활성화될 수 있는 기존 제약은 남아 있다.
 - 게임 연결 토큰만 **`C6HapioGame/22`**로 올린다. **프로토콜5677·`C6PhysicsLab/38`·공유 설정251개**와 기존 인덱스는 유지한다. 구현 설명은 `docs/GAME_FLOW.md`·`docs/STAGE_RESULT_UI.md`·`docs/SESSION_FINISH_UI.md`, 실제 수행 여부는 `docs/VALIDATION.md`에서 구분한다.
+
+## #369 수채 질감 정적 실험
+
+- `C6 Lab > Experiments > Watercolor Paint`는 Editor 전용 파란색 정적 비교다. 실제 게임 연결과 번짐은 시안 확인 뒤 진행한다. 현행 `LabHighResolutionPaintRuntime`과 같은 확정 지도/기록을 비교하며 원본 패턴·Prefab·Scene·성장/건조/완료·네트워크는 변경하지 않는다. 격리된 비교의 Drying OFF와 최근128개 기록 한도를 실제 게임 규칙 변경으로 해석하지 않는다. `docs/WATERCOLOR_PAINT_EXPERIMENT.md`를 따른다.
