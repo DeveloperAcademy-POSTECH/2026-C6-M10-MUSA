@@ -23,9 +23,6 @@ namespace C6Lab.Tests
             values[5] = 1f; values[6] = 1f; values[7] = 1f;
             values[155] = values[184] = 0f;
             values[207] = values[208] = 0f;
-            // 북 누르기 테스트용: 모든 사람에게 북을 두고, 구미호 방해(매혹 등)는 꺼 둔다.
-            values[74] = LabModel.MaximumParticipants;
-            values[205] = values[206] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.YaguangTimelineSabotageEndSeconds, Is.EqualTo(100f), "The timetable's sabotage ends at 100 s.");
             Assert.That(config.YaguangFeverStaminaMultiplier, Is.EqualTo(2f), "Fever doubles recovery by default.");
