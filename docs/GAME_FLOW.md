@@ -60,7 +60,7 @@
 
 새 코드: `Assets/Hapio/Scripts/Core/{GameSession,GameRunFlow,GameFlowState,GameFlowSnapshot,GameScenePaths}.cs`, `Scripts/UI`, `Editor/GameSceneBuilder.cs`, `Editor/GameBuild.cs`.
 
-기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 종전 연결 토큰·단판 동작을 사용한다. 공유 설정은 **228개·프로토콜5669**다. 기존0~199와 #299 고해상도 설정200~201을 유지하고, #301 섬광 흔들어 풀기202~203과 #305 매혹 예고204를 함께 사용한다. 단독 PR이 같은 번호를 다른 필드에 사용하므로 통합 게임 연결 토큰은 `C6HapioGame/17`이며 단일 Lab의 `C6PhysicsLab/34`과 분리한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
+기존 코드의 연결부: `LabNetwork.GameFlow.cs`와 `LabNetwork.cs`의 opt-in 분기. 기본값은 OFF이므로 기존 Lab은 별도 연결 토큰·단판 동작을 사용한다. #341 현재 공유 설정은 **249개·프로토콜5676**, 게임 토큰은 `C6HapioGame/20`, 단일 Lab은 `C6PhysicsLab/37`다. 기존0~237(고해상도·섬광·매혹·공통 기믹·오색 보상 포함)을 유지하고 지귀 A/B의238~248을 추가한다. 서로 다른 규약의 빌드를 혼용하지 않는다.
 
 검사 코드는 `Assets/Hapio/Tests`와 `LabGameFlowBridgeTests`다. 현재 통합의 실제 실행 결과는 `VALIDATION.md`의 #278 절을 참조한다. Scene 흐름 검사의 승리 유도는 CPU 도색 완료용 fixture이며 실제 투척 명중을 검증했다고 해석하지 않는다. 기존 투척·도색 검사는 별도로 유지한다.
 
@@ -208,3 +208,8 @@ UT 기믹 기록은 기존 Inspector 스위치 기본OFF를 유지한다. schema
 ## #332 지귀 120초 표면 불 통합
 
 Stage03에서 새 시간표 ON일 때만 120초를 적용합니다. A 10/40/60/80·B 30/50/70/90·공통 20/40/60/80, 100초 방해 무벌점 정리 뒤 자동 회복 속도 2배입니다. 일반 공통 반복 타이머나 구형 지귀 자동 추첨은 함께 켜지 않습니다. 기존 Home/Lobby/Battle/결과 흐름과 조기 100% 승리·기한 Defeat·완료 연출은 보존합니다. Settings 236개·5672/Lab33/Game16이며 지귀 DEV 228~235는 scope 3에서만 편집합니다. 다른 요괴/2:2와 별도 Lab 수동 시험은 기존 정책을 유지합니다. 소모 감소·실제 음성·기기 행동 검증 상태는 [상세 문서 11~12절](JIGWI_LEVEL_DESIGN_120S.md)을 따릅니다.
+
+
+## #341 현재 지귀 화면 A/B
+
+위 #332의 시간표 슬롯/120초/100초 정리는 유지하며 표면 근원·도색 차단을 개인 발화/전원 화면 화재로 교체했다. A는 개인 회복4배·5초 소각·실제 박 Combined명중3회 조기 해제, B는 각자 불3개·Raw 조합 Water·개별12초 재점화·전원 동시 소화다. ScreenOverlay 프리팹을 기존 Battle Canvas에 연결하며 Scene을 교체하지 않는다. 최신249개 설정·접속 규약·소유권/소모·화면 투영·실행 확인 범위는 [현재 지귀 A/B](JIGWI_SCREEN_PATTERNS.md)를 따른다. 과거 절의 기존 표면 사양과 검사 횟수는 당시 기록이다.

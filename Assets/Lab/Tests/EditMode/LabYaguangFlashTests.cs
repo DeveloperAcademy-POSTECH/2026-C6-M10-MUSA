@@ -97,7 +97,7 @@ namespace C6Lab.Tests
                     .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
                 Assert.That(ui.EnsureValueInputs(), Is.True,
                     "The saved Lab expands its legacy setting rows through the same public startup path as runtime.");
-                Assert.That(ui.valueInputs, Has.Length.EqualTo(238));
+                Assert.That(ui.valueInputs, Has.Length.EqualTo(249));
                 typeof(LabDeveloperMode).GetMethod("BuildCategoryLayout", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(ui, null);
                 Transform content = ui.valueInputs[0].transform.parent.parent;

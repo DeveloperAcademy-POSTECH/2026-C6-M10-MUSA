@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -15,16 +16,18 @@ using Object = UnityEngine.Object;
 namespace Hapio.Tests
 {
     /// <summary>
-    /// Saved Home/session/Battle integration. The explicit clock fixture seeks and holds the
-    /// ignition samples so the normal Host publish/calibration path can be inspected without
-    /// forging a fire snapshot or allowing a later real-time update to move the model backwards.
-    /// A bounded two-player model geometry fixture also samples curtains on the same saved shell.
-    /// It restores the network model and camera before yielding, and does not claim multi-device transport/cooperation verification.
+    /// Actual saved Home -> shared Battle Stage03, with the real DEV skip and held Host clock.
+    /// A/B round state comes from the running model, not a synthetic snapshot. This is solo
+    /// production binding coverage; it does not claim remote clients or rendered overlay pixels.
     /// </summary>
     public sealed class GameJigwiStageIntegrationTests
     {
         private GameSession session;
         private LabNetwork network;
+        private LabBattleClock clock;
+        private LabModel model;
+        private double heldRealSample, startedAt;
+        private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
 
         [UnitySetUp]
         public IEnumerator LoadSavedHome()
@@ -32,11 +35,10 @@ namespace Hapio.Tests
             Assert.That(GameSession.Instance, Is.Null);
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
             yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene,
-                "The saved Home must bootstrap its actual persistent session prefab.");
-            session = GameSession.Instance;
-            network = session.Network;
+                "Saved Home must instantiate its actual persistent session.");
+            session = GameSession.Instance; network = session.Network;
             Assert.That(network.GameFlowEnabled, Is.True);
-            network.port = AvailableDualFamilyPort();
+            network.port = AvailablePort();
         }
 
         [UnityTearDown]
@@ -45,12 +47,11 @@ namespace Hapio.Tests
             Time.timeScale = 1f;
             if (session != null)
             {
-                network.Stop();
-                Object.Destroy(session.gameObject);
+                network.Stop(); Object.Destroy(session.gameObject);
                 yield return null;
             }
             Scene previous = SceneManager.GetActiveScene();
-            Scene cleanup = SceneManager.CreateScene("Jigwi saved-scene fixture cleanup");
+            Scene cleanup = SceneManager.CreateScene("Jigwi A B saved-scene cleanup");
             SceneManager.SetActiveScene(cleanup);
             if (previous.IsValid() && previous.isLoaded) yield return SceneManager.UnloadSceneAsync(previous);
             session = null; network = null;
@@ -58,7 +59,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedGameReachesJigwiAndBindsItsRealPaintShellToHostRootsAndHud()
+        public IEnumerator SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell()
         {
             session.StartSolo();
             yield return WaitPlaying(1);
@@ -70,240 +71,213 @@ namespace Hapio.Tests
             yield return WaitPlaying(3);
 
             LabSnapshot before = network.Snapshot;
-            Assert.That(before.jigwiStage.enabled, Is.True, "Stage03 must opt into the new policy through the real run configuration.");
+            Assert.That(before.jigwiAB.enabled, Is.True);
+            Assert.That(before.jigwiStage.enabled, Is.False, "#341 must not create old surface roots or paint-blocking cones.");
             Assert.That(before.remaining, Is.InRange(116d, 120d));
-            Assert.That(before.jigwiStage.cutoffAt - before.jigwiStage.startedAt, Is.EqualTo(100d));
+            Assert.That(before.jigwiAB.cutoffAt - before.jigwiAB.startedAt, Is.EqualTo(100d));
             var binding = Object.FindFirstObjectByType<GameBattleBindings>();
-            Assert.That(binding, Is.Not.Null);
-            Assert.That(binding.IsPresentationReady, Is.True);
-            Assert.That(binding.target, Is.SameAs(network.target));
+            Assert.That(binding, Is.Not.Null); Assert.That(binding.IsPresentationReady, Is.True);
             LabTarget target = network.target;
+            Assert.That(target, Is.SameAs(binding.target));
             LabGourdPaint paint = target.GetComponent<LabGourdPaint>();
             Assert.That(paint.IsReady, Is.True);
             Assert.That(paint.visualPrefab, Is.SameAs(Resources.Load<GameObject>("GourdPaint/WhiteGourd")));
             Assert.That(target.MountedVisual, Is.Not.Null);
-            MeshFilter shell = paint.Shell.GetComponent<MeshFilter>();
-            Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell.sharedMesh),
-                "The authoritative hitbox must be the saved WhiteGourd paint shell, not a standalone cylinder fixture.");
-            int colliderCount = target.GetComponentsInChildren<Collider>(true).Length;
-
-            // Use the clock's public pause API with an explicit future real-time sample, then
-            // keep it held. Every subsequent network Update now reads this same battle time.
-            var clock = (LabBattleClock)Field("battleClock").GetValue(network);
-            var model = (LabModel)Field("model").GetValue(network);
-            double realNow = Time.realtimeSinceStartupAsDouble;
-            double desired = before.jigwiStage.startedAt + 11.2d;
-            double seek = desired - clock.Now(realNow);
-            Assert.That(seek, Is.GreaterThan(0d));
-            double heldRealSample = realNow + seek;
-            Assert.That(clock.Pause(heldRealSample), Is.True);
-            Assert.That(clock.Now(realNow), Is.EqualTo(desired).Within(.00001d));
-            model.Tick(desired);
-            Method("PublishSnapshot").Invoke(network, new object[] { true });
-            Method("SyncJigwiStagePresentation").Invoke(network, null);
-            yield return null;
-
-            LabSnapshot current = network.Snapshot;
-            Assert.That(current.paused, Is.True, "The fixture must remain held to avoid a reverse-time update after seeking.");
-            LabJigwiStageGroup ignition = current.jigwiStage.groups.Single(group => group.slot == 0);
-            Assert.That(ignition.pattern, Is.EqualTo(LabJigwiStagePattern.Ignition));
-            Assert.That(ignition.geometryConfigured, Is.True, "The Host must calibrate the actual saved shell before presentation.");
-            Assert.That(ignition.helperPlayer, Is.EqualTo(network.LocalPlayerId));
-            Assert.That(ignition.affectedPlayer, Is.EqualTo(network.LocalPlayerId));
-            Assert.That(LabJigwiStagePresentation.TrySurfacePoint(target, ignition.rootDirection,
-                out Vector3 point, out _), Is.True);
-            Vector3 mapped = target.Hitbox.transform.InverseTransformPoint(point).normalized;
-            Assert.That(Vector3.Angle(mapped, ignition.rootDirection), Is.LessThan(.1f));
-            Assert.That(ignition.ContainsRoot(network.LocalPlayerId, mapped, current.serverTime), Is.True);
-            Vector3 screen = binding.battleCamera.WorldToViewportPoint(point);
-            Assert.That(screen.z, Is.GreaterThan(0f));
-            Assert.That(screen.x, Is.InRange(0f, 1f)); Assert.That(screen.y, Is.InRange(0f, 1f));
-            var marks = network.GetComponent<LabJigwiStagePresentation>();
-            Assert.That(marks, Is.Not.Null);
-            Assert.That(marks.VisibleRoots, Is.EqualTo(1));
-            Assert.That(marks.VisibleFirePatches, Is.EqualTo(1));
-            Assert.That(target.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(colliderCount));
-            LabJigwiHud hud = Object.FindFirstObjectByType<LabJigwiHud>();
+            Mesh shell = paint.Shell.GetComponent<MeshFilter>().sharedMesh;
+            Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell));
+            int originalColliderCount = target.GetComponentsInChildren<Collider>(true).Length;
+            var hud = Object.FindFirstObjectByType<LabJigwiHud>();
             Assert.That(hud, Is.Not.Null); Assert.That(hud.network, Is.SameAs(network));
-            Assert.That(hud.stageNotice, Is.Not.Null);
-            Assert.That(hud.stageNotice.gameObject.activeInHierarchy, Is.True);
-            Assert.That(hud.stageNotice.text, Does.Contain("큰 불씨"));
-            Assert.That(hud.stageNotice.raycastTarget, Is.False);
+            var overlay = Object.FindFirstObjectByType<LabJigwiScreenPresentation>();
+            Assert.That(overlay, Is.Not.Null, "The saved battle HUD must install the editable screen prefab.");
+            Assert.That(Resources.Load<GameObject>(LabJigwiScreenPresentation.PrefabResource), Is.Not.Null);
+            Assert.That(overlay.source, Is.SameAs(network));
+            Assert.That(overlay.canvas.rootCanvas, Is.SameAs(hud.canvas.rootCanvas));
+            Assert.That(overlay.transform.parent, Is.SameAs(hud.canvas.rootCanvas.transform));
+            Assert.That(overlay.battleCamera, Is.SameAs(binding.battleCamera));
+            Assert.That(overlay.GetComponentsInChildren<UnityEngine.UI.Graphic>(true).All(graphic => !graphic.raycastTarget), Is.True);
+            Assert.That(overlay.GetComponent<CanvasGroup>().blocksRaycasts, Is.False);
+            Assert.That(overlay.GetComponentsInChildren<Collider>(true), Is.Empty);
+            Assert.That(overlay.GetComponentsInChildren<MeshRenderer>(true), Is.Empty);
 
-            CaptureActualFlamePixels(binding.battleCamera, target);
+            clock = (LabBattleClock)Field("battleClock").GetValue(network);
+            model = (LabModel)Field("model").GetValue(network);
+            startedAt = before.jigwiAB.startedAt;
+            HoldAt(11.2d);
+            yield return null;
+            Assert.That(network.Snapshot.paused, Is.True);
+            Assert.That(clock.Now(Time.realtimeSinceStartupAsDouble), Is.EqualTo(startedAt + 11.2d).Within(.00001d));
+            LabJigwiABRound a = network.Snapshot.jigwiAB.Active(startedAt + 11.2d);
+            Assert.That(a, Is.Not.Null); Assert.That(a.kind, Is.EqualTo(LabJigwiABKind.PersonalBurn));
+            Assert.That(a.targetPlayer, Is.EqualTo(network.LocalPlayerId));
+            Assert.That(a.requiredHits, Is.EqualTo(network.config.JigwiABPersonalRequiredHits));
+            Assert.That(overlay.PersonalHeatVisible, Is.True);
+            Assert.That(overlay.VisibleScreenFires, Is.Zero);
+            Assert.That(overlay.status.text, Does.Contain("과열").And.Contain("0/" + a.requiredHits));
+            Assert.That(overlay.personalFlames.All(image => image.texture
+                == Resources.Load<Texture2D>("Jigwi/SurfaceFlameWash")), Is.True);
+            Assert.That(hud.heat.gameObject.activeInHierarchy, Is.False);
+            Assert.That(hud.effectText.gameObject.activeInHierarchy, Is.False);
+            Assert.That(hud.stageNotice == null || !hud.stageNotice.gameObject.activeInHierarchy, Is.True);
+            Assert.That(hud.testToggle.gameObject.activeInHierarchy, Is.False);
+            AssertNoOldSurfacePresentation();
 
-            Vector2 initialOffset = ScreenOffset(binding.battleCamera, target, point);
-            // Resume at the same synthetic real-time sample, then immediately pause at the
-            // next sample. No Update can observe the temporary unpaused/backward clock.
-            Assert.That(clock.Resume(heldRealSample), Is.True);
-            realNow = Time.realtimeSinceStartupAsDouble;
-            desired = before.jigwiStage.startedAt + 61.2d;
-            heldRealSample = realNow + desired - clock.Now(realNow);
+            HoldAt(31.2d);
+            // The same clock stays held across the forward seek; no real-time Update can roll it back.
+            Method("SyncJigwiFireSurfaces").Invoke(network, null);
+            yield return null;
+            LabSnapshot current = network.Snapshot;
+            LabJigwiABRound b = current.jigwiAB.Active(startedAt + 31.2d);
+            Assert.That(b, Is.Not.Null); Assert.That(b.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
+            Assert.That(overlay.PersonalHeatVisible, Is.False);
+            Assert.That(overlay.VisibleScreenFires, Is.EqualTo(network.config.JigwiABGroupFireCount));
+            Assert.That(overlay.status.text, Does.Contain("물 결합 구슬"));
+            Assert.That(overlay.playerStatus.text, Does.Contain("P1 0/" + network.config.JigwiABGroupFireCount));
+            var surfaces = network.GetComponentsInChildren<LabJigwiFireSurface>(true)
+                .Where(surface => surface.FireId == b.id && surface.OwnerPlayerId == network.LocalPlayerId).ToArray();
+            Assert.That(surfaces, Has.Length.EqualTo(network.config.JigwiABGroupFireCount + 1));
+            var curtain = surfaces.Single(surface => surface.IsCurtain);
+            Assert.That(curtain.Hitbox, Is.TypeOf<BoxCollider>());
+            Assert.That(overlay.GroupCurtainVisible, Is.True);
+            Assert.That(overlay.RemainingIgnitions, Is.EqualTo(3));
+            Assert.That(overlay.CurtainStrength, Is.EqualTo(1f));
+            Assert.That(network.TryGetJigwiABCurtainFrame(b, network.LocalPlayerId, current.serverTime,
+                out Vector3 curtainCenter, out Quaternion curtainRotation, out Vector2 curtainHalfSize), Is.True);
+            Assert.That(Vector3.Distance(curtain.transform.position, curtainCenter), Is.LessThan(.005f));
+            Assert.That(Quaternion.Angle(curtain.transform.rotation, curtainRotation), Is.LessThan(.01f));
+            Assert.That(surfaces.All(surface => surface.Active && surface.Hitbox.isTrigger), Is.True);
+            Assert.That(surfaces.SelectMany(surface => surface.GetComponentsInChildren<Renderer>(true))
+                .Any(renderer => renderer.enabled && renderer.gameObject.activeInHierarchy), Is.False,
+                "The real B hit targets are invisible world colliders; visible fire belongs only to the Canvas.");
+            var localFires = b.players.Single(player => player.playerId == network.LocalPlayerId).targets;
+            for (int i = 0; i < localFires.Length; i++)
+            {
+                Assert.That(network.TryGetJigwiABFireWorldPosition(b, localFires[i], network.LocalPlayerId, i,
+                    current.serverTime, out Vector3 world), Is.True);
+                var collider = surfaces.Single(surface => surface.FireTargetId == localFires[i].id);
+                Assert.That(Vector3.Distance(collider.transform.position, world), Is.LessThan(.005f));
+                Assert.That(collider.Hitbox.bounds.extents.x, Is.EqualTo(b.targetRadius).Within(.005f));
+                Vector3 projected = binding.battleCamera.WorldToViewportPoint(world);
+                Assert.That(projected.z, Is.GreaterThan(0f));
+                Assert.That(projected.x, Is.InRange(0f, 1f)); Assert.That(projected.y, Is.InRange(0f, 1f));
+                Camera uiCamera = overlay.canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : overlay.canvas.worldCamera;
+                Assert.That(RectTransformUtility.ScreenPointToLocalPointInRectangle(overlay.fireLayer,
+                    binding.battleCamera.WorldToScreenPoint(world), uiCamera, out Vector2 expected), Is.True);
+                Assert.That(Vector2.Distance(overlay.fireImages[i].rectTransform.anchoredPosition, expected), Is.LessThan(.1f));
+                Assert.That(overlay.fireImages[i].raycastTarget, Is.False);
+                Assert.That(overlay.fireImages[i].material.shader.name, Is.EqualTo("C6Lab/Jigwi Screen Flame"));
+            }
+            AssertNoOldSurfacePresentation();
+            Assert.That(paint.IsReady, Is.True);
+            Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell), "Switching A/B cannot replace the bound WhiteGourd paint/hit shell.");
+            Assert.That(target.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(originalColliderCount));
+            Assert.That(clock.IsPaused, Is.True);
+
+            // Actual running model + saved UI: a smaller visual must never create an attack gap.
+            // This fixture supplies approved in-flight Water states; real flight contact is tested separately.
+            // Hold the clock without allowing the Pause panel to hide the effect in evidence captures.
+            Transform pauseRoot = binding.hud.pauseMenu.transform;
+            while (pauseRoot.parent != null && pauseRoot.parent != overlay.canvas.transform) pauseRoot = pauseRoot.parent;
+            var pauseCapture = pauseRoot.GetComponent<CanvasGroup>();
+            if (pauseCapture == null) pauseCapture = pauseRoot.gameObject.AddComponent<CanvasGroup>();
+            pauseCapture.alpha = 0f;
+            TestContext.WriteLine("JIGWI_CURTAIN_GEOMETRY frame=" + curtainHalfSize + " eyeRect=" + binding.battleCamera.rect
+                + " mesh=" + shell.bounds + " scale=" + target.Hitbox.transform.lossyScale + " actual=" + target.Hitbox.bounds);
+            CaptureScreenEvidence("3"); yield return null;
+            int paintedBefore = model.PaintSurface.CoveredCount;
+            float previousStrength = overlay.CurtainStrength;
+            for (int i = 0; i < 2; i++)
+            {
+                ThrowFixtureWaterAt(b, localFires[i].id, "saved-point-" + i);
+                PublishFireState(); yield return null;
+                Assert.That(overlay.RemainingIgnitions, Is.EqualTo(2 - i));
+                Assert.That(overlay.GroupCurtainVisible, Is.True);
+                Assert.That(overlay.CurtainStrength, Is.LessThan(previousStrength));
+                previousStrength = overlay.CurtainStrength;
+                Assert.That(curtain.Active, Is.True);
+                Assert.That(model.JigwiABBlocksBoss(network.LocalPlayerId, current.serverTime), Is.True);
+                HoldAt(31.9d + i * .7d); yield return null;
+                CaptureScreenEvidence((2 - i).ToString()); yield return null;
+            }
+            ThrowFixtureWaterAt(b, LabJigwiABFireMotion.CurtainId(b.id, network.LocalPlayerId), "saved-curtain-only");
+            PublishFireState(); yield return null;
+            Assert.That(overlay.GroupWaterVisible, Is.True, "A Water hit on the curtain gives feedback without clearing the last ignition.");
+            Assert.That(overlay.RemainingIgnitions, Is.EqualTo(1));
+            Assert.That(overlay.GroupCurtainVisible, Is.True);
+            Assert.That(curtain.Active, Is.True);
+            ThrowFixtureWaterAt(b, localFires[2].id, "saved-final-point");
+            PublishFireState(); yield return null;
+            Assert.That(overlay.RemainingIgnitions, Is.Zero);
+            Assert.That(overlay.GroupCurtainVisible, Is.False);
+            Assert.That(curtain == null || !curtain.Active, Is.True);
+            Assert.That(model.JigwiABBlocksBoss(network.LocalPlayerId, current.serverTime), Is.False);
+            Assert.That(model.PaintSurface.CoveredCount, Is.EqualTo(paintedBefore));
+            Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell));
+            HoldAt(35d); yield return null;
+            CaptureScreenEvidence("0"); yield return null;
+            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B31.2/Canvas+collider projection/curtain3-2-1-0 checked. "
+                + "Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
+        }
+
+        private static void CaptureScreenEvidence(string remaining)
+        {
+            if (Application.isBatchMode || SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) return;
+            // Nonblocking GameView capture includes the real saved cameras and ScreenSpaceOverlay.
+            // It is supporting visual evidence, not a mobile/device test or the GPU assertion fixture.
+            ScreenCapture.CaptureScreenshot(Path.Combine(Path.GetTempPath(), "jigwi341-curtain-" + remaining + ".png"));
+        }
+
+        private void ThrowFixtureWaterAt(LabJigwiABRound round, string targetId, string id)
+        {
+            double now = clock.Now(Time.realtimeSinceStartupAsDouble);
+            var orb = new LabOrbState { id = id, owner = network.LocalPlayerId, kind = LabOrbKind.Combined,
+                element = LabOrbElement.Water, createdAt = now, x = .5f, y = .5f };
+            ((Dictionary<string, LabOrbState>)typeof(LabModel).GetField("orbs", Private).GetValue(model)).Add(id, orb);
+            Assert.That(model.TryLaunch(orb.owner, id, "launch/" + id, now, out _, out string reason), Is.True, reason);
+            Assert.That(model.ConfirmJigwiABFireHit(id, round.id, targetId, now, out bool extinguished), Is.True);
+            Assert.That(extinguished, Is.EqualTo(targetId != LabJigwiABFireMotion.CurtainId(round.id, orb.owner)));
+        }
+        private void PublishFireState()
+        {
+            Method("PublishSnapshot").Invoke(network, new object[] { true });
+            Method("SyncJigwiFireSurfaces").Invoke(network, null);
+        }
+
+        private void HoldAt(double elapsed)
+        {
+            if (clock.IsPaused) Assert.That(clock.Resume(heldRealSample), Is.True);
+            double realNow = Time.realtimeSinceStartupAsDouble;
+            double desired = startedAt + elapsed;
+            double advance = desired - clock.Now(realNow);
+            Assert.That(advance, Is.GreaterThan(0d));
+            heldRealSample = realNow + advance;
             Assert.That(clock.Pause(heldRealSample), Is.True);
             Assert.That(clock.Now(realNow), Is.EqualTo(desired).Within(.00001d));
             model.Tick(desired);
             Method("PublishSnapshot").Invoke(network, new object[] { true });
             Method("SyncJigwiStagePresentation").Invoke(network, null);
-            yield return null;
-
-            current = network.Snapshot;
-            LabJigwiStageGroup ignitionVariant = current.jigwiStage.groups.Single(group => group.slot == 4);
-            Assert.That(ignitionVariant.geometryConfigured, Is.True);
-            Assert.That(LabJigwiStagePresentation.TrySurfacePoint(target, ignitionVariant.rootDirection,
-                out Vector3 variantPoint, out _), Is.True);
-            Vector2 variantOffset = ScreenOffset(binding.battleCamera, target, variantPoint);
-            Assert.That(variantOffset.x, Is.GreaterThan(initialOffset.x + .01f),
-                "The actual Host-calibrated second ignition must move right, rather than overwriting its variant with the old center aim.");
-            Assert.That(variantOffset.y, Is.GreaterThan(initialOffset.y + .005f),
-                "The second ignition must keep its upward screen variation after actual shell calibration.");
-            Assert.That(marks.VisibleRoots, Is.EqualTo(1));
-
-            // Solo deliberately has no B. Exercise B's real saved-shell calibration with two
-            // model members, without pretending that a remote device or socket joined the run.
-            // This entire substitution is synchronous and always restored before yielding.
-            LabModel originalModel = (LabModel)Field("model").GetValue(network);
-            Vector3 cameraPosition = binding.battleCamera.transform.position;
-            Quaternion cameraRotation = binding.battleCamera.transform.rotation;
-            try
-            {
-                var geometryModel = new LabModel();
-                geometryModel.Begin("jigwi-saved-shell-curtain-geometry", new[] { 0ul, 20ul }, 0d,
-                    network.config, LabStageYokai.Jigwi);
-                Field("model").SetValue(network, geometryModel);
-                Vector2 curtainFirst = CalibratedCurtainOffset(geometryModel, binding.battleCamera, target, 31.2d, 1);
-                Vector2 curtainVariant = CalibratedCurtainOffset(geometryModel, binding.battleCamera, target, 71.2d, 5);
-                Assert.That(curtainVariant.x, Is.LessThan(curtainFirst.x - .01f),
-                    "B's position variation must survive Host calibration as a leftward helper-view change.");
-                Assert.That(curtainVariant.y, Is.LessThan(curtainFirst.y - .005f),
-                    "B's later root must also retain its downward helper-view change.");
-            }
-            finally
-            {
-                Field("model").SetValue(network, originalModel);
-                binding.battleCamera.transform.SetPositionAndRotation(cameraPosition, cameraRotation);
-            }
-            Assert.That(Field("model").GetValue(network), Is.SameAs(model));
-            Assert.That(clock.IsPaused, Is.True);
-            Assert.That(clock.Now(Time.realtimeSinceStartupAsDouble), Is.EqualTo(desired).Within(.00001d));
         }
-
-        /// <summary>Render the actual bound battle camera synchronously: no GameView screenshot or end-of-frame wait.</summary>
-        private static void CaptureActualFlamePixels(Camera camera, LabTarget target)
+        private static void AssertNoOldSurfacePresentation()
         {
-            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
-                Assert.Ignore("GPU unavailable: saved Stage03 flame pixels were not rendered.");
-            Material source = Resources.Load<Material>("Jigwi/SurfaceFlame");
-            Assert.That(source, Is.Not.Null);
-            Assert.That(source.shader.name, Is.EqualTo("C6Lab/Jigwi Ink Flame"));
-            Assert.That(source.shader.isSupported, Is.True);
-            MeshRenderer[] flames = target.GetComponentsInChildren<MeshRenderer>(true)
-                .Where(renderer => renderer.enabled && renderer.gameObject.activeInHierarchy
-                    && renderer.sharedMaterial != null && renderer.sharedMaterial.shader.name == source.shader.name).ToArray();
-            Assert.That(flames, Is.Not.Empty, "The saved WhiteGourd must carry the new flame meshes before sampling pixels.");
-            Assert.That(flames.All(renderer => renderer.sharedMaterial.GetTexture("_BaseMap")
-                == Resources.Load<Texture2D>("Jigwi/SurfaceFlameWash")), Is.True);
-
-            const int width = 390;
-            Rect previousRect = camera.rect;
-            // Match the authored portrait battle viewport, with no unused black lower half.
-            float portraitAspect = (390f / 844f) * previousRect.width / previousRect.height;
-            int height = Mathf.Max(1, Mathf.RoundToInt(width / portraitAspect));
-            var capture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
-            var image = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            RenderTexture previousActive = RenderTexture.active, previousTarget = camera.targetTexture;
-            float previousAspect = camera.aspect;
-            try
-            {
-                camera.targetTexture = capture;
-                // Render exactly the battle viewport, preserving the original portrait projection
-                // and real pose/FOV; the saved scene camera is restored in finally.
-                camera.rect = new Rect(0f, 0f, 1f, 1f);
-                camera.aspect = portraitAspect;
-                foreach (MeshRenderer flame in flames) flame.enabled = false;
-                camera.Render();
-                RenderTexture.active = capture;
-                image.ReadPixels(new Rect(0, 0, width, height), 0, 0); image.Apply(false, false);
-                Color32[] before = image.GetPixels32();
-                foreach (MeshRenderer flame in flames) flame.enabled = true;
-                camera.Render();
-                RenderTexture.active = capture;
-                image.ReadPixels(new Rect(0, 0, width, height), 0, 0); image.Apply(false, false);
-                Color32[] after = image.GetPixels32();
-                int changed = 0, warm = 0;
-                for (int i = 0; i < after.Length; i++)
-                {
-                    Color32 a = after[i], b = before[i];
-                    if (Math.Abs(a.r - b.r) + Math.Abs(a.g - b.g) + Math.Abs(a.b - b.b) < 45) continue;
-                    changed++;
-                    if (a.r > 80 && a.r > a.g * 1.1f && a.r > a.b * 1.4f) warm++;
-                }
-                string evidence = Directory.Exists("/private/tmp") ? "/private/tmp/jigwi340-stage3-render.png"
-                    : Path.Combine(Path.GetTempPath(), "jigwi340-stage3-render.png");
-                File.WriteAllBytes(evidence, image.EncodeToPNG());
-                TestContext.WriteLine("JIGWI_FLAME_RENDER changed=" + changed + " warm=" + warm + " evidence=" + evidence);
-                Assert.That(changed, Is.GreaterThan(24), "Flame meshes must change actual saved-shell camera pixels, rather than merely exist in the hierarchy.");
-                Assert.That(warm, Is.GreaterThan(16), "The visible change must contain the new warm ink/flame art, not only a dark circular marker.");
-            }
-            finally
-            {
-                foreach (MeshRenderer flame in flames) if (flame != null) flame.enabled = true;
-                camera.targetTexture = previousTarget;
-                camera.rect = previousRect;
-                camera.aspect = previousAspect;
-                RenderTexture.active = previousActive;
-                capture.Release();
-                Object.DestroyImmediate(capture);
-                Object.DestroyImmediate(image);
-            }
+            foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
+                foreach (var legacy in root.GetComponentsInChildren<LabJigwiStagePresentation>(true))
+                { Assert.That(legacy.VisibleGroups, Is.Zero); Assert.That(legacy.VisibleRoots, Is.Zero); Assert.That(legacy.VisibleFirePatches, Is.Zero); }
+            // A persistent network component may live outside the active Battle scene.
+            foreach (var legacy in Object.FindObjectsByType<LabJigwiStagePresentation>(FindObjectsSortMode.None))
+                Assert.That(legacy.VisibleGroups, Is.Zero);
         }
-
-        private Vector2 CalibratedCurtainOffset(LabModel geometryModel, Camera camera, LabTarget target,
-            double at, int slot)
-        {
-            geometryModel.Tick(at);
-            LabSnapshot sample = geometryModel.Snapshot(at);
-            Method("CalibrateJigwiStageGeometry").Invoke(network, new object[] { sample, at });
-            sample = geometryModel.Snapshot(at);
-            LabJigwiStageGroup curtain = sample.jigwiStage.groups.Single(group => group.slot == slot);
-            Assert.That(curtain.pattern, Is.EqualTo(LabJigwiStagePattern.Curtain));
-            Assert.That(curtain.geometryConfigured, Is.True);
-            Assert.That(curtain.helperPlayer, Is.Not.EqualTo(curtain.affectedPlayer));
-            LabPlayerState helper = sample.players.Single(player => player.id == curtain.helperPlayer);
-            camera.transform.position = LabThrowMath.SeatPosition(helper.seat, sample.players.Length,
-                target.transform.position, network.config.CameraRadius, network.config.CameraHeightOffset, true);
-            camera.transform.LookAt(target.transform.position + Vector3.up * network.config.CameraLookHeightOffset);
-            Assert.That(LabJigwiStagePresentation.TrySurfacePoint(target, curtain.rootDirection,
-                out Vector3 point, out _), Is.True);
-            Vector3 viewport = camera.WorldToViewportPoint(point);
-            Assert.That(viewport.z, Is.GreaterThan(0f));
-            Assert.That(viewport.x, Is.InRange(0f, 1f)); Assert.That(viewport.y, Is.InRange(0f, 1f));
-            Assert.That(curtain.ContainsRoot(helper.id,
-                target.Hitbox.transform.InverseTransformPoint(point).normalized, at), Is.True);
-            string guide = LabJigwiHud.DescribeStage(sample.jigwiStage, sample, helper.id, at);
-            LabPlayerState victim = sample.players.Single(player => player.id == curtain.affectedPlayer);
-            Assert.That(guide, Does.Contain("P" + (victim.seat + 1) + "의 불장막"));
-            return ScreenOffset(camera, target, point);
-        }
-
-        private static Vector2 ScreenOffset(Camera camera, LabTarget target, Vector3 point)
-        {
-            Vector3 source = camera.WorldToViewportPoint(point);
-            Vector3 shell = camera.WorldToViewportPoint(target.Hitbox.bounds.center);
-            return new Vector2(source.x - shell.x, source.y - shell.y);
-        }
-
         private IEnumerator WaitPlaying(int stage) => Until(() => session.State.phase == GameFlowPhase.Playing
             && session.State.stageIndex == stage && !session.IsLoadingScene && network.HasBattleReferences
-            && SceneManager.GetActiveScene().path == GameScenePaths.Battle, "Saved stage " + stage + " must start through the shared countdown.");
-        private static FieldInfo Field(string name) => typeof(LabNetwork).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
-        private static MethodInfo Method(string name) => typeof(LabNetwork).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic);
+            && SceneManager.GetActiveScene().path == GameScenePaths.Battle, "Saved stage " + stage + " must finish its shared countdown.");
+        private static FieldInfo Field(string name) => typeof(LabNetwork).GetField(name, Private);
+        private static MethodInfo Method(string name) => typeof(LabNetwork).GetMethod(name, Private);
         private static IEnumerator Until(Func<bool> condition, string reason)
         {
             double deadline = Time.realtimeSinceStartupAsDouble + 20d;
             while (!condition() && Time.realtimeSinceStartupAsDouble < deadline) yield return null;
             Assert.That(condition(), Is.True, reason);
         }
-        private static ushort AvailableDualFamilyPort()
+        private static ushort AvailablePort()
         {
             for (int attempt = 0; attempt < 16; attempt++)
                 using (var ipv4 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
@@ -319,7 +293,7 @@ namespace Hapio.Tests
                     }
                     catch (SocketException error) when (error.SocketErrorCode == SocketError.AddressAlreadyInUse) { }
                 }
-            throw new InvalidOperationException("A dual-family test port was not available.");
+            throw new InvalidOperationException("No dual-family test port was available.");
         }
     }
 }

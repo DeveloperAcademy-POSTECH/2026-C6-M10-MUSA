@@ -38,10 +38,25 @@ namespace C6Lab.Tests
             return room;
         }
         private static LabJigwiStageSnapshot State(LabModel room, double now) => room.Snapshot(now).jigwiStage;
-        private static void Bind(LabModel room, LabJigwiStageGroup group, double now)
+        private static void AssertSurfacePolicyDisabled(LabModel room, double now)
         {
-            Assert.That(room.SetJigwiStageGeometry(group.id, group.rootDirection, group.patchDirections, now), Is.True,
-                "This model fixture explicitly supplies known local surface anchors; it does not prove a mesh raycast.");
+            // Screen-policy tests must never silently activate the retained mesh-root migration code.
+            Assert.That(State(room, now).enabled, Is.False);
+            Assert.That(State(room, now).groups, Is.Empty);
+        }
+        private static LabJigwiABSnapshot ScreenState(LabModel room, double now) => room.Snapshot(now).jigwiAB;
+        private void Extinguish(LabModel room, LabJigwiABRound round, ulong owner, string targetId, double now)
+        {
+            var water = Combined(room, owner, now);
+            Assert.That(water.element, Is.EqualTo(LabOrbElement.Water));
+            Launch(room, owner, water, now);
+            Assert.That(room.ConfirmJigwiABFireHit(water.id, round.id, targetId, now, out bool off), Is.True);
+            Assert.That(off, Is.True);
+        }
+        private void ExtinguishAll(LabModel room, LabJigwiABRound round, double now)
+        {
+            foreach (var player in round.players)
+                foreach (var fire in player.targets) Extinguish(room, round, player.playerId, fire.id, now);
         }
         private string NextRequest() => "stage-" + ++request;
         private LabOrbState Combined(LabModel room, ulong owner, double now)
@@ -67,239 +82,248 @@ namespace C6Lab.Tests
         [TestCase(LabStageYokai.Gumiho, false)]
         [TestCase(LabStageYokai.Yaguang, false)]
         [TestCase(LabStageYokai.Jigwi, true)]
-        public void PolicyIsScopedToJigwiAndHasNoWaterSupply(LabStageYokai stage, bool enabled)
+        public void ScreenPolicyIsScopedToJigwiAndHasNoFreeWaterSupply(LabStageYokai stage, bool enabled)
         {
+            // #341 replaces surface roots with screen A/B, while preserving stage scope and no free supplies.
             var room = Room(stage);
-            Assert.That(room.JigwiStageEnabled, Is.EqualTo(enabled));
-            if (enabled) Assert.That(room.Snapshot(0d).remaining, Is.EqualTo(120d));
             var snapshot = room.Snapshot(11d);
-            Assert.That(snapshot.jigwiStage.enabled, Is.EqualTo(enabled));
+            Assert.That(room.JigwiABEnabled, Is.EqualTo(enabled));
+            Assert.That(snapshot.jigwiAB.enabled, Is.EqualTo(enabled));
+            Assert.That(snapshot.jigwiStage.enabled, Is.False);
+            AssertSurfacePolicyDisabled(room, 11d);
             if (enabled)
             {
+                Assert.That(room.Snapshot(11d).remaining, Is.EqualTo(109d));
                 Assert.That(snapshot.jigwi, Is.Empty);
                 Assert.That(snapshot.orbs.Any(orb => orb.jigwiSupply || orb.jigwiGenerationBurn), Is.False);
             }
         }
 
         [Test]
-        public void IgnitionHasOneSecondWarningSevenSecondActiveAndFiniteSpread()
+        public void PersonalFireHasOneSecondWarningTenSecondLimitAndNoSurfaceSpread()
         {
+            // The bounded-lifetime assertion now covers A's 10-second window, not retired 7-second mesh patches.
             var room = Room();
-            Assert.That(State(room, 9.99d).groups, Is.Empty);
-            var warning = State(room, 10d).groups.Single();
+            Assert.That(ScreenState(room, 9.99d).rounds, Is.Empty);
+            var warning = ScreenState(room, 10d).rounds.Single();
             Assert.That(warning.Warning(10d), Is.True);
             Assert.That(warning.Active(10d), Is.False);
-            Assert.That(warning.VisiblePatchCount(10d), Is.Zero);
-            Bind(room, warning, 10d);
-            var first = State(room, 11d).groups.Single();
-            Assert.That(first.Active(11d), Is.True);
-            Assert.That(first.VisiblePatchCount(11d), Is.EqualTo(1));
-            Assert.That(State(room, 12d).groups.Single().VisiblePatchCount(12d), Is.EqualTo(2));
-            Assert.That(State(room, 13d).groups.Single().VisiblePatchCount(13d), Is.EqualTo(3));
-            Assert.That(State(room, 17.99d).groups.Single().Active(17.99d), Is.True);
-            var end = State(room, 18d).groups.Single();
-            Assert.That(end.Active(18d), Is.False);
-            Assert.That(end.resolution, Is.EqualTo(LabJigwiStageResolution.Expired));
-            Assert.That(end.resolvedAt, Is.EqualTo(18d));
+            var active = ScreenState(room, 11d).rounds.Single();
+            Assert.That(active.kind, Is.EqualTo(LabJigwiABKind.PersonalBurn));
+            Assert.That(active.Active(11d), Is.True);
+            Assert.That(room.JigwiABRecoveryMultiplier(active.targetPlayer, 11d), Is.EqualTo(4f));
+            Assert.That(ScreenState(room, 20.99d).rounds.Single().Active(20.99d), Is.True);
+            var end = ScreenState(room, 21d).rounds.Single();
+            Assert.That(end.resolution, Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(end.resolvedAt, Is.EqualTo(21d));
+            Assert.That(room.Snapshot(21d).jigwiStage.groups, Is.Empty);
         }
 
         [Test]
-        public void OneLateTickProducesExactlyTheEightSlotsAndTenIndependentGroups()
+        public void OneLateTickRecordsEightSlotsAndSkipsSlotsBusyWithTheGroupChallenge()
         {
+            // Busy slots are recorded once; B now persists until joint success or the 100-second cutoff.
             var room = Room();
-            var state = State(room, 98d);
-            Assert.That(state.groups.Length, Is.EqualTo(10));
-            int[] perSlot = Enumerable.Range(0, 8).Select(slot => state.groups.Count(group => group.slot == slot)).ToArray();
-            Assert.That(perSlot, Is.EqualTo(new[] { 1, 1, 1, 1, 1, 1, 2, 2 }));
-            Assert.That(state.groups.Select(group => group.id).Distinct().Count(), Is.EqualTo(10));
-            Assert.That(state.groups.All(group => group.resolution == LabJigwiStageResolution.Expired), Is.True);
-            Assert.That(State(room, 98d).groups.Length, Is.EqualTo(10));
-            Assert.That(LabJigwiStageNetworkValidation.Valid(state, room.Snapshot(98d).players), Is.True);
+            var state = ScreenState(room, 98d);
+            Assert.That(state.rounds, Has.Length.EqualTo(8));
+            Assert.That(state.rounds.Select(item => item.slot), Is.EqualTo(Enumerable.Range(0, 8)));
+            Assert.That(state.rounds.Select(item => item.id).Distinct().Count(), Is.EqualTo(8));
+            Assert.That(state.rounds[0].resolution, Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(state.rounds[1].kind, Is.EqualTo(LabJigwiABKind.GroupFire));
+            Assert.That(state.rounds[1].Active(98d), Is.True);
+            Assert.That(state.rounds.Skip(2).All(item => item.resolution == LabJigwiABResolution.Skipped), Is.True);
+            Assert.That(ScreenState(room, 98d).rounds.Length, Is.EqualTo(8));
+            Assert.That(LabJigwiABNetworkValidation.Valid(state, room.Snapshot(98d).players), Is.True);
         }
 
         [Test]
-        public void FireOnlyBlocksTheAffectedPlayerAndExpiresWithoutPenalty()
+        public void ScreenFireLeavesPaintOpenAndOnlyThePersonalTargetGetsBurnDeadlines()
         {
+            // Surface paint blocking was removed; personal A now marks orb expiry for one owner only.
             var room = Room();
-            var fire = State(room, 11d).groups.Single();
-            Bind(room, fire, 11d);
-            ulong other = Players.Single(player => player != fire.affectedPlayer);
-            Assert.That(room.JigwiStagePaintBlocked(fire.affectedPlayer, fire.patchDirections[0]), Is.True);
-            Assert.That(room.JigwiStagePaintBlocked(other, fire.patchDirections[0]), Is.False);
+            var active = ScreenState(room, 11d).rounds.Single();
+            ulong other = Players.Single(player => player != active.targetPlayer);
+            Assert.That(room.JigwiStagePaintBlocked(active.targetPlayer, Vector3.forward), Is.False);
+            Assert.That(room.JigwiStagePaintBlocked(other, Vector3.forward), Is.False);
+            Assert.That(room.TryGenerate(active.targetPlayer, NextRequest(), 11d, out var burning, out string reason), Is.True, reason);
+            Assert.That(room.TryGenerate(other, NextRequest(), 11d, out var ordinary, out reason), Is.True, reason);
+            Assert.That(burning.jigwiABBurnAt, Is.EqualTo(16d));
+            Assert.That(ordinary.jigwiABBurnAt, Is.EqualTo(-1d));
             var before = room.Snapshot(11d);
-            var ended = room.Snapshot(18d);
-            Assert.That(room.JigwiStagePaintBlocked(fire.affectedPlayer, fire.patchDirections[0]), Is.False);
+            var ended = room.Snapshot(21d);
             Assert.That(ended.players.Select(p => p.personalHp), Is.EqualTo(before.players.Select(p => p.personalHp)));
-            Assert.That(ended.jigwi, Is.Empty, "No legacy overheat is produced by a new A expiry.");
+            Assert.That(ended.jigwi, Is.Empty, "A expiry does not invoke the legacy overheat experiment.");
+            Assert.That(ended.jigwiAB.rounds.Single().resolution, Is.EqualTo(LabJigwiABResolution.Expired));
         }
 
         [Test]
-        public void CurtainInformationAndFirstPracticalSwapHelperRoles()
+        public void GroupChallengeUsesEveryParticipantsOwnThreeTargetsInsteadOfHelperSwaps()
         {
+            // B replaced helper/victim pairs with the same all-player challenge on every screen.
             var room = Room();
-            var info = State(room, 31d).groups.Single(group => group.slot == 1);
-            var practical = State(room, 51d).groups.Single(group => group.slot == 3);
-            Assert.That(info.helperPlayer, Is.Not.EqualTo(info.affectedPlayer));
-            Assert.That(practical.affectedPlayer, Is.EqualTo(info.helperPlayer));
-            Assert.That(practical.helperPlayer, Is.EqualTo(info.affectedPlayer));
-            Assert.That(info.pattern, Is.EqualTo(LabJigwiStagePattern.Curtain));
+            var group = ScreenState(room, 31d).rounds.Single(item => item.slot == 1);
+            Assert.That(group.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
+            Assert.That(group.players.Select(player => player.playerId), Is.EquivalentTo(Players));
+            Assert.That(group.players.All(player => player.targets.Length == 3), Is.True);
+            Assert.That(group.players.SelectMany(player => player.targets).Select(fire => fire.id).Distinct().Count(), Is.EqualTo(6));
+            Assert.That(group.players.All(player => player.targets.All(fire => fire.lit)), Is.True);
+            Assert.That(room.Snapshot(31d).orbs.Any(orb => orb.jigwiSupply), Is.False);
         }
 
         [Test]
-        public void MutualHelpClearsEachVictimIndependentlyAndRejectsWrongHelper()
+        public void EachOwnersTargetsRemainIndependentUntilEveryoneHasExtinguishedAllOfThem()
         {
+            // Preserve owner isolation and independent progress, then require joint success under the new B rule.
             var room = Room();
-            var pair = State(room, 91d).groups.Where(group => group.slot == 7).ToArray();
-            Assert.That(pair, Has.Length.EqualTo(2));
-            foreach (var group in pair) Bind(room, group, 91d);
-            Assert.That(pair[0].helperPlayer, Is.EqualTo(pair[1].affectedPlayer));
-            Assert.That(pair[1].helperPlayer, Is.EqualTo(pair[0].affectedPlayer));
-            Assert.That(room.TryExtinguishJigwiStageRoot(pair[0].affectedPlayer, pair[0].rootDirection, 91d, out _), Is.False);
-            Assert.That(room.TryExtinguishJigwiStageRoot(pair[0].helperPlayer, pair[0].rootDirection, 91d, out string cleared), Is.True);
-            Assert.That(cleared, Is.EqualTo(pair[0].id));
-            var after = State(room, 91d).groups;
-            Assert.That(after.Single(group => group.id == pair[0].id).resolution, Is.EqualTo(LabJigwiStageResolution.Extinguished));
-            Assert.That(after.Single(group => group.id == pair[1].id).Active(91d), Is.True);
-            Assert.That(room.TryExtinguishJigwiStageRoot(pair[0].helperPlayer, pair[0].rootDirection, 91d, out _), Is.False);
-            Assert.That(room.TryExtinguishJigwiStageRoot(pair[1].helperPlayer, pair[1].rootDirection, 91d, out _), Is.True);
+            var group = ScreenState(room, 31d).rounds.Single(item => item.slot == 1);
+            var first = group.players[0]; var second = group.players[1];
+            var wrongOwnerShot = Combined(room, first.playerId, 31d);
+            Launch(room, first.playerId, wrongOwnerShot, 31d);
+            Assert.That(room.ConfirmJigwiABFireHit(wrongOwnerShot.id, group.id, second.targets[0].id, 31d, out _), Is.False);
+            foreach (var fire in first.targets) Extinguish(room, group, first.playerId, fire.id, 31d);
+            var halfway = ScreenState(room, 31d).rounds.Single(item => item.id == group.id);
+            Assert.That(halfway.players[0].targets.All(fire => !fire.lit), Is.True);
+            Assert.That(halfway.players[1].targets.All(fire => fire.lit), Is.True);
+            Assert.That(halfway.resolution, Is.EqualTo(LabJigwiABResolution.None));
+            foreach (var fire in second.targets) Extinguish(room, group, second.playerId, fire.id, 31d);
+            var completed = ScreenState(room, 31d).rounds.Single(item => item.id == group.id);
+            Assert.That(completed.resolution, Is.EqualTo(LabJigwiABResolution.Completed));
+            Assert.That(completed.players.All(player => player.targets.All(fire => !fire.lit)), Is.True);
         }
 
         [TestCase(LabOrbKind.Relay, 41)]
-        public void NonPaintableUnlockedItemsCannotExtinguishTheSurfaceRoot(LabOrbKind kind, int chanceField)
+        public void UnlockedRelayHitsCannotCountTowardPersonalCombinedRecovery(LabOrbKind kind, int chanceField)
         {
+            // The original non-paintable item exclusion now protects A's Combined-only recovery counter.
             float[] values = config.CaptureDeveloperValues();
             for (int i = 39; i <= 44; i++) values[i] = 0f;
-            values[chanceField] = 100f;
-            values[46] = values[47] = 0f;
-            Apply(values);
+            values[chanceField] = 100f; values[46] = values[47] = 0f; Apply(values);
             var room = Room();
-            var fire = State(room, 11d).groups.Single();
-            Bind(room, fire, 11d);
-            Assert.That(room.TryGenerate(fire.helperPlayer, NextRequest(), 11d, out var item, out string reason), Is.True, reason);
-            Assert.That(item.kind, Is.EqualTo(kind));
-            Assert.That(item.lockSwipes, Is.Zero);
-            Assert.That(item.element, Is.EqualTo(LabOrbElement.None), "These items can be thrown but do not supply element paint.");
-            Launch(room, fire.helperPlayer, item, 11d);
-            Assert.That(room.ConfirmHit(item.id, 11d, fire.rootDirection, out _, out _, out _), Is.True);
-            var after = State(room, 11d).groups.Single();
-            Assert.That(after.resolution, Is.EqualTo(LabJigwiStageResolution.None));
-            Assert.That(after.Active(11d), Is.True);
-            Assert.That(room.JigwiStagePaintBlocked(fire.affectedPlayer, fire.patchDirections[0]), Is.True);
+            var active = ScreenState(room, 11d).rounds.Single();
+            Assert.That(room.TryGenerate(active.targetPlayer, NextRequest(), 11d, out var item, out string reason), Is.True, reason);
+            Assert.That(item.kind, Is.EqualTo(kind)); Assert.That(item.lockSwipes, Is.Zero);
+            Assert.That(item.element, Is.EqualTo(LabOrbElement.None));
+            Launch(room, active.targetPlayer, item, 11d);
+            Assert.That(room.ConfirmHit(item.id, 11d, Vector3.forward, out _, out _, out _), Is.True);
+            var after = ScreenState(room, 11d).rounds.Single();
+            Assert.That(after.hitCount, Is.Zero); Assert.That(after.Active(11d), Is.True);
             Assert.That(room.PaintSurface.PaintCount, Is.Zero);
             Assert.That(room.PaintSurface.CoveredCount, Is.Zero);
         }
 
 
         [Test]
-        public void UnlockedBombMustOpenIntoElementAttackOrbsBeforeItCanSupplyASurfaceRootHit()
+        public void UnlockedBombMustOpenIntoTwoCombinedOrbsBeforeItCanCountOnePersonalHit()
         {
+            // Preserve main's bomb policy; the resulting Combined uses normal A hit counting, not a surface root.
             float[] values = config.CaptureDeveloperValues();
             for (int i = 39; i <= 44; i++) values[i] = 0f;
-            values[44] = 100f;
-            values[46] = values[47] = 0f;
-            Apply(values);
-            var room = Room();
-            var fire = State(room, 11d).groups.Single();
-            Bind(room, fire, 11d);
-            Assert.That(room.TryGenerate(fire.helperPlayer, NextRequest(), 11d, out var bomb, out string reason), Is.True, reason);
+            values[44] = 100f; values[46] = values[47] = 0f; Apply(values);
+            var room = Room(); var active = ScreenState(room, 11d).rounds.Single();
+            Assert.That(room.TryGenerate(active.targetPlayer, NextRequest(), 11d, out var bomb, out string reason), Is.True, reason);
             Assert.That(bomb.kind, Is.EqualTo(LabOrbKind.Bomb));
-            Assert.That(bomb.lockSwipes, Is.Zero);
-            Assert.That(room.TryLaunch(fire.helperPlayer, bomb.id, NextRequest(), 11d, out _, out reason), Is.False);
+            Assert.That(room.TryLaunch(active.targetPlayer, bomb.id, NextRequest(), 11d, out _, out reason), Is.False);
             Assert.That(reason, Is.EqualTo("RAW_CANNOT_ATTACK"));
-            Assert.That(room.ConfirmHit(bomb.id, 11d, fire.rootDirection, out _, out _, out _), Is.False);
-            LabSnapshot snapshot = room.Snapshot(11d);
-            LabOrbState idle = snapshot.orbs.Single(orb => orb.id == bomb.id);
-            Assert.That(idle.inFlight, Is.False);
-            Assert.That(idle.owner, Is.EqualTo(fire.helperPlayer));
-            Assert.That(snapshot.jigwiStage.groups.Single().resolution, Is.EqualTo(LabJigwiStageResolution.None));
-            Assert.That(room.JigwiStagePaintBlocked(fire.affectedPlayer, fire.patchDirections[0]), Is.True);
-            Assert.That(room.PaintSurface.CoveredCount, Is.Zero);
-
-            Assert.That(room.TryUseItemAt(fire.helperPlayer, bomb.id, NextRequest(), 11d,
+            Assert.That(room.ConfirmHit(bomb.id, 11d, Vector3.forward, out _, out _, out _), Is.False);
+            Assert.That(room.TryGetMovableState(bomb.id, out _), Is.True);
+            Assert.That(room.TryUseItemAt(active.targetPlayer, bomb.id, NextRequest(), 11d,
                 new Vector2(.5f, .5f), out _, out reason), Is.True, reason);
             Assert.That(reason, Is.EqualTo("BOMB_OPENED"));
-            LabOrbState[] attacks = room.Snapshot(11d).orbs.Where(orb => orb.owner == fire.helperPlayer
-                && orb.kind == LabOrbKind.Combined).ToArray();
+            var attacks = room.Snapshot(11d).orbs.Where(orb => orb.kind == LabOrbKind.Combined).ToArray();
             Assert.That(attacks, Has.Length.EqualTo(2));
-            Assert.That(attacks.All(orb => orb.element >= LabOrbElement.Fire && orb.element <= LabOrbElement.Earth), Is.True);
-            Launch(room, fire.helperPlayer, attacks[0], 11d);
-            Assert.That(room.ConfirmHit(attacks[0].id, 11d, fire.rootDirection, out _, out _, out _), Is.True);
-            Assert.That(State(room, 11d).groups.Single().resolution, Is.EqualTo(LabJigwiStageResolution.Extinguished));
+            Assert.That(attacks.All(orb => orb.jigwiABBurnAt == 16d), Is.True);
+            Launch(room, active.targetPlayer, attacks[0], 11d);
+            Assert.That(room.ConfirmHit(attacks[0].id, 11d, Vector3.forward, out _, out _, out _), Is.True);
+            Assert.That(ScreenState(room, 11d).rounds.Single().hitCount, Is.EqualTo(1));
+            Assert.That(ScreenState(room, 11d).rounds.Single().Active(11d), Is.True);
             Assert.That(room.PaintSurface.CoveredCount, Is.GreaterThan(0));
         }
 
         [Test]
-        public void RealRootHitConsumesAndRewardsOnceThenRunsNormalPaint()
+        public void ThreeRealCombinedBossHitsConsumeRewardAndPaintOnceEachThenCompleteA()
         {
-            var room = Room();
-            var fire = State(room, 11d).groups.Single();
-            Bind(room, fire, 11d);
-            var combined = Combined(room, fire.helperPlayer, 11d);
-            Launch(room, fire.helperPlayer, combined, 11d);
-            int paints = room.PaintSurface.PaintCount;
-            int hits = room.Snapshot(11d).players.Single(p => p.id == fire.helperPlayer).hitTotal;
-            Assert.That(room.ConfirmHit(combined.id, 11d, fire.rootDirection, out _, out _, out _), Is.True);
-            Assert.That(State(room, 11d).groups.Single().resolution, Is.EqualTo(LabJigwiStageResolution.Extinguished));
-            Assert.That(room.PaintSurface.PaintCount, Is.EqualTo(paints + 1));
-            Assert.That(room.Snapshot(11d).players.Single(p => p.id == fire.helperPlayer).hitTotal, Is.EqualTo(hits + 1));
-            Assert.That(room.ConfirmHit(combined.id, 11d, fire.rootDirection, out _, out _, out _), Is.False);
-            Assert.That(room.PaintSurface.PaintCount, Is.EqualTo(paints + 1));
+            // Replace one root hit with A's three real boss hits; each retains its original one-time transaction checks.
+            var room = Room(); var active = ScreenState(room, 11d).rounds.Single();
+            for (int i = 0; i < 3; i++)
+            {
+                var combined = Combined(room, active.targetPlayer, 11d);
+                Launch(room, active.targetPlayer, combined, 11d);
+                int paints = room.PaintSurface.PaintCount;
+                var before = room.Snapshot(11d).players.Single(player => player.id == active.targetPlayer);
+                Assert.That(room.ConfirmHit(combined.id, 11d, Vector3.forward, out _, out _, out _), Is.True);
+                var after = room.Snapshot(11d).players.Single(player => player.id == active.targetPlayer);
+                Assert.That(room.PaintSurface.PaintCount, Is.EqualTo(paints + 1));
+                Assert.That(after.hitTotal, Is.EqualTo(before.hitTotal + 1));
+                Assert.That(after.stamina, Is.EqualTo(Mathf.Min(config.StaminaMax, before.stamina + config.HitRecovery)));
+                Assert.That(room.ConfirmHit(combined.id, 11d, Vector3.forward, out _, out _, out _), Is.False);
+                Assert.That(room.PaintSurface.PaintCount, Is.EqualTo(paints + 1));
+                Assert.That(ScreenState(room, 11d).rounds.Single().hitCount, Is.EqualTo(i + 1));
+            }
+            Assert.That(ScreenState(room, 11d).rounds.Single().resolution, Is.EqualTo(LabJigwiABResolution.Completed));
         }
 
         [Test]
-        public void OrdinaryFireHitConsumesAndRewardsButDoesNotSupplyPaintOrClearRoot()
+        public void ScreenFireCollisionConsumesWithoutNormalPaintOrBossHitRewards()
         {
-            var room = Room();
-            var fire = State(room, 13d).groups.Single();
-            Bind(room, fire, 13d);
-            Vector3 direction = fire.patchDirections[2];
-            Assert.That(fire.ContainsRoot(fire.affectedPlayer, direction, 13d), Is.False);
-            var combined = Combined(room, fire.affectedPlayer, 13d);
-            Launch(room, fire.affectedPlayer, combined, 13d);
+            // B's screen flame is now the separate fire-collision path, with no boss hit rewards or paint.
+            var room = Room(); var group = ScreenState(room, 31d).rounds.Single(item => item.slot == 1);
+            ulong owner = group.players[0].playerId;
+            var water = Combined(room, owner, 31d); Launch(room, owner, water, 31d);
+            var before = room.Snapshot(31d).players.Single(player => player.id == owner);
             int paints = room.PaintSurface.PaintCount;
-            var before = room.Snapshot(13d).players.Single(p => p.id == fire.affectedPlayer);
-            Assert.That(room.ConfirmHit(combined.id, 13d, direction, out _, out _, out _), Is.True);
-            var after = room.Snapshot(13d).players.Single(p => p.id == fire.affectedPlayer);
+            Assert.That(room.ConfirmJigwiABFireHit(water.id, group.id, group.players[0].targets[0].id,
+                31d, out bool off), Is.True);
+            Assert.That(off, Is.True);
+            var after = room.Snapshot(31d).players.Single(player => player.id == owner);
             Assert.That(room.PaintSurface.PaintCount, Is.EqualTo(paints));
-            Assert.That(room.PaintSurface.CoveredCount, Is.Zero);
-            Assert.That(after.hitTotal, Is.EqualTo(before.hitTotal + 1));
-            Assert.That(after.stamina, Is.EqualTo(Mathf.Min(config.StaminaMax, before.stamina + config.HitRecovery)));
-            Assert.That(State(room, 13d).groups.Single().Active(13d), Is.True);
-            Assert.That(room.TryGetMovableState(combined.id, out _), Is.False);
+            Assert.That(after.hitTotal, Is.EqualTo(before.hitTotal));
+            Assert.That(after.throwTotal, Is.EqualTo(before.throwTotal));
+            Assert.That(after.stamina, Is.EqualTo(before.stamina));
+            Assert.That(room.TryGetMovableState(water.id, out _), Is.False);
+            Assert.That(ScreenState(room, 31d).rounds.Single(item => item.slot == 1).Active(31d), Is.True);
         }
 
         [Test]
-        public void IndependentIgnitionRootsDoNotClearTheirSibling()
+        public void ExtinguishingOneScreenFlameDoesNotClearItsSiblingTargets()
         {
-            var room = Room();
-            var pair = State(room, 81d).groups.Where(group => group.slot == 6).ToArray();
-            Assert.That(pair, Has.Length.EqualTo(2));
-            foreach (var group in pair) Bind(room, group, 81d);
-            Assert.That(room.TryExtinguishJigwiStageRoot(pair[0].helperPlayer, pair[0].rootDirection, 81d, out _), Is.True);
-            Assert.That(State(room, 81d).groups.Single(group => group.id == pair[1].id).Active(81d), Is.True);
+            // Independent progress now belongs to B's individual screen flames rather than multiple mesh roots.
+            var room = Room(); var group = ScreenState(room, 31d).rounds.Single(item => item.slot == 1);
+            var owner = group.players[0];
+            Extinguish(room, group, owner.playerId, owner.targets[0].id, 31d);
+            var after = ScreenState(room, 31d).rounds.Single(item => item.id == group.id);
+            Assert.That(after.players[0].targets[0].lit, Is.False);
+            Assert.That(after.players[0].targets.Skip(1).All(fire => fire.lit), Is.True);
+            Assert.That(after.players[1].targets.All(fire => fire.lit), Is.True);
+            Assert.That(after.resolution, Is.EqualTo(LabJigwiABResolution.None));
+            Assert.That(ScreenState(room, 43d).rounds.Single(item => item.id == group.id).players[0].targets[0].lit, Is.True);
         }
 
         [Test]
-        public void CutoffCancelsLingeringGroupsAndWinsOverSameTimeExpiry()
+        public void CutoffCancelsScreenChallengeBeforeAnIdenticallyTimedCommonBombExpiry()
         {
-            float[] values = config.CaptureDeveloperValues(); values[230] = 20f; Apply(values);
-            var room = Room();
-            var last = State(room, 99.9d).groups.First(group => group.slot == 7);
+            // Keep the 100-second ordering guarantee using an actual common bomb whose fuse also ends at 100.
+            float[] values = config.CaptureDeveloperValues();
+            values[45] = 20f; values[46] = values[47] = 2f; values[207] = 1f; values[208] = 0f; Apply(values);
+            var room = Room(); var before = room.Snapshot(99.9d);
+            var last = before.jigwiAB.rounds.Single(item => item.slot == 1);
             Assert.That(last.Active(99.9d), Is.True);
-            Bind(room, last, 99.9d);
-            Assert.That(room.JigwiStagePaintBlocked(last.affectedPlayer, last.patchDirections[0]), Is.True);
-            var atCutoff = State(room, 100d);
-            Assert.That(atCutoff.groups.Where(group => group.slot == 7)
-                .All(group => group.resolution == LabJigwiStageResolution.Cancelled), Is.True);
-            Assert.That(room.TryExtinguishJigwiStageRoot(last.helperPlayer, last.rootDirection, 100d, out _), Is.False);
-            Assert.That(room.JigwiStagePaintBlocked(last.affectedPlayer, last.patchDirections[0]), Is.False);
-            Assert.That(atCutoff.fever, Is.True);
+            var bomb = before.orbs.Single(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd && orb.createdAt == 80d);
+            room.DrainBombExplosions();
+            var atCutoff = room.Snapshot(100d);
+            Assert.That(atCutoff.jigwiAB.rounds.Single(item => item.id == last.id).resolution, Is.EqualTo(LabJigwiABResolution.Cancelled));
+            Assert.That(atCutoff.jigwiAB.Active(100d), Is.Null);
+            Assert.That(atCutoff.jigwiAB.fever, Is.True);
+            Assert.That(atCutoff.orbs.Any(orb => orb.id == bomb.id), Is.False);
+            Assert.That(room.DrainBombExplosions().Select(blast => blast.BombId), Does.Not.Contain(bomb.id));
+            Assert.That(room.JigwiStagePaintBlocked(Players[0], Vector3.forward), Is.False);
         }
 
         [Test]
         public void FeverDoublesOnlyAutomaticRecoveryAfterTheExactBoundary()
         {
-            float[] values = config.CaptureDeveloperValues(); values[4] = 0f; values[6] = values[7] = 1f; Apply(values);
+            // Isolate the inherited 100-second fever boundary from A's independent recovery multiplier.
+            float[] values = config.CaptureDeveloperValues(); values[4] = 0f; values[6] = values[7] = 1f;
+            values[239] = 1f; Apply(values);
             var room = Room();
             Assert.That(room.Snapshot(99.5d).players[0].stamina, Is.EqualTo(99.5f).Within(.0001f));
             Assert.That(room.Snapshot(100d).players[0].stamina, Is.EqualTo(100f).Within(.0001f));
@@ -311,65 +335,70 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void UnboundGeometryCannotVisiblySpreadBlockOrExtinguishDuringItsActiveWindow()
+        public void ScreenPolicyNeedsNoSurfaceGeometryAndRetiredRootsCannotChangeItsState()
         {
-            var room = Room();
-            var pending = State(room, 11d).groups.Single();
-            Assert.That(pending.Active(11d), Is.True, "The clock may be active before a Host mesh sample is available.");
-            Assert.That(pending.geometryConfigured, Is.False);
-            Assert.That(pending.VisiblePatchCount(11d), Is.Zero);
-            Assert.That(pending.Blocks(pending.affectedPlayer, pending.patchDirections[0], 11d), Is.False);
-            Assert.That(pending.ContainsRoot(pending.helperPlayer, pending.rootDirection, 11d), Is.False);
-            Assert.That(room.JigwiStagePaintBlocked(pending.affectedPlayer, pending.patchDirections[0]), Is.False);
-            Assert.That(room.TryExtinguishJigwiStageRoot(pending.helperPlayer, pending.rootDirection, 11d, out _), Is.False);
-            Bind(room, pending, 11d);
-            var bound = State(room, 11d).groups.Single();
-            Assert.That(bound.geometryConfigured, Is.True);
-            Assert.That(bound.VisiblePatchCount(11d), Is.EqualTo(1));
-            Assert.That(bound.ContainsRoot(bound.helperPlayer, bound.rootDirection, 11d), Is.True);
-            Assert.That(room.JigwiStagePaintBlocked(bound.affectedPlayer, bound.patchDirections[0]), Is.True);
+            // Geometry readiness is no longer a prerequisite for screen A; retired root APIs cannot resolve it.
+            var room = Room(); var active = ScreenState(room, 11d).rounds.Single();
+            Assert.That(active.Active(11d), Is.True);
+            Assert.That(State(room, 11d).groups, Is.Empty);
+            Assert.That(room.JigwiStagePaintBlocked(active.targetPlayer, Vector3.forward), Is.False);
+            Assert.That(room.TryExtinguishJigwiStageRoot(active.targetPlayer, Vector3.forward, 11d, out _), Is.False);
+            Assert.That(room.SetJigwiStageGeometry(active.id, Vector3.forward, new[] { Vector3.forward }, 11d), Is.False);
+            Assert.That(room.RejectJigwiStageGeometry(active.id, 11d), Is.False);
+            Assert.That(ScreenState(room, 11d).rounds.Single().hitCount, Is.Zero);
+            Assert.That(room.JigwiABRecoveryMultiplier(active.targetPlayer, 11d), Is.EqualTo(4f));
         }
 
         [Test]
-        public void GeometryIsHostBoundedAndDoesNotAcceptZeroNanOrOldIds()
+        public void ScreenAnchorsStayBoundedAndRetiredGeometryRejectsEvenValidOrMalformedInputs()
         {
-            var room = Room();
-            var fire = State(room, 10d).groups.Single();
-            Assert.That(room.SetJigwiStageGeometry(fire.id, Vector3.up, new[] { Vector3.forward }, 10d), Is.True);
-            var changed = State(room, 10d).groups.Single();
-            Assert.That(changed.geometryConfigured, Is.True);
-            Assert.That(changed.rootDirection, Is.EqualTo(Vector3.up));
-            Assert.That(room.SetJigwiStageGeometry(fire.id, Vector3.zero, new[] { Vector3.forward }, 10d), Is.False);
-            Assert.That(room.SetJigwiStageGeometry(fire.id, Vector3.up, new[] { new Vector3(float.NaN, 0, 0) }, 10d), Is.False);
+            // Keep malformed/stale anchor protection while testing the replacement screen-coordinate contract.
+            var room = Room(); var warning = ScreenState(room, 10d).rounds.Single();
+            Assert.That(room.SetJigwiStageGeometry(warning.id, Vector3.up, new[] { Vector3.forward }, 10d), Is.False);
+            Assert.That(room.SetJigwiStageGeometry(warning.id, Vector3.zero, new[] { Vector3.forward }, 10d), Is.False);
+            Assert.That(room.SetJigwiStageGeometry(warning.id, Vector3.up, new[] { new Vector3(float.NaN, 0, 0) }, 10d), Is.False);
             Assert.That(room.SetJigwiStageGeometry("old/round/root", Vector3.up, new[] { Vector3.forward }, 10d), Is.False);
-            Assert.That(room.SetJigwiStageGeometry(fire.id, Vector3.down, new[] { Vector3.back }, 11d), Is.True,
-                "Host may relocate a hidden root while preserving or explicitly setting its surface patches.");
-            Assert.That(LabJigwiStageNetworkValidation.Valid(State(room, 11d), room.Snapshot(11d).players), Is.True);
+            var snapshot = room.Snapshot(31d); var group = snapshot.jigwiAB.Active(31d);
+            foreach (var player in group.players)
+                for (int i = 0; i < player.targets.Length; i++)
+                {
+                    var point = LabJigwiABFireMotion.Position(group, player.targets[i], i, 31d);
+                    Assert.That(point.x, Is.InRange(.1f, .9f)); Assert.That(point.y, Is.InRange(.48f, .86f));
+                }
+            Assert.That(LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players), Is.True);
         }
 
         [TestCase(3)]
         [TestCase(4)]
         [TestCase(5)]
-        public void LargerRoomsKeepDistinctHelpersAndBoundedHistory(int count)
+        public void LargerRoomsKeepAllActualParticipantsAndBoundedScreenHistory(int count)
         {
+            // Preserve 3/4/5-player membership and bounded-history coverage without obsolete helper pairs.
             ulong[] ids = Enumerable.Range(0, count).Select(n => (ulong)n * 10ul).ToArray();
             var room = new LabModel(); room.Begin("jigwi-many", ids, 0d, config, LabStageYokai.Jigwi);
             var snapshot = room.Snapshot(98d);
-            Assert.That(snapshot.jigwiStage.groups, Has.Length.EqualTo(10));
-            Assert.That(snapshot.jigwiStage.groups.Where(g => g.pattern == LabJigwiStagePattern.Curtain)
-                .All(g => g.affectedPlayer != g.helperPlayer), Is.True);
-            Assert.That(LabJigwiStageNetworkValidation.Valid(snapshot.jigwiStage, snapshot.players), Is.True);
+            Assert.That(snapshot.jigwiAB.rounds, Has.Length.EqualTo(8));
+            var group = snapshot.jigwiAB.rounds.Single(item => item.slot == 1);
+            Assert.That(group.players.Select(player => player.playerId), Is.EquivalentTo(ids));
+            Assert.That(group.players.All(player => player.targets.Length == 3), Is.True);
+            Assert.That(group.players.SelectMany(player => player.targets).Select(fire => fire.id).Distinct().Count(), Is.EqualTo(count * 3));
+            Assert.That(LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players), Is.True);
         }
 
         [Test]
-        public void RetryRotatesTheFirstSeatAndClearsAllOldGroups()
+        public void RetryRotatesThePersonalTargetAndClearsAllOldScreenRounds()
         {
+            // Preserve role rotation and reset coverage with the new personal target identity.
             var room = Room();
-            ulong first = State(room, 10d).groups.Single().affectedPlayer;
+            ulong first = ScreenState(room, 10d).rounds.Single().targetPlayer;
+            string previousId = ScreenState(room, 10d).rounds.Single().id;
             room.Tick(120d);
             room.Begin("jigwi-stage", Players, 121d, config, LabStageYokai.Jigwi);
-            Assert.That(State(room, 121d).groups, Is.Empty);
-            Assert.That(State(room, 131d).groups.Single().affectedPlayer, Is.Not.EqualTo(first));
+            Assert.That(ScreenState(room, 121d).rounds, Is.Empty);
+            var next = ScreenState(room, 131d).rounds.Single();
+            Assert.That(next.targetPlayer, Is.Not.EqualTo(first));
+            Assert.That(next.id, Is.Not.EqualTo(previousId));
+            Assert.That(next.hitCount, Is.Zero);
         }
 
         [Test]
@@ -384,33 +413,34 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SnapshotCopyAndValidationRejectMalformedOrNonMemberGroups()
+        public void ScreenSnapshotCopyAndValidationRejectMalformedTargetsOrNonMembers()
         {
-            var room = Room();
-            var snapshot = room.Snapshot(11d);
-            var copied = LabJigwiStageNetworkValidation.Copy(snapshot.jigwiStage);
-            copied.groups[0].patchDirections[0] = Vector3.up;
-            Assert.That(snapshot.jigwiStage.groups[0].patchDirections[0], Is.Not.EqualTo(Vector3.up));
-            copied = snapshot.jigwiStage.Copy(); copied.groups[0].helperPlayer = 9999;
-            Assert.That(LabJigwiStageNetworkValidation.Valid(copied, snapshot.players), Is.False);
-            copied = snapshot.jigwiStage.Copy(); copied.groups[0].rootDirection = Vector3.zero;
-            Assert.That(LabJigwiStageNetworkValidation.Valid(copied, snapshot.players), Is.False);
-            copied = snapshot.jigwiStage.Copy(); copied.groups = new[] { copied.groups[0], copied.groups[0].Copy() };
-            Assert.That(LabJigwiStageNetworkValidation.Valid(copied, snapshot.players), Is.False);
-            copied = snapshot.jigwiStage.Copy(); copied.cutoffAt = double.NaN;
-            Assert.That(LabJigwiStageNetworkValidation.Valid(copied, snapshot.players), Is.False);
+            // Preserve independent copies, member validation, duplicate IDs and finite-clock checks on the active DTO.
+            var room = Room(); var snapshot = room.Snapshot(31d);
+            var copied = LabJigwiABNetworkValidation.Copy(snapshot.jigwiAB);
+            copied.rounds[1].players[0].targets[0].x = .89f;
+            Assert.That(snapshot.jigwiAB.rounds[1].players[0].targets[0].x, Is.Not.EqualTo(.89f));
+            copied = snapshot.jigwiAB.Copy(); copied.rounds[1].players[0].playerId = 9999;
+            Assert.That(LabJigwiABNetworkValidation.Valid(copied, snapshot.players), Is.False);
+            copied = snapshot.jigwiAB.Copy(); copied.rounds[1].players[0].targets[0].x = float.NaN;
+            Assert.That(LabJigwiABNetworkValidation.Valid(copied, snapshot.players), Is.False);
+            copied = snapshot.jigwiAB.Copy(); copied.rounds = new[] { copied.rounds[0], copied.rounds[0].Copy() };
+            Assert.That(LabJigwiABNetworkValidation.Valid(copied, snapshot.players), Is.False);
+            copied = snapshot.jigwiAB.Copy(); copied.cutoffAt = double.NaN;
+            Assert.That(LabJigwiABNetworkValidation.Valid(copied, snapshot.players), Is.False);
+            Assert.That(LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players), Is.True);
         }
         [Test]
-        public void RootIdentityIncludesItsRoomEvenWhenBothModelsAreOnRoundOne()
+        public void ScreenEventIdentityIncludesItsRoomEvenWhenBothModelsAreOnRoundOne()
         {
-            var first = Room();
-            var second = new LabModel();
+            // Keep session-generation isolation and the maximum room-key boundary on the replacement event IDs.
+            var first = Room(); var second = new LabModel();
             second.Begin(new string('x', 128), Players, 0d, config, LabStageYokai.Jigwi);
             var a = first.Snapshot(10d); var b = second.Snapshot(10d);
             Assert.That(a.round, Is.EqualTo(1)); Assert.That(b.round, Is.EqualTo(1));
-            Assert.That(a.jigwiStage.groups[0].id, Is.Not.EqualTo(b.jigwiStage.groups[0].id));
-            Assert.That(LabJigwiStageNetworkValidation.Valid(b.jigwiStage, b.players), Is.True,
-                "The maximum128-character room key still fits the bounded root metadata.");
+            Assert.That(a.jigwiAB.rounds[0].id, Is.Not.EqualTo(b.jigwiAB.rounds[0].id));
+            Assert.That(LabJigwiABNetworkValidation.Valid(b.jigwiAB, b.players), Is.True,
+                "The maximum 128-character room key still fits bounded screen-event metadata.");
         }
     }
 }

@@ -423,6 +423,7 @@ namespace C6Lab
             };
             if (teamMode) ApplyFeverGeneration(orb, sender, now);
             ApplyJigwiGenerationBurn(orb, now);
+            ApplyJigwiABOrb(orb, now);
             orbs.Add(orb.id, orb);
             RecordRawGeneration(sender, orb.kind);
             reason = "GENERATED";
@@ -458,7 +459,7 @@ namespace C6Lab
             }
 
             orbs.Remove(firstId); orbs.Remove(secondId);
-            var element = CombinedElementFor(sender);
+            var element = JigwiABCombinedElement(CombinedElementFor(sender), now);
             Vector2 velocity = Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed);
             orb = new LabOrbState
             {
@@ -473,6 +474,7 @@ namespace C6Lab
                 gourdBlastBurnedAt = Math.Max(first.gourdBlastBurnedAt, second.gourdBlastBurnedAt),
                 ordinaryBlastBurnedAt = Math.Max(first.ordinaryBlastBurnedAt, second.ordinaryBlastBurnedAt)
             };
+            CarryJigwiABBurn(first, second, orb, now);
             orbs.Add(orb.id, orb);
             players[sender].combinedTotal++;
             reason = "COMBINED";
@@ -556,6 +558,7 @@ namespace C6Lab
             }
             else if (current.kind == LabOrbKind.Relay && current.relayStage < RelayMaxStage) current.relayStage++;
             if (current.kind.IsDrum()) ArriveDrum(current, crossing, now);
+            ApplyJigwiABOrb(current, now);
             current.revision = ++revision;
             if (current.kind.IsDrum()) players[sender].drumPassedTotal++;
             else players[sender].passedTotal++;
@@ -580,6 +583,7 @@ namespace C6Lab
             if (!current.kind.CanThrow(current.lockSwipes)) return Reject("RAW_CANNOT_ATTACK", out reason);
             // Charmed (#251): too dazed to attack until it ends or the players beside wake them.
             if (Charmed(sender, now)) return Reject("CHARMED", out reason);
+            ApplyJigwiABOrb(current, now);
             current.inFlight = true;
             current.vx = current.vy = 0f;
             current.revision = ++revision;
@@ -617,9 +621,13 @@ namespace C6Lab
             if (!TryAdvance(now, out _) || phase != LabPhase.Playing
                 || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight
                 || !players.TryGetValue(orb.owner, out var attacker)) return false;
+            // One remaining local ignition keeps the entire B curtain closed. A bypassed
+            // physics contact is consumed here before any normal boss paint/reward/statistic.
+            if (TryBlockJigwiABBossHit(orb, now)) return false;
             element = orb.element;
             if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth)
                 TryExtinguishJigwiStageRoot(orb.owner, paintDirection, now, out _);
+            RecordJigwiABBossHit(orb, paintDirection, now);
             orbs.Remove(id);
             float areaScale = LaunchScaleOf(id);
             launchScales.Remove(id);
@@ -1111,6 +1119,7 @@ namespace C6Lab
                     y = normalizedPosition.y,
                     vx = 0f, vy = 0f, createdAt = now, revision = ++revision, inFlight = false
                 };
+                ApplyJigwiABOrb(opened, now);
                 orbs.Add(opened.id, opened);
             }
         }
@@ -1316,6 +1325,7 @@ namespace C6Lab
                 drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray(),
                 jigwi = CopyJigwiStates(),
                 jigwiStage = CopyJigwiStageSnapshot(now),
+                jigwiAB = CopyJigwiABSnapshot(now),
                 swipeBlockedPlayer = BlockOn(now) ? swipeBlockedPlayer : 0,
                 swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
                 swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
@@ -1408,7 +1418,7 @@ namespace C6Lab
                     played += elapsed;
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
-                            (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond * JigwiStageRecoveryMultiplier(lastTime)));
+                            (float)(player.stamina + elapsed * rules.StaminaRecoveryPerSecond * JigwiABRecoveryMultiplier(player.id, lastTime)));
                     // 결과 대시보드 기록: 이 사이에 북을 점유한 사람의 점유 시간 (북 점유율 계산용)
                     // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)
                     foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())
@@ -1740,7 +1750,11 @@ namespace C6Lab
         // ordinary attack orb and keeps the orb lifetime.
         private float LifetimeOf(LabOrbState orb) =>
             orb.kind.LifetimeFor(orb.lockSwipes, rules.OrbLifetimeSeconds, rules.ItemLifetimeSeconds);
-        private double ExpiresAt(LabOrbState orb) => orb.expiresAt >= 0d ? orb.expiresAt : orb.createdAt + LifetimeOf(orb);
+        private double ExpiresAt(LabOrbState orb)
+        {
+            double ordinary = orb.expiresAt >= 0d ? orb.expiresAt : orb.createdAt + LifetimeOf(orb);
+            return orb.jigwiABBurnAt >= 0d ? Math.Min(ordinary, orb.jigwiABBurnAt) : ordinary;
+        }
         private int CountStored(ulong owner) => orbs.Values.Count(orb => orb.owner == owner && !orb.inFlight && !orb.jigwiSupply);
 
         /// <summary>A late frame's earlier sabotage draws ignore orbs whose lifetime had already ended at that draw.</summary>

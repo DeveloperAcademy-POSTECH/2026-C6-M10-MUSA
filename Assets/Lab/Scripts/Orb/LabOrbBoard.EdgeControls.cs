@@ -104,6 +104,9 @@ namespace C6Lab
         private float GripReach(Entry entry)
         {
             float reach = entry.View.HitSphere.radius * 1.25f;
+            // B reduces only the body: keep the pre-B grab reach so small balls remain playable.
+            if (entry.JigwiABScale < 1f)
+                reach = Mathf.Max(reach, RadiusFor(entry.View.Kind, entry.Small, entry.JigwiScale) * 1.25f);
             if (EdgeControlsActive)
                 reach = Mathf.Max(reach, EdgeSetting(EdgeControlSettings.MinimumGripRadius, 22f, 0f, 64f) * ReferenceWorldUnit);
             return reach;

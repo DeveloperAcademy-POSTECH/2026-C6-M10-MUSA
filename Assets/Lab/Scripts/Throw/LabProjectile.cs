@@ -60,6 +60,7 @@ namespace C6Lab
         [SerializeField] private Transform visualMount;
         [SerializeField] private TrailRenderer flightTrail;
         private LabElementFlightTrail elementFlightTrail;
+        private LabJigwiWaterFlightPath jigwiWaterFlightPath;
         private GameObject replacementVisual;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
@@ -109,6 +110,7 @@ namespace C6Lab
         private bool launched;
         // 박 색상 콤보(#222)의 공 크기 배율: 실패 페널티면 1보다 작고 성공 보상이면 크다. 충돌 반지름/모양/꼬리에 함께 곱한다.
         private float radiusScale = 1f;
+        private float jigwiABRadiusScale = 1f;
         private bool authoritative;
         private bool resolved;
 
@@ -121,12 +123,15 @@ namespace C6Lab
         /// <summary>The share of the configured throw radius this projectile has; below 1 for a blast-shrunk orb (#213).</summary>
         public float SizeScale => sizeScale;
         // 폭발로 작아진 구슬(#213)의 sizeScale과 콤보 페널티/보상(#222)의 radiusScale을 함께 곱한다.
-        private float ScaledRadius => (config != null ? config.ThrowRadius : .165f) * sizeScale * radiusScale;
+        private float ScaledRadius => (config != null ? config.ThrowRadius : .165f)
+            * (jigwiABRadiusScale < 1f ? Mathf.Min(sizeScale * radiusScale, jigwiABRadiusScale) : sizeScale * radiusScale);
         public Vector3 InitialVelocity => initialVelocity;
         public Transform VisualMount => visualMount;
         public TrailRenderer FlightTrail => flightTrail;
         public LabElementFlightTrail ElementFlightTrail => elementFlightTrail;
+        public LabJigwiWaterFlightPath JigwiWaterFlightPath => jigwiWaterFlightPath;
         public float RadiusScale => radiusScale;
+        public float JigwiABRadiusScale => jigwiABRadiusScale;
 
         /// <summary>
         /// 던지기 전에 공 크기 배율(0.01~3)을 정한다. 1이면 기존 크기다. Launch/LaunchVisual 전에 부른다.
@@ -134,6 +139,13 @@ namespace C6Lab
         public void SetRadiusScale(float scale)
         {
             radiusScale = float.IsNaN(scale) || float.IsInfinity(scale) ? 1f : Mathf.Clamp(scale, .01f, 3f);
+            EnsureDefaultVisual(ScaledRadius);
+        }
+
+        /// <summary>Independent B shrink, captured before launch; never changes paint share or launch velocity.</summary>
+        public void SetJigwiABRadiusScale(float scale)
+        {
+            jigwiABRadiusScale = float.IsNaN(scale) || float.IsInfinity(scale) || scale <= 0f ? 1f : Mathf.Clamp(scale, .2f, 1f);
             EnsureDefaultVisual(ScaledRadius);
         }
 
@@ -261,17 +273,22 @@ namespace C6Lab
         }
 
         /// <summary>Correct only a predicted shot's appearance; never rewind its local flight or award a hit.</summary>
-        public void ReconcileVisual(LabOrbElement approvedElement, float approvedSize, float approvedRadius)
+        public void ReconcileVisual(LabOrbElement approvedElement, float approvedSize, float approvedRadius, float approvedJigwiABRadius = 1f)
         {
             if (authoritative || resolved || approvedElement < LabOrbElement.None || approvedElement > LabOrbElement.Earth) return;
             bool changed = element != approvedElement;
             element = approvedElement;
             sizeScale = approvedSize > 0f && approvedSize <= 1f ? approvedSize : 1f;
             SetRadiusScale(approvedRadius > 0f ? approvedRadius : 1f);
+            SetJigwiABRadiusScale(approvedJigwiABRadius);
+            // Only this cosmetic prediction is reconciled. The authoritative launch guard above
+            // keeps the approved Host body's trajectory/radius frozen; never rewind position or velocity.
+            if (sphere != null) sphere.radius = ScaledRadius;
             EnsureDefaultVisual(ScaledRadius);
             EnsureFlightTrail(ScaledRadius);
             if (changed && elementFlightTrail != null && appearance != null)
                 elementFlightTrail.Begin(transform, appearance.ElementTrailFor(element));
+            ConfigureJigwiWaterFlightPath();
         }
 
         private void Awake()
@@ -321,6 +338,7 @@ namespace C6Lab
                 flightTrail.Clear();
                 flightTrail.emitting = true;
             }
+            ConfigureJigwiWaterFlightPath();
         }
 
         private void FixedUpdate()
@@ -468,8 +486,14 @@ namespace C6Lab
             LabProjectileHitKind kind = fire != null ? LabProjectileHitKind.Fire
                 : target != null && collider == target.Hitbox ? LabProjectileHitKind.Monster : LabProjectileHitKind.Miss;
             if (nearest.Found && distance > nearest.Distance + SurfaceDistanceTolerance) return;
-            if (nearest.Found && Mathf.Abs(distance - nearest.Distance) <= SurfaceDistanceTolerance
-                && (int)kind <= (int)nearest.Kind) return;
+            if (nearest.Found && Mathf.Abs(distance - nearest.Distance) <= SurfaceDistanceTolerance)
+            {
+                // Points sit ahead of their wall. At an exact contact tie the ignition point
+                // still wins, regardless of Physics query ordering; all old non-curtain ties stay unchanged.
+                bool pointBeatsCurtain = kind == LabProjectileHitKind.Fire && fire != null && !fire.IsCurtain
+                    && nearest.Fire != null && nearest.Fire.IsCurtain;
+                if (!pointBeatsCurtain && (int)kind <= (int)nearest.Kind) return;
+            }
             nearest.Found = true;
             nearest.Kind = kind;
             nearest.Fire = fire;
@@ -612,8 +636,37 @@ namespace C6Lab
             flightTrail.endColor = color;
         }
 
+        private void ConfigureJigwiWaterFlightPath()
+        {
+            LabJigwiFireSurface curtain = null;
+            if (element == LabOrbElement.Water)
+                foreach (LabJigwiFireSurface surface in fireSurfaces)
+                    if (surface != null && surface.IsCurtain && (!authoritative || surface.OwnerPlayerId == ownerPlayerId))
+                    { curtain = surface; break; }
+            if (curtain == null)
+            {
+                if (jigwiWaterFlightPath != null)
+                { jigwiWaterFlightPath.Clear(); LabVisualSafety.DestroyVisualObject(jigwiWaterFlightPath.gameObject); jigwiWaterFlightPath = null; }
+                return;
+            }
+            if (jigwiWaterFlightPath != null && jigwiWaterFlightPath.IsEmitting
+                && jigwiWaterFlightPath.Owner == curtain.OwnerPlayerId && jigwiWaterFlightPath.FireEventId == curtain.FireId) return;
+            if (jigwiWaterFlightPath == null)
+            {
+                var child = new GameObject("Jigwi Water Flight Path"); child.transform.SetParent(transform, false);
+                jigwiWaterFlightPath = child.AddComponent<LabJigwiWaterFlightPath>();
+            }
+            jigwiWaterFlightPath.Begin(transform, curtain.OwnerPlayerId, curtain.FireId,
+                appearance != null ? appearance.ElementTrailFor(LabOrbElement.Water) : null);
+        }
+
         private void LeaveFadingTrail()
         {
+            if (jigwiWaterFlightPath != null)
+            {
+                var fadingWater = jigwiWaterFlightPath; jigwiWaterFlightPath = null;
+                fadingWater.StopAndFade(transform.parent);
+            }
             if (elementFlightTrail != null)
             {
                 LabElementFlightTrail fadingInk = elementFlightTrail;
@@ -634,6 +687,7 @@ namespace C6Lab
             // detached fading effect is no longer owned here and keeps its natural lifetime.
             if (elementFlightTrail != null) elementFlightTrail.Clear();
             if (flightTrail != null) flightTrail.Clear();
+            if (jigwiWaterFlightPath != null) jigwiWaterFlightPath.Clear();
         }
 
         private static Material GetTrailMaterial()

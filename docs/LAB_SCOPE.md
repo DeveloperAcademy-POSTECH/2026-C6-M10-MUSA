@@ -211,3 +211,8 @@ Config의 `Paint Cluster Compactness`·`Paint Cluster Irregularity`는 현재138
 ## #332 현행 별도 게임 지귀와 Lab의 경계
 
 새 지귀 120초 발화·불장막은 Hapio Stage03 전용이다. standalone Lab의 수동 화재/과열·기존 주기 정책은 보존한다. 새 설정 228~235를 추가해 236개·프로토콜 5672/Lab33/Game16로 분리하며, 실험실 DEV에는 Hapio 전용 8행을 숨긴다. 본문과 과거 검증의 이전 설정 수/규약은 도입 당시 값이며, 현행 접속 규약은 본 항목과 AGENTS 마지막 항목을 따른다. 구체 기획·실제 반영 범위·미실행 실기기 항목은 [JIGWI_LEVEL_DESIGN_120S](JIGWI_LEVEL_DESIGN_120S.md)의 11~12절을 참조한다.
+
+
+## #341 지귀 개인 발화·전원 화면 소화
+
+위 #332 표면 근원·칠 차단의 현행 대체는 [JIGWI_SCREEN_PATTERNS](JIGWI_SCREEN_PATTERNS.md)를 따른다. Hapio Stage03 시간표 ON에서만 실행하며 일반 Lab 수동 실험은 유지한다. 설정249개·5676/Lab37/Game20, 새 DEV238~248 및 숨긴230~234 예약값을 사용한다. 이전 기록의 구현·검증 범위는 당시 기준으로 남긴다.
