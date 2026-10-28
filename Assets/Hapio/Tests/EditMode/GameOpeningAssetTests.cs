@@ -25,6 +25,7 @@ namespace Hapio.Tests
                 Assert.That(controller.player, Is.Not.Null);
                 Assert.That(controller.lobbyView, Is.SameAs(All<GameLobbyView>(scene).Single()));
                 Assert.That(controller.openingRoot, Is.Not.Null);
+                Assert.That(controller.openingRoot.activeSelf, Is.False, "The saved Home starts at the title until Start is clicked.");
                 Assert.That(controller.transform.IsChildOf(controller.openingRoot.transform), Is.False);
                 Assert.That(controller.lobbyView.transform.IsChildOf(controller.openingRoot.transform), Is.False);
                 Assert.That(controller.player.transform.IsChildOf(controller.openingRoot.transform), Is.True);

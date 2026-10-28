@@ -37,10 +37,7 @@ namespace Hapio.Tests
             yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene,
                 "Saved Home must instantiate its actual persistent session.");
             session = GameSession.Instance; network = session.Network;
-            // This fixture exercises the saved stage flow, not cold-launch storytelling.
-            yield return null;
-            var opening = Object.FindFirstObjectByType<GameOpeningController>();
-            if (opening != null && opening.IsPlaying) opening.player.Skip();
+            // This fixture enters DEV/solo from the title, independently of normal Start's opening.
             yield return null;
             Assert.That(network.GameFlowEnabled, Is.True);
             network.port = AvailablePort();

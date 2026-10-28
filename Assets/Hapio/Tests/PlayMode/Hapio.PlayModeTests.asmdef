@@ -1,7 +1,7 @@
 {
   "name": "Hapio.PlayModeTests",
   "rootNamespace": "Hapio.Tests",
-  "references": ["Hapio.Runtime", "C6Lab.Runtime"],
+  "references": ["Hapio.Runtime", "C6Lab.Runtime", "Unity.InputSystem"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "overrideReferences": true,

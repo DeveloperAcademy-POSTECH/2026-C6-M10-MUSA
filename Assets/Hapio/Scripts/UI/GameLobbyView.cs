@@ -44,6 +44,7 @@ namespace Hapio
         [HideInInspector] public int teamLobbyDesignRevision;
 
         private GameSession session;
+        private GameOpeningController openingController;
         private RectTransform[] storyShifted;
         private int storyHeadingFontSize, storySealFontSize;
         private int[] storyLocalLabelFontSizes;
@@ -54,6 +55,19 @@ namespace Hapio
         private LabNetwork Network => session != null ? session.Network : null;
         public int CreationCapacity => creationCapacity;
         public bool OpeningBlocked { get; private set; }
+
+        internal void RegisterOpening(GameOpeningController controller) => openingController = controller;
+        internal void UnregisterOpening(GameOpeningController controller)
+        {
+            if (openingController == controller) openingController = null;
+        }
+
+        private void EnterGame()
+        {
+            if (session.State.phase != GameFlowPhase.Home || session.RoomBrowserVisible) return;
+            if (openingController != null && openingController.TryBeginFromStartButton(session.EnterRoomBrowser)) return;
+            session.EnterRoomBrowser();
+        }
 
         /// <summary>Temporarily hide and lock Home while its independent opening is presented.</summary>
         public void SetOpeningBlocked(bool blocked)
@@ -92,7 +106,7 @@ namespace Hapio
             storyHeadingFontSize = heading.fontSize;
             storySealFontSize = sealButton.GetComponentInChildren<UnityEngine.UI.Text>().fontSize;
             storyLocalLabelFontSizes = localLabels.Select(label => label.fontSize).ToArray();
-            BindNavigation(enterButton, () => session.EnterRoomBrowser());
+            BindNavigation(enterButton, EnterGame);
             // 2:2 (#281): "새 방 만들기 +" first asks which mode. A prefab without the mode panel keeps the old story flow.
             BindNavigation(createButton, () => { if (modePanel != null) SetModes(true); else CreateRoom(GameMode.Story); });
             if (modePanel != null)

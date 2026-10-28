@@ -3215,3 +3215,39 @@ PR 기능 커밋 `71769986`(main `b5695c4e` 포함)을 연결 Editor Unity6000.6
 추가 BGM 검사는 실제 클립과 음소거 AudioSource를 사용한다. Guest는 소켓·transport를 시작하지 않는 수동 상태 fixture이며 실제 Guest 기기 검증이 아니다. PlayerPrefs·기기별 오디오 설정을 변경하지 않는다. 관련 PlayMode는 합계135개이며 모두 통과했다. 이 결과는 재시동 전 실행한 검사이고 재시동 후 무거운 검사를 반복하지 않았다. 원시 로그·기기 정보·개인 경로는 커밋하지 않는다.
 
 매혹 걸림(`Audio/CharmCast`)·체크(`Audio/CharmCheck`)·폭탄 열림(`Audio/BombOpen`)은 처리 알림과 음량 설정만 있고 소리 에셋이 미할당되어 현재 무음이다. 실제 추가된 에셋5개와 이3개를 구분한다. 공유 DEV 필드·프로토콜·게임 규칙·기존 미추적 사용자 폴더는 유지했다.
+
+
+## 2026-10-28 — #359 게임 시작 버튼의 오프닝 / #360 내 P 표시 순서
+
+구현·실행 검사 기준 main `adce582c`, 작업 브랜치 `fix/#359-start-opening-player-layer`. 이후 main의 README/개발 문서 정리 `dfbac9d6`를 반영했으며 검사한 Assets·Packages·ProjectSettings의 내용은 동일하다. 소개 README는 최신 main을 유지하고 실행 설명은 담당 문서에 둔다. Unity 6000.6.5f1·macOS·Metal의 기존 Editor 한 개에서 관련 검사만 순차 실행했다. 아래 항목은 이번 브랜치의 실행 결과이며 이전 PR의 전체 검사 통과를 재사용하지 않는다.
+
+### 구현 범위
+
+- Home은 타이틀에서 대기한다. 첫 게임 시작 → 기존 24컷·26페이지 → 완료/스킵 → 방 목록이며, 같은 실행의 후속 시작은 방 목록으로 바로 간다. 시작/종료의 최소 다음 프레임·실제 포인터 해제 대기, #356의 수동 터치 진행을 보존했다. 비활성화/Scene 이탈은 정리만 하고 방 검색을 시작하지 않는다.
+- `LabOrbHudComposition`의 기존 뒤 HUD에 내 P와 자식 도색 패턴을 넣고, 나중에 생성되는 2:2 팀 고리도 같은 순서로 정렬한다. 기존 Image/RectTransform/입력 카메라/합성 카메라/RenderTexture를 재사용한다.
+- Scene·Prefab·설정 asset·패키지·프로토콜 변경은 없다. 사용자가 남긴 기존 미추적 폴더는 포함하지 않았다.
+
+### 실제 자동 검사
+
+| 검사 | 결과 | 확인한 조건 |
+| --- | --- | --- |
+| `GameOpeningAssetTests` EditMode | **4/4 PASS**, 0.49초 | 저장된 Home 연결·오프닝 초기 숨김·공통 컷/미리보기·Canvas/안전 영역 |
+| `GameOpeningControllerTests` PlayMode | **10/10 PASS**, 2.02초 | 타이틀 대기·실제 시작 콜백·연타·24컷/26페이지 완료·스킵·같은 실행 재진입·새 실행·비활성화·누락/잘못된 참조 복구·held mouse 시작/종료 해제 대기 |
+| `Hapio.PlayModeTests` assembly | **44/44 PASS**, 243.16초 | 위 오프닝 10개를 포함한 로비/방 생성·DEV·전투 준비/입력·스테이지/결과/재시작/지귀 통합 경로 |
+| `Hapio.Story.PlayModeTests` assembly | **18/18 PASS**, 0.47초 | 기존 스토리 진행·화면 터치/raycast·드래그 취소·배경/페이지·제작용 타이틀 |
+| `LabOrbHudCompositionTests` PlayMode | **6/6 PASS**, 0.08초 | 위치/크기/부모·입력 투영 보존·해상도 변경·투명도·실패 복구·내 P/패턴·늦게 생성된 팀 고리·숨김/복귀·기존 자원 재사용 |
+| `LabTeamBattleScreenTests` PlayMode | **5/5 PASS**, 8.15초 | 기존 2:2 전투 표시·팀 고리·팀전 화면 경로 |
+
+최종 고유 검사 범위는 EditMode 4개와 PlayMode 73개다. 오프닝 단독 10개는 44개 assembly 검사에 포함되므로 중복 합산하지 않는다. 초기 오프닝 검사 9개 중 1개는 가상의 새 앱 실행에도 기존 GameSession을 재사용해 방 검색 상태가 남은 fixture 준비 문제로 실패했다. 실제 재실행처럼 이전 세션을 제거하고 새 세션을 만드는 것으로 수정했으며, 입력 상태 검사를 추가한 최종 10개와 이후 44개 assembly 실행은 모두 통과했다.
+
+### 실제 Editor 화면 확인
+
+- 390×844 Game View에서 타이틀이 먼저 보이고 `opening=false`, `consumed=false`, 방 목록/검색=false인 상태를 확인했다. 게임 시작 콜백 후 1번 컷/1번 페이지·AUTO=false를 확인하고, 실제 건너뛰기 버튼 콜백 이후 방 목록 표시=true를 확인했다.
+- 기존 사용자 Editor 설정인 Domain Reload OFF·Scene Reload OFF를 바꾸지 않고 Play를 두 번 시작했다. 두 번째 실행에서도 타이틀 대기·미소비 상태가 초기화되고 게임 시작 후 첫 컷이 재생됐다.
+- 저장된 Battle을 기존 DEV SOLO로 실행했다. 내 P의 형제 순서 3, 기존 구슬 합성 이미지 순서 4를 확인했다. Editor만 일시 정지하고 실제 북과 여우 구슬의 표시 위치를 P 중앙/일부 겹침 위치로 옮겨 P가 가려지는 렌더링을 확인했다. 이 위치 변경은 저장하지 않고 Play 종료로 정리했다. 실제 손가락 드래그나 네트워크 전달 검증은 아니다.
+- 화면 캡처는 프로젝트 밖 검증용 임시 파일로만 보관하며 커밋하지 않는다. 원시 로그·개인 경로·기기 식별자는 포함하지 않는다.
+
+### 미실행 범위
+
+- Mac/iOS 빌드, 서명·설치·실기기 터치/안전 영역·일반 Wi-Fi/핫스팟 다중 기기: **NOT_RUN**.
+- 전체 EditMode/Lab PlayMode 및 모바일 메모리·성능 측정: **NOT_RUN**. 위 관련 검사 결과를 전체 통과나 실기기 통과로 해석하지 않는다.

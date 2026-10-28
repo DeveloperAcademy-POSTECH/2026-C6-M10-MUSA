@@ -18,6 +18,8 @@ Hapio의100% Victory 및 완성 지도 commit → 각 기기의 최종 고해상
 
 스태미나 위치·크기·부모와 구슬 입력 카메라는 유지하고 LabOrbHudComposition이 뒤 HUD → 구슬 합성 이미지 → 전경 HUD 순서를 복원한다. 결과 화면의 GamePreviewAspect는 저장된 바깥 표시 영역을 유지하고 내부 RawImage만 texture 비율에 맞춘다.
 
+#360에서 내 `LocalPlayerCircle`과 자식 도색 패턴도 기존 뒤 HUD에 포함했다. 2:2에서 나중에 만들어지는 Team Ring은 내 P 바로 뒤에 함께 둔다. 따라서 조합판 → 내 P·패턴·팀 고리 → 구슬 순서이며, 원래 Image/RectTransform의 위치·크기·번호 갱신을 유지한다. 기존 합성 카메라·RenderTexture를 재사용하며 좌우 이웃·미니맵·로비 P와 버튼·정지·결과 화면의 순서는 바꾸지 않는다. 실제 실행 여부는 VALIDATION.md의 #359/#360 기록을 따른다.
+
 일반 협동에서 P1→P2→…는 위에서 내려다본 시계방향이다. 내 자리를 아래에 놓았을 때 다음 P가 왼쪽, 이전 P가 오른쪽이다. LabPlayerSlots의 동일 이웃 계산을 Host 실제 전달·HUD·매혹 표시가 사용하고, 미니맵·카메라·투척도 맞춘다. 손짓의 실제 좌우와 반대편 입구/속도는 유지한다. 2:2는 기존 팀 배치·팀 전달·외벽 규칙을 따로 유지한다.
 
 ## iPhone 확인

@@ -60,7 +60,7 @@ namespace Hapio.Editor
                 EditorSceneManager.MarkSceneDirty(home);
                 if (!EditorSceneManager.SaveScene(home, GameScenePaths.Home))
                     throw new InvalidOperationException("Could not save the Home opening connection.");
-                Debug.Log("HAPIO_HOME_OPENING_CONNECTED: app start -> opening -> original title -> rooms.");
+                Debug.Log("HAPIO_HOME_OPENING_CONNECTED: app start -> title -> Start -> opening -> rooms.");
             }
             finally
             {
