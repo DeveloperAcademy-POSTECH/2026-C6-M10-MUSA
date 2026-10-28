@@ -798,6 +798,24 @@ namespace C6Lab
         [Tooltip("추임새가 한 번 나온 뒤 최소 몇 번은 장구 소리만 낼지. 연달아 나오지 않게 한다.")]
         [SerializeField, Range(0, 20)] private int chuimsaeMinGap = 5;
 
+        [Header("Sound · 구미호 스테이지 (#351, Inspector 전용. 소리 파일이 없으면 그 소리만 조용히 넘어간다)")]
+        [Tooltip("구미호 스테이지 전투 BGM 크기 (Resources/Audio/GumihoBGM, 모든 기기). 파일이 없거나 다른 스테이지면 위의 BGM Volume으로 기본 전투 BGM을 튼다.")]
+        [SerializeField, Range(0f, 1f)] private float gumihoBgmVolume = .2f;
+        [Tooltip("구미호 피버타임(마지막 20초) 곡 크기 (Resources/Audio/GumihoFever, 모든 기기). 파일이 없으면 야광귀 피버 곡을 이 크기로 튼다.")]
+        [SerializeField, Range(0f, 1f)] private float gumihoFeverBgmVolume = .3f;
+        [Tooltip("매혹이 걸릴 때 소리 크기 (Resources/Audio/CharmCast, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float charmCastSoundVolume = .7f;
+        [Tooltip("양옆 사람이 내 몫을 다 눌러 체크가 뜰 때 소리 크기 (Resources/Audio/CharmCheck, 누른 사람 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float charmCheckSoundVolume = .8f;
+        [Tooltip("매혹이 풀릴 때 소리 크기 (Resources/Audio/CharmRelease, 걸린 사람과 양옆 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float charmReleaseSoundVolume = .8f;
+        [Tooltip("여우 구슬이 내 판에 떨어질 때 소리 크기 (Resources/Audio/FoxFall, 그 판 주인 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float foxFallSoundVolume = .8f;
+        [Tooltip("여우 구슬이 사라질 때 소리 크기: 두 번 눌러 없앴거나 음·양 구슬과 닿아 함께 사라질 때 (Resources/Audio/FoxClear, 그 판 주인 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float foxClearSoundVolume = .8f;
+        [Tooltip("해금 폭탄이 공격 구슬 2개로 바뀔 때 소리 크기 (Resources/Audio/BombOpen, 그 판 주인 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float bombOpenSoundVolume = .8f;
+
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
         [SerializeField] private bool hapticsEnabled = true;
@@ -1181,6 +1199,15 @@ namespace C6Lab
         public float BombSoundVolume => Scaled(Finite(bombSoundVolume, .9f), bombSoundVolumeDev);
         public LabBombSoundStyle BombSoundStyle =>
             bombSoundStyle == LabBombSoundStyle.Boom ? LabBombSoundStyle.Boom : LabBombSoundStyle.Ppeong;
+        // 구미호 스테이지 소리 크기 (#351): Inspector 값 그대로 (DEV 배율 없음)
+        public float GumihoBgmVolume => Mathf.Clamp01(Finite(gumihoBgmVolume, .2f));
+        public float GumihoFeverBgmVolume => Mathf.Clamp01(Finite(gumihoFeverBgmVolume, .3f));
+        public float CharmCastSoundVolume => Mathf.Clamp01(Finite(charmCastSoundVolume, .7f));
+        public float CharmCheckSoundVolume => Mathf.Clamp01(Finite(charmCheckSoundVolume, .8f));
+        public float CharmReleaseSoundVolume => Mathf.Clamp01(Finite(charmReleaseSoundVolume, .8f));
+        public float FoxFallSoundVolume => Mathf.Clamp01(Finite(foxFallSoundVolume, .8f));
+        public float FoxClearSoundVolume => Mathf.Clamp01(Finite(foxClearSoundVolume, .8f));
+        public float BombOpenSoundVolume => Mathf.Clamp01(Finite(bombOpenSoundVolume, .8f));
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;

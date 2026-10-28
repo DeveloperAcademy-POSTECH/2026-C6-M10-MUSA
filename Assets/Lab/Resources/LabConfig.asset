@@ -192,6 +192,7 @@ MonoBehaviour:
   yaguangFlashShakeCount: 10
   yaguangFiveColorOrbCount: 3
   yaguangFiveColorOrbPaintScale: 2
+  yaguangFeverStaminaMultiplier: 2
   bgmVolume: 0.2
   generateSoundVolume: 1
   hitSoundVolume: 0.9
@@ -210,6 +211,14 @@ MonoBehaviour:
   bombSoundStyle: 1
   chuimsaeChancePercent: 15
   chuimsaeMinGap: 5
+  gumihoBgmVolume: 0.4
+  gumihoFeverBgmVolume: 0.4
+  charmCastSoundVolume: 0.4
+  charmCheckSoundVolume: 0.8
+  charmReleaseSoundVolume: 0.4
+  foxFallSoundVolume: 0.5
+  foxClearSoundVolume: 0.3
+  bombOpenSoundVolume: 0.8
   hapticsEnabled: 1
   generateHapticStyle: 1
   generateHapticIntensity: 1
