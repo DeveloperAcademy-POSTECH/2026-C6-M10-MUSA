@@ -38,6 +38,7 @@ namespace C6Lab
 
         public void Bind(LabNetwork target, GameObject result, Font textFont)
         {
+            Hide();
             network = target;
             resultControls = result;
             font = textFont != null ? textFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -46,13 +47,12 @@ namespace C6Lab
         private void Update()
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
-            bool terminal = snapshot != null && (snapshot.phase == LabPhase.Victory || snapshot.phase == LabPhase.Defeat);
+            bool terminal = network != null && !network.GameFlowEnabled && snapshot != null
+                && (snapshot.phase == LabPhase.Victory || snapshot.phase == LabPhase.Defeat);
             terminal = terminal && !LabPaintFinishPresentation.DelayResult(network, snapshot);
             if (!terminal)
             {
-                if (panel != null && panel.gameObject.activeSelf) panel.gameObject.SetActive(false);
-                RestoreCard();
-                shownKey = null;
+                Hide();
                 return;
             }
             string key = snapshot.sessionId + ":" + snapshot.round + ":" + snapshot.phase;
@@ -64,6 +64,11 @@ namespace C6Lab
         /// <summary>칭호별 목록을 다시 그린다. (테스트에서도 직접 부를 수 있다)</summary>
         public void Show(LabPlayerState[] players, bool victory, double playedSeconds = 0d)
         {
+            if (network != null && network.GameFlowEnabled)
+            {
+                Hide();
+                return;
+            }
             EnsurePanel();
             if (panel == null) return;
             var rows = (players ?? new LabPlayerState[0]).Where(p => p != null).OrderBy(p => p.seat).ToArray();
@@ -74,7 +79,14 @@ namespace C6Lab
             PlaceCard();
         }
 
-        private void OnDisable() => RestoreCard();
+        private void OnDisable() => Hide();
+
+        private void Hide()
+        {
+            if (panel != null && panel.gameObject.activeSelf) panel.gameObject.SetActive(false);
+            RestoreCard();
+            shownKey = null;
+        }
 
         /// <summary>
         /// 결과 카드 윗변을 화면 위에서 resultTopFromTop 지점(기본 1/3)에 놓고, 목록을 카드 바로 밑에 다시 붙인다.

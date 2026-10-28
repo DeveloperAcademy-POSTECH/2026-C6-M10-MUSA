@@ -128,10 +128,11 @@ namespace Hapio.Editor
                 Image("RowRule", template, "RowRule", 0, 38.5f, 296, 3);
                 view.rowTemplate = template.gameObject; template.gameObject.SetActive(false);
                 view.emptyLabel = Text("NoRecords", viewport, "기록 없음", 18, 0, 0, 297, 40, TextAnchor.MiddleCenter);
-                view.guidance = Text("Guidance", view.design, victory ? "다음 스테이지가 시작될 동안\n잠시만 기다리시오" : "요괴를 다시 봉인하고싶다면\n게임을 새로 시작하시오", 18, 35, 561, 332, 52, TextAnchor.UpperCenter);
+                view.guidance = Text("Guidance", view.design, victory ? "결과를 확인한 뒤\n방장이 다음 스테이지를 시작하시오" : "요괴를 다시 봉인하고싶다면\n게임을 새로 시작하시오", 18, 35, 561, 332, 52, TextAnchor.UpperCenter);
                 view.guidance.color = Secondary;
                 view.nextButton = Button("NextStageOrOverall", view.design, "다음 스테이지", 71, 616, 260, 36, Html("9d9586"), 18);
                 view.nextButton.gameObject.SetActive(false);
+                view.nextButton.interactable = false; // GameScreen initializes Host/Guest actions before the first frame.
                 if (victory) view.viewerButton = Button("InspectSealedGourd", view.design, "구미호 봉인 박 확인", 61, 664, 280, 58, Ink, 24);
                 view.homeButton = Button("LeaveRun", view.design, "나가기", 61, 734, 280, 58, Html("9d9586"), 24);
                 screen.resultView = view;

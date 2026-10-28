@@ -3251,3 +3251,38 @@ PR 기능 커밋 `71769986`(main `b5695c4e` 포함)을 연결 Editor Unity6000.6
 
 - Mac/iOS 빌드, 서명·설치·실기기 터치/안전 영역·일반 Wi-Fi/핫스팟 다중 기기: **NOT_RUN**.
 - 전체 EditMode/Lab PlayMode 및 모바일 메모리·성능 측정: **NOT_RUN**. 위 관련 검사 결과를 전체 통과나 실기기 통과로 해석하지 않는다.
+
+## 2026-10-28 — #367 결과 수동 진행·완료 대기·구형 대시보드
+
+기준 main `73c4aa57`, 작업 브랜치 `fix/#367-session-result-flow`. Unity 6000.6.5f1·macOS·Metal의 기존 Editor 한 개와 Unity CLI로 순차 검사했다. 새 Mac 앱이나 iOS 빌드·기기를 띄우지 않았다. 아래는 이번 변경의 실제 실행 결과다.
+
+### 구현과 확인 범위
+
+- Story 중간 결과의10초 자동 진행을 제거했다. 전원 결과 수신 ACK 후 누구도 박을 관람하지 않을 때 Host의 기존 다음 버튼으로만 진행한다. Guest 입력·중복 NEXT·이전 스테이지 ACK를 차단하고, 결과 진입 최소 다음 프레임과 모든 mouse/touch 해제까지 NEXT·나가기·관람 및 직접 콜백을 막는다. 별도 Ready 입력이나 초단위 대기는 추가하지 않았다.
+- 최종 도색 준비와 예약 수신은 한 `schedule_ready`로 확인한다. 멀티의0.75초 예약 여유와1.2초/.2배 연출·전원 완료 확인은 유지하며, 솔로의 예약 여유만 생략한다. Host 최초 Victory 기준12초 서버 deadline을 prepare와 진행 상태에 공유하고 재예약·결과 캡처가 이 예산을 다시 시작하지 않는다.
+- 같은 run/stage/session/round/paint revision/visual version의 결과·GPU 관람 사본을 연출 중 확보하고 결과 Scene에서 재사용한다. 실제 저장 Battle을 세 번 로드하는 검사에서 연출 중 사본 존재와 언로드 뒤 같은 preview/RenderTexture 재사용을 확인했다. 도색 완료는 CPU fixture로 유도했으므로 실제 투척 명중이나 기기 성능 측정은 아니다.
+- 결과 흐름 상태가 전투 스냅샷보다 먼저 도착할 수 있으므로, 결과 화면에서도 matching Victory 기록을 계속 캐시한다. 필수 기록을 확보한 뒤에만 `result_ready`를 보낸다. 기록을 비웠다가 실제 보존 스냅샷으로 복구하는 회귀에서 기존 preview도 유지되는지 확인했다.
+- Hapio의 `LabSceneController`는 독립 Lab 대시보드를 붙이지 않는다. `LabHud`·`LabResultDashboard`의 표시 조건 자체도 게임 세션을 제외한다. 같은 통계 계산과 독립 Lab의 결과·완료 연출은 유지한다.
+- 게임 연결 토큰만 `C6HapioGame/22`로 변경했다. `C6PhysicsLab/38`·프로토콜5677·공유 설정251개는 그대로다. 게임의 모든 참가 앱은 같은 새 토큰의 빌드를 사용해야 한다.
+
+### 실제 실행 결과
+
+| 검사 | 결과 | 근거와 한계 |
+| --- | --- | --- |
+| Unity 스크립트 컴파일 | **PASS** | 최종 변경의 `recompile_status`: completed, 오류 없음 |
+| 전체 EditMode | **1551/1551 PASS**, 38.63초 | 완료 barrier·최초 시한 유지·잘못된 deadline·사본 identity·결과 UI·Game22/Lab38 연결 규약 포함 |
+| `Hapio.PlayModeTests` assembly | **44 PASS / 신규 입력 fixture 1건 실패**, 226.15초 | 실제 저장 Home/Battle/StageResult/GameOver, 수동 진행·10.5초 이상 결과 유지·관람 차단·3스테이지 사본 재사용·기록 복구·최종 전체 기록·패배·2:2·DEV 경로 |
+| 신규 결과 진입 mouse/다중 touch 검사 재실행 | **1/1 PASS**, 11.07초 | 실제 InputSystem mouse+두 touch가 모두 해제되기 전 버튼·콜백 차단, 새 pointer down/up/click으로 NEXT, 패배 HOME과 설정 원복 |
+| `LabResultDashboardTests` PlayMode | **5/5 PASS**, 0.04초 | game-flow 직접 Show/자동 표시 차단, 기존 panel 숨김·카드 위치 복원·독립 Lab 재표시, Victory/Defeat HUD |
+| `LabGourdPaintTests` PlayMode | **8/8 PASS**, 10.32초 | 실제 도색 표현·완료 연출·원본 Collider/Time.timeScale/지도 revision/명중 수 보존 |
+| 문서·변경 범위 | **PASS** | 변경 문서의 로컬 링크23개 누락 없음, 공백 오류 없음. Scene·Prefab·설정 asset·Packages·ProjectSettings·소개 README 변경0. 기존 미추적 사용자 폴더 제외 |
+
+Hapio assembly의 실패는 새 입력 fixture가 원본 `InputSettings`를 복구하는 finally에서 발생했다. Input System은 교체되는 설정의 flags가 정확히 `HideAndDontSave`이면 그 객체를 명시 삭제하므로, 원본을 임시 `DontUnloadUnusedAsset`로 보호하고 같은 인스턴스를 재설치한 뒤 원래 flags를 복원하도록 수정했다. 단순 OR 보호로는 동일 flags가 남아 단독 재실행에서도 실패했고, 정확한 flags 보존 후 위1개 검사가 통과했다. 이 실패를 게임 조작 통과로 간주하지 않았으며 최종 단독 실행에서 앞선 assertion과 정리까지 통과한 것을 확인했다. 실패 수정은 검사 fixture에만 적용했다.
+
+고유 PlayMode 범위는 Hapio45개·대시보드5개·도색8개, 총58개다. Hapio의44개와 수정 후 해당1개 통과를 구분하며, 최종 소스에서 전체 assembly를 한 번 더 실행한 것으로 기록하지 않는다. 원시 실행 JSON·로그·개인 경로는 커밋하지 않는다.
+
+### 예외와 미실행 범위
+
+- 공유 완료 시한 뒤에도 최종 지도가 불일치하면 중간 StageResult는 기존 정책대로 GameOver, 최종 Completed만 클리어를 보존하며 지도 미동기화 안내를 표시한다. CPU 지도 일치 후 GPU preview 생성만 실패하는 경우 별도 오류 안내 없이 관람이 비활성화될 수 있는 기존 제약은 남아 있다.
+- 실제 여러 기기의 prepare/commit/done 왕복·일반 Wi-Fi·핫스팟·지연/손실 환경의 체감 시간: **NOT_RUN**. barrier의 지연/중복/세대 검사는 실제 Guest 기기의 네트워크 검증을 대신하지 않는다.
+- Mac/iOS 내보내기·서명·설치·실기기 터치, 전체 Lab PlayMode, 모바일 메모리·GPU 성능 계측: **NOT_RUN**. 이번 결과를 해당 환경의 통과로 해석하지 않는다.
