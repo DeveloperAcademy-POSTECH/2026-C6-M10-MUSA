@@ -29,7 +29,7 @@
 | `Assets/Lab/Resources/Audio/Miss/Miss.wav` | 내가 던진 구슬이 요괴를 빗나갔을 때 (던진 사람 기기만) | "Woosh_Whip 3" by CAT-FOX_ALEX, [freesound.org](https://freesound.org/people/CAT-FOX_ALEX/sounds/870096/) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
 | `Assets/Lab/Resources/Audio/FlashClear/FlashClear.wav` | 야광귀 섬광을 흔들어 다 풀었을 때 (#338, 푼 사람 기기만) | 팀 제공 CC0 소리 (원본 이름 미확인, 파일 정보 "Melody Assistant 7.4.7c, 2010") | CC0 | 원본 .ogg(4초, 스테레오 48kHz)에서 소리 있는 앞 0.9초만 남겨 1.1초로 자르고 끝 0.25초를 줄임, 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/FiveColorHit/FiveColorHit_1.wav`, `FiveColorHit_2.wav` (2개) | 내가 던진 오색구슬(#329)이 박에 맞았을 때 (#338, 던진 사람 기기만, 맞을 때마다 1 → 2 → 1 번갈아) | 팀 제공 CC0 소리 (원본 이름 미확인) | CC0 | 원본 .mp3(1.06초, 스테레오 48kHz)의 뒤 무음을 잘라 0.96초, 44.1kHz 모노 16bit wav |
-| `Assets/Lab/Resources/Audio/ComboHit/ComboHit.wav` | 박 색상 콤보에서 맞는 칸을 맞힐 때 (#338, 모든 기기). 코드가 1~4칸마다 도·레·미·솔(0·2·4·7반음, 재생 속도 1·1.12·1.26·1.50배)로 높여 낸다 | 팀 제공 CC0 소리 (Freesound, 원본 이름 미확인) | CC0 | 원본 wav(0.46초, 스테레오 44.1kHz, 평균 -29.6dB)를 압축·증폭해 평균 약 -12.5dB(최대 -1.4dB)로 크게 하고 끝 0.1초를 줄임, 44.1kHz 모노 16bit wav |
+| `Assets/Lab/Resources/Audio/ComboHit/ComboHit.wav` | 박 색상 콤보에서 맞는 칸을 맞힐 때 (#338, #366에서 양금으로 교체, 모든 기기). 코드가 1~4칸마다 국악 평조 궁/상/각/치(0/2/5/7반음, 재생 속도 1/1.12/1.33/1.50배)로 높여 낸다 | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 양금 기본음 강 | 출처 표시 조건으로 누구나 이용 가능 (공공누리 제1유형, 상업적 이용·변경 가능) | 단음 15개(E3~A5)가 이어진 원본 wav(104초, 스테레오 44.1kHz 16bit)에서 A4 한 음(약 439Hz)만 타격 5ms 전부터 2.0초로 잘라냄. 앞 0.004초 페이드인, 0.6초부터 끝까지 페이드아웃(여음이 칸끼리 너무 오래 겹치지 않게). 가장 큰 순간이 -1dB가 되도록 음량만 맞춤(평균 -22.4dB). 44.1kHz 모노 16bit wav. 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/ComboFail/ComboFail.wav` | 박 색상 콤보 실패(틀린 색·시간 초과) 때 (#338, 팀 전체 실패라 모든 기기) | 팀 제공 CC0 소리 (원본 이름 미확인) | CC0 | 원본 mp3(0.29초, 모노 48kHz)의 앞 무음 0.03초를 잘라 0.26초로 만들고 +3dB(최대 -0.3dB) 키움, 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/CharmRelease/CharmRelease.wav` | 매혹이 풀릴 때 (#351, 걸린 사람과 양옆 사람 기기) | AI 생성: [Suno](https://suno.com) (2026-10-28 생성, 파일 설명에 "made with suno"). 원본 이름 `매혹 풀렸을 때.wav` | Suno 이용약관: 유료 플랜(Pro·Premier)으로 만든 곡은 만든 사람 소유·상업적 이용 가능, 무료 플랜 곡은 비상업적 이용만 — **팀 계정 플랜 확인 필요** | 2.76초, 스테레오 48kHz 16bit 그대로. 가장 큰 순간이 -1dB가 되도록 음량만 키움(+8dB). 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/FoxFall/FoxFall.wav` | 여우 구슬이 내 판에 떨어질 때 (#351, 한 번 떨어뜨릴 때마다 한 번, 그 판 주인 기기만) | AI 생성: [Suno](https://suno.com) (2026-10-28 생성, 파일 설명에 "made with suno"). 원본 이름 `여우구슬떨어질때.wav` | Suno 이용약관: 유료 플랜(Pro·Premier)으로 만든 곡은 만든 사람 소유·상업적 이용 가능, 무료 플랜 곡은 비상업적 이용만 — **팀 계정 플랜 확인 필요** | 1.15초, 스테레오 48kHz 16bit 그대로. 음량·음색 변경 없음 |
@@ -47,6 +47,8 @@
 
 > 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '연주 - 능게(태평소, 작성자: 국립국악원)'를 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
 
+> 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '양금 기본음 강(작성자: 국립국악원)'을 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
+
 | 우리 파일 | 국립국악원 저작물명 |
 | --- | --- |
 | `BGM/Kkwaenggwari_13.wav` | 동살풀이 |
@@ -54,13 +56,14 @@
 | `Generate/Janggu_3_1.wav`, `Janggu_3_2.wav`, `Janggu_3_3.wav` | 장구-쿵-강, 장구-쿵-중, 장구-쿵-약 |
 | `GenerateVoice/Eolssu_1.wav`, `Eolssu_2.wav`, `Eolssu_3.wav` | 추임새 (정회석, 강효주, 이춘희) |
 | `ComboClear/Jota.wav` | 추임새 – 좋타 (염경애) |
+| `ComboHit/ComboHit.wav` | 양금 기본음 강 |
 | `Fever/Fever_Whimori.wav` | 동살풀이 (꽹과리), 연주 - 능게 (태평소) |
 
 **CC BY 소리 (출처 표시 의무 있음)**
 
 > 김용배의 "뻥튀기 뻥2"(공유마당, https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020)은 CC BY 라이선스로 제공됩니다.
 
-CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, FlashClear, FiveColorHit, ComboHit, ComboFail)는 표시 의무가 없지만, 크레딧 화면이 생기면 아래처럼 함께 적는 것을 권장한다.
+CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, FlashClear, FiveColorHit, ComboFail)는 표시 의무가 없지만, 크레딧 화면이 생기면 아래처럼 함께 적는 것을 권장한다.
 
 > 타격음 "Cartoon Punch Cassette E" by modusmogulus, 페인트 타격음 "Squishes and Splats" by mrickey13, 스친 타격음 "SFX_SQUELCH_slayer_215" by MrFossy, 결합 소리 "chimes" by _bliind, 빗나감 소리 "Woosh_Whip 3" by CAT-FOX_ALEX, 폭발음 "rubble_explode" by canberries4 (freesound.org, CC0)
 
