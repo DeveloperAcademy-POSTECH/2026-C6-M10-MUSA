@@ -3080,3 +3080,21 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - 추가 검사: `LabFeverTimeTests`(DEV 칸, 시작 시각, 다른 스테이지 없음, 0이면 끔·전투보다 긴 피버, 충전 2배와 긴 한 번의 진행, 시작 시각 예정 기믹 취소, 방해 4종 정리), `LabFeverTimeHudTests`(말풍선 등장·위치·숨쉬기·끝, 늦게 본 피버·일시정지, 문구·가장자리 빛·빨간 시간), Hapio `GameStageSettingsTests.FeverTimeIsTunedOnTheFoxsTabAloneAndReachesItsStage`, Lab DEV에서 피버 칸 숨김, 설정 230개·프로토콜 고정값.
 - **main 병합(#332·#329·#335)**: 충돌 30여 파일 중 검사 고정값은 main 쪽을 받아 240/5674로 올렸다. `LabConfig` 칸·접근자·저장/적용은 main 뒤에 피버 2칸을 붙였고, 스태미나 충전은 지귀 피버 배율(`JigwiStageRecoveryMultiplier`)과 피버 타임 구간 배율을 함께 적용하도록 합쳤다(두 피버는 다른 스테이지). `LabConfig.asset`·Home·Lobby는 main 쪽을 받은 뒤 Editor API로 피버 기본값과 DEV 칸 2줄을 다시 넣었다(YAML 수동 병합 없음). Lab DEV는 지귀·피버 칸을 모두 숨긴다.
 
+
+## 2026-10-28 · #351 구미호 스테이지 효과음·BGM
+
+- 기준 main `3b50399f`, 기능 브랜치 `feat/#351-gumiho-stage-sound`. 팀이 고른 소리 6개(매혹 걸림·매혹 풀림·여우 구슬 떨어짐·여우 구슬 소멸·피버 곡·스테이지 BGM)를 넣고, 나머지 2개(체크·폭탄 열림)는 폴더만 정해 두었다(비어 있으면 소리 없음).
+- **발견한 결함(수정)**: 스테이지 요괴(`gameStageYokai`)를 Host만 `PrepareGameStage`에서 알고 Guest는 늘 None이었다. 그래서 #343 야광귀 피버 곡·번쩍임·스태미나 물결(`YaguangFeverElapsed`)이 Guest 기기에서는 나오지 않았을 것이다. Guest가 Host의 게임 진행 상태를 받을 때(`GameSession.SetLocalState`) `LabNetwork.ObserveGameStage`로 같은 요괴를 기록하게 했다. 이 값을 쓰는 다른 곳(`JigwiManualControlsAllowed`, 시작 확인)은 Host 전용이라 Guest 동작은 바뀌지 않는다.
+- **BGM**: `LabBattleBgm`이 라운드 시작 때 구미호 스테이지면 `Audio/GumihoBGM`(162초, Streaming)을 튼다. 구미호 피버(`feverTimeAt`, Host 시각)에는 `Audio/GumihoFever`(20초)를 야광귀 피버와 같은 방식(교차 0.25초, "좋다" 추임새, 늦게 온 기기 건너뛰기)으로 튼다. 일시정지 동안에는 피버를 켜거나 끄지 않는다(멈춘 시계를 1초까지 어림하는 동안 흔들리지 않게).
+- **효과음**: 새 `LabGumihoSound`. 매혹 걸림은 SabotageCast가 예고 시작(3초 전)에 오므로 스냅샷의 `charmStartedAt`을 지나는 순간에 낸다(1초 넘게 늦게 본 매혹은 무음). 체크·풀림은 `LabCharmBubbles.OwnCheckShown`·`HelperCharmEnded`와 `LabCharmHud.CharmReleased`, 여우 구슬 소멸·폭탄 열림은 `LabOrbBoard.FoxFireCleared`·`BombOpening`, 여우 구슬 떨어짐은 대상 기기의 SabotageCast. 매혹 한 번에 한 번만 나도록 매혹 시작 시각으로 거른다(스냅샷은 끝난 매혹을 -1로 보내므로 마지막 매혹 시각을 따로 기억한다). 예전 `Resources/Sabotage/CharmHowl` 재생 코드는 지웠다.
+- **크기**: `LabConfig` Inspector `Sound · 구미호 스테이지` 8칸(BGM 0.2·피버 곡 0.3·매혹 걸림 0.7·나머지 0.8) × 일시정지 메뉴 설정. DEV 칸이 없어 공유 설정 수와 프로토콜·연결 토큰은 바꾸지 않는다(검사는 칸 수를 고정하지 않고, 크기를 바꿔도 DEV 값이 그대로인지 본다). `LabConfig.asset`은 바꾸지 않았다(새 칸은 코드 기본값).
+- **소리 파일 가공**: Opus m4a 두 개는 Unity가 못 읽어 AVFoundation으로 wav로 풀었다. 음량만 맞춘 것과 원본 이름은 `AUDIO_CREDITS.md`. 출처는 파일 안의 생성 정보로 확인했다: 스테이지 BGM·피버 곡·매혹 풀림·여우 구슬 떨어짐은 Suno, 매혹 걸림은 ElevenLabs. 여우 구슬 소멸도 Suno로 다시 만들었다(팀 확인, QuickTime으로 잘라 파일 안 정보는 없음). Suno·ElevenLabs는 유료 플랜으로 만든 것만 상업적 이용이 되므로 **팀 계정 플랜 확인 필요**로 남겼다.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 열린 Editor 재컴파일 | PASS | `compilationFailed=false`, 오류 0, 바뀐 파일에서 새 경고 없음 |
+| 소리 가져오기(Editor API) | PASS | `Gumiho_Stage` 162.49초·48kHz·2ch·Streaming. 다른 파일은 기본 설정 |
+| EditMode·PlayMode | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| 실제 소리·3인·실기기 | NOT_RUN | 소리 크기 균형, 매혹 걸림 순간이 맞는지, Guest 기기에서 구미호 BGM·야광귀 피버 곡이 나오는지 확인 필요 |
+
+- 추가/바뀐 검사: EditMode `LabGumihoSoundTests`(폴더·파일, 파일 없을 때 무음과 횟수, 매혹 걸림 순간·한 번·늦게 본 매혹, Inspector 크기 기본값·0~1 제한·크기를 바꿔도 DEV 값 그대로, 구미호 곡 폴더·Streaming·20초, Guest의 스테이지 요괴와 야광귀 피버), PlayMode `LabCharmBubblesTests.TheOwnCheckAndTheEndOfACharmAreEachAnnouncedOncePerCharm`, `LabOrbPhysicsTests`의 여우 구슬 닿음·두 번 누르기·해금 폭탄 검사에 소리 알림 확인 추가.
