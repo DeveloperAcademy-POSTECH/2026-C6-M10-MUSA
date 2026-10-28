@@ -17,6 +17,7 @@ namespace C6Lab
         public LabNetwork network;
         public GameObject visualPrefab;
         public Material paintMaterial;
+        public LabWatercolorPaintProfile watercolorProfile;
         [Tooltip("Offline preview brush only. Real session growth uses the Host round settings.")]
         [Range(.05f, .3f)] public float splatRadius = LabPaintSurface.DefaultRadius;
 
@@ -27,6 +28,9 @@ namespace C6Lab
         private Texture2D paintTexture;
         private Texture2D painterTexture;
         private LabHighResolutionPaintRuntime highResolution;
+        private LabWatercolorPaintRuntime watercolor;
+        private bool appliedWatercolorEnabled;
+        private int appliedWatercolorSettings;
         private bool appliedHighResolutionEnabled;
         private int appliedHighResolutionColumns;
         private uint uploadedVisualVersion;
@@ -54,16 +58,22 @@ namespace C6Lab
         public Texture2D PaintTexture => paintTexture;
         public Texture2D PainterTexture => painterTexture;
         /// <summary>Actually bound render maps. Authoritative Texture2D observation APIs stay unchanged.</summary>
-        public Texture VisualPaintTexture => HighResolutionActive ? highResolution.PaintTexture : paintTexture;
+        public Texture VisualPaintTexture => WatercolorActive ? watercolor.PaintTexture
+            : HighResolutionActive ? highResolution.PaintTexture : paintTexture;
         public Texture VisualPainterTexture => HighResolutionActive ? highResolution.PainterTexture : painterTexture;
         public bool HighResolutionActive => appliedHighResolutionEnabled && highResolution != null && highResolution.Ready;
         public string HighResolutionError => highResolution != null ? highResolution.Error : null;
+        public bool WatercolorActive => appliedWatercolorEnabled && HighResolutionActive
+            && watercolor != null && watercolor.Ready;
+        public string WatercolorError => watercolor != null ? watercolor.Error : null;
         /// <summary>True only after the final authoritative map and all bounded high-resolution batches are installed.</summary>
         public bool CompletionVisualReady => IsReady && hasUploadedSurface && uploadedSurface == Surface
             && uploadedRevision == Surface.Revision && uploadedVisualVersion == Surface.VisualVersion
             && uploadedSession == network.Snapshot?.sessionId && uploadedRound == network.Snapshot?.round
             && (network.config == null || !network.config.HighResolutionPaintEnabled
-                || highResolution != null && highResolution.Ready && !highResolution.HasPendingWork && highResolution.Error == null);
+                || highResolution != null && highResolution.Ready && !highResolution.HasPendingWork && highResolution.Error == null)
+            && (!appliedWatercolorEnabled || watercolor == null || watercolor.Error != null
+                || watercolor.Ready && !watercolor.HasPendingWork && !watercolor.IsAnimating);
         public Transform Shell => shell != null ? shell.transform : null;
         public GameObject VisualInstance { get; private set; }
         public string InitializationError { get; private set; }
@@ -85,6 +95,8 @@ namespace C6Lab
                 paint.visualPrefab = Resources.Load<GameObject>(ResourceFolder + "WhiteGourd");
             if (paint.paintMaterial == null)
                 paint.paintMaterial = Resources.Load<Material>(ResourceFolder + "WhiteGourd");
+            if (paint.watercolorProfile == null)
+                paint.watercolorProfile = Resources.Load<LabWatercolorPaintProfile>(ResourceFolder + "WatercolorProfile");
             paint.ApplyMode();
             LabPaintFinishPresentation.Attach(network);
             return paint;
@@ -154,6 +166,8 @@ namespace C6Lab
             block = new MaterialPropertyBlock();
             EnsureTexture(Surface);
             initialized = true;
+            if (watercolorProfile == null)
+                watercolorProfile = Resources.Load<LabWatercolorPaintProfile>(ResourceFolder + "WatercolorProfile");
             ApplyVisualSize();
             if (!target.BindHitboxMesh(shell.GetComponent<MeshFilter>()))
                 return FailInitialization("The visible white gourd shell could not supply its collision mesh.");
@@ -256,6 +270,8 @@ namespace C6Lab
             EnsureTexture(source);
             string currentSession = network != null ? network.Snapshot?.sessionId : null;
             uint currentRound = network != null && network.Snapshot != null ? network.Snapshot.round : 0u;
+            bool generationChanged = !hasUploadedSurface || uploadedSurface != source
+                || uploadedSession != currentSession || uploadedRound != currentRound;
             bool uploadMap = force || !hasUploadedSurface || uploadedSurface != source
                 || uploadedRevision != source.Revision || uploadedSession != currentSession || uploadedRound != currentRound;
             LabConfig config = network != null ? network.config : null;
@@ -266,6 +282,13 @@ namespace C6Lab
             bool visualChanged = uploadedVisualVersion != source.VisualVersion;
             bool pendingVisual = highResolution != null && (highResolution.HasPendingWork
                 || (highResolution.Error == null && !highResolution.Ready));
+            LabWatercolorPaintSettings watercolorSettings = watercolorProfile != null ? watercolorProfile.settings : null;
+            bool watercolorEnabled = highResolutionEnabled && watercolorSettings != null && watercolorSettings.enabled;
+            int watercolorSettingsHash = watercolorSettings != null ? watercolorSettings.Fingerprint : 0;
+            bool watercolorChanged = appliedWatercolorEnabled != watercolorEnabled
+                || appliedWatercolorSettings != watercolorSettingsHash;
+            bool pendingWatercolor = watercolor != null && watercolor.Error == null
+                && (watercolor.HasPendingWork || watercolor.IsAnimating || !watercolor.Ready);
             bool playerPaintPatternsEnabled = config == null || config.PlayerPaintPatternsEnabled;
             bool grainEnabled = config != null && config.PaintGrainEnabled;
             float grainSize = config != null ? config.PaintGrainSize : 1f;
@@ -276,7 +299,7 @@ namespace C6Lab
                 || appliedMottleStrength != mottleStrength;
             bool patternsChanged = !grainSettingsApplied || appliedPlayerPaintPatternsEnabled != playerPaintPatternsEnabled;
             if (!uploadMap && !grainChanged && !patternsChanged && !highResolutionChanged
-                && !visualChanged && !pendingVisual && !completeRebuild) return;
+                && !visualChanged && !pendingVisual && !watercolorChanged && !pendingWatercolor && !completeRebuild) return;
             if (block == null) block = new MaterialPropertyBlock();
             shell.GetPropertyBlock(block);
             if (uploadMap)
@@ -309,6 +332,26 @@ namespace C6Lab
             appliedHighResolutionEnabled = highResolutionEnabled;
             appliedHighResolutionColumns = highResolutionColumns;
             uploadedVisualVersion = source.VisualVersion;
+            // A deliberate quality/profile change is also the retry boundary after a
+            // presentation allocation failure. Quiet frames never retry automatically.
+            if ((generationChanged || highResolutionChanged || watercolorChanged) && watercolor != null)
+            {
+                watercolor.Dispose(); watercolor = null;
+            }
+            if (watercolorEnabled && HighResolutionActive)
+            {
+                if (watercolor == null) watercolor = new LabWatercolorPaintRuntime();
+                bool final = completeRebuild || network != null && network.Snapshot != null
+                    && (network.Snapshot.phase == LabPhase.Victory || network.Snapshot.phase == LabPhase.Defeat);
+                watercolor.Update(source, highResolution.PaintTexture, highResolution.PainterTexture,
+                    watercolorSettings, Time.realtimeSinceStartupAsDouble, final);
+            }
+            else if ((!watercolorEnabled || highResolution == null) && watercolor != null)
+            {
+                watercolor.Dispose(); watercolor = null;
+            }
+            appliedWatercolorEnabled = watercolorEnabled;
+            appliedWatercolorSettings = watercolorSettingsHash;
             block.SetTexture("_PaintMap", VisualPaintTexture);
             block.SetTexture("_PainterMap", VisualPainterTexture);
             block.SetFloat("_PaintGrainEnabled", grainEnabled ? 1f : 0f);
@@ -358,6 +401,10 @@ namespace C6Lab
                 mountedTarget.SetVisualPrefab(null);
             if (highResolution != null) highResolution.Dispose();
             highResolution = null;
+            if (watercolor != null) watercolor.Dispose();
+            watercolor = null;
+            appliedWatercolorEnabled = false;
+            appliedWatercolorSettings = 0;
             appliedHighResolutionEnabled = false;
             appliedHighResolutionColumns = 0;
             uploadedVisualVersion = 0;

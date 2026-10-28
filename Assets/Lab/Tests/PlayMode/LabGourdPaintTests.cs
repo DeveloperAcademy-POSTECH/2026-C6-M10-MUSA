@@ -80,6 +80,13 @@ namespace C6Lab.Tests
             Assert.That(paint.VisualInstance.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
             Assert.That(paint.target.GetComponent<LabPaintFinishPresentation>(), Is.Not.Null);
             Assert.That(paint.PaintCount, Is.Zero);
+            Assert.That(paint.watercolorProfile, Is.SameAs(Resources.Load<LabWatercolorPaintProfile>("GourdPaint/WatercolorProfile")),
+                "The ordinary saved Scene must load the authored watercolor profile.");
+            Assert.That(paint.WatercolorActive, Is.True, paint.WatercolorError);
+            Assert.That(ReadBlock(paint).GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture),
+                "The real shell uses the watercolor output, not only an isolated test texture.");
+            Assert.That(ReadBlock(paint).GetTexture("_PainterMap"), Is.SameAs(paint.VisualPainterTexture),
+                "Painter identity remains supplied by the existing authoritative high-resolution map.");
             Assert.That(paint.PaintTexture.width, Is.EqualTo(LabPaintSurface.Width));
             Assert.That(paint.PaintTexture.height, Is.EqualTo(LabPaintSurface.Height));
             Assert.That(paint.PaintTexture.mipmapCount, Is.EqualTo(1));

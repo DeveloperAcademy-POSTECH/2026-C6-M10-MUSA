@@ -17,11 +17,11 @@
         </ui:VisualElement>
         <ui:VisualElement class="watercolor-panels">
             <ui:VisualElement class="watercolor-panel">
-                <ui:Label text="CURRENT · Runtime high resolution" class="watercolor-heading" />
+                <ui:Label text="BASELINE · Previous high resolution" class="watercolor-heading" />
                 <ui:Image name="currentImage" class="watercolor-image" />
             </ui:VisualElement>
             <ui:VisualElement class="watercolor-panel">
-                <ui:Label text="CANDIDATE · Layered watercolor" class="watercolor-heading" />
+                <ui:Label text="WATERCOLOR · Game renderer" class="watercolor-heading" />
                 <ui:Image name="candidateImage" class="watercolor-image" />
             </ui:VisualElement>
         </ui:VisualElement>

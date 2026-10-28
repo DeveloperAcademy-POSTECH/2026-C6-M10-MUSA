@@ -133,8 +133,8 @@ namespace C6Lab.Experiments.Editor
                 LabPaintSurface surface = study.Surface;
                 status.text = $"WATER / blue · {location} · first hit + {repeats} re-hit(s) · seed {seed} · "
                     + $"Host-rule fixture {surface.Coverage:P2} ({surface.CoveredCount:N0}/{surface.CellCount:N0} cells). "
-                    + "Drying OFF only in this private fixture. Static preview only: no live game installation, "
-                    + "network validation or spreading animation.";
+                    + "Drying OFF only in this private fixture. Static comparison of the game renderer; "
+                    + "active spreading is finalized here. This window does not change a live session.";
                 exportButton.SetEnabled(true);
             }
             catch (Exception exception)

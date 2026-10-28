@@ -105,7 +105,7 @@ namespace C6Lab.Experiments.Editor
                 Require(FileDigest(protectedPaths[i]) == originals[i], "The study changed a protected source asset: " + protectedPaths[i]);
             Require(OwnedResources() == resources && PreviewRoots() == roots, "The study leaked an owned GPU resource or preview root.");
             report.configPreserved = report.scenePreserved = report.sourceAssetsPreserved = report.resourcesReleased = true;
-            report.visualApproval = "PENDING: screenshots must be reviewed; numeric checks do not establish artistic quality.";
+            report.visualApproval = "Blue static look approved by the user; numeric checks do not establish animation or mobile quality.";
             File.WriteAllText(Path.Combine(directory, "validation.json"), JsonUtility.ToJson(report, true));
             Debug.Log("C6_WATERCOLOR_STATIC_VALIDATED cases=" + report.entries.Count + " classification=offline_GPU_only");
         }
@@ -170,8 +170,10 @@ namespace C6Lab.Experiments.Editor
         private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
         private static int PreviewRoots() => Resources.FindObjectsOfTypeAll<GameObject>().Count(o => o.name == "Paint study — saved gourd copy");
         private static int OwnedResources() => Resources.FindObjectsOfTypeAll<Texture>().Count(o => o.name.StartsWith("Watercolor study ")
+                || o.name.StartsWith("Gourd watercolor ")
                 || o.name == "Gourd continuous brush cache" || o.name == "Gourd high-resolution committed paint" || o.name == "Gourd high-resolution committed P numbers")
-            + Resources.FindObjectsOfTypeAll<Material>().Count(o => o.name == "Watercolor study material");
+            + Resources.FindObjectsOfTypeAll<Material>().Count(o => o.name == "Watercolor study material"
+                || o.name.StartsWith("Gourd watercolor "));
 
         [Serializable] private sealed class Entry
         {

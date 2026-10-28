@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 978a4f61d3f144281bcc27fb9e503001, type: 3}
+  m_Name: WatercolorProfile
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabWatercolorPaintProfile
+  settings:
+    enabled: 1
+    density: 0.62
+    broadVariation: 0.55
+    mottle: 0.38
+    grain: 0.35
+    grainScale: 1
+    edgeStrength: 0.6
+    edgeWidth: 0.022
+    textureScale: 1
+    spreadSeconds: 0.4
+    maxActiveStains: 12
