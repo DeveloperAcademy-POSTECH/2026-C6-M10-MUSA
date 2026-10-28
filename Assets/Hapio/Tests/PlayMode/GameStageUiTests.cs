@@ -21,6 +21,11 @@ namespace Hapio.Tests
             session = GameSession.Instance;
             Assert.That(session, Is.Not.Null);
             Assert.That(session.IsLoadingScene, Is.False);
+            // DEV controls are tested after the local opening has returned to the title.
+            yield return null;
+            var opening = Object.FindFirstObjectByType<GameOpeningController>();
+            if (opening != null && opening.IsPlaying) opening.player.Skip();
+            yield return null;
         }
         [UnityTearDown]
         public IEnumerator Cleanup()

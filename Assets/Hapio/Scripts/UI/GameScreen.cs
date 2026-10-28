@@ -52,6 +52,7 @@ namespace Hapio
         private bool showOverall;
         private string overallRunId;
         private bool UsesExternalNavigation => externalNavigation && (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby);
+        private bool OpeningBlocked => kind == GameScreenKind.Home && GameOpeningController.IsPresenting;
 
         private void Awake()
         {
@@ -117,6 +118,13 @@ namespace Hapio
         private void Update()
         {
             if (session == null || session.Network == null) return;
+            if (OpeningBlocked)
+            {
+                Show(developerPanel, false);
+                Show(developerButton == null ? null : developerButton.gameObject, false);
+                Interactable(developerButton, false);
+                return;
+            }
             LabNetwork net = session.Network;
             switch (kind)
             {
@@ -411,6 +419,7 @@ namespace Hapio
 
         public void OpenDeveloper()
         {
+            if (OpeningBlocked) return;
             if (session == null || session.IsCreatingRoom) return;
             // A 2:2 room (#281) opens on its own tab; story rooms keep Common first.
             SelectDeveloperScope(session.IsTerritory ? GameStageSettings.TerritoryScope : 0);
@@ -453,6 +462,7 @@ namespace Hapio
 
         private void ApplyDeveloper()
         {
+            if (OpeningBlocked) return;
             float[] values = session.CaptureDeveloperSettings(DeveloperScope);
             for (int i = 0; i < values.Length; i++)
             {

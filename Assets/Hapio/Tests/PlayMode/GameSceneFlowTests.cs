@@ -33,6 +33,11 @@ namespace Hapio.Tests
             session = GameSession.Instance;
             network = session.Network;
             yield return Until(() => !session.IsLoadingScene, "Home bootstrap must finish loading.");
+            // These fixtures begin at the menu after the local app-opening presentation.
+            yield return null;
+            var opening = Object.FindFirstObjectByType<GameOpeningController>();
+            if (opening != null && opening.IsPlaying) opening.player.Skip();
+            yield return null;
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home));
             Assert.That(network, Is.Not.Null);
             Assert.That(network.GameFlowEnabled, Is.True);

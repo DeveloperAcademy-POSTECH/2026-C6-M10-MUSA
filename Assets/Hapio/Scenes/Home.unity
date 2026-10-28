@@ -4342,6 +4342,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
+--- !u!114 &33505953 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6185164209714428684, guid: f5b13f1ee1ccc4df9917a97db7de1072, type: 3}
+  m_PrefabInstance: {fileID: 33505949}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2fe786051f4d4a149baac3492170b42b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameLobbyView
 --- !u!1 &36986002
 GameObject:
   m_ObjectHideFlags: 0
@@ -82553,6 +82564,119 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!1001 &929301011
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1791071061610580468, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_Name
+      value: Game Opening
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_Pivot.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_Pivot.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8786650136082993880, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+--- !u!114 &929301012 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1810705365045347464, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+  m_PrefabInstance: {fileID: 929301011}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 929301013}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af35be9f9ec8f4e1790bd67bfd82e0c6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryPlayer
+--- !u!1 &929301013 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1791071061610580468, guid: f72bde8b283d4415bab35151c679cc60, type: 3}
+  m_PrefabInstance: {fileID: 929301011}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &931174257
 GameObject:
   m_ObjectHideFlags: 0
@@ -119601,6 +119725,53 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1362452992}
   m_CullTransparentMesh: 1
+--- !u!1 &1363848503
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1363848505}
+  - component: {fileID: 1363848504}
+  m_Layer: 0
+  m_Name: Game Opening Controller
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1363848504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1363848503}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7665f0637fa647e898f3a04ed8638a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameOpeningController
+  player: {fileID: 929301012}
+  openingRoot: {fileID: 929301013}
+  lobbyView: {fileID: 33505953}
+--- !u!4 &1363848505
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1363848503}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1366672042
 GameObject:
   m_ObjectHideFlags: 0
@@ -185441,3 +185612,5 @@ SceneRoots:
   - {fileID: 615858793}
   - {fileID: 2144617746}
   - {fileID: 481010671}
+  - {fileID: 929301011}
+  - {fileID: 1363848505}
