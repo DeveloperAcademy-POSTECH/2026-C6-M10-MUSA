@@ -103,8 +103,9 @@ namespace C6Lab
             LabOrbHudComposition.Attach(hud, board, orbCamera);
             if (hud != null && hud.pauseMenu != null && GetComponent<LabAudioSettingsPanel>() == null)
                 gameObject.AddComponent<LabAudioSettingsPanel>().Bind(hud.pauseMenu, generateSound);
-            // 승리/패배 결과 화면 위에 이번 라운드 기록·MVP 대시보드를 붙인다.
+            // Lab 단판 결과에만 붙인다. Hapio는 별도 결과 Scene에서 같은 기록을 표시한다.
             if (hud != null && hud.resultControls != null && boardNetwork != null
+                && !boardNetwork.GameFlowEnabled
                 && GetComponent<LabResultDashboard>() == null)
                 gameObject.AddComponent<LabResultDashboard>().Bind(boardNetwork, hud.resultControls,
                     hud.resultStatusText != null ? hud.resultStatusText.font : null);

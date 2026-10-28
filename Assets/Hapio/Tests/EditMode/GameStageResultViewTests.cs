@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Reflection;
 using C6Lab;
 using NUnit.Framework;
 using UnityEditor.SceneManagement;
@@ -25,6 +26,54 @@ namespace Hapio.Tests
                 Assert.That(view.yokai.font.name, Is.EqualTo("ShillaCultureBold"));
                 Assert.That(view.GetComponentInParent<GameScreen>().legacyResultContent.activeSelf, Is.False);
                 Assert.That(view.scroll.viewport.GetComponent<RectMask2D>(), Is.Not.Null);
+            });
+        }
+
+        [Test]
+        public void FirstResultRefreshInitializesNonHostActionsWithoutLegacyContent()
+        {
+            WithView(GameScenePaths.StageResult, view =>
+            {
+                GameObject root = Object.Instantiate(Resources.Load<GameObject>(GameSession.ResourcePath));
+                try
+                {
+                    GameSession session = root.GetComponent<GameSession>();
+                    const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+                    typeof(GameSession).GetField("stageCatalog", flags).SetValue(session, GameStageCatalog.RequireDefault());
+                    session.State.phase = GameFlowPhase.StageResult;
+                    session.State.stageIndex = 2;
+                    session.State.runId = "non-host-result-fixture";
+                    GameScreen screen = view.GetComponentInParent<GameScreen>();
+                    typeof(GameScreen).GetField("session", flags).SetValue(screen, session);
+                    screen.legacyResultContent.SetActive(true);
+                    view.judgment.text = "stale saved result";
+
+                    typeof(GameScreen).GetMethod("OnEnable", flags).Invoke(screen, null);
+
+                    Assert.That(session.Network.IsHost, Is.False);
+                    Assert.That(view.stage.text, Is.EqualTo("STAGE 2"));
+                    Assert.That(view.yokai.text, Is.EqualTo("야광귀"));
+                    Assert.That(view.judgment.text, Is.EqualTo("봉인 성공 !"));
+                    Assert.That(view.nextButton.gameObject.activeSelf, Is.False, "Only the Host sees manual NEXT.");
+                    Assert.That(view.guidance.text, Does.Contain("결과 기록을 받고 있소"));
+                    Assert.That(screen.legacyResultContent.activeSelf, Is.False);
+                    typeof(GameSession).GetProperty("ResultSnapshot").SetValue(session,
+                        new LabSnapshot { phase = LabPhase.Victory, players = new LabPlayerState[0] });
+                    typeof(GameScreen).GetMethod("OnEnable", flags).Invoke(screen, null);
+                    Assert.That(view.guidance.text, Does.Contain("방장이 다음 스테이지를"));
+                    typeof(GameScreen).GetMethod("OnNextButton", flags).Invoke(screen, null);
+                    Assert.That(session.State.stageIndex, Is.EqualTo(2), "Hidden/programmatic non-Host input cannot advance.");
+
+                    typeof(GameScreen).GetField("resultAwaitingPointerRelease", flags).SetValue(screen, true);
+                    typeof(GameScreen).GetMethod("ApplyResultInputGate", flags).Invoke(screen, null);
+                    Assert.That(view.homeButton.interactable, Is.False);
+                    Assert.That(view.viewerButton.interactable, Is.False);
+                    typeof(GameScreen).GetMethod("OnHomeButton", flags).Invoke(screen, null);
+                    typeof(GameScreen).GetMethod("OnViewerButton", flags).Invoke(screen, null);
+                    Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult),
+                        "Handler guards must reject input even when a disabled button is invoked programmatically.");
+                }
+                finally { Object.DestroyImmediate(root); }
             });
         }
 
