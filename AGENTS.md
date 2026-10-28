@@ -2,7 +2,8 @@
 
 이 저장소는 기존 MUSA 프로토타입을 대신할 Unity 실험실 프로젝트다. 기준 Unity 버전은 6000.6.5f1이며 실행 Scene은 `Assets/Lab/Scenes/Lab.unity`다. 이전 버전은 `pre-physics-lab-rebuild-2026-10-10` 태그와 그 이전 Git 이력에서 확인한다.
 
-- 현재 동작은 `README.md`, 실험 범위는 `docs/LAB_SCOPE.md`, 검증 범위는 `docs/VALIDATION.md`를 먼저 확인한다. 과거 버전의 문서를 새 코드의 검증 근거로 사용하지 않는다.
+- `README.md`는 게임 소개만 담는다. 개발 문서 진입점은 `docs/README.md`이며 실행·기능별 동작은 연결된 상세 문서, 실험 범위는 `docs/LAB_SCOPE.md`, 검증 범위는 `docs/VALIDATION.md`에서 확인한다. 과거 버전의 문서를 새 코드의 검증 근거로 사용하지 않는다.
+- 기능 구현마다 README에 이슈별 설명·설정값·프로토콜 이력·검사 결과를 덧붙이지 않는다. 상세 변경은 해당 기능 문서와 이슈·PR에, 수행한 검증은 `docs/VALIDATION.md`에 기록한다. README는 게임 소개 자체가 달라질 때만 갱신한다.
 - 기본 네트워크 방은 Host가 목표 인원 2~5명(기본 3명)을 정하고, 연결된 각 참가자가 로비에서 P1~P(목표 인원) 중 고유 번호를 선택한 뒤 시작한다. Host도 번호를 자유롭게 선택하며, 전투 자리와 좌우 이웃은 선택된 P번호의 순환 순서다. Development 빌드의 1인 솔로 모드는 별도 물리 조정 경로다.
 - Lab 로비의 Figma UI는 기존 2~5인·Host 자유 P번호·Direct IP·Development 솔로를 유지한다. Lab의 새 방 만들기는 생성자 소유 대기 광고와 별도 카드 입장을 유지한다. Hapio의 새 방 만들기는 등록 완료를 기다려 같은 이름·포트로 Host 로비에 자동 입장한다(#315). 미입장 대기 방은 앱/Scene 종료 시 정리한다. 별도 Hapio 게임에서는 공통 GameLobby Prefab과 GameSession에 연결하며 LabLobbyView 자체를 실행하지 않는다.
 - 수치 원본은 `Assets/Lab/Resources/LabConfig.asset` 하나다. 실행 중 DEV 패널은 원본이 아닌 복사본을 조정한다. 일반 방에서는 Host가 로비의 조정값을 참가자에게 전파하고 모두 확인한 뒤 시작하며, 솔로에는 로컬 복사본을 적용한다.
