@@ -3183,7 +3183,7 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 - **발견한 결함(수정)**: 스테이지 요괴(`gameStageYokai`)를 Host만 `PrepareGameStage`에서 알고 Guest는 늘 None이었다. 그래서 #343 야광귀 피버 곡·번쩍임·스태미나 물결(`YaguangFeverElapsed`)이 Guest 기기에서는 나오지 않았을 것이다. Guest가 Host의 게임 진행 상태를 받을 때(`GameSession.SetLocalState`) `LabNetwork.ObserveGameStage`로 같은 요괴를 기록하게 했다. 이 값을 쓰는 다른 곳(`JigwiManualControlsAllowed`, 시작 확인)은 Host 전용이라 Guest 동작은 바뀌지 않는다.
 - **BGM**: `LabBattleBgm`이 라운드 시작 때 구미호 스테이지면 `Audio/GumihoBGM`(162초, Streaming)을 튼다. 구미호 피버(`feverTimeAt`, Host 시각)에는 `Audio/GumihoFever`(20초)를 야광귀 피버와 같은 방식(교차 0.25초, "좋다" 추임새, 늦게 온 기기 건너뛰기)으로 튼다. 일시정지 동안에는 피버를 켜거나 끄지 않는다(멈춘 시계를 1초까지 어림하는 동안 흔들리지 않게).
 - **효과음**: 새 `LabGumihoSound`. 매혹 걸림은 SabotageCast가 예고 시작(3초 전)에 오므로 스냅샷의 `charmStartedAt`을 지나는 순간에 낸다(1초 넘게 늦게 본 매혹은 무음). 체크·풀림은 `LabCharmBubbles.OwnCheckShown`·`HelperCharmEnded`와 `LabCharmHud.CharmReleased`, 여우 구슬 소멸·폭탄 열림은 `LabOrbBoard.FoxFireCleared`·`BombOpening`, 여우 구슬 떨어짐은 대상 기기의 SabotageCast. 매혹 한 번에 한 번만 나도록 매혹 시작 시각으로 거른다(스냅샷은 끝난 매혹을 -1로 보내므로 마지막 매혹 시각을 따로 기억한다). 예전 `Resources/Sabotage/CharmHowl` 재생 코드는 지웠다.
-- **크기**: `LabConfig` Inspector `Sound · 구미호 스테이지` 8칸(`LabConfig.asset` 값: BGM 0.4·피버 곡 0.4·매혹 걸림 0.4·풀림 0.4·여우 구슬 떨어짐 0.5·사라짐 0.3·체크와 폭탄 열림 0.8. 코드 기본값은 0.2·0.3·0.7·나머지 0.8). 새 소리와 크기를 맞추려고 모든 스테이지 공통인 박 폭탄 소리도 줄였다: 도화선 치지직 0.5 → 0.2, 폭탄 "뻥이요" 0.9 → 0.6 (`LabConfig.asset`, DEV 배율 50 그대로) × 일시정지 메뉴 설정. DEV 칸이 없어 공유 설정 수와 프로토콜·연결 토큰은 바꾸지 않는다(검사는 칸 수를 고정하지 않고, 크기를 바꿔도 DEV 값이 그대로인지 본다). `LabConfig.asset`은 바꾸지 않았다(새 칸은 코드 기본값).
+- **크기**: `LabConfig` Inspector `Sound · 구미호 스테이지` 8칸(`LabConfig.asset` 값: BGM 0.4·피버 곡 0.4·매혹 걸림 0.4·풀림 0.4·여우 구슬 떨어짐 0.5·사라짐 0.3·체크와 폭탄 열림 0.8. 코드 기본값은 0.2·0.3·0.7·나머지 0.8). 새 소리와 크기를 맞추려고 모든 스테이지 공통인 박 폭탄 소리도 줄였다: 도화선 치지직 0.5 → 0.2, 폭탄 "뻥이요" 0.9 → 0.6 (`LabConfig.asset`, DEV 배율 50 그대로) × 일시정지 메뉴 설정. DEV 칸이 없어 공유 설정 수와 프로토콜·연결 토큰은 바꾸지 않는다(검사는 칸 수를 고정하지 않고, 크기를 바꿔도 DEV 값이 그대로인지 본다). `LabConfig.asset`에는 위 Inspector 값과 공통 도화선·폭탄 음량 변경을 실제 저장했다. 코드 기본값과 저장 자산의 값은 서로 구분한다.
 - **소리 파일 가공**: Opus m4a 두 개는 Unity가 못 읽어 AVFoundation으로 wav로 풀었다. 음량만 맞춘 것과 원본 이름은 `AUDIO_CREDITS.md`. 출처는 파일 안의 생성 정보로 확인했다: 스테이지 BGM·피버 곡·매혹 풀림·여우 구슬 떨어짐은 Suno. 여우 구슬 소멸도 Suno로 다시 만들었다(팀 확인, QuickTime으로 잘라 파일 안 정보는 없음). Suno는 유료 플랜으로 만든 것만 상업적 이용이 되므로 **팀 계정 플랜 확인 필요**로 남겼다.
 
 | 항목 | 결과 | 근거 |
@@ -3194,3 +3194,24 @@ main `bddf325b`(#315·#318, 그 전의 #314 병합과 되돌림 포함)를 합�
 | 실제 소리·3인·실기기 | NOT_RUN | 소리 크기 균형, 매혹 걸림 순간이 맞는지, Guest 기기에서 구미호 BGM·야광귀 피버 곡이 나오는지 확인 필요 |
 
 - 추가/바뀐 검사: EditMode `LabGumihoSoundTests`(폴더·파일, 파일 없을 때 무음과 횟수, 매혹 걸림 순간·한 번·늦게 본 매혹, Inspector 크기 기본값·0~1 제한·크기를 바꿔도 DEV 값 그대로, 구미호 곡 폴더·Streaming·20초, Guest의 스테이지 요괴와 야광귀 피버), PlayMode `LabCharmBubblesTests.TheOwnCheckAndTheEndOfACharmAreEachAnnouncedOncePerCharm`, `LabOrbPhysicsTests`의 여우 구슬 닿음·두 번 누르기·해금 폭탄 검사에 소리 알림 확인 추가.
+
+
+### #358 병합 전 추가 검증 — 2026-10-28
+
+PR 기능 커밋 `71769986`(main `b5695c4e` 포함)을 연결 Editor Unity6000.6.5f1/macOS에서 검사했다. 병합 검토 중 게임 동작 코드는 변경하지 않았으며, 검증 문장의 `LabConfig.asset` 미변경 주장을 실제 저장값 변경과 일치하도록 정정하고 `LabBattleBgmStageTests`를 보완했다.
+
+| 검사 | 실제 실행 결과 | 범위 |
+| --- | --- | --- |
+| 컴파일 | PASS — 오류0 | 변경 코드와 추가 BGM 검사 컴파일 완료 |
+| EditMode 전체 | **1534/1534 PASS** | 구미호 소리 폴더·음량·Guest 스테이지 관찰과 기존 Lab/Hapio 설정·판정·에셋 회귀 |
+| LabOrbPhysicsTests | **64/64 PASS** | 여우 구슬 제거·폭탄 분해 효과음 알림을 포함한 기존 물리·조작 |
+| LabCharmBubblesTests | **9/9 PASS** | 2인 양쪽 배지·체크·정지/재개·해제 알림의 단발 처리 |
+| LabBattleBgmStageTests | **3/3 PASS** | 구미호 전용 곡과 야광귀·지귀·2:2·Lab 기본 곡 구분, 구미호 피버 직전 정지·재개·추임새1회·라운드/결과 정리, 야광귀 기존 피버 곡·늦은 관찰·재개 |
+| Hapio PlayMode 전체 | **59/59 PASS** | 오프닝·로비·3스테이지·결과·재시작·지귀 통합 흐름 |
+| Scene 보존 | PASS | Hapio Scene5개·Lab Scene·StoryPreview 총7개 해시 유지, PR의 Scene 변경0 |
+| 실제 청취·기기 연결·iOS | **NOT_RUN** | 실제 3인 동시 재생·Guest의 실제 네트워크 타이밍·음량 균형·iOS 빌드/실기기는 수행하지 않음 |
+| Lab PlayMode 전체 | **NOT_RUN** | 위 영향 범위의 검사만 실행했으며 전체 통과로 기록하지 않음 |
+
+추가 BGM 검사는 실제 클립과 음소거 AudioSource를 사용한다. Guest는 소켓·transport를 시작하지 않는 수동 상태 fixture이며 실제 Guest 기기 검증이 아니다. PlayerPrefs·기기별 오디오 설정을 변경하지 않는다. 관련 PlayMode는 합계135개이며 모두 통과했다. 이 결과는 재시동 전 실행한 검사이고 재시동 후 무거운 검사를 반복하지 않았다. 원시 로그·기기 정보·개인 경로는 커밋하지 않는다.
+
+매혹 걸림(`Audio/CharmCast`)·체크(`Audio/CharmCheck`)·폭탄 열림(`Audio/BombOpen`)은 처리 알림과 음량 설정만 있고 소리 에셋이 미할당되어 현재 무음이다. 실제 추가된 에셋5개와 이3개를 구분한다. 공유 DEV 필드·프로토콜·게임 규칙·기존 미추적 사용자 폴더는 유지했다.
