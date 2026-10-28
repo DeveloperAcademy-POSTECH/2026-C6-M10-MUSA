@@ -24,6 +24,8 @@ namespace Hapio
         public Image speakerBadge;
         public AudioSource voiceSource;
         public bool playOnStart = true;
+        [Tooltip("Game opening only: manual input; the authoring preview can still use AUTO.")]
+        public bool touchOnly;
         public UnityEvent onCompleted = new UnityEvent();
         public UnityEvent onSkipped = new UnityEvent();
         public event Action<StoryExitReason> Finished;
@@ -38,6 +40,8 @@ namespace Hapio
         private StoryCutView currentView;
         private float elapsed;
         private float readElapsed;
+        private int lastInputFrame = -1;
+        private bool suppressMultiTouch;
         private StoryDialoguePage currentPage;
         private Text cachedDialogue, cachedSpeaker;
         private Vector2 defaultDialoguePosition, defaultDialogueSize, defaultSpeakerPosition, defaultSpeakerSize;
@@ -49,10 +53,10 @@ namespace Hapio
 
         private void OnEnable()
         {
-            if (nextButton != null) nextButton.onClick.AddListener(Next);
-            if (previousButton != null) previousButton.onClick.AddListener(Previous);
+            if (nextButton != null) nextButton.onClick.AddListener(RequestNext);
+            if (previousButton != null) previousButton.onClick.AddListener(RequestPrevious);
             UpdatePreviousButton();
-            if (skipButton != null) skipButton.onClick.AddListener(Skip);
+            if (skipButton != null) skipButton.onClick.AddListener(RequestSkip);
             if (autoButton != null) autoButton.onClick.AddListener(ToggleAuto);
         }
 
@@ -63,9 +67,9 @@ namespace Hapio
 
         private void OnDisable()
         {
-            if (nextButton != null) nextButton.onClick.RemoveListener(Next);
-            if (previousButton != null) previousButton.onClick.RemoveListener(Previous);
-            if (skipButton != null) skipButton.onClick.RemoveListener(Skip);
+            if (nextButton != null) nextButton.onClick.RemoveListener(RequestNext);
+            if (previousButton != null) previousButton.onClick.RemoveListener(RequestPrevious);
+            if (skipButton != null) skipButton.onClick.RemoveListener(RequestSkip);
             if (autoButton != null) autoButton.onClick.RemoveListener(ToggleAuto);
             Cancel();
         }
@@ -86,13 +90,25 @@ namespace Hapio
             Cancel();
             sequence = story;
             AutoAdvance = false;
+            lastInputFrame = -1;
+            suppressMultiTouch = false;
             IsPlaying = true;
             UpdateAutoLabel();
             ShowCut(0);
             return true;
         }
 
-        private void Update() => AdvanceTime(Time.unscaledDeltaTime);
+        private void Update()
+        {
+            if (touchOnly && StoryTapAdvance.PressedTouchCount > 1) suppressMultiTouch = true;
+            AdvanceTime(Time.unscaledDeltaTime);
+        }
+
+        private void LateUpdate()
+        {
+            // Clear only after EventSystem has processed the last release in this frame.
+            if (StoryTapAdvance.PressedTouchCount == 0) suppressMultiTouch = false;
+        }
 
         internal void AdvanceTime(float seconds)
         {
@@ -108,6 +124,27 @@ namespace Hapio
             readElapsed += seconds;
             float duration = Mathf.Max(.1f, currentPage.autoReadSeconds);
             if (readElapsed >= duration && (voiceSource == null || !voiceSource.isPlaying)) Next();
+        }
+
+        /// <summary>UI input shares one frame gate. Direct sequencing and preview AUTO keep their existing API.</summary>
+        public void RequestNext()
+        {
+            if (AcceptUserInput()) Next();
+        }
+
+        public void RequestPrevious() { if (AcceptUserInput()) Previous(); }
+        public void RequestSkip() { if (AcceptUserInput()) Skip(); }
+
+        private bool AcceptUserInput()
+        {
+            if (!IsPlaying) return false;
+            if (touchOnly)
+            {
+                if (StoryTapAdvance.PressedTouchCount > 0) suppressMultiTouch = true;
+                if (suppressMultiTouch || lastInputFrame == Time.frameCount) return false;
+            }
+            lastInputFrame = Time.frameCount;
+            return true;
         }
 
         public void Next()
@@ -158,6 +195,7 @@ namespace Hapio
 
         public void ToggleAuto()
         {
+            if (touchOnly) return;
             AutoAdvance = !AutoAdvance;
             readElapsed = 0f;
             UpdateAutoLabel();
@@ -170,10 +208,13 @@ namespace Hapio
 
         private void ShowCut(int index)
         {
-            ReleaseView();
-            CurrentCutIndex = index;
+            var previousView = currentView;
             var cut = sequence.cuts[index];
-            currentView = Instantiate(cut.viewPrefab, cutHost, false);
+            var nextView = Instantiate(cut.viewPrefab, cutHost, false);
+            // Prepare the next background before removing the picture covering the paper base.
+            nextView.Sample(0f);
+            CurrentCutIndex = index;
+            currentView = nextView;
             ApplyDialogueLayout();
             elapsed = readElapsed = 0f;
             CurrentPageIndex = 0;
@@ -181,8 +222,8 @@ namespace Hapio
             currentPage = cut.GetPage(0);
             UpdatePageText();
             SetDialogueVisible(false);
-            currentView.Sample(0f);
             UpdatePreviousButton();
+            ReleaseView(previousView);
         }
 
         private void BeginReading()
@@ -327,17 +368,19 @@ namespace Hapio
             SetDialogueVisible(false);
         }
 
-        private void ReleaseView()
+        private void ReleaseView() => ReleaseView(currentView);
+
+        private void ReleaseView(StoryCutView view)
         {
             if (voiceSource != null)
             {
                 voiceSource.Stop();
                 voiceSource.clip = null;
             }
-            if (currentView == null) return;
-            currentView.gameObject.SetActive(false);
-            Destroy(currentView.gameObject);
-            currentView = null;
+            if (view == null) return;
+            view.gameObject.SetActive(false);
+            Destroy(view.gameObject);
+            if (currentView == view) currentView = null;
         }
     }
 }

@@ -63,6 +63,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 3424504863321559480}
+  isBackground: 0
   delay: 0.16
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -258,6 +259,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4534818035445121758}
+  isBackground: 0
   delay: 0.4
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -477,6 +479,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 1520296601496302219}
+  isBackground: 1
   delay: 0
   enterSeconds: 0.25
   enterOffset: {x: 0, y: 0}
@@ -582,6 +585,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 223269127018279201}
+  isBackground: 0
   delay: 0.28
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -1123,6 +1127,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 1283161939572266269}
+  isBackground: 0
   delay: 0.22
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -1528,6 +1533,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 8471860934476573462}
+  isBackground: 0
   delay: 0.34
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}

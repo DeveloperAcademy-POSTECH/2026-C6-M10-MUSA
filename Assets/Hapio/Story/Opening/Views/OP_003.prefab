@@ -506,6 +506,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 2522454878188413934}
+  isBackground: 0
   delay: 0.16
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -575,6 +576,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 5599208923334974022}
+  isBackground: 1
   delay: 0
   enterSeconds: 0.25
   enterOffset: {x: 0, y: 0}

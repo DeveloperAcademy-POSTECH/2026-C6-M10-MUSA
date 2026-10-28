@@ -120,6 +120,7 @@ namespace Hapio.Editor
                     player.voiceSource.playOnAwake = false;
                     player.voiceSource.spatialBlend = 0f;
                 }
+                GameOpeningTouchAssets.ConfigureOpening(copy);
                 copy.SetActive(false);
                 var saved = PrefabUtility.SaveAsPrefabAsset(copy, PrefabPath);
                 if (saved == null) throw new InvalidOperationException("Could not save the opening prefab.");
