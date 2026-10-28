@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 
 namespace Hapio
@@ -16,6 +17,7 @@ namespace Hapio
         private static GameOpeningController current;
         private bool presenting;
         private bool subscribed;
+        private Coroutine pendingReturn;
 
         public bool IsPlaying => presenting && player != null && player.IsPlaying;
         public static bool HasPlayedThisRun => openingConsumed;
@@ -114,10 +116,24 @@ namespace Hapio
             EndPresentation();
         }
 
-        private void OnFinished(StoryExitReason reason) => EndPresentation();
+        private void OnFinished(StoryExitReason reason)
+        {
+            if (pendingReturn == null) pendingReturn = StartCoroutine(ReturnAfterRelease());
+        }
+
+        private IEnumerator ReturnAfterRelease()
+        {
+            // Keep the opening as an input shield through the release that finished/skipped it.
+            yield return null;
+            while (StoryTapAdvance.HasHeldPointer) yield return null;
+            pendingReturn = null;
+            EndPresentation();
+        }
 
         private void EndPresentation()
         {
+            if (pendingReturn != null) StopCoroutine(pendingReturn);
+            pendingReturn = null;
             presenting = false;
             if (current == this) current = null;
             Unsubscribe();

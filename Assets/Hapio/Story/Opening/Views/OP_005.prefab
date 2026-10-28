@@ -225,6 +225,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 7231257608914443196}
+  isBackground: 0
   delay: 0.45999998
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -642,6 +643,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 1427100303035926354}
+  isBackground: 0
   delay: 0.5
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -939,6 +941,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 9092510307143781882}
+  isBackground: 0
   delay: 0.28
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -1083,6 +1086,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 3471766725643975841}
+  isBackground: 0
   delay: 0.5
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -1755,6 +1759,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 7959487780154810453}
+  isBackground: 0
   delay: 0.22
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -1954,6 +1959,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 6726547616876556726}
+  isBackground: 0
   delay: 0.4
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -2023,6 +2029,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4612202469975935940}
+  isBackground: 0
   delay: 0.34
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -2092,6 +2099,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4829913705237203652}
+  isBackground: 0
   delay: 0.16
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -2212,6 +2220,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 80608594419756030}
+  isBackground: 1
   delay: 0
   enterSeconds: 0.25
   enterOffset: {x: 0, y: 0}

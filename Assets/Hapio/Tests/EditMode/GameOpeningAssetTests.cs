@@ -60,8 +60,33 @@ namespace Hapio.Tests
             Assert.That(player.cutHost, Is.Not.Null);
             Assert.That(player.nextButton, Is.Not.Null); Assert.That(player.previousButton, Is.Not.Null);
             Assert.That(player.skipButton, Is.Not.Null); Assert.That(player.autoButton, Is.Not.Null);
+            Assert.That(player.touchOnly, Is.True);
+            Assert.That(player.autoButton.gameObject.activeSelf, Is.False);
+            var tap = prefab.GetComponentsInChildren<StoryTapAdvance>(true).Single();
+            Assert.That(tap.player, Is.SameAs(player));
+            var surface = (RectTransform)tap.transform;
+            Assert.That(surface.parent, Is.SameAs(prefab.transform));
+            Assert.That(surface.anchorMin, Is.EqualTo(Vector2.zero));
+            Assert.That(surface.anchorMax, Is.EqualTo(Vector2.one));
+            Assert.That(surface.offsetMin, Is.EqualTo(Vector2.zero));
+            Assert.That(surface.offsetMax, Is.EqualTo(Vector2.zero));
+            Assert.That(surface.GetSiblingIndex(), Is.LessThan(player.nextButton.transform.parent.parent.GetSiblingIndex()));
+            Assert.That(tap.GetComponent<UnityEngine.UI.Image>().raycastTarget, Is.True);
+            Assert.That(tap.GetComponent<UnityEngine.UI.Image>().color.a, Is.Zero);
             Assert.That(player.voiceSource, Is.Not.Null);
             Assert.That(player.voiceSource.playOnAwake, Is.False);
+        }
+
+        [Test]
+        public void EverySavedOpeningCutHasOneStableBackgroundWithoutChangingForegroundRoles()
+        {
+            var sequence = AssetDatabase.LoadAssetAtPath<StorySequence>(OpeningSequence);
+            Assert.That(sequence.cuts, Has.Count.EqualTo(24));
+            foreach (var cut in sequence.cuts)
+            {
+                Assert.That(cut.viewPrefab.layers[0].isBackground, Is.True, cut.cutId);
+                Assert.That(cut.viewPrefab.layers.Count(layer => layer.isBackground), Is.EqualTo(1), cut.cutId);
+            }
         }
 
         [Test]
@@ -72,6 +97,9 @@ namespace Hapio.Tests
                 Assert.That(All<GameOpeningController>(scene), Is.Empty);
                 StoryOpeningTitle title = All<StoryOpeningTitle>(scene).Single();
                 Assert.That(title.player, Is.Not.Null);
+                Assert.That(title.player.touchOnly, Is.False);
+                Assert.That(title.player.autoButton.gameObject.activeSelf, Is.True);
+                Assert.That(All<StoryTapAdvance>(scene), Is.Empty);
                 Assert.That(title.beginButton, Is.Not.Null);
                 Assert.That(title.titlePage, Is.Not.Null);
                 Assert.That(title.controls, Is.Not.Null);
