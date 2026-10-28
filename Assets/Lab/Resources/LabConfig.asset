@@ -217,8 +217,8 @@ MonoBehaviour:
   fuseSoundVolumeDev: 50
   bombSoundVolumeDev: 50
   combineSoundVolume: 0.8
-  fuseSoundVolume: 0.5
-  bombSoundVolume: 0.9
+  fuseSoundVolume: 0.2
+  bombSoundVolume: 0.6
   bombSoundStyle: 1
   chuimsaeChancePercent: 15
   chuimsaeMinGap: 5
