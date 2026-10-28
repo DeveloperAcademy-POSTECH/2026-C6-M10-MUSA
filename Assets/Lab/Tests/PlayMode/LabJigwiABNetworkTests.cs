@@ -72,8 +72,8 @@ namespace C6Lab.Tests
             {
                 float[] values = config.CaptureDeveloperValues();
                 values[111] = (float)form;
-                values[242] = 3f;
-                values[246] = .1f; // Maximum existing motion setting: no enlarged target-radius workaround.
+                values[244] = 3f;
+                values[248] = .1f; // Maximum existing motion setting: no enlarged target-radius workaround.
                 Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
                 foreach (int count in new[] { 3, 5 })
                 {
@@ -487,7 +487,7 @@ namespace C6Lab.Tests
         [Test]
         public void BurnDeadlinesAndABHeadersDeepCopyValidateAndClearThroughOwnerDeltas()
         {
-            float[] values = config.CaptureDeveloperValues(); values[241] = 30f;
+            float[] values = config.CaptureDeveloperValues(); values[243] = 30f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             model = Room(LabStageYokai.Jigwi);
             ulong owner = model.Snapshot(10d).jigwiAB.Active(10d).targetPlayer;

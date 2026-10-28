@@ -188,7 +188,7 @@ namespace C6Lab.Tests
         }
         [TestCase(1)] [TestCase(6)] public void FireCountEndpointsRemainBoundedAndValidate(int count)
         {
-            var v=config.CaptureDeveloperValues();v[242]=count;Apply(v);var m=Room();var s=m.Snapshot(31);
+            var v=config.CaptureDeveloperValues();v[244]=count;Apply(v);var m=Room();var s=m.Snapshot(31);
             Assert.That(s.jigwiAB.Active(31).players.All(p=>p.targets.Length==count),Is.True);
             Assert.That(LabJigwiABNetworkValidation.Valid(s.jigwiAB,s.players),Is.True);
         }

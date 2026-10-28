@@ -182,6 +182,8 @@ namespace C6Lab
         [SerializeField, Min(0f)] private float comboScaleSeconds = .25f;
         private int comboLook;
         private Camera inputCamera;
+        /// <summary>이 판을 비추는 카메라. 판 구슬 그림이 이 카메라 쪽을 본다 (LabOrbSpriteArt).</summary>
+        public Camera ViewCamera => inputCamera;
         private Rect bounds;
         private int blockedSide;
         private float blockSecondsLeft;

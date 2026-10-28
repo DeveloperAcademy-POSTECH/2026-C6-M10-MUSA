@@ -82,6 +82,12 @@ namespace C6Lab
             // 콤보 성공 추임새 "좋다" (#271, 팀 전체 성공이라 모든 기기)
             if (boardNetwork != null && GetComponent<LabComboClearSound>() == null)
                 gameObject.AddComponent<LabComboClearSound>().Bind(boardNetwork);
+            // 콤보 히트 소리 (#338, 맞는 칸마다 점점 높게, 팀 전체가 채우는 콤보라 모든 기기)
+            if (boardNetwork != null && GetComponent<LabComboHitSound>() == null)
+                gameObject.AddComponent<LabComboHitSound>().Bind(boardNetwork);
+            // 섬광 해결 소리(내가 흔들어 풀었을 때)와 오색구슬 피격 소리(던진 사람) (#338, 내 기기만)
+            if (boardNetwork != null && GetComponent<LabFlashRewardSound>() == null)
+                gameObject.AddComponent<LabFlashRewardSound>().Bind(boardNetwork);
             // 햅틱 (내 구슬 생성, 내가 던진 구슬 타격)
             if (boardNetwork != null && GetComponent<LabHaptics>() == null)
                 gameObject.AddComponent<LabHaptics>().Bind(boardNetwork, board);
@@ -126,6 +132,17 @@ namespace C6Lab
             // 여우 구슬 안내 (#328): 판마다 내 판에 처음 떨어지면 "빠르게 두 번 눌러서…"
             if (hud != null && boardNetwork != null && GetComponent<LabFoxFireGuide>() == null)
                 gameObject.AddComponent<LabFoxFireGuide>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
+            // 피버 타임 (#334): 연기와 함께 뜨는 "두배" 말풍선, 시작 문구, 붉게 숨 쉬는 가장자리, 빨간 남은 시간
+            if (hud != null && boardNetwork != null && GetComponent<LabFeverTimeHud>() == null)
+                gameObject.AddComponent<LabFeverTimeHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>(),
+                    hud.staminaFill != null ? hud.staminaFill.transform.parent as RectTransform : null,
+                    hud.battleUi != null ? hud.battleUi.transform as RectTransform : null, hud.timeText);
+            // 야광귀 피버타임 (#343): 피버 동안 스태미나 칸이 다섯 색으로 물결치고, 시작할 때 막대가 한 번 번쩍인다
+            if (hud != null && boardNetwork != null && hud.staminaFill != null && GetComponent<LabYaguangFeverStaminaGlow>() == null)
+                gameObject.AddComponent<LabYaguangFeverStaminaGlow>().Bind(boardNetwork, hud.staminaFill);
+            // 야광귀 피버타임 시작 (#343): 화면이 번쩍이고 "피버타임!" 문구가 크게 뜨며 부적이 마구 쏟아진다
+            if (hud != null && boardNetwork != null && GetComponent<LabYaguangFeverHud>() == null)
+                gameObject.AddComponent<LabYaguangFeverHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
 
             if (hud != null && boardNetwork != null)
             {

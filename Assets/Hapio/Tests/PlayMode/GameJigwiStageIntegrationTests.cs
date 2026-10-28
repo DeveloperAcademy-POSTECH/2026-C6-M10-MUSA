@@ -245,6 +245,7 @@ namespace Hapio.Tests
 
         private void HoldAt(double elapsed)
         {
+            double previousBattleTime = clock.Now(Time.realtimeSinceStartupAsDouble);
             if (clock.IsPaused) Assert.That(clock.Resume(heldRealSample), Is.True);
             double realNow = Time.realtimeSinceStartupAsDouble;
             double desired = startedAt + elapsed;
@@ -253,7 +254,11 @@ namespace Hapio.Tests
             heldRealSample = realNow + advance;
             Assert.That(clock.Pause(heldRealSample), Is.True);
             Assert.That(clock.Now(realNow), Is.EqualTo(desired).Within(.00001d));
-            model.Tick(desired);
+            // Use the same paused-clock sample as PublishSnapshot. Reconstructing desired
+            // separately can put it a fraction ahead and make the following snapshot go backwards.
+            double heldBattleTime = clock.Now(realNow);
+            Assert.That(heldBattleTime, Is.GreaterThanOrEqualTo(previousBattleTime));
+            model.Tick(heldBattleTime);
             Method("PublishSnapshot").Invoke(network, new object[] { true });
             Method("SyncJigwiStagePresentation").Invoke(network, null);
         }

@@ -222,16 +222,17 @@ namespace C6Lab
         // 5672: #328/#330 QA rules plus #332 Jigwi surface fire snapshot and shared DEV228..235 (236 values).
         // 5673: #329 flash five-colour orb reward (DEV 236-237, 238 shared values), fiveColor orb/projectile/impact flags,
         //       flash bonus request, glare that only a shake clears.
-        // 5674: #341 screen-space Jigwi A/B state and orb metadata; shared DEV238..248 (249 values).
-        // 5675: #341 persistent B curtain, ignition-only extinguishing and approved Water-splash feedback.
-        // 5676: #341 reachable B ignition geometry derived from the shared legal throw path.
-        internal const ushort LabProtocolVersion = 5676;
+        // 5674: #334 gumiho fever time (DEV 238-239, 240 shared values) and feverTimeAt in the snapshot. It also
+        //       separates the builds that briefly used 5672 for #334 alone.
+        // 5675/5676: standalone #341 screen-space fire curtain and reachable ignition geometry.
+        // 5677: integrate #334/#343 fever and #341 A/B; preserve DEV0..239 and append A/B240..250 (251 values).
+        internal const ushort LabProtocolVersion = 5677;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/37");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/38");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

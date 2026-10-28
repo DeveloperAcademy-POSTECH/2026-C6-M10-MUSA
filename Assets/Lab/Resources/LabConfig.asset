@@ -35,6 +35,8 @@ MonoBehaviour:
   rawStreakCorrectionEnabled: 1
   rawStreakOppositeChancePercent: 75
   rawStreakMaximum: 3
+  feverTimeSeconds: 20
+  feverTimeRecoveryMultiplier: 2
   jigwiStageTimelineEnabled: 1
   jigwiStageWarningSeconds: 1
   jigwiStageActiveSeconds: 7

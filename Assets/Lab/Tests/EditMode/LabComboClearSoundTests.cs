@@ -41,6 +41,14 @@ namespace C6Lab.Tests
             Assert.That(sound.Observe(Result(4, LabComboResult.Success)), Is.True, "CLEAR! plays it.");
             Assert.That(sound.Observe(Result(4, LabComboResult.Success)), Is.False, "Only once per result.");
             Assert.That(sound.PlayCount, Is.EqualTo(1));
+            Assert.That(sound.FailPlayCount, Is.EqualTo(2), "A timeout and a wrong colour each play the fail sound once (#338).");
+        }
+
+        [Test]
+        public void TheComboFailClipIsInResources()
+        {
+            Assert.That(Resources.LoadAll<AudioClip>(LabComboClearSound.FailClipFolder), Has.Length.EqualTo(1),
+                "Resources/Audio/ComboFail/ComboFail.wav (#338)");
         }
 
         [Test]

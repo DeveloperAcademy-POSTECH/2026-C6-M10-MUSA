@@ -12,7 +12,7 @@ namespace C6Lab
     /// - 섬광: 화면 전체가 하얗게 번쩍했다가 빠르게 빠지고, 진동이 한 번 온다. 맞은 사람 화면의 박 옆 말풍선에
     ///   야광귀가 "안보이지롱~" 하고 놀린다 (#301).
     /// - 해제 (#301): 눈부신 사람 화면 가운데에 좌우로 흔들리는 폰 그림 + 게이지가 뜬다(문구는 Inspector에서 넣을 수 있다). 폰을 세게 흔들
-    ///   때마다 하얀 막이 조금씩 걷히고, DEV 횟수(기본 6번)를 채우면 Host에 알려 그 사람 눈부심만 풀린다. 풀리면
+    ///   때마다 하얀 막이 조금씩 걷히고, DEV 횟수(기본 10번)를 채우면 Host에 알려 그 사람 눈부심만 풀린다. 풀리면
     ///   말풍선에 "으악 어지러워~"가 뜬다. Editor·DEV 빌드에서는 K 키 한 번이 한 번 흔들기다.
     /// - 눈부심·회복: 판의 음양·결합 구슬과 아이템을 하얗게 덮고(북 제외), 회복 동안 색을 천천히 돌려준다.
     /// 시각은 Host 스냅샷(flashWarningAt/flashAt/flashLastAt)을, 길이는 DEV 값을 쓴다. 화면 표시만 하며 터치를 막지 않는다.
@@ -49,7 +49,7 @@ namespace C6Lab
         [Tooltip("폰을 흔들어 눈부심을 풀었을 때 말풍선 (푼 사람 화면만). 비우면 안 띄운다.")]
         [SerializeField] private string caughtText = "으악 어지러워~";
         [Tooltip("풀린 말풍선이 떠 있는 시간 (초)")]
-        [SerializeField, Range(.3f, 6f)] private float caughtSeconds = 1.5f;
+        [SerializeField, Range(.3f, 6f)] private float caughtSeconds = 3f;
         [Header("흔들어 풀기 (#301)")]
         [Tooltip("흔들림이 중력의 몇 배를 넘으면 한 번 흔든 것으로 칠지. 작을수록 살살 흔들어도 센다.")]
         [SerializeField, Range(.3f, 3f)] private float shakeThreshold = 1.6f;
@@ -94,6 +94,14 @@ namespace C6Lab
         private int revealedShakes;
         // 섬광 파훼 보상 (#329): 풀린 뒤에도 이어서 흔드는 중인지, 끊겼는지, 마지막으로 흔든 시각, 보상 요청 시각.
         private bool bonusLost, bonusShowing;
+        // #338: 이번 섬광에서 내가 흔들어 다 풀었다고 이미 알렸는지
+        private bool clearAnnounced;
+
+        /// <summary>
+        /// 내가 흔들어서 이번 섬광의 눈부심을 다 풀어낸 순간 한 번 (#338). 이 기기의 흔들기로만 나고,
+        /// 다음 섬광·방해 종료·라운드 종료로 풀리면 나지 않는다. (섬광 해결 효과음은 최대 횟수를 채울 때 나서 이것 대신 ShakeCount를 본다.)
+        /// </summary>
+        public static event System.Action LocalShakeCleared;
         private float lastShakeAt = float.NegativeInfinity, bonusSentAt = float.NegativeInfinity;
         /// <summary>풀린 뒤 오색구슬을 노리고 이어서 흔드는 중이라 안내가 계속 보이는지 (#329)</summary>
         public bool BonusShakeActive => bonusShowing;
@@ -232,9 +240,8 @@ namespace C6Lab
         /// <summary>
         /// 이번 섬광에서 흔든 수를 세고, 다 흔들면 Host에 한 번 알린다. 흔든 만큼의 비율(0~1)을 돌려준다.
         /// 새 섬광이면 처음부터 다시 센다. 눈부시지 않으면(이미 풀렸거나 시간이 지났으면) 세지 않는다.
-        /// #330: 한 번 흔들 때마다 판의 하얀 구슬 하나가 무작위로 색을 되찾는다. 판에 하얀 구슬이 남지 않으면(적어도
-        /// 한 번 흔든 뒤) 다 흔든 것이고, 아무리 구슬이 많아도 maxShakes번이면 나머지가 한꺼번에 돌아온다.
-        /// 판이 없으면(테스트 등) maxShakes번을 채워야 한다.
+        /// #330: 한 번 흔들 때마다 판의 하얀 구슬 하나가 무작위로 색을 되찾고, maxShakes번이면 나머지가 한꺼번에 돌아온다.
+        /// #343: 구슬이 먼저 다 돌아와도 섬광은 maxShakes번을 채워야 풀린다.
         /// </summary>
         private float DriveShake(LabSnapshot snapshot, bool myGlare, int maxShakes)
         {
@@ -250,6 +257,7 @@ namespace C6Lab
                 if (boundBoard != null) boundBoard.ResetFlashReveal();
                 bonusLost = bonusShowing = false;
                 lastShakeAt = bonusSentAt = float.NegativeInfinity;
+                clearAnnounced = false;
             }
             shakeCounter.Threshold = shakeThreshold;
             shakeCounter.MinGap = shakeMinGap;
@@ -268,6 +276,11 @@ namespace C6Lab
                     lastShakeAt = Time.unscaledTime;
                 }
                 RevealShaken(maxShakes);
+                if (myGlare && !clearAnnounced && ShakesDone(maxShakes))
+                {
+                    clearAnnounced = true;
+                    LocalShakeCleared?.Invoke();
+                }
                 // A report can arrive while the Host is paused. Retain this generation's shakes and
                 // retry at a bounded rate until the authoritative snapshot confirms release.
                 if (myGlare && ShakesDone(maxShakes) && Time.unscaledTime - shakeSentAt >= ShakeRetrySeconds
@@ -281,9 +294,8 @@ namespace C6Lab
                 && network.RequestFlashFiveColorBonus())
                 bonusSentAt = Time.unscaledTime;
             if (ShakesDone(maxShakes)) return 1f;
-            if (boundBoard == null) return ShakeProgress(shakeCounter.Count, maxShakes);
-            int count = shakeCounter.Count;
-            return ShakeProgress(count, count + Mathf.Min(boundBoard.FlashWhiteCount, maxShakes - count));
+            // 화면의 하얀 막과 게이지는 흔든 수 / 최대 횟수만큼 걷힌다 (구슬이 먼저 다 돌아와도 막은 남는다).
+            return ShakeProgress(shakeCounter.Count, maxShakes);
         }
 
         /// <summary>이번 섬광의 오색구슬을 Host가 이미 줬는지 (#329)</summary>
@@ -295,13 +307,11 @@ namespace C6Lab
             return false;
         }
 
-        /// <summary>다 흔들었는지 (#330): 최대 횟수를 채웠거나, 한 번 이상 흔들었고 판에 하얀 구슬이 남지 않았다.</summary>
-        private bool ShakesDone(int maxShakes)
-        {
-            int count = shakeCounter.Count;
-            if (count >= Mathf.Max(1, maxShakes)) return true;
-            return boundBoard != null && count >= 1 && boundBoard.FlashWhiteCount == 0;
-        }
+        /// <summary>
+        /// 다 흔들었는지: 최대 횟수(DEV 기본 10번)를 채웠다. 판의 하얀 구슬이 먼저 다 돌아와도(#330) 섬광은 최대 횟수를
+        /// 채워야 풀린다 (#343, 그 순간 섬광 해제 소리와 오색구슬 보상).
+        /// </summary>
+        private bool ShakesDone(int maxShakes) => shakeCounter.Count >= Mathf.Max(1, maxShakes);
 
         /// <summary>새로 센 흔들기마다 판의 하얀 구슬 하나씩 색을 돌려준다. 다 흔들었으면 남은 구슬도 모두 돌려준다.</summary>
         private void RevealShaken(int maxShakes)

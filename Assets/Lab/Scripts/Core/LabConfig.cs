@@ -372,6 +372,9 @@ namespace C6Lab
             // 섬광 파훼 보상 (#329): 최대 횟수까지 이어서 흔든 사람 판에 오색구슬. 칠 면적은 도색 한 번의 상한(3배) 안이다.
             new LabDeveloperField("섬광 오색구슬 수 (0 = 없음)", 0f, 6f, true),
             new LabDeveloperField("오색구슬 칠 면적 (배)", 1f, 3f),
+            // 피버 타임 (#334): 남은 시간이 이만큼이 되면 요괴 방해가 멈추고 자동 충전이 빨라진다. 지금은 구미호 스테이지만.
+            new LabDeveloperField("피버 타임 시작 (남은 초, 0 = 끔)", 0f, 60f),
+            new LabDeveloperField("피버 타임 충전 배율", 1f, 5f),
             new LabDeveloperField("지귀 A 최대 지속 (초)", 1f, 30f),
             new LabDeveloperField("지귀 A 자동 회복 배율", 1f, 10f),
             new LabDeveloperField("지귀 A 해제 명중 수", 1f, 10f, true),
@@ -387,10 +390,14 @@ namespace C6Lab
 
         public const int JigwiStageFirstField = 228;
         public const int JigwiStageLastField = 235;
-        public const int JigwiABFirstField = 238;
-        public const int JigwiABLastField = 248;
+        public const int JigwiABFirstField = 240;
+        public const int JigwiABLastField = 250;
         public static bool IsJigwiStageField(int index) => index >= JigwiStageFirstField && index <= JigwiStageLastField
             || index >= JigwiABFirstField && index <= JigwiABLastField;
+
+        /// <summary>Fever time (#334) DEV slots: when it starts (seconds left) and how much faster stamina refills.</summary>
+        public const int FeverTimeSecondsField = 238;
+        public const int FeverTimeRecoveryField = 239;
 
         public const int YaguangTimelineFirstField = 211;
         public const int YaguangTimelineLastField = 224;
@@ -438,7 +445,7 @@ namespace C6Lab
                 134, 132, 133, 148, 149, 150, 151, 200, 201),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
-            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 229, 235, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248),
+            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 229, 235, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250),
             // 기믹 묶음 (#311): 공용(폭탄·넘기기 막기)과 고유(구미호: 여우불·매혹)를 나눠 간격·켜기·비율·세부값을 모은다.
             new LabDeveloperCategory("Gimmicks", 205, 207, 169, 208, 170, 153,
                 166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177)
@@ -454,7 +461,8 @@ namespace C6Lab
             new LabDeveloperCategory("야광귀 시간표 (Hapio 전용)", 212, 213, 214, 215, 216, 217, 218, 219, 220,
                 221, 222, 223, 224)
                 .WithDividers((0, "── 야광귀 전용 일정 · 일반 주기/비율 대신 사용 ──"), (1, "── 고유 예고 ──"), (9, "── 공용 ──")),
-            new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199)
+            new LabDeveloperCategory("2:2 땅따먹기", 196, 197, 198, 199),
+            new LabDeveloperCategory("피버 타임 (Hapio 구미호 전용)", FeverTimeSecondsField, FeverTimeRecoveryField)
         });
 
 
@@ -489,6 +497,10 @@ namespace C6Lab
         [SerializeField] private bool rawStreakCorrectionEnabled = true;
         [SerializeField, Range(0, 100)] private int rawStreakOppositeChancePercent = 75;
         [SerializeField, Range(1, 10)] private int rawStreakMaximum = 3;
+        [Tooltip("피버 타임 (#334): 남은 시간이 이 초가 되면 구미호의 방해가 멈추고 정리되며 자동 충전이 빨라진다. 0이면 끈다.")]
+        [SerializeField, Range(0f, 60f)] private float feverTimeSeconds = 20f;
+        [Tooltip("피버 타임 동안 스태미나 자동 충전 속도에 곱하는 값. 명중 보상과 구슬 보유 한도는 그대로다.")]
+        [SerializeField, Range(1f, 5f)] private float feverTimeRecoveryMultiplier = 2f;
 
         [Header("Jigwi surface fire timeline (#332)")]
         [SerializeField] private bool jigwiStageTimelineEnabled = true;
@@ -777,6 +789,8 @@ namespace C6Lab
         [SerializeField, Range(0, 6)] private int yaguangFiveColorOrbCount = 3;
         [Tooltip("오색구슬로 박을 맞혔을 때 칠 면적 배율 (보통 구슬 = 1). 다섯 원소 색 얼룩을 합친 넓이다. 도색 한 번은 최대 3배까지라 다른 배율과 곱해도 3을 넘지 않는다.")]
         [SerializeField, Range(1f, 3f)] private float yaguangFiveColorOrbPaintScale = 2f;
+        [Tooltip("야광귀 피버타임 (#343): 방해가 끝난 뒤(시간표 방해 종료, 기본 100초)부터 전투가 끝날 때까지 스태미나 자동 회복에 곱하는 배율. 1이면 피버 없음. Inspector 전용(DEV 칸 없음).")]
+        [SerializeField, Range(1f, 4f)] private float yaguangFeverStaminaMultiplier = 2f;
 
         [Header("Sound (기본 크기 × 기기별 일시정지 메뉴 BGM/SFX 슬라이더)")]
         [Tooltip("전투 BGM 기본 크기")]
@@ -941,6 +955,10 @@ namespace C6Lab
         /// 꺼져 있으면 `섬광 눈부심 (초)`. 다음 섬광 예약 같은 일정 계산은 언제나 `YaguangFlashGlareSeconds`를 쓴다.
         /// </summary>
         public float YaguangFlashGlareLimitSeconds => YaguangFlashShakeRelease ? float.PositiveInfinity : YaguangFlashGlareSeconds;
+        /// <summary>Fever time (#334): it starts when this many seconds are left; 0 turns it off.</summary>
+        public float FeverTimeSeconds => Mathf.Clamp(Finite(feverTimeSeconds, 20f), 0f, 60f);
+        /// <summary>How many times faster stamina refills by itself during fever time (#334).</summary>
+        public float FeverTimeRecoveryMultiplier => Mathf.Clamp(Finite(feverTimeRecoveryMultiplier, 2f), 1f, 5f);
 
         /// <summary>
         /// Percent weights in GeneratedKinds order. An Inspector total of zero falls back to
@@ -1159,6 +1177,8 @@ namespace C6Lab
         private static readonly float[] DefaultTimelineUniqueSeconds = { 10f, 35f, 60f, 75f };
         private static readonly int[] DefaultTimelineUniqueKinds = { 0, 1, 0, 1 };
         private static readonly float[] DefaultTimelineCommonSeconds = { 25f, 40f, 60f, 80f };
+        /// <summary>야광귀 피버타임 (#343) 스태미나 자동 회복 배율 (1~4, 기본 2)</summary>
+        public float YaguangFeverStaminaMultiplier => Mathf.Clamp(Finite(yaguangFeverStaminaMultiplier, 2f), 1f, 4f);
         public float YaguangTimelineSabotageEndSeconds => Mathf.Clamp(Finite(yaguangTimelineSabotageEndSeconds, 100f), 0f, 180f);
         public float YaguangTimelineUniqueSeconds(int slot) => TimelineSeconds(yaguangTimelineUniqueSeconds, slot, DefaultTimelineUniqueSeconds);
         public bool YaguangTimelineUniqueIsCombo(int slot) => slot >= 0 && slot < YaguangTimelineSlots
@@ -1335,6 +1355,7 @@ namespace C6Lab
                 JigwiStageRootAngleDegrees, JigwiStageFireAngleDegrees, JigwiStageSpreadSeconds,
                 JigwiStageSpreadPatches, JigwiStageFeverMultiplier,
                 YaguangFiveColorOrbCount, YaguangFiveColorOrbPaintScale,
+                FeverTimeSeconds, FeverTimeRecoveryMultiplier,
                 JigwiABPersonalDurationSeconds, JigwiABPersonalRecoveryMultiplier, JigwiABPersonalRequiredHits,
                 JigwiABPersonalBurnSeconds, JigwiABGroupFireCount, JigwiABRelightSeconds, JigwiABShrinkDelaySeconds,
                 JigwiABShrinkScale, JigwiABFireMoveAmount, JigwiABFireMovePeriodSeconds, JigwiABFireTargetRadius
@@ -1614,17 +1635,19 @@ namespace C6Lab
             jigwiStageFeverMultiplier = values[235];
             yaguangFiveColorOrbCount = (int)values[236];
             yaguangFiveColorOrbPaintScale = values[237];
-            jigwiABPersonalDurationSeconds = values[238];
-            jigwiABPersonalRecoveryMultiplier = values[239];
-            jigwiABPersonalRequiredHits = (int)values[240];
-            jigwiABPersonalBurnSeconds = values[241];
-            jigwiABGroupFireCount = (int)values[242];
-            jigwiABRelightSeconds = values[243];
-            jigwiABShrinkDelaySeconds = values[244];
-            jigwiABShrinkScale = values[245];
-            jigwiABFireMoveAmount = values[246];
-            jigwiABFireMovePeriodSeconds = values[247];
-            jigwiABFireTargetRadius = values[248];
+            feverTimeSeconds = values[FeverTimeSecondsField];
+            feverTimeRecoveryMultiplier = values[FeverTimeRecoveryField];
+            jigwiABPersonalDurationSeconds = values[240];
+            jigwiABPersonalRecoveryMultiplier = values[241];
+            jigwiABPersonalRequiredHits = (int)values[242];
+            jigwiABPersonalBurnSeconds = values[243];
+            jigwiABGroupFireCount = (int)values[244];
+            jigwiABRelightSeconds = values[245];
+            jigwiABShrinkDelaySeconds = values[246];
+            jigwiABShrinkScale = values[247];
+            jigwiABFireMoveAmount = values[248];
+            jigwiABFireMovePeriodSeconds = values[249];
+            jigwiABFireTargetRadius = values[250];
             error = string.Empty;
             return true;
         }

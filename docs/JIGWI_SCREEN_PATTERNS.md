@@ -1,6 +1,6 @@
 # 지귀 개인 발화·전원 화면 소화 — #341
 
-작성: 2026-10-27. 대상: `feat/#341-jigwi-screen-patterns`. 본문은 #341 구현 기준이며 #332의 박 표면 근원·도색 차단 사양을 대체한다. 기존 기록은 삭제하지 않고 당시 검증 기록으로 남긴다.
+작성: 2026-10-27. main 통합 갱신: 2026-10-28. 대상: `feat/#341-jigwi-screen-patterns`. 본문은 #341 구현 기준이며 #332의 박 표면 근원·도색 차단 사양을 대체한다. 기존 기록은 삭제하지 않고 당시 검증 기록으로 남긴다.
 
 ## 1. 실행 범위와 유지하는 규칙
 
@@ -8,7 +8,7 @@
 - 일반 Lab의 StageNone 수동 물 전용 화재·Overheated 실험은 유지한다. 새 A/B는 그 Overheated 상태를 사용하지 않는다.
 - 전투120초, A 예고10/40/60/80초, B 예고30/50/70/90초, 공통 기믹20/40/60/80초다. A/B 진행 중 다음 A/B 슬롯은 한 번만 Skipped로 기록하며 밀린 패턴을 연속 실행하지 않는다.
 - 100초에는 A/B를 성공 처리하지 않고 취소·정리한다. 기존 공용 폭탄 정리 정책을 재사용하고, 마지막20초 자동 회복2배를 적용한다. 미완성 시간 초과는 기존 Defeat다.
-- 기존 LAN·핫스팟 전송·owner-local 개인 조합판은 유지한다. 설정·A/B DTO·구슬 메타데이터가 추가되어 **249개 설정 / 프로토콜5676 / Lab37 / Game20**인 기기끼리 사용한다. 238개 설정의 구버전과 혼용하지 않는다.
+- 기존 LAN·핫스팟 전송·owner-local 개인 조합판은 유지한다. 설정·A/B DTO·구슬 메타데이터가 추가되어 **251개 설정 / 프로토콜5677 / Lab38 / Game21**인 기기끼리 사용한다. 기존240개 main 및249개 지귀 단독 브랜치 앱과 혼용하지 않는다. main의 구미호/야광귀 피버와 스토리 자료는 보존한다.
 
 ## 2. A — 개인 발화
 
@@ -54,19 +54,19 @@
 |228|JigwiStageTimelineEnabled|ON|ON/OFF|
 |229|JigwiStageWarningSeconds|1초|0~3초|
 |235|JigwiStageFeverMultiplier|2배|1~4배|
-|238|JigwiABPersonalDurationSeconds|10초|1~30초|
-|239|JigwiABPersonalRecoveryMultiplier|4배|1~10배|
-|240|JigwiABPersonalRequiredHits|3회|정수1~10|
-|241|JigwiABPersonalBurnSeconds|5초|.5~30초|
-|242|JigwiABGroupFireCount|3개/명|정수1~6|
-|243|JigwiABRelightSeconds|12초|1~60초|
-|244|JigwiABShrinkDelaySeconds|12초|0~60초|
-|245|JigwiABShrinkScale|.65|.2~1|
-|246|JigwiABFireMoveAmount|.03|0~.1 정규화 폭|
-|247|JigwiABFireMovePeriodSeconds|4초|1~20초|
-|248|JigwiABFireTargetRadius|.3 world|.1~1|
+|240|JigwiABPersonalDurationSeconds|10초|1~30초|
+|241|JigwiABPersonalRecoveryMultiplier|4배|1~10배|
+|242|JigwiABPersonalRequiredHits|3회|정수1~10|
+|243|JigwiABPersonalBurnSeconds|5초|.5~30초|
+|244|JigwiABGroupFireCount|3개/명|정수1~6|
+|245|JigwiABRelightSeconds|12초|1~60초|
+|246|JigwiABShrinkDelaySeconds|12초|0~60초|
+|247|JigwiABShrinkScale|.65|.2~1|
+|248|JigwiABFireMoveAmount|.03|0~.1 정규화 폭|
+|249|JigwiABFireMovePeriodSeconds|4초|1~20초|
+|250|JigwiABFireTargetRadius|.3 world|.1~1|
 
-기존230~234 표면 설정은 값/배열 위치를 보존하되 DEV에서 숨긴 예약 슬롯이다. 기존236·237 오색구슬 보상은 그대로 유지한다. 원본 저장 때 기존0~237의 유효 값은 바꾸지 않았다. Inspector의 화면 효과 `waterDouseSeconds/flameSpeed/flameSway`와 B의 `curtainTexture/curtainStage2Texture/curtainStage1Texture/curtainDenseFrame/curtainDenseUv`는 새 프리팹에서 조정할 수 있다. B 단계 원화는3종을 쓰고 중앙 밀도용 크롭은 강한3단계 원본을 유지한다. 모든 원화는 UV 크롭으로 종횡비를 보존한다. `waterFlightTrail`의 최소/최대 표시 폭·먹선/물/하이라이트 색을 Inspector에서 조절하며 잔상 수명/길이는 기존 WaterFlightTrail 프로필을 따른다. `audioView.clip/volume`은 Inspector에서 바꿀 수 있다.
+기존230~234 표면 설정은 값/배열 위치를 보존하되 DEV에서 숨긴 예약 슬롯이다. 기존236·237 오색구슬 보상과238·239 구미호 피버는 그대로 유지한다. main의0~239 인덱스는 보존하고 새 A/B240~250만 뒤에 붙인다. Inspector의 화면 효과 `waterDouseSeconds/flameSpeed/flameSway`와 B의 `curtainTexture/curtainStage2Texture/curtainStage1Texture/curtainDenseFrame/curtainDenseUv`는 새 프리팹에서 조정할 수 있다. B 단계 원화는3종을 쓰고 중앙 밀도용 크롭은 강한3단계 원본을 유지한다. 모든 원화는 UV 크롭으로 종횡비를 보존한다. `waterFlightTrail`의 최소/최대 표시 폭·먹선/물/하이라이트 색을 Inspector에서 조절하며 잔상 수명/길이는 기존 WaterFlightTrail 프로필을 따른다. `audioView.clip/volume`은 Inspector에서 바꿀 수 있다.
 
 ## 6. 수정할 파일 지도
 
@@ -113,6 +113,8 @@
 5. Pause 중 소각/재점화/미동이 멈추고 Resume 후 남은 시간부터 이어지는지,100초 정리/회복2배·승패·다음 판에 이전 불이 남지 않는지 본다.
 
 위 수동 시나리오는 **실행 완료 체크리스트가 아니다**. 자동 검사 환경·실제 결과와 실기기 미검증 범위는 아래 검증 기록을 따른다.
+
+아래9~12절은 각 보완 당시의 검증 이력이다. 그 절의249개 설정과5674~5676 규약은 당시 값이며 현재 사용 규약이나 이번 main 통합의 통과 결과를 뜻하지 않는다. 현재 설정/접속 기준은1·5절, 이번 통합의 실행 여부는 `VALIDATION.md`의2026-10-28 통합 절을 따른다.
 
 ## 9. 장막 보완 전 1차 검증 기록 — 규약5674
 

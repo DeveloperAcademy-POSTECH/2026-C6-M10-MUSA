@@ -323,7 +323,7 @@ namespace C6Lab.Tests
         {
             // Isolate the inherited 100-second fever boundary from A's independent recovery multiplier.
             float[] values = config.CaptureDeveloperValues(); values[4] = 0f; values[6] = values[7] = 1f;
-            values[239] = 1f; Apply(values);
+            values[241] = 1f; Apply(values);
             var room = Room();
             Assert.That(room.Snapshot(99.5d).players[0].stamina, Is.EqualTo(99.5f).Within(.0001f));
             Assert.That(room.Snapshot(100d).players[0].stamina, Is.EqualTo(100f).Within(.0001f));

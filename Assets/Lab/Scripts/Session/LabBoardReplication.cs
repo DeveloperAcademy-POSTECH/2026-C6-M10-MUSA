@@ -466,6 +466,8 @@ namespace C6Lab
         {
             sessionId = source.sessionId, round = source.round, phase = source.phase, paused = source.paused,
             serverTime = source.serverTime, remaining = source.remaining, playedSeconds = source.playedSeconds,
+            // This per-round reservation is immutable; faster board headers only advance the visible clock.
+            feverTimeAt = source.feverTimeAt,
             hp = source.hp, paintCoverage = source.paintCoverage, paintGoalPercent = source.paintGoalPercent,
             paintColumns = source.paintColumns, paintRows = source.paintRows, paintRevision = source.paintRevision,
             paintCoveredCount = source.paintCoveredCount, paintCellCount = source.paintCellCount, paintCount = source.paintCount,
