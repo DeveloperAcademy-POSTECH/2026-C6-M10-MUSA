@@ -3286,3 +3286,23 @@ Hapio assembly의 실패는 새 입력 fixture가 원본 `InputSettings`를 복�
 - 공유 완료 시한 뒤에도 최종 지도가 불일치하면 중간 StageResult는 기존 정책대로 GameOver, 최종 Completed만 클리어를 보존하며 지도 미동기화 안내를 표시한다. CPU 지도 일치 후 GPU preview 생성만 실패하는 경우 별도 오류 안내 없이 관람이 비활성화될 수 있는 기존 제약은 남아 있다.
 - 실제 여러 기기의 prepare/commit/done 왕복·일반 Wi-Fi·핫스팟·지연/손실 환경의 체감 시간: **NOT_RUN**. barrier의 지연/중복/세대 검사는 실제 Guest 기기의 네트워크 검증을 대신하지 않는다.
 - Mac/iOS 내보내기·서명·설치·실기기 터치, 전체 Lab PlayMode, 모바일 메모리·GPU 성능 계측: **NOT_RUN**. 이번 결과를 해당 환경의 통과로 해석하지 않는다.
+
+## 2026-10-28 — #365 오프닝 화자색·19-1 확대 컷 main 병합 전 확인
+
+PR #365의 `b85904b2`에 최신 main `23217127`(#368, 결과 수동 진행)을 통합한 소스로 확인했다. Unity 6000.6.5f1·macOS·Metal의 Editor 한 개에서 관련 검사만 순차 실행했다. 아래는 PR 작성 당시의18/29개 기록을 재사용한 결과가 아니다.
+
+| 검사 | 결과 | 확인 범위 |
+| --- | --- | --- |
+| `Hapio.EditModeTests` assembly | **130/130 PASS**, 2.13초 | 승인 대본·Opening/BatchPreview의25컷·27페이지,19→19-1→20,팔레트 참조·기존 게임 세션 설정/상태·결과 UI |
+| `Hapio.Story.PlayModeTests` assembly | **19/19 PASS**, 1.20초 | 같은 그림의 화자색 전환·기본 스타일 복원·무화자 숨김·실제25컷/27페이지 전환과 종료·터치·배경 |
+| `GameOpeningControllerTests` PlayMode | **10/10 PASS**, 2.20초 | 타이틀의 첫 게임 시작·실제 전체 오프닝 완료·스킵·후속 시작·포인터 해제·방 목록 진입 |
+| 수동 결과 진행 PlayMode | **1/1 PASS**, 28.69초 | 10.5초 이상 자동 진행 없음·관람 차단·Host NEXT·최종 전체/현재 기록·HOME 유지 |
+| 같은 방의3스테이지·완성 박 사본 PlayMode | **1/1 PASS**, 17.77초 | 실제 저장 Home/Battle/StageResult에서 전투 재생성·연출 중 사본 확보·언로드 후 동일 GPU 사본 재사용·기록 복구·최종 정상 종료 |
+| 새 이름표 셰이더 | **PASS** | Editor에서 shader 존재·지원=true, `ShaderUtil.ShaderHasError=false` 확인. 새 iOS 빌드 검증은 아님 |
+| 보존 범위 | **PASS** | 원본24컷의 데이터/프리팹/meta96개가 main과 동일. Home/Lobby/Battle/StageResult/GameOver와 #367의 Core·GameScreen·연결 소스는 main과 동일. 기존 사용자 미추적 폴더 제외 |
+
+이번 고유 실행 범위는 EditMode130개·PlayMode31개다. 기존 전체 검사 수치를 이번 통합의 전체 통과로 표현하지 않는다. 현재 실행 안내와 AGENTS의 오프닝 분량만25컷·27페이지로 맞추고, 과거 검사 기록은 당시 범위로 보존했다. 원시 로그·임시 실행 JSON·기기 정보는 커밋하지 않는다.
+
+초기 작업 공간 생성 도구의24개 기본 슬롯은 현재 저장된25컷 목록과 구분한다. 기존 Opening.asset은 보존하지만 목록을 삭제한 뒤 `CreateMissing`으로 복구하는 경우19-1이 빠질 수 있는 기존 도구 제약은 `POPUP_STORY_WORKFLOW.md`에 남겼다. 이번 검사에서는 에셋 삭제·재생성을 수행하지 않았다.
+
+Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟·전체 EditMode·전체 PlayMode·모바일 성능: **NOT_RUN**. 앞선 작성자의 렌더 확인과 이번 Shader/API·자동 검사 범위를 구분한다.
