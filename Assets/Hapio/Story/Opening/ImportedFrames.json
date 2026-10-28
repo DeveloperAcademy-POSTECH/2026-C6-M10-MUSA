@@ -1772,6 +1772,110 @@
       ]
     },
     {
+      "number": 19,
+      "nodeId": "3331:479",
+      "items": [
+        {
+          "nodeId": "3314:290",
+          "name": "image 1190",
+          "key": "cbc06.png",
+          "rect": {
+            "x": -449,
+            "y": 0,
+            "width": 1386.971435546875,
+            "height": 924.6476440429688
+          },
+          "width": 1386.971435546875,
+          "height": 924.6476440429688,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        },
+        {
+          "nodeId": "3314:292",
+          "name": "image 1289",
+          "key": "b5a43.png",
+          "rect": {
+            "x": -231,
+            "y": -129,
+            "width": 675.79541015625,
+            "height": 1016.0557861328125
+          },
+          "width": 675.79541015625,
+          "height": 1016.0557861328125,
+          "rotation": 0,
+          "alpha": 1,
+          "vector": false,
+          "cover": true,
+          "bottom": false,
+          "crop": false
+        }
+      ],
+      "dialogue": "",
+      "speaker": "",
+      "dialogueRect": {
+        "x": 84,
+        "y": 720,
+        "width": 270,
+        "height": 100
+      },
+      "cutId": "OP_019_1",
+      "dialogueFontSize": 20.69,
+      "speakerRect": {
+        "x": 57,
+        "y": 721,
+        "width": 91,
+        "height": 18
+      },
+      "badgeRect": {
+        "x": 57,
+        "y": 713,
+        "width": 91,
+        "height": 33
+      },
+      "texts": [
+        {
+          "nodeId": "3314:298",
+          "name": "Scroll Instructions",
+          "text": "<b>하나.</b> 요괴를 박 안에 가둔다.\n요괴를 품은 박은 크게 부풀어 오른다.\n\n둘. 음양구슬을 조합하여 \n오행구슬을 만든다.\n\n셋. 오행구슬로 박 전체에 오행의 기운을 고르게 입힌다.\n\n넷. 오행이 조화를 이루면 봉인이 완성된다!",
+          "parentNodeId": "3314:292",
+          "fontPath": "Assets/Lab/Art/Fonts/Shilla_Culture(M).otf",
+          "rect": {
+            "x": 80.90557861328125,
+            "y": 291.5997740370515,
+            "width": 239.7458642488782,
+            "height": 299.4130123631728
+          },
+          "width": 219.7516326904297,
+          "height": 284.25579833984375,
+          "rotation": 4.149877488985024,
+          "fontSize": 19,
+          "lineHeight": 25.187345504760742
+        },
+        {
+          "nodeId": "3314:299",
+          "name": "Scroll Heading",
+          "text": "「임시 봉인박 사용법」",
+          "parentNodeId": "3314:292",
+          "fontPath": "Assets/Lab/Art/Fonts/ShillaCultureBold.otf",
+          "rect": {
+            "x": 74,
+            "y": 218.99998474501177,
+            "width": 216.3077695939835,
+            "height": 29.706842451502496
+          },
+          "width": 215.77174377441406,
+          "height": 24.39158821105957,
+          "rotation": 1.4135210976419548,
+          "fontSize": 23,
+          "lineHeight": 25.187345504760742
+        }
+      ]
+    },
+    {
       "number": 20,
       "nodeId": "3182:12059",
       "items": [

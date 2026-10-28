@@ -83,6 +83,44 @@ namespace Hapio.Tests
 
 #if UNITY_EDITOR
         [UnityTest]
+        public IEnumerator SpeakerPaletteChangesOnTheSamePictureAndRestoresTheFallbackStyle()
+        {
+            var player = CreatePlayer();
+            var badge = new GameObject("Badge", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+            badge.transform.SetParent(player.transform, false); player.speakerBadge = badge.GetComponent<UnityEngine.UI.Image>();
+            var name = new GameObject("Speaker", typeof(RectTransform), typeof(UnityEngine.UI.Text));
+            name.transform.SetParent(player.transform, false); player.speakerText = name.GetComponent<UnityEngine.UI.Text>();
+            var view = player.sequence.cuts[0].viewPrefab;
+            view.overrideDialogueLayout = true;
+            view.speakerBadge = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Hapio/Art/Story/Opening/OP_002/SpeakerBadge.png");
+            view.speakerColor = Color.cyan;
+            player.speakerPalette = UnityEditor.AssetDatabase.LoadAssetAtPath<StorySpeakerPalette>("Assets/Hapio/Story/Opening/SpeakerPalette.asset");
+            Assert.That(player.speakerPalette, Is.Not.Null);
+            foreach (string speaker in new[] {"불이", "만복이", "묵이", "금옥이", "솔이", "사부님", "unknown", ""})
+                player.sequence.cuts[0].pages.Add(new StoryDialoguePage {speaker = speaker, dialogue = "Page"});
+            player.Replay(); player.Next();
+            var picture = player.CurrentView;
+            foreach (string speaker in new[] {"불이", "만복이", "묵이", "금옥이", "솔이", "사부님"})
+            {
+                Assert.That(player.speakerPalette.TryGet(speaker, out var style), Is.True);
+                Assert.That(player.speakerBadge.color, Is.EqualTo(style.badgeColor));
+                Assert.That(player.speakerText.color, Is.EqualTo(style.textColor));
+                Assert.That(player.speakerBadge.material, Is.SameAs(player.speakerPalette.badgeMaterial));
+                Assert.That(player.speakerBadge.enabled, Is.True);
+                Assert.That(player.CurrentView, Is.SameAs(picture));
+                player.Next();
+            }
+            Assert.That(player.speakerBadge.color, Is.EqualTo(Color.white));
+            Assert.That(player.speakerText.color, Is.EqualTo(Color.cyan));
+            player.Next();
+            Assert.That(player.speakerBadge.enabled, Is.False);
+            player.Previous();
+            yield return null;
+        }
+#endif
+
+#if UNITY_EDITOR
+        [UnityTest]
         public IEnumerator TextAddedToAnOldSilentCutUsesReadableFallbackRects()
         {
             var player = CreatePlayer();

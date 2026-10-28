@@ -28,6 +28,8 @@ namespace Hapio.Editor
         [Serializable] public class Frame
         {
             public int number;
+            public string cutId;
+            public string CutId => string.IsNullOrEmpty(cutId) ? $"OP_{number:000}" : cutId;
             public float dialogueFontSize;
             public string nodeId, dialogue, speaker, badgeKey;
             public Box dialogueRect, speakerRect, badgeRect;
@@ -108,8 +110,8 @@ namespace Hapio.Editor
             {
                 preview = ScriptableObject.CreateInstance<StorySequence>();
                 preview.storyId = "opening-prepared-preview";
-                foreach (int number in new[] { 1, 2 }.Concat(manifest.frames.Select(f => f.number)))
-                    preview.cuts.Add(AssetDatabase.LoadAssetAtPath<StoryCutDefinition>($"{Root}/Opening/Cuts/OP_{number:000}.asset"));
+                foreach (string id in new[] { "OP_001", "OP_002" }.Concat(manifest.frames.Select(f => f.CutId)))
+                    preview.cuts.Add(AssetDatabase.LoadAssetAtPath<StoryCutDefinition>($"{Root}/Opening/Cuts/{id}.asset"));
                 AssetDatabase.CreateAsset(preview, PreviewPath);
             }
             AssetDatabase.SaveAssets();
@@ -124,11 +126,11 @@ namespace Hapio.Editor
             var manifest = JsonUtility.FromJson<Manifest>(File.ReadAllText(ManifestPath));
             UpdateFrameGeometry(manifest.frames.Single(f => f.number == 22));
             var preview = AssetDatabase.LoadAssetAtPath<StorySequence>(PreviewPath);
-            preview.cuts = Enumerable.Range(1, 24).Select(number =>
-                AssetDatabase.LoadAssetAtPath<StoryCutDefinition>($"{Root}/Opening/Cuts/OP_{number:000}.asset")).ToList();
+            preview.cuts = new[] { "OP_001", "OP_002" }.Concat(manifest.frames.Select(f => f.CutId)).Select(id =>
+                AssetDatabase.LoadAssetAtPath<StoryCutDefinition>($"{Root}/Opening/Cuts/{id}.asset")).ToList();
             EditorUtility.SetDirty(preview);
             AssetDatabase.SaveAssets();
-            Debug.Log("HAPIO_STORY_OPENING_COMPLETE: all 24 cuts connected; cut 22 layout updated while retaining its Motion settings.");
+            Debug.Log("HAPIO_STORY_OPENING_COMPLETE: manifest cuts connected; cut 22 layout updated while retaining its Motion settings.");
         }
 
         private static void PlaceLayer(StoryLayer layer, Rect bounds)
@@ -143,7 +145,7 @@ namespace Hapio.Editor
 
         private static void UpdateFrameGeometry(Frame frame)
         {
-            string path = $"{Root}/Opening/Views/OP_{frame.number:000}.prefab";
+            string path = $"{Root}/Opening/Views/{frame.CutId}.prefab";
             var root = PrefabUtility.LoadPrefabContents(path);
             try
             {
@@ -188,7 +190,7 @@ namespace Hapio.Editor
 
         private static void BuildFrame(Frame frame)
         {
-            string viewPath = $"{Root}/Opening/Views/OP_{frame.number:000}.prefab";
+            string viewPath = $"{Root}/Opening/Views/{frame.CutId}.prefab";
             var root = PrefabUtility.LoadPrefabContents(viewPath);
             try
             {
@@ -240,7 +242,7 @@ namespace Hapio.Editor
                 PrefabUtility.SaveAsPrefabAsset(root, viewPath);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
-            var cut = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>($"{Root}/Opening/Cuts/OP_{frame.number:000}.asset");
+            var cut = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>($"{Root}/Opening/Cuts/{frame.CutId}.asset");
             if (cut.pages == null) cut.pages = new List<StoryDialoguePage>();
             if (cut.pages.Count == 0) cut.pages.Add(new StoryDialoguePage());
             if (cut.pages.Count == 1 && string.IsNullOrWhiteSpace(cut.pages[0].dialogue))

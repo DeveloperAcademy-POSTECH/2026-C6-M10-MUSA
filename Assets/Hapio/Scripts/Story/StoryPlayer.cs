@@ -22,6 +22,7 @@ namespace Hapio
         public Button autoButton;
         public Text autoLabel;
         public Image speakerBadge;
+        public StorySpeakerPalette speakerPalette;
         public AudioSource voiceSource;
         public bool playOnStart = true;
         [Tooltip("Game opening only: manual input; the authoring preview can still use AUTO.")]
@@ -44,6 +45,9 @@ namespace Hapio
         private bool suppressMultiTouch;
         private StoryDialoguePage currentPage;
         private Text cachedDialogue, cachedSpeaker;
+        private Image cachedBadge;
+        private Material defaultBadgeMaterial;
+        private Color defaultBadgeColor;
         private Vector2 defaultDialoguePosition, defaultDialogueSize, defaultSpeakerPosition, defaultSpeakerSize;
         private Color defaultSpeakerColor;
         private int defaultDialogueFontSize;
@@ -259,12 +263,35 @@ namespace Hapio
                 speakerBadge.enabled = currentView != null && currentView.overrideDialogueLayout &&
                     currentView.speakerBadge != null && !string.IsNullOrWhiteSpace(currentPage.speaker);
             if (dialogueText != null) dialogueText.text = currentPage.dialogue;
+            ApplySpeakerStyle();
             if (progressText != null)
             {
                 int pages = sequence.cuts[CurrentCutIndex].PageCount;
                 progressText.text = pages > 1
                     ? $"{CurrentCutIndex + 1}/{sequence.cuts.Count} · {CurrentPageIndex + 1}/{pages}"
                     : $"{CurrentCutIndex + 1} / {sequence.cuts.Count}";
+            }
+        }
+
+        private void ApplySpeakerStyle()
+        {
+            if (speakerPalette != null && speakerPalette.TryGet(currentPage.speaker, out var style))
+            {
+                if (speakerText != null) speakerText.color = style.textColor;
+                if (speakerBadge != null)
+                {
+                    speakerBadge.material = speakerPalette.badgeMaterial;
+                    speakerBadge.color = style.badgeColor;
+                }
+            }
+            else
+            {
+                if (speakerText != null) speakerText.color = currentView.overrideDialogueLayout ? currentView.speakerColor : defaultSpeakerColor;
+                if (speakerBadge != null)
+                {
+                    speakerBadge.material = defaultBadgeMaterial;
+                    speakerBadge.color = defaultBadgeColor;
+                }
             }
         }
 
@@ -328,6 +355,12 @@ namespace Hapio
             }
             if (speakerBadge != null)
             {
+                if (cachedBadge != speakerBadge)
+                {
+                    cachedBadge = speakerBadge;
+                    defaultBadgeMaterial = speakerBadge.material;
+                    defaultBadgeColor = speakerBadge.color;
+                }
                 speakerBadge.sprite = currentView.overrideDialogueLayout ? currentView.speakerBadge : null;
                 if (currentView.overrideDialogueLayout)
                 {

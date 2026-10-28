@@ -15,7 +15,7 @@ namespace Hapio.Editor
     public static class StoryApprovedScriptBuilder
     {
         [Serializable] private class Script { public Frame[] frames; }
-        [Serializable] private class Frame { public int number; public Page[] pages; public string direction; }
+        [Serializable] private class Frame { public int number; public string cutId; public Page[] pages; public string direction; }
         [Serializable] private class Page { public string speaker, dialogue; public float seconds; }
         private const string Root = "Assets/Hapio/Story/Opening/";
         public static void Apply()
@@ -34,7 +34,8 @@ namespace Hapio.Editor
             {
                 foreach (var frame in script.frames)
                 {
-                    var cut = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>(Root + $"Cuts/OP_{frame.number:000}.asset");
+                    string id = string.IsNullOrEmpty(frame.cutId) ? $"OP_{frame.number:000}" : frame.cutId;
+                    var cut = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>(Root + $"Cuts/{id}.asset");
                     var old = cut.pages;
                     cut.pages = frame.pages.Select((page, index) => new StoryDialoguePage {
                         speaker = page.speaker, dialogue = page.dialogue, autoReadSeconds = page.seconds,
@@ -79,7 +80,7 @@ namespace Hapio.Editor
             finally { Object.DestroyImmediate(measureObject); }
             RemoveTitleSubtitle();
             AssetDatabase.SaveAssets();
-            Debug.Log("HAPIO_APPROVED_SCRIPT_READY: 24 cuts / 25 pages, centred updated names, two dialogue pages on cut 17, silent cuts 13-14, no title subtitle.");
+            Debug.Log("HAPIO_APPROVED_SCRIPT_READY: opening script applied, centred updated names, two dialogue pages on cut 17, silent cuts 13-14, no title subtitle.");
         }
 
         private static void AddImpact(Transform root, StoryCutView view)
