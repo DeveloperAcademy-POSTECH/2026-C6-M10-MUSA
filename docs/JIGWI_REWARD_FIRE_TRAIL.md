@@ -1,10 +1,11 @@
 # 지귀 B 성공 보상 전용 불꽃 궤적
 
-기준: main `78a8467d`, 작업 `feat/#390-jigwi-reward-fire-trail`. 게임 규칙은 #388을 유지하고 비행 표현만 분리한다. 실행 검증 결과는 `VALIDATION.md`의 #390 항목을 따른다.
+기준: main `78a8467d`, 작업 `feat/#390-jigwi-reward-fire-trail`. 게임 규칙은 #388을 유지하고 비행·조합판의 B 성공 보상 표현을 연결한다. 실행 검증 결과는 `VALIDATION.md`의 #390 항목을 따른다.
 
 ## 1. 적용 조건과 유지하는 규칙
 
 - Host가 기존 `jigwiABReward`에 캡처한 B 성공 보상 발사에만 전용 화염을 켠다. 성공 직후5초에 발사한 공이 대상이며 보상 시간이 지나도 승인된 공은 해당 비행 종료까지 유지한다.
+- 보상5초 동안 조합판의 음·양 Raw와 Combined에도 같은 원형 화염을 표시한다. 이미 있는 구슬뿐 아니라 새 생성·수신·예측 조합도 포함한다. 아이템/북은 제외하며, 판의 구슬 크기·수명·A 소각 기한은 바꾸지 않는다.
 - 원래 오행의 `LabElementFlightTrail`은 실제 원소를 계속 표시한다. 이전 #388의 '모든 보상 꼬리를 Fire로 교체'하는 처리는 제거했다.
 - 실제 구슬 원소·공격 자격·도색 색·Rigidbody·Collider·속도·중력·충돌/명중/도색은 변경하지 않는다. 기존 크기1.3배와 도색1.5배는 그대로이며 표현에서 보상 배율을 다시 곱하지 않는다.
 - 공유 LabConfig253개·설정 인덱스·프로토콜5678·Lab39/Game23을 유지한다. 새 설정은 기기 로컬 표현 에셋이며 통신 필드/요청을 추가하지 않는다.
@@ -129,3 +130,16 @@ Exact layout in EACH equal square cell: the center is exactly the cell center. T
 Style: Korean fantasy game hand-painted ink-and-flat-watercolor, broad simple fiery shapes readable at 32-pixel orb scale. Bright warm-ivory hot inner edge, golden yellow and orange middle, vermilion red flame tips, a little irregular dark dry-brush ink on outer flame edges only. Fire, not a cogwheel, not a sun icon, not an electric halo, not an evenly spiked badge. Clear and elegant playable-game feedback, no clutter or floating debris. Strong continuous inner flame band, unequal natural outer tongues.
 All space outside the paint and all four central holes must have actual alpha-zero transparency. No parchment, background, black/white disks, checkerboard, labels, letters, borders, glow haze, smoke, symbols or scenery. This is the raw transparent runtime sprite sheet, not a mockup.
 ```
+
+
+## 8. 조합판의 보상 화염
+
+`LabNetwork.SyncJigwiRewardBoardPresentation`은 Playing/활성 정책에서 `latest.jigwiAB.Reward(JigwiABPresentationTime)`을 읽는다. Host의 전투 clock·Client의 수신 후 보간 clock을 그대로 쓰므로 snapshot 사이에도 보상 만료를 표시하며 Pause/시작 대기에는 시간을 멈춘다. 기존 발사 캡처 `jigwiABReward`를 판 구슬에 저장하지 않는다.
+
+`LabOrbBoard.SetJigwiRewardFire`는 현재 보상/정지 표시만 보관한다. 기존·신규 Upsert, 임시 Combined, 승인 ID 교체, 요청 거절 후 복원을 같은 표시로 갱신한다. LateUpdate에서 그림 크기 변화를 따라가며, 숨겨진 요청 대기 구슬에는 별도 화염이 남지 않는다. 보상 종료·결과/로비 전환·Clear/제거 때 즉시 끄고, 이미 발사된 공의 별도 비행 잔상은 원래 수명 규칙을 유지한다.
+
+`LabOrbView.SetJigwiRewardFire` → `LabJigwiRewardOrbFlame`은 `Visual` 아래 가벼운48분할 고리 Mesh 하나만 만든다. 비행 꼬리·불티·물리 컴포넌트는 판에 추가하지 않는다. 같은 `RewardFireProfile`의 `Rim Texture/Scale/Color`, `Flame Animation Fps`를 재사용하고 Visual의 잡기/생성/콤보 크기를 한 번만 따라간다. 중앙에는 삼각형이 없어 원래 속성 그림이 유지된다. A의 `LabJigwiOrbFlame`·폭탄 불·소각 기한은 독립적이다.
+
+![실제 Lab 조합판의 음·양과 5속성 보상 화염](images/jigwi-reward-fire-board.png)
+
+위 이미지는 실제 Lab Scene의390×844 Game 화면이다. 표시 비교를 위해 런타임 솔로 판에 음·양2개와 화/수/목/금/토 Combined5개를 배치하고 물리를 멈춰 보상 표시만 켰다. Scene/원본 설정은 저장하지 않았다. 실제 B 소화·다기기 성공 검증을 뜻하지 않는다. 자동 검사는 `LabJigwiRewardBoardFireTests`와 `LabOrbHudCompositionTests.ActualForegroundCameraAddsAndRemovesTheRewardRingWithoutCoveringTheElementArtwork`에 있다.

@@ -39,6 +39,15 @@ namespace C6Lab
             }
         }
 
+        private void SyncJigwiRewardBoardPresentation()
+        {
+            if (board == null) return;
+            bool active = latest != null && latest.phase == LabPhase.Playing
+                && latest.jigwiAB != null && latest.jigwiAB.enabled
+                && latest.jigwiAB.Reward(JigwiABPresentationTime) != null;
+            board.SetJigwiRewardFire(active, latest != null && (latest.paused || GameStartHeld));
+        }
+
         /// <summary>Shared owner-facing point plane, in front of its full curtain and independent of local screen aspect.</summary>
         public bool TryGetJigwiABFireWorldPosition(LabJigwiABRound round, LabJigwiABFireTarget fire,
             ulong owner, int index, double now, out Vector3 position)

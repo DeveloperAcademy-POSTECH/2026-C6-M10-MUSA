@@ -1317,6 +1317,7 @@ namespace C6Lab
             }
             SyncJigwiFireSurfaces();
             SyncJigwiStagePresentation();
+            SyncJigwiRewardBoardPresentation();
             if (!gameBattleFrozen)
             {
                 FlushPendingBlastReports(now);
@@ -2035,6 +2036,7 @@ namespace C6Lab
             ApplyGameStartSimulationHold();
             SyncJigwiFireSurfaces();
             SyncJigwiStagePresentation();
+            SyncJigwiRewardBoardPresentation();
             if (board == null || latest == null) return;
             NoticeFiveColorOrbs(latest);
             var current = new HashSet<string>();

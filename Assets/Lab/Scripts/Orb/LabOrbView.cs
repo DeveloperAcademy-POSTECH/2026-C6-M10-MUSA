@@ -26,6 +26,7 @@ namespace C6Lab
         private LabOrbItemMarker itemMarker;
         private LabOrbBurn burn;
         private LabJigwiOrbFlame jigwiABFlame;
+        private LabJigwiRewardOrbFlame jigwiRewardFlame;
         private LabOrbRainbow rainbow;
         private SpriteRenderer expiryFlash;
         private SpriteRenderer expiryHalo;
@@ -87,6 +88,8 @@ namespace C6Lab
         public bool Burning => burn != null && burn.Burning;
         /// <summary>A-only fire. Independent from the existing bomb blast flame and its deadline.</summary>
         public LabJigwiOrbFlame JigwiABFlame => jigwiABFlame;
+        /// <summary>B-success board artwork only; independent from A burn and its expiry.</summary>
+        public LabJigwiRewardOrbFlame JigwiRewardFlame => jigwiRewardFlame;
         /// <summary>Seconds this screen counts down to the end of the orb's lifetime (#235); negative when not shown.</summary>
         public float LifeSecondsLeft => lifeLeft;
         /// <summary>In its last seconds, flashing white before it goes.</summary>
@@ -458,6 +461,22 @@ namespace C6Lab
             jigwiABFlame.Show(secondsLeft, visualRadius, held);
         }
 
+        /// <summary>Current shared B reward, never a burn deadline or a persistent launch flag.</summary>
+        public void SetJigwiRewardFire(bool active, bool held = false)
+        {
+            if (!isActiveAndEnabled || (!kind.IsRaw() && kind != LabOrbKind.Combined)) active = false;
+            if (!active)
+            {
+                if (jigwiRewardFlame != null) jigwiRewardFlame.Clear();
+                return;
+            }
+            if (jigwiRewardFlame == null) jigwiRewardFlame = LabJigwiRewardOrbFlame.Create(visual);
+            // Visual already carries grab/combo/spawn scaling: supply the unscaled art radius once.
+            float artRadius = visualRadius * (orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf
+                ? LabOrbSpriteArt.SizeScaleFor(kind) : 1f);
+            jigwiRewardFlame.Show(artRadius, held);
+        }
+
         /// <summary>
         /// A blast just shrank this orb (#213). Its body is already small; the art starts at its old
         /// size (fromScale times the new one) and squeezes down to match, dipping just under before
@@ -704,6 +723,7 @@ namespace C6Lab
 
         private void OnDisable()
         {
+            if (jigwiRewardFlame != null) jigwiRewardFlame.Clear();
             if (jigwiABFlame != null) jigwiABFlame.Clear();
             CompleteSpawn();
             CompleteDrop();
