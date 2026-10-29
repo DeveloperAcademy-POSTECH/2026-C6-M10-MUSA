@@ -1,8 +1,8 @@
 # C6 테스트 구성과 검증 범위 보고서
 
-## 현재 구성 — 2026-10-29, #378
+## 현재 구성 — 2026-10-29, #380
 
-기준 main `5c644ef3`에는 #369 수채 구현과 #375 테스트 공통화가 포함돼 있다. #378은 오프닝 입력 검사 한 개의 준비·복원만 격리한다. 현재 테스트 C#은 **187파일**이며, 테스트가 들어 있는186파일과 저장 Scene용 공통 helper1파일로 구성된다. 테스트 assembly는5개다.
+기준 main `8d3cd58d`에는 #369 수채 구현·#375 테스트 공통화·#378 오프닝 입력 격리가 포함돼 있다. #380은 도색 소유권의 고정 위치 픽셀 비교와 이동 안정성 검사를 분리하고 촬영 자원 복원 범위를 보완한다. 현재 테스트 C#은 **187파일**이며, 테스트가 들어 있는186파일과 저장 Scene용 공통 helper1파일로 구성된다. 테스트 assembly는5개다. 이 수치는 #380의 위 기준 소스에 해당하며, 병행 작업 #381이 이후 main에 병합한 콘텐츠 구조와 새 테스트는 이번 집계/실행에 포함하지 않는다.
 
 | 구분 | C# 파일 | 역할 |
 | --- | ---: | --- |
@@ -12,7 +12,7 @@
 | Hapio PlayMode | 8 | Home·3스테이지·결과·게임 화면 통합 |
 | Story PlayMode | 4 | 오프닝 재생·터치·배경·화자 |
 
-파일 수와 실행 케이스 수는 다르다. 매개변수 케이스는 Test Runner가 확장하며, 실제 실행 결과·실패·skip·환경은 `VALIDATION.md`의 #378 및 선행 #375 절에서 확인한다. 아래 2026-10-21의91파일·1,062케이스는 당시 기록이며 현재 수치가 아니다.
+파일 수와 실행 케이스 수는 다르다. 매개변수 케이스는 Test Runner가 확장하며, 실제 실행 결과·실패·skip·환경은 `VALIDATION.md`의 #380·#378 및 선행 #375 절에서 확인한다. 아래 2026-10-21의91파일·1,062케이스는 당시 기록이며 현재 수치가 아니다.
 
 #375에서는 `LabSharedSettingsSchemaTests`가 구형228/P3·240/P2 payload의 거절·원본 보존·fingerprint 예외를 맡는다. 기존11개P3 케이스는 유지하고240/P2 케이스1개를 추가한 뒤, 지귀 설정 검사에서 중복 메서드2개만 제거했다. 기능별 설정값·경계·왕복 검사는 유지한다.
 
@@ -25,6 +25,14 @@
 `GameOpeningControllerTests.HeldPointerDelaysBothTheFirstPageAndTheRoomBrowserUntilRelease`는 #378에서 입력 설정을 검사 안에서 자동 격리한다. 원래 InputSettings 참조·JSON·flags·포커스 정책을 보관하고 검사 전용 복사본에만 `IgnoreFocus`/`AllDeviceInputAlwaysGoesToGameView`를 적용한다. Editor 전체를 수동 조정할 필요가 없다. 설정 교체가 원본을 파괴하지 않도록 보호하며, 입력 설정 변경 전부터 시작하는 try/finally에서 소유 Mouse·설정 복사본을 정리하고 원본 참조와 flags를 복원한다.
 
 기존 시작/종료의 held→release 판정·3프레임 대기는 유지한다. 주입 Mouse 상태와 원본 설정·값·flags 복원, 소유 Mouse·임시 설정 잔존 여부도 같은 검사에서 확인한다. 실제 `StoryTapAdvance`/`GameOpeningController` 입력 판정과 #369 수채 구현은 변경하지 않는다. #375 당시 기본 batch 실패와 외부 임시 포커스 조정 결과는 과거 검증 이력으로 유지하고, #378의 수동 설정 없는 기본 환경 결과는 VALIDATION의 별도 절에서 확인한다.
+
+### 도색 소유권의 고정 위치 비교와 이동 검사
+
+`LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllFivePaintersWithoutChangingPaperAlphaOrCoverage`는 같은 위치에서 P0→P1~P5→P0의 실제 저장 박/셰이더 픽셀을 비교한다. P0 복원은 즉시와 다음 프레임에 모두 완전 동일 비교하며, 원색·종이·알파·CPU 색 맵·P byte·면적과 다섯 무늬 구분 조건을 유지한다.
+
+이동 부분은 같은 파일의 `AllFivePainterPatternsStayOnTheShellWhenCameraAndModelMoveTogether`로 옮겼다. 다섯 P 모두 이동 전 무늬가 중립 이미지와100픽셀 넘게 다른지 확인하고 기존 이동 평균 채널 오차 `<0.1`을 적용한다. 위치는 저장한 시작점+offset으로 직접 지정하며, 이동 후 CPU 색/P 맵·면적·셀 수 불변도 검사한다. 기존 assertion67개를 모두 보존하고8개를 추가했으며 검사 파일/assembly 수는 그대로다.
+
+공유 촬영 rig는 `RenderTexture.active`를 함수 진입 시 저장하고 property block 복사·`Camera.Render()`·readback·PNG 저장 전체를 try/finally로 감싼다. 실제 도색·수채·셰이더·설정 에셋을 변경하거나 허용치를 늘리지 않는다. 과거1단계 RGB 차이는 #380의 진단 실행에서 재현되지 않았으므로, 비교 조건 분리와 과거 실패의 원인 확정 여부를 구분한다. 실제 실행 결과는 VALIDATION의 #380 절을 따른다.
 
 ## 2026-10-21 보고서 — 당시 구성과 실행 기록
 
