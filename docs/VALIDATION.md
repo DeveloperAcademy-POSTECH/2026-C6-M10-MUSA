@@ -1,5 +1,27 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-10-29 — #373 미사용 배경 프로토타입·여우 표시 에셋 정리
+
+main `a0742ef7`에서 별도 `chore/#373-unused-prototype-fox-assets` 작업 트리를 만들었다. 원래 #369 작업 폴더의 브랜치·HEAD·작업 상태·tracked diff와 사용자 미추적 파일을 보존했다.
+
+PR 준비 시 최신 main `7aa0a215`(#370 콤보 사운드)을 충돌 없이 통합하고 다시 확인했다. 최신 main 대비 변경은 같은62개 삭제와 이 검증 기록뿐이다. #370의 음원·코드·테스트·출처 문서4개는 최신 main과 동일하고, 보존 텍스트1,998개(검증 기록 제외)의 후보 GUID·경로 참조0건, Scene7개·빌드 목록6개·테스트 C#186개 유지 및 #369/로컬 파일 보존을 재확인했다. Unity 실행 검증은 추가 수행하지 않았다.
+
+- `Assets/BackgroundPrototype`와 루트 폴더 메타를 포함한 독립 실험 Scene·Editor 창·배경 그림·생성 머터리얼·복제 모델53개를 제거했다.
+- `Assets/Hapio/Art/GumihoVisual.prefab`과 메타2개, `Assets/Lab/Art/Monster`와 루트 메타를 포함한 여우 FBX·머터리얼·텍스처7개를 제거했다. 합계62파일·34 GUID·54,500,774바이트(작업 파일 기준 약51.98MiB)다. Git 이력이나 빌드 크기 감소량을 측정한 값은 아니다.
+- 실제 게임의 공통 검은 요괴는 `Art/GourdYokai`와 `Resources/GourdPaint/WhiteGourd`를 사용한다. Stage01~03의 `yokaiVisual`은 모두 null이며, 구미호 스테이지 규칙·효과음·오프닝/로비 그림은 이번 삭제 대상과 별개로 유지했다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| 삭제 허용 목록 | PASS | 승인한62개와 검증 기록만 변경. 보존된 런타임·Editor·Scene·Prefab·설정·패키지·테스트는 기준 main과 동일 |
+| GUID·경로 참조 | PASS | 보존 추적 텍스트1,999개에서 후보 GUID34개의 incoming 참조0건. 후보 경로/이름은 기존 VALIDATION의 역사 기록에서만 발견되어 보존. Resources 경로·코드·Editor 메뉴 호출도 별도 확인 |
+| #369 및 로컬 참조 | PASS | #369 HEAD의 보존 파일에서도 후보 GUID incoming0건. 사용자 미추적 폴더 파일3개에도 후보 GUID·경로 참조0건 |
+| 현재 실행 자료 보존 | PASS | 공통 WhiteGourd/검은 요괴 모델·애니메이션·도색 몸체, 스테이지3개 설정, 기존 테스트 C#186개 동일. 게임 Scene5개·Lab·StoryPreview 총7개를 유지하고 Build Settings6개의 실제 파일 존재 확인 |
+| 기존 작업 보존 | PASS | 원래 #369 브랜치·HEAD·작업 상태·tracked diff 및 사용자 미추적 파일 해시가 작업 전과 동일 |
+| 공백 검사 | PASS | `git diff --check` 통과 |
+| Unity 의존성 API·컴파일·EditMode·PlayMode·빌드·실기기 | **NOT_RUN** | 연결된 Editor 없이 저장된 GUID·경로·코드·설정을 교차 검사했다. `AssetDatabase.GetDependencies`·실제 렌더·게임 실행을 통과한 것으로 표현하지 않음 |
+
+기존 VALIDATION 본문은 삭제하거나 현재 실행 결과로 재사용하지 않았다. Scene 내부·표시 중인 UI·게임 규칙·#369 수채 구현·로컬 빌드/캐시는 변경하지 않았다.
+
 ## 2026-10-29 — #371 구형 실행 도구·크래시 산출물·메타 잔재 정리
 
 기준은 main `f6effa2c`이며, 별도 `chore/#371-legacy-artifact-cleanup` 작업 트리에서 정리했다. 기존 `experiment/#369-gourd-watercolor` 작업 폴더를 전환·수정하지 않았다.
