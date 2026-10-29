@@ -57,9 +57,13 @@ namespace C6Lab.Tests
             var old = Shot(10);
             Assert.That(old.Launch("old-flight", 0, Vector3.forward, config, target, _ => hits++), Is.True);
             var pending = Shot(0);
+            pending.SetJigwiABReward(true);
             pending.LaunchVisual(Vector3.forward, config, target);
             var after = Shot(31);
+            after.SetJigwiABReward(true);
             after.LaunchVisual(Vector3.forward, config, target);
+            var oldRewardTail = DetachedRewardTail(9);
+            var newRewardTail = DetachedRewardTail(31);
             var oldTail = new GameObject("Old detached trail"); oldTail.transform.SetParent(flights);
             oldTail.AddComponent<LabProjectileRevisionStamp>().Revision = 9;
             var newTail = new GameObject("Later detached trail"); newTail.transform.SetParent(flights);
@@ -82,6 +86,12 @@ namespace C6Lab.Tests
             Assert.That(oldTail.activeSelf, Is.False);
             Assert.That(after.gameObject.activeSelf, Is.True);
             Assert.That(newTail.activeSelf, Is.True);
+            Assert.That(oldRewardTail.gameObject.activeSelf, Is.False);
+            Assert.That(oldRewardTail.PathCount, Is.Zero, "The failed mission immediately clears its detached dedicated flame mesh.");
+            Assert.That(newRewardTail.gameObject.activeSelf, Is.True);
+            Assert.That(newRewardTail.GetComponent<LabProjectileRevisionStamp>().Revision, Is.EqualTo(31UL));
+            Assert.That(after.JigwiRewardFireTrail.IsEmitting, Is.True,
+                "The post-fence approved flight keeps its dedicated layer while its action receipt is pending.");
             Assert.That(predictions.Keys, Is.EquivalentTo(new[] { 7L }),
                 "A newer approved shot awaiting its action receipt must survive preview rollback as well.");
             Assert.That(presented.Contains(7), Is.True);
@@ -89,7 +99,7 @@ namespace C6Lab.Tests
             Assert.That(hits, Is.Zero, "Cancellation must not call the hit/miss resolver.");
             Assert.That(Purge(30), Is.False, "The same failed mission is applied once.");
             yield return null;
-            Assert.That(old == null && pending == null && oldTail == null, Is.True);
+            Assert.That(old == null && pending == null && oldTail == null && oldRewardTail == null, Is.True);
             Assert.That(hits, Is.Zero);
         }
 
@@ -123,9 +133,24 @@ namespace C6Lab.Tests
             Assert.That(shot.AuthorityRevision, Is.EqualTo(42UL));
             Assert.That(shot.RadiusScale, Is.EqualTo(1.3f));
             Assert.That(shot.JigwiABRewardActive, Is.True);
-            Assert.That(shot.ElementFlightTrail.Element, Is.EqualTo(LabOrbElement.Fire));
+            Assert.That(shot.ElementFlightTrail.Element, Is.EqualTo(LabOrbElement.Wood));
+            Assert.That(shot.JigwiRewardFireTrail, Is.Not.Null);
+            Assert.That(shot.JigwiRewardFireTrail.IsEmitting, Is.True);
             Assert.That(typeof(LabProjectile).GetField("element", Private).GetValue(shot), Is.EqualTo(LabOrbElement.Wood));
             Assert.That(shot.InitialVelocity, Is.Not.EqualTo(Vector3.zero));
+        }
+
+        private LabJigwiRewardFireTrail DetachedRewardTail(ulong revision)
+        {
+            LabProjectile shot = Shot(revision);
+            shot.SetJigwiABReward(true);
+            Assert.That(shot.LaunchVisual(Vector3.forward, config, target), Is.True);
+            LabJigwiRewardFireTrail tail = shot.JigwiRewardFireTrail;
+            Assert.That(tail, Is.Not.Null);
+            shot.SendMessage("FinishVisual"); // Existing replica completion, without synthesizing a physical hit.
+            Assert.That(tail.transform.parent, Is.EqualTo(flights));
+            Assert.That(tail.GetComponent<LabProjectileRevisionStamp>().Revision, Is.EqualTo(revision));
+            return tail;
         }
 
         private LabProjectile Shot(ulong revision)

@@ -367,6 +367,113 @@ namespace C6Lab.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator ActualForegroundCameraAddsAndRemovesTheRewardRingWithoutCoveringTheElementArtwork()
+        {
+            RequireGraphics();
+            CreateFixture(out LabHud hud, out LabOrbBoard board, out Camera camera, out _, out _);
+            LabConfig config = Object.Instantiate(Resources.Load<LabConfig>("LabConfig"));
+            Texture2D readback = null;
+            RenderTexture previous = RenderTexture.active;
+            try
+            {
+                Assert.That(config, Is.Not.Null);
+                Assert.That(config.OrbAppearance.SpriteFor(LabOrbKind.Combined, LabOrbElement.Water), Is.Not.Null);
+                LabJigwiRewardFireProfile profile = Resources.Load<LabJigwiRewardFireProfile>(LabJigwiRewardFireProfile.ResourcesPath);
+                Assert.That(profile != null && profile.RimTexture != null && profile.Material != null
+                    && profile.Material.shader != null && profile.Material.shader.isSupported, Is.True);
+                board.Configure(config, camera, new Rect(-4f, -2f, 8f, 4f));
+                LabOrbView view = board.UpsertOrb("foreground-water-reward", LabOrbKind.Combined,
+                    Vector2.one * .5f, Vector2.zero, element: LabOrbElement.Water);
+                board.SetSimulationHeld(true); // Freeze only this board, without changing the global clock or camera projection.
+                LabOrbHudComposition.Attach(hud, board, camera);
+                yield return null;
+                LabOrbHudComposition composition = hud.GetComponent<LabOrbHudComposition>();
+                Assert.That(composition.IsCompositing, Is.True, composition.InitializationError);
+                Assert.That(camera.orthographicSize, Is.EqualTo(5f), "Use the existing foreground-camera projection.");
+                RenderTexture target = composition.Texture;
+                readback = new Texture2D(target.width, target.height, TextureFormat.RGBA32, false, true);
+
+                Color32[] CaptureForeground()
+                {
+                    composition.ForegroundCamera.Render(); // Exercise the real ring shader, camera mask and foreground RenderTexture.
+                    RenderTexture active = RenderTexture.active;
+                    try
+                    {
+                        RenderTexture.active = target;
+                        readback.ReadPixels(new Rect(0f, 0f, target.width, target.height), 0, 0);
+                        readback.Apply();
+                        return readback.GetPixels32();
+                    }
+                    finally { RenderTexture.active = active; }
+                }
+
+                Color32[] normal = CaptureForeground();
+                board.SetJigwiRewardFire(true);
+                yield return null;
+                Assert.That(view.JigwiRewardFlame != null && view.JigwiRewardFlame.Shown, Is.True);
+                Color32[] burning = CaptureForeground();
+                board.SetJigwiRewardFire(false);
+                yield return null;
+                Color32[] restored = CaptureForeground();
+
+                Camera foreground = composition.ForegroundCamera;
+                Vector3 centre = foreground.WorldToViewportPoint(view.Body.position);
+                float artRadius = view.HitSphere.radius * LabOrbSpriteArt.SizeScaleFor(view.Kind);
+                Vector3 edgeX = foreground.WorldToViewportPoint(view.Body.position + foreground.transform.right * artRadius);
+                Vector3 edgeY = foreground.WorldToViewportPoint(view.Body.position + foreground.transform.up * artRadius);
+                float x = centre.x * target.width, y = centre.y * target.height;
+                float rx = Mathf.Abs(edgeX.x - centre.x) * target.width;
+                float ry = Mathf.Abs(edgeY.y - centre.y) * target.height;
+                Assert.That(Mathf.Min(rx, ry), Is.GreaterThan(2f), "The real foreground target must resolve the orb and its annulus.");
+                int corePixels = 0, visibleCorePixels = 0, coreMaxDifference = 0;
+                int ringPixels = 0, addedRingPixels = 0, residualRingPixels = 0;
+                float outer = profile.RimScale * .98f;
+                int minX = Mathf.Max(0, Mathf.FloorToInt(x - rx * profile.RimScale - 2f));
+                int maxX = Mathf.Min(target.width - 1, Mathf.CeilToInt(x + rx * profile.RimScale + 2f));
+                int minY = Mathf.Max(0, Mathf.FloorToInt(y - ry * profile.RimScale - 2f));
+                int maxY = Mathf.Min(target.height - 1, Mathf.CeilToInt(y + ry * profile.RimScale + 2f));
+                for (int py = minY; py <= maxY; py++)
+                    for (int px = minX; px <= maxX; px++)
+                    {
+                        float dx = (px + .5f - x) / rx, dy = (py + .5f - y) / ry;
+                        float radius = Mathf.Sqrt(dx * dx + dy * dy);
+                        int index = py * target.width + px;
+                        Color32 a = normal[index], b = burning[index], c = restored[index];
+                        if (radius <= .6f)
+                        {
+                            corePixels++;
+                            if (a.a > 128) visibleCorePixels++;
+                            int difference = Mathf.Max(Mathf.Abs(b.r - a.r), Mathf.Abs(b.g - a.g));
+                            difference = Mathf.Max(difference, Mathf.Max(Mathf.Abs(b.b - a.b), Mathf.Abs(b.a - a.a)));
+                            coreMaxDifference = Mathf.Max(coreMaxDifference, difference);
+                        }
+                        else if (radius >= 1.1f && radius <= outer)
+                        {
+                            ringPixels++;
+                            if (b.a - a.a > 32) addedRingPixels++;
+                            if (Mathf.Abs(c.a - a.a) > 5) residualRingPixels++;
+                        }
+                    }
+                Assert.That(corePixels, Is.GreaterThan(0));
+                Assert.That(visibleCorePixels, Is.GreaterThan(0), "The baseline must contain the real Water artwork, rather than empty transparent pixels.");
+                Assert.That(coreMaxDifference, Is.LessThanOrEqualTo(5), "The hollow fire ring must preserve the core pigment and alpha.");
+                Assert.That(ringPixels, Is.GreaterThan(20));
+                Assert.That(addedRingPixels, Is.GreaterThanOrEqualTo(8), "B reward must add visible alpha outside the existing orb artwork in the actual foreground target.");
+                Assert.That(residualRingPixels, Is.Zero, "Turning the board reward off restores the baseline outer alpha immediately.");
+                TestContext.WriteLine("JIGWI_BOARD_RING_GPU graphics=" + SystemInfo.graphicsDeviceType
+                    + " addedPixels=" + addedRingPixels + " residualPixels=" + residualRingPixels
+                    + " coreMaxDifference=" + coreMaxDifference);
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                if (root != null) root.SetActive(false);
+                if (readback != null) Object.DestroyImmediate(readback);
+                if (config != null) Object.DestroyImmediate(config);
+            }
+        }
+
         private void CreateFixture(out LabHud hud, out LabOrbBoard board, out Camera camera,
             out Transform paper, out Transform backdrop)
         {

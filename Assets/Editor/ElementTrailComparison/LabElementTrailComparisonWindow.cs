@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -287,6 +288,9 @@ namespace C6Lab.Editor
         public const int FrameWidth = 312;
         public const int FrameHeight = 676;
         private const int PreviewLayer = 30;
+        private const float PreviewCellSpacing = 2048f, PreviewFarClip = PreviewCellSpacing * .25f;
+        private static readonly HashSet<int> PreviewSlots = new HashSet<int>();
+        private int previewSlot = -1;
         private static readonly LabOrbElement[] Elements =
             { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth };
         private readonly RenderTexture[] frames = new RenderTexture[5];
@@ -300,6 +304,7 @@ namespace C6Lab.Editor
         private float presentationMargin;
         private Vector3 frontViewDirection;
         private bool framePath, viewFromSide;
+        private readonly bool jigwiReward;
         private float startedAt;
         private bool disposed;
 
@@ -310,16 +315,23 @@ namespace C6Lab.Editor
         public float ReplayAfterSeconds => FlightDuration + maximumTrailLifetime + .2f;
 
         public LabElementTrailComparisonSession(LabConfig sourceConfig, Camera sourceCamera, bool sideView, bool shortFlight)
-            : this(sourceConfig, sourceCamera, sideView, shortFlight, false) { }
+            : this(sourceConfig, sourceCamera, sideView, shortFlight, false, false) { }
 
         public LabElementTrailComparisonSession(LabConfig sourceConfig, Camera sourceCamera, bool sideView, bool shortFlight,
             bool frontCloseUp)
+            : this(sourceConfig, sourceCamera, sideView, shortFlight, frontCloseUp, false) { }
+
+        public LabElementTrailComparisonSession(LabConfig sourceConfig, Camera sourceCamera, bool sideView, bool shortFlight,
+            bool frontCloseUp, bool jigwiReward)
         {
+            this.jigwiReward = jigwiReward;
             if (!Application.isPlaying) throw new InvalidOperationException("The comparison requires Play Mode.");
             if (sourceConfig == null || sourceCamera == null)
                 throw new ArgumentException("A live Lab config and battle camera are required.");
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 throw new InvalidOperationException("A real graphics device is required for trail comparison.");
+            if (sourceCamera.nearClipPlane >= PreviewFarClip)
+                throw new ArgumentException("The preview camera near plane exceeds its isolated render range.");
             foreach (LabOrbElement element in Elements)
             {
                 if (sourceConfig.OrbAppearance == null || sourceConfig.OrbAppearance.ElementTrailFor(element) == null)
@@ -329,8 +341,15 @@ namespace C6Lab.Editor
                 LabElementTrailProfile profile = sourceConfig.OrbAppearance.ElementTrailFor(element);
                 presentationMargin = Mathf.Max(presentationMargin, Mathf.Max(profile.Width, profile.ParticleSize));
             }
+            // Both rows reserve the same presentation margin; the reward flag never changes body size.
+            LabJigwiRewardFireProfile rewardProfile = Resources.Load<LabJigwiRewardFireProfile>(LabJigwiRewardFireProfile.ResourcesPath);
+            float rewardWidth = rewardProfile != null ? rewardProfile.WidthScale : 1.05f;
+            presentationMargin = Mathf.Max(presentationMargin, sourceConfig.ThrowRadius * Mathf.Max(2.5f, rewardWidth * 2f));
+            maximumTrailLifetime = Mathf.Max(maximumTrailLifetime,
+                rewardProfile != null ? Mathf.Max(rewardProfile.Lifetime, rewardProfile.EmberLifetime) : .45f);
             try
             {
+                previewSlot = ClaimPreviewSlot();
                 config = Object.Instantiate(sourceConfig);
                 config.name = "Element trail comparison config (transient)";
                 config.hideFlags = HideFlags.HideAndDontSave;
@@ -349,9 +368,9 @@ namespace C6Lab.Editor
                 root.AddComponent<LabElementTrailComparisonPhysics>().Initialize(scene.GetPhysicsScene());
                 for (int i = 0; i < frames.Length; i++)
                 {
-                    // Distance plus a private PhysicsScene keeps comparison bodies and cameras away
-                    // from every live battle object without changing any live-camera culling mask.
-                    centers[i] = new Vector3(10000f + i * 100f, 0f, 0f);
+                    // Physics scenes isolate simulation, not SRP rendering. Every live session/panel
+                    // therefore has a distinct volume beyond all other preview cameras' far plane.
+                    centers[i] = new Vector3(10000f + i * PreviewCellSpacing, 0f, previewSlot * PreviewCellSpacing);
                     var group = new GameObject(Elements[i] + " comparison shots");
                     group.transform.SetParent(root.transform, false);
                     groups[i] = group.transform;
@@ -359,6 +378,7 @@ namespace C6Lab.Editor
                     cameraObject.transform.SetParent(root.transform, false);
                     Camera camera = cameraObject.AddComponent<Camera>();
                     camera.CopyFrom(sourceCamera);
+                    camera.farClipPlane = Mathf.Min(sourceCamera.farClipPlane, PreviewFarClip);
                     camera.enabled = false;
                     camera.tag = "Untagged";
                     camera.cameraType = CameraType.Preview;
@@ -389,6 +409,14 @@ namespace C6Lab.Editor
             catch { Dispose(); throw; }
         }
 
+        private static int ClaimPreviewSlot()
+        {
+            int slot = 0;
+            while (PreviewSlots.Contains(slot)) slot++;
+            PreviewSlots.Add(slot);
+            return slot;
+        }
+
         public void StartVolley()
         {
             if (!IsValid) throw new ObjectDisposedException(nameof(LabElementTrailComparisonSession));
@@ -402,6 +430,7 @@ namespace C6Lab.Editor
                 Vector3 launch = LabThrowMath.LaunchPosition(0, 1, centers[i], .5f, config);
                 Vector3 velocity = LabThrowMath.LaunchVelocity(new Vector2(.12f, 1.5f), anchor, centers[i], config);
                 LabProjectile projectile = LabProjectile.Create(launch, config, groups[i], Elements[i]);
+                if (jigwiReward) projectile.SetJigwiABReward(true);
                 foreach (Transform child in projectile.GetComponentsInChildren<Transform>(true))
                     child.gameObject.layer = PreviewLayer;
                 projectile.LaunchVisual(velocity, config);
@@ -409,10 +438,12 @@ namespace C6Lab.Editor
             startedAt = Time.time;
         }
 
-        public void RenderFrames()
+        public void RenderFrames() => RenderFramesWithPeer(null);
+
+        public void RenderFramesWithPeer(LabElementTrailComparisonSession framingPeer)
         {
             if (!IsValid) throw new ObjectDisposedException(nameof(LabElementTrailComparisonSession));
-            if (framePath) FrameRecordedPath();
+            if (framePath) FrameRecordedPath(framingPeer);
             RenderTexture previous = RenderTexture.active;
             try
             {
@@ -441,10 +472,9 @@ namespace C6Lab.Editor
             return new Rect((1f - width) * .5f, 0f, width, 1f);
         }
 
-        private void FrameRecordedPath()
+        private Bounds RecordedPathBounds()
         {
-            // Only observed positions determine the auxiliary view. They never move a body or
-            // create a hypothetical flight. One common bound keeps all five scales comparable.
+            // Coordinates are local to each panel; no hypothetical flight or scene body is added.
             Vector3 launch = LabThrowMath.LaunchPosition(0, 1, Vector3.zero, .5f, config);
             var bounds = new Bounds(launch, Vector3.zero);
             for (int i = 0; i < groups.Length; i++)
@@ -454,8 +484,23 @@ namespace C6Lab.Editor
                 foreach (LabElementFlightTrail trail in groups[i].GetComponentsInChildren<LabElementFlightTrail>())
                     for (int point = 0; point < trail.PathCount; point++)
                         bounds.Encapsulate(trail.GetPathPosition(point) - centers[i]);
+                foreach (LabJigwiRewardFireTrail trail in groups[i].GetComponentsInChildren<LabJigwiRewardFireTrail>())
+                    for (int point = 0; point < trail.PathCount; point++)
+                        bounds.Encapsulate(trail.GetPathPosition(point) - centers[i]);
             }
-            bounds.Expand(2f * (presentationMargin + config.ThrowRadius));
+            return bounds;
+        }
+
+        private void FrameRecordedPath(LabElementTrailComparisonSession framingPeer)
+        {
+            Bounds bounds = RecordedPathBounds();
+            float margin = presentationMargin + config.ThrowRadius;
+            if (framingPeer != null && framingPeer.IsValid)
+            {
+                bounds.Encapsulate(framingPeer.RecordedPathBounds());
+                margin = Mathf.Max(margin, framingPeer.presentationMargin + framingPeer.config.ThrowRadius);
+            }
+            bounds.Expand(2f * margin);
             Vector3 forward = viewFromSide ? Vector3.left : frontViewDirection;
             Vector3 right = Vector3.Cross(Vector3.up, forward).normalized;
             Vector3 up = Vector3.Cross(forward, right).normalized;
@@ -505,6 +550,7 @@ namespace C6Lab.Editor
             foreach (Camera camera in cameras) if (camera != null) camera.targetTexture = null;
             if (root != null) Object.DestroyImmediate(root);
             root = null;
+            if (previewSlot >= 0) { PreviewSlots.Remove(previewSlot); previewSlot = -1; }
             for (int i = 0; i < frames.Length; i++)
             {
                 if (frames[i] == null) continue;

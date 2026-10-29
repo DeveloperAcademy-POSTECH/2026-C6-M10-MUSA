@@ -74,7 +74,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator AcceptedRewardUsesFireHistoryWithoutChangingElementOrFlightAndStampsDetachedResidue()
+        public IEnumerator AcceptedRewardKeepsWaterAndMetalInkAddsSeparateFireAndStampsBothDetachedResidues()
         {
             var target = LabTarget.CreateCylinder(root.transform, new Vector3(0f, 0f, 50f), .8f, 2f);
             Vector3 velocity = new Vector3(.6f, 3f, 8f);
@@ -87,7 +87,10 @@ namespace C6Lab.Tests
             foreach (var shot in new[] { host, predicted })
             {
                 Assert.That(shot.JigwiABRewardActive, Is.True);
-                Assert.That(shot.ElementFlightTrail.Element, Is.EqualTo(LabOrbElement.Fire));
+                Assert.That(shot.ElementFlightTrail.Element,
+                    Is.EqualTo(shot == host ? LabOrbElement.Water : LabOrbElement.Metal));
+                Assert.That(shot.JigwiRewardFireTrail, Is.Not.Null);
+                Assert.That(shot.JigwiRewardFireTrail.IsEmitting, Is.True);
                 Assert.That(shot.InitialVelocity, Is.EqualTo(velocity));
                 Assert.That(shot.GravityAcceleration, Is.EqualTo(config.EffectiveThrowGravity));
                 Assert.That(shot.GetComponent<SphereCollider>().radius, Is.EqualTo(config.ThrowRadius * 1.3f).Within(.00001f));
@@ -99,23 +102,34 @@ namespace C6Lab.Tests
             Assert.That(actualElement.GetValue(predicted), Is.EqualTo(LabOrbElement.Metal), "Fire is a reward trail, not a pigment conversion.");
             yield return new WaitForFixedUpdate(); yield return null;
             var trail = predicted.ElementFlightTrail;
+            var rewardTrail = predicted.JigwiRewardFireTrail;
             Assert.That(trail.PathCount, Is.GreaterThanOrEqualTo(2));
-            int count = trail.PathCount; Vector3 position = predicted.transform.position;
+            Assert.That(rewardTrail.PathCount, Is.GreaterThanOrEqualTo(2));
+            int count = trail.PathCount, rewardCount = rewardTrail.PathCount;
+            Vector3 position = predicted.transform.position;
             predicted.ReconcileVisual(LabOrbElement.Metal, 1f, 1.3f);
             predicted.SetJigwiABReward(true);
             Assert.That(predicted.ElementFlightTrail, Is.SameAs(trail));
             Assert.That(trail.PathCount, Is.EqualTo(count), "Repeated accepted reward flags cannot restart the actual flight history.");
             Assert.That(predicted.transform.position, Is.EqualTo(position));
-            Assert.That(trail.Element, Is.EqualTo(LabOrbElement.Fire), "There is no live reward clock that truncates an already approved flight.");
+            Assert.That(trail.Element, Is.EqualTo(LabOrbElement.Metal));
+            Assert.That(predicted.JigwiRewardFireTrail, Is.SameAs(rewardTrail));
+            Assert.That(rewardTrail.PathCount, Is.EqualTo(rewardCount),
+                "There is no live reward clock or repeated approval that truncates an already approved reward history.");
             // Exercise the existing replica-resolution lifecycle, without claiming a physical target hit.
             predicted.SendMessage("FinishVisual");
             yield return null;
             var residue = root.GetComponentsInChildren<LabProjectileRevisionStamp>(true);
             Assert.That(Array.Exists(residue, stamp => stamp.Revision == 78), Is.True,
                 "Detached flight history keeps the accepted revision for bounded failure cleanup.");
+            Assert.That(rewardTrail.GetComponent<LabProjectileRevisionStamp>().Revision, Is.EqualTo(78UL));
+            Assert.That(rewardTrail.transform.parent, Is.EqualTo(root.transform));
+            var hostRewardTrail = host.JigwiRewardFireTrail;
             host.gameObject.SetActive(false);
             Assert.That(host.JigwiABRewardActive, Is.False);
-            Assert.That(host.ElementFlightTrail.PathCount, Is.Zero, "Cancelled/reused objects cannot join old fire histories.");
+            Assert.That(host.ElementFlightTrail.PathCount, Is.Zero, "Cancelled/reused objects cannot join old ink histories.");
+            Assert.That(hostRewardTrail == null || !hostRewardTrail.IsEmitting && hostRewardTrail.PathCount == 0, Is.True,
+                "Cancellation clears the dedicated reward history as well as the original elemental ink.");
         }
 
         [UnityTest]

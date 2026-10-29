@@ -211,6 +211,8 @@ namespace C6Lab
         private bool uiInputBlocked;
         private bool configured;
         private bool jigwiOverheat;
+        private bool jigwiRewardFire, jigwiRewardHeld;
+        public bool JigwiRewardFireActive => jigwiRewardFire;
         private bool contactCombineRequest;
 
         public int Count
@@ -272,6 +274,20 @@ namespace C6Lab
         public event Action<string, string> JigwiBurnRequested;
         public bool JigwiOverheated => jigwiOverheat;
         public void SetJigwiOverheat(bool active) => jigwiOverheat = active;
+
+        /// <summary>The shared reward window also lights existing and locally predicted board orbs.</summary>
+        public void SetJigwiRewardFire(bool active, bool held = false)
+        {
+            jigwiRewardFire = active;
+            jigwiRewardHeld = held;
+            ApplyJigwiRewardFire();
+        }
+
+        private void ApplyJigwiRewardFire()
+        {
+            foreach (Entry entry in entries.Values)
+                if (entry.View != null) entry.View.SetJigwiRewardFire(jigwiRewardFire, jigwiRewardHeld || simulationHeld);
+        }
         /// <summary>The velocity is input displacement divided by board width and seconds.</summary>
         public event Action<LabOrbThrowGesture> ThrowRequested;
         /// <summary>내가 생성한 구슬이 북에서 튀어나오기 시작할 때 한 번 알린다. (구슬 ID)</summary>
@@ -463,6 +479,7 @@ namespace C6Lab
                 existing.View.SetLife(lifeSeconds);
                 existing.View.SetFever(fever, config.TeamFeverRingScale, config.TeamFeverRingAlpha);
                 existing.View.SetFiveColor(fiveColor);
+                existing.View.SetJigwiRewardFire(jigwiRewardFire, jigwiRewardHeld || simulationHeld);
                 if (fiveColor) fiveColorIds.Add(id); else fiveColorIds.Remove(id);
                 SetBodyMode(existing);
                 return existing.View;
@@ -487,6 +504,7 @@ namespace C6Lab
             view.SetLife(lifeSeconds);
             view.SetFever(fever, config.TeamFeverRingScale, config.TeamFeverRingAlpha);
             view.SetFiveColor(fiveColor);
+            view.SetJigwiRewardFire(jigwiRewardFire, jigwiRewardHeld || simulationHeld);
             if (fiveColor) fiveColorIds.Add(id);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
@@ -704,6 +722,8 @@ namespace C6Lab
         private void LateUpdate()
         {
             ApplyComboLook();
+            // Reapply after predicted rejection/reactivation and visual-size animation without restarting fire.
+            ApplyJigwiRewardFire();
             ApplyFlashGlare();
             SyncBoardTrails();
             // Follows the board if its area was resized.
@@ -1192,6 +1212,7 @@ namespace C6Lab
             entry.PendingPartnerId = null;
             entry.BeforeRequest = null;
             entry.View.gameObject.SetActive(true);
+            entry.View.SetJigwiRewardFire(jigwiRewardFire, jigwiRewardHeld || simulationHeld);
             entry.View.Body.position = OnPlane(ToWorld(motion.Position01, entry.View.HitSphere.radius));
             SetBodyMode(entry);
             if (!entry.View.Body.isKinematic)
@@ -1243,6 +1264,7 @@ namespace C6Lab
             SetTeamWall(0);
             charmed = false;
             jigwiOverheat = false;
+            jigwiRewardFire = jigwiRewardHeld = false;
             flashGlare = 0f;
             flashRevealed.Clear();
             if (charmEdge != null) charmEdge.Hide();
@@ -2018,6 +2040,7 @@ namespace C6Lab
         private static void Retire(Entry entry)
         {
             if (entry.View == null) return;
+            entry.View.SetJigwiRewardFire(false);
             // Destroy is deferred in Play Mode. Remove its collider immediately so a
             // transfer/retry snapshot cannot collide with a visually removed orb.
             StopMotion(entry.View.Body);
