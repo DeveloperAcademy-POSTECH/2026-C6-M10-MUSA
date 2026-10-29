@@ -1,5 +1,28 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-10-29 — #378 기본 batch 오프닝 입력 검사 자동 격리
+
+기준은 #369 병합까지 포함한 main `5c644ef3`이다. 별도 `fix/#378-opening-batch-test-isolation` 작업 공간과 Unity6000.6.5f1·macOS ARM64·Metal batch Editor 한 개를 사용했다. 외부 명령으로 InputSettings 포커스 정책을 변경하지 않았다.
+
+- 변경은 `GameOpeningControllerTests.HeldPointerDelaysBothTheFirstPageAndTheRoomBrowserUntilRelease` 한 메서드다. 원래 설정 참조·값·flags를 보관하고 소유 복사본에만 포커스 정책을 적용한다. try는 flags 변경·설정 복사·Mouse 생성 전부터 시작하며, finally가 소유 Mouse 제거·원본 설정/flags 복원·살아 있는 소유 복사본 정리를 시도한다.
+- 기존 게임 판정8개와 입력4회·3프레임 대기2회를 순서대로 유지했다. 마우스 주입 상태6개와 원본/소유 자원 복원7개 assertion을 추가했다. 대기시간 늘리기·재시도·skip·기대값 완화는 하지 않았다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| 수정 전 기본 batch | **0/1 PASS·1 FAIL**, 0.92초 | focused=false, 기본 ResetAndDisableNonBackgroundDevices/PointersAndKeyboardsRespectGameViewFocus. 기존 첫 페이지 held-pointer assertion 실패 재현 |
+| 재컴파일 | PASS | recompile_status completed·failed/compilationFailed=false·errors0 |
+| 수정 후 단독 | **1/1 PASS**, 1.18초 | 같은 기본 batch에서 검사 자체 격리·복원, 외부 포커스 조정 없음 |
+| 오프닝 클래스 전체 | **10/10 PASS**, 1.61초 | 기존 오프닝 흐름 검사 전체, 실패/skip/inconclusive0 |
+| 검사 후 외부 입력 상태 | PASS | 기본 두 포커스 정책과 HideAndDontSave 유지, 저장 InputSettings 경로 없음. 검사 내부에서 원본 참조·JSON·flags·정책·소유 Mouse/복사본 정리 검증 |
+| 현재 main 전체 PlayMode | **513개 중512 PASS·1 FAIL**, 461.04초 | 오프닝10개·#369 수채 런타임7개 통과. 실패는 별도 도색 owner0 픽셀 동등성 검사이며 skip/inconclusive0 |
+| 별도 도색 검사 · 기준 main 단독 | **1/1 PASS**, 1.69초 | 오프닝 수정 파일을 원복·재컴파일한 뒤 단독 비교. 전체 실행의1바이트 차이를 단독으로 재현하지 못함 |
+| 별도 도색 검사 · 수정본 단독 | **1/1 PASS**, 1.49초 | 오프닝 수정만 재적용·재컴파일 후 같은 도색 검사 통과. 도색 코드·허용 오차·assertion은 변경하지 않음 |
+| 표준 unity test · 새 기본 batch 프로세스 | **1/1 PASS**, 0.832초 | 표준 CLI 종료0·NUnit XML Passed, 외부 포커스 정책 조정 없이 단독 실행. 기존 warm Editor도 먼저 종료 |
+
+전체 실행에서 `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllFivePaintersWithoutChangingPaperAlphaOrCoverage`의 마지막 owner0 비교가 index241380에서 G163→162(1단계) 차이로 실패했다. 이 검사는 실행 순서상 오프닝 검사보다 먼저 끝났으며, 기준 main과 수정본 단독 재검사는 모두 통과했다. 원인은 확정하지 않았고 전체 실행의 실패를 단독 통과로 덮거나 전체513개가 통과했다고 표현하지 않는다. 이번 오프닝 검사 수정 범위 밖으로 남기며 그래픽·#369 구현·도색 검사 기대값은 유지한다.
+
+실제 오프닝 런타임·Scene·Prefab·설정 에셋·#369 구현은 변경하지 않았다. 기존 #375 실패 이력은 덮어쓰지 않는다. 검사용 두 Editor 프로세스는 모두 종료했다. CLI 종료 후 자동 URP 설정 변경을 기준 원본으로 복원하고 Test Runner 임시 Scene이 남지 않았음을 확인했다. 최종 변경은 테스트1파일·관련 문서2파일뿐이며, 원래 main 작업 폴더의 브랜치·HEAD·tracked diff·사용자 미추적 파일 해시는 작업 전과 동일하다. 원시 JSON·NUnit XML·로그·임시 검사 도구는 저장소 밖에 보관했다. iOS 빌드·실기기 검증은 수행하지 않았다.
+
 ## 2026-10-29 — #375 중복 계약 검사·DEV 준비/정리 공통화
 
 기준 main `b1d2ae5f`에서 별도 `refactor/#375-test-fixture-cleanup` 작업 트리를 만들었다. 원래 #369 작업 폴더는 전환하지 않았고, 검사 전후 브랜치·HEAD·tracked diff·사용자 미추적 파일 해시를 대조했다.

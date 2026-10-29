@@ -1,18 +1,18 @@
 # C6 테스트 구성과 검증 범위 보고서
 
-## 현재 구성 — 2026-10-29, #375
+## 현재 구성 — 2026-10-29, #378
 
-기준 main `b1d2ae5f`의 테스트 구성을 유지하면서 중복 계약 검사와 준비·정리 코드만 정리했다. 현재 테스트 C#은 **186파일**이며, 테스트가 들어 있는185파일과 저장 Scene용 공통 helper1파일로 구성된다. 테스트 assembly는5개다.
+기준 main `5c644ef3`에는 #369 수채 구현과 #375 테스트 공통화가 포함돼 있다. #378은 오프닝 입력 검사 한 개의 준비·복원만 격리한다. 현재 테스트 C#은 **187파일**이며, 테스트가 들어 있는186파일과 저장 Scene용 공통 helper1파일로 구성된다. 테스트 assembly는5개다.
 
 | 구분 | C# 파일 | 역할 |
 | --- | ---: | --- |
 | Lab EditMode | 91 | 모델·도색·통신·공유 설정·저장 참조 |
 | Hapio EditMode | 14 | 게임 흐름·스테이지·로비·오프닝 저장 참조 |
-| Lab PlayMode | 69 | 물리·입력·GPU·DEV·통신 처리·HUD·공통 helper |
+| Lab PlayMode | 70 | 물리·입력·GPU·DEV·통신 처리·HUD·공통 helper |
 | Hapio PlayMode | 8 | Home·3스테이지·결과·게임 화면 통합 |
 | Story PlayMode | 4 | 오프닝 재생·터치·배경·화자 |
 
-파일 수와 실행 케이스 수는 다르다. 매개변수 케이스는 Test Runner가 확장하며, 실제 실행 결과·실패·skip·환경은 `VALIDATION.md`의 #375 절에서 확인한다. 아래 2026-10-21의91파일·1,062케이스는 당시 기록이며 현재 수치가 아니다.
+파일 수와 실행 케이스 수는 다르다. 매개변수 케이스는 Test Runner가 확장하며, 실제 실행 결과·실패·skip·환경은 `VALIDATION.md`의 #378 및 선행 #375 절에서 확인한다. 아래 2026-10-21의91파일·1,062케이스는 당시 기록이며 현재 수치가 아니다.
 
 #375에서는 `LabSharedSettingsSchemaTests`가 구형228/P3·240/P2 payload의 거절·원본 보존·fingerprint 예외를 맡는다. 기존11개P3 케이스는 유지하고240/P2 케이스1개를 추가한 뒤, 지귀 설정 검사에서 중복 메서드2개만 제거했다. 기능별 설정값·경계·왕복 검사는 유지한다.
 
@@ -20,9 +20,11 @@
 
 같은 기능명의 모델·패킷·실제 물리·UI·GPU 검사는 서로 다른 층이므로 함께 삭제하지 않는다. helper는 자신이 소유한 NetworkManager와 Scene만 정리하고, Host 시작 재시도·오류 무시·전역 객체 일괄 삭제를 하지 않는다. 다른 실행과의 포트 경쟁 가능성까지 없어진 것은 아니므로 실제 bind 실패를 숨기지 않는다.
 
-### 백그라운드 Editor의 입력 검사 조건
+### 기본 batch Editor의 오프닝 입력 검사
 
-기본 batch Editor는 Game View 포커스가 없을 수 있다. 현재 `GameOpeningControllerTests.HeldPointerDelaysBothTheFirstPageAndTheRoomBrowserUntilRelease`는 synthetic Mouse에 대한 포커스 정책을 자체 격리하지 않으며, 기준 main에서도 기본 batch 정책으로 실패했다. #375 검증에서는 저장되지 않은 InputSettings 객체의 두 정책을 잠시 `IgnoreFocus`/`AllDeviceInputAlwaysGoesToGameView`로 바꿔 같은 assertion과 전체 PlayMode를 확인했다. 시작 전 원래 정책을 저장하고 종료 시 복원하며, 저장 에셋·검사 기대값을 바꾸거나 이 검사를 skip하지 않는다. 기본 환경 실패·기준 코드 재현·설정 후 결과는 VALIDATION에서 구분한다. 포커스 비의존 준비를 해당 오프닝 fixture 자체에 추가하는 작업은 이번6파일 범위에 포함하지 않았다.
+`GameOpeningControllerTests.HeldPointerDelaysBothTheFirstPageAndTheRoomBrowserUntilRelease`는 #378에서 입력 설정을 검사 안에서 자동 격리한다. 원래 InputSettings 참조·JSON·flags·포커스 정책을 보관하고 검사 전용 복사본에만 `IgnoreFocus`/`AllDeviceInputAlwaysGoesToGameView`를 적용한다. Editor 전체를 수동 조정할 필요가 없다. 설정 교체가 원본을 파괴하지 않도록 보호하며, 입력 설정 변경 전부터 시작하는 try/finally에서 소유 Mouse·설정 복사본을 정리하고 원본 참조와 flags를 복원한다.
+
+기존 시작/종료의 held→release 판정·3프레임 대기는 유지한다. 주입 Mouse 상태와 원본 설정·값·flags 복원, 소유 Mouse·임시 설정 잔존 여부도 같은 검사에서 확인한다. 실제 `StoryTapAdvance`/`GameOpeningController` 입력 판정과 #369 수채 구현은 변경하지 않는다. #375 당시 기본 batch 실패와 외부 임시 포커스 조정 결과는 과거 검증 이력으로 유지하고, #378의 수동 설정 없는 기본 환경 결과는 VALIDATION의 별도 절에서 확인한다.
 
 ## 2026-10-21 보고서 — 당시 구성과 실행 기록
 
