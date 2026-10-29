@@ -54,12 +54,12 @@ namespace C6Lab.Tests
         }
         [Test] public void AWarningHasNoBoostOrBurnUntilActive()
         {
-            var m=Room();var a=Current(m,10);var o=Add(m,a.targetPlayer,10);
-            Assert.That(a.Warning(10),Is.True);Assert.That(m.JigwiABRecoveryMultiplier(a.targetPlayer,10),Is.EqualTo(1));
-            Assert.That(m.Snapshot(10.99).orbs.Single(x=>x.id==o.id).jigwiABBurnAt,Is.EqualTo(-1));
-            Assert.That(m.Snapshot(11).orbs.Single(x=>x.id==o.id).jigwiABBurnAt,Is.EqualTo(16));
-            Assert.That(m.JigwiABRecoveryMultiplier(a.targetPlayer,11),Is.EqualTo(4));
-            Assert.That(m.JigwiABRecoveryMultiplier(Players.Single(x=>x!=a.targetPlayer),11),Is.EqualTo(1));
+            var m=Room();var a=Current(m,4);var o=Add(m,a.targetPlayer,4);
+            Assert.That(a.Warning(4),Is.True);Assert.That(m.JigwiABRecoveryMultiplier(a.targetPlayer,4),Is.EqualTo(1));
+            Assert.That(m.Snapshot(4.99).orbs.Single(x=>x.id==o.id).jigwiABBurnAt,Is.EqualTo(-1));
+            Assert.That(m.Snapshot(5).orbs.Single(x=>x.id==o.id).jigwiABBurnAt,Is.EqualTo(10));
+            Assert.That(m.JigwiABRecoveryMultiplier(a.targetPlayer,5),Is.EqualTo(4));
+            Assert.That(m.JigwiABRecoveryMultiplier(Players.Single(x=>x!=a.targetPlayer),5),Is.EqualTo(1));
         }
         [Test] public void GenerateCombineAndTransferKeepEarliestBurnAndOrdinaryExpiry()
         {
@@ -80,9 +80,10 @@ namespace C6Lab.Tests
         }
         [Test] public void BurnConsumesIdleButLeavesTheLaunchedProjectileAlive()
         {
-            var m=Room();ulong owner=Current(m,10).targetPlayer;var idle=Add(m,owner,10);var flying=Add(m,owner,10);
-            m.Tick(11);Launch(m,flying,12);var s=m.Snapshot(16);
-            Assert.That(s.orbs.Any(o=>o.id==idle.id),Is.False);Assert.That(s.orbs.Single(o=>o.id==flying.id).inFlight,Is.True);
+            var m=Room();ulong owner=Current(m,4).targetPlayer;var idle=Add(m,owner,4);var flying=Add(m,owner,4);
+            m.Tick(5);Launch(m,flying,6);var snapshot=m.Snapshot(10);
+            Assert.That(snapshot.orbs.Any(o=>o.id==idle.id),Is.False);
+            Assert.That(snapshot.orbs.Single(o=>o.id==flying.id).inFlight,Is.True);
         }
         [Test] public void ThreeRealCombinedHitsClearAForEveryOwnerAndFiveColorCountsOnce()
         {
@@ -109,8 +110,8 @@ namespace C6Lab.Tests
             var m=Room();var a=Current(m,11);
             Assert.That(m.TryGenerate(a.targetPlayer,Request(),11,out var old,out var e),Is.True,e);m.Tick(16);
             Assert.That(m.Snapshot(16).orbs.Any(o=>o.id==old.id),Is.False);
-            Assert.That(m.TryGenerate(a.targetPlayer,Request(),20,out var late,out e),Is.True,e);
-            Assert.That(late.jigwiABBurnAt,Is.EqualTo(25));var done=m.Snapshot(21);
+            Assert.That(m.TryGenerate(a.targetPlayer,Request(),19,out var late,out e),Is.True,e);
+            Assert.That(late.jigwiABBurnAt,Is.EqualTo(24));var done=m.Snapshot(20);
             Assert.That(done.jigwiAB.rounds.Single().resolution,Is.EqualTo(LabJigwiABResolution.Expired));
             Assert.That(done.orbs.Single(o=>o.id==late.id).jigwiABBurnAt,Is.EqualTo(-1));
             Assert.That(done.orbs.Single(o=>o.id==late.id).expiresAt,Is.EqualTo(-1));
@@ -132,27 +133,53 @@ namespace C6Lab.Tests
             var wrong=Add(m,b.players[1].playerId,31,element:LabOrbElement.Water);Launch(m,wrong,31);
             Assert.That(m.ConfirmJigwiABFireHit(wrong.id,b.id,p.targets[1].id,31,out _),Is.False);
         }
-        [Test] public void PersonalClearDoesNotFinishBAndEachFireRelightsIn12Seconds()
+        [Test] public void PersonalClearDoesNotFinishBAndEachFireRelightsAfterTheConfiguredDelay()
         {
-            var m=Room();var b=Current(m,31);var p=b.players[0];foreach(var f in p.targets)FireHit(m,b,p.playerId,f.id,31);
-            Assert.That(Current(m,42.99).players[0].targets.All(f=>!f.lit),Is.True);
-            Assert.That(Current(m,43).players[0].targets.All(f=>f.lit),Is.True);
+            var values=config.CaptureDeveloperValues();values[245]=2;Apply(values);
+            var m=Room();var b=Current(m,31);var player=b.players[0];
+            foreach(var fire in player.targets)FireHit(m,b,player.playerId,fire.id,31);
+            Assert.That(Current(m,32.99).players[0].targets.All(f=>!f.lit),Is.True);
+            Assert.That(Current(m,33).players[0].targets.All(f=>f.lit),Is.True);
         }
-        [Test] public void BSuccessRestoresOnlyItsScaleAndPreservesBombSmallAndAlreadyFlyingRadius()
+        [Test] public void BSuccessNeverShrinksTheBoardAndStartsAnImmediateFiveSecondLaunchReward()
         {
-            var m=Room();var b=Current(m,31);var idle=Add(m,Players[0],31);var bomb=Add(m,Players[0],31);bomb.small=true;
-            var flying=Add(m,Players[0],42);Launch(m,flying,42);var s=m.Snapshot(43);
-            Assert.That(s.orbs.Single(o=>o.id==idle.id).jigwiABRadiusScale,Is.EqualTo(.65f));
-            Assert.That(s.orbs.Single(o=>o.id==flying.id).jigwiABRadiusScale,Is.EqualTo(1));Clear(m,b,43);s=m.Snapshot(43);
-            Assert.That(s.jigwiAB.rounds.Single(r=>r.slot==1).resolution,Is.EqualTo(LabJigwiABResolution.Completed));
-            Assert.That(s.orbs.Single(o=>o.id==idle.id).jigwiABRadiusScale,Is.EqualTo(1));Assert.That(s.orbs.Single(o=>o.id==bomb.id).small,Is.True);
+            var m=Room();var b=Current(m,31);var idle=Add(m,Players[0],31);
+            var bombSmall=Add(m,Players[0],31);bombSmall.small=true;
+            var flying=Add(m,Players[0],31);Launch(m,flying,31);
+            Assert.That(m.Snapshot(31).orbs.All(o=>o.jigwiABRadiusScale==1f),Is.True);
+            Clear(m,b,31);
+            var snapshot=m.Snapshot(31);var done=snapshot.jigwiAB.rounds.Single(r=>r.slot==1);
+            Assert.That(done.resolution,Is.EqualTo(LabJigwiABResolution.Completed));
+            Assert.That(done.rewardUntil,Is.EqualTo(36d));
+            Assert.That(done.clearedThroughRevision,Is.Zero);
+            Assert.That(snapshot.orbs.Single(o=>o.id==idle.id).jigwiABReward,Is.False);
+            Assert.That(snapshot.orbs.Single(o=>o.id==bombSmall.id).small,Is.True);
+            Assert.That(snapshot.orbs.Single(o=>o.id==flying.id).jigwiABReward,Is.False,
+                "A projectile already in flight cannot gain the later reward retroactively.");
+            var rewarded=Add(m,Players[0],31);Launch(m,rewarded,31);
+            var approved=m.Snapshot(31).orbs.Single(o=>o.id==rewarded.id);
+            Assert.That(approved.jigwiABReward,Is.True);
+            Assert.That(approved.jigwiABRewardSizeScale,Is.EqualTo(config.JigwiABRewardSizeScale));
+            Assert.That(approved.jigwiABRewardPaintScale,Is.EqualTo(config.JigwiABRewardPaintScale));
         }
-        [Test] public void BusySlotsSkipAnd100ClearsBWhile20SecondFeverRemains()
+        [Test] public void OverlappingWarningsNeverSkipActivationAndTheHundredSecondFeverRemains()
         {
-            var m=Room();Current(m,31);var o=Add(m,Players[0],31);var s=m.Snapshot(99);
-            Assert.That(s.jigwiAB.rounds.Length,Is.EqualTo(8));Assert.That(s.jigwiAB.rounds.Where(r=>r.slot>=2).All(r=>r.resolution==LabJigwiABResolution.Skipped),Is.True);
-            s=m.Snapshot(100);Assert.That(s.jigwiAB.fever,Is.True);Assert.That(s.jigwiAB.Active(100),Is.Null);
-            Assert.That(s.orbs.Single(x=>x.id==o.id).jigwiABRadiusScale,Is.EqualTo(1));Assert.That(m.JigwiABRecoveryMultiplier(Players[0],100),Is.EqualTo(2));
+            var m=Room();var snapshot=m.Snapshot(54);
+            Assert.That(snapshot.jigwiAB.Active(54).kind,Is.EqualTo(LabJigwiABKind.PersonalBurn));
+            Assert.That(snapshot.jigwiAB.Warning(54).kind,Is.EqualTo(LabJigwiABKind.GroupFire));
+            Assert.That(LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB,snapshot.players,m.Revision),Is.True);
+            snapshot=m.Snapshot(55);
+            Assert.That(snapshot.jigwiAB.Active(55).slot,Is.EqualTo(3));
+            Assert.That(snapshot.jigwiAB.rounds.Single(r=>r.slot==2).resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            snapshot=m.Snapshot(98);
+            Assert.That(snapshot.jigwiAB.rounds.Length,Is.EqualTo(6));
+            Assert.That(snapshot.jigwiAB.rounds.Any(r=>r.resolution==LabJigwiABResolution.Skipped),Is.False);
+            Assert.That(snapshot.jigwiAB.rounds.Select(r=>r.activeAt),Is.EqualTo(new[]{5d,25d,40d,55d,70d,85d}));
+            ulong fence=m.JigwiABFailureRevision;
+            snapshot=m.Snapshot(100);
+            Assert.That(snapshot.jigwiAB.fever,Is.True);Assert.That(snapshot.jigwiAB.Active(100),Is.Null);
+            Assert.That(m.JigwiABFailureRevision,Is.EqualTo(fence),"Cutoff cleanup must not apply another failure.");
+            Assert.That(m.JigwiABRecoveryMultiplier(Players[0],100),Is.EqualTo(2));
             Assert.That(m.Snapshot(120).phase,Is.EqualTo(LabPhase.Defeat));
         }
         [Test] public void DeepCopyAndValidationRejectNaNAndDuplicateNestedTargets()
@@ -169,22 +196,21 @@ namespace C6Lab.Tests
             var v=config.CaptureDeveloperValues();v[6]=1;Apply(v);var m=Room();var a=Current(m,11);
             float before=m.Snapshot(11).players.Single(p=>p.id==a.targetPlayer).stamina;
             Assert.That(m.Snapshot(12).players.Single(p=>p.id==a.targetPlayer).stamina,Is.EqualTo(before+4).Within(.0001f));
-            var end=m.Snapshot(21);float atEnd=end.players.Single(p=>p.id==a.targetPlayer).stamina;
-            Assert.That(m.Snapshot(22).players.Single(p=>p.id==a.targetPlayer).stamina,Is.EqualTo(atEnd+1).Within(.0001f));
+            var end=m.Snapshot(20);float atEnd=end.players.Single(p=>p.id==a.targetPlayer).stamina;
+            Assert.That(m.Snapshot(21).players.Single(p=>p.id==a.targetPlayer).stamina,Is.EqualTo(atEnd+1).Within(.0001f));
             Assert.That(m.JigwiABRecoveryMultiplier(a.targetPlayer,100),Is.EqualTo(2));
         }
-        [Test] public void BRadiusNeverChangesTheNormalHitPaintBudget()
+        [Test] public void PersonalClearDuringBDoesNotShrinkOrChangeTheNormalHitPaintBudget()
         {
-            var a=Room();var b=Room(LabStageYokai.None);Current(a,43);
-            var small=Add(a,Players[0],43,element:LabOrbElement.Water);
-            var normal=Add(b,Players[0],43,element:LabOrbElement.Water);
-            // Clear only this owner's three ignitions; teammates keep B and its independent shrink active.
-            var group=Current(a,43);var own=group.players.Single(player=>player.playerId==Players[0]);
-            foreach(var target in own.targets)FireHit(a,group,own.playerId,target.id,43);
-            Assert.That(a.JigwiABBlocksBoss(own.playerId,43),Is.False);
-            BossHit(a,small,43,Vector3.forward);BossHit(b,normal,43,Vector3.forward);
-            Assert.That(a.PaintSurface.CoveredCount,Is.EqualTo(b.PaintSurface.CoveredCount));
-            Assert.That(a.Snapshot(43).hp,Is.EqualTo(b.Snapshot(43).hp));
+            var mission=Room();var normal=Room(LabStageYokai.None);var group=Current(mission,31);
+            var owner=group.players.Single(player=>player.playerId==Players[0]);
+            foreach(var fire in owner.targets)FireHit(mission,group,owner.playerId,fire.id,31);
+            Assert.That(mission.JigwiABBlocksBoss(owner.playerId,31),Is.False);
+            var first=Add(mission,Players[0],31,element:LabOrbElement.Water);
+            var second=Add(normal,Players[0],31,element:LabOrbElement.Water);
+            BossHit(mission,first,31,Vector3.forward);BossHit(normal,second,31,Vector3.forward);
+            Assert.That(mission.PaintSurface.CoveredCount,Is.EqualTo(normal.PaintSurface.CoveredCount));
+            Assert.That(mission.Snapshot(31).hp,Is.EqualTo(normal.Snapshot(31).hp));
         }
         [TestCase(1)] [TestCase(6)] public void FireCountEndpointsRemainBoundedAndValidate(int count)
         {
@@ -236,7 +262,7 @@ namespace C6Lab.Tests
         public void RelightValidationUsesTheExtinguishTimeAndAllowsABoundedDeadlinePastCutoff(double delay,bool expected)
         {
             var m=Room();var snapshot=m.Snapshot(91);var copy=snapshot.jigwiAB.Copy();
-            var fire=copy.rounds.Single(value=>value.slot==1).players[0].targets[0];
+            var fire=copy.rounds.Single(value=>value.slot==5).players[0].targets[0];
             fire.lit=false;fire.extinguishedAt=91;fire.relightAt=91+delay;
             Assert.That(LabJigwiABNetworkValidation.Valid(copy,snapshot.players),Is.EqualTo(expected));
         }
@@ -336,6 +362,7 @@ namespace C6Lab.Tests
         [Test]
         public void AWrongColourBossBypassIsConsumedWithoutWaterAndRelightClosesTheOwnersCurtainAgain()
         {
+            var values = config.CaptureDeveloperValues(); values[245] = 2; Apply(values);
             var model = Room();
             var group = Current(model, 31d);
             var own = group.players[0];
@@ -345,16 +372,16 @@ namespace C6Lab.Tests
             Assert.That(Current(model, 31d).players[0].lastWaterSplashAt, Is.EqualTo(-1d));
             Assert.That(model.Snapshot(31d).orbs.Any(orb => orb.id == wrong.id), Is.False);
             foreach (var target in own.targets) FireHit(model, group, own.playerId, target.id, 31d);
-            Assert.That(model.JigwiABBlocksBoss(own.playerId, 42.99d), Is.False);
-            model.Tick(43d);
-            Assert.That(model.JigwiABBlocksBoss(own.playerId, 43d), Is.True);
-            var relit = Current(model, 43d).players[0];
+            Assert.That(model.JigwiABBlocksBoss(own.playerId, 32.99d), Is.False);
+            model.Tick(33d);
+            Assert.That(model.JigwiABBlocksBoss(own.playerId, 33d), Is.True);
+            var relit = Current(model, 33d).players[0];
             Assert.That(relit.targets.All(target => target.lit), Is.True);
             Assert.That(relit.lastWaterSplashAt, Is.EqualTo(31d), "Relight itself is not a new water impact.");
-            var water = Add(model, own.playerId, 43d, element: LabOrbElement.Water);
-            Launch(model, water, 43d);
-            Assert.That(model.ConfirmHit(water.id, 43d), Is.False);
-            Assert.That(Current(model, 43d).players[0].lastWaterSplashAt, Is.EqualTo(43d));
+            var water = Add(model, own.playerId, 33d, element: LabOrbElement.Water);
+            Launch(model, water, 33d);
+            Assert.That(model.ConfirmHit(water.id, 33d), Is.False);
+            Assert.That(Current(model, 33d).players[0].lastWaterSplashAt, Is.EqualTo(33d));
         }
 
         [Test]
@@ -388,13 +415,189 @@ namespace C6Lab.Tests
         }
 
         [TestCase(-.5d)] [TestCase(double.NaN)] [TestCase(double.PositiveInfinity)]
-        [TestCase(30.99d)] [TestCase(100.01d)]
+        [TestCase(24.99d)] [TestCase(35.01d)]
         public void WaterSplashValidationRejectsInvalidAndOutOfRoundTimes(double value)
         {
             var model = Room(); var snapshot = model.Snapshot(31d); var copy = snapshot.jigwiAB.Copy();
             copy.rounds.Last().players[0].lastWaterSplashAt = value;
             Assert.That(LabJigwiABNetworkValidation.Valid(copy, snapshot.players), Is.False);
             Assert.That(LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players), Is.True);
+        }
+
+        [Test]
+        public void BFailureRetiresAllBoardKindsAndFlightsOnceButPreservesDrumsAndCombatStatistics()
+        {
+            var m=Room();var before=m.Snapshot(34.9d);
+            string[] drums=before.orbs.Where(o=>o.kind.IsDrum()).Select(o=>o.id).ToArray();
+            var fixture=new List<LabOrbState>();
+            foreach(ulong owner in Players)
+            {
+                foreach(LabOrbKind kind in Enum.GetValues(typeof(LabOrbKind)))
+                    if(!kind.IsDrum())fixture.Add(Add(m,owner,34.9d,kind));
+                var flying=Add(m,owner,34.9d);Launch(m,flying,34.9d);fixture.Add(flying);
+            }
+            m.DrainOrbExpiries();m.DrainBombExplosions();
+            var expired=m.Snapshot(35d);var failure=expired.jigwiAB.rounds.Single(r=>r.slot==1);
+            Assert.That(failure.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(failure.resolvedAt,Is.EqualTo(35d));
+            Assert.That(failure.clearedThroughRevision,Is.GreaterThan(0ul));
+            Assert.That(m.JigwiABFailureRevision,Is.EqualTo(failure.clearedThroughRevision));
+            Assert.That(expired.orbs.Select(o=>o.id),Is.EquivalentTo(drums));
+            Assert.That(expired.players.All(player=>player.stamina==0f),Is.True);
+            Assert.That(expired.hp,Is.EqualTo(before.hp));
+            Assert.That(expired.players.Select(p=>p.personalHp),Is.EqualTo(before.players.Select(p=>p.personalHp)));
+            Assert.That(expired.players.Select(p=>p.hitTotal),Is.EqualTo(before.players.Select(p=>p.hitTotal)));
+            Assert.That(expired.players.Select(p=>p.throwTotal),Is.EqualTo(before.players.Select(p=>p.throwTotal)));
+            Assert.That(expired.players.Select(p=>p.damageTotal),Is.EqualTo(before.players.Select(p=>p.damageTotal)));
+            Assert.That(m.PaintSurface.PaintCount,Is.Zero);Assert.That(m.DrainBombExplosions(),Is.Empty);
+            Assert.That(m.DrainOrbExpiries().Select(e=>e.OrbId),Is.EquivalentTo(fixture.Select(o=>o.id)));
+            foreach(var orb in fixture)
+            {
+                Assert.That(m.ConfirmHit(orb.id,35d),Is.False);
+                Assert.That(m.ConfirmMiss(orb.id,35d),Is.False);
+                Assert.That(m.TryLaunch(orb.owner,orb.id,Request(),35d,out _,out _),Is.False);
+                Assert.That(m.TryUseItemAt(orb.owner,orb.id,Request(),35d,Vector2.one*.5f,out _,out _),Is.False);
+            }
+            m.Tick(35d);Assert.That(m.DrainOrbExpiries(),Is.Empty);
+            Assert.That(m.JigwiABState.rounds.Single(r=>r.slot==1).clearedThroughRevision,
+                Is.EqualTo(failure.clearedThroughRevision));
+            Assert.That(m.Snapshot(35d).players.All(player=>player.stamina==0f),Is.True);
+        }
+
+        [Test]
+        public void BFailureAllowsNormalRecoveryAndNewApprovalsWithoutReapplyingTheWipe()
+        {
+            var values=config.CaptureDeveloperValues();values[6]=2f;Apply(values);
+            var m=Room();m.Tick(35d);ulong fence=m.JigwiABFailureRevision;
+            var recovered=m.Snapshot(35.5d);
+            Assert.That(recovered.players.Select(p=>p.stamina),Is.EqualTo(new[]{1f,1f}));
+            Assert.That(m.TryGenerate(Players[0],Request(),35.5d,out var fresh,out var reason),Is.True,reason);
+            Assert.That(fresh.revision,Is.GreaterThan(fence));
+            Assert.That(m.Snapshot(36d).orbs.Any(o=>o.id==fresh.id),Is.True);
+            Assert.That(m.JigwiABFailureRevision,Is.EqualTo(fence));
+            Assert.That(m.Snapshot(120d).phase,Is.EqualTo(LabPhase.Defeat));
+            m.Begin("ab-test",Players,121d,config,LabStageYokai.Jigwi);
+            Assert.That(m.JigwiABFailureRevision,Is.Zero);
+            Assert.That(m.JigwiABState.rounds,Is.Empty);
+        }
+
+        [Test]
+        public void RewardIsCapturedOnlyAtLaunchAndRemainsOnAFlightAfterTheFiveSecondWindow()
+        {
+            var m=Room();var group=Current(m,31d);var previous=Add(m,Players[0],31d);Launch(m,previous,31d);
+            Clear(m,group,31d);var reward=m.JigwiABState.Reward(31d);
+            Assert.That(reward,Is.Not.Null);Assert.That(reward.RewardActive(30.999d),Is.False);
+            Assert.That(reward.RewardActive(31d),Is.True);Assert.That(reward.RewardActive(36d),Is.False);
+            var last=Add(m,Players[0],35.999d);Launch(m,last,35.999d);
+            var ordinary=Add(m,Players[0],36d);Launch(m,ordinary,36d);
+            var after=m.Snapshot(36d);
+            Assert.That(after.orbs.Single(o=>o.id==previous.id).jigwiABReward,Is.False);
+            Assert.That(after.orbs.Single(o=>o.id==last.id).jigwiABReward,Is.True);
+            Assert.That(after.orbs.Single(o=>o.id==ordinary.id).jigwiABReward,Is.False);
+            Assert.That(after.orbs.Single(o=>o.id==ordinary.id).jigwiABRewardSizeScale,Is.EqualTo(1f));
+            Assert.That(after.orbs.Single(o=>o.id==ordinary.id).jigwiABRewardPaintScale,Is.EqualTo(1f));
+            Assert.That(after.jigwiAB.Reward(36d),Is.Null);
+            Assert.That(m.ConfirmHit(last.id,36d,Vector3.forward,out _,out _,out _),Is.True);
+            Assert.That(m.PaintSurface.PaintCount,Is.EqualTo(1));
+        }
+
+        [TestCase(false)] [TestCase(true)]
+        public void RewardPaintBudgetUsesTheCapturedPaintScaleAndKeepsTheThreeShareClamp(bool fiveColor)
+        {
+            var values=config.CaptureDeveloperValues();values[251]=3f;values[252]=fiveColor?3f:1.5f;Apply(values);
+            var m=Room();var group=Current(m,31d);Clear(m,group,31d);
+            var shot=Add(m,Players[0],31d,element:LabOrbElement.Water);shot.fiveColor=fiveColor;
+            Launch(m,shot,31d);
+            Assert.That(m.LaunchScaleOf(shot.id),Is.EqualTo(1f),"Reward visual size is not a second paint-area multiplier.");
+            Assert.That(shot.jigwiABRewardSizeScale,Is.EqualTo(3f));
+            Assert.That(m.ConfirmHit(shot.id,31d,Vector3.forward,out _,out _,out _),Is.True);
+            var reference=Room(LabStageYokai.None);
+            if(fiveColor)
+            {
+                var control=Add(reference,Players[0],31d,element:LabOrbElement.Water);control.fiveColor=true;
+                // Give only this control the equivalent already-clamped paint share through the same hit path.
+                var launchScales=(Dictionary<string,float>)typeof(LabModel).GetField("launchScales",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(reference);
+                Launch(reference,control,31d);launchScales[control.id]=3f;
+                Assert.That(reference.ConfirmHit(control.id,31d,Vector3.forward,out _,out _,out _),Is.True);
+            }
+            else Assert.That(reference.PaintSurface.RegisterHit(Vector3.forward,reference.PaintColorFor(LabOrbElement.Water),
+                Players[0],1,1.5f),Is.True);
+            double budget=m.PaintSurface.Coverage+m.PaintSurface.PendingCoverage;
+            double expected=reference.PaintSurface.Coverage+reference.PaintSurface.PendingCoverage;
+            Assert.That(budget,Is.EqualTo(expected).Within(2d/m.PaintSurface.CellCount));
+        }
+
+        [TestCase(54d,55d,2,3)] [TestCase(84d,85d,4,5)]
+        public void WarningOverlapResolvesThePriorAAtTheBoundaryEvenWithAFractionalStartClock(
+            double warning,double activation,int personalSlot,int groupSlot)
+        {
+            const double start=100.2d;var m=new LabModel();m.Begin("fractional-ab",Players,start,config,LabStageYokai.Jigwi);
+            var before=m.Snapshot(start+warning);
+            Assert.That(before.jigwiAB.Active(start+warning).slot,Is.EqualTo(personalSlot));
+            Assert.That(before.jigwiAB.Warning(start+warning).slot,Is.EqualTo(groupSlot));
+            Assert.That(LabJigwiABNetworkValidation.Valid(before.jigwiAB,before.players,m.Revision),Is.True);
+            var after=m.Snapshot(start+activation);
+            Assert.That(after.jigwiAB.Active(start+activation).slot,Is.EqualTo(groupSlot));
+            Assert.That(after.jigwiAB.rounds.Single(r=>r.slot==personalSlot).resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(LabJigwiABNetworkValidation.Valid(after.jigwiAB,after.players,m.Revision),Is.True);
+            Assert.That(after.jigwiAB.rounds.Count(r=>r.Active(start+activation)),Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TeamDefeatCancelsBWithoutApplyingFailureOrDeletingItsOrbs()
+        {
+            var m=Room();var group=Current(m,31d);var kept=Add(m,Players[0],31d);
+            Assert.That(m.TryApplyPlayerDamage(Players[0],int.MaxValue,31d),Is.True);
+            Assert.That(m.TryApplyPlayerDamage(Players[1],int.MaxValue,31d),Is.True);
+            var ended=m.Snapshot(35d);var cancelled=ended.jigwiAB.rounds.Single(r=>r.id==group.id);
+            Assert.That(ended.phase,Is.EqualTo(LabPhase.Defeat));
+            Assert.That(cancelled.resolution,Is.EqualTo(LabJigwiABResolution.Cancelled));
+            Assert.That(cancelled.clearedThroughRevision,Is.Zero);Assert.That(m.JigwiABFailureRevision,Is.Zero);
+            Assert.That(ended.orbs.Any(o=>o.id==kept.id),Is.True);
+            Assert.That(ended.players.All(p=>p.stamina==100f),Is.True);
+        }
+
+        [Test]
+        public void PaintVictoryCancelsTheUnfinishedBWithoutItsFailurePenalty()
+        {
+            var values=config.CaptureDeveloperValues();values[105]=100f;values[107]=100f;Apply(values);
+            var m=Room();var group=Current(m,31d);var own=group.players[0];
+            foreach(var fire in own.targets)FireHit(m,group,own.playerId,fire.id,31d);
+            var preserved=Add(m,Players[1],31d);
+            BossHit(m,Add(m,own.playerId,31d),31d,Vector3.forward);
+            var ended=m.Snapshot(35d);
+            Assert.That(ended.phase,Is.EqualTo(LabPhase.Victory));
+            Assert.That(ended.jigwiAB.rounds.Single(r=>r.id==group.id).resolution,
+                Is.EqualTo(LabJigwiABResolution.Cancelled));
+            Assert.That(m.JigwiABFailureRevision,Is.Zero);
+            Assert.That(ended.orbs.Any(o=>o.id==preserved.id),Is.True);
+            Assert.That(ended.players.All(p=>p.stamina>0f),Is.True);
+        }
+
+        [Test]
+        public void RewardAndFailureMetadataRoundTripAndCopiesRejectMalformedOrFutureFences()
+        {
+            var m=Room();var group=Current(m,31d);Clear(m,group,31d);var source=m.Snapshot(65d);
+            var roundTrip=JsonUtility.FromJson<LabJigwiABSnapshot>(JsonUtility.ToJson(source.jigwiAB));
+            Assert.That(LabJigwiABNetworkValidation.Valid(roundTrip,source.players,m.Revision),Is.True);
+            Assert.That(roundTrip.rounds.Single(r=>r.slot==1).rewardUntil,Is.EqualTo(36d));
+            var failure=roundTrip.rounds.Single(r=>r.slot==3);
+            Assert.That(failure.clearedThroughRevision,Is.GreaterThan(0ul));
+            Assert.That(m.JigwiABFailureRevision,Is.EqualTo(failure.clearedThroughRevision));
+            var copy=roundTrip.Copy();copy.rounds[1].rewardSizeScale=float.NaN;
+            Assert.That(LabJigwiABNetworkValidation.Valid(copy,source.players,m.Revision),Is.False);
+            copy=roundTrip.Copy();copy.rounds[1].rewardPaintScale=3.01f;
+            Assert.That(LabJigwiABNetworkValidation.Valid(copy,source.players,m.Revision),Is.False);
+            copy=roundTrip.Copy();copy.rounds[1].rewardUntil=36.01d;
+            Assert.That(LabJigwiABNetworkValidation.Valid(copy,source.players,m.Revision),Is.False);
+            copy=roundTrip.Copy();copy.rounds[1].clearedThroughRevision=1;
+            Assert.That(LabJigwiABNetworkValidation.Valid(copy,source.players,m.Revision),Is.False);
+            copy=roundTrip.Copy();copy.rounds[3].clearedThroughRevision=0;
+            Assert.That(LabJigwiABNetworkValidation.Valid(copy,source.players,m.Revision),Is.False);
+            copy=roundTrip.Copy();copy.rounds[3].clearedThroughRevision=m.Revision+1;
+            Assert.That(LabJigwiABNetworkValidation.Valid(copy,source.players,m.Revision),Is.False);
+            Assert.That(LabJigwiABNetworkValidation.Valid(roundTrip,source.players,m.Revision),Is.True);
+            Assert.That(source.jigwiAB.rounds[1].rewardSizeScale,Is.EqualTo(config.JigwiABRewardSizeScale));
         }
 
         [Test] public void FireMotionIsDeterministicForTheSameBattleTimeAndMovesInsideViewport()

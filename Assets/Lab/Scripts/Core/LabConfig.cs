@@ -362,7 +362,7 @@ namespace C6Lab
             new LabDeveloperField("Maximum Consecutive Raw", 1f, 10f, true),
             // Jigwi screen A/B policy (#341); old surface settings retain their shared indices.
             LabDeveloperField.Toggle("지귀 120초 개인 발화·전원 소화 (0 off, 1 on)"),
-            new LabDeveloperField("지귀 불 예고 (초)", 0f, 3f),
+            new LabDeveloperField("Reserved Jigwi Warning (fixed 1 second)", 0f, 3f),
             new LabDeveloperField("지귀 불 활성 수명 (초)", 1f, 20f),
             new LabDeveloperField("지귀 근원 반경 (표면 각도)", 5f, 30f),
             new LabDeveloperField("지귀 불 패치 반경 (표면 각도)", 10f, 45f),
@@ -375,23 +375,25 @@ namespace C6Lab
             // 피버 타임 (#334): 남은 시간이 이만큼이 되면 요괴 방해가 멈추고 자동 충전이 빨라진다. 지금은 구미호 스테이지만.
             new LabDeveloperField("피버 타임 시작 (남은 초, 0 = 끔)", 0f, 60f),
             new LabDeveloperField("피버 타임 충전 배율", 1f, 5f),
-            new LabDeveloperField("지귀 A 최대 지속 (초)", 1f, 30f),
+            new LabDeveloperField("지귀 A 최대 지속 (초)", 1f, 15f),
             new LabDeveloperField("지귀 A 자동 회복 배율", 1f, 10f),
             new LabDeveloperField("지귀 A 해제 명중 수", 1f, 10f, true),
             new LabDeveloperField("지귀 A 구슬 소각 대기 (초)", .5f, 30f),
             new LabDeveloperField("지귀 B 개인 불 개수", 1f, 6f, true),
             new LabDeveloperField("지귀 B 소화 후 재점화 (초)", 1f, 60f),
-            new LabDeveloperField("지귀 B 축소 시작 대기 (초)", 0f, 60f),
-            new LabDeveloperField("지귀 B 구슬 반경 배율", .2f, 1f),
+            new LabDeveloperField("Reserved Jigwi B Shrink Delay (unused)", 0f, 60f),
+            new LabDeveloperField("Reserved Jigwi B Shrink Scale (unused)", .2f, 1f),
             new LabDeveloperField("지귀 B 불 이동 폭", 0f, .1f),
             new LabDeveloperField("지귀 B 불 이동 주기 (초)", 1f, 20f),
-            new LabDeveloperField("지귀 B 소화 표적 반경", .1f, 1f)
+            new LabDeveloperField("지귀 B 소화 표적 반경", .1f, 1f),
+            new LabDeveloperField("지귀 성공 보상 구슬 크기 (배)", 1f, 3f),
+            new LabDeveloperField("지귀 성공 보상 칠 면적 (배)", 1f, 3f)
         });
 
         public const int JigwiStageFirstField = 228;
         public const int JigwiStageLastField = 235;
         public const int JigwiABFirstField = 240;
-        public const int JigwiABLastField = 250;
+        public const int JigwiABLastField = 252;
         public static bool IsJigwiStageField(int index) => index >= JigwiStageFirstField && index <= JigwiStageLastField
             || index >= JigwiABFirstField && index <= JigwiABLastField;
 
@@ -410,10 +412,10 @@ namespace C6Lab
         /// the swipe block's own interval and its gap from bombs. #328 adds the bomb damage multiplier (an unlocked bomb
         /// opens into two attack orbs instead of being thrown) and the Yaguang's own battle time (every stage uses the
         /// common battle time). They keep their places in the shared form so every other index stays put, but nothing
-        /// reads them and DEV never shows them.
+        /// reads them and DEV never shows them. #388 also retires the fixed warning slot and screen-B shrink delay/scale while preserving their stored values.
         /// </summary>
         public static IReadOnlyCollection<int> RetiredDeveloperFields { get; } =
-            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168, 211, 230, 231, 232, 233, 234 });
+            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168, 211, 229, 230, 231, 232, 233, 234, 246, 247 });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
         public static IReadOnlyList<LabOrbKind> GeneratedKinds { get; } = Array.AsReadOnly(new[]
@@ -445,7 +447,7 @@ namespace C6Lab
                 134, 132, 133, 148, 149, 150, 151, 200, 201),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
-            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 229, 235, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250),
+            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 241, 242, 243, 244, 245, 248, 249, 250, 251, 252),
             // 기믹 묶음 (#311): 공용(폭탄·넘기기 막기)과 고유(구미호: 여우불·매혹)를 나눠 간격·켜기·비율·세부값을 모은다.
             new LabDeveloperCategory("Gimmicks", 205, 207, 169, 208, 170, 153,
                 166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177)
@@ -504,7 +506,7 @@ namespace C6Lab
 
         [Header("Jigwi surface fire timeline (#332)")]
         [SerializeField] private bool jigwiStageTimelineEnabled = true;
-        [SerializeField, Range(0f, 3f)] private float jigwiStageWarningSeconds = 1f;
+        [HideInInspector, SerializeField, Range(0f, 3f)] private float jigwiStageWarningSeconds = 1f;
         [SerializeField, Range(1f, 20f)] private float jigwiStageActiveSeconds = 7f;
         [SerializeField, Range(5f, 30f)] private float jigwiStageRootAngleDegrees = 18f;
         [SerializeField, Range(10f, 45f)] private float jigwiStageFireAngleDegrees = 30f;
@@ -513,17 +515,19 @@ namespace C6Lab
         [SerializeField, Range(1f, 4f)] private float jigwiStageFeverMultiplier = 2f;
 
         [Header("Jigwi screen patterns (#341)")]
-        [SerializeField, Range(1f, 30f)] private float jigwiABPersonalDurationSeconds = 10f;
+        [SerializeField, Range(1f, 15f)] private float jigwiABPersonalDurationSeconds = 15f;
         [SerializeField, Range(1f, 10f)] private float jigwiABPersonalRecoveryMultiplier = 4f;
         [SerializeField, Range(1, 10)] private int jigwiABPersonalRequiredHits = 3;
         [SerializeField, Range(.5f, 30f)] private float jigwiABPersonalBurnSeconds = 5f;
         [SerializeField, Range(1, 6)] private int jigwiABGroupFireCount = 3;
         [SerializeField, Range(1f, 60f)] private float jigwiABRelightSeconds = 12f;
-        [SerializeField, Range(0f, 60f)] private float jigwiABShrinkDelaySeconds = 12f;
-        [SerializeField, Range(.2f, 1f)] private float jigwiABShrinkScale = .65f;
+        [HideInInspector, SerializeField, Range(0f, 60f)] private float jigwiABShrinkDelaySeconds = 12f;
+        [HideInInspector, SerializeField, Range(.2f, 1f)] private float jigwiABShrinkScale = .65f;
         [SerializeField, Range(0f, .1f)] private float jigwiABFireMoveAmount = .03f;
         [SerializeField, Range(1f, 20f)] private float jigwiABFireMovePeriodSeconds = 4f;
         [SerializeField, Range(.1f, 1f)] private float jigwiABFireTargetRadius = .3f;
+        [SerializeField, Range(1f, 3f)] private float jigwiABRewardSizeScale = 1.3f;
+        [SerializeField, Range(1f, 3f)] private float jigwiABRewardPaintScale = 1.5f;
 
         [Header("Item orbs")]
         [SerializeField, Min(.1f)] private float itemLifetimeSeconds = 15f;
@@ -975,7 +979,7 @@ namespace C6Lab
         public float JigwiStageSpreadSeconds => Mathf.Clamp(Finite(jigwiStageSpreadSeconds, 1f), .1f, 3f);
         public int JigwiStageSpreadPatches => Mathf.Clamp(jigwiStageSpreadPatches, 1, 3);
         public float JigwiStageFeverMultiplier => Mathf.Clamp(Finite(jigwiStageFeverMultiplier, 2f), 1f, 4f);
-        public float JigwiABPersonalDurationSeconds => Mathf.Clamp(Finite(jigwiABPersonalDurationSeconds, 10f), 1f, 30f);
+        public float JigwiABPersonalDurationSeconds => Mathf.Clamp(Finite(jigwiABPersonalDurationSeconds, 15f), 1f, 15f);
         public float JigwiABPersonalRecoveryMultiplier => Mathf.Clamp(Finite(jigwiABPersonalRecoveryMultiplier, 4f), 1f, 10f);
         public int JigwiABPersonalRequiredHits => Mathf.Clamp(jigwiABPersonalRequiredHits, 1, 10);
         public float JigwiABPersonalBurnSeconds => Mathf.Clamp(Finite(jigwiABPersonalBurnSeconds, 5f), .5f, 30f);
@@ -986,6 +990,8 @@ namespace C6Lab
         public float JigwiABFireMoveAmount => Mathf.Clamp(Finite(jigwiABFireMoveAmount, .03f), 0f, .1f);
         public float JigwiABFireMovePeriodSeconds => Mathf.Clamp(Finite(jigwiABFireMovePeriodSeconds, 4f), 1f, 20f);
         public float JigwiABFireTargetRadius => Mathf.Clamp(Finite(jigwiABFireTargetRadius, .3f), .1f, 1f);
+        public float JigwiABRewardSizeScale => Mathf.Clamp(Finite(jigwiABRewardSizeScale, 1.3f), 1f, 3f);
+        public float JigwiABRewardPaintScale => Mathf.Clamp(Finite(jigwiABRewardPaintScale, 1.5f), 1f, 3f);
         public int YaguangFiveColorOrbCount => Mathf.Clamp(yaguangFiveColorOrbCount, 0, 6);
         public float YaguangFiveColorOrbPaintScale => Mathf.Clamp(Finite(yaguangFiveColorOrbPaintScale, 2f), 1f, 3f);
         /// <summary>
@@ -1415,7 +1421,8 @@ namespace C6Lab
                 FeverTimeSeconds, FeverTimeRecoveryMultiplier,
                 JigwiABPersonalDurationSeconds, JigwiABPersonalRecoveryMultiplier, JigwiABPersonalRequiredHits,
                 JigwiABPersonalBurnSeconds, JigwiABGroupFireCount, JigwiABRelightSeconds, JigwiABShrinkDelaySeconds,
-                JigwiABShrinkScale, JigwiABFireMoveAmount, JigwiABFireMovePeriodSeconds, JigwiABFireTargetRadius
+                JigwiABShrinkScale, JigwiABFireMoveAmount, JigwiABFireMovePeriodSeconds, JigwiABFireTargetRadius,
+                JigwiABRewardSizeScale, JigwiABRewardPaintScale
             };
         }
 
@@ -1705,6 +1712,8 @@ namespace C6Lab
             jigwiABFireMoveAmount = values[248];
             jigwiABFireMovePeriodSeconds = values[249];
             jigwiABFireTargetRadius = values[250];
+            jigwiABRewardSizeScale = values[251];
+            jigwiABRewardPaintScale = values[252];
             error = string.Empty;
             return true;
         }

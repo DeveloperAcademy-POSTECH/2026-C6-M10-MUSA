@@ -17,12 +17,37 @@ namespace C6Lab.Tests
             var values = config.CaptureDeveloperValues(); values[207] = values[208] = 0f;
             Assert.That(config.TryApplyDeveloperValues(values, out var error), Is.True, error);
             room = new LabModel(); room.Begin("jigwi-blast-lineage", new ulong[] { 10, 20 }, 0d, config, LabStageYokai.Jigwi);
-            // Add the 90-second fixture orbs only after that time is reached; otherwise
-            // the new A at 11 seconds correctly burns these prematurely inserted objects.
+            // Reach the late bomb/cutoff window before adding its fixture orbs: earlier A/B
+            // effects must not burn or erase objects that did not exist at their activation.
             room.Tick(90d);
             orbs = (Dictionary<string, LabOrbState>)typeof(LabModel).GetField("orbs", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(room);
+            CompleteFinalScreenMission();
         }
         [TearDown] public void TearDown() { Object.DestroyImmediate(config); }
+        private void CompleteFinalScreenMission()
+        {
+            // These tests isolate bomb-origin cleanup at 100, rather than the independent
+            // B failure wipe at 95. Finish B through real approved Water/fire transactions.
+            var group = room.Snapshot(90d).jigwiAB.Active(90d);
+            Assert.That(group.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
+            int index = 0;
+            foreach (var player in group.players)
+                foreach (var target in player.targets)
+                {
+                    string id = "cutoff-water-" + ++index;
+                    orbs.Add(id, new LabOrbState { id = id, owner = player.playerId,
+                        kind = LabOrbKind.Combined, element = LabOrbElement.Water,
+                        createdAt = 90d, expiresAt = 119d, x = .5f, y = .5f });
+                    Assert.That(room.TryLaunch(player.playerId, id, "launch-" + id, 90d,
+                        out _, out var reason), Is.True, reason);
+                    Assert.That(room.ConfirmJigwiABFireHit(id, group.id, target.id, 90d,
+                        out bool extinguished), Is.True);
+                    Assert.That(extinguished, Is.True);
+                }
+            var completed = room.Snapshot(90d).jigwiAB.rounds.Single(value => value.id == group.id);
+            Assert.That(completed.resolution, Is.EqualTo(LabJigwiABResolution.Completed));
+            Assert.That(completed.clearedThroughRevision, Is.Zero);
+        }
         private void AddOrb(string id, LabOrbKind kind = LabOrbKind.Yin)
         {
             orbs.Add(id, new LabOrbState { id = id, owner = 10, kind = kind,

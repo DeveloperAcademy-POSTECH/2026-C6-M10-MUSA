@@ -45,7 +45,7 @@ namespace C6Lab.Tests
         [Test]
         public void FeverTimeAppendsTwoDevRowsInItsOwnGroup()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(251));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(253));
             Assert.That(LabConfig.DeveloperFields.Skip(238).Take(2).Select(field => field.Label), Is.EqualTo(new[]
             {
                 "피버 타임 시작 (남은 초, 0 = 끔)", "피버 타임 충전 배율"

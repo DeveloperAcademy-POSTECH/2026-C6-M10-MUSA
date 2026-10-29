@@ -100,40 +100,38 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void PersonalFireHasOneSecondWarningTenSecondLimitAndNoSurfaceSpread()
+        public void PersonalFireHasOneSecondWarningFifteenSecondLimitAndNoSurfaceSpread()
         {
-            // The bounded-lifetime assertion now covers A's 10-second window, not retired 7-second mesh patches.
             var room = Room();
-            Assert.That(ScreenState(room, 9.99d).rounds, Is.Empty);
-            var warning = ScreenState(room, 10d).rounds.Single();
-            Assert.That(warning.Warning(10d), Is.True);
-            Assert.That(warning.Active(10d), Is.False);
-            var active = ScreenState(room, 11d).rounds.Single();
+            Assert.That(ScreenState(room, 3.99d).rounds, Is.Empty);
+            var warning = ScreenState(room, 4d).rounds.Single();
+            Assert.That(warning.Warning(4d), Is.True);
+            Assert.That(warning.Active(4d), Is.False);
+            var active = ScreenState(room, 5d).rounds.Single();
             Assert.That(active.kind, Is.EqualTo(LabJigwiABKind.PersonalBurn));
-            Assert.That(active.Active(11d), Is.True);
-            Assert.That(room.JigwiABRecoveryMultiplier(active.targetPlayer, 11d), Is.EqualTo(4f));
-            Assert.That(ScreenState(room, 20.99d).rounds.Single().Active(20.99d), Is.True);
-            var end = ScreenState(room, 21d).rounds.Single();
+            Assert.That(active.Active(5d), Is.True);
+            Assert.That(room.JigwiABRecoveryMultiplier(active.targetPlayer, 5d), Is.EqualTo(4f));
+            Assert.That(ScreenState(room, 19.99d).rounds.Single().Active(19.99d), Is.True);
+            var end = ScreenState(room, 20d).rounds.Single();
             Assert.That(end.resolution, Is.EqualTo(LabJigwiABResolution.Expired));
-            Assert.That(end.resolvedAt, Is.EqualTo(21d));
-            Assert.That(room.Snapshot(21d).jigwiStage.groups, Is.Empty);
+            Assert.That(end.resolvedAt, Is.EqualTo(20d));
+            Assert.That(room.Snapshot(20d).jigwiStage.groups, Is.Empty);
         }
 
         [Test]
-        public void OneLateTickRecordsEightSlotsAndSkipsSlotsBusyWithTheGroupChallenge()
+        public void OneLateTickRecordsAllSixTimedMissionsWithoutSkippingBoundarySlots()
         {
-            // Busy slots are recorded once; B now persists until joint success or the 100-second cutoff.
             var room = Room();
             var state = ScreenState(room, 98d);
-            Assert.That(state.rounds, Has.Length.EqualTo(8));
-            Assert.That(state.rounds.Select(item => item.slot), Is.EqualTo(Enumerable.Range(0, 8)));
-            Assert.That(state.rounds.Select(item => item.id).Distinct().Count(), Is.EqualTo(8));
-            Assert.That(state.rounds[0].resolution, Is.EqualTo(LabJigwiABResolution.Expired));
-            Assert.That(state.rounds[1].kind, Is.EqualTo(LabJigwiABKind.GroupFire));
-            Assert.That(state.rounds[1].Active(98d), Is.True);
-            Assert.That(state.rounds.Skip(2).All(item => item.resolution == LabJigwiABResolution.Skipped), Is.True);
-            Assert.That(ScreenState(room, 98d).rounds.Length, Is.EqualTo(8));
-            Assert.That(LabJigwiABNetworkValidation.Valid(state, room.Snapshot(98d).players), Is.True);
+            Assert.That(state.rounds, Has.Length.EqualTo(6));
+            Assert.That(state.rounds.Select(item => item.slot), Is.EqualTo(Enumerable.Range(0, 6)));
+            Assert.That(state.rounds.Select(item => item.id).Distinct().Count(), Is.EqualTo(6));
+            Assert.That(state.rounds.Select(item => item.activeAt), Is.EqualTo(new[] { 5d, 25d, 40d, 55d, 70d, 85d }));
+            Assert.That(state.rounds.All(item => item.resolution == LabJigwiABResolution.Expired), Is.True);
+            Assert.That(state.rounds.Where(item => item.kind == LabJigwiABKind.GroupFire)
+                .All(item => item.clearedThroughRevision > 0), Is.True);
+            Assert.That(ScreenState(room, 98d).rounds.Length, Is.EqualTo(6));
+            Assert.That(LabJigwiABNetworkValidation.Valid(state, room.Snapshot(98d).players, room.Revision), Is.True);
         }
 
         [Test]
@@ -287,6 +285,7 @@ namespace C6Lab.Tests
         public void ExtinguishingOneScreenFlameDoesNotClearItsSiblingTargets()
         {
             // Independent progress now belongs to B's individual screen flames rather than multiple mesh roots.
+            float[] values = config.CaptureDeveloperValues(); values[245] = 2f; Apply(values);
             var room = Room(); var group = ScreenState(room, 31d).rounds.Single(item => item.slot == 1);
             var owner = group.players[0];
             Extinguish(room, group, owner.playerId, owner.targets[0].id, 31d);
@@ -295,22 +294,26 @@ namespace C6Lab.Tests
             Assert.That(after.players[0].targets.Skip(1).All(fire => fire.lit), Is.True);
             Assert.That(after.players[1].targets.All(fire => fire.lit), Is.True);
             Assert.That(after.resolution, Is.EqualTo(LabJigwiABResolution.None));
-            Assert.That(ScreenState(room, 43d).rounds.Single(item => item.id == group.id).players[0].targets[0].lit, Is.True);
+            Assert.That(ScreenState(room, 33d).rounds.Single(item => item.id == group.id).players[0].targets[0].lit, Is.True);
         }
 
         [Test]
-        public void CutoffCancelsScreenChallengeBeforeAnIdenticallyTimedCommonBombExpiry()
+        public void CutoffPreservesCompletedMissionsAndClearsAnIdenticallyTimedCommonBombBeforeExplosion()
         {
-            // Keep the 100-second ordering guarantee using an actual common bomb whose fuse also ends at 100.
             float[] values = config.CaptureDeveloperValues();
-            values[45] = 20f; values[46] = values[47] = 2f; values[207] = 1f; values[208] = 0f; Apply(values);
-            var room = Room(); var before = room.Snapshot(99.9d);
-            var last = before.jigwiAB.rounds.Single(item => item.slot == 1);
-            Assert.That(last.Active(99.9d), Is.True);
-            var bomb = before.orbs.Single(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd && orb.createdAt == 80d);
+            values[4] = 1000f; values[45] = 20f; values[46] = values[47] = 2f;
+            values[207] = 1f; values[208] = 0f; Apply(values);
+            var room = Room();
+            foreach (double at in new[] { 25d, 55d, 85d })
+                ExtinguishAll(room, ScreenState(room, at).Active(at), at);
+            var before = room.Snapshot(99.9d);
+            Assert.That(before.jigwiAB.Active(99.9d), Is.Null);
+            var bomb = before.orbs.Single(orb => orb.kind == LabOrbKind.Bomb
+                && orb.origin == LabOrbOrigin.Gourd && orb.createdAt == 80d);
             room.DrainBombExplosions();
             var atCutoff = room.Snapshot(100d);
-            Assert.That(atCutoff.jigwiAB.rounds.Single(item => item.id == last.id).resolution, Is.EqualTo(LabJigwiABResolution.Cancelled));
+            Assert.That(atCutoff.jigwiAB.rounds.Where(item => item.kind == LabJigwiABKind.GroupFire)
+                .All(item => item.resolution == LabJigwiABResolution.Completed), Is.True);
             Assert.That(atCutoff.jigwiAB.Active(100d), Is.Null);
             Assert.That(atCutoff.jigwiAB.fever, Is.True);
             Assert.That(atCutoff.orbs.Any(orb => orb.id == bomb.id), Is.False);
@@ -319,17 +322,18 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void FeverDoublesOnlyAutomaticRecoveryAfterTheExactBoundary()
+        public void FeverDoublesAutomaticRecoveryAfterTheExactBoundaryWithoutRepeatingTheLastFailure()
         {
-            // Isolate the inherited 100-second fever boundary from A's independent recovery multiplier.
             float[] values = config.CaptureDeveloperValues(); values[4] = 0f; values[6] = values[7] = 1f;
             values[241] = 1f; Apply(values);
             var room = Room();
-            Assert.That(room.Snapshot(99.5d).players[0].stamina, Is.EqualTo(99.5f).Within(.0001f));
-            Assert.That(room.Snapshot(100d).players[0].stamina, Is.EqualTo(100f).Within(.0001f));
-            Assert.That(room.Snapshot(100.5d).players[0].stamina, Is.EqualTo(101f).Within(.0001f));
-            Assert.That(room.Snapshot(101d).players[0].stamina, Is.EqualTo(102f).Within(.0001f));
-            Assert.That(config.StaminaMax, Is.EqualTo(1000f));
+            Assert.That(room.Snapshot(95d).players[0].stamina, Is.Zero, "The last failed B clears stamina once at 95.");
+            ulong fence = room.JigwiABFailureRevision;
+            Assert.That(room.Snapshot(99.5d).players[0].stamina, Is.EqualTo(4.5f).Within(.0001f));
+            Assert.That(room.Snapshot(100d).players[0].stamina, Is.EqualTo(5f).Within(.0001f));
+            Assert.That(room.Snapshot(100.5d).players[0].stamina, Is.EqualTo(6f).Within(.0001f));
+            Assert.That(room.Snapshot(101d).players[0].stamina, Is.EqualTo(7f).Within(.0001f));
+            Assert.That(room.JigwiABFailureRevision, Is.EqualTo(fence));
             Assert.That(room.JigwiStageRecoveryMultiplier(99.99d), Is.EqualTo(1f));
             Assert.That(room.JigwiStageRecoveryMultiplier(100d), Is.EqualTo(2f));
         }
@@ -377,7 +381,7 @@ namespace C6Lab.Tests
             ulong[] ids = Enumerable.Range(0, count).Select(n => (ulong)n * 10ul).ToArray();
             var room = new LabModel(); room.Begin("jigwi-many", ids, 0d, config, LabStageYokai.Jigwi);
             var snapshot = room.Snapshot(98d);
-            Assert.That(snapshot.jigwiAB.rounds, Has.Length.EqualTo(8));
+            Assert.That(snapshot.jigwiAB.rounds, Has.Length.EqualTo(6));
             var group = snapshot.jigwiAB.rounds.Single(item => item.slot == 1);
             Assert.That(group.players.Select(player => player.playerId), Is.EquivalentTo(ids));
             Assert.That(group.players.All(player => player.targets.Length == 3), Is.True);

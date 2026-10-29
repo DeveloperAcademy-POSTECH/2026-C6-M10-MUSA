@@ -14,9 +14,14 @@ namespace C6Lab
         public bool enabled, fever;
         public double startedAt = -1d, cutoffAt = -1d;
         public LabJigwiABRound[] rounds = Array.Empty<LabJigwiABRound>();
+        /// <summary>The running mission takes priority over a following mission's overlapping warning.</summary>
         public LabJigwiABRound Active(double now) => (rounds ?? Array.Empty<LabJigwiABRound>())
-            .FirstOrDefault(value => value != null && value.resolution == LabJigwiABResolution.None
-                && now >= value.warningAt && now < value.endsAt);
+            .FirstOrDefault(value => value != null && value.Active(now)) ?? Warning(now);
+        public LabJigwiABRound Warning(double now) => (rounds ?? Array.Empty<LabJigwiABRound>())
+            .FirstOrDefault(value => value != null && value.Warning(now));
+        /// <summary>The completed B mission whose half-open launch-reward window contains this battle time.</summary>
+        public LabJigwiABRound Reward(double now) => (rounds ?? Array.Empty<LabJigwiABRound>())
+            .LastOrDefault(value => value != null && value.RewardActive(now));
         public LabJigwiABSnapshot Copy() => new LabJigwiABSnapshot
         {
             enabled = enabled, fever = fever, startedAt = startedAt, cutoffAt = cutoffAt,
@@ -33,6 +38,10 @@ namespace C6Lab
         public LabJigwiABResolution resolution;
         public ulong targetPlayer;
         public double warningAt, activeAt, endsAt, resolvedAt = -1d;
+        public double rewardUntil = -1d;
+        public float rewardSizeScale = 1f, rewardPaintScale = 1f;
+        /// <summary>Expired B retired all approvals through this Host revision; no orb-ID history is transmitted.</summary>
+        public ulong clearedThroughRevision;
         public int hitCount, requiredHits;
         public double shrinkAt;
         public bool shrunk;
@@ -40,6 +49,8 @@ namespace C6Lab
         public LabJigwiABPlayerFire[] players = Array.Empty<LabJigwiABPlayerFire>();
         public bool Warning(double now) => resolution == LabJigwiABResolution.None && now >= warningAt && now < activeAt;
         public bool Active(double now) => resolution == LabJigwiABResolution.None && now >= activeAt && now < endsAt;
+        public bool RewardActive(double now) => kind == LabJigwiABKind.GroupFire
+            && resolution == LabJigwiABResolution.Completed && now >= resolvedAt && now < rewardUntil;
         public LabJigwiABRound Copy()
         {
             var copy = (LabJigwiABRound)MemberwiseClone();
@@ -90,11 +101,12 @@ namespace C6Lab
 
     public static class LabJigwiABNetworkValidation
     {
-        public const int MaximumRounds = 8, MaximumPlayers = 5, MaximumFires = 6;
+        public const int MaximumRounds = 6, MaximumPlayers = 5, MaximumFires = 6;
+        private static readonly double[] ActivationSlots = { 5d, 25d, 40d, 55d, 70d, 85d };
         public static LabJigwiABSnapshot Copy(LabJigwiABSnapshot state) => state?.Copy() ?? new LabJigwiABSnapshot();
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
         private static bool Range(double value, double min, double max) => Finite(value) && value >= min && value <= max;
-        public static bool Valid(LabJigwiABSnapshot state, LabPlayerState[] members = null)
+        public static bool Valid(LabJigwiABSnapshot state, LabPlayerState[] members = null, ulong? modelRevision = null)
         {
             if (state == null) return true; // Legacy/standalone snapshots have no AB payload.
             if (state.rounds == null || state.rounds.Length > MaximumRounds) return false;
@@ -105,6 +117,7 @@ namespace C6Lab
             var slots = new HashSet<int>();
             var memberIds = members == null ? null : new HashSet<ulong>(members.Where(p => p != null).Select(p => p.id));
             int unresolved = 0;
+            var intervals = new List<LabJigwiABRound>();
             foreach (var round in state.rounds)
             {
                 if (round == null || string.IsNullOrEmpty(round.id) || round.id.Length > 256 || !ids.Add(round.id)
@@ -117,33 +130,59 @@ namespace C6Lab
                     || !Range(round.resolvedAt, -1d, state.cutoffAt)
                     || !Range(round.shrinkScale, .2d, 1d) || !Range(round.moveAmount, 0d, .100001d)
                     || !Range(round.movePeriodSeconds, 1d, 20d) || !Range(round.targetRadius, .099999d, 1d)
-                    || !Finite(round.shrinkAt) || round.players == null || round.players.Length > MaximumPlayers) return false;
+                    || !Finite(round.shrinkAt) || round.shrunk || round.shrinkScale != 1f
+                    || !Range(round.rewardSizeScale, 1d, 3d) || !Range(round.rewardPaintScale, 1d, 3d)
+                    || !Range(round.rewardUntil, -1d, state.cutoffAt)
+                    || round.players == null || round.players.Length > MaximumPlayers) return false;
+                double scheduled = state.startedAt + ActivationSlots[round.slot];
+                if (Math.Abs(round.activeAt - scheduled) > .00001d
+                    || Math.Abs(round.warningAt - (scheduled - 1d)) > .00001d
+                    || (round.slot % 2 == 0) != (round.kind == LabJigwiABKind.PersonalBurn)) return false;
+                if (round.resolution != LabJigwiABResolution.Skipped)
+                {
+                    if (intervals.Any(other => round.activeAt < other.endsAt && other.activeAt < round.endsAt)) return false;
+                    intervals.Add(round);
+                }
+                bool failed = round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Expired;
+                if (failed != (round.clearedThroughRevision > 0)
+                    || modelRevision.HasValue && round.clearedThroughRevision > modelRevision.Value) return false;
+                bool rewarded = round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Completed;
+                if (rewarded)
+                {
+                    if (round.rewardUntil <= round.resolvedAt
+                        || Math.Abs(round.rewardUntil - Math.Min(state.cutoffAt, round.resolvedAt + 5d)) > .00001d) return false;
+                }
+                else if (round.rewardUntil != -1d) return false;
                 if (round.resolution == LabJigwiABResolution.None)
                 {
-                    if (round.resolvedAt != -1d || ++unresolved > 1) return false;
+                    // A may still be running during the next B's one-second warning.
+                    if (round.resolvedAt != -1d || ++unresolved > 2) return false;
                 }
                 else if (round.resolvedAt < round.warningAt) return false;
                 if (round.kind == LabJigwiABKind.PersonalBurn)
                 {
                     if (round.requiredHits < 1 || round.requiredHits > 10 || round.hitCount < 0 || round.hitCount > round.requiredHits
-                        || round.players.Length != 0 || round.shrunk || memberIds != null && !memberIds.Contains(round.targetPlayer)) return false;
+                        || round.players.Length != 0 || round.rewardSizeScale != 1f || round.rewardPaintScale != 1f
+                        || round.endsAt - round.activeAt < .99999d || round.endsAt - round.activeAt > 15.00001d
+                        || memberIds != null && !memberIds.Contains(round.targetPlayer)) return false;
                     if (round.resolution == LabJigwiABResolution.Completed && round.hitCount != round.requiredHits) return false;
                     continue;
                 }
                 if (round.requiredHits != 0 || round.hitCount != 0 || round.shrinkAt < round.activeAt
+                    || Math.Abs(round.endsAt - round.activeAt - 10d) > .00001d
                     || round.resolution != LabJigwiABResolution.Skipped && round.players.Length == 0) return false;
                 var owners = new HashSet<ulong>();
                 var targets = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var player in round.players)
                 {
                     if (player == null || !owners.Add(player.playerId) || memberIds != null && !memberIds.Contains(player.playerId)
-                        || player.lastWaterSplashAt != -1d && !Range(player.lastWaterSplashAt, round.activeAt, state.cutoffAt)
+                        || player.lastWaterSplashAt != -1d && !Range(player.lastWaterSplashAt, round.activeAt, round.endsAt)
                         || player.targets == null || player.targets.Length < 1 || player.targets.Length > MaximumFires) return false;
                     foreach (var target in player.targets)
                     {
                         if (target == null || string.IsNullOrEmpty(target.id) || target.id.Length > 256 || !targets.Add(target.id)
                             || !Range(target.x, .1d, .9d) || !Range(target.y, .48d, .86d)
-                            || !Range(target.extinguishedAt, -1d, state.cutoffAt) || !Finite(target.relightAt)
+                            || !Range(target.extinguishedAt, -1d, round.endsAt) || !Finite(target.relightAt)
                             || target.relightAt < -1d) return false;
                         if (target.extinguishedAt < 0d)
                         {
@@ -156,8 +195,13 @@ namespace C6Lab
                 if (memberIds != null && round.resolution != LabJigwiABResolution.Skipped && !owners.SetEquals(memberIds)) return false;
                 bool allOff = round.players.Length > 0 && round.players.All(player => player.targets.All(target => !target.lit));
                 if (round.resolution == LabJigwiABResolution.Completed && !allOff
-                    || round.resolution == LabJigwiABResolution.None && allOff) return false;
+                    || (round.resolution == LabJigwiABResolution.None || failed) && allOff) return false;
             }
+            var pending = state.rounds.Where(value => value.resolution == LabJigwiABResolution.None)
+                .OrderBy(value => value.activeAt).ToArray();
+            if (pending.Length == 2 && (pending[0].kind != LabJigwiABKind.PersonalBurn
+                || pending[1].kind != LabJigwiABKind.GroupFire || pending[1].slot != pending[0].slot + 1
+                || pending[0].endsAt <= pending[1].warningAt || pending[0].endsAt > pending[1].activeAt)) return false;
             return true;
         }
     }

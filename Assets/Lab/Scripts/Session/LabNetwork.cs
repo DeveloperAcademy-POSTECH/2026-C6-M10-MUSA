@@ -66,6 +66,9 @@ namespace C6Lab
         /// <summary>던지는 공 크기 배율 (#222 콤보 페널티/보상). 0(옛 패킷)이면 1로 본다.</summary>
         public float sizeScale;
         public float jigwiABRadiusScale = 1f;
+        public bool jigwiABReward;
+        public ulong modelRevision;
+        public double eventAt;
         public string reason;
         public ulong owner;
         public int element;
@@ -226,13 +229,13 @@ namespace C6Lab
         //       separates the builds that briefly used 5672 for #334 alone.
         // 5675/5676: standalone #341 screen-space fire curtain and reachable ignition geometry.
         // 5677: integrate #334/#343 fever and #341 A/B; preserve DEV0..239 and append A/B240..250 (251 values).
-        internal const ushort LabProtocolVersion = 5677;
+        internal const ushort LabProtocolVersion = 5678;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/38");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/39");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1307,7 +1310,10 @@ namespace C6Lab
             if (IsHost && model != null && !gameBattleFrozen)
             {
                 SampleHostPaintFlow(battleClock.Now(now));
-                if (now >= nextSnapshotAt) PublishSnapshot(false);
+                ulong beforePurge = jigwiMissionPurge.Revision;
+                AnnounceJigwiMissionFailures();
+                if (beforePurge != jigwiMissionPurge.Revision) PublishSnapshot(true);
+                else if (now >= nextSnapshotAt) PublishSnapshot(false);
             }
             SyncJigwiFireSurfaces();
             SyncJigwiStagePresentation();
@@ -1655,6 +1661,7 @@ namespace C6Lab
 
         private void AnnounceOrbExpiries()
         {
+            AnnounceJigwiMissionFailures();
             foreach (LabOrbExpiry expiry in model.DrainOrbExpiries())
             {
                 // Ordered before receipts/owner-board frames remove the body. Bulk snapshots use a separate pipeline;
@@ -1876,6 +1883,7 @@ namespace C6Lab
         private void SpawnHostProjectile(LabOrbState orb, Vector2 releaseVelocity, float releaseX01, long actionId = 0)
         {
             if (orb == null || target == null || config == null) return;
+            AnnounceJigwiMissionFailures();
             int selectedSeat = (playerSlots?.GetSlot(orb.owner) ?? 0) - 1;
             int seat = latest != null && latest.players != null
                 ? Array.Find(latest.players, p => p.id == orb.owner)?.seat ?? selectedSeat : selectedSeat;
@@ -1893,9 +1901,12 @@ namespace C6Lab
                 orb.small ? config.BlastShrinkScale : 1f);
             if (orb.fiveColor) LabFiveColorSparkle.AttachArt(projectile.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
             projectile.name = "Projectile " + orb.id;
-            float sizeScale = model != null ? model.LaunchScaleOf(orb.id) : 1f;
+            float sizeScale = (model != null ? model.LaunchScaleOf(orb.id) : 1f)
+                * (orb.jigwiABReward ? orb.jigwiABRewardSizeScale : 1f);
             projectile.SetRadiusScale(sizeScale);
             projectile.SetJigwiABRadiusScale(orb.jigwiABRadiusScale);
+            projectile.SetJigwiABReward(orb.jigwiABReward);
+            projectile.AuthorityRevision = orb.revision;
             projectile.SetMissSurface(battleFloor);
             SyncJigwiFireSurfaces();
             projectile.SetFireSurfaces(JigwiFireSurfacesFor(orb.owner));
@@ -1905,7 +1916,7 @@ namespace C6Lab
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small, fiveColor = orb.fiveColor,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
                 wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale,
-                jigwiABRadiusScale = orb.jigwiABRadiusScale };
+                jigwiABRadiusScale = orb.jigwiABRadiusScale, jigwiABReward = orb.jigwiABReward, modelRevision = orb.revision };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
             Debug.Log("C6_LAB_THROW orb=" + orb.id + " seat=" + seat
                 + " size=" + sizeScale.ToString("F2", CultureInfo.InvariantCulture)
@@ -2020,6 +2031,7 @@ namespace C6Lab
 
         private void SyncBoard()
         {
+            ObserveJigwiMissionFailures();
             ApplyGameStartSimulationHold();
             SyncJigwiFireSurfaces();
             SyncJigwiStagePresentation();
@@ -2028,7 +2040,7 @@ namespace C6Lab
             var current = new HashSet<string>();
             foreach (var orb in latest.orbs ?? Array.Empty<LabOrbState>())
             {
-                if (orb.owner != LocalPlayerId || orb.inFlight) continue;
+                if (orb.owner != LocalPlayerId || orb.inFlight || jigwiMissionPurge.Cancels(orb.revision)) continue;
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
                 // A fever (#281) generates team orbs that are already combined; they still pop out of the drum.
@@ -2270,6 +2282,10 @@ namespace C6Lab
                 case "notice":
                     if (packet.sessionId == sessionId) SetNotice(packet.reason);
                     break;
+                case "jigwiFailure":
+                    if (ApplyJigwiMissionFailure(packet.sessionId, packet.round, packet.firstId, packet.modelRevision, packet.eventAt))
+                        SyncBoard();
+                    break;
                 case "orbExpired":
                     if (packet.sessionId == sessionId && packet.round == actionRound
                         && !string.IsNullOrEmpty(packet.firstId)) OnOrbExpired(packet.firstId);
@@ -2353,6 +2369,8 @@ namespace C6Lab
                         if (packet.fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
                         if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetJigwiABRadiusScale(packet.jigwiABRadiusScale);
+                        visual.SetJigwiABReward(packet.jigwiABReward);
+                        visual.AuthorityRevision = packet.modelRevision;
                         visual.SetMissSurface(battleFloor);
                         SyncJigwiFireSurfaces();
                         visual.SetFireSurfaces(JigwiFireSurfacesFor(packet.owner));

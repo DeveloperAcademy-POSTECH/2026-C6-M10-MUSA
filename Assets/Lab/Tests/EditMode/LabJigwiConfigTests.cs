@@ -14,7 +14,7 @@ namespace C6Lab.Tests
             var config = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
-                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(251), "The yaguang flash (#268) follows at 184-190 and the counting toggle (#271) at 191.");
+                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(253), "The yaguang flash (#268) follows at 184-190 and the counting toggle (#271) at 191.");
                 Assert.That(LabConfig.DeveloperFields[177].Label, Is.EqualTo("Charm Rescue Taps per Neighbor (0 = none)"));
                 Assert.That(LabConfig.DeveloperFields.Skip(178).Take(6).Select(field => field.Label), Is.EqualTo(new[]
                 {
