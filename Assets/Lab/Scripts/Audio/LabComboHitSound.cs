@@ -4,7 +4,7 @@ namespace C6Lab
 {
     /// <summary>
     /// 박 색상 콤보 히트 효과음 (#338). 콤보에서 맞는 칸을 맞힐 때마다 같은 소리를 칸이 오를수록 높게 낸다
-    /// (기본 1칸 도 → 2칸 레 → 3칸 미 → 4칸 솔). 팀이 함께 채우는 콤보라 "좋다"(LabComboClearSound)처럼 모든 기기에서 난다.
+    /// (기본 국악 평조 1칸 궁 → 2칸 상 → 3칸 각 → 4칸 치, 도 → 레 → 파 → 솔 간격). 팀이 함께 채우는 콤보라 "좋다"(LabComboClearSound)처럼 모든 기기에서 난다.
     /// 마지막 칸을 맞혀 성공하면 4칸 소리와 "좋다"가 함께 난다.
     /// Host 스냅샷의 콤보 순번(comboCount)과 맞힌 칸 수(comboProgress)가 같은 콤보 안에서 늘었을 때 한 번만 낸다.
     /// 새 라운드·세션·콤보면 처음부터 다시 세고, 접속 직후 이미 맞혀 둔 칸은 내지 않는다.
@@ -17,8 +17,8 @@ namespace C6Lab
         public const string ClipFolder = "Audio/ComboHit";
 
         [Range(0f, 1f)] public float volume = 1f;
-        [Tooltip("1칸~4칸을 맞혔을 때 원래 소리보다 몇 반음 높일지. 기본 도·레·미·솔 (0, 2, 4, 7).")]
-        public float[] stepSemitones = { 0f, 2f, 4f, 7f };
+        [Tooltip("1칸~4칸을 맞혔을 때 원래 소리보다 몇 반음 높일지. 기본 평조 궁/상/각/치 (0, 2, 5, 7).")]
+        public float[] stepSemitones = { 0f, 2f, 5f, 7f };
 
         private AudioClip clip;
         private AudioSource[] sources;
