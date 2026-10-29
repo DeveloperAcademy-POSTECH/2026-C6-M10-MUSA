@@ -65,10 +65,10 @@ namespace C6Lab.Tests
         public void HigherStepsPlayHigherByTheInspectorSemitones()
         {
             LabComboHitSound sound = Create();
-            Assert.That(sound.PitchFor(1), Is.EqualTo(1f).Within(1e-5f), "The first step is the clip as recorded (do).");
-            Assert.That(sound.PitchFor(2), Is.EqualTo(Mathf.Pow(2f, 2f / 12f)).Within(1e-5f), "re");
-            Assert.That(sound.PitchFor(3), Is.EqualTo(Mathf.Pow(2f, 4f / 12f)).Within(1e-5f), "mi");
-            Assert.That(sound.PitchFor(4), Is.EqualTo(Mathf.Pow(2f, 7f / 12f)).Within(1e-5f), "sol");
+            Assert.That(sound.PitchFor(1), Is.EqualTo(1f).Within(1e-5f), "The first step is the clip as recorded (gung).");
+            Assert.That(sound.PitchFor(2), Is.EqualTo(Mathf.Pow(2f, 2f / 12f)).Within(1e-5f), "sang");
+            Assert.That(sound.PitchFor(3), Is.EqualTo(Mathf.Pow(2f, 5f / 12f)).Within(1e-5f), "gak");
+            Assert.That(sound.PitchFor(4), Is.EqualTo(Mathf.Pow(2f, 7f / 12f)).Within(1e-5f), "chi");
             for (int step = 2; step <= LabGourdCombo.Length; step++)
                 Assert.That(sound.PitchFor(step), Is.GreaterThan(sound.PitchFor(step - 1)));
             sound.stepSemitones = new[] { 0f, 12f };
