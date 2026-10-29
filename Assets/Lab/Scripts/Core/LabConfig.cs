@@ -761,6 +761,26 @@ namespace C6Lab
         [SerializeField, Range(0, 50)] private int teamFeverHits = 15;
         [Tooltip("피버 시간 (초). 그동안 팀 판의 모든 구슬이 팀 색 결합 구슬이 되고, 생성해도 팀 색 결합 구슬이 나온다.")]
         [SerializeField, Range(1f, 30f)] private float teamFeverSeconds = 8f;
+
+        [Header("2:2 땅따먹기 연출 (#293, Inspector 전용. 기본값이 지금 모습이다)")]
+        [Tooltip("피버 구슬 둘레 무지개 고리 크기 (구슬 반지름의 배)")]
+        [SerializeField, Range(1f, 5f)] private float teamFeverRingScale = 2.9f;
+        [Tooltip("무지개 고리 밝기: 가장 밝을 때 불투명도. 고리는 이 값의 56%~100% 사이로 반짝인다.")]
+        [SerializeField, Range(0f, 1f)] private float teamFeverRingAlpha = 1f;
+        [Tooltip("우리 팀 피버 동안 화면 가장자리 빛이 가장 옅을 때 불투명도")]
+        [SerializeField, Range(0f, 1f)] private float teamFeverGlowMin = .45f;
+        [Tooltip("우리 팀 피버 동안 화면 가장자리 빛이 가장 진할 때 불투명도")]
+        [SerializeField, Range(0f, 1f)] private float teamFeverGlowMax = .8f;
+        [Tooltip("가장자리 빛 두께: 화면 가장자리에서 안쪽으로 번지는 거리 (화면 비율)")]
+        [SerializeField, Range(.05f, .5f)] private float teamFeverGlowReach = .3f;
+        [Tooltip("피버로 음·양이 팀 색 구슬로 바뀌는 순간 처음 크기 (배, 1이면 부풀지 않음)")]
+        [SerializeField, Range(1f, 2.5f)] private float teamFeverTurnScale = 1.45f;
+        [Tooltip("부푼 구슬이 원래 크기로 돌아오는 시간 (초)")]
+        [SerializeField, Range(.05f, 1.5f)] private float teamFeverTurnSeconds = .35f;
+        [Tooltip("막힌 바깥 벽에 구슬이 튕길 때 반짝임이 남는 시간 (초, 0이면 반짝이지 않음)")]
+        [SerializeField, Range(0f, 1.5f)] private float teamWallFlashSeconds = .35f;
+        [Tooltip("벽 반짝임 세기: 튕긴 순간 벽 빛 불투명도에 더하는 값 (평소 벽 빛 0.32)")]
+        [SerializeField, Range(0f, .68f)] private float teamWallFlashBoost = .4f;
         [Header("High resolution paint presentation (#299)")]
         [Tooltip("Use the continuous high-resolution paint presentation. Host cell coverage, attribution and battle rules are unchanged.")]
         [SerializeField] private bool highResolutionPaintEnabled = true;
@@ -1189,6 +1209,16 @@ namespace C6Lab
         public float TeamBattleSeconds => Mathf.Clamp(Finite(teamBattleSeconds, 180f), 30f, 600f);
         public int TeamFeverHits => Mathf.Clamp(teamFeverHits, 0, 50);
         public float TeamFeverSeconds => Mathf.Clamp(Finite(teamFeverSeconds, 8f), 1f, 30f);
+        // 2:2 연출 (#293): Inspector 값 그대로 (DEV 칸 없음)
+        public float TeamFeverRingScale => Mathf.Clamp(Finite(teamFeverRingScale, 2.9f), 1f, 5f);
+        public float TeamFeverRingAlpha => Mathf.Clamp01(Finite(teamFeverRingAlpha, 1f));
+        public float TeamFeverGlowMin => Mathf.Clamp01(Finite(teamFeverGlowMin, .45f));
+        public float TeamFeverGlowMax => Mathf.Max(TeamFeverGlowMin, Mathf.Clamp01(Finite(teamFeverGlowMax, .8f)));
+        public float TeamFeverGlowReach => Mathf.Clamp(Finite(teamFeverGlowReach, .3f), .05f, .5f);
+        public float TeamFeverTurnScale => Mathf.Clamp(Finite(teamFeverTurnScale, 1.45f), 1f, 2.5f);
+        public float TeamFeverTurnSeconds => Mathf.Clamp(Finite(teamFeverTurnSeconds, .35f), .05f, 1.5f);
+        public float TeamWallFlashSeconds => Mathf.Clamp(Finite(teamWallFlashSeconds, .35f), 0f, 1.5f);
+        public float TeamWallFlashBoost => Mathf.Clamp(Finite(teamWallFlashBoost, .4f), 0f, .68f);
         public bool HighResolutionPaintEnabled => highResolutionPaintEnabled;
         public int HighResolutionPaintQuality => Mathf.Clamp(highResolutionPaintQuality, 0, 1);
         public int HighResolutionPaintColumns => HighResolutionPaintQuality == 0 ? 1024 : 2048;

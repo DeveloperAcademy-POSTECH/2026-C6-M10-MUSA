@@ -188,8 +188,6 @@ namespace C6Lab
         private int blockedSide;
         private float blockSecondsLeft;
         private LabOrbEdgeBlock edgeBlock;
-        /// <summary>2:2 fever (#281): how much bigger a turned orb starts, and how long it takes to settle.</summary>
-        private const float FeverTurnScale = 1.45f, FeverTurnSeconds = .35f;
         // 2:2 (#281): the closed outer edge of this board for the whole battle.
         private int teamWallSide;
         private LabOrbTeamWall teamWall;
@@ -451,7 +449,8 @@ namespace C6Lab
                     existing.JigwiABScale = jigwiABScale;
                     existing.View.Configure(id, kind, RadiusFor(kind, small, jigwiScale, jigwiABScale), element);
                     if (shrinking) existing.View.PlayShrink(1f / config.BlastShrinkScale, ShrinkSeconds);
-                    else if (feverTurned) existing.View.PlayShrink(FeverTurnScale, FeverTurnSeconds);
+                    // How much bigger it starts and how long it takes to settle: LabConfig (#293).
+                    else if (feverTurned) existing.View.PlayShrink(config.TeamFeverTurnScale, config.TeamFeverTurnSeconds);
                     existing.View.Body.mass = kind == LabOrbKind.Bomb ? config.BombMass : 1f;
                     SetLayerRecursively(existing.View.transform, this.gameObject.layer);
                 }
@@ -462,7 +461,7 @@ namespace C6Lab
                 existing.View.SetBurn(burnSeconds);
                 existing.View.SetJigwiABBurn(jigwiABBurnSeconds, jigwiABHeld);
                 existing.View.SetLife(lifeSeconds);
-                existing.View.SetFever(fever);
+                existing.View.SetFever(fever, config.TeamFeverRingScale, config.TeamFeverRingAlpha);
                 existing.View.SetFiveColor(fiveColor);
                 if (fiveColor) fiveColorIds.Add(id); else fiveColorIds.Remove(id);
                 SetBodyMode(existing);
@@ -486,7 +485,7 @@ namespace C6Lab
             view.SetBurn(burnSeconds);
             view.SetJigwiABBurn(jigwiABBurnSeconds, jigwiABHeld);
             view.SetLife(lifeSeconds);
-            view.SetFever(fever);
+            view.SetFever(fever, config.TeamFeverRingScale, config.TeamFeverRingAlpha);
             view.SetFiveColor(fiveColor);
             if (fiveColor) fiveColorIds.Add(id);
             SetLayerRecursively(gameObject.transform, gameObject.layer);

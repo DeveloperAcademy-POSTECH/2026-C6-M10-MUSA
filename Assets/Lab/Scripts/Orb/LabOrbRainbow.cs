@@ -9,11 +9,13 @@ namespace C6Lab
     /// </summary>
     public sealed class LabOrbRainbow : MonoBehaviour
     {
-        private const float RingScale = 2.9f, TurnDegreesPerSecond = 140f, ShimmerHz = 2.2f;
+        /// <summary>The ring's default size in orb radii and brightest opacity (#293 tunes both in LabConfig).</summary>
+        public const float DefaultRingScale = 2.9f, DefaultRingAlpha = 1f;
+        private const float TurnDegreesPerSecond = 140f, ShimmerHz = 2.2f;
         private const int RingOrder = 0;
         private static Sprite ringSprite;
         private SpriteRenderer ring;
-        private float age;
+        private float age, peak = DefaultRingAlpha;
 
         public bool Visible => ring != null && ring.gameObject.activeSelf;
 
@@ -25,8 +27,9 @@ namespace C6Lab
             return item.AddComponent<LabOrbRainbow>();
         }
 
-        public void Show(bool shown, float radius)
+        public void Show(bool shown, float radius, float ringScale = DefaultRingScale, float ringAlpha = DefaultRingAlpha)
         {
+            peak = Mathf.Clamp01(ringAlpha);
             if (ring == null)
             {
                 if (!shown) return;
@@ -38,7 +41,7 @@ namespace C6Lab
                 ring.sortingOrder = RingOrder;
             }
             if (ring.gameObject.activeSelf != shown) ring.gameObject.SetActive(shown);
-            ring.transform.localScale = Vector3.one * (RingScale * Mathf.Max(.01f, radius));
+            ring.transform.localScale = Vector3.one * (Mathf.Max(.01f, ringScale) * Mathf.Max(.01f, radius));
         }
 
         private void Update()
@@ -46,7 +49,7 @@ namespace C6Lab
             if (!Visible) return;
             age += Time.deltaTime;
             ring.transform.localRotation = Quaternion.Euler(0f, 0f, -age * TurnDegreesPerSecond);
-            ring.color = new Color(1f, 1f, 1f, .78f + .22f * Mathf.Sin(age * ShimmerHz * 2f * Mathf.PI));
+            ring.color = new Color(1f, 1f, 1f, peak * (.78f + .22f * Mathf.Sin(age * ShimmerHz * 2f * Mathf.PI)));
         }
 
         /// <summary>One unit across: a soft ring whose hue runs once around it.</summary>

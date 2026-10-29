@@ -11,13 +11,15 @@ namespace C6Lab
     public sealed class LabOrbTeamWall : MonoBehaviour
     {
         private const float GlowShare = .07f, LineShare = .012f;
-        private const float GlowAlpha = .32f, LineAlpha = .75f, FlashSeconds = .35f;
+        private const float GlowAlpha = .32f, LineAlpha = .75f;
+        /// <summary>How long a bounce lights the wall and how much it adds to the glow by default (#293 tunes both).</summary>
+        public const float DefaultFlashSeconds = .35f, DefaultFlashBoost = .4f;
         private const int GlowOrder = -20, LineOrder = -19;
         private static readonly Color Ink = new Color(.24f, .2f, .16f);
         private static Sprite glowSprite, lineSprite;
 
         private SpriteRenderer glow, line;
-        private float flash;
+        private float flash, flashSeconds = DefaultFlashSeconds, flashBoost = DefaultFlashBoost;
 
         public bool Visible => glow != null && glow.gameObject.activeSelf;
         public bool Right { get; private set; }
@@ -48,8 +50,13 @@ namespace C6Lab
             Pose();
         }
 
-        /// <summary>Something just bounced off the wall.</summary>
-        public void Flash() => flash = FlashSeconds;
+        /// <summary>Something just bounced off the wall: it lights up for seconds, the glow raised by boost at first.</summary>
+        public void Flash(float seconds = DefaultFlashSeconds, float boost = DefaultFlashBoost)
+        {
+            flashSeconds = Mathf.Max(0f, seconds);
+            flashBoost = Mathf.Clamp(boost, 0f, 1f - GlowAlpha);
+            flash = flashSeconds;
+        }
 
         public void Hide()
         {
@@ -66,9 +73,10 @@ namespace C6Lab
 
         private void Pose()
         {
-            float lift = flash / FlashSeconds;
-            glow.color = new Color(Ink.r, Ink.g, Ink.b, Mathf.Min(1f, GlowAlpha + .4f * lift));
-            line.color = new Color(Ink.r, Ink.g, Ink.b, Mathf.Min(1f, LineAlpha + .25f * lift));
+            float lift = flashSeconds > 0f ? flash / flashSeconds : 0f;
+            // The line brightens with the glow, at the same 0.25 : 0.4 share as before.
+            glow.color = new Color(Ink.r, Ink.g, Ink.b, Mathf.Min(1f, GlowAlpha + flashBoost * lift));
+            line.color = new Color(Ink.r, Ink.g, Ink.b, Mathf.Min(1f, LineAlpha + flashBoost * .625f * lift));
         }
 
         private void EnsureParts()

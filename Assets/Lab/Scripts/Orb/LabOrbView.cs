@@ -398,15 +398,16 @@ namespace C6Lab
             return sprite;
         }
 
-        /// <summary>2:2 fever (#281): a rainbow ring around an orb a team fever made or turned.</summary>
-        public void SetFever(bool shown)
+        /// <summary>2:2 fever (#281): a rainbow ring around an orb a team fever made or turned. Size and brightness: #293.</summary>
+        public void SetFever(bool shown, float ringScale = LabOrbRainbow.DefaultRingScale,
+            float ringAlpha = LabOrbRainbow.DefaultRingAlpha)
         {
             if (rainbow == null)
             {
                 if (!shown) return;
                 rainbow = LabOrbRainbow.Create(transform);
             }
-            rainbow.Show(shown, visualRadius);
+            rainbow.Show(shown, visualRadius, ringScale, ringAlpha);
         }
 
         public bool FeverShown => rainbow != null && rainbow.Visible;

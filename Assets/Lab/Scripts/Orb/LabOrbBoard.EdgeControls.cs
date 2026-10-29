@@ -204,7 +204,7 @@ namespace C6Lab
                 body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
                 body.linearVelocity = OnPlane(new Vector2(-velocity.x * config.OrbRestitution, velocity.y));
                 TeamWallBounces++;
-                if (teamWall != null) teamWall.Flash();
+                if (teamWall != null) teamWall.Flash(config.TeamWallFlashSeconds, config.TeamWallFlashBoost);
                 return;
             }
             if (kind == LabEdgeCrossingKind.Swipe && blockedSide == (right ? 1 : -1))
