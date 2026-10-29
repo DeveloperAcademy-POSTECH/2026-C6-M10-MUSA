@@ -3398,3 +3398,20 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 오류 경계 리뷰 보완: 명시적 해상도/Profile 변경에서도 renderer를 재생성해 GPU 오류 뒤 복구할 수 있게 하고, 부분 RT 생성 예외의 로컬 리소스를 회수했다. 조용한 frame의 자동 할당 재시도는 하지 않는다. 수동 fault injection으로 GPU할당실패를 재현한 검사는 미실행이다.
 - 최종 에디터: Home, Edit 상태. 컴파일과 실제 GPU 출력 확인 완료. 개인 기기 식별자·원시 테스트 로그·빌드 결과물은 커밋하지 않았다.
 - **미실행:** 실제 LAN/핫스팟·다기기, 실제2:2/피버 연속 플레이, iOS export/서명/설치, iPhone CPU/GPU 시간·메모리·발열.1024기준 신규 RT22MiB/기존포함28MiB는 원시 픽셀 계산이며 모바일 실측이 아니다.
+
+## 2026-10-29 · #293 2:2 땅따먹기 2분·구미호 BGM·선명한 칠
+
+- 브랜치 `fix/#293-team-territory-qa`(최신 main `5c644ef3` 병합 후). 막대 UI는 그대로 두고(가운데 원형 게이지 안은 보류), 시간과 노래만 바꿨다.
+- **2분**: Hapio 2:2 방의 제한 시간 197을 `StageCatalog`의 `Territory Default Values`에 120초로 저장했다(Editor API, 파일 변경 2줄). 197은 2:2 탭에서만 보이는 칸이라 스토리·Lab에는 영향이 없다. Lab 단독 DEV 솔로 2:2는 `LabConfig.asset`의 180초 그대로다. `LabConfig.asset`과 Home·Lobby DEV 칸 기본값은 바꾸지 않았다.
+- **승패**: 덮어쓰기 허용과 "한 팀이 모든 칸을 차지하면 바로 승리, 아니면 시간이 끝날 때 칸이 많은 팀 승리(같으면 무승부)"는 그대로다.
+- **박 칠 색이 흐린 문제(수정)**: main에 들어온 #369 수채 표현이 전투에서 켜져 있어 칠이 반투명하게 겹쳤다(농도 0.62 → 첫 명중 진하기 대략 40~70%, 셰이더 식으로 어림한 값). 2:2는 청·홍이 한눈에 갈려야 하므로 `LabGourdPaint`가 `snapshot.teamTerritory`인 판에서는 수채를 끄고 기존 고해상도 칠을 쓴다. 스토리 스테이지와 `WatercolorProfile`은 그대로다. 판정·점유율 계산은 바뀌지 않는다(표시만).
+- **노래**: `LabBattleBgm`이 라운드 시작 때 `snapshot.teamTerritory`이면 구미호 스테이지 곡(`Audio/GumihoBGM`, 크기 `Gumiho Bgm Volume`)을 튼다. 2:2에는 구미호 피버(`feverTimeAt`)·야광귀 피버가 없어 피버 곡은 나오지 않고, 팀 피버에도 곡을 바꾸지 않는다.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 2:2 설정 생성(Editor eval) | PASS | `CreateTerritoryConfig().TeamBattleSeconds = 120`, 스테이지1 프로필의 197은 180 그대로(쓰이지 않음), 카탈로그 `Validate` 통과. Test Runner가 아니다 |
+| 열린 Editor 재컴파일 | PASS | 오류 0 |
+| EditMode·PlayMode | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| 4인 2:2 실제 플레이 | NOT_RUN | 2분 체감, BGM 크기, 청·홍 칠이 선명한지 |
+
+- 바뀐 검사: Hapio `GameTerritoryFlowTests.TheTerritoryRoomKeepsItsOwnStaminaAndOrbLifetimeApartFromTheStory`(2:2 197 = 120초), PlayMode `LabBattleBgmStageTests.StageSongsSelectTheGumihoClipForTheGumihoStageAndTheTerritoryRoom`(2:2는 구미호 곡), PlayMode `LabGourdPaintTests.TheTerritoryRoomPaintsWithTheSolidColorsInsteadOfWatercolor`(2:2 판은 수채 끔, 스토리 판은 다시 켜짐).
