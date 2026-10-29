@@ -134,6 +134,12 @@ namespace Hapio.Editor
                 view.nextButton.gameObject.SetActive(false);
                 view.nextButton.interactable = false; // GameScreen initializes Host/Guest actions before the first frame.
                 if (victory) view.viewerButton = Button("InspectSealedGourd", view.design, "구미호 봉인 박 확인", 61, 664, 280, 58, Ink, 24);
+                if (victory)
+                {
+                    // 2:2 (#293) shares this page: the winning team's watercolour corners, blue for 청 and red for 홍.
+                    view.blueTeamBackground = AssetDatabase.LoadAssetAtPath<Texture2D>(Art + "DefeatBackground.png");
+                    view.redTeamBackground = AssetDatabase.LoadAssetAtPath<Texture2D>(Art + "VictoryBackground.png");
+                }
                 view.homeButton = Button("LeaveRun", view.design, "나가기", 61, 734, 280, 58, Html("9d9586"), 24);
                 screen.resultView = view;
                 if (screen.viewerPanel != null) screen.viewerPanel.transform.SetAsLastSibling();

@@ -390,5 +390,33 @@ namespace C6Lab.Tests
             Assert.That(delta.checkpoint, Is.False);
             Assert.That(delta.states.Any(state => state.id == kept.id && state.fever), Is.True);
         }
+
+        [Test]
+        public void TheTerritoryLookIsTunedInTheInspectorFromTodaysNumbers()
+        {
+            // #293: the effect numbers left the code for the Inspector; the defaults are the look as it was.
+            var fresh = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                Assert.That(fresh.TeamFeverRingScale, Is.EqualTo(LabOrbRainbow.DefaultRingScale));
+                Assert.That(fresh.TeamFeverRingAlpha, Is.EqualTo(LabOrbRainbow.DefaultRingAlpha));
+                Assert.That(new[] { fresh.TeamFeverGlowMin, fresh.TeamFeverGlowMax, fresh.TeamFeverGlowReach },
+                    Is.EqualTo(new[] { .45f, .8f, .3f }));
+                Assert.That(new[] { fresh.TeamFeverTurnScale, fresh.TeamFeverTurnSeconds }, Is.EqualTo(new[] { 1.45f, .35f }));
+                Assert.That(fresh.TeamWallFlashSeconds, Is.EqualTo(LabOrbTeamWall.DefaultFlashSeconds));
+                Assert.That(fresh.TeamWallFlashBoost, Is.EqualTo(LabOrbTeamWall.DefaultFlashBoost));
+
+                float[] shared = fresh.CaptureDeveloperValues();
+                JsonUtility.FromJsonOverwrite("{\"teamFeverRingScale\":9,\"teamFeverGlowMin\":0.9,\"teamFeverGlowMax\":0.2,"
+                    + "\"teamFeverTurnScale\":0.5,\"teamWallFlashBoost\":5}", fresh);
+                Assert.That(fresh.TeamFeverRingScale, Is.EqualTo(5f));
+                Assert.That(fresh.TeamFeverGlowMax, Is.EqualTo(fresh.TeamFeverGlowMin), "The strongest glow is never fainter than the faintest.");
+                Assert.That(fresh.TeamFeverTurnScale, Is.EqualTo(1f), "1 means the turned orb does not swell.");
+                Assert.That(fresh.TeamWallFlashBoost, Is.EqualTo(.68f), "A flash never pushes the wall past fully opaque.");
+                Assert.That(fresh.CaptureDeveloperValues(), Is.EqualTo(shared),
+                    "Inspector only: no DEV value moves, so the shared settings and the connection version stay as they were.");
+            }
+            finally { Object.DestroyImmediate(fresh); }
+        }
     }
 }

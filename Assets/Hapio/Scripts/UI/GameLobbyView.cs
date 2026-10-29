@@ -41,6 +41,8 @@ namespace Hapio
         [Tooltip("Heading, hint, room paper, room name, joined, selected and start button. In a 2:2 room each moves to the matching anchor below.")]
         public RectTransform[] teamShifted, teamShiftAnchors;
         public int teamHeadingFontSize = 29, teamLocalLabelFontSize = 20, teamStartFontSize = 25;
+        [Tooltip("2:2 빈 자리 점선 동그라미 (#293): 청팀 P1·P2는 파란 점선, 홍팀 P3·P4는 빨간 점선. 비어 있으면 스토리와 같은 자리별 그림을 쓴다.")]
+        public Sprite blueTeamEmptySlot, redTeamEmptySlot;
         [HideInInspector] public int teamLobbyDesignRevision;
 
         private GameSession session;
@@ -287,6 +289,13 @@ namespace Hapio
             roomTemplate.gameObject.SetActive(false);
         }
 
+        /// <summary>2:2 (#293): an empty seat's dashed circle in its team's colour, or the seat's own when none is saved.</summary>
+        private Sprite TeamEmptySlot(int seat)
+        {
+            Sprite team = LabTeams.TeamOfSeat(seat) == LabTeam.Blue ? blueTeamEmptySlot : redTeamEmptySlot;
+            return team != null ? team : emptySlots[seat];
+        }
+
         private void RefreshPositions()
         {
             int count = Network.TargetParticipantCount;
@@ -320,7 +329,7 @@ namespace Hapio
                 CopyRect(anchors[i], (RectTransform)slotButtons[i].transform);
                 ulong owner = Network.GetSlotOwner(i + 1);
                 bool occupied = owner != ulong.MaxValue, mine = occupied && owner == Network.LocalPlayerId;
-                slotImages[i].sprite = occupied ? filledSlots[i] : emptySlots[i];
+                slotImages[i].sprite = occupied ? filledSlots[i] : team ? TeamEmptySlot(i) : emptySlots[i];
                 slotImages[i].rectTransform.localEulerAngles = new Vector3(0, 0, 180);
                 slotLabels[i].text = "P" + (i + 1);
                 slotLabels[i].color = ColorOf(occupied ? "F6F6F6" : "3F3D38");

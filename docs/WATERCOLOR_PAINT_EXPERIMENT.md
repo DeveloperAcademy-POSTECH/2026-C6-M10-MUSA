@@ -4,6 +4,8 @@
 
 파란 정적 시안은 사용자 확인을 받았으며, 같은 표현을 실제 `LabGourdPaint`의 고해상도 경로에 연결했다. 최초 박 연결 때 `Resources/GourdPaint/WatercolorProfile`을 읽는다. 고해상도 표현과 Profile의 `enabled`가 모두 켜져 있을 때 적용하며, 지원하지 않는 GPU나 생성 실패에서는 기존 고해상도 표현으로 대체한다. 게임 도색 지도·100% 완료·소유권·네트워크 규약을 변경하지 않는다.
 
+2:2 땅따먹기 판(`snapshot.teamTerritory`)에서는 수채 표현을 끄고 기존 고해상도 칠을 쓴다(#293). 칠이 반투명하게 겹쳐 청·홍 구분이 흐려지기 때문이다. 스토리 스테이지는 그대로 수채다.
+
 설정 에셋은 `Assets/Lab/Resources/GourdPaint/WatercolorProfile.asset`이다. Inspector에서 표현만 조절한다. 기존 Host 공통 LabConfig의 수치 인덱스나 DEV 전파 배열에는 추가하지 않았다.
 
 | 표현 항목 | 승인 기본값 |

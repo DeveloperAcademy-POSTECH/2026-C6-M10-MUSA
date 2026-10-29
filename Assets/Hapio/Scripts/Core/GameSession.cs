@@ -189,6 +189,7 @@ namespace Hapio
                     PrepareStage();
             }
             if (goingHome) return;
+            ObserveTerritoryFevers();
             if (state.phase == GameFlowPhase.Home && network.IsConnected)
             {
                 if (network.IsHost) { hostFlow.EnterLobby(hostMode); SetHostState(); }

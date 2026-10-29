@@ -364,7 +364,7 @@ namespace C6Lab
             if (teamFever == null) teamFever = LabTeamFever.Create((RectTransform)battleUi.transform, font);
             LabTeam team = LabTeams.TeamOf(snapshot, network.LocalPlayerId);
             teamBar.Present(snapshot, team, localPlayerCircle, network.config != null ? network.config.TeamFeverHits : 0);
-            teamFever.Present(snapshot, team);
+            teamFever.Present(snapshot, team, network.config);
         }
 
         /// <summary>The 2:2 fever banner and edge glow (#281), created on the first team battle.</summary>

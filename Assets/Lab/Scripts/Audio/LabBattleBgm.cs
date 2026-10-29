@@ -9,8 +9,9 @@ namespace C6Lab
     /// - 일시정지: 멈춤 → 다시 시작하면 멈춘 지점부터 이어서
     /// - 승리/패배: 서서히 꺼짐
     /// 곡은 Resources/Audio/BGM 폴더의 첫 번째 소리 파일을 쓴다. 파일이 없으면 조용히 넘어간다.
-    /// - 구미호 스테이지 (#351): Resources/Audio/GumihoBGM 폴더에 곡이 있으면 그 곡을 대신 튼다 (크기는 LabConfig의
-    ///   Gumiho Bgm Volume). 어느 곡을 틀지는 라운드가 시작될 때 정한다. 다른 스테이지·2:2·Lab 단판은 기본 전투 BGM.
+    /// - 구미호 스테이지 (#351)와 2:2 땅따먹기 (#293): Resources/Audio/GumihoBGM 폴더에 곡이 있으면 그 곡을 대신 튼다
+    ///   (크기는 LabConfig의 Gumiho Bgm Volume). 어느 곡을 틀지는 라운드가 시작될 때 정한다. 야광귀·지귀·Lab 단판은
+    ///   기본 전투 BGM. 2:2에는 피버타임 곡이 없다(팀 피버에도 곡을 바꾸지 않는다).
     /// - 야광귀 피버타임 (#343): 피버가 시작되면 Resources/Audio/Fever 폴더의 첫 파일(휘모리처럼 점점 빨라지는 꽹과리 +
     ///   태평소 능게, 피버 20초에 맞춘 곡)로 바꿔 처음부터 튼다. 늦게 들어온 기기는 피버가 흐른 만큼 건너뛰어 맞춘다.
     ///   전투 BGM은 그동안 줄여 둔다. 일시정지·승리/패배·새 라운드는 전투 BGM과 똑같이 다룬다.
@@ -198,11 +199,11 @@ namespace C6Lab
                 string round = snapshot.sessionId + ":" + snapshot.round;
                 if (round != playingRound)
                 {
-                    // 새 라운드는 처음부터. 구미호 스테이지면 구미호 전투 BGM (#351).
+                    // 새 라운드는 처음부터. 구미호 스테이지 (#351)와 2:2 (#293)는 구미호 전투 BGM.
                     playingRound = round;
                     fading = false;
                     StopFever();
-                    gumihoBgm = network.GameStageYokai == LabStageYokai.Gumiho && gumihoClip != null;
+                    gumihoBgm = (network.GameStageYokai == LabStageYokai.Gumiho || snapshot.teamTerritory) && gumihoClip != null;
                     source.Stop();
                     source.clip = gumihoBgm ? gumihoClip : battleClip;
                     source.volume = TargetVolume;

@@ -14,11 +14,14 @@ namespace C6Lab
         private const float BannerSeconds = 1.6f, PopSeconds = .3f, FadeSeconds = .4f;
         /// <summary>A fever seen later than this after it began, for example after a reconnect, is not announced.</summary>
         private const double AnnounceWindowSeconds = 1.5d;
-        private const float GlowLow = .45f, GlowHigh = .8f, GlowHz = 1.6f, GlowFadeSeconds = .4f;
-        /// <summary>How far in from each screen edge the glow reaches, as a share of the screen.</summary>
-        private const float GlowReach = .3f;
+        private const float GlowHz = 1.6f, GlowFadeSeconds = .4f;
+        /// <summary>Default faintest and strongest glow and how far in from each screen edge it reaches (#293 tunes them).</summary>
+        private const float GlowLow = .45f, GlowHigh = .8f, GlowReach = .3f;
         public const string BannerTitle = "피버타임!", BannerLine = "마구 던져버리자!!";
         private static Sprite glowSprite;
+        private static readonly System.Collections.Generic.Dictionary<int, Sprite> reachSprites =
+            new System.Collections.Generic.Dictionary<int, Sprite>();
+        private float glowReach = GlowReach;
 
         private Image glow;
         private RectTransform banner;
@@ -47,8 +50,11 @@ namespace C6Lab
             return fever;
         }
 
-        /// <summary>Announces each new fever once, and breathes the edge glow while this player's team is in one.</summary>
-        public void Present(LabSnapshot snapshot, LabTeam localTeam)
+        /// <summary>
+        /// Announces each new fever once, and breathes the edge glow while this player's team is in one. The glow's
+        /// strength and thickness come from config (#293); without it they keep their defaults.
+        /// </summary>
+        public void Present(LabSnapshot snapshot, LabTeam localTeam, LabConfig config = null)
         {
             if (!gameObject.activeSelf) gameObject.SetActive(true);
             if (snapshot == null) { Hide(); return; }
@@ -58,8 +64,15 @@ namespace C6Lab
             float delta = Time.unscaledDeltaTime;
             AdvanceBanner(delta);
             bool mine = localTeam != LabTeam.None && snapshot.FeverOn(localTeam);
-            float breathe = GlowLow + (GlowHigh - GlowLow) * (.5f + .5f * Mathf.Sin(Time.unscaledTime * GlowHz * 2f * Mathf.PI));
-            glowAlpha = mine ? breathe : Mathf.MoveTowards(glowAlpha, 0f, delta * GlowHigh / GlowFadeSeconds);
+            float low = config != null ? config.TeamFeverGlowMin : GlowLow, high = config != null ? config.TeamFeverGlowMax : GlowHigh;
+            float reach = config != null ? config.TeamFeverGlowReach : GlowReach;
+            if (!Mathf.Approximately(reach, glowReach))
+            {
+                glowReach = reach;
+                glow.sprite = GlowSprite(reach);
+            }
+            float breathe = low + (high - low) * (.5f + .5f * Mathf.Sin(Time.unscaledTime * GlowHz * 2f * Mathf.PI));
+            glowAlpha = mine ? breathe : Mathf.MoveTowards(glowAlpha, 0f, delta * Mathf.Max(.01f, high) / GlowFadeSeconds);
             Color team = localTeam == LabTeam.Red ? LabTeamBar.Red : LabTeamBar.Blue;
             glow.color = new Color(team.r, team.g, team.b, glowAlpha);
             if (glow.gameObject.activeSelf != glowAlpha > 0f) glow.gameObject.SetActive(glowAlpha > 0f);
@@ -176,9 +189,19 @@ namespace C6Lab
         }
 
         /// <summary>White at the screen's edges, fading to clear well before its middle. Fever time (#334) shares it.</summary>
-        internal static Sprite GlowSprite()
+        internal static Sprite GlowSprite() => glowSprite != null ? glowSprite : glowSprite = CreateGlowSprite(GlowReach);
+
+        /// <summary>The same glow reaching another share of the screen inward (#293), made once per reach.</summary>
+        private static Sprite GlowSprite(float reach)
         {
-            if (glowSprite != null) return glowSprite;
+            if (Mathf.Approximately(reach, GlowReach)) return GlowSprite();
+            int key = Mathf.RoundToInt(reach * 1000f);
+            if (reachSprites.TryGetValue(key, out Sprite sprite) && sprite != null) return sprite;
+            return reachSprites[key] = CreateGlowSprite(reach);
+        }
+
+        private static Sprite CreateGlowSprite(float reach)
+        {
             const int size = 64;
             var pixels = new Color32[size * size];
             for (int y = 0; y < size; y++)
@@ -187,7 +210,7 @@ namespace C6Lab
                     float u = (x + .5f) / size, v = (y + .5f) / size;
                     float edge = Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v));
                     // Solid at the very edge and fading inward slowly, so the colour reads clearly around the screen.
-                    float alpha = Mathf.Pow(1f - Mathf.Clamp01(edge / GlowReach), 1.4f);
+                    float alpha = Mathf.Pow(1f - Mathf.Clamp01(edge / Mathf.Max(.01f, reach)), 1.4f);
                     pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
                 }
             var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
@@ -197,10 +220,10 @@ namespace C6Lab
             };
             texture.SetPixels32(pixels);
             texture.Apply(false, true);
-            glowSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
-            glowSprite.name = "Lab team fever glow";
-            glowSprite.hideFlags = HideFlags.DontSave;
-            return glowSprite;
+            var created = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
+            created.name = "Lab team fever glow";
+            created.hideFlags = HideFlags.DontSave;
+            return created;
         }
     }
 }

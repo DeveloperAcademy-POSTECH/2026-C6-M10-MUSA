@@ -283,7 +283,10 @@ namespace C6Lab
             bool pendingVisual = highResolution != null && (highResolution.HasPendingWork
                 || (highResolution.Error == null && !highResolution.Ready));
             LabWatercolorPaintSettings watercolorSettings = watercolorProfile != null ? watercolorProfile.settings : null;
-            bool watercolorEnabled = highResolutionEnabled && watercolorSettings != null && watercolorSettings.enabled;
+            // 2:2 땅따먹기 (#293)는 청·홍이 한눈에 갈려야 해서 반투명한 수채(#369) 대신 기존 선명한 고해상도 칠을 쓴다.
+            bool teamTerritory = network != null && network.Snapshot != null && network.Snapshot.teamTerritory;
+            bool watercolorEnabled = highResolutionEnabled && !teamTerritory
+                && watercolorSettings != null && watercolorSettings.enabled;
             int watercolorSettingsHash = watercolorSettings != null ? watercolorSettings.Fingerprint : 0;
             bool watercolorChanged = appliedWatercolorEnabled != watercolorEnabled
                 || appliedWatercolorSettings != watercolorSettingsHash;

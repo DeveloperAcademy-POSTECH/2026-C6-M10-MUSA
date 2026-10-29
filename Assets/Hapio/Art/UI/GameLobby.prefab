@@ -3831,7 +3831,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 334d406727f5e43d3869e03b628943ac, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabRoundedGraphic
   m_Material: {fileID: 0}
   m_Color: {r: 0.24705882, g: 0.23921569, b: 0.21960784, a: 1}
@@ -7821,6 +7821,8 @@ MonoBehaviour:
   teamHeadingFontSize: 29
   teamLocalLabelFontSize: 20
   teamStartFontSize: 25
+  blueTeamEmptySlot: {fileID: 21300000, guid: ef1fa53936122415d9b56a49c6894742, type: 3}
+  redTeamEmptySlot: {fileID: 21300000, guid: bf016919f954f4ba7a4e59461c1dbe07, type: 3}
   teamLobbyDesignRevision: 3
 --- !u!1 &6053312028851996347
 GameObject:
@@ -9430,7 +9432,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 334d406727f5e43d3869e03b628943ac, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabRoundedGraphic
   m_Material: {fileID: 0}
   m_Color: {r: 0.24705882, g: 0.23921569, b: 0.21960784, a: 1}

@@ -313,6 +313,61 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd()
+        {
+            session.StartSolo(GameMode.Territory);
+            yield return WaitPlaying(1);
+            Assert.That(session.IsTerritory, Is.True);
+            Assert.That(session.State.totalStages, Is.EqualTo(1));
+            Assert.That(network.Snapshot.teamTerritory, Is.True);
+            Assert.That(network.config.TeamBattleSeconds, Is.EqualTo(120f));
+            Assert.That(network.Snapshot.remaining, Is.InRange(110d, 120d));
+            var livePaint = Object.FindFirstObjectByType<LabGourdPaint>();
+            Assert.That(livePaint.HighResolutionActive, Is.True);
+            Assert.That(livePaint.WatercolorActive, Is.False, "Only the team battle uses the opaque high-resolution presentation.");
+
+            // Complete the real CPU map as a fixture; this is result-flow coverage, not a projectile hit test.
+            LabPaintSurface surface = Model().PaintSurface;
+            Color32 blue = LabPaintSurface.Opaque(Model().PaintColorFor(LabOrbElement.Water));
+            var pixels = Enumerable.Repeat(blue, surface.CellCount).ToArray();
+            var owners = Enumerable.Repeat((byte)network.LocalSlotNumber, surface.CellCount).ToArray();
+            Assert.That(surface.TryReplacePixels(surface.Columns, surface.Rows, surface.Revision + 1,
+                pixels, owners, 1), Is.True);
+            yield return Until(() => session.State.phase == GameFlowPhase.Completed && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.StageResult,
+                "The actual team sweep must reach the saved designed result Scene.");
+            Assert.That(session.ResultSnapshot.teamWinner, Is.EqualTo(LabTeam.Blue));
+            Assert.That(session.ResultSnapshot.blueCells, Is.EqualTo(surface.CellCount));
+            Assert.That(session.ResultSnapshot.redCells, Is.Zero);
+            GameScreen screen = Object.FindFirstObjectByType<GameScreen>();
+            GameStageResultView view = screen.resultView;
+            Assert.That(view.gameObject.activeInHierarchy, Is.True);
+            Assert.That(screen.legacyResultContent.activeSelf, Is.False);
+            Assert.That(view.stage.text, Is.EqualTo("2 : 2"));
+            Assert.That(view.judgment.text, Does.Contain("청팀"));
+            Assert.That(view.nextButton.gameObject.activeSelf, Is.False);
+            Assert.That(view.homeButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("나가기"));
+            Assert.That(view.rows.Find("Award_0/Player").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo("100.0%"));
+            yield return Until(() => view.viewerButton.interactable && view.homeButton.interactable,
+                "Local result readiness and the pointer-release shield must open the two actions.");
+            Texture preview = session.PreviewTexture;
+            Assert.That(preview, Is.Not.Null);
+            string result = JsonUtility.ToJson(session.ResultSnapshot);
+            view.viewerButton.onClick.Invoke();
+            yield return Until(() => session.IsViewerOpen && screen.viewerPanel.activeInHierarchy,
+                "The team result must open the same owned gourd preview.");
+            Assert.That(screen.viewerImage.texture, Is.SameAs(preview));
+            Assert.That(JsonUtility.ToJson(session.ResultSnapshot), Is.EqualTo(result));
+            screen.closeViewerButton.onClick.Invoke();
+            yield return Until(() => !session.IsViewerOpen && !screen.viewerPanel.activeSelf, "Closing the preview restores the team result.");
+            view.homeButton.onClick.Invoke();
+            yield return WaitHome();
+            Assert.That(network.IsConnected, Is.False);
+            Assert.That(session.RoomBrowserVisible, Is.False);
+            Assert.That(session.PreviewTexture, Is.Null);
+        }
+
+        [UnityTest]
         public IEnumerator SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload()
         {
             GameSession persistent = session;
