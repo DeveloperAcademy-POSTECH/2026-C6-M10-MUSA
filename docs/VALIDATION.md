@@ -1,5 +1,98 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-10-29 — #386 미사용 Target·Target2·GourdCrack·PackageInstaller 정리
+
+기준 main `5c2ce667`에서 `chore/#386-unused-target-assets` 별도 작업 공간을 준비했다. 원래 프로젝트의 main·HEAD·tracked diff·작업 상태·사용자 미추적 파일 기준은 전환하거나 수정하지 않았다. Unity6000.6.5f1·macOS ARM64·Metal batch Editor 한 개에서 확인했다.
+
+삭제 허용 목록은 `Assets/Lab/Art/Target`31개·`Target2`35개·`GourdCrack`8개(각 루트 메타 포함), `Assets/Editor/Bootstrap/PackageInstaller.cs`와 메타2개로 고정했다. 합계 **76파일·46GUID·4,391,767바이트**다. 작업 파일의 합계이며 Git 이력 크기나 빌드 용량 감소를 측정한 값은 아니다. 옛 박 모델·재질·애니메이션·크랙 Shader와 해당 재질만 다루는 Editor 메뉴, 초기 패키지 설치 후 종료하던 일회 도구만 제거했다. 패키지를 제거하거나 설정을 바꾸지 않았다.
+
+보존 tracked 텍스트2,000개에서 후보 GUID46개의 외부 참조0을 재확인했고, 구체 경로·Resources/Shader 동적 로딩·두 MaterialTools·PackageInstaller 호출도 보존 코드에서 찾지 못했다. `LabPaintOnlyUpgrade`의 퇴역 타입 이름은 없어진 컴포넌트를 안전하게 건너뛰는 이관 코드이며 자산 로딩이 아니므로 유지했다. 과거 문서의 Crack 설명도 현재 런타임 연결 근거로 간주하지 않았다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| 삭제 전 실제 Unity 의존성 | **PASS** | `AssetDatabase.GetDependencies`로 보존 에셋1,081개·Scene7개·Prefab43개를 조회. 삭제 후보에 대한 의존성0 |
+| 삭제 후 실제 Unity 의존성 | **PASS** | 같은 보존 에셋의 경로·GUID·재귀 의존성 배열이 삭제 전과 전부 동일. 후보 의존성0 |
+| 재컴파일 | **PASS** | completed·failed/compilationFailed=false·errors0 |
+| Hapio EditMode 전체 | **141/141 PASS**, 0.80초 | #381 카탈로그·저장 Scene/참조·기존 스테이지/설정·게임 흐름 |
+| `LabGourdHitboxTests` | **7/7 PASS**, 2.56초 | 현행 저장 박의 실제 셸·충돌체 경로 |
+| `LabGourdPaintTests` | **8/8 PASS**, 10.10초 | 기존 도색·초기화·표면/표현 연결 |
+| `LabHighResolutionPaintRuntimeTests` | **2/2 PASS**, 0.07초 | 고해상도 런타임 경로 |
+| `LabWatercolorPaintRuntimeTests` | **7/7 PASS**, 5.74초 | #369 수채 표현·맵/소유권·자원 수명 |
+| `GameYokaiPresentationTests` | **2/2 PASS**, 0.01초 | 공통 검은 요괴·WhiteGourd 연결 |
+| `GameSceneFlowTests.SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay` | **1/1 PASS**, 5.11초 | 실제 저장 Home→Battle 표현 준비·공유 카운트다운→Playing |
+| 변경·로컬 보존 | **PASS** | 허용76개 삭제+이 검증 문서만 변경. 보존 Runtime·Scene·Prefab·Resources·WhiteGourd·검은 요괴·수채·Config·Packages·테스트·#381 데이터는 기준 main과 동일. 원래 프로젝트의 main/HEAD/작업 상태·tracked diff·미추적 파일 기준 유지 |
+
+실행한 고유 검사는 EditMode141개와 PlayMode27개이며 실패/skip/inconclusive0이다. 기존 #380·#384의 전체514개 통과를 이번 정리의 실행 결과로 재사용하지 않는다. Test Runner 임시 Scene·자동 설정 변경이 남지 않았고 검사용 Editor는 정상 종료0이다. 원시 의존성 JSON·허용 목록/해시·실행 로그는 저장소 밖에 보관했다. TargetSpinGradient·다른 실험 도구·중복 테스트·로컬 IDE/Builds/Library·사용자 부모 메타파일은 변경하지 않았다.
+
+전체 Lab EditMode·전체 PlayMode·Mac/iOS 빌드·실기기 LAN/핫스팟·모바일 성능·손으로 하는 플레이 검증은 이번 작업에서 **미실행**이다. README 소개글과 기존 통합 지시서는 덮어쓰지 않았다.
+
+## 2026-10-29 — #380 도색 소유권 렌더 비교 조건 격리
+
+기준은 #378 병합 main `8d3cd58d`다. 별도 `fix/#380-paint-render-test-isolation` 작업 공간의 Unity6000.6.5f1·macOS ARM64·Metal batch Editor 한 개를 사용했다. 실제 도색·#369 수채·게임 판정·Scene·Prefab·머터리얼·설정·패키지는 변경하지 않았다.
+
+### 조사 결과와 확인 한계
+
+#378 전체 실행에서 실패한 것은 `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllFivePaintersWithoutChangingPaperAlphaOrCoverage`의 마지막 P0 이미지 완전 동일 비교다. 최초 보고는 index241380의 G163→162이며 전체 이미지가 한 픽셀만 달랐다는 뜻은 아니다. 기존 검사는 최초 중립 촬영과 마지막 비교 사이에 P1~P5별 박/카메라 이동·프레임 대기를 함께 수행하고, 촬영마다 실제 Scene의 표시 property block을 다시 읽었다. 무늬는 로컬 좌표지만 최종 셰이더 조명에는 world-space 미분·시선 반사가 포함되어 있다.
+
+임시 진단은 최초/최종 CPU 색/P 텍스처, 실제 표시 색/P 텍스처의 내용 해시·참조·규격, 머터리얼의 주요 값, 표시 property block, root/model/view/projection 행렬과 출력 PNG를 기록했다. 클래스·관련 묶음·전체 실행의 각13회 촬영에서 최초/최종 중립 조건 차이0·RGBA 차이 픽셀0이었다. **과거1단계 차이는 재현하지 못했으며, GPU 반올림·이전 검사 누수·수채 갱신 중 하나를 확정 원인으로 주장하지 않는다.** 추가 readback을 삽입한 진단 실행은 관측 시점도 바꾸므로, 이 통과만으로 과거 현상의 해결을 증명하지 않는다. 선행 검사 간섭을 특정하지 못했으며 단순 왕복 float32 계산도 시작 위치로 복귀해 누적 위치 오차로 단정하지 않았다.
+
+확인된 검사 구조 문제는 정확한 소유권 비교와 이동 시 근사 비교를 같은 mutable rig에 섞었다는 점이다. 최종본은 이를 두 검사로 분리하고 입력·허용치를 보존했다. 고정 위치 검사의 P0 정확 비교는 즉시 및1프레임 뒤 모두 수행한다. 별도 이동 검사도5종 전부 무늬 가시성>100픽셀과 기존 평균 채널 오차 `<0.1`, CPU 색/P 맵·면적·셀 수 불변을 확인한다. 기존 assertion67개는 모두 유지하고8개를 추가했다. 촬영 helper는 RT.active를 Render 이전에 저장해 Render/readback/PNG 예외까지 복원한다. 이는 예외 격리 보완이며 과거 실패의 확정 원인과 구분한다. 임시 진단 코드는 최종 소스에서 제거했다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| 수정 전 렌더 클래스 | **4/4 PASS**, 3.29초 | main 테스트 그대로. 이번 환경에서 과거 차이 미재현 |
+| 임시 진단 보완 후 클래스 | **4/4 PASS**, 3.79초 | 최초/최종 비교 조건 및 출력 차이0 |
+| 임시 진단 보완 후 관련 도색 묶음 | **66/66 PASS**, 58.39초 | Paint 이름 필터. 실제 저장 박/고해상도/수채 설정 유지 |
+| 임시 진단 전체 PlayMode | **513/513 PASS**, 453.39초 | 실패/skip/inconclusive0. 진단 없는 최종본 결과와 구분 |
+| 최종본 재컴파일 | PASS | completed·failed/compilationFailed=false·errors0 |
+| 최종본 고정 위치 소유권 단독 | **1/1 PASS**, 1.88초 | P0 즉시/1프레임 후 정확 복원·기존5종 판정 |
+| 최종본 이동 단독 | **1/1 PASS**, 0.57초 | 5종 무늬 가시성·이동 `<0.1`·원본 데이터 불변 |
+| 최종본 렌더 클래스 | **5/5 PASS**, 3.75초 | 기존4개+분리한 이동1개 |
+| 최종본 관련 도색 묶음 | **67/67 PASS**, 58.94초 | 진단 제거·추가 이동 검사 포함 |
+| 최종본 전체 PlayMode | **514/514 PASS**, 456.27초 | 실패/skip/inconclusive0. 기존513개 이름 모두 유지·분리한 이동1개만 추가, 오프닝10개·#369 수채 런타임7개 포함 |
+
+첫 임시 진단 시도는 Material을 JsonUtility로 직렬화하려다 지원되지 않는 engine type 예외가 발생하여 대상 판정까지 도달하지 못했다. 같은66개 실행에서 별도 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell`의100초 정확 double 비교도99.999999999999986으로 실패했다(64PASS·2FAIL). 진단을 명시적 머터리얼 필드 기록으로 바로잡은 뒤 관련66개와 진단 전체513개가 통과했다. 이 지귀 검사·런타임·허용 오차는 수정하지 않았으며 첫 시도의 실패를 통과로 덮지 않는다. 클래스 필터 형식 오류로0개 실행한 준비 호출은 테스트 결과에 포함하지 않는다.
+
+원시 진단 JSON·PNG·로그와 비교 도구는 저장소 밖에 보관한다. EditMode 전체·Mac 독립 앱·iOS 빌드·실기기 LAN/핫스팟·모바일 성능은 이번 작업에서 미실행이다. 최종 전체 결과의 검사 이름을 대조해 기존513개 누락0·이동1개 추가만 확인했다. 검사용 Editor는 정상 종료0이며 Test Runner 임시 Scene·자동 설정 변경이 남지 않았다. 최종 변경은 기존 테스트1파일과 문서2파일뿐이다. 작업 중 원래 프로젝트는 별도 #381 작업의 `feat/#381-yokai-content-scaffold`/`bf6c32cc`를 거쳐 그 PR이 병합된 main `688947cd`로 진행됐다. #380에서는 그 폴더의 브랜치를 전환하거나 되돌리지 않았다. 이 결과의 검증 기준은 앞에 명시한 `8d3cd58d`이며, 후속 #381을 이번 검사 결과에 포함했다고 주장하지 않는다. 원래 폴더의 tracked diff·작업 상태·사용자 미추적 파일3개의 해시는 시작 때와 동일함을 확인했다. 이 별도 브랜치 진행을 #380의 변경으로 기록하지 않는다. 기존 #378 실패 이력은 아래에 유지한다.
+
+### 최신 main의 #381 통합 및 PR 준비
+
+#380 변경을 `65bd40de`로 커밋하고 최신 main `688947cd`(#383으로 병합한 #381)를 `86374714`에서 통합했다. Git의 자동 병합으로 충돌0건이며, 양쪽 VALIDATION 절을 보존했다. #381은 선택적 StageDefinition.content와 StageCatalog의 ID/Integrated 검증·제작용10종 데이터만 추가하며 기존3개 순서·공통 검은 모델·도색·Scene·프로토콜을 바꾸지 않는다. 최초 통합 시점의 최신 main 대비 차이는 동일한 테스트1파일과 문서2파일뿐이고, #381 검증 절은 최신 main과 바이트가 같다. 테스트 파일 집계는188개(실제 검사187+공통 helper1), assembly5개다.
+
+| 통합본 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| `Hapio.EditModeTests` 전체 | **141/141 PASS**, 1.01초 | #381 카탈로그11개·기존 스테이지/저장 참조/설정·게임 흐름 포함. Lab 전체 EditMode와 구분 |
+| 최초 통합본 전체 PlayMode | **514개 중513 PASS·1 FAIL**, 461.32초 | 도색5개·오프닝10개·수채7개 통과. 실패는 지귀100초 역산 정확 비교이며 아래 #384에서 구분 |
+| #384 수정 후 지귀 단독 | **1/1 PASS**, 13.39초 | 실제 저장 Home→3스테이지→A/B 검사. 정확 종료 시각 비교 이후 나머지 판정까지 수행 |
+| #384 수정 후 전체 PlayMode | **514/514 PASS**, 455.08초 | 실패/skip/inconclusive0. 기존514개 이름 동일, 도색5·오프닝10·수채7·지귀1 포함 |
+
+최초 통합 실행에서 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell`의100초 역산 비교가99.999999999999972로 실패했다. #381이 규칙을 바꾼 것이 아니라 기존 진단 중에도 관측한 별도 검사 오탐이다. 이 문제는 #384로 추적한다. `LabModel.ResetJigwiAB`는 동일 now를 startedAt에 저장하고 cutoffAt=now+100d를 계산하며, 스냅샷은 두 값을 산술 없이 복사한다. 같은 Unity C#에서 start100.2·cutoff200.2를 역산하면99.999999999999986으로100과 달라지지만 cutoff==start+100은 true임을 재현했다.
+
+#384 보완은 이 assertion을 `cutoffAt == startedAt + 100d`의 정확 비교로 바꾸고 주석1줄을 추가한 것이다. epsilon·Within·skip·재시도·게임 시계·100초 규칙·지귀/도색 runtime은 변경하지 않았다. 따라서 PR의 최종 범위는 테스트2파일·문서2파일이다. 기존 #380의67개 판정과 추가8개는 그대로이며, 별도 지귀 assertion1개의 비교식만 달라진다. 수정 후 컴파일 completed·failed/compilationFailed=false·errors0, 지귀 단독과 통합 전체를 위와 같이 확인했다. 테스트 이름514개는 수정 전 목록과 같다. 검사용 Editor는 정상 종료0이며 Test Runner 임시 Scene·자동 설정 변경 잔존0이다. 원래 프로젝트의 main `688947cd`·tracked diff·작업 상태·사용자 미추적 파일3개의 해시가 PR 준비 시작 시점과 동일함을 확인했다. 최종 diff는 테스트2파일·문서2파일만 포함하며 #381 런타임·데이터·메타와 실제 도색은 최신 main과 동일하다. 과거 도색1단계 차이의 원인 미확정과 실기기·빌드 미실행을 유지한다.
+
+## 2026-10-29 — #378 기본 batch 오프닝 입력 검사 자동 격리
+
+기준은 #369 병합까지 포함한 main `5c644ef3`이다. 별도 `fix/#378-opening-batch-test-isolation` 작업 공간과 Unity6000.6.5f1·macOS ARM64·Metal batch Editor 한 개를 사용했다. 외부 명령으로 InputSettings 포커스 정책을 변경하지 않았다.
+
+- 변경은 `GameOpeningControllerTests.HeldPointerDelaysBothTheFirstPageAndTheRoomBrowserUntilRelease` 한 메서드다. 원래 설정 참조·값·flags를 보관하고 소유 복사본에만 포커스 정책을 적용한다. try는 flags 변경·설정 복사·Mouse 생성 전부터 시작하며, finally가 소유 Mouse 제거·원본 설정/flags 복원·살아 있는 소유 복사본 정리를 시도한다.
+- 기존 게임 판정8개와 입력4회·3프레임 대기2회를 순서대로 유지했다. 마우스 주입 상태6개와 원본/소유 자원 복원7개 assertion을 추가했다. 대기시간 늘리기·재시도·skip·기대값 완화는 하지 않았다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| 수정 전 기본 batch | **0/1 PASS·1 FAIL**, 0.92초 | focused=false, 기본 ResetAndDisableNonBackgroundDevices/PointersAndKeyboardsRespectGameViewFocus. 기존 첫 페이지 held-pointer assertion 실패 재현 |
+| 재컴파일 | PASS | recompile_status completed·failed/compilationFailed=false·errors0 |
+| 수정 후 단독 | **1/1 PASS**, 1.18초 | 같은 기본 batch에서 검사 자체 격리·복원, 외부 포커스 조정 없음 |
+| 오프닝 클래스 전체 | **10/10 PASS**, 1.61초 | 기존 오프닝 흐름 검사 전체, 실패/skip/inconclusive0 |
+| 검사 후 외부 입력 상태 | PASS | 기본 두 포커스 정책과 HideAndDontSave 유지, 저장 InputSettings 경로 없음. 검사 내부에서 원본 참조·JSON·flags·정책·소유 Mouse/복사본 정리 검증 |
+| 현재 main 전체 PlayMode | **513개 중512 PASS·1 FAIL**, 461.04초 | 오프닝10개·#369 수채 런타임7개 통과. 실패는 별도 도색 owner0 픽셀 동등성 검사이며 skip/inconclusive0 |
+| 별도 도색 검사 · 기준 main 단독 | **1/1 PASS**, 1.69초 | 오프닝 수정 파일을 원복·재컴파일한 뒤 단독 비교. 전체 실행의1바이트 차이를 단독으로 재현하지 못함 |
+| 별도 도색 검사 · 수정본 단독 | **1/1 PASS**, 1.49초 | 오프닝 수정만 재적용·재컴파일 후 같은 도색 검사 통과. 도색 코드·허용 오차·assertion은 변경하지 않음 |
+| 표준 unity test · 새 기본 batch 프로세스 | **1/1 PASS**, 0.832초 | 표준 CLI 종료0·NUnit XML Passed, 외부 포커스 정책 조정 없이 단독 실행. 기존 warm Editor도 먼저 종료 |
+
+전체 실행에서 `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllFivePaintersWithoutChangingPaperAlphaOrCoverage`의 마지막 owner0 비교가 index241380에서 G163→162(1단계) 차이로 실패했다. 결과 배열에서는 이 검사가 오프닝 검사보다 앞에 기록돼 있지만, 시작·종료 시각이 없어 실제 실행 선후를 확정할 수는 없다(#380 조사에서 해석 보충). 기준 main과 수정본 단독 재검사는 모두 통과했다. 원인은 확정하지 않았고 전체 실행의 실패를 단독 통과로 덮거나 전체513개가 통과했다고 표현하지 않는다. 이번 오프닝 검사 수정 범위 밖으로 남기며 그래픽·#369 구현·도색 검사 기대값은 유지한다.
+
+실제 오프닝 런타임·Scene·Prefab·설정 에셋·#369 구현은 변경하지 않았다. 기존 #375 실패 이력은 덮어쓰지 않는다. 검사용 두 Editor 프로세스는 모두 종료했다. CLI 종료 후 자동 URP 설정 변경을 기준 원본으로 복원하고 Test Runner 임시 Scene이 남지 않았음을 확인했다. 최종 변경은 테스트1파일·관련 문서2파일뿐이며, 원래 main 작업 폴더의 브랜치·HEAD·tracked diff·사용자 미추적 파일 해시는 작업 전과 동일하다. 원시 JSON·NUnit XML·로그·임시 검사 도구는 저장소 밖에 보관했다. iOS 빌드·실기기 검증은 수행하지 않았다.
+
 ## 2026-10-29 — #375 중복 계약 검사·DEV 준비/정리 공통화
 
 기준 main `b1d2ae5f`에서 별도 `refactor/#375-test-fixture-cleanup` 작업 트리를 만들었다. 원래 #369 작업 폴더는 전환하지 않았고, 검사 전후 브랜치·HEAD·tracked diff·사용자 미추적 파일 해시를 대조했다.
@@ -3398,6 +3491,27 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 오류 경계 리뷰 보완: 명시적 해상도/Profile 변경에서도 renderer를 재생성해 GPU 오류 뒤 복구할 수 있게 하고, 부분 RT 생성 예외의 로컬 리소스를 회수했다. 조용한 frame의 자동 할당 재시도는 하지 않는다. 수동 fault injection으로 GPU할당실패를 재현한 검사는 미실행이다.
 - 최종 에디터: Home, Edit 상태. 컴파일과 실제 GPU 출력 확인 완료. 개인 기기 식별자·원시 테스트 로그·빌드 결과물은 커밋하지 않았다.
 - **미실행:** 실제 LAN/핫스팟·다기기, 실제2:2/피버 연속 플레이, iOS export/서명/설치, iPhone CPU/GPU 시간·메모리·발열.1024기준 신규 RT22MiB/기존포함28MiB는 원시 픽셀 계산이며 모바일 실측이 아니다.
+
+## 2026-10-29 — #381 요괴 10종 제작 구조·신규 7종 데이터
+
+- 기준 main `8d3cd58d`, 작업 브랜치 `feat/#381-yokai-content-scaffold`. Unity 6000.6.5f1 / macOS의 대상 프로젝트 전용 batch Editor(`-nographics`)와 Unity CLI로 수행했다. 다른 작업의 Editor는 제어하지 않았다. 아래 결과는 데이터·EditMode 범위이며 화면이나 실기기 플레이 확인이 아니다.
+- 생성: `GameYokaiCatalogValidator.CreateMissingDefinitions()`를 실행해 Resources 밖에 카탈로그1개와 정의10개를 만들고 기존3개 StageDefinition의 빈 `content`만 연결했다. 저장 목록 검증에서10종·3 Integrated·7 Planned와 기존3종 순서를 확인했다. Figma의10번 보스 지하국대적과7번 그슨대의 별칭을 포함한다. 확인하지 않은 설명·아트·음성·효과는 비워 두었다.
+- 실행 참조: `AssetDatabase.GetDependencies`로 기존 StageCatalog의 의존 자료에 신규7종과 제작용 전체 카탈로그가 없음을 확인했다. 빌드 산출물 용량을 측정한 검사는 아니다.
+- 컴파일: 새 런타임/Editor 타입이 로드되고 `EditorUtility.scriptCompilationFailed=false`를 확인했다.
+- 생성기 재실행: 두 번째 생성·저장 목록 검증 뒤 정의/카탈로그/하위 메타/기존 Stage 폴더의38개 파일 SHA-256이 동일했다. Console의 재실행 결과는 생성0·연결0이었다. 임의의 기존 설명을 편집한 뒤 저장 보존하는 별도 실험은 실행하지 않았다.
+- 기존 자료 보존: 원래3개 StageDefinition은 `content` 한 줄을 제외하면 main과 바이트가 같다. 기존 Stage GUID·순서·모델 override 없음·튜닝을 보존한다. StageCatalog·Scene·Prefab·LabConfig·Lab Core/Network·패키지·프로토콜 파일은 변경하지 않았다. 기존 미추적 `Assets/_Project/HapioMVP`는 작업 대상에서 제외했다.
+
+| 실제 실행한 EditMode fixture | 통과 / 전체 | 검사 범위 |
+| --- | --- | --- |
+| `GameYokaiCatalogTests` | 11 / 11 | 저장10종·7 Planned·별칭/보스·기존3 GUID/연결·잘못된 ID/중복/누락 거부·Planned/다른 ID 연결 거부·legacy null 호환 |
+| `GameStageSettingsTests` | 12 / 12 | 기존 스테이지 설정 복사·scope·원본 보존 |
+| `GameRunFlowTests` | 30 / 30 | 기존3단계 진행과 시작·종료 경계 |
+| `GameFlowSnapshotTests` | 14 / 14 | 기존 진행 스냅샷 검증 |
+| `GameTerritoryFlowTests` | 7 / 7 | 기존2:2 독립 흐름 |
+| 합계 | **74 / 74** | 실패0·건너뜀0, 중복 실행 합산 없음 |
+
+- 소스·문서의 `git diff --check` 통과. Unity가 생성한 `.asset`·`.meta`의 빈 필드 뒤 공백은 직렬화 원문을 유지했다. 새 카탈로그와7종 Planned 데이터가 실제 전투 목록을 늘리지 않는 것을 코드/저장 참조/자동 검사로 확인했다. 실제3스테이지를 손으로 완주했다는 의미는 아니다.
+- **미실행:** PlayMode·전체 EditMode·실제 화면/Inspector 수동 조작·기존3종 실제 패턴 플레이·LAN/핫스팟/다기기·Mac/iOS 빌드/서명/설치·실기기/성능. 추가7종의 공격·전용 모델·스테이지 확장·선택 UI는 **미구현(이번 범위 제외)**이다. 파일 구조와 편집 절차는 `docs/YOKAI_CONTENT_STRUCTURE.md`를 따른다.
 
 ## 2026-10-29 · #293 2:2 땅따먹기 2분·구미호 BGM·선명한 칠·연출 값·결과 화면
 

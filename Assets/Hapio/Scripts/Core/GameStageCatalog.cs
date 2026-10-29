@@ -33,6 +33,14 @@ namespace Hapio
                 if (stage == null || stage.stageIndex != i + 1 || string.IsNullOrWhiteSpace(stage.stageId)
                     || string.IsNullOrWhiteSpace(stage.displayName) || stage.yokai != (LabStageYokai)(i + 1))
                     throw new InvalidOperationException("Stage order must be Gumiho, Yaguang, Jigwi with explicit identities.");
+                // Authoring a future yokai is not a runnable combat implementation. Keep
+                // old stage fixtures compatible while checking every supplied content link.
+                if (stage.content != null)
+                {
+                    stage.content.Validate();
+                    if (stage.content.contentId != stage.stageId || !stage.content.IsIntegrated)
+                        throw new InvalidOperationException("A playable stage must reference its own integrated yokai content.");
+                }
                 for (int j = 0; j < i; j++) if (stages[j].stageId == stage.stageId)
                     throw new InvalidOperationException("Stage identities must be unique.");
                 var seen = new System.Collections.Generic.HashSet<int>();

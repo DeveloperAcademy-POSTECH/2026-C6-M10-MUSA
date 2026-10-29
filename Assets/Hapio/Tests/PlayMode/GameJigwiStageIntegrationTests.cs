@@ -76,7 +76,8 @@ namespace Hapio.Tests
             Assert.That(before.jigwiAB.enabled, Is.True);
             Assert.That(before.jigwiStage.enabled, Is.False, "#341 must not create old surface roots or paint-blocking cones.");
             Assert.That(before.remaining, Is.InRange(116d, 120d));
-            Assert.That(before.jigwiAB.cutoffAt - before.jigwiAB.startedAt, Is.EqualTo(100d));
+            // Compare the scheduled deadline directly; reversing the addition can round away from 100.
+            Assert.That(before.jigwiAB.cutoffAt, Is.EqualTo(before.jigwiAB.startedAt + 100d));
             var binding = Object.FindFirstObjectByType<GameBattleBindings>();
             Assert.That(binding, Is.Not.Null); Assert.That(binding.IsPresentationReady, Is.True);
             LabTarget target = network.target;
