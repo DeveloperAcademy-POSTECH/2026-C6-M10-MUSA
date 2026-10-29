@@ -16,5 +16,6 @@ MonoBehaviour:
   stageId: jigwi
   displayName: "\uC9C0\uADC0"
   yokai: 3
+  content: {fileID: 11400000, guid: 94a8c23d50cc64b8cbfc1c8fa3210fb0, type: 2}
   yokaiVisual: {fileID: 0}
   defaultValues: []

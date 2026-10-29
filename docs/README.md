@@ -14,6 +14,7 @@
 | 확인할 내용 | 문서 |
 | --- | --- |
 | Home·Lobby·3스테이지·결과·재시작·빌드 | [게임 흐름](GAME_FLOW.md) |
+| 요괴 10종 제작 데이터·기존 3종 전투 연결·추가 아트 경로 | [요괴 콘텐츠 구조](YOKAI_CONTENT_STRUCTURE.md) |
 | 오프닝 순서·진입 정책·터치 진행 | [앱 시작 오프닝](APP_START_OPENING.md) |
 | 오프닝 그림·대사·제작용 미리보기 편집 | [팝업북 스토리 제작](POPUP_STORY_WORKFLOW.md) |
 | 구슬의 가장자리 전달·정체 보정·세로 방향·iOS 제스처 | [모바일 구슬 조작](MOBILE_ORB_CONTROLS.md) |

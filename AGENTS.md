@@ -77,3 +77,8 @@
 
 - 승인된 파란 시안은 `LabGourdPaint`에서 기존 고해상도 결과 위에 적용한다. `Resources/GourdPaint/WatercolorProfile`은 표현 전용이며 공유 LabConfig/프로토콜에 넣지 않는다. 속성별 정적/활성 농도를 분리하고 새로 이어진 기록만 기본.4초 번지며 완료 시 한 번만 확정한다. 초기/교체/128개 폐기·설정/품질 변경은 정적 복원하며 관람/PNG는 최종 표시를 확정·복사한다. 원본 패턴·Prefab·Scene·성장/건조/100% 판정·P지도·Host 권한은 유지한다.
 - `C6 Lab > Experiments > Watercolor Paint`는 같은 런타임의 격리 정적 비교다. 비교 복사본의 Drying OFF를 실제 규칙 변경으로 해석하지 않는다. 실기기 성능과 자동 GPU 검사는 구분하고 `docs/WATERCOLOR_PAINT_EXPERIMENT.md`·VALIDATION을 따른다.
+
+## #381 요괴 콘텐츠 제작 구조
+
+- `Assets/Hapio/Content/Yokai/YokaiCatalog.asset`은 Resources 밖의 10종 제작 목록이며 실행 스테이지 목록을 대체하지 않는다. 기존 구미호→야광귀→지귀 3단계와 `LabStageYokai` 값·공유 설정251개·접속 규약은 유지한다. 추가7종은 Planned이며 전투 코드·Scene·전용 모델은 아직 없다.
+- `contentId`·Figma 참고 순번·전투 stageIndex를 구분한다. StageDefinition의 선택적 `content`는 같은 ID의 Integrated 정의만 허용하며, 아트 참조는 제작용이다. 기존3종은 공통 검은 요괴를 계속 쓴다. `Hapio > Yokai` 생성기는 없는 데이터와 빈 기존 stage.content만 채우며 이미 편집한 값을 덮어쓰지 않는다. 편집과 후속 아트 폴더 관례는 `docs/YOKAI_CONTENT_STRUCTURE.md`를 따른다.

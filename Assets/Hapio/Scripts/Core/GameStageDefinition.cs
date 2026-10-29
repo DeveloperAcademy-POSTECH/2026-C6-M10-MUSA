@@ -20,6 +20,8 @@ namespace Hapio
         public string stageId;
         public string displayName;
         public LabStageYokai yokai;
+        [Tooltip("Optional content identity. Combat order, rules and tuning remain owned by this stage definition.")]
+        public GameYokaiDefinition content;
         [Tooltip("Optional decorative model. It never replaces the paint mesh or hit collider.")]
         public GameObject yokaiVisual;
         public GameStageValue[] defaultValues = Array.Empty<GameStageValue>();
