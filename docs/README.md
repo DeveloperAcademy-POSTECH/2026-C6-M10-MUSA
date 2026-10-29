@@ -35,6 +35,7 @@
 
 ## 실험·과거 구현 자료
 
+- [수채 질감과 번짐](WATERCOLOR_PAINT_EXPERIMENT.md): 실제 전투의 수채 표현·Inspector 설정과 파란 정적 비교 도구.
 - [고해상도 도색 비교 실험](HIGH_RESOLUTION_PAINT_EXPERIMENT.md): 실제 박에 최초 명중1회·재타격3회를 적용한 표현 비교. 현행 런타임 적용은 위 고해상도 도색 문서를 따른다.
 - [도색 스타일 비교](PAINT_STYLE_COMPARISON_EXPERIMENT.md): 패턴 비교 실험의 기준과 결과.
 - [Lab 수동 지귀 시험](JIGWI_PATTERNS.md): 기존 단판 Lab에서 수동 발동하는 시험 경로. Hapio의 현재 A/B와 구분한다.

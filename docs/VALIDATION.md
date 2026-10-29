@@ -3371,3 +3371,30 @@ PR #365의 `b85904b2`에 최신 main `23217127`(#368, 결과 수동 진행)을 �
 초기 작업 공간 생성 도구의24개 기본 슬롯은 현재 저장된25컷 목록과 구분한다. 기존 Opening.asset은 보존하지만 목록을 삭제한 뒤 `CreateMissing`으로 복구하는 경우19-1이 빠질 수 있는 기존 도구 제약은 `POPUP_STORY_WORKFLOW.md`에 남겼다. 이번 검사에서는 에셋 삭제·재생성을 수행하지 않았다.
 
 Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟·전체 EditMode·전체 PlayMode·모바일 성능: **NOT_RUN**. 앞선 작성자의 렌더 확인과 이번 Shader/API·자동 검사 범위를 구분한다.
+
+## 2026-10-28 — #369 파란 수채 질감 정적 비교 1단계
+
+- 기준: main `f6effa2c`에서 분기한 `experiment/#369-gourd-watercolor`, Unity 6000.6.5f1 / macOS / Metal의 기존 Editor 1개. 새 기능은 Assets/Editor/WatercolorPaint 아래의 비교 도구에만 있으며 실제 전투에는 연결하지 않았다.
+- 컴파일: 신규 Study/Window/Validation 타입 로드, `EditorUtility.scriptCompilationFailed=false`, 수채 Shader 지원 및 ShaderUtil 메시지 0개를 확인했다.
+- 실제 GPU 검증: `LabWatercolorPaintValidation.Export`의 정면 최초·재명중1/3회·이음새/극 재명중3회, 총 **5개 fixture 검사 통과**. 현재 기준은 실제 LabHighResolutionPaintRuntime 1024×512이며 후보와 같은 지도·카메라·저장 박을 사용했다. 전체 EditMode/PlayMode 테스트 모음 통과를 의미하지 않는다.
+- 판정 보존: 반복 Prepare/렌더·슬라이더 설정 변경 전후 RGBA/P 해시·revision·VisualVersion·진행 셀 수·PaintCount·성장 잔량·VisualStamp 바이트가 동일했다. 정면 covered cell은 최초655·재명중1회1146·3회2129/32768이었다. 격리된 fixture의 별도 설정에서만 Drying OFF이며 실제 원본은 그대로다.
+- 후보 GPU 지도: 기존 지원 영역과 alpha>0 영역 일치, 바깥 pigment 없음, premultiplied RGB·파란 hue 유지·동일 입력 반복 재생 byte 동일을 확인했다. 정면 재명중3회에서 227개 alpha 단계와 가장자리 강도 OFF 대비21127개 픽셀 변화가 있었다. 이는 시각 품질 승인이나 모든 경계가 보기 좋다는 판정이 아니다.
+- 원본 보존/수명: Config JSON·원본 Config/박 Prefab/재질/패턴/표면 Shader/Battle Scene 파일 해시·활성 Scene/dirty·loaded Scene 수가 동일했다. 격리 Study 종료 후 전용 Texture/Material/Preview root와 현재 high-resolution RT 개수는 시작 값으로 돌아왔다.
+- 화면: 실제 Watercolor Paint 창에서 좌우 이미지와8개 표현 슬라이더, 시점·위치·재명중 조절 UI 표시를 확인했다. Pigment density UI 값 이벤트 .62→.7에서 후보 이미지가 바뀌고 .62로 복원되는 것을 확인했다. 실제 손/마우스 드래그 플레이 검증은 아니다. Home Scene은 Edit 상태·dirty=false를 유지했다.
+- 저장 이미지: `docs/images/paint-watercolor-369-first.png`, `paint-watercolor-369-repeat3.png` — **왼쪽 기존 / 오른쪽 후보**, 실제 저장 박의 격리 Editor 렌더. 생성형 합성 이미지나 실제 플레이 캡처가 아니다.
+- **검토 대기:** 수채 질감의 미술 품질과 농도·가장자리 강도 승인.
+- **미실행/미구현:** 실제 전투 설치, 짧은 번짐, 다색/P무늬/2:2/건조의 새 표현 회귀, LAN/핫스팟 실기기, iOS export·서명·설치, iPhone CPU/GPU·메모리·발열 실측. 기존 게임/네트워크 코드는 변경하지 않았다.
+
+## 2026-10-28 — #369 승인 시안의 실제 전투 연결·짧은 번짐
+
+- 사용자 확인:1단계 오른쪽 파란 수채 시안 승인 후 같은 실험 브랜치에서 진행했다. 기준은 `63c390df`, Unity6000.6.5f1 / macOS / Metal의 기존 Editor1개다.
+- 실제 변경: 기존 고해상도 확정 결과 위에 LabWatercolorPaintRuntime을 연결하고, 표현 전용 WatercolorProfile을 기본 ON으로 생성했다. 승인8개 질감 값과 번짐.4초/활성12개를 저장했다. Host 도색/군집/건조/완료·P지도·공유 설정251개·접속 규약·Scene·Prefab·원본 패턴은 변경하지 않았다.
+- 최종 PlayMode **16/16 통과**: 새 `LabWatercolorPaintRuntimeTests` **7/7**(5.89초), 기존 `LabGourdPaintTests` **8/8**(10.63초), Hapio의 `GameSceneFlowTests.SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay` **1/1**(5.51초). 초기6개 및수정전8개 실행과 중복 합산하지 않았다. 전체 테스트 모음은 실행하지 않았다.
+- GPU7개: 오행 categorical hue·RGBA/P/기록/진행도 보존, 같은 시각 재호출 무중복,30/60 시간 분할의 최종 byte 일치, capture 강제확정과 자연완료 일치, 실제 표면 삭제/타색 덮어쓰기 후 잔상 없음,128개 복원8개/frame·FIFO폐기 후 fresh복원 일치,1024/2048·RT손실·Dispose를 확인했다. 추가16-record burst fixture는 활성2개 제한·같은 frame 예산 우회 방지·최종checkpoint 일치를 확인했다. 이는 실제 피버 플레이 부하 검증이 아니다.
+- 실제 저장 Scene8개: 원래 Host 투사체 충돌·표시 disable/재초기화·실제 도색 완료 흐름을 통과했다. 기존 저장 Lab Scene의 Profile Resources 연결·WatercolorActive=true·실제 shell MPB._PaintMap=VisualPaintTexture 및 기존 _PainterMap 바인딩 확인을 추가했다.
+- Hapio1개: Home→실제 Battle→표현 준비→공유 카운트다운→Playing 경로에서 WatercolorActive와 실제 shell 텍스처 바인딩을 확인했다. 다기기 카운트다운 검증은 아니다.
+- 정적 비교 도구를 공통 런타임으로 전환한 뒤 `LabWatercolorPaintValidation.Export` **5개 fixture 검사 통과**. 정면 최초/재명중1·3회·이음새/극 재명중3회, 반복 재생 동일·support/premult/hue·원본에셋/Config/Scene·리소스 해제를 재확인했다. 최초 시안과 이후 구현의 셰이더 중복은 제거했다.
+- 화면: 실제 저장 박의 같은 GPU 런타임을0/.2/.41초로 샘플링해 `docs/images/paint-watercolor-369-reveal.png`에 저장했다. 활성 기록은1→1→0, 확정 기록은1→1→2이며 내부 입자와 형태를 확대하지 않고 오른쪽 추가 얼룩이 등장한다. 이것은 격리 GPU 샘플이고 실제 플레이 동영상/실기기 캡처가 아니다.
+- 오류 경계 리뷰 보완: 명시적 해상도/Profile 변경에서도 renderer를 재생성해 GPU 오류 뒤 복구할 수 있게 하고, 부분 RT 생성 예외의 로컬 리소스를 회수했다. 조용한 frame의 자동 할당 재시도는 하지 않는다. 수동 fault injection으로 GPU할당실패를 재현한 검사는 미실행이다.
+- 최종 에디터: Home, Edit 상태. 컴파일과 실제 GPU 출력 확인 완료. 개인 기기 식별자·원시 테스트 로그·빌드 결과물은 커밋하지 않았다.
+- **미실행:** 실제 LAN/핫스팟·다기기, 실제2:2/피버 연속 플레이, iOS export/서명/설치, iPhone CPU/GPU 시간·메모리·발열.1024기준 신규 RT22MiB/기존포함28MiB는 원시 픽셀 계산이며 모바일 실측이 아니다.

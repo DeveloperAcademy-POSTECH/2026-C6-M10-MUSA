@@ -93,6 +93,12 @@ namespace Hapio.Tests
                 && session.StartOverlay.DisplayText == "3", "Prepared participants must enter the shared countdown.");
             Assert.That(network.IsGameInitialStateReady(session.State.battleSessionId, session.State.battleRound), Is.True);
             Assert.That(UnityEngine.Object.FindFirstObjectByType<GameBattleBindings>().IsPresentationReady, Is.True);
+            var watercolorPaint = UnityEngine.Object.FindFirstObjectByType<LabGourdPaint>();
+            Assert.That(watercolorPaint.WatercolorActive, Is.True, watercolorPaint.WatercolorError);
+            var watercolorBlock = new MaterialPropertyBlock();
+            watercolorPaint.Shell.GetComponent<Renderer>().GetPropertyBlock(watercolorBlock);
+            Assert.That(watercolorBlock.GetTexture("_PaintMap"), Is.SameAs(watercolorPaint.VisualPaintTexture),
+                "Hapio's actual Battle must bind the same watercolor renderer before the shared countdown.");
             LabSnapshot before = network.Snapshot;
             double remaining = before.remaining;
             float stamina = before.players.Single(player => player.id == network.LocalPlayerId).stamina;
