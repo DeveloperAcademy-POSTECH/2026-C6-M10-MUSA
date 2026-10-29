@@ -1,5 +1,49 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-10-29 — #380 도색 소유권 렌더 비교 조건 격리
+
+기준은 #378 병합 main `8d3cd58d`다. 별도 `fix/#380-paint-render-test-isolation` 작업 공간의 Unity6000.6.5f1·macOS ARM64·Metal batch Editor 한 개를 사용했다. 실제 도색·#369 수채·게임 판정·Scene·Prefab·머터리얼·설정·패키지는 변경하지 않았다.
+
+### 조사 결과와 확인 한계
+
+#378 전체 실행에서 실패한 것은 `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllFivePaintersWithoutChangingPaperAlphaOrCoverage`의 마지막 P0 이미지 완전 동일 비교다. 최초 보고는 index241380의 G163→162이며 전체 이미지가 한 픽셀만 달랐다는 뜻은 아니다. 기존 검사는 최초 중립 촬영과 마지막 비교 사이에 P1~P5별 박/카메라 이동·프레임 대기를 함께 수행하고, 촬영마다 실제 Scene의 표시 property block을 다시 읽었다. 무늬는 로컬 좌표지만 최종 셰이더 조명에는 world-space 미분·시선 반사가 포함되어 있다.
+
+임시 진단은 최초/최종 CPU 색/P 텍스처, 실제 표시 색/P 텍스처의 내용 해시·참조·규격, 머터리얼의 주요 값, 표시 property block, root/model/view/projection 행렬과 출력 PNG를 기록했다. 클래스·관련 묶음·전체 실행의 각13회 촬영에서 최초/최종 중립 조건 차이0·RGBA 차이 픽셀0이었다. **과거1단계 차이는 재현하지 못했으며, GPU 반올림·이전 검사 누수·수채 갱신 중 하나를 확정 원인으로 주장하지 않는다.** 추가 readback을 삽입한 진단 실행은 관측 시점도 바꾸므로, 이 통과만으로 과거 현상의 해결을 증명하지 않는다. 선행 검사 간섭을 특정하지 못했으며 단순 왕복 float32 계산도 시작 위치로 복귀해 누적 위치 오차로 단정하지 않았다.
+
+확인된 검사 구조 문제는 정확한 소유권 비교와 이동 시 근사 비교를 같은 mutable rig에 섞었다는 점이다. 최종본은 이를 두 검사로 분리하고 입력·허용치를 보존했다. 고정 위치 검사의 P0 정확 비교는 즉시 및1프레임 뒤 모두 수행한다. 별도 이동 검사도5종 전부 무늬 가시성>100픽셀과 기존 평균 채널 오차 `<0.1`, CPU 색/P 맵·면적·셀 수 불변을 확인한다. 기존 assertion67개는 모두 유지하고8개를 추가했다. 촬영 helper는 RT.active를 Render 이전에 저장해 Render/readback/PNG 예외까지 복원한다. 이는 예외 격리 보완이며 과거 실패의 확정 원인과 구분한다. 임시 진단 코드는 최종 소스에서 제거했다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| 수정 전 렌더 클래스 | **4/4 PASS**, 3.29초 | main 테스트 그대로. 이번 환경에서 과거 차이 미재현 |
+| 임시 진단 보완 후 클래스 | **4/4 PASS**, 3.79초 | 최초/최종 비교 조건 및 출력 차이0 |
+| 임시 진단 보완 후 관련 도색 묶음 | **66/66 PASS**, 58.39초 | Paint 이름 필터. 실제 저장 박/고해상도/수채 설정 유지 |
+| 임시 진단 전체 PlayMode | **513/513 PASS**, 453.39초 | 실패/skip/inconclusive0. 진단 없는 최종본 결과와 구분 |
+| 최종본 재컴파일 | PASS | completed·failed/compilationFailed=false·errors0 |
+| 최종본 고정 위치 소유권 단독 | **1/1 PASS**, 1.88초 | P0 즉시/1프레임 후 정확 복원·기존5종 판정 |
+| 최종본 이동 단독 | **1/1 PASS**, 0.57초 | 5종 무늬 가시성·이동 `<0.1`·원본 데이터 불변 |
+| 최종본 렌더 클래스 | **5/5 PASS**, 3.75초 | 기존4개+분리한 이동1개 |
+| 최종본 관련 도색 묶음 | **67/67 PASS**, 58.94초 | 진단 제거·추가 이동 검사 포함 |
+| 최종본 전체 PlayMode | **514/514 PASS**, 456.27초 | 실패/skip/inconclusive0. 기존513개 이름 모두 유지·분리한 이동1개만 추가, 오프닝10개·#369 수채 런타임7개 포함 |
+
+첫 임시 진단 시도는 Material을 JsonUtility로 직렬화하려다 지원되지 않는 engine type 예외가 발생하여 대상 판정까지 도달하지 못했다. 같은66개 실행에서 별도 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell`의100초 정확 double 비교도99.999999999999986으로 실패했다(64PASS·2FAIL). 진단을 명시적 머터리얼 필드 기록으로 바로잡은 뒤 관련66개와 진단 전체513개가 통과했다. 이 지귀 검사·런타임·허용 오차는 수정하지 않았으며 첫 시도의 실패를 통과로 덮지 않는다. 클래스 필터 형식 오류로0개 실행한 준비 호출은 테스트 결과에 포함하지 않는다.
+
+원시 진단 JSON·PNG·로그와 비교 도구는 저장소 밖에 보관한다. EditMode 전체·Mac 독립 앱·iOS 빌드·실기기 LAN/핫스팟·모바일 성능은 이번 작업에서 미실행이다. 최종 전체 결과의 검사 이름을 대조해 기존513개 누락0·이동1개 추가만 확인했다. 검사용 Editor는 정상 종료0이며 Test Runner 임시 Scene·자동 설정 변경이 남지 않았다. 최종 변경은 기존 테스트1파일과 문서2파일뿐이다. 작업 중 원래 프로젝트는 별도 #381 작업의 `feat/#381-yokai-content-scaffold`/`bf6c32cc`를 거쳐 그 PR이 병합된 main `688947cd`로 진행됐다. #380에서는 그 폴더의 브랜치를 전환하거나 되돌리지 않았다. 이 결과의 검증 기준은 앞에 명시한 `8d3cd58d`이며, 후속 #381을 이번 검사 결과에 포함했다고 주장하지 않는다. 원래 폴더의 tracked diff·작업 상태·사용자 미추적 파일3개의 해시는 시작 때와 동일함을 확인했다. 이 별도 브랜치 진행을 #380의 변경으로 기록하지 않는다. 기존 #378 실패 이력은 아래에 유지한다.
+
+### 최신 main의 #381 통합 및 PR 준비
+
+#380 변경을 `65bd40de`로 커밋하고 최신 main `688947cd`(#383으로 병합한 #381)를 `86374714`에서 통합했다. Git의 자동 병합으로 충돌0건이며, 양쪽 VALIDATION 절을 보존했다. #381은 선택적 StageDefinition.content와 StageCatalog의 ID/Integrated 검증·제작용10종 데이터만 추가하며 기존3개 순서·공통 검은 모델·도색·Scene·프로토콜을 바꾸지 않는다. 최초 통합 시점의 최신 main 대비 차이는 동일한 테스트1파일과 문서2파일뿐이고, #381 검증 절은 최신 main과 바이트가 같다. 테스트 파일 집계는188개(실제 검사187+공통 helper1), assembly5개다.
+
+| 통합본 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| `Hapio.EditModeTests` 전체 | **141/141 PASS**, 1.01초 | #381 카탈로그11개·기존 스테이지/저장 참조/설정·게임 흐름 포함. Lab 전체 EditMode와 구분 |
+| 최초 통합본 전체 PlayMode | **514개 중513 PASS·1 FAIL**, 461.32초 | 도색5개·오프닝10개·수채7개 통과. 실패는 지귀100초 역산 정확 비교이며 아래 #384에서 구분 |
+| #384 수정 후 지귀 단독 | **1/1 PASS**, 13.39초 | 실제 저장 Home→3스테이지→A/B 검사. 정확 종료 시각 비교 이후 나머지 판정까지 수행 |
+| #384 수정 후 전체 PlayMode | **514/514 PASS**, 455.08초 | 실패/skip/inconclusive0. 기존514개 이름 동일, 도색5·오프닝10·수채7·지귀1 포함 |
+
+최초 통합 실행에서 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell`의100초 역산 비교가99.999999999999972로 실패했다. #381이 규칙을 바꾼 것이 아니라 기존 진단 중에도 관측한 별도 검사 오탐이다. 이 문제는 #384로 추적한다. `LabModel.ResetJigwiAB`는 동일 now를 startedAt에 저장하고 cutoffAt=now+100d를 계산하며, 스냅샷은 두 값을 산술 없이 복사한다. 같은 Unity C#에서 start100.2·cutoff200.2를 역산하면99.999999999999986으로100과 달라지지만 cutoff==start+100은 true임을 재현했다.
+
+#384 보완은 이 assertion을 `cutoffAt == startedAt + 100d`의 정확 비교로 바꾸고 주석1줄을 추가한 것이다. epsilon·Within·skip·재시도·게임 시계·100초 규칙·지귀/도색 runtime은 변경하지 않았다. 따라서 PR의 최종 범위는 테스트2파일·문서2파일이다. 기존 #380의67개 판정과 추가8개는 그대로이며, 별도 지귀 assertion1개의 비교식만 달라진다. 수정 후 컴파일 completed·failed/compilationFailed=false·errors0, 지귀 단독과 통합 전체를 위와 같이 확인했다. 테스트 이름514개는 수정 전 목록과 같다. 검사용 Editor는 정상 종료0이며 Test Runner 임시 Scene·자동 설정 변경 잔존0이다. 원래 프로젝트의 main `688947cd`·tracked diff·작업 상태·사용자 미추적 파일3개의 해시가 PR 준비 시작 시점과 동일함을 확인했다. 최종 diff는 테스트2파일·문서2파일만 포함하며 #381 런타임·데이터·메타와 실제 도색은 최신 main과 동일하다. 과거 도색1단계 차이의 원인 미확정과 실기기·빌드 미실행을 유지한다.
+
 ## 2026-10-29 — #378 기본 batch 오프닝 입력 검사 자동 격리
 
 기준은 #369 병합까지 포함한 main `5c644ef3`이다. 별도 `fix/#378-opening-batch-test-isolation` 작업 공간과 Unity6000.6.5f1·macOS ARM64·Metal batch Editor 한 개를 사용했다. 외부 명령으로 InputSettings 포커스 정책을 변경하지 않았다.
@@ -19,7 +63,7 @@
 | 별도 도색 검사 · 수정본 단독 | **1/1 PASS**, 1.49초 | 오프닝 수정만 재적용·재컴파일 후 같은 도색 검사 통과. 도색 코드·허용 오차·assertion은 변경하지 않음 |
 | 표준 unity test · 새 기본 batch 프로세스 | **1/1 PASS**, 0.832초 | 표준 CLI 종료0·NUnit XML Passed, 외부 포커스 정책 조정 없이 단독 실행. 기존 warm Editor도 먼저 종료 |
 
-전체 실행에서 `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllFivePaintersWithoutChangingPaperAlphaOrCoverage`의 마지막 owner0 비교가 index241380에서 G163→162(1단계) 차이로 실패했다. 이 검사는 실행 순서상 오프닝 검사보다 먼저 끝났으며, 기준 main과 수정본 단독 재검사는 모두 통과했다. 원인은 확정하지 않았고 전체 실행의 실패를 단독 통과로 덮거나 전체513개가 통과했다고 표현하지 않는다. 이번 오프닝 검사 수정 범위 밖으로 남기며 그래픽·#369 구현·도색 검사 기대값은 유지한다.
+전체 실행에서 `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllFivePaintersWithoutChangingPaperAlphaOrCoverage`의 마지막 owner0 비교가 index241380에서 G163→162(1단계) 차이로 실패했다. 결과 배열에서는 이 검사가 오프닝 검사보다 앞에 기록돼 있지만, 시작·종료 시각이 없어 실제 실행 선후를 확정할 수는 없다(#380 조사에서 해석 보충). 기준 main과 수정본 단독 재검사는 모두 통과했다. 원인은 확정하지 않았고 전체 실행의 실패를 단독 통과로 덮거나 전체513개가 통과했다고 표현하지 않는다. 이번 오프닝 검사 수정 범위 밖으로 남기며 그래픽·#369 구현·도색 검사 기대값은 유지한다.
 
 실제 오프닝 런타임·Scene·Prefab·설정 에셋·#369 구현은 변경하지 않았다. 기존 #375 실패 이력은 덮어쓰지 않는다. 검사용 두 Editor 프로세스는 모두 종료했다. CLI 종료 후 자동 URP 설정 변경을 기준 원본으로 복원하고 Test Runner 임시 Scene이 남지 않았음을 확인했다. 최종 변경은 테스트1파일·관련 문서2파일뿐이며, 원래 main 작업 폴더의 브랜치·HEAD·tracked diff·사용자 미추적 파일 해시는 작업 전과 동일하다. 원시 JSON·NUnit XML·로그·임시 검사 도구는 저장소 밖에 보관했다. iOS 빌드·실기기 검증은 수행하지 않았다.
 
