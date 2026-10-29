@@ -813,8 +813,8 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 결합(오행) 구슬의 얕은 꼬리 (#254). DEV `Board Orb Trail`이 켜져 있으면 결합 구슬마다 꼬리를 붙이고,
-        /// 던진 공 대비 실제 판 구슬 반지름(축소 상태 포함)으로 줄인다. 숨긴 요청 대기 구슬에는 남기지 않는다.
+        /// 조합판 Combined의 물감 방울 (#392). 기존 DEV 토글/대상 범위를 유지하고
+        /// 실제 판 반지름(축소/콤보 포함)만 전달한다. 비행 트레일은 공유하지 않는다.
         /// </summary>
         private void SyncBoardTrails()
         {
@@ -834,8 +834,7 @@ namespace C6Lab
                 }
                 float radius = view.HitSphere != null ? view.HitSphere.radius : config.OrbRadius;
                 // #257 콤보 SMALL/BIG 그림 배율도 꼬리에 곱한다 (물리 반지름은 그대로라 따로 곱함)
-                trail.Sync(view, config.OrbAppearance, wanted,
-                    radius / Mathf.Max(.001f, config.ThrowRadius) * view.ComboScaleTarget);
+                trail.Sync(view, wanted, radius * view.ComboScaleTarget, simulationHeld);
             }
         }
 

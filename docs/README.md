@@ -26,7 +26,7 @@
 | 도색 건조·근처 재타격 | [페인트 건조](PAINT_DRYING.md) |
 | 실제 전투·완성 박의 고해상도 표현 | [런타임 고해상도 도색](RUNTIME_HIGH_RESOLUTION_PAINT.md) |
 | 투척 수치·물리 조정 | [투척 조정](THROW_TUNING_GUIDE.md) · [박 물리 조정](PINATA_TUNING_GUIDE.md) |
-| 오행 비행 트레일 | [트레일 안내](ELEMENT_FLIGHT_TRAILS.md) |
+| 오행 비행 트레일·조합판 물감 방울 | [트레일 안내](ELEMENT_FLIGHT_TRAILS.md) |
 | 현재 지귀 개인 발화·전원 불장막 | [지귀 화면 패턴](JIGWI_SCREEN_PATTERNS.md) |
 | B 성공 보상 전용 화염·Inspector·일반/보상 비교 | [보상 불꽃 궤적](JIGWI_REWARD_FIRE_TRAIL.md) |
 | 구미호 피버 곡·효과음·Inspector 음량 | [구미호 소리](GUMIHO_AUDIO.md) |

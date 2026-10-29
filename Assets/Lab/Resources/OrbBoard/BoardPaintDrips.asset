@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48c08cedb661f444094cf30dae2c9f7c, type: 3}
+  m_Name: BoardPaintDrips
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabOrbDripProfile
+  diameterScale: 0.36
+  spacingRadii: 0.8
+  lifetime: 0.7
+  fallDistanceRadii: 2
+  strength: 0.85
+  fadeInSpeed: 1.5
+  fullSpeed: 10
+  maxDrops: 48
+  dropTexture: {fileID: 2800000, guid: 9b847e91bccf748119edd2e505079dbe, type: 3}
+  material: {fileID: 2100000, guid: c36a81757c0a34f3d9ef9c5a970443e4, type: 2}

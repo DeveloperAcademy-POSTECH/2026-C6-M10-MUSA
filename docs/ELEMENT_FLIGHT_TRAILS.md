@@ -119,3 +119,34 @@ Play Mode 중 프로필 원본 에셋을 편집하면 에셋 변경이 남을 �
 ![실제 경로를 확대한 오행 비교](images/element-trails-front-closeup.png)
 
 두 보조 시점은 실제 기록 경로에 카메라를 맞춘 것이며 게임 카메라 그대로의 가독성을 보증하지 않는다. 실제 전투 카메라를 복사한 기본 정면과 iOS 화면에서도 별도로 확인해야 한다.
+
+
+## 조합판의 물감 방울 — #392
+
+조합판은 위 투척용 오행 트레일과 분리했다. `LabOrbBoard.SyncBoardTrails` → `LabOrbBoardTrail.Sync/Step`에서 원소가 확정된 Combined만 처리하며 기존 DEV `Board Orb Trail`(인덱스165·기본ON)을 사용한다. Raw·아이템·북·미승인 원소는 제외한다. 비행용5종 프로필, 원본 PNG/머터리얼, 지귀 B 보상 화염은 수정하지 않는다.
+
+- 구슬의 실제 XY 이동 구간에서 일정 거리마다 방울을 생성한다. 생성 후에는 구슬을 따라가지 않고 그 자리에서 화면 아래(world -Y)로 가속하는 모양으로 내려간다.
+- 기존 흰 담채/검은 먹선 `WaterDrop.png`와 `ElementInkTrail.mat`를 참조만 하며 속성별 박 도색 팔레트로 색을 입힌다. MaterialPropertyBlock/정점색을 써 공유 원본을 변경하지 않는다.
+- 방울은 약간 길어지며 수명의 후반에 투명해져 제거된다. 멈췄을 때 새 방울은 나오지 않고 이미 나온 방울은 계속 떨어져 사라진다. 착지 얼룩/지속 도색/명중은 없다.
+- 구슬 루트/물리와 별개의 bounded Mesh 하나로 표시한다. 오브젝트·Rigidbody·Collider·ParticleSystem을 방울마다 생성하지 않고 최대96개 배열 안에서 프로필 상한만 유지한다. 로컬 전용 난수를 써 게임의 난수 흐름과 통신에 영향을 주지 않는다.
+- 일반 Pause와 시작 대기는 낙하·수명을 정지한다. 숨김·DEV OFF·구슬 제거·ID/속성 변경은 이력을 비우며, 요청 거절 후 승인 위치에서 새로 시작해 숨긴 위치와 선으로 이어지지 않는다. 크기 변화는 새 방울에 적용하고 이미 나온 방울은 생성 당시 크기를 유지한다.
+
+Project에서 `Assets/Lab/Resources/OrbBoard/BoardPaintDrips.asset`을 선택해 다음 값을 조정한다. 기기 로컬 표현 에셋이며 공유 LabConfig·프로토콜 번호는 바꾸지 않는다. 원본 에셋을 Play 중 편집하면 설정이 파일에 남을 수 있다.
+
+| Inspector 항목 | 기본값 | 의미 |
+| --- | --- | --- |
+| Diameter Scale | 0.36 | 구슬 지름 대비 방울 가로 크기. 개별 방울은0.85~1.15배 변형 |
+| Spacing Radii | 0.8 | 실제 이동 거리당 생성 간격, 구슬 반지름 단위 |
+| Lifetime | 0.7초 | 방울의 개별 유지 시간 |
+| Fall Distance Radii | 2 | 수명 동안 내려가는 거리, 구슬 반지름 단위·개별0.85~1.15배 |
+| Strength | 0.85 | 빠르게 움직일 때 최대 alpha |
+| Fade In Speed / Full Speed | 1.5 / 10 | 초당 반지름 단위 속도. 두 문턱 사이 진하기를 부드럽게 변경 |
+| Max Drops | 48 | 구슬 하나의 동시 표시 상한(설정1~96·한 Step 발생 상한24) |
+| Drop Texture / Material | 기존 WaterDrop / ElementInkTrail | 원화·URP 재질 참조, 공유 원본 편집 없이 사용 |
+
+`LabOrbBoardTrailTests`는 기존 원소/크기/비행 원본 보존·속도·DEV/Raw 제외·숨김/취소 복원·축소 검사를 유지하면서 독립 낙하/소멸·Pause/시작 대기·상한·추가 물리 객체 없음까지 확인한다. 실제 수행 결과와 화면 근거는 `VALIDATION.md`의 #392 항목을 따른다.
+
+
+![조합판의 다섯 속성 물감 방울](images/board-paint-drips.png)
+
+위 이미지는 실제 Lab390×844 화면의 표시 비교다. 런타임에 다섯 Combined를 배치하고 구슬 물리를 고정한 뒤 실제 이동 구간·방울 나이만 명시적으로 진행했다. 원본 Scene/설정은 저장하지 않았으며 멀티/손가락 조작/실기기 검증을 대신하지 않는다.
