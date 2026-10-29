@@ -45,7 +45,7 @@ MonoBehaviour:
   jigwiStageSpreadSeconds: 1
   jigwiStageSpreadPatches: 3
   jigwiStageFeverMultiplier: 2
-  jigwiABPersonalDurationSeconds: 10
+  jigwiABPersonalDurationSeconds: 15
   jigwiABPersonalRecoveryMultiplier: 4
   jigwiABPersonalRequiredHits: 3
   jigwiABPersonalBurnSeconds: 5
@@ -56,6 +56,8 @@ MonoBehaviour:
   jigwiABFireMoveAmount: 0.03
   jigwiABFireMovePeriodSeconds: 4
   jigwiABFireTargetRadius: 0.3
+  jigwiABRewardSizeScale: 1.3
+  jigwiABRewardPaintScale: 1.5
   itemLifetimeSeconds: 15
   itemUnlockSwipesMin: 2
   itemUnlockSwipesMax: 4
@@ -190,6 +192,15 @@ MonoBehaviour:
   teamBattleSeconds: 180
   teamFeverHits: 15
   teamFeverSeconds: 8
+  teamFeverRingScale: 2.9
+  teamFeverRingAlpha: 1
+  teamFeverGlowMin: 0.45
+  teamFeverGlowMax: 0.8
+  teamFeverGlowReach: 0.3
+  teamFeverTurnScale: 1.45
+  teamFeverTurnSeconds: 0.35
+  teamWallFlashSeconds: 0.35
+  teamWallFlashBoost: 0.4
   highResolutionPaintEnabled: 1
   highResolutionPaintQuality: 0
   yaguangFlashEnabled: 0

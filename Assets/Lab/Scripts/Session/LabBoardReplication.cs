@@ -168,6 +168,8 @@ namespace C6Lab
             && a.jigwiRadiusScale == b.jigwiRadiusScale && a.expiresAt == b.expiresAt
             && a.jigwiABBurnEventId == b.jigwiABBurnEventId && a.jigwiABBurnAt == b.jigwiABBurnAt
             && a.jigwiABRadiusScale == b.jigwiABRadiusScale
+            && a.jigwiABReward == b.jigwiABReward && a.jigwiABRewardSizeScale == b.jigwiABRewardSizeScale
+            && a.jigwiABRewardPaintScale == b.jigwiABRewardPaintScale
             && a.jigwiSupply == b.jigwiSupply && a.jigwiGenerationBurn == b.jigwiGenerationBurn && a.fever == b.fever
             && a.fiveColor == b.fiveColor;
 
@@ -196,6 +198,9 @@ namespace C6Lab
         private LabBoardFrame header;
         private LabPlayerState[] players = Array.Empty<LabPlayerState>();
         private double playersAt = -1d;
+        private ulong latestModelRevision, purgedThroughRevision;
+        private double purgedAt = -1d;
+        private bool hasPurge;
         public long LatestSequence { get; private set; }
         public bool NeedsCheckpoint { get; private set; }
         public bool IsInitialized => baseline || LatestSequence > 0;
@@ -219,7 +224,36 @@ namespace C6Lab
             states.Clear(); tombstones.Clear();
             players = Array.Empty<LabPlayerState>(); playersAt = -1d;
             header = null; baseline = false; LatestSequence = 0; NeedsCheckpoint = false;
+            latestModelRevision = purgedThroughRevision = 0;
+            purgedAt = -1d; hasPurge = false;
         }
+
+        /// <summary>
+        /// Apply an authenticated Host failure fence without inventing recipient stream sequences.
+        /// Retire only pre-failure non-drums, including entities not yet received in this replica.
+        /// A repeated notification cannot erase later regeneration or a newly generated board.
+        /// </summary>
+        public void PurgeThrough(ulong modelRevision, double serverTime)
+        {
+            if (modelRevision == 0 || !Finite(serverTime) || serverTime < 0d
+                || hasPurge && modelRevision <= purgedThroughRevision) return;
+            hasPurge = true; purgedThroughRevision = modelRevision;
+            purgedAt = Math.Max(purgedAt, serverTime);
+            latestModelRevision = Math.Max(latestModelRevision, modelRevision);
+            foreach (string id in states.Values.Where(IsPurged).Select(state => state.id).ToArray())
+            {
+                states.Remove(id); tombstones.Add(id);
+            }
+            if (playersAt <= purgedAt)
+            {
+                players = LabBoardPublisher.CopyPlayers(players);
+                foreach (LabPlayerState player in players) player.stamina = 0f;
+                playersAt = purgedAt;
+            }
+        }
+
+        private bool IsPurged(LabOrbState state) => hasPurge && !state.kind.IsDrum()
+            && state.revision <= purgedThroughRevision;
 
         public bool TryGetState(string id, out LabOrbState state)
         {
@@ -234,7 +268,7 @@ namespace C6Lab
             reason = null;
             if (frame == null || !Matches(frame.sessionId, frame.round) || frame.localOwner != owner)
                 return Reject("STALE_BOARD_ROUND", out reason);
-            if (!ValidFrame(frame) || !CanApplyStates(frame.states, frame.removedIds, frame.checkpoint))
+            if (!ValidFrame(frame))
                 return Reject("INVALID_BOARD_FRAME", out reason);
             if (frame.sequence <= LatestSequence) return Reject("STALE_BOARD_SEQUENCE", out reason);
             if (!frame.checkpoint && (NeedsCheckpoint || !baseline || frame.sequence != LatestSequence + 1))
@@ -242,14 +276,23 @@ namespace C6Lab
                 NeedsCheckpoint = true;
                 return Reject("BOARD_CHECKPOINT_REQUIRED", out reason);
             }
+            bool currentModel = frame.modelRevision >= latestModelRevision;
+            if (currentModel && !CanApplyStates(frame.states, frame.removedIds, frame.checkpoint))
+                return Reject("INVALID_BOARD_FRAME", out reason);
             if (frame.checkpoint)
             {
-                states.Clear(); tombstones.Clear(); baseline = true; NeedsCheckpoint = false;
+                // A delayed checkpoint can repair the stream, but cannot replace a newer ledger.
+                if (currentModel) { states.Clear(); tombstones.Clear(); }
+                else SeedMissingDrums(frame.states);
+                baseline = true; NeedsCheckpoint = false;
             }
-            ApplyStates(frame.states, frame.removedIds);
-            header = frame.CopyHeader();
-            players = LabBoardPublisher.CopyPlayers(frame.players);
-            playersAt = frame.serverTime;
+            if (currentModel)
+            {
+                ApplyStates(frame.states, frame.removedIds);
+                if (header == null || frame.serverTime >= header.serverTime) header = frame.CopyHeader();
+                ApplyPlayers(frame.players, frame.serverTime);
+                latestModelRevision = Math.Max(latestModelRevision, frame.modelRevision);
+            }
             LatestSequence = frame.sequence;
             return true;
         }
@@ -259,19 +302,22 @@ namespace C6Lab
             if (receipt == null || !Matches(receipt.sessionId, receipt.round) || receipt.sequence <= LatestSequence
                 || receipt.sequence <= 0 || !Finite(receipt.serverTime) || receipt.serverTime < 0d
                 || !ValidStates(receipt.states, false) || !ValidRemoved(receipt.removedIds)
-                || !ValidPlayers(receipt.players) || !CanApplyStates(receipt.states, receipt.removedIds, false)) return false;
+                || !ValidPlayers(receipt.players)) return false;
             if (NeedsCheckpoint || receipt.sequence != LatestSequence + 1)
             {
                 NeedsCheckpoint = true;
                 return false;
             }
-            // Rejected operations also occupy a stream sequence and can carry restoring ledger state.
-            ApplyStates(receipt.states, receipt.removedIds);
-            if (receipt.serverTime >= playersAt && (receipt.players?.Length ?? 0) > 0)
+            // Rejected and pre-failure operations still consume their valid ordered sequence.
+            // Only payloads from the current model may replace accepted board/player state.
+            if (receipt.modelRevision >= latestModelRevision)
             {
-                players = LabBoardPublisher.CopyPlayers(receipt.players);
-                playersAt = receipt.serverTime;
+                if (!CanApplyStates(receipt.states, receipt.removedIds, false)) return false;
+                ApplyStates(receipt.states, receipt.removedIds);
+                ApplyPlayers(receipt.players, receipt.serverTime);
+                latestModelRevision = Math.Max(latestModelRevision, receipt.modelRevision);
             }
+            else SeedMissingDrums(receipt.states);
             LatestSequence = receipt.sequence;
             return true;
         }
@@ -290,20 +336,27 @@ namespace C6Lab
                     .Where(orb => orb != null && orb.owner == owner && !orb.inFlight)
                     .Concat((snapshot.drums ?? Array.Empty<LabOrbState>()).Where(drum => drum != null)))
                 {
-                    if (!tombstones.Contains(state.id) && !states.ContainsKey(state.id)) states.Add(state.id, state.Copy());
+                    if (!IsPurged(state) && !tombstones.Contains(state.id) && !states.ContainsKey(state.id))
+                    {
+                        states.Add(state.id, state.Copy());
+                        if (hasPurge) latestModelRevision = Math.Max(latestModelRevision, state.revision);
+                    }
                 }
                 baseline = true;
             }
             LabSnapshot copy = CopySnapshot(snapshot);
             copy.orbs = (snapshot.orbs ?? Array.Empty<LabOrbState>())
-                .Where(orb => orb != null && orb.owner != owner && !states.ContainsKey(orb.id) && !tombstones.Contains(orb.id))
+                .Where(orb => orb != null && !IsPurged(orb) && orb.owner != owner && !states.ContainsKey(orb.id) && !tombstones.Contains(orb.id))
                 .Select(orb => orb.Copy()).Concat(states.Values.Where(orb => !orb.kind.IsDrum()).Select(orb => orb.Copy()))
                 .OrderBy(orb => orb.id, StringComparer.Ordinal).ToArray();
             copy.drums = states.Values.Where(orb => orb.kind.IsDrum()).OrderBy(orb => orb.id, StringComparer.Ordinal)
                 .Select(orb => orb.Copy()).ToArray();
-            if (playersAt >= snapshot.serverTime && players.Length > 0)
-                copy.players = LabBoardPublisher.CopyPlayers(players);
-            if (header != null && header.serverTime >= snapshot.serverTime && snapshot.phase == LabPhase.Playing)
+            bool useCachedPlayers = playersAt >= snapshot.serverTime && players.Length > 0;
+            if (useCachedPlayers) copy.players = LabBoardPublisher.CopyPlayers(players);
+            if (hasPurge && (useCachedPlayers ? playersAt : snapshot.serverTime) <= purgedAt)
+                foreach (LabPlayerState player in copy.players) if (player != null) player.stamina = 0f;
+            if (header != null && (!hasPurge || header.modelRevision >= purgedThroughRevision)
+                && header.serverTime >= snapshot.serverTime && snapshot.phase == LabPhase.Playing)
             {
                 copy.serverTime = header.serverTime;
                 copy.paused = header.paused;
@@ -344,11 +397,31 @@ namespace C6Lab
             return copy;
         }
 
+        private void ApplyPlayers(LabPlayerState[] incoming, double serverTime)
+        {
+            if (serverTime < playersAt || (incoming?.Length ?? 0) == 0) return;
+            players = LabBoardPublisher.CopyPlayers(incoming);
+            if (hasPurge && serverTime <= purgedAt)
+                foreach (LabPlayerState player in players) player.stamina = 0f;
+            playersAt = serverTime;
+        }
+
+        private void SeedMissingDrums(LabOrbState[] incoming)
+        {
+            if (baseline) return;
+            int count = states.Values.Count(state => state.kind.IsDrum());
+            foreach (LabOrbState state in incoming ?? Array.Empty<LabOrbState>())
+                if (state.kind.IsDrum() && !states.ContainsKey(state.id) && !tombstones.Contains(state.id)
+                    && count < MaximumDrums && states.Count < MaximumStates)
+                { states.Add(state.id, state.Copy()); count++; }
+        }
+
         private void ApplyStates(LabOrbState[] added, string[] removed)
         {
             foreach (string id in removed ?? Array.Empty<string>()) { states.Remove(id); tombstones.Add(id); }
             foreach (LabOrbState state in added ?? Array.Empty<LabOrbState>())
             {
+                if (IsPurged(state)) continue;
                 if (!state.kind.IsDrum() && (state.owner != owner || state.inFlight))
                 {
                     states.Remove(state.id); tombstones.Add(state.id);
@@ -369,6 +442,7 @@ namespace C6Lab
             foreach (string id in removed ?? Array.Empty<string>()) { ids.Remove(id); drums.Remove(id); }
             foreach (LabOrbState state in added ?? Array.Empty<LabOrbState>())
             {
+                if (IsPurged(state)) continue;
                 if (!state.kind.IsDrum() && (state.owner != owner || state.inFlight))
                 {
                     ids.Remove(state.id); drums.Remove(state.id);
@@ -402,7 +476,7 @@ namespace C6Lab
             && LabFlashNetworkValidation.Valid(frame)
             && LabJigwiNetworkValidation.Valid(frame.jigwi)
             && LabJigwiStageNetworkValidation.Valid(frame.jigwiStage, frame.players)
-            && LabJigwiABNetworkValidation.Valid(frame.jigwiAB, frame.players)
+            && LabJigwiABNetworkValidation.Valid(frame.jigwiAB, frame.players, frame.modelRevision)
             && ValidStates(frame.states, true) && ValidRemoved(frame.removedIds) && ValidPlayers(frame.players);
 
         private bool ValidStates(LabOrbState[] values, bool forThisOwner)
@@ -426,6 +500,9 @@ namespace C6Lab
                     || !Finite(state.expiresAt) || state.expiresAt < -1d
                     || !Finite(state.jigwiABBurnAt) || state.jigwiABBurnAt < -1d
                     || !Finite(state.jigwiABRadiusScale) || state.jigwiABRadiusScale < .2f || state.jigwiABRadiusScale > 1f
+                    || !Finite(state.jigwiABRewardSizeScale) || state.jigwiABRewardSizeScale < 1f || state.jigwiABRewardSizeScale > 3f
+                    || !Finite(state.jigwiABRewardPaintScale) || state.jigwiABRewardPaintScale < 1f || state.jigwiABRewardPaintScale > 3f
+                    || state.jigwiABReward && !state.inFlight
                     || !string.IsNullOrEmpty(state.jigwiABBurnEventId)
                         && (string.IsNullOrWhiteSpace(state.jigwiABBurnEventId) || state.jigwiABBurnEventId.Length > 256)
                     || string.IsNullOrEmpty(state.jigwiABBurnEventId) != (state.jigwiABBurnAt < 0d)

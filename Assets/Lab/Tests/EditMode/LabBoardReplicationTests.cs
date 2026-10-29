@@ -233,6 +233,260 @@ namespace C6Lab.Tests
             Assert.That(replica.Overlay(newer).remaining, Is.EqualTo(178d));
         }
 
+        [Test]
+        public void FailureFenceConsumesOldReceiptsWithoutRestoringOrbsOrStaminaAndAllowsNewGeneration()
+        {
+            var replica = ActiveReplica();
+            var oldOrb = RevisionOrb("old", 10ul, 20ul);
+            var drum = RevisionOrb("kept-drum", 20ul, 1ul, LabOrbKind.Drum);
+            LabBoardFrame before = VersionedFrame(1, true, 20ul, 9d, oldOrb, drum);
+            before.players = new[] { new LabPlayerState { id = 10ul, seat = 0, stamina = 100f, personalHp = 237 } };
+            Assert.That(replica.TryApply(before, out _), Is.True);
+            replica.PurgeThrough(50ul, 10d);
+            Assert.That(replica.LatestSequence, Is.EqualTo(1), "A failure event is not a recipient sequence.");
+            Assert.That(replica.TryGetState("old", out _), Is.False);
+            Assert.That(replica.TryGetState("kept-drum", out _), Is.True);
+
+            LabActionReceipt delayed = Receipt(2, new[] { oldOrb });
+            delayed.modelRevision = 20ul; delayed.serverTime = 9d;
+            delayed.players = before.players;
+            Assert.That(replica.ApplyReceipt(delayed), Is.True, "An ordered old receipt still closes its sequence.");
+            Assert.That(replica.TryGetState("old", out _), Is.False);
+            LabSnapshot oldSnapshot = Snapshot(9d);
+            oldSnapshot.players = before.players;
+            LabPlayerState visible = replica.Overlay(oldSnapshot).players.Single();
+            Assert.That(visible.stamina, Is.Zero);
+            Assert.That(visible.personalHp, Is.EqualTo(237));
+            Assert.That(before.players.Single().stamina, Is.EqualTo(100f), "Never modify a packet's player object.");
+
+            LabActionReceipt fresh = Receipt(3, new[] { RevisionOrb("new", 10ul, 60ul) });
+            fresh.modelRevision = 60ul; fresh.serverTime = 11d;
+            fresh.players = new[] { new LabPlayerState { id = 10ul, seat = 0, stamina = 6f, personalHp = 237 } };
+            Assert.That(replica.ApplyReceipt(fresh), Is.True);
+            Assert.That(replica.LatestSequence, Is.EqualTo(3));
+            Assert.That(replica.NeedsCheckpoint, Is.False);
+            Assert.That(replica.TryGetState("new", out _), Is.True);
+            Assert.That(replica.Overlay(oldSnapshot).players.Single().stamina, Is.EqualTo(6f));
+        }
+
+        [Test]
+        public void DelayedCheckpointRepairsASequenceGapWithoutReplacingTheNewerPostFailureLedgerOrHeader()
+        {
+            var replica = ActiveReplica();
+            Assert.That(replica.TryApply(VersionedFrame(1, true, 20ul, 9d,
+                RevisionOrb("old", 10ul, 20ul), RevisionOrb("drum", 20ul, 1ul, LabOrbKind.Drum)), out _), Is.True);
+            replica.PurgeThrough(50ul, 10d);
+            LabActionReceipt generated = Receipt(2, new[] { RevisionOrb("new", 10ul, 60ul) });
+            generated.modelRevision = 60ul; generated.serverTime = 11d;
+            Assert.That(replica.ApplyReceipt(generated), Is.True);
+            LabBoardFrame current = VersionedFrame(3, false, 65ul, 12d);
+            current.paused = true; current.targetYawDegrees = 42f;
+            current.players = new[] { new LabPlayerState { id = 10ul, seat = 0, stamina = 8f, personalHp = 237 } };
+            Assert.That(replica.TryApply(current, out _), Is.True);
+            Assert.That(replica.TryApply(VersionedFrame(5, false, 70ul, 13d), out var reason), Is.False);
+            Assert.That(reason, Is.EqualTo("BOARD_CHECKPOINT_REQUIRED"));
+
+            LabBoardFrame delayed = VersionedFrame(6, true, 40ul, 9d, RevisionOrb("old", 10ul, 20ul));
+            delayed.targetYawDegrees = 900f;
+            delayed.players = new[] { new LabPlayerState { id = 10ul, seat = 0, stamina = 100f, personalHp = 300 } };
+            Assert.That(replica.TryApply(delayed, out _), Is.True);
+            Assert.That(replica.LatestSequence, Is.EqualTo(6));
+            Assert.That(replica.NeedsCheckpoint, Is.False);
+            Assert.That(replica.TryGetState("old", out _), Is.False);
+            Assert.That(replica.TryGetState("new", out _), Is.True);
+            Assert.That(replica.TryGetState("drum", out _), Is.True);
+            LabSnapshot visible = replica.Overlay(Snapshot(8d));
+            Assert.That(visible.serverTime, Is.EqualTo(12d));
+            Assert.That(visible.paused, Is.True);
+            Assert.That(visible.targetYawDegrees, Is.EqualTo(42f));
+            Assert.That(visible.players.Single().stamina, Is.EqualTo(8f));
+            Assert.That(visible.players.Single().personalHp, Is.EqualTo(237));
+            Assert.That(replica.TryApply(VersionedFrame(7, false, 70ul, 13d), out _), Is.True);
+        }
+
+        [Test]
+        public void FailureBeforeTheFirstBoardFiltersUnknownLocalRemoteAndFlyingSnapshotOrbsButKeepsDrums()
+        {
+            var replica = ActiveReplica();
+            replica.PurgeThrough(50ul, 10d);
+            var flying = RevisionOrb("old-flying", 20ul, 30ul); flying.inFlight = true;
+            LabSnapshot incoming = Snapshot(9d);
+            incoming.orbs = new[] { RevisionOrb("old-local", 10ul, 20ul), RevisionOrb("old-remote", 20ul, 25ul), flying,
+                RevisionOrb("new-local", 10ul, 60ul), RevisionOrb("new-remote", 20ul, 61ul) };
+            incoming.drums = new[] { RevisionOrb("drum", 20ul, 1ul, LabOrbKind.Drum) };
+            incoming.players = new[] { new LabPlayerState { id = 10ul, seat = 0, stamina = 100f, personalHp = 237 } };
+            LabSnapshot visible = replica.Overlay(incoming);
+            Assert.That(visible.orbs.Select(orb => orb.id), Is.EquivalentTo(new[] { "new-local", "new-remote" }));
+            Assert.That(visible.drums.Single().id, Is.EqualTo("drum"));
+            Assert.That(visible.players.Single().stamina, Is.Zero);
+            Assert.That(incoming.orbs.Length, Is.EqualTo(5));
+            Assert.That(incoming.players.Single().stamina, Is.EqualTo(100f));
+            Assert.That(replica.TryApply(VersionedFrame(1, true, 40ul, 9d,
+                RevisionOrb("old-local", 10ul, 20ul)), out _), Is.True);
+            Assert.That(replica.TryGetState("new-local", out _), Is.True, "An old checkpoint cannot clear a known newer orb.");
+            incoming.serverTime = 12d; incoming.players.Single().stamina = 12f;
+            Assert.That(replica.Overlay(incoming).players.Single().stamina, Is.EqualTo(12f), "Newer recovery remains visible.");
+        }
+
+        [Test]
+        public void FailureBeforeAnyReceiptRetainsADelayedGlobalDrumWhileDiscardingItsOldOrdinaryOrb()
+        {
+            var replica = ActiveReplica();
+            replica.PurgeThrough(50ul, 10d);
+            LabActionReceipt old = Receipt(1, new[] { RevisionOrb("old", 10ul, 20ul),
+                RevisionOrb("global-drum", 20ul, 1ul, LabOrbKind.Drum) });
+            old.modelRevision = 20ul; old.serverTime = 9d;
+            Assert.That(replica.ApplyReceipt(old), Is.True);
+            Assert.That(replica.TryGetState("old", out _), Is.False);
+            Assert.That(replica.TryGetState("global-drum", out var drum), Is.True);
+            Assert.That(drum.kind, Is.EqualTo(LabOrbKind.Drum));
+            Assert.That(drum.owner, Is.EqualTo(20ul));
+            Assert.That(replica.TryApply(VersionedFrame(2, true, 20ul, 9d,
+                RevisionOrb("old", 10ul, 20ul)), out _), Is.True);
+            Assert.That(replica.Overlay(Snapshot(9d)).drums.Single().id, Is.EqualTo("global-drum"));
+            Assert.That(replica.LatestSequence, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void LateFailureNotificationPreservesNewerResourcesAndRepeatedFenceCannotZeroRecovery()
+        {
+            var replica = ActiveReplica();
+            LabBoardFrame current = VersionedFrame(1, true, 60ul, 12d,
+                RevisionOrb("old", 10ul, 20ul), RevisionOrb("new", 10ul, 60ul), RevisionOrb("drum", 20ul, 1ul, LabOrbKind.Drum));
+            current.players = new[] { new LabPlayerState { id = 10ul, seat = 0, stamina = 12f, personalHp = 237 } };
+            Assert.That(replica.TryApply(current, out _), Is.True);
+            replica.PurgeThrough(50ul, 10d);
+            replica.PurgeThrough(50ul, 99d);
+            replica.PurgeThrough(40ul, 100d);
+            Assert.That(replica.TryGetState("old", out _), Is.False);
+            Assert.That(replica.TryGetState("new", out _), Is.True);
+            Assert.That(replica.TryGetState("drum", out _), Is.True);
+            Assert.That(replica.Overlay(Snapshot(9d)).players.Single().stamina, Is.EqualTo(12f));
+            replica.PurgeThrough(70ul, 14d);
+            Assert.That(replica.TryGetState("new", out _), Is.False);
+            Assert.That(replica.TryGetState("drum", out _), Is.True);
+            Assert.That(replica.Overlay(Snapshot(9d)).players.Single().stamina, Is.Zero);
+        }
+
+        [Test]
+        public void PurgeFenceSurvivesSameRoundRebindingAndResetsOnlyWithTheActiveRound()
+        {
+            var replica = ActiveReplica();
+            replica.PurgeThrough(50ul, 10d);
+            replica.SetActive("board-test", 1u, 10ul);
+            LabSnapshot old = Snapshot(9d); old.orbs = new[] { RevisionOrb("retired", 10ul, 1ul) };
+            Assert.That(replica.Overlay(old).orbs, Is.Empty);
+            replica.SetActive("board-test", 2u, 10ul);
+            LabBoardFrame freshRound = VersionedFrame(1, true, 1ul, 0d, RevisionOrb("retired", 10ul, 1ul));
+            freshRound.round = 2u;
+            Assert.That(replica.TryApply(freshRound, out _), Is.True);
+            Assert.That(replica.TryGetState("retired", out _), Is.True);
+            Assert.That(replica.LatestSequence, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void PublisherSendsChangesToBothCapturedRewardScales()
+        {
+            var publisher = new LabBoardPublisher();
+            LabSnapshot snapshot = Snapshot(1d); snapshot.orbs = new[] { Orb("mine", 10ul) };
+            publisher.Build(snapshot, 10ul, 1, 1ul);
+            snapshot.orbs.Single().jigwiABRewardSizeScale = 1.3f;
+            Assert.That(publisher.Build(snapshot, 10ul, 2, 2ul).states.Single().jigwiABRewardSizeScale, Is.EqualTo(1.3f));
+            snapshot.orbs.Single().jigwiABRewardPaintScale = 1.5f;
+            Assert.That(publisher.Build(snapshot, 10ul, 3, 3ul).states.Single().jigwiABRewardPaintScale, Is.EqualTo(1.5f));
+        }
+
+        [TestCase(float.NaN, 1f, false)]
+        [TestCase(float.PositiveInfinity, 1f, false)]
+        [TestCase(.99f, 1f, false)]
+        [TestCase(3.01f, 1f, false)]
+        [TestCase(1f, float.NaN, false)]
+        [TestCase(1f, float.PositiveInfinity, false)]
+        [TestCase(1f, .99f, false)]
+        [TestCase(1f, 3.01f, false)]
+        [TestCase(1.3f, 1.5f, true)]
+        public void InvalidOrNonFlyingRewardMetadataCannotChangeAnOrderedLedger(float size, float paint, bool rewarded)
+        {
+            var replica = ActiveReplica();
+            Assert.That(replica.TryApply(Frame(1, true), out _), Is.True);
+            LabOrbState invalid = Orb("invalid", 10ul);
+            invalid.jigwiABReward = rewarded; invalid.jigwiABRewardSizeScale = size; invalid.jigwiABRewardPaintScale = paint;
+            Assert.That(replica.TryApply(Frame(2, false, invalid), out _), Is.False);
+            Assert.That(replica.ApplyReceipt(Receipt(2, new[] { invalid })), Is.False);
+            Assert.That(replica.LatestSequence, Is.EqualTo(1));
+            Assert.That(replica.TryGetState("invalid", out _), Is.False);
+        }
+
+        [Test]
+        public void ABoardFrameCannotInstallAFailureFenceFromAFutureModelRevision()
+        {
+            var replica = ActiveReplica();
+            Assert.That(replica.TryApply(VersionedFrame(1, true, 30ul, 34d,
+                RevisionOrb("kept", 10ul, 20ul)), out _), Is.True);
+            LabBoardFrame frame = VersionedFrame(2, false, 50ul, 35d);
+            frame.removedIds = new[] { "kept" };
+            frame.players = new[] { new LabPlayerState { id = 10ul, seat = 0, stamina = 0f, personalHp = 237 } };
+            frame.jigwiAB = new LabJigwiABSnapshot
+            {
+                enabled = true, startedAt = 0d, cutoffAt = 100d,
+                rounds = new[]
+                {
+                    new LabJigwiABRound
+                    {
+                        id = "failed-mission", slot = 1, kind = LabJigwiABKind.GroupFire,
+                        warningAt = 24d, activeAt = 25d, endsAt = 35d, resolvedAt = 35d,
+                        resolution = LabJigwiABResolution.Expired, clearedThroughRevision = 51ul,
+                        shrinkAt = 25d, shrinkScale = 1f, movePeriodSeconds = 4f, targetRadius = .3f,
+                        rewardSizeScale = 1.3f, rewardPaintScale = 1.5f,
+                        players = new[]
+                        {
+                            new LabJigwiABPlayerFire
+                            {
+                                playerId = 10ul,
+                                targets = new[] { new LabJigwiABFireTarget { id = "fire", x = .5f, y = .62f } }
+                            }
+                        }
+                    }
+                }
+            };
+            Assert.That(LabJigwiABNetworkValidation.Valid(frame.jigwiAB, frame.players), Is.True,
+                "The payload is otherwise valid; only the frame's model revision makes its fence impossible.");
+            Assert.That(replica.TryApply(frame, out string reason), Is.False);
+            Assert.That(reason, Is.EqualTo("INVALID_BOARD_FRAME"));
+            Assert.That(replica.LatestSequence, Is.EqualTo(1));
+            Assert.That(replica.NeedsCheckpoint, Is.False);
+            Assert.That(replica.TryGetState("kept", out _), Is.True,
+                "Invalid outcome metadata must be rejected before applying unrelated removals.");
+            frame.jigwiAB.rounds.Single().clearedThroughRevision = 50ul;
+            Assert.That(replica.TryApply(frame, out reason), Is.True, reason);
+            Assert.That(replica.LatestSequence, Is.EqualTo(2));
+            Assert.That(replica.TryGetState("kept", out _), Is.False);
+        }
+
+        [Test]
+        public void AValidFlyingRewardReceiptConsumesItsSequenceWithoutPuttingTheProjectileBackOnTheBoard()
+        {
+            var replica = ActiveReplica();
+            Assert.That(replica.TryApply(Frame(1, true, Orb("flying", 10ul)), out _), Is.True);
+            LabOrbState launched = Orb("flying", 10ul); launched.inFlight = true;
+            launched.jigwiABReward = true; launched.jigwiABRewardSizeScale = 1.3f; launched.jigwiABRewardPaintScale = 1.5f;
+            Assert.That(replica.ApplyReceipt(Receipt(2, new[] { launched })), Is.True);
+            Assert.That(replica.LatestSequence, Is.EqualTo(2));
+            Assert.That(replica.TryGetState("flying", out _), Is.False);
+        }
+
+        private static LabOrbState RevisionOrb(string id, ulong owner, ulong revision, LabOrbKind kind = LabOrbKind.Combined)
+        {
+            LabOrbState state = Orb(id, owner, kind); state.revision = revision; return state;
+        }
+
+        private static LabBoardFrame VersionedFrame(long sequence, bool checkpoint, ulong revision, double at, params LabOrbState[] states)
+        {
+            LabBoardFrame frame = Frame(sequence, checkpoint, states);
+            frame.modelRevision = revision; frame.serverTime = at; frame.remaining = 180d - at; frame.playedSeconds = at;
+            return frame;
+        }
+
         private static LabBoardReplica ActiveReplica()
         {
             var replica = new LabBoardReplica();

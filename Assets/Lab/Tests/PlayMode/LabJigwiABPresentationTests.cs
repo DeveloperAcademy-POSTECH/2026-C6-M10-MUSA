@@ -243,6 +243,67 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TimedMissionKeepsItsCountdownBesideNextWarningAndFlashesFailureOnlyOnce()
+        {
+            var group = Group(); group.endsAt = 21d;
+            var next = Personal(); next.id = "next-personal"; next.warningAt = 20d; next.activeAt = 21d; next.endsAt = 36d;
+            snapshot = Snapshot(group); snapshot.jigwiAB.rounds = new[] { next, group }; SetSnapshot(snapshot);
+            view.ApplySnapshot(snapshot, Local, 11d);
+            Assert.That(view.status.text, Does.Contain("10.0초"));
+            view.ApplySnapshot(snapshot, Local, 20.5d);
+            Assert.That(view.status.text, Does.Contain("0.5초").And.Contain("다음 기믹 예고"));
+            Assert.That(view.GroupCurtainVisible, Is.True, "The upcoming A warning must not hide B before its deadline.");
+            group.resolution = LabJigwiABResolution.Expired; group.resolvedAt = 21d;
+            view.ApplySnapshot(snapshot, Local, 21d);
+            Assert.That(view.FailureVisible, Is.True); Assert.That(view.FailureFlashCount, Is.EqualTo(1));
+            Assert.That(view.failureStatus.text, Is.EqualTo("실패"));
+            Assert.That(view.failureOverlay.rectTransform.anchorMin, Is.EqualTo(Vector2.zero));
+            Assert.That(view.failureOverlay.rectTransform.anchorMax, Is.EqualTo(Vector2.one));
+            Assert.That(view.failureOverlay.GetComponentsInChildren<UnityEngine.UI.Graphic>(true)
+                .All(graphic => !graphic.raycastTarget), Is.True, "Failure feedback cannot consume input.");
+            view.ApplySnapshot(JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(snapshot)), Local, 21.3d);
+            Assert.That(view.FailureFlashCount, Is.EqualTo(1), "Repeated accepted state cannot restart the failure flash.");
+            view.ApplySnapshot(snapshot, Local, 22.1d);
+            Assert.That(view.FailureVisible, Is.False);
+            var late = Object.Instantiate(Resources.Load<GameObject>(LabJigwiScreenPresentation.PrefabResource), canvas.transform, false)
+                .GetComponent<LabJigwiScreenPresentation>();
+            late.Bind(network, canvas, camera); late.enabled = false;
+            late.ApplySnapshot(snapshot, Local, 21.1d);
+            Assert.That(late.FailureVisible, Is.False, "A late baseline installs state without replaying old failure feedback.");
+            Assert.That(late.FailureFlashCount, Is.Zero);
+        }
+
+        [TestCase(LabJigwiABResolution.Cancelled)]
+        [TestCase(LabJigwiABResolution.Skipped)]
+        public void CancelledOrSkippedMissionDoesNotBecomeFailureFeedback(LabJigwiABResolution resolution)
+        {
+            var group = Group(); snapshot = Snapshot(group); SetSnapshot(snapshot);
+            view.ApplySnapshot(snapshot, Local, 11.2d);
+            group.resolution = resolution; group.resolvedAt = 12d;
+            view.ApplySnapshot(snapshot, Local, 12d);
+            Assert.That(view.FailureVisible, Is.False); Assert.That(view.FailureFlashCount, Is.Zero);
+        }
+
+        [Test]
+        public void SuccessRewardShowsItsAcceptedFiveSecondClockAndScalesWithoutChangingTheCanvas()
+        {
+            var group = Group(); snapshot = Snapshot(group); SetSnapshot(snapshot);
+            view.ApplySnapshot(snapshot, Local, 11.2d);
+            group.resolution = LabJigwiABResolution.Completed; group.resolvedAt = 12d;
+            group.rewardUntil = 17d; group.rewardSizeScale = 1.3f; group.rewardPaintScale = 1.5f;
+            view.ApplySnapshot(snapshot, Local, 12d);
+            Assert.That(view.status.text, Does.Contain("모든 불을 함께 껐어요").And.Contain("5.0초"));
+            Assert.That(view.playerStatus.text, Does.Contain("1.3배").And.Contain("1.5배").And.Contain("불꽃 궤적"));
+            view.ApplySnapshot(snapshot, Local, 16.5d);
+            Assert.That(view.status.text, Does.Contain("0.5초"));
+            view.ApplySnapshot(snapshot, Local, 17d);
+            Assert.That(view.status.text, Does.Not.Contain("보상"));
+            Assert.That(view.FailureVisible, Is.False);
+            Assert.That(view.GetComponentsInChildren<Canvas>(true), Is.Empty, "Reuse the authored Canvas hierarchy.");
+            Assert.That(view.GetComponentsInChildren<Collider>(true), Is.Empty);
+        }
+
+        [Test]
         public void GroupOffRelightAndSharedCompletionFollowAcceptedStateWithoutReplayingSplashes()
         {
             LabJigwiABRound group = Group(); snapshot = Snapshot(group); SetSnapshot(snapshot);

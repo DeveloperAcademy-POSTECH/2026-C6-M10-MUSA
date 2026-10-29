@@ -119,8 +119,11 @@ namespace C6Lab
         // A's deadline is independent of the ordinary lifetime and can be cleared without restoring an expired orb.
         public string jigwiABBurnEventId;
         public double jigwiABBurnAt = -1d;
-        // B changes physical/visual radius only; it never changes paint share or the bomb small flag.
+        // Reserved legacy B-shrink field. Timed screen missions keep it at one.
         public float jigwiABRadiusScale = 1f;
+        /// <summary>Captured only when this projectile launches during a completed B mission's reward window.</summary>
+        public bool jigwiABReward;
+        public float jigwiABRewardSizeScale = 1f, jigwiABRewardPaintScale = 1f;
         /// <summary>2:2 fever (#281): made during a team fever or turned by one; every board rings it with a rainbow.</summary>
         public bool fever;
         /// <summary>

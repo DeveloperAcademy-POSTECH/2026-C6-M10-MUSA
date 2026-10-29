@@ -44,6 +44,9 @@ namespace C6Lab
         public UnityEngine.UI.RawImage personalWaterDouse;
         public UnityEngine.UI.Image statusPanel;
         public UnityEngine.UI.Text status, playerStatus;
+        public UnityEngine.UI.Image failureOverlay;
+        public UnityEngine.UI.RawImage[] failureFlames;
+        public UnityEngine.UI.Text failureStatus;
         [SerializeField, Range(.1f, 2f)] private float waterDouseSeconds = .6f;
         [SerializeField, Range(0f, 8f)] private float flameSpeed = 2.4f;
         [SerializeField, Range(0f, .1f)] private float flameSway = .03f;
@@ -53,6 +56,9 @@ namespace C6Lab
         private readonly Dictionary<UnityEngine.UI.RawImage, Material> flameMaterials =
             new Dictionary<UnityEngine.UI.RawImage, Material>();
         private readonly HashSet<string> seenDouses = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> seenFailures = new HashSet<string>(StringComparer.Ordinal);
+        private const double FailureFlashSeconds = 1d;
+        private double failedAt = -1d;
         private readonly StringBuilder rows = new StringBuilder(180);
         private readonly Vector2[] lastFirePositions = new Vector2[MaxFires], lastFireSizes = new Vector2[MaxFires];
         private readonly bool[] hasFirePosition = new bool[MaxFires];
@@ -89,6 +95,8 @@ namespace C6Lab
         public bool PersonalHeatVisible => personalHeat != null && personalHeat.gameObject.activeSelf;
         public bool PersonalWaterVisible => personalWaterDouse != null && personalWaterDouse.gameObject.activeSelf;
         public double PresentationTime { get; private set; }
+        public bool FailureVisible => failureOverlay != null && failureOverlay.gameObject.activeSelf;
+        public int FailureFlashCount { get; private set; }
 
         public static LabJigwiScreenPresentation EnsureFor(LabNetwork network, Canvas targetCanvas, Camera camera)
         {
@@ -230,7 +238,33 @@ namespace C6Lab
                 playerStatus = Label("PlayerFireStatus", statusPanel.transform, 14);
                 Stretch(playerStatus.rectTransform, new Vector2(.035f, .02f), new Vector2(.965f, .4f));
             }
+            EnsureFailureWidgets();
             EnsureArt();
+        }
+
+        private void EnsureFailureWidgets()
+        {
+            if (failureOverlay == null)
+            {
+                failureOverlay = Image("GroupMissionFailure", transform, new Color(1f, .13f, .01f, .22f));
+                Stretch(failureOverlay.rectTransform, Vector2.zero, Vector2.one);
+                failureOverlay.gameObject.SetActive(false);
+            }
+            if (failureFlames == null || failureFlames.Length != 2) Array.Resize(ref failureFlames, 2);
+            for (int i = 0; i < failureFlames.Length; i++)
+                if (failureFlames[i] == null)
+                {
+                    failureFlames[i] = Raw("FailureFlame" + (i + 1), failureOverlay.transform);
+                    Stretch(failureFlames[i].rectTransform, new Vector2(i == 0 ? -.08f : .4f, -.1f),
+                        new Vector2(i == 0 ? .6f : 1.08f, 1.1f));
+                    if (i == 1) failureFlames[i].uvRect = new Rect(1f, 0f, -1f, 1f);
+                }
+            if (failureStatus == null)
+            {
+                failureStatus = Label("FailureInstruction", failureOverlay.transform, 40);
+                Stretch(failureStatus.rectTransform, new Vector2(.12f, .42f), new Vector2(.88f, .58f));
+                failureStatus.text = "실패";
+            }
         }
 
         private void EnsureCurtainWidgets()
@@ -334,6 +368,7 @@ namespace C6Lab
             font = value;
             if (status != null) status.font = value;
             if (playerStatus != null) playerStatus.font = value;
+            if (failureStatus != null) failureStatus.font = value;
         }
 
         private void EnsureArt()
@@ -348,6 +383,7 @@ namespace C6Lab
             if (curtainStage1Texture == null) curtainStage1Texture = Resources.Load<Texture2D>("Jigwi/ScreenFireCurtainStage1");
             if (curtainArt != null) ConfigureFlame(curtainArt, curtainTexture);
             if (curtainCore != null) ConfigureFlame(curtainCore, curtainTexture);
+            if (failureFlames != null) foreach (var image in failureFlames) ConfigureFlame(image, curtainTexture);
             if (curtainWaterDouse != null) curtainWaterDouse.texture = waterTexture;
             if (personalWaterDouse != null) personalWaterDouse.texture = waterTexture;
             if (fireWaterDouses != null) foreach (var image in fireWaterDouses) if (image != null) image.texture = waterTexture;
@@ -395,6 +431,7 @@ namespace C6Lab
             }
             bool baseline = !baselineReady;
             ObserveDouses(stage, localPlayer, now, baseline);
+            ObserveFailures(stage, now, baseline);
             baselineReady = true; previousNow = now;
             LabJigwiABRound active = stage.Active(now);
             bool personal = active != null && active.kind == LabJigwiABKind.PersonalBurn && active.targetPlayer == localPlayer;
@@ -407,6 +444,34 @@ namespace C6Lab
             else SetFiresHidden(held);
             DrawWater(now, held);
             DrawStatus(stage, active, snapshot, localPlayer, now, held);
+            DrawFailure(now);
+        }
+
+        private void ObserveFailures(LabJigwiABSnapshot stage, double now, bool baseline)
+        {
+            foreach (var round in stage.rounds ?? Array.Empty<LabJigwiABRound>())
+            {
+                if (round == null || round.kind != LabJigwiABKind.GroupFire
+                    || round.resolution != LabJigwiABResolution.Expired) continue;
+                string key = round.id + "/" + round.resolvedAt.ToString("R", CultureInfo.InvariantCulture);
+                if (!seenFailures.Add(key) || baseline || round.resolvedAt < 0d
+                    || now < round.resolvedAt || now - round.resolvedAt >= FailureFlashSeconds) continue;
+                failedAt = round.resolvedAt;
+                FailureFlashCount++;
+            }
+        }
+
+        private void DrawFailure(double now)
+        {
+            if (failureOverlay == null) return;
+            bool visible = failedAt >= 0d && now >= failedAt && now - failedAt < FailureFlashSeconds;
+            failureOverlay.gameObject.SetActive(visible);
+            if (!visible) return;
+            float elapsed = (float)(now - failedAt), opacity = 1f - elapsed / (float)FailureFlashSeconds;
+            failureOverlay.color = new Color(1f, .13f, .01f, .22f * opacity);
+            if (failureFlames != null) for (int i = 0; i < failureFlames.Length; i++)
+                AnimateFlame(failureFlames[i], elapsed, i * 1.73f, .95f * opacity);
+            if (failureStatus != null) failureStatus.color = new Color(1f, .97f, .83f, opacity);
         }
 
         private void ObserveDouses(LabJigwiABSnapshot stage, ulong localPlayer, double now, bool baseline)
@@ -650,7 +715,8 @@ namespace C6Lab
                 }
                 else
                 {
-                    words = shout + "물 결합 구슬로 발화점을 모두 끄세요";
+                    words = shout + "물 결합 구슬로 발화점을 모두 끄세요 · "
+                        + Math.Max(0d, active.endsAt - Math.Max(now, active.activeAt)).ToString("0.0", CultureInfo.InvariantCulture) + "초";
                     foreach (var player in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
                     {
                         if (player == null) continue;
@@ -659,7 +725,7 @@ namespace C6Lab
                         if (rows.Length > 0) rows.Append("  ·  ");
                         rows.Append(PlayerLabel(snapshot, player.playerId)).Append(' ').Append(off).Append('/').Append(player.targets?.Length ?? 0);
                     }
-                    rows.Append(active.shrunk ? "\n축소 중 · 모두 꺼야 박 공격 가능" : "\n발화점을 모두 꺼야 박 공격 가능");
+                    rows.Append("\n발화점을 모두 꺼야 박 공격 가능");
                 }
             }
             if (active == null && !stage.fever)
@@ -667,6 +733,23 @@ namespace C6Lab
                     if (finished != null && finished.resolution == LabJigwiABResolution.Completed && Recent(finished.resolvedAt, now))
                         words = finished.kind == LabJigwiABKind.GroupFire ? "모든 불을 함께 껐어요!"
                             : PlayerLabel(snapshot, finished.targetPlayer) + "의 과열이 끝났어요";
+            LabJigwiABRound reward = stage.Reward(now);
+            if (reward != null)
+            {
+                string remaining = Math.Max(0d, reward.rewardUntil - now).ToString("0.0", CultureInfo.InvariantCulture);
+                words = words.Length > 0 ? words + "\n성공 보상 · " + remaining + "초"
+                    : "모든 불을 함께 껐어요! · 보상 " + remaining + "초";
+                if (rows.Length > 0) rows.Append('\n');
+                rows.Append("투척 크기 ").Append(reward.rewardSizeScale.ToString("0.#", CultureInfo.InvariantCulture))
+                    .Append("배 · 도색 ").Append(reward.rewardPaintScale.ToString("0.#", CultureInfo.InvariantCulture))
+                    .Append("배 · 불꽃 궤적");
+            }
+            foreach (var upcoming in stage.rounds ?? Array.Empty<LabJigwiABRound>())
+            {
+                if (upcoming == null || upcoming == active || !upcoming.Warning(now)) continue;
+                words += "\n다음 기믹 예고 · " + (upcoming.kind == LabJigwiABKind.PersonalBurn ? "개인 과열" : "공동 소화");
+                break;
+            }
             status.text = words; playerStatus.text = rows.ToString();
             statusPanel.gameObject.SetActive(words.Length > 0);
             playerStatus.gameObject.SetActive(rows.Length > 0);
@@ -732,6 +815,7 @@ namespace C6Lab
             if (groupFireCurtain != null) groupFireCurtain.gameObject.SetActive(false);
             if (curtainWaterDouse != null) curtainWaterDouse.gameObject.SetActive(false);
             if (personalHeat != null) personalHeat.gameObject.SetActive(false);
+            if (failureOverlay != null) failureOverlay.gameObject.SetActive(false);
             if (statusPanel != null) statusPanel.gameObject.SetActive(false);
             if (personalWaterDouse != null) personalWaterDouse.gameObject.SetActive(false);
             if (fireImages != null) foreach (var image in fireImages) if (image != null) image.gameObject.SetActive(false);
@@ -741,7 +825,8 @@ namespace C6Lab
         {
             if (audioView != null) audioView.Stop();
             if (waterFlightTrail != null) waterFlightTrail.Hide();
-            seenDouses.Clear(); baselineReady = false;
+            seenDouses.Clear(); seenFailures.Clear(); baselineReady = false;
+            failedAt = -1d; FailureFlashCount = 0;
             personalDousedAt = curtainDousedAt = -1d; previousNow = -1d; sessionId = null; stageStartedAt = -1d;
             for (int i = 0; i < MaxFires; i++) { fireDousedAt[i] = -1d; hasFirePosition[i] = false; }
         }

@@ -44,6 +44,12 @@ namespace C6Lab
         }
     }
 
+    /// <summary>Revision ownership retained by a detached fading trail, for bounded B-failure cleanup.</summary>
+    public sealed class LabProjectileRevisionStamp : MonoBehaviour
+    {
+        public ulong Revision;
+    }
+
     /// <summary>
     /// A dynamic sphere whose release motion is reproduced on every device. Only the Host's
     /// authoritative instance resolves hit or miss; client visual copies never award damage.
@@ -111,11 +117,13 @@ namespace C6Lab
         // 박 색상 콤보(#222)의 공 크기 배율: 실패 페널티면 1보다 작고 성공 보상이면 크다. 충돌 반지름/모양/꼬리에 함께 곱한다.
         private float radiusScale = 1f;
         private float jigwiABRadiusScale = 1f;
+        private bool jigwiABReward;
         private bool authoritative;
         private bool resolved;
 
         public string ProjectileId => projectileId;
         public ulong OwnerPlayerId => ownerPlayerId;
+        public ulong AuthorityRevision { get; set; }
         public bool IsResolved => resolved;
         public float GravityAcceleration => launchedGravity;
         public float LifetimeSeconds => launchedLifetime;
@@ -132,6 +140,22 @@ namespace C6Lab
         public LabJigwiWaterFlightPath JigwiWaterFlightPath => jigwiWaterFlightPath;
         public float RadiusScale => radiusScale;
         public float JigwiABRadiusScale => jigwiABRadiusScale;
+        public bool JigwiABRewardActive => jigwiABReward;
+        private LabOrbElement TrailElement => jigwiABReward ? LabOrbElement.Fire : element;
+
+        /// <summary>
+        /// Captured B-success presentation for this flight. The real element, pigment and physics stay unchanged.
+        /// Call with the launch's accepted flag, rather than the current reward clock, when reconciling a replica.
+        /// </summary>
+        public void SetJigwiABReward(bool enabled)
+        {
+            if (resolved || jigwiABReward == enabled) return;
+            jigwiABReward = enabled;
+            EnsureFlightTrail(ScaledRadius);
+            if (!launched) return;
+            if (elementFlightTrail != null) elementFlightTrail.Begin(transform, ScaledTrailProfile());
+            if (flightTrail != null) { flightTrail.Clear(); flightTrail.emitting = true; }
+        }
 
         /// <summary>
         /// 던지기 전에 공 크기 배율(0.01~3)을 정한다. 1이면 기존 크기다. Launch/LaunchVisual 전에 부른다.
@@ -580,7 +604,7 @@ namespace C6Lab
 
         private void EnsureFlightTrail(float radius)
         {
-            LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(element) : null;
+            LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(TrailElement) : null;
             if (profile != null)
             {
                 if (flightTrail != null)
@@ -631,7 +655,7 @@ namespace C6Lab
             flightTrail.receiveShadows = false;
             flightTrail.sharedMaterial = appearance != null && appearance.ThrowTrailMaterial != null
                 ? appearance.ThrowTrailMaterial : GetTrailMaterial();
-            Color color = LabOrbVisualFactory.TemporaryElementColor(element);
+            Color color = LabOrbVisualFactory.TemporaryElementColor(TrailElement);
             color.a = .82f;
             flightTrail.startColor = color;
             color.a = 0f;
@@ -670,7 +694,7 @@ namespace C6Lab
         /// <summary>지금 공 크기 배율(폭발 축소 × 콤보 배율)에 맞춘 원소 꼬리 설정. 배율이 1이면 원래 설정 그대로다.</summary>
         private LabElementTrailProfile ScaledTrailProfile()
         {
-            LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(element) : null;
+            LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(TrailElement) : null;
             float scale = jigwiABRadiusScale < 1f ? Mathf.Min(sizeScale * radiusScale, jigwiABRadiusScale) : sizeScale * radiusScale;
             return ScaledTrailProfile(profile, scale);
         }
@@ -693,20 +717,29 @@ namespace C6Lab
             if (jigwiWaterFlightPath != null)
             {
                 var fadingWater = jigwiWaterFlightPath; jigwiWaterFlightPath = null;
+                StampDetached(fadingWater.gameObject);
                 fadingWater.StopAndFade(transform.parent);
             }
             if (elementFlightTrail != null)
             {
                 LabElementFlightTrail fadingInk = elementFlightTrail;
                 elementFlightTrail = null;
+                StampDetached(fadingInk.gameObject);
                 fadingInk.StopAndFade(transform.parent);
             }
             if (flightTrail == null) return;
             TrailRenderer fadingTrail = flightTrail;
             flightTrail = null;
+            StampDetached(fadingTrail.gameObject);
             fadingTrail.emitting = false;
             fadingTrail.transform.SetParent(transform.parent, true);
             Destroy(fadingTrail.gameObject, fadingTrail.time);
+        }
+
+        private void StampDetached(GameObject effect)
+        {
+            var stamp = effect.GetComponent<LabProjectileRevisionStamp>() ?? effect.AddComponent<LabProjectileRevisionStamp>();
+            stamp.Revision = AuthorityRevision;
         }
 
         private void OnDisable()
@@ -716,6 +749,7 @@ namespace C6Lab
             if (elementFlightTrail != null) elementFlightTrail.Clear();
             if (flightTrail != null) flightTrail.Clear();
             if (jigwiWaterFlightPath != null) jigwiWaterFlightPath.Clear();
+            jigwiABReward = false;
         }
 
         private static Material GetTrailMaterial()

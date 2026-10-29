@@ -586,6 +586,7 @@ namespace C6Lab
             // Charmed (#251): too dazed to attack until it ends or the players beside wake them.
             if (Charmed(sender, now)) return Reject("CHARMED", out reason);
             ApplyJigwiABOrb(current, now);
+            CaptureJigwiABLaunchReward(current, now);
             current.inFlight = true;
             current.vx = current.vy = 0f;
             current.revision = ++revision;
@@ -651,7 +652,8 @@ namespace C6Lab
                 ConfirmTeamHit(attacker, element, paintDirection, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale, now);
             else
             {
-                float share = (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale;
+                float share = Mathf.Min(3f, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale
+                    * (orb.jigwiABReward ? orb.jigwiABRewardPaintScale : 1f));
                 // 오색구슬 (#329): 다섯 원소 색 얼룩으로, 정해 둔 배율만큼 넓게 칠한다. 도색 한 번은 최대 3배다.
                 if (orb.fiveColor) share = Mathf.Min(3f, share * rules.FiveColorOrbPaintScale);
                 bool paints = orb.fiveColor || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
@@ -1040,7 +1042,11 @@ namespace C6Lab
                 !players.TryGetValue(playerId, out var player) || player.personalHp <= 0) return false;
 
             player.personalHp = Math.Max(0, player.personalHp - amount);
-            if (players.Values.All(current => current.personalHp == 0)) phase = LabPhase.Defeat;
+            if (players.Values.All(current => current.personalHp == 0))
+            {
+                phase = LabPhase.Defeat;
+                if (jigwiABEnabled) CancelJigwiABForBattleEnd(now);
+            }
             return true;
         }
 
@@ -1436,7 +1442,8 @@ namespace C6Lab
                 MarkBusyScreens(lastTime, effectiveNow);
                 // The schedule cutoff cancels before same-time bomb expiry or combo timeout can award a penalty.
                 EndYaguangTimeline(effectiveNow);
-                AdvanceJigwiStage(effectiveNow);
+                if (paintCompleted && jigwiABEnabled) CancelJigwiABForBattleEnd(effectiveNow);
+                else AdvanceJigwiStage(effectiveNow);
                 // Fever time (#334) stops the yokai before any gimmick due at the same moment is cast.
                 StartFeverTime(effectiveNow);
                 if (StageYokai != LabStageYokai.None)

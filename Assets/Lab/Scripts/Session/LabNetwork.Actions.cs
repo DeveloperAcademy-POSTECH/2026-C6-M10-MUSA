@@ -54,6 +54,7 @@ namespace C6Lab
 
         private void ResetActionTransport()
         {
+            jigwiMissionPurge.SetActive(null, 0);
             ClearJigwiFireSurfaces();
             predictedJigwiBurns.Clear();
             foreach (var shot in predictedShots.Values) if (shot != null) Destroy(shot.gameObject);
@@ -230,6 +231,7 @@ namespace C6Lab
                     sequence = NextBoardSequence(sender) };
             }
             else if (execution == LabActionExecution.Replayed) ActionReplayedResults++;
+            AnnounceJigwiMissionFailures();
             DeliverReceipt(sender, receipt);
             if (execution == LabActionExecution.Executed)
             {
@@ -342,7 +344,9 @@ namespace C6Lab
             if (actionStartedAt.TryGetValue(receipt.requestId, out double at))
                 LastActionRoundTripMilliseconds = (Time.realtimeSinceStartupAsDouble - at) * 1000d;
             foreach (long child in resolution.rejectedDependents) RollBackAction(child);
-            if (board != null)
+            bool purged = jigwiMissionPurge.Cancels(receipt.modelRevision);
+            if (purged) RemovePurgedActionViews(request, receipt);
+            if (board != null && !purged)
             {
                 if (request.type == "generate") board.RemoveGenerationPreview(request.provisionalId);
                 if (receipt.accepted && receipt.consumedWithoutOutput)
@@ -371,7 +375,7 @@ namespace C6Lab
                     RollBackAction(receipt.requestId);
                 }
             }
-            if (receipt.accepted && !receipt.consumedWithoutOutput && request.type == "combine") LocalCombined?.Invoke();
+            if (!purged && receipt.accepted && !receipt.consumedWithoutOutput && request.type == "combine") LocalCombined?.Invoke();
             predictedJigwiBurns.Remove(receipt.requestId);
             if (!receipt.accepted) SetNotice(receipt.reason ?? "Request rejected.");
             if (!IsHost)
@@ -485,7 +489,11 @@ namespace C6Lab
             if (fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
             float scale = player.comboPenaltyUntil > latest.serverTime ? config.ComboPenaltySizeScale
                 : player.comboRewardUntil > latest.serverTime ? config.ComboRewardSizeScale : 1f;
-            if (config.GourdColorComboEnabled) visual.SetRadiusScale(scale);
+            if (!config.GourdColorComboEnabled) scale = 1f;
+            bool rewarded = JigwiRewardAt(latest.serverTime);
+            if (rewarded) scale *= config.JigwiABRewardSizeScale;
+            visual.SetRadiusScale(scale);
+            visual.SetJigwiABReward(rewarded);
             visual.SetJigwiABRadiusScale(orb != null ? orb.jigwiABRadiusScale : board != null ? board.JigwiABRadiusScaleFor(request.firstId) : 1f);
             visual.SetMissSurface(battleFloor);
             SyncJigwiFireSurfaces();
@@ -497,12 +505,17 @@ namespace C6Lab
 
         private bool HasPresentedProjectile(LabNetworkPacket packet)
         {
-            if (packet.round != actionRound || packet.sessionId != actionSession) return true;
+            if (packet.round != actionRound || packet.sessionId != actionSession
+                || jigwiMissionPurge.Cancels(packet.modelRevision)) return true;
             if (packet.owner == LocalPlayerId && presentedShots.Contains(packet.requestId))
             {
                 if (predictedShots.TryGetValue(packet.requestId, out var visual) && visual != null)
+                {
                     visual.ReconcileVisual((LabOrbElement)packet.element,
                         packet.small ? config.BlastShrinkScale : 1f, packet.sizeScale, packet.jigwiABRadiusScale);
+                    visual.SetJigwiABReward(packet.jigwiABReward);
+                    visual.AuthorityRevision = packet.modelRevision;
+                }
                 return true;
             }
             return !presentedRemoteShots.Add(packet.firstId ?? string.Empty);

@@ -98,13 +98,13 @@ namespace Hapio.Tests
             LabConfig source = Resources.Load<LabConfig>("LabConfig");
             Assert.That(source, Is.Not.Null);
             float[] before = source.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(251));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(253));
             Assert.That(GameStageSettings.TerritoryScope, Is.EqualTo(4));
             Assert.That(GameRunFlow.StageCount, Is.EqualTo(3));
             using (var settings = new GameStageSettings(source, GameStageCatalog.RequireDefault()))
             {
                 for (int stage = 1; stage <= GameRunFlow.StageCount; stage++)
-                    Assert.That(settings.Capture(stage).Length, Is.EqualTo(251));
+                    Assert.That(settings.Capture(stage).Length, Is.EqualTo(253));
             }
             CollectionAssert.AreEqual(before, source.CaptureDeveloperValues());
         }
