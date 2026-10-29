@@ -67,6 +67,7 @@ namespace C6Lab
         [SerializeField] private TrailRenderer flightTrail;
         private LabElementFlightTrail elementFlightTrail;
         private LabJigwiWaterFlightPath jigwiWaterFlightPath;
+        private LabJigwiRewardFireTrail jigwiRewardFireTrail;
         private GameObject replacementVisual;
         private GameObject replacementPrefab;
         private LabOrbAppearance appearance;
@@ -138,10 +139,10 @@ namespace C6Lab
         public TrailRenderer FlightTrail => flightTrail;
         public LabElementFlightTrail ElementFlightTrail => elementFlightTrail;
         public LabJigwiWaterFlightPath JigwiWaterFlightPath => jigwiWaterFlightPath;
+        public LabJigwiRewardFireTrail JigwiRewardFireTrail => jigwiRewardFireTrail;
         public float RadiusScale => radiusScale;
         public float JigwiABRadiusScale => jigwiABRadiusScale;
         public bool JigwiABRewardActive => jigwiABReward;
-        private LabOrbElement TrailElement => jigwiABReward ? LabOrbElement.Fire : element;
 
         /// <summary>
         /// Captured B-success presentation for this flight. The real element, pigment and physics stay unchanged.
@@ -151,10 +152,7 @@ namespace C6Lab
         {
             if (resolved || jigwiABReward == enabled) return;
             jigwiABReward = enabled;
-            EnsureFlightTrail(ScaledRadius);
-            if (!launched) return;
-            if (elementFlightTrail != null) elementFlightTrail.Begin(transform, ScaledTrailProfile());
-            if (flightTrail != null) { flightTrail.Clear(); flightTrail.emitting = true; }
+            ConfigureJigwiRewardFireTrail();
         }
 
         /// <summary>
@@ -315,6 +313,7 @@ namespace C6Lab
             if (elementFlightTrail != null && appearance != null && (changed || elementFlightTrail.Profile != trailProfile))
                 elementFlightTrail.Begin(transform, trailProfile);
             ConfigureJigwiWaterFlightPath();
+            ConfigureJigwiRewardFireTrail();
         }
 
         private void Awake()
@@ -365,6 +364,7 @@ namespace C6Lab
                 flightTrail.emitting = true;
             }
             ConfigureJigwiWaterFlightPath();
+            ConfigureJigwiRewardFireTrail();
         }
 
         private void FixedUpdate()
@@ -604,7 +604,7 @@ namespace C6Lab
 
         private void EnsureFlightTrail(float radius)
         {
-            LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(TrailElement) : null;
+            LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(element) : null;
             if (profile != null)
             {
                 if (flightTrail != null)
@@ -655,11 +655,36 @@ namespace C6Lab
             flightTrail.receiveShadows = false;
             flightTrail.sharedMaterial = appearance != null && appearance.ThrowTrailMaterial != null
                 ? appearance.ThrowTrailMaterial : GetTrailMaterial();
-            Color color = LabOrbVisualFactory.TemporaryElementColor(TrailElement);
+            Color color = LabOrbVisualFactory.TemporaryElementColor(element);
             color.a = .82f;
             flightTrail.startColor = color;
             color.a = 0f;
             flightTrail.endColor = color;
+        }
+
+        private void ConfigureJigwiRewardFireTrail()
+        {
+            if (!jigwiABReward)
+            {
+                if (jigwiRewardFireTrail == null) return;
+                jigwiRewardFireTrail.Clear();
+                jigwiRewardFireTrail.gameObject.SetActive(false);
+                LabVisualSafety.DestroyVisualObject(jigwiRewardFireTrail.gameObject);
+                jigwiRewardFireTrail = null;
+                return;
+            }
+            if (!launched || resolved) return;
+            if (jigwiRewardFireTrail != null)
+            {
+                if (jigwiRewardFireTrail.IsEmitting) jigwiRewardFireTrail.Reconfigure(ScaledRadius);
+                else jigwiRewardFireTrail.Begin(transform, ScaledRadius, jigwiRewardFireTrail.Profile);
+                return;
+            }
+            var child = new GameObject("Jigwi B Reward Fire");
+            child.transform.SetParent(transform, false);
+            child.layer = gameObject.layer;
+            jigwiRewardFireTrail = child.AddComponent<LabJigwiRewardFireTrail>();
+            jigwiRewardFireTrail.Begin(transform, ScaledRadius);
         }
 
         private void ConfigureJigwiWaterFlightPath()
@@ -694,7 +719,7 @@ namespace C6Lab
         /// <summary>지금 공 크기 배율(폭발 축소 × 콤보 배율)에 맞춘 원소 꼬리 설정. 배율이 1이면 원래 설정 그대로다.</summary>
         private LabElementTrailProfile ScaledTrailProfile()
         {
-            LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(TrailElement) : null;
+            LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(element) : null;
             float scale = jigwiABRadiusScale < 1f ? Mathf.Min(sizeScale * radiusScale, jigwiABRadiusScale) : sizeScale * radiusScale;
             return ScaledTrailProfile(profile, scale);
         }
@@ -714,6 +739,12 @@ namespace C6Lab
 
         private void LeaveFadingTrail()
         {
+            if (jigwiRewardFireTrail != null)
+            {
+                var fadingFire = jigwiRewardFireTrail; jigwiRewardFireTrail = null;
+                StampDetached(fadingFire.gameObject);
+                fadingFire.StopAndFade(transform.parent);
+            }
             if (jigwiWaterFlightPath != null)
             {
                 var fadingWater = jigwiWaterFlightPath; jigwiWaterFlightPath = null;
@@ -749,6 +780,7 @@ namespace C6Lab
             if (elementFlightTrail != null) elementFlightTrail.Clear();
             if (flightTrail != null) flightTrail.Clear();
             if (jigwiWaterFlightPath != null) jigwiWaterFlightPath.Clear();
+            if (jigwiRewardFireTrail != null) jigwiRewardFireTrail.Clear();
             jigwiABReward = false;
         }
 

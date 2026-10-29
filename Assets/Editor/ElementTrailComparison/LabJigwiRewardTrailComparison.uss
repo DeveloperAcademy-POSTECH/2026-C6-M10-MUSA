@@ -1,0 +1,30 @@
+.reward-rows {
+    flex-grow: 1;
+    min-height: 520px;
+}
+
+.reward-row {
+    flex-grow: 1;
+    flex-basis: 0px;
+    margin-bottom: 10px;
+}
+
+.reward-row-title {
+    -unity-font-style: bold;
+    margin-bottom: 5px;
+}
+
+.reward-panels {
+    flex-direction: row;
+    flex-grow: 1;
+}
+
+.reward-frame {
+    flex-grow: 1;
+    min-height: 220px;
+    background-color: rgb(201, 204, 201);
+}
+
+.reward-camera-field {
+    width: 260px;
+}

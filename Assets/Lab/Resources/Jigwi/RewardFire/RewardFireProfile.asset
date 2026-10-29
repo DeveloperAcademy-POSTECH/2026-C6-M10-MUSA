@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e75391da72a4498ebd8230adc2fb2964, type: 3}
+  m_Name: RewardFireProfile
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabJigwiRewardFireProfile
+  widthScale: 1.3
+  maxLengthDiameters: 5
+  lifetime: 0.45
+  flameAnimationFps: 12
+  emberSpacingDiameters: 0.65
+  emberLifetime: 0.35
+  maxParticles: 32
+  flameColor: {r: 1, g: 1, b: 1, a: 1}
+  emberColor: {r: 1, g: 0.8, b: 0.48, a: 0.9}
+  flameTexture: {fileID: 2800000, guid: 1e8a63716446b42dbb644afdb32acd12, type: 3}
+  emberTexture: {fileID: 2800000, guid: f7f92e133935d450f8b8b61120d8346f, type: 3}
+  ribbonTexture: {fileID: 2800000, guid: 1cef289b2d87d48188bf6175776d90f5, type: 3}
+  material: {fileID: 2100000, guid: c36a81757c0a34f3d9ef9c5a970443e4, type: 2}
