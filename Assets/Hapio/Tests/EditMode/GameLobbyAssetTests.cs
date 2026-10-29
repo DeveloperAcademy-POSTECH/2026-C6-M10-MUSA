@@ -44,6 +44,10 @@ namespace Hapio.Tests
             Assert.That(view.seatsTeam.All(anchor => anchor != null && anchor.IsChildOf(view.positionPage.transform)), Is.True);
             Assert.That(view.seatsTeam[0].anchoredPosition.x, Is.LessThan(view.seatsTeam[2].anchoredPosition.x), "Blue P1/P2 sit left of Red P3/P4.");
             Assert.That(view.seatsTeam[0].anchoredPosition.y, Is.GreaterThan(view.seatsTeam[1].anchoredPosition.y), "P1 sits above P2.");
+            // #293: empty 2:2 seats are dashed circles in their team's colour, Blue for P1/P2 and Red for P3/P4.
+            Assert.That(view.blueTeamEmptySlot, Is.Not.Null);
+            Assert.That(view.redTeamEmptySlot, Is.Not.Null.And.Not.SameAs(view.blueTeamEmptySlot));
+            Assert.That(view.blueTeamEmptySlot.rect.size, Is.EqualTo(view.emptySlots[1].rect.size), "The same dashed circle, recoloured.");
             Assert.That(view.teamShifted, Has.Length.EqualTo(7)); Assert.That(view.teamShiftAnchors, Has.Length.EqualTo(7));
             for (int i = 0; i < view.teamShifted.Length; i++)
                 Assert.That(view.teamShifted[i].name, Is.EqualTo(view.teamShiftAnchors[i].name));
