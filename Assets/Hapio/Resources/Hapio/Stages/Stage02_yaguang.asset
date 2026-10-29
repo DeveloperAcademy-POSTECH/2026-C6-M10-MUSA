@@ -16,6 +16,7 @@ MonoBehaviour:
   stageId: yaguang
   displayName: "\uC57C\uAD11\uADC0"
   yokai: 2
+  content: {fileID: 11400000, guid: 7ab2429495425415b8008d99aa22eb5a, type: 2}
   yokaiVisual: {fileID: 0}
   defaultValues:
   - index: 155
