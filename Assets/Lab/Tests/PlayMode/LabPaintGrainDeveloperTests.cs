@@ -14,14 +14,14 @@ namespace C6Lab.Tests
     /// <summary>Saved Scene UI and local runtime-copy flow; no claim of a remote Client ACK.</summary>
     public sealed class LabPaintGrainDeveloperTests
     {
+        private readonly LabSavedSceneNetworkFixture fixture = new LabSavedSceneNetworkFixture();
         private LabDeveloperMode ui;
         private string sourceJson;
 
         [UnitySetUp]
         public IEnumerator LoadSavedPanel()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
@@ -32,17 +32,7 @@ namespace C6Lab.Tests
         [UnityTearDown]
         public IEnumerator CleanUp()
         {
-            if (ui != null && ui.network != null)
-            {
-                ui.network.Stop();
-                Object.Destroy(ui.network.gameObject);
-                yield return null;
-            }
-            Scene scene = SceneManager.GetSceneByName("Lab");
-            if (!scene.IsValid() || !scene.isLoaded) yield break;
-            Scene cleanup = SceneManager.CreateScene("Paint grain DEV cleanup");
-            SceneManager.SetActiveScene(cleanup);
-            yield return SceneManager.UnloadSceneAsync(scene);
+            yield return fixture.Cleanup();
         }
 
         [UnityTest]
@@ -120,7 +110,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SoloRestartAppliesAndDisablesTheAcceptedGrainProfileWithoutSavingTheAsset()
         {
-            ui.network.port = 19196;
+            fixture.UseAvailablePort(ui.network);
             ui.Open();
             ui.valueInputs[128].text = "1";
             ui.valueInputs[129].text = "2";

@@ -18,6 +18,7 @@ namespace C6Lab.Tests
         private const int CompactnessField = 138;
         private const int IrregularityField = 139;
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+        private readonly LabSavedSceneNetworkFixture fixture = new LabSavedSceneNetworkFixture();
         private LabDeveloperMode ui;
         private float[] sourceValues;
         private string sourceJson;
@@ -25,8 +26,7 @@ namespace C6Lab.Tests
         [UnitySetUp]
         public IEnumerator LoadSavedPanel()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceValues = ui.sourceConfig.CaptureDeveloperValues();
@@ -39,16 +39,7 @@ namespace C6Lab.Tests
         public IEnumerator Cleanup()
         {
             Time.timeScale = 1f;
-            if (ui != null && ui.network != null)
-            {
-                ui.network.Stop();
-                Object.Destroy(ui.network.gameObject);
-                yield return null;
-            }
-            Scene scene = SceneManager.GetSceneByName("Lab");
-            if (!scene.IsValid() || !scene.isLoaded) yield break;
-            SceneManager.SetActiveScene(SceneManager.CreateScene("Paint cluster DEV cleanup"));
-            yield return SceneManager.UnloadSceneAsync(scene);
+            yield return fixture.Cleanup();
         }
 
         [UnityTest]
@@ -97,7 +88,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator InvalidClusterInputRejectsTheWholeSoloFormAndKeepsTheAcceptedRound()
         {
-            ui.network.port = 19208;
+            fixture.UseAvailablePort(ui.network);
             ui.Open(); SetDraft(.35f, .7f);
             ui.applyStartButton.onClick.Invoke();
             yield return null;
@@ -124,7 +115,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SoloRestartCopiesBothClusterValuesAndDefaultsRemainDraftUntilApplied()
         {
-            ui.network.port = 19209;
+            fixture.UseAvailablePort(ui.network);
             ui.Open(); SetDraft(.2f, .8f);
             ui.applyStartButton.onClick.Invoke();
             yield return null;
@@ -173,7 +164,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator HostLobbyAppliesAndFingerprintsClusterProfileWithoutSkippingRoomGates()
         {
-            ui.network.port = 19210;
+            fixture.UseAvailablePort(ui.network);
             ui.Open(); ui.targetParticipantsSlider.value = 2f;
             SetDraft(.25f, .75f);
             ui.applyHostButton.onClick.Invoke();

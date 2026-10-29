@@ -43,11 +43,5 @@ namespace C6Lab.Tests
             var before=config.CaptureDeveloperValues();var candidate=(float[])before.Clone();candidate[0]=777;candidate[index]=value;
             Assert.That(config.TryApplyDeveloperValues(candidate,out _),Is.False);Assert.That(config.CaptureDeveloperValues(),Is.EqualTo(before));
         }
-        [Test] public void Older240SettingPayloadCannotSilentlyUseLocalScreenDefaults()
-        {
-            var before=config.CaptureDeveloperValues();var old=before.Take(240).ToArray();old[0]=777;
-            Assert.That(config.TryApplyDeveloperValues(old,out _),Is.False);Assert.That(config.CaptureDeveloperValues(),Is.EqualTo(before));
-            Assert.Throws<ArgumentException>(()=>LabSessionSettings.Fingerprint(old,2,5677));
-        }
     }
 }

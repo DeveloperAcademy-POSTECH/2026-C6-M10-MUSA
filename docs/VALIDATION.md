@@ -1,5 +1,28 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-10-29 — #375 중복 계약 검사·DEV 준비/정리 공통화
+
+기준 main `b1d2ae5f`에서 별도 `refactor/#375-test-fixture-cleanup` 작업 트리를 만들었다. 원래 #369 작업 폴더는 전환하지 않았고, 검사 전후 브랜치·HEAD·tracked diff·사용자 미추적 파일 해시를 대조했다.
+
+- 공통 스키마의 기존11개P3 케이스를 유지하고240/P2 케이스1개를 추가한 뒤, 지귀 설정의 중복 메서드2개만 제거했다. 228/P3·240/P2의 앞값777·전체 적용 거절·원본 유지·fingerprint 예외와 공통 오류 문구/현행 프로토콜 검사를 보존했다. 나머지 설정 기본값·범위·왕복 검사는 변경하지 않았다.
+- Pattern/Grain/Cluster DEV PlayMode3파일은 기존 `LabSavedSceneNetworkFixture`의 Load/Cleanup을 사용하고 고정 포트8곳을 UseAvailablePort로 교체했다. 공통 helper 자체는 변경하지 않았다. 검사13개의 이름·assertion과 기능/helper 본문은 포트 지정8문장 외에 바이트 동일하며, 기존 Pattern/Cluster의 Time.timeScale 정리도 유지했다.
+- helper 사용처는7파일에서10파일이 됐다. 실제 소유 NetworkManager·Scene만 정리하며, 원본 설정을 복원 코드로 덮어쓰기·Host 시작 재시도·오류 무시·skip 추가·전역 NetworkManager 파괴를 하지 않았다.
+
+| 확인 | 이번 실행 결과 | 범위 |
+| --- | --- | --- |
+| 변경 전 대상 EditMode | **57/57 PASS** | Schema12·StageConfig31·ABConfig14, 실패/skip/inconclusive0 |
+| 변경 후 대상 EditMode | **56/56 PASS** | Schema13·StageConfig30·ABConfig13, 기존2개 이름 제거·240/P2의 새 이름1개 추가 외 발견 목록·통과 결과 동일 |
+| 변경 전/후 대상 PlayMode | 각각 **13/13 PASS** | Pattern7·Grain2·Cluster4, 검사명·입력·핵심 assertion 유지, 실패/skip/inconclusive0 |
+| 재컴파일 | PASS | recompile_status의 failed/compilationFailed=false·errors0 |
+| 변경 후 전체 EditMode | **1551/1551 PASS**, 28.30초 | C6Lab1421·Hapio130, 대상56개 포함, 실패/skip/inconclusive0 |
+| 기존 helper 사용처7파일 | **53/53 PASS** | 첫 전체 PlayMode에서 CharmBubbles9·CharmHostIdentity1·DeveloperSolo14·FigmaLobby11·GourdHitbox7·GourdPaint8·JigwiSavedScene3, 새 DEV13개도 같은 실행에서 모두 통과 |
+| 변경 후 전체 PlayMode · 기본 batch 입력 정책 | **506개 중505 PASS·1 FAIL**, 456.20초 | 오프닝 held-pointer1건 실패, skip/inconclusive0. 최종 재검사와 구분 |
+| 같은 오프닝 검사 · 기준 main 복원 | **0/1 PASS·1 FAIL**, 0.66초 | 6개 테스트 변경을 원복하고 재컴파일한 코드에서도 동일한 첫 페이지 held-pointer assertion 실패 |
+| 같은 오프닝 검사 · 임시 입력 포커스 정책 | **1/1 PASS**, 0.62초 | #375 패치를 재적용하고 메모리 InputSettings만 IgnoreFocus/AllDeviceInputAlwaysGoesToGameView로 조정, 소스·assertion은 그대로 |
+| 변경 후 전체 PlayMode · 임시 입력 포커스 정책 | **506/506 PASS**, 454.49초 | 기본 환경과 같은506개 검사명, 실패/skip/inconclusive0. 결과 차이는 위 오프닝1건의 Failed→Passed뿐 |
+
+기본 batch Editor는 focused=false이며 입력 정책은 ResetAndDisableNonBackgroundDevices/PointersAndKeyboardsRespectGameViewFocus였다. `GameOpeningControllerTests.HeldPointerDelaysBothTheFirstPageAndTheRoomBrowserUntilRelease`는 임시 Mouse를 만들지만 자체 포커스 정책을 설정하지 않는다. 위 기준 코드 재현과 환경만 바꾼 재검사로 이번6파일 정리와 환경 의존을 구분했다. 이 포커스 확인을 위해 오프닝 테스트 코드·런타임·저장된 InputSettings를 추가 수정하지 않았으며, 임시 설정은 검사용 Editor의 저장되지 않은 객체에만 적용했다. 최종 실행 환경은 Unity6000.6.5f1·macOS ARM64·Metal의 batch Editor다. 종료 전에 원래 두 입력 정책으로 복원했으며 저장된 InputSettings 에셋은 사용/수정하지 않았다. 제가 실행한 검사 Editor는 종료했고, 최초 임포트에서 자동 변경된 URP Global Settings도 기준 원본으로 복원했다. Test Runner 임시 Scene이 남지 않았음을 확인했다. 최종 변경은 테스트6파일과 관련 문서2파일뿐이며, 원래 #369의 브랜치·HEAD·작업 상태·tracked diff와 사용자 미추적 폴더 파일3개의 해시가 동일함을 확인했다. 원시 결과 JSON·로그·임시 검사 도구는 저장소 밖에 두고, Mac 독립 앱·iOS 빌드·실기기 LAN/핫스팟은 수행하지 않았다.
+
 ## 2026-10-29 — #373 미사용 배경 프로토타입·여우 표시 에셋 정리
 
 main `a0742ef7`에서 별도 `chore/#373-unused-prototype-fox-assets` 작업 트리를 만들었다. 원래 #369 작업 폴더의 브랜치·HEAD·작업 상태·tracked diff와 사용자 미추적 파일을 보존했다.
