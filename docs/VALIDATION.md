@@ -1,5 +1,25 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-10-29 — #371 구형 실행 도구·크래시 산출물·메타 잔재 정리
+
+기준은 main `f6effa2c`이며, 별도 `chore/#371-legacy-artifact-cleanup` 작업 트리에서 정리했다. 기존 `experiment/#369-gourd-watercolor` 작업 폴더를 전환·수정하지 않았다.
+
+- 현행 C#에 진단 인자 수신 코드가 없고 보존 코드·문서·설정에 파일명 참조가 없는 구형 Python 실행 도구13개를 제거했다. P1~P4, L2/L3, T02/T03, T10/T10B/T11, T13용이며 `tools/generate_*.py` 에셋 생성 도구3개는 그대로 남겼다.
+- 루트의 추적된 `mono_crash` JSON1개를 제거하고 `.gitignore`에 루트 한정 `/mono_crash.*.json`만 추가했다. 크래시 원문과 기기 식별자를 검증 문서에 복사하지 않았다.
+- `Assets/Gumiho_V1.meta`와 해당 경로의 폴더 메타6개를 제거했다. 실물 non-meta 에셋은0개였으며, 제거한7개 GUID와 폴더 경로의 외부 참조는 발견되지 않았다. 정상 에셋의 메타와 `Assets/_Project`의 메타는 보존했다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| 삭제 허용 목록 | PASS | 구형 실행 도구13개·크래시1개·빈 폴더 메타7개, 총21개만 삭제 |
+| 잔여 참조 | PASS | 정리 후 보존된 추적 텍스트2,049개에서 제거 도구명·메타 GUID·폴더 경로 참조0건. 이 문서의 정리 설명은 후에 추가했으며 참조 검사에서 제외 |
+| 게임과 개발 자료 보존 | PASS | main 대비 Lab/Hapio·Editor·배경 실험·Plugins·Settings·Packages·ProjectSettings·AGENTS·README 변경0. 기존 테스트 C#186개와 에셋 생성 도구3개 보존, 생성 도구의 Python 구문 검사 통과 |
+| ignore 범위 | PASS | 루트 mono_crash JSON만 제외하며 정상 `.meta`와 docs 아래 같은 이름의 JSON은 제외하지 않음 |
+| 기존 작업 보존 | PASS | 원래 #369 HEAD·작업 상태·tracked diff가 정리 전과 같고 사용자 미추적 파일3개의 SHA-256도 동일 |
+| 공백 검사 | PASS | `git diff --check` 통과 |
+| Unity 컴파일·EditMode·PlayMode·빌드·실기기 | **NOT_RUN** | 이번에는 실행 코드·Scene·Prefab·설정·정상 에셋 변경 없이 참조 없는 파일만 제거했다. 소스 보존 확인을 실제 실행 통과로 확대하지 않음 |
+
+BackgroundPrototype·여우 모델·일회 Editor 도구·테스트 통합과 로컬 Builds/Library/Logs 정리는 이번 범위에 포함하지 않았다.
+
 ## #303 Figma 로비 UI 반영 — 2026-10-26
 
 `orgin/feat/#303-onboarding-lobby-font-size` 작업 트리에서 확인했다. Figma 시작 화면 `2965:7880`, 방 목록 `2965:8042`·`2965:8616`·`2965:8734`, 자리 선택 `2965:6734`·`2965:6792`·`2965:6853`의 폰트 크기·여백·버튼/패널 크기를 공통 `GameLobby.prefab`에 반영했다. 사용자 승인으로 **2~5명 유지**, 네 인원 버튼 모두 **50×44 / 폰트18 / 라운드16**이다. 전체 화면 기준 배율을 유지하며 안전 영역 추가 축소·위치 이동은 적용하지 않는다.
