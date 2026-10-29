@@ -3450,3 +3450,24 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 오류 경계 리뷰 보완: 명시적 해상도/Profile 변경에서도 renderer를 재생성해 GPU 오류 뒤 복구할 수 있게 하고, 부분 RT 생성 예외의 로컬 리소스를 회수했다. 조용한 frame의 자동 할당 재시도는 하지 않는다. 수동 fault injection으로 GPU할당실패를 재현한 검사는 미실행이다.
 - 최종 에디터: Home, Edit 상태. 컴파일과 실제 GPU 출력 확인 완료. 개인 기기 식별자·원시 테스트 로그·빌드 결과물은 커밋하지 않았다.
 - **미실행:** 실제 LAN/핫스팟·다기기, 실제2:2/피버 연속 플레이, iOS export/서명/설치, iPhone CPU/GPU 시간·메모리·발열.1024기준 신규 RT22MiB/기존포함28MiB는 원시 픽셀 계산이며 모바일 실측이 아니다.
+
+## 2026-10-29 — #381 요괴 10종 제작 구조·신규 7종 데이터
+
+- 기준 main `8d3cd58d`, 작업 브랜치 `feat/#381-yokai-content-scaffold`. Unity 6000.6.5f1 / macOS의 대상 프로젝트 전용 batch Editor(`-nographics`)와 Unity CLI로 수행했다. 다른 작업의 Editor는 제어하지 않았다. 아래 결과는 데이터·EditMode 범위이며 화면이나 실기기 플레이 확인이 아니다.
+- 생성: `GameYokaiCatalogValidator.CreateMissingDefinitions()`를 실행해 Resources 밖에 카탈로그1개와 정의10개를 만들고 기존3개 StageDefinition의 빈 `content`만 연결했다. 저장 목록 검증에서10종·3 Integrated·7 Planned와 기존3종 순서를 확인했다. Figma의10번 보스 지하국대적과7번 그슨대의 별칭을 포함한다. 확인하지 않은 설명·아트·음성·효과는 비워 두었다.
+- 실행 참조: `AssetDatabase.GetDependencies`로 기존 StageCatalog의 의존 자료에 신규7종과 제작용 전체 카탈로그가 없음을 확인했다. 빌드 산출물 용량을 측정한 검사는 아니다.
+- 컴파일: 새 런타임/Editor 타입이 로드되고 `EditorUtility.scriptCompilationFailed=false`를 확인했다.
+- 생성기 재실행: 두 번째 생성·저장 목록 검증 뒤 정의/카탈로그/하위 메타/기존 Stage 폴더의38개 파일 SHA-256이 동일했다. Console의 재실행 결과는 생성0·연결0이었다. 임의의 기존 설명을 편집한 뒤 저장 보존하는 별도 실험은 실행하지 않았다.
+- 기존 자료 보존: 원래3개 StageDefinition은 `content` 한 줄을 제외하면 main과 바이트가 같다. 기존 Stage GUID·순서·모델 override 없음·튜닝을 보존한다. StageCatalog·Scene·Prefab·LabConfig·Lab Core/Network·패키지·프로토콜 파일은 변경하지 않았다. 기존 미추적 `Assets/_Project/HapioMVP`는 작업 대상에서 제외했다.
+
+| 실제 실행한 EditMode fixture | 통과 / 전체 | 검사 범위 |
+| --- | --- | --- |
+| `GameYokaiCatalogTests` | 11 / 11 | 저장10종·7 Planned·별칭/보스·기존3 GUID/연결·잘못된 ID/중복/누락 거부·Planned/다른 ID 연결 거부·legacy null 호환 |
+| `GameStageSettingsTests` | 12 / 12 | 기존 스테이지 설정 복사·scope·원본 보존 |
+| `GameRunFlowTests` | 30 / 30 | 기존3단계 진행과 시작·종료 경계 |
+| `GameFlowSnapshotTests` | 14 / 14 | 기존 진행 스냅샷 검증 |
+| `GameTerritoryFlowTests` | 7 / 7 | 기존2:2 독립 흐름 |
+| 합계 | **74 / 74** | 실패0·건너뜀0, 중복 실행 합산 없음 |
+
+- 소스·문서의 `git diff --check` 통과. Unity가 생성한 `.asset`·`.meta`의 빈 필드 뒤 공백은 직렬화 원문을 유지했다. 새 카탈로그와7종 Planned 데이터가 실제 전투 목록을 늘리지 않는 것을 코드/저장 참조/자동 검사로 확인했다. 실제3스테이지를 손으로 완주했다는 의미는 아니다.
+- **미실행:** PlayMode·전체 EditMode·실제 화면/Inspector 수동 조작·기존3종 실제 패턴 플레이·LAN/핫스팟/다기기·Mac/iOS 빌드/서명/설치·실기기/성능. 추가7종의 공격·전용 모델·스테이지 확장·선택 UI는 **미구현(이번 범위 제외)**이다. 파일 구조와 편집 절차는 `docs/YOKAI_CONTENT_STRUCTURE.md`를 따른다.

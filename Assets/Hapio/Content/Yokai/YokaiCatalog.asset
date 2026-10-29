@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e4198755e6a149f59d5fb063a162c1a, type: 3}
+  m_Name: YokaiCatalog
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameYokaiCatalog
+  entries:
+  - {fileID: 11400000, guid: d2c21179ccbda4113b5faa1e1a600cdb, type: 2}
+  - {fileID: 11400000, guid: 89dad8657624642b889a33311aaae3d6, type: 2}
+  - {fileID: 11400000, guid: 7ab2429495425415b8008d99aa22eb5a, type: 2}
+  - {fileID: 11400000, guid: 6c470053fc98c453dbc8a9c339ae487d, type: 2}
+  - {fileID: 11400000, guid: 9cbb39ceff9ca4d76a9c28f9916aae00, type: 2}
+  - {fileID: 11400000, guid: d19da1d1fe542478f9ece32f0564e620, type: 2}
+  - {fileID: 11400000, guid: 3fcab63d26fc04669973a758369621c2, type: 2}
+  - {fileID: 11400000, guid: 94a8c23d50cc64b8cbfc1c8fa3210fb0, type: 2}
+  - {fileID: 11400000, guid: bc18f2f62e9ea403eb09fc7cccefda9e, type: 2}
+  - {fileID: 11400000, guid: fb8129eba5d7a4aa8a0856506e9d3c1d, type: 2}
