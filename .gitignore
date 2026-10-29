@@ -10,6 +10,9 @@
 /[Rr]ecordings/
 /[Aa]ssets/AssetStoreTools*
 
+# Unity crash reports
+/mono_crash.*.json
+
 # IDE and OS output
 .DS_Store
 .vs/
