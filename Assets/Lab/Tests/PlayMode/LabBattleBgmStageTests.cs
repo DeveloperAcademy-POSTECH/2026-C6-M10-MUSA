@@ -26,7 +26,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator StageSongsSelectTheGumihoClipOnlyForTheGumihoGameStage()
+        public IEnumerator StageSongsSelectTheGumihoClipForTheGumihoStageAndTheTerritoryRoom()
         {
             AudioClip normal = Resources.Load<AudioClip>("Audio/BGM/Kkwaenggwari_13");
             AudioClip gumiho = Resources.Load<AudioClip>("Audio/GumihoBGM/Gumiho_Stage");
@@ -44,7 +44,8 @@ namespace C6Lab.Tests
                 fixture.SetSnapshot(snapshot);
                 yield return null;
                 yield return null;
-                AudioClip expected = gameFlow && stages[i] == LabStageYokai.Gumiho ? gumiho : normal;
+                // 2:2 (#293) borrows the gumiho stage's song; the yaguang, the jigwi and the Lab round keep the usual one.
+                AudioClip expected = (gameFlow && stages[i] == LabStageYokai.Gumiho) || territory ? gumiho : normal;
                 Assert.That(fixture.Bgm.BattleClip, Is.SameAs(expected),
                     "Game=" + gameFlow + ", yokai=" + stages[i] + ", territory=" + territory);
                 Assert.That(fixture.Bgm.IsPlaying, Is.True, "The selected song must reach a running AudioSource.");
