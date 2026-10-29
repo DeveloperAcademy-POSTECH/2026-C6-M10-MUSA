@@ -58,6 +58,46 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator TheTerritoryRoomPaintsWithTheSolidColorsInsteadOfWatercolor()
+        {
+            yield return this.fixture.Load();
+            var paint = Object.FindFirstObjectByType<LabGourdPaint>();
+            Assert.That(paint, Is.Not.Null);
+            Assert.That(paint.IsReady, Is.True, paint.InitializationError);
+            Assert.That(paint.WatercolorActive, Is.True, paint.WatercolorError);
+            var latest = typeof(LabNetwork).GetField("latest",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            LabSnapshot Round(string session, bool territory) => new LabSnapshot
+            {
+                sessionId = session, round = 1, phase = LabPhase.Playing, teamTerritory = territory
+            };
+            try
+            {
+                // 2:2 (#293): blue and red must read at a glance, so the translucent watercolor (#369) stays off.
+                latest.SetValue(paint.network, Round("territory-paint-293", true));
+                for (int frame = 0; frame < 10 && !paint.HighResolutionActive; frame++)
+                {
+                    paint.RefreshCommittedMap();
+                    yield return null;
+                }
+                paint.RefreshCommittedMap();
+                Assert.That(paint.WatercolorActive, Is.False);
+                Assert.That(paint.HighResolutionActive, Is.True, "It falls back to the solid high-resolution paint.");
+                Assert.That(ReadBlock(paint).GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture));
+
+                // A story round keeps the approved watercolor.
+                latest.SetValue(paint.network, Round("story-paint-293", false));
+                for (int frame = 0; frame < 10 && !paint.WatercolorActive; frame++)
+                {
+                    paint.RefreshCommittedMap();
+                    yield return null;
+                }
+                Assert.That(paint.WatercolorActive, Is.True, paint.WatercolorError);
+            }
+            finally { latest.SetValue(paint.network, null); }
+        }
+
+        [UnityTest]
         public IEnumerator MainSceneUsesWhiteGourdAndCumulativePaintTextureWithoutAHitCountCap()
         {
             yield return this.fixture.Load();
