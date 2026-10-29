@@ -3515,6 +3515,8 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 
 ## 2026-10-29 · #293 2:2 땅따먹기 2분·구미호 BGM·선명한 칠·연출 값·결과 화면
 
+> 이 절은 PR 최초 작성 당시의 실행 기록이다. 최신 main 통합 후 추가한 Test Runner 결과와 검증 한계는 아래 「PR #382 main 통합 검토」 절을 따른다.
+
 - 브랜치 `fix/#293-team-territory-qa`(최신 main `5c644ef3` 병합 후). 막대 UI는 그대로 두고(가운데 원형 게이지 안은 보류), 시간과 노래만 바꿨다.
 - **2분**: Hapio 2:2 방의 제한 시간 197을 `StageCatalog`의 `Territory Default Values`에 120초로 저장했다(Editor API, 파일 변경 2줄). 197은 2:2 탭에서만 보이는 칸이라 스토리·Lab에는 영향이 없다. Lab 단독 DEV 솔로 2:2는 `LabConfig.asset`의 180초 그대로다. `LabConfig.asset`과 Home·Lobby DEV 칸 기본값은 바꾸지 않았다.
 - **승패**: 덮어쓰기 허용과 "한 팀이 모든 칸을 차지하면 바로 승리, 아니면 시간이 끝날 때 칸이 많은 팀 승리(같으면 무승부)"는 그대로다.
@@ -3533,3 +3535,21 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 | 4인 2:2 실제 플레이 | NOT_RUN | 2분 체감, BGM 크기, 청·홍 칠이 선명한지 |
 
 - 바뀐 검사: Hapio `GameTerritoryFlowTests.TheTerritoryRoomKeepsItsOwnStaminaAndOrbLifetimeApartFromTheStory`(2:2 197 = 120초), PlayMode `LabBattleBgmStageTests.StageSongsSelectTheGumihoClipForTheGumihoStageAndTheTerritoryRoom`(2:2는 구미호 곡), PlayMode `LabGourdPaintTests.TheTerritoryRoomPaintsWithTheSolidColorsInsteadOfWatercolor`(2:2 판은 수채 끔, 스토리 판은 다시 켜짐), EditMode `LabTeamTerritoryTests.TheTerritoryLookIsTunedInTheInspectorFromTodaysNumbers`(연출 기본값·제한·DEV 값 그대로), Hapio EditMode `GameStageResultViewTests`(저장 장면의 팀 배경 2장, 청·홍 승리 결과 화면 글자·배경·표·버튼, 팀 표 합계·동점), `GameLobbyAssetTests`(2:2 팀 점선 그림 연결).
+
+## 2026-10-29 — PR #382 main 통합 검토 (#293)
+
+- 검토 기준: PR 최초 head `ab7e19b4`, main `fbdbfb16`, 통합 커밋 `2397ddaa`. 기존 `fix/#293-team-territory-qa`에서 검토하며 별도 작업 사본을 사용했다. 충돌은 `docs/VALIDATION.md` 한 곳으로, 최신 main의 전체 검증 기록에 PR의 #293 기록을 추가해 양쪽 이력을 보존했다.
+- 변경 범위: Hapio 2:2 기본 시간120초·구미호 BGM·2:2 한정 수채 OFF·팀별 디자인 결과표·빈 자리 팀 색·Inspector 전용 연출9값이다. 기존 기본 연출 수치와 Host 판정·구슬 물리·도색/진행도·공유 설정251개·5677/Lab38/Game22 규약을 유지한다. 새 연출 값은 공유 DEV 배열에 넣지 않았다.
+- 결과 정책 확인: 현재 디자인 2:2 결과는 NEXT를 숨기고 `박 확인`·`나가기`를 표시한다. 나가기는 `GameSession.GoHome`으로 연결을 종료하고 타이틀로 이동한다. 기존 같은 방 로비 복귀 API·구형 결과 fallback·전투 실패/이탈 정책을 제거하지 않았다. `AGENTS.md`와 `GAME_FLOW.md`에서 현재 UI와 기존 API를 구분했다.
+- 추가 회귀 검사7개: 무승부 뒤 저장 배경/중립 행, 2:2→Story 배경/헤더/행 복원2개, 팀 피버 시작의 중복 방지/팀별 독립/판·세션 초기화/Story·종료 상태 제외4개, 저장 Scene의 DEV SOLO 전투→결과→관람→타이틀1개다. 입력 snapshot 불변과 원본 자료 보존도 확인한다.
+- DEV SOLO 결과 검사는 실제 Home·Battle 준비/카운트다운·모델 승리·StageResult·관람·HOME 종료 경로를 사용한다. 승리 준비는 CPU 도색 지도를 완성하는 명시적 fixture다. 투척 명중이나4기기 연결을 검증한 것으로 해석하지 않는다.
+
+| 이번 통합본에서 실제 실행한 검사 | 통과 / 전체 | 실행 환경·결과 |
+| --- | --- | --- |
+| 전체 EditMode | **1572 / 1572** | Unity6000.6.5f1 / macOS / Metal, 30.14초, 실패0·건너뜀0·불확정0 |
+| 전체 PlayMode | **516 / 516** | 같은 작업 사본의 전용 batch Editor1개, 475.12초, 실패0·건너뜀0·불확정0 |
+
+- 위 전체 검사에 결과 UI·로비 Sprite 참조·2:2 모델·BGM·도색·수채 GPU·기존3스테이지 흐름과 새 회귀 검사를 포함한다. 앞서 수행한 대상별 검사나 과거 main의 통과 수를 중복 합산하지 않았다. 컴파일 오류0을 별도로 확인했다.
+- 보존 확인: 기존 `Lab.unity`·`Battle.unity` 배치, StageDefinition/요괴 제작 데이터, LabConfig 저장 에셋, 네트워크 소스·패키지·프로젝트 설정은 main과 같다. Scene 변경은 결과 배경 참조2개, 로비 Prefab은 팀 Sprite 참조2개와 Unity 빈 필드 공백2개다. 앞서 #386에서 삭제한76개 미사용 파일은 복원되지 않았다. 소스·문서 공백 검사는 통과했고 Unity 직렬화 `.meta`·Prefab 빈 필드 공백은 원문을 보존했다.
+- 제한: 피버 횟수는 각 기기가 전투 중 관찰한 시작 횟수다. snapshot/통신에 최종 공유 통계를 추가하지 않아 지연·누락 상황에서 기기별 결과가 같음을 보장하지 않는다.
+- **미실행:** 실제4인 앱 플레이, LAN/핫스팟·다기기, iPhone/iPad 터치·음량·화면 가독성·성능, Mac/iOS 빌드·서명·설치. 자동 검사 통과를 해당 환경의 PASS로 기록하지 않았다. 원시 실행 로그·검사 JSON·빌드 산출물은 커밋하지 않는다.

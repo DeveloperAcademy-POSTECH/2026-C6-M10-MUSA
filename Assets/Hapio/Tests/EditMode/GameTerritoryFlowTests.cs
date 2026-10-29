@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Reflection;
 using C6Lab;
 using NUnit.Framework;
 using UnityEngine;
@@ -236,6 +237,134 @@ namespace Hapio.Tests
                 Assert.Throws<System.InvalidOperationException>(forged.Validate);
             }
             finally { Object.DestroyImmediate(forged); }
+        }
+        [Test]
+        public void TerritoryFeverObservationCountsRepeatedStartTimesOnlyOncePerTeam()
+        {
+            using (var fixture = new TerritoryFeverFixture())
+            {
+                fixture.Observe(FeverSnapshot("territory-observed", 1, 10d, 10d));
+                fixture.AssertCounts(1, 1);
+                fixture.Observe(FeverSnapshot("territory-observed", 1, 10d, 10d));
+                fixture.Observe(FeverSnapshot("territory-observed", 1, 10d, 10d));
+                fixture.AssertCounts(1, 1);
+                Assert.That(fixture.Session.TerritoryFeverCount(LabTeam.None), Is.Zero);
+            }
+        }
+
+        [Test]
+        public void TerritoryFeverObservationCountsNewStartsIndependentlyForEachTeam()
+        {
+            using (var fixture = new TerritoryFeverFixture())
+            {
+                fixture.Observe(FeverSnapshot("territory-observed", 1));
+                fixture.AssertCounts(0, 0);
+                fixture.Observe(FeverSnapshot("territory-observed", 1, 10d));
+                fixture.AssertCounts(1, 0);
+                fixture.Observe(FeverSnapshot("territory-observed", 1, 20d, 30d));
+                fixture.AssertCounts(2, 1);
+                fixture.Observe(FeverSnapshot("territory-observed", 1, 20d, 40d));
+                fixture.AssertCounts(2, 2);
+            }
+        }
+
+        [Test]
+        public void TerritoryFeverObservationResetsWhenTheRoundOrBattleSessionChanges()
+        {
+            using (var fixture = new TerritoryFeverFixture())
+            {
+                fixture.Observe(FeverSnapshot("territory-first", 1, 10d, 20d));
+                fixture.Observe(FeverSnapshot("territory-first", 1, 15d, 20d));
+                fixture.AssertCounts(2, 1);
+                fixture.Observe(FeverSnapshot("territory-first", 2));
+                fixture.AssertCounts(0, 0);
+                fixture.Observe(FeverSnapshot("territory-first", 2, 10d, 20d));
+                fixture.AssertCounts(1, 1);
+                fixture.Observe(FeverSnapshot("territory-second", 2));
+                fixture.AssertCounts(0, 0);
+                fixture.Observe(FeverSnapshot("territory-second", 2, 4d, 7d));
+                fixture.AssertCounts(1, 1);
+            }
+        }
+
+        [Test]
+        public void TerritoryFeverObservationIgnoresStoryAndSnapshotsOutsideTheTerritoryBattle()
+        {
+            using (var fixture = new TerritoryFeverFixture())
+            {
+                fixture.Session.State.mode = GameMode.Story;
+                fixture.Observe(FeverSnapshot("story", 1, 10d, 20d));
+                fixture.AssertCounts(0, 0);
+                fixture.Session.State.mode = GameMode.Territory;
+                LabSnapshot notTerritory = FeverSnapshot("not-territory", 1, 10d, 20d);
+                notTerritory.teamTerritory = false;
+                fixture.Observe(notTerritory);
+                fixture.AssertCounts(0, 0);
+                LabSnapshot finished = FeverSnapshot("territory-finished", 1, 10d, 20d);
+                finished.phase = LabPhase.Victory;
+                fixture.Observe(finished);
+                fixture.Observe(null);
+                fixture.AssertCounts(0, 0);
+
+                fixture.Observe(FeverSnapshot("territory-observed", 1, 10d, 20d));
+                fixture.AssertCounts(1, 1);
+                fixture.Session.State.mode = GameMode.Story;
+                fixture.Observe(FeverSnapshot("story", 1, 30d, 40d));
+                fixture.AssertCounts(1, 1, "Story snapshots must neither add to nor reset the observed territory counts.");
+            }
+        }
+
+        private static LabSnapshot FeverSnapshot(string session, uint round, double blue = -1d, double red = -1d) =>
+            new LabSnapshot
+            {
+                sessionId = session, round = round, phase = LabPhase.Playing, teamTerritory = true,
+                blueFeverStartedAt = blue, redFeverStartedAt = red
+            };
+
+        /// <summary>Passive local observation only; no transport or claim of identical statistics on remote devices.</summary>
+        private sealed class TerritoryFeverFixture : System.IDisposable
+        {
+            private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+            private readonly GameObject root;
+            private readonly LabNetwork network;
+            public readonly GameSession Session;
+
+            public TerritoryFeverFixture()
+            {
+                root = new GameObject("Inactive territory fever observation fixture");
+                root.SetActive(false);
+                GameObject prefab = Resources.Load<GameObject>(GameSession.ResourcePath);
+                Assert.That(prefab, Is.Not.Null);
+                GameObject instance = Object.Instantiate(prefab, root.transform);
+                Session = instance.GetComponent<GameSession>();
+                Assert.That(Session, Is.Not.Null);
+                network = Session.Network;
+                Assert.That(network, Is.Not.Null);
+                Assert.That(network.IsConnected, Is.False);
+                Session.State.mode = GameMode.Territory;
+                Session.State.phase = GameFlowPhase.Playing;
+            }
+
+            public void Observe(LabSnapshot snapshot)
+            {
+                string before = snapshot == null ? null : JsonUtility.ToJson(snapshot);
+                FieldInfo latest = typeof(LabNetwork).GetField("latest", Private);
+                MethodInfo observe = typeof(GameSession).GetMethod("ObserveTerritoryFevers", Private);
+                Assert.That(latest, Is.Not.Null);
+                Assert.That(observe, Is.Not.Null);
+                latest.SetValue(network, snapshot);
+                observe.Invoke(Session, null);
+                Assert.That(snapshot == null ? null : JsonUtility.ToJson(snapshot), Is.EqualTo(before),
+                    "Observing a fever must not mutate the Host snapshot.");
+            }
+
+            public void AssertCounts(int blue, int red, string reason = null)
+            {
+                Assert.That(Session.TerritoryFeverCount(LabTeam.Blue), Is.EqualTo(blue), reason);
+                Assert.That(Session.TerritoryFeverCount(LabTeam.Red), Is.EqualTo(red), reason);
+            }
+
+            public void Dispose() => Object.DestroyImmediate(root);
         }
     }
 }

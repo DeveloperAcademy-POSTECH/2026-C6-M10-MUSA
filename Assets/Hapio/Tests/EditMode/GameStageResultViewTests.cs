@@ -162,6 +162,115 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void TerritoryDrawRestoresTheSavedBackgroundAndLeavesEveryTiedRowNeutral()
+        {
+            WithView(GameScenePaths.StageResult, view =>
+            {
+                Texture savedBackground = view.background.texture;
+                var blueWin = new LabSnapshot
+                {
+                    phase = LabPhase.Victory, teamTerritory = true, teamWinner = LabTeam.Blue,
+                    paintCellCount = 200, blueCells = 120, redCells = 40, paintCoverage = .8f
+                };
+                view.PresentTerritory(LabTeam.Blue, blueWin, GameTerritoryResult.Rows(blueWin, 2, 1), "청팀 결과");
+                Assert.That(view.background.texture, Is.SameAs(view.blueTeamBackground));
+                Assert.That(view.rows.Find("Award_0/Player").GetComponent<Text>().color,
+                    Is.EqualTo(GameStageResultView.BlueTeamInk));
+
+                var draw = new LabSnapshot
+                {
+                    phase = LabPhase.Victory, teamTerritory = true, teamWinner = LabTeam.None,
+                    paintCellCount = 200, blueCells = 50, redCells = 50, paintCoverage = .5f, remaining = 0f,
+                    players = new[]
+                    {
+                        new LabPlayerState { id = 1, seat = 0, throwTotal = 3, hitTotal = 1, stolenCells = 10 },
+                        new LabPlayerState { id = 3, seat = 2, throwTotal = 3, hitTotal = 1, stolenCells = 10 }
+                    }
+                };
+                string before = JsonUtility.ToJson(draw);
+                var records = GameTerritoryResult.Rows(draw, 1, 1);
+                Assert.That(records.Select(row => row.Leader), Is.All.EqualTo(LabTeam.None));
+                view.PresentTerritory(LabTeam.None, draw, records, "무승부 결과");
+
+                Assert.That(view.background.texture, Is.SameAs(savedBackground),
+                    "A draw restores the saved background even after a blue victory used the same view.");
+                Assert.That(view.stage.text, Is.EqualTo("2 : 2"));
+                Assert.That(view.yokai.text, Is.EqualTo("땅따먹기 결과"));
+                Assert.That(view.judgment.text, Is.EqualTo("무승부~!"));
+                Assert.That(view.paint.text, Is.EqualTo("PAINT 50.0%"));
+                Assert.That(view.timeLeft.text, Is.EqualTo("TIME LEFT 0s"));
+                Assert.That(view.rows.Cast<Transform>().Count(child => child.gameObject.activeSelf), Is.EqualTo(5));
+                for (int i = 0; i < records.Count; i++)
+                {
+                    Transform row = view.rows.Find("Award_" + i);
+                    Assert.That(row.Find("Title").GetComponent<Text>().text, Is.EqualTo(records[i].Title));
+                    Assert.That(row.Find("Player").GetComponent<Text>().text, Is.EqualTo(records[i].Blue));
+                    Assert.That(row.Find("Record").GetComponent<Text>().text, Is.EqualTo(records[i].Red));
+                    Assert.That(row.Find("Player").GetComponent<Text>().color, Is.EqualTo(view.secondaryInk));
+                    Assert.That(row.Find("Record").GetComponent<Text>().color, Is.EqualTo(view.secondaryInk));
+                    Assert.That(row.Find("Highlight").gameObject.activeSelf, Is.False);
+                }
+                Assert.That(JsonUtility.ToJson(draw), Is.EqualTo(before), "Presentation must not change the tied result.");
+            });
+        }
+
+        [Test]
+        public void StoryPresentationRestoresItsBackgroundHeadersAndRowInkAfterATerritoryResult()
+        {
+            WithView(GameScenePaths.StageResult, view =>
+            {
+                Texture savedBackground = view.background.texture;
+                string[] headerNames = { "TitleHeader", "PlayerHeader", "RecordHeader" };
+                Text[] headers = headerNames.Select(name => view.design.Find("AwardTable/" + name).GetComponent<Text>()).ToArray();
+                string[] savedLabels = headers.Select(header => header.text).ToArray();
+                Color[] savedColors = headers.Select(header => header.color).ToArray();
+                var territory = new LabSnapshot
+                {
+                    phase = LabPhase.Victory, teamTerritory = true, teamWinner = LabTeam.Blue,
+                    paintCellCount = 200, blueCells = 120, redCells = 40, paintCoverage = .8f
+                };
+                view.PresentTerritory(LabTeam.Blue, territory, GameTerritoryResult.Rows(territory, 2, 1), "청팀 결과");
+                Assert.That(view.background.texture, Is.SameAs(view.blueTeamBackground));
+                Assert.That(headers.Select(header => header.text), Is.EqualTo(new[] { "항목", "청팀", "홍팀" }));
+                Assert.That(view.rows.Find("Award_0/Player").GetComponent<Text>().color,
+                    Is.EqualTo(GameStageResultView.BlueTeamInk));
+
+                var story = new LabSnapshot { phase = LabPhase.Victory, paintCoverage = .823f, remaining = 15.2f };
+                string before = JsonUtility.ToJson(story);
+                var awards = new[]
+                {
+                    new LabResultRow("꾸준한 명중", "P2", "3회", false),
+                    new LabResultRow("조합의 달인", "P1(나)", "5회", true)
+                };
+                view.Present(true, 2, "야광귀", story, awards, "다음 스테이지 안내");
+
+                Assert.That(view.background.texture, Is.SameAs(savedBackground));
+                Assert.That(headers.Select(header => header.text), Is.EqualTo(savedLabels));
+                Assert.That(headers.Select(header => header.color), Is.EqualTo(savedColors));
+                Assert.That(view.stage.text, Is.EqualTo("STAGE 2"));
+                Assert.That(view.yokai.text, Is.EqualTo("야광귀"));
+                Assert.That(view.judgment.text, Is.EqualTo("봉인 성공 !"));
+                Assert.That(view.paint.text, Is.EqualTo("PAINT 82.3%"));
+                Assert.That(view.timeLeft.text, Is.EqualTo("TIME LEFT 16s"));
+                Assert.That(view.guidance.text, Is.EqualTo("다음 스테이지 안내"));
+                Assert.That(view.viewerButton.GetComponentInChildren<Text>(true).text, Is.EqualTo("야광귀 봉인 박 확인"));
+                Assert.That(view.rows.Cast<Transform>().Count(child => child.gameObject.activeSelf), Is.EqualTo(2));
+                for (int i = 0; i < awards.Length; i++)
+                {
+                    Transform row = view.rows.Find("Award_" + i);
+                    Assert.That(row.Find("Title").GetComponent<Text>().text, Is.EqualTo(awards[i].Title));
+                    Assert.That(row.Find("Player").GetComponent<Text>().text, Is.EqualTo(awards[i].Who));
+                    Assert.That(row.Find("Record").GetComponent<Text>().text, Is.EqualTo(awards[i].Record));
+                    Assert.That(row.Find("Highlight").gameObject.activeSelf, Is.EqualTo(awards[i].Mine));
+                    Color expected = awards[i].Mine ? Color.white : view.secondaryInk;
+                    foreach (string column in new[] { "Title", "Player", "Record" })
+                        Assert.That(row.Find(column).GetComponent<Text>().color, Is.EqualTo(expected));
+                }
+                Assert.That(JsonUtility.ToJson(story), Is.EqualTo(before), "Presentation must not change the Story result.");
+            });
+        }
+
+        [Test]
         public void LongTiedAwardsCanScrollAndReturnToAnEmptyResultWithoutStaleRows()
         {
             WithView(GameScenePaths.StageResult, view =>
