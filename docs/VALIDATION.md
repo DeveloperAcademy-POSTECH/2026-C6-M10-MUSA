@@ -1,5 +1,31 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-10-29 — #386 미사용 Target·Target2·GourdCrack·PackageInstaller 정리
+
+기준 main `5c2ce667`에서 `chore/#386-unused-target-assets` 별도 작업 공간을 준비했다. 원래 프로젝트의 main·HEAD·tracked diff·작업 상태·사용자 미추적 파일 기준은 전환하거나 수정하지 않았다. Unity6000.6.5f1·macOS ARM64·Metal batch Editor 한 개에서 확인했다.
+
+삭제 허용 목록은 `Assets/Lab/Art/Target`31개·`Target2`35개·`GourdCrack`8개(각 루트 메타 포함), `Assets/Editor/Bootstrap/PackageInstaller.cs`와 메타2개로 고정했다. 합계 **76파일·46GUID·4,391,767바이트**다. 작업 파일의 합계이며 Git 이력 크기나 빌드 용량 감소를 측정한 값은 아니다. 옛 박 모델·재질·애니메이션·크랙 Shader와 해당 재질만 다루는 Editor 메뉴, 초기 패키지 설치 후 종료하던 일회 도구만 제거했다. 패키지를 제거하거나 설정을 바꾸지 않았다.
+
+보존 tracked 텍스트2,000개에서 후보 GUID46개의 외부 참조0을 재확인했고, 구체 경로·Resources/Shader 동적 로딩·두 MaterialTools·PackageInstaller 호출도 보존 코드에서 찾지 못했다. `LabPaintOnlyUpgrade`의 퇴역 타입 이름은 없어진 컴포넌트를 안전하게 건너뛰는 이관 코드이며 자산 로딩이 아니므로 유지했다. 과거 문서의 Crack 설명도 현재 런타임 연결 근거로 간주하지 않았다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| 삭제 전 실제 Unity 의존성 | **PASS** | `AssetDatabase.GetDependencies`로 보존 에셋1,081개·Scene7개·Prefab43개를 조회. 삭제 후보에 대한 의존성0 |
+| 삭제 후 실제 Unity 의존성 | **PASS** | 같은 보존 에셋의 경로·GUID·재귀 의존성 배열이 삭제 전과 전부 동일. 후보 의존성0 |
+| 재컴파일 | **PASS** | completed·failed/compilationFailed=false·errors0 |
+| Hapio EditMode 전체 | **141/141 PASS**, 0.80초 | #381 카탈로그·저장 Scene/참조·기존 스테이지/설정·게임 흐름 |
+| `LabGourdHitboxTests` | **7/7 PASS**, 2.56초 | 현행 저장 박의 실제 셸·충돌체 경로 |
+| `LabGourdPaintTests` | **8/8 PASS**, 10.10초 | 기존 도색·초기화·표면/표현 연결 |
+| `LabHighResolutionPaintRuntimeTests` | **2/2 PASS**, 0.07초 | 고해상도 런타임 경로 |
+| `LabWatercolorPaintRuntimeTests` | **7/7 PASS**, 5.74초 | #369 수채 표현·맵/소유권·자원 수명 |
+| `GameYokaiPresentationTests` | **2/2 PASS**, 0.01초 | 공통 검은 요괴·WhiteGourd 연결 |
+| `GameSceneFlowTests.SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay` | **1/1 PASS**, 5.11초 | 실제 저장 Home→Battle 표현 준비·공유 카운트다운→Playing |
+| 변경·로컬 보존 | **PASS** | 허용76개 삭제+이 검증 문서만 변경. 보존 Runtime·Scene·Prefab·Resources·WhiteGourd·검은 요괴·수채·Config·Packages·테스트·#381 데이터는 기준 main과 동일. 원래 프로젝트의 main/HEAD/작업 상태·tracked diff·미추적 파일 기준 유지 |
+
+실행한 고유 검사는 EditMode141개와 PlayMode27개이며 실패/skip/inconclusive0이다. 기존 #380·#384의 전체514개 통과를 이번 정리의 실행 결과로 재사용하지 않는다. Test Runner 임시 Scene·자동 설정 변경이 남지 않았고 검사용 Editor는 정상 종료0이다. 원시 의존성 JSON·허용 목록/해시·실행 로그는 저장소 밖에 보관했다. TargetSpinGradient·다른 실험 도구·중복 테스트·로컬 IDE/Builds/Library·사용자 부모 메타파일은 변경하지 않았다.
+
+전체 Lab EditMode·전체 PlayMode·Mac/iOS 빌드·실기기 LAN/핫스팟·모바일 성능·손으로 하는 플레이 검증은 이번 작업에서 **미실행**이다. README 소개글과 기존 통합 지시서는 덮어쓰지 않았다.
+
 ## 2026-10-29 — #380 도색 소유권 렌더 비교 조건 격리
 
 기준은 #378 병합 main `8d3cd58d`다. 별도 `fix/#380-paint-render-test-isolation` 작업 공간의 Unity6000.6.5f1·macOS ARM64·Metal batch Editor 한 개를 사용했다. 실제 도색·#369 수채·게임 판정·Scene·Prefab·머터리얼·설정·패키지는 변경하지 않았다.
