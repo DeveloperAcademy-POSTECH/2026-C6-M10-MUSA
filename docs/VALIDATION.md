@@ -4,6 +4,8 @@
 
 main `a0742ef7`에서 별도 `chore/#373-unused-prototype-fox-assets` 작업 트리를 만들었다. 원래 #369 작업 폴더의 브랜치·HEAD·작업 상태·tracked diff와 사용자 미추적 파일을 보존했다.
 
+PR 준비 시 최신 main `7aa0a215`(#370 콤보 사운드)을 충돌 없이 통합하고 다시 확인했다. 최신 main 대비 변경은 같은62개 삭제와 이 검증 기록뿐이다. #370의 음원·코드·테스트·출처 문서4개는 최신 main과 동일하고, 보존 텍스트1,998개(검증 기록 제외)의 후보 GUID·경로 참조0건, Scene7개·빌드 목록6개·테스트 C#186개 유지 및 #369/로컬 파일 보존을 재확인했다. Unity 실행 검증은 추가 수행하지 않았다.
+
 - `Assets/BackgroundPrototype`와 루트 폴더 메타를 포함한 독립 실험 Scene·Editor 창·배경 그림·생성 머터리얼·복제 모델53개를 제거했다.
 - `Assets/Hapio/Art/GumihoVisual.prefab`과 메타2개, `Assets/Lab/Art/Monster`와 루트 메타를 포함한 여우 FBX·머터리얼·텍스처7개를 제거했다. 합계62파일·34 GUID·54,500,774바이트(작업 파일 기준 약51.98MiB)다. Git 이력이나 빌드 크기 감소량을 측정한 값은 아니다.
 - 실제 게임의 공통 검은 요괴는 `Art/GourdYokai`와 `Resources/GourdPaint/WhiteGourd`를 사용한다. Stage01~03의 `yokaiVisual`은 모두 null이며, 구미호 스테이지 규칙·효과음·오프닝/로비 그림은 이번 삭제 대상과 별개로 유지했다.
