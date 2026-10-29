@@ -193,6 +193,7 @@ namespace Hapio.Tests
                 Assert.That(new[] { story[3], story[4], story[5], story[7], story[10] },
                     Is.EqualTo(new[] { 120f, 120f, 20f, 1f, 15f }));
                 Assert.That(story[3] / story[5], Is.EqualTo(6f), "A full story bar makes six orbs.");
+                Assert.That(team[197], Is.EqualTo(120f), "2:2 lasts two minutes like the story stages (#293).");
 
                 float[] common = settings.Capture(0); common[3] = 200f; common[4] = 200f; common[10] = 20f;
                 Assert.That(settings.TryApply(0, common, out string error), Is.True, error);
