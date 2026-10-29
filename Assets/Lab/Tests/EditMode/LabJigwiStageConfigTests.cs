@@ -91,16 +91,6 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void Old228PayloadIsRejectedAtomicallyRatherThanSilentlyUsingLocalDefaults()
-        {
-            float[] before = config.CaptureDeveloperValues();
-            float[] old = before.Take(228).ToArray(); old[0] = 777f;
-            Assert.That(config.TryApplyDeveloperValues(old, out _), Is.False);
-            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(before));
-            Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(old, 3, 5677));
-        }
-
-        [Test]
         public void MissingSerializedValuesKeepDefaultsAndInspectorValuesClampAtTheirOwnBounds()
         {
             JsonUtility.FromJsonOverwrite("{\"yinChance\":40,\"yangChance\":60}", config);

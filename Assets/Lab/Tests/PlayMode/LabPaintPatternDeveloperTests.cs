@@ -14,14 +14,14 @@ namespace C6Lab.Tests
     {
         private const int ViewerField = 110;
         private const int PlayerPatternsField = 137;
+        private readonly LabSavedSceneNetworkFixture fixture = new LabSavedSceneNetworkFixture();
         private LabDeveloperMode ui;
         private string sourceJson;
 
         [UnitySetUp]
         public IEnumerator LoadSavedPanel()
         {
-            yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
-            yield return null;
+            yield return fixture.Load();
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
@@ -33,14 +33,7 @@ namespace C6Lab.Tests
         public IEnumerator Cleanup()
         {
             Time.timeScale = 1f;
-            if (ui != null && ui.network != null)
-            {
-                ui.network.Stop(); Object.Destroy(ui.network.gameObject); yield return null;
-            }
-            Scene scene = SceneManager.GetSceneByName("Lab");
-            if (!scene.IsValid() || !scene.isLoaded) yield break;
-            SceneManager.SetActiveScene(SceneManager.CreateScene("Paint pattern DEV cleanup"));
-            yield return SceneManager.UnloadSceneAsync(scene);
+            yield return fixture.Cleanup();
         }
 
         [UnityTest]
@@ -83,7 +76,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator AllFourPatternsApplyToSoloRoundCopiesAndRestartResetsPaint()
         {
-            ui.network.port = 19200;
+            fixture.UseAvailablePort(ui.network);
             foreach (int pattern in new[] { 2, 0, 1, 3 })
             {
                 ui.Open();
@@ -107,7 +100,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator HostLobbyAppliesPatternButCannotSkipParticipantOrPausedRestartGates()
         {
-            ui.network.port = 19201;
+            fixture.UseAvailablePort(ui.network);
             ui.Open(); ui.targetParticipantsSlider.value = 2f;
             Choices()[1].onClick.Invoke();
             ui.applyHostButton.onClick.Invoke();
@@ -183,7 +176,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SoloRestartAppliesIndependentFeatureSettingsAndDefaultsStayDraftUntilApply()
         {
-            ui.network.port = 19202;
+            fixture.UseAvailablePort(ui.network);
             ui.Open(); SetFeatureDraft(false, true);
             ui.applyStartButton.onClick.Invoke();
             yield return null;
@@ -226,7 +219,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator HostLobbySharesBothIndependentFeaturesWithoutSkippingRoomStartOrRestartGates()
         {
-            ui.network.port = 19203;
+            fixture.UseAvailablePort(ui.network);
             for (int combination = 0; combination < 4; combination++)
             {
                 bool viewerEnabled = (combination & 2) != 0;
