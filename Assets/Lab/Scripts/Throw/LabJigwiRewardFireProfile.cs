@@ -24,6 +24,11 @@ namespace C6Lab
         [SerializeField] private Color emberColor = new Color(1f, .8f, .48f, .9f);
         [Tooltip("Transparent 2x2 atlas: frame 0 top left, then top right, bottom left, bottom right.")]
         [SerializeField] private Texture2D flameTexture;
+        [Tooltip("Transparent 2x2 circular flame atlas; its centre stays open over the original element orb.")]
+        [SerializeField] private Texture2D rimTexture;
+        [Tooltip("Full artwork quad half-width in accepted projectile radii. The ring never fills the orb centre.")]
+        [SerializeField, Range(1.1f, 3f)] private float rimScale = 1.85f;
+        [SerializeField] private Color rimColor = Color.white;
         [SerializeField] private Texture2D emberTexture;
         [Tooltip("Transparent vertical ribbon: top points toward the orb, bottom toward its old path.")]
         [SerializeField] private Texture2D ribbonTexture;
@@ -40,6 +45,9 @@ namespace C6Lab
         public Color FlameColor => SafeColor(flameColor);
         public Color EmberColor => SafeColor(emberColor);
         public Texture2D FlameTexture => flameTexture;
+        public Texture2D RimTexture => rimTexture;
+        public float RimScale => Safe(rimScale, 1.1f, 3f, 1.85f);
+        public Color RimColor => SafeColor(rimColor);
         public Texture2D EmberTexture => emberTexture;
         public Texture2D RibbonTexture => ribbonTexture;
         public Material Material => material;

@@ -14,12 +14,13 @@
 
 | 요소 | 실제 구현 |
 | --- | --- |
+| 원형 화염 테두리 | 새 전용2×2 원형 화염 원화를48분할 annulus에 표시한다. 중앙 삼각형이 없어 구슬의 속성 색을 가리지 않고 모든 카메라에 원형으로 보인다. |
 | 구슬 가장자리 화염 | 전용2×2 네 프레임 텍스처를 카메라를 향한 네 장의 작은 카드로 표시한다. 중심 속성 색을 전부 덮는 큰 구체는 만들지 않는다. |
 | 밝은 화염 꼬리 | 기존 `LabFlightTrailPath`의 실제 world 위치 이력을 따라 새 리본 Mesh를 만든다. 새 전용 리본 그림·폭 흔들림과 나이별 alpha를 적용한다. |
 | 불티 | 실제 이동 거리마다 작은 카드를 남기고 짧게 위로 떠오르며 흐려진다. 개수·나이·경로 길이를 제한한다. |
 | 렌더링 | 현재 URP의 `C6Lab/Element Ink Trail` shader/Material과 MaterialPropertyBlock을 재사용한다. 새 물리 컴포넌트나 광원, 후처리 패키지는 추가하지 않는다. |
 
-필요한 billboards는 Mesh로 묶어 그리며 별도 ParticleSystem은 생성하지 않는다. 화염/리본/불티 세 Mesh만 전용 컴포넌트가 소유한다. 판정용 GameObject/레이어를 바꾸지 않으며, 카메라마다 실제 이력을 투영하여 해당 카메라에 맞춘 정점을 갱신한다.
+필요한 billboards는 Mesh로 묶어 그리며 별도 ParticleSystem은 생성하지 않는다. 화염/리본/불티/원형 테두리 네 Mesh만 전용 컴포넌트가 소유한다. 판정용 GameObject/레이어를 바꾸지 않으며, 카메라마다 실제 이력을 투영하여 해당 카메라에 맞춘 정점을 갱신한다.
 
 - `Assets/Lab/Scripts/Throw/LabProjectile.cs`: 발사/승인/명중/취소 경로에서 전용 효과를 연결한다. `JigwiRewardFireTrail` getter로 현재 층을 확인할 수 있다.
 - `LabJigwiRewardFireTrail.cs`: `Begin`, `Reconfigure`, `StopAndFade`, `Clear` 및 실제 경로·화염 애니메이션·불티 렌더링.
@@ -43,6 +44,9 @@ Project에서 `Assets/Lab/Resources/Jigwi/RewardFire/RewardFireProfile.asset`을
 | Flame Color | 흰색 | 새 그림의 크림색 핵·주홍·먹선을 보존하는 곱셈 tint. Alpha로 강도 조절 |
 | Ember Color | 따뜻한 연노랑 | 불티 tint |
 | Flame Texture | RewardFlameAtlas | 좌상→우상→좌하→우하4프레임 |
+| Rim Texture | RewardFlameRimAtlas | 같은 순서의4프레임 원형 화염 |
+| Rim Scale | 1.85 | 테두리 전체 원화 폭/공 지름. 실제 공 크기와 독립된 표현 값 |
+| Rim Color | 흰색 | 테두리 tint·alpha. 애니메이션 속도는 Flame Animation Fps 공유 |
 | Ribbon Texture | RewardFlameRibbon | 위=구슬 쪽, 아래=오래된 경로 |
 | Ember Texture | RewardEmber | Unity에서 만든 작은 투명 물방울 도형 |
 | Material | ElementInkTrail | 기존 URP 투명 Material, 원본 변경 없음 |
@@ -54,7 +58,7 @@ Project에서 `Assets/Lab/Resources/Jigwi/RewardFire/RewardFireProfile.asset`을
 - 같은 flag를 재수신하거나 `Reconfigure`로 폭을 보정해도 이미 기록한 경로와 애니메이션 시작점을 초기화하지 않는다.
 - 늦게 true 승인되면 현재 위치에서 새 층을 시작하며 과거 경로를 조작해 덧그리지 않는다. false로 바뀌면 전용 층만 지운다.
 - Pause는 기존 scaled `Time.time`을 따라 경로·불티·애니메이션·fade를 멈춘다.
-- 정상 명중/빗나감은 외피 방출을 즉시 끝내고 기존 world 경로·불티가 최대 수명 뒤 자연스럽게 사라진다.
+- 정상 명중/빗나감은 외피와 원형 테두리를 즉시 지우고 기존 world 경로·불티가 최대 수명 뒤 자연스럽게 사라진다.
 - 분리된 효과도 기존 `projectileRoot` 아래에 두고 `LabProjectileRevisionStamp`로 승인 revision을 유지한다. B 실패의 이전 공/잔상은 즉시 제거되고 실패 이후 승인된 공은 보존된다.
 - Disable/Retry/방 나가기/Scene 종료는 `Clear` 및 기존 전체 투사체 정리 경로를 사용한다. 재사용 시 이전 위치와 잇는 긴 선을 만들지 않는다.
 - 궤적/불티 수·수명은 제한하고 소유 Mesh 및 임시 fallback 자원은 파괴 때 정리한다.
@@ -72,6 +76,8 @@ Project에서 `Assets/Lab/Resources/Jigwi/RewardFire/RewardFireProfile.asset`을
 아래 이미지는 실제0.20초 비행에서 같은 시각에 캡처한 비교다. 위=일반, 아래=B 보상, 왼쪽부터 화·수·목·금·토다.
 
 ![실제 정면 비교](images/jigwi-reward-fire-front.png)
+
+![새 원형 화염 테두리 확대 비교](images/jigwi-reward-fire-rim-closeup.png)
 
 ![실제 측면 비교](images/jigwi-reward-fire-side.png)
 
@@ -108,4 +114,18 @@ Text: none. No orbs, no scenery, no lettering, no labels, no frame, no spark clo
 Use case: stylized-concept. Asset type: a single transparent RGBA brush texture for a Unity reward fire flight ribbon.
 Primary request: one elongated, broad, tapering BLAZING FIRE wake, vertical on a square transparent canvas. Its broad leading base is near the TOP center (it connects behind a flying orb), while three long split pointed flame tails taper toward the BOTTOM. It must look like a bright burning streak, with a broad creamy ivory hot core, gold-orange middle and vermilion red flaring edges. Sparse irregular dry charcoal-black ink edges, flat Korean fantasy watercolor wash, hand-painted broad readable silhouette. Fire tongues weave and separate with transparent gaps toward the bottom, core stays cohesive toward the top. Small internal dry brush breaks only at edge. No smoke.
 Composition/framing: centered, entirely inside middle 65 percent of canvas width and 80 percent of canvas height. Plenty of empty transparent margin. Single continuous flame wake with no other elements. No orb, no lettering, no parchment, no panel, no border, no background of any color, no checkerboard, no halo. Actual transparent pixels around the painted silhouette. This texture is stretched along an actual projectile path at runtime, not a design mockup.
+```
+
+
+### 화염 테두리 추가 원본
+
+`Assets/Lab/Resources/Jigwi/RewardFire/RewardFlameRimAtlas.png`는 빌트인 image_gen으로 새로 생성한2×2 원형 화염 애니메이션이다. 원본1268×1241 RGBA를 픽셀 수정 없이 복사했다. 각 프레임 중앙 반지름20% 영역의 alpha는0~1이며, 실제 렌더링은 내부 반지름0.98×공 반지름의 구멍을 가진48분할 원형 Mesh로 중앙을 완전히 비운다. 원본의 미세한 중앙 alpha도 구슬 위에 그리지 않는다. 타일별 환형 영역의 alpha128 초과 비율은 약63~67%다. 기존 원화와 같은 투명도/NPOT/Clamp/2048 import를 사용한다.
+
+```text
+Use case: stylized-concept.
+Asset type: production Unity mobile game VFX sprite atlas, genuinely transparent RGBA, 2 columns x 2 rows of four identical-size animation cells.
+Primary request: A COHESIVE CIRCULAR FIRE RIM encircling a completely EMPTY transparent round center, for drawing around the silhouette of a colored flying orb. Four consecutive flickering animation phases read top-left, top-right, bottom-left, bottom-right. The flame border must be continuous all the way around 360 degrees, with organic asymmetrical flame tongues licking OUTWARD. Flame tongues and the ring subtly churn between frames but the center and size remain locked.
+Exact layout in EACH equal square cell: the center is exactly the cell center. The completely transparent circular opening is approximately 52 percent of cell width in diameter. Outermost tips of the painted ring occupy approximately 78 percent of cell width in diameter. This leaves a large clean circular hole and generous transparent gutters around every cell. Nothing whatsoever may be painted inside the central opening. NO orb or colored ball. All four rings must be isolated, fully inside their cells, never touching.
+Style: Korean fantasy game hand-painted ink-and-flat-watercolor, broad simple fiery shapes readable at 32-pixel orb scale. Bright warm-ivory hot inner edge, golden yellow and orange middle, vermilion red flame tips, a little irregular dark dry-brush ink on outer flame edges only. Fire, not a cogwheel, not a sun icon, not an electric halo, not an evenly spiked badge. Clear and elegant playable-game feedback, no clutter or floating debris. Strong continuous inner flame band, unequal natural outer tongues.
+All space outside the paint and all four central holes must have actual alpha-zero transparency. No parchment, background, black/white disks, checkerboard, labels, letters, borders, glow haze, smoke, symbols or scenery. This is the raw transparent runtime sprite sheet, not a mockup.
 ```

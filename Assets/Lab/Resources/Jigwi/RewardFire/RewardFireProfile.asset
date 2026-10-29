@@ -22,6 +22,9 @@ MonoBehaviour:
   flameColor: {r: 1, g: 1, b: 1, a: 1}
   emberColor: {r: 1, g: 0.8, b: 0.48, a: 0.9}
   flameTexture: {fileID: 2800000, guid: 1e8a63716446b42dbb644afdb32acd12, type: 3}
+  rimTexture: {fileID: 2800000, guid: f34c87f5169e9473e8ed3158e06eada3, type: 3}
+  rimScale: 1.85
+  rimColor: {r: 1, g: 1, b: 1, a: 1}
   emberTexture: {fileID: 2800000, guid: f7f92e133935d450f8b8b61120d8346f, type: 3}
   ribbonTexture: {fileID: 2800000, guid: 1cef289b2d87d48188bf6175776d90f5, type: 3}
   material: {fileID: 2100000, guid: c36a81757c0a34f3d9ef9c5a970443e4, type: 2}

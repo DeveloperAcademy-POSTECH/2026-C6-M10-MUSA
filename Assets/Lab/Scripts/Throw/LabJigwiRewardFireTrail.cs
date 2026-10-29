@@ -9,7 +9,7 @@ namespace C6Lab
     /// </summary>
     public sealed class LabJigwiRewardFireTrail : MonoBehaviour
     {
-        private const int SparkCapacity = 128, AuraCards = 4;
+        private const int SparkCapacity = 128, AuraCards = 4, RimSegments = 48;
         private static readonly int BaseMap = Shader.PropertyToID("_BaseMap"),
             BaseColor = Shader.PropertyToID("_BaseColor"), UvSwap = Shader.PropertyToID("_UvSwap"),
             MainTex = Shader.PropertyToID("_MainTex");
@@ -18,10 +18,11 @@ namespace C6Lab
         private readonly Surface ribbon = new Surface(LabFlightTrailPath.Capacity * 2);
         private readonly Surface aura = new Surface(AuraCards * 4);
         private readonly Surface embers = new Surface(SparkCapacity * 4);
+        private readonly Surface rim = new Surface((RimSegments + 1) * 2);
         private Transform source;
         private LabJigwiRewardFireProfile profile, ownedFallback;
         private Material fallbackMaterial;
-        private Texture2D fallbackAtlas, fallbackEmber, fallbackRibbon;
+        private Texture2D fallbackAtlas, fallbackEmber, fallbackRibbon, fallbackRim;
         private Vector3 lastPosition;
         private float radius = .165f, lastTime, beganAt, distanceRemainder, travelledDistance, fadeDeadline;
         private int sparkCount, sparkSerial;
@@ -55,6 +56,7 @@ namespace C6Lab
         public int PathCount => path.Count;
         public float PathLength => path.Length;
         public int EmberCount => sparkCount;
+        public Mesh RimMesh => rim.Mesh;
         public Vector3 GetPathPosition(int index) => path.GetPosition(index);
 
         /// <summary>Repeated approval of the same live source preserves its recorded history and animation phase.</summary>
@@ -102,7 +104,7 @@ namespace C6Lab
             RecordSource(Time.time);
             emitting = false; source = null; fading = true;
             fadeDeadline = Time.time + Mathf.Max(profile.Lifetime, profile.EmberLifetime);
-            aura.Clear();
+            aura.Clear(); rim.Clear();
             transform.SetParent(parent, true);
         }
 
@@ -110,7 +112,7 @@ namespace C6Lab
         {
             emitting = fading = false; source = null;
             path.Clear(); sparkCount = sparkSerial = 0; distanceRemainder = travelledDistance = 0f;
-            ribbon.Clear(); aura.Clear(); embers.Clear();
+            ribbon.Clear(); aura.Clear(); embers.Clear(); rim.Clear();
         }
 
         private void OnEnable()
@@ -126,9 +128,9 @@ namespace C6Lab
         }
         private void OnDestroy()
         {
-            Release(ribbon.Mesh); Release(aura.Mesh); Release(embers.Mesh);
+            Release(ribbon.Mesh); Release(aura.Mesh); Release(embers.Mesh); Release(rim.Mesh);
             Release(fallbackMaterial); Release(ownedFallback);
-            Release(fallbackAtlas); Release(fallbackEmber); Release(fallbackRibbon);
+            Release(fallbackAtlas); Release(fallbackEmber); Release(fallbackRibbon); Release(fallbackRim);
         }
         private static void Release(Object value)
         {
@@ -205,7 +207,7 @@ namespace C6Lab
         {
             if (profile == null || camera == null || !isActiveAndEnabled
                 || (camera.cullingMask & (1 << gameObject.layer)) == 0) return;
-            BuildRibbon(camera); BuildAura(camera); BuildEmbers(camera);
+            BuildRibbon(camera); BuildAura(camera); BuildEmbers(camera); BuildRim(camera);
         }
         private void BuildRibbon(Camera camera)
         {
@@ -258,6 +260,38 @@ namespace C6Lab
             }
             Commit(aura, AuraCards * 4, AuraCards * 6);
         }
+        private void BuildRim(Camera camera)
+        {
+            if (!emitting || source == null) { rim.Clear(); return; }
+            Vector3 right = camera.transform.right, up = camera.transform.up;
+            Vector3 view = camera.orthographic ? -camera.transform.forward : camera.transform.position - source.position;
+            if (view.sqrMagnitude < .000001f) view = -camera.transform.forward;
+            Vector3 centre = source.position + view.normalized * (radius * .015f);
+            float inner = radius * .98f, outer = radius * profile.RimScale;
+            int frame = Mathf.FloorToInt((Time.time - beganAt) * profile.FlameAnimationFps) % 4;
+            float tileX = (frame % 2) * .5f, tileY = (1 - frame / 2) * .5f;
+            Color color = profile.RimColor;
+            for (int i = 0; i <= RimSegments; i++)
+            {
+                float angle = i * (Mathf.PI * 2f / RimSegments);
+                float x = Mathf.Cos(angle), y = Mathf.Sin(angle);
+                Vector3 direction = right * x + up * y;
+                int vertex = i * 2;
+                // Both vertices are on an annulus: no central triangle can cover the elemental orb.
+                rim.Vertices[vertex] = transform.InverseTransformPoint(centre + direction * inner);
+                rim.Vertices[vertex + 1] = transform.InverseTransformPoint(centre + direction * outer);
+                rim.UV[vertex] = new Vector2(tileX + .5f * (.5f + x * inner / (2f * outer)),
+                    tileY + .5f * (.5f + y * inner / (2f * outer)));
+                rim.UV[vertex + 1] = new Vector2(tileX + .5f * (.5f + x * .5f),
+                    tileY + .5f * (.5f + y * .5f));
+                rim.Colors[vertex] = rim.Colors[vertex + 1] = color;
+                if (i == RimSegments) continue;
+                int triangle = i * 6;
+                rim.Indices[triangle] = vertex; rim.Indices[triangle + 1] = vertex + 2; rim.Indices[triangle + 2] = vertex + 1;
+                rim.Indices[triangle + 3] = vertex + 1; rim.Indices[triangle + 4] = vertex + 2; rim.Indices[triangle + 5] = vertex + 3;
+            }
+            Commit(rim, (RimSegments + 1) * 2, RimSegments * 6);
+        }
         private void BuildEmbers(Camera camera)
         {
             if (sparkCount == 0) { embers.Clear(); return; }
@@ -305,6 +339,7 @@ namespace C6Lab
         private void EnsureSurfaces()
         {
             Ensure(ribbon, "Reward fire real path"); Ensure(aura, "Reward fire envelope"); Ensure(embers, "Reward fire sparks");
+            Ensure(rim, "Reward fire hollow rim");
         }
         private void Ensure(Surface surface, string title)
         {
@@ -323,6 +358,7 @@ namespace C6Lab
             SetMaterial(ribbon, material, profile.RibbonTexture != null ? profile.RibbonTexture : FallbackTexture(0), true);
             SetMaterial(aura, material, profile.FlameTexture != null ? profile.FlameTexture : FallbackTexture(1), false);
             SetMaterial(embers, material, profile.EmberTexture != null ? profile.EmberTexture : FallbackTexture(2), false);
+            SetMaterial(rim, material, profile.RimTexture != null ? profile.RimTexture : FallbackTexture(3), false);
         }
         private static void SetMaterial(Surface surface, Material material, Texture texture, bool swap)
         {
@@ -342,14 +378,28 @@ namespace C6Lab
         }
         private Texture2D FallbackTexture(int kind)
         {
-            Texture2D old = kind == 0 ? fallbackRibbon : kind == 1 ? fallbackAtlas : fallbackEmber;
+            Texture2D old = kind == 0 ? fallbackRibbon : kind == 1 ? fallbackAtlas : kind == 2 ? fallbackEmber : fallbackRim;
             if (old != null) return old;
             const int size = 64; var pixels = new Color32[size * size];
             for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
             {
-                float u = kind == 1 ? (x % 32) / 31f : x / 63f;
-                float v = kind == 1 ? (y % 32) / 31f : y / 63f;
-                int frame = kind == 1 ? (1 - y / 32) * 2 + x / 32 : 0;
+                bool atlas = kind == 1 || kind == 3;
+                float u = atlas ? (x % 32) / 31f : x / 63f;
+                float v = atlas ? (y % 32) / 31f : y / 63f;
+                int frame = atlas ? (1 - y / 32) * 2 + x / 32 : 0;
+                if (kind == 3)
+                {
+                    float angle = Mathf.Atan2(v - .5f, u - .5f);
+                    float radial = new Vector2(u - .5f, v - .5f).magnitude * 2f;
+                    float edge = .82f + .11f * Mathf.Sin(angle * 7f + frame) + .035f * Mathf.Sin(angle * 13f - frame);
+                    float inner = .47f + .02f * Mathf.Sin(angle * 5f + frame);
+                    float across = Mathf.Clamp01((radial - inner) / Mathf.Max(.01f, edge - inner));
+                    Color ring = across > .88f ? new Color(.2f, .055f, .025f)
+                        : Color.Lerp(new Color(1f, .94f, .5f), new Color(1f, .22f, .035f), across);
+                    ring.a = Mathf.Clamp01(Mathf.Min((radial - inner) * 25f, (edge - radial) * 25f));
+                    pixels[y * size + x] = ring;
+                    continue;
+                }
                 float centre = .5f + .1f * Mathf.Sin(v * 8f + frame) * v;
                 float width = kind == 2 ? .45f * Mathf.Sin(Mathf.PI * v)
                     : kind == 0 ? .4f * Mathf.Pow(Mathf.Max(.001f, v), .45f)
@@ -364,7 +414,8 @@ namespace C6Lab
                 name = "Reward fire fallback " + kind, hideFlags = HideFlags.HideAndDontSave,
                 wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
             texture.SetPixels32(pixels); texture.Apply(false, true);
-            if (kind == 0) fallbackRibbon = texture; else if (kind == 1) fallbackAtlas = texture; else fallbackEmber = texture;
+            if (kind == 0) fallbackRibbon = texture; else if (kind == 1) fallbackAtlas = texture;
+            else if (kind == 2) fallbackEmber = texture; else fallbackRim = texture;
             return texture;
         }
     }
