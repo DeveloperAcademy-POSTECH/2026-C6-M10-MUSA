@@ -311,37 +311,87 @@ namespace Hapio.Tests
         public IEnumerator HeldPointerDelaysBothTheFirstPageAndTheRoomBrowserUntilRelease()
         {
             yield return LoadHome();
-            Mouse mouse = InputSystem.AddDevice<Mouse>();
+            InputSettings originalInputSettings = InputSystem.settings;
+            HideFlags originalInputFlags = originalInputSettings.hideFlags;
+            string originalInputJson = JsonUtility.ToJson(originalInputSettings);
+            InputSettings.BackgroundBehavior originalBackgroundBehavior = originalInputSettings.backgroundBehavior;
+            InputSettings.EditorInputBehaviorInPlayMode originalEditorInputBehavior = originalInputSettings.editorInputBehaviorInPlayMode;
+            InputSettings fixtureInputSettings = null;
+            Mouse mouse = null;
             try
             {
+                // InputSystem destroys replaced HideAndDontSave settings; keep this exact original for restoration.
+                originalInputSettings.hideFlags = HideFlags.DontUnloadUnusedAsset;
+                fixtureInputSettings = ScriptableObject.CreateInstance<InputSettings>();
+                JsonUtility.FromJsonOverwrite(originalInputJson, fixtureInputSettings);
+                fixtureInputSettings.hideFlags = HideFlags.HideAndDontSave;
+                // A batch Editor has no focused GameView, but this test still needs its queued pointer events.
+                fixtureInputSettings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+                fixtureInputSettings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+                InputSystem.settings = fixtureInputSettings;
+                mouse = InputSystem.AddDevice<Mouse>();
                 InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Left));
                 InputSystem.Update();
+                Assert.That(mouse.leftButton.isPressed, Is.True, "The queued Start press must reach the owned test mouse.");
                 opening.lobbyView.enterButton.onClick.Invoke();
                 for (int frame = 0; frame < 3; frame++) yield return null;
+                Assert.That(mouse.leftButton.isPressed, Is.True, "An unfocused Editor must not release the held Start pointer.");
                 Assert.That(GameOpeningController.IsPresenting, Is.True);
                 Assert.That(opening.IsPlaying, Is.False, "A held Start pointer cannot open or skip the first page.");
                 Assert.That(session.RoomBrowserVisible, Is.False);
 
                 InputSystem.QueueStateEvent(mouse, new MouseState());
                 InputSystem.Update();
+                Assert.That(mouse.leftButton.isPressed, Is.False, "The queued Start release must reach the owned test mouse.");
                 yield return Until(() => opening.IsPlaying, "Releasing Start opens the first page");
                 Assert.That(opening.player.CurrentCutIndex, Is.Zero);
                 Assert.That(opening.player.CurrentPageIndex, Is.Zero);
 
                 InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Left));
                 InputSystem.Update();
+                Assert.That(mouse.leftButton.isPressed, Is.True, "The queued finishing press must reach the owned test mouse.");
                 opening.player.Skip();
                 for (int frame = 0; frame < 3; frame++) yield return null;
+                Assert.That(mouse.leftButton.isPressed, Is.True, "An unfocused Editor must not release the held finishing pointer.");
                 Assert.That(opening.lobbyView.OpeningBlocked, Is.True);
                 Assert.That(opening.openingRoot.activeInHierarchy, Is.True);
                 Assert.That(session.RoomBrowserVisible, Is.False, "A held finishing pointer cannot hit a room card.");
 
                 InputSystem.QueueStateEvent(mouse, new MouseState());
                 InputSystem.Update();
+                Assert.That(mouse.leftButton.isPressed, Is.False, "The queued finishing release must reach the owned test mouse.");
                 yield return Until(() => !GameOpeningController.IsPresenting, "Release opens the browser");
                 AssertAtBrowserWithNoOpening();
             }
-            finally { InputSystem.RemoveDevice(mouse); }
+            finally
+            {
+                // Every acquired resource is released even if a later setup step or assertion fails.
+                try
+                {
+                    if (mouse != null && mouse.added) InputSystem.RemoveDevice(mouse);
+                }
+                finally
+                {
+                    try
+                    {
+                        InputSystem.settings = originalInputSettings;
+                    }
+                    finally
+                    {
+                        originalInputSettings.hideFlags = originalInputFlags;
+                        // The settings setter may already have destroyed the replaced temporary settings.
+                        if (fixtureInputSettings != null) Object.DestroyImmediate(fixtureInputSettings);
+                    }
+                }
+            }
+            // Run restoration assertions after finally so they do not hide an earlier gameplay assertion failure.
+            Assert.That(InputSystem.settings, Is.SameAs(originalInputSettings));
+            Assert.That(originalInputSettings.hideFlags, Is.EqualTo(originalInputFlags));
+            Assert.That(JsonUtility.ToJson(originalInputSettings), Is.EqualTo(originalInputJson));
+            Assert.That(originalInputSettings.backgroundBehavior, Is.EqualTo(originalBackgroundBehavior));
+            Assert.That(originalInputSettings.editorInputBehaviorInPlayMode, Is.EqualTo(originalEditorInputBehavior));
+            Assert.That(mouse.added, Is.False, "The fixture must remove only the mouse it created.");
+            Assert.That(fixtureInputSettings == null, Is.True, "The fixture must release its temporary input settings.");
         }
 
         private IEnumerator PressStart()
