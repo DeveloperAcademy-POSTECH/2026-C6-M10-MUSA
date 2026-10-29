@@ -1721,6 +1721,8 @@ MonoBehaviour:
   rowTemplate: {fileID: 791386153}
   ink: {r: 0.24705882, g: 0.23921569, b: 0.21960784, a: 1}
   secondaryInk: {r: 0.40784314, g: 0.39215687, b: 0.36078432, a: 1}
+  blueTeamBackground: {fileID: 2800000, guid: ff1c64b427c8a4846938055020640a19, type: 3}
+  redTeamBackground: {fileID: 2800000, guid: e427ade5c43b14f30ae4439fd892f99e, type: 3}
 --- !u!1 &305884139
 GameObject:
   m_ObjectHideFlags: 0

@@ -251,10 +251,13 @@ namespace Hapio
             if (resultAdvancePending) return;
             if (resultView != null)
             {
-                Show(resultView.gameObject, !session.IsTerritory);
-                Show(resultView.background.gameObject, !session.IsTerritory);
-                Show(legacyResultContent, session.IsTerritory);
-                if (!session.IsTerritory) { RefreshDesignedResult(net, true); return; }
+                // 2:2 (#293) uses the same designed result page, with team records instead of awards.
+                Show(resultView.gameObject, true);
+                Show(resultView.background.gameObject, true);
+                Show(legacyResultContent, false);
+                if (session.IsTerritory) RefreshDesignedTerritoryResult(net);
+                else RefreshDesignedResult(net, true);
+                return;
             }
             if (session.IsTerritory) { RefreshTerritoryResult(net); return; }
             bool complete = session.State.phase == GameFlowPhase.Completed;
@@ -344,6 +347,29 @@ namespace Hapio
             Interactable(resultView.homeButton, !complete || session.CanReturnHome);
             GameStageResultView.Label(resultView.homeButton, "나가기");
             Interactable(resultView.viewerButton, victory && session.PreviewTexture != null);
+            Texture texture = session.PreviewTexture;
+            Show(viewerPanel, session.IsViewerOpen && texture != null);
+            if (viewerImage != null) viewerImage.texture = texture;
+        }
+
+        /// <summary>
+        /// 2:2 땅따먹기 결과 (#293): 디자인된 결과 화면에 이긴 팀(청 파란 배경, 홍 빨간 배경)과 팀별 기록을 보인다.
+        /// 한 판으로 끝나므로 다음 버튼은 없고, 박 확인과 나가기만 둔다.
+        /// </summary>
+        private void RefreshDesignedTerritoryResult(LabNetwork net)
+        {
+            LabSnapshot result = session.ResultSnapshot;
+            LabTeam winner = result != null ? result.teamWinner : LabTeam.None;
+            var rows = GameTerritoryResult.Rows(result, session.TerritoryFeverCount(LabTeam.Blue),
+                session.TerritoryFeverCount(LabTeam.Red));
+            string guidance = result == null ? "결과 기록을 받고 있소…\n잠시만 기다리시오"
+                : "땅따먹기를 다시 하고싶다면\n게임을 새로 시작하시오";
+            if (!string.IsNullOrEmpty(session.UiNotice)) guidance = session.UiNotice;
+            resultView.PresentTerritory(winner, result, rows, guidance);
+            Show(resultView.nextButton.gameObject, false);
+            Interactable(resultView.homeButton, !net.IsHost || session.CanReturnHome);
+            GameStageResultView.Label(resultView.homeButton, "나가기");
+            Interactable(resultView.viewerButton, session.PreviewTexture != null);
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
