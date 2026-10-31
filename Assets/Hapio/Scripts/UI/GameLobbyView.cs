@@ -46,6 +46,22 @@ namespace Hapio
         [Header("땅따먹기 1:1·3:3 (#394), added by Hapio > Upgrade 2v2 Lobby UI")]
         [Tooltip("고른 인원으로 열 수 없는 모드 버튼 바로 아래에 보이는 이유 한 줄: 기본 모드 아래, 땅따먹기 아래.")]
         public UnityEngine.UI.Text basicModeReason, teamModeReason;
+        [Tooltip("땅따먹기 찬 자리 동그라미: 청팀은 파랑, 홍팀은 빨강. 비어 있으면 자리별 그림을 쓴다.")]
+        public Sprite blueTeamFilledSlot, redTeamFilledSlot;
+        [Tooltip("1:1 자리 화면의 P1(청)·P2(홍) 자리.")]
+        public RectTransform[] seatsOneOnOne;
+        [Tooltip("3:3 자리 화면의 P1~P6 자리. 청팀 쪽에 P1~P3, 홍팀 쪽에 P4~P6이 같은 모양으로 앉는다: P1·P4 아래 가운데, P2·P5 왼쪽 위, P3·P6 오른쪽 위.")]
+        public RectTransform[] seatsThreeOnThree;
+        [Tooltip("1:1·2:2에서 보이는 두 팀 상자와 팀 이름, 그리고 2:2에서만 보이는 팀 안 연결선.")]
+        public GameObject[] teamPairParts, teamPairLines;
+        [Tooltip("3:3에서만 보이는 한 팀 쪽: 상자, 삼각형 선, 팀 이름, 쪽 넘김 화살표와 쪽 표시 점.")]
+        public GameObject teamTrio;
+        public UnityEngine.UI.Image teamTrioBox;
+        public UnityEngine.UI.Text teamTrioName;
+        public UnityEngine.UI.Button teamPreviousPage, teamNextPage;
+        public UnityEngine.UI.Graphic[] teamPageDots;
+        public GameLobbySwipe teamSwipe;
+        public Sprite blueTrioBox, redTrioBox;
         [HideInInspector] public int teamLobbyDesignRevision;
 
         private GameSession session;
@@ -56,11 +72,14 @@ namespace Hapio
         // 기본 모드(요괴 봉인)를 열 수 있는 가장 적은 인원 (#394). 2명은 땅따먹기 1:1만 연다.
         private const int StoryMinimumPlayers = 3;
         private int creationCapacity = 3;
+        // 3:3 (#394): the team page on screen, 0 = Blue (P1~P3), 1 = Red (P4~P6); it follows the local seat when that changes.
+        private int teamPage, pageSeat = -1;
         private string localError = string.Empty;
         private readonly List<UnityEngine.UI.Button> rows = new List<UnityEngine.UI.Button>();
         private readonly List<string> keys = new List<string>();
         private LabNetwork Network => session != null ? session.Network : null;
         public int CreationCapacity => creationCapacity;
+        public int TeamPage => teamPage;
         public bool OpeningBlocked { get; private set; }
 
         internal void RegisterOpening(GameOpeningController controller) => openingController = controller;
@@ -171,6 +190,9 @@ namespace Hapio
                 BindNavigation(slotButtons[i], () => session.SelectSlot(Network.LocalSlotNumber == number ? 0 : number));
             }
             if (emptySlots[0] == filledSlots[0]) emptySlots[0] = emptySlots[1];
+            BindNavigation(teamPreviousPage, () => teamPage = 0);
+            BindNavigation(teamNextPage, () => teamPage = 1);
+            if (teamSwipe != null) teamSwipe.Swiped += next => { if (!OpeningBlocked) teamPage = next ? 1 : 0; };
             directConnectionPanel.SetActive(false);
         }
 
@@ -335,28 +357,69 @@ namespace Hapio
             return (match.Length > 0 ? match + " " : string.Empty) + "땅따먹기 · ";
         }
 
-        /// <summary>2:2 (#293): an empty seat's dashed circle in its team's colour, or the seat's own when none is saved.</summary>
-        private Sprite TeamEmptySlot(int seat)
+        /// <summary>땅따먹기 (#293, #394): a seat's dashed (empty) or filled circle in its team's colour, or the seat's own when none is saved.</summary>
+        private Sprite TeamSlot(int seat, bool occupied)
         {
-            Sprite team = LabTeams.SeatTeam(seat, Network.TargetParticipantCount) == LabTeam.Blue ? blueTeamEmptySlot : redTeamEmptySlot;
-            return team != null ? team : emptySlots[seat];
+            bool blue = LabTeams.SeatTeam(seat, Network.TargetParticipantCount) == LabTeam.Blue;
+            Sprite team = occupied ? blue ? blueTeamFilledSlot : redTeamFilledSlot : blue ? blueTeamEmptySlot : redTeamEmptySlot;
+            if (team != null) return team;
+            Sprite[] own = occupied ? filledSlots : emptySlots;
+            return own[Mathf.Min(seat, own.Length - 1)];
+        }
+
+        /// <summary>The seat anchors of this territory size, or null when the prefab has none for it.</summary>
+        private RectTransform[] TeamAnchors(int size)
+        {
+            RectTransform[] anchors = size == 1 ? seatsOneOnOne : size == 2 ? seatsTeam : size == 3 ? seatsThreeOnThree : null;
+            return anchors != null && anchors.Length == size * 2 && slotButtons.Length >= size * 2 && anchors.All(anchor => anchor != null)
+                && (size != 3 || teamTrio != null) ? anchors : null;
+        }
+
+        /// <summary>The seat screen's small line while seats are being chosen (#394).</summary>
+        public static string TeamSeatHint(int players) => LabTeams.TeamSize(players) == 1 ? "원하는 자리를 선택 후, 준비하시오."
+            : LabTeams.TeamSize(players) == 3 ? "3명씩 함께 앉아, 준비하시오." : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
+
+        private void RefreshTeamPage(int count, int size)
+        {
+            if (size != 3) { teamPage = 0; pageSeat = -1; return; }
+            int mine = Network.LocalSlotNumber;
+            if (mine != pageSeat)
+            {
+                // A newly chosen seat brings its own team's page; clearing it keeps the page being looked at.
+                if (mine > 0) teamPage = LabTeams.SeatTeam(mine - 1, count) == LabTeam.Red ? 1 : 0;
+                pageSeat = mine;
+            }
+            bool red = teamPage == 1;
+            if (blueTrioBox != null && redTrioBox != null) teamTrioBox.sprite = red ? redTrioBox : blueTrioBox;
+            teamTrioName.text = red ? "홍팀" : "청팀";
+            teamTrioName.color = ColorOf(red ? "CF4A3E" : "2F62A2");
+            teamPreviousPage.gameObject.SetActive(red);
+            teamNextPage.gameObject.SetActive(!red);
+            for (int i = 0; i < teamPageDots.Length; i++) teamPageDots[i].color = ColorOf(i == teamPage ? "3F3D38" : "C7C0B0");
         }
 
         private void RefreshPositions()
         {
             int count = Network.TargetParticipantCount;
             bool allChosen = Network.ParticipantCount == count && Network.SelectedParticipantCount == count;
-            // 2:2 (#281): Blue P1/P2 and Red P3/P4 in their own boxes; the saved anchors move the shared texts down.
-            bool team = session.IsTerritory && count == LabTeams.Players && teamLayout != null && seatsTeam != null
-                && seatsTeam.Length == LabTeams.Players;
+            // 땅따먹기 (#281, #394): 1:1 and 2:2 show both team boxes, 3:3 one team's page at a time; the saved anchors
+            // move the shared texts down under the mode title.
+            int size = session.IsTerritory && teamLayout != null ? LabTeams.TeamSize(count) : 0;
+            RectTransform[] teamAnchors = size > 0 ? TeamAnchors(size) : null;
+            bool team = teamAnchors != null;
+            if (!team) size = 0;
             teamLayout?.SetActive(team);
+            foreach (GameObject part in teamPairParts ?? Array.Empty<GameObject>()) part.SetActive(size == 1 || size == 2);
+            foreach (GameObject line in teamPairLines ?? Array.Empty<GameObject>()) line.SetActive(size == 2);
+            teamTrio?.SetActive(size == 3);
+            RefreshTeamPage(count, size);
             if (storyShifted != null)
                 for (int i = 0; i < teamShifted.Length; i++) CopyRect(team ? teamShiftAnchors[i] : storyShifted[i], teamShifted[i]);
             heading.fontSize = team ? teamHeadingFontSize : storyHeadingFontSize;
             heading.text = allChosen ? (team ? "준비 완료!" : "요괴 봉인 준비 완료!") : "빈 자리를 고르시오.";
             subheading.text = Network.SlotSelectionPending ? "자리 선택을 확인하고 있소..."
                 : allChosen ? (Network.SessionConfigReady ? "" : "방 설정을 확인하고 있소...")
-                : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
+                : team ? TeamSeatHint(count) : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
             roomName.text = Network.HostRoomNamePending ? "방을 만들고 있소..." : LabRoomNames.Display(Network.ConnectedRoomName);
             joinedCount.text = Network.ParticipantCount + " / " + count + "명 입장";
             selectedCount.text = Network.SelectedParticipantCount + " / " + count + "명 자리 확정";
@@ -366,26 +429,29 @@ namespace Hapio
                 connectionLines.sprite = lines[count - 3];
                 CopyRect(lineLayouts[count - 3], connectionLines.rectTransform);
             }
-            RectTransform[] anchors = team ? seatsTeam : count == 2 ? seats2 : count == 3 ? seats3 : count == 4 ? seats4 : seats5;
+            RectTransform[] anchors = team ? teamAnchors : count == 2 ? seats2 : count == 3 ? seats3 : count == 4 ? seats4 : seats5;
             for (int i = 0; i < slotButtons.Length; i++)
             {
-                bool active = i < count;
+                // 3:3 shows only the seats of the team page on screen.
+                bool active = i < count && (size != 3 || (LabTeams.SeatTeam(i, count) == LabTeam.Red) == (teamPage == 1));
                 slotButtons[i].gameObject.SetActive(active); localLabels[i].gameObject.SetActive(active);
                 if (!active) continue;
                 CopyRect(anchors[i], (RectTransform)slotButtons[i].transform);
                 ulong owner = Network.GetSlotOwner(i + 1);
                 bool occupied = owner != ulong.MaxValue, mine = occupied && owner == Network.LocalPlayerId;
-                slotImages[i].sprite = occupied ? filledSlots[i] : team ? TeamEmptySlot(i) : emptySlots[i];
+                slotImages[i].sprite = team ? TeamSlot(i, occupied) : occupied ? filledSlots[i] : emptySlots[i];
                 slotImages[i].rectTransform.localEulerAngles = new Vector3(0, 0, 180);
                 slotLabels[i].text = "P" + (i + 1);
                 slotLabels[i].color = ColorOf(occupied ? "F6F6F6" : "3F3D38");
                 slotButtons[i].interactable = Network.CanSelectPlayerSlot && (!occupied || mine);
                 bool host = occupied && owner == Unity.Netcode.NetworkManager.ServerClientId;
-                localLabels[i].fontSize = team ? teamLocalLabelFontSize : storyLocalLabelFontSizes[i];
+                localLabels[i].fontSize = team ? teamLocalLabelFontSize
+                    : storyLocalLabelFontSizes[Mathf.Min(i, storyLocalLabelFontSizes.Length - 1)];
                 localLabels[i].text = (host ? "방장" : string.Empty) + (mine ? (host ? " · 나 · 취소" : "나 · 취소") : string.Empty);
                 Vector2 center = anchors[i].anchoredPosition;
-                // In the 2:2 boxes the upper seats (P1, P3) show their label above, clear of the connecting line.
-                bool above = team && i % 2 == 0;
+                // Labels stay clear of the team lines: above the upper seats (2:2 P1·P3, 3:3 P2·P3·P5·P6) and both 1:1
+                // seats, below the lower ones (2:2 P2·P4, 3:3 P1·P4).
+                bool above = size == 1 || size == 2 && i % 2 == 0 || size == 3 && i % 3 != 0;
                 LabLobbyView.Place(localLabels[i].rectTransform, center.x - 60f, -center.y + (above ? -67f : 42f), 120f, 25f);
             }
             clearSlotButton.gameObject.SetActive(!team);
