@@ -1890,11 +1890,11 @@ namespace C6Lab
                 ? Array.Find(latest.players, p => p.id == orb.owner)?.seat ?? selectedSeat : selectedSeat;
             int seatCount = latest?.players?.Length ?? targetParticipantCount;
             if (seat < 0 || seat >= seatCount) return;
-            // 2:2 (#281): the throw starts from the same alternating spot as the thrower's camera.
+            // 땅따먹기 (#281, #394): the throw starts from the same team-seat spot as the thrower's camera.
             seat = LabTeams.RingSeatFor(latest, seat);
             Vector3 targetCenter = target.transform.position;
             Vector3 seatAnchor = LabThrowMath.SeatPosition(seat, seatCount, targetCenter,
-                config.ThrowOriginRadius, config.ThrowOriginHeightOffset, !LabTeams.FourPlayerTeams(latest));
+                config.ThrowOriginRadius, config.ThrowOriginHeightOffset, !LabTeams.TeamSeats(latest));
             Vector3 launchPosition = LabThrowMath.LaunchPosition(seat, seatCount, targetCenter, releaseX01, config);
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
             // A blast-shrunk orb flies small and so has less reach on the gourd (#213).

@@ -95,7 +95,10 @@ namespace C6Lab
     public sealed partial class LabModel
     {
         public const int MinimumParticipants = 2;
+        /// <summary>기본 모드(요괴 봉인)의 최대 인원. 땅따먹기 3:3만 TerritoryMaximumParticipants까지 받는다.</summary>
         public const int MaximumParticipants = 5;
+        /// <summary>땅따먹기 3:3 (#394)의 6명. 기본 모드는 MaximumParticipants(5명)를 넘지 않는다.</summary>
+        public const int TerritoryMaximumParticipants = 6;
         public const int DefaultParticipants = 3;
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
@@ -148,7 +151,7 @@ namespace C6Lab
         private readonly Dictionary<string, LabOrbState> orbs = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
         private readonly Dictionary<string, LabOrbState> drums = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
         private readonly HashSet<string> requests = new HashSet<string>(StringComparer.Ordinal);
-        private readonly ulong[] seats = new ulong[MaximumParticipants];
+        private readonly ulong[] seats = new ulong[TerritoryMaximumParticipants];
         private int activeSeatCount;
         private readonly Dictionary<ulong, uint> generatedCounts = new Dictionary<ulong, uint>();
         private readonly List<LabBombBlast> bombExplosions = new List<LabBombBlast>();
@@ -254,9 +257,11 @@ namespace C6Lab
         public void Begin(string id, ulong[] ids, double now, LabConfig config,
             LabStageYokai stageYokai = LabStageYokai.None)
         {
-            if (ids == null || ids.Length < MinimumParticipants || ids.Length > MaximumParticipants
+            // 6명은 땅따먹기 3:3 (#394)일 때만 받는다.
+            int maximum = TeamModeFor(config, TerritoryMaximumParticipants) ? TerritoryMaximumParticipants : MaximumParticipants;
+            if (ids == null || ids.Length < MinimumParticipants || ids.Length > maximum
                 || ids.Distinct().Count() != ids.Length)
-                throw new ArgumentException("Two to five distinct player IDs are required.", nameof(ids));
+                throw new ArgumentException("Two to five distinct player IDs (six for 3:3 territory) are required.", nameof(ids));
             BeginWithSeats(id, ids, now, config, stageYokai);
         }
 
@@ -278,7 +283,7 @@ namespace C6Lab
             // 2:2 땅따먹기 (#281)는 요괴 없이 진행한다.
             bool nextTeamMode = TeamModeFor(config, ids.Length);
             if (nextTeamMode) stageYokai = LabStageYokai.None;
-            var nextRules = new Rules(config, stageYokai, nextTeamMode);
+            var nextRules = new Rules(config, stageYokai, nextTeamMode, ids.Length);
             double nextDeadline = now + nextRules.BattleDurationSeconds;
             if (!Finite(nextDeadline) || nextDeadline <= now)
                 throw new ArgumentOutOfRangeException(nameof(now), "The battle deadline is not representable.");
@@ -533,11 +538,11 @@ namespace C6Lab
                 && current.kind.IsDrum() && current.arrival == LabDrumArrival.Pass;
             if (crossing != LabEdgeCrossingKind.Pushed && !passingDrum && SwipeBlocked(sender, right, now))
                 return Reject("SWIPE_BLOCKED", out reason);
-            // 2:2 땅따먹기 (#281): 바깥쪽 가장자리는 막혀 있고 안쪽 가장자리로만 팀원에게 넘긴다. 밀려 넘어가도 같다.
-            if (teamMode && !LabTeams.EdgeOpen(players[sender].seat, right))
-                return Reject("TEAM_EDGE", out reason);
-            int receiverSeat = teamMode ? LabTeams.TeammateSeat(players[sender].seat)
+            // 땅따먹기: 팀원에게만 넘긴다. 1:1은 받을 팀원이 없고(#394), 2:2는 바깥쪽 가장자리가 막혀 있다(#281).
+            // 3:3은 양쪽 모두 팀원에게 간다(#394). 밀려 넘어가도 같다.
+            int receiverSeat = teamMode ? LabTeams.ReceiverSeat(players[sender].seat, right, activeSeatCount)
                 : LabPlayerSlots.NeighborSeat(players[sender].seat, activeSeatCount, right);
+            if (receiverSeat < 0) return Reject("TEAM_EDGE", out reason);
             ulong receiver = seats[receiverSeat];
             // A drum is not a stored orb, so a full board still receives it.
             if (!current.kind.IsDrum() && CountStored(receiver) >= rules.OrbStorageLimit)
@@ -1992,7 +1997,7 @@ namespace C6Lab
             public readonly int FiveColorOrbCount;
             public readonly float FiveColorOrbPaintScale;
 
-            public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode)
+            public Rules(LabConfig config, LabStageYokai stageYokai, bool teamMode, int seats)
             {
                 StageYokai = stageYokai;
                 GenerationChances = config.GenerationChances();
@@ -2100,7 +2105,8 @@ namespace C6Lab
                     YaguangTimelineCommonSeconds = Array.Empty<double>();
                     YaguangTimelineUniqueSchedule = Array.Empty<YaguangUniqueSlot>();
                 }
-                TeamFeverHits = teamMode ? config.TeamFeverHits : 0;
+                // 땅따먹기 인원별 피버 명중 수 (#394): 1:1 6번, 2:2 DEV 198, 3:3 18번
+                TeamFeverHits = teamMode ? config.TeamFeverHitsFor(seats) : 0;
                 TeamFeverSeconds = config.TeamFeverSeconds;
                 if (!teamMode) return;
                 // 2:2 땅따먹기 (#281): 요괴·방해공작·콤보·섬광·마르기를 끄고, 도색으로만 겨룬다.

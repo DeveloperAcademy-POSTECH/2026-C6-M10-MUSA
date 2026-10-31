@@ -119,7 +119,7 @@ namespace C6Lab
             Bounds shell = target.Hitbox.bounds;
             Vector3 seat = LabThrowMath.SeatPosition(seatIndex, seatCount, center,
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset,
-                !(config.TeamTerritoryEnabled && seatCount == LabTeams.Players));
+                !(config.TeamTerritoryEnabled && LabTeams.IsTeamCount(seatCount)));
             Vector3 towardSeat = Vector3.ProjectOnPlane(seat - center, Vector3.up).normalized;
             Vector3 screenRight = Vector3.Cross(Vector3.up, -towardSeat);
             float halfWidth = Mathf.Max(.65f, Mathf.Max(shell.extents.x, shell.extents.z));

@@ -151,7 +151,8 @@ namespace Hapio.Tests
             var result = new LabSnapshot
             {
                 paintCellCount = 200, blueCells = 50, redCells = 50,
-                players = new[] { new LabPlayerState { seat = 0, throwTotal = 3 }, new LabPlayerState { seat = 3, throwTotal = 3 } }
+                // 1:1 (#394): P1 is Blue and P2 is Red.
+                players = new[] { new LabPlayerState { seat = 0, throwTotal = 3 }, new LabPlayerState { seat = 1, throwTotal = 3 } }
             };
             var rows = GameTerritoryResult.Rows(result, 2, 1);
             Assert.That(rows.Select(row => row.Title), Is.EqualTo(new[] { "차지한 땅", "빼앗은 땅", "던진 횟수", "명중 횟수", "피버 횟수" }));
@@ -181,10 +182,13 @@ namespace Hapio.Tests
                 {
                     phase = LabPhase.Victory, teamTerritory = true, teamWinner = LabTeam.None,
                     paintCellCount = 200, blueCells = 50, redCells = 50, paintCoverage = .5f, remaining = 0f,
+                    // A full 2:2 roster (#394 reads the team size from it): P1·P2 Blue, P3·P4 Red, the same totals.
                     players = new[]
                     {
                         new LabPlayerState { id = 1, seat = 0, throwTotal = 3, hitTotal = 1, stolenCells = 10 },
-                        new LabPlayerState { id = 3, seat = 2, throwTotal = 3, hitTotal = 1, stolenCells = 10 }
+                        new LabPlayerState { id = 2, seat = 1 },
+                        new LabPlayerState { id = 3, seat = 2, throwTotal = 3, hitTotal = 1, stolenCells = 10 },
+                        new LabPlayerState { id = 4, seat = 3 }
                     }
                 };
                 string before = JsonUtility.ToJson(draw);

@@ -292,7 +292,7 @@ namespace Hapio
         /// <summary>2:2 (#293): an empty seat's dashed circle in its team's colour, or the seat's own when none is saved.</summary>
         private Sprite TeamEmptySlot(int seat)
         {
-            Sprite team = LabTeams.TeamOfSeat(seat) == LabTeam.Blue ? blueTeamEmptySlot : redTeamEmptySlot;
+            Sprite team = LabTeams.SeatTeam(seat, Network.TargetParticipantCount) == LabTeam.Blue ? blueTeamEmptySlot : redTeamEmptySlot;
             return team != null ? team : emptySlots[seat];
         }
 
