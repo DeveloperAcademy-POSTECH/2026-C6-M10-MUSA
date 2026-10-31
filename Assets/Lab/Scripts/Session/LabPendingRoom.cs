@@ -34,7 +34,7 @@ namespace C6Lab
         public static bool TryCreate(int capacity, LabRoomFamily family, bool team, out LabPendingRoom room, out string error)
         {
             room = null; error = string.Empty;
-            if (capacity < 2 || capacity > 5) { error = "함께할 인원을 골라주시오."; return false; }
+            if (!LabModel.ValidRoomSize(capacity, team)) { error = "함께할 인원을 골라주시오."; return false; }
             if (!Enum.IsDefined(typeof(LabRoomFamily), family)) { error = "방 종류를 확인해주시오."; return false; }
             if (!LabBonjourDiscovery.IsSupported) { error = "이 기기에서는 방을 만들 수 없소."; return false; }
             var pending = new LabPendingRoom(family) { Capacity = capacity, Team = team };

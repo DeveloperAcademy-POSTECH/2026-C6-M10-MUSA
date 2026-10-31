@@ -10,15 +10,16 @@ namespace C6Lab
     public static class LabPlayerPaintPatterns
     {
         private const int BadgeSize = 96;
-        private static readonly Sprite[] Badges = new Sprite[6];
-        private static readonly string[] Names = { "None", "Dots", "Diagonal", "Horizontal", "Waves", "Grid" };
+        private static readonly Sprite[] Badges = new Sprite[LabPaintSurface.MaxPainterSlot + 1];
+        // P6 (3:3 땅따먹기, #394) is the diagonal the other way from P2.
+        private static readonly string[] Names = { "None", "Dots", "Diagonal", "Horizontal", "Waves", "Grid", "Back diagonal" };
 
         public static string NameFor(int playerNumber) =>
-            playerNumber >= 1 && playerNumber <= 5 ? Names[playerNumber] : Names[0];
+            playerNumber >= 1 && playerNumber <= LabPaintSurface.MaxPainterSlot ? Names[playerNumber] : Names[0];
 
         public static Sprite SpriteFor(int playerNumber)
         {
-            if (playerNumber < 1 || playerNumber > 5) return null;
+            if (playerNumber < 1 || playerNumber > LabPaintSurface.MaxPainterSlot) return null;
             if (Badges[playerNumber] != null) return Badges[playerNumber];
             var pixels = new Color32[BadgeSize * BadgeSize];
             Color paper = new Color(.96f, .93f, .85f);
@@ -72,6 +73,7 @@ namespace C6Lab
                 case 3: return Line(q.y, .115f);
                 case 4: return Line(q.y + .2f * Mathf.Sin(q.x * Mathf.PI), .115f);
                 case 5: return Mathf.Max(Line(q.x, .075f), Line(q.y, .075f));
+                case 6: return Line(q.x - q.y, .115f);
                 default: return 0f;
             }
         }

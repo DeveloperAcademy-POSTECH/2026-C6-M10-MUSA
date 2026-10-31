@@ -32,6 +32,8 @@ namespace C6Lab
     {
         // Legacy preview defaults. Sessions use the instance dimensions below.
         public const int Width = 256, Height = 128, PixelCount = Width * Height;
+        /// <summary>가장 큰 P번호 (0 = 모름). 땅따먹기 3:3의 P6까지 (#394).</summary>
+        public const int MaxPainterSlot = LabModel.TerritoryMaximumParticipants;
         public const float DefaultRadius = .15f;
         private Color32[] pixels;
         private byte[] painterSlots;
@@ -128,7 +130,7 @@ namespace C6Lab
         /// </summary>
         public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0, float share = 1f)
         {
-            if (painterSlot < 0 || painterSlot > 5) return false;
+            if (painterSlot < 0 || painterSlot > MaxPainterSlot) return false;
             if (!Finite(share) || share <= 0f || share > 3f) return false;
             decimal initial = initialCells * (decimal)share, repeat = repeatCells * (decimal)share;
             if (preview || replica || IsComplete || !ValidHit(direction, color)) return false;
@@ -462,7 +464,7 @@ namespace C6Lab
             Array.Copy(pixels, destination, CellCount);
         }
 
-        /// <summary>Copy stable P1..P5 paint provenance; zero means an unpainted or offline-preview cell.</summary>
+        /// <summary>Copy stable P1..P6 paint provenance; zero means an unpainted or offline-preview cell.</summary>
         public void CopyPainterSlots(byte[] destination)
         {
             if (destination == null) throw new ArgumentNullException(nameof(destination));
@@ -486,10 +488,10 @@ namespace C6Lab
             return count;
         }
 
-        /// <summary>2:2 땅따먹기 (#281): P1..P5가 지금 칠해 둔 칸 수. 0번 칸은 칠하지 않은 칸이다.</summary>
+        /// <summary>땅따먹기 (#281, #394): P1..P6이 지금 칠해 둔 칸 수. 0번 칸은 칠하지 않은 칸이다.</summary>
         public int[] CountPainterSlots()
         {
-            var counts = new int[6];
+            var counts = new int[MaxPainterSlot + 1];
             for (int i = 0; i < painterSlots.Length; i++) if (pixels[i].a != 0) counts[painterSlots[i]]++;
             return counts;
         }
@@ -517,7 +519,7 @@ namespace C6Lab
             for (int i = 0; i < source.Length; i++)
             {
                 Color32 value = source[i];
-                if (painterSlots[i] > 5 || value.a == 0 && painterSlots[i] != 0) return false;
+                if (painterSlots[i] > MaxPainterSlot || value.a == 0 && painterSlots[i] != 0) return false;
                 if (value.a != 0 && value.a != 255) return false;
                 if (value.a == 0 && (value.r != 0 || value.g != 0 || value.b != 0)) return false;
                 if (value.a == 255) covered++;

@@ -229,13 +229,13 @@ namespace C6Lab
         //       separates the builds that briefly used 5672 for #334 alone.
         // 5675/5676: standalone #341 screen-space fire curtain and reachable ignition geometry.
         // 5677: integrate #334/#343 fever and #341 A/B; preserve DEV0..239 and append A/B240..250 (251 values).
-        internal const ushort LabProtocolVersion = 5678;
+        internal const ushort LabProtocolVersion = 5679;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/39");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/40");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -487,9 +487,10 @@ namespace C6Lab
         /// <summary>Install a validated, session-only copy before Host. Never edit the saved asset.</summary>
         public bool ConfigureHostSession(LabConfig candidate, int targetParticipants)
         {
-            if (!CanChooseConnection || targetParticipants < 2 || targetParticipants > 5)
+            // 땅따먹기 방은 2·4·6명, 그 밖의 방은 2~5명이다 (#394).
+            if (!CanChooseConnection || !LabModel.ValidRoomSize(targetParticipants, candidate != null && candidate.TeamTerritoryEnabled))
             {
-                SetNotice("Choose 2–5 players before creating a room.");
+                SetNotice("Choose 2–5 players (2, 4 or 6 for territory) before creating a room.");
                 return false;
             }
             if (!TryInstallSessionConfig(candidate, out string error))
@@ -658,7 +659,7 @@ namespace C6Lab
         {
             if (!CanChooseConnection || registeredRoom == null || registeredRoom.Family != RoomFamily || !registeredRoom.IsAdvertising
                 || !registeredRoom.AdvertisingConfirmed || !ValidRoomName(registeredRoom.RegisteredServiceName)
-                || roomPort == 0 || capacity < 2 || capacity > 5) return false;
+                || roomPort == 0 || !LabModel.ValidRoomSize(capacity, registeredRoom.Team)) return false;
             port = roomPort;
             targetParticipantCount = capacity;
             return HostInternal(registeredRoom);
@@ -2220,7 +2221,9 @@ namespace C6Lab
                     break;
                 case "lobby":
                 {
-                    if (packet.targetParticipants < 2 || packet.targetParticipants > 5
+                    // The Host decides the room size; a Guest only bounds it (6 is a 3:3 territory room, #394).
+                    if (packet.targetParticipants < LabModel.MinimumParticipants
+                        || packet.targetParticipants > LabModel.TerritoryMaximumParticipants
                         || packet.seats == null || packet.seats.Length > packet.targetParticipants
                         || packet.seats.Distinct().Count() != packet.seats.Length
                         || packet.slotAssignments == null || !ValidRoomName(packet.roomName)
@@ -2422,7 +2425,8 @@ namespace C6Lab
 
         private void ReceiveSessionConfig(LabNetworkPacket packet)
         {
-            if (packet.configRevision < 1 || packet.targetParticipants < 2 || packet.targetParticipants > 5
+            if (packet.configRevision < 1 || packet.targetParticipants < LabModel.MinimumParticipants
+                || packet.targetParticipants > LabModel.TerritoryMaximumParticipants
                 || packet.tuning == null || packet.tuning.Length != LabConfig.DeveloperFields.Count) return;
             string expected;
             try { expected = LabSessionSettings.Fingerprint(packet.tuning, packet.targetParticipants, LabProtocolVersion); }

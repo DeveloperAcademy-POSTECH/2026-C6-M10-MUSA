@@ -101,7 +101,9 @@ namespace C6Lab.Tests
         public void OnlyRoomSizedPNumbersAreAccepted()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => new LabPlayerSlots(1));
-            Assert.Throws<ArgumentOutOfRangeException>(() => new LabPlayerSlots(6));
+            // Six seats exist for a 3:3 territory room (#394); the room decides which sizes it allows.
+            Assert.That(new LabPlayerSlots(6).Capacity, Is.EqualTo(6));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new LabPlayerSlots(7));
             var slots = new LabPlayerSlots(2);
             Assert.That(slots.TrySelect(10ul, 3, out _), Is.False);
             Assert.That(slots.TrySelect(ulong.MaxValue, 1, out _), Is.False);

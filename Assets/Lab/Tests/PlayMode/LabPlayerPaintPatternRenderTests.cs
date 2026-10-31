@@ -25,14 +25,15 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void FiveCachedLegendBadgesHaveDistinctPatternsAndIdenticalCircularAlpha()
+        public void SixCachedLegendBadgesHaveDistinctPatternsAndIdenticalCircularAlpha()
         {
             Assert.That(LabPlayerPaintPatterns.SpriteFor(0), Is.Null);
-            Assert.That(LabPlayerPaintPatterns.SpriteFor(6), Is.Null);
+            Assert.That(LabPlayerPaintPatterns.SpriteFor(7), Is.Null);
             Assert.That(LabPlayerPaintPatterns.NameFor(0), Is.EqualTo("None"));
-            var pixels = new Color32[5][];
-            string[] expected = { "Dots", "Diagonal", "Horizontal", "Waves", "Grid" };
-            for (int slot = 1; slot <= 5; slot++)
+            Assert.That(LabPlayerPaintPatterns.NameFor(7), Is.EqualTo("None"));
+            var pixels = new Color32[6][];
+            string[] expected = { "Dots", "Diagonal", "Horizontal", "Waves", "Grid", "Back diagonal" };
+            for (int slot = 1; slot <= 6; slot++)
             {
                 Sprite sprite = LabPlayerPaintPatterns.SpriteFor(slot);
                 Assert.That(sprite, Is.SameAs(LabPlayerPaintPatterns.SpriteFor(slot)), "Badges must be cached, not allocated per HUD refresh.");
@@ -49,7 +50,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator ActualSavedShaderDistinguishesAllFivePaintersWithoutChangingPaperAlphaOrCoverage()
+        public IEnumerator ActualSavedShaderDistinguishesAllSixPaintersWithoutChangingPaperAlphaOrCoverage()
         {
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 Assert.Ignore("A real graphics device is required; shader pixels were not tested.");
@@ -74,8 +75,8 @@ namespace C6Lab.Tests
                 Assert.That(neutral.Where((pixel, i) => !pixel.Equals(paper[i])).Count(), Is.GreaterThan(1000));
                 float coverage = surface.Coverage;
                 int covered = surface.CoveredCount;
-                var captures = new Color32[5][];
-                for (int slot = 1; slot <= 5; slot++)
+                var captures = new Color32[LabPaintSurface.MaxPainterSlot][];
+                for (int slot = 1; slot <= LabPaintSurface.MaxPainterSlot; slot++)
                 {
                     for (int i = 0; i < owners.Length; i++) owners[i] = pixels[i].a > 0 ? (byte)slot : (byte)0;
                     Replace(surface, pixels, owners);
@@ -132,7 +133,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator AllFivePainterPatternsStayOnTheShellWhenCameraAndModelMoveTogether()
+        public IEnumerator AllSixPainterPatternsStayOnTheShellWhenCameraAndModelMoveTogether()
         {
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 Assert.Ignore("A real graphics device is required; shader pixels were not tested.");
@@ -155,7 +156,7 @@ namespace C6Lab.Tests
                 Color32[] neutral = rig.Capture(paint, null);
                 float coverage = surface.Coverage;
                 int covered = surface.CoveredCount;
-                for (int slot = 1; slot <= 5; slot++)
+                for (int slot = 1; slot <= LabPaintSurface.MaxPainterSlot; slot++)
                 {
                     for (int i = 0; i < owners.Length; i++) owners[i] = pixels[i].a > 0 ? (byte)slot : (byte)0;
                     Replace(surface, pixels, owners);

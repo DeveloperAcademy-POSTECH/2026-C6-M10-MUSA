@@ -99,6 +99,10 @@ namespace C6Lab
         public const int MaximumParticipants = 5;
         /// <summary>땅따먹기 3:3 (#394)의 6명. 기본 모드는 MaximumParticipants(5명)를 넘지 않는다.</summary>
         public const int TerritoryMaximumParticipants = 6;
+
+        /// <summary>방 인원으로 받을 수 있는지: 기본 방은 2~5명, 땅따먹기 방은 2·4·6명이다 (#394).</summary>
+        public static bool ValidRoomSize(int capacity, bool territory) => territory ? LabTeams.IsTeamCount(capacity)
+            : capacity >= MinimumParticipants && capacity <= MaximumParticipants;
         public const int DefaultParticipants = 3;
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
