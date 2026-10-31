@@ -15,10 +15,11 @@ namespace C6Lab
         // that worst case plus packet metadata below LabNetwork's 32 KiB receive bound.
         public const int SnapshotChunkCharacters = 512;
 
+        /// <summary>Which room this is follows from ValidRoomSize before here; this only bounds the count (3:3 has six, #394).</summary>
         public static string Fingerprint(float[] values, int participants, ushort protocol)
         {
-            if (values == null || values.Length != LabConfig.DeveloperFields.Count
-                || participants < 2 || participants > 5) throw new ArgumentException("Invalid Lab session settings.");
+            if (values == null || values.Length != LabConfig.DeveloperFields.Count || participants < LabModel.MinimumParticipants
+                || participants > LabModel.TerritoryMaximumParticipants) throw new ArgumentException("Invalid Lab session settings.");
             var text = new StringBuilder(512).Append("C6Lab/").Append(protocol).Append('/')
                 .Append(participants).Append('/').Append(values.Length);
             for (int i = 0; i < values.Length; i++)

@@ -66,6 +66,16 @@ namespace C6Lab.Tests
             Assert.That(LabModel.ValidRoomSize(capacity, true), Is.EqualTo(territory));
         }
 
+        [TestCase(1, false)] [TestCase(2, true)] [TestCase(5, true)] [TestCase(6, true)] [TestCase(7, false)]
+        public void SessionFingerprintCoversEveryRoomSizeUpToTheSixPlayerTerritory(int players, bool valid)
+        {
+            var values = new float[LabConfig.DeveloperFields.Count];
+            if (valid)
+                Assert.That(LabSessionSettings.Fingerprint(values, players, 1), Is.Not.EqualTo(LabSessionSettings.Fingerprint(values, 3, 1))
+                    .Or.Property("Length").EqualTo(64), "A 3:3 room (#394) hosts with six players and gets its own fingerprint.");
+            else Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(values, players, 1));
+        }
+
         [Test]
         public void SixPlayerTerritoryRoomRoundTripsButOtherSizesKeepTheirOwnLimit()
         {
