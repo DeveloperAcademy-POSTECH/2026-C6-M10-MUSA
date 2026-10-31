@@ -177,10 +177,10 @@ namespace C6Lab
             SetVisible(pauseMenu, paused);
             if (paused) BringPauseLayersForward();
             bool hasNeighbors = battleVisible && (snapshot.players?.Length ?? 0) > 1;
-            // 2:2 (#281): nothing passes the closed outer edge, so its neighbour badge stays hidden.
+            // 땅따먹기: nothing passes a closed edge (2:2 outer edge #281, both edges in 1:1 #394), so its badge stays hidden.
             int closedSide = battleVisible ? LabTeams.ClosedSide(snapshot, network.LocalPlayerId) : 0;
-            SetVisible(leftNeighborBadge, hasNeighbors && closedSide != -1);
-            SetVisible(rightNeighborBadge, hasNeighbors && closedSide != 1);
+            SetVisible(leftNeighborBadge, hasNeighbors && !LabTeams.SideClosed(closedSide, false));
+            SetVisible(rightNeighborBadge, hasNeighbors && !LabTeams.SideClosed(closedSide, true));
             SetVisible(pauseButton == null ? null : pauseButton.gameObject, playing);
             SetVisible(resultControls, terminal);
             if (terminal)
@@ -363,7 +363,8 @@ namespace C6Lab
             if (teamBar == null) teamBar = LabTeamBar.Create((RectTransform)battleUi.transform, font);
             if (teamFever == null) teamFever = LabTeamFever.Create((RectTransform)battleUi.transform, font);
             LabTeam team = LabTeams.TeamOf(snapshot, network.LocalPlayerId);
-            teamBar.Present(snapshot, team, localPlayerCircle, network.config != null ? network.config.TeamFeverHits : 0);
+            teamBar.Present(snapshot, team, localPlayerCircle,
+                network.config != null ? network.config.TeamFeverHitsFor(snapshot.players?.Length ?? 0) : 0);
             teamFever.Present(snapshot, team, network.config);
         }
 
@@ -538,11 +539,13 @@ namespace C6Lab
             LabPlayerState local = Array.Find(players, player => player != null && player.id == localId);
             if (local == null || local.seat < 0 || local.seat >= players.Length) return;
             int count = players.Length;
-            if (LabTeams.FourPlayerTeams(snapshot))
+            if (LabTeams.TeamSeats(snapshot))
             {
-                // 2:2 (#281): only the inner edge leads to the teammate; the outer edge is a wall.
-                string mate = "P" + (LabTeams.TeammateSeat(local.seat) + 1);
-                if (LabTeams.EdgeOpen(local.seat, true)) right = mate; else left = mate;
+                // 땅따먹기: each edge leads to the teammate who receives that way; a closed edge keeps "P—" (#281, #394).
+                int leftSeat = LabTeams.ReceiverSeat(local.seat, false, count);
+                int rightSeat = LabTeams.ReceiverSeat(local.seat, true, count);
+                if (leftSeat >= 0) left = "P" + (leftSeat + 1);
+                if (rightSeat >= 0) right = "P" + (rightSeat + 1);
                 return;
             }
             LabPlayerState leftPlayer = Array.Find(players, player => player != null && player.seat == LabPlayerSlots.NeighborSeat(local.seat, count, false));

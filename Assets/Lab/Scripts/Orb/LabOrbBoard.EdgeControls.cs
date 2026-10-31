@@ -167,7 +167,7 @@ namespace C6Lab
             right = false;
             int side = PreparedTransferSide;
             if (side == 0 || !entries.TryGetValue(heldId, out Entry entry) || entry.View.Kind == LabOrbKind.FoxFire
-                || entry.Locked || entry.EdgePending || jigwiOverheat || teamWallSide == side || blockedSide == side) return false;
+                || entry.Locked || entry.EdgePending || jigwiOverheat || TeamWallOn(side > 0) || blockedSide == side) return false;
             if (config.DropCombineEnabled && (entry.View.Kind.IsRaw() || FoxReady(entry)) && FindOppositeOverlap(entry) != null)
                 return false;
             TransferGates(out float left, out float rightGate);
@@ -199,12 +199,13 @@ namespace C6Lab
                 body.linearVelocity = OnPlane(new Vector2(-velocity.x * config.OrbRestitution, velocity.y));
                 return;
             }
-            if (teamWallSide == (right ? 1 : -1))
+            if (TeamWallOn(right))
             {
                 body.position = OnPlane(Clamp(position, entry.View.HitSphere.radius));
                 body.linearVelocity = OnPlane(new Vector2(-velocity.x * config.OrbRestitution, velocity.y));
                 TeamWallBounces++;
-                if (teamWall != null) teamWall.Flash(config.TeamWallFlashSeconds, config.TeamWallFlashBoost);
+                LabOrbTeamWall wall = TeamWallAt(right);
+                if (wall != null) wall.Flash(config.TeamWallFlashSeconds, config.TeamWallFlashBoost);
                 return;
             }
             if (kind == LabEdgeCrossingKind.Swipe && blockedSide == (right ? 1 : -1))

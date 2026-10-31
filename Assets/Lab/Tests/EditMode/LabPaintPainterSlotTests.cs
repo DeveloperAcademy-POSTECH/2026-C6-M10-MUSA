@@ -160,7 +160,7 @@ namespace C6Lab.Tests
         }
 
         [TestCase(-1)]
-        [TestCase(6)]
+        [TestCase(7)]
         [TestCase(int.MinValue)]
         [TestCase(int.MaxValue)]
         public void InvalidPainterSlotCannotMutateAnyHitOrGrowthState(int slot)
@@ -179,6 +179,21 @@ namespace C6Lab.Tests
             Assert.That(surface.PaintCount, Is.EqualTo(hitCount));
             Assert.That(surface.PendingCoverage, Is.EqualTo(pending));
             Assert.That(surface.LastPainter, Is.EqualTo(7ul));
+        }
+
+        [Test]
+        public void SixthTerritoryPainterIsAcceptedCountedAndReplicated()
+        {
+            var surface = new LabPaintSurface(Settings(), 23u);
+            Assert.That(surface.RegisterHit(Vector3.forward, Color.red, 66ul, 6), Is.True, "3:3 땅따먹기의 P6도 칠할 수 있다 (#394).");
+            byte[] owners = Slots(surface);
+            Assert.That(owners.Where(value => value != 0), Is.All.EqualTo((byte)6));
+            int[] counts = surface.CountPainterSlots();
+            Assert.That(counts.Length, Is.EqualTo(LabPaintSurface.MaxPainterSlot + 1));
+            Assert.That(counts[6], Is.EqualTo(surface.CoveredCount));
+            var replica = new LabPaintSurface();
+            Assert.That(replica.TryReplacePixels(64, 32, 80u, Pixels(surface), owners, 1), Is.True);
+            Assert.That(Slots(replica), Is.EqualTo(owners));
         }
 
         [Test]
@@ -240,7 +255,7 @@ namespace C6Lab.Tests
         [TestCase("null")]
         [TestCase("short")]
         [TestCase("long")]
-        [TestCase("above-five")]
+        [TestCase("above-six")]
         [TestCase("unpainted-owner")]
         [TestCase("invalid-alpha")]
         [TestCase("invalid-dimensions")]
@@ -261,7 +276,7 @@ namespace C6Lab.Tests
                 case "null": owners = null; break;
                 case "short": owners = new byte[colors.Length - 1]; break;
                 case "long": owners = new byte[colors.Length + 1]; break;
-                case "above-five": owners[painted] = 6; break;
+                case "above-six": owners[painted] = 7; break;
                 case "unpainted-owner": owners[empty] = 1; break;
                 case "invalid-alpha": colors[painted].a = 128; break;
                 case "invalid-dimensions": columns = 32; rows = 64; break;

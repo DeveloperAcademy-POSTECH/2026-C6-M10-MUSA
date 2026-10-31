@@ -765,6 +765,10 @@ namespace C6Lab
         [SerializeField, Range(0, 50)] private int teamFeverHits = 15;
         [Tooltip("피버 시간 (초). 그동안 팀 판의 모든 구슬이 팀 색 결합 구슬이 되고, 생성해도 팀 색 결합 구슬이 나온다.")]
         [SerializeField, Range(1f, 30f)] private float teamFeverSeconds = 8f;
+        [Tooltip("1:1 땅따먹기 (2명, #394): 이만큼 맞히면 피버. 0이면 피버 없음. 2:2는 위의 Team Fever Hits. Inspector 전용.")]
+        [SerializeField, Range(0, 50)] private int teamFeverHitsOneOnOne = 6;
+        [Tooltip("3:3 땅따먹기 (6명, #394): 이만큼 맞히면 피버. 0이면 피버 없음. Inspector 전용.")]
+        [SerializeField, Range(0, 50)] private int teamFeverHitsThreeOnThree = 18;
 
         [Header("2:2 땅따먹기 연출 (#293, Inspector 전용. 기본값이 지금 모습이다)")]
         [Tooltip("피버 구슬 둘레 무지개 고리 크기 (구슬 반지름의 배)")]
@@ -1215,6 +1219,9 @@ namespace C6Lab
         public float TeamBattleSeconds => Mathf.Clamp(Finite(teamBattleSeconds, 180f), 30f, 600f);
         public int TeamFeverHits => Mathf.Clamp(teamFeverHits, 0, 50);
         public float TeamFeverSeconds => Mathf.Clamp(Finite(teamFeverSeconds, 8f), 1f, 30f);
+        /// <summary>땅따먹기 인원별 피버 명중 수 (#394): 2명(1:1) 6번, 6명(3:3) 18번, 그 밖(2:2·솔로)은 DEV 198.</summary>
+        public int TeamFeverHitsFor(int players) => players == 2 ? Mathf.Clamp(teamFeverHitsOneOnOne, 0, 50)
+            : players == 6 ? Mathf.Clamp(teamFeverHitsThreeOnThree, 0, 50) : TeamFeverHits;
         // 2:2 연출 (#293): Inspector 값 그대로 (DEV 칸 없음)
         public float TeamFeverRingScale => Mathf.Clamp(Finite(teamFeverRingScale, 2.9f), 1f, 5f);
         public float TeamFeverRingAlpha => Mathf.Clamp01(Finite(teamFeverRingAlpha, 1f));

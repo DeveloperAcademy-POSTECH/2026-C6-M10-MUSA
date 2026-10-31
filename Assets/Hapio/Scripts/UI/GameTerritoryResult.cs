@@ -29,10 +29,12 @@ namespace Hapio
             if (result == null) return rows;
             int cells = result.paintCellCount > 0 ? result.paintCellCount : 1;
             int blueStolen = 0, redStolen = 0, blueThrows = 0, redThrows = 0, blueHits = 0, redHits = 0;
-            foreach (LabPlayerState player in result.players ?? new LabPlayerState[0])
+            LabPlayerState[] players = result.players ?? new LabPlayerState[0];
+            foreach (LabPlayerState player in players)
             {
                 if (player == null) continue;
-                LabTeam team = LabTeams.TeamOfSeat(player.seat);
+                // 1:1·2:2·3:3 (#394): the first half of the P numbers is Blue; a DEV solo plays alone for Blue.
+                LabTeam team = players.Length == 1 ? LabTeam.Blue : LabTeams.SeatTeam(player.seat, players.Length);
                 if (team == LabTeam.Blue) { blueStolen += player.stolenCells; blueThrows += player.throwTotal; blueHits += player.hitTotal; }
                 else if (team == LabTeam.Red) { redStolen += player.stolenCells; redThrows += player.throwTotal; redHits += player.hitTotal; }
             }

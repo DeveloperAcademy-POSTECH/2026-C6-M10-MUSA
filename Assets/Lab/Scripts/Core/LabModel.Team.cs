@@ -23,9 +23,11 @@ namespace C6Lab
         /// <summary>이번 판이 2:2 땅따먹기인지.</summary>
         public bool TeamTerritory => teamMode;
 
-        /// <summary>설정이 켜져 있어도 4명 판과 DEV 솔로에서만 팀전이 된다. 다른 인원은 기존 규칙 그대로다.</summary>
+        /// <summary>
+        /// 설정이 켜져 있어도 2명(1:1)·4명(2:2)·6명(3:3) 판과 DEV 솔로에서만 팀전이 된다(#394). 다른 인원은 기존 규칙 그대로다.
+        /// </summary>
         public static bool TeamModeFor(LabConfig config, int seats) =>
-            config != null && config.TeamTerritoryEnabled && (seats == LabTeams.Players || seats == 1);
+            config != null && config.TeamTerritoryEnabled && (LabTeams.IsTeamCount(seats) || seats == 1);
 
         private void ResetTeam()
         {
@@ -39,7 +41,7 @@ namespace C6Lab
         /// <summary>솔로는 혼자 청팀이다.</summary>
         private LabTeam TeamOf(ulong player) =>
             !teamMode || !players.TryGetValue(player, out var state) ? LabTeam.None
-            : activeSeatCount == 1 ? LabTeam.Blue : LabTeams.TeamOfSeat(state.seat);
+            : activeSeatCount == 1 ? LabTeam.Blue : LabTeams.SeatTeam(state.seat, activeSeatCount);
 
         private bool FeverActive(LabTeam team, double now) => team != LabTeam.None && feverUntil[(int)team] > now;
 
@@ -54,11 +56,12 @@ namespace C6Lab
             return LabTeams.ElementOf(TeamOf(sender));
         }
 
-        /// <summary>팀마다 북 하나를 팀원 가운데 무작위 한 명의 판 가운데에 둔다. 솔로는 하나다.</summary>
+        /// <summary>팀마다 북 하나를 팀원 가운데 무작위 한 명의 판 가운데에 둔다(1:1은 각자 하나). 솔로는 하나다.</summary>
         private void PlaceTeamDrums(double now)
         {
-            int[] chosen = activeSeatCount == 1 ? new[] { 0 }
-                : new[] { 0, 2 }.Select(first => first + (int)(DrawFor(seed ^ TeamDrumSalt, (ulong)first, 0u) % 2UL)).ToArray();
+            int size = LabTeams.TeamSize(activeSeatCount);
+            int[] chosen = activeSeatCount == 1 || size == 0 ? new[] { 0 }
+                : new[] { 0, size }.Select(first => first + (int)(DrawFor(seed ^ TeamDrumSalt, (ulong)first, 0u) % (ulong)size)).ToArray();
             foreach (int seat in chosen)
             {
                 var drum = new LabOrbState

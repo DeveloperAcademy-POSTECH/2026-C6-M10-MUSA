@@ -188,9 +188,10 @@ namespace C6Lab
         private int blockedSide;
         private float blockSecondsLeft;
         private LabOrbEdgeBlock edgeBlock;
-        // 2:2 (#281): the closed outer edge of this board for the whole battle.
+        // 땅따먹기: the closed edge of this board for the whole battle: -1 left, +1 right, LabTeams.BothSides (1:1, #394).
         private int teamWallSide;
-        private LabOrbTeamWall teamWall;
+        // The wall on the one closed side, or the right one when both are closed; the left one then (#394).
+        private LabOrbTeamWall teamWall, teamWallLeft;
         /// <summary>The board keeps its own swipe-block countdown unless the Host's differs by more than this.</summary>
         private const float BlockResyncSeconds = .3f;
         private LabOrbAreaShape areaShape;
@@ -241,8 +242,10 @@ namespace C6Lab
         /// <summary>How many of this board's own passes have bounced off a blocked edge.</summary>
         public int BlockBounces { get; private set; }
         public LabOrbEdgeBlock EdgeBlock => edgeBlock;
-        /// <summary>2:2 (#281): the closed outer edge: -1 left, +1 right, 0 none.</summary>
+        /// <summary>땅따먹기: the closed edge: -1 left, +1 right, LabTeams.BothSides for both (1:1), 0 none.</summary>
         public int TeamWallSide => teamWallSide;
+        /// <summary>The left wall while both edges are closed (1:1, #394); otherwise null or hidden.</summary>
+        public LabOrbTeamWall TeamWallLeft => teamWallLeft;
         /// <summary>How many crossings have bounced off the 2:2 outer wall.</summary>
         public int TeamWallBounces { get; private set; }
         public LabOrbTeamWall TeamWall => teamWall;
@@ -668,24 +671,46 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 2:2 (#281): close one side for the whole battle. Swipes, flicks, blast pushes and drums passing on all
-        /// bounce off it like the top and bottom walls; only the teammate's side passes.
+        /// 땅따먹기: close one side (2:2 outer edge, #281) or both (1:1, #394) for the whole battle. Swipes, flicks,
+        /// blast pushes and drums passing on all bounce off a closed side like the top and bottom walls.
         /// </summary>
         public void SetTeamWall(int side)
         {
-            side = configured ? Math.Sign(side) : 0;
+            side = !configured ? 0 : side == LabTeams.BothSides ? side : Math.Sign(side);
             if (side == teamWallSide && (side == 0 || teamWall != null && teamWall.Visible)) return;
             teamWallSide = side;
             if (side != 0) ShowTeamWall();
-            else if (teamWall != null) teamWall.Hide();
+            else
+            {
+                if (teamWall != null) teamWall.Hide();
+                if (teamWallLeft != null) teamWallLeft.Hide();
+            }
         }
+
+        /// <summary>Whether that edge of this board is a team wall now.</summary>
+        private bool TeamWallOn(bool right) => LabTeams.SideClosed(teamWallSide, right);
+
+        /// <summary>The wall drawn on that edge.</summary>
+        private LabOrbTeamWall TeamWallAt(bool right) => teamWallSide == LabTeams.BothSides && !right ? teamWallLeft : teamWall;
 
         private void ShowTeamWall()
         {
+            bool both = teamWallSide == LabTeams.BothSides;
             if (teamWall == null) teamWall = LabOrbTeamWall.Create(transform);
-            float edgeX = teamWallSide > 0 ? bounds.xMax : bounds.xMin;
+            LayTeamWall(teamWall, both || teamWallSide > 0);
+            if (both)
+            {
+                if (teamWallLeft == null) teamWallLeft = LabOrbTeamWall.Create(transform);
+                LayTeamWall(teamWallLeft, false);
+            }
+            else if (teamWallLeft != null) teamWallLeft.Hide();
+        }
+
+        private void LayTeamWall(LabOrbTeamWall wall, bool right)
+        {
+            float edgeX = right ? bounds.xMax : bounds.xMin;
             Vector2 range = areaShape.VerticalRange(edgeX, 0f);
-            teamWall.Show(teamWallSide > 0, edgeX, range.x, range.y, bounds.width);
+            wall.Show(right, edgeX, range.x, range.y, bounds.width);
         }
 
         public void SetSwipeBlock(int side, float secondsLeft)

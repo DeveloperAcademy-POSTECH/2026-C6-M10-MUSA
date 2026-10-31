@@ -236,7 +236,7 @@ namespace C6Lab
             if (me.seat < 0 || me.seat >= count || charmed.seat < 0 || charmed.seat >= count) return;
             // Preserve the separate team-seat presentation; story rooms use the same
             // clockwise neighbours as the lobby, HUD and actual Host handoff.
-            bool team = LabTeams.FourPlayerTeams(snapshot);
+            bool team = LabTeams.TeamSeats(snapshot);
             int leftSeat = team ? (me.seat + count - 1) % count : LabPlayerSlots.NeighborSeat(me.seat, count, false);
             int rightSeat = team ? (me.seat + 1) % count : LabPlayerSlots.NeighborSeat(me.seat, count, true);
             if (charmed == me)

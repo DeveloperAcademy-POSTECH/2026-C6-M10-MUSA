@@ -37,7 +37,7 @@ namespace C6Lab
                     || Mathf.Abs(stamp.right.sqrMagnitude - 1f) > .002f
                     || Mathf.Abs(Vector3.Dot(stamp.center, stamp.right)) > .002f
                     || !float.IsFinite(stamp.radius) || stamp.radius <= 0f || stamp.radius > MaximumRadius
-                    || stamp.color.a != 255 || stamp.painterSlot > 5
+                    || stamp.color.a != 255 || stamp.painterSlot > LabPaintSurface.MaxPainterSlot
                     || stamp.pattern < LabPaintPattern.Legacy || stamp.pattern > LabPaintPattern.Flow) return false;
                 previous = stamp.sequence;
             }

@@ -404,7 +404,7 @@ namespace Hapio
                 {
                     text.Append(team == LabTeam.Blue ? "청팀" : "홍팀").Append(team == winner ? " · 승리" : string.Empty).Append('\n');
                     foreach (LabPlayerState player in result.players)
-                        if (player != null && LabTeams.TeamOfSeat(player.seat) == team)
+                        if (player != null && LabTeams.SeatTeam(player.seat, result.players.Length) == team)
                             text.Append("   P").Append(player.seat + 1)
                                 .Append("   칠한 넓이 ").Append(Percent(player.paintedCells, cells))
                                 .Append("  ·  빼앗은 넓이 ").Append(Percent(player.stolenCells, cells)).Append('\n');
