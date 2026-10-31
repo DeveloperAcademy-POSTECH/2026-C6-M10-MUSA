@@ -345,6 +345,14 @@ namespace Hapio.Tests
             yield return null;
             Assert.That(view.TeamPage, Is.EqualTo(1));
             Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 4, 5, 6 }));
+            // A guest may still hold the story mode until the Host's flow state arrives (a direct-IP join or one waiting
+            // for approval). Six players only exist in 3:3, so the room keeps its team page and never draws story seats.
+            session.State.mode = GameMode.Story;
+            yield return null; yield return null;
+            Assert.That(view.teamTrio.activeInHierarchy, Is.True);
+            Assert.That(view.connectionLines.gameObject.activeSelf, Is.False);
+            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 4, 5, 6 }));
+            session.State.mode = GameMode.Territory;
         }
 
         [UnityTest]

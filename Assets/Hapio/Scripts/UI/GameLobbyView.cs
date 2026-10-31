@@ -375,6 +375,14 @@ namespace Hapio
                 && (size != 3 || teamTrio != null) ? anchors : null;
         }
 
+        /// <summary>
+        /// Whether this room is a territory room (#394). The session knows it from the room card or the Host's flow state;
+        /// before that reaches a guest (a direct-IP join or one still waiting for approval) the room itself tells: six
+        /// players only exist in 3:3, and the Host's confirmed settings carry the territory switch.
+        /// </summary>
+        private bool TerritoryRoom(int count) => session.IsTerritory || count > LabModel.MaximumParticipants
+            || !Network.IsHost && Network.SessionConfigReady && Network.config != null && Network.config.TeamTerritoryEnabled;
+
         /// <summary>The seat screen's small line while seats are being chosen (#394).</summary>
         public static string TeamSeatHint(int players) => LabTeams.TeamSize(players) == 1 ? "원하는 자리를 선택 후, 준비하시오."
             : LabTeams.TeamSize(players) == 3 ? "3명씩 함께 앉아, 준비하시오." : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
@@ -404,7 +412,7 @@ namespace Hapio
             bool allChosen = Network.ParticipantCount == count && Network.SelectedParticipantCount == count;
             // 땅따먹기 (#281, #394): 1:1 and 2:2 show both team boxes, 3:3 one team's page at a time; the saved anchors
             // move the shared texts down under the mode title.
-            int size = session.IsTerritory && teamLayout != null ? LabTeams.TeamSize(count) : 0;
+            int size = TerritoryRoom(count) && teamLayout != null ? LabTeams.TeamSize(count) : 0;
             RectTransform[] teamAnchors = size > 0 ? TeamAnchors(size) : null;
             bool team = teamAnchors != null;
             if (!team) size = 0;
@@ -423,17 +431,20 @@ namespace Hapio
             roomName.text = Network.HostRoomNamePending ? "방을 만들고 있소..." : LabRoomNames.Display(Network.ConnectedRoomName);
             joinedCount.text = Network.ParticipantCount + " / " + count + "명 입장";
             selectedCount.text = Network.SelectedParticipantCount + " / " + count + "명 자리 확정";
-            connectionLines.gameObject.SetActive(count >= 3 && !team);
-            if (count >= 3 && !team)
+            // The story layouts stop at five; a larger room is always territory, so never index past them.
+            int storyLines = Mathf.Min(count - 3, Mathf.Min(lines.Length, lineLayouts.Length) - 1);
+            connectionLines.gameObject.SetActive(storyLines >= 0 && !team);
+            if (storyLines >= 0 && !team)
             {
-                connectionLines.sprite = lines[count - 3];
-                CopyRect(lineLayouts[count - 3], connectionLines.rectTransform);
+                connectionLines.sprite = lines[storyLines];
+                CopyRect(lineLayouts[storyLines], connectionLines.rectTransform);
             }
             RectTransform[] anchors = team ? teamAnchors : count == 2 ? seats2 : count == 3 ? seats3 : count == 4 ? seats4 : seats5;
             for (int i = 0; i < slotButtons.Length; i++)
             {
                 // 3:3 shows only the seats of the team page on screen.
-                bool active = i < count && (size != 3 || (LabTeams.SeatTeam(i, count) == LabTeam.Red) == (teamPage == 1));
+                bool active = i < count && i < anchors.Length
+                    && (size != 3 || (LabTeams.SeatTeam(i, count) == LabTeam.Red) == (teamPage == 1));
                 slotButtons[i].gameObject.SetActive(active); localLabels[i].gameObject.SetActive(active);
                 if (!active) continue;
                 CopyRect(anchors[i], (RectTransform)slotButtons[i].transform);
