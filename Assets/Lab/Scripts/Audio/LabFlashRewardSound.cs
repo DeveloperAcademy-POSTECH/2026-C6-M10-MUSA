@@ -8,6 +8,7 @@ namespace C6Lab
     ///   (LabYaguangFlashHud.ShakeCount). 눈부심이 먼저 풀려도 이어서 끝까지 흔들어야 난다.
     ///   다음 섬광·방해 종료·라운드 종료로 풀릴 때는 나지 않는다.
     /// - 오색구슬 피격: 내가 던진 오색구슬(#329)이 박에 맞았을 때, 던진 사람 기기에서만 (LabNetwork.LocalFiveColorHit, 진동과 같은 때).
+    ///   #395에서 국립국악원 징으로 바꿨고, 여음이 길어 앞 징이 울리는 중에 또 맞으면 끊고 새로 친다.
     /// 소리 파일은 Resources/Audio/FlashClear(여러 개면 무작위), Resources/Audio/FiveColorHit(여러 개면 이름 순서대로
     /// 번갈아) 폴더의 파일을 쓰고, 없으면 조용히 넘어간다. 크기는 volume × 일시정지 메뉴 효과음 설정.
     /// </summary>
@@ -24,6 +25,8 @@ namespace C6Lab
 
         private AudioClip[] flashClearClips, fiveColorHitClips;
         private AudioSource source;
+        // 오색구슬 명중 징 (#395): 여음이 길어서 따로 둔다. 다 울리기 전에 또 맞으면 앞 소리를 끊고 새로 친다.
+        private AudioSource hitSource;
         private LabNetwork network;
         private int fiveColorHitNext;
         private LabYaguangFlashHud flashHud;
@@ -52,6 +55,9 @@ namespace C6Lab
             source = gameObject.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.spatialBlend = 0f; // 화면 기준 소리
+            hitSource = gameObject.AddComponent<AudioSource>();
+            hitSource.playOnAwake = false;
+            hitSource.spatialBlend = 0f;
         }
 
         private void OnEnable()
@@ -92,15 +98,22 @@ namespace C6Lab
         /// <summary>오색구슬 피격 소리 중 다음에 낼 차례 (0부터). 소리가 여러 개면 맞을 때마다 번갈아 낸다.</summary>
         public int NextFiveColorHitIndex => fiveColorHitNext;
 
-        /// <summary>내가 던진 오색구슬이 박에 맞았다. 소리를 냈으면 true. 소리가 여러 개면 이름 순서대로 번갈아 낸다.</summary>
+        /// <summary>
+        /// 내가 던진 오색구슬이 박에 맞았다. 소리를 냈으면 true. 소리가 여러 개면 이름 순서대로 번갈아 낸다.
+        /// 징(#395)이 다 울리기 전에 또 맞으면 앞 소리를 끊고 새 소리를 처음부터 낸다.
+        /// </summary>
         public bool OnFiveColorHit()
         {
             FiveColorHitCount++;
             int count = FiveColorHitClipCount;
             int index = count > 0 ? fiveColorHitNext % count : 0;
             fiveColorHitNext = count > 0 ? (index + 1) % count : 0;
-            if (count == 0 || source == null) return false;
-            source.PlayOneShot(fiveColorHitClips[index], fiveColorHitVolume * LabAudioSettings.SfxVolume);
+            if (count == 0 || hitSource == null) return false;
+            // 앞 징이 아직 울려도 끊고 처음부터 새로 친다 (#395).
+            hitSource.Stop();
+            hitSource.clip = fiveColorHitClips[index];
+            hitSource.volume = fiveColorHitVolume * LabAudioSettings.SfxVolume;
+            hitSource.Play();
             return true;
         }
 
