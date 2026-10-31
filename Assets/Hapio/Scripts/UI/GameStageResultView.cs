@@ -67,7 +67,7 @@ namespace Hapio
         public void PresentTerritory(LabTeam winner, LabSnapshot snapshot, IReadOnlyList<GameTerritoryRow> records, string message)
         {
             UseBackground(winner == LabTeam.Blue ? blueTeamBackground : winner == LabTeam.Red ? redTeamBackground : null);
-            stage.text = "2 : 2";
+            stage.text = TerritoryStage(snapshot);
             yokai.text = "땅따먹기 결과";
             judgment.supportRichText = true;
             judgment.text = snapshot == null ? "결과를 정리하고 있소"
@@ -89,6 +89,13 @@ namespace Hapio
                 Tint(instances[i], "Player", records[i].Leader == LabTeam.Blue ? BlueTeamInk : secondaryInk);
                 Tint(instances[i], "Record", records[i].Leader == LabTeam.Red ? RedTeamInk : secondaryInk);
             }
+        }
+
+        /// <summary>결과 화면 왼쪽 위의 팀 인원 "1 : 1"·"2 : 2"·"3 : 3" (#394). 인원을 모르거나 DEV 혼자면 "땅따먹기"다.</summary>
+        public static string TerritoryStage(LabSnapshot snapshot)
+        {
+            int size = LabTeams.TeamSize(snapshot?.players?.Length ?? 0);
+            return size > 0 ? size + " : " + size : "땅따먹기";
         }
 
         private static string Colored(string value, Color color) =>

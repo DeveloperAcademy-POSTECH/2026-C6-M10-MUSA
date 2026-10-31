@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using C6Lab;
 using NUnit.Framework;
@@ -77,7 +78,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SavedSceneHasFiveAssetsAndFigmaCirclePositions()
+        public void SavedSceneHasSixCircleAssetsAndFigmaCirclePositions()
         {
             var scene = EditorSceneManager.OpenScene("Assets/Lab/Scenes/Lab.unity", OpenSceneMode.Additive);
             try
@@ -86,8 +87,14 @@ namespace C6Lab.Tests
                 foreach (var root in scene.GetRootGameObjects())
                     if (hud == null) hud = root.GetComponentInChildren<LabHud>(true);
                 Assert.That(hud, Is.Not.Null);
-                Assert.That(hud.playerCircleSprites.Length, Is.EqualTo(5));
+                // P1..P5 and P6 for 3:3 territory (#394); the drum minimap draws the same circles.
+                Assert.That(hud.playerCircleSprites.Length, Is.EqualTo(LabModel.TerritoryMaximumParticipants));
                 foreach (var sprite in hud.playerCircleSprites) Assert.That(sprite, Is.Not.Null);
+                Assert.That(hud.playerCircleSprites.Select(sprite => sprite.texture).Distinct().Count(), Is.EqualTo(6));
+                LabDrumMinimap map = null;
+                foreach (var root in scene.GetRootGameObjects())
+                    if (map == null) map = root.GetComponentInChildren<LabDrumMinimap>(true);
+                Assert.That(map.playerSprites, Is.EqualTo(hud.playerCircleSprites));
                 AssertCircle(hud.localPlayerCircle.rectTransform, 87.5f, 832.5f);
                 AssertCircle(hud.leftPlayerCircle.rectTransform, 16.5f, 503.5f);
                 AssertCircle(hud.rightPlayerCircle.rectTransform, 387.5f, 503.5f);

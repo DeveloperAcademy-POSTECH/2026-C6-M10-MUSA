@@ -145,6 +145,15 @@ namespace Hapio.Tests
             });
         }
 
+        [TestCase(2, "1 : 1")] [TestCase(4, "2 : 2")] [TestCase(6, "3 : 3")]
+        [TestCase(1, "땅따먹기")] [TestCase(0, "땅따먹기")]
+        public void TerritoryResultNamesTheMatchSizeFromItsRoster(int players, string stage)
+        {
+            // #394: 1:1 and 3:3 name themselves; a DEV solo check or a missing roster shows only the mode.
+            Assert.That(GameStageResultView.TerritoryStage(new LabSnapshot { players = new LabPlayerState[players] }), Is.EqualTo(stage));
+            if (players == 0) Assert.That(GameStageResultView.TerritoryStage(null), Is.EqualTo(stage));
+        }
+
         [Test]
         public void TeamTableCountsEachTeamsPlayersAndLeavesTiesUncoloured()
         {

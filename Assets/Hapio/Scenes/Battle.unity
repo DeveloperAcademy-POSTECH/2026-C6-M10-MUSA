@@ -2104,7 +2104,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: 95cda75c8cad04ccfbb31a8fae63e93f, type: 3}
@@ -6300,7 +6300,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -6707,7 +6707,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: cdfb2a4ac6a9f4a4fa60c86400f3e591, type: 3}
@@ -11771,7 +11771,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: cdfb2a4ac6a9f4a4fa60c86400f3e591, type: 3}
@@ -12483,7 +12483,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
   m_Material: {fileID: 0}
   m_Color: {r: 0.94, g: 0.93, b: 0.87, a: 1}
@@ -14515,7 +14515,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: 95cda75c8cad04ccfbb31a8fae63e93f, type: 3}
@@ -14961,7 +14961,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: 7faeb1c0168c942d39c4983b0f1dfe26, type: 3}
@@ -16558,7 +16558,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: 7faeb1c0168c942d39c4983b0f1dfe26, type: 3}
@@ -18039,7 +18039,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -18870,7 +18870,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -20780,7 +20780,7 @@ MonoBehaviour:
     boxHeight: 0
     group: {fileID: 2043444348}
     material: {fileID: 2100000, guid: eb9cf100888d9478787aced888c11e4e, type: 2}
-    stableId:
+    stableId: 
     cards:
     - {fileID: 214737888}
     - {fileID: 995377075}
@@ -20810,7 +20810,7 @@ MonoBehaviour:
     boxHeight: 0
     group: {fileID: 1657453732}
     material: {fileID: 2100000, guid: ce7b3952b92584383b25db79cf354c36, type: 2}
-    stableId:
+    stableId: 
     cards:
     - {fileID: 849017238}
     - {fileID: 570220080}
@@ -21882,7 +21882,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -26761,7 +26761,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: 7faeb1c0168c942d39c4983b0f1dfe26, type: 3}
@@ -30641,7 +30641,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -32688,7 +32688,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -33207,7 +33207,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: cdfb2a4ac6a9f4a4fa60c86400f3e591, type: 3}
@@ -39714,7 +39714,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -40793,6 +40793,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 71465abb9dad0451ca1144d980a9ce56, type: 3}
   - {fileID: 21300000, guid: 7867251d67b5e425fb32a19cc103d91d, type: 3}
   - {fileID: 21300000, guid: 0b164e8ce6b734939be6cf2982d14b3d, type: 3}
+  - {fileID: 21300000, guid: 674368b6da5da409089cd2b9c01ca5da, type: 3}
   playerSlotPatternSamples:
   - {fileID: 1197233488}
   - {fileID: 61263185}
@@ -41265,7 +41266,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: 7faeb1c0168c942d39c4983b0f1dfe26, type: 3}
@@ -50270,7 +50271,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: cdfb2a4ac6a9f4a4fa60c86400f3e591, type: 3}
@@ -51030,7 +51031,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -52798,7 +52799,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -53695,7 +53696,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -56726,7 +56727,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: 95cda75c8cad04ccfbb31a8fae63e93f, type: 3}
@@ -57518,7 +57519,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -59969,6 +59970,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 71465abb9dad0451ca1144d980a9ce56, type: 3}
   - {fileID: 21300000, guid: 7867251d67b5e425fb32a19cc103d91d, type: 3}
   - {fileID: 21300000, guid: 0b164e8ce6b734939be6cf2982d14b3d, type: 3}
+  - {fileID: 21300000, guid: 674368b6da5da409089cd2b9c01ca5da, type: 3}
   drumIconSprite: {fileID: 21300000, guid: 634766150107d431794f2000cd4cd0bd, type: 3}
   soloDrumSprite: {fileID: 21300000, guid: 5636f9cd093744508a77decdfda6a583, type: 3}
 --- !u!114 &1925757926
@@ -62441,7 +62443,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -63017,6 +63019,7 @@ MonoBehaviour:
   heat: {fileID: 102283131}
   effectText: {fileID: 1952166472}
   feedback: {fileID: 2087846650}
+  stageNotice: {fileID: 0}
   testToggle: {fileID: 694388009}
   fireButton: {fileID: 1001978600}
   generationButton: {fileID: 553410929}
@@ -63392,7 +63395,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4d8f5e327d52249b5b3855566d2e789b, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabEnvironmentCard
   useGroupAppearance: 1
   png: {fileID: 2800000, guid: 95cda75c8cad04ccfbb31a8fae63e93f, type: 3}
@@ -63727,7 +63730,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
   m_Navigation:
     m_Mode: 3
@@ -63771,7 +63774,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.18, g: 0.43, b: 0.47, a: 1}
@@ -64310,7 +64313,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -64502,7 +64505,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -68252,7 +68255,7 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage:
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
