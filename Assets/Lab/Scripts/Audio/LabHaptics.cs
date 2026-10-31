@@ -8,7 +8,7 @@ namespace C6Lab
     public enum LabHapticStyle { Light = 0, Medium = 1, Heavy = 2, Soft = 3, Rigid = 4 }
 
     /// <summary>어떤 상황의 진동이었는지 (테스트·로그용).</summary>
-    public enum LabHapticKind { None, Generate, Hit, ItemHit, Bomb, Combine, ComboClear, ComboFail, YaguangFlash }
+    public enum LabHapticKind { None, Generate, Hit, ItemHit, Bomb, Combine, ComboClear, ComboFail, YaguangFlash, FiveColorHit }
 
     /// <summary>
     /// 아이폰 진동. 설정(종류·세기·켜기)은 모두 LabConfig 에서 읽는다 (Inspector · DEV 패널).
@@ -19,6 +19,7 @@ namespace C6Lab
     /// - 박 색상 콤보(#222) 성공: 센 진동 3번 (모든 기기)
     /// - 박 색상 콤보 실패(틀린 색 / 시간 초과): 약 2초 동안 크게 이어지는 진동 (모든 기기)
     /// - 야광귀 섬광(#268)을 맞았을 때: 센(Heavy) 진동 한 번 (맞은 사람 기기)
+    /// - 내가 던진 오색구슬(#329)이 박에 맞았을 때: 징이 울리듯 센 진동 한 번 + 약 1초 묵직하게 이어지는 진동 (#395, 던진 사람 기기)
     /// 콤보 진동 외에는 해당 플레이어 기기에서만 난다. 아이폰 빌드에서만 실제로 진동하고, 에디터·Mac에서는 아무 일도 하지 않는다.
     /// </summary>
     [DisallowMultipleComponent]
@@ -31,6 +32,13 @@ namespace C6Lab
         [SerializeField, Range(.05f, .5f)] private float comboClearGapSeconds = .1f;
         [Tooltip("콤보 실패 때 이어지는 진동 길이 (초)")]
         [SerializeField, Range(.2f, 5f)] private float comboFailSeconds = 1.5f;
+        [Header("오색구슬 명중 (#395)")]
+        [Tooltip("오색구슬이 박에 맞았을 때, 첫 센 진동 뒤 이어지는 진동 길이 (초). 징 소리처럼 울린다.")]
+        [SerializeField, Range(.2f, 3f)] private float fiveColorHitSeconds = 1f;
+        [Tooltip("이어지는 진동의 세기 (0~1)")]
+        [SerializeField, Range(0f, 1f)] private float fiveColorHitIntensity = .7f;
+        [Tooltip("이어지는 진동의 날카로움 (0 = 둥글고 묵직, 1 = 날카롭게)")]
+        [SerializeField, Range(0f, 1f)] private float fiveColorHitSharpness = .15f;
 
         private LabNetwork network;
         private LabOrbBoard board;
@@ -62,7 +70,22 @@ namespace C6Lab
         private void OnLocalCombined() => PlayForCombine(Config);
         // 섬광 파훼 보상 (#329): 오색구슬을 받았을 때와 오색구슬이 박에 맞았을 때, 콤보 성공과 같은 짧은 연속 진동.
         private void OnFiveColorOrbsReceived(int count) => PlayForComboClear(Config);
-        private void OnLocalFiveColorHit() => PlayForComboClear(Config);
+        // #395: 오색구슬 명중은 징 소리에 맞춰 묵직하게 약 1초 울린다.
+        private void OnLocalFiveColorHit() => PlayForFiveColorHit(Config);
+        public float FiveColorHitSeconds => fiveColorHitSeconds;
+
+        /// <summary>오색구슬 명중 (#395): 센(Heavy) 진동 한 번 뒤 약 1초 동안 둥글고 묵직하게 이어지는 진동.</summary>
+        public bool PlayForFiveColorHit(LabConfig config)
+        {
+            if (config == null || !config.HapticsEnabled) return false;
+            LastKind = LabHapticKind.FiveColorHit;
+            PlayCount++;
+#if UNITY_IOS && !UNITY_EDITOR
+            C6Lab_PlayImpactHaptic((int)LabHapticStyle.Heavy, 1f);
+            C6Lab_PlayContinuousHaptic(fiveColorHitSeconds, fiveColorHitIntensity, fiveColorHitSharpness);
+#endif
+            return true;
+        }
 
         /// <summary>기본 피해(Damage per Hit)보다 크면 아이템 타격 진동, 아니면 타격 진동.</summary>
         public bool PlayForHit(int damage, LabConfig config)
