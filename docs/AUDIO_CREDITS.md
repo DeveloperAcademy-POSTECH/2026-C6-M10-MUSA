@@ -34,6 +34,10 @@
 | `Assets/Lab/Resources/Audio/CharmRelease/CharmRelease.wav` | 매혹이 풀릴 때 (#351, 걸린 사람과 양옆 사람 기기) | AI 생성: [Suno](https://suno.com) (2026-10-28 생성, 파일 설명에 "made with suno"). 원본 이름 `매혹 풀렸을 때.wav` | Suno 이용약관: 유료 플랜(Pro·Premier)으로 만든 곡은 만든 사람 소유·상업적 이용 가능, 무료 플랜 곡은 비상업적 이용만 — **팀 계정 플랜 확인 필요** | 2.76초, 스테레오 48kHz 16bit 그대로. 가장 큰 순간이 -1dB가 되도록 음량만 키움(+8dB). 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/FoxFall/FoxFall.wav` | 여우 구슬이 내 판에 떨어질 때 (#351, 한 번 떨어뜨릴 때마다 한 번, 그 판 주인 기기만) | AI 생성: [Suno](https://suno.com) (2026-10-28 생성, 파일 설명에 "made with suno"). 원본 이름 `여우구슬떨어질때.wav` | Suno 이용약관: 유료 플랜(Pro·Premier)으로 만든 곡은 만든 사람 소유·상업적 이용 가능, 무료 플랜 곡은 비상업적 이용만 — **팀 계정 플랜 확인 필요** | 1.15초, 스테레오 48kHz 16bit 그대로. 음량·음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/FoxClear/FoxClear.wav` | 여우 구슬이 사라질 때: 두 번 눌러 없앴거나 음·양 구슬과 닿아 함께 사라질 때 (#351, 그 판 주인 기기만) | AI 생성: [Suno](https://suno.com) (팀 확인 기준. QuickTime으로 잘라 저장해 파일 안 Suno 정보는 없음). 원본 이름 `소멸소리.wav` | Suno 이용약관: 유료 플랜(Pro·Premier)으로 만든 곡은 만든 사람 소유·상업적 이용 가능, 무료 플랜 곡은 비상업적 이용만 — **팀 계정 플랜 확인 필요** | 1.36초, 스테레오 48kHz 16bit 그대로. 가장 큰 순간이 -1dB가 되도록 음량만 키움(+1.5dB). 음색 변경 없음 |
+| `Assets/Lab/Resources/Audio/YaguangFlashWarn/YaguangFlashWarn.wav` | 야광귀 섬광 예고 시작, 박 옆 말풍선에 야광귀 눈이 뜰 때 (#395 F1, 모든 기기) | AI 생성: [ElevenLabs Sound Effects](https://elevenlabs.io) (2026-10-31 생성, Creator 유료 플랜). 프롬프트: 대금 낮은 떨림 | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 1초 원본을 0.98초로 자르고 끝 0.05초 페이드아웃, 가장 큰 순간이 -3dB가 되도록 음량만 키움(+8.4dB). 48kHz 스테레오 16bit wav |
+| `Assets/Lab/Resources/Audio/YaguangFlashGlow/YaguangFlashGlow.wav` | 섬광 예고 중 눈이 노랗게 빛나며 화면 가장자리 빛이 차오를 때 (#395 F2, 섬광 대상 기기) | AI 생성: [ElevenLabs Sound Effects](https://elevenlabs.io) (2026-10-31 생성, Creator 유료 플랜). 프롬프트: 꽹과리 연타가 점점 빨라지고 커짐 | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 2초 원본 중 커지는 앞 0.86초만 잘라 음 높이를 유지한 채 2초로 늘림(ffmpeg rubberband, 빠르기 0.43배), 끝 0.03초 페이드아웃. 음량 변경 없음(가장 큰 순간 약 -3dB) |
+| `Assets/Lab/Resources/Audio/YaguangFlashCount/YaguangFlashCount.wav` | 섬광 예고 3/2/1 숫자가 바뀔 때마다 (#395 F3, 섬광 대상 기기). 숫자가 줄수록 코드가 음을 높임 | AI 생성: [ElevenLabs Sound Effects](https://elevenlabs.io) (2026-10-31 생성, Creator 유료 플랜). 프롬프트: 북 한 번 | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 앞 무음 제거, 0.45초로 자르고 끝 0.05초 페이드아웃, 가장 큰 순간이 -3dB가 되도록 음량만 키움(+13.8dB). mp3를 48kHz 16bit wav로 저장 |
+| `Assets/Lab/Resources/Audio/YaguangFlashBurst/YaguangFlashBurst.wav` | 섬광이 번쩍일 때 (#395 F4, 섬광 대상 기기, 진동과 같은 때) | AI 생성: [ElevenLabs Sound Effects](https://elevenlabs.io) (2026-10-31 생성, Creator 유료 플랜). 프롬프트: 징 + 반짝이는 고음 | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 끝 0.08초 페이드아웃, 가장 큰 순간이 -3dB가 되도록 음량만 키움(+1.2dB). 1.48초 |
 
 **출처 표시 문구 (공공누리 제1유형)**
 
@@ -74,3 +78,9 @@ CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, FlashClear, FiveColorHit,
 `GumihoBGM/Gumiho_Stage.wav`, `GumihoFever/Gumiho_Fever.wav`, `CharmRelease/CharmRelease.wav`, `FoxFall/FoxFall.wav`, `FoxClear/FoxClear.wav`는 Suno로 만들었다. Suno는 **만든 계정이 유료 플랜일 때만** 상업적 이용(앱스토어 배포 포함)이 허용되고, 무료 플랜으로 만든 것은 비상업적 이용만 된다. 매혹이 걸릴 때 소리(`Audio/CharmCast`)는 출처가 확실하지 않아 빼 두었다(폴더가 비어 소리 없음, 나중에 넣는다). 출시 전에 만든 계정의 플랜을 확인해 위 표의 "팀 계정 플랜 확인 필요"를 고친다. 무료 플랜이었다면 유료 플랜에서 다시 만들거나 CC0 소리로 바꾼다. 크레딧 화면이 생기면 아래처럼 적는 것을 권장한다.
 
 > 구미호 스테이지 음악·매혹 풀림·여우 구슬 소리: Suno로 제작
+
+**AI로 만든 소리 (#395)**
+
+`YaguangFlashWarn`, `YaguangFlashGlow`, `YaguangFlashCount`, `YaguangFlashBurst`는 ElevenLabs Sound Effects로 만들었다. 유료(Creator) 플랜으로 만들어 상업적 이용이 가능하다. 크레딧 화면이 생기면 아래 문구를 넣는다.
+
+> 야광귀 섬광 효과음: ElevenLabs로 제작
