@@ -27,7 +27,7 @@
 | `Assets/Lab/Resources/Audio/Bomb/Boom/Boom.wav` | 내 판에서 폭탄이 터질 때 (Bomb Sound = BOOM, 그 판 주인 기기만) | "rubble_explode" by canberries4, [freesound.org](https://freesound.org/people/canberries4/) | CC0 (출처 표시 의무 없음) | 앞 무음 약 0.035초 제거, 끝 0.06초 페이드아웃, 가장 큰 순간이 -1dB가 되도록 음량만 키움(+7dB). mp3를 44.1kHz 16bit wav로 저장. 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/Bomb/Ppeong/Ppeong.wav` | 내 판에서 폭탄이 터질 때 (Bomb Sound = PPEONG, 그 판 주인 기기만) | "뻥튀기 뻥2" by 김용배, [공유마당 (한국저작권위원회)](https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020) | **CC BY (저작자 표시)** – 출처 표시 의무 있음 | 끝 0.06초 페이드아웃, 스테레오를 모노로 합치고 가장 큰 순간이 -1dB가 되도록 맞춤. 44.1kHz 16bit로 저장. 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/Miss/Miss.wav` | 내가 던진 구슬이 요괴를 빗나갔을 때 (던진 사람 기기만) | "Woosh_Whip 3" by CAT-FOX_ALEX, [freesound.org](https://freesound.org/people/CAT-FOX_ALEX/sounds/870096/) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
-| `Assets/Lab/Resources/Audio/FlashClear/FlashClear.wav` | 야광귀 섬광을 흔들어 다 풀었을 때 (#338, 푼 사람 기기만) | 팀 제공 CC0 소리 (원본 이름 미확인, 파일 정보 "Melody Assistant 7.4.7c, 2010") | CC0 | 원본 .ogg(4초, 스테레오 48kHz)에서 소리 있는 앞 0.9초만 남겨 1.1초로 자르고 끝 0.25초를 줄임, 44.1kHz 모노 16bit wav |
+| `Assets/Lab/Resources/Audio/FlashClear/FlashClear.wav` | 야광귀 섬광을 최대 횟수(기본 10번)까지 흔들어 오색구슬 보상을 받는 순간 (#338, #395에서 양금 오름 가락으로 교체, 흔든 사람 기기만) | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 양금 기본음 강 | 출처 표시 조건으로 누구나 이용 가능 (공공누리 제1유형, 상업적 이용·변경 가능) | 단음 15개가 이어진 원본 wav(104초, 스테레오 44.1kHz 16bit)에서 평조 궁/상/각/치/우/위 궁(A4/B4/D5/E5/F#5/A5) 여섯 음을 타격 4ms 전부터 잘라, 0.07초 간격으로 빠르게 올라가게 겹쳐 붙임("또로로롱↑"). 앞 음은 0.45초(0.12초부터 페이드아웃, 음량 0.8배), 마지막 위 궁은 1초(0.25초부터 페이드아웃). 모노로 합치고 가장 큰 순간이 -1dB가 되도록 맞춤. 1.35초, 44.1kHz 모노 16bit wav. 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/FiveColorHit/FiveColorHit_1.wav`, `FiveColorHit_2.wav` (2개) | 내가 던진 오색구슬(#329)이 박에 맞았을 때 (#338, #395에서 징으로 교체, 던진 사람 기기만, 맞을 때마다 1 → 2 → 1 번갈아) | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 징 - 타격음 - 강 | 출처 표시 조건으로 누구나 이용 가능 (공공누리 제1유형, 상업적 이용·변경 가능) | 원본 wav(14.5초, 스테레오 44.1kHz 16bit)에서 타격 4ms 전부터 3.0초로 잘라냄. 앞 0.004초 페이드인, 0.6초부터 끝까지 천천히 페이드아웃. 다 울리기 전에 또 맞으면 코드가 앞 소리를 끊고 새로 친다. 모노로 합치고 가장 큰 순간이 -1dB가 되도록 음량만 맞춤. `FiveColorHit_2`는 같은 소리를 2반음 낮춘 것(번갈아 나올 때 단조롭지 않게). 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/ComboHit/ComboHit.wav` | 박 색상 콤보에서 맞는 칸을 맞힐 때 (#338, #366에서 양금으로 교체, 모든 기기). 코드가 1~4칸마다 국악 평조 궁/상/각/치(0/2/5/7반음, 재생 속도 1/1.12/1.33/1.50배)로 높여 낸다 | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 양금 기본음 강 | 출처 표시 조건으로 누구나 이용 가능 (공공누리 제1유형, 상업적 이용·변경 가능) | 단음 15개(E3~A5)가 이어진 원본 wav(104초, 스테레오 44.1kHz 16bit)에서 A4 한 음(약 439Hz)만 타격 5ms 전부터 2.0초로 잘라냄. 앞 0.004초 페이드인, 0.6초부터 끝까지 페이드아웃(여음이 칸끼리 너무 오래 겹치지 않게). 가장 큰 순간이 -1dB가 되도록 음량만 맞춤(평균 -22.4dB). 44.1kHz 모노 16bit wav. 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/ComboFail/ComboFail.wav` | 박 색상 콤보 실패(틀린 색·시간 초과) 때 (#338, 팀 전체 실패라 모든 기기) | 팀 제공 CC0 소리 (원본 이름 미확인) | CC0 | 원본 mp3(0.29초, 모노 48kHz)의 앞 무음 0.03초를 잘라 0.26초로 만들고 +3dB(최대 -0.3dB) 키움, 44.1kHz 모노 16bit wav |
@@ -62,7 +62,7 @@
 | `Generate/Janggu_3_1.wav`, `Janggu_3_2.wav`, `Janggu_3_3.wav` | 장구-쿵-강, 장구-쿵-중, 장구-쿵-약 |
 | `GenerateVoice/Eolssu_1.wav`, `Eolssu_2.wav`, `Eolssu_3.wav` | 추임새 (정회석, 강효주, 이춘희) |
 | `ComboClear/Jota.wav` | 추임새 – 좋타 (염경애) |
-| `ComboHit/ComboHit.wav` | 양금 기본음 강 |
+| `ComboHit/ComboHit.wav`, `FlashClear/FlashClear.wav` | 양금 기본음 강 |
 | `FiveColorHit/FiveColorHit_1.wav`, `FiveColorHit_2.wav` | 징 - 타격음 - 강 |
 | `Fever/Fever_Whimori.wav` | 동살풀이 (꽹과리), 연주 - 능게 (태평소) |
 
@@ -70,7 +70,7 @@
 
 > 김용배의 "뻥튀기 뻥2"(공유마당, https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020)은 CC BY 라이선스로 제공됩니다.
 
-CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, FlashClear, ComboFail)는 표시 의무가 없지만, 크레딧 화면이 생기면 아래처럼 함께 적는 것을 권장한다.
+CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, ComboFail)는 표시 의무가 없지만, 크레딧 화면이 생기면 아래처럼 함께 적는 것을 권장한다.
 
 > 타격음 "Cartoon Punch Cassette E" by modusmogulus, 페인트 타격음 "Squishes and Splats" by mrickey13, 스친 타격음 "SFX_SQUELCH_slayer_215" by MrFossy, 결합 소리 "chimes" by _bliind, 빗나감 소리 "Woosh_Whip 3" by CAT-FOX_ALEX, 폭발음 "rubble_explode" by canberries4 (freesound.org, CC0)
 
