@@ -134,6 +134,13 @@ namespace C6Lab.Tests
             Assert.That(LabTeams.VisibleTeammates(two, 20).Select(player => player.id), Is.EqualTo(new ulong[] { 20 }));
         }
 
+        [TestCase(2, "1:1")] [TestCase(4, "2:2")] [TestCase(6, "3:3")]
+        [TestCase(1, "")] [TestCase(3, "")] [TestCase(5, "")] [TestCase(7, "")]
+        public void MatchLabelNamesOnlyTerritoryCounts(int players, string label)
+        {
+            Assert.That(LabTeams.MatchLabel(players), Is.EqualTo(label));
+        }
+
         [Test]
         public void OnlyTerritoryTakesSixPlayersAndTwoOrSixBecomeTeams()
         {

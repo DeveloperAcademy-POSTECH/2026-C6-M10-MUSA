@@ -608,7 +608,7 @@ namespace Hapio
 
         public bool CreatePendingRoom(int capacity) => CreatePendingRoom(capacity, GameMode.Story);
 
-        /// <summary>A 2:2 room (#281) always waits for exactly four players.</summary>
+        /// <summary>A territory room waits for 2, 4 or 6 players (1:1, 2:2, 3:3; #394), a story room for 2 to 5.</summary>
         public bool CreatePendingRoom(int capacity, GameMode mode)
         {
             if (IsCreatingRoom || state.phase != GameFlowPhase.Home || !network.CanChooseConnection) return false;

@@ -43,6 +43,9 @@ namespace Hapio
         public int teamHeadingFontSize = 29, teamLocalLabelFontSize = 20, teamStartFontSize = 25;
         [Tooltip("2:2 빈 자리 점선 동그라미 (#293): 청팀 P1·P2는 파란 점선, 홍팀 P3·P4는 빨간 점선. 비어 있으면 스토리와 같은 자리별 그림을 쓴다.")]
         public Sprite blueTeamEmptySlot, redTeamEmptySlot;
+        [Header("땅따먹기 1:1·3:3 (#394), added by Hapio > Upgrade 2v2 Lobby UI")]
+        [Tooltip("고른 인원으로 열 수 없는 모드 버튼 바로 아래에 보이는 이유 한 줄: 기본 모드 아래, 땅따먹기 아래.")]
+        public UnityEngine.UI.Text basicModeReason, teamModeReason;
         [HideInInspector] public int teamLobbyDesignRevision;
 
         private GameSession session;
@@ -50,6 +53,8 @@ namespace Hapio
         private RectTransform[] storyShifted;
         private int storyHeadingFontSize, storySealFontSize;
         private int[] storyLocalLabelFontSizes;
+        // 기본 모드(요괴 봉인)를 열 수 있는 가장 적은 인원 (#394). 2명은 땅따먹기 1:1만 연다.
+        private const int StoryMinimumPlayers = 3;
         private int creationCapacity = 3;
         private string localError = string.Empty;
         private readonly List<UnityEngine.UI.Button> rows = new List<UnityEngine.UI.Button>();
@@ -110,7 +115,11 @@ namespace Hapio
             storyLocalLabelFontSizes = localLabels.Select(label => label.fontSize).ToArray();
             BindNavigation(enterButton, EnterGame);
             // 2:2 (#281): "새 방 만들기 +" first asks which mode. A prefab without the mode panel keeps the old story flow.
-            BindNavigation(createButton, () => { if (modePanel != null) SetModes(true); else CreateRoom(GameMode.Story); });
+            BindNavigation(createButton, () =>
+            {
+                if (creationCapacity < 2) { localError = "먼저 함께할 인원을 고르시오."; return; }
+                if (modePanel != null) SetModes(true); else CreateRoom(GameMode.Story);
+            });
             if (modePanel != null)
             {
                 BindNavigation(modeDismissButton, () => SetModes(false));
@@ -165,14 +174,43 @@ namespace Hapio
             directConnectionPanel.SetActive(false);
         }
 
+        /// <summary>고른 인원으로 이 모드를 열 수 있는지 (#394): 기본 모드는 3~5명, 땅따먹기는 2·4·6명.</summary>
+        public static bool ModeAllowed(GameMode mode, int players) => mode == GameMode.Territory
+            ? LabTeams.IsTeamCount(players) : players >= StoryMinimumPlayers && players <= LabModel.MaximumParticipants;
+
+        /// <summary>막힌 모드 버튼 아래에 보이는 이유 한 줄. 열 수 있으면 빈 문자열이다.</summary>
+        public static string ModeBlockedReason(GameMode mode, int players)
+        {
+            if (ModeAllowed(mode, players)) return string.Empty;
+            if (mode == GameMode.Territory) return "땅따먹기는 2·4·6명만 할 수 있소.";
+            return LabTeams.IsTeamCount(players)
+                ? players + "명은 땅따먹기 " + LabTeams.MatchLabel(players) + "만 할 수 있소." : "기본 모드는 3~5명만 할 수 있소.";
+        }
+
         private void CreateRoom(GameMode mode)
         {
             if (OpeningBlocked) return;
+            // A blocked mode button is not interactable and already shows why; an old prefab may still reach here.
+            if (!ModeAllowed(mode, creationCapacity)) { localError = ModeBlockedReason(mode, creationCapacity); return; }
             SetModes(false);
             localError = string.Empty;
-            if (mode == GameMode.Territory) { session.CreateAndEnterRoom(LabTeams.Players, GameMode.Territory); return; }
-            if (creationCapacity < 2 || creationCapacity > 5) { localError = "기본 모드는 먼저 함께할 인원을 고르시오."; return; }
-            if (session.CreateAndEnterRoom(creationCapacity, GameMode.Story)) creationCapacity = 0;
+            if (session.CreateAndEnterRoom(creationCapacity, mode)) creationCapacity = 0;
+        }
+
+        private void RefreshModes()
+        {
+            ModeButton(basicModeButton, basicModeReason, GameMode.Story);
+            ModeButton(teamModeButton, teamModeReason, GameMode.Territory);
+        }
+
+        private void ModeButton(UnityEngine.UI.Button button, UnityEngine.UI.Text reason, GameMode mode)
+        {
+            bool allowed = ModeAllowed(mode, creationCapacity);
+            button.interactable = allowed;
+            button.targetGraphic.color = ColorOf(allowed ? "3F3D38" : "9D9586");
+            if (reason == null) return;
+            reason.text = ModeBlockedReason(mode, creationCapacity);
+            reason.gameObject.SetActive(!allowed);
         }
 
         private void SetModes(bool visible)
@@ -182,6 +220,7 @@ namespace Hapio
             modePanel.SetActive(visible);
             if (!visible) return;
             modePanel.transform.SetAsLastSibling();
+            RefreshModes();
             teamSoloButton.gameObject.SetActive(Network.DeveloperBuildAvailable);
         }
 
@@ -277,7 +316,7 @@ namespace Hapio
                 rows[i].targetGraphic.color = ColorOf(i % 2 == 0 ? "E9DFCA" : "EEE6D6");
                 rows[i].transform.Find("Name").GetComponent<UnityEngine.UI.Text>().text = room.pending && string.IsNullOrEmpty(room.name)
                     ? "새 방 준비 중" : LabRoomNames.Display(room.name);
-                rows[i].transform.Find("Count").GetComponent<UnityEngine.UI.Text>().text = (room.team ? "2:2 땅따먹기 · " : "")
+                rows[i].transform.Find("Count").GetComponent<UnityEngine.UI.Text>().text = (room.team ? TeamRoomLabel(room.capacity) : "")
                     + (room.capacity >= 2 ? room.participants + " / " + room.capacity + "명 모였소" : "인원 확인 중");
                 bool connecting = Network.IsJoiningRoom && Network.JoiningRoomKey == room.key;
                 string action = room.pending && !room.ready ? "준비 중..." : connecting ? "입장 중..."
@@ -287,6 +326,13 @@ namespace Hapio
                 rows[i].interactable = canChoose && (room.pending ? room.ready : Network.CanJoinDiscoveredRoom(room.key));
             }
             roomTemplate.gameObject.SetActive(false);
+        }
+
+        /// <summary>방 카드의 모드 표기: "1:1 땅따먹기 · ", "2:2 땅따먹기 · ", "3:3 땅따먹기 · " (#394).</summary>
+        public static string TeamRoomLabel(int capacity)
+        {
+            string match = LabTeams.MatchLabel(capacity);
+            return (match.Length > 0 ? match + " " : string.Empty) + "땅따먹기 · ";
         }
 
         /// <summary>2:2 (#293): an empty seat's dashed circle in its team's colour, or the seat's own when none is saved.</summary>

@@ -99,7 +99,7 @@ namespace Hapio.Tests
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
             GameLobbyView view = View();
             yield return Click(view.enterButton);
-            yield return Click(view.countButtons[0]);
+            yield return Click(view.countButtons[1]);
             yield return Click(view.createButton);
             Assert.That(view.modePanel.activeInHierarchy, Is.True, "새 방 만들기 first asks which mode to open (#281).");
             Assert.That(session.PendingRooms, Is.Empty);
@@ -130,9 +130,9 @@ namespace Hapio.Tests
             Assert.That(session.Network.LocalSlotNumber, Is.Zero);
             Assert.That(session.PendingRooms, Is.Empty);
             Assert.That(view.positionPage.activeInHierarchy, Is.True);
-            Assert.That(view.slotButtons.Count(button => button.gameObject.activeSelf), Is.EqualTo(2));
+            Assert.That(view.slotButtons.Count(button => button.gameObject.activeSelf), Is.EqualTo(3));
             Assert.That(view.slotImages[0].sprite, Is.Not.SameAs(view.filledSlots[0]));
-            Assert.That(session.Network.RequestPlayerSlot(3), Is.False, "P3 does not exist in this two-player room.");
+            Assert.That(session.Network.RequestPlayerSlot(4), Is.False, "P4 does not exist in this three-player room.");
             yield return null;
             Assert.That(view.message.gameObject.activeInHierarchy, Is.True);
             Assert.That(view.message.text, Is.EqualTo(session.Network.Notice));
@@ -143,12 +143,12 @@ namespace Hapio.Tests
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(2));
             Assert.That(view.localLabels[1].text, Does.Contain("방장"));
             Assert.That(view.localLabels[0].text, Does.Not.Contain("방장"));
-            Vector2 anchor = view.seats2[1].anchoredPosition;
-            view.seats2[1].anchoredPosition += Vector2.right * 5f;
+            Vector2 anchor = view.seats3[1].anchoredPosition;
+            view.seats3[1].anchoredPosition += Vector2.right * 5f;
             yield return null;
-            Assert.That(((RectTransform)view.slotButtons[1].transform).anchoredPosition, Is.EqualTo(view.seats2[1].anchoredPosition),
+            Assert.That(((RectTransform)view.slotButtons[1].transform).anchoredPosition, Is.EqualTo(view.seats3[1].anchoredPosition),
                 "The saved Canvas anchor, rather than a hardcoded slot point, controls the game view.");
-            view.seats2[1].anchoredPosition = anchor;
+            view.seats3[1].anchoredPosition = anchor;
             yield return Click(view.clearSlotButton);
             Assert.That(session.Network.LocalSlotNumber, Is.Zero);
             yield return Click(view.slotButtons[0]);
@@ -214,6 +214,7 @@ namespace Hapio.Tests
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
             GameLobbyView view = View();
             yield return Click(view.enterButton);
+            yield return Click(view.countButtons[2]);
             yield return Click(view.createButton);
             DispatchClick(view.teamModeButton);
             Assert.That(session.IsCreatingRoom, Is.True);
@@ -237,7 +238,7 @@ namespace Hapio.Tests
             int storyHeadingSize = view.heading.fontSize;
             int storySealSize = view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().fontSize;
             yield return Click(view.enterButton);
-            yield return Click(view.countButtons[0]);
+            yield return Click(view.countButtons[2]);
             yield return Click(view.createButton);
             DispatchClick(view.teamModeButton);
             Assert.That(session.IsCreatingRoom, Is.True);
@@ -251,7 +252,7 @@ namespace Hapio.Tests
             Assert.That(session.IsTerritory, Is.True);
             Assert.That(session.IsCreatingRoom, Is.False);
             Assert.That(session.PendingRooms, Is.Empty);
-            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(4), "Territory ignores the browser's two-player story selection.");
+            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(4), "Four chosen players open a 2:2 room (#394).");
             Assert.That(view.heading.fontSize, Is.EqualTo(view.teamHeadingFontSize));
             Assert.That(view.sealButton.interactable, Is.False);
             Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기"));
@@ -265,12 +266,12 @@ namespace Hapio.Tests
                 && SceneManager.GetActiveScene().path == GameScenePaths.Home, "Browser after territory");
             yield return null;
             view = View();
-            yield return Click(view.countButtons[0]);
+            yield return Click(view.countButtons[1]);
             yield return Click(view.createButton);
             DispatchClick(view.basicModeButton);
             Assert.That(session.IsCreatingRoom, Is.True);
             Assert.That(session.PendingRooms.Single().Mode, Is.EqualTo(GameMode.Story));
-            Assert.That(session.PendingRooms.Single().Capacity, Is.EqualTo(2));
+            Assert.That(session.PendingRooms.Single().Capacity, Is.EqualTo(3));
             yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
                 && session.Network.IsHost && SceneManager.GetActiveScene().path == GameScenePaths.Lobby,
                 "Story lobby after territory entered automatically", 15f);
@@ -279,9 +280,44 @@ namespace Hapio.Tests
             Assert.That(session.IsTerritory, Is.False);
             Assert.That(session.IsCreatingRoom, Is.False);
             Assert.That(session.PendingRooms, Is.Empty);
-            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(2));
+            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(3));
             Assert.That(view.heading.fontSize, Is.EqualTo(storyHeadingSize), "Team typography must not leak into story rooms.");
             Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().fontSize, Is.EqualTo(storySealSize));
+        }
+
+        [UnityTest]
+        public IEnumerator ChosenPlayerCountBlocksTheModeItCannotOpenAndShowsWhyUnderThatButton()
+        {
+            GameLobbyView view = View();
+            yield return Click(view.enterButton);
+            var chips = view.countButtons[0].GetComponentInParent<UnityEngine.UI.ScrollRect>();
+            string[] basicReasons = { "2명은 땅따먹기 1:1만 할 수 있소.", "", "", "", "6명은 땅따먹기 3:3만 할 수 있소." };
+            string[] teamReasons = { "", "땅따먹기는 2·4·6명만 할 수 있소.", "", "땅따먹기는 2·4·6명만 할 수 있소.", "" };
+            for (int i = 0; i < view.countButtons.Length; i++)
+            {
+                // The 6 chip only peeks out at the edge until the row is pushed sideways.
+                chips.horizontalNormalizedPosition = i < 4 ? 0f : 1f;
+                yield return Click(view.countButtons[i]);
+                Assert.That(view.CreationCapacity, Is.EqualTo(i + 2));
+                yield return Click(view.createButton);
+                Assert.That(view.modePanel.activeInHierarchy, Is.True);
+                Assert.That(view.basicModeButton.interactable, Is.EqualTo(basicReasons[i].Length == 0), (i + 2) + " players, basic");
+                Assert.That(view.teamModeButton.interactable, Is.EqualTo(teamReasons[i].Length == 0), (i + 2) + " players, territory");
+                Assert.That(view.basicModeReason.gameObject.activeSelf, Is.EqualTo(basicReasons[i].Length > 0));
+                Assert.That(view.teamModeReason.gameObject.activeSelf, Is.EqualTo(teamReasons[i].Length > 0));
+                if (basicReasons[i].Length > 0) Assert.That(view.basicModeReason.text, Is.EqualTo(basicReasons[i]));
+                if (teamReasons[i].Length > 0) Assert.That(view.teamModeReason.text, Is.EqualTo(teamReasons[i]));
+                // A blocked button does not react, also to a pointer click sent straight to it.
+                var press = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
+                if (!view.basicModeButton.interactable) ExecuteEvents.Execute(view.basicModeButton.gameObject, press, ExecuteEvents.pointerClickHandler);
+                if (!view.teamModeButton.interactable) ExecuteEvents.Execute(view.teamModeButton.gameObject, press, ExecuteEvents.pointerClickHandler);
+                Assert.That(session.IsCreatingRoom, Is.False);
+                Assert.That(session.PendingRooms, Is.Empty);
+                // The dimmed backdrop's centre lies under the card, so close it the way a tap beside the card does.
+                view.modeDismissButton.onClick.Invoke();
+                yield return null;
+                Assert.That(view.modePanel.activeSelf, Is.False);
+            }
         }
 
         [UnityTest]

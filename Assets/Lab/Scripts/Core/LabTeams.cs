@@ -28,6 +28,13 @@ namespace C6Lab
         /// <summary>땅따먹기를 할 수 있는 인원인지 (2·4·6명).</summary>
         public static bool IsTeamCount(int players) => TeamSize(players) > 0;
 
+        /// <summary>방 목록·전투·결과에 쓰는 팀 인원 표기 "1:1"·"2:2"·"3:3". 땅따먹기 인원이 아니면 빈 문자열.</summary>
+        public static string MatchLabel(int players)
+        {
+            int size = TeamSize(players);
+            return size > 0 ? size + ":" + size : string.Empty;
+        }
+
         /// <summary>이 인원의 판에서 이 자리의 팀: 앞 절반은 청, 뒤 절반은 홍.</summary>
         public static LabTeam SeatTeam(int seat, int players)
         {
