@@ -79,10 +79,10 @@
 - 승인된 파란 시안은 `LabGourdPaint`에서 기존 고해상도 결과 위에 적용한다. `Resources/GourdPaint/WatercolorProfile`은 표현 전용이며 공유 LabConfig/프로토콜에 넣지 않는다. 속성별 정적/활성 농도를 분리하고 새로 이어진 기록만 기본.4초 번지며 완료 시 한 번만 확정한다. 초기/교체/128개 폐기·설정/품질 변경은 정적 복원하며 관람/PNG는 최종 표시를 확정·복사한다. 원본 패턴·Prefab·Scene·성장/건조/100% 판정·P지도·Host 권한은 유지한다.
 - `C6 Lab > Experiments > Watercolor Paint`는 같은 런타임의 격리 정적 비교다. 비교 복사본의 Drying OFF를 실제 규칙 변경으로 해석하지 않는다. 실기기 성능과 자동 GPU 검사는 구분하고 `docs/WATERCOLOR_PAINT_EXPERIMENT.md`·VALIDATION을 따른다.
 
-## #381 요괴 콘텐츠 제작 구조
+## #402 보류된 요괴 확장 준비 정리
 
-- `Assets/Hapio/Content/Yokai/YokaiCatalog.asset`은 Resources 밖의 10종 제작 목록이며 실행 스테이지 목록을 대체하지 않는다. 기존 구미호→야광귀→지귀 3단계와 `LabStageYokai` 값·공유 설정251개·접속 규약은 유지한다. 추가7종은 Planned이며 전투 코드·Scene·전용 모델은 아직 없다.
-- `contentId`·Figma 참고 순번·전투 stageIndex를 구분한다. StageDefinition의 선택적 `content`는 같은 ID의 Integrated 정의만 허용하며, 아트 참조는 제작용이다. 기존3종은 공통 검은 요괴를 계속 쓴다. `Hapio > Yokai` 생성기는 없는 데이터와 빈 기존 stage.content만 채우며 이미 편집한 값을 덮어쓰지 않는다. 편집과 후속 아트 폴더 관례는 `docs/YOKAI_CONTENT_STRUCTURE.md`를 따른다.
+- 현재 요괴 실행 자료는 `Resources/Hapio/StageCatalog`와 기존 구미호→야광귀→지귀의 StageDefinition 3개다. 기존 단계 순서·GUID·규칙·수치·모델 연결을 유지하며, 기존3종은 공통 검은 요괴를 계속 사용한다.
+- 10종 확장은 보류되어 #381의 제작용 카탈로그·정의 에셋·전용 코드·생성/검증 도구와 StageDefinition의 선택적 `content` 연결을 제거했다. #393의 공통 모듈 경로는 현재 게임에 추가하지 않는다. 확장을 재개할 때는 PR #383과 Git 이력의 자료를 확인하고 새 작업 범위를 정하며, 제거한 준비 파일을 자동 재생성하지 않는다.
 
 
 ## #388 지귀 A/B 시간 제한·성공 보상·실패 정리

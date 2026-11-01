@@ -1,6 +1,7 @@
 using System;
 using C6Lab;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 
 namespace Hapio.Tests
@@ -57,12 +58,29 @@ namespace Hapio.Tests
             var source = Resources.Load<LabConfig>("LabConfig");
             float[] before = source.CaptureDeveloperValues();
             var catalog = GameStageCatalog.RequireDefault();
-            Assert.That(catalog.Get(1).yokai, Is.EqualTo(LabStageYokai.Gumiho));
-            Assert.That(catalog.Get(2).yokai, Is.EqualTo(LabStageYokai.Yaguang));
-            Assert.That(catalog.Get(3).yokai, Is.EqualTo(LabStageYokai.Jigwi));
-            foreach (int stage in new[] { 1, 2, 3 })
-                Assert.That(catalog.Get(stage).yokaiVisual, Is.Null,
+            string[] ids = { "gumiho", "yaguang", "jigwi" };
+            LabStageYokai[] yokai = { LabStageYokai.Gumiho, LabStageYokai.Yaguang, LabStageYokai.Jigwi };
+            string[] guids = {
+                "e5e2128f0ccc743378cf2f906b28eac6",
+                "ea9d9f4da035e4df5bf52fcbd4b73d7e",
+                "88c8de0df4382480eb45bc3f9010ba91"
+            };
+            Assert.That(catalog.stages.Length, Is.EqualTo(3));
+            Assert.That(GameRunFlow.StageCount, Is.EqualTo(3));
+            Assert.That(GameStageSettings.TerritoryScope, Is.EqualTo(4));
+            Assert.That(Enum.GetValues(typeof(LabStageYokai)).Length, Is.EqualTo(4));
+            Assert.That((int)LabStageYokai.None, Is.Zero);
+            for (int i = 0; i < ids.Length; i++)
+            {
+                GameStageDefinition stage = catalog.Get(i + 1);
+                Assert.That(stage.stageId, Is.EqualTo(ids[i]));
+                Assert.That(stage.stageIndex, Is.EqualTo(i + 1));
+                Assert.That(stage.yokai, Is.EqualTo(yokai[i]));
+                Assert.That((int)stage.yokai, Is.EqualTo(i + 1));
+                Assert.That(AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(stage)), Is.EqualTo(guids[i]));
+                Assert.That(stage.yokaiVisual, Is.Null,
                     "Every default stage uses the original black yokai already inside the shared gourd.");
+            }
             using (var settings = new GameStageSettings(source, catalog))
             {
                 Assert.That(GameStageSettings.IsFieldVisible(1, 166), Is.False, "A game stage's yokai decides its own gimmicks (#311).");
