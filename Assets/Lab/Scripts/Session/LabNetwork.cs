@@ -2031,6 +2031,14 @@ namespace C6Lab
             PublishSnapshot(true);
         }
 
+        /// <summary>
+        /// 이 구슬이 내 북에서 막 나온 것처럼 튀어나오고 북 소리·진동을 낼지. 결합 구슬은 보통 조합판에서 만들어지므로 빼지만,
+        /// 북에서 바로 결합된 채로 나오는 2:2 피버 팀 구슬(#281)과 야광귀 피버 오색구슬(#343)은 북에서 나온 것으로 본다.
+        /// </summary>
+        public static bool ShowsDrumSpawn(LabOrbState orb, ulong me) =>
+            orb != null && orb.origin == LabOrbOrigin.Generated && orb.originOwner == me
+            && (orb.kind != LabOrbKind.Combined || orb.fever || orb.fiveColor);
+
         private void SyncBoard()
         {
             ObserveJigwiMissionFailures();
@@ -2046,9 +2054,7 @@ namespace C6Lab
                 if (orb.owner != LocalPlayerId || orb.inFlight || jigwiMissionPurge.Cancels(orb.revision)) continue;
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
-                // A fever (#281) generates team orbs that are already combined; they still pop out of the drum.
-                bool showSpawn = orb.origin == LabOrbOrigin.Generated && orb.originOwner == LocalPlayerId
-                    && (orb.kind != LabOrbKind.Combined || orb.fever);
+                bool showSpawn = ShowsDrumSpawn(orb, LocalPlayerId);
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
