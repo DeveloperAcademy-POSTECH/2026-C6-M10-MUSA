@@ -20,8 +20,8 @@ namespace C6Lab
     /// #397 박 색상 콤보 예고와 진행 (모든 기기):
     /// - 예고 카운트 (Audio/YaguangComboCount1~4): 남은 초가 바뀔 때마다 야광귀 목소리 "하나/둘/셋/넷" (박 옆 말풍선과 같은 수)
     /// - 콤보 시작 (Audio/YaguangComboStart): 4칸 색이 공개되는 순간 꽹과리 "깽!"
-    /// - 제한 시간 (Audio/YaguangComboTick): 콤보가 나온 뒤 1초마다 시계 째깍. 남은 시간이 Inspector 초(기본 3초) 이하면
-    ///   (Audio/YaguangComboTickFast) 0.5초마다 더 빠른 째깍. 콤보가 끝나면(성공/실패) 바로 멈춘다.
+    /// - 제한 시간 (Audio/YaguangComboTick): 콤보가 나온 뒤 Inspector 간격(기본 0.5초)마다 시계 째깍. 남은 시간이 Inspector 초
+    ///   (기본 3초) 이하면 (Audio/YaguangComboTickFast) 더 짧은 간격(기본 0.25초)마다 빠른 째깍. 콤보가 끝나면(성공/실패) 바로 멈춘다.
     /// 그 순간보다 LateSeconds 넘게 늦게 알아챈 기기(늦게 들어옴, 일시정지 뒤)는 내지 않는다. 일시정지 중·시작 대기 중에는
     /// 새로 내지 않는다. 폴더가 비어 있으면 그 소리만 조용히 넘어간다(여러 개면 무작위).
     /// 크기는 LabConfig Inspector의 소리별 크기 × 일시정지 메뉴 효과음 설정.
@@ -47,6 +47,8 @@ namespace C6Lab
             ComboStartFolder, ComboTickFolder, ComboTickFastFolder };
         /// <summary>째깍은 그 박자보다 이 초 넘게 늦게 알아채면 건너뛴다 (스냅샷이 늦게 와도 몰아서 울리지 않게).</summary>
         public const double TickLateSeconds = .3d;
+        public const double DefaultTickInterval = .5d;
+        public const double DefaultTickFastInterval = .25d;
         /// <summary>그 순간보다 이 초 넘게 늦게 알아채면 내지 않는다.</summary>
         public const double LateSeconds = .5d;
 
@@ -263,8 +265,11 @@ namespace C6Lab
 
             // 제한 시간 째깍
             if (!snapshot.comboActive || snapshot.comboStartedAt < 0d || snapshot.comboEndsAt <= snapshot.comboStartedAt) return;
-            double fastFor = network != null && network.config != null ? network.config.YaguangComboTickFastSeconds : 3d;
-            double tick = LatestTickAt(snapshot.comboStartedAt, snapshot.comboEndsAt, now, fastFor, out bool fast);
+            LabConfig config = network != null ? network.config : null;
+            double fastFor = config != null ? config.YaguangComboTickFastSeconds : 3d;
+            double every = config != null ? config.YaguangComboTickIntervalSeconds : DefaultTickInterval;
+            double fastEvery = config != null ? config.YaguangComboTickFastIntervalSeconds : DefaultTickFastInterval;
+            double tick = LatestTickAt(snapshot.comboStartedAt, snapshot.comboEndsAt, now, fastFor, every, fastEvery, out bool fast);
             if (tick <= lastTickAt) return;
             lastTickAt = tick;
             if (now - tick <= TickLateSeconds) Play(fast ? LabYaguangSfx.ComboTickFast : LabYaguangSfx.ComboTick);
@@ -274,22 +279,24 @@ namespace C6Lab
         public static LabYaguangSfx CountSfx(int count) => LabYaguangSfx.ComboCountOne + (Mathf.Max(1, count) - 1) % 4;
 
         /// <summary>
-        /// 콤보 제한 시간 [start, end]에서 now 이하의 가장 늦은 째깍 시각. 처음에는 start에서 1초마다, 남은 시간이 fastFor초
-        /// 이하가 되면 end - fastFor부터 0.5초마다 (fast = true). 끝나는 순간(end)에는 울리지 않는다. 아직 없으면 -무한.
+        /// 콤보 제한 시간 [start, end]에서 now 이하의 가장 늦은 째깍 시각. 처음에는 start에서 every초마다, 남은 시간이 fastFor초
+        /// 이하가 되면 end - fastFor부터 fastEvery초마다 (fast = true). 끝나는 순간(end)에는 울리지 않는다. 아직 없으면 -무한.
         /// </summary>
-        public static double LatestTickAt(double start, double end, double now, double fastFor, out bool fast)
+        public static double LatestTickAt(double start, double end, double now, double fastFor, double every, double fastEvery, out bool fast)
         {
             fast = false;
             if (now <= start || end <= start) return double.NegativeInfinity;
+            every = System.Math.Max(.05d, every);
+            fastEvery = System.Math.Max(.05d, fastEvery);
             double fastFrom = System.Math.Max(start, end - System.Math.Max(0d, fastFor));
             double t = System.Math.Min(now, end - 1e-6);
             if (t >= fastFrom && fastFor > 0d)
             {
                 fast = true;
-                return fastFrom + System.Math.Floor((t - fastFrom) / .5d) * .5d;
+                return fastFrom + System.Math.Floor((t - fastFrom) / fastEvery + 1e-9) * fastEvery;
             }
-            double k = System.Math.Floor(t - start);
-            return k >= 1d ? start + k : double.NegativeInfinity;
+            double k = System.Math.Floor((t - start) / every + 1e-9);
+            return k >= 1d ? start + k * every : double.NegativeInfinity;
         }
 
         /// <summary>

@@ -228,7 +228,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheClockTicksEverySecondThenFasterAndStopsWithTheCombo()
+        public void TheClockTicksEveryHalfSecondThenFasterAndStopsWithTheCombo()
         {
             LabYaguangSound sound = Sound();
             var snapshot = new LabSnapshot
@@ -238,10 +238,10 @@ namespace C6Lab.Tests
             sound.ObserveFlash(snapshot, 33.9d, Me);
             snapshot.comboCount = 1; snapshot.comboActive = true;
             snapshot.comboStartedAt = 34d; snapshot.comboEndsAt = 44d;
-            // 34~44초를 0.05초 간격으로 지켜본다: 35~40초 1초마다 6번, 남은 3초(41~43.5초)는 0.5초마다 6번.
+            // 34~44초를 0.05초 간격으로 지켜본다: 34.5~40.5초 0.5초마다 13번, 남은 3초(41~43.75초)는 0.25초마다 12번.
             for (int i = 0; i < 200; i++) sound.ObserveFlash(snapshot, 34d + i * .05d, Me);
-            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTick), Is.EqualTo(6));
-            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTickFast), Is.EqualTo(6));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTick), Is.EqualTo(13));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTickFast), Is.EqualTo(12));
 
             // 콤보가 끝나면 더 울리지 않는다.
             snapshot.comboActive = false;
@@ -249,11 +249,12 @@ namespace C6Lab.Tests
             sound.ObserveFlash(snapshot, 44.5d, Me);
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboTickFast) + sound.PlayCount(LabYaguangSfx.ComboTick), Is.EqualTo(before));
 
-            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 34.5d, 3d, out _), Is.EqualTo(double.NegativeInfinity));
-            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 36.2d, 3d, out bool fast), Is.EqualTo(36d));
+            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 34.4d, 3d, .5d, .25d, out _), Is.EqualTo(double.NegativeInfinity));
+            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 36.2d, 3d, .5d, .25d, out bool fast), Is.EqualTo(36d));
             Assert.That(fast, Is.False);
-            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 42.7d, 3d, out fast), Is.EqualTo(42.5d));
+            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 42.7d, 3d, .5d, .25d, out fast), Is.EqualTo(42.5d));
             Assert.That(fast, Is.True);
+            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 36.2d, 3d, 1d, .5d, out _), Is.EqualTo(36d));
         }
 
         [Test]
