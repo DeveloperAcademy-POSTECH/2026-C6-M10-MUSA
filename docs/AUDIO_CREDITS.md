@@ -42,6 +42,7 @@
 | `Assets/Lab/Resources/Audio/YaguangFlashCaught/YaguangFlashCaught.wav` | 10번 흔들어 눈부심이 풀린 0.2초 뒤 야광귀가 "으악! 어지러워!" 징징대는 대사 (#396 F8, 푼 사람 기기) | AI 생성: [ElevenLabs](https://elevenlabs.io) (2026-11-01 생성, Creator 유료 플랜). F5와 같은 야광귀 목소리 + Text to Speech | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 원본 mp3(2.59초, 모노 44.1kHz)에서 끝 무음을 잘라 2.06초로 맞춤(끝 0.06초 페이드아웃), 가장 큰 순간이 -1dB가 되도록 음량만 키움(+0.4dB). 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/YaguangShakeBell/YaguangShakeBell.wav` | 섬광을 흔들 때마다(1~9번) 무당 방울 "촤랑" (#396 F6, 흔든 사람 기기) | AI 생성: [ElevenLabs Sound Effects](https://elevenlabs.io) (2026-11-01 생성, Creator 유료 플랜). 프롬프트: 굿에 쓰는 무당 방울을 한 번 흔듦 | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 앞 무음 0.05초 제거, 0.54초로 자르고 끝 0.07초 페이드아웃, 가장 큰 순간이 -3dB가 되도록 음량만 키움(+8.9dB). 48kHz 스테레오 16bit wav |
 | `Assets/Lab/Resources/Audio/YaguangShakeBellFinal/YaguangShakeBellFinal.wav` | 최대 횟수(기본 10번)를 채운 마지막 흔들기의 큰 무당 방울 "쿵! 촤라랑~" (#396 F6-10, 흔든 사람 기기) | 위 `YaguangShakeBell`, `YaguangFlashCount`(북)와 ElevenLabs Sound Effects로 만든 무당 방울 크게 흔들기(2026-11-01 생성) | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 0초에 북 한 방(`YaguangFlashCount`)과 방울 한 번(`YaguangShakeBell`)을 겹치고, 길게 흔드는 방울(앞 무음 제거, 2.2배)을 함께 섞음. 압축(-14dB, 3:1)으로 크기를 고르고 1.2초로 자름(0.9초부터 페이드아웃), 가장 큰 순간 -1dB. 48kHz 스테레오 16bit wav |
+| `Assets/Lab/Resources/Audio/YaguangComboCount1/YaguangComboCount1.wav` ~ `YaguangComboCount4/YaguangComboCount4.wav` (4개) | 콤보 예고 동안 박 옆 말풍선 숫자가 바뀔 때마다 야광귀가 "넷~/셋~/둘!/하나!!"를 점점 신나게 세는 대사 (#397 C2, 모든 기기). 1=하나, 2=둘, 3=셋, 4=넷 | AI 생성: [ElevenLabs](https://elevenlabs.io) (2026-11-02 생성, Creator 유료 플랜). F5와 같은 야광귀 목소리 + Text to Speech | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 원본 mp3 한 개(5.41초, 모노 44.1kHz)에 "넷"이 두 번 들어 있어 무음 기준으로 다섯 조각으로 자르고 첫 번째 "넷"을 씀. 조각마다 0.65~0.95초, 앞뒤 짧은 페이드, 가장 큰 순간이 -1dB가 되도록 음량만 맞춤. 44.1kHz 모노 16bit wav |
 
 **출처 표시 문구 (공공누리 제1유형)**
 
@@ -88,6 +89,6 @@ CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, ComboFail)는 표시 의�
 
 **AI로 만든 소리 (#395)**
 
-`YaguangFlashWarn`, `YaguangFlashGlow`, `YaguangFlashCount`, `YaguangFlashBurst`(#395)와 `YaguangFlashTaunt`, `YaguangFlashCaught`, `YaguangShakeBell`, `YaguangShakeBellFinal`, `YaguangBGM/Yaguang_Stage.wav`(#396)는 ElevenLabs(Sound Effects, Text to Speech, Music)로 만들었다. 유료(Creator) 플랜으로 만들어 상업적 이용이 가능하다. 크레딧 화면이 생기면 아래 문구를 넣는다.
+`YaguangFlashWarn`, `YaguangFlashGlow`, `YaguangFlashCount`, `YaguangFlashBurst`(#395)와 `YaguangFlashTaunt`, `YaguangFlashCaught`, `YaguangShakeBell`, `YaguangShakeBellFinal`, `YaguangBGM/Yaguang_Stage.wav`(#396), `YaguangComboCount1~4`(#397)는 ElevenLabs(Sound Effects, Text to Speech, Music)로 만들었다. 유료(Creator) 플랜으로 만들어 상업적 이용이 가능하다. 크레딧 화면이 생기면 아래 문구를 넣는다.
 
-> 야광귀 섬광 효과음·대사·무당 방울, 야광귀 전투 BGM: ElevenLabs로 제작
+> 야광귀 섬광 효과음·대사·무당 방울·콤보 카운트, 야광귀 전투 BGM: ElevenLabs로 제작
