@@ -38,6 +38,10 @@
 | `Assets/Lab/Resources/Audio/YaguangFlashGlow/YaguangFlashGlow.wav` | 섬광 예고 중 눈이 노랗게 빛나며 화면 가장자리 빛이 차오를 때 (#395 F2, 섬광 대상 기기) | AI 생성: [ElevenLabs Sound Effects](https://elevenlabs.io) (2026-10-31 생성, Creator 유료 플랜). 프롬프트: 꽹과리 연타가 점점 빨라지고 커짐 | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 2초 원본 중 커지는 앞 0.86초만 잘라 음 높이를 유지한 채 2초로 늘림(ffmpeg rubberband, 빠르기 0.43배), 끝 0.03초 페이드아웃. 음량 변경 없음(가장 큰 순간 약 -3dB) |
 | `Assets/Lab/Resources/Audio/YaguangFlashCount/YaguangFlashCount.wav` | 섬광 예고 3/2/1 숫자가 바뀔 때마다 (#395 F3, 섬광 대상 기기). 숫자가 줄수록 코드가 음을 높임 | AI 생성: [ElevenLabs Sound Effects](https://elevenlabs.io) (2026-10-31 생성, Creator 유료 플랜). 프롬프트: 북 한 번 | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 앞 무음 제거, 0.45초로 자르고 끝 0.05초 페이드아웃, 가장 큰 순간이 -3dB가 되도록 음량만 키움(+13.8dB). mp3를 48kHz 16bit wav로 저장 |
 | `Assets/Lab/Resources/Audio/YaguangFlashBurst/YaguangFlashBurst.wav` | 섬광이 번쩍일 때 (#395 F4, 섬광 대상 기기, 진동과 같은 때) | AI 생성: [ElevenLabs Sound Effects](https://elevenlabs.io) (2026-10-31 생성, Creator 유료 플랜). 프롬프트: 징 + 반짝이는 고음 | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 끝 0.08초 페이드아웃, 가장 큰 순간이 -3dB가 되도록 음량만 키움(+1.2dB). 1.48초 |
+| `Assets/Lab/Resources/Audio/YaguangFlashTaunt/YaguangFlashTaunt.wav` | 섬광 번쩍 0.35초 뒤 야광귀가 "안보이지롱~" 놀리는 대사 (#396 F5, 맞은 사람 기기) | AI 생성: [ElevenLabs](https://elevenlabs.io) (2026-11-01 생성, Creator 유료 플랜). Voice Design으로 만든 야광귀 목소리(어른 성우가 연기하는 장난꾸러기 도깨비 캐릭터) + Text to Speech | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 원본 mp3(2.69초, 모노 44.1kHz)에서 대사 뒤 무음과 잡음을 잘라 2.08초로 맞춤(끝 0.06초 페이드아웃), 가장 큰 순간이 -1dB가 되도록 음량만 키움(+2.2dB). 44.1kHz 모노 16bit wav |
+| `Assets/Lab/Resources/Audio/YaguangFlashCaught/YaguangFlashCaught.wav` | 10번 흔들어 눈부심이 풀린 0.2초 뒤 야광귀가 "으악! 어지러워!" 징징대는 대사 (#396 F8, 푼 사람 기기) | AI 생성: [ElevenLabs](https://elevenlabs.io) (2026-11-01 생성, Creator 유료 플랜). F5와 같은 야광귀 목소리 + Text to Speech | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 원본 mp3(2.59초, 모노 44.1kHz)에서 끝 무음을 잘라 2.06초로 맞춤(끝 0.06초 페이드아웃), 가장 큰 순간이 -1dB가 되도록 음량만 키움(+0.4dB). 44.1kHz 모노 16bit wav |
+| `Assets/Lab/Resources/Audio/YaguangShakeBell/YaguangShakeBell.wav` | 섬광을 흔들 때마다(1~9번) 무당 방울 "촤랑" (#396 F6, 흔든 사람 기기) | AI 생성: [ElevenLabs Sound Effects](https://elevenlabs.io) (2026-11-01 생성, Creator 유료 플랜). 프롬프트: 굿에 쓰는 무당 방울을 한 번 흔듦 | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 앞 무음 0.05초 제거, 0.54초로 자르고 끝 0.07초 페이드아웃, 가장 큰 순간이 -3dB가 되도록 음량만 키움(+8.9dB). 48kHz 스테레오 16bit wav |
+| `Assets/Lab/Resources/Audio/YaguangShakeBellFinal/YaguangShakeBellFinal.wav` | 최대 횟수(기본 10번)를 채운 마지막 흔들기의 큰 무당 방울 "쿵! 촤라랑~" (#396 F6-10, 흔든 사람 기기) | 위 `YaguangShakeBell`, `YaguangFlashCount`(북)와 ElevenLabs Sound Effects로 만든 무당 방울 크게 흔들기(2026-11-01 생성) | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 0초에 북 한 방(`YaguangFlashCount`)과 방울 한 번(`YaguangShakeBell`)을 겹치고, 길게 흔드는 방울(앞 무음 제거, 2.2배)을 함께 섞음. 압축(-14dB, 3:1)으로 크기를 고르고 1.2초로 자름(0.9초부터 페이드아웃), 가장 큰 순간 -1dB. 48kHz 스테레오 16bit wav |
 
 **출처 표시 문구 (공공누리 제1유형)**
 
@@ -84,6 +88,6 @@ CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, ComboFail)는 표시 의�
 
 **AI로 만든 소리 (#395)**
 
-`YaguangFlashWarn`, `YaguangFlashGlow`, `YaguangFlashCount`, `YaguangFlashBurst`는 ElevenLabs Sound Effects로 만들었다. 유료(Creator) 플랜으로 만들어 상업적 이용이 가능하다. 크레딧 화면이 생기면 아래 문구를 넣는다.
+`YaguangFlashWarn`, `YaguangFlashGlow`, `YaguangFlashCount`, `YaguangFlashBurst`(#395)와 `YaguangFlashTaunt`, `YaguangFlashCaught`, `YaguangShakeBell`, `YaguangShakeBellFinal`, `YaguangBGM/Yaguang_Stage.wav`(#396)는 ElevenLabs(Sound Effects, Text to Speech, Music)로 만들었다. 유료(Creator) 플랜으로 만들어 상업적 이용이 가능하다. 크레딧 화면이 생기면 아래 문구를 넣는다.
 
-> 야광귀 섬광 효과음: ElevenLabs로 제작
+> 야광귀 섬광 효과음·대사·무당 방울, 야광귀 전투 BGM 후보: ElevenLabs로 제작
