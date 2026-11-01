@@ -9,8 +9,8 @@ namespace C6Lab
     /// - 일시정지: 멈춤 → 다시 시작하면 멈춘 지점부터 이어서
     /// - 승리/패배: 서서히 꺼짐
     /// 곡은 Resources/Audio/BGM 폴더의 첫 번째 소리 파일을 쓴다. 파일이 없으면 조용히 넘어간다.
-    /// - 야광귀 스테이지 새 BGM 후보 (#396 테스트): LabConfig Inspector의 Yaguang Use New Bgm을 켜면 Resources/Audio/YaguangBGM의
-    ///   곡을 튼다(크기는 Yaguang Bgm Volume). 전투 중에 바꾸면 바로 처음부터 바꿔 튼다. 기본은 꺼짐(기존 BGM).
+    /// - 야광귀 스테이지 (#396): Resources/Audio/YaguangBGM의 곡을 튼다(크기는 Yaguang Bgm Volume). LabConfig Inspector의
+    ///   Yaguang Use New Bgm(기본 켜짐)을 끄면 기존 꽹과리 BGM. 전투 중에 바꾸면 바로 처음부터 바꿔 튼다.
     /// - 구미호 스테이지 (#351)와 2:2 땅따먹기 (#293): Resources/Audio/GumihoBGM 폴더에 곡이 있으면 그 곡을 대신 튼다
     ///   (크기는 LabConfig의 Gumiho Bgm Volume). 어느 곡을 틀지는 라운드가 시작될 때 정한다. 야광귀·지귀·Lab 단판은
     ///   기본 전투 BGM. 2:2에는 피버타임 곡이 없다(팀 피버에도 곡을 바꾸지 않는다).
@@ -30,7 +30,7 @@ namespace C6Lab
         public const string FeverClipFolder = "Audio/Fever";
         public const string GumihoClipFolder = "Audio/GumihoBGM";
         public const string GumihoFeverClipFolder = "Audio/GumihoFever";
-        /// <summary>야광귀 스테이지 새 전투 BGM 후보 (#396 테스트). LabConfig Inspector의 Yaguang Use New Bgm을 켜면 기존 BGM 대신 튼다.</summary>
+        /// <summary>야광귀 스테이지 전투 BGM (#396). LabConfig Inspector의 Yaguang Use New Bgm(기본 켜짐)을 끄면 기존 BGM.</summary>
         public const string YaguangClipFolder = "Audio/YaguangBGM";
 
         [Tooltip("LabConfig를 읽을 수 없을 때만 쓰는 기본 크기. 평소에는 LabConfig의 BGM Volume을 쓴다.")]
