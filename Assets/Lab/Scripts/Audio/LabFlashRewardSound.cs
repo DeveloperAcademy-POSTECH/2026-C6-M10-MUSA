@@ -4,7 +4,8 @@ namespace C6Lab
 {
     /// <summary>
     /// 야광귀 섬광 효과음 (#338).
-    /// - 섬광 해결: 이번 섬광에서 내가 흔든 횟수가 DEV 최대 횟수(기본 10번, 오색구슬 보상까지)를 채운 순간, 내 기기에서만
+    /// - 섬광 해결: 이번 섬광에서 내가 흔든 횟수가 DEV 최대 횟수(기본 10번, 오색구슬 보상까지)를 채운 뒤 Inspector 지연(기본 0.4초,
+    ///   #396 큰 방울이 먼저 들리게)만큼 늦게, 내 기기에서만
     ///   (LabYaguangFlashHud.ShakeCount). 눈부심이 먼저 풀려도 이어서 끝까지 흔들어야 난다.
     ///   다음 섬광·방해 종료·라운드 종료로 풀릴 때는 나지 않는다.
     /// - 오색구슬 피격: 내가 던진 오색구슬(#329)이 박에 맞았을 때, 던진 사람 기기에서만 (LabNetwork.LocalFiveColorHit, 진동과 같은 때).
@@ -74,8 +75,18 @@ namespace C6Lab
         {
             if (flashHud == null) flashHud = GetComponent<LabYaguangFlashHud>();
             if (flashHud == null || network == null || network.config == null) return;
-            if (ObserveShakes(flashHud.ShakeCount, network.config.YaguangFlashShakeCount)) OnFlashCleared();
+            // #396: 마지막 흔들기의 큰 방울(LabYaguangSound)이 먼저 들리게, 양금 가락은 Inspector 지연만큼 늦게 낸다.
+            if (ObserveShakes(flashHud.ShakeCount, network.config.YaguangFlashShakeCount))
+                clearDueAt = Time.unscaledTime + network.config.YaguangFlashClearDelaySeconds;
+            if (clearDueAt >= 0f && Time.unscaledTime >= clearDueAt)
+            {
+                clearDueAt = -1f;
+                OnFlashCleared();
+            }
         }
+
+        // 양금 가락을 낼 시각 (Time.unscaledTime). 기다리는 게 없으면 -1.
+        private float clearDueAt = -1f;
 
         /// <summary>
         /// 이번 섬광에서 흔든 수(count)가 최대 횟수(needed)에 막 닿았으면 true (한 번만). 새 섬광이라 수가 0으로
