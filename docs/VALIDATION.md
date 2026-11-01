@@ -3660,7 +3660,7 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 기준 main `3897dbd8`, 작업 브랜치 `chore/#402-yokai-expansion-cleanup`. Unity 6000.6.5f1 / macOS / Metal의 전용 batch Editor와 Unity CLI로 수행했다. iOS/Mac 플레이어 빌드·실기기·실제 다기기 연결은 실행하지 않았다.
 - 제거: 제작용 정의10개와 전체 카탈로그, `GameYokaiDefinition`/`GameYokaiCatalog`, 전용 Editor 생성·검증 도구, 10종 전용 검사와 안내 문서. 소유 폴더·파일을 Unity `AssetDatabase.DeleteAsset`으로 제거해 `.meta`와 빈 상위 Content 폴더도 함께 정리했다.
 - 기존3종: 구미호→야광귀→지귀 Stage 자산의 선택적 `content` 참조와 해당 타입/검사만 제거했다. 세 Stage는 기준 main에서 `content` 한 줄을 뺀 내용과 동일하며, GUID·모델 override·기본값·진행 순서·실제 패턴은 보존했다. 필요한 ID·순서·enum·GUID·3단계/2:2 범위 검사는 기존 `GameStageSettingsTests`에 합쳤다.
-- 자료 보존: Scene·Prefab·모델·Lab 코드·설정·패키지·Stage 메타 등을 포함한1,919개 비교 대상 중 Stage 자산3개만 바뀌었고 나머지 **1,916개 SHA-256이 동일**했다. 기존253개 공유 설정·프로토콜5678·Lab39/Game23은 변경하지 않았다. #392 물감 방울과 이후 main의 다른 변경도 보존했다.
+- 자료 보존: Scene·Prefab·모델·Lab 코드·설정·패키지·Stage 메타 등을 포함한1,919개 비교 대상 중 Stage 자산3개만 바뀌었고 나머지 **1,916개 SHA-256이 동일**했다. 기존253개 공유 설정·프로토콜5679·Lab40/Game24는 변경하지 않았다. #392 물감 방울과 이후 main의 다른 변경도 보존했다.
 - 참조 검사: 삭제된29개 GUID를 남아 있는 직렬화 자료에서 검색해 잔여 참조0개를 확인했다. 실행 코드에 폐기 타입 참조가 없고, 개발 문서 목차의 로컬 링크와 소스·문서 `git diff --check`를 확인했다. 과거 #381 검증 기록은 도입 당시 이력으로 표시해 보존했다.
 
 | 실제 수행한 검사 | 결과 | 범위 |
