@@ -122,6 +122,73 @@ namespace C6Lab.Tests
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.FlashGlow), Is.EqualTo("Audio/YaguangFlashGlow"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.FlashCount), Is.EqualTo("Audio/YaguangFlashCount"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.FlashBurst), Is.EqualTo("Audio/YaguangFlashBurst"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.FlashTaunt), Is.EqualTo("Audio/YaguangFlashTaunt"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ShakeBell), Is.EqualTo("Audio/YaguangShakeBell"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ShakeBellFinal), Is.EqualTo("Audio/YaguangShakeBellFinal"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.FlashCaught), Is.EqualTo("Audio/YaguangFlashCaught"));
+        }
+
+        // #396 섬광 반응
+        [Test]
+        public void TheTauntFollowsTheGongAndTheDizzyLineFollowsTheRelease()
+        {
+            LabYaguangSound sound = Sound();
+            LabSnapshot snapshot = Flash(Me);
+            snapshot.players = new[] { new LabPlayerState { id = Me } };
+            sound.ObserveFlash(snapshot, 10d, Me);
+
+            // 13초 번쩍: 징은 바로, "안보이지롱~"은 0.35초 뒤에 한 번.
+            snapshot.flashCount = 1; snapshot.flashLastAt = 13d; snapshot.flashLastTarget = Me;
+            snapshot.flashWarningAt = snapshot.flashAt = 73d;
+            sound.ObserveFlash(snapshot, 13.05d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.FlashBurst), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.FlashTaunt), Is.Zero, "Not on top of the gong.");
+            sound.ObserveFlash(snapshot, 13.4d, Me);
+            sound.ObserveFlash(snapshot, 13.6d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.FlashTaunt), Is.EqualTo(1));
+
+            // 20초에 Host가 내 눈부심을 풀었다: 0.2초 뒤 "으악 어지러워~" 한 번.
+            snapshot.players[0].flashReleasedAt = 20d;
+            sound.ObserveFlash(snapshot, 20.1d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.FlashCaught), Is.Zero);
+            sound.ObserveFlash(snapshot, 20.25d, Me);
+            sound.ObserveFlash(snapshot, 21d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.FlashCaught), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void LateJoinersHearNoOldLines()
+        {
+            LabYaguangSound sound = Sound();
+            LabSnapshot snapshot = Flash(Me);
+            snapshot.flashCount = 1; snapshot.flashLastAt = 13d; snapshot.flashLastTarget = Me;
+            snapshot.flashWarningAt = snapshot.flashAt = 73d;
+            snapshot.players = new[] { new LabPlayerState { id = Me, flashReleasedAt = 20d } };
+            sound.ObserveFlash(snapshot, 20.3d, Me);
+            sound.ObserveFlash(snapshot, 21d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.FlashTaunt), Is.Zero);
+            Assert.That(sound.PlayCount(LabYaguangSfx.FlashCaught), Is.Zero);
+        }
+
+        [Test]
+        public void EachShakeRingsHigherAndTheLastOneRingsBig()
+        {
+            LabYaguangSound sound = Sound();
+            Assert.That(sound.ObserveShakes(0, 10), Is.Null);
+            Assert.That(sound.ObserveShakes(1, 10), Is.EqualTo(LabYaguangSfx.ShakeBell));
+            Assert.That(sound.ObserveShakes(1, 10), Is.Null, "Once per shake.");
+            Assert.That(sound.ObserveShakes(3, 10), Is.EqualTo(LabYaguangSfx.ShakeBell), "Two at once ring once.");
+            Assert.That(sound.ObserveShakes(10, 10), Is.EqualTo(LabYaguangSfx.ShakeBellFinal));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ShakeBell), Is.EqualTo(2));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ShakeBellFinal), Is.EqualTo(1));
+            // 다음 섬광: 수가 0으로 돌아가면 다시 센다.
+            Assert.That(sound.ObserveShakes(0, 10), Is.Null);
+            Assert.That(sound.ObserveShakes(1, 10), Is.EqualTo(LabYaguangSfx.ShakeBell));
+
+            Assert.That(LabYaguangSound.BellPitch(1, 1f), Is.EqualTo(1f).Within(.0001f));
+            Assert.That(LabYaguangSound.BellPitch(2, 1f), Is.EqualTo(Mathf.Pow(2f, 1f / 12f)).Within(.0001f));
+            Assert.That(LabYaguangSound.BellPitch(9, 1f), Is.EqualTo(Mathf.Pow(2f, 8f / 12f)).Within(.0001f));
+            Assert.That(LabYaguangSound.BellPitch(20, 4f), Is.EqualTo(2f).Within(.0001f), "At most one octave up.");
         }
     }
 }

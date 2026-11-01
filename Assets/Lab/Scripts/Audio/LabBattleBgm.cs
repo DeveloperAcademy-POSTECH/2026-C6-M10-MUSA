@@ -9,6 +9,8 @@ namespace C6Lab
     /// - 일시정지: 멈춤 → 다시 시작하면 멈춘 지점부터 이어서
     /// - 승리/패배: 서서히 꺼짐
     /// 곡은 Resources/Audio/BGM 폴더의 첫 번째 소리 파일을 쓴다. 파일이 없으면 조용히 넘어간다.
+    /// - 야광귀 스테이지 (#396): Resources/Audio/YaguangBGM의 곡을 튼다(크기는 Yaguang Bgm Volume). LabConfig Inspector의
+    ///   Yaguang Use New Bgm(기본 켜짐)을 끄면 기존 꽹과리 BGM. 전투 중에 바꾸면 바로 처음부터 바꿔 튼다.
     /// - 구미호 스테이지 (#351)와 2:2 땅따먹기 (#293): Resources/Audio/GumihoBGM 폴더에 곡이 있으면 그 곡을 대신 튼다
     ///   (크기는 LabConfig의 Gumiho Bgm Volume). 어느 곡을 틀지는 라운드가 시작될 때 정한다. 야광귀·지귀·Lab 단판은
     ///   기본 전투 BGM. 2:2에는 피버타임 곡이 없다(팀 피버에도 곡을 바꾸지 않는다).
@@ -28,6 +30,8 @@ namespace C6Lab
         public const string FeverClipFolder = "Audio/Fever";
         public const string GumihoClipFolder = "Audio/GumihoBGM";
         public const string GumihoFeverClipFolder = "Audio/GumihoFever";
+        /// <summary>야광귀 스테이지 전투 BGM (#396). LabConfig Inspector의 Yaguang Use New Bgm(기본 켜짐)을 끄면 기존 BGM.</summary>
+        public const string YaguangClipFolder = "Audio/YaguangBGM";
 
         [Tooltip("LabConfig를 읽을 수 없을 때만 쓰는 기본 크기. 평소에는 LabConfig의 BGM Volume을 쓴다.")]
         [Range(0f, 1f)] public float volume = .2f;
@@ -42,7 +46,7 @@ namespace C6Lab
         private const double CueWindowSeconds = 1d;
 
         private AudioSource source, feverSource, cueSource;
-        private AudioClip battleClip, gumihoClip, feverClip, gumihoFeverClip;
+        private AudioClip battleClip, gumihoClip, feverClip, gumihoFeverClip, yaguangClip;
         private AudioClip[] cueClips;
         /// <summary>피버 시작 추임새를 낸 횟수 (테스트·확인용)</summary>
         public int FeverCueCount { get; private set; }
@@ -50,7 +54,7 @@ namespace C6Lab
         private string playingRound;
         private bool fading, feverOn;
         // 이번 라운드에 구미호 전투 BGM을 트는지, 지금 피버가 구미호 피버인지 (#351)
-        private bool gumihoBgm, gumihoFever;
+        private bool gumihoBgm, gumihoFever, yaguangBgm;
         private float feverBlend; // 0 = 전투 BGM, 1 = 피버 곡
         private double seenServerTime = -1d;
         private float seenAt;
@@ -65,7 +69,7 @@ namespace C6Lab
 
         // 기본 크기(LabConfig: Inspector·DEV, 구미호 전투 BGM은 Inspector) × 이 기기의 BGM 설정(일시정지 메뉴)
         private float BaseVolume => network == null || network.config == null ? volume
-            : gumihoBgm ? network.config.GumihoBgmVolume : network.config.BgmVolume;
+            : gumihoBgm ? network.config.GumihoBgmVolume : yaguangBgm ? network.config.YaguangBgmVolume : network.config.BgmVolume;
         private float TargetVolume => BaseVolume * LabAudioSettings.BgmVolume;
         private float FeverTargetVolume => (gumihoFever && network != null && network.config != null
             ? network.config.GumihoFeverBgmVolume : BaseVolume * feverVolume) * LabAudioSettings.BgmVolume;
@@ -78,6 +82,7 @@ namespace C6Lab
             gumihoClip = FirstClip(GumihoClipFolder);
             feverClip = FirstClip(FeverClipFolder);
             gumihoFeverClip = FirstClip(GumihoFeverClipFolder);
+            yaguangClip = FirstClip(YaguangClipFolder);
             source = gameObject.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.loop = true;
@@ -180,6 +185,10 @@ namespace C6Lab
             }
         }
 
+        /// <summary>야광귀 스테이지이고 Inspector에서 새 BGM을 켰고 곡 파일이 있으면 true (#396 테스트).</summary>
+        private bool WantsYaguangBgm() => yaguangClip != null && network != null && network.config != null
+            && network.config.YaguangUseNewBgm && network.GameStageYokai == LabStageYokai.Yaguang;
+
         private void Update()
         {
             if (source == null || battleClip == null && gumihoClip == null) return;
@@ -204,12 +213,23 @@ namespace C6Lab
                     fading = false;
                     StopFever();
                     gumihoBgm = (network.GameStageYokai == LabStageYokai.Gumiho || snapshot.teamTerritory) && gumihoClip != null;
+                    yaguangBgm = !gumihoBgm && WantsYaguangBgm();
                     source.Stop();
-                    source.clip = gumihoBgm ? gumihoClip : battleClip;
+                    source.clip = gumihoBgm ? gumihoClip : yaguangBgm ? yaguangClip : battleClip;
                     source.volume = TargetVolume;
                     source.time = 0f;
                     if (!snapshot.paused && source.clip != null) source.Play();
                     return;
+                }
+                // 야광귀 새 BGM 후보 (#396): 전투 중에 Inspector 토글을 바꾸면 바로 다른 곡으로 처음부터 바꿔 들려준다.
+                if (!gumihoBgm && WantsYaguangBgm() != yaguangBgm && !FeverPlaying)
+                {
+                    yaguangBgm = !yaguangBgm;
+                    source.Stop();
+                    source.clip = yaguangBgm ? yaguangClip : battleClip;
+                    source.volume = TargetVolume;
+                    source.time = 0f;
+                    if (!snapshot.paused && source.clip != null) source.Play();
                 }
                 if (source.clip == null) return;
                 if (snapshot.paused)

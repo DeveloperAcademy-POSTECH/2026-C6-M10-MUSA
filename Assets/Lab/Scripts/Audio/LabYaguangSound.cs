@@ -3,7 +3,7 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>야광귀 스테이지 효과음의 종류 (#395~). 숫자는 폴더·크기 순서다. 새 소리는 뒤에 붙인다.</summary>
-    public enum LabYaguangSfx { FlashWarn, FlashGlow, FlashCount, FlashBurst }
+    public enum LabYaguangSfx { FlashWarn, FlashGlow, FlashCount, FlashBurst, FlashTaunt, ShakeBell, ShakeBellFinal, FlashCaught }
 
     /// <summary>
     /// 야광귀 섬광 예고와 번쩍 효과음 (#395). Host 스냅샷의 섬광 시각만 보고 소리를 낸다(화면 코드와 따로 돈다).
@@ -11,6 +11,11 @@ namespace C6Lab
     /// - 눈이 빛나기 시작 (Audio/YaguangFlashGlow): 예고 30% 지점, 눈이 노랗게 빛나고 가장자리 빛이 차오를 때, 맞을 사람 기기
     /// - 3/2/1 (Audio/YaguangFlashCount): 화면 가운데 숫자가 바뀔 때마다, 맞을 사람 기기. 숫자가 줄수록 음이 높아진다.
     /// - 번쩍 (Audio/YaguangFlashBurst): 섬광이 터진 순간, 맞은 사람 기기 (진동과 같은 때)
+    /// #396 섬광 반응:
+    /// - "안보이지롱~" 대사 (Audio/YaguangFlashTaunt): 번쩍 뒤 Inspector 지연(기본 0.35초)만큼 늦게, 맞은 사람 기기 (징 뒤에 들리게)
+    /// - 흔들기 1~(최대-1)번 (Audio/YaguangShakeBell): 흔든 수가 하나 오를 때마다 같은 무당 방울 (Inspector로 횟수마다 높일 수 있음). 흔든 사람 기기
+    /// - 마지막 흔들기 (Audio/YaguangShakeBellFinal): 최대 횟수(기본 10번)를 채운 순간 더 큰 무당 방울. 흔든 사람 기기
+    /// - "으악 어지러워~" 대사 (Audio/YaguangFlashCaught): Host가 내 눈부심을 푼 뒤 Inspector 지연(기본 0.2초)만큼 늦게, 푼 사람 기기
     /// 그 순간보다 LateSeconds 넘게 늦게 알아챈 기기(늦게 들어옴, 일시정지 뒤)는 내지 않는다. 일시정지 중·시작 대기 중에는
     /// 새로 내지 않는다. 폴더가 비어 있으면 그 소리만 조용히 넘어간다(여러 개면 무작위).
     /// 크기는 LabConfig Inspector의 소리별 크기 × 일시정지 메뉴 효과음 설정.
@@ -22,13 +27,18 @@ namespace C6Lab
         public const string FlashGlowFolder = "Audio/YaguangFlashGlow";
         public const string FlashCountFolder = "Audio/YaguangFlashCount";
         public const string FlashBurstFolder = "Audio/YaguangFlashBurst";
-        private static readonly string[] Folders = { FlashWarnFolder, FlashGlowFolder, FlashCountFolder, FlashBurstFolder };
+        public const string FlashTauntFolder = "Audio/YaguangFlashTaunt";
+        public const string ShakeBellFolder = "Audio/YaguangShakeBell";
+        public const string ShakeBellFinalFolder = "Audio/YaguangShakeBellFinal";
+        public const string FlashCaughtFolder = "Audio/YaguangFlashCaught";
+        private static readonly string[] Folders = { FlashWarnFolder, FlashGlowFolder, FlashCountFolder, FlashBurstFolder,
+            FlashTauntFolder, ShakeBellFolder, ShakeBellFinalFolder, FlashCaughtFolder };
         /// <summary>그 순간보다 이 초 넘게 늦게 알아채면 내지 않는다.</summary>
         public const double LateSeconds = .5d;
 
         private AudioClip[][] clips;
         private readonly int[] counts = new int[Folders.Length];
-        private AudioSource source, countSource;
+        private AudioSource source, countSource, bellSource;
         private LabNetwork network;
 
         private string session;
@@ -37,6 +47,11 @@ namespace C6Lab
         private uint seenFlashCount;
         private double warnFor = double.NaN, glowFor = double.NaN, countFor = double.NaN;
         private int lastCount;
+        // #396: 대사를 낼 섬광(섬광 수)과 그 시각(Host 시각). 0이면 기다리는 대사 없음.
+        private uint tauntFor, caughtFor, caughtSeen;
+        private double tauntAt, caughtAt;
+        private int seenShakes;
+        private LabYaguangFlashHud flashHud;
         private string clockSession;
         private uint clockRound;
         private double seenServerTime = -1d;
@@ -58,6 +73,8 @@ namespace C6Lab
             source = NewSource();
             // 3/2/1은 숫자마다 높이가 달라서 따로 둔다 (다른 소리의 높이가 바뀌지 않게).
             countSource = NewSource();
+            // 흔들기 방울도 횟수마다 높이가 달라서 따로 둔다.
+            bellSource = NewSource();
         }
 
         private AudioSource NewSource()
@@ -74,6 +91,37 @@ namespace C6Lab
             LabSnapshot snapshot = network.Snapshot;
             if (snapshot == null) return;
             ObserveFlash(snapshot, ServerNow(snapshot), network.LocalPlayerId);
+            if (flashHud == null) flashHud = GetComponent<LabYaguangFlashHud>();
+            if (flashHud != null && network.config != null && snapshot.phase == LabPhase.Playing)
+                ObserveShakes(flashHud.ShakeCount, network.config.YaguangFlashShakeCount);
+        }
+
+        /// <summary>
+        /// 이번 섬광에서 흔든 수(count)가 늘었으면 방울을 낸다 (#396). 최대 횟수(needed)에 닿은 흔들기는 큰 방울, 그 전은
+        /// 같은 방울(Inspector 반음 간격이 0보다 크면 횟수마다 높아짐). 한 번에 여러 번 늘었으면 마지막 횟수의 소리 하나만 낸다. 새 섬광이라 수가 줄면 다시 센다.
+        /// 낸 소리 종류를 돌려준다 (없으면 null).
+        /// </summary>
+        public LabYaguangSfx? ObserveShakes(int count, int needed)
+        {
+            if (count < seenShakes) seenShakes = count;
+            if (count <= seenShakes) return null;
+            seenShakes = count;
+            if (needed > 0 && count >= needed)
+            {
+                Play(LabYaguangSfx.ShakeBellFinal);
+                return LabYaguangSfx.ShakeBellFinal;
+            }
+            LabConfig config = network != null ? network.config : null;
+            float step = config != null ? config.YaguangShakeBellStepSemitones : 0f;
+            Play(LabYaguangSfx.ShakeBell, bellSource, BellPitch(count, step));
+            return LabYaguangSfx.ShakeBell;
+        }
+
+        /// <summary>count번째 흔들기 방울의 재생 속도. 1번이 원래 높이이고 한 번 늘 때마다 step 반음씩 높다 (최대 +12반음).</summary>
+        public static float BellPitch(int count, float step)
+        {
+            float up = Mathf.Min(12f, Mathf.Max(0, count - 1) * Mathf.Clamp(step, 0f, 4f));
+            return Mathf.Pow(2f, up / 12f);
         }
 
         /// <summary>
@@ -90,6 +138,9 @@ namespace C6Lab
                 seenFlashCount = snapshot.flashCount;
                 warnFor = glowFor = countFor = double.NaN;
                 lastCount = 0;
+                // 접속 직후 이미 지난 섬광의 대사는 내지 않는다.
+                tauntFor = caughtFor = 0;
+                caughtSeen = snapshot.flashCount;
             }
 
             // 번쩍: 섬광 수가 늘었고 이번에 내가 맞았으면 (진동과 같은 기준, 1초 넘게 지난 섬광은 내지 않음).
@@ -97,7 +148,27 @@ namespace C6Lab
             if (snapshot.flashCount > seenFlashCount)
             {
                 seenFlashCount = snapshot.flashCount;
-                if (snapshot.LastFlashHit(me) && now - snapshot.flashLastAt <= 1d) Play(LabYaguangSfx.FlashBurst);
+                if (snapshot.LastFlashHit(me) && now - snapshot.flashLastAt <= 1d)
+                {
+                    Play(LabYaguangSfx.FlashBurst);
+                    // "안보이지롱~"은 징 뒤에 들리게 조금 늦게 낸다.
+                    tauntFor = snapshot.flashCount;
+                    tauntAt = snapshot.flashLastAt + TauntDelay;
+                }
+            }
+            ObserveCaught(snapshot, now, me);
+            if (!snapshot.paused)
+            {
+                if (tauntFor != 0 && tauntFor == snapshot.flashCount && now >= tauntAt)
+                {
+                    tauntFor = 0;
+                    if (now - tauntAt <= LateSeconds) Play(LabYaguangSfx.FlashTaunt);
+                }
+                if (caughtFor != 0 && caughtFor == snapshot.flashCount && now >= caughtAt)
+                {
+                    caughtFor = 0;
+                    if (now - caughtAt <= LateSeconds) Play(LabYaguangSfx.FlashCaught);
+                }
             }
 
             if (snapshot.paused || !snapshot.FlashWarningOn(now)) return;
@@ -133,6 +204,23 @@ namespace C6Lab
                 if (now - (snapshot.flashAt - count) <= LateSeconds) PlayCount(count);
             }
         }
+
+        /// <summary>
+        /// Host가 이번 섬광의 내 눈부심을 풀었으면 "으악 어지러워~"를 예약한다 (#396). 섬광마다 한 번, 푼 지 1초 넘게 지나 알아채면
+        /// 내지 않는다 (말풍선 LabYaguangFlashHud.CheckCaught와 같은 기준).
+        /// </summary>
+        private void ObserveCaught(LabSnapshot snapshot, double now, ulong me)
+        {
+            double released = snapshot.FlashReleasedAt(me);
+            if (released < 0d || caughtSeen == snapshot.flashCount) return;
+            caughtSeen = snapshot.flashCount;
+            if (now - released > 1d) return;
+            caughtFor = snapshot.flashCount;
+            caughtAt = released + CaughtDelay;
+        }
+
+        private double TauntDelay => network != null && network.config != null ? network.config.YaguangFlashTauntDelaySeconds : .35d;
+        private double CaughtDelay => network != null && network.config != null ? network.config.YaguangFlashCaughtDelaySeconds : .2d;
 
         /// <summary>이 소리를 한 번 낸다. 소리를 냈으면 true (파일이 없으면 세기만 하고 false).</summary>
         public bool Play(LabYaguangSfx sfx) => Play(sfx, source, 1f);
@@ -174,6 +262,10 @@ namespace C6Lab
                 case LabYaguangSfx.FlashWarn: return config.YaguangFlashWarnSoundVolume;
                 case LabYaguangSfx.FlashGlow: return config.YaguangFlashGlowSoundVolume;
                 case LabYaguangSfx.FlashCount: return config.YaguangFlashCountSoundVolume;
+                case LabYaguangSfx.FlashTaunt: return config.YaguangFlashTauntSoundVolume;
+                case LabYaguangSfx.ShakeBell: return config.YaguangShakeBellSoundVolume;
+                case LabYaguangSfx.ShakeBellFinal: return config.YaguangShakeBellFinalSoundVolume;
+                case LabYaguangSfx.FlashCaught: return config.YaguangFlashCaughtSoundVolume;
                 default: return config.YaguangFlashBurstSoundVolume;
             }
         }
