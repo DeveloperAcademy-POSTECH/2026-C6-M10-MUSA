@@ -893,8 +893,6 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float yaguangFlashCaughtSoundVolume = .9f;
         [Tooltip("눈부심이 풀린 뒤 \"으악 어지러워~\"까지 기다리는 초")]
         [SerializeField, Range(0f, 2f)] private float yaguangFlashCaughtDelaySeconds = .2f;
-        [Tooltip("10번째 흔들기의 큰 방울 뒤 양금 가락(Resources/Audio/FlashClear)까지 기다리는 초 (0이면 동시에)")]
-        [SerializeField, Range(0f, 1.5f)] private float yaguangFlashClearDelaySeconds = .4f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1325,7 +1323,6 @@ namespace C6Lab
         public float YaguangShakeBellFinalSoundVolume => Mathf.Clamp01(Finite(yaguangShakeBellFinalSoundVolume, .9f));
         public float YaguangFlashCaughtSoundVolume => Mathf.Clamp01(Finite(yaguangFlashCaughtSoundVolume, .9f));
         public float YaguangFlashCaughtDelaySeconds => Mathf.Clamp(Finite(yaguangFlashCaughtDelaySeconds, .2f), 0f, 2f);
-        public float YaguangFlashClearDelaySeconds => Mathf.Clamp(Finite(yaguangFlashClearDelaySeconds, .4f), 0f, 1.5f);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;

@@ -33,8 +33,8 @@ namespace C6Lab.Tests
         {
             AudioClip[] clips = Resources.LoadAll<AudioClip>(LabFlashRewardSound.FiveColorHitFolder);
             Assert.That(clips.Select(clip => clip.name), Is.EquivalentTo(new[] { "FiveColorHit_1", "FiveColorHit_2" }));
-            Assert.That(Resources.LoadAll<AudioClip>(LabFlashRewardSound.FlashClearFolder).Select(clip => clip.name),
-                Is.EqualTo(new[] { "FlashClear" }));
+            // #396: 10번째 흔들기에는 큰 무당 방울(LabYaguangSound)만 내므로 섬광 해결 소리 폴더는 비워 둔다.
+            Assert.That(Resources.LoadAll<AudioClip>(LabFlashRewardSound.FlashClearFolder), Is.Empty);
 
             host = new GameObject("flash-reward-sound");
             LabFlashRewardSound sound = host.AddComponent<LabFlashRewardSound>();
