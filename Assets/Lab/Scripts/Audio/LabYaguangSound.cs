@@ -13,7 +13,7 @@ namespace C6Lab
     /// - 번쩍 (Audio/YaguangFlashBurst): 섬광이 터진 순간, 맞은 사람 기기 (진동과 같은 때)
     /// #396 섬광 반응:
     /// - "안보이지롱~" 대사 (Audio/YaguangFlashTaunt): 번쩍 뒤 Inspector 지연(기본 0.35초)만큼 늦게, 맞은 사람 기기 (징 뒤에 들리게)
-    /// - 흔들기 1~(최대-1)번 (Audio/YaguangShakeBell): 흔든 수가 하나 오를 때마다 무당 방울, 횟수가 늘수록 음이 높아진다. 흔든 사람 기기
+    /// - 흔들기 1~(최대-1)번 (Audio/YaguangShakeBell): 흔든 수가 하나 오를 때마다 같은 무당 방울 (Inspector로 횟수마다 높일 수 있음). 흔든 사람 기기
     /// - 마지막 흔들기 (Audio/YaguangShakeBellFinal): 최대 횟수(기본 10번)를 채운 순간 더 큰 무당 방울. 흔든 사람 기기
     /// - "으악 어지러워~" 대사 (Audio/YaguangFlashCaught): Host가 내 눈부심을 푼 뒤 Inspector 지연(기본 0.2초)만큼 늦게, 푼 사람 기기
     /// 그 순간보다 LateSeconds 넘게 늦게 알아챈 기기(늦게 들어옴, 일시정지 뒤)는 내지 않는다. 일시정지 중·시작 대기 중에는
@@ -98,7 +98,7 @@ namespace C6Lab
 
         /// <summary>
         /// 이번 섬광에서 흔든 수(count)가 늘었으면 방울을 낸다 (#396). 최대 횟수(needed)에 닿은 흔들기는 큰 방울, 그 전은
-        /// 횟수마다 높아지는 방울. 한 번에 여러 번 늘었으면 마지막 횟수의 소리 하나만 낸다. 새 섬광이라 수가 줄면 다시 센다.
+        /// 같은 방울(Inspector 반음 간격이 0보다 크면 횟수마다 높아짐). 한 번에 여러 번 늘었으면 마지막 횟수의 소리 하나만 낸다. 새 섬광이라 수가 줄면 다시 센다.
         /// 낸 소리 종류를 돌려준다 (없으면 null).
         /// </summary>
         public LabYaguangSfx? ObserveShakes(int count, int needed)
@@ -112,7 +112,7 @@ namespace C6Lab
                 return LabYaguangSfx.ShakeBellFinal;
             }
             LabConfig config = network != null ? network.config : null;
-            float step = config != null ? config.YaguangShakeBellStepSemitones : 1f;
+            float step = config != null ? config.YaguangShakeBellStepSemitones : 0f;
             Play(LabYaguangSfx.ShakeBell, bellSource, BellPitch(count, step));
             return LabYaguangSfx.ShakeBell;
         }

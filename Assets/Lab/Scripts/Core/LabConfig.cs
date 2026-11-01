@@ -885,8 +885,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 2f)] private float yaguangFlashTauntDelaySeconds = .35f;
         [Tooltip("흔들 때마다 나는 무당 방울 크기 (Resources/Audio/YaguangShakeBell, 흔든 사람 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangShakeBellSoundVolume = .6f;
-        [Tooltip("흔든 수가 하나 늘 때마다 방울을 몇 반음씩 높일지 (0이면 같은 높이, 최대 +12반음까지)")]
-        [SerializeField, Range(0f, 4f)] private float yaguangShakeBellStepSemitones = 1f;
+        [Tooltip("흔든 수가 하나 늘 때마다 방울을 몇 반음씩 높일지 (기본 0 = 매번 같은 방울 소리, 최대 +12반음까지)")]
+        [SerializeField, Range(0f, 4f)] private float yaguangShakeBellStepSemitones;
         [Tooltip("최대 횟수(기본 10번)를 채운 마지막 흔들기의 큰 무당 방울 크기 (Resources/Audio/YaguangShakeBellFinal, 흔든 사람 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangShakeBellFinalSoundVolume = .9f;
         [Tooltip("\"으악 어지러워~\" 대사 크기 (Resources/Audio/YaguangFlashCaught, 푼 사람 기기)")]
@@ -1321,7 +1321,7 @@ namespace C6Lab
         public float YaguangFlashTauntSoundVolume => Mathf.Clamp01(Finite(yaguangFlashTauntSoundVolume, .9f));
         public float YaguangFlashTauntDelaySeconds => Mathf.Clamp(Finite(yaguangFlashTauntDelaySeconds, .35f), 0f, 2f);
         public float YaguangShakeBellSoundVolume => Mathf.Clamp01(Finite(yaguangShakeBellSoundVolume, .6f));
-        public float YaguangShakeBellStepSemitones => Mathf.Clamp(Finite(yaguangShakeBellStepSemitones, 1f), 0f, 4f);
+        public float YaguangShakeBellStepSemitones => Mathf.Clamp(Finite(yaguangShakeBellStepSemitones, 0f), 0f, 4f);
         public float YaguangShakeBellFinalSoundVolume => Mathf.Clamp01(Finite(yaguangShakeBellFinalSoundVolume, .9f));
         public float YaguangFlashCaughtSoundVolume => Mathf.Clamp01(Finite(yaguangFlashCaughtSoundVolume, .9f));
         public float YaguangFlashCaughtDelaySeconds => Mathf.Clamp(Finite(yaguangFlashCaughtDelaySeconds, .2f), 0f, 2f);
