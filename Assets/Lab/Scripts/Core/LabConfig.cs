@@ -878,6 +878,21 @@ namespace C6Lab
         [SerializeField, Range(0f, 12f)] private float yaguangFlashCountStepSemitones = 2f;
         [Tooltip("섬광 번쩍 소리 크기 (Resources/Audio/YaguangFlashBurst, 맞은 사람 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangFlashBurstSoundVolume = .9f;
+        [Header("야광귀 섬광 반응 효과음 (#396, Inspector 전용)")]
+        [Tooltip("\"안보이지롱~\" 대사 크기 (Resources/Audio/YaguangFlashTaunt, 맞은 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangFlashTauntSoundVolume = .9f;
+        [Tooltip("번쩍 뒤 \"안보이지롱~\"까지 기다리는 초 (징 소리 뒤에 들리게)")]
+        [SerializeField, Range(0f, 2f)] private float yaguangFlashTauntDelaySeconds = .35f;
+        [Tooltip("흔들 때마다 나는 무당 방울 크기 (Resources/Audio/YaguangShakeBell, 흔든 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangShakeBellSoundVolume = .6f;
+        [Tooltip("흔든 수가 하나 늘 때마다 방울을 몇 반음씩 높일지 (0이면 같은 높이, 최대 +12반음까지)")]
+        [SerializeField, Range(0f, 4f)] private float yaguangShakeBellStepSemitones = 1f;
+        [Tooltip("최대 횟수(기본 10번)를 채운 마지막 흔들기의 큰 무당 방울 크기 (Resources/Audio/YaguangShakeBellFinal, 흔든 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangShakeBellFinalSoundVolume = .9f;
+        [Tooltip("\"으악 어지러워~\" 대사 크기 (Resources/Audio/YaguangFlashCaught, 푼 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangFlashCaughtSoundVolume = .9f;
+        [Tooltip("눈부심이 풀린 뒤 \"으악 어지러워~\"까지 기다리는 초")]
+        [SerializeField, Range(0f, 2f)] private float yaguangFlashCaughtDelaySeconds = .2f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1300,6 +1315,14 @@ namespace C6Lab
         public float YaguangFlashCountSoundVolume => Mathf.Clamp01(Finite(yaguangFlashCountSoundVolume, .8f));
         public float YaguangFlashCountStepSemitones => Mathf.Clamp(Finite(yaguangFlashCountStepSemitones, 2f), 0f, 12f);
         public float YaguangFlashBurstSoundVolume => Mathf.Clamp01(Finite(yaguangFlashBurstSoundVolume, .9f));
+        // 야광귀 섬광 반응 효과음 (#396): Inspector 값 그대로
+        public float YaguangFlashTauntSoundVolume => Mathf.Clamp01(Finite(yaguangFlashTauntSoundVolume, .9f));
+        public float YaguangFlashTauntDelaySeconds => Mathf.Clamp(Finite(yaguangFlashTauntDelaySeconds, .35f), 0f, 2f);
+        public float YaguangShakeBellSoundVolume => Mathf.Clamp01(Finite(yaguangShakeBellSoundVolume, .6f));
+        public float YaguangShakeBellStepSemitones => Mathf.Clamp(Finite(yaguangShakeBellStepSemitones, 1f), 0f, 4f);
+        public float YaguangShakeBellFinalSoundVolume => Mathf.Clamp01(Finite(yaguangShakeBellFinalSoundVolume, .9f));
+        public float YaguangFlashCaughtSoundVolume => Mathf.Clamp01(Finite(yaguangFlashCaughtSoundVolume, .9f));
+        public float YaguangFlashCaughtDelaySeconds => Mathf.Clamp(Finite(yaguangFlashCaughtDelaySeconds, .2f), 0f, 2f);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;
