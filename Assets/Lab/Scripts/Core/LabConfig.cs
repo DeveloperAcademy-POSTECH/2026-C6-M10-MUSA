@@ -901,6 +901,17 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float yaguangFlashCaughtSoundVolume = .9f;
         [Tooltip("눈부심이 풀린 뒤 \"으악 어지러워~\"까지 기다리는 초")]
         [SerializeField, Range(0f, 2f)] private float yaguangFlashCaughtDelaySeconds = .2f;
+        [Header("야광귀 콤보 예고와 진행 효과음 (#397, Inspector 전용)")]
+        [Tooltip("콤보 예고 카운트 \"넷/셋/둘/하나\" 야광귀 목소리 크기 (Resources/Audio/YaguangComboCount1~4, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboCountSoundVolume = .9f;
+        [Tooltip("4칸 색이 공개되는 순간 꽹과리 \"깽!\" 크기 (Resources/Audio/YaguangComboStart, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboStartSoundVolume = .8f;
+        [Tooltip("콤보 제한 시간 동안 1초마다 나는 시계 째깍 크기 (Resources/Audio/YaguangComboTick, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboTickSoundVolume = .5f;
+        [Tooltip("마지막 몇 초의 빠른 째깍(0.5초마다) 크기 (Resources/Audio/YaguangComboTickFast, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboTickFastSoundVolume = .6f;
+        [Tooltip("남은 시간이 이 초 이하가 되면 빠른 째깍으로 바꾼다 (0이면 끝까지 1초마다)")]
+        [SerializeField, Range(0f, 10f)] private float yaguangComboTickFastSeconds = 3f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1336,6 +1347,12 @@ namespace C6Lab
         public float YaguangShakeBellFinalSoundVolume => Mathf.Clamp01(Finite(yaguangShakeBellFinalSoundVolume, .9f));
         public float YaguangFlashCaughtSoundVolume => Mathf.Clamp01(Finite(yaguangFlashCaughtSoundVolume, .9f));
         public float YaguangFlashCaughtDelaySeconds => Mathf.Clamp(Finite(yaguangFlashCaughtDelaySeconds, .2f), 0f, 2f);
+        // 야광귀 콤보 예고와 진행 효과음 (#397): Inspector 값 그대로
+        public float YaguangComboCountSoundVolume => Mathf.Clamp01(Finite(yaguangComboCountSoundVolume, .9f));
+        public float YaguangComboStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboStartSoundVolume, .8f));
+        public float YaguangComboTickSoundVolume => Mathf.Clamp01(Finite(yaguangComboTickSoundVolume, .5f));
+        public float YaguangComboTickFastSoundVolume => Mathf.Clamp01(Finite(yaguangComboTickFastSoundVolume, .6f));
+        public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 3f), 0f, 10f);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;
