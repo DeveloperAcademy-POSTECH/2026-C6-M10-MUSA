@@ -114,5 +114,20 @@ namespace C6Lab.Tests
             Assert.That(haptics.PlayForComboFail(config), Is.False);
             Assert.That(haptics.PlayCount, Is.EqualTo(before));
         }
+
+        [Test]
+        public void AFiveColorHitRingsLikeAGongForAboutASecondUnlessHapticsAreOff()
+        {
+            Assert.That(haptics.FiveColorHitSeconds, Is.EqualTo(1f), "#395: about one second, with the gong.");
+            Assert.That(haptics.PlayForFiveColorHit(config), Is.True);
+            Assert.That(haptics.LastKind, Is.EqualTo(LabHapticKind.FiveColorHit));
+
+            float[] values = config.CaptureDeveloperValues();
+            values[67] = 0f; // haptics off
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            int before = haptics.PlayCount;
+            Assert.That(haptics.PlayForFiveColorHit(config), Is.False);
+            Assert.That(haptics.PlayCount, Is.EqualTo(before));
+        }
     }
 }

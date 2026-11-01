@@ -867,6 +867,18 @@ namespace C6Lab
         [Tooltip("해금 폭탄이 공격 구슬 2개로 바뀔 때 소리 크기 (Resources/Audio/BombOpen, 그 판 주인 기기만)")]
         [SerializeField, Range(0f, 1f)] private float bombOpenSoundVolume = .8f;
 
+        [Header("야광귀 섬광 효과음 (#395, Inspector 전용)")]
+        [Tooltip("섬광 예고 시작, 말풍선에 야광귀 눈이 뜰 때 소리 크기 (Resources/Audio/YaguangFlashWarn, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangFlashWarnSoundVolume = .6f;
+        [Tooltip("눈이 노랗게 빛나며 가장자리 빛이 차오를 때 소리 크기 (Resources/Audio/YaguangFlashGlow, 맞을 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangFlashGlowSoundVolume = .6f;
+        [Tooltip("화면 가운데 3/2/1 숫자 소리 크기 (Resources/Audio/YaguangFlashCount, 맞을 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangFlashCountSoundVolume = .8f;
+        [Tooltip("3 → 2 → 1로 줄 때마다 몇 반음씩 높일지 (0이면 같은 높이)")]
+        [SerializeField, Range(0f, 12f)] private float yaguangFlashCountStepSemitones = 2f;
+        [Tooltip("섬광 번쩍 소리 크기 (Resources/Audio/YaguangFlashBurst, 맞은 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangFlashBurstSoundVolume = .9f;
+
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
         [SerializeField] private bool hapticsEnabled = true;
@@ -1282,6 +1294,12 @@ namespace C6Lab
         public float FoxFallSoundVolume => Mathf.Clamp01(Finite(foxFallSoundVolume, .8f));
         public float FoxClearSoundVolume => Mathf.Clamp01(Finite(foxClearSoundVolume, .8f));
         public float BombOpenSoundVolume => Mathf.Clamp01(Finite(bombOpenSoundVolume, .8f));
+        // 야광귀 섬광 효과음 (#395): Inspector 값 그대로 (DEV 배열에 넣지 않음)
+        public float YaguangFlashWarnSoundVolume => Mathf.Clamp01(Finite(yaguangFlashWarnSoundVolume, .6f));
+        public float YaguangFlashGlowSoundVolume => Mathf.Clamp01(Finite(yaguangFlashGlowSoundVolume, .6f));
+        public float YaguangFlashCountSoundVolume => Mathf.Clamp01(Finite(yaguangFlashCountSoundVolume, .8f));
+        public float YaguangFlashCountStepSemitones => Mathf.Clamp(Finite(yaguangFlashCountStepSemitones, 2f), 0f, 12f);
+        public float YaguangFlashBurstSoundVolume => Mathf.Clamp01(Finite(yaguangFlashBurstSoundVolume, .9f));
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;
