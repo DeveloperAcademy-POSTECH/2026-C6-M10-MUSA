@@ -36,7 +36,7 @@ namespace C6Lab
                 throw new ArgumentOutOfRangeException(nameof(releaseX01));
             Vector3 anchor = SeatPosition(seatIndex, seatCount, targetCenter,
                 config.ThrowOriginRadius, config.ThrowOriginHeightOffset,
-                !(config.TeamTerritoryEnabled && seatCount == LabTeams.Players));
+                !(config.TeamTerritoryEnabled && LabTeams.IsTeamCount(seatCount)));
             Vector3 right = ScreenRight(anchor, targetCenter);
             Vector3 position = anchor + right * ((releaseX01 * 2f - 1f) * config.ThrowOriginLateralRange);
             if (config.ThrowForm == LabThrowForm.Straight)

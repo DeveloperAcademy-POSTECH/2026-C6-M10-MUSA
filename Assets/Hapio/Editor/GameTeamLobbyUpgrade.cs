@@ -12,6 +12,8 @@ namespace Hapio.Editor
     /// 2:2 청홍 땅따먹기 (#281): adds the authored mode popup and the team seat screen to the shared lobby prefab
     /// through Unity, at the Figma positions of the 402x874 design. Existing objects and their edits are kept;
     /// running it again only fills in what is missing. Home/Lobby receive the new objects as prefab instances.
+    /// #394 adds the 2~6 player chips in a horizontal scroll, a reason line under each mode button, P6 and the
+    /// 1:1 and 3:3 seat screens (3:3 shows one team page at a time) with team-coloured seats.
     /// </summary>
     public static class GameTeamLobbyUpgrade
     {
@@ -35,8 +37,12 @@ namespace Hapio.Editor
                 if (view == null) throw new InvalidOperationException("The shared lobby prefab has no GameLobbyView.");
                 BuildModePanel(view);
                 BuildTeamScreen(view);
+                BuildCountScroll(view);
+                BuildTeamSizeSeats(view);
                 if (view.teamLobbyDesignRevision < 2) ApplyFigma303(view);
                 if (view.teamLobbyDesignRevision < 3) ApplyInk303(view);
+                if (view.teamLobbyDesignRevision < 4) ApplyTeamSizes394(view);
+                if (view.teamLobbyDesignRevision < 5) ApplySeatTitle394(view);
                 EditorUtility.SetDirty(view);
                 PrefabUtility.SaveAsPrefabAsset(root, GameLobbySceneUpgrade.PrefabPath);
             }
@@ -44,12 +50,13 @@ namespace Hapio.Editor
             // The DEV panel gains its "2:2" tab in the same pass; Battle is never copied again here.
             if (!MenuDeveloperSchemaIsCurrent()) GameSceneBuilder.UpgradeMenuDeveloperSchema();
             AssetDatabase.SaveAssets();
-            Debug.Log("HAPIO_2V2_LOBBY_READY: mode popup, team seats and the 2:2 DEV tab are saved.");
+            Debug.Log("HAPIO_2V2_LOBBY_READY: mode popup, 1:1·2:2·3:3 team seats, 2~6 player chips and the 2:2 DEV tab are saved.");
         }
 
         private static void ImportSprites()
         {
-            foreach (string name in new[] { "TeamBoxBlue", "TeamBoxRed", "ModeCard", "ModePill", "TeamLineBlue", "TeamLineRed" })
+            foreach (string name in new[] { "TeamBoxBlue", "TeamBoxRed", "ModeCard", "ModePill", "TeamLineBlue", "TeamLineRed",
+                "TeamTrioBoxBlue", "TeamTrioBoxRed", "TeamSeatBlue", "TeamSeatRed" })
             {
                 string path = ArtFolder + name + ".png";
                 AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
@@ -163,6 +170,208 @@ namespace Hapio.Editor
         private static void Place(Transform rect, float x, float y, float width, float height)
             => LabLobbyView.Place((RectTransform)rect, x, y, width, height);
 
+        // One-time #394 layout: a taller card leaves a reason line under each mode button. Later edits are kept.
+        private static void ApplyTeamSizes394(GameLobbyView view)
+        {
+            Transform card = view.modePanel.transform.Find("Card");
+            Place(card, 28, 278, 345, 290);
+            Place(card.Find("BasicMode"), 21, 115, 303, 48);
+            Place(card.Find("BasicReason"), 21, 165, 303, 22);
+            Place(card.Find("TeamMode"), 21, 193, 303, 48);
+            Place(card.Find("TeamReason"), 21, 243, 303, 22);
+            Place(view.modePanel.transform.Find("TeamSolo"), 111, 584, 180, 34);
+            // A blocked mode is drawn in the view's grey; the default half-transparent tint would let the dim show through.
+            foreach (UnityEngine.UI.Button button in new[] { view.basicModeButton, view.teamModeButton })
+            {
+                var colors = button.colors; colors.disabledColor = Color.white; button.colors = colors;
+            }
+            view.teamLobbyDesignRevision = 4;
+        }
+
+        // One-time #394 title: the seat screen no longer names the team size.
+        private static void ApplySeatTitle394(GameLobbyView view)
+        {
+            var title = view.teamLayout.transform.Find("ModeTitle").GetComponent<UnityEngine.UI.Text>();
+            title.text = "< 땅따먹기 >";
+            view.teamLobbyDesignRevision = 5;
+        }
+
+        /// <summary>
+        /// #394: P6 (a copy of P5), the 1:1 and 3:3 seat anchors, team-coloured filled seats and the 3:3 team page: one
+        /// wider dashed team box with the story's three-seat triangle, the team name, page arrows and two page dots.
+        /// </summary>
+        private static void BuildTeamSizeSeats(GameLobbyView view)
+        {
+            Transform page = view.positionPage.transform;
+            Font brush = view.heading.font;
+            if (view.slotButtons.Length < LabModel.TerritoryMaximumParticipants)
+            {
+                UnityEngine.UI.Button five = view.slotButtons[4];
+                UnityEngine.UI.Text fiveLocal = view.localLabels[4];
+                Transform slot = page.Find("SlotP6") ?? UnityEngine.Object.Instantiate(five.gameObject, page).transform;
+                slot.name = "SlotP6";
+                slot.SetSiblingIndex(fiveLocal.transform.GetSiblingIndex() + 1);
+                Transform local = page.Find("LocalP6") ?? UnityEngine.Object.Instantiate(fiveLocal.gameObject, page).transform;
+                local.name = "LocalP6";
+                local.SetSiblingIndex(slot.GetSiblingIndex() + 1);
+                view.slotButtons = Append(view.slotButtons, slot.GetComponent<UnityEngine.UI.Button>());
+                view.slotImages = Append(view.slotImages, slot.Find(view.slotImages[4].name).GetComponent<UnityEngine.UI.Image>());
+                view.slotLabels = Append(view.slotLabels, slot.Find(view.slotLabels[4].name).GetComponent<UnityEngine.UI.Text>());
+                view.localLabels = Append(view.localLabels, local.GetComponent<UnityEngine.UI.Text>());
+            }
+
+            Transform layouts = page.Find("EditableSeatLayouts");
+            view.seatsOneOnOne = Anchors(layouts, "Team2", new Vector2(103.03f, 516.5f), new Vector2(298.03f, 516.5f));
+            // Each team page: P1/P4 bottom centre, P2/P5 upper left, P3/P6 upper right.
+            Vector2 bottom = new Vector2(201f, 570f), left = new Vector2(130f, 445f), right = new Vector2(272f, 445f);
+            view.seatsThreeOnThree = Anchors(layouts, "Team6", bottom, left, right, bottom, left, right);
+            if (view.blueTeamFilledSlot == null) view.blueTeamFilledSlot = Art("TeamSeatBlue");
+            if (view.redTeamFilledSlot == null) view.redTeamFilledSlot = Art("TeamSeatRed");
+            if (view.blueTrioBox == null) view.blueTrioBox = Art("TeamTrioBoxBlue");
+            if (view.redTrioBox == null) view.redTrioBox = Art("TeamTrioBoxRed");
+
+            Transform layout = view.teamLayout.transform;
+            view.teamPairParts = new[] { "BlueBox", "RedBox", "BlueTeam", "RedTeam" }.Select(name => layout.Find(name).gameObject).ToArray();
+            view.teamPairLines = new[] { "BlueLine", "RedLine" }.Select(name => layout.Find(name).gameObject).ToArray();
+            RectTransform trio = Child(layout, "Trio");
+            Stretch(trio);
+            view.teamTrio = trio.gameObject;
+            RectTransform box = Child(trio, "TeamBox", out bool newBox);
+            var boxImage = Component<UnityEngine.UI.Image>(box);
+            if (newBox)
+            {
+                LabLobbyView.Place(box, 72f, 370f, 258f, 270f);
+                boxImage.sprite = view.blueTrioBox; boxImage.color = Color.white;
+            }
+            // The box is also the swipe area, behind every seat button.
+            boxImage.type = UnityEngine.UI.Image.Type.Simple; boxImage.raycastTarget = true;
+            view.teamTrioBox = boxImage;
+            view.teamSwipe = Component<GameLobbySwipe>(box);
+            RectTransform lines = Child(trio, "TeamLines", out bool newLines);
+            if (newLines)
+            {
+                // The story's three-seat triangle, scaled to these seats and turned like ConnectionLines3.
+                LabLobbyView.Place(lines, 124.5f, 438.85f, 161.4f, 143.5f);
+                lines.localEulerAngles = new Vector3(0f, 0f, 180f);
+            }
+            var lineImage = Component<UnityEngine.UI.Image>(lines);
+            lineImage.sprite = view.lines[0]; lineImage.color = view.connectionLines.color; lineImage.raycastTarget = false;
+            RectTransform teamName = Child(trio, "TeamName");
+            Text(teamName, view.mediumFont, "청팀", 20, Blue, 151f, 646.5f, 100f, 26f);
+            view.teamTrioName = teamName.GetComponent<UnityEngine.UI.Text>();
+            view.teamPreviousPage = PageArrow(trio, "PreviousPage", brush, "<", 28f);
+            view.teamNextPage = PageArrow(trio, "NextPage", brush, ">", 330f);
+            view.teamPageDots = new[] { PageDot(trio, "BluePageDot", 191f), PageDot(trio, "RedPageDot", 203f) };
+            // Saved hidden like the other team-only objects; the view shows it in a 3:3 room.
+            trio.gameObject.SetActive(false);
+        }
+
+        private static RectTransform[] Anchors(Transform layouts, string group, params Vector2[] centers)
+        {
+            RectTransform seats = Child(layouts, group);
+            Stretch(seats);
+            var anchors = new RectTransform[centers.Length];
+            for (int i = 0; i < centers.Length; i++)
+            {
+                RectTransform anchor = Child(seats, "P" + (i + 1), out bool created);
+                if (created) LabLobbyView.Place(anchor, centers[i].x - 34.41555f, centers[i].y - 33.9867f, 68.8311f, 67.9734f);
+                anchors[i] = anchor;
+            }
+            return anchors;
+        }
+
+        /// <summary>A 44x44 page arrow beside the 3:3 team box: a clear hit area with the glyph in ink.</summary>
+        private static UnityEngine.UI.Button PageArrow(Transform parent, string name, Font font, string glyph, float x)
+        {
+            RectTransform rect = Child(parent, name, out bool created);
+            if (created) LabLobbyView.Place(rect, x, 483f, 44f, 44f);
+            var hit = Component<UnityEngine.UI.Image>(rect);
+            hit.sprite = null; hit.color = Color.clear;
+            var button = Component<UnityEngine.UI.Button>(rect);
+            button.targetGraphic = hit; button.transition = UnityEngine.UI.Selectable.Transition.None;
+            Text(Child(rect, "Glyph"), font, glyph, 30, Ink, 0f, 0f, 44f, 44f);
+            return button;
+        }
+
+        private static UnityEngine.UI.Graphic PageDot(Transform parent, string name, float x)
+        {
+            RectTransform rect = Child(parent, name, out bool created);
+            var dot = Component<LabRoundedGraphic>(rect);
+            if (created)
+            {
+                LabLobbyView.Place(rect, x, 676f, 8f, 8f);
+                dot.color = LabLobbyView.Html("C7C0B0");
+            }
+            dot.radius = 4f; dot.raycastTarget = false;
+            return dot;
+        }
+
+        private static T[] Append<T>(T[] items, T item) => items.Concat(new[] { item }).ToArray();
+
+        /// <summary>
+        /// #394: the "함께할 인원" chips 2~6 in a horizontal scroll. The label stays; the chips keep their saved spots, and the
+        /// scroll reaches the design's right edge so the 6 chip peeks out there until the row is pushed sideways.
+        /// </summary>
+        private static void BuildCountScroll(GameLobbyView view)
+        {
+            Transform page = view.browserPage.transform;
+            RectTransform scroll = Child(page, "CountScroll", out bool created);
+            if (created)
+            {
+                LabLobbyView.Place(scroll, 153f, 314f, 249f, 44f);
+                scroll.SetSiblingIndex(page.Find("People").GetSiblingIndex() + 1);
+            }
+            // A clear hit area, so a drag that starts between two chips also moves the row.
+            var hit = Component<UnityEngine.UI.Image>(scroll);
+            hit.sprite = null; hit.color = Color.clear;
+            Component<UnityEngine.UI.RectMask2D>(scroll);
+            RectTransform content = Child(scroll, "Content", out bool newContent);
+            if (newContent)
+            {
+                content.anchorMin = Vector2.zero; content.anchorMax = Vector2.up; content.pivot = Vector2.up;
+                content.anchoredPosition = Vector2.zero; content.sizeDelta = new Vector2(4 * 57f + 50f + 28f, 0f);
+            }
+            var rect = Component<UnityEngine.UI.ScrollRect>(scroll);
+            rect.content = content; rect.viewport = scroll; rect.horizontal = true; rect.vertical = false;
+            rect.movementType = UnityEngine.UI.ScrollRect.MovementType.Clamped; rect.inertia = true; rect.decelerationRate = .135f;
+            var chips = new UnityEngine.UI.Button[LabModel.TerritoryMaximumParticipants - 1];
+            for (int i = 0; i < chips.Length; i++)
+            {
+                string name = "Count" + (i + 2);
+                Transform chip = content.Find(name) ?? page.Find(name);
+                // Only a chip that is new to the row gets its spot; one already in the row keeps any later edit.
+                bool place = chip == null || chip.parent != content;
+                if (chip == null)
+                {
+                    chip = UnityEngine.Object.Instantiate(chips[i - 1].gameObject, content).transform;
+                    chip.name = name;
+                    chip.GetComponentInChildren<UnityEngine.UI.Text>().text = (i + 2) + "명";
+                }
+                else if (chip.parent != content) chip.SetParent(content, false);
+                if (place) Place(chip, i * 57f, 0f, 50f, 44f);
+                chip.SetSiblingIndex(i);
+                chips[i] = chip.GetComponent<UnityEngine.UI.Button>();
+            }
+            view.countButtons = chips;
+        }
+
+        /// <summary>#394: the one-line reason under a blocked mode button, saved hidden. The view fills and shows it.</summary>
+        private static UnityEngine.UI.Text Reason(Transform card, string name, Font font, float y)
+        {
+            RectTransform rect = Child(card, name, out bool created);
+            var text = Component<UnityEngine.UI.Text>(rect);
+            if (created)
+            {
+                LabLobbyView.Place(rect, 21f, y, 303f, 22f);
+                text.fontSize = 14; text.color = LabLobbyView.Html("575750");
+            }
+            text.font = font; text.alignment = TextAnchor.MiddleCenter; text.raycastTarget = false;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.text = string.Empty;
+            rect.gameObject.SetActive(false);
+            return text;
+        }
+
         private static void ApplyInk303(GameLobbyView view)
         {
             foreach (var text in view.GetComponentsInChildren<UnityEngine.UI.Text>(true))
@@ -195,16 +404,19 @@ namespace Hapio.Editor
             view.modeDismissButton.transition = UnityEngine.UI.Selectable.Transition.None;
             view.modeDismissButton.targetGraphic = dimImage;
 
-            RectTransform card = Child(panel, "Card");
-            LabLobbyView.Place(card, 28f, 298f, 346f, 250f);
+            // Placed only when new, like the pills: the one-time layouts below (#303, #394) resize it afterwards.
+            RectTransform card = Child(panel, "Card", out bool newCard);
+            if (newCard) LabLobbyView.Place(card, 28f, 298f, 346f, 250f);
             Sliced(Component<UnityEngine.UI.Image>(card), Art("ModeCard"), Color.white);
             Text(Child(card, "Title"), brush, "어떤 걸로 동지를 부르겠소?", 25, Ink, 0f, 37f, 346f, 34f);
             Text(Child(card, "Hint"), medium, "하고 싶은 유형을 선택하시오.", 14, LabLobbyView.Html("575750"), 0f, 78f, 346f, 22f);
             view.basicModeButton = Pill(card, "BasicMode", brush, "기본 모드", 21f, 115f, 304f, 44f, 20);
-            view.teamModeButton = Pill(card, "TeamMode", brush, "2 : 2 땅따먹기", 21f, 168f, 304f, 44f, 20);
+            view.teamModeButton = Pill(card, "TeamMode", brush, "땅따먹기", 21f, 168f, 304f, 44f, 20);
+            view.basicModeReason = Reason(card, "BasicReason", medium, 165f);
+            view.teamModeReason = Reason(card, "TeamReason", medium, 243f);
 
             // Development builds only: start alone on the Blue team to check overwriting and the ratio.
-            view.teamSoloButton = Pill(panel, "TeamSolo", medium, "DEV · 혼자 2:2 확인", 126f, 562f, 150f, 34f, 13);
+            view.teamSoloButton = Pill(panel, "TeamSolo", medium, "DEV · 혼자 땅따먹기 확인", 126f, 562f, 150f, 34f, 13);
             // Saved closed like the Direct IP panel; "새 방 만들기 +" opens it.
             panel.gameObject.SetActive(false);
         }

@@ -37,7 +37,8 @@ namespace C6Lab
 
         public LabPlayerSlots(int capacity)
         {
-            if (capacity < LabModel.MinimumParticipants || capacity > LabModel.MaximumParticipants)
+            // 6 seats only for a 3:3 territory room (#394); the room decides which sizes it allows.
+            if (capacity < LabModel.MinimumParticipants || capacity > LabModel.TerritoryMaximumParticipants)
                 throw new ArgumentOutOfRangeException(nameof(capacity));
             Capacity = capacity;
         }

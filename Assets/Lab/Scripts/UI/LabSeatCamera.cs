@@ -54,12 +54,12 @@ namespace C6Lab
 
             if (target == null || config == null || snapshot.players == null) return;
             int seatCount = snapshot.players.Length;
-            if (seatCount < 1 || seatCount > LabModel.MaximumParticipants) return;
+            if (seatCount < 1 || seatCount > LabModel.TerritoryMaximumParticipants) return;
             ulong localId = network.LocalPlayerId;
             foreach (LabPlayerState player in snapshot.players)
             {
                 if (player == null || player.id != localId) continue;
-                // 2:2 (#281): around the gourd the teams alternate Blue, Red, Blue, Red.
+                // 땅따먹기: 2:2는 청·홍이 엇갈리고(#281), 1:1은 마주 보고, 3:3은 팀끼리 앞뒤로 앉는다(#394).
                 int ring = LabTeams.RingSeatFor(snapshot, player.seat);
                 if (ring < 0 || ring >= seatCount
                     || (ring == activeSeat && seatCount == activeSeatCount)) return;
@@ -67,7 +67,7 @@ namespace C6Lab
                 Vector3 center = target.transform.position;
                 battleCamera.transform.position = LabThrowMath.SeatPosition(
                     ring, seatCount, center, config.CameraRadius, config.CameraHeightOffset,
-                    !LabTeams.FourPlayerTeams(snapshot));
+                    !LabTeams.TeamSeats(snapshot));
                 battleCamera.transform.LookAt(center + Vector3.up * config.CameraLookHeightOffset);
                 activeSeat = ring;
                 activeSeatCount = seatCount;

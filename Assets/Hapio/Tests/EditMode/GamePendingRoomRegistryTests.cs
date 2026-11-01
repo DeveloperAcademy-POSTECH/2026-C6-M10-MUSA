@@ -57,18 +57,29 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void TerritoryCreationHandleKeepsFourPlayerCapacityAndInvalidCreationHasNoHandle()
+        public void TerritoryCreationKeepsTheChosenTwoFourOrSixAndInvalidCreationHasNoHandle()
         {
             using (var registry = new GamePendingRoomRegistry())
             {
                 Assert.That(registry.TryCreate(1, GameMode.Story, out GamePendingRoomHandle invalid, out string error), Is.False);
                 Assert.That(invalid, Is.Null);
                 Assert.That(error, Is.Not.Empty);
+                // #394: territory rooms are 1:1, 2:2 or 3:3, so an uneven count or six story players never reserve a port.
+                foreach ((int capacity, GameMode mode) in new[] { (3, GameMode.Territory), (5, GameMode.Territory), (6, GameMode.Story) })
+                {
+                    Assert.That(registry.TryCreate(capacity, mode, out invalid, out error), Is.False, capacity + " " + mode);
+                    Assert.That(invalid, Is.Null); Assert.That(error, Is.Not.Empty);
+                }
+                Assert.That(registry.Rooms, Is.Empty);
                 if (!LabBonjourDiscovery.IsSupported) return;
-                Assert.That(registry.TryCreate(2, GameMode.Territory, out GamePendingRoomHandle handle, out error), Is.True, error);
-                Assert.That(registry.TryGet(handle, out GamePendingRoomInfo room), Is.True);
-                Assert.That(room.Capacity, Is.EqualTo(LabTeams.Players));
-                Assert.That(room.Mode, Is.EqualTo(GameMode.Territory));
+                foreach (int capacity in new[] { 2, 4, 6 })
+                {
+                    Assert.That(registry.TryCreate(capacity, GameMode.Territory, out GamePendingRoomHandle handle, out error), Is.True, error);
+                    Assert.That(registry.TryGet(handle, out GamePendingRoomInfo room), Is.True);
+                    Assert.That(room.Capacity, Is.EqualTo(capacity), "The territory room keeps the chosen player count.");
+                    Assert.That(room.Mode, Is.EqualTo(GameMode.Territory));
+                    Assert.That(registry.Cancel(handle), Is.True);
+                }
             }
         }
 

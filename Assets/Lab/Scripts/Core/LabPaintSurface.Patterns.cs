@@ -88,7 +88,7 @@ namespace C6Lab
             out int painted, out int stolen)
         {
             painted = stolen = 0;
-            if (painterSlot < 0 || painterSlot > 5 || !Finite(share) || share <= 0f || share > 3f) return false;
+            if (painterSlot < 0 || painterSlot > MaxPainterSlot || !Finite(share) || share <= 0f || share > 3f) return false;
             if (preview || replica || pattern == LabPaintPattern.Legacy || !ValidHit(direction, color)) return false;
             if (patternMask == null) patternMask = LabPaintPatternMask.Load(pattern);
             decimal initial = initialCells * (decimal)share;

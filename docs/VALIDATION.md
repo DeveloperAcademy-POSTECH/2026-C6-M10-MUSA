@@ -3622,3 +3622,33 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 최신 원격 main `78a8467d`와 충돌 없이3개 기능 커밋을 비교했다. Scene/기존 머터리얼/공유 설정/패키지/프로젝트 설정·통신/Core 규칙 변경이 없으며 독립 읽기 리뷰에서 차단 오류를 찾지 못했다.
 - 현재 기능 커밋 `6eaf3232`에서 전체 EditMode **1617/1617 PASS** (38.83초), 기존 오행 트레일 PlayMode **9/9 PASS** (3.13초)를 실행했다. Unity6000.6.5f1/macOS/Metal·실패/skip0이다. 위 조합판 추가 절의 지귀80개와 HUD7개는 동일 기능 코드에서 이미 실행한 결과이며 이번 PR 확인 때 중복 실행하지 않았다. 관련 PlayMode는 합계96개 범위이며 전체 PlayMode 수행을 의미하지 않는다.
 - 실기기·실제 다기기 B 성공·LAN/핫스팟·iOS 빌드/성능은 미실행이다. 병합 전 원본 파일/스태시와 Unity 종료 상태를 별도로 확인한다. 자동 생성된 새 `.meta`의 빈 YAML 필드 뒤 공백은 Unity 직렬화 형식으로 보존하고 나머지 diff 공백 검사는 통과했다.
+
+
+## 2026-10-31 — #394 땅따먹기 1:1·3:3
+
+브랜치 `feat/#394-territory-1v1-3v3`. 사용자 요청으로 다섯 단계로 나눠 진행했다. 규칙·화면은 [게임 흐름](GAME_FLOW.md)의 #394 절, 피버 수는 [DEV 명세](DEVELOPER_MODE_PARAMETER_SPEC.md)의 #281 절을 따른다. 아래 "Editor 직접 확인"은 열린 Editor의 `unity command eval`로 실제 클래스를 호출한 결과이며 Test Runner 실행이 아니다.
+
+| 단계 | 커밋 | 내용 |
+| --- | --- | --- |
+| 1 팀 규칙 | `387b5d22` | `LabTeams` 인원별 팀·박 둘레·넘기기·벽, 북, 피버 6/15/18, 6명은 땅따먹기만 |
+| 2 방·통신 6명 | `91bf5bb4` | `ValidRoomSize`, 방 광고 기록·방장·참가자 6명, P6 칠 무늬(CPU·셰이더), 접속 5679/Lab40/Game24 |
+| 3 방 만들기 | `2e59369f` | 인원 칩 2~6 가로 스크롤, 모드 막힘과 이유 문구, 땅따먹기 방 인원 = 고른 인원, 방 카드 1:1·2:2·3:3 |
+| 4 자리 화면 | `fbe55b2b` | P6 자리, 1:1 배치, 3:3 팀별 쪽 넘김, 팀 색 빈/찬 자리, 제목 "< 땅따먹기 >" |
+| 수정 | `5d6fd89f` | 세션 지문(`LabSessionSettings.Fingerprint`)의 5명 상한 때문에 6명 방장 입장이 `ArgumentException` (사용자 Play에서 발견) |
+| 5 라벨·문서 | (이 기록) | 전투 "n:n 땅따먹기", 결과 "n : n", P6 전투 동그라미, 문서 |
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 단계마다 열린 Editor 재컴파일 | PASS | 오류 0 |
+| 팀 규칙 (1단계, Editor 직접 확인) | PASS | 1:1 양쪽 넘기기 `TEAM_EDGE` 거절·북 2개·막힌 쪽 양쪽, 3:3 오른쪽 넘기기 30→20→10→30 순환·북 2개·막힌 쪽 없음, 피버 6/15/18, 기본 모드 6명 거절 |
+| 방 인원·통신 (2단계, Editor 직접 확인) | PASS | 1·7명 둘 다 거절, 2·4명 둘 다, 3·5명 기본만, 6명 땅따먹기만. 6명 땅따먹기 방 광고 기록 왕복, 6명 기본 방 기록 거절, P6 칠·P7 거절·칸 수 7칸, P6 무늬 그림, 셰이더 오류 없음 |
+| 모드 막힘·방 카드 (3단계, Editor 직접 확인) | PASS | 1~7명 모드 열림/막힘과 이유 문구, 카드 1:1/2:2/3:3, 땅따먹기 방 2·4·6명은 그 인원 그대로·3·5명 거절 |
+| 로비 화면 저장 (3·4단계) | PASS | `Hapio > Upgrade 2v2 Lobby UI`를 두 번 실행해 두 번째에 파일이 바뀌지 않음. 이 과정에서 팝업 카드 크기를 매번 처음 값으로 되돌리던 기존 문제를 찾아 처음 만들 때만 배치하도록 고침 |
+| 자리 화면 모양 (4단계) | PASS (화면 밖 그림) | 저장된 Prefab을 Editor에서 화면 밖에 그려 1:1·2:2·3:3 청팀 쪽·홍팀 쪽 확인. Play 화면이 아니다 |
+| 세션 지문 6명 (수정) | PASS | 1·7명 거절, 2·5·6명 지문 생성 |
+| P6 전투 동그라미 (5단계) | PASS | Lab·Battle 장면의 HUD·북 미니맵 배열이 P1~P6 (`C6 Lab > Add Player 6 Circle`, 장면 변경은 배열 한 줄씩 + Unity가 다시 저장한 빈 값 뒤 공백·팀원 코드의 빈 `stageNotice` 칸) |
+| Test Runner | 일부 | 1단계 뒤 사용자가 실행해 실패 2건 보고: 무승부 결과 검사의 명단이 P1·P3뿐이라 새 인원 기준에서 어긋남(검사 데이터를 4명 명단으로 수정), 수채 번짐 검사 194 vs 195(이번 변경과 무관, 다시 실행 권장). 2~5단계 뒤 전체 결과는 아직 받지 못해 **NOT_RUN** |
+| 실제 2대(1:1)·6대(3:3) 연결, Mac 여러 앱, iPhone | NOT_RUN | |
+
+- 새·바뀐 검사: EditMode `LabTeamSizesTests`(새), `LabRoomPresenceTests`(방 인원 표·6명 기록·지문), `LabPaintPainterSlotTests`(P6 허용·P7 거절), `LabPlayerSlotsTests`, `LabSharedSettingsSchemaTests`·`LabGameFlowBridgeTests`(접속 버전), `LabPlayerCircleTests`(P1~P6), Hapio `GameLobbyModeRulesTests`(새), `GameLobbyAssetTests`, `GamePendingRoomRegistryTests`, `GameStageResultViewTests`(결과 n : n), PlayMode `LabPlayerPaintPatternRenderTests`(P1~P6), `GameLobbyViewTests`(인원별 모드 막힘, 1:1 방, 3:3 쪽 넘김), `GameSceneFlowTests`(DEV 혼자 결과 "땅따먹기").
+- 임시 그림: 3:3 쪽 넘김 `<` `>`·쪽 표시 점, P6 전투 동그라미(P5 그림의 색·숫자만 바꿈)는 디자인 그림을 받으면 바꾼다.

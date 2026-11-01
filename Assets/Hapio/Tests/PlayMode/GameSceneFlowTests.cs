@@ -343,7 +343,7 @@ namespace Hapio.Tests
             GameStageResultView view = screen.resultView;
             Assert.That(view.gameObject.activeInHierarchy, Is.True);
             Assert.That(screen.legacyResultContent.activeSelf, Is.False);
-            Assert.That(view.stage.text, Is.EqualTo("2 : 2"));
+            Assert.That(view.stage.text, Is.EqualTo("땅따먹기"), "A DEV solo check is not a 1:1, 2:2 or 3:3 match (#394).");
             Assert.That(view.judgment.text, Does.Contain("청팀"));
             Assert.That(view.nextButton.gameObject.activeSelf, Is.False);
             Assert.That(view.homeButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("나가기"));
