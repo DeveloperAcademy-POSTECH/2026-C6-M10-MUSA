@@ -852,6 +852,10 @@ namespace C6Lab
         [Header("Sound · 구미호 스테이지 (#351, Inspector 전용. 소리 파일이 없으면 그 소리만 조용히 넘어간다)")]
         [Tooltip("구미호 스테이지 전투 BGM 크기 (Resources/Audio/GumihoBGM, 모든 기기). 파일이 없거나 다른 스테이지면 위의 BGM Volume으로 기본 전투 BGM을 튼다.")]
         [SerializeField, Range(0f, 1f)] private float gumihoBgmVolume = .2f;
+        [Tooltip("야광귀 스테이지 새 전투 BGM 후보로 듣기 (#396 테스트, Resources/Audio/YaguangBGM). 끄면 기존 꽹과리 BGM. 전투 중에 바꾸면 바로 바뀐다.")]
+        [SerializeField] private bool yaguangUseNewBgm;
+        [Tooltip("야광귀 새 전투 BGM 크기 (모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangBgmVolume = .2f;
         [Tooltip("구미호 피버타임(마지막 20초) 곡 크기 (Resources/Audio/GumihoFever, 모든 기기). 파일이 없으면 야광귀 피버 곡을 이 크기로 튼다.")]
         [SerializeField, Range(0f, 1f)] private float gumihoFeverBgmVolume = .3f;
         [Tooltip("매혹이 걸릴 때 소리 크기 (Resources/Audio/CharmCast, 모든 기기)")]
@@ -1302,6 +1306,8 @@ namespace C6Lab
             bombSoundStyle == LabBombSoundStyle.Boom ? LabBombSoundStyle.Boom : LabBombSoundStyle.Ppeong;
         // 구미호 스테이지 소리 크기 (#351): Inspector 값 그대로 (DEV 배율 없음)
         public float GumihoBgmVolume => Mathf.Clamp01(Finite(gumihoBgmVolume, .2f));
+        public bool YaguangUseNewBgm => yaguangUseNewBgm;
+        public float YaguangBgmVolume => Mathf.Clamp01(Finite(yaguangBgmVolume, .2f));
         public float GumihoFeverBgmVolume => Mathf.Clamp01(Finite(gumihoFeverBgmVolume, .3f));
         public float CharmCastSoundVolume => Mathf.Clamp01(Finite(charmCastSoundVolume, .7f));
         public float CharmCheckSoundVolume => Mathf.Clamp01(Finite(charmCheckSoundVolume, .8f));
