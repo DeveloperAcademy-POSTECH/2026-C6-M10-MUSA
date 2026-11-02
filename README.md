@@ -69,6 +69,10 @@
 
 친구와 구슬을 주고받는 협동에 한국 설화 속 요괴와 음양오행을 더했습니다. 함께 구슬을 던져 박을 칠하고, 오래된 봉인을 되살리는 놀이에 우리만의 색을 담았습니다.
 
+## 프로젝트 구조
+
+폴더 구성, 코드 간 의존 관계, 화면 흐름, 통신 구조는 [프로젝트 구조](docs/PROJECT_STRUCTURE.md)에서 볼 수 있습니다. 개발 문서 목차는 [docs/README](docs/README.md)에 있습니다.
+
 ## Team 일단무사
 
 Apple Developer Academy @ POSTECH

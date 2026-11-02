@@ -9,7 +9,7 @@ namespace C6Lab.Tests
     /// <summary>Transaction fixtures verify attribution and pigment commit together, not live transport.</summary>
     public sealed class LabPainterReplicationTests
     {
-        [TestCase(1)] [TestCase(2)] [TestCase(3)] [TestCase(4)] [TestCase(5)]
+        [TestCase(1)] [TestCase(2)] [TestCase(3)] [TestCase(4)] [TestCase(5)] [TestCase(6)]
         public void SamePigmentKeepsDistinctPainterIdentityAcrossFullAndRecoveryCheckpoints(int player)
         {
             var source = Surface();
@@ -29,6 +29,19 @@ namespace C6Lab.Tests
             var recovered = Surface();
             Assert.That(Receive(new LabPaintReceiver(recovered), publisher.Checkpoint()), Is.EqualTo(LabPaintReceive.Applied));
             AssertSame(replica, recovered);
+        }
+
+        [Test]
+        public void TheSixthPlayersHitReachesTheGuestAsADeltaAfterAnEmptyStart()
+        {
+            // #417: a 3:3 game starts with no paint, then P6's first hit arrives as a delta.
+            var source = Surface(); var replica = Surface();
+            var receiver = new LabPaintReceiver(replica); var publisher = new LabPaintPublisher();
+            Assert.That(Receive(receiver, publisher.Publish(source, "painters", 1, 1)), Is.EqualTo(LabPaintReceive.Applied));
+            source.RegisterHit(Vector3.forward, Color.red, 124ul, LabModel.TerritoryMaximumParticipants);
+            Assert.That(Receive(receiver, publisher.Publish(source, "painters", 1, 2)), Is.EqualTo(LabPaintReceive.Applied));
+            AssertSame(source, replica);
+            Assert.That(Painters(replica), Has.Some.EqualTo((byte)6));
         }
 
         [Test]
@@ -84,7 +97,8 @@ namespace C6Lab.Tests
             int painted = Array.FindIndex(Pixels(source), p => p.a == 255);
             if (corruption == "unpainted-owner")
                 payload[Array.FindIndex(Pixels(source), p => p.a == 0) * 5 + 4] = 1;
-            else payload[painted * 5 + 4] = corruption == "invalid-owner" ? (byte)6 : (byte)2;
+            // P6 is a real 3:3 painter (#417), so the first invalid slot is one past it.
+            else payload[painted * 5 + 4] = corruption == "invalid-owner" ? (byte)(LabPaintSurface.MaxPainterSlot + 1) : (byte)2;
             string encoded = Convert.ToBase64String(payload), hash;
             using (var sha = SHA256.Create()) hash = BitConverter.ToString(sha.ComputeHash(payload)).Replace("-", "").ToLowerInvariant();
             var changed = frames.Select(f => JsonUtility.FromJson<LabPaintFrame>(JsonUtility.ToJson(f))).ToArray();

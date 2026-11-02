@@ -4,6 +4,7 @@
 
 ## 실행과 작업 시작
 
+- 폴더 구성·어셈블리 의존·Scene 흐름·통신 계층의 전체 그림은 [프로젝트 구조](PROJECT_STRUCTURE.md)에서 먼저 확인한다.
 - 개발용 게임은 Unity의 `Hapio > Open Home`에서 실행한다. 1~3스테이지는 공통 Battle Scene을 사용한다. 메뉴·방 입장·빌드 경로는 [게임 흐름](GAME_FLOW.md)의 **실행과 빌드**를 따른다.
 - 기존 `Assets/Lab/Scenes/Lab.unity`는 단판 실험·회귀 확인용이다. 별도 게임과 구분하고 [Lab 범위](LAB_SCOPE.md)를 먼저 확인한다.
 - 수치와 Inspector·DEV 변경 지점은 [개발자 모드 설정](DEVELOPER_MODE_PARAMETER_SPEC.md), 작업 규칙은 [AGENTS](../AGENTS.md)를 따른다.

@@ -188,7 +188,9 @@ namespace C6Lab
         // This is a packet/ledger safety bound, not the configured storage rule: gourd bombs can
         // legally arrive on a full board and therefore must not be capped at storage + drums.
         public const int MaximumStates = 4096;
-        public const int MaximumPlayers = 5;
+        // Every room size, including the six-player 3:3 territory room (#394, #417); the basic mode's own
+        // 2..5 bound is LabModel.ValidRoomSize, not this packet bound.
+        public const int MaximumPlayers = LabModel.TerritoryMaximumParticipants;
         public const int MaximumDrums = 5;
         private readonly Dictionary<string, LabOrbState> states = new Dictionary<string, LabOrbState>(StringComparer.Ordinal);
         private readonly HashSet<string> tombstones = new HashSet<string>(StringComparer.Ordinal);

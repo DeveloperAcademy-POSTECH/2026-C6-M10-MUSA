@@ -215,6 +215,41 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void SixPlayerTerritoryBoardFrameAndReceiptReachTheGuestButASeventhPlayerDoesNot()
+        {
+            // #417: a 3:3 territory room's Host publishes all six players; P6 is seat 5.
+            var snapshot = Snapshot(1d);
+            snapshot.orbs = new[] { Orb("mine", 10ul) };
+            snapshot.players = Players(LabModel.TerritoryMaximumParticipants);
+            LabBoardFrame frame = new LabBoardPublisher().Build(snapshot, 10ul, 1, 1ul);
+            Assert.That(frame.players.Length, Is.EqualTo(6));
+            var replica = ActiveReplica();
+            Assert.That(replica.TryApply(frame, out var reason), Is.True, reason);
+            Assert.That(replica.InteractionAllowed, Is.True);
+            LabActionReceipt receipt = Receipt(2);
+            receipt.players = Players(LabModel.TerritoryMaximumParticipants);
+            Assert.That(replica.ApplyReceipt(receipt), Is.True);
+            Assert.That(replica.LatestSequence, Is.EqualTo(2));
+
+            LabBoardFrame seven = Frame(3, false);
+            seven.players = Players(LabModel.TerritoryMaximumParticipants + 1);
+            Assert.That(replica.TryApply(seven, out _), Is.False);
+            LabActionReceipt sevenReceipt = Receipt(3);
+            sevenReceipt.players = Players(LabModel.TerritoryMaximumParticipants + 1);
+            Assert.That(replica.ApplyReceipt(sevenReceipt), Is.False);
+            Assert.That(replica.LatestSequence, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void JigwiStatesKeepTheBasicRoomsFivePlayerBound()
+        {
+            LabJigwiState[] States(int count) => Enumerable.Range(0, count)
+                .Select(index => new LabJigwiState { playerId = 10ul + (ulong)index }).ToArray();
+            Assert.That(LabJigwiNetworkValidation.Valid(States(LabModel.MaximumParticipants)), Is.True);
+            Assert.That(LabJigwiNetworkValidation.Valid(States(LabModel.MaximumParticipants + 1)), Is.False);
+        }
+
+        [Test]
         public void ReplicaOwnsItsCopiesAndNewerFullSnapshotResourcesWinOverOlderControlHeader()
         {
             var replica = ActiveReplica();
@@ -493,6 +528,10 @@ namespace C6Lab.Tests
             replica.SetActive("board-test", 1u, 10ul);
             return replica;
         }
+
+        private static LabPlayerState[] Players(int count) => Enumerable.Range(0, count)
+            .Select(seat => new LabPlayerState { id = 10ul + (ulong)seat * 10ul, seat = seat, stamina = 100f, personalHp = 300 })
+            .ToArray();
 
         private static LabOrbState Orb(string id, ulong owner, LabOrbKind kind = LabOrbKind.Combined) =>
             new LabOrbState { id = id, owner = owner, kind = kind, x = .5f, y = .5f, ownershipVersion = 1ul };

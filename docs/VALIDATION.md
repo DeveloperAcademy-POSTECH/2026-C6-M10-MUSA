@@ -3785,70 +3785,23 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - **종료 상태:** Play OFF, 원래 Lab Scene 열림, dirty=false, 스크립트 컴파일 오류 없음. 임시 C#·원시 JSON·실행 로그·TestRunner 임시 Scene은 커밋 대상에서 제외한다.
 - **미실행:** iPhone/iPad 실기기·iOS 서명/설치·LAN/핫스팟 실제 다기기·모바일 성능. 실제 짧은 플리크 감각과 폰 화면에서의 화염 가독성은 이후 실기기로 확인해야 한다. 기본/DEV 조절과 수동 기대 시나리오는 `JIGWI_SCREEN_PATTERNS.md`의 최신1~8절을 따른다.
 
-## 2026-11-02 — #418 1단계: 방에 들어갈 때 화면 전환
+## #417 3:3 땅따먹기 6인 세션 시작 실패 — 2026-11-02
 
-- 기준 main `322e00a0`, `feat/#418-room-fade-stamina-foxfire`. 이 단계는 화면 전환만 다룬다(스태미나 부족 피드백·여우구슬은 다음 단계).
-- 원인: 방에 들어가 상태가 Lobby가 되는 같은 프레임에 Home의 `GameLobbyView`가 화면을 숨기고(Home도 Lobby도 아닌 상태), Lobby 씬을 불러오는 동안 빈 화면이 비친 뒤 자리 고르기 화면이 갑자기 나타났다.
-- 수정: `GameSession`이 Home → Lobby 전환에서만, 방이 열린 순간 화면을 바로 검게 가리고 곧장 씬을 불러온 뒤 새 화면이 그려지면 밝아진다(사용자 요청으로 방이 열린 뒤 기다리지 않음). 어두워지는 시간을 주면 그동안 Home 화면을 그대로 둔다. 막은 코드로 만든 `GameSceneFade`(Scene·Prefab 변경 없음). 시간·색은 GameSession 프리팹 Inspector 값(프리팹에 아직 저장되지 않아 코드 기본값: 어두워짐 0초/밝아짐 0.35초/검정). 기본 모드를 누른 순간부터 가리는 방식은 사용자 확인 후 되돌렸다.
+- **기준:** main `322e00a0` → `fix/#417-territory-six-start`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac 플레이어·iOS 빌드는 만들지 않았다.
+- **원인:** #394에서 로비·방 광고·P슬롯·도색 슬롯은 6명으로 늘렸지만 Guest 쪽 검사 두 곳이 5명에 머물렀다. ①`LabBoardReplica.MaximumPlayers`=5라 6명 배열·P6(seat5)이 있는 조합판 프레임·행동 결과를 거절해 owner-board 준비가 끝나지 않고 카운트다운으로 넘어가지 못했다. ②`LabPaintReceiver`가 칠한 사람 번호를 5까지만 받아, 시작 후 P6의 첫 칠부터 체크포인트 재요청이 끝나지 않고 Guest의 공유 상태가 멈출 수 있었다(②는 시작 경로 전체를 다시 훑는 별도 점검에서 찾았다).
+- **수정:** 두 상한을 `LabModel.TerritoryMaximumParticipants`·`LabPaintSurface.MaxPainterSlot`(6)으로 맞췄다. 기본 모드 2~5인은 `ValidRoomSize`가 그대로 지키고, 기본 모드 전용 지귀 상태 검사는 5명을 명시적으로 유지한다. 공유 설정257개·인덱스는 그대로이며 접속 규약만 **5681/Lab42/Game26**으로 올렸다.
 
-| 항목 | 결과 | 근거 |
+| 실행 검사 | 결과 | 시간 |
 | --- | --- | --- |
-| 열린 Editor 재컴파일 | PASS | 컴파일 실패 없음, 콘솔 오류 0 |
-| PlayMode `GameLobbyViewTests.EnteringACreatedRoomDarkensOverTheHeldBrowserThenBrightensOnTheSeatScreen` (새: 기본 어두워짐 0초 확인, 1초로 바꿔 어두워지는 동안 Home 유지·눌림 막힘 → Lobby 뒤 밝아짐) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| PlayMode `GameLobbyViewTests` 전체, `GameSceneFlowTests` (전환 막이 생겨도 기존 흐름 유지) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| Play로 방 만들기·방 들어가기·DEV 솔로 전환 보기 | NOT_RUN | |
+| 전체 EditMode (최종 수정 후) | **1730/1730 PASS** | 약45초 |
+| PlayMode `LabTeamBattleScreenTests` | **5/5 PASS** | 8.16초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 222.81초 |
+| PlayMode `GameLobbyViewTests` | **11/11 PASS** | 21.14초 |
+| PlayMode `LabQuickConnectTests` | **4/4 PASS** | 1.07초 |
+| PlayMode `LabLobbyPositionSelectionTests` | **5/5 PASS** | 1.20초 |
 
-## 2026-11-02 — #418 2단계: 스태미나 부족 피드백
-
-- 같은 브랜치, 1단계 커밋 `7e0514f5` 다음. 이 단계는 스태미나 부족 피드백만 다룬다(여우구슬은 다음 단계).
-- 문제: 스태미나가 생성 비용보다 적을 때 북을 눌러도 아무 표시·소리가 없어, 게이지를 안 보고 북만 계속 누르며 "왜 안 되지?"가 됐다.
-- 수정: Host가 내 생성 요청을 `INSUFFICIENT_STAMINA`(`LabModel.InsufficientStaminaReason`)로 거절한 응답을 받을 때마다 `LabNetwork.LocalStaminaShort`가 한 번 알린다(보유 한도 초과·다른 이유·지난 라운드의 늦은 응답은 제외). 그러면 누른 사람 화면에서 ① 스태미나 게이지가 지지직 흔들리고(`LabStaminaShortFeedback`, 끝나면 원래 자리로) ② 지금 충전 중인 칸(차 있는 부분)이 같은 칸 모양으로 순간 빨갛게 빛나며 ③ 팀 제공 효과음 `Audio/StaminaShort`가 난다(`LabStaminaShortSound`, 연달아 누르면 처음부터 다시). 원본 게이지 그림·채움 값·야광귀 피버 색은 건드리지 않고 그 위에 그린다.
-- 사용자 확인 후 조정: 게이지가 빛나는 것은 스태미나가 부족할 때(빨간색)만 — 저장된 `StaminaFeedbackProfile`의 #412 소비 깜빡임(정상 생성마다 파란 번쩍임)을 Editor API로 껐다(코드는 그대로, Inspector에서 다시 켤 수 있음). 지귀 A 화염 테두리는 그대로. 소리는 더 크게: 파일을 +11dB·리미터 -1dB로 키우고(평균 -22.6 → -14.3dB) 기본 크기를 .8 → 1로 올렸다.
-- 조절: 흔들림·빛은 `Resources/Stamina/StaminaFeedbackProfile`의 "스태미나 부족" 칸(프로필 에셋에 저장됨), 소리 크기는 LabConfig Inspector `Stamina Short Sound Volume`(기본 1, LabConfig 에셋에는 아직 저장되지 않아 코드 기본값). 공유 DEV 값·접속 규약 변경 없음.
-
-| 항목 | 결과 | 근거 |
-| --- | --- | --- |
-| 효과음 가져오기 | PASS | `StaminaShort` 0.6065초·2채널·DecompressOnLoad, 가져오기 설정은 기존 짧은 효과음(`YaguangComboStart`)과 같음 |
-| 열린 Editor 재컴파일 | PASS | 컴파일 실패 없음, 콘솔 오류 0 (처음 한 번 접근 제한 오류 CS0051을 고친 뒤) |
-| PlayMode `LabStaminaShortFeedbackTests` 5개 (새: 흔들림·빨간 빛·제자리 복귀, 다시 누름, 흔들림 값, 거절 이유 구분, 소리 폴더) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| PlayMode `LabStaminaFeedbackTests` (바꿈: 검사 전용 프로필로 소비 효과 동작 유지 확인 + 새: 저장된 프로필은 소비 깜빡임 꺼짐), Hapio PlayMode `GameJigwiStageIntegrationTests` (바꿈: 정상 생성 때 파란 깜빡임 0번), EditMode `LabRawStreakTests` (거절 이유 그대로) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| Play로 스태미나가 모자랄 때 북 연타해 보기 (흔들림·빨간 빛·소리 크기) | NOT_RUN | |
-
-## 2026-11-02 — #418 3단계: 여우구슬을 모든 플레이어에게
-
-- 같은 브랜치, 2단계 커밋 `bb07ee77` 다음.
-- 전: 구미호 고유 기믹(#311)에서 여우불이 뽑히면 받을 수 있는 사람 중 **무작위 한 명**의 판에만 떨어졌다.
-- 후(`LabModel.CastGimmick` → `DropFoxFireOnAll`): 여우불이 뽑히면 **지금 받을 수 있는 모든 사람**의 판에 한꺼번에 떨어진다. 빠지는 사람은 예전과 같다(판이 가득 참·넘기기 막힘·매혹/예고 중·지귀 막힘·야광귀 다른 화면). 다만 "바로 앞 차례에 걸린 사람" 제외는 여우불에 적용하지 않고, 여우불은 다음 차례가 피할 사람(`last`)도 바꾸지 않는다. 개수는 모두 같고(한 번 뽑음, 판이 거의 차면 그 판만 빈 칸 수만큼), 자리는 판마다 따로 뽑는다(자리 순서 첫 판은 예전과 같은 자리).
-- 기록: 기믹 기록(`DrainSabotages`, UT 통계 `foxFire`)·박 옆 "!"·요괴 움직임은 **한 번**(대상은 자리 순서로 첫 사람). 여우 구슬은 판마다 따로 Host가 보내고(`foxFire` 패킷, 예전과 같음), 그 판 주인 기기에서 새 `LabNetwork.LocalFoxFireDropped`가 한 번 알린다. 낙하 소리(`LabGumihoSound` FoxFall)와 첫 안내(`LabFoxFireGuide`)는 기믹 알림 대상 대신 이 신호를 본다.
-- 공유 DEV 값·접속 규약·Scene·Prefab 변경 없음.
-
-| 항목 | 결과 | 근거 |
-| --- | --- | --- |
-| 열린 Editor 재컴파일 | PASS | 컴파일 실패 없음, 콘솔 오류 0 |
-| Editor 직접 확인 (구미호, 3명, 고유 기믹 5초·여우불 100%) | PASS | 5초에 P10·P20·P30 판에 3개씩, 기믹 기록 1번(`FoxFire@5 → 10`), 통계 `foxFire` 1, 판마다 첫 자리 다름 |
-| EditMode `LabModelTests.FoxFireDropsTwoToFiveFoxOrbsOnEveryBoardButNoMoreThanEachBoardHolds` (이름·내용 바꿈: 세 판 모두·기록 한 번·같은 개수·판마다 다른 자리·같은 세션은 같은 결과, 솔로 가득 찬 판은 그대로) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| EditMode `LabModelTests.AFoxOrbStaysAtASideEdgeAndADoubleTapClearsOnlyThatOne` (판 하나만 골라 씀) 외 기믹 묶음·통계·피버·스테이지 검사 | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| PlayMode `LabDeveloperSoloIntegrationTests`(솔로 여우불 안내), Hapio `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset` | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| 3인 실행으로 모든 판에 떨어지는지·각자 소리·첫 안내 보기 | NOT_RUN | |
-
-## 2026-11-02 — #418 1단계 보강: 자리 고르기 화면에서 뒤로 갈 때도 같은 전환
-
-- 같은 브랜치, 3단계 커밋 `a4dfb180` 다음. 사용자 요청: 방을 만든 뒤 뒤로 가기(방 나가기)를 눌렀을 때도 같은 연출.
-- 전: 막은 Home → Lobby에만 씌웠고, 뒤로 가기(`GoHomeToRoomBrowser` → Home 상태)에서는 자리 고르기 화면이 먼저 사라진 뒤 Home 씬이 떴다.
-- 후: `GameSession`이 Home ↔ Lobby 양쪽 전환에서 바로 가리고 곧장 씬을 불러온 뒤 밝아진다. 떠나는 화면을 붙잡는 표시를 씬 기준(`HoldsSceneForFade(scenePath)`)으로 바꿔, 자리 고르기 화면도 가려질 때까지 그대로 둔다. 방이 끝나 Home으로 돌아가는 경우도 같은 전환이다. 시간·색 값과 기본값(가림 0초·밝아짐 0.35초·검정)은 그대로.
-
-| 항목 | 결과 | 근거 |
-| --- | --- | --- |
-| 열린 Editor 재컴파일 | PASS | 컴파일 실패 없음, 콘솔 오류 0 |
-| PlayMode `GameLobbyViewTests.EnteringAndLeavingACreatedRoomDarkenOverTheHeldScreenThenBrightenOnTheNextOne` (이름 바꿈, 추가: 뒤로 가기 → 자리 고르기 화면 유지·눌림 막힘 → Home 뒤 밝아짐) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| PlayMode `GameLobbyViewTests` 전체, `GameSceneFlowTests` (방 나가기 뒤 방 목록 검사들) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| Play로 방 만들기 → 뒤로 가기 전환 보기 | NOT_RUN | |
-
-## 2026-11-02 — #418 3단계 검사 수정 (사용자 Test Runner 결과)
-
-- 사용자 EditMode 실행에서 2개 실패: ① `LabModelTests.FoxFireDropsTwoToFiveFoxOrbsOnEveryBoardButNoMoreThanEachBoardHolds` — "같은 세션은 같은 결과" 비교가 스냅샷 순서까지 비교했는데, 구슬 ID가 무작위(GUID)라 ID 순서로 정렬된 스냅샷 순서가 방마다 달랐다(떨어진 자리는 같음). 순서와 상관없이(`EquivalentTo`) 비교하도록 고쳤다. ② `LabModelTests.AFoxOrbStaysAtASideEdgeAndADoubleTapClearsOnlyThatOne` — 이제 모든 판에 여우구슬이 있는데 화면 전체 개수를 셌다. 누른 사람 판만 세고, 다른 판의 여우구슬은 그대로인지 확인을 더했다. 규칙 코드는 바꾸지 않았다.
-
-| 항목 | 결과 | 근거 |
-| --- | --- | --- |
-| 위 2개 검사 수정 후 열린 Editor 컴파일 | PASS | 컴파일 오류 0 |
-| 위 2개 검사 다시 실행 | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+- 각 실행의 skip/inconclusive0. 새·바뀐 검사: `LabBoardReplicationTests`(6명·P6 프레임/결과 수락, 7명 거절, 지귀 5명 유지), `LabPainterReplicationTests`(P6 전체·복구 체크포인트, 빈 시작 뒤 P6 delta, 잘못된 번호 예시를 7로), `LabGameFlowBridgeTests`·`LabSharedSettingsSchemaTests`(접속 규약).
+- 수정 중간의 PlayMode 1차 실행에서 `GameSceneFlowTests.SavedHomeRunsThreeFreshBattles…`·`GameLobbyViewTests.DevSoloAfterLeavingASixPlayerRoom…`이 각1회 실패했으나 단독 재실행과 위 최종 실행에서 모두 통과했다. 실행 순서·시간에 따른 불안정으로 보며 원인은 확인하지 않았다.
+- 전체 PlayMode는 실행하지 않았다. 한 Editor 프로세스에서는 Host 1개만 띄울 수 있어 실제 6명 접속은 자동 검사로 재현하지 못했다.
+- **종료 상태:** Play OFF, Home Scene 열림, dirty=false, 컴파일 오류 없음. 중단된 실행이 남긴 Test Runner 임시 Scene은 남아 있지 않음을 확인했다.
+- **미실행:** 6대(3:3)·2대(1:1) 실제 연결, Mac 여러 앱, iPhone/iPad 실기기, LAN/핫스팟. 실기기 검증은 main 병합 후 사용자가 직접 6대 3:3 시작·P6 칠 동기화를 확인하기로 했다. 확인 결과는 그때 이 절에 추가하며, 그 전까지 PASS로 쓰지 않는다.
