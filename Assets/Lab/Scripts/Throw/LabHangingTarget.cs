@@ -146,8 +146,13 @@ namespace C6Lab
             ApplyRopeLength();
         }
 
-        /// <summary>Keep a remote target close to the Host, or pin its rope state while paused.</summary>
-        public void ReconcileRope(float elapsed, float hitOffset, float hitVelocity, bool paused = false)
+        /// <summary>
+        /// Keep a remote target close to the Host, or pin its rope state while paused. With holdImpulse a
+        /// running sample still blends the shared rope phase but leaves the hit offset and velocity alone,
+        /// so a sample captured before a predicted local impact cannot undo that impact.
+        /// </summary>
+        public void ReconcileRope(float elapsed, float hitOffset, float hitVelocity, bool paused = false,
+            bool holdImpulse = false)
         {
             if (pivot == null || !Finite(elapsed) || !Finite(hitOffset) || !Finite(hitVelocity)) return;
             float phase = Mathf.Repeat(elapsed, CyclePeriod);
@@ -166,10 +171,13 @@ namespace C6Lab
             if (Mathf.Abs(phaseError) > .25f) cycleElapsed = phase;
             else if (Mathf.Abs(phaseError) > .03f)
                 cycleElapsed = Mathf.Repeat(cycleElapsed + phaseError * .25f, CyclePeriod);
-            if (Mathf.Abs(hitOffset - verticalOffset) > .08f)
-                verticalOffset = Mathf.Lerp(verticalOffset, hitOffset, .5f);
-            if (Mathf.Abs(hitVelocity - verticalVelocity) > .5f)
-                verticalVelocity = Mathf.Lerp(verticalVelocity, hitVelocity, .5f);
+            if (!holdImpulse)
+            {
+                if (Mathf.Abs(hitOffset - verticalOffset) > .08f)
+                    verticalOffset = Mathf.Lerp(verticalOffset, hitOffset, .5f);
+                if (Mathf.Abs(hitVelocity - verticalVelocity) > .5f)
+                    verticalVelocity = Mathf.Lerp(verticalVelocity, hitVelocity, .5f);
+            }
             ApplyRopeLength();
         }
 

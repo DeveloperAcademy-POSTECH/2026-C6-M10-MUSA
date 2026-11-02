@@ -3882,3 +3882,20 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - Editor는 `TargetFrameRateFor`가 −1을 돌려 Play 속도가 바뀌지 않으므로 기존 PlayMode 검사의 의미는 그대로다.
 - **참고:** 60 fps에서는 `FlushBulkPackets`의 Update당 16 KB 예산이 초당 약 2배(≈980 KB/s/피어)가 된다. 후속 Bulk 작업(적응형 RTO·백로그 기준)에서 함께 본다.
 - **미실행:** iPhone 실기기의 실제 프레임레이트·발열·배터리·체감. 기록 전까지 PASS로 쓰지 않는다.
+
+## #433 Guest 박 포즈 이중 보정 제거 — 2026-11-02
+
+- **기준:** main `80db0616` → `fix/#433-gourd-pose-reconcile-once`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 빌드는 만들지 않았다.
+- **배경·수정:** Guest는 조합판 프레임(`ApplyFastTargetPose`)에서 Host 박 포즈를 블렌드한 뒤, 뒤따라온 Bulk 스냅샷(`ApplyPaintSnapshot`)에서 `Overlay`가 얹은 같은 헤더 포즈로 한 번 더 블렌드해 명중 뒤 박이 역방향으로 튀었다. `LabNetwork.LocalState.ReconcileTargetPose(snapshot)`가 두 경로를 합치고, 같은 세션/라운드에서 `serverTime`이 마지막 적용 시각 이하인 비정지 샘플은 건너뛴다. 정지 샘플은 항상 적용한다. 라운드 변경·액션 리셋에서 기록을 초기화한다. 투척 로컬 선반영(후속)이 쓸 보류 훅 `HoldTargetPoseForPredictedImpact`/`ReleaseTargetPoseHold`와 `ReconcileRope(..., holdImpulse)`를 함께 두었다(보류 중 비정지 샘플은 로프 위상만 블렌드). 이번 변경에서는 아무도 보류를 걸지 않는다. 와이어·공유 설정 변경 없음.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1736/1736 PASS** | 40.13초 |
+| PlayMode `LabRopeReconciliationTests` (새 3개 포함) | **8/8 PASS** | 0.17초 |
+| PlayMode `LabHangingPresentationTests` | **14/14 PASS** | 22.65초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.34초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 210.01초 |
+
+- 새 검사: 같은 `serverTime` 비정지 샘플 재적용은 두 번 블렌드하지 않음(yaw 0→10.5°→10.5°, 새 시각이면 17.325°), 정지 샘플은 반복 적용 때마다 다시 고정됨, 보류 중 비정지 샘플은 로프 위상만 바꾸고 오프셋·yaw는 그대로이며 해제 뒤 정상 블렌드. 기존 `LabRopeReconciliationTests`·`LabHangingPresentationTests` 단언은 바꾸지 않았다.
+- `LabLocalBoardNetworkIntegrationTests`·`GameSceneFlowTests`는 단일 `LabNetwork`에 합성 패킷·솔로 Host로 도는 핸들러 수준 검사이며 실제 두 기기 연결 증거는 아니다.
+- **미실행:** iPhone 실기기·여러 폰 연결에서의 체감.
