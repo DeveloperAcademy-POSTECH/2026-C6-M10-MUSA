@@ -275,7 +275,9 @@ namespace C6Lab
                 Color32 pixel = next[i];
                 if (pixel.a != 0 && pixel.a != 255) return LabPaintReceive.NeedCheckpoint;
                 if (pixel.a == 0 && (pixel.r != 0 || pixel.g != 0 || pixel.b != 0)) return LabPaintReceive.NeedCheckpoint;
-                if (nextPainters[i] > 5 || (pixel.a == 0 && nextPainters[i] != 0)) return LabPaintReceive.NeedCheckpoint;
+                // P6 of a 3:3 territory room paints slot 6 (#394, #417), the surface's own bound.
+                if (nextPainters[i] > LabPaintSurface.MaxPainterSlot || (pixel.a == 0 && nextPainters[i] != 0))
+                    return LabPaintReceive.NeedCheckpoint;
                 if (pixel.a == 255) covered++;
             }
             if (covered != head.coveredCount || LabPaintPublisher.Hash(next, nextPainters) != head.hash

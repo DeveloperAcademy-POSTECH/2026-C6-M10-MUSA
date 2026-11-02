@@ -142,7 +142,8 @@ namespace C6Lab
 
         public static bool Valid(LabJigwiState[] states)
         {
-            if (states == null || states.Length > LabBoardReplica.MaximumPlayers) return false;
+            // Jigwi is a basic-mode stage, so it keeps the basic room's five players (#417).
+            if (states == null || states.Length > LabModel.MaximumParticipants) return false;
             var players = new HashSet<ulong>();
             foreach (LabJigwiState state in states)
             {

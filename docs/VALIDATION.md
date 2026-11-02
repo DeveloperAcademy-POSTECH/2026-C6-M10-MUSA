@@ -3784,3 +3784,24 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - **배치 보존:** Home/Lobby는 기존 serialized block 각2곳의 DEV 배열/자식 참조에4행만 더했다(새124block, 삭제0). 모든 기존 RectTransform·기존 UI object는 동일하다. Lab/Battle Scene·기존 Prefab·머터리얼·ThrowMath/Projectile·Packages/ProjectSettings는 변경하지 않았다. LabConfig를 Unity로 저장하면서 main에서 이미 동작하던 팀 피버/음향 기본값도 명시 직렬화됐다. 기존 저장값을 바꾸지 않았고 해당 기본값 코드는 main과 같다. 스태시9개 보존·신규meta누락/GUID중복0을 확인했다.
 - **종료 상태:** Play OFF, 원래 Lab Scene 열림, dirty=false, 스크립트 컴파일 오류 없음. 임시 C#·원시 JSON·실행 로그·TestRunner 임시 Scene은 커밋 대상에서 제외한다.
 - **미실행:** iPhone/iPad 실기기·iOS 서명/설치·LAN/핫스팟 실제 다기기·모바일 성능. 실제 짧은 플리크 감각과 폰 화면에서의 화염 가독성은 이후 실기기로 확인해야 한다. 기본/DEV 조절과 수동 기대 시나리오는 `JIGWI_SCREEN_PATTERNS.md`의 최신1~8절을 따른다.
+
+## #417 3:3 땅따먹기 6인 세션 시작 실패 — 2026-11-02
+
+- **기준:** main `322e00a0` → `fix/#417-territory-six-start`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac 플레이어·iOS 빌드는 만들지 않았다.
+- **원인:** #394에서 로비·방 광고·P슬롯·도색 슬롯은 6명으로 늘렸지만 Guest 쪽 검사 두 곳이 5명에 머물렀다. ①`LabBoardReplica.MaximumPlayers`=5라 6명 배열·P6(seat5)이 있는 조합판 프레임·행동 결과를 거절해 owner-board 준비가 끝나지 않고 카운트다운으로 넘어가지 못했다. ②`LabPaintReceiver`가 칠한 사람 번호를 5까지만 받아, 시작 후 P6의 첫 칠부터 체크포인트 재요청이 끝나지 않고 Guest의 공유 상태가 멈출 수 있었다(②는 시작 경로 전체를 다시 훑는 별도 점검에서 찾았다).
+- **수정:** 두 상한을 `LabModel.TerritoryMaximumParticipants`·`LabPaintSurface.MaxPainterSlot`(6)으로 맞췄다. 기본 모드 2~5인은 `ValidRoomSize`가 그대로 지키고, 기본 모드 전용 지귀 상태 검사는 5명을 명시적으로 유지한다. 공유 설정257개·인덱스는 그대로이며 접속 규약만 **5681/Lab42/Game26**으로 올렸다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode (최종 수정 후) | **1730/1730 PASS** | 약45초 |
+| PlayMode `LabTeamBattleScreenTests` | **5/5 PASS** | 8.16초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 222.81초 |
+| PlayMode `GameLobbyViewTests` | **11/11 PASS** | 21.14초 |
+| PlayMode `LabQuickConnectTests` | **4/4 PASS** | 1.07초 |
+| PlayMode `LabLobbyPositionSelectionTests` | **5/5 PASS** | 1.20초 |
+
+- 각 실행의 skip/inconclusive0. 새·바뀐 검사: `LabBoardReplicationTests`(6명·P6 프레임/결과 수락, 7명 거절, 지귀 5명 유지), `LabPainterReplicationTests`(P6 전체·복구 체크포인트, 빈 시작 뒤 P6 delta, 잘못된 번호 예시를 7로), `LabGameFlowBridgeTests`·`LabSharedSettingsSchemaTests`(접속 규약).
+- 수정 중간의 PlayMode 1차 실행에서 `GameSceneFlowTests.SavedHomeRunsThreeFreshBattles…`·`GameLobbyViewTests.DevSoloAfterLeavingASixPlayerRoom…`이 각1회 실패했으나 단독 재실행과 위 최종 실행에서 모두 통과했다. 실행 순서·시간에 따른 불안정으로 보며 원인은 확인하지 않았다.
+- 전체 PlayMode는 실행하지 않았다. 한 Editor 프로세스에서는 Host 1개만 띄울 수 있어 실제 6명 접속은 자동 검사로 재현하지 못했다.
+- **종료 상태:** Play OFF, Home Scene 열림, dirty=false, 컴파일 오류 없음. 중단된 실행이 남긴 Test Runner 임시 Scene은 남아 있지 않음을 확인했다.
+- **미실행:** 6대(3:3)·2대(1:1) 실제 연결, Mac 여러 앱, iPhone/iPad 실기기, LAN/핫스팟.

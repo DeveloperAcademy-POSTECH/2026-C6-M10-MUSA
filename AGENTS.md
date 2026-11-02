@@ -95,8 +95,14 @@
 - 현재 동작/코드 연결/기대 검증은 `docs/JIGWI_SCREEN_PATTERNS.md`·`docs/GAME_FLOW.md`·`docs/DEVELOPER_MODE_PARAMETER_SPEC.md`를 따르고, 실행한 검사·미실행 실기기는 `docs/VALIDATION.md`에만 실제 근거로 구분한다. 위 #332/#341의 시간표·축소·규약·검증 횟수는 당시 이력이다.
 
 
-## #412 지귀 회복 표시와 소화 Water 공급 — 최신 호환 기준
+## #412 지귀 회복 표시와 소화 Water 공급
 
 - 지귀 A는 기존 규칙을 유지하고 실제 스태미나를 따르는 화염 테두리/배율을 표시한다. 공통 소비 표시의 입력은 중복 제거된 승인 `LocalStaminaSpent`이며 snapshot 차이나 구슬 Spawn으로 추측하지 않는다. 원본 Canvas 배치·색·구슬 뒤 위계·야광귀 피버는 보존한다.
 - B 일반 조합은 평소 원소다. Host가 활성 즉시1개·2초마다1개, 최초 지급 대상별 미소모 최대5개의 소화용 Water를 공급한다(전달/비행 포함 상한). `jigwiABSupplyEventId`로 일반 Water/구형 Lab 공급과 구분하고 종료 후 선택적 폐기를 유지한다. 실패는 기존 전원 전체제거/스태미나0/북 보존이다. 일반 투척 물리는 바꾸지 않는다.
-- 기존0~252는 유지하며 공급 간격/초기 수량/상한/발화점 거리253~256을 더한 **257개·5680/Lab41/Game25**가 최신 묶음이다. 위 과거 규약 기록은 도입 당시 값이며 이전 앱과 혼용하지 않는다. `JIGWI_SCREEN_PATTERNS.md`·`DEVELOPER_MODE_PARAMETER_SPEC.md`를 따르고 수행한 검사만 VALIDATION에 기록한다.
+- 기존0~252는 유지하며 공급 간격/초기 수량/상한/발화점 거리253~256을 더한 **257개·5680/Lab41/Game25**가 #412 당시 묶음이며 현재 기준은 아래 #417을 따른다. 위 과거 규약 기록은 도입 당시 값이며 이전 앱과 혼용하지 않는다. `JIGWI_SCREEN_PATTERNS.md`·`DEVELOPER_MODE_PARAMETER_SPEC.md`를 따르고 수행한 검사만 VALIDATION에 기록한다.
+
+
+## #417 3:3 땅따먹기 6인 시작 — 최신 호환 기준
+
+- 조합판 프레임·행동 결과의 플레이어 상한 `LabBoardReplica.MaximumPlayers`는 모든 방 인원의 패킷 상한인 `LabModel.TerritoryMaximumParticipants`(6)다. 기본 모드 2~5인 제한은 `LabModel.ValidRoomSize`가 지키며 이 상한으로 대신하지 않는다. 지귀 상태 검사는 기본 모드 전용이라 `LabModel.MaximumParticipants`(5)를 유지한다. Guest 도색 수신(`LabPaintReceiver`)의 칠한 사람 번호 상한도 `LabPaintSurface.MaxPainterSlot`(6)이다. P6 칠을 5로 거절하면 체크포인트 재요청이 끝나지 않아 Guest 화면이 멈춘다.
+- 공유 설정 257개·인덱스는 그대로이며 최신 묶음은 **5681/Lab42/Game26**이다. 6명을 거절하던 5680 앱과 혼용하지 않는다. 실행한 검사만 `docs/VALIDATION.md`에 기록하고 6대 실기기 시작은 별도로 확인한다.
