@@ -6,11 +6,14 @@ namespace C6Lab
     /// <summary>Bounded Bonjour presence metadata; discovery is advisory, admission remains authoritative.</summary>
     public static class LabRoomPresence
     {
-        /// <summary>team marks a 2:2 team territory room (#281) with a trailing "t=1"; older records simply omit it.</summary>
+        /// <summary>
+        /// team marks a team territory room (#281) with a trailing "t=1"; older records simply omit it. A territory room
+        /// holds 2, 4 or 6 players (#394), any other room 2 to 5.
+        /// </summary>
         public static byte[] Encode(string protocol, bool ipv4, bool ipv6, int participants, int capacity, bool playing,
             bool waitingForHost = false, bool team = false)
         {
-            if (!ValidProtocol(protocol) || (!ipv4 && !ipv6) || capacity < 2 || capacity > 5 || participants < 1 || participants > capacity
+            if (!ValidProtocol(protocol) || (!ipv4 && !ipv6) || !LabModel.ValidRoomSize(capacity, team) || participants < 1 || participants > capacity
                 || (waitingForHost && (playing || participants != 1)))
                 throw new ArgumentOutOfRangeException();
             string text = "p=" + protocol + ";f=" + (ipv4 ? "4" : "") + (ipv6 ? "6" : "")
@@ -49,7 +52,7 @@ namespace C6Lab
             if (family != "4" && family != "6" && family != "46") return false;
             if (!int.TryParse(fields[2].Substring(2), NumberStyles.None, CultureInfo.InvariantCulture, out int n)
                 || !int.TryParse(fields[3].Substring(2), NumberStyles.None, CultureInfo.InvariantCulture, out int c)
-                || c < 2 || c > 5 || n < 1 || n > c) return false;
+                || !LabModel.ValidRoomSize(c, teamField) || n < 1 || n > c) return false;
             if (fields.Length == 6 && (n != 1 || fields[4] != "b=0")) return false;
             ipv4 = family.Contains("4"); ipv6 = family.Contains("6");
             participants = n; capacity = c; playing = fields[4] == "b=1"; waitingForHost = fields.Length == 6;

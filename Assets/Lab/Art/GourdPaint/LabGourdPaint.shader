@@ -159,7 +159,7 @@ Shader "C6Lab/GourdPaint"
             float PainterInk(float painter, float2 uv)
             {
                 float2 q = uv * float2(12.0, 6.0);
-                if (painter < .5 || painter > 5.5) return 0;
+                if (painter < .5 || painter > 6.5) return 0;
                 if (painter < 1.5)
                 {
                     float distance = length(frac(q) - .5);
@@ -169,7 +169,9 @@ Shader "C6Lab/GourdPaint"
                 if (painter < 2.5) return PeriodicLine(q.x + q.y, .115);
                 if (painter < 3.5) return PeriodicLine(q.y, .115);
                 if (painter < 4.5) return PeriodicLine(q.y + .2 * sin(q.x * PI), .115);
-                return max(PeriodicLine(q.x, .075), PeriodicLine(q.y, .075));
+                if (painter < 5.5) return max(PeriodicLine(q.x, .075), PeriodicLine(q.y, .075));
+                // P6 (3:3 territory, #394): the diagonal the other way from P2.
+                return PeriodicLine(q.x - q.y, .115);
             }
 
             Varyings vert(Attributes input)

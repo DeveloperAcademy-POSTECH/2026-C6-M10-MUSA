@@ -95,6 +95,9 @@ namespace Hapio
         public GameFlowState State => state;
         /// <summary>2:2 team territory room (#281): one battle, then back to this room's lobby.</summary>
         public bool IsTerritory => state.mode == GameMode.Territory;
+        /// <summary>땅따먹기 판의 팀 인원 "1:1"·"2:2"·"3:3" (#394). DEV 혼자 확인처럼 팀 인원이 아니면 빈 문자열이다.</summary>
+        public string TerritoryMatchLabel => IsTerritory ? LabTeams.MatchLabel(network.Snapshot?.players?.Length
+            ?? (network.IsDeveloperSolo ? 1 : network.TargetParticipantCount)) : string.Empty;
         public GameStageDefinition CurrentStageDefinition => state.mode == GameMode.Story
             && state.stageIndex >= 1 && state.stageIndex <= 3 ? stageCatalog.Get(state.stageIndex) : null;
         public LabSnapshot ResultSnapshot { get; private set; }
@@ -608,7 +611,7 @@ namespace Hapio
 
         public bool CreatePendingRoom(int capacity) => CreatePendingRoom(capacity, GameMode.Story);
 
-        /// <summary>A 2:2 room (#281) always waits for exactly four players.</summary>
+        /// <summary>A territory room waits for 2, 4 or 6 players (1:1, 2:2, 3:3; #394), a story room for 2 to 5.</summary>
         public bool CreatePendingRoom(int capacity, GameMode mode)
         {
             if (IsCreatingRoom || state.phase != GameFlowPhase.Home || !network.CanChooseConnection) return false;

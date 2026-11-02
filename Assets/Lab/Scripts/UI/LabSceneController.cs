@@ -88,6 +88,9 @@ namespace C6Lab
             // 섬광 해결 소리(내가 흔들어 풀었을 때)와 오색구슬 피격 소리(던진 사람) (#338, 내 기기만)
             if (boardNetwork != null && GetComponent<LabFlashRewardSound>() == null)
                 gameObject.AddComponent<LabFlashRewardSound>().Bind(boardNetwork);
+            // 야광귀 섬광 예고(눈 뜸/빛남/3·2·1)와 번쩍 소리 (#395)
+            if (boardNetwork != null && GetComponent<LabYaguangSound>() == null)
+                gameObject.AddComponent<LabYaguangSound>().Bind(boardNetwork);
             // 햅틱 (내 구슬 생성, 내가 던진 구슬 타격)
             if (boardNetwork != null && GetComponent<LabHaptics>() == null)
                 gameObject.AddComponent<LabHaptics>().Bind(boardNetwork, board);

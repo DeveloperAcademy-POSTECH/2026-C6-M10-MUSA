@@ -58,6 +58,48 @@ namespace C6Lab.Tests
             Assert.That(isTeam, Is.False);
         }
 
+        [TestCase(1, false, false)] [TestCase(2, true, true)] [TestCase(3, true, false)] [TestCase(4, true, true)]
+        [TestCase(5, true, false)] [TestCase(6, false, true)] [TestCase(7, false, false)]
+        public void StoryRoomsHoldTwoToFiveAndTerritoryRoomsTwoFourOrSix(int capacity, bool story, bool territory)
+        {
+            Assert.That(LabModel.ValidRoomSize(capacity, false), Is.EqualTo(story));
+            Assert.That(LabModel.ValidRoomSize(capacity, true), Is.EqualTo(territory));
+        }
+
+        [TestCase(1, false)] [TestCase(2, true)] [TestCase(5, true)] [TestCase(6, true)] [TestCase(7, false)]
+        public void SessionFingerprintCoversEveryRoomSizeUpToTheSixPlayerTerritory(int players, bool valid)
+        {
+            var values = new float[LabConfig.DeveloperFields.Count];
+            if (valid)
+                Assert.That(LabSessionSettings.Fingerprint(values, players, 1), Is.Not.EqualTo(LabSessionSettings.Fingerprint(values, 3, 1))
+                    .Or.Property("Length").EqualTo(64), "A 3:3 room (#394) hosts with six players and gets its own fingerprint.");
+            else Assert.Throws<ArgumentException>(() => LabSessionSettings.Fingerprint(values, players, 1));
+        }
+
+        [Test]
+        public void SixPlayerTerritoryRoomRoundTripsButOtherSizesKeepTheirOwnLimit()
+        {
+            string protocol = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game);
+            byte[] six = LabRoomPresence.Encode(protocol, true, true, 5, 6, false, false, true);
+            Assert.That(LabRoomPresence.TryDecode(six, protocol, out _, out _, out int count, out int capacity,
+                out _, out _, out bool isTeam), Is.True);
+            Assert.That((count, capacity, isTeam), Is.EqualTo((5, 6, true)));
+            Assert.Throws<ArgumentOutOfRangeException>(() => LabRoomPresence.Encode(protocol, true, true, 1, 6, false));
+            Assert.Throws<ArgumentOutOfRangeException>(() => LabRoomPresence.Encode(protocol, true, true, 1, 3, false, false, true));
+            Assert.Throws<ArgumentOutOfRangeException>(() => LabRoomPresence.Encode(protocol, true, true, 1, 5, false, false, true));
+        }
+
+        [TestCase("f=46;n=1;c=3;b=0;t=1")]
+        [TestCase("f=46;n=1;c=5;b=0;t=1")]
+        [TestCase("f=46;n=1;c=8;b=0;t=1")]
+        [TestCase("f=46;n=7;c=6;b=0;t=1")]
+        public void TerritoryRecordWithAnUnevenOrOversizedRoomIsRejected(string fields)
+        {
+            byte[] record = Record("p=" + LabBonjourDiscovery.Protocol + ";" + fields);
+            Assert.That(LabRoomPresence.TryDecode(record, LabBonjourDiscovery.Protocol,
+                out _, out _, out _, out _, out _, out _, out _), Is.False);
+        }
+
         [TestCase("f=46;n=1;c=4;b=0;t=1;t=1")]
         [TestCase("f=46;n=1;c=4;b=0;t=1;w=1")]
         [TestCase("f=46;n=1;c=4;b=0;t=0")]
@@ -110,6 +152,13 @@ namespace C6Lab.Tests
         public void PendingRoomRejectsUnsupportedCapacityBeforeAllocating(int capacity)
         {
             Assert.That(LabPendingRoom.TryCreate(capacity, out var pending, out string error), Is.False);
+            Assert.That(pending, Is.Null); Assert.That(error, Is.Not.Empty);
+        }
+
+        [TestCase(1)] [TestCase(3)] [TestCase(5)] [TestCase(7)]
+        public void PendingTerritoryRoomRejectsUnevenCapacityBeforeAllocating(int capacity)
+        {
+            Assert.That(LabPendingRoom.TryCreate(capacity, LabRoomFamily.Game, true, out var pending, out string error), Is.False);
             Assert.That(pending, Is.Null); Assert.That(error, Is.Not.Empty);
         }
 
