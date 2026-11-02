@@ -7,6 +7,7 @@ namespace C6Lab
     /// - 요괴에 맞으면: 박 모드가 Paint면 Resources/Audio/Hit(물감 터지는 소리), Crack이면 Resources/Audio/HitCrack 폴더의
     ///   소리 중 하나 (여러 개면 무작위, 연속 같은 소리 X). 한쪽 폴더가 비어 있으면 다른 쪽 소리를 쓴다.
     ///   Paint에서 박의 옆을 스쳐 맞으면(LabConfig Glancing Hit Offset 이상) Resources/Audio/HitGlance 소리를 쓴다.
+    ///   콤보 실패 페널티(SMALL, #222) 중인 내 공이 맞으면 작은 공답게 Resources/Audio/HitSmall의 짧고 높은 "톡" 소리를 쓴다 (#398).
     /// - 빗나가면: Resources/Audio/Miss 폴더의 소리 중 하나 (같은 방식)
     /// 소리 파일이 없으면 조용히 넘어간다. 크기는 기본 크기 × 일시정지 메뉴 SFX 설정.
     /// </summary>
@@ -17,6 +18,8 @@ namespace C6Lab
         public const string CrackHitFolder = "Audio/HitCrack";
         // Audio/Hit 아래에 두면 LoadAll이 하위 폴더까지 읽어 일반 타격음에 섞이므로 옆 폴더로 둔다.
         public const string GlanceHitFolder = "Audio/HitGlance";
+        // SMALL 중 맞힌 소리 (#398). 같은 이유로 Audio/Hit 옆 폴더.
+        public const string SmallHitFolder = "Audio/HitSmall";
         // 박 원기둥(Unity 기본 Cylinder)의 로컬 반지름.
         private const float HitboxLocalRadius = .5f;
         public const string MissFolder = "Audio/Miss";
@@ -33,6 +36,8 @@ namespace C6Lab
         private AudioClip[] crackHitClips;
         private AudioClip[] glanceHitClips;
         private int lastGlanceIndex = -1;
+        private AudioClip[] smallHitClips;
+        private int lastSmallIndex = -1;
         private AudioClip[] missClips;
         private int lastMissIndex = -1;
         private AudioSource source;
@@ -45,6 +50,9 @@ namespace C6Lab
         public int GlanceHitClipCount => glanceHitClips == null ? 0 : glanceHitClips.Length;
         /// <summary>마지막 타격음이 스친 타격 소리였는지 (테스트·확인용).</summary>
         public bool LastHitWasGlance { get; private set; }
+        public int SmallHitClipCount => smallHitClips == null ? 0 : smallHitClips.Length;
+        /// <summary>마지막 타격음이 SMALL 중 작은 공 소리였는지 (테스트·확인용).</summary>
+        public bool LastHitWasSmall { get; private set; }
         public int MissClipCount => missClips == null ? 0 : missClips.Length;
 
         public void Bind(LabNetwork target)
@@ -67,13 +75,24 @@ namespace C6Lab
             hitClips = Resources.LoadAll<AudioClip>(HitFolder);
             crackHitClips = Resources.LoadAll<AudioClip>(CrackHitFolder);
             glanceHitClips = Resources.LoadAll<AudioClip>(GlanceHitFolder);
+            smallHitClips = Resources.LoadAll<AudioClip>(SmallHitFolder);
             missClips = Resources.LoadAll<AudioClip>(MissFolder);
             source = gameObject.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.spatialBlend = 0f; // 화면 기준 소리라 위치와 상관없이 같은 크기로 들린다.
         }
 
-        private void OnLocalThrowHit(int damage) => PlayHit(network != null ? network.LastLocalHitOffset : 0f);
+        private void OnLocalThrowHit(int damage) => PlayHit(network != null ? network.LastLocalHitOffset : 0f,
+            network != null && InComboPenalty(network.Snapshot, network.LocalPlayerId));
+
+        /// <summary>스냅샷 시각에 이 플레이어가 콤보 실패 페널티(SMALL, #222) 중인지.</summary>
+        public static bool InComboPenalty(LabSnapshot snapshot, ulong playerId)
+        {
+            if (snapshot == null || snapshot.players == null) return false;
+            foreach (LabPlayerState player in snapshot.players)
+                if (player != null && player.id == playerId) return player.comboPenaltyUntil > snapshot.serverTime;
+            return false;
+        }
 
         /// <summary>
         /// 맞은 자리가 박 중심축에서 날아온 방향 기준으로 얼마나 옆으로 벗어났는지. 0 = 정중앙, 1 = 가장자리를 스침.
@@ -94,9 +113,16 @@ namespace C6Lab
         private static bool IsFinite(Vector2 v) =>
             !float.IsNaN(v.x) && !float.IsInfinity(v.x) && !float.IsNaN(v.y) && !float.IsInfinity(v.y);
 
-        /// <summary>페인트 타격음. 옆을 스치면 스친 소리를 사용한다.</summary>
-        public void PlayHit(float offset = 0f)
+        /// <summary>페인트 타격음. SMALL 중이면 작은 공 소리, 옆을 스치면 스친 소리를 사용한다.</summary>
+        public void PlayHit(float offset = 0f, bool small = false)
         {
+            LastHitWasSmall = small && smallHitClips != null && smallHitClips.Length > 0;
+            if (LastHitWasSmall)
+            {
+                LastHitWasGlance = false;
+                PlayRandom(smallHitClips, ref lastSmallIndex, HitBase);
+                return;
+            }
             float threshold = Config != null ? Config.GlancingHitOffset : .7f;
             LastHitWasGlance = glanceHitClips != null && glanceHitClips.Length > 0
                 && IsGlancing(offset, threshold);

@@ -43,5 +43,37 @@ namespace C6Lab.Tests
             Assert.IsTrue(LabThrowSound.IsGlancing(.7f, .7f));
             Assert.IsTrue(LabThrowSound.IsGlancing(1f, .7f));
         }
+
+        [Test]
+        public void ASmallBallFromTheComboPenaltyHitsWithTheSmallSound()
+        {
+            var snapshot = new LabSnapshot
+            {
+                serverTime = 60d,
+                players = new[]
+                {
+                    new LabPlayerState { id = 1ul, comboPenaltyUntil = 65d },
+                    new LabPlayerState { id = 2ul, comboPenaltyUntil = 59d },
+                    new LabPlayerState { id = 3ul, comboRewardUntil = 65d }
+                }
+            };
+            Assert.IsTrue(LabThrowSound.InComboPenalty(snapshot, 1ul), "SMALL is still on.");
+            Assert.IsFalse(LabThrowSound.InComboPenalty(snapshot, 2ul), "SMALL already ended.");
+            Assert.IsFalse(LabThrowSound.InComboPenalty(snapshot, 3ul), "BIG is not SMALL.");
+            Assert.IsFalse(LabThrowSound.InComboPenalty(snapshot, 4ul));
+            Assert.IsFalse(LabThrowSound.InComboPenalty(null, 1ul));
+
+            var host = new GameObject("throw-sound");
+            try
+            {
+                LabThrowSound sound = host.AddComponent<LabThrowSound>();
+                Assert.That(sound.SmallHitClipCount, Is.GreaterThan(0), "Resources/Audio/HitSmall holds the small hit.");
+                sound.PlayHit(0f, true);
+                Assert.IsTrue(sound.LastHitWasSmall);
+                sound.PlayHit(0f);
+                Assert.IsFalse(sound.LastHitWasSmall);
+            }
+            finally { Object.DestroyImmediate(host); }
+        }
     }
 }
