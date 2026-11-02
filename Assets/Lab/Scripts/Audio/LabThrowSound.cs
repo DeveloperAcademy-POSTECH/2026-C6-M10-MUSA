@@ -58,7 +58,13 @@ namespace C6Lab
         public bool LastHitWasSmall { get; private set; }
         /// <summary>마지막 타격음이 BIG 중 던진 큰 공의 징이었는지 (테스트·확인용).</summary>
         public bool LastHitWasBig { get; private set; }
-        public int BigHitClipCount => bigHitClips == null ? 0 : bigHitClips.Length;
+        public int BigHitClipCount { get { EnsureBigClips(); return bigHitClips.Length; } }
+
+        // Awake 전(에디터 테스트 등)에 불려도 징 파일을 읽을 수 있게 처음 쓸 때 읽는다.
+        private void EnsureBigClips()
+        {
+            if (bigHitClips == null) bigHitClips = Resources.LoadAll<AudioClip>(BigHitFolder);
+        }
         /// <summary>마지막 타격음의 재생 높이 (1 = 원래 높이, 테스트·확인용).</summary>
         public float LastHitPitch { get; private set; } = 1f;
         public int MissClipCount => missClips == null ? 0 : missClips.Length;
@@ -84,7 +90,7 @@ namespace C6Lab
             crackHitClips = Resources.LoadAll<AudioClip>(CrackHitFolder);
             glanceHitClips = Resources.LoadAll<AudioClip>(GlanceHitFolder);
             missClips = Resources.LoadAll<AudioClip>(MissFolder);
-            bigHitClips = Resources.LoadAll<AudioClip>(BigHitFolder);
+            EnsureBigClips();
             source = gameObject.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.spatialBlend = 0f; // 화면 기준 소리라 위치와 상관없이 같은 크기로 들린다.
@@ -129,6 +135,7 @@ namespace C6Lab
         /// <summary>페인트 타격음. 옆을 스치면 스친 소리, SMALL 중 던진 공이면 같은 소리를 높여서 낸다.</summary>
         public void PlayHit(float offset = 0f, bool small = false, bool big = false)
         {
+            if (big) EnsureBigClips();
             LastHitWasBig = big && !small && bigHitClips != null && bigHitClips.Length > 0;
             if (LastHitWasBig)
             {
