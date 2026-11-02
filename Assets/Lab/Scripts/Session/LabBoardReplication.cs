@@ -81,7 +81,20 @@ namespace C6Lab
             public string session;
             public uint round;
             public double checkpointAt;
+            /// <summary>This recipient's offset on the 5 s checkpoint grid, fixed on its first frame of a round (#435).</summary>
+            public double phaseSeconds;
             public Dictionary<string, LabOrbState> states;
+        }
+
+        /// <summary>
+        /// The grid time a checkpoint at <paramref name="serverTime"/> belongs to, so a forced checkpoint (a Guest's
+        /// board_checkpoint request, also during the start hold) keeps the recipient's phase instead of resetting it.
+        /// </summary>
+        private static double GridCheckpointAt(double serverTime, double previousCheckpointAt)
+        {
+            double offset = (serverTime - previousCheckpointAt) % CheckpointIntervalSeconds;
+            if (offset < 0d) offset += CheckpointIntervalSeconds;
+            return serverTime - offset;
         }
 
         private readonly Dictionary<ulong, SentBoard> sent = new Dictionary<ulong, SentBoard>();
@@ -96,11 +109,16 @@ namespace C6Lab
             && (frame.states == null || frame.states.Length == 0)
             && (frame.removedIds == null || frame.removedIds.Length == 0);
 
+        /// <param name="checkpointPhaseSeconds">Where this recipient sits on the 5 s checkpoint grid, in [0, 5). Read only on
+        /// its first frame of a round; the Host spreads its peers so their periodic checkpoints do not share one frame (#435).</param>
         public LabBoardFrame Build(LabSnapshot snapshot, ulong recipient, long sequence,
-            ulong modelRevision, bool force = false)
+            ulong modelRevision, bool force = false, double checkpointPhaseSeconds = 0d)
         {
             if (snapshot == null || string.IsNullOrWhiteSpace(snapshot.sessionId) || snapshot.round == 0
                 || sequence <= 0) throw new ArgumentException("An active snapshot and positive board sequence are required.");
+            if (double.IsNaN(checkpointPhaseSeconds) || checkpointPhaseSeconds < 0d
+                || checkpointPhaseSeconds >= CheckpointIntervalSeconds)
+                throw new ArgumentOutOfRangeException(nameof(checkpointPhaseSeconds));
             LabOrbState[] current = (snapshot.orbs ?? Array.Empty<LabOrbState>())
                 .Where(orb => orb != null && orb.owner == recipient && !orb.inFlight)
                 .Concat((snapshot.drums ?? Array.Empty<LabOrbState>()).Where(drum => drum != null))
@@ -112,6 +130,7 @@ namespace C6Lab
                 || previous.session != snapshot.sessionId || previous.round != snapshot.round;
             bool checkpoint = force || newRound
                 || snapshot.serverTime - previous.checkpointAt >= CheckpointIntervalSeconds;
+            double phase = newRound ? checkpointPhaseSeconds : previous.phaseSeconds;
             var states = new List<LabOrbState>();
             var currentIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (LabOrbState orb in current)
@@ -159,7 +178,9 @@ namespace C6Lab
             sent[recipient] = new SentBoard
             {
                 session = snapshot.sessionId, round = snapshot.round,
-                checkpointAt = checkpoint ? snapshot.serverTime : previous.checkpointAt,
+                checkpointAt = !checkpoint ? previous.checkpointAt
+                    : newRound ? snapshot.serverTime - phase : GridCheckpointAt(snapshot.serverTime, previous.checkpointAt),
+                phaseSeconds = phase,
                 states = current.ToDictionary(orb => orb.id, orb => orb.Copy(), StringComparer.Ordinal)
             };
             return frame;

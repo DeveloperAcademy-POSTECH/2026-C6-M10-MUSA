@@ -3867,3 +3867,20 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 조합판 프레임 생략의 순번 보존은 EditMode 판정 검사와 Host/Guest 통합 PlayMode(`LabLocalBoardNetworkIntegrationTests`)로 확인했다. 실제 여러 폰의 대역폭·반응 변화는 측정하지 않았다.
 - **종료 상태:** Play OFF, Home Scene 열림, 컴파일 오류 없음. 같은 폴더에서 다른 세션이 작업하던 지귀 미커밋 수정은 그 세션이 작업 트리에서 치운 뒤 검사를 실행했으며 이 기록에 포함하지 않는다.
 - **미실행:** iPhone 실기기·LAN/핫스팟 실제 다기기·대역폭 측정. 전체 PlayMode는 실행하지 않았다.
+
+## #435 조합판 체크포인트 피어별 위상 분산·Host 요청 스로틀 — 2026-11-02
+
+- **기준:** main `80db0616` → `fix/#435-board-checkpoint-stagger`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac 플레이어·iOS 빌드는 만들지 않았다.
+- **배경:** 통신 렉 점검에서 Host가 모든 Guest의 5초 조합판 체크포인트를 같은 프레임에 만들어 보내(방 인원만큼 전체 조합판 동시 버스트) 5초마다 끊김이 생길 수 있고, Guest의 `board_checkpoint` 요청을 Host가 횟수 제한 없이 즉시 전체 재발송하는 것이 확인됐다.
+- **수정:** `LabBoardPublisher.Build(..., checkpointPhaseSeconds)`가 수신자별 위상(0 이상 5 미만)을 라운드 첫 프레임에서만 받아 보관하고, 체크포인트 시각을 격자 기준으로 기록한다(새 라운드 `serverTime − 위상`, 이후 `serverTime − (serverTime − 이전 기준) mod 5`). 그래서 강제 체크포인트(Guest 요청·시작 대기 중 요청)나 늦은 틱이 위상을 지우거나 밀지 않는다. `PublishOwnerBoards`는 로컬을 뺀 피어 순번으로 `5·i/N` 위상을 준다. Host의 `board_checkpoint` 처리에 피어당 0.5초 스로틀을 두고(Guest의 기존 0.5초 재요청 간격과 같음, 받아들인 요청만 기록) 같은 동작이던 `paint_resync` 스로틀과 함께 `LabPeerRequestThrottle`로 묶었다. 체크포인트 주기 5초·프레임 형식·순번·접속 규약 **5682/Lab43/Game27**·공유 설정257개는 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1740/1740 PASS** | — |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | — |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 210.85초 |
+
+- 각 실행의 skip/inconclusive0. 새 검사 `LabBoardCheckpointPhaseTests` 4개: 위상0/2.5 두 수신자가 0·2.5·5·7.5초에 엇갈려 체크포인트, 강제 체크포인트 뒤 격자 유지와 늦은 틱(2.57초) 뒤에도 다음이 7.5초, 위상은 라운드 첫 프레임에서만 읽고 범위 밖·NaN은 거절, 스로틀의 피어별 0.5초·거절 요청 미기록·Forget/Clear. 기존 `LabBoardReplicationTests`의 5초 체크포인트 검사는 위상0 기본값으로 그대로 통과했다.
+- 시간 칸의 —는 이번 실행에서 소요 시간을 따로 남기지 않은 것이다.
+- **종료 상태:** Play OFF, 컴파일 오류 없음.
+- **미실행:** iPhone 실기기·LAN/핫스팟 실제 다기기에서의 5초 주기 끊김 변화와 대역폭 측정. 전체 PlayMode는 실행하지 않았다.

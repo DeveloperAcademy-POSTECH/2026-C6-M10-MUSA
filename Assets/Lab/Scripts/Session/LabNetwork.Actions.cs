@@ -449,11 +449,18 @@ namespace C6Lab
             AnnounceOrbExpiries();
             AnnounceGourdBombs();
             CaptureTargetPose(snapshot);
+            // Spread the peers over the 5 s checkpoint grid so their periodic checkpoints never share one frame (#435).
+            int remoteCount = 0;
+            foreach (ulong peer in order) if (peer != LocalPlayerId) remoteCount++;
+            int remoteIndex = 0;
             foreach (ulong peer in order)
             {
-                if (peer == LocalPlayerId || only.HasValue && only.Value != peer) continue;
+                if (peer == LocalPlayerId) continue;
+                int index = remoteIndex++;
+                if (only.HasValue && only.Value != peer) continue;
+                double phase = LabBoardPublisher.CheckpointIntervalSeconds * index / remoteCount;
                 long sequence = PeekBoardSequence(peer);
-                var frame = boardPublisher.Build(snapshot, peer, sequence, model.Revision, force);
+                var frame = boardPublisher.Build(snapshot, peer, sequence, model.Revision, force, phase);
                 if (skipEmpty && LabBoardPublisher.IsEmptyDelta(frame)) continue;
                 CommitBoardSequence(peer, sequence);
                 SendBoardFrame(peer, frame);
