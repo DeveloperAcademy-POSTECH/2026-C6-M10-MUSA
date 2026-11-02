@@ -28,7 +28,12 @@ namespace C6Lab.Tests
 
                 var block = new MaterialPropertyBlock();
                 ball.GetComponent<MeshRenderer>().GetPropertyBlock(block);
-                Assert.That(block.GetColor("_BaseColor"), Is.EqualTo(look.BodyColor), "The ball itself takes the five colours.");
+                // 프로젝트가 Linear 색 공간이라 MaterialPropertyBlock.SetColor는 sRGB 색을 linear로 바꿔 담는다.
+                Color expected = QualitySettings.activeColorSpace == ColorSpace.Linear ? look.BodyColor.linear : look.BodyColor;
+                Color actual = block.GetColor("_BaseColor");
+                Assert.That(actual.r, Is.EqualTo(expected.r).Within(1e-3f), "The ball itself takes the five colours.");
+                Assert.That(actual.g, Is.EqualTo(expected.g).Within(1e-3f));
+                Assert.That(actual.b, Is.EqualTo(expected.b).Within(1e-3f));
                 marker.GetComponent<MeshRenderer>().GetPropertyBlock(block);
                 Assert.That(block.isEmpty, Is.True, "The roll marker keeps its own colour.");
             }
