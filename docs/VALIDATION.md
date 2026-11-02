@@ -3661,3 +3661,16 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 
 - 새·바뀐 검사: EditMode `LabTeamSizesTests`(새), `LabRoomPresenceTests`(방 인원 표·6명 기록·지문), `LabPaintPainterSlotTests`(P6 허용·P7 거절), `LabPlayerSlotsTests`, `LabSharedSettingsSchemaTests`·`LabGameFlowBridgeTests`(접속 버전), `LabPlayerCircleTests`(P1~P6), Hapio `GameLobbyModeRulesTests`(새), `GameLobbyAssetTests`, `GamePendingRoomRegistryTests`, `GameStageResultViewTests`(결과 n : n), PlayMode `LabPlayerPaintPatternRenderTests`(P1~P6), `GameLobbyViewTests`(인원별 모드 막힘, 1:1 방, 3:3 쪽 넘김), `GameSceneFlowTests`(DEV 혼자 결과 "땅따먹기").
 - 임시 그림: 3:3 쪽 넘김 `<` `>`·쪽 표시 점, P6 전투 동그라미(P5 그림의 색·숫자만 바꿈)는 디자인 그림을 받으면 바꾼다.
+
+
+## 조합판 낙하·착지 수채 얼룩 원화 연결 — #392, 2026-11-02
+
+- 기존 #392의 `b2fcf031` 이후 최신 origin/main `3897dbd8`을 같은 `feat/#392-board-paint-drips`에 병합했다(`989ed19b`). 충돌은 이 검증 문서의 양쪽 추가 기록뿐이었고 둘 다 보존했다. #402 정리 브랜치·스태시는 이동하거나 합치지 않았다.
+- 기존 WaterDrop 아이콘 대신 새 RGBA 주 얼룩3종·작은 튀김점2종을 연결했다. 원본 PNG는 생성 결과와 SHA-256이 같으며 픽셀 수정 없이 Unity512/NPOT None으로 가져왔다(가로형512×384, 나머지512×512). 판 전용 셰이더/재질/프로필만 사용하고 투척 원화·비행 재질·B보상 화염·판정 지도·공유 설정/패키지는 변경하지 않았다.
+- 낙하.08초→착지 고정/번짐.16초→유지.12초→페이드.44초, 총.8초다. 중심 방울을 번짐 초반까지 혼합해 착지 순간 끊김을 완화했다. 최대24개/구슬·한 Step 생성24·고정배열96·얼룩당 최대2quad다. 표시만 실제 곡선/좌우 끝 안에 넣고 물리·소유권 전달면은 유지했다. 실행 중 원화 참조가 빠지면 이력을 지운다.
+- **실행 환경:** Unity6000.6.5f1, macOS/Metal. 컴파일 오류 없음, 새 셰이더 supported=true·ShaderUtil 경고/오류0.
+- **실행:** 구슬 관련 PlayMode **123/123 PASS**(42.99초, 새 얼룩9개 포함), 기존 오행 비행 **9/9 PASS**(3.38초), 지귀 보상 **8/8 PASS**(1.25초). 이후 참조 누락 정리와 회귀1개를 더하고 얼룩 **10/10 PASS**(0.12초)를 재실행했다. 각 실행 실패/skip0. 중복 재실행을 별도 기능 수로 합산하지 않는다. 전체 EditMode/전체 PlayMode 수행 기록은 아니다.
+- **GPU 직접 확인:** 실제 Lab의 저장된 조합판·원형 구슬 외형·도색 팔레트로 하단390×403 카메라를 캡처했다. 5색×6얼룩에서.13초에 착지한 world위치가.26/.52초까지 고정됨을 확인했고, reveal .3178→1·alpha .88→.6132·.82초에 전부0개를 확인했다. 이어 같은 판에서0.65초 실제 소스 위치를 이동한 뒤 정지해30fps/2초60프레임을 만들었고 마지막 잔여0을 확인했다. `images/board-paint-stain-motion.gif`·`images/board-paint-stain-landed.png`가 화면 근거다. 물리를 고정하고 표시 clock만 진행한 격리 비교이며 실제 손가락/연결 플레이는 아니다.
+- 코드 리뷰의 착지 pop·곡선 투영의 X이동·Inspector 원화 누락 경계를 보완했다. 생성 당시 시간/크기·속성색·원화 선택, Pause/시작대기, Raw/DEV제외, 숨김/거절복원, 축소, localRNG 재현/게임난수 보존, 곡선 네 모서리의 실제 Mesh정점과 개수 제한을 검사했다.
+- 작업 전 보호 파일의 내용 해시가 모두 같고 #402 브랜치 HEAD·스태시9개도 동일하다. 원본 Lab/Hapio Scene·Prefab·기존 재질·프로젝트 설정을 저장하거나 수정하지 않았다. 캡처 후 Play를 종료했다. 원시 JSON/로그/연속PNG는 커밋하지 않는다.
+- **미실행:** iPhone/iPad·iOS 빌드·LAN/핫스팟·실제 다기기·모바일 성능. 새 표현의 미감은 사용자 확인 대상이며 자동 검사 통과로 확정하지 않는다. 설정/직접 비교는 `ELEMENT_FLIGHT_TRAILS.md`의 최신 #392 절을 따른다.

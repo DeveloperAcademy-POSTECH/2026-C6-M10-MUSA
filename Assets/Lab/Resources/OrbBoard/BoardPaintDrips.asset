@@ -12,13 +12,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 48c08cedb661f444094cf30dae2c9f7c, type: 3}
   m_Name: BoardPaintDrips
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabOrbDripProfile
-  diameterScale: 0.36
-  spacingRadii: 0.8
-  lifetime: 0.7
-  fallDistanceRadii: 2
-  strength: 0.85
-  fadeInSpeed: 1.5
-  fullSpeed: 10
-  maxDrops: 48
-  dropTexture: {fileID: 2800000, guid: 9b847e91bccf748119edd2e505079dbe, type: 3}
-  material: {fileID: 2100000, guid: c36a81757c0a34f3d9ef9c5a970443e4, type: 2}
+  diameterScale: 0.7
+  spacingRadii: 1.4
+  fallDuration: 0.08
+  spreadDuration: 0.16
+  holdDuration: 0.12
+  fadeDuration: 0.44
+  fallDistanceRadii: 0.8
+  strength: 0.88
+  minimumOpacity: 0.45
+  fadeInSpeed: 0.5
+  fullSpeed: 4
+  maxDrops: 24
+  spatterChance: 0.45
+  stainTextures:
+  - {fileID: 2800000, guid: c98f012eba1c047cdbab6a2d462610c4, type: 3}
+  - {fileID: 2800000, guid: 17f1e05ffc6d24c06ae85f603e5b95e5, type: 3}
+  - {fileID: 2800000, guid: 31a69775a5bd044528789765f2e57d0c, type: 3}
+  spatterTextures:
+  - {fileID: 2800000, guid: abffc937816ff4c27b7575730f6b6a6c, type: 3}
+  - {fileID: 2800000, guid: c0f67d6c0a80d4796b15204b7f8c0320, type: 3}
+  material: {fileID: 2100000, guid: 73faea4d143e64562a6ac597d2a69aae, type: 2}

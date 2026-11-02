@@ -121,32 +121,47 @@ Play Mode 중 프로필 원본 에셋을 편집하면 에셋 변경이 남을 �
 두 보조 시점은 실제 기록 경로에 카메라를 맞춘 것이며 게임 카메라 그대로의 가독성을 보증하지 않는다. 실제 전투 카메라를 복사한 기본 정면과 iOS 화면에서도 별도로 확인해야 한다.
 
 
-## 조합판의 물감 방울 — #392
+## 조합판의 낙하·착지 얼룩 — #392
 
-조합판은 위 투척용 오행 트레일과 분리했다. `LabOrbBoard.SyncBoardTrails` → `LabOrbBoardTrail.Sync/Step`에서 원소가 확정된 Combined만 처리하며 기존 DEV `Board Orb Trail`(인덱스165·기본ON)을 사용한다. Raw·아이템·북·미승인 원소는 제외한다. 비행용5종 프로필, 원본 PNG/머터리얼, 지귀 B 보상 화염은 수정하지 않는다.
+`LabOrbBoard.SyncBoardTrails` → `LabOrbBoardTrail.Sync/Step`은 원소가 확정된 Combined의 실제 XY 이동 구간을 샘플링한다. 기존 DEV `Board Orb Trail`(165·기본 ON)을 그대로 쓰며 Raw·아이템·북은 제외한다. 투척용 오행 트레일과 지귀 B 보상 화염은 별도 경로다.
 
-- 구슬의 실제 XY 이동 구간에서 일정 거리마다 방울을 생성한다. 생성 후에는 구슬을 따라가지 않고 그 자리에서 화면 아래(world -Y)로 가속하는 모양으로 내려간다.
-- 기존 흰 담채/검은 먹선 `WaterDrop.png`와 `ElementInkTrail.mat`를 참조만 하며 속성별 박 도색 팔레트로 색을 입힌다. MaterialPropertyBlock/정점색을 써 공유 원본을 변경하지 않는다.
-- 방울은 약간 길어지며 수명의 후반에 투명해져 제거된다. 멈췄을 때 새 방울은 나오지 않고 이미 나온 방울은 계속 떨어져 사라진다. 착지 얼룩/지속 도색/명중은 없다.
-- 구슬 루트/물리와 별개의 bounded Mesh 하나로 표시한다. 오브젝트·Rigidbody·Collider·ParticleSystem을 방울마다 생성하지 않고 최대96개 배열 안에서 프로필 상한만 유지한다. 로컬 전용 난수를 써 게임의 난수 흐름과 통신에 영향을 주지 않는다.
-- 일반 Pause와 시작 대기는 낙하·수명을 정지한다. 숨김·DEV OFF·구슬 제거·ID/속성 변경은 이력을 비우며, 요청 거절 후 승인 위치에서 새로 시작해 숨긴 위치와 선으로 이어지지 않는다. 크기 변화는 새 방울에 적용하고 이미 나온 방울은 생성 당시 크기를 유지한다.
+기존의 세로 물방울 아이콘을 판 전용 원화로 교체했다. `Resources/OrbBoard/Stains`의 주 얼룩 3종·작은 튀김점 2종은 실제 RGBA 이미지다. 원본 PNG 픽셀을 수정하지 않고 Unity에서 최대 512, alpha transparency, NPOT None(가로형 비율 유지), Bilinear/Clamp, mipmap OFF로 가져온다. 중성 RGB의 수채 농담과 alpha를 함께 사용하며 `LabPaintPalette`의 박 도색 색으로 물들인다. 생성 출처는 `asset-generation/board-paint-stains.json`이다.
 
-Project에서 `Assets/Lab/Resources/OrbBoard/BoardPaintDrips.asset`을 선택해 다음 값을 조정한다. 기기 로컬 표현 에셋이며 공유 LabConfig·프로토콜 번호는 바꾸지 않는다. 원본 에셋을 Play 중 편집하면 설정이 파일에 남을 수 있다.
+1. 실제 지나간 점에서 작은 둥근 방울이 잠깐 아래로 떨어진다. 구슬 물리와 무관한 표시 이동이다.
+2. 착지 위치를 고정하고, 같은 크기의 얼룩 안에서 불규칙한 번짐 전선이 진행한다. 원화 전체를 풍선처럼 키우거나 UV를 흘리지 않는다. 착지 직후 중심 방울을 잠깐 남겨 끊김을 완화한다.
+3. 잠시 남은 후 투명해져 제거된다. 멈추면 새 방울은 생성하지 않고 기존 얼룩만 수명을 마친다. 영구 도색·명중·성장·건조 판정을 만들지 않는다.
+
+전용 `C6Lab/Board Paint Stain` 재질 하나가 5장의 원화를 선택한다. 구슬마다 제한된 Mesh 하나, 얼룩마다 주 얼룩+선택적 튀김점 최대 2quad다. 방울별 GameObject/Rigidbody/Collider/ParticleSystem은 없다. 실제 곡선 조합판의 위아래와 열린 좌우 끝 안으로 **표현만** 넣으며 이동/소유권 전달면은 바꾸지 않는다. 비정상적으로 큰 표현 값은 해당 얼룩 크기만 줄여 영역에 맞춘다. 판 전용 로컬 난수로 원화·각도·크기를 한 번 정하고 게임 난수를 소비하지 않는다.
+
+Pause/시작 대기는 낙하·번짐·수명을 함께 정지한다. 숨김·DEV OFF·ID/속성 변경·제거는 잔상을 비운다. 거절 후 복원은 승인 위치에서 새로 시작하며 숨긴 위치와 이어지지 않는다. 축소/확대와 수명 설정 변경은 새 얼룩부터 적용하고 기존 얼룩은 생성 당시 크기·시간을 유지한다.
+
+Project에서 `Assets/Lab/Resources/OrbBoard/BoardPaintDrips.asset`을 선택해 조정한다. 로컬 표현 에셋이며 공유 LabConfig나 프로토콜에 추가하지 않는다. Play 중 원본을 편집하면 파일에 남을 수 있으므로 종료 후 확인한다.
 
 | Inspector 항목 | 기본값 | 의미 |
 | --- | --- | --- |
-| Diameter Scale | 0.36 | 구슬 지름 대비 방울 가로 크기. 개별 방울은0.85~1.15배 변형 |
-| Spacing Radii | 0.8 | 실제 이동 거리당 생성 간격, 구슬 반지름 단위 |
-| Lifetime | 0.7초 | 방울의 개별 유지 시간 |
-| Fall Distance Radii | 2 | 수명 동안 내려가는 거리, 구슬 반지름 단위·개별0.85~1.15배 |
-| Strength | 0.85 | 빠르게 움직일 때 최대 alpha |
-| Fade In Speed / Full Speed | 1.5 / 10 | 초당 반지름 단위 속도. 두 문턱 사이 진하기를 부드럽게 변경 |
-| Max Drops | 48 | 구슬 하나의 동시 표시 상한(설정1~96·한 Step 발생 상한24) |
-| Drop Texture / Material | 기존 WaterDrop / ElementInkTrail | 원화·URP 재질 참조, 공유 원본 편집 없이 사용 |
+| Diameter Scale | 0.7 | 구슬 지름 대비 주 얼룩 quad의 최대 축, 개별 0.85~1.15배 |
+| Spacing Radii | 1.4 | 실제 이동 거리당 간격, 구슬 반지름 단위 |
+| Fall / Spread / Hold / Fade Duration | 0.08 / 0.16 / 0.12 / 0.44초 | 낙하→번짐→유지→소멸, 총 0.8초 |
+| Fall Distance Radii | 0.8 | 짧은 낙하 거리, 개별 0.85~1.15배 |
+| Strength / Minimum Opacity | 0.88 / 0.45 | 최대 alpha / 문턱을 넘겨 생성된 얼룩의 상대 최소 농도 |
+| Fade In Speed / Full Speed | 0.5 / 4 | 초당 구슬 반지름 단위의 이동 속도 |
+| Max Drops | 24 | 구슬 하나의 동시 상한(설정 1~96, 한 Step 생성 상한 24) |
+| Spatter Chance | 0.45 | 선택적 작은 튀김점을 덧붙이는 비율 |
+| Stain / Spatter Textures | 주 원화 3장 / 작은 원화 2장 | 투명 중성 담채, 원본 비율 유지 |
+| Material | BoardPaintStain | 기존 비행 재질과 분리. Wash Contrast/Edge Pooling 조정 가능 |
 
-`LabOrbBoardTrailTests`는 기존 원소/크기/비행 원본 보존·속도·DEV/Raw 제외·숨김/취소 복원·축소 검사를 유지하면서 독립 낙하/소멸·Pause/시작 대기·상한·추가 물리 객체 없음까지 확인한다. 실제 수행 결과와 화면 근거는 `VALIDATION.md`의 #392 항목을 따른다.
+### 직접 비교 방법
 
+Lab 또는 Hapio Development의 DEV에서 `Board Orb Trail`을 켜고 각 속성 Combined를 만든다. 아래 판에서 천천히 끌기·빠르게 밀기·정지하기를 비교한다. 움직이는 구슬 뒤에서 작은 방울이 짧게 떨어지고, 판에 찍힌 얼룩은 위치가 고정된 채 번지고 지워져야 한다. 같은 구슬을 가장자리로 보내도 판 밖에 사각 면이 드러나면 안 된다. 일시정지를 걸면 이미 찍힌 얼룩의 번짐·소멸도 멈춰야 한다. 끄면 즉시 제거된다.
 
-![조합판의 다섯 속성 물감 방울](images/board-paint-drips.png)
+자동 검사와 GPU 비교의 실제 실행 여부는 `VALIDATION.md`의 최신 #392 절을 따른다. 테스트 존재나 과거 물방울 버전의 통과를 새 원화 버전의 실행 결과로 해석하지 않는다. 아래 이전 물방울 화면은 교체 전 기록이다.
 
-위 이미지는 실제 Lab390×844 화면의 표시 비교다. 런타임에 다섯 Combined를 배치하고 구슬 물리를 고정한 뒤 실제 이동 구간·방울 나이만 명시적으로 진행했다. 원본 Scene/설정은 저장하지 않았으며 멀티/손가락 조작/실기기 검증을 대신하지 않는다.
+![교체 전 세로 물방울 표현](images/board-paint-drips.png)
+
+### 현재 원화 버전의 실제 GPU 비교
+
+![5색 낙하·착지·번짐·소멸](images/board-paint-stain-motion.gif)
+
+실제 Lab의 조합판·곡선 영역·구슬 외형·팔레트를 사용한 390×403 하단 카메라 캡처다. 5개 Combined를 같은 이동 경로로 0.65초 움직인 뒤 정지하고, 표시 시간만 30fps로 진행해 2초를 비교했다. Scene/입력/네트워크 플레이를 저장하거나 자동 조작한 검증은 아니다. 마지막 프레임에서 모든 얼룩이 제거됐다. 프레임별 정적 화면은 아래와 같다.
+
+![착지 후 완전히 드러난 5색 얼룩](images/board-paint-stain-landed.png)
