@@ -3813,3 +3813,20 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 | PlayMode `LabStaminaShortFeedbackTests` 5개 (새: 흔들림·빨간 빛·제자리 복귀, 다시 누름, 흔들림 값, 거절 이유 구분, 소리 폴더) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | PlayMode `LabStaminaFeedbackTests` (바꿈: 검사 전용 프로필로 소비 효과 동작 유지 확인 + 새: 저장된 프로필은 소비 깜빡임 꺼짐), Hapio PlayMode `GameJigwiStageIntegrationTests` (바꿈: 정상 생성 때 파란 깜빡임 0번), EditMode `LabRawStreakTests` (거절 이유 그대로) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | Play로 스태미나가 모자랄 때 북 연타해 보기 (흔들림·빨간 빛·소리 크기) | NOT_RUN | |
+
+## 2026-11-02 — #418 3단계: 여우구슬을 모든 플레이어에게
+
+- 같은 브랜치, 2단계 커밋 `bb07ee77` 다음.
+- 전: 구미호 고유 기믹(#311)에서 여우불이 뽑히면 받을 수 있는 사람 중 **무작위 한 명**의 판에만 떨어졌다.
+- 후(`LabModel.CastGimmick` → `DropFoxFireOnAll`): 여우불이 뽑히면 **지금 받을 수 있는 모든 사람**의 판에 한꺼번에 떨어진다. 빠지는 사람은 예전과 같다(판이 가득 참·넘기기 막힘·매혹/예고 중·지귀 막힘·야광귀 다른 화면). 다만 "바로 앞 차례에 걸린 사람" 제외는 여우불에 적용하지 않고, 여우불은 다음 차례가 피할 사람(`last`)도 바꾸지 않는다. 개수는 모두 같고(한 번 뽑음, 판이 거의 차면 그 판만 빈 칸 수만큼), 자리는 판마다 따로 뽑는다(자리 순서 첫 판은 예전과 같은 자리).
+- 기록: 기믹 기록(`DrainSabotages`, UT 통계 `foxFire`)·박 옆 "!"·요괴 움직임은 **한 번**(대상은 자리 순서로 첫 사람). 여우 구슬은 판마다 따로 Host가 보내고(`foxFire` 패킷, 예전과 같음), 그 판 주인 기기에서 새 `LabNetwork.LocalFoxFireDropped`가 한 번 알린다. 낙하 소리(`LabGumihoSound` FoxFall)와 첫 안내(`LabFoxFireGuide`)는 기믹 알림 대상 대신 이 신호를 본다.
+- 공유 DEV 값·접속 규약·Scene·Prefab 변경 없음.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 열린 Editor 재컴파일 | PASS | 컴파일 실패 없음, 콘솔 오류 0 |
+| Editor 직접 확인 (구미호, 3명, 고유 기믹 5초·여우불 100%) | PASS | 5초에 P10·P20·P30 판에 3개씩, 기믹 기록 1번(`FoxFire@5 → 10`), 통계 `foxFire` 1, 판마다 첫 자리 다름 |
+| EditMode `LabModelTests.FoxFireDropsTwoToFiveFoxOrbsOnEveryBoardButNoMoreThanEachBoardHolds` (이름·내용 바꿈: 세 판 모두·기록 한 번·같은 개수·판마다 다른 자리·같은 세션은 같은 결과, 솔로 가득 찬 판은 그대로) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| EditMode `LabModelTests.AFoxOrbStaysAtASideEdgeAndADoubleTapClearsOnlyThatOne` (판 하나만 골라 씀) 외 기믹 묶음·통계·피버·스테이지 검사 | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| PlayMode `LabDeveloperSoloIntegrationTests`(솔로 여우불 안내), Hapio `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset` | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| 3인 실행으로 모든 판에 떨어지는지·각자 소리·첫 안내 보기 | NOT_RUN | |

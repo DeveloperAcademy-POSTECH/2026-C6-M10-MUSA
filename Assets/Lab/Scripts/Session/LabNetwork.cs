@@ -367,8 +367,13 @@ namespace C6Lab
         private double announcedBlockStart = -1d;
         /// <summary>박이 누군가의 판에 폭탄을 떨어뜨렸을 때 모든 기기에서 한 번 알린다. (받는 사람, 폭탄 ID, 떨어질 위치 0..1)</summary>
         public event Action<ulong, string, Vector2> GourdBombDropped;
-        /// <summary>요괴가 통합 추첨으로 방해공작을 걸었을 때 모든 기기에서 한 번 알린다 (#251). (종류, 받는 사람)</summary>
+        /// <summary>
+        /// 요괴가 통합 추첨으로 방해공작을 걸었을 때 모든 기기에서 한 번 알린다 (#251). (종류, 받는 사람) 여우불은 모든 판에
+        /// 떨어지므로(#418) 받는 사람은 자리 순서로 첫 사람이다. 내 판에 떨어졌는지는 LocalFoxFireDropped로 안다.
+        /// </summary>
         public event Action<LabSabotageKind, ulong> SabotageCast;
+        /// <summary>여우 구슬이 내 판에 떨어질 때 판 주인 기기에서만 한 번 알린다 (#418). 떨어진 여우 구슬 ID들.</summary>
+        public event Action<string[]> LocalFoxFireDropped;
         /// <summary>옆 사람들이 깨워 매혹이 풀렸을 때 모든 기기에서 한 번 알린다 (#251). (깨어난 사람) 시간이 다 되어 풀리면 알리지 않는다.</summary>
         public event Action<ulong> CharmWoken;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
@@ -1767,6 +1772,7 @@ namespace C6Lab
         private void OnFoxFire(string[] orbIds)
         {
             SetNotice(FoxFireNotice);
+            LocalFoxFireDropped?.Invoke(orbIds);
             if (board == null) return;
             foreach (string id in orbIds) board.ExpectDrop(id);
         }
