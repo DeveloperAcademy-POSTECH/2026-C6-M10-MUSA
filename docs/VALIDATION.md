@@ -3804,4 +3804,4 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 수정 중간의 PlayMode 1차 실행에서 `GameSceneFlowTests.SavedHomeRunsThreeFreshBattles…`·`GameLobbyViewTests.DevSoloAfterLeavingASixPlayerRoom…`이 각1회 실패했으나 단독 재실행과 위 최종 실행에서 모두 통과했다. 실행 순서·시간에 따른 불안정으로 보며 원인은 확인하지 않았다.
 - 전체 PlayMode는 실행하지 않았다. 한 Editor 프로세스에서는 Host 1개만 띄울 수 있어 실제 6명 접속은 자동 검사로 재현하지 못했다.
 - **종료 상태:** Play OFF, Home Scene 열림, dirty=false, 컴파일 오류 없음. 중단된 실행이 남긴 Test Runner 임시 Scene은 남아 있지 않음을 확인했다.
-- **미실행:** 6대(3:3)·2대(1:1) 실제 연결, Mac 여러 앱, iPhone/iPad 실기기, LAN/핫스팟.
+- **미실행:** 6대(3:3)·2대(1:1) 실제 연결, Mac 여러 앱, iPhone/iPad 실기기, LAN/핫스팟. 실기기 검증은 main 병합 후 사용자가 직접 6대 3:3 시작·P6 칠 동기화를 확인하기로 했다. 확인 결과는 그때 이 절에 추가하며, 그 전까지 PASS로 쓰지 않는다.
