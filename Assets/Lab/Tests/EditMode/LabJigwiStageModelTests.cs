@@ -6,7 +6,7 @@ using Object = UnityEngine.Object;
 
 namespace C6Lab.Tests
 {
-    /// <summary>Stage A/B use real Host clocks and normal generation/launch/hit paths.</summary>
+    /// <summary>Stage A/B use real Host clocks, normal A generation and B-supplied Water launch/hit paths.</summary>
     public sealed class LabJigwiStageModelTests
     {
         private LabConfig config;
@@ -27,6 +27,9 @@ namespace C6Lab.Tests
             values[207] = values[208] = 0f;
             values[228] = 1f; values[229] = 1f; values[230] = 7f;
             values[231] = 18f; values[232] = 30f; values[233] = 1f; values[234] = 3f; values[235] = 2f;
+            // These owner/fire-isolation fixtures begin with one shot per fire. The default
+            // one initial shot / two-second cadence is covered by LabJigwiABSupplyModelTests.
+            values[254] = 3f;
             Apply(values);
         }
         [TearDown] public void Dispose() => Object.DestroyImmediate(config);
@@ -45,10 +48,19 @@ namespace C6Lab.Tests
             Assert.That(State(room, now).groups, Is.Empty);
         }
         private static LabJigwiABSnapshot ScreenState(LabModel room, double now) => room.Snapshot(now).jigwiAB;
+        private static LabOrbState SuppliedWater(LabModel room, LabJigwiABRound round, ulong owner, double now)
+        {
+            var water = room.Snapshot(now).orbs.FirstOrDefault(orb => orb.owner == owner && !orb.inFlight
+                && orb.jigwiABSupplyEventId == round.id);
+            Assert.That(water, Is.Not.Null, "The Host must provide the owner's B ammunition.");
+            Assert.That(water.kind, Is.EqualTo(LabOrbKind.Combined));
+            Assert.That(water.element, Is.EqualTo(LabOrbElement.Water));
+            Assert.That(water.jigwiSupply, Is.True);
+            return water;
+        }
         private void Extinguish(LabModel room, LabJigwiABRound round, ulong owner, string targetId, double now)
         {
-            var water = Combined(room, owner, now);
-            Assert.That(water.element, Is.EqualTo(LabOrbElement.Water));
+            var water = SuppliedWater(room, round, owner, now);
             Launch(room, owner, water, now);
             Assert.That(room.ConfirmJigwiABFireHit(water.id, round.id, targetId, now, out bool off), Is.True);
             Assert.That(off, Is.True);
@@ -82,9 +94,9 @@ namespace C6Lab.Tests
         [TestCase(LabStageYokai.Gumiho, false)]
         [TestCase(LabStageYokai.Yaguang, false)]
         [TestCase(LabStageYokai.Jigwi, true)]
-        public void ScreenPolicyIsScopedToJigwiAndHasNoFreeWaterSupply(LabStageYokai stage, bool enabled)
+        public void ScreenPolicyIsScopedToJigwiAndDoesNotSupplyWaterDuringA(LabStageYokai stage, bool enabled)
         {
-            // #341 replaces surface roots with screen A/B, while preserving stage scope and no free supplies.
+            // #412 supplies Water only during B; A still preserves its normal generation path.
             var room = Room(stage);
             var snapshot = room.Snapshot(11d);
             Assert.That(room.JigwiABEnabled, Is.EqualTo(enabled));
@@ -165,7 +177,13 @@ namespace C6Lab.Tests
             Assert.That(group.players.All(player => player.targets.Length == 3), Is.True);
             Assert.That(group.players.SelectMany(player => player.targets).Select(fire => fire.id).Distinct().Count(), Is.EqualTo(6));
             Assert.That(group.players.All(player => player.targets.All(fire => fire.lit)), Is.True);
-            Assert.That(room.Snapshot(31d).orbs.Any(orb => orb.jigwiSupply), Is.False);
+            var supplies = room.Snapshot(31d).orbs.Where(orb => orb.jigwiABSupplyEventId == group.id).ToArray();
+            foreach (ulong owner in Players)
+            {
+                Assert.That(supplies.Count(orb => orb.owner == owner), Is.InRange(3, config.JigwiABSupplyLimit));
+                Assert.That(supplies.Where(orb => orb.owner == owner).All(orb => orb.kind == LabOrbKind.Combined
+                    && orb.element == LabOrbElement.Water && orb.jigwiSupply && orb.originOwner == owner), Is.True);
+            }
         }
 
         [Test]
@@ -175,7 +193,7 @@ namespace C6Lab.Tests
             var room = Room();
             var group = ScreenState(room, 31d).rounds.Single(item => item.slot == 1);
             var first = group.players[0]; var second = group.players[1];
-            var wrongOwnerShot = Combined(room, first.playerId, 31d);
+            var wrongOwnerShot = SuppliedWater(room, group, first.playerId, 31d);
             Launch(room, first.playerId, wrongOwnerShot, 31d);
             Assert.That(room.ConfirmJigwiABFireHit(wrongOwnerShot.id, group.id, second.targets[0].id, 31d, out _), Is.False);
             foreach (var fire in first.targets) Extinguish(room, group, first.playerId, fire.id, 31d);
@@ -266,7 +284,7 @@ namespace C6Lab.Tests
             // B's screen flame is now the separate fire-collision path, with no boss hit rewards or paint.
             var room = Room(); var group = ScreenState(room, 31d).rounds.Single(item => item.slot == 1);
             ulong owner = group.players[0].playerId;
-            var water = Combined(room, owner, 31d); Launch(room, owner, water, 31d);
+            var water = SuppliedWater(room, group, owner, 31d); Launch(room, owner, water, 31d);
             var before = room.Snapshot(31d).players.Single(player => player.id == owner);
             int paints = room.PaintSurface.PaintCount;
             Assert.That(room.ConfirmJigwiABFireHit(water.id, group.id, group.players[0].targets[0].id,

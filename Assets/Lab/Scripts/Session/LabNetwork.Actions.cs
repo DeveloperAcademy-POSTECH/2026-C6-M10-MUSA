@@ -55,6 +55,7 @@ namespace C6Lab
         private void ResetActionTransport()
         {
             jigwiMissionPurge.SetActive(null, 0);
+            ResetJigwiSupplyTransport();
             ClearJigwiFireSurfaces();
             predictedJigwiBurns.Clear();
             foreach (var shot in predictedShots.Values) if (shot != null) Destroy(shot.gameObject);
@@ -339,13 +340,17 @@ namespace C6Lab
 
         private void ReceiveActionReceipt(LabActionReceipt receipt)
         {
-            if (!CanProcessBattleActions || receipt == null || !localActions.ApplyReceipt(receipt, out var resolution)
+            if (!CanProcessBattleActions || receipt == null || !ValidJigwiSupplyReceipt(receipt)
+                || !localActions.ApplyReceipt(receipt, out var resolution)
                 || !actionRequests.TryGetValue(receipt.requestId, out var request)) return;
             if (actionStartedAt.TryGetValue(receipt.requestId, out double at))
                 LastActionRoundTripMilliseconds = (Time.realtimeSinceStartupAsDouble - at) * 1000d;
             foreach (long child in resolution.rejectedDependents) RollBackAction(child);
-            bool purged = jigwiMissionPurge.Cancels(receipt.modelRevision);
-            if (purged) RemovePurgedActionViews(request, receipt);
+            bool missionPurged = jigwiMissionPurge.Cancels(receipt.modelRevision);
+            bool supplyPurged = RetiredJigwiSupplyAction(request, receipt);
+            bool purged = missionPurged || supplyPurged;
+            if (missionPurged) RemovePurgedActionViews(request, receipt);
+            if (supplyPurged) RemoveRetiredJigwiSupplyActionViews(request);
             if (board != null && !purged)
             {
                 if (request.type == "generate") board.RemoveGenerationPreview(request.provisionalId);
@@ -375,6 +380,7 @@ namespace C6Lab
                     RollBackAction(receipt.requestId);
                 }
             }
+            NotifyLocalStaminaSpent(request, receipt, purged);
             if (!purged && receipt.accepted && !receipt.consumedWithoutOutput && request.type == "combine") LocalCombined?.Invoke();
             predictedJigwiBurns.Remove(receipt.requestId);
             if (!receipt.accepted) SetNotice(receipt.reason ?? "Request rejected.");
@@ -474,6 +480,7 @@ namespace C6Lab
             if (player == null) return;
             string id = ResolveLocalId(request.firstId);
             TryKnownState(id, out var orb);
+            if (RetiredJigwiSupplyId(id)) return;
             Vector3 center = target.transform.position;
             int ring = LabTeams.RingSeatFor(latest, player.seat);
             Vector3 anchor = LabThrowMath.SeatPosition(ring, latest.players.Length, center,
@@ -495,6 +502,7 @@ namespace C6Lab
             visual.SetRadiusScale(scale);
             visual.SetJigwiABReward(rewarded);
             visual.SetJigwiABRadiusScale(orb != null ? orb.jigwiABRadiusScale : board != null ? board.JigwiABRadiusScaleFor(request.firstId) : 1f);
+            TagJigwiSupplyProjectile(visual, id, orb?.jigwiABSupplyEventId);
             visual.SetMissSurface(battleFloor);
             SyncJigwiFireSurfaces();
             visual.SetFireSurfaces(JigwiFireSurfacesFor(LocalPlayerId));
@@ -506,7 +514,7 @@ namespace C6Lab
         private bool HasPresentedProjectile(LabNetworkPacket packet)
         {
             if (packet.round != actionRound || packet.sessionId != actionSession
-                || jigwiMissionPurge.Cancels(packet.modelRevision)) return true;
+                || jigwiMissionPurge.Cancels(packet.modelRevision) || RejectJigwiSupplyProjectile(packet)) return true;
             if (packet.owner == LocalPlayerId && presentedShots.Contains(packet.requestId))
             {
                 if (predictedShots.TryGetValue(packet.requestId, out var visual) && visual != null)
@@ -514,6 +522,7 @@ namespace C6Lab
                     visual.ReconcileVisual((LabOrbElement)packet.element,
                         packet.small ? config.BlastShrinkScale : 1f, packet.sizeScale, packet.jigwiABRadiusScale);
                     visual.SetJigwiABReward(packet.jigwiABReward);
+                    TagJigwiSupplyProjectile(visual, packet.firstId, packet.jigwiABSupplyEventId);
                     visual.AuthorityRevision = packet.modelRevision;
                 }
                 return true;

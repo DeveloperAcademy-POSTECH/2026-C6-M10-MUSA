@@ -13,13 +13,14 @@ namespace C6Lab.Tests
         [TearDown] public void Dispose()=>Object.DestroyImmediate(config);
         [Test] public void ScreenRewardsAppendWithoutShiftingEarlierFieldsAndRetiredValuesRemainReserved()
         {
-            var v=config.CaptureDeveloperValues();Assert.That(v.Length,Is.EqualTo(253));
-            Assert.That(v.Skip(240),Is.EqualTo(new[]{15f,4f,3f,5f,3f,12f,12f,.65f,.03f,4f,.3f,1.3f,1.5f}));
+            var v=config.CaptureDeveloperValues();Assert.That(v.Length,Is.EqualTo(257));
+            Assert.That(v.Skip(240).Take(13),Is.EqualTo(new[]{15f,4f,3f,5f,3f,12f,12f,.65f,.03f,4f,.3f,1.3f,1.5f}));
+            Assert.That(v.Skip(253),Is.EqualTo(new[]{2f,1f,5f,.8f}));
             Assert.That(v.Skip(228).Take(8),Is.EqualTo(new[]{1f,1f,7f,18f,30f,1f,3f,2f}));
             var old=new[]{229,230,231,232,233,234,246,247};
             foreach(int i in old)Assert.That(LabConfig.RetiredDeveloperFields,Does.Contain(i));
             var category=LabConfig.DeveloperCategories.Single(x=>x.Title=="지귀 120초 (Hapio 전용)");
-            Assert.That(category.FieldIndices,Is.EqualTo(new[]{228,235}.Concat(Enumerable.Range(240,13)).Except(new[]{246,247})));
+            Assert.That(category.FieldIndices,Is.EqualTo(new[]{228,235}.Concat(Enumerable.Range(240,17)).Except(new[]{246,247})));
             Assert.That(v[55],Is.EqualTo(3));Assert.That(v[211],Is.EqualTo(120));
             Assert.That(LabConfig.DeveloperFields[240].Max, Is.EqualTo(15f));
         }
@@ -93,9 +94,25 @@ namespace C6Lab.Tests
             Assert.That(config.JigwiABRewardSizeScale, Is.EqualTo(1.3f));
             Assert.That(config.JigwiABRewardPaintScale, Is.EqualTo(1.5f));
             Assert.That(config.JigwiABPersonalDurationSeconds, Is.EqualTo(15f));
-            Assert.That(config.CaptureDeveloperValues().Skip(251), Is.EqualTo(new[] { 1.3f, 1.5f }));
+            Assert.That(config.CaptureDeveloperValues().Skip(251).Take(2), Is.EqualTo(new[] { 1.3f, 1.5f }));
         }
 
+        [Test] public void SupplyFormRejectsMoreInitialWaterThanItsLimitWithoutChangingTheOldPrefix()
+        {
+            var before=config.CaptureDeveloperValues();var values=(float[])before.Clone();
+            values[254]=3;values[255]=2;
+            Assert.That(config.TryApplyDeveloperValues(values,out var error),Is.False);
+            Assert.That(error,Does.Contain("supply limit"));Assert.That(config.CaptureDeveloperValues(),Is.EqualTo(before));
+            values[253]=1.5f;values[254]=2;values[255]=4;values[256]=.85f;
+            Assert.That(config.TryApplyDeveloperValues(values,out error),Is.True,error);
+            Assert.That(config.CaptureDeveloperValues().Take(253),Is.EqualTo(before.Take(253)));
+            Assert.That(config.JigwiABSupplyInitialCount,Is.EqualTo(2));Assert.That(config.JigwiABSupplyLimit,Is.EqualTo(4));
+            Assert.That(config.JigwiABSupplyIntervalSeconds,Is.EqualTo(1.5f));Assert.That(config.JigwiABFireDepth,Is.EqualTo(.85f));
+        }
+
+        [TestCase(253,.24f)] [TestCase(253,10.01f)] [TestCase(253,float.NaN)]
+        [TestCase(254,-1f)] [TestCase(254,1.5f)] [TestCase(254,6f)]
+        [TestCase(255,0f)] [TestCase(255,13f)] [TestCase(256,.39f)] [TestCase(256,.91f)]
         [TestCase(240,0f)] [TestCase(240,15.01f)] [TestCase(241,float.NaN)] [TestCase(242,1.5f)] [TestCase(243,.4f)]
         [TestCase(244,7f)] [TestCase(245,0f)] [TestCase(246,-1f)] [TestCase(247,.1f)]
         [TestCase(248,.2f)] [TestCase(249,0f)] [TestCase(250,float.PositiveInfinity)]

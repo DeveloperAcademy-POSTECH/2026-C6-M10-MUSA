@@ -26,26 +26,33 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator StageSongsSelectTheGumihoClipForTheGumihoStageAndTheTerritoryRoom()
+        public IEnumerator StageSongsKeepGumihoTerritoryAndYaguangSelectionsAndTheLegacyFallback()
         {
             AudioClip normal = Resources.Load<AudioClip>("Audio/BGM/Kkwaenggwari_13");
             AudioClip gumiho = Resources.Load<AudioClip>("Audio/GumihoBGM/Gumiho_Stage");
+            AudioClip yaguang = Resources.Load<AudioClip>("Audio/YaguangBGM/Yaguang_Stage");
             Assert.That(normal, Is.Not.Null);
             Assert.That(gumiho, Is.Not.Null);
+            Assert.That(yaguang, Is.Not.Null);
+            Assert.That(Resources.Load<LabConfig>("LabConfig").YaguangUseNewBgm, Is.True,
+                "The saved #396 default enables the Yaguang stage song.");
             var stages = new[] { LabStageYokai.Gumiho, LabStageYokai.Yaguang, LabStageYokai.Jigwi,
-                LabStageYokai.None, LabStageYokai.Gumiho };
+                LabStageYokai.None, LabStageYokai.Gumiho, LabStageYokai.Yaguang };
             for (int i = 0; i < stages.Length; i++)
             {
-                bool gameFlow = i != 4; // The last case is the unchanged Lab single-round path.
+                bool gameFlow = i != 4; // Case 4 is the unchanged Lab single-round path.
                 bool territory = i == 3;
-                fixture = new Fixture(gameFlow, stages[i]);
+                bool legacyYaguang = i == 5;
+                fixture = new Fixture(gameFlow, stages[i], legacyYaguang ? false : (bool?)null);
                 var snapshot = Snapshot(10d, feverAt: -1d);
                 snapshot.teamTerritory = territory;
                 fixture.SetSnapshot(snapshot);
                 yield return null;
                 yield return null;
-                // 2:2 (#293) borrows the gumiho stage's song; the yaguang, the jigwi and the Lab round keep the usual one.
-                AudioClip expected = (gameFlow && stages[i] == LabStageYokai.Gumiho) || territory ? gumiho : normal;
+                // Territory borrows Gumiho; #396 Yaguang uses its own saved-default song.
+                // Jigwi, standalone Lab and an explicitly disabled Yaguang toggle keep the usual song.
+                AudioClip expected = (gameFlow && stages[i] == LabStageYokai.Gumiho) || territory ? gumiho
+                    : gameFlow && stages[i] == LabStageYokai.Yaguang && !legacyYaguang ? yaguang : normal;
                 Assert.That(fixture.Bgm.BattleClip, Is.SameAs(expected),
                     "Game=" + gameFlow + ", yokai=" + stages[i] + ", territory=" + territory);
                 Assert.That(fixture.Bgm.IsPlaying, Is.True, "The selected song must reach a running AudioSource.");
@@ -135,10 +142,13 @@ namespace C6Lab.Tests
         {
             fixture = new Fixture(true, LabStageYokai.Yaguang);
             fixture.Bgm.feverCrossfadeSeconds = 0f;
+            AudioClip battle = Resources.Load<AudioClip>("Audio/YaguangBGM/Yaguang_Stage");
+            Assert.That(battle, Is.Not.Null);
             fixture.SetSnapshot(Snapshot(105d));
             yield return null;
             yield return null;
-            Assert.That(fixture.Bgm.BattleClip, Is.SameAs(Resources.LoadAll<AudioClip>(LabBattleBgm.ClipFolder)[0]));
+            Assert.That(fixture.Bgm.BattleClip, Is.SameAs(battle),
+                "The Yaguang stage keeps its own battle selection while the existing fever song plays.");
             Assert.That(fixture.Bgm.FeverClip, Is.SameAs(Resources.LoadAll<AudioClip>(LabBattleBgm.FeverClipFolder)[0]));
             Assert.That(fixture.Bgm.FeverPlaying, Is.True);
             Assert.That(fixture.Sources[1].time, Is.GreaterThanOrEqualTo(4.9f), "A late observer seeks into the existing fever song.");
@@ -170,12 +180,14 @@ namespace C6Lab.Tests
             public readonly LabBattleBgm Bgm;
             public readonly AudioSource[] Sources;
 
-            public Fixture(bool gameFlow, LabStageYokai stage)
+            public Fixture(bool gameFlow, LabStageYokai stage, bool? useNewYaguangBgm = null)
             {
                 passiveRoot = new GameObject("Passive BGM Guest #358");
                 passiveRoot.SetActive(false);
                 config = Object.Instantiate(Resources.Load<LabConfig>("LabConfig"));
                 Assert.That(config, Is.Not.Null);
+                if (useNewYaguangBgm.HasValue)
+                    typeof(LabConfig).GetField("yaguangUseNewBgm", Instance).SetValue(config, useNewYaguangBgm.Value);
                 managerType = typeof(LabNetwork).GetField("manager", Instance).FieldType;
                 manager = passiveRoot.AddComponent(managerType);
                 Network = passiveRoot.AddComponent<LabNetwork>();

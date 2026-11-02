@@ -56,7 +56,7 @@ namespace C6Lab
             if (round == null || fire == null || double.IsNaN(now) || double.IsInfinity(now)
                 || !TryJigwiABPlane(owner, out Vector3 eye, out Vector3 forward, out Vector3 right,
                     out Vector3 up, out float launchDepth, out float bossFront)) return false;
-            float depth = Mathf.Lerp(launchDepth, bossFront, 1f / 3f);
+            float depth = Mathf.Lerp(launchDepth, bossFront, config.JigwiABFireDepth);
             if (!TryJigwiABReachableBand(round, owner, eye, forward, depth, out JigwiABReachableBand band)) return false;
             Vector2 point = LabJigwiABFireMotion.Position(round, fire, index, now);
             int count = JigwiABFireCount(round, owner);
@@ -79,7 +79,7 @@ namespace C6Lab
             if (round == null || double.IsNaN(now) || double.IsInfinity(now)
                 || !TryJigwiABPlane(owner, out Vector3 eye, out Vector3 forward, out Vector3 right,
                     out Vector3 up, out float launchDepth, out float bossFront)) return false;
-            float depth = Mathf.Lerp(launchDepth, bossFront, 2f / 3f);
+            float depth = Mathf.Lerp(launchDepth, bossFront, Mathf.Lerp(config.JigwiABFireDepth, 1f, .6f));
             Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
             Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
             Mesh mesh = target.Hitbox.sharedMesh;
@@ -91,7 +91,7 @@ namespace C6Lab
                 ExpandJigwiABCurtainProjection(target.Hitbox.transform.TransformPoint(local),
                     eye, forward, right, up, depth, ref minimum, ref maximum);
             }
-            float pointDepth = Mathf.Lerp(launchDepth, bossFront, 1f / 3f);
+            float pointDepth = Mathf.Lerp(launchDepth, bossFront, config.JigwiABFireDepth);
             if (!TryJigwiABReachableBand(round, owner, eye, forward, pointDepth, out JigwiABReachableBand band)) return false;
             foreach (LabJigwiABPlayerFire player in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
             {

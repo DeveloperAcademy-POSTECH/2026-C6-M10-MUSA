@@ -27,6 +27,7 @@ namespace C6Lab
         private LabOrbBurn burn;
         private LabJigwiOrbFlame jigwiABFlame;
         private LabJigwiRewardOrbFlame jigwiRewardFlame;
+        private LabJigwiSupplyWaterArt jigwiSupplyWaterArt;
         private LabOrbRainbow rainbow;
         private SpriteRenderer expiryFlash;
         private SpriteRenderer expiryHalo;
@@ -90,6 +91,7 @@ namespace C6Lab
         public LabJigwiOrbFlame JigwiABFlame => jigwiABFlame;
         /// <summary>B-success board artwork only; independent from A burn and its expiry.</summary>
         public LabJigwiRewardOrbFlame JigwiRewardFlame => jigwiRewardFlame;
+        public LabJigwiSupplyWaterArt JigwiSupplyWaterArt => jigwiSupplyWaterArt;
         /// <summary>Seconds this screen counts down to the end of the orb's lifetime (#235); negative when not shown.</summary>
         public float LifeSecondsLeft => lifeLeft;
         /// <summary>In its last seconds, flashing white before it goes.</summary>
@@ -278,6 +280,7 @@ namespace C6Lab
             if (Body == null) Body = GetComponent<Rigidbody>();
             if (HitSphere == null) HitSphere = GetComponent<SphereCollider>();
             if (orbId != id && jigwiABFlame != null) jigwiABFlame.Clear();
+            if (orbId != id && jigwiSupplyWaterArt != null) jigwiSupplyWaterArt.Clear();
             orbId = id;
             kind = orbKind;
             element = orbKind == LabOrbKind.Combined ? orbElement : LabOrbElement.None;
@@ -459,6 +462,17 @@ namespace C6Lab
                 jigwiABFlame = LabJigwiOrbFlame.Create(transform);
             }
             jigwiABFlame.Show(secondsLeft, visualRadius, held);
+        }
+
+        /// <summary>Only tagged free B water gets the drop/ripple; ordinary Water art stays unchanged.</summary>
+        public void SetJigwiSupplyWaterArt(bool active, bool held = false)
+        {
+            if (!isActiveAndEnabled || kind != LabOrbKind.Combined || element != LabOrbElement.Water) active = false;
+            if (!active) { if (jigwiSupplyWaterArt != null) jigwiSupplyWaterArt.Clear(); return; }
+            if (jigwiSupplyWaterArt == null) jigwiSupplyWaterArt = LabJigwiSupplyWaterArt.Create(visual);
+            float artRadius = visualRadius * (orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf
+                ? LabOrbSpriteArt.SizeScaleFor(kind) : 1f);
+            jigwiSupplyWaterArt.Show(artRadius, held, ExpiryLook.ElementTrailFor(LabOrbElement.Water));
         }
 
         /// <summary>Current shared B reward, never a burn deadline or a persistent launch flag.</summary>

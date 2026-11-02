@@ -11,7 +11,7 @@ namespace Hapio.Tests
         [Test]
         public void JigwiScreenPatternFieldsAreOwnedOnlyByStageThreeAndCannotLeakFromCommonOrOtherStages()
         {
-            foreach (int field in System.Linq.Enumerable.Except(System.Linq.Enumerable.Concat(new[] { 228, 235 }, System.Linq.Enumerable.Range(240, 13)), new[] { 246, 247 }))
+            foreach (int field in System.Linq.Enumerable.Except(System.Linq.Enumerable.Concat(new[] { 228, 235 }, System.Linq.Enumerable.Range(240, 17)), new[] { 246, 247 }))
                 for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
                     Assert.That(GameStageSettings.IsFieldVisible(scope, field), Is.EqualTo(scope == 3),
                         "Field " + field + " in scope " + scope);
@@ -90,7 +90,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(253));
+                    Assert.That(values.Length, Is.EqualTo(257));
                     Assert.That(values[205], Is.EqualTo(before[205]), "Common gimmick interval preserved (#311)");
                     Assert.That(values[206], Is.EqualTo(before[206]), "Unique gimmick interval preserved (#311)");
                 }

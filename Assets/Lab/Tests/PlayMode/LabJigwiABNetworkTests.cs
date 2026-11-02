@@ -207,8 +207,10 @@ namespace C6Lab.Tests
             LabJigwiFireSurface curtain = Surfaces()[curtainId];
             Assert.That(curtain.IsCurtain, Is.True);
             Assert.That(curtain.Hitbox, Is.TypeOf<BoxCollider>());
+            // Aim above the ignition row. The former lower corner intersects the nearer
+            // point plane on its ballistic ascent, so it is no longer empty along the path.
             Vector3 aim = center + rotation * Vector3.right * (half.x * .7f)
-                - rotation * Vector3.up * (half.y * .6f);
+                + rotation * Vector3.up * (half.y * .75f);
             LabOrbState orb = Add(model, 0, snapshot.serverTime, LabOrbElement.Water);
             Assert.That(model.TryLaunch(0, orb.id, "actual-curtain-water", snapshot.serverTime, out _, out string error), Is.True, error);
             int beforeHits = snapshot.players.Single(player => player.id == 0).hitTotal;
@@ -218,7 +220,12 @@ namespace C6Lab.Tests
             LabProjectileResult result = default;
             LabProjectile shot = Shot();
             shot.SetFireSurfaces(Surfaces().Values.Where(surface => surface.OwnerPlayerId == 0));
-            shot.Launch(orb.id, 0, VelocityTo(aim, .06f), config, target, contact =>
+            // The wall now sits close to the boss. A 60 ms injected flight is clamped
+            // by the unchanged speed limit and no longer reaches this empty wall location.
+            // Use a feasible ballistic velocity; this still exercises the real projectile query.
+            Vector3 wallVelocity = VelocityTo(aim, .4f);
+            Assert.That(wallVelocity.magnitude, Is.LessThanOrEqualTo(config.ThrowMaxWorldSpeed));
+            shot.Launch(orb.id, 0, wallVelocity, config, target, contact =>
             {
                 received = true; result = contact;
                 if (contact.Kind == LabProjectileHitKind.Fire)
@@ -226,7 +233,8 @@ namespace C6Lab.Tests
                         contact.FireTargetId, snapshot.serverTime, out extinguished);
             });
             for (int i = 0; i < 60 && !received; i++) yield return new WaitForFixedUpdate();
-            Assert.That(received && accepted, Is.True);
+            Assert.That(received, Is.True, "The real projectile must reach the curtain.");
+            Assert.That(accepted, Is.True, "Contact=" + result.Kind + " target=" + result.FireTargetId);
             Assert.That(result.Kind, Is.EqualTo(LabProjectileHitKind.Fire));
             Assert.That(result.FireTargetId, Is.EqualTo(curtainId), "An empty part of the wall cannot count as an ignition point.");
             Assert.That(extinguished, Is.False);
