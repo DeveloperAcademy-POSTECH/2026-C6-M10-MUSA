@@ -4017,3 +4017,40 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 확인된 결함은 없었다. "같은 프레임 검사가 새 코드끼리만 비교한다"는 지적을 받아 main 발행자와의 바이트 비교 검사를 추가했다.
 - 검사 중 `GameSceneFlowTests` 실행과 재컴파일이 겹쳐 Editor가 응답하지 않았고, 사용자가 Editor를 재시작했다. 그 실행은 결과가 없으며 표의 21/21은 재시작 뒤 다시 실행한 것이다. 남은 임시 `InitTestScene` 파일은 지웠고, 재시작 뒤 열린 Scene은 저장되지 않은 변경이 없는 빈 Scene이었다.
 - **미실행:** iPhone 실기기·여러 폰에서의 Host 프레임 시간. 전체 PlayMode는 실행하지 않았다.
+
+## #444 Guest 도색 복제본을 복사 없이 넘겨받는 표면 API — 2026-11-03
+
+- **기준:** main `4fa0a5c1` → `fix/#444-paint-replica-adopt`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Guest는 도색 프레임마다 `TryReplacePixels`로 지도를 설치한다. 이 API는 받은 배열을 다시 새 배열로 복사하고 전체 셀을 검사한다. `CopyPaintToDisplay`도 스냅샷마다 수신 표면을 새 배열 두 개로 복사한 뒤 같은 API를 부른다. 이 이슈는 다음 작업(수신기 제자리 적용)이 쓸 표면 API만 추가하며 호출 경로는 바꾸지 않는다.
+- **수정:**
+  - 새 partial `LabPaintSurface.Replica.cs`
+    - `TryAdoptReplica`: 호출자가 만든 배열의 소유권을 복사 없이 넘겨받는다. 같은 크기의 복제본에서 `fromRevision == Revision`이면 바뀐 셀만 기존 규칙으로 검사하고 칠해진 셀 수를 증분 계산한다. 이전 배열은 재사용하도록 돌려준다.
+    - `TryCopyReplicaFrom`: 같은 크기면 기존 배열에 덮어쓰고, 시각 스탬프가 같으면 `VisualVersion`을 유지한다.
+    - 두 API 모두 실패하면 표면을 바꾸지 않는다.
+  - `TryReplacePixels`는 시그니처·복사 의미·검사 순서를 그대로 두고 공통 검사·설치(`ValidReplicaShape`·`CountValidReplicaCells`·`InstallReplica`)로 옮겼다. 시각 스탬프 비교는 `SameStamp`로 묶었다.
+  - 와이어·접속 규약 **5682/Lab43/Game27**·공유 설정 257개·Scene·판정은 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1787/1788** (아래 1건 실패) | 46.02초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.35초 |
+| PlayMode `LabHighResolutionPaintRuntimeTests` | **2/2 PASS** | 0.10초 |
+| PlayMode `LabWatercolorPaintRuntimeTests` | **7/7 PASS** | 6.84초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 18.83초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 209.17초 |
+
+- 새 검사 `LabPaintReplicaAdoptTests` 20개가 모두 통과했다.
+  - 전체 adopt가 `TryReplacePixels`와 같은 결과이고 배열을 복사하지 않음
+  - 바뀐 셀만 검사하는 증분 경로와 이전 배열 반환
+  - 칠해진 셀 수 증분(새로 칠함 2·지움 3·둘 다, 이전 개수 거절)
+  - 잘못된 셀·정렬·중복·범위·개수·칠해진 셀 수·스탬프·자기 배열 10가지에서 원자성
+  - 기준 리비전이 다르거나 아직 복제본이 아니면 전체 검사
+  - 성장·건조 권한 없음
+  - `TryCopyReplicaFrom`의 동일성·같은 크기 배열 재사용·`VisualVersion` 유지·크기 변경·잘못된 원본 거절
+- 기존 `TryReplacePixels` 검사(`LabPaintPainterSlotTests` 등)는 그대로 통과했다. PlayMode 앞의 네 클래스는 검토 뒤 테스트를 추가하기 전(제품 코드는 같음)에, `GameSceneFlowTests`는 추가한 뒤에 실행했다.
+- **EditMode 실패 1건:** `LabFiveColorFlightTests.AFlyingFiveColorOrbIsOneColouredBallWithoutFlatArt`. 이 변경과 무관한 #426 검사다.
+  - 구슬 색 나이를 정적 카운터(`attachCount`)로 정하고, `MaterialPropertyBlock`에 넣었다 꺼낸 색을 정확히 같은지 비교한다.
+  - Linear 색 공간에서는 이 왕복이 정확하지 않다(Editor에서 차이 약 3e-8을 확인). 그래서 실행 순서에 따라 통과하거나 실패한다. 같은 Editor에서 #439 기록의 1762개 실행 때는 통과했다.
+  - 이 PR에서는 고치지 않았다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 제품 코드 결함은 확인되지 않았다. 검사 공백 3건(칠해진 셀 수 증분이 실제로 바뀌는 경우, 음수 칠 횟수 거절이 다른 실패에 가려짐, 복제본이 아닌 표면의 전체 검사)을 지적받아 검사를 추가했다.
+- **미실행:** 호출 경로 연결과 Guest GC 측정은 다음 이슈에서 한다. iPhone 실기기는 실행하지 않았다.

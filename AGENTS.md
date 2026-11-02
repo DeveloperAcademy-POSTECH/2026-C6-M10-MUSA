@@ -137,3 +137,7 @@
 ## #439 Host 도색 발행 캡처 공유
 
 - Host의 피어별 `LabPaintPublisher`는 하나의 `LabPaintPublishCache`를 공유한다. 한 번의 발행(같은 epoch)에서 표면 복사·해시·인코딩은 한 번이며 피어별 발행자는 자기가 마지막으로 보낸 캡처를 기준으로 delta를 만든다. 캡처 키는 표면·epoch·Revision·PaintCount·VisualVersion·크기이므로 픽셀을 바꾸는 표면 경로는 계속 Revision을 올려야 한다. 프레임 바이트는 이전 구현과 같아야 하며 `LabPaintPublishCacheTests`의 main 참조 비교로 고정한다.
+
+## #444 도색 복제본 설치 API
+
+- Guest 도색 복제본은 `TryReplacePixels`(복사), `TryAdoptReplica`(호출자 배열 소유권 이전, 같은 크기·같은 기준 리비전의 복제본이면 바뀐 셀만 검사), `TryCopyReplicaFrom`(같은 크기면 기존 배열에 덮어씀)로 설치한다. 셋은 같은 셀 규칙과 `InstallReplica` 상태를 공유하며 실패 시 표면을 바꾸지 않는다. `TryAdoptReplica`에 넘긴 배열은 이후 호출자가 건드리지 않고, 바뀐 셀 목록 밖의 셀은 현재 지도와 같아야 한다.

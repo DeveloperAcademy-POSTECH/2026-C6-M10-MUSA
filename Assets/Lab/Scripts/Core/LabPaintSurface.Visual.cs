@@ -29,15 +29,14 @@ namespace C6Lab
         {
             if (stamps.Length != visualStamps.Count) return false;
             for (int i = 0; i < stamps.Length; i++)
-            {
-                var a = stamps[i]; var b = visualStamps[i];
-                if (a.sequence != b.sequence || !SameVectorBits(a.center, b.center) || !SameVectorBits(a.right, b.right)
-                    || !SameFloatBits(a.radius, b.radius)
-                    || !a.color.Equals(b.color) || a.painterSlot != b.painterSlot || a.pattern != b.pattern || a.seed != b.seed)
-                    return false;
-            }
+                if (!SameStamp(stamps[i], visualStamps[i])) return false;
             return true;
         }
+
+        private static bool SameStamp(LabPaintVisualStamp a, LabPaintVisualStamp b)
+            => a.sequence == b.sequence && SameVectorBits(a.center, b.center) && SameVectorBits(a.right, b.right)
+                && SameFloatBits(a.radius, b.radius)
+                && a.color.Equals(b.color) && a.painterSlot == b.painterSlot && a.pattern == b.pattern && a.seed == b.seed;
 
         private static bool SameVectorBits(Vector3 a, Vector3 b) => SameFloatBits(a.x, b.x)
             && SameFloatBits(a.y, b.y) && SameFloatBits(a.z, b.z);
