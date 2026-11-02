@@ -113,3 +113,10 @@
 - `LabNetworkPacket`에 메시지 본문을 타입 필드로 두지 않는다. JsonUtility는 null인 클래스 필드를 기본값 객체로 써서 모든 패킷이 그 타입의 사본을 실어 가므로, 행동 결과(`LabActionReceipt`)와 도색 프레임(`LabPaintFrame`)은 `payload` JSON 문자열로만 보내고 `LabPacketPayload.Encode/Decode`로 다룬다. `LabBulkPayload`도 같다. 값을 넣는 곳이 없던 `snapshot`·`boardFrame` 필드는 지웠다. 본문 없는 패킷은 약 1 KB다(측정 937 B, 검사 상한 1,100 B; 이전 4,189 B).
 - 승인된 행동 직후 `HandleBoardAction`이 보내는 조합판 프레임(`PublishOwnerBoards(..., skipEmpty: true)`)만 변경·제거 구슬이 없고 체크포인트가 아닌 수신자를 건너뛴다. 건너뛴 프레임은 순번을 소비하지 않는다(`PeekBoardSequence`/`CommitBoardSequence`). `PublishSnapshot`이 보내는 프레임(100 ms 타이머, 명중·시작·일시정지/재개·섬광 등 즉시 발행)과 5초 체크포인트는 그대로 전원에게 간다. 재개 스냅샷은 정지 중 헤더와 같은 serverTime을 가지므로 헤더 프레임을 생략하면 Guest가 다음 타이머 프레임까지 정지 상태로 남는다.
 - 공유 설정 257개·인덱스는 그대로이며 최신 묶음은 **5682/Lab43/Game27**이다. 이전 봉투 형식의 앱과 혼용하지 않는다. 실행한 검사와 패킷 크기 측정만 `docs/VALIDATION.md`에 기록한다.
+
+
+## #433 Guest 박 포즈 보정
+
+- Guest의 박 포즈 보정은 `LabNetwork.LocalState.ReconcileTargetPose` 하나로 간다(조합판 프레임·Bulk 스냅샷 공용). 같은 세션/라운드에서 `serverTime`이 마지막 적용 시각 이하인 비정지 샘플은 건너뛰고, 정지 샘플은 항상 적용한다. 스냅샷 경로에서 `ReconcileYaw/ReconcileRope`를 따로 다시 부르지 않는다.
+- `HoldTargetPoseForPredictedImpact`/`ReleaseTargetPoseHold`와 `ReconcileRope(..., holdImpulse)`는 투척 로컬 선반영이 쓸 훅이다. 보류 중 비정지 샘플은 로프 위상만 블렌드하고 오프셋·속도·yaw는 로컬 물리에 맡긴다.
+
