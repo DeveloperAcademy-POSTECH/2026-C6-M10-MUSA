@@ -234,6 +234,8 @@ MonoBehaviour:
   chuimsaeChancePercent: 15
   chuimsaeMinGap: 5
   gumihoBgmVolume: 0.4
+  yaguangUseNewBgm: 1
+  yaguangBgmVolume: 0.35
   gumihoFeverBgmVolume: 0.4
   charmCastSoundVolume: 0.4
   charmCheckSoundVolume: 0.8
@@ -241,6 +243,18 @@ MonoBehaviour:
   foxFallSoundVolume: 0.5
   foxClearSoundVolume: 0.3
   bombOpenSoundVolume: 0.8
+  yaguangFlashWarnSoundVolume: 0.6
+  yaguangFlashGlowSoundVolume: 0.6
+  yaguangFlashCountSoundVolume: 0.8
+  yaguangFlashCountStepSemitones: 2
+  yaguangFlashBurstSoundVolume: 0.9
+  yaguangFlashTauntSoundVolume: 0.9
+  yaguangFlashTauntDelaySeconds: 0.35
+  yaguangShakeBellSoundVolume: 0.6
+  yaguangShakeBellStepSemitones: 0
+  yaguangShakeBellFinalSoundVolume: 0.9
+  yaguangFlashCaughtSoundVolume: 0.9
+  yaguangFlashCaughtDelaySeconds: 0.2
   hapticsEnabled: 1
   generateHapticStyle: 1
   generateHapticIntensity: 1
