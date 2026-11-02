@@ -190,5 +190,81 @@ namespace C6Lab.Tests
             Assert.That(LabYaguangSound.BellPitch(9, 1f), Is.EqualTo(Mathf.Pow(2f, 8f / 12f)).Within(.0001f));
             Assert.That(LabYaguangSound.BellPitch(20, 4f), Is.EqualTo(2f).Within(.0001f), "At most one octave up.");
         }
+
+        // #397 콤보 예고와 진행
+        private static LabSnapshot ComboWarning()
+        {
+            // 30초에 예고가 시작해 34초에 4칸이 나오는 콤보 (예고 4초).
+            return new LabSnapshot
+            {
+                sessionId = "yaguang", round = 1, phase = LabPhase.Playing,
+                comboWarningAt = 30d, comboNextAt = 34d
+            };
+        }
+
+        [Test]
+        public void TheGoblinCountsFourThreeTwoOneThenTheGongStartsTheCombo()
+        {
+            LabYaguangSound sound = Sound();
+            LabSnapshot snapshot = ComboWarning();
+            sound.ObserveFlash(snapshot, 29.5d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountFour), Is.Zero);
+            foreach (double now in new[] { 30d, 30.5d, 31d, 32d, 32.7d, 33d })
+                sound.ObserveFlash(snapshot, now, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountFour), Is.EqualTo(1), "넷");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountThree), Is.EqualTo(1), "셋");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountTwo), Is.EqualTo(1), "둘");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountOne), Is.EqualTo(1), "하나");
+
+            // 34초에 4칸이 나온다: 깽! 한 번.
+            snapshot.comboWarningAt = snapshot.comboNextAt = -1d;
+            snapshot.comboCount = 1; snapshot.comboActive = true;
+            snapshot.comboStartedAt = 34d; snapshot.comboEndsAt = 44d;
+            sound.ObserveFlash(snapshot, 34.05d, Me);
+            sound.ObserveFlash(snapshot, 34.2d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboStart), Is.EqualTo(1));
+
+            Assert.That(LabYaguangSound.CountSfx(5), Is.EqualTo(LabYaguangSfx.ComboCountOne), "Longer warnings count from 하나 again.");
+        }
+
+        [Test]
+        public void TheClockTicksEveryHalfSecondThenFasterAndStopsWithTheCombo()
+        {
+            LabYaguangSound sound = Sound();
+            var snapshot = new LabSnapshot
+            {
+                sessionId = "yaguang", round = 1, phase = LabPhase.Playing
+            };
+            sound.ObserveFlash(snapshot, 33.9d, Me);
+            snapshot.comboCount = 1; snapshot.comboActive = true;
+            snapshot.comboStartedAt = 34d; snapshot.comboEndsAt = 44d;
+            // 34~44초를 0.05초 간격으로 지켜본다: 34.5~40.5초 0.5초마다 13번, 남은 3초(41~43.75초)는 0.25초마다 12번.
+            for (int i = 0; i < 200; i++) sound.ObserveFlash(snapshot, 34d + i * .05d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTick), Is.EqualTo(13));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTickFast), Is.EqualTo(12));
+
+            // 콤보가 끝나면 더 울리지 않는다.
+            snapshot.comboActive = false;
+            int before = sound.PlayCount(LabYaguangSfx.ComboTickFast) + sound.PlayCount(LabYaguangSfx.ComboTick);
+            sound.ObserveFlash(snapshot, 44.5d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTickFast) + sound.PlayCount(LabYaguangSfx.ComboTick), Is.EqualTo(before));
+
+            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 34.4d, 3d, .5d, .25d, out _), Is.EqualTo(double.NegativeInfinity));
+            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 36.2d, 3d, .5d, .25d, out bool fast), Is.EqualTo(36d));
+            Assert.That(fast, Is.False);
+            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 42.7d, 3d, .5d, .25d, out fast), Is.EqualTo(42.5d));
+            Assert.That(fast, Is.True);
+            Assert.That(LabYaguangSound.LatestTickAt(34d, 44d, 36.2d, 3d, 1d, .5d, out _), Is.EqualTo(36d));
+        }
+
+        [Test]
+        public void TheComboFoldersAreUnderResourcesAudio()
+        {
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboCountOne), Is.EqualTo("Audio/YaguangComboCount1"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboCountFour), Is.EqualTo("Audio/YaguangComboCount4"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboStart), Is.EqualTo("Audio/YaguangComboStart"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboTick), Is.EqualTo("Audio/YaguangComboTick"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboTickFast), Is.EqualTo("Audio/YaguangComboTickFast"));
+        }
     }
 }
