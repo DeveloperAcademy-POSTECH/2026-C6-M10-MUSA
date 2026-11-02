@@ -3624,6 +3624,15 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 실기기·실제 다기기 B 성공·LAN/핫스팟·iOS 빌드/성능은 미실행이다. 병합 전 원본 파일/스태시와 Unity 종료 상태를 별도로 확인한다. 자동 생성된 새 `.meta`의 빈 YAML 필드 뒤 공백은 Unity 직렬화 형식으로 보존하고 나머지 diff 공백 검사는 통과했다.
 
 
+## 조합판 이동 잔상을 낙하하는 물감 방울로 변경 — #392, 2026-10-29
+
+- 기준 main `2ba9e806`, `feat/#392-board-paint-drips`. `LabOrbBoardTrail`을 판 전용 bounded 방울 Mesh로 교체하고 기존 DEV165 토글/대상(실제 원소 Combined)·기본ON을 유지했다. 별도 `Resources/OrbBoard/BoardPaintDrips` 프로필만 추가했으며 비행5종 아트/프로필·머터리얼, B 보상 화염, Scene/Prefab, 공유LabConfig 값/프로토콜/패키지는 수정하지 않았다. LabConfig 소스는 기존 토글 tooltip만 갱신했다.
+- **실행:** Unity6000.6.5f1/macOS/Metal, 구슬 관련 PlayMode **121/121 PASS** (42.90초), 기존 비행 오행 **9/9 PASS** (3.29초), 지귀 보상 **8/8 PASS** (1.24초). 합계138개·실패/skip0이다. 전체 EditMode/전체 PlayMode/실기기 수행 기록은 아니다.
+- 기존 BoardTrail5개 검사의 원소/크기/비행 원본 보존·속도·DEV/Raw 제외·숨김/거절 복원·축소 의도를 새API로 이관하고2개를 더해7개로 구성했다. 실제 이동점 생성, 기존 방울world X유지/Y낙하·개별fade/소멸, 일반/시작 대기 정지, 개수 상한, 추가 물리/ParticleSystem 없음까지 확인했다. 관련121개에는 기존 HUD 합성/구슬 표시·물리/입력 검사도 포함한다.
+- **실제 GPU 화면 확인:** Lab390×844의 다섯 속성 Combined에서 각각3개(총15개)의 방울을 생성해 초기/0.25초추가/수명완료를 캡처했다. 같은 첫 방울의world Y가0.18~0.23 내려가고 alpha0.85→0.6352로 감소,0.8초 추가 후 잔여0개를 확인했다. 초기 화면은 `images/board-paint-drips.png`다. 물리를 고정하고 표시 clock만 명시적으로 진행한 비교이며 실제 손가락/다기기 플레이를 의미하지 않는다.
+- 기존 WaterDrop PNG는1024×1536 RGBA, alpha0~254·완전투명61.5%이며 픽셀을 변경하지 않고 기존 재질의PropertyBlock과 도색 팔레트 정점색으로 사용했다. 새 방울 설정만 Unity AssetDatabase에서 생성·저장했다.
+- 읽기 코드 리뷰에서 차단 결함은 발견하지 못했다. 확인 뒤 Play OFF·Home 복귀·임시 판효과0개·컴파일 오류 없음. 보호 파일153개·스태시9개 동일을 재확인했다. **미실행:** iPhone/iPad·LAN/핫스팟·실제 다기기·모바일 빌드/성능. 원시 검사JSON·실행 로그·프레임 파일은 커밋하지 않는다.
+
 ## 2026-10-31 — #394 땅따먹기 1:1·3:3
 
 브랜치 `feat/#394-territory-1v1-3v3`. 사용자 요청으로 다섯 단계로 나눠 진행했다. 규칙·화면은 [게임 흐름](GAME_FLOW.md)의 #394 절, 피버 수는 [DEV 명세](DEVELOPER_MODE_PARAMETER_SPEC.md)의 #281 절을 따른다. 아래 "Editor 직접 확인"은 열린 Editor의 `unity command eval`로 실제 클래스를 호출한 결과이며 Test Runner 실행이 아니다.
@@ -3654,6 +3663,36 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 임시 그림: 3:3 쪽 넘김 `<` `>`·쪽 표시 점, P6 전투 동그라미(P5 그림의 색·숫자만 바꿈)는 디자인 그림을 받으면 바꾼다.
 
 
+## 조합판 낙하·착지 수채 얼룩 원화 연결 — #392, 2026-11-02
+
+- 기존 #392의 `b2fcf031` 이후 최신 origin/main `3897dbd8`을 같은 `feat/#392-board-paint-drips`에 병합했다(`989ed19b`). 충돌은 이 검증 문서의 양쪽 추가 기록뿐이었고 둘 다 보존했다. #402 정리 브랜치·스태시는 이동하거나 합치지 않았다.
+- 기존 WaterDrop 아이콘 대신 새 RGBA 주 얼룩3종·작은 튀김점2종을 연결했다. 원본 PNG는 생성 결과와 SHA-256이 같으며 픽셀 수정 없이 Unity512/NPOT None으로 가져왔다(가로형512×384, 나머지512×512). 판 전용 셰이더/재질/프로필만 사용하고 투척 원화·비행 재질·B보상 화염·판정 지도·공유 설정/패키지는 변경하지 않았다.
+- 낙하.08초→착지 고정/번짐.16초→유지.12초→페이드.44초, 총.8초다. 중심 방울을 번짐 초반까지 혼합해 착지 순간 끊김을 완화했다. 최대24개/구슬·한 Step 생성24·고정배열96·얼룩당 최대2quad다. 표시만 실제 곡선/좌우 끝 안에 넣고 물리·소유권 전달면은 유지했다. 실행 중 원화 참조가 빠지면 이력을 지운다.
+- **실행 환경:** Unity6000.6.5f1, macOS/Metal. 컴파일 오류 없음, 새 셰이더 supported=true·ShaderUtil 경고/오류0.
+- **실행:** 구슬 관련 PlayMode **123/123 PASS**(42.99초, 새 얼룩9개 포함), 기존 오행 비행 **9/9 PASS**(3.38초), 지귀 보상 **8/8 PASS**(1.25초). 이후 참조 누락 정리와 회귀1개를 더하고 얼룩 **10/10 PASS**(0.12초)를 재실행했다. 각 실행 실패/skip0. 중복 재실행을 별도 기능 수로 합산하지 않는다. 전체 EditMode/전체 PlayMode 수행 기록은 아니다.
+- **GPU 직접 확인:** 실제 Lab의 저장된 조합판·원형 구슬 외형·도색 팔레트로 하단390×403 카메라를 캡처했다. 5색×6얼룩에서.13초에 착지한 world위치가.26/.52초까지 고정됨을 확인했고, reveal .3178→1·alpha .88→.6132·.82초에 전부0개를 확인했다. 이어 같은 판에서0.65초 실제 소스 위치를 이동한 뒤 정지해30fps/2초60프레임을 만들었고 마지막 잔여0을 확인했다. `images/board-paint-stain-motion.gif`·`images/board-paint-stain-landed.png`가 화면 근거다. 물리를 고정하고 표시 clock만 진행한 격리 비교이며 실제 손가락/연결 플레이는 아니다.
+- 코드 리뷰의 착지 pop·곡선 투영의 X이동·Inspector 원화 누락 경계를 보완했다. 생성 당시 시간/크기·속성색·원화 선택, Pause/시작대기, Raw/DEV제외, 숨김/거절복원, 축소, localRNG 재현/게임난수 보존, 곡선 네 모서리의 실제 Mesh정점과 개수 제한을 검사했다.
+- 작업 전 보호 파일의 내용 해시가 모두 같고 #402 브랜치 HEAD·스태시9개도 동일하다. 원본 Lab/Hapio Scene·Prefab·기존 재질·프로젝트 설정을 저장하거나 수정하지 않았다. 캡처 후 Play를 종료했다. 원시 JSON/로그/연속PNG는 커밋하지 않는다.
+- **미실행:** iPhone/iPad·iOS 빌드·LAN/핫스팟·실제 다기기·모바일 성능. 새 표현의 미감은 사용자 확인 대상이며 자동 검사 통과로 확정하지 않는다. 설정/직접 비교는 `ELEMENT_FLIGHT_TRAILS.md`의 최신 #392 절을 따른다.
+
+
+## #392 PR 병합 전 최신 main 통합 검증 — 2026-11-02
+
+- 기준 main `75079ac5`(#397 야광귀 콤보 효과음) → #392 통합 커밋 `a5e76454`. LabConfig의 판 효과 tooltip과 main의 음향 필드를 함께 보존했다. #402 브랜치/열린 PR과 스태시9개는 유지했다.
+- 최초 전체 EditMode는1686개 중1684통과·2실패였다. `LabPaintDryingTests`의 large-slot과 `LabPaintVisualStateTests`의 painter fixture가 현재 허용되는 P6를 무효 입력으로 사용했다. 같은 fixture/MaxPainterSlot=6 코드가 origin/main에도 존재함을 확인했고, 검사 입력만 `MaxPainterSlot+1`(직렬화는byte)로 고쳤다. 실제 `LabPaintSurface`·`LabPaintVisualStamp`와 건조·도색·복제 규칙은 수정하지 않았다. 기존 P6 허용/복제 검사도 그대로 유지했다.
+- Unity6000.6.5f1/macOS/Metal의 재실행 결과:
+
+| 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | 1686/1686 PASS | 40.05초 |
+| 구슬 PlayMode | 124/124 PASS | 42.71초 |
+| 기존 오행 비행 PlayMode | 9/9 PASS | 3.23초 |
+| 지귀 보상 PlayMode | 8/8 PASS | 1.24초 |
+
+- 각 실행 실패/skip0. 구슬124개에는 판 효과10개 및 기존 물리·표시·HUD/복원 검사가 포함된다. 전체 PlayMode 수행 기록이 아니다. 새 shader supported/컴파일 상태를 확인했고 셰이더 경고/오류0, Play OFF·Lab Scene dirty=false로 돌아왔다.
+- 원화/GPU 비교는 위 `fb2a17b3`의 동일 VFX 코드 실행 기록을 사용하며 이번 PR 통합에서 재촬영하지 않았다. main 대비 Scene/Prefab·프로젝트/패키지·기존 비행/보상 아트의 변경 없음, 신규GUID중복/누락meta0을 확인했다. 원시 실행JSON·로그·개인 경로는 커밋하지 않는다.
+- iOS 빌드·실기기·LAN/핫스팟·실제 다기기·모바일 성능은 계속 미실행이다.
+
 ## 2026-11-02 — #405 3:3 방을 나간 뒤 DEV 솔로 오류
 
 - **재현(사용자 Play):** 함께할 인원 6명 → 땅따먹기 방 입장 → 방 나가기 → DEV · SOLO. `LabRoomPresence.Encode`에서 `ArgumentOutOfRangeException`이 나고, 솔로 전투 대신 3:3 자리 고르기 화면으로 넘어갔다.
@@ -3666,3 +3705,18 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 | DEV 솔로가 다시 정하는 인원 (Editor 직접 확인) | PASS | 1·6·7명 → 3명, 2~5명은 그대로 |
 | PlayMode `GameLobbyViewTests.DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt` (새: 3:3 방 → 나가기 → 카드 없는 방은 6명이면 열리지 않음 → DEV 솔로가 혼자 전투 시작) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | 실제 Play 재현 순서 다시 해 보기 | NOT_RUN | |
+
+
+## #392 PR #408의 추가 main #405 통합 확인 — 2026-11-02
+
+- 앞선 검사 중 main에 #407/#405가 병합돼 기준을 `83441bd4`까지 반영했다(통합 `7ae2421f`). 충돌은 이 문서의 양쪽 추가 기록뿐이라 #392/#405 기록 모두 보존했다. 네트워크의 6인 방/솔로 진입 수정과 새 회귀 검사는 main 그대로이며 #392 VFX 코드는 변경하지 않았다.
+- Unity6000.6.5f1/macOS/Metal 최종 통합 재검사:
+
+| 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | 1686/1686 PASS | 39.65초 |
+| 판 얼룩 PlayMode | 10/10 PASS | 0.06초 |
+| 로비 PlayMode(#405 포함) | 11/11 PASS | 19.29초 |
+
+- 실패/skip0. 로비11개에는 `DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt`가 포함되며, 최초 #405 기록에서 미실행이던 Test Runner 경로를 이 통합에서 실제 실행했다. 3:3 방→나가기→잘못된 6인 직접Host 거부→DEV솔로 혼자 전투 시작을 검사한다. 실제 6기기 연결이나 손가락 조작을 의미하지 않는다.
+- 기존 비행/보상과 구슬124개는 앞선75079ac5 통합 실행을 사용하고, 이 후속 main은 VFX/구슬 물리·Scene·공유 설정/아트를 바꾸지 않는다. 전체 PlayMode·실기기·iOS/모바일 성능은 미실행이다. 이전 검증 이력의 당시 미실행 표시는 그대로 남긴다.

@@ -1,0 +1,59 @@
+{
+  "stage": "Integrated into board-only visual emitter on feat/#392-board-paint-drips; no gameplay paint changes",
+  "date": "2026-11-02",
+  "tool": "built-in image_gen",
+  "prompts": [
+    {
+      "name": "stain-a",
+      "prompt": "Use case: style-transfer. Asset type: one production-ready isolated hand-painted ink/watercolor paint-splash opacity sprite for the Korean cooperative game Hapio.\nDerive a fresh splash variation from reference image 1 (existing in-game irregular gourd paint footprint); use reference image 2 only for the soft mottled pigment and broken wet edge style. The gourd, rope, paper and scene are NOT part of the output.\nSTRICT deliverable: ONE isolated flat top-down paint stain, real transparent background, no solid backdrop or checkerboard, square canvas, generous 12% transparent margin, no text/labels/border. Paint is neutral WHITE; varying density, lighter wash, darker pooled-looking edges and tiny paper-like gaps must be conveyed as varying OPACITY against transparency, with neutral near-white RGB rather than any colored pigment. This will be alpha-tinted to five game colors. Preserve translucent areas; avoid an opaque plastic sticker. The silhouette must read at 24 to 48 screen pixels. Keep a strong dense joined main body with broad soft organic irregular lobes, a few visible bleed details and very few separate larger splatter beads. Do not use a teardrop, a water icon, black outline, 3D shading, bevel, shine, glow, smoke, flame, ornamental brush swirls, spiky starburst, hairlike tendrils, noisy pepper-speck halo, scattered field of tiny dots, or a perfectly round disc. All pigment is a flat surface stain, not falling water.\nPRIMARY STAIN A: compact asymmetrical puddle with five broad rounded lobes, a slightly denser wet rim, a softly mottled central fill, and two nearby satellite beads. The body should be cohesive and plump, not a radial star."
+    },
+    {
+      "name": "stain-b",
+      "prompt": "Use case: style-transfer. Asset type: one production-ready isolated hand-painted ink/watercolor paint-splash opacity sprite for the Korean cooperative game Hapio.\nDerive a fresh splash variation from reference image 1 (existing in-game irregular gourd paint footprint); use reference image 2 only for the soft mottled pigment and broken wet edge style. The gourd, rope, paper and scene are NOT part of the output.\nSTRICT deliverable: ONE isolated flat top-down paint stain, real transparent background, no solid backdrop or checkerboard, square canvas, generous 12% transparent margin, no text/labels/border. Paint is neutral WHITE; varying density, lighter wash, darker pooled-looking edges and tiny paper-like gaps must be conveyed as varying OPACITY against transparency, with neutral near-white RGB rather than any colored pigment. This will be alpha-tinted to five game colors. Preserve translucent areas; avoid an opaque plastic sticker. The silhouette must read at 24 to 48 screen pixels. Keep a strong dense joined main body with broad soft organic irregular lobes, a few visible bleed details and very few separate larger splatter beads. Do not use a teardrop, a water icon, black outline, 3D shading, bevel, shine, glow, smoke, flame, ornamental brush swirls, spiky starburst, hairlike tendrils, noisy pepper-speck halo, scattered field of tiny dots, or a perfectly round disc. All pigment is a flat surface stain, not falling water.\nPRIMARY STAIN B: gently horizontally spreading cohesive splash, about 1.35:1 aspect within the square, with three broad uneven lobes and a short blunt outward splash shoulder, delicate broken pooling at the edge and two nearby secondary blotches. Not stretched into a trail."
+    },
+    {
+      "name": "stain-c",
+      "prompt": "Use case: style-transfer. Asset type: one production-ready isolated hand-painted ink/watercolor paint-splash opacity sprite for the Korean cooperative game Hapio.\nDerive a fresh splash variation from reference image 1 (existing in-game irregular gourd paint footprint); use reference image 2 only for the soft mottled pigment and broken wet edge style. The gourd, rope, paper and scene are NOT part of the output.\nSTRICT deliverable: ONE isolated flat top-down paint stain, real transparent background, no solid backdrop or checkerboard, square canvas, generous 12% transparent margin, no text/labels/border. Paint is neutral WHITE; varying density, lighter wash, darker pooled-looking edges and tiny paper-like gaps must be conveyed as varying OPACITY against transparency, with neutral near-white RGB rather than any colored pigment. This will be alpha-tinted to five game colors. Preserve translucent areas; avoid an opaque plastic sticker. The silhouette must read at 24 to 48 screen pixels. Keep a strong dense joined main body with broad soft organic irregular lobes, a few visible bleed details and very few separate larger splatter beads. Do not use a teardrop, a water icon, black outline, 3D shading, bevel, shine, glow, smoke, flame, ornamental brush swirls, spiky starburst, hairlike tendrils, noisy pepper-speck halo, scattered field of tiny dots, or a perfectly round disc. All pigment is a flat surface stain, not falling water.\nPRIMARY STAIN C: rounded off-centre asymmetrical splash with a weightier lower left lobe and two smaller merged upper lobes, one shallow concave notch, soft uneven watercolor pooling, sparse internal wet mottling, and one or two detached nearby beads. Still clearly the same art family as the reference."
+    },
+    {
+      "name": "spatter-a",
+      "prompt": "Use case: style-transfer. Asset type: one production-ready isolated hand-painted ink/watercolor paint-splash opacity sprite for the Korean cooperative game Hapio.\nDerive a fresh splash variation from reference image 1 (existing in-game irregular gourd paint footprint); use reference image 2 only for the soft mottled pigment and broken wet edge style. The gourd, rope, paper and scene are NOT part of the output.\nSTRICT deliverable: ONE isolated flat top-down paint stain, real transparent background, no solid backdrop or checkerboard, square canvas, generous 12% transparent margin, no text/labels/border. Paint is neutral WHITE; varying density, lighter wash, darker pooled-looking edges and tiny paper-like gaps must be conveyed as varying OPACITY against transparency, with neutral near-white RGB rather than any colored pigment. This will be alpha-tinted to five game colors. Preserve translucent areas; avoid an opaque plastic sticker. The silhouette must read at 24 to 48 screen pixels. Keep a strong dense joined main body with broad soft organic irregular lobes, a few visible bleed details and very few separate larger splatter beads. Do not use a teardrop, a water icon, black outline, 3D shading, bevel, shine, glow, smoke, flame, ornamental brush swirls, spiky starburst, hairlike tendrils, noisy pepper-speck halo, scattered field of tiny dots, or a perfectly round disc. All pigment is a flat surface stain, not falling water.\nSMALL SATELLITE CLUSTER A: only THREE small rounded irregular pigment beads as one small loose group in the center of a generous transparent square. One bead slightly larger, two smaller. Each bead has softly pooled wet edges and translucent watercolor density. No main large stain, no thin drip tail, no tiny dust."
+    },
+    {
+      "name": "spatter-b",
+      "prompt": "Use case: style-transfer. Asset type: one production-ready isolated hand-painted ink/watercolor paint-splash opacity sprite for the Korean cooperative game Hapio.\nDerive a fresh splash variation from reference image 1 (existing in-game irregular gourd paint footprint); use reference image 2 only for the soft mottled pigment and broken wet edge style. The gourd, rope, paper and scene are NOT part of the output.\nSTRICT deliverable: ONE isolated flat top-down paint stain, real transparent background, no solid backdrop or checkerboard, square canvas, generous 12% transparent margin, no text/labels/border. Paint is neutral WHITE; varying density, lighter wash, darker pooled-looking edges and tiny paper-like gaps must be conveyed as varying OPACITY against transparency, with neutral near-white RGB rather than any colored pigment. This will be alpha-tinted to five game colors. Preserve translucent areas; avoid an opaque plastic sticker. The silhouette must read at 24 to 48 screen pixels. Keep a strong dense joined main body with broad soft organic irregular lobes, a few visible bleed details and very few separate larger splatter beads. Do not use a teardrop, a water icon, black outline, 3D shading, bevel, shine, glow, smoke, flame, ornamental brush swirls, spiky starburst, hairlike tendrils, noisy pepper-speck halo, scattered field of tiny dots, or a perfectly round disc. All pigment is a flat surface stain, not falling water.\nSMALL SATELLITE CLUSTER B: only TWO squat irregular pigment flecks plus ONE tiny round bead as one small centered group. Each fleck is a small flat wet ink blot with broad blunt edges and slight mottled density. No large main stain, no sharp points, no falling teardrops."
+    }
+  ],
+  "revision_prompt": "Use case: precise-object-edit. Edit the supplied transparent sprite into a SECOND tiny satellite-spatter group for the same game art family. Keep exactly THREE separate small flat watercolor/ink spots in a compact central group: two squat oval flecks and one round smaller bead. Preserve the soft wet pooling and neutral near-white pigment. Spread the group into a shallow triangle, with clear transparent gaps between all three. The ENTIRE group occupies only the middle 28 percent of the square; the rest is genuine transparent alpha. These are secondary small specks, not a large stain. Do not introduce a connected main puddle, any starburst, a giant splash, lines, a teardrop, text, borders or a background. Preserve transparency. Local values should include translucent density and soft dry pores rather than a uniform solid sticker. No black contour. This is an isolated top-down surface paint texture.",
+  "source_repository_branch": "feat/#392-board-paint-drips",
+  "source_commit": "989ed19b2a43a70f8481c802217ae0cd128f357e",
+  "palette": "LabPaintPalette.SrgbColorFor (authoritative session paint)",
+  "alpha_contract": "Generated RGBA is preserved. Preview uses source alpha once for silhouette and source neutral RGB for wash texture; game integration is pending.",
+  "source_references": [
+    "docs/images/paint-watercolor-369-first.png",
+    "Assets/Lab/Art/UI/CombinationBoard.png"
+  ],
+  "import_contract": "Original generated RGBA PNG bytes unchanged; Unity512, NPOT None, Alpha FromInput, Bilinear Clamp, no mipmaps; shader uses neutral RGB wash and source alpha.",
+  "assets": [
+    {
+      "path": "Assets/Lab/Resources/OrbBoard/Stains/stain-a.png",
+      "sha256": "8b1368823009995a2e09154ef07e0631049f47b8bb870a693310a3f7c470dfc8"
+    },
+    {
+      "path": "Assets/Lab/Resources/OrbBoard/Stains/stain-b.png",
+      "sha256": "73e4a2233678d7008846d27b25190fc17199bddce07b1b46d01f23c4fb1fcd12"
+    },
+    {
+      "path": "Assets/Lab/Resources/OrbBoard/Stains/stain-c.png",
+      "sha256": "dac1fab7fec5bbed7a8bad76bf0da1e575db8734e576b5860eac2ef74df43fc6"
+    },
+    {
+      "path": "Assets/Lab/Resources/OrbBoard/Stains/spatter-a.png",
+      "sha256": "428a2fd1d872135dfa884f811cb49a67a5ec0e7a298303fc7bf86f491d6e2747"
+    },
+    {
+      "path": "Assets/Lab/Resources/OrbBoard/Stains/spatter-b.png",
+      "sha256": "5969eeb60140fb0e86f76df427ff404df0d12d4b4724325d4cd686ba5a1e6bc9"
+    }
+  ]
+}

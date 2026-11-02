@@ -591,7 +591,7 @@ namespace C6Lab
         [SerializeField, Min(.001f)] private float orbMaxReleaseSpeed = 3f;
         [SerializeField, Min(.001f)] private float orbRadius = .32f;
         [SerializeField, Min(.1f)] private float boardHeight = 5f;
-        [Tooltip("조합판의 결합(오행) 구슬이 움직일 때 던진 구슬처럼 오행 꼬리를 얕게 남긴다 (#254). 크기/진하기는 LabOrbBoardTrail Inspector.")]
+        [Tooltip("조합판 Combined가 움직이면 속성 색 물방울이 떨어졌다 사라진다 (#392). 크기/간격/낙하는 BoardPaintDrips 표현 프로필에서 조정한다.")]
         [SerializeField] private bool boardOrbTrailEnabled = true;
 
         [Header("Orb combine")]
