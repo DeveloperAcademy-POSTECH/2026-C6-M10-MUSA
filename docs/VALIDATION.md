@@ -3492,7 +3492,9 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 최종 에디터: Home, Edit 상태. 컴파일과 실제 GPU 출력 확인 완료. 개인 기기 식별자·원시 테스트 로그·빌드 결과물은 커밋하지 않았다.
 - **미실행:** 실제 LAN/핫스팟·다기기, 실제2:2/피버 연속 플레이, iOS export/서명/설치, iPhone CPU/GPU 시간·메모리·발열.1024기준 신규 RT22MiB/기존포함28MiB는 원시 픽셀 계산이며 모바일 실측이 아니다.
 
-## 2026-10-29 — #381 요괴 10종 제작 구조·신규 7종 데이터
+## 2026-10-29 — #381 요괴 10종 제작 구조·신규 7종 데이터 (도입 당시 이력, #402에서 제거)
+
+아래는 도입 당시의 실행 기록이다. 2026-11-02의 #402에서 제작용 10종 구조와 안내 문서를 제거했으며, 당시 자료는 PR #383과 Git 이력에서 확인한다. 현재 실행 구조와 검증은 아래 #402 기록을 따른다.
 
 - 기준 main `8d3cd58d`, 작업 브랜치 `feat/#381-yokai-content-scaffold`. Unity 6000.6.5f1 / macOS의 대상 프로젝트 전용 batch Editor(`-nographics`)와 Unity CLI로 수행했다. 다른 작업의 Editor는 제어하지 않았다. 아래 결과는 데이터·EditMode 범위이며 화면이나 실기기 플레이 확인이 아니다.
 - 생성: `GameYokaiCatalogValidator.CreateMissingDefinitions()`를 실행해 Resources 밖에 카탈로그1개와 정의10개를 만들고 기존3개 StageDefinition의 빈 `content`만 연결했다. 저장 목록 검증에서10종·3 Integrated·7 Planned와 기존3종 순서를 확인했다. Figma의10번 보스 지하국대적과7번 그슨대의 별칭을 포함한다. 확인하지 않은 설명·아트·음성·효과는 비워 두었다.
@@ -3662,6 +3664,26 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 새·바뀐 검사: EditMode `LabTeamSizesTests`(새), `LabRoomPresenceTests`(방 인원 표·6명 기록·지문), `LabPaintPainterSlotTests`(P6 허용·P7 거절), `LabPlayerSlotsTests`, `LabSharedSettingsSchemaTests`·`LabGameFlowBridgeTests`(접속 버전), `LabPlayerCircleTests`(P1~P6), Hapio `GameLobbyModeRulesTests`(새), `GameLobbyAssetTests`, `GamePendingRoomRegistryTests`, `GameStageResultViewTests`(결과 n : n), PlayMode `LabPlayerPaintPatternRenderTests`(P1~P6), `GameLobbyViewTests`(인원별 모드 막힘, 1:1 방, 3:3 쪽 넘김), `GameSceneFlowTests`(DEV 혼자 결과 "땅따먹기").
 - 임시 그림: 3:3 쪽 넘김 `<` `>`·쪽 표시 점, P6 전투 동그라미(P5 그림의 색·숫자만 바꿈)는 디자인 그림을 받으면 바꾼다.
 
+## 2026-11-02 — #402 보류된 10종 확장 준비 구조·#393 잔여 작업 정리
+
+- 기준 main `3897dbd8`, 작업 브랜치 `chore/#402-yokai-expansion-cleanup`. Unity 6000.6.5f1 / macOS / Metal의 전용 batch Editor와 Unity CLI로 수행했다. iOS/Mac 플레이어 빌드·실기기·실제 다기기 연결은 실행하지 않았다.
+- 제거: 제작용 정의10개와 전체 카탈로그, `GameYokaiDefinition`/`GameYokaiCatalog`, 전용 Editor 생성·검증 도구, 10종 전용 검사와 안내 문서. 소유 폴더·파일을 Unity `AssetDatabase.DeleteAsset`으로 제거해 `.meta`와 빈 상위 Content 폴더도 함께 정리했다.
+- 기존3종: 구미호→야광귀→지귀 Stage 자산의 선택적 `content` 참조와 해당 타입/검사만 제거했다. 세 Stage는 기준 main에서 `content` 한 줄을 뺀 내용과 동일하며, GUID·모델 override·기본값·진행 순서·실제 패턴은 보존했다. 필요한 ID·순서·enum·GUID·3단계/2:2 범위 검사는 기존 `GameStageSettingsTests`에 합쳤다.
+- 자료 보존: Scene·Prefab·모델·Lab 코드·설정·패키지·Stage 메타 등을 포함한1,919개 비교 대상 중 Stage 자산3개만 바뀌었고 나머지 **1,916개 SHA-256이 동일**했다. 기존253개 공유 설정·프로토콜5679·Lab40/Game24는 변경하지 않았다. #392 물감 방울과 이후 main의 다른 변경도 보존했다.
+- 참조 검사: 삭제된29개 GUID를 남아 있는 직렬화 자료에서 검색해 잔여 참조0개를 확인했다. 실행 코드에 폐기 타입 참조가 없고, 개발 문서 목차의 로컬 링크와 소스·문서 `git diff --check`를 확인했다. 과거 #381 검증 기록은 도입 당시 이력으로 표시해 보존했다.
+
+| 실제 수행한 검사 | 결과 | 범위 |
+| --- | --- | --- |
+| 컴파일 및 저장 Stage 로드 | 통과 | `scriptCompilationFailed=false`, 기존3 Stage·공유 설정253개 확인 |
+| Hapio EditMode 전체 | **159/159** | 저장 에셋·설정·진행·UI 등 해당 어셈블리 검사 |
+| `LabStageYokaiTests` EditMode | **21/21** | 기존3종 기믹·시간 진행·모드 분리 |
+| `GameSceneFlowTests.SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload` PlayMode | **1/1**, 18.54초 | 저장 Home/Battle의3판 진행·초기화·결과/지도 보존 |
+| 합계 | **181/181** | 실패0·건너뜀0, 중복 실행 합산 없음 |
+
+- PlayMode 검사는 저장 Scene과 개발용 솔로를 사용하며 완료는 기존 CPU 도색 fixture로 유도했다. 실제 손 조작·투사체 명중·세 요괴의 모든 패턴 플레이·다기기 검증을 뜻하지 않는다. 현재 CLI에서 동기 PlayMode 호출은0개 실행 안내를 반환했으며, 비동기로 다시 시작한 실제 완료 결과만 위에 기록했다.
+- #393: 임시 작업 폴더는 이미 없었고 해당 로컬 브랜치는 시작점 `2ba9e806` 그대로여서 고유 커밋이 없었다. 관련 원격 브랜치·PR도 없는 상태에서 그 작업 폴더의 Git 등록과 로컬 브랜치만 제거했다. 이슈는 구현 완료가 아닌 `not planned` 사유로 종료했다. 당시 미커밋 구현이나 중단된 검사 결과를 현재 main의 구현·통과 근거로 사용하지 않았다.
+- **미실행:** 전체 Lab EditMode·전체 PlayMode·iOS/Mac 빌드/서명/설치·실기기·LAN/핫스팟 다기기·성능 측정. 신규7종 패턴은 구현하지 않았으며 현재 프로젝트에 확장 준비 구조를 남기지 않는다.
+
 
 ## 조합판 낙하·착지 수채 얼룩 원화 연결 — #392, 2026-11-02
 
@@ -3720,3 +3742,22 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 
 - 실패/skip0. 로비11개에는 `DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt`가 포함되며, 최초 #405 기록에서 미실행이던 Test Runner 경로를 이 통합에서 실제 실행했다. 3:3 방→나가기→잘못된 6인 직접Host 거부→DEV솔로 혼자 전투 시작을 검사한다. 실제 6기기 연결이나 손가락 조작을 의미하지 않는다.
 - 기존 비행/보상과 구슬124개는 앞선75079ac5 통합 실행을 사용하고, 이 후속 main은 VFX/구슬 물리·Scene·공유 설정/아트를 바꾸지 않는다. 전체 PlayMode·실기기·iOS/모바일 성능은 미실행이다. 이전 검증 이력의 당시 미실행 표시는 그대로 남긴다.
+
+
+## PR #403의 최신 main 통합·삭제 참조 재검토 — #402, 2026-11-02
+
+- 기준 main `0c9d8614`(#392 PR #408 병합) → 정리 브랜치 통합 `3de1e901`. 충돌은 이 문서의 추가 기록 한 곳이어서 #402/#392/#405의 양쪽 기록을 모두 보존했다. 중간 branch 전환은 Unity 자동 새로고침을 잠시 억제한 후 통합 직후 복구했으며 Scene/에셋을 새로 저장하지 않았다.
+- 독립 읽기 검토에서 삭제 대상은 제작용 10종 정의/카탈로그와 도구이고, 런타임의 유일한 선택적 연결은 `stage.content` 검증임을 다시 확인했다. 실제 `GameYokaiPresentation`은 보존된 `stage.yokaiVisual`을 사용한다. 삭제29 GUID의 Assets/Packages/ProjectSettings 잔여 직렬화 참조0·실행 코드의 폐기 타입 참조0을 확인했다.
+- 기존 Stage3개는 현재 main에서 `content:` 한 줄을 제거한 내용과 정확히 같고 `.meta`도 동일하다. Stage ID/순서/enum/GUID/모델/기본값과 원본 LabConfig 불변 검사는 기존 `GameStageSettingsTests`로 이관되어 실행됐다. 제작 전용 `GameYokaiCatalogTests`11개만 제거돼 이전 전체1686개에서1675개가 됐다.
+- Unity6000.6.5f1/macOS/Metal 통합 실행 결과:
+
+| 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | 1675/1675 PASS | 41.31초 |
+| 저장 Home→3스테이지→완료 지도 PlayMode | 1/1 PASS | 18.52초 |
+| 로비/솔로 PlayMode | 11/11 PASS | 19.49초 |
+| 조합판 물감 효과 PlayMode | 10/10 PASS | 0.06초 |
+
+- 합계1697개·실패/skip0이며 전체 PlayMode 실행을 의미하지 않는다. 3스테이지 검사는 저장 Home/Battle/StageResult와 개발용 솔로를 사용하고 완료만 기존 CPU 도색 fixture로 유도한다. 실제 손 조작/투사체 명중/모든 요괴 패턴/실제 다기기 연결 증거는 아니다. 로비11개에는 #405의 3:3 방 이후 DEV솔로 검사가 포함되고, 물감10개는 #392 보존 검사다.
+- 컴파일 오류 없음·현재 실행 스테이지 구미호/야광귀/지귀3개·공유 설정253개를 확인했다. 접속 규약5679/Lab40/Game24를 그대로 유지한다. PR범위 밖 작업직전 main의 tracked파일2487개 SHA-256·스태시9개가 모두 같고, Scene/Prefab·Lab 코드/아트·패키지/프로젝트 설정 변경 없음도 확인했다. 종료 후 Play OFF·Lab Scene dirty=false다.
+- 원시 검사JSON/로그/임시 TestRunner Scene은 커밋하지 않는다. iOS/Mac 빌드·서명/설치·실기기·LAN/핫스팟 다기기·성능 측정은 미실행이다. 이전 #402 준비 단계의181개와 이번 최신 main 통합 실행은 별도 기록이다.
