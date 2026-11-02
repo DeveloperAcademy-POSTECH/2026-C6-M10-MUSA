@@ -148,16 +148,27 @@ namespace C6Lab
         private float comboPopFit = 1f;
 
         /// <summary>
-        /// #414 N 콤보! 크기 배율: 숫자 높이가 내 판 북 지름 × LabConfig Combo Pop Drum Ratio(기본 0.5)가 되게 한다. 북을 못 찾으면 1(원래 크기).
+        /// #414 N 콤보! 크기 배율: "N 콤보!" 전체 높이(숫자 + 글자)가 내 판 북 지름 × LabConfig Combo Pop Drum Ratio(기본 0.35)가 되게 한다.
+        /// 원래 크기보다 커지지는 않는다(최대 1). 북을 못 찾으면 원래 크기의 0.6배. 맞춘 값은 Console에 C6_COMBO_POP으로 남긴다.
         /// </summary>
         private float ComboPopFit()
         {
-            float comboToDrumSize = network != null && network.config != null ? network.config.ComboPopDrumRatio : .5f;
-            if (comboToDrumSize <= 0f || canvas == null || network == null || network.board == null) return 1f;
-            if (!network.board.TryGetDrumScreenDiameter(out float pixels)) return 1f;
+            const float Fallback = .6f;
+            float ratio = network != null && network.config != null ? network.config.ComboPopDrumRatio : .35f;
+            if (ratio <= 0f) return 1f;
+            if (canvas == null || network == null || network.board == null) return Fallback;
+            if (!network.board.TryGetDrumScreenDiameter(out float pixels))
+            {
+                Debug.Log("C6_COMBO_POP drum=none fit=" + Fallback.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+                return Fallback;
+            }
             float canvasUnits = pixels / Mathf.Max(.01f, canvas.scaleFactor);
-            float numberHeight = slotSize * comboNumberSize;
-            return numberHeight > 0f ? Mathf.Clamp(canvasUnits * comboToDrumSize / numberHeight, .2f, 2f) : 1f;
+            float popHeight = comboPop != null ? comboPop.sizeDelta.y : slotSize * comboNumberSize * 1.3f;
+            float fit = popHeight > 0f ? Mathf.Clamp(canvasUnits * ratio / popHeight, .15f, 1f) : Fallback;
+            Debug.Log("C6_COMBO_POP drum=" + canvasUnits.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)
+                + " pop=" + popHeight.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)
+                + " fit=" + fit.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+            return fit;
         }
 
         public bool PanelVisible => panel != null && panel.gameObject.activeSelf;
