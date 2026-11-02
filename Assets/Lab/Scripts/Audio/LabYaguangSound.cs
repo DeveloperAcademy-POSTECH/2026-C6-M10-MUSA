@@ -5,7 +5,7 @@ namespace C6Lab
     /// <summary>야광귀 스테이지 효과음의 종류 (#395~). 숫자는 폴더·크기 순서다. 새 소리는 뒤에 붙인다.</summary>
     public enum LabYaguangSfx { FlashWarn, FlashGlow, FlashCount, FlashBurst, FlashTaunt, ShakeBell, ShakeBellFinal, FlashCaught,
         ComboCountOne, ComboCountTwo, ComboCountThree, ComboCountFour, ComboStart, ComboTick, ComboTickFast,
-        ComboTaunt, ComboSmallStart, ComboSmallEnd, ComboBigStart, ComboBigEnd }
+        ComboTaunt, ComboSmallStart, ComboSmallEnd, ComboBigStart, ComboBigEnd, ComboClearedFirst, ComboClearedSecond }
 
     /// <summary>
     /// 야광귀 섬광 예고와 번쩍 효과음 (#395). Host 스냅샷의 섬광 시각만 보고 소리를 낸다(화면 코드와 따로 돈다).
@@ -29,6 +29,9 @@ namespace C6Lab
     /// - SMALL 끝 (Audio/YaguangComboSmallEnd): 페널티가 끝나 공이 원래 크기로 돌아올 때 (가장 늦게 끝나는 사람 기준)
     /// - BIG 시작 (Audio/YaguangComboBigStart): 성공 뒤 BIG 배지와 부적 비가 시작될 때
     /// - BIG 끝 (Audio/YaguangComboBigEnd): 보상이 끝날 때
+    /// - 성공 대사 (Audio/YaguangComboClearedFirst "이런!", Audio/YaguangComboClearedSecond "이럴 수가!"): 콤보 성공 뒤
+    ///   Inspector 지연(기본 0.8초). 이번 라운드 첫 성공은 "이런!", 그 뒤 성공은 "이럴 수가!" (이 기기에서 본 성공 수 기준).
+    ///   "이럴 수가!" 폴더가 비어 있으면 "이런!" 파일을 쓴다.
     ///   다음 콤보 결과가 먼저 나오면 앞 결과의 남은 소리는 내지 않는다.
     /// 그 순간보다 LateSeconds 넘게 늦게 알아챈 기기(늦게 들어옴, 일시정지 뒤)는 내지 않는다. 일시정지 중·시작 대기 중에는
     /// 새로 내지 않는다. 폴더가 비어 있으면 그 소리만 조용히 넘어간다(여러 개면 무작위).
@@ -54,11 +57,14 @@ namespace C6Lab
         public const string ComboSmallEndFolder = "Audio/YaguangComboSmallEnd";
         public const string ComboBigStartFolder = "Audio/YaguangComboBigStart";
         public const string ComboBigEndFolder = "Audio/YaguangComboBigEnd";
+        public const string ComboClearedFirstFolder = "Audio/YaguangComboClearedFirst";
+        public const string ComboClearedSecondFolder = "Audio/YaguangComboClearedSecond";
         private static readonly string[] Folders = { FlashWarnFolder, FlashGlowFolder, FlashCountFolder, FlashBurstFolder,
             FlashTauntFolder, ShakeBellFolder, ShakeBellFinalFolder, FlashCaughtFolder,
             ComboCountFolder + "1", ComboCountFolder + "2", ComboCountFolder + "3", ComboCountFolder + "4",
             ComboStartFolder, ComboTickFolder, ComboTickFastFolder,
-            ComboTauntFolder, ComboSmallStartFolder, ComboSmallEndFolder, ComboBigStartFolder, ComboBigEndFolder };
+            ComboTauntFolder, ComboSmallStartFolder, ComboSmallEndFolder, ComboBigStartFolder, ComboBigEndFolder,
+            ComboClearedFirstFolder, ComboClearedSecondFolder };
         /// <summary>째깍은 그 박자보다 이 초 넘게 늦게 알아채면 건너뛴다 (스냅샷이 늦게 와도 몰아서 울리지 않게).</summary>
         public const double TickLateSeconds = .3d;
         public const double DefaultTickInterval = .5d;
@@ -91,7 +97,9 @@ namespace C6Lab
         private uint seenResultCount;
         private double resultAt;
         private int resultEffect;
-        private bool tauntDue, effectStartDue, effectEndDue;
+        private bool tauntDue, effectStartDue, effectEndDue, clearedDue;
+        // 이번 라운드에 본 콤보 성공 수 (첫 성공 "이런!", 그 뒤 "이럴 수가!")
+        private int clearedCount;
         private LabYaguangFlashHud flashHud;
         private string clockSession;
         private uint clockRound;
@@ -188,7 +196,8 @@ namespace C6Lab
                 lastTickAt = double.NegativeInfinity;
                 // 접속 직후 이미 지난 콤보 결과의 소리는 내지 않는다.
                 seenResultCount = snapshot.comboResultCount;
-                tauntDue = effectStartDue = effectEndDue = false;
+                tauntDue = effectStartDue = effectEndDue = clearedDue = false;
+                clearedCount = 0;
             }
             ObserveCombo(snapshot, now);
             ObserveComboResult(snapshot, now);
@@ -312,6 +321,8 @@ namespace C6Lab
                 bool failed = snapshot.comboResult == LabComboResult.WrongColor || snapshot.comboResult == LabComboResult.Timeout;
                 resultEffect = failed ? -1 : snapshot.comboResult == LabComboResult.Success ? 1 : 0;
                 tauntDue = failed && resultAt >= 0d;
+                clearedDue = resultEffect > 0 && resultAt >= 0d;
+                if (clearedDue) clearedCount++;
                 effectStartDue = effectEndDue = resultEffect != 0 && resultAt >= 0d
                     && EffectUntil(snapshot, resultEffect, resultAt) > resultAt + LabGourdComboHud.ResultSeconds;
             }
@@ -322,6 +333,18 @@ namespace C6Lab
             {
                 tauntDue = false;
                 if (now - tauntAt <= LateSeconds) Play(LabYaguangSfx.ComboTaunt);
+            }
+            double clearedAt = resultAt + ClearedDelay;
+            if (clearedDue && now >= clearedAt)
+            {
+                clearedDue = false;
+                if (now - clearedAt <= LateSeconds)
+                {
+                    // "이럴 수가!" 파일이 없으면 "이런!"을 그대로 쓴다 (지금은 한 파일로 통일).
+                    LabYaguangSfx line = ClearedSfx(clearedCount);
+                    if (clips != null && ClipCount(line) == 0) line = LabYaguangSfx.ComboClearedFirst;
+                    Play(line);
+                }
             }
             double startAt = resultAt + LabGourdComboHud.ResultSeconds;
             if (effectStartDue && now >= startAt)
@@ -352,6 +375,10 @@ namespace C6Lab
             }
             return until;
         }
+
+        /// <summary>이번 라운드 count번째 콤보 성공의 대사. 1번째는 "이런!", 그 뒤는 "이럴 수가!".</summary>
+        public static LabYaguangSfx ClearedSfx(int count) =>
+            count <= 1 ? LabYaguangSfx.ComboClearedFirst : LabYaguangSfx.ComboClearedSecond;
 
         /// <summary>남은 초 count를 야광귀식으로 센 소리 (1 하나, 2 둘, 3 셋, 4 넷, 5부터는 다시 하나부터).</summary>
         public static LabYaguangSfx CountSfx(int count) => LabYaguangSfx.ComboCountOne + (Mathf.Max(1, count) - 1) % 4;
@@ -393,6 +420,7 @@ namespace C6Lab
 
         private double TauntDelay => network != null && network.config != null ? network.config.YaguangFlashTauntDelaySeconds : .35d;
         private double ComboTauntDelay => network != null && network.config != null ? network.config.YaguangComboTauntDelaySeconds : .3d;
+        private double ClearedDelay => network != null && network.config != null ? network.config.YaguangComboClearedDelaySeconds : .8d;
         private double CaughtDelay => network != null && network.config != null ? network.config.YaguangFlashCaughtDelaySeconds : .2d;
 
         /// <summary>이 소리를 한 번 낸다. 소리를 냈으면 true (파일이 없으면 세기만 하고 false).</summary>
@@ -451,6 +479,8 @@ namespace C6Lab
                 case LabYaguangSfx.ComboSmallEnd: return config.YaguangComboSmallEndSoundVolume;
                 case LabYaguangSfx.ComboBigStart: return config.YaguangComboBigStartSoundVolume;
                 case LabYaguangSfx.ComboBigEnd: return config.YaguangComboBigEndSoundVolume;
+                case LabYaguangSfx.ComboClearedFirst:
+                case LabYaguangSfx.ComboClearedSecond: return config.YaguangComboClearedSoundVolume;
                 default: return config.YaguangFlashBurstSoundVolume;
             }
         }

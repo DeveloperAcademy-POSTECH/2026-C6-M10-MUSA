@@ -23,6 +23,9 @@ namespace C6Lab
     /// - 구미호 피버타임 (#334, #351): 남은 시간이 피버 시간(기본 20초)이 된 순간부터 Resources/Audio/GumihoFever 폴더의 곡을
     ///   야광귀 피버와 똑같이 튼다 (크기는 LabConfig의 Gumiho Fever Bgm Volume). 폴더가 비어 있으면 야광귀 피버 곡을 쓴다.
     ///   구미호 피버는 Host 시각(feverTimeAt)으로 정해지고 구미호 스테이지에만 있다.
+    /// - 야광귀 콤보 BIG/SMALL 톤: BIG 배지가 떠 있는 동안 전투 BGM이 Inspector 반음(기본 2)만큼 높아지고, SMALL 동안
+    ///   그만큼 낮아진다(AudioSource.pitch라 빠르기도 같이 바뀐다). 배지가 나오고 사라지는 때(LabYaguangSound의 SMALL/BIG
+    ///   시작/끝 소리와 같은 때)에 Inspector 초(기본 0.3초)에 걸쳐 바뀐다. 모든 기기. 피버 곡은 바꾸지 않는다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabBattleBgm : MonoBehaviour
@@ -59,6 +62,7 @@ namespace C6Lab
         // 이번 라운드에 구미호 크기로 스테이지 곡(구미호 #351, 땅따먹기 #409)을 트는지, 지금 피버가 구미호 피버인지 (#351)
         private bool gumihoBgm, gumihoFever, yaguangBgm;
         private float feverBlend; // 0 = 전투 BGM, 1 = 피버 곡
+        private float toneSemitones; // 지금 전투 BGM 높이 (반음, 콤보 BIG/SMALL)
         private double seenServerTime = -1d;
         private float seenAt;
 
@@ -69,6 +73,8 @@ namespace C6Lab
         /// <summary>지금 틀고 있는 전투 BGM과 피버 곡 (테스트·확인용, #351)</summary>
         public AudioClip BattleClip => source != null ? source.clip : null;
         public AudioClip FeverClip => feverSource != null ? feverSource.clip : null;
+        /// <summary>지금 전투 BGM 높이 (반음, 테스트·확인용). BIG이면 +, SMALL이면 -</summary>
+        public float ToneSemitones => toneSemitones;
 
         // 기본 크기(LabConfig: Inspector·DEV, 구미호 전투 BGM은 Inspector) × 이 기기의 BGM 설정(일시정지 메뉴)
         private float BaseVolume => network == null || network.config == null ? volume
@@ -216,6 +222,7 @@ namespace C6Lab
                     playingRound = round;
                     fading = false;
                     StopFever();
+                    SetTone(0f);
                     AudioClip stageClip = snapshot.teamTerritory ? (territoryClip != null ? territoryClip : gumihoClip)
                         : network.GameStageYokai == LabStageYokai.Gumiho ? gumihoClip : null;
                     gumihoBgm = stageClip != null;
@@ -249,6 +256,7 @@ namespace C6Lab
                     if (!source.isPlaying) source.Play();
                 }
                 DriveFever(snapshot);
+                if (!snapshot.paused) DriveTone(snapshot, ServerNow(snapshot), Time.unscaledDeltaTime);
                 return;
             }
 
@@ -264,10 +272,50 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// 콤보 결과로 전투 BGM 높이를 정한다. 목표 높이(ComboToneSemitones)까지 seconds초에 걸쳐 옮긴다. 검사에서 시각을 정해 부를 수 있게 공개한다.
+        /// </summary>
+        public void DriveTone(LabSnapshot snapshot, double now, float deltaTime)
+        {
+            LabConfig config = network != null ? network.config : null;
+            float big = config != null ? config.YaguangComboBigBgmSemitones : 2f;
+            float small = config != null ? config.YaguangComboSmallBgmSemitones : 2f;
+            float seconds = config != null ? config.YaguangComboBgmToneSeconds : .3f;
+            float target = ComboToneSemitones(snapshot, now, big, small);
+            float range = Mathf.Max(Mathf.Abs(big), Mathf.Abs(small), Mathf.Abs(toneSemitones - target));
+            float step = seconds <= 0f ? float.PositiveInfinity : range * Mathf.Max(0f, deltaTime) / seconds;
+            SetTone(Mathf.MoveTowards(toneSemitones, target, step));
+        }
+
+        /// <summary>
+        /// 콤보 결과에 맞는 전투 BGM 높이 (반음). 성공이면 BIG 배지가 떠 있는 동안 +big, 실패(틀린 색/시간 초과)면 SMALL 배지가
+        /// 떠 있는 동안 -small, 그 밖에는 0. 배지는 결과 문구가 사라진 때(결과 + LabGourdComboHud.ResultSeconds)부터 효과가 가장 늦게
+        /// 끝나는 때(LabYaguangSound.EffectUntil)까지 떠 있다.
+        /// </summary>
+        public static float ComboToneSemitones(LabSnapshot snapshot, double now, float big, float small)
+        {
+            if (snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.comboResultCount == 0
+                || snapshot.comboResultAt < 0d) return 0f;
+            bool failed = snapshot.comboResult == LabComboResult.WrongColor || snapshot.comboResult == LabComboResult.Timeout;
+            int effect = failed ? -1 : snapshot.comboResult == LabComboResult.Success ? 1 : 0;
+            if (effect == 0) return 0f;
+            double start = snapshot.comboResultAt + LabGourdComboHud.ResultSeconds;
+            double end = LabYaguangSound.EffectUntil(snapshot, effect, snapshot.comboResultAt);
+            if (now < start || now >= end) return 0f;
+            return effect > 0 ? Mathf.Clamp(big, 0f, 12f) : -Mathf.Clamp(small, 0f, 12f);
+        }
+
+        private void SetTone(float semitones)
+        {
+            toneSemitones = semitones;
+            if (source != null) source.pitch = Mathf.Pow(2f, semitones / 12f);
+        }
+
         private void StopNow()
         {
             if (source.isPlaying || fading) source.Stop();
             StopFever();
+            SetTone(0f);
             fading = false;
             source.volume = TargetVolume;
             if (network == null || network.Snapshot == null) playingRound = null;

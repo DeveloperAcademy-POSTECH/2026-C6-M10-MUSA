@@ -946,6 +946,17 @@ namespace C6Lab
         [SerializeField, Range(0f, 12f)] private float smallHitPitchSemitones = 6f;
         [Tooltip("BIG 중 던진 큰 공이 맞을 때 징 크기 (Resources/Audio/FiveColorHit, 던진 사람 기기)")]
         [SerializeField, Range(0f, 1f)] private float bigHitSoundVolume = .8f;
+        [Header("야광귀 콤보 BIG/SMALL BGM 톤과 성공 대사 (Inspector 전용)")]
+        [Tooltip("BIG 배지가 떠 있는 동안 전투 BGM을 높이는 반음 (2 = 한 음, 0이면 그대로, 모든 기기)")]
+        [SerializeField, Range(0f, 12f)] private float yaguangComboBigBgmSemitones = 2f;
+        [Tooltip("SMALL 배지가 떠 있는 동안 전투 BGM을 낮추는 반음 (2 = 한 음, 0이면 그대로, 모든 기기)")]
+        [SerializeField, Range(0f, 12f)] private float yaguangComboSmallBgmSemitones = 2f;
+        [Tooltip("BGM 높이가 바뀌는 데 걸리는 초 (0이면 바로)")]
+        [SerializeField, Range(0f, 2f)] private float yaguangComboBgmToneSeconds = .3f;
+        [Tooltip("콤보 성공 뒤 야광귀 대사(이번 라운드 첫 성공 \"이런!\", 그 뒤 \"이럴 수가!\")를 내기까지 지연 (초, 모든 기기)")]
+        [SerializeField, Range(0f, 3f)] private float yaguangComboClearedDelaySeconds = .8f;
+        [Tooltip("콤보 성공 야광귀 대사 크기 (Audio/YaguangComboClearedFirst, YaguangComboClearedSecond)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboClearedSoundVolume = .9f;
         [Header("야광귀 콤보 예고와 피버 신호 (#414, Inspector 전용)")]
         [Tooltip("콤보 예고(넷/셋/둘/하나) 동안 화면 가장자리가 어두워지는 최대 진하기 (0이면 끔, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboWarningShade = .5f;
@@ -1415,6 +1426,11 @@ namespace C6Lab
         public float YaguangFeverDrumPulseRate => Mathf.Clamp(Finite(yaguangFeverDrumPulseRate, 1.6f), .5f, 4f);
         public float YaguangFeverTapComboSeconds => Mathf.Clamp(Finite(yaguangFeverTapComboSeconds, .8f), .2f, 2f);
         public float ComboPopDrumRatio => Mathf.Clamp(Finite(comboPopDrumRatio, .35f), 0f, 2f);
+        public float YaguangComboBigBgmSemitones => Mathf.Clamp(Finite(yaguangComboBigBgmSemitones, 2f), 0f, 12f);
+        public float YaguangComboSmallBgmSemitones => Mathf.Clamp(Finite(yaguangComboSmallBgmSemitones, 2f), 0f, 12f);
+        public float YaguangComboBgmToneSeconds => Mathf.Clamp(Finite(yaguangComboBgmToneSeconds, .3f), 0f, 2f);
+        public float YaguangComboClearedDelaySeconds => Mathf.Clamp(Finite(yaguangComboClearedDelaySeconds, .8f), 0f, 3f);
+        public float YaguangComboClearedSoundVolume => Mathf.Clamp01(Finite(yaguangComboClearedSoundVolume, .9f));
         public float YaguangComboWarningShade => Mathf.Clamp01(Finite(yaguangComboWarningShade, .5f));
         public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));
         public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 4f), 0f, 10f);
