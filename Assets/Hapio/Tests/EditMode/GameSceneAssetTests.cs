@@ -129,7 +129,7 @@ namespace Hapio.Tests
             WithScene("Assets/Lab/Scenes/Lab.unity", source => WithScene(GameScenePaths.Battle, battle =>
             {
                 LabBackgroundStudio original = All<LabBackgroundStudio>(source).Single();
-                LabBackgroundStudio studio = All<LabBackgroundStudio>(battle).Single();
+                LabBackgroundStudio studio = All<GameStageBackgrounds>(battle).Single().defaultBackground.studio;
                 GameBattleBindings bindings = All<GameBattleBindings>(battle).Single();
                 Assert.That(studio.target, Is.SameAs(bindings.target.transform));
                 Assert.That(studio.collisionFloor, Is.SameAs(bindings.battleFloor.transform));
@@ -155,7 +155,7 @@ namespace Hapio.Tests
                 }
                 Dictionary<string, LabEnvironmentCard> expectedCards = All<LabEnvironmentCard>(source)
                     .ToDictionary(card => HierarchyPath(card.transform), card => card);
-                LabEnvironmentCard[] actualCards = All<LabEnvironmentCard>(battle);
+                LabEnvironmentCard[] actualCards = studio.GetComponentsInChildren<LabEnvironmentCard>(true);
                 Assert.That(actualCards.Length, Is.GreaterThan(0), "The Battle must contain the saved 3D environment cards.");
                 Assert.That(actualCards.Length, Is.EqualTo(expectedCards.Count));
                 foreach (LabEnvironmentCard card in actualCards)

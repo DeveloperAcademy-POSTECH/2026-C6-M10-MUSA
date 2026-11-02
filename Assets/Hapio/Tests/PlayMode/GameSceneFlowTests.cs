@@ -957,6 +957,11 @@ namespace Hapio.Tests
                     Assert.That(session.CanDeveloperAdvanceStage, Is.False, "DEV skip requires an explicitly paused battle.");
                     Assert.That(session.DeveloperNextStage(), Is.False);
                     Assert.That(session.State.stageIndex, Is.EqualTo(stage));
+                    var scenery = Object.FindFirstObjectByType<GameStageBackgrounds>();
+                    Assert.That(scenery, Is.Not.Null);
+                    Assert.That(scenery.AppliedStage, Is.EqualTo(stage));
+                    Assert.That(scenery.defaultBackground.studio.gameObject.activeInHierarchy, Is.EqualTo(stage != 2));
+                    Assert.That(scenery.Resolve(2).studio.gameObject.activeInHierarchy, Is.EqualTo(stage == 2));
 
                     network.Generate();
                     yield return Until(() => network.Snapshot.players.Single().generatedTotal == 1,
