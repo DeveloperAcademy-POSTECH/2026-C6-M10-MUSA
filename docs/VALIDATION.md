@@ -3805,3 +3805,14 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 전체 PlayMode는 실행하지 않았다. 한 Editor 프로세스에서는 Host 1개만 띄울 수 있어 실제 6명 접속은 자동 검사로 재현하지 못했다.
 - **종료 상태:** Play OFF, Home Scene 열림, dirty=false, 컴파일 오류 없음. 중단된 실행이 남긴 Test Runner 임시 Scene은 남아 있지 않음을 확인했다.
 - **미실행:** 6대(3:3)·2대(1:1) 실제 연결, Mac 여러 앱, iPhone/iPad 실기기, LAN/핫스팟. 실기기 검증은 main 병합 후 사용자가 직접 6대 3:3 시작·P6 칠 동기화를 확인하기로 했다. 확인 결과는 그때 이 절에 추가하며, 그 전까지 PASS로 쓰지 않는다.
+
+## 2026-11-02 야광귀 박 전달용 에셋
+
+- 범위: `Assets/Hapio/Art/Yagwanggwi`의 FBX, 텍스처, URP 재질, 애니메이션, 미리보기 프리팹 및 전달 문서. 게임 Scene·StageDefinition·공통 WhiteGourd는 변경하지 않음.
+- Unity 6000.6.5f1에서 임포트 확인: 4초 클립 1개, 커브 250개, 바인딩 경로 누락 0개. Renderer 20개, 누락/오류 재질 0개, BaseColor 텍스처 슬롯 7개.
+- 분리된 Preview Scene에서 0/1/3초 샘플 렌더링으로 색상·뚜껑 개폐·요괴 등장 확인.
+- 게임 도색·충돌·네트워크 통합, EditMode/PlayMode 테스트, 실기기 검증은 수행하지 않음. Blender 전용 미세 표면 및 Image_2의 URP 변환 한계는 에셋 HANDOFF.md에 명시.
+
+### 야광귀 박 8초 수정본 교체
+
+- 기존 야광귀 FBX/추출 클립을 24fps, 1–193프레임의 8초 버전으로 교체. meta GUID 유지. Unity에서 FBX 8초·추출 클립 8초·클립 1개·바인딩 경로 누락 0개 확인. Controller 상태 Speed=1. 게임 통합/실기기/자동 테스트는 미실행.
