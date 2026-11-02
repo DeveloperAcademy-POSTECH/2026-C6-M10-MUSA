@@ -88,6 +88,14 @@ namespace C6Lab
 
         public void Reset() => sent.Clear();
 
+        /// <summary>
+        /// A non-checkpoint frame with no changed or removed orb. Its header alone can wait for the next
+        /// 100 ms timer frame, so an immediate publish leaves such a frame out (#428).
+        /// </summary>
+        public static bool IsEmptyDelta(LabBoardFrame frame) => frame != null && !frame.checkpoint
+            && (frame.states == null || frame.states.Length == 0)
+            && (frame.removedIds == null || frame.removedIds.Length == 0);
+
         public LabBoardFrame Build(LabSnapshot snapshot, ulong recipient, long sequence,
             ulong modelRevision, bool force = false)
         {

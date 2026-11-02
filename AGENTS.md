@@ -102,7 +102,14 @@
 - 기존0~252는 유지하며 공급 간격/초기 수량/상한/발화점 거리253~256을 더한 **257개·5680/Lab41/Game25**가 #412 당시 묶음이며 현재 기준은 아래 #417을 따른다. 위 과거 규약 기록은 도입 당시 값이며 이전 앱과 혼용하지 않는다. `JIGWI_SCREEN_PATTERNS.md`·`DEVELOPER_MODE_PARAMETER_SPEC.md`를 따르고 수행한 검사만 VALIDATION에 기록한다.
 
 
-## #417 3:3 땅따먹기 6인 시작 — 최신 호환 기준
+## #417 3:3 땅따먹기 6인 시작
 
 - 조합판 프레임·행동 결과의 플레이어 상한 `LabBoardReplica.MaximumPlayers`는 모든 방 인원의 패킷 상한인 `LabModel.TerritoryMaximumParticipants`(6)다. 기본 모드 2~5인 제한은 `LabModel.ValidRoomSize`가 지키며 이 상한으로 대신하지 않는다. 지귀 상태 검사는 기본 모드 전용이라 `LabModel.MaximumParticipants`(5)를 유지한다. Guest 도색 수신(`LabPaintReceiver`)의 칠한 사람 번호 상한도 `LabPaintSurface.MaxPainterSlot`(6)이다. P6 칠을 5로 거절하면 체크포인트 재요청이 끝나지 않아 Guest 화면이 멈춘다.
-- 공유 설정 257개·인덱스는 그대로이며 최신 묶음은 **5681/Lab42/Game26**이다. 6명을 거절하던 5680 앱과 혼용하지 않는다. 실행한 검사만 `docs/VALIDATION.md`에 기록하고 6대 실기기 시작은 별도로 확인한다.
+- 공유 설정 257개·인덱스는 그대로이며 #417 당시 묶음은 **5681/Lab42/Game26**이었다(현재 기준은 아래 #428). 6명을 거절하던 5680 앱과 혼용하지 않는다. 실행한 검사만 `docs/VALIDATION.md`에 기록하고 6대 실기기 시작은 별도로 확인한다.
+
+
+## #428 통신 패킷 봉투와 조합판 프레임 전송 — 최신 호환 기준
+
+- `LabNetworkPacket`에 메시지 본문을 타입 필드로 두지 않는다. JsonUtility는 null인 클래스 필드를 기본값 객체로 써서 모든 패킷이 그 타입의 사본을 실어 가므로, 행동 결과(`LabActionReceipt`)와 도색 프레임(`LabPaintFrame`)은 `payload` JSON 문자열로만 보내고 `LabPacketPayload.Encode/Decode`로 다룬다. `LabBulkPayload`도 같다. 값을 넣는 곳이 없던 `snapshot`·`boardFrame` 필드는 지웠다. 본문 없는 패킷은 약 1 KB다(측정 937 B, 검사 상한 1,100 B; 이전 4,189 B).
+- 승인된 행동 직후 `HandleBoardAction`이 보내는 조합판 프레임(`PublishOwnerBoards(..., skipEmpty: true)`)만 변경·제거 구슬이 없고 체크포인트가 아닌 수신자를 건너뛴다. 건너뛴 프레임은 순번을 소비하지 않는다(`PeekBoardSequence`/`CommitBoardSequence`). `PublishSnapshot`이 보내는 프레임(100 ms 타이머, 명중·시작·일시정지/재개·섬광 등 즉시 발행)과 5초 체크포인트는 그대로 전원에게 간다. 재개 스냅샷은 정지 중 헤더와 같은 serverTime을 가지므로 헤더 프레임을 생략하면 Guest가 다음 타이머 프레임까지 정지 상태로 남는다.
+- 공유 설정 257개·인덱스는 그대로이며 최신 묶음은 **5682/Lab43/Game27**이다. 이전 봉투 형식의 앱과 혼용하지 않는다. 실행한 검사와 패킷 크기 측정만 `docs/VALIDATION.md`에 기록한다.
