@@ -266,5 +266,91 @@ namespace C6Lab.Tests
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboTick), Is.EqualTo("Audio/YaguangComboTick"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboTickFast), Is.EqualTo("Audio/YaguangComboTickFast"));
         }
+
+        // #398: 50초에 콤보 결과. 효과는 팀 전체가 받아 65초에 끝난다 (Other는 64초).
+        private static LabSnapshot ComboResult(LabComboResult result)
+        {
+            bool failed = result != LabComboResult.Success;
+            return new LabSnapshot
+            {
+                sessionId = "yaguang", round = 1, phase = LabPhase.Playing,
+                comboResultCount = 1, comboResult = result, comboResultAt = 50d,
+                players = new[]
+                {
+                    new LabPlayerState { id = Me, comboPenaltyUntil = failed ? 65d : 0d, comboRewardUntil = failed ? 0d : 65d },
+                    new LabPlayerState { id = Other, comboPenaltyUntil = failed ? 64d : 0d, comboRewardUntil = failed ? 0d : 64d }
+                }
+            };
+        }
+
+        private static void Watch(LabYaguangSound sound, LabSnapshot snapshot, double from, double to)
+        {
+            for (double t = from; t <= to + 1e-9; t += .05d) sound.ObserveFlash(snapshot, t, Me);
+        }
+
+        [Test]
+        public void AFailedComboGetsAMelongThenSmallStartsAndEnds()
+        {
+            LabYaguangSound sound = Sound();
+            sound.ObserveFlash(new LabSnapshot { sessionId = "yaguang", round = 1, phase = LabPhase.Playing }, 49.9d, Me);
+            LabSnapshot snapshot = ComboResult(LabComboResult.Timeout);
+            Watch(sound, snapshot, 50d, 50.25d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTaunt), Is.Zero, "메롱 waits for the fail sound.");
+            Watch(sound, snapshot, 50.3d, 51.5d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTaunt), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboSmallStart), Is.Zero, "SMALL waits for its badge.");
+            Watch(sound, snapshot, 51.6d, 64.9d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboSmallStart), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboSmallEnd), Is.Zero, "It ends when the last one gets back to size.");
+            Watch(sound, snapshot, 65d, 70d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboSmallEnd), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTaunt), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboBigStart) + sound.PlayCount(LabYaguangSfx.ComboBigEnd), Is.Zero);
+        }
+
+        [Test]
+        public void ASuccessfulComboStartsAndEndsBigWithoutAMelong()
+        {
+            LabYaguangSound sound = Sound();
+            sound.ObserveFlash(new LabSnapshot { sessionId = "yaguang", round = 1, phase = LabPhase.Playing }, 49.9d, Me);
+            LabSnapshot snapshot = ComboResult(LabComboResult.Success);
+            Watch(sound, snapshot, 50d, 70d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTaunt), Is.Zero);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboBigStart), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboBigEnd), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboSmallStart) + sound.PlayCount(LabYaguangSfx.ComboSmallEnd), Is.Zero);
+        }
+
+        [Test]
+        public void ANewResultDropsTheLastOnesEndAndALateJoinerHearsNothingOld()
+        {
+            LabYaguangSound sound = Sound();
+            sound.ObserveFlash(new LabSnapshot { sessionId = "yaguang", round = 1, phase = LabPhase.Playing }, 49.9d, Me);
+            LabSnapshot snapshot = ComboResult(LabComboResult.WrongColor);
+            Watch(sound, snapshot, 50d, 55d);
+            // 다음 콤보 성공: SMALL은 소리 없이 끝나고 BIG이 시작된다.
+            snapshot.comboResultCount = 2; snapshot.comboResult = LabComboResult.Success; snapshot.comboResultAt = 56d;
+            foreach (LabPlayerState player in snapshot.players) { player.comboPenaltyUntil = 56d; player.comboRewardUntil = 71d; }
+            Watch(sound, snapshot, 56d, 72d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboSmallEnd), Is.Zero);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboBigStart), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboBigEnd), Is.EqualTo(1));
+
+            LabYaguangSound late = Sound();
+            LabSnapshot old = ComboResult(LabComboResult.Timeout);
+            for (double t = 50.5d; t <= 70d; t += .05d) late.ObserveFlash(old, t, Me);
+            Assert.That(late.PlayCount(LabYaguangSfx.ComboTaunt) + late.PlayCount(LabYaguangSfx.ComboSmallStart)
+                + late.PlayCount(LabYaguangSfx.ComboSmallEnd), Is.Zero, "A screen that joins after the result stays quiet.");
+        }
+
+        [Test]
+        public void TheComboResultFoldersAreUnderResourcesAudio()
+        {
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboTaunt), Is.EqualTo("Audio/YaguangComboTaunt"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboSmallStart), Is.EqualTo("Audio/YaguangComboSmallStart"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboSmallEnd), Is.EqualTo("Audio/YaguangComboSmallEnd"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboBigStart), Is.EqualTo("Audio/YaguangComboBigStart"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboBigEnd), Is.EqualTo("Audio/YaguangComboBigEnd"));
+        }
     }
 }

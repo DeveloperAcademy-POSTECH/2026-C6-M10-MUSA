@@ -4,7 +4,8 @@ namespace C6Lab
 {
     /// <summary>야광귀 스테이지 효과음의 종류 (#395~). 숫자는 폴더·크기 순서다. 새 소리는 뒤에 붙인다.</summary>
     public enum LabYaguangSfx { FlashWarn, FlashGlow, FlashCount, FlashBurst, FlashTaunt, ShakeBell, ShakeBellFinal, FlashCaught,
-        ComboCountOne, ComboCountTwo, ComboCountThree, ComboCountFour, ComboStart, ComboTick, ComboTickFast }
+        ComboCountOne, ComboCountTwo, ComboCountThree, ComboCountFour, ComboStart, ComboTick, ComboTickFast,
+        ComboTaunt, ComboSmallStart, ComboSmallEnd, ComboBigStart, ComboBigEnd }
 
     /// <summary>
     /// 야광귀 섬광 예고와 번쩍 효과음 (#395). Host 스냅샷의 섬광 시각만 보고 소리를 낸다(화면 코드와 따로 돈다).
@@ -22,6 +23,13 @@ namespace C6Lab
     /// - 콤보 시작 (Audio/YaguangComboStart): 4칸 색이 공개되는 순간 꽹과리 "깽!"
     /// - 제한 시간 (Audio/YaguangComboTick): 콤보가 나온 뒤 Inspector 간격(기본 0.5초)마다 시계 째깍. 남은 시간이 Inspector 초
     ///   (기본 3초) 이하면 (Audio/YaguangComboTickFast) 더 짧은 간격(기본 0.25초)마다 빠른 째깍. 콤보가 끝나면(성공/실패) 바로 멈춘다.
+    /// #398 박 색상 콤보 결과 (모든 기기, 콤보는 팀이 같이 하므로 누가 받든 모두 듣는다):
+    /// - "메롱~" 대사 (Audio/YaguangComboTaunt): 콤보 실패(틀린 색/시간 초과) 뒤 Inspector 지연(기본 0.3초), 실패 소리 다음에
+    /// - SMALL 시작 (Audio/YaguangComboSmallStart): 결과 문구가 사라지고 SMALL 배지가 나오는 때 (결과 + LabGourdComboHud.ResultSeconds)
+    /// - SMALL 끝 (Audio/YaguangComboSmallEnd): 페널티가 끝나 공이 원래 크기로 돌아올 때 (가장 늦게 끝나는 사람 기준)
+    /// - BIG 시작 (Audio/YaguangComboBigStart): 성공 뒤 BIG 배지와 부적 비가 시작될 때
+    /// - BIG 끝 (Audio/YaguangComboBigEnd): 보상이 끝날 때
+    ///   다음 콤보 결과가 먼저 나오면 앞 결과의 남은 소리는 내지 않는다.
     /// 그 순간보다 LateSeconds 넘게 늦게 알아챈 기기(늦게 들어옴, 일시정지 뒤)는 내지 않는다. 일시정지 중·시작 대기 중에는
     /// 새로 내지 않는다. 폴더가 비어 있으면 그 소리만 조용히 넘어간다(여러 개면 무작위).
     /// 크기는 LabConfig Inspector의 소리별 크기 × 일시정지 메뉴 효과음 설정.
@@ -41,10 +49,16 @@ namespace C6Lab
         public const string ComboStartFolder = "Audio/YaguangComboStart";
         public const string ComboTickFolder = "Audio/YaguangComboTick";
         public const string ComboTickFastFolder = "Audio/YaguangComboTickFast";
+        public const string ComboTauntFolder = "Audio/YaguangComboTaunt";
+        public const string ComboSmallStartFolder = "Audio/YaguangComboSmallStart";
+        public const string ComboSmallEndFolder = "Audio/YaguangComboSmallEnd";
+        public const string ComboBigStartFolder = "Audio/YaguangComboBigStart";
+        public const string ComboBigEndFolder = "Audio/YaguangComboBigEnd";
         private static readonly string[] Folders = { FlashWarnFolder, FlashGlowFolder, FlashCountFolder, FlashBurstFolder,
             FlashTauntFolder, ShakeBellFolder, ShakeBellFinalFolder, FlashCaughtFolder,
             ComboCountFolder + "1", ComboCountFolder + "2", ComboCountFolder + "3", ComboCountFolder + "4",
-            ComboStartFolder, ComboTickFolder, ComboTickFastFolder };
+            ComboStartFolder, ComboTickFolder, ComboTickFastFolder,
+            ComboTauntFolder, ComboSmallStartFolder, ComboSmallEndFolder, ComboBigStartFolder, ComboBigEndFolder };
         /// <summary>째깍은 그 박자보다 이 초 넘게 늦게 알아채면 건너뛴다 (스냅샷이 늦게 와도 몰아서 울리지 않게).</summary>
         public const double TickLateSeconds = .3d;
         public const double DefaultTickInterval = .5d;
@@ -72,6 +86,11 @@ namespace C6Lab
         private int lastComboCount;
         private uint seenComboCount;
         private double lastTickAt = double.NegativeInfinity;
+        // #398 콤보 결과: 마지막으로 본 결과 순번, 그 결과 시각과 효과(-1 SMALL, 1 BIG, 0 없음), 아직 낼 소리
+        private uint seenResultCount;
+        private double resultAt;
+        private int resultEffect;
+        private bool tauntDue, effectStartDue, effectEndDue;
         private LabYaguangFlashHud flashHud;
         private string clockSession;
         private uint clockRound;
@@ -166,8 +185,12 @@ namespace C6Lab
                 lastComboCount = 0;
                 seenComboCount = snapshot.comboCount;
                 lastTickAt = double.NegativeInfinity;
+                // 접속 직후 이미 지난 콤보 결과의 소리는 내지 않는다.
+                seenResultCount = snapshot.comboResultCount;
+                tauntDue = effectStartDue = effectEndDue = false;
             }
             ObserveCombo(snapshot, now);
+            ObserveComboResult(snapshot, now);
 
             // 번쩍: 섬광 수가 늘었고 이번에 내가 맞았으면 (진동과 같은 기준, 1초 넘게 지난 섬광은 내지 않음).
             if (snapshot.flashCount < seenFlashCount) seenFlashCount = snapshot.flashCount;
@@ -275,6 +298,60 @@ namespace C6Lab
             if (now - tick <= TickLateSeconds) Play(fast ? LabYaguangSfx.ComboTickFast : LabYaguangSfx.ComboTick);
         }
 
+        /// <summary>
+        /// 박 색상 콤보 결과 소리 (#398): 실패 뒤 "메롱~", SMALL/BIG 배지가 나올 때와 끝날 때. 모든 기기에서 같은 Host 시각으로 낸다.
+        /// </summary>
+        private void ObserveComboResult(LabSnapshot snapshot, double now)
+        {
+            if (snapshot.comboResultCount < seenResultCount) seenResultCount = snapshot.comboResultCount;
+            if (snapshot.comboResultCount > seenResultCount)
+            {
+                seenResultCount = snapshot.comboResultCount;
+                resultAt = snapshot.comboResultAt;
+                bool failed = snapshot.comboResult == LabComboResult.WrongColor || snapshot.comboResult == LabComboResult.Timeout;
+                resultEffect = failed ? -1 : snapshot.comboResult == LabComboResult.Success ? 1 : 0;
+                tauntDue = failed && resultAt >= 0d;
+                effectStartDue = effectEndDue = resultEffect != 0 && resultAt >= 0d
+                    && EffectUntil(snapshot, resultEffect, resultAt) > resultAt + LabGourdComboHud.ResultSeconds;
+            }
+            if (snapshot.paused) return;
+
+            double tauntAt = resultAt + ComboTauntDelay;
+            if (tauntDue && now >= tauntAt)
+            {
+                tauntDue = false;
+                if (now - tauntAt <= LateSeconds) Play(LabYaguangSfx.ComboTaunt);
+            }
+            double startAt = resultAt + LabGourdComboHud.ResultSeconds;
+            if (effectStartDue && now >= startAt)
+            {
+                effectStartDue = false;
+                if (now - startAt <= LateSeconds) Play(resultEffect < 0 ? LabYaguangSfx.ComboSmallStart : LabYaguangSfx.ComboBigStart);
+            }
+            if (!effectEndDue) return;
+            double endAt = EffectUntil(snapshot, resultEffect, resultAt);
+            if (now < endAt) return;
+            effectEndDue = false;
+            if (now - endAt <= LateSeconds && endAt > startAt)
+                Play(resultEffect < 0 ? LabYaguangSfx.ComboSmallEnd : LabYaguangSfx.ComboBigEnd);
+        }
+
+        /// <summary>
+        /// 결과 시각(at) 뒤에 효과(-1 SMALL, 1 BIG)가 가장 늦게 끝나는 시각. 그 효과를 받은 사람이 없으면 at.
+        /// </summary>
+        public static double EffectUntil(LabSnapshot snapshot, int effect, double at)
+        {
+            double until = at;
+            if (snapshot == null || snapshot.players == null || effect == 0) return until;
+            foreach (LabPlayerState player in snapshot.players)
+            {
+                if (player == null) continue;
+                double end = effect < 0 ? player.comboPenaltyUntil : player.comboRewardUntil;
+                if (end > until) until = end;
+            }
+            return until;
+        }
+
         /// <summary>남은 초 count를 야광귀식으로 센 소리 (1 하나, 2 둘, 3 셋, 4 넷, 5부터는 다시 하나부터).</summary>
         public static LabYaguangSfx CountSfx(int count) => LabYaguangSfx.ComboCountOne + (Mathf.Max(1, count) - 1) % 4;
 
@@ -314,6 +391,7 @@ namespace C6Lab
         }
 
         private double TauntDelay => network != null && network.config != null ? network.config.YaguangFlashTauntDelaySeconds : .35d;
+        private double ComboTauntDelay => network != null && network.config != null ? network.config.YaguangComboTauntDelaySeconds : .3d;
         private double CaughtDelay => network != null && network.config != null ? network.config.YaguangFlashCaughtDelaySeconds : .2d;
 
         /// <summary>이 소리를 한 번 낸다. 소리를 냈으면 true (파일이 없으면 세기만 하고 false).</summary>
@@ -367,6 +445,11 @@ namespace C6Lab
                 case LabYaguangSfx.ComboStart: return config.YaguangComboStartSoundVolume;
                 case LabYaguangSfx.ComboTick: return config.YaguangComboTickSoundVolume;
                 case LabYaguangSfx.ComboTickFast: return config.YaguangComboTickFastSoundVolume;
+                case LabYaguangSfx.ComboTaunt: return config.YaguangComboTauntSoundVolume;
+                case LabYaguangSfx.ComboSmallStart: return config.YaguangComboSmallStartSoundVolume;
+                case LabYaguangSfx.ComboSmallEnd: return config.YaguangComboSmallEndSoundVolume;
+                case LabYaguangSfx.ComboBigStart: return config.YaguangComboBigStartSoundVolume;
+                case LabYaguangSfx.ComboBigEnd: return config.YaguangComboBigEndSoundVolume;
                 default: return config.YaguangFlashBurstSoundVolume;
             }
         }

@@ -42,7 +42,8 @@ namespace C6Lab
         public static string CountWord(int n) => CountWords[(Mathf.Max(1, n) - 1) % CountWords.Length];
 
         private const int TextureSize = 96;
-        private const float ResultSeconds = 1.6f;
+        /// <summary>콤보 결과 문구가 떠 있는 초. 이 뒤에 SMALL/BIG 배지가 나온다 (#398 효과음도 이 시각에 맞춘다).</summary>
+        public const float ResultSeconds = 1.6f;
         private static readonly Color32 InkColor = new Color32(43, 36, 32, 255);
         private static readonly Color PanelColor = new Color(1f, .98f, .93f, .92f);
         private static readonly Color ClearColor = new Color(.98f, .78f, .16f);
