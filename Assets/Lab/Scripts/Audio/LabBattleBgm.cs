@@ -87,7 +87,7 @@ namespace C6Lab
             gumihoFeverClip = FirstClip(GumihoFeverClipFolder);
             yaguangClip = FirstClip(YaguangClipFolder);
             territoryClip = FirstClip(TerritoryClipFolder);
-            source =gameObject.AddComponent<AudioSource>();
+            source = gameObject.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.loop = true;
             source.spatialBlend = 0f;
