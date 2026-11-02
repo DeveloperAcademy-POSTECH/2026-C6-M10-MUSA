@@ -45,33 +45,48 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ASmallBallFromTheComboPenaltyHitsWithTheSmallSound()
+        public void ABallThrownSmallHitsWithTheSameSoundPitchedUp()
         {
-            var snapshot = new LabSnapshot
-            {
-                serverTime = 60d,
-                players = new[]
-                {
-                    new LabPlayerState { id = 1ul, comboPenaltyUntil = 65d },
-                    new LabPlayerState { id = 2ul, comboPenaltyUntil = 59d },
-                    new LabPlayerState { id = 3ul, comboRewardUntil = 65d }
-                }
-            };
-            Assert.IsTrue(LabThrowSound.InComboPenalty(snapshot, 1ul), "SMALL is still on.");
-            Assert.IsFalse(LabThrowSound.InComboPenalty(snapshot, 2ul), "SMALL already ended.");
-            Assert.IsFalse(LabThrowSound.InComboPenalty(snapshot, 3ul), "BIG is not SMALL.");
-            Assert.IsFalse(LabThrowSound.InComboPenalty(snapshot, 4ul));
-            Assert.IsFalse(LabThrowSound.InComboPenalty(null, 1ul));
+            Assert.IsTrue(LabThrowSound.IsSmallThrow(.1f), "The combo penalty throws a small ball.");
+            Assert.IsFalse(LabThrowSound.IsSmallThrow(1f));
+            Assert.IsFalse(LabThrowSound.IsSmallThrow(2.5f), "BIG is not small.");
+            Assert.IsFalse(LabThrowSound.IsSmallThrow(0f), "An old packet without a size is a usual ball.");
+            Assert.AreEqual(1f, LabThrowSound.SmallHitPitch(0f), 1e-4f);
+            Assert.AreEqual(Mathf.Sqrt(2f), LabThrowSound.SmallHitPitch(6f), 1e-4f);
+            Assert.AreEqual(2f, LabThrowSound.SmallHitPitch(20f), 1e-4f, "At most an octave up.");
 
             var host = new GameObject("throw-sound");
             try
             {
                 LabThrowSound sound = host.AddComponent<LabThrowSound>();
-                Assert.That(sound.SmallHitClipCount, Is.GreaterThan(0), "Resources/Audio/HitSmall holds the small hit.");
                 sound.PlayHit(0f, true);
                 Assert.IsTrue(sound.LastHitWasSmall);
+                Assert.AreEqual(Mathf.Sqrt(2f), sound.LastHitPitch, 1e-4f, "Six semitones up by default.");
                 sound.PlayHit(0f);
                 Assert.IsFalse(sound.LastHitWasSmall);
+                Assert.AreEqual(1f, sound.LastHitPitch, 1e-4f);
+            }
+            finally { Object.DestroyImmediate(host); }
+        }
+
+        [Test]
+        public void ABallThrownBigHitsWithTheJing()
+        {
+            Assert.IsTrue(LabThrowSound.IsBigThrow(2.5f), "The combo reward throws a big ball.");
+            Assert.IsFalse(LabThrowSound.IsBigThrow(1f));
+            Assert.IsFalse(LabThrowSound.IsBigThrow(.1f));
+            Assert.IsFalse(LabThrowSound.IsBigThrow(0f));
+
+            var host = new GameObject("throw-sound");
+            try
+            {
+                LabThrowSound sound = host.AddComponent<LabThrowSound>();
+                Assert.That(sound.BigHitClipCount, Is.GreaterThan(0), "The jing lives in Resources/Audio/FiveColorHit.");
+                sound.PlayHit(0f, false, true);
+                Assert.IsTrue(sound.LastHitWasBig);
+                Assert.IsFalse(sound.LastHitWasSmall);
+                sound.PlayHit(0f);
+                Assert.IsFalse(sound.LastHitWasBig, "A usual ball splats as before.");
             }
             finally { Object.DestroyImmediate(host); }
         }

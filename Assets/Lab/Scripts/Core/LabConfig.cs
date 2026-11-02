@@ -929,6 +929,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float yaguangComboBigStartSoundVolume = .8f;
         [Tooltip("BIG이 끝날 때 소리 크기 (Resources/Audio/YaguangComboBigEnd, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboBigEndSoundVolume = .7f;
+        [Tooltip("SMALL 중 던진 작은 공이 맞을 때 일반 타격음을 높이는 반음 수 (0이면 그대로, 던진 사람 기기)")]
+        [SerializeField, Range(0f, 12f)] private float smallHitPitchSemitones = 6f;
+        [Tooltip("BIG 중 던진 큰 공이 맞을 때 징 크기 (Resources/Audio/FiveColorHit, 던진 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float bigHitSoundVolume = .8f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1377,6 +1381,8 @@ namespace C6Lab
         public float YaguangComboSmallEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboSmallEndSoundVolume, .8f));
         public float YaguangComboBigStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigStartSoundVolume, .8f));
         public float YaguangComboBigEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigEndSoundVolume, .7f));
+        public float SmallHitPitchSemitones => Mathf.Clamp(Finite(smallHitPitchSemitones, 6f), 0f, 12f);
+        public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));
         public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 4f), 0f, 10f);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
