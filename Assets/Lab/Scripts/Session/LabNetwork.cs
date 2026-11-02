@@ -284,7 +284,8 @@ namespace C6Lab
         private readonly LabPaintSurface receivedPaintSurface = new LabPaintSurface();
         private LabPaintReceiver paintReceiver;
         private LabPaintReceiver PaintReceiver => paintReceiver ?? (paintReceiver = new LabPaintReceiver(receivedPaintSurface));
-        private readonly Dictionary<ulong, double> paintCheckpointRequests = new Dictionary<ulong, double>();
+        private readonly LabPeerRequestThrottle paintCheckpointRequests = new LabPeerRequestThrottle();
+        private readonly LabPeerRequestThrottle boardCheckpointRequests = new LabPeerRequestThrottle();
         private LabSnapshot pendingPaintSnapshot;
         private string awaitingPaintSession;
         private uint awaitingPaintRound;
@@ -1883,6 +1884,9 @@ namespace C6Lab
             }
             if (packet.type == "board_checkpoint")
             {
+                // A Guest already waits .5 s between requests; the Host matches it so a burst of requests
+                // cannot make it rebuild and resend a full board every frame (#435).
+                if (!boardCheckpointRequests.TryAccept(sender, Time.realtimeSinceStartupAsDouble, .5d)) return;
                 LabSnapshot checkpoint = model.Snapshot(now);
                 AnnounceBombExplosions();
                 AnnounceOrbExpiries();
@@ -2258,12 +2262,9 @@ namespace C6Lab
                     if (model != null && packet.sessionId == sessionId && packet.round == model.Round
                         && packet.configRevision == configRevision && packet.configFingerprint == configFingerprint)
                     {
-                        double now = Time.realtimeSinceStartupAsDouble;
-                        if (!paintCheckpointRequests.TryGetValue(sender, out double last) || now - last >= .5d)
-                        {
-                            paintCheckpointRequests[sender] = now;
-                            if (!HasPendingBulk(sender)) SendPaintFrames(sender, PeerPaintPublisher(sender).Checkpoint());
-                        }
+                        if (paintCheckpointRequests.TryAccept(sender, Time.realtimeSinceStartupAsDouble, .5d)
+                            && !HasPendingBulk(sender))
+                            SendPaintFrames(sender, PeerPaintPublisher(sender).Checkpoint());
                     }
                     return;
                 }
@@ -2681,7 +2682,7 @@ namespace C6Lab
             PaintReceiver.Reset();
             clientPaintSurface.Reset(new LabPaintGrowthSettings(), 1);
             pendingPaintSnapshot = null; awaitingPaintSession = null; awaitingPaintRound = 0;
-            nextPaintRequestAt = 0d; paintCheckpointRequests.Clear();
+            nextPaintRequestAt = 0d; paintCheckpointRequests.Clear(); boardCheckpointRequests.Clear();
         }
 
         private void RejectLocally(string orbId, string reason)

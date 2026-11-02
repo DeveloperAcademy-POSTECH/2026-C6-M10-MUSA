@@ -124,3 +124,7 @@
 - Guest의 박 포즈 보정은 `LabNetwork.LocalState.ReconcileTargetPose` 하나로 간다(조합판 프레임·Bulk 스냅샷 공용). 같은 세션/라운드에서 `serverTime`이 마지막 적용 시각 이하인 비정지 샘플은 건너뛰고, 정지 샘플은 항상 적용한다. 스냅샷 경로에서 `ReconcileYaw/ReconcileRope`를 따로 다시 부르지 않는다.
 - `HoldTargetPoseForPredictedImpact`/`ReleaseTargetPoseHold`와 `ReconcileRope(..., holdImpulse)`는 투척 로컬 선반영이 쓸 훅이다. 보류 중 비정지 샘플은 로프 위상만 블렌드하고 오프셋·속도·yaw는 로컬 물리에 맡긴다.
 
+## #435 조합판 체크포인트 위상 분산
+
+- Host의 5초 조합판 체크포인트는 수신자마다 위상(`5·i/N`, 로컬 제외 피어 순번)을 두어 같은 프레임에 몰리지 않게 한다. 위상은 라운드 첫 프레임에서만 정하며 체크포인트 기준 시각은 격자에 맞춰 기록하므로 강제 체크포인트(Guest `board_checkpoint`)와 늦은 틱이 위상을 바꾸지 않는다. 주기 5초(`CheckpointIntervalSeconds`)와 프레임 형식·규약은 바꾸지 않는다.
+- Host는 Guest의 `board_checkpoint`·`paint_resync` 요청을 피어당 0.5초에 한 번만 처리한다(`LabPeerRequestThrottle`, 처리한 요청만 기록). 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
