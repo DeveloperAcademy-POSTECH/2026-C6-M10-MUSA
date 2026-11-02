@@ -58,6 +58,10 @@ MonoBehaviour:
   jigwiABFireTargetRadius: 0.3
   jigwiABRewardSizeScale: 1.3
   jigwiABRewardPaintScale: 1.5
+  jigwiABSupplyIntervalSeconds: 2
+  jigwiABSupplyInitialCount: 1
+  jigwiABSupplyLimit: 5
+  jigwiABFireDepth: 0.8
   itemLifetimeSeconds: 15
   itemUnlockSwipesMin: 2
   itemUnlockSwipesMax: 4
@@ -192,6 +196,8 @@ MonoBehaviour:
   teamBattleSeconds: 180
   teamFeverHits: 15
   teamFeverSeconds: 8
+  teamFeverHitsOneOnOne: 6
+  teamFeverHitsThreeOnThree: 18
   teamFeverRingScale: 2.9
   teamFeverRingAlpha: 1
   teamFeverGlowMin: 0.45
@@ -255,6 +261,21 @@ MonoBehaviour:
   yaguangShakeBellFinalSoundVolume: 0.9
   yaguangFlashCaughtSoundVolume: 0.9
   yaguangFlashCaughtDelaySeconds: 0.2
+  yaguangComboCountSoundVolume: 0.9
+  yaguangComboStartSoundVolume: 0.8
+  yaguangComboTickSoundVolume: 1
+  yaguangComboTickFastSoundVolume: 1
+  yaguangComboTickIntervalSeconds: 0.5
+  yaguangComboTickFastIntervalSeconds: 0.25
+  yaguangComboTickFastSeconds: 4
+  yaguangComboTauntSoundVolume: 0.9
+  yaguangComboTauntDelaySeconds: 0.3
+  yaguangComboSmallStartSoundVolume: 0.8
+  yaguangComboSmallEndSoundVolume: 0.8
+  yaguangComboBigStartSoundVolume: 0.8
+  yaguangComboBigEndSoundVolume: 0.7
+  smallHitPitchSemitones: 6
+  bigHitSoundVolume: 0.8
   hapticsEnabled: 1
   generateHapticStyle: 1
   generateHapticIntensity: 1

@@ -67,6 +67,7 @@ namespace C6Lab
         public float sizeScale;
         public float jigwiABRadiusScale = 1f;
         public bool jigwiABReward;
+        public string jigwiABSupplyEventId;
         public ulong modelRevision;
         public double eventAt;
         public string reason;
@@ -229,13 +230,13 @@ namespace C6Lab
         //       separates the builds that briefly used 5672 for #334 alone.
         // 5675/5676: standalone #341 screen-space fire curtain and reachable ignition geometry.
         // 5677: integrate #334/#343 fever and #341 A/B; preserve DEV0..239 and append A/B240..250 (251 values).
-        internal const ushort LabProtocolVersion = 5679;
+        internal const ushort LabProtocolVersion = 5680;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/40");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/41");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1926,6 +1927,7 @@ namespace C6Lab
             projectile.SetJigwiABRadiusScale(orb.jigwiABRadiusScale);
             projectile.SetJigwiABReward(orb.jigwiABReward);
             projectile.AuthorityRevision = orb.revision;
+            TagJigwiSupplyProjectile(projectile, orb.id, orb.jigwiABSupplyEventId);
             projectile.SetMissSurface(battleFloor);
             SyncJigwiFireSurfaces();
             projectile.SetFireSurfaces(JigwiFireSurfacesFor(orb.owner));
@@ -1935,7 +1937,8 @@ namespace C6Lab
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small, fiveColor = orb.fiveColor,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
                 wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale,
-                jigwiABRadiusScale = orb.jigwiABRadiusScale, jigwiABReward = orb.jigwiABReward, modelRevision = orb.revision };
+                jigwiABRadiusScale = orb.jigwiABRadiusScale, jigwiABReward = orb.jigwiABReward,
+                jigwiABSupplyEventId = orb.jigwiABSupplyEventId, modelRevision = orb.revision };
             foreach (ulong id in order) if (id != LocalPlayerId) Send(id, notice);
             Debug.Log("C6_LAB_THROW orb=" + orb.id + " seat=" + seat
                 + " size=" + sizeScale.ToString("F2", CultureInfo.InvariantCulture)
@@ -2063,6 +2066,7 @@ namespace C6Lab
 
         private void SyncBoard()
         {
+            ObserveJigwiSupplyRetirement();
             ObserveJigwiMissionFailures();
             ApplyGameStartSimulationHold();
             SyncJigwiFireSurfaces();
@@ -2073,14 +2077,15 @@ namespace C6Lab
             var current = new HashSet<string>();
             foreach (var orb in latest.orbs ?? Array.Empty<LabOrbState>())
             {
-                if (orb.owner != LocalPlayerId || orb.inFlight || jigwiMissionPurge.Cancels(orb.revision)) continue;
+                if (orb.owner != LocalPlayerId || orb.inFlight || jigwiMissionPurge.Cancels(orb.revision)
+                    || jigwiSupplyRetirement.Cancels(orb)) continue;
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
                 bool showSpawn = ShowsDrumSpawn(orb, LocalPlayerId);
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
-                board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
+                LabOrbView view = board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
                     orb.JustUnlocked(latest.serverTime), small: orb.small,
                     // Every screen counts the blast fire down from the same Host clock (#213).
@@ -2097,6 +2102,7 @@ namespace C6Lab
                     // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
+                view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId), latest.paused || GameStartHeld);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
@@ -2407,6 +2413,7 @@ namespace C6Lab
                         visual.SetJigwiABRadiusScale(packet.jigwiABRadiusScale);
                         visual.SetJigwiABReward(packet.jigwiABReward);
                         visual.AuthorityRevision = packet.modelRevision;
+                        TagJigwiSupplyProjectile(visual, packet.firstId, packet.jigwiABSupplyEventId);
                         visual.SetMissSurface(battleFloor);
                         SyncJigwiFireSurfaces();
                         visual.SetFireSurfaces(JigwiFireSurfacesFor(packet.owner));
@@ -2530,6 +2537,8 @@ namespace C6Lab
                 || !LabJigwiNetworkValidation.Valid(snapshot.jigwi)
                 || !LabJigwiStageNetworkValidation.Valid(snapshot.jigwiStage, snapshot.players)
                 || !LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players)
+                || (snapshot.orbs ?? Array.Empty<LabOrbState>()).Any(orb => orb != null
+                    && !LabJigwiSupplyIdentity.Valid(orb, snapshot.sessionId, snapshot.round, snapshot.players))
                 || !LabFlashNetworkValidation.Valid(snapshot)) return;
             if (latest != null && latest.sessionId == snapshot.sessionId && latest.round > snapshot.round) return;
             if (!PaintReceiver.Matches(snapshot))

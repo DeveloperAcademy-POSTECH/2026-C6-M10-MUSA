@@ -170,6 +170,7 @@ namespace C6Lab
             && a.jigwiABRadiusScale == b.jigwiABRadiusScale
             && a.jigwiABReward == b.jigwiABReward && a.jigwiABRewardSizeScale == b.jigwiABRewardSizeScale
             && a.jigwiABRewardPaintScale == b.jigwiABRewardPaintScale
+            && a.jigwiABSupplyEventId == b.jigwiABSupplyEventId
             && a.jigwiSupply == b.jigwiSupply && a.jigwiGenerationBurn == b.jigwiGenerationBurn && a.fever == b.fever
             && a.fiveColor == b.fiveColor;
 
@@ -201,6 +202,7 @@ namespace C6Lab
         private ulong latestModelRevision, purgedThroughRevision;
         private double purgedAt = -1d;
         private bool hasPurge;
+        private readonly LabJigwiSupplyRetirementGate retiredJigwiSupplies = new LabJigwiSupplyRetirementGate();
         public long LatestSequence { get; private set; }
         public bool NeedsCheckpoint { get; private set; }
         public bool IsInitialized => baseline || LatestSequence > 0;
@@ -226,6 +228,7 @@ namespace C6Lab
             header = null; baseline = false; LatestSequence = 0; NeedsCheckpoint = false;
             latestModelRevision = purgedThroughRevision = 0;
             purgedAt = -1d; hasPurge = false;
+            retiredJigwiSupplies.SetActive(session, round);
         }
 
         /// <summary>
@@ -252,8 +255,20 @@ namespace C6Lab
             }
         }
 
-        private bool IsPurged(LabOrbState state) => hasPurge && !state.kind.IsDrum()
-            && state.revision <= purgedThroughRevision;
+        private bool IsPurged(LabOrbState state) => retiredJigwiSupplies.Cancels(state)
+            || hasPurge && !state.kind.IsDrum() && state.revision <= purgedThroughRevision;
+
+        public void ObserveJigwiSupplySnapshot(LabSnapshot snapshot)
+        {
+            if (snapshot == null || !Matches(snapshot.sessionId, snapshot.round)) return;
+            if (!retiredJigwiSupplies.Observe(snapshot.sessionId, snapshot.round, snapshot.jigwiAB, snapshot.phase)) return;
+            RemoveRetiredJigwiSupplies();
+        }
+        private void RemoveRetiredJigwiSupplies()
+        {
+            foreach (string id in states.Values.Where(retiredJigwiSupplies.Cancels).Select(state => state.id).ToArray())
+            { states.Remove(id); tombstones.Add(id); }
+        }
 
         public bool TryGetState(string id, out LabOrbState state)
         {
@@ -276,6 +291,8 @@ namespace C6Lab
                 NeedsCheckpoint = true;
                 return Reject("BOARD_CHECKPOINT_REQUIRED", out reason);
             }
+            if (retiredJigwiSupplies.Observe(frame.sessionId, frame.round, frame.jigwiAB, frame.phase))
+                RemoveRetiredJigwiSupplies();
             bool currentModel = frame.modelRevision >= latestModelRevision;
             if (currentModel && !CanApplyStates(frame.states, frame.removedIds, frame.checkpoint))
                 return Reject("INVALID_BOARD_FRAME", out reason);
@@ -301,7 +318,7 @@ namespace C6Lab
         {
             if (receipt == null || !Matches(receipt.sessionId, receipt.round) || receipt.sequence <= LatestSequence
                 || receipt.sequence <= 0 || !Finite(receipt.serverTime) || receipt.serverTime < 0d
-                || !ValidStates(receipt.states, false) || !ValidRemoved(receipt.removedIds)
+                || !ValidStates(receipt.states, false, receipt.players) || !ValidRemoved(receipt.removedIds)
                 || !ValidPlayers(receipt.players)) return false;
             if (NeedsCheckpoint || receipt.sequence != LatestSequence + 1)
             {
@@ -330,6 +347,7 @@ namespace C6Lab
         public LabSnapshot Overlay(LabSnapshot snapshot)
         {
             if (snapshot == null || !Matches(snapshot.sessionId, snapshot.round)) return snapshot;
+            ObserveJigwiSupplySnapshot(snapshot);
             if (!baseline)
             {
                 foreach (LabOrbState state in (snapshot.orbs ?? Array.Empty<LabOrbState>())
@@ -477,9 +495,9 @@ namespace C6Lab
             && LabJigwiNetworkValidation.Valid(frame.jigwi)
             && LabJigwiStageNetworkValidation.Valid(frame.jigwiStage, frame.players)
             && LabJigwiABNetworkValidation.Valid(frame.jigwiAB, frame.players, frame.modelRevision)
-            && ValidStates(frame.states, true) && ValidRemoved(frame.removedIds) && ValidPlayers(frame.players);
+            && ValidStates(frame.states, true, frame.players) && ValidRemoved(frame.removedIds) && ValidPlayers(frame.players);
 
-        private bool ValidStates(LabOrbState[] values, bool forThisOwner)
+        private bool ValidStates(LabOrbState[] values, bool forThisOwner, LabPlayerState[] members = null)
         {
             if (values == null || values.Length > MaximumStates) return false;
             var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -487,6 +505,7 @@ namespace C6Lab
             foreach (LabOrbState state in values)
             {
                 if (state == null || !ValidId(state.id) || !ids.Add(state.id) || state.ownershipVersion == 0
+                    || !LabJigwiSupplyIdentity.Valid(state, session, round, members)
                     || state.kind < LabOrbKind.Yin || state.kind > LabOrbKind.FoxFire
                     || state.element < LabOrbElement.None || state.element > LabOrbElement.Earth
                     || state.lockSwipes < 0 || state.relayStage < 0 || state.relayStage > 3

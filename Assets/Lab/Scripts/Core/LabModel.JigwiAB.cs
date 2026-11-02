@@ -30,6 +30,7 @@ namespace C6Lab
         {
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
+            ResetJigwiABSupply(config);
             if (!jigwiABEnabled) return;
             // Preserve the old code as an inactive migration path, never run two policies together.
             jigwiStageEnabled = false; jigwiStageGroups.Clear(); jigwiGourdBlastIds.Clear();
@@ -103,7 +104,8 @@ namespace C6Lab
         }
         private void AdvanceJigwiABActive(LabJigwiABRound active, double now)
         {
-            if (jigwiABActivated.Add(active.id))
+            bool firstActivation = jigwiABActivated.Add(active.id);
+            if (firstActivation)
             {
                 foreach (var orb in orbs.Values) ApplyJigwiABOrb(orb, active.activeAt);
                 revision++;
@@ -112,6 +114,8 @@ namespace C6Lab
             foreach (var player in active.players)
                 foreach (var fire in player.targets)
                     if (!fire.lit && now >= fire.relightAt) { fire.lit = true; revision++; }
+            if (firstActivation) StartJigwiABSupply(active, now);
+            else AdvanceJigwiABSupply(active, now);
         }
         private void BeginJigwiABSlot(int slot, double activeAt)
         {
@@ -160,6 +164,7 @@ namespace C6Lab
             }
             if (item.kind == LabJigwiABKind.GroupFire)
             {
+                ClearJigwiABSupplies(item);
                 if (result == LabJigwiABResolution.Completed)
                     item.rewardUntil = Math.Min(jigwiStageCutoffAt, item.resolvedAt + JigwiABRewardSeconds);
                 else if (result == LabJigwiABResolution.Expired)
@@ -185,12 +190,6 @@ namespace C6Lab
             if (jigwiABEnabled && active != null && active.kind == LabJigwiABKind.PersonalBurn
                 && active.targetPlayer == player && active.Active(at)) return jigwiABRecovery;
             return JigwiStageRecoveryMultiplier(at);
-        }
-        private LabOrbElement JigwiABCombinedElement(LabOrbElement normal, double at)
-        {
-            var active = ActiveJigwiABRound(at);
-            return jigwiABEnabled && active != null && active.kind == LabJigwiABKind.GroupFire && active.Active(at)
-                ? LabOrbElement.Water : normal;
         }
         private void ApplyJigwiABOrb(LabOrbState orb, double now)
         {
@@ -258,6 +257,7 @@ namespace C6Lab
                 || !orbs.TryGetValue(projectileOrbId ?? string.Empty, out var orb) || !orb.inFlight) return false;
             var active = ActiveJigwiABRound(now);
             if (active == null || active.kind != LabJigwiABKind.GroupFire || !active.Active(now) || active.id != eventId) return false;
+            if (!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) && orb.jigwiABSupplyEventId != active.id) return false;
             var owner = active.players.FirstOrDefault(p => p.playerId == orb.owner);
             if (owner == null) return false;
             bool curtain = targetId == LabJigwiABFireMotion.CurtainId(active.id, orb.owner)
