@@ -3863,6 +3863,7 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 
 - 각 실행의 skip/inconclusive0. 새 검사 `LabNetworkPacketTests`(봉투 1,100 B 상한·중첩 기본값 부재, 영수증/도색 프레임 payload 왕복과 실제 수신 적용, 잘못된 payload→null, 빈 델타 판정). `LabPaintReplicationTests`는 Bulk 본문의 `payload` 필드를 쓰도록 바꿨고 `LabGameFlowBridgeTests`·`LabSharedSettingsSchemaTests`는 접속 규약을 갱신했다.
 - 생략 범위를 행동 경로로 좁힌 뒤 전체 EditMode **1736/1736**(42.02초), PlayMode `LabLocalBoardNetworkIntegrationTests` **16/16**, `GameSceneFlowTests` **21/21**(214.56초)을 다시 실행해 통과했다. 위 표의 나머지 PlayMode 5개 클래스는 좁히기 전 실행 기록이며 좁힌 코드는 그 경로(`PublishSnapshot`)를 원래대로 되돌린 것이다.
+- 최신 main(`ac9c9f1b`, #422·#427 포함) 병합 후에도 전체 EditMode **1736/1736**(40.49초), PlayMode `LabLocalBoardNetworkIntegrationTests` **16/16**, `GameSceneFlowTests` **21/21**(211.04초)을 다시 실행해 통과했다. 공유 설정은 257개 그대로다.
 - 조합판 프레임 생략의 순번 보존은 EditMode 판정 검사와 Host/Guest 통합 PlayMode(`LabLocalBoardNetworkIntegrationTests`)로 확인했다. 실제 여러 폰의 대역폭·반응 변화는 측정하지 않았다.
 - **종료 상태:** Play OFF, Home Scene 열림, 컴파일 오류 없음. 같은 폴더에서 다른 세션이 작업하던 지귀 미커밋 수정은 그 세션이 작업 트리에서 치운 뒤 검사를 실행했으며 이 기록에 포함하지 않는다.
 - **미실행:** iPhone 실기기·LAN/핫스팟 실제 다기기·대역폭 측정. 전체 PlayMode는 실행하지 않았다.
