@@ -3830,3 +3830,16 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 | EditMode `LabModelTests.AFoxOrbStaysAtASideEdgeAndADoubleTapClearsOnlyThatOne` (판 하나만 골라 씀) 외 기믹 묶음·통계·피버·스테이지 검사 | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | PlayMode `LabDeveloperSoloIntegrationTests`(솔로 여우불 안내), Hapio `GameSceneFlowTests.SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset` | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | 3인 실행으로 모든 판에 떨어지는지·각자 소리·첫 안내 보기 | NOT_RUN | |
+
+## 2026-11-02 — #418 1단계 보강: 자리 고르기 화면에서 뒤로 갈 때도 같은 전환
+
+- 같은 브랜치, 3단계 커밋 `a4dfb180` 다음. 사용자 요청: 방을 만든 뒤 뒤로 가기(방 나가기)를 눌렀을 때도 같은 연출.
+- 전: 막은 Home → Lobby에만 씌웠고, 뒤로 가기(`GoHomeToRoomBrowser` → Home 상태)에서는 자리 고르기 화면이 먼저 사라진 뒤 Home 씬이 떴다.
+- 후: `GameSession`이 Home ↔ Lobby 양쪽 전환에서 바로 가리고 곧장 씬을 불러온 뒤 밝아진다. 떠나는 화면을 붙잡는 표시를 씬 기준(`HoldsSceneForFade(scenePath)`)으로 바꿔, 자리 고르기 화면도 가려질 때까지 그대로 둔다. 방이 끝나 Home으로 돌아가는 경우도 같은 전환이다. 시간·색 값과 기본값(가림 0초·밝아짐 0.35초·검정)은 그대로.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 열린 Editor 재컴파일 | PASS | 컴파일 실패 없음, 콘솔 오류 0 |
+| PlayMode `GameLobbyViewTests.EnteringAndLeavingACreatedRoomDarkenOverTheHeldScreenThenBrightenOnTheNextOne` (이름 바꿈, 추가: 뒤로 가기 → 자리 고르기 화면 유지·눌림 막힘 → Home 뒤 밝아짐) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| PlayMode `GameLobbyViewTests` 전체, `GameSceneFlowTests` (방 나가기 뒤 방 목록 검사들) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| Play로 방 만들기 → 뒤로 가기 전환 보기 | NOT_RUN | |

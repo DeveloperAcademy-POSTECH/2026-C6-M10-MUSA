@@ -390,8 +390,8 @@ namespace Hapio
             wantedScene = path;
             if (sceneRoutine == null && (SceneManager.GetActiveScene().path != path || forceBattleReload))
             {
-                // 방에 들어갈 때 (#418): 이 프레임부터 Home 화면을 그대로 두고 어두워진 뒤에 씬을 바꾼다.
-                holdHomeForFade = FadesIntoLobby(path);
+                // 방에 들어가고 나올 때 (#418): 이 프레임부터 떠나는 화면을 그대로 두고 가려진 뒤에 씬을 바꾼다.
+                HoldForFade(path);
                 sceneRoutine = StartCoroutine(ChangeScene());
             }
         }
@@ -401,7 +401,7 @@ namespace Hapio
             // Never unload a terminal Battle before its actual committed paint map is copied.
             yield return null;
             if (quitting) { sceneRoutine = null; yield break; }
-            if (holdHomeForFade) yield return FadeOutOfHome();
+            if (holdForFade) yield return FadeOutOfScene();
             while (SceneManager.GetActiveScene().path != wantedScene || forceBattleReload)
             {
                 string destination = wantedScene;

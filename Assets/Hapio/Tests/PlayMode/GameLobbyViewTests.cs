@@ -176,7 +176,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator EnteringACreatedRoomDarkensOverTheHeldBrowserThenBrightensOnTheSeatScreen()
+        public IEnumerator EnteringAndLeavingACreatedRoomDarkenOverTheHeldScreenThenBrightenOnTheNextOne()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
             System.Reflection.FieldInfo fadeOut = typeof(GameSession).GetField("lobbyFadeOutSeconds",
@@ -195,7 +195,7 @@ namespace Hapio.Tests
             yield return Until(() => session.State.phase == GameFlowPhase.Lobby, "The created room is entered", 15f);
             yield return null; yield return null;
             Assert.That(SceneManager.GetActiveScene().path, Is.EqualTo(GameScenePaths.Home), "The seat screen loads only after darkening.");
-            Assert.That(session.HoldsHomeForFade, Is.True);
+            Assert.That(session.HoldsSceneForFade(GameScenePaths.Home), Is.True);
             Assert.That(view.background.gameObject.activeSelf && view.design.gameObject.activeSelf, Is.True,
                 "The browser stays as it was instead of vanishing to an empty frame under the darkening (#418).");
             Assert.That(view.browserPage.activeSelf, Is.True);
@@ -211,11 +211,29 @@ namespace Hapio.Tests
 
             yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.Lobby,
                 "The seat screen after darkening");
-            Assert.That(session.HoldsHomeForFade, Is.False);
+            Assert.That(session.HoldsSceneForFade(GameScenePaths.Home), Is.False);
             Assert.That(session.SceneFade.BlocksInput, Is.False, "The seat screen can be tapped while it brightens.");
             yield return Until(() => !session.SceneFade.Visible, "The cover clears", 3f);
             view = View();
             Assert.That(view.positionPage.activeInHierarchy, Is.True);
+
+            // Back from the seat screen (#418): the same cover over the held seat screen, then the browser brightens.
+            yield return Click(view.leaveButton);
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home));
+            Assert.That(SceneManager.GetActiveScene().path, Is.EqualTo(GameScenePaths.Lobby), "Home loads only after darkening.");
+            Assert.That(session.HoldsSceneForFade(GameScenePaths.Lobby), Is.True);
+            Assert.That(view.background.gameObject.activeSelf && view.design.gameObject.activeSelf, Is.True,
+                "The seat screen stays as it was instead of vanishing to an empty frame under the darkening.");
+            Assert.That(view.positionPage.activeSelf, Is.True);
+            Assert.That(session.SceneFade.Alpha, Is.GreaterThan(0f).And.LessThan(1f));
+            Assert.That(session.SceneFade.BlocksInput, Is.True);
+            yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.Home,
+                "The browser after darkening");
+            Assert.That(session.HoldsSceneForFade(GameScenePaths.Lobby), Is.False);
+            Assert.That(session.SceneFade.BlocksInput, Is.False);
+            yield return Until(() => !session.SceneFade.Visible, "The cover clears on the browser", 3f);
+            view = View();
+            Assert.That(view.browserPage.activeInHierarchy, Is.True);
         }
 
         [UnityTest]
