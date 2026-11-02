@@ -9,6 +9,7 @@ namespace C6Lab.Tests
         private GameObject root;
         private LabShapeFillImage fill;
         private LabStaminaFeedback feedback;
+        private LabStaminaFeedbackProfile testProfile;
         private Texture2D texture;
         private Sprite sprite;
 
@@ -36,13 +37,27 @@ namespace C6Lab.Tests
             fill.sprite = sprite; hud.staminaFill = fill;
             feedback = root.AddComponent<LabStaminaFeedback>(); feedback.enabled = false;
             feedback.Bind(null, hud); // Only Present advances this fixture's visual clock.
+            // The saved profile turns the spend flash off (#418); these checks keep the effect itself working when it is on.
+            testProfile = ScriptableObject.CreateInstance<LabStaminaFeedbackProfile>();
+            feedback.SetProfile(testProfile);
         }
         [TearDown]
         public void DestroyWindow()
         {
             if (root != null) Object.DestroyImmediate(root);
+            if (testProfile != null) Object.DestroyImmediate(testProfile);
             if (sprite != null) Object.DestroyImmediate(sprite);
             if (texture != null) Object.DestroyImmediate(texture);
+        }
+
+        [Test]
+        public void TheSavedProfileGlowsOnlyForAStaminaShortTapNotForEverySpend()
+        {
+            var saved = Resources.Load<LabStaminaFeedbackProfile>(LabStaminaFeedbackProfile.ResourcesPath);
+            Assert.That(saved, Is.Not.Null);
+            Assert.That(saved.ConsumptionEnabled, Is.False, "The gauge glows only red, when stamina is short (#418).");
+            Assert.That(saved.ShortEnabled, Is.True);
+            Assert.That(saved.PersonalFireEnabled, Is.True, "Jigwi A's recovery fire stays.");
         }
 
         [Test]

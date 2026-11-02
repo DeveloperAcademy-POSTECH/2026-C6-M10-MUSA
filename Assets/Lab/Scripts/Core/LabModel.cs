@@ -104,6 +104,8 @@ namespace C6Lab
         public static bool ValidRoomSize(int capacity, bool territory) => territory ? LabTeams.IsTeamCount(capacity)
             : capacity >= MinimumParticipants && capacity <= MaximumParticipants;
         public const int DefaultParticipants = 3;
+        /// <summary>스태미나가 생성 비용보다 적어 생성을 거절한 이유. 누른 사람 화면의 부족 표시(#418)가 이 값을 본다.</summary>
+        public const string InsufficientStaminaReason = "INSUFFICIENT_STAMINA";
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
         private const float SecretBoxSpread = .05f;
@@ -408,7 +410,7 @@ namespace C6Lab
             // An overheated press still pays for a burnt attempt but creates no stored entity.
             if (!JigwiOverheated(sender, now) && CountStored(sender) >= rules.OrbStorageLimit)
                 return Reject("STORAGE_FULL", out reason);
-            if (player.stamina + .00001f < rules.GenerateCost) return Reject("INSUFFICIENT_STAMINA", out reason);
+            if (player.stamina + .00001f < rules.GenerateCost) return Reject(InsufficientStaminaReason, out reason);
             uint generated = generatedCounts[sender];
             if (generated == uint.MaxValue) return Reject("GENERATION_LIMIT", out reason);
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);

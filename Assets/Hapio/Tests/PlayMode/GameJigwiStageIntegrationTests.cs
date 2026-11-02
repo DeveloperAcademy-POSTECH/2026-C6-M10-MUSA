@@ -81,7 +81,8 @@ namespace Hapio.Tests
             yield return Until(() => spendEvents == 1, "Approved generation produces one real stamina-spend event");
             yield return null;
             Assert.That(spentCost, Is.EqualTo(network.config.GenerateCost));
-            Assert.That(staminaFeedback.ConsumptionPulseCount, Is.EqualTo(1));
+            Assert.That(staminaFeedback.ConsumptionPulseCount, Is.Zero,
+                "The saved profile glows only red for a stamina-short tap, not for every paid generation (#418).");
             LabSnapshot before = network.Snapshot;
             Assert.That(before.jigwiAB.enabled, Is.True);
             Assert.That(before.jigwiStage.enabled, Is.False, "#341 must not create old surface roots or paint-blocking cones.");
@@ -148,7 +149,7 @@ namespace Hapio.Tests
             Assert.That(current.orbs.Any(orb => orb.jigwiABSupplyEventId == b.id), Is.True,
                 "B supplies real owned Water, without a player generation request.");
             Assert.That(spendEvents, Is.EqualTo(1), "Free supply and new snapshots never flash as a paid generation.");
-            Assert.That(staminaFeedback.ConsumptionPulseCount, Is.EqualTo(1));
+            Assert.That(staminaFeedback.ConsumptionPulseCount, Is.Zero);
             Assert.That(overlay.playerStatus.text, Does.Contain("P1 0/" + network.config.JigwiABGroupFireCount));
             var surfaces = network.GetComponentsInChildren<LabJigwiFireSurface>(true)
                 .Where(surface => surface.FireId == b.id && surface.OwnerPlayerId == network.LocalPlayerId).ToArray();

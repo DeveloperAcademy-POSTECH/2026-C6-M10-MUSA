@@ -3797,3 +3797,19 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 | PlayMode `GameLobbyViewTests.EnteringACreatedRoomDarkensOverTheHeldBrowserThenBrightensOnTheSeatScreen` (새: 기본 어두워짐 0초 확인, 1초로 바꿔 어두워지는 동안 Home 유지·눌림 막힘 → Lobby 뒤 밝아짐) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | PlayMode `GameLobbyViewTests` 전체, `GameSceneFlowTests` (전환 막이 생겨도 기존 흐름 유지) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | Play로 방 만들기·방 들어가기·DEV 솔로 전환 보기 | NOT_RUN | |
+
+## 2026-11-02 — #418 2단계: 스태미나 부족 피드백
+
+- 같은 브랜치, 1단계 커밋 `7e0514f5` 다음. 이 단계는 스태미나 부족 피드백만 다룬다(여우구슬은 다음 단계).
+- 문제: 스태미나가 생성 비용보다 적을 때 북을 눌러도 아무 표시·소리가 없어, 게이지를 안 보고 북만 계속 누르며 "왜 안 되지?"가 됐다.
+- 수정: Host가 내 생성 요청을 `INSUFFICIENT_STAMINA`(`LabModel.InsufficientStaminaReason`)로 거절한 응답을 받을 때마다 `LabNetwork.LocalStaminaShort`가 한 번 알린다(보유 한도 초과·다른 이유·지난 라운드의 늦은 응답은 제외). 그러면 누른 사람 화면에서 ① 스태미나 게이지가 지지직 흔들리고(`LabStaminaShortFeedback`, 끝나면 원래 자리로) ② 지금 충전 중인 칸(차 있는 부분)이 같은 칸 모양으로 순간 빨갛게 빛나며 ③ 팀 제공 효과음 `Audio/StaminaShort`가 난다(`LabStaminaShortSound`, 연달아 누르면 처음부터 다시). 원본 게이지 그림·채움 값·야광귀 피버 색은 건드리지 않고 그 위에 그린다.
+- 사용자 확인 후 조정: 게이지가 빛나는 것은 스태미나가 부족할 때(빨간색)만 — 저장된 `StaminaFeedbackProfile`의 #412 소비 깜빡임(정상 생성마다 파란 번쩍임)을 Editor API로 껐다(코드는 그대로, Inspector에서 다시 켤 수 있음). 지귀 A 화염 테두리는 그대로. 소리는 더 크게: 파일을 +11dB·리미터 -1dB로 키우고(평균 -22.6 → -14.3dB) 기본 크기를 .8 → 1로 올렸다.
+- 조절: 흔들림·빛은 `Resources/Stamina/StaminaFeedbackProfile`의 "스태미나 부족" 칸(프로필 에셋에 저장됨), 소리 크기는 LabConfig Inspector `Stamina Short Sound Volume`(기본 1, LabConfig 에셋에는 아직 저장되지 않아 코드 기본값). 공유 DEV 값·접속 규약 변경 없음.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 효과음 가져오기 | PASS | `StaminaShort` 0.6065초·2채널·DecompressOnLoad, 가져오기 설정은 기존 짧은 효과음(`YaguangComboStart`)과 같음 |
+| 열린 Editor 재컴파일 | PASS | 컴파일 실패 없음, 콘솔 오류 0 (처음 한 번 접근 제한 오류 CS0051을 고친 뒤) |
+| PlayMode `LabStaminaShortFeedbackTests` 5개 (새: 흔들림·빨간 빛·제자리 복귀, 다시 누름, 흔들림 값, 거절 이유 구분, 소리 폴더) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| PlayMode `LabStaminaFeedbackTests` (바꿈: 검사 전용 프로필로 소비 효과 동작 유지 확인 + 새: 저장된 프로필은 소비 깜빡임 꺼짐), Hapio PlayMode `GameJigwiStageIntegrationTests` (바꿈: 정상 생성 때 파란 깜빡임 0번), EditMode `LabRawStreakTests` (거절 이유 그대로) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| Play로 스태미나가 모자랄 때 북 연타해 보기 (흔들림·빨간 빛·소리 크기) | NOT_RUN | |
