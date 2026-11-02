@@ -101,8 +101,7 @@ namespace C6Lab
 
     public static class LabJigwiABNetworkValidation
     {
-        public const int MaximumRounds = 6, MaximumPlayers = 5, MaximumFires = 6;
-        private static readonly double[] ActivationSlots = { 5d, 25d, 40d, 55d, 70d, 85d };
+        public const int MaximumRounds = LabJigwiABTimeline.SlotCount, MaximumPlayers = 5, MaximumFires = 6;
         public static LabJigwiABSnapshot Copy(LabJigwiABSnapshot state) => state?.Copy() ?? new LabJigwiABSnapshot();
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
         private static bool Range(double value, double min, double max) => Finite(value) && value >= min && value <= max;
@@ -134,10 +133,10 @@ namespace C6Lab
                     || !Range(round.rewardSizeScale, 1d, 3d) || !Range(round.rewardPaintScale, 1d, 3d)
                     || !Range(round.rewardUntil, -1d, state.cutoffAt)
                     || round.players == null || round.players.Length > MaximumPlayers) return false;
-                double scheduled = state.startedAt + ActivationSlots[round.slot];
+                double scheduled = state.startedAt + LabJigwiABTimeline.ActiveOffset(round.slot);
                 if (Math.Abs(round.activeAt - scheduled) > .00001d
-                    || Math.Abs(round.warningAt - (scheduled - 1d)) > .00001d
-                    || (round.slot % 2 == 0) != (round.kind == LabJigwiABKind.PersonalBurn)) return false;
+                    || Math.Abs(round.warningAt - (scheduled - LabJigwiABTimeline.WarningSeconds)) > .00001d
+                    || round.kind != LabJigwiABTimeline.KindForSlot(round.slot)) return false;
                 if (round.resolution != LabJigwiABResolution.Skipped)
                 {
                     if (intervals.Any(other => round.activeAt < other.endsAt && other.activeAt < round.endsAt)) return false;

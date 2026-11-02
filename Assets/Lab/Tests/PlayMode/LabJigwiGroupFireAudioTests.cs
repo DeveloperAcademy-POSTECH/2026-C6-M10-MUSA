@@ -119,9 +119,10 @@ namespace C6Lab.Tests
                 jigwiAB = new LabJigwiABSnapshot { enabled = true, startedAt = 0d, cutoffAt = 100d, rounds = new[] { group } } };
             typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(network, state);
             Canvas.ForceUpdateCanvases(); view.ApplySnapshot(state, 42, 1.2d);
-            Assert.That(view.GroupCurtainVisible, Is.True); Assert.That(view.audioView.WantsLoop, Is.True);
-            Assert.That(view.audioView.PlaybackStartCount, Is.EqualTo(1), "Warning appearance starts one local loop.");
+            Assert.That(view.GroupCurtainVisible, Is.False); Assert.That(view.audioView.WantsLoop, Is.False);
+            Assert.That(view.audioView.PlaybackStartCount, Is.Zero, "A warning must not start the active fire loop.");
             state.serverTime = 2.2d; view.ApplySnapshot(state, 42, 2.2d);
+            Assert.That(view.GroupCurtainVisible, Is.True); Assert.That(view.audioView.WantsLoop, Is.True);
             Assert.That(view.audioView.PlaybackStartCount, Is.EqualTo(1));
             foreach (var point in group.players[0].targets) point.lit = false;
             view.ApplySnapshot(state, 42, 2.3d);
