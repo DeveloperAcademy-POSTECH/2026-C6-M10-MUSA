@@ -3914,5 +3914,6 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 
 - 각 실행의 skip/inconclusive0. 새 검사 `LabBoardCheckpointPhaseTests` 4개: 위상0/2.5 두 수신자가 0·2.5·5·7.5초에 엇갈려 체크포인트, 강제 체크포인트 뒤 격자 유지와 늦은 틱(2.57초) 뒤에도 다음이 7.5초, 위상은 라운드 첫 프레임에서만 읽고 범위 밖·NaN은 거절, 스로틀의 피어별 0.5초·거절 요청 미기록·Forget/Clear. 기존 `LabBoardReplicationTests`의 5초 체크포인트 검사는 위상0 기본값으로 그대로 통과했다.
 - 시간 칸의 —는 이번 실행에서 소요 시간을 따로 남기지 않은 것이다.
+- #431·#433 병합 후 main을 이 브랜치에 합친 코드에서 컴파일 오류 없이 전체 EditMode **1742/1742**(43.32초), PlayMode `LabRopeReconciliationTests` **8/8**, `LabLocalBoardNetworkIntegrationTests` **16/16**을 다시 실행해 통과했다. `GameSceneFlowTests`는 합친 뒤 다시 실행하지 않았다.
 - **종료 상태:** Play OFF, 컴파일 오류 없음.
 - **미실행:** iPhone 실기기·LAN/핫스팟 실제 다기기에서의 5초 주기 끊김 변화와 대역폭 측정. 전체 PlayMode는 실행하지 않았다.
