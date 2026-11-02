@@ -434,13 +434,16 @@ namespace C6Lab
             ObserveFailures(stage, now, baseline);
             baselineReady = true; previousNow = now;
             LabJigwiABRound active = stage.Active(now);
-            bool personal = active != null && active.kind == LabJigwiABKind.PersonalBurn && active.targetPlayer == localPlayer;
+            // Active() can return the upcoming warning for instructions. Flames and the B loop
+            // belong only to the real mission window, aligned with the voice's terminal shout.
+            bool missionActive = active != null && active.Active(now);
+            bool personal = missionActive && active.kind == LabJigwiABKind.PersonalBurn && active.targetPlayer == localPlayer;
             personalHeat.gameObject.SetActive(personal);
-            float animationTime = active != null ? (float)Math.Max(0d, now - active.warningAt) : 0f;
+            float animationTime = missionActive ? (float)Math.Max(0d, now - active.activeAt) : 0f;
             if (personalFlames != null) for (int i = 0; i < personalFlames.Length; i++)
                 AnimateFlame(personalFlames[i], animationTime, i * 2.13f, .9f);
             VisibleScreenFires = 0;
-            if (active != null && active.kind == LabJigwiABKind.GroupFire) DrawGroup(active, localPlayer, now, animationTime, held);
+            if (missionActive && active.kind == LabJigwiABKind.GroupFire) DrawGroup(active, localPlayer, now, animationTime, held);
             else SetFiresHidden(held);
             DrawWater(now, held);
             DrawStatus(stage, active, snapshot, localPlayer, now, held);

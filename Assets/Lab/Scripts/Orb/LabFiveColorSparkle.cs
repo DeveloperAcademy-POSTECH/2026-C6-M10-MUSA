@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace C6Lab
 {
@@ -7,6 +8,8 @@ namespace C6Lab
     /// 부드럽게 건너가는 구슬을 얹는다. 몸통 색이 바뀌는 동안 안쪽에서 다음 색 빛이 천천히 돌아 물들고, 둘레에는 같은 색
     /// 빛무리, 가장자리를 따라 도는 윤광, 둘레에서 피었다 지는 별빛이 있어 영롱하게 보인다. 박에 맞은 자리에서는
     /// 다섯 색 별가루를 터뜨린다. 화면 표시만 하며 규칙·물리에는 쓰지 않는다.
+    /// 3D로 날아가는 오색구슬(투사체)은 납작한 그림을 얹지 않고, 구슬(3D 공) 자체의 색이 다섯 색 사이를 건너간다 (#426).
+    /// 그림은 카메라 쪽으로 돌려 세워야 하는데, 자리마다 전투 카메라 방향이 달라 옆자리에서는 그림이 납작하게 공 옆으로 비켜 보였다.
     /// 먹선·그늘·하이라이트 그림은 Resources/Yaguang/FiveColorOrb, 별은 FiveColorSparkle에 있고, 없으면 코드로 그린 것을 쓴다.
     /// </summary>
     public sealed class LabFiveColorSparkle : MonoBehaviour
@@ -48,7 +51,11 @@ namespace C6Lab
         private readonly SpriteRenderer[] twinkles = new SpriteRenderer[TwinkleCount];
         private SpriteRenderer[] burstStars;
         private float radius = .3f, age, dim;
-        private bool faceCamera, burst;
+        private bool burst;
+        // 3D로 날아가는 구슬: 그림 대신 이 구슬의 3D 공 렌더러 색을 바꾼다.
+        private Transform flightRoot;
+        private MaterialPropertyBlock tintBlock;
+        private readonly System.Collections.Generic.List<MeshRenderer> tinted = new System.Collections.Generic.List<MeshRenderer>();
         private Vector3[] burstDirections;
 
         /// <summary>오색구슬 그림이 보이는지</summary>
@@ -58,7 +65,8 @@ namespace C6Lab
         public Color BodyColor => ColorAt(age);
 
         /// <summary>
-        /// 이 구슬에 오색구슬 그림을 얹는다(이미 있으면 그것을 쓴다). faceCamera는 투사체처럼 3D로 날아가는 구슬용이다.
+        /// 이 구슬에 오색구슬 그림을 얹는다(이미 있으면 그것을 쓴다). faceCamera는 투사체처럼 3D로 날아가는 구슬용으로,
+        /// 이때는 그림을 얹지 않고 구슬의 3D 공 색을 다섯 색 사이로 바꾼다.
         /// </summary>
         public static LabFiveColorSparkle AttachArt(Transform orbRoot, float orbRadius, bool faceCamera)
         {
@@ -73,9 +81,9 @@ namespace C6Lab
                 look = root.AddComponent<LabFiveColorSparkle>();
                 // 구슬마다 색이 다른 데서 시작해 여러 개가 한꺼번에 같은 색으로 바뀌지 않게 한다.
                 look.age = Mathf.Repeat(++attachCount * .618f, 1f) * ColorSeconds * FiveColors.Length;
-                look.Build();
+                if (faceCamera) look.flightRoot = orbRoot;
+                else look.Build();
             }
-            look.faceCamera = faceCamera;
             look.SetRadius(orbRadius);
             look.Show(true);
             return look;
@@ -88,8 +96,8 @@ namespace C6Lab
             root.transform.position = worldPoint;
             var look = root.AddComponent<LabFiveColorSparkle>();
             look.burst = true;
-            look.faceCamera = true;
             look.radius = orbRadius > 0f ? orbRadius : .3f;
+            RenderPipelineManager.beginCameraRendering += look.FaceRenderingCamera;
             look.burstDirections = new Vector3[BurstCount];
             look.burstStars = new SpriteRenderer[BurstCount];
             for (int i = 0; i < BurstCount; i++)
@@ -159,9 +167,35 @@ namespace C6Lab
 
         private void LateUpdate()
         {
-            if (!faceCamera) return;
-            Camera view = Camera.main;
-            if (view != null) transform.rotation = view.transform.rotation;
+            if (flightRoot != null) Tint();
+        }
+
+        /// <summary>날아가는 구슬의 3D 공(굴림 표시 점 제외)을 지금 몸통 색으로 칠한다. 공이 바뀌어도 매번 다시 찾는다.</summary>
+        public void Tint()
+        {
+            if (flightRoot == null) return;
+            if (tintBlock == null) tintBlock = new MaterialPropertyBlock();
+            Color color = ColorAt(age);
+            flightRoot.GetComponentsInChildren(false, tinted);
+            foreach (MeshRenderer surface in tinted)
+            {
+                if (surface == null || surface.name == "Roll Marker") continue;
+                surface.GetPropertyBlock(tintBlock);
+                tintBlock.SetColor("_BaseColor", color); // URP Lit
+                tintBlock.SetColor("_Color", color);     // Standard shader fallback
+                surface.SetPropertyBlock(tintBlock);
+            }
+        }
+
+        // 별가루는 그리는 카메라마다 그 카메라 쪽으로 돌려 세운다 (전투 카메라에 MainCamera 태그가 없어도 된다).
+        private void FaceRenderingCamera(ScriptableRenderContext context, Camera view)
+        {
+            if (this != null && view != null) transform.rotation = view.transform.rotation;
+        }
+
+        private void OnDestroy()
+        {
+            if (burst) RenderPipelineManager.beginCameraRendering -= FaceRenderingCamera;
         }
 
         private void Pose()

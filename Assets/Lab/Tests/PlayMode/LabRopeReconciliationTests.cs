@@ -141,6 +141,72 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ARunningSampleWithTheSameServerTimeIsBlendedOnlyOnce()
+        {
+            // A bulk snapshot repeats the header pose the board frame already applied. Blending the same
+            // stale sample twice pulled the gourd backwards after every hit.
+            LabTarget target = CreateTarget(out LabHangingTarget hanging);
+            LabNetwork receiver = CreateReceiver(target);
+            LabSnapshot sample = Snapshot(false, .2f, .24f, 0f, 30f, 0f);
+            sample.serverTime = 5d;
+            ApplySnapshot(receiver, sample);
+            AssertYaw(hanging, 10.5f, 0f);
+            AssertState(hanging, .05f, .12f, 0f);
+
+            ApplySnapshot(receiver, sample);
+            AssertYaw(hanging, 10.5f, 0f);
+            AssertState(hanging, .05f, .12f, 0f);
+
+            LabSnapshot newer = Snapshot(false, .2f, .24f, 0f, 30f, 0f);
+            newer.serverTime = 5.1d;
+            ApplySnapshot(receiver, newer);
+            AssertYaw(hanging, 17.325f, 0f);
+            AssertState(hanging, .0875f, .18f, 0f);
+        }
+
+        [Test]
+        public void RepeatedPausedSamplesStillPinTheRunningPoseEveryTime()
+        {
+            LabTarget target = CreateTarget(out LabHangingTarget hanging);
+            LabNetwork receiver = CreateReceiver(target);
+            LabSnapshot pinned = Snapshot(true, .2f, .24f, 1.6f, 10f, 0f);
+            pinned.serverTime = 3d;
+            ApplySnapshot(receiver, pinned);
+            AssertState(hanging, .2f, .24f, 1.6f);
+            AssertYaw(hanging, 10f, 0f);
+            hanging.Kick(new Vector3(0f, 0f, -4f));
+            ApplySnapshot(receiver, pinned);
+            AssertState(hanging, .2f, .24f, 1.6f);
+            AssertYaw(hanging, 10f, 0f);
+        }
+
+        [Test]
+        public void AHeldReceiverBlendsOnlyTheRopePhaseUntilTheHoldIsReleased()
+        {
+            LabTarget target = CreateTarget(out LabHangingTarget hanging);
+            LabNetwork receiver = CreateReceiver(target);
+            LabSnapshot start = Snapshot(false);
+            start.serverTime = 1d;
+            ApplySnapshot(receiver, start);
+            typeof(LabNetwork).GetMethod("HoldTargetPoseForPredictedImpact", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(receiver, new object[] { Time.realtimeSinceStartupAsDouble + 60d });
+
+            LabSnapshot held = Snapshot(false, .2f, .24f, 0f, 30f, 0f);
+            held.serverTime = 2d;
+            ApplySnapshot(receiver, held);
+            AssertState(hanging, .05f, 0f, 0f);
+            AssertYaw(hanging, 0f, 0f);
+
+            typeof(LabNetwork).GetMethod("ReleaseTargetPoseHold", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(receiver, null);
+            LabSnapshot released = Snapshot(false, .2f, .24f, 0f, 30f, 0f);
+            released.serverTime = 3d;
+            ApplySnapshot(receiver, released);
+            AssertYaw(hanging, 10.5f, 0f);
+            AssertState(hanging, .0875f, .12f, 0f);
+        }
+
+        [Test]
         public void NonFiniteSnapshotsAreIgnoredAtomicallyForPausedAndRunningReceivers()
         {
             LabTarget target = CreateTarget(out LabHangingTarget hanging);

@@ -104,6 +104,8 @@ namespace C6Lab
         public static bool ValidRoomSize(int capacity, bool territory) => territory ? LabTeams.IsTeamCount(capacity)
             : capacity >= MinimumParticipants && capacity <= MaximumParticipants;
         public const int DefaultParticipants = 3;
+        /// <summary>스태미나가 생성 비용보다 적어 생성을 거절한 이유. 누른 사람 화면의 부족 표시(#418)가 이 값을 본다.</summary>
+        public const string InsufficientStaminaReason = "INSUFFICIENT_STAMINA";
         private const int MaximumRequestsPerRound = 4096;
         private const float EdgeTolerance = .06f;
         private const float SecretBoxSpread = .05f;
@@ -141,6 +143,7 @@ namespace C6Lab
         private const uint FoxCountSalt = 0xF0C5C017u;
         private const uint FoxLandingXSalt = 0xF0C51A0Du;
         private const uint FoxLandingYSalt = 0xF0C51A1Du;
+        private const uint FoxLaneSalt = 0x9E3779B9u;
         // 여우구슬이 떨어지는 곳: 판 너비의 15~85%, 높이의 25~80% 사이에서 하나씩 뽑는다.
         private const float FoxLandingMinX = .15f, FoxLandingMaxX = .85f, FoxLandingMinY = .25f, FoxLandingMaxY = .8f;
         // 박 폭탄이 떨어지는 곳: 판 너비의 20~80% 사이, 판 높이의 이 지점 (보드가 영역 안으로 맞춘다).
@@ -408,7 +411,7 @@ namespace C6Lab
             // An overheated press still pays for a burnt attempt but creates no stored entity.
             if (!JigwiOverheated(sender, now) && CountStored(sender) >= rules.OrbStorageLimit)
                 return Reject("STORAGE_FULL", out reason);
-            if (player.stamina + .00001f < rules.GenerateCost) return Reject("INSUFFICIENT_STAMINA", out reason);
+            if (player.stamina + .00001f < rules.GenerateCost) return Reject(InsufficientStaminaReason, out reason);
             uint generated = generatedCounts[sender];
             if (generated == uint.MaxValue) return Reject("GENERATION_LIMIT", out reason);
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
@@ -1595,11 +1598,24 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 여우불 (#251): 이 사람의 판에 푸른 여우구슬을 정해 둔 개수만큼 떨어뜨린다. 판이 거의 차 있으면 빈 칸 수만큼만
-        /// 떨어진다. 떨어질 자리는 판 안쪽에서 seed로 하나씩 뽑는다.
+        /// 여우불 (#251, #418): 받을 수 있는 모든 사람의 판에 한꺼번에 떨어뜨린다. 개수는 모두 같고, 떨어질 자리는 판마다 따로
+        /// 뽑는다. 기믹 기록·"!" 알림은 한 번이고(대상은 자리 순서로 첫 사람), 각 판 주인에게는 떨어진 여우 구슬로 따로 알린다.
         /// </summary>
-        private void DropFoxFire(ulong target, double at, uint index)
+        private void DropFoxFireOnAll(List<ulong> targets, double at, uint index)
         {
+            for (int lane = 0; lane < targets.Count; lane++) DropFoxFire(targets[lane], at, index, (uint)lane);
+            sabotages.Add(new LabSabotage(LabSabotageKind.FoxFire, targets[0], at));
+            gimmickStats.Add(LabSabotageKind.FoxFire);
+        }
+
+        /// <summary>
+        /// 여우불 (#251): 이 사람의 판에 푸른 여우구슬을 정해 둔 개수만큼 떨어뜨린다. 판이 거의 차 있으면 빈 칸 수만큼만
+        /// 떨어진다. 떨어질 자리는 판 안쪽에서 seed로 하나씩 뽑는다. lane(0부터)은 같은 여우불을 받는 몇 번째 판인지로,
+        /// 판마다 자리가 달라진다 (첫 판은 예전과 같은 자리).
+        /// </summary>
+        private void DropFoxFire(ulong target, double at, uint index, uint lane)
+        {
+            uint landing = unchecked(lane * FoxLaneSalt);
             int span = rules.FoxFireCountMax - rules.FoxFireCountMin + 1;
             int count = Math.Min(rules.OrbStorageLimit - CountStored(target, at),
                 rules.FoxFireCountMin + (int)(DrawFor(seed ^ FoxCountSalt, SabotageDrawKey, index) % (ulong)span));
@@ -1611,8 +1627,8 @@ namespace C6Lab
                 {
                     id = NewOrbId(), owner = target, kind = LabOrbKind.FoxFire,
                     origin = LabOrbOrigin.Gourd, originOwner = target,
-                    x = Mathf.Lerp(FoxLandingMinX, FoxLandingMaxX, Unit01(DrawFor(seed ^ FoxLandingXSalt, SabotageDrawKey, spot))),
-                    y = Mathf.Lerp(FoxLandingMinY, FoxLandingMaxY, Unit01(DrawFor(seed ^ FoxLandingYSalt, SabotageDrawKey, spot))),
+                    x = Mathf.Lerp(FoxLandingMinX, FoxLandingMaxX, Unit01(DrawFor(seed ^ FoxLandingXSalt ^ landing, SabotageDrawKey, spot))),
+                    y = Mathf.Lerp(FoxLandingMinY, FoxLandingMaxY, Unit01(DrawFor(seed ^ FoxLandingYSalt ^ landing, SabotageDrawKey, spot))),
                     createdAt = at, revision = ++revision, inFlight = false
                 };
                 orbs.Add(fox.id, fox);
@@ -1673,6 +1689,8 @@ namespace C6Lab
         /// 이 묶음에서 켜져 있고 지금 걸 사람이 있는 기믹 중 하나를 비율(%)대로 골라, 걸 수 있는 사람 중 무작위 한 명에게 건다
         /// (#311). 어떤 사람에게 걸 수 없는 기믹은 그 사람을 빼고 고르므로 다른 사람에게 가고, 아무에게도 걸 수 없는 기믹은
         /// 후보에서 빠진다. 남은 기믹이 없으면 이번 차례는 건너뛰고 false를 돌려준다.
+        /// 여우불 (#418)은 한 명이 아니라 지금 받을 수 있는 모든 사람(지난번에 걸린 사람 포함)에게 떨어지고, 다음 차례가 피할
+        /// 사람(last)은 바꾸지 않는다.
         /// </summary>
         private bool CastGimmick(LabSabotageKind[] kinds, double at, uint index, uint kindSalt, uint targetSalt, ref ulong? last)
         {
@@ -1683,7 +1701,7 @@ namespace C6Lab
             {
                 int kind = (int)kinds[i];
                 if (!rules.GimmickEnabled[kind] || rules.GimmickChances[kind] <= 0) continue;
-                targets[i] = GimmickTargets(kinds[i], at, last);
+                targets[i] = GimmickTargets(kinds[i], at, kinds[i] == LabSabotageKind.FoxFire ? null : last);
                 if (targets[i].Count > 0) total += weights[i] = rules.GimmickChances[kind];
             }
             if (total == 0) return false;
@@ -1692,6 +1710,7 @@ namespace C6Lab
             {
                 roll -= weights[i];
                 if (roll >= 0) continue;
+                if (kinds[i] == LabSabotageKind.FoxFire) { DropFoxFireOnAll(targets[i], at, index); return true; }
                 ulong target = targets[i][(int)(DrawFor(seed ^ targetSalt, SabotageDrawKey, index) % (ulong)targets[i].Count)];
                 last = target;
                 DispatchGimmick(kinds[i], target, at, index);
@@ -1700,12 +1719,15 @@ namespace C6Lab
             return false;
         }
 
-        /// <summary>The one effect/notification/statistics path for periodic and scheduled common gimmicks.</summary>
+        /// <summary>
+        /// The one effect/notification/statistics path for periodic and scheduled one-player gimmicks. Fox fire falls on
+        /// every board through DropFoxFireOnAll (#418).
+        /// </summary>
         private void DispatchGimmick(LabSabotageKind kind, ulong target, double at, uint index)
         {
             if (kind == LabSabotageKind.GourdBomb) DropGourdBomb(target, at);
             else if (kind == LabSabotageKind.SwipeBlock) StartSwipeBlock(target, at);
-            else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index);
+            else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index, 0u);
             else if (kind == LabSabotageKind.Charm) StartCharm(target, at);
             sabotages.Add(new LabSabotage(kind, target, at));
             gimmickStats.Add(kind);

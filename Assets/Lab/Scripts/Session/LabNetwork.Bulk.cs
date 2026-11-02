@@ -22,7 +22,8 @@ namespace C6Lab
         public uint round;
         public int configRevision, chunkIndex, chunkCount;
         public long snapshotSequence;
-        public LabPaintFrame paintFrame;
+        /// <summary>The paint frame as JSON text, present only on paint_cells (#428).</summary>
+        public string payload;
     }
 
     public sealed partial class LabNetwork
@@ -30,17 +31,43 @@ namespace C6Lab
         private const string BulkMessageName = "C6Lab.Bulk.1";
         private readonly Dictionary<ulong, LabBulkSender> bulkSenders = new Dictionary<ulong, LabBulkSender>();
         private readonly Dictionary<ulong, LabPaintPublisher> peerPaintPublishers = new Dictionary<ulong, LabPaintPublisher>();
+        /// <summary>One surface copy, hash and encoding per publish pass, shared by every peer's publisher (#439).</summary>
+        private readonly LabPaintPublishCache paintPublishCache = new LabPaintPublishCache();
         private readonly Dictionary<ulong, string> peerSharedRounds = new Dictionary<ulong, string>();
         private readonly LabBulkReceiver bulkReceiver = new LabBulkReceiver();
         private readonly LabBulkMessageAssembler bulkMessages = new LabBulkMessageAssembler();
         public long SentControlBytes { get; private set; }
         public long SentBulkBytes { get; private set; }
 
-        private bool HasPendingBulk(ulong peer) => bulkSenders.TryGetValue(peer, out var sender) && sender.Count > 0;
+        /// <summary>
+        /// Queued bytes (unsent or unacknowledged) at which the Host stops adding snapshots and paint for a peer
+        /// until it drains. Far below the 4 MiB queue limit, so one stage-start paint map plus a snapshot always fits.
+        /// </summary>
+        public const int BulkBacklogLimitBytes = 64 * 1024;
+
+        /// <summary>
+        /// A slow peer is skipped only once its backlog is this large, not whenever any chunk awaits its ACK:
+        /// that skipped every 100 ms snapshot for a whole round trip even without loss (#437). A skipped peer
+        /// still coalesces to the newest state on its next publish.
+        /// </summary>
+        private bool BulkBacklogFull(ulong peer) => bulkSenders.TryGetValue(peer, out var sender)
+            && sender.QueuedBytes >= BulkBacklogLimitBytes;
+        /// <summary>The last Bulk sequence of the most recent full paint map queued to each peer (round start or checkpoint).</summary>
+        private readonly Dictionary<ulong, long> paintCheckpointThrough = new Dictionary<ulong, long>();
+
+        /// <summary>A full map is several hundred KB; another one before the last is acknowledged repairs nothing.</summary>
+        private bool PaintCheckpointInFlight(ulong peer) => paintCheckpointThrough.TryGetValue(peer, out long through)
+            && bulkSenders.TryGetValue(peer, out var sender) && sender.Acknowledged < through;
+
+        private void MarkPaintFullQueued(ulong peer)
+        {
+            if (bulkSenders.TryGetValue(peer, out var sender)) paintCheckpointThrough[peer] = sender.LastEnqueued;
+        }
+
         private LabPaintPublisher PeerPaintPublisher(ulong peer)
         {
             if (!peerPaintPublishers.TryGetValue(peer, out var publisher))
-                peerPaintPublishers.Add(peer, publisher = new LabPaintPublisher());
+                peerPaintPublishers.Add(peer, publisher = new LabPaintPublisher(paintPublishCache));
             return publisher;
         }
 
@@ -49,7 +76,7 @@ namespace C6Lab
             var body = new LabBulkPayload { type = packet.type, sessionId = packet.sessionId, round = packet.round,
                 configRevision = packet.configRevision, configFingerprint = packet.configFingerprint,
                 snapshotSequence = packet.snapshotSequence, chunkIndex = packet.chunkIndex,
-                chunkCount = packet.chunkCount, chunkData = packet.chunkData, paintFrame = packet.paintFrame };
+                chunkCount = packet.chunkCount, chunkData = packet.chunkData, payload = packet.payload };
             string encoded = Convert.ToBase64String(Utf8.GetBytes(JsonUtility.ToJson(body)));
             if (!bulkSenders.TryGetValue(peer, out var sender)) bulkSenders.Add(peer, sender = new LabBulkSender());
             string[] fragments;
@@ -115,7 +142,8 @@ namespace C6Lab
                 if (IsHost)
                 {
                     if (order.Contains(sender) && string.IsNullOrEmpty(wire.payload)
-                        && bulkSenders.TryGetValue(sender, out var outgoing)) outgoing.Ack(wire.ack);
+                        && bulkSenders.TryGetValue(sender, out var outgoing))
+                        outgoing.Ack(wire.ack, Time.realtimeSinceStartupAsDouble);
                     return;
                 }
                 if (sender != NetworkManager.ServerClientId || !clientConfigReady) return;
@@ -129,7 +157,7 @@ namespace C6Lab
                         var packet = new LabNetworkPacket { type = body.type, sessionId = body.sessionId, round = body.round,
                             configRevision = body.configRevision, configFingerprint = body.configFingerprint,
                             snapshotSequence = body.snapshotSequence, chunkIndex = body.chunkIndex,
-                            chunkCount = body.chunkCount, chunkData = body.chunkData, paintFrame = body.paintFrame };
+                            chunkCount = body.chunkCount, chunkData = body.chunkData, payload = body.payload };
                         if (packet.type == "paint_cells") ReceivePaintFrame(packet);
                         else if (packet.type == "snapshot_chunk") ReceiveSnapshotChunk(packet);
                     }
@@ -145,7 +173,9 @@ namespace C6Lab
 
         private void ResetBulkTransport()
         {
-            bulkSenders.Clear(); peerPaintPublishers.Clear(); peerSharedRounds.Clear(); bulkReceiver.Clear(); bulkMessages.Clear();
+            bulkSenders.Clear(); peerPaintPublishers.Clear(); paintPublishCache.Clear();
+            peerSharedRounds.Clear(); bulkReceiver.Clear(); bulkMessages.Clear();
+            paintCheckpointThrough.Clear();
         }
     }
 }

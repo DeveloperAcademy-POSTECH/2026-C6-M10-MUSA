@@ -25,10 +25,11 @@ namespace C6Lab
         public bool restarting;
         public long lobbyRevision;
         public string roomName;
-        public LabSnapshot snapshot;
-        public LabPaintFrame paintFrame;
-        public LabActionReceipt actionReceipt;
-        public LabBoardFrame boardFrame;
+        /// <summary>
+        /// The message body (an action receipt or a paint frame) as JSON text. A typed field would make
+        /// JsonUtility write a default copy of that type into every other packet as well (#428).
+        /// </summary>
+        public string payload;
         public ulong ownershipVersion, secondOwnershipVersion;
         public string provisionalId;
         public long requestId;
@@ -81,6 +82,23 @@ namespace C6Lab
         public int chunkIndex;
         public int chunkCount;
         public string chunkData;
+    }
+
+    /// <summary>
+    /// Message bodies travel inside LabNetworkPacket.payload as JSON text (#428). JsonUtility cannot leave a
+    /// class-typed field out, so a typed body field would cost every packet a default copy of that type.
+    /// </summary>
+    public static class LabPacketPayload
+    {
+        public static string Encode<T>(T body) where T : class => body == null ? null : JsonUtility.ToJson(body);
+
+        /// <summary>Null for a missing or malformed body; callers already treat a null body as invalid.</summary>
+        public static T Decode<T>(string payload) where T : class
+        {
+            if (string.IsNullOrEmpty(payload)) return null;
+            try { return JsonUtility.FromJson<T>(payload); }
+            catch (ArgumentException) { return null; }
+        }
     }
 
     /// <summary>
@@ -231,13 +249,15 @@ namespace C6Lab
         // 5675/5676: standalone #341 screen-space fire curtain and reachable ignition geometry.
         // 5677: integrate #334/#343 fever and #341 A/B; preserve DEV0..239 and append A/B240..250 (251 values).
         // 5681: #417 board frames, action receipts and paint frames accept the six players of a 3:3 territory room.
-        internal const ushort LabProtocolVersion = 5681;
+        // 5682: #428 lean packet envelope (bodies in a JSON payload string, no default nested objects); immediate
+        //       board publishes skip peers whose delta is empty.
+        internal const ushort LabProtocolVersion = 5682;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/42");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/43");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -264,11 +284,13 @@ namespace C6Lab
         private readonly LabPaintSurface receivedPaintSurface = new LabPaintSurface();
         private LabPaintReceiver paintReceiver;
         private LabPaintReceiver PaintReceiver => paintReceiver ?? (paintReceiver = new LabPaintReceiver(receivedPaintSurface));
-        private readonly Dictionary<ulong, double> paintCheckpointRequests = new Dictionary<ulong, double>();
+        private readonly LabPeerRequestThrottle paintCheckpointRequests = new LabPeerRequestThrottle();
+        private readonly LabPeerRequestThrottle boardCheckpointRequests = new LabPeerRequestThrottle();
         private LabSnapshot pendingPaintSnapshot;
         private string awaitingPaintSession;
         private uint awaitingPaintRound;
         private double nextPaintRequestAt;
+        private readonly LabStallWatch partialPaintWatch = new LabStallWatch(1d);
 
         /// <summary>The map committed with the displayed snapshot; never a client simulation.</summary>
         public LabPaintSurface PaintSurface => clientPaintSurface;
@@ -368,8 +390,13 @@ namespace C6Lab
         private double announcedBlockStart = -1d;
         /// <summary>박이 누군가의 판에 폭탄을 떨어뜨렸을 때 모든 기기에서 한 번 알린다. (받는 사람, 폭탄 ID, 떨어질 위치 0..1)</summary>
         public event Action<ulong, string, Vector2> GourdBombDropped;
-        /// <summary>요괴가 통합 추첨으로 방해공작을 걸었을 때 모든 기기에서 한 번 알린다 (#251). (종류, 받는 사람)</summary>
+        /// <summary>
+        /// 요괴가 통합 추첨으로 방해공작을 걸었을 때 모든 기기에서 한 번 알린다 (#251). (종류, 받는 사람) 여우불은 모든 판에
+        /// 떨어지므로(#418) 받는 사람은 자리 순서로 첫 사람이다. 내 판에 떨어졌는지는 LocalFoxFireDropped로 안다.
+        /// </summary>
         public event Action<LabSabotageKind, ulong> SabotageCast;
+        /// <summary>여우 구슬이 내 판에 떨어질 때 판 주인 기기에서만 한 번 알린다 (#418). 떨어진 여우 구슬 ID들.</summary>
+        public event Action<string[]> LocalFoxFireDropped;
         /// <summary>옆 사람들이 깨워 매혹이 풀렸을 때 모든 기기에서 한 번 알린다 (#251). (깨어난 사람) 시간이 다 되어 풀리면 알리지 않는다.</summary>
         public event Action<ulong> CharmWoken;
         /// <summary>내가 던진 구슬이 요괴를 빗나갔다고 Host가 확정했을 때, 던진 사람 기기에서만 한 번 알린다.</summary>
@@ -1344,7 +1371,7 @@ namespace C6Lab
                 FlushBoardActions(now);
             }
             FlushBulkPackets();
-            if (!IsHost && (pendingPaintSnapshot != null || PaintReceiver.HasPending)
+            if (!IsHost && (pendingPaintSnapshot != null || PartialPaintStalled(now))
                 && now >= nextPaintRequestAt) RequestPaintCheckpoint();
             // Command-line smoke mode is intentionally separate from ordinary UI play.
             if (CanProcessBattleActions && IsConnected && latest != null && latest.phase == LabPhase.Playing && !latest.paused)
@@ -1471,7 +1498,7 @@ namespace C6Lab
                     // publish a legacy lobby that would erase it on the remaining peers.
                     if (stopping || manager == null || !manager.IsHost) return;
                     order.Remove(id);
-                    bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id);
+                    bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id); paintCheckpointThrough.Remove(id);
                     boardSequences.Remove(id);
                     playerSlots?.Release(id);
                     slotRequestIds.Remove(id);
@@ -1485,7 +1512,7 @@ namespace C6Lab
                     Debug.Log("C6_LAB_JOIN_REJECTED id=" + id);
                     return;
                 }
-                bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id);
+                bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id); paintCheckpointThrough.Remove(id);
                 boardSequences.Remove(id);
                 playerSlots?.Release(id);
                 slotRequestIds.Remove(id);
@@ -1638,6 +1665,8 @@ namespace C6Lab
             AnnounceBombExplosions();
             AnnounceOrbExpiries();
             AnnounceGourdBombs();
+            // Header frames always go out here: pause/resume, start and flash publishes rely on the header reaching
+            // every peer at once. Only HandleBoardAction skips peers whose board did not change (#428).
             PublishOwnerBoards(latest);
             // Large experimental states are deliberately updated less often instead of queuing
             // many reliable fragments per peer until the network becomes unusable.
@@ -1650,7 +1679,7 @@ namespace C6Lab
             long sequence = ++snapshotSequence;
             foreach (ulong id in order)
             {
-                if (id == manager.LocalClientId || HasPendingBulk(id)) continue;
+                if (id == manager.LocalClientId || BulkBacklogFull(id)) continue;
                 // A slow peer coalesces to the newest shared state, without holding up board actions or other peers.
                 var shared = LabBoardReplica.CopySnapshot(latest);
                 string roundKey = latest.sessionId + "/" + latest.round;
@@ -1665,6 +1694,7 @@ namespace C6Lab
                 LabPaintFrame[] paintFrames = PeerPaintPublisher(id).Publish(model.PaintSurface, sessionId, latest.round, sequence);
                 if (!SendPaintFrames(id, paintFrames))
                 { AbortOversizedSnapshot("Could not queue the complete paint transaction."); return; }
+                if (paintFrames.Length > 0 && paintFrames[0].full) MarkPaintFullQueued(id);
                 for (int i = 0; i < pieces.Length; i++)
                 {
                     if (!QueueBulk(id, new LabNetworkPacket { type = "snapshot_chunk", sessionId = sessionId,
@@ -1768,6 +1798,7 @@ namespace C6Lab
         private void OnFoxFire(string[] orbIds)
         {
             SetNotice(FoxFireNotice);
+            LocalFoxFireDropped?.Invoke(orbIds);
             if (board == null) return;
             foreach (string id in orbIds) board.ExpectDrop(id);
         }
@@ -1855,6 +1886,9 @@ namespace C6Lab
             }
             if (packet.type == "board_checkpoint")
             {
+                // A Guest already waits .5 s between requests; the Host matches it so a burst of requests
+                // cannot make it rebuild and resend a full board every frame (#435).
+                if (!boardCheckpointRequests.TryAccept(sender, Time.realtimeSinceStartupAsDouble, .5d)) return;
                 LabSnapshot checkpoint = model.Snapshot(now);
                 AnnounceBombExplosions();
                 AnnounceOrbExpiries();
@@ -2230,12 +2264,13 @@ namespace C6Lab
                     if (model != null && packet.sessionId == sessionId && packet.round == model.Round
                         && packet.configRevision == configRevision && packet.configFingerprint == configFingerprint)
                     {
-                        double now = Time.realtimeSinceStartupAsDouble;
-                        if (!paintCheckpointRequests.TryGetValue(sender, out double last) || now - last >= .5d)
-                        {
-                            paintCheckpointRequests[sender] = now;
-                            if (!HasPendingBulk(sender)) SendPaintFrames(sender, PeerPaintPublisher(sender).Checkpoint());
-                        }
+                        // Queued deltas still arrive first in order; the checkpoint after them repairs the peer.
+                        // A full backlog or an earlier checkpoint not yet acknowledged refuses, and only a served
+                        // request starts the .5 s window (#437).
+                        if (!BulkBacklogFull(sender) && !PaintCheckpointInFlight(sender)
+                            && paintCheckpointRequests.TryAccept(sender, Time.realtimeSinceStartupAsDouble, .5d)
+                            && SendPaintFrames(sender, PeerPaintPublisher(sender).Checkpoint()))
+                            MarkPaintFullQueued(sender);
                     }
                     return;
                 }
@@ -2249,7 +2284,7 @@ namespace C6Lab
                     ReceiveActionRetry(packet);
                     break;
                 case "action_result":
-                    ReceiveActionReceipt(packet.actionReceipt);
+                    ReceiveActionReceipt(LabPacketPayload.Decode<LabActionReceipt>(packet.payload));
                     break;
                 case "board_delta":
                     ReceiveBoardChunk(packet);
@@ -2562,6 +2597,7 @@ namespace C6Lab
             if (sessionId != snapshot.sessionId || latest == null || latest.round != snapshot.round)
             {
                 target?.GetComponent<LabHangingTarget>()?.ResetSwing();
+                ResetTargetPoseReconcile();
                 impactFeedback?.Clear();
             }
             sessionId = snapshot.sessionId;
@@ -2579,15 +2615,7 @@ namespace C6Lab
             if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
             ApplyLocalPause(CanProcessBattleActions && latest.phase == LabPhase.Playing && latest.paused);
-            bool targetPaused = latest.phase == LabPhase.Playing && latest.paused;
-            if (target != null && Finite(latest.targetYawDegrees)
-                && Finite(latest.targetYawSpeedDegreesPerSecond))
-                target.GetComponent<LabHangingTarget>()?.ReconcileYaw(
-                    latest.targetYawDegrees, latest.targetYawSpeedDegreesPerSecond, targetPaused);
-            if (target != null)
-                target.GetComponent<LabHangingTarget>()?.ReconcileRope(
-                    latest.targetRopeCycleElapsed, latest.targetRopeHitOffset,
-                    latest.targetRopeHitVelocity, targetPaused);
+            ReconcileTargetPose(latest);
             SyncBoard();
             if (logTransition && latest.phase == LabPhase.Playing) SetNotice(string.Empty);
             SetStatus((latest.paused ? "PAUSED" : latest.phase.ToString())
@@ -2620,13 +2648,13 @@ namespace C6Lab
             foreach (LabPaintFrame frame in frames)
                 if (!QueueBulk(receiver, new LabNetworkPacket { type = "paint_cells", sessionId = frame.session,
                     round = frame.round, snapshotSequence = frame.epoch, configRevision = configRevision,
-                    configFingerprint = configFingerprint, paintFrame = frame })) return false;
+                    configFingerprint = configFingerprint, payload = LabPacketPayload.Encode(frame) })) return false;
             return true;
         }
 
         private void ReceivePaintFrame(LabNetworkPacket packet)
         {
-            LabPaintFrame frame = packet.paintFrame;
+            LabPaintFrame frame = LabPacketPayload.Decode<LabPaintFrame>(packet.payload);
             if (!clientConfigReady || packet.configRevision != configRevision || packet.configFingerprint != configFingerprint
                 || frame == null || frame.session != packet.sessionId || frame.round != packet.round
                 || frame.epoch != packet.snapshotSequence || frame.epoch <= lobbySnapshotSequenceFloor
@@ -2643,6 +2671,15 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// A partly received paint frame normally completes on the reliable Bulk channel within a few frames. Only a
+        /// partial frame that received no new fragment for a whole second counts as stuck, so a frame that is merely
+        /// arriving no longer asks the Host for a full map checkpoint, now that the Host serves one while other Bulk
+        /// data is in flight (#437).
+        /// </summary>
+        private bool PartialPaintStalled(double now)
+            => partialPaintWatch.Stalled(PaintReceiver.PendingSequence, PaintReceiver.PendingReceivedParts, now);
+
         private void RequestPaintCheckpoint()
         {
             if (IsHost || !IsConnected || string.IsNullOrEmpty(awaitingPaintSession)
@@ -2656,11 +2693,13 @@ namespace C6Lab
         private void ResetPaintTransport()
         {
             peerPaintPublishers.Clear();
+            paintPublishCache.Clear();
             peerSharedRounds.Clear();
             PaintReceiver.Reset();
             clientPaintSurface.Reset(new LabPaintGrowthSettings(), 1);
             pendingPaintSnapshot = null; awaitingPaintSession = null; awaitingPaintRound = 0;
-            nextPaintRequestAt = 0d; paintCheckpointRequests.Clear();
+            nextPaintRequestAt = 0d; paintCheckpointRequests.Clear(); boardCheckpointRequests.Clear();
+            partialPaintWatch.Clear(); paintCheckpointThrough.Clear();
         }
 
         private void RejectLocally(string orbId, string reason)
