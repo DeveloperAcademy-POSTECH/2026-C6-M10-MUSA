@@ -71,6 +71,23 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void AFeverFiveColorOrbPopsOutOfTheDrumWithItsSound()
+        {
+            LabModel room = Room(LabStageYokai.Yaguang);
+            Assert.That(room.TryGenerate(0ul, "before", 60d, out LabOrbState before, out string reason), Is.True, reason);
+            Assert.That(LabNetwork.ShowsDrumSpawn(before, 0ul), Is.True);
+            Assert.That(room.TryGenerate(0ul, "fever", 101d, out LabOrbState orb, out reason), Is.True, reason);
+            Assert.That(LabNetwork.ShowsDrumSpawn(orb, 0ul), Is.True,
+                "A five-color orb from the drum in the fever still pops out with the drum sound.");
+            Assert.That(LabNetwork.ShowsDrumSpawn(orb, 20ul), Is.False, "Only the one who pressed the drum hears it.");
+
+            var combined = new LabOrbState { kind = LabOrbKind.Combined, origin = LabOrbOrigin.Generated, originOwner = 0ul };
+            Assert.That(LabNetwork.ShowsDrumSpawn(combined, 0ul), Is.False, "An orb combined on the board makes no drum sound.");
+            var gourd = new LabOrbState { kind = LabOrbKind.Combined, fiveColor = true, origin = LabOrbOrigin.Gourd, originOwner = 0ul };
+            Assert.That(LabNetwork.ShowsDrumSpawn(gourd, 0ul), Is.False, "A gourd reward did not come from the drum.");
+        }
+
+        [Test]
         public void OtherStagesDrumsGiveNoFiveColorOrbs()
         {
             float[] values = config.CaptureDeveloperValues();

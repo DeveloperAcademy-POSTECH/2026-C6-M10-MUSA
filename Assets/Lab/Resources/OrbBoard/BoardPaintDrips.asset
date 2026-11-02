@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48c08cedb661f444094cf30dae2c9f7c, type: 3}
+  m_Name: BoardPaintDrips
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabOrbDripProfile
+  diameterScale: 0.7
+  spacingRadii: 1.4
+  fallDuration: 0.08
+  spreadDuration: 0.16
+  holdDuration: 0.12
+  fadeDuration: 0.44
+  fallDistanceRadii: 0.8
+  strength: 0.88
+  minimumOpacity: 0.45
+  fadeInSpeed: 0.5
+  fullSpeed: 4
+  maxDrops: 24
+  spatterChance: 0.45
+  stainTextures:
+  - {fileID: 2800000, guid: c98f012eba1c047cdbab6a2d462610c4, type: 3}
+  - {fileID: 2800000, guid: 17f1e05ffc6d24c06ae85f603e5b95e5, type: 3}
+  - {fileID: 2800000, guid: 31a69775a5bd044528789765f2e57d0c, type: 3}
+  spatterTextures:
+  - {fileID: 2800000, guid: abffc937816ff4c27b7575730f6b6a6c, type: 3}
+  - {fileID: 2800000, guid: c0f67d6c0a80d4796b15204b7f8c0320, type: 3}
+  material: {fileID: 2100000, guid: 73faea4d143e64562a6ac597d2a69aae, type: 2}

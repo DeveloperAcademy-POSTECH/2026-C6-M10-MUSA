@@ -591,7 +591,7 @@ namespace C6Lab
         [SerializeField, Min(.001f)] private float orbMaxReleaseSpeed = 3f;
         [SerializeField, Min(.001f)] private float orbRadius = .32f;
         [SerializeField, Min(.1f)] private float boardHeight = 5f;
-        [Tooltip("조합판의 결합(오행) 구슬이 움직일 때 던진 구슬처럼 오행 꼬리를 얕게 남긴다 (#254). 크기/진하기는 LabOrbBoardTrail Inspector.")]
+        [Tooltip("조합판 Combined가 움직이면 속성 색 물방울이 떨어졌다 사라진다 (#392). 크기/간격/낙하는 BoardPaintDrips 표현 프로필에서 조정한다.")]
         [SerializeField] private bool boardOrbTrailEnabled = true;
 
         [Header("Orb combine")]
@@ -901,6 +901,21 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float yaguangFlashCaughtSoundVolume = .9f;
         [Tooltip("눈부심이 풀린 뒤 \"으악 어지러워~\"까지 기다리는 초")]
         [SerializeField, Range(0f, 2f)] private float yaguangFlashCaughtDelaySeconds = .2f;
+        [Header("야광귀 콤보 예고와 진행 효과음 (#397, Inspector 전용)")]
+        [Tooltip("콤보 예고 카운트 \"넷/셋/둘/하나\" 야광귀 목소리 크기 (Resources/Audio/YaguangComboCount1~4, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboCountSoundVolume = .9f;
+        [Tooltip("4칸 색이 공개되는 순간 꽹과리 \"깽!\" 크기 (Resources/Audio/YaguangComboStart, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboStartSoundVolume = .8f;
+        [Tooltip("콤보 제한 시간 동안 나는 시계 째깍 크기 (Resources/Audio/YaguangComboTick, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboTickSoundVolume = 1f;
+        [Tooltip("마지막 몇 초의 빠른 째깍 크기 (Resources/Audio/YaguangComboTickFast, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboTickFastSoundVolume = 1f;
+        [Tooltip("째깍 간격 (초). 작을수록 시계가 빨리 간다")]
+        [SerializeField, Range(.1f, 2f)] private float yaguangComboTickIntervalSeconds = .5f;
+        [Tooltip("남은 시간이 아래 초 이하일 때의 빠른 째깍 간격 (초)")]
+        [SerializeField, Range(.05f, 1f)] private float yaguangComboTickFastIntervalSeconds = .25f;
+        [Tooltip("남은 시간이 이 초 이하가 되면 빠른 째깍으로 바꾼다 (0이면 끝까지 기본 째깍)")]
+        [SerializeField, Range(0f, 10f)] private float yaguangComboTickFastSeconds = 3f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1336,6 +1351,14 @@ namespace C6Lab
         public float YaguangShakeBellFinalSoundVolume => Mathf.Clamp01(Finite(yaguangShakeBellFinalSoundVolume, .9f));
         public float YaguangFlashCaughtSoundVolume => Mathf.Clamp01(Finite(yaguangFlashCaughtSoundVolume, .9f));
         public float YaguangFlashCaughtDelaySeconds => Mathf.Clamp(Finite(yaguangFlashCaughtDelaySeconds, .2f), 0f, 2f);
+        // 야광귀 콤보 예고와 진행 효과음 (#397): Inspector 값 그대로
+        public float YaguangComboCountSoundVolume => Mathf.Clamp01(Finite(yaguangComboCountSoundVolume, .9f));
+        public float YaguangComboStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboStartSoundVolume, .8f));
+        public float YaguangComboTickSoundVolume => Mathf.Clamp01(Finite(yaguangComboTickSoundVolume, 1f));
+        public float YaguangComboTickFastSoundVolume => Mathf.Clamp01(Finite(yaguangComboTickFastSoundVolume, 1f));
+        public float YaguangComboTickIntervalSeconds => Mathf.Clamp(Finite(yaguangComboTickIntervalSeconds, .5f), .1f, 2f);
+        public float YaguangComboTickFastIntervalSeconds => Mathf.Clamp(Finite(yaguangComboTickFastIntervalSeconds, .25f), .05f, 1f);
+        public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 3f), 0f, 10f);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;
