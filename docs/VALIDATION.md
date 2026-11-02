@@ -3843,3 +3843,12 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 | PlayMode `GameLobbyViewTests.EnteringAndLeavingACreatedRoomDarkenOverTheHeldScreenThenBrightenOnTheNextOne` (이름 바꿈, 추가: 뒤로 가기 → 자리 고르기 화면 유지·눌림 막힘 → Home 뒤 밝아짐) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | PlayMode `GameLobbyViewTests` 전체, `GameSceneFlowTests` (방 나가기 뒤 방 목록 검사들) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | Play로 방 만들기 → 뒤로 가기 전환 보기 | NOT_RUN | |
+
+## 2026-11-02 — #418 3단계 검사 수정 (사용자 Test Runner 결과)
+
+- 사용자 EditMode 실행에서 2개 실패: ① `LabModelTests.FoxFireDropsTwoToFiveFoxOrbsOnEveryBoardButNoMoreThanEachBoardHolds` — "같은 세션은 같은 결과" 비교가 스냅샷 순서까지 비교했는데, 구슬 ID가 무작위(GUID)라 ID 순서로 정렬된 스냅샷 순서가 방마다 달랐다(떨어진 자리는 같음). 순서와 상관없이(`EquivalentTo`) 비교하도록 고쳤다. ② `LabModelTests.AFoxOrbStaysAtASideEdgeAndADoubleTapClearsOnlyThatOne` — 이제 모든 판에 여우구슬이 있는데 화면 전체 개수를 셌다. 누른 사람 판만 세고, 다른 판의 여우구슬은 그대로인지 확인을 더했다. 규칙 코드는 바꾸지 않았다.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 위 2개 검사 수정 후 열린 Editor 컴파일 | PASS | 컴파일 오류 0 |
+| 위 2개 검사 다시 실행 | NOT_RUN | 사용자가 Test Runner로 실행한다 |
