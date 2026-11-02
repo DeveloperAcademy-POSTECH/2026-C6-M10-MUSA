@@ -745,7 +745,7 @@ namespace C6Lab
                     uint index = combo.Count * (uint)LabGourdCombo.Length + (uint)i;
                     colors[i] = (LabOrbElement)(1 + (int)(DrawFor(seed ^ ComboColorSalt, ComboDrawKey, index) % 5UL));
                 }
-                combo.Start(colors, at, rules.ComboTimeLimitSeconds);
+                combo.Start(colors, at, rules.ComboTimeLimitSeconds, rules.ComboGraceSeconds);
                 // Scheduled stages receive the next occurrence from CastGimmicks, never from this effect.
                 nextComboAt = rules.YaguangTimeline ? double.PositiveInfinity : at + rules.ComboRepeatIntervalSeconds;
             }
@@ -1365,6 +1365,8 @@ namespace C6Lab
                 comboResultCount = combo.LastResultCount,
                 comboResultAt = combo.LastResultAt,
                 comboFailedBy = combo.LastFailedBy,
+                comboForgivenCount = combo.ForgivenCount,
+                comboForgivenAt = combo.LastForgivenAt,
                 comboNextAt = ComboAnnounced ? nextComboAt : -1d,
                 comboWarningAt = ComboAnnounced ? nextComboAt - rules.ComboWarningSeconds : -1d,
                 flashAt = FlashWaiting ? nextFlashAt : -1d,
@@ -1989,6 +1991,8 @@ namespace C6Lab
             public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
                 ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale,
                 ComboWarningSeconds;
+            /// <summary>#414: 콤보가 나오고 첫 틀림 한 번을 봐주는 초 (Host Inspector).</summary>
+            public readonly float ComboGraceSeconds;
             /// <summary>Yaguang flash (#268): on/off, everyone or one at a time, and its timing.</summary>
             public readonly bool FlashEnabled, FlashTargetOne;
             public readonly float FlashFirstStartSeconds, FlashIntervalSeconds, FlashWarningSeconds,
@@ -2062,6 +2066,7 @@ namespace C6Lab
                 ComboFirstStartSeconds = config.ComboFirstStartSeconds;
                 ComboRepeatIntervalSeconds = config.ComboRepeatIntervalSeconds;
                 ComboTimeLimitSeconds = config.ComboTimeLimitSeconds;
+                ComboGraceSeconds = config.YaguangComboGraceSeconds;
                 ComboPenaltyDurationSeconds = config.ComboPenaltyDurationSeconds;
                 ComboPenaltySizeScale = config.ComboPenaltySizeScale;
                 ComboPenaltyThrowerOnly = config.ComboPenaltyThrowerOnly;

@@ -933,6 +933,9 @@ namespace C6Lab
         [SerializeField, Range(0f, 12f)] private float smallHitPitchSemitones = 6f;
         [Tooltip("BIG 중 던진 큰 공이 맞을 때 징 크기 (Resources/Audio/FiveColorHit, 던진 사람 기기)")]
         [SerializeField, Range(0f, 1f)] private float bigHitSoundVolume = .8f;
+        [Header("야광귀 콤보 예고와 피버 신호 (#414, Inspector 전용)")]
+        [Tooltip("콤보가 나오고 이 초 안에 틀린 색을 맞히면 첫 번째 한 번만 봐주고(경고) 콤보를 이어 간다. 0이면 봐주지 않음 (Host 기기 값)")]
+        [SerializeField, Range(0f, 5f)] private float yaguangComboGraceSeconds = 2f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1382,6 +1385,7 @@ namespace C6Lab
         public float YaguangComboBigStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigStartSoundVolume, .8f));
         public float YaguangComboBigEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigEndSoundVolume, .7f));
         public float SmallHitPitchSemitones => Mathf.Clamp(Finite(smallHitPitchSemitones, 6f), 0f, 12f);
+        public float YaguangComboGraceSeconds => Mathf.Clamp(Finite(yaguangComboGraceSeconds, 2f), 0f, 5f);
         public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));
         public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 4f), 0f, 10f);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);

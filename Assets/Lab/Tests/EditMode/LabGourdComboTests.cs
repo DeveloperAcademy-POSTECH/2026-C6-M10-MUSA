@@ -63,6 +63,36 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheFirstWrongColorInTheGraceSecondsIsOnlyAWarning()
+        {
+            var combo = new LabGourdCombo();
+            combo.Start(Sample, 10d, 10d, 2d);
+            Assert.That(combo.Judge(LabOrbElement.Water, 7, 10.5d), Is.EqualTo(LabComboResult.None),
+                "The first slot is Fire: a Water in the first 2 s is forgiven once (#414).");
+            Assert.That(combo.Active, Is.True);
+            Assert.That(combo.ForgivenCount, Is.EqualTo(1u));
+            Assert.That(combo.LastForgivenAt, Is.EqualTo(10.5d));
+            Assert.That(combo.Progress, Is.Zero, "A forgiven miss neither counts nor moves on.");
+            Assert.That(combo.Judge(LabOrbElement.Fire, 1, 11d), Is.EqualTo(LabComboResult.None));
+            Assert.That(combo.Progress, Is.EqualTo(1));
+            Assert.That(combo.Judge(LabOrbElement.Fire, 7, 11.5d), Is.EqualTo(LabComboResult.WrongColor),
+                "Only the first miss is forgiven, even inside the grace seconds.");
+            Assert.That(combo.ForgivenCount, Is.EqualTo(1u));
+
+            // 다음 콤보는 다시 한 번 봐준다. 봐주기 초가 지나면 바로 실패.
+            combo.Start(Sample, 30d, 10d, 2d);
+            Assert.That(combo.Judge(LabOrbElement.Water, 7, 32.5d), Is.EqualTo(LabComboResult.WrongColor),
+                "After the grace seconds a wrong color fails at once.");
+            Assert.That(combo.ForgivenCount, Is.EqualTo(1u));
+            combo.Start(Sample, 50d, 10d, 2d);
+            Assert.That(combo.Judge(LabOrbElement.Water, 7, 50.1d), Is.EqualTo(LabComboResult.None), "A new combo forgives once again.");
+            Assert.That(combo.ForgivenCount, Is.EqualTo(2u));
+
+            combo.Start(Sample, 70d, 10d);
+            Assert.That(combo.Judge(LabOrbElement.Water, 7, 70.1d), Is.EqualTo(LabComboResult.WrongColor), "No grace by default.");
+        }
+
+        [Test]
         public void TheTimeLimitEndsTheComboAtItsDeadline()
         {
             var combo = new LabGourdCombo();
