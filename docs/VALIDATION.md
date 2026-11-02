@@ -3784,3 +3784,16 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - **배치 보존:** Home/Lobby는 기존 serialized block 각2곳의 DEV 배열/자식 참조에4행만 더했다(새124block, 삭제0). 모든 기존 RectTransform·기존 UI object는 동일하다. Lab/Battle Scene·기존 Prefab·머터리얼·ThrowMath/Projectile·Packages/ProjectSettings는 변경하지 않았다. LabConfig를 Unity로 저장하면서 main에서 이미 동작하던 팀 피버/음향 기본값도 명시 직렬화됐다. 기존 저장값을 바꾸지 않았고 해당 기본값 코드는 main과 같다. 스태시9개 보존·신규meta누락/GUID중복0을 확인했다.
 - **종료 상태:** Play OFF, 원래 Lab Scene 열림, dirty=false, 스크립트 컴파일 오류 없음. 임시 C#·원시 JSON·실행 로그·TestRunner 임시 Scene은 커밋 대상에서 제외한다.
 - **미실행:** iPhone/iPad 실기기·iOS 서명/설치·LAN/핫스팟 실제 다기기·모바일 성능. 실제 짧은 플리크 감각과 폰 화면에서의 화염 가독성은 이후 실기기로 확인해야 한다. 기본/DEV 조절과 수동 기대 시나리오는 `JIGWI_SCREEN_PATTERNS.md`의 최신1~8절을 따른다.
+
+## 2026-11-02 — #418 1단계: 방에 들어갈 때 화면 전환
+
+- 기준 main `322e00a0`, `feat/#418-room-fade-stamina-foxfire`. 이 단계는 화면 전환만 다룬다(스태미나 부족 피드백·여우구슬은 다음 단계).
+- 원인: 방에 들어가 상태가 Lobby가 되는 같은 프레임에 Home의 `GameLobbyView`가 화면을 숨기고(Home도 Lobby도 아닌 상태), Lobby 씬을 불러오는 동안 빈 화면이 비친 뒤 자리 고르기 화면이 갑자기 나타났다.
+- 수정: `GameSession`이 Home → Lobby 전환에서만, 방이 열린 순간 화면을 바로 검게 가리고 곧장 씬을 불러온 뒤 새 화면이 그려지면 밝아진다(사용자 요청으로 방이 열린 뒤 기다리지 않음). 어두워지는 시간을 주면 그동안 Home 화면을 그대로 둔다. 막은 코드로 만든 `GameSceneFade`(Scene·Prefab 변경 없음). 시간·색은 GameSession 프리팹 Inspector 값(프리팹에 아직 저장되지 않아 코드 기본값: 어두워짐 0초/밝아짐 0.35초/검정). 기본 모드를 누른 순간부터 가리는 방식은 사용자 확인 후 되돌렸다.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 열린 Editor 재컴파일 | PASS | 컴파일 실패 없음, 콘솔 오류 0 |
+| PlayMode `GameLobbyViewTests.EnteringACreatedRoomDarkensOverTheHeldBrowserThenBrightensOnTheSeatScreen` (새: 기본 어두워짐 0초 확인, 1초로 바꿔 어두워지는 동안 Home 유지·눌림 막힘 → Lobby 뒤 밝아짐) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| PlayMode `GameLobbyViewTests` 전체, `GameSceneFlowTests` (전환 막이 생겨도 기존 흐름 유지) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| Play로 방 만들기·방 들어가기·DEV 솔로 전환 보기 | NOT_RUN | |

@@ -259,6 +259,8 @@ namespace Hapio
         {
             if (OpeningBlocked) return;
             if (session == null || Network == null) return;
+            // 방에 들어가며 어두워지는 동안 (#418) Home은 마지막 모습 그대로 둔다 (먼저 사라지면 빈 화면이 비친다).
+            if (session.HoldsHomeForFade && screen.kind == GameScreenKind.Home) return;
             bool home = screen.kind == GameScreenKind.Home && session.State.phase == GameFlowPhase.Home;
             bool lobby = screen.kind == GameScreenKind.Lobby && session.State.phase == GameFlowPhase.Lobby;
             bool developerOpen = screen.developerPanel != null && screen.developerPanel.activeInHierarchy;

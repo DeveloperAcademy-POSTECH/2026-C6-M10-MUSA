@@ -176,6 +176,49 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator EnteringACreatedRoomDarkensOverTheHeldBrowserThenBrightensOnTheSeatScreen()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            System.Reflection.FieldInfo fadeOut = typeof(GameSession).GetField("lobbyFadeOutSeconds",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(fadeOut.GetValue(session), Is.EqualTo(0f),
+                "By default the room's seat screen loads as soon as the room opens, under an immediate cover.");
+            // A long darkening keeps the held Home on screen for several frames, so the checks below never race the load.
+            fadeOut.SetValue(session, 1f);
+            GameLobbyView view = View();
+            yield return Click(view.enterButton);
+            yield return Click(view.countButtons[1]);
+            yield return Click(view.createButton);
+            UnityEngine.UI.Button refresh = view.refreshButton;
+            DispatchClick(view.basicModeButton);
+            Assert.That(session.SceneFade.Visible, Is.False, "Waiting for the room to open does not darken yet.");
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby, "The created room is entered", 15f);
+            yield return null; yield return null;
+            Assert.That(SceneManager.GetActiveScene().path, Is.EqualTo(GameScenePaths.Home), "The seat screen loads only after darkening.");
+            Assert.That(session.HoldsHomeForFade, Is.True);
+            Assert.That(view.background.gameObject.activeSelf && view.design.gameObject.activeSelf, Is.True,
+                "The browser stays as it was instead of vanishing to an empty frame under the darkening (#418).");
+            Assert.That(view.browserPage.activeSelf, Is.True);
+            Assert.That(session.SceneFade.Alpha, Is.GreaterThan(0f).And.LessThan(1f));
+            Assert.That(session.SceneFade.BlocksInput, Is.True);
+            Canvas.ForceUpdateCanvases();
+            var data = new PointerEventData(EventSystem.current)
+                { position = RectTransformUtility.WorldToScreenPoint(null, refresh.transform.position) };
+            var hits = new System.Collections.Generic.List<RaycastResult>(); EventSystem.current.RaycastAll(data, hits);
+            Assert.That(hits, Is.Not.Empty);
+            Assert.That(hits[0].gameObject.transform.IsChildOf(session.SceneFade.transform), Is.True,
+                "A second tap while darkening lands on the cover, not on the browser.");
+
+            yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.Lobby,
+                "The seat screen after darkening");
+            Assert.That(session.HoldsHomeForFade, Is.False);
+            Assert.That(session.SceneFade.BlocksInput, Is.False, "The seat screen can be tapped while it brightens.");
+            yield return Until(() => !session.SceneFade.Visible, "The cover clears", 3f);
+            view = View();
+            Assert.That(view.positionPage.activeInHierarchy, Is.True);
+        }
+
+        [UnityTest]
         public IEnumerator PendingAutomaticCreationCanBeCanceledOrTimedOutWithoutLeavingAnAdvertisedRoom()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");

@@ -290,3 +290,11 @@ B는 전원 동시에 자기 발화점을 소화하면 그 순간부터5초 보�
 실패를 `clearedThroughRevision` scalar fence로 알리고 같은 snapshot으로도 catch-up한다. Host 승인 이전/오래된 투사체·receipt/checkpoint를 정리하되 실패 이후 새 승인과 회복을 보존한다. 큰 제거 ID 목록을 통신하지 않는다. 기존 owner-local 조합판·LAN/핫스팟 연결·stage/run generation 검증은 유지한다.
 
 구형 B 축소246/247은 숨긴 예약값이다.245 기본 재점화12초는 미션10초 안에서 발동하지 않으며 DEV로 줄인 경우에만 개별 재점화한다. 공통 기믹20/40/60/80·100초 정리와 마지막20초 자동 회복2배·120초 전투·일반 Lab 수동 실험은 유지한다. 자세한 설정·입력/판정·기대 검증은 [지귀 화면 A/B](JIGWI_SCREEN_PATTERNS.md), 실제 수행은 [VALIDATION](VALIDATION.md)의 #388 기록을 따른다. 이 구현 설명을 검사나 실기기 PASS로 해석하지 않는다.
+
+## #418 방에 들어갈 때 화면 전환
+
+방을 만들거나 들어가 Home에서 자리 고르기(Lobby) 화면으로 넘어갈 때, 방이 열린 순간 화면을 바로 검게 가리고 곧장 Lobby 씬을 불러온 뒤, 자리 고르기 화면이 그려지면 다시 밝아진다. 예전에는 상태가 Lobby가 되는 순간 Home 화면이 먼저 사라져, 씬을 불러오는 동안 빈 화면이 비쳤다.
+
+- 가리는 동안 막(`GameSceneFade`, 정렬 30100)이 눌림을 막는다. 밝아지는 동안에는 자리 고르기 화면을 바로 누를 수 있다. 어두워지는 시간을 주면 그동안(`GameSession.HoldsHomeForFade`) Home의 `GameLobbyView`는 마지막 모습을 유지하고, 다 어두워진 뒤에 씬을 바꾼다.
+- 방이 열리기를 기다리는 동안("방을 만들고 있소...")은 가리지 않는다. 가리는 중 입장이 실패·취소되어 Home에 남으면 다시 밝아진다.
+- 시간은 `Assets/Hapio/Resources/Hapio/GameSession.prefab` Inspector의 `Lobby Fade Out Seconds`(기본 0초: 기다리지 않고 바로 전환)·`Lobby Fade In Seconds`(기본 0.35초)·`Lobby Fade Color`(검정)로 조절한다. 다른 씬 전환(전투·결과·Home 복귀)은 바꾸지 않았다.
