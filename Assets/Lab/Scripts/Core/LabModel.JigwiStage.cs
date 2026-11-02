@@ -300,6 +300,7 @@ namespace C6Lab
             CancelJigwiStageGroups(at);
             nextCommonGimmickAt = nextUniqueGimmickAt = nextStageJigwiAt = nextComboAt = nextFlashAt = double.PositiveInfinity;
             if (swipeBlockedUntil > at) swipeBlockedUntil = at;
+            ReleaseInterferenceForFever(at); // #441: 피버 시작에 걸린 방해 풀기 (세 스테이지 공통)
             comboWarned = flashWarned = comboHeld = comboWasHeld = flashHeld = flashWasHeld = false;
             comboQueuedAt = flashQueuedAt = -1d;
             combo.Stop(at);
