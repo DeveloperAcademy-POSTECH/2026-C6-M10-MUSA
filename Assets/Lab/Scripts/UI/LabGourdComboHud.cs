@@ -18,8 +18,8 @@ namespace C6Lab
     ///   ("P2 색 틀림", 내가 틀렸으면 "내가 색 틀림")를 모든 기기에 같이 보여준다. 페널티(SMALL)는 게임을 가리지
     ///   않게 공격 영역 왼쪽 아래 구석에 "작게" 글자와 그 밑 세로 사각형으로만 보이고, 사각형 안 빨간 칸이 위에서
     ///   아래로 줄어든다. 보상(BIG)도 같은 자리에 금색 "크게" 글자와 금색 칸으로 보인다(부적 비는 그대로).
-    /// - #414: 예고 동안 화면 가장자리가 천천히 어두워지고(박 쪽은 밝게) 4칸이 나오면 걷힌다. 야광귀 셈법이면 패널 자리에 빈 ? 칸이
-    ///   야광귀가 셀 때마다 하나씩 튀어나와(넷=1칸 … 하나=4칸) 곧 4칸 색 순서가 나온다는 걸 보여 준다. Host가 처음 봐주기 초 안의
+    /// - #414: 예고 동안 화면 가장자리가 천천히 어두워지고(박 쪽은 밝게) 4칸이 나오면 걷힌다. N 콤보!는 내 판 북 크기에 맞춰
+    ///   작게 보인다(ComboPopFit). Host가 처음 봐주기 초 안의
     ///   틀림을 봐주면(snapshot.comboForgivenCount) 모든 기기에서 콤보 칸이 흔들리고 화면 가장자리가 잠깐 빨갛게 번쩍인다.
     /// - #411: 화면 문구는 모두 한글이고, 글꼴은 피버타임 배너와 같은 신라문화체 굵은 글씨(LabYaguangFeverHud.ShillaFont)다.
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
@@ -115,10 +115,6 @@ namespace C6Lab
         // #414 예고 그늘, 빈 칸 미리 보기, 봐준 틀림 경고
         private Image warningShade, forgiveFlash;
         private float shadeAlpha;
-        private RectTransform previewPanel;
-        private readonly RectTransform[] previewSlots = new RectTransform[LabGourdCombo.Length];
-        private int previewShown;
-        private float previewPopElapsed = -1f;
         private uint seenForgivenCount = uint.MaxValue;
         private float forgiveElapsed = -1f;
 
@@ -149,7 +145,7 @@ namespace C6Lab
 
         /// <summary>
         /// #414 N 콤보! 크기 배율: "N 콤보!" 전체 높이(숫자 + 글자)가 내 판 북 지름 × LabConfig Combo Pop Drum Ratio(기본 0.35)가 되게 한다.
-        /// 원래 크기보다 커지지는 않는다(최대 1). 북을 못 찾으면 원래 크기의 0.6배. 맞춘 값은 Console에 C6_COMBO_POP으로 남긴다.
+        /// 원래 크기보다 커지지는 않는다(최대 1). 북을 못 찾으면 원래 크기의 0.6배.
         /// </summary>
         private float ComboPopFit()
         {
@@ -157,30 +153,18 @@ namespace C6Lab
             float ratio = network != null && network.config != null ? network.config.ComboPopDrumRatio : .35f;
             if (ratio <= 0f) return 1f;
             if (canvas == null || network == null || network.board == null) return Fallback;
-            if (!network.board.TryGetDrumScreenDiameter(out float pixels))
-            {
-                Debug.Log("C6_COMBO_POP drum=none fit=" + Fallback.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
-                return Fallback;
-            }
+            if (!network.board.TryGetDrumScreenDiameter(out float pixels)) return Fallback;
             float canvasUnits = pixels / Mathf.Max(.01f, canvas.scaleFactor);
             float popHeight = comboPop != null ? comboPop.sizeDelta.y : slotSize * comboNumberSize * 1.3f;
             float fit = popHeight > 0f ? Mathf.Clamp(canvasUnits * ratio / popHeight, .15f, 1f) : Fallback;
-            Debug.Log("C6_COMBO_POP drum=" + canvasUnits.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)
-                + " pop=" + popHeight.ToString("F0", System.Globalization.CultureInfo.InvariantCulture)
-                + " fit=" + fit.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
             return fit;
         }
 
         public bool PanelVisible => panel != null && panel.gameObject.activeSelf;
         /// <summary>#414 예고 그늘의 지금 진하기 (0~1, 테스트·확인용)</summary>
         public float WarningShadeAlpha => shadeAlpha;
-        /// <summary>#414 예고 동안 보이는 빈 칸 수 (0~4, 테스트·확인용)</summary>
-        public int PreviewSlotsShown => previewPanel != null && previewPanel.gameObject.activeSelf ? previewShown : 0;
-        /// <summary>#414 봐준 틀림 경고가 지금 보이는지 (테스트·확인용)</summary>
         public bool ForgiveWarningVisible => forgiveElapsed >= 0f;
 
-        /// <summary>#414 야광귀가 남은 초 count를 셀 때 미리 보일 빈 칸 수: 넷=1칸, 셋=2칸, 둘=3칸, 하나=4칸. 넷보다 길면 아직 0칸.</summary>
-        public static int PreviewSlotsFor(int count) => count < 1 ? LabGourdCombo.Length : Mathf.Clamp(LabGourdCombo.Length + 1 - count, 0, LabGourdCombo.Length);
         public bool EffectVisible => effectBadge != null && effectBadge.gameObject.activeSelf;
         public string EffectLabel => effectText != null ? effectText.text : string.Empty;
         /// <summary>보상(BIG) 별이 지금 쏟아지고 있는지 (#257)</summary>
@@ -311,71 +295,6 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #414 넷/셋/둘/하나 말풍선과 빈 ? 칸이 겹치면 ? 칸을 말풍선 아래로 내린다. 겹치지 않으면 제자리.
-        /// </summary>
-        private void AvoidBubble()
-        {
-            previewPanel.anchoredPosition = Vector2.zero;
-            LabGourdAlert alert = GetComponent<LabGourdAlert>();
-            RectTransform bubble = alert != null && alert.Visible ? alert.BubbleRect : null;
-            if (bubble == null) return;
-            Rect bubbleRect = RectIn(layer, bubble), previewRect = RectIn(layer, previewPanel);
-            if (!bubbleRect.Overlaps(previewRect)) return;
-            float down = previewRect.yMax - bubbleRect.yMin + 8f * unit;
-            previewPanel.anchoredPosition = new Vector2(0f, -down);
-        }
-
-        /// <summary>rect의 네 모서리를 parent 좌표로 옮긴 사각형 (회전·크기 포함).</summary>
-        private static Rect RectIn(RectTransform parent, RectTransform rect)
-        {
-            var corners = new Vector3[4];
-            rect.GetWorldCorners(corners);
-            Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
-            foreach (Vector3 corner in corners)
-            {
-                Vector2 p = parent.InverseTransformPoint(corner);
-                min = Vector2.Min(min, p);
-                max = Vector2.Max(max, p);
-            }
-            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
-        }
-
-        /// <summary>
-        /// #414 야광귀 셈법 예고 동안 패널 자리에 빈 ? 칸을 센 수만큼 보여 준다. 새 칸은 톡 튀어나온다.
-        /// </summary>
-        private void DrawPreview(bool show, int count)
-        {
-            previewPanel.gameObject.SetActive(show);
-            if (!show)
-            {
-                previewShown = 0;
-                previewPopElapsed = -1f;
-                return;
-            }
-            int shown = PreviewSlotsFor(count);
-            if (shown > previewShown) previewPopElapsed = 0f;
-            previewShown = shown;
-            float pop = 1f;
-            if (previewPopElapsed >= 0f)
-            {
-                previewPopElapsed += Time.unscaledDeltaTime;
-                float u = Mathf.Clamp01(previewPopElapsed / .25f);
-                pop = Mathf.Lerp(1.6f, 1f, 1f - (1f - u) * (1f - u));
-                if (previewPopElapsed >= .25f) previewPopElapsed = -1f;
-            }
-            AvoidBubble();
-            float wobble = Mathf.Sin(Time.unscaledTime * 6f) * .05f;
-            for (int i = 0; i < previewSlots.Length; i++)
-            {
-                bool on = i < shown;
-                previewSlots[i].gameObject.SetActive(on);
-                if (!on) continue;
-                float scale = i == shown - 1 ? pop : 1f + wobble;
-                previewSlots[i].localScale = Vector3.one * scale;
-            }
-        }
-
-        /// <summary>
         /// 콤보 예고 (#241): 패널 자리에 COMBO! 와 남은 초(3 → 2 → 1). 숫자가 바뀔 때마다 톡 튀어나오고,
         /// 0이 되는 순간(4칸이 나오는 시각) Host 스냅샷의 새 콤보로 바뀐다. 색은 예고 중에 보여주지 않는다.
         /// 앞 콤보의 결과 문구가 떠 있으면 그것부터 보여준다.
@@ -387,8 +306,6 @@ namespace C6Lab
             warningActive = show;
             // 야광귀 셈법 (#271): 박 옆 말풍선만 하나·둘·셋·넷으로 세고, 패널 자리의 COMBO! 예고는 띄우지 않는다.
             warningPanel.gameObject.SetActive(show && !yaguang);
-            int previewCount = show ? Mathf.Max(1, Mathf.CeilToInt((float)(snapshot.comboNextAt - serverNow))) : 0;
-            DrawPreview(show && yaguang, previewCount);
             if (!show)
             {
                 shownWarningCount = -1;
@@ -717,8 +634,6 @@ namespace C6Lab
             warningPopElapsed = -1f;
             seenForgivenCount = uint.MaxValue;
             forgiveElapsed = -1f;
-            previewShown = 0;
-            previewPopElapsed = -1f;
             resultDelay = 0f;
             comboPopElapsed = -1f;
             comboPopCombo = 0;
@@ -883,36 +798,6 @@ namespace C6Lab
             questionMark.color = new Color(.17f, .14f, .12f, .55f);
             questionSlot.gameObject.SetActive(false);
 
-            // #414 야광귀 셈법 예고: 콤보 패널과 같은 자리·크기에 빈 ? 칸 4개 (센 수만큼 보인다).
-            previewPanel = NewRect("Combo Preview", layer);
-            previewPanel.anchorMin = previewPanel.anchorMax = panelAnchor;
-            previewPanel.sizeDelta = panel.sizeDelta;
-            Image previewBack = previewPanel.gameObject.AddComponent<Image>();
-            previewBack.sprite = RoundedSprite();
-            previewBack.type = Image.Type.Sliced;
-            previewBack.color = PanelColor;
-            previewBack.raycastTarget = false;
-            for (int i = 0; i < LabGourdCombo.Length; i++)
-            {
-                RectTransform slot = NewRect("Preview Slot " + (i + 1), previewPanel);
-                slot.anchorMin = slot.anchorMax = new Vector2(0f, 1f);
-                slot.pivot = new Vector2(.5f, .5f);
-                slot.sizeDelta = new Vector2(slotSize, slotSize);
-                slot.anchoredPosition = new Vector2(gap + slotSize * .5f + i * (slotSize + gap), -gap - slotSize * .5f);
-                Image disc = slot.gameObject.AddComponent<Image>();
-                disc.sprite = DiscSprite();
-                disc.color = new Color(.78f, .75f, .7f, 1f);
-                disc.raycastTarget = false;
-                Text mark = NewText("?", slot, Mathf.Max(10, Mathf.RoundToInt(30f * u)), TextAnchor.MiddleCenter);
-                mark.rectTransform.anchorMin = Vector2.zero;
-                mark.rectTransform.anchorMax = Vector2.one;
-                mark.rectTransform.offsetMin = mark.rectTransform.offsetMax = Vector2.zero;
-                mark.text = "?";
-                mark.color = InkColor;
-                slot.gameObject.SetActive(false);
-                previewSlots[i] = slot;
-            }
-            previewPanel.gameObject.SetActive(false);
 
             RectTransform barBack = NewRect("Combo Time Bar", panel);
             barBack.anchorMin = new Vector2(0f, 0f);

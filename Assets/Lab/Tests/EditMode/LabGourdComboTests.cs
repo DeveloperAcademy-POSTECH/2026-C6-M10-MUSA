@@ -93,18 +93,6 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheWarningPreviewShowsOneMoreEmptySlotForEachCount()
-        {
-            // #414: 야광귀가 넷 → 셋 → 둘 → 하나로 셀 때 빈 ? 칸이 1 → 2 → 3 → 4개.
-            Assert.That(LabGourdComboHud.PreviewSlotsFor(4), Is.EqualTo(1));
-            Assert.That(LabGourdComboHud.PreviewSlotsFor(3), Is.EqualTo(2));
-            Assert.That(LabGourdComboHud.PreviewSlotsFor(2), Is.EqualTo(3));
-            Assert.That(LabGourdComboHud.PreviewSlotsFor(1), Is.EqualTo(4));
-            Assert.That(LabGourdComboHud.PreviewSlotsFor(6), Is.Zero, "A longer warning shows nothing until 넷.");
-            Assert.That(LabGourdComboHud.PreviewSlotsFor(0), Is.EqualTo(4));
-        }
-
-        [Test]
         public void TheTimeLimitEndsTheComboAtItsDeadline()
         {
             var combo = new LabGourdCombo();
