@@ -145,6 +145,20 @@ namespace C6Lab
         private bool comboPopFinal;
         private uint comboPopCombo;
         private float resultDelay;
+        private float comboPopFit = 1f;
+
+        /// <summary>
+        /// #414 N 콤보! 크기 배율: 숫자 높이가 내 판 북 지름 × LabConfig Combo Pop Drum Ratio(기본 0.5)가 되게 한다. 북을 못 찾으면 1(원래 크기).
+        /// </summary>
+        private float ComboPopFit()
+        {
+            float comboToDrumSize = network != null && network.config != null ? network.config.ComboPopDrumRatio : .5f;
+            if (comboToDrumSize <= 0f || canvas == null || network == null || network.board == null) return 1f;
+            if (!network.board.TryGetDrumScreenDiameter(out float pixels)) return 1f;
+            float canvasUnits = pixels / Mathf.Max(.01f, canvas.scaleFactor);
+            float numberHeight = slotSize * comboNumberSize;
+            return numberHeight > 0f ? Mathf.Clamp(canvasUnits * comboToDrumSize / numberHeight, .2f, 2f) : 1f;
+        }
 
         public bool PanelVisible => panel != null && panel.gameObject.activeSelf;
         /// <summary>#414 예고 그늘의 지금 진하기 (0~1, 테스트·확인용)</summary>
@@ -726,6 +740,7 @@ namespace C6Lab
             comboPopFinal = final;
             comboPopElapsed = 0f;
             comboPopNumber.text = count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            comboPopFit = ComboPopFit();
             comboPopWord.text = final ? ComboClearText : ComboHitText;
         }
 
@@ -745,7 +760,7 @@ namespace C6Lab
             float t = comboPopElapsed;
             float pop = t < .14f ? Mathf.Lerp(.3f, 1.7f, t / .14f) : Mathf.Lerp(1.7f, 1f, Mathf.Clamp01((t - .14f) / .16f));
             float leave = Mathf.Clamp01((t - (life - .2f)) / .2f);
-            float size = comboPopFinal ? 1.5f : 1f;
+            float size = (comboPopFinal ? 1.5f : 1f) * comboPopFit;
             comboPop.localScale = Vector3.one * pop * size * (1f - leave);
             comboPop.localRotation = Quaternion.Euler(0f, 0f, -6f + 3f * Mathf.Sin(t * 14f));
             comboPop.anchoredPosition = comboPopFinal ? Vector2.zero

@@ -774,6 +774,26 @@ namespace C6Lab
             drumPulse = float.IsNaN(scale) || float.IsInfinity(scale) || scale <= 0f ? 1f : scale;
         public float DrumPulse => drumPulse;
 
+        /// <summary>#414 이 판의 북 하나가 화면에서 차지하는 지름 (픽셀). 북이 없으면 false.</summary>
+        public bool TryGetDrumScreenDiameter(out float pixels)
+        {
+            pixels = 0f;
+            if (inputCamera == null) return false;
+            foreach (var entry in entries.Values)
+            {
+                LabOrbView view = entry.View;
+                if (view == null || !view.Kind.IsDrum() || view.HitSphere == null) continue;
+                Vector3 center = view.transform.position;
+                float radius = view.HitSphere.radius * Mathf.Abs(view.HitSphere.transform.lossyScale.x);
+                Vector3 a = inputCamera.WorldToScreenPoint(center);
+                Vector3 b = inputCamera.WorldToScreenPoint(center + inputCamera.transform.right * radius);
+                if (a.z < 0f || b.z < 0f) continue;
+                pixels = 2f * Vector2.Distance(a, b);
+                return pixels > 0f;
+            }
+            return false;
+        }
+
         /// <summary>#414 이 판에 보이는 북 orbId의 화면 좌표 (연타 숫자를 북 옆에 띄우려고). 없으면 false.</summary>
         public bool TryGetScreenPoint(string orbId, out Vector2 screen)
         {

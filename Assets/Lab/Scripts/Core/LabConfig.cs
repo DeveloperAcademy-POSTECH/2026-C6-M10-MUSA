@@ -938,6 +938,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 5f)] private float yaguangComboGraceSeconds = 2f;
         [Tooltip("콤보 예고(넷/셋/둘/하나) 동안 화면 가장자리가 어두워지는 최대 진하기 (0이면 끔, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboWarningShade = .5f;
+        [Tooltip("칸을 맞힐 때 뜨는 N 콤보! 숫자 높이를 내 판 북 지름의 이 비율로 맞춘다 (0.5 = 북의 절반, 0이면 원래 크기)")]
+        [SerializeField, Range(0f, 2f)] private float comboPopDrumRatio = .5f;
         [Tooltip("피버 동안 내 북이 두근두근 커지는 정도 (0.12 = 12% 커짐, 0이면 끔)")]
         [SerializeField, Range(0f, .5f)] private float yaguangFeverDrumPulseScale = .12f;
         [Tooltip("피버 북 두근두근 박자 (초당 박 수, 1.6 = 1분에 96번)")]
@@ -1396,6 +1398,7 @@ namespace C6Lab
         public float YaguangFeverDrumPulseScale => Mathf.Clamp(Finite(yaguangFeverDrumPulseScale, .12f), 0f, .5f);
         public float YaguangFeverDrumPulseRate => Mathf.Clamp(Finite(yaguangFeverDrumPulseRate, 1.6f), .5f, 4f);
         public float YaguangFeverTapComboSeconds => Mathf.Clamp(Finite(yaguangFeverTapComboSeconds, .8f), .2f, 2f);
+        public float ComboPopDrumRatio => Mathf.Clamp(Finite(comboPopDrumRatio, .5f), 0f, 2f);
         public float YaguangComboWarningShade => Mathf.Clamp01(Finite(yaguangComboWarningShade, .5f));
         public float YaguangComboGraceSeconds => Mathf.Clamp(Finite(yaguangComboGraceSeconds, 2f), 0f, 5f);
         public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));
