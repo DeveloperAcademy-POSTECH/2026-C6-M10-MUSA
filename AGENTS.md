@@ -115,6 +115,10 @@
 - 공유 설정 257개·인덱스는 그대로이며 최신 묶음은 **5682/Lab43/Game27**이다. 이전 봉투 형식의 앱과 혼용하지 않는다. 실행한 검사와 패킷 크기 측정만 `docs/VALIDATION.md`에 기록한다.
 
 
+## #431 iOS 목표 프레임레이트
+
+- `LabMobilePresentationPolicy.InitializePlayer`가 iPhone 플레이어에서만 `Application.targetFrameRate = 60`을 적용한다(`TargetFrameRateFor`). Editor·Mac은 바꾸지 않으며, `QualitySettings` Mobile 레벨의 vSync 0을 유지해야 값이 적용된다. ProMotion 120은 고해상도 도색 재구성 비용 때문에 쓰지 않는다.
+
 ## #433 Guest 박 포즈 보정
 
 - Guest의 박 포즈 보정은 `LabNetwork.LocalState.ReconcileTargetPose` 하나로 간다(조합판 프레임·Bulk 스냅샷 공용). 같은 세션/라운드에서 `serverTime`이 마지막 적용 시각 이하인 비정지 샘플은 건너뛰고, 정지 샘플은 항상 적용한다. 스냅샷 경로에서 `ReconcileYaw/ReconcileRope`를 따로 다시 부르지 않는다.
