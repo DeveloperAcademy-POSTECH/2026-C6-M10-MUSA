@@ -766,6 +766,45 @@ namespace C6Lab
         /// </summary>
         public void SetComboLook(int look) => comboLook = Math.Sign(look);
 
+        private float drumPulse = 1f;
+        /// <summary>
+        /// #414 야광귀 피버 북 두근두근: 이 판의 북 그림에 곱할 배율(1 = 그대로). 피버 신호가 매 프레임 정한다. 물리 크기는 그대로다.
+        /// </summary>
+        public void SetDrumPulse(float scale) =>
+            drumPulse = float.IsNaN(scale) || float.IsInfinity(scale) || scale <= 0f ? 1f : scale;
+        public float DrumPulse => drumPulse;
+
+        /// <summary>#414 이 판의 북 하나가 화면에서 차지하는 지름 (픽셀). 북이 없으면 false.</summary>
+        public bool TryGetDrumScreenDiameter(out float pixels)
+        {
+            pixels = 0f;
+            if (inputCamera == null) return false;
+            foreach (var entry in entries.Values)
+            {
+                LabOrbView view = entry.View;
+                if (view == null || !view.Kind.IsDrum() || view.HitSphere == null) continue;
+                Vector3 center = view.transform.position;
+                float radius = view.HitSphere.radius * Mathf.Abs(view.HitSphere.transform.lossyScale.x);
+                Vector3 a = inputCamera.WorldToScreenPoint(center);
+                Vector3 b = inputCamera.WorldToScreenPoint(center + inputCamera.transform.right * radius);
+                if (a.z < 0f || b.z < 0f) continue;
+                pixels = 2f * Vector2.Distance(a, b);
+                return pixels > 0f;
+            }
+            return false;
+        }
+
+        /// <summary>#414 이 판에 보이는 북 orbId의 화면 좌표 (연타 숫자를 북 옆에 띄우려고). 없으면 false.</summary>
+        public bool TryGetScreenPoint(string orbId, out Vector2 screen)
+        {
+            screen = default;
+            if (orbId == null || inputCamera == null || !entries.TryGetValue(orbId, out Entry entry) || entry.View == null) return false;
+            Vector3 point = inputCamera.WorldToScreenPoint(entry.View.transform.position);
+            if (point.z < 0f) return false;
+            screen = point;
+            return true;
+        }
+
         private float flashGlare;
 
         /// <summary>
@@ -832,6 +871,13 @@ namespace C6Lab
                 LabOrbView view = entry.View;
                 if (view == null) continue;
                 bool sized = view.Kind.IsRaw() || view.Kind == LabOrbKind.Combined;
+                if (view.Kind.IsDrum())
+                {
+                    // #414 피버 북 두근두근은 박자를 그대로 따라가야 해서 부드럽게 늦추지 않는다.
+                    view.SetComboScaleTarget(drumPulse);
+                    view.StepComboScale(Time.deltaTime, 0f);
+                    continue;
+                }
                 view.SetComboScaleTarget(sized ? target : 1f);
                 view.StepComboScale(Time.deltaTime, comboScaleSeconds);
             }

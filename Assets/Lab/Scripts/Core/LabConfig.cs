@@ -943,6 +943,17 @@ namespace C6Lab
         [SerializeField, Range(0f, 12f)] private float smallHitPitchSemitones = 6f;
         [Tooltip("BIG 중 던진 큰 공이 맞을 때 징 크기 (Resources/Audio/FiveColorHit, 던진 사람 기기)")]
         [SerializeField, Range(0f, 1f)] private float bigHitSoundVolume = .8f;
+        [Header("야광귀 콤보 예고와 피버 신호 (#414, Inspector 전용)")]
+        [Tooltip("콤보 예고(넷/셋/둘/하나) 동안 화면 가장자리가 어두워지는 최대 진하기 (0이면 끔, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboWarningShade = .5f;
+        [Tooltip("칸을 맞힐 때 뜨는 N 콤보! 전체 높이(숫자 + 글자)를 내 판 북 지름의 이 비율로 맞춘다. 원래 크기보다 커지지 않는다 (0이면 원래 크기)")]
+        [SerializeField, Range(0f, 2f)] private float comboPopDrumRatio = .35f;
+        [Tooltip("피버 동안 내 북이 두근두근 커지는 정도 (0.12 = 12% 커짐, 0이면 끔)")]
+        [SerializeField, Range(0f, .5f)] private float yaguangFeverDrumPulseScale = .12f;
+        [Tooltip("피버 북 두근두근 박자 (초당 박 수, 1.6 = 1분에 96번)")]
+        [SerializeField, Range(.5f, 4f)] private float yaguangFeverDrumPulseRate = 1.6f;
+        [Tooltip("피버 중 북을 이 초 안에 연달아 누르면 연타 숫자(x2, x3…)가 이어진다")]
+        [SerializeField, Range(.2f, 2f)] private float yaguangFeverTapComboSeconds = .8f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1396,6 +1407,11 @@ namespace C6Lab
         public float YaguangComboBigStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigStartSoundVolume, .8f));
         public float YaguangComboBigEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigEndSoundVolume, .7f));
         public float SmallHitPitchSemitones => Mathf.Clamp(Finite(smallHitPitchSemitones, 6f), 0f, 12f);
+        public float YaguangFeverDrumPulseScale => Mathf.Clamp(Finite(yaguangFeverDrumPulseScale, .12f), 0f, .5f);
+        public float YaguangFeverDrumPulseRate => Mathf.Clamp(Finite(yaguangFeverDrumPulseRate, 1.6f), .5f, 4f);
+        public float YaguangFeverTapComboSeconds => Mathf.Clamp(Finite(yaguangFeverTapComboSeconds, .8f), .2f, 2f);
+        public float ComboPopDrumRatio => Mathf.Clamp(Finite(comboPopDrumRatio, .35f), 0f, 2f);
+        public float YaguangComboWarningShade => Mathf.Clamp01(Finite(yaguangComboWarningShade, .5f));
         public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));
         public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 4f), 0f, 10f);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);

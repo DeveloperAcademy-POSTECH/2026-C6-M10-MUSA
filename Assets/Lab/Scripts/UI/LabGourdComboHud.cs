@@ -18,6 +18,8 @@ namespace C6Lab
     ///   ("P2 색 틀림", 내가 틀렸으면 "내가 색 틀림")를 모든 기기에 같이 보여준다. 페널티(SMALL)는 게임을 가리지
     ///   않게 공격 영역 왼쪽 아래 구석에 "작게" 글자와 그 밑 세로 사각형으로만 보이고, 사각형 안 빨간 칸이 위에서
     ///   아래로 줄어든다. 보상(BIG)도 같은 자리에 금색 "크게" 글자와 금색 칸으로 보인다(부적 비는 그대로).
+    /// - #414: 예고 동안 화면 가장자리가 천천히 어두워지고(박 쪽은 밝게) 4칸이 나오면 걷힌다. N 콤보!는 내 판 북 크기에 맞춰
+    ///   작게 보인다(ComboPopFit).
     /// - #411: 화면 문구는 모두 한글이고, 글꼴은 피버타임 배너와 같은 신라문화체 굵은 글씨(LabYaguangFeverHud.ShillaFont)다.
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
     /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
@@ -54,7 +56,9 @@ namespace C6Lab
         private static readonly Color RewardBadgeColor = new Color(.95f, .69f, .13f, 1f);
         // BIG 글자: 밝은 바탕에서도 읽히게 사각형보다 진한 금색 (#301)
         private static readonly Color RewardLabelColor = new Color(.82f, .5f, .04f, 1f);
-        private static Sprite discSprite, checkSprite, roundedSprite, pillSprite;
+        private static Sprite discSprite, checkSprite, roundedSprite, pillSprite, vignetteSprite;
+        /// <summary>#414 예고 그늘의 밝은 가운데 높이 (화면 아래 0 ~ 위 1). 박이 있는 쪽.</summary>
+        public const float ShadeCenterY = .68f;
 
         [Tooltip("화면에서 콤보 패널 가운데 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 panelAnchor = new Vector2(.5f, .8f);
@@ -105,6 +109,9 @@ namespace C6Lab
         private readonly Text[] slotWords = new Text[LabGourdCombo.Length];
         private RectTransform questionSlot;
         private float warningPopElapsed = -1f;
+        // #414 예고 그늘, 빈 칸 미리 보기, 봐준 틀림 경고
+        private Image warningShade;
+        private float shadeAlpha;
 
         private LabComboRewardStars stars;
         private int boardLook;
@@ -129,8 +136,29 @@ namespace C6Lab
         private bool comboPopFinal;
         private uint comboPopCombo;
         private float resultDelay;
+        private float comboPopFit = 1f;
+
+        /// <summary>
+        /// #414 N 콤보! 크기 배율: "N 콤보!" 전체 높이(숫자 + 글자)가 내 판 북 지름 × LabConfig Combo Pop Drum Ratio(기본 0.35)가 되게 한다.
+        /// 원래 크기보다 커지지는 않는다(최대 1). 북을 못 찾으면 원래 크기의 0.6배.
+        /// </summary>
+        private float ComboPopFit()
+        {
+            const float Fallback = .6f;
+            float ratio = network != null && network.config != null ? network.config.ComboPopDrumRatio : .35f;
+            if (ratio <= 0f) return 1f;
+            if (canvas == null || network == null || network.board == null) return Fallback;
+            if (!network.board.TryGetDrumScreenDiameter(out float pixels)) return Fallback;
+            float canvasUnits = pixels / Mathf.Max(.01f, canvas.scaleFactor);
+            float popHeight = comboPop != null ? comboPop.sizeDelta.y : slotSize * comboNumberSize * 1.3f;
+            float fit = popHeight > 0f ? Mathf.Clamp(canvasUnits * ratio / popHeight, .15f, 1f) : Fallback;
+            return fit;
+        }
 
         public bool PanelVisible => panel != null && panel.gameObject.activeSelf;
+        /// <summary>#414 예고 그늘의 지금 진하기 (0~1, 테스트·확인용)</summary>
+        public float WarningShadeAlpha => shadeAlpha;
+
         public bool EffectVisible => effectBadge != null && effectBadge.gameObject.activeSelf;
         public string EffectLabel => effectText != null ? effectText.text : string.Empty;
         /// <summary>보상(BIG) 별이 지금 쏟아지고 있는지 (#257)</summary>
@@ -215,7 +243,19 @@ namespace C6Lab
             DrawCombo(snapshot, serverNow);
             DrawResult();
             DrawWarning(snapshot, serverNow, warning);
+            DrawShade(warning);
             DrawEffect(snapshot, serverNow);
+        }
+
+        /// <summary>#414 예고 그늘: 예고 동안 천천히 진해지고, 4칸이 나오면 빨리 걷힌다.</summary>
+        private void DrawShade(bool warning)
+        {
+            float maxShade = network != null && network.config != null ? network.config.YaguangComboWarningShade : .5f;
+            float target = warning ? maxShade : 0f;
+            float speed = warning ? maxShade / .8f : maxShade / .3f;
+            shadeAlpha = Mathf.MoveTowards(shadeAlpha, target, Mathf.Max(.01f, speed) * Time.unscaledDeltaTime);
+            warningShade.gameObject.SetActive(shadeAlpha > .001f);
+            warningShade.color = new Color(0f, 0f, 0f, shadeAlpha);
         }
 
         /// <summary>
@@ -588,6 +628,7 @@ namespace C6Lab
             comboPopFinal = final;
             comboPopElapsed = 0f;
             comboPopNumber.text = count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            comboPopFit = ComboPopFit();
             comboPopWord.text = final ? ComboClearText : ComboHitText;
         }
 
@@ -607,7 +648,7 @@ namespace C6Lab
             float t = comboPopElapsed;
             float pop = t < .14f ? Mathf.Lerp(.3f, 1.7f, t / .14f) : Mathf.Lerp(1.7f, 1f, Mathf.Clamp01((t - .14f) / .16f));
             float leave = Mathf.Clamp01((t - (life - .2f)) / .2f);
-            float size = comboPopFinal ? 1.5f : 1f;
+            float size = (comboPopFinal ? 1.5f : 1f) * comboPopFit;
             comboPop.localScale = Vector3.one * pop * size * (1f - leave);
             comboPop.localRotation = Quaternion.Euler(0f, 0f, -6f + 3f * Mathf.Sin(t * 14f));
             comboPop.anchoredPosition = comboPopFinal ? Vector2.zero
@@ -648,6 +689,9 @@ namespace C6Lab
             flash.color = Color.clear;
             flash.raycastTarget = false;
             flashRect.gameObject.SetActive(false);
+
+            // #414 예고 그늘: 박 쪽(ShadeCenterY)이 밝은 둥근 그늘. 화면을 다 덮게 크게 둔다.
+            warningShade = NewShade("Combo Warning Shade", layer);
 
             // 보상 별(#257): 번쩍임 바로 앞, 콤보 패널·결과 문구·배지 뒤에 그린다.
             stars = layer.gameObject.AddComponent<LabComboRewardStars>();
@@ -714,6 +758,7 @@ namespace C6Lab
             questionMark.text = "?";
             questionMark.color = new Color(.17f, .14f, .12f, .55f);
             questionSlot.gameObject.SetActive(false);
+
 
             RectTransform barBack = NewRect("Combo Time Bar", panel);
             barBack.anchorMin = new Vector2(0f, 0f);
@@ -838,7 +883,8 @@ namespace C6Lab
             Outline numberOutline = comboPopNumber.gameObject.AddComponent<Outline>();
             numberOutline.effectColor = Color.white;
             numberOutline.effectDistance = new Vector2(4f, -4f) * Mathf.Max(.5f, u);
-            comboPopWord = NewText("Combo Word", comboPop, Mathf.Max(10, Mathf.RoundToInt(numberSize * .36f)), TextAnchor.MiddleCenter);
+            // #414: 한글 "콤보!"가 숫자보다 커 보여서 영어 때(.36)보다 줄였다.
+            comboPopWord = NewText("Combo Word", comboPop, Mathf.Max(10, Mathf.RoundToInt(numberSize * .26f)), TextAnchor.MiddleCenter);
             comboPopWord.rectTransform.anchorMin = comboPopWord.rectTransform.anchorMax = new Vector2(.62f, .12f);
             comboPopWord.rectTransform.sizeDelta = new Vector2(numberSize * 2f, numberSize * .5f);
             Outline wordOutlineWhite = comboPopWord.gameObject.AddComponent<Outline>();
@@ -874,6 +920,33 @@ namespace C6Lab
         }
 
         // ---- 손그림 느낌의 단순 도형: 진한 테두리 원, 흰 체크, 둥근 패널 ----
+
+        /// <summary>#414 화면을 다 덮는 둥근 그늘 (가운데는 투명, 가장자리로 갈수록 진함). 터치를 막지 않는다.</summary>
+        private static Image NewShade(string name, RectTransform parent)
+        {
+            RectTransform rect = NewRect(name, parent);
+            rect.anchorMin = new Vector2(-.25f, ShadeCenterY - .8f);
+            rect.anchorMax = new Vector2(1.25f, ShadeCenterY + .8f);
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.sprite = VignetteSprite();
+            image.color = Color.clear;
+            image.raycastTarget = false;
+            rect.gameObject.SetActive(false);
+            return image;
+        }
+
+        private static Sprite VignetteSprite()
+        {
+            if (vignetteSprite != null) return vignetteSprite;
+            vignetteSprite = Draw("Lab combo vignette", (p, c) =>
+            {
+                float r = Vector2.Distance(p, c) / (TextureSize * .5f);
+                float a = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.28f, .9f, r));
+                return new Color(1f, 1f, 1f, a);
+            }, Vector4.zero);
+            return vignetteSprite;
+        }
 
         private static Sprite DiscSprite()
         {
