@@ -352,5 +352,50 @@ namespace C6Lab.Tests
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboBigStart), Is.EqualTo("Audio/YaguangComboBigStart"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboBigEnd), Is.EqualTo("Audio/YaguangComboBigEnd"));
         }
+
+        [Test]
+        public void TheFirstSuccessSaysIreonThenLaterOnesSayIreolSuga()
+        {
+            LabYaguangSound sound = Sound();
+            sound.ObserveFlash(new LabSnapshot { sessionId = "yaguang", round = 1, phase = LabPhase.Playing }, 49.9d, Me);
+            LabSnapshot snapshot = ComboResult(LabComboResult.Success);
+            Watch(sound, snapshot, 50d, 50.75d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboClearedFirst), Is.Zero, "The line waits 0.8 s.");
+            Watch(sound, snapshot, 50.8d, 70d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboClearedFirst), Is.EqualTo(1), "이런! on the first success.");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboClearedSecond), Is.Zero);
+
+            // 두 번째, 세 번째 성공은 "이럴 수가!"
+            for (uint n = 2; n <= 3; n++)
+            {
+                double at = 60d * n;
+                snapshot.comboResultCount = n; snapshot.comboResultAt = at;
+                foreach (LabPlayerState player in snapshot.players) player.comboRewardUntil = at + 15d;
+                Watch(sound, snapshot, at, at + 2d);
+            }
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboClearedFirst), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboClearedSecond), Is.EqualTo(2));
+
+            // 새 라운드는 다시 "이런!"부터
+            LabSnapshot next = ComboResult(LabComboResult.Success);
+            next.round = 2;
+            sound.ObserveFlash(new LabSnapshot { sessionId = "yaguang", round = 2, phase = LabPhase.Playing }, 49.9d, Me);
+            Watch(sound, next, 50d, 52d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboClearedFirst), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void FailuresAndLateJoinersHearNoSuccessLine()
+        {
+            LabYaguangSound sound = Sound();
+            sound.ObserveFlash(new LabSnapshot { sessionId = "yaguang", round = 1, phase = LabPhase.Playing }, 49.9d, Me);
+            Watch(sound, ComboResult(LabComboResult.WrongColor), 50d, 70d);
+            LabYaguangSound late = Sound();
+            for (double t = 50.5d; t <= 70d; t += .05d) late.ObserveFlash(ComboResult(LabComboResult.Success), t, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboClearedFirst) + sound.PlayCount(LabYaguangSfx.ComboClearedSecond)
+                + late.PlayCount(LabYaguangSfx.ComboClearedFirst) + late.PlayCount(LabYaguangSfx.ComboClearedSecond), Is.Zero);
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboClearedFirst), Is.EqualTo("Audio/YaguangComboClearedFirst"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboClearedSecond), Is.EqualTo("Audio/YaguangComboClearedSecond"));
+        }
     }
 }
