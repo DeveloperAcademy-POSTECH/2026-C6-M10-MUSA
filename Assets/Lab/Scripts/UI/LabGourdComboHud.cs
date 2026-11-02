@@ -15,9 +15,10 @@ namespace C6Lab
     /// - 이 기기 플레이어의 SMALL/BIG을 조합판에도 알려 판 구슬 그림이 작아지거나 커지게 한다(#257).
     /// - #301: 칸을 맞힐 때마다 패널 아래에 "N COMBO!"(주황 숫자 + 흰 테두리 + 분홍 COMBO!)가 튀어나오고, 4칸을
     ///   다 맞히면 패널 자리에 "4 COMBO!!"가 가장 크게 나온 뒤 CLEAR!가 이어진다. 틀린 색 실패는 누가 틀렸는지
-    ///   ("P2 WRONG COLOR", 내가 틀렸으면 "YOU WRONG COLOR")를 모든 기기에 같이 보여준다. SMALL은 게임을 가리지
-    ///   않게 공격 영역 왼쪽 아래 구석에 "SMALL" 글자와 그 밑 세로 사각형으로만 보이고, 사각형 안 빨간 칸이 위에서
-    ///   아래로 줄어든다. BIG 보상도 같은 자리에 금색 "BIG" 글자와 금색 칸으로 보인다(부적 비는 그대로).
+    ///   ("P2 색 틀림", 내가 틀렸으면 "내가 색 틀림")를 모든 기기에 같이 보여준다. 페널티(SMALL)는 게임을 가리지
+    ///   않게 공격 영역 왼쪽 아래 구석에 "작게" 글자와 그 밑 세로 사각형으로만 보이고, 사각형 안 빨간 칸이 위에서
+    ///   아래로 줄어든다. 보상(BIG)도 같은 자리에 금색 "크게" 글자와 금색 칸으로 보인다(부적 비는 그대로).
+    /// - #411: 화면 문구는 모두 한글이고, 글꼴은 피버타임 배너와 같은 신라문화체 굵은 글씨(LabYaguangFeverHud.ShillaFont)다.
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
     /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
@@ -26,16 +27,16 @@ namespace C6Lab
     [DisallowMultipleComponent]
     public sealed class LabGourdComboHud : MonoBehaviour
     {
-        public const string ClearText = "CLEAR!";
-        public const string WrongColorText = "WRONG COLOR";
-        public const string TimeUpText = "TIME UP";
-        public const string PenaltyLabel = "SMALL";
-        public const string RewardLabel = "BIG";
-        public const string WarningText = "COMBO!";
-        /// <summary>칸을 맞힐 때 숫자 옆 글자, 다 맞혔을 때 글자 (#301)</summary>
-        public const string ComboHitText = "COMBO!", ComboClearText = "COMBO!!";
-        /// <summary>틀린 색 실패에서 내가 틀렸을 때 이름 자리 (#301)</summary>
-        public const string YouText = "YOU";
+        public const string ClearText = "성공!";
+        public const string WrongColorText = "색 틀림";
+        public const string TimeUpText = "시간 끝!";
+        public const string PenaltyLabel = "작게";
+        public const string RewardLabel = "크게";
+        public const string WarningText = "콤보!";
+        /// <summary>칸을 맞힐 때 숫자 옆 글자, 다 맞혔을 때 글자 (#301, #411 한글)</summary>
+        public const string ComboHitText = "콤보!", ComboClearText = "콤보 완성!!";
+        /// <summary>틀린 색 실패에서 내가 틀렸을 때 이름 자리 (#301, #411 한글)</summary>
+        public const string YouText = "내가";
         /// <summary>야광귀 셈법 (#271): 야광귀는 넷까지만 센다. 넷 다음은 다시 하나.</summary>
         public static readonly string[] CountWords = { "하나", "둘", "셋", "넷" };
         /// <summary>수 n(1부터)을 야광귀식으로. 넷을 넘으면 넷까지밖에 몰라 다시 하나·둘…로 돈다(예고에서는 넷 → 하나로 거꾸로 센다).</summary>
@@ -168,7 +169,7 @@ namespace C6Lab
 
         /// <summary>
         /// 콤보 결과 문구 (#301). 성공은 CLEAR!, 시간 초과는 TIME UP. 틀린 색은 틀린 사람을 앞에 붙인다:
-        /// 이 기기 플레이어면 "YOU WRONG COLOR", 아니면 좌석 번호로 "P2 WRONG COLOR". 누군지 모르면 이름 없이.
+        /// 이 기기 플레이어면 "내가 색 틀림", 아니면 좌석 번호로 "P2 색 틀림". 누군지 모르면 이름 없이.
         /// </summary>
         public static string ResultTextFor(LabComboResult result, bool failedKnown, bool failedIsMe, int failedSeat)
         {
@@ -625,8 +626,8 @@ namespace C6Lab
             }
             RectTransform canvasRect = canvas != null ? canvas.GetComponent<RectTransform>() : null;
             if (canvasRect == null) return false;
-            Text[] existing = canvas.GetComponentsInChildren<Text>(true);
-            for (int i = 0; i < existing.Length && font == null; i++) font = existing[i].font;
+            // #411: 피버타임 배너와 같은 신라문화체 굵은 글씨 (없으면 화면의 첫 글꼴, 그것도 없으면 기본 글꼴).
+            font = LabYaguangFeverHud.ShillaFont(canvas);
             if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             layer = NewRect("Gourd Combo", canvasRect);
