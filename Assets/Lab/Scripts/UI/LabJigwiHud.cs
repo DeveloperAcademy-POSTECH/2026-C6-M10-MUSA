@@ -231,7 +231,8 @@ namespace C6Lab
         public static string DescribeStage(LabJigwiStageSnapshot stage, LabSnapshot snapshot, ulong localPlayer, double now)
         {
             if (stage == null || !stage.enabled || snapshot == null || snapshot.phase != LabPhase.Playing) return string.Empty;
-            if (stage.fever) return "피버 · 스태미나 자동 회복 2배";
+            // 피버는 세 스테이지 공통 연출(#441, LabYaguangFeverHud)이 알린다.
+            if (stage.fever) return string.Empty;
             LabJigwiStageGroup[] live = (stage.groups ?? Array.Empty<LabJigwiStageGroup>())
                 .Where(group => group != null && (group.Warning(now) || group.Active(now)))
                 .ToArray();

@@ -701,9 +701,9 @@ namespace C6Lab
             if (active != null && active.kind == LabJigwiABKind.GroupFire) PositionGroupStatus(active, local, now);
             else RestoreStatusLayout();
             rows.Clear();
-            float feverMultiplier = source != null && source.config != null ? source.config.JigwiStageFeverMultiplier : 2f;
             float personalMultiplier = source != null && source.config != null ? source.config.JigwiABPersonalRecoveryMultiplier : 4f;
-            string words = stage.fever ? "피버 · 스태미나 자동 회복 " + feverMultiplier.ToString("0.#") + "배" : string.Empty;
+            // 피버는 세 스테이지 공통 연출(#441, LabYaguangFeverHud)이 알린다.
+            string words = string.Empty;
             if (active != null)
             {
                 string shout = active.Warning(now) ? (active.kind == LabJigwiABKind.PersonalBurn

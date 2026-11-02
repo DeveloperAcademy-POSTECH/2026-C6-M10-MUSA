@@ -69,7 +69,7 @@ namespace C6Lab
                 board = current;
                 if (board != null) board.DrumTapped += OnDrumTapped;
             }
-            fever = network != null && network.YaguangFeverOn;
+            fever = network != null && network.StageFeverOn; // #441: 세 스테이지 피버 공통
             if (board == null) return;
             if (!fever)
             {

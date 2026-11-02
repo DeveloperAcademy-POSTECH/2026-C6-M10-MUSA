@@ -114,7 +114,7 @@ namespace C6Lab.Tests
             group.resolution = LabJigwiStageResolution.Extinguished; group.resolvedAt = 17d;
             Assert.That(LabJigwiHud.DescribeStage(stage, latest, 41, 17.1d), Does.Contain("P2가 불을 꺼줬어요"));
             stage.fever = true;
-            Assert.That(LabJigwiHud.DescribeStage(stage, latest, 41, 100d), Does.Contain("자동 회복 2배"));
+            Assert.That(LabJigwiHud.DescribeStage(stage, latest, 41, 100d), Is.Empty, "The shared fever look (#441) announces the fever.");
             latest.phase = LabPhase.Victory;
             Assert.That(LabJigwiHud.DescribeStage(stage, latest, 41, 100d), Is.Empty);
         }
