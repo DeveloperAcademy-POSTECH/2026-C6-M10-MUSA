@@ -2693,6 +2693,7 @@ namespace C6Lab
         private void ResetPaintTransport()
         {
             peerPaintPublishers.Clear();
+            paintPublishCache.Clear();
             peerSharedRounds.Clear();
             PaintReceiver.Reset();
             clientPaintSurface.Reset(new LabPaintGrowthSettings(), 1);
