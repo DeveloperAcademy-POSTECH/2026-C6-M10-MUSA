@@ -715,7 +715,7 @@ namespace C6Lab
                 }
                 else
                 {
-                    words = shout + "물 결합 구슬로 발화점을 모두 끄세요 · "
+                    words = shout + "지급 물구슬로 불씨를 끄세요 · "
                         + Math.Max(0d, active.endsAt - Math.Max(now, active.activeAt)).ToString("0.0", CultureInfo.InvariantCulture) + "초";
                     foreach (var player in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
                     {

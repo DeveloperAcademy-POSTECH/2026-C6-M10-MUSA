@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e51d402e058f4ce7886c033324bbfa7, type: 3}
+  m_Name: StaminaFeedbackProfile
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabStaminaFeedbackProfile
+  consumptionEnabled: 1
+  consumptionSeconds: 0.18
+  consumptionColor: {r: 0.65, g: 0.95, b: 1, a: 0.9}
+  personalFireEnabled: 1
+  ignitionSeconds: 0.4
+  flameHeightRatio: 0.85
+  borderWidthRatio: 0.11
+  animationFps: 12
+  fireOpacity: 0.95
+  flameAtlas: {fileID: 0}

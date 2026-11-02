@@ -72,6 +72,16 @@ namespace Hapio.Tests
             Assert.That(session.DeveloperNextStage(), Is.True);
             yield return WaitPlaying(3);
 
+            int spendEvents = 0; float spentCost = 0f;
+            Action<float> onSpent = value => { spendEvents++; spentCost = value; };
+            network.LocalStaminaSpent += onSpent;
+            var staminaFeedback = Object.FindFirstObjectByType<LabStaminaFeedback>();
+            Assert.That(staminaFeedback, Is.Not.Null, "Saved Battle binds the new common stamina feedback.");
+            network.Generate();
+            yield return Until(() => spendEvents == 1, "Approved generation produces one real stamina-spend event");
+            yield return null;
+            Assert.That(spentCost, Is.EqualTo(network.config.GenerateCost));
+            Assert.That(staminaFeedback.ConsumptionPulseCount, Is.EqualTo(1));
             LabSnapshot before = network.Snapshot;
             Assert.That(before.jigwiAB.enabled, Is.True);
             Assert.That(before.jigwiStage.enabled, Is.False, "#341 must not create old surface roots or paint-blocking cones.");
@@ -134,7 +144,11 @@ namespace Hapio.Tests
             Assert.That(b, Is.Not.Null); Assert.That(b.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
             Assert.That(overlay.PersonalHeatVisible, Is.False);
             Assert.That(overlay.VisibleScreenFires, Is.EqualTo(network.config.JigwiABGroupFireCount));
-            Assert.That(overlay.status.text, Does.Contain("물 결합 구슬"));
+            Assert.That(overlay.status.text, Does.Contain("지급 물구슬"));
+            Assert.That(current.orbs.Any(orb => orb.jigwiABSupplyEventId == b.id), Is.True,
+                "B supplies real owned Water, without a player generation request.");
+            Assert.That(spendEvents, Is.EqualTo(1), "Free supply and new snapshots never flash as a paid generation.");
+            Assert.That(staminaFeedback.ConsumptionPulseCount, Is.EqualTo(1));
             Assert.That(overlay.playerStatus.text, Does.Contain("P1 0/" + network.config.JigwiABGroupFireCount));
             var surfaces = network.GetComponentsInChildren<LabJigwiFireSurface>(true)
                 .Where(surface => surface.FireId == b.id && surface.OwnerPlayerId == network.LocalPlayerId).ToArray();
@@ -216,6 +230,7 @@ namespace Hapio.Tests
             Assert.That(model.JigwiABBlocksBoss(network.LocalPlayerId, current.serverTime), Is.False);
             Assert.That(model.PaintSurface.CoveredCount, Is.EqualTo(paintedBefore));
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell));
+            network.LocalStaminaSpent -= onSpent;
             HoldAt(35d); yield return null;
             CaptureScreenEvidence("0"); yield return null;
             TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B31.2/Canvas+collider projection/curtain3-2-1-0 checked. "

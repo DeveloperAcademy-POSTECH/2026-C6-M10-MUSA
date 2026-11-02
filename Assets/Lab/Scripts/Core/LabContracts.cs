@@ -115,6 +115,8 @@ namespace C6Lab
         /// <summary>Explicit Host battle-clock expiry; -1 retains the existing kind lifetime.</summary>
         public double expiresAt = -1d;
         public bool jigwiSupply;
+        /// <summary>Current B event supplying this Water orb; null for normal/legacy manual water. OriginOwner retains its supplier's quota through transfers.</summary>
+        public string jigwiABSupplyEventId;
         public bool jigwiGenerationBurn;
         // A's deadline is independent of the ordinary lifetime and can be cleared without restoring an expired orb.
         public string jigwiABBurnEventId;

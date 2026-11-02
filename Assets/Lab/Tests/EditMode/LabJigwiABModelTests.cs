@@ -116,12 +116,18 @@ namespace C6Lab.Tests
             Assert.That(done.orbs.Single(o=>o.id==late.id).jigwiABBurnAt,Is.EqualTo(-1));
             Assert.That(done.orbs.Single(o=>o.id==late.id).expiresAt,Is.EqualTo(-1));
         }
-        [Test] public void BHasNoFreeSuppliesAndOnlyRawPairMakesWater()
+        [Test] public void BProvidesTaggedWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
         {
-            var m=Room();var b=Current(m,31);Assert.That(b.players.Length,Is.EqualTo(2));Assert.That(b.players.All(p=>p.targets.Length==3),Is.True);
-            Assert.That(m.Snapshot(31).orbs,Is.Empty);var yin=Add(m,Players[0],31,LabOrbKind.Yin);var yang=Add(m,Players[0],31,LabOrbKind.Yang);
-            Assert.That(m.TryCombineAt(Players[0],yin.id,yang.id,Request(),31,new Vector2(.5f,.5f),Vector2.zero,out var o,out var e),Is.True,e);
-            Assert.That(o.element,Is.EqualTo(LabOrbElement.Water));Assert.That(m.Snapshot(31).jigwi,Is.Empty);
+            var m=Room();var normal=Room(LabStageYokai.None);var b=Current(m,31);normal.Tick(31);
+            Assert.That(b.players.Length,Is.EqualTo(2));Assert.That(b.players.All(p=>p.targets.Length==3),Is.True);
+            Assert.That(m.Snapshot(31).orbs.Where(o=>o.jigwiSupply),Is.Not.Empty);
+            Assert.That(m.Snapshot(31).orbs.All(o=>o.jigwiABSupplyEventId==b.id && o.element==LabOrbElement.Water),Is.True);
+            var yin=Add(m,Players[0],31,LabOrbKind.Yin);var yang=Add(m,Players[0],31,LabOrbKind.Yang);
+            var oldYin=Add(normal,Players[0],31,LabOrbKind.Yin);var oldYang=Add(normal,Players[0],31,LabOrbKind.Yang);
+            Assert.That(normal.TryCombineAt(Players[0],oldYin.id,oldYang.id,Request(),31,new Vector2(.5f,.5f),Vector2.zero,out var expected,out var error),Is.True,error);
+            Assert.That(m.TryCombineAt(Players[0],yin.id,yang.id,Request(),31,new Vector2(.5f,.5f),Vector2.zero,out var actual,out error),Is.True,error);
+            Assert.That(actual.element,Is.EqualTo(expected.element));Assert.That(actual.jigwiABSupplyEventId,Is.Null.Or.Empty);
+            Assert.That(m.Snapshot(31).jigwi,Is.Empty,"The old manual fire policy stays inactive.");
         }
         [Test] public void FireHitConsumesOnceWithoutNormalRewardsAndNeedsWater()
         {
@@ -290,7 +296,8 @@ namespace C6Lab.Tests
             Assert.That(own.targets.All(target => target.lit), Is.True);
             Assert.That(own.lastWaterSplashAt, Is.EqualTo(31.2d));
             Assert.That(model.JigwiABBlocksBoss(owner, 31.2d), Is.True);
-            Assert.That(after.orbs, Is.Empty);
+            Assert.That(after.orbs.Select(orb => orb.id), Is.EquivalentTo(before.orbs.Select(orb => orb.id)),
+                "Curtain misses consume the thrown fixtures and preserve unrelated free supplies.");
             Assert.That(after.hp, Is.EqualTo(before.hp));
             Assert.That(model.PaintSurface.CoveredCount, Is.Zero);
             var current = after.players.Single(player => player.id == owner);
@@ -319,7 +326,9 @@ namespace C6Lab.Tests
             var own = Current(model, 31d).players.Single(player => player.playerId == owner);
             Assert.That(own.lastWaterSplashAt, Is.EqualTo(-1d));
             Assert.That(own.targets.All(target => target.lit), Is.True);
-            Assert.That(model.Snapshot(31d).orbs, Is.Empty);
+            Assert.That(model.Snapshot(31d).orbs.Any(orb => orb.id == wrong.id), Is.False);
+            Assert.That(model.Snapshot(31d).orbs.All(orb => orb.jigwiABSupplyEventId == group.id), Is.True,
+                "The remaining entities are only the new B supplies, not the consumed wrong-colour shot.");
         }
 
         [Test]
@@ -436,6 +445,7 @@ namespace C6Lab.Tests
                     if(!kind.IsDrum())fixture.Add(Add(m,owner,34.9d,kind));
                 var flying=Add(m,owner,34.9d);Launch(m,flying,34.9d);fixture.Add(flying);
             }
+            var allRetired=m.Snapshot(34.9d).orbs.Where(o=>!o.kind.IsDrum()).ToArray();
             m.DrainOrbExpiries();m.DrainBombExplosions();
             var expired=m.Snapshot(35d);var failure=expired.jigwiAB.rounds.Single(r=>r.slot==1);
             Assert.That(failure.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
@@ -450,8 +460,8 @@ namespace C6Lab.Tests
             Assert.That(expired.players.Select(p=>p.throwTotal),Is.EqualTo(before.players.Select(p=>p.throwTotal)));
             Assert.That(expired.players.Select(p=>p.damageTotal),Is.EqualTo(before.players.Select(p=>p.damageTotal)));
             Assert.That(m.PaintSurface.PaintCount,Is.Zero);Assert.That(m.DrainBombExplosions(),Is.Empty);
-            Assert.That(m.DrainOrbExpiries().Select(e=>e.OrbId),Is.EquivalentTo(fixture.Select(o=>o.id)));
-            foreach(var orb in fixture)
+            Assert.That(m.DrainOrbExpiries().Select(e=>e.OrbId),Is.EquivalentTo(allRetired.Select(o=>o.id)));
+            foreach(var orb in allRetired)
             {
                 Assert.That(m.ConfirmHit(orb.id,35d),Is.False);
                 Assert.That(m.ConfirmMiss(orb.id,35d),Is.False);

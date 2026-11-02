@@ -3492,7 +3492,9 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 최종 에디터: Home, Edit 상태. 컴파일과 실제 GPU 출력 확인 완료. 개인 기기 식별자·원시 테스트 로그·빌드 결과물은 커밋하지 않았다.
 - **미실행:** 실제 LAN/핫스팟·다기기, 실제2:2/피버 연속 플레이, iOS export/서명/설치, iPhone CPU/GPU 시간·메모리·발열.1024기준 신규 RT22MiB/기존포함28MiB는 원시 픽셀 계산이며 모바일 실측이 아니다.
 
-## 2026-10-29 — #381 요괴 10종 제작 구조·신규 7종 데이터
+## 2026-10-29 — #381 요괴 10종 제작 구조·신규 7종 데이터 (도입 당시 이력, #402에서 제거)
+
+아래는 도입 당시의 실행 기록이다. 2026-11-02의 #402에서 제작용 10종 구조와 안내 문서를 제거했으며, 당시 자료는 PR #383과 Git 이력에서 확인한다. 현재 실행 구조와 검증은 아래 #402 기록을 따른다.
 
 - 기준 main `8d3cd58d`, 작업 브랜치 `feat/#381-yokai-content-scaffold`. Unity 6000.6.5f1 / macOS의 대상 프로젝트 전용 batch Editor(`-nographics`)와 Unity CLI로 수행했다. 다른 작업의 Editor는 제어하지 않았다. 아래 결과는 데이터·EditMode 범위이며 화면이나 실기기 플레이 확인이 아니다.
 - 생성: `GameYokaiCatalogValidator.CreateMissingDefinitions()`를 실행해 Resources 밖에 카탈로그1개와 정의10개를 만들고 기존3개 StageDefinition의 빈 `content`만 연결했다. 저장 목록 검증에서10종·3 Integrated·7 Planned와 기존3종 순서를 확인했다. Figma의10번 보스 지하국대적과7번 그슨대의 별칭을 포함한다. 확인하지 않은 설명·아트·음성·효과는 비워 두었다.
@@ -3662,6 +3664,26 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 새·바뀐 검사: EditMode `LabTeamSizesTests`(새), `LabRoomPresenceTests`(방 인원 표·6명 기록·지문), `LabPaintPainterSlotTests`(P6 허용·P7 거절), `LabPlayerSlotsTests`, `LabSharedSettingsSchemaTests`·`LabGameFlowBridgeTests`(접속 버전), `LabPlayerCircleTests`(P1~P6), Hapio `GameLobbyModeRulesTests`(새), `GameLobbyAssetTests`, `GamePendingRoomRegistryTests`, `GameStageResultViewTests`(결과 n : n), PlayMode `LabPlayerPaintPatternRenderTests`(P1~P6), `GameLobbyViewTests`(인원별 모드 막힘, 1:1 방, 3:3 쪽 넘김), `GameSceneFlowTests`(DEV 혼자 결과 "땅따먹기").
 - 임시 그림: 3:3 쪽 넘김 `<` `>`·쪽 표시 점, P6 전투 동그라미(P5 그림의 색·숫자만 바꿈)는 디자인 그림을 받으면 바꾼다.
 
+## 2026-11-02 — #402 보류된 10종 확장 준비 구조·#393 잔여 작업 정리
+
+- 기준 main `3897dbd8`, 작업 브랜치 `chore/#402-yokai-expansion-cleanup`. Unity 6000.6.5f1 / macOS / Metal의 전용 batch Editor와 Unity CLI로 수행했다. iOS/Mac 플레이어 빌드·실기기·실제 다기기 연결은 실행하지 않았다.
+- 제거: 제작용 정의10개와 전체 카탈로그, `GameYokaiDefinition`/`GameYokaiCatalog`, 전용 Editor 생성·검증 도구, 10종 전용 검사와 안내 문서. 소유 폴더·파일을 Unity `AssetDatabase.DeleteAsset`으로 제거해 `.meta`와 빈 상위 Content 폴더도 함께 정리했다.
+- 기존3종: 구미호→야광귀→지귀 Stage 자산의 선택적 `content` 참조와 해당 타입/검사만 제거했다. 세 Stage는 기준 main에서 `content` 한 줄을 뺀 내용과 동일하며, GUID·모델 override·기본값·진행 순서·실제 패턴은 보존했다. 필요한 ID·순서·enum·GUID·3단계/2:2 범위 검사는 기존 `GameStageSettingsTests`에 합쳤다.
+- 자료 보존: Scene·Prefab·모델·Lab 코드·설정·패키지·Stage 메타 등을 포함한1,919개 비교 대상 중 Stage 자산3개만 바뀌었고 나머지 **1,916개 SHA-256이 동일**했다. 기존253개 공유 설정·프로토콜5679·Lab40/Game24는 변경하지 않았다. #392 물감 방울과 이후 main의 다른 변경도 보존했다.
+- 참조 검사: 삭제된29개 GUID를 남아 있는 직렬화 자료에서 검색해 잔여 참조0개를 확인했다. 실행 코드에 폐기 타입 참조가 없고, 개발 문서 목차의 로컬 링크와 소스·문서 `git diff --check`를 확인했다. 과거 #381 검증 기록은 도입 당시 이력으로 표시해 보존했다.
+
+| 실제 수행한 검사 | 결과 | 범위 |
+| --- | --- | --- |
+| 컴파일 및 저장 Stage 로드 | 통과 | `scriptCompilationFailed=false`, 기존3 Stage·공유 설정253개 확인 |
+| Hapio EditMode 전체 | **159/159** | 저장 에셋·설정·진행·UI 등 해당 어셈블리 검사 |
+| `LabStageYokaiTests` EditMode | **21/21** | 기존3종 기믹·시간 진행·모드 분리 |
+| `GameSceneFlowTests.SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload` PlayMode | **1/1**, 18.54초 | 저장 Home/Battle의3판 진행·초기화·결과/지도 보존 |
+| 합계 | **181/181** | 실패0·건너뜀0, 중복 실행 합산 없음 |
+
+- PlayMode 검사는 저장 Scene과 개발용 솔로를 사용하며 완료는 기존 CPU 도색 fixture로 유도했다. 실제 손 조작·투사체 명중·세 요괴의 모든 패턴 플레이·다기기 검증을 뜻하지 않는다. 현재 CLI에서 동기 PlayMode 호출은0개 실행 안내를 반환했으며, 비동기로 다시 시작한 실제 완료 결과만 위에 기록했다.
+- #393: 임시 작업 폴더는 이미 없었고 해당 로컬 브랜치는 시작점 `2ba9e806` 그대로여서 고유 커밋이 없었다. 관련 원격 브랜치·PR도 없는 상태에서 그 작업 폴더의 Git 등록과 로컬 브랜치만 제거했다. 이슈는 구현 완료가 아닌 `not planned` 사유로 종료했다. 당시 미커밋 구현이나 중단된 검사 결과를 현재 main의 구현·통과 근거로 사용하지 않았다.
+- **미실행:** 전체 Lab EditMode·전체 PlayMode·iOS/Mac 빌드/서명/설치·실기기·LAN/핫스팟 다기기·성능 측정. 신규7종 패턴은 구현하지 않았으며 현재 프로젝트에 확장 준비 구조를 남기지 않는다.
+
 
 ## 조합판 낙하·착지 수채 얼룩 원화 연결 — #392, 2026-11-02
 
@@ -3721,30 +3743,44 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 실패/skip0. 로비11개에는 `DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt`가 포함되며, 최초 #405 기록에서 미실행이던 Test Runner 경로를 이 통합에서 실제 실행했다. 3:3 방→나가기→잘못된 6인 직접Host 거부→DEV솔로 혼자 전투 시작을 검사한다. 실제 6기기 연결이나 손가락 조작을 의미하지 않는다.
 - 기존 비행/보상과 구슬124개는 앞선75079ac5 통합 실행을 사용하고, 이 후속 main은 VFX/구슬 물리·Scene·공유 설정/아트를 바꾸지 않는다. 전체 PlayMode·실기기·iOS/모바일 성능은 미실행이다. 이전 검증 이력의 당시 미실행 표시는 그대로 남긴다.
 
-## 2026-11-02 — #409 구미호 스테이지 전투 BGM 교체
 
-- 기준 main `0c9d8614`, `feat/#409-gumiho-stage-bgm`. 사용자가 ElevenLabs Music으로 만들어 확정한 `스테이지1배경음악.wav`를 `Resources/Audio/GumihoBGM/Gumiho_Stage.wav` 자리에 그대로 넣었다(파일 이름·`.meta`·GUID 유지, 가져오기 설정 Streaming·Vorbis·normalize 그대로). 코드·Scene·LabConfig 값은 바꾸지 않았다.
-- 원본 분석: 120.000초, 48kHz 스테레오 16bit, 평균 -15.6dBFS, 가장 큰 순간 -0.27dBFS(이전 Suno 곡은 162.5초, 평균 -18.7dBFS, 최대 -4.2dBFS). 가져오기 normalize가 켜져 있어 게임 안 크기는 Inspector `Gumiho Bgm Volume`(0.4)으로 듣고 정한다. 곡 끝 약 3초는 마지막 타격의 울림이 잦아드는 부분이다.
-- 구미호 스테이지(120초)는 마지막 20초가 피버 곡이라 전투 곡은 앞 100초까지 들린다. 땅따먹기는 아래처럼 예전 곡을 그대로 쓴다.
-- 파일 끝의 C2PA 블록에는 ElevenLabs 회사 정보·서명 인증서만 있고 개인 계정 정보는 없다.
+## PR #403의 최신 main 통합·삭제 참조 재검토 — #402, 2026-11-02
 
-| 항목 | 결과 | 근거 |
+- 기준 main `0c9d8614`(#392 PR #408 병합) → 정리 브랜치 통합 `3de1e901`. 충돌은 이 문서의 추가 기록 한 곳이어서 #402/#392/#405의 양쪽 기록을 모두 보존했다. 중간 branch 전환은 Unity 자동 새로고침을 잠시 억제한 후 통합 직후 복구했으며 Scene/에셋을 새로 저장하지 않았다.
+- 독립 읽기 검토에서 삭제 대상은 제작용 10종 정의/카탈로그와 도구이고, 런타임의 유일한 선택적 연결은 `stage.content` 검증임을 다시 확인했다. 실제 `GameYokaiPresentation`은 보존된 `stage.yokaiVisual`을 사용한다. 삭제29 GUID의 Assets/Packages/ProjectSettings 잔여 직렬화 참조0·실행 코드의 폐기 타입 참조0을 확인했다.
+- 기존 Stage3개는 현재 main에서 `content:` 한 줄을 제거한 내용과 정확히 같고 `.meta`도 동일하다. Stage ID/순서/enum/GUID/모델/기본값과 원본 LabConfig 불변 검사는 기존 `GameStageSettingsTests`로 이관되어 실행됐다. 제작 전용 `GameYokaiCatalogTests`11개만 제거돼 이전 전체1686개에서1675개가 됐다.
+- Unity6000.6.5f1/macOS/Metal 통합 실행 결과:
+
+| 검사 | 결과 | 시간 |
 | --- | --- | --- |
-| 열린 Editor에서 다시 가져오기 | PASS | `Gumiho_Stage` 120초·2채널·48kHz·Streaming, GUID `b942e3bf…` 그대로 |
-| 열린 Editor 재컴파일 | PASS | 오류 0 |
-| EditMode `LabGumihoSoundTests.TheGumihoSongsAreInTheirOwnFolders` (120초 길이 검사 추가) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| PlayMode `LabBattleBgmStageTests` (구미호·땅따먹기 곡 선택, 피버 전환) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| Play로 구미호 스테이지·땅따먹기 실제 청취(크기, 2분 반복 이음매) | NOT_RUN | |
+| 전체 EditMode | 1675/1675 PASS | 41.31초 |
+| 저장 Home→3스테이지→완료 지도 PlayMode | 1/1 PASS | 18.52초 |
+| 로비/솔로 PlayMode | 11/11 PASS | 19.49초 |
+| 조합판 물감 효과 PlayMode | 10/10 PASS | 0.06초 |
 
-### 땅따먹기는 예전 곡 유지 — 2026-11-02
+- 합계1697개·실패/skip0이며 전체 PlayMode 실행을 의미하지 않는다. 3스테이지 검사는 저장 Home/Battle/StageResult와 개발용 솔로를 사용하고 완료만 기존 CPU 도색 fixture로 유도한다. 실제 손 조작/투사체 명중/모든 요괴 패턴/실제 다기기 연결 증거는 아니다. 로비11개에는 #405의 3:3 방 이후 DEV솔로 검사가 포함되고, 물감10개는 #392 보존 검사다.
+- 컴파일 오류 없음·현재 실행 스테이지 구미호/야광귀/지귀3개·공유 설정253개를 확인했다. 접속 규약5679/Lab40/Game24를 그대로 유지한다. PR범위 밖 작업직전 main의 tracked파일2487개 SHA-256·스태시9개가 모두 같고, Scene/Prefab·Lab 코드/아트·패키지/프로젝트 설정 변경 없음도 확인했다. 종료 후 Play OFF·Lab Scene dirty=false다.
+- 원시 검사JSON/로그/임시 TestRunner Scene은 커밋하지 않는다. iOS/Mac 빌드·서명/설치·실기기·LAN/핫스팟 다기기·성능 측정은 미실행이다. 이전 #402 준비 단계의181개와 이번 최신 main 통합 실행은 별도 기록이다.
 
-- 사용자 결정: 땅따먹기(1:1·2:2·3:3)는 새 곡이 아니라 기존 곡을 쓴다. #409 커밋 `440846cb` 바로 전의 `GumihoBGM/Gumiho_Stage.wav`(Suno, 162.5초)를 같은 내용 그대로 `Resources/Audio/TerritoryBGM/Territory_Stage.wav`로 꺼냈다(git blob `31c9997f`가 같음). 가져오기 설정은 Editor API로 예전 곡과 똑같이 맞췄다(Streaming·Vorbis·품질 100%·normalize, `.meta`는 GUID만 다름).
-- `LabBattleBgm`: 라운드 시작 때 땅따먹기이면 `TerritoryBGM` 곡(비어 있으면 구미호 곡)을, 구미호 스테이지이면 `GumihoBGM` 곡을 고른다. 두 곡 모두 크기는 `Gumiho Bgm Volume`이다. 야광귀·지귀·Lab 단판은 그대로다.
 
-| 항목 | 결과 | 근거 |
+## #412 지귀 스태미나 피드백·B 소화 물 구슬 주기 지급 — 2026-11-02
+
+- **기준:** main `4f7f2962` → `feat/#412-jigwi-stamina-water-supply`. Unity6000.6.5f1/macOS/Metal의 연결된 Editor에서 실행했다. 새 Mac 플레이어·iOS 빌드는 만들지 않았다.
+- **구현:** A 대상자의 잔량을 따르는 화염 테두리·점화·회복 4배 표시, 실제 승인 비용에만 공통 파란 소비 잔광을 추가했다. B는 강제 Water 조합 변환을 제거하고 Host가 시작1개·2초마다1개·원래 지급 대상별 미소모5개 상한의 소화 전용 Water Combined를 준다. 일반 조합·소유권·정상 투척 물리는 유지한다. 지급분의 B 회차 태그를 직렬화하고 종료·지연 응답·예측 비행 복원에서 해당 회차 공급만 제거한다. 공유 설정257개·접속 규약5680/Lab41/Game25이며 서로 다른 규약의 앱을 혼용하지 않는다.
+
+| 실행 검사 | 결과 | 시간 |
 | --- | --- | --- |
-| 열린 Editor에서 가져오기 | PASS | `Territory_Stage` 162.4935초·Streaming |
-| 열린 Editor 재컴파일 | PASS | 오류 0 |
-| EditMode `LabGumihoSoundTests.TheGumihoSongsAreInTheirOwnFolders` (땅따먹기 폴더·162.5초 검사 추가) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| PlayMode `LabBattleBgmStageTests.StageSongsSelectTheGumihoClipAndTheTerritoryRoomsOwnClip` (이름 바꿈: 땅따먹기는 예전 곡) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
-| Play로 구미호 스테이지 새 곡, 땅따먹기 예전 곡 듣기 | NOT_RUN | |
+| 전체 EditMode | **1726/1726 PASS** |40.45초|
+| 전체 PlayMode 최초 실행 |544/547 PASS, **3실패**|518.16초|
+| 보완 후 스태미나 UI PlayMode |**7/7 PASS**|.05초|
+| 보완 후 실제 발화점·장막/투사체 PlayMode |**13/13 PASS**|11.11초|
+| 보완 후 스테이지 배경음 PlayMode |**3/3 PASS**|1.13초|
+| 보완 후 저장 Home→Stage03 A/B 연결 PlayMode |**1/1 PASS**|14.24초|
+
+- 각 완료 실행의 skip/inconclusive0. 전체 PlayMode의 실패 원인은 ①main에도 있던 야광귀 새 기본곡과 구형 검사 기대곡의 불일치2건 ②박 가까이 옮긴 장막을 예전60ms 주입 속도로 겨냥해 실제 속도 제한에 걸린 검사1건이었다. 음향은 현재 기본곡과 DEV OFF의 기존곡을 모두 검사하게 했고 실제 음향 코드는 바꾸지 않았다. 장막은 속도 상한 이하의 실제 탄도로 발화점을 피한 빈 상단 영역을 맞히도록 했다. 여전히 실제 LabProjectile의 화재 충돌·물 효과·미소화·무보상·복제 timestamp를 검사한다. 박/화재의 판정이나 일반 물리를 테스트 통과 목적으로 변경하지 않았다.
+- 별도 코드 검토에서 재시작/새 세션 첫 Present 전에 들어온 승인 비용이 초기화될 수 있는 UI 경계를 보완했다. NotifySpent가 현재 세션·판을 먼저 반영하고 새 비용을 적재하며, 두 경계 검사와 이전 판 잔상 제거 검사를 함께 실행했다. 전체 PlayMode를 수정 후 전부 재실행한 기록은 아니며, 최초 전체 실행과 후속 관련24개 실행을 구분한다.
+- **모델/복제 검사:** 실제 지급 주기·상한(전달/비행 포함)·누락 Tick·재점화·정상 조합·소화 전용·일반 Water 보존·성공/실패/취소/새 판, 회차 태그 검증·중복/늦은 delta/receipt/checkpoint·순서 fence·이후 새 구슬 보존을 전체 EditMode에 포함했다. 이는 실제 원격 기기 연결 증거가 아니다.
+- **GPU 확인:** 실제 저장 Home의 StartSolo → 공통 카운트다운 → 기존 DEV Next Stage2회 → 실제 Jigwi 모델을 실행했다. 실제 Generate의 승인 비용 이벤트1회를 발생시킨 뒤 모델/표현 clock을 A11.2초·B31.2초로 앞으로 진행해 고정했다. 원본 스태미나 배치 아래 화염·파란 소비 잔광, `회복 4배` 글꼴, 실제 지급 태그를 가진 Water2개·물방울/잔물결·화재3점의 연결을 확인했다. 실제 손가락 플레이나 2초 실시간 지급 간격 측정은 아니다. Pause 메뉴만 runtime CanvasGroup으로 숨긴 정지 화면이며, 소비 잔광도 정지 상태로 보존된다. [A 캡처](images/jigwi412-stamina-fire.png)·[B 캡처](images/jigwi412-supplied-water.png)를 남긴다.
+- **배치 보존:** Home/Lobby는 기존 serialized block 각2곳의 DEV 배열/자식 참조에4행만 더했다(새124block, 삭제0). 모든 기존 RectTransform·기존 UI object는 동일하다. Lab/Battle Scene·기존 Prefab·머터리얼·ThrowMath/Projectile·Packages/ProjectSettings는 변경하지 않았다. LabConfig를 Unity로 저장하면서 main에서 이미 동작하던 팀 피버/음향 기본값도 명시 직렬화됐다. 기존 저장값을 바꾸지 않았고 해당 기본값 코드는 main과 같다. 스태시9개 보존·신규meta누락/GUID중복0을 확인했다.
+- **종료 상태:** Play OFF, 원래 Lab Scene 열림, dirty=false, 스크립트 컴파일 오류 없음. 임시 C#·원시 JSON·실행 로그·TestRunner 임시 Scene은 커밋 대상에서 제외한다.
+- **미실행:** iPhone/iPad 실기기·iOS 서명/설치·LAN/핫스팟 실제 다기기·모바일 성능. 실제 짧은 플리크 감각과 폰 화면에서의 화염 가독성은 이후 실기기로 확인해야 한다. 기본/DEV 조절과 수동 기대 시나리오는 `JIGWI_SCREEN_PATTERNS.md`의 최신1~8절을 따른다.

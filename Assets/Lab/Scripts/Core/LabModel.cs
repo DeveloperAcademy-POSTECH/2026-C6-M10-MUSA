@@ -470,7 +470,7 @@ namespace C6Lab
             }
 
             orbs.Remove(firstId); orbs.Remove(secondId);
-            var element = JigwiABCombinedElement(CombinedElementFor(sender), now);
+            var element = CombinedElementFor(sender);
             Vector2 velocity = Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed);
             orb = new LabOrbState
             {
@@ -636,6 +636,7 @@ namespace C6Lab
             // One remaining local ignition keeps the entire B curtain closed. A bypassed
             // physics contact is consumed here before any normal boss paint/reward/statistic.
             if (TryBlockJigwiABBossHit(orb, now)) return false;
+            if (ConsumeJigwiABSupplyBossHit(orb, now)) return false;
             element = orb.element;
             if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth)
                 TryExtinguishJigwiStageRoot(orb.owner, paintDirection, now, out _);
@@ -1263,8 +1264,8 @@ namespace C6Lab
         public bool ConfirmMiss(string id, double now, bool countThrow = true)
         {
             if (!TryAdvance(now, out _) || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight) return false;
-            if (countThrow && phase == LabPhase.Playing && players.TryGetValue(orb.owner, out var thrower))
-                thrower.throwTotal++;
+            if (countThrow && string.IsNullOrEmpty(orb.jigwiABSupplyEventId) && phase == LabPhase.Playing
+                && players.TryGetValue(orb.owner, out var thrower)) thrower.throwTotal++;
             launchScales.Remove(id);
             return orbs.Remove(id);
         }

@@ -148,13 +148,13 @@ namespace C6Lab.Tests
         [Test]
         public void TheWrongColorResultNamesWhoMissed()
         {
-            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, true, false, 1), Is.EqualTo("P2 WRONG COLOR"));
-            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, true, true, 1), Is.EqualTo("YOU WRONG COLOR"));
-            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, false, false, -1), Is.EqualTo("WRONG COLOR"),
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, true, false, 1), Is.EqualTo("P2 색 틀림"));
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, true, true, 1), Is.EqualTo("내가 색 틀림"));
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, false, false, -1), Is.EqualTo("색 틀림"),
                 "Unknown thrower: no name.");
-            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.Timeout, true, true, 0), Is.EqualTo("TIME UP"),
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.Timeout, true, true, 0), Is.EqualTo("시간 끝!"),
                 "A time out is nobody's miss.");
-            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.Success, true, true, 0), Is.EqualTo("CLEAR!"));
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.Success, true, true, 0), Is.EqualTo("성공!"));
         }
 
         [UnityTest]

@@ -38,6 +38,7 @@ namespace C6Lab.Tests
             yield return new TestCaseData(240, 2).SetName("SharedSchema_TwoPlayerBeforeJigwiScreenSettingsRejectedAtomically");
             yield return new TestCaseData(249, 3).SetName("SharedSchema_UnmergedJigwiScreenPayloadRejectedAtomically");
             yield return new TestCaseData(251, 3).SetName("SharedSchema_BeforeJigwiMissionRewardsRejectedAtomically");
+            yield return new TestCaseData(253, 3).SetName("SharedSchema_BeforePeriodicJigwiWaterRejectedAtomically");
             yield return new TestCaseData(current - 1, 3).SetName("SharedSchema_MissingTailRejectedAtomically");
             yield return new TestCaseData(current + 1, 3).SetName("SharedSchema_UnknownTailRejectedAtomically");
         }
@@ -58,8 +59,8 @@ namespace C6Lab.Tests
         [Test]
         public void CurrentSchemaHasTheCurrentProtocolAndCanBeAppliedAndFingerprinted()
         {
-            Assert.That(Protocol, Is.EqualTo(5679));
-            Assert.That(baseline.Length, Is.EqualTo(253));
+            Assert.That(Protocol, Is.EqualTo(5680));
+            Assert.That(baseline.Length, Is.EqualTo(257));
             Assert.That(baseline.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
             Assert.That(config.TryApplyDeveloperValues(baseline, out string error), Is.True, error);
             Assert.That(LabSessionSettings.Fingerprint(baseline, 3, Protocol), Is.Not.Empty);

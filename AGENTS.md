@@ -79,10 +79,10 @@
 - 승인된 파란 시안은 `LabGourdPaint`에서 기존 고해상도 결과 위에 적용한다. `Resources/GourdPaint/WatercolorProfile`은 표현 전용이며 공유 LabConfig/프로토콜에 넣지 않는다. 속성별 정적/활성 농도를 분리하고 새로 이어진 기록만 기본.4초 번지며 완료 시 한 번만 확정한다. 초기/교체/128개 폐기·설정/품질 변경은 정적 복원하며 관람/PNG는 최종 표시를 확정·복사한다. 원본 패턴·Prefab·Scene·성장/건조/100% 판정·P지도·Host 권한은 유지한다.
 - `C6 Lab > Experiments > Watercolor Paint`는 같은 런타임의 격리 정적 비교다. 비교 복사본의 Drying OFF를 실제 규칙 변경으로 해석하지 않는다. 실기기 성능과 자동 GPU 검사는 구분하고 `docs/WATERCOLOR_PAINT_EXPERIMENT.md`·VALIDATION을 따른다.
 
-## #381 요괴 콘텐츠 제작 구조
+## #402 보류된 요괴 확장 준비 정리
 
-- `Assets/Hapio/Content/Yokai/YokaiCatalog.asset`은 Resources 밖의 10종 제작 목록이며 실행 스테이지 목록을 대체하지 않는다. 기존 구미호→야광귀→지귀 3단계와 `LabStageYokai` 값·공유 설정251개·접속 규약은 유지한다. 추가7종은 Planned이며 전투 코드·Scene·전용 모델은 아직 없다.
-- `contentId`·Figma 참고 순번·전투 stageIndex를 구분한다. StageDefinition의 선택적 `content`는 같은 ID의 Integrated 정의만 허용하며, 아트 참조는 제작용이다. 기존3종은 공통 검은 요괴를 계속 쓴다. `Hapio > Yokai` 생성기는 없는 데이터와 빈 기존 stage.content만 채우며 이미 편집한 값을 덮어쓰지 않는다. 편집과 후속 아트 폴더 관례는 `docs/YOKAI_CONTENT_STRUCTURE.md`를 따른다.
+- 현재 요괴 실행 자료는 `Resources/Hapio/StageCatalog`와 기존 구미호→야광귀→지귀의 StageDefinition 3개다. 기존 단계 순서·GUID·규칙·수치·모델 연결을 유지하며, 기존3종은 공통 검은 요괴를 계속 사용한다.
+- 10종 확장은 보류되어 #381의 제작용 카탈로그·정의 에셋·전용 코드·생성/검증 도구와 StageDefinition의 선택적 `content` 연결을 제거했다. #393의 공통 모듈 경로는 현재 게임에 추가하지 않는다. 확장을 재개할 때는 PR #383과 Git 이력의 자료를 확인하고 새 작업 범위를 정하며, 제거한 준비 파일을 자동 재생성하지 않는다.
 
 
 ## #388 지귀 A/B 시간 제한·성공 보상·실패 정리
@@ -93,3 +93,10 @@
 - 구형 B 축소246/247은 숨긴 예약값으로 저장/인덱스만 보존한다.245 기본 재점화12초는 미션10초보다 길어 기본에서는 재점화하지 않으며 DEV로 줄일 때만 미션 안에서 동작한다. 예고는 현행 A/B에서1초 고정이며229는 숨긴 미사용 예약 슬롯으로 저장값만 보존한다. 공통20/40/60/80·100초 방해 정리/회복2배·120초 전투와 일반 Lab 수동 정책은 유지한다.
 - 현재 호환 묶음은 **설정253개·프로토콜5678·`C6PhysicsLab/39`·`C6HapioGame/23`**다. 기존0~250을 보존하고251/252를 추가한다. 실패는 session/round별 scalar `clearedThroughRevision` fence로 전파·catch-up하며 제거 ID 배열을 싣지 않는다. 이전 승인/receipt/투사체 부활은 막고 fence 이후 승인·회복·북은 보존한다.
 - 현재 동작/코드 연결/기대 검증은 `docs/JIGWI_SCREEN_PATTERNS.md`·`docs/GAME_FLOW.md`·`docs/DEVELOPER_MODE_PARAMETER_SPEC.md`를 따르고, 실행한 검사·미실행 실기기는 `docs/VALIDATION.md`에만 실제 근거로 구분한다. 위 #332/#341의 시간표·축소·규약·검증 횟수는 당시 이력이다.
+
+
+## #412 지귀 회복 표시와 소화 Water 공급 — 최신 호환 기준
+
+- 지귀 A는 기존 규칙을 유지하고 실제 스태미나를 따르는 화염 테두리/배율을 표시한다. 공통 소비 표시의 입력은 중복 제거된 승인 `LocalStaminaSpent`이며 snapshot 차이나 구슬 Spawn으로 추측하지 않는다. 원본 Canvas 배치·색·구슬 뒤 위계·야광귀 피버는 보존한다.
+- B 일반 조합은 평소 원소다. Host가 활성 즉시1개·2초마다1개, 최초 지급 대상별 미소모 최대5개의 소화용 Water를 공급한다(전달/비행 포함 상한). `jigwiABSupplyEventId`로 일반 Water/구형 Lab 공급과 구분하고 종료 후 선택적 폐기를 유지한다. 실패는 기존 전원 전체제거/스태미나0/북 보존이다. 일반 투척 물리는 바꾸지 않는다.
+- 기존0~252는 유지하며 공급 간격/초기 수량/상한/발화점 거리253~256을 더한 **257개·5680/Lab41/Game25**가 최신 묶음이다. 위 과거 규약 기록은 도입 당시 값이며 이전 앱과 혼용하지 않는다. `JIGWI_SCREEN_PATTERNS.md`·`DEVELOPER_MODE_PARAMETER_SPEC.md`를 따르고 수행한 검사만 VALIDATION에 기록한다.

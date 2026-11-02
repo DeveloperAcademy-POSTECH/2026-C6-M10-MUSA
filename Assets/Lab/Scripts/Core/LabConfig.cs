@@ -387,13 +387,17 @@ namespace C6Lab
             new LabDeveloperField("지귀 B 불 이동 주기 (초)", 1f, 20f),
             new LabDeveloperField("지귀 B 소화 표적 반경", .1f, 1f),
             new LabDeveloperField("지귀 성공 보상 구슬 크기 (배)", 1f, 3f),
-            new LabDeveloperField("지귀 성공 보상 칠 면적 (배)", 1f, 3f)
+            new LabDeveloperField("지귀 성공 보상 칠 면적 (배)", 1f, 3f),
+            new LabDeveloperField("지귀 B 물 구슬 지급 간격 (초)", .25f, 10f),
+            new LabDeveloperField("지귀 B 시작 물 구슬 수", 0f, 5f, true),
+            new LabDeveloperField("지귀 B 미소모 지급 상한", 1f, 12f, true),
+            new LabDeveloperField("지귀 B 발화점 거리 (박까지 비율)", .4f, .9f)
         });
 
         public const int JigwiStageFirstField = 228;
         public const int JigwiStageLastField = 235;
         public const int JigwiABFirstField = 240;
-        public const int JigwiABLastField = 252;
+        public const int JigwiABLastField = 256;
         public static bool IsJigwiStageField(int index) => index >= JigwiStageFirstField && index <= JigwiStageLastField
             || index >= JigwiABFirstField && index <= JigwiABLastField;
 
@@ -447,7 +451,7 @@ namespace C6Lab
                 134, 132, 133, 148, 149, 150, 151, 200, 201),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
-            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 241, 242, 243, 244, 245, 248, 249, 250, 251, 252),
+            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 241, 242, 243, 244, 245, 248, 249, 250, 251, 252, 253, 254, 255, 256),
             // 기믹 묶음 (#311): 공용(폭탄·넘기기 막기)과 고유(구미호: 여우불·매혹)를 나눠 간격·켜기·비율·세부값을 모은다.
             new LabDeveloperCategory("Gimmicks", 205, 207, 169, 208, 170, 153,
                 166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177)
@@ -528,6 +532,12 @@ namespace C6Lab
         [SerializeField, Range(.1f, 1f)] private float jigwiABFireTargetRadius = .3f;
         [SerializeField, Range(1f, 3f)] private float jigwiABRewardSizeScale = 1.3f;
         [SerializeField, Range(1f, 3f)] private float jigwiABRewardPaintScale = 1.5f;
+        [Header("Jigwi B free extinguishing supplies (#412)")]
+        [SerializeField, Range(.25f, 10f)] private float jigwiABSupplyIntervalSeconds = 2f;
+        [SerializeField, Range(0, 5)] private int jigwiABSupplyInitialCount = 1;
+        [SerializeField, Range(1, 12)] private int jigwiABSupplyLimit = 5;
+        [Tooltip("Fire targets on the ordinary legal throw path, as a fraction from launch to the boss front. Curtain stays behind them.")]
+        [SerializeField, Range(.4f, .9f)] private float jigwiABFireDepth = .8f;
 
         [Header("Item orbs")]
         [SerializeField, Min(.1f)] private float itemLifetimeSeconds = 15f;
@@ -915,7 +925,24 @@ namespace C6Lab
         [Tooltip("남은 시간이 아래 초 이하일 때의 빠른 째깍 간격 (초)")]
         [SerializeField, Range(.05f, 1f)] private float yaguangComboTickFastIntervalSeconds = .25f;
         [Tooltip("남은 시간이 이 초 이하가 되면 빠른 째깍으로 바꾼다 (0이면 끝까지 기본 째깍)")]
-        [SerializeField, Range(0f, 10f)] private float yaguangComboTickFastSeconds = 3f;
+        [SerializeField, Range(0f, 10f)] private float yaguangComboTickFastSeconds = 4f;
+        [Header("야광귀 콤보 결과 효과음 (#398, Inspector 전용)")]
+        [Tooltip("콤보 실패 뒤 야광귀 \"메롱~\" 대사 크기 (Resources/Audio/YaguangComboTaunt, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboTauntSoundVolume = .9f;
+        [Tooltip("콤보 실패 소리 뒤 \"메롱~\"까지 기다리는 초")]
+        [SerializeField, Range(0f, 2f)] private float yaguangComboTauntDelaySeconds = .3f;
+        [Tooltip("SMALL 배지가 나올 때 소리 크기 (Resources/Audio/YaguangComboSmallStart, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboSmallStartSoundVolume = .8f;
+        [Tooltip("SMALL이 끝나 원래 크기로 돌아올 때 소리 크기 (Resources/Audio/YaguangComboSmallEnd, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboSmallEndSoundVolume = .8f;
+        [Tooltip("BIG 배지와 부적 비가 시작될 때 소리 크기 (Resources/Audio/YaguangComboBigStart, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboBigStartSoundVolume = .8f;
+        [Tooltip("BIG이 끝날 때 소리 크기 (Resources/Audio/YaguangComboBigEnd, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboBigEndSoundVolume = .7f;
+        [Tooltip("SMALL 중 던진 작은 공이 맞을 때 일반 타격음을 높이는 반음 수 (0이면 그대로, 던진 사람 기기)")]
+        [SerializeField, Range(0f, 12f)] private float smallHitPitchSemitones = 6f;
+        [Tooltip("BIG 중 던진 큰 공이 맞을 때 징 크기 (Resources/Audio/FiveColorHit, 던진 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float bigHitSoundVolume = .8f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1042,6 +1069,10 @@ namespace C6Lab
         public float JigwiABFireTargetRadius => Mathf.Clamp(Finite(jigwiABFireTargetRadius, .3f), .1f, 1f);
         public float JigwiABRewardSizeScale => Mathf.Clamp(Finite(jigwiABRewardSizeScale, 1.3f), 1f, 3f);
         public float JigwiABRewardPaintScale => Mathf.Clamp(Finite(jigwiABRewardPaintScale, 1.5f), 1f, 3f);
+        public float JigwiABSupplyIntervalSeconds => Mathf.Clamp(Finite(jigwiABSupplyIntervalSeconds, 2f), .25f, 10f);
+        public int JigwiABSupplyInitialCount => Mathf.Clamp(jigwiABSupplyInitialCount, 0, Mathf.Min(5, JigwiABSupplyLimit));
+        public int JigwiABSupplyLimit => Mathf.Clamp(jigwiABSupplyLimit, 1, 12);
+        public float JigwiABFireDepth => Mathf.Clamp(Finite(jigwiABFireDepth, .8f), .4f, .9f);
         public int YaguangFiveColorOrbCount => Mathf.Clamp(yaguangFiveColorOrbCount, 0, 6);
         public float YaguangFiveColorOrbPaintScale => Mathf.Clamp(Finite(yaguangFiveColorOrbPaintScale, 2f), 1f, 3f);
         /// <summary>
@@ -1358,7 +1389,15 @@ namespace C6Lab
         public float YaguangComboTickFastSoundVolume => Mathf.Clamp01(Finite(yaguangComboTickFastSoundVolume, 1f));
         public float YaguangComboTickIntervalSeconds => Mathf.Clamp(Finite(yaguangComboTickIntervalSeconds, .5f), .1f, 2f);
         public float YaguangComboTickFastIntervalSeconds => Mathf.Clamp(Finite(yaguangComboTickFastIntervalSeconds, .25f), .05f, 1f);
-        public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 3f), 0f, 10f);
+        public float YaguangComboTauntSoundVolume => Mathf.Clamp01(Finite(yaguangComboTauntSoundVolume, .9f));
+        public float YaguangComboTauntDelaySeconds => Mathf.Clamp(Finite(yaguangComboTauntDelaySeconds, .3f), 0f, 2f);
+        public float YaguangComboSmallStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboSmallStartSoundVolume, .8f));
+        public float YaguangComboSmallEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboSmallEndSoundVolume, .8f));
+        public float YaguangComboBigStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigStartSoundVolume, .8f));
+        public float YaguangComboBigEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigEndSoundVolume, .7f));
+        public float SmallHitPitchSemitones => Mathf.Clamp(Finite(smallHitPitchSemitones, 6f), 0f, 12f);
+        public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));
+        public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 4f), 0f, 10f);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;
@@ -1499,7 +1538,8 @@ namespace C6Lab
                 JigwiABPersonalDurationSeconds, JigwiABPersonalRecoveryMultiplier, JigwiABPersonalRequiredHits,
                 JigwiABPersonalBurnSeconds, JigwiABGroupFireCount, JigwiABRelightSeconds, JigwiABShrinkDelaySeconds,
                 JigwiABShrinkScale, JigwiABFireMoveAmount, JigwiABFireMovePeriodSeconds, JigwiABFireTargetRadius,
-                JigwiABRewardSizeScale, JigwiABRewardPaintScale
+                JigwiABRewardSizeScale, JigwiABRewardPaintScale,
+                JigwiABSupplyIntervalSeconds, JigwiABSupplyInitialCount, JigwiABSupplyLimit, JigwiABFireDepth
             };
         }
 
@@ -1528,6 +1568,7 @@ namespace C6Lab
                 }
             }
 
+            if (values[254] > values[255]) { error = "Starting Jigwi B water count cannot exceed the supply limit."; return false; }
             if (values[4] > values[3]) { error = "Starting Stamina cannot exceed Maximum Stamina."; return false; }
             if (values[5] > values[3]) { error = "Orb Generation Cost cannot exceed Maximum Stamina."; return false; }
             if (values[6] > values[3]) { error = "Stamina Recovery Amount cannot exceed Maximum Stamina."; return false; }
@@ -1791,6 +1832,10 @@ namespace C6Lab
             jigwiABFireTargetRadius = values[250];
             jigwiABRewardSizeScale = values[251];
             jigwiABRewardPaintScale = values[252];
+            jigwiABSupplyIntervalSeconds = values[253];
+            jigwiABSupplyInitialCount = (int)values[254];
+            jigwiABSupplyLimit = (int)values[255];
+            jigwiABFireDepth = values[256];
             error = string.Empty;
             return true;
         }
