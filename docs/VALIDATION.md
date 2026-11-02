@@ -3705,3 +3705,18 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 | DEV 솔로가 다시 정하는 인원 (Editor 직접 확인) | PASS | 1·6·7명 → 3명, 2~5명은 그대로 |
 | PlayMode `GameLobbyViewTests.DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt` (새: 3:3 방 → 나가기 → 카드 없는 방은 6명이면 열리지 않음 → DEV 솔로가 혼자 전투 시작) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | 실제 Play 재현 순서 다시 해 보기 | NOT_RUN | |
+
+
+## #392 PR #408의 추가 main #405 통합 확인 — 2026-11-02
+
+- 앞선 검사 중 main에 #407/#405가 병합돼 기준을 `83441bd4`까지 반영했다(통합 `7ae2421f`). 충돌은 이 문서의 양쪽 추가 기록뿐이라 #392/#405 기록 모두 보존했다. 네트워크의 6인 방/솔로 진입 수정과 새 회귀 검사는 main 그대로이며 #392 VFX 코드는 변경하지 않았다.
+- Unity6000.6.5f1/macOS/Metal 최종 통합 재검사:
+
+| 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | 1686/1686 PASS | 39.65초 |
+| 판 얼룩 PlayMode | 10/10 PASS | 0.06초 |
+| 로비 PlayMode(#405 포함) | 11/11 PASS | 19.29초 |
+
+- 실패/skip0. 로비11개에는 `DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt`가 포함되며, 최초 #405 기록에서 미실행이던 Test Runner 경로를 이 통합에서 실제 실행했다. 3:3 방→나가기→잘못된 6인 직접Host 거부→DEV솔로 혼자 전투 시작을 검사한다. 실제 6기기 연결이나 손가락 조작을 의미하지 않는다.
+- 기존 비행/보상과 구슬124개는 앞선75079ac5 통합 실행을 사용하고, 이 후속 main은 VFX/구슬 물리·Scene·공유 설정/아트를 바꾸지 않는다. 전체 PlayMode·실기기·iOS/모바일 성능은 미실행이다. 이전 검증 이력의 당시 미실행 표시는 그대로 남긴다.
