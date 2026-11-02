@@ -133,3 +133,7 @@
 
 - `LabBulkSender`의 재전송 대기는 RTT 측정값(RFC 6298, 0.08~1초)이며, 측정은 덮은 조각을 모두 한 번만 보낸 ACK에서만 한다(Karn). 시간 초과 재전송은 공유 백오프를 늘리고 다음 유효 측정에서 되돌린다. 같은 누적 ACK가 세 번 더 오면 선두 조각을 바로 다시 보내되, 이미 재전송한 사본이 만드는 반복 ACK는 빼고 센다. Guest는 매 데이터그램마다 누적 ACK를 보내야 이 동작이 성립한다.
 - Host는 피어 백로그가 `BulkBacklogLimitBytes`(64 KiB) 이상일 때만 그 피어의 스냅샷·도색 발행을 건너뛴다. 미확인 조각이 있다는 이유만으로 건너뛰지 않는다. `paint_resync`는 백로그가 가득 찼거나 직전 전체 도색 지도가 미확인일 때만 거절하고, Guest는 받는 중인 도색 프레임이 1초 동안 새 조각을 못 받았을 때만 재요청한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
+
+## #439 Host 도색 발행 캡처 공유
+
+- Host의 피어별 `LabPaintPublisher`는 하나의 `LabPaintPublishCache`를 공유한다. 한 번의 발행(같은 epoch)에서 표면 복사·해시·인코딩은 한 번이며 피어별 발행자는 자기가 마지막으로 보낸 캡처를 기준으로 delta를 만든다. 캡처 키는 표면·epoch·Revision·PaintCount·VisualVersion·크기이므로 픽셀을 바꾸는 표면 경로는 계속 Revision을 올려야 한다. 프레임 바이트는 이전 구현과 같아야 하며 `LabPaintPublishCacheTests`의 main 참조 비교로 고정한다.

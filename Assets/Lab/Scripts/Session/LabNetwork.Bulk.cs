@@ -31,6 +31,8 @@ namespace C6Lab
         private const string BulkMessageName = "C6Lab.Bulk.1";
         private readonly Dictionary<ulong, LabBulkSender> bulkSenders = new Dictionary<ulong, LabBulkSender>();
         private readonly Dictionary<ulong, LabPaintPublisher> peerPaintPublishers = new Dictionary<ulong, LabPaintPublisher>();
+        /// <summary>One surface copy, hash and encoding per publish pass, shared by every peer's publisher (#439).</summary>
+        private readonly LabPaintPublishCache paintPublishCache = new LabPaintPublishCache();
         private readonly Dictionary<ulong, string> peerSharedRounds = new Dictionary<ulong, string>();
         private readonly LabBulkReceiver bulkReceiver = new LabBulkReceiver();
         private readonly LabBulkMessageAssembler bulkMessages = new LabBulkMessageAssembler();
@@ -65,7 +67,7 @@ namespace C6Lab
         private LabPaintPublisher PeerPaintPublisher(ulong peer)
         {
             if (!peerPaintPublishers.TryGetValue(peer, out var publisher))
-                peerPaintPublishers.Add(peer, publisher = new LabPaintPublisher());
+                peerPaintPublishers.Add(peer, publisher = new LabPaintPublisher(paintPublishCache));
             return publisher;
         }
 
@@ -171,7 +173,8 @@ namespace C6Lab
 
         private void ResetBulkTransport()
         {
-            bulkSenders.Clear(); peerPaintPublishers.Clear(); peerSharedRounds.Clear(); bulkReceiver.Clear(); bulkMessages.Clear();
+            bulkSenders.Clear(); peerPaintPublishers.Clear(); paintPublishCache.Clear();
+            peerSharedRounds.Clear(); bulkReceiver.Clear(); bulkMessages.Clear();
             paintCheckpointThrough.Clear();
         }
     }

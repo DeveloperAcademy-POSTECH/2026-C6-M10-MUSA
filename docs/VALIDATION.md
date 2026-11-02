@@ -3942,3 +3942,41 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - **Mac 3프로세스:** 이 브랜치로 만든 `Builds/Lab/20261102-223606-5ecfe8d0` 앱을 `--lab-host`/`--lab-join 127.0.0.1`·`--lab-auto-start --lab-auto-generate --lab-auto-transfer`로 실행했다. 세 명 연결·설정 확인·`C6_LAB_START seats=0,1,2` 뒤 두 Client가 Bulk 스냅샷으로 `Playing` 시작과 120초 종료(`Defeat remaining=0`)를 모두 받았다. 자동 전달 요청은 Host·Client에서 승인됐고 `C6_LAB_BULK_INVALID`·`BULK_SEND_FAILED`·`SNAPSHOT_ABORT`·예외는 없었다. 같은 앱의 앞선 75초 실행에서는 한 Client의 첫 자동 행동이 시작 직후 `Restoring board state`로 한 번 거절됐다(조합판 체크포인트가 제어 채널로 도착하기 전, Bulk와 무관한 경로이며 이후 요청은 승인). 이 거절이 main에서도 나는지는 비교하지 않았다. 이 실행은 손실·지연을 넣지 않은 같은 Mac의 localhost이므로 재전송 타이밍 자체는 확인하지 않았다.
 - **종료 상태:** Play OFF, 컴파일 오류 없음, Mac 프로세스 종료.
 - **미실행:** 손실·지연을 넣은 실제 전송, iPhone 실기기·LAN/핫스팟 여러 기기에서의 체감·대역폭 측정. 전체 PlayMode는 실행하지 않았다.
+
+## #439 Host 도색 발행 캡처 공유·셀 비교 박싱 제거 — 2026-11-03
+
+- **기준:** main `58981642` → `fix/#439-shared-paint-capture`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Host는 도색이 바뀔 때마다 Guest마다 `LabPaintPublisher.Publish`를 따로 불렀다. 그때마다 256×128 지도(색 128 KB + 칠한 사람 32 KB)를 새로 복사하고 이전 지도와 셀 단위로 비교했다(`Color32.Equals`가 셀마다 박싱). SHA-256과 base64도 다시 계산했다. 같은 작업이 피어 수만큼 반복됐다.
+- **수정:**
+  - 새 `LabPaintPublishCapture`가 한 번의 발행에서 표면을 한 번만 복사한다. 해시·전체 본문·이전 캡처 기준 delta 본문은 처음 필요할 때 계산해 캐시한다. delta 캐시의 키는 이전 캡처의 번호라서 캡처끼리 참조로 이어져 메모리에 쌓이지 않는다.
+  - `LabPaintPublishCache`는 표면·발행 번호(epoch)·Revision·PaintCount·VisualVersion·크기가 같으면 같은 캡처를 돌려준다. Host의 피어별 발행자(`PeerPaintPublisher`)가 하나의 캐시를 쓰고, 도색·Bulk 전송 초기화 때 비운다.
+  - 피어별 발행자는 마지막으로 보낸 캡처를 기준으로 보관한다. 그래서 백로그로 건너뛴 피어도 자기 기준에서 delta를 받는다.
+  - 셀 비교는 `r,g,b,a` 필드 비교로 바꿨다. 공개 `Hash`·프레임 형식·바이트·접속 규약 **5682/Lab43/Game27**·공유 설정 257개는 그대로다.
+
+| Editor 측정 (256×128, 매 회 1회 명중 후 발행, 60회 평균) | 전 | 후 |
+| --- | --- | --- |
+| 발행 1회 — 피어 1명 | 4.18 / 4.43 / 4.56 ms | 1.00 / 1.16 / 1.14 ms |
+| 발행 1회 — 피어 4명 | 17.99 / 15.61 / 16.46 ms | **1.36 / 1.03 / 1.09 ms** |
+| 발행 1회 — 피어 4명, 캐시 없이 필드 비교만 | — | 4.13 / 4.47 ms |
+| 같은 시나리오의 프레임 수 / 데이터 문자 수 | 피어1 122 / 189,596, 피어4 288 / 146,784 | 같음 |
+
+- 측정은 Editor `script.eval`에서 같은 표면·같은 난수 시드로 세 번(후 캐시 없음은 두 번) 반복했다. 할당량은 이 Mono 프로필에서 `GC.GetAllocatedBytesForCurrentThread`가 0을 반환해 기록하지 않았다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1762/1762 PASS** | 41.26초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.33초 |
+| PlayMode `LabHighResolutionPaintRuntimeTests` | **2/2 PASS** | 0.08초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 19.31초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 213.41초 |
+
+- 각 실행의 skip/inconclusive0. 새 검사 `LabPaintPublishCacheTests` 5개:
+  - main의 이전 발행자를 테스트 안에 그대로 옮긴 참조와 바이트 단위 비교(시각 스탬프 포함 프레임, 패스를 건너뛴 피어, 표면 Reset과 라운드 변경, 세션 변경, 5회마다 체크포인트)
+  - 공유 시 패스당 캡처 1회
+  - 건너뛴 피어가 자기 기준에서 받는 delta와 수신 적용
+  - 칠한 사람만 바뀐 셀의 1셀(7바이트) delta
+  - 변화 없음과 캐시 Clear
+- `LabDeveloperSoloIntegrationTests`는 바이트 비교 검사를 추가하기 전 코드(제품 코드는 같음)에서 실행했다. 나머지는 추가한 뒤 Editor를 재시작하고 실행했다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 확인된 결함은 없었다. "같은 프레임 검사가 새 코드끼리만 비교한다"는 지적을 받아 main 발행자와의 바이트 비교 검사를 추가했다.
+- 검사 중 `GameSceneFlowTests` 실행과 재컴파일이 겹쳐 Editor가 응답하지 않았고, 사용자가 Editor를 재시작했다. 그 실행은 결과가 없으며 표의 21/21은 재시작 뒤 다시 실행한 것이다. 남은 임시 `InitTestScene` 파일은 지웠고, 재시작 뒤 열린 Scene은 저장되지 않은 변경이 없는 빈 Scene이었다.
+- **미실행:** iPhone 실기기·여러 폰에서의 Host 프레임 시간. 전체 PlayMode는 실행하지 않았다.

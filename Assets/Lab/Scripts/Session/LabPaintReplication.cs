@@ -34,87 +34,56 @@ namespace C6Lab
         /// <summary>Enough fragments for the largest supported full RGBA/P-number checkpoint.</summary>
         public const int MaximumFragmentCount = (((256 * 128 * 5 + LabPaintVisualStamp.MaximumBytes + 2) / 3) * 4
             + FragmentCharacters - 1) / FragmentCharacters;
-        private Color32[] published;
-        private byte[] publishedPainters;
-        private byte[] publishedVisual = Array.Empty<byte>();
-        private LabPaintSurface publishedSource;
-        private uint publishedVisualVersion;
-        private string publishedVisualHash;
+        private readonly LabPaintPublishCache cache;
+        private LabPaintPublishCapture published;
         private string session;
-        private uint round, revision;
-        private int columns, rows, paintCount, covered;
-        private string hash;
+        private uint round;
         private long sequence, epoch;
+
+        /// <param name="cache">Shared by every peer's publisher on the Host so one publish pass copies, hashes and
+        /// encodes the surface once instead of once per peer (#439). Null keeps a private capture per call.</param>
+        public LabPaintPublisher(LabPaintPublishCache cache = null) => this.cache = cache;
 
         public LabPaintFrame[] Publish(LabPaintSurface source, string nextSession, uint nextRound, long nextEpoch)
         {
-            bool sameSource = ReferenceEquals(publishedSource, source);
-            if (sameSource && published != null && session == nextSession && round == nextRound
-                && columns == source.Columns && rows == source.Rows && revision == source.Revision
-                && paintCount == source.PaintCount && publishedVisualVersion == source.VisualVersion)
+            bool sameSource = published != null && ReferenceEquals(published.Source, source);
+            if (sameSource && session == nextSession && round == nextRound
+                && published.Columns == source.Columns && published.Rows == source.Rows && published.Revision == source.Revision
+                && published.PaintCount == source.PaintCount && published.VisualVersion == source.VisualVersion)
                 return Array.Empty<LabPaintFrame>();
-            var current = new Color32[source.CellCount];
-            var painters = new byte[source.CellCount];
-            source.CopyPixels(current);
-            source.CopyPainterSlots(painters);
-            byte[] visual = sameSource && publishedVisualVersion == source.VisualVersion
-                ? publishedVisual : LabPaintVisualStamp.Encode(source.CopyVisualStamps());
-            bool visualChanged = !SameBytes(visual, publishedVisual);
-            string visualHash = visual.Length == 0 ? null : sameSource && publishedVisualVersion == source.VisualVersion
-                ? publishedVisualHash : LabPaintVisualStamp.Hash(visual);
+            LabPaintPublishCapture current = cache != null ? cache.Capture(source, nextEpoch)
+                : LabPaintPublishCapture.Take(source, nextEpoch, published);
             bool fresh = published == null || !sameSource || session != nextSession || round != nextRound
-                || columns != source.Columns || rows != source.Rows;
-            if (!fresh && revision == source.Revision && paintCount == source.PaintCount && !visualChanged)
-                return Array.Empty<LabPaintFrame>();
-            var delta = new List<byte>();
-            if (!fresh)
-                for (int i = 0; i < current.Length; i++)
-                    if (!current[i].Equals(published[i]) || painters[i] != publishedPainters[i])
-                    {
-                        delta.Add((byte)i); delta.Add((byte)(i >> 8));
-                        AddPixel(delta, current[i]);
-                        delta.Add(painters[i]);
-                    }
-            bool full = fresh || delta.Count >= current.Length * 5;
-            byte[] payload = full ? CellBytes(current, painters) : delta.ToArray();
-            var frames = Frames(nextSession, nextRound, nextEpoch, ++sequence, full,
-                fresh ? 0u : revision, source.Revision, source.Columns, source.Rows,
-                source.PaintCount, source.CoveredCount, Hash(current, painters), payload,
-                visual, visualHash, full || visualChanged);
-            published = current; publishedPainters = painters; publishedVisual = visual;
-            publishedSource = source; publishedVisualVersion = source.VisualVersion; publishedVisualHash = visualHash;
+                || published.Columns != source.Columns || published.Rows != source.Rows;
+            LabPaintPublishCapture.Body body = fresh ? current.FullBody : current.BodyFrom(published);
+            if (body == null) return Array.Empty<LabPaintFrame>();
+            var frames = Frames(nextSession, nextRound, nextEpoch, ++sequence, body.Full,
+                fresh ? 0u : published.Revision, current.Revision, current.Columns, current.Rows,
+                current.PaintCount, current.CoveredCount, current.Hash, body.Encoded, body.VisualSize, current.VisualHash);
+            published = current;
             session = nextSession; round = nextRound; epoch = nextEpoch;
-            columns = source.Columns; rows = source.Rows; revision = source.Revision;
-            paintCount = source.PaintCount; covered = source.CoveredCount; hash = frames[0].hash;
             return frames;
         }
 
         public LabPaintFrame[] Checkpoint()
-            => published == null ? Array.Empty<LabPaintFrame>()
-                : Frames(session, round, epoch, ++sequence, true, 0, revision, columns, rows,
-                    paintCount, covered, hash, CellBytes(published, publishedPainters), publishedVisual, publishedVisualHash, true);
+        {
+            if (published == null) return Array.Empty<LabPaintFrame>();
+            LabPaintPublishCapture.Body body = published.FullBody;
+            return Frames(session, round, epoch, ++sequence, true, 0, published.Revision, published.Columns, published.Rows,
+                published.PaintCount, published.CoveredCount, published.Hash, body.Encoded, body.VisualSize, published.VisualHash);
+        }
 
         public void Reset()
         {
-            published = null; publishedPainters = null; publishedVisual = Array.Empty<byte>(); session = null;
-            publishedSource = null; publishedVisualVersion = 0; publishedVisualHash = null;
-            round = revision = 0; columns = rows = paintCount = covered = 0;
-            hash = null; epoch = sequence = 0;
+            published = null; session = null;
+            round = 0;
+            epoch = sequence = 0;
         }
 
         private static LabPaintFrame[] Frames(string session, uint round, long epoch, long sequence,
             bool full, uint from, uint revision, int columns, int rows, int paintCount,
-            int coveredCount, string hash, byte[] cellPayload, byte[] visual, string visualHash, bool includeVisual)
+            int coveredCount, string hash, string encoded, int visualSize, string visualHash)
         {
-            int visualSize = includeVisual ? visual.Length : visual.Length == 0 ? 0 : -1;
-            byte[] payload = cellPayload;
-            if (visualSize > 0)
-            {
-                payload = new byte[cellPayload.Length + visual.Length];
-                Array.Copy(cellPayload, payload, cellPayload.Length);
-                Array.Copy(visual, 0, payload, cellPayload.Length, visual.Length);
-            }
-            string encoded = Convert.ToBase64String(payload);
             int count = Math.Max(1, (encoded.Length + FragmentCharacters - 1) / FragmentCharacters);
             var result = new LabPaintFrame[count];
             for (int i = 0; i < count; i++)
@@ -130,7 +99,21 @@ namespace C6Lab
             return result;
         }
 
-        private static bool SameBytes(byte[] a, byte[] b)
+        /// <summary>Cell payload plus the visual descriptor when it is included, as one Base64 string.</summary>
+        internal static string EncodeBody(byte[] cellPayload, byte[] visual, bool includeVisual, out int visualSize)
+        {
+            visualSize = includeVisual ? visual.Length : visual.Length == 0 ? 0 : -1;
+            byte[] payload = cellPayload;
+            if (visualSize > 0)
+            {
+                payload = new byte[cellPayload.Length + visual.Length];
+                Array.Copy(cellPayload, payload, cellPayload.Length);
+                Array.Copy(visual, 0, payload, cellPayload.Length, visual.Length);
+            }
+            return Convert.ToBase64String(payload);
+        }
+
+        internal static bool SameBytes(byte[] a, byte[] b)
         {
             if (ReferenceEquals(a, b)) return true;
             if (a.Length != b.Length) return false;
@@ -177,6 +160,126 @@ namespace C6Lab
                 return BitConverter.ToString(sha.ComputeHash(CellBytes(pixels, painters)))
                     .Replace("-", "").ToLowerInvariant();
         }
+    }
+
+    /// <summary>
+    /// One Host copy of a paint surface for a publish pass: colors, painter slots and visual stamps, with the hash,
+    /// the full body and the delta bodies computed on first use and shared by every peer's publisher (#439).
+    /// Delta bodies are keyed by the earlier capture's id, never its reference, so captures do not chain in memory.
+    /// </summary>
+    public sealed class LabPaintPublishCapture
+    {
+        internal sealed class Body
+        {
+            public bool Full;
+            public string Encoded;
+            public int VisualSize;
+        }
+
+        private const int MaximumCachedBodies = 8;
+        private static long nextId;
+        private readonly Dictionary<long, Body> bodies = new Dictionary<long, Body>();
+        private string hash;
+        private Body fullBody;
+        internal readonly long Id;
+        internal readonly LabPaintSurface Source;
+        internal readonly long Epoch;
+        internal readonly uint Revision, VisualVersion;
+        internal readonly int Columns, Rows, PaintCount, CoveredCount;
+        internal readonly Color32[] Pixels;
+        internal readonly byte[] Painters;
+        internal readonly byte[] Visual;
+        internal readonly string VisualHash;
+
+        private LabPaintPublishCapture(LabPaintSurface source, long epoch, LabPaintPublishCapture reuse)
+        {
+            Id = ++nextId;
+            Source = source; Epoch = epoch;
+            Revision = source.Revision; VisualVersion = source.VisualVersion;
+            Columns = source.Columns; Rows = source.Rows; PaintCount = source.PaintCount; CoveredCount = source.CoveredCount;
+            Pixels = new Color32[source.CellCount];
+            Painters = new byte[source.CellCount];
+            source.CopyPixels(Pixels);
+            source.CopyPainterSlots(Painters);
+            bool sameVisual = reuse != null && ReferenceEquals(reuse.Source, source) && reuse.VisualVersion == source.VisualVersion;
+            Visual = sameVisual ? reuse.Visual : LabPaintVisualStamp.Encode(source.CopyVisualStamps());
+            VisualHash = Visual.Length == 0 ? null : sameVisual ? reuse.VisualHash : LabPaintVisualStamp.Hash(Visual);
+        }
+
+        /// <summary>Copy the surface now; the visual descriptor is reused from <paramref name="reuse"/> when unchanged.</summary>
+        internal static LabPaintPublishCapture Take(LabPaintSurface source, long epoch, LabPaintPublishCapture reuse)
+            => new LabPaintPublishCapture(source ?? throw new ArgumentNullException(nameof(source)), epoch, reuse);
+
+        internal bool Matches(LabPaintSurface source, long epoch) => ReferenceEquals(Source, source) && Epoch == epoch
+            && Revision == source.Revision && PaintCount == source.PaintCount && VisualVersion == source.VisualVersion
+            && Columns == source.Columns && Rows == source.Rows;
+
+        internal string Hash => hash ?? (hash = LabPaintPublisher.Hash(Pixels, Painters));
+
+        internal Body FullBody => fullBody ?? (fullBody = new Body
+        {
+            Full = true,
+            Encoded = LabPaintPublisher.EncodeBody(LabPaintPublisher.CellBytes(Pixels, Painters), Visual, true, out int size),
+            VisualSize = size
+        });
+
+        /// <summary>
+        /// The body that brings a peer from <paramref name="previous"/> (same source, round and size) to this capture,
+        /// or null when nothing a peer sees changed. A delta as large as a full map is sent as the full map.
+        /// </summary>
+        internal Body BodyFrom(LabPaintPublishCapture previous)
+        {
+            if (bodies.TryGetValue(previous.Id, out Body cached)) return cached;
+            bool visualChanged = !LabPaintPublisher.SameBytes(Visual, previous.Visual);
+            Body body = null;
+            if (previous.Revision != Revision || previous.PaintCount != PaintCount || visualChanged)
+            {
+                var delta = new List<byte>();
+                Color32[] before = previous.Pixels;
+                byte[] beforePainters = previous.Painters;
+                for (int i = 0; i < Pixels.Length; i++)
+                {
+                    Color32 now = Pixels[i], was = before[i];
+                    // Field comparison: Color32.Equals(object) boxes every cell.
+                    if (now.r != was.r || now.g != was.g || now.b != was.b || now.a != was.a || Painters[i] != beforePainters[i])
+                    {
+                        delta.Add((byte)i); delta.Add((byte)(i >> 8));
+                        LabPaintPublisher.AddPixel(delta, now);
+                        delta.Add(Painters[i]);
+                    }
+                }
+                if (delta.Count >= Pixels.Length * 5) body = FullBody;
+                else body = new Body
+                {
+                    Full = false,
+                    Encoded = LabPaintPublisher.EncodeBody(delta.ToArray(), Visual, visualChanged, out int size),
+                    VisualSize = size
+                };
+            }
+            if (bodies.Count >= MaximumCachedBodies) bodies.Clear();
+            bodies[previous.Id] = body;
+            return body;
+        }
+    }
+
+    /// <summary>
+    /// The Host's shared capture for one publish pass. Peers published with the same snapshot epoch from an
+    /// unchanged surface get the same capture; any change of epoch or surface state takes a new one.
+    /// </summary>
+    public sealed class LabPaintPublishCache
+    {
+        private LabPaintPublishCapture latest;
+        public int CapturesTaken { get; private set; }
+
+        internal LabPaintPublishCapture Capture(LabPaintSurface source, long epoch)
+        {
+            if (latest != null && latest.Matches(source, epoch)) return latest;
+            latest = LabPaintPublishCapture.Take(source, epoch, latest);
+            CapturesTaken++;
+            return latest;
+        }
+
+        public void Clear() => latest = null;
     }
 
     /// <summary>
