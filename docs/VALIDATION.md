@@ -3652,3 +3652,17 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 
 - 새·바뀐 검사: EditMode `LabTeamSizesTests`(새), `LabRoomPresenceTests`(방 인원 표·6명 기록·지문), `LabPaintPainterSlotTests`(P6 허용·P7 거절), `LabPlayerSlotsTests`, `LabSharedSettingsSchemaTests`·`LabGameFlowBridgeTests`(접속 버전), `LabPlayerCircleTests`(P1~P6), Hapio `GameLobbyModeRulesTests`(새), `GameLobbyAssetTests`, `GamePendingRoomRegistryTests`, `GameStageResultViewTests`(결과 n : n), PlayMode `LabPlayerPaintPatternRenderTests`(P1~P6), `GameLobbyViewTests`(인원별 모드 막힘, 1:1 방, 3:3 쪽 넘김), `GameSceneFlowTests`(DEV 혼자 결과 "땅따먹기").
 - 임시 그림: 3:3 쪽 넘김 `<` `>`·쪽 표시 점, P6 전투 동그라미(P5 그림의 색·숫자만 바꿈)는 디자인 그림을 받으면 바꾼다.
+
+
+## 2026-11-02 — #405 3:3 방을 나간 뒤 DEV 솔로 오류
+
+- **재현(사용자 Play):** 함께할 인원 6명 → 땅따먹기 방 입장 → 방 나가기 → DEV · SOLO. `LabRoomPresence.Encode`에서 `ArgumentOutOfRangeException`이 나고, 솔로 전투 대신 3:3 자리 고르기 화면으로 넘어갔다.
+- **원인:** 3:3 방이 정한 방 인원 6이 방을 나간 뒤에도 `LabNetwork`에 남는다. DEV 솔로는 카드 없이 일반 방으로 열리는데(`Host()`), 일반 방 광고 기록은 2~5명만 받으므로 방장 연결을 연 **뒤** 광고에서 예외가 났다. 그래서 반쯤 열린 6명 방이 남고 게임은 그것을 3:3 로비로 띄웠다.
+- **수정:** ① 게임·Lab의 DEV 솔로는 일반 방으로 쓸 수 없는 인원(1·6명 등)을 물려받지 않고 기본 3명으로 연다. ② 카드 없이 여는 방(`HostInternal(null)`)은 방장을 열기 **전에** 2~5명인지 검사해, 맞지 않으면 아무것도 열지 않고 안내만 남긴다. 방 카드로 여는 땅따먹기 방(2·4·6명)은 그대로다.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 열린 Editor 재컴파일 | PASS | 오류 0 |
+| DEV 솔로가 다시 정하는 인원 (Editor 직접 확인) | PASS | 1·6·7명 → 3명, 2~5명은 그대로 |
+| PlayMode `GameLobbyViewTests.DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt` (새: 3:3 방 → 나가기 → 카드 없는 방은 6명이면 열리지 않음 → DEV 솔로가 혼자 전투 시작) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| 실제 Play 재현 순서 다시 해 보기 | NOT_RUN | |
