@@ -13,7 +13,8 @@ namespace C6Lab
     /// - 내 몫을 다 눌러 체크가 뜰 때 (Audio/CharmCheck): 누른 사람 기기만, 매혹 한 번에 한 번 (LabCharmBubbles.OwnCheckShown)
     /// - 매혹이 풀릴 때 (Audio/CharmRelease): 걸린 사람(LabCharmHud.CharmReleased)과 양옆 사람(LabCharmBubbles.HelperCharmEnded)
     ///   기기. 양옆이 다 눌러 풀었든, 시간이 다 되었든, 피버타임이 시작되었든 같다. 라운드가 끝나 사라지는 것은 내지 않는다.
-    /// - 여우 구슬이 떨어질 때 (Audio/FoxFall): 여우 구슬을 받은 판 주인 기기만, 한 번 떨어뜨릴 때마다 한 번 (SabotageCast)
+    /// - 여우 구슬이 떨어질 때 (Audio/FoxFall): 여우 구슬을 받은 판 주인 기기만, 한 번 떨어뜨릴 때마다 한 번. 여우불은 받을 수
+    ///   있는 모든 판에 떨어진다 (#418, LabNetwork.LocalFoxFireDropped)
     /// - 여우 구슬이 사라질 때 (Audio/FoxClear): 두 번 눌러 없앴거나 음·양 구슬과 닿아 함께 사라질 때, 그 판 주인 기기만
     ///   (LabOrbBoard.FoxFireCleared). 수명이 다하거나 피버타임 시작으로 사라질 때는 내지 않는다.
     /// - 해금 폭탄이 공격 구슬 2개로 바뀔 때 (Audio/BombOpen): 멈춘 폭탄이 연기로 사라지는 순간, 그 판 주인 기기만
@@ -79,7 +80,7 @@ namespace C6Lab
         {
             if (subscribed) return;
             subscribed = true;
-            if (network != null) network.SabotageCast += OnSabotageCast;
+            if (network != null) network.LocalFoxFireDropped += OnLocalFoxFire;
             if (board != null)
             {
                 board.FoxFireCleared += OnFoxFireCleared;
@@ -97,7 +98,7 @@ namespace C6Lab
         {
             if (!subscribed) return;
             subscribed = false;
-            if (network != null) network.SabotageCast -= OnSabotageCast;
+            if (network != null) network.LocalFoxFireDropped -= OnLocalFoxFire;
             if (board != null)
             {
                 board.FoxFireCleared -= OnFoxFireCleared;
@@ -131,11 +132,8 @@ namespace C6Lab
             return now - snapshot.charmStartedAt <= LateSeconds;
         }
 
-        // 여우 구슬은 받은 판 주인 기기에서만 (모든 기기가 알림을 받는다)
-        private void OnSabotageCast(LabSabotageKind kind, ulong target)
-        {
-            if (kind == LabSabotageKind.FoxFire && network != null && target == network.LocalPlayerId) Play(LabGumihoSfx.FoxFall);
-        }
+        // 여우 구슬은 받은 판 주인 기기에서만 (#418: 받을 수 있는 모든 판에 떨어진다)
+        private void OnLocalFoxFire(string[] orbIds) => Play(LabGumihoSfx.FoxFall);
 
         private void OnFoxFireCleared(string id) => Play(LabGumihoSfx.FoxClear);
         private void OnBombOpening(string id) => Play(LabGumihoSfx.BombOpen);

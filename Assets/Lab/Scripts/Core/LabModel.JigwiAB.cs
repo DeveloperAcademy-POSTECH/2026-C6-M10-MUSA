@@ -13,8 +13,7 @@ namespace C6Lab
         private bool jigwiABEnabled;
         private int jigwiABFirstSeat, jigwiABRequiredHits, jigwiABFireCount;
         private int[] jigwiABAffectedCounts;
-        private static readonly double[] JigwiABActivationSlots = { 5d, 25d, 40d, 55d, 70d, 85d };
-        private const double JigwiABWarningSeconds = 1d, JigwiABMissionSeconds = 10d, JigwiABRewardSeconds = 5d;
+        private const double JigwiABMissionSeconds = 10d, JigwiABRewardSeconds = 5d;
         private float jigwiABDuration, jigwiABRecovery, jigwiABBurnSeconds, jigwiABRelight,
             jigwiABMoveAmount, jigwiABMovePeriod, jigwiABTargetRadius, jigwiABRewardSize, jigwiABRewardPaint;
         private ulong jigwiABFailureRevision;
@@ -36,7 +35,7 @@ namespace C6Lab
             jigwiStageEnabled = false; jigwiStageGroups.Clear(); jigwiGourdBlastIds.Clear();
             jigwiStageNextSlot = 0; jigwiStageCutoffReached = false;
             jigwiStageStartedAt = now; jigwiStageCutoffAt = now + 100d;
-            jigwiStageWarning = (float)JigwiABWarningSeconds; jigwiStageFever = config.JigwiStageFeverMultiplier;
+            jigwiStageWarning = (float)LabJigwiABTimeline.WarningSeconds; jigwiStageFever = config.JigwiStageFeverMultiplier;
             jigwiABDuration = Mathf.Min(15f, config.JigwiABPersonalDurationSeconds); jigwiABRecovery = config.JigwiABPersonalRecoveryMultiplier;
             jigwiABRequiredHits = config.JigwiABPersonalRequiredHits; jigwiABBurnSeconds = config.JigwiABPersonalBurnSeconds;
             jigwiABFireCount = config.JigwiABGroupFireCount; jigwiABRelight = config.JigwiABRelightSeconds;
@@ -57,8 +56,8 @@ namespace C6Lab
             double next = requested;
             void Include(double at) { if (at > lastTime && at < next) next = at; }
             Include(jigwiStageCutoffAt);
-            if (jigwiStageNextSlot < JigwiABActivationSlots.Length)
-                Include(jigwiStageStartedAt + JigwiABActivationSlots[jigwiStageNextSlot] - JigwiABWarningSeconds);
+            if (jigwiStageNextSlot < LabJigwiABTimeline.SlotCount)
+                Include(jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot) - LabJigwiABTimeline.WarningSeconds);
             foreach (var item in jigwiABRounds)
             {
                 if (item.resolution == LabJigwiABResolution.None)
@@ -93,11 +92,11 @@ namespace C6Lab
             // Resolve an ending A before activating B at the same instant. Its warning may already be visible.
             foreach (var item in jigwiABRounds.Where(value => value.resolution == LabJigwiABResolution.None).ToArray())
                 if (now >= item.endsAt) ResolveJigwiAB(item, LabJigwiABResolution.Expired, item.endsAt);
-            while (jigwiStageNextSlot < JigwiABActivationSlots.Length
-                && jigwiStageStartedAt + JigwiABActivationSlots[jigwiStageNextSlot] - JigwiABWarningSeconds <= now)
+            while (jigwiStageNextSlot < LabJigwiABTimeline.SlotCount
+                && jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot) - LabJigwiABTimeline.WarningSeconds <= now)
             {
                 int slot = jigwiStageNextSlot++;
-                BeginJigwiABSlot(slot, jigwiStageStartedAt + JigwiABActivationSlots[slot]);
+                BeginJigwiABSlot(slot, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(slot));
             }
             var active = ActiveJigwiABRound(now);
             if (active != null) AdvanceJigwiABActive(active, now);
@@ -119,14 +118,15 @@ namespace C6Lab
         }
         private void BeginJigwiABSlot(int slot, double activeAt)
         {
-            bool personal = slot % 2 == 0;
+            LabJigwiABKind kind = LabJigwiABTimeline.KindForSlot(slot);
+            bool personal = kind == LabJigwiABKind.PersonalBurn;
             var item = new LabJigwiABRound
             {
                 id = "jigwi-ab/" + sessionId + "/" + round + "/" + slot, slot = slot,
-                kind = personal ? LabJigwiABKind.PersonalBurn : LabJigwiABKind.GroupFire,
-                warningAt = activeAt - JigwiABWarningSeconds, activeAt = activeAt,
+                kind = kind,
+                warningAt = activeAt - LabJigwiABTimeline.WarningSeconds, activeAt = activeAt,
                 endsAt = Math.Min(jigwiStageCutoffAt, personal
-                    ? Math.Min(activeAt + jigwiABDuration, jigwiStageStartedAt + JigwiABActivationSlots[slot + 1])
+                    ? Math.Min(activeAt + jigwiABDuration, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(slot + 1))
                     : activeAt + JigwiABMissionSeconds),
                 requiredHits = personal ? jigwiABRequiredHits : 0,
                 // Reserved shrink fields remain on the wire, but the timed mission never shrinks an orb.

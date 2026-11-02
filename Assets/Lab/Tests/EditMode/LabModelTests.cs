@@ -3026,7 +3026,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void FoxFireDropsTwoToFiveFoxOrbsOnOnePlayerButNoMoreThanItsBoardHolds()
+        public void FoxFireDropsTwoToFiveFoxOrbsOnEveryBoardButNoMoreThanEachBoardHolds()
         {
             var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
             try
@@ -3034,16 +3034,37 @@ namespace C6Lab.Tests
                 var room = new LabModel();
                 room.Begin("fox-drop", new ulong[] { 10, 20, 30 }, 0d, mix);
                 room.Tick(5d);
-                LabFoxFireDrop drop = room.DrainFoxFires().Single();
-                Assert.That(room.DrainSabotages().Single().Target, Is.EqualTo(drop.Target));
-                Assert.That(drop.OrbIds.Length, Is.InRange(2, 5));
+                LabFoxFireDrop[] drops = room.DrainFoxFires();
+                Assert.That(drops.Select(drop => drop.Target), Is.EqualTo(new ulong[] { 10, 20, 30 }),
+                    "One fox fire falls on every player's board at once, in seat order (#418).");
+                LabSabotage cast = room.DrainSabotages().Single();
+                Assert.That((cast.Kind, cast.Target, cast.At), Is.EqualTo((LabSabotageKind.FoxFire, 10ul, 5d)),
+                    "It is still one cast: one \"!\" and one count, named after the first seat.");
+                Assert.That(room.GimmickStats().foxFire, Is.EqualTo(1));
+                Assert.That(drops.Select(drop => drop.OrbIds.Length).Distinct().Single(), Is.InRange(2, 5),
+                    "Every board gets the same number.");
                 LabOrbState[] foxes = room.Snapshot(5d).orbs.Where(orb => orb.kind == LabOrbKind.FoxFire).ToArray();
-                Assert.That(foxes.Select(orb => orb.id), Is.EquivalentTo(drop.OrbIds));
-                Assert.That(foxes.All(orb => orb.owner == drop.Target && orb.origin == LabOrbOrigin.Gourd
-                    && orb.createdAt == 5d), Is.True);
+                Assert.That(foxes.Select(orb => orb.id), Is.EquivalentTo(drops.SelectMany(drop => drop.OrbIds)));
+                foreach (LabFoxFireDrop drop in drops)
+                    Assert.That(foxes.Where(orb => drop.OrbIds.Contains(orb.id)).All(orb => orb.owner == drop.Target
+                        && orb.origin == LabOrbOrigin.Gourd && orb.createdAt == 5d), Is.True, "P" + drop.Target);
                 Assert.That(foxes.All(orb => orb.x >= .15f && orb.x <= .85f && orb.y >= .25f && orb.y <= .8f), Is.True,
                     "They fall well inside the board.");
                 Assert.That(foxes.Any(orb => orb.kind.CanThrow(orb.lockSwipes)), Is.False, "A fox orb is never an attack.");
+                Vector2 Spot(LabFoxFireDrop drop)
+                {
+                    LabOrbState first = foxes.Single(orb => orb.id == drop.OrbIds[0]);
+                    return new Vector2(first.x, first.y);
+                }
+                Assert.That(drops.Select(Spot).Distinct().Count(), Is.EqualTo(drops.Length), "Each board draws its own spots.");
+
+                var again = new LabModel();
+                again.Begin("fox-drop", new ulong[] { 10, 20, 30 }, 0d, mix);
+                again.Tick(5d);
+                // Orb ids are random, so the snapshot's id order differs between rooms; compare where they fell.
+                Assert.That(again.Snapshot(5d).orbs.Where(orb => orb.kind == LabOrbKind.FoxFire)
+                    .Select(orb => (orb.owner, orb.x, orb.y)), Is.EquivalentTo(foxes.Select(orb => (orb.owner, orb.x, orb.y))),
+                    "The same session drops the same foxes on the same boards.");
             }
             finally { UnityEngine.Object.DestroyImmediate(mix); }
 
@@ -3113,7 +3134,7 @@ namespace C6Lab.Tests
                 var room = new LabModel();
                 room.Begin("fox-edge", new ulong[] { 10, 20, 30 }, 0d, mix);
                 room.Tick(5d);
-                LabFoxFireDrop drop = room.DrainFoxFires().Single();
+                LabFoxFireDrop drop = room.DrainFoxFires().First(); // every board has its own (#418); one is enough here
                 string fox = drop.OrbIds[0];
                 Assert.That(room.TryTransferAt(drop.Target, fox, true, new Vector2(.99f, .5f), Vector2.right, "fox-edge", 5.2d,
                     LabEdgeCrossingKind.Swipe, out var passed, out string reason), Is.False);
@@ -3132,8 +3153,11 @@ namespace C6Lab.Tests
                 Assert.That(cleared.id, Is.EqualTo(fox));
                 LabSnapshot tapped = room.Snapshot(5.4d);
                 Assert.That(tapped.orbs.Any(orb => orb.id == fox), Is.False);
-                Assert.That(tapped.orbs.Count(orb => orb.kind == LabOrbKind.FoxFire), Is.EqualTo(drop.OrbIds.Length - 1),
-                    "Only the tapped fox orb goes.");
+                Assert.That(tapped.orbs.Count(orb => orb.kind == LabOrbKind.FoxFire && orb.owner == drop.Target),
+                    Is.EqualTo(drop.OrbIds.Length - 1), "Only the tapped fox orb goes.");
+                Assert.That(tapped.orbs.Count(orb => orb.kind == LabOrbKind.FoxFire && orb.owner != drop.Target),
+                    Is.EqualTo(after.orbs.Count(orb => orb.kind == LabOrbKind.FoxFire && orb.owner != drop.Target)),
+                    "The other boards keep their own fox orbs (#418).");
                 Assert.That(room.TryUseItemAt(drop.Target == 10ul ? 20ul : 10ul, drop.OrbIds[1], "fox-other", 5.5d,
                     new Vector2(.5f, .5f), out _, out reason), Is.False, "Only its holder clears it.");
 

@@ -3817,6 +3817,26 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 
 - 기존 야광귀 FBX/추출 클립을 24fps, 1–193프레임의 8초 버전으로 교체. meta GUID 유지. Unity에서 FBX 8초·추출 클립 8초·클립 1개·바인딩 경로 누락 0개 확인. Controller 상태 Speed=1. 게임 통합/실기기/자동 테스트는 미실행.
 
+
+## #427 지귀 A/B 예고 음성과 외침 발동 연결 — 2026-11-02
+
+- **기준:** main `79a96817` → `feat/#427-jigwi-pattern-shout-cues`. 작업 중 데스크탑 프로젝트가 별도 #428 작업 브랜치로 전환된 것을 감지해, 이번 소유 파일을 해시 확인 후 별도 작업트리로 옮겼다. 데스크탑은 #428 수정만 남겼으며 그 브랜치·진행 파일·기존 스태시9개를 보존했다. 이번 전용 Unity6000.6.5f1/macOS/Metal **batch Editor**에서 검사했으며 사용자 Editor의 Scene을 저장하거나 전환하지 않았다.
+- **구현:** 기존 Host A5/40/70초·B25/55/85초 및1초 상태 예고를 유지하고, 같은 `LabJigwiABTimeline`을 모델·DTO 검사·음성이 공유한다. 전용2D 비반복 소스가 `activeAt − cueSeconds`에 예고를 시작한다. 음성이 Host 규칙을 발동시키지 않는다. A 화면 열기와 B 장막/발화점/반복 불소리는 실제 activeAt부터 표시한다. 기존 물 공급·소각·소화/재점화·B 보상/실패·투척/도색·LAN/핫스팟 판정은 변경하지 않았다.
+- **원본/기준점:** 사용자 WAV를 자르거나 음량을 가공하지 않고 PCM·원본48000Hz·stereo·DecompressOnLoad/preload로 가져왔다. 파일 바이트 SHA-256이 원본과 같음: A `2c623cc10c332b8656fc7f1d59e3d8f64e1dfee23d83dc9ebad772717038b7cb`(384078bytes,2초), B `1918526d5d8f0fc4e09e0697c67ff2f0ea424dab9d19df1d15cdba72c3277cb5`(721998bytes,3.76초). 파형 기반 후보의 위치 확인용 음원을 제시했고 사용자가 **A1.05초·B2.08초로 진행**하도록 승인했다. 음소 인식 확정이나 실기기 오디오 출력 지연 측정은 아니다. 초기 음성 시작은 A3.95/38.95/68.95초, B22.92/52.92/82.92초다.
+
+| 최종 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1732/1732 PASS** |30.76초|
+| 지귀 관련 PlayMode (`Jigwi` 부분 일치) | **110/110 PASS** |48.25초|
+| 기존 스테이지/팀전 BGM PlayMode | **3/3 PASS** |1.10초|
+
+- 최종 실행 합계1845개, 실패/skip/inconclusive0. 전체 PlayMode 실행은 아니다. 지귀110개에는 새 음성22개·화면22개(A/B 실제 시작 경계6개 추가)·실제 발화점/탄도/장막13개·기존 소비/rollback/취소/잔상/보상 검사와 저장 Home→Stage03 연결1개·기존 지귀 게임 흐름1개가 포함된다. 실제 게임 연결 검사는 persistent Network의 단일 음성 소스와 원본 Resources/profile 연결, 기존 WhiteGourd 표면/투사체/스테미나/공급 경로를 확인한다.
+- 새 음성22개는 공통 시간표/기준점·클립 중간 합류·6슬롯 bounded 기록·중복 snapshot/재바인딩/disable·실제 Pause·앱 포커스 복귀/놓친 외침·75ms 초과 시계 역행·세션/판/스테이지 변경·결과/해결·누락 클립·SFX0을 확인한다. 검사는 소스를 mute한 상태의 수명·cursor·상태 검사이며 실제 귀로 들리는 출력 타이밍을 보증하지 않는다.
+- **중간 실행 구분:** 마지막 시계 역행 보완을 명시적 Refresh하기 전1732 EditMode·107 지귀·3 BGM·1 저장 게임 검사는 통과했지만 최종22번째 음성 검사는 포함하지 않았으므로 위 최종 실행과 구분한다. 이후 새 소스의 지귀108개 실행에서1건이 `SaveCurrentModifiedScenesIfUserWantsTo: This cannot be used during play mode`라는 TestRunner 예외로 실패했다(동시 RunStarted/이전 run 무효화 기록). 검사 프로세스를 정상 재시작한 후 위110개가 모두 통과했다. 여러 필터를 세미콜론으로 묶은 시도는 Pipeline의 부분 일치 필터와 맞지 않아0개였으며 PASS로 세지 않았다. 게임 코드나 물리 판정은 이 실행기 문제를 피하기 위해 바꾸지 않았다.
+- **보존:** Scene/기존 Prefab·머터리얼·LabConfig·StageCatalog/StageDefinition·BGM·Packages/ProjectSettings·공유 설정257개·5681/Lab42/Game26은 변경하지 않았다. 새 에셋은 두 원본 WAV·로컬 음성 프로필뿐이며 모두 Unity API로 임포트/생성했다. 초기 batch 임포트의 URP global 설정 자동 직렬화는 범위 밖이므로 원본으로 복구했다. 새 Assets 파일의 meta 누락/GUID 충돌0. README는 수정하지 않았다.
+- **종료:** 전용 검사 Editor에서 Play OFF·dirty=false·컴파일 오류 없음 확인 후 해당 프로세스를 종료했다. 데스크탑의 별도 Editor는 유지했다. 원시 검사JSON·음성 위치 확인용 비프 미리듣기·분석 이미지·실행 로그/빌드 산출물은 커밋하지 않는다.
+- **미실행:** iOS/Mac 플레이어 빌드·서명/설치·iPhone/iPad 실제 청취·LAN/핫스팟 실제 다기기·하드웨어 출력 지연 측정. Inspector 조절과 실제 플레이 확인 방법은 `JIGWI_SCREEN_PATTERNS.md`1.1/5.1절을 따른다.
+
 ## #428 통신 패킷 봉투 다이어트·빈 조합판 프레임 생략 — 2026-11-02
 
 - **기준:** main `79a96817` → `fix/#428-lean-packet-envelope`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac 플레이어·iOS 빌드는 만들지 않았다.

@@ -29,19 +29,20 @@ namespace C6Lab
         public bool Showing => guide != null && guide.Showing;
         public string Shown => guide != null ? guide.Shown : string.Empty;
 
-        /// <summary>스냅샷과 기믹 알림을 받을 네트워크와, 글자를 그릴 Canvas를 연결한다.</summary>
+        /// <summary>스냅샷과 내 판의 여우 구슬 알림을 받을 네트워크와, 글자를 그릴 Canvas를 연결한다.</summary>
         public void Bind(LabNetwork target, Canvas uiCanvas)
         {
-            if (network != null) network.SabotageCast -= OnSabotageCast;
+            if (network != null) network.LocalFoxFireDropped -= OnLocalFoxFire;
             network = target;
             canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
-            if (network != null) network.SabotageCast += OnSabotageCast;
+            if (network != null) network.LocalFoxFireDropped += OnLocalFoxFire;
         }
 
-        private void OnSabotageCast(LabSabotageKind kind, ulong targetPlayer)
+        // 여우불이 모든 판에 떨어지므로(#418) 기믹 알림의 대상이 아니라 내 판에 떨어진 순간을 본다.
+        private void OnLocalFoxFire(string[] orbIds)
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
-            if (kind != LabSabotageKind.FoxFire || snapshot == null || targetPlayer != network.LocalPlayerId) return;
+            if (snapshot == null) return;
             // Only this player's first fox fire (#328); the round it falls in ends the showing at the latest.
             if (!LabGuideText.TryShowOnce(OnceKey)) return;
             guidedSession = snapshot.sessionId;
@@ -92,7 +93,7 @@ namespace C6Lab
 
         private void OnDestroy()
         {
-            if (network != null) network.SabotageCast -= OnSabotageCast;
+            if (network != null) network.LocalFoxFireDropped -= OnLocalFoxFire;
             if (layer != null) Destroy(layer.gameObject);
         }
     }
