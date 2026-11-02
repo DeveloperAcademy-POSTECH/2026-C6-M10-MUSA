@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8784f7b88df174e1597e3de1e0b277c6, type: 3}
+  m_Name: PatternAudioProfile
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabJigwiPatternAudioProfile
+  personalClip: {fileID: 8300000, guid: b1850d66137a84d83896f54146504e9d, type: 3}
+  groupClip: {fileID: 8300000, guid: 44b72e3466fe34757b09c0cd4eb15cec, type: 3}
+  personalCueSeconds: 1.05
+  groupCueSeconds: 2.08
+  personalVolume: 1
+  groupVolume: 1

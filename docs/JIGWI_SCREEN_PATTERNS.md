@@ -1,6 +1,6 @@
-# 지귀 개인 발화·전원 화면 소화 — 현재 #412 기준
+# 지귀 개인 발화·전원 화면 소화 — 현재 #427 기준
 
-작성: 2026-10-27. 구현 명세 갱신: 2026-11-02, `feat/#412-jigwi-stamina-water-supply`. 1~8절은 현재 코드 기준이며 #341의 A/B 시간표·B 장기 유지/축소 동작을 대체한다. 9~12절의 과거 실행 기록과 생성 프롬프트는 당시 근거로 보존한다. 이 문서 갱신 자체는 자동 검사·실기기 PASS를 뜻하지 않으며 실제 수행 결과는 `VALIDATION.md`에서 구분한다.
+작성: 2026-10-27. 구현 명세 갱신: 2026-11-02, `feat/#427-jigwi-pattern-shout-cues`(main `79a96817` 기준). #412 회복 표시·물 공급과 #417 호환 규약은 유지한다. 1~8절은 현재 코드 기준이며 #341의 A/B 시간표·B 장기 유지/축소 동작을 대체한다. 9~12절의 과거 실행 기록과 생성 프롬프트는 당시 근거로 보존한다. 이 문서 갱신 자체는 자동 검사·실기기 PASS를 뜻하지 않으며 실제 수행 결과는 `VALIDATION.md`에서 구분한다.
 
 ## 1. 실행 범위와 유지하는 규칙
 
@@ -20,6 +20,22 @@
 - A 최대 지속은 DEV240으로1~15초에서 줄일 수 있다. B 미션은10초 고정, 예고는 활성 전1초 고정이다. A 조기 성공은 다음 예약 시각을 당기지 않는다. A2/B2와 A3/B3에서는 **다음 경고만 앞 패턴과 겹친다**. 실제 활성은 겹치지 않으며 같은 시각에 앞 A를 종료한 뒤 B를 활성화한다. #341의 중첩 슬롯 Skipped 정책은 사용하지 않는다.
 - 공통 기믹은20/40/60/80초의 기존 가중 난수 경로다. A/B 진행과 별개이며100초에는 남은 방해를 무벌점 정리하고 마지막20초 자동 회복2배(DEV235)를 적용한다. 전투 제한은120초, 미완성 시간 초과는 Defeat다.
 - 기존 LAN·핫스팟·owner-local 조합판을 유지한다. 현재 호환 묶음은 **공유 설정257개 / 프로토콜5681 / `C6PhysicsLab/42` / `C6HapioGame/26`**다(#417, 지귀 규칙 변경 없음). 5680/Lab41/Game25, 251개·5677/Lab38/Game21·22 등 이전 빌드와 혼용하지 않는다.
+
+### 1.1. 음성 예고와 실제 발동 (#427)
+
+Host의 실제 발동 시각과 표의 **1초 전 상태/화면 예고**는 바꾸지 않는다. 별도로 각 기기의 `LabJigwiPatternAudio`가 같은 전투 clock·공유 시간표를 읽어 **음성 시작 = 실제 발동 − 파일 내 외침 기준점**으로 재생한다. 음성 종료 이벤트로 게임 규칙을 시작하지 않는다. A는 대상 선정 전부터 전원에게 들리고, 실제 개인 화염은 Host가 선택한 대상에게만 표시한다.
+
+| 사용자 제공 원본 | 길이 | 파일 내 외침 기준점 | 1회차 음성 시작 → 발동 |
+| --- | ---: | ---: | --- |
+| `jigwi-A.wav` |2.000초|1.05초|3.95초 →5초의 `요`|
+| `jigwi-B.wav` |3.760초|2.08초|22.92초 →25초의 `줘`|
+
+기준점은 파형·스펙트럼에서 초기 후보를 정한 뒤, 사용자가 위치 확인용 음원을 듣고 **A1.05초·B2.08초로 진행하도록 승인한 초기값**이다. 전체 파일 길이·끝 무음을 기준으로 삼거나 음성 인식으로 확정한 값은 아니다. 실제 게임의 출력 지연은 별도 확인한다. 예고 확인용 외침 위치 조정은 아래 Inspector 설정을 사용한다. 사용자 원본은 자르거나 음량을 재가공하지 않고 그대로 가져온다.
+
+- A의 실제 화면 열기와 B의 불장막·발화점·반복 불소리는 `round.Active(now)`부터 시작한다. 예고 구간에는 기존 안내만 표시한다. B의3→2→1·개인 소화·재점화·성공/실패 규칙은 유지한다.
+- 음성은 network 객체 아래 전용 `Jigwi Pattern Voice`의2D·비반복 AudioSource 하나다. 기존 B `GroupFireLoop` 및 BGM과 분리하고, 각 음성 음량×기기별 SFX 음량을 사용한다. 공유 설정257개/통신 규약을 추가 변경하지 않는다.
+- `(sessionId, round, startedAt)` 범위의6슬롯 재생/건너뜀 기록을 유지한다. 반복 snapshot·HUD 재연결로 예고를 다시 재생하지 않는다. 늦게 받은 상태는 외침 전이면 현재 파일 위치로 맞추고, 이미 발동한 슬롯은 건너뛴다. 새 판에서만 슬롯 기록을 초기화한다.
+- 공동 Pause/시작 대기에는 음성을 멈춘다. 앱 포커스가 돌아왔을 때 전투 시계가 진행했다면 재생 위치를 맞추고, 외침 시각이 지났다면 뒤늦게 외치지 않는다. 종료·Scene 이탈·패턴 해결에서는 해당 재생을 중단한다. 파일 누락은 경고 후 해당 슬롯을 건너뛰며 게임 규칙은 계속된다.
 
 ## 2. A — 개인 발화
 
@@ -106,10 +122,25 @@ A 대상자의 기존 스태미나 창에는 `LabStaminaFeedback`의 수채 화�
 
 기존230~234 표면 설정은 값/배열 위치를 보존하되 DEV에서 숨긴 예약 슬롯이다. 기존236·237 오색구슬 보상과238·239 구미호 피버는 그대로 유지한다. 기존0~252를 보존하고 공급 간격/초기 수량/미소모 상한/발화점 거리253~256을 더해 총257개를 공유한다.229·246·247은 Inspector와 DEV에서 숨기며 저장값은 그대로 보존한다. B 미션10초와 성공 보상5초는 현재 고정 규칙이고 별도 DEV 행은 없다. Inspector의 화면 효과 `waterDouseSeconds/flameSpeed/flameSway`와 B의 `curtainTexture/curtainStage2Texture/curtainStage1Texture/curtainDenseFrame/curtainDenseUv`는 새 프리팹에서 조정할 수 있다. B 단계 원화는3종을 쓰고 중앙 밀도용 크롭은 강한3단계 원본을 유지한다. 모든 원화는 UV 크롭으로 종횡비를 보존한다. `waterFlightTrail`의 최소/최대 표시 폭·먹선/물/하이라이트 색을 Inspector에서 조절하며 잔상 수명/길이는 기존 WaterFlightTrail 프로필을 따른다. `audioView.clip/volume`은 Inspector에서 바꿀 수 있다.
 
+### 5.1. 음성 Inspector 설정 (로컬 표현 전용)
+
+Project 창에서 `Assets/Lab/Resources/Jigwi/PatternAudio/PatternAudioProfile.asset`을 선택한다. Scene/ScreenOverlay를 다시 만들 필요는 없다.
+
+| 필드 | 기본값 | 의미 |
+| --- | --- | --- |
+|Personal Clip / Group Clip|`JigwiA` / `JigwiB`|사용자 제공 원본 WAV|
+|Personal Cue Seconds|1.05초(사용자 승인)|A 파일 내 `요` 강세 시작 위치|
+|Group Cue Seconds|2.08초(사용자 승인)|B 파일 내 `줘` 강세 시작 위치|
+|Personal Volume / Group Volume|각1|0~1, 최종 음량은 기존 SFX 설정과 곱함|
+
+Cue를 늘리면 전체 음성이 더 일찍 시작하며, 실제 A/B 발동 시각은 그대로다. 유효 범위는 최소.01초~해당 클립 길이이며 비정상 값은 기본값으로 보정한다. 이 프로필은 도색/투척/공유 수치 원본 `LabConfig`와 별개다. 청취 조정은 실제 지귀 전투에서 Pause/Resume와 함께 확인한다. 아직 실행하지 않은 실기기 청취를 자동 검사 PASS로 해석하지 않는다.
+
 ## 6. 수정할 파일 지도
 
 | 책임 | 파일/메서드 |
 | --- | --- |
+| 공통 A/B 실제 발동 시간표 | `Assets/Lab/Scripts/Core/LabJigwiABTimeline.cs` — 모델·DTO 검사·음성에서 같은 자료 사용 |
+| 음성 예고·슬롯 기록·정지/복귀 | `Assets/Lab/Scripts/Audio/LabJigwiPatternAudio.cs`, `LabJigwiPatternAudioProfile.cs`; `LabSceneController`가 network에 Attach |
 | A/B 상태·타이밍·보상/소비 | `Assets/Lab/Scripts/Core/LabModel.JigwiAB.cs` |
 | B 무료 지급·상한·회차 정리·박 명중 차단 | `Assets/Lab/Scripts/Core/LabModel.JigwiABSupply.cs` |
 | 기존 모델의 호출 지점 | `LabModel.cs`: 생성·조합·전달·발사·ConfirmHit·회복·ExpiresAt, `LabModel.JigwiStage.cs`: facade |
@@ -134,6 +165,8 @@ A 대상자의 기존 스태미나 창에는 `LabStaminaFeedback`의 수채 화�
 |`Assets/Lab/Resources/Jigwi/WaterDouseWash.png`|#341 built-in image_gen 생성, transparent_background=true. 생성 PNG를 픽셀 수정 없이 복사.1536×1024 RGBA, 원본 alpha0~254/완전 투명 픽셀52.75%. Unity import는 alpha FromInput·alphaIsTransparency·Clamp·Bilinear·max1024·Uncompressed·NPOT None(런타임1024×683, 원본 비율 보존)|
 |`Assets/Lab/Resources/Jigwi/ScreenFireCurtainWash.png`|#341 B 보완에서 built-in image_gen으로 생성한 연결된 단일 투명 불장막.1484×1060 원본 비율·alpha 보존, Unity max2048·NPOT None·Uncompressed. 원문 프롬프트와 검증 범위는11절|
 |`Assets/Lab/Resources/Jigwi/ScreenFireCurtainStage2.png` / `ScreenFireCurtainStage1.png`|2026-10-28 built-in image_gen으로3단계 원본을 기준으로 추가 생성. 각1484×1060 RGBA·픽셀 수정 없이 복사. 프롬프트는12절|
+|`Assets/Lab/Resources/Jigwi/PatternAudio/JigwiA.wav` / `JigwiB.wav`|사용자 제공 A/B 원본 복사. 각각2.000초/3.760초·2ch·48000Hz. 음성 예고용이며 원본 hash 일치는 VALIDATION에 기록|
+|`Assets/Lab/Resources/Jigwi/PatternAudio/PatternAudioProfile.asset`|전용 클립·외침 후보 위치·개별 음량의 로컬 Inspector 자료|
 |`Assets/Lab/Resources/Jigwi/GroupFireLoop.wav`|사용자 제공 `612277__robinhood76__10835-big-fire-loop.wav` 원본 복사.13.5초·2ch·44100Hz. 외부 출처/라이선스 메타데이터는 추정하지 않음|
 |`Assets/Lab/Resources/Jigwi/ScreenFlame.shader`|Canvas용 alpha blend/clip/stencil/색상, Resources 포함. 전투 clock으로만 흔들리며 Pause 때 고정|
 
@@ -141,7 +174,7 @@ A 대상자의 기존 스태미나 창에는 `LabStaminaFeedback`의 수채 화�
 
 > Use case: game-asset. Asset type: a single production-ready transparent watercolor splash/pour effect sprite for the Korean folk cooperative game Hapio. Create a sheet of cool blue water being thrown downward from above to quench fire: a broad sweeping curved crest across the upper-middle, two irregular descending streams curling toward the center and a spreading lower splash with a few large distinct teardrop droplets close to it. Shape should suggest a satisfying splash of a bucket of water, NOT a circular icon, not a wave landscape, not a pool surface. Match hand-painted Korean ink-and-wash storybook game art: irregular broken dark blue ink brush contours, flat translucent pale aqua and medium indigo washes, dry-brush gaps, subtle pigment grain/pooling. Lively asymmetry, clear broad shapes legible at small size; no glossy 3D water, no photoreal spray, no smooth vector edges or airbrush glow. Palette predominantly light azure, turquoise and muted indigo with a small amount of cream-white reflected watercolor. One isolated composition on genuine transparent alpha, complete splash with comfortable transparent margins all around. Square canvas, composition wider than tall, empty alpha outside water and droplets; no hanji or paper/background texture, no white/black backdrop, no flame, no bucket, no person, no lettering, no symbols, no watermark, no grid or sprite sheet. This sprite will animate downward/scaling/fading over an existing game screen and also shrink into small extinguish splashes; leave the spaces between water strokes transparent.
 
-불 원본의 생성 프롬프트와 이전 표현 기록은 `JIGWI_FIRE_VISUAL.md`를 따른다. 전용 샤우팅 음성은 미할당이다. B 불장벽 소리는12절의 사용자 제공 반복 효과음을 사용한다.
+불 원본의 생성 프롬프트와 이전 표현 기록은 `JIGWI_FIRE_VISUAL.md`를 따른다. #427에서 사용자 제공 A/B 샤우팅 음성을1.1절 방식으로 할당했다. B 불장벽 소리는12절의 사용자 제공 반복 효과음을 사용한다.
 
 ## 8. 확인 방법 — 기대 결과, 실행 여부와 구분
 

@@ -146,6 +146,68 @@ namespace C6Lab.Tests
             Assert.That(shader.name, Is.EqualTo("C6Lab/Jigwi Screen Flame"));
         }
 
+        [TestCase(5d)]
+        [TestCase(40d)]
+        [TestCase(70d)]
+        public void PersonalWarningKeepsInstructionsButHeatStartsOnlyAtTheAcceptedMissionBoundary(double activeAt)
+        {
+            var personal = Personal();
+            personal.warningAt = activeAt - 1d; personal.activeAt = activeAt; personal.endsAt = activeAt + 15d;
+            snapshot = Snapshot(personal); SetSnapshot(snapshot);
+            view.ApplySnapshot(snapshot, Local, personal.warningAt);
+            Assert.That(view.PersonalHeatVisible, Is.False, "The voice warning must not apply active heat early.");
+            Assert.That(view.status.text, Does.Contain("으아아 마음이 불타오른다"));
+            Assert.That(view.playerStatus.text, Does.Contain("결합 구슬로 박을 맞혀"));
+            view.ApplySnapshot(snapshot, Local, activeAt - .001d);
+            Assert.That(view.PersonalHeatVisible, Is.False);
+            Assert.That(view.VisibleScreenFires, Is.Zero);
+            view.ApplySnapshot(snapshot, Local, activeAt);
+            Assert.That(view.PersonalHeatVisible, Is.True, "Heat starts at the host's activeAt, not warningAt.");
+            Assert.That(view.status.text, Does.Not.Contain("으아아 마음이 불타오른다"));
+            Assert.That(view.personalFlames[0].material.GetFloat("_FlameTime"), Is.EqualTo(0f).Within(.0001f));
+            view.ApplySnapshot(snapshot, Other, activeAt + .01d);
+            Assert.That(view.PersonalHeatVisible, Is.False, "Only the accepted A owner receives heat.");
+            view.ApplySnapshot(snapshot, Local, personal.endsAt);
+            Assert.That(view.PersonalHeatVisible, Is.False, "The active window remains half open.");
+        }
+
+        [TestCase(25d)]
+        [TestCase(55d)]
+        [TestCase(85d)]
+        public void GroupWarningKeepsInstructionsButCurtainIgnitionsAndLoopStartTogetherAtTheAcceptedBoundary(double activeAt)
+        {
+            var group = Group();
+            group.warningAt = activeAt - 1d; group.activeAt = activeAt; group.endsAt = activeAt + 10d;
+            snapshot = Snapshot(group); SetSnapshot(snapshot);
+            view.audioView.Source.mute = true;
+            view.audioView.SendMessage("OnApplicationFocus", true, SendMessageOptions.RequireReceiver);
+            view.ApplySnapshot(snapshot, Local, group.warningAt);
+            Assert.That(view.status.text, Does.Contain("화면에 불이 붙었어요"));
+            Assert.That(view.playerStatus.text, Does.Contain("발화점을 모두 꺼야"));
+            Assert.That(view.GroupCurtainVisible, Is.False);
+            Assert.That(view.VisibleScreenFires, Is.Zero);
+            Assert.That(view.audioView.WantsLoop, Is.False);
+            Assert.That(view.audioView.PlaybackStartCount, Is.Zero);
+            view.ApplySnapshot(snapshot, Local, activeAt - .001d);
+            Assert.That(view.GroupCurtainVisible, Is.False);
+            Assert.That(view.VisibleScreenFires, Is.Zero);
+            Assert.That(view.audioView.PlaybackStartCount, Is.Zero);
+            view.ApplySnapshot(snapshot, Local, activeAt);
+            Assert.That(view.GroupCurtainVisible, Is.True);
+            Assert.That(view.CurtainVisualLevel, Is.EqualTo(3));
+            Assert.That(view.VisibleScreenFires, Is.EqualTo(3));
+            Assert.That(view.audioView.WantsLoop, Is.True);
+            Assert.That(view.audioView.PlaybackStartCount, Is.EqualTo(1));
+            Assert.That(view.status.text, Does.Not.Contain("화면에 불이 붙었어요"));
+            view.ApplySnapshot(snapshot, Local, activeAt + .01d);
+            view.ApplySnapshot(snapshot, Local, activeAt + .02d);
+            Assert.That(view.audioView.PlaybackStartCount, Is.EqualTo(1), "Accepted active snapshots cannot restart the loop.");
+            view.ApplySnapshot(snapshot, Local, group.endsAt);
+            Assert.That(view.GroupCurtainVisible, Is.False);
+            Assert.That(view.VisibleScreenFires, Is.Zero);
+            Assert.That(view.audioView.WantsLoop, Is.False);
+        }
+
         [Test]
         public void PersonalHeatUsesPSeatAndApprovedProgressAndDousesOnlyOnceAfterCompletion()
         {
