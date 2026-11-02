@@ -3692,3 +3692,16 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 각 실행 실패/skip0. 구슬124개에는 판 효과10개 및 기존 물리·표시·HUD/복원 검사가 포함된다. 전체 PlayMode 수행 기록이 아니다. 새 shader supported/컴파일 상태를 확인했고 셰이더 경고/오류0, Play OFF·Lab Scene dirty=false로 돌아왔다.
 - 원화/GPU 비교는 위 `fb2a17b3`의 동일 VFX 코드 실행 기록을 사용하며 이번 PR 통합에서 재촬영하지 않았다. main 대비 Scene/Prefab·프로젝트/패키지·기존 비행/보상 아트의 변경 없음, 신규GUID중복/누락meta0을 확인했다. 원시 실행JSON·로그·개인 경로는 커밋하지 않는다.
 - iOS 빌드·실기기·LAN/핫스팟·실제 다기기·모바일 성능은 계속 미실행이다.
+
+## 2026-11-02 — #405 3:3 방을 나간 뒤 DEV 솔로 오류
+
+- **재현(사용자 Play):** 함께할 인원 6명 → 땅따먹기 방 입장 → 방 나가기 → DEV · SOLO. `LabRoomPresence.Encode`에서 `ArgumentOutOfRangeException`이 나고, 솔로 전투 대신 3:3 자리 고르기 화면으로 넘어갔다.
+- **원인:** 3:3 방이 정한 방 인원 6이 방을 나간 뒤에도 `LabNetwork`에 남는다. DEV 솔로는 카드 없이 일반 방으로 열리는데(`Host()`), 일반 방 광고 기록은 2~5명만 받으므로 방장 연결을 연 **뒤** 광고에서 예외가 났다. 그래서 반쯤 열린 6명 방이 남고 게임은 그것을 3:3 로비로 띄웠다.
+- **수정:** ① 게임·Lab의 DEV 솔로는 일반 방으로 쓸 수 없는 인원(1·6명 등)을 물려받지 않고 기본 3명으로 연다. ② 카드 없이 여는 방(`HostInternal(null)`)은 방장을 열기 **전에** 2~5명인지 검사해, 맞지 않으면 아무것도 열지 않고 안내만 남긴다. 방 카드로 여는 땅따먹기 방(2·4·6명)은 그대로다.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 열린 Editor 재컴파일 | PASS | 오류 0 |
+| DEV 솔로가 다시 정하는 인원 (Editor 직접 확인) | PASS | 1·6·7명 → 3명, 2~5명은 그대로 |
+| PlayMode `GameLobbyViewTests.DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt` (새: 3:3 방 → 나가기 → 카드 없는 방은 6명이면 열리지 않음 → DEV 솔로가 혼자 전투 시작) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| 실제 Play 재현 순서 다시 해 보기 | NOT_RUN | |

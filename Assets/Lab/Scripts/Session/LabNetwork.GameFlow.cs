@@ -231,6 +231,8 @@ namespace C6Lab
         public bool PrepareDeveloperSoloGame()
         {
             if (!gameFlowEnabled || !DeveloperBuildAvailable || !CanChooseConnection) return false;
+            // A solo room is a plain room of its own; it never inherits a territory-only size from the last room (#405).
+            if (!LabModel.ValidRoomSize(targetParticipantCount, false)) targetParticipantCount = LabModel.DefaultParticipants;
             Host();
             if (!IsHost || order.Count != 1) return false;
             developerSolo = true;

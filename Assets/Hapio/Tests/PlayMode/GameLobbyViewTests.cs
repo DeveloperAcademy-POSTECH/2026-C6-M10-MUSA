@@ -356,6 +356,31 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            yield return EnterTerritoryRoom(4, 6);
+            yield return Click(View().leaveButton);
+            yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
+                && session.Network.CanChooseConnection && SceneManager.GetActiveScene().path == GameScenePaths.Home,
+                "Home browser after leaving the 3:3 room");
+            yield return null;
+            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(6), "The last room's size is still remembered here.");
+            // #405: a plain room (no registered card) refuses that six-player size before the Host starts.
+            session.Network.Host();
+            Assert.That(session.Network.IsConnected, Is.False, "Nothing may be left half-open.");
+            Assert.That(session.Network.CanChooseConnection, Is.True);
+            GameLobbyView view = View();
+            yield return Click(view.soloButton);
+            yield return Until(() => session.State.phase == GameFlowPhase.Playing && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.Battle, "DEV solo battle after a 3:3 room", 15f);
+            Assert.That(session.Network.IsDeveloperSolo, Is.True);
+            Assert.That(session.IsTerritory, Is.False);
+            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(LabModel.DefaultParticipants));
+            Assert.That(session.Network.Snapshot.players, Has.Length.EqualTo(1));
+        }
+
+        [UnityTest]
         public IEnumerator ChosenPlayerCountBlocksTheModeItCannotOpenAndShowsWhyUnderThatButton()
         {
             GameLobbyView view = View();
