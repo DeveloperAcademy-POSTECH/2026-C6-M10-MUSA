@@ -70,6 +70,7 @@ namespace C6Lab
             actionSession = null; actionRound = 0;
             deferredBoardFrame = null;
             nextActionRecoveryAt = nextBoardCheckpointAt = 0d;
+            ResetTargetPoseReconcile();
         }
 
         private long NextBoardSequence(ulong recipient)

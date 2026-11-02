@@ -115,15 +115,53 @@ namespace C6Lab
             snapshot.targetRopeHitVelocity = hanging.VerticalVelocity;
         }
 
-        private void ApplyFastTargetPose()
+        private void ApplyFastTargetPose() => ReconcileTargetPose(latest);
+
+        // The newest Host pose sample this receiver blended toward, per session/round.
+        private string reconciledPoseSession;
+        private uint reconciledPoseRound;
+        private double reconciledPoseServerTime = double.NegativeInfinity;
+        /// <summary>
+        /// Real time until which running samples leave the rope offset and yaw alone, so a header frame
+        /// captured before a predicted local impact cannot undo that impact while the Host verdict is in flight.
+        /// Nothing holds yet; the own-throw presentation will.
+        /// </summary>
+        private double predictedImpactHoldUntil = double.NegativeInfinity;
+
+        /// <summary>Leave the rope offset and yaw to local physics until the real time given (or an earlier release).</summary>
+        internal void HoldTargetPoseForPredictedImpact(double untilRealtime) => predictedImpactHoldUntil = untilRealtime;
+        internal void ReleaseTargetPoseHold() => predictedImpactHoldUntil = double.NegativeInfinity;
+
+        private void ResetTargetPoseReconcile()
         {
-            if (latest == null || target == null) return;
+            reconciledPoseSession = null;
+            reconciledPoseRound = 0;
+            reconciledPoseServerTime = double.NegativeInfinity;
+            predictedImpactHoldUntil = double.NegativeInfinity;
+        }
+
+        /// <summary>
+        /// Blend the hanging target toward a Host pose sample once. A bulk snapshot repeats the header pose
+        /// the board frame already applied (Overlay keeps the header when it is at least as new), and
+        /// blending the same stale sample twice jerked the gourd backwards after every hit.
+        /// Paused samples always apply: a paused target has one authoritative pose.
+        /// </summary>
+        private void ReconcileTargetPose(LabSnapshot snapshot)
+        {
+            if (snapshot == null || target == null) return;
             LabHangingTarget hanging = target.GetComponent<LabHangingTarget>();
             if (hanging == null) return;
-            bool paused = latest.paused && latest.phase == LabPhase.Playing;
-            hanging.ReconcileYaw(latest.targetYawDegrees, latest.targetYawSpeedDegreesPerSecond, paused);
-            hanging.ReconcileRope(latest.targetRopeCycleElapsed, latest.targetRopeHitOffset,
-                latest.targetRopeHitVelocity, paused);
+            bool paused = snapshot.paused && snapshot.phase == LabPhase.Playing;
+            bool sameRound = snapshot.sessionId == reconciledPoseSession && snapshot.round == reconciledPoseRound;
+            if (!paused && sameRound && snapshot.serverTime <= reconciledPoseServerTime) return;
+            bool hold = !paused && Time.realtimeSinceStartupAsDouble < predictedImpactHoldUntil;
+            if (!hold && Finite(snapshot.targetYawDegrees) && Finite(snapshot.targetYawSpeedDegreesPerSecond))
+                hanging.ReconcileYaw(snapshot.targetYawDegrees, snapshot.targetYawSpeedDegreesPerSecond, paused);
+            hanging.ReconcileRope(snapshot.targetRopeCycleElapsed, snapshot.targetRopeHitOffset,
+                snapshot.targetRopeHitVelocity, paused, hold);
+            reconciledPoseSession = snapshot.sessionId;
+            reconciledPoseRound = snapshot.round;
+            reconciledPoseServerTime = snapshot.serverTime;
         }
     }
 }
