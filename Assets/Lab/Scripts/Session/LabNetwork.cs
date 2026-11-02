@@ -2591,6 +2591,7 @@ namespace C6Lab
             if (sessionId != snapshot.sessionId || latest == null || latest.round != snapshot.round)
             {
                 target?.GetComponent<LabHangingTarget>()?.ResetSwing();
+                ResetTargetPoseReconcile();
                 impactFeedback?.Clear();
             }
             sessionId = snapshot.sessionId;
@@ -2608,15 +2609,7 @@ namespace C6Lab
             if (snapshot.paused || snapshot.phase != LabPhase.Playing) pauseRequestPending = false;
             impactReceipts.SetActive(snapshot.sessionId, snapshot.round);
             ApplyLocalPause(CanProcessBattleActions && latest.phase == LabPhase.Playing && latest.paused);
-            bool targetPaused = latest.phase == LabPhase.Playing && latest.paused;
-            if (target != null && Finite(latest.targetYawDegrees)
-                && Finite(latest.targetYawSpeedDegreesPerSecond))
-                target.GetComponent<LabHangingTarget>()?.ReconcileYaw(
-                    latest.targetYawDegrees, latest.targetYawSpeedDegreesPerSecond, targetPaused);
-            if (target != null)
-                target.GetComponent<LabHangingTarget>()?.ReconcileRope(
-                    latest.targetRopeCycleElapsed, latest.targetRopeHitOffset,
-                    latest.targetRopeHitVelocity, targetPaused);
+            ReconcileTargetPose(latest);
             SyncBoard();
             if (logTransition && latest.phase == LabPhase.Playing) SetNotice(string.Empty);
             SetStatus((latest.paused ? "PAUSED" : latest.phase.ToString())

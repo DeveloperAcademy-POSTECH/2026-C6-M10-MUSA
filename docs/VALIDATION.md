@@ -3868,6 +3868,38 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - **종료 상태:** Play OFF, Home Scene 열림, 컴파일 오류 없음. 같은 폴더에서 다른 세션이 작업하던 지귀 미커밋 수정은 그 세션이 작업 트리에서 치운 뒤 검사를 실행했으며 이 기록에 포함하지 않는다.
 - **미실행:** iPhone 실기기·LAN/핫스팟 실제 다기기·대역폭 측정. 전체 PlayMode는 실행하지 않았다.
 
+## #431 iOS 플레이어 목표 프레임레이트 60 — 2026-11-02
+
+- **기준:** main `80db0616` → `fix/#431-ios-target-frame-rate`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. iOS 빌드는 만들지 않았다.
+- **배경·수정:** `Application.targetFrameRate`가 어디에도 없어 iPhone이 Unity 모바일 기본 30 fps로 돌았다(`QualitySettings` Mobile 레벨 vSync 0, iPhone 기본 품질 0). `LabMobilePresentationPolicy.InitializePlayer`(`BeforeSceneLoad`, Lab·Hapio 공용)가 `TargetFrameRateFor(platform)`로 iPhone 플레이어에만 60을 적용한다. Editor·Mac·Android는 변경 없음(−1). 와이어·공유 설정 변경 없음.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1738/1738 PASS** | 42.32초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 209.87초 |
+
+- 새 검사 `LabMobilePresentationPolicyTests` 2개: 플랫폼별 목표값과 `RuntimeInitializeOnLoadMethod(BeforeSceneLoad)` 속성, Editor 플랫폼 인자는 `targetFrameRate`를 바꾸지 않고 iPhone 인자는 60으로 바꿈, 저장된 Mobile 품질 레벨의 vSync 0(vSync가 켜져 있으면 targetFrameRate가 무시되므로).
+- Editor는 `TargetFrameRateFor`가 −1을 돌려 Play 속도가 바뀌지 않으므로 기존 PlayMode 검사의 의미는 그대로다.
+- **참고:** 60 fps에서는 `FlushBulkPackets`의 Update당 16 KB 예산이 초당 약 2배(≈980 KB/s/피어)가 된다. 후속 Bulk 작업(적응형 RTO·백로그 기준)에서 함께 본다.
+- **미실행:** iPhone 실기기의 실제 프레임레이트·발열·배터리·체감. 기록 전까지 PASS로 쓰지 않는다.
+
+## #433 Guest 박 포즈 이중 보정 제거 — 2026-11-02
+
+- **기준:** main `80db0616` → `fix/#433-gourd-pose-reconcile-once`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 빌드는 만들지 않았다.
+- **배경·수정:** Guest는 조합판 프레임(`ApplyFastTargetPose`)에서 Host 박 포즈를 블렌드한 뒤, 뒤따라온 Bulk 스냅샷(`ApplyPaintSnapshot`)에서 `Overlay`가 얹은 같은 헤더 포즈로 한 번 더 블렌드해 명중 뒤 박이 역방향으로 튀었다. `LabNetwork.LocalState.ReconcileTargetPose(snapshot)`가 두 경로를 합치고, 같은 세션/라운드에서 `serverTime`이 마지막 적용 시각 이하인 비정지 샘플은 건너뛴다. 정지 샘플은 항상 적용한다. 라운드 변경·액션 리셋에서 기록을 초기화한다. 투척 로컬 선반영(후속)이 쓸 보류 훅 `HoldTargetPoseForPredictedImpact`/`ReleaseTargetPoseHold`와 `ReconcileRope(..., holdImpulse)`를 함께 두었다(보류 중 비정지 샘플은 로프 위상만 블렌드). 이번 변경에서는 아무도 보류를 걸지 않는다. 와이어·공유 설정 변경 없음.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1736/1736 PASS** | 40.13초 |
+| PlayMode `LabRopeReconciliationTests` (새 3개 포함) | **8/8 PASS** | 0.17초 |
+| PlayMode `LabHangingPresentationTests` | **14/14 PASS** | 22.65초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.34초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 210.01초 |
+
+- 새 검사: 같은 `serverTime` 비정지 샘플 재적용은 두 번 블렌드하지 않음(yaw 0→10.5°→10.5°, 새 시각이면 17.325°), 정지 샘플은 반복 적용 때마다 다시 고정됨, 보류 중 비정지 샘플은 로프 위상만 바꾸고 오프셋·yaw는 그대로이며 해제 뒤 정상 블렌드. 기존 `LabRopeReconciliationTests`·`LabHangingPresentationTests` 단언은 바꾸지 않았다.
+- `LabLocalBoardNetworkIntegrationTests`·`GameSceneFlowTests`는 단일 `LabNetwork`에 합성 패킷·솔로 Host로 도는 핸들러 수준 검사이며 실제 두 기기 연결 증거는 아니다.
+- **미실행:** iPhone 실기기·여러 폰 연결에서의 체감.
+
 ## #435 조합판 체크포인트 피어별 위상 분산·Host 요청 스로틀 — 2026-11-02
 
 - **기준:** main `80db0616` → `fix/#435-board-checkpoint-stagger`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac 플레이어·iOS 빌드는 만들지 않았다.
