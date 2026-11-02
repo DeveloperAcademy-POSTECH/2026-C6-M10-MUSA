@@ -137,7 +137,7 @@ namespace C6Lab.Tests
                 case "zero-direction": hints[0].center = Vector3.zero; break;
                 case "parallel-tangent": hints[0].right = hints[0].center; break;
                 case "radius": hints[0].radius = 0f; break;
-                case "painter": hints[0].painterSlot = 6; break;
+                case "painter": hints[0].painterSlot = (byte)(LabPaintSurface.MaxPainterSlot + 1); break;
                 case "pattern": hints[0].pattern = (LabPaintPattern)99; break;
                 case "sequence": hints = new[] { hints[0], hints[0] }; break;
                 case "count": hints = new LabPaintVisualStamp[LabPaintVisualStamp.MaximumCount + 1]; break;

@@ -3674,3 +3674,21 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 코드 리뷰의 착지 pop·곡선 투영의 X이동·Inspector 원화 누락 경계를 보완했다. 생성 당시 시간/크기·속성색·원화 선택, Pause/시작대기, Raw/DEV제외, 숨김/거절복원, 축소, localRNG 재현/게임난수 보존, 곡선 네 모서리의 실제 Mesh정점과 개수 제한을 검사했다.
 - 작업 전 보호 파일의 내용 해시가 모두 같고 #402 브랜치 HEAD·스태시9개도 동일하다. 원본 Lab/Hapio Scene·Prefab·기존 재질·프로젝트 설정을 저장하거나 수정하지 않았다. 캡처 후 Play를 종료했다. 원시 JSON/로그/연속PNG는 커밋하지 않는다.
 - **미실행:** iPhone/iPad·iOS 빌드·LAN/핫스팟·실제 다기기·모바일 성능. 새 표현의 미감은 사용자 확인 대상이며 자동 검사 통과로 확정하지 않는다. 설정/직접 비교는 `ELEMENT_FLIGHT_TRAILS.md`의 최신 #392 절을 따른다.
+
+
+## #392 PR 병합 전 최신 main 통합 검증 — 2026-11-02
+
+- 기준 main `75079ac5`(#397 야광귀 콤보 효과음) → #392 통합 커밋 `a5e76454`. LabConfig의 판 효과 tooltip과 main의 음향 필드를 함께 보존했다. #402 브랜치/열린 PR과 스태시9개는 유지했다.
+- 최초 전체 EditMode는1686개 중1684통과·2실패였다. `LabPaintDryingTests`의 large-slot과 `LabPaintVisualStateTests`의 painter fixture가 현재 허용되는 P6를 무효 입력으로 사용했다. 같은 fixture/MaxPainterSlot=6 코드가 origin/main에도 존재함을 확인했고, 검사 입력만 `MaxPainterSlot+1`(직렬화는byte)로 고쳤다. 실제 `LabPaintSurface`·`LabPaintVisualStamp`와 건조·도색·복제 규칙은 수정하지 않았다. 기존 P6 허용/복제 검사도 그대로 유지했다.
+- Unity6000.6.5f1/macOS/Metal의 재실행 결과:
+
+| 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | 1686/1686 PASS | 40.05초 |
+| 구슬 PlayMode | 124/124 PASS | 42.71초 |
+| 기존 오행 비행 PlayMode | 9/9 PASS | 3.23초 |
+| 지귀 보상 PlayMode | 8/8 PASS | 1.24초 |
+
+- 각 실행 실패/skip0. 구슬124개에는 판 효과10개 및 기존 물리·표시·HUD/복원 검사가 포함된다. 전체 PlayMode 수행 기록이 아니다. 새 shader supported/컴파일 상태를 확인했고 셰이더 경고/오류0, Play OFF·Lab Scene dirty=false로 돌아왔다.
+- 원화/GPU 비교는 위 `fb2a17b3`의 동일 VFX 코드 실행 기록을 사용하며 이번 PR 통합에서 재촬영하지 않았다. main 대비 Scene/Prefab·프로젝트/패키지·기존 비행/보상 아트의 변경 없음, 신규GUID중복/누락meta0을 확인했다. 원시 실행JSON·로그·개인 경로는 커밋하지 않는다.
+- iOS 빌드·실기기·LAN/핫스팟·실제 다기기·모바일 성능은 계속 미실행이다.

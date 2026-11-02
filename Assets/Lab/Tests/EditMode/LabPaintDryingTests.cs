@@ -180,7 +180,7 @@ namespace C6Lab.Tests
                 case "large-share": share = 3.001f; break;
                 case "nan-share": share = float.NaN; break;
                 case "negative-slot": slot = -1; break;
-                case "large-slot": slot = 6; break;
+                case "large-slot": slot = LabPaintSurface.MaxPainterSlot + 1; break;
                 case "zero-direction": direction = Vector3.zero; break;
                 case "nan-direction": direction = new Vector3(float.NaN, 0, 1); break;
                 case "transparent-color": color = Color.clear; break;
