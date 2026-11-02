@@ -25,10 +25,11 @@ namespace C6Lab
         public bool restarting;
         public long lobbyRevision;
         public string roomName;
-        public LabSnapshot snapshot;
-        public LabPaintFrame paintFrame;
-        public LabActionReceipt actionReceipt;
-        public LabBoardFrame boardFrame;
+        /// <summary>
+        /// The message body (an action receipt or a paint frame) as JSON text. A typed field would make
+        /// JsonUtility write a default copy of that type into every other packet as well (#428).
+        /// </summary>
+        public string payload;
         public ulong ownershipVersion, secondOwnershipVersion;
         public string provisionalId;
         public long requestId;
@@ -81,6 +82,23 @@ namespace C6Lab
         public int chunkIndex;
         public int chunkCount;
         public string chunkData;
+    }
+
+    /// <summary>
+    /// Message bodies travel inside LabNetworkPacket.payload as JSON text (#428). JsonUtility cannot leave a
+    /// class-typed field out, so a typed body field would cost every packet a default copy of that type.
+    /// </summary>
+    public static class LabPacketPayload
+    {
+        public static string Encode<T>(T body) where T : class => body == null ? null : JsonUtility.ToJson(body);
+
+        /// <summary>Null for a missing or malformed body; callers already treat a null body as invalid.</summary>
+        public static T Decode<T>(string payload) where T : class
+        {
+            if (string.IsNullOrEmpty(payload)) return null;
+            try { return JsonUtility.FromJson<T>(payload); }
+            catch (ArgumentException) { return null; }
+        }
     }
 
     /// <summary>
@@ -231,13 +249,15 @@ namespace C6Lab
         // 5675/5676: standalone #341 screen-space fire curtain and reachable ignition geometry.
         // 5677: integrate #334/#343 fever and #341 A/B; preserve DEV0..239 and append A/B240..250 (251 values).
         // 5681: #417 board frames, action receipts and paint frames accept the six players of a 3:3 territory room.
-        internal const ushort LabProtocolVersion = 5681;
+        // 5682: #428 lean packet envelope (bodies in a JSON payload string, no default nested objects); immediate
+        //       board publishes skip peers whose delta is empty.
+        internal const ushort LabProtocolVersion = 5682;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/42");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/43");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1638,6 +1658,8 @@ namespace C6Lab
             AnnounceBombExplosions();
             AnnounceOrbExpiries();
             AnnounceGourdBombs();
+            // Header frames always go out here: pause/resume, start and flash publishes rely on the header reaching
+            // every peer at once. Only HandleBoardAction skips peers whose board did not change (#428).
             PublishOwnerBoards(latest);
             // Large experimental states are deliberately updated less often instead of queuing
             // many reliable fragments per peer until the network becomes unusable.
@@ -2249,7 +2271,7 @@ namespace C6Lab
                     ReceiveActionRetry(packet);
                     break;
                 case "action_result":
-                    ReceiveActionReceipt(packet.actionReceipt);
+                    ReceiveActionReceipt(LabPacketPayload.Decode<LabActionReceipt>(packet.payload));
                     break;
                 case "board_delta":
                     ReceiveBoardChunk(packet);
@@ -2620,13 +2642,13 @@ namespace C6Lab
             foreach (LabPaintFrame frame in frames)
                 if (!QueueBulk(receiver, new LabNetworkPacket { type = "paint_cells", sessionId = frame.session,
                     round = frame.round, snapshotSequence = frame.epoch, configRevision = configRevision,
-                    configFingerprint = configFingerprint, paintFrame = frame })) return false;
+                    configFingerprint = configFingerprint, payload = LabPacketPayload.Encode(frame) })) return false;
             return true;
         }
 
         private void ReceivePaintFrame(LabNetworkPacket packet)
         {
-            LabPaintFrame frame = packet.paintFrame;
+            LabPaintFrame frame = LabPacketPayload.Decode<LabPaintFrame>(packet.payload);
             if (!clientConfigReady || packet.configRevision != configRevision || packet.configFingerprint != configFingerprint
                 || frame == null || frame.session != packet.sessionId || frame.round != packet.round
                 || frame.epoch != packet.snapshotSequence || frame.epoch <= lobbySnapshotSequenceFloor

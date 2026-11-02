@@ -22,7 +22,8 @@ namespace C6Lab
         public uint round;
         public int configRevision, chunkIndex, chunkCount;
         public long snapshotSequence;
-        public LabPaintFrame paintFrame;
+        /// <summary>The paint frame as JSON text, present only on paint_cells (#428).</summary>
+        public string payload;
     }
 
     public sealed partial class LabNetwork
@@ -49,7 +50,7 @@ namespace C6Lab
             var body = new LabBulkPayload { type = packet.type, sessionId = packet.sessionId, round = packet.round,
                 configRevision = packet.configRevision, configFingerprint = packet.configFingerprint,
                 snapshotSequence = packet.snapshotSequence, chunkIndex = packet.chunkIndex,
-                chunkCount = packet.chunkCount, chunkData = packet.chunkData, paintFrame = packet.paintFrame };
+                chunkCount = packet.chunkCount, chunkData = packet.chunkData, payload = packet.payload };
             string encoded = Convert.ToBase64String(Utf8.GetBytes(JsonUtility.ToJson(body)));
             if (!bulkSenders.TryGetValue(peer, out var sender)) bulkSenders.Add(peer, sender = new LabBulkSender());
             string[] fragments;
@@ -129,7 +130,7 @@ namespace C6Lab
                         var packet = new LabNetworkPacket { type = body.type, sessionId = body.sessionId, round = body.round,
                             configRevision = body.configRevision, configFingerprint = body.configFingerprint,
                             snapshotSequence = body.snapshotSequence, chunkIndex = body.chunkIndex,
-                            chunkCount = body.chunkCount, chunkData = body.chunkData, paintFrame = body.paintFrame };
+                            chunkCount = body.chunkCount, chunkData = body.chunkData, payload = body.payload };
                         if (packet.type == "paint_cells") ReceivePaintFrame(packet);
                         else if (packet.type == "snapshot_chunk") ReceiveSnapshotChunk(packet);
                     }

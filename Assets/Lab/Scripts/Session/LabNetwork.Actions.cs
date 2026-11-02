@@ -74,9 +74,19 @@ namespace C6Lab
 
         private long NextBoardSequence(ulong recipient)
         {
-            boardSequences.TryGetValue(recipient, out long previous);
-            return boardSequences[recipient] = previous + 1;
+            long sequence = PeekBoardSequence(recipient);
+            CommitBoardSequence(recipient, sequence);
+            return sequence;
         }
+
+        /// <summary>The sequence the next frame or receipt to this recipient would take, without consuming it (#428).</summary>
+        private long PeekBoardSequence(ulong recipient)
+        {
+            boardSequences.TryGetValue(recipient, out long previous);
+            return previous + 1;
+        }
+
+        private void CommitBoardSequence(ulong recipient, long sequence) => boardSequences[recipient] = sequence;
 
         private string TemporaryOutput(long requestId) => "pending/" + actionRound + "/" + LocalPlayerId + "/" + requestId;
 
@@ -242,8 +252,9 @@ namespace C6Lab
                 AnnounceOrbExpiries();
                 AnnounceGourdBombs();
                 SyncBoard();
-                // Publish small board state before paint checkpoints; accepted actions need no full snapshot.
-                PublishOwnerBoards(latest);
+                // Publish small board state before paint checkpoints; accepted actions need no full snapshot,
+                // and only the boards this action changed are sent (#428).
+                PublishOwnerBoards(latest, skipEmpty: true);
                 nextSnapshotAt = Math.Min(nextSnapshotAt, Time.realtimeSinceStartupAsDouble + .1d);
             }
         }
@@ -335,7 +346,7 @@ namespace C6Lab
         {
             if (sender == LocalPlayerId) ReceiveActionReceipt(receipt);
             else Send(sender, new LabNetworkPacket { type = "action_result", sessionId = actionSession,
-                round = actionRound, actionReceipt = receipt });
+                round = actionRound, payload = LabPacketPayload.Encode(receipt) });
         }
 
         private void ReceiveActionReceipt(LabActionReceipt receipt)
@@ -429,7 +440,9 @@ namespace C6Lab
             }
         }
 
-        private void PublishOwnerBoards(LabSnapshot snapshot, bool force = false, ulong? only = null)
+        /// <param name="skipEmpty">Leave out a peer whose frame has no changed or removed orb and is not a checkpoint.
+        /// A skipped frame consumes no sequence number, so that peer's replica sees no gap (#428).</param>
+        private void PublishOwnerBoards(LabSnapshot snapshot, bool force = false, ulong? only = null, bool skipEmpty = false)
         {
             if (snapshot == null || !IsHost || model == null) return;
             AnnounceBombExplosions();
@@ -439,7 +452,10 @@ namespace C6Lab
             foreach (ulong peer in order)
             {
                 if (peer == LocalPlayerId || only.HasValue && only.Value != peer) continue;
-                var frame = boardPublisher.Build(snapshot, peer, NextBoardSequence(peer), model.Revision, force);
+                long sequence = PeekBoardSequence(peer);
+                var frame = boardPublisher.Build(snapshot, peer, sequence, model.Revision, force);
+                if (skipEmpty && LabBoardPublisher.IsEmptyDelta(frame)) continue;
+                CommitBoardSequence(peer, sequence);
                 SendBoardFrame(peer, frame);
             }
         }

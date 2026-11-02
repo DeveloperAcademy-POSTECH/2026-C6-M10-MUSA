@@ -3816,3 +3816,33 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 ### 야광귀 박 8초 수정본 교체
 
 - 기존 야광귀 FBX/추출 클립을 24fps, 1–193프레임의 8초 버전으로 교체. meta GUID 유지. Unity에서 FBX 8초·추출 클립 8초·클립 1개·바인딩 경로 누락 0개 확인. Controller 상태 Speed=1. 게임 통합/실기기/자동 테스트는 미실행.
+
+## #428 통신 패킷 봉투 다이어트·빈 조합판 프레임 생략 — 2026-11-02
+
+- **기준:** main `79a96817` → `fix/#428-lean-packet-envelope`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac 플레이어·iOS 빌드는 만들지 않았다.
+- **배경:** 통신 경로 점검(7각도 읽기 조사, 원인별 2관점 검증)에서 자잘한 렉의 바탕으로 ①JsonUtility가 null 중첩 객체를 기본값으로 써서 모든 제어 패킷이 약 4.2 KB 봉투를 실어 가는 것, ②변화가 없어도 조합판 프레임을 10 Hz로 전원에게, 행동·명중마다 또 전원에게 보내는 것이 확인됐다. 이 둘만 이 이슈에서 다룬다.
+- **수정:** `LabNetworkPacket`의 미사용 `snapshot`·`boardFrame` 필드 삭제, `actionReceipt`·`paintFrame`을 `payload` JSON 문자열로(`LabPacketPayload`), `LabBulkPayload`도 같이. 승인된 행동 직후 `HandleBoardAction`의 `PublishOwnerBoards(skipEmpty: true)`만 변경·제거 구슬이 없는 수신자를 건너뛰고 순번을 소비하지 않는다. `PublishSnapshot`의 프레임(100 ms 타이머·명중·일시정지/재개·섬광)과 5초 체크포인트는 그대로. 별도 코드 검토에서 재개 즉시 프레임까지 생략하면 Guest가 다음 타이머 프레임까지 정지 상태로 남는 회귀를 찾아, 생략 범위를 행동 경로로만 좁혔다. 접속 규약 **5682/Lab43/Game27**, 공유 설정257개 유지.
+
+| Editor 측정 (Mac, JsonUtility) | 전 | 후 |
+| --- | --- | --- |
+| 본문 없는 패킷(`type=generate`) 직렬화 크기 | 4,189 B | **937 B** |
+| 같은 패킷 ToJson / FromJson 1회 | 0.105 / 0.127 ms | **0.024 / 0.017 ms** |
+| `action_result` 봉투 + 빈 영수증 | (영수증 항상 포함) | 1,212 B |
+| 스냅샷 512자 조각의 Bulk 본문 | 898자 | **683자** |
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1736/1736 PASS** | 46.24초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.36초 |
+| PlayMode `LabJigwiActionRollbackTests` | **8/8 PASS** | 0.08초 |
+| PlayMode `LabFlashShakeRequestTests` | **6/6 PASS** | 0.58초 |
+| PlayMode `LabLobbyPositionSelectionTests` | **5/5 PASS** | 1.45초 |
+| PlayMode `LabQuickConnectTests` | **4/4 PASS** | 0.87초 |
+| PlayMode `LabTeamBattleScreenTests` | **5/5 PASS** | 8.16초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 212.1초 |
+
+- 각 실행의 skip/inconclusive0. 새 검사 `LabNetworkPacketTests`(봉투 1,100 B 상한·중첩 기본값 부재, 영수증/도색 프레임 payload 왕복과 실제 수신 적용, 잘못된 payload→null, 빈 델타 판정). `LabPaintReplicationTests`는 Bulk 본문의 `payload` 필드를 쓰도록 바꿨고 `LabGameFlowBridgeTests`·`LabSharedSettingsSchemaTests`는 접속 규약을 갱신했다.
+- 생략 범위를 행동 경로로 좁힌 뒤 전체 EditMode **1736/1736**(42.02초), PlayMode `LabLocalBoardNetworkIntegrationTests` **16/16**, `GameSceneFlowTests` **21/21**(214.56초)을 다시 실행해 통과했다. 위 표의 나머지 PlayMode 5개 클래스는 좁히기 전 실행 기록이며 좁힌 코드는 그 경로(`PublishSnapshot`)를 원래대로 되돌린 것이다.
+- 조합판 프레임 생략의 순번 보존은 EditMode 판정 검사와 Host/Guest 통합 PlayMode(`LabLocalBoardNetworkIntegrationTests`)로 확인했다. 실제 여러 폰의 대역폭·반응 변화는 측정하지 않았다.
+- **종료 상태:** Play OFF, Home Scene 열림, 컴파일 오류 없음. 같은 폴더에서 다른 세션이 작업하던 지귀 미커밋 수정은 그 세션이 작업 트리에서 치운 뒤 검사를 실행했으며 이 기록에 포함하지 않는다.
+- **미실행:** iPhone 실기기·LAN/핫스팟 실제 다기기·대역폭 측정. 전체 PlayMode는 실행하지 않았다.
