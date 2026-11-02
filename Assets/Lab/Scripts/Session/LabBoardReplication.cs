@@ -52,8 +52,6 @@ namespace C6Lab
         public uint comboCount, comboResultCount;
         public LabComboResult comboResult;
         public ulong comboFailedBy;
-        public uint comboForgivenCount;
-        public double comboForgivenAt = -1d;
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
         public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
 
@@ -144,7 +142,6 @@ namespace C6Lab
                 comboEndsAt = snapshot.comboEndsAt, comboCount = snapshot.comboCount,
                 comboResult = snapshot.comboResult, comboResultCount = snapshot.comboResultCount,
                 comboResultAt = snapshot.comboResultAt, comboFailedBy = snapshot.comboFailedBy,
-                comboForgivenCount = snapshot.comboForgivenCount, comboForgivenAt = snapshot.comboForgivenAt,
                 comboNextAt = snapshot.comboNextAt, comboWarningAt = snapshot.comboWarningAt,
                 targetYawDegrees = snapshot.targetYawDegrees,
                 targetYawSpeedDegreesPerSecond = snapshot.targetYawSpeedDegreesPerSecond,
@@ -390,7 +387,6 @@ namespace C6Lab
                     copy.comboStartedAt = header.comboStartedAt; copy.comboEndsAt = header.comboEndsAt;
                     copy.comboResult = header.comboResult; copy.comboResultCount = header.comboResultCount;
                     copy.comboResultAt = header.comboResultAt; copy.comboFailedBy = header.comboFailedBy;
-                    copy.comboForgivenCount = header.comboForgivenCount; copy.comboForgivenAt = header.comboForgivenAt;
                     copy.comboNextAt = header.comboNextAt; copy.comboWarningAt = header.comboWarningAt;
                 }
                 copy.targetYawDegrees = header.targetYawDegrees;
@@ -573,7 +569,6 @@ namespace C6Lab
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,
             comboCount = source.comboCount, comboResult = source.comboResult, comboResultCount = source.comboResultCount,
             comboResultAt = source.comboResultAt, comboFailedBy = source.comboFailedBy,
-            comboForgivenCount = source.comboForgivenCount, comboForgivenAt = source.comboForgivenAt,
             comboNextAt = source.comboNextAt, comboWarningAt = source.comboWarningAt,
             flashWarningAt = source.flashWarningAt, flashAt = source.flashAt, flashTarget = source.flashTarget,
             flashTargetAll = source.flashTargetAll, flashCount = source.flashCount, flashLastAt = source.flashLastAt,
@@ -604,7 +599,7 @@ namespace C6Lab
                 || value.comboProgress < 0 || value.comboProgress > LabGourdCombo.Length
                 || value.comboResult < LabComboResult.None || value.comboResult > LabComboResult.Timeout) return false;
             return Finite(value.comboStartedAt) && Finite(value.comboEndsAt) && Finite(value.comboResultAt)
-                && Finite(value.comboNextAt) && Finite(value.comboWarningAt) && Finite(value.comboForgivenAt);
+                && Finite(value.comboNextAt) && Finite(value.comboWarningAt);
         }
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
     }

@@ -9,8 +9,6 @@ namespace C6Lab
     /// 박 색상 콤보 실험 (#222)의 판정만 맡는다. Host의 LabModel이 시각을 정해 Start를 부르고,
     /// 박에 맞은 결합 구슬의 속성을 Judge로 넘긴다. 순서와 색이 모두 맞아야 다음 칸으로 가고,
     /// 다른 색이 맞으면 바로 실패, 제한 시간이 지나면 시간 초과로 실패한다.
-    /// #414: 콤보가 나오고 봐주기 초(GraceSeconds) 안에 틀린 색이 맞으면 그 콤보에서 첫 번째 한 번만 봐주고(경고) 콤보를 이어 간다.
-    /// 두 번째 틀림이나 봐주기 뒤의 틀림은 지금처럼 실패다.
     /// 시각은 모두 LabModel의 전투 시계(일시정지 시간 제외) 기준이다.
     /// </summary>
     public sealed class LabGourdCombo
@@ -27,12 +25,6 @@ namespace C6Lab
         public double EndsAt { get; private set; } = -1d;
         /// <summary>이번 라운드에 나온 콤보 수. 새 콤보가 나올 때마다 1씩 는다.</summary>
         public uint Count { get; private set; }
-        /// <summary>#414 봐주기 초. Start 때 정해진다. 0이면 봐주지 않는다.</summary>
-        public double GraceSeconds { get; private set; }
-        /// <summary>#414 이번 라운드에 봐준 틀림 수(모든 콤보를 합침)와 마지막으로 봐준 시각. 화면이 경고를 띄우는 데 쓴다.</summary>
-        public uint ForgivenCount { get; private set; }
-        public double LastForgivenAt { get; private set; } = -1d;
-        private bool forgivenThisCombo;
 
         /// <summary>마지막으로 끝난 콤보의 결과와, 몇 번째 콤보였는지, 언제 끝났는지</summary>
         public LabComboResult LastResult { get; private set; }
@@ -51,10 +43,6 @@ namespace C6Lab
             Progress = 0;
             StartedAt = EndsAt = -1d;
             Count = 0;
-            GraceSeconds = 0d;
-            ForgivenCount = 0;
-            LastForgivenAt = -1d;
-            forgivenThisCombo = false;
             LastResult = LabComboResult.None;
             LastResultCount = 0;
             LastResultAt = -1d;
@@ -62,7 +50,7 @@ namespace C6Lab
         }
 
         /// <summary>새 콤보를 낸다. 색은 화·수·목·금·토(Fire~Earth)만 쓸 수 있다.</summary>
-        public void Start(LabOrbElement[] nextColors, double at, double timeLimit, double graceSeconds = 0d)
+        public void Start(LabOrbElement[] nextColors, double at, double timeLimit)
         {
             if (nextColors == null || nextColors.Length != Length)
                 throw new ArgumentException("A combo needs exactly four colors.", nameof(nextColors));
@@ -76,8 +64,6 @@ namespace C6Lab
             Progress = 0;
             StartedAt = at;
             EndsAt = at + timeLimit;
-            GraceSeconds = double.IsNaN(graceSeconds) || graceSeconds < 0d ? 0d : graceSeconds;
-            forgivenThisCombo = false;
             Count++;
         }
 
@@ -90,18 +76,7 @@ namespace C6Lab
             if (!Active || element < LabOrbElement.Fire || element > LabOrbElement.Earth)
                 return LabComboResult.None;
             if (at >= EndsAt) return Finish(LabComboResult.Timeout, EndsAt, 0);
-            if (element != colors[Progress])
-            {
-                // #414: 처음 봐주기 초 안의 첫 틀림은 경고만 하고 넘어간다.
-                if (!forgivenThisCombo && at < StartedAt + GraceSeconds)
-                {
-                    forgivenThisCombo = true;
-                    ForgivenCount++;
-                    LastForgivenAt = at;
-                    return LabComboResult.None;
-                }
-                return Finish(LabComboResult.WrongColor, at, thrower);
-            }
+            if (element != colors[Progress]) return Finish(LabComboResult.WrongColor, at, thrower);
             Progress++;
             return Progress >= Length ? Finish(LabComboResult.Success, at, 0) : LabComboResult.None;
         }

@@ -364,9 +364,6 @@ namespace C6Lab
         public uint comboResultCount;
         public double comboResultAt = -1d;
         public ulong comboFailedBy;
-        /// <summary>#414 이번 라운드에 봐준 틀림 수와 마지막으로 봐준 시각. 수가 늘면 화면이 경고(칸 흔들림, 빨간 번쩍)를 띄운다.</summary>
-        public uint comboForgivenCount;
-        public double comboForgivenAt = -1d;
         /// <summary>
         /// 다음 콤보 4칸이 나오는 시각과 그 예고(COMBO! 3, 2, 1)가 시작되는 시각 (#241). 둘 다 전투 시계 기준이고,
         /// 콤보가 진행 중이거나 꺼져 있으면 -1이다. 예고 시간이 0이면 두 시각이 같다(예고 없음).

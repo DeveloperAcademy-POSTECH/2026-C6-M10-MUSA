@@ -19,8 +19,7 @@ namespace C6Lab
     ///   않게 공격 영역 왼쪽 아래 구석에 "작게" 글자와 그 밑 세로 사각형으로만 보이고, 사각형 안 빨간 칸이 위에서
     ///   아래로 줄어든다. 보상(BIG)도 같은 자리에 금색 "크게" 글자와 금색 칸으로 보인다(부적 비는 그대로).
     /// - #414: 예고 동안 화면 가장자리가 천천히 어두워지고(박 쪽은 밝게) 4칸이 나오면 걷힌다. N 콤보!는 내 판 북 크기에 맞춰
-    ///   작게 보인다(ComboPopFit). Host가 처음 봐주기 초 안의
-    ///   틀림을 봐주면(snapshot.comboForgivenCount) 모든 기기에서 콤보 칸이 흔들리고 화면 가장자리가 잠깐 빨갛게 번쩍인다.
+    ///   작게 보인다(ComboPopFit).
     /// - #411: 화면 문구는 모두 한글이고, 글꼴은 피버타임 배너와 같은 신라문화체 굵은 글씨(LabYaguangFeverHud.ShillaFont)다.
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
     /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
@@ -60,8 +59,6 @@ namespace C6Lab
         private static Sprite discSprite, checkSprite, roundedSprite, pillSprite, vignetteSprite;
         /// <summary>#414 예고 그늘의 밝은 가운데 높이 (화면 아래 0 ~ 위 1). 박이 있는 쪽.</summary>
         public const float ShadeCenterY = .68f;
-        /// <summary>#414 봐준 틀림 경고(칸 흔들림, 빨간 가장자리) 시간 (초)</summary>
-        public const float ForgiveSeconds = .45f;
 
         [Tooltip("화면에서 콤보 패널 가운데 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 panelAnchor = new Vector2(.5f, .8f);
@@ -113,10 +110,8 @@ namespace C6Lab
         private RectTransform questionSlot;
         private float warningPopElapsed = -1f;
         // #414 예고 그늘, 빈 칸 미리 보기, 봐준 틀림 경고
-        private Image warningShade, forgiveFlash;
+        private Image warningShade;
         private float shadeAlpha;
-        private uint seenForgivenCount = uint.MaxValue;
-        private float forgiveElapsed = -1f;
 
         private LabComboRewardStars stars;
         private int boardLook;
@@ -163,7 +158,6 @@ namespace C6Lab
         public bool PanelVisible => panel != null && panel.gameObject.activeSelf;
         /// <summary>#414 예고 그늘의 지금 진하기 (0~1, 테스트·확인용)</summary>
         public float WarningShadeAlpha => shadeAlpha;
-        public bool ForgiveWarningVisible => forgiveElapsed >= 0f;
 
         public bool EffectVisible => effectBadge != null && effectBadge.gameObject.activeSelf;
         public string EffectLabel => effectText != null ? effectText.text : string.Empty;
@@ -249,14 +243,12 @@ namespace C6Lab
             DrawCombo(snapshot, serverNow);
             DrawResult();
             DrawWarning(snapshot, serverNow, warning);
-            DrawShadeAndForgive(snapshot, serverNow, warning);
+            DrawShade(warning);
             DrawEffect(snapshot, serverNow);
         }
 
-        /// <summary>
-        /// #414 예고 그늘(예고 동안 천천히 진해지고 4칸이 나오면 빨리 걷힘)과 봐준 틀림 경고(콤보 칸 흔들림 + 빨간 가장자리).
-        /// </summary>
-        private void DrawShadeAndForgive(LabSnapshot snapshot, double serverNow, bool warning)
+        /// <summary>#414 예고 그늘: 예고 동안 천천히 진해지고, 4칸이 나오면 빨리 걷힌다.</summary>
+        private void DrawShade(bool warning)
         {
             float maxShade = network != null && network.config != null ? network.config.YaguangComboWarningShade : .5f;
             float target = warning ? maxShade : 0f;
@@ -264,34 +256,6 @@ namespace C6Lab
             shadeAlpha = Mathf.MoveTowards(shadeAlpha, target, Mathf.Max(.01f, speed) * Time.unscaledDeltaTime);
             warningShade.gameObject.SetActive(shadeAlpha > .001f);
             warningShade.color = new Color(0f, 0f, 0f, shadeAlpha);
-
-            if (seenForgivenCount == uint.MaxValue || snapshot.comboForgivenCount < seenForgivenCount)
-                seenForgivenCount = snapshot.comboForgivenCount;
-            if (snapshot.comboForgivenCount > seenForgivenCount)
-            {
-                seenForgivenCount = snapshot.comboForgivenCount;
-                // 늦게 알아챈 경고(1초 넘게 지남)는 띄우지 않는다.
-                if (serverNow - snapshot.comboForgivenAt <= 1d) forgiveElapsed = 0f;
-            }
-            if (forgiveElapsed < 0f)
-            {
-                forgiveFlash.gameObject.SetActive(false);
-                panel.anchoredPosition = Vector2.zero;
-                return;
-            }
-            forgiveElapsed += Time.unscaledDeltaTime;
-            float t = forgiveElapsed / ForgiveSeconds;
-            if (t >= 1f)
-            {
-                forgiveElapsed = -1f;
-                forgiveFlash.gameObject.SetActive(false);
-                panel.anchoredPosition = Vector2.zero;
-                return;
-            }
-            float fade = 1f - t;
-            forgiveFlash.gameObject.SetActive(true);
-            forgiveFlash.color = new Color(FailColor.r, FailColor.g, FailColor.b, .65f * fade);
-            panel.anchoredPosition = new Vector2(Mathf.Sin(forgiveElapsed * 70f) * 9f * unit * fade, 0f);
         }
 
         /// <summary>
@@ -632,8 +596,6 @@ namespace C6Lab
             if (stars != null) stars.Clear();
             shownWarningCount = -1;
             warningPopElapsed = -1f;
-            seenForgivenCount = uint.MaxValue;
-            forgiveElapsed = -1f;
             resultDelay = 0f;
             comboPopElapsed = -1f;
             comboPopCombo = 0;
@@ -728,9 +690,8 @@ namespace C6Lab
             flash.raycastTarget = false;
             flashRect.gameObject.SetActive(false);
 
-            // #414 예고 그늘과 봐준 틀림 빨간 가장자리: 박 쪽(ShadeCenterY)이 밝은 둥근 그늘. 화면을 다 덮게 크게 둔다.
+            // #414 예고 그늘: 박 쪽(ShadeCenterY)이 밝은 둥근 그늘. 화면을 다 덮게 크게 둔다.
             warningShade = NewShade("Combo Warning Shade", layer);
-            forgiveFlash = NewShade("Combo Forgive Flash", layer);
 
             // 보상 별(#257): 번쩍임 바로 앞, 콤보 패널·결과 문구·배지 뒤에 그린다.
             stars = layer.gameObject.AddComponent<LabComboRewardStars>();
