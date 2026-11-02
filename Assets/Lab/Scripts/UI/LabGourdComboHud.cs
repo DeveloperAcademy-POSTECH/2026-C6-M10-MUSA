@@ -286,6 +286,36 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// #414 넷/셋/둘/하나 말풍선과 빈 ? 칸이 겹치면 ? 칸을 말풍선 아래로 내린다. 겹치지 않으면 제자리.
+        /// </summary>
+        private void AvoidBubble()
+        {
+            previewPanel.anchoredPosition = Vector2.zero;
+            LabGourdAlert alert = GetComponent<LabGourdAlert>();
+            RectTransform bubble = alert != null && alert.Visible ? alert.BubbleRect : null;
+            if (bubble == null) return;
+            Rect bubbleRect = RectIn(layer, bubble), previewRect = RectIn(layer, previewPanel);
+            if (!bubbleRect.Overlaps(previewRect)) return;
+            float down = previewRect.yMax - bubbleRect.yMin + 8f * unit;
+            previewPanel.anchoredPosition = new Vector2(0f, -down);
+        }
+
+        /// <summary>rect의 네 모서리를 parent 좌표로 옮긴 사각형 (회전·크기 포함).</summary>
+        private static Rect RectIn(RectTransform parent, RectTransform rect)
+        {
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
+            foreach (Vector3 corner in corners)
+            {
+                Vector2 p = parent.InverseTransformPoint(corner);
+                min = Vector2.Min(min, p);
+                max = Vector2.Max(max, p);
+            }
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        }
+
+        /// <summary>
         /// #414 야광귀 셈법 예고 동안 패널 자리에 빈 ? 칸을 센 수만큼 보여 준다. 새 칸은 톡 튀어나온다.
         /// </summary>
         private void DrawPreview(bool show, int count)
@@ -308,6 +338,7 @@ namespace C6Lab
                 pop = Mathf.Lerp(1.6f, 1f, 1f - (1f - u) * (1f - u));
                 if (previewPopElapsed >= .25f) previewPopElapsed = -1f;
             }
+            AvoidBubble();
             float wobble = Mathf.Sin(Time.unscaledTime * 6f) * .05f;
             for (int i = 0; i < previewSlots.Length; i++)
             {
@@ -980,7 +1011,8 @@ namespace C6Lab
             Outline numberOutline = comboPopNumber.gameObject.AddComponent<Outline>();
             numberOutline.effectColor = Color.white;
             numberOutline.effectDistance = new Vector2(4f, -4f) * Mathf.Max(.5f, u);
-            comboPopWord = NewText("Combo Word", comboPop, Mathf.Max(10, Mathf.RoundToInt(numberSize * .36f)), TextAnchor.MiddleCenter);
+            // #414: 한글 "콤보!"가 숫자보다 커 보여서 영어 때(.36)보다 줄였다.
+            comboPopWord = NewText("Combo Word", comboPop, Mathf.Max(10, Mathf.RoundToInt(numberSize * .26f)), TextAnchor.MiddleCenter);
             comboPopWord.rectTransform.anchorMin = comboPopWord.rectTransform.anchorMax = new Vector2(.62f, .12f);
             comboPopWord.rectTransform.sizeDelta = new Vector2(numberSize * 2f, numberSize * .5f);
             Outline wordOutlineWhite = comboPopWord.gameObject.AddComponent<Outline>();

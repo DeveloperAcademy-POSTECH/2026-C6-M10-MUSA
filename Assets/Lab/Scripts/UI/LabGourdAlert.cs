@@ -90,6 +90,8 @@ namespace C6Lab
         public bool Active => elapsed >= 0f;
         /// <summary>말풍선이 지금 화면에 그려지고 있는지.</summary>
         public bool Visible => bubble != null && bubble.gameObject.activeSelf;
+        /// <summary>#414 말풍선 사각형 (콤보 예고 칸이 겹치지 않게 피하려고). 아직 없으면 null.</summary>
+        public RectTransform BubbleRect => bubble;
         public RectTransform Bubble => bubble;
         /// <summary>말풍선의 내용: 폭탄이면 "!", 넘기기 막기면 "← 🚫" 또는 "→ 🚫", 매혹이면 "♥".</summary>
         public string Label => showingBlock ? (blockRight ? "→ 🚫" : "← 🚫") : showingHeart ? "♥"
