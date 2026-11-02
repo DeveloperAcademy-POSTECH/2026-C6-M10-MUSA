@@ -18,6 +18,9 @@ namespace C6Lab
     ///   ("P2 색 틀림", 내가 틀렸으면 "내가 색 틀림")를 모든 기기에 같이 보여준다. 페널티(SMALL)는 게임을 가리지
     ///   않게 공격 영역 왼쪽 아래 구석에 "작게" 글자와 그 밑 세로 사각형으로만 보이고, 사각형 안 빨간 칸이 위에서
     ///   아래로 줄어든다. 보상(BIG)도 같은 자리에 금색 "크게" 글자와 금색 칸으로 보인다(부적 비는 그대로).
+    /// - #414: 예고 동안 화면 가장자리가 천천히 어두워지고(박 쪽은 밝게) 4칸이 나오면 걷힌다. 야광귀 셈법이면 패널 자리에 빈 ? 칸이
+    ///   야광귀가 셀 때마다 하나씩 튀어나와(넷=1칸 … 하나=4칸) 곧 4칸 색 순서가 나온다는 걸 보여 준다. Host가 처음 봐주기 초 안의
+    ///   틀림을 봐주면(snapshot.comboForgivenCount) 모든 기기에서 콤보 칸이 흔들리고 화면 가장자리가 잠깐 빨갛게 번쩍인다.
     /// - #411: 화면 문구는 모두 한글이고, 글꼴은 피버타임 배너와 같은 신라문화체 굵은 글씨(LabYaguangFeverHud.ShillaFont)다.
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
     /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
@@ -54,7 +57,11 @@ namespace C6Lab
         private static readonly Color RewardBadgeColor = new Color(.95f, .69f, .13f, 1f);
         // BIG 글자: 밝은 바탕에서도 읽히게 사각형보다 진한 금색 (#301)
         private static readonly Color RewardLabelColor = new Color(.82f, .5f, .04f, 1f);
-        private static Sprite discSprite, checkSprite, roundedSprite, pillSprite;
+        private static Sprite discSprite, checkSprite, roundedSprite, pillSprite, vignetteSprite;
+        /// <summary>#414 예고 그늘의 밝은 가운데 높이 (화면 아래 0 ~ 위 1). 박이 있는 쪽.</summary>
+        public const float ShadeCenterY = .68f;
+        /// <summary>#414 봐준 틀림 경고(칸 흔들림, 빨간 가장자리) 시간 (초)</summary>
+        public const float ForgiveSeconds = .45f;
 
         [Tooltip("화면에서 콤보 패널 가운데 위치 (0~1, 왼쪽 아래가 0)")]
         [SerializeField] private Vector2 panelAnchor = new Vector2(.5f, .8f);
@@ -105,6 +112,15 @@ namespace C6Lab
         private readonly Text[] slotWords = new Text[LabGourdCombo.Length];
         private RectTransform questionSlot;
         private float warningPopElapsed = -1f;
+        // #414 예고 그늘, 빈 칸 미리 보기, 봐준 틀림 경고
+        private Image warningShade, forgiveFlash;
+        private float shadeAlpha;
+        private RectTransform previewPanel;
+        private readonly RectTransform[] previewSlots = new RectTransform[LabGourdCombo.Length];
+        private int previewShown;
+        private float previewPopElapsed = -1f;
+        private uint seenForgivenCount = uint.MaxValue;
+        private float forgiveElapsed = -1f;
 
         private LabComboRewardStars stars;
         private int boardLook;
@@ -131,6 +147,15 @@ namespace C6Lab
         private float resultDelay;
 
         public bool PanelVisible => panel != null && panel.gameObject.activeSelf;
+        /// <summary>#414 예고 그늘의 지금 진하기 (0~1, 테스트·확인용)</summary>
+        public float WarningShadeAlpha => shadeAlpha;
+        /// <summary>#414 예고 동안 보이는 빈 칸 수 (0~4, 테스트·확인용)</summary>
+        public int PreviewSlotsShown => previewPanel != null && previewPanel.gameObject.activeSelf ? previewShown : 0;
+        /// <summary>#414 봐준 틀림 경고가 지금 보이는지 (테스트·확인용)</summary>
+        public bool ForgiveWarningVisible => forgiveElapsed >= 0f;
+
+        /// <summary>#414 야광귀가 남은 초 count를 셀 때 미리 보일 빈 칸 수: 넷=1칸, 셋=2칸, 둘=3칸, 하나=4칸. 넷보다 길면 아직 0칸.</summary>
+        public static int PreviewSlotsFor(int count) => count < 1 ? LabGourdCombo.Length : Mathf.Clamp(LabGourdCombo.Length + 1 - count, 0, LabGourdCombo.Length);
         public bool EffectVisible => effectBadge != null && effectBadge.gameObject.activeSelf;
         public string EffectLabel => effectText != null ? effectText.text : string.Empty;
         /// <summary>보상(BIG) 별이 지금 쏟아지고 있는지 (#257)</summary>
@@ -215,7 +240,83 @@ namespace C6Lab
             DrawCombo(snapshot, serverNow);
             DrawResult();
             DrawWarning(snapshot, serverNow, warning);
+            DrawShadeAndForgive(snapshot, serverNow, warning);
             DrawEffect(snapshot, serverNow);
+        }
+
+        /// <summary>
+        /// #414 예고 그늘(예고 동안 천천히 진해지고 4칸이 나오면 빨리 걷힘)과 봐준 틀림 경고(콤보 칸 흔들림 + 빨간 가장자리).
+        /// </summary>
+        private void DrawShadeAndForgive(LabSnapshot snapshot, double serverNow, bool warning)
+        {
+            float maxShade = network != null && network.config != null ? network.config.YaguangComboWarningShade : .5f;
+            float target = warning ? maxShade : 0f;
+            float speed = warning ? maxShade / .8f : maxShade / .3f;
+            shadeAlpha = Mathf.MoveTowards(shadeAlpha, target, Mathf.Max(.01f, speed) * Time.unscaledDeltaTime);
+            warningShade.gameObject.SetActive(shadeAlpha > .001f);
+            warningShade.color = new Color(0f, 0f, 0f, shadeAlpha);
+
+            if (seenForgivenCount == uint.MaxValue || snapshot.comboForgivenCount < seenForgivenCount)
+                seenForgivenCount = snapshot.comboForgivenCount;
+            if (snapshot.comboForgivenCount > seenForgivenCount)
+            {
+                seenForgivenCount = snapshot.comboForgivenCount;
+                // 늦게 알아챈 경고(1초 넘게 지남)는 띄우지 않는다.
+                if (serverNow - snapshot.comboForgivenAt <= 1d) forgiveElapsed = 0f;
+            }
+            if (forgiveElapsed < 0f)
+            {
+                forgiveFlash.gameObject.SetActive(false);
+                panel.anchoredPosition = Vector2.zero;
+                return;
+            }
+            forgiveElapsed += Time.unscaledDeltaTime;
+            float t = forgiveElapsed / ForgiveSeconds;
+            if (t >= 1f)
+            {
+                forgiveElapsed = -1f;
+                forgiveFlash.gameObject.SetActive(false);
+                panel.anchoredPosition = Vector2.zero;
+                return;
+            }
+            float fade = 1f - t;
+            forgiveFlash.gameObject.SetActive(true);
+            forgiveFlash.color = new Color(FailColor.r, FailColor.g, FailColor.b, .65f * fade);
+            panel.anchoredPosition = new Vector2(Mathf.Sin(forgiveElapsed * 70f) * 9f * unit * fade, 0f);
+        }
+
+        /// <summary>
+        /// #414 야광귀 셈법 예고 동안 패널 자리에 빈 ? 칸을 센 수만큼 보여 준다. 새 칸은 톡 튀어나온다.
+        /// </summary>
+        private void DrawPreview(bool show, int count)
+        {
+            previewPanel.gameObject.SetActive(show);
+            if (!show)
+            {
+                previewShown = 0;
+                previewPopElapsed = -1f;
+                return;
+            }
+            int shown = PreviewSlotsFor(count);
+            if (shown > previewShown) previewPopElapsed = 0f;
+            previewShown = shown;
+            float pop = 1f;
+            if (previewPopElapsed >= 0f)
+            {
+                previewPopElapsed += Time.unscaledDeltaTime;
+                float u = Mathf.Clamp01(previewPopElapsed / .25f);
+                pop = Mathf.Lerp(1.6f, 1f, 1f - (1f - u) * (1f - u));
+                if (previewPopElapsed >= .25f) previewPopElapsed = -1f;
+            }
+            float wobble = Mathf.Sin(Time.unscaledTime * 6f) * .05f;
+            for (int i = 0; i < previewSlots.Length; i++)
+            {
+                bool on = i < shown;
+                previewSlots[i].gameObject.SetActive(on);
+                if (!on) continue;
+                float scale = i == shown - 1 ? pop : 1f + wobble;
+                previewSlots[i].localScale = Vector3.one * scale;
+            }
         }
 
         /// <summary>
@@ -230,6 +331,8 @@ namespace C6Lab
             warningActive = show;
             // 야광귀 셈법 (#271): 박 옆 말풍선만 하나·둘·셋·넷으로 세고, 패널 자리의 COMBO! 예고는 띄우지 않는다.
             warningPanel.gameObject.SetActive(show && !yaguang);
+            int previewCount = show ? Mathf.Max(1, Mathf.CeilToInt((float)(snapshot.comboNextAt - serverNow))) : 0;
+            DrawPreview(show && yaguang, previewCount);
             if (!show)
             {
                 shownWarningCount = -1;
@@ -556,6 +659,10 @@ namespace C6Lab
             if (stars != null) stars.Clear();
             shownWarningCount = -1;
             warningPopElapsed = -1f;
+            seenForgivenCount = uint.MaxValue;
+            forgiveElapsed = -1f;
+            previewShown = 0;
+            previewPopElapsed = -1f;
             resultDelay = 0f;
             comboPopElapsed = -1f;
             comboPopCombo = 0;
@@ -649,6 +756,10 @@ namespace C6Lab
             flash.raycastTarget = false;
             flashRect.gameObject.SetActive(false);
 
+            // #414 예고 그늘과 봐준 틀림 빨간 가장자리: 박 쪽(ShadeCenterY)이 밝은 둥근 그늘. 화면을 다 덮게 크게 둔다.
+            warningShade = NewShade("Combo Warning Shade", layer);
+            forgiveFlash = NewShade("Combo Forgive Flash", layer);
+
             // 보상 별(#257): 번쩍임 바로 앞, 콤보 패널·결과 문구·배지 뒤에 그린다.
             stars = layer.gameObject.AddComponent<LabComboRewardStars>();
             stars.Initialize(layer, u);
@@ -714,6 +825,37 @@ namespace C6Lab
             questionMark.text = "?";
             questionMark.color = new Color(.17f, .14f, .12f, .55f);
             questionSlot.gameObject.SetActive(false);
+
+            // #414 야광귀 셈법 예고: 콤보 패널과 같은 자리·크기에 빈 ? 칸 4개 (센 수만큼 보인다).
+            previewPanel = NewRect("Combo Preview", layer);
+            previewPanel.anchorMin = previewPanel.anchorMax = panelAnchor;
+            previewPanel.sizeDelta = panel.sizeDelta;
+            Image previewBack = previewPanel.gameObject.AddComponent<Image>();
+            previewBack.sprite = RoundedSprite();
+            previewBack.type = Image.Type.Sliced;
+            previewBack.color = PanelColor;
+            previewBack.raycastTarget = false;
+            for (int i = 0; i < LabGourdCombo.Length; i++)
+            {
+                RectTransform slot = NewRect("Preview Slot " + (i + 1), previewPanel);
+                slot.anchorMin = slot.anchorMax = new Vector2(0f, 1f);
+                slot.pivot = new Vector2(.5f, .5f);
+                slot.sizeDelta = new Vector2(slotSize, slotSize);
+                slot.anchoredPosition = new Vector2(gap + slotSize * .5f + i * (slotSize + gap), -gap - slotSize * .5f);
+                Image disc = slot.gameObject.AddComponent<Image>();
+                disc.sprite = DiscSprite();
+                disc.color = new Color(.78f, .75f, .7f, 1f);
+                disc.raycastTarget = false;
+                Text mark = NewText("?", slot, Mathf.Max(10, Mathf.RoundToInt(30f * u)), TextAnchor.MiddleCenter);
+                mark.rectTransform.anchorMin = Vector2.zero;
+                mark.rectTransform.anchorMax = Vector2.one;
+                mark.rectTransform.offsetMin = mark.rectTransform.offsetMax = Vector2.zero;
+                mark.text = "?";
+                mark.color = InkColor;
+                slot.gameObject.SetActive(false);
+                previewSlots[i] = slot;
+            }
+            previewPanel.gameObject.SetActive(false);
 
             RectTransform barBack = NewRect("Combo Time Bar", panel);
             barBack.anchorMin = new Vector2(0f, 0f);
@@ -874,6 +1016,33 @@ namespace C6Lab
         }
 
         // ---- 손그림 느낌의 단순 도형: 진한 테두리 원, 흰 체크, 둥근 패널 ----
+
+        /// <summary>#414 화면을 다 덮는 둥근 그늘 (가운데는 투명, 가장자리로 갈수록 진함). 터치를 막지 않는다.</summary>
+        private static Image NewShade(string name, RectTransform parent)
+        {
+            RectTransform rect = NewRect(name, parent);
+            rect.anchorMin = new Vector2(-.25f, ShadeCenterY - .8f);
+            rect.anchorMax = new Vector2(1.25f, ShadeCenterY + .8f);
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.sprite = VignetteSprite();
+            image.color = Color.clear;
+            image.raycastTarget = false;
+            rect.gameObject.SetActive(false);
+            return image;
+        }
+
+        private static Sprite VignetteSprite()
+        {
+            if (vignetteSprite != null) return vignetteSprite;
+            vignetteSprite = Draw("Lab combo vignette", (p, c) =>
+            {
+                float r = Vector2.Distance(p, c) / (TextureSize * .5f);
+                float a = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.28f, .9f, r));
+                return new Color(1f, 1f, 1f, a);
+            }, Vector4.zero);
+            return vignetteSprite;
+        }
 
         private static Sprite DiscSprite()
         {

@@ -936,6 +936,14 @@ namespace C6Lab
         [Header("야광귀 콤보 예고와 피버 신호 (#414, Inspector 전용)")]
         [Tooltip("콤보가 나오고 이 초 안에 틀린 색을 맞히면 첫 번째 한 번만 봐주고(경고) 콤보를 이어 간다. 0이면 봐주지 않음 (Host 기기 값)")]
         [SerializeField, Range(0f, 5f)] private float yaguangComboGraceSeconds = 2f;
+        [Tooltip("콤보 예고(넷/셋/둘/하나) 동안 화면 가장자리가 어두워지는 최대 진하기 (0이면 끔, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboWarningShade = .5f;
+        [Tooltip("피버 동안 내 북이 두근두근 커지는 정도 (0.12 = 12% 커짐, 0이면 끔)")]
+        [SerializeField, Range(0f, .5f)] private float yaguangFeverDrumPulseScale = .12f;
+        [Tooltip("피버 북 두근두근 박자 (초당 박 수, 1.6 = 1분에 96번)")]
+        [SerializeField, Range(.5f, 4f)] private float yaguangFeverDrumPulseRate = 1.6f;
+        [Tooltip("피버 중 북을 이 초 안에 연달아 누르면 연타 숫자(x2, x3…)가 이어진다")]
+        [SerializeField, Range(.2f, 2f)] private float yaguangFeverTapComboSeconds = .8f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1385,6 +1393,10 @@ namespace C6Lab
         public float YaguangComboBigStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigStartSoundVolume, .8f));
         public float YaguangComboBigEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigEndSoundVolume, .7f));
         public float SmallHitPitchSemitones => Mathf.Clamp(Finite(smallHitPitchSemitones, 6f), 0f, 12f);
+        public float YaguangFeverDrumPulseScale => Mathf.Clamp(Finite(yaguangFeverDrumPulseScale, .12f), 0f, .5f);
+        public float YaguangFeverDrumPulseRate => Mathf.Clamp(Finite(yaguangFeverDrumPulseRate, 1.6f), .5f, 4f);
+        public float YaguangFeverTapComboSeconds => Mathf.Clamp(Finite(yaguangFeverTapComboSeconds, .8f), .2f, 2f);
+        public float YaguangComboWarningShade => Mathf.Clamp01(Finite(yaguangComboWarningShade, .5f));
         public float YaguangComboGraceSeconds => Mathf.Clamp(Finite(yaguangComboGraceSeconds, 2f), 0f, 5f);
         public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));
         public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 4f), 0f, 10f);
