@@ -149,6 +149,11 @@ namespace C6Lab
             // 지귀 A의 회복 화염과 공통 생성 소비 표시 (#412). 원본 게이지/구슬 아래 위계는 유지한다.
             if (hud != null && boardNetwork != null && hud.staminaFill != null && GetComponent<LabStaminaFeedback>() == null)
                 gameObject.AddComponent<LabStaminaFeedback>().Bind(boardNetwork, hud);
+            // 스태미나 부족 (#418): 모자란데 북을 누르면 게이지가 지지직 흔들리고 충전 중인 칸이 빨갛게 빛나며 소리가 난다
+            if (hud != null && boardNetwork != null && hud.staminaFill != null && GetComponent<LabStaminaShortFeedback>() == null)
+                gameObject.AddComponent<LabStaminaShortFeedback>().Bind(boardNetwork, hud.staminaFill);
+            if (boardNetwork != null && GetComponent<LabStaminaShortSound>() == null)
+                gameObject.AddComponent<LabStaminaShortSound>().Bind(boardNetwork);
             // 야광귀 피버타임 시작 (#343): 화면이 번쩍이고 "피버타임!" 문구가 크게 뜨며 부적이 마구 쏟아진다
             if (hud != null && boardNetwork != null && GetComponent<LabYaguangFeverHud>() == null)
                 gameObject.AddComponent<LabYaguangFeverHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());

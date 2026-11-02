@@ -37,7 +37,7 @@
 | 매혹 걸림 | `Audio/CharmCast` | 스냅샷 `charmStartedAt`에 도달할 때 모든 기기. 예고 시작의 `SabotageCast`에서 바로 재생하지 않는다. |
 | 내 구조 탭 완료 | `Audio/CharmCheck` | `LabCharmBubbles.OwnCheckShown`. 자기 몫의 탭을 끝낸 도우미 기기만 재생한다(저장 기본 10회, DEV로 조절). |
 | 매혹 풀림 | `Audio/CharmRelease` | 걸린 기기의 `LabCharmHud.CharmReleased`와 양옆 도우미의 `LabCharmBubbles.HelperCharmEnded`. 구조 완료·시간 만료·피버 정리에 반응한다. |
-| 여우 구슬 낙하 | `Audio/FoxFall` | `SabotageCast(FoxFire, target)`. 대상 조합판 주인의 기기만 재생한다. |
+| 여우 구슬 낙하 | `Audio/FoxFall` | `LabNetwork.LocalFoxFireDropped`. 여우불이 떨어진 조합판 주인의 기기마다 재생한다(#418부터 받을 수 있는 모든 판에 떨어진다). |
 | 여우 구슬 제거 | `Audio/FoxClear` | `LabOrbBoard.FoxFireCleared`. 두 번 누르기 또는 음·양과의 접촉으로 연기가 나는 조합판에서 재생한다. 수명 만료·피버 정리는 제외한다. |
 | 해금 폭탄 분해 | `Audio/BombOpen` | `LabOrbBoard.BombOpening`. 해금 폭탄이 멈춘 뒤 연기로 사라지고 공격 구슬로 열리는 조합판에서 재생한다. 잠긴 폭탄 폭발음과는 별도다. |
 
