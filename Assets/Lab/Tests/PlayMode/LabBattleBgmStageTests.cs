@@ -31,9 +31,11 @@ namespace C6Lab.Tests
             AudioClip normal = Resources.Load<AudioClip>("Audio/BGM/Kkwaenggwari_13");
             AudioClip gumiho = Resources.Load<AudioClip>("Audio/GumihoBGM/Gumiho_Stage");
             AudioClip yaguang = Resources.Load<AudioClip>("Audio/YaguangBGM/Yaguang_Stage");
+            AudioClip territorySong = Resources.Load<AudioClip>("Audio/TerritoryBGM/Territory_Stage");
             Assert.That(normal, Is.Not.Null);
             Assert.That(gumiho, Is.Not.Null);
             Assert.That(yaguang, Is.Not.Null);
+            Assert.That(territorySong, Is.Not.Null);
             Assert.That(Resources.Load<LabConfig>("LabConfig").YaguangUseNewBgm, Is.True,
                 "The saved #396 default enables the Yaguang stage song.");
             var stages = new[] { LabStageYokai.Gumiho, LabStageYokai.Yaguang, LabStageYokai.Jigwi,
@@ -49,9 +51,10 @@ namespace C6Lab.Tests
                 fixture.SetSnapshot(snapshot);
                 yield return null;
                 yield return null;
-                // Territory borrows Gumiho; #396 Yaguang uses its own saved-default song.
+                // Territory keeps the Gumiho song from before #409; #396 Yaguang uses its own saved-default song.
                 // Jigwi, standalone Lab and an explicitly disabled Yaguang toggle keep the usual song.
-                AudioClip expected = (gameFlow && stages[i] == LabStageYokai.Gumiho) || territory ? gumiho
+                AudioClip expected = territory ? territorySong
+                    : gameFlow && stages[i] == LabStageYokai.Gumiho ? gumiho
                     : gameFlow && stages[i] == LabStageYokai.Yaguang && !legacyYaguang ? yaguang : normal;
                 Assert.That(fixture.Bgm.BattleClip, Is.SameAs(expected),
                     "Game=" + gameFlow + ", yokai=" + stages[i] + ", territory=" + territory);

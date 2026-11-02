@@ -862,6 +862,9 @@ namespace C6Lab
         [SerializeField, Range(0, 100)] private int chuimsaeChancePercent = 15;
         [Tooltip("추임새가 한 번 나온 뒤 최소 몇 번은 장구 소리만 낼지. 연달아 나오지 않게 한다.")]
         [SerializeField, Range(0, 20)] private int chuimsaeMinGap = 5;
+        [Header("스태미나 부족 효과음 (#418, Inspector 전용)")]
+        [Tooltip("스태미나가 모자란데 북을 눌러 생성이 거절될 때 소리 크기 (Resources/Audio/StaminaShort, 누른 사람 기기만). 게이지 흔들림·빨간 빛은 Resources/Stamina/StaminaFeedbackProfile에서 조절한다.")]
+        [SerializeField, Range(0f, 1f)] private float staminaShortSoundVolume = 1f;
 
         [Header("Sound · 구미호 스테이지 (#351, Inspector 전용. 소리 파일이 없으면 그 소리만 조용히 넘어간다)")]
         [Tooltip("구미호 스테이지 전투 BGM 크기 (Resources/Audio/GumihoBGM, 모든 기기). 파일이 없거나 다른 스테이지면 위의 BGM Volume으로 기본 전투 BGM을 튼다.")]
@@ -1409,6 +1412,7 @@ namespace C6Lab
         public float YaguangComboStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboStartSoundVolume, .8f));
         public float YaguangComboTickSoundVolume => Mathf.Clamp01(Finite(yaguangComboTickSoundVolume, 1f));
         public float YaguangComboTickFastSoundVolume => Mathf.Clamp01(Finite(yaguangComboTickFastSoundVolume, 1f));
+        public float StaminaShortSoundVolume => Mathf.Clamp01(Finite(staminaShortSoundVolume, 1f));
         public float YaguangComboTickIntervalSeconds => Mathf.Clamp(Finite(yaguangComboTickIntervalSeconds, .5f), .1f, 2f);
         public float YaguangComboTickFastIntervalSeconds => Mathf.Clamp(Finite(yaguangComboTickFastIntervalSeconds, .25f), .05f, 1f);
         public float YaguangComboTauntSoundVolume => Mathf.Clamp01(Finite(yaguangComboTauntSoundVolume, .9f));

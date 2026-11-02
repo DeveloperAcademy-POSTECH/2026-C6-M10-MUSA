@@ -196,6 +196,10 @@ namespace C6Lab
         public uint Round => round;
         public long Epoch => epoch;
         public bool HasPending => pending != null;
+        /// <summary>The transfer ordinal of the partly received frame, or 0 when none is pending.</summary>
+        public long PendingSequence => pending?.sequence ?? 0;
+        /// <summary>Fragments of the pending frame received so far; it grows while the frame is still arriving.</summary>
+        public int PendingReceivedParts => pending == null ? 0 : received;
 
         public LabPaintReceiver(LabPaintSurface surface) => this.surface = surface ?? throw new ArgumentNullException(nameof(surface));
 

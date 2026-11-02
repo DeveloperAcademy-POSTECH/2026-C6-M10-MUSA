@@ -164,6 +164,7 @@ namespace Hapio
             network.GameFlowDeveloperConfigValidation = ValidateBattleDeveloperConfig;
             DontDestroyOnLoad(gameObject);
             startOverlay = GameStartOverlay.Create(transform);
+            sceneFade = GameSceneFade.Create(transform, lobbyFadeColor);
             network.GameFlowMessage += ReceiveControl;
             network.GameFlowDisconnected += OnPeerDisconnected;
             network.GameFlowDeveloperRestartRequested += OnDeveloperRestart;
@@ -388,7 +389,11 @@ namespace Hapio
             if (quitting) return;
             wantedScene = path;
             if (sceneRoutine == null && (SceneManager.GetActiveScene().path != path || forceBattleReload))
+            {
+                // 방에 들어가고 나올 때 (#418): 이 프레임부터 떠나는 화면을 그대로 두고 가려진 뒤에 씬을 바꾼다.
+                HoldForFade(path);
                 sceneRoutine = StartCoroutine(ChangeScene());
+            }
         }
 
         private IEnumerator ChangeScene()
@@ -396,6 +401,7 @@ namespace Hapio
             // Never unload a terminal Battle before its actual committed paint map is copied.
             yield return null;
             if (quitting) { sceneRoutine = null; yield break; }
+            if (holdForFade) yield return FadeOutOfScene();
             while (SceneManager.GetActiveScene().path != wantedScene || forceBattleReload)
             {
                 string destination = wantedScene;
@@ -428,6 +434,7 @@ namespace Hapio
                 yield return null;
             }
             sceneRoutine = null;
+            FadeIntoScene();
         }
 
         private bool CanCaptureResult()

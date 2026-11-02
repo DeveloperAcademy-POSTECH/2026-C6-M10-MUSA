@@ -64,7 +64,7 @@ namespace C6Lab.Tests
                 bodyType.GetField("configRevision").SetValue(body, int.MaxValue);
                 bodyType.GetField("configFingerprint").SetValue(body, new string('f', 64));
                 bodyType.GetField("snapshotSequence").SetValue(body, long.MaxValue);
-                bodyType.GetField("paintFrame").SetValue(body, frame);
+                bodyType.GetField("payload").SetValue(body, LabPacketPayload.Encode(frame));
                 string payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonUtility.ToJson(body)));
                 Assert.That(Encoding.UTF8.GetByteCount(payload), Is.LessThanOrEqualTo(LabBulkSender.MaximumPayloadBytes));
                 var assembler = new LabBulkMessageAssembler();

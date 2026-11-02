@@ -3816,3 +3816,129 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 ### 야광귀 박 8초 수정본 교체
 
 - 기존 야광귀 FBX/추출 클립을 24fps, 1–193프레임의 8초 버전으로 교체. meta GUID 유지. Unity에서 FBX 8초·추출 클립 8초·클립 1개·바인딩 경로 누락 0개 확인. Controller 상태 Speed=1. 게임 통합/실기기/자동 테스트는 미실행.
+
+
+## #427 지귀 A/B 예고 음성과 외침 발동 연결 — 2026-11-02
+
+- **기준:** main `79a96817` → `feat/#427-jigwi-pattern-shout-cues`. 작업 중 데스크탑 프로젝트가 별도 #428 작업 브랜치로 전환된 것을 감지해, 이번 소유 파일을 해시 확인 후 별도 작업트리로 옮겼다. 데스크탑은 #428 수정만 남겼으며 그 브랜치·진행 파일·기존 스태시9개를 보존했다. 이번 전용 Unity6000.6.5f1/macOS/Metal **batch Editor**에서 검사했으며 사용자 Editor의 Scene을 저장하거나 전환하지 않았다.
+- **구현:** 기존 Host A5/40/70초·B25/55/85초 및1초 상태 예고를 유지하고, 같은 `LabJigwiABTimeline`을 모델·DTO 검사·음성이 공유한다. 전용2D 비반복 소스가 `activeAt − cueSeconds`에 예고를 시작한다. 음성이 Host 규칙을 발동시키지 않는다. A 화면 열기와 B 장막/발화점/반복 불소리는 실제 activeAt부터 표시한다. 기존 물 공급·소각·소화/재점화·B 보상/실패·투척/도색·LAN/핫스팟 판정은 변경하지 않았다.
+- **원본/기준점:** 사용자 WAV를 자르거나 음량을 가공하지 않고 PCM·원본48000Hz·stereo·DecompressOnLoad/preload로 가져왔다. 파일 바이트 SHA-256이 원본과 같음: A `2c623cc10c332b8656fc7f1d59e3d8f64e1dfee23d83dc9ebad772717038b7cb`(384078bytes,2초), B `1918526d5d8f0fc4e09e0697c67ff2f0ea424dab9d19df1d15cdba72c3277cb5`(721998bytes,3.76초). 파형 기반 후보의 위치 확인용 음원을 제시했고 사용자가 **A1.05초·B2.08초로 진행**하도록 승인했다. 음소 인식 확정이나 실기기 오디오 출력 지연 측정은 아니다. 초기 음성 시작은 A3.95/38.95/68.95초, B22.92/52.92/82.92초다.
+
+| 최종 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1732/1732 PASS** |30.76초|
+| 지귀 관련 PlayMode (`Jigwi` 부분 일치) | **110/110 PASS** |48.25초|
+| 기존 스테이지/팀전 BGM PlayMode | **3/3 PASS** |1.10초|
+
+- 최종 실행 합계1845개, 실패/skip/inconclusive0. 전체 PlayMode 실행은 아니다. 지귀110개에는 새 음성22개·화면22개(A/B 실제 시작 경계6개 추가)·실제 발화점/탄도/장막13개·기존 소비/rollback/취소/잔상/보상 검사와 저장 Home→Stage03 연결1개·기존 지귀 게임 흐름1개가 포함된다. 실제 게임 연결 검사는 persistent Network의 단일 음성 소스와 원본 Resources/profile 연결, 기존 WhiteGourd 표면/투사체/스테미나/공급 경로를 확인한다.
+- 새 음성22개는 공통 시간표/기준점·클립 중간 합류·6슬롯 bounded 기록·중복 snapshot/재바인딩/disable·실제 Pause·앱 포커스 복귀/놓친 외침·75ms 초과 시계 역행·세션/판/스테이지 변경·결과/해결·누락 클립·SFX0을 확인한다. 검사는 소스를 mute한 상태의 수명·cursor·상태 검사이며 실제 귀로 들리는 출력 타이밍을 보증하지 않는다.
+- **중간 실행 구분:** 마지막 시계 역행 보완을 명시적 Refresh하기 전1732 EditMode·107 지귀·3 BGM·1 저장 게임 검사는 통과했지만 최종22번째 음성 검사는 포함하지 않았으므로 위 최종 실행과 구분한다. 이후 새 소스의 지귀108개 실행에서1건이 `SaveCurrentModifiedScenesIfUserWantsTo: This cannot be used during play mode`라는 TestRunner 예외로 실패했다(동시 RunStarted/이전 run 무효화 기록). 검사 프로세스를 정상 재시작한 후 위110개가 모두 통과했다. 여러 필터를 세미콜론으로 묶은 시도는 Pipeline의 부분 일치 필터와 맞지 않아0개였으며 PASS로 세지 않았다. 게임 코드나 물리 판정은 이 실행기 문제를 피하기 위해 바꾸지 않았다.
+- **보존:** Scene/기존 Prefab·머터리얼·LabConfig·StageCatalog/StageDefinition·BGM·Packages/ProjectSettings·공유 설정257개·5681/Lab42/Game26은 변경하지 않았다. 새 에셋은 두 원본 WAV·로컬 음성 프로필뿐이며 모두 Unity API로 임포트/생성했다. 초기 batch 임포트의 URP global 설정 자동 직렬화는 범위 밖이므로 원본으로 복구했다. 새 Assets 파일의 meta 누락/GUID 충돌0. README는 수정하지 않았다.
+- **종료:** 전용 검사 Editor에서 Play OFF·dirty=false·컴파일 오류 없음 확인 후 해당 프로세스를 종료했다. 데스크탑의 별도 Editor는 유지했다. 원시 검사JSON·음성 위치 확인용 비프 미리듣기·분석 이미지·실행 로그/빌드 산출물은 커밋하지 않는다.
+- **미실행:** iOS/Mac 플레이어 빌드·서명/설치·iPhone/iPad 실제 청취·LAN/핫스팟 실제 다기기·하드웨어 출력 지연 측정. Inspector 조절과 실제 플레이 확인 방법은 `JIGWI_SCREEN_PATTERNS.md`1.1/5.1절을 따른다.
+
+## #428 통신 패킷 봉투 다이어트·빈 조합판 프레임 생략 — 2026-11-02
+
+- **기준:** main `79a96817` → `fix/#428-lean-packet-envelope`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac 플레이어·iOS 빌드는 만들지 않았다.
+- **배경:** 통신 경로 점검(7각도 읽기 조사, 원인별 2관점 검증)에서 자잘한 렉의 바탕으로 ①JsonUtility가 null 중첩 객체를 기본값으로 써서 모든 제어 패킷이 약 4.2 KB 봉투를 실어 가는 것, ②변화가 없어도 조합판 프레임을 10 Hz로 전원에게, 행동·명중마다 또 전원에게 보내는 것이 확인됐다. 이 둘만 이 이슈에서 다룬다.
+- **수정:** `LabNetworkPacket`의 미사용 `snapshot`·`boardFrame` 필드 삭제, `actionReceipt`·`paintFrame`을 `payload` JSON 문자열로(`LabPacketPayload`), `LabBulkPayload`도 같이. 승인된 행동 직후 `HandleBoardAction`의 `PublishOwnerBoards(skipEmpty: true)`만 변경·제거 구슬이 없는 수신자를 건너뛰고 순번을 소비하지 않는다. `PublishSnapshot`의 프레임(100 ms 타이머·명중·일시정지/재개·섬광)과 5초 체크포인트는 그대로. 별도 코드 검토에서 재개 즉시 프레임까지 생략하면 Guest가 다음 타이머 프레임까지 정지 상태로 남는 회귀를 찾아, 생략 범위를 행동 경로로만 좁혔다. 접속 규약 **5682/Lab43/Game27**, 공유 설정257개 유지.
+
+| Editor 측정 (Mac, JsonUtility) | 전 | 후 |
+| --- | --- | --- |
+| 본문 없는 패킷(`type=generate`) 직렬화 크기 | 4,189 B | **937 B** |
+| 같은 패킷 ToJson / FromJson 1회 | 0.105 / 0.127 ms | **0.024 / 0.017 ms** |
+| `action_result` 봉투 + 빈 영수증 | (영수증 항상 포함) | 1,212 B |
+| 스냅샷 512자 조각의 Bulk 본문 | 898자 | **683자** |
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1736/1736 PASS** | 46.24초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.36초 |
+| PlayMode `LabJigwiActionRollbackTests` | **8/8 PASS** | 0.08초 |
+| PlayMode `LabFlashShakeRequestTests` | **6/6 PASS** | 0.58초 |
+| PlayMode `LabLobbyPositionSelectionTests` | **5/5 PASS** | 1.45초 |
+| PlayMode `LabQuickConnectTests` | **4/4 PASS** | 0.87초 |
+| PlayMode `LabTeamBattleScreenTests` | **5/5 PASS** | 8.16초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 212.1초 |
+
+- 각 실행의 skip/inconclusive0. 새 검사 `LabNetworkPacketTests`(봉투 1,100 B 상한·중첩 기본값 부재, 영수증/도색 프레임 payload 왕복과 실제 수신 적용, 잘못된 payload→null, 빈 델타 판정). `LabPaintReplicationTests`는 Bulk 본문의 `payload` 필드를 쓰도록 바꿨고 `LabGameFlowBridgeTests`·`LabSharedSettingsSchemaTests`는 접속 규약을 갱신했다.
+- 생략 범위를 행동 경로로 좁힌 뒤 전체 EditMode **1736/1736**(42.02초), PlayMode `LabLocalBoardNetworkIntegrationTests` **16/16**, `GameSceneFlowTests` **21/21**(214.56초)을 다시 실행해 통과했다. 위 표의 나머지 PlayMode 5개 클래스는 좁히기 전 실행 기록이며 좁힌 코드는 그 경로(`PublishSnapshot`)를 원래대로 되돌린 것이다.
+- 최신 main(`ac9c9f1b`, #422·#427 포함) 병합 후에도 전체 EditMode **1736/1736**(40.49초), PlayMode `LabLocalBoardNetworkIntegrationTests` **16/16**, `GameSceneFlowTests` **21/21**(211.04초)을 다시 실행해 통과했다. 공유 설정은 257개 그대로다.
+- 조합판 프레임 생략의 순번 보존은 EditMode 판정 검사와 Host/Guest 통합 PlayMode(`LabLocalBoardNetworkIntegrationTests`)로 확인했다. 실제 여러 폰의 대역폭·반응 변화는 측정하지 않았다.
+- **종료 상태:** Play OFF, Home Scene 열림, 컴파일 오류 없음. 같은 폴더에서 다른 세션이 작업하던 지귀 미커밋 수정은 그 세션이 작업 트리에서 치운 뒤 검사를 실행했으며 이 기록에 포함하지 않는다.
+- **미실행:** iPhone 실기기·LAN/핫스팟 실제 다기기·대역폭 측정. 전체 PlayMode는 실행하지 않았다.
+
+## #431 iOS 플레이어 목표 프레임레이트 60 — 2026-11-02
+
+- **기준:** main `80db0616` → `fix/#431-ios-target-frame-rate`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. iOS 빌드는 만들지 않았다.
+- **배경·수정:** `Application.targetFrameRate`가 어디에도 없어 iPhone이 Unity 모바일 기본 30 fps로 돌았다(`QualitySettings` Mobile 레벨 vSync 0, iPhone 기본 품질 0). `LabMobilePresentationPolicy.InitializePlayer`(`BeforeSceneLoad`, Lab·Hapio 공용)가 `TargetFrameRateFor(platform)`로 iPhone 플레이어에만 60을 적용한다. Editor·Mac·Android는 변경 없음(−1). 와이어·공유 설정 변경 없음.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1738/1738 PASS** | 42.32초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 209.87초 |
+
+- 새 검사 `LabMobilePresentationPolicyTests` 2개: 플랫폼별 목표값과 `RuntimeInitializeOnLoadMethod(BeforeSceneLoad)` 속성, Editor 플랫폼 인자는 `targetFrameRate`를 바꾸지 않고 iPhone 인자는 60으로 바꿈, 저장된 Mobile 품질 레벨의 vSync 0(vSync가 켜져 있으면 targetFrameRate가 무시되므로).
+- Editor는 `TargetFrameRateFor`가 −1을 돌려 Play 속도가 바뀌지 않으므로 기존 PlayMode 검사의 의미는 그대로다.
+- **참고:** 60 fps에서는 `FlushBulkPackets`의 Update당 16 KB 예산이 초당 약 2배(≈980 KB/s/피어)가 된다. 후속 Bulk 작업(적응형 RTO·백로그 기준)에서 함께 본다.
+- **미실행:** iPhone 실기기의 실제 프레임레이트·발열·배터리·체감. 기록 전까지 PASS로 쓰지 않는다.
+
+## #433 Guest 박 포즈 이중 보정 제거 — 2026-11-02
+
+- **기준:** main `80db0616` → `fix/#433-gourd-pose-reconcile-once`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 빌드는 만들지 않았다.
+- **배경·수정:** Guest는 조합판 프레임(`ApplyFastTargetPose`)에서 Host 박 포즈를 블렌드한 뒤, 뒤따라온 Bulk 스냅샷(`ApplyPaintSnapshot`)에서 `Overlay`가 얹은 같은 헤더 포즈로 한 번 더 블렌드해 명중 뒤 박이 역방향으로 튀었다. `LabNetwork.LocalState.ReconcileTargetPose(snapshot)`가 두 경로를 합치고, 같은 세션/라운드에서 `serverTime`이 마지막 적용 시각 이하인 비정지 샘플은 건너뛴다. 정지 샘플은 항상 적용한다. 라운드 변경·액션 리셋에서 기록을 초기화한다. 투척 로컬 선반영(후속)이 쓸 보류 훅 `HoldTargetPoseForPredictedImpact`/`ReleaseTargetPoseHold`와 `ReconcileRope(..., holdImpulse)`를 함께 두었다(보류 중 비정지 샘플은 로프 위상만 블렌드). 이번 변경에서는 아무도 보류를 걸지 않는다. 와이어·공유 설정 변경 없음.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1736/1736 PASS** | 40.13초 |
+| PlayMode `LabRopeReconciliationTests` (새 3개 포함) | **8/8 PASS** | 0.17초 |
+| PlayMode `LabHangingPresentationTests` | **14/14 PASS** | 22.65초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.34초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 210.01초 |
+
+- 새 검사: 같은 `serverTime` 비정지 샘플 재적용은 두 번 블렌드하지 않음(yaw 0→10.5°→10.5°, 새 시각이면 17.325°), 정지 샘플은 반복 적용 때마다 다시 고정됨, 보류 중 비정지 샘플은 로프 위상만 바꾸고 오프셋·yaw는 그대로이며 해제 뒤 정상 블렌드. 기존 `LabRopeReconciliationTests`·`LabHangingPresentationTests` 단언은 바꾸지 않았다.
+- `LabLocalBoardNetworkIntegrationTests`·`GameSceneFlowTests`는 단일 `LabNetwork`에 합성 패킷·솔로 Host로 도는 핸들러 수준 검사이며 실제 두 기기 연결 증거는 아니다.
+- **미실행:** iPhone 실기기·여러 폰 연결에서의 체감.
+
+## #435 조합판 체크포인트 피어별 위상 분산·Host 요청 스로틀 — 2026-11-02
+
+- **기준:** main `80db0616` → `fix/#435-board-checkpoint-stagger`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac 플레이어·iOS 빌드는 만들지 않았다.
+- **배경:** 통신 렉 점검에서 Host가 모든 Guest의 5초 조합판 체크포인트를 같은 프레임에 만들어 보내(방 인원만큼 전체 조합판 동시 버스트) 5초마다 끊김이 생길 수 있고, Guest의 `board_checkpoint` 요청을 Host가 횟수 제한 없이 즉시 전체 재발송하는 것이 확인됐다.
+- **수정:** `LabBoardPublisher.Build(..., checkpointPhaseSeconds)`가 수신자별 위상(0 이상 5 미만)을 라운드 첫 프레임에서만 받아 보관하고, 체크포인트 시각을 격자 기준으로 기록한다(새 라운드 `serverTime − 위상`, 이후 `serverTime − (serverTime − 이전 기준) mod 5`). 그래서 강제 체크포인트(Guest 요청·시작 대기 중 요청)나 늦은 틱이 위상을 지우거나 밀지 않는다. `PublishOwnerBoards`는 로컬을 뺀 피어 순번으로 `5·i/N` 위상을 준다. Host의 `board_checkpoint` 처리에 피어당 0.5초 스로틀을 두고(Guest의 기존 0.5초 재요청 간격과 같음, 받아들인 요청만 기록) 같은 동작이던 `paint_resync` 스로틀과 함께 `LabPeerRequestThrottle`로 묶었다. 체크포인트 주기 5초·프레임 형식·순번·접속 규약 **5682/Lab43/Game27**·공유 설정257개는 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1740/1740 PASS** | — |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | — |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 210.85초 |
+
+- 각 실행의 skip/inconclusive0. 새 검사 `LabBoardCheckpointPhaseTests` 4개: 위상0/2.5 두 수신자가 0·2.5·5·7.5초에 엇갈려 체크포인트, 강제 체크포인트 뒤 격자 유지와 늦은 틱(2.57초) 뒤에도 다음이 7.5초, 위상은 라운드 첫 프레임에서만 읽고 범위 밖·NaN은 거절, 스로틀의 피어별 0.5초·거절 요청 미기록·Forget/Clear. 기존 `LabBoardReplicationTests`의 5초 체크포인트 검사는 위상0 기본값으로 그대로 통과했다.
+- 시간 칸의 —는 이번 실행에서 소요 시간을 따로 남기지 않은 것이다.
+- #431·#433 병합 후 main을 이 브랜치에 합친 코드에서 컴파일 오류 없이 전체 EditMode **1742/1742**(43.32초), PlayMode `LabRopeReconciliationTests` **8/8**, `LabLocalBoardNetworkIntegrationTests` **16/16**을 다시 실행해 통과했다. `GameSceneFlowTests`는 합친 뒤 다시 실행하지 않았다.
+- **종료 상태:** Play OFF, 컴파일 오류 없음.
+- **미실행:** iPhone 실기기·LAN/핫스팟 실제 다기기에서의 5초 주기 끊김 변화와 대역폭 측정. 전체 PlayMode는 실행하지 않았다.
+
+## #437 Bulk 재전송 RTT 적응·중복 ACK 빠른 재전송·백로그 기준 발행 — 2026-11-02
+
+- **기준:** main `b962288d` → `fix/#437-bulk-adaptive-retransmit`. Unity6000.6.5f1/macOS의 연결된 Editor와 이 브랜치로 새로 만든 Lab Mac Development 앱에서 실행했다. iOS 빌드는 만들지 않았다.
+- **배경:** 도색·스냅샷용 Bulk 채널(Unreliable + 자체 재전송)의 재전송 대기가 RTT와 무관하게 0.25초 고정이었고, Guest가 손실 뒤 매 데이터그램마다 같은 ACK를 반복해도 Host가 쓰지 않았다. Host는 피어에게 미확인 조각이 하나라도 있으면 그 피어의 스냅샷·도색 발행을 통째로 건너뛰어(`HasPendingBulk`) 손실이 없어도 ACK 왕복 동안 100 ms 스냅샷이 빠졌고, `paint_resync`도 같은 조건으로 거절했다.
+- **수정:**
+  - `LabBulkSender`: 조각을 한 번만 보낸 경우에만 RTT를 잰다(Karn, 덮은 조각 중 재전송된 것이 있으면 측정 안 함). RFC 6298 `srtt + 4·rttvar`를 0.08~1초로 제한하고, 측정 전에는 기존 0.25초를 쓴다. 시간 초과 재전송마다(한 번의 타임아웃 간격에 한 번) 공유 백오프를 두 배로 하고 다음 유효 측정에서 되돌린다. 같은 조각의 재전송은 1초까지 두 배씩 늘어난다(이전에는 3회에서 멈춤).
+  - 같은 누적 ACK가 세 번 더 오면 선두 미확인 조각을 바로 다시 보낸다(손실 한 번에 한 번). 이미 재전송한 조각의 사본이 만드는 반복 ACK는 그 수만큼(타임아웃 한 번 동안만) 빼고 센다. 봉투 형식은 그대로다.
+  - Host 발행 건너뛰기는 피어 백로그 64 KiB 이상(`BulkBacklogFull`)일 때만 한다. 4 MiB 큐 상한과 중단 경로는 그대로다.
+  - `paint_resync`는 백로그가 가득 찼거나 직전 전체 도색 지도(라운드 시작 지도·체크포인트)가 아직 확인되지 않았을 때만 거절하고, 처리한 요청만 0.5초 스로틀에 기록한다. Guest는 받는 중인 도색 프레임이 1초 동안 새 조각을 받지 못했을 때만(`LabStallWatch`) 재요청한다. 이전에는 받는 중이기만 해도 1초마다 요청했다.
+  - 접속 규약 **5682/Lab43/Game27**, 공유 설정 257개는 그대로다.
+- **검토:** 구현 뒤 코드 검토 워크플로 두 번(관점별 검토 + 지적별 반박 검증)을 돌렸다. 1차에서 확인된 8건(측정 RTO가 RTT 급증 뒤 고정, 갭 복구 ACK의 측정, 재전송 사본 반복 ACK의 오탐, 재전송 1초 미도달, 받는 중 프레임의 전체 지도 요청, 체크포인트 중복 등)과 2차에서 확인된 4건(가장 오래된 조각만 백오프할 때 남는 고착, 반복 ACK 할인 덮어쓰기, 라운드 시작 지도 미추적, 진행 중 프레임 오판)을 고쳤다. 같은 규칙을 옮긴 Python 모델(60 Hz 송신, 100 ms마다 2조각, 20초)에서 RTT 0.05→0.4/0.6초 급증 시 조각당 송신 1.04회로 회복했다(설계 확인용이며 실제 실행 근거가 아님).
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1757/1757 PASS** | 41.56초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.36초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 213.96초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 19.27초 |
+| Lab Mac Development 앱 3프로세스(Host + Client 2, `127.0.0.1:17992`) | **PASS** | 150초 |
+
+- 각 실행의 skip/inconclusive0. 새 검사 `LabBulkAdaptiveRetransmitTests` 15개: 측정 전 고정 0.25초, 첫 측정 RTO와 재전송 배수, 0.08/1초 제한, 재전송 조각·갭 복구 ACK의 측정 제외, 세 번째 반복 ACK의 1회 빠른 재전송, 재전송 사본 반복 ACK 할인(여러 번의 진행 누적과 만료), RTT 급증 뒤 공유 백오프로 측정 회복, 최신 조각 타임아웃의 백오프와 한 창 동시 만료 1회, 재전송 1초 도달, 보낸 것이 하나뿐일 때 미발동, Clear, 체크포인트 추적용 순번, 받는 중 프레임 정체 판정, 백로그 상한. 기존 `LabBulkChannelTests` 고정 스케줄 검사는 그대로 통과했다. PlayMode 세 클래스는 리뷰 1차 수정 뒤 코드에서 실행했고, 2차 수정(백오프 조건·할인 누적·정체 판정·라운드 시작 지도 추적) 뒤에는 전체 EditMode와 Mac 실행만 다시 했다.
+- **Mac 3프로세스:** 이 브랜치로 만든 `Builds/Lab/20261102-223606-5ecfe8d0` 앱을 `--lab-host`/`--lab-join 127.0.0.1`·`--lab-auto-start --lab-auto-generate --lab-auto-transfer`로 실행했다. 세 명 연결·설정 확인·`C6_LAB_START seats=0,1,2` 뒤 두 Client가 Bulk 스냅샷으로 `Playing` 시작과 120초 종료(`Defeat remaining=0`)를 모두 받았다. 자동 전달 요청은 Host·Client에서 승인됐고 `C6_LAB_BULK_INVALID`·`BULK_SEND_FAILED`·`SNAPSHOT_ABORT`·예외는 없었다. 같은 앱의 앞선 75초 실행에서는 한 Client의 첫 자동 행동이 시작 직후 `Restoring board state`로 한 번 거절됐다(조합판 체크포인트가 제어 채널로 도착하기 전, Bulk와 무관한 경로이며 이후 요청은 승인). 이 거절이 main에서도 나는지는 비교하지 않았다. 이 실행은 손실·지연을 넣지 않은 같은 Mac의 localhost이므로 재전송 타이밍 자체는 확인하지 않았다.
+- **종료 상태:** Play OFF, 컴파일 오류 없음, Mac 프로세스 종료.
+- **미실행:** 손실·지연을 넣은 실제 전송, iPhone 실기기·LAN/핫스팟 여러 기기에서의 체감·대역폭 측정. 전체 PlayMode는 실행하지 않았다.

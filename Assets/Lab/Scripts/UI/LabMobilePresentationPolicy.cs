@@ -36,13 +36,34 @@ namespace C6Lab
             return policy;
         }
 
+        /// <summary>
+        /// iOS players render at Unity's 30 fps mobile default unless a target is set, which quantises every
+        /// network hop and touch sample to 33 ms. 60 is a fixed choice: ProMotion 120 would double the
+        /// high-resolution paint reconcile cost for no judgment benefit.
+        /// </summary>
+        public const int PlayerTargetFrameRate = 60;
+        /// <summary>Returned for every platform that keeps its own presentation (Editor, Mac player).</summary>
+        public const int KeepTargetFrameRate = -1;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void InitializePlayer()
         {
             ApplyPortrait();
+            ApplyTargetFrameRate(Application.platform);
 #if UNITY_IOS && !UNITY_EDITOR
             Device.deferSystemGesturesMode = UnityEngine.iOS.SystemGestureDeferMode.None;
 #endif
+        }
+
+        /// <summary>The frame-rate target a platform gets, or KeepTargetFrameRate to leave Application.targetFrameRate alone.</summary>
+        public static int TargetFrameRateFor(RuntimePlatform platform) =>
+            platform == RuntimePlatform.IPhonePlayer ? PlayerTargetFrameRate : KeepTargetFrameRate;
+
+        /// <summary>Applies the platform's target once; a kept platform is never touched, so Editor play speed is unchanged.</summary>
+        public static void ApplyTargetFrameRate(RuntimePlatform platform)
+        {
+            int target = TargetFrameRateFor(platform);
+            if (target > 0) Application.targetFrameRate = target;
         }
 
         private static void ApplyPortrait()
