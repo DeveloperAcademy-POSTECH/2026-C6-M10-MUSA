@@ -343,6 +343,14 @@ namespace C6Lab
         /// LocalThrowHit을 부르기 바로 전에 정해지므로, 그 이벤트 안에서 읽으면 이번 타격 값이다.
         /// </summary>
         public float LastLocalHitOffset { get; private set; }
+        /// <summary>
+        /// 마지막으로 맞은 내 공이 던질 때 작은 공(콤보 페널티 SMALL, #222)이었는지 (#398). LocalThrowHit 바로 전에 정해진다.
+        /// </summary>
+        public bool LastLocalHitSmall { get; private set; }
+        /// <summary>마지막으로 맞은 내 공이 던질 때 큰 공(콤보 보상 BIG)이었는지 (#398).</summary>
+        public bool LastLocalHitBig { get; private set; }
+        /// <summary>마지막으로 맞은 내 공이 오색구슬이었는지 (#398, 큰 공 징과 오색구슬 징이 겹치지 않게).</summary>
+        public bool LastLocalHitFiveColor { get; private set; }
         /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
         public event Action<string, Vector2> BombBlasted;
         /// <summary>An orb on this player's board reached the end of its lifetime and went (#235).</summary>
@@ -1974,6 +1982,8 @@ namespace C6Lab
                 // size and offset. The bound hitbox shares that exact mesh and transform.
                 Vector3 paintDirection = target != null && target.Hitbox != null
                     ? target.Hitbox.transform.InverseTransformPoint(result.HitPoint).normalized : Vector3.zero;
+                // 던질 때 정해진 공 크기 (#398 작은 공 타격음). ConfirmHit이 지우기 전에 읽는다.
+                float launchScale = model.LaunchScaleOf(result.ProjectileId);
                 bool approvedHit = model.ConfirmHit(result.ProjectileId, now, paintDirection,
                     out var element, out int actualDamage, out int impactValue);
                 blockedByCurtain = !approvedHit && model.JigwiABBlocksBoss(result.OwnerPlayerId, now);
@@ -2003,6 +2013,9 @@ namespace C6Lab
                     {
                         LastLocalHitOffset = LabThrowSound.HitOffset(targetLocalPoint,
                             hitbox.InverseTransformDirection(result.ImpactVelocity));
+                        LastLocalHitSmall = LabThrowSound.IsSmallThrow(launchScale);
+                        LastLocalHitBig = LabThrowSound.IsBigThrow(launchScale);
+                        LastLocalHitFiveColor = fiveColor;
                         LocalThrowHit?.Invoke(impactValue);
                     }
                     Color paintColor = fiveColor ? model.PaintColorFor(LabOrbElement.Wood) : model.PaintColorFor(element); // 표시용, 오색구슬은 다섯 색을 칠한다
@@ -2014,7 +2027,7 @@ namespace C6Lab
                         paintB = Mathf.Clamp01(paintColor.b), paintA = Mathf.Clamp01(paintColor.a),
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
-                        spinImpulse = signedYawImpulse, fiveColor = fiveColor };
+                        spinImpulse = signedYawImpulse, fiveColor = fiveColor, sizeScale = launchScale };
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
             }
@@ -2363,6 +2376,9 @@ namespace C6Lab
                             Transform localHitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
                             LastLocalHitOffset = LabThrowSound.HitOffset(new Vector3(packet.x, packet.y, packet.z),
                                 localHitbox.InverseTransformDirection(new Vector3(packet.wx, packet.wy, packet.wz)));
+                            LastLocalHitSmall = LabThrowSound.IsSmallThrow(packet.sizeScale);
+                            LastLocalHitBig = LabThrowSound.IsBigThrow(packet.sizeScale);
+                            LastLocalHitFiveColor = packet.fiveColor;
                             LocalThrowHit?.Invoke(packet.impactValue);
                         }
                     }

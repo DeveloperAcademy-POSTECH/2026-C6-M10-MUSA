@@ -915,7 +915,24 @@ namespace C6Lab
         [Tooltip("남은 시간이 아래 초 이하일 때의 빠른 째깍 간격 (초)")]
         [SerializeField, Range(.05f, 1f)] private float yaguangComboTickFastIntervalSeconds = .25f;
         [Tooltip("남은 시간이 이 초 이하가 되면 빠른 째깍으로 바꾼다 (0이면 끝까지 기본 째깍)")]
-        [SerializeField, Range(0f, 10f)] private float yaguangComboTickFastSeconds = 3f;
+        [SerializeField, Range(0f, 10f)] private float yaguangComboTickFastSeconds = 4f;
+        [Header("야광귀 콤보 결과 효과음 (#398, Inspector 전용)")]
+        [Tooltip("콤보 실패 뒤 야광귀 \"메롱~\" 대사 크기 (Resources/Audio/YaguangComboTaunt, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboTauntSoundVolume = .9f;
+        [Tooltip("콤보 실패 소리 뒤 \"메롱~\"까지 기다리는 초")]
+        [SerializeField, Range(0f, 2f)] private float yaguangComboTauntDelaySeconds = .3f;
+        [Tooltip("SMALL 배지가 나올 때 소리 크기 (Resources/Audio/YaguangComboSmallStart, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboSmallStartSoundVolume = .8f;
+        [Tooltip("SMALL이 끝나 원래 크기로 돌아올 때 소리 크기 (Resources/Audio/YaguangComboSmallEnd, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboSmallEndSoundVolume = .8f;
+        [Tooltip("BIG 배지와 부적 비가 시작될 때 소리 크기 (Resources/Audio/YaguangComboBigStart, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboBigStartSoundVolume = .8f;
+        [Tooltip("BIG이 끝날 때 소리 크기 (Resources/Audio/YaguangComboBigEnd, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboBigEndSoundVolume = .7f;
+        [Tooltip("SMALL 중 던진 작은 공이 맞을 때 일반 타격음을 높이는 반음 수 (0이면 그대로, 던진 사람 기기)")]
+        [SerializeField, Range(0f, 12f)] private float smallHitPitchSemitones = 6f;
+        [Tooltip("BIG 중 던진 큰 공이 맞을 때 징 크기 (Resources/Audio/FiveColorHit, 던진 사람 기기)")]
+        [SerializeField, Range(0f, 1f)] private float bigHitSoundVolume = .8f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1358,7 +1375,15 @@ namespace C6Lab
         public float YaguangComboTickFastSoundVolume => Mathf.Clamp01(Finite(yaguangComboTickFastSoundVolume, 1f));
         public float YaguangComboTickIntervalSeconds => Mathf.Clamp(Finite(yaguangComboTickIntervalSeconds, .5f), .1f, 2f);
         public float YaguangComboTickFastIntervalSeconds => Mathf.Clamp(Finite(yaguangComboTickFastIntervalSeconds, .25f), .05f, 1f);
-        public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 3f), 0f, 10f);
+        public float YaguangComboTauntSoundVolume => Mathf.Clamp01(Finite(yaguangComboTauntSoundVolume, .9f));
+        public float YaguangComboTauntDelaySeconds => Mathf.Clamp(Finite(yaguangComboTauntDelaySeconds, .3f), 0f, 2f);
+        public float YaguangComboSmallStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboSmallStartSoundVolume, .8f));
+        public float YaguangComboSmallEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboSmallEndSoundVolume, .8f));
+        public float YaguangComboBigStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigStartSoundVolume, .8f));
+        public float YaguangComboBigEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigEndSoundVolume, .7f));
+        public float SmallHitPitchSemitones => Mathf.Clamp(Finite(smallHitPitchSemitones, 6f), 0f, 12f);
+        public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));
+        public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 4f), 0f, 10f);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;
