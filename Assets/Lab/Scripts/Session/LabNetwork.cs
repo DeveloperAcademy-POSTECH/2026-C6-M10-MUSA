@@ -668,6 +668,13 @@ namespace C6Lab
         private bool HostInternal(LabBonjourDiscovery registeredRoom)
         {
             if (!CanChooseConnection || manager == null || transport == null || config == null) return false;
+            // A room without a registered card is advertised as a plain room, so it holds 2 to 5 players. Check before the
+            // Host starts: a six-player size left from a 3:3 room must not open a half-advertised room (#405).
+            if (registeredRoom == null && !LabModel.ValidRoomSize(targetParticipantCount, false))
+            {
+                SetNotice("Choose 2–5 players before hosting this room.");
+                return false;
+            }
             resumeRoomSearchAfterStop = false;
             ClearRoomSearchMessage();
             DisposeDiscovery();
@@ -996,6 +1003,8 @@ namespace C6Lab
                 SetNotice("Leave the current session before starting Developer Solo.");
                 return false;
             }
+            // Like the game's DEV solo, never inherit a territory-only size from the last room (#405).
+            if (!LabModel.ValidRoomSize(targetParticipantCount, false)) targetParticipantCount = LabModel.DefaultParticipants;
             Host();
             if (!IsHost || order.Count != 1) return false;
             developerSolo = true;
