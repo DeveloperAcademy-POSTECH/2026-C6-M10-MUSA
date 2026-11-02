@@ -26,12 +26,14 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator StageSongsSelectTheGumihoClipForTheGumihoStageAndTheTerritoryRoom()
+        public IEnumerator StageSongsSelectTheGumihoClipAndTheTerritoryRoomsOwnClip()
         {
             AudioClip normal = Resources.Load<AudioClip>("Audio/BGM/Kkwaenggwari_13");
             AudioClip gumiho = Resources.Load<AudioClip>("Audio/GumihoBGM/Gumiho_Stage");
+            AudioClip territorySong = Resources.Load<AudioClip>("Audio/TerritoryBGM/Territory_Stage");
             Assert.That(normal, Is.Not.Null);
             Assert.That(gumiho, Is.Not.Null);
+            Assert.That(territorySong, Is.Not.Null);
             var stages = new[] { LabStageYokai.Gumiho, LabStageYokai.Yaguang, LabStageYokai.Jigwi,
                 LabStageYokai.None, LabStageYokai.Gumiho };
             for (int i = 0; i < stages.Length; i++)
@@ -44,8 +46,9 @@ namespace C6Lab.Tests
                 fixture.SetSnapshot(snapshot);
                 yield return null;
                 yield return null;
-                // 2:2 (#293) borrows the gumiho stage's song; the yaguang, the jigwi and the Lab round keep the usual one.
-                AudioClip expected = (gameFlow && stages[i] == LabStageYokai.Gumiho) || territory ? gumiho : normal;
+                // The territory room (#293) keeps the gumiho song from before #409; the yaguang, the jigwi and the Lab round
+                // keep the usual one.
+                AudioClip expected = territory ? territorySong : gameFlow && stages[i] == LabStageYokai.Gumiho ? gumiho : normal;
                 Assert.That(fixture.Bgm.BattleClip, Is.SameAs(expected),
                     "Game=" + gameFlow + ", yokai=" + stages[i] + ", territory=" + territory);
                 Assert.That(fixture.Bgm.IsPlaying, Is.True, "The selected song must reach a running AudioSource.");

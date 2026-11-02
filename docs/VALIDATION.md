@@ -3725,7 +3725,7 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 
 - 기준 main `0c9d8614`, `feat/#409-gumiho-stage-bgm`. 사용자가 ElevenLabs Music으로 만들어 확정한 `스테이지1배경음악.wav`를 `Resources/Audio/GumihoBGM/Gumiho_Stage.wav` 자리에 그대로 넣었다(파일 이름·`.meta`·GUID 유지, 가져오기 설정 Streaming·Vorbis·normalize 그대로). 코드·Scene·LabConfig 값은 바꾸지 않았다.
 - 원본 분석: 120.000초, 48kHz 스테레오 16bit, 평균 -15.6dBFS, 가장 큰 순간 -0.27dBFS(이전 Suno 곡은 162.5초, 평균 -18.7dBFS, 최대 -4.2dBFS). 가져오기 normalize가 켜져 있어 게임 안 크기는 Inspector `Gumiho Bgm Volume`(0.4)으로 듣고 정한다. 곡 끝 약 3초는 마지막 타격의 울림이 잦아드는 부분이다.
-- 구미호 스테이지(120초)는 마지막 20초가 피버 곡이라 전투 곡은 앞 100초까지 들린다. 땅따먹기(180초)는 같은 곡을 쓰고 2분에서 처음부터 다시 튼다.
+- 구미호 스테이지(120초)는 마지막 20초가 피버 곡이라 전투 곡은 앞 100초까지 들린다. 땅따먹기는 아래처럼 예전 곡을 그대로 쓴다.
 - 파일 끝의 C2PA 블록에는 ElevenLabs 회사 정보·서명 인증서만 있고 개인 계정 정보는 없다.
 
 | 항목 | 결과 | 근거 |
@@ -3735,3 +3735,16 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 | EditMode `LabGumihoSoundTests.TheGumihoSongsAreInTheirOwnFolders` (120초 길이 검사 추가) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | PlayMode `LabBattleBgmStageTests` (구미호·땅따먹기 곡 선택, 피버 전환) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
 | Play로 구미호 스테이지·땅따먹기 실제 청취(크기, 2분 반복 이음매) | NOT_RUN | |
+
+### 땅따먹기는 예전 곡 유지 — 2026-11-02
+
+- 사용자 결정: 땅따먹기(1:1·2:2·3:3)는 새 곡이 아니라 기존 곡을 쓴다. #409 커밋 `440846cb` 바로 전의 `GumihoBGM/Gumiho_Stage.wav`(Suno, 162.5초)를 같은 내용 그대로 `Resources/Audio/TerritoryBGM/Territory_Stage.wav`로 꺼냈다(git blob `31c9997f`가 같음). 가져오기 설정은 Editor API로 예전 곡과 똑같이 맞췄다(Streaming·Vorbis·품질 100%·normalize, `.meta`는 GUID만 다름).
+- `LabBattleBgm`: 라운드 시작 때 땅따먹기이면 `TerritoryBGM` 곡(비어 있으면 구미호 곡)을, 구미호 스테이지이면 `GumihoBGM` 곡을 고른다. 두 곡 모두 크기는 `Gumiho Bgm Volume`이다. 야광귀·지귀·Lab 단판은 그대로다.
+
+| 항목 | 결과 | 근거 |
+| --- | --- | --- |
+| 열린 Editor에서 가져오기 | PASS | `Territory_Stage` 162.4935초·Streaming |
+| 열린 Editor 재컴파일 | PASS | 오류 0 |
+| EditMode `LabGumihoSoundTests.TheGumihoSongsAreInTheirOwnFolders` (땅따먹기 폴더·162.5초 검사 추가) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| PlayMode `LabBattleBgmStageTests.StageSongsSelectTheGumihoClipAndTheTerritoryRoomsOwnClip` (이름 바꿈: 땅따먹기는 예전 곡) | NOT_RUN | 사용자가 Test Runner로 실행한다 |
+| Play로 구미호 스테이지 새 곡, 땅따먹기 예전 곡 듣기 | NOT_RUN | |
