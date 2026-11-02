@@ -33,6 +33,12 @@ namespace C6Lab
         public const int DefaultWindowSize = 32;
         public const double InitialRetrySeconds = .25d;
         public const double MaximumRetrySeconds = 1d;
+        /// <summary>Floor of the measured retry timeout; below it a 30 fps receiver's ACK frame alone could cause spurious resends (#437).</summary>
+        public const double MinimumRetrySeconds = .08d;
+        /// <summary>Repeats of the same cumulative ACK that resend the first unacknowledged chunk without waiting for its timeout.</summary>
+        public const int DuplicateAckThreshold = 3;
+        private const int MaximumAttempts = 8;
+        private const int MaximumBackoff = 16;
         private sealed class Pending
         {
             public long sequence;
@@ -40,6 +46,8 @@ namespace C6Lab
             public int bytes;
             public int attempts;
             public double dueAt;
+            public double sentAt, lastSentAt;
+            public bool fastResend;
         }
 
         private readonly LinkedList<Pending> pending = new LinkedList<Pending>();
@@ -48,8 +56,30 @@ namespace C6Lab
         private long lastEnqueued;
         private long highestSent;
         private long acknowledged;
+        private double smoothedRtt, rttVariance;
+        private bool hasRttSample;
+        private int backoff = 1;
+        private double lastBackoffAt = double.NegativeInfinity;
+        private int duplicateAcks, expectedDuplicateAcks;
+        private double expectedDuplicatesUntil;
+        private bool fastRetransmitUsed;
         public int Count => pending.Count;
         public int QueuedBytes { get; private set; }
+        public long LastEnqueued => lastEnqueued;
+        public long Acknowledged => acknowledged;
+        public bool HasRttSample => hasRttSample;
+        public double SmoothedRttSeconds => smoothedRtt;
+
+        /// <summary>
+        /// The delay before a chunk's first resend. Until an RTT sample exists it is the fixed quarter second.
+        /// After that it is RFC 6298's srtt + 4·rttvar, kept at 0.08 s or more, times a shared backoff, capped at one second.
+        /// The backoff doubles on a timeout resend, at most once per current timeout, and resets on the next valid
+        /// sample. So new chunks wait longer too after the RTT jumps above a stale timeout (Karn). Without it, every
+        /// send would be resent before its ACK and no sample would ever recover the estimate. Each further resend of
+        /// the same chunk doubles its own wait, up to one second.
+        /// </summary>
+        public double RetryTimeoutSeconds => !hasRttSample ? InitialRetrySeconds
+            : Math.Min(MaximumRetrySeconds, Math.Max(MinimumRetrySeconds, smoothedRtt + 4d * rttVariance) * backoff);
 
         public LabBulkSender(int maximumQueuedBytes = DefaultMaximumQueuedBytes, int windowSize = DefaultWindowSize)
         {
@@ -89,25 +119,84 @@ namespace C6Lab
                 byteBudget -= entry.bytes;
                 result.Add(new LabBulkFrame(entry.sequence, entry.payload, entry.bytes));
                 highestSent = Math.Max(highestSent, entry.sequence);
-                // Backoff saturates after three sends; no unbounded exponent or attempts overflow.
-                entry.attempts = Math.Min(3, entry.attempts + 1);
+                if (entry.attempts == 0) entry.sentAt = now;
+                // A timeout of any chunk backs off the shared timer, but a window of chunks expiring together counts once.
+                else if (!entry.fastResend && hasRttSample && now - lastBackoffAt >= RetryTimeoutSeconds)
+                {
+                    backoff = Math.Min(MaximumBackoff, backoff * 2);
+                    lastBackoffAt = now;
+                }
+                entry.lastSentAt = now;
+                entry.fastResend = false;
+                // Attempts and the exponent saturate; the one-second cap is reached long before either does.
+                entry.attempts = Math.Min(MaximumAttempts, entry.attempts + 1);
                 entry.dueAt = now + Math.Min(MaximumRetrySeconds,
-                    InitialRetrySeconds * (1 << (entry.attempts - 1)));
+                    RetryTimeoutSeconds * (1 << (entry.attempts - 1)));
             }
             return result.ToArray();
         }
 
         /// <summary>A cumulative acknowledgement cannot discard chunks that have never been sent.</summary>
-        public bool Ack(long highestContiguous)
+        public bool Ack(long highestContiguous) => Ack(highestContiguous, double.NaN);
+
+        /// <summary>
+        /// Same as <see cref="Ack(long)"/>. With a valid <paramref name="now"/> it also measures the RTT, but only
+        /// when every chunk this ACK covers was sent once (Karn). An ACK that waited on a resent chunk would time
+        /// the recovery, not the path. It also counts repeats of the current ACK, which the receiver sends for every
+        /// datagram after a gap, so the third repeat resends the first missing chunk immediately, once per gap (#437).
+        /// </summary>
+        public bool Ack(long highestContiguous, double now)
         {
+            bool timed = ValidTime(now);
+            if (highestContiguous == acknowledged && timed) CountDuplicate(now);
             if (highestContiguous <= acknowledged || highestContiguous > highestSent) return false;
             acknowledged = highestContiguous;
+            duplicateAcks = 0;
+            fastRetransmitUsed = false;
+            Pending newest = null;
+            bool resent = false;
             while (pending.First != null && pending.First.Value.sequence <= highestContiguous)
             {
-                QueuedBytes -= pending.First.Value.bytes;
+                newest = pending.First.Value;
+                if (newest.attempts > 1)
+                {
+                    // Copies of a resent chunk may still be in flight. Each one makes the receiver repeat the current
+                    // ACK, which says nothing about a gap after it, so that many repeats are discounted. The discount
+                    // expires one timeout after the last copy left, so copies that were lost cannot hide a later gap.
+                    resent = true;
+                    expectedDuplicateAcks = Math.Min(4 * windowSize, expectedDuplicateAcks + newest.attempts - 1);
+                    if (timed) expectedDuplicatesUntil = Math.Max(expectedDuplicatesUntil, newest.lastSentAt + RetryTimeoutSeconds);
+                }
+                QueuedBytes -= newest.bytes;
                 pending.RemoveFirst();
             }
+            if (timed && newest != null && !resent && now >= newest.sentAt) Sample(now - newest.sentAt);
             return true;
+        }
+
+        private void CountDuplicate(double now)
+        {
+            if (now > expectedDuplicatesUntil) expectedDuplicateAcks = 0;
+            if (expectedDuplicateAcks > 0) { expectedDuplicateAcks--; return; }
+            Pending first = pending.First?.Value;
+            // Only a gap the receiver can see: the first chunk was sent and something after it went out too.
+            if (first == null || first.attempts == 0 || highestSent <= first.sequence || fastRetransmitUsed) return;
+            if (++duplicateAcks < DuplicateAckThreshold) return;
+            first.dueAt = Math.Min(first.dueAt, now);
+            first.fastResend = true;
+            fastRetransmitUsed = true;
+        }
+
+        private void Sample(double rtt)
+        {
+            backoff = 1;
+            if (!hasRttSample)
+            {
+                smoothedRtt = rtt; rttVariance = rtt / 2d; hasRttSample = true;
+                return;
+            }
+            rttVariance = .75d * rttVariance + .25d * Math.Abs(smoothedRtt - rtt);
+            smoothedRtt = .875d * smoothedRtt + .125d * rtt;
         }
 
         /// <summary>Reset only when the peer connection is replaced, alongside its receiver.</summary>
@@ -115,6 +204,8 @@ namespace C6Lab
         {
             pending.Clear(); QueuedBytes = 0;
             lastEnqueued = highestSent = acknowledged = 0;
+            smoothedRtt = rttVariance = 0d; hasRttSample = false; backoff = 1; lastBackoffAt = double.NegativeInfinity;
+            duplicateAcks = expectedDuplicateAcks = 0; expectedDuplicatesUntil = 0d; fastRetransmitUsed = false;
         }
 
         private static bool ValidTime(double value) => !double.IsNaN(value) && !double.IsInfinity(value) && value >= 0d;

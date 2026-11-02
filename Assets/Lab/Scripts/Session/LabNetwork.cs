@@ -290,6 +290,7 @@ namespace C6Lab
         private string awaitingPaintSession;
         private uint awaitingPaintRound;
         private double nextPaintRequestAt;
+        private readonly LabStallWatch partialPaintWatch = new LabStallWatch(1d);
 
         /// <summary>The map committed with the displayed snapshot; never a client simulation.</summary>
         public LabPaintSurface PaintSurface => clientPaintSurface;
@@ -1370,7 +1371,7 @@ namespace C6Lab
                 FlushBoardActions(now);
             }
             FlushBulkPackets();
-            if (!IsHost && (pendingPaintSnapshot != null || PaintReceiver.HasPending)
+            if (!IsHost && (pendingPaintSnapshot != null || PartialPaintStalled(now))
                 && now >= nextPaintRequestAt) RequestPaintCheckpoint();
             // Command-line smoke mode is intentionally separate from ordinary UI play.
             if (CanProcessBattleActions && IsConnected && latest != null && latest.phase == LabPhase.Playing && !latest.paused)
@@ -1497,7 +1498,7 @@ namespace C6Lab
                     // publish a legacy lobby that would erase it on the remaining peers.
                     if (stopping || manager == null || !manager.IsHost) return;
                     order.Remove(id);
-                    bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id);
+                    bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id); paintCheckpointThrough.Remove(id);
                     boardSequences.Remove(id);
                     playerSlots?.Release(id);
                     slotRequestIds.Remove(id);
@@ -1511,7 +1512,7 @@ namespace C6Lab
                     Debug.Log("C6_LAB_JOIN_REJECTED id=" + id);
                     return;
                 }
-                bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id);
+                bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id); paintCheckpointThrough.Remove(id);
                 boardSequences.Remove(id);
                 playerSlots?.Release(id);
                 slotRequestIds.Remove(id);
@@ -1678,7 +1679,7 @@ namespace C6Lab
             long sequence = ++snapshotSequence;
             foreach (ulong id in order)
             {
-                if (id == manager.LocalClientId || HasPendingBulk(id)) continue;
+                if (id == manager.LocalClientId || BulkBacklogFull(id)) continue;
                 // A slow peer coalesces to the newest shared state, without holding up board actions or other peers.
                 var shared = LabBoardReplica.CopySnapshot(latest);
                 string roundKey = latest.sessionId + "/" + latest.round;
@@ -1693,6 +1694,7 @@ namespace C6Lab
                 LabPaintFrame[] paintFrames = PeerPaintPublisher(id).Publish(model.PaintSurface, sessionId, latest.round, sequence);
                 if (!SendPaintFrames(id, paintFrames))
                 { AbortOversizedSnapshot("Could not queue the complete paint transaction."); return; }
+                if (paintFrames.Length > 0 && paintFrames[0].full) MarkPaintFullQueued(id);
                 for (int i = 0; i < pieces.Length; i++)
                 {
                     if (!QueueBulk(id, new LabNetworkPacket { type = "snapshot_chunk", sessionId = sessionId,
@@ -2262,9 +2264,13 @@ namespace C6Lab
                     if (model != null && packet.sessionId == sessionId && packet.round == model.Round
                         && packet.configRevision == configRevision && packet.configFingerprint == configFingerprint)
                     {
-                        if (paintCheckpointRequests.TryAccept(sender, Time.realtimeSinceStartupAsDouble, .5d)
-                            && !HasPendingBulk(sender))
-                            SendPaintFrames(sender, PeerPaintPublisher(sender).Checkpoint());
+                        // Queued deltas still arrive first in order; the checkpoint after them repairs the peer.
+                        // A full backlog or an earlier checkpoint not yet acknowledged refuses, and only a served
+                        // request starts the .5 s window (#437).
+                        if (!BulkBacklogFull(sender) && !PaintCheckpointInFlight(sender)
+                            && paintCheckpointRequests.TryAccept(sender, Time.realtimeSinceStartupAsDouble, .5d)
+                            && SendPaintFrames(sender, PeerPaintPublisher(sender).Checkpoint()))
+                            MarkPaintFullQueued(sender);
                     }
                     return;
                 }
@@ -2665,6 +2671,15 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// A partly received paint frame normally completes on the reliable Bulk channel within a few frames. Only a
+        /// partial frame that received no new fragment for a whole second counts as stuck, so a frame that is merely
+        /// arriving no longer asks the Host for a full map checkpoint, now that the Host serves one while other Bulk
+        /// data is in flight (#437).
+        /// </summary>
+        private bool PartialPaintStalled(double now)
+            => partialPaintWatch.Stalled(PaintReceiver.PendingSequence, PaintReceiver.PendingReceivedParts, now);
+
         private void RequestPaintCheckpoint()
         {
             if (IsHost || !IsConnected || string.IsNullOrEmpty(awaitingPaintSession)
@@ -2683,6 +2698,7 @@ namespace C6Lab
             clientPaintSurface.Reset(new LabPaintGrowthSettings(), 1);
             pendingPaintSnapshot = null; awaitingPaintSession = null; awaitingPaintRound = 0;
             nextPaintRequestAt = 0d; paintCheckpointRequests.Clear(); boardCheckpointRequests.Clear();
+            partialPaintWatch.Clear(); paintCheckpointThrough.Clear();
         }
 
         private void RejectLocally(string orbId, string reason)
