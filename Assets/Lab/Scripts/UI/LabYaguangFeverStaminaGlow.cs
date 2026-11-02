@@ -7,7 +7,7 @@ namespace C6Lab
     /// 야광귀 피버타임 (#343) 스태미나 영롱 효과. 피버 동안 스태미나 막대의 차 있는 칸이 오색구슬(#329)처럼 노랑·초록·파랑·
     /// 빨강·갈색 사이를 쉬지 않고 건너가며, 칸마다 조금씩 늦게 바뀌어 왼쪽에서 오른쪽으로 물결이 흐른다. 피버가 시작되는
     /// 순간에는 막대가 살짝 커졌다 돌아오며 하얗게 한 번 번쩍인다. 화면 표시만 하며 스태미나 값·터치는 건드리지 않는다.
-    /// 구미호 피버 타임(#334)과는 따로 돌아가고, 야광귀 스테이지에서만 켜진다.
+    /// #441부터 세 스테이지(구미호/야광귀/지귀) 피버 공통 연출이다.
     /// 막대는 흰 칸 모양(StaminaBarFillMask)을 왼쪽부터 채우는 그림 한 장이라, 같은 그림을 칸 수만큼 겹쳐
     /// k번째 겹은 (k+1)칸까지만 채우고 왼쪽 칸일수록 위에 둔다. 그러면 칸마다 제 색이 보인다.
     /// </summary>
@@ -48,7 +48,7 @@ namespace C6Lab
 
         private void LateUpdate()
         {
-            bool fever = network != null && network.YaguangFeverOn && fill != null;
+            bool fever = network != null && network.StageFeverOn && fill != null;
             if (fever != on)
             {
                 on = fever;

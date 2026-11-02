@@ -138,11 +138,8 @@ namespace C6Lab
             // 여우 구슬 안내 (#328): 판마다 내 판에 처음 떨어지면 "빠르게 두 번 눌러서…"
             if (hud != null && boardNetwork != null && GetComponent<LabFoxFireGuide>() == null)
                 gameObject.AddComponent<LabFoxFireGuide>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
-            // 피버 타임 (#334): 연기와 함께 뜨는 "두배" 말풍선, 시작 문구, 붉게 숨 쉬는 가장자리, 빨간 남은 시간
-            if (hud != null && boardNetwork != null && GetComponent<LabFeverTimeHud>() == null)
-                gameObject.AddComponent<LabFeverTimeHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>(),
-                    hud.staminaFill != null ? hud.staminaFill.transform.parent as RectTransform : null,
-                    hud.battleUi != null ? hud.battleUi.transform as RectTransform : null, hud.timeText);
+            // 구미호 피버 타임 (#334)의 "두배" 말풍선/시작 문구/붉은 가장자리/빨간 남은 시간(LabFeverTimeHud)은 #441부터 붙이지 않는다.
+            // 세 스테이지 모두 아래 야광귀식 피버 연출(LabYaguangFeverHud, LabYaguangFeverStaminaGlow, LabYaguangFeverDrumCue)을 쓴다.
             // 야광귀 피버타임 (#343): 피버 동안 스태미나 칸이 다섯 색으로 물결치고, 시작할 때 막대가 한 번 번쩍인다
             if (hud != null && boardNetwork != null && hud.staminaFill != null && GetComponent<LabYaguangFeverStaminaGlow>() == null)
                 gameObject.AddComponent<LabYaguangFeverStaminaGlow>().Bind(boardNetwork, hud.staminaFill);

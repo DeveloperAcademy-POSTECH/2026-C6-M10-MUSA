@@ -7,6 +7,7 @@ namespace C6Lab
     /// 피버 타임 (#334): 전투가 정해 둔 초만큼 남으면 바로 시작해 끝날 때까지 이어진다. 요괴는 더 방해하지 않고 걸려 있던
     /// 방해도 그 순간 끝나며(넘기기 막기 해제, 매혹과 그 예고 풀림, 여우 구슬·잠긴 박 폭탄은 연기로 사라짐), 스태미나
     /// 자동 충전만 배율만큼 빨라진다. 명중 보상과 구슬 보유 한도는 그대로다. 지금은 구미호 스테이지만 쓴다.
+    /// #441부터 피버 동안 북에서 나오는 것은 오색구슬이다 (세 스테이지 공통 규칙, LabModel.StageFever.cs).
     /// 시작 시각은 Host 시계로 정해 스냅샷에 실리므로 모든 화면이 같은 순간에 연출을 시작한다.
     /// </summary>
     public sealed partial class LabModel
@@ -38,15 +39,10 @@ namespace C6Lab
             feverTimeStarted = true;
             double at = feverTimeAt;
             nextCommonGimmickAt = nextUniqueGimmickAt = double.PositiveInfinity;
-            if (BlockOn(at)) swipeBlockedUntil = at;
-            if (CharmComingOrOn(at))
-            {
-                charmWarnedAt = -1d;
-                charmStartedAt = Math.Min(charmStartedAt, at);
-                charmUntil = at;
-            }
-            foreach (LabOrbState orb in orbs.Values.Where(orb => !orb.inFlight && (orb.kind == LabOrbKind.FoxFire
-                || orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd && orb.lockSwipes > 0)).ToArray())
+            // 넘기기 막기/매혹/여우 구슬은 세 스테이지 공통으로 푼다 (#441, LabModel.StageFever.cs).
+            ReleaseInterferenceForFever(at);
+            foreach (LabOrbState orb in orbs.Values.Where(orb => !orb.inFlight
+                && orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd && orb.lockSwipes > 0).ToArray())
             {
                 // Each goes up in its smoke on its holder's screen, as when an orb's lifetime runs out (#235).
                 orbs.Remove(orb.id);
