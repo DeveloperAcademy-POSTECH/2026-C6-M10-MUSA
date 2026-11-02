@@ -22,7 +22,7 @@ namespace C6Lab
     /// - 예고 카운트 (Audio/YaguangComboCount1~4): 남은 초가 바뀔 때마다 야광귀 목소리 "하나/둘/셋/넷" (박 옆 말풍선과 같은 수)
     /// - 콤보 시작 (Audio/YaguangComboStart): 4칸 색이 공개되는 순간 꽹과리 "깽!"
     /// - 제한 시간 (Audio/YaguangComboTick): 콤보가 나온 뒤 Inspector 간격(기본 0.5초)마다 시계 째깍. 남은 시간이 Inspector 초
-    ///   (기본 3초) 이하면 (Audio/YaguangComboTickFast) 더 짧은 간격(기본 0.25초)마다 빠른 째깍. 콤보가 끝나면(성공/실패) 바로 멈춘다.
+    ///   (기본 4초) 이하면 (Audio/YaguangComboTickFast, 같은 높이의 째깍) 더 짧은 간격(기본 0.25초)마다 빠른 째깍. 콤보가 끝나면(성공/실패) 바로 멈춘다.
     /// #398 박 색상 콤보 결과 (모든 기기, 콤보는 팀이 같이 하므로 누가 받든 모두 듣는다):
     /// - "메롱~" 대사 (Audio/YaguangComboTaunt): 콤보 실패(틀린 색/시간 초과) 뒤 Inspector 지연(기본 0.3초), 실패 소리 다음에
     /// - SMALL 시작 (Audio/YaguangComboSmallStart): 결과 문구가 사라지고 SMALL 배지가 나오는 때 (결과 + LabGourdComboHud.ResultSeconds)
@@ -63,6 +63,7 @@ namespace C6Lab
         public const double TickLateSeconds = .3d;
         public const double DefaultTickInterval = .5d;
         public const double DefaultTickFastInterval = .25d;
+        public const double DefaultTickFastSeconds = 4d;
         /// <summary>그 순간보다 이 초 넘게 늦게 알아채면 내지 않는다.</summary>
         public const double LateSeconds = .5d;
 
@@ -289,7 +290,7 @@ namespace C6Lab
             // 제한 시간 째깍
             if (!snapshot.comboActive || snapshot.comboStartedAt < 0d || snapshot.comboEndsAt <= snapshot.comboStartedAt) return;
             LabConfig config = network != null ? network.config : null;
-            double fastFor = config != null ? config.YaguangComboTickFastSeconds : 3d;
+            double fastFor = config != null ? config.YaguangComboTickFastSeconds : DefaultTickFastSeconds;
             double every = config != null ? config.YaguangComboTickIntervalSeconds : DefaultTickInterval;
             double fastEvery = config != null ? config.YaguangComboTickFastIntervalSeconds : DefaultTickFastInterval;
             double tick = LatestTickAt(snapshot.comboStartedAt, snapshot.comboEndsAt, now, fastFor, every, fastEvery, out bool fast);

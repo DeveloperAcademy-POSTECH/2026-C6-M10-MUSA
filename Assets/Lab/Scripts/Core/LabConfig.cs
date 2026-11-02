@@ -915,7 +915,7 @@ namespace C6Lab
         [Tooltip("남은 시간이 아래 초 이하일 때의 빠른 째깍 간격 (초)")]
         [SerializeField, Range(.05f, 1f)] private float yaguangComboTickFastIntervalSeconds = .25f;
         [Tooltip("남은 시간이 이 초 이하가 되면 빠른 째깍으로 바꾼다 (0이면 끝까지 기본 째깍)")]
-        [SerializeField, Range(0f, 10f)] private float yaguangComboTickFastSeconds = 3f;
+        [SerializeField, Range(0f, 10f)] private float yaguangComboTickFastSeconds = 4f;
         [Header("야광귀 콤보 결과 효과음 (#398, Inspector 전용)")]
         [Tooltip("콤보 실패 뒤 야광귀 \"메롱~\" 대사 크기 (Resources/Audio/YaguangComboTaunt, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboTauntSoundVolume = .9f;
@@ -1377,7 +1377,7 @@ namespace C6Lab
         public float YaguangComboSmallEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboSmallEndSoundVolume, .8f));
         public float YaguangComboBigStartSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigStartSoundVolume, .8f));
         public float YaguangComboBigEndSoundVolume => Mathf.Clamp01(Finite(yaguangComboBigEndSoundVolume, .7f));
-        public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 3f), 0f, 10f);
+        public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 4f), 0f, 10f);
         private static float DevVolume(float value) => Mathf.Clamp(Finite(value, DevVolumeDefault), 0f, 100f);
         private static float Scaled(float inspectorVolume, float devVolume) =>
             Mathf.Clamp01(inspectorVolume) * DevVolume(devVolume) / DevVolumeDefault;

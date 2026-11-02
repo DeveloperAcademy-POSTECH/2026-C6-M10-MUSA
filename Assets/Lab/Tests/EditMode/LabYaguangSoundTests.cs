@@ -238,10 +238,10 @@ namespace C6Lab.Tests
             sound.ObserveFlash(snapshot, 33.9d, Me);
             snapshot.comboCount = 1; snapshot.comboActive = true;
             snapshot.comboStartedAt = 34d; snapshot.comboEndsAt = 44d;
-            // 34~44초를 0.05초 간격으로 지켜본다: 34.5~40.5초 0.5초마다 13번, 남은 3초(41~43.75초)는 0.25초마다 12번.
+            // 34~44초를 0.05초 간격으로 지켜본다: 34.5~39.5초 0.5초마다 11번, 남은 4초(40~43.75초)는 0.25초마다 16번.
             for (int i = 0; i < 200; i++) sound.ObserveFlash(snapshot, 34d + i * .05d, Me);
-            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTick), Is.EqualTo(13));
-            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTickFast), Is.EqualTo(12));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTick), Is.EqualTo(11));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTickFast), Is.EqualTo(16));
 
             // 콤보가 끝나면 더 울리지 않는다.
             snapshot.comboActive = false;
