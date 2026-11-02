@@ -3917,3 +3917,28 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - #431·#433 병합 후 main을 이 브랜치에 합친 코드에서 컴파일 오류 없이 전체 EditMode **1742/1742**(43.32초), PlayMode `LabRopeReconciliationTests` **8/8**, `LabLocalBoardNetworkIntegrationTests` **16/16**을 다시 실행해 통과했다. `GameSceneFlowTests`는 합친 뒤 다시 실행하지 않았다.
 - **종료 상태:** Play OFF, 컴파일 오류 없음.
 - **미실행:** iPhone 실기기·LAN/핫스팟 실제 다기기에서의 5초 주기 끊김 변화와 대역폭 측정. 전체 PlayMode는 실행하지 않았다.
+
+## #437 Bulk 재전송 RTT 적응·중복 ACK 빠른 재전송·백로그 기준 발행 — 2026-11-02
+
+- **기준:** main `b962288d` → `fix/#437-bulk-adaptive-retransmit`. Unity6000.6.5f1/macOS의 연결된 Editor와 이 브랜치로 새로 만든 Lab Mac Development 앱에서 실행했다. iOS 빌드는 만들지 않았다.
+- **배경:** 도색·스냅샷용 Bulk 채널(Unreliable + 자체 재전송)의 재전송 대기가 RTT와 무관하게 0.25초 고정이었고, Guest가 손실 뒤 매 데이터그램마다 같은 ACK를 반복해도 Host가 쓰지 않았다. Host는 피어에게 미확인 조각이 하나라도 있으면 그 피어의 스냅샷·도색 발행을 통째로 건너뛰어(`HasPendingBulk`) 손실이 없어도 ACK 왕복 동안 100 ms 스냅샷이 빠졌고, `paint_resync`도 같은 조건으로 거절했다.
+- **수정:**
+  - `LabBulkSender`: 조각을 한 번만 보낸 경우에만 RTT를 잰다(Karn, 덮은 조각 중 재전송된 것이 있으면 측정 안 함). RFC 6298 `srtt + 4·rttvar`를 0.08~1초로 제한하고, 측정 전에는 기존 0.25초를 쓴다. 시간 초과 재전송마다(한 번의 타임아웃 간격에 한 번) 공유 백오프를 두 배로 하고 다음 유효 측정에서 되돌린다. 같은 조각의 재전송은 1초까지 두 배씩 늘어난다(이전에는 3회에서 멈춤).
+  - 같은 누적 ACK가 세 번 더 오면 선두 미확인 조각을 바로 다시 보낸다(손실 한 번에 한 번). 이미 재전송한 조각의 사본이 만드는 반복 ACK는 그 수만큼(타임아웃 한 번 동안만) 빼고 센다. 봉투 형식은 그대로다.
+  - Host 발행 건너뛰기는 피어 백로그 64 KiB 이상(`BulkBacklogFull`)일 때만 한다. 4 MiB 큐 상한과 중단 경로는 그대로다.
+  - `paint_resync`는 백로그가 가득 찼거나 직전 전체 도색 지도(라운드 시작 지도·체크포인트)가 아직 확인되지 않았을 때만 거절하고, 처리한 요청만 0.5초 스로틀에 기록한다. Guest는 받는 중인 도색 프레임이 1초 동안 새 조각을 받지 못했을 때만(`LabStallWatch`) 재요청한다. 이전에는 받는 중이기만 해도 1초마다 요청했다.
+  - 접속 규약 **5682/Lab43/Game27**, 공유 설정 257개는 그대로다.
+- **검토:** 구현 뒤 코드 검토 워크플로 두 번(관점별 검토 + 지적별 반박 검증)을 돌렸다. 1차에서 확인된 8건(측정 RTO가 RTT 급증 뒤 고정, 갭 복구 ACK의 측정, 재전송 사본 반복 ACK의 오탐, 재전송 1초 미도달, 받는 중 프레임의 전체 지도 요청, 체크포인트 중복 등)과 2차에서 확인된 4건(가장 오래된 조각만 백오프할 때 남는 고착, 반복 ACK 할인 덮어쓰기, 라운드 시작 지도 미추적, 진행 중 프레임 오판)을 고쳤다. 같은 규칙을 옮긴 Python 모델(60 Hz 송신, 100 ms마다 2조각, 20초)에서 RTT 0.05→0.4/0.6초 급증 시 조각당 송신 1.04회로 회복했다(설계 확인용이며 실제 실행 근거가 아님).
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1757/1757 PASS** | 41.56초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.36초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 213.96초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 19.27초 |
+| Lab Mac Development 앱 3프로세스(Host + Client 2, `127.0.0.1:17992`) | **PASS** | 150초 |
+
+- 각 실행의 skip/inconclusive0. 새 검사 `LabBulkAdaptiveRetransmitTests` 15개: 측정 전 고정 0.25초, 첫 측정 RTO와 재전송 배수, 0.08/1초 제한, 재전송 조각·갭 복구 ACK의 측정 제외, 세 번째 반복 ACK의 1회 빠른 재전송, 재전송 사본 반복 ACK 할인(여러 번의 진행 누적과 만료), RTT 급증 뒤 공유 백오프로 측정 회복, 최신 조각 타임아웃의 백오프와 한 창 동시 만료 1회, 재전송 1초 도달, 보낸 것이 하나뿐일 때 미발동, Clear, 체크포인트 추적용 순번, 받는 중 프레임 정체 판정, 백로그 상한. 기존 `LabBulkChannelTests` 고정 스케줄 검사는 그대로 통과했다. PlayMode 세 클래스는 리뷰 1차 수정 뒤 코드에서 실행했고, 2차 수정(백오프 조건·할인 누적·정체 판정·라운드 시작 지도 추적) 뒤에는 전체 EditMode와 Mac 실행만 다시 했다.
+- **Mac 3프로세스:** 이 브랜치로 만든 `Builds/Lab/20261102-223606-5ecfe8d0` 앱을 `--lab-host`/`--lab-join 127.0.0.1`·`--lab-auto-start --lab-auto-generate --lab-auto-transfer`로 실행했다. 세 명 연결·설정 확인·`C6_LAB_START seats=0,1,2` 뒤 두 Client가 Bulk 스냅샷으로 `Playing` 시작과 120초 종료(`Defeat remaining=0`)를 모두 받았다. 자동 전달 요청은 Host·Client에서 승인됐고 `C6_LAB_BULK_INVALID`·`BULK_SEND_FAILED`·`SNAPSHOT_ABORT`·예외는 없었다. 같은 앱의 앞선 75초 실행에서는 한 Client의 첫 자동 행동이 시작 직후 `Restoring board state`로 한 번 거절됐다(조합판 체크포인트가 제어 채널로 도착하기 전, Bulk와 무관한 경로이며 이후 요청은 승인). 이 거절이 main에서도 나는지는 비교하지 않았다. 이 실행은 손실·지연을 넣지 않은 같은 Mac의 localhost이므로 재전송 타이밍 자체는 확인하지 않았다.
+- **종료 상태:** Play OFF, 컴파일 오류 없음, Mac 프로세스 종료.
+- **미실행:** 손실·지연을 넣은 실제 전송, iPhone 실기기·LAN/핫스팟 여러 기기에서의 체감·대역폭 측정. 전체 PlayMode는 실행하지 않았다.

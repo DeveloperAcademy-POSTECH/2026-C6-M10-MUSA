@@ -24,4 +24,26 @@ namespace C6Lab
 
         public void Clear() => acceptedAt.Clear();
     }
+
+    /// <summary>
+    /// Reports when a nonzero value has made no progress for at least the given time; value 0 means nothing to watch.
+    /// The Guest uses it so only a paint frame that received no new fragment for a second asks for a checkpoint (#437).
+    /// </summary>
+    public sealed class LabStallWatch
+    {
+        private readonly double stallSeconds;
+        private long value;
+        private int progress;
+        private double since;
+
+        public LabStallWatch(double stallSeconds) => this.stallSeconds = stallSeconds;
+
+        public bool Stalled(long current, int currentProgress, double now)
+        {
+            if (current != value || currentProgress != progress) { value = current; progress = currentProgress; since = now; }
+            return current != 0 && now - since >= stallSeconds;
+        }
+
+        public void Clear() { value = 0; progress = 0; since = 0d; }
+    }
 }
