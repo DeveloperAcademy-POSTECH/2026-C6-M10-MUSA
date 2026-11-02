@@ -11,6 +11,49 @@ namespace C6Lab.Tests
     public sealed class LabMobilePresentationPolicyTests
     {
         [Test]
+        public void OnlyTheIphonePlayerGetsTheSixtyFrameTargetAndItIsAppliedBeforeAnySceneLoads()
+        {
+            Assert.That(LabMobilePresentationPolicy.PlayerTargetFrameRate, Is.EqualTo(60));
+            Assert.That(LabMobilePresentationPolicy.TargetFrameRateFor(RuntimePlatform.IPhonePlayer), Is.EqualTo(60));
+            foreach (RuntimePlatform kept in new[] { RuntimePlatform.OSXEditor, RuntimePlatform.WindowsEditor,
+                RuntimePlatform.LinuxEditor, RuntimePlatform.OSXPlayer, RuntimePlatform.Android })
+                Assert.That(LabMobilePresentationPolicy.TargetFrameRateFor(kept),
+                    Is.EqualTo(LabMobilePresentationPolicy.KeepTargetFrameRate), kept.ToString());
+            MethodInfo initialize = typeof(LabMobilePresentationPolicy).GetMethod("InitializePlayer",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(initialize, Is.Not.Null);
+            var attribute = initialize.GetCustomAttribute<RuntimeInitializeOnLoadMethodAttribute>();
+            Assert.That(attribute, Is.Not.Null);
+            Assert.That(attribute.loadType, Is.EqualTo(RuntimeInitializeLoadType.BeforeSceneLoad));
+        }
+
+        [Test]
+        public void ApplyingTheTargetOnlyChangesTheIphoneAndTheShippedMobileQualityKeepsVSyncOff()
+        {
+            int before = Application.targetFrameRate;
+            try
+            {
+                Application.targetFrameRate = 37;
+                LabMobilePresentationPolicy.ApplyTargetFrameRate(RuntimePlatform.OSXEditor);
+                Assert.That(Application.targetFrameRate, Is.EqualTo(37), "A kept platform is never touched.");
+                LabMobilePresentationPolicy.ApplyTargetFrameRate(RuntimePlatform.IPhonePlayer);
+                Assert.That(Application.targetFrameRate, Is.EqualTo(60));
+            }
+            finally { Application.targetFrameRate = before; }
+            // targetFrameRate is ignored while vSyncCount != 0, so the saved Mobile level must keep it off.
+            string[] names = QualitySettings.names;
+            int mobile = Array.IndexOf(names, "Mobile");
+            Assert.That(mobile, Is.GreaterThanOrEqualTo(0), string.Join(",", names));
+            int level = QualitySettings.GetQualityLevel();
+            try
+            {
+                QualitySettings.SetQualityLevel(mobile, false);
+                Assert.That(QualitySettings.vSyncCount, Is.EqualTo(0));
+            }
+            finally { QualitySettings.SetQualityLevel(level, false); }
+        }
+
+        [Test]
         public void InteractiveCombatDefersOnlyLeftRightAndBottom()
         {
             var mode = LabMobilePresentationPolicy.SelectGestureMode(LabPhase.Playing,
