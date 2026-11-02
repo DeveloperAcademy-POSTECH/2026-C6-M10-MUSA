@@ -968,6 +968,8 @@ namespace C6Lab
         [SerializeField, Range(.5f, 4f)] private float yaguangFeverDrumPulseRate = 1.6f;
         [Tooltip("피버 중 북을 이 초 안에 연달아 누르면 연타 숫자(x2, x3…)가 이어진다")]
         [SerializeField, Range(.2f, 2f)] private float yaguangFeverTapComboSeconds = .8f;
+        [Tooltip("피버 북 연타 숫자(x2, x3…) 크기 배율 (#441, 1 = 예전 크기, 기본 0.45로 훨씬 작게, 0이면 숨김)")]
+        [SerializeField, Range(0f, 1.5f)] private float yaguangFeverTapCountSize = .45f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1425,6 +1427,7 @@ namespace C6Lab
         public float YaguangFeverDrumPulseScale => Mathf.Clamp(Finite(yaguangFeverDrumPulseScale, .12f), 0f, .5f);
         public float YaguangFeverDrumPulseRate => Mathf.Clamp(Finite(yaguangFeverDrumPulseRate, 1.6f), .5f, 4f);
         public float YaguangFeverTapComboSeconds => Mathf.Clamp(Finite(yaguangFeverTapComboSeconds, .8f), .2f, 2f);
+        public float YaguangFeverTapCountSize => Mathf.Clamp(Finite(yaguangFeverTapCountSize, .45f), 0f, 1.5f);
         public float ComboPopDrumRatio => Mathf.Clamp(Finite(comboPopDrumRatio, .35f), 0f, 2f);
         public float YaguangComboBigBgmSemitones => Mathf.Clamp(Finite(yaguangComboBigBgmSemitones, 2f), 0f, 12f);
         public float YaguangComboSmallBgmSemitones => Mathf.Clamp(Finite(yaguangComboSmallBgmSemitones, 2f), 0f, 12f);

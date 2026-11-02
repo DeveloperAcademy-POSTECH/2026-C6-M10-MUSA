@@ -8,6 +8,7 @@ namespace C6Lab
     /// - 두근두근: 피버 내내 내 판의 북 그림이 심장 박동처럼 "두-근" 두 번씩 커졌다 돌아온다 (LabOrbBoard.SetDrumPulse).
     /// - 연타 숫자: 피버 중 북을 Inspector 간격(기본 0.8초) 안에 연달아 누르면 그 북 옆에 x2, x3…가 오색으로 톡톡 튀어나오고,
     ///   숫자가 클수록 조금씩 커진다. 간격보다 오래 멈추면 사라지고 다시 1부터 센다.
+    /// #441: 연타 숫자는 훨씬 작고 차분하게(Inspector 크기 배율 기본 0.45, 커지는 정도/튀는 정도/흔들림도 줄임).
     /// 화면 표시만 하며 규칙(생성, 스태미나)과 터치는 건드리지 않는다. 박자/크기/간격은 LabConfig Inspector(#414).
     /// </summary>
     [DisallowMultipleComponent]
@@ -56,6 +57,9 @@ namespace C6Lab
             return u < 0f || u > 1f ? 0f : Mathf.Sin(u * Mathf.PI);
         }
 
+        /// <summary>연타 수에 따른 숫자 크기 (크기 배율 전). 연타가 늘수록 아주 조금씩 커지고 1.25배에서 멈춘다 (#441).</summary>
+        public static float TapSize(int count) => Mathf.Min(1.25f, 1f + .025f * Mathf.Max(0, count - 2));
+
         /// <summary>앞 연타 수 count, 마지막으로 누른 시각 lastAt에서 now에 또 누르면 몇 연타인지 (간격 window 안이면 이어서, 아니면 1).</summary>
         public static int NextTapCount(int count, float lastAt, float now, float window) =>
             now - lastAt <= window && count > 0 ? count + 1 : 1;
@@ -97,7 +101,8 @@ namespace C6Lab
 
         private void DrawTap()
         {
-            if (!fever || tapCount < 2 || Time.unscaledTime - lastTapAt > TapWindow)
+            float scale = network != null && network.config != null ? network.config.YaguangFeverTapCountSize : .45f;
+            if (!fever || tapCount < 2 || Time.unscaledTime - lastTapAt > TapWindow || scale <= 0f)
             {
                 if (Time.unscaledTime - lastTapAt > TapWindow) tapCount = 0;
                 HideTap();
@@ -117,19 +122,19 @@ namespace C6Lab
             }
             tapRect.gameObject.SetActive(true);
             tapRect.SetAsLastSibling();
-            float size = Mathf.Min(1.8f, 1f + .08f * (tapCount - 2));
+            float size = scale * TapSize(tapCount);
             float pop = 1f;
             if (tapPopElapsed >= 0f)
             {
                 tapPopElapsed += Time.unscaledDeltaTime;
                 float u = Mathf.Clamp01(tapPopElapsed / .18f);
-                pop = Mathf.Lerp(1.6f, 1f, 1f - (1f - u) * (1f - u));
+                pop = Mathf.Lerp(1.2f, 1f, 1f - (1f - u) * (1f - u));
                 if (tapPopElapsed >= .18f) tapPopElapsed = -1f;
             }
             float left = 1f - (Time.unscaledTime - lastTapAt) / Mathf.Max(.01f, TapWindow);
-            tapRect.anchoredPosition = local + new Vector2(70f, 60f);
+            tapRect.anchoredPosition = local + new Vector2(70f, 60f) * Mathf.Max(.5f, scale);
             tapRect.localScale = Vector3.one * size * pop;
-            tapRect.localRotation = Quaternion.Euler(0f, 0f, -8f + 4f * Mathf.Sin(Time.unscaledTime * 12f));
+            tapRect.localRotation = Quaternion.Euler(0f, 0f, -4f + 1.5f * Mathf.Sin(Time.unscaledTime * 12f));
             tapText.text = "x" + tapCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
             Color color = LabPaintPalette.SrgbColorFor(Colors[tapCount % Colors.Length]);
             color.a = Mathf.Clamp01(left * 3f);
