@@ -31,6 +31,7 @@ namespace C6Lab
     /// - BIG 끝 (Audio/YaguangComboBigEnd): 보상이 끝날 때
     /// - 성공 대사 (Audio/YaguangComboClearedFirst "이런!", Audio/YaguangComboClearedSecond "이럴 수가!"): 콤보 성공 뒤
     ///   Inspector 지연(기본 0.8초). 이번 라운드 첫 성공은 "이런!", 그 뒤 성공은 "이럴 수가!" (이 기기에서 본 성공 수 기준).
+    ///   "이럴 수가!" 폴더가 비어 있으면 "이런!" 파일을 쓴다.
     ///   다음 콤보 결과가 먼저 나오면 앞 결과의 남은 소리는 내지 않는다.
     /// 그 순간보다 LateSeconds 넘게 늦게 알아챈 기기(늦게 들어옴, 일시정지 뒤)는 내지 않는다. 일시정지 중·시작 대기 중에는
     /// 새로 내지 않는다. 폴더가 비어 있으면 그 소리만 조용히 넘어간다(여러 개면 무작위).
@@ -337,7 +338,13 @@ namespace C6Lab
             if (clearedDue && now >= clearedAt)
             {
                 clearedDue = false;
-                if (now - clearedAt <= LateSeconds) Play(ClearedSfx(clearedCount));
+                if (now - clearedAt <= LateSeconds)
+                {
+                    // "이럴 수가!" 파일이 없으면 "이런!"을 그대로 쓴다 (지금은 한 파일로 통일).
+                    LabYaguangSfx line = ClearedSfx(clearedCount);
+                    if (clips != null && ClipCount(line) == 0) line = LabYaguangSfx.ComboClearedFirst;
+                    Play(line);
+                }
             }
             double startAt = resultAt + LabGourdComboHud.ResultSeconds;
             if (effectStartDue && now >= startAt)

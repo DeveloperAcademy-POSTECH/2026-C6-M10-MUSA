@@ -53,6 +53,7 @@
 | `Assets/Lab/Resources/Audio/YaguangComboSmallEnd/YaguangComboSmallEnd.wav` | SMALL이 끝나 공이 원래 크기로 돌아올 때 해금이 위로 튕기는 "뿅↑" (#398 C7, 모든 기기) | AI 생성: [ElevenLabs](https://elevenlabs.io) (2026-11-02 생성, Creator 유료 플랜). Sound Effects | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 원본 wav(0.49초, 스테레오 48kHz)에서 뒤 잡음을 잘라 0.3초로 맞춤(0.22초부터 0.08초 페이드아웃), 모노로 합치고 원본이 작아 가장 큰 순간이 -1dB가 되도록 음량만 키움(+26.8dB). 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/YaguangComboBigStart/YaguangComboBigStart.wav` | 콤보 성공 뒤 BIG 배지가 나오고 부적이 쏟아지기 시작할 때 꽹과리 + 부적 촤르르 (#398 C8, 모든 기기) | AI 생성: [ElevenLabs](https://elevenlabs.io) (2026-11-02 생성, Creator 유료 플랜). Sound Effects | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 원본 wav(1.6초, 스테레오 48kHz)에서 끝 무음을 잘라 1.3초로 맞춤(1.1초부터 0.2초 페이드아웃), 모노로 합치고 가장 큰 순간이 -1dB가 되도록 음량만 키움(+5.0dB). 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/YaguangComboBigEnd/YaguangComboBigEnd.wav` | BIG이 끝날 때 작은 방울과 종이 소리가 잦아드는 소리 (#398 C9, 모든 기기) | AI 생성: [ElevenLabs](https://elevenlabs.io) (2026-11-02 생성, Creator 유료 플랜). Sound Effects | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 원본 wav(1.0초, 스테레오 48kHz)에서 끝 무음을 잘라 0.85초로 맞춤(0.7초부터 0.15초 페이드아웃), 모노로 합치고 원본이 작아 가장 큰 순간이 -1dB가 되도록 음량만 키움(+25.3dB). 44.1kHz 모노 16bit wav |
+| `Assets/Lab/Resources/Audio/YaguangComboClearedFirst/YaguangComboClearedFirst.wav` | 콤보 성공 0.8초 뒤 야광귀가 장난스럽게 칭얼대는 "이런~!" (#426, 모든 기기). 지금은 그 뒤 성공("이럴 수가!" 자리)에도 같은 파일을 쓴다 | AI 생성: [ElevenLabs](https://elevenlabs.io) (2026-11-02 생성, Creator 유료 플랜). Text to Speech (Voice Design으로 만든 야광귀 목소리) | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 원본 mp3(1.65초, 모노 44.1kHz)에서 끝 무음을 잘라 1.36초로 맞춤(1.28초부터 0.08초 페이드아웃), 가장 큰 순간이 -1dB가 되도록 음량만 키움(+5.2dB). 44.1kHz 모노 16bit wav |
 
 **출처 표시 문구 (공공누리 제1유형)**
 
@@ -99,6 +100,6 @@ CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, ComboFail)는 표시 의�
 
 **AI로 만든 소리 (#395)**
 
-`YaguangFlashWarn`, `YaguangFlashGlow`, `YaguangFlashCount`, `YaguangFlashBurst`(#395)와 `YaguangFlashTaunt`, `YaguangFlashCaught`, `YaguangShakeBell`, `YaguangShakeBellFinal`, `YaguangBGM/Yaguang_Stage.wav`(#396), `YaguangComboCount1~4`, `YaguangComboStart`, `YaguangComboTick`, `YaguangComboTickFast`(#397), `YaguangComboTaunt`, `YaguangComboSmallStart`, `YaguangComboSmallEnd`, `YaguangComboBigStart`, `YaguangComboBigEnd`(#398)는 ElevenLabs(Sound Effects, Text to Speech, Music)로 만들었다. 유료(Creator) 플랜으로 만들어 상업적 이용이 가능하다. 크레딧 화면이 생기면 아래 문구를 넣는다.
+`YaguangFlashWarn`, `YaguangFlashGlow`, `YaguangFlashCount`, `YaguangFlashBurst`(#395)와 `YaguangFlashTaunt`, `YaguangFlashCaught`, `YaguangShakeBell`, `YaguangShakeBellFinal`, `YaguangBGM/Yaguang_Stage.wav`(#396), `YaguangComboCount1~4`, `YaguangComboStart`, `YaguangComboTick`, `YaguangComboTickFast`(#397), `YaguangComboTaunt`, `YaguangComboSmallStart`, `YaguangComboSmallEnd`, `YaguangComboBigStart`, `YaguangComboBigEnd`(#398), `YaguangComboClearedFirst`(#426)는 ElevenLabs(Sound Effects, Text to Speech, Music)로 만들었다. 유료(Creator) 플랜으로 만들어 상업적 이용이 가능하다. 크레딧 화면이 생기면 아래 문구를 넣는다.
 
 > 야광귀 섬광 효과음·대사·무당 방울·콤보 카운트·꽹과리·째깍, 야광귀 전투 BGM: ElevenLabs로 제작
