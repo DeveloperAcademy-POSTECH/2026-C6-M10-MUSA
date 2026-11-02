@@ -3818,6 +3818,43 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 기존 야광귀 FBX/추출 클립을 24fps, 1–193프레임의 8초 버전으로 교체. meta GUID 유지. Unity에서 FBX 8초·추출 클립 8초·클립 1개·바인딩 경로 누락 0개 확인. Controller 상태 Speed=1. 게임 통합/실기기/자동 테스트는 미실행.
 
 
+## 2026-11-03 — Stage 2 야광귀 배경 세트 첫 배치
+
+- 연결된 Unity 6000.6.5f1 Editor에서 Battle에 Stage02 전용 Studio·Ground·Board Backing과 독립 재질을 저장했다. 원본 PNG 11개를 별도 Stage02 폴더로 가져왔으며 기본 배경과 Lab Scene·게임 규칙·카메라·물리·통신 설정은 유지했다.
+- EditMode: GameStageBackgroundAssetTests, GameBackgroundAnimationAssetTests, GameSceneAssetTests **12/12 PASS**, 1.71초. 기존 기본 배경과 저장 Lab 에셋/카드 Transform 보존, PNG 연결, 재질 분리, Stage 1/2/3 반복 선택, 기본 fallback, 충돌 없는 장식, 구름·나비 애니메이션 연결을 확인했다. 초기 검사에서 비활성 legacy 카드 placeholder의 빈 컴포넌트 및 이름의 slash에 의한 나비 탐색 문제를 확인하고 보완한 뒤 통과했다.
+- PlayMode: GameSceneFlowTests.PausedDeveloperNextStageUsesSavedButtonAndFreshBattlesWithoutApplyingUnsavedFields **1/1 PASS**, 15.94초. 실제 저장 Home에서 시작해 Stage 1→2→3으로 새 Battle을 로드할 때 Stage 2만 밤 배경이 활성화되는 assertion을 추가해 확인했다.
+- 전투 카메라 렌더 및 P1~P5 방향의 배경 전용 렌더를 확인했다. 최초 도깨비불이 각 좌석의 중앙 박 뒤에 겹쳐 보이지 않아 반경11·높이2.2·시작각0으로 이동하고 5방향 렌더를 다시 만들었다. 카메라 위치·회전·viewport·RenderTexture는 캡처 뒤 복원했다. 해당 렌더는 HUD를 포함한 실기기 화면 검수가 아니다.
+- 종료: Play OFF, Battle Scene의 Stage 2 편집 미리보기 저장. Stage Backgrounds Inspector에서 Stage 1/2/3 미리보기 가능. PNG 폴더 자동 분류 UI, 새 Mac/iOS 빌드·다중 앱·실기기 검증은 수행하지 않았다. 구름 원본 가장자리의 일부 잘림과 밝은 기존 바닥/HUD의 밤 색감은 후속 미술 조정 대상이다.
+
+### 2026-11-03 — Stage 2 바위소나무를 기와집·호롱불로 교체
+
+- Stage 2 바위소나무 그룹만 비활성화하고, 기존 Hanok 2개를 신발이 놓인 새 PNG로 교체하여 해당 두 위치로 옮겼다. 노란 호롱불은 각 집 옆1개, 총2개. 원본 파일·기본 배경·Stage1/3과 게임 코드는 유지했다. 점등 애니메이션은 미구현.
+- EditMode 관련3클래스 **12/12 PASS**(1.71초), 실제1→2→3 전환 PlayMode **1/1 PASS**(15.77초). 업데이트된 에셋 검사에서 Stage2 바위소나무 OFF·새 한옥2개·호롱불2개를 확인했다.
+- 최종 P1~P5 배경 전용 렌더에서 위치·겹침·접지를 확인. Play OFF, Battle의 Stage2 미리보기 저장. 컴파일 오류0. 새 빌드·실기기 검증은 미실행.
+
+- 2026-11-03 후속: Stage2 GhostFlame 장식 그룹의 visible 및 activeSelf를 false로 저장. 저장 씬을 다시 열어 그룹 및 하위5개 불꽃이 activeInHierarchy=false임을 확인한다. 미술 표시 토글만 변경하며 자동 테스트는 재실행하지 않는다.
+
+### 2026-11-03 — Stage 2 은은한 눈
+
+- 기본 ParticleSystem과 URP Particles/Unlit 투명 재질·절차적 부드러운 점 텍스처를 Stage2 전용으로 저장했다. 기본 배경·도깨비불 OFF·기와집/호롱불을 보존한다. 18초 시뮬레이션에서88개 파티클 및 배경 전용 렌더를 확인했다. 새 스크립트는 없다.
+- 관련 EditMode **12/12 PASS**(1.55초), 저장 Scene의1→2→3 전환 PlayMode **1/1 PASS**(15.84초). 컴파일 오류 없음. 최종 저장 씬을 다시 열어 loop/playOnAwake 및 충돌/조명OFF를 확인했다. 실기기 시인성·성능은 미실행.
+
+### 2026-11-03 — Stage 2 반딧불이 한 쌍
+
+- Stage2에 정확히2개 반딧불이와32초 loop clip, 작은 노란 core/halo, .65초 투명 잔상을 저장. loop·전체 커브 바인딩 경로·2개체 참조 및 잔상 끝 alpha0을 확인했고0/8/16/24초 샘플에서 약.76 간격을 확인했다. 6초 샘플 배경 렌더에서 두 노란 점을 확인하고 시작 pose/카메라를 복원했다.
+- 관련 EditMode **12/12 PASS**(1.89초), 저장1→2→3 전환 PlayMode **1/1 PASS**(15.68초). 컴파일 오류 없음. 실제 다중 기기 시인성/성능은 미실행. Play OFF, Battle Stage2 편집 미리보기.
+
+- 2026-11-03 반딧불이 시인성 피드백: core3배·halo2.4배 및 밝기/잔상폭을 높이고 Animator 상태속도를2.2배로 저장. 최종 카메라 렌더에서 두 노란 빛의 확대를 확인했고 저장 씬 재오픈 후 크기.45·상태속도2.2를 확인했다. 컴파일 오류0. 가역적인 미술 수치 변경으로 자동 검사는 재실행하지 않았다.
+
+- 2026-11-03 기와집 부유 피드백: 두 Hanok 카드의 높이를2.8→2.23으로 조정. 최종 전투 카메라 렌더에서 집 아래 어두운 틈이 사라지고 돌기단/신발이 지면과 이어짐을 확인했다. 저장 씬 재오픈 후 그룹/두 카드 높이 일치를 확인했다. 위치만 변경하여 자동 검사는 재실행하지 않았다.
+
+### 2026-11-03 — Stage 2 지나가는 발자국
+
+- 절차적 짚신 밑창 마스크·투명 재질·14개 바닥 Quad·10초 반복 alpha clip을 저장. 전체 자국 바인딩과7초 이후 alpha0을 확인하고2.2초 샘플 렌더에서 좌우교대 발자국이 바닥에 보임을 확인했다. 원근에 작게 보이던 초기 위치/크기를 앞쪽으로 옮겨 확대했다.
+- 관련 EditMode **12/12 PASS**(1.90초), 실제 저장1→2→3 전환 PlayMode **1/1 PASS**(15.84초). 종료 시 애니메이션 시작값/카메라 복원, Battle Stage2 미리보기 저장. 실기기 검증은 미실행.
+
+- 2026-11-03 발자국 경로 피드백: 전경→기와집 문 앞 경로 및 밑창 방향으로 변경.2.2초 카메라 렌더에서 화면 아래쪽부터 집까지 이어짐을 확인하고 시작 상태로 복원, 저장 씬 재오픈 후 양 끝 위치 확인. Transform만 바꿔 자동 검사는 재실행하지 않았다.
+
 ## #427 지귀 A/B 예고 음성과 외침 발동 연결 — 2026-11-02
 
 - **기준:** main `79a96817` → `feat/#427-jigwi-pattern-shout-cues`. 작업 중 데스크탑 프로젝트가 별도 #428 작업 브랜치로 전환된 것을 감지해, 이번 소유 파일을 해시 확인 후 별도 작업트리로 옮겼다. 데스크탑은 #428 수정만 남겼으며 그 브랜치·진행 파일·기존 스태시9개를 보존했다. 이번 전용 Unity6000.6.5f1/macOS/Metal **batch Editor**에서 검사했으며 사용자 Editor의 Scene을 저장하거나 전환하지 않았다.

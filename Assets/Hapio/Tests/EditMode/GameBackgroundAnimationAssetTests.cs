@@ -19,7 +19,7 @@ namespace Hapio.Tests
             try
             {
                 LabBackgroundStudio studio = scene.GetRootGameObjects()
-                    .SelectMany(root => root.GetComponentsInChildren<LabBackgroundStudio>(true)).Single();
+                    .SelectMany(root => root.GetComponentsInChildren<LabBackgroundStudio>(true)).Single(studio => studio.name == "Background Studio");
                 Transform generated = studio.transform.Find("Generated Background");
                 Assert.That(generated, Is.Not.Null);
                 foreach (string rootName in new[] { "Clouds / 구름 순환", "Butterflies / 배경 나비" })
