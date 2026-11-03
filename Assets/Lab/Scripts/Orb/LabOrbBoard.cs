@@ -165,6 +165,10 @@ namespace C6Lab
         private const float BombOpenSmokeScale = 2.2f;
         private readonly Dictionary<string, Entry> entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private readonly HashSet<string> spawnedIds = new HashSet<string>(StringComparer.Ordinal);
+        // A Guest tap that was certain to be approved already played its spawn feedback (#457). The pending generation
+        // keeps a credit until its receipt; an approved one moves to the new orb's ID, so that orb pops silently.
+        private readonly HashSet<string> generationCredits = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> spawnFeedbackCredits = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> unlockEffectIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> expectedDrops = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<string, CombinePreview> combinePreviews = new Dictionary<string, CombinePreview>(StringComparer.Ordinal);
@@ -548,7 +552,7 @@ namespace C6Lab
                 StartArrival(entry, arrival, stopAt, normalizedPosition.x);
             if (playSpawn && spawnedIds.Add(id))
             {
-                SpawnStarted?.Invoke(id);
+                if (!spawnFeedbackCredits.Remove(id)) SpawnStarted?.Invoke(id);
                 // The orb flies on its launch at once, so a burst never waits. For the short pop it
                 // passes through other orbs and drums (walls still stop it), so orbs leaving together
                 // cannot jam on each other or shove the drum.
@@ -1174,6 +1178,32 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// Play the spawn feedback for a pending generation now, because its approval is certain (#457). Its receipt
+        /// either moves the credit to the new orb (<see cref="ResolveGenerationCredit"/>) or drops it.
+        /// </summary>
+        public bool AnnounceGenerationPreview(string temporaryId)
+        {
+            if (temporaryId == null || !generationPreviews.ContainsKey(temporaryId) || !generationCredits.Add(temporaryId))
+                return false;
+            SpawnStarted?.Invoke(temporaryId);
+            return true;
+        }
+
+        /// <summary>The approved orb of an announced generation appears without a second spawn sound or vibration.</summary>
+        public void ResolveGenerationCredit(string temporaryId, string orbId)
+        {
+            if (temporaryId != null && generationCredits.Remove(temporaryId) && !string.IsNullOrEmpty(orbId)
+                && !spawnedIds.Contains(orbId))
+                spawnFeedbackCredits.Add(orbId);
+        }
+
+        /// <summary>A rejected, burnt, rolled back or purged generation leaves nothing to suppress.</summary>
+        public void DropGenerationCredit(string temporaryId)
+        {
+            if (temporaryId != null) generationCredits.Remove(temporaryId);
+        }
+
         public bool RemoveGenerationPreview(string temporaryId)
         {
             if (temporaryId == null || !generationPreviews.TryGetValue(temporaryId, out GenerationPreview preview)) return false;
@@ -1342,6 +1372,7 @@ namespace C6Lab
                 Retire(entry);
             entries.Clear();
             spawnedIds.Clear();
+            generationCredits.Clear(); spawnFeedbackCredits.Clear();
             unlockEffectIds.Clear();
             expectedDrops.Clear();
             combinePreviews.Clear();

@@ -8,7 +8,8 @@ namespace C6Lab
     /// Chuimsae Min Gap 번만큼 장구만 내서 연달아 나오지 않는다.
     /// 장구는 Resources/Audio/Generate, 추임새는 Resources/Audio/GenerateVoice 폴더의 파일을 쓰고,
     /// 각 종류 안에서는 무작위로 고르되 같은 소리는 연속으로 나오지 않는다. 목소리 파일이 없으면 장구만 낸다.
-    /// 생성이 거절되면 구슬이 생기지 않으므로 소리도 나지 않는다.
+    /// 생성이 거절되면 구슬이 생기지 않으므로 소리도 나지 않는다. 다만 Guest가 승인이 확실한 탭(스태미나·보관 한도로 판단)을
+    /// 하면 Host 응답 전에 바로 한 번 내고, 그 구슬이 나타날 때는 다시 내지 않는다(#457). 드물게 그 뒤 거절되면 소리만 먼저 난다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabGenerateSound : MonoBehaviour
