@@ -85,11 +85,14 @@ namespace Hapio.Tests
             Assert.That(drift.clouds.Length, Is.EqualTo(4));
             Assert.That(title.GetComponent<TitleArtCover>().referenceSize, Is.EqualTo(new Vector2(402, 874)),
                 "#467: the title art fills screens of any ratio.");
+            Assert.That(drift.width, Is.EqualTo(402));
             foreach (var cloud in drift.clouds)
             {
-                Assert.That(cloud.distance, Is.GreaterThan(0));
-                Assert.That(cloud.seconds, Is.InRange(10f, 20f), "#467: a lively drift, about 3x the old 32~44 s sway.");
+                Assert.That(cloud.speed, Is.InRange(8f, 30f), "#467: a steady one-way drift across the title.");
+                Assert.That(cloud.reverse, Is.False, "Left, with the wind that blows the flag and the leaves.");
                 Assert.That(cloud.target.GetComponentInChildren<UnityEngine.UI.Image>(true).sprite, Is.Not.Null);
+                Assert.That(cloud.target.GetSiblingIndex(), Is.LessThan(title.transform.Find("합이오").GetSiblingIndex()),
+                    "Clouds pass behind the name.");
             }
             Assert.That(drift.clouds[0].target.anchoredPosition, Is.EqualTo(new Vector2(-182, -257)));
             Assert.That(drift.clouds[1].target.anchoredPosition, Is.EqualTo(new Vector2(193, -67)));

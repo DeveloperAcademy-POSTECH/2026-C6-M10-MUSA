@@ -8,27 +8,40 @@ namespace Hapio.Tests
 {
     public sealed class StoryTitleTests
     {
+        // #467: one way across, then back in from the other side as soon as the cloud has fully left.
         [UnityTest]
-        public IEnumerator CloudsStayBoundedMoveInOppositeDirectionsAndRestoreWhenReenabled()
+        public IEnumerator CloudsDriftOneWayComeBackFromTheOtherSideAndRestoreWhenReenabled()
         {
             var root = new GameObject("Cloud test");
             var left = new GameObject("Left", typeof(RectTransform)).GetComponent<RectTransform>();
             var right = new GameObject("Right", typeof(RectTransform)).GetComponent<RectTransform>();
             left.SetParent(root.transform, false); right.SetParent(root.transform, false);
-            left.anchoredPosition = new Vector2(-182, -257); right.anchoredPosition = new Vector2(193, -67);
+            left.pivot = right.pivot = new Vector2(0, 1);
+            left.sizeDelta = new Vector2(459, 153); right.sizeDelta = new Vector2(145, 91);
+            left.anchoredPosition = new Vector2(-182, -257); right.anchoredPosition = new Vector2(15, -9);
             var drift = root.AddComponent<TitleCloudDrift>();
             drift.clouds = new[] {
-                new TitleCloudDrift.Cloud {target=left,distance=24,seconds=40},
-                new TitleCloudDrift.Cloud {target=right,distance=20,seconds=40,reverse=true}
+                new TitleCloudDrift.Cloud {target=left,speed=16},
+                new TitleCloudDrift.Cloud {target=right,speed=10,reverse=true}
             };
             float clock = Time.timeScale;
             try
             {
                 drift.Sample(0); drift.Sample(10);
-                Assert.That(left.anchoredPosition, Is.EqualTo(new Vector2(-158, -257)));
-                Assert.That(right.anchoredPosition, Is.EqualTo(new Vector2(173, -67)));
+                Assert.That(left.anchoredPosition, Is.EqualTo(new Vector2(-342, -257)), "Left with the wind, height kept.");
+                Assert.That(right.anchoredPosition, Is.EqualTo(new Vector2(115, -9)), "Reverse goes right.");
+                drift.Sample(17.375f); // 278 travelled: 1 past fully gone on the left, so 1 inside the right edge
+                Assert.That(left.anchoredPosition.x, Is.EqualTo(401).Within(.01f), "Back in from the right edge at once.");
+                drift.Sample(38.75f); // 387.5 travelled: half a point past the right edge, so entering from the left
+                Assert.That(right.anchoredPosition.x, Is.EqualTo(-144.5f).Within(.01f));
+                for (float t = 0; t < 200; t += .7f)
+                {
+                    drift.Sample(t);
+                    Assert.That(left.anchoredPosition.x, Is.InRange(-459f, 402f), "Never further off than one cloud width.");
+                    Assert.That(right.anchoredPosition.x, Is.InRange(-145f, 402f));
+                }
+                Assert.That(TitleCloudDrift.Wrap(-182, -861, 459, 402), Is.EqualTo(-182).Within(.01f), "A full lap returns to the start.");
                 drift.Sample(4000);
-                Assert.That(left.anchoredPosition.x, Is.EqualTo(-182).Within(.01f));
                 root.SetActive(false);
                 Assert.That(left.anchoredPosition, Is.EqualTo(new Vector2(-182, -257)));
                 left.anchoredPosition = new Vector2(-100, -200);
@@ -36,7 +49,7 @@ namespace Hapio.Tests
                 Assert.That(left.anchoredPosition, Is.EqualTo(new Vector2(-100, -200)));
                 Time.timeScale = 0;
                 yield return null; yield return null;
-                Assert.That(left.anchoredPosition.x, Is.GreaterThan(-100), "Clouds must continue with a paused game clock.");
+                Assert.That(left.anchoredPosition.x, Is.LessThan(-100), "Clouds must continue with a paused game clock.");
                 Assert.That(left.anchoredPosition.y, Is.EqualTo(-200));
             }
             finally { Time.timeScale = clock; Object.Destroy(root); }

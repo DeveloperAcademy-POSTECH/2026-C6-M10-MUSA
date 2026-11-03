@@ -4472,3 +4472,24 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
   - EditMode `StoryWorkspaceTests.TitleLeavesFallInFrontOfTheCloudsWithTheFlagsGust`
   - PlayMode `StoryTitleTests.LeavesRecycleInsideTheTitleBlowLeftInAGustAndRestartTheSame`(게임 시계 0에서도 움직이는지 포함)
 - **미실행:** Play에서 실제 움직임 느낌, iPhone 실기기 성능(나뭇잎 9장 매 프레임 이동).
+
+### #467 5단계: 구름이 한 방향으로 흘러가 반대쪽에서 다시 등장 — 2026-11-03
+
+- **기준:** `cfaaa6ae`(4단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 프리팹 수정, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **요청:** 좌우 왕복 대신 한쪽으로 쭉 이동한 뒤 다시 등장.
+- **바꾼 것:**
+  - `TitleCloudDrift`의 `distance`·`seconds`를 지우고 `speed`(초당 이동)와 `width`(지나가는 폭 402)를 추가했다. `reverse`는 오른쪽으로 흐르게 하는 뜻으로 바꿨다.
+  - 위치는 `Wrap`으로 계산한다. 구름 왼쪽 끝이 [−구름 폭, 402) 안에서 돌기 때문에, 완전히 나간 순간 반대쪽 가장자리에 닿아 있다.
+  - 프리팹은 구름 4개 모두 왼쪽(속도 16·12·20·14)이다. 합이오 글자를 구름 뒤(순서 6)로 옮겨 구름이 글자 뒤로 지나가게 했다.
+  - `StoryTitleBuilder`의 새로 만들기도 같은 값과 순서를 쓴다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| 프리팹 diff | **PASS** — 구름 값(`speed`·`reverse`·`width`)과 글자 순서만 바뀜 |
+| Editor 안 화면 그리기 0 · 12 · 24 · 36초 | **PASS** — 구름이 모두 왼쪽으로 흐르고, 가운데 큰 구름은 왼쪽으로 나간 뒤 24초에 오른쪽에서 들어온다. 작은 구름도 같다. 위쪽 큰 구름이 글자 뒤로 지나간다 |
+
+- **검사 변경 (NOT_RUN):**
+  - PlayMode `StoryTitleTests.CloudsStayBoundedMoveInOppositeDirectionsAndRestoreWhenReenabled`를 `CloudsDriftOneWayComeBackFromTheOtherSideAndRestoreWhenReenabled`로 바꿨다. 10초 위치, 다 나간 직후 반대쪽 진입(401, −144.5), 200초 동안 범위, 한 바퀴 복귀, 복원, 게임 시계 0에서 왼쪽 이동을 확인한다.
+  - EditMode `AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`는 속도 8~30·왼쪽·글자보다 뒤를 확인한다.
+- **미실행:** Play에서 흐름 속도 느낌, iPhone 실기기.

@@ -458,11 +458,11 @@ RectTransform:
   m_Children:
   - {fileID: 1687228938123012630}
   - {fileID: 9127300480244105124}
-  - {fileID: 2300729591581244778}
   - {fileID: 1087842139303391096}
   - {fileID: 7907387035352142869}
   - {fileID: 5873589256742553043}
   - {fileID: 5410035902355965275}
+  - {fileID: 2300729591581244778}
   - {fileID: 8189687057298735962}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -497,23 +497,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db7ac35441b1e4896b330092ea3cfecf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.TitleCloudDrift
+  width: 402
   clouds:
   - target: {fileID: 1087842139303391096}
-    distance: 30
-    seconds: 14
+    speed: 16
     reverse: 0
   - target: {fileID: 7907387035352142869}
-    distance: 26
-    seconds: 16
-    reverse: 1
+    speed: 12
+    reverse: 0
   - target: {fileID: 5873589256742553043}
-    distance: 16
-    seconds: 12
+    speed: 20
     reverse: 0
   - target: {fileID: 5410035902355965275}
-    distance: 14
-    seconds: 13
-    reverse: 1
+    speed: 14
+    reverse: 0
 --- !u!114 &6854476936464384518
 MonoBehaviour:
   m_ObjectHideFlags: 0

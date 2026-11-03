@@ -39,17 +39,18 @@ namespace Hapio.Editor
             try
             {
                 Image(root.transform, "Paper Landscape", new Rect(0, 0, 402, 874), "a763a.png");
+                // #467: clouds drift left with the wind across the whole width, so the name is drawn in front of them.
+                var tracks = new List<TitleCloudDrift.Cloud>();
+                Cloud(root.transform, tracks, "Cloud Left", new Rect(-182, 257, 459, 153), "5e97a.png", 16);
+                Cloud(root.transform, tracks, "Cloud Right", new Rect(193, 67, 459, 153), "5e97a.png", 12);
+                Cloud(root.transform, tracks, "Cloud Lower", new Rect(233, 766, 218, 87), "4c1b0.png", 20);
+                Cloud(root.transform, tracks, "Cloud Upper", new Rect(15, 9, 145, 91), "31590.png", 14);
+                root.GetComponent<TitleCloudDrift>().clouds = tracks.ToArray();
                 var logo = StoryWorkspaceBuilder.Rect("합이오", root.transform, new Rect(82, 164, 238, 113)).gameObject.AddComponent<Text>();
                 logo.font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/ShillaCultureBold.otf");
                 logo.fontSize = 96; logo.text = "합이오"; logo.color = Color.black;
                 logo.alignment = TextAnchor.MiddleLeft; logo.horizontalOverflow = HorizontalWrapMode.Overflow;
                 logo.verticalOverflow = VerticalWrapMode.Overflow; logo.raycastTarget = false;
-                var tracks = new List<TitleCloudDrift.Cloud>();
-                Cloud(root.transform, tracks, "Cloud Left", new Rect(-182, 257, 459, 153), "5e97a.png", 24, 38, false);
-                Cloud(root.transform, tracks, "Cloud Right", new Rect(193, 67, 459, 153), "5e97a.png", 20, 44, true);
-                Cloud(root.transform, tracks, "Cloud Lower", new Rect(233, 766, 218, 87), "4c1b0.png", 12, 32, false);
-                Cloud(root.transform, tracks, "Cloud Upper", new Rect(15, 9, 145, 91), "31590.png", 10, 36, true);
-                root.GetComponent<TitleCloudDrift>().clouds = tracks.ToArray();
                 PrefabUtility.SaveAsPrefabAsset(root, TitlePath);
             }
             finally { Object.DestroyImmediate(root); }
@@ -137,10 +138,10 @@ namespace Hapio.Editor
         }
 
         private static void Cloud(Transform parent, List<TitleCloudDrift.Cloud> tracks, string name, Rect box,
-            string image, float distance, float seconds, bool reverse)
+            string image, float speed)
         {
             var frame = Image(parent, name, box, image);
-            tracks.Add(new TitleCloudDrift.Cloud { target = frame, distance = distance, seconds = seconds, reverse = reverse });
+            tracks.Add(new TitleCloudDrift.Cloud { target = frame, speed = speed });
         }
 
         private static RectTransform Image(Transform parent, string name, Rect box, string file)
