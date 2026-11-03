@@ -83,6 +83,8 @@ namespace Hapio.Tests
             var title = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Hapio/Story/AnimatedTitle.prefab");
             var drift = title.GetComponent<TitleCloudDrift>();
             Assert.That(drift.clouds.Length, Is.EqualTo(4));
+            Assert.That(title.GetComponent<TitleArtCover>().referenceSize, Is.EqualTo(new Vector2(402, 874)),
+                "#467: the title art fills screens of any ratio.");
             foreach (var cloud in drift.clouds)
             {
                 Assert.That(cloud.distance, Is.GreaterThan(0));

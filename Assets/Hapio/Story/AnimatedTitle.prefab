@@ -236,6 +236,7 @@ GameObject:
   - component: {fileID: 2651498663020759336}
   - component: {fileID: 8121947810861207003}
   - component: {fileID: 4806445881070166951}
+  - component: {fileID: 6854476936464384518}
   m_Layer: 0
   m_Name: AnimatedTitle
   m_TagString: Untagged
@@ -311,6 +312,19 @@ MonoBehaviour:
     distance: 10
     seconds: 36
     reverse: 1
+--- !u!114 &6854476936464384518
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3021991755688719118}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6aec18fab1d148c596ce1ef6e44a9a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.TitleArtCover
+  referenceSize: {x: 402, y: 874}
 --- !u!1 &4348296627439685302
 GameObject:
   m_ObjectHideFlags: 0

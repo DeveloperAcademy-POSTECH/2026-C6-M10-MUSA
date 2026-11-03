@@ -43,6 +43,43 @@ namespace Hapio.Tests
             yield return null;
         }
 
+        // #467: the page is fitted inside the screen (GameLobbyView), so its art must still reach every edge.
+        [TestCase(375, 667)] [TestCase(375, 812)] [TestCase(393, 852)] [TestCase(402, 874)] [TestCase(440, 956)] [TestCase(360, 820)]
+        public void TitleArtCoversTheWholeScreenWhileItsPageStaysFittedInside(float width, float height)
+        {
+            var screenObject = new GameObject("Screen", typeof(RectTransform), typeof(Canvas));
+            try
+            {
+                screenObject.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+                var screen = (RectTransform)screenObject.transform;
+                screen.sizeDelta = new Vector2(width, height); screen.localScale = Vector3.one * 3;
+                var page = new GameObject("Page", typeof(RectTransform)).GetComponent<RectTransform>();
+                page.SetParent(screen, false); page.sizeDelta = new Vector2(402, 874);
+                page.localScale = Vector3.one * Mathf.Min(width / 402, height / 874);
+                var art = new GameObject("Art", typeof(RectTransform)).GetComponent<RectTransform>();
+                art.SetParent(page, false); art.anchorMin = Vector2.zero; art.anchorMax = Vector2.one; art.sizeDelta = Vector2.zero;
+                var logo = new GameObject("Logo", typeof(RectTransform)).GetComponent<RectTransform>();
+                logo.SetParent(art, false); logo.anchorMin = logo.anchorMax = logo.pivot = new Vector2(0, 1);
+                logo.anchoredPosition = new Vector2(82, -164); logo.sizeDelta = new Vector2(238, 113);
+                art.gameObject.AddComponent<TitleArtCover>().Apply();
+
+                var a = new Vector3[4]; art.GetWorldCorners(a);
+                var s = new Vector3[4]; screen.GetWorldCorners(s);
+                const float pixel = .01f;
+                Assert.That(a[0].x, Is.LessThanOrEqualTo(s[0].x + pixel)); Assert.That(a[0].y, Is.LessThanOrEqualTo(s[0].y + pixel));
+                Assert.That(a[2].x, Is.GreaterThanOrEqualTo(s[2].x - pixel)); Assert.That(a[2].y, Is.GreaterThanOrEqualTo(s[2].y - pixel));
+                Assert.That(Mathf.Min(a[2].x - a[0].x - (s[2].x - s[0].x), a[2].y - a[0].y - (s[2].y - s[0].y)),
+                    Is.EqualTo(0).Within(pixel), "Grown only until it covers, so one side fits exactly.");
+                Assert.That(Vector3.Distance((a[0] + a[2]) * .5f, (s[0] + s[2]) * .5f), Is.LessThan(pixel),
+                    "Cropped evenly around the screen centre.");
+                Assert.That(page.localScale.x, Is.EqualTo(Mathf.Min(width / 402, height / 874)), "The page with the buttons keeps its fit.");
+                Assert.That(logo.anchoredPosition, Is.EqualTo(new Vector2(82, -164)), "The authored layout inside the art is untouched.");
+                var l = new Vector3[4]; logo.GetWorldCorners(l);
+                Assert.That(l[0].x >= s[0].x && l[2].x <= s[2].x && l[0].y >= s[0].y && l[2].y <= s[2].y, Is.True, "The title name stays on screen.");
+            }
+            finally { Object.DestroyImmediate(screenObject); }
+        }
+
         [UnityTest]
         public IEnumerator TitleWaitsForTheStartButtonAndCanReturnWithoutOldStoryViews()
         {

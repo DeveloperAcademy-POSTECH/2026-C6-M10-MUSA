@@ -33,7 +33,8 @@ namespace Hapio.Editor
         private static void CreateTitle()
         {
             if (AssetDatabase.LoadAssetAtPath<GameObject>(TitlePath) != null) return;
-            var root = new GameObject("Animated Title", typeof(RectTransform), typeof(RectMask2D), typeof(TitleCloudDrift));
+            var root = new GameObject("Animated Title", typeof(RectTransform), typeof(RectMask2D), typeof(TitleCloudDrift),
+                typeof(TitleArtCover));
             Stretch((RectTransform)root.transform);
             try
             {

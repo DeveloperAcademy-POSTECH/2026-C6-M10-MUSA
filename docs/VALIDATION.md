@@ -4380,3 +4380,31 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
   - 시각 20 전 단언이 프레임 실행 없이 통과하던 문제를 고쳤다.
 - **남은 검사 공백:** Host 분기와 나머지 8개 소비자는 소비자별 검사가 없다. 각 소비자는 공유 시계를 한 줄로 읽으며, 시계 규칙은 `LabGuestBattleClockTests`·`LabJigwiABPresentationTests`가 검사한다.
 - **미실행:** Guest 실기기에서 늦은 스냅샷·일시정지 때 HUD 숫자와 효과음이 튀지 않는지 확인하지 않았다.
+
+## #467 타이틀 화면 비율 자동 맞춤 (1단계: 흰선) — 2026-11-03
+
+- **기준:** main `2ab6b3c3` → `feat/#467-title-fit-wind`. Unity6000.6.5f1/macOS의 연결된 Editor에서 컴파일과 Editor 계산 확인만 했다. Play·Test Runner·앱 빌드·iOS 실기기는 실행하지 않았다.
+- **원인:** Home 페이지는 402×874 설계를 화면 안에 다 들어가게 줄인다(`GameLobbyView.FitScreen`). 비율이 다른 폰에서는 남는 띠로 뒤의 예전 로비 그림(밝은 종이)이 보였다. 새 타이틀 양끝의 어두운 나무 기둥 옆이라 흰선처럼 보였다.
+- **수정:** 새 `TitleArtCover`를 `AnimatedTitle.prefab` 루트에 Editor API로 붙였다.
+  - 그림만 화면 가운데 기준으로 화면을 덮을 때까지 키운다.
+  - 버튼이 있는 페이지 배율, 그림 안의 배치, 구름 움직임, Scene은 바꾸지 않았다.
+  - `StoryTitleBuilder`도 새로 만들 때 같은 부품을 붙인다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| Editor 계산: 실제 프리팹을 폰 크기별 화면에 놓고 수정 전 띠와 수정 후 넘침을 쟀다 | **PASS** — 아래 표 |
+
+| 화면(pt) | 수정 전 띠 | 수정 후 그림 넘침 | 합이오 글자 |
+| --- | --- | --- | --- |
+| SE 375×667 | 양옆 34.11 | 위아래 74.15씩 | 화면 안 (위에서 78.8) |
+| 13 mini 375×812 | 양옆 0.76 | 위아래 1.65씩 | 화면 안 |
+| 15 393×852 | 양옆 0.56 | 위아래 1.22씩 | 화면 안 |
+| 16 Pro 402×874 | 없음 | 없음 | 화면 안 |
+| 16 Pro Max 440×956 | 양옆 0.14 | 위아래 0.31씩 | 화면 안 |
+| 더 긴 화면 360×820 | 위아래 18.66 | 양옆 8.58씩 | 화면 안 |
+
+- **새 검사 (NOT_RUN):**
+  - PlayMode `StoryTitleTests.TitleArtCoversTheWholeScreenWhileItsPageStaysFittedInside`(위 6개 비율)는 그림이 네 변을 다 덮는지, 한 변은 꼭 맞는지, 가운데 기준인지를 확인한다. 페이지 배율·글자 배치가 그대로이고 글자가 화면 안인지도 확인한다.
+  - EditMode `StoryWorkspaceTests.AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`에 프리팹 부품 확인을 추가했다.
+- **미실행:** Play에서 Game 뷰 비율을 바꿔 보는 확인, iPhone 실기기 확인.
